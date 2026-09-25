@@ -493,7 +493,8 @@ theorem cr_copyout (EC : EITHER_COPYOUT) (c : CPU) (k' : KCtx) (γl : GName) (γ
               umMapped P' (k'.regs 11#5).toNat [b].length) ∨
            (R' 10#5 = -1#64 ∧ ∃ d, d < [b].length ∧
               M' = umemWrite (viewFaulted P P' Mi) (k'.regs 11#5).toNat ([b].take d) ∧
-              umMapped P' (k'.regs 11#5).toNat d))⌝ ∗
+              umMapped P' (k'.regs 11#5).toNat d ∧
+              ¬ uvaWmapped P (k'.regs 11#5 + BitVec.ofNat 64 d).toNat))⌝ ∗
         procPrivExt (procAddr j) pid V P' M') -∗
       ⌜calleeSaved k'.regs R'⌝ -∗ wpLoop cpu'))
     ⊢ wpLoop (GF := GF) c := by

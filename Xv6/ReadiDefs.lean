@@ -250,7 +250,7 @@ theorem rd_copyout (EC : EITHER_COPYOUT) (c : CPU) (k' : KCtx) (γkl : GName) (�
     · ipureintro
       rw [ha1] at harm
       have hext' := UMemL.extSz_trans hext0 hext
-      rcases harm with ⟨hr, hM, hmap⟩ | ⟨hr, d, hd, hM, hmap⟩
+      rcases harm with ⟨hr, hM, hmap⟩ | ⟨hr, d, hd, hM, hmap, -⟩
       · refine Or.inl ⟨hr, fun _ => ⟨hext', ?_⟩⟩
         rw [hM, hchunk]
         rw [hbs] at hmap

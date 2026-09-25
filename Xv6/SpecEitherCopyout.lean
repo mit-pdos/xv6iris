@@ -31,6 +31,11 @@ whole), so a caller that copies in a LOOP
 (`consoleread`'s bytes) can re-enter it -- `procPrivRun` pins `P = V.upt`
 and cannot be rebuilt once the first call has faulted a page in.
 
+AND THE FAILING EXIT CARRIES ITS REASON (Rocq `either_copyout_post`'s user
+`-1` arm): `SpecCopyout`'s relayed -- the byte the copy stopped at, at the
+wrapped address `dst + d`, is not writable (`uvaWmapped`) at the descriptor
+`P` the call was handed.
+
 Imports only definitional files (never a `Code*` or `Proof*` file).
 -/
 import Xv6.EitherDefs
@@ -73,7 +78,8 @@ def wp_either_copyout_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF]
             umMapped P' (k.regs 11#5).toNat bs.length) ∨
            (R' 10#5 = -1#64 ∧ ∃ d, d < bs.length ∧
               M' = umemWrite (viewFaulted P P' M) (k.regs 11#5).toNat (bs.take d) ∧
-              umMapped P' (k.regs 11#5).toNat d))⌝ ∗
+              umMapped P' (k.regs 11#5).toNat d ∧
+              ¬ uvaWmapped P (k.regs 11#5 + BitVec.ofNat 64 d).toNat))⌝ ∗
         procPrivExt (procAddr j) pid V P' M')
      else ⌜R' 10#5 = 0#64⌝ ∗ byteBuf (k.regs 11#5) (DFrac.own 1) bs) -∗
     ⌜calleeSaved k.regs R'⌝ -∗ wpLoop cpu'))

@@ -230,9 +230,9 @@ theorem fstat_copyout (CO : COPYOUT) (c : CPU) (k' : KCtx) (γl : GName) (γk : 
       trapCsrsExt c' k'.sie -∗ cpuClaimExt c' k'.sie k'.proc -∗
       byteBuf (k'.regs 13#5) (DFrac.own 1) bs -∗ procPtAt P' M' -∗ wpLoop c')
     ⊢ wpLoop (GF := GF) c := by
-  have h := CO.wp_copyout (hlc := hlc) (GF := GF) c k' γl γk P M (DFrac.own 1) bs hnoff hK hlk
+  have h := CO.wp_copyout_nr (hlc := hlc) (GF := GF) c k' γl γk P M (DFrac.own 1) bs hnoff hK hlk
     hroot hsz hlen hlen'
-  unfold wp_copyout_body at h
+  unfold wp_copyout_nr_body at h
   simp only [copyoutAddr] at h
   iintro ⟨Hk, Hpc, Hte, Hce, #Hkl, #Hav, Hpt, Hbuf, HK⟩
   iapply h

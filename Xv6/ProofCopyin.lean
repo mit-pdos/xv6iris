@@ -56,12 +56,6 @@ theorem ci_addSplit (b : BitVec 64) (x y : Nat) :
     b + (BitVec.ofNat 64 x + BitVec.ofNat 64 y) = b + BitVec.ofNat 64 (x + y) := by
   rw [co_ofNat_add]
 
-/-- The wrapped byte address of the spec's reason, where the run does not wrap. -/
-theorem ci_addr_toNat (b : BitVec 64) (e : Nat) (h : b.toNat + e < 2 ^ 64) :
-    (b + BitVec.ofNat 64 e).toNat = b.toNat + e := by
-  rw [BitVec.toNat_add, BitVec.toNat_ofNat, Nat.mod_eq_of_lt (by omega : e < 2 ^ 64)]
-  exact Nat.mod_eq_of_lt h
-
 theorem ci_nval (A d : Nat) (hA64 : A + d < 2 ^ 64) :
     BitVec.ofNat 64 ((A + d) / 4096 * 4096) + (-(BitVec.ofNat 64 A + BitVec.ofNat 64 d) + 4096#64)
       = BitVec.ofNat 64 (4096 - (A + d) % 4096) := by
@@ -270,42 +264,6 @@ def ciPost (psz : BitVec 64) (P : UPtd) (M : Nat → List (BitVec 8)) (A : Nat) 
      (r = -1#64 ∧ (∃ e, e ≤ old.length ∧
         bs' = umemRead (viewFaulted P P' M) A e ++ old.drop e) ∧
       ∃ e, e < old.length ∧ A + e < 2 ^ 64 ∧ ¬ uvaRmapped P (A + e)))
-
-/-! ## Why the `-1` arm failed, as a fact about the ENTRY table
-
-Rocq `ProofCopyin.ci_fault_vpn` / `ci_fault_leaf` (lane TRAP-ROWS, T1):
-copyin has no `PTE_R` re-walk, so the only verdict a failing round has is
-walkaddr's, and the predicate it refutes is `uvaRmapped`.  The entry
-table's leaves are all still in the round's grown one (`P.ext P1`), the
-byte's page is the one the round walked, and every user leaf lies below
-`TRAPFRAME`, so walkaddr's `MAXVA` reason cannot fire at a readable byte.
-(The Lean walkaddr reports at the recorded leaves, so Rocq's A/D view step
-is not needed.) -/
-
-theorem ci_fault_leaf (P P1 : UPtd) (x : Nat) (hext : P.ext P1) (hwf : uptWf P1)
-    (hx : x < 2 ^ 64)
-    (hwhy : 2 ^ 38 ≤ (BitVec.ofNat 64 (x / 4096 * 4096)).toNat ∨
-      get? P1.leaves (vpnOf (BitVec.ofNat 64 (x / 4096 * 4096))).toNat = none ∨
-      ∃ w, get? P1.leaves (vpnOf (BitVec.ofNat 64 (x / 4096 * 4096))).toNat = some w ∧ ¬ pteVU w) :
-    ¬ uvaRmapped P x := by
-  rintro ⟨vpn, w, j, hl, hvu, hj, hxe⟩
-  have hl1 := hext.2.2 _ _ hl
-  have hk : vpn < tfVpn.toNat := (hwf.1 _ _ hl1).1
-  rw [UMemL.tfVpn_toNat] at hk
-  have hdiv : x / 4096 * 4096 = vpn * 4096 := by omega
-  have hlt : vpn * 4096 < 2 ^ 38 := by omega
-  have hnat : (BitVec.ofNat 64 (x / 4096 * 4096)).toNat = vpn * 4096 := by
-    rw [hdiv, BitVec.toNat_ofNat]; exact Nat.mod_eq_of_lt (by omega)
-  have h39 : (BitVec.ofNat 64 (x / 4096 * 4096)).toNat < 2 ^ 39 := by
-    rw [hnat]; exact Nat.lt_of_lt_of_le hlt (by decide)
-  have hvpn : (vpnOf (BitVec.ofNat 64 (x / 4096 * 4096))).toNat = vpn := by
-    rw [co_vpnOf_toNat _ h39, hnat]; omega
-  have hlv := UMemL.leaves_of_um P1 hwf vpn w hl1
-  rw [hnat, hvpn] at hwhy
-  rcases hwhy with h | h | ⟨w', h, hn⟩
-  · omega
-  · rw [hlv] at h; cases h
-  · rw [hlv] at h; cases h; exact hn hvu
 
 /-! ## One page: `walkaddr`, and `vmfault` when it is not mapped -/
 

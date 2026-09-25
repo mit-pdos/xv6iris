@@ -261,6 +261,78 @@ theorem co_ite_bgeu {α : Type _} (x y : BitVec 64) (p q : α) :
     (if bcond bop.BGEU x y then p else q) = if x.toNat < y.toNat then q else p := by
   by_cases h : x.toNat < y.toNat <;> simp [bcond, BitVec.ult, h]
 
+/-- The wrapped byte address of the spec's reason, where the run does not wrap. -/
+theorem ci_addr_toNat (b : BitVec 64) (e : Nat) (h : b.toNat + e < 2 ^ 64) :
+    (b + BitVec.ofNat 64 e).toNat = b.toNat + e := by
+  rw [BitVec.toNat_add, BitVec.toNat_ofNat, Nat.mod_eq_of_lt (by omega : e < 2 ^ 64)]
+  exact Nat.mod_eq_of_lt h
+
+/-! ## Why the `-1` arm failed, as a fact about the ENTRY table
+
+Rocq `ProofCopyin.ci_fault_vpn` / `ci_fault_leaf` (lane TRAP-ROWS, T1):
+copyin has no `PTE_R` re-walk, so the only verdict a failing round has is
+walkaddr's, and the predicate it refutes is `uvaRmapped`.  The entry
+table's leaves are all still in the round's grown one (`P.ext P1`), the
+byte's page is the one the round walked, and every user leaf lies below
+`TRAPFRAME`, so walkaddr's `MAXVA` reason cannot fire at a readable byte.
+(The Lean walkaddr reports at the recorded leaves, so Rocq's A/D view step
+is not needed.) -/
+
+theorem ci_fault_leaf (P P1 : UPtd) (x : Nat) (hext : P.ext P1) (hwf : uptWf P1)
+    (hx : x < 2 ^ 64)
+    (hwhy : 2 ^ 38 ≤ (BitVec.ofNat 64 (x / 4096 * 4096)).toNat ∨
+      get? P1.leaves (vpnOf (BitVec.ofNat 64 (x / 4096 * 4096))).toNat = none ∨
+      ∃ w, get? P1.leaves (vpnOf (BitVec.ofNat 64 (x / 4096 * 4096))).toNat = some w ∧ ¬ pteVU w) :
+    ¬ uvaRmapped P x := by
+  rintro ⟨vpn, w, j, hl, hvu, hj, hxe⟩
+  have hl1 := hext.2.2 _ _ hl
+  have hk : vpn < tfVpn.toNat := (hwf.1 _ _ hl1).1
+  rw [UMemL.tfVpn_toNat] at hk
+  have hdiv : x / 4096 * 4096 = vpn * 4096 := by omega
+  have hlt : vpn * 4096 < 2 ^ 38 := by omega
+  have hnat : (BitVec.ofNat 64 (x / 4096 * 4096)).toNat = vpn * 4096 := by
+    rw [hdiv, BitVec.toNat_ofNat]; exact Nat.mod_eq_of_lt (by omega)
+  have h39 : (BitVec.ofNat 64 (x / 4096 * 4096)).toNat < 2 ^ 39 := by
+    rw [hnat]; exact Nat.lt_of_lt_of_le hlt (by decide)
+  have hvpn : (vpnOf (BitVec.ofNat 64 (x / 4096 * 4096))).toNat = vpn := by
+    rw [co_vpnOf_toNat _ h39, hnat]; omega
+  have hlv := UMemL.leaves_of_um P1 hwf vpn w hl1
+  rw [hnat, hvpn] at hwhy
+  rcases hwhy with h | h | ⟨w', h, hn⟩
+  · omega
+  · rw [hlv] at h; cases h
+  · rw [hlv] at h; cases h; exact hn hvu
+
+
+/-- ...AND THE WRITE SIDE (Rocq `ProofCopyout`'s `co_fault_*`): walkaddr's
+verdict refutes `uvaRmapped`, hence `uvaWmapped`. -/
+theorem co_fault_leaf (P P1 : UPtd) (x : Nat) (hext : P.ext P1) (hwf : uptWf P1)
+    (hx : x < 2 ^ 64)
+    (hwhy : 2 ^ 38 ≤ (BitVec.ofNat 64 (x / 4096 * 4096)).toNat ∨
+      get? P1.leaves (vpnOf (BitVec.ofNat 64 (x / 4096 * 4096))).toNat = none ∨
+      ∃ w, get? P1.leaves (vpnOf (BitVec.ofNat 64 (x / 4096 * 4096))).toNat = some w ∧ ¬ pteVU w) :
+    ¬ uvaWmapped P x :=
+  fun h => ci_fault_leaf P P1 x hext hwf hx hwhy (UMemL.uvaRmapped_of_wmapped h)
+
+/-- copyout's `MAXVA` test: a page at or above `2^38` holds no user leaf. -/
+theorem co_fault_maxva (P P1 : UPtd) (x : Nat) (hext : P.ext P1) (hwf : uptWf P1)
+    (hmax : ¬ x / 4096 * 4096 < 2 ^ 38) : ¬ uvaWmapped P x := by
+  rintro ⟨vpn, w, j, hl, -, -, hj, hxe⟩
+  have hk : vpn < tfVpn.toNat := (hwf.1 _ _ (hext.2.2 _ _ hl)).1
+  rw [UMemL.tfVpn_toNat] at hk
+  omega
+
+/-- copyout's `PTE_W` re-walk: the page's leaf (in the grown table) has no
+`W`, and the entry table's leaf there, if any, is the same one. -/
+theorem co_fault_ro (P P2 : UPtd) (x : Nat) (w : BitVec 64) (hext : P.ext P2)
+    (hum : get? P2.um (x / 4096) = some w) (hW : w &&& 4#64 = 0#64) : ¬ uvaWmapped P x := by
+  rintro ⟨vpn, w', j, hl, -, hw', hj, hxe⟩
+  have hv : x / 4096 = vpn := by omega
+  have hl2 := hext.2.2 _ _ hl
+  rw [← hv, hum] at hl2
+  cases hl2
+  exact hw' (by simpa only [PTE_W] using hW)
+
 end
 
 end Xv6

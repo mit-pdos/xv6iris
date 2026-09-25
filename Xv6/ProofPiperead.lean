@@ -247,8 +247,8 @@ theorem pr_copyout (CO : COPYOUT) (c : CPU) (k' : KCtx) (γl : GName) (γk : Kme
         procPtAt P' M') -∗
       ⌜calleeSaved k'.regs R'⌝ -∗ wpLoop cpu'))
     ⊢ wpLoop (GF := GF) c := by
-  have h := CO.wp_copyout (hlc := hlc) (GF := GF) c k' γl γk P M (DFrac.own 1) bs hnoff hK hlk hroot hsz hlen hlen'
-  unfold wp_copyout_body at h
+  have h := CO.wp_copyout_nr (hlc := hlc) (GF := GF) c k' γl γk P M (DFrac.own 1) bs hnoff hK hlk hroot hsz hlen hlen'
+  unfold wp_copyout_nr_body at h
   simp only [copyoutAddr] at h
   exact h
 

@@ -932,8 +932,8 @@ theorem kw_copyout (CO : COPYOUT) (c : CPU) (k' : KCtx) (γl : GName) (γk : Kme
       ⌜calleeSaved k'.regs R'⌝ -∗ wpLoop cpu'))
     ⊢ wpLoop (GF := GF) c := by
   subst hsrc hdst
-  have h := CO.wp_copyout (hlc := hlc) (GF := GF) c k' γl γk P M dqs bs hnoff hK hlk hroot hsz hlen hlen'
-  unfold wp_copyout_body at h
+  have h := CO.wp_copyout_nr (hlc := hlc) (GF := GF) c k' γl γk P M dqs bs hnoff hK hlk hroot hsz hlen hlen'
+  unfold wp_copyout_nr_body at h
   simp only [copyoutAddr] at h
   exact h
 

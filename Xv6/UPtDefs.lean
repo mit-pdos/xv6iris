@@ -180,6 +180,16 @@ def uvaRmapped (P : UPtd) (va : Nat) : Prop :=
   ∃ (vpn : Nat) (w : BitVec 64) (j : Nat),
     Iris.Std.PartialMap.get? P.um vpn = some w ∧ pteVU w ∧ j < 4096 ∧ va = vpn * 4096 + j
 
+/-- **The addresses a copyout can write** (Rocq `UserPtTree.uva_wmapped`):
+`uvaRmapped`'s leaf, which ALSO passes copyout's `PTE_W` re-walk.  What a
+failing copyout refutes at its failing byte (`SpecCopyout`'s `-1` arm), and
+the fault reason of consoleread's swallowed byte.  The map only grows
+(`UMemL.uvaWmapped_mono`). -/
+def uvaWmapped (P : UPtd) (va : Nat) : Prop :=
+  ∃ (vpn : Nat) (w : BitVec 64) (j : Nat),
+    Iris.Std.PartialMap.get? P.um vpn = some w ∧ pteVU w ∧ w &&& PTE_W ≠ 0#64 ∧ j < 4096 ∧
+      va = vpn * 4096 + j
+
 /-- The view with page `k` zeroed. -/
 def viewZero (M : Nat → List (BitVec 8)) (k : Nat) : Nat → List (BitVec 8) :=
   fun k' => if k' = k then List.replicate 4096 0#8 else M k'

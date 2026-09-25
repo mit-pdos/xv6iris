@@ -644,6 +644,33 @@ theorem uvaRmapped_mono {P P' : UPtd} (h : P.ext P') {va : Nat} (hr : uvaRmapped
   obtain ⟨vpn, w, j, hl, hvu, hj, hva⟩ := hr
   exact ⟨vpn, w, j, h.2.2 _ _ hl, hvu, hj, hva⟩
 
+/-- Rocq `uva_wmapped_mono`. -/
+theorem uvaWmapped_mono {P P' : UPtd} (h : P.ext P') {va : Nat} (hr : uvaWmapped P va) :
+    uvaWmapped P' va := by
+  obtain ⟨vpn, w, j, hl, hvu, hw, hj, hva⟩ := hr
+  exact ⟨vpn, w, j, h.2.2 _ _ hl, hvu, hw, hj, hva⟩
+
+/-- Rocq `uva_rmapped_of_wmapped`: a writable byte is readable. -/
+theorem uvaRmapped_of_wmapped {P : UPtd} {va : Nat} (hr : uvaWmapped P va) : uvaRmapped P va := by
+  obtain ⟨vpn, w, j, hl, hvu, -, hj, hva⟩ := hr
+  exact ⟨vpn, w, j, hl, hvu, hj, hva⟩
+
+/-- A copyout post (`SpecCopyout` / `SpecEitherCopyout`) with its failure
+reason dropped: what the callers that never read the reason restate. -/
+theorem coPost_drop {P P' : UPtd} {sz : BitVec 64} {r : BitVec 64} {M M' : Nat → List (BitVec 8)}
+    {A : Nat} {bs : List (BitVec 8)} {Q : Nat → Prop}
+    (h : P.extSz sz P' ∧
+      ((r = 0#64 ∧ M' = umemWrite (viewFaulted P P' M) A bs ∧ umMapped P' A bs.length) ∨
+       (r = -1#64 ∧ ∃ d, d < bs.length ∧ M' = umemWrite (viewFaulted P P' M) A (bs.take d) ∧
+          umMapped P' A d ∧ Q d))) :
+    P.extSz sz P' ∧
+      ((r = 0#64 ∧ M' = umemWrite (viewFaulted P P' M) A bs ∧ umMapped P' A bs.length) ∨
+       (r = -1#64 ∧ ∃ d, d < bs.length ∧ M' = umemWrite (viewFaulted P P' M) A (bs.take d) ∧
+          umMapped P' A d)) := by
+  obtain ⟨he, h | ⟨h1, d, hd, hM, hm, -⟩⟩ := h
+  · exact ⟨he, Or.inl h⟩
+  · exact ⟨he, Or.inr ⟨h1, d, hd, hM, hm⟩⟩
+
 theorem umMapped_zero (P : UPtd) (va : Nat) : umMapped P va 0 := fun _ h => absurd h (by omega)
 
 theorem umMapped_le {P : UPtd} {va n m : Nat} (hle : m ≤ n) (h : umMapped P va n) :
