@@ -35,10 +35,14 @@ keyed by the returned `a0`:
     `uptd_ext_refl`);
   - it passed: on `0` the word is the process's own little-endian
     doubleword at `addr` (`bytesToWord (umemRead _ addr 8)`, Rocq's
-    `uimg_word_at`), read in the view `copyin` left (`viewFaulted P P' M`,
-    `SpecCopyin`'s view -- the Lean `COPYIN` exposes the faulted view where
-    the Rocq one keeps the image fixed); on `-1` only ownership (a `copyin`
-    that gave up part-way already wrote a prefix).
+    `uimg_word_at`), read at ROCQ'S SINGLE IMAGE, fixed before the call:
+    `viewLazy P V.sz M`, the view the block was handed with every lazy page
+    zeroed (`Xv6/UMemLazy.lean`; Rocq's `us_M`, which its `vmfault`
+    preserves).  `copyin` says the word's pages are mapped in the table it
+    returns (`umMapped`), and on those pages the faulted view it read is
+    the lazy image (`UMemL.umemRead_viewLazy`); the block itself still
+    comes back at the faulted view `viewFaulted P P' M`.  On `-1` only
+    ownership (a `copyin` that gave up part-way already wrote a prefix).
 `r = 0` therefore implies `fetchOk`: a caller that gets `0` learns the
 whole doubleword lay inside the address space.
 
@@ -49,6 +53,7 @@ fact (carried by `wordPointsTo`) is what the proof uses to lend it to
 Imports only definitional files (never a `Code*` or `Proof*` file).
 -/
 import Xv6.EitherDefs
+import Xv6.UMemLazy
 import MachCSL.ByteWord
 
 namespace Xv6
@@ -66,8 +71,9 @@ def fetchaddrSlots : Nat := 54
 `addr` lies below `sz`. -/
 def fetchOk (addr sz : BitVec 64) : Prop := addr.toNat + 8 ≤ sz.toNat
 
-/-- What `fetchaddr` answers (`r`) and leaves in `*ip` (`w`), at the view
-`M'` `copyin` read from (Rocq `fetchaddr_post` / `fetchaddr_got`). -/
+/-- What `fetchaddr` answers (`r`) and leaves in `*ip` (`w`), read at the
+image `M'` (the entry image `viewLazy P V.sz M`; Rocq `fetchaddr_post` /
+`fetchaddr_got`). -/
 def fetchaddrAns (M' : Nat → List (BitVec 8)) (addr sz oldv r w : BitVec 64) : Prop :=
   (r = -1#64 ∧ ¬ fetchOk addr sz ∧ w = oldv) ∨
   (fetchOk addr sz ∧ ((r = 0#64 ∧ w = bytesToWord (umemRead M' addr.toNat 8)) ∨ r = -1#64))
@@ -86,7 +92,7 @@ def wp_fetchaddr_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6
     ⌜k.sie = false → spie = k.spie ∧ spp = k.spp⌝ -∗
     kctx cpu' ((k.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k.regs 1#5)) -∗
     (∃ (P' : UPtd) (w : BitVec 64),
-      ⌜P.extSz V.sz P' ∧ fetchaddrAns (viewFaulted P P' M) (k.regs 10#5) V.sz oldv (R' 10#5) w⌝ ∗
+      ⌜P.extSz V.sz P' ∧ fetchaddrAns (viewLazy P V.sz M) (k.regs 10#5) V.sz oldv (R' 10#5) w⌝ ∗
       procPrivExt (procAddr j) pid V P' (viewFaulted P P' M) ∗
       wordPointsTo (k.regs 11#5) 8 (DFrac.own 1) w) -∗
     ⌜calleeSaved k.regs R'⌝ -∗ wpLoop cpu'))

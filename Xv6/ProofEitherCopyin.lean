@@ -199,7 +199,7 @@ theorem either_copyin_proof (MP : MYPROC) (CI : COPYIN) (MM : MEMMOVE) : EITHER_
       iexists P'
       iexists bs'
       isplitl []
-      · ipureintro; rw [x10]; exact hpost
+      · ipureintro; rw [x10]; exact ⟨hpost.1, hpost.2.imp (fun h => ⟨h.1, h.2.1⟩) id⟩
       · isplitl [Hsz Hpg Hspace Hrest]
         · iapply (ec_priv_close (procAddr j) pid V P P' (viewFaulted P P' M) hpost.1
             hfacts)

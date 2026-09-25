@@ -382,7 +382,8 @@ theorem ec_copyin_call (CI : COPYIN) [CurCtx] (c : CPU) (k' : KCtx) (γl : GName
       kctx cpu' ((k'.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k'.regs 1#5)) -∗
       (∃ (P' : UPtd) (bs' : List (BitVec 8)),
         ⌜P.extSz (k'.regs 11#5) P' ∧
-          ((R' 10#5 = 0#64 ∧ bs' = umemRead (viewFaulted P P' M) (k'.regs 13#5).toNat old.length) ∨
+          ((R' 10#5 = 0#64 ∧ bs' = umemRead (viewFaulted P P' M) (k'.regs 13#5).toNat old.length ∧
+              umMapped P' (k'.regs 13#5).toNat old.length) ∨
            (R' 10#5 = -1#64 ∧ ∃ d, d ≤ old.length ∧
               bs' = umemRead (viewFaulted P P' M) (k'.regs 13#5).toNat d ++ old.drop d))⌝ ∗
         procPtAt P' (viewFaulted P P' M) ∗ byteBuf (k'.regs 12#5) (DFrac.own 1) bs') -∗

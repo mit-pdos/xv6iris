@@ -5,6 +5,13 @@ buffer `dst`, faulting in lazily allocated pages on the way (`vmfault`, the
 uncounted mode).  Returns `0`, or `-1` after copying a strict prefix (a failed
 fault).  The mirror of `copyout`.  copyin needs 50 slots.
 
+The success arm also says WHICH PAGES the bytes lie on: every page of the
+`len` bytes read is mapped in the returned table (`umMapped P' srcva len`,
+as `COPYINSTR` says of its string).  It is what puts the read at the entry
+image with every lazy page zeroed (`UMemLazy.umemRead_viewLazy`), Rocq's
+single reading `us_M` (Rocq's `copyin` keeps the image fixed: its `vmfault`
+preserves the view, the Lean one zeroes a page when it is faulted in).
+
 Imports only definitional files (never a `Code*` or `Proof*` file).
 -/
 
@@ -34,7 +41,8 @@ def wp_copyin_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G G
     kctx cpu' ((k.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k.regs 1#5)) -∗
     (∃ (P' : UPtd) (bs' : List (BitVec 8)),
       ⌜P.extSz (k.regs 11#5) P' ∧
-        ((R' 10#5 = 0#64 ∧ bs' = umemRead (viewFaulted P P' M) (k.regs 13#5).toNat old.length) ∨
+        ((R' 10#5 = 0#64 ∧ bs' = umemRead (viewFaulted P P' M) (k.regs 13#5).toNat old.length ∧
+            umMapped P' (k.regs 13#5).toNat old.length) ∨
          (R' 10#5 = -1#64 ∧ ∃ d, d ≤ old.length ∧
             bs' = umemRead (viewFaulted P P' M) (k.regs 13#5).toNat d ++ old.drop d))⌝ ∗
       procPtAt P' (viewFaulted P P' M) ∗ byteBuf (k.regs 12#5) (DFrac.own 1) bs') -∗

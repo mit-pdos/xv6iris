@@ -95,13 +95,11 @@ than handed in.  A port of Rocq `SpecSysExec.v`
    `viewLazy V.upt V.sz M`** (`Xv6/UMemLazy.lean`: the entry view with every
    lazy page zeroed; `M` itself for a lazy-free block,
    `UMemL.viewLazy_of_lazyFree`) -- exactly where the restated argstr /
-   fetchstr read their strings (`SpecSysOpen` deviation 10).  **FLAG: the
-   landed `SpecFetchaddr` answers at the FAULTED view `viewFaulted P P' M`
-   and its callee `SpecCopyin` does not say the word's pages are mapped in
-   `P'`**, so the fill loop cannot yet move fetchaddr's word to `viewLazy`;
-   the b1848c322 treatment (copyin's success arm gains `umMapped P' srcva
-   n`, `fetchaddrAns` at `viewLazy P V.sz M`) is owed before the fill-loop
-   stage closes (see `SysExecParts` §5 and the interfaces file).
+   fetchstr read their strings (`SpecSysOpen` deviation 10), and where
+   `SpecFetchaddr` reads its word (`fetchaddrAns` at `viewLazy P V.sz M`,
+   copyin's success arm saying the word's pages are mapped in `P'`); the
+   fill loop moves each round's reading to the entry image by
+   `SysExecParts.sysExec_viewLazy_faulted`.
 4. **The frame is KexecOkQ's / SpecKexec's** (their deviation 4 / 3): no
    `kalloc_env`, `sb_bmapstart`/`sb_inodestart ↦{dqb/dqs}`, `bitmap_inv`
    rows in or out -- `KexecDefs.fsFabric` (Rocq's `fs_fabric`) holds them

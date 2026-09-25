@@ -82,9 +82,10 @@ the prologue); slot `n` is `sp0 - 8 n`:
    faulted one because the Lean image moves where Rocq's does not --
    `viewFaulted_trans` keeps every round at this ONE form).  The argv
    reading `sx_avok (us_M U) …` is at `sysExecIm A = viewLazy A.V.upt
-   A.V.sz A.M` (`SpecSysExec` deviation 3).  **FLAG (fill loop): the landed
-   `FETCHADDR` answers at `viewFaulted P P' M` with no `umMapped` fact, so
-   `sysExecAvOk` cannot be pushed from it yet; see the interfaces file.**
+   A.V.sz A.M` (`SpecSysExec` deviation 3).  `FETCHADDR` answers at the
+   block's own lazy image `viewLazy P V.sz M` (copyin's success arm says
+   the word's pages are mapped), which `sysExec_viewLazy_faulted` moves to
+   `sysExecIm A`; so does fetchstr's.
 5. THE MACHINE: `sie_cap_gpr KT1 M (K - 60) b pj` at `pc_is (SX + off)` is
    `kctx c (((k.withSpie spie spp).pushed 60).withRegs R)` at `pcIs c
    (sysExecAddr + off#64)`; Rocq's `sx_sp` / `sx_thr` / nine register
@@ -780,7 +781,7 @@ theorem sysExec_argsOf (M : Nat → List (BitVec 8)) (av : BitVec 64) (uvf : Nat
 
 /-- **THE IMAGE LEMMA** (deviation 4): the block every round re-enters at --
 `{ A.V with upt := P }` at `viewFaulted A.V.upt P A.M` -- has the ENTRY image
-as its lazy image, so fetchstr's (and a restated fetchaddr's) reading at the
+as its lazy image, so fetchstr's and fetchaddr's readings at the
 block's own `viewLazy` is `sysExecIm A`. -/
 theorem sysExec_viewLazy_faulted (V : ProcPriv) (P : UPtd) (M : Nat → List (BitVec 8))
     (hext : V.upt.extSz V.sz P) :
