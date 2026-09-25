@@ -45,7 +45,7 @@ open Iris Iris.BI Iris.ProofMode MachCSL
 set_option linter.unusedSectionVars false
 
 section
-variable {GF : BundledGFunctors} [FsBytesG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachFixedGS hlc GF] [FsBytesG GF]
 
 /-- Rocq's `fs_gamma_L`: the LOGGED instance of the abstract view. -/
 def fsGammaL (γfs : FsNames) : FsViewNames GF :=

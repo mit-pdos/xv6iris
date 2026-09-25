@@ -45,9 +45,10 @@ neither needs the other.
    (`[GhostMapG GF Nat (BitVec 8) RegMapF]`, Rocq `diskImgG`).  Rocq has two
    `ghost_mapG Σ Z (bv 8)` classes (`fsLogG`'s byte map and `diskImgG`) and
    its header warns against having both in scope; the port's rule is ONE
-   instance per camera type, and `FsBytesG.gmBytes` is today that one.
-   Binding the bare `GhostMapG` here lets crash-wave C-M's `DiskImg` reuse
-   the same camera (it must not add a second instance).
+   instance per camera type, and `MachFixedGS.diskImgG` is that one (the
+   byte view `FsBytesG` carries no copy).  Binding the bare `GhostMapG` here
+   keeps this file MachFixedGS-free; under `MachFixedGS` it resolves to
+   `diskImgG`.
 5. `phiExcl` is in wand form (`Xv6/FsStateDefs.lean` deviation 5).
 
 ## Dropped/simplified vs Rocq

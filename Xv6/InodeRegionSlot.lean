@@ -694,7 +694,7 @@ FLUSH, which already opens the region.  The multiplicity arithmetic
 `Xv6/InodeRegion.lean`'s. -/
 
 section Lnk
-variable {GF : BundledGFunctors} [FsBytesG GF] [FsLinkG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachFixedGS hlc GF] [FsBytesG GF] [FsLinkG GF]
 
 /-- THE ROOT KEEP-ALIVE FRAGMENT.  `ent_tokenless` exempts the ROOT's `".."`
 -- which names the root -- so the image's `nlink = 1` at the root is
@@ -969,7 +969,7 @@ admits have a zero count -- a free record by (L3), a claim box by
 have (E2-V2's filter), which ilock's fill needs. -/
 
 section TopPark
-variable {GF : BundledGFunctors} [FsBytesG GF] [FsTopG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachFixedGS hlc GF] [FsBytesG GF] [FsTopG GF]
 
 def iregTopPark (γfs : FsNames) (z : Nat) (d : Dinode) : IProp GF :=
   iprop(∃ n : FsNode,

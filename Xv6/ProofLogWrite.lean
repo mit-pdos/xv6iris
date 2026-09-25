@@ -405,7 +405,7 @@ theorem lw_cov_nodup (cov : Std.ExtTreeSet Nat compare) : cov.toList.Nodup := by
   exact hab (by subst he; simp)
 
 section
-variable {GF : BundledGFunctors} [FsBlocksG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachFixedGS hlc GF] [FsBlocksG GF]
 
 /-- Outside `b`, growing the batch by `b` does not move a pin half. -/
 theorem lw_dirty_eq (γfs : FsNames) (l LB LB' : List Nat) (b : Nat) (hb : ¬ (b ∈ l))

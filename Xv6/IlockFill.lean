@@ -53,7 +53,7 @@ theorem il_bmcells_empty : bmCells bmEmpty = List.replicate 13 0 := by
   simp [bmCells, bmEmpty, NDIRECT, List.replicate]
 
 section Empty
-variable {GF : BundledGFunctors} [FsBlocksG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachFixedGS hlc GF] [FsBlocksG GF]
 
 /-- Rocq's `il_ind_res_empty`. -/
 theorem il_indRes_empty (γfs : FsNames) : ⊢ indRes (GF := GF) γfs bmEmpty := by

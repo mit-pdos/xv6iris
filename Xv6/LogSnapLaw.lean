@@ -23,23 +23,10 @@ invariant, which sits below the inode region and the collection).
 
 ## DEVIATIONS from Rocq
 
-1. **THE TWO BYTE CAMERAS ARE PINNED BY NAME.**  Rocq has ONE
-   `ghost_mapG Σ Z (bv 8)` (`DiskImg.diskImgG`, which types both the logged
-   byte view `fs_bytes` and the snapshot's byte map).  The Lean tree has TWO
-   instances of that camera type -- `FsBytesG.gmBytes` (the byte view) and
-   `MachFixedGS.diskImgG` (the durable disk; `DiskMapF` and `RegMapF` are the
-   same abbreviation) -- so a section binding both resolves
-   `GhostMapG GF Nat (BitVec 8) RegMapF` ambiguously.  This file states the
-   byte authority through `snapLawBytes` (a section over `FsBytesG` alone,
-   hence `gmBytes`, matching `fsBytesInv`) and the epoch through `snapLawOut`
-   (a section over `MachFixedGS` alone, hence `diskImgG`, matching
-   `fsCommitL_seqPermit` under `MachGS`).  Reported as a one-instance-rule
-   violation to fix at the camera level (drop `FsBytesG.gmBytes` for the
-   fixed layer's instance, as Rocq's `Xv6Cameras.v` :428 does).
-2. Rocq's `dom C = fs_home_set cov logstart` is
+1. Rocq's `dom C = fs_home_set cov logstart` is
    `∀ b, (∃ bs, get? C b = some bs) ↔ fsHome cov logstart b` (the
    `fsRecovery_dom` spelling; the port has no `dom` on `ExtTreeMap`).
-3. Rocq's `ghost_map_auth (ln_tx γ) 1 ∅` is `logTxAuth γ ∅`.
+2. Rocq's `ghost_map_auth (ln_tx γ) 1 ∅` is `logTxAuth γ ∅`.
 
 ## NOT PORTED (D36): none.
 -/
@@ -52,31 +39,16 @@ open Iris Iris.BI Iris.ProofMode Std MachCSL
 
 set_option linter.unusedSectionVars false
 
-/-! ## The two pinned readings (deviation 1) -/
-
-section
-variable {GF : BundledGFunctors} [FsBytesG GF]
-
-/-- The logged byte view's authority, at the byte view's own camera. -/
-def snapLawBytes (γfs : FsNames) (Lb : RegMapF (BitVec 8)) : IProp GF := γfs.bytes ↪●MAP Lb
-
-end
-
-section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachFixedGS hlc GF] [FsLinkG GF] [FsTopG GF]
-
-/-- THE CONCLUSION, AS ONE NAME: the next epoch at the map the commit jumps to,
-with the guest (Rocq `snap_law_out`). -/
-def snapLawOut (G : GName → IProp GF) (C : BlockMap) (home : List Nat) : IProp GF :=
-  durPair G (fsRestrict (dvOfD C) home)
-
-end
-
 /-! ## The law -/
 
 section
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachFixedGS hlc GF] [Xv6G GF] [FsBytesG GF]
   [MonoListG GF BlockMap] [FsLinkG GF] [FsTopG GF]
+
+/-- THE CONCLUSION, AS ONE NAME: the next epoch at the map the commit jumps to,
+with the guest (Rocq `snap_law_out`). -/
+def snapLawOut (G : GName → IProp GF) (C : BlockMap) (home : List Nat) : IProp GF :=
+  durPair G (fsRestrict (dvOfD C) home)
 
 /-- THE LAW, at a NAMED mask and a NAMED guest (Rocq `snap_law_at`). -/
 def snapLawAt (γ : LogNames) (γfs : FsNames) (cov : ExtTreeSet Nat compare) (logstart : Nat)
@@ -87,8 +59,8 @@ def snapLawAt (γ : LogNames) (γfs : FsNames) (cov : ExtTreeSet Nat compare) (l
     ⌜∀ b bs, PartialMap.get? C b = some bs → bs.length = BSIZE⌝ -∗
     ⌜bytesTie Lb C⌝ -∗
     ⌜bytesDom Lb (fsHomeList cov logstart)⌝ -∗
-    snapLawBytes γfs Lb -∗ logTxAuth γ ∅ ={E}=∗
-      snapLawOut (hlc := hlc) G C (fsHomeList cov logstart) ∗ snapLawBytes γfs Lb ∗
+    (γfs.bytes ↪●MAP Lb) -∗ logTxAuth γ ∅ ={E}=∗
+      snapLawOut (hlc := hlc) G C (fsHomeList cov logstart) ∗ (γfs.bytes ↪●MAP Lb) ∗
       logTxAuth γ ∅))
 
 /-- ...and the arity-free form the log carries: mask and guest closed over,
@@ -130,10 +102,10 @@ theorem snapLaw_run (γ : LogNames) (γfs : FsNames) (cov : ExtTreeSet Nat compa
     (hlens : ∀ b bs, PartialMap.get? C b = some bs → bs.length = BSIZE)
     (htie : bytesTie Lb C) (hdm : bytesDom Lb (fsHomeList cov logstart)) :
     snapLaw (hlc := hlc) (GF := GF) γ γfs cov logstart ⊢
-      snapLawBytes γfs Lb -∗ logTxAuth γ ∅ ={⊤ \ ↑fsbN}=∗
+      (γfs.bytes ↪●MAP Lb) -∗ logTxAuth γ ∅ ={⊤ \ ↑fsbN}=∗
         (∃ G : GName → IProp GF, fsCrashSeamAt (hlc := hlc) G cov logstart ∗
           snapLawOut (hlc := hlc) G C (fsHomeList cov logstart)) ∗
-        snapLawBytes γfs Lb ∗ logTxAuth γ ∅ := by
+        (γfs.bytes ↪●MAP Lb) ∗ logTxAuth γ ∅ := by
   iintro #Hlaw Hb Ht
   unfold snapLaw
   icases Hlaw with ⟨%N, %G, %hdj, #Hseam, #Hbody⟩

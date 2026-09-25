@@ -130,7 +130,7 @@ def bytesExcVal (L : RegMapF (BitVec 8)) (Xv : Nat → List (BitVec 8)) (X : Lis
   ∀ b ∈ X, mapSeq (b * BSZ) (Xv b) ⊆ L
 
 section
-variable {GF : BundledGFunctors} [FsBytesG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachFixedGS hlc GF] [FsBytesG GF]
 
 /-! ## The exception handle and its seal -/
 

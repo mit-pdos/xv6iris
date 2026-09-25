@@ -394,7 +394,7 @@ theorem icLoaded_bmLen [Icfg] [CurCtx] (γfs : FsNames) (γi : GName) (cov : Ext
   ipureintro
   simp [bmCells, blkmapWf_dir_len hok.1, NDIRECT]
 
-omit [MachGS hlc GF] [IcacheG GF] [FsLinkG GF] in
+omit [IcacheG GF] [FsLinkG GF] in
 /-- `inodeOwnedEra_local`, keeping the bundle (deviation 4). -/
 private theorem inodeOwnedEra_localKeep (γfs : FsNames) (γi : GName) (inum : BitVec 32)
     (n : FsNode) :

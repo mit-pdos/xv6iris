@@ -183,7 +183,7 @@ WHY NO COLUMN BOUND IS READ HERE EITHER: the bound the licence needs is
 the target's own slot (`iregLnk`). -/
 
 section Lic
-variable {GF : BundledGFunctors} [IregG GF] [IcacheG GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [FsBlocksG GF] [FsLinkG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachFixedGS hlc GF] [IregG GF] [IcacheG GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [FsBlocksG GF] [FsLinkG GF]
 
 /-- THE LICENCE.
 
@@ -277,7 +277,7 @@ end Lic
 (iclaim-ledger.md §2.6, executed as §3.1's RULING A) -/
 
 section Table
-variable {GF : BundledGFunctors} [IregG GF] [IcacheG GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [LogG GF] [FsBlocksG GF] [FsLinkG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachFixedGS hlc GF] [IregG GF] [IcacheG GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [LogG GF] [FsBlocksG GF] [FsLinkG GF]
 
 /-- THE LICENCE TABLE.  §2.6 wrote a five-row table -- "at a box the free
 path has frozen, EVERY runtime licence is refutable" -- and increment IIIb

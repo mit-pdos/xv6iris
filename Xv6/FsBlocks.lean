@@ -304,7 +304,7 @@ here as bare names -- the byte view's own authorities are born inside
 `Xv6.fsAlloc` (`Xv6/FsBytesMint.lean`), Rocq's `fs_alloc`, which is what
 the era actually calls; this lemma is the block layer's own free-state
 statement and says nothing about them. -/
-theorem fsGhostAlloc (γlk γtp : GName) :
+theorem fsGhostAlloc {hlc : HasLC} [MachFixedGS hlc GF] (γlk γtp : GName) :
     ⊢ |==> (∃ γfs : FsNames, ⌜γfs.link = γlk ∧ γfs.top = γtp⌝ ∗ fsFreeTok (GF := GF) γfs) := by
   imod (ghost_map_alloc_empty (GF := GF) (K := Nat) (V := List (BitVec 8)) (H := RegMapF))
     with ⟨%γc, Hc⟩

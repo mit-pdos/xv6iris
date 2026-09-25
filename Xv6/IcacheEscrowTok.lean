@@ -439,7 +439,7 @@ entries and counts freely, and re-seals at `dlinks_intro`.  create's mkdir
 arm is exactly the window that needs the freedom. -/
 
 section Dlinks
-variable {GF : BundledGFunctors} [FsBlocksG GF] [FsLinkG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachFixedGS hlc GF] [FsBlocksG GF] [FsLinkG GF]
 
 /-- Rocq's `dlinks`. -/
 def dlinks (γfs : FsNames) (self : Nat) (dn : Dinode) (bm : Blkmap)
@@ -515,7 +515,7 @@ one unfold -- so `icInodeLeg_eraOpen` / `_eraIntro` are the two directions
 at the era's own `(dn, bm, data)` triple. -/
 
 section Leg
-variable {GF : BundledGFunctors} [FsBlocksG GF] [IregG GF] [FsTopG GF] [FsLinkG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachFixedGS hlc GF] [FsBlocksG GF] [IregG GF] [FsTopG GF] [FsLinkG GF]
 
 /-- Rocq's `ic_inode_leg`. -/
 def icInodeLeg (γfs : FsNames) (dq : DFrac) (γi : GName) (inum : BitVec 32)

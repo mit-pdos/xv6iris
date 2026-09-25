@@ -244,7 +244,7 @@ theorem recOwnedAt_IBLOCK (Γ : FsViewNames GF) (inodestart : Nat) (inum : BitVe
   rw [Nat.add_comm inodestart]
   exact .rfl
 
-variable [FsBytesG GF]
+variable {hlc : HasLC} [MachFixedGS hlc GF] [FsBytesG GF]
 
 /-- Block `bi`'s sixteen record runs, at the region's slot numbering (Rocq
 `ireg_recs`). -/

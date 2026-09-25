@@ -653,7 +653,7 @@ ahead of the cell-carrying ones, because Lean's section binders are
 per-section and the block resources need neither `MachGS` nor `CurCtx`. -/
 
 section
-variable {GF : BundledGFunctors} [FsBlocksG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachFixedGS hlc GF] [FsBlocksG GF]
 
 /-! ## `indBlk`: the indirect block's own logical content
 
@@ -851,7 +851,7 @@ theorem inodeBlocksQ_split (γfs : FsNames) (q1 q2 : Qp) (bm : Blkmap)
 end
 
 section
-variable {GF : BundledGFunctors} [FsBlocksG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachFixedGS hlc GF] [FsBlocksG GF]
 
 /-- A position of `List.range` is its own value (Rocq's stdpp
 `lookup_seq`).  `Xv6.rangeGetElem?` says the same in
@@ -1027,7 +1027,7 @@ theorem inodeBlocks_of_blocks (γfs : FsNames) (bm : Blkmap) (U : ExtTreeSet Nat
 end
 
 section
-variable {GF : BundledGFunctors} [FsBlocksG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachFixedGS hlc GF] [FsBlocksG GF]
 
 /-! ### `inodeBlocks`: one-block access, and the deposit of a fresh block -/
 

@@ -343,7 +343,7 @@ theorem rd_pay_contentQ (E : CoPset) (γb : BcacheNames) (γfs : FsNames) (V : B
 end
 
 section
-variable {GF : BundledGFunctors} [FsBlocksG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachFixedGS hlc GF] [FsBlocksG GF]
 
 /-- Rocq's `rd_blocks_restore`: the block put back at the bytes it had. -/
 theorem rd_blocks_restore (γfs : FsNames) (dq : DFrac) (bm : Blkmap)

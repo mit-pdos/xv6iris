@@ -238,7 +238,7 @@ theorem imgSlot_in_inodeBlocks (P : Nat → List (BitVec 8)) (sb : FsSb) (dn : D
 /-! ## G.  THE RESOURCE HALF: block-granular ghosts -> `inodeBlocks` -/
 
 section ImageRes
-variable {GF : BundledGFunctors} [FsBlocksG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachFixedGS hlc GF] [FsBlocksG GF]
 
 /-- `inodeBlocks_of_blocks` AT AN IMAGE RECORD (Rocq's
 `img_inode_blocks_res`): the run of ONE inode's blocks the boot carve hands

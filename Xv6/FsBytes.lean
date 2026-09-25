@@ -54,21 +54,23 @@ set_option linter.unusedSectionVars false
 
 /-! ## The ghost library
 
-A `GhostMapG GF Nat (BitVec 8) RegMapF` exists nowhere else in the tree
-(the disk image and the logged view are at `List (BitVec 8)`, on the shared
-`Xv6G.gmBlkG`), so this class is the one instance of its camera. -/
+THE LOGGED VIEW `L`, keyed by BYTE ADDRESS, is typed by the FIXED layer's
+`MachFixedGS.diskImgG` -- the tree's UNIQUE source of the
+`GhostMapG GF Nat (BitVec 8) RegMapF` instance (`DiskMapF` and `RegMapF` are
+the same functor), exactly as Rocq's `fsLogG` leaves the byte view to
+`DiskImg.diskImgG` (`Xv6Cameras.v:428`: "A second field here would be a
+second, non-interacting Sigma slot").  Hence every byte-view section carries
+`[MachFixedGS hlc GF]` (Rocq's `riscvGS` in the same `Context`). -/
 
-/-- The two ghost maps the byte view needs (Rocq's `fsLogG` members for the
-`FsBytes` section). -/
+/-- The byte view's own ghost map beyond the shared one (Rocq's `fsLogG`
+member for the `FsBytes` section). -/
 class FsBytesG (GF : BundledGFunctors) where
-  /-- THE LOGGED VIEW `L`, keyed by BYTE ADDRESS -/
-  [gmBytes : GhostMapG GF Nat (BitVec 8) RegMapF]
   /-- the byte view's EXCEPTION SET, at the single key `0` (Rocq uses
   `gmap unit (gset Z)`; this port has no `unit`-keyed map functor and its
   sets are lists) -/
   [gmExc : GhostMapG GF Nat (List Nat) RegMapF]
 
-attribute [reducible, instance] FsBytesG.gmBytes FsBytesG.gmExc
+attribute [reducible, instance] FsBytesG.gmExc
 
 /-! ## Byte-address arithmetic -/
 
@@ -183,7 +185,7 @@ theorem logN_top : (↑logN : CoPset) ⊆ ⊤ := CoPset.subseteq_top
 theorem fsbN_top : (↑fsbN : CoPset) ⊆ ⊤ := CoPset.subseteq_top
 
 section
-variable {GF : BundledGFunctors} [FsBytesG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachFixedGS hlc GF] [FsBytesG GF]
 
 /-! ## The points-to run -/
 

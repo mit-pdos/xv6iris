@@ -319,7 +319,7 @@ theorem iregWriteUnlink_pure (dn dn' : Dinode) (hnz : dn'.diType.toNat ≠ 0)
 /-! ## 5.  THE RAISE's REGISTER STEP -/
 
 section Raise
-variable {GF : BundledGFunctors} [FsBytesG GF] [FsLinkG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachFixedGS hlc GF] [FsBytesG GF] [FsLinkG GF]
 
 /-- THE RA's OWN STEP (durable-disk 2b-inode-4), Rocq's inline `iAssert`
 in `ireg_write_link_reg`: the raised count is one `link_mint` on the

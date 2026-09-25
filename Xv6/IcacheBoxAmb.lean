@@ -521,7 +521,7 @@ instance icRdHeldGhost_timeless (γfs : FsNames) (cov : ExtTreeSet Nat compare)
     Timeless (icRdHeldGhost (GF := GF) γfs cov logstart inum dn bm) := by
   unfold icRdHeldGhost; infer_instance
 
-omit [MachGS hlc GF] [IcacheG GF] [LogG GF] in
+omit [IcacheG GF] [LogG GF] in
 /-- `icInodeLeg_local`, keeping the leg (Rocq's `iDestruct … as %` keeps
 the hypothesis). -/
 private theorem icInodeLeg_localKeep (γfs : FsNames) (dq : DFrac) (γi : GName)
