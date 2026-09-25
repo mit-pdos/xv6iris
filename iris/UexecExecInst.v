@@ -533,10 +533,12 @@ Section UexecExecInst.
        EXEC-SEAM); [UexecSG.skey_eq] pins both *)
     uvis_ch W = uvis_ch W' ->
     uvis_pid W = uvis_pid W' ->
+    (* ...and the mask, which the slot piece's pin names (upstream a083670) *)
+    uvis_secc W = uvis_secc W' ->
     exec_sbundle X f W ⊣⊢ exec_sbundle X f W'.
   Proof using .
-    intros HM Hpv Hav Hfd Hcw Hgn Hch Hpi.
-    rewrite /exec_sbundle HM Hpv Hav Hfd Hcw Hgn Hch Hpi. reflexivity.
+    intros HM Hpv Hav Hfd Hcw Hgn Hch Hpi Hsc.
+    rewrite /exec_sbundle HM Hpv Hav Hfd Hcw Hgn Hch Hpi Hsc. reflexivity.
   Qed.
 
   (* ===================================================================== *)
@@ -871,7 +873,7 @@ Section UexecExecInst.
                       & Hpm & Hsz & Hlz & Hsc).
     rewrite /xv6_sbundle.
     destruct (decide (n = USYS_exec)) as [_ | _];
-      [ exact (exec_sbundle_cong X f W W' HM Ha0 Ha1 Hfd Hcw Hgn Hch Hpi) | ].
+      [ exact (exec_sbundle_cong X f W W' HM Ha0 Ha1 Hfd Hcw Hgn Hch Hpi Hsc) | ].
     (* RULING WR-TB: row 16 now reads the key's permission map, break and
        lazy bit too, and [UexecSG.skey_eq] already fixes all three. *)
     rewrite /xk_a /tf_w HM Ha0 Ha1 Ha2 Hfd Hcw Hpm Hsz Hlz.

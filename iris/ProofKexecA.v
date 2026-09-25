@@ -777,7 +777,7 @@ Section KexecAUAMain.
       (* ...and the caller's WORKING DIRECTORY, threaded straight into
          [SpecKexec.exec_slot_pre]'s row: the key the wands are answered at
          carries the cwd exec inherits (lane LAZY-FLAG's K4 (d)). *)
-      (cw : Z)
+      (cw : Z) (secc : mword 64)
       (L : nat) (zi : Z)
       (na : nat) (alen : nat -> nat) (afun : nat -> nat -> bv 8)
       (sts : list fdstate)
@@ -795,19 +795,19 @@ Section KexecAUAMain.
        Fo.(pf_recv) av zi (abs_row (FsStateEra.era_node dn bm data)) ∗
        P L zi ∗
        pf_at (fun S => SpecKexec.exec_slot_pre S Qpay (P L) Fo.(pf_recv)
-                         cw na alen afun sts cs pidv) Fs)%I.
+                         cw secc na alen afun sts cs pidv) Fs)%I.
 
   (* the +0x090 row, and the [bad:] tails' row, are the same receipt: the
      buffer [ef] plays no part in it (the header claim was the only thing
      that had to be re-read at the buffer). *)
   Definition kxa_receipt_x (Fs : pfam Σ (UexecSlot.uvis -> iProp Σ)) (P : nat -> Z -> iProp Σ)
       (Fo : pfam Σ (aview -> Z -> anode -> iProp Σ))
-      (Qpay : Z -> iProp Σ) (cw : Z)
+      (Qpay : Z -> iProp Σ) (cw : Z) (secc : mword 64)
       (L : nat) (zi : Z)
       (na : nat) (alen : nat -> nat) (afun : nat -> nat -> bv 8)
       (sts : list fdstate) (cs : gset gname) (pidv : mword 32) (ef : nat -> bv 8)
       (dn : dinode) (bm : blkmap) (data : nat -> list (bv 8)) : iProp Σ :=
-    kxa_receipt Fs P Fo Qpay cw L zi na alen afun sts cs pidv dn bm data.
+    kxa_receipt Fs P Fo Qpay cw secc L zi na alen afun sts cs pidv dn bm data.
 
   (* ---- the two refund shapes, assembled ------------------------------ *)
 
@@ -946,7 +946,7 @@ Section KexecAUAMain.
       (ef : nat -> bv 8) :
     L = length (path_elems pl) ->
     LA.kxc_bad_cause dn ef data ->
-    kxa_receipt Fs P Fo Qpay cw L zi na alen afun sts cs pidv dn bm data -∗
+    kxa_receipt Fs P Fo Qpay cw secc L zi na alen afun sts cs pidv dn bm data -∗
     SpecKexec.exec_post_fail Fs (FsBytesGamma.fs_gamma_L γ) γ cw secc Qpay P Pmiss Fo
       pl na alen afun sts cs pidv.
   Proof using XI.
@@ -1145,7 +1145,7 @@ Section KexecAUAMain.
            [zi] is existential here for the same reason the landed exit's
            [kf] is: phase A found it, nothing above named it. ==== *)
         (∃ zi : Z,
-           kxa_receipt Fs P Fo Qpay (pv_cwi (us_V U))
+           kxa_receipt Fs P Fo Qpay (pv_cwi (us_V U)) (pv_secc (us_V U))
                        (length (path_elems (bview plen pfun))) zi
                        na alen afun sts cs pidv dnf bmf datl) -∗
         kxc_frameA6x sp0 ra0 s00 s10 s20 pv av (m !!! Regidx Rs4) ef -∗
@@ -1189,10 +1189,10 @@ Section KexecAUAMain.
     iApply (LA.kxc_a2_r (CID0 := CIDs) Q QF gs jp gl pd pav pu gf
               plen pfun na avf alen aslen afun pidv U dqb dqs dqa dqpv dqas
               m M32 K eb b lks sp0 ra0 s00 s10 s20 pv av ipv zi n1
-              (kxa_receipt Fs P Fo Qpay (pv_cwi (us_V U))
+              (kxa_receipt Fs P Fo Qpay (pv_cwi (us_V U)) (pv_secc (us_V U))
                            (length (path_elems (bview plen pfun))) zi
                            na alen afun sts cs pidv)
-              (kxa_receipt_x Fs P Fo Qpay (pv_cwi (us_V U))
+              (kxa_receipt_x Fs P Fo Qpay (pv_cwi (us_V U)) (pv_secc (us_V U))
                              (length (path_elems (bview plen pfun))) zi
                              na alen afun sts cs pidv)
               KEX

@@ -373,6 +373,8 @@ Proof.
                 the resumed record's run key reads it
                 ([UexecRet.urun_eq]). *)
              ⌜pv_lazy V' = pv_lazy (us_V U)⌝ ∗
+             (* ...nor the mask ([ProcDefs.pv_secc]), for the same reason *)
+             ⌜pv_secc V' = pv_secc (us_V U)⌝ ∗
              (* ...nor the break.  [upd_tf] rewrites the word list and
                 nothing else, and the resumed record's RUN KEY reads the
                 size ([UexecRet.urun_eq]), so the steady mode's closer
@@ -385,9 +387,10 @@ Proof.
                 sret's to is the [sepc] cell prepare_return wrote from it. *)
              ⌜tf_ueq (pv_tf (us_V U)) (pv_tf V')⌝ ∗
              UsertrapRes.ut_tfk (CID := CIDf) ksp V' ∗ proc_priv γf p pid (MkUstate V' ((us_M U))))%I
-    with "[Hpv]" as (V') "(%HuptV' & %Hfg & %Hcg & %Hgenk & %Hcwi & %Hlzq & %Hpsz & %Htueq & #Htfk & Hpv)".
+    with "[Hpv]" as (V') "(%HuptV' & %Hfg & %Hcg & %Hgenk & %Hcwi & %Hlzq & %Hscq & %Hpsz & %Htueq & #Htfk & Hpv)".
   { iExists (upd_tf (us_V U) (prepare_return_tf (pv_tf (us_V U)) ksat ksp (cid_word (CID := CIDf)))).
     iFrame "Hpv". iSplitR; [iPureIntro; reflexivity |].
+    iSplitR; [iPureIntro; reflexivity |].
     iSplitR; [iPureIntro; reflexivity |].
     iSplitR; [iPureIntro; reflexivity |].
     iSplitR; [iPureIntro; reflexivity |].
@@ -796,14 +799,16 @@ Proof.
   { destruct steady; [| exact I].
     refine (urun_eq_resume (uvis_of U [] gn cs pid) U
               (MkUstate (upd_upt V' pt) (us_M U))
-              (urun_eq_of U [] gn cs pid) _ _ _ _ _ _).
+              (urun_eq_of U [] gn cs pid) _ _ _ _ _ _ _).
     - exact Htueq.
     - reflexivity.
     - exact Hpsz.
     - exact Hcwi.
     - reflexivity.
     (* the lazy bit: forkret writes no block field (lane LAZY-FLAG) *)
-    - cbn [us_V]. exact Hlzq. }
+    - cbn [us_V]. exact Hlzq.
+    (* ...nor the mask *)
+    - cbn [us_V]. exact Hscq. }
   (* ---- the config record for this round ---- *)
   assert (HSEa0 : tp_pin SE !!! Regidx (mword_of_int 10)
                   = kvi_satp_word (ud_root pt)).
@@ -836,7 +841,7 @@ Proof.
                     (urun_eq_of U sts gn cs pid) Htueq eq_refl Hpsz Hcwi eq_refl
                     (* the lazy bit: prepare_return writes trapframe words
                        and no block field (lane LAZY-FLAG) *)
-                    Hlzq)
+                    Hlzq Hscq)
                  eq_refl eq_refl eq_refl eq_refl)).
     iExact "Hbslot". }
   assert (Hpcslot : tf_resume_pc

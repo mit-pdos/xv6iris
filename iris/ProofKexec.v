@@ -663,7 +663,7 @@ Section KexecAUExit.
          pl na alen afun sts gn cs pidv U)
       gf fsc_kalloc pj pidv m ret_tgt K b eb lks dqb dqs fsc_bmapstart
       na plen pv dqpv pfun av dqa avf aslen dqas afun -∗
-    PA.kxa_receipt Fs P Fo Qpay (pv_cwi (us_V U)) (length (path_elems pl)) zi
+    PA.kxa_receipt Fs P Fo Qpay (pv_cwi (us_V U)) (pv_secc (us_V U)) (length (path_elems pl)) zi
                    na alen afun sts cs pidv dn bm datl -∗
     KexecOkQ.kexec_closer (CID := CIDx)
       (KexecBridge.exec_built_Q (kxc_fb datl dn) ef na alen afun)

@@ -1165,7 +1165,7 @@ Section UtRet.
                       (add_vec (un_ks N) (mword_of_int 4096)) (cid_word (CID := CIDp)))
       by (rewrite /Vr; destruct (us_V U); reflexivity).
     assert (Hrdr : ut_round epw scw U0 (MkUstate Vr (us_M U))).
-    { refine (ut_round_ueq epw scw U0 U (MkUstate Vr (us_M U)) _ _ eq_refl _ _ _
+    { refine (ut_round_ueq epw scw U0 U (MkUstate Vr (us_M U)) _ _ eq_refl _ _ _ _
                 Hrd).
       - cbn [us_V]. rewrite HVrtf. apply prepare_return_tf_ueq.
       - cbn [us_V]. rewrite HVrupt HVrsz. reflexivity.
@@ -1173,6 +1173,8 @@ Section UtRet.
       - cbn [us_V]. rewrite /Vr; destruct (us_V U); reflexivity.
       (* the lazy bit: prepare_return writes trapframe words and no block
          field ([ProcDefs.pv_lazy]) -- lane LAZY-FLAG *)
+      - cbn [us_V]. rewrite /Vr; destruct (us_V U); reflexivity.
+      (* ...nor the mask *)
       - cbn [us_V]. rewrite /Vr; destruct (us_V U); reflexivity. }
     (* ...and the cwd's inum, which prepare_return's four stores leave alone *)
     assert (HVrcwi : pv_cwi (us_V (MkUstate Vr (us_M U))) = pv_cwi (us_V U))

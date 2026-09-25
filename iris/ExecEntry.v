@@ -173,12 +173,12 @@ Section ExecEntry.
       (X : uvis -d> iPropO Σ) : iProp Σ :=
     (□ (∀ W' : uvis, T -∗ my_pay (uvis_gen W') Q -∗ X W'))%I.
 
-  Global Instance image_entry_at_persistent f na alen afun sts cw cs pidv
+  Global Instance image_entry_at_persistent f na alen afun sts cw secc cs pidv
       Q Pay X :
     Persistent (image_entry_at f na alen afun sts cw secc cs pidv Q Pay X).
   Proof using . rewrite /image_entry_at. apply _. Qed.
 
-  Global Instance image_entry_persistent f M av sts cw cs pidv Q Pay X :
+  Global Instance image_entry_persistent f M av sts cw secc cs pidv Q Pay X :
     Persistent (image_entry f M av sts cw secc cs pidv Q Pay X).
   Proof using . rewrite /image_entry. apply _. Qed.
 
