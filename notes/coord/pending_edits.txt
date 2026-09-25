@@ -38,3 +38,4 @@
 - wave 9 (from W8-M review): add G = 0 to uptWf's leaf clause so USER can keep utlbOk; rename .kpt satp tag (cosmetic).
 - userret: trampoline claim kmapAt trampVpn (kLeaf trampPpn .rx 0 0) is a premise; nothing mints it yet (kvminithart has no such claim) → W8-L closed loop / W8-N main must supply it.
 - W8-J deferred: main_globals_raw/main_locks_raw + boot_* carves → with SpecMain (W8-I); GOT word stack0Slot fractions across 8 harts + per-hart boot stacks → BootShared (8-4).
+- uservec: caller must pass k with sp = kernel_sp (whole-page stack); userret's leftover is deeper → W8-R/W8-L re-form it; kernel-words fact uservecKWords from prepare_return_tf_kernel_words.

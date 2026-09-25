@@ -27,8 +27,9 @@ near). Resume launching the NEXT list only when the user says so.
 ## Done (all pushed)
 - All of fs.c, log.c, bio.c, virtio, uart/console/plic, pipes, file layer, kalloc/vm, proc,
   trap (kerneltrap/devintr/prepare_return), kexec, and ALL 22 sys_* (sys_exec sealed 46d43a76c).
-  182/194 kernel text symbols have Spec/Proof/Link. Missing: syscall, usertrap, uservec (in
-  flight), forkret (ForkretIs assumed), main; userret DONE (9afea77e3).
+  182/194 kernel text symbols have Spec/Proof/Link. Missing: syscall, usertrap, forkret
+  (ForkretIs assumed), main; userret DONE (9afea77e3), uservec DONE (2ef4ec0f0; continuation abstract at
+  usertrap entry; caller must re-form whole-page kernel stack at kernel_sp — W8-R/W8-L obligation).
 - Wave 8 so far: W8-A/B (UsysMemOk, SyscallDefs, StartedInv), W8-C (TfUser, UserFd, UexecSG,
   UserExec, SpecUser, UexecWp), W8-D (CtxAmb, FileMorph, FsReadyMorph, EnvMorph), W8-F
   (UexecRet/Round/Apply/Cond, ProofUexecWp), W8-G (MachCSL/Adequacy), W8-H (Boot*, DiskBoot,
@@ -46,7 +47,6 @@ near). Resume launching the NEXT list only when the user says so.
 | CH crash C-2a: disk driver/bwrite/bread on crashPermInv (replaces TEMP premise `diskDrainEnv` in Xv6/DiskInv.lean) | branch `worktree-agent-a48f64363af3b49d9` | verify+push; unblocks C-2b (CI). |
 | Camera fixes: drop FsBytesG.gmBytes → MachFixedGS.diskImgG; add Xv6G.mlHistG : MonoListG GF BlockMap; FileG.gmUfdG (D29) | branch `worktree-agent-a180d1701b15e8512` | verify+push. |
 | MachCSL boot image tie: Hboot learns image = g₀.image; riscvPowerAdequacy takes BootImage-style premise; + report on emitting .data in dump_kernel.py | branch `worktree-agent-a18ac9de1787aa490` | verify+push. |
-| W8-U uservec (SpecUservec/UservecDefs/UservecPt/UservecExitPt/ProofUservec/LinkUservec) | main tree, untracked Xv6/*Uservec* | commit+verify+push. Model: userret. |
 | CJ crash C-3: FsCollect*, FsCollectAll | main tree, untracked Xv6/FsCollect* | commit+verify+push. |
 
 ## NEXT (dependency order)
