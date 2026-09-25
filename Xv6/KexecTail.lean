@@ -89,10 +89,11 @@ a STAGE file (no `Proof` prefix, brief rule 2; the one seal is
 12. **`kxc_bad64` takes the open inode as `kxcOpen`** (Rocq spells its twelve
     rows and `ic_loaded`; `kxcLdat_to_loaded` is applied inside), and the
     pid cell comes out of the block inside the lemma (Rocq `proc_priv_bare_cref`).
-13. **`kxc_bad_1d6` takes `szf.toNat ≤ uvmMaxsz`** (Lean proc_freepagetable's
-    `hsz`), where Rocq derives it from `um_covered` (`proc_pt_covered_maxsz`,
-    no Lean counterpart), and the new table as `procPtAt P Mi` (Rocq
-    `proc_pt_any P`); its `um_covered` premise is then unused and dropped.
+13. **`kxc_bad_1d6` takes Rocq's `um_covered` premise** (`hcov : lazyFree
+    P.um szf`) and derives Lean proc_freepagetable's `hsz` from it with
+    `UmCovered.lazyFree_maxsz` (Rocq `proc_pt_covered_maxsz`), the table's
+    `uptWf` read off `procPtAt_wf`; the new table is `procPtAt P Mi` (Rocq
+    `proc_pt_any P`).
 -/
 import Xv6.KexecOkQ
 import Xv6.KexecParts
@@ -105,6 +106,7 @@ import Xv6.OffBox
 import Xv6.FsTree
 import Xv6.DinodeSlot
 import MachCSL.ByteWord4
+import Xv6.UmCovered
 
 namespace Xv6
 
@@ -996,11 +998,10 @@ set_option maxHeartbeats 16000000 in
 reloads of s3..s10 from slots 5..12, `j +0x72`).  Every path arrives with s8
 the size to free and s6 the second table's root.  s11 is NOT reloaded
 (XV6_REV 7d258aa), so the caller says it still holds its entry value; slot
-13 holds whatever `w13` it held.  (Deviation: Lean's proc_freepagetable takes
-`szf ≤ uvmMaxsz` as a premise; Rocq derives it from `um_covered` through
-`proc_pt_covered_maxsz`, which has no Lean counterpart -- the caller, phase C,
-has it from its own uvmalloc's `hnew`.  The new table is `procPtAt P Mi`,
-Rocq `proc_pt_any P`.) -/
+13 holds whatever `w13` it held.  (Lean's proc_freepagetable's size bound
+is read off the coverage `hcov` by `UmCovered.lazyFree_maxsz`, Rocq
+`proc_pt_covered_maxsz`.  The new table is `procPtAt P Mi`, Rocq
+`proc_pt_any P`.) -/
 theorem kxc_bad_1d6 (PFP : PROC_FREEPAGETABLE) (Γ : SchedNames)
     (Q : BitVec 64 → ProcPriv → (Nat → List (BitVec 8)) → Prop) (QF : KxfCause → Prop)
     (cpu : CPU) (k : KCtx) (A : KexecArgs) (spie spp : Bool) (R : RegMap)
@@ -1008,7 +1009,7 @@ theorem kxc_bad_1d6 (PFP : PROC_FREEPAGETABLE) (Γ : SchedNames)
     (hqf : ∃ c, QF c) (hK : kexecSlots ≤ k.avail) (hnoff : k.noff = 0)
     (h2 : R 2#5 = k.regs 2#5 + 0xFFFFFFFFFFFFFDE0#64) (h24 : R 24#5 = szf)
     (h22 : R 22#5 = pageAddr P.root) (h27 : R 27#5 = k.regs 27#5)
-    (hbelow : umBelow szf P) (hsz : szf.toNat ≤ uvmMaxsz) :
+    (hbelow : umBelow szf P) (hcov : lazyFree P.um szf) :
     kctx cpu (((k.withSpie spie spp).pushed 68).withRegs R) ∗ pcIs cpu (KA.«kexec» + 0x1d6#64) ∗
     trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗
     fsFabric (hlc := hlc) Γ A.pd A.pav A.pu ∗ procPtAt P Mi ∗
@@ -1020,6 +1021,8 @@ theorem kxc_bad_1d6 (PFP : PROC_FREEPAGETABLE) (Γ : SchedNames)
     ⊢ wpLoop (GF := GF) cpu := by
   have hK68 : 68 ≤ k.avail := by rw [kxc_slots_val] at hK; omega
   iintro ⟨Hk, Hpc, Hte, Hce, #Hfab, Hpt, Hpriv, Hbufs, Hbs, Hirs, Hfr, Hcl⟩
+  icases UMemL.procPtAt_wf P Mi $$ Hpt with ⟨Hpt, %hwf⟩
+  have hsz : szf.toNat ≤ uvmMaxsz := UmCovered.lazyFree_maxsz P szf hwf hcov
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
   -- +0x1d6  c.mv a1,s8 ; +0x1d8  c.mv a0,s6
   k_step_e (wp_s_add cpu _ (KA.«kexec» + 0x1d6#64) true 11#5 0#5 24#5 (by decide))

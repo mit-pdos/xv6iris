@@ -976,3 +976,6 @@ import Xv6.LinkSysUnlink
 import Xv6.SpecSysOpen
 import Xv6.SysOpenParts
 import Xv6.SysOpenPub
+import Xv6.KexecB2Spec
+import Xv6.KexecB2
+import Xv6.KexecB3
