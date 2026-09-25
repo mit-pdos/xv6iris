@@ -250,6 +250,16 @@ Proof.
   apply usys_eff_all. lia.
 Qed.
 
+(* ...and at a number the stub itself fixed, which may be 0: the mask's
+   low 64 bits are all set, so every number in [0, 64) is its own. *)
+Lemma uvis_num_full0 (W : uvis) :
+  uvis_secc W = secc_all -> 0 <= usys_num (uvis_tf W) < 64 ->
+  uvis_num W = usys_num (uvis_tf W).
+Proof.
+  intros Hs Hn. unfold uvis_num. rewrite Hs. unfold secc_all.
+  apply usys_eff_all. exact Hn.
+Qed.
+
 Lemma uvis_lz_id (W : uvis) : uvis_lz W (uvis_lazy W) = W.
 Proof. destruct W; reflexivity. Qed.
 

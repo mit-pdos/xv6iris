@@ -1481,3 +1481,12 @@ Qed.
 (* raises the trap (UserTrap.v is not in this file's cone).                *)
 (* ===================================================================== *)
 Definition uecall_scause : mword 64 := mword_of_int 8.
+
+(* A number the program fixed, read off the stub: in range, and not the
+   one entry that moves the mask.  [assumption] first, for the leaves whose
+   number is a parameter carrying these as premises. *)
+Ltac usys_range :=
+  first [ assumption
+        | (unfold USYS_fork, USYS_exit, USYS_exec, USYS_sbrk, USYS_wait,
+                  USYS_pipe, USYS_read, USYS_fstat, USYS_dup, USYS_open,
+                  USYS_close, USYS_chdir, USYS_getpid, USYS_seccomp in *; lia) ].

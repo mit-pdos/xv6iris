@@ -546,6 +546,12 @@ Section UkRunSys.
        ([UsysMemOk.usys_cwd_ok]) -- is excluded here.  It is quiet in memory
        and in the descriptor table, so nothing else was ruling it out. *)
     n <> USYS_chdir ->
+    (* ...AND IT IS A NUMBER THE FULL MASK PASSES, AND NOT SECCOMP'S
+       (upstream a083670).  [urun] is keyed at the full mask, so a number
+       in [0, 64) is its own effective number ([UexecSlot.uvis_num_full0]),
+       and seccomp is the one row that would move the mask the run is
+       re-closed at. *)
+    (0 <= n < 64)%Z -> n <> USYS_seccomp ->
     is_aligned_vaddr (Virtaddr (add_vec_int pc 4)) 2 = true ->
     uinstr_is (ukn_t N) pc false (ECALL tt) -∗
     urun N h m pc avail -∗
@@ -555,7 +561,7 @@ Section UkRunSys.
        mWP (Loop : expr riscv_lang)) -∗
     mWP (Loop : expr riscv_lang).
   Proof using .
-    intros Hn Hexit Hfork Hexec Hsbrk H3 H4 H5 H8 Hcl Hdp Hop Hcd Hal4.
+    intros Hn Hexit Hfork Hexec Hsbrk H3 H4 H5 H8 Hcl Hdp Hop Hcd Hrng Hn23 Hal4.
     iIntros "#Hi Hrun Hsb Hcont".
     iDestruct "Hrun" as (xi C pt Rfd Rut sz M pm fdv cw gn cs pidv) "(%Hlo & %Hpm & %Hlzf & %HRut & Hheap & Hstk & Hufd & Hcwda & Hcha & #Hmy & #Hdep & #Hnpx & Hb)".
     iMod (udepw_mint N m pc _ M pm _ fdv cw gn cs pidv
@@ -571,8 +577,11 @@ Section UkRunSys.
                    ltac:(vm_compute; reflexivity) Hp Hc)
               with "Hb Hmy").
     rewrite (uexec_ret_ecall _ _ eq_refl).
-    assert (Hnum : usys_num (uvis_tf (uvis_of_run m pc M pm sz fdv cw gn cs pidv false secc_all)) = n).
-    { cbn [uvis_tf uvis_of_run]. rewrite tf_of_num. exact Hn. }
+    assert (Hnum : uvis_num (uvis_of_run m pc M pm sz fdv cw gn cs pidv false secc_all) = n).
+    { rewrite uvis_num_full0.
+      - cbn [uvis_tf uvis_of_run]. rewrite tf_of_num. exact Hn.
+      - reflexivity.
+      - cbn [uvis_tf uvis_of_run]. rewrite tf_of_num, Hn. usys_range. }
     (* the PAYMENT's guard IS the deposit's own, so it is opened BEFORE the
        number is rewritten and the destructs below then reduce both copies
        at once *)
@@ -604,7 +613,7 @@ Section UkRunSys.
     cbn [uvis_gen uvis_of_run].
     iSplitR; [ iFrame "Hmy" | ].
     iSplitL "Hdepn"; [ iExact "Hdepn" | ].
-    iIntros (r M' pm' sz' fdv' cw' gn' cs' lz') "%Hok %Hfdok %Hpiperow %Hcwrow %Hgnrow %Hpidrow %Hliverow %Hchrow _".
+    iIntros (r M' pm' sz' fdv' cw' gn' cs' lz' secc') \"%Hok %Hfdok %Hpiperow %Hcwrow %Hgnrow %Hpidrow %Hliverow %Hscrow %Hchrow _".
     (* THE LAZY BIT CROSSED THE TRAP UNCHANGED (lane LAZY-FLAG, L6).  The
        trapping key is at [false] -- the U tier's run is
        ([UexecRet.ukcq]) -- and every row but sbrk's is the equation
@@ -614,6 +623,11 @@ Section UkRunSys.
       by (refine (usys_mem_ok_lazy _ _ _ _ _ _ _ _ _ _ _ _ Hok);
           first [ assumption | vm_compute; discriminate ]).
     subst lz'.
+    (* ...AND SO DID THE MASK: not seccomp's number, so the row is the
+       equation ([UsysMemOk.usys_secc_ok_quiet]), and the resume key is at
+       the full mask [urun] is keyed at *)
+    pose proof (usys_secc_ok_quiet _ _ _ _ _ ltac:(usys_range) Hscrow) as Hscq.
+    cbn [uvis_secc uvis_of_run] in Hscq. subst secc'.
     (* THE CWD CROSSED THE TRAP UNCHANGED -- chdir is the one row that moves
        it, and this is not it -- so the engine's half is re-keyed onto the
        view the process resumes at and the program's half never moved. *)
@@ -710,9 +724,12 @@ Section UkRunSys.
                    ltac:(vm_compute; reflexivity) Hp Hc)
               with "Hb Hmy").
     rewrite (uexec_ret_ecall _ _ eq_refl).
-    assert (Hnum : usys_num (uvis_tf (uvis_of_run m pc M pm sz fdv c gn cs pidv false secc_all))
+    assert (Hnum : uvis_num (uvis_of_run m pc M pm sz fdv c gn cs pidv false secc_all)
                    = USYS_chdir).
-    { cbn [uvis_tf uvis_of_run]. rewrite tf_of_num. exact Hn. }
+    { rewrite uvis_num_full0.
+      - cbn [uvis_tf uvis_of_run]. rewrite tf_of_num. exact Hn.
+      - reflexivity.
+      - cbn [uvis_tf uvis_of_run]. rewrite tf_of_num, Hn. usys_range. }
     (* the PAYMENT's guard IS the deposit's own, so it is opened BEFORE the
        number is rewritten and the destructs below then reduce both copies
        at once *)
@@ -733,7 +750,7 @@ Section UkRunSys.
     cbn [uvis_gen uvis_of_run].
     iSplitR; [ iFrame "Hmy" | ].
     iSplitL "Hdepn"; [ iExact "Hdepn" | ].
-    iIntros (r M' pm' sz' fdv' cw' gn' cs' lz') "%Hok %Hfdok %Hpiperow %Hcwrow %Hgnrow %Hpidrow %Hliverow %Hchrow _".
+    iIntros (r M' pm' sz' fdv' cw' gn' cs' lz' secc') \"%Hok %Hfdok %Hpiperow %Hcwrow %Hgnrow %Hpidrow %Hliverow %Hscrow %Hchrow _".
     (* THE LAZY BIT CROSSED THE TRAP UNCHANGED (lane LAZY-FLAG, L6).  The
        trapping key is at [false] -- the U tier's run is
        ([UexecRet.ukcq]) -- and every row but sbrk's is the equation
@@ -743,6 +760,11 @@ Section UkRunSys.
       by (refine (usys_mem_ok_lazy _ _ _ _ _ _ _ _ _ _ _ _ Hok);
           first [ assumption | vm_compute; discriminate ]).
     subst lz'.
+    (* ...AND SO DID THE MASK: not seccomp's number, so the row is the
+       equation ([UsysMemOk.usys_secc_ok_quiet]), and the resume key is at
+       the full mask [urun] is keyed at *)
+    pose proof (usys_secc_ok_quiet _ _ _ _ _ ltac:(usys_range) Hscrow) as Hscq.
+    cbn [uvis_secc uvis_of_run] in Hscq. subst secc'.
     (* the IMAGE and the TABLE crossed the trap untouched, as at a quiet
        call: chdir writes no user byte and moves no descriptor. *)
     destruct (usys_mem_ok_quiet USYS_chdir _ r _ _ _ _ _ _ _ _
@@ -873,8 +895,11 @@ Section UkRunSys.
                    ltac:(vm_compute; reflexivity) Hp Hc)
               with "Hb Hmy").
     rewrite (uexec_ret_ecall _ _ eq_refl).
-    assert (Hnum : usys_num (uvis_tf (uvis_of_run m pc M pm sz fdv cw gn cs pidv false secc_all)) = USYS_open).
-    { cbn [uvis_tf uvis_of_run]. rewrite tf_of_num. exact Hn. }
+    assert (Hnum : uvis_num (uvis_of_run m pc M pm sz fdv cw gn cs pidv false secc_all) = USYS_open).
+    { rewrite uvis_num_full0.
+      - cbn [uvis_tf uvis_of_run]. rewrite tf_of_num. exact Hn.
+      - reflexivity.
+      - cbn [uvis_tf uvis_of_run]. rewrite tf_of_num, Hn. usys_range. }
     (* the PAYMENT's guard IS the deposit's own, so it is opened BEFORE the
        number is rewritten and the destructs below then reduce both copies
        at once *)
@@ -898,7 +923,7 @@ Section UkRunSys.
     cbn [uvis_gen uvis_of_run].
     iSplitR; [ iFrame "Hmy" | ].
     iSplitL "Hdepn"; [ iExact "Hdepn" | ].
-    iIntros (r M' pm' sz' fdv' cw' gn' cs' lz') "%Hok %Hfdok %Hpiperow %Hcwrow %Hgnrow %Hpidrow %Hliverow %Hchrow _".
+    iIntros (r M' pm' sz' fdv' cw' gn' cs' lz' secc') \"%Hok %Hfdok %Hpiperow %Hcwrow %Hgnrow %Hpidrow %Hliverow %Hscrow %Hchrow _".
     (* THE LAZY BIT CROSSED THE TRAP UNCHANGED (lane LAZY-FLAG, L6).  The
        trapping key is at [false] -- the U tier's run is
        ([UexecRet.ukcq]) -- and every row but sbrk's is the equation
@@ -908,6 +933,11 @@ Section UkRunSys.
       by (refine (usys_mem_ok_lazy _ _ _ _ _ _ _ _ _ _ _ _ Hok);
           first [ assumption | vm_compute; discriminate ]).
     subst lz'.
+    (* ...AND SO DID THE MASK: not seccomp's number, so the row is the
+       equation ([UsysMemOk.usys_secc_ok_quiet]), and the resume key is at
+       the full mask [urun] is keyed at *)
+    pose proof (usys_secc_ok_quiet _ _ _ _ _ ltac:(usys_range) Hscrow) as Hscq.
+    cbn [uvis_secc uvis_of_run] in Hscq. subst secc'.
     (* THE CWD CROSSED THE TRAP UNCHANGED -- chdir is the one row that moves
        it, and this is not it -- so the engine's half is re-keyed onto the
        view the process resumes at and the program's half never moved. *)
@@ -1055,8 +1085,11 @@ Section UkRunSys.
                    ltac:(vm_compute; reflexivity) Hp Hc)
               with "Hb Hmy").
     rewrite (uexec_ret_ecall _ _ eq_refl).
-    assert (Hnum : usys_num (uvis_tf (uvis_of_run m pc M pm sz fdv cw gn cs pidv false secc_all)) = USYS_dup).
-    { cbn [uvis_tf uvis_of_run]. rewrite tf_of_num. exact Hn. }
+    assert (Hnum : uvis_num (uvis_of_run m pc M pm sz fdv cw gn cs pidv false secc_all) = USYS_dup).
+    { rewrite uvis_num_full0.
+      - cbn [uvis_tf uvis_of_run]. rewrite tf_of_num. exact Hn.
+      - reflexivity.
+      - cbn [uvis_tf uvis_of_run]. rewrite tf_of_num, Hn. usys_range. }
     (* the PAYMENT's guard IS the deposit's own, so it is opened BEFORE the
        number is rewritten and the destructs below then reduce both copies
        at once *)
@@ -1080,7 +1113,7 @@ Section UkRunSys.
     cbn [uvis_gen uvis_of_run].
     iSplitR; [ iFrame "Hmy" | ].
     iSplitL "Hdepn"; [ iExact "Hdepn" | ].
-    iIntros (r M' pm' sz' fdv' cw' gn' cs' lz') "%Hok %Hfdok %Hpiperow %Hcwrow %Hgnrow %Hpidrow %Hliverow %Hchrow _".
+    iIntros (r M' pm' sz' fdv' cw' gn' cs' lz' secc') \"%Hok %Hfdok %Hpiperow %Hcwrow %Hgnrow %Hpidrow %Hliverow %Hscrow %Hchrow _".
     (* THE LAZY BIT CROSSED THE TRAP UNCHANGED (lane LAZY-FLAG, L6).  The
        trapping key is at [false] -- the U tier's run is
        ([UexecRet.ukcq]) -- and every row but sbrk's is the equation
@@ -1090,6 +1123,11 @@ Section UkRunSys.
       by (refine (usys_mem_ok_lazy _ _ _ _ _ _ _ _ _ _ _ _ Hok);
           first [ assumption | vm_compute; discriminate ]).
     subst lz'.
+    (* ...AND SO DID THE MASK: not seccomp's number, so the row is the
+       equation ([UsysMemOk.usys_secc_ok_quiet]), and the resume key is at
+       the full mask [urun] is keyed at *)
+    pose proof (usys_secc_ok_quiet _ _ _ _ _ ltac:(usys_range) Hscrow) as Hscq.
+    cbn [uvis_secc uvis_of_run] in Hscq. subst secc'.
     (* THE CWD CROSSED THE TRAP UNCHANGED -- chdir is the one row that moves
        it, and this is not it -- so the engine's half is re-keyed onto the
        view the process resumes at and the program's half never moved. *)
@@ -1213,8 +1251,11 @@ Section UkRunSys.
                    ltac:(vm_compute; reflexivity) Hp Hc)
               with "Hb Hmy").
     rewrite (uexec_ret_ecall _ _ eq_refl).
-    assert (Hnum : usys_num (uvis_tf (uvis_of_run m pc M pm sz fdv cw gn cs pidv false secc_all)) = USYS_dup).
-    { cbn [uvis_tf uvis_of_run]. rewrite tf_of_num. exact Hn. }
+    assert (Hnum : uvis_num (uvis_of_run m pc M pm sz fdv cw gn cs pidv false secc_all) = USYS_dup).
+    { rewrite uvis_num_full0.
+      - cbn [uvis_tf uvis_of_run]. rewrite tf_of_num. exact Hn.
+      - reflexivity.
+      - cbn [uvis_tf uvis_of_run]. rewrite tf_of_num, Hn. usys_range. }
     (* the PAYMENT's guard IS the deposit's own, so it is opened BEFORE the
        number is rewritten and the destructs below then reduce both copies
        at once *)
@@ -1238,7 +1279,7 @@ Section UkRunSys.
     cbn [uvis_gen uvis_of_run].
     iSplitR; [ iFrame "Hmy" | ].
     iSplitL "Hdepn"; [ iExact "Hdepn" | ].
-    iIntros (r M' pm' sz' fdv' cw' gn' cs' lz') "%Hok %Hfdok %Hpiperow %Hcwrow %Hgnrow %Hpidrow %Hliverow %Hchrow _".
+    iIntros (r M' pm' sz' fdv' cw' gn' cs' lz' secc') \"%Hok %Hfdok %Hpiperow %Hcwrow %Hgnrow %Hpidrow %Hliverow %Hscrow %Hchrow _".
     (* THE LAZY BIT CROSSED THE TRAP UNCHANGED (lane LAZY-FLAG, L6).  The
        trapping key is at [false] -- the U tier's run is
        ([UexecRet.ukcq]) -- and every row but sbrk's is the equation
@@ -1248,6 +1289,11 @@ Section UkRunSys.
       by (refine (usys_mem_ok_lazy _ _ _ _ _ _ _ _ _ _ _ _ Hok);
           first [ assumption | vm_compute; discriminate ]).
     subst lz'.
+    (* ...AND SO DID THE MASK: not seccomp's number, so the row is the
+       equation ([UsysMemOk.usys_secc_ok_quiet]), and the resume key is at
+       the full mask [urun] is keyed at *)
+    pose proof (usys_secc_ok_quiet _ _ _ _ _ ltac:(usys_range) Hscrow) as Hscq.
+    cbn [uvis_secc uvis_of_run] in Hscq. subst secc'.
     (* THE CWD CROSSED THE TRAP UNCHANGED -- chdir is the one row that moves
        it, and this is not it -- so the engine's half is re-keyed onto the
        view the process resumes at and the program's half never moved. *)
@@ -1386,8 +1432,11 @@ Section UkRunSys.
                    ltac:(vm_compute; reflexivity) Hp Hc)
               with "Hb Hmy").
     rewrite (uexec_ret_ecall _ _ eq_refl).
-    assert (Hnum : usys_num (uvis_tf (uvis_of_run m pc M pm sz fdv cw gn cs pidv false secc_all)) = USYS_dup).
-    { cbn [uvis_tf uvis_of_run]. rewrite tf_of_num. exact Hn. }
+    assert (Hnum : uvis_num (uvis_of_run m pc M pm sz fdv cw gn cs pidv false secc_all) = USYS_dup).
+    { rewrite uvis_num_full0.
+      - cbn [uvis_tf uvis_of_run]. rewrite tf_of_num. exact Hn.
+      - reflexivity.
+      - cbn [uvis_tf uvis_of_run]. rewrite tf_of_num, Hn. usys_range. }
     rewrite /uexec_pay_dep /upay_at.
     rewrite Hnum. cbv zeta.
     destruct (decide (uecall_scause = uecall_scause)) as [_ | Hpne];
@@ -1401,7 +1450,7 @@ Section UkRunSys.
     cbn [uvis_gen uvis_of_run].
     iSplitR; [ iFrame "Hmy" | ].
     iSplitL "Hdepn"; [ iExact "Hdepn" | ].
-    iIntros (r M' pm' sz' fdv' cw' gn' cs' lz') "%Hok %Hfdok %Hpiperow %Hcwrow %Hgnrow %Hpidrow %Hliverow %Hchrow _".
+    iIntros (r M' pm' sz' fdv' cw' gn' cs' lz' secc') \"%Hok %Hfdok %Hpiperow %Hcwrow %Hgnrow %Hpidrow %Hliverow %Hscrow %Hchrow _".
     (* THE LAZY BIT CROSSED THE TRAP UNCHANGED (lane LAZY-FLAG, L6).  The
        trapping key is at [false] -- the U tier's run is
        ([UexecRet.ukcq]) -- and every row but sbrk's is the equation
@@ -1411,6 +1460,11 @@ Section UkRunSys.
       by (refine (usys_mem_ok_lazy _ _ _ _ _ _ _ _ _ _ _ _ Hok);
           first [ assumption | vm_compute; discriminate ]).
     subst lz'.
+    (* ...AND SO DID THE MASK: not seccomp's number, so the row is the
+       equation ([UsysMemOk.usys_secc_ok_quiet]), and the resume key is at
+       the full mask [urun] is keyed at *)
+    pose proof (usys_secc_ok_quiet _ _ _ _ _ ltac:(usys_range) Hscrow) as Hscq.
+    cbn [uvis_secc uvis_of_run] in Hscq. subst secc'.
     assert (Hcw : cw' = cw)
       by (refine (usys_cwd_ok_quiet _ _ _ _ _ Hcwrow); vm_compute; discriminate).
     iDestruct (ucwd_auth_quiet N cw cw' Hcw with "Hcwda") as "Hcwda".
@@ -1558,8 +1612,11 @@ Section UkRunSys.
                    ltac:(vm_compute; reflexivity) Hp Hc)
               with "Hb Hmy").
     rewrite (uexec_ret_ecall _ _ eq_refl).
-    assert (Hnum : usys_num (uvis_tf (uvis_of_run m pc M pm sz fdv cw gn cs pidv false secc_all)) = USYS_close).
-    { cbn [uvis_tf uvis_of_run]. rewrite tf_of_num. exact Hn. }
+    assert (Hnum : uvis_num (uvis_of_run m pc M pm sz fdv cw gn cs pidv false secc_all) = USYS_close).
+    { rewrite uvis_num_full0.
+      - cbn [uvis_tf uvis_of_run]. rewrite tf_of_num. exact Hn.
+      - reflexivity.
+      - cbn [uvis_tf uvis_of_run]. rewrite tf_of_num, Hn. usys_range. }
     (* the PAYMENT's guard IS the deposit's own, so it is opened BEFORE the
        number is rewritten and the destructs below then reduce both copies
        at once *)
@@ -1583,7 +1640,7 @@ Section UkRunSys.
     cbn [uvis_gen uvis_of_run].
     iSplitR; [ iFrame "Hmy" | ].
     iSplitL "Hdepn"; [ iExact "Hdepn" | ].
-    iIntros (r M' pm' sz' fdv' cw' gn' cs' lz') "%Hok %Hfdok %Hpiperow %Hcwrow %Hgnrow %Hpidrow %Hliverow %Hchrow _".
+    iIntros (r M' pm' sz' fdv' cw' gn' cs' lz' secc') \"%Hok %Hfdok %Hpiperow %Hcwrow %Hgnrow %Hpidrow %Hliverow %Hscrow %Hchrow _".
     (* THE LAZY BIT CROSSED THE TRAP UNCHANGED (lane LAZY-FLAG, L6).  The
        trapping key is at [false] -- the U tier's run is
        ([UexecRet.ukcq]) -- and every row but sbrk's is the equation
@@ -1593,6 +1650,11 @@ Section UkRunSys.
       by (refine (usys_mem_ok_lazy _ _ _ _ _ _ _ _ _ _ _ _ Hok);
           first [ assumption | vm_compute; discriminate ]).
     subst lz'.
+    (* ...AND SO DID THE MASK: not seccomp's number, so the row is the
+       equation ([UsysMemOk.usys_secc_ok_quiet]), and the resume key is at
+       the full mask [urun] is keyed at *)
+    pose proof (usys_secc_ok_quiet _ _ _ _ _ ltac:(usys_range) Hscrow) as Hscq.
+    cbn [uvis_secc uvis_of_run] in Hscq. subst secc'.
     (* THE CWD CROSSED THE TRAP UNCHANGED -- chdir is the one row that moves
        it, and this is not it -- so the engine's half is re-keyed onto the
        view the process resumes at and the program's half never moved. *)
@@ -1673,8 +1735,11 @@ Section UkRunSys.
                    ltac:(vm_compute; reflexivity) Hp Hc)
               with "Hb Hmy").
     rewrite (uexec_ret_ecall _ _ eq_refl).
-    assert (Hnum : usys_num (uvis_tf (uvis_of_run m pc M pm sz fdv cw gn cs pidv false secc_all)) = USYS_close).
-    { cbn [uvis_tf uvis_of_run]. rewrite tf_of_num. exact Hn. }
+    assert (Hnum : uvis_num (uvis_of_run m pc M pm sz fdv cw gn cs pidv false secc_all) = USYS_close).
+    { rewrite uvis_num_full0.
+      - cbn [uvis_tf uvis_of_run]. rewrite tf_of_num. exact Hn.
+      - reflexivity.
+      - cbn [uvis_tf uvis_of_run]. rewrite tf_of_num, Hn. usys_range. }
     (* the PAYMENT's guard IS the deposit's own, so it is opened BEFORE the
        number is rewritten and the destructs below then reduce both copies
        at once *)
@@ -1698,7 +1763,7 @@ Section UkRunSys.
     cbn [uvis_gen uvis_of_run].
     iSplitR; [ iFrame "Hmy" | ].
     iSplitL "Hdepn"; [ iExact "Hdepn" | ].
-    iIntros (r M' pm' sz' fdv' cw' gn' cs' lz') "%Hok %Hfdok %Hpiperow %Hcwrow %Hgnrow %Hpidrow %Hliverow %Hchrow _".
+    iIntros (r M' pm' sz' fdv' cw' gn' cs' lz' secc') \"%Hok %Hfdok %Hpiperow %Hcwrow %Hgnrow %Hpidrow %Hliverow %Hscrow %Hchrow _".
     (* THE LAZY BIT CROSSED THE TRAP UNCHANGED (lane LAZY-FLAG, L6).  The
        trapping key is at [false] -- the U tier's run is
        ([UexecRet.ukcq]) -- and every row but sbrk's is the equation
@@ -1708,6 +1773,11 @@ Section UkRunSys.
       by (refine (usys_mem_ok_lazy _ _ _ _ _ _ _ _ _ _ _ _ Hok);
           first [ assumption | vm_compute; discriminate ]).
     subst lz'.
+    (* ...AND SO DID THE MASK: not seccomp's number, so the row is the
+       equation ([UsysMemOk.usys_secc_ok_quiet]), and the resume key is at
+       the full mask [urun] is keyed at *)
+    pose proof (usys_secc_ok_quiet _ _ _ _ _ ltac:(usys_range) Hscrow) as Hscq.
+    cbn [uvis_secc uvis_of_run] in Hscq. subst secc'.
     (* THE CWD CROSSED THE TRAP UNCHANGED -- chdir is the one row that moves
        it, and this is not it -- so the engine's half is re-keyed onto the
        view the process resumes at and the program's half never moved. *)
@@ -1798,8 +1868,11 @@ Section UkRunSys.
                    ltac:(vm_compute; reflexivity) Hp Hc)
               with "Hb Hmy").
     rewrite (uexec_ret_ecall _ _ eq_refl).
-    assert (Hnum : usys_num (uvis_tf (uvis_of_run m pc M pm sz fdv cw gn cs pidv false secc_all)) = USYS_exec).
-    { cbn [uvis_tf uvis_of_run]. rewrite tf_of_num. exact Hn. }
+    assert (Hnum : uvis_num (uvis_of_run m pc M pm sz fdv cw gn cs pidv false secc_all) = USYS_exec).
+    { rewrite uvis_num_full0.
+      - cbn [uvis_tf uvis_of_run]. rewrite tf_of_num. exact Hn.
+      - reflexivity.
+      - cbn [uvis_tf uvis_of_run]. rewrite tf_of_num, Hn. usys_range. }
     (* the PAYMENT's guard IS the deposit's own, so it is opened BEFORE the
        number is rewritten and the destructs below then reduce both copies
        at once *)
@@ -1823,7 +1896,7 @@ Section UkRunSys.
     cbn [uvis_gen uvis_of_run].
     iSplitR; [ iFrame "Hmy" | ].
     iSplitL "Hdepn"; [ iExact "Hdepn" | ].
-    iIntros (r M' pm' sz' fdv' cw' gn' cs' lz') "%Hok %Hfdok %Hpiperow %Hcwrow %Hgnrow %Hpidrow %Hliverow %Hchrow _".
+    iIntros (r M' pm' sz' fdv' cw' gn' cs' lz' secc') \"%Hok %Hfdok %Hpiperow %Hcwrow %Hgnrow %Hpidrow %Hliverow %Hscrow %Hchrow _".
     (* THE LAZY BIT CROSSED THE TRAP UNCHANGED (lane LAZY-FLAG, L6).  The
        trapping key is at [false] -- the U tier's run is
        ([UexecRet.ukcq]) -- and every row but sbrk's is the equation
@@ -1833,6 +1906,11 @@ Section UkRunSys.
       by (refine (usys_mem_ok_lazy _ _ _ _ _ _ _ _ _ _ _ _ Hok);
           first [ assumption | vm_compute; discriminate ]).
     subst lz'.
+    (* ...AND SO DID THE MASK: not seccomp's number, so the row is the
+       equation ([UsysMemOk.usys_secc_ok_quiet]), and the resume key is at
+       the full mask [urun] is keyed at *)
+    pose proof (usys_secc_ok_quiet _ _ _ _ _ ltac:(usys_range) Hscrow) as Hscq.
+    cbn [uvis_secc uvis_of_run] in Hscq. subst secc'.
     (* THE CWD CROSSED THE TRAP UNCHANGED -- chdir is the one row that moves
        it, and this is not it -- so the engine's half is re-keyed onto the
        view the process resumes at and the program's half never moved. *)
@@ -1941,8 +2019,11 @@ Section UkRunSys.
                    ltac:(vm_compute; reflexivity) Hp Hc)
               with "Hb Hmy").
     rewrite (uexec_ret_ecall _ _ eq_refl).
-    assert (Hnum : usys_num (uvis_tf (uvis_of_run m pc M pm sz fdv c gn cs pidv false secc_all)) = USYS_exec).
-    { cbn [uvis_tf uvis_of_run]. rewrite tf_of_num. exact Hn. }
+    assert (Hnum : uvis_num (uvis_of_run m pc M pm sz fdv c gn cs pidv false secc_all) = USYS_exec).
+    { rewrite uvis_num_full0.
+      - cbn [uvis_tf uvis_of_run]. rewrite tf_of_num. exact Hn.
+      - reflexivity.
+      - cbn [uvis_tf uvis_of_run]. rewrite tf_of_num, Hn. usys_range. }
     (* the PAYMENT's guard IS the deposit's own, so it is opened BEFORE the
        number is rewritten and the destructs below then reduce both copies
        at once *)
@@ -1967,7 +2048,7 @@ Section UkRunSys.
        to be [emp] and is a wand from "the answer was -1" now
        ([UexecSG.spost_at_exec]), which is exactly the branch this leaf is
        on -- a successful exec never resumes here. *)
-    iIntros (r M' pm' sz' fdv' cw' gn' cs' lz') "%Hok %Hfdok %Hpiperow %Hcwrow %Hgnrow %Hpidrow %Hliverow %Hchrow Hsp".
+    iIntros (r M' pm' sz' fdv' cw' gn' cs' lz' secc') \"%Hok %Hfdok %Hpiperow %Hcwrow %Hgnrow %Hpidrow %Hliverow %Hscrow %Hchrow Hsp".
     (* THE LAZY BIT CROSSED THE TRAP UNCHANGED (lane LAZY-FLAG, L6).  The
        trapping key is at [false] -- the U tier's run is
        ([UexecRet.ukcq]) -- and every row but sbrk's is the equation
@@ -1977,6 +2058,11 @@ Section UkRunSys.
       by (refine (usys_mem_ok_lazy _ _ _ _ _ _ _ _ _ _ _ _ Hok);
           first [ assumption | vm_compute; discriminate ]).
     subst lz'.
+    (* ...AND SO DID THE MASK: not seccomp's number, so the row is the
+       equation ([UsysMemOk.usys_secc_ok_quiet]), and the resume key is at
+       the full mask [urun] is keyed at *)
+    pose proof (usys_secc_ok_quiet _ _ _ _ _ ltac:(usys_range) Hscrow) as Hscq.
+    cbn [uvis_secc uvis_of_run] in Hscq. subst secc'.
     assert (Hcw : cw' = c)
       by (refine (usys_cwd_ok_quiet _ _ _ _ _ Hcwrow); vm_compute; discriminate).
     iDestruct (ucwd_auth_quiet N c cw' Hcw with "Hcwda") as "Hcwda".
@@ -2080,6 +2166,8 @@ Section UkRunSys.
               ltac:(unfold USYS_kill, USYS_dup; lia)
               ltac:(unfold USYS_kill, USYS_open; lia)
               ltac:(unfold USYS_kill, USYS_chdir; lia)
+              ltac:(unfold USYS_kill; lia)
+              ltac:(unfold USYS_kill, USYS_seccomp; lia)
               Hal4 with "Hi Hrun Hsb Hcont").
   Qed.
 
@@ -2167,8 +2255,11 @@ Section UkRunSys.
                    ltac:(vm_compute; reflexivity) Hp Hc)
               with "Hb Hmy").
     rewrite (uexec_ret_ecall _ _ eq_refl).
-    assert (Hnum : usys_num (uvis_tf (uvis_of_run m pc M pm sz fdv cw gn cs pidv false secc_all)) = USYS_wait).
-    { cbn [uvis_tf uvis_of_run]. rewrite tf_of_num. exact Hn. }
+    assert (Hnum : uvis_num (uvis_of_run m pc M pm sz fdv cw gn cs pidv false secc_all) = USYS_wait).
+    { rewrite uvis_num_full0.
+      - cbn [uvis_tf uvis_of_run]. rewrite tf_of_num. exact Hn.
+      - reflexivity.
+      - cbn [uvis_tf uvis_of_run]. rewrite tf_of_num, Hn. usys_range. }
     assert (Ha0 : uint (uvis_tf (uvis_of_run m pc M pm sz fdv cw gn cs pidv false secc_all) !!! tf_arg_idx 0) = 0).
     { cbn [uvis_tf uvis_of_run]. rewrite tf_of_arg0. exact Hz. }
     (* the PAYMENT's guard IS the deposit's own, so it is opened BEFORE the
@@ -2199,7 +2290,7 @@ Section UkRunSys.
     cbn [uvis_gen uvis_of_run].
     iSplitR; [ iFrame "Hmy" | ].
     iSplitL "Hdepn"; [ iExact "Hdepn" | ].
-    iIntros (r M' pm' sz' fdv' cw' gn' cs' lz') "%Hok %Hfdok %Hpiperow %Hcwrow %Hgnrow %Hpidrow %Hliverow Hans _".
+    iIntros (r M' pm' sz' fdv' cw' gn' cs' lz' secc') \"%Hok %Hfdok %Hpiperow %Hcwrow %Hgnrow %Hpidrow %Hliverow %Hscrow Hans _".
     (* THE LAZY BIT CROSSED THE TRAP UNCHANGED (lane LAZY-FLAG, L6).  The
        trapping key is at [false] -- the U tier's run is
        ([UexecRet.ukcq]) -- and every row but sbrk's is the equation
@@ -2209,6 +2300,11 @@ Section UkRunSys.
       by (refine (usys_mem_ok_lazy _ _ _ _ _ _ _ _ _ _ _ _ Hok);
           first [ assumption | vm_compute; discriminate ]).
     subst lz'.
+    (* ...AND SO DID THE MASK: not seccomp's number, so the row is the
+       equation ([UsysMemOk.usys_secc_ok_quiet]), and the resume key is at
+       the full mask [urun] is keyed at *)
+    pose proof (usys_secc_ok_quiet _ _ _ _ _ ltac:(usys_range) Hscrow) as Hscq.
+    cbn [uvis_secc uvis_of_run] in Hscq. subst secc'.
     (* THE CWD CROSSED THE TRAP UNCHANGED -- chdir is the one row that moves
        it, and this is not it -- so the engine's half is re-keyed onto the
        view the process resumes at and the program's half never moved. *)
@@ -2512,8 +2608,11 @@ Section UkRunSys.
                    ltac:(vm_compute; reflexivity) Hp Hc)
               with "Hb Hmy").
     rewrite (uexec_ret_ecall _ _ eq_refl).
-    assert (Hnum : usys_num (uvis_tf (uvis_of_run m pc M pm sz fdv cw gn cs pidv false secc_all)) = USYS_wait).
-    { cbn [uvis_tf uvis_of_run]. rewrite tf_of_num. exact Hn. }
+    assert (Hnum : uvis_num (uvis_of_run m pc M pm sz fdv cw gn cs pidv false secc_all) = USYS_wait).
+    { rewrite uvis_num_full0.
+      - cbn [uvis_tf uvis_of_run]. rewrite tf_of_num. exact Hn.
+      - reflexivity.
+      - cbn [uvis_tf uvis_of_run]. rewrite tf_of_num, Hn. usys_range. }
     rewrite /uexec_pay_dep /upay_at.
     rewrite Hnum. cbv zeta.
     destruct (decide (uecall_scause = uecall_scause)) as [_ | Hpne];
@@ -2529,11 +2628,16 @@ Section UkRunSys.
     cbn [uvis_gen uvis_of_run].
     iSplitR; [ iFrame "Hmy" | ].
     iSplitL "Hdepn"; [ iExact "Hdepn" | ].
-    iIntros (r M' pm' sz' fdv' cw' gn' cs' lz') "%Hok %Hfdok %Hpiperow %Hcwrow %Hgnrow %Hpidrow %Hliverow Hans _".
+    iIntros (r M' pm' sz' fdv' cw' gn' cs' lz' secc') \"%Hok %Hfdok %Hpiperow %Hcwrow %Hgnrow %Hpidrow %Hliverow %Hscrow Hans _".
     assert (Hlzq : lz' = false)
       by (refine (usys_mem_ok_lazy _ _ _ _ _ _ _ _ _ _ _ _ Hok);
           first [ assumption | vm_compute; discriminate ]).
     subst lz'.
+    (* ...AND SO DID THE MASK: not seccomp's number, so the row is the
+       equation ([UsysMemOk.usys_secc_ok_quiet]), and the resume key is at
+       the full mask [urun] is keyed at *)
+    pose proof (usys_secc_ok_quiet _ _ _ _ _ ltac:(usys_range) Hscrow) as Hscq.
+    cbn [uvis_secc uvis_of_run] in Hscq. subst secc'.
     assert (Hcw : cw' = cw)
       by (refine (usys_cwd_ok_quiet _ _ _ _ _ Hcwrow); vm_compute; discriminate).
     iDestruct (ucwd_auth_quiet N cw cw' Hcw with "Hcwda") as "Hcwda".
@@ -2722,8 +2826,11 @@ Section UkRunSys.
                    ltac:(vm_compute; reflexivity) Hp Hc)
               with "Hb Hmy").
     rewrite (uexec_ret_ecall _ _ eq_refl).
-    assert (Hnum : usys_num (uvis_tf (uvis_of_run m pc M pm sz fdv cw gn cs pidv false secc_all)) = n).
-    { cbn [uvis_tf uvis_of_run]. rewrite tf_of_num. exact Hn. }
+    assert (Hnum : uvis_num (uvis_of_run m pc M pm sz fdv cw gn cs pidv false secc_all) = n).
+    { rewrite uvis_num_full0.
+      - cbn [uvis_tf uvis_of_run]. rewrite tf_of_num. exact Hn.
+      - reflexivity.
+      - cbn [uvis_tf uvis_of_run]. rewrite tf_of_num, Hn. usys_range. }
     assert (Hw : usys_win n (uvis_tf (uvis_of_run m pc M pm sz fdv cw gn cs pidv false secc_all))
                  = Some (dst, cap)).
     { cbn [uvis_tf uvis_of_run]. rewrite usyswin_tf_of. exact Hwin. }
@@ -2750,7 +2857,7 @@ Section UkRunSys.
     cbn [uvis_gen uvis_of_run].
     iSplitR; [ iFrame "Hmy" | ].
     iSplitL "Hdepn"; [ iExact "Hdepn" | ].
-    iIntros (r M' pm' sz' fdv' cw' gn' cs' lz') "%Hok %Hfdok %Hpiperow %Hcwrow %Hgnrow %Hpidrow %Hliverow %Hchrow _".
+    iIntros (r M' pm' sz' fdv' cw' gn' cs' lz' secc') \"%Hok %Hfdok %Hpiperow %Hcwrow %Hgnrow %Hpidrow %Hliverow %Hscrow %Hchrow _".
     (* THE LAZY BIT CROSSED THE TRAP UNCHANGED (lane LAZY-FLAG, L6).  The
        trapping key is at [false] -- the U tier's run is
        ([UexecRet.ukcq]) -- and every row but sbrk's is the equation
@@ -2760,6 +2867,11 @@ Section UkRunSys.
       by (refine (usys_mem_ok_lazy _ _ _ _ _ _ _ _ _ _ _ _ Hok);
           first [ assumption | vm_compute; discriminate ]).
     subst lz'.
+    (* ...AND SO DID THE MASK: not seccomp's number, so the row is the
+       equation ([UsysMemOk.usys_secc_ok_quiet]), and the resume key is at
+       the full mask [urun] is keyed at *)
+    pose proof (usys_secc_ok_quiet _ _ _ _ _ ltac:(usys_range) Hscrow) as Hscq.
+    cbn [uvis_secc uvis_of_run] in Hscq. subst secc'.
     (* THE CWD CROSSED THE TRAP UNCHANGED -- chdir is the one row that moves
        it, and this is not it -- so the engine's half is re-keyed onto the
        view the process resumes at and the program's half never moved. *)
@@ -3045,8 +3157,11 @@ Section UkRunSys.
                    ltac:(vm_compute; reflexivity) Hp Hc)
               with "Hb Hmy").
     rewrite (uexec_ret_ecall _ _ eq_refl).
-    assert (Hnum : usys_num (uvis_tf (uvis_of_run m pc M pm sz fdv cw gn cs pidv false secc_all)) = USYS_pipe).
-    { cbn [uvis_tf uvis_of_run]. rewrite tf_of_num. exact Hn. }
+    assert (Hnum : uvis_num (uvis_of_run m pc M pm sz fdv cw gn cs pidv false secc_all) = USYS_pipe).
+    { rewrite uvis_num_full0.
+      - cbn [uvis_tf uvis_of_run]. rewrite tf_of_num. exact Hn.
+      - reflexivity.
+      - cbn [uvis_tf uvis_of_run]. rewrite tf_of_num, Hn. usys_range. }
     assert (Hw : usys_win USYS_pipe (uvis_tf (uvis_of_run m pc M pm sz fdv cw gn cs pidv false secc_all))
                  = Some (dst, 8%nat)).
     { cbn [uvis_tf uvis_of_run]. rewrite usyswin_tf_of.
@@ -3082,7 +3197,7 @@ Section UkRunSys.
     cbn [uvis_gen uvis_of_run].
     iSplitR; [ iFrame "Hmy" | ].
     iSplitL "Hdepn"; [ iExact "Hdepn" | ].
-    iIntros (r M' pm' sz' fdv' cw' gn' cs' lz') "%Hok %Hfdok %Hpiperow %Hcwrow %Hgnrow %Hpidrow %Hliverow %Hchrow Hsp".
+    iIntros (r M' pm' sz' fdv' cw' gn' cs' lz' secc') \"%Hok %Hfdok %Hpiperow %Hcwrow %Hgnrow %Hpidrow %Hliverow %Hscrow %Hchrow Hsp".
     (* THE POST IS NOT DISCARDED ANY MORE (design/pipe.md, "The byte
        queue"): row 4 hands the process the new pipe's exact fragment, and
        this leaf passes it on unread -- only the instance can open it. *)
@@ -3095,6 +3210,11 @@ Section UkRunSys.
       by (refine (usys_mem_ok_lazy _ _ _ _ _ _ _ _ _ _ _ _ Hok);
           first [ assumption | vm_compute; discriminate ]).
     subst lz'.
+    (* ...AND SO DID THE MASK: not seccomp's number, so the row is the
+       equation ([UsysMemOk.usys_secc_ok_quiet]), and the resume key is at
+       the full mask [urun] is keyed at *)
+    pose proof (usys_secc_ok_quiet _ _ _ _ _ ltac:(usys_range) Hscrow) as Hscq.
+    cbn [uvis_secc uvis_of_run] in Hscq. subst secc'.
     (* THE CWD CROSSED THE TRAP UNCHANGED -- chdir is the one row that moves
        it, and this is not it -- so the engine's half is re-keyed onto the
        view the process resumes at and the program's half never moved. *)
@@ -3677,8 +3797,11 @@ Section UkRunSys.
                    ltac:(vm_compute; reflexivity) Hp Hc)
               with "Hb Hmy").
     rewrite (uexec_ret_ecall _ _ eq_refl).
-    assert (Hnum : usys_num (uvis_tf (uvis_of_run m pc M pm sz fdv cw gn cs pidv false secc_all)) = USYS_read).
-    { cbn [uvis_tf uvis_of_run]. rewrite tf_of_num. exact Hn. }
+    assert (Hnum : uvis_num (uvis_of_run m pc M pm sz fdv cw gn cs pidv false secc_all) = USYS_read).
+    { rewrite uvis_num_full0.
+      - cbn [uvis_tf uvis_of_run]. rewrite tf_of_num. exact Hn.
+      - reflexivity.
+      - cbn [uvis_tf uvis_of_run]. rewrite tf_of_num, Hn. usys_range. }
     assert (Hw : usys_win USYS_read (uvis_tf (uvis_of_run m pc M pm sz fdv cw gn cs pidv false secc_all))
                  = Some (dst, cap)).
     { cbn [uvis_tf uvis_of_run]. rewrite usyswin_tf_of. exact Hwin. }
@@ -3696,8 +3819,8 @@ Section UkRunSys.
     cbn [uvis_gen uvis_of_run].
     iSplitR; [ iFrame "Hmy" | ].
     iSplitL "Hdepn"; [ iExact "Hdepn" | ].
-    iIntros (r M' pm' sz' fdv' cw' gn' cs' lz')
-      "%Hok %Hfdok %Hpiperow %Hcwrow %Hgnrow %Hpidrow %Hliverow %Hchrow Hpost".
+    iIntros (r M' pm' sz' fdv' cw' gn' cs' lz' secc')
+      \"%Hok %Hfdok %Hpiperow %Hcwrow %Hgnrow %Hpidrow %Hliverow %Hscrow %Hchrow Hpost".
     (* THE LAZY BIT CROSSED THE TRAP UNCHANGED (lane LAZY-FLAG, L6).  The
        trapping key is at [false] -- the U tier's run is
        ([UexecRet.ukcq]) -- and every row but sbrk's is the equation
@@ -3707,6 +3830,11 @@ Section UkRunSys.
       by (refine (usys_mem_ok_lazy _ _ _ _ _ _ _ _ _ _ _ _ Hok);
           first [ assumption | vm_compute; discriminate ]).
     subst lz'.
+    (* ...AND SO DID THE MASK: not seccomp's number, so the row is the
+       equation ([UsysMemOk.usys_secc_ok_quiet]), and the resume key is at
+       the full mask [urun] is keyed at *)
+    pose proof (usys_secc_ok_quiet _ _ _ _ _ ltac:(usys_range) Hscrow) as Hscq.
+    cbn [uvis_secc uvis_of_run] in Hscq. subst secc'.
     assert (Hcw : cw' = cw)
       by (refine (usys_cwd_ok_quiet _ _ _ _ _ Hcwrow); vm_compute; discriminate).
     iDestruct (ucwd_auth_quiet N cw cw' Hcw with "Hcwda") as "Hcwda".
@@ -3987,8 +4115,11 @@ Section UkRunSys.
                    ltac:(vm_compute; reflexivity) Hp Hc)
               with "Hb Hmy").
     rewrite (uexec_ret_ecall _ _ eq_refl).
-    assert (Hnum : usys_num (uvis_tf (uvis_of_run m pc M pm sz fdv c gn cs pidv false secc_all)) = USYS_open).
-    { cbn [uvis_tf uvis_of_run]. rewrite tf_of_num. exact Hn. }
+    assert (Hnum : uvis_num (uvis_of_run m pc M pm sz fdv c gn cs pidv false secc_all) = USYS_open).
+    { rewrite uvis_num_full0.
+      - cbn [uvis_tf uvis_of_run]. rewrite tf_of_num. exact Hn.
+      - reflexivity.
+      - cbn [uvis_tf uvis_of_run]. rewrite tf_of_num, Hn. usys_range. }
     rewrite /uexec_pay_dep /upay_at.
     rewrite Hnum. cbv zeta.
     destruct (decide (uecall_scause = uecall_scause)) as [_ | Hpne];
@@ -4001,8 +4132,8 @@ Section UkRunSys.
     cbn [uvis_gen uvis_of_run].
     iSplitR; [ iFrame "Hmy" | ].
     iSplitL "Hdepn"; [ iExact "Hdepn" | ].
-    iIntros (r M' pm' sz' fdv' cw' gn' cs' lz')
-      "%Hok %Hfdok %Hpiperow %Hcwrow %Hgnrow %Hpidrow %Hliverow %Hchrow Hpost".
+    iIntros (r M' pm' sz' fdv' cw' gn' cs' lz' secc')
+      \"%Hok %Hfdok %Hpiperow %Hcwrow %Hgnrow %Hpidrow %Hliverow %Hscrow %Hchrow Hpost".
     (* THE LAZY BIT CROSSED THE TRAP UNCHANGED (lane LAZY-FLAG, L6).  The
        trapping key is at [false] -- the U tier's run is
        ([UexecRet.ukcq]) -- and every row but sbrk's is the equation
@@ -4012,6 +4143,11 @@ Section UkRunSys.
       by (refine (usys_mem_ok_lazy _ _ _ _ _ _ _ _ _ _ _ _ Hok);
           first [ assumption | vm_compute; discriminate ]).
     subst lz'.
+    (* ...AND SO DID THE MASK: not seccomp's number, so the row is the
+       equation ([UsysMemOk.usys_secc_ok_quiet]), and the resume key is at
+       the full mask [urun] is keyed at *)
+    pose proof (usys_secc_ok_quiet _ _ _ _ _ ltac:(usys_range) Hscrow) as Hscq.
+    cbn [uvis_secc uvis_of_run] in Hscq. subst secc'.
     assert (Hcw : cw' = c)
       by (refine (usys_cwd_ok_quiet _ _ _ _ _ Hcwrow); vm_compute; discriminate).
     assert (Hgn : gn' = gn) by exact (usys_gen_ok_quiet _ _ _ Hgnrow).
@@ -4143,8 +4279,11 @@ Section UkRunSys.
                    ltac:(vm_compute; reflexivity) Hp Hc)
               with "Hb Hmy").
     rewrite (uexec_ret_ecall _ _ eq_refl).
-    assert (Hnum : usys_num (uvis_tf (uvis_of_run m pc M pm sz fdv c gn cs pidv false secc_all)) = n).
-    { cbn [uvis_tf uvis_of_run]. rewrite tf_of_num. exact Hn. }
+    assert (Hnum : uvis_num (uvis_of_run m pc M pm sz fdv c gn cs pidv false secc_all) = n).
+    { rewrite uvis_num_full0.
+      - cbn [uvis_tf uvis_of_run]. rewrite tf_of_num. exact Hn.
+      - reflexivity.
+      - cbn [uvis_tf uvis_of_run]. rewrite tf_of_num, Hn. usys_range. }
     rewrite /uexec_pay_dep /upay_at.
     rewrite Hnum. cbv zeta.
     destruct (decide (uecall_scause = uecall_scause)) as [_ | Hpne];
@@ -4156,8 +4295,8 @@ Section UkRunSys.
     cbn [uvis_gen uvis_of_run].
     iSplitR; [ iFrame "Hmy" | ].
     iSplitL "Hdepn"; [ iExact "Hdepn" | ].
-    iIntros (r M' pm' sz' fdv' cw' gn' cs' lz')
-      "%Hok %Hfdok %Hpiperow %Hcwrow %Hgnrow %Hpidrow %Hliverow %Hchrow Hpost".
+    iIntros (r M' pm' sz' fdv' cw' gn' cs' lz' secc')
+      \"%Hok %Hfdok %Hpiperow %Hcwrow %Hgnrow %Hpidrow %Hliverow %Hscrow %Hchrow Hpost".
     (* THE LAZY BIT CROSSED THE TRAP UNCHANGED (lane LAZY-FLAG, L6).  The
        trapping key is at [false] -- the U tier's run is
        ([UexecRet.ukcq]) -- and every row but sbrk's is the equation
@@ -4167,6 +4306,11 @@ Section UkRunSys.
       by (refine (usys_mem_ok_lazy _ _ _ _ _ _ _ _ _ _ _ _ Hok);
           first [ assumption | vm_compute; discriminate ]).
     subst lz'.
+    (* ...AND SO DID THE MASK: not seccomp's number, so the row is the
+       equation ([UsysMemOk.usys_secc_ok_quiet]), and the resume key is at
+       the full mask [urun] is keyed at *)
+    pose proof (usys_secc_ok_quiet _ _ _ _ _ ltac:(usys_range) Hscrow) as Hscq.
+    cbn [uvis_secc uvis_of_run] in Hscq. subst secc'.
     assert (Hcw : cw' = c) by (exact (usys_cwd_ok_quiet n r c cw' Hcd Hcwrow)).
     assert (Hgn : gn' = gn) by exact (usys_gen_ok_quiet _ _ _ Hgnrow).
     assert (Hch : cs' = cs) by exact (usys_ch_ok_quiet _ _ _ _ Hchrow).
@@ -4426,8 +4570,11 @@ Section UkRunSys.
                    ltac:(vm_compute; reflexivity) Hp Hc)
               with "Hb Hmy").
     rewrite (uexec_ret_ecall _ _ eq_refl).
-    assert (Hnum : usys_num (uvis_tf (uvis_of_run m pc M pm sz fdv cw gn cs pidv false secc_all)) = 16).
-    { cbn [uvis_tf uvis_of_run]. rewrite tf_of_num. exact Hn. }
+    assert (Hnum : uvis_num (uvis_of_run m pc M pm sz fdv cw gn cs pidv false secc_all) = 16).
+    { rewrite uvis_num_full0.
+      - cbn [uvis_tf uvis_of_run]. rewrite tf_of_num. exact Hn.
+      - reflexivity.
+      - cbn [uvis_tf uvis_of_run]. rewrite tf_of_num, Hn. usys_range. }
     rewrite /uexec_pay_dep /upay_at.
     rewrite Hnum. cbv zeta.
     destruct (decide (uecall_scause = uecall_scause)) as [_ | Hpne];
@@ -4439,14 +4586,19 @@ Section UkRunSys.
     cbn [uvis_gen uvis_of_run].
     iSplitR; [ iFrame "Hmy" | ].
     iSplitL "Hdepn"; [ iExact "Hdepn" | ].
-    iIntros (r M' pm' sz' fdv' cw' gn' cs' lz')
-      "%Hok %Hfdok %Hpiperow %Hcwrow %Hgnrow %Hpidrow %Hliverow %Hchrow Hpost".
+    iIntros (r M' pm' sz' fdv' cw' gn' cs' lz' secc')
+      \"%Hok %Hfdok %Hpiperow %Hcwrow %Hgnrow %Hpidrow %Hliverow %Hscrow %Hchrow Hpost".
     (* THE LAZY BIT, THE CWD, THE GENERATION AND THE CHILDREN ALL CROSSED
        THE TRAP UNCHANGED: 16 is none of the rows that move them. *)
     assert (Hlzq : lz' = false)
       by (refine (usys_mem_ok_lazy _ _ _ _ _ _ _ _ _ _ _ _ Hok);
           vm_compute; discriminate).
     subst lz'.
+    (* ...AND SO DID THE MASK: not seccomp's number, so the row is the
+       equation ([UsysMemOk.usys_secc_ok_quiet]), and the resume key is at
+       the full mask [urun] is keyed at *)
+    pose proof (usys_secc_ok_quiet _ _ _ _ _ ltac:(usys_range) Hscrow) as Hscq.
+    cbn [uvis_secc uvis_of_run] in Hscq. subst secc'.
     assert (Hcw : cw' = cw)
       by (refine (usys_cwd_ok_quiet _ _ _ _ _ Hcwrow); vm_compute; discriminate).
     assert (Hgn : gn' = gn) by exact (usys_gen_ok_quiet _ _ _ Hgnrow).
@@ -4862,8 +5014,11 @@ Section UkRunSys.
                    ltac:(vm_compute; reflexivity) Hp Hc)
               with "Hb Hmy").
     rewrite (uexec_ret_ecall _ _ eq_refl).
-    assert (Hnum : usys_num (uvis_tf (uvis_of_run m pc M pm sz fdv c gn cs pidv false secc_all)) = USYS_open).
-    { cbn [uvis_tf uvis_of_run]. rewrite tf_of_num. exact Hn. }
+    assert (Hnum : uvis_num (uvis_of_run m pc M pm sz fdv c gn cs pidv false secc_all) = USYS_open).
+    { rewrite uvis_num_full0.
+      - cbn [uvis_tf uvis_of_run]. rewrite tf_of_num. exact Hn.
+      - reflexivity.
+      - cbn [uvis_tf uvis_of_run]. rewrite tf_of_num, Hn. usys_range. }
     rewrite /uexec_pay_dep /upay_at.
     rewrite Hnum. cbv zeta.
     destruct (decide (uecall_scause = uecall_scause)) as [_ | Hpne];
@@ -4876,8 +5031,8 @@ Section UkRunSys.
     cbn [uvis_gen uvis_of_run].
     iSplitR; [ iFrame "Hmy" | ].
     iSplitL "Hdepn"; [ iExact "Hdepn" | ].
-    iIntros (r M' pm' sz' fdv' cw' gn' cs' lz')
-      "%Hok %Hfdok %Hpiperow %Hcwrow %Hgnrow %Hpidrow %Hliverow %Hchrow Hpost".
+    iIntros (r M' pm' sz' fdv' cw' gn' cs' lz' secc')
+      \"%Hok %Hfdok %Hpiperow %Hcwrow %Hgnrow %Hpidrow %Hliverow %Hscrow %Hchrow Hpost".
     (* THE LAZY BIT CROSSED THE TRAP UNCHANGED (lane LAZY-FLAG, L6).  The
        trapping key is at [false] -- the U tier's run is
        ([UexecRet.ukcq]) -- and every row but sbrk's is the equation
@@ -4887,6 +5042,11 @@ Section UkRunSys.
       by (refine (usys_mem_ok_lazy _ _ _ _ _ _ _ _ _ _ _ _ Hok);
           first [ assumption | vm_compute; discriminate ]).
     subst lz'.
+    (* ...AND SO DID THE MASK: not seccomp's number, so the row is the
+       equation ([UsysMemOk.usys_secc_ok_quiet]), and the resume key is at
+       the full mask [urun] is keyed at *)
+    pose proof (usys_secc_ok_quiet _ _ _ _ _ ltac:(usys_range) Hscrow) as Hscq.
+    cbn [uvis_secc uvis_of_run] in Hscq. subst secc'.
     assert (Hcw : cw' = c)
       by (refine (usys_cwd_ok_quiet _ _ _ _ _ Hcwrow); vm_compute; discriminate).
     assert (Hgn : gn' = gn) by exact (usys_gen_ok_quiet _ _ _ Hgnrow).
@@ -5110,8 +5270,11 @@ Section UkRunSys.
                    ltac:(vm_compute; reflexivity) Hp Hc)
               with "Hb Hmy").
     rewrite (uexec_ret_ecall _ _ eq_refl).
-    assert (Hnum : usys_num (uvis_tf (uvis_of_run m pc M pm sz fdv c gn cs pidv false secc_all)) = USYS_open).
-    { cbn [uvis_tf uvis_of_run]. rewrite tf_of_num. exact Hn. }
+    assert (Hnum : uvis_num (uvis_of_run m pc M pm sz fdv c gn cs pidv false secc_all) = USYS_open).
+    { rewrite uvis_num_full0.
+      - cbn [uvis_tf uvis_of_run]. rewrite tf_of_num. exact Hn.
+      - reflexivity.
+      - cbn [uvis_tf uvis_of_run]. rewrite tf_of_num, Hn. usys_range. }
     rewrite /uexec_pay_dep /upay_at.
     rewrite Hnum. cbv zeta.
     destruct (decide (uecall_scause = uecall_scause)) as [_ | Hpne];
@@ -5124,8 +5287,8 @@ Section UkRunSys.
     cbn [uvis_gen uvis_of_run].
     iSplitR; [ iFrame "Hmy" | ].
     iSplitL "Hdepn"; [ iExact "Hdepn" | ].
-    iIntros (r M' pm' sz' fdv' cw' gn' cs' lz')
-      "%Hok %Hfdok %Hpiperow %Hcwrow %Hgnrow %Hpidrow %Hliverow %Hchrow Hpost".
+    iIntros (r M' pm' sz' fdv' cw' gn' cs' lz' secc')
+      \"%Hok %Hfdok %Hpiperow %Hcwrow %Hgnrow %Hpidrow %Hliverow %Hscrow %Hchrow Hpost".
     (* THE LAZY BIT CROSSED THE TRAP UNCHANGED (lane LAZY-FLAG, L6).  The
        trapping key is at [false] -- the U tier's run is
        ([UexecRet.ukcq]) -- and every row but sbrk's is the equation
@@ -5135,6 +5298,11 @@ Section UkRunSys.
       by (refine (usys_mem_ok_lazy _ _ _ _ _ _ _ _ _ _ _ _ Hok);
           first [ assumption | vm_compute; discriminate ]).
     subst lz'.
+    (* ...AND SO DID THE MASK: not seccomp's number, so the row is the
+       equation ([UsysMemOk.usys_secc_ok_quiet]), and the resume key is at
+       the full mask [urun] is keyed at *)
+    pose proof (usys_secc_ok_quiet _ _ _ _ _ ltac:(usys_range) Hscrow) as Hscq.
+    cbn [uvis_secc uvis_of_run] in Hscq. subst secc'.
     assert (Hcw : cw' = c)
       by (refine (usys_cwd_ok_quiet _ _ _ _ _ Hcwrow); vm_compute; discriminate).
     assert (Hgn : gn' = gn) by exact (usys_gen_ok_quiet _ _ _ Hgnrow).
@@ -5307,8 +5475,11 @@ Section UkRunSys.
                    ltac:(vm_compute; reflexivity) Hp Hc)
               with "Hb Hmy").
     rewrite (uexec_ret_ecall _ _ eq_refl).
-    assert (Hnum : usys_num (uvis_tf (uvis_of_run m pc M pm sz fdv c gn cs pidv false secc_all)) = n).
-    { cbn [uvis_tf uvis_of_run]. rewrite tf_of_num. exact Hn. }
+    assert (Hnum : uvis_num (uvis_of_run m pc M pm sz fdv c gn cs pidv false secc_all) = n).
+    { rewrite uvis_num_full0.
+      - cbn [uvis_tf uvis_of_run]. rewrite tf_of_num. exact Hn.
+      - reflexivity.
+      - cbn [uvis_tf uvis_of_run]. rewrite tf_of_num, Hn. usys_range. }
     rewrite /uexec_pay_dep /upay_at.
     rewrite Hnum. cbv zeta.
     destruct (decide (uecall_scause = uecall_scause)) as [_ | Hpne];
@@ -5320,8 +5491,8 @@ Section UkRunSys.
     cbn [uvis_gen uvis_of_run].
     iSplitR; [ iFrame "Hmy" | ].
     iSplitL "Hdepn"; [ iExact "Hdepn" | ].
-    iIntros (r M' pm' sz' fdv' cw' gn' cs' lz')
-      "%Hok %Hfdok %Hpiperow %Hcwrow %Hgnrow %Hpidrow %Hliverow %Hchrow Hpost".
+    iIntros (r M' pm' sz' fdv' cw' gn' cs' lz' secc')
+      \"%Hok %Hfdok %Hpiperow %Hcwrow %Hgnrow %Hpidrow %Hliverow %Hscrow %Hchrow Hpost".
     (* THE LAZY BIT CROSSED THE TRAP UNCHANGED (lane LAZY-FLAG, L6).  The
        trapping key is at [false] -- the U tier's run is
        ([UexecRet.ukcq]) -- and every row but sbrk's is the equation
@@ -5331,6 +5502,11 @@ Section UkRunSys.
       by (refine (usys_mem_ok_lazy _ _ _ _ _ _ _ _ _ _ _ _ Hok);
           first [ assumption | vm_compute; discriminate ]).
     subst lz'.
+    (* ...AND SO DID THE MASK: not seccomp's number, so the row is the
+       equation ([UsysMemOk.usys_secc_ok_quiet]), and the resume key is at
+       the full mask [urun] is keyed at *)
+    pose proof (usys_secc_ok_quiet _ _ _ _ _ ltac:(usys_range) Hscrow) as Hscq.
+    cbn [uvis_secc uvis_of_run] in Hscq. subst secc'.
     assert (Hcw : cw' = c) by (exact (usys_cwd_ok_quiet n r c cw' Hcd Hcwrow)).
     assert (Hgn : gn' = gn) by exact (usys_gen_ok_quiet _ _ _ Hgnrow).
     assert (Hch : cs' = cs) by exact (usys_ch_ok_quiet _ _ _ _ Hchrow).
@@ -5490,9 +5666,12 @@ Section UkRunSys.
                    ltac:(vm_compute; reflexivity) Hp Hc)
               with "Hb Hmy").
     rewrite (uexec_ret_ecall _ _ eq_refl).
-    assert (Hnum : usys_num (uvis_tf (uvis_of_run m pc M pm sz fdv cw gn cs pidv false secc_all))
+    assert (Hnum : uvis_num (uvis_of_run m pc M pm sz fdv cw gn cs pidv false secc_all)
                    = USYS_sbrk).
-    { cbn [uvis_tf uvis_of_run]. rewrite tf_of_num. exact Hn. }
+    { rewrite uvis_num_full0.
+      - cbn [uvis_tf uvis_of_run]. rewrite tf_of_num. exact Hn.
+      - reflexivity.
+      - cbn [uvis_tf uvis_of_run]. rewrite tf_of_num, Hn. usys_range. }
     (* the PAYMENT's guard IS the deposit's own, so it is opened BEFORE the
        number is rewritten and the destructs below then reduce both copies
        at once *)
@@ -5516,7 +5695,7 @@ Section UkRunSys.
     cbn [uvis_gen uvis_of_run].
     iSplitR; [ iFrame "Hmy" | ].
     iSplitL "Hdepn"; [ iExact "Hdepn" | ].
-    iIntros (r M' pm' sz' fdv' cw' gn' cs' lz') "%Hok %Hfdok %Hpiperow %Hcwrow %Hgnrow %Hpidrow %Hliverow %Hchrow _".
+    iIntros (r M' pm' sz' fdv' cw' gn' cs' lz' secc') \"%Hok %Hfdok %Hpiperow %Hcwrow %Hgnrow %Hpidrow %Hliverow %Hscrow %Hchrow _".
     (* THE CWD CROSSED THE TRAP UNCHANGED -- chdir is the one row that moves
        it, and this is not it -- so the engine's half is re-keyed onto the
        view the process resumes at and the program's half never moved. *)
@@ -5550,6 +5729,11 @@ Section UkRunSys.
       unfold usys_sbrk_eager. cbn [uvis_tf uvis_of_run].
       rewrite tf_of_arg1. exact Heag. }
     subst lz'.
+    (* ...AND SO DID THE MASK: not seccomp's number, so the row is the
+       equation ([UsysMemOk.usys_secc_ok_quiet]), and the resume key is at
+       the full mask [urun] is keyed at *)
+    pose proof (usys_secc_ok_quiet _ _ _ _ _ ltac:(usys_range) Hscrow) as Hscq.
+    cbn [uvis_secc uvis_of_run] in Hscq. subst secc'.
     (* the descriptor view does not move: sbrk is none of the four *)
     assert (Hview : fdv' = fdv).
     { apply (usys_fd_ok_quiet USYS_sbrk
@@ -5729,8 +5913,11 @@ Section UkRunSys.
                    ltac:(vm_compute; reflexivity) Hp Hc)
               with "Hb Hmy").
     rewrite (uexec_ret_ecall _ _ eq_refl).
-    assert (Hnum : usys_num (uvis_tf (uvis_of_run m pc M pm sz fdv cw gn cs pidv false secc_all)) = USYS_exit).
-    { cbn [uvis_tf uvis_of_run]. rewrite tf_of_num. exact Hn. }
+    assert (Hnum : uvis_num (uvis_of_run m pc M pm sz fdv cw gn cs pidv false secc_all) = USYS_exit).
+    { rewrite uvis_num_full0.
+      - cbn [uvis_tf uvis_of_run]. rewrite tf_of_num. exact Hn.
+      - reflexivity.
+      - cbn [uvis_tf uvis_of_run]. rewrite tf_of_num, Hn. usys_range. }
     (* the PAYMENT's guard IS the deposit's own, so it is opened BEFORE the
        number is rewritten and the destructs below then reduce both copies
        at once *)

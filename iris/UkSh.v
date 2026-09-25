@@ -1085,6 +1085,9 @@ Section UkSh.
     (* ...and chdir, the one row that moves the working directory, which
        [urun] carries the process's own authority over *)
     n <> USYS_chdir ->
+    (* ...and a number the full mask passes, not seccomp's
+       ([UkRunSys.wp_uk_ecall_quiet]'s two new rows) *)
+    (0 <= n < 64)%Z -> n <> USYS_seccomp ->
     add_vec_int (mword_of_int pc0 : mword 64) 2 = mword_of_int pc1 ->
     add_vec_int (mword_of_int pc1 : mword 64) 4 = mword_of_int pc2 ->
     is_aligned_vaddr (Virtaddr (mword_of_int pc2 : mword 64)) 2 = true ->
@@ -1107,7 +1110,7 @@ Section UkSh.
        mWP (Loop : expr riscv_lang)) -∗
     mWP (Loop : expr riscv_lang).
   Proof using .
-    intros Himm Hno He Hf Hx Hs Hw Hp Hr Hst Hcl Hdp Hop Hcd E01 E12 Hal2.
+    intros Himm Hno He Hf Hx Hs Hw Hp Hr Hst Hcl Hdp Hop Hcd Hrng Hn23 E01 E12 Hal2.
     iIntros "#Hdp #Ci0 #Ci1 #Ci2 Hrun Hcont".
     (* ---- pc0  c.li a7,n ---- *)
     iApply (wp_uk_cli N h m (mword_of_int pc0) imm a7_idx avail
@@ -1121,7 +1124,7 @@ Section UkSh.
     set (m1 := <[Regidx a7_idx := (mword_of_int n : mword 64)]> m).
     (* ---- pc1  ecall -- the QUIET row ---- *)
     iApply (wp_uk_ecall_quiet N h1 m1 (mword_of_int pc1) n avail
-              Hno He Hf Hx Hs Hw Hp Hr Hst Hcl Hdp Hop Hcd
+              Hno He Hf Hx Hs Hw Hp Hr Hst Hcl Hdp Hop Hcd Hrng Hn23
               ltac:(rewrite E12; exact Hal2)
               with "Ci1 Hrun []").
     (* THE FLAGGED DEPOSIT, at this stub's own number: its one caller is
@@ -1342,6 +1345,7 @@ Section UkSh.
               (* ...and the three descriptor-moving numbers, and chdir *)
               ltac:(discriminate) ltac:(discriminate) ltac:(discriminate)
               ltac:(discriminate)
+              ltac:(lia) ltac:(discriminate)
               ltac:(apply bv_eq; vm_compute; reflexivity)
               ltac:(apply bv_eq; vm_compute; reflexivity)
               ltac:(vm_compute; reflexivity)

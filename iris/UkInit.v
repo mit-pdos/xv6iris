@@ -640,6 +640,8 @@ Section UkInit.
               (* ...and the three descriptor-moving numbers, and chdir *)
               ltac:(discriminate) ltac:(discriminate) ltac:(discriminate)
               ltac:(discriminate)
+              (* ...and a number the full mask passes, not seccomp's *)
+              ltac:(lia) ltac:(discriminate)
               ltac:(vm_compute; reflexivity)
               with "[] Hrun []").
     { iApply (uis_init_3bc with "Hcode"). }
@@ -1229,6 +1231,8 @@ Section UkInit.
               (* ...and the three descriptor-moving numbers, and chdir *)
               ltac:(discriminate) ltac:(discriminate) ltac:(discriminate)
               ltac:(discriminate)
+              (* ...and a number the full mask passes, not seccomp's *)
+              ltac:(lia) ltac:(discriminate)
               ltac:(vm_compute; reflexivity)
               with "[] Hrun []").
     { iApply (uis_init_394 with "Hcode"). }

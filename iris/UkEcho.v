@@ -1039,6 +1039,8 @@ Section UkEcho.
               (* ...and the three descriptor-moving numbers, and chdir *)
               ltac:(discriminate) ltac:(discriminate) ltac:(discriminate)
               ltac:(discriminate)
+              (* ...and a number the full mask passes, not seccomp's *)
+              ltac:(lia) ltac:(discriminate)
               ltac:(vm_compute; reflexivity)
               with "[] Hrun []").
     { iApply (uis_echo_354 with "Hcode"). }

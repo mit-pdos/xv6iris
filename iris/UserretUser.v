@@ -367,7 +367,7 @@ Section UserretUser.
     (* AND THE CONTINUATION RUNS.  The bundle is built row by row inside
        [UexecApply.ukc_apply] -- where the context is that lemma's own
        premises -- rather than inline here (optimization.md, RULE ONE). *)
-    iApply (ukc_apply C pt Rfd Rut HRut sz fdv cw gn cs pidv lz M
+    iApply (ukc_apply C pt Rfd Rut HRut sz fdv cw gn cs pidv lz secc M
               (userret_gpr m vra vsp vgp vtp vt0 vt1 vt2 vs0 vs1 va1 va2
                  va3 va4 va5 va6 va7 vs2 vs3 vs4 vs5 vs6 vs7 vs8 vs9 vs10
                  vs11 vt3 vt4 vt5 vt6 va0f)

@@ -996,9 +996,12 @@ Section UkFork.
                    ltac:(vm_compute; reflexivity) Hp Hc)
               with "Hb Hmy").
     rewrite (uexec_ret_ecall _ _ eq_refl).
-    assert (Hnum : usys_num (uvis_tf (uvis_of_run m pc M pm sz fdv c gn Sc pidv false secc_all))
+    assert (Hnum : uvis_num (uvis_of_run m pc M pm sz fdv c gn Sc pidv false secc_all)
                    = USYS_fork).
-    { cbn [uvis_tf uvis_of_run]. rewrite tf_of_num. exact Hn. }
+    { rewrite uvis_num_full0.
+      - cbn [uvis_tf uvis_of_run]. rewrite tf_of_num. exact Hn.
+      - reflexivity.
+      - cbn [uvis_tf uvis_of_run]. rewrite tf_of_num, Hn. usys_range. }
     rewrite Hnum. cbv zeta.
     destruct (decide (USYS_fork = USYS_exit)) as [He | _];
       [ exfalso; unfold USYS_fork, USYS_exit in He; lia | ].

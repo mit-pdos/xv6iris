@@ -330,8 +330,11 @@ Section UkPipeDev.
                    ltac:(vm_compute; reflexivity) Hp Hc)
               with "Hb Hmy").
     rewrite (uexec_ret_ecall _ _ eq_refl).
-    assert (Hnum : usys_num (uvis_tf (uvis_of_run m pc M pm sz fdv cw gn cs pidv false secc_all)) = 16).
-    { cbn [uvis_tf uvis_of_run]. rewrite tf_of_num. exact Hn. }
+    assert (Hnum : uvis_num (uvis_of_run m pc M pm sz fdv cw gn cs pidv false secc_all) = 16).
+    { rewrite uvis_num_full0.
+      - cbn [uvis_tf uvis_of_run]. rewrite tf_of_num. exact Hn.
+      - reflexivity.
+      - cbn [uvis_tf uvis_of_run]. rewrite tf_of_num, Hn. usys_range. }
     rewrite /uexec_pay_dep /upay_at.
     rewrite Hnum. cbv zeta.
     destruct (decide (uecall_scause = uecall_scause)) as [_ | Hpne];
@@ -343,12 +346,17 @@ Section UkPipeDev.
     cbn [uvis_gen uvis_of_run].
     iSplitR; [ iFrame "Hmy" | ].
     iSplitL "Hdepn"; [ iExact "Hdepn" | ].
-    iIntros (r M' pm' sz' fdv' cw' gn' cs' lz')
-      "%Hok %Hfdok %Hpiperow %Hcwrow %Hgnrow %Hpidrow %Hliverow %Hchrow Hpost".
+    iIntros (r M' pm' sz' fdv' cw' gn' cs' lz' secc')
+      \"%Hok %Hfdok %Hpiperow %Hcwrow %Hgnrow %Hpidrow %Hliverow %Hscrow %Hchrow Hpost".
     assert (Hlzq : lz' = false)
       by (refine (usys_mem_ok_lazy _ _ _ _ _ _ _ _ _ _ _ _ Hok);
           vm_compute; discriminate).
     subst lz'.
+    (* ...AND SO DID THE MASK: not seccomp's number, so the row is the
+       equation ([UsysMemOk.usys_secc_ok_quiet]), and the resume key is at
+       the full mask [urun] is keyed at *)
+    pose proof (usys_secc_ok_quiet _ _ _ _ _ ltac:(usys_range) Hscrow) as Hscq.
+    cbn [uvis_secc uvis_of_run] in Hscq. subst secc'.
     assert (Hcw : cw' = cw)
       by (refine (usys_cwd_ok_quiet _ _ _ _ _ Hcwrow); vm_compute; discriminate).
     assert (Hgn : gn' = gn) by exact (usys_gen_ok_quiet _ _ _ Hgnrow).

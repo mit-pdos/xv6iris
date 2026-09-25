@@ -999,9 +999,9 @@ Section KexecAU.
        [pf_at_triv]. *)
     rewrite /pf_at /=. iSplit; [| done].
     rewrite /exec_slot_pre. iSplitR.
-    - iIntros (av i f nl W') "_ _ _ %Hok _ _ _ _ Hp".
+    - iIntros (av i f nl W') "_ _ _ %Hok _ _ _ _ _ Hp".
       iApply ("HS" $! W' with "Hp").
-    - iIntros (av i a W') "_ _ _ %Hok _ _ _ _ Hp".
+    - iIntros (av i a W') "_ _ _ %Hok _ _ _ _ _ Hp".
       iApply ("HS" $! W' with "Hp").
   Qed.
 
