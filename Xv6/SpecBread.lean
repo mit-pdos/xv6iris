@@ -56,7 +56,7 @@ import Xv6.SpecAcquiresleep
 
 namespace Xv6
 
-open Iris Iris.ProgramLogic Iris.BI Std MachCSL
+open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
 open LeanRV64D
 
 /-- Address of `bread`. -/
@@ -93,15 +93,65 @@ def wp_bread_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF
     bioLocked γ V kk pidv dev bno bs bsd d -∗ wpLoop cpu'))
   ⊢ wpLoop (GF := GF) cpu
 
-/-- The interface of `bread`. -/
-structure BREAD : Prop where
-  wp_bread : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
+/-- The eb-generic form of `wp_bread_body` (Rocq: `cpu_own 0 eb`, the
+complement `trap_csrs_ext` / `cpu_claim_ext` in and out; depth 0, so no
+spinlock held by `KCtx.wf`). -/
+def wp_bread_eb_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
     [BcacheG GF] [SleepLockG GF] [DiskG GF] [CurCtx]
     (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
     (cpu : CPU) (k : KCtx) (γl : GName) (γ : BcacheNames) (V : BioView GF) (γdl : GName)
     (pd pav pu : BitVec 64) (j : Nat) (pidv dev bno : BitVec 32) (dqp : DFrac)
-    hj hproc hK hsie hnoff hlocks htier hbno hcov hdev hpd ha0 ha1,
+    (hj : j < NPROC) (hproc : k.proc = procAddr j) (hK : breadSlots ≤ k.avail)
+    (hnoff : k.noff = 0)
+    (htier : k.tier = KTier.kpt)
+    (hbno : bno.toNat < 2 ^ 31) (hcov : bno.toNat ∈ V.cov) (hdev : dev = V.dev)
+    (hpd : descPageRw pd)
+    (ha0 : k.regs 10#5 = BitVec.signExtend 64 dev)
+    (ha1 : k.regs 11#5 = BitVec.signExtend 64 bno) : Prop :=
+  kctx cpu k ∗ pcIs cpu breadAddr ∗ procsInv Γ ∗
+  trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗
+  bioCtx γl γ V ∗ diskCaps V.gd γdl pd pav pu ∗ panicEnv ∗
+  wordPointsTo (pPid k.proc) 4 dqp pidv ∗ bslot γ ∗
+  wpNext true k.proc cpu (fun cpu' => iprop(∀ (spie spp : Bool) (R' : RegMap) (kk : Nat)
+      (bs bsd : List (BitVec 8)) (d : Bool),
+    ⌜calleeSaved k.regs R' ∧ R' 10#5 = bnode kk⌝ -∗
+    kctx cpu' ((k.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k.regs 1#5)) -∗
+    trapCsrsExt cpu' k.sie -∗ cpuClaimExt cpu' k.sie k.proc -∗
+    wordPointsTo (pPid k.proc) 4 dqp pidv -∗
+    bioLocked γ V kk pidv dev bno bs bsd d -∗ wpLoop cpu'))
+  ⊢ wpLoop (GF := GF) cpu
+
+/-- The interface of `bread`. -/
+structure BREAD : Prop where
+  wp_bread_eb : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
+    [BcacheG GF] [SleepLockG GF] [DiskG GF] [CurCtx]
+    (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+    (cpu : CPU) (k : KCtx) (γl : GName) (γ : BcacheNames) (V : BioView GF) (γdl : GName)
+    (pd pav pu : BitVec 64) (j : Nat) (pidv dev bno : BitVec 32) (dqp : DFrac)
+    hj hproc hK hnoff htier hbno hcov hdev hpd ha0 ha1,
+    wp_bread_eb_body (hlc := hlc) (GF := GF) Γ cpu k γl γ V γdl pd pav pu j pidv dev bno dqp
+      hj hproc hK hnoff htier hbno hcov hdev hpd ha0 ha1
+
+/-- The interrupts-off instance of `wp_bread_eb` (the complement is the whole
+bundle): the contract every not-yet-generalized caller states. -/
+theorem BREAD.wp_bread (A : BREAD) {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
+    [BcacheG GF] [SleepLockG GF] [DiskG GF] [CurCtx]
+    (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+    (cpu : CPU) (k : KCtx) (γl : GName) (γ : BcacheNames) (V : BioView GF) (γdl : GName)
+    (pd pav pu : BitVec 64) (j : Nat) (pidv dev bno : BitVec 32) (dqp : DFrac)
+    hj hproc hK hsie hnoff hlocks htier hbno hcov hdev hpd ha0 ha1 :
     wp_bread_body (hlc := hlc) (GF := GF) Γ cpu k γl γ V γdl pd pav pu j pidv dev bno dqp
-      hj hproc hK hsie hnoff hlocks htier hbno hcov hdev hpd ha0 ha1
+      hj hproc hK hsie hnoff hlocks htier hbno hcov hdev hpd ha0 ha1 := by
+  have h := A.wp_bread_eb (hlc := hlc) (GF := GF) (Γ := Γ) (cpu := cpu) (k := k) (γl := γl) (γ := γ) (V := V) (γdl := γdl) (pd := pd) (pav := pav) (pu := pu) (j := j) (pidv := pidv) (dev := dev) (bno := bno) (dqp := dqp) (hj := hj) (hproc := hproc) (hK := hK) (hnoff := hnoff) (htier := htier) (hbno := hbno) (hcov := hcov) (hdev := hdev) (hpd := hpd) (ha0 := ha0) (ha1 := ha1)
+  unfold wp_bread_eb_body at h
+  unfold wp_bread_body
+  rw [hsie] at h
+  simp only [trapCsrsExt_false, cpuClaimExt_false] at h
+  iintro ⟨H0, H1, H2, Htc, Hcl, Hir, H6, H7, H8, H9, H10, Hnext⟩
+  iapply h
+  iframe H0 H1 H2 Htc Hcl Hir H6 H7 H8 H9 H10
+  iapply wpNext_mono $$ Hnext
+  iintro %cpu' HK %spie %spp %R' %kk %bs %bsd %d %p0 H1 H2 ⟨Htc, Hir⟩ Hcl H6 H7
+  iapply HK $$ %spie %spp %R' %kk %bs %bsd %d %p0 H1 H2 Htc Hcl Hir H6 H7
 
 end Xv6

@@ -267,33 +267,34 @@ set_option maxHeartbeats 1000000 in
 /-- `acquiresleep(&b->lock)` with the acquire edge's store-order receipt
 (Rocq `wp_acquiresleep_genl_llb_sconf`): the `MachCSL.topLb T` a reference
 carries becomes the hart-free `MachCSL.ctxFloor curCtx T` the escrow's
-checkout wants. -/
+checkout wants.  At either entry `SIE` (`AS.wp_acquiresleep_gen_llb_eb`):
+the complement at a NAMED index `s` / proc `pj`, handed back at the
+resuming hart. -/
 theorem bd_aslp (AS : ACQUIRESLEEP_LLB) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
     (c : CPU) (k' : KCtx) (γ : BcacheNames) (kk T j : Nat) (pid : BitVec 32) (dqp : DFrac)
-    (pj : BitVec 64) (hpj : k'.proc = pj)
+    (s : Bool) (pj : BitVec 64) (hpj : k'.proc = pj) (hs : k'.sie = s)
     (haddr : k'.regs 10#5 = aBufLock (bnode kk))
     (hj : j < NPROC) (hproc : k'.proc = procAddr j) (hK : acquiresleepSlots ≤ k'.avail)
-    (hsie : k'.sie = false) (hnoff : k'.noff = 0) (hlocks : k'.locks = [])
-    (htier : k'.tier = KTier.kpt) :
+    (hnoff : k'.noff = 0) (htier : k'.tier = KTier.kpt) :
     kctx c k' ∗ pcIs c KA.«acquiresleep» ∗ procsInv Γ ∗
-    trapCsrs c ∗ cpuClaim c pj ∗ intrRes c ∗
+    trapCsrsExt c s ∗ cpuClaimExt c s pj ∗
     isBufSlk γ kk ∗ topLb T ∗ wordPointsTo (pPid pj) 4 dqp pid ∗
     wpNext true pj c (fun cpu' => iprop(∀ (spie spp : Bool) (R' : RegMap),
       ⌜calleeSaved k'.regs R'⌝ -∗
       kctx cpu' ((k'.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k'.regs 1#5)) -∗
-      trapCsrs cpu' -∗ cpuClaim cpu' pj -∗ intrRes cpu' -∗
+      trapCsrsExt cpu' s -∗ cpuClaimExt cpu' s pj -∗
       sleeplockedQ (γ.slk kk).2 1 (aBufLock (bnode kk)) pid -∗ bufSlpBox γ kk curCtx -∗
       ctxFloor curCtx T -∗ wordPointsTo (pPid pj) 4 dqp pid -∗ wpLoop cpu'))
     ⊢ wpLoop (GF := GF) c := by
-  subst hpj
-  have h := AS.wp_acquiresleep_gen_llb (hlc := hlc) (GF := GF) Γ c k' (γ.slk kk).1 (γ.slk kk).2
-    (bufSlpBox γ kk) slUntracked 1 j pid dqp T hj hproc hK hsie hnoff hlocks htier
-  unfold wp_acquiresleep_gen_llb_body at h
+  subst hpj hs
+  have h := AS.wp_acquiresleep_gen_llb_eb (hlc := hlc) (GF := GF) Γ c k' (γ.slk kk).1 (γ.slk kk).2
+    (bufSlpBox γ kk) slUntracked 1 j pid dqp T hj hproc hK hnoff htier
+  unfold wp_acquiresleep_gen_llb_eb_body at h
   simp only [acquiresleepAddr] at h
   rw [haddr] at h
-  iintro ⟨Hk, Hpc, Hpi, Htc, Hcl, Hir, #Hslk, #HT, Hpid, HΦ⟩
+  iintro ⟨Hk, Hpc, Hpi, Hte, Hce, #Hslk, #HT, Hpid, HΦ⟩
   iapply h
-  iframe Hk Hpc Hpi Htc Hcl Hir Hpid HΦ
+  iframe Hk Hpc Hpi Hte Hce Hpid HΦ
   isplitl []
   · unfold isBufSlk isSleeplock
     iexact Hslk

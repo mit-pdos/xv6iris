@@ -73,6 +73,34 @@ theorem bread_callF [Fscfg] [Icfg] (BD : BREAD) (Γ : SchedNames) [ClaimIs (hlc 
     pidv icfgDev bno dqp pj hpj hj hproc hK hsie hnoff hlocks htier hbno hcov rfl hpd ha0 ha1
 
 set_option maxHeartbeats 1000000 in
+/-- `bread(ip->dev, bno)` at the ambient view, at EITHER entry `SIE`. -/
+theorem bread_callF_eb [Fscfg] [Icfg] (BD : BREAD) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+    (c : CPU) (k' : KCtx) (γl : GName) (pd pav pu : BitVec 64) (j : Nat)
+    (pidv bno : BitVec 32) (dqp : DFrac) (pj : BitVec 64) (hpj : k'.proc = pj)
+    (s : Bool) (hs : k'.sie = s)
+    (hj : j < NPROC) (hproc : k'.proc = procAddr j) (hK : breadSlots ≤ k'.avail)
+    (hnoff : k'.noff = 0) (htier : k'.tier = KTier.kpt)
+    (hbno : bno.toNat < 2 ^ 31) (hcov : bno.toNat ∈ fscCov) (hpd : descPageRw pd)
+    (ha0 : k'.regs 10#5 = BitVec.signExtend 64 icfgDev)
+    (ha1 : k'.regs 11#5 = BitVec.signExtend 64 bno) :
+    kctx c k' ∗ pcIs c KA.«bread» ∗ procsInv Γ ∗
+    trapCsrsExt c s ∗ cpuClaimExt c s pj ∗
+    bioCtx γl fscBio (fsView fscFs fscDisk icfgDev fscCov) ∗
+    diskCaps fscDisk fscDlock pd pav pu ∗ panicEnv ∗
+    wordPointsTo (pPid pj) 4 dqp pidv ∗ bslot fscBio ∗
+    wpNext true pj c (fun cpu' => iprop(∀ (spie spp : Bool) (R' : RegMap) (kk : Nat)
+        (bs bsd : List (BitVec 8)) (d : Bool),
+      ⌜calleeSaved k'.regs R' ∧ R' 10#5 = bnode kk⌝ -∗
+      kctx cpu' ((k'.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k'.regs 1#5)) -∗
+      trapCsrsExt cpu' s -∗ cpuClaimExt cpu' s pj -∗
+      wordPointsTo (pPid pj) 4 dqp pidv -∗
+      bioLocked fscBio (fsView fscFs fscDisk icfgDev fscCov) kk pidv icfgDev bno bs bsd d -∗
+      wpLoop cpu'))
+    ⊢ wpLoop (GF := GF) c :=
+  bread_call_eb BD Γ c k' γl fscBio (fsView fscFs fscDisk icfgDev fscCov) fscDlock pd pav pu j
+    pidv icfgDev bno dqp pj hpj s hs hj hproc hK hnoff htier hbno hcov rfl hpd ha0 ha1
+
+set_option maxHeartbeats 1000000 in
 /-- `brelse(b)` at the ambient view. -/
 theorem brelse_callF [Fscfg] [Icfg] (BE : BRELSE) (Γ : SchedNames)
     (c : CPU) (k' : KCtx) (γl : GName) (kk : Nat)

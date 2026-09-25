@@ -36,7 +36,7 @@ import Xv6.SpecVirtioDiskRw
 
 namespace Xv6
 
-open Iris Iris.ProgramLogic Iris.BI Std MachCSL
+open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
 open LeanRV64D
 
 /-- Address of `bwrite`. -/
@@ -71,16 +71,66 @@ def wp_bwrite_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G G
     bufHold0 γ V kk pidv dev bno bs bs -∗ wpLoop cpu'))
   ⊢ wpLoop (GF := GF) cpu
 
-/-- The interface of `bwrite`. -/
-structure BWRITE : Prop where
-  wp_bwrite : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
+/-- The eb-generic form of `wp_bwrite_body` (Rocq: `cpu_own 0 eb`, the
+complement `trap_csrs_ext` / `cpu_claim_ext` in and out; depth 0, so no
+spinlock held by `KCtx.wf`). -/
+def wp_bwrite_eb_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
     [BcacheG GF] [SleepLockG GF] [DiskG GF] [CurCtx]
     (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
     (cpu : CPU) (k : KCtx) (γl : GName) (γ : BcacheNames) (V : BioView GF) (γdl : GName)
     (pd pav pu : BitVec 64) (j : Nat) (kk : Nat)
     (pidv dev bno : BitVec 32) (dqp : DFrac) (bs bsd : List (BitVec 8))
-    hj hproc hK hsie hnoff hlocks htier hkk ha0 hbno hbsd hpd,
+    (hj : j < NPROC) (hproc : k.proc = procAddr j) (hK : bwriteSlots ≤ k.avail)
+    (hnoff : k.noff = 0)
+    (htier : k.tier = KTier.kpt)
+    (hkk : kk < NBUF) (ha0 : k.regs 10#5 = bnode kk)
+    (hbno : bno.toNat < 2 ^ 31) (hbsd : bsd.length = BSIZE) (hpd : descPageRw pd) : Prop :=
+  kctx cpu k ∗ pcIs cpu bwriteAddr ∗ procsInv Γ ∗
+  trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗
+  bioCtx γl γ V ∗ diskCaps V.gd γdl pd pav pu ∗
+  wordPointsTo (pPid k.proc) 4 dqp pidv ∗
+  bufHold0 γ V kk pidv dev bno bs bsd ∗
+  wpNext true k.proc cpu (fun cpu' => iprop(∀ (spie spp : Bool) (R' : RegMap),
+    ⌜calleeSaved k.regs R'⌝ -∗
+    kctx cpu' ((k.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k.regs 1#5)) -∗
+    trapCsrsExt cpu' k.sie -∗ cpuClaimExt cpu' k.sie k.proc -∗
+    wordPointsTo (pPid k.proc) 4 dqp pidv -∗
+    bufHold0 γ V kk pidv dev bno bs bs -∗ wpLoop cpu'))
+  ⊢ wpLoop (GF := GF) cpu
+
+/-- The interface of `bwrite`. -/
+structure BWRITE : Prop where
+  wp_bwrite_eb : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
+    [BcacheG GF] [SleepLockG GF] [DiskG GF] [CurCtx]
+    (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+    (cpu : CPU) (k : KCtx) (γl : GName) (γ : BcacheNames) (V : BioView GF) (γdl : GName)
+    (pd pav pu : BitVec 64) (j : Nat) (kk : Nat)
+    (pidv dev bno : BitVec 32) (dqp : DFrac) (bs bsd : List (BitVec 8))
+    hj hproc hK hnoff htier hkk ha0 hbno hbsd hpd,
+    wp_bwrite_eb_body (hlc := hlc) (GF := GF) Γ cpu k γl γ V γdl pd pav pu j kk
+      pidv dev bno dqp bs bsd hj hproc hK hnoff htier hkk ha0 hbno hbsd hpd
+
+/-- The interrupts-off instance of `wp_bwrite_eb` (the complement is the whole
+bundle): the contract every not-yet-generalized caller states. -/
+theorem BWRITE.wp_bwrite (A : BWRITE) {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
+    [BcacheG GF] [SleepLockG GF] [DiskG GF] [CurCtx]
+    (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+    (cpu : CPU) (k : KCtx) (γl : GName) (γ : BcacheNames) (V : BioView GF) (γdl : GName)
+    (pd pav pu : BitVec 64) (j : Nat) (kk : Nat)
+    (pidv dev bno : BitVec 32) (dqp : DFrac) (bs bsd : List (BitVec 8))
+    hj hproc hK hsie hnoff hlocks htier hkk ha0 hbno hbsd hpd :
     wp_bwrite_body (hlc := hlc) (GF := GF) Γ cpu k γl γ V γdl pd pav pu j kk
-      pidv dev bno dqp bs bsd hj hproc hK hsie hnoff hlocks htier hkk ha0 hbno hbsd hpd
+      pidv dev bno dqp bs bsd hj hproc hK hsie hnoff hlocks htier hkk ha0 hbno hbsd hpd := by
+  have h := A.wp_bwrite_eb (hlc := hlc) (GF := GF) (Γ := Γ) (cpu := cpu) (k := k) (γl := γl) (γ := γ) (V := V) (γdl := γdl) (pd := pd) (pav := pav) (pu := pu) (j := j) (kk := kk) (pidv := pidv) (dev := dev) (bno := bno) (dqp := dqp) (bs := bs) (bsd := bsd) (hj := hj) (hproc := hproc) (hK := hK) (hnoff := hnoff) (htier := htier) (hkk := hkk) (ha0 := ha0) (hbno := hbno) (hbsd := hbsd) (hpd := hpd)
+  unfold wp_bwrite_eb_body at h
+  unfold wp_bwrite_body
+  rw [hsie] at h
+  simp only [trapCsrsExt_false, cpuClaimExt_false] at h
+  iintro ⟨H0, H1, H2, Htc, Hcl, Hir, H6, H7, H8, H9, Hnext⟩
+  iapply h
+  iframe H0 H1 H2 Htc Hcl Hir H6 H7 H8 H9
+  iapply wpNext_mono $$ Hnext
+  iintro %cpu' HK %spie %spp %R' %p0 H1 H2 ⟨Htc, Hir⟩ Hcl H6 H7
+  iapply HK $$ %spie %spp %R' %p0 H1 H2 Htc Hcl Hir H6 H7
 
 end Xv6

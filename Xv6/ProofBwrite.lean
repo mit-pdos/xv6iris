@@ -72,30 +72,31 @@ theorem bw_holdingsleep (HS : HOLDINGSLEEP) (c : CPU) (k' : KCtx) (γ : BcacheNa
 
 theorem bw_vdr (VR : VIRTIO_DISK_RW) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
     (c : CPU) (k' : KCtx) (V : BioView GF) (γdl : GName) (pd pav pu : BitVec 64) (j kk : Nat)
-    (bno : BitVec 32) (bs bsd : List (BitVec 8)) (pj : BitVec 64) (hpj : k'.proc = pj)
+    (bno : BitVec 32) (bs bsd : List (BitVec 8)) (s : Bool) (pj : BitVec 64)
+    (hs : k'.sie = s) (hpj : k'.proc = pj)
     (ha0 : k'.regs 10#5 = bnode kk) (ha1 : k'.regs 11#5 = 1#64)
     (hj : j < NPROC) (hproc : k'.proc = procAddr j) (hK : virtioDiskRwSlots ≤ k'.avail)
-    (hsie : k'.sie = false) (hnoff : k'.noff = 0) (hlocks : k'.locks = [])
+    (hnoff : k'.noff = 0)
     (htier : k'.tier = KTier.kpt)
     (hbno : bno.toNat < 2 ^ 31) (hbsd : bsd.length = BSIZE) (hpd : descPageRw pd)
     (hkk : kk < NBUF) :
     kctx c k' ∗ pcIs c KA.«virtio_disk_rw» ∗ procsInv Γ ∗
-    trapCsrs c ∗ cpuClaim c pj ∗ intrRes c ∗
+    trapCsrsExt c s ∗ cpuClaimExt c s pj ∗
     diskCaps V.gd γdl pd pav pu ∗
     bufOwn (bnode kk) bno 0#32 bs ∗ diskBlock V.gd bno.toNat bsd ∗
     wpNext true pj c (fun cpu' => iprop(∀ (spie spp : Bool) (R' : RegMap),
       ⌜calleeSaved k'.regs R'⌝ -∗
       kctx cpu' ((k'.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k'.regs 1#5)) -∗
-      trapCsrs cpu' -∗ cpuClaim cpu' pj -∗ intrRes cpu' -∗
+      trapCsrsExt cpu' s -∗ cpuClaimExt cpu' s pj -∗
       bufOwn (bnode kk) bno 0#32 bs -∗ diskBlock V.gd bno.toNat bs -∗ wpLoop cpu'))
     ⊢ wpLoop (GF := GF) c := by
-  subst hpj
+  subst hpj hs
   have hkm : ∀ m, m < BSIZE →
       kmapClass (vpnOf (aBufData (k'.regs 10#5) + BitVec.ofNat 64 m)).toNat = some .rw := by
     intro m hm; rw [ha0]; exact bufData_kmapRw kk m hkk hm
-  have h := VR.wp_virtio_disk_rw (hlc := hlc) (GF := GF) Γ c k' V.gd γdl pd pav pu j bno 0#32 bs bsd
-    hj hproc hK hsie hnoff hlocks htier hbno hbsd hpd hkm
-  unfold wp_virtio_disk_rw_body at h
+  have h := VR.wp_virtio_disk_rw_eb (hlc := hlc) (GF := GF) Γ c k' V.gd γdl pd pav pu j bno 0#32 bs bsd
+    hj hproc hK hnoff htier hbno hbsd hpd hkm
+  unfold wp_virtio_disk_rw_eb_body at h
   simp only [virtioDiskRwAddr, ha0, ha1, ne_eq, BitVec.reduceEq, not_false_eq_true,
     decide_true, if_true] at h
   exact h
@@ -105,15 +106,30 @@ end
 /-! ## The function -/
 
 set_option maxHeartbeats 16000000 in
+/-- **`bwrite` meets its specification**, at either entry `SIE` (a level-0
+function: every step runs at the caller's index, the complement
+`Hte`/`Hce` follows the thread, `virtio_disk_rw` is called at its eb
+contract). -/
 theorem bwrite_proof (HS : HOLDINGSLEEP) (VR : VIRTIO_DISK_RW) : BWRITE := ⟨
   fun {hlc GF} _ _ _ _ _ _ Γ _ cpu k γl γ V γdl pd pav pu j kk pidv dev bno dqp bs bsd
-    hj hproc hK hsie hnoff hlocks htier hkk ha0 hbno hbsd hpd => by
-  unfold wp_bwrite_body
+    hj hproc hK hnoff htier hkk ha0 hbno hbsd hpd => by
+  unfold wp_bwrite_eb_body
   simp only [bwriteAddr]
-  iintro ⟨Hk, Hpc, Hpi, Htc, Hcl, Hir, #Hbc, #Hdc, Hpid, Hhold, Hnext⟩
+  iintro ⟨Hk, Hpc, Hpi, Hte, Hce, #Hbc, #Hdc, Hpid, Hhold, Hnext⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
   icases kctx_wf _ _ $$ Hk with ⟨%hwf, Hk⟩
+  have hlocks : k.locks = [] := List.eq_nil_of_length_eq_zero (by have := hwf.2.2.2.1; omega)
   have hK4 : 4 ≤ k.avail := by unfold bwriteSlots virtioDiskRwSlots sleepSlots at hK; omega
+  -- the caller's continuation is hart-free (a park's crossing, at a proc)
+  ihave HΦ : ∀ c : CPU, (∀ (spie spp : Bool) (R' : RegMap),
+      ⌜calleeSaved k.regs R'⌝ -∗
+      kctx c ((k.withSpie spie spp).withRegs R') -∗ pcIs c (jumpPc (k.regs 1#5)) -∗
+      trapCsrsExt c k.sie -∗ cpuClaimExt c k.sie k.proc -∗
+      wordPointsTo (pPid k.proc) 4 dqp pidv -∗
+      bufHold0 γ V kk pidv dev bno bs bs -∗ wpLoop c) $$ [Hnext]
+  · iintro %c
+    iapply wpNext_at true k.proc cpu c _ (fun hc => Or.elim hc (fun hx => absurd hx (by decide))
+      (fun hx => absurd (hproc ▸ hx) (procAddr_nonzero hj))) $$ Hnext
   ihave #Hslk := bioCtx_buf γl γ V kk hkk $$ Hbc
   icases (show bufHold0 (GF := GF) γ V kk pidv dev bno bs bsd ⊢
       ⌜kk < NBUF ∧ bno.toNat ∈ V.cov ∧ dev = V.dev ∧ bs.length = BSIZE ∧ bsd.length = BSIZE⌝ ∗
@@ -133,20 +149,18 @@ theorem bwrite_proof (HS : HOLDINGSLEEP) (VR : VIRTIO_DISK_RW) : BWRITE := ⟨
   k_norm_g
   iframe
   inext
-  iapply wpNext_intro_pin
-  iintro %c1 %hp1 Hk Hpc Hframe
-  have hc1 : c1 = cpu := hp1 (Or.inl hsie)
-  subst hc1
-  k_step (wp_s_add c1 _ (KA.«bwrite» + 0xa#64) true 9#5 0#5 10#5 (by decide))
+  k_next_e
+  iintro Hk Hpc Hframe
+  k_step_e (wp_s_add cpu _ (KA.«bwrite» + 0xa#64) true 9#5 0#5 10#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [ha0]
   iintro Hk Hpc
-  k_step (wp_s_addi c1 _ (KA.«bwrite» + 0xc#64) true 16#12 10#5 10#5 (by decide))
+  k_step_e (wp_s_addi cpu _ (KA.«bwrite» + 0xc#64) true 16#12 10#5 10#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [ha0, aBufLock_sext]
   iintro Hk Hpc
-  k_step (wp_s_jal c1 _ (KA.«bwrite» + 0xe#64) false 5062#21 1#5 (by decide))
+  k_step_e (wp_s_jal cpu _ (KA.«bwrite» + 0xe#64) false 5062#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [bw_br_hold]
   iintro Hk Hpc
-  iapply (bw_holdingsleep HS c1 _ γ kk pidv dqp k.proc (by k_norm_g) ?ha ?hn ?hKh ?hsl ?ht)
+  iapply (bw_holdingsleep HS cpu _ γ kk pidv dqp k.proc (by k_norm_g) ?ha ?hn ?hKh ?hsl ?ht)
     $$ [- $Hk $Hpc $Hslk $Hsl $Hpid]
   rotate_right 1
   k_norm_g [bw_ret_12]
@@ -157,10 +171,8 @@ theorem bwrite_proof (HS : HOLDINGSLEEP) (VR : VIRTIO_DISK_RW) : BWRITE := ⟨
   case hsl => k_norm_g; rw [hlocks]; simp
   case ht => k_norm_g; exact htier
   -- back from holdingsleep: a0 = 1, so the beqz is not taken
-  iapply wpNext_intro_pin
-  iintro %c2 %hp2 %spie %spp %R1 %hsp Hk Hpc %hcs1 Hsl Hpid
-  have hc2 : c2 = c1 := hp2 (Or.inl (by k_norm))
-  subst hc2
+  k_next_e
+  iintro %spie %spp %R1 %hsp Hk Hpc %hcs1 Hsl Hpid
   k_norm_g [bw_ret_12]
   obtain ⟨hcs, ha0r⟩ := hcs1
   unfold calleeSaved at hcs
@@ -168,20 +180,21 @@ theorem bwrite_proof (HS : HOLDINGSLEEP) (VR : VIRTIO_DISK_RW) : BWRITE := ⟨
   obtain ⟨b2, b8, b9, b18, b19, b20, b21, b22, b23, b24, b25, b26, b27⟩ := hcs
   have h9 : R1 9#5 = bnode kk := b9
   -- c.beqz a0 ; c.li a1,1 ; c.mv a0,s1 ; jal virtio_disk_rw
-  k_step (wp_s_branch c2 _ (KA.«bwrite» + 0x12#64) true 20#13 10#5 0#5 (by decide) bop.BEQ)
+  k_step_e (wp_s_branch cpu _ (KA.«bwrite» + 0x12#64) true 20#13 10#5 0#5 (by decide) bop.BEQ)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [ha0r, bw_beqz]
   iintro Hk Hpc
-  k_step (wp_s_addi c2 _ (KA.«bwrite» + 0x14#64) true 1#12 11#5 0#5 (by decide))
+  k_step_e (wp_s_addi cpu _ (KA.«bwrite» + 0x14#64) true 1#12 11#5 0#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
-  k_step (wp_s_add c2 _ (KA.«bwrite» + 0x16#64) true 10#5 0#5 9#5 (by decide))
+  k_step_e (wp_s_add cpu _ (KA.«bwrite» + 0x16#64) true 10#5 0#5 9#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h9]
   iintro Hk Hpc
-  k_step (wp_s_jal c2 _ (KA.«bwrite» + 0x18#64) false 11366#21 1#5 (by decide))
+  k_step_e (wp_s_jal cpu _ (KA.«bwrite» + 0x18#64) false 11366#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [bw_br_vdr]
   iintro Hk Hpc
-  iapply (bw_vdr VR Γ c2 _ V γdl pd pav pu j kk bno bs bsd k.proc (by k_norm_g) ?va0 ?va1 hj ?vproc ?vK ?vsie
-      ?vnoff ?vlocks ?vtier hbno hbsd hpd hkk) $$ [- $Hk $Hpc $Hpi $Htc $Hcl $Hir $Hdc $Hbuf $Hblk]
+  iapply (bw_vdr VR Γ cpu _ V γdl pd pav pu j kk bno bs bsd k.sie k.proc (by k_norm_g) (by k_norm_g)
+      ?va0 ?va1 hj ?vproc ?vK ?vnoff ?vtier hbno hbsd hpd hkk)
+    $$ [- $Hk $Hpc $Hpi $Hte $Hce $Hdc $Hbuf $Hblk]
   rotate_right 1
   k_norm_g [bw_ret_1c]
   iframe #
@@ -189,13 +202,11 @@ theorem bwrite_proof (HS : HOLDINGSLEEP) (VR : VIRTIO_DISK_RW) : BWRITE := ⟨
   case va1 => k_norm_g
   case vproc => k_norm_g; exact hproc
   case vK => k_norm_g; unfold bwriteSlots at hK; omega
-  case vsie => k_norm_g; exact hsie
   case vnoff => k_norm_g; exact hnoff
-  case vlocks => k_norm_g; exact hlocks
   case vtier => k_norm_g; exact htier
-  -- back from virtio_disk_rw: the epilogue
+  -- back from virtio_disk_rw (a park: any hart): the epilogue
   iapply wpNext_intro_pin
-  iintro %c3 %hp3 %spie2 %spp2 %R2 %hcs2 Hk Hpc Htc Hcl Hir Hbuf Hblk
+  iintro %cpu %_ %spie2 %spp2 %R2 %hcs2 Hk Hpc Hte Hce Hbuf Hblk
   have hsw1 : ∀ a b c d : Bool, ((k.pushed 4).withSpie a b).withSpie c d = (k.withSpie c d).pushed 4 :=
     fun _ _ _ _ => rfl
   k_norm_g [bw_ret_1c, hsw1]
@@ -206,7 +217,7 @@ theorem bwrite_proof (HS : HOLDINGSLEEP) (VR : VIRTIO_DISK_RW) : BWRITE := ⟨
       frame4s1 ((k.withSpie spie2 spp2).regs 2#5) ((k.withSpie spie2 spp2).regs 1#5)
         ((k.withSpie spie2 spp2).regs 8#5) ((k.withSpie spie2 spp2).regs 9#5) from by
     simp only [KCtx.withSpie_regs]; iintro H; iexact H) $$ Hframe
-  iapply (wp_epilogue4s1_gen c3 (k.withSpie spie2 spp2) (KA.«bwrite» + 0x1c#64)
+  iapply (wp_epilogue4s1_gen cpu (k.withSpie spie2 spp2) (KA.«bwrite» + 0x1c#64)
       (by simp only [KCtx.withSpie_avail]; exact hK4) R2
       (by k_norm_g; exact e2.trans b2) ((k.withSpie spie2 spp2).regs 1#5)
       ((k.withSpie spie2 spp2).regs 8#5) ((k.withSpie spie2 spp2).regs 9#5))
@@ -215,20 +226,16 @@ theorem bwrite_proof (HS : HOLDINGSLEEP) (VR : VIRTIO_DISK_RW) : BWRITE := ⟨
   k_norm_g
   iframe
   inext
-  iapply wpNext_intro_pin
-  iintro %c4 %hp4 Hk Hpc
-  have hc4 : c4 = c3 := hp4 (Or.inl (by k_norm))
-  subst hc4
-  ihave HΦ := wpNext_at true k.proc c2 c4 _ (fun hh => hp3 hh) $$ Hnext
-  iapply HΦ $$ %spie2 %spp2 %_ [] Hk Hpc [Htc] [Hcl] [Hir] [Hpid]
+  k_next_e
+  iintro Hk Hpc
+  iapply HΦ $$ %cpu %spie2 %spp2 %_ [] Hk Hpc [Hte] [Hce] [Hpid]
     [Hsl Htok Hrt Hhd Hval Hdev Hbuf Hblk]
   · ipureintro
     exact bc_calleeSaved_epi k.regs R2
       (e18.trans b18) (e19.trans b19) (e20.trans b20) (e21.trans b21) (e22.trans b22)
       (e23.trans b23) (e24.trans b24) (e25.trans b25) (e26.trans b26) (e27.trans b27)
-  · iexact Htc
-  · iexact Hcl
-  · iexact Hir
+  · iexact Hte
+  · iexact Hce
   · iexact Hpid
   · unfold bufHold0
     isplitl []

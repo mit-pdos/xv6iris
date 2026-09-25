@@ -74,6 +74,39 @@ theorem bread_call (BR : BREAD) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
   exact h
 
 set_option maxHeartbeats 1000000 in
+/-- `bread(dev, bno)` at its call site, at EITHER entry `SIE` (`BREAD.wp_bread_eb`): the
+trap-CSR complement at a named index `s` (so a caller's `trapCsrsExt c k.sie` frames
+syntactically against a context whose `sie` only normalises to `k.sie`). -/
+theorem bread_call_eb (BR : BREAD) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+    (c : CPU) (k' : KCtx) (γl : GName) (γb : BcacheNames) (V : BioView GF) (γdl : GName)
+    (pd pav pu : BitVec 64) (j : Nat) (pidv dev bno : BitVec 32) (dqp : DFrac)
+    (pj : BitVec 64) (hpj : k'.proc = pj) (s : Bool) (hs : k'.sie = s)
+    (hj : j < NPROC) (hproc : k'.proc = procAddr j) (hK : breadSlots ≤ k'.avail)
+    (hnoff : k'.noff = 0) (htier : k'.tier = KTier.kpt)
+    (hbno : bno.toNat < 2 ^ 31) (hcov : bno.toNat ∈ V.cov) (hdev : dev = V.dev)
+    (hpd : descPageRw pd)
+    (ha0 : k'.regs 10#5 = BitVec.signExtend 64 dev)
+    (ha1 : k'.regs 11#5 = BitVec.signExtend 64 bno) :
+    kctx c k' ∗ pcIs c KA.«bread» ∗ procsInv Γ ∗
+    trapCsrsExt c s ∗ cpuClaimExt c s pj ∗
+    bioCtx γl γb V ∗ diskCaps V.gd γdl pd pav pu ∗ panicEnv ∗
+    wordPointsTo (pPid pj) 4 dqp pidv ∗ bslot γb ∗
+    wpNext true pj c (fun cpu' => iprop(∀ (spie spp : Bool) (R' : RegMap) (kk : Nat)
+        (bs bsd : List (BitVec 8)) (d : Bool),
+      ⌜calleeSaved k'.regs R' ∧ R' 10#5 = bnode kk⌝ -∗
+      kctx cpu' ((k'.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k'.regs 1#5)) -∗
+      trapCsrsExt cpu' s -∗ cpuClaimExt cpu' s pj -∗
+      wordPointsTo (pPid pj) 4 dqp pidv -∗
+      bioLocked γb V kk pidv dev bno bs bsd d -∗ wpLoop cpu'))
+    ⊢ wpLoop (GF := GF) c := by
+  subst hpj hs
+  have h := BR.wp_bread_eb (hlc := hlc) (GF := GF) Γ c k' γl γb V γdl pd pav pu j pidv dev bno dqp
+    hj hproc hK hnoff htier hbno hcov hdev hpd ha0 ha1
+  unfold wp_bread_eb_body at h
+  simp only [breadAddr] at h
+  exact h
+
+set_option maxHeartbeats 1000000 in
 /-- `brelse(b)` at its call site, at any view `V`. -/
 theorem brelse_call (BE : BRELSE) (Γ : SchedNames)
     (c : CPU) (k' : KCtx) (γl : GName) (γb : BcacheNames) (V : BioView GF) (kk : Nat)
