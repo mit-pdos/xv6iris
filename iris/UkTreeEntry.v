@@ -279,7 +279,7 @@ Section UkTreeEntry.
     iApply image_entry_of_at. iIntros "!>" (na alen afun) "%Hargs".
     destruct (UShEcho.echo_args_det_holds ws Hline M s0 t g na alen afun
                 Himg Hbytes Hargs) as (Hna & Halen & Hafun).
-    rewrite /image_entry_at. iIntros "!>" (W') "%Hokk %Hcwv %Hlzf _ _ Hmp HPay".
+    rewrite /image_entry_at. iIntros "!>" (W') "%Hokk %Hcwv %Hlzf %Hscf _ _ Hmp HPay".
     destruct (UShEcho.echo_kexec_pages na alen afun sts W' Hokk)
       as (Hpc & Hsub & Hx & Hwr & Hrp).
     destruct (UShEcho.echo_kexec_entry_rows na alen afun sts W' Hokk
@@ -326,7 +326,7 @@ Section UkTreeEntry.
     iAssert (UkRun.urun_nopipe (uvis_fd W')) as "#Hnpw'";
       [ rewrite Hfd; iExact "Hnpw" | ].
     iApply (uslot_of_urun_ro W' 12 Q Hal8
-              ltac:(unfold uvis_sp in Hroom96; lia) Hstkrow Hfdlen Hstop Hlzf
+              ltac:(unfold uvis_sp in Hroom96; lia) Hstkrow Hfdlen Hstop Hlzf Hscf
               with "Hdep Hnpw' Hmp").
     iIntros (N' h) "%Hpayeq %Hsz _ #Ht Hstd Hcwf _ _ #HA Hrun".
     rewrite Hpc.
@@ -421,7 +421,7 @@ Section UkTreeEntry.
                 Himg Hbytes Hargs) as (Hna & Halen & Hafun).
     pose proof (UShCat.cat_room_of_det_x ws na alen Hok Hna Halen) as Hroom.
     rewrite /image_entry_at.
-    iIntros "!>" (W') "%Hokk %Hcwv %Hlzf _ _ Hmp HPay".
+    iIntros "!>" (W') "%Hokk %Hcwv %Hlzf %Hscf _ _ Hmp HPay".
     destruct (UShCat.cat_kexec_pages na alen afun sts W' Hokk)
       as (Hpc & Hsub & Hsub2 & Hx & Hdw & Hbufb & Hwr & Hrp).
     destruct (UShCat.cat_kexec_entry_rows na alen afun sts W' Hokk Hroom
@@ -478,7 +478,7 @@ Section UkTreeEntry.
     iAssert (UkRun.urun_nopipe (uvis_fd W')) as "#Hnpw'";
       [ rewrite Hfd; iExact "Hnpw" | ].
     iApply (UShCat.cat_entry_run W' Q Hpc Hsub Hsub2 Hx Hroom336 Hal8
-              Hstkrow Hbuf Hargsrow Havd Havs Hfdlen Hstop Hlzf
+              Hstkrow Hbuf Hargsrow Havd Havs Hfdlen Hstop Hlzf Hscf
               with "Hdep Hnpw' Hmp").
     iIntros (N' h) "%Hpayeq Hstd Hcwf #Hcode #Hro #Hargv _ Hbuf' Hrun".
     assert (Ha0 : tf_resume_gpr0 (uvis_tf W') !!! Regidx (mword_of_int 10 : mword 5)
@@ -614,7 +614,7 @@ Section UkTreeEntry.
                 Himg Hbytes Hargs) as (Hna & Halen & Hafun).
     pose proof (UShGrep.grep_room_of_det_x ws na alen Hok Hna Halen) as Hroom.
     rewrite /image_entry_at.
-    iIntros "!>" (W') "%Hokk %Hcwv %Hlzf _ _ Hmp HPay".
+    iIntros "!>" (W') "%Hokk %Hcwv %Hlzf %Hscf _ _ Hmp HPay".
     destruct (UShGrep.grep_kexec_pages na alen afun sts W' Hokk)
       as (Hpc & Hsub & Hsub2 & Hx & Hdw & Hbufb & Hwr & Hrp).
     destruct (UShGrep.grep_kexec_entry_rows na alen afun sts W'
@@ -671,7 +671,7 @@ Section UkTreeEntry.
     iAssert (UkRun.urun_nopipe (uvis_fd W')) as "#Hnpw'";
       [ rewrite Hfd; iExact "Hnpw" | ].
     iApply (UShGrep.grep_entry_run W' Q (UShGrep.grep_need ws) Hpc Hsub Hsub2
-              Hx HroomK Hal8 Hstkrow Hbuf Hargsrow Havd Havs Hfdlen Hstop Hlzf
+              Hx HroomK Hal8 Hstkrow Hbuf Hargsrow Havd Havs Hfdlen Hstop Hlzf Hscf
               with "Hdep Hnpw' Hmp").
     iIntros (N' h) "%Hpayeq Hstd Hcwf #Hcode #Hro #Hargv _ Hbuf' Hrun".
     assert (Ha0 : tf_resume_gpr0 (uvis_tf W') !!! Regidx (mword_of_int 10 : mword 5)

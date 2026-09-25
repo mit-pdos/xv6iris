@@ -383,7 +383,7 @@ Section UShExecPin.
     iPoseProof ("Hent" $! M s0 t gn fdv chs pidv with "[%] [%] [%] [%] Hnp0") as "#He";
       [ exact Himg | exact Hbytes | exact Hflen | rewrite Hl; exact Hrows | ].
     iApply (UShEchoPipePay.image_entry_pay_mono elf M
-              (mword_of_int (t + 8) : mword 64) fdv FsImg.ROOTINO chs pidv
+              (mword_of_int (t + 8) : mword 64) fdv FsImg.ROOTINO ProcDefs.secc_all chs pidv
               (fun _ : Z => Qv) Cr (UserFd.ustd (ukn_fd N') ld ∗ Cr)%I uslot with "[] He").
     iIntros "!> [_ Hc]". iExact "Hc".
   Qed.
