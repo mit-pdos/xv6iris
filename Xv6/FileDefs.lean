@@ -72,9 +72,9 @@ invariants the Rocq algebra enforces:
    `q.half`; `bv_unsigned` is `toNat`; FdSlots.v's `FdInode (inum : Z)` is a
    `Nat`.
 
-Not ported yet (no Lean consumer): `off_free_of_word` (its one Rocq use is
-the ftable's boot carve, `FileInv.ftable_res_boot`; the Lean port has no
-ftable boot site yet), `fentry_raw` (same).
+`off_free_of_word` and `fentry_raw` (the ftable's boot carve,
+`FileInv.ftable_res_boot`) are ported in `Xv6/FileBoot.lean`
+(`fileBoot_offFree_of_word`, `fentryRaw`).
 -/
 import MachCSL.Lock
 import Xv6.PipeInvDefs
