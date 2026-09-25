@@ -195,3 +195,28 @@ KexecLoad (and, if KexecLoad needs `kxbPermOk` for `kexec_image_ok`, that part o
   (`sp (S i) + alen i < sp i`) is false under Nat truncation, so either `kxcSp` stays `Int` (recommended;
   lookups then take `.toNat` under `kxc_stack_ok`'s `base ≤ sp`, base = top − 4096 ≥ 4096) or the
   disjointness rows gain a `kxcStackOk` premise. Coordinator: please settle with K-A.
+
+## 11. Status after the coordinator's decisions (K-B, second round)
+
+Decisions applied: (1) stack algebra at `Int` (K-A's KexecDefs); the view is `umemGet P M : ElfMem`
+(`Nat → Option (BitVec 8)`, the ELF image's own type), so `uimgSub (elfImage f) (umemGet P M)` needs no
+conversion and **ElfFile.lean is NOT edited**; the Int stack rows read the map through `memAtZ` (none below 0).
+(2) `kexecArgsAt`/`kexecStackAt` over a plain `ElfMem`, in KexecBuilt. (3) D17: `Xv6/UserPerm.lean`
+(uperm subset) and `Xv6/UexecSlot.lean` (minimal `Uvis`); S6/S7 as Rocq. (4) `kxb_` twins dropped.
+
+Files (all build, no `sorry`, `tools/check_layering.sh` ok; KexecBuilt ~6 s whole file):
+- `Xv6/KexecBuilt.lean` (appended to the landed §0): §0–§9 complete (Rocq KexecBuilt.v, 2051 lines).
+- `Xv6/KexecPtImage.lean` (new): `umPages_pageLen`, `procPtAt_pageLen`, `umPages_page_load_split`,
+  `procPtAt_page_load_split`.
+- `Xv6/KexecImageAlg.lean` (new): `kexecTop_of_szAfter`, `kexecSz_of_szAfter`, `kexecTop_mod`, `kexecSz_mod`,
+  `kexecSz_ge`, `kexecSzAfter_take_all`, `kxbWalkOk_of_loadable`, `kexecLoadable_of_walk`,
+  `umemLazy_of_lazyFree`.
+- `Xv6/UserPerm.lean` (new, partial port of UserPerm.v §1–2).
+- `Xv6/UexecSlot.lean` (new, minimal port: `Uvis`, `umemLazy`, `uvisOf`, `uvisLz`, `tfW`, `retPc`,
+  `tfResumePc`; `tf_resume_gpr*` deferred to wave 8).
+Imports for Xv6.lean: `Xv6.UserPerm`, `Xv6.UexecSlot`, `Xv6.KexecPtImage`, `Xv6.KexecImageAlg`
+(`Xv6.KexecBuilt` is already there if §0 was added).
+
+One statement change beyond the plan: `kxbAt_step_load` takes `lazyFree Pi.um o` + `umPageLen Pi Mi`
+(Rocq's `umem_grow` fills every live byte; Lean's uvmalloc only its run, so the bss rows need coverage of
+the running space — which Rocq's seams carry as `um_covered`).

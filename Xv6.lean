@@ -850,3 +850,7 @@ import Xv6.SysExecDefs
 import Xv6.KexecLoad
 import Xv6.KexecParts
 import Xv6.ConsLog
+import Xv6.UserPerm
+import Xv6.UexecSlot
+import Xv6.KexecPtImage
+import Xv6.KexecImageAlg
