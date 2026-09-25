@@ -277,6 +277,7 @@ theorem riscvPowerAdequacy [MachGpreS hlc GF] [KernelMap] (ndisk : Nat) (g : GSt
           γobs T (Pt γobs c) γhist
           (Tg c) (HTg c) (HTgt c) (Kc c) (HKc c) (HKct c) (Cres c) (HCrest c) →
       ∀ (E : EraGS GF) (gen : Nat) (σ : MState) (image : Mem), bootFacts σ image →
+        (∃ ds0 : DevStates, σ.devs = ds0.reset) →
         Ppure (diskOf σ.devs) →
         obsInv ∗ powerBootRes Mof (Rb c) E gen σ ⊢@{IProp GF} |={⊤}=>
           ([∗list] cpu ∈ cpus, hartWP gen cpu (pure ())) ∗
@@ -340,10 +341,10 @@ theorem riscvPowerAdequacy [MachGpreS hlc GF] [KernelMap] (ndisk : Nat) (g : GSt
       Ppure (fun dk => Hproj γdisk γswap γreg γstart c dk)
       Mof (Rb c) (fun E gen dk => Hswap γdisk γswap γreg γstart c E gen dk)
       (fun h on dk hs => Hobs γdisk γobs c h on dk hs)
-      (fun E gen σ image hbf hpp => @Hboot ((bootFixedGS Hinv γgen γstart γreg γdisk ndisk γswap
+      (fun E gen σ image hbf hdv hpp => @Hboot ((bootFixedGS Hinv γgen γstart γreg γdisk ndisk γswap
         (Pc γdisk γswap γreg γstart c) γobs T (Pt γobs c) γhist
         (Tg c) (HTg c) (HTgt c) (Kc c) (HKc c) (HKct c) (Cres c) (HCrest c)).withInv Hinv)
-        Hinv γgen γstart γreg γdisk γswap γobs γhist c T rfl E gen σ image hbf hpp))
+        Hinv γgen γstart γreg γdisk γswap γobs γhist c T rfl E gen σ image hbf hdv hpp))
     unfold obsInv crashInv
     iframe Hcinv Hoinv
   unfold obsHalf
@@ -548,6 +549,7 @@ theorem riscvTraceAdequacy [KernelMap] (ndisk : Nat) (g : GState)
           killCredTriv inferInstance inferInstance
           consResTriv (fun _ _ _ => inferInstance) →
       ∀ (E : EraGS GF) (gen : Nat) (σ : MState) (image : Mem), bootFacts σ image →
+        (∃ ds0 : DevStates, σ.devs = ds0.reset) →
         Ppure (diskOf σ.devs) →
         obsInv ∗ powerBootRes Mof (fun _ => Rb) E gen σ ⊢@{IProp GF} |={⊤}=>
           ([∗list] cpu ∈ cpus, hartWP gen cpu (pure ())) ∗

@@ -278,6 +278,8 @@ def resetVal (cpu : CPU) : (r : Register) → Option (RegisterType r)
   | .elp => some 0#1
   | .senvcfg => some 0#64
   | .mcountinhibit => some 0#32
+  | .mstateen0 => some 0#64
+  | .sstateen0 => some 0#32
   | .minstretcfg => some 0#64
   | .mcyclecfg => some 0#64
   | .pma_regions => some bootPMA

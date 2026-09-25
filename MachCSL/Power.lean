@@ -465,6 +465,7 @@ theorem wp_power [KernelMap]
         |==> ◇ (diskFixedAuth dk ∗ ▷ MachFixedGS.obsPred (hlc := hlc) (GF := GF) ∗
           obsHalf (h ++ [powerEv on]) ∗ powerYield on h))
     (Hboot : ∀ (E : EraGS GF) (gen : Nat) (σ : MState) (image : Mem), bootFacts σ image →
+      (∃ ds0 : DevStates, σ.devs = ds0.reset) →
       Ppure (diskOf σ.devs) →
       obsInv ∗ powerBootRes Mof Rb E gen σ ⊢@{IProp GF} |={⊤}=>
         ([∗list] cpu ∈ cpus, hartWP gen cpu (pure ())) ∗
@@ -612,7 +613,7 @@ theorem wp_power [KernelMap]
         · unfold lockSetAt locksMap
           iexact Hls
     imod (Hboot ⟨names, G, vn, ivn, rvn, γtop, γauth, γresv, lsn, γkmap, γkroot, dn, γmir⟩ g.gen g₂.m g.image hbf
-      (by rw [hdk]; exact hpure)) $$ [Hres] with ⟨Hwps, Hdwps⟩
+      ⟨g.m.devs, hdevs⟩ (by rw [hdk]; exact hpure)) $$ [Hres] with ⟨Hwps, Hdwps⟩
     · isplitl []
       · unfold obsInv; iexact Hoinv
       · iexact Hres
