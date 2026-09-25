@@ -241,7 +241,7 @@ Section KforkArms.
   (* =================================================================== *)
   (*  ARM 2 -- uvmcopy failed.  [Hcont7c] now hands the frame as           *)
   (*  [∃ w4 w5, ProofKfork.kfk_frame_at sp0 ra0 s00 s10 s50 w4 w5 (m !!!   *)
-  (*  Regidx Rs4)] -- slot 6 pinned, slots 4/5 still existential -- which   *)
+  (*  Regidx Rs3)] -- slot 6 pinned, slots 4/5 still existential -- which   *)
   (*  is exactly what [ProofKforkB1.kfk_exit_uvmcopy] needs; this is now    *)
   (*  a complete, hypothesis-free match for [Hcont7c]'s own type.           *)
   (* =================================================================== *)
@@ -267,12 +267,12 @@ Section KforkArms.
     match lvl with O => eb | S _ => false end = b ->
     m !!! Regidx csp_rs1 = sp0 -> m !!! Regidx Rra = ra0 -> m !!! Regidx Rs0 = s00 ->
     m !!! Regidx Rs1 = s10 -> m !!! Regidx Rs5 = s50 ->
-    Mt !!! Regidx csp_rs1 = pa_stk sp0 8 -> Mt !!! Regidx Rs4 = proc_addr j ->
+    Mt !!! Regidx csp_rs1 = pa_stk sp0 8 -> Mt !!! Regidx Rs3 = proc_addr j ->
     npa = proc_addr j -> (j < NPROC)%nat -> γs !! j = Some γl2 ->
     pv_ofile (us_V Uc) = replicate NOFILE (zero_reg : mword 64) ->
     pv_cwd (us_V Uc) = (zero_reg : mword 64) ->
     (forall r : mword 5, is_cs_idx r = true -> r <> csp_rs1 ->
-        r <> Rs0 -> r <> Rs1 -> r <> Rs4 -> r <> Rs5 -> Mt !!! Regidx r = m !!! Regidx r) ->
+        r <> Rs0 -> r <> Rs1 -> r <> Rs3 -> r <> Rs5 -> Mt !!! Regidx r = m !!! Regidx r) ->
     (* THE FLOOR OF THIS CONE IS wait_lock (8), which kfork takes AFTER
        releasing np->lock (kernel/proc.c:295) and which ProofKforkB5 states.
        allocproc's "proc" (9) is the call the function is about and the one
@@ -292,7 +292,7 @@ Section KforkArms.
     arm_pay KT1 lvl eb pme -∗
     kernel_text -∗
     pc_is (mword_of_int (KF + 0x7c) : mword 64) -∗
-    (∃ w4 w5 : mword 64, ProofKfork.kfk_frame_at sp0 ra0 s00 s10 s50 w4 w5 (m !!! Regidx Rs4)) -∗
+    (∃ w4 w5 : mword 64, ProofKfork.kfk_frame_at sp0 ra0 s00 s10 s50 w4 (m !!! Regidx Rs3) w5) -∗
     proc_priv γf pme pid_p Up -∗
     (* ...and its descriptor states, which [kfork_post] hands back verbatim
        beside the block: this arm touches neither. *)
@@ -346,10 +346,10 @@ Section KforkArms.
              Hpv Hpfrag Hprow HCpriv Hcrow Hcsg Hcpr Hcxb Hheld Hhart Hfd Hir Hbsl Hctx Hkst Hkalloc HRc Hcont".
     iDestruct "Hframe" as (w4 w5) "Hframe".
     rewrite /ProofKfork.kfk_frame_at.
-    iDestruct "Hframe" as "(Hb1 & Hb2 & Hb3 & Hb4 & Hb5 & Hb6 & Hb7 & Hb8)".
+    iDestruct "Hframe" as "(Hb1 & Hb2 & Hb3 & Hb4 & Hb6 & Hb5 & Hb7 & Hb8)".
     iAssert (∃ w4', ctx_word_pointsto (KTR := KT1) cur_ctx (pa_stk sp0 4) (DfracOwn 1) w4')%I with "[Hb4]" as "Hb4x".
     { iExists w4. iExact "Hb4". }
-    iAssert (∃ w5', ctx_word_pointsto (KTR := KT1) cur_ctx (pa_stk sp0 5) (DfracOwn 1) w5')%I with "[Hb5]" as "Hb5x".
+    iAssert (∃ w5', ctx_word_pointsto (KTR := KT1) cur_ctx (pa_stk sp0 6) (DfracOwn 1) w5')%I with "[Hb5]" as "Hb5x".
     { iExists w5. iExact "Hb5". }
     iDestruct (SchedCtx.procs_inv_lookup γs j γl2 Hgamma with "Hprocs") as "#Hislock".
     iDestruct (ProofKforkParts.kfk_of_priv γf (proc_addr j) pid_c Uc Hofnull Hcwdnull
@@ -416,7 +416,7 @@ Section KforkArms.
     sie_cap_gpr KT1 Mt (K - 8)%nat b pme -∗
     cpu_own lvl eb pme b lks -∗
     kernel_text -∗
-    pc_is (mword_of_int (KF + 0x10a) : mword 64) -∗
+    pc_is (mword_of_int (KF + 0x112) : mword 64) -∗
     kfk_frame sp0 ra0 s00 s10 s50 -∗
     proc_priv γf pme pid_p Up -∗
     (* ...and its descriptor states, which [kfork_post] hands back verbatim
@@ -476,7 +476,7 @@ Section KforkArms.
   (*  scheduler context as the GENERIC [SwtchCtx.own_ctx (p_context npa)]   *)
   (*  (14 words, contents existential, no relation to any specific value)   *)
   (*  -- exactly the form [ProofKforkParts.kfk_of_priv]/freeproc want on     *)
-  (*  the uvmcopy-FAILURE arm.  But arm 3 never frees the child; +0xc2's     *)
+  (*  the uvmcopy-FAILURE arm.  But arm 3 never frees the child; +0xca's     *)
   (*  first release instead runs [SpecForkretPark.forkret_park] (inside     *)
   (*  [ProofKforkB5.kfk_b5]), whose contract ([SpecForkretPark.v]'s own      *)
   (*  header: precisely what allocproc's own postcondition hands the        *)
@@ -527,7 +527,7 @@ Section KforkArms.
     m !!! Regidx csp_rs1 = sp0 -> m !!! Regidx Rra = ra0 -> m !!! Regidx Rs0 = s00 ->
     m !!! Regidx Rs1 = s10 -> m !!! Regidx Rs5 = s50 ->
     Mt !!! Regidx csp_rs1 = pa_stk sp0 8 ->
-    Mt !!! Regidx Rs4 = npa ->
+    Mt !!! Regidx Rs3 = npa ->
     Mt !!! Regidx Rs5 = pme ->
     (* THE PARENT'S ADDRESS IS A PROC SLOT'S, hence not 0 (design app-pipe
        SS4.3x (ii), lane PIPE-GEN): relayed from this function's own
@@ -540,7 +540,7 @@ Section KforkArms.
     Mt !!! Regidx Ra3 = a_tf_word tfsrc 36 ->
     ud_tfp (pv_upt (us_V Up)) = tfsrc -> ud_tfp (pv_upt (us_V Uc')) = tfdst ->
     (forall r : mword 5, is_cs_idx r = true -> r <> csp_rs1 ->
-        r <> Rs0 -> r <> Rs1 -> r <> Rs4 -> r <> Rs5 -> Mt !!! Regidx r = m !!! Regidx r) ->
+        r <> Rs0 -> r <> Rs1 -> r <> Rs3 -> r <> Rs5 -> Mt !!! Regidx r = m !!! Regidx r) ->
     npa = proc_addr j -> (j < NPROC)%nat -> γs !! j = Some γl2 ->
     pv_ofile (us_V Uc') = replicate NOFILE (zero_reg : mword 64) ->
     pv_cwd (us_V Uc') = (zero_reg : mword 64) ->
@@ -714,8 +714,8 @@ Section KforkArms.
     iDestruct ("Hclose_c" $! (pv_tf (us_V Up)) with "Htf_c Htfp_c") as "HCpriv".
     set (V1 := upd_pt (us_V Uc') (pv_upt (us_V Uc')) (pv_tf (us_V Up))).
     change (upd_pt (us_V Uc') (pv_upt (us_V Uc')) (pv_tf (us_V Up))) with V1.
-    assert (Hmfs4 : mf !!! Regidx Rs4 = npa)
-      by (rewrite (callee_saved_lookup Hcsmf Rs4 ltac:(vm_compute; reflexivity)); exact HMts4).
+    assert (Hmfs4 : mf !!! Regidx Rs3 = npa)
+      by (rewrite (callee_saved_lookup Hcsmf Rs3 ltac:(vm_compute; reflexivity)); exact HMts4).
     assert (Hmfs5 : mf !!! Regidx Rs5 = pme)
       by (rewrite (callee_saved_lookup Hcsmf Rs5 ltac:(vm_compute; reflexivity)); exact HMts5).
     (* ---- ProofKforkB7: MY OWN block ---- *)
@@ -728,7 +728,7 @@ Section KforkArms.
     { assert (Hcs : is_cs_idx csp_rs1 = true) by (vm_compute; reflexivity).
       assert (Hne1 : csp_rs1 <> Rs1) by (vm_compute; discriminate).
       assert (Hne2 : csp_rs1 <> Rs2) by (vm_compute; discriminate).
-      assert (Hne3 : csp_rs1 <> Rs3) by (vm_compute; discriminate).
+      assert (Hne3 : csp_rs1 <> Rs4) by (vm_compute; discriminate).
       rewrite (HMxthr csp_rs1 Hcs Hne1 Hne2 Hne3).
       rewrite (callee_saved_lookup Hcsmf csp_rs1 ltac:(vm_compute; reflexivity)).
       exact HMtsp. }
@@ -736,11 +736,11 @@ Section KforkArms.
     { assert (Hcs : is_cs_idx Rs0 = true) by (vm_compute; reflexivity).
       assert (Hne1 : Rs0 <> Rs1) by (vm_compute; discriminate).
       assert (Hne2 : Rs0 <> Rs2) by (vm_compute; discriminate).
-      assert (Hne3 : Rs0 <> Rs3) by (vm_compute; discriminate).
+      assert (Hne3 : Rs0 <> Rs4) by (vm_compute; discriminate).
       rewrite (HMxthr Rs0 Hcs Hne1 Hne2 Hne3).
       apply (callee_saved_lookup Hcsmf Rs0 ltac:(vm_compute; reflexivity)). }
     assert (HMxfull : forall r : mword 5, is_cs_idx r = true -> r <> csp_rs1 ->
-                r <> Rs0 -> r <> Rs1 -> r <> Rs2 -> r <> Rs3 -> r <> Rs4 -> r <> Rs5 ->
+                r <> Rs0 -> r <> Rs1 -> r <> Rs2 -> r <> Rs4 -> r <> Rs3 -> r <> Rs5 ->
                 Mx !!! Regidx r = m !!! Regidx r).
     { intros r Hr Ncsp Ns0 Ns1 Ns2 Ns3 Ns4 Ns5.
       rewrite (HMxthr r Hr Ns1 Ns2 Ns3).
@@ -854,8 +854,8 @@ Section KforkArms.
       { destruct HVc4 as (_ & _ & _ & _ & _ & _ & _ & _ & _ & Hg & _).
         rewrite Hg. rewrite /kfk_childV /V2 /V1. reflexivity. }
       iEval (rewrite -Hcchg4) in "Hcrow".
-      assert (Hmf4s4 : mf4 !!! Regidx Rs4 = npa).
-      { rewrite (Hthr4 Rs4 ltac:(vm_compute; reflexivity) ltac:(vm_compute; discriminate)).
+      assert (Hmf4s4 : mf4 !!! Regidx Rs3 = npa).
+      { rewrite (Hthr4 Rs3 ltac:(vm_compute; reflexivity) ltac:(vm_compute; discriminate)).
         exact Hd3. }
       assert (Hmf4s5 : mf4 !!! Regidx Rs5 = pme).
       { rewrite (Hthr4 Rs5 ltac:(vm_compute; reflexivity) ltac:(vm_compute; discriminate)).
@@ -897,7 +897,7 @@ Section KforkArms.
       assert (Hurun : urun_eq
                         (uvis_of (kfork_child Up) stsP (pv_gen Vc4) ∅ pid_c)
                         (MkUstate Vc4 ((us_M Uc')))).
-      { destruct HVc4 as (Hs & Hu & Ht & _ & _ & _ & _ & Hc & _ & _ & Hlz).
+      { destruct HVc4 as (Hs & Hu & Ht & _ & _ & _ & _ & Hc & _ & _ & Hlz & Hsc).
         apply urun_eq_kfork_child.
         - exact Ht.
         - exact Hshimg.
@@ -906,7 +906,9 @@ Section KforkArms.
         - cbn [us_V]. exact Hc.
         (* the child's bit is the parent's: B6's close wrote it there and
            B4's walk moved the cwd and the name only *)
-        - cbn [us_V]. rewrite Hlz. rewrite /kfk_childV /V2 /V1. exact Hshlz. }
+        - cbn [us_V]. rewrite Hlz. rewrite /kfk_childV /V2 /V1. exact Hshlz.
+        (* ...and its mask is the parent's: B4 copied it at +0xbe/+0xc2 *)
+        - cbn [us_V]. exact Hsc. }
       (* ---- ProofKforkB5: the two lock crossings, the RUNNABLE park ---- *)
       (* pass B5's exit arm as THIS proof's [b] (with [eq_sym Hbeq] for B5's
          own [b = match lvl ...] premise) rather than as the [match] itself:
@@ -962,7 +964,7 @@ Section KforkArms.
       { intros r Hr Ncsp Ns0 Ns1 Ns2 Ns3 Ns4 Ns5.
         rewrite (callee_saved_lookup Hcs5 r Hr).
         rewrite (Hthr4 r Hr Ns1).
-        exact (Hd5 r Hr Ncsp Ns0 Ns1 Ns2 Ns3 Ns4 Ns5). }
+        exact (Hd5 r Hr Ncsp Ns0 Ns1 Ns2 Ns4 Ns3 Ns5). }
       (* ---- ProofKfork.kfk_tail_succ: the three lazy reloads ---- *)
       (* B5 now exits at THIS proof's [b] (see the call above), so the tail and
          the [cpu_own] transport are instantiated at [b] too -- and none of the
@@ -1074,7 +1076,7 @@ Section KforkMain.
               with "HKp Hcg Hcpu Htext Hpc Hprocs Hplock Hwlock Hftbl
                     Hitbl Hitinv Henv Hpav Hpv Hpfrag HR0 [] [] [Hjslot]").
     all: try lkbelow.
-    - (* ---- arm 1: allocproc found no free slot, +0x10a ---- *)
+    - (* ---- arm 1: allocproc found no free slot, +0x112 ---- *)
       iIntros (CID1 Hx1 Mt) "%HMtsp %HMtthr Hcg Hcpu #Ht Hpc Hframe Hpv Hpfrag Hke HR".
       iDestruct "HR" as "(Hrow & HRc & HR)".
       (* THE COLLAPSE.  allocproc's two not-found disjuncts are the same

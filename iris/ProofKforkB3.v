@@ -275,7 +275,7 @@ Section KforkB3Proof.
      meaning at function entry). *)
   Definition kfkb3_thr (m0 M : regfile) : Prop :=
     forall r : mword 5, is_cs_idx r = true -> r <> csp_rs1 ->
-      r <> Rs0 -> r <> Rs1 -> r <> Rs2 -> r <> Rs3 -> r <> Rs4 -> r <> Rs5 ->
+      r <> Rs0 -> r <> Rs1 -> r <> Rs2 -> r <> Rs4 -> r <> Rs3 -> r <> Rs5 ->
       M !!! Regidx r = m0 !!! Regidx r.
 
   (* THE RESERVE IS AN EXPLICIT PARAMETER [r], NOT [trap_res b].
@@ -304,12 +304,12 @@ Section KforkB3Proof.
       ⌜(i < NOFILE)%nat⌝ -∗
       ⌜M !!! Regidx csp_rs1 = sp0v /\ M !!! Regidx Rs0 = s00v /\
         M !!! Regidx Rs1 = p_ofile pme i /\ M !!! Regidx Rs2 = p_ofile npa i /\
-        M !!! Regidx Rs3 = p_cwd pme /\ M !!! Regidx Rs4 = npa /\
+        M !!! Regidx Rs4 = p_cwd pme /\ M !!! Regidx Rs3 = npa /\
         M !!! Regidx Rs5 = pme /\ kfkb3_thr m0 M⌝ -∗
       wp_next (CID0 := CID0) b pme (fun (CID : CpuId) =>
         ∀ (Mx : regfile),
           ⌜Mx !!! Regidx csp_rs1 = sp0v /\ Mx !!! Regidx Rs0 = s00v /\
-            Mx !!! Regidx Rs4 = npa /\ Mx !!! Regidx Rs5 = pme /\
+            Mx !!! Regidx Rs3 = npa /\ Mx !!! Regidx Rs5 = pme /\
             kfkb3_thr m0 Mx⌝ -∗
           sie_cap_gpr KT1 Mx (rsv + (K - 8))%nat b pme -∗
           cpu_own n eb pme b lks -∗
@@ -344,12 +344,12 @@ Section KforkB3Proof.
           ⌜(i < NOFILE)%nat⌝ -∗
           ⌜M !!! Regidx csp_rs1 = sp0v /\ M !!! Regidx Rs0 = s00v /\
             M !!! Regidx Rs1 = p_ofile pme i /\ M !!! Regidx Rs2 = p_ofile npa i /\
-            M !!! Regidx Rs3 = p_cwd pme /\ M !!! Regidx Rs4 = npa /\
+            M !!! Regidx Rs4 = p_cwd pme /\ M !!! Regidx Rs3 = npa /\
             M !!! Regidx Rs5 = pme /\ kfkb3_thr m0 M⌝ -∗
           wp_next (CID0 := CID0) b pme (fun (CID2 : CpuId) =>
             ∀ (Mx : regfile),
               ⌜Mx !!! Regidx csp_rs1 = sp0v /\ Mx !!! Regidx Rs0 = s00v /\
-                Mx !!! Regidx Rs4 = npa /\ Mx !!! Regidx Rs5 = pme /\
+                Mx !!! Regidx Rs3 = npa /\ Mx !!! Regidx Rs5 = pme /\
                 kfkb3_thr m0 Mx⌝ -∗
               sie_cap_gpr KT1 Mx (rsv + (K - 8))%nat b pme -∗
               cpu_own n eb pme b lks -∗
@@ -381,7 +381,7 @@ Section KforkB3Proof.
         ∀ (Mt : regfile),
           ⌜Mt !!! Regidx csp_rs1 = sp0v /\ Mt !!! Regidx Rs0 = s00v /\
             Mt !!! Regidx Rs1 = p_ofile pme i /\ Mt !!! Regidx Rs2 = p_ofile npa i /\
-            Mt !!! Regidx Rs3 = p_cwd pme /\ Mt !!! Regidx Rs4 = npa /\
+            Mt !!! Regidx Rs4 = p_cwd pme /\ Mt !!! Regidx Rs3 = npa /\
             Mt !!! Regidx Rs5 = pme /\ kfkb3_thr m0 Mt⌝ -∗
           sie_cap_gpr KT1 Mt (rsv + (K - 8))%nat b pme -∗
           cpu_own n eb pme b lks -∗
@@ -418,9 +418,9 @@ Section KforkB3Proof.
           by (rewrite /T1 upd_ne; [exact Ht0' | vm_compute; discriminate]).
         assert (HT1s2 : T1 !!! Regidx Rs2 = p_ofile npa i)
           by (rewrite /T1 upd_ne; [exact Ht2 | vm_compute; discriminate]).
-        assert (HT1s3 : T1 !!! Regidx Rs3 = p_cwd pme)
+        assert (HT1s3 : T1 !!! Regidx Rs4 = p_cwd pme)
           by (rewrite /T1 upd_ne; [exact Ht3 | vm_compute; discriminate]).
-        assert (HT1s4 : T1 !!! Regidx Rs4 = npa)
+        assert (HT1s4 : T1 !!! Regidx Rs3 = npa)
           by (rewrite /T1 upd_ne; [exact Ht4 | vm_compute; discriminate]).
         assert (HT1s5 : T1 !!! Regidx Rs5 = pme)
           by (rewrite /T1 upd_ne; [exact Ht5 | vm_compute; discriminate]).
@@ -451,9 +451,9 @@ Section KforkB3Proof.
           by (rewrite /T2 upd_ne; [exact HT1csp | vm_compute; discriminate]).
         assert (HT2s0 : T2 !!! Regidx Rs0 = s00v)
           by (rewrite /T2 upd_ne; [exact HT1s0 | vm_compute; discriminate]).
-        assert (HT2s3 : T2 !!! Regidx Rs3 = p_cwd pme)
+        assert (HT2s3 : T2 !!! Regidx Rs4 = p_cwd pme)
           by (rewrite /T2 upd_ne; [exact HT1s3 | vm_compute; discriminate]).
-        assert (HT2s4 : T2 !!! Regidx Rs4 = npa)
+        assert (HT2s4 : T2 !!! Regidx Rs3 = npa)
           by (rewrite /T2 upd_ne; [exact HT1s4 | vm_compute; discriminate]).
         assert (HT2s5 : T2 !!! Regidx Rs5 = pme)
           by (rewrite /T2 upd_ne; [exact HT1s5 | vm_compute; discriminate]).
@@ -463,10 +463,10 @@ Section KforkB3Proof.
         (* ---- +0x92: beq s1,s3 -- exit iff (S i) = NOFILE ---- *)
         destruct (decide (S i = NOFILE)) as [Heos | Hne].
         - (* TAKEN: the scan is done *)
-          assert (Hcmp : eq_vec (T2 !!! Regidx Rs1) (T2 !!! Regidx Rs3) = true).
+          assert (Hcmp : eq_vec (T2 !!! Regidx Rs1) (T2 !!! Regidx Rs4) = true).
           { rewrite HT2s1 HT2s3 Heos -p_ofile_end. apply eq_vec_refl. }
           iApply (wp_beq_taken_s_sconf (mword_of_int (KF + 0x92)) (mword_of_int 18 : mword 13)
-                    Rs3 Rs1 T2 (rsv + (K - 8))%nat b
+                    Rs4 Rs1 T2 (rsv + (K - 8))%nat b
                     ltac:(vm_compute; discriminate) ltac:(vm_compute; discriminate)
                     ltac:(rgne; rgne; exact Hcmp) ltac:(vm_compute; reflexivity)
                     with "Hcg Hpc []").
@@ -493,10 +493,10 @@ Section KforkB3Proof.
           assert (Hne' : p_ofile pme (S i) <> p_ofile pme NOFILE).
           { intro Hbad. apply Hne.
             apply (kfkb3_p_ofile_inj pme (S i) NOFILE ltac:(lia) ltac:(lia) Hbad). }
-          assert (Hcmp : eq_vec (T2 !!! Regidx Rs1) (T2 !!! Regidx Rs3) = false).
+          assert (Hcmp : eq_vec (T2 !!! Regidx Rs1) (T2 !!! Regidx Rs4) = false).
           { rewrite HT2s1 HT2s3 -p_ofile_end. apply eq_vec_false_iff. exact Hne'. }
           iApply (wp_beq_fall_s_sconf (mword_of_int (KF + 0x92)) (mword_of_int 18 : mword 13)
-                    Rs3 Rs1 T2 (rsv + (K - 8))%nat b
+                    Rs4 Rs1 T2 (rsv + (K - 8))%nat b
                     ltac:(vm_compute; discriminate) ltac:(vm_compute; discriminate)
                     ltac:(rgne; rgne; exact Hcmp)
                     with "Hcg Hpc []").
@@ -553,9 +553,9 @@ Section KforkB3Proof.
         by (rewrite /L1 upd_ne; [exact Hs1 | vm_compute; discriminate]).
       assert (HL1s2 : L1 !!! Regidx Rs2 = p_ofile npa i)
         by (rewrite /L1 upd_ne; [exact Hs2 | vm_compute; discriminate]).
-      assert (HL1s3 : L1 !!! Regidx Rs3 = p_cwd pme)
+      assert (HL1s3 : L1 !!! Regidx Rs4 = p_cwd pme)
         by (rewrite /L1 upd_ne; [exact Hs3 | vm_compute; discriminate]).
-      assert (HL1s4 : L1 !!! Regidx Rs4 = npa)
+      assert (HL1s4 : L1 !!! Regidx Rs3 = npa)
         by (rewrite /L1 upd_ne; [exact Hs4 | vm_compute; discriminate]).
       assert (HL1s5 : L1 !!! Regidx Rs5 = pme)
         by (rewrite /L1 upd_ne; [exact Hs5 | vm_compute; discriminate]).
@@ -661,9 +661,9 @@ Section KforkB3Proof.
           by (rewrite /L2 upd_ne; [exact HL1s1 | vm_compute; discriminate]).
         assert (HL2s2 : L2 !!! Regidx Rs2 = p_ofile npa i)
           by (rewrite /L2 upd_ne; [exact HL1s2 | vm_compute; discriminate]).
-        assert (HL2s3 : L2 !!! Regidx Rs3 = p_cwd pme)
+        assert (HL2s3 : L2 !!! Regidx Rs4 = p_cwd pme)
           by (rewrite /L2 upd_ne; [exact HL1s3 | vm_compute; discriminate]).
-        assert (HL2s4 : L2 !!! Regidx Rs4 = npa)
+        assert (HL2s4 : L2 !!! Regidx Rs3 = npa)
           by (rewrite /L2 upd_ne; [exact HL1s4 | vm_compute; discriminate]).
         assert (HL2s5 : L2 !!! Regidx Rs5 = pme)
           by (rewrite /L2 upd_ne; [exact HL1s5 | vm_compute; discriminate]).
@@ -690,10 +690,10 @@ Section KforkB3Proof.
           by (rewrite (callee_saved_lookup Hcsmr Rs1 ltac:(vm_compute; reflexivity)); exact HL2s1).
         assert (Hmrs2 : mr !!! Regidx Rs2 = p_ofile npa i)
           by (rewrite (callee_saved_lookup Hcsmr Rs2 ltac:(vm_compute; reflexivity)); exact HL2s2).
-        assert (Hmrs3 : mr !!! Regidx Rs3 = p_cwd pme)
-          by (rewrite (callee_saved_lookup Hcsmr Rs3 ltac:(vm_compute; reflexivity)); exact HL2s3).
-        assert (Hmrs4 : mr !!! Regidx Rs4 = npa)
-          by (rewrite (callee_saved_lookup Hcsmr Rs4 ltac:(vm_compute; reflexivity)); exact HL2s4).
+        assert (Hmrs3 : mr !!! Regidx Rs4 = p_cwd pme)
+          by (rewrite (callee_saved_lookup Hcsmr Rs4 ltac:(vm_compute; reflexivity)); exact HL2s3).
+        assert (Hmrs4 : mr !!! Regidx Rs3 = npa)
+          by (rewrite (callee_saved_lookup Hcsmr Rs3 ltac:(vm_compute; reflexivity)); exact HL2s4).
         assert (Hmrs5 : mr !!! Regidx Rs5 = pme)
           by (rewrite (callee_saved_lookup Hcsmr Rs5 ltac:(vm_compute; reflexivity)); exact HL2s5).
         assert (Hmrthr : kfkb3_thr m0 mr).
