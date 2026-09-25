@@ -69,29 +69,34 @@ variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [Fdslot
 
 theorem sw_kwait (KW : KWAIT) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
     (c : CPU) (k' : KCtx) (γw γp γl : GName) (γk : KmemNames) (j : Nat) (pid : BitVec 32)
-    (V : ProcPriv) (M : Nat → List (BitVec 8)) (s : Bool) (p : BitVec 64)
+    (V : ProcPriv) (M : Nat → List (BitVec 8)) (cs : ExtTreeSet GName compare) (s : Bool) (p a : BitVec 64)
     (hj : j < NPROC) (hproc : k'.proc = procAddr j) (hK : kwaitSlots ≤ k'.avail)
-    (hnoff : k'.noff = 0) (htier : k'.tier = KTier.kpt) (hs : k'.sie = s) (hp : k'.proc = p) :
+    (hnoff : k'.noff = 0) (htier : k'.tier = KTier.kpt) (hs : k'.sie = s) (hp : k'.proc = p)
+    (ha : k'.regs 10#5 = a) :
     kctx c k' ∗ pcIs c KA.«kwait» ∗ procsInv Γ ∗
     trapCsrsExt c s ∗ cpuClaimExt c s p ∗
     isLock γw waitLockAddr "wait_lock" waitLockPay ∗
     isLock γp pidLockAddr "nextpid" pidLockPay ∗
     isLock γl kmemLockAddr "kmem" (kmemRes γk) ∗ kallocAvail γk none ∗
     procPrivNoctxAt curCtx (procAddr j) pid V M ∗
+    kwaitGen (procAddr j) pid V.gen ∗ chFrag V.chg (procAddr j) cs ∗ initPidIs 1#32 ∗
     wpNext true k'.proc c (fun cpu' => iprop(∀ (spie spp : Bool) (R' : RegMap) (P' : UPtd)
-      (rv xw : BitVec 32) (d : Nat),
+      (rv xw : BitVec 32) (d : Nat) (cs' : ExtTreeSet GName compare),
       ⌜calleeSaved k'.regs R' ∧ R' 10#5 = BitVec.signExtend 64 rv ∧ V.upt.extSz V.sz P' ∧ d ≤ 4 ∧
-        kwaitAns rv (k'.regs 10#5) d⌝ -∗
+        kwaitAns rv a d⌝ -∗
+      waitAns rv (xstateVal xw) cs cs' V.gen (decide (a = 0#64)) pid -∗
+      kwaitGen (procAddr j) pid V.gen -∗ chFrag V.chg (procAddr j) cs' -∗
       kctx cpu' ((k'.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k'.regs 1#5)) -∗
       trapCsrsExt cpu' s -∗ cpuClaimExt cpu' s p -∗
       procPrivNoctxAt curCtx (procAddr j) pid { V with upt := P' }
-        (umemWrite (viewFaulted V.upt P' M) (k'.regs 10#5).toNat ((xstateBytes xw).take d)) -∗
+        (umemWrite (viewFaulted V.upt P' M) a.toNat ((xstateBytes xw).take d)) -∗
       wpLoop cpu'))
     ⊢ wpLoop (GF := GF) c := by
   subst hs hp
-  have h := KW.wp_kwait_eb (hlc := hlc) (GF := GF) Γ c k' γw γp γl γk j pid V M hj hproc hK hnoff htier
+  have h := KW.wp_kwait_eb (hlc := hlc) (GF := GF) Γ c k' γw γp γl γk j pid V M cs hj hproc hK hnoff htier
   unfold wp_kwait_eb_body at h
   simp only [kwaitAddr] at h
+  rw [ha] at h
   exact h
 
 /-! ## The frame -/
@@ -147,6 +152,7 @@ set_option maxHeartbeats 4000000 in
 post -- itself a `wpNext true` -- the hart we are on. -/
 theorem sw_exit (cpu cr : CPU) (k : KCtx) (j : Nat) (pid : BitVec 32) (V : ProcPriv)
     (M : Nat → List (BitVec 8)) (v : BitVec 64) (P' : UPtd) (rv xw : BitVec 32) (d : Nat)
+    (cs cs' : ExtTreeSet GName compare)
     (hj : j < NPROC) (hproc : k.proc = procAddr j) (hK : 4 ≤ k.avail)
     (spie spp : Bool) (R : RegMap) (hR2 : R 2#5 = k.regs 2#5 + 0xFFFFFFFFFFFFFFE0#64)
     (hpins : swPins k R) (h10 : R 10#5 = BitVec.signExtend 64 rv)
@@ -156,37 +162,43 @@ theorem sw_exit (cpu cr : CPU) (k : KCtx) (j : Nat) (pid : BitVec 32) (V : ProcP
     trapCsrsExt cr k.sie ∗ cpuClaimExt cr k.sie k.proc ∗
     procPrivNoctxAt curCtx (procAddr j) pid { V with upt := P' }
       (umemWrite (viewFaulted V.upt P' M) v.toNat ((xstateBytes xw).take d)) ∗
+    waitAns rv (xstateVal xw) cs cs' V.gen (decide (v = 0#64)) pid ∗
+    kwaitGen (procAddr j) pid V.gen ∗ chFrag V.chg (procAddr j) cs' ∗
     wpNext true k.proc cpu (fun cpu' => iprop(∀ (spie spp : Bool) (R' : RegMap) (P' : UPtd)
-      (rv xw : BitVec 32) (d : Nat),
+      (rv xw : BitVec 32) (d : Nat) (cs' : ExtTreeSet GName compare),
       ⌜calleeSaved k.regs R' ∧ R' 10#5 = BitVec.signExtend 64 rv ∧ V.upt.extSz V.sz P' ∧ d ≤ 4 ∧
         kwaitAns rv v d⌝ -∗
+      waitAns rv (xstateVal xw) cs cs' V.gen (decide (v = 0#64)) pid -∗
+      kwaitGen (procAddr j) pid V.gen -∗ chFrag V.chg (procAddr j) cs' -∗
       kctx cpu' ((k.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k.regs 1#5)) -∗
       trapCsrsExt cpu' k.sie -∗ cpuClaimExt cpu' k.sie k.proc -∗
       procPrivNoctxAt curCtx (procAddr j) pid { V with upt := P' }
         (umemWrite (viewFaulted V.upt P' M) v.toNat ((xstateBytes xw).take d)) -∗
       wpLoop cpu'))
     ⊢ wpLoop (GF := GF) cr := by
-  iintro ⟨Hk, Hpc, Hframe, Hte, Hce, Hblk, Hnext⟩
+  iintro ⟨Hk, Hpc, Hframe, Hte, Hce, Hblk, Hans, Hgen, Hch, Hnext⟩
   obtain ⟨p9, p18, p19, p20, p21, p22, p23, p24, p25, p26, p27⟩ := hpins
   iapply (sw_tail cr (k.withSpie spie spp) (by simp only [KCtx.withSpie_avail]; exact hK)
       k.regs rfl R hR2
       iprop(trapCsrsExt cr k.sie ∗ cpuClaimExt cr k.sie k.proc ∗
         procPrivNoctxAt curCtx (procAddr j) pid { V with upt := P' }
-          (umemWrite (viewFaulted V.upt P' M) v.toNat ((xstateBytes xw).take d))))
+          (umemWrite (viewFaulted V.upt P' M) v.toNat ((xstateBytes xw).take d)) ∗
+        waitAns rv (xstateVal xw) cs cs' V.gen (decide (v = 0#64)) pid ∗
+        kwaitGen (procAddr j) pid V.gen ∗ chFrag V.chg (procAddr j) cs'))
     $$ [- $Hk $Hpc $Hframe]
-  isplitl [Hte Hce Hblk]
-  · iframe Hte Hce Hblk
+  isplitl [Hte Hce Hblk Hans Hgen Hch]
+  · iframe Hte Hce Hblk Hans Hgen Hch
   k_norm_g
   iapply wpNext_intro_pin
   iintro %cz %hpz Hk Hpc HP
-  icases HP with ⟨Hte, Hce, Hblk⟩
+  icases HP with ⟨Hte, Hce, Hblk, Hans, Hgen, Hch⟩
   have hcz : k.sie = false → cz = cr := fun h => hpz (Or.inl h)
   ihave Hte := trapCsrsExt_move cr cz k.sie hcz $$ Hte
   ihave Hce := cpuClaimExt_move cr cz k.sie k.proc hcz $$ Hce
   ihave Hnext := wpNext_at true k.proc cpu cz _
     (fun h => h.elim (fun h => absurd h (by decide))
       (fun h => absurd h (by rw [hproc]; exact procAddr_nonzero hj))) $$ Hnext
-  iapply Hnext $$ %spie %spp %_ %P' %rv %xw %d [] Hk Hpc Hte Hce Hblk
+  iapply Hnext $$ %spie %spp %_ %P' %rv %xw %d %cs' [] Hans Hgen Hch Hk Hpc Hte Hce Hblk
   ipureintro
   refine ⟨sw_calleeSaved_mk _ _ p9 p18 p19 p20 p21 p22 p23 p24 p25 p26 p27, ?_, hext, hd, hans⟩
   simp only [RegMap.set_apply, BitVec.reduceEq, ite_false]
@@ -203,12 +215,12 @@ theorem sys_wait_br_ffffffffffffff0a : KA.«sys_wait» + 0xffffffffffffff0a#64 =
 set_option maxHeartbeats 64000000 in
 set_option maxRecDepth 20000 in
 theorem sys_wait_proof (AA : ARGADDR) (KW : KWAIT) : SYSWAIT := ⟨
-  fun {hlc GF} _ _ _ _ _ _ _ X Γ _ cpu k γw γp γl γk j pid V M v hj hproc hv hK hnoff htier => by
+  fun {hlc GF} _ _ _ _ _ _ _ X Γ _ cpu k γw γp γl γk j pid V M v cs hj hproc hv hK hnoff htier => by
   obtain ⟨ξ0, t0⟩ := X
   letI : CurCtx := ⟨ξ0, t0⟩
   unfold wp_sys_wait_eb_body
   simp only [sysWaitAddr]
-  iintro ⟨Hk, Hpc, #Hpi, Hte, Hce, #Hwl, #Hpl, #Hkl, Hav, Hblk, Hnext⟩
+  iintro ⟨Hk, Hpc, #Hpi, Hte, Hce, #Hwl, #Hpl, #Hkl, Hav, Hblk, Hgen, Hch, #Hip, Hnext⟩
   icases kctx_tier cpu k $$ Hk with ⟨%hct, Hk⟩
   have ht0 : t0 = KTier.kpt := hct.symm.trans htier
   subst ht0
@@ -289,11 +301,11 @@ theorem sys_wait_proof (AA : ARGADDR) (KW : KWAIT) : SYSWAIT := ⟨
     ipureintro; exact ⟨hVb, hlz⟩
   ihave Hframe := sw_frame_close (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) v w2 $$ [Hra Hs0 Hslot Hc2]
   case' _ => iframe
-  iapply (sw_kwait KW Γ c7 _ γw γp γl γk j pid V M k.sie k.proc hj ?hpr ?hKw ?hn2 ?ht ?hs ?hp)
+  iapply (sw_kwait KW Γ c7 _ γw γp γl γk j pid V M cs k.sie k.proc v hj ?hpr ?hKw ?hn2 ?ht ?hs ?hp ?ha)
     $$ [- $Hk $Hpc]
   rotate_right 1
   k_norm_g [sw_ret_298c]
-  iframe Hpi Hte Hce Hwl Hpl Hkl Hav Hblk
+  iframe Hpi Hte Hce Hwl Hpl Hkl Hav Hblk Hgen Hch
   iframe #
   case hpr => k_norm_g; exact hproc
   case hKw => k_norm_g; unfold sysWaitSlots at hK; omega
@@ -301,19 +313,20 @@ theorem sys_wait_proof (AA : ARGADDR) (KW : KWAIT) : SYSWAIT := ⟨
   case ht => k_norm_g; exact htier
   case hs => k_norm_g
   case hp => k_norm_g
+  case ha => k_norm_g
   -- past kwait, on some hart: the epilogue
   iapply wpNext_intro_pin
-  iintro %cf %hpf %spie2 %spp2 %R2 %P' %rv %xw %d %hfacts Hk Hpc Hte Hce Hblk
+  iintro %cf %hpf %spie2 %spp2 %R2 %P' %rv %xw %d %cs' %hfacts Hans Hgen Hch Hk Hpc Hte Hce Hblk
   k_norm_g [sw_withSpie_withSpie, sw_pushed_withSpie, sw_withRegs_withSpie]
   obtain ⟨hcs2, h10, hext, hd, hans⟩ := hfacts
   unfold calleeSaved at hcs2
   k_norm_g at hcs2
   obtain ⟨d2, d8, d9, d18, d19, d20, d21, d22, d23, d24, d25, d26, d27⟩ := hcs2
-  iapply (sw_exit cpu cf k j pid V M v P' rv xw d hj hproc hK4 spie2 spp2 R2
+  iapply (sw_exit cpu cf k j pid V M v P' rv xw d cs cs' hj hproc hK4 spie2 spp2 R2
       (d2.trans b2)
       ⟨d9.trans b9, d18.trans b18, d19.trans b19, d20.trans b20, d21.trans b21, d22.trans b22,
         d23.trans b23, d24.trans b24, d25.trans b25, d26.trans b26, d27.trans b27⟩
       h10 hext hd hans)
-    $$ [- $Hk $Hpc $Hframe $Hte $Hce $Hblk $Hnext]⟩
+    $$ [- $Hk $Hpc $Hframe $Hte $Hce $Hblk $Hans $Hgen $Hch $Hnext]⟩
 
 end Xv6

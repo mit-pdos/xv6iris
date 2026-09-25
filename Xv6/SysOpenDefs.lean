@@ -490,7 +490,7 @@ def openFdRcpt (rb wb : Bool) (t : FdType) (sts : List FdState) (r : BitVec 64)
 section OpenFd
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
   [FileG GF] [IcacheG GF] [SleepLockG GF] [IcboxG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [OffboxG GF] [OffboxBoxG GF]
-  [Icfg] [CurCtx]
+  [BcacheG GF] [DiskG GF] [LogG GF] [FsBlocksG GF] [IregG GF] [FsTopG GF] [FsLinkG GF] [Appcfg GF] [Fscfg] [Icfg] [CurCtx]
 
 /-- the sharpened success post implies the landed bundle shape (Rocq's
 `open_fd_frags_any`; deviation 10: `fd_frags_any` inline). -/

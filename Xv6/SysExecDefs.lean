@@ -47,7 +47,7 @@ open Iris Iris.BI Std MachCSL
 section Post
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
   [FileG GF] [IcacheG GF] [SleepLockG GF] [IcboxG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [OffboxG GF]
-  [OffboxBoxG GF] [Icfg] [CurCtx]
+  [OffboxBoxG GF] [BcacheG GF] [DiskG GF] [LogG GF] [FsBlocksG GF] [IregG GF] [FsTopG GF] [FsLinkG GF] [Appcfg GF] [Fscfg] [Icfg] [CurCtx]
 
 /-- **Rocq `sys_exec_post`: sys_exec's result, `kexecOk` VERBATIM**, against
 the block `V` the copy-ins left behind (the caller reads it as `{ V with upt

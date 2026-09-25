@@ -161,19 +161,6 @@ def procPriv (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv) (M : Nat → List
   tfPageAt V.upt.tfp V.tf ∗
   ⌜V.pvLazy = false → lazyFree V.upt.um V.sz⌝
 
-/-! ## The public part (Rocq `SchedCtx.proc_pub`, `proc_held`) -/
-
-/-- The fields `p->lock` protects (Rocq `proc_held` minus the lock token
-and the state ghost mirror): `state`, `chan`, `killed`, `xstate` whole and
-the `pid_lock`-free quarter of `pid`. -/
-def procPub (pa : BitVec 64) (st : BitVec 32) (chan : BitVec 64) (killed xstate pid : BitVec 32) :
-    IProp GF := iprop%
-  wordPointsTo (pState pa) 4 (DFrac.own 1) st ∗
-  wordPointsTo (pChan pa) 8 (DFrac.own 1) chan ∗
-  wordPointsTo (pKilled pa) 4 (DFrac.own 1) killed ∗
-  wordPointsTo (pXstate pa) 4 (DFrac.own 1) xstate ∗
-  wordPointsTo (pPid pa) 4 pidPub pid
-
 /-! ## Dormant slots (Rocq `proc_dormant`, `proc_slots`) -/
 
 /-- The memory a dormant slot still owns (the tail of Rocq
@@ -193,6 +180,30 @@ def dormantSpace (st : BitVec 32) (V : ProcPriv) (pid : BitVec 32) : IProp GF :=
 
 section Dormant
 variable [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
+
+/-! ## The public part (Rocq `SchedCtx.proc_pub`, `proc_held`) -/
+
+/-- `p->xstate`'s two halves (Rocq `DfracOwn (1/2)`): one in `p->lock`'s
+public payload, the other in the private block (a running process's core,
+Rocq `proc_priv_core`) or the dormant block (Rocq `proc_dormant`). -/
+def xsHalf : DFrac := DFrac.own (Qp.half 1)
+
+/-- The fields `p->lock` protects (Rocq `proc_held`'s cells and
+`SchedCtx.proc_pub`): `state`, `chan`, `killed` whole, HALF of `xstate`
+(the other half is the block's: the ZOMBIE park keys its escrow at what the
+cell reads), the `pid_lock`-free quarter of `pid`, and THE KILLED ROW
+(`KillRow.killPaidAt` at the machine's kill credential
+`MachFixedGS.killCred`, Rocq `kill_paid pid kl`): the flag's ghost side,
+keyed at the current incarnation of the pid. -/
+def procPub (pa : BitVec 64) (st : BitVec 32) (chan : BitVec 64) (killed xstate pid : BitVec 32) :
+    IProp GF := iprop%
+  wordPointsTo (pState pa) 4 (DFrac.own 1) st ∗
+  wordPointsTo (pChan pa) 8 (DFrac.own 1) chan ∗
+  wordPointsTo (pKilled pa) 4 (DFrac.own 1) killed ∗
+  wordPointsTo (pXstate pa) 4 xsHalf xstate ∗
+  wordPointsTo (pPid pa) 4 pidPub pid ∗
+  killPaidAt (MachFixedGS.killCred (hlc := hlc) (GF := GF)) pid killed
+
 
 /-- **The dormant slot's allowances** (Rocq `proc_dormant`'s four supply
 rows, ProcDefs.v:623): one fd-slot unit per descriptor (`[∗ list] _ ∈
@@ -243,9 +254,14 @@ once at boot, handed out with the block by allocproc, parked with a newborn
 ZOMBIE park at `∅` and returned by freeproc.  Keyed at the block's own
 `chg`, AT `∅` at both states.
 
-Rocq's remaining `proc_dormant` rows -- `gen_halves_dorm`, the `p->xstate`
-half with the ZOMBIE `exit_tok` -- are the rest of the D8 generation
-machinery (not yet wired). -/
+THE SLOT'S PIECES OF THE TWO EXCLUSIVE GENERATION GHOSTS
+(`SlotGen.genHalvesDorm`, Rocq `gen_halves_dorm`): at UNUSED the slot's
+current generation WHOLE (at the last incarnation's junk name) and the pid
+cell's zero; at ZOMBIE the dead process's quarter/eighth (`genHalvesAt`),
+the other three quarters being in `wait_lock`'s payload.  AND THE SLOT'S
+HALF OF `p->xstate`, with -- at a ZOMBIE -- THE EXIT ESCROW keyed at what
+that half reads (`ChildTok.exitTok`, Rocq `exit_tok (pv_gen V) pid
+(xstate_val xsv)`); the other half is `p->lock`'s (`procPub`). -/
 def procDormant (pa : BitVec 64) (st : BitVec 32) : IProp GF := iprop%
   ⌜st = UNUSED ∨ st = ZOMBIE⌝ ∗
   ∃ (V : ProcPriv) (pid : BitVec 32),
@@ -254,6 +270,9 @@ def procDormant (pa : BitVec 64) (st : BitVec 32) : IProp GF := iprop%
     wordPointsTo (pPid pa) 4 pidPriv pid ∗
     procFields pa (DFrac.own 1) V ∗
     dormantAllow ∗ chFrag V.chg pa ∅ ∗
+    genHalvesDorm pa pid V.gen st ∗
+    (∃ xsv : BitVec 32, wordPointsTo (pXstate pa) 4 xsHalf xsv ∗
+      (if st = ZOMBIE then exitTok V.gen pid (xstateVal xsv) else iprop(emp))) ∗
     dormantSpace st V pid
 
 /-- What slot `i` owes at state `st` besides the lock-protected part

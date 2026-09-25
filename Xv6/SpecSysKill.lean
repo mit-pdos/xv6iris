@@ -25,9 +25,9 @@ trapframe holds becomes the pid kkill looks for.  So the result is kkill's
 verbatim, `0` or `-1`, and nothing relates it to `v`.  Generic in SIE and
 depth, like both callees.
 
-Deviation from Rocq: no `riscv_kill_cred` relay -- the Lean `kkill`
-(`Xv6/SpecKkill.lean`) takes none, so there is nothing to hand on; and no
-`page_valid` premise -- the Lean `argint` takes none.
+The kill credential `□ MachFixedGS.killCred` (Rocq `□ riscv_kill_cred`,
+D8 wiring) is relayed to kkill, whose store of `p->killed` pays with it.
+Deviation from Rocq: no `page_valid` premise -- the Lean `argint` takes none.
 
 Imports only definitional files (never a `Code*` or `Proof*` file).
 -/
@@ -52,7 +52,7 @@ def wp_sys_kill_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G
     (hws : ws[tfArgIdx 0]? = some v)
     (hnoff : k.noff + 1 < 2 ^ 31) (hK : sysKillSlots ≤ k.avail) (hlk : "proc" ∉ k.locks)
     (htier : k.tier = KTier.kpt) : Prop :=
-  kctx cpu k ∗ pcIs cpu sysKillAddr ∗ procsInv Γ ∗
+  kctx cpu k ∗ pcIs cpu sysKillAddr ∗ procsInv Γ ∗ □ MachFixedGS.killCred (hlc := hlc) (GF := GF) ∗
   wordPointsTo (pTrapframe k.proc) 8 dqt (pageAddr tfp) ∗ tfPageAt tfp ws ∗
   wpNext k.sie k.proc cpu (fun cpu' => iprop(∀ spie : Bool, ∀ spp : Bool, ∀ R' : RegMap,
     ⌜k.sie = false → spie = k.spie ∧ spp = k.spp⌝ -∗

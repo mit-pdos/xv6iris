@@ -102,7 +102,7 @@ def sdPins (k : KCtx) (R : RegMap) : Prop :=
   R 25#5 = k.regs 25#5 ∧ R 26#5 = k.regs 26#5 ∧ R 27#5 = k.regs 27#5
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [FileG GF] [IcacheG GF] [SleepLockG GF] [IcboxG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [OffboxG GF] [OffboxBoxG GF] [Icfg] [CurCtx]
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [FileG GF] [IcacheG GF] [SleepLockG GF] [IcboxG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [OffboxG GF] [OffboxBoxG GF] [BcacheG GF] [DiskG GF] [LogG GF] [FsBlocksG GF] [IregG GF] [FsTopG GF] [FsLinkG GF] [Appcfg GF] [Fscfg] [Icfg] [CurCtx]
 
 /-! ## The callees -/
 
@@ -258,7 +258,7 @@ theorem sys_dup_br_fffffffffffffe02 : KA.«sys_dup» + 0xfffffffffffffe02#64 = K
 
 set_option maxHeartbeats 64000000 in
 theorem sys_dup_proof (AF : ARGFD) (FD : FDALLOC) (FU : FILEDUP) : SYSDUP := ⟨
-  fun {hlc GF} _ _ _ _ _ _ _ _ _ _ _ _ _ _ X cpu k γl γ pa pid V M sts v hv hproc htier hsp hnoff hK hlk => by
+  fun {hlc GF} _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ X cpu k γl γ pa pid V M sts v hv hproc htier hsp hnoff hK hlk => by
   obtain ⟨ξ0, t0⟩ := X
   letI : CurCtx := ⟨ξ0, t0⟩
   unfold wp_sys_dup_body

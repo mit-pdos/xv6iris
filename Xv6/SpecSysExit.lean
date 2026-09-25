@@ -14,14 +14,16 @@ tail is decoded by nobody -- kexit's own contract discharges the rest of
 the function by never handing control back.
 
 THE CONTRACT IS THE UNION OF ITS TWO CALLEES', and kexit's dominates it:
-everything `kexit` asks for (`procsInv`, wait_lock, `initprocIs`, the
+everything `kexit` asks for (`procsInv`, wait_lock, `initIdentAt`, the
 not-init premise, the whole private block, the file system, the stack
-closer) is here verbatim.  The `int n` cell is carved out of sys_exit's own frame, so it
-does not appear.  The status itself is not named: kexit's contract takes
-none (nothing downstream of `p->xstate` is observable from its diverging
-body), so all sys_exit needs from `argint` is that argument 0 exists -- a
-fact about the block's own trapframe record, `V.tf[tfArgIdx 0]? = some v`,
-exactly as in `SpecSysWait`.  The trapframe pointer and page are split out
+closer, the caller's children row `chFrag V.chg pa cs`, and -- D8 wiring --
+the exit payment `myPay V.gen Q ∗ (Q (xstateOf v) ∨ (⌜xstateOf v = -1⌝ ∗
+killShot V.gen))`) is here verbatim.  The `int n` cell is carved out of
+sys_exit's own frame, so it does not appear.  THE STATUS is the syscall's
+argument 0, `v` (`V.tf[tfArgIdx 0]? = some v`, as in `SpecSysWait`): argint
+reads its low word and `lw` sign-extends it back into `a0`, and kexit's
+payment is keyed at `xstateOf a0`, which only reads the low word
+(`ProofSysExit.sysx_status`).  The trapframe pointer and page are split out
 of the block for the duration of `argint` and put back before `kexit`.
 
 The block is Rocq's whole `proc_priv` (`procPrivFd`, wave 7 W7-C) with its
@@ -67,20 +69,21 @@ def wp_sys_exit_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G
     (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
     (cpu : CPU) (k : KCtx) (γw γl : GName) (γ : FileNames) (γkl : GName) (γk : KmemNames)
     (on : Option Nat) (j : Nat) (pid : BitVec 32) (V : ProcPriv)
-    (M : Nat → List (BitVec 8)) (ip v : BitVec 64)
+    (M : Nat → List (BitVec 8)) (ip v : BitVec 64) (cs : ExtTreeSet GName compare) (Q : Int → IProp GF)
     (hj : j < NPROC) (hproc : k.proc = procAddr j) (hv : V.tf[tfArgIdx 0]? = some v)
     (hK : sysExitSlots ≤ k.avail)
     (hsie : k.sie = false) (hnoff : k.noff = 0) (hlocks : k.locks = [])
     (htier : k.tier = KTier.kpt) (hinit : procAddr j ≠ ip) : Prop :=
   kctx cpu k ∗ pcIs cpu sysExitAddr ∗ procsInv Γ ∗
   trapCsrs cpu ∗ cpuClaim cpu k.proc ∗ intrRes cpu ∗
-  isLock γw waitLockAddr "wait_lock" waitLockPay ∗ initprocIs ip ∗
+  isLock γw waitLockAddr "wait_lock" waitLockPay ∗ initIdentAt curCtx ip ∗
   isFtable γl γ ∗ panicEnv ∗
   isLock γkl kmemLockAddr "kmem" (kmemRes γk) ∗ kallocAvail γk on ∗
   fsReady (hlc := hlc) ∗ bslots 3 ∗
   fdSlots FDSPARE ∗ irefSlots IREFSPARE ∗
   procPrivFd γ (procAddr j) pid V M ∗ (∃ sts, fdFrags V.fdg sts) ∗
-  chFrag V.chg (procAddr j) ∅ ∗
+  chFrag V.chg (procAddr j) cs ∗
+  myPay V.gen Q ∗ (Q (xstateOf v) ∨ (⌜xstateOf v = -1⌝ ∗ killShot V.gen)) ∗
   (stackOwn k.sp k.avail -∗ stackOwn (V.kstack + 4096#64) 512)
   ⊢ wpLoop (GF := GF) cpu
 
@@ -93,19 +96,20 @@ def wp_sys_exit_eb_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [X
     (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
     (cpu : CPU) (k : KCtx) (γw γl : GName) (γ : FileNames) (γkl : GName) (γk : KmemNames)
     (on : Option Nat) (j : Nat) (pid : BitVec 32) (V : ProcPriv)
-    (M : Nat → List (BitVec 8)) (ip v : BitVec 64)
+    (M : Nat → List (BitVec 8)) (ip v : BitVec 64) (cs : ExtTreeSet GName compare) (Q : Int → IProp GF)
     (hj : j < NPROC) (hproc : k.proc = procAddr j) (hv : V.tf[tfArgIdx 0]? = some v)
     (hK : sysExitSlots ≤ k.avail) (hnoff : k.noff = 0)
     (htier : k.tier = KTier.kpt) (hinit : procAddr j ≠ ip) : Prop :=
   kctx cpu k ∗ pcIs cpu sysExitAddr ∗ procsInv Γ ∗
   trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗
-  isLock γw waitLockAddr "wait_lock" waitLockPay ∗ initprocIs ip ∗
+  isLock γw waitLockAddr "wait_lock" waitLockPay ∗ initIdentAt curCtx ip ∗
   isFtable γl γ ∗ panicEnv ∗
   isLock γkl kmemLockAddr "kmem" (kmemRes γk) ∗ kallocAvail γk on ∗
   fsReady (hlc := hlc) ∗ bslots 3 ∗
   fdSlots FDSPARE ∗ irefSlots IREFSPARE ∗
   procPrivFd γ (procAddr j) pid V M ∗ (∃ sts, fdFrags V.fdg sts) ∗
-  chFrag V.chg (procAddr j) ∅ ∗
+  chFrag V.chg (procAddr j) cs ∗
+  myPay V.gen Q ∗ (Q (xstateOf v) ∨ (⌜xstateOf v = -1⌝ ∗ killShot V.gen)) ∗
   (stackOwn k.sp (trapRes k.sie + k.avail) -∗ stackOwn (V.kstack + 4096#64) 512)
   ⊢ wpLoop (GF := GF) cpu
 
@@ -118,8 +122,9 @@ structure SYSEXIT : Prop where
     (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
     (cpu : CPU) (k : KCtx) (γw γl : GName) (γ : FileNames) (γkl : GName) (γk : KmemNames)
     (on : Option Nat) (j : Nat) (pid : BitVec 32) (V : ProcPriv)
-    (M : Nat → List (BitVec 8)) (ip v : BitVec 64) hj hproc hv hK hnoff htier hinit,
-    wp_sys_exit_eb_body (hlc := hlc) (GF := GF) Γ cpu k γw γl γ γkl γk on j pid V M ip v
+    (M : Nat → List (BitVec 8)) (ip v : BitVec 64) (cs : ExtTreeSet GName compare) (Q : Int → IProp GF)
+    hj hproc hv hK hnoff htier hinit,
+    wp_sys_exit_eb_body (hlc := hlc) (GF := GF) Γ cpu k γw γl γ γkl γk on j pid V M ip v cs Q
       hj hproc hv hK hnoff htier hinit
 
 /-- The interrupts-off instance of `wp_sys_exit_eb`. -/
@@ -130,17 +135,18 @@ theorem SYSEXIT.wp_sys_exit (A : SYSEXIT) {hlc : HasLC} {GF : BundledGFunctors} 
     [Appcfg GF] [FileG GF] [Fscfg] [Icfg] [CurCtx] (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
     (cpu : CPU) (k : KCtx) (γw γl : GName) (γ : FileNames) (γkl : GName) (γk : KmemNames)
     (on : Option Nat) (j : Nat) (pid : BitVec 32) (V : ProcPriv)
-    (M : Nat → List (BitVec 8)) (ip v : BitVec 64) hj hproc hv hK hsie hnoff hlocks htier hinit :
-    wp_sys_exit_body (hlc := hlc) (GF := GF) Γ cpu k γw γl γ γkl γk on j pid V M ip v
+    (M : Nat → List (BitVec 8)) (ip v : BitVec 64) (cs : ExtTreeSet GName compare) (Q : Int → IProp GF)
+    hj hproc hv hK hsie hnoff hlocks htier hinit :
+    wp_sys_exit_body (hlc := hlc) (GF := GF) Γ cpu k γw γl γ γkl γk on j pid V M ip v cs Q
       hj hproc hv hK hsie hnoff hlocks htier hinit := by
-  have h := A.wp_sys_exit_eb (hlc := hlc) (GF := GF) Γ cpu k γw γl γ γkl γk on j pid V M ip v hj hproc hv hK hnoff
+  have h := A.wp_sys_exit_eb (hlc := hlc) (GF := GF) Γ cpu k γw γl γ γkl γk on j pid V M ip v cs Q hj hproc hv hK hnoff
     htier hinit
   unfold wp_sys_exit_eb_body at h
   unfold wp_sys_exit_body
   rw [hsie, trapRes_off] at h
   simp only [trapCsrsExt_false, cpuClaimExt_false] at h
-  iintro ⟨Hk, Hpc, Hpi, Htc, Hcl, Hir, Hwl, Hin, Hft, Hpe, Hkl, Hav, Hrdy, Hbs, Hfs, Hirs, Hpr, Hfr, Hch, Hcl2⟩
+  iintro ⟨Hk, Hpc, Hpi, Htc, Hcl, Hir, Hwl, Hin, Hft, Hpe, Hkl, Hav, Hrdy, Hbs, Hfs, Hirs, Hpr, Hfr, Hch, Hmy, Hpay, Hcl2⟩
   iapply h
-  iframe Hk Hpc Hpi Htc Hcl Hir Hwl Hin Hft Hpe Hkl Hav Hrdy Hbs Hfs Hirs Hpr Hfr Hch Hcl2
+  iframe Hk Hpc Hpi Htc Hcl Hir Hwl Hin Hft Hpe Hkl Hav Hrdy Hbs Hfs Hirs Hpr Hfr Hch Hmy Hpay Hcl2
 
 end Xv6

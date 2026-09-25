@@ -36,18 +36,32 @@ THE NEW PROCESS'S SUPPLY ALLOWANCES (`dormantAllow`, wave 7 P3) come out
 of `allocproc`, and are spent as Rocq's are (SpecUserinit.v: "THE ONE
 [iref_slot] namei's [iget] spends is NOT a premise"): the cwd's unit pays
 the root's `iget`, and the rest (`liveAllow`) is parked with the process
-(`ForkretRecord.newbornPay`).  PROCESS-LAYER DEVIATION (flagged): the
-process's null descriptor table (with its per-descriptor units) and its cwd
-reference (`inodeHeldAt ipv ROOTINO`, namei's result) are DROPPED at the park
-(`SpecForkret`'s deviation: the file-layer predicates have no `CtxMorph`
-yet); Rocq parks the whole `proc_priv`.  The D8 boot-token deposit
-(`first_*`), `init_pid_tok`, the six park rows and the exec bundle are not
-in this contract yet (D8 / the trap path).
+(`ForkretRecord.newbornPay`) with the process's WHOLE block (D8 wiring):
+its null descriptor table at a fresh descriptor ghost (the per-descriptor
+units parked in the null slots), stated at the file table's names `γ`
+(Rocq's `is_ftable γft γf` premise; the null table reads none of it), its cwd reference (`inodeHeldAt ipv
+ROOTINO`, namei's result), and its generation row (`FdTable.procGenAt`).
+
+THE BOOT-TOKEN DEPOSIT (Rocq's `first_addr ↦₄ 1 ∗ first_boot_persist ∗
+first_fsinit`, here the one row `FirstTok.firstBoot`): userinit is the
+COURIER -- it reads none of it; it becomes the first process's `firstTok`
+(the boot arm forkret's `if (first)` consumes) inside the block it parks.
+
+INIT'S IDENTITY, SEALED (Rocq `init_pid_tok` in, `init_gen` / `procs_avail
+None` out, lane TRAP-ROWS-3/4): the ledger's boot-era token pins the
+allocated pid to the literal 1 (`SpecAllocproc`, `pavBoot`); userinit writes
+it into the saved-pid ghost and SEALS it (`SlotGen.initPid_set` /
+`initPid_seal`), discards the three-quarter shares of init's slot generation
+and pid registration that a forking parent would have deposited (init has no
+parent), and publishes `WaitInv.initIdentAt` -- the `initproc` cell
+discarded, init's slot generation, its pid 1 -- and seals the proc ledger
+with init's registration (`ProcAvail.procsAvail_seal_spent`).  The six park
+rows and the exec bundle are 8-P's.
 
 IT PUBLISHES `initproc`.  The word at `&initproc` is written exactly once,
 here, and read forever after (`kexit`'s "init exiting" check, `reparent`'s
-target), so `userinit` takes it owned and gives it back DISCARDED, as the
-persistent `initprocIs` every later reader takes as a premise.
+target), so `userinit` takes it owned and gives it back DISCARDED, inside
+the persistent `WaitInv.initIdentAt` every later reader takes as a premise.
 
 COUNTED: `allocproc` needs a trapframe page and up to
 `procPagetableNodes` table nodes, so the caller lends `kallocAvail γk
@@ -55,7 +69,9 @@ COUNTED: `allocproc` needs a trapframe page and up to
 needs a FREE SLOT, which it does not check for, so the caller lends the
 proc table's counted regime `procsAvail Γ (some (np + 1))`
 (`Xv6/ProcAvail.lean`) -- the only thing that can refute `allocproc`'s
-empty-table arm -- and gets back `procsAvail Γ (some np)`.  The
+empty-table arm -- with the boot-era token, and gets back the SEALED
+ledger `procsAvailAt Γ none false` (nothing allocates a proc after userinit
+in the boot chain; the seal is where init's registration is filed).  The
 whole of the first process -- its block, its kernel stack, its parked
 `forkret` record (`Xv6/ForkretRecord.lean`, whence `[ForkretIs]`) -- goes
 into `procsInv` at the closing `release`, and the slot is left RUNNABLE
@@ -89,9 +105,9 @@ def userinitSlots : Nat := 4 + nameiRootSlots
 /-- **WP of `userinit`.** -/
 def wp_userinit_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
     [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF] [FsTopG GF] [FsLinkG GF] [IcboxG GF]
-    [SleepLockG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [Appcfg GF] [Fscfg] [Icfg] [CurCtx]
+    [SleepLockG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [Appcfg GF] [BcacheG GF] [DiskG GF] [OffboxG GF] [OffboxBoxG GF] [FileG GF] [Fscfg] [Icfg] [CurCtx]
     (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ] [ForkretIs]
-    (cpu : CPU) (k : KCtx) (γp γl : GName) (γk : KmemNames) (nb np : Nat)
+    (cpu : CPU) (k : KCtx) (γp γl : GName) (γk : KmemNames) (γft : GName) (γ : FileNames) (nb np : Nat)
     (hnoff : k.noff + 2 < 2 ^ 31) (hnoff0 : k.noff = 0) (hK : userinitSlots ≤ k.avail)
     (hlk : "kmem" ∉ k.locks) (hlp : "nextpid" ∉ k.locks) (hlq : "proc" ∉ k.locks)
     (hlocks : k.locks = []) (htier : k.tier = KTier.kpt) (hproc : k.proc = 0#64)
@@ -99,28 +115,30 @@ def wp_userinit_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G
     (hroot : icfgDev = BitVec.ofNat 32 ROOTDEV) (hnib0 : 0 < icfgNib) : Prop :=
   kctx cpu k ∗ pcIs cpu userinitAddr ∗ procsInv Γ ∗
   isLock γl kmemLockAddr "kmem" (kmemRes γk) ∗ isLock γp pidLockAddr "nextpid" pidLockPay ∗
-  kallocAvail γk (some nb) ∗ procsAvail Γ (some (np + 1)) ∗
+  kallocAvail γk (some nb) ∗ procsAvailAt Γ (some (np + 1)) true ∗
   (∃ w : BitVec 64, wordPointsTo initprocAddr 8 (DFrac.own 1) w) ∗
+  firstBoot (hlc := hlc) ∗ initPidTok 0#32 ∗
   -- namei("/")'s four inode-cache rows and iget's live panic
   isItable2 fscItlock fscIc fscFs fscIreg fscCov fscLogst icfgNib icfgDev ∗
   itableInv (hlc := hlc) ∗ iregReg (hlc := hlc) fscIreg fscFs icfgIst icfgNib ∗ panicEnv ∗
+  isFtable γft γ ∗
   wpNext k.sie k.proc cpu (fun cpu' => iprop(∀ (spie spp : Bool) (R' : RegMap) (ip : BitVec 64)
     (g : Nat),
     ⌜(k.sie = false → spie = k.spie ∧ spp = k.spp) ∧ calleeSaved k.regs R' ∧
       g ≤ procPagetableNodes + 1 ∧ ∃ i : Nat, i < NPROC ∧ ip = procAddr i⌝ -∗
     kctx cpu' ((k.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k.regs 1#5)) -∗
-    initprocIs ip -∗ kallocAvail γk (availSub (some nb) g) -∗ procsAvail Γ (some np) -∗ wpLoop cpu'))
+    initIdentAt curCtx ip -∗ kallocAvail γk (availSub (some nb) g) -∗ procsAvailAt Γ none false -∗ wpLoop cpu'))
   ⊢ wpLoop (GF := GF) cpu
 
 /-- The interface of `userinit`. -/
 structure USERINIT : Prop where
   wp_userinit : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
     [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF] [FsTopG GF] [FsLinkG GF] [IcboxG GF]
-    [SleepLockG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [Appcfg GF] [Fscfg] [Icfg] [CurCtx]
+    [SleepLockG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [Appcfg GF] [BcacheG GF] [DiskG GF] [OffboxG GF] [OffboxBoxG GF] [FileG GF] [Fscfg] [Icfg] [CurCtx]
     (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ] [ForkretIs]
-    (cpu : CPU) (k : KCtx) (γp γl : GName) (γk : KmemNames) (nb np : Nat)
+    (cpu : CPU) (k : KCtx) (γp γl : GName) (γk : KmemNames) (γft : GName) (γ : FileNames) (nb np : Nat)
     hnoff hnoff0 hK hlk hlp hlq hlocks htier hproc hsie hnb hroot hnib0,
-    wp_userinit_body (hlc := hlc) (GF := GF) Γ cpu k γp γl γk nb np
+    wp_userinit_body (hlc := hlc) (GF := GF) Γ cpu k γp γl γk γft γ nb np
       hnoff hnoff0 hK hlk hlp hlq hlocks htier hproc hsie hnb hroot hnib0
 
 end Xv6

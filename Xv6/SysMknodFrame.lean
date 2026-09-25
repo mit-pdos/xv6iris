@@ -514,9 +514,10 @@ theorem sys_mknod_pid (hct : curTier = KTier.kpt) (γ : FileNames) (pa : BitVec 
       wordPointsTo (pPid pa) 4 pidPriv pid ∗
       (wordPointsTo (pPid pa) 4 pidPriv pid -∗ procPrivFd γ pa pid V M) := by
   have h : ∀ (X : CurCtx), X.curTier = KTier.kpt →
-      @procPrivFd hlc GF _ _ _ _ _ _ _ _ _ _ X γ pa pid V M ⊢
-        @wordPointsTo hlc GF _ X (pPid pa) 4 pidPriv pid ∗
-        (@wordPointsTo hlc GF _ X (pPid pa) 4 pidPriv pid -∗ @procPrivFd hlc GF _ _ _ _ _ _ _ _ _ _ X γ pa pid V M) := by
+      letI := X
+      procPrivFd (GF := GF) γ pa pid V M ⊢
+        wordPointsTo (pPid pa) 4 pidPriv pid ∗
+        (wordPointsTo (pPid pa) 4 pidPriv pid -∗ procPrivFd γ pa pid V M) := by
     intro X hX
     obtain ⟨c, t⟩ := X
     simp only at hX

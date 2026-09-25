@@ -120,6 +120,45 @@ theorem wordAtN_agree [CurCtx] (ξ : CtxId) (va : BitVec 64) (n : Nat) (q1 q2 : 
   icases wordAtN_merge ξ va n q1 q2 w1 w2 $$ H with ⟨-, %h⟩
   ipureintro; exact h
 
+/-! ## A word at the ambient context (`wordAtN curCtx` is `wordPointsTo`) -/
+
+theorem wordPointsTo_split [CurCtx] (va : BitVec 64) (n : Nat) (q1 q2 : Qp) (w : BitVec (8 * n)) :
+    wordPointsTo (GF := GF) va n (DFrac.own (q1 + q2)) w ⊢
+      wordPointsTo va n (DFrac.own q1) w ∗ wordPointsTo va n (DFrac.own q2) w := by
+  exact wordAtN_split (GF := GF) curCtx va n q1 q2 w
+
+theorem wordPointsTo_merge [CurCtx] (va : BitVec 64) (n : Nat) (q1 q2 : Qp) (w1 w2 : BitVec (8 * n)) :
+    wordPointsTo (GF := GF) va n (DFrac.own q1) w1 ∗ wordPointsTo va n (DFrac.own q2) w2 ⊢
+      wordPointsTo va n (DFrac.own (q1 + q2)) w1 ∗ ⌜w1 = w2⌝ := by
+  exact wordAtN_merge (GF := GF) curCtx va n q1 q2 w1 w2
+
+/-- Two fractions agree, and both come back. -/
+theorem wordPointsTo_agree_keep [CurCtx] (va : BitVec 64) (n : Nat) (q1 q2 : Qp) (w1 w2 : BitVec (8 * n)) :
+    wordPointsTo (GF := GF) va n (DFrac.own q1) w1 ∗ wordPointsTo va n (DFrac.own q2) w2 ⊢
+      ⌜w1 = w2⌝ ∗ wordPointsTo va n (DFrac.own q1) w1 ∗ wordPointsTo va n (DFrac.own q2) w2 := by
+  iintro H
+  icases wordPointsTo_merge va n q1 q2 w1 w2 $$ H with ⟨H, %h⟩
+  subst h
+  icases wordPointsTo_split va n q1 q2 w1 $$ H with ⟨H1, H2⟩
+  isplitr
+  · ipureintro; rfl
+  iframe H1 H2
+
+/-- The two halves of a word are the whole word (and agree). -/
+theorem wordPointsTo_halves_join [CurCtx] (va : BitVec 64) (n : Nat) (w1 w2 : BitVec (8 * n)) :
+    wordPointsTo (GF := GF) va n (DFrac.own (Qp.half 1)) w1 ∗ wordPointsTo va n (DFrac.own (Qp.half 1)) w2 ⊢
+      wordPointsTo va n (DFrac.own 1) w1 ∗ ⌜w1 = w2⌝ := by
+  have h := wordPointsTo_merge (GF := GF) va n (Qp.half 1) (Qp.half 1) w1 w2
+  rw [Qp.half_add_half] at h
+  exact h
+
+theorem wordPointsTo_halves_split [CurCtx] (va : BitVec 64) (n : Nat) (w : BitVec (8 * n)) :
+    wordPointsTo (GF := GF) va n (DFrac.own 1) w ⊢
+      wordPointsTo va n (DFrac.own (Qp.half 1)) w ∗ wordPointsTo va n (DFrac.own (Qp.half 1)) w := by
+  have h := wordPointsTo_split (GF := GF) va n (Qp.half 1) (Qp.half 1) w
+  rw [Qp.half_add_half] at h
+  exact h
+
 end
 
 end Xv6

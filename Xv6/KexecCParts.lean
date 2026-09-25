@@ -188,7 +188,7 @@ theorem kxcC_permOf_congr {um um' : RegMapF (BitVec 64)} (h : ∀ k, get? um' k 
 
 section Priv
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
-  [FileG GF] [IcacheG GF] [SleepLockG GF] [IcboxG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [OffboxG GF] [OffboxBoxG GF] [Icfg]
+  [FileG GF] [IcacheG GF] [SleepLockG GF] [IcboxG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [OffboxG GF] [OffboxBoxG GF] [BcacheG GF] [DiskG GF] [LogG GF] [FsBlocksG GF] [IregG GF] [FsTopG GF] [FsLinkG GF] [Appcfg GF] [Fscfg] [Icfg]
 
 /-- The `p->sz` cell LENT out of the whole block (+0x1b4's `ld s5,72(a0)`,
 the old size phase D frees the old table at), with the block's size bound,

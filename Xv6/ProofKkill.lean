@@ -174,7 +174,7 @@ theorem kk_lockRes_wake (Γ : SchedNames) (ξl : CtxId) (pa : BitVec 64) (ch : B
     @wordPointsTo hlc GF _ ⟨ξl, KTier.kpt⟩ (pState pa) 4 (DFrac.own 1) RUNNABLE ∗
     pstateLock Γ pa SLEEPING ∗
     @wordPointsTo hlc GF _ ⟨ξl, KTier.kpt⟩ (pChan pa) 8 (DFrac.own 1) ch ∗
-    @procPubRest hlc GF _ ⟨ξl, KTier.kpt⟩ pa 1#32 xs pid ∗
+    @procPubRest hlc GF _ ⟨ξl, KTier.kpt⟩ _ _ pa 1#32 xs pid ∗
     procSlotsAt Γ ξl pa SLEEPING ⊢ |==> procLockResAt Γ ξl pa := by
   iintro ⟨Hs, Hg, Hc, Hr, Hsl⟩
   ihave Hg := (pstateWhole_split (GF := GF) Γ pa SLEEPING).mpr $$ [Hg]
@@ -407,7 +407,7 @@ theorem kk_found (RE : RELEASE) {hlc : HasLC} {GF : BundledGFunctors}
     (cur c : CPU) (hpin : k.sie = false ∨ k.proc = 0#64 → c = cur) :
     kctx c ((((k.pushOffAt spie1 spp1).withLocks ("proc" :: k.locks)).pushed 6).withRegs Rr) ∗
     pcIs c (KA.«kkill» + 0x3e#64) ∗
-    isLock (Γ.lock i) (procAddr i) "proc" (procLockPay Γ i) ∗
+    isLock (Γ.lock i) (procAddr i) "proc" (procLockPay Γ i) ∗ □ MachFixedGS.killCred (hlc := hlc) (GF := GF) ∗
     locked (Γ.lock i) c ∗ procLockPay Γ i curCtx ∗ sieArm c k.sie k.proc ∗
     wpNext k.sie k.proc cur (fun cpu' => iprop(∀ (spie2 spp2 : Bool) (R2 : RegMap) (done : Bool),
       ⌜k.sie = false → spie2 = spie ∧ spp2 = spp⌝ -∗
@@ -420,7 +420,7 @@ theorem kk_found (RE : RELEASE) {hlc : HasLC} {GF : BundledGFunctors}
     ⊢ wpLoop (GF := GF) c := by
   obtain ⟨ξ0, t0⟩ := X
   letI : CurCtx := ⟨ξ0, t0⟩
-  iintro ⟨Hk, Hpc, #Hlk, Hlocked, HR, Harm, HPhi⟩
+  iintro ⟨Hk, Hpc, #Hlk, #Hcred, Hlocked, HR, Harm, HPhi⟩
   icases kctx_tier c _ $$ Hk with ⟨%hct, Hk⟩
   have ht0 : t0 = KTier.kpt := hct.symm.trans htier
   subst ht0
@@ -430,7 +430,15 @@ theorem kk_found (RE : RELEASE) {hlc : HasLC} {GF : BundledGFunctors}
   ihave HR := kl_pay_elim Γ ξ0 i $$ HR
   icases procLockRes_elim Γ ξ0 (procAddr i) $$ HR with
     ⟨%st, %ch, Hstate, Hpg, Hchan, ⟨%kl, %xs, %pid, Hrest⟩, Hslots⟩
-  icases kl_rest_elim ξ0 (procAddr i) kl xs pid $$ Hrest with ⟨Hkilled, Hxs, Hpid⟩
+  icases kl_rest_elim ξ0 (procAddr i) kl xs pid $$ Hrest with ⟨Hkilled, Hxs, Hpid, Hkp⟩
+  -- the store below is PAID with the killer's credential (the killed row)
+  iapply wpLoop_bupd
+  imod killPaid_kill (MachFixedGS.killCred (hlc := hlc) (GF := GF)) pid kl 1#32 (by decide)
+    $$ [Hkp] with Hkp
+  · isplitr
+    · iexact Hcred
+    · iexact Hkp
+  imodintro
   -- c.li a5,1
   k_step (wp_s_addi c _ (KA.«kkill» + 0x3e#64) true 1#12 15#5 0#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
@@ -448,7 +456,7 @@ theorem kk_found (RE : RELEASE) {hlc : HasLC} {GF : BundledGFunctors}
   k_step (wp_s_addi c _ (KA.«kkill» + 0x44#64) true 2#12 15#5 0#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
-  ihave Hrest := kl_rest_intro ξ0 (procAddr i) 1#32 xs pid $$ [Hkilled Hxs Hpid]
+  ihave Hrest := kl_rest_intro ξ0 (procAddr i) 1#32 xs pid $$ [Hkilled Hxs Hpid Hkp]
   case' _ => simp only [pKilled, pXstate, pPid]; iframe
   by_cases hst : BitVec.signExtend 64 st = 2#64
   · -- SLEEPING: wake it
@@ -521,7 +529,7 @@ theorem kk_iter (AC : ACQUIRE) (RE : RELEASE) {hlc : HasLC} {GF : BundledGFuncto
     (h9 : R 9#5 = procAddr i) (h18 : R 18#5 = arg) (h19 : R 19#5 = KA.«tickslock»)
     (cur : CPU) :
     kctx cur (((k.withSpie spie spp).pushed 6).withRegs R) ∗ pcIs cur (KA.«kkill» + 0x20#64) ∗
-    procsInv Γ ∗
+    procsInv Γ ∗ □ MachFixedGS.killCred (hlc := hlc) (GF := GF) ∗
     wpNext k.sie k.proc cur (fun cpu' => iprop(∀ (spie2 spp2 : Bool) (R2 : RegMap) (done : Bool),
       ⌜k.sie = false → spie2 = spie ∧ spp2 = spp⌝ -∗
       kctx cpu' (((k.withSpie spie2 spp2).pushed 6).withRegs R2) -∗
@@ -533,7 +541,7 @@ theorem kk_iter (AC : ACQUIRE) (RE : RELEASE) {hlc : HasLC} {GF : BundledGFuncto
     ⊢ wpLoop (GF := GF) cur := by
   obtain ⟨ξ0, t0⟩ := X
   letI : CurCtx := ⟨ξ0, t0⟩
-  iintro ⟨Hk, Hpc, #Hpinv, HPhi⟩
+  iintro ⟨Hk, Hpc, #Hpinv, #Hcred, HPhi⟩
   icases kctx_tier cur _ $$ Hk with ⟨%hct, Hk⟩
   have ht0 : t0 = KTier.kpt := hct.symm.trans htier
   subst ht0
@@ -573,13 +581,13 @@ theorem kk_iter (AC : ACQUIRE) (RE : RELEASE) {hlc : HasLC} {GF : BundledGFuncto
   ihave HR := kl_pay_elim Γ ξ0 i $$ HR
   icases procLockRes_elim Γ ξ0 (procAddr i) $$ HR with
     ⟨%st, %ch, Hstate, Hpg, Hchan, ⟨%kl, %xs, %pid, Hrest⟩, Hslots⟩
-  icases kl_rest_elim ξ0 (procAddr i) kl xs pid $$ Hrest with ⟨Hkilled, Hxs, Hpid⟩
+  icases kl_rest_elim ξ0 (procAddr i) kl xs pid $$ Hrest with ⟨Hkilled, Hxs, Hpid, Hkp⟩
   -- c.lw a5,48(s1): a5 := sext(p->pid)
   k_step (wp_s_lw c3 _ (KA.«kkill» + 0x26#64) true 48#12 15#5 9#5 (by decide) (by decide)
       pidPub pid)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [g9, pPid]
   iintro Hk Hpc Hpid
-  ihave Hrest := kl_rest_intro ξ0 (procAddr i) kl xs pid $$ [Hkilled Hxs Hpid]
+  ihave Hrest := kl_rest_intro ξ0 (procAddr i) kl xs pid $$ [Hkilled Hxs Hpid Hkp]
   case' _ => simp only [pKilled, pXstate, pPid]; iframe
   ihave HR := procLockRes_intro Γ ξ0 (procAddr i) st ch kl xs pid
     $$ [Hstate Hpg Hchan Hrest Hslots]
@@ -594,7 +602,7 @@ theorem kk_iter (AC : ACQUIRE) (RE : RELEASE) {hlc : HasLC} {GF : BundledGFuncto
     iapply (kk_found RE Γ k arg hwf hnoff hK hlk htier i hi spie spp spie1 spp1 R _ ?hkp ?hcr
       hsp1 cur c3 hpin3) $$ [- $Hk $Hpc $Hlk $Hlocked $HR $Harm]
     rotate_right 1
-    · iframe HPhi
+    · iframe HPhi Hcred
     case hkp =>
       unfold kkKept
       simp only [RegMap.set_apply, BitVec.reduceEq, ite_false]
@@ -639,7 +647,7 @@ theorem kk_loop (AC : ACQUIRE) (RE : RELEASE) {hlc : HasLC} {GF : BundledGFuncto
     ∀ (i : Nat) (_ : NPROC - i = fuel + 1) (spie spp : Bool) (R : RegMap)
       (_ : R 9#5 = procAddr i) (_ : R 18#5 = arg) (_ : R 19#5 = KA.«tickslock») (cur : CPU),
     kctx cur (((k.withSpie spie spp).pushed 6).withRegs R) ∗ pcIs cur (KA.«kkill» + 0x20#64) ∗
-    procsInv Γ ∗
+    procsInv Γ ∗ □ MachFixedGS.killCred (hlc := hlc) (GF := GF) ∗
     wpNext k.sie k.proc cur (fun cpu' => iprop(∀ (spie2 spp2 : Bool) (R2 : RegMap),
       ⌜k.sie = false → spie2 = spie ∧ spp2 = spp⌝ -∗
       kctx cpu' (((k.withSpie spie2 spp2).pushed 6).withRegs R2) -∗
@@ -651,7 +659,7 @@ theorem kk_loop (AC : ACQUIRE) (RE : RELEASE) {hlc : HasLC} {GF : BundledGFuncto
     intro i hf spie spp R h9 h18 h19 cur
     have hi : i < NPROC := by unfold NPROC at hf ⊢; omega
     have hlast : i + 1 = NPROC := by unfold NPROC at hf ⊢; omega
-    iintro ⟨Hk, Hpc, #Hpinv, HPhi⟩
+    iintro ⟨Hk, Hpc, #Hpinv, #Hcred, HPhi⟩
     icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
     iapply (kk_iter AC RE Γ k arg hwf hnoff hK hlk htier i hi spie spp R h9 h18 h19 cur)
       $$ [- $Hk $Hpc]
@@ -699,7 +707,7 @@ theorem kk_loop (AC : ACQUIRE) (RE : RELEASE) {hlc : HasLC} {GF : BundledGFuncto
     intro i hf spie spp R h9 h18 h19 cur
     have hi : i < NPROC := by unfold NPROC at hf ⊢; omega
     have hlast : ¬ (i + 1 = NPROC) := by unfold NPROC at hf ⊢; omega
-    iintro ⟨Hk, Hpc, #Hpinv, HPhi⟩
+    iintro ⟨Hk, Hpc, #Hpinv, #Hcred, HPhi⟩
     iapply (kk_iter AC RE Γ k arg hwf hnoff hK hlk htier i hi spie spp R h9 h18 h19 cur)
       $$ [- $Hk $Hpc]
     rotate_right 1
@@ -818,7 +826,7 @@ theorem kkill_proof (AC : ACQUIRE) (RE : RELEASE) : KKILL :=
   ⟨fun {hlc GF} _ _ _ _ _ _ _ _ Γ cpu k hnoff hK hlk htier => by
   unfold wp_kkill_body
   simp only [kkillAddr]
-  iintro ⟨Hk, Hpc, #Hpinv, HPhi⟩
+  iintro ⟨Hk, Hpc, #Hpinv, #Hcred, HPhi⟩
   icases kctx_wf _ _ $$ Hk with ⟨%hwf, Hk⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
   have hK6 : 6 ≤ k.avail := by omega

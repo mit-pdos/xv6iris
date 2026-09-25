@@ -659,14 +659,14 @@ variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [Fdslot
 
 /-- `allocproc`'s continuation, as the specification states it. -/
 def apCont [CurCtx] (Γ : SchedNames) (k : KCtx) (γk : KmemNames) (on : Option Nat)
-    (pav : Option Nat) :
+    (pav : Option Nat) (tk : Bool) (Q : Int → IProp GF) :
     CPU → IProp GF := fun cpu' => iprop(∀ spie : Bool, ∀ spp : Bool, ∀ R' : RegMap,
   ⌜k.sie = false → spie = k.spie ∧ spp = k.spp⌝ -∗
   ((⌜R' 10#5 = 0#64⌝ ∗ kctx cpu' ((k.withSpie spie spp).withRegs R')) ∨
    (⌜R' 10#5 ≠ 0#64⌝ ∗ kctx cpu' (((k.pushOffAt spie spp).withLocks ("proc" :: k.locks)).withRegs R') ∗
     sieArm cpu' k.sie k.proc)) -∗
   pcIs cpu' (jumpPc (k.regs 1#5)) -∗
-  allocprocPost Γ cpu' γk on pav (R' 10#5) -∗
+  allocprocPost Γ cpu' γk on pav tk Q (R' 10#5) -∗
   ⌜calleeSaved k.regs R'⌝ -∗ wpLoop cpu')
 
 end Body
@@ -922,7 +922,7 @@ theorem ap_pidscan {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G G
       (_ : R 12#5 = KA.«tickslock»),
     kctx c (kh.withRegs R) ∗ pcIs c (KA.«allocproc» + 0x74#64) ∗
     ([∗list] j ∈ List.range NPROC, wordPointsTo (pPid (procAddr j)) 4 pidLockQ (pids j)) ∗ F ∗
-    (∀ (R' : RegMap) (m' : Nat), ⌜m' < NPROC ∧ apKeep R R' ∧ R' 15#5 = procAddr m'⌝ -∗
+    (∀ (R' : RegMap) (m' : Nat), ⌜m' < NPROC ∧ apKeep R R' ∧ R' 15#5 = procAddr m' ∧ pids m' = cand⌝ -∗
       kctx c (kh.withRegs R') -∗ pcIs c (KA.«allocproc» + 0x5c#64) -∗
       ([∗list] j ∈ List.range NPROC, wordPointsTo (pPid (procAddr j)) 4 pidLockQ (pids j)) -∗
       F -∗ wpLoop c) ∗
@@ -953,7 +953,7 @@ theorem ap_pidscan {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G G
       k_norm
       iapply Hmatch $$ %_ %m [] Hk Hpc Hcells HF
       ipureintro
-      refine ⟨hm, apKeep_set R R 14#5 _ (Or.inl rfl) (apKeep_refl R), ?_⟩
+      refine ⟨hm, apKeep_set R R 14#5 _ (Or.inl rfl) (apKeep_refl R), ?_, hmatch⟩
       simp only [RegMap.set_apply, BitVec.reduceEq, ite_false]
       exact h15
     · rw [if_neg (by simp only [hmatch, decide_false]; exact Bool.false_ne_true)]
@@ -997,7 +997,7 @@ theorem ap_pidscan {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G G
       k_norm
       iapply Hmatch $$ %_ %m [] Hk Hpc Hcells HF
       ipureintro
-      refine ⟨hm, apKeep_set R R 14#5 _ (Or.inl rfl) (apKeep_refl R), ?_⟩
+      refine ⟨hm, apKeep_set R R 14#5 _ (Or.inl rfl) (apKeep_refl R), ?_, hmatch⟩
       simp only [RegMap.set_apply, BitVec.reduceEq, ite_false]
       exact h15
     · rw [if_neg (by simp only [hmatch, decide_false]; exact Bool.false_ne_true)]
@@ -1032,10 +1032,10 @@ theorem ap_pidscan {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G G
         exact h12
       iframe Hk Hpc Hcells HF
       isplitl [Hmatch]
-      · iintro %R' %m' %⟨hm', hkeep', h15'⟩ Hk Hpc Hcells HF
+      · iintro %R' %m' %⟨hm', hkeep', h15', hmm'⟩ Hk Hpc Hcells HF
         iapply Hmatch $$ %R' %m' [] Hk Hpc Hcells HF
         ipureintro
-        exact ⟨hm', apKeep_trans hkeep hkeep', h15'⟩
+        exact ⟨hm', apKeep_trans hkeep hkeep', h15', hmm'⟩
       · iintro %R' %⟨hall, hkeep'⟩ Hk Hpc Hcells HF
         iapply Hdone $$ %R' [] Hk Hpc Hcells HF
         ipureintro
@@ -1046,17 +1046,6 @@ theorem ap_pidscan {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G G
 section
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
 
-/-- `pid_lock`'s payload transports between contexts, so `acquire` and
-`release` apply to it (a copy of `ProofFreeproc.fp_instCtxMorphPidLockPay`:
-a `Proof` file may not import another). -/
-instance ap_instCtxMorphPidLockPay [CurCtx] : CtxMorph (GF := GF) pidLockPay := by
-  unfold pidLockPay pidLockResAt
-  exact @instCtxMorphExists hlc GF _ _ _ (fun _ => @instCtxMorphExists hlc GF _ _ _ (fun pids =>
-    @instCtxMorphSep hlc GF _ _ _ (instCtxMorphConst _)
-      (@instCtxMorphSep hlc GF _ _ _ (instCtxMorphWordAtN _ _ _ _)
-        (ctxMorph_bigSepL (List.range NPROC)
-          (fun _ y ξ => wordAtN ξ (pPid (procAddr y)) 4 pidLockQ (pids y))
-          (fun _ _ => instCtxMorphWordAtN _ _ _ _)))))
 
 end
 
@@ -1121,11 +1110,12 @@ variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [Fdslot
 
 /-- The loop's exit continuation: at `0x80001c10`, with a pid no slot holds
 in `[1, PIDMAX]` (`a3`), the next counter value in `a1`, and the payload's
-pid words handed back. -/
-@[reducible] def apExitCont [CurCtx] (c : CPU) (kh : KCtx) (pids : Nat → BitVec 32) (R0 : RegMap) :
-    IProp GF := iprop%
+pid words handed back.  `B` is the boot era (Rocq `wp_ap_pidsec`'s
+`tk`): there the chosen pid is the literal 1. -/
+@[reducible] def apExitCont [CurCtx] (c : CPU) (kh : KCtx) (pids : Nat → BitVec 32) (R0 : RegMap)
+    (B : Prop) : IProp GF := iprop%
   ∀ (R' : RegMap) (pid : BitVec 32),
-    ⌜1 ≤ pid.toNat ∧ pid.toNat ≤ PIDMAX ∧ (∀ j, j < NPROC → pids j ≠ pid) ∧
+    ⌜1 ≤ pid.toNat ∧ pid.toNat ≤ PIDMAX ∧ (∀ j, j < NPROC → pids j ≠ pid) ∧ (B → pid.toNat = 1) ∧
       R' 13#5 = BitVec.signExtend 64 pid ∧ R' 11#5 = BitVec.signExtend 64 (apNewPid pid) ∧
       apKeepPid R0 R'⌝ -∗
     kctx c (kh.withRegs R') -∗ pcIs c (KA.«allocproc» + 0x82#64) -∗
@@ -1140,16 +1130,17 @@ loop back with the next candidate. -/
 theorem allocproc_br_10cd2 : KA.«allocproc» + 0x10cd2#64 = procAddr 0 := by decide
 
 theorem ap_pidloop [CurCtx] (c : CPU) (kh : KCtx) (hsie : kh.sie = false)
-    (pids : Nat → BitVec 32) (R0 : RegMap) :
+    (pids : Nat → BitVec 32) (R0 : RegMap) (B : Prop)
+    (hB : B → ∀ j, j < NPROC → (pids j).toNat ≠ 1) :
     ⊢ ∀ (cand : BitVec 32) (R : RegMap),
-      ⌜1 ≤ cand.toNat ∧ cand.toNat ≤ PIDMAX ∧ apKeepPid R0 R ∧
+      ⌜1 ≤ cand.toNat ∧ cand.toNat ≤ PIDMAX ∧ (B → cand.toNat = 1) ∧ apKeepPid R0 R ∧
         R 13#5 = BitVec.signExtend 64 cand ∧ R 10#5 = 1#64 ∧ R 16#5 = 1000#64 ∧
         R 12#5 = KA.«tickslock»⌝ -∗
       kctx c (kh.withRegs R) -∗ pcIs c (KA.«allocproc» + 0x62#64) -∗
       ([∗list] j ∈ List.range NPROC, wordPointsTo (pPid (procAddr j)) 4 pidLockQ (pids j)) -∗
-      apExitCont (GF := GF) c kh pids R0 -∗ wpLoop c := by
+      apExitCont (GF := GF) c kh pids R0 B -∗ wpLoop c := by
   iloeb as IH
-  iintro %cand %R %⟨hlo, hhi, hkeep0, h13, h10, h16, h12⟩ Hk Hpc Hcells Hexit
+  iintro %cand %R %⟨hlo, hhi, hcand1, hkeep0, h13, h10, h16, h12⟩ Hk Hpc Hcells Hexit
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
   -- The shared tail from `0x80001bfa`, proved once (it needs `IH`).
   ihave Htail : (∀ (Ra : RegMap),
@@ -1158,7 +1149,7 @@ theorem ap_pidloop [CurCtx] (c : CPU) (kh : KCtx) (hsie : kh.sie = false)
         Ra 12#5 = KA.«tickslock»⌝ -∗
       kctx c (kh.withRegs Ra) -∗ pcIs c (KA.«allocproc» + 0x6c#64) -∗
       ([∗list] j ∈ List.range NPROC, wordPointsTo (pPid (procAddr j)) 4 pidLockQ (pids j)) -∗
-      apExitCont (GF := GF) c kh pids R0 -∗ wpLoop c) $$ []
+      apExitCont (GF := GF) c kh pids R0 B -∗ wpLoop c) $$ []
   case' _ =>
     iintro %Ra %⟨ka1, kkeep, ka13, ka10, ka16, ka12⟩ Hk Hpc Hcells Hexit
     -- 0x80001bfa auipc a5,0x11 ; 0x80001bfe addi a5,a5,-916 : a5 = &proc[0]
@@ -1170,14 +1161,14 @@ theorem ap_pidloop [CurCtx] (c : CPU) (kh : KCtx) (hsie : kh.sie = false)
     iintro Hk Hpc
     k_norm
     -- the inner scan
-    iapply (ap_pidscan c kh hsie pids cand (NPROC - 1) (apExitCont (GF := GF) c kh pids R0) 0
+    iapply (ap_pidscan c kh hsie pids cand (NPROC - 1) (apExitCont (GF := GF) c kh pids R0 B) 0
       (by unfold NPROC; decide) (by unfold NPROC; decide)
       (fun j hj => absurd hj (Nat.not_lt_zero j)) _ ?hs15 ?hs13 ?hs12)
       $$ [- $Hk $Hpc $Hcells $Hexit]
     rotate_right 1
     · isplitl []
       · -- match: retry the loop with the next candidate
-        iintro %Rm %m' %⟨hm', hkeepm, hm15⟩ Hk Hpc Hcells Hexit
+        iintro %Rm %m' %⟨hm', hkeepm, hm15, hmcand⟩ Hk Hpc Hcells Hexit
         have hm12 : Rm 12#5 = KA.«tickslock» := by
           rw [hkeepm 12#5 (by decide) (by decide)]
           simp only [RegMap.set_apply, BitVec.reduceEq, ite_false]; exact ka12
@@ -1204,7 +1195,10 @@ theorem ap_pidloop [CurCtx] (c : CPU) (kh : KCtx) (hsie : kh.sie = false)
         iapply IH $$ %(apNewPid cand) %(Rm.set 13#5 (BitVec.signExtend 64 (apNewPid cand)))
           [] Hk Hpc Hcells Hexit
         ipureintro
-        refine ⟨hlo', hhi', ?_, ?_, ?_, ?_, ?_⟩
+        refine ⟨hlo', hhi', ?_, ?_, ?_, ?_, ?_, ?_⟩
+        · -- the boot era never retries: slot `m'` holds the candidate, 1
+          intro hb
+          exact absurd (by rw [hmcand]; exact hcand1 hb) (hB hb m' hm')
         · intro i a b cc d e f g
           simp only [RegMap.set_apply, if_neg d]
           rw [hkeepm i (by exact e) (by exact f)]
@@ -1224,7 +1218,7 @@ theorem ap_pidloop [CurCtx] (c : CPU) (kh : KCtx) (hsie : kh.sie = false)
           simp only [RegMap.set_apply, BitVec.reduceEq, ite_false]; exact ka1
         iapply Hexit $$ %Rd %cand [] Hk Hpc Hcells
         ipureintro
-        refine ⟨hlo, hhi, hall, hd13, hd11, ?_⟩
+        refine ⟨hlo, hhi, hall, hcand1, hd13, hd11, ?_⟩
         intro i a b cc d e f g
         rw [hkeepd i (by exact e) (by exact f)]
         simp only [RegMap.set_apply, if_neg f]
@@ -1288,16 +1282,21 @@ theorem ap_dormant_unused_elim [CurCtx] (pa : BitVec 64) :
       ∃ (V : ProcPriv), ⌜V.ofile = List.replicate NOFILE 0#64 ∧ V.cwd = 0#64 ∧
         V.pagetable = 0#64 ∧ V.trapframe = 0#64 ∧ V.sz = 0#64 ∧ V.pvLazy = true⌝ ∗
       wordPointsTo (pPid pa) 4 pidPriv 0#32 ∗ procFields pa (DFrac.own 1) V ∗
-      dormantAllow ∗ chFrag V.chg pa ∅ ∗ stackOwn (V.kstack + 4096#64) 512 := by
-  unfold procDormant dormantSpace
-  iintro ⟨_, %V, %pidd, %⟨hof, hcwd, _, hlz⟩, Hpid, Hfields, Hal, Hch, Hspace⟩
-  rw [if_pos (rfl : UNUSED = UNUSED)]
-  icases Hspace with ⟨%⟨hpt, htf, hsz, hpd⟩, Hstack⟩
+      dormantAllow ∗ chFrag V.chg pa ∅ ∗ slotGen pa (.own 1) V.gen ∗
+      (∃ xsv : BitVec 32, wordPointsTo (pXstate pa) 4 xsHalf xsv) ∗
+      stackOwn (V.kstack + 4096#64) 512 := by
+  have hz : ¬ ((UNUSED : BitVec 32) = ZOMBIE) := by decide
+  unfold procDormant dormantSpace genHalvesDorm
+  simp only [if_neg hz, if_pos (rfl : (UNUSED : BitVec 32) = UNUSED), ite_true]
+  iintro ⟨_, %V, %pidd, %⟨hof, hcwd, _, hlz⟩, Hpid, Hfields, Hal, Hch, ⟨_, Hsg⟩, ⟨%xsv, Hxs, _⟩,
+    ⟨%⟨hpt, htf, hsz, hpd⟩, Hstack⟩⟩
   subst hpd
   iexists V
   isplitl []
   · ipureintro; exact ⟨hof, hcwd, hpt, htf, hsz, hlz⟩
-  iframe Hpid Hfields Hal Hch Hstack
+  iframe Hpid Hfields Hal Hch Hsg Hstack
+  iexists xsv
+  iexact Hxs
 
 set_option maxHeartbeats 1000000 in
 /-- `acquire(&pid_lock)` as a rule (a copy of `ProofFreeproc.fp_acquire`). -/
@@ -1469,20 +1468,20 @@ theorem ap_pp_call (PP : PROC_PAGETABLE) (c : CPU) (k' : KCtx) (γl : GName) (γ
 /-- `freeproc`'s contract at its call site (address folded). -/
 theorem ap_fp_call (FP : FREEPROC) (Γ : SchedNames) (c : CPU) (k' : KCtx) (γl γp : GName)
     (γk : KmemNames) (j : Nat) (st : BitVec 32) (ch : BitVec 64) (pid : BitVec 32) (V : ProcPriv)
-    (M : Nat → List (BitVec 8)) (hj : j < NPROC) (hp : k'.regs 10#5 = procAddr j)
+    (M : Nat → List (BitVec 8)) (g : GName) (hj : j < NPROC) (hp : k'.regs 10#5 = procAddr j)
     (hst : st = USED ∨ st = ZOMBIE) (hnoff : k'.noff + 1 < 2 ^ 31) (hK : freeprocSlots ≤ k'.avail)
     (hsie : k'.sie = false) (hlk : "kmem" ∉ k'.locks) (hlp : "nextpid" ∉ k'.locks)
     (htier : k'.tier = KTier.kpt) :
     kctx c k' ∗ pcIs c KA.«freeproc» ∗ isLock γl kmemLockAddr "kmem" (kmemRes γk) ∗ kallocAvail γk none ∗
     isLock γp pidLockAddr "nextpid" pidLockPay ∗
-    procHeld Γ c j st ch ∗ freeprocIn (procAddr j) pid V M ∗
+    procHeld Γ c j st ch ∗ freeprocIn (procAddr j) pid V M ∗ freeprocGen (procAddr j) pid g ∗
     wpNext k'.sie k'.proc c (fun cpu' => iprop(∀ spie : Bool, ∀ spp : Bool, ∀ R' : RegMap,
       ⌜k'.sie = false → spie = k'.spie ∧ spp = k'.spp⌝ -∗
       kctx cpu' ((k'.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k'.regs 1#5)) -∗
       procHeld Γ cpu' j UNUSED 0#64 -∗ procDormant (procAddr j) UNUSED -∗
       ⌜calleeSaved k'.regs R'⌝ -∗ wpLoop cpu'))
     ⊢ wpLoop (GF := GF) c := by
-  have h := FP.wp_freeproc (hlc := hlc) (GF := GF) Γ c k' γl γp γk j st ch pid V M hj hp hst hnoff hK hsie hlk hlp htier
+  have h := FP.wp_freeproc (hlc := hlc) (GF := GF) Γ c k' γl γp γk j st ch pid V M g hj hp hst hnoff hK hsie hlk hlp htier
   unfold wp_freeproc_body at h
   simp only [freeprocAddr] at h
   exact h
@@ -1529,7 +1528,7 @@ variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [Fdslot
 /-- The UNUSED slot's dormant block and hart tag. -/
 theorem ap_slots_unused_elim (Γ : SchedNames) (ξl : CtxId) (pa : BitVec 64) :
     procSlotsAt (GF := GF) Γ ξl pa UNUSED ⊢
-      @procDormant hlc GF _ ⟨ξl, KTier.kpt⟩ _ _ _ _ _ pa UNUSED ∗ hartAtAny Γ pa ∗
+      @procDormant hlc GF _ ⟨ξl, KTier.kpt⟩ _ _ _ _ _ _ pa UNUSED ∗ hartAtAny Γ pa ∗
       (slotFree Γ pa ∨ slotUsed Γ pa) := by
   unfold procSlotsAt
   rw [if_neg (by decide : ¬ needsCtx UNUSED), if_neg (by decide : ¬ isRunning UNUSED),
@@ -1596,7 +1595,7 @@ theorem ap_avail_none (γk : KmemNames) (on : Option Nat) :
 
 /-- Rebuild an UNUSED slot from its dormant block and hart tag. -/
 theorem ap_slots_unused_intro (Γ : SchedNames) (ξl : CtxId) (pa : BitVec 64) :
-    @procDormant hlc GF _ ⟨ξl, KTier.kpt⟩ _ _ _ _ _ pa UNUSED ∗ hartAtAny Γ pa ∗
+    @procDormant hlc GF _ ⟨ξl, KTier.kpt⟩ _ _ _ _ _ _ pa UNUSED ∗ hartAtAny Γ pa ∗
       (slotFree Γ pa ∨ slotUsed Γ pa) ⊢
       procSlotsAt (GF := GF) Γ ξl pa UNUSED := by
   unfold procSlotsAt
@@ -1648,6 +1647,122 @@ theorem ap_pav_mint (Γ : SchedNames) (pav : Option Nat) (j0 : Nat) (hj0 : j0 < 
 
 end Fail
 
+/-! ## The D8 ghost steps of the pid section (Rocq `wp_ap_pidsec`)
+
+The generation machinery: the ledger's boot-era token read ONCE against
+`pid_lock`'s two marks, and -- at the `p->pid = pid` store -- the mint of the
+incarnation (`ChildTok.gen_alloc`), the slot's generation re-keyed to it
+(`SlotGen.slotGen_update`), the pid registered (`pidReg_insert`), and the
+killed row founded at the new pid (`KillRow.killPaid_found`). -/
+
+section Ghost
+variable {GF : BundledGFunctors} [CtokG GF] [WchG GF]
+
+/-- A pure reading that keeps its source. -/
+theorem ap_keep {P : IProp GF} {φ : Prop} (h : P ⊢ ⌜φ⌝) : P ⊢ ⌜φ⌝ ∗ P :=
+  (and_intro h .rfl).trans persistent_and_sep_mp
+
+/-- **THE BOOT ERA'S TWO MARKS, READ ONCE** (Rocq `wp_ap_pidsec`'s first
+`iAssert`).  In the boot era the token refutes the shot on both marks, so
+the counter IS 1 and no slot holds pid 1; the token is shot here and now.
+Outside it the ledger carries the shot and init's registration. -/
+theorem ap_tok_read (b : Bool) (np : BitVec 32) (pids : Nat → BitVec 32) :
+    (if b then nextpidPend (GF := GF) else npidDone) ∗ (⌜np.toNat = 1⌝ ∨ nextpidShot) ∗
+      (⌜∀ j, j < NPROC → (pids j).toNat ≠ 1⌝ ∨ nextpidShot) ⊢
+    |==> (nextpidShot ∗ ⌜b = true → np.toNat = 1 ∧ ∀ j, j < NPROC → (pids j).toNat ≠ 1⌝ ∗
+      (⌜b = true⌝ ∨ initReg)) := by
+  cases b with
+  | true =>
+    simp only [ite_true]
+    iintro ⟨Htok, Hm1, Hm2⟩
+    icases Hm1 with (%h1 | Hs)
+    · icases Hm2 with (%h2 | Hs)
+      · imod nextpid_shoot (GF := GF) $$ Htok with #Hs
+        imodintro
+        isplitr
+        · iexact Hs
+        isplitr
+        · ipureintro; intro _; exact ⟨h1, h2⟩
+        · ileft; ipureintro; trivial
+      · iexfalso
+        iapply nextpid_pend_shot (GF := GF)
+        isplitl [Htok]
+        · iexact Htok
+        · iexact Hs
+    · iexfalso
+      iapply nextpid_pend_shot (GF := GF)
+      isplitl [Htok]
+      · iexact Htok
+      · iexact Hs
+  | false =>
+    simp only [Bool.false_eq_true, ite_false]
+    unfold npidDone
+    iintro ⟨⟨#Hs, #Hir⟩, _, _⟩
+    imodintro
+    isplitr
+    · iexact Hs
+    isplitr
+    · ipureintro; intro h; cases h
+    · iright; iexact Hir
+
+/-- **THE INCARNATION IS MINTED HERE** (Rocq `wp_ap_pidsec` at the store,
+and the found arm's founding of the killed row).  Which side of init the
+candidate is on is read BEFORE the insert (`initReg_ne`); then the mint
+(`gen_alloc`, at the slot, the pid, the creator's payload `Q`), the slot's
+whole generation re-keyed, the registration inserted and split
+(`pidReg_rest_whole`: the eighth goes to `p->lock`'s killed row), and the
+row founded on the UNUSED slot's flag (`killPaid_flag`, pid 0) with the
+pending one-shot, the eighth, the persistent reading (`genNew_myPay`) and
+the creator's kill wand (`killPaid_found`). -/
+theorem ap_pid_mint (Wk : IProp GF) (pa : BitVec 64) (pid pid0 kl : BitVec 32) (b : Bool)
+    (R : IntMapF GName) (g0 : GName) (Q : Int → IProp GF)
+    (hfree : get? R (pid.toNat : Int) = none) (hp0 : pid0.toNat = 0) (hpnz : pid.toNat ≠ 0)
+    (hb : b = true → pid.toNat = 1) :
+    (⌜b = true⌝ ∨ initReg) ∗ pidRegAuth R ∗ slotGen pa (.own 1) g0 ∗ killPaidAt Wk pid0 kl ∗
+      □ (Wk -∗ Q (-1)) ⊢
+    |==> ∃ γ : GName, ⌜if b then pid.toNat = 1 else pid.toNat ≠ 1⌝ ∗
+      pidRegAuth (PartialMap.insert R (pid.toNat : Int) γ) ∗ killPaidAt Wk pid kl ∗
+      genNew γ pa pid Q ∗ slotGen pa (.own 1) γ ∗ pidRegRest pid γ := by
+  iintro ⟨Hir, Hauth, Hsg, Hkp, #Hw⟩
+  -- which side of init the candidate is on, BEFORE the insert
+  ihave Hside : ⌜if b then pid.toNat = 1 else pid.toNat ≠ 1⌝ ∗ pidRegAuth R $$ [Hir Hauth]
+  · cases b with
+    | true =>
+      simp only [ite_true]
+      iclear Hir
+      isplitr
+      · ipureintro; exact hb rfl
+      · iexact Hauth
+    | false =>
+      simp only [Bool.false_eq_true, ite_false]
+      icases Hir with (%hc | #Hir)
+      · cases hc
+      have hk := (ap_keep (initReg_ne (GF := GF) R pid hfree)).trans (sep_mono_right sep_elim_left)
+      iapply hk
+      isplitl [Hauth]
+      · iexact Hauth
+      · iexact Hir
+  icases Hside with ⟨%hside, Hauth⟩
+  -- the UNUSED slot's flag (its pid cell is 0: the free arm)
+  ihave Hfl := killPaid_flag Wk pid0 kl hp0 $$ Hkp
+  imod gen_alloc (GF := GF) pa pid Q with ⟨%γ, Hgen, Hpend⟩
+  imod slotGen_update pa g0 γ $$ Hsg with Hsg
+  imod pidReg_insert R pid γ hfree $$ Hauth with ⟨Hauth, Hpr⟩
+  icases (pidReg_rest_whole pid γ).1 $$ Hpr with ⟨Hrest, Hpr8⟩
+  icases genNew_myPay γ pa pid Q $$ Hgen with ⟨#Hmy, Hgen⟩
+  imod killPaid_found Wk pid kl γ Q hpnz $$ [Hfl Hpend Hpr8] with Hkp
+  · iframe Hfl Hpend Hpr8
+    isplitr
+    · iexact Hmy
+    · iexact Hw
+  imodintro
+  iexists γ
+  isplitr
+  · ipureintro; exact hside
+  iframe Hauth Hkp Hgen Hsg Hrest
+
+end Ghost
+
 theorem allocproc_br_fffffffffffff18a : KA.«allocproc» + 0xfffffffffffff18a#64 = KA.«memset» := by decide
 
 theorem allocproc_br_fffffffffffffed2 : KA.«allocproc» + 0xfffffffffffffed2#64 = KA.«proc_pagetable» := by decide
@@ -1670,7 +1785,7 @@ theorem ap_found (AC : ACQUIRE) (RE : RELEASE) (KAL : KALLOC) (MS : MEMSET)
     (PP : PROC_PAGETABLE) (FP : FREEPROC)
     {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [X : CurCtx]
     (Γ : SchedNames) (c : CPU) (k : KCtx) (γl γp : GName) (γk : KmemNames) (on : Option Nat)
-    (pav : Option Nat)
+    (pav : Option Nat) (tk : Bool) (Q : Int → IProp GF)
     (n : Nat) (hn : n < NPROC) (hwf : k.wf)
     (hnoff : k.noff + 2 < 2 ^ 31) (hK : allocprocSlots ≤ k.avail)
     (hlk : "kmem" ∉ k.locks) (hlp : "nextpid" ∉ k.locks) (hlq : "proc" ∉ k.locks)
@@ -1683,7 +1798,8 @@ theorem ap_found (AC : ACQUIRE) (RE : RELEASE) (KAL : KALLOC) (MS : MEMSET)
     (ch : BitVec 64) (kl xs pid0 : BitVec 32) :
     kctx c ((((k.pushed 4).pushOffAt spie2 spp2).withRegs R2).withLocks ("proc" :: k.locks)) ∗
     pcIs c (KA.«allocproc» + 0x38#64) ∗ procsInv Γ ∗ isLock γl kmemLockAddr "kmem" (kmemRes γk) ∗
-    isLock γp pidLockAddr "nextpid" pidLockPay ∗ kallocAvail γk on ∗ procsAvail Γ pav ∗
+    isLock γp pidLockAddr "nextpid" pidLockPay ∗ kallocAvail γk on ∗ procsAvailAt Γ pav tk ∗
+    □ (MachFixedGS.killCred (hlc := hlc) (GF := GF) -∗ Q (-1)) ∗
     frame4s2 (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) (k.regs 9#5) (k.regs 18#5) ∗
     locked (Γ.lock n) c ∗
     wordPointsTo (pState (procAddr n)) 4 (DFrac.own 1) UNUSED ∗
@@ -1691,11 +1807,11 @@ theorem ap_found (AC : ACQUIRE) (RE : RELEASE) (KAL : KALLOC) (MS : MEMSET)
     wordPointsTo (pChan (procAddr n)) 8 (DFrac.own 1) ch ∗
     procPubRest (procAddr n) kl xs pid0 ∗
     procSlotsAt Γ curCtx (procAddr n) UNUSED ∗ sieArm c k.sie k.proc ∗
-    wpNext k.sie k.proc c (apCont Γ k γk on pav)
+    wpNext k.sie k.proc c (apCont Γ k γk on pav tk Q)
     ⊢ wpLoop (GF := GF) c := by
   obtain ⟨ξ0, t0⟩ := X
   letI : CurCtx := ⟨ξ0, t0⟩
-  iintro ⟨Hk, Hpc, #Hpinv, #Hlk, #Hlp, Hav, Hpav, Hframe, Hlocked, Hstate, Hpl, Hchan, Hrest,
+  iintro ⟨Hk, Hpc, #Hpinv, #Hlk, #Hlp, Hav, Hpav, #Hkw, Hframe, Hlocked, Hstate, Hpl, Hchan, Hrest,
     Hslots, Harm, HΦ⟩
   icases kctx_tier c _ $$ Hk with ⟨%hct, Hk⟩
   have ht0 : t0 = KTier.kpt := by
@@ -1706,6 +1822,8 @@ theorem ap_found (AC : ACQUIRE) (RE : RELEASE) (KAL : KALLOC) (MS : MEMSET)
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
   unfold allocprocSlots at hK
   have hsie : k.tier = KTier.kpt := htier
+  -- the ledger's token goes into the pid section (Rocq `procs_avail_at_tok`)
+  icases procsAvailAt_tok Γ pav tk $$ Hpav with ⟨Hpav, Htok⟩
   -- 0x80001bc6 auipc a0,0x11 ; 0x80001bca addi a0,a0,-1936 : a0 = &pid_lock
   k_step (wp_s_auipc c _ (KA.«allocproc» + 0x38#64) false 0x11#20 10#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
@@ -1734,9 +1852,18 @@ theorem ap_found (AC : ACQUIRE) (RE : RELEASE) (KAL : KALLOC) (MS : MEMSET)
   icases (show pidLockPay (GF := GF) curCtx ⊢ ∃ (np : BitVec 32) (pids : Nat → BitVec 32),
       ⌜1 ≤ np.toNat ∧ np.toNat ≤ PIDMAX ∧ pidsOk pids⌝ ∗
       wordAtN curCtx nextpidAddr 4 (DFrac.own 1) np ∗
-      [∗list] j ∈ List.range NPROC, wordAtN curCtx (pPid (procAddr j)) 4 pidLockQ (pids j)
+      ([∗list] j ∈ List.range NPROC, wordAtN curCtx (pPid (procAddr j)) 4 pidLockQ (pids j)) ∗
+      (⌜np.toNat = 1⌝ ∨ nextpidShot) ∗
+      ∃ PR : IntMapF GName, ⌜pidRegDom PR pids⌝ ∗ pidRegAuth PR ∗
+        (⌜∀ j, j < NPROC → (pids j).toNat ≠ 1⌝ ∨ nextpidShot)
       from by unfold pidLockPay pidLockResAt; iintro H; iexact H) $$ HRpay with
-    ⟨%np, %pids, %⟨hnplo, hnphi, hpidsok⟩, Hnp, Hpids⟩
+    ⟨%np, %pids, %⟨hnplo, hnphi, hpidsok⟩, Hnp, Hpids, Hm1, %PR, %hdom, Hauth, Hm2⟩
+  -- THE BOOT ERA'S TWO MARKS, READ ONCE (Rocq `wp_ap_pidsec`): the token is
+  -- shot here; in the boot era the counter is 1 and no slot holds pid 1
+  iapply MachCSL.wpLoop_bupd
+  imod ap_tok_read (pavBoot pav tk) np pids $$ [Htok Hm1 Hm2] with ⟨#Hshot, %hboot, #Hir⟩
+  · iframe Htok Hm1 Hm2
+  imodintro
   ihave Hnp : wordPointsTo (GF := GF) nextpidAddr 4 (DFrac.own 1) np $$ [Hnp]
   case' _ => rw [← wordAtN_cur]; iexact Hnp
   ihave Hpids : ([∗list] j ∈ List.range NPROC,
@@ -1769,11 +1896,12 @@ theorem ap_found (AC : ACQUIRE) (RE : RELEASE) (KAL : KALLOC) (MS : MEMSET)
   iintro Hk Hpc
   k_norm
   k_norm
-  iapply (ap_pidloop c _ ?hsie pids R3) $$ %np %_ [] Hk Hpc Hpids
+  iapply (ap_pidloop c _ ?hsie pids R3 (pavBoot pav tk = true) (fun hb => (hboot hb).2))
+    $$ %np %_ [] Hk Hpc Hpids
   case hsie => simp only [KCtx.withLocks_sie, KCtx.pushOffAt_sie]
   · -- pure loop-entry facts
     ipureintro
-    refine ⟨hnplo, hnphi, ?_, ?_, ?_, ?_, ?_⟩
+    refine ⟨hnplo, hnphi, fun hb => (hboot hb).1, ?_, ?_, ?_, ?_, ?_⟩
     · exact apKeepPid_set R3 _ 12#5 _ (by decide)
         (apKeepPid_set R3 _ 12#5 _ (by decide)
           (apKeepPid_set R3 _ 10#5 _ (by decide)
@@ -1785,7 +1913,7 @@ theorem ap_found (AC : ACQUIRE) (RE : RELEASE) (KAL : KALLOC) (MS : MEMSET)
     · simp only [RegMap.set_apply, BitVec.reduceEq, ite_true, ite_false]
     · simp only [RegMap.set_apply, BitVec.reduceEq, ite_true, ite_false]
   -- apExitCont body
-  iintro %Rf %pid %⟨hpidlo, hpidhi, hnohold, hRf13, hRf11, hkeep⟩ Hk Hpc Hpids
+  iintro %Rf %pid %⟨hpidlo, hpidhi, hnohold, hpid1, hRf13, hRf11, hkeep⟩ Hk Hpc Hpids
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
   have hR39 : R3 9#5 = procAddr n := by
     have h := hcs3.2.2.1
@@ -1804,12 +1932,13 @@ theorem ap_found (AC : ACQUIRE) (RE : RELEASE) (KAL : KALLOC) (MS : MEMSET)
   -- open the dormant block and the pid word's three fractions
   icases ap_slots_unused_elim Γ ξ0 (procAddr n) $$ Hslots with ⟨Hdorm, Hhart, Hpavarm⟩
   icases ap_dormant_unused_elim (procAddr n) $$ Hdorm with
-    ⟨%V0, %⟨hV0of, hV0cwd, hV0pt, hV0tf, hV0sz, hV0lz⟩, Hpriv, Hfields, Hal, Hch, Hstack⟩
+    ⟨%V0, %⟨hV0of, hV0cwd, hV0pt, hV0tf, hV0sz, hV0lz⟩, Hpriv, Hfields, Hal, Hch, Hsg0, Hxs, Hstack⟩
   icases (show procPubRest (GF := GF) (procAddr n) kl xs pid0 ⊢
       wordPointsTo (pKilled (procAddr n)) 4 (DFrac.own 1) kl ∗
-        wordPointsTo (pXstate (procAddr n)) 4 (DFrac.own 1) xs ∗
-        wordPointsTo (pPid (procAddr n)) 4 pidPub pid0
-      from by unfold procPubRest; iintro H; iexact H) $$ Hrest with ⟨Hkilled, Hxstate, Hpub⟩
+        wordPointsTo (pXstate (procAddr n)) 4 xsHalf xs ∗
+        wordPointsTo (pPid (procAddr n)) 4 pidPub pid0 ∗
+        killPaidAt (MachFixedGS.killCred (hlc := hlc) (GF := GF)) pid0 kl
+      from by unfold procPubRest; iintro H; iexact H) $$ Hrest with ⟨Hkilled, Hxstate, Hpub, Hkp0⟩
   icases ap_bigop_upd (fun j => wordPointsTo (pPid (procAddr j)) 4 pidLockQ (pids j))
       (fun j => wordPointsTo (pPid (procAddr j)) 4 pidLockQ (apPidsSet pids n pid j)) n hn
       (fun j hj => by rw [apPidsSet_other pids n pid hj]) $$ Hpids with ⟨Hq, HpidsClose⟩
@@ -1839,7 +1968,21 @@ theorem ap_found (AC : ACQUIRE) (RE : RELEASE) (KAL : KALLOC) (MS : MEMSET)
   -- build the pid_lock payload
   have hpidnz : pid ≠ 0#32 := by intro h; rw [h] at hpidlo; exact absurd hpidlo (by decide)
   obtain ⟨hnplo', hnphi'⟩ := apNewPid_bounds pid hpidlo hpidhi
-  ihave HRpay : pidLockPay (GF := GF) curCtx $$ [Hnp Hpids]
+  -- THE INCARNATION IS MINTED HERE (Rocq `wp_ap_pidsec` at the store): the
+  -- scan proved the candidate in no slot, so it is a free key of the register
+  have hfree := pidRegDom_fresh PR pids pid hdom hnohold
+  have hpnz' : pid.toNat ≠ 0 := by omega
+  have hp0 : pid0.toNat = 0 := by rw [hpid0_0]; rfl
+  iapply MachCSL.wpLoop_bupd
+  imod ap_pid_mint (MachFixedGS.killCred (hlc := hlc) (GF := GF)) (procAddr n) pid pid0 kl
+      (pavBoot pav tk) PR V0.gen Q hfree hp0 hpnz' hpid1 $$ [Hauth Hsg0 Hkp0]
+    with ⟨%γ, %hside, Hauth, Hkp, Hgen, Hsg, Hprr⟩
+  · iframe Hauth Hsg0 Hkp0
+    isplitr
+    · iexact Hir
+    · iexact Hkw
+  imodintro
+  ihave HRpay : pidLockPay (GF := GF) curCtx $$ [Hnp Hpids Hauth]
   case _ =>
     unfold pidLockPay pidLockResAt
     iexists (apNewPid pid), (apPidsSet pids n pid)
@@ -1848,7 +1991,18 @@ theorem ap_found (AC : ACQUIRE) (RE : RELEASE) (KAL : KALLOC) (MS : MEMSET)
       exact ⟨hnplo', hnphi', apPidsOk_set pids n pid hn hpidnz hnohold hpidsok⟩
     isplitl [Hnp]
     · rw [← wordAtN_cur]; iexact Hnp
+    isplitl [Hpids]
     · simp only [← wordAtN_cur]; iexact Hpids
+    -- both marks re-established by the shot
+    isplitr
+    · iright; iexact Hshot
+    iexists (PartialMap.insert PR (pid.toNat : Int) γ)
+    isplitr
+    · ipureintro
+      exact pidRegDom_insert PR pids n pid γ hdom hn (by rw [hpidsn0]; rfl) hpnz'
+    isplitl [Hauth]
+    · iexact Hauth
+    · iright; iexact Hshot
   -- 0x80001c1a auipc a0 ; 0x80001c1e addi a0 ; 0x80001c22 jal release
   k_step (wp_s_auipc c _ (KA.«allocproc» + 0x8c#64) false 0x11#20 10#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
@@ -1970,11 +2124,11 @@ theorem ap_found (AC : ACQUIRE) (RE : RELEASE) (KAL : KALLOC) (MS : MEMSET)
       $$ [Hkstack Hsz Hpagetable Htrapframe Hcontext Hofile Hcwd Hname]
     case _ => unfold procFields; iframe Hkstack Hsz Hpagetable Htrapframe Hcontext Hofile Hcwd Hname
     -- procHeld at USED
-    ihave Hheld : procHeld Γ c n USED ch $$ [Hlocked Hpstw Hstate Hchan Hkilled Hxstate HpidPub]
+    ihave Hheld : procHeld Γ c n USED ch $$ [Hlocked Hpstw Hstate Hchan Hkilled Hxstate HpidPub Hkp]
     case _ =>
       iapply procHeldAt_intro Γ curCtx c n USED ch kl xs pid
       unfold procPubRest
-      iframe Hlocked Hpstw Hstate Hchan Hkilled Hxstate HpidPub
+      iframe Hlocked Hpstw Hstate Hchan Hkilled Hxstate HpidPub Hkp
     -- freeprocIn (trapframe = 0, pagetable = 0)
     ihave HfpIn : freeprocIn (GF := GF) (procAddr n) pid V0 (fun _ => [])
       $$ [HpidPriv Hfields Hal Hch Hstack]
@@ -1985,6 +2139,11 @@ theorem ap_found (AC : ACQUIRE) (RE : RELEASE) (KAL : KALLOC) (MS : MEMSET)
       · ipureintro; exact ⟨hV0of, hV0cwd⟩
       iframe HpidPriv Hfields Hal Hch Hstack
       isplitl [] <;> iempintro
+    -- freeproc takes the minted generation's wholes and the dormant block's
+    -- xstate half (`freeprocGen`); the rest of the mint is dropped
+    iclear Hgen
+    ihave HfG : freeprocGen (GF := GF) (procAddr n) pid γ $$ [Hsg Hprr Hxs]
+    case _ => unfold freeprocGen; iframe Hsg Hprr Hxs
     -- 0x80001c6e c.mv a0,s1
     k_step (wp_s_add c _ (KA.«allocproc» + 0xe0#64) true 10#5 0#5 9#5 (by decide))
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hRk9]
@@ -1993,8 +2152,8 @@ theorem ap_found (AC : ACQUIRE) (RE : RELEASE) (KAL : KALLOC) (MS : MEMSET)
     k_step (wp_s_jal c _ (KA.«allocproc» + 0xe2#64) false 2096826#21 1#5 (by decide))
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [allocproc_br_ffffffffffffff9c]
     iintro Hk Hpc
-    iapply (ap_fp_call FP Γ c _ γl γp γk n USED ch pid V0 (fun _ => []) hn ?hpf (Or.inl rfl)
-      ?hnf ?hKf ?hsf ?hlkf ?hlpf ?htf) $$ [- $Hk $Hpc $Hlk $Havn $Hlp $Hheld $HfpIn]
+    iapply (ap_fp_call FP Γ c _ γl γp γk n USED ch pid V0 (fun _ => []) γ hn ?hpf (Or.inl rfl)
+      ?hnf ?hKf ?hsf ?hlkf ?hlpf ?htf) $$ [- $Hk $Hpc $Hlk $Havn $Hlp $Hheld $HfpIn $HfG]
     rotate_right 1
     k_norm
     iframe #
@@ -2143,14 +2302,15 @@ theorem ap_found (AC : ACQUIRE) (RE : RELEASE) (KAL : KALLOC) (MS : MEMSET)
         ileft; isplitl []
         · ipureintro; exact h10
         · iexact Hk
-      ihave Hpost : allocprocPost (GF := GF) Γ c8 γk on pav (R'' 10#5) $$ [Havn Hpav]
+      ihave Hpost : allocprocPost (GF := GF) Γ c8 γk on pav tk Q (R'' 10#5) $$ [Havn Hpav]
       case' _ =>
         unfold allocprocPost
         ileft
         isplitl []
         · ipureintro; exact ⟨h10, Or.inr hfail⟩
         isplitl [Hpav]
-        · iexact Hpav
+        · -- the token was spent in the pid section
+          iright; unfold pavSpent; iframe Hpav; iexact Hshot
         iexists none
         isplitl []
         · ipureintro; exact Or.inr rfl
@@ -2420,8 +2580,9 @@ theorem ap_found (AC : ACQUIRE) (RE : RELEASE) (KAL : KALLOC) (MS : MEMSET)
         have hpa2 : pageAddr (BitVec.extractLsb' 12 44 (Rk 10#5)) = Rk 10#5 :=
           ap_pageAddr_of_valid _ hpv
         -- the private block V
-        obtain ⟨V, hVdef⟩ : ∃ V : ProcPriv, V = { V0 with pagetable := Rpp 10#5, trapframe := Rk 10#5, upt := { root := root, tfp := BitVec.extractLsb' 12 44 (Rk 10#5), um := ∅ }, tf := ws, context := [forkretAddr, V0.kstack + 4096#64] ++ List.replicate 12 (0#64) } := ⟨_, rfl⟩
+        obtain ⟨V, hVdef⟩ : ∃ V : ProcPriv, V = { V0 with pagetable := Rpp 10#5, trapframe := Rk 10#5, upt := { root := root, tfp := BitVec.extractLsb' 12 44 (Rk 10#5), um := ∅ }, tf := ws, context := [forkretAddr, V0.kstack + 4096#64] ++ List.replicate 12 (0#64), gen := γ } := ⟨_, rfl⟩
         have hVks : V.kstack = V0.kstack := by rw [hVdef]
+        have hVgen : V.gen = γ := by rw [hVdef]
         have hVchg : V.chg = V0.chg := by rw [hVdef]
         have hVsz : V.sz = V0.sz := by rw [hVdef]
         have hVpt : V.pagetable = Rpp 10#5 := by rw [hVdef]
@@ -2444,11 +2605,11 @@ theorem ap_found (AC : ACQUIRE) (RE : RELEASE) (KAL : KALLOC) (MS : MEMSET)
           rw [hVks, hVsz, hVpt, hVtf, hVctx, hVofl, hVcw, hVnm]
           iframe Hkstack Hsz Hpagetable Htrapframe Hctx Hofile Hcwd Hname
         -- procHeld at USED
-        ihave Hheld : procHeld Γ c n USED ch $$ [Hlocked Hpstw Hstate Hchan Hkilled Hxstate HpidPub]
+        ihave Hheld : procHeld Γ c n USED ch $$ [Hlocked Hpstw Hstate Hchan Hkilled Hxstate HpidPub Hkp]
         case _ =>
           iapply procHeldAt_intro Γ curCtx c n USED ch kl xs pid
           unfold procPubRest
-          iframe Hlocked Hpstw Hstate Hchan Hkilled Hxstate HpidPub
+          iframe Hlocked Hpstw Hstate Hchan Hkilled Hxstate HpidPub Hkp
         -- procPriv V
         ihave Hpriv : procPriv (GF := GF) (procAddr n) pid V Mpp
           $$ [HpidPriv Hfields Hppt Htfpage]
@@ -2477,7 +2638,7 @@ theorem ap_found (AC : ACQUIRE) (RE : RELEASE) (KAL : KALLOC) (MS : MEMSET)
           (hpg (Or.inl rfl)).trans ((hpf (Or.inl rfl)).trans ((hpe (Or.inl rfl)).trans
             ((hpd (Or.inl rfl)).trans ((hpc (Or.inl rfl)).trans ((hpb (Or.inl rfl)).trans
               ((hpa (Or.inl rfl)).trans (hpm (Or.inl rfl))))))))
-        ihave HΦ := wpNext_at k.sie k.proc c cg (apCont Γ k γk on pav) (fun _ => hgc) $$ HΦ
+        ihave HΦ := wpNext_at k.sie k.proc c cg (apCont Γ k γk on pav tk Q) (fun _ => hgc) $$ HΦ
         -- telescope the balanced pid-lock pair
         have hwf4 : (k.pushed 4).wf := hwf
         have hwfpid : (((k.pushed 4).pushOffAt spie3 spp3).withLocks ("proc" :: k.locks)).wf := by
@@ -2527,6 +2688,8 @@ theorem ap_found (AC : ACQUIRE) (RE : RELEASE) (KAL : KALLOC) (MS : MEMSET)
           imod (ap_pav_mint Γ pav n hn) $$ [Hpav Hpavarm] with ⟨Hpav, Hused⟩
           · iframe Hpav Hpavarm
           imodintro
+          ihave Hpav : pavSpent (GF := GF) Γ (pavDec pav) $$ [Hpav]
+          case' _ => unfold pavSpent; iframe Hpav; iexact Hshot
           ihave Hdisj : ((⌜R'' 10#5 = 0#64⌝ ∗ kctx (GF := GF) cg ((k.withSpie spie6 spp6).withRegs R'')) ∨
               (⌜R'' 10#5 ≠ 0#64⌝ ∗ kctx cg (((k.pushOffAt spie6 spp6).withLocks
                 ("proc" :: k.locks)).withRegs R'') ∗ sieArm cg k.sie k.proc)) $$ [Hk Harm]
@@ -2535,8 +2698,8 @@ theorem ap_found (AC : ACQUIRE) (RE : RELEASE) (KAL : KALLOC) (MS : MEMSET)
             · ipureintro; rw [h10]; exact procAddr_nonzero hn
             · iframe Hk
               rw [hgc]; iexact Harm
-          ihave Hpost : allocprocPost (GF := GF) Γ cg γk on pav (R'' 10#5)
-            $$ [Hheld Hhart Hused Hpav Hpriv Hal Hch Hstack Hav4]
+          ihave Hpost : allocprocPost (GF := GF) Γ cg γk on pav tk Q (R'' 10#5)
+            $$ [Hheld Hhart Hused Hpav Hpriv Hal Hch Hgen Hsg Hprr Hxs Hstack Hav4]
           case' _ =>
             unfold allocprocPost
             rw [hgc]
@@ -2544,23 +2707,23 @@ theorem ap_found (AC : ACQUIRE) (RE : RELEASE) (KAL : KALLOC) (MS : MEMSET)
             iexists n, ch, pid, V, Mpp, 4
             isplitl []
             · ipureintro
-              refine ⟨h10, hn, hpidlo, hpidhi, ⟨?_, ?_, ?_, ?_, ?_⟩, ?_⟩
+              refine ⟨h10, hn, hpidlo, hpidhi, ⟨?_, ?_, ?_, ?_, ?_⟩, ?_, hside⟩
               · rw [hVofl, hV0of]
               · rw [hVcw, hV0cwd]
               · rw [hVsz, hV0sz]
               · intro vpn; rw [hVum]; exact get?_empty vpn
               · rw [hVctx, hVks]
               · unfold procPagetableNodes; omega
-            · rw [hVks, hVchg]
-              iframe Hheld Hhart Hused Hpav Hpriv Hal Hch Hstack Hav4
-          ihave HΦ := (show apCont Γ k γk on pav cg ⊢
+            · rw [hVks, hVchg, hVgen]
+              iframe Hheld Hhart Hused Hpav Hpriv Hal Hch Hgen Hsg Hprr Hxs Hstack Hav4
+          ihave HΦ := (show apCont Γ k γk on pav tk Q cg ⊢
               (∀ (spie spp : Bool) (R' : RegMap),
                 ⌜k.sie = false → spie = k.spie ∧ spp = k.spp⌝ -∗
                 ((⌜R' 10#5 = 0#64⌝ ∗ kctx (GF := GF) cg ((k.withSpie spie spp).withRegs R')) ∨
                  (⌜R' 10#5 ≠ 0#64⌝ ∗ kctx cg (((k.pushOffAt spie spp).withLocks
                     ("proc" :: k.locks)).withRegs R') ∗ sieArm cg k.sie k.proc)) -∗
                 pcIs cg (jumpPc (k.regs 1#5)) -∗
-                allocprocPost Γ cg γk on pav (R' 10#5) -∗
+                allocprocPost Γ cg γk on pav tk Q (R' 10#5) -∗
                 ⌜calleeSaved k.regs R'⌝ -∗ wpLoop cg)
               from by unfold apCont; iintro H; iexact H) $$ HΦ
           iapply HΦ $$ %spie6 %spp6 %R'' %hspc6 Hdisj Hpc Hpost
@@ -2661,11 +2824,11 @@ theorem ap_found (AC : ACQUIRE) (RE : RELEASE) (KAL : KALLOC) (MS : MEMSET)
         rw [hV1ks, hV1sz, hV1pt, hV1tf, hV1ctx, hV1ofl, hV1cw, hV1nm]
         iframe Hkstack Hsz Hpagetable Htrapframe Hcontext Hofile Hcwd Hname
       -- procHeld at USED
-      ihave Hheld : procHeld Γ c n USED ch $$ [Hlocked Hpstw Hstate Hchan Hkilled Hxstate HpidPub]
+      ihave Hheld : procHeld Γ c n USED ch $$ [Hlocked Hpstw Hstate Hchan Hkilled Hxstate HpidPub Hkp]
       case _ =>
         iapply procHeldAt_intro Γ curCtx c n USED ch kl xs pid
         unfold procPubRest
-        iframe Hlocked Hpstw Hstate Hchan Hkilled Hxstate HpidPub
+        iframe Hlocked Hpstw Hstate Hchan Hkilled Hxstate HpidPub Hkp
       -- freeprocIn: trapframe present (Rk 10), pagetable absent (Rpp 10 = 0)
       ihave HfpIn : freeprocIn (GF := GF) (procAddr n) pid V1 (fun _ => [])
         $$ [HpidPriv Hfields Hal Hch Hstack Htfpage]
@@ -2684,6 +2847,11 @@ theorem ap_found (AC : ACQUIRE) (RE : RELEASE) (KAL : KALLOC) (MS : MEMSET)
             exact ⟨hpa2.symm, hpv⟩
           · rw [hV1tfp, hV1tfw]; iexact Htfpage
         · iempintro
+      -- freeproc takes the minted generation's wholes and the dormant block's
+      -- xstate half (`freeprocGen`); the rest of the mint is dropped
+      iclear Hgen
+      ihave HfG : freeprocGen (GF := GF) (procAddr n) pid γ $$ [Hsg Hprr Hxs]
+      case _ => unfold freeprocGen; iframe Hsg Hprr Hxs
       -- 0x80001c7e c.mv a0,s1
       k_step (wp_s_add c _ (KA.«allocproc» + 0xf0#64) true 10#5 0#5 9#5 (by decide))
         from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hRpp9]
@@ -2692,8 +2860,8 @@ theorem ap_found (AC : ACQUIRE) (RE : RELEASE) (KAL : KALLOC) (MS : MEMSET)
       k_step (wp_s_jal c _ (KA.«allocproc» + 0xf2#64) false 2096810#21 1#5 (by decide))
         from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [allocproc_br_ffffffffffffff9c]
       iintro Hk Hpc
-      iapply (ap_fp_call FP Γ c _ γl γp γk n USED ch pid V1 (fun _ => []) hn ?hpf (Or.inl rfl)
-        ?hnf ?hKf ?hsf ?hlkf ?hlpf ?htf) $$ [- $Hk $Hpc $Hlk $Havn $Hlp $Hheld $HfpIn]
+      iapply (ap_fp_call FP Γ c _ γl γp γk n USED ch pid V1 (fun _ => []) γ hn ?hpf (Or.inl rfl)
+        ?hnf ?hKf ?hsf ?hlkf ?hlpf ?htf) $$ [- $Hk $Hpc $Hlk $Havn $Hlp $Hheld $HfpIn $HfG]
       rotate_right 1
       k_norm
       iframe #
@@ -2843,14 +3011,15 @@ theorem ap_found (AC : ACQUIRE) (RE : RELEASE) (KAL : KALLOC) (MS : MEMSET)
           ileft; isplitl []
           · ipureintro; exact h10
           · iexact Hk
-        ihave Hpost : allocprocPost (GF := GF) Γ c8 γk on pav (R'' 10#5) $$ [Havn Hpav]
+        ihave Hpost : allocprocPost (GF := GF) Γ c8 γk on pav tk Q (R'' 10#5) $$ [Havn Hpav]
         case' _ =>
           unfold allocprocPost
           ileft
           isplitl []
           · ipureintro; exact ⟨h10, Or.inr hfail⟩
           isplitl [Hpav]
-          · iexact Hpav
+          · -- the token was spent in the pid section
+            iright; unfold pavSpent; iframe Hpav; iexact Hshot
           iexists none
           isplitl []
           · ipureintro; exact Or.inr rfl
@@ -2927,7 +3096,7 @@ theorem ap_scan (AC : ACQUIRE) (RE : RELEASE) (KAL : KALLOC) (MS : MEMSET)
     (PP : PROC_PAGETABLE) (FP : FREEPROC)
     {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [X : CurCtx]
     (Γ : SchedNames) (k : KCtx) (γl γp : GName) (γk : KmemNames) (on : Option Nat)
-    (pav : Option Nat)
+    (pav : Option Nat) (tk : Bool) (Q : Int → IProp GF)
     (hwf : k.wf) (hnoff : k.noff + 2 < 2 ^ 31) (hK : allocprocSlots ≤ k.avail)
     (hlk : "kmem" ∉ k.locks) (hlp : "nextpid" ∉ k.locks) (hlq : "proc" ∉ k.locks)
     (htier : k.tier = KTier.kpt) (fuel : Nat) :
@@ -2941,16 +3110,17 @@ theorem ap_scan (AC : ACQUIRE) (RE : RELEASE) (KAL : KALLOC) (MS : MEMSET)
       (cur : CPU),
     kctx cur (((k.pushed 4).withSpie spie spp).withRegs R) ∗ pcIs cur (KA.«allocproc» + 0x1c#64) ∗
     procsInv Γ ∗ isLock γl kmemLockAddr "kmem" (kmemRes γk) ∗
-    isLock γp pidLockAddr "nextpid" pidLockPay ∗ kallocAvail γk on ∗ procsAvail Γ pav ∗
+    isLock γp pidLockAddr "nextpid" pidLockPay ∗ kallocAvail γk on ∗ procsAvailAt Γ pav tk ∗
+    □ (MachFixedGS.killCred (hlc := hlc) (GF := GF) -∗ Q (-1)) ∗
     ([∗list] j ∈ List.range n, slotUsed Γ (procAddr j)) ∗
     frame4s2 (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) (k.regs 9#5) (k.regs 18#5) ∗
-    wpNext k.sie k.proc cur (apCont Γ k γk on pav)
+    wpNext k.sie k.proc cur (apCont Γ k γk on pav tk Q)
     ⊢ wpLoop (GF := GF) cur := by
   induction fuel with
   | zero =>
     intro n hfuel hn spie spp hsp R hR2 h9 h18 h19 h20 h21 h22 h23 h24 h25 h26 h27 cur
     have hlast : n + 1 = NPROC := by unfold NPROC at hfuel hn ⊢; omega
-    iintro ⟨Hk, Hpc, #Hpinv, #Hlk, #Hlp, Hav, Hpav, Hmarks, Hframe, HΦ⟩
+    iintro ⟨Hk, Hpc, #Hpinv, #Hlk, #Hlp, Hav, Hpav, #Hkw, Hmarks, Hframe, HΦ⟩
     ihave #Hln := procsInv_lookup Γ n hn $$ Hpinv
     iapply (ap_scan_acq AC Γ cur cur k n hn hnoff hK hlq htier spie spp R h9) $$ [- $Hk $Hpc]
     iframe #
@@ -2967,7 +3137,7 @@ theorem ap_scan (AC : ACQUIRE) (RE : RELEASE) (KAL : KALLOC) (MS : MEMSET)
     by_cases hst : st = UNUSED
     · subst hst
       rw [if_pos (rfl : (UNUSED : BitVec 32) = UNUSED)]
-      iapply (ap_found AC RE KAL MS PP FP Γ c2 k γl γp γk on pav n hn hwf hnoff hK hlk hlp hlq htier
+      iapply (ap_found AC RE KAL MS PP FP Γ c2 k γl γp γk on pav tk Q n hn hwf hnoff hK hlk hlp hlq htier
         spie2 spp2 hspc R2 (hcs2.1.trans hR2) h9'
         (hcs2.2.2.2.2.1.trans h19) (hcs2.2.2.2.2.2.1.trans h20) (hcs2.2.2.2.2.2.2.1.trans h21)
         (hcs2.2.2.2.2.2.2.2.1.trans h22) (hcs2.2.2.2.2.2.2.2.2.1.trans h23)
@@ -3034,7 +3204,7 @@ theorem ap_scan (AC : ACQUIRE) (RE : RELEASE) (KAL : KALLOC) (MS : MEMSET)
           isplitl []
           · ipureintro; exact h10
           · iexact Hk
-        ihave Hpost : allocprocPost (GF := GF) Γ c8 γk on pav (R'' 10#5)
+        ihave Hpost : allocprocPost (GF := GF) Γ c8 γk on pav tk Q (R'' 10#5)
           $$ [Hav Hpav Hmarks]
         case' _ =>
           unfold allocprocPost
@@ -3045,6 +3215,7 @@ theorem ap_scan (AC : ACQUIRE) (RE : RELEASE) (KAL : KALLOC) (MS : MEMSET)
             cases m with
             | succ m' =>
               iexfalso
+              icases procsAvailAt_tok Γ (some (m' + 1)) tk $$ Hpav with ⟨Hpav, _⟩
               iapply procsAvail_refute Γ m' $$ [Hpav Hmarks]
               iframe
             | zero =>
@@ -3052,7 +3223,7 @@ theorem ap_scan (AC : ACQUIRE) (RE : RELEASE) (KAL : KALLOC) (MS : MEMSET)
               isplitl []
               · ipureintro; exact ⟨h10, Or.inl (Or.inr rfl)⟩
               isplitl [Hpav]
-              · iexact Hpav
+              · ileft; iexact Hpav
               iexists on
               isplitl []
               · ipureintro; exact Or.inl rfl
@@ -3062,7 +3233,7 @@ theorem ap_scan (AC : ACQUIRE) (RE : RELEASE) (KAL : KALLOC) (MS : MEMSET)
             isplitl []
             · ipureintro; exact ⟨h10, Or.inl (Or.inl rfl)⟩
             isplitl [Hpav]
-            · iexact Hpav
+            · ileft; iexact Hpav
             iexists on
             isplitl []
             · ipureintro; exact Or.inl rfl
@@ -3104,7 +3275,7 @@ theorem ap_scan (AC : ACQUIRE) (RE : RELEASE) (KAL : KALLOC) (MS : MEMSET)
   | succ fuel ih =>
     intro n hfuel hn spie spp hsp R hR2 h9 h18 h19 h20 h21 h22 h23 h24 h25 h26 h27 cur
     have hnext : n + 1 < NPROC := by unfold NPROC at hfuel hn ⊢; omega
-    iintro ⟨Hk, Hpc, #Hpinv, #Hlk, #Hlp, Hav, Hpav, Hmarks, Hframe, HΦ⟩
+    iintro ⟨Hk, Hpc, #Hpinv, #Hlk, #Hlp, Hav, Hpav, #Hkw, Hmarks, Hframe, HΦ⟩
     ihave #Hln := procsInv_lookup Γ n hn $$ Hpinv
     iapply (ap_scan_acq AC Γ cur cur k n hn hnoff hK hlq htier spie spp R h9) $$ [- $Hk $Hpc]
     iframe #
@@ -3121,7 +3292,7 @@ theorem ap_scan (AC : ACQUIRE) (RE : RELEASE) (KAL : KALLOC) (MS : MEMSET)
     by_cases hst : st = UNUSED
     · subst hst
       rw [if_pos (rfl : (UNUSED : BitVec 32) = UNUSED)]
-      iapply (ap_found AC RE KAL MS PP FP Γ c2 k γl γp γk on pav n hn hwf hnoff hK hlk hlp hlq htier
+      iapply (ap_found AC RE KAL MS PP FP Γ c2 k γl γp γk on pav tk Q n hn hwf hnoff hK hlk hlp hlq htier
         spie2 spp2 hspc R2 (hcs2.1.trans hR2) h9'
         (hcs2.2.2.2.2.1.trans h19) (hcs2.2.2.2.2.2.1.trans h20) (hcs2.2.2.2.2.2.2.1.trans h21)
         (hcs2.2.2.2.2.2.2.2.1.trans h22) (hcs2.2.2.2.2.2.2.2.2.1.trans h23)
@@ -3208,10 +3379,10 @@ set_option maxHeartbeats 4000000 in
 /-- **`allocproc` meets its specification.** -/
 theorem allocproc_proof (AC : ACQUIRE) (RE : RELEASE) (KAL : KALLOC) (MS : MEMSET)
     (PP : PROC_PAGETABLE) (FP : FREEPROC) : ALLOCPROC :=
-  ⟨fun {hlc GF} _ _ _ _ _ _ _ X Γ cpu k γl γp γk on pav hnoff hK hlk hlp hlq htier => by
+  ⟨fun {hlc GF} _ _ _ _ _ _ _ X Γ cpu k γl γp γk on pav tk Q hnoff hK hlk hlp hlq htier => by
   unfold wp_allocproc_body
   simp only [allocprocAddr]
-  iintro ⟨Hk, Hpc, #Hpinv, #Hlk, #Hlp, Hav, Hpav, HΦ⟩
+  iintro ⟨Hk, Hpc, #Hpinv, #Hlk, #Hlp, Hav, Hpav, #Hkw, HΦ⟩
   icases kctx_wf _ _ $$ Hk with ⟨%hwf, Hk⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
   have hK4 : 4 ≤ k.avail := by unfold allocprocSlots at hK; omega
@@ -3244,7 +3415,7 @@ theorem allocproc_proof (AC : ACQUIRE) (RE : RELEASE) (KAL : KALLOC) (MS : MEMSE
     KCtx.withSpie_self' (k.pushed 4) k.spie k.spp rfl rfl
   k_norm_g
   rw [← hspie]
-  iapply (ap_scan AC RE KAL MS PP FP Γ k γl γp γk on pav hwf hnoff hK hlk hlp hlq htier (NPROC - 1) 0
+  iapply (ap_scan AC RE KAL MS PP FP Γ k γl γp γk on pav tk Q hwf hnoff hK hlk hlp hlq htier (NPROC - 1) 0
     (by decide) (by decide) k.spie k.spp (fun _ => ⟨rfl, rfl⟩) _ ?hR2 ?h9 ?h18 ?h19 ?h20 ?h21 ?h22
     ?h23 ?h24 ?h25 ?h26 ?h27 c5)
   rotate_right 2

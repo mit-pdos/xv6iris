@@ -11,20 +11,15 @@ does not arise); a consumer imports `Xv6.EnvMorph`.
 
 ## Deviations from Rocq
 
-1. **THE PIPE ROW IS A PREMISE, NOT AN INSTANCE (landed-file blocker).**
-   `is_pipe_morph` cannot be proved against the landed `PipeInvDefs`:
-   `pipeResAt γp pi ζ` ends in `pipeSlack pi`, whose bytes are `byteBuf` at
-   the AMBIENT context -- so the lock invariant a holder at `ξ` states
-   (`isPipe` at `⟨ξ, t⟩`) is a different proposition from the one at `ξ'`
-   (`amb_tier_rfl` reports exactly the slack bytes' `ctxBytes ξ` vs
-   `ctxBytes ξ'`).  Rocq's `pipe_slack` is `byte_any` (context-free).  The
-   fix is a one-definition edit listed for 8-P (`pipeSlackAt ξ` inside
-   `pipeResAt`, `pipeSlack = pipeSlackAt curCtx` by `rfl`, so no consumer
-   changes; checked in a scratch copy, where `isPipe_morph` then closes by
-   `unfold isPipe; amb_morph_solve`).  Until then the rows above the pipe
-   arm (`fileCoreNoff_morph` … `procOfiles_morph`) take it as the
-   instance-implicit premise `hpipe`; once 8-P lands `isPipe_morph` as an
-   instance, instance search discharges it and nothing here changes.
+1. **THE PIPE ROW** (closed by the D8 wiring).  `is_pipe_morph` could not
+   be proved against the landed `PipeInvDefs`: `pipeResAt γp pi ζ` ended in
+   `pipeSlack pi`, whose bytes are `byteBuf` at the AMBIENT context (Rocq's
+   `pipe_slack` is `byte_any`, context-free).  The payload now carries
+   `PipeInvDefs.pipeSlackAt ξ` (an `abbrev`, `pipeSlackAt curCtx = pipeSlack`
+   by `rfl`, so no consumer changed) and `isPipe_morph` closes by `unfold
+   isPipe; amb_morph_solve`.  The rows above the pipe arm (`fileCoreNoff_morph`
+   … `procOfiles_morph`) still state the instance-implicit premise `hpipe`,
+   which instance search now discharges with `isPipe_morph`.
 2. `file_fields_morph`, `file_rest_morph`, `fslot_morph` are the landed
    `FileDefs` instances (`fslotAt`'s payload at the ambient, FileDefs
    deviation 4).  `file_core_off` "takes no context" in Rocq; Lean's
@@ -77,8 +72,17 @@ instance fileCoreOff_morph (t : KTier) (k : Nat) (q : Qp) (pn : FPNames) (C : FC
     CtxMorph (GF := GF) (fun ξ => letI : CurCtx := ⟨ξ, t⟩; fileCoreOff (GF := GF) k q pn C) :=
   ctxMorph_ofEq _ (fun _ _ => by amb_tier_rfl)
 
+/-- Rocq `is_pipe_morph` (deviation 1, closed by the D8 wiring: the lock
+payload's slack bytes are `PipeInvDefs.pipeSlackAt ξ`, so the payload is a
+transport family and `isPipe` reads the ambient for its tier only). -/
+instance isPipe_morph (t : KTier) (γl : GName) (γp : PipeNames) (pi : BitVec 64) :
+    CtxMorph (GF := GF) (fun ξ => letI : CurCtx := ⟨ξ, t⟩; isPipe (GF := GF) γl γp pi) := by
+  unfold isPipe
+  amb_morph_solve
+
 section PipeMorphPremise
-/- THE PIPE ROW (deviation 1): discharged by 8-P's `isPipe_morph`. -/
+/- THE PIPE ROW (deviation 1): discharged by `isPipe_morph` above (instance
+search closes the premise at every use). -/
 variable [hpipe : ∀ (t : KTier) (γl : GName) (γp : PipeNames) (pi : BitVec 64),
   CtxMorph (GF := GF) (fun ξ => letI : CurCtx := ⟨ξ, t⟩; isPipe (GF := GF) γl γp pi)]
 

@@ -24,17 +24,14 @@ the context change at forkret (D25 (i)).
 
 ## Deviations / dependencies
 
-1. `procPrivFd_morph` inherits FileMorph's pipe premise `hpipe` (FileMorph
-   deviation 1; discharged by 8-P's `isPipe_morph`).
-2. **D8 dependency.**  The block's core is stated today WITHOUT Rocq's D8
-   conjuncts (`first_tok`, `∃ Q, gen_kq ∗ my_pay`, `½ p_xstate`,
-   `gen_halves_priv`).  The two core proofs are `unfold …;
-   amb_morph_solve`, so when D8 adds them the walk closes them unchanged:
-   the generation rows are ghost (constants), the xstate half a
-   `wordPointsTo` (`instCtxMorphWordAt`) and `firstTok` at `⟨ξ, kpt⟩` is
-   `FsReadyMorph.firstTok_morph`.  The only edit then is this section's
-   binder list, which must gain whatever class binders D8 gives
-   `procPrivCoreNoctxAt` (`[Fscfg]` and FsReady's cameras for `firstTok`).
+1. `procPrivFd_morph` states FileMorph's pipe premise `hpipe` (FileMorph
+   deviation 1), which instance search discharges with
+   `FileMorph.isPipe_morph` (landed with the D8 wiring).
+2. **D8.**  The block's core carries Rocq's D8 conjuncts as one row,
+   `FdTable.procGenAt` (`first_tok`, `∃ Q, gen_kq ∗ my_pay`, `½ p_xstate`,
+   `gen_halves_priv`); its transport `procGenAt_morph` is the walk: the
+   generation rows are ghost (constants), the xstate half a `wordPointsTo`
+   and `firstTok` at `⟨ξ, kpt⟩` is `FsReadyMorph.firstTok_morph`.
 -/
 import Xv6.FileMorph
 import Xv6.FsReadyMorph
@@ -49,7 +46,7 @@ set_option linter.unusedSectionVars false
 section
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [FileG GF]
   [IcacheG GF] [SleepLockG GF] [IcboxG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [OffboxG GF] [OffboxBoxG GF]
-  [Icfg]
+  [BcacheG GF] [DiskG GF] [LogG GF] [FsBlocksG GF] [IregG GF] [FsTopG GF] [FsLinkG GF] [Appcfg GF] [Fscfg] [Icfg]
 
 /-- `procFields` less `p->ofile` (Rocq `proc_fields`' cells, SchedCtx's
 `proc_fields_morph` minus the array row). -/
@@ -64,6 +61,17 @@ instance procPrivBareAt_morph (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv)
     CtxMorph (GF := GF) (fun ξ => procPrivBareAt ξ pa pid V M) := by
   unfold procPrivBareAt
   amb_morph_solve
+
+/-- The core's generation row (D8): `firstTok` at `⟨ξ, kpt⟩`
+(`FsReadyMorph.firstTok_morph`), the xstate half (a cell), the rest ghost. -/
+instance procGenAt_morph (pa : BitVec 64) (pid : BitVec 32) (g : GName) :
+    CtxMorph (GF := GF) (fun ξ => procGenAt ξ pa pid g) := by
+  unfold procGenAt
+  exact @instCtxMorphSep hlc GF _ _ _ firstTok_morph
+    (@instCtxMorphSep hlc GF _ _ _ (instCtxMorphConst _)
+      (@instCtxMorphSep hlc GF _ _ _
+        (@instCtxMorphExists hlc GF _ _ _ (fun _ => instCtxMorphWordAt _ _ _ _ _))
+        (instCtxMorphConst _)))
 
 /-- Rocq `ProcInv.proc_priv_core_morph`. -/
 instance procPrivCoreNoctxAt_morph (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv)

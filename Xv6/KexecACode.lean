@@ -128,7 +128,7 @@ theorem kxcA_hdr_bytes (data : Nat → List (BitVec 8)) (olds : List (BitVec 8))
 
 section Pid
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
-  [FileG GF] [IcacheG GF] [SleepLockG GF] [IcboxG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [OffboxG GF] [OffboxBoxG GF] [Icfg]
+  [FileG GF] [IcacheG GF] [SleepLockG GF] [IcboxG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [OffboxG GF] [OffboxBoxG GF] [BcacheG GF] [DiskG GF] [LogG GF] [FsBlocksG GF] [IregG GF] [FsTopG GF] [FsLinkG GF] [Appcfg GF] [Fscfg] [Icfg]
 
 /-! ## The block's pid cell and working directory (Rocq `proc_priv_bare_cref`) -/
 
@@ -146,10 +146,10 @@ theorem kxcA_priv_rows [X : CurCtx] (hct : X.curTier = KTier.kpt) (γ : FileName
   simp only at hct
   subst hct
   unfold procPrivFd procPrivCoreNoctxAt procPrivBareAt procFieldsNoOfile cwdRefAt
-  iintro ⟨⟨⟨%hf, Hpid, ⟨Hk, Hs, Hpg, Htf, Hcwd, Hnm⟩, Hpt, Htfp, %hlz⟩, Hc⟩, Hof⟩
+  iintro ⟨⟨⟨%hf, Hpid, ⟨Hk, Hs, Hpg, Htf, Hcwd, Hnm⟩, Hpt, Htfp, %hlz⟩, Hc, Hg⟩, Hof⟩
   iframe Hpid Hcwd Hc
   iintro Hpid Hcwd Hc
-  iframe Hpid Hk Hs Hpg Htf Hcwd Hnm Hpt Htfp Hc Hof
+  iframe Hpid Hk Hs Hpg Htf Hcwd Hnm Hpt Htfp Hc Hg Hof
   isplitl []
   · ipureintro; exact hf
   · ipureintro; exact hlz

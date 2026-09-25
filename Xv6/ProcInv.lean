@@ -43,9 +43,11 @@ payloads (P2).  This file is the layer above them.
    namex (wave-7 items C / 7b).  `FdTable.procPrivCoreNoctxAt` (A1/C0's file)
    now carries it (wave 7 P2): `procPrivCoreNoctxAt = procPrivBareAt ∗
    cwdRefAt V.cwd V.cwi`, and the block `procPrivFd` is that core beside `procOfiles`.
-2. **`proc_priv_core`'s D8 conjuncts are absent**: `first_tok`, `∃Q, gen_kq ∗
-   my_pay`, the `p->xstate` half and `gen_halves_priv` (the fork/exit
-   generation machinery; the record's `gen`/`chg` fields are reserved for it).
+2. **`proc_priv_core`'s D8 conjuncts live one layer up**: `first_tok`, `∃Q,
+   gen_kq ∗ my_pay`, the `p->xstate` half and `gen_halves_priv` are
+   `FdTable.procGenAt`, the third conjunct of `FdTable.procPrivCoreNoctxAt`
+   (D8 wiring; `firstTok` needs the file-system cameras, which this file
+   does not see).  `procPrivCwd` below stays the D8-free cwd seam.
 3. **No `upd_cwd`/`upd_cwi`/`us_cwi`**: the Lean updaters are record updates
    (`{ V with cwd := v', cwi := z' }`), and Rocq's `upd_*_id` identities are
    structure eta (`rfl`).

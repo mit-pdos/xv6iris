@@ -21,7 +21,10 @@ about the block's own trapframe record, `V.tf[tfArgIdx 0]? = some v`.
 WHAT IT SAYS ABOUT THE RESULT is kwait's verbatim, with `v` -- the
 syscall's argument 0 -- in place of kwait's `a0`: `-1` with nothing
 moved, or the reaped child's pid with the four-byte status word at `v`
-(nothing when `v = 0`).
+(nothing when `v = 0`), and kwait's D8 answer (`waitAns`: the escrow, the
+caller's children row moved by the reap), with the generation pieces
+(`kwaitGen`), the row (`chFrag`) and init's saved pid (`initPidIs 1`)
+forwarded.
 
 Imports only definitional files (never a `Code*` or `Proof*` file).
 -/
@@ -45,7 +48,7 @@ def sysWaitSlots : Nat := 4 + kwaitSlots
 def wp_sys_wait_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [CurCtx]
     (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
     (cpu : CPU) (k : KCtx) (γw γp γl : GName) (γk : KmemNames) (j : Nat) (pid : BitVec 32)
-    (V : ProcPriv) (M : Nat → List (BitVec 8)) (v : BitVec 64)
+    (V : ProcPriv) (M : Nat → List (BitVec 8)) (v : BitVec 64) (cs : ExtTreeSet GName compare)
     (hj : j < NPROC) (hproc : k.proc = procAddr j) (hv : V.tf[tfArgIdx 0]? = some v)
     (hK : sysWaitSlots ≤ k.avail)
     (hsie : k.sie = false) (hnoff : k.noff = 0) (hlocks : k.locks = [])
@@ -56,10 +59,13 @@ def wp_sys_wait_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G
   isLock γp pidLockAddr "nextpid" pidLockPay ∗
   isLock γl kmemLockAddr "kmem" (kmemRes γk) ∗ kallocAvail γk none ∗
   procPrivNoctxAt curCtx (procAddr j) pid V M ∗
+  kwaitGen (procAddr j) pid V.gen ∗ chFrag V.chg (procAddr j) cs ∗ initPidIs 1#32 ∗
   wpNext true k.proc cpu (fun cpu' => iprop(∀ (spie spp : Bool) (R' : RegMap) (P' : UPtd)
-    (rv xw : BitVec 32) (d : Nat),
+    (rv xw : BitVec 32) (d : Nat) (cs' : ExtTreeSet GName compare),
     ⌜calleeSaved k.regs R' ∧ R' 10#5 = BitVec.signExtend 64 rv ∧ V.upt.extSz V.sz P' ∧ d ≤ 4 ∧
       kwaitAns rv v d⌝ -∗
+    waitAns rv (xstateVal xw) cs cs' V.gen (decide (v = 0#64)) pid -∗
+    kwaitGen (procAddr j) pid V.gen -∗ chFrag V.chg (procAddr j) cs' -∗
     kctx cpu' ((k.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k.regs 1#5)) -∗
     trapCsrs cpu' -∗ cpuClaim cpu' k.proc -∗ intrRes cpu' -∗
     procPrivNoctxAt curCtx (procAddr j) pid { V with upt := P' }
@@ -74,7 +80,7 @@ so it mints nothing and every stretch outside kwait is level 0. -/
 def wp_sys_wait_eb_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [CurCtx]
     (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
     (cpu : CPU) (k : KCtx) (γw γp γl : GName) (γk : KmemNames) (j : Nat) (pid : BitVec 32)
-    (V : ProcPriv) (M : Nat → List (BitVec 8)) (v : BitVec 64)
+    (V : ProcPriv) (M : Nat → List (BitVec 8)) (v : BitVec 64) (cs : ExtTreeSet GName compare)
     (hj : j < NPROC) (hproc : k.proc = procAddr j) (hv : V.tf[tfArgIdx 0]? = some v)
     (hK : sysWaitSlots ≤ k.avail)
     (hnoff : k.noff = 0)
@@ -85,10 +91,13 @@ def wp_sys_wait_eb_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [X
   isLock γp pidLockAddr "nextpid" pidLockPay ∗
   isLock γl kmemLockAddr "kmem" (kmemRes γk) ∗ kallocAvail γk none ∗
   procPrivNoctxAt curCtx (procAddr j) pid V M ∗
+  kwaitGen (procAddr j) pid V.gen ∗ chFrag V.chg (procAddr j) cs ∗ initPidIs 1#32 ∗
   wpNext true k.proc cpu (fun cpu' => iprop(∀ (spie spp : Bool) (R' : RegMap) (P' : UPtd)
-    (rv xw : BitVec 32) (d : Nat),
+    (rv xw : BitVec 32) (d : Nat) (cs' : ExtTreeSet GName compare),
     ⌜calleeSaved k.regs R' ∧ R' 10#5 = BitVec.signExtend 64 rv ∧ V.upt.extSz V.sz P' ∧ d ≤ 4 ∧
       kwaitAns rv v d⌝ -∗
+    waitAns rv (xstateVal xw) cs cs' V.gen (decide (v = 0#64)) pid -∗
+    kwaitGen (procAddr j) pid V.gen -∗ chFrag V.chg (procAddr j) cs' -∗
     kctx cpu' ((k.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k.regs 1#5)) -∗
     trapCsrsExt cpu' k.sie -∗ cpuClaimExt cpu' k.sie k.proc -∗
     procPrivNoctxAt curCtx (procAddr j) pid { V with upt := P' }
@@ -101,8 +110,9 @@ structure SYSWAIT : Prop where
   wp_sys_wait_eb : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [CurCtx]
     (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
     (cpu : CPU) (k : KCtx) (γw γp γl : GName) (γk : KmemNames) (j : Nat) (pid : BitVec 32)
-    (V : ProcPriv) (M : Nat → List (BitVec 8)) (v : BitVec 64) hj hproc hv hK hnoff htier,
-    wp_sys_wait_eb_body (hlc := hlc) (GF := GF) Γ cpu k γw γp γl γk j pid V M v
+    (V : ProcPriv) (M : Nat → List (BitVec 8)) (v : BitVec 64) (cs : ExtTreeSet GName compare)
+    hj hproc hv hK hnoff htier,
+    wp_sys_wait_eb_body (hlc := hlc) (GF := GF) Γ cpu k γw γp γl γk j pid V M v cs
       hj hproc hv hK hnoff htier
 
 /-- The interrupts-off instance of `wp_sys_wait_eb` (the complement is the
@@ -110,20 +120,21 @@ whole bundle). -/
 theorem SYSWAIT.wp_sys_wait (A : SYSWAIT) {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF]
     [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [CurCtx] (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
     (cpu : CPU) (k : KCtx) (γw γp γl : GName) (γk : KmemNames) (j : Nat) (pid : BitVec 32)
-    (V : ProcPriv) (M : Nat → List (BitVec 8)) (v : BitVec 64) hj hproc hv hK hsie hnoff hlocks htier :
-    wp_sys_wait_body (hlc := hlc) (GF := GF) Γ cpu k γw γp γl γk j pid V M v
+    (V : ProcPriv) (M : Nat → List (BitVec 8)) (v : BitVec 64) (cs : ExtTreeSet GName compare)
+    hj hproc hv hK hsie hnoff hlocks htier :
+    wp_sys_wait_body (hlc := hlc) (GF := GF) Γ cpu k γw γp γl γk j pid V M v cs
       hj hproc hv hK hsie hnoff hlocks htier := by
-  have h := A.wp_sys_wait_eb (hlc := hlc) (GF := GF) Γ cpu k γw γp γl γk j pid V M v hj hproc hv hK
+  have h := A.wp_sys_wait_eb (hlc := hlc) (GF := GF) Γ cpu k γw γp γl γk j pid V M v cs hj hproc hv hK
     hnoff htier
   unfold wp_sys_wait_eb_body at h
   unfold wp_sys_wait_body
   rw [hsie] at h
   simp only [trapCsrsExt_false, cpuClaimExt_false] at h
-  iintro ⟨H0, H1, H2, Htc, Hcl, Hir, H6, H7, H8, H9, H10, Hnext⟩
+  iintro ⟨H0, H1, H2, Htc, Hcl, Hir, H6, H7, H8, H9, H10, H11, H12, H13, Hnext⟩
   iapply h
-  iframe H0 H1 H2 Htc Hcl Hir H6 H7 H8 H9 H10
+  iframe H0 H1 H2 Htc Hcl Hir H6 H7 H8 H9 H10 H11 H12 H13
   iapply wpNext_mono $$ Hnext
-  iintro %cpu' HK %spie %spp %R' %P' %rv %xw %d %p0 H1 H2 ⟨Htc, Hir⟩ Hcl H6
-  iapply HK $$ %spie %spp %R' %P' %rv %xw %d %p0 H1 H2 Htc Hcl Hir H6
+  iintro %cpu' HK %spie %spp %R' %P' %rv %xw %d %cs' %p0 Ha Hg Hc H1 H2 ⟨Htc, Hir⟩ Hcl H6
+  iapply HK $$ %spie %spp %R' %P' %rv %xw %d %cs' %p0 Ha Hg Hc H1 H2 Htc Hcl Hir H6
 
 end Xv6

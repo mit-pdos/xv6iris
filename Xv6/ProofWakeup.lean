@@ -140,7 +140,7 @@ theorem wk_lockRes_wake (Γ : SchedNames) (ξl : CtxId) (pa : BitVec 64) (kl xs 
     @wordPointsTo hlc GF _ ⟨ξl, KTier.kpt⟩ (pState pa) 4 (DFrac.own 1) RUNNABLE ∗
     pstateLock Γ pa SLEEPING ∗
     @wordPointsTo hlc GF _ ⟨ξl, KTier.kpt⟩ (pChan pa) 8 (DFrac.own 1) 0#64 ∗
-    @procPubRest hlc GF _ ⟨ξl, KTier.kpt⟩ pa kl xs pid ∗
+    @procPubRest hlc GF _ ⟨ξl, KTier.kpt⟩ _ _ pa kl xs pid ∗
     procSlotsAt Γ ξl pa SLEEPING ⊢ |==> procLockResAt Γ ξl pa := by
   iintro ⟨Hs, Hg, Hc, Hr, Hsl⟩
   -- the mirror: both halves are the lock's at SLEEPING

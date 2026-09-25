@@ -34,12 +34,12 @@ theorem killed_br_ffffffffffffea2a : KA.«killed» + 0xffffffffffffea2a#64 = KA.
 set_option maxHeartbeats 4000000 in
 /-- **`killed` meets its specification.** -/
 theorem killed_proof (AC : ACQUIRE) (RE : RELEASE) : KILLED :=
-  ⟨fun {hlc GF} _ _ _ _ _ _ _ X Γ cpu k j hj hp hnoff hK hlk htier => by
+  ⟨fun {hlc GF} _ _ _ _ _ _ _ X Γ cpu k j Rout hj hp hnoff hK hlk htier => by
   obtain ⟨ξ0, t0⟩ := X
   letI : CurCtx := ⟨ξ0, t0⟩
-  unfold wp_killed_body
+  unfold wp_killed_r_body
   simp only [killedAddr]
-  iintro ⟨Hk, Hpc, #Hpinv, HPhi⟩
+  iintro ⟨Hk, Hpc, #Hpinv, Hread, HPhi⟩
   icases kctx_tier cpu _ $$ Hk with ⟨%hct, Hk⟩
   have ht0 : t0 = KTier.kpt := hct.symm.trans htier
   subst ht0
@@ -81,7 +81,10 @@ theorem killed_proof (AC : ACQUIRE) (RE : RELEASE) : KILLED :=
   ihave HR := kl_pay_elim Γ ξ0 j $$ HR
   icases procLockRes_elim Γ ξ0 (procAddr j) $$ HR with
     ⟨%st, %ch, Hstate, Hpg, Hchan, ⟨%kl, %xs, %pid, Hrest⟩, Hslots⟩
-  icases kl_rest_elim ξ0 (procAddr j) kl xs pid $$ Hrest with ⟨Hkilled, Hxs, Hpid⟩
+  icases kl_rest_elim ξ0 (procAddr j) kl xs pid $$ Hrest with ⟨Hkilled, Hxs, Hpid, Hkp⟩
+  -- THE CALLER'S READING, inside the critical section (Rocq's `Rout`):
+  -- the pid quarter and the killed row go out and come back untouched
+  icases Hread $$ %pid %kl Hpid Hkp with ⟨Hpid, Hkp, Hout⟩
   have hsie : (k.pushOffAt spie spp).sie = false := rfl
   -- c.lw a5,40(s1): a5 := sext(p->killed)
   k_step (wp_s_lw c _ (KA.«killed» + 0x12#64) true 40#12 15#5 9#5 (by decide) (by decide)
@@ -100,7 +103,7 @@ theorem killed_proof (AC : ACQUIRE) (RE : RELEASE) : KILLED :=
   k_step (wp_s_jal c _ (KA.«killed» + 0x18#64) false 2091674#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [killed_br_ffffffffffffeab2]
   iintro Hk Hpc
-  ihave Hrest := kl_rest_intro ξ0 (procAddr j) kl xs pid $$ [Hkilled Hxs Hpid]
+  ihave Hrest := kl_rest_intro ξ0 (procAddr j) kl xs pid $$ [Hkilled Hxs Hpid Hkp]
   case' _ => simp only [pKilled, pXstate, pPid]; iframe
   ihave HR := procLockRes_intro Γ ξ0 (procAddr j) st ch kl xs pid
     $$ [Hstate Hpg Hchan Hrest Hslots]
@@ -152,7 +155,7 @@ theorem killed_proof (AC : ACQUIRE) (RE : RELEASE) : KILLED :=
   ihave HPhi := wpNext_shift _ _ _ _ _ hpin6 $$ HPhi
   iapply wpNext_mono _ _ _ _ _ $$ HPhi
   iintro %cF HPhi Hk Hpc
-  iapply HPhi $$ %spie %spp %_ %hsp1 Hk Hpc
+  iapply HPhi $$ %spie %spp %_ %kl %hsp1 Hk Hpc [] Hout
   ipureintro
   refine ⟨?_, ?_⟩
   · unfold calleeSaved
@@ -160,8 +163,7 @@ theorem killed_proof (AC : ACQUIRE) (RE : RELEASE) : KILLED :=
     exact ⟨trivial, trivial, trivial, trivial, e19.trans b19, e20.trans b20, e21.trans b21,
       e22.trans b22, e23.trans b23, e24.trans b24, e25.trans b25, e26.trans b26,
       e27.trans b27⟩
-  · simp only [RegMap.set_apply, BitVec.reduceEq, ite_true, ite_false]
-    exact ⟨kl, rfl⟩⟩
+  · simp only [RegMap.set_apply, BitVec.reduceEq, ite_true, ite_false]⟩
 
 
 end Xv6

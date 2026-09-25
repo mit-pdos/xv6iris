@@ -257,6 +257,80 @@ theorem procsAvail_seal (Γ : SchedNames) (n : Nat) :
   imodintro
   iexact Hinv
 
+
+/-! ## The boot-era token (Rocq `procs_avail_at` / `pav_boot` / `pav_spent`)
+
+The ledger also carries `pid_lock`'s BOOT-ERA TOKEN (`SlotGen.nextpidPend`)
+while it is counted and the first allocation has not run: that is what
+refutes the payload's two marks (`PidLock.pidLockResAt`) and pins init's
+pid to the literal 1.  Everywhere else -- the sealed regime, or the counted
+one after the first allocation -- it carries the shot and init's permanent
+registration (`npidDone`).  `procsAvail` above is Rocq's `pav_core`. -/
+
+/-- Rocq `npid_done`. -/
+def npidDone : IProp GF := iprop(nextpidShot ∗ initReg)
+
+instance npidDone_persistent : Persistent (npidDone (GF := GF)) := by
+  unfold npidDone; infer_instance
+
+/-- Rocq `procs_avail_at`: the ledger at its boot-era index `t`; at `none`
+the index is ignored, which keeps the sealed regime persistent. -/
+def procsAvailAt (Γ : SchedNames) (on : Option Nat) (t : Bool) : IProp GF :=
+  iprop(procsAvail Γ on ∗
+    match on with
+    | some _ => if t then nextpidPend else npidDone
+    | none => npidDone)
+
+instance procsAvailAt_none_persistent (Γ : SchedNames) (t : Bool) :
+    Persistent (procsAvailAt (GF := GF) Γ none t) := by
+  unfold procsAvailAt; rw [procsAvail_none]; infer_instance
+
+/-- Rocq `pav_boot`: at `none` the index says nothing. -/
+def pavBoot : Option Nat → Bool → Bool
+  | some _, t => t
+  | none, _ => false
+
+/-- Rocq `procs_avail_at_tok`: the core and the token, what allocproc's pid
+section takes. -/
+theorem procsAvailAt_tok (Γ : SchedNames) (on : Option Nat) (t : Bool) :
+    procsAvailAt (GF := GF) Γ on t ⊢
+      procsAvail Γ on ∗ (if pavBoot on t then nextpidPend else npidDone) := by
+  unfold procsAvailAt
+  cases on <;> exact .rfl
+
+/-- Rocq `pav_spent`: the ledger with its token SHOT (allocproc's store to
+`nextpid`). -/
+def pavSpent (Γ : SchedNames) (on : Option Nat) : IProp GF :=
+  iprop(procsAvail Γ on ∗ nextpidShot)
+
+/-- Rocq `pav_of_spent`. -/
+theorem pavOfSpent (Γ : SchedNames) (on : Option Nat) :
+    initReg (GF := GF) ∗ pavSpent Γ on ⊢ procsAvailAt Γ on false := by
+  unfold pavSpent procsAvailAt npidDone
+  cases on <;> simp only [Bool.false_eq_true, ite_false] <;>
+  · iintro ⟨#Hir, Hc, #Hs⟩
+    iframe Hc
+    isplitr
+    · iexact Hs
+    · iexact Hir
+
+/-- The sealed ledger at its (ignored) index. -/
+theorem procsAvailAt_none (Γ : SchedNames) (t : Bool) :
+    procsAvailAt (GF := GF) Γ none t ⊢ procsAvail Γ none ∗ npidDone := by
+  unfold procsAvailAt; exact .rfl
+
+/-- Rocq `procs_avail_seal_spent`: userinit's seal. -/
+theorem procsAvail_seal_spent (Γ : SchedNames) (n : Nat) :
+    initReg (GF := GF) ∗ pavSpent Γ (some n) ⊢ |={⊤}=> procsAvailAt Γ none false := by
+  unfold pavSpent procsAvailAt npidDone
+  iintro ⟨#Hir, Hc, #Hs⟩
+  imod procsAvail_seal Γ n $$ Hc with Hc
+  imodintro
+  iframe Hc
+  isplitr
+  · iexact Hs
+  · iexact Hir
+
 end
 
 end Xv6

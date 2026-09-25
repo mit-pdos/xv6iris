@@ -25,6 +25,7 @@ licence to reclaim the page (`pipeResDead`).
 import MachCSL.Lock
 import MachCSL.WpLock
 import Xv6.KallocDefs
+import MachCSL.KCtxMove
 
 namespace Xv6
 
@@ -309,6 +310,25 @@ def pipeSlack (pi : BitVec 64) : IProp GF := iprop%
 instance pipeSlack_timeless (pi : BitVec 64) : Timeless (pipeSlack (GF := GF) pi) := by
   unfold pipeSlack byteBuf; infer_instance
 
+/-- `pipeSlack` at an explicit context (the ambient tier): what the lock's
+payload carries, so that the payload is a transport family (Rocq's
+`pipe_slack` is `byte_any`, context-free; FileMorph deviation 1). -/
+abbrev pipeSlackAt (ξ : CtxId) (pi : BitVec 64) : IProp GF :=
+  @pipeSlack hlc GF _ ⟨ξ, curTier⟩ pi
+
+theorem pipeSlackAt_cur (pi : BitVec 64) : pipeSlackAt (GF := GF) curCtx pi = pipeSlack pi := rfl
+
+instance instCtxMorphPipeSlackAt (pi : BitVec 64) :
+    CtxMorph (GF := GF) (fun ξ => pipeSlackAt ξ pi) := by
+  unfold pipeSlackAt pipeSlack byteBuf
+  refine @instCtxMorphSep _ _ _ _ _ ?_ ?_
+  · refine @instCtxMorphExists _ _ _ _ _ (fun b1 => ?_)
+    refine @instCtxMorphSep _ _ _ _ _ (instCtxMorphConst _) ?_
+    exact ctxMorph_bigSepL b1 _ (fun _ _ => instCtxMorphWordAt _ _ _ _ _)
+  · refine @instCtxMorphExists _ _ _ _ _ (fun b2 => ?_)
+    refine @instCtxMorphSep _ _ _ _ _ (instCtxMorphConst _) ?_
+    exact ctxMorph_bigSepL b2 _ (fun _ _ => instCtxMorphWordAt _ _ _ _ _)
+
 /-- The resource `pi->lock` protects: every byte of the page except the lock's
 own two WORDS.  THE PAYLOAD OVER AN EXPLICIT CONTEXT -- what the lock surface
 takes as its `CtxId → IProp`.  The lock's NAME field is here, held raw. -/
@@ -323,7 +343,7 @@ def pipeResAt (γp : PipeNames) (pi : BitVec 64) (ξ : CtxId) : IProp GF := ipro
     pipeEndstate γp true wo ∗
     ⌜pipeCountOk nr nw⌝ ∗
     ⌜bs.length = PIPESIZE⌝ ∗ pipeDataAt ξ pi bs ∗
-    pipeSlack pi
+    pipeSlackAt ξ pi
 
 /-- The payload at the ambient context. -/
 def pipeRes (γp : PipeNames) (pi : BitVec 64) : IProp GF := pipeResAt γp pi curCtx

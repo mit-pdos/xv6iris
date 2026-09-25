@@ -275,12 +275,54 @@ theorem pidsOk_clear (pids : Nat → BitVec 32) (j : Nat) (h : pidsOk pids) :
 section
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
 
+/-- `pidReg_lookup`, keeping both sides. -/
+theorem fp_pidReg_lookup_keep (R : IntMapF GName) (pid : BitVec 32) (dq : DFrac) (g : GName) :
+    pidRegAuth (GF := GF) R ∗ pidReg pid dq g ⊢
+      (pidRegAuth R ∗ pidReg pid dq g) ∗ ⌜get? R (pid.toNat : Int) = some g⌝ :=
+  persistent_entails_left (pidReg_lookup R pid dq g)
+
+/-- **The registration dies** (Rocq `ProofFreeproc.v`, the `p->pid = 0`
+critical section): with `pid_lock`'s authority in hand, the 3/4 share of
+the registration looks the key up (so `pid ≠ 0`, `pidRegDom`), `p->lock`'s
+eighth comes out of the killed row (`killPaid_agree`; its free arm is
+refuted by `pid ≠ 0`; the live arm's payment publication is dropped), the
+registration is whole again (`pidReg_rest_whole`) and is DELETED
+(`pidReg_delete`). -/
+theorem fp_pidReg_die (R : IntMapF GName) (pids : Nat → BitVec 32) (hdom : pidRegDom R pids)
+    (Wk : IProp GF) (pid kl : BitVec 32) (g : GName) :
+    pidRegAuth (GF := GF) R ∗ killPaidAt Wk pid kl ∗ pidRegRest pid g ⊢
+      |==> pidRegAuth (PartialMap.delete R (pid.toNat : Int)) := by
+  unfold pidRegRest
+  iintro ⟨Hauth, Hkp, H34, H8⟩
+  icases fp_pidReg_lookup_keep R pid (.own Qp.threeQuarters) g $$ [Hauth H34]
+    with ⟨⟨Hauth, H34⟩, %hreg⟩
+  · iframe
+  have hpnz : pid.toNat ≠ 0 := by
+    have h := (hdom _ (by rw [hreg]; rfl)).1
+    omega
+  icases killPaid_agree Wk pid kl (.own Qp.threeQuarters) g $$ [Hkp H34]
+    with ⟨(⟨%hz, -⟩ | ⟨-, %Q, H8', -, -, -⟩), H34⟩
+  · iframe
+  · exact (hpnz hz).elim
+  ihave Hw : pidReg pid (.own 1) g $$ [H34 H8 H8']
+  case' _ =>
+    iapply (pidReg_rest_whole pid g).2
+    unfold pidRegRest
+    iframe
+  iapply pidReg_delete R pid g
+  iframe
+
 /-- **The quarter of `proc[j].pid` the payload holds**, with the frame that
-puts the cleared cell back. -/
-theorem fp_pidRes_acc [CurCtx] (j : Nat) (hj : j < NPROC) :
+puts the cleared cell back -- and, at the close, THE PID REGISTER'S STEP
+(`fp_pidReg_die`; `pidRegDom_delete` against the table with slot `j`
+cleared) and the payload's two boot-era marks (the store writes 0, not 1;
+the shot side is persistent). -/
+theorem fp_pidRes_acc [CurCtx] (j : Nat) (hj : j < NPROC) (Wk : IProp GF) (pid kl : BitVec 32)
+    (g : GName) :
     pidLockPay (GF := GF) curCtx ⊢
       ∃ pidj : BitVec 32, wordPointsTo (pPid (procAddr j)) 4 pidLockQ pidj ∗
-        (wordPointsTo (pPid (procAddr j)) 4 pidLockQ 0#32 -∗ pidLockPay curCtx) := by
+        (⌜pidj = pid⌝ -∗ wordPointsTo (pPid (procAddr j)) 4 pidLockQ 0#32 -∗
+          killPaidAt Wk pid kl -∗ pidRegRest pid g -∗ |==> pidLockPay curCtx) := by
   have hget : (List.range NPROC)[j]? = some j := by rw [List.getElem?_range hj]
   have hidx : ∀ {k y : Nat}, (List.range NPROC)[k]? = some y → y = k := by
     intro k y h
@@ -289,7 +331,7 @@ theorem fp_pidRes_acc [CurCtx] (j : Nat) (hj : j < NPROC) :
     exact he.symm
   unfold pidLockPay pidLockResAt
   simp only [wordAtN_cur]
-  iintro ⟨%np, %pids, %hpure, Hnp, Hlist⟩
+  iintro ⟨%np, %pids, %hpure, Hnp, Hlist, Hm1, %R, %hdom, Hauth, Hm2⟩
   have hrest : ([∗list] k ↦ y ∈ List.range NPROC, if k = j then iprop(emp) else
         wordPointsTo (GF := GF) (pPid (procAddr y)) 4 pidLockQ (pids y))
       = ([∗list] k ↦ y ∈ List.range NPROC, if k = j then iprop(emp) else
@@ -303,16 +345,37 @@ theorem fp_pidRes_acc [CurCtx] (j : Nat) (hj : j < NPROC) :
     with ⟨Hj, Hrest⟩
   iexists (pids j)
   iframe Hj
-  iintro H0
+  iintro %hpj H0 Hkp Hrr
+  imod fp_pidReg_die R pids hdom Wk pid kl g $$ [Hauth Hkp Hrr] with Hauth
+  · iframe
+  imodintro
   iexists np, (pidsClear pids j)
   isplitl []
   · ipureintro; exact ⟨hpure.1, hpure.2.1, pidsOk_clear pids j hpure.2.2⟩
   iframe Hnp
-  rw [hrest]
-  iapply (BigSepL.bigSepL_delete_cond (Φ := fun (_ : Nat) (y : Nat) =>
-      wordPointsTo (GF := GF) (pPid (procAddr y)) 4 pidLockQ (pidsClear pids j y)) hget).2
-  simp only [pidsClear_self]
-  iframe H0 Hrest
+  isplitl [H0 Hrest]
+  · rw [hrest]
+    iapply (BigSepL.bigSepL_delete_cond (Φ := fun (_ : Nat) (y : Nat) =>
+        wordPointsTo (GF := GF) (pPid (procAddr y)) 4 pidLockQ (pidsClear pids j y)) hget).2
+    simp only [pidsClear_self]
+    iframe H0 Hrest
+  iframe Hm1
+  iexists (PartialMap.delete R (pid.toNat : Int))
+  iframe Hauth
+  isplitl []
+  · ipureintro
+    have h := pidRegDom_delete R pids j 0#32 hdom
+    rw [hpj] at h
+    exact h
+  -- the boot era's second mark survives: the store writes 0, which is not 1
+  icases Hm2 with (%hall | #Hs)
+  · ileft
+    ipureintro
+    intro i hi
+    by_cases hij : i = j
+    · subst hij; simp only [pidsClear_self]; decide
+    · rw [pidsClear_ne pids j i hij]; exact hall i hi
+  · iright; iexact Hs
 
 end
 
@@ -341,6 +404,14 @@ def fpPub [CurCtx] (pa : BitVec 64) (st : BitVec 32) (ch : BitVec 64) (kl xs : B
   wordPointsTo (pKilled pa) 4 (DFrac.own 1) kl ∗
   wordPointsTo (pXstate pa) 4 (DFrac.own 1) xs
 
+/-- The generation ghosts `freeproc` carries to the `pid_lock` stretch (D8):
+`p->lock`'s killed row (at the pid its quarter reads), the rest of the
+registration (`freeprocGen`'s `pidRegRest`) and the slot generation, whole
+(which goes back into the UNUSED block). -/
+def fpGhost (pa : BitVec 64) (pidb kl pid : BitVec 32) (g : GName) : IProp GF := iprop%
+  killPaidAt (MachFixedGS.killCred (hlc := hlc) (GF := GF)) pidb kl ∗ pidRegRest pid g ∗
+  slotGen pa (.own 1) g
+
 end
 
 /-- A name buffer whose first byte is NUL is a C string. -/
@@ -356,43 +427,44 @@ variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [Fdslot
 
 /-- **The UNUSED block freeproc leaves**: the emptied cells, the kernel
 stack, and the two pure rows its caller brought. -/
-theorem fp_dormant_intro [CurCtx] (pa : BitVec 64) (V : ProcPriv) (nm : List (BitVec 8))
+theorem fp_dormant_intro [CurCtx] (pa : BitVec 64) (V : ProcPriv) (nm : List (BitVec 8)) (g : GName)
     (hof : V.ofile = List.replicate NOFILE 0#64) (hcwd : V.cwd = 0#64) (hnm : pnameWf nm) :
     wordPointsTo (GF := GF) (pPid pa) 4 pidPriv 0#32 ∗
     wordPointsTo (pSz pa) 8 (DFrac.own 1) 0#64 ∗
     wordPointsTo (pPagetable pa) 8 (DFrac.own 1) 0#64 ∗
     wordPointsTo (pTrapframe pa) 8 (DFrac.own 1) 0#64 ∗
-    fpKeep pa V nm ⊢ procDormant pa UNUSED := by
+    fpKeep pa V nm ∗ slotGen pa (.own 1) g ∗ wordPointsTo (pXstate pa) 4 xsHalf 0#32
+    ⊢ procDormant pa UNUSED := by
+  have hUZ : ¬ (UNUSED = ZOMBIE) := by decide
   unfold fpKeep procDormant procFields pnameCells dormantSpace
-  iintro ⟨Hpid, Hsz, Hpt, Htf, Hks, Hctx, Hof, Hcwd, Hnm, Hal, Hch, Hst⟩
+  iintro ⟨Hpid, Hsz, Hpt, Htf, ⟨Hks, Hctx, Hof, Hcwd, Hnm, Hal, Hch, Hst⟩, Hsg, Hxs⟩
   isplitl []
   · ipureintro; exact Or.inl rfl
   -- the zeroed block is at the lazy bit SET (Rocq freeproc's dormant block:
-  -- `proc_dormant`'s `pv_lazy V = true`, a ghost write -- no cell moves)
-  iexists ({ V with sz := 0#64, pagetable := 0#64, trapframe := 0#64, name := nm, pvLazy := true }), 0#32
+  -- `proc_dormant`'s `pv_lazy V = true`, a ghost write -- no cell moves),
+  -- and records the generation freeproc was handed (Rocq `pv_gen := g`)
+  iexists ({ V with sz := 0#64, pagetable := 0#64, trapframe := 0#64, name := nm, gen := g, pvLazy := true }), 0#32
   rw [if_pos (rfl : UNUSED = UNUSED)]
+  unfold genHalvesDorm
+  rw [if_neg hUZ]
   isplitl []
   · ipureintro
     refine ⟨hof, hcwd, ?_, rfl⟩
     simp only [uvmMaxsz]
     decide
-  iframe Hpid Hks Hsz Hpt Htf Hctx Hof Hcwd Hal Hch Hst
+  iframe Hpid Hks Hsz Hpt Htf Hctx Hof Hcwd Hal Hch Hst Hsg
   isplitl [Hnm]
   · isplitl []
     · ipureintro; exact hnm
     · iexact Hnm
+  isplitl []
+  · ipureintro; rfl
+  isplitl [Hxs]
+  · iexists 0#32
+    rw [if_neg hUZ]
+    iframe Hxs
   · ipureintro; exact ⟨rfl, rfl, rfl, rfl⟩
 
-/-- `pid_lock`'s payload transports between contexts, so `acquire` and
-`release` apply to it. -/
-instance fp_instCtxMorphPidLockPay [CurCtx] : CtxMorph (GF := GF) pidLockPay := by
-  unfold pidLockPay pidLockResAt
-  exact @instCtxMorphExists hlc GF _ _ _ (fun _ => @instCtxMorphExists hlc GF _ _ _ (fun pids =>
-    @instCtxMorphSep hlc GF _ _ _ (instCtxMorphConst _)
-      (@instCtxMorphSep hlc GF _ _ _ (instCtxMorphWordAtN _ _ _ _)
-        (ctxMorph_bigSepL (List.range NPROC)
-          (fun _ y ξ => wordAtN ξ (pPid (procAddr y)) 4 pidLockQ (pids y))
-          (fun _ _ => instCtxMorphWordAtN _ _ _ _)))))
 
 /-! ## Registers -/
 
@@ -431,7 +503,7 @@ set_option maxHeartbeats 4000000 in
 theorem fp_tail [X : CurCtx]
     (Γ : SchedNames) (cpu : CPU) (k : KCtx) (j : Nat) (hj : j < NPROC)
     (st : BitVec 32) (ch : BitVec 64) (kl xs : BitVec 32)
-    (V : ProcPriv) (nm : List (BitVec 8))
+    (V : ProcPriv) (nm : List (BitVec 8)) (g : GName)
     (hof : V.ofile = List.replicate NOFILE 0#64) (hcwd : V.cwd = 0#64)
     (hnm : nm.length = PNAMELEN)
     (hsie : k.sie = false) (hK : freeprocSlots ≤ k.avail) (htier : k.tier = KTier.kpt)
@@ -445,7 +517,7 @@ theorem fp_tail [X : CurCtx]
     wordPointsTo (pSz (procAddr j)) 8 (DFrac.own 1) 0#64 ∗
     wordPointsTo (pPagetable (procAddr j)) 8 (DFrac.own 1) 0#64 ∗
     wordPointsTo (pTrapframe (procAddr j)) 8 (DFrac.own 1) 0#64 ∗
-    fpKeep (procAddr j) V nm ∗ fpCont Γ cpu k j
+    fpKeep (procAddr j) V nm ∗ slotGen (procAddr j) (.own 1) g ∗ fpCont Γ cpu k j
     ⊢ wpLoop (GF := GF) cpu := by
   obtain ⟨ξ0, t0⟩ := X
   letI : CurCtx := ⟨ξ0, t0⟩
@@ -454,7 +526,7 @@ theorem fp_tail [X : CurCtx]
     | b :: l, _ => exact ⟨b, l, rfl⟩
   unfold fpKeep fpPub fpCont
   iintro ⟨Hk, Hpc, Hframe, Hlocked, Hpg, ⟨Hstate, Hchan, Hkilled, Hxstate⟩,
-    Hpub, Hpriv, Hsz, Hpt, Htf, ⟨Hks, Hctx, Hof, Hcwd, Hname, Hal, Hch, Hstack⟩, HPhi⟩
+    Hpub, Hpriv, Hsz, Hpt, Htf, ⟨Hks, Hctx, Hof, Hcwd, Hname, Hal, Hch, Hstack⟩, Hsg, HPhi⟩
   icases kctx_tier cpu _ $$ Hk with ⟨%hct, Hk⟩
   have ht0 : t0 = KTier.kpt := by
     have h := hct.symm
@@ -494,15 +566,21 @@ theorem fp_tail [X : CurCtx]
   iapply wpLoop_bupd
   imod pstateWhole_update Γ (procAddr j) st UNUSED $$ Hpg with Hpg
   imodintro
-  ihave Hheld : procHeld Γ cpu j UNUSED 0#64 $$ [Hlocked Hpg Hstate Hchan Hkilled Hxstate Hpub]
+  -- the xstate cell back in its two halves: `p->lock`'s and the UNUSED block's
+  icases fp_word4_split' (procAddr j + 44#64) (Qp.half 1) (Qp.half 1) 1 (Qp.half_add_half 1)
+    0#32 $$ Hxstate with ⟨Hxs1, Hxs2⟩
+  ihave Hheld : procHeld Γ cpu j UNUSED 0#64 $$ [Hlocked Hpg Hstate Hchan Hkilled Hxs1 Hpub]
   case' _ =>
     iapply procHeldAt_intro Γ curCtx cpu j UNUSED 0#64 0#32 0#32 0#32
-    unfold procPubRest pState pChan pKilled pXstate pPid UNUSED
+    unfold procPubRest pState pChan pKilled pXstate pPid UNUSED xsHalf
     iframe
-  ihave Hdorm := fp_dormant_intro (procAddr j) V (0#8 :: nm') hof hcwd
+    -- `p->killed = 0` and `p->pid = 0`: the killed row is re-founded at its
+    -- free arm (Rocq `kill_paid_zero`)
+    iapply (killPaid_zero _ _ _ rfl rfl)
+  ihave Hdorm := fp_dormant_intro (procAddr j) V (0#8 :: nm') g hof hcwd
       (fp_pnameWf_zero (b0 :: nm') hnm)
-    $$ [Hpriv Hsz Hpt Htf Hks Hctx Hof Hcwd Hname Hal Hch Hstack]
-  case' _ => unfold fpKeep pName; iframe
+    $$ [Hpriv Hsz Hpt Htf Hks Hctx Hof Hcwd Hname Hal Hch Hstack Hsg Hxs2]
+  case' _ => unfold fpKeep pName pXstate xsHalf; iframe
   -- the epilogue
   obtain ⟨hR2, hR8, h18, h19, h20, h21, h22, h23, h24, h25, h26, h27⟩ := hkept
   iapply (wp_epilogue4s1 cpu k hsie (KA.«freeproc» + 0x5a#64) hK4 R hR2 (k.regs 1#5) (k.regs 8#5) (k.regs 9#5))
@@ -608,7 +686,7 @@ theorem freeproc_br_10906 : KA.«freeproc» + 0x10906#64 = KA.«pid_lock» := by
 theorem fp_pid (AC : ACQUIRE) (RE : RELEASE) [X : CurCtx]
     (Γ : SchedNames) (cpu : CPU) (k : KCtx) (γp : GName) (j : Nat) (hj : j < NPROC)
     (st : BitVec 32) (ch : BitVec 64) (kl xs pid pidb : BitVec 32)
-    (V : ProcPriv) (nm : List (BitVec 8))
+    (V : ProcPriv) (nm : List (BitVec 8)) (g : GName)
     (hof : V.ofile = List.replicate NOFILE 0#64) (hcwd : V.cwd = 0#64)
     (hnm : nm.length = PNAMELEN)
     (hwf : k.wf) (hsie : k.sie = false) (hnoff : k.noff + 1 < 2 ^ 31)
@@ -624,10 +702,10 @@ theorem fp_pid (AC : ACQUIRE) (RE : RELEASE) [X : CurCtx]
     wordPointsTo (pSz (procAddr j)) 8 (DFrac.own 1) 0#64 ∗
     wordPointsTo (pPagetable (procAddr j)) 8 (DFrac.own 1) 0#64 ∗
     wordPointsTo (pTrapframe (procAddr j)) 8 (DFrac.own 1) 0#64 ∗
-    fpKeep (procAddr j) V nm ∗ fpCont Γ cpu k j
+    fpKeep (procAddr j) V nm ∗ fpGhost (procAddr j) pidb kl pid g ∗ fpCont Γ cpu k j
     ⊢ wpLoop (GF := GF) cpu := by
   simp only [pidLockAddr]
-  iintro ⟨Hk, Hpc, Hframe, #Hlk, Hlocked, Hpg, Hpub, Hpub4, Hpriv, Hsz, Hpt, Htf, Hkeep, HPhi⟩
+  iintro ⟨Hk, Hpc, Hframe, #Hlk, Hlocked, Hpg, Hpub, Hpub4, Hpriv, Hsz, Hpt, Htf, Hkeep, Hgh, HPhi⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
   have hK4 : 4 ≤ k.avail := by unfold freeprocSlots at hK; omega
   -- auipc a0,0x11 ; addi a0,a0,-1822
@@ -662,16 +740,25 @@ theorem fp_pid (AC : ACQUIRE) (RE : RELEASE) [X : CurCtx]
   have hkept1 : fpKept k.regs R1 := fpKept_step hkept hcs1
   have hR19 : R1 9#5 = procAddr j := hcs1.2.2.1.trans hR9
   -- the payload's quarter of p->pid, joined with the other two
-  icases fp_pidRes_acc j hj $$ HR with ⟨%pidq, Hq, Hqclose⟩
+  unfold fpGhost
+  icases Hgh with ⟨Hkp, Hrr, Hsg⟩
+  icases fp_pidRes_acc j hj (MachFixedGS.killCred (hlc := hlc) (GF := GF)) pid kl g $$ HR
+    with ⟨%pidq, Hq, Hqclose⟩
   icases fp_pid_join (pPid (procAddr j)) pid pidb pidq $$ [Hpriv Hpub4 Hq] with ⟨%hag, Hcell⟩
   · iframe
+  obtain ⟨hb, hq⟩ := hag
+  subst pidb
   -- sw zero,48(s1)
   k_step (wp_s_sw cpu _ (KA.«freeproc» + 0x36#64) false 48#12 9#5 0#5 (by decide) pid)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
     with [hR19, KCtx.rget_zero, fp_addr_pid]
   iintro Hk Hpc Hcell
   icases fp_pid_split (pPid (procAddr j)) 0#32 $$ Hcell with ⟨Hpriv, Hpub4, Hq⟩
-  ihave HR := Hqclose $$ Hq
+  -- the registration dies here (Rocq: lookup, `kill_paid_agree`, rejoin,
+  -- `pid_reg_delete`, `pid_reg_dom_delete`, the boot-era marks)
+  iapply wpLoop_bupd
+  imod Hqclose $$ %hq Hq Hkp Hrr with HR
+  imodintro
   -- auipc a0,0x11 ; addi a0,a0,-1838 ; jal release
   k_step (wp_s_auipc cpu _ (KA.«freeproc» + 0x3a#64) false 17#20 10#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
@@ -700,7 +787,7 @@ theorem fp_pid (AC : ACQUIRE) (RE : RELEASE) [X : CurCtx]
   k_norm [fp_filter_nextpid k.locks hlp, hpe, hK4, hret2]
   have hkept2 : fpKept k.regs R2 := fpKept_step hkept1 hcs2
   have hR29 : R2 9#5 = procAddr j := hcs2.2.2.1.trans hR19
-  iapply (fp_tail Γ cpu k j hj st ch kl xs V nm hof hcwd hnm hsie hK htier R2 hR29 hkept2)
+  iapply (fp_tail Γ cpu k j hj st ch kl xs V nm g hof hcwd hnm hsie hK htier R2 hR29 hkept2)
   iframe
 
 /-! ## The entry: prologue, `kfree`, `proc_freepagetable` -/
@@ -782,7 +869,7 @@ stretch.  `ptv`/`szv` are the values the two cells still hold. -/
 theorem fp_after_pt (AC : ACQUIRE) (RE : RELEASE) [X : CurCtx]
     (Γ : SchedNames) (cpu : CPU) (k : KCtx) (γp : GName) (j : Nat) (hj : j < NPROC)
     (st : BitVec 32) (ch : BitVec 64) (kl xs pid pidb : BitVec 32) (ptv szv : BitVec 64)
-    (V : ProcPriv) (nm : List (BitVec 8))
+    (V : ProcPriv) (nm : List (BitVec 8)) (g : GName)
     (hof : V.ofile = List.replicate NOFILE 0#64) (hcwd : V.cwd = 0#64)
     (hnm : nm.length = PNAMELEN)
     (hwf : k.wf) (hsie : k.sie = false) (hnoff : k.noff + 1 < 2 ^ 31)
@@ -798,9 +885,9 @@ theorem fp_after_pt (AC : ACQUIRE) (RE : RELEASE) [X : CurCtx]
     wordPointsTo (pSz (procAddr j)) 8 (DFrac.own 1) szv ∗
     wordPointsTo (pPagetable (procAddr j)) 8 (DFrac.own 1) ptv ∗
     wordPointsTo (pTrapframe (procAddr j)) 8 (DFrac.own 1) 0#64 ∗
-    fpKeep (procAddr j) V nm ∗ fpCont Γ cpu k j
+    fpKeep (procAddr j) V nm ∗ fpGhost (procAddr j) pidb kl pid g ∗ fpCont Γ cpu k j
     ⊢ wpLoop (GF := GF) cpu := by
-  iintro ⟨Hk, Hpc, Hframe, #Hlk, Hlocked, Hpg, Hpub, Hpub4, Hpriv, Hsz, Hpt, Htf, Hkeep, HPhi⟩
+  iintro ⟨Hk, Hpc, Hframe, #Hlk, Hlocked, Hpg, Hpub, Hpub4, Hpriv, Hsz, Hpt, Htf, Hkeep, Hgh, HPhi⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
   -- sd zero,80(s1) : p->pagetable = 0
   k_step (wp_s_sd cpu _ (KA.«freeproc» + 0x22#64) false 80#12 9#5 0#5 (by decide) ptv)
@@ -812,9 +899,9 @@ theorem fp_after_pt (AC : ACQUIRE) (RE : RELEASE) [X : CurCtx]
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
     with [hR9, KCtx.rget_zero, fp_addr_sz]
   iintro Hk Hpc Hsz
-  iapply (fp_pid AC RE Γ cpu k γp j hj st ch kl xs pid pidb V nm hof hcwd hnm hwf hsie
+  iapply (fp_pid AC RE Γ cpu k γp j hj st ch kl xs pid pidb V nm g hof hcwd hnm hwf hsie
     hnoff hK hlp htier R hR9 hkept)
-  iframe Hk Hpc Hframe Hlk Hlocked Hpg Hpub Hpub4 Hpriv Hsz Hpt Htf Hkeep HPhi
+  iframe Hk Hpc Hframe Hlk Hlocked Hpg Hpub Hpub4 Hpriv Hsz Hpt Htf Hkeep Hgh HPhi
 
 set_option maxHeartbeats 4000000 in
 /-- From `0x80001b3e`: `p->trapframe = 0`, then `if (p->pagetable)
@@ -826,7 +913,7 @@ theorem fp_after_tf (KF : KFREE) (PFP : PROC_FREEPAGETABLE) (AC : ACQUIRE) (RE :
     [X : CurCtx]
     (Γ : SchedNames) (cpu : CPU) (k : KCtx) (γl γp : GName) (γk : KmemNames) (j : Nat)
     (hj : j < NPROC) (st : BitVec 32) (ch : BitVec 64) (kl xs pid pidb : BitVec 32) (tfv : BitVec 64)
-    (V : ProcPriv) (M : Nat → List (BitVec 8)) (nm : List (BitVec 8))
+    (V : ProcPriv) (M : Nat → List (BitVec 8)) (nm : List (BitVec 8)) (g : GName)
     (hof : V.ofile = List.replicate NOFILE 0#64) (hcwd : V.cwd = 0#64)
     (hnm : nm.length = PNAMELEN)
     (hwf : k.wf) (hsie : k.sie = false) (hnoff : k.noff + 1 < 2 ^ 31)
@@ -847,10 +934,10 @@ theorem fp_after_tf (KF : KFREE) (PFP : PROC_FREEPAGETABLE) (AC : ACQUIRE) (RE :
     (if V.pagetable = 0#64 then emp else
       ⌜V.pagetable = pageAddr V.upt.root ∧ V.sz.toNat ≤ uvmMaxsz ∧ umBelow V.sz V.upt⌝ ∗
         procPtAt V.upt M) ∗
-    fpKeep (procAddr j) V nm ∗ fpCont Γ cpu k j
+    fpKeep (procAddr j) V nm ∗ fpGhost (procAddr j) pidb kl pid g ∗ fpCont Γ cpu k j
     ⊢ wpLoop (GF := GF) cpu := by
   iintro ⟨Hk, Hpc, Hframe, #Hlkk, Hav, #Hlkp, Hlocked, Hpg, Hpub, Hpub4, Hpriv, Hsz, Hpt, Htf,
-    Hptarm, Hkeep, HPhi⟩
+    Hptarm, Hkeep, Hgh, HPhi⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
   have hK4 : 4 ≤ k.avail := by unfold freeprocSlots at hK; omega
   -- sd zero,88(s1) : p->trapframe = 0
@@ -870,7 +957,7 @@ theorem fp_after_tf (KF : KFREE) (PFP : PROC_FREEPAGETABLE) (AC : ACQUIRE) (RE :
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
       with [fp_beq_taken V.pagetable hpt0]
     iintro Hk Hpc
-    iapply (fp_after_pt AC RE Γ cpu k γp j hj st ch kl xs pid pidb V.pagetable V.sz V nm hof hcwd
+    iapply (fp_after_pt AC RE Γ cpu k γp j hj st ch kl xs pid pidb V.pagetable V.sz V nm g hof hcwd
       hnm hwf hsie hnoff hK hlp htier (R.set 10#5 V.pagetable)
       (by simp only [RegMap.set_apply, BitVec.reduceEq, ite_false]; exact hR9)
       (by
@@ -878,7 +965,7 @@ theorem fp_after_tf (KF : KFREE) (PFP : PROC_FREEPAGETABLE) (AC : ACQUIRE) (RE :
         refine ⟨?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_⟩ <;>
           simp only [RegMap.set_apply, BitVec.reduceEq, ite_false] <;>
           assumption))
-    iframe Hk Hpc Hframe Hlkp Hlocked Hpg Hpub Hpub4 Hpriv Hsz Hpt Htf Hkeep HPhi
+    iframe Hk Hpc Hframe Hlkp Hlocked Hpg Hpub Hpub4 Hpriv Hsz Hpt Htf Hkeep Hgh HPhi
   · -- not taken: proc_freepagetable(p->pagetable, p->sz)
     k_step (wp_s_branch cpu _ (KA.«freeproc» + 0x1a#64) true 8#13 10#5 0#5 (by decide) bop.BEQ)
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
@@ -915,7 +1002,7 @@ theorem fp_after_tf (KF : KFREE) (PFP : PROC_FREEPAGETABLE) (AC : ACQUIRE) (RE :
       KCtx.withSpie_self' (k.pushed 4) k.spie k.spp rfl rfl
     have hret : jumpPc (KA.«freeproc» + 0x22#64) = (KA.«freeproc» + 0x22#64) := fp_ret_a9e
     k_norm [hself, hret]
-    iapply (fp_after_pt AC RE Γ cpu k γp j hj st ch kl xs pid pidb V.pagetable V.sz V nm hof hcwd
+    iapply (fp_after_pt AC RE Γ cpu k γp j hj st ch kl xs pid pidb V.pagetable V.sz V nm g hof hcwd
       hnm hwf hsie hnoff hK hlp htier R'
       (by
         have h := hcs.2.2.1
@@ -927,7 +1014,7 @@ theorem fp_after_tf (KF : KFREE) (PFP : PROC_FREEPAGETABLE) (AC : ACQUIRE) (RE :
         refine ⟨?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_⟩ <;>
           simp only [RegMap.set_apply, BitVec.reduceEq, ite_false] <;>
           assumption))
-    iframe Hk Hpc Hframe Hlkp Hlocked Hpg Hpub Hpub4 Hpriv Hsz Hpt Htf Hkeep HPhi
+    iframe Hk Hpc Hframe Hlkp Hlocked Hpg Hpub Hpub4 Hpriv Hsz Hpt Htf Hkeep Hgh HPhi
 
 end
 
@@ -939,13 +1026,13 @@ theorem freeproc_br_ffffffffffffef6c : KA.«freeproc» + 0xffffffffffffef6c#64 =
 
 theorem freeproc_proof (KF : KFREE) (PFP : PROC_FREEPAGETABLE) (AC : ACQUIRE) (RE : RELEASE) :
     FREEPROC :=
-  ⟨fun {hlc GF} _ _ _ _ _ _ _ X Γ cpu k γl γp γk j st ch pid V M hj hp hst hnoff hK hsie hlk hlp htier => by
+  ⟨fun {hlc GF} _ _ _ _ _ _ _ X Γ cpu k γl γp γk j st ch pid V M g hj hp hst hnoff hK hsie hlk hlp htier => by
     unfold wp_freeproc_body
     simp only [freeprocAddr]
-    unfold freeprocIn procFields pnameCells
+    unfold freeprocIn freeprocGen procFields pnameCells
     iintro ⟨Hk, Hpc, #Hlkk, Hav, #Hlkp, Hheld,
       ⟨%hpure, Hpriv, ⟨Hks, Hsz, Hpt, Htf, Hctx, Hof, Hcwd, %hpnwf, Hnamebuf⟩, Hal, Hch, Hstack, Htfarm,
-        Hptarm⟩, HPhi0⟩
+        Hptarm⟩, ⟨Hsg, Hrr, %xsv, Hxsb⟩, HPhi0⟩
     obtain ⟨hof, hcwd⟩ := hpure
     have hnm : V.name.length = PNAMELEN := hpnwf.1
     icases kctx_wf _ _ $$ Hk with ⟨%hwf, Hk⟩
@@ -962,9 +1049,18 @@ theorem freeproc_proof (KF : KFREE) (PFP : PROC_FREEPAGETABLE) (AC : ACQUIRE) (R
       ⟨Hlocked, Hpg, %kl, %xs, %pidb, Hstate, Hchan, Hpr⟩
     icases (show procPubRest (GF := GF) (procAddr j) kl xs pidb ⊢
         wordPointsTo (pKilled (procAddr j)) 4 (DFrac.own 1) kl ∗
-          wordPointsTo (pXstate (procAddr j)) 4 (DFrac.own 1) xs ∗
-            wordPointsTo (pPid (procAddr j)) 4 pidPub pidb
-        from by unfold procPubRest; iintro H; iexact H) $$ Hpr with ⟨Hkilled, Hxstate, Hpub4⟩
+          wordPointsTo (pXstate (procAddr j)) 4 (DFrac.own (Qp.half 1)) xs ∗
+            wordPointsTo (pPid (procAddr j)) 4 pidPub pidb ∗
+              killPaidAt (MachFixedGS.killCred (hlc := hlc) (GF := GF)) pidb kl
+        from by unfold procPubRest xsHalf; iintro H; iexact H) $$ Hpr
+      with ⟨Hkilled, Hxstate, Hpub4, Hkp⟩
+    -- THE xstate CELL, JOINED (Rocq, at the top): `p->lock`'s half and the
+    -- slot's half out of `freeprocGen`; re-split at the `p->xstate = 0` store
+    icases fp_word4_join' (pXstate (procAddr j)) (Qp.half 1) (Qp.half 1) 1 (Qp.half_add_half 1)
+      xs xsv $$ [Hxstate Hxsb] with ⟨-, Hxstate⟩
+    · unfold xsHalf; iframe
+    ihave Hgh : fpGhost (procAddr j) pidb kl pid g $$ [Hkp Hrr Hsg]
+    case' _ => unfold fpGhost; iframe
     ihave Hpub : fpPub (procAddr j) st ch kl xs $$ [Hstate Hchan Hkilled Hxstate]
     case' _ => unfold fpPub; iframe
     ihave Hkeep : fpKeep (procAddr j) V V.name $$ [Hks Hctx Hof Hcwd Hnamebuf Hal Hch Hstack]
@@ -996,14 +1092,14 @@ theorem freeproc_proof (KF : KFREE) (PFP : PROC_FREEPAGETABLE) (AC : ACQUIRE) (R
       iintro Hk Hpc
       iclear Htfarm
       iapply (fp_after_tf KF PFP AC RE Γ cpu k γl γp γk j hj st ch kl xs pid pidb V.trapframe V M
-        V.name hof hcwd hnm hwf hsie hnoff hK hlk hlp htier
+        V.name g hof hcwd hnm hwf hsie hnoff hK hlk hlp htier
         ((((k.regs.set 2#5 (k.regs 2#5 + 0xFFFFFFFFFFFFFFE0#64)).set 8#5 (k.regs 2#5)).set 9#5
             (procAddr j)).set 10#5 V.trapframe)
         (by simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true])
         (by
           refine ⟨?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_⟩ <;>
             simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true]))
-      iframe Hk Hpc Hframe Hlkk Hav Hlkp Hlocked Hpg Hpub Hpub4 Hpriv Hsz Hpt Htf Hptarm Hkeep
+      iframe Hk Hpc Hframe Hlkk Hav Hlkp Hlocked Hpg Hpub Hpub4 Hpriv Hsz Hpt Htf Hptarm Hkeep Hgh
       unfold fpCont
       k_norm
       iexact HPhi
@@ -1041,7 +1137,7 @@ theorem freeproc_proof (KF : KFREE) (PFP : PROC_FREEPAGETABLE) (AC : ACQUIRE) (R
       have hret : jumpPc (KA.«freeproc» + 0x14#64) = (KA.«freeproc» + 0x14#64) := fp_ret_a90
       k_norm [hself, hret]
       iapply (fp_after_tf KF PFP AC RE Γ cpu k γl γp γk j hj st ch kl xs pid pidb V.trapframe V M
-        V.name hof hcwd hnm hwf hsie hnoff hK hlk hlp htier R'
+        V.name g hof hcwd hnm hwf hsie hnoff hK hlk hlp htier R'
         (by
           have h := hcs.2.2.1
           simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true] at h
@@ -1050,7 +1146,7 @@ theorem freeproc_proof (KF : KFREE) (PFP : PROC_FREEPAGETABLE) (AC : ACQUIRE) (R
           refine fpKept_step ?_ hcs
           refine ⟨?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_⟩ <;>
             simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true]))
-      iframe Hk Hpc Hframe Hlkk Hav Hlkp Hlocked Hpg Hpub Hpub4 Hpriv Hsz Hpt Htf Hptarm Hkeep
+      iframe Hk Hpc Hframe Hlkk Hav Hlkp Hlocked Hpg Hpub Hpub4 Hpriv Hsz Hpt Htf Hptarm Hkeep Hgh
       unfold fpCont
       k_norm
       iexact HPhi⟩

@@ -212,7 +212,7 @@ tier is pinned (`kctx_tier` gives `curTier = KTier.kpt` under `htier`). -/
 
 section Bridge
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
-  [FileG GF] [IcacheG GF] [SleepLockG GF] [IcboxG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [OffboxG GF] [OffboxBoxG GF] [Icfg]
+  [FileG GF] [IcacheG GF] [SleepLockG GF] [IcboxG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [OffboxG GF] [OffboxBoxG GF] [BcacheG GF] [DiskG GF] [LogG GF] [FsBlocksG GF] [IregG GF] [FsTopG GF] [FsLinkG GF] [Appcfg GF] [Fscfg] [Icfg]
 
 /-- **The block's core as namex's three rows**, at the ambient context
 (tier pinned): the pid cell at `pidPriv`, the `p->cwd` cell whole, the
@@ -230,10 +230,10 @@ theorem namexEra_core_rows [X : CurCtx] (hct : X.curTier = KTier.kpt) (pa : BitV
   simp only at hct
   subst hct
   unfold procPrivCoreNoctxAt procPrivBareAt procFieldsNoOfile cwdRefAt
-  iintro ⟨⟨%h, Hpid, ⟨Hk, Hs, Hpg, Htf, Hcwd, Hnm⟩, Hpt, Htfp, %hlz⟩, Hc⟩
+  iintro ⟨⟨%h, Hpid, ⟨Hk, Hs, Hpg, Htf, Hcwd, Hnm⟩, Hpt, Htfp, %hlz⟩, Hc, Hg⟩
   iframe Hpid Hcwd Hc
   iintro Hpid Hcwd Hc
-  iframe Hpid Hk Hs Hpg Htf Hcwd Hnm Hpt Htfp Hc
+  iframe Hpid Hk Hs Hpg Htf Hcwd Hnm Hpt Htfp Hc Hg
   isplitl []
   · ipureintro; exact h
   · ipureintro; exact hlz

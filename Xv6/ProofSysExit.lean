@@ -76,24 +76,27 @@ theorem sysx_argint (AI : ARGINT) (c : CPU) (k' : KCtx) (tfp : BitVec 44) (ws : 
 theorem sysx_kexit (KX : KEXIT) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
     (c : CPU) (k' : KCtx) (γw γl : GName) (γ : FileNames) (γkl : GName) (γk : KmemNames)
     (on : Option Nat) (j : Nat) (pid : BitVec 32) (V : ProcPriv)
-    (M : Nat → List (BitVec 8)) (ip : BitVec 64) (sp : BitVec 64) (n : Nat) (s : Bool)
+    (M : Nat → List (BitVec 8)) (ip : BitVec 64) (cs : ExtTreeSet GName compare) (Q : Int → IProp GF)
+    (sp : BitVec 64) (n : Nat) (s : Bool) (st : Int)
     (hj : j < NPROC) (hproc : k'.proc = procAddr j) (hK : kexitSlots ≤ k'.avail)
     (hs : k'.sie = s) (hnoff : k'.noff = 0)
     (htier : k'.tier = KTier.kpt) (hinit : procAddr j ≠ ip)
-    (hsp : k'.regs 2#5 = sp) (hav : trapRes k'.sie + k'.avail = n) :
+    (hsp : k'.regs 2#5 = sp) (hav : trapRes k'.sie + k'.avail = n) (hst : xstateOf (k'.regs 10#5) = st) :
     kctx c k' ∗ pcIs c KA.«kexit» ∗ procsInv Γ ∗
     trapCsrsExt c s ∗ cpuClaimExt c s (procAddr j) ∗
-    isLock γw waitLockAddr "wait_lock" waitLockPay ∗ initprocIs ip ∗
+    isLock γw waitLockAddr "wait_lock" waitLockPay ∗ initIdentAt curCtx ip ∗
     isFtable γl γ ∗ panicEnv ∗
     isLock γkl kmemLockAddr "kmem" (kmemRes γk) ∗ kallocAvail γk on ∗
     fsReady (hlc := hlc) ∗ bslots 3 ∗
     fdSlots FDSPARE ∗ irefSlots IREFSPARE ∗
     procPrivFd γ (procAddr j) pid V M ∗ (∃ sts, fdFrags V.fdg sts) ∗
-    chFrag V.chg (procAddr j) ∅ ∗
+    chFrag V.chg (procAddr j) cs ∗
+    myPay V.gen Q ∗ (Q st ∨ (⌜st = -1⌝ ∗ killShot V.gen)) ∗
     (stackOwn sp n -∗ stackOwn (V.kstack + 4096#64) 512)
     ⊢ wpLoop (GF := GF) c := by
   subst hs
-  have h := KX.wp_kexit_eb (hlc := hlc) (GF := GF) Γ c k' γw γl γ γkl γk on j pid V M ip
+  subst hst
+  have h := KX.wp_kexit_eb (hlc := hlc) (GF := GF) Γ c k' γw γl γ γkl γk on j pid V M ip cs Q
     hj hproc hK hnoff htier hinit
   unfold wp_kexit_eb_body at h
   simp only [kexitAddr, KCtx.sp, hsp, hav, hproc] at h
@@ -149,6 +152,14 @@ theorem sysx_closer (sp ra s0 w2 : BitVec 64) (lo nn : BitVec 32) (n : Nat) (hn 
 
 end
 
+/-- The status `kexit` stores is the syscall argument's (the `int` argint
+read, sign-extended back by `lw`): `xstateOf` only looks at the low word. -/
+theorem sysx_status (v : BitVec 64) :
+    xstateOf (BitVec.signExtend 64 (BitVec.extractLsb' 0 32 v)) = xstateOf v := by
+  unfold xstateOf
+  congr 1
+  bv_decide
+
 /-! ## The function -/
 
 theorem sys_exit_br_ffffffffffffff3c : KA.«sys_exit» + 0xffffffffffffff3c#64 = KA.«argint» := by decide
@@ -158,14 +169,14 @@ theorem sys_exit_br_fffffffffffff71c : KA.«sys_exit» + 0xfffffffffffff71c#64 =
 set_option maxHeartbeats 64000000 in
 set_option maxRecDepth 20000 in
 theorem sys_exit_proof (AI : ARGINT) (KX : KEXIT) : SYSEXIT := ⟨
-  fun {hlc GF} _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ X Γ _ cpu k γw γl γ γkl γk on j pid V M ip v
+  fun {hlc GF} _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ X Γ _ cpu k γw γl γ γkl γk on j pid V M ip v cs Q
       hj hproc hv hK hnoff htier hinit => by
   obtain ⟨ξ0, t0⟩ := X
   letI : CurCtx := ⟨ξ0, t0⟩
   unfold wp_sys_exit_eb_body
   simp only [sysExitAddr]
   iintro ⟨Hk, Hpc, #Hpi, Hte, Hce, #Hwl, #Hinit, #Hft, #Hpe, #Hkl, Hav, #Hrdy, Hbs, Hfsp, Hirs,
-    Hblk, Hfr, Hch, Hcloser⟩
+    Hblk, Hfr, Hch, Hmy, Hpay, Hcloser⟩
   icases kctx_tier cpu k $$ Hk with ⟨%hct, Hk⟩
   have ht0 : t0 = KTier.kpt := hct.symm.trans htier
   subst ht0
@@ -184,7 +195,7 @@ theorem sys_exit_proof (AI : ARGINT) (KX : KEXIT) : SYSEXIT := ⟨
        wordPointsTo (pCwd (procAddr j)) 8 (DFrac.own 1) V.cwd ∗
        pnameCells (procAddr j) (DFrac.own 1) V.name) ∗
       procPtAt V.upt M ∗ tfPageAt V.upt.tfp V.tf ∗ ⌜V.pvLazy = false → lazyFree V.upt.um V.sz⌝ ∗
-      cwdRefAt V.cwd V.cwi
+      (cwdRefAt V.cwd V.cwi ∗ procGenAt curCtx (procAddr j) pid V.gen)
       from by unfold procPrivCoreNoctxAt procPrivBareAt procFieldsNoOfile; iintro ⟨⟨H1, H2, H3, H4, H5, H6⟩, H7⟩; iframe) $$ Hcore
     with ⟨%hVb, Hpid, ⟨Hks, Hsz, Hpg, Htf, Hcwd, Hnm⟩, HPt, HTf, %hlz, Hcwr⟩
   ihave Htf := (show wordPointsTo (GF := GF) (pTrapframe (procAddr j)) 8 (DFrac.own 1) V.trapframe ⊢
@@ -242,11 +253,11 @@ theorem sys_exit_proof (AI : ARGINT) (KX : KEXIT) : SYSEXIT := ⟨
       (by omega) hal
       (stackOwn (V.kstack + 4096#64) 512) $$ [F0 F1 Flo Fnn F3 Hcloser]
     case' _ => iframe
-    iapply (sysx_kexit KX Γ cpu _ γw γl γ γkl γk on j pid V M ip (k.regs 2#5 + 0xFFFFFFFFFFFFFFE0#64)
-        (trapRes k.sie + k.avail - 4) k.sie
-        hj ?hpr ?hKx ?hs ?hn2 ?ht hinit ?hsp ?hav)
+    iapply (sysx_kexit KX Γ cpu _ γw γl γ γkl γk on j pid V M ip cs Q (k.regs 2#5 + 0xFFFFFFFFFFFFFFE0#64)
+        (trapRes k.sie + k.avail - 4) k.sie (xstateOf v)
+        hj ?hpr ?hKx ?hs ?hn2 ?ht hinit ?hsp ?hav ?hst)
       $$ [- $Hk $Hpc $Hpi $Hte $Hce $Hwl $Hinit $Hft $Hpe $Hkl $Hav $Hrdy $Hbs $Hfsp $Hirs $Hblk $Hfr
-          $Hch $Hcloser]
+          $Hch $Hmy $Hpay $Hcloser]
     case hpr => k_norm_g; exact hproc
     case hKx => k_norm_g; unfold sysExitSlots at hK; omega
     case hs => k_norm_g
@@ -254,6 +265,7 @@ theorem sys_exit_proof (AI : ARGINT) (KX : KEXIT) : SYSEXIT := ⟨
     case ht => k_norm_g; exact htier
     case hsp => k_norm_g; exact c2
     case hav => k_norm_g; omega
+    case hst => k_norm_g; exact sysx_status v
   case ha0 => k_norm_g [sysx_li0]
   case hn => k_norm_g; rw [hnoff]; decide
   case hKa =>

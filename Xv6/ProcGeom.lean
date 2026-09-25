@@ -81,6 +81,14 @@ def ZOMBIE : BitVec 32 := 5#32
 bound, allocpid's retry range. -/
 def PIDMAX : Nat := 1000
 
+/-- The exit status a `p->xstate` word reads as (Rocq `ProcGeom.xstate_val`:
+the signed value of the 32-bit cell). -/
+def xstateVal (w : BitVec 32) : Int := w.toInt
+
+/-- ...and the status a 64-bit register carries into that cell (Rocq
+`ProcGeom.xstate_of`: `sw` stores the low 32 bits). -/
+def xstateOf (v : BitVec 64) : Int := xstateVal (v.setWidth 32)
+
 /-! ## `&proc[j]` is injective -/
 
 /-- `&proc[]` as a number: the symbol's value (below `2^32`). -/

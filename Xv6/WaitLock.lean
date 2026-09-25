@@ -2,8 +2,11 @@
 `wait_lock` (kernel/proc.c): protects every `p->parent` word.  `kfork`
 sets the child's parent, `kwait` scans for children, `reparent` moves the
 exiting process's children to `init`, and `kexit` reads its own parent to
-wake it -- all under `wait_lock`.  The payload is the 64 `parent` words and
-nothing else.
+wake it -- all under `wait_lock`.  The payload is Rocq's `wait_res_at`
+(`WaitInvTies.waitInvResAt`, D8 wiring): the 64 `parent` words
+(`waitResAt`, which is `WaitInv.parentsOwnAt`), the children map's
+authority, the orphan column and the invariant tying them to the
+generation ghosts.
 
 `initproc`: the word at `&initproc` is written once by `userinit` and read
 forever after (`kexit`'s "init exiting" check, `reparent`'s target); it is
@@ -11,6 +14,7 @@ published as a discarded fraction, `initprocIs`.
 -/
 import Xv6.ProcDefs
 import Xv6.PidLock
+import Xv6.WaitInvTies
 import MachCSL.Lock
 
 namespace Xv6
@@ -28,8 +32,9 @@ process. -/
 def waitResAt [CurCtx] (ξ : CtxId) (parents : Nat → BitVec 64) : IProp GF := iprop%
   [∗list] j ∈ List.range NPROC, wordAtN ξ (pParent (procAddr j)) 8 (DFrac.own 1) (parents j)
 
-/-- The payload as a function of the holder's context. -/
-def waitLockPay [CurCtx] : CtxId → IProp GF := fun ξ => iprop(∃ parents, waitResAt ξ parents)
+/-- The payload as a function of the holder's context (Rocq `wait_res_at`). -/
+def waitLockPay [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [WchG GF] [CtokG GF] [CurCtx] :
+    CtxId → IProp GF := fun ξ => waitInvResAt ξ
 
 /-! ### A discarded cell is persistent
 
@@ -64,9 +69,9 @@ instance instCtxMorphWaitResAt [CurCtx] (parents : Nat → BitVec 64) :
     (fun _ j ξ => wordAtN ξ (pParent (procAddr j)) 8 (DFrac.own 1) (parents j))
     (fun _ _ => instCtxMorphWordAtN _ _ _ _)
 
-instance instCtxMorphWaitLockPay [CurCtx] : CtxMorph (GF := GF) (waitLockPay (GF := GF)) :=
-  @instCtxMorphExists hlc GF _ _ (fun parents ξ => waitResAt ξ parents)
-    (fun parents => instCtxMorphWaitResAt parents)
+instance instCtxMorphWaitLockPay [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [WchG GF] [CtokG GF]
+    [CurCtx] : CtxMorph (GF := GF) (waitLockPay (GF := GF)) :=
+  waitInvResAt_morph
 
 /-- One parent word out of the payload, and the way back (with a new value). -/
 theorem waitRes_acc [CurCtx] (ξ : CtxId) (parents : Nat → BitVec 64) (j : Nat) (hj : j < NPROC) :

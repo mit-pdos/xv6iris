@@ -90,7 +90,7 @@ theorem sk_argint (AI : ARGINT) (c : CPU) (k' : KCtx) (tfp : BitVec 44) (ws : Li
 theorem sk_kkill (KK : KKILL) (Γ : SchedNames) (c : CPU) (k' : KCtx)
     (hnoff : k'.noff + 1 < 2 ^ 31) (hK : 16 ≤ k'.avail) (hlk : "proc" ∉ k'.locks)
     (htier : k'.tier = KTier.kpt) :
-    kctx c k' ∗ pcIs c KA.«kkill» ∗ procsInv Γ ∗
+    kctx c k' ∗ pcIs c KA.«kkill» ∗ procsInv Γ ∗ □ MachFixedGS.killCred (hlc := hlc) (GF := GF) ∗
     wpNext k'.sie k'.proc c (fun cpu' => iprop(∀ spie : Bool, ∀ spp : Bool, ∀ R' : RegMap,
       ⌜k'.sie = false → spie = k'.spie ∧ spp = k'.spp⌝ -∗
       kctx cpu' ((k'.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k'.regs 1#5)) -∗
@@ -162,7 +162,7 @@ theorem sys_kill_proof (AI : ARGINT) (KK : KKILL) : SYSKILL := ⟨
   fun {hlc GF} _ _ _ _ _ _ _ _ Γ cpu k tfp ws v dqt hws hnoff hK hlk htier => by
   unfold wp_sys_kill_body
   simp only [sysKillAddr]
-  iintro ⟨Hk, Hpc, #Hpi, Htf, Hpage, Hnext⟩
+  iintro ⟨Hk, Hpc, #Hpi, #Hcred, Htf, Hpage, Hnext⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
   have hK4 : 4 ≤ k.avail := by unfold sysKillSlots argintSlots at hK; omega
   -- the prologue ; a1 = &pid ; a0 = 0 ; jal argint

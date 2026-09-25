@@ -145,7 +145,7 @@ theorem srd_cs_epi (k : KCtx) (R : RegMap) (h : srdRegs k R) :
 
 section
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
-  [IrefslotG GF] [CtokG GF] [WchG GF] [CurCtx]
+  [IrefslotG GF] [CtokG GF] [WchG GF] [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF] [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [Appcfg GF] [FileG GF] [Fscfg] [Icfg] [CurCtx]
 
 theorem srd_ctx_entry (c : CPU) (k : KCtx) (R : RegMap) :
     kctx (GF := GF) c ((k.pushed 6).withRegs R) ⊢
@@ -241,7 +241,7 @@ end
 section
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
   [FileG GF] [IcacheG GF] [SleepLockG GF] [IcboxG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [OffboxG GF] [OffboxBoxG GF]
-  [Icfg] [X : CurCtx]
+  [BcacheG GF] [DiskG GF] [LogG GF] [FsBlocksG GF] [IregG GF] [FsTopG GF] [FsLinkG GF] [Appcfg GF] [Fscfg] [Icfg] [X : CurCtx]
 
 /-- At the kernel-page-table tier fileread's block IS the ambient
 `procPrivExt` (FilereadParts' `filerw_priv_conv`). -/

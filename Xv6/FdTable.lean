@@ -39,12 +39,14 @@ a key's two halves update together, `fdSt_update`), minted by `fdSt_alloc`
 (Rocq `fd_st_alloc`).  The external `γd : Nat → GName` (one ghost variable
 per descriptor) is gone; `argfd`/`sys_close`/`sys_dup`/`sys_pipe` read
 `V.fdg`, `fdalloc` (which sees only the array) keeps a `γd : GName`.
-Rocq's `proc_priv_core` D8 conjuncts (`first_tok`, `gen_kq`/`my_pay`, the
-`p->xstate` half, `gen_halves_priv`) are not ported.
+Rocq's `proc_priv_core` D8 conjuncts (`first_tok`, `∃ Q, gen_kq ∗ my_pay`,
+the `p->xstate` half, `gen_halves_priv`) ride the core as ONE named row,
+`procGenAt` (D8 wiring), the core's third conjunct.
 -/
 import Xv6.FileDefs
 import Xv6.FileInv
 import Xv6.ProcInv
+import Xv6.FirstTok
 
 namespace Xv6
 
@@ -656,24 +658,6 @@ def procPrivBareAt (ξ : CtxId) (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv
   @tfPageAt hlc GF _ ⟨ξ, KTier.kpt⟩ V.upt.tfp V.tf ∗
   ⌜V.pvLazy = false → lazyFree V.upt.um V.sz⌝
 
-/-- **The block's core** (Rocq `proc_priv_core`, ProcInv.v:1331, minus the D8
-generation conjuncts): the bare block and `p->cwd`'s reference AT the
-block's inum (`ProcInv.cwdRefAt V.cwd V.cwi`, wave 7 P1/P2: the reference
-joins the block here, where the file layer is in scope -- `ProcDefs` /
-`SchedCtx` cannot name an inode, `ProcInv`'s header).  No null arm: a
-process whose `p->cwd` is not installed yet holds the deficit block
-(`procPrivBareAt`), exactly as Rocq's `proc_priv_nocwd`. -/
-def procPrivCoreNoctxAt (ξ : CtxId) (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv)
-    (M : Nat → List (BitVec 8)) : IProp GF := iprop%
-  procPrivBareAt ξ pa pid V M ∗ @cwdRefAt hlc GF _ _ _ _ _ ⟨ξ, KTier.kpt⟩ V.cwd V.cwi
-
-/-- The core is the bare block and the cwd reference (`rfl`; Rocq
-`proc_priv_split_cwd`'s cwd part at the core). -/
-theorem procPrivCoreNoctxAt_bare (ξ : CtxId) (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv)
-    (M : Nat → List (BitVec 8)) :
-    procPrivCoreNoctxAt (GF := GF) ξ pa pid V M ⊣⊢
-      procPrivBareAt ξ pa pid V M ∗ @cwdRefAt hlc GF _ _ _ _ _ ⟨ξ, KTier.kpt⟩ V.cwd V.cwi := .rfl
-
 theorem procPrivNoctxAt_split (ξ : CtxId) (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv)
     (M : Nat → List (BitVec 8)) :
     procPrivNoctxAt (GF := GF) ξ pa pid V M ⊣⊢
@@ -690,6 +674,51 @@ theorem procPrivNoctxAt_split (ξ : CtxId) (pa : BitVec 64) (pid : BitVec 32) (V
     isplitl []
     · ipureintro; exact h
     · ipureintro; exact hlz
+
+section Core
+variable [BcacheG GF] [DiskG GF] [LogG GF] [FsBlocksG GF] [IregG GF] [FsTopG GF] [FsLinkG GF] [Appcfg GF] [Fscfg]
+
+/-- **THE BLOCK'S GENERATION ROW** (Rocq `proc_priv_core`'s four D8
+conjuncts, ProcInv.v:1356-1391, D8 wiring), at context `ξ`:
+* `firstTok` -- fsinit's first-call token (the boot arm, or the steady
+  `firstDone` arm every forked child is paid with);
+* `∃ Q, genKq g pa pid Q ∗ myPay g Q` -- the KERNEL's quarter of
+  this incarnation's generation and the persistent reading of the payload
+  its exit owes its parent;
+* HALF of the process's own `p->xstate` (the other half is `p->lock`'s,
+  `ProcDefs.procPub`): kexit joins them at its store and parks the escrow
+  keyed at what the cell reads;
+* `genHalvesPriv pa pid g` -- a quarter of the slot's current
+  generation, an eighth of the pid's registration, and the incarnation's
+  spent marker.
+Keyed at the generation `g` (the core passes `V.gen`, Rocq `pv_gen`).
+Ghost except the two cells (`firstTok`'s word, the xstate half). -/
+def procGenAt (ξ : CtxId) (pa : BitVec 64) (pid : BitVec 32) (g : GName) : IProp GF :=
+  letI : CurCtx := ⟨ξ, KTier.kpt⟩
+  iprop(firstTok (hlc := hlc) ∗
+    (∃ Q : Int → IProp GF, genKq g pa pid Q ∗ myPay g Q) ∗
+    (∃ xsv : BitVec 32, wordPointsTo (pXstate pa) 4 xsHalf xsv) ∗
+    genHalvesPriv pa pid g)
+
+/-- **The block's core** (Rocq `proc_priv_core`, ProcInv.v:1331): the bare
+block, `p->cwd`'s reference AT the block's inum (`ProcInv.cwdRefAt V.cwd
+V.cwi`, wave 7 P1/P2: the reference joins the block here, where the file
+layer is in scope -- `ProcDefs` / `SchedCtx` cannot name an inode,
+`ProcInv`'s header), and the generation row (`procGenAt`, D8).  No null
+arm: a process whose `p->cwd` is not installed yet holds the deficit block
+(`procPrivBareAt`), exactly as Rocq's `proc_priv_nocwd`. -/
+def procPrivCoreNoctxAt (ξ : CtxId) (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv)
+    (M : Nat → List (BitVec 8)) : IProp GF := iprop%
+  procPrivBareAt ξ pa pid V M ∗ @cwdRefAt hlc GF _ _ _ _ _ ⟨ξ, KTier.kpt⟩ V.cwd V.cwi ∗
+  procGenAt ξ pa pid V.gen
+
+/-- The core is the bare block, the cwd reference and the generation row
+(`rfl`; Rocq `proc_priv_core_bare`). -/
+theorem procPrivCoreNoctxAt_bare (ξ : CtxId) (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv)
+    (M : Nat → List (BitVec 8)) :
+    procPrivCoreNoctxAt (GF := GF) ξ pa pid V M ⊣⊢
+      procPrivBareAt ξ pa pid V M ∗ @cwdRefAt hlc GF _ _ _ _ _ ⟨ξ, KTier.kpt⟩ V.cwd V.cwi ∗
+        procGenAt ξ pa pid V.gen := .rfl
 
 /-- The core does not mention the array, so it survives any store into it. -/
 theorem procPrivCoreNoctxAt_ofile (ξ : CtxId) (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv)
@@ -709,6 +738,8 @@ theorem procPrivFd_split (γ : FileNames) (pa : BitVec 64) (pid : BitVec 32) (V 
     (M : Nat → List (BitVec 8)) :
     procPrivFd (GF := GF) γ pa pid V M ⊣⊢ procPrivCoreNoctxAt curCtx pa pid V M ∗ procOfilesOwe γ V.fdg pa V.ofile [] :=
   .rfl
+
+end Core
 
 /-- One descriptor's cell out of its lent-or-slot and back. -/
 theorem ofileLentOrSlot_cell (γ : FileNames) (γd : GName) (pa : BitVec 64) (D : List Nat) (fd : Nat)

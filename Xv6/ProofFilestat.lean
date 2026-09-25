@@ -74,11 +74,11 @@ reference at the ambient context (by `rfl` once the ambient context is
 taken apart). -/
 theorem filestat_priv_conv {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
     [FdslotG GF] [BioslotG GF] [IcacheG GF] [SleepLockG GF] [IcboxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
-    [OffboxG GF] [OffboxBoxG GF] [FileG GF] [Icfg] [X : CurCtx]
+    [OffboxG GF] [OffboxBoxG GF] [FileG GF] [BcacheG GF] [DiskG GF] [LogG GF] [FsBlocksG GF] [IregG GF] [FsTopG GF] [FsLinkG GF] [Appcfg GF] [Fscfg] [Icfg] [X : CurCtx]
     (h : curTier = KTier.kpt) (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv) (P : UPtd)
     (M : Nat → List (BitVec 8)) :
     procPrivCoreNoctxAt (GF := GF) curCtx pa pid { V with upt := P } M ⊣⊢
-      fstatPrivExt pa pid V P M ∗ cwdRefAt V.cwd V.cwi := by
+      fstatPrivExt pa pid V P M ∗ (cwdRefAt V.cwd V.cwi ∗ procGenAt curCtx pa pid V.gen) := by
   obtain ⟨ξ, t⟩ := X
   simp only at h
   subst h

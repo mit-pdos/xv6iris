@@ -12,6 +12,7 @@ import Xv6.SpecSetkilled
 import Xv6.SpecAcquire
 import Xv6.SpecRelease
 import Xv6.KilledDefs
+import Xv6.WordFrac
 import Xv6.CodeTactics
 
 namespace Xv6
@@ -34,12 +35,12 @@ theorem setkilled_br_ffffffffffffea4e : KA.«setkilled» + 0xffffffffffffea4e#64
 set_option maxHeartbeats 4000000 in
 /-- **`setkilled` meets its specification.** -/
 theorem setkilled_proof (AC : ACQUIRE) (RE : RELEASE) : SETKILLED :=
-  ⟨fun {hlc GF} _ _ _ _ _ _ _ X Γ cpu k j hj hp hnoff hK hlk htier => by
+  ⟨fun {hlc GF} _ _ _ _ _ _ _ X Γ cpu k j pidv gn hj hp hpnz hnoff hK hlk htier => by
   obtain ⟨ξ0, t0⟩ := X
   letI : CurCtx := ⟨ξ0, t0⟩
   unfold wp_setkilled_body
   simp only [setkilledAddr]
-  iintro ⟨Hk, Hpc, #Hpinv, HPhi⟩
+  iintro ⟨Hk, Hpc, #Hpinv, Hpay, Hreg, Hmypid, HPhi⟩
   icases kctx_tier cpu _ $$ Hk with ⟨%hct, Hk⟩
   have ht0 : t0 = KTier.kpt := hct.symm.trans htier
   subst ht0
@@ -81,7 +82,20 @@ theorem setkilled_proof (AC : ACQUIRE) (RE : RELEASE) : SETKILLED :=
   ihave HR := kl_pay_elim Γ ξ0 j $$ HR
   icases procLockRes_elim Γ ξ0 (procAddr j) $$ HR with
     ⟨%st, %ch, Hstate, Hpg, Hchan, ⟨%kl, %xs, %pid, Hrest⟩, Hslots⟩
-  icases kl_rest_elim ξ0 (procAddr j) kl xs pid $$ Hrest with ⟨Hkilled, Hxs, Hpid⟩
+  icases kl_rest_elim ξ0 (procAddr j) kl xs pid $$ Hrest with ⟨Hkilled, Hxs, Hpid, Hkp⟩
+  -- THE LENT QUARTER ties the payload's pid to the caller's: the row is at
+  -- the incarnation the registration eighth names (Rocq's setkilled)
+  icases wordPointsTo_agree_keep (pPid (procAddr j)) 4 (Qp.half (Qp.half 1)) (1 : Qp).half.half pid pidv
+    $$ [Hpid Hmypid] with ⟨%hpe, Hpid, Hmypid⟩
+  · unfold pidPub; iframe Hpid Hmypid
+  subst hpe
+  -- ...and the store is PAID: the one-shot fires, the row closes on the
+  -- paid arm at the flag this function writes
+  iapply wpLoop_bupd
+  imod killPaid_kill_two (MachFixedGS.killCred (hlc := hlc) (GF := GF)) pid kl 1#32 (.own qeighth) gn hpnz
+    (by decide) $$ [Hreg Hpay Hkp] with ⟨Hreg, #Hshot, Hkp⟩
+  · iframe Hreg Hpay Hkp
+  imodintro
   have hsie : (k.pushOffAt spie spp).sie = false := rfl
   -- c.li a5,1
   k_step (wp_s_addi c _ (KA.«setkilled» + 0x10#64) true 1#12 15#5 0#5 (by decide))
@@ -99,8 +113,8 @@ theorem setkilled_proof (AC : ACQUIRE) (RE : RELEASE) : SETKILLED :=
   k_step (wp_s_jal c _ (KA.«setkilled» + 0x16#64) false 2091712#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [setkilled_br_ffffffffffffead6]
   iintro Hk Hpc
-  ihave Hrest := kl_rest_intro ξ0 (procAddr j) 1#32 xs pid $$ [Hkilled Hxs Hpid]
-  case' _ => simp only [pKilled, pXstate, pPid]; iframe
+  ihave Hrest := kl_rest_intro ξ0 (procAddr j) 1#32 xs pid $$ [Hkilled Hxs Hpid Hkp]
+  case' _ => simp only [pKilled, pXstate, pPid, pidPub]; iframe
   ihave HR := procLockRes_intro Γ ξ0 (procAddr j) st ch 1#32 xs pid
     $$ [Hstate Hpg Hchan Hrest Hslots]
   case' _ => simp only [pState, pChan]; iframe
@@ -147,7 +161,7 @@ theorem setkilled_proof (AC : ACQUIRE) (RE : RELEASE) : SETKILLED :=
   ihave HPhi := wpNext_shift _ _ _ _ _ hpin5 $$ HPhi
   iapply wpNext_mono _ _ _ _ _ $$ HPhi
   iintro %cF HPhi Hk Hpc
-  iapply HPhi $$ %spie %spp %_ %hsp1 Hk Hpc
+  iapply HPhi $$ %spie %spp %_ %hsp1 Hk Hpc [] Hmypid Hreg Hshot
   ipureintro
   unfold calleeSaved
   simp only [RegMap.set_apply, BitVec.reduceEq, ite_true, ite_false]

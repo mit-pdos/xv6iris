@@ -39,11 +39,26 @@ and only when `addr != 0` (the port of the Rocq prototype's
 `4` on the reaping arm; a short prefix when `copyout` itself failed), and
 the bytes are those of ONE status word `xw`, the zombie's.
 
-WHICH child was reaped is NOT stated: the prototype answers that with a
-children-row ghost (`ch_frag`, a set of generations) and a pid escrow,
-which this port does not carry -- `kwaitAns` keeps only what is provable
-without them, and it is enough to tell a `-1` apart from a reap whose
-status did reach the caller.
+WHICH child was reaped IS stated (D8 wiring, Rocq `wait_ans`): the caller
+brings its CHILDREN ROW (`chFrag V.chg pa cs`, Rocq `ch_frag (pv_chg) pj
+cs`), kwait holds `wait_lock` -- the row's authority -- across everything
+it does, and the reap MOVES the row: the reaped generation leaves the set
+(`WaitInvTies.childrenInv_reap`), and the answer
+(`UserChildren.waitAns rv (xstateVal xw) cs cs' V.gen (addr = 0) pid`) is
+`-1` with the set unmoved and its reason, or the reaped child's pid with
+its ESCROW (`ChildTok.exitTok`, handed over out of the ZOMBIE block, keyed
+at the status word copied out), the pid uniqueness that makes the number
+name a generation, and "the generation was in the caller's own column, or
+the caller is init" -- read off the caller's own generation row
+(`kwaitGen`: the kernel's quarter and the slot/pid halves, LENT and given
+back) against init's sealed identity (`initPidIs 1`, Rocq
+`init_pid_is 1`).  `kwaitAns` (Lean's pure summary) is kept beside it.
+
+PROCESS-LAYER DEVIATION (flagged): Rocq's kwait takes the whole block
+`proc_priv`; Lean's takes the cells as `procPrivNoctxAt` (as before D8) and
+the generation pieces the reap reads as `kwaitGen` -- the D8 row
+(`FdTable.procGenAt`) minus `firstTok` and the xstate half, which kwait
+never touches.
 
 THE BLOCK COMES BACK WHOLE at the descriptor `copyout`'s lazy faults grew
 (Rocq: `uptd_ext_sz (pv_sz V)` and `proc_priv (us_upt U P')`): `copyout`
@@ -91,11 +106,19 @@ WHOLE status word reached `addr` (nothing at all if `addr` was null). -/
 def kwaitAns (rv : BitVec 32) (addr : BitVec 64) (d : Nat) : Prop :=
   rv = -1#32 ∨ (addr = 0#64 ∧ d = 0) ∨ (addr ≠ 0#64 ∧ d = 4)
 
+/-- The generation pieces of the caller's own block the reap reads (the D8
+row `FdTable.procGenAt` minus `firstTok` and the xstate half): the kernel's
+quarter with the payload reading, and the slot/pid halves with the spent
+marker. -/
+def kwaitGen {GF : BundledGFunctors} [CtokG GF] [WchG GF] (pa : BitVec 64) (pid : BitVec 32) (g : GName) :
+    IProp GF :=
+  iprop((∃ Q : Int → IProp GF, genKq g pa pid Q ∗ myPay g Q) ∗ genHalvesPriv pa pid g)
+
 /-- **WP of `kwait(addr = a0)`.** -/
 def wp_kwait_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [CurCtx]
     (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
     (cpu : CPU) (k : KCtx) (γw γp γl : GName) (γk : KmemNames) (j : Nat) (pid : BitVec 32)
-    (V : ProcPriv) (M : Nat → List (BitVec 8))
+    (V : ProcPriv) (M : Nat → List (BitVec 8)) (cs : ExtTreeSet GName compare)
     (hj : j < NPROC) (hproc : k.proc = procAddr j) (hK : kwaitSlots ≤ k.avail)
     (hsie : k.sie = false) (hnoff : k.noff = 0) (hlocks : k.locks = [])
     (htier : k.tier = KTier.kpt) : Prop :=
@@ -105,10 +128,13 @@ def wp_kwait_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF
   isLock γp pidLockAddr "nextpid" pidLockPay ∗
   isLock γl kmemLockAddr "kmem" (kmemRes γk) ∗ kallocAvail γk none ∗
   procPrivNoctxAt curCtx (procAddr j) pid V M ∗
+  kwaitGen (procAddr j) pid V.gen ∗ chFrag V.chg (procAddr j) cs ∗ initPidIs 1#32 ∗
   wpNext true k.proc cpu (fun cpu' => iprop(∀ (spie spp : Bool) (R' : RegMap) (P' : UPtd)
-    (rv xw : BitVec 32) (d : Nat),
+    (rv xw : BitVec 32) (d : Nat) (cs' : ExtTreeSet GName compare),
     ⌜calleeSaved k.regs R' ∧ R' 10#5 = BitVec.signExtend 64 rv ∧ V.upt.extSz V.sz P' ∧ d ≤ 4 ∧
       kwaitAns rv (k.regs 10#5) d⌝ -∗
+    waitAns rv (xstateVal xw) cs cs' V.gen (decide (k.regs 10#5 = 0#64)) pid -∗
+    kwaitGen (procAddr j) pid V.gen -∗ chFrag V.chg (procAddr j) cs' -∗
     kctx cpu' ((k.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k.regs 1#5)) -∗
     trapCsrs cpu' -∗ cpuClaim cpu' k.proc -∗ intrRes cpu' -∗
     procPrivNoctxAt curCtx (procAddr j) pid { V with upt := P' }
@@ -127,7 +153,7 @@ literal `true`. -/
 def wp_kwait_eb_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [CurCtx]
     (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
     (cpu : CPU) (k : KCtx) (γw γp γl : GName) (γk : KmemNames) (j : Nat) (pid : BitVec 32)
-    (V : ProcPriv) (M : Nat → List (BitVec 8))
+    (V : ProcPriv) (M : Nat → List (BitVec 8)) (cs : ExtTreeSet GName compare)
     (hj : j < NPROC) (hproc : k.proc = procAddr j) (hK : kwaitSlots ≤ k.avail)
     (hnoff : k.noff = 0)
     (htier : k.tier = KTier.kpt) : Prop :=
@@ -137,10 +163,13 @@ def wp_kwait_eb_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G
   isLock γp pidLockAddr "nextpid" pidLockPay ∗
   isLock γl kmemLockAddr "kmem" (kmemRes γk) ∗ kallocAvail γk none ∗
   procPrivNoctxAt curCtx (procAddr j) pid V M ∗
+  kwaitGen (procAddr j) pid V.gen ∗ chFrag V.chg (procAddr j) cs ∗ initPidIs 1#32 ∗
   wpNext true k.proc cpu (fun cpu' => iprop(∀ (spie spp : Bool) (R' : RegMap) (P' : UPtd)
-    (rv xw : BitVec 32) (d : Nat),
+    (rv xw : BitVec 32) (d : Nat) (cs' : ExtTreeSet GName compare),
     ⌜calleeSaved k.regs R' ∧ R' 10#5 = BitVec.signExtend 64 rv ∧ V.upt.extSz V.sz P' ∧ d ≤ 4 ∧
       kwaitAns rv (k.regs 10#5) d⌝ -∗
+    waitAns rv (xstateVal xw) cs cs' V.gen (decide (k.regs 10#5 = 0#64)) pid -∗
+    kwaitGen (procAddr j) pid V.gen -∗ chFrag V.chg (procAddr j) cs' -∗
     kctx cpu' ((k.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k.regs 1#5)) -∗
     trapCsrsExt cpu' k.sie -∗ cpuClaimExt cpu' k.sie k.proc -∗
     procPrivNoctxAt curCtx (procAddr j) pid { V with upt := P' }
@@ -153,8 +182,8 @@ structure KWAIT : Prop where
   wp_kwait_eb : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [CurCtx]
     (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
     (cpu : CPU) (k : KCtx) (γw γp γl : GName) (γk : KmemNames) (j : Nat) (pid : BitVec 32)
-    (V : ProcPriv) (M : Nat → List (BitVec 8)) hj hproc hK hnoff htier,
-    wp_kwait_eb_body (hlc := hlc) (GF := GF) Γ cpu k γw γp γl γk j pid V M
+    (V : ProcPriv) (M : Nat → List (BitVec 8)) (cs : ExtTreeSet GName compare) hj hproc hK hnoff htier,
+    wp_kwait_eb_body (hlc := hlc) (GF := GF) Γ cpu k γw γp γl γk j pid V M cs
       hj hproc hK hnoff htier
 
 /-- The interrupts-off instance of `wp_kwait_eb` (the complement is the whole
@@ -162,19 +191,19 @@ bundle): the contract every not-yet-generalized caller states. -/
 theorem KWAIT.wp_kwait (A : KWAIT) {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
     [CurCtx] (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
     (cpu : CPU) (k : KCtx) (γw γp γl : GName) (γk : KmemNames) (j : Nat) (pid : BitVec 32)
-    (V : ProcPriv) (M : Nat → List (BitVec 8)) hj hproc hK hsie hnoff hlocks htier :
-    wp_kwait_body (hlc := hlc) (GF := GF) Γ cpu k γw γp γl γk j pid V M
+    (V : ProcPriv) (M : Nat → List (BitVec 8)) (cs : ExtTreeSet GName compare) hj hproc hK hsie hnoff hlocks htier :
+    wp_kwait_body (hlc := hlc) (GF := GF) Γ cpu k γw γp γl γk j pid V M cs
       hj hproc hK hsie hnoff hlocks htier := by
-  have h := A.wp_kwait_eb (hlc := hlc) (GF := GF) Γ cpu k γw γp γl γk j pid V M hj hproc hK hnoff htier
+  have h := A.wp_kwait_eb (hlc := hlc) (GF := GF) Γ cpu k γw γp γl γk j pid V M cs hj hproc hK hnoff htier
   unfold wp_kwait_eb_body at h
   unfold wp_kwait_body
   rw [hsie] at h
   simp only [trapCsrsExt_false, cpuClaimExt_false] at h
-  iintro ⟨H0, H1, H2, Htc, Hcl, Hir, H6, H7, H8, H9, H10, Hnext⟩
+  iintro ⟨H0, H1, H2, Htc, Hcl, Hir, H6, H7, H8, H9, H10, H11, H12, H13, Hnext⟩
   iapply h
-  iframe H0 H1 H2 Htc Hcl Hir H6 H7 H8 H9 H10
+  iframe H0 H1 H2 Htc Hcl Hir H6 H7 H8 H9 H10 H11 H12 H13
   iapply wpNext_mono $$ Hnext
-  iintro %cpu' HK %spie %spp %R' %P' %rv %xw %d %p0 H1 H2 ⟨Htc, Hir⟩ Hcl H6
-  iapply HK $$ %spie %spp %R' %P' %rv %xw %d %p0 H1 H2 Htc Hcl Hir H6
+  iintro %cpu' HK %spie %spp %R' %P' %rv %xw %d %cs' %p0 Ha Hg Hc H1 H2 ⟨Htc, Hir⟩ Hcl H6
+  iapply HK $$ %spie %spp %R' %P' %rv %xw %d %cs' %p0 Ha Hg Hc H1 H2 Htc Hcl Hir H6
 
 end Xv6

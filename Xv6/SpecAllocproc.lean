@@ -62,17 +62,44 @@ new process, and a failure tail gives them straight back to `freeproc`
 THE SLOT'S CHILDREN ROW (Rocq's `ch_frag (pv_chg (us_V U)) (proc_addr j)
 ∅`, D8 wiring) comes out of the dormant block with the rest, at `∅` and at
 the block's own `chg`: allocproc cannot mint it (the authority is
-`wait_lock`'s), so it is the row boot put in the slot. -/
+`wait_lock`'s), so it is the row boot put in the slot.
+
+THE GENERATION MACHINERY (D8 wiring, Rocq `allocproc_post`).  allocproc is
+the one place a process comes into existence, so it MINTS the incarnation
+(`ChildTok.gen_alloc`) at the slot, the pid its inlined allocpid chose, and
+the CALLER's payload `Q` (a parameter: the killed row it founds names the
+generation persistently, which freezes the payload): the three pieces and
+the spent marker (`genNew`), the slot's generation re-keyed to it WHOLE
+(`slotGen`), the pid's registration WHOLE but for `p->lock`'s eighth
+(`pidRegRest`, inserted into `pid_lock`'s register at the store that put
+the pid in the cell), and the slot's half of `p->xstate`.  `p->lock`'s
+killed row is founded at the new pid inside `procHeld` (`killPaidAt`'s live
+arm, on the zero flag the UNUSED slot carried and the one-shot the mint
+handed out PENDING), which is why the caller supplies `□ (killCred -∗ Q (-1))`.
+A failure tail hands the wholes to `freeproc` (`freeprocGen`), which is
+what deregisters the pid.
+
+THE LEDGER'S BOOT-ERA TOKEN (Rocq `procs_avail_at op tk`, lane
+TRAP-ROWS-4): the counted caller (`userinit`) hands `nextpidPend`, which
+refutes `pid_lock`'s payload marks and so pins the pid to the literal 1;
+the sealed one hands the shot and init's registration, which refutes the
+candidate 1.  Both come back as `pavSpent` once the pid section ran (the
+null arm, which returns before it, hands the ledger back as it came). -/
 def allocprocPost {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [CurCtx]
-    (Γ : SchedNames) (cpu : CPU) (γk : KmemNames) (on : Option Nat) (pav : Option Nat) (r : BitVec 64) :
+    (Γ : SchedNames) (cpu : CPU) (γk : KmemNames) (on : Option Nat) (pav : Option Nat) (tk : Bool)
+    (Q : Int → IProp GF) (r : BitVec 64) :
     IProp GF := iprop%
   (⌜r = 0#64 ∧ ((pav = none ∨ pav = some 0) ∨
-      ∃ g : Nat, g ≤ procPagetableNodes + 1 ∧ availZero (availSub on g))⌝ ∗ procsAvail Γ pav ∗
+      ∃ g : Nat, g ≤ procPagetableNodes + 1 ∧ availZero (availSub on g))⌝ ∗
+    (procsAvailAt Γ pav tk ∨ pavSpent Γ pav) ∗
     ∃ on' : Option Nat, ⌜on' = on ∨ on' = none⌝ ∗ kallocAvail γk on') ∨
   (∃ (j : Nat) (ch : BitVec 64) (pid : BitVec 32) (V : ProcPriv) (M : Nat → List (BitVec 8)) (g : Nat),
-    ⌜r = procAddr j ∧ j < NPROC ∧ 1 ≤ pid.toNat ∧ pid.toNat ≤ PIDMAX ∧ allocprocPriv V ∧ g ≤ procPagetableNodes + 1⌝ ∗
-    procHeld Γ cpu j USED ch ∗ hartAtAny Γ (procAddr j) ∗ slotUsed Γ (procAddr j) ∗ procsAvail Γ (pavDec pav) ∗
+    ⌜r = procAddr j ∧ j < NPROC ∧ 1 ≤ pid.toNat ∧ pid.toNat ≤ PIDMAX ∧ allocprocPriv V ∧ g ≤ procPagetableNodes + 1 ∧
+      (if pavBoot pav tk then pid.toNat = 1 else pid.toNat ≠ 1)⌝ ∗
+    procHeld Γ cpu j USED ch ∗ hartAtAny Γ (procAddr j) ∗ slotUsed Γ (procAddr j) ∗ pavSpent Γ (pavDec pav) ∗
     procPriv (procAddr j) pid V M ∗ dormantAllow ∗ chFrag V.chg (procAddr j) ∅ ∗
+    genNew V.gen (procAddr j) pid Q ∗ slotGen (procAddr j) (.own 1) V.gen ∗ pidRegRest pid V.gen ∗
+    (∃ xsv : BitVec 32, wordPointsTo (pXstate (procAddr j)) 4 xsHalf xsv) ∗
     stackOwn (V.kstack + 4096#64) 512 ∗
     kallocAvail γk (availSub on g))
 
@@ -84,25 +111,26 @@ eventual `release` (re-enabling interrupts when the entry had them on) takes
 it back through `popArm`. -/
 def wp_allocproc_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [CurCtx]
     (Γ : SchedNames) (cpu : CPU) (k : KCtx) (γl γp : GName) (γk : KmemNames) (on : Option Nat)
-    (pav : Option Nat)
+    (pav : Option Nat) (tk : Bool) (Q : Int → IProp GF)
     (hnoff : k.noff + 2 < 2 ^ 31) (hK : allocprocSlots ≤ k.avail)
     (hlk : "kmem" ∉ k.locks) (hlp : "nextpid" ∉ k.locks) (hlq : "proc" ∉ k.locks) (htier : k.tier = KTier.kpt) : Prop :=
   kctx cpu k ∗ pcIs cpu allocprocAddr ∗ procsInv Γ ∗
   isLock γl kmemLockAddr "kmem" (kmemRes γk) ∗ isLock γp pidLockAddr "nextpid" pidLockPay ∗ kallocAvail γk on ∗
-  procsAvail Γ pav ∗
+  procsAvailAt Γ pav tk ∗ □ (MachFixedGS.killCred (hlc := hlc) (GF := GF) -∗ Q (-1)) ∗
   wpNext k.sie k.proc cpu (fun cpu' => iprop(∀ spie : Bool, ∀ spp : Bool, ∀ R' : RegMap,
     ⌜k.sie = false → spie = k.spie ∧ spp = k.spp⌝ -∗
     ((⌜R' 10#5 = 0#64⌝ ∗ kctx cpu' ((k.withSpie spie spp).withRegs R')) ∨
      (⌜R' 10#5 ≠ 0#64⌝ ∗ kctx cpu' (((k.pushOffAt spie spp).withRegs R').withLocks ("proc" :: k.locks)) ∗
       sieArm cpu' k.sie k.proc)) -∗
     pcIs cpu' (jumpPc (k.regs 1#5)) -∗
-    allocprocPost Γ cpu' γk on pav (R' 10#5) -∗
+    allocprocPost Γ cpu' γk on pav tk Q (R' 10#5) -∗
     ⌜calleeSaved k.regs R'⌝ -∗ wpLoop cpu'))
   ⊢ wpLoop (GF := GF) cpu
 
 structure ALLOCPROC : Prop where
   wp_allocproc : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [CurCtx] (Γ : SchedNames) (cpu : CPU) (k : KCtx)
-    (γl γp : GName) (γk : KmemNames) (on : Option Nat) (pav : Option Nat) hnoff hK hlk hlp hlq htier,
-    wp_allocproc_body (hlc := hlc) (GF := GF) Γ cpu k γl γp γk on pav hnoff hK hlk hlp hlq htier
+    (γl γp : GName) (γk : KmemNames) (on : Option Nat) (pav : Option Nat) (tk : Bool) (Q : Int → IProp GF)
+    hnoff hK hlk hlp hlq htier,
+    wp_allocproc_body (hlc := hlc) (GF := GF) Γ cpu k γl γp γk on pav tk Q hnoff hK hlk hlp hlq htier
 
 end Xv6

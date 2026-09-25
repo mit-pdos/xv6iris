@@ -549,7 +549,7 @@ def sysPipeCoreRest (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv) : IProp GF
   @pnameCells hlc GF _ ⟨curCtx, KTier.kpt⟩ pa (DFrac.own 1) V.name ∗
   @tfPageAt hlc GF _ ⟨curCtx, KTier.kpt⟩ V.upt.tfp V.tf ∗
   ⌜V.pvLazy = false → lazyFree V.upt.um V.sz⌝ ∗
-  @cwdRefAt hlc GF _ _ _ _ _ ⟨curCtx, KTier.kpt⟩ V.cwd V.cwi
+  @cwdRefAt hlc GF _ _ _ _ _ ⟨curCtx, KTier.kpt⟩ V.cwd V.cwi ∗ procGenAt curCtx pa pid V.gen
 
 /-- The trapframe cell and page `argaddr` reads, out and back. -/
 theorem sys_pipe_core_tf (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv) (M : Nat → List (BitVec 8)) :
@@ -596,7 +596,7 @@ def sysPipeCoreExt (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv) (P' : UPtd)
   @procPtAt hlc GF _ ⟨curCtx, KTier.kpt⟩ P' M' ∗
   @tfPageAt hlc GF _ ⟨curCtx, KTier.kpt⟩ P'.tfp V.tf ∗
   ⌜V.pvLazy = false → lazyFree P'.um V.sz⌝) ∗
-  @cwdRefAt hlc GF _ _ _ _ _ ⟨curCtx, KTier.kpt⟩ V.cwd V.cwi
+  @cwdRefAt hlc GF _ _ _ _ _ ⟨curCtx, KTier.kpt⟩ V.cwd V.cwi ∗ procGenAt curCtx pa pid V.gen
 
 theorem sysPipeCoreExt_eq (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv) (P' : UPtd)
     (M' : Nat → List (BitVec 8)) :

@@ -53,17 +53,30 @@ def freeprocIn (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv) (M : Nat → Li
   (if V.pagetable = 0#64 then emp else
     ⌜V.pagetable = pageAddr V.upt.root ∧ V.sz.toNat ≤ uvmMaxsz ∧ umBelow V.sz V.upt⌝ ∗ procPtAt V.upt M)
 
+/-- **The incarnation's two exclusive ghosts, both WHOLE, and the slot's half
+of `p->xstate`** (Rocq `wp_freeproc_sconf_body`'s `slot_gen pa (DfracOwn 1)
+g`, `pid_reg_rest pid g`, `∃ xsv, p_xstate pa ↦₄{1/2} xsv`; D8 wiring).  At
+the caller's name `g`, a free parameter and not `V.gen`: allocproc's failure
+tails hold the generation the pid section MINTED while the block they carry
+is still the dormant one they took.  THIS IS WHERE A GENERATION DIES: the
+slot generation goes back into the UNUSED block (which records `g`), and the
+pid registration (with `p->lock`'s eighth, out of the killed row) is DELETED
+from `pid_lock`'s register at the `p->pid = 0` store.  The xstate half joins
+`p->lock`'s at `p->xstate = 0` and goes back into the UNUSED block. -/
+def freeprocGen (pa : BitVec 64) (pid : BitVec 32) (g : GName) : IProp GF := iprop%
+  slotGen pa (.own 1) g ∗ pidRegRest pid g ∗ (∃ xsv : BitVec 32, wordPointsTo (pXstate pa) 4 xsHalf xsv)
+
 end
 
 def wp_freeproc_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [CurCtx]
     (Γ : SchedNames) (cpu : CPU) (k : KCtx) (γl γp : GName) (γk : KmemNames) (j : Nat) (st : BitVec 32) (ch : BitVec 64)
-    (pid : BitVec 32) (V : ProcPriv) (M : Nat → List (BitVec 8))
+    (pid : BitVec 32) (V : ProcPriv) (M : Nat → List (BitVec 8)) (g : GName)
     (hj : j < NPROC) (hp : k.regs 10#5 = procAddr j) (hst : st = USED ∨ st = ZOMBIE)
     (hnoff : k.noff + 1 < 2 ^ 31) (hK : freeprocSlots ≤ k.avail) (hsie : k.sie = false)
     (hlk : "kmem" ∉ k.locks) (hlp : "nextpid" ∉ k.locks) (htier : k.tier = KTier.kpt) : Prop :=
   kctx cpu k ∗ pcIs cpu freeprocAddr ∗ isLock γl kmemLockAddr "kmem" (kmemRes γk) ∗ kallocAvail γk none ∗
   isLock γp pidLockAddr "nextpid" pidLockPay ∗
-  procHeld Γ cpu j st ch ∗ freeprocIn (procAddr j) pid V M ∗
+  procHeld Γ cpu j st ch ∗ freeprocIn (procAddr j) pid V M ∗ freeprocGen (procAddr j) pid g ∗
   wpNext k.sie k.proc cpu (fun cpu' => iprop(∀ spie : Bool, ∀ spp : Bool, ∀ R' : RegMap,
     ⌜k.sie = false → spie = k.spie ∧ spp = k.spp⌝ -∗
     kctx cpu' ((k.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k.regs 1#5)) -∗
@@ -74,7 +87,7 @@ def wp_freeproc_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G
 structure FREEPROC : Prop where
   wp_freeproc : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [CurCtx] (Γ : SchedNames) (cpu : CPU) (k : KCtx)
     (γl γp : GName) (γk : KmemNames) (j : Nat) (st : BitVec 32) (ch : BitVec 64) (pid : BitVec 32) (V : ProcPriv)
-    (M : Nat → List (BitVec 8)) hj hp hst hnoff hK hsie hlk hlp htier,
-    wp_freeproc_body (hlc := hlc) (GF := GF) Γ cpu k γl γp γk j st ch pid V M hj hp hst hnoff hK hsie hlk hlp htier
+    (M : Nat → List (BitVec 8)) (g : GName) hj hp hst hnoff hK hsie hlk hlp htier,
+    wp_freeproc_body (hlc := hlc) (GF := GF) Γ cpu k γl γp γk j st ch pid V M g hj hp hst hnoff hK hsie hlk hlp htier
 
 end Xv6

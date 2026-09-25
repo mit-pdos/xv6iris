@@ -46,6 +46,16 @@ target's payload at -1.
    instantiates at it unchanged.  Reported (MachGS dependency).
 3. `mword_of_int 0 : mword 32` is `0#32`; `bv_unsigned pid` is
    `pid.toNat`.
+4. **THE FREE ARM ALSO ADMITS THE KILLER'S CREDENTIAL** (`kl = 0 ∨ □ Wk`,
+   D8 wiring).  Rocq's image has xv6 64c58ba2 ("prevent kill(0) from marking
+   UNUSED proc as killed"), so its kkill never reaches a free slot and the
+   free arm is `kill_free kl` alone.  The Lean image (163d39be) PREDATES that
+   fix: `kkill(0)` matches every UNUSED slot and stores 1.  The store is paid
+   with the credential the killer holds (`killPaid_kill` needs no nonzero
+   pid), and allocproc founds a slot a `kill(0)` marked on the PAID arm --
+   the fresh one-shot fired, the death payment the creator's wand applied to
+   the credential (`killPaid_found`).  Retire when the image is bumped past
+   64c58ba2.
 
 Imports only definitional files.
 -/
@@ -176,11 +186,12 @@ section KillPaid
 variable {GF : BundledGFunctors} [CtokG GF] [WchG GF]
 
 /-- Rocq `kill_paid`, at the credential `Wk` (deviation 2): an unused slot's
-cell is 0 with a zero flag; a live slot's row is keyed at the generation its
-pid's registration eighth names, beside the persistent reading of its payload
-and the published price `□ (Wk -∗ Q (-1))`. -/
+cell is 0 with a zero flag -- OR THE KILLER'S CREDENTIAL (deviation 4); a live
+slot's row is keyed at the generation its pid's registration eighth names,
+beside the persistent reading of its payload and the published price
+`□ (Wk -∗ Q (-1))`. -/
 def killPaidAt (Wk : IProp GF) (pid : BitVec 32) (kl : BitVec 32) : IProp GF :=
-  iprop((⌜pid.toNat = 0⌝ ∗ ⌜killFree kl⌝) ∨
+  iprop((⌜pid.toNat = 0⌝ ∗ (⌜killFree kl⌝ ∨ □ Wk)) ∨
     (⌜pid.toNat ≠ 0⌝ ∗ ∃ (gn : GName) (Q : Int → IProp GF),
       pidReg pid (.own qeighth) gn ∗ myPay gn Q ∗ □ (Wk -∗ Q (-1)) ∗ killRow gn kl))
 
@@ -190,7 +201,18 @@ theorem killPaid_zero (Wk : IProp GF) (pid : BitVec 32) (kl : BitVec 32) (h : pi
   ileft
   isplitr
   · ipureintro; exact h
-  · ipureintro; exact hk
+  · ileft; ipureintro; exact hk
+
+/-- THE FREE ARM A `kill(0)` LEAVES (deviation 4): the credential it paid
+with, at any flag. -/
+theorem killPaid_free_cred (Wk : IProp GF) (pid : BitVec 32) (kl : BitVec 32) (h : pid.toNat = 0) :
+    □ Wk ⊢ killPaidAt Wk pid kl := by
+  unfold killPaidAt
+  iintro #Hw
+  ileft
+  isplitr
+  · ipureintro; exact h
+  · iright; iexact Hw
 
 theorem killPaid_of_reg (Wk : IProp GF) (pid : BitVec 32) (kl : BitVec 32) (gn : GName)
     (Q : Int → IProp GF) (hnz : pid.toNat ≠ 0) :
@@ -213,12 +235,18 @@ theorem killPaid_of_reg (Wk : IProp GF) (pid : BitVec 32) (kl : BitVec 32) (gn :
 /-- THE PUBLICATION'S USE: a party that holds the credential re-closes the
 payload at ANY nonzero flag, firing the one-shot (kkill's / setkilled's
 payment). -/
-theorem killPaid_kill (Wk : IProp GF) (pid : BitVec 32) (kl kl' : BitVec 32) (hpnz : pid.toNat ≠ 0)
+theorem killPaid_kill (Wk : IProp GF) (pid : BitVec 32) (kl kl' : BitVec 32)
     (hknz : kl' ≠ 0#32) :
     □ Wk ∗ killPaidAt Wk pid kl ⊢ |==> killPaidAt Wk pid kl' := by
   unfold killPaidAt
   iintro ⟨#Hsup, (⟨%hz, -⟩ | ⟨%hnz, ⟨%gn, %Q, Hr, #Hmy, #Hw, Hrow⟩⟩)⟩
-  · exact absurd hz hpnz
+  · -- a FREE slot (deviation 4: the image's kkill does not refuse pid 0):
+    -- the killer's credential is what the free arm keeps
+    imodintro
+    ileft
+    isplitr
+    · ipureintro; exact hz
+    · iright; iexact Hsup
   imod killRow_fire gn kl $$ Hrow with #Hs
   imodintro
   iright
@@ -322,6 +350,140 @@ theorem killPaid_kill_two (Wk : IProp GF) (pid : BitVec 32) (kl kl' : BitVec 32)
   isplitr
   · iexact Hs
   · iexact Howed
+
+/-- WHAT AN UNUSED SLOT'S PAYLOAD SAYS ABOUT THE FLAG (Rocq `kill_paid_flag`):
+at a zero pid the row is on its free arm, whose flag is zero. -/
+theorem killPaid_flag (Wk : IProp GF) (pid : BitVec 32) (kl : BitVec 32) (h : pid.toNat = 0) :
+    killPaidAt (GF := GF) Wk pid kl ⊢ ⌜killFree kl⌝ ∨ □ Wk := by
+  unfold killPaidAt
+  iintro (⟨-, H⟩ | ⟨%hnz, -⟩)
+  · iexact H
+  · exact absurd h hnz
+
+/-- ALLOCPROC FOUNDS THE NEW INCARNATION'S ROW (Rocq `ProofAllocproc`'s
+`kill_paid_of_reg` on `kill_row_zero`) out of what the UNUSED slot's free arm
+said: a zero flag goes on the zero arm with the fresh one-shot PENDING; a flag
+a `kill(0)` set (deviation 4) goes on the paid arm -- the one-shot is fired
+and the death payment is the creator's wand applied to the killer's
+credential. -/
+theorem killPaid_found (Wk : IProp GF) (pid : BitVec 32) (kl : BitVec 32) (gn : GName)
+    (Q : Int → IProp GF) (hnz : pid.toNat ≠ 0) :
+    (⌜killFree kl⌝ ∨ □ Wk) ∗ killPend gn ∗ pidReg pid (.own qeighth) gn ∗ myPay gn Q ∗
+      □ (Wk -∗ Q (-1)) ⊢ |==> killPaidAt Wk pid kl := by
+  iintro ⟨Hfl, Hp, Hr, #Hmy, #Hw⟩
+  by_cases hk : kl = 0#32
+  · imodintro
+    iapply killPaid_of_reg Wk pid kl gn Q hnz
+    iframe Hr Hmy Hw
+    rw [hk]
+    iapply killRow_zero gn $$ Hp
+  · icases Hfl with (%hf | #Hc)
+    · exact absurd hf hk
+    imod killPend_fire gn $$ Hp with #Hs
+    imodintro
+    iapply killPaid_of_reg Wk pid kl gn Q hnz
+    iframe Hr Hmy Hw
+    iapply killRow_of_owed gn kl hk
+    isplitr
+    · iexact Hs
+    iapply killOwed_of gn Q
+    isplitr
+    · iexact Hmy
+    · iapply Hw $$ Hc
+
+/-- WHAT A HOLDER OF A SHARE OF THE REGISTRATION READS OFF THE ROW (Rocq
+`kill_paid_agree`): the row is at ITS generation; the share comes back. -/
+theorem killPaid_agree (Wk : IProp GF) (pid : BitVec 32) (kl : BitVec 32) (dq : DFrac) (gn : GName) :
+    killPaidAt (GF := GF) Wk pid kl ∗ pidReg pid dq gn ⊢
+      ((⌜pid.toNat = 0⌝ ∗ (⌜killFree kl⌝ ∨ □ Wk)) ∨
+        (⌜pid.toNat ≠ 0⌝ ∗ ∃ Q : Int → IProp GF,
+          pidReg pid (.own qeighth) gn ∗ myPay gn Q ∗ □ (Wk -∗ Q (-1)) ∗ killRow gn kl)) ∗
+      pidReg pid dq gn := by
+  unfold killPaidAt
+  iintro ⟨(⟨%hz, Hf⟩ | ⟨%hnz, ⟨%gn', %Q, Hr, #Hmy, #Hw, Hk⟩⟩), Hmine⟩
+  · iframe Hmine
+    ileft
+    isplitr
+    · ipureintro; exact hz
+    · iexact Hf
+  · icases killPaid_reg_keep pid dq gn gn' $$ [Hmine Hr] with ⟨%e, Hmine, Hr⟩
+    · isplitl [Hmine]
+      · iexact Hmine
+      · iexact Hr
+    subst e
+    iframe Hmine
+    iright
+    isplitr
+    · ipureintro; exact hnz
+    iexists Q
+    isplitl [Hr]
+    · iexact Hr
+    isplitr
+    · iexact Hmy
+    isplitr
+    · iexact Hw
+    · iexact Hk
+
+/-- WHAT `killed()` READS OUT BESIDE THE VALUE (Rocq `kill_paid_shot`): at a
+nonzero flag, the incarnation's persistent one-shot; the row and the share
+go back. -/
+theorem killPaid_shot (Wk : IProp GF) (pid kl : BitVec 32) (dq : DFrac) (gn : GName)
+    (hpnz : pid.toNat ≠ 0) :
+    killPaidAt (GF := GF) Wk pid kl ∗ pidReg pid dq gn ⊢
+      killPaidAt Wk pid kl ∗ pidReg pid dq gn ∗ (⌜kl = 0#32⌝ ∨ killShot gn) := by
+  iintro ⟨Hkp, Hmine⟩
+  icases killPaid_agree Wk pid kl dq gn $$ [Hkp Hmine] with ⟨Harm, Hmine⟩
+  · iframe Hkp Hmine
+  icases Harm with (⟨%hz, -⟩ | ⟨%hnz, ⟨%Q, Hr, #Hmy, #Hw, Hrow⟩⟩)
+  · exact absurd hz hpnz
+  · by_cases hk : kl = 0#32
+    · iframe Hmine
+      isplitl [Hr Hrow]
+      · iapply killPaid_of_reg Wk pid kl gn Q hnz
+        iframe Hr Hmy Hw Hrow
+      · ileft; ipureintro; exact hk
+    · icases killRow_shot gn kl hk $$ Hrow with ⟨#Hs, Hrow⟩
+      iframe Hmine
+      isplitl [Hr Hrow]
+      · iapply killPaid_of_reg Wk pid kl gn Q hnz
+        iframe Hr Hmy Hw Hrow
+      · iright; iexact Hs
+
+/-- ...AND THE CONVERSE (Rocq `kill_paid_shot_nz`): a holder of the shot
+reads the flag as nonzero. -/
+theorem killPaid_shot_nz (Wk : IProp GF) (pid kl : BitVec 32) (dq : DFrac) (gn : GName)
+    (hnz : pid.toNat ≠ 0) :
+    killPaidAt (GF := GF) Wk pid kl ∗ pidReg pid dq gn ∗ killShot gn ⊢
+      killPaidAt Wk pid kl ∗ pidReg pid dq gn ∗ ⌜kl ≠ 0#32⌝ := by
+  iintro ⟨Hkp, Hmine, #Hs⟩
+  icases killPaid_agree Wk pid kl dq gn $$ [Hkp Hmine] with ⟨Harm, Hmine⟩
+  · iframe Hkp Hmine
+  icases Harm with (⟨%hz, -⟩ | ⟨-, ⟨%Q, Hr, #Hmy, #Hw, Hrow⟩⟩)
+  · exact absurd hz hnz
+  icases killRow_shot_nz gn kl $$ [Hrow] with ⟨Hrow, %hknz⟩
+  · iframe Hrow Hs
+  iframe Hmine
+  isplitl [Hr Hrow]
+  · iapply killPaid_of_reg Wk pid kl gn Q hnz
+    iframe Hr Hmy Hw Hrow
+  · ipureintro; exact hknz
+
+/-- THE TAKE, AND IT IS KEXIT'S ALONE (Rocq `kill_paid_take`): the shot and
+the process's own spent marker, exchanged for the deposited death payment. -/
+theorem killPaid_take (Wk : IProp GF) (pid kl : BitVec 32) (dq : DFrac) (gn : GName)
+    (hpnz : pid.toNat ≠ 0) :
+    killShot (GF := GF) gn ∗ takenAt gn ∗ pidReg pid dq gn ∗ killPaidAt Wk pid kl ⊢
+      killOwed gn ∗ pidReg pid dq gn ∗ killPaidAt Wk pid kl := by
+  iintro ⟨#Hs, Ht, Hmine, Hkp⟩
+  icases killPaid_agree Wk pid kl dq gn $$ [Hkp Hmine] with ⟨Harm, Hmine⟩
+  · iframe Hkp Hmine
+  icases Harm with (⟨%hz, -⟩ | ⟨%hnz, ⟨%Q, Hr, #Hmy, #Hw, Hrow⟩⟩)
+  · exact absurd hz hpnz
+  icases killRow_take gn kl $$ [Ht Hrow] with ⟨Howed, Hrow⟩
+  · iframe Hs Ht Hrow
+  iframe Howed Hmine
+  iapply killPaid_of_reg Wk pid kl gn Q hnz
+  iframe Hr Hmy Hw Hrow
 
 end KillPaid
 

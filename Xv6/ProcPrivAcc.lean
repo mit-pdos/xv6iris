@@ -26,12 +26,11 @@ accessors over `procPrivFd` cannot live in `ProcInv.lean`; this is its
 sibling, one layer up.  Definitional: no `wp`.
 
 ## DEVIATIONS from Rocq (process layer; flagged to the coordinator)
-1. **The block's D8 conjuncts are absent** (`first_tok`, `∃Q, gen_kq ∗
-   my_pay`, the `p->xstate` half, `gen_halves_priv`), as in `procPrivFd`
-   itself (`ProcInv` deviation 2).  Every accessor here leaves them in the
-   block untouched in Rocq (each is framed straight through), so when they
-   join `procPrivCoreNoctxAt` the statements do not change; only the proofs'
-   intro patterns grow.
+1. (Closed by the D8 wiring.)  The block's D8 conjuncts (`first_tok`, `∃Q,
+   gen_kq ∗ my_pay`, the `p->xstate` half, `gen_halves_priv`) now ride the
+   core as one row, `FdTable.procGenAt`; every accessor here frames it
+   straight through, as Rocq's do, so no statement changed.  Rocq's `GenId`
+   binder has no Lean counterpart yet.
 2. **Lean's `ProcPriv` stores `p->pagetable` / `p->trapframe` values**
    (`V.pagetable` / `V.trapframe`, pinned by the block's pure row to
    `pageAddr V.upt.root` / `.tfp`), where Rocq's cells hold
@@ -71,7 +70,7 @@ open LeanRV64D
 set_option linter.unusedSectionVars false
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [FileG GF] [IcacheG GF] [SleepLockG GF] [IcboxG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [OffboxG GF] [OffboxBoxG GF] [Icfg] [CurCtx]
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [FileG GF] [IcacheG GF] [SleepLockG GF] [IcboxG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [OffboxG GF] [OffboxBoxG GF] [BcacheG GF] [DiskG GF] [LogG GF] [FsBlocksG GF] [IregG GF] [FsTopG GF] [FsLinkG GF] [Appcfg GF] [Fscfg] [Icfg] [CurCtx]
 
 /-! ## Halving a block cell (Rocq `word_split14` / `word_join14`) -/
 
@@ -246,10 +245,10 @@ theorem procPrivFd_cwd (γ : FileNames) (pa : BitVec 64) (pid : BitVec 32) (V : 
         @cwdRefAt hlc GF _ _ _ _ _ ⟨curCtx, KTier.kpt⟩ v' z' -∗
         procPrivFd γ pa pid { V with cwd := v', cwi := z' } M) := by
   unfold procPrivFd procPrivCoreNoctxAt procPrivBareAt procFieldsNoOfile
-  iintro ⟨⟨⟨%h, Hpid, ⟨Hk, Hs, Hpg, Htf, Hcwd, Hnm⟩, Hpt, Htfp, %hlz⟩, Hc⟩, Ho⟩
+  iintro ⟨⟨⟨%h, Hpid, ⟨Hk, Hs, Hpg, Htf, Hcwd, Hnm⟩, Hpt, Htfp, %hlz⟩, Hc, Hg⟩, Ho⟩
   iframe Hcwd Hc
   iintro %v' %z' Hcwd Hc
-  iframe Hpid Hk Hs Hpg Htf Hcwd Hnm Hpt Htfp Hc Ho
+  iframe Hpid Hk Hs Hpg Htf Hcwd Hnm Hpt Htfp Hc Hg Ho
   isplitl []
   · ipureintro; exact h
   · ipureintro; exact hlz
@@ -269,13 +268,13 @@ theorem procPrivFd_cwdPid (γ : FileNames) (pa : BitVec 64) (pid : BitVec 32) (V
         @wordPointsTo hlc GF _ ⟨curCtx, KTier.kpt⟩ (pPid pa) 4 (DFrac.own (1 : Qp).half.half) pid -∗
         procPrivFd γ pa pid { V with cwd := v', cwi := z' } M) := by
   unfold procPrivFd procPrivCoreNoctxAt procPrivBareAt procFieldsNoOfile pidPriv
-  iintro ⟨⟨⟨%h, Hpid, ⟨Hk, Hs, Hpg, Htf, Hcwd, Hnm⟩, Hpt, Htfp, %hlz⟩, Hc⟩, Ho⟩
+  iintro ⟨⟨⟨%h, Hpid, ⟨Hk, Hs, Hpg, Htf, Hcwd, Hnm⟩, Hpt, Htfp, %hlz⟩, Hc, Hg⟩, Ho⟩
   icases procPrivAcc_split curCtx _ 4 (1 : Qp).half _ $$ Hpid with ⟨Hpid, Hpid1⟩
   iframe Hcwd Hc Hpid
   iintro %v' %z' Hcwd Hc Hpid
   ihave Hpid := procPrivAcc_join curCtx _ 4 (1 : Qp).half _ $$ [Hpid Hpid1]
   · iframe
-  iframe Hpid Hk Hs Hpg Htf Hcwd Hnm Hpt Htfp Hc Ho
+  iframe Hpid Hk Hs Hpg Htf Hcwd Hnm Hpt Htfp Hc Hg Ho
   isplitl []
   · ipureintro; exact h
   · ipureintro; exact hlz

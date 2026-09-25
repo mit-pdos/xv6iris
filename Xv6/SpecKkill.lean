@@ -3,6 +3,11 @@ Specification of `kkill` (kernel/proc.c): `kkill(pid)` scans the table for
 the pid, sets the `killed` flag and wakes a sleeper (`0`), or returns `-1`.
 Generic in SIE and depth (`"proc"` not held).  kkill needs 16 slots.
 
+Setting `p->killed` nonzero costs the application's price of a kill
+(`KillRow.killPaidAt`'s row: "zero, or paid"), so the caller hands the
+persistent credential `□ MachFixedGS.killCred` (Rocq `□ riscv_kill_cred`),
+which the row's published wand turns into the target's `Q (-1)`.
+
 Imports only definitional files (never a `Code*` or `Proof*` file).
 -/
 import MachCSL.WpSmodeFrame
@@ -23,6 +28,7 @@ def wp_kkill_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF
     (Γ : SchedNames) (cpu : CPU) (k : KCtx)
     (hnoff : k.noff + 1 < 2 ^ 31) (hK : 16 ≤ k.avail) (hlk : "proc" ∉ k.locks) (htier : k.tier = KTier.kpt) : Prop :=
   kctx cpu k ∗ pcIs cpu kkillAddr ∗ procsInv Γ ∗
+  □ MachFixedGS.killCred (hlc := hlc) (GF := GF) ∗
   wpNext k.sie k.proc cpu (fun cpu' => iprop(∀ spie : Bool, ∀ spp : Bool, ∀ R' : RegMap,
     ⌜k.sie = false → spie = k.spie ∧ spp = k.spp⌝ -∗
     kctx cpu' ((k.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k.regs 1#5)) -∗

@@ -525,7 +525,7 @@ end
 section
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
   [FileG GF] [IcacheG GF] [SleepLockG GF] [IcboxG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [OffboxG GF] [OffboxBoxG GF]
-  [Icfg] [X : CurCtx]
+  [BcacheG GF] [DiskG GF] [LogG GF] [FsBlocksG GF] [IregG GF] [FsTopG GF] [FsLinkG GF] [Appcfg GF] [Fscfg] [Icfg] [X : CurCtx]
 
 /-- A null `int *pfd` owes argfd nothing (Rocq `ofd_out_null`). -/
 theorem sysfile_ofdOut_null (w : BitVec 32) : ⊢ ofdOut (GF := GF) 0#64 w := by
@@ -679,7 +679,7 @@ end
 section
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
   [FileG GF] [IcacheG GF] [SleepLockG GF] [IcboxG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [OffboxG GF]
-  [OffboxBoxG GF] [Icfg] [CurCtx]
+  [OffboxBoxG GF] [BcacheG GF] [DiskG GF] [LogG GF] [FsBlocksG GF] [IregG GF] [FsTopG GF] [FsLinkG GF] [Appcfg GF] [Fscfg] [Icfg] [CurCtx]
 
 /-- `argfd(i, pfd, pf)` (Rocq `Argfd.wp_argfd_sconf`), unpacked. -/
 theorem sysfile_argfd_wp (AF : ARGFD) (c : CPU) (k' : KCtx) (γ : FileNames) (pa : BitVec 64)

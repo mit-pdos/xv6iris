@@ -58,12 +58,28 @@ and `begin_op(); iput(p->cwd); end_op();`).  Rocq's `bio_ctx`, `log_ctx`,
 the disk fabric and `log_geom_ok` rows are `fsReady`'s projections; its
 `fs_crash_seam` / `gen_cert` are dropped (D11).
 
-THE SLOT'S CHILDREN ROW (D8 wiring, INTERIM, flagged): the ZOMBIE park
-returns the row to the slot at `∅` (`ProcDefs.procDormant`), so the caller
-brings `chFrag V.chg (procAddr j) ∅`.  Rocq's pre takes the row at the
-caller's set `cs` and EMPTIES it under `wait_lock` at the reparent
-(`WaitInv.orphans_own`); that needs the `waitInvResAt` payload, which is the
-next D8 layer, so until then the row comes in already empty.
+THE SLOT'S CHILDREN ROW (D8 wiring, Rocq `ch_frag (pv_chg) pj cs`): the
+caller brings its row at its own set `cs`, and kexit EMPTIES it under
+`wait_lock` at the reparent -- the children's parent cells move to `ip`
+(reparent's stores) and the row's set moves into init's orphan column
+(`WaitInvTies.childrenInv_reparent`, `WaitInv.orphans_add`) -- so what the
+ZOMBIE park returns to the slot is the row at `∅` (`ProcDefs.procDormant`).
+
+THE EXIT PAYMENT (Rocq `my_pay (pv_gen) Q` and `Q (kexit_status m) ∨
+(kexit_status m = -1 ∗ kill_shot (pv_gen))`): the process's own reading of
+the payload its exit owes its parent, and that payload PAID at the status
+this call stores into `p->xstate` (`xstateOf a0`) -- or, on the kernel's own
+tear-down at `-1`, the incarnation's kill one-shot, whose deposit kexit
+takes out of `p->lock`'s killed row with the spent marker its block carries
+(`KillRow.killRow_take`).  kexit parks the ESCROW (`ChildTok.exitTok`) in the
+ZOMBIE slot, keyed at what the cell reads, built from the kernel's quarter
+of the generation the block carries (`FdTable.procGenAt`).  The block's
+generation halves go to the ZOMBIE block (`SlotGen.genHalvesDorm`), its
+xstate half joins `p->lock`'s at the store and is re-split.
+
+`initproc` is read off `WaitInv.initIdentAt` (the published cell and init's
+sealed generation, Rocq `initproc ↦₈□ ip ∗ init_ident ip`): the reparent's
+orphan conjunct can only be re-established at an address named as init's.
 
 `initproc` may not exit (the C panics); the premise `procAddr j ≠ ip`
 against the published `initprocIs` is what rules that branch out.
@@ -117,19 +133,20 @@ def wp_kexit_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF
     (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
     (cpu : CPU) (k : KCtx) (γw γl : GName) (γ : FileNames) (γkl : GName) (γk : KmemNames)
     (on : Option Nat) (j : Nat) (pid : BitVec 32) (V : ProcPriv)
-    (M : Nat → List (BitVec 8)) (ip : BitVec 64)
+    (M : Nat → List (BitVec 8)) (ip : BitVec 64) (cs : ExtTreeSet GName compare) (Q : Int → IProp GF)
     (hj : j < NPROC) (hproc : k.proc = procAddr j) (hK : kexitSlots ≤ k.avail)
     (hsie : k.sie = false) (hnoff : k.noff = 0) (hlocks : k.locks = [])
     (htier : k.tier = KTier.kpt) (hinit : procAddr j ≠ ip) : Prop :=
   kctx cpu k ∗ pcIs cpu kexitAddr ∗ procsInv Γ ∗
   trapCsrs cpu ∗ cpuClaim cpu k.proc ∗ intrRes cpu ∗
-  isLock γw waitLockAddr "wait_lock" waitLockPay ∗ initprocIs ip ∗
+  isLock γw waitLockAddr "wait_lock" waitLockPay ∗ initIdentAt curCtx ip ∗
   isFtable γl γ ∗ panicEnv ∗
   isLock γkl kmemLockAddr "kmem" (kmemRes γk) ∗ kallocAvail γk on ∗
   fsReady (hlc := hlc) ∗ bslots 3 ∗
   fdSlots FDSPARE ∗ irefSlots IREFSPARE ∗
   procPrivFd γ (procAddr j) pid V M ∗ (∃ sts, fdFrags V.fdg sts) ∗
-  chFrag V.chg (procAddr j) ∅ ∗
+  chFrag V.chg (procAddr j) cs ∗
+  myPay V.gen Q ∗ (Q (xstateOf (k.regs 10#5)) ∨ (⌜xstateOf (k.regs 10#5) = -1⌝ ∗ killShot V.gen)) ∗
   (stackOwn k.sp k.avail -∗ stackOwn (V.kstack + 4096#64) 512)
   ⊢ wpLoop (GF := GF) cpu
 
@@ -142,19 +159,20 @@ def wp_kexit_eb_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G
     (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
     (cpu : CPU) (k : KCtx) (γw γl : GName) (γ : FileNames) (γkl : GName) (γk : KmemNames)
     (on : Option Nat) (j : Nat) (pid : BitVec 32) (V : ProcPriv)
-    (M : Nat → List (BitVec 8)) (ip : BitVec 64)
+    (M : Nat → List (BitVec 8)) (ip : BitVec 64) (cs : ExtTreeSet GName compare) (Q : Int → IProp GF)
     (hj : j < NPROC) (hproc : k.proc = procAddr j) (hK : kexitSlots ≤ k.avail)
     (hnoff : k.noff = 0)
     (htier : k.tier = KTier.kpt) (hinit : procAddr j ≠ ip) : Prop :=
   kctx cpu k ∗ pcIs cpu kexitAddr ∗ procsInv Γ ∗
   trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗
-  isLock γw waitLockAddr "wait_lock" waitLockPay ∗ initprocIs ip ∗
+  isLock γw waitLockAddr "wait_lock" waitLockPay ∗ initIdentAt curCtx ip ∗
   isFtable γl γ ∗ panicEnv ∗
   isLock γkl kmemLockAddr "kmem" (kmemRes γk) ∗ kallocAvail γk on ∗
   fsReady (hlc := hlc) ∗ bslots 3 ∗
   fdSlots FDSPARE ∗ irefSlots IREFSPARE ∗
   procPrivFd γ (procAddr j) pid V M ∗ (∃ sts, fdFrags V.fdg sts) ∗
-  chFrag V.chg (procAddr j) ∅ ∗
+  chFrag V.chg (procAddr j) cs ∗
+  myPay V.gen Q ∗ (Q (xstateOf (k.regs 10#5)) ∨ (⌜xstateOf (k.regs 10#5) = -1⌝ ∗ killShot V.gen)) ∗
   (stackOwn k.sp (trapRes k.sie + k.avail) -∗ stackOwn (V.kstack + 4096#64) 512)
   ⊢ wpLoop (GF := GF) cpu
 
@@ -167,8 +185,9 @@ structure KEXIT : Prop where
     (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
     (cpu : CPU) (k : KCtx) (γw γl : GName) (γ : FileNames) (γkl : GName) (γk : KmemNames)
     (on : Option Nat) (j : Nat) (pid : BitVec 32) (V : ProcPriv)
-    (M : Nat → List (BitVec 8)) (ip : BitVec 64) hj hproc hK hnoff htier hinit,
-    wp_kexit_eb_body (hlc := hlc) (GF := GF) Γ cpu k γw γl γ γkl γk on j pid V M ip
+    (M : Nat → List (BitVec 8)) (ip : BitVec 64) (cs : ExtTreeSet GName compare) (Q : Int → IProp GF)
+    hj hproc hK hnoff htier hinit,
+    wp_kexit_eb_body (hlc := hlc) (GF := GF) Γ cpu k γw γl γ γkl γk on j pid V M ip cs Q
       hj hproc hK hnoff htier hinit
 
 /-- The interrupts-off instance of `wp_kexit_eb` (the complement is the
@@ -179,16 +198,17 @@ theorem KEXIT.wp_kexit (A : KEXIT) {hlc : HasLC} {GF : BundledGFunctors} [MachGS
     [Appcfg GF] [FileG GF] [Fscfg] [Icfg] [CurCtx] (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
     (cpu : CPU) (k : KCtx) (γw γl : GName) (γ : FileNames) (γkl : GName) (γk : KmemNames)
     (on : Option Nat) (j : Nat) (pid : BitVec 32) (V : ProcPriv)
-    (M : Nat → List (BitVec 8)) (ip : BitVec 64) hj hproc hK hsie hnoff hlocks htier hinit :
-    wp_kexit_body (hlc := hlc) (GF := GF) Γ cpu k γw γl γ γkl γk on j pid V M ip
+    (M : Nat → List (BitVec 8)) (ip : BitVec 64) (cs : ExtTreeSet GName compare) (Q : Int → IProp GF)
+    hj hproc hK hsie hnoff hlocks htier hinit :
+    wp_kexit_body (hlc := hlc) (GF := GF) Γ cpu k γw γl γ γkl γk on j pid V M ip cs Q
       hj hproc hK hsie hnoff hlocks htier hinit := by
-  have h := A.wp_kexit_eb (hlc := hlc) (GF := GF) Γ cpu k γw γl γ γkl γk on j pid V M ip hj hproc hK hnoff htier hinit
+  have h := A.wp_kexit_eb (hlc := hlc) (GF := GF) Γ cpu k γw γl γ γkl γk on j pid V M ip cs Q hj hproc hK hnoff htier hinit
   unfold wp_kexit_eb_body at h
   unfold wp_kexit_body
   rw [hsie, trapRes_off] at h
   simp only [trapCsrsExt_false, cpuClaimExt_false] at h
-  iintro ⟨Hk, Hpc, Hpi, Htc, Hcl, Hir, Hwl, Hin, Hft, Hpe, Hkl, Hav, Hrdy, Hbs, Hfs, Hirs, Hpr, Hfr, Hch, Hcl2⟩
+  iintro ⟨Hk, Hpc, Hpi, Htc, Hcl, Hir, Hwl, Hin, Hft, Hpe, Hkl, Hav, Hrdy, Hbs, Hfs, Hirs, Hpr, Hfr, Hch, Hmy, Hpay, Hcl2⟩
   iapply h
-  iframe Hk Hpc Hpi Htc Hcl Hir Hwl Hin Hft Hpe Hkl Hav Hrdy Hbs Hfs Hirs Hpr Hfr Hch Hcl2
+  iframe Hk Hpc Hpi Htc Hcl Hir Hwl Hin Hft Hpe Hkl Hav Hrdy Hbs Hfs Hirs Hpr Hfr Hch Hmy Hpay Hcl2
 
 end Xv6

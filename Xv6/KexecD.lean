@@ -184,7 +184,7 @@ restated at the ambient context (the `KexecTail.kxc_priv_pid` shape). -/
 
 section Tier
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
-  [FileG GF] [IcacheG GF] [SleepLockG GF] [IcboxG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [OffboxG GF] [OffboxBoxG GF] [Icfg]
+  [FileG GF] [IcacheG GF] [SleepLockG GF] [IcboxG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [OffboxG GF] [OffboxBoxG GF] [BcacheG GF] [DiskG GF] [LogG GF] [FsBlocksG GF] [IregG GF] [FsTopG GF] [FsLinkG GF] [Appcfg GF] [Fscfg] [Icfg]
 
 theorem kxd_tfUpd [X : CurCtx] (hct : X.curTier = KTier.kpt) (γ : FileNames) (pa : BitVec 64)
     (pid : BitVec 32) (V : ProcPriv) (M : Nat → List (BitVec 8)) :

@@ -33,33 +33,30 @@ produces when a scheduler resumes it:
   handler;
 * `p->lock` HELD at RUNNING with the whole hart tag and the resuming hart's
   parked scheduler record -- what `swtch` handed over;
-* the process's private block, and its spare allowances (`liveAllow`:
+* the process's WHOLE private block (`procPrivFd`: the core -- bare block,
+  cwd reference, D8 generation row `procGenAt` with the `firstTok` forkret's
+  `if (first)` branches on -- and the descriptor table with its payloads)
+  beside its fragment bundle `fdFrags V.fdg sts` and the 14 save-area words
+  (`contextCells`, which the record hands back and forkret splits off
+  itself when it releases `p->lock`), its spare allowances (`liveAllow`:
   `fdSlots FDSPARE ∗ irefSlots IREFSPARE ∗ bslots 3`, wave 7 W7-C -- the rest
   of what its creator took out of the slot's dormant block; Rocq's newborn
   park carries them into the trap residue, `SpecForkretParkPaid`), and the
   slot's children row at `∅` (`chFrag V.chg (procAddr j) ∅`, D8 wiring;
   Rocq's `UsertrapRes.ut_own` carries it, where fork moves it).
 
-DEVIATION (process layer, flagged, wave 7 W7-C): Rocq's park also carries
-the newborn's file table (`proc_ofiles` at its fresh `pv_fdg`), its fragment
-bundle and its working directory's reference (`cwd_ref_at`), i.e. the whole
-`proc_priv`; the Lean record transports its payload across the context
-move (`ctx_move`, a `CtxMorph`), and the file-layer predicates have no
-`CtxMorph` yet (`FsReady` deviation 8, the D8 park machinery), so the record
-carries the non-fd block `procPriv` and the ghost-only allowances, and the
-creator (kfork / userinit) DROPS the file table and the cwd reference at
-the park.
-
-THE CONTEXT CELLS ARE INSIDE `procPriv` (`procFields` owns them), NOT a
-separate `ownCtxCells`: the record hands its 14 save-area words back to the
-resumed party, and they are the block's `contextCells`.  `forkret` splits
-them off itself when it releases `p->lock` (the RUNNING arm of
-`procSlotsAt` wants them raw).
+THE WHOLE BLOCK (D8 wiring; closes wave 7 W7-C's flagged deviation "the
+newborn record drops the file table, fragments and cwd reference"): the
+record transports its payload across the context move (`ctx_move`, a
+`CtxMorph`), and the file-layer predicates have their transports now
+(`FileMorph`, `EnvMorph.procPrivFd_morph`, `FileMorph.isPipe_morph`), so
+the record parks Rocq's whole `proc_priv` and `fd_frags`.
 
 Imports only definitional files.
 -/
 import Xv6.SchedCtx
 import Xv6.SpecAllocproc
+import Xv6.FdTable
 import MachCSL.WpSmodeIntr
 
 namespace Xv6
@@ -78,26 +75,34 @@ theorem jumpPc_forkretAddr : jumpPc forkretAddr = forkretAddr := by
 
 /-- **WP of `forkret`** (assumed): the resume wand of a fresh process's
 record. -/
-def wp_forkret_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [CurCtx]
+def wp_forkret_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+    [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
+    [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
+    [Appcfg GF] [FileG GF] [Fscfg] [Icfg] [CurCtx]
     (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
     (cpu : CPU) (R : RegMap) (spie spp intena : Bool) (root : BitVec 44)
-    (j : Nat) (ch : BitVec 64) (pid : BitVec 32) (V : ProcPriv) (M : Nat → List (BitVec 8))
+    (j : Nat) (ch : BitVec 64) (γ : FileNames) (pid : BitVec 32) (V : ProcPriv) (M : Nat → List (BitVec 8))
+    (sts : List FdState)
     (hj : j < NPROC) (hra : R 1#5 = forkretAddr) (hsp : R 2#5 = V.kstack + 4096#64) : Prop :=
   kctx cpu (resumedK R spie spp forkretStack intena root (procAddr j)) ∗
   pcIs cpu forkretAddr ∗ procsInv Γ ∗ trapCsrs cpu ∗ intrRes cpu ∗
   procHeld Γ cpu j RUNNING ch ∗ hartFull Γ j cpu ∗
   ▷ schedVcAt Γ cpu (cpuCtxAddr cpu) (procAddr j) ∗
-  procPriv (procAddr j) pid V M ∗ liveAllow ∗ chFrag V.chg (procAddr j) ∅
+  contextCells (procAddr j) (DFrac.own 1) V.context ∗
+  procPrivFd γ (procAddr j) pid V M ∗ fdFrags V.fdg sts ∗ liveAllow ∗ chFrag V.chg (procAddr j) ∅
   ⊢ wpLoop (GF := GF) cpu
 
 /-- **The `forkret` boundary** (assumed; the retired `FsEnv` boundary's last sibling): the user-mode
 return is out of scope. -/
 class ForkretIs : Prop where
-  wp_forkret : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [CurCtx]
+  wp_forkret : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+    [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
+    [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
+    [Appcfg GF] [FileG GF] [Fscfg] [Icfg] [CurCtx]
     (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
     (cpu : CPU) (R : RegMap) (spie spp intena : Bool) (root : BitVec 44)
-    (j : Nat) (ch : BitVec 64) (pid : BitVec 32) (V : ProcPriv) (M : Nat → List (BitVec 8))
-    hj hra hsp,
-    wp_forkret_body (hlc := hlc) (GF := GF) Γ cpu R spie spp intena root j ch pid V M hj hra hsp
+    (j : Nat) (ch : BitVec 64) (γ : FileNames) (pid : BitVec 32) (V : ProcPriv) (M : Nat → List (BitVec 8))
+    (sts : List FdState) hj hra hsp,
+    wp_forkret_body (hlc := hlc) (GF := GF) Γ cpu R spie spp intena root j ch γ pid V M sts hj hra hsp
 
 end Xv6

@@ -135,19 +135,21 @@ theorem kl_pay_intro (Γ : SchedNames) (ξ : CtxId) (j : Nat) :
     procLockResAt (GF := GF) Γ ξ (procAddr j) ⊢ procLockPay Γ j ξ := by
   unfold procLockPay; iintro H; iexact H
 
-/-- The three cells of `procPubRest`, named. -/
+/-- The cells of `procPubRest`, named, and the killed row. -/
 theorem kl_rest_elim (ξ : CtxId) (pa : BitVec 64) (kl xs pid : BitVec 32) :
-    @procPubRest hlc GF _ ⟨ξ, KTier.kpt⟩ pa kl xs pid ⊢
+    @procPubRest hlc GF _ ⟨ξ, KTier.kpt⟩ _ _ pa kl xs pid ⊢
       iprop(@wordPointsTo hlc GF _ ⟨ξ, KTier.kpt⟩ (pKilled pa) 4 (DFrac.own 1) kl ∗
-        @wordPointsTo hlc GF _ ⟨ξ, KTier.kpt⟩ (pXstate pa) 4 (DFrac.own 1) xs ∗
-        @wordPointsTo hlc GF _ ⟨ξ, KTier.kpt⟩ (pPid pa) 4 pidPub pid) := by
+        @wordPointsTo hlc GF _ ⟨ξ, KTier.kpt⟩ (pXstate pa) 4 xsHalf xs ∗
+        @wordPointsTo hlc GF _ ⟨ξ, KTier.kpt⟩ (pPid pa) 4 pidPub pid ∗
+        killPaidAt (MachFixedGS.killCred (hlc := hlc) (GF := GF)) pid kl) := by
   unfold procPubRest; iintro H; iexact H
 
 theorem kl_rest_intro (ξ : CtxId) (pa : BitVec 64) (kl xs pid : BitVec 32) :
     iprop(@wordPointsTo hlc GF _ ⟨ξ, KTier.kpt⟩ (pKilled pa) 4 (DFrac.own 1) kl ∗
-        @wordPointsTo hlc GF _ ⟨ξ, KTier.kpt⟩ (pXstate pa) 4 (DFrac.own 1) xs ∗
-        @wordPointsTo hlc GF _ ⟨ξ, KTier.kpt⟩ (pPid pa) 4 pidPub pid) ⊢
-      @procPubRest hlc GF _ ⟨ξ, KTier.kpt⟩ pa kl xs pid := by
+        @wordPointsTo hlc GF _ ⟨ξ, KTier.kpt⟩ (pXstate pa) 4 xsHalf xs ∗
+        @wordPointsTo hlc GF _ ⟨ξ, KTier.kpt⟩ (pPid pa) 4 pidPub pid ∗
+        killPaidAt (MachFixedGS.killCred (hlc := hlc) (GF := GF)) pid kl) ⊢
+      @procPubRest hlc GF _ ⟨ξ, KTier.kpt⟩ _ _ pa kl xs pid := by
   unfold procPubRest; iintro H; iexact H
 
 end

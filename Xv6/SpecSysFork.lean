@@ -24,12 +24,14 @@ THE RETURN VALUE is kfork's, unchanged: `-1` on either failure arm, or the
 child's pid in `[1, PIDMAX]`, sign-extended exactly as kfork left it
 (`kforkAns`, restated by name rather than unfolded).
 
-DEVIATION FROM ROCQ, inherited from the Lean `kfork` contract (used as is):
-Rocq's `kfork` additionally threads the child's user-execution slot
-(`uslot`), the parent's lend `Rc`, the exit payload `Q` / `child_tok`, the
-children row `ch_frag`, `fd_frags` and `first_done`/`park_world`; the Lean
-`kfork` spec has none of these (the child is parked under `procsInv` via
-`[ForkretIs]`), so neither does this wrapper.
+THE D8 ROWS are kfork's, forwarded (D8 wiring): the child's payload `Q` and
+its kill wand, `firstDone`, the caller's children row `chFrag V.chg pa csP`
+(moved on success, beside the parent's `childTok`), the ledger at
+`procsAvailAt Γ none false`.  DEVIATION FROM ROCQ, inherited from the Lean
+`kfork` contract: Rocq's `kfork` additionally threads the child's
+user-execution slot (`uslot`), the parent's lend `Rc` and
+`park_world`/`park_token` (8-P's park rows; the child is parked under
+`procsInv` via `[ForkretIs]`), so neither does this wrapper.
 
 `kfork` does not sleep (`filedup`/`idup` are non-blocking):
 like `kfork`'s, the contract is BALANCED and generic in the entry interrupt
@@ -62,6 +64,7 @@ def wp_sys_fork_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G
     (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ] [ForkretIs]
     (cpu : CPU) (k : KCtx) (γw γp γl : GName) (γk : KmemNames) (γft : GName) (γ : FileNames)
     (j : Nat) (pid : BitVec 32) (V : ProcPriv) (M : Nat → List (BitVec 8)) (stsP : List FdState)
+    (Q : Int → IProp GF) (csP : ExtTreeSet GName compare)
     (hj : j < NPROC) (hproc : k.proc = procAddr j) (hK : sysForkSlots ≤ k.avail)
     (hsie : k.sie = false) (hnoff : k.noff = 0) (hlocks : k.locks = [])
     (htier : k.tier = KTier.kpt) : Prop :=
@@ -69,16 +72,17 @@ def wp_sys_fork_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G
   trapCsrs cpu ∗ cpuClaim cpu k.proc ∗ intrRes cpu ∗
   isLock γw waitLockAddr "wait_lock" waitLockPay ∗
   isLock γp pidLockAddr "nextpid" pidLockPay ∗
-  isLock γl kmemLockAddr "kmem" (kmemRes γk) ∗ kallocAvail γk none ∗ procsAvail Γ none ∗
+  isLock γl kmemLockAddr "kmem" (kmemRes γk) ∗ kallocAvail γk none ∗ procsAvailAt Γ none false ∗
   isFtable γft γ ∗
   isItable2 fscItlock fscIc fscFs fscIreg fscCov fscLogst icfgNib icfgDev ∗
   itableInv (hlc := hlc) ∗ iregInv (hlc := hlc) fscIreg fscFs icfgIst icfgNib ∗
-  procPrivFd γ (procAddr j) pid V M ∗ fdFrags V.fdg stsP ∗
+  □ (MachFixedGS.killCred (hlc := hlc) (GF := GF) -∗ Q (-1)) ∗ firstDone (hlc := hlc) ∗
+  procPrivFd γ (procAddr j) pid V M ∗ fdFrags V.fdg stsP ∗ chFrag V.chg (procAddr j) csP ∗
   wpNext true k.proc cpu (fun cpu' => iprop(∀ (spie spp : Bool) (R' : RegMap) (rv : BitVec 32),
     ⌜calleeSaved k.regs R' ∧ R' 10#5 = BitVec.signExtend 64 rv ∧ kforkAns rv⌝ -∗
     kctx cpu' ((k.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k.regs 1#5)) -∗
     trapCsrs cpu' -∗ cpuClaim cpu' k.proc -∗ intrRes cpu' -∗
-    procPrivFd γ (procAddr j) pid V M -∗ fdFrags V.fdg stsP -∗ wpLoop cpu'))
+    kforkRet γ j pid V M stsP Q csP rv -∗ wpLoop cpu'))
   ⊢ wpLoop (GF := GF) cpu
 
 /-- **WP of `sys_fork()`, at either entry `SIE`** (Rocq `wp_sys_fork_sconf_body`):
@@ -90,17 +94,19 @@ def wp_sys_fork_eb_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [X
     (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ] [ForkretIs]
     (cpu : CPU) (k : KCtx) (γw γp γl : GName) (γk : KmemNames) (γft : GName) (γ : FileNames)
     (j : Nat) (pid : BitVec 32) (V : ProcPriv) (M : Nat → List (BitVec 8)) (stsP : List FdState)
+    (Q : Int → IProp GF) (csP : ExtTreeSet GName compare)
     (hj : j < NPROC) (hproc : k.proc = procAddr j) (hK : sysForkSlots ≤ k.avail)
     (hnoff : k.noff = 0) (htier : k.tier = KTier.kpt) : Prop :=
   kctx cpu k ∗ pcIs cpu sysForkAddr ∗ procsInv Γ ∗
   isLock γw waitLockAddr "wait_lock" waitLockPay ∗
   isLock γp pidLockAddr "nextpid" pidLockPay ∗
-  isLock γl kmemLockAddr "kmem" (kmemRes γk) ∗ kallocAvail γk none ∗ procsAvail Γ none ∗
+  isLock γl kmemLockAddr "kmem" (kmemRes γk) ∗ kallocAvail γk none ∗ procsAvailAt Γ none false ∗
   isFtable γft γ ∗
   isItable2 fscItlock fscIc fscFs fscIreg fscCov fscLogst icfgNib icfgDev ∗
   itableInv (hlc := hlc) ∗ iregInv (hlc := hlc) fscIreg fscFs icfgIst icfgNib ∗
-  procPrivFd γ (procAddr j) pid V M ∗ fdFrags V.fdg stsP ∗
-  wpNext k.sie k.proc cpu (kforkPost k γ j pid V M stsP)
+  □ (MachFixedGS.killCred (hlc := hlc) (GF := GF) -∗ Q (-1)) ∗ firstDone (hlc := hlc) ∗
+  procPrivFd γ (procAddr j) pid V M ∗ fdFrags V.fdg stsP ∗ chFrag V.chg (procAddr j) csP ∗
+  wpNext k.sie k.proc cpu (kforkPost k γ j pid V M stsP Q csP)
   ⊢ wpLoop (GF := GF) cpu
 
 /-- The interface of `sys_fork`. -/
@@ -111,8 +117,9 @@ structure SYSFORK : Prop where
     [Appcfg GF] [FileG GF] [Fscfg] [Icfg] [CurCtx]
     (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ] [ForkretIs]
     (cpu : CPU) (k : KCtx) (γw γp γl : GName) (γk : KmemNames) (γft : GName) (γ : FileNames)
-    (j : Nat) (pid : BitVec 32) (V : ProcPriv) (M : Nat → List (BitVec 8)) (stsP : List FdState) hj hproc hK hnoff htier,
-    wp_sys_fork_eb_body (hlc := hlc) (GF := GF) Γ cpu k γw γp γl γk γft γ j pid V M stsP
+    (j : Nat) (pid : BitVec 32) (V : ProcPriv) (M : Nat → List (BitVec 8)) (stsP : List FdState)
+    (Q : Int → IProp GF) (csP : ExtTreeSet GName compare) hj hproc hK hnoff htier,
+    wp_sys_fork_eb_body (hlc := hlc) (GF := GF) Γ cpu k γw γp γl γk γft γ j pid V M stsP Q csP
       hj hproc hK hnoff htier
 
 /-- The interrupts-off instance of `wp_sys_fork_eb`: the hart is pinned, so
@@ -123,20 +130,21 @@ theorem SYSFORK.wp_sys_fork (A : SYSFORK) {hlc : HasLC} {GF : BundledGFunctors} 
     [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
     [Appcfg GF] [FileG GF] [Fscfg] [Icfg] [CurCtx] (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ] [ForkretIs]
     (cpu : CPU) (k : KCtx) (γw γp γl : GName) (γk : KmemNames) (γft : GName) (γ : FileNames)
-    (j : Nat) (pid : BitVec 32) (V : ProcPriv) (M : Nat → List (BitVec 8)) (stsP : List FdState) hj hproc hK hsie hnoff hlocks htier :
-    wp_sys_fork_body (hlc := hlc) (GF := GF) Γ cpu k γw γp γl γk γft γ j pid V M stsP
+    (j : Nat) (pid : BitVec 32) (V : ProcPriv) (M : Nat → List (BitVec 8)) (stsP : List FdState)
+    (Q : Int → IProp GF) (csP : ExtTreeSet GName compare) hj hproc hK hsie hnoff hlocks htier :
+    wp_sys_fork_body (hlc := hlc) (GF := GF) Γ cpu k γw γp γl γk γft γ j pid V M stsP Q csP
       hj hproc hK hsie hnoff hlocks htier := by
-  have h := A.wp_sys_fork_eb (hlc := hlc) (GF := GF) Γ cpu k γw γp γl γk γft γ j pid V M stsP hj hproc hK hnoff htier
+  have h := A.wp_sys_fork_eb (hlc := hlc) (GF := GF) Γ cpu k γw γp γl γk γft γ j pid V M stsP Q csP hj hproc hK hnoff htier
   unfold wp_sys_fork_eb_body at h
   unfold wp_sys_fork_body
-  iintro ⟨H0, H1, H2, Htc, Hcl, Hir, H6, H7, H8, H9, H10, H11, H12, H13, H14, H15, H16, Hnext⟩
+  iintro ⟨H0, H1, H2, Htc, Hcl, Hir, H6, H7, H8, H9, H10, H11, H12, H13, H14, H15, H16, H17, H18, H19, Hnext⟩
   iapply h
-  iframe H0 H1 H2 H6 H7 H8 H9 H10 H11 H12 H13 H14 H15 H16
+  iframe H0 H1 H2 H6 H7 H8 H9 H10 H11 H12 H13 H14 H15 H16 H17 H18 H19
   rw [hsie]
   iapply wpNext_off_intro
   unfold kforkPost kforkPostB
-  iintro %spie %spp %R' %rv %hpost Hk Hpc ⟨Hpriv, Hfr⟩
+  iintro %spie %spp %R' %rv %hpost Hk Hpc Hret
   ihave Hn := wpNext_at true k.proc cpu cpu _ (fun _ => rfl) $$ Hnext
-  iapply Hn $$ %spie %spp %R' %rv %hpost Hk Hpc Htc Hcl Hir Hpriv Hfr
+  iapply Hn $$ %spie %spp %R' %rv %hpost Hk Hpc Htc Hcl Hir Hret
 
 end Xv6
