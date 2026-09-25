@@ -56,7 +56,7 @@ open Iris Iris.BI Iris.ProofMode Std MachCSL
 set_option linter.unusedSectionVars false
 
 section
-variable {GF : BundledGFunctors} [MonoListG GF BlockMap] [GhostMapG GF Nat (EraGS GF) RegMapF]
+variable {GF : BundledGFunctors} [Xv6G GF] [GhostMapG GF Nat (EraGS GF) RegMapF]
   [MonoNatG GF] [GhostVarG GF LogMirror] [GhostMapG GF Nat (BitVec 8) RegMapF]
   [FsLinkG GF] [FsTopG GF]
 

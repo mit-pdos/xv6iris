@@ -41,7 +41,7 @@ open Iris Iris.BI Iris.ProofMode Std MachCSL
 set_option linter.unusedSectionVars false
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachFixedGS hlc GF] [MonoListG GF BlockMap]
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachFixedGS hlc GF] [Xv6G GF]
   [FsLinkG GF] [FsTopG GF]
 
 /-- The record at an image, at the fixed layer's names (Rocq `P_fs_rec_at`). -/

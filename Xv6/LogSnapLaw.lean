@@ -43,7 +43,7 @@ set_option linter.unusedSectionVars false
 
 section
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachFixedGS hlc GF] [Xv6G GF] [FsBytesG GF]
-  [MonoListG GF BlockMap] [FsLinkG GF] [FsTopG GF]
+  [FsLinkG GF] [FsTopG GF]
 
 /-- THE CONCLUSION, AS ONE NAME: the next epoch at the map the commit jumps to,
 with the guest (Rocq `snap_law_out`). -/

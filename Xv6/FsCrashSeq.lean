@@ -41,7 +41,7 @@ open Iris Iris.BI Iris.ProofMode Std MachCSL
 set_option linter.unusedSectionVars false
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [MonoListG GF BlockMap]
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
   [FsLinkG GF] [FsTopG GF]
 
 /-- ONE LANDING ORDER (deviation 1): the first record permit, and from its

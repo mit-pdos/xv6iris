@@ -16,8 +16,8 @@ from there it is `LogInv`'s `log_flushed_bank` (batch C-2b).
 
 1. Rocq's two sections bind `lockG` / `CurCtx` / the durable snapshot's
    classes because they copy `FsCrash`'s binder lists verbatim; the Lean
-   sections bind only what the statements use (`MonoListG GF BlockMap` for the
-   history, `MachFixedGS` for the seam equations).
+   sections bind only what the statements use (`Xv6G` for the history's
+   `mlHistG`, `MachFixedGS` for the seam equations).
 
 ## NOT PORTED (crash brief D36; uses checked over `/shared/xv6rocq/iris/*.v`)
 
@@ -39,7 +39,7 @@ set_option linter.unusedSectionVars false
 /-! ## 1. The receipt, at the crash record's own gnames -/
 
 section
-variable {GF : BundledGFunctors} [MonoListG GF BlockMap]
+variable {GF : BundledGFunctors} [Xv6G GF]
 
 /-- "`D` is the `b`-th committed state" (Rocq `flushed_at`). -/
 def flushedAt (γs : FsCrashNames) (b : Nat) (D : BlockMap) : IProp GF :=
@@ -72,7 +72,7 @@ end
 /-! ## 2. The client-facing receipt -/
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachFixedGS hlc GF] [MonoListG GF BlockMap]
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachFixedGS hlc GF] [Xv6G GF]
 
 /-- `fsReceiptAny` with the batch NUMBER exposed (Rocq `flushed`). -/
 def flushed (b : Nat) (D : BlockMap) : IProp GF :=

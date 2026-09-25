@@ -284,8 +284,12 @@ class FileG (GF : BundledGFunctors) where
   process incarnation, named by `ProcPriv.fdg` (Rocq's `fdst_inG`, which
   rides `fdslotG`; here the file table's class owns the camera, rule 1) -/
   [fdstG : ElemG GF FdstF]
+  /-- a user program's descriptor table (Rocq `ufdG := ghost_mapG Σ nat
+  fdstate`, `Xv6/UserFd.lean`; D29), one map per program, named by its
+  ghost name -/
+  [gmUfdG : GhostMapG GF Nat FdState RegMapF]
 
-attribute [reducible, instance] FileG.gmRefG FileG.gvPayG FileG.fdstG
+attribute [reducible, instance] FileG.gmRefG FileG.gvPayG FileG.fdstG FileG.gmUfdG
 
 /-! ## The inode arm's parked core (NO `CurCtx`: ghost only) -/
 

@@ -26,10 +26,9 @@ why a fresh era can always swap (`fsArm_swap`).
 
 ## DEVIATIONS from Rocq
 
-1. **THE HISTORY CAMERA IS A BARE `MonoListG GF BlockMap` CONSTRAINT** (Rocq
-   `fsCrashG`'s one `inG Σ fs_histR`).  No `Xv6G` field carries it yet (the
-   one-instance rule: it belongs in `Xv6G` as `[mlHistG : MonoListG GF
-   BlockMap]`; reported, not edited -- no other instance of the type exists).
+1. **THE HISTORY CAMERA IS `Xv6G.mlHistG`** (Rocq `fsCrashG`'s one
+   `inG Σ fs_histR`), the one instance of `MonoListG GF BlockMap`; the
+   sections bind `[Xv6G GF]` rather than a separate class.
 2. Rocq's `mono_nat_auth_own γ 1 n` / `mono_nat_lb_own γ n` are
    `MonoNat.auth_own γ (DFrac.own 1) (.ofNat n)` / `MonoNat.lb_own γ (.ofNat n)`;
    `S g` is `g + 1`; `ghost_var γ (1/2) M` is `γ ↪VAR{.own (1 : Qp).half} M`;
@@ -66,7 +65,7 @@ structure FsCrashNames where
   start : GName
 
 section
-variable {GF : BundledGFunctors} [MonoListG GF BlockMap]
+variable {GF : BundledGFunctors} [Xv6G GF]
 
 /-! ## §2a The committed-history mono-list -/
 
