@@ -116,7 +116,7 @@ Qed.
 (* ====================================================================== *)
 
 Lemma fsimg_grep_size :
-  bv_unsigned (di_size (fs_dinode fsimg_P fsimg_sb GREP_INO)) = 44440.
+  bv_unsigned (di_size (fs_dinode fsimg_P fsimg_sb GREP_INO)) = 44496.
 Proof. vm_eq. Qed.
 
 Lemma fsimg_grep_nlink :

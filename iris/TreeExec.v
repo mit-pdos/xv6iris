@@ -169,7 +169,7 @@ Section TreeExec.
     □ (∀ (M : gmap Z (bv 8)) (fdv : list fdstate) (cs : gset gname)
          (pidv : mword 32),
          urun_rows N fdv -∗
-         image_entry f M av fdv cw secc cs pidv (ukn_pay N) Pay uslot) -∗
+         image_entry f M av fdv cw ProcDefs.secc_all cs pidv (ukn_pay N) Pay uslot) -∗
     image_entry_taint (tree_taint c) (ukn_pay N) uslot -∗
     □ (Pay -∗ R) -∗
     Pay -∗

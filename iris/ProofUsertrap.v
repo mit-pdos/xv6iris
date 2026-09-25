@@ -219,6 +219,8 @@ Section UtEntry.
           field, so [ProcDefs.pv_lazy] is the entry record's -- which is
           what [SpecUsertrap.ut_pro]'s seventh row states. *)
        ⌜pv_lazy V' = pv_lazy (us_V U)⌝ -∗
+       (* ...and its mask, likewise ([SpecUsertrap.ut_pro]'s eighth row) *)
+       ⌜pv_secc V' = pv_secc (us_V U)⌝ -∗
        pc_is (mword_of_int (UT + 0x30)) -∗
        sie_cap_gpr KT1 M (av - 4)%nat false (un_pj N) -∗
        cpu_own 0%nat false (un_pj N) false ∅ -∗ cpu_claim (un_pj N) -∗
@@ -669,7 +671,7 @@ Section UtEntry.
       iSplitL "Hb3"; [iExact "Hb3" | iExact "Hb4"]. }
     assert (HS3a4 : rget S3 Ra4 = ret_pc sepc_v)
       by (rgne; rewrite /S3; apply upd_eq).
-    iApply ("Hcont" $! S3 V' with "[%] [%] [%] [%] [%] [%] [%] [%] [%] [%] Hpc Hcg Hcpu Hclm
+    iApply ("Hcont" $! S3 V' with "[%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] Hpc Hcg Hcpu Hclm
               Hraw Henv Hfr").
     - exact HS3sp.
     - exact HS3s1.
@@ -682,6 +684,8 @@ Section UtEntry.
     - (* ...and the generation: the prologue writes one trapframe word *)
       rewrite /V'; destruct (us_V U); reflexivity.
     - (* ...and the lazy bit, for the generation's reason (lane LAZY-FLAG) *)
+      rewrite /V'; destruct (us_V U); reflexivity.
+    - (* ...and the mask *)
       rewrite /V'; destruct (us_V U); reflexivity.
   Qed.
 
@@ -1481,12 +1485,12 @@ Section UtSeal.
               Hms Hav Hsp Htp Hmiev Hmask Hmenvv
               with "Htext Hpc Hhw Hminv Hhs Hpriv Hms Hsc Hst Hep Hstv
                     Hmie Hmdl Hmenv Hgpr Htc Htrap Henv [Hcont Hxin Hfin Hein Hkin]").
-    iIntros (M V') "%HMsp %HMs1 %HMa0 %HcsM %HuptV %HtfV %HszV %HcwiV %HgenV %HlzV Hpc Hcg Hcpu Hclm Hraw Henv Hfr".
+    iIntros (M V') "%HMsp %HMs1 %HMa0 %HcsM %HuptV %HtfV %HszV %HcwiV %HgenV %HlzV %HscV Hpc Hcg Hcpu Hclm Hraw Henv Hfr".
     iApply (ut_dispatch N (MkUstate V Mu) (MkUstate V' Mu) pt ksp m M av (av - 4)%nat sepc_v sc_v stval_v
               mie_v menvcfg0 sts gn cs pid fdep Wk
               ltac:(cbn [us_V]; exact Hgnq)
               (conj HtfV (conj HuptV (conj HszV (conj eq_refl
-                 (conj HcwiV (conj HgenV HlzV))))))
+                 (conj HcwiV (conj HgenV (conj HlzV HscV)))))))
               Hwf Hav
               (trap_res_off (av - 4)%nat)
               ltac:(rewrite HuptV Hupt; reflexivity) Hksp Hsp HMsp HMs1 HMa0 HcsM

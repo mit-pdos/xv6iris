@@ -941,10 +941,15 @@ Section UtSysBlock.
         - (* exec, whose cwd inum the dispatcher's clause pins: exec is not
              chdir, so the clause's right arm is the one that holds *)
           left. split; [ rewrite <- Hnumeq; exact Hex | ].
-          cbn [us_V pv_cwi pv_gen pv_chg].
-          destruct Hcwig as [[H9 _] | Hc9];
-            [ exfalso; rewrite Hex in H9; discriminate H9 | ].
-          rewrite Hc9. exact HV1cwi.
+          split.
+          + cbn [us_V pv_cwi pv_gen pv_chg].
+            destruct Hcwig as [[H9 _] | Hc9];
+              [ exfalso; rewrite Hex in H9; discriminate H9 | ].
+            rewrite Hc9. exact HV1cwi.
+          + (* ...and exec keeps the mask: not seccomp's number *)
+            cbn [us_V]. rewrite <- HV1sc.
+            eapply usys_secc_ok_quiet; [ | exact Hsecg ].
+            cbn [us_V]. rewrite Hex. unfold USYS_seccomp. lia.
         - right.
           (* THE ARM RETURNED, SO IT WAS NOT [exit] (milestone J, K1).  The
              dispatcher's returning post now says so outright; without it
@@ -1004,7 +1009,7 @@ Section UtSysBlock.
           (* THE CWD ROW, off the dispatcher's clause: a chdir that returned
              nonzero moved nothing, and every other entry moved nothing.
              The clause reads the stored a0 word, which is [w]. *)
-          assert (Hcwrow : usys_cwd_ok (usys_num (pv_tf (us_V U))) w
+          assert (Hcwrow : usys_cwd_ok (usys_eff (pv_secc (us_V U)) (pv_tf (us_V U))) w
                              (pv_cwi (us_V U)) (pv_cwi V2)).
           { rewrite <- Hnumeq.
             unfold usys_cwd_ok.
@@ -1015,7 +1020,15 @@ Section UtSysBlock.
               + rewrite Hc9. exact HV1cwi.
             - destruct Hcwig as [[H9 _] | Hc9]; [ contradiction (Hn9 H9) | ].
               rewrite Hc9. exact HV1cwi. }
-          split; [ | split; [ | exact Hcwrow ] ].
+          (* THE MASK ROW, off the dispatcher's: it reads argument 0, which
+             the prologue's epc store leaves alone, and the stored a0 word *)
+          assert (Hscrow : usys_secc_ok (usys_eff (pv_secc (us_V U)) (pv_tf (us_V U)))
+                             (pv_tf (us_V U)) (pv_secc (us_V U)) (pv_secc V2) w).
+          { rewrite <- Hnumeq. rewrite <- HV1sc. rewrite <- Ha0w.
+            refine (usys_secc_ok_arg_cong _ (pv_tf V1) _ _ _ _ _ Hsecg).
+            rewrite HV1tf. apply list_lookup_total_insert_ne.
+            unfold tf_epc_idx, tf_arg_idx; lia. }
+          split; [ | split; [ | split; [ exact Hcwrow | exact Hscrow ] ] ].
           + (* THE BUMP *)
             unfold uround_bump_ok. rewrite Hbump. split.
             * unfold tf_resume_gpr0.
@@ -1183,7 +1196,8 @@ Section UtSysBlock.
           | (cbn [uvis_of uvis_perm];
              rewrite HV1upt HV1sz Hpr2 Hpr3; reflexivity)
           | (cbn [uvis_of uvis_sz]; rewrite HV1sz Hpr3; reflexivity)
-          | (cbn [uvis_of uvis_lazy]; rewrite HV1lz Hpr7; reflexivity) ]. }
+          | (cbn [uvis_of uvis_lazy]; rewrite HV1lz Hpr7; reflexivity)
+          | (cbn [uvis_of uvis_secc]; rewrite HV1sc Hpr8; reflexivity) ]. }
       (* FORK'S ANSWER, from the dispatcher's row to the trap contract's:
          the two are the same disjunction, read at the same a0 word, and
          the guard differs only in the cause conjunct the dispatcher does

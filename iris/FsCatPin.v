@@ -155,7 +155,7 @@ Qed.
 (* ====================================================================== *)
 
 Lemma fsimg_cat_size :
-  bv_unsigned (di_size (fs_dinode fsimg_P fsimg_sb CAT_INO)) = 36728.
+  bv_unsigned (di_size (fs_dinode fsimg_P fsimg_sb CAT_INO)) = 36776.
 Proof. vm_eq. Qed.
 
 Lemma fsimg_cat_nlink :
