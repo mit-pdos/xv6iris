@@ -1179,3 +1179,10 @@ import Xv6.UsertrapSysSpec
 import Xv6.UsertrapSysTail
 import Xv6.UsertrapTail
 import Xv6.UsertrapTailA6
+import Xv6.SyscallHead
+import Xv6.SpecSyscallXv6
+import Xv6.ProofSyscall
+import Xv6.LinkSyscall
+import Xv6.FsCfgSnapFirst
+import Xv6.FsCfgSnapVocab
+import Xv6.FsCfgSnap
