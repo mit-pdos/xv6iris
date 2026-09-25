@@ -763,10 +763,12 @@ Section UShURoundDefs.
      list is still the line's [nlines I - 1] -- DONE would need a lower
      bound one longer, which only the filing mints; a pipeline's step is
      the identity, so the filing turns this into DONE
-     ([udone_tie_of_pre_id]) *)
+     ([udone_tie_of_pre_id]).  It carries the era's boot witness at [s0]
+     too (C9g): the filing hands back the block's writer at its own boot
+     state, and the record's space credential is at [s0] *)
   Definition uWcu (I : list (bv 8)) (p : nat) : iProp Σ :=
     (uWcf I p ∨ (⌜(p < 3)%nat⌝ ∗ PT I (5 + p)%nat)
-     ∨ (⌜p = 0%nat⌝ ∗ PD I ∗ ush_deed_at upre_tie s0 I))%I.
+     ∨ (⌜p = 0%nat⌝ ∗ PD I ∗ ush_deed_at upre_tie s0 I ∗ f0cw gf (S gen_id) s0))%I.
 
   Lemma uWcu_of (I : list (bv 8)) (p : nat) : uWcf I p -∗ uWcu I p.
   Proof using . iIntros "H". rewrite /uWcu. by iLeft. Qed.

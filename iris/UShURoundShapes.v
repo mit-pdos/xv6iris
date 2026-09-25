@@ -10,6 +10,8 @@
 (*  halves, or every writer committed.  B3: the terminal shape carries NO *)
 (*  deed; the committed one gets the deed at its PRE tie through          *)
 (*  [UShURoundDefs.uWcu]'s index-0 arm (the block is not filed yet).      *)
+(*  Both carry the round's content function's shape [fc_ok] (C9g): the   *)
+(*  prompt's steps spend the family's block witness, which reads it.      *)
 (* ===================================================================== *)
 From Stdlib Require Import ZArith Lia List.
 From stdpp Require Import gmap list bitvector.definitions.
@@ -64,7 +66,8 @@ Section UShURoundShapes.
        (i : nat) (sw : nat -> list (bv 8)) (sR : fstate) (lR : pline'),
        ⌜(forall w s, Timeless (dep w s))
         /\ pv_line pview_unionU (lineV U I) = Some lR /\ adm_u_f lR = true
-        /\ pl_ok lR /\ (i < lcats lR)%nat /\ (1 <= nlines I)%nat⌝
+        /\ pl_ok lR /\ (i < lcats lR)%nat /\ (1 <= nlines I)%nat
+        /\ fc_ok (pv_fc pview_unionU sR)⌝
        ∗ era_pin (fgn_echo gf) (S gen_id) v
        ∗ inp_lb v I
        ∗ pwc_fork_exitN (wids (lcats lR)) (runN (files_of sR) lR)
@@ -79,7 +82,7 @@ Section UShURoundShapes.
        (sR : fstate) (lR : pline'),
        ⌜(forall w s, Timeless (dep w s))
         /\ pv_line pview_unionU (lineV U I) = Some lR /\ adm_u_f lR = true
-        /\ pl_ok lR⌝
+        /\ pl_ok lR /\ fc_ok (pv_fc pview_unionU sR)⌝
        ∗ era_pin (fgn_echo gf) (S gen_id) v
        ∗ inp_lb v I
        ∗ blkN_inv (wids (lcats lR)) (runN (files_of sR) lR)

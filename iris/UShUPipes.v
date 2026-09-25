@@ -236,10 +236,11 @@ Section UShUPipes.
   Lemma ufin (v : era_pins) (I : list (bv 8)) (sR : fstate) (lR : pline')
       (L : list (bv 8)) (pr : producer) (Rd Rk : iProp Σ)
       (P : nat -> pnames) (gF gG : nat -> gname) (γc γm : wid -> gname) :
-    pv_line pview_unionU (lineV U I) = Some lR -> adm_u_f lR = true -> pl_ok lR ->
+    pv_line pview_unionU (lineV U I) = Some lR -> fc_ok (pv_fc pview_unionU sR) ->
+    adm_u_f lR = true -> pl_ok lR ->
     (1 <= nlines I)%nat ->
     (Rk ∗ Rd ⊢ DPRE I) ->
-    ((era_pin (fgn_echo gf) (S gen_id) v ∗ inp_lb v I ∗ Rk)
+    ((era_pin (fgn_echo gf) (S gen_id) v ∗ inp_lb v I ∗ f0cw gf (S gen_id) s0 ∗ Rk)
      ∗ blkN_inv (wids (lcats lR)) (runN (pv_fc pview_unionU sR) lR)
          (pwc_blkV pg U (gcPIN CPU) (gcW CPU) (gcT CPU) v I sR)
          termw (tokN (pv_fc pview_unionU sR) lR)
@@ -247,19 +248,20 @@ Section UShUPipes.
      ∗ Qtop U CPU v I lR Rd γc γm
      ⊢ UkShFork.ushf_wq Wcu I).
   Proof using .
-    intros HlR Ha Hl Hpos Hdeed.
-    iIntros "((#Hpin & #Hlb & Hk) & #Hinv & Hq)".
+    intros HlR Hfc Ha Hl Hpos Hdeed.
+    iIntros "((#Hpin & #Hlb & #Hcw & Hk) & #Hinv & Hq)".
     rewrite /UkShFork.ushf_wq. iRight.
     rewrite /Qtop. iDestruct "Hq" as "[#HT | [[Hall HRd] | Hter]]".
     - iApply (uWcu_taint ug r s0 PT PD I 0%nat v with "Hpin HT").
     - (* COMMITTED: every writer at its whole source, the loan back *)
       rewrite /uWcu. iRight. iRight. iSplitR; [done |].
       iSplitR "Hk HRd"; last first.
-      { iApply Hdeed. iFrame "Hk HRd". }
+      { iSplitL; [iApply Hdeed; iFrame "Hk HRd" | iExact "Hcw"]. }
       rewrite /updone_shape.
       iExists v, γc, γm, (pdep U pview_unionU sR lR L pr P gF gG), sR, lR.
       iSplitR.
-      { iPureIntro. split_and!; [intros ??; apply pdep_timeless | exact HlR | exact Ha | exact Hl]. }
+      { iPureIntro. split_and!; [intros ??; apply pdep_timeless | exact HlR | exact Ha | exact Hl
+                                | exact Hfc]. }
       iFrame "Hpin Hlb Hinv".
       iApply (big_sepL_mono with "Hall"). iIntros (k w _) "Hw".
       rewrite /wdone. iDestruct "Hw" as (s) "[Hw %Ht]".
@@ -280,7 +282,7 @@ Section UShUPipes.
       iExists v, γc, γm, (pdep U pview_unionU sR lR L pr P gF gG), i, sw, sR, lR.
       iSplitR.
       { iPureIntro. split_and!; [intros ??; apply pdep_timeless | exact HlR | exact Ha
-                                | exact Hl | exact Hi | exact Hpos]. }
+                                | exact Hl | exact Hi | exact Hpos | exact Hfc]. }
       iFrame "Hpin Hlb". rewrite /pwc_fork_exitN. iFrame "Hinv Hc Hm Htk".
       rewrite /heldN big_sepL_fmap. cbn [fst snd]. iExact "Hws".
   Qed.
@@ -313,6 +315,7 @@ Section UShUPipes.
     T ∨ ∃ (v : era_pins) (cs : list nat) (s : dst),
           ⌜upre_tie cs s0 I (dst_content s)⌝
           ∗ era_pin (fgn_echo gf) (S gen_id) v ∗ inp_lb v I ∗ cs_lb v cs
+          ∗ f0cw gf (S gen_id) s0
           ∗ f_typed (fgn_cl gf) s ∗ fown r s
           ∗ pwc_blkU ug v I (dst_content s) (S gen_id) [] false.
   Proof using .
@@ -337,7 +340,7 @@ Section UShUPipes.
     rewrite Hcon /ust.
     iPoseProof (pwc_blkU_entry ug v I (S gen_id) ps cs s0 P0 Hw with "Hpin Hcw Htn Hps Hcs HE")
       as "HPW".
-    iFrame "HPW Hd Hty Hpin' Hcs HE".
+    iFrame "HPW Hd Hty Hpin' Hcs HE Hcw".
   Qed.
 
   (* =================================================================== *)
@@ -462,7 +465,7 @@ Section UShUPipes.
     { iApply (urun_gen (PS := uprogSG_free) (SG := uexecSG_xv6) (ghost_varG0 := offbox_offG)
                 N' T h' m' (mword_of_int ShSyms.runcmd) _ ltac:(vm_compute; reflexivity)
                 with "Hgenw HT Hrun"). }
-    iDestruct "Hop" as (v cs s) "(%Htie & #Hpin & #Hlb & #Hcsl & #Hty & Hown & HPW)".
+    iDestruct "Hop" as (v cs s) "(%Htie & #Hpin & #Hlb & #Hcsl & #Hcw & #Hty & Hown & HPW)".
     iDestruct (udeed_typed s with "Hty") as %[Hsok _].
     pose proof (upv_line_pipe I (PrEcho ws) (S n') Hul) as HlR.
     assert (Hfc : fc_ok (pv_fc pview_unionU (dst_content s)))
@@ -504,9 +507,10 @@ Section UShUPipes.
               HlR Hfc Hadmit Hplok (wl_line (drop 1 ws))
               (UkPipesEntries.pe_line_len ws Hok) (PrEcho ws) True%I γc γm P gF gG
               (UkShFork.ushf_wq Wcu I)
-              (era_pin (fgn_echo gf) (S gen_id) v ∗ inp_lb v I ∗ DPRE I)%I
+              (era_pin (fgn_echo gf) (S gen_id) v ∗ inp_lb v I ∗ f0cw gf (S gen_id) s0
+               ∗ DPRE I)%I
               (ufin v I (dst_content s) (LPipes (PrEcho ws) (S n')) (wl_line (drop 1 ws))
-                 (PrEcho ws) True%I (DPRE I) P gF gG γc γm HlR eq_refl Hplok Hpos
+                 (PrEcho ws) True%I (DPRE I) P gF gG γc γm HlR Hfc eq_refl Hplok Hpos
                  ltac:(iIntros "[$ _]"))
               eq_refl eq_refl sa (pcut ws (S n') len gb)
               (STG ws (S n') len gb sa) (ustg_len ws (S n') len gb sa)
@@ -521,7 +525,7 @@ Section UShUPipes.
               eq_refl Hpeq Ha0' Hl0 ltac:(discriminate)
               with "Hfam Hpl Hcs Hh Hnodes [Hown] [//] Hpid Hcode Hjt Hcmd Hsz Hstd Hcd0
                     Hcwd Hch Hrun").
-    iSplitR; [iExact "Hpin" |]. iSplitR; [iExact "Hlb" |].
+    iSplitR; [iExact "Hpin" |]. iSplitR; [iExact "Hlb" |]. iSplitR; [iExact "Hcw" |].
     rewrite /ush_deed_at. iLeft. iExists cs, s, v.
     iFrame "Hown Hty Hpin Hcsl". by iPureIntro.
   Qed.
@@ -588,7 +592,7 @@ Section UShUPipes.
     { iApply (urun_gen (PS := uprogSG_free) (SG := uexecSG_xv6) (ghost_varG0 := offbox_offG)
                 N' T h' m' (mword_of_int ShSyms.runcmd) _ ltac:(vm_compute; reflexivity)
                 with "Hgenw HT Hrun"). }
-    iDestruct "Hop" as (v cs s) "(%Htie & #Hpin & #Hlb & #Hcsl & #Hty & Hown & HPW)".
+    iDestruct "Hop" as (v cs s) "(%Htie & #Hpin & #Hlb & #Hcsl & #Hcw & #Hty & Hown & HPW)".
     iDestruct (udeed_typed s with "Hty") as %[Hsok Hshort].
     (* THE DEED, split: node 0 keeps the ticket, the producer borrows the
        deed's half *)
@@ -651,12 +655,12 @@ Section UShUPipes.
               (prod_content (pv_fc pview_unionU (dst_content s)) (PrCatF fname_f)) HL31
               (PrCatF fname_f) (fdq r (1/2)%Qp s) γc γm P gF gG
               (UkShFork.ushf_wq Wcu I)
-              (era_pin (fgn_echo gf) (S gen_id) v ∗ inp_lb v I
+              (era_pin (fgn_echo gf) (S gen_id) v ∗ inp_lb v I ∗ f0cw gf (S gen_id) s0
                ∗ (ftkt r s ∗ f_typed (fgn_cl gf) s ∗ era_pin (fgn_echo gf) (S gen_id) v
                   ∗ cs_lb v cs))%I
               (ufin v I (dst_content s) (LPipes (PrCatF fname_f) (S n'))
                  (prod_content (pv_fc pview_unionU (dst_content s)) (PrCatF fname_f))
-                 (PrCatF fname_f) (fdq r (1/2)%Qp s) _ P gF gG γc γm HlR
+                 (PrCatF fname_f) (fdq r (1/2)%Qp s) _ P gF gG γc γm HlR Hfc
                  ltac:(cbn; by apply bool_decide_eq_true_2) Hplok Hpos Hdeed)
               eq_refl eq_refl sa (pcut PWC (S n') len gb)
               (STG PWC (S n') len gb sa) (ustg_len PWC (S n') len gb sa)
@@ -671,7 +675,7 @@ Section UShUPipes.
               eq_refl Hpeq Ha0' Hl0 ltac:(discriminate)
               with "Hfam Hpl Hcs Hh Hnodes [Htk] Hdq Hpid Hcode Hjt Hcmd Hsz Hstd Hcd0
                     Hcwd Hch Hrun").
-    iSplitR; [iExact "Hpin" |]. iSplitR; [iExact "Hlb" |].
+    iSplitR; [iExact "Hpin" |]. iSplitR; [iExact "Hlb" |]. iSplitR; [iExact "Hcw" |].
     iFrame "Htk Hty Hpin Hcsl".
   Qed.
 
