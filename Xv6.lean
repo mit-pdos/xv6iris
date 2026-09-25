@@ -1077,3 +1077,5 @@ import Xv6.BootHart
 import Xv6.BootBridge
 import Xv6.DiskBoot
 import Xv6.FsBoot
+import Xv6.FsDurSnapBytes
+import Xv6.FsDurSnap

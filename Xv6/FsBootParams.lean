@@ -14,21 +14,12 @@ image's BYTES.
 **DEVIATIONS.**
 1. `Nat` block numbers; `cov` is `Std.ExtTreeSet Nat compare` (the port's
    `BioView.cov`).  `fsimg_cov_elem_of`'s `1 <= b < 2000` reads unchanged.
-2. **PENDING: `fs_boot_pure`** (FsBootParams.v :57) is not in this file yet.
-   It is `fs_extent cov ls XV6_DISK_BYTES ∧ ∃ D, fs_recovery (fs_blocks dk) D
-   cov ls ∧ hdr_wf (fs_blocks dk) cov ls ∧ ∃ S : fs_state_rec, snap_ok S D`,
-   and `snap_ok` / `fs_state_rec` land with batch C-0/C-1 (`FsState`, agent
-   CA; `FsDurSnap`, agent CE).  Every other ingredient is here
-   (`fsExtent`, `fsRecovery`, `fsBlocks`, `hdrWf` in `Xv6/FsCrashPure.lean`),
-   so the definition is one line once `FsDurSnap` exists:
-   ```
-   def fsBootPure (cov : ExtTreeSet Nat compare) (ls : Nat) (dk : Nat → BitVec 8) : Prop :=
-     fsExtent cov ls XV6_DISK_BYTES ∧
-     ∃ D : BlockMap, fsRecovery (fsBlocks dk) D cov ls ∧ hdrWf (fsBlocks dk) cov ls ∧
-       ∃ S : FsStateRec, snapOk S D
-   ```
+2. `fs_boot_pure` (FsBootParams.v :57) is `fsBootPure` below; it reads
+   `snapOk` / `FsStateRec`, so this file imports `Xv6.FsDurSnapBytes`
+   (crash batch C-1, item CE).
 -/
 import Xv6.FsCrashPure
+import Xv6.FsDurSnapBytes
 
 namespace Xv6
 
@@ -53,5 +44,15 @@ theorem fsimgCov_mem (b : Nat) : b ∈ fsimgCov ↔ 1 ≤ b ∧ b < 2000 := by
 /-- The image's inode-region size, in blocks: `ninodes/16 + 1 = 200/16 + 1`,
 which is `bmapstart - inodestart = 46 - 33` (Rocq `fsimg_nib`). -/
 def fsimgNib : Nat := 13
+
+/-- THE PURE PROJECTION OF THE CRASH PREDICATE, the system theorem's `phi`:
+the durable extent is inside the disk, the physical disk recovers to a
+committed view `D` under a well-formed header, AND THE COMMITTED VIEW IS A
+FILE SYSTEM (`snapOk`, off `FsCrash.P_fs`'s durable snapshot) (Rocq
+`fs_boot_pure`). -/
+def fsBootPure (cov : ExtTreeSet Nat compare) (ls : Nat) (dk : Nat → BitVec 8) : Prop :=
+  fsExtent cov ls XV6_DISK_BYTES ∧
+  ∃ D : BlockMap, fsRecovery (fsBlocks dk) D cov ls ∧ hdrWf (fsBlocks dk) cov ls ∧
+    ∃ S : FsStateRec, snapOk S D
 
 end Xv6

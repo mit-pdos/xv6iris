@@ -16,10 +16,9 @@
 
 **WHAT IS NOT HERE YET, AND WHY (blockers, not deviations).**
 
-1. **`fs_boot_snap_wf`** (Rocq :671) is stated over `FsState.fs_state_rec` /
-   `fss_sb` (batch C-0, agent CA) and `FsDurSnap.snap_ok` (batch C-1, agent
-   CE).  Every crash-side ingredient is ready (`hdrWf`, `hdrWset`,
-   `fsBlocks`, `fsHome`, `logRegion`, and `fsCovIn` below).
+1. (landed) **`fs_boot_snap_wf`** (Rocq :671) is `fsBootSnapWf` at the end
+   of this file (crash batch C-1, item CE); this file imports
+   `Xv6.FsDurSnapBytes` for it.
 2. **`fs_boot_supply`** / `fs_boot_supply_app_inv` (Rocq :715/:741) bundle
    `FsCfgKits.fs_kit_icache` / `fs_kit_fsinit_ghost`, which this port does
    not have: `Xv6/FirstTok.lean`'s `firstFsinit` spells the kit's rows out
@@ -60,6 +59,7 @@ import Xv6.FsImgDir
 import Xv6.FsStateEraPure
 import Xv6.FsStateBitmap
 import Xv6.FsCrashSector
+import Xv6.FsDurSnapBytes
 
 namespace Xv6
 
@@ -311,5 +311,31 @@ def fsBootImageWf (dk : Nat → BitVec 8) (ndisk : Nat) (sb : FsSb) (nib : Nat)
   ∧ fsLinksEq (fsBlocks dk) sb = true
   ∧ fsRegionBare (fsBlocks dk) sb nib = true
   ∧ fsRootNoSelf (fsBlocks dk) sb = true
+
+/-! ## What the era's disk must be at every later boot -/
+
+/-- **THE SNAPSHOT HYPOTHESIS** (Rocq `fs_boot_snap_wf`, rows in Rocq's
+order): (1)/(2) the era's configuration is the snapshot's own superblock;
+(3)/(4) the snapshot at the committed view as a BLOCK VIEW `Pb`; (5)/(6)/(7)
+the on-disk header, and exactly where `Pb` differs from the raw disk (on the
+header's write set, where it holds the LOGGED value); (8)/(9) the covered
+range, which is fixed across power cycles.  Deviations: `Nat` blocks; the
+home set is `fsHomeList` (the list `fsRestrict` walks) and `fsHome`;
+`b ∉ hdr_wset` is list non-membership in `hdrWset`; `log_region_set ls ⊆
+cov` is `∀ b, logRegion ls b = true → b ∈ cov` (`Xv6/FsDurSnapBytes.lean`
+deviation 3). -/
+def fsBootSnapWf (dk : Nat → BitVec 8) (ndisk : Nat) (S : FsStateRec)
+    (Pb : Nat → List (BitVec 8)) (sb : FsSb) (nib : Nat) (cov : ExtTreeSet Nat compare) : Prop :=
+  sb = S.fssSb
+  ∧ nib = sb.sbNinodes / 16 + 1
+  ∧ snapOk S (fsRestrict Pb (fsHomeList cov sb.sbLogstart))
+  ∧ (∀ b, (Pb b).length = BSIZE)
+  ∧ hdrWf (fsBlocks dk) cov sb.sbLogstart
+  ∧ (∀ b, fsHome cov sb.sbLogstart b → b ∉ hdrWset (fsBlocks dk) sb.sbLogstart →
+      Pb b = fsBlocks dk b)
+  ∧ (∀ (i b : Nat), (hdrDec (fsBlocks dk (logHdrBno sb.sbLogstart))).2[i]? = some b →
+      Pb b = fsBlocks dk (logSlotBno sb.sbLogstart i))
+  ∧ fsCovIn cov ndisk
+  ∧ (∀ b, logRegion sb.sbLogstart b = true → b ∈ cov)
 
 end Xv6
