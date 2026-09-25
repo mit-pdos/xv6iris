@@ -219,9 +219,9 @@ theorem vdrw_P6 (FD : FREE_DESC) (RE : RELEASE)
     (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
     (cpu : CPU) (k : KCtx) (γ : DiskNames) (γl : GName) (pd pav pu : BitVec 64)
     (bno : BitVec 32) (dataBuf dataDisk : List (BitVec 8)) (wr : Bool) (c : Chain)
-    (y : BitVec 32) (R : RegMap)
-    (hK : virtioDiskRwSlots ≤ k.avail) (hsie : k.sie = false) (hnoff : k.noff = 0)
-    (hlocks : k.locks = []) (htier : k.tier = KTier.kpt) (hintena : k.intena = false)
+    (y : BitVec 32) (R : RegMap) (jp : Nat) (hjp : jp < NPROC) (hproc : k.proc = procAddr jp)
+    (hK : virtioDiskRwSlots ≤ k.avail) (hnoff : k.noff = 0)
+    (hlocks : k.locks = []) (htier : k.tier = KTier.kpt) (hintena : k.intena = k.sie)
     (hwf : k.wf) (hpd : descPageRw pd) (hdwr : c.dwr = !wr)
     (hctx : c.ctx = curCtx) (hpay : c.pay = if c.dwr then dataDisk else dataBuf)
     (hram : ∀ j, j < BSIZE → inRam (aBufData (k.regs 10#5) + BitVec.ofNat 64 j) 1)
@@ -233,6 +233,7 @@ theorem vdrw_P6 (FD : FREE_DESC) (RE : RELEASE)
     unfold virtioDiskRwSlots sleepSlots freeDescSlots wakeupSlots at *; omega
   have hKa : 20 ≤ k.avail - 12 := by
     unfold virtioDiskRwSlots sleepSlots at hK; omega
+  have hsie : (vdrwK k).sie = false := rfl
   unfold vdrwP5Exit
   iintro ⟨%⟨hR6, hcwf, hbp, hblk⟩, Hk, Hpc, #Hpi, Htc, Hcc, Hir, #Hcaps, Hlocked, Hpay, Hth,
     Hcl, ⟨%n, #Hdone, #Hlbn⟩, Hkm, Hkt, Hbno, Hsv, Hidx, Hnext⟩
@@ -346,7 +347,7 @@ theorem vdrw_P6 (FD : FREE_DESC) (RE : RELEASE)
   k_norm [vdrwK_sie]
   iframe #
   case hn1 => k_norm [vdrwK_noff, hnoff]; omega
-  case hK1 => k_norm [vdrwK_avail k hsie]; exact hKf
+  case hK1 => k_norm [vdrwK_avail k]; omega
   case hl1 => rw [hlkKK]; simp
   case ht1 => k_norm [vdrwK_tier, htier]
   case htk1 => exact (tk3_true c.hd c.md c.tl).1
@@ -378,7 +379,7 @@ theorem vdrw_P6 (FD : FREE_DESC) (RE : RELEASE)
   k_norm [vdrwK_sie]
   iframe #
   case hn2 => k_norm [vdrwK_noff, hnoff]; omega
-  case hK2 => k_norm [vdrwK_avail k hsie]; exact hKf
+  case hK2 => k_norm [vdrwK_avail k]; omega
   case hl2 => rw [hlkKK]; simp
   case ht2 => k_norm [vdrwK_tier, htier]
   case htk2 => rw [updB_ne _ _ _ _ hmne]; exact (tk3_true c.hd c.md c.tl).2.1
@@ -407,7 +408,7 @@ theorem vdrw_P6 (FD : FREE_DESC) (RE : RELEASE)
   k_norm [vdrwK_sie]
   iframe #
   case hn3 => k_norm [vdrwK_noff, hnoff]; omega
-  case hK3 => k_norm [vdrwK_avail k hsie]; exact hKf
+  case hK3 => k_norm [vdrwK_avail k]; omega
   case hl3 => rw [hlkKK]; simp
   case ht3 => k_norm [vdrwK_tier, htier]
   case htk3 =>
@@ -437,22 +438,35 @@ theorem vdrw_P6 (FD : FREE_DESC) (RE : RELEASE)
   k_step (wp_s_jal cpu _ (KA.«virtio_disk_rw» + 0x218#64) false 2076948#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [vdrwK_sie, vdrw2_br_release]
   iintro Hk Hpc
-  iapply (vdrw5_re RE cpu _ γ γl pd pav pu ?hsr ?hnr ?hKr ?hrr ?ha0r)
+  -- the release takes back the arm the acquire paid out; the complement stays
+  icases armExt_split cpu k.sie k.proc $$ [$Htc $Hcc $Hir] with ⟨Harm, Hte, Hce⟩
+  iapply (vdrw5_re RE cpu _ γ γl pd pav pu ?hsr ?hnr ?hKr k.sie ?hrr ?hor ?ha0r)
     $$ [- $Hk $Hpc $Hlocked $Hpay]
   rotate_right 1
   k_norm [vdrwK_sie, vdrw6_ret_21c, hlkKK, vdrw5_filter]
   iframe #
+  isplitl [Harm]
+  · iapply (popArm_sie cpu k _ ?hpp) $$ Harm
+    case hpp => first | rfl | k_norm_g
   case hsr => k_norm [vdrwK_sie]
   case hnr => k_norm [vdrwK_noff]; omega
-  case hKr => k_norm [vdrwK_avail k hsie]; omega
+  case hKr => k_norm [vdrwK_avail k]; omega
   case hrr => k_norm [vdrwK_noff, vdrwK_intena]; simp [hnoff, hintena]
+  case hor =>
+    intro hon
+    refine ⟨by k_norm [vdrwK_tier, htier], ?_⟩
+    k_norm [vdrwK_avail k, hon]; simp [trapRes, kvFrameSlots]; omega
   case ha0r => k_norm
-  k_norm [vdrwK_sie]
-  iapply wpNext_off_intro
+  -- past the release: at the caller's index again
+  k_norm_g [vdrw6_ret_21c, hlkKK, vdrw5_filter, vdrw_popctx k k.sie rfl hlocks hwf]
+  ihave Hnext : ∀ c : CPU, wpNext true k.proc c (vdrwPostK k γ bno wr dataBuf dataDisk) $$ [Hnext]
+  · iintro %c0
+    iapply (vdrw5_next_at cpu c0 k γ bno wr dataBuf dataDisk jp hjp hproc) $$ Hnext
+  k_next_e
   iintro %Rf Hk Hpc %hcsf
   try isimp only [vdrw6_ret_21c] at Hpc
-  isimp only [vdrw6_popctx k hsie hlocks hwf] at Hk
-  k_norm at hcsf
+  k_norm_g [vdrw6_ret_21c, hlkKK, vdrw5_filter, vdrw_popctx k k.sie rfl hlocks hwf]
+  k_norm_g at hcsf
   simp only [calleeSaved, RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true] at hcsf
   obtain ⟨q2, q8, q9, q18, q19, q20, q21, q22, q23, q24, q25, q26, q27⟩ := hcsf
   -- the epilogue
@@ -470,10 +484,10 @@ theorem vdrw_P6 (FD : FREE_DESC) (RE : RELEASE)
     (k.regs 21#5) (k.regs 22#5) (k.regs 23#5) (k.regs 24#5)
     (y ++ BitVec.ofNat 32 c.tl) (BitVec.ofNat 32 c.md ++ BitVec.ofNat 32 c.hd))
   k_code (text_instr _ _ _ _ rfl rfl) Htext
-  k_norm
+  k_norm_g
   iframe
   inext
-  iapply wpNext_off_intro
+  k_next_e
   iintro Hk Hpc
   have hcsfin : calleeSaved k.regs
       (Rf.set 1#5 (k.regs 1#5) |>.set 8#5 (k.regs 8#5) |>.set 9#5 (k.regs 9#5)
@@ -502,11 +516,12 @@ theorem vdrw_P6 (FD : FREE_DESC) (RE : RELEASE)
   ihave Hbufo := bufOwn_intro (k.regs 10#5) bno 0#32 (if wr then dataBuf else dataDisk) hlen
     $$ [Hbno Hdsk Hbuf]
   · iframe Hbno Hdsk Hbuf
+  ihave Hnext := Hnext $$ %cpu
   ihave HΦp := wpNext_here k.proc cpu (vdrwPostK k γ bno wr dataBuf dataDisk) $$ Hnext
   isimp only [vdrwPostK] at HΦp
   ihave HΦ2 := HΦp $$ %(k.spie) %(k.spp)
   isimp only [KCtx.withSpie_self' k k.spie k.spp rfl rfl] at HΦ2
-  iapply HΦ2 $$ %_ %hcsfin Hk Hpc Htc Hcc Hir Hbufo Hblkd
+  iapply HΦ2 $$ %_ %hcsfin Hk Hpc Hte Hce Hbufo Hblkd
 
 end
 

@@ -324,9 +324,10 @@ theorem vdrwK_fold (k : KCtx) :
 
 theorem vdrwK_withSpie (k : KCtx) : (vdrwK k).withSpie k.spie k.spp = vdrwK k := rfl
 
-theorem vdrwK_avail (k : KCtx) (h : k.sie = false) : (vdrwK k).avail = k.avail - 12 := by
-  simp only [vdrwK, KCtx.pushed_avail, KCtx.withLocks_avail, KCtx.pushOffAt_avail, h]
-  simp only [trapRes, Bool.false_eq_true, ite_false, Nat.zero_add]
+/-- The locked context's free stack: the entry's, plus the trap reserve the
+acquire freed (at `SIE = 1`), minus the frame. -/
+theorem vdrwK_avail (k : KCtx) : (vdrwK k).avail = trapRes k.sie + k.avail - 12 := by
+  simp only [vdrwK, KCtx.pushed_avail, KCtx.withLocks_avail, KCtx.pushOffAt_avail]
 
 /-- The register pins the body of `virtio_disk_rw` maintains: the frame
 pointers, the three values loaded at entry (`s3 = b`, `s6 = write`,
@@ -363,7 +364,7 @@ def vdrwPostK (k : KCtx) (γ : DiskNames) (bno : BitVec 32) (wr : Bool)
     (dataBuf dataDisk : List (BitVec 8)) : CPU → IProp GF := fun cpu' => iprop(
   ∀ (spie spp : Bool) (R' : RegMap), ⌜calleeSaved k.regs R'⌝ -∗
     kctx cpu' ((k.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k.regs 1#5)) -∗
-    trapCsrs cpu' -∗ cpuClaim cpu' k.proc -∗ intrRes cpu' -∗
+    trapCsrsExt cpu' k.sie -∗ cpuClaimExt cpu' k.sie k.proc -∗
     bufOwn (k.regs 10#5) bno 0#32 (if wr then dataBuf else dataDisk) -∗
     diskBlock γ bno.toNat (if wr then dataBuf else dataDisk) -∗ wpLoop cpu')
 
@@ -382,6 +383,19 @@ def vdrwP1Exit (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
   (∃ K : Nat, viewLb cpu K) ∗ vdrwFrame k ∗
   bufOwn (k.regs 10#5) bno dsk0 dataBuf ∗ diskBlock γ bno.toNat dataDisk ∗
   wpNext true k.proc cpu (vdrwPostK k γ bno (decide (k.regs 11#5 ≠ 0#64)) dataBuf dataDisk)
+
+/-- The phase vocabulary sees a context only through its registers and
+proc: a pinned-bits update is invisible to it. -/
+theorem vdrwPostK_withSpie (k : KCtx) (a b : Bool) (γ : DiskNames) (bno : BitVec 32) (wr : Bool)
+    (dataBuf dataDisk : List (BitVec 8)) :
+    vdrwPostK (GF := GF) (k.withSpie a b) γ bno wr dataBuf dataDisk =
+      vdrwPostK k γ bno wr dataBuf dataDisk := rfl
+
+theorem vdrwFrame_withSpie (k : KCtx) (a b : Bool) :
+    vdrwFrame (GF := GF) (k.withSpie a b) = vdrwFrame k := rfl
+
+theorem vdrwRegs_withSpie (k : KCtx) (a b : Bool) (R : RegMap) (sec : BitVec 64) :
+    vdrwRegs (k.withSpie a b) R sec = vdrwRegs k R sec := rfl
 
 end resources
 

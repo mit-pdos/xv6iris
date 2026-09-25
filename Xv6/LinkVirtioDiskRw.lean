@@ -51,14 +51,12 @@ theorem virtio_disk_rw_proof
     (SP : SLEEP_PREPARE) (AC : ACQUIRE) (RE : RELEASE) (SL : SLEEP) (FD : FREE_DESC) :
     VIRTIO_DISK_RW :=
   ⟨fun {hlc GF} _ _ _ _ Γ _ cpu k γ γl pd pav pu j bno dsk0 dataBuf dataDisk
-      hj hproc hK hsie hnoff hlocks htier hbno hdata hpd hkm => by
-    unfold wp_virtio_disk_rw_body
-    iintro ⟨Hk, Hpc, #Hpi, Htc, Hcc, Hir, #Hcaps, Hbuf, Hblk, Hnext⟩
+      hj hproc hK hnoff htier hbno hdata hpd hkm => by
+    unfold wp_virtio_disk_rw_eb_body
+    iintro ⟨Hk, Hpc, #Hpi, Hte, Hce, #Hcaps, Hbuf, Hblk, Hnext⟩
     icases kctx_wf _ _ $$ Hk with ⟨%hwf, Hk⟩
-    have hintena : k.intena = false := by
-      have h := hwf.1 hnoff
-      rw [hsie] at h
-      exact h.symm
+    have hintena : k.intena = k.sie := (hwf.1 hnoff).symm
+    have hlocks : k.locks = [] := List.eq_nil_of_length_eq_zero (by have := hwf.2.2.2.1; omega)
     have hbz : k.regs 10#5 ≠ 0#64 := vdrw5_buf_nz (k.regs 10#5) hkm
     ihave #Hcaps2 := vdrwCaps_of_diskCaps γ γl pd pav pu $$ Hcaps
     icases kctx_kmapStatic _ _ $$ Hk with ⟨#HS, Hk⟩
@@ -80,14 +78,14 @@ theorem virtio_disk_rw_proof
       · ipureintro; exact hdl
       iframe Hb1 Hb2 Hb3
     -- P1
-    iapply (vdrw_P1 AC Γ cpu k γ γl pd pav pu j bno dsk0 dataBuf dataDisk hK hsie hnoff
+    iapply (vdrw_P1 AC Γ cpu k γ γl pd pav pu j bno dsk0 dataBuf dataDisk hj hproc hK hnoff
       hlocks hbno)
     unfold vdrwPostK
-    iframe Hk Hpc Hpi Htc Hcc Hir Hcaps2 Hbuf Hblk Hnext
-    iintro %R1 HP1
+    iframe Hk Hpc Hpi Hte Hce Hcaps2 Hbuf Hblk Hnext
+    iintro %c0 %a0 %b0 %R1 HP1
     -- P2
-    iapply (vdrw_P2 FD SP AC RE SL Γ cpu k γ γl pd pav pu j bno dsk0 dataBuf dataDisk R1
-      hj hproc hK hsie hnoff hlocks htier hintena hpd)
+    iapply (vdrw_P2 FD SP AC RE SL Γ c0 (k.withSpie a0 b0) γ γl pd pav pu j bno dsk0 dataBuf dataDisk R1
+      (decide (k.regs 11#5 ≠ 0#64)) rfl hj hproc hK hwf hnoff hlocks htier hintena hpd)
     isplitl [HP1]
     · iexact HP1
     iintro %c1 %a1 %b1 %R2 %hix %mix %tix %yy HP2
@@ -95,7 +93,8 @@ theorem virtio_disk_rw_proof
     iapply (vdrw_P3 Γ c1 (k.withSpie a1 b1) γ γl pd pav pu bno dsk0 dataBuf dataDisk
       (decide (k.regs 11#5 ≠ 0#64)) hix mix tix yy R2 hpd hbno rfl)
     isplitl [HP2]
-    · iexact HP2
+    · isimp only [KCtx.withSpie_twice] at HP2
+      iexact HP2
     iintro %R3 HP3
     -- P4
     iapply (vdrw_P4 Γ c1 (k.withSpie a1 b1) γ γl pd pav pu bno dataBuf dataDisk
@@ -118,7 +117,7 @@ theorem virtio_disk_rw_proof
           (decide (k.regs 11#5 ≠ 0#64)) hix mix tix) ep
         (vdrwPayw (vdrwChain ((k.withSpie a1 b1).regs 10#5) bno
           (decide (k.regs 11#5 ≠ 0#64)) hix mix tix) dataBuf dataDisk) curCtx)
-      yy R4 hj hproc hK hsie hnoff hlocks htier hintena hbz)
+      yy R4 hj hproc hK hwf hnoff hlocks htier hintena hbz)
     isplitl [HP4]
     · iexact HP4
     iintro %c2 %a2 %b2 %R5 HP5
@@ -129,7 +128,7 @@ theorem virtio_disk_rw_proof
           (decide (k.regs 11#5 ≠ 0#64)) hix mix tix) ep
         (vdrwPayw (vdrwChain ((k.withSpie a1 b1).regs 10#5) bno
           (decide (k.regs 11#5 ≠ 0#64)) hix mix tix) dataBuf dataDisk) curCtx)
-      yy R5 hK hsie hnoff hlocks htier hintena hwf hpd rfl rfl
+      yy R5 j hj hproc hK hnoff hlocks htier hintena hwf hpd rfl rfl
       (by
         show bytesOf (vdrwPayw _ dataBuf dataDisk) = _
         cases hdd : (vdrwChain ((k.withSpie a1 b1).regs 10#5) bno

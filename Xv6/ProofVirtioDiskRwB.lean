@@ -20,7 +20,7 @@ resumed with, so the induction hypothesis is `Xv6.vdrwLoopHead` at
 `k.withSpie a b`, universally quantified over the hart.
 -/
 import MachCSL.WpSmodeFrame12b
-import Xv6.VirtioDiskRwDefs2
+import Xv6.VirtioDiskRwDefs4
 import Xv6.SpecVirtioDiskRw
 import Xv6.SpecFreeDesc
 import Xv6.SpecAcquire
@@ -505,49 +505,6 @@ theorem vdrw_sp (SP : SLEEP_PREPARE) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF 
   simp only [sleepPrepareAddr] at h
   exact h
 
-theorem vdrw_sl (SL : SLEEP) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
-    (c : CPU) (k' : KCtx) (jp : Nat)
-    (hj : jp < NPROC) (hproc : k'.proc = procAddr jp) (hK : sleepSlots ≤ k'.avail)
-    (hsie' : k'.sie = false) (hnoff : k'.noff = 0) (hlocks : k'.locks = [])
-    (htier : k'.tier = KTier.kpt) :
-    kctx c k' ∗ pcIs c KA.«sleep» ∗ procsInv Γ ∗
-    trapCsrs c ∗ cpuClaim c k'.proc ∗ intrRes c ∗
-    wpNext true k'.proc c (fun cpu' => iprop(∀ spie : Bool, ∀ spp : Bool, ∀ R' : RegMap,
-      kctx cpu' ((k'.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k'.regs 1#5)) -∗
-      trapCsrs cpu' -∗ cpuClaim cpu' k'.proc -∗ intrRes cpu' -∗
-      ⌜calleeSaved k'.regs R'⌝ -∗ wpLoop cpu'))
-    ⊢ wpLoop (GF := GF) c := by
-  have h := SL.wp_sleep (hlc := hlc) (GF := GF) Γ c k' jp hj hproc hK hsie' hnoff hlocks htier
-  unfold wp_sleep_body at h
-  simp only [sleepAddr] at h
-  exact h
-
-theorem vdrw_re (RE : RELEASE) (c : CPU) (k' : KCtx) (γ : DiskNames) (γl : GName)
-    (pd pav pu : BitVec 64)
-    (hsie' : k'.sie = false) (hnoff : 1 ≤ k'.noff) (hK : 10 ≤ k'.avail)
-    (hreen : false = (decide (k'.noff = 1) && k'.intena))
-    (ha0 : k'.regs 10#5 = aVdiskLock) :
-    kctx c k' ∗ pcIs c KA.«release» ∗ vdrwCaps γ γl pd pav pu ∗
-    locked γl c ∗ diskRes γ pd pav pu curCtx ∗
-    wpNext (k'.popExit false).sie k'.proc c (fun cpu' => iprop(∀ R' : RegMap,
-      kctx cpu' (((k'.popExit false).withRegs R').withLocks
-        (k'.locks.filter (fun x => x ≠ "virtio_disk"))) -∗
-      pcIs cpu' (jumpPc (k'.regs 1#5)) -∗ ⌜calleeSaved k'.regs R'⌝ -∗ wpLoop cpu'))
-    ⊢ wpLoop (GF := GF) c := by
-  have h := RE.wp_release (hlc := hlc) (GF := GF) c k' γl "virtio_disk" (diskRes γ pd pav pu)
-    hsie' hnoff hK false hreen (by simp)
-  unfold wp_release_body at h
-  simp only [releaseAddr] at h
-  rw [ha0] at h
-  unfold vdrwCaps
-  iintro ⟨Hk, Hpc, ⟨#Hinv, #Hgeom, #Hlk⟩, Hlocked, Hpay, HΦ⟩
-  iapply h
-  iframe Hk Hpc Hlocked Hpay HΦ
-  isplitl []
-  · iexact Hlk
-  · simp only [popArm_false]
-    iempintro
-
 theorem vdrw_ac (AC : ACQUIRE) (c : CPU) (k' : KCtx) (γ : DiskNames) (γl : GName)
     (pd pav pu : BitVec 64) (ha0 : k'.regs 10#5 = aVdiskLock)
     (hnoff : k'.noff + 1 < 2 ^ 31) (hK : 10 ≤ k'.avail) (hs : "virtio_disk" ∉ k'.locks) :
@@ -616,15 +573,17 @@ theorem vdrw_fd (FD : FREE_DESC) (Γ : SchedNames) (c : CPU) (k' : KCtx) (γ : D
 set_option maxHeartbeats 8000000 in
 /-- **The retry path** at `+0x94`, with every descriptor back in the
 payload: park on `&disk.free[0]`, drop the lock, sleep, take the lock
-again and jump to the head of the loop. -/
+again and jump to the head of the loop.  At either entry `SIE`: the
+release re-splits the bundle (its arm back to the pop, the complement on
+to `sleep`), the re-acquire joins them again. -/
 theorem vdrw_park (SP : SLEEP_PREPARE) (AC : ACQUIRE) (RE : RELEASE) (SL : SLEEP)
     (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
     (cpu : CPU) (k : KCtx) (γ : DiskNames) (γl : GName) (pd pav pu : BitVec 64) (jp : Nat)
     (bno dsk0 : BitVec 32) (dataBuf dataDisk : List (BitVec 8)) (wr : Bool)
     (x0 x1 x2 y : BitVec 32) (R : RegMap)
     (hjp : jp < NPROC) (hproc : k.proc = procAddr jp) (hK : virtioDiskRwSlots ≤ k.avail)
-    (hsie : k.sie = false) (hnoff : k.noff = 0) (hlocks : k.locks = [])
-    (htier : k.tier = KTier.kpt) (hintena : k.intena = false)
+    (hwf : k.wf) (hnoff : k.noff = 0) (hlocks : k.locks = [])
+    (htier : k.tier = KTier.kpt) (hintena : k.intena = k.sie)
     (hR : vdrwRegs k R (sectorOf bno)) :
     kctx cpu ((vdrwK k).withRegs R) ∗ pcIs cpu (KA.«virtio_disk_rw» + 0x94#64) ∗
     procsInv Γ ∗ trapCsrs cpu ∗ cpuClaim cpu k.proc ∗ intrRes cpu ∗
@@ -638,8 +597,13 @@ theorem vdrw_park (SP : SLEEP_PREPARE) (AC : ACQUIRE) (RE : RELEASE) (SL : SLEEP
     ⊢ wpLoop (GF := GF) cpu := by
   have hK12 : 12 ≤ k.avail := by unfold virtioDiskRwSlots sleepSlots at hK; omega
   have hKa : 20 ≤ k.avail - 12 := by unfold virtioDiskRwSlots sleepSlots at hK; omega
+  have hsie : (vdrwK k).sie = false := rfl
   iintro ⟨Hk, Hpc, #Hpi, Htc, Hcc, Hir, #Hcaps, Hlocked, Hpay, Hsv, Hidx, Hbuf, Hblk, Hnext, IH⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
+  -- the caller's continuation is hart-free (a park's crossing, at a proc)
+  ihave Hnext : ∀ c : CPU, wpNext true k.proc c (vdrwPostK k γ bno wr dataBuf dataDisk) $$ [Hnext]
+  · iintro %c
+    iapply (vdrw_next_at cpu c k γ bno wr dataBuf dataDisk jp hjp hproc) $$ Hnext
   -- auipc a0,0x1e ; addi a0,a0,-1328 ; jal sleep_prepare
   k_step (wp_s_auipc cpu _ (KA.«virtio_disk_rw» + 0x94#64) false 0x1e#20 10#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [vdrwK_sie k]
@@ -659,7 +623,7 @@ theorem vdrw_park (SP : SLEEP_PREPARE) (AC : ACQUIRE) (RE : RELEASE) (SL : SLEEP
   case hc1 => k_norm; exact aFree0_nz
   case hn1 => k_norm [vdrwK_noff k, hnoff]; omega
   case hK1 =>
-    k_norm [vdrwK_avail k hsie]
+    k_norm [vdrwK_avail k]
     unfold sleepPrepareSlots; omega
   case hl1 => k_norm [vdrwK_locks k, hlocks]; simp
   case ht1 => k_norm [vdrwK_tier k, htier]
@@ -681,74 +645,80 @@ theorem vdrw_park (SP : SLEEP_PREPARE) (AC : ACQUIRE) (RE : RELEASE) (SL : SLEEP
   k_step (wp_s_jal cpu _ (KA.«virtio_disk_rw» + 0xa8#64) false 2077316#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [vdrwK_sie k, vdrw2_br_release]
   iintro Hk Hpc
-  iapply (vdrw_re RE cpu _ γ γl pd pav pu ?hsr ?hnr ?hKr ?hrr ?ha0r)
+  -- the release takes back the arm the acquire paid out; the complement stays
+  icases armExt_split cpu k.sie k.proc $$ [$Htc $Hcc $Hir] with ⟨Harm, Hte, Hce⟩
+  iapply (vdrw5_re RE cpu _ γ γl pd pav pu ?hsr ?hnr ?hKr k.sie ?hrr ?hor ?ha0r)
     $$ [- $Hk $Hpc $Hlocked $Hpay]
   rotate_right 1
-  k_norm [vdrwK_sie k, vdrw2_ret_ac, vdrwK_locks k, hlocks, vdrw2_filter]
+  k_norm [vdrwK_sie k, vdrw2_ret_ac]
   iframe #
+  isplitl [Harm]
+  · iapply (popArm_sie cpu k _ ?hpp) $$ Harm
+    case hpp => first | rfl | k_norm_g
   case hsr => k_norm [vdrwK_sie k]
   case hnr => k_norm [vdrwK_noff k]; omega
-  case hKr => k_norm [vdrwK_avail k hsie]; omega
+  case hKr => k_norm [vdrwK_avail k]; omega
   case hrr => k_norm [vdrwK_noff k, vdrwK_intena k]; simp [hnoff, hintena]
+  case hor =>
+    intro hon
+    refine ⟨by k_norm [vdrwK_tier k, htier], ?_⟩
+    k_norm [vdrwK_avail k, hon]; simp [trapRes, kvFrameSlots]; omega
   case ha0r => k_norm
-  k_norm [vdrwK_sie k]
-  iapply wpNext_off_intro
+  k_norm_g [vdrw2_ret_ac, vdrwK_locks k, hlocks, vdrw2_filter, vdrw_popctx k k.sie rfl hlocks hwf]
+  k_next_e
   iintro %R2 Hk Hpc %hcs2
-  k_norm [vdrwK_sie k, vdrw2_ret_ac, vdrwK_locks k, hlocks, vdrw2_filter]
+  k_norm_g [vdrw2_ret_ac, vdrwK_locks k, hlocks, vdrw2_filter, vdrw_popctx k k.sie rfl hlocks hwf]
   have hR2 : vdrwRegs k R2 (sectorOf bno) :=
-    vdrwRegs_pin k R1 R2 _ hR1 (vdrwPin_of_calleeSaved R1 R2 (by k_norm at hcs2; exact hcs2))
-  -- jal sleep
-  k_step (wp_s_jal cpu _ (KA.«virtio_disk_rw» + 0xac#64) false 2082226#21 1#5 (by decide))
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [vdrwK_sie k, vdrw2_br_sleep]
+    vdrwRegs_pin k R1 R2 _ hR1 (vdrwPin_of_calleeSaved R1 R2 (by k_norm_g at hcs2; exact hcs2))
+  -- jal sleep, at the caller's index
+  k_step_e (wp_s_jal cpu _ (KA.«virtio_disk_rw» + 0xac#64) false 2082226#21 1#5 (by decide))
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [vdrw2_br_sleep]
   iintro Hk Hpc
-  iapply (vdrw_sl SL Γ cpu _ jp hjp ?hp3 ?hK3 ?hs3 ?hn3 ?hl3 ?ht3)
-    $$ [- $Hk $Hpc $Htc $Hir]
+  iapply (vdrw5_sl SL Γ cpu _ jp k.sie k.proc hjp ?hp3 ?hK3 ?hn3 ?ht3 ?hs3 ?hpp3)
+    $$ [- $Hk $Hpc $Hte $Hce]
   rotate_right 1
-  k_norm [vdrwK_sie k, vdrw2_ret_b0, vdrwK_proc k]
+  k_norm_g [vdrw2_ret_b0]
   iframe #
-  isplitl [Hcc]
-  · iexact Hcc
-  case hp3 => k_norm [vdrwK_proc k, hproc]
-  case hK3 => k_norm [vdrwK_avail k hsie]; unfold sleepSlots; omega
-  case hs3 => k_norm [vdrwK_sie k]
-  case hn3 => k_norm [vdrwK_noff k, hnoff]
-  case hl3 => k_norm [vdrwK_locks k, hlocks, vdrw2_filter]
-  case ht3 => k_norm [vdrwK_tier k, htier]
+  case hp3 => k_norm_g [hproc]
+  case hK3 => k_norm_g; unfold sleepSlots; omega
+  case hn3 => k_norm_g [hnoff]
+  case ht3 => k_norm_g [htier]
+  case hs3 => k_norm_g
+  case hpp3 => k_norm_g
   iapply wpNext_intro_pin
-  iintro %cpu2 %hpin2 %sS %pS %RS Hk Hpc Htc Hcc Hir %hcsS
-  k_norm [vdrwK_sie k, vdrw2_ret_b0, vdrwK_proc k]
+  iintro %cpu %_ %sS %pS %RS Hk Hpc Hte Hce %hcsS
+  k_norm_g [vdrw2_ret_b0]
   have hRS : vdrwRegs k RS (sectorOf bno) :=
-    vdrwRegs_pin k R2 RS _ hR2 (vdrwPin_of_calleeSaved R2 RS (by k_norm at hcsS; exact hcsS))
-  ihave Hnext := vdrw_next_at cpu cpu2 k γ bno wr dataBuf dataDisk jp hjp hproc $$ Hnext
+    vdrwRegs_pin k R2 RS _ hR2 (vdrwPin_of_calleeSaved R2 RS (by k_norm_g at hcsS; exact hcsS))
   -- auipc a0,0x1e ; addi a0,a0,-1084 ; jal acquire
-  k_step (wp_s_auipc cpu2 _ (KA.«virtio_disk_rw» + 0xb0#64) false 0x1e#20 10#5 (by decide))
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [vdrwK_sie k]
+  k_step_e (wp_s_auipc cpu _ (KA.«virtio_disk_rw» + 0xb0#64) false 0x1e#20 10#5 (by decide))
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
-  k_step (wp_s_addi cpu2 _ (KA.«virtio_disk_rw» + 0xb4#64) false 3012#12 10#5 10#5 (by decide))
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [vdrwK_sie k, vdrw2_lock_addr]
+  k_step_e (wp_s_addi cpu _ (KA.«virtio_disk_rw» + 0xb4#64) false 3012#12 10#5 10#5 (by decide))
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [vdrw2_lock_addr]
   iintro Hk Hpc
-  k_step (wp_s_jal cpu2 _ (KA.«virtio_disk_rw» + 0xb8#64) false 2077164#21 1#5 (by decide))
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [vdrwK_sie k, vdrw2_br_acquire]
+  k_step_e (wp_s_jal cpu _ (KA.«virtio_disk_rw» + 0xb8#64) false 2077164#21 1#5 (by decide))
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [vdrw2_br_acquire]
   iintro Hk Hpc
-  iapply (vdrw_ac AC cpu2 _ γ γl pd pav pu ?ha0q ?hnq ?hKq ?hsq) $$ [- $Hk $Hpc]
+  iapply (vdrw_ac AC cpu _ γ γl pd pav pu ?ha0q ?hnq ?hKq ?hsq) $$ [- $Hk $Hpc]
   rotate_right 1
-  k_norm [vdrwK_sie k, vdrw2_ret_bc]
+  k_norm_g [vdrw2_ret_bc]
   iframe #
-  case ha0q => k_norm
-  case hnq => k_norm [vdrwK_noff k, hnoff]; omega
-  case hKq => k_norm [vdrwK_avail k hsie]; omega
-  case hsq => k_norm [vdrwK_locks k, hlocks, vdrw2_filter]; simp
-  iapply wpNext_off_intro
-  iintro %s4 %p4 %R3 %hsp4 Hk Hpc %hcs4 Hlocked Hpay Hview -
-  k_norm [vdrwK_sie k] at hsp4
-  obtain ⟨f1, f2⟩ := hsp4 trivial
-  subst f1; subst f2
-  k_norm [vdrwK_sie k, vdrw2_ret_bc, KCtx.pushOffAt_withRegs, vdrwK_locks k, hlocks,
-    vdrw2_filter, vdrwK_spie k, vdrwK_spp k, vdrwK_withSpie k,
-    vdrw2_reenter k s4 p4 hsie hnoff hlocks]
+  case ha0q => k_norm_g
+  case hnq => k_norm_g [hnoff] <;> omega
+  case hKq => k_norm_g; omega
+  case hsq => k_norm_g [hlocks]; simp
+  k_next_e
+  iintro %s4 %p4 %R3 %_ Hk Hpc %hcs4 Hlocked Hpay Hview Harm
+  k_norm_g [vdrw2_ret_bc]
+  -- the acquire's arm and the complement: the whole bundle again
+  icases armExt_join cpu k.sie k.proc $$ [$Harm $Hte $Hce] with ⟨Htc, Hcc, Hir⟩
+  ihave Hk := kctx_eq_mono cpu _ ((vdrwK (k.withSpie s4 p4)).withRegs R3)
+    (by kctx_ext [vdrwK, hlocks]) $$ Hk
   have hR3 : vdrwRegs k R3 (sectorOf bno) :=
-    vdrwRegs_pin k RS R3 _ hRS (vdrwPin_of_calleeSaved RS R3 (by k_norm at hcs4; exact hcs4))
-  iapply IH $$ %cpu2 %s4 %p4 %R3
+    vdrwRegs_pin k RS R3 _ hRS (vdrwPin_of_calleeSaved RS R3 (by k_norm_g at hcs4; exact hcs4))
+  ihave Hnext := Hnext $$ %cpu
+  iapply IH $$ %cpu %s4 %p4 %R3
   unfold vdrwLoopHead
   isimp only [vdrwSaved_ws, vdrwPostK_ws, vdrwRegs_ws, KCtx.withSpie_regs, KCtx.withSpie_proc]
   iframe Hk Hpc Hpi Htc Hcc Hir Hcaps Hlocked Hpay Hsv Hidx Hbuf Hblk Hnext
@@ -796,8 +766,8 @@ theorem vdrw_ladder (FD : FREE_DESC) (SP : SLEEP_PREPARE) (AC : ACQUIRE) (RE : R
     (bno dsk0 : BitVec 32) (dataBuf dataDisk : List (BitVec 8)) (wr : Bool)
     (i h m : Nat) (v0 v1 v2 y : BitVec 32) (R : RegMap)
     (hjp : jp < NPROC) (hproc : k.proc = procAddr jp) (hK : virtioDiskRwSlots ≤ k.avail)
-    (hsie : k.sie = false) (hnoff : k.noff = 0) (hlocks : k.locks = [])
-    (htier : k.tier = KTier.kpt) (hintena : k.intena = false) (hpd : descPageRw pd)
+    (hwf : k.wf) (hnoff : k.noff = 0) (hlocks : k.locks = [])
+    (htier : k.tier = KTier.kpt) (hintena : k.intena = k.sie) (hpd : descPageRw pd)
     (hi : i < 3) (hh : h < NUM) (hm : m < NUM) (hhm : 2 ≤ i → h ≠ m)
     (hv0 : 1 ≤ i → v0 = BitVec.ofNat 32 h) (hv1 : 2 ≤ i → v1 = BitVec.ofNat 32 m)
     (hR : vdrwRegs k R (sectorOf bno)) (h18 : R 18#5 = BitVec.ofNat 64 i) :
@@ -812,6 +782,7 @@ theorem vdrw_ladder (FD : FREE_DESC) (SP : SLEEP_PREPARE) (AC : ACQUIRE) (RE : R
       vdrwLoopHead Γ cpu' (k.withSpie a b) γ γl pd pav pu bno dsk0 dataBuf dataDisk wr
         v0 v1 v2 y R' -∗ wpLoop cpu')
     ⊢ wpLoop (GF := GF) cpu := by
+  have hsie : (vdrwK k).sie = false := rfl
   have hK12 : 12 ≤ k.avail := by unfold virtioDiskRwSlots sleepSlots at hK; omega
   have hKf : freeDescSlots ≤ k.avail - 12 := by
     unfold virtioDiskRwSlots sleepSlots freeDescSlots wakeupSlots at *; omega
@@ -829,7 +800,7 @@ theorem vdrw_ladder (FD : FREE_DESC) (SP : SLEEP_PREPARE) (AC : ACQUIRE) (RE : R
       with [vdrwK_sie k, h18, vdrw2_blez0]
     iintro Hk Hpc
     iapply (vdrw_park SP AC RE SL Γ cpu k γ γl pd pav pu jp bno dsk0 dataBuf dataDisk wr
-      v0 v1 v2 y R hjp hproc hK hsie hnoff hlocks htier hintena hR)
+      v0 v1 v2 y R hjp hproc hK hwf hnoff hlocks htier hintena hR)
       $$ [- $Hk $Hpc $Htc $Hcc $Hir $Hlocked $Hpay $Hsv $Hidx $Hbuf $Hblk $Hnext $IH]
     iframe #
   · -- one taken: free_desc(idx[0]), then park
@@ -868,7 +839,7 @@ theorem vdrw_ladder (FD : FREE_DESC) (SP : SLEEP_PREPARE) (AC : ACQUIRE) (RE : R
     case ha0f => k_norm
     case hsf => k_norm [vdrwK_sie k]
     case hnf => k_norm [vdrwK_noff k, hnoff]; omega
-    case hKff => k_norm [vdrwK_avail k hsie]; exact hKf
+    case hKff => k_norm [vdrwK_avail k]; omega
     case hlf => k_norm [vdrwK_locks k, hlocks]; simp
     case htf => k_norm [vdrwK_tier k, htier]
     iintro %R1 Hk Hpc %hcs1 Hs Hd
@@ -900,7 +871,7 @@ theorem vdrw_ladder (FD : FREE_DESC) (SP : SLEEP_PREPARE) (AC : ACQUIRE) (RE : R
         refine ⟨?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_⟩ <;>
           simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true])
     iapply (vdrw_park SP AC RE SL Γ cpu k γ γl pd pav pu jp bno dsk0 dataBuf dataDisk wr
-      (BitVec.ofNat 32 h) v1 v2 y (R1.set 15#5 1#64) hjp hproc hK hsie hnoff hlocks htier
+      (BitVec.ofNat 32 h) v1 v2 y (R1.set 15#5 1#64) hjp hproc hK hwf hnoff hlocks htier
       hintena hR1')
       $$ [- $Hk $Hpc $Htc $Hcc $Hir $Hlocked $Hpay $Hsv $Hbuf $Hblk $Hnext $IH]
     iframe #
@@ -945,7 +916,7 @@ theorem vdrw_ladder (FD : FREE_DESC) (SP : SLEEP_PREPARE) (AC : ACQUIRE) (RE : R
     case ha0f => k_norm
     case hsf => k_norm [vdrwK_sie k]
     case hnf => k_norm [vdrwK_noff k, hnoff]; omega
-    case hKff => k_norm [vdrwK_avail k hsie]; exact hKf
+    case hKff => k_norm [vdrwK_avail k]; omega
     case hlf => k_norm [vdrwK_locks k, hlocks]; simp
     case htf => k_norm [vdrwK_tier k, htier]
     iintro %R1 Hk Hpc %hcs1 Hs Hd
@@ -1001,7 +972,7 @@ theorem vdrw_ladder (FD : FREE_DESC) (SP : SLEEP_PREPARE) (AC : ACQUIRE) (RE : R
     case ha0g => k_norm
     case hsg => k_norm [vdrwK_sie k]
     case hng => k_norm [vdrwK_noff k, hnoff]; omega
-    case hKg => k_norm [vdrwK_avail k hsie]; exact hKf
+    case hKg => k_norm [vdrwK_avail k]; omega
     case hlg => k_norm [vdrwK_locks k, hlocks]; simp
     case htg => k_norm [vdrwK_tier k, htier]
     iintro %R2 Hk Hpc %hcs2 Hs Hd
@@ -1017,7 +988,7 @@ theorem vdrw_ladder (FD : FREE_DESC) (SP : SLEEP_PREPARE) (AC : ACQUIRE) (RE : R
     case' _ => iframe Htok2 Hs Hw2 Hback
     isimp only [tk_clear2, diskResA_nil] at Hpay
     iapply (vdrw_park SP AC RE SL Γ cpu k γ γl pd pav pu jp bno dsk0 dataBuf dataDisk wr
-      (BitVec.ofNat 32 h) (BitVec.ofNat 32 m) v2 y R2 hjp hproc hK hsie hnoff hlocks htier
+      (BitVec.ofNat 32 h) (BitVec.ofNat 32 m) v2 y R2 hjp hproc hK hwf hnoff hlocks htier
       hintena hR2)
       $$ [- $Hk $Hpc $Htc $Hcc $Hir $Hlocked $Hpay $Hsv $Hbuf $Hblk $Hnext $IH]
     iframe #
@@ -1050,14 +1021,15 @@ theorem vdrw_loop (FD : FREE_DESC) (SP : SLEEP_PREPARE) (AC : ACQUIRE) (RE : REL
     (k : KCtx) (γ : DiskNames) (γl : GName) (pd pav pu : BitVec 64) (jp : Nat)
     (bno dsk0 : BitVec 32) (dataBuf dataDisk : List (BitVec 8)) (wr : Bool)
     (hjp : jp < NPROC) (hproc : k.proc = procAddr jp) (hK : virtioDiskRwSlots ≤ k.avail)
-    (hsie : k.sie = false) (hnoff : k.noff = 0) (hlocks : k.locks = [])
-    (htier : k.tier = KTier.kpt) (hintena : k.intena = false) (hpd : descPageRw pd) :
+    (hwf : k.wf) (hnoff : k.noff = 0) (hlocks : k.locks = [])
+    (htier : k.tier = KTier.kpt) (hintena : k.intena = k.sie) (hpd : descPageRw pd) :
     (∀ (cpu' : CPU) (a b : Bool) (R' : RegMap) (h m t : Nat) (y : BitVec 32),
       vdrwP2Exit Γ cpu' (k.withSpie a b) γ γl pd pav pu bno dsk0 dataBuf dataDisk wr
         h m t y R' -∗ wpLoop cpu')
     ⊢ ∀ (cpu' : CPU) (a b : Bool) (R' : RegMap) (x0 x1 x2 y : BitVec 32),
         vdrwLoopHead Γ cpu' (k.withSpie a b) γ γl pd pav pu bno dsk0 dataBuf dataDisk wr
           x0 x1 x2 y R' -∗ wpLoop (GF := GF) cpu' := by
+  have hsie : (vdrwK k).sie = false := rfl
   iintro HΦ
   iloeb as IH
   iintro %c %a %b %R %x0 %x1 %x2 %y HL
@@ -1108,7 +1080,7 @@ theorem vdrw_loop (FD : FREE_DESC) (SP : SLEEP_PREPARE) (AC : ACQUIRE) (RE : REL
   rotate_left 1
   · -- turn 0 found nothing
     iapply (vdrw_ladder FD SP AC RE SL Γ c (k.withSpie a b) γ γl pd pav pu jp bno dsk0 dataBuf
-      dataDisk wr 0 0 0 0xffffffff#32 x1 x2 y R0 hjp hproc hK hsie hnoff hlocks htier hintena hpd
+      dataDisk wr 0 0 0 0xffffffff#32 x1 x2 y R0 hjp hproc hK hwf hnoff hlocks htier hintena hpd
       (by omega) (by unfold NUM; omega) (by unfold NUM; omega) (by omega) (by omega) (by omega)
       hR0 f18)
       $$ [- $Hk $Hpc]
@@ -1142,7 +1114,7 @@ theorem vdrw_loop (FD : FREE_DESC) (SP : SLEEP_PREPARE) (AC : ACQUIRE) (RE : REL
   rotate_left 1
   · -- turn 1 found nothing
     iapply (vdrw_ladder FD SP AC RE SL Γ c (k.withSpie a b) γ γl pd pav pu jp bno dsk0 dataBuf
-      dataDisk wr 1 n0 0 (BitVec.ofNat 32 n0) 0xffffffff#32 x2 y R1 hjp hproc hK hsie hnoff
+      dataDisk wr 1 n0 0 (BitVec.ofNat 32 n0) 0xffffffff#32 x2 y R1 hjp hproc hK hwf hnoff
       hlocks htier hintena hpd (by omega) hn0 (by unfold NUM; omega) (by omega) (fun _ => rfl)
       (by omega) hR1 g18)
       $$ [- $Hk $Hpc]
@@ -1179,7 +1151,7 @@ theorem vdrw_loop (FD : FREE_DESC) (SP : SLEEP_PREPARE) (AC : ACQUIRE) (RE : REL
   · -- turn 2 found nothing
     iapply (vdrw_ladder FD SP AC RE SL Γ c (k.withSpie a b) γ γl pd pav pu jp bno dsk0 dataBuf
       dataDisk wr 2 n0 n1 (BitVec.ofNat 32 n0) (BitVec.ofNat 32 n1) 0xffffffff#32 y R2 hjp hproc
-      hK hsie hnoff hlocks htier hintena hpd (by omega) hn0 hn1 (fun _ => Ne.symm hne10)
+      hK hwf hnoff hlocks htier hintena hpd (by omega) hn0 hn1 (fun _ => Ne.symm hne10)
       (fun _ => rfl) (fun _ => rfl) hR2 f18)
       $$ [- $Hk $Hpc]
     rotate_right 1
@@ -1227,21 +1199,24 @@ theorem vdrw_P2 (FD : FREE_DESC) (SP : SLEEP_PREPARE) (AC : ACQUIRE) (RE : RELEA
     (SL : SLEEP) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
     (cpu : CPU) (k : KCtx) (γ : DiskNames) (γl : GName) (pd pav pu : BitVec 64) (jp : Nat)
     (bno dsk0 : BitVec 32) (dataBuf dataDisk : List (BitVec 8)) (R : RegMap)
+    (wr : Bool) (hwr : wr = decide (k.regs 11#5 ≠ 0#64))
     (hjp : jp < NPROC) (hproc : k.proc = procAddr jp) (hK : virtioDiskRwSlots ≤ k.avail)
-    (hsie : k.sie = false) (hnoff : k.noff = 0) (hlocks : k.locks = [])
-    (htier : k.tier = KTier.kpt) (hintena : k.intena = false) (hpd : descPageRw pd) :
+    (hwf : k.wf) (hnoff : k.noff = 0) (hlocks : k.locks = [])
+    (htier : k.tier = KTier.kpt) (hintena : k.intena = k.sie) (hpd : descPageRw pd) :
     vdrwP1Exit Γ cpu k γ γl pd pav pu bno dsk0 dataBuf dataDisk R ∗
     (∀ (cpu' : CPU) (a b : Bool) (R' : RegMap) (h m t : Nat) (y : BitVec 32),
       vdrwP2Exit Γ cpu' (k.withSpie a b) γ γl pd pav pu bno dsk0 dataBuf dataDisk
-        (decide (k.regs 11#5 ≠ 0#64)) h m t y R' -∗ wpLoop cpu')
+        wr h m t y R' -∗ wpLoop cpu')
     ⊢ wpLoop (GF := GF) cpu := by
+  subst hwr
+  have hsie : (vdrwK k).sie = false := rfl
   iintro ⟨HP1, HΦ⟩
   icases vdrwP1Exit_head Γ cpu k γ γl pd pav pu bno dsk0 dataBuf dataDisk R $$ HP1
     with ⟨%x0, %x1, %x2, %y, HL⟩
   ihave HL := vdrwLoopHead_self Γ cpu k γ γl pd pav pu bno dsk0 dataBuf dataDisk _ x0 x1 x2 y R
     $$ HL
   iapply (vdrw_loop FD SP AC RE SL Γ k γ γl pd pav pu jp bno dsk0 dataBuf dataDisk
-      (decide (k.regs 11#5 ≠ 0#64)) hjp hproc hK hsie hnoff hlocks htier hintena hpd)
+      (decide (k.regs 11#5 ≠ 0#64)) hjp hproc hK hwf hnoff hlocks htier hintena hpd)
     $$ HΦ %cpu %(k.spie) %(k.spp) %R %x0 %x1 %x2 %y
   iexact HL
 

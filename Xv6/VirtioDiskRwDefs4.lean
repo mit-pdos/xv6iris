@@ -306,15 +306,33 @@ theorem vdrw5_filter :
 /-- **Re-entering the critical section after the park**: the context the
 sleeper's `acquire` leaves is the one it had before the `release`, with
 the pinned bits `sleep` came back on. -/
-theorem vdrw5_reenter (k : KCtx) (a b : Bool) (hsie : k.sie = false) (hnoff : k.noff = 0)
-    (hlocks : k.locks = []) :
-    (((((vdrwK k).popExit false).withLocks []).withSpie a b).pushOffAt a b).withLocks
-      ["virtio_disk"] = vdrwK (k.withSpie a b) := by
+theorem vdrw5_reenter (k : KCtx) (a b c d : Bool) (hwf : k.wf) (hnoff : k.noff = 0)
+    (hlocks : k.locks = []) (hK : 12 ≤ k.avail) :
+    ((((k.pushed 12).withSpie a b).pushOffAt c d).withLocks ["virtio_disk"]) =
+      vdrwK (k.withSpie c d) := by
+  obtain ⟨-, -, -, -, -⟩ := hwf
   obtain ⟨regs, sie, spie, spp, avail, noff, intena, locks, tier, root, proc⟩ := k
-  simp only at hsie hnoff hlocks
-  subst hsie; subst hnoff; subst hlocks
-  simp [vdrwK, KCtx.pushOffAt, KCtx.pushed, KCtx.withLocks, KCtx.withSpie, KCtx.popExit,
-    KCtx.popOff, trapRes]
+  simp only at hnoff hlocks hK
+  subst hnoff; subst hlocks
+  simp only [vdrwK, KCtx.pushOffAt, KCtx.pushed, KCtx.withLocks, KCtx.withSpie, KCtx.mk.injEq,
+    _root_.true_and, _root_.and_true]
+  omega
+
+/-- After the `release` of a balanced pair, `virtio_disk_rw`'s context is
+its entry context with the twelve-slot frame still up (at either `SIE`). -/
+theorem vdrw_popctx (k : KCtx) (s : Bool) (hs : k.sie = s) (hlocks : k.locks = []) (hwf : k.wf) :
+    ((vdrwK k).popExit s).withLocks ([] : List String) = k.pushed 12 := by
+  subst hs
+  have h0 : (k.pushOffAt k.spie k.spp).popExit k.sie = k := by
+    rw [KCtx.pushOffAt_popExit k k.spie k.spp hwf]
+    rfl
+  have h1 : (vdrwK k).popExit k.sie = (k.withLocks ("virtio_disk" :: k.locks)).pushed 12 := by
+    show ((((k.pushOffAt k.spie k.spp).withLocks ("virtio_disk" :: k.locks)).pushed 12).popExit
+      k.sie) = _
+    rw [KCtx.popExit_pushed, KCtx.popExit_withLocks, h0]
+  rw [h1, KCtx.pushed_withLocks, KCtx.withLocks_withLocks,
+    show k.withLocks ([] : List String) = k from by
+      rw [← hlocks]; exact KCtx.withLocks_self k]
 
 theorem vdrw5_saved_ws (k : KCtx) (a b : Bool) :
     vdrwSaved (GF := GF) (k.withSpie a b) = vdrwSaved k := rfl
@@ -455,48 +473,50 @@ theorem vdrw5_sp (SP : SLEEP_PREPARE) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF
   simp only [sleepPrepareAddr] at h
   exact h
 
+/-- `sleep` at either `SIE`, with the complement at a named index `s` and
+proc `p` (so the caller's hypotheses frame syntactically). -/
 theorem vdrw5_sl (SL : SLEEP) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
-    (c : CPU) (k' : KCtx) (jp : Nat)
+    (c : CPU) (k' : KCtx) (jp : Nat) (s : Bool) (p : BitVec 64)
     (hj : jp < NPROC) (hproc : k'.proc = procAddr jp) (hK : sleepSlots ≤ k'.avail)
-    (hsie' : k'.sie = false) (hnoff : k'.noff = 0) (hlocks : k'.locks = [])
-    (htier : k'.tier = KTier.kpt) :
+    (hnoff : k'.noff = 0) (htier : k'.tier = KTier.kpt) (hs : k'.sie = s) (hp : k'.proc = p) :
     kctx c k' ∗ pcIs c KA.«sleep» ∗ procsInv Γ ∗
-    trapCsrs c ∗ cpuClaim c k'.proc ∗ intrRes c ∗
-    wpNext true k'.proc c (fun cpu' => iprop(∀ spie : Bool, ∀ spp : Bool, ∀ R' : RegMap,
+    trapCsrsExt c s ∗ cpuClaimExt c s p ∗
+    wpNext true p c (fun cpu' => iprop(∀ spie : Bool, ∀ spp : Bool, ∀ R' : RegMap,
       kctx cpu' ((k'.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k'.regs 1#5)) -∗
-      trapCsrs cpu' -∗ cpuClaim cpu' k'.proc -∗ intrRes cpu' -∗
+      trapCsrsExt cpu' s -∗ cpuClaimExt cpu' s p -∗
       ⌜calleeSaved k'.regs R'⌝ -∗ wpLoop cpu'))
     ⊢ wpLoop (GF := GF) c := by
-  have h := SL.wp_sleep (hlc := hlc) (GF := GF) Γ c k' jp hj hproc hK hsie' hnoff hlocks htier
-  unfold wp_sleep_body at h
+  subst hs hp
+  have h := SL.wp_sleep_eb (hlc := hlc) (GF := GF) Γ c k' jp hj hproc hK hnoff htier
+  unfold wp_sleep_eb_body at h
   simp only [sleepAddr] at h
   exact h
 
+/-- `release(&disk.vdisk_lock)`, re-enabling interrupts when the entry
+had them on (`reen`, the arm the caller hands back in `popArm`). -/
 theorem vdrw5_re (RE : RELEASE) (c : CPU) (k' : KCtx) (γ : DiskNames) (γl : GName)
     (pd pav pu : BitVec 64)
     (hsie' : k'.sie = false) (hnoff : 1 ≤ k'.noff) (hK : 10 ≤ k'.avail)
-    (hreen : false = (decide (k'.noff = 1) && k'.intena))
+    (reen : Bool) (hreen : reen = (decide (k'.noff = 1) && k'.intena))
+    (hon : reen = true → k'.tier = .kpt ∧ trapRes true + 6 ≤ k'.avail)
     (ha0 : k'.regs 10#5 = aVdiskLock) :
     kctx c k' ∗ pcIs c KA.«release» ∗ vdrwCaps γ γl pd pav pu ∗
-    locked γl c ∗ diskRes γ pd pav pu curCtx ∗
-    wpNext (k'.popExit false).sie k'.proc c (fun cpu' => iprop(∀ R' : RegMap,
-      kctx cpu' (((k'.popExit false).withRegs R').withLocks
+    locked γl c ∗ diskRes γ pd pav pu curCtx ∗ popArm c k' reen ∗
+    wpNext (k'.popExit reen).sie k'.proc c (fun cpu' => iprop(∀ R' : RegMap,
+      kctx cpu' (((k'.popExit reen).withRegs R').withLocks
         (k'.locks.filter (fun x => x ≠ "virtio_disk"))) -∗
       pcIs cpu' (jumpPc (k'.regs 1#5)) -∗ ⌜calleeSaved k'.regs R'⌝ -∗ wpLoop cpu'))
     ⊢ wpLoop (GF := GF) c := by
   have h := RE.wp_release (hlc := hlc) (GF := GF) c k' γl "virtio_disk" (diskRes γ pd pav pu)
-    hsie' hnoff hK false hreen (by simp)
+    hsie' hnoff hK reen hreen hon
   unfold wp_release_body at h
   simp only [releaseAddr] at h
   rw [ha0] at h
   unfold vdrwCaps
-  iintro ⟨Hk, Hpc, ⟨#Hinv, #Hgeom, #Hlk⟩, Hlocked, Hpay, HΦ⟩
+  iintro ⟨Hk, Hpc, ⟨#Hinv, #Hgeom, #Hlk⟩, Hlocked, Hpay, Harm, HΦ⟩
   iapply h
-  iframe Hk Hpc Hlocked Hpay HΦ
-  isplitl []
-  · iexact Hlk
-  · simp only [popArm_false]
-    iempintro
+  iframe Hk Hpc Hlocked Hpay Harm HΦ
+  iexact Hlk
 
 theorem vdrw5_ac (AC : ACQUIRE) (c : CPU) (k' : KCtx) (γ : DiskNames) (γl : GName)
     (pd pav pu : BitVec 64) (ha0 : k'.regs 10#5 = aVdiskLock)
