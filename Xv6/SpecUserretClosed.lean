@@ -60,7 +60,8 @@ record's own key: `uslot (uvisOf V M sts gn cs pid)`.  The sret lands at
    (usertrap's exec row, forkret's park).  Rocq's `fdv`/`sts` pair is ONE
    list, as Rocq's module-type field instantiates it.
 4. **The residue is pinned** (`usertrapResAt PT Γ j`, SpecUsertrap
-   deviation 2), so the structure quantifies `PT`, `Γ` (`ClaimIs`) and the
+   deviation 2), at the park token `ParkCap.parkToken` (where `USERTRAP` is
+   sealed, W8-P2), so the structure quantifies `Γ` (`ClaimIs`) and the
    handler environment's names (`EnvIs`) exactly as `USERTRAP` does, and the
    running slot is tied to the context (`hproc`) outside the residue.
 5. **The stack gap** (above): Lean's `kctx` stack is explicit, Rocq's
@@ -81,6 +82,8 @@ Imports only definitional and Spec files.
 -/
 import Xv6.SpecUsertrap
 import Xv6.SpecUserret
+import Xv6.ParkCap
+import Xv6.UexecExecInst
 
 namespace Xv6
 
@@ -117,22 +120,24 @@ def wp_userret_closed_body (PT : SchedNames → IProp GF) (Γ : SchedNames) (j :
 end
 
 /-- **Rocq `Module Type USERRET_CLOSED`**: the closed loop, at the pinned
-residue (deviation 4) and the kernel's deposit instance, ∀-quantified over
-the park token, the era's proc table and the handler environment's names as
+residue (deviation 4) and the kernel's deposit instance, AT the park token
+(`ParkCap.parkToken`, where `USERTRAP` is sealed; W8-P2), ∀-quantified over
+the era's proc table and the handler environment's names as
 `USERTRAP` is. -/
 structure USERRET_CLOSED : Prop where
   wp_userret_closed : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF]
     [BioslotG GF] [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF]
     [IregG GF] [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF]
     [CtokG GF] [WchG GF] [Appcfg GF] [FileG GF] [Fscfg] [Icfg] [CurCtx]
-    (PT : SchedNames → IProp GF) [∀ Γ, Persistent (PT Γ)] (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+    (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
     (γ0 γ1 : UartNames) (γc γl0 γl1 : GName) (γd : DiskNames) (γdl γt : GName)
     [EnvIs (hlc := hlc) GF Γ γ0 γ1 γc γl0 γl1 γd γdl γt]
     (j : Nat) (cpu : CPU) (k : KCtx) (m : Nat) (P : UPtd) (ksp : BitVec 64) (V : ProcPriv)
     (M : Nat → List (BitVec 8)) (sts : List FdState) (gn : GName) (cs : ExtTreeSet GName compare)
     (pid : BitVec 32) (sep sc tv : BitVec 64)
     hj hproc hctx htier hnoff hsp hav ha0 hsep hgn,
-    wp_userret_closed_body (hlc := hlc) (GF := GF) PT Γ j cpu k m P ksp V M sts gn cs pid sep sc tv
+    wp_userret_closed_body (hlc := hlc) (GF := GF) (parkToken (hlc := hlc) (GF := GF) (SG := uexecSGXv6))
+      Γ j cpu k m P ksp V M sts gn cs pid sep sc tv
       hj hproc hctx htier hnoff hsp hav ha0 hsep hgn
 
 end Xv6

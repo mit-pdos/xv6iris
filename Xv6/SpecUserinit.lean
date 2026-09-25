@@ -58,8 +58,9 @@ names, Rocq's `devintr_caps_any`), `wireInv`, the trampoline claim, and
 THE FIRST PROCESS'S EXEC BUNDLE (`InitBoot.initBootBundle` at the root and
 the all-closed table) with the console's reader token it is a wand from --
 LINEAR, userinit mints nothing.  `USERINIT` is stated at the kernel's
-deposit instance (`uexecSGXv6`), where the park token's cap is proved
-(SpecForkret deviation 6; PROCESS LAYER, flagged).
+deposit instance (`uexecSGXv6`) and under the handler environment's names
+(`EnvIs`), where the park token's cap is proved (SpecForkret deviation 6;
+PROCESS LAYER, flagged).
 
 INIT'S IDENTITY, SEALED (Rocq `init_pid_tok` in, `init_gen` / `procs_avail
 None` out, lane TRAP-ROWS-3/4): the ledger's boot-era token pins the
@@ -167,6 +168,8 @@ structure USERINIT : Prop where
     [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF] [FsTopG GF] [FsLinkG GF] [IcboxG GF]
     [SleepLockG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [Appcfg GF] [BcacheG GF] [DiskG GF] [OffboxG GF] [OffboxBoxG GF] [FileG GF] [Fscfg] [Icfg] [CurCtx]
     (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+    (γ0 γ1 : UartNames) (γc γl0 γl1 : GName) (γd : DiskNames) (γdl γt : GName)
+    [EnvIs (hlc := hlc) GF Γ γ0 γ1 γc γl0 γl1 γd γdl γt]
     (cpu : CPU) (k : KCtx) (γp γl : GName) (γk : KmemNames) (γft : GName) (γ : FileNames) (γw γtk : GName) (nb np : Nat)
     hnoff hnoff0 hK hlk hlp hlq hlocks htier hproc hsie hnb hroot hnib0,
     wp_userinit_body (hlc := hlc) (GF := GF) (SG := uexecSGXv6) Γ cpu k γp γl γk γft γ γw γtk nb np

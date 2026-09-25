@@ -31,8 +31,8 @@ package's `firstDone`.
 3. `park_token_intro` is stated at the era's table `Γ` under `[ClaimIs GF Γ]`
    (forkret's claim is the table's, `SchedCtx.cpuClaim_eq`).
 4. **PROCESS LAYER (flagged)**: both fields are at the kernel's deposit
-   instance (`uexecSGXv6`) and the park token, as `FORKRET` is
-   (SpecForkret deviation 6).
+   instance (`uexecSGXv6`) and the park token, and under the handler
+   environment's names (`EnvIs`), as `FORKRET` is (SpecForkret deviation 6).
 
 Imports only definitional files and Spec files.
 -/
@@ -75,6 +75,8 @@ structure FORKRET_PARK_PAID : Prop where
     [Appcfg GF] [FileG GF] [Fscfg] [Icfg]
     (W : IProp GF)
     (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+    (γ0 γ1 : UartNames) (γc γl0 γl1 : GName) (γd : DiskNames) (γdl γt : GName)
+    [EnvIs (hlc := hlc) GF Γ γ0 γ1 γc γl0 γl1 γd γdl γt]
     (hp : CPU) (ξp : CtxId) (N : UtNames) (rest : List (BitVec 64)) (V : ProcPriv)
     (M : Nat → List (BitVec 8)) (sts : List FdState) (cs : ExtTreeSet GName compare) (steady : Bool),
     forkretParkPaidBody (hlc := hlc) (GF := GF) (SG := uexecSGXv6)
@@ -85,7 +87,9 @@ structure FORKRET_PARK_PAID : Prop where
     [BioslotG GF] [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
     [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
     [Appcfg GF] [FileG GF] [Fscfg] [Icfg]
-    (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ],
+    (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+    (γ0 γ1 : UartNames) (γc γl0 γl1 : GName) (γd : DiskNames) (γdl γt : GName)
+    [EnvIs (hlc := hlc) GF Γ γ0 γ1 γc γl0 γl1 γd γdl γt],
     ⊢ parkToken (hlc := hlc) (GF := GF) (SG := uexecSGXv6) Γ
 
 end Xv6

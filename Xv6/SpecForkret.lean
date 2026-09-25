@@ -87,7 +87,9 @@ the CLOSED trap loop.
    (`ParkCap.parkToken`) and the kernel's deposit instance (`uexecSGXv6`),
    not over an abstract residue: Rocq's forkret re-exports the closed loop's
    `usertrap_res` (`UC : USERRET_CLOSED`), and the closed loop -- like the
-   usertrap / syscall seals -- lives at that instance and token.
+   usertrap / syscall seals -- lives at that instance and token; with it,
+   the handler environment's names (`EnvIs`), as `USERTRAP` /
+   `USERRET_CLOSED` quantify them.
 
 Imports only definitional files.
 -/
@@ -171,6 +173,8 @@ structure FORKRET : Prop where
     [Appcfg GF] [FileG GF] [Fscfg] [Icfg] [CurCtx]
     (W : IProp GF)
     (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+    (γ0 γ1 : UartNames) (γc γl0 γl1 : GName) (γd : DiskNames) (γdl γt : GName)
+    [EnvIs (hlc := hlc) GF Γ γ0 γ1 γc γl0 γl1 γd γdl γt]
     (cpu : CPU) (R : RegMap) (spie spp eb : Bool) (root : BitVec 44) (N : UtNames) (V : ProcPriv)
     (M : Nat → List (BitVec 8)) (sts : List FdState) (gn : GName) (cs : ExtTreeSet GName compare)
     (steady : Bool) hΓ hj hgn hsp,
