@@ -507,7 +507,7 @@ Section SyscExec.
      payload is a field of them, so what goes down and what comes back are
      at ONE predicate. *)
   Definition sysc_pay_in (f : sfam) (U : ustate) : iProp Σ :=
-    upay_at (pv_gen (us_V U)) uecall_scause (pv_tf (us_V U)) f.
+    upay_at (pv_gen (us_V U)) uecall_scause (pv_secc (us_V U)) (pv_tf (us_V U)) f.
 
   (* THERE IS NO ROW COMING BACK (lane SELF-KILL, P6b).  The payload at the
      kill status is the KILLER's price and is paid into <p->lock>'s own

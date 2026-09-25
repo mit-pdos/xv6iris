@@ -1410,6 +1410,11 @@ Proof.
     [ reflexivity | unfold tf_arg_idx, tf_epc_idx; lia ].
 Qed.
 
+(* ...and the effective number, which reads the mask beside it *)
+Lemma usys_eff_epc (secc : mword 64) (tf : list (mword 64)) (v : mword 64) :
+  usys_eff secc (<[tf_epc_idx := v]> tf) = usys_eff secc tf.
+Proof. unfold usys_eff. rewrite usys_num_epc. reflexivity. Qed.
+
 (* THE THREE WORDS THE TABLE READS, besides the number: the two
    destination pointers (arguments 0 and 1) and read's count (argument 2).
    Everything below is "the table is blind to every other word". *)

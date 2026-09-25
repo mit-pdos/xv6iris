@@ -269,23 +269,23 @@ Definition uservec_post `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fileG Σ} `{GEN 
        anyway because the alternative is what the kfork loop does -- prove
        the fact and leave it unstatable. *)
     ⌜SpecUsertrap.ut_fd_kept sc_v sts sts'⌝ -∗
-    ⌜SpecUsertrap.ut_ch_kept sc_v (tf_of g (ret_pc sepc_v)) cs cs'⌝ -∗
+    ⌜SpecUsertrap.ut_ch_kept sc_v (pv_secc (us_V U)) (tf_of g (ret_pc sepc_v)) cs cs'⌝ -∗
     (* ...and the generation's, which the loop reads to convert the exit
        deposit's [ChildTok.my_pay] onto the block's own name
        ([SpecUsertrap.ut_gen_kept]) *)
     ⌜SpecUsertrap.ut_gen_kept
        (ProcDefs.upd_usM (ProcInv.us_tf U (tf_of g (ret_pc sepc_v))) M) U'⌝ -∗
-    ⌜SpecUsertrap.ut_fd_ecall sc_v (tf_of g (ret_pc sepc_v))
+    ⌜SpecUsertrap.ut_fd_ecall sc_v (pv_secc (us_V U)) (tf_of g (ret_pc sepc_v))
        (pv_tf (us_V U')) sts sts'⌝ -∗
     (* ...and pipe's join, off the same two frames.  The ENTRY image is [M],
        the one the frame names above, so this boundary states the row at a
        map anchored to a resource on both ends -- see
        [SpecUsertrap.ut_pipe_ecall]. *)
-    ⌜SpecUsertrap.ut_pipe_ecall sc_v (tf_of g (ret_pc sepc_v))
+    ⌜SpecUsertrap.ut_pipe_ecall sc_v (pv_secc (us_V U)) (tf_of g (ret_pc sepc_v))
        (pv_tf (us_V U')) M (us_M U') sts sts'⌝ -∗
     (* ...and getpid's answer, forwarded the same way -- see
        [SpecUsertrap.ut_ret_pid] *)
-    ⌜SpecUsertrap.ut_ret_pid sc_v (tf_of g (ret_pc sepc_v))
+    ⌜SpecUsertrap.ut_ret_pid sc_v (pv_secc (us_V U)) (tf_of g (ret_pc sepc_v))
        (pv_tf (us_V U')) pid⌝ -∗
     ⌜ret_pc uepc = tf_resume_pc (pv_tf (us_V U'))⌝ -∗
     ⌜mf = tf_resume_gpr0 (pv_tf (us_V U'))⌝ -∗

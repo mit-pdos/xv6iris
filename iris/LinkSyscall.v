@@ -48,10 +48,13 @@ Require Import LinkSysMknod LinkSysOpen LinkSysUnlink.
 (* ...and the three the dispatch itself needs: myproc, printk's general path
    for the unknown-number fallback, and the [p->name] fact below. *)
 Require Import LinkMyproc LinkPrintk.
+(* ...and the twenty-third entry, [sys_seccomp] (upstream a083670) *)
+Require Import LinkSysSeccomp.
 
 Module Syscall :=
   SyscallProof SysFork SysExit SysWait SysPipe SysRead SysKill
                SysExec SysFstat SysChdir SysDup SysGetpid SysSbrk
                SysPause SysUptime SysWrite SysMknod SysLink SysMkdir
                SysClose SysSync SysOpen SysUnlink
+               SysSeccomp
                Myproc PrintkGen.

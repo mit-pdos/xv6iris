@@ -88,8 +88,8 @@ Section UkBranch.
   Local Lemma uvb_zero_at (r : mword 5) (M : gmap Z (bv 8)) (m : regfile)
       (pc : mword 64) (fdv : list fdstate) (cw : Z) (gn : gname) (cs : gset gname) (pidv : mword 32) :
     uint r = 0 ->
-    uvb C pt Rfd Rut sz π fdv cw gn cs pidv false secc_all M m pc -∗
-    ⌜m !!! Regidx r = zero_reg⌝ ∗ uvb C pt Rfd Rut sz π fdv cw gn cs pidv false secc_all M m pc.
+    uvb C pt Rfd Rut sz π fdv cw gn cs pidv false ProcDefs.secc_all M m pc -∗
+    ⌜m !!! Regidx r = zero_reg⌝ ∗ uvb C pt Rfd Rut sz π fdv cw gn cs pidv false ProcDefs.secc_all M m pc.
   Proof using .
     intros Hr.
     rewrite /uvb /uvb_F.
@@ -128,7 +128,7 @@ Section UkBranch.
     taken = uv_btaken op (m !!! Regidx rs1) (m !!! Regidx rs2) ->
     tgt = add_vec pc (sign_extend' 64 imm) ->
     (taken = true -> eq_vec (access_vec_dec tgt 0) ('b"0") = true) ->
-    uvb C pt Rfd Rut sz π fdv cw gn cs pidv false secc_all M m pc -∗
+    uvb C pt Rfd Rut sz π fdv cw gn cs pidv false ProcDefs.secc_all M m pc -∗
     ▷ ukcq Qp π M sz fdv cw gn cs pidv m (if taken then tgt else add_vec_int pc (if is_rvc then 2 else 4)) -∗
     mWP (Loop : expr riscv_lang).
   Proof using HRut Hlf0 Hlo Hpm.
@@ -182,7 +182,7 @@ Section UkBranch.
     taken = uv_btaken op (m !!! Regidx rs1) (m !!! Regidx rs2) ->
     tgt = add_vec pc (sign_extend' 64 imm) ->
     (taken = true -> eq_vec (access_vec_dec tgt 0) ('b"0") = true) ->
-    uvb C pt Rfd Rut sz π fdv cw gn cs pidv false secc_all M m pc -∗
+    uvb C pt Rfd Rut sz π fdv cw gn cs pidv false ProcDefs.secc_all M m pc -∗
     ukcq Qp π M sz fdv cw gn cs pidv m (if taken then tgt else add_vec_int pc (if is_rvc then 2 else 4)) -∗
     mWP (Loop : expr riscv_lang).
   Proof using HRut Hlf0 Hlo Hpm.
@@ -204,7 +204,7 @@ Section UkBranch.
     taken = uv_btaken op (m !!! Regidx rs1) (m !!! Regidx rs2) ->
     tgt = add_vec pc (sign_extend' 64 imm) ->
     (taken = true -> eq_vec (access_vec_dec tgt 0) ('b"0") = true) ->
-    uvb C pt Rfd Rut sz π fdv cw gn cs pidv false secc_all M m pc -∗
+    uvb C pt Rfd Rut sz π fdv cw gn cs pidv false ProcDefs.secc_all M m pc -∗
     ukcq Qp π M sz fdv cw gn cs pidv m (if taken then tgt else add_vec_int pc 4) -∗
     mWP (Loop : expr riscv_lang).
   Proof using HRut Hlf0 Hlo Hpm.
@@ -227,7 +227,7 @@ Section UkBranch.
     taken = uv_btaken op (m !!! Regidx rs1) (m !!! Regidx rs2) ->
     tgt = add_vec pc (sign_extend' 64 imm) ->
     (taken = true -> eq_vec (access_vec_dec tgt 0) ('b"0") = true) ->
-    uvb C pt Rfd Rut sz π fdv cw gn cs pidv false secc_all M m pc -∗
+    uvb C pt Rfd Rut sz π fdv cw gn cs pidv false ProcDefs.secc_all M m pc -∗
     ▷ ukcq Qp π M sz fdv cw gn cs pidv m (if taken then tgt else add_vec_int pc 4) -∗
     mWP (Loop : expr riscv_lang).
   Proof using HRut Hlf0 Hlo Hpm.
@@ -256,7 +256,7 @@ Section UkBranch.
     taken = uv_btaken op (m !!! Regidx rs1) zero_reg ->
     tgt = add_vec pc (sign_extend' 64 imm) ->
     (taken = true -> eq_vec (access_vec_dec tgt 0) ('b"0") = true) ->
-    uvb C pt Rfd Rut sz π fdv cw gn cs pidv false secc_all M m pc -∗
+    uvb C pt Rfd Rut sz π fdv cw gn cs pidv false ProcDefs.secc_all M m pc -∗
     ▷ ukcq Qp π M sz fdv cw gn cs pidv m (if taken then tgt else add_vec_int pc 4) -∗
     mWP (Loop : expr riscv_lang).
   Proof using HRut Hlf0 Hlo Hpm.
@@ -276,7 +276,7 @@ Section UkBranch.
     taken = uv_btaken op (m !!! Regidx rs1) zero_reg ->
     tgt = add_vec pc (sign_extend' 64 imm) ->
     (taken = true -> eq_vec (access_vec_dec tgt 0) ('b"0") = true) ->
-    uvb C pt Rfd Rut sz π fdv cw gn cs pidv false secc_all M m pc -∗
+    uvb C pt Rfd Rut sz π fdv cw gn cs pidv false ProcDefs.secc_all M m pc -∗
     ukcq Qp π M sz fdv cw gn cs pidv m (if taken then tgt else add_vec_int pc 4) -∗
     mWP (Loop : expr riscv_lang).
   Proof using HRut Hlf0 Hlo Hpm.
@@ -302,7 +302,7 @@ Section UkBranch.
     taken = eq_vec (m !!! Regidx rs) zero_reg ->
     tgt = add_vec pc (sign_extend' 64 (sign_extend' 13 (concat_vec imm ('b"0")))) ->
     (taken = true -> eq_vec (access_vec_dec tgt 0) ('b"0") = true) ->
-    uvb C pt Rfd Rut sz π fdv cw gn cs pidv false secc_all M m pc -∗
+    uvb C pt Rfd Rut sz π fdv cw gn cs pidv false ProcDefs.secc_all M m pc -∗
     ukcq Qp π M sz fdv cw gn cs pidv m (if taken then tgt else add_vec_int pc 2) -∗
     mWP (Loop : expr riscv_lang).
   Proof using HRut Hlf0 Hlo Hpm.
@@ -339,7 +339,7 @@ Section UkBranch.
     taken = neq_vec (m !!! Regidx rs) zero_reg ->
     tgt = add_vec pc (sign_extend' 64 (sign_extend' 13 (concat_vec imm ('b"0")))) ->
     (taken = true -> eq_vec (access_vec_dec tgt 0) ('b"0") = true) ->
-    uvb C pt Rfd Rut sz π fdv cw gn cs pidv false secc_all M m pc -∗
+    uvb C pt Rfd Rut sz π fdv cw gn cs pidv false ProcDefs.secc_all M m pc -∗
     ukcq Qp π M sz fdv cw gn cs pidv m (if taken then tgt else add_vec_int pc 2) -∗
     mWP (Loop : expr riscv_lang).
   Proof using HRut Hlf0 Hlo Hpm.

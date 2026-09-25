@@ -751,7 +751,7 @@ Definition ut_live_read_g (sc_v : mword 64) (secc : mword 64) (tf : list (mword 
   /\ ut_live_fd_g tf sts
   /\ r = (mword_of_int (-1) : mword 64).
 
-Global Instance ut_live_read_g_dec sc_v tf sts r :
+Global Instance ut_live_read_g_dec sc_v secc tf sts r :
   Decision (ut_live_read_g sc_v secc tf sts r).
 Proof. rewrite /ut_live_read_g. apply _. Defined.
 
@@ -763,7 +763,7 @@ Definition ut_live_wait_g (sc_v : mword 64) (secc : mword 64) (tf : list (mword 
   /\ uint (tf !!! tf_arg_idx 0) = 0%Z
   /\ r = (mword_of_int (-1) : mword 64).
 
-Global Instance ut_live_wait_g_dec sc_v tf r :
+Global Instance ut_live_wait_g_dec sc_v secc tf r :
   Decision (ut_live_wait_g sc_v secc tf r).
 Proof. rewrite /ut_live_wait_g. apply _. Defined.
 
@@ -1412,6 +1412,10 @@ Definition ut_pro (sepc_v : mword 64) (U U' : ustate) : Prop :=
   /\ pv_lazy (us_V U') = pv_lazy (us_V U)
   (* ...and the mask, likewise ([ProcDefs.pv_secc]) *)
   /\ pv_secc (us_V U') = pv_secc (us_V U).
+
+Lemma ut_pro_secc (sepc_v : mword 64) (U U' : ustate) :
+  ut_pro sepc_v U U' -> pv_secc (us_V U') = pv_secc (us_V U).
+Proof. intros (_ & _ & _ & _ & _ & _ & _ & Hsc). exact Hsc. Qed.
 
 (* THE ENTRY INSTANCE: at the record the prologue hands on, the round has
    done nothing yet, so every arm of the relation is an identity. *)

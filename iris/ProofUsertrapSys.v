@@ -562,15 +562,16 @@ Section UtSysBlock.
          one (durable-notes, "CpuId IS A CLASS") *)
       assert (HV1tf0 : pv_tf V1 = <[tf_epc_idx := rget S3 Ra5]> (pv_tf (us_V U)))
         by (rewrite /V1; destruct (us_V U); reflexivity).
-      assert (Hnumeq0 : sysc_num V1 = usys_num (pv_tf (us_V U))).
-      { rewrite (sysc_num_usys V1). rewrite HV1tf0. apply usys_num_epc. }
+      assert (Hnumeq0 : sysc_num V1 = usys_eff (pv_secc (us_V U)) (pv_tf (us_V U))).
+      { rewrite (sysc_num_usys V1).
+        change (pv_secc V1) with (pv_secc (us_V U)). rewrite HV1tf0. apply usys_eff_epc. }
       pose proof Hpro as Hpro'.
       destruct Hpro' as (Hpr1 & Hpr2 & Hpr3 & Hpr4 & Hpr5 & Hpr6 & Hpr7).
       (* the entry record's number and argument words are the dispatcher's:
          neither epc rewrite reads them -- the deposit's key congruence
          ([SpecUsertrap.ut_sys_in_cong]) *)
-      assert (Hn0 : usys_num (pv_tf (us_V U0)) = sysc_num V1).
-      { rewrite Hnumeq0 Hpr1 usys_num_epc. reflexivity. }
+      assert (Hn0 : usys_eff (pv_secc (us_V U0)) (pv_tf (us_V U0)) = sysc_num V1).
+      { rewrite Hnumeq0 Hpr1 usys_eff_epc (ut_pro_secc _ _ _ Hpro). reflexivity. }
       assert (Hargw : forall i : nat, (i < 3)%nat ->
                 tf_w (pv_tf (us_V U0)) (tf_arg_idx i)
                 = tf_w (pv_tf V1) (tf_arg_idx i)).
@@ -877,8 +878,9 @@ Section UtSysBlock.
          [tf_ueq] is the wrong tool here, since the epc IS the difference. *)
       assert (HV1tf : pv_tf V1 = <[tf_epc_idx := rget S3 Ra5]> (pv_tf (us_V U)))
         by (rewrite /V1; destruct (us_V U); reflexivity).
-      assert (Hnumeq : sysc_num V1 = usys_num (pv_tf (us_V U))).
-      { rewrite (sysc_num_usys V1). rewrite HV1tf. apply usys_num_epc. }
+      assert (Hnumeq : sysc_num V1 = usys_eff (pv_secc (us_V U)) (pv_tf (us_V U))).
+      { rewrite (sysc_num_usys V1).
+        change (pv_secc V1) with (pv_secc (us_V U)). rewrite HV1tf. apply usys_eff_epc. }
       (* the bumped epc, in [bump_tf]'s [add_vec_int] spelling *)
       assert (HS2a5 : rget S2 Ra5 = uepc)
         by (rgne; rewrite /S2 upd_eq; reflexivity).
@@ -1065,14 +1067,14 @@ Section UtSysBlock.
          [usys_mem_ok_epc] the image row above crosses by. *)
       assert (Hfde : ut_fd_ecall scv (pv_secc (us_V U0)) (pv_tf (us_V U0))
                        (pv_tf (us_V (MkUstate V2 M2))) sts stsR).
-      { intros _. destruct Hpro as (Hp1 & _ & _ & _).
+      { intros _. pose proof (ut_pro_secc _ _ _ Hpro) as Hsc0. destruct Hpro as (Hp1 & _ & _ & _).
         assert (Hlen1 : (tf_epc_idx < length (pv_tf (us_V U)))%nat)
           by (rewrite Htflen0; unfold tf_epc_idx, TFWORDS; lia).
         assert (Hlen0 : (tf_epc_idx < length (pv_tf (us_V U0)))%nat).
         { pose proof Htflen0 as HL. rewrite Hp1 length_insert in HL.
           rewrite HL. unfold tf_epc_idx, TFWORDS. lia. }
-        assert (Hnum0 : usys_num (pv_tf (us_V U0)) = sysc_num V1).
-        { rewrite Hnumeq Hp1 usys_num_epc. reflexivity. }
+        assert (Hnum0 : usys_eff (pv_secc (us_V U0)) (pv_tf (us_V U0)) = sysc_num V1).
+        { rewrite Hnumeq Hp1 usys_eff_epc Hsc0. reflexivity. }
         cbn [us_V pv_tf]. rewrite Hnum0.
         apply (usys_fd_ok_epc _ _ (ret_pc epv) _ _ _ Hlen0).
         rewrite <- Hp1.
@@ -1087,14 +1089,14 @@ Section UtSysBlock.
       assert (Hpipe : ut_pipe_ecall scv (pv_secc (us_V U0)) (pv_tf (us_V U0))
                         (pv_tf (us_V (MkUstate V2 M2)))
                         (us_M U0) (us_M (MkUstate V2 M2)) sts stsR).
-      { intros _. destruct Hpro as (Hp1 & _ & _ & HM1 & _).
+      { intros _. pose proof (ut_pro_secc _ _ _ Hpro) as Hsc0. destruct Hpro as (Hp1 & _ & _ & HM1 & _).
         assert (Hlen1 : (tf_epc_idx < length (pv_tf (us_V U)))%nat)
           by (rewrite Htflen0; unfold tf_epc_idx, TFWORDS; lia).
         assert (Hlen0 : (tf_epc_idx < length (pv_tf (us_V U0)))%nat).
         { pose proof Htflen0 as HL. rewrite Hp1 length_insert in HL.
           rewrite HL. unfold tf_epc_idx, TFWORDS. lia. }
-        assert (Hnum0 : usys_num (pv_tf (us_V U0)) = sysc_num V1).
-        { rewrite Hnumeq Hp1 usys_num_epc. reflexivity. }
+        assert (Hnum0 : usys_eff (pv_secc (us_V U0)) (pv_tf (us_V U0)) = sysc_num V1).
+        { rewrite Hnumeq Hp1 usys_eff_epc Hsc0. reflexivity. }
         cbn [us_V us_M pv_tf]. rewrite Hnum0. rewrite <- HM1.
         apply (usys_pipe_ok_epc _ _ (ret_pc epv) _ _ _ _ _ Hlen0).
         rewrite <- Hp1.
@@ -1108,9 +1110,9 @@ Section UtSysBlock.
          pid] out to the user-execution round ([SpecUsertrap.ut_ret_pid]). *)
       assert (Hpidr : ut_ret_pid scv (pv_secc (us_V U0)) (pv_tf (us_V U0))
                         (pv_tf (us_V (MkUstate V2 M2))) pid).
-      { intros _. destruct Hpro as (Hp1 & _ & _ & _).
-        assert (Hnum0 : usys_num (pv_tf (us_V U0)) = sysc_num V1).
-        { rewrite Hnumeq Hp1 usys_num_epc. reflexivity. }
+      { intros _. pose proof (ut_pro_secc _ _ _ Hpro) as Hsc0. destruct Hpro as (Hp1 & _ & _ & _).
+        assert (Hnum0 : usys_eff (pv_secc (us_V U0)) (pv_tf (us_V U0)) = sysc_num V1).
+        { rewrite Hnumeq Hp1 usys_eff_epc Hsc0. reflexivity. }
         cbn [us_V pv_tf]. rewrite Hnum0. exact Hpidg. }
       (* THE EXEC CHANNEL'S ANSWER, re-spelled from the dispatcher's record
          to the round's entry trapframe.  Failure is [sysc_exec_failed]: the

@@ -125,6 +125,9 @@ Section UkGen.
           way), so this copy of the bundle does not take the bit as a
           parameter.  [X_unfold] below carries the matching guard. *)
        ⌜uvis_lazy W' = false⌝ -∗
+       (* ...AND THE MASK, the ninth pin, at the literal [secc_all] for the
+          same reason: the U tier's run is at the full mask *)
+       ⌜uvis_secc W' = ProcDefs.secc_all⌝ -∗
        trapped_machine C pt Rut sz sc stv W' ∗ Rfd (uvis_fd W') ∗
        RetF X sc W' -∗
        mWP (Loop : expr riscv_lang))%I.
@@ -178,6 +181,7 @@ Section UkGen.
      where the premise is [eq_refl]. *)
   Hypothesis X_unfold : forall W : uvis,
     uvis_lazy W = false ->
+    uvis_secc W = ProcDefs.secc_all ->
     X W ⊣⊢
     ukc' (uvis_perm W) (uvis_M W) (uvis_sz W) (uvis_fd W) (uvis_cwd W)
       (uvis_gen W) (uvis_ch W) (uvis_pid W)
@@ -210,7 +214,7 @@ Section UkGen.
   Proof using X_unfold.
     intros Hx0 Hal.
     rewrite (X_unfold (uvis_of_run m pc M π szv fdv cw gn cs pidv false secc_all)
-               eq_refl).
+               eq_refl eq_refl).
     cbn [uvis_tf uvis_M uvis_perm uvis_sz uvis_fd uvis_cwd uvis_gen uvis_ch
          uvis_pid uvis_of_run].
     rewrite (tf_of_resume_gpr m pc Hx0) (tf_of_resume_pc m pc Hal).
@@ -1908,13 +1912,14 @@ Section UkGenPlain.
      the only difference from [uslot_unfold] is one vacuous premise. *)
   Lemma uslot_unfold_gen (W : uvis) :
     uvis_lazy W = false ->
+    uvis_secc W = ProcDefs.secc_all ->
     uslot W ⊣⊢
     ukc' uexec_ret_F uslot (fun _ : CtxIdDefs.CurCtx => Logic.True) (uvis_perm W) (uvis_M W)
       (uvis_sz W) (uvis_fd W) (uvis_cwd W) (uvis_gen W) (uvis_ch W)
       (uvis_pid W)
       (tf_resume_gpr0 (uvis_tf W)) (tf_resume_pc (uvis_tf W)).
   Proof using .
-    intros Hlz. rewrite (uslot_unfold W) /ukc' /uvb_F' /ukont_F' /ukb_F' Hlz.
+    intros Hlz Hsc. rewrite (uslot_unfold W) /ukc' /uvb_F' /ukont_F' /ukb_F' Hlz Hsc.
     iSplit.
     - iIntros "H" (h xi C pt Rfd Rut HRut) "_ %Hlo %Hpm %Hlf Hb".
       iApply ("H" $! h xi C pt Rfd Rut HRut with "[%] [%] [%] Hb");

@@ -135,11 +135,11 @@ Section UkWriteClosed.
     iIntros (M pm sz fdv cw gn cs pidv) "%Htake _ Hheap Hufd".
     iFrame "Hheap Hufd".
     iApply (sbundle_at_write_intro_at uslot (xfam_wr Q (ukn_pay N))
-              (uvis_of_run m pc M pm sz fdv cw gn cs pidv false secc_all)
+              (uvis_of_run m pc M pm sz fdv cw gn cs pidv false ProcDefs.secc_all)
               (m !!! Regidx a0_idx) (m !!! Regidx a1_idx)
               (m !!! Regidx a2_idx) fdv M _ _ _
               (tf_of_arg0 m pc) (tf_of_arg1 m pc) (tf_of_arg2 m pc)
-              (uvis_of_run_fd m pc M pm sz fdv cw gn cs pidv false secc_all)
+              (uvis_of_run_fd m pc M pm sz fdv cw gn cs pidv false ProcDefs.secc_all)
               eq_refl eq_refl eq_refl eq_refl).
     rewrite (uwr_fd_st_closed (m !!! Regidx a0_idx) fdv l i H0 Hi Htake Hli).
     rewrite /filewrite_in. done.

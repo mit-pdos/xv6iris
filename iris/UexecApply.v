@@ -1272,7 +1272,7 @@ Section LoopApply.
             by exact (usys_cwd_ok_quiet (uvis_num (uvis_run W)) r
                         (uvis_cwd W) (uvis_cwd W') Hne9 Hc).
           assert (Hsc' : uvis_secc W' = uvis_secc W)
-            by exact (usys_secc_ok_quiet _ _ _ _ _
+            by exact (usys_secc_ok_quiet (uvis_num (uvis_run W)) _ _ _ _
                         ltac:(rewrite Hfk; vm_compute; discriminate) Hsc).
           (* ...and the bump, read back at the resume key -- the same two
              transports the returning arms use *)
@@ -1561,6 +1561,7 @@ Section LoopApply.
     uvis_ch W = cs ->
     uvis_pid W = pidv ->
     uvis_lazy W = lz ->
+    uvis_secc W = secc ->
     (* the fill row, as [ukc_apply] takes it *)
     (lz = false -> lazy_free (ud_um pt) sz) ->
     tf_resume_gpr0 (uvis_tf W) = m ->
@@ -1575,12 +1576,12 @@ Section LoopApply.
     ▷ ukb C pt Rfd Rut sz (perm_of (ud_um pt) sz) fdv cw gn cs pidv lz secc -∗
     mWP (Loop : expr riscv_lang).
   Proof using .
-    intros Hlo Hsz Hms Hpi HM Hsw Hfd Hcw Hgn Hch Hpid Hlz Hlf Hg Hpc.
+    intros Hlo Hsz Hms Hpi HM Hsw Hfd Hcw Hgn Hch Hpid Hlz Hsc Hlf Hg Hpc.
     iIntros "Hs".
     (* the seal comes off the HYPOTHESIS only *)
     iEval (rewrite uslot_ukc) in "Hs".
-    iEval (rewrite Hpi HM Hsw Hfd Hcw Hgn Hch Hpid Hlz Hg Hpc) in "Hs".
-    iApply (ukc_apply C pt Rfd Rut HRut sz fdv cw gn cs pidv lz M m ms_v sc_v
+    iEval (rewrite Hpi HM Hsw Hfd Hcw Hgn Hch Hpid Hlz Hsc Hg Hpc) in "Hs".
+    iApply (ukc_apply C pt Rfd Rut HRut sz fdv cw gn cs pidv lz secc M m ms_v sc_v
               stv_v sepc_v pc Hlo Hsz Hms Hlf with "Hs").
   Qed.
 

@@ -16,9 +16,18 @@ theorem: lane M's model, the universe slot (S1), the claim arm (S2), the
 seccomp program (S3), the round and the knob (S4).
 
 - Lane K (kernel bump + the mask in the contracts): IN FLIGHT in
-  `/shared/xv6iris-3` (branch `main`, uncommitted: Makefile pin,
-  kernel-rocq/ + user-rocq/ dumps, iris/Code*.v + KernelDecode*.v
-  regenerated).  Owner: the top-level agent.
+  `/shared/xv6iris-3`, branch `secc/bump`.  STATUS LINE (keep current):
+  DONE -- sweeps (e09564a33), decode layer (7db68875e), stride + mask
+  definitions through the contracts (23224306f), sys_seccomp Proof/Link +
+  userinit (secc/sc, ff), kfork reshape (merge 24cb26c17), syscall's
+  blocked arm + entry 23 (WIP commit).  RED -- the U-tier engine's
+  literal-[secc_all] pins (UkStepGen/UkRun constructors mirror LAZY-FLAG's
+  `uvis_lazy W = false`), ProofUsertrap{Sys,Tail,Arms}, ProofForkret,
+  UserretUser, SpecUservec, ProofSyscall's remaining arms (the secc row at
+  `upd_usV U V'` needs `pv_secc V' = pv_secc (us_V U)`), user tier (UCode*,
+  waits on the `secc/user` merge).  NEXT -- VM round from the tree root
+  (`scratchpad/bin/round.sh k3rN`, logs `/tmp/k3rN.log` on the VM; last
+  k3r8), fix fallout, then merge `secc/user`, then the five checks.
 - Lane U (user tier relayout + the seccomp binary's dumps/catalog):
   IN FLIGHT in worktree `/shared/xv6iris-3-lanes/secc-user` (branch
   `secc/user`, from the same uncommitted base).  Textual until K lands.
