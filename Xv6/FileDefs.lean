@@ -55,12 +55,13 @@ invariants the Rocq algebra enforces:
    day-one skeleton; each step a proof calls is ported as a lemma where
    that proof lands (`proto_publish` with sys_open,
    `proto_read_checkout/park` with fileread/filewrite).
-4. **`fslotAt`'s payload is at the AMBIENT context.**  `fslotAt ξ` states
-   the content cells at `ξ` (`fileFieldsAt ξ`) but the payload
-   (`fileCore`, `fpayTok`) at the ambient `CurCtx`, as the landed pipe arm
-   already did (`isPipe`'s floors are `lkFloor curCtx`); Rocq states all of
-   `fslot` at `XI` and transports the payload with `file_core_morph`.  The
-   lock's `CtxMorph` therefore treats the payload as a constant.
+4. (RETIRED, W8-P2.)  `fslotAt ξ` / `fileRestAt ξ` state EVERYTHING at
+   `ξ` -- the content cells and the payload (`fileCore`, `fpayTok`) -- by
+   re-binding the ambient to `⟨ξ, curTier⟩`, Rocq's `ftable_res_at γ ξ :=
+   ftable_res (XI := ξ) γ`, so the lock handle `isFtable` transports
+   (`FtableMorph`), which the park needs (a process's syscall environment is
+   at its own context).  The transports are `FtableMorph`'s (they need
+   `FileMorph.fileCore_morph`).
 5. **`offFree` is over MAPPABLE visibility-free bytes** (`offFreeByte`, the
    fractional form of `MachCSL.byteMapped`: the page claim, the tier pin and
    the raw history cell at fraction `q`), because the port's kernel
@@ -487,15 +488,17 @@ def ftableOk (M : RegMapF (Nat × Qp)) (Ls : Nat → List (Nat × Qp)) : Prop :=
 /-- What the lock keeps of a referenced slot: the content fraction NOT out
 (nothing when `qt = 1`); the witnesses are lifted to `fslotAt`. -/
 def fileRestAt (γ : FileNames) (ξ : CtxId) (k : Nat) (qt q' : Qp) (C : FContent) (pn : FPNames) :
-    IProp GF := iprop%
-  ⌜qt = 1⌝ ∨ (⌜q' + qt = 1⌝ ∗ fileFieldsAt ξ k q' C ∗ fpayTok γ k q' pn ∗ fileCore k q' pn C)
+    IProp GF :=
+  letI : CurCtx := ⟨ξ, curTier⟩
+  iprop% ⌜qt = 1⌝ ∨ (⌜q' + qt = 1⌝ ∗ fileFieldsAt ξ k q' C ∗ fpayTok γ k q' pn ∗ fileCore k q' pn C)
 
 /-- One slot of the table under the lock, with its list `L` of outstanding
 references: its `ref` cell holds their number, the lock keeps their other
 halves, one fd token each, and the content fraction not handed out (all of
 it, untyped, when the slot is free). -/
-def fslotAt (γ : FileNames) (ξ : CtxId) (k : Nat) (L : List (Nat × Qp)) : IProp GF := iprop%
-  ∃ (C : FContent) (pn : FPNames) (q' : Qp),
+def fslotAt (γ : FileNames) (ξ : CtxId) (k : Nat) (L : List (Nat × Qp)) : IProp GF :=
+  letI : CurCtx := ⟨ξ, curTier⟩
+  iprop% ∃ (C : FContent) (pn : FPNames) (q' : Qp),
     ⌜(L.map Prod.fst).Nodup ∧ L.length < 2 ^ 31⌝ ∗
     wordAtN ξ (aFref k) 4 (DFrac.own 1) (BitVec.ofNat 32 L.length) ∗
     ([∗list] e ∈ L, frefRest γ k e) ∗ fdSlots L.length ∗
@@ -509,28 +512,8 @@ def ftableResAt (γ : FileNames) (ξ : CtxId) : IProp GF := iprop%
     (γ.ref ↪●MAP M) ∗ ⌜(∀ i, nx ≤ i → PartialMap.get? M i = none) ∧ ftableOk M Ls⌝ ∗
     [∗list] k ∈ List.range NFILE, fslotAt γ ξ k (Ls k)
 
-instance instCtxMorphFileRestAt (γ : FileNames) (k : Nat) (qt q' : Qp) (C : FContent) (pn : FPNames) :
-    CtxMorph (GF := GF) (fun ξ => fileRestAt γ ξ k qt q' C pn) := by
-  unfold fileRestAt
-  infer_instance
-
-instance instCtxMorphFslotAt (γ : FileNames) (k : Nat) (L : List (Nat × Qp)) :
-    CtxMorph (GF := GF) (fun ξ => fslotAt γ ξ k L) := by
-  unfold fslotAt
-  refine @instCtxMorphExists _ _ _ _ _ (fun C => ?_)
-  refine @instCtxMorphExists _ _ _ _ _ (fun pn => ?_)
-  refine @instCtxMorphExists _ _ _ _ _ (fun q' => ?_)
-  infer_instance
-
-instance instCtxMorphFtableResAt (γ : FileNames) :
-    CtxMorph (GF := GF) (ftableResAt γ) := by
-  unfold ftableResAt
-  refine @instCtxMorphExists _ _ _ _ _ (fun M => ?_)
-  refine @instCtxMorphExists _ _ _ _ _ (fun nx => ?_)
-  refine @instCtxMorphExists _ _ _ _ _ (fun Ls => ?_)
-  have h := ctxMorph_bigSepL (GF := GF) (List.range NFILE) (fun _ k ξ => fslotAt γ ξ k (Ls k))
-    (fun _ k => instCtxMorphFslotAt γ k (Ls k))
-  infer_instance
+-- The three transports (`fileRestAt`, `fslotAt`, `ftableResAt`) need the
+-- payload's (`FileMorph.fileCore_morph`): they are in `Xv6/FtableMorph.lean`.
 
 /-- The table (persistent): the lock over its resource, and the fd supply. -/
 def isFtable (γl : GName) (γ : FileNames) : IProp GF :=

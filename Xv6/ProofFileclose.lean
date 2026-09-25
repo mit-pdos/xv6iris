@@ -121,7 +121,7 @@ theorem fileclose_proof (AC : ACQUIRE) (RE : RELEASE) (PC : PIPECLOSE) (BO : BEG
   icases fslot_upd_acc γ curCtx Ls kk hkk $$ Hs with ⟨Hsl, Hcl⟩
   ihave Hsl := (show fslotAt (GF := GF) γ curCtx kk (Ls kk) ⊢ fslotAt γ curCtx kk (s ++ (id, q) :: t) from by
     rw [hL]) $$ Hsl
-  icases fslot_elim γ curCtx kk (s ++ (id, q) :: t) $$ Hsl
+  icases fslot_elim γ kk (s ++ (id, q) :: t) $$ Hsl
     with ⟨%C', %pn, %q', %⟨hnd, hlt⟩, Hrefc, Hhalves, Hfdn, Hor⟩
   obtain ⟨n, hn⟩ : ∃ n, (s ++ (id, q) :: t).length = n := ⟨_, rfl⟩
   have hn1 : 1 ≤ n := by rw [← hn]; simp only [List.length_append, List.length_cons]; omega
@@ -199,7 +199,7 @@ theorem fileclose_proof (AC : ACQUIRE) (RE : RELEASE) (PC : PIPECLOSE) (BO : BEG
         wordAtN curCtx (aFref kk) 4 (DFrac.own 1) (BitVec.ofNat 32 (s ++ t).length) from by
       rw [wordAtN_cur, aFref_eq', hlen2]) $$ Hrefc
     have hlt'' : (s ++ t).length < 2 ^ 31 := by rw [hlen2]; omega
-    ihave Hslot := fslot_intro γ curCtx kk (s ++ t) C'' pn'' q'' hnd' hlt'' $$ [Hrefc Hhalves Hfdn Hrest]
+    ihave Hslot := fslot_intro γ kk (s ++ t) C'' pn'' q'' hnd' hlt'' $$ [Hrefc Hhalves Hfdn Hrest]
     case' _ =>
       iframe Hrefc Hhalves Hfdn
       iright

@@ -1058,6 +1058,7 @@ import Xv6.TransPt
 import Xv6.UserKernelBridge
 import Xv6.CtxAmb
 import Xv6.FileMorph
+import Xv6.FtableMorph
 import Xv6.FsReadyMorph
 import Xv6.EnvMorph
 import Xv6.ProofSysExec
@@ -1189,3 +1190,6 @@ import Xv6.UserretClosedRows
 import Xv6.UserretClosedRound
 import Xv6.ProofUserretClosed
 import Xv6.LinkUserretClosed
+import Xv6.ParkCap
+import Xv6.SpecForkretParkPaid
+import Xv6.ProofForkretPark

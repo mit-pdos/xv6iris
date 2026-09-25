@@ -186,7 +186,7 @@ theorem filedup_proof (AC : ACQUIRE) (RE : RELEASE) : FILEDUP := ⟨
   icases fslot_upd_acc γ curCtx Ls kk hkk $$ Hs with ⟨Hsl, Hcl⟩
   ihave Hsl := (show fslotAt (GF := GF) γ curCtx kk (Ls kk) ⊢ fslotAt γ curCtx kk (s ++ (id, q) :: t) from by
     rw [hL]) $$ Hsl
-  icases fslot_elim γ curCtx kk (s ++ (id, q) :: t) $$ Hsl
+  icases fslot_elim γ kk (s ++ (id, q) :: t) $$ Hsl
     with ⟨%C', %pn, %q', %⟨hnd, hlt⟩, Hrefc, Hhalves, Hfdn, Hor⟩
   obtain ⟨n, hn⟩ : ∃ n, (s ++ (id, q) :: t).length = n := ⟨_, rfl⟩
   have hn1 : 1 ≤ n := by rw [← hn]; simp only [List.length_append, List.length_cons]; omega
@@ -242,7 +242,7 @@ theorem filedup_proof (AC : ACQUIRE) (RE : RELEASE) : FILEDUP := ⟨
   ihave Hrest := (show fileRestAt (GF := GF) γ curCtx kk (qsum (s ++ (id, q) :: t)) q' C' pn ⊢
       fileRestAt γ curCtx kk (qsum ((nx, q.half) :: (id, q.half) :: (s ++ t))) q' C' pn from by
     rw [qsum_dup]) $$ Hrest
-  ihave Hslot := fslot_intro γ curCtx kk ((nx, q.half) :: (id, q.half) :: (s ++ t)) C' pn q' hnd' hlt'
+  ihave Hslot := fslot_intro γ kk ((nx, q.half) :: (id, q.half) :: (s ++ t)) C' pn q' hnd' hlt'
     $$ [Hrefc Hhalves' Hfdn Hrest]
   case' _ =>
     iframe Hrefc Hhalves' Hfdn

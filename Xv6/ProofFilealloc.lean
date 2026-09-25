@@ -175,7 +175,7 @@ theorem fa_body (RE : RELEASE) (cpu c : CPU) (k : KCtx) (γl : GName) (γ : File
   -- slot kk's `ref` cell
   icases fslot_upd_acc γ curCtx Ls kk hkk $$ Hs with ⟨Hsl, Hcl⟩
   generalize hL : Ls kk = L
-  icases fslot_elim γ curCtx kk L $$ Hsl with ⟨%C, %pn, %q', %⟨hnd, hlt⟩, Href, Hhalves, Hfdn, Hor⟩
+  icases fslot_elim γ kk L $$ Hsl with ⟨%C, %pn, %q', %⟨hnd, hlt⟩, Href, Hhalves, Hfdn, Hor⟩
   obtain ⟨n, hn⟩ : ∃ n, L.length = n := ⟨_, rfl⟩
   ihave Href := (show wordAtN (GF := GF) curCtx (aFref kk) 4 (DFrac.own 1) (BitVec.ofNat 32 L.length) ⊢
       wordPointsTo (fnode kk + BitVec.signExtend 64 4#12) 4 (DFrac.own 1) (BitVec.ofNat 32 n) from by
@@ -226,7 +226,7 @@ theorem fa_body (RE : RELEASE) (cpu c : CPU) (k : KCtx) (γl : GName) (γ : File
       iapply BigSepL.bigSepL_nil.2; iempintro
     ihave Hfd := (show fdSlot (GF := GF) ⊢ fdSlots ([(nx, (1 : Qp))]).length from by
       simp only [List.length_singleton]; unfold fdSlot; iintro H; iexact H) $$ Hfd
-    ihave Hslot := fslot_intro γ curCtx kk [(nx, (1 : Qp))] C pn 1 (by simp) (by simp)
+    ihave Hslot := fslot_intro γ kk [(nx, (1 : Qp))] C pn 1 (by simp) (by simp)
       $$ [Href Hhalves' Hfd]
     case' _ =>
       iframe Href Hhalves' Hfd
@@ -297,7 +297,7 @@ theorem fa_body (RE : RELEASE) (cpu c : CPU) (k : KCtx) (γl : GName) (γ : File
     k_step (wp_s_branch c _ (KA.«filealloc» + 0x28#64) true 26#13 15#5 0#5 (by decide) bop.BEQ)
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [fa_beqz_nonzero n hn0 (hn ▸ hlt)]
     iintro Hk Hpc
-    ihave Hslot := fslot_intro γ curCtx kk (e :: t) C pn q' hnd hlt $$ [Href Hhalves Hfdn Hor]
+    ihave Hslot := fslot_intro γ kk (e :: t) C pn q' hnd hlt $$ [Href Hhalves Hfdn Hor]
     case' _ => iframe
     ihave Hs := Hcl $$ %(e :: t) Hslot
     have hok' : ftableOk M (updAt Ls kk (e :: t)) := by rw [updAt_same Ls kk _ hL]; exact hok

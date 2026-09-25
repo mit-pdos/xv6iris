@@ -271,21 +271,24 @@ theorem fslot_upd_acc (γ : FileNames) (ξ : CtxId) (Ls : Nat → List (Nat × Q
       rw [updAt_self]) $$ HL'
     iexact HL'
 
-theorem fslot_elim (γ : FileNames) (ξ : CtxId) (k : Nat) (L : List (Nat × Qp)) :
-    fslotAt (GF := GF) γ ξ k L ⊢ ∃ (C : FContent) (pn : FPNames) (q' : Qp),
+/-- A slot at the running context, opened AT THE AMBIENT (the slot re-binds
+the ambient to `⟨curCtx, curTier⟩`, FileDefs deviation 4, which is the
+ambient itself by structure eta). -/
+theorem fslot_elim (γ : FileNames) (k : Nat) (L : List (Nat × Qp)) :
+    fslotAt (GF := GF) γ curCtx k L ⊢ ∃ (C : FContent) (pn : FPNames) (q' : Qp),
       ⌜(L.map Prod.fst).Nodup ∧ L.length < 2 ^ 31⌝ ∗
-      wordAtN ξ (aFref k) 4 (DFrac.own 1) (BitVec.ofNat 32 L.length) ∗
+      wordAtN curCtx (aFref k) 4 (DFrac.own 1) (BitVec.ofNat 32 L.length) ∗
       ([∗list] e ∈ L, frefRest γ k e) ∗ fdSlots L.length ∗
-      ((⌜L = [] ∧ C.type = FD_NONE⌝ ∗ fileFieldsAt ξ k 1 C ∗ fpayTok γ k 1 pn ∗ fileCore k 1 pn C) ∨
-       (⌜L ≠ []⌝ ∗ fileRestAt γ ξ k (qsum L) q' C pn)) := by
+      ((⌜L = [] ∧ C.type = FD_NONE⌝ ∗ fileFieldsAt curCtx k 1 C ∗ fpayTok γ k 1 pn ∗ fileCore k 1 pn C) ∨
+       (⌜L ≠ []⌝ ∗ fileRestAt γ curCtx k (qsum L) q' C pn)) := by
   unfold fslotAt; iintro H; iexact H
 
-theorem fslot_intro (γ : FileNames) (ξ : CtxId) (k : Nat) (L : List (Nat × Qp)) (C : FContent)
+theorem fslot_intro (γ : FileNames) (k : Nat) (L : List (Nat × Qp)) (C : FContent)
     (pn : FPNames) (q' : Qp) (hnd : (L.map Prod.fst).Nodup) (hlt : L.length < 2 ^ 31) :
-    wordAtN (GF := GF) ξ (aFref k) 4 (DFrac.own 1) (BitVec.ofNat 32 L.length) ∗
+    wordAtN (GF := GF) curCtx (aFref k) 4 (DFrac.own 1) (BitVec.ofNat 32 L.length) ∗
     ([∗list] e ∈ L, frefRest γ k e) ∗ fdSlots L.length ∗
-    ((⌜L = [] ∧ C.type = FD_NONE⌝ ∗ fileFieldsAt ξ k 1 C ∗ fpayTok γ k 1 pn ∗ fileCore k 1 pn C) ∨
-     (⌜L ≠ []⌝ ∗ fileRestAt γ ξ k (qsum L) q' C pn)) ⊢ fslotAt γ ξ k L := by
+    ((⌜L = [] ∧ C.type = FD_NONE⌝ ∗ fileFieldsAt curCtx k 1 C ∗ fpayTok γ k 1 pn ∗ fileCore k 1 pn C) ∨
+     (⌜L ≠ []⌝ ∗ fileRestAt γ curCtx k (qsum L) q' C pn)) ⊢ fslotAt γ curCtx k L := by
   unfold fslotAt
   iintro ⟨H1, H2, H3, H4⟩
   iexists C, pn, q'

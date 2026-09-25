@@ -414,7 +414,7 @@ theorem fc_last (RE : RELEASE) (PC : PIPECLOSE) (BO : BEGIN_OP) (IP : IPUT) (EO 
     with ⟨Hc0, Hc⟩
   · iframe Hc Hir
   imodintro
-  ihave Hslot := fslot_intro γ curCtx kk [] { C with type := FD_NONE } pn 1 (by simp) (by simp)
+  ihave Hslot := fslot_intro γ kk [] { C with type := FD_NONE } pn 1 (by simp) (by simp)
     $$ [Hrefc Hhalves Hfdn Hf' Ht Hc0]
   case' _ =>
     iframe Hrefc Hhalves Hfdn

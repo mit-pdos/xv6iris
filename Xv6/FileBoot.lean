@@ -38,8 +38,10 @@ right after `fileinit` returns the zeroed lock words: `NFILE` raw entries plus
    counter).
 3. **A bupd, not an `={E}=>`**: nothing here opens an invariant (true of
    Rocq's too).  `fileBoot_isFtable` is at `⊤` because `kctx_newlock` is.
-4. **The entries are at context `ξ`** (Lean's `fslotAt ξ`); main passes
-   `curCtx`, the same convention as SpecMain deviation 4.  The off word is
+4. **The entries are at the running context** (`fslotAt curCtx`, whose
+   payload re-binds the ambient, FileDefs deviation 4): `fileBoot_fslot` /
+   `fileBoot_ftableRes` are stated at `curCtx`, what main passes (SpecMain
+   deviation 4); the carve `bootCarve_fileEntries` stays at any `ξ`.  The off word is
    carved at `ξ` too; `offFree` is context-free, so turning it into `offFree`
    loses nothing.  All eight fields come out at the `.bss` zero, and
    `fentryRaw`'s existentials are filled with zero.  `bootCarve_ftable` also
@@ -51,6 +53,7 @@ import Xv6.FileInv
 import Xv6.FilePay
 import Xv6.BootCarveMain
 import Xv6.SpecFileinit
+import Xv6.FtableMorph
 
 namespace Xv6
 
@@ -126,16 +129,13 @@ theorem fileBoot_ghostsAlloc :
 /-- **One free slot, assembled** (the per-slot body of Rocq
 `ftable_res_boot`): the raw entry, the slot's names and one iref unit make
 the free arm of `fslotAt` at the empty list. -/
-theorem fileBoot_fslot (γ : FileNames) (ξ : CtxId) (k : Nat) :
-    fentryRaw (GF := GF) ξ k ∗ (∃ pn : FPNames, fpayTok γ k 1 pn) ∗ irefSlot ⊢ fslotAt γ ξ k [] := by
+theorem fileBoot_fslot (γ : FileNames) (k : Nat) :
+    fentryRaw (GF := GF) curCtx k ∗ (∃ pn : FPNames, fpayTok γ k 1 pn) ∗ irefSlot ⊢ fslotAt γ curCtx k [] := by
   unfold fentryRaw
   iintro ⟨⟨Hty, Href, ⟨%r, Hrd⟩, ⟨%w, Hwr⟩, ⟨%pp, Hpp⟩, ⟨%ip, Hip⟩, Hoff, ⟨%mj, Hmj⟩⟩, ⟨%pn, Htok⟩, Hu⟩
-  ihave Hoff := fileBoot_offFree_of_word ξ k _ $$ Hoff
+  ihave Hoff := fileBoot_offFree_of_word curCtx k _ $$ Hoff
   ihave Hu := irefSlot_frac.1 $$ Hu
-  unfold fslotAt
-  iexists (⟨FD_NONE, r, w, pp, ip, mj⟩ : FContent), pn, 1
-  isplitr
-  · ipureintro; exact ⟨List.nodup_nil, by decide⟩
+  iapply fslot_intro γ k [] (⟨FD_NONE, r, w, pp, ip, mj⟩ : FContent) pn 1 List.nodup_nil (by decide)
   isplitl [Href]
   · iexact Href
   isplitr
@@ -155,9 +155,9 @@ theorem fileBoot_fslot (γ : FileNames) (ξ : CtxId) (k : Nat) :
 /-- **THE TABLE, MINTED** (Rocq `ftable_res_boot`): `NFILE` raw entries and
 `NFILE` iref units (one per free slot, because an untyped payload IS its
 iref unit) become the ftable lock's resource at the empty reference map. -/
-theorem fileBoot_ftableRes (ξ : CtxId) :
-    ([∗list] k ∈ List.range NFILE, fentryRaw ξ k) ∗ irefSlots NFILE ⊢
-      |==> ∃ γ : FileNames, ftableResAt (GF := GF) γ ξ := by
+theorem fileBoot_ftableRes :
+    ([∗list] k ∈ List.range NFILE, fentryRaw curCtx k) ∗ irefSlots NFILE ⊢
+      |==> ∃ γ : FileNames, ftableResAt (GF := GF) γ curCtx := by
   iintro ⟨Hraw, Hir⟩
   imod fileBoot_ghostsAlloc (GF := GF) with ⟨%γ, Ha, Htoks⟩
   ihave Hu := irefSlots_to_list NFILE $$ Hir
@@ -175,9 +175,9 @@ theorem fileBoot_ftableRes (ξ : CtxId) :
     refine ⟨fun i _ => get?_empty i, fun i v h => ?_⟩
     rw [get?_empty] at h
     cases h
-  iapply BigSepL.bigSepL_mono (Φ := fun _ k => iprop(fentryRaw ξ k ∗ ((∃ pn : FPNames, fpayTok γ k 1 pn) ∗ irefSlot))) _ $$ Hall
+  iapply BigSepL.bigSepL_mono (Φ := fun _ k => iprop(fentryRaw curCtx k ∗ ((∃ pn : FPNames, fpayTok γ k 1 pn) ∗ irefSlot))) _ $$ Hall
   intro _ k _
-  exact fileBoot_fslot γ ξ k
+  exact fileBoot_fslot γ k
 
 /-- **`isFtable`, born** (ProofMain.v at `main+0x9a`: `ftable_res_boot`
 followed by `newlock`).  It takes `fileinit`'s output words
@@ -193,7 +193,7 @@ theorem fileBoot_isFtable [KernelImage GF] {lent : Bool} (cpu : CPU) (kc : KCtx)
   unfold lockInited
   rw [show ftableLockAddr = ftableAddr from rfl]
   iintro ⟨Hk, ⟨Hnm, Hf⟩, #H1, #H2, Hraw, Hir⟩
-  imod fileBoot_ftableRes curCtx $$ [Hraw Hir] with ⟨%γ, Hres⟩
+  imod fileBoot_ftableRes $$ [Hraw Hir] with ⟨%γ, Hres⟩
   · iframe Hraw Hir
   imod kctx_newlock cpu kc ftableAddr "ftable" (ftableResAt γ) $$ [Hk Hres Hf] with ⟨Hk, %γl, #Hl⟩
   · iframe Hk Hres Hf H1 H2

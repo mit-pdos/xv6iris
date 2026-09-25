@@ -4,6 +4,7 @@ The ftable lock's `acquire`/`release` interfaces instantiated at
 functions (`filealloc`, `filedup`, `fileclose`).
 -/
 import Xv6.FileDefs
+import Xv6.FtableMorph
 import Xv6.SpecAcquire
 import Xv6.SpecRelease
 import Xv6.CodeTactics
