@@ -269,10 +269,21 @@ Fixpoint ushq_tail_is (g : nat -> bv 8) (c len : nat)
          end
   end.
 
+(* what the lexing needs of the left command's words: well formed, and
+   between one and nine of them -- echo's admissible lines, and [cat f] *)
+Definition ushq_ws_ok (ws : list (list (bv 8))) : Prop :=
+  wl_wf ws /\ (0 < length ws)%nat /\ (length ws < 10)%nat.
+
+Lemma ushq_ws_ok_of_line_ok (ws : list (list (bv 8))) : line_ok ws -> ushq_ws_ok ws.
+Proof using.
+  intros Hok. split_and!; [exact (line_ok_wf ws Hok) | exact (line_ok_pos ws Hok)
+                          | exact (line_ok_lt10 ws Hok)].
+Qed.
+
 Definition ushq_lines_is (ws rs : list (list (bv 8))) (f : nat -> bv 8)
     (k len : nat) : Prop :=
   let p0 := length (wl_body ws) in
-  line_ok ws
+  ushq_ws_ok ws
   /\ (forall j : nat, (j < p0)%nat -> f (k + j)%nat = wl_body ws !!! j)
   /\ f (k + p0)%nat = wl_sp
   /\ f (k + p0 + 1)%nat = ushq_bar
@@ -314,7 +325,7 @@ Lemma ushq_lines_is_one (ws : list (list (bv 8))) (r : list (bv 8))
 Proof using.
   intros (Hok & Hr & Hlen & Hbody & Hsp1 & Hbar & Hsp2 & Hrb & Hnl).
   unfold ushq_lines_is. cbv zeta.
-  split; [ exact Hok | ].
+  split; [ exact (ushq_ws_ok_of_line_ok ws Hok) | ].
   split; [ exact Hbody | ].
   split; [ exact Hsp1 | ].
   split; [ exact Hbar | ].
@@ -495,7 +506,7 @@ Lemma ushq_lines_bars (ws rs : list (list (bv 8))) (f : nat -> bv 8)
   ushq_bars len (fun j : nat => f (k + j)%nat) 0%nat (wl_toks ws)
     (ushq_rtoks (length (wl_body ws) + 3) rs).
 Proof using.
-  intros (Hok & Hbody & Hsp1 & Hbar & Hsp2 & Htail).
+  intros ((Hwf & Hpos & Hlt10) & Hbody & Hsp1 & Hbar & Hsp2 & Htail).
   set (g := fun j : nat => f (k + j)%nat) in *.
   assert (Eg : forall j : nat, g j = f (k + j)%nat) by reflexivity.
   destruct rs as [| r rs ]; [ destruct Htail | ].
@@ -514,7 +525,7 @@ Proof using.
     { exfalso. rewrite (Hbody j Hlo) in Hs.
       rewrite (ushs_body_not_sym _
                  (Forall_lookup_1 _ _ _ _
-                    (wl_body_bytes ws (line_ok_wf ws Hok))
+                    (wl_body_bytes ws Hwf)
                     (list_lookup_lookup_total_lt (wl_body ws) j Hlo))) in Hs.
       discriminate. }
     destruct (Nat.eq_dec j (length (wl_body ws))%nat) as [ Hj0 | Hn0 ].
@@ -546,7 +557,7 @@ Proof using.
     exact (ushs_alnum_not_ws _ (ushq_word_byte r 0 Hw Hrpos)).
   - (* the left command's arguments: the landed lexing at the first bar *)
     apply (ushs_toks_line ws g wl_sp len (length (wl_body ws) + 1)%nat).
-    + exact (line_ok_wf ws Hok).
+    + exact Hwf.
     + exact wl_sp_ws.
     + reflexivity.
     + lia.
@@ -558,8 +569,8 @@ Proof using.
         rewrite Nat.add_0_r in Hr. rewrite Hr. reflexivity.
       * rewrite (Hbody j ltac:(lia)). symmetry.
         exact (wl_lta_app_l (wl_body ws) [wl_sp] j ltac:(lia)).
-  - rewrite wl_toks_length. exact (line_ok_pos ws Hok).
-  - rewrite wl_toks_length. exact (line_ok_lt10 ws Hok).
+  - rewrite wl_toks_length. exact Hpos.
+  - rewrite wl_toks_length. exact Hlt10.
   - replace (S (S (length (wl_body ws) + 1)))
       with (length (wl_body ws) + 3)%nat by lia.
     exact (ushq_tail_bars g len Hsym rs r (length (wl_body ws) + 3)%nat
@@ -587,7 +598,7 @@ Lemma ushq_demo3_lines_is :
   ushq_lines_is ushq_demo_ws [ushq_cat; ushq_cat] ushq_demo3_f 0%nat 29%nat.
 Proof using.
   unfold ushq_lines_is. cbv zeta.
-  split; [ apply (bool_decide_unpack _); vm_compute; exact I | ].
+  split; [ apply ushq_ws_ok_of_line_ok; apply (bool_decide_unpack _); vm_compute; exact I | ].
   split.
   { intros j Hj.
     vm_compute (length (wl_body ushq_demo_ws)) in Hj.

@@ -55,22 +55,44 @@ Proof using.
   rewrite (_ : length FileDisc.suf_barcat = 6); [lia | reflexivity].
 Qed.
 
+(* at either producer (cut C9f2): [p]'s words are [prod_words p], its
+   body [wl_body (prod_words p)] *)
+Lemma line_bytes_pipe_split_p (p : FileDisc.producer) (n : nat) :
+  FileDisc.line_bytes (FileDisc.LPipe p (S n))
+  = wl_body (FileDisc.prod_words p) ++ [wl_sp; ushq_bar; wl_sp]
+    ++ (ushq_cat ++ FileDisc.suf_barcats n ++ [wl_nl]).
+Proof using.
+  rewrite FileDisc.line_bytes_body. cbn [FileDisc.line_body].
+  rewrite FileDisc.suf_barcats_S suf_barcat_split -!app_assoc. reflexivity.
+Qed.
+
+Lemma line_bytes_pipe_length_p (p : FileDisc.producer) (n : nat) :
+  length (FileDisc.line_bytes (FileDisc.LPipe p n))
+  = length (wl_body (FileDisc.prod_words p)) + 6 * n + 1.
+Proof using.
+  rewrite FileDisc.line_bytes_body. cbn [FileDisc.line_body].
+  rewrite !length_app suf_barcats_length. cbn [length]. unfold FileDisc.prod_body. lia.
+Qed.
+
 Lemma line_bytes_pipe_split (ws : list (list (bv 8))) (n : nat) :
   FileDisc.line_bytes (FileDisc.LPipe (FileDisc.PrEcho ws) (S n))
   = wl_body ws ++ [wl_sp; ushq_bar; wl_sp] ++ (ushq_cat ++ FileDisc.suf_barcats n ++ [wl_nl]).
-Proof using.
-  rewrite FileDisc.line_bytes_body. cbn [FileDisc.line_body].
-  rewrite (_ : FileDisc.prod_body (FileDisc.PrEcho ws) = wl_body ws); [| reflexivity].
-  rewrite FileDisc.suf_barcats_S suf_barcat_split -!app_assoc. reflexivity.
-Qed.
+Proof using. exact (line_bytes_pipe_split_p (FileDisc.PrEcho ws) n). Qed.
 
 Lemma line_bytes_pipe_length (ws : list (list (bv 8))) (n : nat) :
   length (FileDisc.line_bytes (FileDisc.LPipe (FileDisc.PrEcho ws) n))
   = length (wl_body ws) + 6 * n + 1.
+Proof using. exact (line_bytes_pipe_length_p (FileDisc.PrEcho ws) n). Qed.
+
+(* the lexer's word condition at an admissible producer *)
+Lemma prod_ws_ok (p : FileDisc.producer) :
+  FileDisc.prod_ok p -> ushq_ws_ok (FileDisc.prod_words p).
 Proof using.
-  rewrite FileDisc.line_bytes_body. cbn [FileDisc.line_body].
-  rewrite (_ : FileDisc.prod_body (FileDisc.PrEcho ws) = wl_body ws); [| reflexivity].
-  rewrite !length_app suf_barcats_length. cbn [length]. lia.
+  intros Hp. split_and!.
+  - exact (FileDisc.prod_wf p Hp).
+  - pose proof (FileDisc.prod_words_ge2 p Hp). lia.
+  - destruct p as [ws | f]; cbn [FileDisc.prod_ok FileDisc.prod_words length] in *;
+      [exact (line_ok_lt10 ws Hp) | lia].
 Qed.
 
 (* ---- the tail after the first bar: one [cat] per stage ---- *)
@@ -101,19 +123,20 @@ Proof using.
 Qed.
 
 (* ---- THE LINE IS THE LEXER'S ---- *)
-Lemma lines_of_pipe (ws : list (list (bv 8))) (n : nat) (f : nat -> bv 8) (len : nat) :
-  line_ok ws -> 1 <= n ->
-  bat f 0 (FileDisc.line_bytes (FileDisc.LPipe (FileDisc.PrEcho ws) n)) ->
-  len = length (FileDisc.line_bytes (FileDisc.LPipe (FileDisc.PrEcho ws) n)) ->
-  ushq_lines_is ws (replicate n ushq_cat) f 0 len.
+Lemma lines_of_pipe_p (p : FileDisc.producer) (n : nat) (f : nat -> bv 8) (len : nat) :
+  FileDisc.prod_ok p -> 1 <= n ->
+  bat f 0 (FileDisc.line_bytes (FileDisc.LPipe p n)) ->
+  len = length (FileDisc.line_bytes (FileDisc.LPipe p n)) ->
+  ushq_lines_is (FileDisc.prod_words p) (replicate n ushq_cat) f 0 len.
 Proof using.
   intros Hok Hn Hb Hlen.
-  rewrite line_bytes_pipe_length in Hlen.
+  rewrite line_bytes_pipe_length_p in Hlen.
   destruct n as [| n]; [lia |].
-  rewrite line_bytes_pipe_split in Hb.
+  rewrite line_bytes_pipe_split_p in Hb.
   apply bat_app in Hb as [Hbody Hr]. apply bat_app in Hr as [Hs Hr].
+  set (ws := FileDisc.prod_words p) in *.
   unfold ushq_lines_is. cbv zeta.
-  split; [exact Hok |].
+  split; [exact (prod_ws_ok p Hok) |].
   split; [exact Hbody |].
   split; [pose proof (Hs 0 ltac:(cbn; lia)) as H0; rewrite Nat.add_0_r in H0; exact H0 |].
   split; [exact (Hs 1 ltac:(cbn; lia)) |].
@@ -122,6 +145,13 @@ Proof using.
   - exact Hr.
   - lia.
 Qed.
+
+Lemma lines_of_pipe (ws : list (list (bv 8))) (n : nat) (f : nat -> bv 8) (len : nat) :
+  line_ok ws -> 1 <= n ->
+  bat f 0 (FileDisc.line_bytes (FileDisc.LPipe (FileDisc.PrEcho ws) n)) ->
+  len = length (FileDisc.line_bytes (FileDisc.LPipe (FileDisc.PrEcho ws) n)) ->
+  ushq_lines_is ws (replicate n ushq_cat) f 0 len.
+Proof using. exact (lines_of_pipe_p (FileDisc.PrEcho ws) n f len). Qed.
 
 (* ---- the [cat] words' bytes, stage by stage ---- *)
 Lemma bat_cat_at (g : nat -> bv 8) :
@@ -168,15 +198,20 @@ Proof using.
 Qed.
 
 (* below the first bar the pipeline line's bytes ARE the echo line's *)
+Lemma pipe_bytes_lo_p (p : FileDisc.producer) (n j : nat) :
+  j < length (wl_body (FileDisc.prod_words p)) ->
+  FileDisc.line_bytes (FileDisc.LPipe p n) !!! j = wl_line (FileDisc.prod_words p) !!! j.
+Proof using.
+  intros Hj. rewrite FileDisc.line_bytes_body. cbn [FileDisc.line_body].
+  unfold FileDisc.prod_body.
+  rewrite -app_assoc (wl_lta_app_l (wl_body (FileDisc.prod_words p)) _ j Hj).
+  rewrite /wl_line (wl_lta_app_l (wl_body (FileDisc.prod_words p)) [wl_nl] j Hj). reflexivity.
+Qed.
+
 Lemma pipe_bytes_lo (ws : list (list (bv 8))) (n j : nat) :
   j < length (wl_body ws) ->
   FileDisc.line_bytes (FileDisc.LPipe (FileDisc.PrEcho ws) n) !!! j = wl_line ws !!! j.
-Proof using.
-  intros Hj. rewrite FileDisc.line_bytes_body. cbn [FileDisc.line_body].
-  rewrite (_ : FileDisc.prod_body (FileDisc.PrEcho ws) = wl_body ws); [| reflexivity].
-  rewrite -app_assoc (wl_lta_app_l (wl_body ws) _ j Hj).
-  rewrite /wl_line (wl_lta_app_l (wl_body ws) [wl_nl] j Hj). reflexivity.
-Qed.
+Proof using. exact (pipe_bytes_lo_p (FileDisc.PrEcho ws) n j). Qed.
 
 Lemma pipes_lp0 (wsf : list (list (bv 8))) (gf : nat -> bv 8) (k len : nat) :
   pipes_lp wsf gf k len -> bv_unsigned (gf k) = 101%Z.
@@ -189,6 +224,40 @@ Proof using.
   pose proof (Hby 0 Hlpos) as H0. rewrite Nat.add_0_r in H0.
   rewrite H0 (pipe_bytes_lo ws n 0 Hbody).
   exact (line_ok_head_byte0 ws Hok).
+Qed.
+
+(* THE [cat f] PIPELINE'S LINE PREDICATE (cut C9f2): the loop's typed
+   line [cat f | cat | ... | cat] at the one user file *)
+Definition pipes_lpc (wsf : list (list (bv 8))) (gf : nat -> bv 8) (k len : nat) : Prop :=
+  exists n : nat,
+    wsf = FileDisc.uline_ws (FileDisc.LPipe (FileDisc.PrCatF FileDisc.fname_f) n)
+    /\ UkSh.ush_line_at (FileDisc.LPipe (FileDisc.PrCatF FileDisc.fname_f) n) gf k len.
+
+Lemma pipes_lpc_of_at (n : nat) (f : nat -> bv 8) (k len : nat) :
+  UkSh.ush_line_at (FileDisc.LPipe (FileDisc.PrCatF FileDisc.fname_f) n) f k len ->
+  pipes_lpc (FileDisc.uline_ws (FileDisc.LPipe (FileDisc.PrCatF FileDisc.fname_f) n))
+    (fun j : nat => f (k + j)) 0 len.
+Proof using.
+  intros (Hok & Hlen & Hby). exists n. split; [reflexivity |].
+  split; [exact Hok |]. split; [exact Hlen |].
+  intros j Hj. rewrite Nat.add_0_l. exact (Hby j Hj).
+Qed.
+
+(* its first two bytes are [c] and [a], so the loop's [cd] test falls out
+   at the second, as [cat f]'s does *)
+Lemma pipes_lpc_bytes (wsf : list (list (bv 8))) (gf : nat -> bv 8) (k len : nat) :
+  pipes_lpc wsf gf k len ->
+  bv_unsigned (gf k) = 99%Z /\ bv_unsigned (gf (k + 1)) = 97%Z /\ 2 <= len.
+Proof using.
+  intros (n & _ & _ & Hlen & Hby).
+  assert (Hb : length (wl_body (FileDisc.prod_words (FileDisc.PrCatF FileDisc.fname_f))) = 5)
+    by (vm_compute; reflexivity).
+  rewrite line_bytes_pipe_length_p Hb in Hlen.
+  split_and!; [| | lia].
+  - rewrite -(Nat.add_0_r k) (Hby 0 ltac:(lia)) (pipe_bytes_lo_p (FileDisc.PrCatF FileDisc.fname_f) n 0 ltac:(lia)).
+    by vm_compute.
+  - rewrite (Hby 1 ltac:(lia)) (pipe_bytes_lo_p (FileDisc.PrCatF FileDisc.fname_f) n 1 ltac:(lia)).
+    by vm_compute.
 Qed.
 
 (* ===================================================================== *)
@@ -280,54 +349,59 @@ Proof using.
 Qed.
 
 (* ...AND ECHO'S ARGV IS THERE *)
-Lemma pcut_echo_bytes (ws : list (list (bv 8))) (n : nat) (f : nat -> bv 8) (len : nat) :
-  UkSh.ush_line_at (FileDisc.LPipe (FileDisc.PrEcho ws) n) f 0 len ->
-  UkShEcho.echo_argv_bytes ws (pcut ws n len f).
+Lemma pcut_echo_bytes_p (p : FileDisc.producer) (n : nat) (f : nat -> bv 8) (len : nat) :
+  UkSh.ush_line_at (FileDisc.LPipe p n) f 0 len ->
+  UkShEcho.echo_argv_bytes (FileDisc.prod_words p) (pcut (FileDisc.prod_words p) n len f).
 Proof using.
   intros (Hok & Hlen & Hby).
   destruct Hok as (Hok & Hn & _).
-  assert (Hblen : length (wl_body ws) < len)
-    by (rewrite Hlen line_bytes_pipe_length; lia).
-  assert (Hlo : forall j : nat, j < length (wl_body ws) -> f j = wl_line ws !!! j).
+  assert (Hblen : length (wl_body (FileDisc.prod_words p)) < len)
+    by (rewrite Hlen line_bytes_pipe_length_p; lia).
+  assert (Hlo : forall j : nat, j < length (wl_body (FileDisc.prod_words p)) -> f j = wl_line (FileDisc.prod_words p) !!! j).
   { intros j Hj. pose proof (Hby j ltac:(lia)) as Hfj.
-    rewrite Nat.add_0_l in Hfj. rewrite Hfj. exact (pipe_bytes_lo ws n j Hj). }
+    rewrite Nat.add_0_l in Hfj. rewrite Hfj. exact (pipe_bytes_lo_p p n j Hj). }
   split.
   - intros i j Hi Hj.
-    destruct (lookup_lt_is_Some_2 ws i Hi) as [w Hw].
-    assert (Hwi : ws !!! i = w)
+    destruct (lookup_lt_is_Some_2 (FileDisc.prod_words p) i Hi) as [w Hw].
+    assert (Hwi : (FileDisc.prod_words p) !!! i = w)
       by (rewrite list_lookup_total_alt Hw; reflexivity).
     rewrite /UkShEcho.echo_alen Hwi in Hj.
     rewrite /UkShEcho.echo_off.
-    pose proof (wl_off_le_body ws 0 i w (length w) Hw ltac:(lia)) as Hle.
-    rewrite (pcut_low ws n len f (wl_off 0 ws i + j) ltac:(lia)).
-    rewrite (wl_cut_in ws f len i w j Hw Hj ltac:(lia)).
-    exact (Hlo (wl_off 0 ws i + j) ltac:(lia)).
+    pose proof (wl_off_le_body (FileDisc.prod_words p) 0 i w (length w) Hw ltac:(lia)) as Hle.
+    rewrite (pcut_low (FileDisc.prod_words p) n len f (wl_off 0 (FileDisc.prod_words p) i + j) ltac:(lia)).
+    rewrite (wl_cut_in (FileDisc.prod_words p) f len i w j Hw Hj ltac:(lia)).
+    exact (Hlo (wl_off 0 (FileDisc.prod_words p) i + j) ltac:(lia)).
   - intros i Hi.
-    destruct (lookup_lt_is_Some_2 ws i Hi) as [w Hw].
-    assert (Hwi : ws !!! i = w)
+    destruct (lookup_lt_is_Some_2 (FileDisc.prod_words p) i Hi) as [w Hw].
+    assert (Hwi : (FileDisc.prod_words p) !!! i = w)
       by (rewrite list_lookup_total_alt Hw; reflexivity).
     rewrite /UkShEcho.echo_off /UkShEcho.echo_alen Hwi.
-    pose proof (wl_off_le_body ws 0 i w (length w) Hw ltac:(lia)) as Hle.
-    rewrite (pcut_low ws n len f (wl_off 0 ws i + length w) ltac:(lia)).
-    exact (wl_cut_end ws f len i w Hw).
+    pose proof (wl_off_le_body (FileDisc.prod_words p) 0 i w (length w) Hw ltac:(lia)) as Hle.
+    rewrite (pcut_low (FileDisc.prod_words p) n len f (wl_off 0 (FileDisc.prod_words p) i + length w) ltac:(lia)).
+    exact (wl_cut_end (FileDisc.prod_words p) f len i w Hw).
 Qed.
 
+Lemma pcut_echo_bytes (ws : list (list (bv 8))) (n : nat) (f : nat -> bv 8) (len : nat) :
+  UkSh.ush_line_at (FileDisc.LPipe (FileDisc.PrEcho ws) n) f 0 len ->
+  UkShEcho.echo_argv_bytes ws (pcut ws n len f).
+Proof using. exact (pcut_echo_bytes_p (FileDisc.PrEcho ws) n f len). Qed.
+
 (* ...AND EVERY [cat]'s *)
-Lemma pcut_cat_bytes (ws : list (list (bv 8))) (n : nat) (f : nat -> bv 8) (len i : nat) :
-  UkSh.ush_line_at (FileDisc.LPipe (FileDisc.PrEcho ws) n) f 0 len -> i < n ->
-  UkShCat.cat_argv_bytes (length (wl_body ws) + 3 + 6 * i)
-    (length (wl_body ws) + 3 + 6 * i + 3) (pcut ws n len f).
+Lemma pcut_cat_bytes_p (p : FileDisc.producer) (n : nat) (f : nat -> bv 8) (len i : nat) :
+  UkSh.ush_line_at (FileDisc.LPipe p n) f 0 len -> i < n ->
+  UkShCat.cat_argv_bytes (length (wl_body (FileDisc.prod_words p)) + 3 + 6 * i)
+    (length (wl_body (FileDisc.prod_words p)) + 3 + 6 * i + 3) (pcut (FileDisc.prod_words p) n len f).
 Proof using.
   intros (Hok & Hlen & Hby) Hi.
   destruct n as [| n]; [lia |].
-  assert (Hlen' : len = length (wl_body ws) + 6 * S n + 1)
-    by (rewrite Hlen line_bytes_pipe_length; reflexivity).
-  assert (Hb : bat f 0 (FileDisc.line_bytes (FileDisc.LPipe (FileDisc.PrEcho ws) (S n)))).
+  assert (Hlen' : len = length (wl_body (FileDisc.prod_words p)) + 6 * S n + 1)
+    by (rewrite Hlen line_bytes_pipe_length_p; reflexivity).
+  assert (Hb : bat f 0 (FileDisc.line_bytes (FileDisc.LPipe p (S n)))).
   { intros j Hj. apply Hby. rewrite Hlen. exact Hj. }
-  rewrite line_bytes_pipe_split in Hb.
+  rewrite line_bytes_pipe_split_p in Hb.
   apply bat_app in Hb as [_ Hr]. apply bat_app in Hr as [_ Hr].
   cbn [length] in Hr.
-  pose proof (bat_cat_at f i n (0 + length (wl_body ws) + 3) ltac:(lia) Hr) as Hc.
+  pose proof (bat_cat_at f i n (0 + length (wl_body (FileDisc.prod_words p)) + 3) ltac:(lia) Hr) as Hc.
   split_and!.
   - rewrite UkShCat.cmd_cat_len. reflexivity.
   - intros j Hj. rewrite UkShCat.cmd_cat_len in Hj.
@@ -337,16 +411,22 @@ Proof using.
         destruct (rtoks_cats_in (S n) _ tk Hi') as (i'' & _ & ->). cbn [snd]. lia. }
     rewrite UkShMain.ushp_nulfold_miss.
     2:{ intros i' tk Hi'. apply elem_of_list_lookup_2 in Hi'.
-        pose proof (wl_toks_end_le ws tk Hi'). lia. }
+        pose proof (wl_toks_end_le (FileDisc.prod_words p) tk Hi'). lia. }
     rewrite /UkShParseCmd.ushp_ext bool_decide_eq_true_2; [| lia].
     pose proof (Hc j ltac:(rewrite ushq_cat_len; lia)) as Hcj.
-    replace (0 + length (wl_body ws) + 3 + 6 * i + j)
-      with (length (wl_body ws) + 3 + 6 * i + j) in Hcj by lia.
+    replace (0 + length (wl_body (FileDisc.prod_words p)) + 3 + 6 * i + j)
+      with (length (wl_body (FileDisc.prod_words p)) + 3 + 6 * i + j) in Hcj by lia.
     exact Hcj.
   - rewrite pcut_flat.
-    pose proof (rtoks_cats_concat_lookup (S n) (length (wl_body ws) + 3) i Hi) as Hl.
+    pose proof (rtoks_cats_concat_lookup (S n) (length (wl_body (FileDisc.prod_words p)) + 3) i Hi) as Hl.
     exact (UkShParseCmd.ushp_nulfold_hit _ _ i _ Hl).
 Qed.
+
+Lemma pcut_cat_bytes (ws : list (list (bv 8))) (n : nat) (f : nat -> bv 8) (len i : nat) :
+  UkSh.ush_line_at (FileDisc.LPipe (FileDisc.PrEcho ws) n) f 0 len -> i < n ->
+  UkShCat.cat_argv_bytes (length (wl_body ws) + 3 + 6 * i)
+    (length (wl_body ws) + 3 + 6 * i + 3) (pcut ws n len f).
+Proof using. exact (pcut_cat_bytes_p (FileDisc.PrEcho ws) n f len i). Qed.
 
 (* a lookup in a [map], as the option's *)
 Lemma map_lookup_fmap {A B : Type} (f : A -> B) (l : list A) (k : nat) :

@@ -105,6 +105,10 @@ Section UShPipesDefs.
   (* THE PRODUCER at the head of the line (echo, or [cat f]): its failures
      ([PipesFire.fail_src]) and whether it may halt *)
   Context (pr : producer).
+  (* WHAT THE PRODUCER BORROWS AND HANDS BACK (C9f2): node 0 lends it to
+     its left child beside [echo_raw], and the left report returns it --
+     the [cat f] producer's deed; [True] for echo *)
+  Context (Rd : iProp Σ).
   Context (γc γm : wid -> gname).
   (* THE ROUND'S NAMES, fixed before the walk: node [k]'s pipe, and the two
      one-shots of its two forks *)
@@ -533,14 +537,21 @@ Section UShPipesDefs.
                | S k' => ∃ ro, rd_final (P k') ro ∗ ⌜copier ro wo⌝
                end).
 
+  (* the producer's loan, back beside the left report of node 0 *)
+  Definition lrd (k : nat) : iProp Σ := match k with O => Rd | S _ => True end%I.
+
+  Lemma lrd_S (k : nat) : ⊢ lrd (S k).
+  Proof using . rewrite /lrd. done. Qed.
+
   (* THE PAYMENT node [k]'s children owe, side-tagged at its pipe *)
-  Definition QcK (k : nat) : iProp Σ := (T ∨ pipe_Qc (P k) (lrep k) (rrep (S k)))%I.
+  Definition QcK (k : nat) : iProp Σ := (T ∨ pipe_Qc (P k) (lrd k ∗ lrep k) (rrep (S k)))%I.
 
   (* THE ROUND'S: what the forked sh running the whole line pays the main
-     loop -- every writer committed and exhausted (the filing's input), or
-     the terminal round (the prompt's) *)
+     loop -- every writer committed and exhausted (the filing's input) with
+     the producer's loan back, or the terminal round (the prompt's; a
+     stray producer may still hold the loan, review B3) *)
   Definition Qtop : iProp Σ :=
-    (T ∨ ([∗ list] w ∈ wsN, wdone w)
+    (T ∨ (([∗ list] w ∈ wsN, wdone w) ∗ Rd)
        ∨ (∃ i, ⌜(i < nc)%nat⌝ ∗ terT i ∗ [∗ list] j ∈ seq 0 i, wdone (WLeft j)))%I.
 
   Global Instance pns_wfin_timeless w o : Timeless (pns_wfin γc γm w o).
@@ -571,9 +582,11 @@ Section UShPipesDefs.
   Proof using . rewrite /rrep. apply _. Qed.
   Global Instance lrep_timeless k : Timeless (lrep k).
   Proof using . rewrite /lrep. destruct k; apply _. Qed.
-  Global Instance QcK_timeless k : Timeless (QcK k).
+  Global Instance lrd_timeless `{!Timeless Rd} k : Timeless (lrd k).
+  Proof using . rewrite /lrd. destruct k; apply _. Qed.
+  Global Instance QcK_timeless `{!Timeless Rd} k : Timeless (QcK k).
   Proof using . rewrite /QcK /pipe_Qc. apply _. Qed.
-  Global Instance Qtop_timeless : Timeless Qtop.
+  Global Instance Qtop_timeless `{!Timeless Rd} : Timeless Qtop.
   Proof using . rewrite /Qtop. apply _. Qed.
 End UShPipesDefs.
 

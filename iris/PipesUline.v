@@ -181,16 +181,31 @@ Proof using.
       destruct (IH r' Hnb Hnb' Heq) as [-> ->]. by split.
 Qed.
 
-(* a body some admissible line has, whose words are an N-stage pipeline's,
-   IS that pipeline's body *)
-Lemma fline_ok_pipes_words (b : list (bv 8)) (ws : list (list (bv 8))) (n : nat) :
-  FileDisc.fline_ok b -> line_ok ws -> 1 <= n ->
-  wl_words b = FileDisc.uline_ws (FileDisc.LPipe (PrEcho ws) n) ->
-  b = FileDisc.line_body (FileDisc.LPipe (PrEcho ws) n).
+(* the producers' words determine them *)
+Lemma prod_words_inj (p q : producer) :
+  prod_ok p -> prod_ok q -> prod_words p = prod_words q -> p = q.
 Proof using.
-  intros (l & Hok & ->) Hws Hn Hw.
+  intros Hp Hq Hw. destruct p as [ws | f], q as [ws' | f']; cbn [prod_words prod_ok] in *.
+  - by subst.
+  - exfalso. pose proof (line_ok_head ws Hp) as Hh. rewrite Hw in Hh.
+    change (Some cmd_cat = Some cmd_echo) in Hh.
+    exact (cmd_cat_ne_echo (inj Some _ _ Hh)).
+  - exfalso. pose proof (line_ok_head ws' Hq) as Hh. rewrite -Hw in Hh.
+    change (Some cmd_cat = Some cmd_echo) in Hh.
+    exact (cmd_cat_ne_echo (inj Some _ _ Hh)).
+  - injection Hw as ->. reflexivity.
+Qed.
+
+(* an admissible line whose words are an N-stage pipeline's IS that
+   pipeline, at either producer *)
+Lemma uline_pipes_words (l : FileDisc.uline) (p : producer) (n : nat) :
+  FileDisc.uline_ok l -> prod_ok p -> 1 <= n ->
+  wl_words (FileDisc.line_body l) = FileDisc.uline_ws (FileDisc.LPipe p n) ->
+  l = FileDisc.LPipe p n.
+Proof using.
+  intros Hok Hp Hn Hw.
   destruct n as [| m]; [lia |].
-  cbn [FileDisc.uline_ws FileDisc.prod_words] in Hw.
+  cbn [FileDisc.uline_ws] in Hw.
   destruct l as [ws' | ws' | | ws' n'].
   - (* LEcho: its words are alphanumeric, and the bar is not *)
     exfalso. cbn [FileDisc.line_body] in Hw.
@@ -206,28 +221,39 @@ Proof using.
     replace (ws' ++ [FileDisc.fd_w_gt; FileDisc.fname_f])
       with ((ws' ++ [FileDisc.fd_w_gt]) ++ [FileDisc.fname_f]) in Hw
       by (rewrite -app_assoc; reflexivity).
-    replace (ws ++ FileDisc.w_barcats m ++ [FileDisc.fd_w_bar; FileDisc.fd_w_cat])
-      with (((ws ++ FileDisc.w_barcats m) ++ [FileDisc.fd_w_bar]) ++ [FileDisc.fd_w_cat]) in Hw
-      by (rewrite -!app_assoc; reflexivity).
+    replace (prod_words p ++ FileDisc.w_barcats m ++ [FileDisc.fd_w_bar; FileDisc.fd_w_cat])
+      with (((prod_words p ++ FileDisc.w_barcats m) ++ [FileDisc.fd_w_bar]) ++ [FileDisc.fd_w_cat])
+      in Hw by (rewrite -!app_assoc; reflexivity).
     apply app_inj_tail in Hw as [Hw _].
     apply app_inj_tail in Hw as [_ Hgt]. discriminate Hgt.
   - (* LCat: two words, while a pipeline has at least four *)
     exfalso. cbn [FileDisc.line_body] in Hw.
     apply (f_equal length) in Hw. rewrite length_app FileDisc.w_barcats_length in Hw.
-    pose proof (line_ok_ge2 ws Hws) as H2.
+    pose proof (FileDisc.prod_words_ge2 p Hp) as H2.
     revert Hw. vm_compute (length (wl_words FileDisc.cmd_cat_f)). lia.
-  - (* LPipe: the words determine the producer and the cats; the
-       producer's words are an echo line's, so it is echo *)
+  - (* LPipe: the words determine the producer and the cats *)
     destruct Hok as (Hok' & Hn' & _).
     rewrite (FileDisc.uline_ws_pipe ws' n' Hok') in Hw. cbn [FileDisc.uline_ws] in Hw.
-    destruct (barcats_split (prod_words ws') ws n' (S m) (prod_no_bar ws' Hok')
-                (line_ok_no_bar ws Hws) Hw) as [Hpw ->].
-    destruct ws' as [ws0 | f]; cbn [prod_words] in Hpw.
-    + subst ws0. reflexivity.
-    + exfalso. pose proof (line_ok_head ws Hws) as Hh. rewrite -Hpw in Hh.
-      change (Some cmd_cat = Some cmd_echo) in Hh.
-      exact (cmd_cat_ne_echo (inj Some _ _ Hh)).
+    destruct (barcats_split (prod_words ws') (prod_words p) n' (S m) (prod_no_bar ws' Hok')
+                (prod_no_bar p Hp) Hw) as [Hpw ->].
+    by rewrite (prod_words_inj ws' p Hok' Hp Hpw).
 Qed.
+
+(* a body some admissible line has, whose words are an N-stage pipeline's,
+   IS that pipeline's body *)
+Lemma fline_ok_pipes_words_p (b : list (bv 8)) (p : producer) (n : nat) :
+  FileDisc.fline_ok b -> prod_ok p -> 1 <= n ->
+  wl_words b = FileDisc.uline_ws (FileDisc.LPipe p n) ->
+  b = FileDisc.line_body (FileDisc.LPipe p n).
+Proof using.
+  intros (l & Hok & ->) Hp Hn Hw. by rewrite (uline_pipes_words l p n Hok Hp Hn Hw).
+Qed.
+
+Lemma fline_ok_pipes_words (b : list (bv 8)) (ws : list (list (bv 8))) (n : nat) :
+  FileDisc.fline_ok b -> line_ok ws -> 1 <= n ->
+  wl_words b = FileDisc.uline_ws (FileDisc.LPipe (PrEcho ws) n) ->
+  b = FileDisc.line_body (FileDisc.LPipe (PrEcho ws) n).
+Proof using. exact (fline_ok_pipes_words_p b (PrEcho ws) n). Qed.
 
 (* ...AND THE MODEL READS IT AS THAT LINE *)
 Lemma pl_of_pipe_body (ws : list (list (bv 8))) (n : nat) :

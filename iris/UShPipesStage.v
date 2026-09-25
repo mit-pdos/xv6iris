@@ -113,6 +113,8 @@ Section UShPipesStage.
   Context (L : list (bv 8)) (HL31 : pns_short L).
   (* THE PRODUCER at the head of the line *)
   Context (pr : producer).
+  (* the producer's loan ([UShPipesDefs.lrd]) *)
+  Context (Rd : iProp Σ).
   Context (γc γm : wid -> gname).
   Context (P : nat -> pnames) (gF gG : nat -> gname).
 
@@ -129,7 +131,7 @@ Section UShPipesStage.
   Local Notation pdepR := (pdep LM PV sR lR L pr P gF gG).
   Local Notation FAM := (blkN_inv wsN RUNN PWN termw TOKN pdepR pnsN (S gen_id) γc γm).
   Local Notation pkitR w s := (pns_kit LM PV I sR lR termw TOKN pdepR w s).
-  Local Notation QcR k := (QcK LM CP v I lR L pr γc γm P k).
+  Local Notation QcR k := (QcK LM CP v I lR L pr Rd γc γm P k).
   Local Notation a0_idx := (mword_of_int 10 : mword 5).
 
   (* ================================================================= *)
@@ -224,7 +226,7 @@ Section UShPipesStage.
     (pipe_inv (P 0) γp L ∗ wcur (P 0) 0 ∗ pws_lb (P 0) [] ∗ side_L (P 0)
      ∗ wcurN γc (WLeft 0) (1/2) 0 ∗ wmodeN γm (WLeft 0) (1/2) None ∗ osP (gG 0))%I.
 
-  Lemma stage_echo (ws : list (list (bv 8))) (s0 : Z) (gs : nat -> bv 8)
+  Lemma stage_echo `{!Persistent Rd} (ws : list (list (bv 8))) (s0 : Z) (gs : nat -> bv 8)
       (N' : uk_names Σ) (h' : CpuId) (m' : regfile) (γp : pipe_names) (q szv : Z)
       (ld : list fdstate) (av : nat) :
     pr = PrEcho ws -> line_ok ws -> echo_argv_bytes ws gs -> L = wl_line (drop 1 ws) ->
@@ -238,14 +240,14 @@ Section UShPipesStage.
     usz (ukn_s N') szv -∗ UserFd.ustd (ukn_fd N') ld -∗
     UserCwd.ucwd (ukn_cwd N') FsImg.ROOTINO -∗
     UserChildren.uch (ukn_ch N') (∅ : gset gname) -∗
-    echo_raw γp -∗
+    echo_raw γp -∗ Rd -∗
     urun (SG := uexecSG_xv6) (PS := uprogSG_free) N' h' m' (mword_of_int ShSyms.runcmd)
       (2 + (UkShDiag.ush_Dg + av)) -∗
     mWP (Loop : expr riscv_lang).
   Proof using HL31 Hadmit Hcons Hext Hsup HlR Hfc Hfire Hkill Hplok pnsRegG0.
     intros Hpr Hok Hbytes HLw Hn Hpeq Ha0 Hfd1 Hfd2 Hav.
     assert (Hdg0 : dg_execL = dg_st pr 0) by (rewrite Hpr; reflexivity).
-    iIntros "#Hinv #Hslot #Hcode #Hjt #Hcmd Hsz Hstd Hcwd Hch Hraw Hrun".
+    iIntros "#Hinv #Hslot #Hcode #Hjt #Hcmd Hsz Hstd Hcwd Hch Hraw #HRd Hrun".
     pose proof (ukn_const_of_eq N' _ Hpeq (fun x y => eq_refl)) as Hc.
     iDestruct "Hraw" as "(#Hpi & Hw & #Hlb & HsL & Hcw & Hmw & HG)".
     iApply stg_fupd_mwp. iMod (os_shoot with "HG") as "#HGs". iModIntro.
@@ -267,7 +269,7 @@ Section UShPipesStage.
         cbn [pns_final snd].
         iDestruct "Hf" as "[Hf | Hw0]"; last first.
         { (* the write end untouched: [WrNone] *)
-          iRight. iLeft. iFrame "HsL". rewrite /lrep. iExists None.
+          iRight. iLeft. iFrame "HsL". iSplitR; [rewrite /lrd; iExact "HRd" |]. rewrite /lrep. iExists None.
           cbn [pns_wfin]. iFrame "Hcw Hmw". iRight. iExists WrNone.
           cbn [wr_final]. rewrite /wtok.
           iSplitL "Hw0"; [iExact "Hw0" | iPureIntro; intros D HD; discriminate HD]. }
@@ -275,12 +277,12 @@ Section UShPipesStage.
         iDestruct "Hf" as "[Hf | [Hf | #Hta]]"; last first.
         { iLeft. rewrite Hkill. iExact "Hta". }
         + iDestruct "Hf" as (c) "(%HcL & [Hw' #Hlb'] & #Hro)".
-          iRight. iLeft. iFrame "HsL". rewrite /lrep. iExists None.
+          iRight. iLeft. iFrame "HsL". iSplitR; [rewrite /lrd; iExact "HRd" |]. rewrite /lrep. iExists None.
           cbn [pns_wfin]. iFrame "Hcw Hmw". iRight. iExists (WrHalt (take c L)).
           cbn [wr_final]. iSplitL; [| iPureIntro; intros D HD; discriminate HD].
           iExists c. iFrame "Hw' Hro". done.
         + iDestruct "Hf" as "[Hw' #Hlb']".
-          iRight. iLeft. iFrame "HsL". rewrite /lrep. iExists None.
+          iRight. iLeft. iFrame "HsL". iSplitR; [rewrite /lrd; iExact "HRd" |]. rewrite /lrep. iExists None.
           cbn [pns_wfin]. iFrame "Hcw Hmw". iRight. iExists (WrAll L).
           cbn [wr_final]. rewrite firstn_all.
           iSplitL; [| iPureIntro; intros D HD; by injection HD as <-].
@@ -321,7 +323,7 @@ Section UShPipesStage.
               (UShEchoPipePay.ush_fd1pipe γp) ws (fun _ : Z => QcR 0) Cr Cd
               N' Hc h' m' q szv s0 gs ld (av - 6)%nat Hok Hpeq Ha0 Hbytes Hfd1 Hfd2
               with "Hcode Hsup Hxl [] Hjt Hcmd Hsz Hstd Hcwd [Hch] [Hw HsL Hcw Hmw] Hrun").
-    - iIntros "!> [HsL Hf]". iRight. iLeft. iFrame "HsL". rewrite /lrep.
+    - iIntros "!> [HsL Hf]". iRight. iLeft. iFrame "HsL". iSplitR; [rewrite /lrd; iExact "HRd" |]. rewrite /lrep.
       iExists (Some dg_execL). iFrame "Hf". iLeft. iPureIntro.
       exists dg_execL. split; [reflexivity | left; exact Hdg0].
     - iApply (UserChildren.uch_any_of with "Hch").
@@ -348,7 +350,7 @@ Section UShPipesStage.
           usz (ukn_s N') szv -∗ UserFd.ustd (ukn_fd N') ld -∗
           UserCwd.ucwd (ukn_cwd N') FsImg.ROOTINO -∗
           UserChildren.uch (ukn_ch N') (∅ : gset gname) -∗
-          echo_raw γp -∗
+          echo_raw γp -∗ Rd -∗
           urun (SG := uexecSG_xv6) (PS := uprogSG_free) N' h' m' (mword_of_int ShSyms.runcmd)
             (2 + (UkShDiag.ush_Dg + av)) -∗
           mWP (Loop : expr riscv_lang)))%I.
@@ -356,7 +358,7 @@ Section UShPipesStage.
   Global Instance prod_stage_law_persistent args0 : Persistent (prod_stage_law args0) | 0.
   Proof using . rewrite /prod_stage_law. apply bi.intuitionistically_persistent. Qed.
 
-  Lemma stage_echo_law (ws : list (list (bv 8))) (s0 : Z) (gs : nat -> bv 8) :
+  Lemma stage_echo_law `{!Persistent Rd} (ws : list (list (bv 8))) (s0 : Z) (gs : nat -> bv 8) :
     pr = PrEcho ws -> line_ok ws -> echo_argv_bytes ws gs -> L = wl_line (drop 1 ws) ->
     (0 < nc)%nat ->
     FAM -∗ UShEcho.sh_echo_slot T -∗
@@ -364,9 +366,9 @@ Section UShPipesStage.
   Proof using HL31 Hadmit Hcons Hext Hsup HlR Hfc Hfire Hkill Hplok pnsRegG0.
     intros Hpr Hok Hbytes HLw Hn. iIntros "#Hfam #Hes". rewrite /prod_stage_law.
     iIntros "!>" (N' h' m' γp q szv ld av) "%Hpeq %Ha0 %Hfd1 %Hfd2 %Hav #Hck #Hjt #Hcmd".
-    iIntros "Hsz Hstd Hcwd Hch Hraw Hrun".
+    iIntros "Hsz Hstd Hcwd Hch Hraw HRd Hrun".
     iApply (stage_echo ws s0 gs N' h' m' γp q szv ld av Hpr Hok Hbytes HLw Hn Hpeq Ha0
-              Hfd1 Hfd2 Hav with "Hfam Hes Hck Hjt Hcmd Hsz Hstd Hcwd Hch Hraw Hrun").
+              Hfd1 Hfd2 Hav with "Hfam Hes Hck Hjt Hcmd Hsz Hstd Hcwd Hch Hraw HRd Hrun").
   Qed.
 
   (* what the head stage holds at its exec: the first pipe's write permit,
@@ -376,102 +378,10 @@ Section UShPipesStage.
      ∗ wcurN γc (WLeft 0) (1/2) 0 ∗ wmodeN γm (WLeft 0) (1/2) None)%I.
 
 
-  (* [cat f] AT THE HEAD (union.md S6, C9c').  The exec arm at the words
-     [cat f]: the EXEC SUCCEEDS arm is the ENTRY, a premise here -- C9d'
-     builds it at the merged registry (the [cat f] image, fd 1 the first
-     pipe's write end at [DOutH [L; []]], fd 2 the stage's family writer
-     at [[]; cat: cannot open f; cat: write error]); the EXEC FAILS arm is
-     the stage's family writer at [exec cat failed], depositing its
-     untouched write permit, as echo's does.  The premise carries no deed,
-     which [cat f] needs to read or refuse `f`: [UShCatFStage.
-     stage_catf_d] is this law at the lend with the deed, its premise paid
-     by the entry ([UShCatFStage.stage_catf_law_holds]). *)
-  Lemma stage_catf (f : list (bv 8)) (s0 : Z) (gs : nat -> bv 8)
-      (N' : uk_names Σ) (h' : CpuId) (m' : regfile) (γp : pipe_names) (q szv : Z)
-      (ld : list fdstate) (av : nat) :
-    pr = PrCatF f -> ExecWords.exec_ok (FileDisc.prod_words (PrCatF f)) ->
-    echo_argv_bytes (FileDisc.prod_words (PrCatF f)) gs ->
-    (0 < nc)%nat ->
-    ukn_pay N' = (fun _ : Z => QcR 0) ->
-    m' !!! Regidx a0_idx = (mword_of_int q : mword 64) ->
-    UShEchoPipePay.ush_fd1pipe γp ld -> UkSh.ush_fd2p ld -> (6 <= av)%nat ->
-    FAM -∗
-    (* THE ENTRY: exec'ing [cat f] on the stage's lend pays node 0's report *)
-    UkShEcho.sh_exec_sup_echo_at (SG := uexecSG_xv6)
-      (UShEchoPipePay.ush_fd1pipe γp) (FileDisc.prod_words (PrCatF f))
-      (fun _ : Z => QcR 0) prod_cr -∗
-    shk_code (ukn_t N') -∗ ush_jtab (ukn_t N') -∗
-    ush_cmd (ukn_d N') q (echo_cmd (FileDisc.prod_words (PrCatF f)) s0 gs) -∗
-    usz (ukn_s N') szv -∗ UserFd.ustd (ukn_fd N') ld -∗
-    UserCwd.ucwd (ukn_cwd N') FsImg.ROOTINO -∗
-    UserChildren.uch (ukn_ch N') (∅ : gset gname) -∗
-    echo_raw γp -∗
-    urun (SG := uexecSG_xv6) (PS := uprogSG_free) N' h' m' (mword_of_int ShSyms.runcmd)
-      (2 + (UkShDiag.ush_Dg + av)) -∗
-    mWP (Loop : expr riscv_lang).
-  Proof using Hadmit Hcons Hext HlR Hfc Hfire Hplok.
-    intros Hpr Hok Hbytes Hn Hpeq Ha0 Hfd1 Hfd2 Hav.
-    assert (Hdg0 : dg_execR = dg_st pr 0) by (rewrite Hpr; reflexivity).
-    iIntros "#Hinv #Hsup #Hcode #Hjt #Hcmd Hsz Hstd Hcwd Hch Hraw Hrun".
-    pose proof (ukn_const_of_eq N' _ Hpeq (fun x y => eq_refl)) as Hc.
-    iDestruct "Hraw" as "(#Hpi & Hw & #Hlb & HsL & Hcw & Hmw & HG)".
-    iApply stg_fupd_mwp. iMod (os_shoot with "HG") as "#HGs". iModIntro.
-    assert (Hw0 : WLeft 0 ∈ wsN) by (apply wids_elem; exact Hn).
-    set (Cd := (side_L (P 0) ∗ pns_wfin γc γm (WLeft 0) (Some dg_execR))%I).
-    (* ---- THE EXEC-FAILED LAW: the stage's family writer ---- *)
-    iAssert (UkShDiag.ush_execfail_law_at (SG := uexecSG_xv6) (PS := uprogSG_free)
-               alt_execR 16%nat prod_cr Cd)%I as "#Hxl".
-    { iApply (exf_writer (WLeft 0) dg_execR alt_execR 16%nat
-                (EXf fcR pr nc L (WLeft 0) dg_execR) prod_cr (side_L (P 0)) Cd Hw0 ltac:(lia)
-                ltac:(intros j b Hj Hb; exact (dg_app_lookup dg_execR u_prompt j b
-                               ltac:(rewrite dg_execR_len; lia) Hb))
-                (Hfire (WLeft 0) dg_execR Hw0 (or_introl (or_introl Hdg0)))
-                ltac:(intros c Hcx; apply (cstep_okV_tok LM PV I sR lR HlR Hadmit (WLeft 0) dg_execR c);
-                      [lia | rewrite dg_execR_len; lia | intros k Hk; discriminate Hk])
-                with "Hinv [] [] []").
-      - iApply (pexcl_left LM PV sR lR L pr P gF gG 0 dg_execR Hn ltac:(vm_compute; discriminate)).
-        rewrite /pinv. iExists γp. cbn [prevP flow_U]. iExact "Hpi".
-      - iIntros "!> (Hw & HsL & Hcw & Hmw)". iFrame "HsL Hcw Hmw".
-        rewrite (pdep_unfold LM PV sR lR L pr P gF gG (WLeft 0) dg_execR
-                   ltac:(vm_compute; discriminate) (or_introl (or_introl Hdg0))) /pdep_ne.
-        rewrite bool_decide_true; [| left; exact Hdg0].
-        iFrame "Hw HGs". rewrite /shotsF. done.
-      - iIntros "!> HsL Hcw Hmw _". rewrite /Cd. iFrame "HsL".
-        cbn [pns_wfin]. rewrite dg_execR_len. iFrame "Hcw Hmw". }
-    (* ---- ...AND THE ARM, at any exec'able word list ---- *)
-    replace (2 + (UkShDiag.ush_Dg + av))%nat
-      with (6 + (2 + (UkShDiag.ush_Dg + (av - 6))))%nat by lia.
-    iApply (UkShEcho.wp_kshr_exec_x_at_holds (SG := uexecSG_xv6) (PS := uprogSG_free)
-              (UShEchoPipePay.ush_fd1pipe γp) (FileDisc.prod_words (PrCatF f)) alt_execR
-              (fun _ : Z => QcR 0) prod_cr Cd
-              N' Hc h' m' q szv s0 gs ld (av - 6)%nat Hok catf_execfail_bytes Hpeq Ha0
-              Hbytes Hfd1 Hfd2
-              with "Hcode Hsup Hxl [] Hjt Hcmd Hsz Hstd Hcwd [Hch] [Hw HsL Hcw Hmw] Hrun").
-    - iIntros "!> [HsL Hf]". iRight. iLeft. iFrame "HsL". rewrite /lrep.
-      iExists (Some dg_execR). iFrame "Hf". iLeft. iPureIntro.
-      exists dg_execR. split; [reflexivity | left; exact Hdg0].
-    - iApply (UserChildren.uch_any_of with "Hch").
-    - rewrite /prod_cr. iFrame.
-  Qed.
-
-  (* ...AS THE PRODUCER'S STAGE LAW, at the entry *)
-  Lemma stage_catf_law (f : list (bv 8)) (s0 : Z) (gs : nat -> bv 8) :
-    pr = PrCatF f -> ExecWords.exec_ok (FileDisc.prod_words (PrCatF f)) ->
-    echo_argv_bytes (FileDisc.prod_words (PrCatF f)) gs -> (0 < nc)%nat ->
-    FAM -∗
-    □ (∀ γp : pipe_names,
-         UkShEcho.sh_exec_sup_echo_at (SG := uexecSG_xv6)
-           (UShEchoPipePay.ush_fd1pipe γp) (FileDisc.prod_words (PrCatF f))
-           (fun _ : Z => QcR 0) prod_cr) -∗
-    prod_stage_law (UkShMain.ush_args s0 gs (echo_toks (FileDisc.prod_words (PrCatF f)))).
-  Proof using Hadmit Hcons Hext HlR Hfc Hfire Hplok.
-    intros Hpr Hok Hbytes Hn. iIntros "#Hfam #Hsup". rewrite /prod_stage_law.
-    iIntros "!>" (N' h' m' γp q szv ld av) "%Hpeq %Ha0 %Hfd1 %Hfd2 %Hav #Hck #Hjt #Hcmd".
-    iIntros "Hsz Hstd Hcwd Hch Hraw Hrun".
-    iApply (stage_catf f s0 gs N' h' m' γp q szv ld av Hpr Hok Hbytes Hn Hpeq Ha0
-              Hfd1 Hfd2 Hav with "Hfam [] Hck Hjt Hcmd Hsz Hstd Hcwd Hch Hraw Hrun").
-    iApply "Hsup".
-  Qed.
+  (* [cat f] AT THE HEAD is [UShCatFStage.stage_catf]: the exec arm at the
+     words [cat f] on node 0's lend with the producer's loan (the deed) --
+     the EXEC SUCCEEDS arm the entry C9d' builds, the EXEC FAILS arm the
+     stage's family writer at [exec cat failed], the loan back in both. *)
 
   #[local] Instance stg_kit_pers0 w s : Persistent (pkitR w s) | 0 :=
     pns_kit_persistent LM PV I sR lR termw TOKN pdepR w s.
@@ -579,7 +489,7 @@ Section UShPipesStage.
         rewrite /pns_xkQ. iIntros "[#HT | (Hf0 & Hf1 & _)]"; [by iLeft |].
         cbn [pns_final snd].
         iDestruct "Hf0" as (o) "[_ Ho]".
-        iRight. iLeft. iFrame "HsL". rewrite /lrep. iExists o. iFrame "Ho". iRight.
+        iRight. iLeft. iFrame "HsL". iSplitR; [iApply lrd_S |]. rewrite /lrep. iExists o. iFrame "Ho". iRight.
         iDestruct "Hf1" as "[Hf1 | Hf1]".
         * iDestruct "Hf1" as (c) "(#Heof & _ & Hw' & #Hlb')".
           iExists (WrAll (take c L)). cbn [wr_final]. iFrame "Hlb'".
@@ -622,7 +532,7 @@ Section UShPipesStage.
         iFrame "Hw HGs Hsk".
       + iIntros "!> HsL Hcw Hmw _". rewrite /Cd. iFrame "HsL".
         cbn [pns_wfin]. rewrite dg_execR_len. iFrame "Hcw Hmw".
-    - iIntros "!> [HsL Hf]". iRight. iLeft. iFrame "HsL". rewrite /lrep.
+    - iIntros "!> [HsL Hf]". iRight. iLeft. iFrame "HsL". iSplitR; [iApply lrd_S |]. rewrite /lrep.
       iExists (Some dg_execR). iFrame "Hf". iLeft. iPureIntro.
       exists dg_execR. split; [reflexivity | by left].
     - iApply (UserChildren.uch_any_of with "Hch").

@@ -95,6 +95,10 @@ Section UShPipesNode.
   Context (L : list (bv 8)) (HL31 : pns_short L).
   (* THE PRODUCER at the head of the line: echo, or [cat f] *)
   Context (pr : producer).
+  (* THE PRODUCER'S LOAN ([UShPipesDefs.lrd]): node 0 holds it from its
+     credential, lends it to its left child and gets it back in the left
+     report; a committed round hands it to the caller in [Qtop] *)
+  Context (Rd : iProp Σ) `{HRd_tl : !Timeless Rd}.
   Context (γc γm : wid -> gname).
   Context (P : nat -> pnames) (gF gG : nat -> gname).
 
@@ -110,10 +114,10 @@ Section UShPipesNode.
   Local Notation TOKN := (tokN fcR lR).
   Local Notation pdepR := (pdep LM PV sR lR L pr P gF gG).
   Local Notation FAM := (blkN_inv wsN RUNN PWN termw TOKN pdepR pnsN (S gen_id) γc γm).
-  Local Notation QcR k := (QcK LM CP v I lR L pr γc γm P k).
-  Local Notation QtopR := (Qtop LM CP v I lR γc γm).
+  Local Notation QcR k := (QcK LM CP v I lR L pr Rd γc γm P k).
+  Local Notation QtopR := (Qtop LM CP v I lR Rd γc γm).
   (* the producer's stage law ([UShPipesStage.prod_stage_law]) *)
-  Local Notation PLAW a := (prod_stage_law LM CP v I lR L pr γc γm P gG a).
+  Local Notation PLAW a := (prod_stage_law LM CP v I lR L pr Rd γc γm P gG a).
   (* WHAT THE TOP NODE PAYS (cut C8): the round's [Qtop], read into the
      caller's own payload by a conversion that may use the family *)
   Context (Qfin Rtop : iProp Σ).
@@ -325,9 +329,9 @@ Section UShPipesNode.
      end (the chain meets the producer's whole line), every writer
      committed *)
   Lemma top_finish (ro : rd_out) :
-    FAM -∗ ⌜ro = RdEof L \/ ro = RdGone⌝ -∗ sufR 0 ro ={⊤}=∗ QtopR.
+    FAM -∗ ⌜ro = RdEof L \/ ro = RdGone⌝ -∗ sufR 0 ro -∗ Rd ={⊤}=∗ QtopR.
   Proof using Hadmit Hcons Hext HlR Hfc Hplok.
-    iIntros "#Hfam %Hro [Hn | Ht]".
+    iIntros "#Hfam %Hro [Hn | Ht] HRd".
     - iDestruct "Hn" as (oc) "(%Hch & Hwl & Hws)".
       assert (Hwl : WLast ∈ wsN) by (apply wids_elem; done).
       iAssert (|={⊤}=> wdoneR WLast)%I with "[Hwl]" as ">HL".
@@ -343,7 +347,7 @@ Section UShPipesNode.
           iModIntro. iExists L. cbn [pns_wfin]. rewrite -Hcl. iFrame "Hc Hm".
           iPureIntro. reflexivity.
         - iApply (wfin_done ⊤ WLast ltac:(done) Hwl with "Hfam Hwl"). }
-      iModIntro. iRight. iLeft. rewrite /wsub Nat.sub_0_r.
+      iModIntro. iRight. iLeft. iFrame "HRd". rewrite /wsub Nat.sub_0_r.
       iApply (wst_all 0 nc with "Hws HL").
     - iDestruct "Ht" as (i) "(%Hi & Hter & Hw)".
       iModIntro. iRight. iRight. iExists i. rewrite Nat.sub_0_r. iFrame "Hter Hw".
@@ -390,7 +394,7 @@ Section UShPipesNode.
      kernel names of its fd 0, its read permit and right side token *)
   Definition ninp (k : nat) (st0 : fdstate) : iProp Σ :=
     match k with
-    | O => Rtop
+    | O => Rtop ∗ Rd
     | S k' =>
         match gin_of st0 with
         | Some gin =>
@@ -423,9 +427,9 @@ Section UShPipesNode.
     (1 <= nc)%nat ->
     ([∗ list] w ∈ wsN, halvesN w) -∗
     ([∗ list] j ∈ seq 0 nc, osP (gF j) ∗ osP (gG j) ∗ pbundle (P j)) -∗
-    Rtop -∗ ncred 0 st0 ∗ pbundle (P 0).
+    Rtop -∗ Rd -∗ ncred 0 st0 ∗ pbundle (P 0).
   Proof using GEN.
-    intros Hn. iIntros "Hh Ho HR".
+    intros Hn. iIntros "Hh Ho HR HRd".
     rewrite /ncred /below /nknow /shotsF /wids. cbn [ninp].
     assert (Hnc : lcats lR = S (lcats lR - 1)) by lia.
     rewrite Hnc. generalize (lcats lR - 1)%nat. intros m.
@@ -433,7 +437,7 @@ Section UShPipesNode.
     cbn [wids_from seq]. rewrite !big_sepL_cons.
     iDestruct "Hh" as "(HS & HL & Hh)". iDestruct "Ho" as "[(HF & HG & Hp) Ho]".
     iDestruct (below_of_halves 1 m with "Hh Ho") as "[Hb HW]".
-    iFrame "HS HL HF HG Hp Hb HW HR". all: try rewrite !big_sepL_nil. all: try done.
+    iFrame "HS HL HF HG Hp Hb HW HR HRd". all: try rewrite !big_sepL_nil. all: try done.
   Qed.
 
   (* WHAT ITS pipe(2) ANSWERS: the pipe at its flow parameter, both
@@ -451,7 +455,7 @@ Section UShPipesNode.
   Definition Qcf (k : nat) (st : fdstate) (z : Z) : iProp Σ := QcR k.
   Definition RcLf (k : nat) (st0 : fdstate) (γp : pipe_names) : iProp Σ :=
     match k with
-    | O => echo_raw L γc γm P gG γp
+    | O => echo_raw L γc γm P gG γp ∗ Rd
     | S k' =>
         match gin_of st0 with
         | Some gin => mid_raw L γc γm P gF gG k' gin γp
@@ -534,9 +538,10 @@ Section UShPipesNode.
        writer and its input's side token ---- *)
     iAssert (Rkf k γp) as "#HRk"; [iExact "Hinv" |].
     destruct k as [| k'].
-    - (* THE TOP: echo on the left *)
-      iSplitL "Hw HsL HLc HLm HG".
-      { rewrite /RcLf /echo_raw /pipe_inv. iFrame "Hw HsL HLc HLm HG Hlb".
+    - (* THE TOP: the producer on the left, with the loan *)
+      iDestruct "Hinp" as "[Hinp HRd]".
+      iSplitL "Hw HsL HLc HLm HG HRd".
+      { rewrite /RcLf /echo_raw /pipe_inv. iFrame "Hw HsL HLc HLm HG Hlb HRd".
         iExact "Hinv". }
       iSplitL "HF Hr HsR Hbel"; [| iFrame "HRk"; rewrite /Cxf; iFrame "HSh Hinp"].
       rewrite /RcRf. case_decide as Hlast.
@@ -675,9 +680,9 @@ Section UShPipesNode.
       { iExists dg_pipe_b. cbn [pns_wfin]. rewrite dg_pipe_b_len. iFrame "Hc Hm".
         iPureIntro. exact (termw_pipe k). }
       destruct k as [| k'].
-      + (* THE TOP: every writer committed *)
-        cbn [npay]. iApply Hfin. iFrame "Hfam Hinp".
-        iRight. iLeft. rewrite (wids_top Hk) !big_sepL_cons.
+      + (* THE TOP: every writer committed, the loan never lent *)
+        cbn [npay]. iApply Hfin. iDestruct "Hinp" as "[Hinp HRd]". iFrame "Hfam Hinp".
+        iRight. iLeft. iFrame "HRd". rewrite (wids_top Hk) !big_sepL_cons.
         iFrame "Hsd Hld". iApply (wst_all 1 (nc - 1) with "Hws HL").
       + (* BELOW: the suffix read nothing *)
         cbn [npay]. rewrite /ninp. destruct (gin_of st0) as [gin |]; [| iDestruct "Hinp" as %[]].
@@ -768,7 +773,7 @@ Section UShPipesNode.
     Rkf k γp -∗ Cxf k γp -∗
     urun (SG := uexecSG_xv6) (PS := uprogSG_free) N h' m' (mword_of_int 0xea) avail -∗
     mWP (Loop : expr riscv_lang).
-  Proof using Hfin Hadmit Hcons Hext HlR Hfc HL31 Hline HLw Hplok.
+  Proof using Hfin Hadmit Hcons Hext HlR Hfc HL31 Hline HLw Hplok HRd_tl.
     intros Hk Hpeq Hn1 Hn2.
     iIntros "#Hfam #Hcode Hf1 Hf2 Hw1 Hw2 #HRk [HSh Hsr] Hrun".
     iAssert (⌜S1 <> S2⌝ ∧ ush_fork_ans S1 S2 (RcRf k st0 γp) (Qcf k st0) r2)%I
@@ -787,11 +792,11 @@ Section UShPipesNode.
         [destruct k; iModIntro; [iApply Hfin; iFrame "Hfam Hsr"; by iLeft | by iLeft] |].
       iDestruct "HQ2" as "[#HT | HQ2]";
         [destruct k; iModIntro; [iApply Hfin; iFrame "Hfam Hsr"; by iLeft | by iLeft] |].
-      iDestruct (pipe_Qc_two with "HQ1 HQ2") as "[[_ Hl] [_ Hr]]".
+      iDestruct (pipe_Qc_two with "HQ1 HQ2") as "[[_ [HRd Hl]] [_ Hr]]".
       iDestruct "HSh" as "[Hc Hm]".
       iMod (node_read k γp Hk with "Hfam HRk Hc Hm Hl Hr") as (ro) "[Hro Hsuf]".
       destruct k as [| k'].
-      - cbn [npay]. iMod (top_finish ro with "Hfam Hro Hsuf") as "Hq".
+      - cbn [npay]. iMod (top_finish ro with "Hfam Hro Hsuf HRd") as "Hq".
         iModIntro. iApply Hfin. iFrame "Hfam Hq Hsr".
       - cbn [npay]. iModIntro. iRight. iRight. iFrame "Hsr". rewrite /rrep. iExists ro.
         replace (S k' - 1)%nat with k' by lia. iFrame "Hro Hsuf". }
@@ -820,7 +825,7 @@ Section UShPipesNode.
     shk_code (ukn_t N) -∗ ush_jtab (ukn_t N) -∗
     ush_node_obl (SG := uexecSG_xv6) (PS := uprogSG_free) N ld szv cwdv ∅ av
       (Qcf k st0) (RcLf k st0) (RcRf k st0).
-  Proof using Hfin Hadmit Hcons Hext HlR Hfc Hkill HL31 Hline HLw Hplok.
+  Proof using Hfin Hadmit Hcons Hext HlR Hfc Hkill HL31 Hline HLw Hplok HRd_tl.
     intros Hk Hpeq Hnone Hfd2.
     iIntros "#Hfam Hcr Hpb Hpid #Hcode #Hjt".
     rewrite /ush_node_obl.
@@ -901,9 +906,9 @@ Section UShPipesNode.
       exact Hld2. }
     destruct k as [| k'].
     - rewrite Hst0 in Hk. injection Hk as <-.
-      rewrite /prod_stage_law.
+      rewrite /prod_stage_law /RcLf. iDestruct "HRc" as "[HRc HRd]".
       iApply ("Hpl" $! N' h' m' γp q szv ld av with "[%] [%] [%] [%] [%] Hck Hjt Hcmd Hsz Hstd
-                Hcwd Hch HRc Hrun").
+                Hcwd Hch HRc HRd Hrun").
       + exact Hpeq.
       + exact Ha0.
       + exists false; exact H1.
@@ -916,7 +921,7 @@ Section UShPipesNode.
       assert (H0 : ld !! 0%nat = Some (FdOpen true wb (FdPipe gin))).
       { rewrite /ld list_lookup_insert_ne; [| lia]. apply list_lookup_insert. lia. }
       iApply (stage_mid g LM PV CP sd WA Hext Hcons Hkill Hsup v I sR lR HlR Hfc Hadmit Hplok L HL31 pr
-                γc γm P gF gG Hfire k' a b s0 gs N' h' m' gin γp q szv ld av
+                Rd γc γm P gF gG Hfire k' a b s0 gs N' h' m' gin γp q szv ld av
                 Hab ltac:(lia) Hpeq Ha0
                 ltac:(split; [exists wb; exact H0 | split; [exists false; exact H1 |
                                                           exists rb2; exact H2]])
@@ -946,7 +951,7 @@ Section UShPipesNode.
     assert (H2 : ld !! 2%nat = Some (FdOpen rb2 true (FdDevice ConsoleInv.CONSOLE))).
     { rewrite /ld list_lookup_insert_ne; [exact Hld2 | lia]. }
     iApply (stage_last g LM PV CP sd WA Hext Hcons Hkill Hsup v I sR lR HlR Hfc Hadmit Hplok L HL31 pr
-              γc γm P gF gG Hfire k a b s0 gs N' h' m' γp q szv ld av
+              Rd γc γm P gF gG Hfire k a b s0 gs N' h' m' γp q szv ld av
               Hab Hnc Hpeq Ha0
               ltac:(split; [exists false; exact H0 | split; [exists rb1; exact H1 |
                                                          exists rb2; exact H2]])
@@ -960,7 +965,7 @@ Section UShPipesNode.
     FAM -∗
     ush_entry_law_g (SG := uexecSG_xv6) (PS := uprogSG_free) stgs ld0 szv FsImg.ROOTINO (6 + e)
       Qcf RcLf RcRf.
-  Proof using Hfin Hadmit Hcons Hext HlR Hfc Hkill HL31 Hld2 Hlen Hline HLw Hnone Hplok.
+  Proof using Hfin Hadmit Hcons Hext HlR Hfc Hkill HL31 Hld2 Hlen Hline HLw Hnone Hplok HRd_tl.
     pose proof nc_pos as Hn.
     iIntros "#Hfam". rewrite /ush_entry_law_g.
     iIntros (k st0 N' γ' γp av) "%Hlt %Hav %Hpeq _ HRc Hpid #Hck #Hjt".
@@ -1002,7 +1007,7 @@ Section UShPipesNode.
     urun (SG := uexecSG_xv6) (PS := uprogSG_free) N h m (mword_of_int ShSyms.runcmd)
       (6 + (2 + (UkShDiag.ush_Dg + (6 * length rest + (6 + e))))) -∗
     mWP (Loop : expr riscv_lang).
-  Proof using Hfin Hadmit Hcons Hext HlR Hsup Hfc Hkill HL31 Hld1 Hld2 Hlen Hline HLw Hnone Hplok Hst0 Hstc pnsRegG0 uartGhostG0.
+  Proof using Hfin Hadmit Hcons Hext HlR Hsup Hfc Hkill HL31 Hld1 Hld2 Hlen Hline HLw Hnone Hplok Hst0 Hstc pnsRegG0 uartGhostG0 HRd_tl.
     pose proof nc_pos as Hn.
     intros Hstg Hpeq Ha0 Hl0 Hne0.
     iIntros "#Hfam #Hpl #Hcs Hcr Hpb Hpid #Hcode #Hjt #Hcmd Hsz Hstd #Hcd0 Hcwd Hch Hrun".
@@ -1037,7 +1042,7 @@ Section UShPipesNode.
     FAM -∗ PLAW args0 -∗ UShCatPay.sh_cat_slot T -∗
     ([∗ list] w ∈ wsN, halvesN w) -∗
     ([∗ list] j ∈ seq 0 nc, osP (gF j) ∗ osP (gG j) ∗ pbundle (P j)) -∗
-    Rtop -∗ UkSh.ush_pid N -∗
+    Rtop -∗ Rd -∗ UkSh.ush_pid N -∗
     shk_code (ukn_t N) -∗ ush_jtab (ukn_t N) -∗
     ush_cmd (ukn_d N) t (ush_pipes a (b :: rest)) -∗
     usz (ukn_s N) szv -∗ UserFd.ustd (ukn_fd N) ld0 -∗
@@ -1046,39 +1051,25 @@ Section UShPipesNode.
     urun (SG := uexecSG_xv6) (PS := uprogSG_free) N h m (mword_of_int ShSyms.runcmd)
       (6 + (2 + (UkShDiag.ush_Dg + (6 * length rest + (6 + e))))) -∗
     mWP (Loop : expr riscv_lang).
-  Proof using Hfin Hadmit Hcons Hext HlR Hsup Hfc Hkill HL31 Hld1 Hld2 Hlen Hline HLw Hnone Hplok Hst0 Hstc pnsRegG0 uartGhostG0.
+  Proof using Hfin Hadmit Hcons Hext HlR Hsup Hfc Hkill HL31 Hld1 Hld2 Hlen Hline HLw Hnone Hplok Hst0 Hstc pnsRegG0 uartGhostG0 HRd_tl.
     intros Hstg Hpeq Ha0 Hl0 Hne0.
-    iIntros "#Hfam #Hpl #Hcs Hh Ho HR Hpid #Hcode #Hjt #Hcmd Hsz Hstd #Hcd0 Hcwd Hch Hrun".
-    iDestruct (ncred0_of st0 nc_pos with "Hh Ho HR") as "[Hcr Hpb]".
+    iIntros "#Hfam #Hpl #Hcs Hh Ho HR HRd Hpid #Hcode #Hjt #Hcmd Hsz Hstd #Hcd0 Hcwd Hch Hrun".
+    iDestruct (ncred0_of st0 nc_pos with "Hh Ho HR HRd") as "[Hcr Hpb]".
     iApply (wp_pipes_round rest a b N h m t szv st0 e Hstg Hpeq Ha0 Hl0 Hne0
               with "Hfam Hpl Hcs Hcr Hpb Hpid Hcode Hjt Hcmd Hsz Hstd Hcd0 Hcwd Hch Hrun").
   Qed.
   (* ---- THE PRODUCER'S LAW, per producer ---- *)
-  Lemma plaw_echo (ws : list (list (bv 8))) :
+  Lemma plaw_echo `{!Persistent Rd} (ws : list (list (bv 8))) :
     pr = PrEcho ws -> line_ok ws -> echo_argv_bytes ws gs ->
     FAM -∗ UShEcho.sh_echo_slot T -∗ PLAW (UkShMain.ush_args s0 gs (echo_toks ws)).
   Proof using HL31 HLw Hadmit Hcons Hext HlR Hsup Hfc Hkill Hline Hplok pnsRegG0.
     intros Hpr Hok Hbytes. iIntros "#Hfam #Hes".
     iApply (stage_echo_law g LM PV CP sd WA Hext Hcons Hkill Hsup v I sR lR HlR Hfc Hadmit Hplok L HL31 pr
-              γc γm P gF gG Hfire ws s0 gs Hpr Hok Hbytes
+              Rd γc γm P gF gG Hfire ws s0 gs Hpr Hok Hbytes
               ltac:(rewrite HLw Hpr; reflexivity) nc_pos with "Hfam Hes").
   Qed.
 
-  (* [cat f] at the head: its law at the entry C9d' builds *)
-  Lemma plaw_catf (f : list (bv 8)) :
-    pr = PrCatF f -> ExecWords.exec_ok (FileDisc.prod_words (PrCatF f)) ->
-    echo_argv_bytes (FileDisc.prod_words (PrCatF f)) gs ->
-    FAM -∗
-    □ (∀ γp : pipe_names,
-         UkShEcho.sh_exec_sup_echo_at (SG := uexecSG_xv6)
-           (UShEchoPipePay.ush_fd1pipe γp) (FileDisc.prod_words (PrCatF f))
-           (fun _ : Z => QcR 0) (prod_cr γc γm P)) -∗
-    PLAW (UkShMain.ush_args s0 gs (echo_toks (FileDisc.prod_words (PrCatF f)))).
-  Proof using Hadmit Hcons Hext HlR Hfc Hline HLw Hplok.
-    intros Hpr Hok Hbytes. iIntros "#Hfam #Hsup".
-    iApply (stage_catf_law g LM PV CP sd WA Hext Hcons v I sR lR HlR Hfc Hadmit Hplok L pr γc γm P gF gG Hfire
-              f s0 gs Hpr Hok Hbytes nc_pos with "Hfam Hsup").
-  Qed.
+  (* [cat f] at the head: [UShCatFStage.stage_catf_law_holds], at the deed *)
 End UShPipesNode.
 
 (* AT THE DEFAULT MODEL [PipesDisc.pipes_lmE] (owner ruling): the round's

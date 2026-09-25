@@ -471,10 +471,11 @@ Section UkShRedirBody.
       urun N h m (mword_of_int 0x92c) (16 + (UkSh.ush_Dbody + n)) -∗
       mWP (Loop : expr riscv_lang).
 
-  Lemma wp_kshm_body_cat_with (Hfork : kshf_fork_law)
+  Lemma wp_kshm_body_ca_with (Hfork : kshf_fork_law)
+      (Lp : list (list (bv 8)) -> (nat -> bv 8) -> nat -> nat -> Prop)
       (Dc : nat)
       (h : CpuId) (m : regfile) (f : nat -> bv 8) (k len : nat)
-      (sz : Z) (l : list fdstate) (n : nat) :
+      (ws : list (list (bv 8))) (sz : Z) (l : list fdstate) (n : nat) :
     (Dc <= 68 + UkSh.ush_Dpipe)%nat ->
     UkSh.ush_regs m ->
     m !!! Regidx s1_idx = mword_of_int (sh_buf + Z.of_nat k) ->
@@ -482,7 +483,8 @@ Section UkShRedirBody.
     (forall j : nat, (j < len)%nat -> f (k + j)%nat <> ubyte0) ->
     f (k + len)%nat = ubyte0 ->
     (k + len < sh_nbuf)%nat ->
-    UkSh.ush_line_at FileDisc.LCat f k len ->
+    Lp ws (fun j : nat => f (k + j)%nat) 0%nat len ->
+    bv_unsigned (f k) = 99%Z -> bv_unsigned (f (k + 1)%nat) = 97%Z -> (2 <= len)%nat ->
     8344 <= sz ->
     UserPtTree.pgroundup sz = sz ->
     usz_ok (sz + 65536) ->
@@ -497,36 +499,25 @@ Section UkShRedirBody.
     UCodeShK.shk_code γt -∗
     UCodeShK.shk_rodata γt -∗ UCodeShP.shp_code γt -∗ UkSh.ush_jtab γt -∗
     UkShFork.ushf_kill_law Wc -∗
-    UkShFork.ushf_child_law_at Wc ushs_lp_cat Dc -∗
+    UkShFork.ushf_child_law_at Wc Lp Dc -∗
     UkShDiag.ush_panic_law Wc Wb -∗
     ⌜ UkSh.ush_fd0p l ⌝ -∗
-    UkSh.ush_bstate N γp T Wc Wb Pm l (FileDisc.uline_ws FileDisc.LCat) -∗
+    UkSh.ush_bstate N γp T Wc Wb Pm l ws -∗
     ushl_dat -∗ usz γs sz -∗
     ubytes γd sh_buf sh_nbuf f -∗
     urun N h m (mword_of_int 0x97a) (16 + (UkSh.ush_Dbody + n)) -∗
     mWP (Loop : expr riscv_lang).
   Proof using .
-    intros HDc Hregs Hs1 Ha5 Hnn Hnul Hkl Hline Hszlo Hszal Hszok
+    intros HDc Hregs Hs1 Ha5 Hnn Hnul Hkl Hline Hb0 Hb1 Hlen2 Hszlo Hszal Hszok
            Hpm1 Hpmwb Hwbl.
     iIntros "#Hgen Hhead #Hcode #Hro #Hpcode #Hjt #Hkl #Hchl #Hplaw %Hfd0
              Hstd Hdat Hsz Hbuf Hrun".
     pose proof Hregs as Hregs'.
     destruct Hregs' as (Hs2 & Hs3 & Hs4 & Hs5 & Hs6).
-    (* the line's first two bytes *)
-    assert (Hb0 : bv_unsigned (f k) = 99%Z).
-    { pose proof (ushs_cat_byte f k len 0%nat _ Hline ltac:(lia) eq_refl) as H0.
-      rewrite Nat.add_0_r in H0. rewrite H0. by vm_compute. }
-    assert (Hb1 : bv_unsigned (f (k + 1)%nat) = 97%Z).
-    { pose proof (ushs_cat_byte f k len 1%nat _ Hline ltac:(lia) eq_refl) as H1.
-      rewrite H1. by vm_compute. }
     assert (Hbr : forall j : nat, 0 <= bv_unsigned (f j) < Z64).
     { intros j. pose proof (bv_unsigned_in_range 8 (f j)) as H0.
       assert (Em8 : bv_modulus 8 = 256) by (vm_compute; reflexivity).
       rewrite Em8 in H0. unfold Z64. lia. }
-    (* [cat f\n] is six bytes, which is what puts the second one inside
-       the buffer *)
-    assert (Hlen6 : len = 6%nat).
-    { destruct Hline as (_ & Hl & _). rewrite Hl. by vm_compute. }
     (* ---- 0x97a  bne a5,s5 -- NOT taken: the line's first byte IS 'c' ---- *)
     assert (Htk7a : false = uv_btaken BNE (m !!! Regidx a5_idx)
                               (m !!! Regidx s5_idx)).
@@ -606,14 +597,62 @@ Section UkShRedirBody.
     iIntros (h3) "Hrun".
     (* ---- 0x92c: the fork, at the cat line's own child law ---- *)
     iApply (Hfork
-              ushs_lp_cat Dc h3 m1 f k len
-              (FileDisc.uline_ws FileDisc.LCat) sz l n
-              HDc Hregs1 Hs1_1 Hnn Hnul Hkl
-              (conj eq_refl Hline)
+              Lp Dc h3 m1 f k len ws sz l n
+              HDc Hregs1 Hs1_1 Hnn Hnul Hkl Hline
               Hszlo Hszal Hszok Hpm1 Hpmwb Hwbl
               with "Hgen Hhead Hcode Hro Hjt Hkl Hchl Hplaw [%] Hstd Hdat
                     Hsz Hbuf Hrun").
     exact Hfd0.
+  Qed.
+
+  (* [cat f] itself *)
+  Lemma wp_kshm_body_cat_with (Hfork : kshf_fork_law)
+      (Dc : nat)
+      (h : CpuId) (m : regfile) (f : nat -> bv 8) (k len : nat)
+      (sz : Z) (l : list fdstate) (n : nat) :
+    (Dc <= 68 + UkSh.ush_Dpipe)%nat ->
+    UkSh.ush_regs m ->
+    m !!! Regidx s1_idx = mword_of_int (sh_buf + Z.of_nat k) ->
+    m !!! Regidx a5_idx = mword_of_int (bv_unsigned (f k)) ->
+    (forall j : nat, (j < len)%nat -> f (k + j)%nat <> ubyte0) ->
+    f (k + len)%nat = ubyte0 ->
+    (k + len < sh_nbuf)%nat ->
+    UkSh.ush_line_at FileDisc.LCat f k len ->
+    8344 <= sz ->
+    UserPtTree.pgroundup sz = sz ->
+    usz_ok (sz + 65536) ->
+    (forall n' : nat,
+       ⊢ UkSh.ush_at N γp n' -∗
+         ∃ I : list (bv 8), ⌜length I = n'⌝ ∗ UkSh.ush_lease N γp T Pm I) ->
+    (forall I : list (bv 8),
+       ⊢ Pm I -∗ Wb I -∗ UkSh.ush_at N γp (length I)) ->
+    (forall I : list (bv 8), ⊢ Wc I 3%nat -∗ Wc I 0%nat) ->
+    UkSh.ush_gen_slot N T -∗
+    UkShLoop.ushl_head N γp T Wc Wb Pm l sz -∗
+    UCodeShK.shk_code γt -∗
+    UCodeShK.shk_rodata γt -∗ UCodeShP.shp_code γt -∗ UkSh.ush_jtab γt -∗
+    UkShFork.ushf_kill_law Wc -∗
+    UkShFork.ushf_child_law_at Wc ushs_lp_cat Dc -∗
+    UkShDiag.ush_panic_law Wc Wb -∗
+    ⌜ UkSh.ush_fd0p l ⌝ -∗
+    UkSh.ush_bstate N γp T Wc Wb Pm l (FileDisc.uline_ws FileDisc.LCat) -∗
+    ushl_dat -∗ usz γs sz -∗
+    ubytes γd sh_buf sh_nbuf f -∗
+    urun N h m (mword_of_int 0x97a) (16 + (UkSh.ush_Dbody + n)) -∗
+    mWP (Loop : expr riscv_lang).
+  Proof using .
+    intros HDc Hregs Hs1 Ha5 Hnn Hnul Hkl Hline.
+    assert (Hb0 : bv_unsigned (f k) = 99%Z).
+    { pose proof (ushs_cat_byte f k len 0%nat _ Hline ltac:(lia) eq_refl) as H0.
+      rewrite Nat.add_0_r in H0. rewrite H0. by vm_compute. }
+    assert (Hb1 : bv_unsigned (f (k + 1)%nat) = 97%Z).
+    { pose proof (ushs_cat_byte f k len 1%nat _ Hline ltac:(lia) eq_refl) as H1.
+      rewrite H1. by vm_compute. }
+    assert (Hlen2 : (2 <= len)%nat).
+    { destruct Hline as (_ & Hl & _). rewrite Hl. vm_compute. lia. }
+    exact (wp_kshm_body_ca_with Hfork ushs_lp_cat Dc h m f k len
+             (FileDisc.uline_ws FileDisc.LCat) sz l n HDc Hregs Hs1 Ha5 Hnn Hnul Hkl
+             (conj eq_refl Hline) Hb0 Hb1 Hlen2).
   Qed.
 
   Lemma wp_kshm_body_cat

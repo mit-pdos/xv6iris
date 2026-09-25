@@ -187,7 +187,7 @@ Section UShPipesLaw.
     (era_pin γ (S gen_id) v ∗ (inp_lb v I ∨ T))
     ∗ blkN_inv (wids (lcats (lE I))) (runN fcE (lE I)) (pwc_blkN g fcE adm_echo v I)
         termw (tokN fcE (lE I)) (pdep pipes_lmE VPE tt (lE I) L pr P gF gG) pnsN (S gen_id) γc γm
-    ∗ Qtop pipes_lmE GPE v I (lE I) γc γm
+    ∗ Qtop pipes_lmE GPE v I (lE I) True γc γm
     ⊢ UkShFork.ushf_wq (pterm_wcN g) I.
   Proof using .
     intros Ha Hl Hpos.
@@ -197,6 +197,7 @@ Section UShPipesLaw.
     rewrite /Qtop. iDestruct "Hq" as "[#HT | [Hall | Hter]]".
     - iApply (pterm_payN_taint g v I with "Hpin HT").
     - (* committed *)
+      iDestruct "Hall" as "[Hall _]".
       rewrite /pterm_payN. iRight. iRight. rewrite /pdone_shapeN.
       iExists v, γc, γm, (pdep pipes_lmE VPE tt (lE I) L pr P gF gG).
       iSplitR; [iPureIntro; split_and!; [intros ??; apply pdep_timeless | exact Ha | exact Hl] |].
@@ -341,12 +342,12 @@ Section UShPipesLaw.
     (* THE PRODUCER'S LAW: echo's *)
     iPoseProof (plaw_echo g pipes_lmE VPE GPE tt GAE HXE Hcons Hkill pls_sup
                   v I tt (lE I) eq_refl fc_none_ok Hadmit Hplok (wl_line (drop 1 ws))
-                  (UkPipesEntries.pe_line_len ws Hok) (PrEcho ws) γc γm P gF gG
+                  (UkPipesEntries.pe_line_len ws Hok) (PrEcho ws) True%I γc γm P gF gG
                   ltac:(rewrite HlN; reflexivity) eq_refl s0 (pcut ws (S n') len gf)
                   ws eq_refl Hok Hbytes with "Hfam Hes") as "#Hpl".
     iApply (wp_pipes_round_alloc g pipes_lmE VPE GPE tt GAE HXE Hcons Hkill pls_sup
               v I tt (lE I) eq_refl fc_none_ok Hadmit Hplok (wl_line (drop 1 ws))
-              (UkPipesEntries.pe_line_len ws Hok) (PrEcho ws) γc γm P gF gG
+              (UkPipesEntries.pe_line_len ws Hok) (PrEcho ws) True%I γc γm P gF gG
               (UkShFork.ushf_wq (pterm_wcN g) I)
               (era_pin γ (S gen_id) v ∗ (inp_lb v I ∨ T))%I
               (pipes_fin v I (wl_line (drop 1 ws)) (PrEcho ws) P gF gG γc γm Hadmit Hplok Hpos)
@@ -361,7 +362,7 @@ Section UShPipesLaw.
               N' h' m' q (sz + 65536) (FdOpen true wr0 (FdDevice ConsoleInv.CONSOLE))
               (32 + (96 + nn - 6 * S n'))%nat
               eq_refl Hpeq Ha0' Hl0 ltac:(discriminate)
-              with "Hfam Hpl Hcs Hh Hnodes [] Hpid Hcode Hjt Hcmd Hsz Hstd Hcd0 Hcwd Hch Hrun").
+              with "Hfam Hpl Hcs Hh Hnodes [] [//] Hpid Hcode Hjt Hcmd Hsz Hstd Hcd0 Hcwd Hch Hrun").
     iFrame "Hpin Hlb".
   Qed.
 End UShPipesLaw.
