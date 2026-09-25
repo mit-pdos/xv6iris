@@ -346,3 +346,82 @@ model.
   the class (the class is the union's).
 - The universe's `sync`, `chdir` and `exec` of the image's binaries are
   admitted by the proof, not excluded -- they move no row.
+
+## 9. Amendments after lane M and the second survey (owner, 2026-09-25)
+
+Rulings that supersede the sections above where they differ.  The cut
+plan is S0 -> S1 || S2 -> S3 -> S4 (worklist `projects/seccomp.md`).
+
+§3, lane M's deviations ACCEPTED as the design:
+- `uok s (LSecc ws) (US u)` requires `u <> []` (the hook law
+  `LineModelLinks.lmh_cont_nonnil` quantifies over every admitted
+  alternative); the decider's canonical witness is `US [wl_nl]`, not
+  `US []`.  The claim is a prefix of the transcript, so nothing is lost.
+- `FileDisc.parse_line` is untouched (the `LPipe` precedent): the union
+  reads a seccomp body through `FileDisc.secc_parse` in
+  `UnionDisc.uline_of_u`'s fallback, and `uline_nopipe` excludes `LSecc`.
+  Extending `parse_line` would put seccomp lines into `fbody_ok`, where no
+  knob refutes them.
+- `secc_ok ws` := `wl_wf ws`, `ws <> []`, sh's MAXARGS (`S (length ws) <
+  10`) and the line buffer -- `line_ok`'s shape.
+- The exec failure at a seccomp line is a NEW `ralt`, `RSExec` (`exec
+  seccomp failed`, code 17); the fork panic and the silent round reuse
+  `RCFork`/`RCSilent`.
+- The knob: `ulm adm adm_s`, `lm_line_ok := uline_okU adm_s`, `ubody_ok
+  adm adm_s := fbody_ok \/ upipe_ok \/ usecc_ok`, `ulmG := ulm adm_u_g
+  adm_s_off`; `UShURound.ush_line_union` is `False` at `LSecc` until S4.
+  The decider is generic in the knob (`UnionDecU.u_seg_at`), so the
+  knob-on decider `lm_disc_ulmS_dec` already exists.
+- `ualt_code (US u) = 4 * encode_nat u + 3` is astronomically large for
+  any real `u`: never let a conversion reduce a code.
+
+§5, the universe:
+- `image_entry_secc` is WITHDRAWN.  Instead `ExecEntry.image_entry_taint
+  T Q X` is GENERALISED with the exec's own two key pins, which
+  `SpecKexec.exec_slot_pre` already has in hand: `□ (∀ W', T -∗ ⌜uvis_fd
+  W' = sts⌝ -∗ ⌜uvis_secc W' = secc⌝ -∗ my_pay (uvis_gen W') Q -∗ X W')`
+  (so it takes `sts` and `secc`).  Every generic taint entry ignores the
+  two premises; the universe reads `secc_key W'` off them (the table is
+  the caller's -- `kexec_image_ok` pins `uvis_fd W' = sts` -- and the
+  mask is the caller's).  `exec_bundle_of` keeps its shape and the
+  taint-shaped walk `exec_walk_of_taint` at `T := riscv_wild k` is the
+  seccomp program's and the universe's exec.
+- The minter's credential is the ERA credential `riscv_wild (S gen_id)`
+  (§6's `secc_tok`, read through the interface) and `□ uexec_wp`; it
+  takes NO `app_sup` and NO `app_taint`: `chdir`'s AU needs no supply
+  (`FsAbsInvFire.fsabs_chdir_pre`), and the kill arm is paid at the RIGHT
+  disjunct of `UexecRet.ukill_cred_at` -- `ChildTok.kill_owed gn` is
+  `my_pay gn (fun _ => True) ∗ True`, free at the trivial payload, beside
+  the exit bundle (the table's close payments: pipe rows from
+  `wild_pipe`, console rows `emp`, inode rows refuted by `secc_key`).
+- `wild_pipe γp` is ALLOCATED at pipe's resume inside the slot: `uslot_F`
+  is a WP, so `inv_alloc` runs under `fupd_wp` after one unfold of the
+  fixpoint and before the Löb hypothesis is applied at the new key.
+- The mask condition is `secc_masked m := forall n, n ∈ secc_B ->
+  Z.testbit (bv_unsigned m) n = false` with `secc_B := [6;15;17;18;19;20]`;
+  `usys_eff` returns 0 at every such number (and at every number outside
+  0..63), so the dispatcher's out-of-range arm is what a blocked call
+  hits.  `usys_secc_ok` ands the mask, so `secc_masked` is preserved.
+
+§6, the plumbing is its own cut S0, ahead of S1 and S2 and shared by both:
+- `RiscvPtsto.app_iface` gains `ai_wild : nat -> iProp Σ` (persistent,
+  timeless) and `ai_wild_lic : forall k, ai_wild k ⊢ □ ∀ h H ev, ai_cons
+  k h H ==∗ ai_cons k h (cons_step H ev)` -- the per-era twin of
+  `ai_lic`; `riscv_wild := ai_wild riscvF_app_iface`.  The trivial and
+  echo instances set it to `fun _ => False`; the union sets it to `fun _
+  => False` in S0 and to `secc_tok k` in S2.
+- `WpUart.cons_licence_at k` is the era-k licence; `cons_licence ⊢
+  cons_licence_at k`, `riscv_wild k ⊢ cons_licence_at k`;
+  `cons_link_of_licence` / `cons_run_of_licence` / `cons_read_pay_triv`
+  are RESTATED at `cons_licence_at k` (one general lemma each) with the
+  old forms as corollaries.
+- `AppInv.app_rdcred := app_sup ∨ riscv_wild (S gen_id)` under a `GenId`
+  binder (AppInv has none today; the era is the one of the console
+  escrow's allocation in `ProofMain`).  Every `cons_dirty_cred app_sup`
+  becomes `cons_dirty_cred app_rdcred`; the generic reader pays `iLeft`.
+- In S0 the shell tier keeps `ush_rd_ret`'s two arms: the token holder's
+  dirty arm gets `□ app_rdcred` back and turns it into `lk_T L` through
+  the premise `(⊢ riscv_wild (S gen_id) -∗ lk_T L)` beside the E2
+  readings `(⊢ app_sup -∗ lk_T L)`, discharged where those are (the
+  instance is `False` there).  S2 replaces that premise with the third
+  outcome ("the era is wild") and the loop laws' handling of it.
