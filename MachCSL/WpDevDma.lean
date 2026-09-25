@@ -56,14 +56,14 @@ theorem devOpStep_dmaR (gen : Nat) (d : DevId) (o : DevOp (DevSt d) (DevTask d))
       obs = [] ∧ efs = []) := by
   cases o with
   | step g =>
-    obtain ⟨s', os, hg, rfl, _, rfl⟩ := hop
+    obtain ⟨s', os, hg, _, rfl, _, rfl⟩ := hop
     exact Or.inl ⟨g, s', os, rfl, hg, rfl, rfl⟩
   | get => obtain ⟨_, rfl, _, rfl⟩ := hop; exact Or.inr (Or.inl ⟨rfl, rfl⟩)
   | choose => obtain ⟨rfl, _, rfl⟩ := hop; exact Or.inr (Or.inl ⟨rfl, rfl⟩)
   | dmaRead pa n => obtain ⟨_, rfl, _, rfl⟩ := hop; exact Or.inr (Or.inl ⟨rfl, rfl⟩)
   | dmaWrite g pa n w =>
     obtain ⟨rfl, rfl, hcase⟩ := hop
-    rcases hcase with ⟨s', hg, hram, hnr, rfl⟩ | ⟨_, rfl⟩
+    rcases hcase with ⟨s', hg, _, hram, hnr, rfl⟩ | ⟨_, rfl⟩
     · exact Or.inr (Or.inr (Or.inr ⟨g, pa, n, w, s', rfl, hg, hram, hnr, rfl, rfl, rfl⟩))
     · exact Or.inr (Or.inl ⟨rfl, rfl⟩)
   | sample src => obtain ⟨_, rfl, _, rfl⟩ := hop; exact Or.inr (Or.inl ⟨rfl, rfl⟩)
@@ -407,7 +407,7 @@ theorem wpDev_dma (N : Namespace) (d : DevId) (rel : DevSt d → DevSt d → Pro
       rcases hstep with ⟨v, rfl, hop⟩ | ⟨hb, rfl, hσ, rfl, rfl⟩
       · obtain ⟨rfl, rfl, hcase⟩ := hop
         cases v
-        rcases hcase with ⟨s', hgt, hram, hnr, rfl⟩ | ⟨_, hσn⟩
+        rcases hcase with ⟨s', hgt, _, hram, hnr, rfl⟩ | ⟨_, hσn⟩
         · -- the write fires, and the device's own state moves with it
           rw [MState.storeDma_setDev]
           imod (devUpdateAt _ d (σ.devs.st d) (σ.devs.st d) s') $$ [Hauth Hfrag]

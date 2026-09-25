@@ -7,6 +7,8 @@ import MachCSL.Dev.Plic
 import MachCSL.Dev.Virtio
 import MachCSL.Dev.Fabric
 import MachCSL.Lang
+import MachCSL.ObsTrace
+import MachCSL.LogEntryDefs
 import MachCSL.Resources
 import MachCSL.Ctx
 import MachCSL.Wp

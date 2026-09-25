@@ -437,13 +437,16 @@ def hartStep (cpu : CPU) (m : SailM Unit) (σ : MState) (m' : SailM Unit) (σ' :
 is answered with `v`, moving the state to `σ'`, emitting `obs` and forking
 `efs` (the tasks of `DevOp.fork`).
 
-* `step g`: the guarded update, with `g` answering;
+* `step g`: the guarded update, with `g` answering -- and the answer
+  FAITHFUL to its events (`devObsOk`: a port's events are its own and its
+  wire grows by exactly its output events; no other device observes);
 * `get`, `choose`: read the local state, any number;
 * `dmaRead`: any value consistent with the top of the order (`dmaView`);
 * `dmaWrite g`: appended at the top as the disk agent if `g` ANSWERS
   (`g s = some s'`) and the footprint is DRAM (no hart may reserve a byte
   of it) -- and the device's own state becomes `s'` IN THE SAME
-  TRANSITION; a silent no-op otherwise;
+  TRANSITION, a silent move of the device (`devObsOk d s s' []`: a port's
+  wire does not move); a silent no-op otherwise;
 * `sample`: the level its device drives on the source;
 * `setPin`: the hart's `sig_meip`/`sig_seip` register;
 * `fork t`: the next task id, and the named subprogram as a new thread;
@@ -452,14 +455,15 @@ def devOpStep (gen : Nat) (d : DevId) (o : DevOp (DevSt d) (DevTask d)) (σ : MS
     o.ret → MState → List Obs → List Expr → Prop :=
   match o with
   | .step g => fun _ σ' obs efs =>
-      ∃ s' os, g (σ.devs.st d) = some (s', os) ∧ σ' = σ.setDev d s' ∧ obs = os.map Obs.dev ∧ efs = []
+      ∃ s' os, g (σ.devs.st d) = some (s', os) ∧ devObsOk d (σ.devs.st d) s' os ∧
+        σ' = σ.setDev d s' ∧ obs = os.map Obs.dev ∧ efs = []
   | .get => fun v σ' obs efs => v = σ.devs.st d ∧ σ' = σ ∧ obs = [] ∧ efs = []
   | .choose => fun _ σ' obs efs => σ' = σ ∧ obs = [] ∧ efs = []
   | .dmaRead pa n => fun v σ' obs efs => dmaView σ pa n v ∧ σ' = σ ∧ obs = [] ∧ efs = []
   | .dmaWrite g pa n w => fun _ σ' obs efs =>
       obs = [] ∧ efs = [] ∧
-      ((∃ s', g (σ.devs.st d) = some s' ∧ ramBytes pa n ∧ ¬ anyReserve σ.resv pa n ∧
-          σ' = (σ.storeDma pa n w).setDev d s') ∨
+      ((∃ s', g (σ.devs.st d) = some s' ∧ devObsOk d (σ.devs.st d) s' [] ∧ ramBytes pa n ∧
+          ¬ anyReserve σ.resv pa n ∧ σ' = (σ.storeDma pa n w).setDev d s') ∨
        ((g (σ.devs.st d) = none ∨ ¬ ramBytes pa n) ∧ σ' = σ))
   | .sample src => fun v σ' obs efs => v = devLevel σ.devs src ∧ σ' = σ ∧ obs = [] ∧ efs = []
   | .setPin cpu mmode b => fun _ σ' obs efs =>
@@ -473,12 +477,17 @@ def devOpStep (gen : Nat) (d : DevId) (o : DevOp (DevSt d) (DevTask d)) (σ : MS
   | .join tid => fun _ σ' obs efs => tid ∈ (σ.devrt d).done ∧ σ' = σ ∧ obs = [] ∧ efs = []
 
 /-- `devBlocked d o σ`: primitive `o` is blocked (the thread retries it): a
-guard that does not answer, a DMA write into a reserved footprint, a join
+guard that does not answer (or answers a move unfaithful to its events,
+`devObsOk`), a DMA write into a reserved footprint (or whose guard answers
+a move of a port's wire), a join
 on an unfinished task. -/
 def devBlocked (d : DevId) (o : DevOp (DevSt d) (DevTask d)) (σ : MState) : Prop :=
   match o with
-  | .step g => g (σ.devs.st d) = none
-  | .dmaWrite g pa n _ => (g (σ.devs.st d)).isSome ∧ anyReserve σ.resv pa n
+  | .step g => ∀ s' os, g (σ.devs.st d) = some (s', os) → ¬ devObsOk d (σ.devs.st d) s' os
+  | .dmaWrite g pa n _ =>
+      (g (σ.devs.st d)).isSome ∧
+      (anyReserve σ.resv pa n ∨
+       ramBytes pa n ∧ ∃ s', g (σ.devs.st d) = some s' ∧ ¬ devObsOk d (σ.devs.st d) s' [])
   | .join tid => tid ∉ (σ.devrt d).done
   | _ => False
 

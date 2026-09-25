@@ -56,7 +56,7 @@ theorem devOpStep_wireR (gen : Nat) (d : DevId) (o : DevOp (DevSt d) (DevTask d)
       0 < rt.next ∧ σ' = σ.setRt d rt ∧ efs = [.dev gen d tid' ((devSig d).task t)]) := by
   cases o with
   | step g =>
-    obtain ⟨s', os, hg, rfl, _, rfl⟩ := hop
+    obtain ⟨s', os, hg, _, rfl, _, rfl⟩ := hop
     exact Or.inl ⟨g, s', os, rfl, hg, rfl, rfl⟩
   | get => obtain ⟨_, rfl, _, rfl⟩ := hop; exact Or.inr (Or.inl ⟨rfl, rfl⟩)
   | choose => obtain ⟨rfl, _, rfl⟩ := hop; exact Or.inr (Or.inl ⟨rfl, rfl⟩)

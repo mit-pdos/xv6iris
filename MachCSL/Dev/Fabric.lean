@@ -59,6 +59,39 @@ theorem DevStates.set_other (ds : DevStates) (d d' : DevId) (s : DevSt d) (h : d
 /-- A power cycle: every device's reset of its own state. -/
 def DevStates.reset (ds : DevStates) : DevStates := ⟨fun d => (devSig d).reset (ds.st d)⟩
 
+/-! ## The observations a device move may make
+
+The language's device steps are generic programs, so a program's DECLARED
+events (the `List DevObs` a `DevOp.step` guard answers) are only as good as
+the program.  The Rocq prototype's UART step relation is fixed and its
+events are faithful by construction (`ObsTrace.uart_step_wire`); here the
+language enforces the same thing (`devOpStep`): a device move is taken only
+if it is FAITHFUL to its events -- a port's events are its own, and its wire
+grows by exactly its output events; no other device observes anything.
+Every answer of the board's own programs is faithful (`MachCSL.ObsTrace`:
+`Uart.txArm_ok`, `Uart.rxArm_ok`; the PLIC and the disk never emit), so on
+them the restriction is vacuous.  It is what makes the observation history's
+well-formedness (`MachCSL.obsWf`) a STEP INVARIANT of the semantics, as in
+Rocq. -/
+
+/-- Port `i`'s wire: the bytes that ever left it on `SOUT`. -/
+def DevStates.wire (ds : DevStates) (i : UartId) : List (BitVec 8) :=
+  UartState.wire (ds.st (.uart i))
+
+/-- Device `d`'s move from `s` to `s'` is faithful to the events `os`. -/
+def devObsOk : (d : DevId) → DevSt d → DevSt d → List DevObs → Prop
+  | .uart i, s, s', os =>
+      (∀ o ∈ os, o.port = i) ∧ UartState.wire s' = UartState.wire s ++ devObsOut i os
+  | .plic, _, _, os => os = []
+  | .virtio, _, _, os => os = []
+
+/-- A device that never observes anything: its only faithful moves are
+silent.  The PLIC and the disk (`devSilent_plic`, `devSilent_virtio`). -/
+def DevSilent (d : DevId) : Prop := ∀ (s s' : DevSt d) (os : List DevObs), devObsOk d s s' os → os = []
+
+theorem devSilent_plic : DevSilent .plic := fun _ _ _ h => h
+theorem devSilent_virtio : DevSilent .virtio := fun _ _ _ h => h
+
 /-- A device's task bookkeeping. -/
 structure DevRt where
   /-- the tasks that have finished -/

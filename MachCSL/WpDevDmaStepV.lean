@@ -264,7 +264,7 @@ theorem wpDev_dmaV (N : Namespace) (d : DevId) (R : DevSt d → IProp GF) [∀ s
         · exact BigSepL.bigSepL_nil_intro
     | step _ C' g _ hs hk =>
       rcases hstep with ⟨v, rfl, hop⟩ | ⟨hb, rfl, hσ, rfl, rfl⟩
-      · obtain ⟨s', os, hgg, rfl, _, rfl⟩ := hop
+      · obtain ⟨s', os, hgg, _, rfl, _, rfl⟩ := hop
         imod (devUpdateAt _ d (σ.devs.st d) (σ.devs.st d) s') $$ [Hauth Hfrag] with ⟨Hauth, Hfrag⟩
         · iframe
         imod (hs _ _ _ hgg) $$ [HC HR] with ⟨HR, HC⟩
@@ -385,7 +385,7 @@ theorem wpDev_dmaV (N : Namespace) (d : DevId) (R : DevSt d → IProp GF) [∀ s
       rcases hstep with ⟨v, rfl, hop⟩ | ⟨hb, rfl, hσ, rfl, rfl⟩
       · obtain ⟨rfl, rfl, hcase⟩ := hop
         cases v
-        rcases hcase with ⟨s', hgt, hram, hnr, rfl⟩ | ⟨hsk, hσn⟩
+        rcases hcase with ⟨s', hgt, _, hram, hnr, rfl⟩ | ⟨hsk, hσn⟩
         · -- the write fires, and the device's own state moves with it
           rw [MState.storeDma_setDev]
           imod (devUpdateAt _ d (σ.devs.st d) (σ.devs.st d) s') $$ [Hauth Hfrag]

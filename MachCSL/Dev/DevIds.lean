@@ -54,4 +54,41 @@ inductive DevObs where
   | uartIn (i : UartId) (b : BitVec 8)
   deriving DecidableEq, Repr
 
+/-- The port a wire event happened on. -/
+def DevObs.port : DevObs → UartId
+  | .uartOut i _ => i
+  | .uartIn i _ => i
+
+/-- The OUTPUT bytes of a list of device events on port `i`: what they put on
+that port's wire (the device-level twin of `MachCSL.obsWire`, Rocq
+`ObsTrace.obs_wire`).  A direct recursion, so it reduces on literal lists. -/
+def devObsOut (i : UartId) : List DevObs → List (BitVec 8)
+  | [] => []
+  | .uartOut j b :: os => if j = i then b :: devObsOut i os else devObsOut i os
+  | .uartIn _ _ :: os => devObsOut i os
+
+theorem devObsOut_append (i : UartId) (os₁ os₂ : List DevObs) :
+    devObsOut i (os₁ ++ os₂) = devObsOut i os₁ ++ devObsOut i os₂ := by
+  induction os₁ with
+  | nil => rfl
+  | cons o os ih =>
+    cases o with
+    | uartOut j b => by_cases h : j = i <;> simp [devObsOut, h, ih]
+    | uartIn j b => simp [devObsOut, ih]
+
+/-- Events all on port `i` put nothing on any other port's wire. -/
+theorem devObsOut_other (i j : UartId) (os : List DevObs) (hport : ∀ o ∈ os, o.port = i)
+    (hji : j ≠ i) : devObsOut j os = [] := by
+  induction os with
+  | nil => rfl
+  | cons o os ih =>
+    have ih' := ih (fun o' ho' => hport o' (List.mem_cons_of_mem _ ho'))
+    have ho := hport o (List.mem_cons_self ..)
+    cases o with
+    | uartOut k b =>
+      simp only [DevObs.port] at ho
+      subst ho
+      simp [devObsOut, Ne.symm hji, ih']
+    | uartIn k b => simp [devObsOut, ih']
+
 end MachCSL

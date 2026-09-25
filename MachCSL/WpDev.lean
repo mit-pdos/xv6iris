@@ -31,9 +31,10 @@ theorem devOpStep_or_blocked (gen : Nat) (d : DevId) (o : DevOp (DevSt d) (DevTa
     (∃ v σ' obs efs, devOpStep gen d o σ v σ' obs efs) ∨ devBlocked d o σ := by
   cases o with
   | step g =>
-    cases h : g (σ.devs.st d) with
-    | none => exact Or.inr h
-    | some p => exact Or.inl ⟨(), _, _, _, p.1, p.2, h, rfl, rfl, rfl⟩
+    by_cases hok : ∃ s' os, g (σ.devs.st d) = some (s', os) ∧ devObsOk d (σ.devs.st d) s' os
+    · obtain ⟨s', os, h, hok⟩ := hok
+      exact Or.inl ⟨(), _, _, _, s', os, h, hok, rfl, rfl, rfl⟩
+    · exact Or.inr fun s' os h hk => hok ⟨s', os, h, hk⟩
   | get => exact Or.inl ⟨_, _, _, _, rfl, rfl, rfl, rfl⟩
   | choose => exact Or.inl ⟨0, _, _, _, rfl, rfl, rfl⟩
   | dmaRead pa n =>
@@ -49,8 +50,10 @@ theorem devOpStep_or_blocked (gen : Nat) (d : DevId) (o : DevOp (DevSt d) (DevTa
     | some s' =>
       by_cases hram : ramBytes pa n
       · by_cases hr : anyReserve σ.resv pa n
-        · exact Or.inr ⟨by rw [hg]; rfl, hr⟩
-        · exact Or.inl ⟨(), _, _, _, rfl, rfl, Or.inl ⟨s', hg, hram, hr, rfl⟩⟩
+        · exact Or.inr ⟨by rw [hg]; rfl, Or.inl hr⟩
+        · by_cases hok : devObsOk d (σ.devs.st d) s' []
+          · exact Or.inl ⟨(), _, _, _, rfl, rfl, Or.inl ⟨s', hg, hok, hram, hr, rfl⟩⟩
+          · exact Or.inr ⟨by rw [hg]; rfl, Or.inr ⟨hram, s', hg, hok⟩⟩
       · exact Or.inl ⟨(), _, _, _, rfl, rfl, Or.inr ⟨Or.inr hram, rfl⟩⟩
   | sample src => exact Or.inl ⟨_, _, _, _, rfl, rfl, rfl, rfl⟩
   | setPin cpu mm b => exact Or.inl ⟨(), _, _, _, rfl, rfl, rfl⟩
@@ -355,7 +358,7 @@ theorem devOpStep_localR (gen : Nat) (d : DevId) (o : DevOp (DevSt d) (DevTask d
       0 < rt.next ∧ σ' = σ.setRt d rt ∧ efs = [.dev gen d tid' ((devSig d).task t)]) := by
   cases o with
   | step g =>
-    obtain ⟨s', os, hg, rfl, _, rfl⟩ := hop
+    obtain ⟨s', os, hg, _, rfl, _, rfl⟩ := hop
     exact Or.inl ⟨g, s', os, rfl, hg, rfl, rfl⟩
   | get => obtain ⟨_, rfl, _, rfl⟩ := hop; exact Or.inr (Or.inl ⟨rfl, rfl⟩)
   | choose => obtain ⟨rfl, _, rfl⟩ := hop; exact Or.inr (Or.inl ⟨rfl, rfl⟩)
@@ -444,7 +447,7 @@ theorem devOpStep_local (gen : Nat) (d : DevId) (o : DevOp (DevSt d) (DevTask d)
       0 < rt.next ∧ σ' = σ.setRt d rt ∧ efs = [.dev gen d tid' ((devSig d).task t)]) := by
   cases o with
   | step g =>
-    obtain ⟨s', os, _, rfl, _, rfl⟩ := hop
+    obtain ⟨s', os, _, _, rfl, _, rfl⟩ := hop
     exact Or.inl ⟨s', rfl, rfl⟩
   | get => obtain ⟨_, rfl, _, rfl⟩ := hop; exact Or.inr (Or.inl ⟨rfl, rfl⟩)
   | choose => obtain ⟨rfl, _, rfl⟩ := hop; exact Or.inr (Or.inl ⟨rfl, rfl⟩)
