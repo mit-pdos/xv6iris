@@ -967,3 +967,6 @@ import Xv6.SysUnlinkW5F
 import Xv6.SysUnlinkW5D
 import Xv6.ProofSysUnlink
 import Xv6.LinkSysUnlink
+import Xv6.SpecSysOpen
+import Xv6.SysOpenParts
+import Xv6.SysOpenPub

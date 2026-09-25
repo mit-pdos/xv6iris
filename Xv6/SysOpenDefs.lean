@@ -20,7 +20,14 @@ PORTED:
   W-A of wave 7b, after `FsAbsEra` and `FsAbsMknodFire` §5-6 landed);
 * 2d / 2d' the four AU bundles `open_au_pre_plain/create`,
   `open_au_plain_at/create_at`, their `_inst` and `_of_all` lemmas (W-A);
-* from 2e', the PURE receipt `open_fd_rcpt`.
+* from 2e', the PURE receipt `open_fd_rcpt`;
+* 2e `open_fd_frags_any`, `open_fd_ok` and 2e' `open_fd_ok_split`
+  (APPENDED by the first sys_open agent of wave 7b, after C0 landed the
+  one block `FdTable.procPrivFd` and `fdFrags V.fdg sts`).  **Process
+  layer, flagged**: Rocq's `proc_priv γf p pid (us_ofile UW fd (fnode k))`
+  is `procPrivFd γ pa pid { V with ofile := V.ofile.set fd (fnode k) } M`
+  (deviation 9); D8's `first_tok` / `GenId` are absent from the Lean block
+  (`ProcPrivAcc` deviation 1), so Rocq's `GenId` binder is dropped.
 
 DEFERRED (appended later by a worktree agent -- rule 1 of the brief; the
 FsAbsOpenFire precedent):
@@ -28,11 +35,6 @@ FsAbsOpenFire precedent):
   iProp half (`nview`, `mkf_auth_nview`), deferred by D15.  Consumers
   (grep of /shared/xv6rocq/iris, comments stripped): the stable add-ons
   only (`SpecSysMknod` / FsAbsInvFire's pinned families); no kernel proof.
-* 2e `open_fd_frags_any`, `open_fd_ok`, and 2e' `open_fd_ok_split`: they
-  state Rocq's whole `proc_priv` block and `fd_frags (pv_fdg ..)` --
-  C0's P2 block (brief rule 5 / D16).  **Process-layer: flagged, not
-  ported.**  `open_fd_rcpt` (the pure half) IS ported, so the split lands
-  as a one-liner beside `open_fd_ok` after C0.
 
 ## Deviations from Rocq
 
@@ -73,6 +75,16 @@ FsAbsOpenFire precedent):
    `openWalk_start` (the statement of `FsAbsOpenFire.opfStart_of_open`,
    which cannot be called from here: that file imports this one) and the
    create pair calls `FsAbsMknodFire.npStart_of_mknod`.
+9. **2e: Rocq's `ustate` is the block's `V` and `M`, separately** (the
+   `SpecSysChdir` deviation-4 reading): `open_fd_ok γf p pid UW …` is
+   `openFdOk γ pa pid V M …` with `pv_ofile (us_V UW)` = `V.ofile`,
+   `pv_fdg (us_V UW)` = `V.fdg`, and `us_ofile UW fd (fnode k)` the record
+   update `{ V with ofile := V.ofile.set fd (fnode k) }` at the same `M`.
+   The block is at `γ : FileNames` (Rocq's `γf : gname`, C0's reading).
+   `<[fd := s]> sts` is `sts.set fd s` (deviation 5).
+10. **`open_fd_frags_any`: `FdSlots.fd_frags_any γ` has no Lean
+   definition** (no Lean consumer names it); it is spelled inline as
+   `∃ sts', fdFrags γ sts'` (`openFdFragsAny`).
 
 ## Dropped/simplified vs Rocq
 
@@ -84,6 +96,7 @@ import Xv6.PieceFam
 import Xv6.FileDefs
 import Xv6.FsAbsMknodFire
 import Xv6.ArgPath
+import Xv6.SpecFdalloc
 
 namespace Xv6
 
@@ -472,4 +485,71 @@ def openFdRcpt (rb wb : Bool) (t : FdType) (sts : List FdState) (r : BitVec 64)
   ∃ fd : Nat, r = BitVec.ofNat 64 fd ∧ sts[fd]? = some .closed ∧
     fdv' = sts.set fd (.open rb wb t)
 
+/-! ## 2e.  The descriptor story (the kernel's half; deviation 9) -/
+
+section OpenFd
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+  [FileG GF] [IcacheG GF] [SleepLockG GF] [IcboxG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [OffboxG GF] [OffboxBoxG GF]
+  [Icfg] [CurCtx]
+
+/-- the sharpened success post implies the landed bundle shape (Rocq's
+`open_fd_frags_any`; deviation 10: `fd_frags_any` inline). -/
+theorem openFdFragsAny (γd : GName) (sts : List FdState) :
+    fdFrags (GF := GF) γd sts ⊢ ∃ sts' : List FdState, fdFrags γd sts' := by
+  iintro H
+  iexists sts
+  iexact H
+
+/-- THE SUCCESS ARMS' SHARED TAIL (Rocq's `open_fd_ok`):
+`SpecSysOpen.sysOpenPost`'s success arm with the bundle SHARPENED -- the
+LEAST free descriptor now names the new file (`r` = that descriptor; which
+file-table slot is existential, the table is not the caller's to name), the
+block comes back with the cell written, and the fragment bundle comes back
+at an EXPLICIT state list whose row at `fd` is the NEW descriptor's type --
+`ProcPrivAcc.procPrivFd_settle`'s payout, re-packed through `fdFrags_acc`.
+...AND THE SLOT WAS CLOSED: fdalloc hands its authority back at `.closed`,
+and the process's insert needs the key free. -/
+def openFdOk (γ : FileNames) (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv)
+    (M : Nat → List (BitVec 8)) (rb wb : Bool) (t : FdType) (sts : List FdState)
+    (r : BitVec 64) : IProp GF :=
+  iprop(∃ (fd : Nat) (l : List Nat) (k : Nat),
+    ⌜r = BitVec.ofNat 64 fd ∧ fdFrees V.ofile = fd :: l ∧ sts[fd]? = some .closed⌝ ∗
+    procPrivFd γ pa pid { V with ofile := V.ofile.set fd (fnode k) } M ∗
+    -- the caller's OWN table with exactly ONE row moved
+    fdFrags V.fdg (sts.set fd (.open rb wb t)))
+
+/-! ## 2e'.  The descriptor story, SPLIT: the kernel's half and the process's
+
+`openFdOk` bundles three things: the `struct proc` cell fdalloc wrote (the
+block at the new `ofile`), the descriptor-state fragments at the moved table
+-- both KERNEL-owned -- and one PURE fact, the only part of open's success a
+process can state (`openFdRcpt`, read at the RESUME view `fdv'`).  The split
+reads the bundle as the kernel's half at that view beside the receipt. -/
+
+/-- Rocq's `open_fd_ok_split`: the kernel's row AT THE SPLIT'S OWN `fd`
+(which descriptor fdalloc took, that the caller's table had it closed, and
+what the resume view is -- the dispatcher reads `fdFrees_below` at the
+descriptor the free list's head names), the receipt beside it, and the two
+kernel halves at that view. -/
+theorem openFdOk_split (γ : FileNames) (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv)
+    (M : Nat → List (BitVec 8)) (rb wb : Bool) (t : FdType) (sts : List FdState)
+    (r : BitVec 64) :
+    openFdOk (GF := GF) γ pa pid V M rb wb t sts r ⊢
+      ∃ (fd : Nat) (l : List Nat) (k : Nat) (fdv' : List FdState),
+        ⌜r = BitVec.ofNat 64 fd ∧ fdFrees V.ofile = fd :: l ∧ sts[fd]? = some .closed ∧
+          fdv' = sts.set fd (.open rb wb t)⌝ ∗
+        ⌜openFdRcpt rb wb t sts r fdv'⌝ ∗
+        procPrivFd γ pa pid { V with ofile := V.ofile.set fd (fnode k) } M ∗
+        fdFrags V.fdg fdv' := by
+  unfold openFdOk
+  iintro ⟨%fd, %l, %k, ⟨%hr, %hfl, %hcl⟩, Hp, Hb⟩
+  iexists fd, l, k, (sts.set fd (.open rb wb t))
+  iframe Hp Hb
+  isplitr
+  · ipureintro; exact ⟨hr, hfl, hcl, rfl⟩
+  · ipureintro; exact ⟨fd, hr, hcl, rfl⟩
+
+end OpenFd
+
 end Xv6
+
