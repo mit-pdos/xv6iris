@@ -79,15 +79,6 @@ Definition rd_stage_f (ps0 cs0 : list nat) (I : list (bv 8)) : Prop :=
   /\ pro_pin_f ps0 cs0 I
   /\ (nlines (removelast I) <= length cs0)%nat.
 
-Lemma rd_stage_f_0 : rd_stage_f [] [] [].
-Proof using.
-  rewrite /rd_stage_f. split_and!.
-  - constructor.
-  - apply alts_pre_nil.
-  - intros q Hq. rewrite nstarted_nil in Hq. lia.
-  - cbn [removelast]. rewrite nlines_nil. cbn [length]. lia.
-Qed.
-
 Lemma rd_stage_f_lm ps0 cs0 s0 I : rd_stage_f ps0 cs0 I <-> lm_rd_stage file_lm ps0 cs0 s0 I.
 Proof using.
   rewrite /rd_stage_f /lm_rd_stage.
@@ -458,61 +449,6 @@ Section file_out.
   Qed.
 
   (* ====================================================================== *)
-  (*  4.  THE STEPS OUTSIDE THE LINKS: [GenOut]'s, in the file's words.     *)
-  (*  The writes, the read, the close and the byte are spent at the       *)
-  (*  console contracts directly ([GenLinks] at this instance, from       *)
-  (*  [FileLinks]); what stays is the echo shift's open, the taint's      *)
-  (*  supply and the ledger's drain.                                      *)
-  (* ====================================================================== *)
-
-  Lemma fecl_open (k : nat) (ho : list mobs) (H : LogEntryDefs.cons_hist)
-      (h : list mobs) (c : bv 8) (cs : list (bv 8)) :
-    ConsLog.cons_hist_ok H ->
-    ConsLog.cons_ev_ok H (ConsLog.EvOpen h c cs) ->
-    disc_seg_f (open_seg h) -> obs_boots h = k ->
-    disc_f h -> trace_shape h true ->
-    fecl k ho H -∗ fecl k h (ConsLog.cons_step H (ConsLog.EvOpen h c cs)).
-  Proof using .
-    intros Hok Hev Hd Hb Hdh Hsh.
-    exact (gcl_open file_lm file_cparams file_lm_byte_laws None file_wa k ho H
-             h c cs Hok Hev Hd Hb (proj1 (disc_f_lm h) Hdh) Hsh).
-  Qed.
-
-  Lemma fecl_sup (k : nat) (ho : list mobs) (H : LogEntryDefs.cons_hist)
-      (ev : ConsLog.cons_ev) :
-    file_taint (fgn_cl g) -∗ fecl k ho H ==∗ fecl k ho (ConsLog.cons_step H ev).
-  Proof using . exact (gcl_sup file_lm file_cparams None file_wa k ho H ev). Qed.
-
-  (* WHAT THE DRAIN HANDS THE LEDGER: the trace fact at the era's own boot
-     state, that state's deed witness, the era pin and a lower bound of the
-     state ([GenOut.gdrain_ret] at the file) *)
-  Definition fdrain_ret (k : nat) (seg : list mobs) : iProp Σ :=
-    (file_taint (fgn_cl g)
-     ∨ ∃ (s0 : fstate) (vf : file_era),
-         ⌜good_out_f s0 seg⌝ ∗ ⌜fstate_ok s0⌝ ∗ f0_typed s0
-         ∗ file_era_pin k vf ∗ f0_lb vf s0)%I.
-
-  Lemma fecl_drain (k : nat) (h ho : list mobs) (CH : LogEntryDefs.cons_hist)
-      (seg : list mobs) :
-    trace_shape h true ->
-    obs_boots h = k ->
-    ho `prefix_of` h ->
-    ins seg = ins (open_seg h) ->
-    obs_wire Uart0 seg `prefix_of` LogEntryDefs.ch_acc CH ->
-    obs_wire Uart0 seg <> [] ->
-    fecl k ho CH -∗ fecl k ho CH ∗ fdrain_ret k seg.
-  Proof using .
-    intros Hsh Hk Hpre Hins Hwire Hne. iIntros "Hcl".
-    iDestruct (gcl_drain file_lm file_cparams file_lm_byte_laws None file_wa
-                 k h ho CH seg Hsh Hk Hpre Hins Hwire Hne with "Hcl") as "[$ Hd]".
-    rewrite /fdrain_ret.
-    iDestruct "Hd" as "[#HT | (%s0 & %Hgo & %Hok & #Hty & #Hw)]"; [by iLeft |].
-    iRight. iDestruct "Hw" as (vf) "[#Hfp #Hlb]".
-    iExists s0, vf. iFrame "Hty Hfp Hlb". iPureIntro.
-    split; [by apply good_out_f_lm | exact Hok].
-  Qed.
-
-  (* ====================================================================== *)
   (*  5.  THE LEDGER                                                        *)
   (*                                                                        *)
   (*  THE COUNTER IS AT [decide (FileDisc.disc_f h)].                       *)
@@ -669,135 +605,10 @@ Section file_out.
     iExists vf, s0. iFrame "Hfp Hlb". iPureIntro. by exists u1.
   Qed.
 
-  (* ---- THE CONCLUSION'S PURE CARRIER.
-         [FileDisc.file_phi] VERBATIM, its antecedent included: that is what
-         lets the era's boot state be fixed at the era's FIRST drain, where
-         the cycle has typed nothing ([FileOutPure.efl_of_first_out]).
-         [disc_f] is prefix-closed, so every step below
-         assumes the NEW history's discipline and reads the old one's
-         witnesses off it. ---- *)
-  Definition file_phi_res (h : list mobs) : iProp Σ :=
-    (∃ s0s : list fstate,
-       ⌜disc_f h -> file_phi_body h s0s⌝ ∗ f0_pinned h s0s)%I.
-
-  Global Instance file_phi_res_timeless h : Timeless (file_phi_res h).
-  Proof using . rewrite /file_phi_res. apply _. Qed.
-
-  (* ...AND THE WHOLE LEDGER, which is what the record's [app_R] becomes. *)
-  Definition file_led (h : list mobs) : iProp Σ :=
-    (mono_nat_auth_own (eg_taint (fgn_echo g)) 1
-       (if decide (disc_f h) then 0%nat else 1%nat)
-     ∗ pin_map (fgn_echo g) h
-     ∗ f0_map h
-     ∗ fl_auth (fgn_cl g) (efl_of h)
-     ∗ (file_phi_res h ∨ file_taint (fgn_cl g)))%I.
-
-  Global Instance file_led_timeless h : Timeless (file_led h).
-  Proof using . rewrite /file_led. apply _. Qed.
-
   (* the birth's yield *)
   Definition file_cl_all : iProp Σ :=
     (file_cl (fgn_cl g)
      ∗ ghost_map_auth (fgn_era g) 1 (∅ : gmap nat file_era))%I.
-
-  Lemma file_led_init : file_cl_all -∗ file_led [].
-  Proof using .
-    rewrite /file_cl_all /file_cl /echo_cl /file_led /pin_map /f0_map.
-    iIntros "[[[Ht Hm] Hfl] Hmf]".
-    rewrite decide_True; [| exact disc_f_nil].
-    rewrite (_ : efl_of [] = []); last first.
-    { rewrite /efl_of /echof_lines_of /cycles_of /cycles_rev /=. reflexivity. }
-    iFrame "Ht Hfl".
-    iSplitL "Hm"; [iExists ∅; iFrame "Hm"; iPureIntro; apply pin_dom_empty |].
-    iSplitL "Hmf"; [iExists ∅; iFrame "Hmf"; iPureIntro; apply pin_dom_empty |].
-    iLeft. iExists []. iSplitR.
-    { iPureIntro. intros _. exact file_phi_body_nil. }
-    iApply f0_pinned_undrained. reflexivity.
-  Qed.
-
-
-  (* ---- THE FOUNDING, as a resource split: the era's ghosts become the
-         port's claim at the start of their era and init's credential ---- *)
-  Lemma file_era_split (k : nat) (v : era_pins) (vf : file_era) :
-    era_pin (fgn_echo g) k v -∗ file_era_pin k vf -∗
-    era_full v -∗ f0_auth vf [] -∗ f0f_auth vf [] -∗
-      fecl k [] (LogEntryDefs.MkCH [] [] [] None) ∗ fturn k.
-  Proof using .
-    iIntros "#Hpin #Hfp (Ht & Hcs & Hps & HE & Hdl & Hdll) Hf0 Hfla".
-    iEval (rewrite -Qp.half_half) in "Ht".
-    iDestruct "Ht" as "[Ht1 Ht2]".
-    iEval (rewrite -Qp.half_half) in "Hdl".
-    iDestruct (ghost_var_split with "Hdl") as "[Hdl1 Hdl2]".
-    iDestruct (cs_lb_get with "Hcs") as "[Hcs #Hcslb]".
-    iDestruct (ps_lb_get with "Hps") as "[Hps #Hpslb]".
-    iDestruct (dl_list_lb_get with "Hdll") as "[Hdll #Hdllb]".
-    iSplitL "Ht1 Hcs Hps HE Hdl1 Hdll Hfla".
-    { rewrite /fecl /gcl. iRight. iExists v, (gstage0 file_lm).
-      cbn [gs_ps gs_cs gs_E gs_w gs_st gstage0 LogEntryDefs.ch_dl length].
-      rewrite (_ : lm_pcount file_lm [] [] (gs_state file_lm None (gstage0 file_lm))
-                     [] [] = 0%nat); [| reflexivity].
-      iFrame "Hpin Ht1 Hcs Hps HE Hdl1 Hdll".
-      iSplitL "Hfla".
-      { iExists vf. iFrame "Hfp Hfla". cbn [f0_wit default f0_typed]. done. }
-      iPureIntro.
-      rewrite /gcl_pure.
-      cbn [LogEntryDefs.ch_acc LogEntryDefs.ch_log LogEntryDefs.ch_dl
-           LogEntryDefs.ch_arm].
-      split_and!.
-      - exact (lm_out_pure_0 file_lm None k [] I).
-      - exact (lm_cs_len_ok_0 file_lm).
-      - exact (lm_ps_len_ok_0 file_lm None).
-      - exact (gin_pure_0 file_lm k).
-      - by rewrite /garm_era.
-      - rewrite /ch_E. cbn [LogEntryDefs.ch_log LogEntryDefs.ch_arm ch_arm_E].
-        rewrite app_nil_r echoed_nil /seg_of fmap_nil. reflexivity.
-      - exact (lm_dl_ok_0 file_lm). }
-    rewrite /fturn. iExists v, vf. iFrame "Hpin Hfp Ht2 Hdl2 Hcslb Hpslb Hf0".
-    iApply (inp_lb_of_dl_lb v [] []); [apply prefix_nil | iExact "Hdllb"].
-  Qed.
-
-  (* THE POWER STEP: the on-arm allocates BOTH per-era records, mints both
-     pins, and splits the ghosts into the era's claim and init's credential. *)
-  Lemma file_led_pow (h : list mobs) (on : bool) :
-    file_led h ==∗
-      file_led (h ++ [if on then ObsPowerOff else ObsPowerOn])
-      ∗ (if on then emp
-         else fecl (S (obs_boots h)) [] (LogEntryDefs.MkCH [] [] [] None)
-              ∗ fturn (S (obs_boots h))).
-  Proof using .
-    iIntros "(Ht & Hpm & Hfm & Hfl & Hphi)". rewrite /file_led.
-    rewrite (decide_ext _ (disc_f h) 0%nat 1%nat (disc_f_power h on)).
-    rewrite (efl_of_power h on).
-    destruct on.
-    - iDestruct (pin_map_step (fgn_echo g) h ObsPowerOff eq_refl with "Hpm")
-        as "Hpm".
-      iDestruct (f0_map_step h ObsPowerOff eq_refl with "Hfm") as "Hfm".
-      iModIntro. iSplitR ""; [| done]. iFrame "Ht Hpm Hfm Hfl".
-      iDestruct "Hphi" as "[Hphi | HT]"; [| by iRight].
-      iLeft. iDestruct "Hphi" as (s0s) "[%Hb _]". iExists s0s. iSplitR.
-      { iPureIntro. intros Hd.
-        exact (file_phi_body_off h s0s
-                 (Hb (proj1 (disc_f_power h true) Hd))). }
-      iApply f0_pinned_undrained.
-      by rewrite (open_seg_power h ObsPowerOff eq_refl).
-    - iMod era_full_alloc as (v) "Hfull".
-      iMod f0_alloc as (vf) "[Hf0 Hfla]".
-      iMod (pin_map_on (fgn_echo g) h v with "Hpm") as "[Hpm #Hpin]".
-      iMod (f0_map_on h vf with "Hfm") as "[Hfm #Hfp]".
-      iDestruct (file_era_split (S (obs_boots h)) v vf
-                   with "Hpin Hfp Hfull Hf0 Hfla") as "(Hcl & Hturn)".
-      iModIntro. iSplitR "Hcl Hturn".
-      + iFrame "Ht Hpm Hfm Hfl".
-        iDestruct "Hphi" as "[Hphi | HT]"; [| by iRight].
-        iLeft. iDestruct "Hphi" as (s0s) "[%Hb _]".
-        iExists (s0s ++ [None]). iSplitR.
-        { iPureIntro. intros Hd.
-          exact (file_phi_body_on h s0s
-                   (Hb (proj1 (disc_f_power h false) Hd))). }
-        iApply f0_pinned_undrained.
-        by rewrite (open_seg_power h ObsPowerOn eq_refl).
-      + iFrame "Hcl Hturn".
-  Qed.
 
 
   (* the deed's typed witness, read against the ledger's own line list *)
@@ -815,70 +626,6 @@ Section file_out.
     by exists ws, sel.
   Qed.
 
-  (* THE OUTPUT STEP, AND THE ERA'S FIRST DRAIN.
-     The drain hands over the era's boot state [s0], its deed witness, and
-     a LOWER BOUND of the state pinned to the era's record.  If the cycle
-     has not yet put a byte on the console's wire then this is the era's
-     FIRST drain: the entry the ledger parked at the power step was
-     provisional, and it is replaced by [s0] -- whose admissibility comes
-     out of the witness read against the ledger's own line list, which at
-     that moment IS the list of lines typed in strictly earlier cycles
-     ([FileOutPure.efl_of_first_out]; at cycle 0 that list is empty and the
-     same reading refutes [f0_typed]'s [Some] arm, which is
-     [FileDisc.file_phi]'s guarded first clause).  If the cycle HAS
-     drained, the handed bound agrees with the one already kept
-     ([f0_pinned_drained]), so the entry does not move and the body simply
-     extends by the drain's own [good_out_f]. *)
-  Lemma file_led_tx (h : list mobs) (i : uart_id) (b : bv 8) :
-    trace_shape h true ->
-    (file_taint (fgn_cl g)
-     ∨ (match i with
-        | Uart0 => ∃ (s0 : fstate) (vf : file_era),
-                     ⌜good_out_f s0 (open_seg h ++ [ObsUartOut Uart0 b])⌝
-                     ∗ f0_typed s0 ∗ file_era_pin (obs_boots h) vf
-                     ∗ f0_lb vf s0
-        | _ => True
-        end)) -∗
-    file_led h ==∗ file_led (h ++ [ObsUartOut i b]).
-  Proof using .
-    intros Hsh. iIntros "Hgo (Ht & Hpm & Hfm & Hfl & Hphi)".
-    iDestruct (pin_map_step (fgn_echo g) h (ObsUartOut i b) eq_refl
-                 with "Hpm") as "Hpm".
-    iDestruct (f0_map_step h (ObsUartOut i b) eq_refl with "Hfm") as "Hfm".
-    rewrite /file_led.
-    rewrite (decide_ext _ (disc_f h) 0%nat 1%nat (disc_f_out h i b Hsh)).
-    rewrite (efl_of_out h i b Hsh).
-    iFrame "Ht Hpm Hfm".
-    iDestruct "Hphi" as "[Hphi | HT]"; last first.
-    { iModIntro. iFrame "Hfl". by iRight. }
-    iDestruct "Hphi" as (s0s) "[%Hb #Hpin0]".
-    destruct i; last first.
-    { iModIntro. iFrame "Hfl". iLeft. iExists s0s. iSplitR.
-      { iPureIntro. intros Hd.
-        apply (file_phi_body_step_io h (ObsUartOut Uart1 b) s0s Hsh eq_refl
-                 eq_refl), Hb.
-        exact (proj1 (disc_f_out h Uart1 b Hsh) Hd). }
-      iApply (f0_pinned_io h (ObsUartOut Uart1 b) s0s eq_refl eq_refl
-                with "Hpin0"). }
-    iDestruct "Hgo" as "[#HT | Hgo]".
-    { iModIntro. iFrame "Hfl". by iRight. }
-    iDestruct "Hgo" as (s0 vf) "(%Hgo & #Hty & #Hfp & #Hlb)".
-    iDestruct (f0_typed_adm (efl_of h) s0 with "Hfl Hty") as "[Hfl %Hadm]".
-    iAssert (⌜obs_wire Uart0 (open_seg h) <> [] ->
-               exists u1, s0s = u1 ++ [s0]⌝)%I as "%Hlast".
-    { destruct (decide (obs_wire Uart0 (open_seg h) = [])) as [Hw | Hw].
-      - iPureIntro. intro Hne. by destruct (Hne Hw).
-      - iDestruct (f0_pinned_drained h s0s vf s0 Hw with "Hfp Hlb Hpin0")
-          as %Hl. iPureIntro. by intros _. }
-    iModIntro. iFrame "Hfl". iLeft.
-    iExists (removelast s0s ++ [s0]). iSplitR; last first.
-    { iApply (f0_pinned_drain h b (removelast s0s) vf s0 with "Hfp Hlb"). }
-    iPureIntro. intros Hd.
-    exact (file_phi_body_drain h b s0s s0 Hsh
-             (proj1 (disc_f_out h Uart0 b Hsh) Hd) Hgo Hadm Hlast
-             (Hb (proj1 (disc_f_out h Uart0 b Hsh) Hd))).
-  Qed.
-
   (* the line list grows by whatever the new input completed *)
   Lemma fl_auth_grow_pre (ls ls' : list wordline) :
     ls `prefix_of` ls' ->
@@ -890,64 +637,6 @@ Section file_out.
       as "Ha".
     { apply mono_list_update. by destruct Hp as [z ->]; exists z. }
     iModIntro. iApply (fl_auth_lb with "Ha").
-  Qed.
-
-  Lemma file_led_rx (h : list mobs) (i : uart_id) (b : bv 8) :
-    trace_shape h true ->
-    file_led h ==∗
-      file_led (h ++ [ObsUartIn i b]) ∗ ftag (h ++ [ObsUartIn i b]).
-  Proof using .
-    intros Hsh. iIntros "(Hcnt & Hpm & Hfm & Hfl & Hphi)".
-    iDestruct (pin_map_step (fgn_echo g) h (ObsUartIn i b) eq_refl
-                 with "Hpm") as "Hpm".
-    iDestruct (f0_map_step h (ObsUartIn i b) eq_refl with "Hfm") as "Hfm".
-    iMod (fl_auth_grow_pre (efl_of h) (efl_of (h ++ [ObsUartIn i b]))
-            (echof_lines_of_snoc h (ObsUartIn i b)) with "Hfl")
-      as "[Hfl #Hfllb]".
-    iAssert (file_phi_res (h ++ [ObsUartIn i b]) ∨ file_taint (fgn_cl g))%I
-      with "[Hphi]" as "Hphi".
-    { iDestruct "Hphi" as "[Hphi | HT]"; [| by iRight].
-      iLeft. iDestruct "Hphi" as (s0s) "[%Hb #Hp]".
-      iExists s0s. iSplitR.
-      - iPureIntro. intros Hd.
-        apply (file_phi_body_step_io h (ObsUartIn i b) s0s Hsh
-                 ltac:(by destruct i) ltac:(by destruct i)), Hb.
-        destruct i;
-          [ exact (disc_f_in h b Hsh Hd)
-          | exact (proj1 (disc_f_other h (ObsUartIn Uart1 b) eq_refl I Hsh)
-                     Hd) ].
-      - iApply (f0_pinned_io h (ObsUartIn i b) s0s ltac:(by destruct i)
-                  ltac:(by destruct i) with "Hp"). }
-    assert (Hsh' : trace_shape (h ++ [ObsUartIn i b]) true)
-      by (eapply trace_shape_snoc; [exact Hsh | reflexivity]).
-    rewrite /file_led /ftag.
-    destruct (decide (disc_f (h ++ [ObsUartIn i b]))) as [Hd' | Hd'].
-    - rewrite decide_True; last first.
-      { destruct i;
-          [ exact (disc_f_in h b Hsh Hd')
-          | exact (proj1 (disc_f_other h (ObsUartIn Uart1 b) eq_refl I Hsh)
-                     Hd') ]. }
-      iModIntro. iFrame "Hcnt Hpm Hfm Hfl Hphi Hfllb".
-      iSplitR; [by iPureIntro |]. iLeft. by iPureIntro.
-    - iMod (mono_nat_own_update 1%nat with "Hcnt") as "[Hcnt #Hlb]";
-        [destruct (decide (disc_f h)); lia |].
-      iModIntro. iFrame "Hcnt Hpm Hfm Hfl Hphi Hfllb".
-      iSplitR; [by iPureIntro |]. iRight. rewrite /file_taint /echo_taint.
-      iExact "Hlb".
-  Qed.
-
-  (* PHI's read at the end of the run, in the owner's form: the guard is the
-     WHOLE history's discipline. *)
-  Lemma file_led_phi (h : list mobs) :
-    file_led h -∗ ⌜file_phi h⌝.
-  Proof using .
-    iIntros "(Hcnt & _ & _ & _ & [Hphi | HT'])".
-    { iDestruct "Hphi" as (s0s) "[%Hb _]". iPureIntro.
-      exact (file_phi_of_body h s0s Hb). }
-    rewrite /file_taint /echo_taint.
-    iDestruct (mono_nat_lb_own_valid with "Hcnt HT'") as %[_ Hle].
-    iPureIntro. rewrite /file_phi. intros Hd. exfalso.
-    rewrite decide_True in Hle; [| exact Hd]. lia.
   Qed.
 
 End file_out.

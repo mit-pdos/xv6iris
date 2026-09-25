@@ -376,46 +376,6 @@ Section UInitConsFile.
     exact Hnm.
   Qed.
 
-  (* ...and it resolves in the NEW one *)
-  Lemma cre_pre_astep_some (av : aview) (d : Z) (nmn : fname)
-      (ents : gmap fname Z) (nl : nat) (i : Z) :
-    cre_pre av d nmn ents nl i cdev ->
-    astep (delta_create d nmn i cdev av) d nmn = Some i.
-  Proof using .
-    intros Hpre.
-    pose proof (cre_pre_ne av d nmn ents nl i cdev Hpre file_cons_arm_nd)
-      as Hne.
-    destruct Hpre as (Hd & _ & _).
-    rewrite /astep /aents
-            (delta_create_parent av d nmn ents nl i cdev Hd Hne)
-            /= /anode_ents /=.
-    by rewrite lookup_insert.
-  Qed.
-
-  (* THE REFUTATION, machine-checked: at [(ROOTINO, fname_f)] -- a pair
-     conjunct (g)'s side condition admits -- the claim's deed conjunct
-     cannot survive the create, at ANY deed value. *)
-  Lemma file_cons_create_other_refuted (av : aview) (ents : gmap fname Z)
-      (nl : nat) (i : Z) (s : dst) :
-    cre_pre av FsImg.ROOTINO fname_f ents nl i cdev ->
-    f_ok av s ->
-    f_ok (delta_create FsImg.ROOTINO fname_f i cdev av) s ->
-    False.
-  Proof using .
-    intros Hpre Hok Hok'.
-    destruct s as [[j bs] |].
-    - (* the deed is PRESENT: `f` already resolves in [av], and [cre_pre]
-         says it does not *)
-      destruct Hok as (Hs & _).
-      pose proof (cre_pre_astep_none av FsImg.ROOTINO fname_f ents nl i cdev
-                    Hpre) as Hn.
-      rewrite Hs in Hn. discriminate Hn.
-    - (* the deed is ABSENT: the create makes `f` resolve *)
-      pose proof (cre_pre_astep_some av FsImg.ROOTINO fname_f ents nl i Hpre)
-        as Hs.
-      rewrite /f_ok /f_absent Hs in Hok'. discriminate Hok'.
-  Qed.
-
   (* THE LEG THAT IS TRUE: conjunct (g)'s premise PLUS the deed's own
      separation.  [AppFileCons.file_cons_create_other] is this at
      [or_introl] twice. *)
@@ -513,39 +473,6 @@ Section UInitConsFile.
     rewrite Hst in Hn. discriminate Hn.
   Qed.
 
-  (* ---- 4a.  THE KEY ARM, at the file reading of the pure half ---- *)
-  Lemma init_cons_laws_file_of_leg :
-    file_app = MkAppcfg file_names (file_pred (FileOut.fgn_cl g)) r ->
-    file_cons_create_leg -∗
-    init_cons_laws_at FileFsPure.file_fs_pure (cons_made (fn_cons r))
-      cons_absent (file_taint (FileOut.fgn_cl g)) (cons_key (fn_cons r)).
-  Proof using .
-    intros Heq.
-    rewrite /init_cons_laws_at /init_cons_pin_law /file_cons_create_leg.
-    rewrite Heq. rewrite /app_sup. cbn [app_pred app_run app_names].
-    iIntros "#Hg".
-    iSplit; [| iSplit; [| iSplit; [| iSplit; [| iSplit; [| iSplit;
-      [| iSplit; [| iSplit ]]]]]]].
-    - iIntros "!> #Ht".
-      iApply (file_sup_of_taint (FileOut.fgn_cl g) r with "Ht").
-    - iIntros "!>" (v) "Hp".
-      iApply (file_fs_pure_acc (FileOut.fgn_cl g) r v with "Hp").
-    - iApply (file_cons_abs_law (FileOut.fgn_cl g) r).
-    - iIntros "!>" (av i) "%Hfree Hp".
-      iApply (file_cons_arm (FileOut.fgn_cl g) r av i Hfree with "Hp").
-    - iIntros "!>" (av0 av i cn) "%Hfree %Hp0 %Hab0 %Hab %Hrow %Hcn Hp".
-      iApply (file_cons_unarm_absent (FileOut.fgn_cl g) r av0 av i cn
-                Hfree Hp0 Hrow Hcn Hab with "Hp").
-    - iIntros "!>" (av ents nl i) "%Hpre Hk Hp".
-      iApply (file_cons_mknod (FileOut.fgn_cl g) r av ents nl i Hpre
-                with "Hk Hp").
-    - iExact "Hg".
-    - iIntros "!>" (av i) "%Hpr Hp".
-      iApply (file_cons_shoot (FileOut.fgn_cl g) r av i Hpr with "Hp").
-    - iIntros "!>" (i) "#Hm".
-      iApply (FileOpen.file_cons_law (FileOut.fgn_cl g) r i with "Hm").
-  Qed.
-
   (* ---- 4b.  ...and at the ECHO reading, which is what the leaves take ---- *)
   Lemma init_cons_laws_efp_file_of_leg :
     file_app = MkAppcfg file_names (file_pred (FileOut.fgn_cl g)) r ->
@@ -578,43 +505,6 @@ Section UInitConsFile.
       iApply (file_cons_shoot (FileOut.fgn_cl g) r av i Hpr with "Hp").
     - iIntros "!>" (i) "#Hm".
       iApply (FileOpen.file_cons_law (FileOut.fgn_cl g) r i with "Hm").
-  Qed.
-
-  (* ---- 4c.  THE FLAG ARM, both readings ---- *)
-  Lemma init_cons_laws_made_file_of_leg (i0 : Z) :
-    file_app = MkAppcfg file_names (file_pred (FileOut.fgn_cl g)) r ->
-    file_cons_create_leg -∗
-    cons_made (fn_cons r) i0 -∗
-    init_cons_laws_at FileFsPure.file_fs_pure (cons_made (fn_cons r))
-      (cons_present_at i0) (file_taint (FileOut.fgn_cl g))
-      (cons_made (fn_cons r) i0).
-  Proof using .
-    intros Heq.
-    rewrite /init_cons_laws_at /init_cons_pin_law /file_cons_create_leg.
-    rewrite Heq. rewrite /app_sup. cbn [app_pred app_run app_names].
-    iIntros "#Hg #Hm".
-    iSplit; [| iSplit; [| iSplit; [| iSplit; [| iSplit; [| iSplit;
-      [| iSplit; [| iSplit ]]]]]]].
-    - iIntros "!> #Ht".
-      iApply (file_sup_of_taint (FileOut.fgn_cl g) r with "Ht").
-    - iIntros "!>" (v) "Hp".
-      iApply (file_fs_pure_acc (FileOut.fgn_cl g) r v with "Hp").
-    - iIntros "!>" (v) "#Hm' Hp".
-      iDestruct (FileOpen.file_cons_law (FileOut.fgn_cl g) r i0 with "Hm")
-        as "#Hl".
-      iDestruct ("Hl" $! v with "Hp") as "[Hp Hc]". iFrame "Hp Hm' Hc".
-    - iIntros "!>" (av i) "%Hfree Hp".
-      iApply (file_cons_arm (FileOut.fgn_cl g) r av i Hfree with "Hp").
-    - iIntros "!>" (av0 av i cn) "%Hfree %Hp0 %Hpv0 %Hpv %Hrow %Hcn Hp".
-      iApply (file_cons_unarm_present (FileOut.fgn_cl g) r av0 av i i0 cn
-                Hfree Hp0 Hrow Hcn Hpv0 Hpv with "Hp").
-    - iIntros "!>" (av ents nl i) "%Hpre Hk Hp".
-      iApply (file_cons_mknod_present av ents nl i i0 Hpre with "Hk Hp").
-    - iExact "Hg".
-    - iIntros "!>" (av i) "%Hpr Hp".
-      iApply (file_cons_shoot (FileOut.fgn_cl g) r av i Hpr with "Hp").
-    - iIntros "!>" (i) "#Hm2".
-      iApply (FileOpen.file_cons_law (FileOut.fgn_cl g) r i with "Hm2").
   Qed.
 
   Lemma init_cons_laws_made_efp_file_of_leg (i0 : Z) :

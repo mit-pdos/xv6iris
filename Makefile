@@ -20,8 +20,6 @@
 #   make audit-only the same audit, against an already-built tree
 #   make audit-tree / audit-tree-only  the same, for the TREE APPLICATION's
 #                   era-0 obligation -- a cone neither of the other two walks
-#   make audit-file / audit-file-only  the same, for the FILE APPLICATION's
-#                   top-level theorem -- a fourth cone again
 #   make audit-pipe / audit-pipe-only  the same, for the PIPELINE application's
 #                   theorem (echo and pipeline lines) -- a fifth cone
 #   make audit-union / audit-union-only  the same, for THE APPLICATION theorem:
@@ -150,7 +148,7 @@ USER_DUMPS ?= sync:Sync echo:Echo sh:Sh init:Init cat:Cat grep:Grep
 .PHONY: all proofs model kernel user dump dump-force kernel-rocq user-rocq \
         xv6-rev-check sail-rev-check gen-code check-decode update-decode \
         gen-ucode check-ucode \
-        audit audit-only audit-tree audit-tree-only audit-file audit-file-only audit-pipe audit-pipe-only audit-union audit-union-only audit-all audit-all-only vtest vtest-check vtest-check-ci vtest-gen vtest-deps \
+        audit audit-only audit-tree audit-tree-only audit-pipe audit-pipe-only audit-union audit-union-only audit-all audit-all-only vtest vtest-check vtest-check-ci vtest-gen vtest-deps \
         hwtest hwtest-gen hwtest-gen-all hwtest-probe \
         vtest-runs vtest-passes vtest-table \
         clean clean-proofs distclean model-gen
@@ -373,22 +371,6 @@ audit-tree: proofs
 
 audit-tree-only:
 	cd $(IRIS) && $(RUN) coqc $(AUDIT_FLAGS) -noglob TreeAssumptions.v
-
-# The SAME audit for the FILE APPLICATION (iris/FileAssumptions.v): `Print
-# Assumptions` on UFileBootAdequacy.file_adequacy_fileSigma, the whole-system
-# theorem at AppFileRec.app_file -- the `echo ... > f` / power cycle / `cat f`
-# application.  A FOURTH target for the reason there is a third: no two of the
-# four cones contain each other -- this one walks FileDisc/FileOutPure/FileOut/
-# FileLinks/AppFile/AppFileRec/FileDiscDec, which none of the other three do.
-# That file's header says what it audits, and in particular that the theorem's
-# one open premise (Hprog, lane SH-ROUND's al_programs) is a PREMISE and so is
-# invisible to Print Assumptions by construction.  Same reasons for -noglob and
-# for staying out of iris/_CoqProject.
-audit-file: proofs
-	$(MAKE) audit-file-only
-
-audit-file-only:
-	cd $(IRIS) && $(RUN) coqc $(AUDIT_FLAGS) -noglob FileAssumptions.v
 
 # The SAME audit for the APPLICATION theorem (iris/PipeAssumptions.v): `Print
 # Assumptions` on UInitPipeAdequacy.pipe_adequacy_pipeSigma_final, the

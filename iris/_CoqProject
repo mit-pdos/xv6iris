@@ -1568,9 +1568,7 @@ AppPipeCons.v
 AppPipe.v
 FileLinks.v
 FileLinksLine.v
-FileLinkInst.v
 FileLinkGen.v
-AppFileRec.v
 AppTree.v
 
 FsAbsUnlinkFire.v
@@ -1656,7 +1654,6 @@ UShConsK.v
 
 UShEcho.v
 UShLine.v
-FileReadInst.v
 
 UImgWordDefs.v
 UInitSh.v
@@ -1702,27 +1699,18 @@ UInitTreeExec.v
 UShLineHold.v
 UShLineAtHold.v
 UShPanicHold.v
-FileLinksAt.v
-FileLinksAtInp.v
 AppFileCons.v
 UInitConsFile.v
 UInitConsPipe.v
-UFileBootAdequacy.v
-# FileAssumptions.v
 UPipeBootAdequacy.v
 # PipeAssumptions.v
 
-UInitFileCons.v
 
 UEchoFile.v
 UkFileDev.v
 UkFreeHandler.v
 UkFileIface.v
 UkFileEntries.v
-UShRound.v
-UInitFileCC.v
-UInitFileBoot.v
-UInitFile.v
 PipeKillMark.v
 UEchoPipe.v
 UkPipeDev.v

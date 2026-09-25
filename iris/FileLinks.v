@@ -49,19 +49,6 @@ Section file_links.
   Context (Hcons : @riscv_cons_res Σ (@riscv_fixedGS Σ HRg) = fecl g).
   Context (Htag : @riscv_rx_tag Σ (@riscv_fixedGS Σ HRg) = ftag g).
 
-  Lemma fchist_at0 (kk : nat) (hh : list mobs) (HH : LogEntryDefs.cons_hist) :
-    chist_at Uart0 kk hh HH = fecl g kk hh HH.
-  Proof using Hcons. rewrite /chist_at. by rewrite Hcons. Qed.
-
-  (* ---- the taint route: once the era is off the discipline every link of
-          every run is free ---- *)
-  Lemma file_cons_link_of_taint (k : nat) (ev : ConsLog.cons_ev)
-      (Φ : iProp Σ) :
-    file_taint (fgn_cl g) -∗ Φ -∗ cons_link Uart0 k ev Φ.
-  Proof using Hcons.
-    exact (gcons_link_of_taint file_lm (file_cparams g) None (file_wa g) Hcons k ev Φ).
-  Qed.
-
   Lemma file_write_link_taint (k : nat) (b : bv 8) (Φ : iProp Σ) :
     file_taint (fgn_cl g) -∗ (file_taint (fgn_cl g) -∗ Φ) -∗
     out_link Uart0 k b Φ.
@@ -155,73 +142,6 @@ Section file_links.
                                  (snd <$> (dl ++ ws))))
                   ∗ ⌜rd_stage_f ps0 cs0 (snd <$> (dl ++ ws))⌝))%I.
 
-  Lemma file_read_link (k : nat) (v : era_pins) (n : nat)
-      (ws : list (list mobs * bv 8)) (Φ : iProp Σ) :
-    era_pin (fgn_echo g) k v -∗ dl_cnt v (1/2) n -∗
-    (fread_ret k v n ws -∗ Φ) -∗
-    cons_link Uart0 k (ConsLog.EvRead ws) Φ.
-  Proof using Hcons.
-    iIntros "#Hpin Hdlr HΦ".
-    iApply (gread_link file_lm (file_cparams g) file_lm_byte_laws None (file_wa g) Hcons k v n ws Φ with "Hpin Hdlr [HΦ]").
-    iIntros "Hret". iApply "HΦ". rewrite /gread_ret /fread_ret.
-    iDestruct "Hret" as "[Hret | (Hdl & %pops & %dl & %Hrok & %Hn & %Hpref & %Hidx
-                                  & %Hdisc & %Hbt & #Hilb & %Hdi & Hws)]"; [by iLeft |].
-    iRight. iFrame "Hdl". iExists pops, dl.
-    iSplitR; [done |]. iSplitR; [done |]. iSplitR; [done |].
-    iSplitR; [done |]. iSplitR; [done |]. iSplitR; [done |].
-    iSplitR; [iExact "Hilb" |]. iSplitR; [done |].
-    iDestruct "Hws" as "[%Hw | (%cs0 & %ps0 & %s0 & #Hcs & #Hps & #Hw & %Hnl
-                                 & #Htl & %Hrd)]"; [by iLeft |].
-    iRight. iDestruct "Hw" as (vf) "[#Hfp #Hlb]".
-    iExists cs0, ps0, vf, s0. rewrite proc_before_f_lm.
-    iFrame "Hcs Hps Hfp Hlb Htl". iPureIntro.
-    split; [exact Hnl | by apply (rd_stage_f_lm _ _ s0)].
-  Qed.
-
-  (* ---- the arm's close and its bytes, both free ---- *)
-  Lemma file_close_link (k : nat) (Φ : iProp Σ) :
-    Φ -∗ cons_link Uart0 k ConsLog.EvClose Φ.
-  Proof using Hcons.
-    exact (gclose_link file_lm (file_cparams g) None (file_wa g) Hcons k Φ).
-  Qed.
-
-  Lemma file_byte_link (k : nat) (b : bv 8) (Φ : iProp Σ) :
-    Φ -∗ cons_link Uart0 k (ConsLog.EvByte b) Φ.
-  Proof using Hcons.
-    exact (gbyte_link file_lm (file_cparams g) file_lm_byte_laws None (file_wa g) Hcons k b Φ).
-  Qed.
-
-  Lemma file_cons_run (k : nat) (cs : list (bv 8)) (Φ : iProp Σ) :
-    Φ -∗ cons_run k cs Φ.
-  Proof using Hcons.
-    exact (gcons_run file_lm (file_cparams g) file_lm_byte_laws None (file_wa g) Hcons k cs Φ).
-  Qed.
-
-  (* ==================================================================== *)
-  (*  THE ECHO SHIFT ITSELF -- [App.al_echo], a CLOSED entailment.         *)
-  (* ==================================================================== *)
-  Lemma file_happ_echo :
-    ⊢ ∀ (GEN : GenId) (XI : CurCtx),
-        @SpecConsoleintr.cons_echo_shift Σ HRg GEN XI.
-  Proof using Hcons Htag.
-    iIntros (GEN XI).
-    rewrite /SpecConsoleintr.cons_echo_shift Htag.
-    iIntros "!>" (h c cs Φ) "%Hends %Hk %Hcs #Htg #Hlbh HΦ".
-    iDestruct "Htg" as "(%Hsh & [%Hdisc | #HT] & #Hfllb)"; last first.
-    { iApply (file_cons_link_of_taint with "HT [HΦ]").
-      by iApply file_cons_run. }
-    iIntros (o H) "#Hlb Hres %Hok %Hev".
-    rewrite fchist_at0.
-    (* the open takes NOTHING beyond the kernel's own event facts: (K1) and
-       the drop's reason are inside [Hev] ([EchoLinks]'s shape) *)
-    iDestruct (fecl_open g (S gen_id) (default [] o) H h c cs Hok Hev
-                 (disc_seg_f_open_seg h Hsh Hdisc) Hk Hdisc Hsh
-                 with "Hres") as "Hres".
-    iModIntro. iExists (Some h). cbn [obs_hist_lb_o from_option id].
-    rewrite fchist_at0. iFrame "Hlbh Hres".
-    by iApply file_cons_run.
-  Qed.
-
 End file_links.
 
 (* ====================================================================== *)
@@ -242,45 +162,8 @@ Section file_links_bundle.
   Context (g : file_gn).
   Context `{HRg : !riscvGS Σ}.
 
-  Definition file_link_rd : iProp Σ :=
-    (□ ∀ (k : nat) (v : era_pins) (n : nat)
-         (ws : list (list mobs * bv 8)) (Φ : iProp Σ),
-        era_pin (fgn_echo g) k v -∗ dl_cnt v (1/2) n -∗
-        (fread_ret g k v n ws -∗ Φ) -∗
-        cons_link Uart0 k (ConsLog.EvRead ws) Φ)%I.
-
-  Definition file_link_rd_taint : iProp Σ :=
-    (□ ∀ (k : nat) (ws : list (list mobs * bv 8)) (Φ : iProp Σ),
-        file_taint (fgn_cl g) -∗ (file_taint (fgn_cl g) -∗ Φ) -∗
-        cons_link Uart0 k (ConsLog.EvRead ws) Φ)%I.
-
   Definition file_links : iProp Σ :=
     ⌜@riscv_cons_res Σ (@riscv_fixedGS Σ HRg) = fecl g⌝%I.
-
-  Global Instance file_link_rd_persistent : Persistent file_link_rd.
-  Proof using . rewrite /file_link_rd. apply _. Qed.
-  Global Instance file_link_rd_taint_persistent : Persistent file_link_rd_taint.
-  Proof using . rewrite /file_link_rd_taint. apply _. Qed.
   Global Instance file_links_persistent : Persistent file_links.
   Proof using . rewrite /file_links. apply _. Qed.
-
-  Lemma file_links_rd : file_links -∗ file_link_rd.
-  Proof using .
-    iIntros "%Hc". rewrite /file_link_rd.
-    iIntros "!>" (k v n ws Φ) "Hpin Hdl HΦ".
-    iApply (file_read_link g Hc with "Hpin Hdl HΦ").
-  Qed.
-
-  Lemma file_links_rd_taint : file_links -∗ file_link_rd_taint.
-  Proof using .
-    iIntros "%Hc". rewrite /file_link_rd_taint.
-    iIntros "!>" (k ws Φ) "#HT HΦ".
-    iApply (file_cons_link_of_taint g Hc with "HT [HΦ]").
-    by iApply "HΦ".
-  Qed.
-
-  Lemma file_links_holds
-      (Hcons : @riscv_cons_res Σ (@riscv_fixedGS Σ HRg) = fecl g) :
-    ⊢ file_links.
-  Proof using . by iPureIntro. Qed.
 End file_links_bundle.

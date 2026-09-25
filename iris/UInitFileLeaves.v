@@ -57,7 +57,7 @@ Require Import FileOut.
 Require Import FileLinks.
 Require Import FileLinksLine.
 Require Import LinkRec.
-Require Import FileLinksAt.        (* [f0pre_at] *)
+Require Import FileLinkGen.        (* [f0pre_at] *)
 Require Import GenLinksLine.
 Require Import UkRun.
 Require Import UkWriteClosed.      (* [kinit_w1_of_closed_l0] *)
@@ -127,7 +127,7 @@ Section UInitFileLeaves.
   Lemma file_f0pre_at_of_bw (s0 : fstate) (s : dst) :
     FileLinksLine.f0bw g (S gen_id) s0 -∗ boot_at s0 s -∗ f0pre_at g s0.
   Proof using .
-    iIntros "#Hbw Hb". rewrite /FileLinksAt.f0pre_at.
+    iIntros "#Hbw Hb". rewrite /FileLinkGen.f0pre_at.
     iDestruct "Hb" as "[[-> Hty] | [-> #HT]]".
     - destruct s as [[i bs] | ];
         cbn [dst_content fmap option_fmap option_map].

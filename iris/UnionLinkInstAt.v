@@ -5,7 +5,7 @@
 (*                                                                        *)
 (*  [UnionLinkInst.union_link_inst] with the writer's witness pinned to   *)
 (*  the era's boot state [s0] -- [FileLinkGen.f0w_at] -- and the head at  *)
-(*  that state -- [FileLinksAt.fhead_at]: RULING H' of the file round     *)
+(*  that state -- [FileLinkGen.fhead_at]: RULING H' of the file round     *)
 (*  ([FileLinkGen.file_link_gen_at]), at the union model.  The shell's    *)
 (*  round names [s0] and ties the deed to it by a SHARED INDEX, so every  *)
 (*  block the record hands back is at [s0] structurally.                   *)
@@ -40,7 +40,6 @@ Require Import FileDisc.
 Require Import AppFile.
 Require Import FileOut.
 Require Import FileLinksLine.
-Require Import FileLinksAt.       (* [fhead_at], [f0pre_at], [fturn_pre_at] *)
 Require Import FileLinkGen.       (* [f0w_at], [fhead_at_boot], [fhead_at_cur] *)
 Require Import PipeOut.
 Require Import ProgTree.
