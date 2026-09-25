@@ -87,6 +87,23 @@ Old dumps for the tools: `$SCRATCH/old/OldKernelInstrs.v`,
 6. Commit by explicit path; update `xv6-bump-playbook.md` with anything
    this bump taught; a `completed/xv6-bump-a083670.md` narrative.
 
+STATUS, Lane K2 (merge of origin/main W2/W3, 2026-09-25): `origin/main`
+6d48ce9d0 (filenames W2/W3) merged into secc/bump as 19ddc4d12 (a merge
+commit; nothing under kernel-rocq/ or user-rocq/ moved).  Five files
+conflicted, all resolved by carrying BOTH sides: UShCatFStage,
+UkCatFEntries, UkUnionEntries (image_entry at `ProcDefs.secc_all` AND
+W3's name/map arguments; echo's file entry keeps `%Hscw` and W3's
+`efany_of .. nm s`), UkFileOpen (six `uvis_of_run .. false secc_all`
+with W3's per-name family arguments), UkShRedirPaid (W3's general-name
+diagnostic windows at the bumped sh's format address 0x12c8, including
+W3's two new lemmas that auto-merged at the pre-bump 0x12b8).  No
+design question arose; no semantic fallout outside the conflicts.
+vmbuild k4r1: COMPILED=100, EXIT=0, zero `Error`, `make -n` 0 compiles
+left.  Audits (/tmp/k4audit.log on the VM): system 13, union 14, tree
+13, textually the baseline and identical to /tmp/k3audit.log.
+`gen-ucode` on the VM: all nine UCode*.v unchanged (md5).  Local
+`make check-decode`: passes.
+
 ## Lane U -- the user tier (design §0, §4 last bullet)
 
 1. `make gen-ucode` on the VM against the OLD build (the remote tree's
