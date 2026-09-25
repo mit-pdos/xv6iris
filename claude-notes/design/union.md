@@ -65,6 +65,13 @@ created and read by the user's lines, and NOT the image's binaries.
 ORDER (owner, same day): 'let's land the union app first. then we'll go
 broaden it to *.txt or something.' -- the union lands at the one name
 `f` (`adm_u_f`); the widening is the NEXT effort after C9h;
+SEAMS for the later widening (design/filenames.md §5; they change no
+landed statement): (a) C9e-dec states its canonicalisation through a
+`line_file : uline -> option fname` and two name-locality lemmas, even
+at one name; (b) C9d' gives `UDFile`/`UDIn` a name field pinned to
+`fname_f`; (c) C9d'/C9f state the scope, `stage_catf` and the catf entry
+over a `uname` definition that is `(= fname_f)` for now; (d) C9f states
+argv/diagnostic byte facts positionally over `|g|`, never `ua_len = 1`;
 also AFTER the union (owner, same day): 'add support for grep into the
 pipeline' -- grep as a pipe stage (the first non-cat filter: its output
 is a function of its input, so the copy device generalises to a FILTER

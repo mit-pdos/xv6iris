@@ -299,6 +299,12 @@ in `durable-notes.md` for what belongs where and what gets deleted.
   long for its buffer is skipped, and the walks down to the entry
   `wp_kgrep_start_tree` — the recursion's pattern-dependent stack.
 
+- **[`filenames.md`](design/filenames.md)** — WIDENING THE FILE MODEL
+  to a class of user files such as `*.txt` (deferred until the union
+  lands): an abstract name class with five laws, the state as a map, one
+  deed over the map, no kernel-row purchase, cuts W0-W4, and four seams
+  applied during the union cuts.
+
 - **[`contexts.md`](design/contexts.md)** — CONTEXTS (`TsoCtx.v`): the three
   tokens (running, stamped, parked under a context), the one domination
   relation and its four mints, `CtxMorph` as the only transport class with
