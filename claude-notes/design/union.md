@@ -25,7 +25,12 @@ two-stage corner).  OPEN (C9b2): `lm_hooks (ulm adm)` cannot be built as
 designed -- at an echo pipeline the exec alternative `UP (PLRun
 dg_execL)` is state-DEPENDENT at `cat f | cat` (f may hold those bytes),
 so it cannot be free (`no_free_execL`); FIX (b): split `UP` by producer
-(`UPE`/`UPC`), since an echo pipeline's admission reads no state.
+(`UPE`/`UPC`), since an echo pipeline's admission reads no state.  C9b2
+LANDED (17cc9177c, VM c9b2merge2, audits 13/13/14/14): `ualt := UR | UPE
+| UPC`, `uok_echo_st` (an echo pipeline's admission is state-independent),
+`ufree` (every non-terminal `UPE`; at `UPC` only `PLPanic`, `PLRun []`,
+`PLRun dg_execR`), `ulm_hooks adm : lm_hooks (ulm adm)` with every field
+proved, `ulmU_hooks`.
 
 ## Review amendments (override the plan below)
 
