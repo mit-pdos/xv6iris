@@ -5,6 +5,16 @@ Opened 2026-09-25.  Read `xv6-bump-playbook.md` before lane K or U.
 
 ## RESUME HERE
 
+OWNER'S CHECKPOINTS (2026-09-25): (1) a CLEAN BUMP to upstream `verified`
+7b2c1b1, the whole tree green, audits 13/13/14, `check-decode`,
+`check-ucode`, `vtest-check-ci`; `sys_seccomp` and `syscall()` at the
+modest specs of design section 4 (a blocked call is the unknown-number
+call; sys_seccomp ands the mask and returns 0); the seccomp user program
+DUMPED AND CATALOGUED BUT NOT VERIFIED and not in the union app -- that
+is lanes K + U merged, committed and PUSHED TO main.  (2) then the
+theorem: lane M's model, the universe slot (S1), the claim arm (S2), the
+seccomp program (S3), the round and the knob (S4).
+
 - Lane K (kernel bump + the mask in the contracts): IN FLIGHT in
   `/shared/xv6iris-3` (branch `main`, uncommitted: Makefile pin,
   kernel-rocq/ + user-rocq/ dumps, iris/Code*.v + KernelDecode*.v
