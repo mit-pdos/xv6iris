@@ -924,3 +924,7 @@ import Xv6.ProofFilewrite
 import Xv6.LinkFilewrite
 import Xv6.KexecB
 import Xv6.KexecACode
+import Xv6.SpecSafestrcpySrc
+import Xv6.ProofSafestrcpySrc
+import Xv6.LinkSafestrcpySrc
+import Xv6.KexecD
