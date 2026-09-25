@@ -1084,3 +1084,9 @@ import Xv6.FsBoot
 import Xv6.FsDurSnapBytes
 import Xv6.FsDurSnap
 import Xv6.FsDurImg
+import Xv6.SpecUserret
+import Xv6.UserretDefs
+import Xv6.UserretEntryPt
+import Xv6.UserretPt
+import Xv6.ProofUserret
+import Xv6.LinkUserret
