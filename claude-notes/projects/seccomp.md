@@ -32,11 +32,11 @@ WHERE THINGS ARE (verify with the commands; do not trust this text over
   To be MERGED into secc/bump when K's kernel tier is green (`git merge
   secc/user` in /shared/xv6iris-3; then TreeImg.v's `<=? 22` -> 23 if K
   has not done it).
-- Branch `secc/model`, worktree `/shared/xv6iris-3-lanes/secc-model`
-  (from 92cd62067, the OLD pin): LANE M in flight (design section 3;
-  status line below); its VM tree is
+- Branch `secc/model`, worktree `/shared/xv6iris-3-lanes/secc-model`:
+  LANE M DONE, rebased onto f347775c7 (new pin, W4), green, audits
+  13/13/14 (status under "Lane M" below); its VM tree is
   /mnt/rocq/trees/_shared_xv6iris-3-lanes_secc-model.  NOT part of
-  checkpoint 1; rebase onto main after the push.
+  checkpoint 1; merge after it.
 - Old dumps for the relayout tools: `git show 92cd62067:kernel-rocq/
   KernelSyms.v` etc. (the scratchpad copies die with the session);
   `RELAYOUT_OLD_REV=92cd62067`.
@@ -148,7 +148,57 @@ range (lines 27/206/213) is the same fs.img-count class and is K's.
 
 ## Lane M -- the pure model (design §3)
 
-Worktree at the OLD pin, so the tree is green underneath.
+STATUS: ALL FIVE ITEMS LANDED on `secc/model`, REBASED onto f347775c7
+(the 7b2c1b1 kernel bump merged with filenames W2-W4).  Along the way:
+at W3 one conflict (`UShUPipes`' catf gate took `adm_s_off`); at W4 six
+(`FileDisc`: the constructor-generic `uline_ws_body` with W4's
+`cat_words_N` arm, `uline_nopipe_cat` with `exact Hok`, `lname_fn` at
+five arms; `PipesDisc`: `psbyte` with the line-indexed merge; `UkSh`: the
+generic cat head under `right; left`; `UnionDisc`: the knob definitions
+before `ubyte`, the byte law's `psbyte` cases plus the seccomp arm;
+`UnionDecU`: `umerge_p`; `UnionDiscDec`: W4's demos, then the seccomp
+demos at `a.txt`); at f347775c7 only this notes file (lane K's
+`UShURound`/`UkUnionEntries` mask threading merged cleanly; no lane M
+edit names a user-image address).  VM: the mirror re-seeded from
+`_shared_xv6iris-3` (k5r1), the 31 differing files' cone rebuilt,
+`seccm4-r1` EXIT=0, no `Error`, second pass 0 compiles; audits
+`seccm4-audit` system 13 / tree 13 / union 14, textually `seccm3`'s and
+`seccm2`'s.  OWNER QUESTION: seccomp words stay alphanumeric (section 3),
+so `seccomp rm a.txt` is not a line (`demo_secc_nodot`) and the demo runs
+`echo hi > a.txt`, `seccomp rm a`, power cycle, `cat a.txt`; widen the
+tail to `fn_wf` (W4's argv precedent)?
+
+What differs from design §3, for the owner:
+
+- `uok s (LSecc ws) (US u)` is `u <> []`, not any `u`: the hook law
+  `LineModelLinks.lmh_cont_nonnil` (every admitted continuation is
+  nonempty -- the writer stream's block-head reasoning, and the pipeline's
+  terminal blocks are nonempty for the same reason) quantifies over every
+  admitted alternative.  The claim is a prefix of the transcript, so a
+  wire showing nothing after the echo is still a prefix of `US u`; the
+  decider's canonical witness is `US us0`, `us0 = [wl_nl]`, not `US []`.
+- `FileDisc.parse_line` is UNTOUCHED (the `LPipe` precedent): the union
+  reads a seccomp body through `FileDisc.secc_parse` in
+  `UnionDisc.uline_of_u`'s fallback; `uline_nopipe` (the guard of
+  `parse_line`'s range) now excludes `LSecc` too.  Extending `parse_line`
+  would have put seccomp lines into the file model's `fbody_ok`, where no
+  knob refutes them.
+- `secc_ok ws` ("the words are ok") is `wl_wf ws`, `ws <> []`, sh's MAXARGS
+  (`S (length ws) < 10`) and the line buffer, `line_ok`'s shape.
+- The exec failure at a seccomp line is a NEW `ralt`, `RSExec`
+  (`exec seccomp failed`, code 17); the fork panic and the silent round
+  reuse `RCFork`/`RCSilent` (their bytes name no command).
+- The knob: `ulm adm adm_s`, `lm_line_ok := uline_okU adm_s` (`uline_ok`
+  and `usecc_adm`), `ubody_ok adm adm_s := fbody_ok \/ upipe_ok \/
+  usecc_ok`; `ulmG := ulm adm_u_g adm_s_off`.  The sh tier's admitted-line
+  predicate `UShURound.ush_line_union` is `False` at `LSecc` (flip it with
+  the knob at S4).  `umerge` = `True` at `LSecc`, `umerge_p` elsewhere.
+- The decider is generic in the knob (`UnionDecU.u_seg_at` canonicalises
+  `US u` to `US us0`; `u_canon_name` keeps D4 at an unchecked seccomp
+  line), so the knob-on decider `lm_disc_ulmS_dec` is DONE.
+- Codes: `ualt_code (US u) = 4 * encode_nat u + 3` is astronomically large
+  for any real `u` -- never let a conversion reduce a code (the demos read
+  codes back with `ualt_dec_code`).
 
 1. `LineModel.lm_merge` line-indexed; port `lml_term_merge`,
    `lml_merge_prefix`, `lm_d4`, the determinacy section, `GenOut`,
