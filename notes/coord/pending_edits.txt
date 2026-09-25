@@ -48,3 +48,4 @@
   (e) DECIDED (follow Rocq SpecKernelvec.v:125, KERNELVEC ∀ pd pav pu): Lean's EnvIs/KERNELVEC fix the disk pages at era-instance build, but virtio_disk_init picks them by kalloc → make the handler spec ∀-quantified over pd/pav/pu (Rocq form), so main installs the handler at the pages virtio_disk_init chose. Do before W8-N.
   (f) W8-N: retire DISK_INIT_WM; mint the userret trampoline claim kmapAt trampVpn.
   (g) move MainSecondarySpin's mainSec_wp_s_lw_aur / fence r,rw rules into MachCSL/WpSmodeFenceFloor.lean.
+- DONE (writei/pipewrite reasons): wrFailWhy, awriteChainAt, pipeWpostR. OPEN from Rocq main (for the drift audit): PipeQueue byte queue not ported (pipe arm: no chain/read-shut/kill shot/taint); pipewrite doesn't pin the write end (w = true); FsAbsWriteFire dev 7: wchunk_at (RELAY 3), partial arm's short-chunk/single-block conjuncts + awrite_part_at_mapped_single (RELAY 4), off_ret, awrite_*_adv / filewrite_in_held / wr_tb.
