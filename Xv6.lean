@@ -879,3 +879,13 @@ import Xv6.NamexEraElem
 import Xv6.NamexEraLoop
 import Xv6.NamexEraStart
 import Xv6.ProofNamexEra
+import Xv6.ProofNparEra
+import Xv6.ProofNameiEra
+import Xv6.ProofNparWrapEra
+import Xv6.LinkNamexEra
+import Xv6.LinkNparEra
+import Xv6.LinkNameiEra
+import Xv6.LinkNparWrapEra
+import Xv6.SpecCreate
+import Xv6.CreateSharedRegs
+import Xv6.CreateSharedBody
