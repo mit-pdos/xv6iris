@@ -43,7 +43,7 @@ theorem kernelvec_br_ffffffffffffd120 : KA.«kernelvec» + 0xffffffffffffd120#64
 set_option maxHeartbeats 8000000 in
 /-- **`kernelvec` meets the handler contract**, given `kerneltrap`. -/
 theorem kernelvec_proof (KT : KERNELTRAP) : KERNELVEC :=
-  ⟨fun {hlc GF} _ _ _ Γ γ0 γ1 γc γl0 γl1 γd γdl γt pd pav pu bs _ _ cpu₀ => by
+  ⟨fun {hlc GF} _ _ _ _ _ _ Γ γ0 γ1 γc γl0 γl1 γd γdl γt pd pav pu bs _ _ cpu₀ => by
   suffices h : ⊢@{IProp GF} ∀ cpu : CPU, ihs ⟨cpu, kernelvecAddr⟩ by
     exact h.trans (by iintro H; iapply H $$ %cpu₀)
   iintro

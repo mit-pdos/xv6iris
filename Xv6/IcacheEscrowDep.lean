@@ -196,7 +196,7 @@ for that map is EMPTY -- neither window can be standing.  NO NAMED LEMMA:
 the consumers open the pin's existential and call `txPin_noOps`. -/
 
 section Pin
-variable {GF : BundledGFunctors} [IcacheG GF] [Xv6G GF] [LogG GF]
+variable {GF : BundledGFunctors} [IcacheG GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [LogG GF]
 
 /-- The slot is in NEITHER of iput's two windows (Rocq's `ic_pin_rest`). -/
 def icPinRest [Icfg] (k : Nat) : IProp GF := hpnFull k none
@@ -273,7 +273,7 @@ def icDepSideTx (d : IcDep) : Option (Nat × Qp) :=
   | _ => none
 
 section Side
-variable {GF : BundledGFunctors} [Xv6G GF] [LogG GF]
+variable {GF : BundledGFunctors} [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [LogG GF]
 
 /-- Rocq's `ic_dep_side`. -/
 def icDepSide [Icfg] (d : IcDep) : IProp GF := txPinO icfgLog (icDepSideTx d)

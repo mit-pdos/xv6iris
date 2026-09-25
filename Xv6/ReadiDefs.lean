@@ -34,7 +34,7 @@ set_option linter.unusedSimpArgs false
 set_option linter.unusedVariables false
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [CurCtx]
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CurCtx]
 
 /-! ## The destination -/
 
@@ -108,7 +108,7 @@ end
 /-! ## The callees, at their call sites -/
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [CurCtx]
 
 set_option maxHeartbeats 1000000 in
@@ -137,7 +137,7 @@ theorem rd_bmap (BM : BMAP_NOALLOC) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF �
     wordPointsTo (iDev ip) 4 dqd dev ∗
     inodeMapQ γfs dq ip bm ∗ inodeBlocksQ γfs dq bm data ∗
     wordPointsTo (pPid pj) 4 dqp pidv ∗
-    bslot γb ∗
+    bslot ∗
     wpNext true pj c (fun cpu' => iprop(∀ (spie spp : Bool) (R' : RegMap),
       ⌜calleeSaved k'.regs R'⌝ -∗
       ⌜R' 10#5 = BitVec.signExtend 64 (blkmapGet bm fbn)⌝ -∗
@@ -146,7 +146,7 @@ theorem rd_bmap (BM : BMAP_NOALLOC) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF �
       wordPointsTo (pPid pj) 4 dqp pidv -∗
       wordPointsTo (iDev ip) 4 dqd dev -∗
       inodeMapQ γfs dq ip bm -∗ inodeBlocksQ γfs dq bm data -∗
-      bslot γb -∗ wpLoop cpu'))
+      bslot -∗ wpLoop cpu'))
     ⊢ wpLoop (GF := GF) c := by
   subst hpj hs
   have h := BM.wp_bmap_noalloc_eb (hlc := hlc) (GF := GF) Γ c k' γl γb V γdl pd pav pu j γfs
@@ -160,7 +160,7 @@ end
 
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [CurCtx]
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CurCtx]
 
 set_option maxHeartbeats 4000000 in
 /-- **THE COPY** (`jal either_copyout` at `+0x60`), on both arms: the
@@ -266,7 +266,7 @@ end
 /-! ## The buffer, the block, the agreement -/
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [BcacheG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [BcacheG GF]
   [DiskG GF] [FsBlocksG GF] [SleepLockG GF] [CurCtx]
 
 /-- Rocq's `rd_buf_win_acc` (+ `rd_held_swap`): the `m`-byte window at

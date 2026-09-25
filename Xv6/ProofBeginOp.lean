@@ -323,7 +323,7 @@ theorem bo_calleeSaved_epi (KR R : RegMap)
 /-! ## Opening and re-closing the log lock's payload -/
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF]
 variable [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [CurCtx]
 
 /-- Rocq `bo_batch_lhn`: the batch, opened just for its `lh.n` cell. -/
@@ -1493,7 +1493,7 @@ set_option maxHeartbeats 16000000 in
 /-- **`begin_op` meets its specification**, at either entry `SIE`. -/
 theorem beginOp_proof (SP : SLEEP_PREPARE) (AC : ACQUIRE) (RE : RELEASE) (SL : SLEEP) :
     BEGIN_OP := ⟨
-  fun {hlc GF} _ _ _ _ _ _ _ _ Γ _ cpu k γ γb V γfs j logstart dev pidv dqp
+  fun {hlc GF} _ _ _ _ _ _ _ _ _ _ _ Γ _ cpu k γ γb V γfs j logstart dev pidv dqp
     hj hproc hK hnoff htier => by
   unfold wp_begin_op_eb_body
   simp only [beginOpAddr]

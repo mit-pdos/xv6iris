@@ -134,7 +134,7 @@ set_option linter.unusedSectionVars false
 
 section IcacheBoxSites
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [IcacheG GF] [LogG GF]
-  [FsBlocksG GF] [IregG GF] [FsTopG GF] [FsLinkG GF] [Xv6G GF] [IcboxG GF]
+  [FsBlocksG GF] [IregG GF] [FsTopG GF] [FsLinkG GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [IcboxG GF]
 
 /-- iget's RECYCLE, part 1 -- (a) at `c = 0` on a DEAD slot: the raw header
 comes out, its shape known from the identity (M-1').  F38: the OUT_L1

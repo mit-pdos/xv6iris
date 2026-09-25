@@ -167,7 +167,7 @@ theorem fc_next_shift {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] (k :
   wpNext_shift true k.proc cpu c K (fun h => hpin (h.elim (fun e => absurd e (by decide)) Or.inr))
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
   [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF]
   [Appcfg GF] [FileG GF]
@@ -354,7 +354,7 @@ theorem fc_iput [Fscfg] [Icfg] [CurCtx] (IP : IPUT) (Γ : SchedNames)
     wordPointsTo sbInodestart 4 dqs (BitVec.ofNat 32 icfgIst) ∗
     bitmapInv fscFs fscBmapstart fscCov fscLogst fscSize ∗
     wordPointsTo (pPid k'.proc) 4 dqp pidv ∗
-    bslots fscBio 3 ∗
+    bslots 3 ∗
     logOp icfgLog n ∗
     wpNext true k'.proc c (fun cpu' => iprop(∀ (spie spp : Bool) (R' : RegMap) (n' : Nat),
       ⌜calleeSaved k'.regs R'⌝ -∗
@@ -363,7 +363,7 @@ theorem fc_iput [Fscfg] [Icfg] [CurCtx] (IP : IPUT) (Γ : SchedNames)
       wordPointsTo (pPid k'.proc) 4 dqp pidv -∗
       wordPointsTo sbBmapstartAddr 4 dqb (BitVec.ofNat 32 fscBmapstart) -∗
       wordPointsTo sbInodestart 4 dqs (BitVec.ofNat 32 icfgIst) -∗
-      bslots fscBio 3 -∗
+      bslots 3 -∗
       ⌜n - iputUnits ≤ n' ∧ n' ≤ n⌝ -∗
       logOp icfgLog n' -∗
       irefSlot -∗ wpLoop cpu'))
@@ -418,14 +418,14 @@ theorem fc_exit [Fscfg] [Icfg] [CurCtx] (cr : CPU) (k : KCtx) (γ : FileNames) (
     kctx cr (((k.withSpie spie spp).pushed 8).withRegs R) ∗ pcIs cr (KA.«fileclose» + 0x8e#64) ∗
     frame8s1 (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) (k.regs 9#5) ∗
     trapCsrsExt cr k.sie ∗ cpuClaimExt cr k.sie k.proc ∗
-    wordPointsTo (pPid k.proc) 4 dqp pidv ∗ fdSlot γ ∗ irefSlot ∗
+    wordPointsTo (pPid k.proc) 4 dqp pidv ∗ fdSlot ∗ irefSlot ∗
     filecloseEnvOut (GF := GF) γk on st ∗
     wpNext true k.proc cr (fun cpu' => iprop(∀ (spie spp : Bool) (R' : RegMap),
       ⌜calleeSaved k.regs R'⌝ -∗
       kctx cpu' ((k.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k.regs 1#5)) -∗
       trapCsrsExt cpu' k.sie -∗ cpuClaimExt cpu' k.sie k.proc -∗
       wordPointsTo (pPid k.proc) 4 dqp pidv -∗
-      fdSlot γ -∗ irefSlot -∗ filecloseEnvOut γk on st -∗ wpLoop cpu'))
+      fdSlot -∗ irefSlot -∗ filecloseEnvOut γk on st -∗ wpLoop cpu'))
     ⊢ wpLoop (GF := GF) cr := by
   obtain ⟨p18, p19, p20, p21, p22, p23, p24, p25, p26, p27⟩ := hpins
   iintro ⟨Hk, Hpc, Hframe, Hte, Hce, Hpid, Hfd, Hir, Hout, Hnext⟩

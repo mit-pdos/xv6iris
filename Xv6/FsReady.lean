@@ -165,7 +165,7 @@ theorem FsGeomOk.iblockOut [Fscfg] [Icfg] (h : FsGeomOk) (inum : BitVec 32)
   (h.fgoIreg inum hi).2
 
 section FsReady
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
   [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [Appcfg GF]
 

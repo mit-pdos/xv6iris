@@ -37,7 +37,7 @@ theorem ba_sraiw13_0 : BitVec.signExtend 64 ((BitVec.extractLsb' 0 32 (0#64)).ss
 theorem ba_ret_ac : jumpPc (KA.«balloc» + 0xac#64) = KA.«balloc» + 0xac#64 := by decide
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [CurCtx]
 
 set_option maxHeartbeats 8000000 in
@@ -70,7 +70,7 @@ theorem ba_after_bread (BR : BREAD) (LW : LOG_WRITE) (BE : BRELSE) (MS : MEMSET)
     wordPointsTo (pPid k.proc) 4 dqp pidv ∗
     wordPointsTo sbSizeAddr 4 dqs (BitVec.ofNat 32 size) ∗
     wordPointsTo sbBmapstartAddr 4 dqb (BitVec.ofNat 32 bmapstart) ∗
-    bslot γb ∗ logOpS γ (2 + u) Sb ∗
+    bslot ∗ logOpS γ (2 + u) Sb ∗
     bioLocked γb V kk pidv dev (BitVec.ofNat 32 bmapstart) bs bsd d ∗
     baCont k c0 γ γb γfs V.cov logstart bmapstart size u cr Sb pidv dqp dqb dqs
     ⊢ wpLoop (GF := GF) cpu := by
@@ -158,7 +158,7 @@ theorem ba_setup (BR : BREAD) (LW : LOG_WRITE) (BE : BRELSE) (MS : MEMSET) (PK :
     wordPointsTo sbSizeAddr 4 dqs (BitVec.ofNat 32 size) ∗
     wordPointsTo sbBmapstartAddr 4 dqb (BitVec.ofNat 32 bmapstart) ∗
     bitmapInv γfs bmapstart V.cov logstart size ∗
-    bslots γb 2 ∗ logOpS γ (2 + u) Sb ∗
+    bslots 2 ∗ logOpS γ (2 + u) Sb ∗
     baCont k c0 γ γb γfs V.cov logstart bmapstart size u cr Sb pidv dqp dqb dqs ∗
     baFrameK k
     ⊢ wpLoop (GF := GF) cpu := by
@@ -288,7 +288,7 @@ theorem ba_saves (BR : BREAD) (LW : LOG_WRITE) (BE : BRELSE) (MS : MEMSET) (PK :
     wordPointsTo sbSizeAddr 4 dqs (BitVec.ofNat 32 size) ∗
     wordPointsTo sbBmapstartAddr 4 dqb (BitVec.ofNat 32 bmapstart) ∗
     bitmapInv γfs bmapstart V.cov logstart size ∗
-    bslots γb 2 ∗ logOpS γ (2 + u) Sb ∗
+    bslots 2 ∗ logOpS γ (2 + u) Sb ∗
     baCont k c0 γ γb γfs V.cov logstart bmapstart size u cr Sb pidv dqp dqb dqs ∗
     baFrame (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) (k.regs 9#5) w3 w4 w5 w6 w7 w8 w9
     ⊢ wpLoop (GF := GF) cpu := by

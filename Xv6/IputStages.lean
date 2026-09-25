@@ -17,7 +17,7 @@ set_option linter.unusedVariables false
 
 /-- The statement of `IputTailNeSpec` (see the stage file). -/
 def IputTailNeSpec : Prop :=
-  ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
+  ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
     [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
     [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF]
     [Appcfg GF] [Fscfg] [Icfg] [CurCtx]
@@ -48,7 +48,7 @@ def IputTailNeSpec : Prop :=
 
 /-- The statement of `IputTailOneSpec` (see the stage file). -/
 def IputTailOneSpec : Prop :=
-  ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
+  ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
     [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
     [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF]
     [Appcfg GF] [Fscfg] [Icfg] [CurCtx]
@@ -83,7 +83,7 @@ def IputTailOneSpec : Prop :=
 
 /-- The statement of `IputOfflockSpec` (see the stage file). -/
 def IputOfflockSpec : Prop :=
-  ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
+  ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
     [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
     [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF]
     [Appcfg GF] [Fscfg] [Icfg] [CurCtx]
@@ -115,7 +115,7 @@ def IputOfflockSpec : Prop :=
     wordPointsTo (pPid k.proc) 4 dqp pidv ∗
     wordPointsTo sbBmapstartAddr 4 dqb (BitVec.ofNat 32 fscBmapstart) ∗
     wordPointsTo sbInodestart 4 dqs (BitVec.ofNat 32 icfgIst) ∗
-    bslots fscBio 3 ∗ logOpSe icfgLog (u + 1) Sb1 e0 ∗ irefSlot ∗
+    bslots 3 ∗ logOpSe icfgLog (u + 1) Sb1 e0 ∗ irefSlot ∗
     iputFrame6 (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) (k.regs 9#5) (k.regs 18#5)
       (k.regs 19#5) (k.regs 20#5) ∗
     iputPost k n Sb crb cru crz tid qtx pidv dqp dqb dqs rgb
@@ -123,7 +123,7 @@ def IputOfflockSpec : Prop :=
 
 /-- The statement of `IputLockedSpec` (see the stage file). -/
 def IputLockedSpec : Prop :=
-  ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
+  ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
     [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
     [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF]
     [Appcfg GF] [Fscfg] [Icfg] [CurCtx]
@@ -193,7 +193,7 @@ def IputLockedSpec : Prop :=
     wordPointsTo (pPid k.proc) 4 dqp pidv ∗
     wordPointsTo sbBmapstartAddr 4 dqb (BitVec.ofNat 32 fscBmapstart) ∗
     wordPointsTo sbInodestart 4 dqs (BitVec.ofNat 32 icfgIst) ∗
-    bslots fscBio 3 ∗
+    bslots 3 ∗
     iputFrame6 (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) (k.regs 9#5) (k.regs 18#5)
       (k.regs 19#5) (k.regs 20#5) ∗
     iputPost k n Sb crb cru crz tid qtx pidv dqp dqb dqs rgb
@@ -201,7 +201,7 @@ def IputLockedSpec : Prop :=
 
 /-- The statement of `IputEntrySpec` (see the stage file). -/
 def IputEntrySpec : Prop :=
-  ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
+  ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
     [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
     [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF]
     [Appcfg GF] [Fscfg] [Icfg] [CurCtx]
@@ -243,7 +243,7 @@ def IputEntrySpec : Prop :=
     wordPointsTo (pPid k.proc) 4 dqp pidv ∗
     wordPointsTo sbBmapstartAddr 4 dqb (BitVec.ofNat 32 fscBmapstart) ∗
     wordPointsTo sbInodestart 4 dqs (BitVec.ofNat 32 icfgIst) ∗
-    bslots fscBio 3 ∗
+    bslots 3 ∗
     frame6s1 (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) (k.regs 9#5) ∗
     iputPost k n Sb crb cru crz tid qtx pidv dqp dqb dqs rgb
     ⊢ wpLoop (GF := GF) c

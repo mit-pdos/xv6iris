@@ -140,7 +140,7 @@ def ireclaimLoopRegs [Icfg] (k : KCtx) (n : Nat) (R : RegMap) : Prop :=
 /-! ## The environment, the continuation, the loop's resources -/
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
   [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF]
   [Appcfg GF]
@@ -175,7 +175,7 @@ def ireclaimCont [Fscfg] [Icfg] [CurCtx] (k : KCtx) (pidv : BitVec 32)
     wordPointsTo sbInodestart 4 dqs (BitVec.ofNat 32 icfgIst) -∗
     wordPointsTo sbBmapstartAddr 4 dqb (BitVec.ofNat 32 fscBmapstart) -∗
     wordPointsTo (pPid k.proc) 4 dqp pidv -∗
-    bslots fscBio 3 -∗
+    bslots 3 -∗
     irefSlot -∗
     iregBoot -∗ wpLoop cpu')
 
@@ -191,7 +191,7 @@ theorem ireclaim_cont_of_spec [Fscfg] [Icfg] [CurCtx] {j : Nat} (hj : j < NPROC)
       wordPointsTo sbInodestart 4 dqs (BitVec.ofNat 32 icfgIst) -∗
       wordPointsTo sbBmapstartAddr 4 dqb (BitVec.ofNat 32 fscBmapstart) -∗
       wordPointsTo (pPid k.proc) 4 dqp pidv -∗
-      bslots fscBio 3 -∗
+      bslots 3 -∗
       irefSlot -∗
       iregBoot -∗ wpLoop cpu'))
     ⊢ ireclaimCont (GF := GF) k pidv dqp dqb dqs dqn := by
@@ -219,14 +219,14 @@ def ireclaimLoopPre [Fscfg] [Icfg] [CurCtx] (Γ : SchedNames) (c : CPU) (k : KCt
     (pidv : BitVec 32) (dqp dqb dqs dqn : DFrac) : IProp GF := iprop%
   kctx c (((k.withSpie spie spp).pushed 8).withRegs R) ∗ pcIs c (KA.«ireclaim» + 0x7c#64) ∗
   ireclaimEnv (hlc := hlc) Γ γl pd pav pu ∗ ireclaimTurn c k pidv dqp dqb dqs dqn ∗
-  bslots fscBio 3 ∗ irefSlot ∗ iregBoot
+  bslots 3 ∗ irefSlot ∗ iregBoot
 
 end
 
 /-! ## The callees, at their call sites -/
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
   [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF]
   [Appcfg GF]
@@ -383,7 +383,7 @@ theorem ireclaim_ilock [Fscfg] [Icfg] [CurCtx] (IL : ILOCK) (Γ : SchedNames)
     iregWdLic o g inum.toNat ∗
     wordPointsTo sbInodestart 4 dqs (BitVec.ofNat 32 icfgIst) ∗
     wordPointsTo (pPid k'.proc) 4 dqp pidv ∗
-    bslot fscBio ∗
+    bslot ∗
     logTx icfgLog ∗
     topLb Tl ∗
     wpNext true k'.proc c (ilockPostTxEb k' γisl kk s g lo o inum pidv dqp dqs Tl)
@@ -467,7 +467,7 @@ theorem ireclaim_iput [Fscfg] [Icfg] [CurCtx] (IP : IPUT) (Γ : SchedNames)
     wordPointsTo sbInodestart 4 dqs (BitVec.ofNat 32 icfgIst) ∗
     bitmapInv fscFs fscBmapstart fscCov fscLogst fscSize ∗
     wordPointsTo (pPid k'.proc) 4 dqp pidv ∗
-    bslots fscBio 3 ∗
+    bslots 3 ∗
     logOpSe icfgLog n Sb e0 ∗ txPin icfgLog tid qtx ∗
     wpNext true k'.proc c (fun cpu' => iprop(∀ (spie spp : Bool) (R' : RegMap) (n' : Nat)
         (Sb' : List Nat) (w : Bool),
@@ -477,7 +477,7 @@ theorem ireclaim_iput [Fscfg] [Icfg] [CurCtx] (IP : IPUT) (Γ : SchedNames)
       wordPointsTo (pPid k'.proc) 4 dqp pidv -∗
       wordPointsTo sbBmapstartAddr 4 dqb (BitVec.ofNat 32 fscBmapstart) -∗
       wordPointsTo sbInodestart 4 dqs (BitVec.ofNat 32 icfgIst) -∗
-      bslots fscBio 3 -∗
+      bslots 3 -∗
       logOpS icfgLog n' Sb' -∗
       txPin icfgLog tid qtx -∗
       irefSlot -∗
@@ -506,14 +506,14 @@ end
 /-! ## Slot units -/
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF]
   [BcacheG GF] [DiskG GF] [CurCtx]
 
-theorem ireclaim_slots_join3 (γ : BcacheNames) : bslot (GF := GF) γ ∗ bslots γ 2 ⊢ bslots γ 3 :=
-  bslots_cons γ 2
+theorem ireclaim_slots_join3 (γ : BcacheNames) : bslot (GF := GF) ∗ bslots 2 ⊢ bslots 3 :=
+  bslots_cons 2
 
-theorem ireclaim_slots_split3 (γ : BcacheNames) : bslots (GF := GF) γ 3 ⊢ bslot γ ∗ bslots γ 2 :=
-  bslots_uncons γ 2
+theorem ireclaim_slots_split3 (γ : BcacheNames) : bslots (GF := GF) 3 ⊢ bslot ∗ bslots 2 :=
+  bslots_uncons 2
 
 end
 

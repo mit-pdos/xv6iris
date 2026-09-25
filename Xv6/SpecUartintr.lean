@@ -40,7 +40,7 @@ def uartintrAddr : BitVec 64 := KA.«uartintr»
 def uartintrSlots : Nat := 4 + consoleintrSlots
 
 /-- **WP of `uartintr`.**  `a0` the port index. -/
-def wp_uartintr_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [CurCtx]
+def wp_uartintr_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CurCtx]
     (Γ : SchedNames) (cpu : CPU) (k : KCtx) (i : UartId) (γc γl : GName) (γ : UartNames)
     (kp : Nat) (bs : List (BitVec 8))
     (hsie : k.sie = false) (hnoff : k.noff + 2 < 2 ^ 31) (hK : uartintrSlots ≤ k.avail)
@@ -55,7 +55,7 @@ def wp_uartintr_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G
 
 /-- The interface of `uartintr`. -/
 structure UARTINTR : Prop where
-  wp_uartintr : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [CurCtx]
+  wp_uartintr : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CurCtx]
     (Γ : SchedNames) (cpu : CPU) (k : KCtx) (i : UartId) (γc γl : GName) (γ : UartNames)
     (kp : Nat) (bs : List (BitVec 8)) hsie hnoff hK hlk htier hid,
     wp_uartintr_body (hlc := hlc) (GF := GF) Γ cpu k i γc γl γ kp bs hsie hnoff hK hlk htier hid

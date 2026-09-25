@@ -132,7 +132,7 @@ begin_op 24, brelse 26 (Rocq's `K_ireclaim = 88`). -/
 def ireclaimSlots : Nat := 8 + endOpSlots
 
 /-- **WP of `ireclaim(dev = a0)`** (Rocq's `wp_ireclaim_sconf_body`). -/
-def wp_ireclaim_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
+def wp_ireclaim_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
     [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
     [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF]
     [Appcfg GF] [Fscfg] [Icfg] [CurCtx]
@@ -175,7 +175,7 @@ def wp_ireclaim_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G
   -- the caller's own pid cell
   wordPointsTo (pPid k.proc) 4 dqp pidv ∗
   -- THREE slot units: iput's indirect arm forces three
-  bslots fscBio 3 ∗
+  bslots 3 ∗
   -- ONE ledger unit: iget spends it, iput returns it, every iteration
   irefSlot ∗
   wpNext true k.proc cpu (fun cpu' => iprop(∀ (spie spp : Bool) (R' : RegMap),
@@ -186,7 +186,7 @@ def wp_ireclaim_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G
     wordPointsTo sbInodestart 4 dqs (BitVec.ofNat 32 icfgIst) -∗
     wordPointsTo sbBmapstartAddr 4 dqb (BitVec.ofNat 32 fscBmapstart) -∗
     wordPointsTo (pPid k.proc) 4 dqp pidv -∗
-    bslots fscBio 3 -∗
+    bslots 3 -∗
     irefSlot -∗
     -- the boot-shelter token, returned unspent
     iregBoot -∗ wpLoop cpu'))
@@ -195,7 +195,7 @@ def wp_ireclaim_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G
 /-- The eb-generic form of `wp_ireclaim_body` (Rocq: `cpu_own 0 eb`, the
 complement `trap_csrs_ext` / `cpu_claim_ext` in and out; depth 0, so no
 spinlock held by `KCtx.wf`). -/
-def wp_ireclaim_eb_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
+def wp_ireclaim_eb_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
     [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
     [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF]
     [Appcfg GF] [Fscfg] [Icfg] [CurCtx]
@@ -238,7 +238,7 @@ def wp_ireclaim_eb_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [X
   -- the caller's own pid cell
   wordPointsTo (pPid k.proc) 4 dqp pidv ∗
   -- THREE slot units: iput's indirect arm forces three
-  bslots fscBio 3 ∗
+  bslots 3 ∗
   -- ONE ledger unit: iget spends it, iput returns it, every iteration
   irefSlot ∗
   wpNext true k.proc cpu (fun cpu' => iprop(∀ (spie spp : Bool) (R' : RegMap),
@@ -249,7 +249,7 @@ def wp_ireclaim_eb_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [X
     wordPointsTo sbInodestart 4 dqs (BitVec.ofNat 32 icfgIst) -∗
     wordPointsTo sbBmapstartAddr 4 dqb (BitVec.ofNat 32 fscBmapstart) -∗
     wordPointsTo (pPid k.proc) 4 dqp pidv -∗
-    bslots fscBio 3 -∗
+    bslots 3 -∗
     irefSlot -∗
     -- the boot-shelter token, returned unspent
     iregBoot -∗ wpLoop cpu'))
@@ -257,7 +257,7 @@ def wp_ireclaim_eb_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [X
 
 /-- The interface of `ireclaim` (Rocq's `Module Type IRECLAIM`). -/
 structure IRECLAIM : Prop where
-  wp_ireclaim_eb : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
+  wp_ireclaim_eb : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
     [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
     [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF]
     [Appcfg GF] [Fscfg] [Icfg] [CurCtx]
@@ -270,7 +270,7 @@ structure IRECLAIM : Prop where
 
 /-- The interrupts-off instance of `wp_ireclaim_eb` (the complement is the whole
 bundle): the contract every not-yet-generalized caller states. -/
-theorem IRECLAIM.wp_ireclaim (A : IRECLAIM) {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
+theorem IRECLAIM.wp_ireclaim (A : IRECLAIM) {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
     [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
     [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF]
     [Appcfg GF] [Fscfg] [Icfg] [CurCtx]

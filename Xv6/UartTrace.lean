@@ -37,8 +37,8 @@ class Xv6G (GF : BundledGFunctors) where
   /-- the UART's divisor-latch flag (`UartInv.dlabAuth`) -/
   [gvBoolG : GhostVarG GF Bool]
   /-- THE ONE `Nat ↦ ()` ghost-map camera: the log's open transactions
-  (`LogNames.tx`), the buffer cache's slot tokens (`BcacheNames.slot`) and
-  the file table's fd-slot tokens (`FileNames.fd`) all live here, told
+  (`LogNames.tx`), the buffer cache's slot tokens (`BioslotG.bioslotName`)
+  and the file table's fd-slot tokens (`FdslotG.fdslotName`) all live here, told
   apart by their ghost NAMES (Rocq: one `ghost_mapG Σ nat unit`) -/
   [gmUnitG : GhostMapG GF Nat Unit RegMapF]
   /-- THE ONE `Nat ↦ block bytes` ghost-map camera: the disk image

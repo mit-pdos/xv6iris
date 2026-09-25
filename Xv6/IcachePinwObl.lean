@@ -185,7 +185,7 @@ theorem irefPin_read_head (W : WordHist 4) (Hold : Nat → Hist) (h : Agent) (tv
 The payload's floor row covers every stamp in the window (`tst ≤ K`), so
 the read is the LATEST value -- exactly `irefWord M k` -- at every view the
 load may choose.  The map half and the stamp half come back untouched. -/
-theorem iref_readAU_locked [Xv6G GF] [SleepLockG GF] [Icfg] (cpu : CPU) (M : RegMapF (Qp × PosNat))
+theorem iref_readAU_locked [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [SleepLockG GF] [Icfg] (cpu : CPU) (M : RegMapF (Qp × PosNat))
     (k tst K : Nat) (ts : List (Nat × Agent)) (hk : k < NINODE)
     (his : ∃ v, PartialMap.get? M k = some v) (htK : tst ≤ K) :
     itableInv (hlc := hlc) (GF := GF) ∗ ([∗list] p ∈ ts, authoredBy p.1 p.2) ∗

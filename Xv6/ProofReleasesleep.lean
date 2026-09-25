@@ -66,7 +66,7 @@ theorem rsl_withSpie_canon (k : KCtx) (l : List String) (a b : Bool) :
     (((k.pushOffAt a b).withLocks l).pushed 4).withSpie a b = ((k.pushOffAt a b).withLocks l).pushed 4 := rfl
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [SleepLockG GF] [CurCtx]
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [SleepLockG GF] [CurCtx]
 
 /-! ## The callees -/
 
@@ -346,7 +346,7 @@ theorem releasesleep_br_ffffffffffffcb86 : KA.«releasesleep» + 0xffffffffffffc
 set_option maxHeartbeats 16000000 in
 theorem releasesleep_hook_proof (AC : ACQUIRE) (RE : RELEASE_HOOK) (WK : WAKEUP) :
     RELEASESLEEP_HOOK := ⟨
-  fun {hlc GF} _ _ _ X Γ cpu k γl γ Rp Rin _ _ H q pid hnoff hK hs hp htier => by
+  fun {hlc GF} _ _ _ _ _ _ X Γ cpu k γl γ Rp Rin _ _ H q pid hnoff hK hs hp htier => by
   obtain ⟨ξ0, t0⟩ := X
   letI : CurCtx := ⟨ξ0, t0⟩
   unfold wp_releasesleep_gen_hook_body

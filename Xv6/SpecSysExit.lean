@@ -55,7 +55,7 @@ def sysExitSlots : Nat := 4 + kexitSlots
 
 /-- **WP of `sys_exit()`**: no continuation -- the thread parks as a ZOMBIE
 inside `kexit` and is never resumed. -/
-def wp_sys_exit_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [CurCtx]
+def wp_sys_exit_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CurCtx]
     (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ] [FsEnv]
     (cpu : CPU) (k : KCtx) (γw : GName) (j : Nat) (pid : BitVec 32) (V : ProcPriv)
     (M : Nat → List (BitVec 8)) (ip v : BitVec 64)
@@ -72,7 +72,7 @@ def wp_sys_exit_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G
 
 /-- **WP of `sys_exit()`, at either entry `SIE`**: the complement in,
 nothing out; depth 0. -/
-def wp_sys_exit_eb_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [CurCtx]
+def wp_sys_exit_eb_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CurCtx]
     (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ] [FsEnv]
     (cpu : CPU) (k : KCtx) (γw : GName) (j : Nat) (pid : BitVec 32) (V : ProcPriv)
     (M : Nat → List (BitVec 8)) (ip v : BitVec 64)
@@ -88,7 +88,7 @@ def wp_sys_exit_eb_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [X
 
 /-- The interface of `sys_exit`. -/
 structure SYSEXIT : Prop where
-  wp_sys_exit_eb : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [CurCtx]
+  wp_sys_exit_eb : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CurCtx]
     (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ] [FsEnv]
     (cpu : CPU) (k : KCtx) (γw : GName) (j : Nat) (pid : BitVec 32) (V : ProcPriv)
     (M : Nat → List (BitVec 8)) (ip v : BitVec 64) hj hproc hv hK hnoff htier hinit,
@@ -97,7 +97,7 @@ structure SYSEXIT : Prop where
 
 /-- The interrupts-off instance of `wp_sys_exit_eb`. -/
 theorem SYSEXIT.wp_sys_exit (A : SYSEXIT) {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF]
-    [Xv6G GF] [CurCtx] (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ] [FsEnv]
+    [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CurCtx] (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ] [FsEnv]
     (cpu : CPU) (k : KCtx) (γw : GName) (j : Nat) (pid : BitVec 32) (V : ProcPriv)
     (M : Nat → List (BitVec 8)) (ip v : BitVec 64) hj hproc hv hK hsie hnoff hlocks htier hinit :
     wp_sys_exit_body (hlc := hlc) (GF := GF) Γ cpu k γw j pid V M ip v

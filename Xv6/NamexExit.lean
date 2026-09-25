@@ -29,7 +29,7 @@ set_option linter.unusedSimpArgs false
 set_option linter.unusedVariables false
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
   [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF]
   [Appcfg GF] [Fscfg] [Icfg] [CurCtx]
@@ -47,7 +47,7 @@ def namexAfterIup (k : KCtx) (A : NamexArgs) (R : RegMap) (X : BitVec 64) (ncur 
       (wc = true → w = false) ∧ ncur - ipSpendW w false crz ≤ n' ∧ n' ≤ ncur⌝ -∗
     kctx c (((k.withSpie spie spp).pushed 12).withRegs R') -∗ pcIs c (X + 4#64) -∗
     trapCsrsExt c k.sie -∗ cpuClaimExt c k.sie k.proc -∗
-    namexKeep k A -∗ bslots fscBio 3 -∗ logOpS icfgLog n' Sb' -∗ logTx icfgLog -∗
+    namexKeep k A -∗ bslots 3 -∗ logOpS icfgLog n' Sb' -∗ logTx icfgLog -∗
     irefSlot -∗ wpLoop c)
 
 set_option maxHeartbeats 8000000 in
@@ -65,7 +65,7 @@ theorem namex_call_iup (IUP : IUNLOCKPUT) (Γ : SchedNames) [ClaimIs (hlc := hlc
     kctx cpu (((k.withSpie spie spp).pushed 12).withRegs R) ∗ pcIs cpu X ∗
     trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗ namexEnv (hlc := hlc) Γ A ∗
     namexLk A ik q g lo tl inum dn γil γisl ∗ icLoaded fscFs fscIreg fscCov fscLogst ik inum dn bm ∗
-    namexKeep k A ∗ bslots fscBio 3 ∗
+    namexKeep k A ∗ bslots 3 ∗
     (if crz then nlzObs inum.toNat e0 else emp) ∗ logOpSe icfgLog ncur Scur e0 ∗
     namexAfterIup k A (R.set 1#5 (X + 4#64)) X ncur Scur wc crz
     ⊢ wpLoop (GF := GF) cpu := by
@@ -109,7 +109,7 @@ theorem namex_fail_out (k : KCtx) (A : NamexArgs) (nf : Nat → BitVec 8) (ncur 
     (hf : (∀ x ∈ Scur, x ∈ Sb') ∧ (w = true → fscBmapstart ∈ Sb') ∧ (wc = true → w = false) ∧
       ncur - ipSpendW w false cz ≤ n' ∧ n' ≤ ncur) :
     namexKeep (GF := GF) k A ∗ namexPath k A ∗ byteBuf (k.regs 12#5) (DFrac.own 1) (bview 14 nf) ∗
-      bslots fscBio 3 ∗ logOpS icfgLog n' Sb' ∗ logTx icfgLog ∗ irefSlots 1 ∗ irefSlot ⊢
+      bslots 3 ∗ logOpS icfgLog n' Sb' ∗ logTx icfgLog ∗ irefSlots 1 ∗ irefSlot ⊢
     namexOut k A n' Sb' false nf 0#64 (wc || w) 0#64 := by
   obtain ⟨hsub, hw, hww, hn1, hn2⟩ := hf
   have hsp := namex_wi_spend A.n ncur n' wc w cz hA hB hww hn1 hn2
@@ -168,7 +168,7 @@ theorem namex_notdir (IUP : IUNLOCKPUT) (Γ : SchedNames) [ClaimIs (hlc := hlc) 
     namexEnv (hlc := hlc) Γ A ∗
     namexLk A ik q g lo tl inum dn γil γisl ∗ icLoaded fscFs fscIreg fscCov fscLogst ik inum dn bm ∗
     irefSlots 1 ∗ namexKeep k A ∗ namexPath k A ∗ byteBuf (k.regs 12#5) (DFrac.own 1) (bview 14 nf) ∗
-    bslots fscBio 3 ∗ logOpS icfgLog ncur Scur ∗
+    bslots 3 ∗ logOpS icfgLog ncur Scur ∗
     (∀ c' : CPU, namexPostA k A c')
     ⊢ wpLoop (GF := GF) cpu := by
   have hK12 := namex_slots_12 _ hs.hK
@@ -219,7 +219,7 @@ theorem namex_nlink (IUP : IUNLOCKPUT) (Γ : SchedNames) [ClaimIs (hlc := hlc) G
     namexEnv (hlc := hlc) Γ A ∗
     namexLk A ik q g lo tl inum dn γil γisl ∗ icLoaded fscFs fscIreg fscCov fscLogst ik inum dn bm ∗
     irefSlots 1 ∗ namexKeep k A ∗ namexPath k A ∗ byteBuf (k.regs 12#5) (DFrac.own 1) (bview 14 nf) ∗
-    bslots fscBio 3 ∗ logOpS icfgLog ncur Scur ∗
+    bslots 3 ∗ logOpS icfgLog ncur Scur ∗
     (∀ c' : CPU, namexPostA k A c')
     ⊢ wpLoop (GF := GF) cpu := by
   have hK12 := namex_slots_12 _ hs.hK
@@ -274,7 +274,7 @@ theorem namex_miss (IUP : IUNLOCKPUT) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF
     namexEnv (hlc := hlc) Γ A ∗
     namexLk A ik q g lo tl inum dn γil γisl ∗ icLoaded fscFs fscIreg fscCov fscLogst ik inum dn bm ∗
     irefSlots 1 ∗ namexKeep k A ∗ namexPath k A ∗ byteBuf (k.regs 12#5) (DFrac.own 1) (bview 14 nf) ∗
-    bslots fscBio 3 ∗ nlzObs inum.toNat e0 ∗ logOpSe icfgLog ncur Scur e0 ∗
+    bslots 3 ∗ nlzObs inum.toNat e0 ∗ logOpSe icfgLog ncur Scur e0 ∗
     (∀ c' : CPU, namexPostA k A c')
     ⊢ wpLoop (GF := GF) cpu := by
   have hK12 := namex_slots_12 _ hs.hK
@@ -350,7 +350,7 @@ theorem namex_par (IU : IUNLOCK) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
     namexEnv (hlc := hlc) Γ A ∗
     namexLk A ik q g lo tl inum dn γil γisl ∗ icLoaded fscFs fscIreg fscCov fscLogst ik inum dn bm ∗
     irefSlots 1 ∗ namexKeep k A ∗ namexPath k A ∗ byteBuf (k.regs 12#5) (DFrac.own 1) (bview 14 nf) ∗
-    bslots fscBio 3 ∗ logOpSe icfgLog ncur Scur e0 ∗
+    bslots 3 ∗ logOpSe icfgLog ncur Scur e0 ∗
     (∀ c' : CPU, namexPostA k A c')
     ⊢ wpLoop (GF := GF) cpu := by
   have hK12 := namex_slots_12 _ hs.hK

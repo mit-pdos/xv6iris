@@ -45,7 +45,7 @@ def growprocOk (V V' : ProcPriv) (M M' : Nat → List (BitVec 8)) (n r : BitVec 
     V' = { V with sz := uvmdRsz sz (sz + n),
                   upt := V.upt.delRun (pgRoundUpN (sz + n).toNat / 4096) (uvmdNp sz (sz + n)) } ∧ M' = M)
 
-def wp_growproc_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [CurCtx]
+def wp_growproc_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CurCtx]
     (cpu : CPU) (k : KCtx) (γl : GName) (γk : KmemNames) (j : Nat) (pid : BitVec 32) (V : ProcPriv)
     (M : Nat → List (BitVec 8))
     (hj : j < NPROC) (hproc : k.proc = procAddr j)
@@ -62,7 +62,7 @@ def wp_growproc_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G
   ⊢ wpLoop (GF := GF) cpu
 
 structure GROWPROC : Prop where
-  wp_growproc : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [CurCtx] (cpu : CPU) (k : KCtx)
+  wp_growproc : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CurCtx] (cpu : CPU) (k : KCtx)
     (γl : GName) (γk : KmemNames) (j : Nat) (pid : BitVec 32) (V : ProcPriv) (M : Nat → List (BitVec 8))
     hj hproc hnoff hK hlk htier,
     wp_growproc_body (hlc := hlc) (GF := GF) cpu k γl γk j pid V M hj hproc hnoff hK hlk htier

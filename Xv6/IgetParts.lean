@@ -296,7 +296,7 @@ def igMsgStr : List (BitVec 8) :=
    0x69#8, 0x6e#8, 0x6f#8, 0x64#8, 0x65#8, 0x73#8]
 
 section Msg
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF]
 
 set_option maxRecDepth 100000 in
 theorem ig_cstr_msg [CurCtx] :

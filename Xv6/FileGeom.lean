@@ -16,10 +16,8 @@ open MachCSL
 
 /-! ## Geometry -/
 
-def NFILE : Nat := 100
-def FDSPARE : Nat := 4
-/-- The fd-slot supply: `NOFILE` descriptors plus the allowance, per process. -/
-def FDSLOTS : Nat := NPROC * (NOFILE + FDSPARE)
+-- `NFILE`, `FDSPARE`, `FDSLOTS` are `Xv6/SlotSupply.lean`'s (the dormant
+-- block parks fd slots, below `ProcDefs`).
 
 /-- `struct ftable { struct spinlock lock; struct file file[NFILE]; }`: the
 lock is the first member. -/

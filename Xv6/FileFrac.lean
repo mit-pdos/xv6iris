@@ -48,7 +48,7 @@ theorem qsum_dup (s t : List (Nat × Qp)) (nx id : Nat) (q : Qp) :
       Qp.half_add_half]
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FileG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [FileG GF]
   [IcacheG GF] [SleepLockG GF] [IcboxG GF] [IrefslotG GF] [OffboxG GF] [OffboxBoxG GF]
   [Icfg] [CurCtx]
 
@@ -172,48 +172,6 @@ theorem fileRef_elim (γ : FileNames) (k : Nat) (q : Qp) (st : FdState) :
   iintro ⟨%C, ⟨%id, He⟩, Hf, Hp⟩
   iexists C, id
   iframe He Hf Hp
-
-/-! ## The fd-slot supply -/
-
-theorem fdSlots_bound (γ : FileNames) (n : Nat) :
-    fdSlots (GF := GF) γ n ⊢ fdSlots γ n ∗ ⌜n ≤ FDSLOTS⌝ := by
-  unfold fdSlots
-  iintro ⟨%l, %⟨hlen, hnd, hb⟩, H⟩
-  isplitl [H]
-  · iexists l; iframe H; ipureintro; exact ⟨hlen, hnd, hb⟩
-  · ipureintro
-    rw [← hlen]
-    exact nodup_lt_length_le FDSLOTS l hnd hb
-
-/-- A unit joins the supply: its token's key is fresh (two full tokens on one
-key are invalid). -/
-theorem fdSlots_cons (γ : FileNames) (n : Nat) :
-    fdSlot (GF := GF) γ ∗ fdSlots γ n ⊢ fdSlots γ (n + 1) := by
-  unfold fdSlot fdSlots
-  iintro ⟨⟨%l1, %⟨hlen1, -, hb1⟩, H1⟩, ⟨%l, %⟨hlen, hnd, hb⟩, H⟩⟩
-  obtain ⟨i, rfl⟩ : ∃ i, l1 = [i] := by
-    cases l1 with
-    | nil => exact absurd hlen1 (by decide)
-    | cons i t =>
-      cases t with
-      | nil => exact ⟨i, rfl⟩
-      | cons _ _ => exact absurd hlen1 (by simp)
-  ihave H1 := BigSepL.bigSepL_singleton.1 $$ H1
-  by_cases hmem : i ∈ l
-  · iexfalso
-    icases BigSepL.bigSepL_mem_acc hmem $$ H with ⟨Hi, -⟩
-    ihave %hne := ghost_map_elem_ne γ.fd i i (DFrac.own 1) () () $$ H1 Hi
-    exact absurd rfl hne
-  · iexists (i :: l)
-    isplitl []
-    · ipureintro
-      refine ⟨by simp [hlen], List.nodup_cons.2 ⟨hmem, hnd⟩, ?_⟩
-      intro j hj
-      rcases List.mem_cons.1 hj with rfl | hj
-      · exact hb1 j (List.mem_singleton.2 rfl)
-      · exact hb j hj
-    · iapply BigSepL.bigSepL_cons.2
-      iframe H1 H
 
 /-! ## Keys of the lock's halves are in the map -/
 
@@ -380,27 +338,6 @@ theorem file_dup_step (γ : FileNames) (M : RegMapF (Nat × Qp)) (Ls : Nat → L
       dup_fresh M nx id (k, q.half) hfresh hid⟩
 
 /-! ## `fileclose`: the fd unit back, the content back, the element gone -/
-
-theorem fdSlots_uncons (γ : FileNames) (n : Nat) :
-    fdSlots (GF := GF) γ (n + 1) ⊢ fdSlot γ ∗ fdSlots γ n := by
-  unfold fdSlot fdSlots
-  iintro ⟨%l, %⟨hlen, hnd, hb⟩, H⟩
-  cases l with
-  | nil => exact absurd hlen (by simp)
-  | cons i l =>
-    icases BigSepL.bigSepL_cons.1 $$ H with ⟨Hi, Hl⟩
-    obtain ⟨hi, hnd⟩ := List.nodup_cons.1 hnd
-    isplitl [Hi]
-    · iexists [i]
-      isplitl []
-      · ipureintro
-        refine ⟨rfl, List.nodup_cons.2 ⟨List.not_mem_nil, List.nodup_nil⟩, ?_⟩
-        intro j hj; rw [List.mem_singleton.1 hj]; exact hb i (List.mem_cons_self)
-      · iapply BigSepL.bigSepL_singleton.2; iexact Hi
-    · iexists l
-      iframe Hl
-      ipureintro
-      exact ⟨by simpa using hlen, hnd, fun j hj => hb j (List.mem_cons_of_mem _ hj)⟩
 
 theorem close_ftableOk (M : RegMapF (Nat × Qp)) (Ls : Nat → List (Nat × Qp)) (s t : List (Nat × Qp))
     (id k : Nat) (q : Qp) (hok : ftableOk M Ls) (hL : Ls k = s ++ (id, q) :: t)

@@ -35,7 +35,7 @@ theorem rd_beq_self (v : BitVec 64) : bcond bop.BEQ v v = true := by
   rw [bcond_beq_eq]; simp
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [CurCtx]
 
 /-- **THE LOOP HEAD `+0x7c`, AS A CONTINUATION** (Rocq's loop invariant):
@@ -59,7 +59,7 @@ def rdLoop (cpu : CPU) (k : KCtx) (γb : BcacheNames) (γfs : FsNames) (dev : Bi
     trapCsrsExt cur k.sie -∗ cpuClaimExt cur k.sie k.proc -∗
     wordPointsTo (iDev ip) 4 dqd dev -∗ inodeMeta ip dn -∗
     inodeMapQ γfs dq ip bm -∗ inodeBlocksQ γfs dq bm data -∗
-    rdDst user (k.regs 12#5) j pidv Vp P Mi dqp data olds off tot -∗ bslot γb -∗
+    rdDst user (k.regs 12#5) j pidv Vp P Mi dqp data olds off tot -∗ bslot -∗
     wpNext true k.proc cpu (rdPost k γb γfs dev j ip bm data dn user off n olds pidv Vp M dqp dq dqd) -∗
     wpLoop cur)
 
@@ -81,7 +81,7 @@ theorem rdLoop_elim (cpu : CPU) (k : KCtx) (γb : BcacheNames) (γfs : FsNames) 
       trapCsrsExt cur k.sie -∗ cpuClaimExt cur k.sie k.proc -∗
       wordPointsTo (iDev ip) 4 dqd dev -∗ inodeMeta ip dn -∗
       inodeMapQ γfs dq ip bm -∗ inodeBlocksQ γfs dq bm data -∗
-      rdDst user (k.regs 12#5) j pidv Vp P Mi dqp data olds off tot -∗ bslot γb -∗
+      rdDst user (k.regs 12#5) j pidv Vp P Mi dqp data olds off tot -∗ bslot -∗
       wpNext true k.proc cpu (rdPost k γb γfs dev j ip bm data dn user off n olds pidv Vp M dqp dq dqd) -∗
       wpLoop cur := by
   unfold rdLoop; iintro H; iexact H
@@ -103,7 +103,7 @@ theorem rdLoop_intro (cpu : CPU) (k : KCtx) (γb : BcacheNames) (γfs : FsNames)
       trapCsrsExt cur k.sie -∗ cpuClaimExt cur k.sie k.proc -∗
       wordPointsTo (iDev ip) 4 dqd dev -∗ inodeMeta ip dn -∗
       inodeMapQ γfs dq ip bm -∗ inodeBlocksQ γfs dq bm data -∗
-      rdDst user (k.regs 12#5) j pidv Vp P Mi dqp data olds off tot -∗ bslot γb -∗
+      rdDst user (k.regs 12#5) j pidv Vp P Mi dqp data olds off tot -∗ bslot -∗
       wpNext true k.proc cpu (rdPost k γb γfs dev j ip bm data dn user off n olds pidv Vp M dqp dq dqd) -∗
       wpLoop cur) ⊢
     rdLoop (GF := GF) cpu k γb γfs dev j ip bm data dn user off n olds pidv Vp M dqp dq dqd N fuel := by

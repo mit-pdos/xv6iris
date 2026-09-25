@@ -29,7 +29,7 @@ set_option linter.unusedSimpArgs false
 set_option linter.unusedVariables false
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
   [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF]
   [Appcfg GF]
@@ -81,7 +81,7 @@ def fsinitCont [Fscfg] [Icfg] [CurCtx] (k : KCtx) (pidv : BitVec 32) (dqp : DFra
     wordPointsTo sbBmapstartAddr 4 (DFrac.own 1) (BitVec.ofNat 32 fscBmapstart) -∗
     fsblock fscFs.bytes 1 bsSb -∗
     logCtx icfgLog fscBio fscFs fscCov fscLogst icfgDev -∗
-    bslots fscBio 3 -∗ irefSlot -∗ iregBoot -∗ wpLoop cpu')
+    bslots 3 -∗ irefSlot -∗ iregBoot -∗ wpLoop cpu')
 
 /-- The contract's continuation, made hart-free (`true` crossing, `k.proc`
 a process). -/
@@ -103,7 +103,7 @@ theorem fsinit_cont_of_spec [Fscfg] [Icfg] [CurCtx] {j : Nat} (hj : j < NPROC) (
       wordPointsTo sbBmapstartAddr 4 (DFrac.own 1) (BitVec.ofNat 32 fscBmapstart) -∗
       fsblock fscFs.bytes 1 bsSb -∗
       logCtx icfgLog fscBio fscFs fscCov fscLogst icfgDev -∗
-      bslots fscBio 3 -∗ irefSlot -∗ iregBoot -∗ wpLoop cpu'))
+      bslots 3 -∗ irefSlot -∗ iregBoot -∗ wpLoop cpu'))
     ⊢ fsinitCont (GF := GF) k pidv dqp vMagic vSize vNblocks vNlog bsSb := by
   unfold fsinitCont
   iintro H %c
@@ -126,7 +126,7 @@ theorem fsinit_epilogue [Fscfg] [Icfg] [CurCtx] (cpu : CPU) (k : KCtx) (spie spp
     wordPointsTo (pPid k.proc) 4 dqp pidv ∗
     fsinitCells vMagic vSize vNblocks vNlog ∗ fsblock fscFs.bytes 1 bsSb ∗
     logCtx icfgLog fscBio fscFs fscCov fscLogst icfgDev ∗
-    bslots fscBio 3 ∗ irefSlot ∗ iregBoot ∗
+    bslots 3 ∗ irefSlot ∗ iregBoot ∗
     fsinitCont k pidv dqp vMagic vSize vNblocks vNlog bsSb
     ⊢ wpLoop (GF := GF) cpu := by
   iintro ⟨Hk, Hpc, Hte, Hce, Hframe, Hpid, Hcells, Hfsb, #Hlc, Hsl, Hiref, Hboot, Hnext⟩
@@ -187,7 +187,7 @@ theorem fsinit_reclaim (IR : IRECLAIM) [Fscfg] [Icfg] [CurCtx]
     wordPointsTo (pPid k.proc) 4 dqp pidv ∗
     fsinitCells vMagic vSize vNblocks vNlog ∗ fsblock fscFs.bytes 1 bsSb ∗
     logCtx icfgLog fscBio fscFs fscCov fscLogst icfgDev ∗
-    bslots fscBio 3 ∗ irefSlot ∗ iregBoot ∗
+    bslots 3 ∗ irefSlot ∗ iregBoot ∗
     fsinitCont k pidv dqp vMagic vSize vNblocks vNlog bsSb
     ⊢ wpLoop (GF := GF) cpu := by
   obtain ⟨hK4, -, -, -, -, hKir⟩ := fsinit_slots k.avail hK

@@ -222,7 +222,7 @@ theorem firstSbImage_eq (a b c d e f g h : BitVec 32) :
       wordToBytes4 e ++ wordToBytes4 f ++ wordToBytes4 g ++ wordToBytes4 h := rfl
 
 section FirstTok
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
   [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [Appcfg GF]
 
@@ -309,7 +309,7 @@ def firstFsinit [Fscfg] [Icfg] [CurCtx] : IProp GF := iprop(
     fsChalf fscFs (logHdrBno fscLogst) bsHdr ∗
     ([∗list] i ∈ List.range LOGBLOCKS, ∃ bs : List (BitVec 8),
        fsChalf fscFs (logSlotBno fscLogst i) bs) ∗
-    bslots fscBio ((LOGBLOCKS + 2) + 2 + 1) ∗
+    bslots ((LOGBLOCKS + 2) + 2 + 1) ∗
     irefSlots 2)
 
 /-- **Rocq `first_fsinit_open`**: the pile with its pure block handed out as
@@ -347,7 +347,7 @@ theorem firstFsinit_open [Fscfg] [Icfg] [CurCtx] :
         fsChalf fscFs (logHdrBno fscLogst) bsHdr ∗
         ([∗list] i ∈ List.range LOGBLOCKS, ∃ bs : List (BitVec 8),
            fsChalf fscFs (logSlotBno fscLogst i) bs) ∗
-        bslots fscBio ((LOGBLOCKS + 2) + 2 + 1) ∗
+        bslots ((LOGBLOCKS + 2) + 2 + 1) ∗
         irefSlots 2 := by
   unfold firstFsinit
   iintro ⟨%vMagic, %vSize, %vNblocks, %vNlog, %bsSb, %sbOld, %bsHdr, %L, %D, %vlock, %vname,

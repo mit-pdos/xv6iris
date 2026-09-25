@@ -115,7 +115,7 @@ theorem fetchaddr_snez_negw (v : BitVec 64) (h : v = 0#64 ∨ v = 18446744073709
   rcases h with h | h <;> subst h <;> decide
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF]
 
 /-! ## The word cell as eight bytes -/
 
@@ -252,7 +252,7 @@ theorem fetchaddr_tail [CurCtx] (c : CPU) (k : KCtx) (hK : 4 ≤ k.avail) (spie 
 
 set_option maxHeartbeats 4000000 in
 theorem fetchaddr_proof (MP : MYPROC) (CI : COPYIN) : FETCHADDR :=
-  ⟨fun {hlc GF} _ _ _ cpu k γl γk j pid V P M oldv hj hproc hnoff hK hlk => by
+  ⟨fun {hlc GF} _ _ _ _ _ _ cpu k γl γk j pid V P M oldv hj hproc hnoff hK hlk => by
   unfold wp_fetchaddr_body
   simp only [fetchaddrAddr]
   iintro ⟨Hk, Hpc, #Hlk, Hav, Hpriv, Hip, HΦ⟩

@@ -166,7 +166,7 @@ theorem ciK_popExit (k : KCtx) (hsie : k.sie = false) :
     _root_.true_and, _root_.and_true]
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [CurCtx]
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CurCtx]
 
 /-! ## The caller's continuation -/
 
@@ -1022,7 +1022,7 @@ def ciKillFix (k : KCtx) (R : RegMap) (e : BitVec 32) : Prop :=
   R 15#5 = BitVec.signExtend 64 e ∧ R 18#5 = 10#64 ∧ R 19#5 = 256#64 ∧ ciSaved4 k.regs R
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [CurCtx]
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CurCtx]
 
 /-- Re-entering the kill-line loop at `+0xb8`. -/
 def ciKillLoop (cpu : CPU) (k : KCtx) (γc : GName) (γ : UartNames) : IProp GF := iprop(
@@ -1659,7 +1659,7 @@ set_option maxHeartbeats 8000000 in
 `acquire(&cons.lock)`, and then the dispatch. -/
 theorem consoleintr_proof (CP : CONSPUTC) (AC : ACQUIRE) (RE : RELEASE) (WK : WAKEUP) :
     CONSOLEINTR := ⟨
-  fun {hlc GF} _ _ _ Γ cpu k γc γl γ bs hsie hnoff hK hlk htier => by
+  fun {hlc GF} _ _ _ _ _ _ Γ cpu k γc γl γ bs hsie hnoff hK hlk htier => by
   unfold wp_consoleintr_body
   simp only [consoleintrAddr]
   iintro ⟨Hk, Hpc, #Hpi, #Hlk, #Hport, #Hsub, Hnext⟩

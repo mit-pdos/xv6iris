@@ -74,7 +74,7 @@ theorem itrunc_ent_acc [CurCtx] (kk : Nat) (bno dsk : BitVec 32) (e : List (BitV
 end
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [Fscfg] [Icfg] [CurCtx]
 
 /-- The resources at a point of the indirect loop, cursor `q` (Rocq's
@@ -93,7 +93,7 @@ def itEPre (pc : BitVec 64) (Γ : SchedNames) (c : CPU) (k : KCtx) (spie spp : B
   wordPointsTo (pPid k.proc) 4 dqp pidv ∗
   wordPointsTo ip 4 dqd icfgDev ∗
   wordPointsTo sbBmapstartAddr 4 dqb (BitVec.ofNat 32 fscBmapstart) ∗
-  bslots fscBio 2 ∗
+  bslots 2 ∗
   bufOwn (bnode kk) bm.bmInd 0#32 (indBytes bm.bmEnt) ∗
   inodeBlocks fscFs (itZ bm (NDIRECT + q)) data ∗
   bmPaidS crb u Sb e0 ∗ F

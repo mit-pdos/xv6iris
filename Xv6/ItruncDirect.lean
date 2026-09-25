@@ -45,7 +45,7 @@ def itDRegs (k : KCtx) (ip : BitVec 64) (kx : Nat) (R : RegMap) : Prop :=
   itPins k R ∧ R 9#5 = iAddr ip kx ∧ R 18#5 = iAddr ip NDIRECT ∧ R 19#5 = ip
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [Fscfg] [Icfg] [CurCtx]
 
 /-- The resources at a point of the direct loop, cursor `kx` (the state
@@ -63,7 +63,7 @@ def itDPre (pc : BitVec 64) (Γ : SchedNames) (c : CPU) (k : KCtx) (spie spp : B
   wordPointsTo (pPid k.proc) 4 dqp pidv ∗
   wordPointsTo ip 4 dqd icfgDev ∗
   wordPointsTo sbBmapstartAddr 4 dqb (BitVec.ofNat 32 fscBmapstart) ∗
-  bslots fscBio 2 ∗
+  bslots 2 ∗
   inodeMap fscFs ip (bmDirZeroed bm kx) ∗ inodeBlocks fscFs (itZ bm kx) data ∗
   bmPaidS crb u Sb e0 ∗ F
 

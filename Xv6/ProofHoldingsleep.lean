@@ -81,7 +81,7 @@ theorem hsl_withSpie_canon (k : KCtx) (l : List String) (a b : Bool) :
     (((k.pushOffAt a b).withLocks l).pushed 6).withSpie a b = ((k.pushOffAt a b).withLocks l).pushed 6 := rfl
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [SleepLockG GF] [CurCtx]
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [SleepLockG GF] [CurCtx]
 
 /-! ## The frame's two spare cells -/
 
@@ -427,7 +427,7 @@ theorem holdingsleep_br_ffffffffffffcb4e : KA.«holdingsleep» + 0xffffffffffffc
 
 set_option maxHeartbeats 16000000 in
 theorem holdingsleep_proof (AC : ACQUIRE) (RE : RELEASE) (MP : MYPROC) : HOLDINGSLEEP := ⟨
-  fun {hlc GF} _ _ _ X cpu k γl γ Rp _ H q pid dqp hnoff hK hs htier => by
+  fun {hlc GF} _ _ _ _ _ _ X cpu k γl γ Rp _ H q pid dqp hnoff hK hs htier => by
   obtain ⟨ξ0, t0⟩ := X
   letI : CurCtx := ⟨ξ0, t0⟩
   unfold wp_holdingsleep_gen_body

@@ -411,7 +411,7 @@ end
 /-! ## (3) The budget: one bfree's step (Rocq's `bm_paidS_use`) -/
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF]
   [BcacheG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [Fscfg] [Icfg] [CurCtx]
 
 /-- THE ONE STEP bfree TAKES, and why the loops never case-split (Rocq's
@@ -459,7 +459,7 @@ end
 /-! ## (4) The callees at their call sites -/
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [Fscfg] [Icfg] [CurCtx]
 
 end
@@ -467,7 +467,7 @@ end
 /-! ## (5) The client continuation, named (Rocq's `it_cont`) -/
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [IregG GF] [IcacheG GF]
   [FsTopG GF] [FsLinkG GF] [Appcfg GF] [Fscfg] [Icfg] [CurCtx]
 
@@ -485,7 +485,7 @@ continuation made HART-FREE (Rocq's `it_cont` after the entry's
 walk carries may be anchored at the entry hart. -/
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [Fscfg] [Icfg] [CurCtx]
 
 /-- `Xv6.itrunc_bfree_eb` at either entry `SIE` (`BFREE.wp_bfree_eb`). -/
@@ -509,14 +509,14 @@ theorem itrunc_bfree_eb (BF : BFREE) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF 
     bitmapInv fscFs fscBmapstart fscCov fscLogst fscSize ∗
     fsblock fscFs.bytes bno.toNat bs ∗
     wordPointsTo (pPid pj) 4 dqp pidv ∗
-    bslots fscBio 2 ∗ bmPaidS crb w Sb e0 ∗
+    bslots 2 ∗ bmPaidS crb w Sb e0 ∗
     wpNext true pj c (fun cpu' => iprop(∀ (spie spp : Bool) (R' : RegMap),
       ⌜calleeSaved k'.regs R'⌝ -∗
       kctx cpu' ((k'.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k'.regs 1#5)) -∗
       trapCsrsExt cpu' s -∗ cpuClaimExt cpu' s pj -∗
       wordPointsTo (pPid pj) 4 dqp pidv -∗
       wordPointsTo sbBmapstartAddr 4 dqb (BitVec.ofNat 32 fscBmapstart) -∗
-      bslots fscBio 2 -∗ bmPaidS crb w Sb e0 -∗ wpLoop cpu'))
+      bslots 2 -∗ bmPaidS crb w Sb e0 -∗ wpLoop cpu'))
     ⊢ wpLoop (GF := GF) c := by
   subst hpj hs
   iintro ⟨Hk, Hpc, #Hpi, Hte, Hce, #Hbc, #Hdc, #Hpe, #Hlc, Hsb, #Hbmi, Hfsb, Hpid, Hsl,
@@ -542,7 +542,7 @@ theorem itrunc_bfree_eb (BF : BFREE) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF 
 end
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [IregG GF] [IcacheG GF]
   [FsTopG GF] [FsLinkG GF] [Appcfg GF] [Fscfg] [Icfg] [CurCtx]
 
@@ -562,7 +562,7 @@ def itContE (k : KCtx) (ip : BitVec 64) (inum : BitVec 32) (dn : Dinode)
     inodeMap fscFs ip bmEmpty -∗
     inodeBlocks fscFs bmEmpty (fun _ => List.replicate BSIZE 0) -∗
     dinodeAt fscIreg inum (diTrunc dn) -∗
-    bslots fscBio 3 -∗ L -∗ wpLoop cpu')
+    bslots 3 -∗ L -∗ wpLoop cpu')
 
 /-- The widening, hart-free. -/
 theorem itContE_mono (k : KCtx) (ip : BitVec 64) (inum : BitVec 32) (dn : Dinode)

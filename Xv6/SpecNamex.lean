@@ -185,7 +185,7 @@ theorem walkSpend_counted (L n n' : Nat) (w ok : Bool) (h : (L + 1) * iputUnits 
   cases w <;> cases ok <;> unfold walkSpend at h' <;> simp at h' <;> omega
 
 section Post
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
   [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF]
   [Appcfg GF]
@@ -210,7 +210,7 @@ def namexPost [Fscfg] [Icfg] [CurCtx] (k : KCtx) (plen : Nat) (pfun : Nat → Bi
     byteBuf (k.regs 10#5) dqpv (bview (plen + 1) pfun) -∗
     -- the name buffer, at an UNSPECIFIED naming function
     byteBuf (k.regs 12#5) (DFrac.own 1) (bview 14 nf) -∗
-    bslots fscBio 3 -∗
+    bslots 3 -∗
     -- THE SET ONLY GROWS; THE PAID-BITMAP REPORT; THE PRICED INTERVAL
     ⌜(∀ x ∈ Sb, x ∈ Sb') ∧ (w = true → fscBmapstart ∈ Sb') ∧
       n - (walkSpend w + (if ok then 0 else 1)) ≤ n' ∧ n' ≤ n⌝ -∗
@@ -227,7 +227,7 @@ end Post
 
 /-- **WP of `namex(path = a0, nameiparent = a1, name = a2)`, the set-form
 contract at either entry `SIE`** (Rocq's `wp_namex_gen_body`). -/
-def wp_namex_gen_eb_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
+def wp_namex_gen_eb_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
     [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
     [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF]
     [Appcfg GF] [Fscfg] [Icfg] [CurCtx]
@@ -281,7 +281,7 @@ def wp_namex_gen_eb_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [
   -- ---- THE NAME BUFFER, WRITTEN: full ownership ----
   byteBuf (k.regs 12#5) (DFrac.own 1) (bview 14 nfun) ∗
   -- ---- three buffer slots (iput's itrunc arm forces three) ----
-  bslots fscBio 3 ∗
+  bslots 3 ∗
   -- ---- the ledger: two slots in ----
   irefSlots 2 ∗
   -- ---- this operation's reservation, SET FORM, BESIDE THE TOKEN ----
@@ -294,7 +294,7 @@ def wp_namex_gen_eb_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [
 /-- The interface of `namex` (Rocq's `Module Type NAMEX`, its `wp_namex_gen`
 field; the counted `wp_namex_sconf` is dropped, see the header). -/
 structure NAMEX : Prop where
-  wp_namex_gen_eb : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
+  wp_namex_gen_eb : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
     [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
     [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF]
     [Appcfg GF] [Fscfg] [Icfg] [CurCtx]
@@ -340,7 +340,7 @@ def namexRootSlots : Nat := 12 + igetSlots
 
 /-- **WP of `namex("/", 0, name)`, the root corner** (Rocq's
 `wp_namex_root_body`). -/
-def wp_namex_root_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
+def wp_namex_root_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
     [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF] [FsTopG GF] [FsLinkG GF] [IcboxG GF]
     [SleepLockG GF] [IrefslotG GF] [Appcfg GF] [Fscfg] [Icfg] [CurCtx]
     (cpu : CPU) (k : KCtx) (dqp : DFrac)
@@ -367,7 +367,7 @@ def wp_namex_root_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv
 
 /-- The root corner's interface (Rocq's `Module Type NAMEX_ROOT`). -/
 structure NAMEX_ROOT : Prop where
-  wp_namex_root : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
+  wp_namex_root : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
     [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF] [FsTopG GF] [FsLinkG GF] [IcboxG GF]
     [SleepLockG GF] [IrefslotG GF] [Appcfg GF] [Fscfg] [Icfg] [CurCtx]
     (cpu : CPU) (k : KCtx) (dqp : DFrac) hK hnoff hroot hnib0 ha1 hit hpr huart,

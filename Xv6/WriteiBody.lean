@@ -39,7 +39,7 @@ theorem writei_ret_6e : jumpPc (KA.«writei» + 0x6e#64) = KA.«writei» + 0x6e#
 theorem writei_ret_74 : jumpPc (KA.«writei» + 0x74#64) = KA.«writei» + 0x74#64 := by decide
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [IregG GF] [IcacheG GF]
   [FsTopG GF] [FsLinkG GF] [Appcfg GF] [Fscfg] [Icfg] [CurCtx]
 
@@ -80,7 +80,7 @@ theorem writei_iter_fail (IU : IUPDATE) (LW : LOG_WRITE) (BE : BRELSE) (Γ : Sch
     wiFrameK k ∗ wiEnv Γ A ∗ trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗
     wiCells A ∗ inodeMeta A.ip A.dn ∗ inodeMap fscFs A.ip bm2 ∗
     dinodeAt fscIreg A.inum A.dn0 ∗ wiSrc A (k.regs 12#5) P2 ∗
-    bslots fscBio 2 ∗ logOpS icfgLog (uX + 1) Sb2 ∗
+    bslots 2 ∗ logOpS icfgLog (uX + 1) Sb2 ∗
     wiBuf A bm2 data2 fbn kk (writei_splice (data2 fbn) o ch) bsd d ∗ wiContEb k A
     ⊢ wpLoop (GF := GF) cpu := by
   have hww : ∀ (K : KCtx) (a b c d : Bool), (K.withSpie a b).withSpie c d = K.withSpie c d :=
@@ -111,7 +111,7 @@ theorem writei_iter_fail (IU : IUPDATE) (LW : LOG_WRITE) (BE : BRELSE) (Γ : Sch
   k_step_e (wp_s_jal cpu _ (KA.«writei» + 0xb2#64) false 1690#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [writei_br_logwrite]
   iintro Hk Hpc
-  icases bslots_uncons fscBio 1 $$ Hsl with ⟨Hsl1, Hslr⟩
+  icases bslots_uncons 1 $$ Hsl with ⟨Hsl1, Hslr⟩
   unfold wiEnv
   icases Henv with ⟨#Hpi, #Hpe, #Hbc, #Hlc, #Hdc, #Hkl, #Hka, #Hbmi, #Hinv⟩
   iapply (writei_log_writeF LW cpu _ A.γl kk A.pidv (blkmapGet bm2 fbn)
@@ -170,9 +170,9 @@ theorem writei_iter_fail (IU : IUPDATE) (LW : LOG_WRITE) (BE : BRELSE) (Γ : Sch
   k_norm_g at hcs3
   obtain ⟨d2, d8, d9, d18, d19, d20, d21, d22, d23, d24, d25, d26, d27⟩ := hcs3
   ihave Hsrc := Hsrcb $$ Hpid
-  ihave Hsl := bslots_cons fscBio 1 $$ [Hsl2 Hslr]
+  ihave Hsl := bslots_cons 1 $$ [Hsl2 Hslr]
   case' _ => iframe
-  ihave Hsl := bslots_cons fscBio 2 $$ [Hsl1 Hsl]
+  ihave Hsl := bslots_cons 2 $$ [Hsl1 Hsl]
   case' _ => iframe
   ihave Hblk := Hblkw $$ %_ Hfsb
   ihave Henv : wiEnv (GF := GF) Γ A $$ []
@@ -195,7 +195,7 @@ def wiLoopRes (Γ : SchedNames) (cpu : CPU) (k : KCtx) (spie spp : Bool) (R : Re
   kctx cpu (((k.withSpie spie spp).pushed 14).withRegs R) ∗ pcIs cpu (KA.«writei» + 0x82#64) ∗
   wiFrameK k ∗ wiEnv Γ A ∗ trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗
   wiCells A ∗ inodeMeta A.ip A.dn ∗ inodeMap fscFs A.ip bmI ∗ inodeBlocks fscFs bmI dataI ∗
-  dinodeAt fscIreg A.inum A.dn0 ∗ wiSrc A (k.regs 12#5) PI ∗ bslots fscBio 3 ∗
+  dinodeAt fscIreg A.inum A.dn0 ∗ wiSrc A (k.regs 12#5) PI ∗ bslots 3 ∗
   logOpS icfgLog nI SI ∗ wiContEb k A
 
 /-- THE LOOP GOAL at fuel `W` (what the induction proves). -/
@@ -237,7 +237,7 @@ theorem writei_iter_ok (IU : IUPDATE) (LW : LOG_WRITE) (BE : BRELSE) (Γ : Sched
     wiFrameK k ∗ wiEnv Γ A ∗ trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗
     wiCells A ∗ inodeMeta A.ip A.dn ∗ inodeMap fscFs A.ip bm2 ∗
     dinodeAt fscIreg A.inum A.dn0 ∗ wiSrc A (k.regs 12#5) P2 ∗
-    bslots fscBio 2 ∗ logOpS icfgLog (uX + 1) Sb2 ∗
+    bslots 2 ∗ logOpS icfgLog (uX + 1) Sb2 ∗
     wiBuf A bm2 data2 fbn kk (writei_splice (data2 fbn) o ch) bsd d ∗ wiContEb k A
     ⊢ wpLoop (GF := GF) cpu := by
   have hww : ∀ (K : KCtx) (a b c d : Bool), (K.withSpie a b).withSpie c d = K.withSpie c d :=
@@ -265,7 +265,7 @@ theorem writei_iter_ok (IU : IUPDATE) (LW : LOG_WRITE) (BE : BRELSE) (Γ : Sched
   k_step_e (wp_s_jal cpu _ (KA.«writei» + 0x6a#64) false 1762#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [writei_br_logwrite]
   iintro Hk Hpc
-  icases bslots_uncons fscBio 1 $$ Hsl with ⟨Hsl1, Hslr⟩
+  icases bslots_uncons 1 $$ Hsl with ⟨Hsl1, Hslr⟩
   ihave Henv' := Henv
   unfold wiEnv
   icases Henv' with ⟨#Hpi, #Hpe, #Hbc, #Hlc, #Hdc, #Hkl, #Hka, #Hbmi, #Hinv⟩
@@ -325,9 +325,9 @@ theorem writei_iter_ok (IU : IUPDATE) (LW : LOG_WRITE) (BE : BRELSE) (Γ : Sched
   k_norm_g at hcs3
   obtain ⟨d2, d8, d9, d18, d19, d20, d21, d22, d23, d24, d25, d26, d27⟩ := hcs3
   ihave Hsrc := Hsrcb $$ Hpid
-  ihave Hsl := bslots_cons fscBio 1 $$ [Hsl2 Hslr]
+  ihave Hsl := bslots_cons 1 $$ [Hsl2 Hslr]
   case' _ => iframe
-  ihave Hsl := bslots_cons fscBio 2 $$ [Hsl1 Hsl]
+  ihave Hsl := bslots_cons 2 $$ [Hsl1 Hsl]
   case' _ => iframe
   ihave Hblk := Hblkw $$ %_ Hfsb
   -- +0x74  addw s3,s10,s3 ; +0x78  addw s2,s10,s2 ; +0x7c  c.add s4,s4,s11
@@ -535,7 +535,7 @@ theorem writei_iter_copy (IU : IUPDATE) (LW : LOG_WRITE) (BE : BRELSE) (EC : EIT
     wiFrameK k ∗ wiEnv Γ A ∗ trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗
     wiCells A ∗ inodeMeta A.ip A.dn ∗ inodeMap fscFs A.ip bm2 ∗
     dinodeAt fscIreg A.inum A.dn0 ∗ wiSrc A (k.regs 12#5) PI ∗
-    bslots fscBio 2 ∗ logOpS icfgLog (uX + 1) Sb2 ∗
+    bslots 2 ∗ logOpS icfgLog (uX + 1) Sb2 ∗
     wiBuf A bm2 data2 fbn kk (data2 fbn) bsd d ∗ wiContEb k A
     ⊢ wpLoop (GF := GF) cpu := by
   have hww : ∀ (K : KCtx) (a b c d : Bool), (K.withSpie a b).withSpie c d = K.withSpie c d :=

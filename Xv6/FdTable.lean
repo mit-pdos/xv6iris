@@ -80,7 +80,7 @@ theorem bigSepL_set_acc_congr (Φ Ψ : Nat → A → PROP) :
 end
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FileG GF] [IcacheG GF] [SleepLockG GF] [IcboxG GF] [IrefslotG GF] [OffboxG GF] [OffboxBoxG GF] [Icfg] [CurCtx]
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [FileG GF] [IcacheG GF] [SleepLockG GF] [IcboxG GF] [IrefslotG GF] [OffboxG GF] [OffboxBoxG GF] [Icfg] [CurCtx]
 
 /-! ## The descriptor states -/
 
@@ -252,7 +252,7 @@ theorem fdFrags_acc (γd : Nat → GName) (sts : List FdState) (fd : Nat) (st : 
 def ofileSlot (γ : FileNames) (γd : Nat → GName) (pa : BitVec 64) (fd : Nat) (v : BitVec 64) :
     IProp GF := iprop%
   wordPointsTo (pOfile pa fd) 8 (DFrac.own 1) v ∗
-  ((⌜v = 0#64⌝ ∗ fdSlot γ ∗ fdStAuth γd fd .closed) ∨
+  ((⌜v = 0#64⌝ ∗ fdSlot ∗ fdStAuth γd fd .closed) ∨
    (∃ (k : Nat) (q : Qp) (st : FdState), ⌜v = fnode k ∧ k < NFILE ∧ st ≠ .closed⌝ ∗
       fileRef γ k q st ∗ fdStAuth γd fd st))
 
@@ -260,7 +260,7 @@ def ofileSlot (γ : FileNames) (γd : Nat → GName) (pa : BitVec 64) (fd : Nat)
 refuted: a slot's address is never null). -/
 theorem ofileSlot_null (γ : FileNames) (γd : Nat → GName) (pa : BitVec 64) (fd : Nat) :
     ofileSlot (GF := GF) γ γd pa fd 0#64 ⊢
-      wordPointsTo (pOfile pa fd) 8 (DFrac.own 1) 0#64 ∗ fdSlot γ ∗ fdStAuth γd fd .closed := by
+      wordPointsTo (pOfile pa fd) 8 (DFrac.own 1) 0#64 ∗ fdSlot ∗ fdStAuth γd fd .closed := by
   unfold ofileSlot
   iintro ⟨Hc, ⟨⟨-, Hs, Ha⟩ | ⟨%k, %q, %st, %⟨hv, hk, -⟩, -, -⟩⟩⟩
   · iframe Hc Hs Ha
@@ -279,7 +279,7 @@ theorem ofileSlot_file (γ : FileNames) (γd : Nat → GName) (pa : BitVec 64) (
   ipureintro; exact ⟨rfl, hk, hst⟩
 
 theorem ofileSlot_closed (γ : FileNames) (γd : Nat → GName) (pa : BitVec 64) (fd : Nat) :
-    wordPointsTo (GF := GF) (pOfile pa fd) 8 (DFrac.own 1) 0#64 ∗ fdSlot γ ∗ fdStAuth γd fd .closed ⊢
+    wordPointsTo (GF := GF) (pOfile pa fd) 8 (DFrac.own 1) 0#64 ∗ fdSlot ∗ fdStAuth γd fd .closed ⊢
       ofileSlot γ γd pa fd 0#64 := by
   unfold ofileSlot
   iintro ⟨Hc, Hs, Ha⟩
@@ -414,7 +414,7 @@ theorem procOfilesOwe_read (γ : FileNames) (γd : Nat → GName) (pa : BitVec 6
       rw [ofileLentOrSlot_out γ γd pa D fd v hd]) $$ Hs
     ihave Hs := (show ofileSlot (GF := GF) γ γd pa fd v ⊢
         wordPointsTo (pOfile pa fd) 8 (DFrac.own 1) v ∗
-        ((⌜v = 0#64⌝ ∗ fdSlot γ ∗ fdStAuth γd fd .closed) ∨
+        ((⌜v = 0#64⌝ ∗ fdSlot ∗ fdStAuth γd fd .closed) ∨
          (∃ (k : Nat) (q : Qp) (st : FdState), ⌜v = fnode k ∧ k < NFILE ∧ st ≠ .closed⌝ ∗
             fileRef γ k q st ∗ fdStAuth γd fd st)) from by unfold ofileSlot; iintro H; iexact H) $$ Hs
     icases Hs with ⟨Hc, Hor⟩
@@ -486,7 +486,7 @@ its unit and closed authority come out and it joins the deficit. -/
 theorem procOfilesOwe_install (γ : FileNames) (γd : Nat → GName) (pa : BitVec 64) (fs : List (BitVec 64))
     (D : List Nat) (fd : Nat) (v' : BitVec 64) (hfd : fs[fd]? = some 0#64) (hnz : v' ≠ 0#64) :
     procOfilesOwe (GF := GF) γ γd pa fs D ⊢
-      ⌜fd ∉ D⌝ ∗ wordPointsTo (pOfile pa fd) 8 (DFrac.own 1) 0#64 ∗ fdSlot γ ∗ fdStAuth γd fd .closed ∗
+      ⌜fd ∉ D⌝ ∗ wordPointsTo (pOfile pa fd) 8 (DFrac.own 1) 0#64 ∗ fdSlot ∗ fdStAuth γd fd .closed ∗
       (wordPointsTo (pOfile pa fd) 8 (DFrac.own 1) v' -∗ procOfilesOwe γ γd pa (fs.set fd v') (fd :: D)) := by
   iintro H
   icases procOfilesOwe_acc γ γd pa fs D (fd :: D) fd 0#64 hfd
@@ -516,7 +516,7 @@ theorem procOfilesOwe_close (γ : FileNames) (γd : Nat → GName) (pa : BitVec 
     (D : List Nat) (fd : Nat) (v : BitVec 64) (hnin : fd ∉ D) (hfd : fs[fd]? = some v) :
     procOfilesOwe (GF := GF) γ γd pa fs (fd :: D) ⊢
       wordPointsTo (pOfile pa fd) 8 (DFrac.own 1) v ∗
-      (wordPointsTo (pOfile pa fd) 8 (DFrac.own 1) 0#64 -∗ fdSlot γ -∗ fdStAuth γd fd .closed -∗
+      (wordPointsTo (pOfile pa fd) 8 (DFrac.own 1) 0#64 -∗ fdSlot -∗ fdStAuth γd fd .closed -∗
         procOfilesOwe γ γd pa (fs.set fd 0#64) D) := by
   iintro H
   icases procOfilesOwe_acc γ γd pa fs (fd :: D) D fd v hfd

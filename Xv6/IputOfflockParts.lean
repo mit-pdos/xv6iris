@@ -141,7 +141,7 @@ theorem iput_ofl_mask_ftop (z : Nat) :
 
 section
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [IregG GF] [IcacheG GF]
-  [Xv6G GF] [LogG GF] [FsBlocksG GF] [FsTopG GF] [FsLinkG GF] [Appcfg GF]
+  [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [LogG GF] [FsBlocksG GF] [FsTopG GF] [FsLinkG GF] [Appcfg GF]
 
 /-- THE DEPOSIT (Rocq's `ireg_free_deposit_au` through `lw_au_rec`): the
 region's type-0 write of the corpse, filling the escrow and retiring the
@@ -171,7 +171,7 @@ end
 /-! ## The handle, opened (iupdate's `iu_hold_open`, copied) -/
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [BcacheG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [BcacheG GF]
   [DiskG GF] [FsBlocksG GF] [SleepLockG GF]
 
 theorem iput_ofl_hold_open [CurCtx] (γ : BcacheNames) (V : BioView GF) (kk : Nat)
@@ -189,7 +189,7 @@ theorem iput_ofl_hold_open [CurCtx] (γ : BcacheNames) (V : BioView GF) (kk : Na
   iapply dsHold_swap γ V kk pidv dev bno bs bsd $$ Hh
 
 theorem iput_ofl_slots3 [CurCtx] (γ : BcacheNames) :
-    bslots (GF := GF) γ 3 ⊢ bslot γ ∗ bslot γ ∗ bslot γ := by
+    bslots (GF := GF) 3 ⊢ bslot ∗ bslot ∗ bslot := by
   unfold bslot
   iintro H
   icases dsSlots_split γ 1 2 $$ H with ⟨H1, H2⟩
@@ -197,7 +197,7 @@ theorem iput_ofl_slots3 [CurCtx] (γ : BcacheNames) :
   iframe
 
 theorem iput_ofl_slots3_join [CurCtx] (γ : BcacheNames) :
-    bslot (GF := GF) γ ∗ bslot γ ∗ bslot γ ⊢ bslots γ 3 := by
+    bslot (GF := GF) ∗ bslot ∗ bslot ⊢ bslots 3 := by
   unfold bslot
   iintro ⟨H1, H2, H3⟩
   ihave H23 := dsSlots_join γ 1 1 $$ H2 H3

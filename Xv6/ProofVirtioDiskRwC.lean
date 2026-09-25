@@ -96,7 +96,7 @@ theorem vdrw3_flDataV (v : BitVec 64) :
   rw [vdrw3_seqz v, vdrw3_flData (decide (v ≠ 0#64))]
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [DiskG GF] [CurCtx]
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [DiskG GF] [CurCtx]
 
 set_option maxHeartbeats 6000000 in
 /-- **P3.**  From `Xv6.vdrwP2Exit` to `Xv6.vdrwP3Exit`.

@@ -104,7 +104,7 @@ theorem fd_s16 : BitVec.extractLsb' 0 16 (0#64) = 0#16 := by decide
 theorem fd_s8 : BitVec.extractLsb' 0 8 (1#64) = 1#8 := by decide
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [DiskG GF] [CurCtx]
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [DiskG GF] [CurCtx]
 
 /-- `&disk.desc`, out of the geometry. -/
 theorem fd_geom (γ : DiskNames) (pd pav pu : BitVec 64) :
@@ -135,7 +135,7 @@ end
 
 set_option maxHeartbeats 4000000 in
 theorem free_desc_proof (WK : WAKEUP) : FREE_DESC :=
-  ⟨fun {hlc GF} _ _ _ _ Γ cpu k γ pd pav pu i w hi hpd ha0 hsie hnoff hK hlk htier => by
+  ⟨fun {hlc GF} _ _ _ _ _ _ _ Γ cpu k γ pd pav pu i w hi hpd ha0 hsie hnoff hK hlk htier => by
   unfold wp_free_desc_body
   simp only [freeDescAddr]
   iintro ⟨Hk, Hpc, #Hpi, #Hgeom, Hfree, Hdesc, HΦ⟩

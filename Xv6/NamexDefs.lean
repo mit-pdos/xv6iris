@@ -196,7 +196,7 @@ def namexInv [Fscfg] (k : KCtx) (A : NamexArgs) (R : RegMap) (off : Nat) (ipv : 
   (wc = true → fscBmapstart ∈ Scur) ∧ (∀ x ∈ A.Sb, x ∈ Scur)
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
   [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF]
   [Appcfg GF] [Fscfg] [Icfg] [CurCtx]
@@ -245,7 +245,7 @@ def namexPath (k : KCtx) (A : NamexArgs) : IProp GF :=
 def namexWalk (k : KCtx) (A : NamexArgs) (ipv : BitVec 64) (ncur : Nat) (Scur : List Nat)
     (nf : Nat → BitVec 8) : IProp GF := iprop%
   inodeHeld ipv ∗ irefSlots 1 ∗ namexKeep k A ∗ namexPath k A ∗
-  byteBuf (k.regs 12#5) (DFrac.own 1) (bview 14 nf) ∗ bslots fscBio 3 ∗
+  byteBuf (k.regs 12#5) (DFrac.own 1) (bview 14 nf) ∗ bslots 3 ∗
   logOpS icfgLog ncur Scur ∗ logTx icfgLog
 
 /-- The contract's two arms, at the value `rv` that ends up in `a0`. -/
@@ -262,7 +262,7 @@ state, at the return value `rv`. -/
 def namexOut (k : KCtx) (A : NamexArgs) (n' : Nat) (Sb' : List Nat) (ok : Bool)
     (nf : Nat → BitVec 8) (ipv : BitVec 64) (w : Bool) (rv : BitVec 64) : IProp GF := iprop%
   namexKeep k A ∗ namexPath k A ∗ byteBuf (k.regs 12#5) (DFrac.own 1) (bview 14 nf) ∗
-  bslots fscBio 3 ∗
+  bslots 3 ∗
   ⌜(∀ x ∈ A.Sb, x ∈ Sb') ∧ (w = true → fscBmapstart ∈ Sb') ∧
     A.n - (walkSpend w + (if ok then 0 else 1)) ≤ n' ∧ n' ≤ A.n⌝ ∗
   logOpS icfgLog n' Sb' ∗ logTx icfgLog ∗ namexArm A ok nf ipv rv

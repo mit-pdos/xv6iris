@@ -41,7 +41,7 @@ theorem sg_withSpie_pushed (k : KCtx) (m : Nat) (a b : Bool) :
     (k.pushed m).withSpie a b = (k.withSpie a b).pushed m := rfl
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF]
 
 /-- **The pid cell**, out of the running process's private block and back
 (Rocq `ProcInv.proc_priv_pid`).  The block is stated at the kernel-page-
@@ -83,7 +83,7 @@ end
 
 set_option maxHeartbeats 4000000 in
 theorem sys_getpid_proof (MP : MYPROC) : SYSGETPID :=
-  ⟨fun {hlc GF} _ _ _ cpu k pa pid V M hproc htier hnoff hK => by
+  ⟨fun {hlc GF} _ _ _ _ _ _ cpu k pa pid V M hproc htier hnoff hK => by
   unfold wp_sys_getpid_body
   simp only [sysGetpidAddr]
   iintro ⟨Hk, Hpc, Hpriv, Hnext⟩

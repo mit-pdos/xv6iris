@@ -31,7 +31,7 @@ attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Funct
 set_option maxHeartbeats 16000000 in
 /-- `+0x20 .. +0x46` and on (Rocq's `wp_bfree_gen` from bread's return). -/
 theorem bf_mid (LW : LOG_WRITE) (BE : BRELSE)
-    {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
+    {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF]
     [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [CurCtx]
     (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
     (c0 cpu : CPU) (k : KCtx) (spie1 spp1 : Bool) (R : RegMap)
@@ -57,7 +57,7 @@ theorem bf_mid (LW : LOG_WRITE) (BE : BRELSE)
     wordPointsTo (pPid k.proc) 4 dqp pidv ∗
     wordPointsTo sbBmapstartAddr 4 dqb (BitVec.ofNat 32 bmapstart) ∗
     bitmapInv γfs bmapstart V.cov logstart size ∗ fsblock γfs.bytes bno.toNat bs ∗
-    bslot γb ∗ logCredit γ cr Sb e0 bmapstart ∗ logOpSe γ (u + 1) Sb e0 ∗
+    bslot ∗ logCredit γ cr Sb e0 bmapstart ∗ logOpSe γ (u + 1) Sb e0 ∗
     bioLocked γb V kk pidv dev bnoB bs0 bsd d0 ∗
     frame4s2 (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) (k.regs 9#5) (k.regs 18#5) ∗
     wpNext true k.proc c0 (fun cpu' => iprop(∀ (spie spp : Bool) (R' : RegMap),
@@ -66,7 +66,7 @@ theorem bf_mid (LW : LOG_WRITE) (BE : BRELSE)
       trapCsrsExt cpu' k.sie -∗ cpuClaimExt cpu' k.sie k.proc -∗
       wordPointsTo (pPid k.proc) 4 dqp pidv -∗
       wordPointsTo sbBmapstartAddr 4 dqb (BitVec.ofNat 32 bmapstart) -∗
-      bslots γb 2 -∗
+      bslots 2 -∗
       logOpSe γ (if cr then u + 1 else u) (bmapstart :: Sb) e0 -∗ wpLoop cpu'))
     ⊢ wpLoop (GF := GF) cpu := by
   have hlt : bno.toNat < 8192 := by unfold BPB BSIZE at hsz; omega

@@ -26,7 +26,7 @@ set_option linter.unusedSimpArgs false
 set_option linter.unusedVariables false
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
   [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF]
   [Appcfg GF]
@@ -90,7 +90,7 @@ theorem fsinit_log (IL : INITLOG) (IR : IRECLAIM) [Fscfg] [Icfg] [CurCtx]
     fsinitCells vMagic vSize vNblocks vNlog ∗ fsblock fscFs.bytes 1 bsSb ∗
     excOwn fscFs.exc (hdrDec bsHdr).2 ∗
     fsinitLogRes bsHdr L D vlock vname vcpu vStart vDev vNc vN ∗
-    bslots fscBio ((LOGBLOCKS + 2) + 2) ∗ bslot fscBio ∗ irefSlot ∗ iregBoot ∗
+    bslots ((LOGBLOCKS + 2) + 2) ∗ bslot ∗ irefSlot ∗ iregBoot ∗
     fsinitCont k pidv dqp vMagic vSize vNblocks vNlog bsSb
     ⊢ wpLoop (GF := GF) cpu := by
   obtain ⟨hK4, -, -, -, hKil, -⟩ := fsinit_slots k.avail hK
@@ -169,7 +169,7 @@ theorem fsinit_log (IL : INITLOG) (IR : IRECLAIM) [Fscfg] [Icfg] [CurCtx]
   k_norm_g at hcs
   obtain ⟨e2, e8, e9, e18, e19, e20, e21, e22, e23, e24, e25, e26, e27⟩ := hcs
   -- the held-back slot rejoins initlog's two: THREE for ireclaim
-  ihave Hsl3 := bslots_cons fscBio 2 $$ [Hsl1 Hsl2]
+  ihave Hsl3 := bslots_cons 2 $$ [Hsl1 Hsl2]
   · iframe Hsl1 Hsl2
   iapply (fsinit_reclaim IR Γ cpu k spie2 spp2 R2 γl pd pav pu j pidv dqp vMagic vSize vNblocks
       vNlog bsSb hj hproc hK hnoff htier hgeom hblk hbg hbel hn1 hnnib hn31 hpd (e18.trans hs2)

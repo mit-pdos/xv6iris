@@ -29,6 +29,7 @@ import MachCSL.CallConv
 import Xv6.Geom
 import Xv6.KernelText
 import Xv6.UPtDefs
+import Xv6.IrefSlots
 
 set_option linter.unusedSectionVars false
 
@@ -48,10 +49,8 @@ both land on `KernelSyms.«proc»`, and `&proc[NPROC] = KernelSyms.«tickslock»
 different build of the same kernel.) -/
 def procsAddr : BitVec 64 := KA.«proc»
 
-/-- `NPROC`. -/
-def NPROC : Nat := 64
-/-- `NOFILE`. -/
-def NOFILE : Nat := 16
+-- `NPROC` / `NOFILE` are `Xv6/SlotSupply.lean`'s (the slot supplies'
+-- bounds need them below this file).
 /-- `sizeof (struct proc)` (Rocq `proc_size`). -/
 def procSize : Nat := 360
 /-- `sizeof (p->name)` (Rocq `PNAMELEN`). -/

@@ -166,7 +166,7 @@ def sbImage (magic fssize nblocks ninodes nlog logstart inodestart bmapstart : B
 
 /-- **WP of `fsinit(dev = a0)`** at either entry `SIE` (Rocq's
 `wp_fsinit_sconf_body`). -/
-def wp_fsinit_eb_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
+def wp_fsinit_eb_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
     [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
     [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF]
     [Appcfg GF] [Fscfg] [Icfg] [CurCtx]
@@ -254,7 +254,7 @@ def wp_fsinit_eb_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6
   ([∗list] i ∈ List.range LOGBLOCKS, ∃ bs : List (BitVec 8),
      fsChalf fscFs (logSlotBno fscLogst i) bs) ∗
   -- THIRTY-FIVE slot units: initlog seals 32, returns 2, ONE is held back
-  bslots fscBio ((LOGBLOCKS + 2) + 2 + 1) ∗
+  bslots ((LOGBLOCKS + 2) + 2 + 1) ∗
   -- ONE ledger unit for ireclaim's iget/iput pair; it comes back
   irefSlot ∗
   wpNext true k.proc cpu (fun cpu' => iprop(∀ (spie spp : Bool) (R' : RegMap),
@@ -277,7 +277,7 @@ def wp_fsinit_eb_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6
     -- AT `icfgLog`, the names handed in (what `fs_ready` seals)
     logCtx icfgLog fscBio fscFs fscCov fscLogst icfgDev -∗
     -- three, not two
-    bslots fscBio 3 -∗
+    bslots 3 -∗
     irefSlot -∗
     -- the boot-shelter token, handed back for the seal
     iregBoot -∗ wpLoop cpu'))
@@ -285,7 +285,7 @@ def wp_fsinit_eb_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6
 
 /-- The interface of `fsinit` (Rocq's `Module Type FSINIT`). -/
 structure FSINIT : Prop where
-  wp_fsinit_eb : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
+  wp_fsinit_eb : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
     [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
     [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF]
     [Appcfg GF] [Fscfg] [Icfg] [CurCtx]

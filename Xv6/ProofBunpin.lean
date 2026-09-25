@@ -38,7 +38,7 @@ theorem bu_br_acq : KA.«bunpin» + 0xffffffffffffde38#64 = KA.«acquire» := by
 theorem bu_br_rel : KA.«bunpin» + 0xffffffffffffdec0#64 = KA.«release» := by decide
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [BcacheG GF] [CurCtx]
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [BcacheG GF] [CurCtx]
 
 /-! ## The tail: the epilogue -/
 
@@ -76,7 +76,7 @@ end
 
 set_option maxHeartbeats 16000000 in
 theorem bunpin_proof (AC : ACQUIRE) (RE : RELEASE_HOOK) : BUNPIN := ⟨
-  fun {hlc GF} _ _ _ _ _ _ cpu k γl γ V kk dev bno hnoff hK hlk hkk ha0 => by
+  fun {hlc GF} _ _ _ _ _ _ _ _ _ cpu k γl γ V kk dev bno hnoff hK hlk hkk ha0 => by
   unfold wp_bunpin_body
   simp only [bunpinAddr]
   iintro ⟨Hk, Hpc, #Hbc, Href, Hnext⟩
@@ -212,12 +212,12 @@ theorem bunpin_proof (AC : ACQUIRE) (RE : RELEASE_HOOK) : BUNPIN := ⟨
   case' _ => iframe Hkd Hkb Hregs
   ihave Hkey := Hkcl $$ Hkey0
   -- the slot unit comes back
-  ihave ⟨Hsl, Hslots⟩ := (show bslots (GF := GF) γ (s ++ id :: t).length ⊢
-      bslot γ ∗ bslots γ (s ++ t).length from by
+  ihave ⟨Hsl, Hslots⟩ := (show bslots (GF := GF) (s ++ id :: t).length ⊢
+      bslot ∗ bslots (s ++ t).length from by
     rw [hn, hlen2]
     have he : n - 1 + 1 = n := by omega
     rw [← he]
-    exact bslots_uncons γ (n - 1)) $$ Hslots
+    exact bslots_uncons (n - 1)) $$ Hslots
   have hnd' : (s ++ t).Nodup := bunpin_nodup s t id hnd
   have hlt' : (s ++ t).length < 2 ^ 31 := by rw [hlen2]; omega
   ihave Hslot := bslotAt_intro γ curCtx kk (s ++ t) hnd' hlt' $$ [Hrefc Hhalves' Hslots Hcnt]

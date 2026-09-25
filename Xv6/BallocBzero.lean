@@ -36,7 +36,7 @@ theorem ba_ret_6a : jumpPc (KA.«balloc» + 0x6a#64) = KA.«balloc» + 0x6a#64 :
 theorem ba_ret_70 : jumpPc (KA.«balloc» + 0x70#64) = KA.«balloc» + 0x70#64 := by decide
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [CurCtx]
 
 set_option maxHeartbeats 16000000 in
@@ -64,7 +64,7 @@ theorem ba_bzero_fill (LW : LOG_WRITE) (BE : BRELSE) (MS : MEMSET)
     wordPointsTo (pPid k.proc) 4 dqp pidv ∗
     wordPointsTo sbSizeAddr 4 dqs (BitVec.ofNat 32 size) ∗
     wordPointsTo sbBmapstartAddr 4 dqb (BitVec.ofNat 32 bmapstart) ∗
-    bslot γb ∗
+    bslot ∗
     logOpS γ ((if cr then u + 1 else u) + 1) (bmapstart :: Sb) ∗
     fsblock γfs.bytes bi bs2 ∗
     bufHold0 γb V kk2 pidv dev (BitVec.ofNat 32 bi) bs2 bsd2 ∗
@@ -224,7 +224,7 @@ theorem ba_bzero (BR : BREAD) (LW : LOG_WRITE) (BE : BRELSE) (MS : MEMSET)
     wordPointsTo (pPid k.proc) 4 dqp pidv ∗
     wordPointsTo sbSizeAddr 4 dqs (BitVec.ofNat 32 size) ∗
     wordPointsTo sbBmapstartAddr 4 dqb (BitVec.ofNat 32 bmapstart) ∗
-    bslots γb 2 ∗
+    bslots 2 ∗
     logOpS γ ((if cr then u + 1 else u) + 1) (bmapstart :: Sb) ∗
     fsblock γfs.bytes bi bsD ∗
     baCont k c0 γ γb γfs V.cov logstart bmapstart size u cr Sb pidv dqp dqb dqs

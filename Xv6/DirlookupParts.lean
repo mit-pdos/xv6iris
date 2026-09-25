@@ -83,7 +83,7 @@ def dirlookupMsgStr : List (BitVec 8) :=
    0x72#8, 0x65#8, 0x61#8, 0x64#8]
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF]
 
 set_option maxRecDepth 100000 in
 /-- Rocq's `dlk_msg_str`. -/

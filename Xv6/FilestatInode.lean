@@ -49,7 +49,7 @@ theorem filestat_psw (K : KCtx) (m : Nat) (a b : Bool) :
     (K.pushed m).withSpie a b = (K.withSpie a b).pushed m := rfl
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
   [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF]
   [Appcfg GF] [FileG GF] [Fscfg] [Icfg] [CurCtx]
@@ -73,7 +73,7 @@ theorem filestat_copy (CO : COPYOUT) (cpu : CPU) (k : KCtx) (spie spp : Bool) (R
     wordPointsTo (fstatBufAddr (k.regs 2#5) + 12#64) 4 (DFrac.own 1) h ∗
     trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗
     isLock γkl kmemLockAddr "kmem" (kmemRes γk) ∗ kallocAvail γk none ∗
-    fileRef γ fk q st ∗ procPrivExt (procAddr j) pid V V.upt M ∗ bslot fscBio ∗
+    fileRef γ fk q st ∗ procPrivExt (procAddr j) pid V V.upt M ∗ bslot ∗
     fstatK k γ fk q st (procAddr j) pid V M
     ⊢ wpLoop (GF := GF) cpu := by
   rw [filestatSlots_eq] at hK
@@ -157,7 +157,7 @@ theorem filestat_copy (CO : COPYOUT) (cpu : CPU) (k : KCtx) (spie spp : Bool) (R
   ihave Hcells := fstat_buf_close (k.regs 2#5) hal _ (fstatBytes_length _ _ _ _ _ _) $$ Hbuf
   ihave Hpriv := ec_priv_close (procAddr j) pid V V.upt P' M' hext hf $$ [Hsz Hpg Hpt Hrest]
   · iframe
-  ihave Henv := (show bslot (GF := GF) fscBio ⊢ filestatEnvOut st from
+  ihave Henv := (show bslot (GF := GF) ⊢ filestatEnvOut st from
     filestat_env_out_in st hst) $$ Hbs
   have hr2 := fstatRegs_s23 k fk _ _ (k.regs 18#5) (k.regs 19#5) _
     (fstatRegs_set k fk _ _ R1 10#5 (R1 10#5) hr1 (by decide))
@@ -204,7 +204,7 @@ theorem filestat_stat (ST : STATI) (IU : IUNLOCK) (CO : COPYOUT) (Γ : SchedName
     credFloor lo tl ∗ fstatLk ik s g lo inum dn bm γisl pid ∗
     frefTok γ fk q ∗ fileFieldsAt curCtx fk q C ∗
     (inodeShrGenlo ik s icfgDev inum g lo -∗ filePaySt γ fk q C st) ∗
-    procPrivExt (procAddr j) pid V V.upt M ∗ bslot fscBio ∗
+    procPrivExt (procAddr j) pid V V.upt M ∗ bslot ∗
     fstatK k γ fk q st (procAddr j) pid V M
     ⊢ wpLoop (GF := GF) cpu := by
   rw [filestatSlots_eq] at hK
@@ -334,7 +334,7 @@ theorem filestat_lock (IL : ILOCK) (ST : STATI) (IU : IUNLOCK) (CO : COPYOUT) (�
     credFloor lo tl ∗ ityShot g ty ∗ inodeShrGenlo ik s icfgDev inum g lo ∗
     frefTok γ fk q ∗ fileFieldsAt curCtx fk q C ∗
     (inodeShrGenlo ik s icfgDev inum g lo -∗ filePaySt γ fk q C st) ∗
-    procPrivExt (procAddr j) pid V V.upt M ∗ bslot fscBio ∗
+    procPrivExt (procAddr j) pid V V.upt M ∗ bslot ∗
     fstatK k γ fk q st (procAddr j) pid V M
     ⊢ wpLoop (GF := GF) cpu := by
   have hK76 := hK

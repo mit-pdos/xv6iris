@@ -259,7 +259,7 @@ structure DirlinkOut [Fscfg] [Icfg] (bm : Blkmap) (data : Nat → List (BitVec 8
 
 /-- **WP of `dirlink(dp = a0, name = a1, inum = a2)`, the set-form contract**
 (Rocq's `wp_dirlink_gen_body`), at the interrupts-off pin. -/
-def wp_dirlink_gen_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
+def wp_dirlink_gen_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
     [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [IregG GF] [IcacheG GF]
     [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF]
     [Appcfg GF] [Fscfg] [Icfg] [CurCtx]
@@ -320,7 +320,7 @@ def wp_dirlink_gen_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [X
   dinodeAt fscIreg dinum dn0 ∗
   -- the caller's own pid cell
   wordPointsTo (pPid k.proc) 4 dqp pidv ∗
-  bslots fscBio 3 ∗
+  bslots 3 ∗
   -- THE ICACHE
   isItable2 fscItlock fscIc fscFs fscIreg fscCov fscLogst icfgNib icfgDev ∗
   itableInv (hlc := hlc) ∗ icSleeplocks fscIc ∗
@@ -345,7 +345,7 @@ def wp_dirlink_gen_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [X
     wordPointsTo sbBmapstartAddr 4 dqb (BitVec.ofNat 32 fscBmapstart) -∗
     dinodeAt fscIreg dinum dn0' -∗
     wordPointsTo (pPid k.proc) 4 dqp pidv -∗
-    bslots fscBio 3 -∗
+    bslots 3 -∗
     -- NET ZERO on the ledger
     irefSlot -∗
     -- ...and the borrow, back VERBATIM
@@ -358,7 +358,7 @@ def wp_dirlink_gen_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [X
 /-- The eb-generic form of `wp_dirlink_gen_body` (Rocq: `cpu_own 0 eb`, the
 complement `trap_csrs_ext` / `cpu_claim_ext` in and out; depth 0, so no
 spinlock held by `KCtx.wf`). -/
-def wp_dirlink_gen_eb_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
+def wp_dirlink_gen_eb_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
     [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [IregG GF] [IcacheG GF]
     [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF]
     [Appcfg GF] [Fscfg] [Icfg] [CurCtx]
@@ -408,7 +408,7 @@ def wp_dirlink_gen_eb_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF]
   iregInv (hlc := hlc) fscIreg fscFs icfgIst icfgNib ∗ iregOpen ∗
   dinodeAt fscIreg dinum dn0 ∗
   wordPointsTo (pPid k.proc) 4 dqp pidv ∗
-  bslots fscBio 3 ∗
+  bslots 3 ∗
   isItable2 fscItlock fscIc fscFs fscIreg fscCov fscLogst icfgNib icfgDev ∗
   itableInv (hlc := hlc) ∗ icSleeplocks fscIc ∗
   irefSlot ∗
@@ -430,7 +430,7 @@ def wp_dirlink_gen_eb_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF]
     wordPointsTo sbBmapstartAddr 4 dqb (BitVec.ofNat 32 fscBmapstart) -∗
     dinodeAt fscIreg dinum dn0' -∗
     wordPointsTo (pPid k.proc) 4 dqp pidv -∗
-    bslots fscBio 3 -∗
+    bslots 3 -∗
     irefSlot -∗
     dlinks fscFs dinum.toNat dn bm data -∗
     logOpS icfgLog n' Sb' -∗
@@ -440,7 +440,7 @@ def wp_dirlink_gen_eb_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF]
 /-- The interface of `dirlink` (Rocq's `Module Type DIRLINK`, less the
 dropped counted form). -/
 structure DIRLINK : Prop where
-  wp_dirlink_gen_eb : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
+  wp_dirlink_gen_eb : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
     [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [IregG GF] [IcacheG GF]
     [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF]
     [Appcfg GF] [Fscfg] [Icfg] [CurCtx]
@@ -461,7 +461,7 @@ structure DIRLINK : Prop where
 /-- The interrupts-off instance of `wp_dirlink_gen_eb` (the complement is the
 whole bundle). -/
 theorem DIRLINK.wp_dirlink_gen (A : DIRLINK) {hlc : HasLC} {GF : BundledGFunctors}
-    [MachGS hlc GF] [Xv6G GF]
+    [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
     [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [IregG GF] [IcacheG GF]
     [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF]
     [Appcfg GF] [Fscfg] [Icfg] [CurCtx]

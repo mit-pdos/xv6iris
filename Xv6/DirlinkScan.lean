@@ -78,7 +78,7 @@ theorem dirlink_slots_panic (a : Nat) (h : dirlinkSlots ≤ a) : panicSlots ≤ 
   omega
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [IregG GF] [IcacheG GF]
   [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF]
   [Appcfg GF] [Fscfg] [Icfg] [CurCtx]
@@ -137,7 +137,7 @@ theorem dirlink_record (SN : STRNCPY) (WI : WRITEI) (Γ : SchedNames) [ClaimIs (
     dirlinkDe (k.regs 2#5) (halfBytes (dirInum data i) ++ bview 14 (dirName data i)) ∗
     trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗
     dirlinkKeep k ip dinum bm data dn dn0 fn pidv dqp dqd dqf dqn dqs dqbs dqb ∗
-    bslots fscBio 3 ∗ irefSlot ∗ dlinks fscFs dinum.toNat dn bm data ∗
+    bslots 3 ∗ irefSlot ∗ dlinks fscFs dinum.toNat dn bm data ∗
     logOpS icfgLog ncount Sb ∗ txPin icfgLog tid qtx ∗
     dirlinkEnv (hlc := hlc) Γ γl pd pav pu γkl γk ∗
     (∀ c' : CPU, dirlinkPost k ip dinum bm data dn dn0 fn inum ncount Sb tid qtx pidv

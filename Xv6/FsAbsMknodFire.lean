@@ -153,7 +153,7 @@ theorem mkfChild_dev (dn : Dinode) (bm : Blkmap) (data : Nat → List (BitVec 8)
 /-! ## 3.  The read-only fire point, `ftopN` opened and closed -/
 
 section MknodFire
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [IcacheG GF] [Xv6G GF]
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [IcacheG GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF]
   [FsTopG GF] [FsBytesG GF]
 
 /-- THE READ-ONLY FIRE, at create's dirlookup(found) under the parent's lock
@@ -435,7 +435,7 @@ theorem cafMade_row (ty major minor : BitVec 16) (bm : Blkmap) (data : Nat → L
 /-! ### 7.3  The success fire, fused with the parent-row retag -/
 
 section CreateFire2
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [IcacheG GF] [Xv6G GF]
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [IcacheG GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF]
   [FsTopG GF] [FsBytesG GF] [Appcfg GF]
 
 /-- THE SUCCESS FIRE, FUSED WITH THE PARENT-ROW RETAG (Rocq's

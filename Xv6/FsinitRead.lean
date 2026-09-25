@@ -22,7 +22,7 @@ set_option linter.unusedSimpArgs false
 set_option linter.unusedVariables false
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
   [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF]
   [Appcfg GF]
@@ -84,7 +84,7 @@ theorem fsinit_readsb (MM : MEMMOVE) (BE : BRELSE) (IL : INITLOG) (IR : IRECLAIM
     fsblock fscFs.bytes 1 bsSb ∗ byteBuf KA.«sb» (DFrac.own 1) sbOld ∗
     excOwn fscFs.exc (hdrDec bsHdr).2 ∗
     fsinitLogRes bsHdr L D vlock vname vcpu vStart vDev vNc vN ∗
-    bslots fscBio ((LOGBLOCKS + 2) + 2) ∗ irefSlot ∗ iregBoot ∗
+    bslots ((LOGBLOCKS + 2) + 2) ∗ irefSlot ∗ iregBoot ∗
     fsinitCont k pidv dqp vMagic vSize vNblocks vNlog bsSb
     ⊢ wpLoop (GF := GF) cpu := by
   obtain ⟨hK4, -, hKmm, hKbl, -, -⟩ := fsinit_slots k.avail hK

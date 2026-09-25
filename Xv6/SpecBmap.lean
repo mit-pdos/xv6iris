@@ -235,7 +235,7 @@ theorem bmapAi_true (bm bm' : Blkmap) (h1 : bm.bmInd.toNat = 0) (h2 : bm'.bmInd.
 /-! ## The contracts -/
 
 /-- **THE CREDITED / SET-FORM CONTRACT** (Rocq's `wp_bmap_gen_body`). -/
-def wp_bmap_gen_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
+def wp_bmap_gen_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF]
     [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [CurCtx]
     (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
     (cpu : CPU) (k : KCtx) (γl : GName) (γb : BcacheNames) (V : BioView GF) (γdl : GName)
@@ -273,7 +273,7 @@ def wp_bmap_gen_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G
   wordPointsTo sbBmapstartAddr 4 dqb (BitVec.ofNat 32 bmapstart) ∗
   bitmapInv γfs bmapstart V.cov logstart size ∗
   -- THREE slot units: bread's one held across the interior balloc's two
-  bslots γb 3 ∗
+  bslots 3 ∗
   logOpS γ n Sb ∗
   wpNext true k.proc cpu (fun cpu' => iprop(∀ (spie spp : Bool) (R' : RegMap) (bm' : Blkmap)
       (n' : Nat) (data' : Nat → List (BitVec 8)) (Sb' : List Nat),
@@ -297,7 +297,7 @@ def wp_bmap_gen_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G
     ⌜data' = data ∨
       ((blkmapGet bm fbn).toNat = 0 ∧ data' = dataUpd data fbn (List.replicate BSIZE 0#8))⌝ -∗
     inodeBlocks γfs bm' data' -∗
-    bslots γb 3 -∗
+    bslots 3 -∗
     -- THE LEDGER, ARM-WISE
     ⌜-- (a) the spend, arm-wise exact, as an upper bound
       n ≤ n' + bmapCost cr (bmapAlloced bm bm' fbn) (bmapInd fbn) ∧ n' ≤ n ∧
@@ -317,7 +317,7 @@ def wp_bmap_gen_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G
 /-- The eb-generic form of `wp_bmap_gen_body` (Rocq: `cpu_own 0 eb`, the
 complement `trap_csrs_ext` / `cpu_claim_ext` in and out; depth 0, so no
 spinlock held by `KCtx.wf`). -/
-def wp_bmap_gen_eb_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
+def wp_bmap_gen_eb_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF]
     [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [CurCtx]
     (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
     (cpu : CPU) (k : KCtx) (γl : GName) (γb : BcacheNames) (V : BioView GF) (γdl : GName)
@@ -355,7 +355,7 @@ def wp_bmap_gen_eb_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [X
   wordPointsTo sbBmapstartAddr 4 dqb (BitVec.ofNat 32 bmapstart) ∗
   bitmapInv γfs bmapstart V.cov logstart size ∗
   -- THREE slot units: bread's one held across the interior balloc's two
-  bslots γb 3 ∗
+  bslots 3 ∗
   logOpS γ n Sb ∗
   wpNext true k.proc cpu (fun cpu' => iprop(∀ (spie spp : Bool) (R' : RegMap) (bm' : Blkmap)
       (n' : Nat) (data' : Nat → List (BitVec 8)) (Sb' : List Nat),
@@ -379,7 +379,7 @@ def wp_bmap_gen_eb_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [X
     ⌜data' = data ∨
       ((blkmapGet bm fbn).toNat = 0 ∧ data' = dataUpd data fbn (List.replicate BSIZE 0#8))⌝ -∗
     inodeBlocks γfs bm' data' -∗
-    bslots γb 3 -∗
+    bslots 3 -∗
     -- THE LEDGER, ARM-WISE
     ⌜-- (a) the spend, arm-wise exact, as an upper bound
       n ≤ n' + bmapCost cr (bmapAlloced bm bm' fbn) (bmapInd fbn) ∧ n' ≤ n ∧
@@ -400,7 +400,7 @@ def wp_bmap_gen_eb_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [X
 `wp_bmap_noalloc_sconf_body`): the slot is already allocated, so all three
 allocation sites are dead; the block resources at a SHARE `dq`; one
 `bslot`; the postcondition exact. -/
-def wp_bmap_noalloc_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
+def wp_bmap_noalloc_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF]
     [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [CurCtx]
     (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
     (cpu : CPU) (k : KCtx) (γl : GName) (γb : BcacheNames) (V : BioView GF) (γdl : GName)
@@ -427,7 +427,7 @@ def wp_bmap_noalloc_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [
   inodeMapQ γfs dq ip bm ∗ inodeBlocksQ γfs dq bm data ∗
   wordPointsTo (pPid k.proc) 4 dqp pidv ∗
   -- ONE slot unit: the interior bread's, handed back by brelse
-  bslot γb ∗
+  bslot ∗
   wpNext true k.proc cpu (fun cpu' => iprop(∀ (spie spp : Bool) (R' : RegMap),
     ⌜calleeSaved k.regs R'⌝ -∗
     -- the block the map already named, and nothing else happened
@@ -437,13 +437,13 @@ def wp_bmap_noalloc_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [
     wordPointsTo (pPid k.proc) 4 dqp pidv -∗
     wordPointsTo (iDev ip) 4 dqd dev -∗
     inodeMapQ γfs dq ip bm -∗ inodeBlocksQ γfs dq bm data -∗
-    bslot γb -∗ wpLoop cpu'))
+    bslot -∗ wpLoop cpu'))
   ⊢ wpLoop (GF := GF) cpu
 
 /-- The eb-generic form of `wp_bmap_noalloc_body` (Rocq: `cpu_own 0 eb`, the
 complement `trap_csrs_ext` / `cpu_claim_ext` in and out; depth 0, so no
 spinlock held by `KCtx.wf`). -/
-def wp_bmap_noalloc_eb_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
+def wp_bmap_noalloc_eb_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF]
     [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [CurCtx]
     (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
     (cpu : CPU) (k : KCtx) (γl : GName) (γb : BcacheNames) (V : BioView GF) (γdl : GName)
@@ -470,7 +470,7 @@ def wp_bmap_noalloc_eb_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF
   inodeMapQ γfs dq ip bm ∗ inodeBlocksQ γfs dq bm data ∗
   wordPointsTo (pPid k.proc) 4 dqp pidv ∗
   -- ONE slot unit: the interior bread's, handed back by brelse
-  bslot γb ∗
+  bslot ∗
   wpNext true k.proc cpu (fun cpu' => iprop(∀ (spie spp : Bool) (R' : RegMap),
     ⌜calleeSaved k.regs R'⌝ -∗
     -- the block the map already named, and nothing else happened
@@ -480,13 +480,13 @@ def wp_bmap_noalloc_eb_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF
     wordPointsTo (pPid k.proc) 4 dqp pidv -∗
     wordPointsTo (iDev ip) 4 dqd dev -∗
     inodeMapQ γfs dq ip bm -∗ inodeBlocksQ γfs dq bm data -∗
-    bslot γb -∗ wpLoop cpu'))
+    bslot -∗ wpLoop cpu'))
   ⊢ wpLoop (GF := GF) cpu
 
 /-- The interface of the allocating `bmap` (Rocq's `Module Type BMAP`, less
 the dropped counted form). -/
 structure BMAP : Prop where
-  wp_bmap_gen_eb : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
+  wp_bmap_gen_eb : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF]
     [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [CurCtx]
     (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
     (cpu : CPU) (k : KCtx) (γl : GName) (γb : BcacheNames) (V : BioView GF) (γdl : GName)
@@ -503,7 +503,7 @@ structure BMAP : Prop where
 
 /-- The interrupts-off instance of `wp_bmap_gen_eb` (the complement is the whole
 bundle): the contract every not-yet-generalized caller states. -/
-theorem BMAP.wp_bmap_gen (A : BMAP) {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
+theorem BMAP.wp_bmap_gen (A : BMAP) {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF]
     [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [CurCtx]
     (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
     (cpu : CPU) (k : KCtx) (γl : GName) (γb : BcacheNames) (V : BioView GF) (γdl : GName)
@@ -531,7 +531,7 @@ theorem BMAP.wp_bmap_gen (A : BMAP) {hlc : HasLC} {GF : BundledGFunctors} [MachG
 
 /-- The interface of the no-alloc `bmap` (Rocq's `Module Type BMAP_NOALLOC`). -/
 structure BMAP_NOALLOC : Prop where
-  wp_bmap_noalloc_eb : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
+  wp_bmap_noalloc_eb : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF]
     [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [CurCtx]
     (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
     (cpu : CPU) (k : KCtx) (γl : GName) (γb : BcacheNames) (V : BioView GF) (γdl : GName)
@@ -545,7 +545,7 @@ structure BMAP_NOALLOC : Prop where
 
 /-- The interrupts-off instance of `wp_bmap_noalloc_eb` (the complement is the whole
 bundle): the contract every not-yet-generalized caller states. -/
-theorem BMAP_NOALLOC.wp_bmap_noalloc (A : BMAP_NOALLOC) {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
+theorem BMAP_NOALLOC.wp_bmap_noalloc (A : BMAP_NOALLOC) {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF]
     [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [CurCtx]
     (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
     (cpu : CPU) (k : KCtx) (γl : GName) (γb : BcacheNames) (V : BioView GF) (γdl : GName)

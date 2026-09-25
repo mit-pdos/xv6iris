@@ -84,7 +84,7 @@ theorem sleep_prepare_br_fffffffffffff9b2 : KA.«sleep_prepare» + 0xfffffffffff
 set_option maxHeartbeats 4000000 in
 /-- **`sleep_prepare` meets its specification.** -/
 theorem sleep_prepare_proof (MP : MYPROC) (AC : ACQUIRE) (RE : RELEASE) : SLEEP_PREPARE :=
-  ⟨fun {hlc GF} _ _ X Γ _ cpu k j hj hproc hchan hnoff hK hlk htier => by
+  ⟨fun {hlc GF} _ _ _ _ _ X Γ _ cpu k j hj hproc hchan hnoff hK hlk htier => by
   obtain ⟨ξ0, t0⟩ := X
   letI : CurCtx := ⟨ξ0, t0⟩
   unfold wp_sleep_prepare_body

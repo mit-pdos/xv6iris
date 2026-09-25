@@ -291,7 +291,7 @@ theorem bm_insert_ind_facts (cov : ExtTreeSet Nat compare) (ls : Nat) (bm : Blkm
 /-! ## The indirect block's entry cell, inside the held buffer -/
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [BcacheG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [BcacheG GF]
   [DiskG GF] [FsBlocksG GF] [SleepLockG GF] [CurCtx]
 
 /-- Entry `q`'s cell out of the checked-out indirect buffer, and back at
@@ -470,7 +470,7 @@ macro_rules
 /-! ## The kit, the continuation -/
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [CurCtx]
 
 /-- Everything the ALLOCATING arms need and the no-alloc caller does not
@@ -480,7 +480,7 @@ def bmKit (ak : Option BmAlloc) (γb : BcacheNames) (γfs : FsNames)
     (Sb : List Nat) : IProp GF :=
   match ak with
   | some a => iprop(bmAllocRes γfs cov logstart a ∗ logCtx a.baLog γb γfs cov logstart dev ∗
-      bslots γb 2 ∗ logOpS a.baLog n Sb)
+      bslots 2 ∗ logOpS a.baLog n Sb)
   | none => iprop(emp)
 
 theorem bmKit_some (a : BmAlloc) (γb : BcacheNames) (γfs : FsNames)
@@ -488,7 +488,7 @@ theorem bmKit_some (a : BmAlloc) (γb : BcacheNames) (γfs : FsNames)
     (Sb : List Nat) :
     bmKit (GF := GF) (some a) γb γfs cov logstart dev n Sb ⊣⊢
       iprop(bmAllocRes γfs cov logstart a ∗ logCtx a.baLog γb γfs cov logstart dev ∗
-        bslots γb 2 ∗ logOpS a.baLog n Sb) := by
+        bslots 2 ∗ logOpS a.baLog n Sb) := by
   unfold bmKit; exact .rfl
 
 theorem bmKit_none (γb : BcacheNames) (γfs : FsNames) (cov : ExtTreeSet Nat compare)
@@ -510,7 +510,7 @@ def bmCont (k : KCtx) (cpu : CPU) (γb : BcacheNames) (γfs : FsNames)
     wordPointsTo (pPid k.proc) 4 dqp pidv -∗
     wordPointsTo (iDev ip) 4 dqd dev -∗
     inodeMapQ γfs dq ip bm' -∗ inodeBlocksQ γfs dq bm' data' -∗
-    bslot γb -∗ bmKit ak γb γfs cov logstart dev n' Sb' -∗ wpLoop cpu'))
+    bslot -∗ bmKit ak γb γfs cov logstart dev n' Sb' -∗ wpLoop cpu'))
 
 end
 
@@ -518,7 +518,7 @@ end
 
 /-- A view with `fsView`'s two fields IS `fsView` of its own geometry
 (a copy of `Xv6.bioView_eq_fsView`, BallocDefs). -/
-theorem bm_view_eq {GF : BundledGFunctors} [Xv6G GF] [FsBlocksG GF] (V : BioView GF)
+theorem bm_view_eq {GF : BundledGFunctors} [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [FsBlocksG GF] (V : BioView GF)
     (γfs : FsNames) (hcl : V.clean = fsMclean γfs) (hdt : V.dirty = fsMdirty γfs) :
     V = fsView γfs V.gd V.dev V.cov := by
   cases V
@@ -527,7 +527,7 @@ theorem bm_view_eq {GF : BundledGFunctors} [Xv6G GF] [FsBlocksG GF] (V : BioView
   rfl
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [BcacheG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [BcacheG GF]
   [DiskG GF] [FsBlocksG GF] [SleepLockG GF] [CurCtx]
 
 /-- Rocq's `bm_held_content` at a share, at the parameter view
@@ -551,7 +551,7 @@ end
 /-! ## The callees, at their call sites (copies of BallocDefs' wrappers) -/
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [CurCtx]
 
 set_option maxHeartbeats 1000000 in
@@ -581,7 +581,7 @@ theorem bm_balloc (BA : BALLOC) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
     wordPointsTo sbSizeAddr 4 dqs (BitVec.ofNat 32 size) ∗
     wordPointsTo sbBmapstartAddr 4 dqb (BitVec.ofNat 32 bmapstart) ∗
     bitmapInv γfs bmapstart V.cov logstart size ∗
-    bslots γb 2 ∗ logOpS γ (2 + u) Sb ∗
+    bslots 2 ∗ logOpS γ (2 + u) Sb ∗
     wpNext true pj c (fun cpu' => iprop(∀ (spie spp : Bool) (R' : RegMap),
       ⌜calleeSaved k'.regs R'⌝ -∗
       kctx cpu' ((k'.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k'.regs 1#5)) -∗
@@ -589,7 +589,7 @@ theorem bm_balloc (BA : BALLOC) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
       wordPointsTo (pPid pj) 4 dqp pidv -∗
       wordPointsTo sbSizeAddr 4 dqs (BitVec.ofNat 32 size) -∗
       wordPointsTo sbBmapstartAddr 4 dqb (BitVec.ofNat 32 bmapstart) -∗
-      bslots γb 2 -∗
+      bslots 2 -∗
       ((⌜R' 10#5 = 0#64⌝ ∗ logOpS γ (2 + u) Sb) ∨
        (∃ blk : BitVec 32,
           ⌜R' 10#5 = BitVec.signExtend 64 blk ∧ blk.toNat ≠ 0 ∧

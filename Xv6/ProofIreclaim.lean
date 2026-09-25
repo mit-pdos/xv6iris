@@ -42,7 +42,7 @@ set_option linter.unusedSimpArgs false
 set_option linter.unusedVariables false
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
   [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF]
   [Appcfg GF]
@@ -69,7 +69,7 @@ theorem ireclaim_scan_start (PK : PRINTK) (BD : BREAD) (BE : BRELSE) (IG : IGET)
     wordPointsTo sbBmapstartAddr 4 dqb (BitVec.ofNat 32 fscBmapstart) ∗
     wordPointsTo (pPid k.proc) 4 dqp pidv ∗
     ireclaimFrameK k ∗ ireclaimCont k pidv dqp dqb dqs dqn ∗
-    bslots fscBio 3 ∗ irefSlot ∗ iregBoot
+    bslots 3 ∗ irefSlot ∗ iregBoot
     ⊢ wpLoop (GF := GF) cpu := by
   have h := ireclaim_scan (hlc := hlc) (GF := GF) PK BD BE IG BO IL IU IP EO Γ k γl pd pav pu j
     pidv dqp dqb dqs dqn hj hproc hK hnoff hlocks htier hgeom hblk hbg hbel hn31 hnnib hpd
@@ -112,7 +112,7 @@ theorem ireclaim_setup (PK : PRINTK) (BD : BREAD) (BE : BRELSE) (IG : IGET) (BO 
     wordPointsTo sbInodestart 4 dqs (BitVec.ofNat 32 icfgIst) ∗
     wordPointsTo sbBmapstartAddr 4 dqb (BitVec.ofNat 32 fscBmapstart) ∗
     wordPointsTo (pPid k.proc) 4 dqp pidv ∗
-    bslots fscBio 3 ∗ irefSlot ∗ iregBoot ∗
+    bslots 3 ∗ irefSlot ∗ iregBoot ∗
     ireclaimCont k pidv dqp dqb dqs dqn
     ⊢ wpLoop (GF := GF) cpu := by
   obtain ⟨hK8, -⟩ := ireclaim_slots k.avail hK
@@ -256,7 +256,7 @@ end
 `IreclaimProof BR BL IG BO IL IU IP EO Printk`). -/
 theorem ireclaim_proof (BR : BREAD) (BL : BRELSE) (IG : IGET) (BO : BEGIN_OP) (IL : ILOCK)
     (IU : IUNLOCK) (IP : IPUT) (EO : END_OP) (PK : PRINTK) : IRECLAIM :=
-  ⟨fun {hlc GF} _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ Γ _ cpu k γl pd pav pu j pidv dqp dqb dqs dqn
+  ⟨fun {hlc GF} _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ Γ _ cpu k γl pd pav pu j pidv dqp dqb dqs dqn
     hj hproc hK hnoff htier hgeom hblk hbg hbel hn1 hnnib hn31 hpd ha0 =>
   ireclaim_entry PK BR BL IG BO IL IU IP EO Γ cpu k γl pd pav pu j pidv dqp dqb dqs dqn hj hproc
     hK hnoff htier hgeom hblk hbg hbel hn1 hnnib hn31 hpd ha0⟩

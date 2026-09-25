@@ -61,7 +61,7 @@ theorem bdOther_of_cs (R0 R : RegMap) (h : calleeSaved R0 R) : bdOther R0 R := b
   exact ⟨c2, c18, c19, c20, c21, c22, c23, c24, c25, c26, c27⟩
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [BcacheG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [BcacheG GF]
 variable [SleepLockG GF] [DiskG GF] [CurCtx]
 
 set_option maxHeartbeats 8000000 in
@@ -580,7 +580,7 @@ theorem bd_hit (RE : RELEASE_HOOK) (AS : ACQUIRESLEEP_LLB) (VR : VIRTIO_DISK_RW)
     (hR2 : R0 2#5 = k0.regs 2#5 + 0xFFFFFFFFFFFFFFD0#64) (hpins : bdPins k0 R0) :
     kctx c (kc.withRegs Rc) ∗ pcIs c (KA.«bread» + 0x48#64) ∗
     bdScan γ V tl M Ls ord devs bnos ∗ ctxFloor curCtx tl ∗ topLb tl ∗ locked γl c ∗
-    bioCtx γl γ V ∗ diskCaps V.gd γdl pd pav pu ∗ bslot γ ∗
+    bioCtx γl γ V ∗ diskCaps V.gd γdl pd pav pu ∗ bslot ∗
     frame6s3 (k0.regs 2#5) (k0.regs 1#5) (k0.regs 8#5) (k0.regs 9#5)
       (k0.regs 18#5) (k0.regs 19#5) ∗
     procsInv Γ ∗ trapCsrs c ∗ cpuClaim c k0.proc ∗ intrRes c ∗
@@ -654,11 +654,11 @@ theorem bd_hit (RE : RELEASE_HOOK) (AS : ACQUIRESLEEP_LLB) (VR : VIRTIO_DISK_RW)
   ihave Hkey0 := bkeyAt_intro γ curCtx tl kk (devs kk) (bnos kk) $$ [Hkd Hkb Hkr]
   case' _ => iframe Hkd Hkb Hkr
   ihave Hkey := Hkcl $$ Hkey0
-  ihave Hslots := (show bslot (GF := GF) γ ∗ bslots γ (Ls kk).length ⊢
-      bslots γ (nx :: Ls kk).length from by
-    rw [hlen, hn]; exact bslots_cons γ n) $$ [Hsl Hslots]
+  ihave Hslots := (show bslot (GF := GF) ∗ bslots (Ls kk).length ⊢
+      bslots (nx :: Ls kk).length from by
+    rw [hlen, hn]; exact bslots_cons n) $$ [Hsl Hslots]
   case' _ => iframe
-  icases bslots_bound γ _ $$ Hslots with ⟨Hslots, %hbound⟩
+  icases bslots_bound _ $$ Hslots with ⟨Hslots, %hbound⟩
   have hlt' : (nx :: Ls kk).length < 2 ^ 31 := by
     rw [hlen] at hbound ⊢
     unfold BSLOTS at hbound
@@ -797,7 +797,7 @@ theorem bd_recyc (RE : RELEASE_HOOK) (AS : ACQUIRESLEEP_LLB) (VR : VIRTIO_DISK_R
     (hR2 : R0 2#5 = k0.regs 2#5 + 0xFFFFFFFFFFFFFFD0#64) (hpins : bdPins k0 R0) :
     kctx c (kc.withRegs Rc) ∗ pcIs c (KA.«bread» + 0x90#64) ∗
     bdScan γ V tl M Ls ord devs bnos ∗ ctxFloor curCtx tl ∗ topLb tl ∗ locked γl c ∗
-    bioCtx γl γ V ∗ diskCaps V.gd γdl pd pav pu ∗ bslot γ ∗
+    bioCtx γl γ V ∗ diskCaps V.gd γdl pd pav pu ∗ bslot ∗
     frame6s3 (k0.regs 2#5) (k0.regs 1#5) (k0.regs 8#5) (k0.regs 9#5)
       (k0.regs 18#5) (k0.regs 19#5) ∗
     procsInv Γ ∗ trapCsrs c ∗ cpuClaim c k0.proc ∗ intrRes c ∗
@@ -970,12 +970,12 @@ theorem bd_recyc (RE : RELEASE_HOOK) (AS : ACQUIRESLEEP_LLB) (VR : VIRTIO_DISK_R
   case' _ => iframe
   imod Hup with ⟨Ha, Href, Hhalves', %hnx⟩
   imodintro
-  ihave Hslots := (show bslot (GF := GF) γ ∗ bslots γ ([] : List Nat).length ⊢
-      bslots γ ([nx] : List Nat).length from by
+  ihave Hslots := (show bslot (GF := GF) ∗ bslots ([] : List Nat).length ⊢
+      bslots ([nx] : List Nat).length from by
     simp only [List.length_nil, List.length_cons]
-    exact bslots_cons γ 0) $$ [Hsl Hslots]
+    exact bslots_cons 0) $$ [Hsl Hslots]
   case' _ => iframe
-  icases bslots_bound γ _ $$ Hslots with ⟨Hslots, %hbound⟩
+  icases bslots_bound _ $$ Hslots with ⟨Hslots, %hbound⟩
   ihave Hrefc := (show wordPointsTo (GF := GF) (bnode kk + 64#64) 4 (DFrac.own 1)
         (BitVec.ofNat 32 1) ⊢
       wordAtN curCtx (aBufRefcnt (bnode kk)) 4 (DFrac.own 1)

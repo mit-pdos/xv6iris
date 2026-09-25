@@ -677,7 +677,7 @@ lives) and `Xv6.bioPay` (where `bsl` does).  `Xv6.bioLocked_split` puts
 them back together. -/
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [BcacheG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [BcacheG GF]
 variable [DiskG GF] [FsBlocksG GF] [SleepLockG GF]
 
 /-- Rocq's `iu_held_k`. -/
@@ -755,7 +755,7 @@ tokens, which is exactly what `Xv6.bslots_cons` already establishes.  So
 both directions are inductions over the second count. -/
 
 theorem dsSlots_split [CurCtx] (γ : BcacheNames) (a c : Nat) :
-    bslots (GF := GF) γ (a + c) ⊢ iprop(bslots γ a ∗ bslots γ c) := by
+    bslots (GF := GF) (a + c) ⊢ iprop(bslots a ∗ bslots c) := by
   induction c with
   | zero =>
     iintro H
@@ -764,30 +764,30 @@ theorem dsSlots_split [CurCtx] (γ : BcacheNames) (a c : Nat) :
     · iapply bslots_zero
   | succ c ih =>
     iintro H
-    ihave ⟨Hs, Hr⟩ := bslots_uncons γ (a + c) $$ H
+    ihave ⟨Hs, Hr⟩ := bslots_uncons (a + c) $$ H
     ihave ⟨Ha, Hc⟩ := ih $$ Hr
     isplitl [Ha]
     · iexact Ha
-    · iapply bslots_cons γ c
+    · iapply bslots_cons c
       iframe Hs Hc
 
 theorem dsSlots_join [CurCtx] (γ : BcacheNames) (a c : Nat) :
-    bslots (GF := GF) γ a ⊢ iprop(bslots γ c -∗ bslots γ (a + c)) := by
+    bslots (GF := GF) a ⊢ iprop(bslots c -∗ bslots (a + c)) := by
   induction c with
   | zero =>
     iintro H -
     iexact H
   | succ c ih =>
     iintro Ha Hc
-    ihave ⟨Hs, Hc⟩ := bslots_uncons γ c $$ Hc
+    ihave ⟨Hs, Hc⟩ := bslots_uncons c $$ Hc
     ihave Hac := ih $$ Ha Hc
-    iapply bslots_cons γ (a + c)
+    iapply bslots_cons (a + c)
     iframe Hs Hac
 
 end
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [BcacheG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [BcacheG GF]
 variable [DiskG GF] [FsBlocksG GF] [SleepLockG GF]
 
 /-- **THE COUPLING**: the caller's own EXCLUSIVE byte run against the

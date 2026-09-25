@@ -116,7 +116,7 @@ theorem iu_disp (a : BitVec 64) (d : Nat) (h : d < 2048) :
 
 section
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [IregG GF] [IcacheG GF]
-  [Xv6G GF] [LogG GF] [FsBlocksG GF] [FsTopG GF] [FsLinkG GF] [Appcfg GF]
+  [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [LogG GF] [FsBlocksG GF] [FsTopG GF] [FsLinkG GF] [Appcfg GF]
 
 /-- ...and the form a SEAL supplies, which cannot name `ds`: the list is
 proof-internal (the walk learns it at `Xv6.iregRead`), so the premise
@@ -212,7 +212,7 @@ end
 /-! ## The continuation (Rocq's `iu_cont`) -/
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF]
 
 /-- What the walk owes its caller once `brelse` has returned: the entry
@@ -227,7 +227,7 @@ def iuPost [Fscfg] [Icfg] [CurCtx] (cpu : CPU) (k : KCtx) (dqp : DFrac) (pidv : 
     kctx cpu' ((k.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k.regs 1#5)) -∗
     trapCsrsExt cpu' k.sie -∗ cpuClaimExt cpu' k.sie k.proc -∗
     wordPointsTo (pPid k.proc) 4 dqp pidv -∗
-    F -∗ Pout -∗ bslots fscBio 2 -∗ logOpS icfgLog u' Sbo -∗
+    F -∗ Pout -∗ bslots 2 -∗ logOpS icfgLog u' Sbo -∗
     (∃ e : Nat, loggedAt icfgLog e (IBLOCK inum icfgIst) ∗ ⌜v ≤ e⌝) -∗ wpLoop cpu'))
 
 /-- The continuation is a park's crossing at a process (`k.proc ≠ 0`), so it
@@ -302,16 +302,16 @@ end
 /-! ## Slot-unit bookkeeping (Rocq's `iu_slots_split` / `iu_slots_join`, at 1 + 1) -/
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [BcacheG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [BcacheG GF]
   [DiskG GF] [FsBlocksG GF] [SleepLockG GF]
 
 theorem iu_slots_split [CurCtx] (γ : BcacheNames) :
-    bslots (GF := GF) γ 2 ⊢ bslot γ ∗ bslot γ := by
+    bslots (GF := GF) 2 ⊢ bslot ∗ bslot := by
   unfold bslot
   exact dsSlots_split γ 1 1
 
 theorem iu_slots_join [CurCtx] (γ : BcacheNames) :
-    bslot (GF := GF) γ ∗ bslot γ ⊢ bslots γ 2 := by
+    bslot (GF := GF) ∗ bslot ⊢ bslots 2 := by
   unfold bslot
   iintro ⟨H1, H2⟩
   iapply (dsSlots_join γ 1 1) $$ H1 H2
@@ -321,7 +321,7 @@ end
 /-! ## The handle, opened at iupdate's bread -/
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [BcacheG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [BcacheG GF]
   [DiskG GF] [FsBlocksG GF] [SleepLockG GF]
 
 /-- Rocq's `iu_held_k` and `iu_held_swap` in one opening: the buffer index
@@ -345,7 +345,7 @@ end
 /-! ## The four callees, at their call sites (at the ambient view) -/
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [CurCtx]
 
 theorem iu_memmove (MM : MEMMOVE) (c : CPU) (k' : KCtx) (bs olds : List (BitVec 8)) (n : Nat)

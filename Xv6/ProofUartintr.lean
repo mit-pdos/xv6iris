@@ -113,7 +113,7 @@ theorem uiPres_call (k : KCtx) (R R' : RegMap) (h : uiPres k R) (hcs : calleeSav
     c22.trans h22, c23.trans h23, c24.trans h24, c25.trans h25, c26.trans h26, c27.trans h27⟩
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF]
 variable {lent : Bool}
 
 /-! ## One byte load from a UART register -/
@@ -194,7 +194,7 @@ end
 
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF]
 
 /-! ## Unpacking the port's bundle and port 0's credentials -/
 
@@ -546,7 +546,7 @@ theorem ui_wake (CI : CONSOLEINTR) (WK : WAKEUP) [CurCtx]
 
 set_option maxHeartbeats 4000000 in
 theorem uartintr_proof (CI : CONSOLEINTR) (WK : WAKEUP) : UARTINTR :=
-  ⟨fun {hlc GF} _ _ _ Γ cpu k i γc γl γ kp bs hsie hnoff hK hlk htier hid => by
+  ⟨fun {hlc GF} _ _ _ _ _ _ Γ cpu k i γc γl γ kp bs hsie hnoff hK hlk htier hid => by
   unfold wp_uartintr_body
   simp only [uartintrAddr]
   iintro ⟨Hk, Hpc, #HΓ, #Hport, #Hrxw, Hrtok, #Hcaps, HΦ⟩

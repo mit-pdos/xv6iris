@@ -178,7 +178,7 @@ theorem dirlookup_lic_live (dn : Dinode) (data : Nat → List (BitVec 8))
 
 /-- **WP of `dirlookup(dp = a0, name = a1, poff = a2)`** (Rocq's
 `wp_dirlookup_sconf_body`). -/
-def wp_dirlookup_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
+def wp_dirlookup_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
     [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [IregG GF] [IcacheG GF]
     [FsTopG GF] [FsLinkG GF] [IcboxG GF] [IrefslotG GF] [Appcfg GF] [Fscfg] [Icfg] [CurCtx]
     (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
@@ -224,7 +224,7 @@ def wp_dirlookup_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6
   (if hasp then wordPointsTo (k.regs 12#5) 4 (DFrac.own 1) pofv else emp) ∗
   -- the caller's own pid cell (bread's acquiresleep records it)
   wordPointsTo (pPid k.proc) 4 dqp pidv ∗
-  bslot fscBio ∗
+  bslot ∗
   -- THE ICACHE, exactly as iget takes it
   isItable2 fscItlock fscIc fscFs fscIreg fscCov fscLogst icfgNib icfgDev ∗
   itableInv (hlc := hlc) ∗
@@ -244,7 +244,7 @@ def wp_dirlookup_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6
     inodeMap fscFs ip bm -∗ inodeBlocks fscFs bm data -∗
     byteBuf (k.regs 11#5) dqn (bview 14 fn) -∗
     wordPointsTo (pPid k.proc) 4 dqp pidv -∗
-    bslot fscBio -∗
+    bslot -∗
     -- ...AND THE BORROW, BACK VERBATIM ON BOTH ARMS
     dlinks fscFs dinum.toNat dn bm data -∗ dinodeAt fscIreg dinum dr -∗
     -- THE TWO ARMS
@@ -265,7 +265,7 @@ def wp_dirlookup_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6
 /-- The eb-generic form of `wp_dirlookup_body` (Rocq: `cpu_own 0 eb`, the
 complement `trap_csrs_ext` / `cpu_claim_ext` in and out; depth 0, so no
 spinlock held by `KCtx.wf`). -/
-def wp_dirlookup_eb_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
+def wp_dirlookup_eb_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
     [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [IregG GF] [IcacheG GF]
     [FsTopG GF] [FsLinkG GF] [IcboxG GF] [IrefslotG GF] [Appcfg GF] [Fscfg] [Icfg] [CurCtx]
     (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
@@ -311,7 +311,7 @@ def wp_dirlookup_eb_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [
   (if hasp then wordPointsTo (k.regs 12#5) 4 (DFrac.own 1) pofv else emp) ∗
   -- the caller's own pid cell (bread's acquiresleep records it)
   wordPointsTo (pPid k.proc) 4 dqp pidv ∗
-  bslot fscBio ∗
+  bslot ∗
   -- THE ICACHE, exactly as iget takes it
   isItable2 fscItlock fscIc fscFs fscIreg fscCov fscLogst icfgNib icfgDev ∗
   itableInv (hlc := hlc) ∗
@@ -331,7 +331,7 @@ def wp_dirlookup_eb_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [
     inodeMap fscFs ip bm -∗ inodeBlocks fscFs bm data -∗
     byteBuf (k.regs 11#5) dqn (bview 14 fn) -∗
     wordPointsTo (pPid k.proc) 4 dqp pidv -∗
-    bslot fscBio -∗
+    bslot -∗
     -- ...AND THE BORROW, BACK VERBATIM ON BOTH ARMS
     dlinks fscFs dinum.toNat dn bm data -∗ dinodeAt fscIreg dinum dr -∗
     -- THE TWO ARMS
@@ -352,7 +352,7 @@ def wp_dirlookup_eb_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [
 /-- The interface of `dirlookup` (Rocq's `Module Type DIRLOOKUP`; its one
 field is Rocq's `wp_dirlookup_sconf`). -/
 structure DIRLOOKUP : Prop where
-  wp_dirlookup_eb : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
+  wp_dirlookup_eb : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
     [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [IregG GF] [IcacheG GF]
     [FsTopG GF] [FsLinkG GF] [IcboxG GF] [IrefslotG GF] [Appcfg GF] [Fscfg] [Icfg] [CurCtx]
     (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
@@ -370,7 +370,7 @@ structure DIRLOOKUP : Prop where
 
 /-- The interrupts-off instance of `wp_dirlookup_eb` (the complement is the whole
 bundle): the contract every not-yet-generalized caller states. -/
-theorem DIRLOOKUP.wp_dirlookup (A : DIRLOOKUP) {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
+theorem DIRLOOKUP.wp_dirlookup (A : DIRLOOKUP) {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
     [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [IregG GF] [IcacheG GF]
     [FsTopG GF] [FsLinkG GF] [IcboxG GF] [IrefslotG GF] [Appcfg GF] [Fscfg] [Icfg] [CurCtx]
     (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]

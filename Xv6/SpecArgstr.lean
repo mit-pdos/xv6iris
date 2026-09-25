@@ -44,7 +44,7 @@ def argstrSlots : Nat := 4 + fetchstrSlots
 
 /-- `argstr(n a0, buf a1, max a2)` in the current process `pa`, argument `i`
 holding `v`: `old` is the buffer's `max` bytes. -/
-def wp_argstr_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [CurCtx]
+def wp_argstr_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CurCtx]
     (cpu : CPU) (k : KCtx) (γl : GName) (γk : KmemNames) (pa : BitVec 64) (pid : BitVec 32)
     (V : ProcPriv) (M : Nat → List (BitVec 8)) (i : Nat) (v : BitVec 64)
     (old : List (BitVec 8))
@@ -66,7 +66,7 @@ def wp_argstr_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G G
   ⊢ wpLoop (GF := GF) cpu
 
 structure ARGSTR : Prop where
-  wp_argstr : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [CurCtx]
+  wp_argstr : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CurCtx]
     (cpu : CPU) (k : KCtx) (γl : GName) (γk : KmemNames) (pa : BitVec 64) (pid : BitVec 32)
     (V : ProcPriv) (M : Nat → List (BitVec 8)) (i : Nat) (v : BitVec 64)
     (old : List (BitVec 8))

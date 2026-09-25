@@ -107,7 +107,7 @@ def sysPipeMem (sz : BitVec 64) (P : UPtd) (M : Nat → List (BitVec 8)) (v : Bi
     umMapped P' v.toNat (b0 ++ b1).length
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
   [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF]
   [Appcfg GF] [FileG GF] [Fscfg] [Icfg] [CurCtx]
@@ -137,7 +137,7 @@ def sysPipeCont (cpu : CPU) (k : KCtx) (γ : FileNames) (γd : Nat → GName) (p
     kctx cpu' ((k.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k.regs 1#5)) -∗
     trapCsrsExt cpu' k.sie -∗ cpuClaimExt cpu' k.sie k.proc -∗
     sysPipePost γ γd pa pid V M sts v (R' 10#5) -∗
-    fdSlot γ -∗ fdSlot γ -∗ irefSlot -∗ wpLoop cpu'))
+    fdSlot -∗ fdSlot -∗ irefSlot -∗ wpLoop cpu'))
 
 /-- **WP of `sys_pipe()`** (Rocq `wp_sys_pipe_sconf_body`), eb-generic at
 depth 0. -/
@@ -151,14 +151,14 @@ def wp_sys_pipe_eb_body (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ] (cpu : CP
   trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗
   isFtable γl γ ∗ panicEnv ∗
   isLock γkl kmemLockAddr "kmem" (kmemRes γk) ∗ kallocAvail γk none ∗ procsInv Γ ∗
-  procPrivFd γ γd pa pid V M ∗ fdFrags γd sts ∗ fdSlot γ ∗ fdSlot γ ∗ irefSlot ∗
+  procPrivFd γ γd pa pid V M ∗ fdFrags γd sts ∗ fdSlot ∗ fdSlot ∗ irefSlot ∗
   sysPipeCont cpu k γ γd pa pid V M sts v
   ⊢ wpLoop (GF := GF) cpu
 
 end
 
 structure SYSPIPE : Prop where
-  wp_sys_pipe_eb : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
+  wp_sys_pipe_eb : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
     [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
     [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF]
     [Appcfg GF] [FileG GF] [Fscfg] [Icfg] [CurCtx]

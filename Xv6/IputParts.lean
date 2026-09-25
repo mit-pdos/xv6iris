@@ -255,7 +255,7 @@ end Frame
 /-! ## The bundles -/
 
 section Bundles
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
   [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF]
   [Appcfg GF] [Fscfg] [Icfg] [CurCtx]
@@ -298,7 +298,7 @@ def iputRet (k : KCtx) (n' : Nat) (Sb' : List Nat) (pidv : BitVec 32) (dqp dqb d
   iprop(wordPointsTo (pPid k.proc) 4 dqp pidv ∗
     wordPointsTo sbBmapstartAddr 4 dqb (BitVec.ofNat 32 fscBmapstart) ∗
     wordPointsTo sbInodestart 4 dqs (BitVec.ofNat 32 icfgIst) ∗
-    bslots fscBio 3 ∗ logOpS icfgLog n' Sb' ∗ iregRegime rg)
+    bslots 3 ∗ logOpS icfgLog n' Sb' ∗ iregRegime rg)
 
 /-- THE CONTRACT'S CONTINUATION (`wp_iput_gen_eb_body`'s last conjunct),
 HART-FREE: the contract's crossing is the literal `wpNext true` at a proc
@@ -316,7 +316,7 @@ def iputPost (k : KCtx) (n : Nat) (Sb : List Nat) (crb cru crz : Bool)
     wordPointsTo (pPid k.proc) 4 dqp pidv -∗
     wordPointsTo sbBmapstartAddr 4 dqb (BitVec.ofNat 32 fscBmapstart) -∗
     wordPointsTo sbInodestart 4 dqs (BitVec.ofNat 32 icfgIst) -∗
-    bslots fscBio 3 -∗
+    bslots 3 -∗
     ⌜(∀ x ∈ Sb, x ∈ Sb') ∧ (w = true → fscBmapstart ∈ Sb') ∧ (crb = true → w = false) ∧
       n - ipSpendW w cru crz ≤ n' ∧ n' ≤ n⌝ -∗
     logOpS icfgLog n' Sb' -∗
@@ -386,7 +386,7 @@ end Bundles
 /-! ## The epilogue, `+0x30 .. +0x38`, and the contract's post -/
 
 section Epi
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
   [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF]
   [Appcfg GF] [Fscfg] [Icfg] [CurCtx]
@@ -437,7 +437,7 @@ end Epi
 /-! ## The itable lock's two calls -/
 
 section Lock
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
   [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF]
   [Appcfg GF] [Fscfg] [Icfg] [CurCtx]

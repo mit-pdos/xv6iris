@@ -50,7 +50,7 @@ is `k_step_e` (the complement `Hte`/`Hce` follows the thread), `bread` is
 called at its eb contract, and the caller's continuation (a park's
 crossing, at a proc) is cashed at whatever hart the epilogue ends on. -/
 theorem bfree_proof (BD : BREAD) (LW : LOG_WRITE) (BE : BRELSE) : BFREE := ⟨
-  fun {hlc GF} _ _ _ _ _ _ _ _ Γ _ c0 k γl γb V γdl pd pav pu j γ γfs logstart bmapstart size
+  fun {hlc GF} _ _ _ _ _ _ _ _ _ _ _ Γ _ c0 k γl γb V γdl pd pav pu j γ γfs logstart bmapstart size
     dev bno bs u cr Sb e0 pidv dqp dqb hj hproc hK hnoff htier hgeom hbg hdev hcl hdt
     hbno hbs hpd ha0 ha1 => by
   obtain ⟨-, hszB, hbmcov, hbmlog⟩ := hbg

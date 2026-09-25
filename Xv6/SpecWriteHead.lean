@@ -73,7 +73,7 @@ its deepest callee is `bread`.  `bwrite`/`brelse` want less. -/
 def writeHeadSlots : Nat := 4 + breadSlots
 
 /-- **WP of `write_head()`**. -/
-def wp_write_head_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
+def wp_write_head_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF]
     [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [CurCtx]
     (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
     (cpu : CPU) (k : KCtx) (γl : GName) (γb : BcacheNames) (V : BioView GF) (γdl : GName)
@@ -95,7 +95,7 @@ def wp_write_head_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv
   ([∗list] i ↦ w ∈ W, wordPointsTo (lhBlock i) 4 (DFrac.own 1) w) ∗
   fsCacheAuth γfs L ∗
   (∃ bsh : List (BitVec 8), fsChalf γfs (logHdrBno logstart) bsh) ∗
-  bslot γb ∗
+  bslot ∗
   wpNext true k.proc cpu (fun cpu' => iprop(∀ (spie spp : Bool) (R' : RegMap)
       (bs' : List (BitVec 8)),
     ⌜calleeSaved k.regs R'⌝ -∗
@@ -107,13 +107,13 @@ def wp_write_head_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv
     fsCacheAuth γfs (PartialMap.insert L (logHdrBno logstart) bs') -∗
     fsChalf γfs (logHdrBno logstart) bs' -∗
     ⌜bs'.length = BSIZE ∧ hdrN bs' = n ∧ hdrDec bs' = (n, W.map (fun w => w.toNat))⌝ -∗
-    bslot γb -∗ wpLoop cpu'))
+    bslot -∗ wpLoop cpu'))
   ⊢ wpLoop (GF := GF) cpu
 
 /-- The eb-generic form of `wp_write_head_body` (Rocq: `cpu_own 0 eb`, the
 complement `trap_csrs_ext` / `cpu_claim_ext` in and out; depth 0, so no
 spinlock held by `KCtx.wf`). -/
-def wp_write_head_eb_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
+def wp_write_head_eb_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF]
     [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [CurCtx]
     (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
     (cpu : CPU) (k : KCtx) (γl : GName) (γb : BcacheNames) (V : BioView GF) (γdl : GName)
@@ -135,7 +135,7 @@ def wp_write_head_eb_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] 
   ([∗list] i ↦ w ∈ W, wordPointsTo (lhBlock i) 4 (DFrac.own 1) w) ∗
   fsCacheAuth γfs L ∗
   (∃ bsh : List (BitVec 8), fsChalf γfs (logHdrBno logstart) bsh) ∗
-  bslot γb ∗
+  bslot ∗
   wpNext true k.proc cpu (fun cpu' => iprop(∀ (spie spp : Bool) (R' : RegMap)
       (bs' : List (BitVec 8)),
     ⌜calleeSaved k.regs R'⌝ -∗
@@ -147,12 +147,12 @@ def wp_write_head_eb_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] 
     fsCacheAuth γfs (PartialMap.insert L (logHdrBno logstart) bs') -∗
     fsChalf γfs (logHdrBno logstart) bs' -∗
     ⌜bs'.length = BSIZE ∧ hdrN bs' = n ∧ hdrDec bs' = (n, W.map (fun w => w.toNat))⌝ -∗
-    bslot γb -∗ wpLoop cpu'))
+    bslot -∗ wpLoop cpu'))
   ⊢ wpLoop (GF := GF) cpu
 
 /-- The interface of `write_head`. -/
 structure WRITE_HEAD : Prop where
-  wp_write_head_eb : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
+  wp_write_head_eb : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF]
     [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [CurCtx]
     (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
     (cpu : CPU) (k : KCtx) (γl : GName) (γb : BcacheNames) (V : BioView GF) (γdl : GName)
@@ -164,7 +164,7 @@ structure WRITE_HEAD : Prop where
 
 /-- The interrupts-off instance of `wp_write_head_eb` (the complement is the whole
 bundle): the contract every not-yet-generalized caller states. -/
-theorem WRITE_HEAD.wp_write_head (A : WRITE_HEAD) {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
+theorem WRITE_HEAD.wp_write_head (A : WRITE_HEAD) {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF]
     [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [CurCtx]
     (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
     (cpu : CPU) (k : KCtx) (γl : GName) (γb : BcacheNames) (V : BioView GF) (γdl : GName)

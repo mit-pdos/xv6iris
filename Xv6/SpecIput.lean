@@ -139,7 +139,7 @@ def ipSpendW (w cru crz : Bool) : Nat := ipBm w + (if cru || crz then 0 else 1)
 
 /-- **WP of `iput(ip = a0)`, the credited set-form contract** (Rocq's
 `wp_iput_gen_body`).  See the header. -/
-def wp_iput_gen_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
+def wp_iput_gen_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
     [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
     [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF]
     [Appcfg GF] [Fscfg] [Icfg] [CurCtx]
@@ -190,7 +190,7 @@ def wp_iput_gen_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G
   bitmapInv fscFs fscBmapstart fscCov fscLogst fscSize ∗
   wordPointsTo (pPid k.proc) 4 dqp pidv ∗
   -- three buffer slots: itrunc's indirect arm is what forces three
-  bslots fscBio 3 ∗
+  bslots 3 ∗
   -- THE GROUP CREDIT (`emp` at `crz = false`)
   (if crz then nlzObs inum.toNat e0 else emp) ∗
   -- the reservation, EPOCH-NAMED, and the transaction share beside it
@@ -203,7 +203,7 @@ def wp_iput_gen_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G
     wordPointsTo (pPid k.proc) 4 dqp pidv -∗
     wordPointsTo sbBmapstartAddr 4 dqb (BitVec.ofNat 32 fscBmapstart) -∗
     wordPointsTo sbInodestart 4 dqs (BitVec.ofNat 32 icfgIst) -∗
-    bslots fscBio 3 -∗
+    bslots 3 -∗
     -- the set only GROWS; the paid-bitmap report; the credited worst case
     ⌜(∀ x ∈ Sb, x ∈ Sb') ∧ (w = true → fscBmapstart ∈ Sb') ∧ (crb = true → w = false) ∧
       n - ipSpendW w cru crz ≤ n' ∧ n' ≤ n⌝ -∗
@@ -219,7 +219,7 @@ def wp_iput_gen_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G
 /-- The eb-generic form of `wp_iput_gen_body` (Rocq: `cpu_own 0 eb`, the
 complement `trap_csrs_ext` / `cpu_claim_ext` in and out; depth 0, so no
 spinlock held by `KCtx.wf`). -/
-def wp_iput_gen_eb_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
+def wp_iput_gen_eb_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
     [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
     [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF]
     [Appcfg GF] [Fscfg] [Icfg] [CurCtx]
@@ -270,7 +270,7 @@ def wp_iput_gen_eb_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [X
   bitmapInv fscFs fscBmapstart fscCov fscLogst fscSize ∗
   wordPointsTo (pPid k.proc) 4 dqp pidv ∗
   -- three buffer slots: itrunc's indirect arm is what forces three
-  bslots fscBio 3 ∗
+  bslots 3 ∗
   -- THE GROUP CREDIT (`emp` at `crz = false`)
   (if crz then nlzObs inum.toNat e0 else emp) ∗
   -- the reservation, EPOCH-NAMED, and the transaction share beside it
@@ -283,7 +283,7 @@ def wp_iput_gen_eb_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [X
     wordPointsTo (pPid k.proc) 4 dqp pidv -∗
     wordPointsTo sbBmapstartAddr 4 dqb (BitVec.ofNat 32 fscBmapstart) -∗
     wordPointsTo sbInodestart 4 dqs (BitVec.ofNat 32 icfgIst) -∗
-    bslots fscBio 3 -∗
+    bslots 3 -∗
     -- the set only GROWS; the paid-bitmap report; the credited worst case
     ⌜(∀ x ∈ Sb, x ∈ Sb') ∧ (w = true → fscBmapstart ∈ Sb') ∧ (crb = true → w = false) ∧
       n - ipSpendW w cru crz ≤ n' ∧ n' ≤ n⌝ -∗
@@ -299,7 +299,7 @@ def wp_iput_gen_eb_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [X
 /-- **WP of `iput(ip = a0)`, the counted contract** (Rocq's
 `wp_iput_sconf_body`): the plain reservation `logOp icfgLog n` in, spend at
 most `iputUnits`; the runtime regime `iregOpen` (persistent, not returned). -/
-def wp_iput_sconf_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
+def wp_iput_sconf_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
     [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
     [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF]
     [Appcfg GF] [Fscfg] [Icfg] [CurCtx]
@@ -336,7 +336,7 @@ def wp_iput_sconf_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv
   wordPointsTo sbInodestart 4 dqs (BitVec.ofNat 32 icfgIst) ∗
   bitmapInv fscFs fscBmapstart fscCov fscLogst fscSize ∗
   wordPointsTo (pPid k.proc) 4 dqp pidv ∗
-  bslots fscBio 3 ∗
+  bslots 3 ∗
   logOp icfgLog n ∗
   wpNext true k.proc cpu (fun cpu' => iprop(∀ (spie spp : Bool) (R' : RegMap) (n' : Nat),
     ⌜calleeSaved k.regs R'⌝ -∗
@@ -345,7 +345,7 @@ def wp_iput_sconf_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv
     wordPointsTo (pPid k.proc) 4 dqp pidv -∗
     wordPointsTo sbBmapstartAddr 4 dqb (BitVec.ofNat 32 fscBmapstart) -∗
     wordPointsTo sbInodestart 4 dqs (BitVec.ofNat 32 icfgIst) -∗
-    bslots fscBio 3 -∗
+    bslots 3 -∗
     -- at most `iputUnits` gone, and none gained
     ⌜n - iputUnits ≤ n' ∧ n' ≤ n⌝ -∗
     logOp icfgLog n' -∗
@@ -356,7 +356,7 @@ def wp_iput_sconf_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv
 /-- The eb-generic form of `wp_iput_sconf_body` (Rocq: `cpu_own 0 eb`, the
 complement `trap_csrs_ext` / `cpu_claim_ext` in and out; depth 0, so no
 spinlock held by `KCtx.wf`). -/
-def wp_iput_sconf_eb_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
+def wp_iput_sconf_eb_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
     [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
     [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF]
     [Appcfg GF] [Fscfg] [Icfg] [CurCtx]
@@ -393,7 +393,7 @@ def wp_iput_sconf_eb_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] 
   wordPointsTo sbInodestart 4 dqs (BitVec.ofNat 32 icfgIst) ∗
   bitmapInv fscFs fscBmapstart fscCov fscLogst fscSize ∗
   wordPointsTo (pPid k.proc) 4 dqp pidv ∗
-  bslots fscBio 3 ∗
+  bslots 3 ∗
   logOp icfgLog n ∗
   wpNext true k.proc cpu (fun cpu' => iprop(∀ (spie spp : Bool) (R' : RegMap) (n' : Nat),
     ⌜calleeSaved k.regs R'⌝ -∗
@@ -402,7 +402,7 @@ def wp_iput_sconf_eb_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] 
     wordPointsTo (pPid k.proc) 4 dqp pidv -∗
     wordPointsTo sbBmapstartAddr 4 dqb (BitVec.ofNat 32 fscBmapstart) -∗
     wordPointsTo sbInodestart 4 dqs (BitVec.ofNat 32 icfgIst) -∗
-    bslots fscBio 3 -∗
+    bslots 3 -∗
     -- at most `iputUnits` gone, and none gained
     ⌜n - iputUnits ≤ n' ∧ n' ≤ n⌝ -∗
     logOp icfgLog n' -∗
@@ -414,7 +414,7 @@ def wp_iput_sconf_eb_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] 
 `wp_iput_sconf`, derived below). -/
 structure IPUT : Prop where
   /-- the credited set-form contract -/
-  wp_iput_gen_eb : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
+  wp_iput_gen_eb : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
     [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
     [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF]
     [Appcfg GF] [Fscfg] [Icfg] [CurCtx]
@@ -430,7 +430,7 @@ structure IPUT : Prop where
 
 /-- The interrupts-off instance of `wp_iput_gen_eb` (the complement is the whole
 bundle): the contract every not-yet-generalized caller states. -/
-theorem IPUT.wp_iput_gen (A : IPUT) {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
+theorem IPUT.wp_iput_gen (A : IPUT) {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
     [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
     [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF]
     [Appcfg GF] [Fscfg] [Icfg] [CurCtx]
@@ -471,7 +471,7 @@ other waits for the join), the regime is `iregOpen` at `rg := true`
 (`iregRegime_true`, persistent, and dropped on the way out), and the grown
 set is forgotten again (`logOpS_op` after `logTx_join`). -/
 theorem IPUT.wp_iput_sconf (IP : IPUT) {hlc : HasLC} {GF : BundledGFunctors}
-    [MachGS hlc GF] [Xv6G GF]
+    [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
     [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
     [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF]
     [Appcfg GF] [Fscfg] [Icfg] [CurCtx]
@@ -513,7 +513,7 @@ theorem IPUT.wp_iput_sconf (IP : IPUT) {hlc : HasLC} {GF : BundledGFunctors}
   exact ⟨ipSpendW_uncredited w n n' hlo, hhi⟩
 
 theorem IPUT.wp_iput_sconf_eb (IP : IPUT) {hlc : HasLC} {GF : BundledGFunctors}
-    [MachGS hlc GF] [Xv6G GF]
+    [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
     [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
     [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF]
     [Appcfg GF] [Fscfg] [Icfg] [CurCtx]

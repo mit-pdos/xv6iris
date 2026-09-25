@@ -40,7 +40,7 @@ set_option linter.unusedSimpArgs false
 set_option linter.unusedVariables false
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
   [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF]
   [Appcfg GF] [FileG GF]
@@ -61,14 +61,14 @@ theorem fc_inode (BO : BEGIN_OP) (IP : IPUT) (EO : END_OP) [Fscfg] [Icfg] [CurCt
     kctx cpu (((k.withSpie spie spp).pushed 8).withRegs R) ∗ pcIs cpu (KA.«fileclose» + 0xaa#64) ∗
     fcSpilled (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) (k.regs 9#5) w4 w5 w6 w7 ∗
     trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗
-    panicEnv ∗ procsInv Γ ∗ fsReady (hlc := hlc) ∗ bslots fscBio 3 ∗
-    wordPointsTo (pPid k.proc) 4 dqp pidv ∗ fdSlot γ ∗ inodeHeld v ∗
+    panicEnv ∗ procsInv Γ ∗ fsReady (hlc := hlc) ∗ bslots 3 ∗
+    wordPointsTo (pPid k.proc) 4 dqp pidv ∗ fdSlot ∗ inodeHeld v ∗
     wpNext true k.proc cpu (fun cpu' => iprop(∀ (spie spp : Bool) (R' : RegMap),
       ⌜calleeSaved k.regs R'⌝ -∗
       kctx cpu' ((k.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k.regs 1#5)) -∗
       trapCsrsExt cpu' k.sie -∗ cpuClaimExt cpu' k.sie k.proc -∗
       wordPointsTo (pPid k.proc) 4 dqp pidv -∗
-      fdSlot γ -∗ irefSlot -∗ filecloseEnvOut γk on st -∗ wpLoop cpu'))
+      fdSlot -∗ irefSlot -∗ filecloseEnvOut γk on st -∗ wpLoop cpu'))
     ⊢ wpLoop (GF := GF) cpu := by
   obtain ⟨hK1, hK2, -, -⟩ := filecloseSlots_callees
   have hKe : 8 + endOpSlots ≤ k.avail := hK
@@ -177,7 +177,7 @@ theorem fc_inode (BO : BEGIN_OP) (IP : IPUT) (EO : END_OP) [Fscfg] [Icfg] [CurCt
   ihave Hframe := fc_frame_close (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) (k.regs 9#5) w4 w5 w6 w7
     $$ [Hra Hs0 Hs1 Hc32 Hc24 Hc16 Hc8 Hc0]
   · unfold fcSpilled; iframe
-  ihave Hout := (show bslots (GF := GF) fscBio 3 ⊢ filecloseEnvOut γk on st from hout) $$ Hbs
+  ihave Hout := (show bslots (GF := GF) 3 ⊢ filecloseEnvOut γk on st from hout) $$ Hbs
   ihave Hnext := fc_next_free k j hj hproc _ cpu _ $$ Hnext
   subst hw4 hw5 hw6 hw7
   iapply (fc_exit cpu k γ γk on st pidv dqp (by omega) spie3 spp3 _

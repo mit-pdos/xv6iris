@@ -37,7 +37,7 @@ theorem bp_br_acq : KA.«bpin» + 0xffffffffffffde6c#64 = KA.«acquire» := by d
 theorem bp_br_rel : KA.«bpin» + 0xffffffffffffdef4#64 = KA.«release» := by decide
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [BcacheG GF] [CurCtx]
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [BcacheG GF] [CurCtx]
 
 /-! ## The tail: the epilogue -/
 
@@ -75,7 +75,7 @@ end
 
 set_option maxHeartbeats 16000000 in
 theorem bpin_proof (AC : ACQUIRE) (RE : RELEASE) : BPIN := ⟨
-  fun {hlc GF} _ _ _ _ _ _ cpu k γl γ V kk dev bno hnoff hK hlk hkk ha0 => by
+  fun {hlc GF} _ _ _ _ _ _ _ _ _ cpu k γl γ V kk dev bno hnoff hK hlk hkk ha0 => by
   unfold wp_bpin_body
   simp only [bpinAddr]
   iintro ⟨Hk, Hpc, #Hbc, Hsl, Hdevc, Hbnoc, Hnext⟩
@@ -193,10 +193,10 @@ theorem bpin_proof (AC : ACQUIRE) (RE : RELEASE) : BPIN := ⟨
   case' _ => iframe
   ihave Hkey := Hkcl $$ Hkey0
   -- the slot unit joins the supply
-  ihave Hslots := (show bslot (GF := GF) γ ∗ bslots γ (Ls kk).length ⊢ bslots γ (nx :: Ls kk).length from by
-    rw [hlen, hn]; exact bslots_cons γ n) $$ [Hsl Hslots]
+  ihave Hslots := (show bslot (GF := GF) ∗ bslots (Ls kk).length ⊢ bslots (nx :: Ls kk).length from by
+    rw [hlen, hn]; exact bslots_cons n) $$ [Hsl Hslots]
   case' _ => iframe
-  icases bslots_bound γ _ $$ Hslots with ⟨Hslots, %hbound⟩
+  icases bslots_bound _ $$ Hslots with ⟨Hslots, %hbound⟩
   have hlt' : (nx :: Ls kk).length < 2 ^ 31 := by
     rw [hlen] at hbound ⊢
     unfold BSLOTS at hbound

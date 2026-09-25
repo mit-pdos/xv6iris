@@ -30,7 +30,7 @@ set_option linter.unusedVariables false
 
 set_option maxHeartbeats 16000000 in
 theorem iu_tail (LW : LOG_WRITE) (BE : BRELSE)
-    {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
+    {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF]
     [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [IregG GF]
     [Fscfg] [Icfg] [CurCtx]
     (Γ : SchedNames)
@@ -57,7 +57,7 @@ theorem iu_tail (LW : LOG_WRITE) (BE : BRELSE)
     logCtx icfgLog fscBio fscFs fscCov fscLogst icfgDev ∗
     wordPointsTo (pPid k.proc) 4 dqp pidv ∗
     frame4s2 (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) (k.regs 9#5) (k.regs 18#5) ∗
-    bslot fscBio ∗ logEpochLb icfgLog v ∗
+    bslot ∗ logEpochLb icfgLog v ∗
     logCredit icfgLog cru Sb e0 (IBLOCK inum icfgIst) ∗
     logOpSe icfgLog (u + 1) Sb e0 ∗
     dislotWriteAu inum dn ds e0 Pout ∗

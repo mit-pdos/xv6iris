@@ -145,7 +145,7 @@ theorem lfParent_row (dn dn' : Dinode) (bm bm' : Blkmap) (data data' : Nat → L
 /-! ## 2.  The two fire points, `ftopN` opened and closed -/
 
 section LinkFire
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [IcacheG GF] [Xv6G GF]
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [IcacheG GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF]
   [FsTopG GF] [FsBytesG GF]
 
 /-- INSTANT 1 -- THE TARGET'S COUNT UP, FUSED WITH ITS RETAG (Rocq's

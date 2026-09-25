@@ -56,7 +56,7 @@ theorem fa_ext1' : BitVec.extractLsb' 0 32 (1#64 : BitVec 64) = 1#32 := by decid
 theorem fa_sext4 : BitVec.signExtend 64 4#12 = 4#64 := by decide
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FileG GF] [IcacheG GF] [SleepLockG GF] [IcboxG GF] [IrefslotG GF] [OffboxG GF] [OffboxBoxG GF] [Icfg] [CurCtx]
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [FileG GF] [IcacheG GF] [SleepLockG GF] [IcboxG GF] [IrefslotG GF] [OffboxG GF] [OffboxBoxG GF] [Icfg] [CurCtx]
 
 /-! ## The shared tail: `mv a0,s1` and the epilogue -/
 
@@ -148,7 +148,7 @@ theorem fa_body (RE : RELEASE) (cpu c : CPU) (k : KCtx) (γl : GName) (γ : File
     kctx c ((((k.pushOffAt spie spp).withLocks ("ftable" :: k.locks)).pushed 4).withRegs R) ∗
     pcIs c (KA.«filealloc» + 0x26#64) ∗ isLock γl ftableAddr "ftable" (ftableResAt γ) ∗
     locked γl c ∗ (γ.ref ↪●MAP M) ∗ ([∗list] j ∈ List.range NFILE, fslotAt γ curCtx j (Ls j)) ∗
-    fdSlot γ ∗ frame4s1 (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) (k.regs 9#5) ∗
+    fdSlot ∗ frame4s1 (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) (k.regs 9#5) ∗
     sieArm c k.sie k.proc ∗
     wpNext k.sie k.proc cpu (fun cpu' => iprop(∀ spie2 : Bool, ∀ spp2 : Bool, ∀ R' : RegMap,
       ⌜k.sie = false → spie2 = k.spie ∧ spp2 = k.spp⌝ -∗
@@ -159,7 +159,7 @@ theorem fa_body (RE : RELEASE) (cpu c : CPU) (k : KCtx) (γl : GName) (γ : File
         faPins k R' ∧ ftableOk M Ls'⌝ -∗
       kctx c ((((k.pushOffAt spie spp).withLocks ("ftable" :: k.locks)).pushed 4).withRegs R') -∗
       pcIs c (KA.«filealloc» + 0x26#64) -∗ locked γl c -∗ (γ.ref ↪●MAP M) -∗
-      ([∗list] j ∈ List.range NFILE, fslotAt γ curCtx j (Ls' j)) -∗ fdSlot γ -∗
+      ([∗list] j ∈ List.range NFILE, fslotAt γ curCtx j (Ls' j)) -∗ fdSlot -∗
       frame4s1 (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) (k.regs 9#5) -∗ sieArm c k.sie k.proc -∗
       wpNext k.sie k.proc cpu (fun cpu' => iprop(∀ spie2 : Bool, ∀ spp2 : Bool, ∀ R' : RegMap,
         ⌜k.sie = false → spie2 = k.spie ∧ spp2 = k.spp⌝ -∗
@@ -224,7 +224,7 @@ theorem fa_body (RE : RELEASE) (cpu c : CPU) (k : KCtx) (γl : GName) (γ : File
       iapply BigSepL.bigSepL_cons.2
       iframe Hrest
       iapply BigSepL.bigSepL_nil.2; iempintro
-    ihave Hfd := (show fdSlot (GF := GF) γ ⊢ fdSlots γ ([(nx, (1 : Qp))]).length from by
+    ihave Hfd := (show fdSlot (GF := GF) ⊢ fdSlots ([(nx, (1 : Qp))]).length from by
       simp only [List.length_singleton]; unfold fdSlot; iintro H; iexact H) $$ Hfd
     ihave Hslot := fslot_intro γ curCtx kk [(nx, (1 : Qp))] C pn 1 (by simp) (by simp)
       $$ [Href Hhalves' Hfd]
@@ -396,7 +396,7 @@ theorem fa_scan (RE : RELEASE) (cpu c : CPU) (k : KCtx) (γl : GName) (γ : File
     kctx c ((((k.pushOffAt spie spp).withLocks ("ftable" :: k.locks)).pushed 4).withRegs R) ∗
     pcIs c (KA.«filealloc» + 0x26#64) ∗ isLock γl ftableAddr "ftable" (ftableResAt γ) ∗
     locked γl c ∗ (γ.ref ↪●MAP M) ∗ ([∗list] j ∈ List.range NFILE, fslotAt γ curCtx j (Ls j)) ∗
-    fdSlot γ ∗ frame4s1 (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) (k.regs 9#5) ∗
+    fdSlot ∗ frame4s1 (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) (k.regs 9#5) ∗
     sieArm c k.sie k.proc ∗
     wpNext k.sie k.proc cpu (fun cpu' => iprop(∀ spie2 : Bool, ∀ spp2 : Bool, ∀ R' : RegMap,
       ⌜k.sie = false → spie2 = k.spie ∧ spp2 = k.spp⌝ -∗
@@ -435,7 +435,7 @@ theorem filealloc_br_1e3e8 : KA.«filealloc» + 0x1e3e8#64 = fnode 0 := by decid
 
 set_option maxHeartbeats 16000000 in
 theorem filealloc_proof (AC : ACQUIRE) (RE : RELEASE) : FILEALLOC := ⟨
-  fun {hlc GF} _ _ _ _ _ _ _ _ _ _ _ cpu k γl γ hnoff hK hlk => by
+  fun {hlc GF} _ _ _ _ _ _ _ _ _ _ _ _ _ cpu k γl γ hnoff hK hlk => by
   unfold wp_filealloc_body
   simp only [fileallocAddr]
   iintro ⟨Hk, Hpc, #Hft, Hfd, Hnext⟩

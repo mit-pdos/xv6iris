@@ -224,7 +224,7 @@ theorem uw_cs9' (R R' : RegMap) (w : BitVec 64) (hcs : calleeSaved (R.set 1#5 w)
   rw [hcs.2.2.1]; simp only [RegMap.set_apply, BitVec.reduceEq, ite_false]
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [CurCtx]
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CurCtx]
 
 /-! ## The transmit token -/
 
@@ -451,7 +451,7 @@ end
 /-! ## The loop invariant at the guard `+0x44` -/
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [CurCtx]
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CurCtx]
 
 def uwLoop (cpu : CPU) (k kb : KCtx) (i : UartId) (γ : UartNames) (dq : DFrac)
     (bs cs : List (BitVec 8)) (n : Nat) : IProp GF := iprop(
@@ -885,7 +885,7 @@ end
 set_option maxHeartbeats 16000000 in
 theorem uartwrite_proof (SP : SLEEP_PREPARE) (AC : ACQUIRE) (RE : RELEASE) (SL : SLEEP) :
     UARTWRITE := ⟨
-  fun {hlc GF} _ _ _ Γ _ cpu k i γl γ j bs cs dq n
+  fun {hlc GF} _ _ _ _ _ _ Γ _ cpu k i γl γ j bs cs dq n
       hj hproc hK hnoff htier hid hn hn' hcs => by
   unfold wp_uartwrite_eb_body
   simp only [uartwriteAddr]

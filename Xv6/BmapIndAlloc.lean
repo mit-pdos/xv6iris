@@ -34,7 +34,7 @@ set_option linter.unusedSimpArgs false
 set_option linter.unusedVariables false
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [CurCtx]
 
 set_option maxHeartbeats 8000000 in
@@ -142,7 +142,7 @@ theorem bm_ind_alloc_ok (LW : LOG_WRITE) (BE : BRELSE) (Γ : SchedNames) (c cpu 
         (DFrac.own 1) w -∗
       bufHold0 γb V kk pidv dev bmI.bmInd (indBytes (bmI.bmEnt.set q w)) bsd) ∗
     bioPay γb V kk dev bmI.bmInd (indBytes bmI.bmEnt) bsd d ∗
-    bmAllocRes γfs V.cov logstart a ∗ logCtx a.baLog γb γfs V.cov logstart dev ∗ bslots γb 2 ∗
+    bmAllocRes γfs V.cov logstart a ∗ logCtx a.baLog γb γfs V.cov logstart dev ∗ bslots 2 ∗
     logOpS a.baLog u1 (blk.toNat :: a.baBms :: SbI) ∗
     fsblock γfs.bytes blk.toNat (List.replicate BSIZE 0#8) ∗
     bmCont k cpu γb γfs V.cov logstart dev (some a) ip bm data fbn n cr Sb pidv dqp dq dqd
@@ -186,7 +186,7 @@ theorem bm_ind_alloc_ok (LW : LOG_WRITE) (BE : BRELSE) (Γ : SchedNames) (c cpu 
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [bm_br_logwrite]
   iintro Hk Hpc
   ihave Hfsbi := fsblockQ_1_of γfs.bytes (DFrac.own 1) _ _ rfl $$ Hind
-  icases bslots_uncons γb 1 $$ Hsl2 with ⟨Hsl1, Hslr⟩
+  icases bslots_uncons 1 $$ Hsl2 with ⟨Hsl1, Hslr⟩
   iapply (log_write_gen_call LW c _ a.baLog γl γb V γfs logstart dev kk pidv bmI.bmInd
       bmI.bmInd.toNat rfl (indBytes (bmI.bmEnt.set q blk)) (indBytes bmI.bmEnt) bsd d w cri
       (blk.toNat :: a.baBms :: SbI) ?wK ?wnoff ?wlk ?wbc ?wtier hkk ?wa0 hdev hcl hdt hihome ?wcr)
@@ -213,7 +213,7 @@ theorem bm_ind_alloc_ok (LW : LOG_WRITE) (BE : BRELSE) (Γ : SchedNames) (c cpu 
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
   -- ---- THE NEW MAP, and everything it has to satisfy ----
-  ihave Hsl2 := bslots_cons γb 1 $$ [Hsl1 Hslr]
+  ihave Hsl2 := bslots_cons 1 $$ [Hsl1 Hslr]
   case' _ => iframe
   ihave Hindq := fsblockQ_1_to γfs.bytes (DFrac.own 1) _ _ rfl $$ Hfsbi
   ihave Hindq := (indBlkQ_run γfs (DFrac.own 1) ⟨bmI.bmDir, bmI.bmInd, bmI.bmEnt.set q blk⟩ _

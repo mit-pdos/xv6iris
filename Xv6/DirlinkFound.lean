@@ -42,7 +42,7 @@ theorem dirlink_slots_iput (a : Nat) (h : dirlinkSlots ≤ a) : iputSlots ≤ a 
   omega
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [IregG GF] [IcacheG GF]
   [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF]
   [Appcfg GF] [Fscfg] [Icfg] [CurCtx]
@@ -74,7 +74,7 @@ theorem dirlink_iput (IP : IPUT) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
     wordPointsTo sbBmapstartAddr 4 dqb (BitVec.ofNat 32 fscBmapstart) ∗
     wordPointsTo sbInodestart 4 dqs (BitVec.ofNat 32 icfgIst) ∗
     bitmapInv fscFs fscBmapstart fscCov fscLogst fscSize ∗
-    wordPointsTo (pPid k'.proc) 4 dqp pidv ∗ bslots fscBio 3 ∗
+    wordPointsTo (pPid k'.proc) 4 dqp pidv ∗ bslots 3 ∗
     logOpSe icfgLog n Sb e0 ∗ txPin icfgLog tid qtx ∗
     wpNext true k'.proc c (fun cpu' => iprop(∀ (spie spp : Bool) (R' : RegMap) (n' : Nat)
         (Sb' : List Nat) (w : Bool),
@@ -84,7 +84,7 @@ theorem dirlink_iput (IP : IPUT) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
       wordPointsTo (pPid k'.proc) 4 dqp pidv -∗
       wordPointsTo sbBmapstartAddr 4 dqb (BitVec.ofNat 32 fscBmapstart) -∗
       wordPointsTo sbInodestart 4 dqs (BitVec.ofNat 32 icfgIst) -∗
-      bslots fscBio 3 -∗
+      bslots 3 -∗
       ⌜(∀ x ∈ Sb, x ∈ Sb') ∧ (w = true → fscBmapstart ∈ Sb') ∧
         n - ipSpendW w false false ≤ n' ∧ n' ≤ n⌝ -∗
       logOpS icfgLog n' Sb' -∗ txPin icfgLog tid qtx -∗ irefSlot -∗ wpLoop cpu'))
@@ -132,7 +132,7 @@ theorem dirlink_found (IP : IPUT) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
     inodeRef kslot q icfgDev (BitVec.setWidth 32 (dirInum data kk)) ∗
     runitAny (BitVec.setWidth 32 (dirInum data kk)).toNat ∗
     dirlinkKeep k ip dinum bm data dn dn0 fn pidv dqp dqd dqf dqn dqs dqbs dqb ∗
-    bslots fscBio 3 ∗ dlinks fscFs dinum.toNat dn bm data ∗
+    bslots 3 ∗ dlinks fscFs dinum.toNat dn bm data ∗
     logOpS icfgLog ncount Sb ∗ txPin icfgLog tid qtx ∗
     dirlinkEnv (hlc := hlc) Γ γl pd pav pu γkl γk ∗
     (∀ c' : CPU, dirlinkPost k ip dinum bm data dn dn0 fn inum ncount Sb tid qtx pidv

@@ -33,7 +33,7 @@ set_option linter.unusedSimpArgs false
 set_option linter.unusedVariables false
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
   [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF]
   [Appcfg GF] [Fscfg] [Icfg] [CurCtx]
@@ -75,13 +75,13 @@ theorem namex_ilock (IL : ILOCK) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ] 
     icEscrow fscIc fscFs fscIreg fscCov fscLogst ik ∗ credFloor lo tl ∗
     inodeShrGenlo ik q.half icfgDev inum g lo ∗ runitAny inum.toNat ∗
     wordPointsTo sbInodestart 4 A.dqs (BitVec.ofNat 32 icfgIst) ∗
-    wordPointsTo (pPid k'.proc) 4 A.dqp A.pidv ∗ bslot fscBio ∗ logTx icfgLog ∗
+    wordPointsTo (pPid k'.proc) 4 A.dqp A.pidv ∗ bslot ∗ logTx icfgLog ∗
     (∀ (c : CPU) (spie spp : Bool) (R' : RegMap) (dn : Dinode) (bm : Blkmap),
       ⌜calleeSaved k'.regs R'⌝ -∗
       kctx c ((k'.withSpie spie spp).withRegs R') -∗ pcIs c (jumpPc (k'.regs 1#5)) -∗
       trapCsrsExt c k'.sie -∗ cpuClaimExt c k'.sie k'.proc -∗
       wordPointsTo sbInodestart 4 A.dqs (BitVec.ofNat 32 icfgIst) -∗
-      wordPointsTo (pPid k'.proc) 4 A.dqp A.pidv -∗ bslot fscBio -∗
+      wordPointsTo (pPid k'.proc) 4 A.dqp A.pidv -∗ bslot -∗
       sleeplockedQ γisl q.half (iLock (ientry ik)) A.pidv -∗
       icTxDep fscIc ik q.half icfgDev inum g lo -∗
       offRows offCfg ik curCtx -∗
@@ -126,7 +126,7 @@ def namexIupK (k' : KCtx) (A : NamexArgs) (ncur : Nat) (Scur : List Nat) (wc crz
     wordPointsTo sbBmapstartAddr 4 A.dqb (BitVec.ofNat 32 fscBmapstart) -∗
     wordPointsTo sbInodestart 4 A.dqs (BitVec.ofNat 32 icfgIst) -∗
     wordPointsTo (pPid k'.proc) 4 A.dqp A.pidv -∗
-    bslots fscBio 3 -∗ logOpS icfgLog n' Sb' -∗ logTx icfgLog -∗ irefSlot -∗ wpLoop c)
+    bslots 3 -∗ logOpS icfgLog n' Sb' -∗ logTx icfgLog -∗ irefSlot -∗ wpLoop c)
 
 set_option maxHeartbeats 8000000 in
 /-- `iunlockput(ip)` at a namex call site: the tx form, `crb := wc`,
@@ -150,7 +150,7 @@ theorem namex_iunlockput (IUP : IUNLOCKPUT) (Γ : SchedNames) [ClaimIs (hlc := h
     namexLk A ik q g lo tl inum dn γil γisl ∗ icLoaded fscFs fscIreg fscCov fscLogst ik inum dn bm ∗
     wordPointsTo sbBmapstartAddr 4 A.dqb (BitVec.ofNat 32 fscBmapstart) ∗
     wordPointsTo sbInodestart 4 A.dqs (BitVec.ofNat 32 icfgIst) ∗
-    wordPointsTo (pPid k'.proc) 4 A.dqp A.pidv ∗ bslots fscBio 3 ∗
+    wordPointsTo (pPid k'.proc) 4 A.dqp A.pidv ∗ bslots 3 ∗
     (if crz then nlzObs inum.toNat e0 else emp) ∗ logOpSe icfgLog ncur Scur e0 ∗
     namexIupK k' A ncur Scur wc crz
     ⊢ wpLoop (GF := GF) cpu := by
@@ -242,7 +242,7 @@ def namexIputK (k' : KCtx) (A : NamexArgs) (ncur : Nat) (Scur : List Nat) (wc : 
     wordPointsTo sbBmapstartAddr 4 A.dqb (BitVec.ofNat 32 fscBmapstart) -∗
     wordPointsTo sbInodestart 4 A.dqs (BitVec.ofNat 32 icfgIst) -∗
     wordPointsTo (pPid k'.proc) 4 A.dqp A.pidv -∗
-    bslots fscBio 3 -∗ logOpS icfgLog n' Sb' -∗ logTx icfgLog -∗ irefSlot -∗ wpLoop c)
+    bslots 3 -∗ logOpS icfgLog n' Sb' -∗ logTx icfgLog -∗ irefSlot -∗ wpLoop c)
 
 set_option maxHeartbeats 8000000 in
 /-- `iput(ip)` at `L_done` (+0x146): the credited set form UNCREDITED
@@ -263,7 +263,7 @@ theorem namex_iput (IP : IPUT) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
     inodeHeld ipv ∗
     wordPointsTo sbBmapstartAddr 4 A.dqb (BitVec.ofNat 32 fscBmapstart) ∗
     wordPointsTo sbInodestart 4 A.dqs (BitVec.ofNat 32 icfgIst) ∗
-    wordPointsTo (pPid k'.proc) 4 A.dqp A.pidv ∗ bslots fscBio 3 ∗
+    wordPointsTo (pPid k'.proc) 4 A.dqp A.pidv ∗ bslots 3 ∗
     logOpS icfgLog ncur Scur ∗ logTx icfgLog ∗
     namexIputK k' A ncur Scur wc
     ⊢ wpLoop (GF := GF) cpu := by
@@ -310,7 +310,7 @@ def namexDlK (k' : KCtx) (A : NamexArgs) (ik : Nat) (inum : BitVec 32) (bm : Blk
     wordPointsTo (iDev (ientry ik)) 4 (DFrac.own (1 : Qp).half) icfgDev -∗
     inodeMeta (ientry ik) dn -∗ inodeMap fscFs (ientry ik) bm -∗ inodeBlocks fscFs bm data -∗
     byteBuf (k'.regs 11#5) (DFrac.own 1) (bview 14 nf) -∗
-    wordPointsTo (pPid k'.proc) 4 A.dqp A.pidv -∗ bslot fscBio -∗
+    wordPointsTo (pPid k'.proc) 4 A.dqp A.pidv -∗ bslot -∗
     dlinks fscFs inum.toNat dn bm data -∗ dinodeAt fscIreg inum dn -∗
     (if found then
       iprop(⌜dirFirst data (dirNrec dn.diSize.toNat) (bname 14 nf) = some kd ∧
@@ -341,7 +341,7 @@ theorem namex_dirlookup (DL : DIRLOOKUP) (Γ : SchedNames) [ClaimIs (hlc := hlc)
     wordPointsTo (iDev (ientry ik)) 4 (DFrac.own (1 : Qp).half) icfgDev ∗
     inodeMeta (ientry ik) dn ∗ inodeMap fscFs (ientry ik) bm ∗ inodeBlocks fscFs bm data ∗
     byteBuf (k'.regs 11#5) (DFrac.own 1) (bview 14 nf) ∗
-    wordPointsTo (pPid k'.proc) 4 A.dqp A.pidv ∗ bslot fscBio ∗ irefSlot ∗
+    wordPointsTo (pPid k'.proc) 4 A.dqp A.pidv ∗ bslot ∗ irefSlot ∗
     dlinks fscFs inum.toNat dn bm data ∗ dinodeAt fscIreg inum dn ∗
     namexDlK k' A ik inum bm data dn nf
     ⊢ wpLoop (GF := GF) cpu := by

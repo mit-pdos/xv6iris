@@ -33,7 +33,7 @@ set_option linter.unusedSimpArgs false
 set_option linter.unusedVariables false
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
   [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF]
   [Appcfg GF]
@@ -46,7 +46,7 @@ theorem ireclaim_epilogue [Fscfg] [Icfg] [CurCtx] (cpu : CPU) (k : KCtx) (spie s
     (hR2 : R 2#5 = k.regs 2#5 + 0xFFFFFFFFFFFFFFC0#64) (hp : ireclaimPins k R) :
     kctx cpu (((k.withSpie spie spp).pushed 8).withRegs R) ∗ pcIs cpu (KA.«ireclaim» + 0xb2#64) ∗
     ireclaimTurn cpu k pidv dqp dqb dqs dqn ∗
-    bslots fscBio 3 ∗ irefSlot ∗ iregBoot
+    bslots 3 ∗ irefSlot ∗ iregBoot
     ⊢ wpLoop (GF := GF) cpu := by
   have hK' : 8 ≤ (k.withSpie spie spp).avail := hK
   iintro ⟨Hk, Hpc, Hturn, Hsl, Hiref, Hboot⟩
@@ -119,7 +119,7 @@ theorem ireclaim_step [Fscfg] [Icfg] [CurCtx] (Γ : SchedNames) (cpu : CPU) (k :
         wpLoop (GF := GF) c') :
     kctx cpu (((k.withSpie spie spp).pushed 8).withRegs R) ∗ pcIs cpu (KA.«ireclaim» + 0x6e#64) ∗
     ireclaimEnv (hlc := hlc) Γ γl pd pav pu ∗ ireclaimTurn cpu k pidv dqp dqb dqs dqn ∗
-    bslots fscBio 3 ∗ irefSlot ∗ iregBoot
+    bslots 3 ∗ irefSlot ∗ iregBoot
     ⊢ wpLoop (GF := GF) cpu := by
   obtain ⟨hK8, -⟩ := ireclaim_slots k.avail hK
   have hn1 : n + 1 < 2 ^ 31 := by omega
@@ -192,7 +192,7 @@ theorem ireclaim_release (BE : BRELSE) [Fscfg] [Icfg] [CurCtx] (Γ : SchedNames)
         wpLoop (GF := GF) c') :
     kctx cpu (((k.withSpie spie spp).pushed 8).withRegs R) ∗ pcIs cpu (KA.«ireclaim» + 0xaa#64) ∗
     ireclaimEnv (hlc := hlc) Γ γl pd pav pu ∗ ireclaimTurn cpu k pidv dqp dqb dqs dqn ∗
-    bslots fscBio 2 ∗
+    bslots 2 ∗
     bioLocked fscBio (fsView fscFs fscDisk icfgDev fscCov) kk pidv icfgDev bno bs bsd d ∗
     irefSlot ∗ iregBoot
     ⊢ wpLoop (GF := GF) cpu := by

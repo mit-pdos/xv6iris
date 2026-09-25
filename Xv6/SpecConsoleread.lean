@@ -43,7 +43,7 @@ def consReadRet (d : Nat) (r : BitVec 64) : Prop :=
   r = -1#64 ∨ r = BitVec.ofInt 64 d
 
 /-- **WP of `consoleread`.**  `a0 = user_dst` (nonzero), `a1 = dst`, `a2 = n`. -/
-def wp_consoleread_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [CurCtx]
+def wp_consoleread_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CurCtx]
     (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
     (cpu : CPU) (k : KCtx) (γc : GName)
     (γkl : GName) (γk : KmemNames) (j : Nat) (pid : BitVec 32)
@@ -72,7 +72,7 @@ no spinlock held, by `KCtx.wf`), the trap-CSR complement `trapCsrsExt` /
 `cpuClaimExt` in and out -- `emp` at `sie = true`, where consoleread's own
 `acquire(&cons.lock)` mints what its interior `sleep` needs -- and the
 crossing the literal `true` (it parks). -/
-def wp_consoleread_eb_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [CurCtx]
+def wp_consoleread_eb_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CurCtx]
     (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
     (cpu : CPU) (k : KCtx) (γc : GName)
     (γkl : GName) (γk : KmemNames) (j : Nat) (pid : BitVec 32)
@@ -97,7 +97,7 @@ def wp_consoleread_eb_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF]
 
 /-- The interface of `consoleread`. -/
 structure CONSOLEREAD : Prop where
-  wp_consoleread_eb : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [CurCtx]
+  wp_consoleread_eb : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CurCtx]
     (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
     (cpu : CPU) (k : KCtx) (γc : GName)
     (γkl : GName) (γk : KmemNames) (j : Nat) (pid : BitVec 32)
@@ -107,7 +107,7 @@ structure CONSOLEREAD : Prop where
 /-- The interrupts-off instance of `wp_consoleread_eb` (the complement is the
 whole bundle). -/
 theorem CONSOLEREAD.wp_consoleread (A : CONSOLEREAD) {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF]
-    [Xv6G GF] [CurCtx]
+    [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CurCtx]
     (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
     (cpu : CPU) (k : KCtx) (γc : GName)
     (γkl : GName) (γk : KmemNames) (j : Nat) (pid : BitVec 32)

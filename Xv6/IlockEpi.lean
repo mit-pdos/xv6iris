@@ -21,7 +21,7 @@ set_option linter.unusedSimpArgs false
 set_option linter.unusedVariables false
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [BcacheG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [BcacheG GF]
   [SleepLockG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF] [FsTopG GF] [FsLinkG GF]
   [IcboxG GF] [OffboxG GF] [OffboxBoxG GF]
 
@@ -32,7 +32,7 @@ def ilDone [Fscfg] [Icfg] [CurCtx] (γisl : GName) (kk : Nat) (s : Qp) (g : GNam
     (dn : Dinode) (bm : Blkmap) (filled : Bool) : IProp GF :=
   iprop((∃ K : Nat, ⌜Tl ≤ K⌝ ∗ ctxFloor curCtx K) ∗
     wordPointsTo sbInodestart 4 dqs (BitVec.ofNat 32 icfgIst) ∗
-    bslot fscBio ∗
+    bslot ∗
     sleeplockedQ γisl s (iLock (ientry kk)) pidv ∗
     icHandle fscIc kk d ∗
     offRows offCfg kk curCtx ∗
@@ -68,7 +68,7 @@ every callee.  The caller's continuation is carried HART-FREE
 a pinning fact. -/
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [BcacheG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [BcacheG GF]
   [SleepLockG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF] [FsTopG GF] [FsLinkG GF]
   [IcboxG GF] [OffboxG GF] [OffboxBoxG GF]
 
@@ -121,7 +121,7 @@ end
 the complement for the trio, no `SIE` premise, and the caller's
 continuation hart-free. -/
 def IlLoadEb : Prop :=
-  ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [BcacheG GF]
+  ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [BcacheG GF]
     [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF] [FsTopG GF]
     [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [Appcfg GF] [Fscfg] [Icfg] [CurCtx]
     (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
@@ -144,7 +144,7 @@ def IlLoadEb : Prop :=
       wordPointsTo (iDev (ientry kk)) 4 (DFrac.own (1 : Qp).half) icfgDev ∗
       wordPointsTo (iInum (ientry kk)) 4 (DFrac.own (1 : Qp).half) inum ∗
       wordPointsTo sbInodestart 4 dqs (BitVec.ofNat 32 icfgIst) ∗
-      bslot fscBio ∗
+      bslot ∗
       wordPointsTo (iValid (ientry kk)) 4 (DFrac.own 1) (validWord false) ∗
       inodeRaw (ientry kk) ∗ ipoolShapeNp fscFs fscIreg fscCov fscLogst inum ∗
       ityPending g ∗ ifreezeOff inum.toNat ∗ iregWdLic o g inum.toNat ∗

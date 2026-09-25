@@ -66,7 +66,7 @@ theorem itrunc_frame_join [CurCtx] (sp ra s0 s1 s2 s3 w : BitVec 64) :
 end
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [CurCtx]
 
 /-- No indirect block, no resource (the `if` of `Xv6.indBlkQ`). -/
@@ -105,7 +105,7 @@ end
 /-! ## The callees at their call sites -/
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [Fscfg] [Icfg] [CurCtx]
 
 /-- The resources at the JOIN `+0x38` both predecessors reach (the machine
@@ -124,7 +124,7 @@ def itJPre (Γ : SchedNames) (c : CPU) (k : KCtx) (spie spp : Bool) (R : RegMap)
   wordPointsTo (pPid k.proc) 4 dqp pidv ∗
   wordPointsTo ip 4 dqd icfgDev ∗
   wordPointsTo sbBmapstartAddr 4 dqb (BitVec.ofNat 32 fscBmapstart) ∗
-  bslots fscBio 3 ∗ inodeMap fscFs ip bmEmpty ∗ bmPaidS crb u Sb e0 ∗ F
+  bslots 3 ∗ inodeMap fscFs ip bmEmpty ∗ bmPaidS crb u Sb e0 ∗ F
 
 /-- What the arm parks across the indirect loop (Rocq's arm-local context):
 the five saved slots and the pad slot holding the caller's `s4`, the
@@ -271,7 +271,7 @@ theorem itrunc_arm_rest (BF : BFREE) (BE : BRELSE) (Γ : SchedNames) [ClaimIs (h
   ihave Hframe := itrunc_frame_join (GF := GF) (k.regs 2#5) (k.regs 1#5) (k.regs 8#5)
     (k.regs 9#5) (k.regs 18#5) (k.regs 19#5) (k.regs 20#5) $$ [H5 Hs0]
   · iframe
-  ihave Hsl1 := (show bslot (GF := GF) fscBio ⊢ bslots fscBio 1 from .rfl) $$ Hsl1
+  ihave Hsl1 := (show bslot (GF := GF) ⊢ bslots 1 from .rfl) $$ Hsl1
   ihave Hsl := dsSlots_join fscBio 2 1 $$ Hsl Hsl1
   have hexit' := hexit cpu spie4 spp4 (R4.set 20#5 (k.regs 20#5)) ?xp ?x19
   unfold itJPre at hexit'
@@ -323,7 +323,7 @@ theorem itrunc_arm (BR : BREAD) (BF : BFREE) (BE : BRELSE) (Γ : SchedNames)
     wordPointsTo (pPid k.proc) 4 dqp pidv ∗
     wordPointsTo ip 4 dqd icfgDev ∗
     wordPointsTo sbBmapstartAddr 4 dqb (BitVec.ofNat 32 fscBmapstart) ∗
-    bslots fscBio 3 ∗
+    bslots 3 ∗
     inodeMap fscFs ip (bmDirZeroed bm NDIRECT) ∗ inodeBlocks fscFs (itZ bm NDIRECT) data ∗
     bmPaidS crb u Sb e0 ∗ F
     ⊢ wpLoop (GF := GF) cpu := by
@@ -358,7 +358,7 @@ theorem itrunc_arm (BR : BREAD) (BF : BFREE) (BE : BRELSE) (Γ : SchedNames)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [itrunc_br_bread]
   iintro Hk Hpc
   icases dsSlots_split fscBio 1 2 $$ Hsl with ⟨Hsl1, Hsl⟩
-  ihave Hsl1 := (show bslots (GF := GF) fscBio 1 ⊢ bslot fscBio from .rfl) $$ Hsl1
+  ihave Hsl1 := (show bslots (GF := GF) 1 ⊢ bslot from .rfl) $$ Hsl1
   iapply (bread_callF_eb BR Γ cpu _ γl pd pav pu j pidv bm.bmInd dqp k.proc (by k_norm_g)
       k.sie (by k_norm_g) hj ?dproc ?dK ?dnoff ?dtier hib31 hhome.1 hpd ?da0 ?da1)
     $$ [- $Hk $Hpc $Hpi $Hte $Hce $Hbc $Hdc $Hpe $Hpid $Hsl1]

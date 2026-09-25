@@ -41,7 +41,7 @@ def reparented (parents : Nat → BitVec 64) (p ip : BitVec 64) : Nat → BitVec
   fun i => if parents i = p then ip else parents i
 
 /-- **WP of `reparent`.** -/
-def wp_reparent_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [CurCtx]
+def wp_reparent_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CurCtx]
     (Γ : SchedNames) (cpu : CPU) (k : KCtx) (parents : Nat → BitVec 64) (ip : BitVec 64)
     (hnoff : k.noff + 1 < 2 ^ 31) (hK : reparentSlots ≤ k.avail)
     (hlk : "proc" ∉ k.locks) (hwl : "wait_lock" ∈ k.locks) (htier : k.tier = KTier.kpt) : Prop :=
@@ -55,7 +55,7 @@ def wp_reparent_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G
 
 /-- The interface of `reparent`. -/
 structure REPARENT : Prop where
-  wp_reparent : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [CurCtx]
+  wp_reparent : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CurCtx]
     (Γ : SchedNames) (cpu : CPU) (k : KCtx) (parents : Nat → BitVec 64) (ip : BitVec 64)
     hnoff hK hlk hwl htier,
     wp_reparent_body (hlc := hlc) (GF := GF) Γ cpu k parents ip hnoff hK hlk hwl htier

@@ -65,7 +65,7 @@ macro_rules
                try (case hs => k_norm_g)))
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
   [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF] [FsTopG GF] [FsLinkG GF] [IcboxG GF]
   [SleepLockG GF] [IrefslotG GF] [Appcfg GF] [Fscfg] [Icfg] [CurCtx]
 

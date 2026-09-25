@@ -33,7 +33,7 @@ set_option linter.unusedSimpArgs false
 set_option linter.unusedVariables false
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [IregG GF] [IcacheG GF]
   [FsTopG GF] [FsLinkG GF] [Appcfg GF] [Fscfg] [Icfg] [CurCtx]
 
@@ -85,7 +85,7 @@ theorem itrunc_iupdate (IU : IUPDATE) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF
     iuCells ip inum (diTrunc dn) bmEmpty dqd dqn dqs ∗
     iregInv (hlc := hlc) fscIreg fscFs icfgIst icfgNib ∗ dinodeAt fscIreg inum dn0 ∗
     wordPointsTo (pPid pj) 4 dqp pidv ∗
-    bslots fscBio 2 ∗
+    bslots 2 ∗
     logCredit icfgLog cru Sb0 e0 (IBLOCK inum icfgIst) ∗
     logOpSe icfgLog (u + 1) Sb0 e0 ∗
     wpNext true pj c (fun cpu' => iprop(∀ (spie spp : Bool) (R' : RegMap),
@@ -95,7 +95,7 @@ theorem itrunc_iupdate (IU : IUPDATE) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF
       wordPointsTo (pPid pj) 4 dqp pidv -∗
       iuCells ip inum (diTrunc dn) bmEmpty dqd dqn dqs -∗
       dinodeAt fscIreg inum (diTrunc dn) -∗
-      bslots fscBio 2 -∗
+      bslots 2 -∗
       logOpS icfgLog (if cru then u + 1 else u) (IBLOCK inum icfgIst :: Sb0) -∗ wpLoop cpu'))
     ⊢ wpLoop (GF := GF) c := by
   subst hpj hs
@@ -151,7 +151,7 @@ theorem itrunc_tail (IU : IUPDATE) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ
     wordPointsTo sbInodestart 4 dqs (BitVec.ofNat 32 icfgIst) ∗
     inodeMeta ip dn ∗ inodeMap fscFs ip bmEmpty ∗
     iregInv (hlc := hlc) fscIreg fscFs icfgIst icfgNib ∗ dinodeAt fscIreg inum dn0 ∗
-    bslots fscBio 3 ∗
+    bslots 3 ∗
     logCredit icfgLog cru Sb0 e0 (IBLOCK inum icfgIst) ∗
     logOpSe icfgLog (u + 1) Sb0 e0 ∗
     itContE k ip inum dn pidv dqp dqd dqn dqb dqs
@@ -266,7 +266,7 @@ theorem itrunc_join (IU : IUPDATE) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ
     wordPointsTo sbInodestart 4 dqs (BitVec.ofNat 32 icfgIst) ∗
     inodeMeta ip dn ∗ inodeMap fscFs ip bmEmpty ∗
     iregInv (hlc := hlc) fscIreg fscFs icfgIst icfgNib ∗ dinodeAt fscIreg inum dn0 ∗
-    bslots fscBio 3 ∗
+    bslots 3 ∗
     logCredit icfgLog cru Sb e0 (IBLOCK inum icfgIst) ∗
     bmPaidS crb u Sb e0 ∗
     itContE k ip inum dn pidv dqp dqd dqn dqb dqs (itLedger crb cru u Sb inum)

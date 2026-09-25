@@ -53,7 +53,7 @@ def sysForkAddr : BitVec 64 := KA.«sys_fork»
 def sysForkSlots : Nat := 2 + kforkSlots
 
 /-- **WP of `sys_fork()`.** -/
-def wp_sys_fork_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [CurCtx]
+def wp_sys_fork_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CurCtx]
     (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ] [FsEnv] [ForkretIs]
     (cpu : CPU) (k : KCtx) (γw γp γl : GName) (γk : KmemNames) (j : Nat) (pid : BitVec 32)
     (V : ProcPriv) (M : Nat → List (BitVec 8))
@@ -75,7 +75,7 @@ def wp_sys_fork_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G
 
 /-- **WP of `sys_fork()`, at either entry `SIE`** (Rocq `wp_sys_fork_sconf_body`):
 kfork's balanced contract forwarded through the two-slot frame. -/
-def wp_sys_fork_eb_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [CurCtx]
+def wp_sys_fork_eb_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CurCtx]
     (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ] [FsEnv] [ForkretIs]
     (cpu : CPU) (k : KCtx) (γw γp γl : GName) (γk : KmemNames) (j : Nat) (pid : BitVec 32)
     (V : ProcPriv) (M : Nat → List (BitVec 8))
@@ -91,7 +91,7 @@ def wp_sys_fork_eb_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [X
 
 /-- The interface of `sys_fork`. -/
 structure SYSFORK : Prop where
-  wp_sys_fork_eb : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [CurCtx]
+  wp_sys_fork_eb : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CurCtx]
     (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ] [FsEnv] [ForkretIs]
     (cpu : CPU) (k : KCtx) (γw γp γl : GName) (γk : KmemNames) (j : Nat) (pid : BitVec 32)
     (V : ProcPriv) (M : Nat → List (BitVec 8)) hj hproc hK hnoff htier,
@@ -101,7 +101,7 @@ structure SYSFORK : Prop where
 /-- The interrupts-off instance of `wp_sys_fork_eb`: the hart is pinned, so
 the trap bundle frames across the call. -/
 theorem SYSFORK.wp_sys_fork (A : SYSFORK) {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF]
-    [Xv6G GF] [CurCtx] (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ] [FsEnv] [ForkretIs]
+    [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CurCtx] (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ] [FsEnv] [ForkretIs]
     (cpu : CPU) (k : KCtx) (γw γp γl : GName) (γk : KmemNames) (j : Nat) (pid : BitVec 32)
     (V : ProcPriv) (M : Nat → List (BitVec 8)) hj hproc hK hsie hnoff hlocks htier :
     wp_sys_fork_body (hlc := hlc) (GF := GF) Γ cpu k γw γp γl γk j pid V M

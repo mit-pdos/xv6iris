@@ -309,7 +309,7 @@ def islotEmpty [Icfg] [CurCtx] (ξ : CtxId) (cn : IcNames) (k : Nat) : IProp GF 
     islotFreeAtCtx ξ k dev inum ∗ icId cn k (1 : Qp).half false dev inum ∗ icPinRest k)
 
 section Live
-variable [Xv6G GF] [IrefslotG GF]
+variable [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF]
 
 /-- `islot2`'s LIVE arm (deviation 2): the retained identity share, the
 slot's `n` iref-slot units, the table's `true` half of the identification
@@ -381,7 +381,7 @@ instance islotEmpty_morph [Icfg] [CurCtx] (cn : IcNames) (k : Nat) :
   exact @instCtxMorphSep hlc GF _ _ _ (islotFreeAtCtx_morph k dev inum) (instCtxMorphConst _)
 
 /-- Rocq's `islot2_morph`. -/
-instance islot2_morph [Xv6G GF] [IrefslotG GF] [Icfg] [CurCtx] (cn : IcNames) (M : RegMapF (Qp × PosNat))
+instance islot2_morph [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [Icfg] [CurCtx] (cn : IcNames) (M : RegMapF (Qp × PosNat))
     (ci : RegMapF (BitVec 32 × BitVec 32)) (k : Nat) :
     CtxMorph (GF := GF) (fun ξ => islot2 ξ cn M ci k) := by
   unfold islot2
@@ -398,7 +398,7 @@ end IcacheTableSlot
 /-! ## §6.  The per-slot PAYLOAD rows (A6.145, R3 M-6/F17) -/
 
 section IcacheTableRow
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [IcboxG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [IcboxG GF]
 
 /-- The slot's count in `M` (0 when not live; Rocq's `icM_count`). -/
 def icMCount (M : RegMapF (Qp × PosNat)) (k : Nat) : Nat :=
@@ -765,7 +765,7 @@ end IcacheTableRow
 
 section IcacheTableRes
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [IcacheG GF]
-  [FsBlocksG GF] [FsTopG GF] [Xv6G GF] [IcboxG GF] [SleepLockG GF] [IrefslotG GF]
+  [FsBlocksG GF] [FsTopG GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IcboxG GF] [SleepLockG GF] [IrefslotG GF]
 
 /-- Rocq's `itable_res2`: the lock holder's half of the count authority,
 the per-slot payload rows, the two wf facts, the slots' share authorities
@@ -1022,7 +1022,7 @@ end IcacheTableRes
 
 /-- Rocq's `ic_escrows_lookup`. -/
 theorem icEscrows_lookup {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [IcacheG GF]
-    [LogG GF] [FsBlocksG GF] [IregG GF] [FsTopG GF] [FsLinkG GF] [Xv6G GF] [IcboxG GF]
+    [LogG GF] [FsBlocksG GF] [IregG GF] [FsTopG GF] [FsLinkG GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [IcboxG GF]
     [Icfg] [CurCtx] (cn : IcNames) (γfs : FsNames) (γi : GName) (cov : ExtTreeSet Nat compare)
     (logstart k : Nat) (hk : k < NINODE) :
     icEscrows (GF := GF) cn γfs γi cov logstart ⊢ icEscrow cn γfs γi cov logstart k := by
@@ -1033,7 +1033,7 @@ theorem icEscrows_lookup {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [
 /-! ## §6b.  EVERY ENTRY'S INODE SLEEPLOCK -/
 
 section IcacheSleeplocks
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [SleepLockG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [SleepLockG GF]
   [IcacheG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF]
 
 /-- Rocq's `ic_sleeplocks` (deviation 4: no name conjunct). -/
@@ -1059,7 +1059,7 @@ end IcacheSleeplocks
 /-! ## §6c.  THE TWO ICACHE ENVIRONMENT ROWS' TRANSPORT OBLIGATIONS -/
 
 section IcacheEnvMorph
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [SleepLockG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [SleepLockG GF]
   [IcacheG GF] [IcboxG GF]
 
 /-- One slot's sleeplock handle transports: the payload `slBody … (icSlp cn

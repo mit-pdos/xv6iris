@@ -62,7 +62,7 @@ def swPins (k : KCtx) (R : RegMap) : Prop :=
   R 25#5 = k.regs 25#5 ∧ R 26#5 = k.regs 26#5 ∧ R 27#5 = k.regs 27#5
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [CurCtx]
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CurCtx]
 
 /-! ## The callees -/
 
@@ -221,7 +221,7 @@ theorem sys_wait_br_ffffffffffffff0a : KA.«sys_wait» + 0xffffffffffffff0a#64 =
 set_option maxHeartbeats 64000000 in
 set_option maxRecDepth 20000 in
 theorem sys_wait_proof (AA : ARGADDR) (KW : KWAIT) : SYSWAIT := ⟨
-  fun {hlc GF} _ _ X Γ _ cpu k γw γp γl γk j pid V M v hj hproc hv hK hnoff htier => by
+  fun {hlc GF} _ _ _ _ _ X Γ _ cpu k γw γp γl γk j pid V M v hj hproc hv hK hnoff htier => by
   obtain ⟨ξ0, t0⟩ := X
   letI : CurCtx := ⟨ξ0, t0⟩
   unfold wp_sys_wait_eb_body

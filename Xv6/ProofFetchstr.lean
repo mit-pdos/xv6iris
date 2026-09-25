@@ -122,7 +122,7 @@ theorem fetchstr_calleeSaved_mk (KR R : RegMap)
       | assumption
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF]
 
 /-! ## The block, opened at the two cells and the address space -/
 
@@ -383,7 +383,7 @@ end
 
 set_option maxHeartbeats 16000000 in
 theorem fetchstr_proof (MP : MYPROC) (CI : COPYINSTR) (SL : STRLEN) : FETCHSTR :=
-  ⟨fun {hlc GF} _ _ X cpu k γl γk pa pid V M old hproc htier hnoff hK hlk hmax hmax' => by
+  ⟨fun {hlc GF} _ _ _ _ _ X cpu k γl γk pa pid V M old hproc htier hnoff hK hlk hmax hmax' => by
   obtain ⟨ξ0, t0⟩ := X
   letI : CurCtx := ⟨ξ0, t0⟩
   unfold wp_fetchstr_body

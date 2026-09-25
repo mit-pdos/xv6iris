@@ -391,7 +391,7 @@ theorem growproc_br_fffffffffffffcbe : KA.«growproc» + 0xfffffffffffffcbe#64 =
 
 set_option maxHeartbeats 4000000 in
 theorem growproc_proof (MP : MYPROC) (UA : UVMALLOC) (UD : UVMDEALLOC) : GROWPROC :=
-  ⟨fun {hlc GF} _ _ _ cpu k γl γk j pid V M hj hproc hnoff hK hlk htier => by
+  ⟨fun {hlc GF} _ _ _ _ _ _ cpu k γl γk j pid V M hj hproc hnoff hK hlk htier => by
   unfold wp_growproc_body
   simp only [growprocAddr]
   iintro ⟨Hk, Hpc, #Hlk, Hav, Hpv, HΦ⟩

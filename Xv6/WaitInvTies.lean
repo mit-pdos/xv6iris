@@ -54,7 +54,7 @@ open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Iris.Std Std MachCSL
 set_option linter.unusedSectionVars false
 
 section WaitInvTies
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [WchG GF] [CtokG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [WchG GF] [CtokG GF]
 
 /-! ## What the three writers spend -/
 

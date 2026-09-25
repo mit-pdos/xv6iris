@@ -73,7 +73,7 @@ def nameiparentSlots : Nat := 2 + namexSlots
 theorem nameiparentSlots_eq : nameiparentSlots = 118 := by decide
 
 section Post
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
   [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF]
   [Appcfg GF] [Fscfg] [Icfg] [CurCtx]
@@ -96,7 +96,7 @@ def nameiparentPost (k : KCtx) (plen : Nat) (pfun : Nat → BitVec 8) (n : Nat) 
     byteBuf (k.regs 10#5) dqpv (bview (plen + 1) pfun) -∗
     -- the caller's name buffer, at an UNSPECIFIED naming function
     byteBuf (k.regs 11#5) (DFrac.own 1) (bview 14 nf) -∗
-    bslots fscBio 3 -∗
+    bslots 3 -∗
     -- THE SET ONLY GROWS; THE PAID-BITMAP REPORT; THE PRICED INTERVAL
     ⌜(∀ x ∈ Sb, x ∈ Sb') ∧ (w = true → fscBmapstart ∈ Sb') ∧
       n - (walkSpend w + (if ok then 0 else 1)) ≤ n' ∧ n' ≤ n⌝ -∗
@@ -112,7 +112,7 @@ end Post
 
 /-- **WP of `nameiparent(path = a0, name = a1)`, the set-form contract at
 either entry `SIE`** (Rocq's `wp_nameiparent_gen_body`). -/
-def wp_nameiparent_gen_eb_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
+def wp_nameiparent_gen_eb_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
     [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
     [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF]
     [Appcfg GF] [Fscfg] [Icfg] [CurCtx]
@@ -156,7 +156,7 @@ def wp_nameiparent_gen_eb_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc
   byteBuf (k.regs 10#5) dqpv (bview (plen + 1) pfun) ∗
   -- ---- THE CALLER'S NAME BUFFER, WRITTEN: full ownership ----
   byteBuf (k.regs 11#5) (DFrac.own 1) (bview 14 nfun) ∗
-  bslots fscBio 3 ∗
+  bslots 3 ∗
   irefSlots 2 ∗
   logOpS icfgLog n Sb ∗ logTx icfgLog ∗
   -- THE CROSSING IS THE LITERAL `true`: nameiparent parks (through namex)
@@ -166,7 +166,7 @@ def wp_nameiparent_gen_eb_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc
 /-- The interface of `nameiparent` (Rocq's `Module Type NAMEIPARENT`, its
 `wp_nameiparent_gen` field; the counted form is dropped, see the header). -/
 structure NAMEIPARENT : Prop where
-  wp_nameiparent_gen_eb : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
+  wp_nameiparent_gen_eb : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
     [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
     [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF]
     [Appcfg GF] [Fscfg] [Icfg] [CurCtx]

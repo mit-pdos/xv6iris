@@ -434,7 +434,7 @@ theorem bigSepS_sep2 {PROP : Type _} [BI PROP] {Φ Ψ : Nat → PROP} {X : Std.E
 
 section IcacheBootRegion
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [IregG GF] [IcacheG GF]
-  [Xv6G GF] [LogG GF] [FsBlocksG GF] [FsTopG GF] [FsLinkG GF] [Appcfg GF]
+  [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [LogG GF] [FsBlocksG GF] [FsTopG GF] [FsLinkG GF] [Appcfg GF]
 
 /-- Rocq's `ireg_slots_of_set`. -/
 theorem iregSlots_ofSet [Icfg] (γfs : FsNames) (γi : GName) (dss : List (List Dinode))

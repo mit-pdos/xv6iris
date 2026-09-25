@@ -37,7 +37,7 @@ the rest of the trap reserve. -/
 def ktSlots : Nat := kvFrameSlots - 32
 
 /-- **WP of `kerneltrap`.** -/
-def wp_kerneltrap_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [DiskG GF] [CurCtx]
+def wp_kerneltrap_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [DiskG GF] [CurCtx]
     (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
     (γ0 γ1 : UartNames) (γc γl0 γl1 : GName) (γd : DiskNames) (γdl γt : GName)
     (pd pav pu : BitVec 64) (bs : List (BitVec 8))
@@ -55,7 +55,7 @@ def wp_kerneltrap_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv
 
 /-- The interface of `kerneltrap`. -/
 structure KERNELTRAP : Prop where
-  wp_kerneltrap : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [DiskG GF] [CurCtx]
+  wp_kerneltrap : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [DiskG GF] [CurCtx]
     (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
     (γ0 γ1 : UartNames) (γc γl0 γl1 : GName) (γd : DiskNames) (γdl γt : GName)
     (pd pav pu : BitVec 64) (bs : List (BitVec 8))

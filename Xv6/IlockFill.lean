@@ -102,7 +102,7 @@ theorem il_box_rec (dn : Dinode) (hf : freshShape dn) (hty : iregTyOk dn) :
 
 section Fill
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [IregG GF] [IcacheG GF]
-  [Xv6G GF] [LogG GF] [FsBlocksG GF] [FsTopG GF] [FsLinkG GF] [Appcfg GF]
+  [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [LogG GF] [FsBlocksG GF] [FsTopG GF] [FsLinkG GF] [Appcfg GF]
 
 /-- What the fill hands on to the type test (Rocq 1123-1152): EITHER the
 record's fragment, the licence's payout and the whole loaded bundle's

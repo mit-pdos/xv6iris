@@ -119,7 +119,7 @@ theorem ui_ret_c04 : jumpPc (KA.«userinit» + 0x24#64) = (KA.«userinit» + 0x2
 theorem ui_ret_c12 : jumpPc (KA.«userinit» + 0x32#64) = (KA.«userinit» + 0x32#64) := by decide
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF]
 
 /-! ## The private block, opened at `p->cwd` -/
 
@@ -161,7 +161,7 @@ end
 /-! ## The callees, at their entry addresses -/
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [CurCtx]
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CurCtx]
 
 set_option maxHeartbeats 1000000 in
 /-- `allocproc`'s contract at `0x80001b8e`. -/
@@ -247,7 +247,7 @@ theorem ui_filter_one : (["proc"] : List String).filter (fun x => x ≠ "proc") 
 /-! ## The publish, from `(KernelSyms.«userinit» + 0x24)` -/
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF]
 
 set_option maxHeartbeats 2000000 in
 /-- **`userinit`'s publish.**  `namei` has returned in `a0`, `s1` is `p`,
@@ -354,7 +354,7 @@ end
 /-! ## From `(KernelSyms.«userinit» + 0xe)`: `initproc = p` and `namei("/")` -/
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF]
 
 /-- `calleeSaved` composes. -/
 theorem ui_calleeSaved_trans {R R' R'' : RegMap} (h1 : calleeSaved R R') (h2 : calleeSaved R' R'') :
@@ -476,7 +476,7 @@ end
 /-! ## The whole function -/
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF]
 
 /-- A context whose held set is empty drops a `withLocks []`. -/
 theorem ui_withLocks_nil (k : KCtx) (h : k.locks = []) : k.withLocks [] = k := by
@@ -513,7 +513,7 @@ theorem userinit_br_ffffffffffffff00 : KA.«userinit» + 0xffffffffffffff00#64 =
 set_option maxHeartbeats 4000000 in
 /-- **`userinit` meets its specification.** -/
 theorem userinit_proof (AP : ALLOCPROC) (RE : RELEASE) : USERINIT :=
-  ⟨fun {hlc GF} _ _ X Γ _ _ _ cpu k γp γl γk nb np
+  ⟨fun {hlc GF} _ _ _ _ _ X Γ _ _ _ cpu k γp γl γk nb np
       hnoff hnoff0 hK hlk hlp hlq hlocks htier hproc hsie hnb => by
   obtain ⟨ξ0, t0⟩ := X
   letI : CurCtx := ⟨ξ0, t0⟩

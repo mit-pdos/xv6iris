@@ -152,7 +152,7 @@ theorem rd_arg32_small (x : Nat) (h : x < 2 ^ 31) :
   bv_decide
 
 /-- **readi** (Rocq's `wp_readi_sconf_body`). -/
-def wp_readi_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
+def wp_readi_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF]
     [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [CurCtx]
     (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
     (cpu : CPU) (k : KCtx) (γl : GName) (γb : BcacheNames) (V : BioView GF) (γdl : GName)
@@ -190,7 +190,7 @@ def wp_readi_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF
   inodeMapQ γfs dq ip bm ∗ inodeBlocksQ γfs dq bm data ∗
   (if user then procPrivRun (procAddr j) pidv Vp M
    else byteBuf (k.regs 12#5) (DFrac.own 1) olds ∗ wordPointsTo (pPid k.proc) 4 dqp pidv) ∗
-  bslot γb ∗
+  bslot ∗
   wpNext true k.proc cpu (fun cpu' => iprop(∀ (spie spp : Bool) (R' : RegMap) (tot : Nat),
     ⌜calleeSaved k.regs R'⌝ -∗
     ⌜tot ≤ rdClamp dn.diSize off n⌝ -∗
@@ -207,13 +207,13 @@ def wp_readi_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF
         procPrivRun (procAddr j) pidv { Vp with upt := P' } M')
      else byteBuf (k.regs 12#5) (DFrac.own 1) (rdDelivered data olds off tot) ∗
        wordPointsTo (pPid k.proc) 4 dqp pidv) -∗
-    bslot γb -∗ wpLoop cpu'))
+    bslot -∗ wpLoop cpu'))
   ⊢ wpLoop (GF := GF) cpu
 
 /-- The eb-generic form of `wp_readi_body` (Rocq: `cpu_own 0 eb`, the
 complement `trap_csrs_ext` / `cpu_claim_ext` in and out; depth 0, so no
 spinlock held by `KCtx.wf`). -/
-def wp_readi_eb_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
+def wp_readi_eb_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF]
     [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [CurCtx]
     (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
     (cpu : CPU) (k : KCtx) (γl : GName) (γb : BcacheNames) (V : BioView GF) (γdl : GName)
@@ -251,7 +251,7 @@ def wp_readi_eb_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G
   inodeMapQ γfs dq ip bm ∗ inodeBlocksQ γfs dq bm data ∗
   (if user then procPrivRun (procAddr j) pidv Vp M
    else byteBuf (k.regs 12#5) (DFrac.own 1) olds ∗ wordPointsTo (pPid k.proc) 4 dqp pidv) ∗
-  bslot γb ∗
+  bslot ∗
   wpNext true k.proc cpu (fun cpu' => iprop(∀ (spie spp : Bool) (R' : RegMap) (tot : Nat),
     ⌜calleeSaved k.regs R'⌝ -∗
     ⌜tot ≤ rdClamp dn.diSize off n⌝ -∗
@@ -268,12 +268,12 @@ def wp_readi_eb_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G
         procPrivRun (procAddr j) pidv { Vp with upt := P' } M')
      else byteBuf (k.regs 12#5) (DFrac.own 1) (rdDelivered data olds off tot) ∗
        wordPointsTo (pPid k.proc) 4 dqp pidv) -∗
-    bslot γb -∗ wpLoop cpu'))
+    bslot -∗ wpLoop cpu'))
   ⊢ wpLoop (GF := GF) cpu
 
 /-- The interface of `readi` (Rocq's `Module Type READI`). -/
 structure READI : Prop where
-  wp_readi_eb : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
+  wp_readi_eb : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF]
     [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [CurCtx]
     (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
     (cpu : CPU) (k : KCtx) (γl : GName) (γb : BcacheNames) (V : BioView GF) (γdl : GName)
@@ -291,7 +291,7 @@ structure READI : Prop where
 
 /-- The interrupts-off instance of `wp_readi_eb` (the complement is the whole
 bundle): the contract every not-yet-generalized caller states. -/
-theorem READI.wp_readi (A : READI) {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
+theorem READI.wp_readi (A : READI) {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF]
     [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [CurCtx]
     (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
     (cpu : CPU) (k : KCtx) (γl : GName) (γb : BcacheNames) (V : BioView GF) (γdl : GName)

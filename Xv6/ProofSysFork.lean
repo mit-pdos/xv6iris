@@ -46,7 +46,7 @@ theorem sys_fork_withRegs_withSpie (k : KCtx) (R : RegMap) (a b : Bool) :
     (k.withRegs R).withSpie a b = (k.withSpie a b).withRegs R := rfl
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [CurCtx]
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CurCtx]
 
 /-- `kfork`'s contract at its entry address (either `SIE`). -/
 theorem sys_fork_kfork (KF : KFORK) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ] [FsEnv] [ForkretIs]
@@ -75,7 +75,7 @@ set_option maxHeartbeats 8000000 in
 /-- At either entry `SIE`: every step is at the caller's index, the client's
 continuation re-anchored along each step's pinning fact. -/
 theorem sys_fork_proof (KF : KFORK) : SYSFORK :=
-  ⟨fun {hlc GF} _ _ _ Γ _ _ _ cpu k γw γp γl γk j pid V M hj hproc hK hnoff htier => by
+  ⟨fun {hlc GF} _ _ _ _ _ _ Γ _ _ _ cpu k γw γp γl γk j pid V M hj hproc hK hnoff htier => by
   unfold wp_sys_fork_eb_body
   simp only [sysForkAddr]
   iintro ⟨Hk, Hpc, #Hpi, #Hwl, #Hpl, #Hkl, Hav, Hpav, Hblk, Hnext⟩

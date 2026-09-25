@@ -140,7 +140,7 @@ theorem ialloc_calleeSaved_epi (KR R : RegMap)
 continuation (Rocq's `ia_cont`) -/
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [IregG GF] [IcacheG GF]
   [FsTopG GF] [FsLinkG GF] [IcboxG GF] [IrefslotG GF] [Appcfg GF]
 
@@ -172,7 +172,7 @@ def iallocCont [Fscfg] [Icfg] [CurCtx] (k : KCtx) (cpu : CPU) (ty : BitVec 16) (
     wordPointsTo sbNinodes 4 dqn (BitVec.ofNat 32 fscNinodes) -∗
     wordPointsTo sbInodestart 4 dqs (BitVec.ofNat 32 icfgIst) -∗
     wordPointsTo (pPid k.proc) 4 dqp pidv -∗
-    bslots fscBio 2 -∗
+    bslots 2 -∗
     (if alloc then
       iprop(⌜R' 10#5 = ientry kslot ∧ kslot < NINODE ∧
           0 < inum.toNat ∧ inum.toNat < fscNinodes ∧ inum.toNat < 16 * icfgNib ∧
@@ -190,7 +190,7 @@ end
 `inodeClaimed` carries beside the receipt (Rocq's `change (runit (is_claim
 (ClaimL ty t qt)) …) with (runit_claim …)`). -/
 theorem ialloc_refb_claim {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Icfg] [CurCtx]
-    [IcacheG GF] [IregG GF] [FsBlocksG GF] [FsLinkG GF] [LogG GF] [SleepLockG GF] [Xv6G GF]
+    [IcacheG GF] [IregG GF] [FsBlocksG GF] [FsLinkG GF] [LogG GF] [SleepLockG GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
     [FsTopG GF] [Appcfg GF] [IrefslotG GF] [IcboxG GF] (ty : BitVec 16) (t : Nat) (qt : Qp) (kk : Nat) (q : Qp)
     (dev inum : BitVec 32) :
     inodeRefb (GF := GF) (isClaim (.claimL ty t qt)) kk q dev inum ⊢
@@ -203,7 +203,7 @@ theorem ialloc_refb_claim {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] 
 
 section
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [IregG GF] [IcacheG GF]
-  [Xv6G GF] [LogG GF] [FsBlocksG GF] [FsTopG GF] [FsLinkG GF] [Appcfg GF]
+  [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [LogG GF] [FsBlocksG GF] [FsTopG GF] [FsLinkG GF] [Appcfg GF]
 
 /-- **THE CLAIM** (Rocq 1532–1536): `lwAuRec` ∘ `iregClaim_au`.  No resource
 in beyond the persistent region and seal and the transaction's share; the
@@ -230,7 +230,7 @@ end
 /-! ## The callees, at their call sites (at the ambient view) -/
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [IcacheG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IcacheG GF]
   [LogG GF] [FsBlocksG GF] [IregG GF] [FsTopG GF] [FsLinkG GF] [IcboxG GF] [SleepLockG GF]
   [IrefslotG GF] [Appcfg GF]
 
@@ -267,14 +267,14 @@ end
 /-! ## Slot units -/
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF]
   [BcacheG GF] [DiskG GF] [CurCtx]
 
-theorem ialloc_slots_join2 (γ : BcacheNames) : bslot (GF := GF) γ ∗ bslot γ ⊢ bslots γ 2 :=
-  bslots_cons γ 1
+theorem ialloc_slots_join2 (γ : BcacheNames) : bslot (GF := GF) ∗ bslot ⊢ bslots 2 :=
+  bslots_cons 1
 
-theorem ialloc_slots_split2 (γ : BcacheNames) : bslots (GF := GF) γ 2 ⊢ bslot γ ∗ bslot γ :=
-  bslots_uncons γ 1
+theorem ialloc_slots_split2 (γ : BcacheNames) : bslots (GF := GF) 2 ⊢ bslot ∗ bslot :=
+  bslots_uncons 1
 
 end
 

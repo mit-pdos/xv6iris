@@ -100,7 +100,7 @@ theorem dirlinkRegs_cs (k : KCtx) (ip v9 v19 v20 : BitVec 64) (R R' : RegMap)
     c27.trans a27⟩
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [IregG GF] [IcacheG GF]
   [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF]
   [Appcfg GF] [Fscfg] [Icfg] [CurCtx]
@@ -160,7 +160,7 @@ def dirlinkPost (k : KCtx) (ip : BitVec 64) (dinum : BitVec 32) (bm : Blkmap)
     kctx cpu' ((k.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k.regs 1#5)) -∗
     trapCsrsExt cpu' k.sie -∗ cpuClaimExt cpu' k.sie k.proc -∗
     dirlinkKeep k ip dinum bm' data' dn' dn0' fn pidv dqp dqd dqf dqn dqs dqbs dqb -∗
-    bslots fscBio 3 -∗ irefSlot -∗ dlinks fscFs dinum.toNat dn bm data -∗
+    bslots 3 -∗ irefSlot -∗ dlinks fscFs dinum.toNat dn bm data -∗
     logOpS icfgLog n' Sb' -∗ txPin icfgLog tid qtx -∗ wpLoop cpu')
 
 /-- The specification's `wpNext`, named, and hart-free: a `true` crossing at
@@ -186,7 +186,7 @@ theorem dirlink_post_of_spec {j : Nat} (hj : j < NPROC) (cpu : CPU) (k : KCtx)
       wordPointsTo sbBmapstartAddr 4 dqb (BitVec.ofNat 32 fscBmapstart) -∗
       dinodeAt fscIreg dinum dn0' -∗
       wordPointsTo (pPid k.proc) 4 dqp pidv -∗
-      bslots fscBio 3 -∗
+      bslots 3 -∗
       irefSlot -∗
       dlinks fscFs dinum.toNat dn bm data -∗
       logOpS icfgLog n' Sb' -∗
@@ -217,7 +217,7 @@ theorem dirlinkPost_elim (k : KCtx) (ip : BitVec 64) (dinum : BitVec 32) (bm : B
       kctx cpu' ((k.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k.regs 1#5)) -∗
       trapCsrsExt cpu' k.sie -∗ cpuClaimExt cpu' k.sie k.proc -∗
       dirlinkKeep k ip dinum bm' data' dn' dn0' fn pidv dqp dqd dqf dqn dqs dqbs dqb -∗
-      bslots fscBio 3 -∗ irefSlot -∗ dlinks fscFs dinum.toNat dn bm data -∗
+      bslots 3 -∗ irefSlot -∗ dlinks fscFs dinum.toNat dn bm data -∗
       logOpS icfgLog n' Sb' -∗ txPin icfgLog tid qtx -∗ wpLoop cpu' := by
   unfold dirlinkPost; iintro H; iexact H
 
@@ -239,7 +239,7 @@ def dirlinkLoop (Γ : SchedNames) (γl : GName) (pd pav pu : BitVec 64) (γkl : 
     dirlinkDe (k.regs 2#5) bs -∗
     trapCsrsExt c k.sie -∗ cpuClaimExt c k.sie k.proc -∗
     dirlinkKeep k ip dinum bm data dn dn0 fn pidv dqp dqd dqf dqn dqs dqbs dqb -∗
-    bslots fscBio 3 -∗ irefSlot -∗ dlinks fscFs dinum.toNat dn bm data -∗
+    bslots 3 -∗ irefSlot -∗ dlinks fscFs dinum.toNat dn bm data -∗
     logOpS icfgLog ncount Sb -∗ txPin icfgLog tid qtx -∗
     (∀ c' : CPU, dirlinkPost k ip dinum bm data dn dn0 fn inum ncount Sb tid qtx pidv
       dqp dqd dqf dqn dqs dqbs dqb c') -∗
@@ -263,7 +263,7 @@ theorem dirlinkLoop_elim (Γ : SchedNames) (γl : GName) (pd pav pu : BitVec 64)
       dirlinkDe (k.regs 2#5) bs -∗
       trapCsrsExt c k.sie -∗ cpuClaimExt c k.sie k.proc -∗
       dirlinkKeep k ip dinum bm data dn dn0 fn pidv dqp dqd dqf dqn dqs dqbs dqb -∗
-      bslots fscBio 3 -∗ irefSlot -∗ dlinks fscFs dinum.toNat dn bm data -∗
+      bslots 3 -∗ irefSlot -∗ dlinks fscFs dinum.toNat dn bm data -∗
       logOpS icfgLog ncount Sb -∗ txPin icfgLog tid qtx -∗
       (∀ c' : CPU, dirlinkPost k ip dinum bm data dn dn0 fn inum ncount Sb tid qtx pidv
         dqp dqd dqf dqn dqs dqbs dqb c') -∗
@@ -286,7 +286,7 @@ theorem dirlinkLoop_intro (Γ : SchedNames) (γl : GName) (pd pav pu : BitVec 64
       dirlinkDe (k.regs 2#5) bs -∗
       trapCsrsExt c k.sie -∗ cpuClaimExt c k.sie k.proc -∗
       dirlinkKeep k ip dinum bm data dn dn0 fn pidv dqp dqd dqf dqn dqs dqbs dqb -∗
-      bslots fscBio 3 -∗ irefSlot -∗ dlinks fscFs dinum.toNat dn bm data -∗
+      bslots 3 -∗ irefSlot -∗ dlinks fscFs dinum.toNat dn bm data -∗
       logOpS icfgLog ncount Sb -∗ txPin icfgLog tid qtx -∗
       (∀ c' : CPU, dirlinkPost k ip dinum bm data dn dn0 fn inum ncount Sb tid qtx pidv
         dqp dqd dqf dqn dqs dqbs dqb c') -∗

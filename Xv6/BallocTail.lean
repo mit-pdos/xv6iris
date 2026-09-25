@@ -37,7 +37,7 @@ theorem ba_sext0_32 : BitVec.signExtend 64 (0#32) = 0#64 := by decide
 theorem ba_sz_addr : KA.«sb» + 4#64 = sbSizeAddr := rfl
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [CurCtx]
 
 set_option maxHeartbeats 4000000 in
@@ -58,7 +58,7 @@ theorem ba_epilogue (cpu c0 : CPU) (k : KCtx) (spie spp : Bool) (R : RegMap) (rv
     wordPointsTo (pPid k.proc) 4 dqp pidv ∗
     wordPointsTo sbSizeAddr 4 dqs (BitVec.ofNat 32 size) ∗
     wordPointsTo sbBmapstartAddr 4 dqb (BitVec.ofNat 32 bmapstart) ∗
-    bslots γb 2 ∗
+    bslots 2 ∗
     baArms γ γfs cov logstart bmapstart u cr Sb rv ∗
     baCont k c0 γ γb γfs cov logstart bmapstart size u cr Sb pidv dqp dqb dqs
     ⊢ wpLoop (GF := GF) cpu := by
@@ -122,7 +122,7 @@ theorem ba_restore (cpu c0 : CPU) (k : KCtx) (spie spp : Bool) (R : RegMap) (rv 
     wordPointsTo (pPid k.proc) 4 dqp pidv ∗
     wordPointsTo sbSizeAddr 4 dqs (BitVec.ofNat 32 size) ∗
     wordPointsTo sbBmapstartAddr 4 dqb (BitVec.ofNat 32 bmapstart) ∗
-    bslots γb 2 ∗
+    bslots 2 ∗
     baArms γ γfs cov logstart bmapstart u cr Sb rv ∗
     baCont k c0 γ γb γfs cov logstart bmapstart size u cr Sb pidv dqp dqb dqs
     ⊢ wpLoop (GF := GF) cpu := by
@@ -188,7 +188,7 @@ theorem ba_out (PK : PRINTK) (cpu c0 : CPU) (k : KCtx) (spie spp : Bool) (R : Re
     wordPointsTo (pPid k.proc) 4 dqp pidv ∗
     wordPointsTo sbSizeAddr 4 dqs (BitVec.ofNat 32 size) ∗
     wordPointsTo sbBmapstartAddr 4 dqb (BitVec.ofNat 32 bmapstart) ∗
-    bslots γb 2 ∗ logOpS γ (2 + u) Sb ∗
+    bslots 2 ∗ logOpS γ (2 + u) Sb ∗
     baCont k c0 γ γb γfs cov logstart bmapstart size u cr Sb pidv dqp dqb dqs
     ⊢ wpLoop (GF := GF) cpu := by
   have hK10 : 10 ≤ k.avail := by unfold ballocSlots at hK; omega
@@ -307,7 +307,7 @@ theorem ba_exhaust (BE : BRELSE) (PK : PRINTK) (Γ : SchedNames) (cpu c0 : CPU) 
     wordPointsTo (pPid k.proc) 4 dqp pidv ∗
     wordPointsTo sbSizeAddr 4 dqs (BitVec.ofNat 32 size) ∗
     wordPointsTo sbBmapstartAddr 4 dqb (BitVec.ofNat 32 bmapstart) ∗
-    bslot γb ∗ bioLocked γb V kk pidv dev bno bs bsd d ∗ logOpS γ (2 + u) Sb ∗
+    bslot ∗ bioLocked γb V kk pidv dev bno bs bsd d ∗ logOpS γ (2 + u) Sb ∗
     baCont k c0 γ γb γfs V.cov logstart bmapstart size u cr Sb pidv dqp dqb dqs
     ⊢ wpLoop (GF := GF) cpu := by
   have hww : ∀ (K : KCtx) (a b c d : Bool), (K.withSpie a b).withSpie c d = K.withSpie c d :=

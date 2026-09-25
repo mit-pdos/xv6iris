@@ -25,7 +25,7 @@ set_option linter.unusedSimpArgs false
 set_option linter.unusedVariables false
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [CurCtx]
 
 set_option maxHeartbeats 8000000 in
@@ -48,7 +48,7 @@ theorem rd_exit_ok (cpu c0 : CPU) (k : KCtx) (spie spp : Bool) (R : RegMap)
     trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗
     wordPointsTo (iDev ip) 4 dqd dev ∗ inodeMeta ip dn ∗
     inodeMapQ γfs dq ip bm ∗ inodeBlocksQ γfs dq bm data ∗
-    rdDst user (k.regs 12#5) j pidv Vp P Mi dqp data olds off tot ∗ bslot γb ∗
+    rdDst user (k.regs 12#5) j pidv Vp P Mi dqp data olds off tot ∗ bslot ∗
     wpNext true k.proc c0 (rdPost k γb γfs dev j ip bm data dn user off n olds pidv Vp M dqp dq dqd)
     ⊢ wpLoop (GF := GF) cpu := by
   iintro ⟨Hk, Hpc, Hframe, Hte, Hce, Hdev, Hmeta, Hmap, Hblk, Hdst, Hsl, Hnext⟩

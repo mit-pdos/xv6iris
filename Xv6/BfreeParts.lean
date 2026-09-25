@@ -156,7 +156,7 @@ theorem bf_slots (a : Nat) (h : bfreeSlots ≤ a) :
   omega
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [CurCtx]
 
 /-! ## The handle -/
@@ -188,12 +188,12 @@ theorem bf_hold_bytes (γ : BcacheNames) (V : BioView GF) (kk : Nat) (pidv dev b
 /-- The two slot units, one for bread's reference and one for log_write's
 (Rocq's `iu_slots_split 1 1` / `iu_slots_join 1 1`). -/
 theorem bf_slots_split (γ : BcacheNames) :
-    bslots (GF := GF) γ 2 ⊢ bslot γ ∗ bslot γ := by
+    bslots (GF := GF) 2 ⊢ bslot ∗ bslot := by
   unfold bslot
   exact dsSlots_split γ 1 1
 
 theorem bf_slots_join (γ : BcacheNames) :
-    bslot (GF := GF) γ ∗ bslot γ ⊢ bslots γ 2 := by
+    bslot (GF := GF) ∗ bslot ⊢ bslots 2 := by
   unfold bslot
   iintro ⟨H1, H2⟩
   iapply (dsSlots_join γ 1 1) $$ H1 H2
@@ -230,7 +230,7 @@ end
 /-! ## The three callees, at their call sites -/
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [CurCtx]
 
 /-- `log_write`'s atomic-update, credited form at its call site. -/
@@ -246,7 +246,7 @@ theorem bf_log_write (LW : LOG_WRITE)
     (hhome : fsHome V.cov logstart bno.toNat) (hlogE : (↑logN : CoPset) ⊆ Efs) :
     kctx c k' ∗ pcIs c KA.«log_write» ∗
     bioCtx γl γb V ∗ logCtx γ γb γfs V.cov logstart dev ∗
-    bslot γb ∗ logEpochLb γ vlb ∗
+    bslot ∗ logEpochLb γ vlb ∗
     logCredit γ cr Sb e0 bno.toNat ∗
     logOpSe γ (u + 1) Sb e0 ∗
     (|={⊤, Efs}=> ∃ (bsl' : List (BitVec 8)) (v' : Nat),
@@ -261,7 +261,7 @@ theorem bf_log_write (LW : LOG_WRITE)
       logOpSwe γ (if cr then u + 1 else u) (bno.toNat :: Sb) bno.toNat vlb e0 -∗
       Φfsb -∗
       bioLocked γb V kk pidv dev bno bs bsd true -∗
-      bslot γb -∗ wpLoop cpu'))
+      bslot -∗ wpLoop cpu'))
     ⊢ wpLoop (GF := GF) c := by
   have h := LW.wp_log_write_au (hlc := hlc) (GF := GF) c k' γ γl γb V γfs logstart dev kk pidv
     bno bs bsl bsd d u cr Sb e0 vlb Efs Φfsb hK hnoff hlk hbc htier hkk ha0 hdev hcl hdt hhome

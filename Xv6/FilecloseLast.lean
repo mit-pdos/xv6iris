@@ -30,7 +30,7 @@ set_option linter.unusedSimpArgs false
 set_option linter.unusedVariables false
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
   [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF]
   [Appcfg GF] [FileG GF]
@@ -84,7 +84,7 @@ theorem fc_disp (PC : PIPECLOSE) (BO : BEGIN_OP) (IP : IPUT) (EO : END_OP)
     wordPointsTo (k.regs 2#5 + 0xFFFFFFFFFFFFFFD8#64) 8 (DFrac.own 1) (R 19#5) ∗
     wordPointsTo (k.regs 2#5 + 0xFFFFFFFFFFFFFFD0#64) 8 (DFrac.own 1) (R 20#5) ∗
     wordPointsTo (k.regs 2#5 + 0xFFFFFFFFFFFFFFC8#64) 8 (DFrac.own 1) (R 21#5) ∗
-    fdSlot γ ∗ trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗ panicEnv ∗
+    fdSlot ∗ trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗ panicEnv ∗
     wordPointsTo (pPid k.proc) 4 dqp pidv ∗
     filecloseEnv (hlc := hlc) Γ j k.proc γkl γk on st ∗
     wpNext true k.proc cpu (fun cpu' => iprop(∀ (spie spp : Bool) (R' : RegMap),
@@ -92,7 +92,7 @@ theorem fc_disp (PC : PIPECLOSE) (BO : BEGIN_OP) (IP : IPUT) (EO : END_OP)
       kctx cpu' ((k.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k.regs 1#5)) -∗
       trapCsrsExt cpu' k.sie -∗ cpuClaimExt cpu' k.sie k.proc -∗
       wordPointsTo (pPid k.proc) 4 dqp pidv -∗
-      fdSlot γ -∗ irefSlot -∗ filecloseEnvOut γk on st -∗ wpLoop cpu')) ∗
+      fdSlot -∗ irefSlot -∗ filecloseEnvOut γk on st -∗ wpLoop cpu')) ∗
     fcRest pn C
     ⊢ wpLoop (GF := GF) cr := by
   iintro ⟨Hk, Hpc, Hra, Hs0, Hs1, Hc0, Hc32, Hc24, Hc16, Hc8, Hfd, Hte, Hce, #Hpe, Hpid, Henv, Hnext, Hc⟩
@@ -313,9 +313,9 @@ theorem fc_last (RE : RELEASE) (PC : PIPECLOSE) (BO : BEGIN_OP) (IP : IPUT) (EO 
     (∀ L' : List (Nat × Qp), fslotAt γ curCtx kk L' -∗
       [∗list] j ∈ List.range NFILE, fslotAt γ curCtx j (updAt Ls kk L' j)) ∗
     wordAtN curCtx (aFref kk) 4 (DFrac.own 1) (BitVec.ofNat 32 0) ∗
-    ([∗list] e ∈ ([] : List (Nat × Qp)), frefRest γ kk e) ∗ fdSlots γ 0 ∗
+    ([∗list] e ∈ ([] : List (Nat × Qp)), frefRest γ kk e) ∗ fdSlots 0 ∗
     fileFieldsAt curCtx kk 1 C ∗ fpayTok γ kk 1 pn ∗ fileCore kk 1 pn C ∗
-    fdSlot γ ∗ frame8s1 (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) (k.regs 9#5) ∗
+    fdSlot ∗ frame8s1 (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) (k.regs 9#5) ∗
     sieArm c k.sie k.proc ∗
     trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗ panicEnv ∗
     wordPointsTo (pPid k.proc) 4 dqp pidv ∗ irefSlot ∗
@@ -325,7 +325,7 @@ theorem fc_last (RE : RELEASE) (PC : PIPECLOSE) (BO : BEGIN_OP) (IP : IPUT) (EO 
       kctx cpu' ((k.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k.regs 1#5)) -∗
       trapCsrsExt cpu' k.sie -∗ cpuClaimExt cpu' k.sie k.proc -∗
       wordPointsTo (pPid k.proc) 4 dqp pidv -∗
-      fdSlot γ -∗ irefSlot -∗ filecloseEnvOut γk on st -∗ wpLoop cpu'))
+      fdSlot -∗ irefSlot -∗ filecloseEnvOut γk on st -∗ wpLoop cpu'))
     ⊢ wpLoop (GF := GF) c := by
   iintro ⟨Hk, Hpc, #Hlk, Hlocked, Ha, Hcl, Hrefc, Hhalves, Hfdn, Hf, Ht, Hc, Hfd, Hframe, Harm,
     Hte, Hce, #Hpe, Hpid, Hir, Henv, Hnext⟩

@@ -29,7 +29,7 @@ set_option linter.unusedSimpArgs false
 set_option linter.unusedVariables false
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
   [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF]
   [Appcfg GF] [FileG GF] [Fscfg] [Icfg] [CurCtx]
@@ -270,7 +270,7 @@ theorem sys_pipe_unfd0 (FC : FILECLOSE) (Γ : SchedNames) [ClaimIs (hlc := hlc) 
     wordPointsTo (k.regs 2#5 + 0xFFFFFFFFFFFFFFC8#64) 8 (DFrac.own 1) (fnode k1) ∗
     fileRef γ k0 1 (.open true false .pipe) ∗ fileRef γ k1 1 (.open false true .pipe) ∗
     procPrivCoreNoctxAt curCtx pa pid V M ∗ procOfilesOwe γ γd pa (V.ofile.set fd0 (fnode k0)) [fd0] ∗
-    fdSlot γ ∗ fdStAuth γd fd0 .closed ∗ fdFrags γd sts ∗
+    fdSlot ∗ fdStAuth γd fd0 .closed ∗ fdFrags γd sts ∗
     sysPipeTurn cpu k γ γd pa pid V M sts v
     ⊢ wpLoop (GF := GF) c := by
   iintro ⟨Hk, Hpc, #Hft, #Hkl, #Hav, #Hpi, Hfr, Hrf, Hwf, Hr0, Hr1, Hcore, Howe, Hu0, Ha0, Hfrag, Hnext⟩
@@ -349,7 +349,7 @@ theorem sys_pipe_unfd2 (FC : FILECLOSE) (Γ : SchedNames) [ClaimIs (hlc := hlc) 
     fileRef γ k0 1 (.open true false .pipe) ∗ fileRef γ k1 1 (.open false true .pipe) ∗
     sysPipeCoreExt pa pid V P' M' ∗
     procOfilesOwe γ γd pa ((V.ofile.set fd0 (fnode k0)).set fd1 (fnode k1)) [fd1, fd0] ∗
-    fdSlot γ ∗ fdStAuth γd fd0 .closed ∗ fdSlot γ ∗ fdStAuth γd fd1 .closed ∗ fdFrags γd sts ∗
+    fdSlot ∗ fdStAuth γd fd0 .closed ∗ fdSlot ∗ fdStAuth γd fd1 .closed ∗ fdFrags γd sts ∗
     sysPipeTurn cpu k γ γd pa pid V M sts v
     ⊢ wpLoop (GF := GF) c := by
   iintro ⟨Hk, Hpc, #Hft, #Hkl, #Hav, #Hpi, Hfr, Hrf, Hwf, Hr0, Hr1, Hcore, Howe, Hu0, Ha0, Hu1, Ha1, Hfrag, Hnext⟩

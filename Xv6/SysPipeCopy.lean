@@ -35,7 +35,7 @@ set_option linter.unusedSimpArgs false
 set_option linter.unusedVariables false
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
   [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF]
   [Appcfg GF] [FileG GF] [Fscfg] [Icfg] [CurCtx]
@@ -71,7 +71,7 @@ theorem sys_pipe_stage_f (FC : FILECLOSE) (Γ : SchedNames) [ClaimIs (hlc := hlc
     fileRef γ k0 1 (.open true false .pipe) ∗ fileRef γ k1 1 (.open false true .pipe) ∗
     sysPipeCoreExt pa pid V P2 M2 ∗
     procOfilesOwe γ γd pa ((V.ofile.set fd0 (fnode k0)).set fd1 (fnode k1)) [fd1, fd0] ∗
-    fdSlot γ ∗ fdStAuth γd fd0 .closed ∗ fdSlot γ ∗ fdStAuth γd fd1 .closed ∗ fdFrags γd sts ∗
+    fdSlot ∗ fdStAuth γd fd0 .closed ∗ fdSlot ∗ fdStAuth γd fd1 .closed ∗ fdFrags γd sts ∗
     sysPipeTurn cpu k γ γd pa pid V M sts v
     ⊢ wpLoop (GF := GF) c := by
   iintro ⟨Hk, Hpc, #Hft, #Hkl, #Hav, #Hpi, Hfr, Hrf, Hwf, Hr0, Hr1, Hcore, Howe, Hu0, Ha0, Hu1, Ha1, Hfrag, Hnext⟩
@@ -164,7 +164,7 @@ end
 set_option maxHeartbeats 16000000 in
 /-- `+0x62`, after the first copyout: `bltz a0` (failure into `+0x80`), then
 the second copyout's arguments and the call. -/
-theorem sys_pipe_stage_e {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
+theorem sys_pipe_stage_e {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
     [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
     [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF]
     [Appcfg GF] [FileG GF] [Fscfg] [Icfg]
@@ -196,7 +196,7 @@ theorem sys_pipe_stage_e {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [
     @wordPointsTo hlc GF _ ⟨curCtx, KTier.kpt⟩ (pPagetable pa) 8 (DFrac.own 1) V.pagetable ∗
     @procPtAt hlc GF _ ⟨curCtx, KTier.kpt⟩ P1 M1 ∗ sysPipeCoreRest pa pid V ∗
     procOfilesOwe γ γd pa ((V.ofile.set fd0 (fnode k0)).set fd1 (fnode k1)) [fd1, fd0] ∗
-    fdSlot γ ∗ fdStAuth γd fd0 .closed ∗ fdSlot γ ∗ fdStAuth γd fd1 .closed ∗ fdFrags γd sts ∗
+    fdSlot ∗ fdStAuth γd fd0 .closed ∗ fdSlot ∗ fdStAuth γd fd1 .closed ∗ fdFrags γd sts ∗
     sysPipeTurn cpu k γ γd pa pid V M sts v
     ⊢ wpLoop (GF := GF) c := by
   obtain ⟨ξ0, t0⟩ := X
@@ -294,7 +294,7 @@ theorem sys_pipe_stage_e {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [
 set_option maxHeartbeats 16000000 in
 /-- `+0x48`, after `fdalloc(wf)`: `sw a0,-64(s0) ; bltz a0` (failure into
 `+0xb4`), then the first copyout's arguments and the call. -/
-theorem sys_pipe_stage_d {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
+theorem sys_pipe_stage_d {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
     [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
     [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF]
     [Appcfg GF] [FileG GF] [Fscfg] [Icfg]
@@ -316,7 +316,7 @@ theorem sys_pipe_stage_d {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [
     fileRef γ k0 1 (.open true false .pipe) ∗ fileRef γ k1 1 (.open false true .pipe) ∗
     procPrivCoreNoctxAt curCtx pa pid V M ∗
     fdallocPost γ γd pa (V.ofile.set fd0 (fnode k0)) [fd0] k1 (R 10#5) ∗
-    fdSlot γ ∗ fdStAuth γd fd0 .closed ∗ fdFrags γd sts ∗
+    fdSlot ∗ fdStAuth γd fd0 .closed ∗ fdFrags γd sts ∗
     sysPipeTurn cpu k γ γd pa pid V M sts v
     ⊢ wpLoop (GF := GF) c := by
   obtain ⟨ξ0, t0⟩ := X

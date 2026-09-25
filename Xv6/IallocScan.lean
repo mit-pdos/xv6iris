@@ -52,7 +52,7 @@ def iallocScanRegs [Icfg] (k : KCtx) (ty : BitVec 16) (n : Nat) (R : RegMap) : P
   iallocBody k ty R ∧ R 18#5 = BitVec.ofNat 64 n
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [IregG GF] [IcacheG GF]
   [FsTopG GF] [FsLinkG GF] [IcboxG GF] [IrefslotG GF] [Appcfg GF]
 
@@ -123,7 +123,7 @@ def iallocScanPre [Fscfg] [Icfg] [CurCtx] (Γ : SchedNames) (cpu c0 : CPU) (k : 
   wordPointsTo sbNinodes 4 dqn (BitVec.ofNat 32 fscNinodes) ∗
   wordPointsTo sbInodestart 4 dqs (BitVec.ofNat 32 icfgIst) ∗
   wordPointsTo (pPid k.proc) 4 dqp pidv ∗
-  bslots fscBio 2 ∗ irefSlot ∗ txPin icfgLog t qt ∗ logOpS icfgLog (u + 1) Sb ∗
+  bslots 2 ∗ irefSlot ∗ txPin icfgLog t qt ∗ logOpS icfgLog (u + 1) Sb ∗
   iallocCont k c0 ty u Sb t qt pidv dqp dqs dqn
 
 set_option maxHeartbeats 16000000 in
@@ -154,7 +154,7 @@ theorem ialloc_scan_next (BE : BRELSE) (PK : PRINTK) [Fscfg] [Icfg] [CurCtx]
     wordPointsTo sbNinodes 4 dqn (BitVec.ofNat 32 fscNinodes) ∗
     wordPointsTo sbInodestart 4 dqs (BitVec.ofNat 32 icfgIst) ∗
     wordPointsTo (pPid k.proc) 4 dqp pidv ∗
-    bslot fscBio ∗
+    bslot ∗
     bioLocked fscBio (fsView fscFs fscDisk icfgDev fscCov) kk pidv icfgDev bno bs bsd d ∗
     irefSlot ∗ txPin icfgLog t qt ∗ logOpS icfgLog (u + 1) Sb ∗
     iallocCont k c0 ty u Sb t qt pidv dqp dqs dqn
@@ -287,7 +287,7 @@ theorem ialloc_scan_body (MS : MEMSET) (LW : LOG_WRITE) (BE : BRELSE) (IG : IGET
     wordPointsTo sbNinodes 4 dqn (BitVec.ofNat 32 fscNinodes) ∗
     wordPointsTo sbInodestart 4 dqs (BitVec.ofNat 32 icfgIst) ∗
     wordPointsTo (pPid k.proc) 4 dqp pidv ∗
-    bslot fscBio ∗
+    bslot ∗
     bioLocked fscBio (fsView fscFs fscDisk icfgDev fscCov) kk pidv icfgDev
       (BitVec.ofNat 32 (IBLOCK (BitVec.ofNat 32 n) icfgIst)) bs bsd d ∗
     irefSlot ∗ txPin icfgLog t qt ∗ logOpS icfgLog (u + 1) Sb ∗

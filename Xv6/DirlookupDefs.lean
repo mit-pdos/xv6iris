@@ -91,7 +91,7 @@ theorem dirlookupRegs_cs (k : KCtx) (ip : BitVec 64) (R R' : RegMap) (i : Nat)
     c27.trans a27⟩
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [IregG GF] [IcacheG GF]
   [FsTopG GF] [FsLinkG GF] [IcboxG GF] [IrefslotG GF] [Appcfg GF] [Fscfg] [Icfg] [CurCtx]
 
@@ -102,7 +102,7 @@ def dirlookupKeep (k : KCtx) (ip : BitVec 64) (dinum : BitVec 32) (bm : Blkmap)
   wordPointsTo (iDev ip) 4 dqd icfgDev ∗ inodeMeta ip dn ∗
   inodeMap fscFs ip bm ∗ inodeBlocks fscFs bm data ∗
   byteBuf (k.regs 11#5) dqn (bview 14 fn) ∗
-  wordPointsTo (pPid k.proc) 4 dqp pidv ∗ bslot fscBio ∗
+  wordPointsTo (pPid k.proc) 4 dqp pidv ∗ bslot ∗
   dlinks fscFs dinum.toNat dn bm data ∗ dinodeAt fscIreg dinum dr
 
 /-- The not-found arm's inputs, carried by the scan: iget's ledger unit and
@@ -175,7 +175,7 @@ theorem dirlookup_post_of_spec {j : Nat} (hj : j < NPROC) (cpu : CPU) (k : KCtx)
       inodeMap fscFs ip bm -∗ inodeBlocks fscFs bm data -∗
       byteBuf (k.regs 11#5) dqn (bview 14 fn) -∗
       wordPointsTo (pPid k.proc) 4 dqp pidv -∗
-      bslot fscBio -∗
+      bslot -∗
       dlinks fscFs dinum.toNat dn bm data -∗ dinodeAt fscIreg dinum dr -∗
       (if found then
         iprop(⌜dirFirst data (dirNrec dn.diSize.toNat) (bname 14 fn) = some kk ∧
@@ -275,7 +275,7 @@ end
 /-! ## The callees at their call sites -/
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [IregG GF] [IcacheG GF]
   [FsTopG GF] [FsLinkG GF] [IcboxG GF] [IrefslotG GF] [Appcfg GF] [Fscfg] [Icfg] [CurCtx]
 
@@ -305,7 +305,7 @@ theorem dirlookup_readi (RD : READI) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF 
     wordPointsTo (iDev ip) 4 dqd icfgDev ∗ inodeMeta ip dn ∗
     inodeMap fscFs ip bm ∗ inodeBlocks fscFs bm data ∗
     byteBuf (k'.regs 12#5) (DFrac.own 1) olds ∗ wordPointsTo (pPid k'.proc) 4 dqp pidv ∗
-    bslot fscBio ∗
+    bslot ∗
     wpNext true k'.proc c (fun cpu' => iprop(∀ (spie spp : Bool) (R' : RegMap) (tot : Nat),
       ⌜calleeSaved k'.regs R'⌝ -∗
       ⌜R' 10#5 = BitVec.ofNat 64 tot ∧ tot = rdClamp dn.diSize off 16⌝ -∗
@@ -315,7 +315,7 @@ theorem dirlookup_readi (RD : READI) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF 
       inodeMap fscFs ip bm -∗ inodeBlocks fscFs bm data -∗
       byteBuf (k'.regs 12#5) (DFrac.own 1) (rdDelivered data olds off tot) -∗
       wordPointsTo (pPid k'.proc) 4 dqp pidv -∗
-      bslot fscBio -∗ wpLoop cpu'))
+      bslot -∗ wpLoop cpu'))
     ⊢ wpLoop (GF := GF) c := by
   have h := RD.wp_readi_eb (hlc := hlc) (GF := GF) Γ c k' γl fscBio
     (fsView fscFs fscDisk icfgDev fscCov) fscDlock pd pav pu j fscFs fscLogst icfgDev γkl γk ip

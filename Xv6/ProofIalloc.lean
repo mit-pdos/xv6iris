@@ -47,7 +47,7 @@ set_option linter.unusedSimpArgs false
 set_option linter.unusedVariables false
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [IregG GF] [IcacheG GF]
   [FsTopG GF] [FsLinkG GF] [IcboxG GF] [IrefslotG GF] [Appcfg GF]
 
@@ -76,7 +76,7 @@ theorem ialloc_scan_start (BD : BREAD) (MS : MEMSET) (LW : LOG_WRITE) (BE : BREL
     wordPointsTo sbNinodes 4 dqn (BitVec.ofNat 32 fscNinodes) ∗
     wordPointsTo sbInodestart 4 dqs (BitVec.ofNat 32 icfgIst) ∗
     wordPointsTo (pPid k.proc) 4 dqp pidv ∗
-    bslots fscBio 2 ∗ irefSlot ∗ txPin icfgLog t qt ∗ logOpS icfgLog (u + 1) Sb ∗
+    bslots 2 ∗ irefSlot ∗ txPin icfgLog t qt ∗ logOpS icfgLog (u + 1) Sb ∗
     iallocCont k c0 ty u Sb t qt pidv dqp dqs dqn ∗ iallocFrameK k
     ⊢ wpLoop (GF := GF) cpu := by
   have h := ialloc_scan (hlc := hlc) (GF := GF) BD MS LW BE IG PK Γ c0 k γl pd pav pu j ty u Sb t qt
@@ -120,7 +120,7 @@ theorem ialloc_setup (BD : BREAD) (MS : MEMSET) (LW : LOG_WRITE) (BE : BRELSE) (
     wordPointsTo sbInodestart 4 dqs (BitVec.ofNat 32 icfgIst) ∗
     iregInv (hlc := hlc) fscIreg fscFs icfgIst icfgNib ∗ iregOpen ∗
     wordPointsTo (pPid k.proc) 4 dqp pidv ∗
-    bslots fscBio 2 ∗
+    bslots 2 ∗
     isItable2 fscItlock fscIc fscFs fscIreg fscCov fscLogst icfgNib icfgDev ∗
     itableInv (hlc := hlc) ∗ irefSlot ∗ logOpS icfgLog (u + 1) Sb ∗ txPin icfgLog t qt ∗
     iallocCont k c0 ty u Sb t qt pidv dqp dqs dqn ∗
@@ -260,7 +260,7 @@ end
 /-- `ialloc` meets its contract, given its six callees. -/
 theorem ialloc_proof (BR : BREAD) (LW : LOG_WRITE) (BL : BRELSE) (MS : MEMSET) (IG : IGET)
     (PK : PRINTK) : IALLOC :=
-  ⟨fun {hlc GF} _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ Γ _ cpu k γl pd pav pu j ty u Sb t qt
+  ⟨fun {hlc GF} _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ Γ _ cpu k γl pd pav pu j ty u Sb t qt
     pidv dqp dqs dqn hj hproc hK hnoff htier hgeom hblk hn1 hnnib hn31 hty htyk hpd
     ha0 ha1 =>
   ialloc_entry BR MS LW BL IG PK Γ cpu k γl pd pav pu j ty u Sb t qt pidv dqp dqs dqn hj hproc hK

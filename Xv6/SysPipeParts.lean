@@ -238,7 +238,7 @@ theorem sys_pipe_cur_kpt [inst : CurCtx] (hct : curTier = KTier.kpt) :
     (⟨curCtx, KTier.kpt⟩ : CurCtx) = inst := (sys_pipe_ctx inst hct).symm
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
   [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF]
   [Appcfg GF] [FileG GF] [Fscfg] [Icfg] [CurCtx]
@@ -325,7 +325,7 @@ theorem sys_pipe_pipealloc (PA : PIPEALLOC) (Γ : SchedNames) [ClaimIs (hlc := h
     kctx c k' ∗ pcIs c KA.«pipealloc» ∗ trapCsrsExt c s ∗ cpuClaimExt c s pj ∗
     isFtable γl γ ∗ panicEnv ∗
     isLock γkl kmemLockAddr "kmem" (kmemRes γk) ∗ kallocAvail γk on ∗
-    fdSlot γ ∗ fdSlot γ ∗
+    fdSlot ∗ fdSlot ∗
     wordPointsTo (k'.regs 10#5) 8 (DFrac.own 1) v0 ∗ wordPointsTo (k'.regs 11#5) 8 (DFrac.own 1) v1 ∗
     wordPointsTo (pPid pj) 4 dqp pidv ∗ irefSlot ∗
     wpNext true pj c (fun cpu' => iprop(∀ (spie spp : Bool) (R' : RegMap),
@@ -398,7 +398,7 @@ theorem sys_pipe_fileclose (FC : FILECLOSE) (Γ : SchedNames) [ClaimIs (hlc := h
       ⌜calleeSaved k'.regs R'⌝ -∗
       kctx cpu' ((k'.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k'.regs 1#5)) -∗
       trapCsrsExt cpu' s -∗ cpuClaimExt cpu' s pj -∗
-      wordPointsTo (pPid pj) 4 dqp pidv -∗ fdSlot γ -∗ irefSlot -∗ wpLoop cpu'))
+      wordPointsTo (pPid pj) 4 dqp pidv -∗ fdSlot -∗ irefSlot -∗ wpLoop cpu'))
     ⊢ wpLoop (GF := GF) c := by
   subst hs hpj
   have h := FC.wp_fileclose_eb (hlc := hlc) (GF := GF) Γ c k' γl γ kk 1 (.open r w .pipe) 0 γkl γk none
@@ -697,7 +697,7 @@ theorem sys_pipe_exit (cpu cr : CPU) (k : KCtx) (γ : FileNames) (γd : Nat → 
     (R : RegMap) (hpins : sysPipePins k R) (r : BitVec 64) (h15 : R 15#5 = r) :
     kctx cr (((k.withSpie spie spp).pushed 8).withRegs R) ∗ pcIs cr (KA.«sys_pipe» + 0xda#64) ∗
     frame8s1 (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) (k.regs 9#5) ∗
-    sysPipePost γ γd pa pid V M sts v r ∗ fdSlot γ ∗ fdSlot γ ∗
+    sysPipePost γ γd pa pid V M sts v r ∗ fdSlot ∗ fdSlot ∗
     sysPipeTurn cpu k γ γd pa pid V M sts v
     ⊢ wpLoop (GF := GF) cr := by
   unfold sysPipeTurn sysPipeCont
@@ -716,7 +716,7 @@ theorem sys_pipe_exit (cpu cr : CPU) (k : KCtx) (γ : FileNames) (γd : Nat → 
         (by simp only [RegMap.set_apply, BitVec.reduceEq, ite_false]; exact p25)
         (by simp only [RegMap.set_apply, BitVec.reduceEq, ite_false]; exact p26)
         (by simp only [RegMap.set_apply, BitVec.reduceEq, ite_false]; exact p27))
-      iprop(sysPipePost γ γd pa pid V M sts v r ∗ fdSlot γ ∗ fdSlot γ ∗ irefSlot))
+      iprop(sysPipePost γ γd pa pid V M sts v r ∗ fdSlot ∗ fdSlot ∗ irefSlot))
     $$ [- $Hk $Hpc $Hframe]
   isplitl [Hpost Hu0 Hu1 Hir]
   · iframe Hpost Hu0 Hu1 Hir
@@ -744,7 +744,7 @@ theorem sys_pipe_exit' (cpu cr : CPU) (k : KCtx) (γ : FileNames) (γd : Nat →
     sysPipeFrame (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) (k.regs 9#5) fa w0 w1 ∗
     wordPointsTo (k.regs 2#5 + 0xFFFFFFFFFFFFFFD0#64) 8 (DFrac.own 1) rf ∗
     wordPointsTo (k.regs 2#5 + 0xFFFFFFFFFFFFFFC8#64) 8 (DFrac.own 1) wf ∗
-    sysPipePost γ γd pa pid V M sts v r ∗ fdSlot γ ∗ fdSlot γ ∗
+    sysPipePost γ γd pa pid V M sts v r ∗ fdSlot ∗ fdSlot ∗
     sysPipeTurn cpu k γ γd pa pid V M sts v
     ⊢ wpLoop (GF := GF) cr := by
   iintro ⟨Hk, Hpc, Hfr, Hrf, Hwf, Hpost, Hu0, Hu1, Hnext⟩

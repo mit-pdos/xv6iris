@@ -192,15 +192,11 @@ theorem blast_app_mid (d a : BitVec 64) (l1 l2 : List (BitVec 64)) :
 
 /-! ## Ghost names -/
 
-/-- The supply of buffer-cache references (Rocq `BioDefs.BSLOTS`). -/
-def BSLOTS : Nat := 1024
-
 /-- The bcache's ghosts: the reference map (id ↦ slot), the slot supply,
 buffer `k`'s sleeplock names (inner spinlock, holder token) and its CHECKOUT
 token (Rocq's `bn_slk` / `bn_own`). -/
 structure BcacheNames where
   ref : GName
-  slot : GName
   slk : Nat → GName × GName
   own : Nat → GName
   /-- buffer `k`'s ESCROW names (Rocq's `bn_box`). -/
@@ -208,7 +204,7 @@ structure BcacheNames where
 
 /-- The ghost libraries the buffer cache uses (Rocq's `bioG`/`bioslotG`,
 with the escrow's `boxG` folded in -- Rocq `BioInv.v`'s `bioboxG`).  The
-slot tokens (`BcacheNames.slot`), the per-buffer ownership variables and
+slot tokens (at `BioslotG.bioslotName`, `Xv6/SlotSupply.lean`), the per-buffer ownership variables and
 the escrow counters use the SHARED cameras `Xv6G.gmUnitG`,
 `Xv6G.gvUnitG` and `Xv6G.gvNatG` (one instance per camera type). -/
 class BcacheG (GF : BundledGFunctors) where
@@ -221,7 +217,7 @@ attribute [reducible, instance] BcacheG.gmRefG
   BcacheG.stmG BcacheG.gvSlotd BcacheG.gvSlotp
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [BcacheG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [BcacheG GF]
 variable [DiskG GF] [CurCtx]
 
 /-! ## The circular LRU list -/
@@ -756,16 +752,6 @@ theorem bufPay_of_valid (γ : BcacheNames) (V : BioView GF) (k : Nat) (dev bno v
   · ipureintro; exact hlen
   · iframe H1 H2
 
-/-! ## The slot supply -/
-
-/-- `n` units: `n` distinct slot tokens, all minted at boot with keys below
-`BSLOTS` (Rocq `BioDefs.bslots`). -/
-def bslots (γ : BcacheNames) (n : Nat) : IProp GF := iprop%
-  ∃ l : List Nat, ⌜l.length = n ∧ l.Nodup ∧ ∀ i ∈ l, i < BSLOTS⌝ ∗ [∗list] i ∈ l, γ.slot ↪◯MAP[i] ()
-
-/-- One unit: the right to hold one buffer-cache reference. -/
-def bslot (γ : BcacheNames) : IProp GF := bslots γ 1
-
 /-! ## The escrow's L1 row
 
 **THE L1 ROW** (Rocq's `bslot_regs`): the drop register's other half,
@@ -811,7 +797,7 @@ their other halves, and one slot token each. -/
 def bslotAt (γ : BcacheNames) (ξ : CtxId) (k : Nat) (L : List Nat) : IProp GF := iprop%
   ⌜L.Nodup ∧ L.length < 2 ^ 31⌝ ∗
   wordAtN ξ (aBufRefcnt (bnode k)) 4 (DFrac.own 1) (BitVec.ofNat 32 L.length) ∗
-  ([∗list] id ∈ L, brefRest γ k id) ∗ bslots γ L.length ∗
+  ([∗list] id ∈ L, brefRest γ k id) ∗ bslots L.length ∗
   cntHalf (γ.box k) L.length
 
 /-- **Buffer `k`'s KEY half** (the cache's share of Rocq's `b_dev`/`b_blockno`
@@ -1108,7 +1094,7 @@ theorem bufData_kmapRw (k m : Nat) (hk : k < NBUF) (hm : m < BSIZE) :
   rw [if_neg (by omega), if_pos (Or.inl ⟨hlo, hhi⟩)]
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [BcacheG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [BcacheG GF]
   [SleepLockG GF] [DiskG GF] [CurCtx]
 
 /-! ## The per-buffer sleeplock, and the held handle -/
@@ -1367,34 +1353,6 @@ end
 `f->ref`; restated here so the buffer cache does not import the file
 table.) -/
 
-/-- Distinct naturals below `n` are at most `n` (the slot bound). -/
-theorem bslot_nodup_bound : ∀ (n : Nat) (l : List Nat), l.Nodup → (∀ i ∈ l, i < n) → l.length ≤ n := by
-  intro n
-  induction n with
-  | zero =>
-    intro l _ hb
-    cases l with
-    | nil => simp
-    | cons a t => exact absurd (hb a (List.mem_cons_self)) (Nat.not_lt_zero a)
-  | succ n ih =>
-    intro l hn hb
-    by_cases hmem : n ∈ l
-    · have hp : l.Perm (n :: l.erase n) := List.perm_cons_erase hmem
-      have hlen : l.length = (l.erase n).length + 1 := by rw [hp.length_eq]; rfl
-      have hb' : ∀ i ∈ l.erase n, i < n := by
-        intro i hi
-        have h1 := hb i (List.mem_of_mem_erase hi)
-        have hne : i ≠ n := by intro e; subst e; exact hn.not_mem_erase hi
-        omega
-      have := ih _ (hn.erase n) hb'
-      omega
-    · have hb' : ∀ i ∈ l, i < n := fun i hi => by
-        have := hb i hi
-        have : i ≠ n := fun e => hmem (e ▸ hi)
-        omega
-      have := ih l hn hb'
-      omega
-
 /-- `BitVec.ofNat 32 n + 1#32` folded back. -/
 theorem bc_ofNat32_succ (n : Nat) : BitVec.ofNat 32 n + 1#32 = BitVec.ofNat 32 (n + 1) := by
   apply BitVec.eq_of_toNat_eq
@@ -1494,7 +1452,7 @@ theorem bcacheOrd_map (o1 o2 : List Nat) (kk : Nat) :
   simp
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [BcacheG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [BcacheG GF]
 variable [DiskG GF] [CurCtx]
 
 /-! ## Opening the cache and one slot -/
@@ -1710,88 +1668,19 @@ theorem bslotAt_elim (γ : BcacheNames) (ξ : CtxId) (k : Nat) (L : List Nat) :
     bslotAt (GF := GF) γ ξ k L ⊢
       ⌜L.Nodup ∧ L.length < 2 ^ 31⌝ ∗
       wordAtN ξ (aBufRefcnt (bnode k)) 4 (DFrac.own 1) (BitVec.ofNat 32 L.length) ∗
-      ([∗list] id ∈ L, brefRest γ k id) ∗ bslots γ L.length ∗
+      ([∗list] id ∈ L, brefRest γ k id) ∗ bslots L.length ∗
       cntHalf (γ.box k) L.length := by
   unfold bslotAt; iintro H; iexact H
 
 theorem bslotAt_intro (γ : BcacheNames) (ξ : CtxId) (k : Nat) (L : List Nat)
     (hnd : L.Nodup) (hlt : L.length < 2 ^ 31) :
     wordAtN (GF := GF) ξ (aBufRefcnt (bnode k)) 4 (DFrac.own 1) (BitVec.ofNat 32 L.length) ∗
-    ([∗list] id ∈ L, brefRest γ k id) ∗ bslots γ L.length ∗
+    ([∗list] id ∈ L, brefRest γ k id) ∗ bslots L.length ∗
     cntHalf (γ.box k) L.length ⊢ bslotAt γ ξ k L := by
   unfold bslotAt
   iintro ⟨H1, H2, H3, H4⟩
   iframe H1 H2 H3 H4
   ipureintro; exact ⟨hnd, hlt⟩
-
-/-! ## The slot supply -/
-
-theorem bslots_zero (γ : BcacheNames) : ⊢ bslots (GF := GF) γ 0 := by
-  unfold bslots
-  iintro
-  iexists []
-  isplitl []
-  · ipureintro; exact ⟨rfl, List.nodup_nil, fun _ h => absurd h (List.not_mem_nil)⟩
-  · iapply BigSepL.bigSepL_nil.2; iempintro
-
-theorem bslots_bound (γ : BcacheNames) (n : Nat) :
-    bslots (GF := GF) γ n ⊢ bslots γ n ∗ ⌜n ≤ BSLOTS⌝ := by
-  unfold bslots
-  iintro ⟨%l, %⟨hlen, hnd, hb⟩, H⟩
-  isplitl [H]
-  · iexists l; iframe H; ipureintro; exact ⟨hlen, hnd, hb⟩
-  · ipureintro
-    rw [← hlen]
-    exact bslot_nodup_bound BSLOTS l hnd hb
-
-theorem bslots_cons (γ : BcacheNames) (n : Nat) :
-    bslot (GF := GF) γ ∗ bslots γ n ⊢ bslots γ (n + 1) := by
-  unfold bslot bslots
-  iintro ⟨⟨%l1, %⟨hlen1, -, hb1⟩, H1⟩, ⟨%l, %⟨hlen, hnd, hb⟩, H⟩⟩
-  obtain ⟨i, rfl⟩ : ∃ i, l1 = [i] := by
-    cases l1 with
-    | nil => exact absurd hlen1 (by decide)
-    | cons i t =>
-      cases t with
-      | nil => exact ⟨i, rfl⟩
-      | cons _ _ => exact absurd hlen1 (by simp)
-  ihave H1 := BigSepL.bigSepL_singleton.1 $$ H1
-  by_cases hmem : i ∈ l
-  · iexfalso
-    icases BigSepL.bigSepL_mem_acc hmem $$ H with ⟨Hi, -⟩
-    ihave %hne := ghost_map_elem_ne γ.slot i i (DFrac.own 1) () () $$ H1 Hi
-    exact absurd rfl hne
-  · iexists (i :: l)
-    isplitl []
-    · ipureintro
-      refine ⟨by simp [hlen], List.nodup_cons.2 ⟨hmem, hnd⟩, ?_⟩
-      intro j hj
-      rcases List.mem_cons.1 hj with rfl | hj
-      · exact hb1 j (List.mem_singleton.2 rfl)
-      · exact hb j hj
-    · iapply BigSepL.bigSepL_cons.2
-      iframe H1 H
-
-theorem bslots_uncons (γ : BcacheNames) (n : Nat) :
-    bslots (GF := GF) γ (n + 1) ⊢ bslot γ ∗ bslots γ n := by
-  unfold bslot bslots
-  iintro ⟨%l, %⟨hlen, hnd, hb⟩, H⟩
-  cases l with
-  | nil => exact absurd hlen (by simp)
-  | cons i l =>
-    icases BigSepL.bigSepL_cons.1 $$ H with ⟨Hi, Hl⟩
-    obtain ⟨hi, hnd⟩ := List.nodup_cons.1 hnd
-    isplitl [Hi]
-    · iexists [i]
-      isplitl []
-      · ipureintro
-        refine ⟨rfl, List.nodup_cons.2 ⟨List.not_mem_nil, List.nodup_nil⟩, ?_⟩
-        intro j hj; rw [List.mem_singleton.1 hj]; exact hb i (List.mem_cons_self)
-      · iapply BigSepL.bigSepL_singleton.2; iexact Hi
-    · iexists l
-      iframe Hl
-      ipureintro
-      exact ⟨by simpa using hlen, hnd, fun j hj => hb j (List.mem_cons_of_mem _ hj)⟩
 
 /-! ## The authority and the lock's halves -/
 

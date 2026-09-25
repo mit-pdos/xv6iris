@@ -107,7 +107,7 @@ theorem id_filter_itable (l : List String) (h : "itable" ∉ l) :
   exact List.filter_eq_self.2 (fun x hx => by simp; intro e; subst e; exact h hx)
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [IcacheG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IcacheG GF]
   [SleepLockG GF] [IcboxG GF] [IrefslotG GF] [FsBlocksG GF] [FsTopG GF] [LogG GF] [IregG GF]
   [FsLinkG GF] [Appcfg GF]
 
@@ -422,7 +422,7 @@ end
 /-! ## The public contract: ONE PACKAGE IN, TWO OUT (Rocq `wp_idup_sconf`) -/
 
 theorem idup_proof (AC : ACQUIRE) (RE : RELEASE_HOOK) : IDUP := ⟨
-  fun {hlc GF} _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ cpu k kk z hnoff hK hkk hlk ha0 => by
+  fun {hlc GF} _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ cpu k kk z hnoff hK hkk hlk ha0 => by
   unfold wp_idup_body
   simp only [idupAddr]
   iintro ⟨Hk, Hpc, #Hit, #Hinv, #Hrinv, Hislot, Hheld, Hnext⟩

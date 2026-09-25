@@ -122,7 +122,7 @@ theorem iput_tail_rest_frac (q qt qrest qr : Qp) (hsub : qpSub qt q = some qrest
   show (1 : Qp).half.val = qrest.val + (q.val + qr.val)
   grind
 
-theorem iput_tail_icHdr_cur {GF : BundledGFunctors} [IcacheG GF] [Xv6G GF] [LogG GF]
+theorem iput_tail_icHdr_cur {GF : BundledGFunctors} [IcacheG GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [LogG GF]
     [FsBlocksG GF] [IregG GF] [FsTopG GF] [FsLinkG GF] [MachGS hlc GF] [Icfg] [CurCtx]
     (cn : IcNames) (γfs : FsNames) (γi : GName) (cov : ExtTreeSet Nat compare)
     (logstart k : Nat) (i : IcBid) (x : IcX) :
@@ -132,7 +132,7 @@ theorem iput_tail_icHdr_cur {GF : BundledGFunctors} [IcacheG GF] [Xv6G GF] [LogG
 theorem iput_tail_ret_30 : jumpPc (KA.«iput» + 0x30#64) = (KA.«iput» + 0x30#64) := by decide
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
   [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF]
   [Appcfg GF] [Fscfg] [Icfg] [CurCtx]

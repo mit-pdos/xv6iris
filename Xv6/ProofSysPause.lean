@@ -182,7 +182,7 @@ structure SpBase (k kb : KCtx) : Prop where
   struct : ∃ (a b : Bool) (Rb : RegMap), kb = ((k.pushed 8).withSpie a b).withRegs Rb
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [CurCtx]
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CurCtx]
 
 /-! ## The frame -/
 
@@ -452,7 +452,7 @@ end
 /-! ## The epilogue `(KernelSyms.«sys_pause» + 0x8e)` -/
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [CurCtx]
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CurCtx]
 
 set_option maxHeartbeats 8000000 in
 /-- `ld ra,56(sp); ld s0,48(sp); addi sp,sp,64; ret` with `r` in `a0`. -/
@@ -500,7 +500,7 @@ theorem sp_exit (cpu : CPU) (k kb : KCtx) (hb : SpBase k kb) (j : Nat)
 end
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [X : CurCtx]
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [X : CurCtx]
 
 theorem sys_pause_br_ffffffffffffe216 : KA.«sys_pause» + 0xffffffffffffe216#64 = KA.«release» := by decide
 
@@ -681,7 +681,7 @@ end
 /-! ## The sleep loop at `(KernelSyms.«sys_pause» + 0x4a)` -/
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [X : CurCtx]
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [X : CurCtx]
 
 /-- The loop invariant at `0x80002b14`: the lock held, the counter reading
 `t0` in `s3`, `&ticks` in `s2`, `&tickslock` in `s1`. -/
@@ -1139,7 +1139,7 @@ end
 /-! ## From `(KernelSyms.«sys_pause» + 0x1a)`: acquire, the `n == 0` test, the loop setup -/
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [X : CurCtx]
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [X : CurCtx]
 
 theorem sys_pause_br_787e : KA.«sys_pause» + 0x787e#64 = ticksAddr := by decide
 
@@ -1301,7 +1301,7 @@ call) run at the caller's index with the complement following the thread
 loop keeps. -/
 theorem sys_pause_proof (AI : ARGINT) (AC : ACQUIRE) (RE : RELEASE) (MP : MYPROC) (KL : KILLED)
     (SP : SLEEP_PREPARE) (SL : SLEEP) : SYSPAUSE := ⟨
-  fun {hlc GF} _ _ _ Γ _ cpu k γt j tfp ws v dqt hj hproc hws hK hnoff htier => by
+  fun {hlc GF} _ _ _ _ _ _ Γ _ cpu k γt j tfp ws v dqt hj hproc hws hK hnoff htier => by
   unfold wp_sys_pause_eb_body
   simp only [sysPauseAddr]
   iintro ⟨Hk, Hpc, #Hpinv, Hte, Hce, #Hlk, Htf, Htp, HΦ⟩

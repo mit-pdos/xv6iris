@@ -21,7 +21,7 @@ set_option linter.unusedSimpArgs false
 set_option linter.unusedVariables false
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [IregG GF] [IcacheG GF]
   [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF]
   [Appcfg GF] [Fscfg] [Icfg] [CurCtx]
@@ -49,7 +49,7 @@ theorem dirlink_read (RD : READI) (SN : STRNCPY) (WI : WRITEI) (PA : PANIC)
     dirlinkDe (k.regs 2#5) bs ∗
     trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗
     dirlinkKeep k ip dinum bm data dn dn0 fn pidv dqp dqd dqf dqn dqs dqbs dqb ∗
-    bslots fscBio 3 ∗ irefSlot ∗ dlinks fscFs dinum.toNat dn bm data ∗
+    bslots 3 ∗ irefSlot ∗ dlinks fscFs dinum.toNat dn bm data ∗
     logOpS icfgLog ncount Sb ∗ txPin icfgLog tid qtx ∗
     dirlinkEnv (hlc := hlc) Γ γl pd pav pu γkl γk ∗
     (∀ c' : CPU, dirlinkPost k ip dinum bm data dn dn0 fn inum ncount Sb tid qtx pidv
@@ -92,7 +92,7 @@ theorem dirlink_read (RD : READI) (SN : STRNCPY) (WI : WRITEI) (PA : PANIC)
   ihave #Hany := iregInv_bytes (hlc := hlc) fscIreg fscFs icfgIst icfgNib $$ Hinv
   unfold dirlinkKeep
   icases Hkeep with ⟨Hdev, Hin, Hmeta, Hmap, Hblk, Hnm, Hsi, Hss, Hsb, Hdi, Hpid⟩
-  icases bslots_uncons fscBio 2 $$ Hbs with ⟨Hb1, Hb2⟩
+  icases bslots_uncons 2 $$ Hbs with ⟨Hb1, Hb2⟩
   unfold dirlinkDe
   icases Hde with ⟨Hbuf, %hbl⟩
   iapply (readi_kcall RD Γ cpu _ γl pd pav pu j γkl γk ip bm data dn (16 * i) bs pidv dqp dqd
@@ -123,7 +123,7 @@ theorem dirlink_read (RD : READI) (SN : STRNCPY) (WI : WRITEI) (PA : PANIC)
     ⟨b2.trans r2, b8.trans r8, b9.trans r9, b18.trans r18, b19.trans r19, b20.trans r20,
       b21.trans r21, b22.trans r22, b23.trans r23, b24.trans r24, b25.trans r25, b26.trans r26,
       b27.trans r27⟩
-  ihave Hbs := bslots_cons fscBio 2 $$ [Hb1 Hb2]
+  ihave Hbs := bslots_cons 2 $$ [Hb1 Hb2]
   · iframe
   -- +0x3e  bne a0,s3,+0x60
   by_cases hshort : dn.diSize.toNat < 16 * i + 16

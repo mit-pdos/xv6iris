@@ -39,7 +39,7 @@ set_option linter.unusedSimpArgs false
 set_option linter.unusedVariables false
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
   [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF]
   [Appcfg GF] [Fscfg] [Icfg] [CurCtx]
@@ -94,12 +94,12 @@ theorem fstat_ilock (IL : ILOCK) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ] 
     fsReady (hlc := hlc) ∗
     isSleeplockGen γil γisl (iLock (ientry ik)) (icSlp fscIc ik) (slhTok (icfgIsl ik)) ∗
     credFloor lo tl ∗ ityShot g ty ∗ inodeShrGenlo ik s icfgDev inum g lo ∗
-    wordPointsTo (pPid k'.proc) 4 pidPriv pid ∗ bslot fscBio ∗
+    wordPointsTo (pPid k'.proc) 4 pidPriv pid ∗ bslot ∗
     (∀ (c' : CPU) (spie spp : Bool) (R' : RegMap) (dn : Dinode) (bm : Blkmap),
       ⌜calleeSaved k'.regs R'⌝ -∗
       kctx c' ((k'.withSpie spie spp).withRegs R') -∗ pcIs c' (jumpPc (k'.regs 1#5)) -∗
       trapCsrsExt c' k'.sie -∗ cpuClaimExt c' k'.sie k'.proc -∗
-      wordPointsTo (pPid k'.proc) 4 pidPriv pid -∗ bslot fscBio -∗
+      wordPointsTo (pPid k'.proc) 4 pidPriv pid -∗ bslot -∗
       fstatLk ik s g lo inum dn bm γisl pid -∗ wpLoop c')
     ⊢ wpLoop (GF := GF) c := by
   iintro ⟨Hk, Hpc, Hte, Hce, #Hpi, #Hpe, #Hfs, #Hslk, #Hfl, #Hshot, Hshr, Hpid, Hbs, HK⟩

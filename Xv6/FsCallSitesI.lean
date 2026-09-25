@@ -36,7 +36,7 @@ def readiKVp : ProcPriv :=
     chg := 0, pvLazy := false }
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [IregG GF] [IcacheG GF]
   [FsTopG GF] [FsLinkG GF] [Appcfg GF] [Fscfg] [Icfg] [CurCtx]
 
@@ -65,7 +65,7 @@ theorem readi_kcall (RD : READI) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
     wordPointsTo (iDev ip) 4 dqd icfgDev ∗ inodeMeta ip dn ∗
     inodeMap fscFs ip bm ∗ inodeBlocks fscFs bm data ∗
     byteBuf (k'.regs 12#5) (DFrac.own 1) olds ∗ wordPointsTo (pPid k'.proc) 4 dqp pidv ∗
-    bslot fscBio ∗
+    bslot ∗
     wpNext true k'.proc c (fun cpu' => iprop(∀ (spie spp : Bool) (R' : RegMap) (tot : Nat),
       ⌜calleeSaved k'.regs R'⌝ -∗
       ⌜R' 10#5 = BitVec.ofNat 64 tot ∧ tot = rdClamp dn.diSize off 16⌝ -∗
@@ -75,7 +75,7 @@ theorem readi_kcall (RD : READI) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
       inodeMap fscFs ip bm -∗ inodeBlocks fscFs bm data -∗
       byteBuf (k'.regs 12#5) (DFrac.own 1) (rdDelivered data olds off tot) -∗
       wordPointsTo (pPid k'.proc) 4 dqp pidv -∗
-      bslot fscBio -∗ wpLoop cpu'))
+      bslot -∗ wpLoop cpu'))
     ⊢ wpLoop (GF := GF) c := by
   have h := RD.wp_readi_eb (hlc := hlc) (GF := GF) Γ c k' γl fscBio
     (fsView fscFs fscDisk icfgDev fscCov) fscDlock pd pav pu j fscFs fscLogst icfgDev γkl γk ip

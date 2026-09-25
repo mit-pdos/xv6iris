@@ -28,7 +28,7 @@ set_option linter.unusedSimpArgs false
 set_option linter.unusedVariables false
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [CurCtx]
 
 /-- **THE CONTINUATION, NAMED** (Rocq's `rd_cont`): the specification's
@@ -54,7 +54,7 @@ def rdPost (k : KCtx) (γb : BcacheNames) (γfs : FsNames) (dev : BitVec 32) (j 
         procPrivRun (procAddr j) pidv { Vp with upt := P' } M')
      else byteBuf (k.regs 12#5) (DFrac.own 1) (rdDelivered data olds off tot) ∗
        wordPointsTo (pPid k.proc) 4 dqp pidv) -∗
-    bslot γb -∗ wpLoop cpu')
+    bslot -∗ wpLoop cpu')
 
 theorem rdPost_elim (k : KCtx) (γb : BcacheNames) (γfs : FsNames) (dev : BitVec 32) (j : Nat)
     (ip : BitVec 64) (bm : Blkmap) (data : Nat → List (BitVec 8)) (dn : Dinode)
@@ -78,7 +78,7 @@ theorem rdPost_elim (k : KCtx) (γb : BcacheNames) (γfs : FsNames) (dev : BitVe
         procPrivRun (procAddr j) pidv { Vp with upt := P' } M')
      else byteBuf (k.regs 12#5) (DFrac.own 1) (rdDelivered data olds off tot) ∗
        wordPointsTo (pPid k.proc) 4 dqp pidv) -∗
-    bslot γb -∗ wpLoop cpu' := by
+    bslot -∗ wpLoop cpu' := by
   unfold rdPost; iintro H; iexact H
 
 /-- The destination handed back in the specification's form. -/
@@ -129,7 +129,7 @@ theorem rd_join (cpu c0 : CPU) (k : KCtx) (spie spp : Bool) (R : RegMap) (rv : B
     trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗
     wordPointsTo (iDev ip) 4 dqd dev ∗ inodeMeta ip dn ∗
     inodeMapQ γfs dq ip bm ∗ inodeBlocksQ γfs dq bm data ∗
-    rdDst user (k.regs 12#5) j pidv Vp P Mi dqp data olds off tot ∗ bslot γb ∗
+    rdDst user (k.regs 12#5) j pidv Vp P Mi dqp data olds off tot ∗ bslot ∗
     wpNext true k.proc c0 (rdPost k γb γfs dev j ip bm data dn user off n olds pidv Vp M dqp dq dqd)
     ⊢ wpLoop (GF := GF) cpu := by
   have hK' : 14 ≤ (k.withSpie spie spp).avail := hK

@@ -29,7 +29,7 @@ set_option linter.unusedSimpArgs false
 set_option linter.unusedVariables false
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
   [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF]
   [Appcfg GF] [Fscfg] [Icfg] [CurCtx]
@@ -216,7 +216,7 @@ theorem iput_lk_itrunc (IT : ITRUNC) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF 
     bitmapInv fscFs fscBmapstart fscCov fscLogst fscSize ∗
     iregInv (hlc := hlc) fscIreg fscFs icfgIst icfgNib ∗ dinodeAt fscIreg inum dn ∗
     wordPointsTo (pPid k'.proc) 4 dqp pidv ∗
-    bslots fscBio 3 ∗
+    bslots 3 ∗
     logCredit icfgLog cru Sb e0 (IBLOCK inum icfgIst) ∗
     logOpSe icfgLog (itEntry crb u) Sb e0 ∗
     wpNext true k'.proc c (fun cpu' => iprop(∀ (spie spp : Bool) (R' : RegMap),
@@ -231,7 +231,7 @@ theorem iput_lk_itrunc (IT : ITRUNC) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF 
       inodeMap fscFs ip bmEmpty -∗
       inodeBlocks fscFs bmEmpty (fun _ => List.replicate BSIZE 0) -∗
       dinodeAt fscIreg inum (diTrunc dn) -∗
-      bslots fscBio 3 -∗
+      bslots 3 -∗
       (∃ (w : Bool) (u' : Nat) (Sb' : List Nat),
         ⌜(∀ x ∈ Sb, x ∈ Sb') ∧ IBLOCK inum icfgIst ∈ Sb' ∧
           (w = true → fscBmapstart ∈ Sb') ∧ (crb = true → w = false) ∧
@@ -336,7 +336,7 @@ theorem iput_lk_a (RH : RELEASE_HOOK) (AC : ACQUIRE_LLB) (ASN : ACQUIRESLEEP_NB)
     wordPointsTo (pPid k.proc) 4 dqp pidv ∗
     wordPointsTo sbBmapstartAddr 4 dqb (BitVec.ofNat 32 fscBmapstart) ∗
     wordPointsTo sbInodestart 4 dqs (BitVec.ofNat 32 icfgIst) ∗
-    bslots fscBio 3 ∗
+    bslots 3 ∗
     iputFrame6 (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) (k.regs 9#5) (k.regs 18#5)
       (k.regs 19#5) (k.regs 20#5) ∗
     iputPost k n Sb crb cru crz tid qtx pidv dqp dqb dqs rgb

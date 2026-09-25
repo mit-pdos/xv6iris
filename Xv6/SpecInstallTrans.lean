@@ -206,7 +206,7 @@ theorem itRecL_hit (W : List (BitVec 32)) (Lw : Nat → List (BitVec 8)) (L : Bl
 /-! ## The contract -/
 
 /-- **WP of `install_trans(recovering = a0)`**. -/
-def wp_install_trans_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
+def wp_install_trans_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF]
     [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [CurCtx]
     (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
     (cpu : CPU) (k : KCtx) (γl : GName) (γb : BcacheNames) (V : BioView GF) (γdl : GName)
@@ -253,7 +253,7 @@ def wp_install_trans_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] 
   fsCacheAuth γfs L ∗ fsDirtyAuth γfs D ∗
   ([∗list] i ↦ w ∈ W, fsChalf γfs (logSlotBno logstart i) (Lw i) ∗
      (if recovering then iprop(emp) else fsDirtyHalf γfs w.toNat true)) ∗
-  bslots γb 2 ∗
+  bslots 2 ∗
   wpNext true k.proc cpu (fun cpu' => iprop(∀ (spie spp : Bool) (R' : RegMap),
     ⌜calleeSaved k.regs R'⌝ -∗
     kctx cpu' ((k.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k.regs 1#5)) -∗
@@ -269,13 +269,13 @@ def wp_install_trans_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] 
     fsDirtyAuth γfs (if recovering then D else dirtyClear D (W.map (fun w => w.toNat))) -∗
     ([∗list] i ↦ w ∈ W, fsChalf γfs (logSlotBno logstart i) (Lw i) ∗
        (if recovering then iprop(emp) else fsDirtyHalf γfs w.toNat false)) -∗
-    bslots γb (2 + (if recovering then 0 else W.length)) -∗ wpLoop cpu'))
+    bslots (2 + (if recovering then 0 else W.length)) -∗ wpLoop cpu'))
   ⊢ wpLoop (GF := GF) cpu
 
 /-- The eb-generic form of `wp_install_trans_body` (Rocq: `cpu_own 0 eb`, the
 complement `trap_csrs_ext` / `cpu_claim_ext` in and out; depth 0, so no
 spinlock held by `KCtx.wf`). -/
-def wp_install_trans_eb_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
+def wp_install_trans_eb_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF]
     [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [CurCtx]
     (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
     (cpu : CPU) (k : KCtx) (γl : GName) (γb : BcacheNames) (V : BioView GF) (γdl : GName)
@@ -322,7 +322,7 @@ def wp_install_trans_eb_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc G
   fsCacheAuth γfs L ∗ fsDirtyAuth γfs D ∗
   ([∗list] i ↦ w ∈ W, fsChalf γfs (logSlotBno logstart i) (Lw i) ∗
      (if recovering then iprop(emp) else fsDirtyHalf γfs w.toNat true)) ∗
-  bslots γb 2 ∗
+  bslots 2 ∗
   wpNext true k.proc cpu (fun cpu' => iprop(∀ (spie spp : Bool) (R' : RegMap),
     ⌜calleeSaved k.regs R'⌝ -∗
     kctx cpu' ((k.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k.regs 1#5)) -∗
@@ -338,12 +338,12 @@ def wp_install_trans_eb_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc G
     fsDirtyAuth γfs (if recovering then D else dirtyClear D (W.map (fun w => w.toNat))) -∗
     ([∗list] i ↦ w ∈ W, fsChalf γfs (logSlotBno logstart i) (Lw i) ∗
        (if recovering then iprop(emp) else fsDirtyHalf γfs w.toNat false)) -∗
-    bslots γb (2 + (if recovering then 0 else W.length)) -∗ wpLoop cpu'))
+    bslots (2 + (if recovering then 0 else W.length)) -∗ wpLoop cpu'))
   ⊢ wpLoop (GF := GF) cpu
 
 /-- The interface of `install_trans`. -/
 structure INSTALL_TRANS : Prop where
-  wp_install_trans_eb : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
+  wp_install_trans_eb : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF]
     [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [CurCtx]
     (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
     (cpu : CPU) (k : KCtx) (γl : GName) (γb : BcacheNames) (V : BioView GF) (γdl : GName)
@@ -360,7 +360,7 @@ structure INSTALL_TRANS : Prop where
 
 /-- The interrupts-off instance of `wp_install_trans_eb` (the complement is the whole
 bundle): the contract every not-yet-generalized caller states. -/
-theorem INSTALL_TRANS.wp_install_trans (A : INSTALL_TRANS) {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
+theorem INSTALL_TRANS.wp_install_trans (A : INSTALL_TRANS) {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF]
     [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [CurCtx]
     (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
     (cpu : CPU) (k : KCtx) (γl : GName) (γb : BcacheNames) (V : BioView GF) (γdl : GName)

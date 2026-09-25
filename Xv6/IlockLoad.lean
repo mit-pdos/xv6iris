@@ -38,7 +38,7 @@ theorem il_bno_sext (inum : BitVec 32) (ist : Nat) (hib : IBLOCK inum ist < 2 ^ 
 set_option maxHeartbeats 16000000 in
 /-- **THE UNCACHED ARM** (Rocq's `il_load`). -/
 theorem il_load (BD : BREAD) (MM : MEMMOVE) (BL : BRELSE) (PA : PANIC) : IlLoadEb := by
-  intro hlc GF _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ Γ _ cpu k spie spp R γl pd pav pu j γisl kk
+  intro hlc GF _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ Γ _ cpu k spie spp R γl pd pav pu j γisl kk
     s g d o inum pidv dqp dqs Tl hj hproc hK hnoff hlocks htier hfills hrdf hkk hgeom hcov
     hnib hpd hR2 hpins hs1
   have hww : ∀ (K : KCtx) (a b c d : Bool), (K.withSpie a b).withSpie c d = K.withSpie c d :=

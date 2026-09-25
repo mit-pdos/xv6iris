@@ -135,7 +135,7 @@ def bfreeSlots : Nat := 4 + breadSlots
 
 /-- **WP of `bfree(dev = a0, b = a1)`, the credited general form** (Rocq's
 `wp_bfree_gen_body`).  See the header for the budget and the dead arm. -/
-def wp_bfree_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
+def wp_bfree_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF]
     [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [CurCtx]
     (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
     (cpu : CPU) (k : KCtx) (γl : GName) (γb : BcacheNames) (V : BioView GF) (γdl : GName)
@@ -171,7 +171,7 @@ def wp_bfree_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF
   -- the caller's pid cell (bread's acquiresleep records it)
   wordPointsTo (pPid k.proc) 4 dqp pidv ∗
   -- TWO slot units: bread's reference is held across log_write's own
-  bslots γb 2 ∗
+  bslots 2 ∗
   -- THE CREDIT, AS A RESOURCE AT A NAMED EPOCH (`emp` at `cr = false`)
   logCredit γ cr Sb e0 bmapstart ∗
   -- THE RESERVATION, WITH THE BIRTH EPOCH NAMED: a unit in hand either way
@@ -182,7 +182,7 @@ def wp_bfree_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF
     trapCsrs cpu' -∗ cpuClaim cpu' k.proc -∗ intrRes cpu' -∗
     wordPointsTo (pPid k.proc) 4 dqp pidv -∗
     wordPointsTo sbBmapstartAddr 4 dqb (BitVec.ofNat 32 bmapstart) -∗
-    bslots γb 2 -∗
+    bslots 2 -∗
     -- the SAME epoch back; the unit back iff credited; the bitmap block logged
     logOpSe γ (if cr then u + 1 else u) (bmapstart :: Sb) e0 -∗ wpLoop cpu'))
   ⊢ wpLoop (GF := GF) cpu
@@ -190,7 +190,7 @@ def wp_bfree_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF
 /-- The eb-generic form of `wp_bfree_body` (Rocq: `cpu_own 0 eb`, the
 complement `trap_csrs_ext` / `cpu_claim_ext` in and out; depth 0, so no
 spinlock held by `KCtx.wf`). -/
-def wp_bfree_eb_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
+def wp_bfree_eb_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF]
     [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [CurCtx]
     (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
     (cpu : CPU) (k : KCtx) (γl : GName) (γb : BcacheNames) (V : BioView GF) (γdl : GName)
@@ -226,7 +226,7 @@ def wp_bfree_eb_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G
   -- the caller's pid cell (bread's acquiresleep records it)
   wordPointsTo (pPid k.proc) 4 dqp pidv ∗
   -- TWO slot units: bread's reference is held across log_write's own
-  bslots γb 2 ∗
+  bslots 2 ∗
   -- THE CREDIT, AS A RESOURCE AT A NAMED EPOCH (`emp` at `cr = false`)
   logCredit γ cr Sb e0 bmapstart ∗
   -- THE RESERVATION, WITH THE BIRTH EPOCH NAMED: a unit in hand either way
@@ -237,7 +237,7 @@ def wp_bfree_eb_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G
     trapCsrsExt cpu' k.sie -∗ cpuClaimExt cpu' k.sie k.proc -∗
     wordPointsTo (pPid k.proc) 4 dqp pidv -∗
     wordPointsTo sbBmapstartAddr 4 dqb (BitVec.ofNat 32 bmapstart) -∗
-    bslots γb 2 -∗
+    bslots 2 -∗
     -- the SAME epoch back; the unit back iff credited; the bitmap block logged
     logOpSe γ (if cr then u + 1 else u) (bmapstart :: Sb) e0 -∗ wpLoop cpu'))
   ⊢ wpLoop (GF := GF) cpu
@@ -246,7 +246,7 @@ def wp_bfree_eb_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G
 `wp_bfree_sconf`, which is derived below: deviation 5). -/
 structure BFREE : Prop where
   /-- the credited, general form -/
-  wp_bfree_eb : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
+  wp_bfree_eb : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF]
     [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [CurCtx]
     (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
     (cpu : CPU) (k : KCtx) (γl : GName) (γb : BcacheNames) (V : BioView GF) (γdl : GName)
@@ -260,7 +260,7 @@ structure BFREE : Prop where
 
 /-- The interrupts-off instance of `wp_bfree_eb` (the complement is the whole
 bundle): the contract every not-yet-generalized caller states. -/
-theorem BFREE.wp_bfree (A : BFREE) {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
+theorem BFREE.wp_bfree (A : BFREE) {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF]
     [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [CurCtx]
     (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
     (cpu : CPU) (k : KCtx) (γl : GName) (γb : BcacheNames) (V : BioView GF) (γdl : GName)
@@ -286,7 +286,7 @@ theorem BFREE.wp_bfree (A : BFREE) {hlc : HasLC} {GF : BundledGFunctors} [MachGS
 /-- **THE SET-FORGETTING FORM** (Rocq's `wp_bfree_sconf_body`): the plain
 counted budget `logOp γ (u + 1)` in, `logOp γ u` out -- spend-exactly, since
 bfree always runs its one `log_write`. -/
-def wp_bfree_sconf_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
+def wp_bfree_sconf_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF]
     [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [CurCtx]
     (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
     (cpu : CPU) (k : KCtx) (γl : GName) (γb : BcacheNames) (V : BioView GF) (γdl : GName)
@@ -309,7 +309,7 @@ def wp_bfree_sconf_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [X
   bitmapInv γfs bmapstart V.cov logstart size ∗
   fsblock γfs.bytes bno.toNat bs ∗
   wordPointsTo (pPid k.proc) 4 dqp pidv ∗
-  bslots γb 2 ∗
+  bslots 2 ∗
   -- THE RESERVATION, SPEND-EXACTLY: the one log_write always runs
   logOp γ (u + 1) ∗
   wpNext true k.proc cpu (fun cpu' => iprop(∀ (spie spp : Bool) (R' : RegMap),
@@ -318,13 +318,13 @@ def wp_bfree_sconf_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [X
     trapCsrs cpu' -∗ cpuClaim cpu' k.proc -∗ intrRes cpu' -∗
     wordPointsTo (pPid k.proc) 4 dqp pidv -∗
     wordPointsTo sbBmapstartAddr 4 dqb (BitVec.ofNat 32 bmapstart) -∗
-    bslots γb 2 -∗ logOp γ u -∗ wpLoop cpu'))
+    bslots 2 -∗ logOp γ u -∗ wpLoop cpu'))
   ⊢ wpLoop (GF := GF) cpu
 
 /-- The eb-generic form of `wp_bfree_sconf_body` (Rocq: `cpu_own 0 eb`, the
 complement `trap_csrs_ext` / `cpu_claim_ext` in and out; depth 0, so no
 spinlock held by `KCtx.wf`). -/
-def wp_bfree_sconf_eb_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
+def wp_bfree_sconf_eb_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF]
     [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [CurCtx]
     (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
     (cpu : CPU) (k : KCtx) (γl : GName) (γb : BcacheNames) (V : BioView GF) (γdl : GName)
@@ -347,7 +347,7 @@ def wp_bfree_sconf_eb_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF]
   bitmapInv γfs bmapstart V.cov logstart size ∗
   fsblock γfs.bytes bno.toNat bs ∗
   wordPointsTo (pPid k.proc) 4 dqp pidv ∗
-  bslots γb 2 ∗
+  bslots 2 ∗
   -- THE RESERVATION, SPEND-EXACTLY: the one log_write always runs
   logOp γ (u + 1) ∗
   wpNext true k.proc cpu (fun cpu' => iprop(∀ (spie spp : Bool) (R' : RegMap),
@@ -356,7 +356,7 @@ def wp_bfree_sconf_eb_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF]
     trapCsrsExt cpu' k.sie -∗ cpuClaimExt cpu' k.sie k.proc -∗
     wordPointsTo (pPid k.proc) 4 dqp pidv -∗
     wordPointsTo sbBmapstartAddr 4 dqb (BitVec.ofNat 32 bmapstart) -∗
-    bslots γb 2 -∗ logOp γ u -∗ wpLoop cpu'))
+    bslots 2 -∗ logOp γ u -∗ wpLoop cpu'))
   ⊢ wpLoop (GF := GF) cpu
 
 /-- The set-forgetting form, derived at `cr = false` (Rocq's
@@ -365,7 +365,7 @@ epoch (`Xv6.logOp_openS`, `Xv6.logOpS_named`) and presents the EMPTY
 credit (`Xv6.logCredit_own` at `cr = false`); on the way out the epoch is
 closed again (`Xv6.logOpSe_opS`, `Xv6.logOpS_op`). -/
 theorem BFREE.wp_bfree_sconf (BF : BFREE) {hlc : HasLC} {GF : BundledGFunctors}
-    [MachGS hlc GF] [Xv6G GF] [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF]
+    [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF]
     [CurCtx] (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
     (cpu : CPU) (k : KCtx) (γl : GName) (γb : BcacheNames) (V : BioView GF) (γdl : GName)
     (pd pav pu : BitVec 64) (j : Nat) (γ : LogNames) (γfs : FsNames)
@@ -403,7 +403,7 @@ theorem BFREE.wp_bfree_sconf (BF : BFREE) {hlc : HasLC} {GF : BundledGFunctors}
   ipureintro; exact hcs
 
 theorem BFREE.wp_bfree_sconf_eb (BF : BFREE) {hlc : HasLC} {GF : BundledGFunctors}
-    [MachGS hlc GF] [Xv6G GF] [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF]
+    [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF]
     [CurCtx] (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
     (cpu : CPU) (k : KCtx) (γl : GName) (γb : BcacheNames) (V : BioView GF) (γdl : GName)
     (pd pav pu : BitVec 64) (j : Nat) (γ : LogNames) (γfs : FsNames)

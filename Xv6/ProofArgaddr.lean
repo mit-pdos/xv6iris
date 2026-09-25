@@ -52,7 +52,7 @@ theorem aa_withSpie_pushed (k : KCtx) (m : Nat) (a b : Bool) :
     (k.pushed m).withSpie a b = (k.withSpie a b).pushed m := rfl
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [CurCtx]
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CurCtx]
 
 /-! ## The callee -/
 
@@ -146,7 +146,7 @@ theorem argaddr_br_fffffffffffffef8 : KA.«argaddr» + 0xfffffffffffffef8#64 = K
 
 set_option maxHeartbeats 8000000 in
 theorem argaddr_proof (MP : MYPROC) (AR : ARGRAW) : ARGADDR := ⟨
-  fun {hlc GF} _ _ _ cpu k i tfp ws v old dqt hi ha0 hws hnoff hK => by
+  fun {hlc GF} _ _ _ _ _ _ cpu k i tfp ws v old dqt hi ha0 hws hnoff hK => by
   unfold wp_argaddr_body
   simp only [argaddrAddr]
   iintro ⟨Hk, Hpc, Htf, Hpage, Hcell, Hnext⟩

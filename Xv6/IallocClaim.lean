@@ -44,7 +44,7 @@ set_option linter.unusedSimpArgs false
 set_option linter.unusedVariables false
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [IregG GF] [IcacheG GF]
   [FsTopG GF] [FsLinkG GF] [IcboxG GF] [IrefslotG GF] [Appcfg GF]
 
@@ -66,7 +66,7 @@ theorem ialloc_claim_iget (IG : IGET) [Fscfg] [Icfg] [CurCtx] (cpu c0 : CPU) (k 
     wordPointsTo sbNinodes 4 dqn (BitVec.ofNat 32 fscNinodes) ∗
     wordPointsTo sbInodestart 4 dqs (BitVec.ofNat 32 icfgIst) ∗
     wordPointsTo (pPid k.proc) 4 dqp pidv ∗
-    bslots fscBio 2 ∗ irefSlot ∗ iclaim inum.toNat ty t qt ∗
+    bslots 2 ∗ irefSlot ∗ iclaim inum.toNat ty t qt ∗
     logOpS icfgLog u (IBLOCK inum icfgIst :: Sb) ∗
     iallocCont k c0 ty u Sb t qt pidv dqp dqs dqn
     ⊢ wpLoop (GF := GF) cpu := by
@@ -197,7 +197,7 @@ theorem ialloc_claim_rel (BE : BRELSE) (IG : IGET) [Fscfg] [Icfg] [CurCtx] (Γ :
     wordPointsTo (pPid k.proc) 4 dqp pidv ∗
     bioLocked fscBio (fsView fscFs fscDisk icfgDev fscCov) kk pidv icfgDev
       (BitVec.ofNat 32 (IBLOCK inum icfgIst)) bs bsd true ∗
-    bslot fscBio ∗ irefSlot ∗ iclaim inum.toNat ty t qt ∗
+    bslot ∗ irefSlot ∗ iclaim inum.toNat ty t qt ∗
     logOpS icfgLog u (IBLOCK inum icfgIst :: Sb) ∗
     iallocCont k c0 ty u Sb t qt pidv dqp dqs dqn
     ⊢ wpLoop (GF := GF) cpu := by
@@ -294,7 +294,7 @@ theorem ialloc_claim_lw (LW : LOG_WRITE) (BE : BRELSE) (IG : IGET) [Fscfg] [Icfg
       bsd ∗
     bioPay fscBio (fsView fscFs fscDisk icfgDev fscCov) kk icfgDev
       (BitVec.ofNat 32 (IBLOCK inum icfgIst)) (diblkBytes ds) bsd d0 ∗
-    bslot fscBio ∗ irefSlot ∗ txPin icfgLog t qt ∗
+    bslot ∗ irefSlot ∗ txPin icfgLog t qt ∗
     logOpS icfgLog (u + 1) Sb ∗
     iallocCont k c0 ty u Sb t qt pidv dqp dqs dqn
     ⊢ wpLoop (GF := GF) cpu := by
@@ -374,7 +374,7 @@ theorem ialloc_claim_lw (LW : LOG_WRITE) (BE : BRELSE) (IG : IGET) [Fscfg] [Icfg
       | exact h9
       | (simp only [RegMap.set_apply, BitVec.reduceEq, ite_false]; exact h9)
 
-omit [Xv6G GF] [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [IregG GF]
+omit [Xv6G GF] [FdslotG GF] [BioslotG GF] [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [IregG GF]
   [IcacheG GF] [FsTopG GF] [FsLinkG GF] [IcboxG GF] [IrefslotG GF] [Appcfg GF] in
 /-- The zero record's six cells, with the type cell out and the way back at
 the FRESH record (Rocq's `ia_fresh_of_zero` at the `dislot` level: the `sh`
@@ -422,7 +422,7 @@ theorem ialloc_claim (MS : MEMSET) (LW : LOG_WRITE) (BE : BRELSE) (IG : IGET) [F
     wordPointsTo (pPid k.proc) 4 dqp pidv ∗
     bioLocked fscBio (fsView fscFs fscDisk icfgDev fscCov) kk pidv icfgDev
       (BitVec.ofNat 32 (IBLOCK inum icfgIst)) (diblkBytes ds) bsd d0 ∗
-    bslot fscBio ∗ irefSlot ∗ txPin icfgLog t qt ∗
+    bslot ∗ irefSlot ∗ txPin icfgLog t qt ∗
     logOpS icfgLog (u + 1) Sb ∗
     iallocCont k c0 ty u Sb t qt pidv dqp dqs dqn
     ⊢ wpLoop (GF := GF) cpu := by

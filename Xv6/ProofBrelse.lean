@@ -39,7 +39,7 @@ theorem br_headaddr : KA.«brelse» + 0x1d778#64 = bhead := by
   unfold bhead bcacheHeadAddr; decide
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [CurCtx]
 
 /-! ## The two sleeplock callees, at this call site -/
@@ -119,12 +119,12 @@ theorem br_tail (RE : RELEASE_HOOK) (cpu c : CPU) (k : KCtx) (γl : GName) (γ :
     topLb tl ∗ bcacheScanAt γ V curCtx tl ∗
     sieArm c k.sie k.proc ∗
     frame4s2 (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) (k.regs 9#5) (k.regs 18#5) ∗
-    wordPointsTo (pPid k.proc) 4 dqp pidv ∗ bslot γ ∗
+    wordPointsTo (pPid k.proc) 4 dqp pidv ∗ bslot ∗
     wpNext k.sie k.proc cpu (fun cpu' => iprop(∀ spie : Bool, ∀ spp : Bool, ∀ R' : RegMap,
       ⌜k.sie = false → spie = k.spie ∧ spp = k.spp⌝ -∗
       kctx cpu' ((k.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k.regs 1#5)) -∗
       ⌜calleeSaved k.regs R'⌝ -∗ wordPointsTo (pPid k.proc) 4 dqp pidv -∗
-      bslot γ -∗ wpLoop cpu'))
+      bslot -∗ wpLoop cpu'))
     ⊢ wpLoop (GF := GF) c := by
   iintro ⟨Hk, Hpc, #Hlk, Hlocked, #Htl, Hscan, Harm, Hframe, Hpid, Hbslot, Hnext⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
@@ -210,7 +210,7 @@ end
 set_option maxHeartbeats 16000000 in
 theorem brelse_proof (HS : HOLDINGSLEEP) (RS : RELEASESLEEP_HOOK) (AC : ACQUIRE)
     (RE : RELEASE_HOOK) : BRELSE := ⟨
-  fun {hlc GF} _ _ _ _ _ _ Γ cpu k γl γ V kk pidv dev bno dqp bs bsd d
+  fun {hlc GF} _ _ _ _ _ _ _ _ _ Γ cpu k γl γ V kk pidv dev bno dqp bs bsd d
     hnoff hK hlk hsl hp htier hkk ha0 => by
   unfold wp_brelse_body
   simp only [brelseAddr]
@@ -429,12 +429,12 @@ theorem brelse_proof (HS : HOLDINGSLEEP) (RS : RELEASESLEEP_HOOK) (AC : ACQUIRE)
   ihave Hkey0 := bkeyAt_intro γ curCtx tl kk (devs kk) (bnos kk) $$ [Hkd Hkb Hregs]
   case' _ => iframe Hkd Hkb Hregs
   ihave Hkey := Hkcl $$ Hkey0
-  ihave ⟨Hbslot, Hslots⟩ := (show bslots (GF := GF) γ (ls1 ++ id :: ls2).length ⊢
-      bslot γ ∗ bslots γ (ls1 ++ ls2).length from by
+  ihave ⟨Hbslot, Hslots⟩ := (show bslots (GF := GF) (ls1 ++ id :: ls2).length ⊢
+      bslot ∗ bslots (ls1 ++ ls2).length from by
     rw [hn, hlen2]
     have he : n - 1 + 1 = n := by omega
     rw [← he]
-    exact bslots_uncons γ (n - 1)) $$ Hslots
+    exact bslots_uncons (n - 1)) $$ Hslots
   have hnd' : (ls1 ++ ls2).Nodup := bunpin_nodup ls1 ls2 id hnd
   have hlt' : (ls1 ++ ls2).length < 2 ^ 31 := by rw [hlen2]; omega
   ihave Hslot := bslotAt_intro γ curCtx kk (ls1 ++ ls2) hnd' hlt' $$ [Hrefc Hhalves' Hslots Hcnt]

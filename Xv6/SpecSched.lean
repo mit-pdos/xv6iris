@@ -49,7 +49,7 @@ def schedAddr : BitVec 64 := KA.«sched»
 def schedSlots : Nat := 16
 
 /-- **WP of `sched`.** -/
-def wp_sched_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [X : CurCtx]
+def wp_sched_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [X : CurCtx]
     (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
     (cpu : CPU) (k : KCtx) (j : Nat) (st : BitVec 32) (ch : BitVec 64)
     (hj : j < NPROC) (hpark : parkOk st) (hK : schedSlots ≤ k.avail)
@@ -75,7 +75,7 @@ def wp_sched_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF
 
 /-- The interface of `sched`. -/
 structure SCHED : Prop where
-  wp_sched : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [CurCtx]
+  wp_sched : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CurCtx]
     (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
     (cpu : CPU) (k : KCtx) (j : Nat) (st : BitVec 32) (ch : BitVec 64)
     hj hpark hK hsie hnoff hlocks htier hproc,

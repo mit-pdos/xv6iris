@@ -25,7 +25,7 @@ set_option linter.unusedVariables false
 theorem writei_imm_p112 : BitVec.signExtend 64 112#12 = 8#64 * BitVec.ofNat 64 14 := by decide
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [IregG GF] [IcacheG GF]
   [FsTopG GF] [FsLinkG GF] [Appcfg GF] [Fscfg] [Icfg] [CurCtx]
 
@@ -48,7 +48,7 @@ theorem writei_ret (cpu : CPU) (k : KCtx) (spie spp : Bool) (R : RegMap) (A : Wi
       (k.regs 21#5) (k.regs 22#5) (k.regs 23#5) x8 x9 x10 x11 ∗
     trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗
     wiCells A ∗ inodeMeta A.ip dn' ∗ inodeMap fscFs A.ip bm' ∗ inodeBlocks fscFs bm' data' ∗
-    dinodeAt fscIreg A.inum dn0' ∗ wiSrc A (k.regs 12#5) P' ∗ bslots fscBio 3 ∗
+    dinodeAt fscIreg A.inum dn0' ∗ wiSrc A (k.regs 12#5) P' ∗ bslots 3 ∗
     logOpS icfgLog n' Sb' ∗ wiContEb k A
     ⊢ wpLoop (GF := GF) cpu := by
   have hK' : 14 ≤ (k.withSpie spie spp).avail := hK
@@ -169,7 +169,7 @@ theorem writei_join (IU : IUPDATE) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ
     wiEnv Γ A ∗ trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗
     wiCells A ∗ inodeMeta A.ip (wiDinode A.dn bm' A.off tot) ∗ inodeMap fscFs A.ip bm' ∗
     inodeBlocks fscFs bm' data' ∗ dinodeAt fscIreg A.inum A.dn0 ∗ wiSrc A (k.regs 12#5) P' ∗
-    bslots fscBio 3 ∗ logOpS icfgLog (u + 1) SbC ∗ wiContEb k A
+    bslots 3 ∗ logOpS icfgLog (u + 1) SbC ∗ wiContEb k A
     ⊢ wpLoop (GF := GF) cpu := by
   have hww : ∀ (K : KCtx) (a b c d : Bool), (K.withSpie a b).withSpie c d = K.withSpie c d :=
     fun _ _ _ _ _ => rfl
@@ -328,7 +328,7 @@ theorem writei_size (IU : IUPDATE) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ
     wiFrameK k ∗ wiEnv Γ A ∗ trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗
     wiCells A ∗ inodeMeta A.ip A.dn ∗ inodeMap fscFs A.ip bm' ∗
     inodeBlocks fscFs bm' data' ∗ dinodeAt fscIreg A.inum A.dn0 ∗ wiSrc A (k.regs 12#5) P' ∗
-    bslots fscBio 3 ∗ logOpS icfgLog (u + 1) SbC ∗ wiContEb k A
+    bslots 3 ∗ logOpS icfgLog (u + 1) SbC ∗ wiContEb k A
     ⊢ wpLoop (GF := GF) cpu := by
   have hmb : MAXFILE * BSIZE = 274432 := rfl
   have hx : A.off + tot < 2 ^ 31 := by have := hS.rng; omega

@@ -137,7 +137,7 @@ theorem ckK_popExit (k : KCtx) (hsie : k.sie = false) :
     _root_.true_and, _root_.and_true]
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [CurCtx]
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CurCtx]
 
 /-- What every arm ends with: the caller's continuation. -/
 def ckPost (cpu : CPU) (k : KCtx) : IProp GF := iprop%
@@ -432,7 +432,7 @@ end
 
 set_option maxHeartbeats 4000000 in
 theorem clockintr_proof (CU : CPUID) (AC : ACQUIRE) (RE : RELEASE) (WK : WAKEUP) : CLOCKINTR :=
-  ⟨fun {hlc GF} _ _ _ Γ cpu k γt hsie hnoff hK hlk htier => by
+  ⟨fun {hlc GF} _ _ _ _ _ _ Γ cpu k γt hsie hnoff hK hlk htier => by
   unfold wp_clockintr_body
   simp only [clockintrAddr]
   iintro ⟨Hk, Hpc, #Hpi, #Hlk, HΦ⟩

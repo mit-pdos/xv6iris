@@ -56,7 +56,7 @@ def sysPauseAddr : BitVec 64 := KA.«sys_pause»
 def sysPauseSlots : Nat := 8 + sleepSlots
 
 /-- **WP of `sys_pause()`.** -/
-def wp_sys_pause_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [CurCtx]
+def wp_sys_pause_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CurCtx]
     (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
     (cpu : CPU) (k : KCtx) (γt : GName) (j : Nat)
     (tfp : BitVec 44) (ws : List (BitVec 64)) (v : BitVec 64) (dqt : DFrac)
@@ -83,7 +83,7 @@ that instance).  At `sie = true` sys_pause's own `acquire(&tickslock)`
 mints the bundle `killed`/`sleep` need and the caller brings nothing; at
 `sie = false` the caller brings it.  Depth 0, so no spinlock is held
 (`KCtx.wf`). -/
-def wp_sys_pause_eb_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [CurCtx]
+def wp_sys_pause_eb_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CurCtx]
     (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
     (cpu : CPU) (k : KCtx) (γt : GName) (j : Nat)
     (tfp : BitVec 44) (ws : List (BitVec 64)) (v : BitVec 64) (dqt : DFrac)
@@ -105,7 +105,7 @@ def wp_sys_pause_eb_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [
 
 /-- The interface of `sys_pause`. -/
 structure SYSPAUSE : Prop where
-  wp_sys_pause_eb : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [CurCtx]
+  wp_sys_pause_eb : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CurCtx]
     (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
     (cpu : CPU) (k : KCtx) (γt : GName) (j : Nat)
     (tfp : BitVec 44) (ws : List (BitVec 64)) (v : BitVec 64) (dqt : DFrac)
@@ -116,7 +116,7 @@ structure SYSPAUSE : Prop where
 /-- The interrupts-off instance of `wp_sys_pause_eb` (the complement is the
 whole bundle). -/
 theorem SYSPAUSE.wp_sys_pause (A : SYSPAUSE) {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF]
-    [Xv6G GF] [CurCtx]
+    [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CurCtx]
     (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
     (cpu : CPU) (k : KCtx) (γt : GName) (j : Nat)
     (tfp : BitVec 44) (ws : List (BitVec 64)) (v : BitVec 64) (dqt : DFrac)

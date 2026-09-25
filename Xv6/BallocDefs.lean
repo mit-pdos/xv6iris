@@ -120,7 +120,7 @@ What each of balloc's two exits carries into the shared epilogue; `rv` is
 the value in `s1` at `+0x7e`. -/
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [CurCtx]
 
 def baArms (γ : LogNames) (γfs : FsNames) (cov : ExtTreeSet Nat compare)
@@ -145,7 +145,7 @@ def baCont (k : KCtx) (cpu : CPU) (γ : LogNames) (γb : BcacheNames) (γfs : Fs
     wordPointsTo (pPid k.proc) 4 dqp pidv -∗
     wordPointsTo sbSizeAddr 4 dqs (BitVec.ofNat 32 size) -∗
     wordPointsTo sbBmapstartAddr 4 dqb (BitVec.ofNat 32 bmapstart) -∗
-    bslots γb 2 -∗
+    bslots 2 -∗
     ((⌜R' 10#5 = 0#64⌝ ∗ logOpS γ (2 + u) Sb) ∨
      (∃ blk : BitVec 32,
         ⌜R' 10#5 = BitVec.signExtend 64 blk ∧ blk.toNat ≠ 0 ∧
@@ -184,7 +184,7 @@ end
 contract keeps the view a parameter pinned by `hcl`/`hdt`, and a view with
 those two fields IS `fsView` of its own geometry. -/
 
-theorem bioView_eq_fsView {GF : BundledGFunctors} [Xv6G GF] [FsBlocksG GF] (V : BioView GF)
+theorem bioView_eq_fsView {GF : BundledGFunctors} [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [FsBlocksG GF] (V : BioView GF)
     (γfs : FsNames) (hcl : V.clean = fsMclean γfs) (hdt : V.dirty = fsMdirty γfs) :
     V = fsView γfs V.gd V.dev V.cov := by
   cases V
@@ -193,7 +193,7 @@ theorem bioView_eq_fsView {GF : BundledGFunctors} [Xv6G GF] [FsBlocksG GF] (V : 
   rfl
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [BcacheG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [BcacheG GF]
   [DiskG GF] [FsBlocksG GF] [SleepLockG GF] [CurCtx]
 
 /-- Rocq's `bio_held_fs_L`, at the parameter view. -/
@@ -251,7 +251,7 @@ end
 /-! ## The callees, at their call sites -/
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [CurCtx]
 
 set_option maxHeartbeats 1000000 in
@@ -270,7 +270,7 @@ theorem ba_log_write_au (LW : LOG_WRITE)
     (hhome : fsHome V.cov logstart b) (hlogE : (↑logN : CoPset) ⊆ Efs) :
     kctx c k' ∗ pcIs c KA.«log_write» ∗
     bioCtx γl γb V ∗ logCtx γ γb γfs V.cov logstart dev ∗
-    bslot γb ∗ logEpochLb γ vlb ∗ logCredit γ cr Sb e0 b ∗
+    bslot ∗ logEpochLb γ vlb ∗ logCredit γ cr Sb e0 b ∗
     logOpSe γ (u + 1) Sb e0 ∗
     (|={⊤, Efs}=> ∃ (bsl' : List (BitVec 8)) (v' : Nat),
        fsblock γfs.bytes b bsl' ∗ logEpochLb γ v' ∗
@@ -284,7 +284,7 @@ theorem ba_log_write_au (LW : LOG_WRITE)
       logOpSwe γ (if cr then u + 1 else u) (b :: Sb) b vlb e0 -∗
       Φfsb -∗
       bioLocked γb V kk pidv dev bno bs bsd true -∗
-      bslot γb -∗ wpLoop cpu'))
+      bslot -∗ wpLoop cpu'))
     ⊢ wpLoop (GF := GF) c := by
   subst hb
   have h := LW.wp_log_write_au (hlc := hlc) (GF := GF) c k' γ γl γb V γfs logstart dev kk pidv
@@ -325,14 +325,14 @@ end
 /-! ## Slot units -/
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF]
   [BcacheG GF] [DiskG GF] [CurCtx]
 
-theorem ba_slots_join2 (γ : BcacheNames) : bslot (GF := GF) γ ∗ bslot γ ⊢ bslots γ 2 :=
-  bslots_cons γ 1
+theorem ba_slots_join2 (γ : BcacheNames) : bslot (GF := GF) ∗ bslot ⊢ bslots 2 :=
+  bslots_cons 1
 
-theorem ba_slots_split2 (γ : BcacheNames) : bslots (GF := GF) γ 2 ⊢ bslot γ ∗ bslot γ :=
-  bslots_uncons γ 1
+theorem ba_slots_split2 (γ : BcacheNames) : bslots (GF := GF) 2 ⊢ bslot ∗ bslot :=
+  bslots_uncons 1
 
 end
 

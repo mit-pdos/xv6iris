@@ -186,7 +186,7 @@ theorem ufNd_top : ((↑ftopN : CoPset) ∪ ↑appN) ⊆ ⊤ := CoPset.subseteq_
 /-! ## 2.  The fire points, `ftopN` opened and closed -/
 
 section UnlinkFire
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [IcacheG GF] [Xv6G GF]
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [IcacheG GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF]
   [FsTopG GF] [FsBytesG GF]
 
 /-- THE MISS, at dirlookup's `none` under the parent's lock (Rocq's

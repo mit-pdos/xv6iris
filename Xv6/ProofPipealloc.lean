@@ -161,7 +161,7 @@ def paPins1 (k : KCtx) (R : RegMap) : Prop :=
   R 26#5 = k.regs 26#5 ∧ R 27#5 = k.regs 27#5
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
   [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF]
   [Appcfg GF] [FileG GF] [Fscfg] [Icfg] [CurCtx]
@@ -211,7 +211,7 @@ theorem pa_frame_close (sp ra s0 s1 s4 w1 w2 : BitVec 64) :
 
 theorem pa_filealloc (FA : FILEALLOC) (c : CPU) (k' : KCtx) (γl : GName) (γ : FileNames)
     (hnoff : k'.noff + 1 < 2 ^ 31) (hK : 14 ≤ k'.avail) (hlk : "ftable" ∉ k'.locks) :
-    kctx c k' ∗ pcIs c KA.«filealloc» ∗ isFtable γl γ ∗ fdSlot γ ∗
+    kctx c k' ∗ pcIs c KA.«filealloc» ∗ isFtable γl γ ∗ fdSlot ∗
     wpNext k'.sie k'.proc c (fun cpu' => iprop(∀ spie : Bool, ∀ spp : Bool, ∀ R' : RegMap,
       ⌜k'.sie = false → spie = k'.spie ∧ spp = k'.spp⌝ -∗
       kctx cpu' ((k'.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k'.regs 1#5)) -∗
@@ -266,7 +266,7 @@ theorem pa_fileclose (FC : FILECLOSE) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF
       ⌜calleeSaved k'.regs R'⌝ -∗
       kctx cpu' ((k'.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k'.regs 1#5)) -∗
       trapCsrsExt cpu' s -∗ cpuClaimExt cpu' s pj -∗
-      wordPointsTo (pPid pj) 4 dqp pidv -∗ fdSlot γ -∗ irefSlot -∗ wpLoop cpu'))
+      wordPointsTo (pPid pj) 4 dqp pidv -∗ fdSlot -∗ irefSlot -∗ wpLoop cpu'))
     ⊢ wpLoop (GF := GF) c := by
   subst hs hpj
   have h := FC.wp_fileclose_eb (hlc := hlc) (GF := GF) Γ c k' γl γ kk 1 .closed 0 γkl γk on pidv dqp
@@ -388,7 +388,7 @@ theorem pa_bad_tail (FC : FILECLOSE) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF 
     kctx c (((k.withSpie spie spp).pushed 6).withRegs R) ∗ pcIs c (KA.«pipealloc» + 0xa8#64) ∗
     trapCsrsExt c k.sie ∗ cpuClaimExt c k.sie k.proc ∗
     isFtable γl γ ∗ panicEnv ∗
-    kallocAvail γk on ∗ fdSlot γ ∗
+    kallocAvail γk on ∗ fdSlot ∗
     wordPointsTo (k.regs 10#5) 8 (DFrac.own 1) w0 ∗ wordPointsTo (k.regs 11#5) 8 (DFrac.own 1) v1 ∗
     fileallocPost γ v1 ∗
     frame6s4 (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) (k.regs 9#5) (k.regs 20#5) ∗
@@ -825,7 +825,7 @@ theorem pipealloc_br_fffffffffffffc28 : KA.«pipealloc» + 0xfffffffffffffc28#64
 
 set_option maxHeartbeats 16000000 in
 theorem pipealloc_proof (FA : FILEALLOC) (KAL : KALLOC) (IL : INITLOCK) (FC : FILECLOSE) : PIPEALLOC := ⟨
-  fun {hlc GF} _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ Γ _ cpu k γl γ γkl γk on v0 v1 pidv dqp
+  fun {hlc GF} _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ Γ _ cpu k γl γ γkl γk on v0 v1 pidv dqp
       hK hnoff htier => by
   unfold wp_pipealloc_eb_body
   simp only [pipeallocAddr]

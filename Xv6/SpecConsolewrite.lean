@@ -55,7 +55,7 @@ def consWriteRet (n : Int) (r : BitVec 64) : Prop :=
   ∃ i : Int, r = BitVec.ofInt 64 i ∧ 0 ≤ i ∧ i ≤ max 0 n
 
 /-- **WP of `consolewrite`.**  `a0 = user_src` (nonzero), `a1 = src`, `a2 = n`. -/
-def wp_consolewrite_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [CurCtx]
+def wp_consolewrite_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CurCtx]
     (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
     (cpu : CPU) (k : KCtx) (γl : GName) (γ : UartNames) (bs : List (BitVec 8))
     (γkl : GName) (γk : KmemNames) (j : Nat) (pid : BitVec 32)
@@ -83,7 +83,7 @@ instance at `k.sie = true`): the trap-CSR complement (`trapCsrsExt` /
 `cpuClaimExt`, `emp` at `sie = true`) in and out, handed to `uartwrite`'s eb
 contract across each park.  Depth 0 (no spinlock held, `KCtx.wf`); it parks,
 so the crossing is the literal `true`. -/
-def wp_consolewrite_eb_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [CurCtx]
+def wp_consolewrite_eb_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CurCtx]
     (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
     (cpu : CPU) (k : KCtx) (γl : GName) (γ : UartNames) (bs : List (BitVec 8))
     (γkl : GName) (γk : KmemNames) (j : Nat) (pid : BitVec 32)
@@ -107,7 +107,7 @@ def wp_consolewrite_eb_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF
 
 /-- The interface of `consolewrite`. -/
 structure CONSOLEWRITE : Prop where
-  wp_consolewrite_eb : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [CurCtx]
+  wp_consolewrite_eb : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CurCtx]
     (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
     (cpu : CPU) (k : KCtx) (γl : GName) (γ : UartNames) (bs : List (BitVec 8))
     (γkl : GName) (γk : KmemNames) (j : Nat) (pid : BitVec 32)
@@ -117,7 +117,7 @@ structure CONSOLEWRITE : Prop where
 /-- The interrupts-off instance of `wp_consolewrite_eb` (the complement is the
 whole bundle). -/
 theorem CONSOLEWRITE.wp_consolewrite (A : CONSOLEWRITE) {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF]
-    [Xv6G GF] [CurCtx] (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+    [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CurCtx] (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
     (cpu : CPU) (k : KCtx) (γl : GName) (γ : UartNames) (bs : List (BitVec 8))
     (γkl : GName) (γk : KmemNames) (j : Nat) (pid : BitVec 32)
     (V : ProcPriv) (M : Nat → List (BitVec 8)) (n : Int) hj hproc hK hsie hnoff hlocks htier huser hn hn' :

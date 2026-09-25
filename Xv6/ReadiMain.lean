@@ -30,7 +30,7 @@ set_option linter.unusedVariables false
 theorem rd_priv_eta (Vp : ProcPriv) : { Vp with upt := Vp.upt } = Vp := rfl
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [CurCtx]
 
 /-- The destination as the contract hands it over, at `tot = 0`. -/
@@ -70,7 +70,7 @@ theorem rd_post_of_spec (cpu : CPU) (k : KCtx) (γb : BcacheNames) (γfs : FsNam
           procPrivRun (procAddr j) pidv { Vp with upt := P' } M')
        else byteBuf (k.regs 12#5) (DFrac.own 1) (rdDelivered data olds off tot) ∗
          wordPointsTo (pPid k.proc) 4 dqp pidv) -∗
-      bslot γb -∗ wpLoop cpu'))
+      bslot -∗ wpLoop cpu'))
     ⊢ wpNext (GF := GF) true k.proc cpu
         (rdPost k γb γfs dev j ip bm data dn user off n olds pidv Vp M dqp dq dqd) := by
   unfold rdPost; iintro H; iexact H
@@ -90,7 +90,7 @@ theorem rd_early (cpu c0 : CPU) (k : KCtx) (R : RegMap)
     trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗
     wordPointsTo (iDev ip) 4 dqd dev ∗ inodeMeta ip dn ∗
     inodeMapQ γfs dq ip bm ∗ inodeBlocksQ γfs dq bm data ∗
-    rdDst user (k.regs 12#5) j pidv Vp Vp.upt M dqp data olds off 0 ∗ bslot γb ∗
+    rdDst user (k.regs 12#5) j pidv Vp Vp.upt M dqp data olds off 0 ∗ bslot ∗
     wpNext true k.proc c0 (rdPost k γb γfs dev j ip bm data dn user off n olds pidv Vp M dqp dq dqd)
     ⊢ wpLoop (GF := GF) cpu := by
   iintro ⟨Hk, Hpc, Hte, Hce, Hdev, Hmeta, Hmap, Hblk, Hdst, Hsl, Hnext⟩
@@ -147,7 +147,7 @@ theorem rd_body0 (BM : BMAP_NOALLOC) (BR : BREAD) (BE : BRELSE) (EC : EITHER_COP
     trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗
     wordPointsTo (iDev ip) 4 dqd dev ∗ inodeMeta ip dn ∗
     inodeMapQ γfs dq ip bm ∗ inodeBlocksQ γfs dq bm data ∗
-    rdDst user (k.regs 12#5) j pidv Vp Vp.upt M dqp data olds off 0 ∗ bslot γb ∗
+    rdDst user (k.regs 12#5) j pidv Vp Vp.upt M dqp data olds off 0 ∗ bslot ∗
     wpNext true k.proc c0 (rdPost k γb γfs dev j ip bm data dn user off n olds pidv Vp M dqp dq dqd)
     ⊢ wpLoop (GF := GF) cpu := by
   have hK14 : 14 ≤ k.avail := by have := hs.hK; unfold readiSlots at this; omega

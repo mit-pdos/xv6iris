@@ -15,7 +15,7 @@ set_option linter.unusedSectionVars false
 set_option linter.unusedVariables false
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
   [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF]
   [Appcfg GF]
@@ -59,7 +59,7 @@ theorem fsinit_ireclaim_call (IR : IRECLAIM) [Fscfg] [Icfg] [CurCtx]
     -- the caller's own pid cell
     wordPointsTo (pPid k.proc) 4 dqp pidv ∗
     -- THREE slot units: iput's indirect arm forces three
-    bslots fscBio 3 ∗
+    bslots 3 ∗
     -- ONE ledger unit: iget spends it, iput returns it, every iteration
     irefSlot ∗
     wpNext true k.proc cpu (fun cpu' => iprop(∀ (spie spp : Bool) (R' : RegMap),
@@ -70,7 +70,7 @@ theorem fsinit_ireclaim_call (IR : IRECLAIM) [Fscfg] [Icfg] [CurCtx]
       wordPointsTo sbInodestart 4 dqs (BitVec.ofNat 32 icfgIst) -∗
       wordPointsTo sbBmapstartAddr 4 dqb (BitVec.ofNat 32 fscBmapstart) -∗
       wordPointsTo (pPid k.proc) 4 dqp pidv -∗
-      bslots fscBio 3 -∗
+      bslots 3 -∗
       irefSlot -∗
       -- the boot-shelter token, returned unspent
       iregBoot -∗ wpLoop cpu'))
@@ -83,7 +83,7 @@ theorem fsinit_ireclaim_call (IR : IRECLAIM) [Fscfg] [Icfg] [CurCtx]
 end
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF]
 
 set_option maxHeartbeats 1000000 in
@@ -144,14 +144,14 @@ theorem fsinit_initlog_call (IL : INITLOG) [Fscfg] [Icfg] [CurCtx]
     ([∗list] i ∈ List.range LOGBLOCKS, ∃ bs : List (BitVec 8),
        fsChalf fscFs (logSlotBno fscLogst i) bs) ∗
     -- the slot pool, stocked: the batch's 32 plus initlog's own working pair
-    bslots fscBio ((LOGBLOCKS + 2) + 2) ∗
+    bslots ((LOGBLOCKS + 2) + 2) ∗
     wpNext true k.proc cpu (fun cpu' => iprop(∀ (spie spp : Bool) (R' : RegMap),
       ⌜calleeSaved k.regs R'⌝ -∗
       kctx cpu' ((k.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k.regs 1#5)) -∗
       trapCsrsExt cpu' k.sie -∗ cpuClaimExt cpu' k.sie k.proc -∗
       wordPointsTo (pPid k.proc) 4 dqp pidv -∗
       wordPointsTo sbLogstartAddr 4 dqs (BitVec.ofNat 32 fscLogst) -∗
-      bslots fscBio 2 -∗
+      bslots 2 -∗
       logCtx icfgLog fscBio fscFs fscCov fscLogst icfgDev -∗ wpLoop cpu'))
       ⊢ wpLoop (GF := GF) cpu := by
   unfold fsBytesAt

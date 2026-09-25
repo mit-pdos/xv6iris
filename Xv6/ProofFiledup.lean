@@ -45,7 +45,7 @@ theorem fd_lock_413a : KA.«filedup» + 0x1e372#64 = ftableAddr := by
   unfold ftableAddr; decide
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FileG GF] [IcacheG GF] [SleepLockG GF] [IcboxG GF] [IrefslotG GF] [OffboxG GF] [OffboxBoxG GF] [Icfg] [CurCtx]
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [FileG GF] [IcacheG GF] [SleepLockG GF] [IcboxG GF] [IrefslotG GF] [OffboxG GF] [OffboxBoxG GF] [Icfg] [CurCtx]
 
 /-! ## The tail: `mv a0,s1` and the epilogue -/
 
@@ -125,7 +125,7 @@ theorem filedup_br_1e372 : KA.«filedup» + 0x1e372#64 = ftableAddr := by decide
 
 set_option maxHeartbeats 16000000 in
 theorem filedup_proof (AC : ACQUIRE) (RE : RELEASE) : FILEDUP := ⟨
-  fun {hlc GF} _ _ _ _ _ _ _ _ _ _ _ cpu k γl γ kk q st hnoff hK hlk ha0 => by
+  fun {hlc GF} _ _ _ _ _ _ _ _ _ _ _ _ _ cpu k γl γ kk q st hnoff hK hlk ha0 => by
   unfold wp_filedup_body
   simp only [filedupAddr]
   iintro ⟨Hk, Hpc, #Hft, Hfd, Href, Hnext⟩
@@ -228,11 +228,11 @@ theorem filedup_proof (AC : ACQUIRE) (RE : RELEASE) : FILEDUP := ⟨
   ihave Hr2 := fileRef_intro γ kk q.half st C nx $$ [He2 Hf2 Hp2]
   case' _ => iframe
   -- the slot back, one longer
-  ihave Hfdn := (show fdSlot (GF := GF) γ ∗ fdSlots γ (s ++ (id, q) :: t).length ⊢
-      fdSlots γ ((nx, q.half) :: (id, q.half) :: (s ++ t)).length from by
-    rw [hlen, hn]; exact fdSlots_cons γ n) $$ [Hfd Hfdn]
+  ihave Hfdn := (show fdSlot (GF := GF) ∗ fdSlots (s ++ (id, q) :: t).length ⊢
+      fdSlots ((nx, q.half) :: (id, q.half) :: (s ++ t)).length from by
+    rw [hlen, hn]; exact fdSlots_cons n) $$ [Hfd Hfdn]
   case' _ => iframe
-  icases fdSlots_bound γ _ $$ Hfdn with ⟨Hfdn, %hbound⟩
+  icases fdSlots_bound _ $$ Hfdn with ⟨Hfdn, %hbound⟩
   have hlt' : ((nx, q.half) :: (id, q.half) :: (s ++ t)).length < 2 ^ 31 := by
     rw [hlen] at hbound ⊢
     unfold FDSLOTS NPROC NOFILE FDSPARE at hbound

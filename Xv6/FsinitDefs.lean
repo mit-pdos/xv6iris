@@ -174,7 +174,7 @@ end
 /-! ## The buffer's data window, and the `readsb` crossing -/
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF]
 variable [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [CurCtx]
 
 /-- `b->data` is `b + 88`: the address `addi a1,a0,88` at `+0x1a` computes. -/
@@ -232,7 +232,7 @@ end
 /-! ## The boot dirty map, as the pure fact initlog consumes -/
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FsBlocksG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [FsBlocksG GF]
 
 /-- Rocq's `initlog_dirty_all_false`: every covered block's pin half is
 `false`, so the authority says so too. -/

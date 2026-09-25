@@ -47,7 +47,7 @@ theorem bm_cells_restore_dir (bm : Blkmap) (j : Nat) (hlen : bm.bmDir.length = N
   exact List.set_getElem_self hlt
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [CurCtx]
 
 set_option maxHeartbeats 16000000 in
@@ -74,8 +74,8 @@ theorem bm_direct_ok (c cpu : CPU) (k : KCtx) (spie spp : Bool) (R : RegMap)
     (∀ v : BitVec 32, wordPointsTo (iAddr ip fbn) 4 (DFrac.own 1) v -∗
       inodeAddrs ip ((bmCells bm).set fbn v)) ∗
     indBlkQ γfs dq bm ∗ inodeBlocksQ γfs dq bm data ∗
-    bslot γb ∗ bmAllocRes γfs cov logstart a ∗ logCtx a.baLog γb γfs cov logstart dev ∗
-    bslots γb 2 ∗ logOpS a.baLog (if cr then u2 + 1 else u2) (blk.toNat :: a.baBms :: Sb) ∗
+    bslot ∗ bmAllocRes γfs cov logstart a ∗ logCtx a.baLog γb γfs cov logstart dev ∗
+    bslots 2 ∗ logOpS a.baLog (if cr then u2 + 1 else u2) (blk.toNat :: a.baBms :: Sb) ∗
     fsblock γfs.bytes blk.toNat (List.replicate BSIZE 0#8) ∗
     bmCont k cpu γb γfs cov logstart dev (some a) ip bm data fbn n cr Sb pidv dqp dq dqd
     ⊢ wpLoop (GF := GF) c := by
@@ -166,7 +166,7 @@ theorem bm_direct_alloc (BA : BALLOC) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF
     (∀ v : BitVec 32, wordPointsTo (iAddr ip fbn) 4 (DFrac.own 1) v -∗
       inodeAddrs ip ((bmCells bm).set fbn v)) ∗
     indBlkQ γfs dq bm ∗ inodeBlocksQ γfs dq bm data ∗
-    bslot γb ∗ bmKit (some a) γb γfs V.cov logstart dev n Sb ∗
+    bslot ∗ bmKit (some a) γb γfs V.cov logstart dev n Sb ∗
     bmCont k cpu γb γfs V.cov logstart dev (some a) ip bm data fbn n cr Sb pidv dqp dq dqd
     ⊢ wpLoop (GF := GF) c := by
   have hww : ∀ (K : KCtx) (a b c d : Bool), (K.withSpie a b).withSpie c d = K.withSpie c d :=
@@ -282,7 +282,7 @@ theorem bm_direct (ak : Option BmAlloc)
     trapCsrsExt c k.sie ∗ cpuClaimExt c k.sie k.proc ∗
     wordPointsTo (pPid k.proc) 4 dqp pidv ∗ wordPointsTo (iDev ip) 4 dqd dev ∗
     inodeAddrs ip (bmCells bm) ∗ indBlkQ γfs dq bm ∗ inodeBlocksQ γfs dq bm data ∗
-    bslot γb ∗ bmKit ak γb γfs V.cov logstart dev n Sb ∗
+    bslot ∗ bmKit ak γb γfs V.cov logstart dev n Sb ∗
     bmCont k cpu γb γfs V.cov logstart dev ak ip bm data fbn n cr Sb pidv dqp dq dqd
     ⊢ wpLoop (GF := GF) c := by
   have hK6 : 6 ≤ k.avail := by unfold bmapSlots at hK; omega

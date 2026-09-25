@@ -34,7 +34,7 @@ theorem setkilled_br_ffffffffffffea4e : KA.«setkilled» + 0xffffffffffffea4e#64
 set_option maxHeartbeats 4000000 in
 /-- **`setkilled` meets its specification.** -/
 theorem setkilled_proof (AC : ACQUIRE) (RE : RELEASE) : SETKILLED :=
-  ⟨fun {hlc GF} _ _ X Γ cpu k j hj hp hnoff hK hlk htier => by
+  ⟨fun {hlc GF} _ _ _ _ _ X Γ cpu k j hj hp hnoff hK hlk htier => by
   obtain ⟨ξ0, t0⟩ := X
   letI : CurCtx := ⟨ξ0, t0⟩
   unfold wp_setkilled_body

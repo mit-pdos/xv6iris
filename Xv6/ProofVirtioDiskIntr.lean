@@ -108,7 +108,7 @@ end
 /-! ## The two MMIO instruction rules, with the identity claim supplied -/
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF]
 variable {lent : Bool}
 
 /-- `lw rd, imm(rs1)` from a virtio-mmio register. -/
@@ -156,7 +156,7 @@ end
 /-! ## The three callees, at their entry addresses -/
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [DiskG GF] [CurCtx]
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [DiskG GF] [CurCtx]
 
 /-- `acquire(&disk.vdisk_lock)` at its entry address. -/
 theorem vdis_acquire (AC : ACQUIRE) (c : CPU) (k' : KCtx) (γ : DiskNames) (γl : GName)
@@ -231,7 +231,7 @@ end
 /-! ## The payload, opened around the watermark -/
 
 section pay
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [DiskG GF] [CurCtx]
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [DiskG GF] [CurCtx]
 
 /-- Everything in `Xv6.diskRes` except the handler's watermark, its
 persistent bound and the `disk.used_idx` cell -- the three parts the loop
@@ -408,7 +408,7 @@ theorem vdisPres_call (k : KCtx) (R R' : RegMap) (h : vdisPres k R) (hcs : calle
 /-! ## The exit: `release(&disk.vdisk_lock)` and the epilogue -/
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [DiskG GF] [CurCtx]
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [DiskG GF] [CurCtx]
 
 set_option maxHeartbeats 4000000 in
 theorem vdis_exit (RE : RELEASE) (cpu : CPU) (k : KCtx) (γ : DiskNames) (γl : GName)
@@ -611,7 +611,7 @@ theorem vdis_status_ram (i : Nat) (hi : i < NUM) : inRam (aInfoStatus i) 1 := by
 /-! ## The loop -/
 
 section loop
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [DiskG GF] [CurCtx]
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [DiskG GF] [CurCtx]
 
 /-- The geometry's used-page pointer. -/
 theorem vdis_geom_used (γ : DiskNames) (pd pav pu : PAddr) :
@@ -928,7 +928,7 @@ end loop
 /-! ## The function -/
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [DiskG GF] [CurCtx]
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [DiskG GF] [CurCtx]
 
 theorem vdis_caps_inv (γ : DiskNames) (γl : GName) (pd pav pu : BitVec 64) :
     diskCaps (GF := GF) γ γl pd pav pu ⊢ diskInv γ := by
@@ -945,7 +945,7 @@ set_option maxHeartbeats 4000000 in
 and `wakeup`. -/
 theorem virtio_disk_intr_proof
     (AC : ACQUIRE) (RE : RELEASE) (WK : WAKEUP) : VIRTIO_DISK_INTR :=
-  ⟨fun {hlc GF} _ _ _ _ Γ cpu k γ γl pd pav pu hsie hnoff hK hlk htier => by
+  ⟨fun {hlc GF} _ _ _ _ _ _ _ Γ cpu k γ γl pd pav pu hsie hnoff hK hlk htier => by
   unfold wp_virtio_disk_intr_body
   simp only [virtioDiskIntrAddr]
   have hK22 : 22 ≤ k.avail := by unfold virtioDiskIntrSlots wakeupSlots at hK; omega

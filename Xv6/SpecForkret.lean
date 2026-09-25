@@ -63,7 +63,7 @@ theorem jumpPc_forkretAddr : jumpPc forkretAddr = forkretAddr := by
 
 /-- **WP of `forkret`** (assumed): the resume wand of a fresh process's
 record. -/
-def wp_forkret_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [CurCtx]
+def wp_forkret_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CurCtx]
     (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
     (cpu : CPU) (R : RegMap) (spie spp intena : Bool) (root : BitVec 44)
     (j : Nat) (ch : BitVec 64) (pid : BitVec 32) (V : ProcPriv) (M : Nat → List (BitVec 8))
@@ -78,7 +78,7 @@ def wp_forkret_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G 
 /-- **The `forkret` boundary** (assumed, like `Xv6.FsEnv`): the user-mode
 return is out of scope. -/
 class ForkretIs : Prop where
-  wp_forkret : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [CurCtx]
+  wp_forkret : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CurCtx]
     (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
     (cpu : CPU) (R : RegMap) (spie spp intena : Bool) (root : BitVec 44)
     (j : Nat) (ch : BitVec 64) (pid : BitVec 32) (V : ProcPriv) (M : Nat → List (BitVec 8))

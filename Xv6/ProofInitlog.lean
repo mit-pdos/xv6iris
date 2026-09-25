@@ -106,7 +106,7 @@ theorem il_ext_sext (w : BitVec 32) : BitVec.extractLsb' 0 32 (BitVec.signExtend
 /-! ## The held buffer -/
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF]
 variable [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [CurCtx]
 
 /-- Open the held buffer at its data bytes (Rocq's `bio_locked` unfold). -/
@@ -191,7 +191,7 @@ theorem il_initlock_call (IL : INITLOCK) (c : CPU) (k' : KCtx)
 end
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF]
 variable [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [CurCtx]
 
 set_option maxHeartbeats 2000000 in
@@ -232,7 +232,7 @@ theorem il_install_trans (IT : INSTALL_TRANS) (Γ : SchedNames) [ClaimIs (hlc :=
     excOwn γfs.exc Xexc ∗
     fsCacheAuth γfs L ∗ fsDirtyAuth γfs D ∗
     ([∗list] i ↦ _w ∈ W, fsChalf γfs (logSlotBno logstart i) (Lw i)) ∗
-    bslots γb 2 ∗
+    bslots 2 ∗
     wpNext true pj c (fun cpu' => iprop(∀ (spie spp : Bool) (R' : RegMap),
       ⌜calleeSaved k'.regs R'⌝ -∗
       kctx cpu' ((k'.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k'.regs 1#5)) -∗
@@ -243,7 +243,7 @@ theorem il_install_trans (IT : INSTALL_TRANS) (Γ : SchedNames) [ClaimIs (hlc :=
       excOwn γfs.exc (excDelMany Xexc (W.map (fun w => w.toNat))) -∗
       fsCacheAuth γfs (itRecL W Lw L) -∗ fsDirtyAuth γfs D -∗
       ([∗list] i ↦ _w ∈ W, fsChalf γfs (logSlotBno logstart i) (Lw i)) -∗
-      bslots γb 2 -∗ wpLoop cpu'))
+      bslots 2 -∗ wpLoop cpu'))
     ⊢ wpLoop (GF := GF) c := by
   subst hpj hs
   have h := IT.wp_install_trans_eb (hlc := hlc) (GF := GF) Γ c k' γl γb V γdl γfs pd pav pu j
@@ -293,7 +293,7 @@ theorem il_write_head (WH : WRITE_HEAD) (Γ : SchedNames) [ClaimIs (hlc := hlc) 
     wordPointsTo (pPid pj) 4 dqp pidv ∗
     wordPointsTo lhNAddr 4 (DFrac.own 1) 0#32 ∗
     fsCacheAuth γfs L ∗ (∃ bsh : List (BitVec 8), fsChalf γfs (logHdrBno logstart) bsh) ∗
-    bslot γb ∗
+    bslot ∗
     wpNext true pj c (fun cpu' => iprop(∀ (spie spp : Bool) (R' : RegMap)
         (bs' : List (BitVec 8)),
       ⌜calleeSaved k'.regs R'⌝ -∗
@@ -302,7 +302,7 @@ theorem il_write_head (WH : WRITE_HEAD) (Γ : SchedNames) [ClaimIs (hlc := hlc) 
       wordPointsTo (pPid pj) 4 dqp pidv -∗
       wordPointsTo lhNAddr 4 (DFrac.own 1) 0#32 -∗
       fsCacheAuth γfs (PartialMap.insert L (logHdrBno logstart) bs') -∗
-      fsChalf γfs (logHdrBno logstart) bs' -∗ bslot γb -∗ wpLoop cpu'))
+      fsChalf γfs (logHdrBno logstart) bs' -∗ bslot -∗ wpLoop cpu'))
     ⊢ wpLoop (GF := GF) c := by
   subst hpj hs
   have h := WH.wp_write_head_eb (hlc := hlc) (GF := GF) Γ c k' γl γb V γdl γfs pd pav pu j
@@ -330,33 +330,33 @@ end
 /-! ## The slot pool, split and rejoined -/
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF]
 variable [BcacheG GF] [DiskG GF] [CurCtx]
 
 /-- The stocked pool: the batch's thirty-two plus `initlog`'s working
 pair. -/
 theorem il_slots_split (γ : BcacheNames) :
-    bslots (GF := GF) γ ((LOGBLOCKS + 2) + 2) ⊢
-      bslot γ ∗ bslot γ ∗ bslots γ (LOGBLOCKS + 2) := by
+    bslots (GF := GF) ((LOGBLOCKS + 2) + 2) ⊢
+      bslot ∗ bslot ∗ bslots (LOGBLOCKS + 2) := by
   have h : (LOGBLOCKS + 2) + 2 = ((LOGBLOCKS + 2) + 1) + 1 := by omega
   rw [h]
   iintro H
-  icases bslots_uncons γ ((LOGBLOCKS + 2) + 1) $$ H with ⟨H1, H2⟩
-  icases bslots_uncons γ (LOGBLOCKS + 2) $$ H2 with ⟨H3, H4⟩
+  icases bslots_uncons ((LOGBLOCKS + 2) + 1) $$ H with ⟨H1, H2⟩
+  icases bslots_uncons (LOGBLOCKS + 2) $$ H2 with ⟨H3, H4⟩
   iframe H1 H3 H4
 
-theorem il_slots_join2 (γ : BcacheNames) : bslot (GF := GF) γ ∗ bslot γ ⊢ bslots γ 2 :=
-  bslots_cons γ 1
+theorem il_slots_join2 (γ : BcacheNames) : bslot (GF := GF) ∗ bslot ⊢ bslots 2 :=
+  bslots_cons 1
 
-theorem il_slots_split2 (γ : BcacheNames) : bslots (GF := GF) γ 2 ⊢ bslot γ ∗ bslot γ :=
-  bslots_uncons γ 1
+theorem il_slots_split2 (γ : BcacheNames) : bslots (GF := GF) 2 ⊢ bslot ∗ bslot :=
+  bslots_uncons 1
 
 end
 
 /-! ## The constructor's ghost step, the epilogue and the return -/
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF]
 variable [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [CurCtx]
 
 set_option maxHeartbeats 8000000 in
@@ -394,14 +394,14 @@ theorem il_seal (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
     fsChalf γfs (logHdrBno logstart) bsh ∗
     ([∗list] i ∈ List.range LOGBLOCKS, ∃ bs : List (BitVec 8),
        fsChalf γfs (logSlotBno logstart i) bs) ∗
-    bslots γb (LOGBLOCKS + 2) ∗ bslots γb 2 ∗
+    bslots (LOGBLOCKS + 2) ∗ bslots 2 ∗
     (∀ (cpu' : CPU) (spie spp : Bool) (R' : RegMap),
       ⌜calleeSaved k.regs R'⌝ -∗
       kctx cpu' ((k.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k.regs 1#5)) -∗
       trapCsrsExt cpu' k.sie -∗ cpuClaimExt cpu' k.sie k.proc -∗
       wordPointsTo (pPid k.proc) 4 dqp pidv -∗
       wordPointsTo (sb + 20#64) 4 dqs (BitVec.ofNat 32 logstart) -∗
-      bslots γb 2 -∗
+      bslots 2 -∗
       logCtx γ γb γfs V.cov logstart dev -∗ wpLoop cpu')
     ⊢ wpLoop (GF := GF) cpu := by
   iintro ⟨Hk, Hpc, Hte, Hce, Hframe, Hpid, Hsb, #Hfroz, #Hrow, #Hm1, #Hm2, Hfresh, Htok,
@@ -466,7 +466,7 @@ set_option maxHeartbeats 32000000 in
 theorem initlog_proof
     (IL : INITLOCK) (BD : BREAD) (BE : BRELSE) (IT : INSTALL_TRANS) (WH : WRITE_HEAD) :
     INITLOG := ⟨
-  fun {hlc GF} _ _ _ _ _ _ _ _ Γ _ cpu k γ γl γb V γdl γfs pd pav pu j logstart dev sb
+  fun {hlc GF} _ _ _ _ _ _ _ _ _ _ _ Γ _ cpu k γ γl γb V γdl γfs pd pav pu j logstart dev sb
     bsHdr Xv L D vlock vname vcpu vStart vDev vNc vN pidv dqp dqs
     hj hproc hK hnoff htier hgeom hdev hcl hdt ha0 ha1
     hhdrLen hhdrNodup hhdrHome hxslot hpinned hpd => by
@@ -504,7 +504,7 @@ theorem initlog_proof
       trapCsrsExt c k.sie -∗ cpuClaimExt c k.sie k.proc -∗
       wordPointsTo (pPid k.proc) 4 dqp pidv -∗
       wordPointsTo (sb + 20#64) 4 dqs (BitVec.ofNat 32 logstart) -∗
-      bslots γb 2 -∗
+      bslots 2 -∗
       logCtx γ γb γfs V.cov logstart dev -∗ wpLoop c $$ [Hnext]
   · iintro %c
     iapply wpNext_at true k.proc cpu c _ (fun hc => Or.elim hc (fun hx => absurd hx (by decide))

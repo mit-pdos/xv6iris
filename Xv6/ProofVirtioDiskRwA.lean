@@ -53,7 +53,7 @@ theorem vdrw_ret_36 :
 theorem vdrw_bno_addr (b : BitVec 64) : b + 12#64 = aBufBlockno b := rfl
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [DiskG GF] [CurCtx]
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [DiskG GF] [CurCtx]
 
 /-- `acquire(&disk.vdisk_lock)` at its entry address. -/
 theorem vdrw_acquire (AC : ACQUIRE) (c : CPU) (k' : KCtx) (γ : DiskNames) (γl : GName)
@@ -87,7 +87,7 @@ the prologue and the sector arithmetic run at the caller's index
 (`k_step_e`, the complement following the thread); the acquire's arm
 joined with the complement is the bundle the seam carries
 (`armExt_join`), at the `SPIE`/`SPP` the acquire returned with. -/
-theorem vdrw_P1 {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [DiskG GF]
+theorem vdrw_P1 {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [DiskG GF]
     [CurCtx] (AC : ACQUIRE) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
     (cpu : CPU) (k : KCtx) (γ : DiskNames) (γl : GName) (pd pav pu : BitVec 64) (j : Nat)
     (bno dsk0 : BitVec 32) (dataBuf dataDisk : List (BitVec 8))

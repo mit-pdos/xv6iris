@@ -161,7 +161,7 @@ def kfork_filedupAddr : BitVec 64 := KA.«filedup»
 def kfork_idupAddr : BitVec 64 := KA.«idup»
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF]
 
 /-- **The slot a fresh USED process owns**: `allocproc` left it at USED
 with a parked record owed (`procCtxAt`) and the whole hart tag
@@ -320,7 +320,7 @@ into a single `iapply` whose only side goals are the instruction (from the
 kernel text) and the address fold. -/
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF]
 
 /-- One kernel `ld` at interrupts-off; the loaded cell (address `addr`)
 comes back unchanged and `rd := v`. -/
@@ -2201,7 +2201,7 @@ theorem kfork_br_fffffffffffffc5c : KA.«kfork» + 0xfffffffffffffc5c#64 = KA.«
 set_option maxHeartbeats 8000000 in
 theorem kfork_proof (MP : MYPROC) (AC : ACQUIRE) (RE : RELEASE) (AL : ALLOCPROC)
     (UV : UVMCOPY) (FP : FREEPROC) (SS : SAFESTRCPY) : KFORK :=
-  ⟨fun {hlc GF} _ _ X Γ _ _ _ cpu k γw γp γl γk j pid V M
+  ⟨fun {hlc GF} _ _ _ _ _ X Γ _ _ _ cpu k γw γp γl γk j pid V M
       hj hproc hK hnoff htier => by
     obtain ⟨ξ0, t0⟩ := X
     letI : CurCtx := ⟨ξ0, t0⟩

@@ -36,7 +36,7 @@ set_option linter.unusedSimpArgs false
 set_option linter.unusedVariables false
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
   [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF]
   [Appcfg GF] [Fscfg] [Icfg] [CurCtx]
@@ -122,9 +122,9 @@ theorem namexLvlFacts_fail {k : KCtx} {A : NamexArgs} {R R' : RegMap} {o2 ik : N
   exact ⟨h20.trans r20, h2.trans r2, h27.trans r27, hf.hik, hf.hnib, hA, hB, hn, hf.hW, hf.hSb⟩
 
 theorem namex_bslots3_split (γ : BcacheNames) :
-    bslots (GF := GF) γ 3 ⊢ bslot γ ∗ bslots γ 2 := bslots_uncons γ 2
+    bslots (GF := GF) 3 ⊢ bslot ∗ bslots 2 := bslots_uncons 2
 theorem namex_bslots3_join (γ : BcacheNames) :
-    bslot (GF := GF) γ ∗ bslots γ 2 ⊢ bslots γ 3 := bslots_cons γ 2
+    bslot (GF := GF) ∗ bslots 2 ⊢ bslots 3 := bslots_cons 2
 
 theorem namex_br_dl : KA.«namex» + 0xffffffffffffff54#64 = KA.«dirlookup» := namex_br_dirlookup
 
@@ -143,7 +143,7 @@ theorem namex_look (IUP : IUNLOCKPUT) (DL : DIRLOOKUP) (Γ : SchedNames) [ClaimI
     namexEnv (hlc := hlc) Γ A ∗
     namexLk A ik q g lo tl inum dn γil γisl ∗ icLoaded fscFs fscIreg fscCov fscLogst ik inum dn bm ∗
     irefSlots 1 ∗ namexKeep k A ∗ namexPath k A ∗ byteBuf (k.regs 12#5) (DFrac.own 1) (bview 14 nf) ∗
-    bslots fscBio 3 ∗ nlzObs inum.toNat e0 ∗ logOpSe icfgLog ncur Scur e0 ∗
+    bslots 3 ∗ nlzObs inum.toNat e0 ∗ logOpSe icfgLog ncur Scur e0 ∗
     (∀ c' : CPU, namexPostA k A c') ∗ namexLoop k A fuel
     ⊢ wpLoop (GF := GF) cpu := by
   have hK12 := namex_slots_12 _ hs.hK

@@ -122,7 +122,7 @@ theorem dirlink_out_append [Fscfg] [Icfg] (bm bm' : Blkmap) (data data' : Nat �
       · exact Or.inr ⟨h, h0⟩)
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [IregG GF] [IcacheG GF]
   [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF]
   [Appcfg GF] [Fscfg] [Icfg] [CurCtx]
@@ -167,7 +167,7 @@ theorem dirlink_writei (WI : WRITEI) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF 
     bitmapInv fscFs fscBmapstart fscCov fscLogst fscSize ∗
     iregInv (hlc := hlc) fscIreg fscFs icfgIst icfgNib ∗ dinodeAt fscIreg inum dn0 ∗
     byteBuf (k'.regs 12#5) (DFrac.own 1) sbs ∗ wordPointsTo (pPid k'.proc) 4 dqp pidv ∗
-    bslots fscBio 3 ∗ logOpS icfgLog ncount Sb ∗
+    bslots 3 ∗ logOpS icfgLog ncount Sb ∗
     wpNext true k'.proc c (fun cpu' => iprop(∀ (spie spp : Bool) (R' : RegMap)
         (tot : Nat) (bm' : Blkmap) (data' : Nat → List (BitVec 8)) (dn' dn0' : Dinode)
         (n' : Nat) (wrote : Nat → BitVec 8) (dist : Nat) (dstb : Nat → BitVec 8) (P' : UPtd)
@@ -185,7 +185,7 @@ theorem dirlink_writei (WI : WRITEI) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF 
       wordPointsTo sbBmapstartAddr 4 dqb (BitVec.ofNat 32 fscBmapstart) -∗
       dinodeAt fscIreg inum dn0' -∗
       byteBuf (k'.regs 12#5) (DFrac.own 1) sbs -∗ wordPointsTo (pPid k'.proc) 4 dqp pidv -∗
-      bslots fscBio 3 -∗ logOpS icfgLog n' Sb' -∗ wpLoop cpu'))
+      bslots 3 -∗ logOpS icfgLog n' Sb' -∗ wpLoop cpu'))
     ⊢ wpLoop (GF := GF) c := by
   have h := WI.wp_writei_gen_eb (hlc := hlc) (GF := GF) Γ c k' γl pd pav pu j γkl γk ip inum bm
     data dn dn0 false off 16 sbs readiKVp (fun _ => []) ncount Sb pidv dqp (DFrac.own 1) dqd dqn
@@ -227,7 +227,7 @@ theorem dirlink_write (WI : WRITEI) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF �
     dirlinkDe (k.regs 2#5) (direntBytes (deOfName inum (bname 14 fn))) ∗
     trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗
     dirlinkKeep k ip dinum bm data dn dn0 fn pidv dqp dqd dqf dqn dqs dqbs dqb ∗
-    bslots fscBio 3 ∗ irefSlot ∗ dlinks fscFs dinum.toNat dn bm data ∗
+    bslots 3 ∗ irefSlot ∗ dlinks fscFs dinum.toNat dn bm data ∗
     logOpS icfgLog ncount Sb ∗ txPin icfgLog tid qtx ∗
     dirlinkEnv (hlc := hlc) Γ γl pd pav pu γkl γk ∗
     (∀ c' : CPU, dirlinkPost k ip dinum bm data dn dn0 fn inum ncount Sb tid qtx pidv

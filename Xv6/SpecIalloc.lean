@@ -162,7 +162,7 @@ theorem iallocFresh_wf (ty : BitVec 16) : dinodeWf (iallocFresh ty) := rfl
 There is no absorption credit: the logged block is `IBLOCK inum icfgIst` at
 the inum THE SCAN chose, so the spend is unconditional and the set growth
 is determinate. -/
-def wp_ialloc_gen_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
+def wp_ialloc_gen_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
     [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [IregG GF] [IcacheG GF]
     [FsTopG GF] [FsLinkG GF] [IcboxG GF] [IrefslotG GF] [Appcfg GF] [Fscfg] [Icfg] [CurCtx]
     (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
@@ -194,7 +194,7 @@ def wp_ialloc_gen_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv
   iregInv (hlc := hlc) fscIreg fscFs icfgIst icfgNib ∗ iregOpen ∗
   wordPointsTo (pPid k.proc) 4 dqp pidv ∗
   -- TWO slot units: bread's reference is held across log_write
-  bslots fscBio 2 ∗
+  bslots 2 ∗
   -- THE ICACHE, as iget takes it
   isItable2 fscItlock fscIc fscFs fscIreg fscCov fscLogst icfgNib icfgDev ∗
   itableInv (hlc := hlc) ∗
@@ -212,7 +212,7 @@ def wp_ialloc_gen_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv
     wordPointsTo sbNinodes 4 dqn (BitVec.ofNat 32 fscNinodes) -∗
     wordPointsTo sbInodestart 4 dqs (BitVec.ofNat 32 icfgIst) -∗
     wordPointsTo (pPid k.proc) 4 dqp pidv -∗
-    bslots fscBio 2 -∗
+    bslots 2 -∗
     (if alloc then
       -- SUCCESS: iget's postcondition, at the claimed inum
       iprop(⌜R' 10#5 = ientry kslot ∧ kslot < NINODE ∧
@@ -233,7 +233,7 @@ def wp_ialloc_gen_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv
 /-- The eb-generic form of `wp_ialloc_gen_body` (Rocq: `cpu_own 0 eb`, the
 complement `trap_csrs_ext` / `cpu_claim_ext` in and out; depth 0, so no
 spinlock held by `KCtx.wf`). -/
-def wp_ialloc_gen_eb_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
+def wp_ialloc_gen_eb_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
     [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [IregG GF] [IcacheG GF]
     [FsTopG GF] [FsLinkG GF] [IcboxG GF] [IrefslotG GF] [Appcfg GF] [Fscfg] [Icfg] [CurCtx]
     (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
@@ -265,7 +265,7 @@ def wp_ialloc_gen_eb_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] 
   iregInv (hlc := hlc) fscIreg fscFs icfgIst icfgNib ∗ iregOpen ∗
   wordPointsTo (pPid k.proc) 4 dqp pidv ∗
   -- TWO slot units: bread's reference is held across log_write
-  bslots fscBio 2 ∗
+  bslots 2 ∗
   -- THE ICACHE, as iget takes it
   isItable2 fscItlock fscIc fscFs fscIreg fscCov fscLogst icfgNib icfgDev ∗
   itableInv (hlc := hlc) ∗
@@ -283,7 +283,7 @@ def wp_ialloc_gen_eb_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] 
     wordPointsTo sbNinodes 4 dqn (BitVec.ofNat 32 fscNinodes) -∗
     wordPointsTo sbInodestart 4 dqs (BitVec.ofNat 32 icfgIst) -∗
     wordPointsTo (pPid k.proc) 4 dqp pidv -∗
-    bslots fscBio 2 -∗
+    bslots 2 -∗
     (if alloc then
       -- SUCCESS: iget's postcondition, at the claimed inum
       iprop(⌜R' 10#5 = ientry kslot ∧ kslot < NINODE ∧
@@ -303,7 +303,7 @@ def wp_ialloc_gen_eb_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] 
 
 /-- **THE COUNTED CONTRACT** (Rocq's `wp_ialloc_sconf_body`): the set form
 with the op's set forgotten. -/
-def wp_ialloc_sconf_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
+def wp_ialloc_sconf_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
     [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [IregG GF] [IcacheG GF]
     [FsTopG GF] [FsLinkG GF] [IcboxG GF] [IrefslotG GF] [Appcfg GF] [Fscfg] [Icfg] [CurCtx]
     (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
@@ -329,7 +329,7 @@ def wp_ialloc_sconf_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [
   wordPointsTo sbInodestart 4 dqs (BitVec.ofNat 32 icfgIst) ∗
   iregInv (hlc := hlc) fscIreg fscFs icfgIst icfgNib ∗ iregOpen ∗
   wordPointsTo (pPid k.proc) 4 dqp pidv ∗
-  bslots fscBio 2 ∗
+  bslots 2 ∗
   isItable2 fscItlock fscIc fscFs fscIreg fscCov fscLogst icfgNib icfgDev ∗
   itableInv (hlc := hlc) ∗
   irefSlot ∗
@@ -343,7 +343,7 @@ def wp_ialloc_sconf_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [
     wordPointsTo sbNinodes 4 dqn (BitVec.ofNat 32 fscNinodes) -∗
     wordPointsTo sbInodestart 4 dqs (BitVec.ofNat 32 icfgIst) -∗
     wordPointsTo (pPid k.proc) 4 dqp pidv -∗
-    bslots fscBio 2 -∗
+    bslots 2 -∗
     (if alloc then
       iprop(⌜R' 10#5 = ientry kslot ∧ kslot < NINODE ∧
           0 < inum.toNat ∧ inum.toNat < fscNinodes ∧ inum.toNat < 16 * icfgNib ∧
@@ -359,7 +359,7 @@ def wp_ialloc_sconf_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [
 /-- The eb-generic form of `wp_ialloc_sconf_body` (Rocq: `cpu_own 0 eb`, the
 complement `trap_csrs_ext` / `cpu_claim_ext` in and out; depth 0, so no
 spinlock held by `KCtx.wf`). -/
-def wp_ialloc_sconf_eb_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
+def wp_ialloc_sconf_eb_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
     [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [IregG GF] [IcacheG GF]
     [FsTopG GF] [FsLinkG GF] [IcboxG GF] [IrefslotG GF] [Appcfg GF] [Fscfg] [Icfg] [CurCtx]
     (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
@@ -385,7 +385,7 @@ def wp_ialloc_sconf_eb_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF
   wordPointsTo sbInodestart 4 dqs (BitVec.ofNat 32 icfgIst) ∗
   iregInv (hlc := hlc) fscIreg fscFs icfgIst icfgNib ∗ iregOpen ∗
   wordPointsTo (pPid k.proc) 4 dqp pidv ∗
-  bslots fscBio 2 ∗
+  bslots 2 ∗
   isItable2 fscItlock fscIc fscFs fscIreg fscCov fscLogst icfgNib icfgDev ∗
   itableInv (hlc := hlc) ∗
   irefSlot ∗
@@ -399,7 +399,7 @@ def wp_ialloc_sconf_eb_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF
     wordPointsTo sbNinodes 4 dqn (BitVec.ofNat 32 fscNinodes) -∗
     wordPointsTo sbInodestart 4 dqs (BitVec.ofNat 32 icfgIst) -∗
     wordPointsTo (pPid k.proc) 4 dqp pidv -∗
-    bslots fscBio 2 -∗
+    bslots 2 -∗
     (if alloc then
       iprop(⌜R' 10#5 = ientry kslot ∧ kslot < NINODE ∧
           0 < inum.toNat ∧ inum.toNat < fscNinodes ∧ inum.toNat < 16 * icfgNib ∧
@@ -415,7 +415,7 @@ def wp_ialloc_sconf_eb_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF
 /-- The interface of `ialloc` (Rocq's `Module Type IALLOC`, less the derived
 counted form -- deviation 6). -/
 structure IALLOC : Prop where
-  wp_ialloc_gen_eb : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
+  wp_ialloc_gen_eb : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
     [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [IregG GF] [IcacheG GF]
     [FsTopG GF] [FsLinkG GF] [IcboxG GF] [IrefslotG GF] [Appcfg GF] [Fscfg] [Icfg] [CurCtx]
     (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
@@ -429,7 +429,7 @@ structure IALLOC : Prop where
 
 /-- The interrupts-off instance of `wp_ialloc_gen_eb` (the complement is the whole
 bundle): the contract every not-yet-generalized caller states. -/
-theorem IALLOC.wp_ialloc_gen (A : IALLOC) {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
+theorem IALLOC.wp_ialloc_gen (A : IALLOC) {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
     [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [IregG GF] [IcacheG GF]
     [FsTopG GF] [FsLinkG GF] [IcboxG GF] [IrefslotG GF] [Appcfg GF] [Fscfg] [Icfg] [CurCtx]
     (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
@@ -456,7 +456,7 @@ theorem IALLOC.wp_ialloc_gen (A : IALLOC) {hlc : HasLC} {GF : BundledGFunctors} 
 `ProofIalloc.v` exactly so): open the op's set (`Xv6.logOp_openS`), run the
 set form, and close each arm (`Xv6.logOpS_op`). -/
 theorem IALLOC.wp_ialloc_sconf (IA : IALLOC) {hlc : HasLC} {GF : BundledGFunctors}
-    [MachGS hlc GF] [Xv6G GF]
+    [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
     [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [IregG GF] [IcacheG GF]
     [FsTopG GF] [FsLinkG GF] [IcboxG GF] [IrefslotG GF] [Appcfg GF] [Fscfg] [Icfg] [CurCtx]
     (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
@@ -498,7 +498,7 @@ theorem IALLOC.wp_ialloc_sconf (IA : IALLOC) {hlc : HasLC} {GF : BundledGFunctor
     · iapply logOpS_op icfgLog u _ $$ HopS Hltx
 
 theorem IALLOC.wp_ialloc_sconf_eb (IA : IALLOC) {hlc : HasLC} {GF : BundledGFunctors}
-    [MachGS hlc GF] [Xv6G GF]
+    [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
     [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [IregG GF] [IcacheG GF]
     [FsTopG GF] [FsLinkG GF] [IcboxG GF] [IrefslotG GF] [Appcfg GF] [Fscfg] [Icfg] [CurCtx]
     (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]

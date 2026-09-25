@@ -41,7 +41,7 @@ def sleepPrepareSlots : Nat := 14
 /-- **WP of `sleep_prepare`**, at either `SIE`.  `a0` is the channel, which
 must not be `0` (the `panic` arm is dead code); the proc whose lock is taken
 is the running one, `k.proc = &proc[j]`. -/
-def wp_sleep_prepare_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [CurCtx]
+def wp_sleep_prepare_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CurCtx]
     (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
     (cpu : CPU) (k : KCtx) (j : Nat)
     (hj : j < NPROC) (hproc : k.proc = procAddr j) (hchan : k.regs 10#5 ≠ 0#64)
@@ -56,7 +56,7 @@ def wp_sleep_prepare_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] 
 
 /-- The interface of `sleep_prepare`. -/
 structure SLEEP_PREPARE : Prop where
-  wp_sleep_prepare : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [CurCtx]
+  wp_sleep_prepare : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CurCtx]
     (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
     (cpu : CPU) (k : KCtx) (j : Nat) hj hproc hchan hnoff hK hlk htier,
     wp_sleep_prepare_body (hlc := hlc) (GF := GF) Γ cpu k j hj hproc hchan hnoff hK hlk htier

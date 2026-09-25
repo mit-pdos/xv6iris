@@ -118,7 +118,7 @@ theorem kx_invDormant_zombie : invDormant ZOMBIE := by decide
 /-! ## The ZOMBIE park's payment -/
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [CurCtx]
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CurCtx]
 
 /-- The dormant block a ZOMBIE park owes, built from the zeroed private block
 and the whole kernel stack (at the explicit context key `parkPay` wants). -/
@@ -255,7 +255,7 @@ theorem kx_pcIs_neg {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF]
     pcIs (GF := GF) cpu (if p then a else b) ⊢ pcIs cpu b := by rw [if_neg h]
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [X : CurCtx]
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [X : CurCtx]
 
 /-- A blocking fs call at entry `entry` (numeric literal `pcnum`), hart
 `c`, context `kk`, at either `SIE`: the complement at a named index `s`
@@ -1015,7 +1015,7 @@ end
 /-! ## The whole function -/
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [X : CurCtx]
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [X : CurCtx]
 
 /-- `&initproc` from `auipc a5,0x8; ld a5,536(a5)` at `0x80002116`. -/
 theorem kx_initproc_addr :
@@ -1033,7 +1033,7 @@ theorem kx_sp48 (sp : BitVec 64) : (sp - 8#64 * BitVec.ofNat 64 6) + 48#64 = sp 
 end
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF]
 
 theorem kexit_br_fffffffffffff88a : KA.«kexit» + 0xfffffffffffff88a#64 = KA.«myproc» := by decide
 
@@ -1047,7 +1047,7 @@ index with the complement following the thread (`k_step_e`); see
 `kx_rest` for the join at `acquire(&wait_lock)`. -/
 theorem kexit_proof (MP : MYPROC) (AC : ACQUIRE) (RE : RELEASE) (RP : REPARENT) (WU : WAKEUP)
     (SC : SCHED) : KEXIT :=
-  ⟨fun {hlc GF} _ _ X Γ _ _ cpu k γw j pid V M ip hj hproc hK hnoff htier hinit => by
+  ⟨fun {hlc GF} _ _ _ _ _ X Γ _ _ cpu k γw j pid V M ip hj hproc hK hnoff htier hinit => by
   obtain ⟨ξ0, t0⟩ := X
   letI : CurCtx := ⟨ξ0, t0⟩
   unfold wp_kexit_eb_body

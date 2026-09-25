@@ -78,7 +78,7 @@ def kexitSlots : Nat := 6 + fsSlots
 
 /-- **WP of `kexit`**: no continuation -- the thread parks as a ZOMBIE and
 is never resumed. -/
-def wp_kexit_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [CurCtx]
+def wp_kexit_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CurCtx]
     (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ] [FsEnv]
     (cpu : CPU) (k : KCtx) (γw : GName) (j : Nat) (pid : BitVec 32) (V : ProcPriv)
     (M : Nat → List (BitVec 8)) (ip : BitVec 64)
@@ -94,7 +94,7 @@ def wp_kexit_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF
 
 /-- **WP of `kexit`, at either entry `SIE`** (Rocq `wp_kexit_sconf_body`):
 the complement in, nothing out; depth 0 (so no spinlock held, `KCtx.wf`). -/
-def wp_kexit_eb_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [CurCtx]
+def wp_kexit_eb_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CurCtx]
     (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ] [FsEnv]
     (cpu : CPU) (k : KCtx) (γw : GName) (j : Nat) (pid : BitVec 32) (V : ProcPriv)
     (M : Nat → List (BitVec 8)) (ip : BitVec 64)
@@ -110,7 +110,7 @@ def wp_kexit_eb_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G
 
 /-- The interface of `kexit`. -/
 structure KEXIT : Prop where
-  wp_kexit_eb : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [CurCtx]
+  wp_kexit_eb : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CurCtx]
     (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ] [FsEnv]
     (cpu : CPU) (k : KCtx) (γw : GName) (j : Nat) (pid : BitVec 32) (V : ProcPriv)
     (M : Nat → List (BitVec 8)) (ip : BitVec 64) hj hproc hK hnoff htier hinit,
@@ -119,7 +119,7 @@ structure KEXIT : Prop where
 
 /-- The interrupts-off instance of `wp_kexit_eb` (the complement is the
 whole bundle, the trap reserve is empty). -/
-theorem KEXIT.wp_kexit (A : KEXIT) {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
+theorem KEXIT.wp_kexit (A : KEXIT) {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF]
     [CurCtx] (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ] [FsEnv]
     (cpu : CPU) (k : KCtx) (γw : GName) (j : Nat) (pid : BitVec 32) (V : ProcPriv)
     (M : Nat → List (BitVec 8)) (ip : BitVec 64) hj hproc hK hsie hnoff hlocks htier hinit :

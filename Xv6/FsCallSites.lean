@@ -38,7 +38,7 @@ set_option linter.unusedSectionVars false
 /-! ## `bread` and `brelse` -/
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [CurCtx]
 
 set_option maxHeartbeats 1000000 in
@@ -57,7 +57,7 @@ theorem bread_call (BR : BREAD) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
     kctx c k' ∗ pcIs c KA.«bread» ∗ procsInv Γ ∗
     trapCsrs c ∗ cpuClaim c pj ∗ intrRes c ∗
     bioCtx γl γb V ∗ diskCaps V.gd γdl pd pav pu ∗ panicEnv ∗
-    wordPointsTo (pPid pj) 4 dqp pidv ∗ bslot γb ∗
+    wordPointsTo (pPid pj) 4 dqp pidv ∗ bslot ∗
     wpNext true pj c (fun cpu' => iprop(∀ (spie spp : Bool) (R' : RegMap) (kk : Nat)
         (bs bsd : List (BitVec 8)) (d : Bool),
       ⌜calleeSaved k'.regs R' ∧ R' 10#5 = bnode kk⌝ -∗
@@ -90,7 +90,7 @@ theorem bread_call_eb (BR : BREAD) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ
     kctx c k' ∗ pcIs c KA.«bread» ∗ procsInv Γ ∗
     trapCsrsExt c s ∗ cpuClaimExt c s pj ∗
     bioCtx γl γb V ∗ diskCaps V.gd γdl pd pav pu ∗ panicEnv ∗
-    wordPointsTo (pPid pj) 4 dqp pidv ∗ bslot γb ∗
+    wordPointsTo (pPid pj) 4 dqp pidv ∗ bslot ∗
     wpNext true pj c (fun cpu' => iprop(∀ (spie spp : Bool) (R' : RegMap) (kk : Nat)
         (bs bsd : List (BitVec 8)) (d : Bool),
       ⌜calleeSaved k'.regs R' ∧ R' 10#5 = bnode kk⌝ -∗
@@ -122,7 +122,7 @@ theorem brelse_call (BE : BRELSE) (Γ : SchedNames)
       ⌜k'.sie = false → spie = k'.spie ∧ spp = k'.spp⌝ -∗
       kctx cpu' ((k'.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k'.regs 1#5)) -∗
       ⌜calleeSaved k'.regs R'⌝ -∗ wordPointsTo (pPid pj) 4 dqp pidv -∗
-      bslot γb -∗ wpLoop cpu'))
+      bslot -∗ wpLoop cpu'))
     ⊢ wpLoop (GF := GF) c := by
   subst hpj
   have h := BE.wp_brelse (hlc := hlc) (GF := GF) Γ c k' γl γb V kk pidv dev bno dqp bs bsd d
@@ -136,7 +136,7 @@ end
 /-! ## `log_write`, generic form -/
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [CurCtx]
 
 /-- `log_write(b)` at its call site: the whole-block, generic form (the
@@ -153,7 +153,7 @@ theorem log_write_gen_call (LW : LOG_WRITE)
     (hhome : fsHome V.cov logstart b) (hcredit : cr = true → b ∈ Sb) :
     kctx c k' ∗ pcIs c KA.«log_write» ∗
     bioCtx γl γb V ∗ logCtx γ γb γfs V.cov logstart dev ∗
-    bslot γb ∗ logOpS γ (u + 1) Sb ∗ fsblock γfs.bytes b bsl ∗
+    bslot ∗ logOpS γ (u + 1) Sb ∗ fsblock γfs.bytes b bsl ∗
     bufHold0 γb V kk pidv dev bno bs bsd ∗ bioPay γb V kk dev bno bsl bsd d ∗
     wpNext k'.sie k'.proc c (fun cpu' => iprop(∀ (spie spp : Bool) (R' : RegMap),
       ⌜k'.sie = false → spie = k'.spie ∧ spp = k'.spp⌝ -∗
@@ -162,7 +162,7 @@ theorem log_write_gen_call (LW : LOG_WRITE)
       logOpS γ (if cr then u + 1 else u) (b :: Sb) -∗
       fsblock γfs.bytes b bs -∗
       bioLocked γb V kk pidv dev bno bs bsd true -∗
-      bslot γb -∗ wpLoop cpu'))
+      bslot -∗ wpLoop cpu'))
     ⊢ wpLoop (GF := GF) c := by
   subst hb
   have h := LW.wp_log_write_gen (hlc := hlc) (GF := GF) c k' γ γl γb V γfs logstart dev kk pidv
@@ -209,7 +209,7 @@ theorem memset_zero_call (MS : MEMSET) (c : CPU) (k' : KCtx) (olds : List (BitVe
 end
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [CurCtx]
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CurCtx]
 
 set_option maxHeartbeats 1000000 in
 /-- `printk(msg)` with no varargs: the credentials are `panicEnv`'s, the

@@ -45,7 +45,7 @@ theorem namei_root_slots_namex (a : Nat) (h : nameiRootSlots ≤ a) : namexRootS
   unfold nameiRootSlots at h; omega
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
   [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF] [FsTopG GF] [FsLinkG GF] [IcboxG GF]
   [SleepLockG GF] [IrefslotG GF] [Appcfg GF] [Fscfg] [Icfg] [CurCtx]
 

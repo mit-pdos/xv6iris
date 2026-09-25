@@ -44,7 +44,7 @@ theorem sysx_sp4 (x : BitVec 64) :
     x - 8#64 * BitVec.ofNat 64 4 = x + 0xFFFFFFFFFFFFFFE0#64 := by bv_decide
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [CurCtx]
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CurCtx]
 
 /-! ## The callees -/
 
@@ -149,7 +149,7 @@ theorem sys_exit_br_fffffffffffff71c : KA.«sys_exit» + 0xfffffffffffff71c#64 =
 set_option maxHeartbeats 64000000 in
 set_option maxRecDepth 20000 in
 theorem sys_exit_proof (AI : ARGINT) (KX : KEXIT) : SYSEXIT := ⟨
-  fun {hlc GF} _ _ X Γ _ _ cpu k γw j pid V M ip v hj hproc hv hK hnoff htier hinit => by
+  fun {hlc GF} _ _ _ _ _ X Γ _ _ cpu k γw j pid V M ip v hj hproc hv hK hnoff htier hinit => by
   obtain ⟨ξ0, t0⟩ := X
   letI : CurCtx := ⟨ξ0, t0⟩
   unfold wp_sys_exit_eb_body

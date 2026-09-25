@@ -230,7 +230,7 @@ theorem waitInv_range_acc {GF : BundledGFunctors} {A : Type} (n k : Nat) (hk : k
   iapply H $$ %(fun _ i => Φ' a i) Hbox HΦ'
 
 section WaitInv
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [WchG GF] [CtokG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [WchG GF] [CtokG GF]
 
 /-- every proc's `parent` cell, at context `ξ` (Rocq `parents_own_at`;
 deviation 1: it IS `WaitLock.waitResAt`). -/

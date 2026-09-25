@@ -34,7 +34,7 @@ def clockintrAddr : BitVec 64 := KA.«clockintr»
 def clockintrSlots : Nat := 2 + wakeupSlots
 
 /-- **WP of `clockintr`.** -/
-def wp_clockintr_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [CurCtx]
+def wp_clockintr_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CurCtx]
     (Γ : SchedNames) (cpu : CPU) (k : KCtx) (γt : GName)
     (hsie : k.sie = false) (hnoff : k.noff + 2 < 2 ^ 31) (hK : clockintrSlots ≤ k.avail)
     (hlk : "time" ∉ k.locks ∧ "proc" ∉ k.locks) (htier : k.tier = KTier.kpt) : Prop :=
@@ -45,7 +45,7 @@ def wp_clockintr_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6
 
 /-- The interface of `clockintr`. -/
 structure CLOCKINTR : Prop where
-  wp_clockintr : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [CurCtx]
+  wp_clockintr : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CurCtx]
     (Γ : SchedNames) (cpu : CPU) (k : KCtx) (γt : GName) hsie hnoff hK hlk htier,
     wp_clockintr_body (hlc := hlc) (GF := GF) Γ cpu k γt hsie hnoff hK hlk htier
 

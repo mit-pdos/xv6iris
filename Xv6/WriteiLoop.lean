@@ -30,7 +30,7 @@ theorem writei_br_bread : KA.«writei» + 0xFFFFFFFFFFFFF49C#64 = KA.«bread» :
 theorem writei_ret_98 : jumpPc (KA.«writei» + 0x98#64) = KA.«writei» + 0x98#64 := by decide
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [IregG GF] [IcacheG GF]
   [FsTopG GF] [FsLinkG GF] [Appcfg GF] [Fscfg] [Icfg] [CurCtx]
 
@@ -65,7 +65,7 @@ theorem writei_iter_bread (IU : IUPDATE) (BR : BREAD) (LW : LOG_WRITE) (BE : BRE
     wiFrameK k ∗ wiEnv Γ A ∗ trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗
     wiCells A ∗ inodeMeta A.ip A.dn ∗ inodeMap fscFs A.ip bm2 ∗ inodeBlocks fscFs bm2 data2 ∗
     dinodeAt fscIreg A.inum A.dn0 ∗ wiSrc A (k.regs 12#5) PI ∗
-    bslots fscBio 3 ∗ logOpS icfgLog (uX + 1) Sb2 ∗ wiContEb k A
+    bslots 3 ∗ logOpS icfgLog (uX + 1) Sb2 ∗ wiContEb k A
     ⊢ wpLoop (GF := GF) cpu := by
   have hww : ∀ (K : KCtx) (a b c d : Bool), (K.withSpie a b).withSpie c d = K.withSpie c d :=
     fun _ _ _ _ _ => rfl
@@ -97,7 +97,7 @@ theorem writei_iter_bread (IU : IUPDATE) (BR : BREAD) (LW : LOG_WRITE) (BE : BRE
   k_step_e (wp_s_jal cpu _ (KA.«writei» + 0x94#64) false 2094088#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [writei_br_bread]
   iintro Hk Hpc
-  icases bslots_uncons fscBio 2 $$ Hsl with ⟨Hsl1, Hslr⟩
+  icases bslots_uncons 2 $$ Hsl with ⟨Hsl1, Hslr⟩
   icases wiSrc_pidAt A (k.regs 12#5) PI k.proc hA.hproc $$ Hsrc with ⟨Hpid, Hsrcb⟩
   iapply (bread_callF_eb BR Γ cpu _ A.γl A.pd A.pav A.pu A.j A.pidv (blkmapGet bm2 fbn) (wiQ A) k.proc
       ?bpj k.sie ?bsie hA.hj ?bproc ?bK ?bnoff ?btier hb31 hhome.1 hA.hpd ?ba0 ?ba1)

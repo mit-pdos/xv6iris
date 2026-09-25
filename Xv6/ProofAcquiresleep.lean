@@ -166,7 +166,7 @@ theorem asl_popExit (kb : KCtx) (s a b : Bool) (hwf : kb.wf) (hs : kb.sie = s) :
   rw [hs] at h; exact h
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [SleepLockG GF] [CurCtx]
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [SleepLockG GF] [CurCtx]
 
 /-! ## The post -/
 
@@ -342,7 +342,7 @@ end
 /-! ## The exit path `(KernelSyms.«acquiresleep» + 0x36)`: take the lock, stamp the pid, release -/
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [SleepLockG GF] [X : CurCtx]
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [SleepLockG GF] [X : CurCtx]
 
 theorem acquiresleep_br_ffffffffffffcc62 : KA.«acquiresleep» + 0xffffffffffffcc62#64 = KA.«release» := by decide
 
@@ -507,7 +507,7 @@ end
 /-! ## The wait loop at `(KernelSyms.«acquiresleep» + 0x1c)` -/
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [SleepLockG GF] [X : CurCtx]
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [SleepLockG GF] [X : CurCtx]
 
 /-- The loop invariant at `0x8000409a`: the inner lock held with its payload
 closed, `s1 = lk`, `s2 = &lk->lk`, the deposit still in hand, and the WHOLE
@@ -776,7 +776,7 @@ complement following the thread); the acquire's arm joined with the
 complement is the loop's bundle (`armExt_join`). -/
 theorem acquiresleep_llb_proof (ACL : ACQUIRE_LLB) (RE : RELEASE) (MP : MYPROC) (SP : SLEEP_PREPARE)
     (SL : SLEEP) : ACQUIRESLEEP_LLB := ⟨
-  fun {hlc GF} _ _ _ X Γ _ c0 k γl γ Rp _ Hd q j pid dqp tl
+  fun {hlc GF} _ _ _ _ _ _ X Γ _ c0 k γl γ Rp _ Hd q j pid dqp tl
       hj hproc hK hnoff htier => by
   have AC : ACQUIRE := ACL.toACQUIRE
   obtain ⟨ξ0, t0⟩ := X
@@ -918,7 +918,7 @@ theorem asl_pushed_spie_nb (k : KCtx) (m : Nat) :
 theorem asl_withSpie_self_nb (k : KCtx) : k.withSpie k.spie k.spp = k := rfl
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [SleepLockG GF] [X : CurCtx]
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [SleepLockG GF] [X : CurCtx]
 
 /-- The non-blocking specification's post, as a λ over the returning hart. -/
 def aslPostNb (k : KCtx) (γ γt : GName) (Rp : CtxId → IProp GF) (q : Qp) (slk : BitVec 64)
@@ -1096,7 +1096,7 @@ set_option maxHeartbeats 32000000 in
 set_option maxRecDepth 20000 in
 /-- **`acquiresleep` meets its non-blocking specification.** -/
 theorem acquiresleep_nb_proof (AC : ACQUIRE) (RE : RELEASE) (MP : MYPROC) : ACQUIRESLEEP_NB := ⟨
-  fun {hlc GF} _ _ _ X cpu k γl γ γt Rp _ q pid dqp hK hsie hnoff hs htier => by
+  fun {hlc GF} _ _ _ _ _ _ X cpu k γl γ γt Rp _ q pid dqp hK hsie hnoff hs htier => by
   obtain ⟨ξ0, t0⟩ := X
   letI : CurCtx := ⟨ξ0, t0⟩
   unfold wp_acquiresleep_nb_body

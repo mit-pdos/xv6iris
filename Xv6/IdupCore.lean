@@ -81,7 +81,7 @@ theorem id_frac_rest (qt qr : Qp) (h : qpSub (1 : Qp).half qt = some qr) :
 theorem id_ent_of_eq {PROP : Type _} [BI PROP] {P Q : PROP} (h : P = Q) : P ⊢ Q := h ▸ .rfl
 
 section IdupCore
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [IcacheG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IcacheG GF]
   [SleepLockG GF] [IcboxG GF] [IrefslotG GF] [FsBlocksG GF] [FsTopG GF] [LogG GF] [IregG GF]
   [FsLinkG GF] [Appcfg GF]
 

@@ -51,7 +51,7 @@ set_option linter.unusedSimpArgs false
 set_option linter.unusedVariables false
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [CurCtx]
 
 theorem rd_ctx_entry (c : CPU) (k : KCtx) (X R : RegMap) :
@@ -109,7 +109,7 @@ theorem rd_clamp_n (BM : BMAP_NOALLOC) (BR : BREAD) (BE : BRELSE) (EC : EITHER_C
     trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗
     wordPointsTo (iDev ip) 4 dqd dev ∗ inodeMeta ip dn ∗
     inodeMapQ γfs dq ip bm ∗ inodeBlocksQ γfs dq bm data ∗
-    rdDst user (k.regs 12#5) j pidv Vp Vp.upt M dqp data olds off 0 ∗ bslot γb ∗
+    rdDst user (k.regs 12#5) j pidv Vp Vp.upt M dqp data olds off 0 ∗ bslot ∗
     wpNext true k.proc c0 (rdPost k γb γfs dev j ip bm data dn user off n olds pidv Vp M dqp dq dqd)
     ⊢ wpLoop (GF := GF) cpu := by
   have hmaxb := rd_maxbytes
@@ -194,7 +194,7 @@ theorem rd_entry (BM : BMAP_NOALLOC) (BR : BREAD) (BE : BRELSE) (EC : EITHER_COP
     isLock γkl kmemLockAddr "kmem" (kmemRes γk) ∗ kallocAvail γk none ∗
     wordPointsTo (iDev ip) 4 dqd dev ∗ inodeMeta ip dn ∗
     inodeMapQ γfs dq ip bm ∗ inodeBlocksQ γfs dq bm data ∗
-    rdDst user (k.regs 12#5) j pidv Vp Vp.upt M dqp data olds off 0 ∗ bslot γb ∗
+    rdDst user (k.regs 12#5) j pidv Vp Vp.upt M dqp data olds off 0 ∗ bslot ∗
     wpNext true k.proc c0 (rdPost k γb γfs dev j ip bm data dn user off n olds pidv Vp M dqp dq dqd)
     ⊢ wpLoop (GF := GF) cpu := by
   have hmaxb := rd_maxbytes
@@ -339,7 +339,7 @@ end
 /-- `readi`'s proof, from its callees' interfaces (Rocq's `ReadiProof`). -/
 theorem readi_proof (BM : BMAP_NOALLOC) (BR : BREAD) (BE : BRELSE) (EC : EITHER_COPYOUT) :
     READI :=
-  ⟨fun {hlc GF} _ _ _ _ _ _ _ _ Γ _ cpu k γl γb V γdl pd pav pu j γfs logstart dev γkl γk ip bm
+  ⟨fun {hlc GF} _ _ _ _ _ _ _ _ _ _ _ Γ _ cpu k γl γb V γdl pd pav pu j γfs logstart dev γkl γk ip bm
     data dn user off n olds pidv Vp M dqp dq dqd hj hproc hK hnoff htier hgeom hwf
     hcov hsz hoff hjoint hdev hcl hdt hpd ha0 huser ha3 ha4 holds =>
   readi_main BM BR BE EC Γ cpu k γl γb V γdl pd pav pu j γfs logstart dev γkl γk ip bm data dn user

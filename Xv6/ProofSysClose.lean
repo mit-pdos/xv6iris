@@ -117,7 +117,7 @@ def scPins (k : KCtx) (R : RegMap) : Prop :=
   R 25#5 = k.regs 25#5 ∧ R 26#5 = k.regs 26#5 ∧ R 27#5 = k.regs 27#5
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
   [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF]
   [Appcfg GF] [FileG GF] [Fscfg] [Icfg] [CurCtx]
@@ -196,7 +196,7 @@ theorem sc_fileclose (FC : FILECLOSE) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF
       kctx cpu' ((k'.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k'.regs 1#5)) -∗
       trapCsrsExt cpu' s -∗ cpuClaimExt cpu' s pj -∗
       wordPointsTo (pPid pj) 4 dqp pidv -∗
-      fdSlot γ -∗ irefSlot -∗ filecloseEnvOut γk on st -∗ wpLoop cpu'))
+      fdSlot -∗ irefSlot -∗ filecloseEnvOut γk on st -∗ wpLoop cpu'))
     ⊢ wpLoop (GF := GF) c := by
   subst hs hpj
   have h := FC.wp_fileclose_eb (hlc := hlc) (GF := GF) Γ c k' γl γ kk q st j γkl γk on pidv dqp
@@ -339,7 +339,7 @@ theorem sys_close_br_fffffffffffffd26 : KA.«sys_close» + 0xfffffffffffffd26#64
 set_option maxHeartbeats 64000000 in
 set_option maxRecDepth 20000 in
 theorem sys_close_proof (AF : ARGFD) (MP : MYPROC) (FC : FILECLOSE) : SYSCLOSE := ⟨
-  fun {hlc GF} _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ X Γ _ cpu k γl γ γd pa pid V M sts v j γkl γk on
+  fun {hlc GF} _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ X Γ _ cpu k γl γ γd pa pid V M sts v j γkl γk on
       hv hproc htier hsp hnoff hK => by
   obtain ⟨ξ0, t0⟩ := X
   letI : CurCtx := ⟨ξ0, t0⟩

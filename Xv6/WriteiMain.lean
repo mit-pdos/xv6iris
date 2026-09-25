@@ -123,7 +123,7 @@ theorem writei_li_m1 : BitVec.signExtend 64 4095#12 = -1#64 := by decide
 theorem writei_lui43 : BitVec.signExtend 64 (0x43#20 ++ 0#12) = BitVec.ofNat 64 274432 := by decide
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [IregG GF] [IcacheG GF]
   [FsTopG GF] [FsLinkG GF] [Appcfg GF] [Fscfg] [Icfg] [CurCtx]
 
@@ -142,7 +142,7 @@ theorem writei_exit_range (cpu : CPU) (k : KCtx) (spie spp : Bool) (R : RegMap) 
       (k.regs 21#5) (k.regs 22#5) (k.regs 23#5) x8 x9 x10 x11 ∗
     trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗
     wiCells A ∗ inodeMeta A.ip A.dn ∗ inodeMap fscFs A.ip A.bm ∗ inodeBlocks fscFs A.bm A.data ∗
-    dinodeAt fscIreg A.inum A.dn0 ∗ wiSrc A (k.regs 12#5) A.V.upt ∗ bslots fscBio 3 ∗
+    dinodeAt fscIreg A.inum A.dn0 ∗ wiSrc A (k.regs 12#5) A.V.upt ∗ bslots 3 ∗
     logOpS icfgLog A.ncount A.Sb ∗ wiContEb k A
     ⊢ wpLoop (GF := GF) cpu := by
   have hK14 : 14 ≤ k.avail := by have := hA.hK; unfold writeiSlots at this; omega
@@ -185,7 +185,7 @@ theorem writei_zero (IU : IUPDATE) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ
       (k.regs 21#5) (k.regs 22#5) (k.regs 23#5) x8 x9 x10 x11 ∗
     wiEnv Γ A ∗ trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗
     wiCells A ∗ inodeMeta A.ip A.dn ∗ inodeMap fscFs A.ip A.bm ∗ inodeBlocks fscFs A.bm A.data ∗
-    dinodeAt fscIreg A.inum A.dn0 ∗ wiSrc A (k.regs 12#5) A.V.upt ∗ bslots fscBio 3 ∗
+    dinodeAt fscIreg A.inum A.dn0 ∗ wiSrc A (k.regs 12#5) A.V.upt ∗ bslots 3 ∗
     logOpS icfgLog A.ncount A.Sb ∗ wiContEb k A
     ⊢ wpLoop (GF := GF) cpu := by
   have hc := hA.hcost
@@ -233,7 +233,7 @@ theorem writei_saves (IU : IUPDATE) (BM : BMAP) (BR : BREAD) (LW : LOG_WRITE) (B
       (k.regs 21#5) (k.regs 22#5) (k.regs 23#5) w8 w9 w10 w11 ∗
     wiEnv Γ A ∗ trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗
     wiCells A ∗ inodeMeta A.ip A.dn ∗ inodeMap fscFs A.ip A.bm ∗ inodeBlocks fscFs A.bm A.data ∗
-    dinodeAt fscIreg A.inum A.dn0 ∗ wiSrc A (k.regs 12#5) A.V.upt ∗ bslots fscBio 3 ∗
+    dinodeAt fscIreg A.inum A.dn0 ∗ wiSrc A (k.regs 12#5) A.V.upt ∗ bslots 3 ∗
     logOpS icfgLog A.ncount A.Sb ∗ wiContEb k A
     ⊢ wpLoop (GF := GF) cpu := by
   unfold wiSp at hsp

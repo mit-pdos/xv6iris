@@ -51,7 +51,7 @@ def pipewriteAddr : BitVec 64 := KA.«pipewrite»
 def pipewriteSlots : Nat := 64
 
 /-- **WP of `pipewrite`.**  `a0 = pi`, `a1 = addr`, `a2 = n` (an `int`). -/
-def wp_pipewrite_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [CurCtx]
+def wp_pipewrite_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CurCtx]
     (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
     (cpu : CPU) (k : KCtx) (γl : GName) (γp : PipeNames) (w : Bool) (q : Qp)
     (γkl : GName) (γk : KmemNames) (j : Nat) (pid : BitVec 32)
@@ -80,7 +80,7 @@ brings the trap-CSR complement (`trapCsrsExt` / `cpuClaimExt`, `emp` at
 `acquire(&pi->lock)` mints the rest of the bundle its interior `sleep`
 needs.  Depth 0, so no spinlock is held (`KCtx.wf`).  It parks, so the
 crossing is the literal `true`. -/
-def wp_pipewrite_eb_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [CurCtx]
+def wp_pipewrite_eb_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CurCtx]
     (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
     (cpu : CPU) (k : KCtx) (γl : GName) (γp : PipeNames) (w : Bool) (q : Qp)
     (γkl : GName) (γk : KmemNames) (j : Nat) (pid : BitVec 32)
@@ -104,7 +104,7 @@ def wp_pipewrite_eb_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [
 
 /-- The interface of `pipewrite`. -/
 structure PIPEWRITE : Prop where
-  wp_pipewrite_eb : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [CurCtx]
+  wp_pipewrite_eb : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CurCtx]
     (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
     (cpu : CPU) (k : KCtx) (γl : GName) (γp : PipeNames) (w : Bool) (q : Qp)
     (γkl : GName) (γk : KmemNames) (j : Nat) (pid : BitVec 32)
@@ -116,7 +116,7 @@ structure PIPEWRITE : Prop where
 /-- The interrupts-off instance of `wp_pipewrite_eb` (the complement is the
 whole bundle). -/
 theorem PIPEWRITE.wp_pipewrite (A : PIPEWRITE) {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF]
-    [Xv6G GF] [CurCtx]
+    [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CurCtx]
     (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
     (cpu : CPU) (k : KCtx) (γl : GName) (γp : PipeNames) (w : Bool) (q : Qp)
     (γkl : GName) (γk : KmemNames) (j : Nat) (pid : BitVec 32)

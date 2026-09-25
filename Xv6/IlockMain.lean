@@ -31,7 +31,7 @@ set_option linter.unusedVariables false
 set_option maxHeartbeats 16000000 in
 /-- `+0x1a .. +0x1c` and on (Rocq 2587-2860). -/
 theorem il_after (LD : IlLoadEb)
-    {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [BcacheG GF]
+    {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [BcacheG GF]
     [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF] [FsTopG GF]
     [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [Appcfg GF] [Fscfg] [Icfg] [CurCtx]
     (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
@@ -59,7 +59,7 @@ theorem il_after (LD : IlLoadEb)
     frame4s1 (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) (k.regs 9#5) ∗
     wordPointsTo (pPid k.proc) 4 dqp pidv ∗
     wordPointsTo sbInodestart 4 dqs (BitVec.ofNat 32 icfgIst) ∗
-    bslot fscBio ∗
+    bslot ∗
     sleeplockedQ γisl s (iLock (ientry kk)) pidv ∗ icSlp fscIc kk curCtx ∗ ctxFloor curCtx Kt ∗
     inodeIdent kk (DFrac.own s) icfgDev inum ∗ liveGenlo kk s g lo ∗
     reference (icfgBox kk) (some (icfgDev, inum)) mst ∗
@@ -159,7 +159,7 @@ set_option linter.unusedVariables false
 entry's tracked sleeplock over `ic_slp`, the share's `slhTok` slice as the
 deposit). -/
 theorem il_acq (AS : ACQUIRESLEEP_LLB) {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF]
-    [Xv6G GF] [SleepLockG GF] [IcacheG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [Icfg] [CurCtx]
+    [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [SleepLockG GF] [IcacheG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [Icfg] [CurCtx]
     (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
     (c : CPU) (k' : KCtx) (γil γisl : GName) (cn : IcNames) (kk : Nat) (s : Qp) (j : Nat)
     (pidv : BitVec 32) (dqp : DFrac) (tl : Nat) (pj : BitVec 64) (hpj : k'.proc = pj)
@@ -190,7 +190,7 @@ theorem il_acq (AS : ACQUIRESLEEP_LLB) {hlc : HasLC} {GF : BundledGFunctors} [Ma
 set_option maxHeartbeats 16000000 in
 /-- **THE WALK** `+0x00 .. +0x16` and the acquire (Rocq 2242-2586). -/
 theorem il_main (AS : ACQUIRESLEEP_LLB) (LD : IlLoadEb)
-    {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
+    {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF]
     [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
     [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [Appcfg GF]
     [Fscfg] [Icfg] [CurCtx]
@@ -300,7 +300,7 @@ theorem il_main (AS : ACQUIRESLEEP_LLB) (LD : IlLoadEb)
 
 /-- The generic form, from the walk. -/
 theorem ilock_main (AS : ACQUIRESLEEP_LLB) (LD : IlLoadEb) : ILOCK :=
-  ⟨fun {hlc GF} _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ Γ _ cpu k γl pd pav pu j γil γisl kk s g lo tl
+  ⟨fun {hlc GF} _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ Γ _ cpu k γl pd pav pu j γil γisl kk s g lo tl
       d o inum pidv dqp dqs Tl hj hproc hK hnoff htier hshr hrdo hkk hgeom hcov hnib
       hpd ha0 hle =>
     il_main AS LD Γ cpu k γl pd pav pu j γil γisl kk s g lo tl d o inum pidv dqp dqs Tl hj hproc hK

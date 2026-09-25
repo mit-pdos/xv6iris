@@ -47,7 +47,7 @@ def baScanRegs (k : KCtx) (dev : BitVec 32) (kk size bi : Nat) (R : RegMap) : Pr
   R 10#5 = BitVec.signExtend 64 (BitVec.ofNat 32 size)
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [CurCtx]
 
 /-- The resources at a point of the loop body (Rocq's `ba_scan` precondition). -/
@@ -65,7 +65,7 @@ def baScanPreAt (pc : BitVec 64) (Γ : SchedNames) (cpu c0 : CPU) (k : KCtx) (sp
   wordPointsTo (pPid k.proc) 4 dqp pidv ∗
   wordPointsTo sbSizeAddr 4 dqs (BitVec.ofNat 32 size) ∗
   wordPointsTo sbBmapstartAddr 4 dqb (BitVec.ofNat 32 bmapstart) ∗
-  bslot γb ∗ logOpS γ (2 + u) Sb ∗
+  bslot ∗ logOpS γ (2 + u) Sb ∗
   bioLocked γb V kk pidv dev (BitVec.ofNat 32 bmapstart) (bitmapBytes used) bsd d ∗
   baCont k c0 γ γb γfs V.cov logstart bmapstart size u cr Sb pidv dqp dqb dqs
 
@@ -109,7 +109,7 @@ theorem ba_scan_next (BE : BRELSE) (PK : PRINTK)
     wordPointsTo (pPid k.proc) 4 dqp pidv ∗
     wordPointsTo sbSizeAddr 4 dqs (BitVec.ofNat 32 size) ∗
     wordPointsTo sbBmapstartAddr 4 dqb (BitVec.ofNat 32 bmapstart) ∗
-    bslot γb ∗ logOpS γ (2 + u) Sb ∗
+    bslot ∗ logOpS γ (2 + u) Sb ∗
     bioLocked γb V kk pidv dev (BitVec.ofNat 32 bmapstart) (bitmapBytes used) bsd d ∗
     baCont k c0 γ γb γfs V.cov logstart bmapstart size u cr Sb pidv dqp dqb dqs
       ⊢ wpLoop (GF := GF) cpu := by

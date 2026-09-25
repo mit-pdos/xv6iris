@@ -74,7 +74,7 @@ theorem wp_s_lw_iref [CurCtx] [KernelGeom] [KernelImage GF] [Icfg] (cpu : CPU) (
 
 /-- THE LOCK HOLDER's EXACT READ at any `SIE` (Rocq: `wp_lw_au_rel_s_sconf`
 + `iref_read_locked_all`/`_obl`, as ProofIget 1832 applies them). -/
-theorem wp_s_lw_iref_locked [Xv6G GF] [SleepLockG GF] [CurCtx] [KernelGeom] [KernelImage GF] [Icfg]
+theorem wp_s_lw_iref_locked [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [SleepLockG GF] [CurCtx] [KernelGeom] [KernelImage GF] [Icfg]
     (cpu : CPU) (k : KCtx)
     (pc : BitVec 64) (is_rvc : Bool) (imm : BitVec 12) (rd rs1 : BitVec 5) (hrs1 : rs1 ≠ 4#5)
     (hrd : rdOk rd) (i : Nat) (hi : i < NINODE)

@@ -29,7 +29,7 @@ def consoleintrAddr : BitVec 64 := KA.«consoleintr»
 def consoleintrSlots : Nat := 26
 
 /-- **WP of `consoleintr`.**  The byte in `a0`. -/
-def wp_consoleintr_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [CurCtx]
+def wp_consoleintr_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CurCtx]
     (Γ : SchedNames) (cpu : CPU) (k : KCtx) (γc γl : GName) (γ : UartNames) (bs : List (BitVec 8))
     (hsie : k.sie = false) (hnoff : k.noff + 2 < 2 ^ 31) (hK : consoleintrSlots ≤ k.avail)
     (hlk : "cons" ∉ k.locks ∧ "proc" ∉ k.locks ∧ "uart0" ∉ k.locks)
@@ -43,7 +43,7 @@ def wp_consoleintr_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [X
 
 /-- The interface of `consoleintr`. -/
 structure CONSOLEINTR : Prop where
-  wp_consoleintr : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [CurCtx]
+  wp_consoleintr : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CurCtx]
     (Γ : SchedNames) (cpu : CPU) (k : KCtx) (γc γl : GName) (γ : UartNames) (bs : List (BitVec 8))
     hsie hnoff hK hlk htier,
     wp_consoleintr_body (hlc := hlc) (GF := GF) Γ cpu k γc γl γ bs hsie hnoff hK hlk htier

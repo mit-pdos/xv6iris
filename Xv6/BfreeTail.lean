@@ -45,7 +45,7 @@ set_option maxHeartbeats 16000000 in
 cleared bitmap `bitmapBytes (used \ {bi})` and its payload still at
 `bitmapBytes used`. -/
 theorem bf_tail (LW : LOG_WRITE) (BE : BRELSE)
-    {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
+    {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF]
     [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [CurCtx]
     (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
     (c0 cpu : CPU) (k : KCtx) (spie1 spp1 : Bool) (R : RegMap)
@@ -71,7 +71,7 @@ theorem bf_tail (LW : LOG_WRITE) (BE : BRELSE)
     wordPointsTo (pPid k.proc) 4 dqp pidv ∗
     wordPointsTo sbBmapstartAddr 4 dqb (BitVec.ofNat 32 bmapstart) ∗
     bitmapInv γfs bmapstart V.cov logstart size ∗ freeBlk γfs bi ∗
-    bslot γb ∗ logCredit γ cr Sb e0 bmapstart ∗ logOpSe γ (u + 1) Sb e0 ∗
+    bslot ∗ logCredit γ cr Sb e0 bmapstart ∗ logOpSe γ (u + 1) Sb e0 ∗
     bufHold0 γb V kk pidv dev bnoB (bitmapBytes (used \ {bi})) bsd ∗
     bioPay γb V kk dev bnoB (bitmapBytes used) bsd d0 ∗
     frame4s2 (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) (k.regs 9#5) (k.regs 18#5) ∗
@@ -81,7 +81,7 @@ theorem bf_tail (LW : LOG_WRITE) (BE : BRELSE)
       trapCsrsExt cpu' k.sie -∗ cpuClaimExt cpu' k.sie k.proc -∗
       wordPointsTo (pPid k.proc) 4 dqp pidv -∗
       wordPointsTo sbBmapstartAddr 4 dqb (BitVec.ofNat 32 bmapstart) -∗
-      bslots γb 2 -∗
+      bslots 2 -∗
       logOpSe γ (if cr then u + 1 else u) (bmapstart :: Sb) e0 -∗ wpLoop cpu'))
     ⊢ wpLoop (GF := GF) cpu := by
   subst hbnoB

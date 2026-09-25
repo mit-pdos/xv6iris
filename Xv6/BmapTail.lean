@@ -26,7 +26,7 @@ set_option linter.unusedSimpArgs false
 set_option linter.unusedVariables false
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [CurCtx]
 
 set_option maxHeartbeats 4000000 in
@@ -45,7 +45,7 @@ theorem bm_epilogue (c cpu : CPU) (k : KCtx) (spie spp : Bool) (R : RegMap) (rv 
     frame6s3 (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) (k.regs 9#5) (k.regs 18#5) (k.regs 19#5) ∗
     trapCsrsExt c k.sie ∗ cpuClaimExt c k.sie k.proc ∗
     wordPointsTo (pPid k.proc) 4 dqp pidv ∗ wordPointsTo (iDev ip) 4 dqd dev ∗
-    inodeMapQ γfs dq ip bm' ∗ inodeBlocksQ γfs dq bm' data' ∗ bslot γb ∗
+    inodeMapQ γfs dq ip bm' ∗ inodeBlocksQ γfs dq bm' data' ∗ bslot ∗
     bmKit ak γb γfs cov logstart dev n' Sb' ∗
     bmCont k cpu γb γfs cov logstart dev ak ip bm data fbn n cr Sb pidv dqp dq dqd
     ⊢ wpLoop (GF := GF) c := by

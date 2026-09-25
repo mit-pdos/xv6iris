@@ -78,7 +78,7 @@ theorem igScanInv_succ [Icfg] (M : RegMapF (Qp × PosNat)) (ci : RegMapF (BitVec
   · exact h i (by omega) v hv p hp
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [IcacheG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IcacheG GF]
   [LogG GF] [FsBlocksG GF] [IregG GF] [FsTopG GF] [FsLinkG GF] [IcboxG GF] [SleepLockG GF]
   [IrefslotG GF] [Appcfg GF] [Fscfg] [Icfg] [CurCtx]
 

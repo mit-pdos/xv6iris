@@ -49,7 +49,7 @@ def uartwriteAddr : BitVec 64 := KA.«uartwrite»
 def uartwriteSlots : Nat := 8 + sleepSlots
 
 /-- **WP of `uartwrite`.**  `a0` the port index, `a1` the buffer, `a2` the count. -/
-def wp_uartwrite_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [CurCtx]
+def wp_uartwrite_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CurCtx]
     (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
     (cpu : CPU) (k : KCtx) (i : UartId) (γl : GName) (γ : UartNames) (j : Nat)
     (bs cs : List (BitVec 8)) (dq : DFrac) (n : Nat)
@@ -76,7 +76,7 @@ the caller brings the trap-CSR complement (`trapCsrsExt` / `cpuClaimExt`,
 back (nothing sleeps under the lock), so the complement is exactly what the
 interior `sleep` needs.  Depth 0, so no spinlock held (`KCtx.wf`).  It parks,
 so the crossing is the literal `true`. -/
-def wp_uartwrite_eb_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [CurCtx]
+def wp_uartwrite_eb_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CurCtx]
     (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
     (cpu : CPU) (k : KCtx) (i : UartId) (γl : GName) (γ : UartNames) (j : Nat)
     (bs cs : List (BitVec 8)) (dq : DFrac) (n : Nat)
@@ -97,7 +97,7 @@ def wp_uartwrite_eb_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [
 
 /-- The interface of `uartwrite`. -/
 structure UARTWRITE : Prop where
-  wp_uartwrite_eb : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [CurCtx]
+  wp_uartwrite_eb : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CurCtx]
     (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
     (cpu : CPU) (k : KCtx) (i : UartId) (γl : GName) (γ : UartNames) (j : Nat)
     (bs cs : List (BitVec 8)) (dq : DFrac) (n : Nat) hj hproc hK hnoff htier hid hn hn' hcs,
@@ -105,7 +105,7 @@ structure UARTWRITE : Prop where
 
 /-- The interrupts-off instance of `wp_uartwrite_eb` (the complement is the
 whole bundle). -/
-theorem UARTWRITE.wp_uartwrite (A : UARTWRITE) {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
+theorem UARTWRITE.wp_uartwrite (A : UARTWRITE) {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF]
     [CurCtx] (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
     (cpu : CPU) (k : KCtx) (i : UartId) (γl : GName) (γ : UartNames) (j : Nat)
     (bs cs : List (BitVec 8)) (dq : DFrac) (n : Nat) hj hproc hK hsie hnoff hlocks htier hid hn hn' hcs :

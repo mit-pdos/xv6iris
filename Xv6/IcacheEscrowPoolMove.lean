@@ -219,7 +219,7 @@ theorem icIds_lookup (ids : List (Bool × BitVec 32 × BitVec 32)) (k : Nat)
 end MovePure
 
 section Move
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [IcacheG GF] [Xv6G GF] [LogG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [IcacheG GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [LogG GF]
   [FsBlocksG GF] [IregG GF] [FsTopG GF] [FsLinkG GF]
 
 /-! ## THE THREE MOVERS

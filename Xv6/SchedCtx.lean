@@ -150,7 +150,7 @@ theorem pContext_inj {j j' : Nat} (hj : j < NPROC) (hj' : j' < NPROC)
   procAddr_inj hj hj' (pContext_addr_cancel _ _ h)
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF]
 
 /-! ## Transport
 
@@ -597,7 +597,7 @@ end
 /-! ## The records and the slot invariant -/
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF]
 
 /-- `&cpus[h].context`. -/
 def cpuCtxAddr (h : CPU) : BitVec 64 := cpuAddr h + 8#64

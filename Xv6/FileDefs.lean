@@ -254,15 +254,15 @@ structure FPNames where
   obox : BoxNames
   ooff : GName
 
-/-- The table's ghosts: the reference map (id ↦ slot, fraction), the fd-slot
-tokens, and one payload-names variable per slot. -/
+/-- The table's ghosts: the reference map (id ↦ slot, fraction) and one
+payload-names variable per slot.  (The fd-slot tokens are at the CANONICAL
+name `FdslotG.fdslotName`, `Xv6/SlotSupply.lean`, as Rocq's `fdslot_name`.) -/
 structure FileNames where
   ref : GName
-  fd : GName
   pay : Nat → GName
 
 /-- The ghost libraries the file table uses (Rocq's `fileG`/`fdslotG`).  The
-fd-slot tokens (`FileNames.fd`) use the SHARED `Xv6G.gmUnitG`; the inode
+fd-slot tokens (`FdslotG.fdslotName`) use the SHARED `Xv6G.gmUnitG`; the inode
 arm's cancellable invariant the shared `Xv6G.cinvG`. -/
 class FileG (GF : BundledGFunctors) where
   [gmRefG : GhostMapG GF Nat (Nat × Qp) RegMapF]
@@ -280,7 +280,7 @@ invariants. -/
 def fileipN : Namespace := ndot nroot "fileip"
 
 section InodeCore
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [IcacheG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [IcacheG GF]
   [SleepLockG GF] [IcboxG GF]
 
 /-- What `inodePay`'s cancellable invariant parks (Rocq `inode_core`): the
@@ -299,7 +299,7 @@ instance inodeCore_timeless [Icfg] (v : BitVec 64) (Q : Qp) (inum : BitVec 32) :
 end InodeCore
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FileG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [FileG GF]
   [IcacheG GF] [SleepLockG GF] [IcboxG GF] [IrefslotG GF] [OffboxG GF] [OffboxBoxG GF]
   [Icfg] [CurCtx]
 
@@ -329,15 +329,6 @@ def frefTok (γ : FileNames) (k : Nat) (q : Qp) : IProp GF := iprop%
 /-- The lock's half of one outstanding reference. -/
 def frefRest (γ : FileNames) (k : Nat) (e : Nat × Qp) : IProp GF :=
   γ.ref ↪◯MAP[e.1]{.own (1 : Qp).half} (k, e.2)
-
-/-! ## The fd-slot supply -/
-
-/-- `n` units: `n` distinct fd-slot tokens, all minted at boot with keys
-below `FDSLOTS` (FdSlots.v's `fd_slots n`; the bound rides the tokens). -/
-def fdSlots (γ : FileNames) (n : Nat) : IProp GF := iprop%
-  ∃ l : List Nat, ⌜l.length = n ∧ l.Nodup ∧ ∀ i ∈ l, i < FDSLOTS⌝ ∗ [∗list] i ∈ l, γ.fd ↪◯MAP[i] ()
-
-def fdSlot (γ : FileNames) : IProp GF := fdSlots γ 1
 
 /-! ## The payload: what a file is a reference TO -/
 
@@ -489,7 +480,7 @@ def fslotAt (γ : FileNames) (ξ : CtxId) (k : Nat) (L : List (Nat × Qp)) : IPr
   ∃ (C : FContent) (pn : FPNames) (q' : Qp),
     ⌜(L.map Prod.fst).Nodup ∧ L.length < 2 ^ 31⌝ ∗
     wordAtN ξ (aFref k) 4 (DFrac.own 1) (BitVec.ofNat 32 L.length) ∗
-    ([∗list] e ∈ L, frefRest γ k e) ∗ fdSlots γ L.length ∗
+    ([∗list] e ∈ L, frefRest γ k e) ∗ fdSlots L.length ∗
     ((⌜L = [] ∧ C.type = FD_NONE⌝ ∗ fileFieldsAt ξ k 1 C ∗ fpayTok γ k 1 pn ∗ fileCore k 1 pn C) ∨
      (⌜L ≠ []⌝ ∗ fileRestAt γ ξ k (qsum L) q' C pn))
 

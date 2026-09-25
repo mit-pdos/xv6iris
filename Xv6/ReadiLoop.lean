@@ -42,7 +42,7 @@ theorem rd_subw_bsize (o : Nat) (h : o < BSIZE) :
   exact e
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [CurCtx]
 
 set_option maxHeartbeats 16000000 in
@@ -164,7 +164,7 @@ theorem rd_chunk (BE : BRELSE) (EC : EITHER_COPYOUT) (Γ : SchedNames)
 end
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [CurCtx]
 
 set_option maxHeartbeats 16000000 in
@@ -194,7 +194,7 @@ theorem rd_head (BM : BMAP_NOALLOC) (BR : BREAD) (BE : BRELSE) (EC : EITHER_COPY
     trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗
     wordPointsTo (iDev ip) 4 dqd dev ∗ inodeMeta ip dn ∗
     inodeMapQ γfs dq ip bm ∗ inodeBlocksQ γfs dq bm data ∗
-    rdDst user (k.regs 12#5) j pidv Vp P Mi dqp data olds off tot ∗ bslot γb ∗
+    rdDst user (k.regs 12#5) j pidv Vp P Mi dqp data olds off tot ∗ bslot ∗
     wpNext true k.proc c0 (rdPost k γb γfs dev j ip bm data dn user off n olds pidv Vp M dqp dq dqd) ∗
     rdLoop c0 k γb γfs dev j ip bm data dn user off n olds pidv Vp M dqp dq dqd N fuel
     ⊢ wpLoop (GF := GF) cpu := by
@@ -313,7 +313,7 @@ theorem rd_head (BM : BMAP_NOALLOC) (BR : BREAD) (BE : BRELSE) (EC : EITHER_COPY
 end
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [CurCtx]
 
 set_option maxHeartbeats 4000000 in

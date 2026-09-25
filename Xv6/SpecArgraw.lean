@@ -36,7 +36,7 @@ def tfArgIdx (i : Nat) : Nat := 14 + i
 /-- argraw's 4-slot frame over `myproc`'s 10. -/
 def argrawSlots : Nat := 14
 
-def wp_argraw_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [CurCtx]
+def wp_argraw_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CurCtx]
     (cpu : CPU) (k : KCtx) (i : Nat) (tfp : BitVec 44) (ws : List (BitVec 64)) (v : BitVec 64) (dqt : DFrac)
     (hi : i < NARG) (ha0 : k.regs 10#5 = BitVec.ofNat 64 i) (hws : ws[tfArgIdx i]? = some v)
     (hnoff : k.noff + 1 < 2 ^ 31) (hK : argrawSlots ≤ k.avail) : Prop :=
@@ -50,7 +50,7 @@ def wp_argraw_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G G
   ⊢ wpLoop (GF := GF) cpu
 
 structure ARGRAW : Prop where
-  wp_argraw : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [CurCtx]
+  wp_argraw : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CurCtx]
     (cpu : CPU) (k : KCtx) (i : Nat) (tfp : BitVec 44) (ws : List (BitVec 64)) (v : BitVec 64) (dqt : DFrac)
     hi ha0 hws hnoff hK,
     wp_argraw_body (hlc := hlc) (GF := GF) cpu k i tfp ws v dqt hi ha0 hws hnoff hK

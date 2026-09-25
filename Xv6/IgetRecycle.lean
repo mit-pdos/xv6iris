@@ -164,7 +164,7 @@ theorem ig_ciwf_insert (M : RegMapF (Qp × PosNat)) (ci : RegMapF (BitVec 32 × 
     · simp only [e1, if_false] at h; exact hdv k p h
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [IcacheG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IcacheG GF]
   [LogG GF] [FsBlocksG GF] [IregG GF] [FsTopG GF] [FsLinkG GF] [IcboxG GF] [SleepLockG GF]
   [IrefslotG GF] [Appcfg GF] [Fscfg] [Icfg] [CurCtx]
 
@@ -281,7 +281,7 @@ theorem ig_ireg_esc (z : Nat) : (↑iregN : CoPset) ## (↑(escAN z) : CoPset) :
     p ⟨h1, nclose_subseteq (ndot nroot "icescA") z p h2⟩
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [IcacheG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IcacheG GF]
   [LogG GF] [FsBlocksG GF] [IregG GF] [FsTopG GF] [FsLinkG GF] [IcboxG GF] [SleepLockG GF]
   [IrefslotG GF] [Appcfg GF] [Fscfg] [Icfg] [CurCtx]
 

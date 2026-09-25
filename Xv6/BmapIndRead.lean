@@ -33,7 +33,7 @@ set_option linter.unusedSimpArgs false
 set_option linter.unusedVariables false
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [CurCtx]
 
 set_option maxHeartbeats 16000000 in
@@ -82,7 +82,7 @@ theorem bm_ind_read (BR : BREAD) (BE : BRELSE) (ak : Option BmAlloc)
     trapCsrsExt c k.sie ∗ cpuClaimExt c k.sie k.proc ∗
     wordPointsTo (pPid k.proc) 4 dqp pidv ∗ wordPointsTo (iDev ip) 4 dqd dev ∗
     inodeAddrs ip (bmCells bmI) ∗ indBlkQ γfs dq bmI ∗ inodeBlocksQ γfs dq bmI data ∗
-    bslot γb ∗ bmKit ak γb γfs V.cov logstart dev nI SbI ∗
+    bslot ∗ bmKit ak γb γfs V.cov logstart dev nI SbI ∗
     bmCont k cpu γb γfs V.cov logstart dev ak ip bm data fbn n cr Sb pidv dqp dq dqd
     ⊢ wpLoop (GF := GF) c := by
   have hww : ∀ (K : KCtx) (a b c d : Bool), (K.withSpie a b).withSpie c d = K.withSpie c d :=

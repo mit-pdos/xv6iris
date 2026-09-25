@@ -40,7 +40,7 @@ set_option maxHeartbeats 16000000 in
 set_option maxRecDepth 20000 in
 theorem sys_pipe_proof (MP : MYPROC) (AA : ARGADDR) (PA : PIPEALLOC) (FD : FDALLOC) (CO : COPYOUT)
     (FC : FILECLOSE) : SYSPIPE := ⟨
-  fun {hlc GF} _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ X Γ _ cpu k γl γ γd pa pid V M sts v γkl γk
+  fun {hlc GF} _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ X Γ _ cpu k γl γ γd pa pid V M sts v γkl γk
       hv hproc htier hnoff hK => by
   obtain ⟨ξ0, t0⟩ := X
   letI : CurCtx := ⟨ξ0, t0⟩

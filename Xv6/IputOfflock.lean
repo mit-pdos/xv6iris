@@ -39,7 +39,7 @@ set_option linter.unusedSimpArgs false
 set_option linter.unusedVariables false
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
   [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF]
   [Appcfg GF] [Fscfg] [Icfg] [CurCtx]
@@ -77,7 +77,7 @@ theorem iput_ofl_body (LW : LOG_WRITE) (BL : BRELSE)
     wordPointsTo (pPid k.proc) 4 dqp pidv ∗
     wordPointsTo sbBmapstartAddr 4 dqb (BitVec.ofNat 32 fscBmapstart) ∗
     wordPointsTo sbInodestart 4 dqs (BitVec.ofNat 32 icfgIst) ∗
-    bslot fscBio ∗ bslot fscBio ∗
+    bslot ∗ bslot ∗
     bioLocked fscBio (fsView fscFs fscDisk icfgDev fscCov) b pidv icfgDev
       (BitVec.ofNat 32 (IBLOCK inum icfgIst)) bs bsd d0 ∗
     logOpSe icfgLog (u + 1) Sb1 e0 ∗ irefSlot ∗
@@ -207,7 +207,7 @@ theorem iput_offlock (BR : BREAD) (LW : LOG_WRITE) (BL : BRELSE)
     wordPointsTo (pPid k.proc) 4 dqp pidv ∗
     wordPointsTo sbBmapstartAddr 4 dqb (BitVec.ofNat 32 fscBmapstart) ∗
     wordPointsTo sbInodestart 4 dqs (BitVec.ofNat 32 icfgIst) ∗
-    bslots fscBio 3 ∗ logOpSe icfgLog (u + 1) Sb1 e0 ∗ irefSlot ∗
+    bslots 3 ∗ logOpSe icfgLog (u + 1) Sb1 e0 ∗ irefSlot ∗
     iputFrame6 (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) (k.regs 9#5) (k.regs 18#5)
       (k.regs 19#5) (k.regs 20#5) ∗
     iputPost k n Sb crb cru crz tid qtx pidv dqp dqb dqs rgb

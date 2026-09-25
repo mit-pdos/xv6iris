@@ -276,7 +276,7 @@ theorem scheduler_setup [CurCtx] (cpu : CPU) (k : KCtx) (hsie : k.sie = false)
 /-! ## The loop invariants -/
 
 section
-variable [Xv6G GF] [CurCtx]
+variable [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CurCtx]
 
 /-- At the loop head `0x80001ed0`, interrupts off at depth 0 with nothing
 held: this hart's own `struct context` save area is free, and the interrupt
@@ -321,7 +321,7 @@ end
 
 /-! ## The interrupt arm of an idle hart -/
 
-theorem sc_sieArm_on [Xv6G GF] [CurCtx] (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ] (cpu : CPU) :
+theorem sc_sieArm_on [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CurCtx] (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ] (cpu : CPU) :
     trapCsrs (GF := GF) cpu ∗ intrRes cpu ⊢ sieArm cpu true 0#64 := by
   unfold sieArm sieArmP intrRes
   simp only [ite_true]
@@ -333,7 +333,7 @@ theorem sc_sieArm_on [Xv6G GF] [CurCtx] (Γ : SchedNames) [ClaimIs (hlc := hlc) 
     iapply procClaim_idle
   · iexact Hir
 
-theorem sc_sieArm_off [Xv6G GF] [CurCtx] (cpu : CPU) (p : BitVec 64) :
+theorem sc_sieArm_off [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CurCtx] (cpu : CPU) (p : BitVec 64) :
     sieArm (GF := GF) cpu true p ⊢ trapCsrs cpu ∗ intrRes cpu := by
   unfold sieArm sieArmP intrRes
   simp only [ite_true]
@@ -351,7 +351,7 @@ theorem scheduler_br_16426 : KA.«scheduler» + 0x16426#64 = KA.«tickslock» :=
 
 theorem scheduler_br_10a26 : KA.«scheduler» + 0x10a26#64 = KA.«proc» := by decide
 
-theorem scheduler_head_step [Xv6G GF] [CurCtx] (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+theorem scheduler_head_step [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CurCtx] (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
     (cpu : CPU) (A : Nat) (hA : kvFrameSlots ≤ A) :
     ▷ scanInv (GF := GF) Γ cpu A 0 ⊢ headInv Γ cpu A := by
   iintro Hscan
@@ -450,7 +450,7 @@ theorem scheduler_br_ffffffffffffeea6 : KA.«scheduler» + 0xffffffffffffeea6#64
 
 set_option maxHeartbeats 4000000 in
 /-- `0x80001e88 .. 0x80001e8e`: `release(&p->lock); p++`. -/
-theorem scheduler_release [Xv6G GF] [CurCtx] (RE : RELEASE) (Γ : SchedNames) (cpu : CPU) (k : KCtx)
+theorem scheduler_release [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CurCtx] (RE : RELEASE) (Γ : SchedNames) (cpu : CPU) (k : KCtx)
     (n : Nat) (hn : n < NPROC) (hsie : k.sie = false) (hnoff : k.noff = 1)
     (hlocks : k.locks = ["proc"]) (htier : k.tier = KTier.kpt) (hintena : k.intena = false)
     (hproc : k.proc = 0#64) (hK : 10 ≤ k.avail) (hregs : scanRegs cpu k.regs n) :
@@ -547,7 +547,7 @@ theorem sc_bcond_end_eq {m : Nat} (h : m = NPROC) :
 
 set_option maxHeartbeats 4000000 in
 /-- The tail of a scan step that is not the last: release and go round. -/
-theorem scheduler_tail_next [Xv6G GF] [CurCtx] (RE : RELEASE) (Γ : SchedNames) (cpu : CPU) (A : Nat)
+theorem scheduler_tail_next [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CurCtx] (RE : RELEASE) (Γ : SchedNames) (cpu : CPU) (A : Nat)
     (hA : 10 ≤ A) (n : Nat) (hn : n < NPROC) (hn1 : n + 1 < NPROC) :
     procsInv (GF := GF) Γ ∗ scanInv Γ cpu A (n + 1) ⊢ tailInv Γ cpu A n := by
   iintro ⟨#Hpinv, Hscan⟩
@@ -572,7 +572,7 @@ theorem scheduler_tail_next [Xv6G GF] [CurCtx] (RE : RELEASE) (Γ : SchedNames) 
 set_option maxHeartbeats 4000000 in
 /-- The tail of the last scan step: release, then the `wfi` when nothing was
 found, and back to the loop head either way. -/
-theorem scheduler_tail_last [Xv6G GF] [CurCtx] (RE : RELEASE) (Γ : SchedNames) (cpu : CPU) (A : Nat)
+theorem scheduler_tail_last [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CurCtx] (RE : RELEASE) (Γ : SchedNames) (cpu : CPU) (A : Nat)
     (hA : 10 ≤ A) (n : Nat) (hn : n < NPROC) (hn1 : n + 1 = NPROC) :
     procsInv (GF := GF) Γ ∗ headInv Γ cpu A ⊢ tailInv Γ cpu A n := by
   iintro ⟨#Hpinv, Hhead⟩
@@ -669,7 +669,7 @@ RUNNING, publish it in `c->proc`, cross into its record, and on the way back
 clear `c->intena`/`c->proc`, set `found` and rejoin the release. -/
 theorem scheduler_br_664 : KA.«scheduler» + 0x664#64 = KA.«swtch» := by decide
 
-theorem scheduler_dispatch (SW : SWTCH) [Xv6G GF] [X : CurCtx] (Γ : SchedNames) (cpu : CPU) (A : Nat)
+theorem scheduler_dispatch (SW : SWTCH) [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [X : CurCtx] (Γ : SchedNames) (cpu : CPU) (A : Nat)
     (n : Nat) (hn : n < NPROC) :
     tailInv (GF := GF) Γ cpu A n ⊢ dispInv Γ cpu A n := by
   obtain ⟨ξ0, t0⟩ := X
@@ -894,7 +894,7 @@ theorem scheduler_br_ffffffffffffee1e : KA.«scheduler» + 0xffffffffffffee1e#64
 set_option maxHeartbeats 4000000 in
 /-- `0x80001e96 .. 0x80001e9e`: acquire `proc[n]`'s lock and look at its
 state; RUNNABLE dispatches, anything else releases straight away. -/
-theorem scheduler_body (SW : SWTCH) (AC : ACQUIRE) [Xv6G GF] [X : CurCtx] (Γ : SchedNames)
+theorem scheduler_body (SW : SWTCH) (AC : ACQUIRE) [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [X : CurCtx] (Γ : SchedNames)
     (cpu : CPU) (A : Nat) (hA : 10 ≤ A) (n : Nat) (hn : n < NPROC) :
     procsInv (GF := GF) Γ ∗ tailInv Γ cpu A n ⊢ scanInv Γ cpu A n := by
   obtain ⟨ξ0, t0⟩ := X
@@ -1025,7 +1025,7 @@ theorem scheduler_body (SW : SWTCH) (AC : ACQUIRE) [Xv6G GF] [X : CurCtx] (Γ : 
 /-! ## The scan, the loop, and the whole function -/
 
 /-- The scan from slot `n` on, by induction on the slots left. -/
-theorem scheduler_scan (SW : SWTCH) (AC : ACQUIRE) (RE : RELEASE) [Xv6G GF] [CurCtx]
+theorem scheduler_scan (SW : SWTCH) (AC : ACQUIRE) (RE : RELEASE) [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CurCtx]
     (Γ : SchedNames) (cpu : CPU) (A : Nat) (hA : kvFrameSlots + 10 ≤ A) :
     ∀ (m n : Nat), m + n = NPROC → n < NPROC →
       procsInv (GF := GF) Γ ∗ headInv Γ cpu A ⊢ scanInv Γ cpu A n := by
@@ -1053,7 +1053,7 @@ theorem scheduler_scan (SW : SWTCH) (AC : ACQUIRE) (RE : RELEASE) [Xv6G GF] [Cur
       · iexact Hhead
 
 /-- **The loop**, by Löb induction over the head. -/
-theorem scheduler_loop (SW : SWTCH) (AC : ACQUIRE) (RE : RELEASE) [Xv6G GF] [CurCtx]
+theorem scheduler_loop (SW : SWTCH) (AC : ACQUIRE) (RE : RELEASE) [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CurCtx]
     (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ] (cpu : CPU) (A : Nat)
     (hA : kvFrameSlots + 10 ≤ A) :
     procsInv (GF := GF) Γ ⊢ headInv Γ cpu A := by
@@ -1068,7 +1068,7 @@ theorem scheduler_loop (SW : SWTCH) (AC : ACQUIRE) (RE : RELEASE) [Xv6G GF] [Cur
   · iexact IH
 
 /-- This hart's `struct context` save area, at the running context. -/
-theorem sc_cpuCtx_take [Xv6G GF] (ξ0 : CtxId) (cpu : CPU) (k : KCtx) :
+theorem sc_cpuCtx_take [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] (ξ0 : CtxId) (cpu : CPU) (k : KCtx) :
     @kctx hlc GF _ ⟨ξ0, KTier.kpt⟩ _ _ cpu k ∗ cpuCtxFree cpu ⊢
       |==> (@kctx hlc GF _ ⟨ξ0, KTier.kpt⟩ _ _ cpu k ∗
         @ownCtxCells hlc GF _ ⟨ξ0, KTier.kpt⟩ (cpuCtxAddr cpu)) := by
@@ -1090,7 +1090,7 @@ theorem sc_cpuCtx_take [Xv6G GF] (ξ0 : CtxId) (cpu : CPU) (k : KCtx) :
 set_option maxHeartbeats 4000000 in
 /-- **`scheduler` meets its specification.** -/
 theorem scheduler_proof (SW : SWTCH) (AC : ACQUIRE) (RE : RELEASE) : SCHEDULER :=
-  ⟨fun {hlc GF} _ _ X Γ _ cpu k hproc hK hsie hnoff hlocks htier => by
+  ⟨fun {hlc GF} _ _ _ _ _ X Γ _ cpu k hproc hK hsie hnoff hlocks htier => by
   obtain ⟨ξ0, t0⟩ := X
   letI : CurCtx := ⟨ξ0, t0⟩
   unfold wp_scheduler_body

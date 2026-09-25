@@ -126,7 +126,7 @@ def nameiRootSlots : Nat := 4 + namexRootSlots
 theorem nameiRootSlots_eq : nameiRootSlots = 78 := by decide
 
 section Post
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
   [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF]
   [Appcfg GF] [Fscfg] [Icfg] [CurCtx]
@@ -148,7 +148,7 @@ def nameiPost (k : KCtx) (plen : Nat) (pfun : Nat → BitVec 8) (n : Nat) (Sb : 
     wordPointsTo (pPid k.proc) 4 dqp pidv -∗
     wordPointsTo (pCwd k.proc) 8 dqc cwdv -∗ inodeHeldAt cwdv cwi -∗
     byteBuf (k.regs 10#5) dqpv (bview (plen + 1) pfun) -∗
-    bslots fscBio 3 -∗
+    bslots 3 -∗
     -- THE SET ONLY GROWS; THE PAID-BITMAP REPORT; THE PRICED INTERVAL
     ⌜(∀ x ∈ Sb, x ∈ Sb') ∧ (w = true → fscBmapstart ∈ Sb') ∧
       n - (walkSpend w + (if ok then 0 else 1)) ≤ n' ∧ n' ≤ n⌝ -∗
@@ -162,7 +162,7 @@ end Post
 
 /-- **WP of `namei(path = a0)`, the set-form contract at either entry
 `SIE`** (Rocq's `wp_namei_gen_body`). -/
-def wp_namei_gen_eb_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
+def wp_namei_gen_eb_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
     [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
     [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF]
     [Appcfg GF] [Fscfg] [Icfg] [CurCtx]
@@ -204,7 +204,7 @@ def wp_namei_gen_eb_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [
   wordPointsTo (pCwd k.proc) 8 dqc cwdv ∗ inodeHeldAt cwdv cwi ∗
   -- ---- THE PATH, at the caller's fraction (only READ) ----
   byteBuf (k.regs 10#5) dqpv (bview (plen + 1) pfun) ∗
-  bslots fscBio 3 ∗
+  bslots 3 ∗
   irefSlots 2 ∗
   logOpS icfgLog n Sb ∗ logTx icfgLog ∗
   -- THE CROSSING IS THE LITERAL `true`: namei parks (through namex)
@@ -214,7 +214,7 @@ def wp_namei_gen_eb_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [
 /-- The interface of `namei` (Rocq's `Module Type NAMEI`, its `wp_namei_gen`
 field; the counted `wp_namei_sconf` is dropped, see the header). -/
 structure NAMEI : Prop where
-  wp_namei_gen_eb : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
+  wp_namei_gen_eb : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
     [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
     [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF]
     [Appcfg GF] [Fscfg] [Icfg] [CurCtx]
@@ -231,7 +231,7 @@ structure NAMEI : Prop where
 /-- **WP of `namei("/")`, the root corner** (Rocq's `wp_namei_root_body`,
 and -- after SpecNamex's two cleanups -- `SpecNameiRootBoot`'s
 `wp_namei_root_boot_body` too). -/
-def wp_namei_root_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
+def wp_namei_root_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
     [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF] [FsTopG GF] [FsLinkG GF] [IcboxG GF]
     [SleepLockG GF] [IrefslotG GF] [Appcfg GF] [Fscfg] [Icfg] [CurCtx]
     (cpu : CPU) (k : KCtx) (dqp : DFrac)
@@ -257,7 +257,7 @@ def wp_namei_root_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv
 /-- The root corner's interface (Rocq's `Module Type NAMEI_ROOT`, and
 `NAMEI_ROOT_BOOT`'s, see the header). -/
 structure NAMEI_ROOT : Prop where
-  wp_namei_root : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
+  wp_namei_root : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
     [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF] [FsTopG GF] [FsLinkG GF] [IcboxG GF]
     [SleepLockG GF] [IrefslotG GF] [Appcfg GF] [Fscfg] [Icfg] [CurCtx]
     (cpu : CPU) (k : KCtx) (dqp : DFrac) hK hnoff hroot hnib0 hit hpr huart,
@@ -266,7 +266,7 @@ structure NAMEI_ROOT : Prop where
 /-! ## THE CWD BRIDGE -/
 
 section Bridge
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [IcacheG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [IcacheG GF]
   [SleepLockG GF] [IcboxG GF] [Icfg] [CurCtx]
 
 /-- **The cwd-bearing block as namex's / namei's / nameiparent's three

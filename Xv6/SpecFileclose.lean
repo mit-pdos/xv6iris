@@ -15,7 +15,7 @@ clause for clause).
 
 ## THE REFERENCE HALF (Rocq's header, condensed)
 
-A `fileRef γ k q st` goes in, one `fdSlot γ` comes back, and nothing says
+A `fileRef γ k q st` goes in, one `fdSlot` comes back, and nothing says
 which arm ran.  Not the last reference: the departing fraction is absorbed
 into the lock's leftover (`fileRest_absorb`).  The last: the lock's leftover
 makes it the whole slot (`fileRest_join`), which licenses the `ff = *f` read
@@ -109,7 +109,7 @@ theorem filecloseSlots_callees :
   decide
 
 section Env
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
   [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [Appcfg GF]
   [Fscfg] [Icfg] [CurCtx]
@@ -133,10 +133,10 @@ the running process's slot, the scheduler invariant, THE FILE SYSTEM
 holds.  The log reservation is NOT here: begin_op mints it and end_op retires
 it.  The pid cell is not here either (a top-level row of the contract). -/
 def filecloseFsEnv (Γ : SchedNames) (j : Nat) (p : BitVec 64) : IProp GF :=
-  iprop(⌜p = procAddr j⌝ ∗ ⌜j < NPROC⌝ ∗ procsInv Γ ∗ fsReady (hlc := hlc) ∗ bslots fscBio 3)
+  iprop(⌜p = procAddr j⌝ ∗ ⌜j < NPROC⌝ ∗ procsInv Γ ∗ fsReady (hlc := hlc) ∗ bslots 3)
 
 /-- Rocq `fileclose_fs_out`: the slots alone. -/
-def filecloseFsOut : IProp GF := bslots (GF := GF) fscBio 3
+def filecloseFsOut : IProp GF := bslots (GF := GF) 3
 
 /-- **The environment, keyed on the descriptor's STATE** (Rocq
 `fileclose_env`). -/
@@ -302,7 +302,7 @@ end Env
 
 /-- **WP of `fileclose(f = a0)`** (Rocq `wp_fileclose_sconf_body`),
 eb-generic at depth 0 (deviation 1). -/
-def wp_fileclose_eb_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
+def wp_fileclose_eb_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
     [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
     [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF]
     [Appcfg GF] [FileG GF] [Fscfg] [Icfg] [CurCtx]
@@ -327,12 +327,12 @@ def wp_fileclose_eb_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [
     kctx cpu' ((k.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k.regs 1#5)) -∗
     trapCsrsExt cpu' k.sie -∗ cpuClaimExt cpu' k.sie k.proc -∗
     wordPointsTo (pPid k.proc) 4 dqp pidv -∗
-    fdSlot γ -∗ irefSlot -∗ filecloseEnvOut γk on st -∗ wpLoop cpu'))
+    fdSlot -∗ irefSlot -∗ filecloseEnvOut γk on st -∗ wpLoop cpu'))
   ⊢ wpLoop (GF := GF) cpu
 
 /-- The interface of `fileclose` (Rocq `Module Type FILECLOSE`). -/
 structure FILECLOSE : Prop where
-  wp_fileclose_eb : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
+  wp_fileclose_eb : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
     [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
     [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF]
     [Appcfg GF] [FileG GF] [Fscfg] [Icfg] [CurCtx]

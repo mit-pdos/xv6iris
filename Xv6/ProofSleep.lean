@@ -120,7 +120,7 @@ theorem sl_calleeSaved_mk (KR R : RegMap)
       | assumption
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [CurCtx]
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CurCtx]
 
 /-- The lock's share of the mirror plus the claimant's half IS the whole
 variable (at RUNNING, which is claimed). -/
@@ -181,7 +181,7 @@ set_option maxHeartbeats 4000000 in
 contents out at RUNNING, inside the balanced pair's critical section
 (`k.pushOffAt a b`, `k` the entry context at either `SIE`): re-form the
 claim, split it against the complement (`armExt_popArm`), release, return. -/
-theorem sleep_tail (RE : RELEASE) {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
+theorem sleep_tail (RE : RELEASE) {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF]
     [X : CurCtx] (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
     (cpu : CPU) (k : KCtx) (a b : Bool) (j : Nat) (hj : j < NPROC)
     (hwf : k.wf) (hnoff : k.noff = 0) (hlocks : k.locks = [])
@@ -308,7 +308,7 @@ prologue, myproc and the entry acquire run at the caller's index (the
 complement follows the thread, `k_step_e`); the acquire's arm joined with
 the complement is the bundle `sched` needs (`armExt_join`). -/
 theorem sleep_proof (MP : MYPROC) (AC : ACQUIRE) (RE : RELEASE) (SC : SCHED) : SLEEP :=
-  ⟨fun {hlc GF} _ _ X Γ _ cpu k j hj hproc hK hnoff htier => by
+  ⟨fun {hlc GF} _ _ _ _ _ X Γ _ cpu k j hj hproc hK hnoff htier => by
   obtain ⟨ξ0, t0⟩ := X
   letI : CurCtx := ⟨ξ0, t0⟩
   unfold wp_sleep_eb_body

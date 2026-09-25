@@ -47,7 +47,7 @@ set_option maxHeartbeats 16000000 in
 /-- `+0x56 .. +0x62`, the memmove of the thirteen addrs, the slot rebuilt at
 the NEW dinode, and into the tail. -/
 theorem iu_mm (LW : LOG_WRITE) (BE : BRELSE) (MM : MEMMOVE)
-    {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
+    {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF]
     [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [IregG GF]
     [Fscfg] [Icfg] [CurCtx]
     (Γ : SchedNames)
@@ -76,7 +76,7 @@ theorem iu_mm (LW : LOG_WRITE) (BE : BRELSE) (MM : MEMMOVE)
     logCtx icfgLog fscBio fscFs fscCov fscLogst icfgDev ∗
     wordPointsTo (pPid k.proc) 4 dqp pidv ∗
     frame4s2 (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) (k.regs 9#5) (k.regs 18#5) ∗
-    bslot fscBio ∗ logEpochLb icfgLog v ∗
+    bslot ∗ logEpochLb icfgLog v ∗
     logCredit icfgLog cru Sb e0 (IBLOCK inum icfgIst) ∗
     logOpSe icfgLog (u + 1) Sb e0 ∗
     dislotWriteAu inum dn ds e0 Pout ∗
@@ -166,7 +166,7 @@ theorem iu_mm (LW : LOG_WRITE) (BE : BRELSE) (MM : MEMMOVE)
 set_option maxHeartbeats 16000000 in
 /-- `+0x32 .. +0x54`, the five field copies, then `iu_mm`. -/
 theorem iu_copy (LW : LOG_WRITE) (BE : BRELSE) (MM : MEMMOVE)
-    {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
+    {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF]
     [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [IregG GF]
     [Fscfg] [Icfg] [CurCtx]
     (Γ : SchedNames)
@@ -195,7 +195,7 @@ theorem iu_copy (LW : LOG_WRITE) (BE : BRELSE) (MM : MEMMOVE)
     logCtx icfgLog fscBio fscFs fscCov fscLogst icfgDev ∗
     wordPointsTo (pPid k.proc) 4 dqp pidv ∗
     frame4s2 (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) (k.regs 9#5) (k.regs 18#5) ∗
-    bslot fscBio ∗ logEpochLb icfgLog v ∗
+    bslot ∗ logEpochLb icfgLog v ∗
     logCredit icfgLog cru Sb e0 (IBLOCK inum icfgIst) ∗
     logOpSe icfgLog (u + 1) Sb e0 ∗
     dislotWriteAu inum dn ds e0 Pout ∗
@@ -294,7 +294,7 @@ set_option maxHeartbeats 16000000 in
 /-- `+0x24 .. +0x30`: bread's return, THE COUPLING, the slot opened and its
 address computed; then `iu_copy`. -/
 theorem iu_body (LW : LOG_WRITE) (BE : BRELSE) (MM : MEMMOVE)
-    {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
+    {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF]
     [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [IregG GF] [IcacheG GF]
     [FsTopG GF] [FsLinkG GF] [Appcfg GF] [Fscfg] [Icfg] [CurCtx]
     (Γ : SchedNames)
@@ -323,7 +323,7 @@ theorem iu_body (LW : LOG_WRITE) (BE : BRELSE) (MM : MEMMOVE)
     logCtx icfgLog fscBio fscFs fscCov fscLogst icfgDev ∗
     wordPointsTo (pPid k.proc) 4 dqp pidv ∗
     frame4s2 (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) (k.regs 9#5) (k.regs 18#5) ∗
-    bslot fscBio ∗ logEpochLb icfgLog v ∗
+    bslot ∗ logEpochLb icfgLog v ∗
     logCredit icfgLog cru Sb e0 (IBLOCK inum icfgIst) ∗
     logOpSe icfgLog (u + 1) Sb e0 ∗
     iregInv (hlc := hlc) fscIreg fscFs icfgIst icfgNib ∗ dinodeAt fscIreg inum dn0 ∗
@@ -424,7 +424,7 @@ the only difference between the three contracts `Xv6/ProofIupdate.lean`
 seals.  The credit is a RESOURCE against the named epoch `e0`, forwarded
 untouched to `log_write`. -/
 theorem iu_main (BD : BREAD) (LW : LOG_WRITE) (BE : BRELSE) (MM : MEMMOVE)
-    {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
+    {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF]
     [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [IregG GF] [IcacheG GF]
     [FsTopG GF] [FsLinkG GF] [Appcfg GF] [Fscfg] [Icfg] [CurCtx]
     (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
@@ -450,7 +450,7 @@ theorem iu_main (BD : BREAD) (LW : LOG_WRITE) (BE : BRELSE) (MM : MEMMOVE)
     iregInv (hlc := hlc) fscIreg fscFs icfgIst icfgNib ∗ dinodeAt fscIreg inum dn0 ∗
     iuRegionStep inum dn dn0 e0 Pout ∗
     wordPointsTo (pPid k.proc) 4 dqp pidv ∗
-    bslots fscBio 2 ∗
+    bslots 2 ∗
     logEpochLb icfgLog v ∗
     logCredit icfgLog cru Sb e0 (IBLOCK inum icfgIst) ∗
     logOpSe icfgLog (u + 1) Sb e0 ∗

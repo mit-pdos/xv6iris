@@ -56,9 +56,9 @@ def pipeallocSlots : Nat := 6 + filecloseSlots
 
 theorem pipeallocSlots_eq : pipeallocSlots = 94 := by decide
 
-def pipeallocPost {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FileG GF] [IcacheG GF] [SleepLockG GF] [IcboxG GF] [IrefslotG GF] [OffboxG GF] [OffboxBoxG GF] [Icfg] [CurCtx]
+def pipeallocPost {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [FileG GF] [IcacheG GF] [SleepLockG GF] [IcboxG GF] [IrefslotG GF] [OffboxG GF] [OffboxBoxG GF] [Icfg] [CurCtx]
     (γ : FileNames) (γk : KmemNames) (on : Option Nat) (pf0 pf1 r : BitVec 64) : IProp GF := iprop%
-  (⌜r = 0xFFFFFFFFFFFFFFFF#64⌝ ∗ kallocAvail γk on ∗ fdSlot γ ∗ fdSlot γ ∗
+  (⌜r = 0xFFFFFFFFFFFFFFFF#64⌝ ∗ kallocAvail γk on ∗ fdSlot ∗ fdSlot ∗
     (∃ w0 w1 : BitVec 64, wordPointsTo pf0 8 (DFrac.own 1) w0 ∗ wordPointsTo pf1 8 (DFrac.own 1) w1)) ∨
   (⌜r = 0#64⌝ ∗ kallocAvail γk (availDec on) ∗
     ∃ k0 k1 : Nat, ⌜k0 < NFILE ∧ k1 < NFILE⌝ ∗
@@ -70,7 +70,7 @@ eb-generic at depth 0: the trap-CSR complement, the running thread's pid
 cell and fileclose's iref loan are PASS-THROUGHS, in and straight back out
 (the two files the error paths close are untyped, `filecloseEnv_none`, but
 fileclose's crossing is `true` on every arm, so pipealloc's is too). -/
-def wp_pipealloc_eb_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
+def wp_pipealloc_eb_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
     [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
     [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF]
     [Appcfg GF] [FileG GF] [Fscfg] [Icfg] [CurCtx]
@@ -83,7 +83,7 @@ def wp_pipealloc_eb_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [
   trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗
   isFtable γl γ ∗ panicEnv ∗
   isLock γkl kmemLockAddr "kmem" (kmemRes γk) ∗ kallocAvail γk on ∗
-  fdSlot γ ∗ fdSlot γ ∗
+  fdSlot ∗ fdSlot ∗
   wordPointsTo (k.regs 10#5) 8 (DFrac.own 1) v0 ∗ wordPointsTo (k.regs 11#5) 8 (DFrac.own 1) v1 ∗
   wordPointsTo (pPid k.proc) 4 dqp pidv ∗ irefSlot ∗
   wpNext true k.proc cpu (fun cpu' => iprop(∀ (spie spp : Bool) (R' : RegMap),
@@ -99,7 +99,7 @@ ghost classes and `ClaimIs` appear although nothing in the contract mentions
 the file system: fileclose's inode arm needs them (Rocq's header note, the
 same). -/
 structure PIPEALLOC : Prop where
-  wp_pipealloc_eb : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
+  wp_pipealloc_eb : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
     [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
     [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF]
     [Appcfg GF] [FileG GF] [Fscfg] [Icfg] [CurCtx]

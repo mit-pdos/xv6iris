@@ -209,7 +209,7 @@ theorem fda_withRegs_withSpie (k : KCtx) (R : RegMap) (a b : Bool) :
     (k.withRegs R).withSpie a b = (k.withSpie a b).withRegs R := rfl
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FileG GF] [IcacheG GF] [SleepLockG GF] [IcboxG GF] [IrefslotG GF] [OffboxG GF] [OffboxBoxG GF] [Icfg] [CurCtx]
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [FileG GF] [IcacheG GF] [SleepLockG GF] [IcboxG GF] [IrefslotG GF] [OffboxG GF] [OffboxBoxG GF] [Icfg] [CurCtx]
 
 /-! ## The callee -/
 
@@ -505,7 +505,7 @@ theorem fdalloc_br_ffffffffffffcd1e : KA.«fdalloc» + 0xffffffffffffcd1e#64 = K
 
 set_option maxHeartbeats 16000000 in
 theorem fdalloc_proof (MP : MYPROC) : FDALLOC := ⟨
-  fun {hlc GF} _ _ _ _ _ _ _ _ _ _ _ cpu k γ γd kk fs D ha0 hkk hnoff hK => by
+  fun {hlc GF} _ _ _ _ _ _ _ _ _ _ _ _ _ cpu k γ γd kk fs D ha0 hkk hnoff hK => by
   unfold wp_fdalloc_body
   simp only [fdallocAddr]
   iintro ⟨Hk, Hpc, Howe, Hnext⟩

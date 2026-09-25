@@ -120,7 +120,7 @@ theorem create_lic_regen [Icfg] {GF : BundledGFunctors} [IcacheG GF] (ty : BitVe
     iregWdLic (GF := GF) (.claimK ty t q) g1 z ⊢ iregWdLic (.claimK ty t q) g2 z := .rfl
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
   [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF]
   [Appcfg GF] [Fscfg] [Icfg] [CurCtx]
@@ -182,7 +182,7 @@ def createFreshPost (k : KCtx) (R : RegMap) (ty : BitVec 16) (kd : Nat) (dqd : D
     wordPointsTo sbNinodes 4 dqn (BitVec.ofNat 32 fscNinodes) -∗
     wordPointsTo sbInodestart 4 dqs (BitVec.ofNat 32 icfgIst) -∗
     wordPointsTo (pPid k.proc) 4 dqp pidv -∗
-    bslots fscBio 3 -∗
+    bslots 3 -∗
     wordPointsTo (iDev (ientry kd)) 4 dqd icfgDev -∗
     (if alloc then createFreshAlloc pidv ty u Sb t qt qc R' kslot q g lo tl inum γil γisl dn bm c
      else createFreshFail u Sb t qt qc R' c) -∗
@@ -205,7 +205,7 @@ theorem create_ialloc (IA : IALLOC) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF �
     createFreshEnv (hlc := hlc) Γ γl pd pav pu ∗
     wordPointsTo sbNinodes 4 dqn (BitVec.ofNat 32 fscNinodes) ∗
     wordPointsTo sbInodestart 4 dqs (BitVec.ofNat 32 icfgIst) ∗
-    wordPointsTo (pPid k'.proc) 4 dqp pidv ∗ bslots fscBio 2 ∗ irefSlot ∗
+    wordPointsTo (pPid k'.proc) 4 dqp pidv ∗ bslots 2 ∗ irefSlot ∗
     logOpS icfgLog (u + 1) Sb ∗ txPin icfgLog t qc ∗
     (∀ (c : CPU) (spie spp : Bool) (R' : RegMap) (alloc : Bool) (kslot : Nat) (q : Qp)
         (inum : BitVec 32) (dn' : Dinode),
@@ -215,7 +215,7 @@ theorem create_ialloc (IA : IALLOC) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF �
       wordPointsTo sbNinodes 4 dqn (BitVec.ofNat 32 fscNinodes) -∗
       wordPointsTo sbInodestart 4 dqs (BitVec.ofNat 32 icfgIst) -∗
       wordPointsTo (pPid k'.proc) 4 dqp pidv -∗
-      bslots fscBio 2 -∗
+      bslots 2 -∗
       (if alloc then
         iprop(⌜R' 10#5 = ientry kslot ∧ kslot < NINODE ∧
             0 < inum.toNat ∧ inum.toNat < fscNinodes ∧ inum.toNat < 16 * icfgNib ∧
@@ -262,14 +262,14 @@ theorem create_ilock_claim (IL : ILOCK) (Γ : SchedNames) [ClaimIs (hlc := hlc) 
     createFreshEnv (hlc := hlc) Γ γl pd pav pu ∗
     inodeClaimed ty kslot q icfgDev inum t qc ∗ txPin icfgLog t qt ∗
     wordPointsTo sbInodestart 4 dqs (BitVec.ofNat 32 icfgIst) ∗
-    wordPointsTo (pPid k'.proc) 4 dqp pidv ∗ bslot fscBio ∗
+    wordPointsTo (pPid k'.proc) 4 dqp pidv ∗ bslot ∗
     (∀ (c : CPU) (spie spp : Bool) (R' : RegMap) (g : GName) (lo tl : Nat) (γil γisl : GName)
         (dn : Dinode) (bm : Blkmap),
       ⌜calleeSaved k'.regs R' ∧ lo ≤ tl ∧ dn.diType = ty ∧ freshShape dn⌝ -∗
       kctx c ((k'.withSpie spie spp).withRegs R') -∗ pcIs c (jumpPc (k'.regs 1#5)) -∗
       trapCsrsExt c k'.sie -∗ cpuClaimExt c k'.sie k'.proc -∗
       wordPointsTo sbInodestart 4 dqs (BitVec.ofNat 32 icfgIst) -∗
-      wordPointsTo (pPid k'.proc) 4 dqp pidv -∗ bslot fscBio -∗
+      wordPointsTo (pPid k'.proc) 4 dqp pidv -∗ bslot -∗
       isSleeplockGen γil γisl (iLock (ientry kslot)) (icSlp fscIc kslot) (slhTok (icfgIsl kslot)) -∗
       sleeplockedQ γisl q.half (iLock (ientry kslot)) pidv -∗
       credFloor lo tl -∗
@@ -347,7 +347,7 @@ theorem create_fresh_ty (IA : IALLOC) (IL : ILOCK) (Γ : SchedNames) [ClaimIs (h
     createFreshEnv (hlc := hlc) Γ γl pd pav pu ∗
     wordPointsTo sbNinodes 4 dqn (BitVec.ofNat 32 fscNinodes) ∗
     wordPointsTo sbInodestart 4 dqs (BitVec.ofNat 32 icfgIst) ∗
-    wordPointsTo (pPid k.proc) 4 dqp pidv ∗ bslots fscBio 3 ∗ irefSlot ∗
+    wordPointsTo (pPid k.proc) 4 dqp pidv ∗ bslots 3 ∗ irefSlot ∗
     wordPointsTo (iDev (ientry kd)) 4 dqd icfgDev ∗
     txPin icfgLog t qt ∗ txPin icfgLog t qc ∗ logOpS icfgLog (u + 1) Sb ∗
     (∀ c : CPU, createFreshPost k R ty kd dqd u Sb t qt qc pidv dqp dqs dqn c)
@@ -370,7 +370,7 @@ theorem create_fresh_ty (IA : IALLOC) (IL : ILOCK) (Γ : SchedNames) [ClaimIs (h
   k_step_e (wp_s_jal cpu _ (KA.«create» + 0xa8#64) false 2090038#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [create_br_ialloc]
   iintro Hk Hpc
-  icases bslots_uncons fscBio 2 $$ Hbs with ⟨Hb1, Hb2⟩
+  icases bslots_uncons 2 $$ Hbs with ⟨Hb1, Hb2⟩
   iapply (create_ialloc IA Γ cpu _ j γl pd pav pu ty u Sb t qc pidv dqp dqs dqn hj ?gp ?gK ?gn ?gt
       hgeom hblk hn1 hnnib hn31 hty htyk hpd ?ga0 ?ga1)
     $$ [- $Hk $Hpc]
@@ -405,7 +405,7 @@ theorem create_fresh_ty (IA : IALLOC) (IL : ILOCK) (Γ : SchedNames) [ClaimIs (h
     iintro Hk Hpc
     ihave Hk := kctx_eq_mono cpu _ ((k.withSpie spie1 spp1).withRegs (R1.set 19#5 0#64))
       (by kctx_ext) $$ Hk
-    ihave Hbs := bslots_cons fscBio 2 $$ [Hb1 Hb2]
+    ihave Hbs := bslots_cons 2 $$ [Hb1 Hb2]
     · iframe
     ispecialize Hpost $$ %cpu
     unfold createFreshPost createFreshFail
@@ -452,7 +452,7 @@ theorem create_fresh_ty (IA : IALLOC) (IL : ILOCK) (Γ : SchedNames) [ClaimIs (h
     k_norm_g at hcs2
     obtain ⟨f2, f8, f9, f18, f19, f20, f21, f22, f23, f24, f25, f26, f27⟩ := hcs2
     ihave Hk := kctx_eq_mono cpu _ ((k.withSpie spie2 spp2).withRegs R2) (by kctx_ext) $$ Hk
-    ihave Hbs := bslots_cons fscBio 2 $$ [Hb1 Hb2]
+    ihave Hbs := bslots_cons 2 $$ [Hb1 Hb2]
     · iframe
     ispecialize Hpost $$ %cpu
     unfold createFreshPost createFreshAlloc

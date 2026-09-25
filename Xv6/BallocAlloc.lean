@@ -41,7 +41,7 @@ theorem ba_addr_byte (kk q : Nat) :
   unfold aBufData bOffData; bv_omega
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [CurCtx]
 
 set_option maxHeartbeats 16000000 in
@@ -75,7 +75,7 @@ theorem ba_alloc (BR : BREAD) (LW : LOG_WRITE) (BE : BRELSE) (MS : MEMSET)
     wordPointsTo (pPid k.proc) 4 dqp pidv ∗
     wordPointsTo sbSizeAddr 4 dqs (BitVec.ofNat 32 size) ∗
     wordPointsTo sbBmapstartAddr 4 dqb (BitVec.ofNat 32 bmapstart) ∗
-    bslot γb ∗ logOpS γ (2 + u) Sb ∗
+    bslot ∗ logOpS γ (2 + u) Sb ∗
     bioLocked γb V kk pidv dev (BitVec.ofNat 32 bmapstart) (bitmapBytes used) bsd d ∗
     baCont k c0 γ γb γfs V.cov logstart bmapstart size u cr Sb pidv dqp dqb dqs
     ⊢ wpLoop (GF := GF) cpu := by

@@ -327,7 +327,7 @@ theorem kw_zombie_not_needsCtx : ¬ needsCtx ZOMBIE := by decide
 theorem kw_zombie_not_isRunning : ¬ isRunning ZOMBIE := by decide
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [CurCtx]
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CurCtx]
 
 /-- The lock's share of the mirror at ZOMBIE (unclaimed) IS the whole
 variable, as `freeproc`'s `procHeld` demands. -/
@@ -427,7 +427,7 @@ end
 /-! ## `wait_lock`'s payload as a λ (so `ACQUIRE`/`RELEASE` apply) -/
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [CurCtx]
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CurCtx]
 
 theorem kw_wait_pay_elim (ξ : CtxId) :
     waitLockPay (GF := GF) ξ ⊢ ∃ parents, waitResAt ξ parents := by
@@ -451,7 +451,7 @@ end
 /-! ## The `procPrivNoctx` / `procPrivExtNoctx` seam (`copyout`) -/
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [CurCtx]
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CurCtx]
 
 /-- `procPrivNoctx` minus its address space and the `pagetable`/`sz` fields
 `copyout` reads (the ctx-free analogue of `EitherDefs.ecRest`). -/
@@ -503,7 +503,7 @@ end
 /-! ## The callee call-site helpers (interface at the folded entry address) -/
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [CurCtx]
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CurCtx]
 
 set_option maxHeartbeats 1000000 in
 /-- `acquire`'s contract at its entry, for a payload `Rp`. -/
@@ -675,7 +675,7 @@ theorem kw_imm_p80 : BitVec.signExtend 64 80#12 = 8#64 * BitVec.ofNat 64 10 := b
   simp only [BitVec.reduceSignExtend, BitVec.reduceMul]
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [CurCtx]
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CurCtx]
 
 /-- `kwait`'s ten-slot frame at `sp` (`ra`, `s0`, `s1`..`s7`, and the unused
 top slot at `sp - 80`). -/
@@ -877,7 +877,7 @@ theorem kwj_2250 : jumpPc (KA.«kwait» + 0xa6#64) = (KA.«kwait» + 0xa6#64) :=
 theorem kw_neg1_ext : (18446744073709551615#64 : BitVec 64) = BitVec.signExtend 64 (-1#32) := by decide
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [X : CurCtx]
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [X : CurCtx]
 
 set_option maxHeartbeats 1000000 in
 /-- `release` at an explicit lock address `lk`. -/
@@ -900,7 +900,7 @@ theorem kw_rel_at (RE : RELEASE) (c : CPU) (k' : KCtx) (γ : GName) (lk : BitVec
 end
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [X : CurCtx]
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [X : CurCtx]
 
 theorem kwait_br_fffffffffffff36a : KA.«kwait» + 0xfffffffffffff36a#64 = KA.«copyout» := by decide
 
@@ -1563,7 +1563,7 @@ theorem kw_cs_trans {A B C : RegMap} (h1 : calleeSaved A B) (h2 : calleeSaved B 
     h2.2.2.2.2.2.2.2.2.2.2.2.2.trans h1.2.2.2.2.2.2.2.2.2.2.2.2⟩
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [X : CurCtx]
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [X : CurCtx]
 
 theorem kwait_br_ffffffffffffea00 : KA.«kwait» + 0xffffffffffffea00#64 = KA.«acquire» := by decide
 
@@ -2501,7 +2501,7 @@ theorem kwait_br_16008 : KA.«kwait» + 0x16008#64 = KA.«tickslock» := by deci
 
 theorem kwait_proof (MP : MYPROC) (AC : ACQUIRE) (RE : RELEASE) (CO : COPYOUT)
     (FP : FREEPROC) (KL : KILLED) (SP : SLEEP_PREPARE) (SL : SLEEP) : KWAIT :=
-  ⟨fun {hlc GF} _ _ X Γ _ cpu k γw γp γl γk j pid V M hj hproc hK hnoff htier => by
+  ⟨fun {hlc GF} _ _ _ _ _ X Γ _ cpu k γw γp γl γk j pid V M hj hproc hK hnoff htier => by
   unfold wp_kwait_eb_body
   simp only [kwaitAddr]
   iintro ⟨Hk, Hpc, #Hpinv, Hte, Hce, #Hlw, #Hlp, #Hlk, Hav, Hpriv, HΦ⟩

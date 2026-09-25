@@ -78,7 +78,7 @@ theorem dirlink_ctx_entry (c : CPU) (k : KCtx) (R : RegMap) :
 end
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [IregG GF] [IcacheG GF]
   [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF]
   [Appcfg GF] [Fscfg] [Icfg] [CurCtx]
@@ -109,7 +109,7 @@ theorem dirlink_dirlookup (DL : DIRLOOKUP) (Γ : SchedNames) [ClaimIs (hlc := hl
     wordPointsTo (iDev ip) 4 dqd icfgDev ∗ inodeMeta ip dn ∗
     inodeMap fscFs ip bm ∗ inodeBlocks fscFs bm data ∗
     byteBuf (k'.regs 11#5) dqn (bview 14 fn) ∗
-    wordPointsTo (pPid k'.proc) 4 dqp pidv ∗ bslot fscBio ∗
+    wordPointsTo (pPid k'.proc) 4 dqp pidv ∗ bslot ∗
     isItable2 fscItlock fscIc fscFs fscIreg fscCov fscLogst icfgNib icfgDev ∗
     itableInv (hlc := hlc) ∗ iregInv (hlc := hlc) fscIreg fscFs icfgIst icfgNib ∗
     irefSlot ∗ dlinks fscFs dinum.toNat dn bm data ∗ dinodeAt fscIreg dinum dr ∗
@@ -122,7 +122,7 @@ theorem dirlink_dirlookup (DL : DIRLOOKUP) (Γ : SchedNames) [ClaimIs (hlc := hl
       inodeMap fscFs ip bm -∗ inodeBlocks fscFs bm data -∗
       byteBuf (k'.regs 11#5) dqn (bview 14 fn) -∗
       wordPointsTo (pPid k'.proc) 4 dqp pidv -∗
-      bslot fscBio -∗
+      bslot -∗
       dlinks fscFs dinum.toNat dn bm data -∗ dinodeAt fscIreg dinum dr -∗
       (if found then
         iprop(⌜dirFirst data (dirNrec dn.diSize.toNat) (bname 14 fn) = some kk ∧
@@ -245,7 +245,7 @@ theorem dirlink_main (DL : DIRLOOKUP) (RD : READI) (IP : IPUT) (SN : STRNCPY) (W
   k_step_e (wp_s_jal cpu _ (KA.«dirlink» + 0x16#64) false 2096624#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [dirlink_br_dirlookup]
   iintro Hk Hpc
-  icases bslots_uncons fscBio 2 $$ Hbs with ⟨Hb1, Hb2⟩
+  icases bslots_uncons 2 $$ Hbs with ⟨Hb1, Hb2⟩
   iapply (dirlink_dirlookup DL Γ cpu _ γl pd pav pu j γkl γk ip dinum bm data dn dn0 fn pidv dqp
       dqd dqn hj ?gproc ?gK ?gnoff ?gtier htype hgeom hwf hcovs hszb hholes hinums hdisj horph
       hdrnz hdrnl hpd ?ga0 ?ga2)
@@ -272,7 +272,7 @@ theorem dirlink_main (DL : DIRLOOKUP) (RD : READI) (IP : IPUT) (SN : STRNCPY) (W
     refine ⟨?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_⟩ <;>
       simp only [b2, b8, b9, b18, b19, b20, b21, b22, b23, b24, b25, b26, b27, RegMap.set_apply,
         BitVec.reduceEq, ite_false, ite_true, ha0]
-  ihave Hbs := bslots_cons fscBio 2 $$ [Hb1 Hb2]
+  ihave Hbs := bslots_cons 2 $$ [Hb1 Hb2]
   · iframe
   ihave Hkeep : dirlinkKeep k ip dinum bm data dn dn0 fn pidv dqp dqd dqf dqn dqs dqbs dqb
     $$ [Hdev Hin Hmeta Hmap Hblk Hnm Hsi Hss Hsb Hdi Hpid]

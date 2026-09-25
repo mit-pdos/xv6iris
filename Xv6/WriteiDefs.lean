@@ -218,7 +218,7 @@ structure WiSizeOk [Fscfg] (A : WiArgs) (src : BitVec 64) (tot : Nat) (bm' : Blk
 /-! ## The resources -/
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [IregG GF] [IcacheG GF]
   [FsTopG GF] [FsLinkG GF] [Appcfg GF] [Fscfg] [Icfg] [CurCtx]
 
@@ -289,7 +289,7 @@ open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
 open LeanRV64D
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [IregG GF] [IcacheG GF]
   [FsTopG GF] [FsLinkG GF] [Appcfg GF] [Fscfg] [Icfg] [CurCtx]
 
@@ -303,7 +303,7 @@ open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
 open LeanRV64D
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [CurCtx]
 
 set_option maxHeartbeats 1000000 in
@@ -320,7 +320,7 @@ theorem writei_log_writeF [Fscfg] [Icfg] (LW : LOG_WRITE) (c : CPU) (k' : KCtx) 
     kctx c k' ∗ pcIs c KA.«log_write» ∗
     bioCtx γl fscBio (fsView fscFs fscDisk icfgDev fscCov) ∗
     logCtx icfgLog fscBio fscFs fscCov fscLogst icfgDev ∗
-    bslot fscBio ∗ logOpS icfgLog (u + 1) Sb ∗ fsblock fscFs.bytes bno.toNat bsl ∗
+    bslot ∗ logOpS icfgLog (u + 1) Sb ∗ fsblock fscFs.bytes bno.toNat bsl ∗
     bufHold0 fscBio (fsView fscFs fscDisk icfgDev fscCov) kk pidv icfgDev bno bs bsd ∗
     bioPay fscBio (fsView fscFs fscDisk icfgDev fscCov) kk icfgDev bno bsl bsd d ∗
     wpNext k'.sie k'.proc c (fun cpu' => iprop(∀ (spie spp : Bool) (R' : RegMap),
@@ -330,7 +330,7 @@ theorem writei_log_writeF [Fscfg] [Icfg] (LW : LOG_WRITE) (c : CPU) (k' : KCtx) 
       logOpS icfgLog (if cr then u + 1 else u) (bno.toNat :: Sb) -∗
       fsblock fscFs.bytes bno.toNat bs -∗
       bioLocked fscBio (fsView fscFs fscDisk icfgDev fscCov) kk pidv icfgDev bno bs bsd true -∗
-      bslot fscBio -∗ wpLoop cpu'))
+      bslot -∗ wpLoop cpu'))
     ⊢ wpLoop (GF := GF) c :=
   log_write_gen_call LW c k' icfgLog γl fscBio (fsView fscFs fscDisk icfgDev fscCov) fscFs fscLogst
     icfgDev kk pidv bno bno.toNat rfl bs bsl bsd d u cr Sb hK hnoff hlk hbc htier hkk ha0 rfl rfl
@@ -339,7 +339,7 @@ theorem writei_log_writeF [Fscfg] [Icfg] (LW : LOG_WRITE) (c : CPU) (k' : KCtx) 
 end
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [CurCtx]
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CurCtx]
 
 set_option maxHeartbeats 1000000 in
 /-- `either_copyin(bp->data + off%BSIZE, user_src, src, m)` at `+0x60`. -/
@@ -379,7 +379,7 @@ theorem writei_either_copyin (EC : EITHER_COPYIN) (c : CPU) (k' : KCtx) (γl : G
 end
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [CurCtx]
 
 end
@@ -430,7 +430,7 @@ structure WiFactsEb [Fscfg] [Icfg] (k : KCtx) (A : WiArgs) : Prop where
   huser : if A.user then k.regs 11#5 ≠ 0#64 else k.regs 11#5 = 0#64
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [IregG GF] [IcacheG GF]
   [FsTopG GF] [FsLinkG GF] [Appcfg GF] [Fscfg] [Icfg] [CurCtx]
 
@@ -449,7 +449,7 @@ def wiContEb (k : KCtx) (A : WiArgs) : IProp GF :=
     trapCsrsExt cpu' k.sie -∗ cpuClaimExt cpu' k.sie k.proc -∗
     wiCells A -∗ inodeMeta A.ip dn' -∗ inodeMap fscFs A.ip bm' -∗ inodeBlocks fscFs bm' data' -∗
     dinodeAt fscIreg A.inum dn0' -∗ wiSrc A (k.regs 12#5) P' -∗
-    bslots fscBio 3 -∗ logOpS icfgLog n' Sb' -∗ wpLoop cpu')
+    bslots 3 -∗ logOpS icfgLog n' Sb' -∗ wpLoop cpu')
 
 set_option maxHeartbeats 2000000 in
 /-- `iupdate(ip)` at `+0xd4` at EITHER entry `SIE` (`Xv6.writei_iupdate` at
@@ -478,7 +478,7 @@ theorem writei_iupdate_eb (IU : IUPDATE) (Γ : SchedNames) [ClaimIs (hlc := hlc)
     iuCells ip inum dn bm dqd dqn dqs ∗
     iregInv (hlc := hlc) fscIreg fscFs icfgIst icfgNib ∗ dinodeAt fscIreg inum dn0 ∗
     wordPointsTo (pPid pj) 4 dqp pidv ∗
-    bslots fscBio 2 ∗
+    bslots 2 ∗
     logCredit icfgLog cru Sb0 e0 (IBLOCK inum icfgIst) ∗
     logOpSe icfgLog (u + 1) Sb0 e0 ∗
     wpNext true pj c (fun cpu' => iprop(∀ (spie spp : Bool) (R' : RegMap),
@@ -488,7 +488,7 @@ theorem writei_iupdate_eb (IU : IUPDATE) (Γ : SchedNames) [ClaimIs (hlc := hlc)
       wordPointsTo (pPid pj) 4 dqp pidv -∗
       iuCells ip inum dn bm dqd dqn dqs -∗
       dinodeAt fscIreg inum dn -∗
-      bslots fscBio 2 -∗
+      bslots 2 -∗
       logOpS icfgLog (if cru then u + 1 else u) (IBLOCK inum icfgIst :: Sb0) -∗ wpLoop cpu'))
     ⊢ wpLoop (GF := GF) c := by
   subst hpj hs
@@ -513,7 +513,7 @@ theorem writei_iupdate_eb (IU : IUPDATE) (Γ : SchedNames) [ClaimIs (hlc := hlc)
 end
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [CurCtx]
 
 set_option maxHeartbeats 1000000 in
@@ -548,7 +548,7 @@ theorem writei_bmap_eb (BM : BMAP) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ
     wordPointsTo sbSizeAddr 4 dqs (BitVec.ofNat 32 size) ∗
     wordPointsTo sbBmapstartAddr 4 dqb (BitVec.ofNat 32 bmapstart) ∗
     bitmapInv γfs bmapstart V.cov logstart size ∗
-    bslots γb 3 ∗
+    bslots 3 ∗
     logOpS γ n Sb ∗
     wpNext true pj c (fun cpu' => iprop(∀ (spie spp : Bool) (R' : RegMap) (bm' : Blkmap)
         (n' : Nat) (data' : Nat → List (BitVec 8)) (Sb' : List Nat),
@@ -568,7 +568,7 @@ theorem writei_bmap_eb (BM : BMAP) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ
       ⌜data' = data ∨
         ((blkmapGet bm fbn).toNat = 0 ∧ data' = dataUpd data fbn (List.replicate BSIZE 0#8))⌝ -∗
       inodeBlocks γfs bm' data' -∗
-      bslots γb 3 -∗
+      bslots 3 -∗
       ⌜n ≤ n' + bmapCost cr (bmapAlloced bm bm' fbn) (bmapInd fbn) ∧ n' ≤ n ∧
         (∀ x ∈ Sb, x ∈ Sb') ∧
         (∀ x ∈ Sb', x ∈ Sb ∨ x = bmapstart ∨ x = bm'.bmInd.toNat ∨

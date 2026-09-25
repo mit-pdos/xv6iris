@@ -166,7 +166,7 @@ theorem kmap_insert_stacks [CurCtx] (pas : Nat → BitVec 44) :
 
 /-- **The seal with the stacks**: `kvmmake`'s output becomes `kptOn` for
 the map with the 64 stack leaves, and the stack claims are handed back. -/
-theorem kctx_kptOn_seal_stacks [CurCtx] [Xv6G GF] {lent : Bool} (cpu : CPU) (k : KCtx)
+theorem kctx_kptOn_seal_stacks [CurCtx] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] {lent : Bool} (cpu : CPU) (k : KCtx)
     (t : PTree) (pas : Nat → BitVec 44) (r0 : BitVec 44) (hct : curTier = KTier.bare)
     (hok : kvmTableOk t pas) :
     kctxL (GF := GF) lent cpu k ∗ ptreeOwn 2 (DFrac.own 1) t ∗

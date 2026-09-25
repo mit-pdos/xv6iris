@@ -278,7 +278,7 @@ theorem arfFoffN_sub (E : CoPset) (hE : (↑ftopN : CoPset) ∪ ↑appN ⊆ E) :
   nclose_subseteq' (N := appN) "foff" (fun p hp => hE p (CoPset.in_union.2 (Or.inr hp)))
 
 section ReadFire
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [IcacheG GF] [Xv6G GF]
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [IcacheG GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF]
   [FsTopG GF] [FsBytesG GF] [OffboxG GF]
 
 /-- THE FIRE, AT ANY SUPPLIER (Rocq's `arf_read_fire_gen`): ONE step,

@@ -58,7 +58,7 @@ theorem prepare_return_ctx_eq (k : KCtx) (a b s1 s2 : Bool) (h : 2 ≤ k.avail) 
   omega
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF]
 
 /-- `myproc`'s contract at its entry address. -/
 theorem prepare_return_myproc (MP : MYPROC) [CurCtx] (c : CPU) (k' : KCtx)
@@ -85,7 +85,7 @@ end
 
 set_option maxHeartbeats 16000000 in
 theorem prepare_return_proof (MP : MYPROC) : PREPARE_RETURN :=
-  ⟨fun {hlc GF} _ _ _ cpu k pa pid V M epc hproc hnoff htier hK hepc => by
+  ⟨fun {hlc GF} _ _ _ _ _ _ cpu k pa pid V M epc hproc hnoff htier hK hepc => by
   unfold wp_prepare_return_body
   simp only [prepareReturnAddr]
   iintro ⟨Hk, Hpc, Hext, Hpriv, Hnext⟩

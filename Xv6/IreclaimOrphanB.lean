@@ -40,7 +40,7 @@ set_option linter.unusedSimpArgs false
 set_option linter.unusedVariables false
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
   [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF]
   [Appcfg GF]
@@ -69,7 +69,7 @@ theorem ireclaim_orphan_b (BO : BEGIN_OP) (IL : ILOCK) (IU : IUNLOCK) (IP : IPUT
         wpLoop (GF := GF) c') :
     kctx cpu (((k.withSpie spie spp).pushed 8).withRegs R) ∗ pcIs cpu (KA.«ireclaim» + 0x54#64) ∗
     ireclaimEnv (hlc := hlc) Γ γl pd pav pu ∗ ireclaimTurn cpu k pidv dqp dqb dqs dqn ∗
-    bslots fscBio 3 ∗ iregBoot ∗
+    bslots 3 ∗ iregBoot ∗
     inodeRef kslot q icfgDev (BitVec.ofNat 32 n) ∗ runitPlain (BitVec.ofNat 32 n).toNat
     ⊢ wpLoop (GF := GF) cpu := by
   obtain ⟨hK8, -, -, -, -, hKbo, hKil, hKiu, -, -⟩ := ireclaim_slots k.avail hK

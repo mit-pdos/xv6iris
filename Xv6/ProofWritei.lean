@@ -98,7 +98,7 @@ theorem writei_bltu_size (w : BitVec 32) (off : Nat) (hw : w.toNat < 2 ^ 31) (ho
   rw [writei_sext_toNat w hw, writei_bltu_nat _ _ (by omega) (by omega)]
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [IregG GF] [IcacheG GF]
   [FsTopG GF] [FsLinkG GF] [Appcfg GF] [Fscfg] [Icfg] [X : CurCtx]
 
@@ -125,7 +125,7 @@ theorem writei_entry (IU : IUPDATE) (BM : BMAP) (BR : BREAD) (LW : LOG_WRITE) (B
     iregInv (hlc := hlc) fscIreg fscFs icfgIst icfgNib ∗ dinodeAt fscIreg A.inum A.dn0 ∗
     (if A.user then procPrivNoctxAt curCtx (procAddr A.j) A.pidv A.V A.M
      else iprop(byteBuf (k.regs 12#5) A.dqs A.sbs ∗ wordPointsTo (pPid k.proc) 4 A.dqp A.pidv)) ∗
-    bslots fscBio 3 ∗
+    bslots 3 ∗
     logOpS icfgLog A.ncount A.Sb ∗
     wpNext true k.proc cpu (fun cpu' => iprop(∀ (spie spp : Bool) (R' : RegMap)
         (tot : Nat) (bm' : Blkmap) (data' : Nat → List (BitVec 8)) (dn' dn0' : Dinode)
@@ -146,7 +146,7 @@ theorem writei_entry (IU : IUPDATE) (BM : BMAP) (BR : BREAD) (LW : LOG_WRITE) (B
       (if A.user then procPrivNoctxAt curCtx (procAddr A.j) A.pidv { A.V with upt := P' }
           (viewFaulted A.V.upt P' A.M)
        else iprop(byteBuf (k.regs 12#5) A.dqs A.sbs ∗ wordPointsTo (pPid k.proc) 4 A.dqp A.pidv)) -∗
-      bslots fscBio 3 -∗
+      bslots 3 -∗
       logOpS icfgLog n' Sb' -∗ wpLoop cpu'))
     ⊢ wpLoop (GF := GF) cpu := by
   obtain ⟨ξ0, t0⟩ := X
@@ -360,7 +360,7 @@ namespace Xv6
 /-- **`writei` meets its specification.** -/
 theorem writei_proof (BM : BMAP) (BR : BREAD) (BE : BRELSE) (LW : LOG_WRITE) (EC : EITHER_COPYIN)
     (IU : IUPDATE) : WRITEI :=
-  ⟨fun {hlc GF} _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ Γ _ cpu k γl pd pav pu j γkl γk ip inum bm data
+  ⟨fun {hlc GF} _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ Γ _ cpu k γl pd pav pu j γkl γk ip inum bm data
     dn dn0 user off n sbs V M ncount Sb pidv dqp dqs dqd dqn dqi dqb dqz
     hj hproc hK hnoff htier hcost hgeom hcov hlog hnib hda hnz hstab hnl hwf hhz
     hcovs hsum hsz hbg hsbs hpd ha0 huser ha3 ha4 => by

@@ -26,7 +26,7 @@ set_option linter.unusedSimpArgs false
 set_option linter.unusedVariables false
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [CurCtx]
 
 set_option maxHeartbeats 16000000 in
@@ -58,7 +58,7 @@ theorem bm_core (BR : BREAD) (BE : BRELSE) (ak : Option BmAlloc)
     bioCtx γl γb V ∗ diskCaps V.gd γdl pd pav pu ∗ panicEnv ∗ fsBytesAny γfs ∗
     wordPointsTo (pPid k.proc) 4 dqp pidv ∗ wordPointsTo (iDev ip) 4 dqd dev ∗
     inodeMapQ γfs dq ip bm ∗ inodeBlocksQ γfs dq bm data ∗
-    bslot γb ∗ bmKit ak γb γfs V.cov logstart dev n Sb ∗
+    bslot ∗ bmKit ak γb γfs V.cov logstart dev n Sb ∗
     bmCont k cpu γb γfs V.cov logstart dev ak ip bm data fbn n cr Sb pidv dqp dq dqd
     ⊢ wpLoop (GF := GF) cpu := by
   have hK6 : 6 ≤ k.avail := by unfold bmapSlots ballocSlots at hK; omega

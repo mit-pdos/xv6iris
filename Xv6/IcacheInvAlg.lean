@@ -325,7 +325,7 @@ theorem irefSet_read (w : BitVec 32) (h : irefSet w) : 0 < w.toNat ∧ w.toNat <
 /-! ### The sleeplock share's authority, and the two authority halves -/
 
 section IcacheGhost
-variable {GF : BundledGFunctors} [IcacheG GF] [Xv6G GF] [SleepLockG GF]
+variable {GF : BundledGFunctors} [IcacheG GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [SleepLockG GF]
 
 /-! THE SLEEPLOCK SHARE'S AUTHORITY, PER SLOT.  `irefTok k q` carries
 `slhTok (icfgIsl k) q` -- a q-share of "somebody may hold slot `k`'s

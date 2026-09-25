@@ -83,7 +83,7 @@ macro_rules
                k_ext_move))
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [CurCtx]
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CurCtx]
 
 /-! ## Link registers, immediates -/
 
@@ -608,7 +608,7 @@ theorem pw_popExit_off (kb : KCtx) (a b : Bool) (hwf : kb.wf) (s : Bool) (hs : k
 end
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [X : CurCtx]
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [X : CurCtx]
 
 /-! ## The shared tail `(KernelSyms.«pipewrite» + 0x108)`: wake readers, release, return `s2` -/
 
@@ -1626,7 +1626,7 @@ theorem pipewrite_br_ffffffffffffd312 : KA.«pipewrite» + 0xffffffffffffd312#64
 
 theorem pipewrite_proof (MP : MYPROC) (AC : ACQUIRE_GEN) (RE : RELEASE_GEN) (WK : WAKEUP)
     (SP : SLEEP_PREPARE) (SL : SLEEP) (KL : KILLED) (CI : COPYIN) : PIPEWRITE := ⟨
-  fun {hlc GF} _ _ X Γ _ cpu k γl γp w q γkl γk j pid V M n hj hproc hK hnoff htier hn hn' => by
+  fun {hlc GF} _ _ _ _ _ X Γ _ cpu k γl γp w q γkl γk j pid V M n hj hproc hK hnoff htier hn hn' => by
   unfold wp_pipewrite_eb_body
   simp only [pipewriteAddr]
   iintro ⟨Hk, Hpc, #Hpinv, Hte, Hce, #Hpipe, Href, #Hkl, #Hav, Hpriv, HΦ⟩

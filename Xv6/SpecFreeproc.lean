@@ -50,7 +50,7 @@ def freeprocIn (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv) (M : Nat → Li
 
 end
 
-def wp_freeproc_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [CurCtx]
+def wp_freeproc_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CurCtx]
     (Γ : SchedNames) (cpu : CPU) (k : KCtx) (γl γp : GName) (γk : KmemNames) (j : Nat) (st : BitVec 32) (ch : BitVec 64)
     (pid : BitVec 32) (V : ProcPriv) (M : Nat → List (BitVec 8))
     (hj : j < NPROC) (hp : k.regs 10#5 = procAddr j) (hst : st = USED ∨ st = ZOMBIE)
@@ -67,7 +67,7 @@ def wp_freeproc_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G
   ⊢ wpLoop (GF := GF) cpu
 
 structure FREEPROC : Prop where
-  wp_freeproc : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [CurCtx] (Γ : SchedNames) (cpu : CPU) (k : KCtx)
+  wp_freeproc : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CurCtx] (Γ : SchedNames) (cpu : CPU) (k : KCtx)
     (γl γp : GName) (γk : KmemNames) (j : Nat) (st : BitVec 32) (ch : BitVec 64) (pid : BitVec 32) (V : ProcPriv)
     (M : Nat → List (BitVec 8)) hj hp hst hnoff hK hsie hlk hlp htier,
     wp_freeproc_body (hlc := hlc) (GF := GF) Γ cpu k γl γp γk j st ch pid V M hj hp hst hnoff hK hsie hlk hlp htier

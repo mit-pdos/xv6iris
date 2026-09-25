@@ -126,7 +126,7 @@ theorem wkKept_trans {R R' R'' : RegMap} (h : wkKept R R') (h' : wkKept R' R'') 
     h'.2.2.2.2.2.2.2.2.2.2.2.trans h.2.2.2.2.2.2.2.2.2.2.2⟩
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF]
 
 /-! ## The wake transition of the lock payload -/
 
@@ -215,7 +215,7 @@ theorem wk_withSpie_pushOffAt (k : KCtx) (s p a b : Bool) :
     (k.withSpie s p).pushOffAt a b = k.pushOffAt a b := rfl
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF]
 
 /-- The lock payload, named at a slot. -/
 theorem wk_pay_elim (Γ : SchedNames) (ξ : CtxId) (j : Nat) :
@@ -240,7 +240,7 @@ falls into: `release(&p->lock)`, the cursor step and the termination test.
 The lock is still held, so the hart is pinned up to the release. -/
 theorem wakeup_br_ffffffffffffec9e : KA.«wakeup» + 0xffffffffffffec9e#64 = KA.«release» := by decide
 
-theorem wk_rel (RE : RELEASE) {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
+theorem wk_rel (RE : RELEASE) {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF]
     [CurCtx] (Γ : SchedNames) (k : KCtx) (hwf : k.wf) (hnoff : k.noff + 1 < 2 ^ 31)
     (hK : wakeupSlots ≤ k.avail) (hlk : "proc" ∉ k.locks)
     (i : Nat) (hi : i < NPROC) (spie spp spie1 spp1 : Bool) (R Rr : RegMap)
@@ -339,7 +339,7 @@ slot. -/
 theorem wakeup_br_ffffffffffffec16 : KA.«wakeup» + 0xffffffffffffec16#64 = KA.«acquire» := by decide
 
 theorem wk_iter (AC : ACQUIRE) (RE : RELEASE) {hlc : HasLC} {GF : BundledGFunctors}
-    [MachGS hlc GF] [Xv6G GF] [X : CurCtx]
+    [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [X : CurCtx]
     (Γ : SchedNames) (k : KCtx) (chan : BitVec 64)
     (hwf : k.wf) (hnoff : k.noff + 1 < 2 ^ 31) (hK : wakeupSlots ≤ k.avail)
     (hlk : "proc" ∉ k.locks) (htier : k.tier = KTier.kpt)
@@ -518,7 +518,7 @@ the epilogue at `(KernelSyms.«wakeup» + 0x54)`.  A bounded loop: ordinary indu
 bounding the iterations left, with the hart quantified inside (the thread may
 migrate at every interrupt window between two critical sections). -/
 theorem wk_loop (AC : ACQUIRE) (RE : RELEASE) {hlc : HasLC} {GF : BundledGFunctors}
-    [MachGS hlc GF] [Xv6G GF] [CurCtx]
+    [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CurCtx]
     (Γ : SchedNames) (k : KCtx) (chan : BitVec 64)
     (hwf : k.wf) (hnoff : k.noff + 1 < 2 ^ 31) (hK : wakeupSlots ≤ k.avail)
     (hlk : "proc" ∉ k.locks) (htier : k.tier = KTier.kpt) (fuel : Nat) :
@@ -712,7 +712,7 @@ theorem wakeup_br_1621e : KA.«wakeup» + 0x1621e#64 = KA.«tickslock» := by de
 set_option maxHeartbeats 4000000 in
 /-- **`wakeup` meets its specification.** -/
 theorem wakeup_proof (AC : ACQUIRE) (RE : RELEASE) : WAKEUP :=
-  ⟨fun {hlc GF} _ _ _ Γ cpu k hnoff hK hlk htier => by
+  ⟨fun {hlc GF} _ _ _ _ _ _ Γ cpu k hnoff hK hlk htier => by
   unfold wp_wakeup_body
   simp only [wakeupAddr]
   iintro ⟨Hk, Hpc, #Hpinv, HPhi⟩

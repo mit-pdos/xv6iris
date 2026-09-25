@@ -29,6 +29,12 @@ then is `Xv6.BcacheNames` assembled.
 cover the boot stamps of all thirty escrows, and a floor above the creator's
 own view can only be minted on a stamped record -- so `bcache.lock` is
 created with `MachCSL.kctx_newlock_hook` over `Xv6.bcacheRes_fold_in`.
+
+**THE SLOT SUPPLY IS NOT MINTED HERE** (wave 7, P3 prerequisite): the
+`bslots` tokens live at the CANONICAL name `BioslotG.bioslotName`
+(`Xv6/SlotSupply.lean`, Rocq's `bioslot_name`), minted by the boot chain's
+`Xv6.bslots_alloc` exactly as Rocq's `BioDefs.bslots_alloc` is, so the post
+no longer carries `bslots BSLOTS` (it was a fresh name's whole supply).
 -/
 import Xv6.BufEscrow
 import MachCSL.LockBornHook
@@ -42,57 +48,8 @@ open LeanRV64D
 set_option linter.unusedSectionVars false
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [BcacheG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [BcacheG GF]
 variable [SleepLockG GF] [DiskG GF] [CurCtx]
-
-/-! ## The slot supply -/
-
-/-- The finite supply, minted one key at a time (Rocq's `bslots_alloc`). -/
-theorem bslots_build (γ : BcacheNames) :
-    ∀ (n : Nat), n ≤ BSLOTS → ∀ (M : RegMapF Unit),
-      (∀ i, i < n → PartialMap.get? M i = none) →
-      ((γ.slot ↪●MAP M) ⊢ |==> ∃ M' : RegMapF Unit,
-        ⌜∀ i, n ≤ i → PartialMap.get? M' i = PartialMap.get? M i⌝ ∗
-        (γ.slot ↪●MAP M') ∗ bslots (GF := GF) γ n) := by
-  intro n
-  induction n with
-  | zero =>
-    intro _ M _
-    iintro Ha
-    imodintro
-    iexists M
-    isplitl []
-    · ipureintro; intro i _; rfl
-    iframe Ha
-    iapply bslots_zero
-  | succ n ih =>
-    intro hn M hfresh
-    iintro Ha
-    imod ih (by omega) M (fun i hi => hfresh i (by omega)) $$ Ha with ⟨%M', %hM', Ha, Hs⟩
-    imod ghost_map_insert n () (by rw [hM' n (Nat.le_refl n)]; exact hfresh n (by omega))
-      $$ Ha with ⟨Ha, He⟩
-    imodintro
-    iexists (PartialMap.insert M' n ())
-    isplitl []
-    · ipureintro
-      intro i hi
-      rw [LawfulPartialMap.get?_insert_ne (show n ≠ i by omega)]
-      exact hM' i (by omega)
-    iframe Ha
-    iapply bslots_cons γ n
-    isplitl [He]
-    · unfold bslot bslots
-      iexists [n]
-      isplitl []
-      · ipureintro
-        refine ⟨rfl, by simp, ?_⟩
-        intro j hj
-        rw [List.mem_singleton] at hj
-        subst hj
-        omega
-      · iapply BigSepL.bigSepL_singleton.2
-        iexact He
-    · iexact Hs
 
 /-! ## The LRU cycle, out of `binit`'s links -/
 
@@ -434,7 +391,7 @@ theorem bioInit (cpu : CPU) (k : KCtx) (V : BioView GF) (hcov0 : (0 : Nat) ∉ V
     ([∗list] i ∈ List.range NBUF, bdBss curCtx i) ∗
     ([∗set] b ∈ V.cov, poolBlk V b)
     ⊢ |={⊤}=> (kctx (GF := GF) cpu k ∗
-      ∃ (γl : GName) (γ : BcacheNames), bioCtx γl γ V ∗ bslots γ BSLOTS) := by
+      ∃ (γl : GName) (γ : BcacheNames), bioCtx γl γ V) := by
   iintro ⟨Hk, Hfresh, Hhn, Hhp, Hslki, Hlinks, Hbss, Hpool⟩
   icases kctx_kmapStatic _ _ $$ Hk with ⟨#HS, Hk⟩
   ihave Hpool := bioPool_boot V hcov0 $$ Hpool
@@ -485,12 +442,10 @@ theorem bioInit (cpu : CPU) (k : KCtx) (V : BioView GF) (hcov0 : (0 : Nat) ∉ V
   -- **THE NAMES RECORD**, now that every ghost exists
   imod (ghost_map_alloc_empty (GF := GF) (K := Nat) (V := Nat) (H := RegMapF))
     with ⟨%γref, Ha⟩
-  imod (ghost_map_alloc_empty (GF := GF) (K := Nat) (V := Unit) (H := RegMapF))
-    with ⟨%γslot, Hsa⟩
-  obtain ⟨γ, h1, h2, h3, h4, h5⟩ : ∃ g : BcacheNames,
-      g.ref = γref ∧ g.slot = γslot ∧ g.slk = fslk ∧ g.own = fown ∧ g.box = bx :=
-    ⟨⟨γref, γslot, fslk, fown, bx⟩, rfl, rfl, rfl, rfl, rfl⟩
-  rw [← h1, ← h2, ← h3, ← h4, ← h5]
+  obtain ⟨γ, h1, h3, h4, h5⟩ : ∃ g : BcacheNames,
+      g.ref = γref ∧ g.slk = fslk ∧ g.own = fown ∧ g.box = bx :=
+    ⟨⟨γref, fslk, fown, bx⟩, rfl, rfl, rfl, rfl⟩
+  rw [← h1, ← h3, ← h4, ← h5]
   -- the `.bss` cells, split the way the cache seats them (the travelling
   -- payload names `γ`, so this waits for the record)
   ihave Hbss := BigSepL.bigSepL_mono_of_forall
@@ -513,9 +468,6 @@ theorem bioInit (cpu : CPU) (k : KCtx) (V : BioView GF) (hcov0 : (0 : Nat) ∉ V
   · iframe Hctx Hbraw Htrav
   ihave Hk := Hkback $$ Hctx
   icases bd_rows_split γ V γ.box NBUF $$ Hrows with ⟨%tl, #Htl, Hbox, Hrg, Hcnt⟩
-  -- the slot supply
-  imod bslots_build γ BSLOTS (Nat.le_refl _) ∅ (fun i _ => get?_empty i) $$ Hsa
-    with ⟨%Msl, -, -, Hsl⟩
   -- the key rows
   ihave Hkey := BigSepL.bigSepL_sep_eqv.2 $$ [Hdev Hbno]
   case' _ => iframe Hdev Hbno
@@ -572,18 +524,16 @@ theorem bioInit (cpu : CPU) (k : KCtx) (V : BioView GF) (hcov0 : (0 : Nat) ∉ V
   imodintro
   iframe Hk
   iexists γl, γ
-  isplitl [Hbox Hslks]
-  · unfold bioCtx isBcache
-    isplitl []
-    · iexact Hlk
-    isplitl [Hslks]
-    · iapply BigSepL.bigSepL_mono_of_forall
-        (Φ := fun _ j => isSleeplockGen (GF := GF) (γ.slk j).1 (γ.slk j).2 (aBufLock (bnode j))
-          (bufSlpRaw (γ.own j) (γ.box j)) slUntracked)
-        (Ψ := fun _ j => isBufSlk (GF := GF) γ j)
-        (fun {_ j} => by unfold isBufSlk isSleeplock bufSlpBox bufSlpRaw bufTok; iintro H; iexact H) $$ Hslks
-    · iexact Hbox
-  · iexact Hsl
+  unfold bioCtx isBcache
+  isplitl []
+  · iexact Hlk
+  isplitl [Hslks]
+  · iapply BigSepL.bigSepL_mono_of_forall
+      (Φ := fun _ j => isSleeplockGen (GF := GF) (γ.slk j).1 (γ.slk j).2 (aBufLock (bnode j))
+        (bufSlpRaw (γ.own j) (γ.box j)) slUntracked)
+      (Ψ := fun _ j => isBufSlk (GF := GF) γ j)
+      (fun {_ j} => by unfold isBufSlk isSleeplock bufSlpBox bufSlpRaw bufTok; iintro H; iexact H) $$ Hslks
+  · iexact Hbox
 
 /-! ## ...as `binit` leaves it
 
@@ -626,7 +576,7 @@ theorem bioInit_of_binit (cpu : CPU) (k : KCtx) (V : BioView GF) (hcov0 : (0 : N
     ([∗list] i ∈ List.range NBUF, bdBss curCtx i) ∗
     ([∗set] b ∈ V.cov, poolBlk V b)
     ⊢ |={⊤}=> (kctx (GF := GF) cpu k ∗
-      ∃ (γl : GName) (γ : BcacheNames), bioCtx γl γ V ∗ bslots γ BSLOTS) := by
+      ∃ (γl : GName) (γ : BcacheNames), bioCtx γl γ V) := by
   iintro ⟨Hk, Hli, Hhp, Hhn, Hout, Hbss, Hpool⟩
   icases (show lockInited (GF := GF) bcacheLockAddr bcacheNameAddr ⊢
       wordPointsTo (bcacheLockAddr + 8#64) 8 (DFrac.own 1) bcacheNameAddr ∗

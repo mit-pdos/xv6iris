@@ -52,7 +52,7 @@ def idupAddr : BitVec 64 := KA.«idup»
 def fsSlots : Nat := 64
 
 /-- **A blocking call** (the shape of `wp_sleep_body` at entry `entry`). -/
-def wp_blocking_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [CurCtx]
+def wp_blocking_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CurCtx]
     (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
     (cpu : CPU) (k : KCtx) (j : Nat) (entry : BitVec 64)
     (hj : j < NPROC) (hproc : k.proc = procAddr j) (hK : fsSlots ≤ k.avail)
@@ -69,7 +69,7 @@ def wp_blocking_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G
 /-- **A blocking call at either entry `SIE`** (the shape of
 `wp_sleep_eb_body` at entry `entry`): the complement in and out, crossing
 `true`, depth 0. -/
-def wp_blocking_eb_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [CurCtx]
+def wp_blocking_eb_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CurCtx]
     (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
     (cpu : CPU) (k : KCtx) (j : Nat) (entry : BitVec 64)
     (hj : j < NPROC) (hproc : k.proc = procAddr j) (hK : fsSlots ≤ k.avail)
@@ -92,7 +92,7 @@ unconstrained).  It gives `k.locks`/`k.noff` back unchanged and returns
 some word in `a0`.  This is the sound contract for a call that only takes
 lower-ranked locks -- the sleep-shaped `FsEntry` (which pins
 `k.locks = []`) would wrongly forbid the held `"proc"` lock. -/
-def wp_nb_blocking_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [CurCtx]
+def wp_nb_blocking_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CurCtx]
     (Γ : SchedNames) (cpu : CPU) (k : KCtx) (entry : BitVec 64)
     (hK : fsSlots ≤ k.avail) (hnoff : k.noff + 1 < 2 ^ 31)
     (htier : k.tier = KTier.kpt) : Prop :=
@@ -105,27 +105,27 @@ def wp_nb_blocking_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [X
 
 /-- The assumed contract of one non-blocking fs entry point. -/
 def FsEntryNB (entry : BitVec 64) : Prop :=
-  ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [CurCtx]
+  ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CurCtx]
     (Γ : SchedNames) (cpu : CPU) (k : KCtx) hK hnoff htier,
     wp_nb_blocking_body (hlc := hlc) (GF := GF) Γ cpu k entry hK hnoff htier
 
 /-- The assumed contract of one fs entry point. -/
 def FsEntry (entry : BitVec 64) : Prop :=
-  ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [CurCtx]
+  ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CurCtx]
     (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
     (cpu : CPU) (k : KCtx) (j : Nat) hj hproc hK hsie hnoff hlocks htier,
     wp_blocking_body (hlc := hlc) (GF := GF) Γ cpu k j entry hj hproc hK hsie hnoff hlocks htier
 
 /-- The assumed contract of one fs entry point, at either entry `SIE`. -/
 def FsEntryEb (entry : BitVec 64) : Prop :=
-  ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [CurCtx]
+  ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CurCtx]
     (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
     (cpu : CPU) (k : KCtx) (j : Nat) hj hproc hK hnoff htier,
     wp_blocking_eb_body (hlc := hlc) (GF := GF) Γ cpu k j entry hj hproc hK hnoff htier
 
 /-- The interrupts-off instance (the complement is the whole bundle). -/
 theorem FsEntryEb.pinned {entry : BitVec 64} (A : FsEntryEb entry) : FsEntry entry := by
-  intro hlc GF _ _ _ Γ _ cpu k j hj hproc hK hsie hnoff hlocks htier
+  intro hlc GF _ _ _ _ _ _ Γ _ cpu k j hj hproc hK hsie hnoff hlocks htier
   have h := A (hlc := hlc) (GF := GF) Γ cpu k j hj hproc hK hnoff htier
   unfold wp_blocking_eb_body at h
   unfold wp_blocking_body

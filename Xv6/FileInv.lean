@@ -223,7 +223,7 @@ theorem fc_wbool (b : BitVec 8) : (b != 0#8) = decide (BitVec.zeroExtend 64 b �
     rw [h1, decide_eq_true h2]
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FileG GF] [IcacheG GF] [SleepLockG GF] [IcboxG GF] [IrefslotG GF] [OffboxG GF] [OffboxBoxG GF] [Icfg] [CurCtx]
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [FileG GF] [IcacheG GF] [SleepLockG GF] [IcboxG GF] [IrefslotG GF] [OffboxG GF] [OffboxBoxG GF] [Icfg] [CurCtx]
 
 /-! ## Opening the table and a slot -/
 
@@ -275,7 +275,7 @@ theorem fslot_elim (γ : FileNames) (ξ : CtxId) (k : Nat) (L : List (Nat × Qp)
     fslotAt (GF := GF) γ ξ k L ⊢ ∃ (C : FContent) (pn : FPNames) (q' : Qp),
       ⌜(L.map Prod.fst).Nodup ∧ L.length < 2 ^ 31⌝ ∗
       wordAtN ξ (aFref k) 4 (DFrac.own 1) (BitVec.ofNat 32 L.length) ∗
-      ([∗list] e ∈ L, frefRest γ k e) ∗ fdSlots γ L.length ∗
+      ([∗list] e ∈ L, frefRest γ k e) ∗ fdSlots L.length ∗
       ((⌜L = [] ∧ C.type = FD_NONE⌝ ∗ fileFieldsAt ξ k 1 C ∗ fpayTok γ k 1 pn ∗ fileCore k 1 pn C) ∨
        (⌜L ≠ []⌝ ∗ fileRestAt γ ξ k (qsum L) q' C pn)) := by
   unfold fslotAt; iintro H; iexact H
@@ -283,7 +283,7 @@ theorem fslot_elim (γ : FileNames) (ξ : CtxId) (k : Nat) (L : List (Nat × Qp)
 theorem fslot_intro (γ : FileNames) (ξ : CtxId) (k : Nat) (L : List (Nat × Qp)) (C : FContent)
     (pn : FPNames) (q' : Qp) (hnd : (L.map Prod.fst).Nodup) (hlt : L.length < 2 ^ 31) :
     wordAtN (GF := GF) ξ (aFref k) 4 (DFrac.own 1) (BitVec.ofNat 32 L.length) ∗
-    ([∗list] e ∈ L, frefRest γ k e) ∗ fdSlots γ L.length ∗
+    ([∗list] e ∈ L, frefRest γ k e) ∗ fdSlots L.length ∗
     ((⌜L = [] ∧ C.type = FD_NONE⌝ ∗ fileFieldsAt ξ k 1 C ∗ fpayTok γ k 1 pn ∗ fileCore k 1 pn C) ∨
      (⌜L ≠ []⌝ ∗ fileRestAt γ ξ k (qsum L) q' C pn)) ⊢ fslotAt γ ξ k L := by
   unfold fslotAt
@@ -326,14 +326,6 @@ theorem ftableOk_alloc (M : RegMapF (Nat × Qp)) (Ls : Nat → List (Nat × Qp))
     · rw [updAt_ne Ls k v.1 _ hvk]; exact hm
 
 /-! ## The fd tokens -/
-
-theorem fdSlots_zero (γ : FileNames) : ⊢ fdSlots (GF := GF) γ 0 := by
-  unfold fdSlots
-  iintro
-  iexists []
-  isplitl []
-  · ipureintro; exact ⟨rfl, List.nodup_nil, fun _ h => absurd h (List.not_mem_nil)⟩
-  · iapply BigSepL.bigSepL_nil.2; iempintro
 
 /-- A whole reference element as its two halves. -/
 theorem fref_halves (γ : FileNames) (id : Nat) (v : Nat × Qp) :

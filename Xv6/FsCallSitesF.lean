@@ -10,8 +10,8 @@ Merged here (old names, all deleted):
 * `bread_callF`  -- `iu_bread` (IupdateSteps), `ialloc_bread` (IallocDefs),
   `itrunc_bread` (ItruncArm): `Xv6.bread_call` at the ambient view.
 * `brelse_callF` -- `iu_brelse`, `ialloc_brelse`, `itrunc_brelse`.
-  (`itrunc_bread` / `itrunc_brelse` spelt the bcache slot `bslots γ 1`,
-  which is `bslot γ` by definition.)
+  (`itrunc_bread` / `itrunc_brelse` spelt the bcache slot `bslots 1`,
+  which is `bslot` by definition.)
 * `dislotWriteAu` -- `iuRegionAu` (IupdateSteps; Rocq's `iu_region_au`)
   and `iallocClaimAu` (IallocDefs), which was `iuRegionAu` at
   `dn = iallocFresh ty` restated.  Exactly
@@ -41,7 +41,7 @@ set_option linter.unusedSectionVars false
 /-! ## ...at the ambient `Fscfg` / `Icfg` view -/
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [CurCtx]
 
 set_option maxHeartbeats 1000000 in
@@ -59,7 +59,7 @@ theorem bread_callF [Fscfg] [Icfg] (BD : BREAD) (Γ : SchedNames) [ClaimIs (hlc 
     trapCsrs c ∗ cpuClaim c pj ∗ intrRes c ∗
     bioCtx γl fscBio (fsView fscFs fscDisk icfgDev fscCov) ∗
     diskCaps fscDisk fscDlock pd pav pu ∗ panicEnv ∗
-    wordPointsTo (pPid pj) 4 dqp pidv ∗ bslot fscBio ∗
+    wordPointsTo (pPid pj) 4 dqp pidv ∗ bslot ∗
     wpNext true pj c (fun cpu' => iprop(∀ (spie spp : Bool) (R' : RegMap) (kk : Nat)
         (bs bsd : List (BitVec 8)) (d : Bool),
       ⌜calleeSaved k'.regs R' ∧ R' 10#5 = bnode kk⌝ -∗
@@ -87,7 +87,7 @@ theorem bread_callF_eb [Fscfg] [Icfg] (BD : BREAD) (Γ : SchedNames) [ClaimIs (h
     trapCsrsExt c s ∗ cpuClaimExt c s pj ∗
     bioCtx γl fscBio (fsView fscFs fscDisk icfgDev fscCov) ∗
     diskCaps fscDisk fscDlock pd pav pu ∗ panicEnv ∗
-    wordPointsTo (pPid pj) 4 dqp pidv ∗ bslot fscBio ∗
+    wordPointsTo (pPid pj) 4 dqp pidv ∗ bslot ∗
     wpNext true pj c (fun cpu' => iprop(∀ (spie spp : Bool) (R' : RegMap) (kk : Nat)
         (bs bsd : List (BitVec 8)) (d : Bool),
       ⌜calleeSaved k'.regs R' ∧ R' 10#5 = bnode kk⌝ -∗
@@ -116,7 +116,7 @@ theorem brelse_callF [Fscfg] [Icfg] (BE : BRELSE) (Γ : SchedNames)
       ⌜k'.sie = false → spie = k'.spie ∧ spp = k'.spp⌝ -∗
       kctx cpu' ((k'.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k'.regs 1#5)) -∗
       ⌜calleeSaved k'.regs R'⌝ -∗ wordPointsTo (pPid pj) 4 dqp pidv -∗
-      bslot fscBio -∗ wpLoop cpu'))
+      bslot -∗ wpLoop cpu'))
     ⊢ wpLoop (GF := GF) c :=
   brelse_call BE Γ c k' γl fscBio (fsView fscFs fscDisk icfgDev fscCov) kk pidv icfgDev bno dqp
     bs bsd d pj hpj hnoff hK hlk hsl hp htier hkk ha0
@@ -126,7 +126,7 @@ end
 /-! ## The dinode record's `log_write` -/
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [LogG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [LogG GF]
   [FsBlocksG GF]
 
 /-- THE GHOST STEP `log_write` runs at one dinode's record, at the
@@ -159,7 +159,7 @@ theorem dislot_shape (ds : List Dinode) (inum : BitVec 32) (dn : Dinode) (hds : 
     diblkBytes_splice ds (islot inum) dn hds hdn (islot_lt inum)⟩
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [CurCtx]
 
 set_option maxHeartbeats 1000000 in
@@ -179,7 +179,7 @@ theorem dislot_log_write [Fscfg] [Icfg] [IregG GF] (LW : LOG_WRITE)
     kctx c k' ∗ pcIs c KA.«log_write» ∗
     bioCtx γl fscBio (fsView fscFs fscDisk icfgDev fscCov) ∗
     logCtx icfgLog fscBio fscFs fscCov fscLogst icfgDev ∗
-    bslot fscBio ∗ logEpochLb icfgLog vlb ∗
+    bslot ∗ logEpochLb icfgLog vlb ∗
     logCredit icfgLog cr Sb e0 (IBLOCK inum icfgIst) ∗
     logOpSe icfgLog (u + 1) Sb e0 ∗
     dislotWriteAu inum dn ds e0 Pout ∗
@@ -196,7 +196,7 @@ theorem dislot_log_write [Fscfg] [Icfg] [IregG GF] (LW : LOG_WRITE)
       Pout -∗
       bioLocked fscBio (fsView fscFs fscDisk icfgDev fscCov) kk pidv icfgDev
         (BitVec.ofNat 32 (IBLOCK inum icfgIst)) (diblkBytes (ds.set (islot inum) dn)) bsd true -∗
-      bslot fscBio -∗ wpLoop cpu'))
+      bslot -∗ wpLoop cpu'))
     ⊢ wpLoop (GF := GF) c := by
   have h := LW.wp_log_write_au_range (hlc := hlc) (GF := GF) c k' icfgLog γl fscBio
     (fsView fscFs fscDisk icfgDev fscCov) fscFs fscLogst icfgDev kk pidv

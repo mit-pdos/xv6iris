@@ -80,14 +80,13 @@ Nothing.
 
 ## IMPORT NOTE
 
-`NFILE` comes from the light `Xv6/FileGeom.lean` (Rocq's `FdSlots.v`
-role), not the heavy `Xv6/FileDefs.lean`: when the file table's inode arm
-lands, `FileDefs` will import this file (Rocq's `file_core` names
-`iref_frac`), and that must not be a cycle.
+`NPROC` and `NFILE` come from the light `Xv6/SlotSupply.lean` (Rocq's
+`ProcGeom.v`/`FdSlots.v` role), so this file sits BELOW `Xv6/ProcDefs.lean`:
+the dormant block (`ProcDefs.procDormant`, Rocq `proc_dormant`) parks
+`irefSlots (1 + IREFSPARE)`, and `FileDefs` imports this file (Rocq's
+`file_core` names `iref_frac`) -- neither may be a cycle.
 -/
-import Xv6.ProcDefs
-import Xv6.FileGeom
-import Xv6.UartTrace
+import Xv6.SlotSupply
 import Iris.Algebra.Auth
 import Iris.Algebra.UFrac
 import Iris.BI.Lib.Fractional

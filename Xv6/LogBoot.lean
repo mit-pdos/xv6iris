@@ -84,7 +84,7 @@ end
 /-! ## The persistent bundle -/
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF]
 variable [BcacheG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [CurCtx]
 
 /-- The persistent bundle `initlog` returns, out of the sealed lock, the
@@ -122,7 +122,7 @@ block's content moves inside `Xv6.fsBytesInv` through
 `Xv6.fsblock_install_exc`, and `SpecInitlog` is general in `n`.) -/
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF]
 variable [BcacheG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [CurCtx]
 
 /-- **THE TWO FROZEN CELLS**, minted at `initlog`'s two stores.  Rocq's
@@ -156,7 +156,7 @@ theorem logStateAt_boot (γb : BcacheNames) (γfs : FsNames)
     fsChalf γfs (logHdrBno logstart) bsh ∗
     ([∗list] i ∈ List.range LOGBLOCKS, ∃ bs : List (BitVec 8),
        fsChalf γfs (logSlotBno logstart i) bs) ∗
-    bslots γb (LOGBLOCKS + 2)
+    bslots (LOGBLOCKS + 2)
     ⊢ logStateAt (GF := GF) γb γfs cov logstart 0 [] pend curCtx := by
   unfold logStateAt
   iintro ⟨Hn, Hjunk, HL, HD, Hd, Hhdr, Hsl, Hpool⟩

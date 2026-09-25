@@ -38,7 +38,7 @@ set_option linter.unusedSimpArgs false
 set_option linter.unusedVariables false
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
   [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF]
   [Appcfg GF]
@@ -102,7 +102,7 @@ theorem fsinit_entry (BD : BREAD) (MM : MEMMOVE) (BE : BRELSE) (IL : INITLOG) (I
     iframe Hfree Hl0 Hl8 Hl16 Hls Hld Hlo Hlc Hlnc Hlhn Hlhb HauthL HauthD Hdirty Hhdr Hslots
     iframe #
   -- one slot for readsb's bread, 34 for initlog
-  icases bslots_uncons fscBio ((LOGBLOCKS + 2) + 2) $$ Hsl with ⟨Hsl1, Hsl⟩
+  icases bslots_uncons ((LOGBLOCKS + 2) + 2) $$ Hsl with ⟨Hsl1, Hsl⟩
   simp only [fsinitAddr]
   -- +0x00 .. +0x0a the prologue
   iapply (wp_prologue4s2_gen cpu k KA.«fsinit» hK4)
@@ -154,7 +154,7 @@ end
 `FsinitProof BR MM BL IL IR`). -/
 theorem fsinit_proof (BR : BREAD) (MM : MEMMOVE) (BL : BRELSE) (IL : INITLOG) (IR : IRECLAIM) :
     FSINIT :=
-  ⟨fun {hlc GF} _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ Γ _ cpu k γl pd pav pu j
+  ⟨fun {hlc GF} _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ Γ _ cpu k γl pd pav pu j
     vMagic vSize vNblocks vNlog bsSb sbOld bsHdr L D vlock vname vcpu vStart vDev vNc vN pidv dqp
     hj hproc hK hnoff htier hgeom h1cov hsbImg hmagic hn1 hnnib hn31 hblk hbg hbel
     hhdrLen hhdrNodup hhdrHome hhdr0 hsbOld hpd ha0 =>

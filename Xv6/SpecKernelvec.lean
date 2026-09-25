@@ -47,7 +47,7 @@ whose device path calls `devintr`.  Nothing else about the interrupted
 context is assumed -- `ihsF` quantifies it freely, and the running slot is
 named by THE CLAIM the trap hands over (`Xv6.cpuClaim_proc_shape`). -/
 structure KERNELVEC : Prop where
-  handler : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [DiskG GF]
+  handler : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [DiskG GF]
     (Γ : SchedNames) (γ0 γ1 : UartNames) (γc γl0 γl1 : GName) (γd : DiskNames) (γdl γt : GName)
     (pd pav pu : BitVec 64) (bs : List (BitVec 8))
     [ClaimIs (hlc := hlc) GF Γ]
@@ -59,7 +59,7 @@ proc table and devintr's credentials -- both at ITS OWN context, which is
 all a boot hart ever has, and at the kernel tier (`hT`) -- installs the
 handler.  (This is what `procsInvAll`, the family over ALL contexts the
 contract used to demand, made impossible.) -/
-theorem intrRes_of_kernelvec {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
+theorem intrRes_of_kernelvec {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF]
     [DiskG GF] [CurCtx] (KV : KERNELVEC) (Γ : SchedNames) (γ0 γ1 : UartNames)
     (γc γl0 γl1 : GName) (γd : DiskNames) (γdl γt : GName) (pd pav pu : BitVec 64)
     (bs : List (BitVec 8)) [ClaimIs (hlc := hlc) GF Γ]

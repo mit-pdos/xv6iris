@@ -60,7 +60,7 @@ theorem ba_beqz_size (size : Nat) (h0 : 0 < size) (h : size < 2 ^ 31) :
   simp [this]
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [CurCtx]
 
 set_option maxHeartbeats 16000000 in
@@ -150,7 +150,7 @@ theorem ba_entry (BR : BREAD) (LW : LOG_WRITE) (BE : BRELSE) (MS : MEMSET) (PK :
 end
 
 theorem balloc_proof (BR : BREAD) (LW : LOG_WRITE) (BE : BRELSE) (MS : MEMSET) (PK : PRINTK) :
-    BALLOC := ⟨fun {hlc GF} _ _ _ _ _ _ _ _ Γ _ cpu k γl γb V γdl pd pav pu j γ γfs
+    BALLOC := ⟨fun {hlc GF} _ _ _ _ _ _ _ _ _ _ _ Γ _ cpu k γl γb V γdl pd pav pu j γ γfs
     logstart bmapstart size dev u cr Sb pidv dqp dqb dqs
     hj hproc hK hnoff htier hgeom hbm hcredit hdev hcl hdt hpd ha0 =>
   ba_entry BR LW BE MS PK Γ cpu k γl γb V γdl pd pav pu j γ γfs logstart bmapstart size dev

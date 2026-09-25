@@ -71,7 +71,7 @@ theorem iunlockput_ret_16 :
 theorem iunlockput_slots_iunlock : iunlockSlots + 4 ≤ iunlockputSlots := by decide
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
   [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF]
   [Appcfg GF] [Fscfg] [Icfg] [CurCtx]
@@ -184,7 +184,7 @@ theorem iunlockput_main (IU : IUNLOCK) (IP : IPUT)
       wordPointsTo (pPid k.proc) 4 dqp pidv -∗
       wordPointsTo sbBmapstartAddr 4 dqb (BitVec.ofNat 32 fscBmapstart) -∗
       wordPointsTo sbInodestart 4 dqs (BitVec.ofNat 32 icfgIst) -∗
-      bslots fscBio 3 -∗
+      bslots 3 -∗
       ⌜(∀ x ∈ Sb, x ∈ Sb') ∧ (w = true → fscBmapstart ∈ Sb') ∧ (crb = true → w = false) ∧
         n - ipSpendW w cru crz ≤ n' ∧ n' ≤ n⌝ -∗
       logOpS icfgLog n' Sb' -∗

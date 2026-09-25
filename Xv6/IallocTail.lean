@@ -28,7 +28,7 @@ set_option linter.unusedSimpArgs false
 set_option linter.unusedVariables false
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [IregG GF] [IcacheG GF]
   [FsTopG GF] [FsLinkG GF] [IcboxG GF] [IrefslotG GF] [Appcfg GF]
 
@@ -49,7 +49,7 @@ theorem ialloc_epilogue [Fscfg] [Icfg] [CurCtx] (cpu c0 : CPU) (k : KCtx) (spie 
     wordPointsTo sbNinodes 4 dqn (BitVec.ofNat 32 fscNinodes) ∗
     wordPointsTo sbInodestart 4 dqs (BitVec.ofNat 32 icfgIst) ∗
     wordPointsTo (pPid k.proc) 4 dqp pidv ∗
-    bslots fscBio 2 ∗
+    bslots 2 ∗
     iallocArms ty u Sb t qt (R 10#5) ∗
     iallocCont k c0 ty u Sb t qt pidv dqp dqs dqn
     ⊢ wpLoop (GF := GF) cpu := by
@@ -126,7 +126,7 @@ theorem ialloc_out (PK : PRINTK) [Fscfg] [Icfg] [CurCtx] (cpu c0 : CPU) (k : KCt
     wordPointsTo sbNinodes 4 dqn (BitVec.ofNat 32 fscNinodes) ∗
     wordPointsTo sbInodestart 4 dqs (BitVec.ofNat 32 icfgIst) ∗
     wordPointsTo (pPid k.proc) 4 dqp pidv ∗
-    bslots fscBio 2 ∗ irefSlot ∗ txPin icfgLog t qt ∗
+    bslots 2 ∗ irefSlot ∗ txPin icfgLog t qt ∗
     logOpS icfgLog (u + 1) Sb ∗
     iallocCont k c0 ty u Sb t qt pidv dqp dqs dqn
     ⊢ wpLoop (GF := GF) cpu := by

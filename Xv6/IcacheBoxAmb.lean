@@ -251,7 +251,7 @@ they are context-constant, which is what Rocq's `ic_hdr_morph` proves of
 them with `ctx_morph_const`. -/
 
 section IcacheBoxAmb
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [IcacheG GF] [Xv6G GF] [LogG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [IcacheG GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [LogG GF]
   [FsBlocksG GF] [IregG GF] [FsTopG GF] [FsLinkG GF]
 
 /-- THE STITCH: the payload's GHOST side -- main's `icLoaded` minus its two

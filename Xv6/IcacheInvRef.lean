@@ -667,7 +667,7 @@ theorem iref_load_pinw_au [Icfg] (Eo : CoPset) (k : Nat) (s : Qp) (g : GName) (l
 names the word, the A6.144 payload stamp half names the bound, and the
 window crosses the load step unchanged.  (Free slots' cells are plain ctx
 cells in the payload -- a different, ordinary leaf.) -/
-theorem iref_load_locked_pinw_au [Xv6G GF] [SleepLockG GF] [Icfg] (Eo : CoPset) (M : RegMapF (Qp × PosNat)) (k : Nat)
+theorem iref_load_locked_pinw_au [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [SleepLockG GF] [Icfg] (Eo : CoPset) (M : RegMapF (Qp × PosNat)) (k : Nat)
     (tstp : Nat) (hE : (↑icacheN : CoPset) ⊆ Eo) (hk : k < NINODE)
     (his : ∃ v, PartialMap.get? M k = some v) :
     ⊢@{IProp GF} itableInv (hlc := hlc) -∗ itableHalf M -∗ istmpAuth k (1 : Qp).half tstp -∗
@@ -706,7 +706,7 @@ theorem iref_load_locked_pinw_au [Xv6G GF] [SleepLockG GF] [Icfg] (Eo : CoPset) 
   iframe Hhalf Hstp
 
 /-- The slot-finder for a bare slice holder (SpecIdup's need), pinw-faced. -/
-theorem iref_share_lookup_pinw_au [Xv6G GF] [SleepLockG GF] [Icfg] (Eo : CoPset) (M : RegMapF (Qp × PosNat)) (k : Nat)
+theorem iref_share_lookup_pinw_au [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [SleepLockG GF] [Icfg] (Eo : CoPset) (M : RegMapF (Qp × PosNat)) (k : Nat)
     (s : Qp) (g : GName) (lo : Nat) (hE : (↑icacheN : CoPset) ⊆ Eo) (hk : k < NINODE) :
     ⊢@{IProp GF} itableInv (hlc := hlc) -∗ itableHalf M -∗ liveGenlo k s g lo -∗
       |={Eo}=> ⌜∃ v, PartialMap.get? M k = some v⌝ ∗ itableHalf M ∗ liveGenlo k s g lo := by
@@ -812,7 +812,7 @@ private theorem liveGenlo_scatter3 [Icfg] (k : Nat) (q c : Qp) (g : GName) (lo :
 own `q`, the escrow's returned half and the pool residual) into the frozen
 arm and flips the selector.  The window rows stay -- the freeze stores
 nothing, so the pin persists through the phase. -/
-theorem frz_slot_freeze_pinw [Xv6G GF] [SleepLockG GF] [Icfg] (Eo : CoPset) (M : RegMapF (Qp × PosNat)) (k : Nat)
+theorem frz_slot_freeze_pinw [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [SleepLockG GF] [Icfg] (Eo : CoPset) (M : RegMapF (Qp × PosNat)) (k : Nat)
     (q : Qp) (n : PosNat) (g : GName) (lo : Nat) (hE : (↑icacheN : CoPset) ⊆ Eo)
     (hMk : PartialMap.get? M k = some (q, n)) :
     ⊢@{IProp GF} itableInv (hlc := hlc) -∗ itableHalf M -∗ liveGenlo k q g lo -∗
@@ -862,7 +862,7 @@ theorem frz_slot_freeze_pinw [Xv6G GF] [SleepLockG GF] [Icfg] (Eo : CoPset) (M :
 AT THE SAME `lo`.  No store happens here, so the pin's floor cannot move;
 only the agree'd gname regenerates (what invalidates the stale
 one-shots). -/
-theorem live_slot_regen_pinw [Xv6G GF] [SleepLockG GF] [Icfg] (Eo : CoPset) (M : RegMapF (Qp × PosNat)) (k : Nat)
+theorem live_slot_regen_pinw [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [SleepLockG GF] [Icfg] (Eo : CoPset) (M : RegMapF (Qp × PosNat)) (k : Nat)
     (qt : Qp) (n : PosNat) (g : GName) (lo : Nat) (hE : (↑icacheN : CoPset) ⊆ Eo)
     (hMk : PartialMap.get? M k = some (qt, n)) :
     ⊢@{IProp GF} itableInv (hlc := hlc) -∗ itableHalf M -∗ liveGenlo k qt g lo -∗
@@ -1018,7 +1018,7 @@ end IcacheRefInv
 /-! ### The count-move token -/
 
 section IcacheRefTok
-variable {GF : BundledGFunctors} [IcacheG GF] [Xv6G GF] [SleepLockG GF]
+variable {GF : BundledGFunctors} [IcacheG GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [SleepLockG GF]
 
 /-- The token a pinw count-move hands out: the reference's three ghost
 slices AT THE SLOT's `(g, lo)`.  The caller wraps it to the floored bundle

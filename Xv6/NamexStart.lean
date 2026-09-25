@@ -30,7 +30,7 @@ set_option linter.unusedSimpArgs false
 set_option linter.unusedVariables false
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
   [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF]
   [Appcfg GF] [Fscfg] [Icfg] [CurCtx]
@@ -110,7 +110,7 @@ cells, the path, the name buffer, the slots, the reservation and the token
 (two ledger units: the start spends one). -/
 def namexPre (k : KCtx) (A : NamexArgs) (nf : Nat → BitVec 8) : IProp GF := iprop%
   irefSlots 2 ∗ namexKeep k A ∗ namexPath k A ∗
-  byteBuf (k.regs 12#5) (DFrac.own 1) (bview 14 nf) ∗ bslots fscBio 3 ∗
+  byteBuf (k.regs 12#5) (DFrac.own 1) (bview 14 nf) ∗ bslots 3 ∗
   logOpS icfgLog A.n A.Sb ∗ logTx icfgLog
 
 theorem namex_pre_walk (k : KCtx) (A : NamexArgs) (nf : Nat → BitVec 8) :

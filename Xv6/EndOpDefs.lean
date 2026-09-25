@@ -772,7 +772,7 @@ mirror row and the crash seam Rocq carries beside it are dropped with the
 crash layer (see the file header). -/
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF]
 variable [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [CurCtx]
 
 def eoOpen (γb : BcacheNames) (γfs : FsNames) (cov : Std.ExtTreeSet Nat compare)
@@ -788,7 +788,7 @@ def eoOpen (γb : BcacheNames) (γfs : FsNames) (cov : Std.ExtTreeSet Nat compar
   ([∗list] i ∈ List.range t, fsChalf γfs (logSlotBno logstart i) (Lw i)) ∗
   ([∗list] i ∈ List.range (LOGBLOCKS - t), ∃ bs : List (BitVec 8),
      fsChalf γfs (logSlotBno logstart (t + i)) bs) ∗
-  bslots γb ((LOGBLOCKS - n) + 2)
+  bslots ((LOGBLOCKS - n) + 2)
 
 theorem eoOpen_elim (γb : BcacheNames) (γfs : FsNames) (cov : Std.ExtTreeSet Nat compare)
     (logstart n : Nat) (W : List (BitVec 32)) (L : BlockMap) (D : RegMapF Bool)
@@ -804,7 +804,7 @@ theorem eoOpen_elim (γb : BcacheNames) (γfs : FsNames) (cov : Std.ExtTreeSet N
       ([∗list] i ∈ List.range t, fsChalf γfs (logSlotBno logstart i) (Lw i)) ∗
       ([∗list] i ∈ List.range (LOGBLOCKS - t), ∃ bs : List (BitVec 8),
          fsChalf γfs (logSlotBno logstart (t + i)) bs) ∗
-      bslots γb ((LOGBLOCKS - n) + 2) := by
+      bslots ((LOGBLOCKS - n) + 2) := by
   unfold eoOpen; iintro H; iexact H
 
 theorem eoOpen_intro (γb : BcacheNames) (γfs : FsNames) (cov : Std.ExtTreeSet Nat compare)
@@ -820,7 +820,7 @@ theorem eoOpen_intro (γb : BcacheNames) (γfs : FsNames) (cov : Std.ExtTreeSet 
     ([∗list] i ∈ List.range t, fsChalf γfs (logSlotBno logstart i) (Lw i)) ∗
     ([∗list] i ∈ List.range (LOGBLOCKS - t), ∃ bs : List (BitVec 8),
        fsChalf γfs (logSlotBno logstart (t + i)) bs) ∗
-    bslots γb ((LOGBLOCKS - n) + 2) ⊢
+    bslots ((LOGBLOCKS - n) + 2) ⊢
       eoOpen (GF := GF) γb γfs cov logstart n W L D Lw t := by
   unfold eoOpen; iintro H; iexact H
 
@@ -949,7 +949,7 @@ end
 /-! ## The lock's payload, and the caller's continuation -/
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF]
 variable [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [CurCtx]
 
 /-- The caller's continuation, at whichever hart the thread ends on.

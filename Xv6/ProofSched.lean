@@ -433,7 +433,7 @@ theorem sched_br_fffffffffffffa9a : KA.«sched» + 0xfffffffffffffa9a#64 = KA.«
 set_option maxHeartbeats 4000000 in
 /-- **`sched` meets its specification.** -/
 theorem sched_proof (SW : SWTCH) (MP : MYPROC) (HO : HOLDING) : SCHED :=
-  ⟨fun {hlc GF} _ _ X Γ _ cpu k j st ch hj hpark hK hsie hnoff hlocks htier hproc => by
+  ⟨fun {hlc GF} _ _ _ _ _ X Γ _ cpu k j st ch hj hpark hK hsie hnoff hlocks htier hproc => by
   obtain ⟨ξ0, t0⟩ := X
   letI : CurCtx := ⟨ξ0, t0⟩
   unfold wp_sched_body

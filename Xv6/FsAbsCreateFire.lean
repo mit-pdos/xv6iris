@@ -483,7 +483,7 @@ end CreateCommit
 phases on either side of the map update -/
 
 section CreateFire
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [IcacheG GF] [Xv6G GF]
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [IcacheG GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF]
   [FsTopG GF] [FsBytesG GF] [Appcfg GF]
 
 /-- UNDER THE ARMED REGISTRY (Rocq's `caf_armed_retag`): the receipt names

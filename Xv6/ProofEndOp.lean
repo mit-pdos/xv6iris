@@ -82,7 +82,7 @@ set_option linter.unusedVariables false
 /-! ## The nine call sites -/
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF]
 variable [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [CurCtx]
 
 theorem eo_ac (AC : ACQUIRE) (c : CPU) (k' : KCtx) (γ : LogNames) (γb : BcacheNames)
@@ -212,7 +212,7 @@ theorem eo_wh (WH : WRITE_HEAD) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
     ([∗list] i ↦ w ∈ W, wordPointsTo (lhBlock i) 4 (DFrac.own 1) w) ∗
     fsCacheAuth γfs L ∗
     (∃ bsh : List (BitVec 8), fsChalf γfs (logHdrBno logstart) bsh) ∗
-    bslot γb ∗
+    bslot ∗
     wpNext true pj c (fun cpu' => iprop(∀ (spie spp : Bool) (R' : RegMap)
         (bs' : List (BitVec 8)),
       ⌜calleeSaved k'.regs R'⌝ -∗
@@ -224,7 +224,7 @@ theorem eo_wh (WH : WRITE_HEAD) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
       fsCacheAuth γfs (PartialMap.insert L (logHdrBno logstart) bs') -∗
       fsChalf γfs (logHdrBno logstart) bs' -∗
       ⌜bs'.length = BSIZE ∧ hdrN bs' = n ∧ hdrDec bs' = (n, W.map (fun w => w.toNat))⌝ -∗
-      bslot γb -∗ wpLoop cpu'))
+      bslot -∗ wpLoop cpu'))
     ⊢ wpLoop (GF := GF) c := by
   subst hpj hs
   have h := WH.wp_write_head_eb (hlc := hlc) (GF := GF) Γ c k' γl γb V γdl γfs pd pav pu j
@@ -266,7 +266,7 @@ theorem eo_it (IT : INSTALL_TRANS) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ
     fsCacheAuth γfs L ∗ fsDirtyAuth γfs D ∗
     ([∗list] i ↦ w ∈ W, fsChalf γfs (logSlotBno logstart i) (Lw i) ∗
        fsDirtyHalf γfs w.toNat true) ∗
-    bslots γb 2 ∗
+    bslots 2 ∗
     wpNext true pj c (fun cpu' => iprop(∀ (spie spp : Bool) (R' : RegMap),
       ⌜calleeSaved k'.regs R'⌝ -∗
       kctx cpu' ((k'.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k'.regs 1#5)) -∗
@@ -279,7 +279,7 @@ theorem eo_it (IT : INSTALL_TRANS) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ
       fsDirtyAuth γfs (dirtyClear D (W.map (fun w => w.toNat))) -∗
       ([∗list] i ↦ w ∈ W, fsChalf γfs (logSlotBno logstart i) (Lw i) ∗
          fsDirtyHalf γfs w.toNat false) -∗
-      bslots γb (2 + W.length) -∗ wpLoop cpu'))
+      bslots (2 + W.length) -∗ wpLoop cpu'))
     ⊢ wpLoop (GF := GF) c := by
   subst hpj hs
   have h := IT.wp_install_trans_eb (hlc := hlc) (GF := GF) Γ c k' γl γb V γdl γfs pd pav pu j
@@ -296,7 +296,7 @@ end
 /-! ## The epilogue, shared by both arms -/
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF]
 variable [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [CurCtx]
 
 /-- Two cache authorities cannot coexist.  This is what refutes the
@@ -371,7 +371,7 @@ epilogue.  The op has already retired (the store at `+0x20` and the ledger
 step with it), so this stretch moves no ghost at all. -/
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF]
 variable [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [CurCtx]
 
 theorem eoK_withSpie (k : KCtx) : (eoK k).withSpie k.spie k.spp = eoK k := rfl
@@ -516,7 +516,7 @@ all at epochs `≤ E`, so at `E + 1` none of them can name a block of the new
 (empty) header -- which is exactly `logResAt`'s third registry clause. -/
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF]
 variable [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [CurCtx]
 
 theorem eo_word_ex (a : BitVec 64) (v : BitVec 32) :
@@ -771,7 +771,7 @@ committer has no client half for a home block (Rocq's `eo_pay_bs_auth`).
 The home block itself rides through untouched. -/
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF]
 variable [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [CurCtx]
 
 /-- The loop's invariant at the head `+0xb4`. -/
@@ -845,19 +845,19 @@ theorem eoOpen_peel (γb : BcacheNames) (γfs : FsNames) (cov : Std.ExtTreeSet N
     (Lw : Nat → List (BitVec 8)) (t : Nat) (ht : t < LOGBLOCKS) (hn : n ≤ LOGBLOCKS) :
     eoOpen (GF := GF) γb γfs cov ls n W L D Lw t ⊢
       (∃ bs : List (BitVec 8), fsChalf γfs (logSlotBno ls t) bs) ∗
-      fsCacheAuth γfs L ∗ bslot γb ∗ bslot γb ∗
+      fsCacheAuth γfs L ∗ bslot ∗ bslot ∗
       ([∗list] i ↦ w ∈ W, wordPointsTo (lhBlock i) 4 (DFrac.own 1) w) ∗
       (∀ (L' : BlockMap) (Lw' : Nat → List (BitVec 8)),
         fsChalf γfs (logSlotBno ls t) (Lw' t) -∗
-        fsCacheAuth γfs L' -∗ bslot γb -∗ bslot γb -∗
+        fsCacheAuth γfs L' -∗ bslot -∗ bslot -∗
         ([∗list] i ↦ w ∈ W, wordPointsTo (lhBlock i) 4 (DFrac.own 1) w) -∗
         ⌜∀ i, i < t → Lw' i = Lw i⌝ -∗
         eoOpen γb γfs cov ls n W L' D Lw' (t + 1)) := by
   unfold eoOpen
   iintro ⟨Hn, Hblk, Hjunk, HL, HD, Hd, Hhdr, Hdone, Hrest, Hpool⟩
   -- the two slot units the two breads spend
-  icases bslots_uncons γb ((LOGBLOCKS - n) + 1) $$ Hpool with ⟨Hu1, Hpool⟩
-  icases bslots_uncons γb (LOGBLOCKS - n) $$ Hpool with ⟨Hu2, Hpool⟩
+  icases bslots_uncons ((LOGBLOCKS - n) + 1) $$ Hpool with ⟨Hu1, Hpool⟩
+  icases bslots_uncons (LOGBLOCKS - n) $$ Hpool with ⟨Hu2, Hpool⟩
   -- entry `t`'s slot half
   icases eo_range_peel (GF := GF)
     (fun i => iprop(∃ bs : List (BitVec 8), fsChalf γfs (logSlotBno ls i) bs))
@@ -876,9 +876,9 @@ theorem eoOpen_peel (γb : BcacheNames) (γfs : FsNames) (cov : Std.ExtTreeSet N
   ihave Hdone := eo_range_push (GF := GF)
     (fun i => fsChalf γfs (logSlotBno ls i) (Lw' i)) t $$ [Hdone Hslot']
   case' _ => iframe Hdone Hslot'
-  ihave Hpool := bslots_cons γb (LOGBLOCKS - n) $$ [Hu2 Hpool]
+  ihave Hpool := bslots_cons (LOGBLOCKS - n) $$ [Hu2 Hpool]
   case' _ => iframe Hu2 Hpool
-  ihave Hpool := bslots_cons γb ((LOGBLOCKS - n) + 1) $$ [Hu1 Hpool]
+  ihave Hpool := bslots_cons ((LOGBLOCKS - n) + 1) $$ [Hu1 Hpool]
   case' _ => iframe Hu1 Hpool
   iframe Hn Hblk Hjunk HL HD Hd Hhdr Hdone Hrest Hpool
 
@@ -892,7 +892,7 @@ accounting tail at `+0x42`.  Entered by falling out of the copy loop with
 the cursor at `n`. -/
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF]
 variable [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [CurCtx]
 
 /-- The converse of `Xv6.eo_idx_range`: a `List.range` row read back as an
@@ -934,13 +934,13 @@ theorem eo_hdr_ne (cov : Std.ExtTreeSet Nat compare) (ls : Nat) (w : BitVec 32)
 end
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF]
 variable [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [CurCtx]
 
 /-- The slot pool is additive (`install_trans` hands back `2 + n` units at
 once, and they have to rejoin the rest). -/
 theorem bslots_add (γ : BcacheNames) : ∀ (m n : Nat),
-    bslots (GF := GF) γ m ∗ bslots γ n ⊢ bslots γ (m + n) := by
+    bslots (GF := GF) m ∗ bslots n ⊢ bslots (m + n) := by
   intro m
   induction m with
   | zero =>
@@ -951,10 +951,10 @@ theorem bslots_add (γ : BcacheNames) : ∀ (m n : Nat),
     intro n
     rw [show m + 1 + n = (m + n) + 1 from by omega]
     iintro ⟨H1, H2⟩
-    icases bslots_uncons γ m $$ H1 with ⟨Hu, H1⟩
+    icases bslots_uncons m $$ H1 with ⟨Hu, H1⟩
     ihave H := ih n $$ [H1 H2]
     case' _ => iframe H1 H2
-    iapply bslots_cons γ (m + n)
+    iapply bslots_cons (m + n)
     iframe Hu H
 
 /-- The commit's per-entry row, assembled for `install_trans`: the slot's
@@ -1007,7 +1007,7 @@ theorem eo_ctx_collapse (k : KCtx) (m : Nat) (a b c d : Bool) (R R' : RegMap) :
       ((k.withSpie c d).pushed m).withRegs R' := rfl
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF]
 variable [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [CurCtx]
 
 set_option maxRecDepth 100000 in
@@ -1068,7 +1068,7 @@ theorem eo_commit (WH : WRITE_HEAD) (IT : INSTALL_TRANS) (AC : ACQUIRE) (RE : RE
   icases eoOpen_elim γb γfs V.cov ls n W L D Lw n $$ Hopen
     with ⟨HlhN, Hblk, Hjunk, Hauth, Hdirty, Hcov, Hhdr, Hdone, Hrest, Hpool⟩
   -- one slot unit for the first `write_head`
-  icases bslots_uncons γb ((LOGBLOCKS - n) + 1) $$ Hpool with ⟨Hu1, Hpool⟩
+  icases bslots_uncons ((LOGBLOCKS - n) + 1) $$ Hpool with ⟨Hu1, Hpool⟩
   -- ===== +0x104  jal write_head =====
   k_step_e (wp_s_jal cpu _ (KA.«end_op» + 0x104#64) false 2096324#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [eo_br_wh]
@@ -1099,10 +1099,10 @@ theorem eo_commit (WH : WRITE_HEAD) (IT : INSTALL_TRANS) (AC : ACQUIRE) (RE : RE
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [eo_br_it]
   iintro Hk Hpc
   -- the per-entry rows, assembled
-  icases bslots_uncons γb (LOGBLOCKS - n) $$ Hpool with ⟨Hu2, Hpool⟩
-  ihave Hu2 := (show bslot (GF := GF) γb ⊢ bslots γb 1 from by
+  icases bslots_uncons (LOGBLOCKS - n) $$ Hpool with ⟨Hu2, Hpool⟩
+  ihave Hu2 := (show bslot (GF := GF) ⊢ bslots 1 from by
     unfold bslot; iintro H; iexact H) $$ Hu2
-  ihave Hu12 := bslots_cons γb 1 $$ [Hu1 Hu2]
+  ihave Hu12 := bslots_cons 1 $$ [Hu1 Hu2]
   case' _ => iframe Hu1 Hu2
   icases eo_cov_split γfs V.cov.toList (W.map (fun w => w.toNat)) (eo_cov_nodup V.cov)
     hnodup hsub $$ Hcov with ⟨Hdirt, Hcovback⟩
@@ -1164,11 +1164,11 @@ theorem eo_commit (WH : WRITE_HEAD) (IT : INSTALL_TRANS) (AC : ACQUIRE) (RE : RE
   -- ===== +0x116  jal write_head, at the emptied header =====
   ihave Hpool := bslots_add γb (2 + W.length) (LOGBLOCKS - n) $$ [Hu12 Hpool]
   case' _ => iframe Hu12 Hpool
-  ihave Hpool := (show bslots (GF := GF) γb (2 + W.length + (LOGBLOCKS - n)) ⊢
-      bslots γb ((1 + W.length + (LOGBLOCKS - n)) + 1) from by
+  ihave Hpool := (show bslots (GF := GF) (2 + W.length + (LOGBLOCKS - n)) ⊢
+      bslots ((1 + W.length + (LOGBLOCKS - n)) + 1) from by
     rw [show (1 + W.length + (LOGBLOCKS - n)) + 1 = 2 + W.length + (LOGBLOCKS - n) from by
       omega]) $$ Hpool
-  icases bslots_uncons γb (1 + W.length + (LOGBLOCKS - n)) $$ Hpool with ⟨Hu3, Hpool⟩
+  icases bslots_uncons (1 + W.length + (LOGBLOCKS - n)) $$ Hpool with ⟨Hu3, Hpool⟩
   ihave Hblk0 : ([∗list] i ↦ w ∈ ([] : List (BitVec 32)),
       wordPointsTo (GF := GF) (lhBlock i) 4 (DFrac.own 1) w) $$ []
   case' _ => iapply BigSepL.bigSepL_nil.2; iempintro
@@ -1196,10 +1196,10 @@ theorem eo_commit (WH : WRITE_HEAD) (IT : INSTALL_TRANS) (AC : ACQUIRE) (RE : RE
     refine eoPins_set k R2 _ _ _ _ _ hfix2 1#5 _ (by decide)
   obtain ⟨h32, h38, h39, h318, h319, h320, h321, h322, h323, h324, h325, h326, h327⟩ := id hfix3
   -- the pool, and the emptied batch
-  ihave Hpool := bslots_cons γb (1 + W.length + (LOGBLOCKS - n)) $$ [Hu3 Hpool]
+  ihave Hpool := bslots_cons (1 + W.length + (LOGBLOCKS - n)) $$ [Hu3 Hpool]
   case' _ => iframe Hu3 Hpool
-  ihave Hpool := (show bslots (GF := GF) γb ((1 + W.length + (LOGBLOCKS - n)) + 1) ⊢
-      bslots γb ((LOGBLOCKS - 0) + 2) from by
+  ihave Hpool := (show bslots (GF := GF) ((1 + W.length + (LOGBLOCKS - n)) + 1) ⊢
+      bslots ((LOGBLOCKS - 0) + 2) from by
     rw [show (LOGBLOCKS - 0) + 2 = (1 + W.length + (LOGBLOCKS - n)) + 1 from by omega]) $$ Hpool
   ihave Hjunk := (show ([∗list] i ↦ w ∈ W, wordPointsTo (GF := GF) (lhBlock i) 4
         (DFrac.own 1) w) ∗
@@ -1285,7 +1285,7 @@ theorem eo_commit (WH : WRITE_HEAD) (IT : INSTALL_TRANS) (AC : ACQUIRE) (RE : RE
 end
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF]
 variable [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [CurCtx]
 
 /-- The `lh.n` cell, read out of the opened batch and put straight back
@@ -1389,7 +1389,7 @@ theorem eo_slot_ne (cov : Std.ExtTreeSet Nat compare) (ls i : Nat) (w : BitVec 3
 end
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF]
 variable [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [CurCtx]
 
 set_option maxRecDepth 100000 in
@@ -1834,7 +1834,7 @@ end
 /-! ## The loop, closed by Löb at the head `+0xb4` -/
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF]
 variable [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [CurCtx]
 
 set_option maxHeartbeats 16000000 in
@@ -1873,7 +1873,7 @@ end
 `+0x00 .. +0x3e`, plus the commit arm's set-up at `+0x9e .. +0xb0`. -/
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF]
 variable [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [CurCtx]
 
 /-- The token in hand is a LIVE ledger entry, so the outstanding count is
@@ -2304,7 +2304,7 @@ set_option maxHeartbeats 16000000 in
 theorem endOp_proof (BR : BREAD) (BW : BWRITE) (BE : BRELSE) (MM : MEMMOVE)
     (WH : WRITE_HEAD) (IT : INSTALL_TRANS) (AC : ACQUIRE) (RE : RELEASE) (WK : WAKEUP) :
     END_OP := ⟨
-  fun {hlc GF} _ _ _ _ _ _ _ _ Γ _ cpu k γ γl γb V γdl γfs pd pav pu j logstart dev u pidv dqp
+  fun {hlc GF} _ _ _ _ _ _ _ _ _ _ _ Γ _ cpu k γ γl γb V γdl γfs pd pav pu j logstart dev u pidv dqp
     hj hproc hK hnoff htier hgeom hdev hcl hdt hpd => by
   unfold wp_end_op_eb_body
   simp only [endOpAddr]

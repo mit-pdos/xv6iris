@@ -56,7 +56,7 @@ set_option linter.unusedVariables false
 set_option maxHeartbeats 16000000 in
 theorem fileclose_proof (AC : ACQUIRE) (RE : RELEASE) (PC : PIPECLOSE) (BO : BEGIN_OP)
     (IP : IPUT) (EO : END_OP) : FILECLOSE := ⟨
-  fun {hlc GF} _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ Γ _ cpu k γl γ kk q st j γkl γk on pidv dqp
+  fun {hlc GF} _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ Γ _ cpu k γl γ kk q st j γkl γk on pidv dqp
       hK hnoff htier ha0 => by
   unfold wp_fileclose_eb_body
   simp only [filecloseAddr]
@@ -154,9 +154,9 @@ theorem fileclose_proof (AC : ACQUIRE) (RE : RELEASE) (PC : PIPECLOSE) (BO : BEG
   · exact absurd hnil (by simp)
   have hlen1 : (s ++ (id, q) :: t).length = (s ++ t).length + 1 := by
     simp only [List.length_append, List.length_cons]; omega
-  ihave Hfdn := (show fdSlots (GF := GF) γ (s ++ (id, q) :: t).length ⊢ fdSlots γ ((s ++ t).length + 1) from by
+  ihave Hfdn := (show fdSlots (GF := GF) (s ++ (id, q) :: t).length ⊢ fdSlots ((s ++ t).length + 1) from by
     rw [hlen1]) $$ Hfdn
-  icases fdSlots_uncons γ _ $$ Hfdn with ⟨Hfd, Hfdn⟩
+  icases fdSlots_uncons _ $$ Hfdn with ⟨Hfd, Hfdn⟩
   -- bgtz a5
   by_cases hlast : s ++ t = []
   · -- the last reference: not taken
@@ -168,7 +168,7 @@ theorem fileclose_proof (AC : ACQUIRE) (RE : RELEASE) (PC : PIPECLOSE) (BO : BEG
     ihave Hrefc := (show wordPointsTo (GF := GF) (fnode kk + 4#64) 4 (DFrac.own 1) (BitVec.ofNat 32 (n - 1)) ⊢
         wordAtN curCtx (aFref kk) 4 (DFrac.own 1) (BitVec.ofNat 32 0) from by
       rw [wordAtN_cur, aFref_eq', show n - 1 = 0 by omega]) $$ Hrefc
-    ihave Hfdn := (show fdSlots (GF := GF) γ (s ++ t).length ⊢ fdSlots γ 0 from by
+    ihave Hfdn := (show fdSlots (GF := GF) (s ++ t).length ⊢ fdSlots 0 from by
       rw [hlast, List.length_nil]) $$ Hfdn
     ihave Hhalves := (show ([∗list] e ∈ s ++ t, frefRest (GF := GF) γ kk e) ⊢
         ([∗list] e ∈ ([] : List (Nat × Qp)), frefRest γ kk e) from by rw [hlast]) $$ Hhalves
