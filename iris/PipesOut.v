@@ -96,7 +96,7 @@ Section pipes_writes.
       iDestruct "Hr" as "[(Ht & Hps & Hcs & Hi & _) | HT]";
         [iLeft; by iFrame | by iRight].
     - iDestruct "Hp" as (v2 w so r gb pre tm)
-        "(#Hpin2 & #Hpera & Hblk & Hcur & Hrb & Hta & Hcs & Hps & HE & Hdl & Hdll & %Hopen)".
+        "(#Hpin2 & #Hpera & _ & Hblk & Hcur & Hrb & Hta & Hcs & Hps & HE & Hdl & Hdll & %Hopen)".
       iDestruct (era_pin_agree with "Hpin2 Hpin") as %->.
       iDestruct (turn_agree with "Ht Hta") as %HP.
       iDestruct (pcs_lb_prefix with "Hcs Hcslb") as %Hcsp.
@@ -147,7 +147,7 @@ Section pipes_writes.
       iDestruct "Hr" as "[(Ht & Hps & Hcs & Hi & _) | HT]";
         [iLeft; by iFrame | by iRight].
     - iDestruct "Hp" as (v2 w so r gb pre tm)
-        "(#Hpin2 & #Hpera & Hblk & Hcur & Hrb & Hta & Hcs & Hps & HE & Hdl & Hdll & %Hopen)".
+        "(#Hpin2 & #Hpera & _ & Hblk & Hcur & Hrb & Hta & Hcs & Hps & HE & Hdl & Hdll & %Hopen)".
       iDestruct (era_pin_agree with "Hpin2 Hpin") as %->.
       iDestruct (turn_agree with "Ht Hta") as %HP.
       iDestruct (pcs_lb_prefix with "Hcs Hcslb") as %Hcsp.
@@ -202,7 +202,7 @@ Section pipes_writes.
       iDestruct "Hr" as "[(Ht & Hps & Hcs & Hi & _) | HT]";
         [iLeft; by iFrame | by iRight].
     - iDestruct "Hp" as (v2 w so r gb pre tm)
-        "(#Hpin2 & #Hpera & Hblk & Hcur & Hrb & Hta & Hcs & Hps & HE & Hdl & Hdll & %Hopen2)".
+        "(#Hpin2 & #Hpera & _ & Hblk & Hcur & Hrb & Hta & Hcs & Hps & HE & Hdl & Hdll & %Hopen2)".
       iDestruct (era_pin_agree with "Hpin2 Hpin") as %->.
       iDestruct (turn_agree with "Ht Hta") as %HP.
       iDestruct (pcs_lb_prefix with "Hcs Hcslb") as %Hcsp.

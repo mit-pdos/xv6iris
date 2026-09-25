@@ -542,7 +542,7 @@ Section pipes_events.
   Proof using .
     intros Hok Hev. iIntros "Hp".
     iDestruct "Hp" as (v w so r gb pre tm)
-      "(Hpin & Hpera & Hblk & Hcur & Hrb & Htn & Hcs & Hps & HE & Hdl & Hdll & %Hpure)".
+      "(Hpin & Hpera & _ & Hblk & Hcur & Hrb & Htn & Hcs & Hps & HE & Hdl & Hdll & %Hpure)".
     iExists v, w, so, r, gb, pre, tm. iFrame "Hpin Hpera Hblk Hcur Hrb Htn Hcs Hps HE".
     rewrite ch_dl_close. iFrame "Hdl Hdll". iPureIntro.
     exact (gcl_pure_o_close PM tt k ho so r pre H Hok Hev Hpure).
@@ -558,7 +558,7 @@ Section pipes_events.
   Proof using .
     intros Hok Hev Hd Hb Hdh Hsh. iIntros "Hp".
     iDestruct "Hp" as (v w so r gb pre tm)
-      "(Hpin & Hpera & Hblk & Hcur & Hrb & Htn & Hcs & Hps & HE & Hdl & Hdll & %Hpure)".
+      "(Hpin & Hpera & _ & Hblk & Hcur & Hrb & Htn & Hcs & Hps & HE & Hdl & Hdll & %Hpure)".
     iExists v, w, so, r, gb, pre, tm. iFrame "Hpin Hpera Hblk Hcur Hrb Htn Hcs Hps HE".
     rewrite /ConsLog.cons_step. cbn [LogEntryDefs.ch_dl]. iFrame "Hdl Hdll".
     iPureIntro. exact (gcl_pure_o_open PM tt PB k ho so r pre H h c cs Hok Hev Hd Hb Hdh Hsh Hpure).
@@ -569,7 +569,7 @@ Section pipes_events.
   Proof using .
     iIntros "Hp".
     iDestruct "Hp" as (v w so r gb pre tm)
-      "(#Hpin & #Hpera & Hblk & Hcur & Hrb & Htn & Hcs & Hps & HE & Hdl & Hdll & %Hall)".
+      "(#Hpin & #Hpera & _ & Hblk & Hcur & Hrb & Htn & Hcs & Hps & HE & Hdl & Hdll & %Hall)".
     iSplitL.
     - iExists v, w, so, r, gb, pre, tm.
       iFrame "Hpin Hpera Hblk Hcur Hrb Htn Hcs Hps HE Hdl Hdll". by iPureIntro.
@@ -645,7 +645,7 @@ Section pipes_events.
   Proof using .
     intros Hread. iIntros "#Hpinr Hdlr Hp".
     iDestruct "Hp" as (v2 w so r gb pre tm)
-      "(#Hpin & #Hpera & Hblk & Hcur & Hrb & Hta & Hcs & Hps & HE & Hdl & Hdll & %Hall)".
+      "(#Hpin & #Hpera & _ & Hblk & Hcur & Hrb & Hta & Hcs & Hps & HE & Hdl & Hdll & %Hall)".
     iDestruct (era_pin_agree with "Hpin Hpinr") as %->.
     iDestruct (dl_cnt_agree with "Hdl Hdlr") as %Hdleq.
     pose proof Hall as Hall0.
@@ -797,7 +797,7 @@ Section pipes_events.
               with "Hc") as "Hc"; try done.
       iModIntro. by iLeft.
     - iDestruct "Hp" as (v w so r gb pre tm)
-        "(_ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & %Hopen)".
+        "(_ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & %Hopen)".
       subst k. by destruct (gcl_pure_o_no_echo PM tt Lw K PB h c ho CH so r pre
                               Hdisc Hsh Hends Hwire Hord HK1 Harm Hopen).
   Qed.
@@ -855,7 +855,7 @@ Section pipes_events.
     intros Hsh Hk Hpre Hins Hwire. subst k.
     iIntros "Hp".
     iDestruct "Hp" as (v w so r gb pre tm)
-      "(#Hpin & #Hpera & Hblk & Hcur & Hrb & Hta & Hcs & Hps & HE & Hdl & Hdll & %Hpo)".
+      "(#Hpin & #Hpera & _ & Hblk & Hcur & Hrb & Hta & Hcs & Hps & HE & Hdl & Hdll & %Hpo)".
     pose proof (proj1 Hpo)
       as (Hacc & Hidx & Hbyte & Hpsb & Hpinf & Hcs' & Hdsc & Hpre1 & Hpre2 & Hpre3
           & Hnofk & Hf0n & Hfok0).
@@ -924,14 +924,15 @@ Section pipes_events.
     intros Ha Hbl Hbv. iIntros "Hpw Hcl".
     iDestruct "Hpw" as "[Hx | #HT]"; last first.
     { iModIntro. iSplitR; [by iApply (pecl'_taint with "HT") | by iRight]. }
-    iDestruct "Hx" as (ps cs P) "(%Hw & #Hpin & Htn & #Hps & #Hcs & _ & #HE)".
+    iDestruct "Hx" as (ps cs s0 P) "([%Hw _] & #Hpin & _ & Htn & #Hps & #Hcs & _ & #HE)".
+    destruct s0.
     pose proof Hw as ((Hpp & Hr & Hn & HP) & _).
     assert (HneI : I <> []) by (intros ->; rewrite nlines_nil in Hn; lia).
     replace (P + length (@nil (bv 8)))%nat with P by (cbn [length]; lia).
     rewrite pecl'_gen. iDestruct "Hcl" as "[Hc | Hp]"; last first.
     { (* AN OPEN ROUND has already written a byte: the turn refutes it *)
       iDestruct "Hp" as (v2 w so r gb pre tm)
-        "(#Hpin2 & #Hpera & Hblk & Hcur & Hrb & Hta & Hcs2 & Hps2 & HE2 & Hdl & Hdll & %Hopen)".
+        "(#Hpin2 & #Hpera & _ & Hblk & Hcur & Hrb & Hta & Hcs2 & Hps2 & HE2 & Hdl & Hdll & %Hopen)".
       iDestruct (era_pin_agree with "Hpin2 Hpin") as %->.
       iDestruct (turn_agree with "Htn Hta") as %HP2.
       iDestruct (pcs_lb_prefix with "Hcs2 Hcs") as %Hcsp.

@@ -152,7 +152,7 @@ Section UInitPipeSeam.
     gwc_lpr pipes_lmE GP (pipes_X g) k v I p ⊢ inp_lb v I ∨ T.
   Proof using .
     destruct p as [| [| [| p']]]; cbn [gwc_lpr].
-    - rewrite /gwc_line /gwc_pro /gwc_post /gcur /pipes_X /pwc_blkN.
+    - rewrite /gwc_line /gwc_pro /gwc_post /gcur /pipes_X /pwc_blkN /pwc_blkV.
       cbn [gH gT pipes_params]. rewrite /pipes_H.
       iIntros "[[Hl | [[] | #HT]] | [Hq | Hx]]".
       + iDestruct "Hl" as (ps cs s P) "(_ & _ & _ & _ & #HE & _)". by iLeft.
@@ -160,7 +160,7 @@ Section UInitPipeSeam.
       + iDestruct "Hq" as (a) "[_ [Hl | #HT]]"; [| by iRight].
         iDestruct "Hl" as (ps cs s P) "(_ & _ & _ & _ & #HE & _)". by iLeft.
       + iDestruct "Hx" as (pre) "[_ [Hl | #HT]]"; [| by iRight].
-        iDestruct "Hl" as (ps cs P) "(_ & _ & _ & _ & _ & _ & #HE)". by iLeft.
+        iDestruct "Hl" as (ps cs s0 P) "(_ & _ & _ & _ & _ & _ & _ & #HE)". by iLeft.
     - rewrite /gwc_sp_t /gcur. cbn [gT pipes_params].
       iIntros "[Hl | #HT]"; [| by iRight].
       iDestruct "Hl" as (ps cs s P) "(_ & _ & _ & _ & #HE & _)". by iLeft.

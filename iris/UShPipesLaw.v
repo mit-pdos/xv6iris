@@ -161,9 +161,11 @@ Section UShPipesLaw.
     iDestruct "Hc" as "[Hx | #HT]"; [| iSplitR; [by iRight | by iRight]].
     iDestruct "Hx" as (ps cs s0 P) "(%Hw & Htn & #Hps & #Hcs & #HE & _)".
     iSplitR; [by iLeft |].
-    rewrite /pwc_blkN. iLeft. iExists ps, cs, P. destruct s0.
-    rewrite Nat.add_0_r. cbn [lm_blkcs]. iFrame "Htn Hps Hcs HE".
-    iSplit; [iPureIntro; exact Hw | rewrite /pledN; by iLeft].
+    destruct s0. rewrite /pwc_blkN /pwc_blkV. iLeft. iExists ps, cs, tt, P.
+    rewrite ?Nat.add_0_r. cbn [lm_blkcs length]. rewrite ?Nat.add_0_r.
+    iFrame "Htn Hps Hcs HE".
+    iSplitR; [iPureIntro; split; [exact Hw | by destruct (lm_upto _ _ _ _ _)] |].
+    rewrite /pledV. by iLeft.
   Qed.
 
   (* THE TOP NODE'S PAYMENT, read into the child's exit payload *)
