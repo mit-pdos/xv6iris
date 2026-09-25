@@ -101,6 +101,7 @@ Imports only definitional files and Spec files (`UexecExecInst` for the
 instance, deviation 10).
 -/
 import Xv6.UtResFits
+import Xv6.ParkCap
 import Xv6.SpecSyscall
 import Xv6.UexecRound
 import Xv6.HandlerEnv
@@ -424,7 +425,8 @@ def wp_usertrap_body (R : CPU → UPtd → BitVec 64 → ProcPriv → List FdSta
 end Contract
 
 /-- **Rocq `Module Type USERTRAP`**: `wp_usertrap` at the pinned residue
-(deviation 2), ∀-quantified over the park token `PT` (persistent), the era's
+(deviation 2), at THE PARK TOKEN (`ParkCap.parkToken`, W8-P2: the syscall
+seal `SYSCALL_XV6` is at it, since fork spends it), the era's
 proc table (`ClaimIs`) and its handler environment's names (`EnvIs`, which
 devintr's credentials are read from), at the kernel's deposit instance
 (deviation 10). -/
@@ -433,14 +435,15 @@ structure USERTRAP : Prop where
     [BioslotG GF] [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF]
     [IregG GF] [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF]
     [CtokG GF] [WchG GF] [Appcfg GF] [FileG GF] [Fscfg] [Icfg] [CurCtx]
-    (PT : SchedNames → IProp GF) [∀ Γ, Persistent (PT Γ)] (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+    (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
     (γ0 γ1 : UartNames) (γc γl0 γl1 : GName) (γd : DiskNames) (γdl γt : GName)
     [EnvIs (hlc := hlc) GF Γ γ0 γ1 γc γl0 γl1 γd γdl γt]
     (cpu : CPU) (k : KCtx) (j : Nat) (P : UPtd) (ksp : BitVec 64) (V : ProcPriv)
     (M : Nat → List (BitVec 8)) (sts : List FdState) (gn : GName) (cs : ExtTreeSet GName compare)
     (pid : BitVec 32) (sep sc tv : BitVec 64) (f : UexecSG.sfam GF) (Wk : Uvis)
     hj hproc hctx htier hnoff hstk hgn,
-    wp_usertrap_body (hlc := hlc) (GF := GF) (fun h => usertrapResAt (hlc := hlc) PT Γ j h)
+    wp_usertrap_body (hlc := hlc) (GF := GF)
+      (fun h => usertrapResAt (hlc := hlc) (parkToken (hlc := hlc) (GF := GF) (SG := uexecSGXv6)) Γ j h)
       cpu k j P ksp V M sts gn cs pid sep sc tv f Wk hj hproc hctx htier hnoff hstk hgn
 
 end Xv6

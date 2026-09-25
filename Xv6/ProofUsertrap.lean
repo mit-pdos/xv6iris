@@ -40,8 +40,9 @@ interfaces. -/
 theorem usertrap_proof (SY : SYSCALL_XV6) (PK : PRINTK) (MP : MYPROC) (KI : KILLED) (SK : SETKILLED)
     (DI : DEVINTR) (VM : VMFAULT) (YI : YIELD) (PR : PREPARE_RETURN)
     (KE : KEXIT) (KV : KERNELVEC) : USERTRAP :=
-  ⟨fun {hlc GF} _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ PT _ Γ _ γ0 γ1 γc γl0 γl1 γd γdl γt _
+  ⟨fun {hlc GF} _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ Γ _ γ0 γ1 γc γl0 γl1 γd γdl γt _
       cpu k j P ksp V M sts gn cs pid sep sc tv f Wk hj hproc hctx htier hnoff hstk hgn => by
+    let PT := parkToken (hlc := hlc) (GF := GF) (SG := uexecSGXv6)
     have HK := usertrap_kexit_proof PT Γ KE
     have HR := usertrap_ret_proof PT Γ PR
     have HA6 := usertrap_a6_proof PT Γ KI HR HK
@@ -49,7 +50,7 @@ theorem usertrap_proof (SY : SYSCALL_XV6) (PK : PRINTK) (MP : MYPROC) (KI : KILL
     have HEA := usertrap_ea_proof PT Γ KI HFA HK
     have H56 := usertrap_56_proof PT Γ PK SK HA6
     have HD0 := usertrap_d0_proof PT Γ VM HA6 H56
-    have H90 : UT_90 PT Γ := usertrap_90_proof PT Γ KI SY utReadWhy_xv6 HA6 HK
+    have H90 : UT_90 PT Γ := usertrap_90_proof PT Γ KI SY rfl utReadWhy_xv6 HA6 HK
     have HD := usertrap_dispatch_proof PT Γ DI KV H90 HEA HD0 H56 γ0 γ1 γc γl0 γl1 γd γdl γt
     exact usertrap_open MP PT Γ HD cpu k j P ksp V M sts gn cs pid sep sc tv f Wk hj hproc hctx
       htier hnoff hstk hgn⟩
