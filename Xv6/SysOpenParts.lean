@@ -950,7 +950,7 @@ structure SysOpenArgs (GF : BundledGFunctors) where
 /-- THE STATIC PREMISES (Rocq's `K_sys_open <= K -> … -> eb = true ->`
 block, minus `eb`): the contract's own, fixed for the whole call.  `k` is
 sys_open's ENTRY context. -/
-structure SysOpenStatic (k : KCtx) (A : SysOpenArgs GF) : Prop where
+structure SysOpenStatic {GF : BundledGFunctors} (k : KCtx) (A : SysOpenArgs GF) : Prop where
   hj : A.j < NPROC
   hproc : k.proc = procAddr A.j
   htier : k.tier = KTier.kpt
@@ -962,18 +962,18 @@ structure SysOpenStatic (k : KCtx) (A : SysOpenArgs GF) : Prop where
 
 /-- The block after argstr: the page table grown to `P2`, the view faulted
 (argstr's post; Rocq's `us_upt U P2`). -/
-abbrev sysOpenV2 (A : SysOpenArgs GF) (P2 : UPtd) : ProcPriv := { A.V with upt := P2 }
-abbrev sysOpenM2 (A : SysOpenArgs GF) (P2 : UPtd) : Nat → List (BitVec 8) :=
+abbrev sysOpenV2 {GF : BundledGFunctors} (A : SysOpenArgs GF) (P2 : UPtd) : ProcPriv := { A.V with upt := P2 }
+abbrev sysOpenM2 {GF : BundledGFunctors} (A : SysOpenArgs GF) (P2 : UPtd) : Nat → List (BitVec 8) :=
   viewFaulted A.V.upt P2 A.M
 
 /-- `omode` as argint stored it. -/
-abbrev sysOpenOm (A : SysOpenArgs GF) : BitVec 32 := BitVec.extractLsb' 0 32 A.vom
+abbrev sysOpenOm {GF : BundledGFunctors} (A : SysOpenArgs GF) : BitVec 32 := BitVec.extractLsb' 0 32 A.vom
 
 /-- THE IMAGE THE PATH IS READ AT (Rocq's `us_M U` at entry): the entry view
 with every lazy page read as zeros (`UMemLazy.viewLazy`), which is where
 argstr reads its string.  `A.M` itself when the block has no lazy page
 (`UMemL.viewLazy_of_lazyFree`). -/
-abbrev sysOpenIm (A : SysOpenArgs GF) : Nat → List (BitVec 8) := viewLazy A.V.upt A.V.sz A.M
+abbrev sysOpenIm {GF : BundledGFunctors} (A : SysOpenArgs GF) : Nat → List (BitVec 8) := viewLazy A.V.upt A.V.sz A.M
 
 section Vocab
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]

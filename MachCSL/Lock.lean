@@ -80,7 +80,7 @@ theorem wordPin_curVal {W : WordHist 4} {B : Nat} {i : CPU} (hpin : wordPin W B 
   | cons e W1 => exact h1 e List.mem_cons_self
 
 /-- The read cases of `WordHist.read_cases`, for a reader `h` at view `tvn`. -/
-abbrev ReadCases (W : WordHist n) (h : Agent) (tvn : Nat) (v0 w : BitVec (8 * n)) : Prop :=
+abbrev ReadCases {n : Nat} (W : WordHist n) (h : Agent) (tvn : Nat) (v0 w : BitVec (8 * n)) : Prop :=
   (∃ W1 e W2, W = W1 ++ e :: W2 ∧ e.visible h tvn = true ∧ (∀ x ∈ W1, x.visible h tvn = false) ∧
     w = e.v) ∨
   ((∀ x ∈ W, x.visible h tvn = false) ∧ w = v0)

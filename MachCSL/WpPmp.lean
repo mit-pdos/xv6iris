@@ -22,7 +22,7 @@ variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF]
 
 /-- A cast along an equation with a constant motive (the compiled `match` on
 a `BitVec 1` pattern leaves one behind). -/
-@[sail_facts] theorem eq_rec_const {α : Sort u} {a a' : α} {β : Sort v} (y : β) (h : a = a') :
+@[sail_facts] theorem eq_rec_const.{u, v} {α : Sort u} {a a' : α} {β : Sort v} (y : β) (h : a = a') :
     (@Eq.rec α a (fun _ _ => β) y a' h) = y := by subst h; rfl
 
 /-- The boot PMP tables at an integer index (the model indexes them with `Int`). -/

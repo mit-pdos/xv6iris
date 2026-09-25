@@ -20,7 +20,9 @@ path = "model/Lean_RV64D"
 
 [[lean_lib]]
 name = "MachCSL"
+leanOptions = { autoImplicit = false, relaxedAutoImplicit = false }
 
 # The xv6 kernel proofs, kept separate from the MachCSL framework.
 [[lean_lib]]
 name = "Xv6"
+leanOptions = { autoImplicit = false, relaxedAutoImplicit = false }

@@ -1230,7 +1230,7 @@ theorem createMkdir_dots_comm (i d : Nat) :
   · subst h2; simp; intro h; exact absurd h (by decide)
   · simp [Ne.symm h1, Ne.symm h2]
 
-theorem createMkdir_dots_one (i : Nat) :
+theorem createMkdir_dots_one {d : Nat} (i : Nat) :
     (∅ : Std.ExtTreeMap Fname Nat compare).insert DOT i = dotsEnts false i d := by
   unfold dotsEnts; rfl
 

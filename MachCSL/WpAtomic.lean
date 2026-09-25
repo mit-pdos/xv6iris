@@ -280,7 +280,7 @@ def histBytes (pa : PAddr) (n : Nat) (dqs : Nat → DFrac) (Hs : Nat → Hist) :
   [∗list] j ∈ List.range n, (pa + BitVec.ofNat 64 j) ↦ₕ{dqs j} Hs j
 
 /-- The histories after the store of `w` at position `t` by `h`. -/
-abbrev pushed (Hs : Nat → Hist) (t : Nat) (h : Agent) (w : BitVec (8 * n)) : Nat → Hist :=
+abbrev pushed {n : Nat} (Hs : Nat → Hist) (t : Nat) (h : Agent) (w : BitVec (8 * n)) : Nat → Hist :=
   fun j => ⟨t, h, nthByte w j⟩ :: Hs j
 
 theorem histBytes_valid' (m : FlatMem) (pa : PAddr) (dqs : Nat → DFrac) (Hs : Nat → Hist) :

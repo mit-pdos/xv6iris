@@ -122,7 +122,7 @@ theorem iput_tail_rest_frac (q qt qrest qr : Qp) (hsub : qpSub qt q = some qrest
   show (1 : Qp).half.val = qrest.val + (q.val + qr.val)
   grind
 
-theorem iput_tail_icHdr_cur {GF : BundledGFunctors} [IcacheG GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [LogG GF]
+theorem iput_tail_icHdr_cur {hlc : HasLC} {GF : BundledGFunctors} [IcacheG GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [LogG GF]
     [FsBlocksG GF] [IregG GF] [FsTopG GF] [FsLinkG GF] [MachGS hlc GF] [Icfg] [CurCtx]
     (cn : IcNames) (γfs : FsNames) (γi : GName) (cov : ExtTreeSet Nat compare)
     (logstart k : Nat) (i : IcBid) (x : IcX) :

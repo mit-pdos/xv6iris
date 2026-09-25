@@ -19,6 +19,8 @@ import MachCSL.WpAtomic
 
 namespace MachCSL
 
+variable {n : Nat}
+
 open Iris Iris.BI Iris.ProofMode Std
 
 /-! ## Word entries -/

@@ -299,7 +299,7 @@ def getSailNormCtx : TacticM (Simp.Context × Simp.SimprocsArray) := do
   mkSailNormCtx
 
 /-- Run `x` with the normaliser's context built once. -/
-def withSailNormCtx (x : TacticM α) : TacticM α := do
+def withSailNormCtx {α : Type} (x : TacticM α) : TacticM α := do
   let saved ← sailNormCtx.get
   sailNormCtx.set (some (← mkSailNormCtx))
   try x finally sailNormCtx.set saved

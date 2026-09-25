@@ -245,7 +245,7 @@ theorem irefFrac_combine (q1 q2 : Qp) :
 instance irefFrac_fractional : Fractional (PROP := IProp GF) (fun q => irefFrac q) :=
   ⟨irefFrac_op⟩
 
-instance irefFrac_as_fractional (q : Qp) :
+instance irefFrac_as_fractional {ioΦ ioq : InOut} (q : Qp) :
     AsFractional (PROP := IProp GF) (irefFrac q) ioΦ (fun q => irefFrac q) ioq q where
   as_fractional := .rfl
   as_fractional_fractional := irefFrac_fractional

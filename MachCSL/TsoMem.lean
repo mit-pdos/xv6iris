@@ -250,7 +250,7 @@ theorem Mem.foldl_insert_get? (m : Mem) (pa : PAddr) (bs : Nat → BitVec 8) :
       rw [if_neg hne]
       exact Mem.foldl_insert_get? m pa bs n (by omega) j hlt
 
-theorem Mem.writeBytes_get?_in (m : Mem) (pa : PAddr) (w : BitVec (8 * n)) (hn : n < 2 ^ 64)
+theorem Mem.writeBytes_get?_in {n : Nat} (m : Mem) (pa : PAddr) (w : BitVec (8 * n)) (hn : n < 2 ^ 64)
     (j : Nat) (hj : j < n) : (m.writeBytes pa n w)[pa + BitVec.ofNat 64 j]? = some (nthByte w j) :=
   Mem.foldl_insert_get? m pa (nthByte w) n hn j hj
 
@@ -490,7 +490,7 @@ theorem FlatMem.push_eq_insert (m : FlatMem) (a : PAddr) (e : HEnt) (H : Hist) (
   rfl
 
 /-- An address outside the footprint is untouched by a store. -/
-theorem FlatMem.writeBytes_get?_notin (m : FlatMem) (pa : PAddr) (w : BitVec (8 * n)) (t : Nat)
+theorem FlatMem.writeBytes_get?_notin {n : Nat} (m : FlatMem) (pa : PAddr) (w : BitVec (8 * n)) (t : Nat)
     (h : Agent) (a : PAddr) (ha : ∀ j, j < n → a ≠ pa + BitVec.ofNat 64 j) :
     (m.writeBytes pa n w t h)[a]? = m[a]? := by
   unfold FlatMem.writeBytes
@@ -508,7 +508,7 @@ theorem FlatMem.writeBytes_get?_notin (m : FlatMem) (pa : PAddr) (w : BitVec (8 
 
 /-- Every history of a stored-into memory is well formed (against the log
 extended by the author) if every history was before. -/
-theorem FlatMem.writeBytes_histOk (m : FlatMem) (log : List Agent) (pa : PAddr)
+theorem FlatMem.writeBytes_histOk {n : Nat} (m : FlatMem) (log : List Agent) (pa : PAddr)
     (w : BitVec (8 * n)) (h : Agent)
     (hm : ∀ (a : PAddr) (H : Hist), m[a]? = some H → histOk log H) :
     ∀ (a : PAddr) (H : Hist), (m.writeBytes pa n w (log.length + 1) h)[a]? = some H →

@@ -1144,7 +1144,7 @@ and which therefore comes back through `Xv6.dmaOwnT_ctxBytes` instead)
 and the driver's halves (`Xv6.claimRes`) are the same ghost elements, so
 the collect joins them into the `own 1` windows `free_desc` needs.  This
 is the exact inverse of what `Xv6.disk_publish` splits. -/
-theorem chainLease_claim_join [CurCtx] (ξ : CtxId) (pd : PAddr) (c : Chain) :
+theorem chainLease_claim_join {γ : DiskNames} [CurCtx] (ξ : CtxId) (pd : PAddr) (c : Chain) :
     iprop(chainLease (GF := GF) pd c ∗ claimRes γ ξ pd c) ⊢
       ctxBytes ξ (descAt pd c.hd) 16 (DFrac.own 1) c.d0 ∗
       ctxBytes ξ (descAt pd c.md) 16 (DFrac.own 1) c.d1 ∗
@@ -1171,7 +1171,7 @@ theorem chainLease_claim_join [CurCtx] (ξ : CtxId) (pd : PAddr) (c : Chain) :
     · iexact Hch
 
 /-- **The chain's windows, taken back whole, at a KNOWN `b->disk`.** -/
-theorem chainLease_claimD_join [CurCtx] (ξ : CtxId) (pd : PAddr) (c : Chain) (d : BitVec 32) :
+theorem chainLease_claimD_join {γ : DiskNames} [CurCtx] (ξ : CtxId) (pd : PAddr) (c : Chain) (d : BitVec 32) :
     iprop(chainLease (GF := GF) pd c ∗ claimResD γ ξ pd c d) ⊢
       ctxBytes ξ (descAt pd c.hd) 16 (DFrac.own 1) c.d0 ∗
       ctxBytes ξ (descAt pd c.md) 16 (DFrac.own 1) c.d1 ∗

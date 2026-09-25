@@ -66,7 +66,7 @@ No other (b) site exists in the tree.
   `d : Nat` in `CreateMkdir.createMkdir_dots_one` (the `..` target, unused
   by `dotsEnts false`).
 
-## Proposal (not done yet)
+## Proposal (DONE: autoImplicit is off in lakefile.toml for both libs; the 41 binders are explicit)
 
 Turn autoImplicit off project-wide so this class of bug is a compile error:
 

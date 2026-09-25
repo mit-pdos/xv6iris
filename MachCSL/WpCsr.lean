@@ -26,7 +26,7 @@ variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF]
 
 /-- A cast along an equation with a constant motive (compiled `match` on a
 bitvector pattern; also in `WpPmp`). -/
-@[sail_facts] theorem eq_rec_const_csr {α : Sort u} {a a' : α} {β : Sort v} (y : β) (h : a = a') :
+@[sail_facts] theorem eq_rec_const_csr.{u, v} {α : Sort u} {a a' : α} {β : Sort v} (y : β) (h : a = a') :
     (@Eq.rec α a (fun _ _ => β) y a' h) = y := by subst h; rfl
 
 /-- `updateSubrange w 63 0 v` after the normaliser has taken it apart. -/
