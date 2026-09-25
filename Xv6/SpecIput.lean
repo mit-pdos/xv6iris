@@ -84,8 +84,8 @@ no caller can know in advance which arm runs.
    `Xv6/SpecIlock.lean`); the post's `callee_saved m mf` is
    `⌜calleeSaved k.regs R'⌝` with the exit context
    `(k.withSpie spie spp).withRegs R'` (SpecItrunc's shape).
-5. `iputAddr` is `Xv6/FsEnv.lean`'s (reused, as `SpecIdup` reuses
-   `idupAddr`); when wave 7 retires FsEnv's abstract entries, move it here.
+5. `iputAddr` lives here (wave 7 D13; it used to be `Xv6/FsEnv.lean`'s,
+   retired with FsEnv's abstract entries).
 6. `wp_iput_sconf` is not a field: it is DERIVED below
    (`IPUT.wp_iput_sconf`), exactly as Rocq derives it in ProofIput.v
    5656--5713 (at the `logOp` existential's own witness, `crb = cru = crz =
@@ -107,12 +107,15 @@ import Xv6.SpecLogWrite
 import Xv6.IcacheTable
 import Xv6.IcacheHeld
 import Xv6.TxPin
-import Xv6.FsEnv
+import Xv6.SpecSleep
 
 namespace Xv6
 
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
 open LeanRV64D
+
+/-- `iput`'s entry (D13). -/
+def iputAddr : BitVec 64 := KA.«iput»
 
 set_option linter.unusedSectionVars false
 set_option linter.unusedVariables false

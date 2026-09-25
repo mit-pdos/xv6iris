@@ -33,6 +33,8 @@ proved in exactly this eb shape (`SpecBeginOp.wp_begin_op_eb_body`,
 -/
 import Xv6.SpecSleep
 import Xv6.SpecFiledup
+import Xv6.SpecIdup
+import Xv6.SpecFileclose
 import Iris.ProofMode
 
 namespace Xv6
@@ -40,13 +42,11 @@ namespace Xv6
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
 open LeanRV64D
 
-def filecloseAddr : BitVec 64 := KA.«fileclose»
 def fsBeginOpAddr : BitVec 64 := KA.«begin_op»
 def fsEndOpAddr : BitVec 64 := KA.«end_op»
-def iputAddr : BitVec 64 := KA.«iput»
 def nameiAddr : BitVec 64 := KA.«namei»
--- `filedupAddr` is `Xv6/SpecFiledup.lean`'s (D13: the entry address lives with its Spec).
-def idupAddr : BitVec 64 := KA.«idup»
+-- `filedupAddr` / `idupAddr` / `iputAddr` / `filecloseAddr` live with their
+-- Specs (D13).
 
 /-- The stack an fs entry point may use (assumed). -/
 def fsSlots : Nat := 64

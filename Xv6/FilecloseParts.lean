@@ -20,6 +20,7 @@ Rocq cancels after release, in the inode arm.  Ghost-only; the cinv's mask
 is `fileipN`, disjoint from everything the lock holds.
 -/
 import Xv6.SpecFileclose
+import Xv6.FsCallSitesOp
 import Xv6.FileFrac
 import Xv6.FilePay
 import Xv6.FtableLock
@@ -114,11 +115,6 @@ theorem fc_calleeSaved_mk (KR R : RegMap)
     first
       | rfl
       | assumption
-
-/-- `iputUnits ≤ MAXOPBLOCKS`: begin_op's reservation pays iput (Rocq's
-`unfold iput_units, MAXOPBLOCKS; lia`). -/
-theorem fc_iput_units : iputUnits ≤ MAXOPBLOCKS := by
-  unfold iputUnits MAXOPBLOCKS; decide
 
 /-- The caller's `true` crossing is HART-FREE at a process (Rocq's
 `wp_next true` at `p = proc_addr j`). -/
@@ -291,117 +287,6 @@ theorem fc_pipeclose [CurCtx] (PC : PIPECLOSE) (Γ : SchedNames) (c : CPU) (k' :
   have h := PC.wp_pipeclose (hlc := hlc) (GF := GF) Γ c k' γl γp w γkl γk on hw hnoff hK hpipe hproc hkmem htier
   unfold wp_pipeclose_body at h
   simp only [pipecloseAddr] at h
-  exact h
-
-/-- `begin_op()` at `+0xaa` (Rocq `BeginOp.wp_begin_op_sconf`), at the
-ambient names. -/
-theorem fc_begin_op [Fscfg] [Icfg] [CurCtx] (BO : BEGIN_OP) (Γ : SchedNames)
-    [ClaimIs (hlc := hlc) GF Γ] (c : CPU) (k' : KCtx) (j : Nat) (pidv : BitVec 32) (dqp : DFrac)
-    (pj : BitVec 64) (hpj : k'.proc = pj) (s : Bool) (hs : k'.sie = s)
-    (hj : j < NPROC) (hproc : k'.proc = procAddr j) (hK : beginOpSlots ≤ k'.avail)
-    (hnoff : k'.noff = 0) (htier : k'.tier = KTier.kpt) :
-    kctx c k' ∗ pcIs c KA.«begin_op» ∗ procsInv Γ ∗
-    trapCsrsExt c s ∗ cpuClaimExt c s pj ∗
-    logCtx icfgLog fscBio fscFs fscCov fscLogst icfgDev ∗
-    wordPointsTo (pPid pj) 4 dqp pidv ∗
-    wpNext true pj c (fun cpu' => iprop(∀ (spie spp : Bool) (R' : RegMap),
-      ⌜calleeSaved k'.regs R'⌝ -∗
-      kctx cpu' ((k'.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k'.regs 1#5)) -∗
-      trapCsrsExt cpu' s -∗ cpuClaimExt cpu' s pj -∗
-      wordPointsTo (pPid pj) 4 dqp pidv -∗
-      logOp icfgLog MAXOPBLOCKS -∗ wpLoop cpu'))
-    ⊢ wpLoop (GF := GF) c := by
-  subst hpj hs
-  have h := BO.wp_begin_op_eb (hlc := hlc) (GF := GF) Γ c k' icfgLog fscBio
-    (fsView fscFs fscDisk icfgDev fscCov) fscFs j fscLogst icfgDev pidv dqp
-    hj hproc hK hnoff htier
-  unfold wp_begin_op_eb_body at h
-  simp only [beginOpAddr] at h
-  exact h
-
-/-- `iput(ff.ip)` at `+0xb0`, THE COUNTED SEAL (Rocq `Iput.wp_iput_sconf`,
-Lean `IPUT.wp_iput_sconf_eb`): the `logOp` begin_op minted opens at its set,
-the credited set form runs, and the set is forgotten again -- the
-`logOp_openS` / `logOpS_op` bridge IreclaimOrphanB/C spell by hand. -/
-theorem fc_iput [Fscfg] [Icfg] [CurCtx] (IP : IPUT) (Γ : SchedNames)
-    [ClaimIs (hlc := hlc) GF Γ]
-    (c : CPU) (k' : KCtx) (γl : GName) (pd pav pu : BitVec 64) (j : Nat)
-    (γil γisl : GName) (kk : Nat) (q : Qp) (inum : BitVec 32) (n : Nat)
-    (pidv : BitVec 32) (dqp dqb dqs : DFrac) (s : Bool) (hs : k'.sie = s)
-    (hj : j < NPROC) (hproc : k'.proc = procAddr j) (hK : iputSlots ≤ k'.avail)
-    (hnoff : k'.noff = 0) (htier : k'.tier = KTier.kpt) (hkk : kk < NINODE)
-    (hgeom : logGeomOk fscCov fscLogst)
-    (hbg : bitmapGeomOk fscCov fscLogst fscBmapstart fscSize)
-    (hcov : IBLOCK inum icfgIst ∈ fscCov)
-    (hlog : logRegion fscLogst (IBLOCK inum icfgIst) = false)
-    (hnib : inum.toNat < 16 * icfgNib)
-    (hbel : covBelow fscCov fscSize)
-    (hn : iputUnits ≤ n)
-    (hpd : descPageRw pd) (ha0 : k'.regs 10#5 = ientry kk) :
-    kctx c k' ∗ pcIs c KA.«iput» ∗ procsInv Γ ∗
-    trapCsrsExt c s ∗ cpuClaimExt c s k'.proc ∗ panicEnv ∗
-    bioCtx γl fscBio (fsView fscFs fscDisk icfgDev fscCov) ∗
-    logCtx icfgLog fscBio fscFs fscCov fscLogst icfgDev ∗
-    diskCaps fscDisk fscDlock pd pav pu ∗
-    isItable2 fscItlock fscIc fscFs fscIreg fscCov fscLogst icfgNib icfgDev ∗
-    itableInv (hlc := hlc) ∗
-    icEscrow fscIc fscFs fscIreg fscCov fscLogst kk ∗
-    iregInv (hlc := hlc) fscIreg fscFs icfgIst icfgNib ∗
-    iregOpen ∗
-    isSleeplockGen γil γisl (iLock (ientry kk)) (icSlp fscIc kk) (slhTok (icfgIsl kk)) ∗
-    inodeRefp kk q icfgDev inum ∗
-    wordPointsTo sbBmapstartAddr 4 dqb (BitVec.ofNat 32 fscBmapstart) ∗
-    wordPointsTo sbInodestart 4 dqs (BitVec.ofNat 32 icfgIst) ∗
-    bitmapInv fscFs fscBmapstart fscCov fscLogst fscSize ∗
-    wordPointsTo (pPid k'.proc) 4 dqp pidv ∗
-    bslots 3 ∗
-    logOp icfgLog n ∗
-    wpNext true k'.proc c (fun cpu' => iprop(∀ (spie spp : Bool) (R' : RegMap) (n' : Nat),
-      ⌜calleeSaved k'.regs R'⌝ -∗
-      kctx cpu' ((k'.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k'.regs 1#5)) -∗
-      trapCsrsExt cpu' s -∗ cpuClaimExt cpu' s k'.proc -∗
-      wordPointsTo (pPid k'.proc) 4 dqp pidv -∗
-      wordPointsTo sbBmapstartAddr 4 dqb (BitVec.ofNat 32 fscBmapstart) -∗
-      wordPointsTo sbInodestart 4 dqs (BitVec.ofNat 32 icfgIst) -∗
-      bslots 3 -∗
-      ⌜n - iputUnits ≤ n' ∧ n' ≤ n⌝ -∗
-      logOp icfgLog n' -∗
-      irefSlot -∗ wpLoop cpu'))
-    ⊢ wpLoop (GF := GF) c := by
-  subst hs
-  have h := IP.wp_iput_sconf_eb (hlc := hlc) (GF := GF) Γ c k' γl pd pav pu j γil γisl kk q inum n
-    pidv dqp dqb dqs hj hproc hK hnoff htier hkk hgeom hbg hcov hlog hnib hbel hn hpd ha0
-  unfold wp_iput_sconf_eb_body at h
-  simp only [iputAddr] at h
-  exact h
-
-/-- `end_op()` at `+0xb4` (Rocq `EndOp.wp_end_op_sconf`). -/
-theorem fc_end_op [Fscfg] [Icfg] [CurCtx] (EO : END_OP) (Γ : SchedNames)
-    [ClaimIs (hlc := hlc) GF Γ] (c : CPU) (k' : KCtx) (γl : GName) (pd pav pu : BitVec 64)
-    (j : Nat) (u : Nat) (pidv : BitVec 32) (dqp : DFrac)
-    (pj : BitVec 64) (hpj : k'.proc = pj) (s : Bool) (hs : k'.sie = s)
-    (hj : j < NPROC) (hproc : k'.proc = procAddr j) (hK : endOpSlots ≤ k'.avail)
-    (hnoff : k'.noff = 0)
-    (htier : k'.tier = KTier.kpt) (hgeom : logGeomOk fscCov fscLogst) (hpd : descPageRw pd) :
-    kctx c k' ∗ pcIs c KA.«end_op» ∗ procsInv Γ ∗
-    trapCsrsExt c s ∗ cpuClaimExt c s pj ∗
-    bioCtx γl fscBio (fsView fscFs fscDisk icfgDev fscCov) ∗
-    diskCaps fscDisk fscDlock pd pav pu ∗ panicEnv ∗
-    logCtx icfgLog fscBio fscFs fscCov fscLogst icfgDev ∗
-    wordPointsTo (pPid pj) 4 dqp pidv ∗
-    logOp icfgLog u ∗
-    wpNext true pj c (fun cpu' => iprop(∀ (spie spp : Bool) (R' : RegMap),
-      ⌜calleeSaved k'.regs R'⌝ -∗
-      kctx cpu' ((k'.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k'.regs 1#5)) -∗
-      trapCsrsExt cpu' s -∗ cpuClaimExt cpu' s pj -∗
-      wordPointsTo (pPid pj) 4 dqp pidv -∗ wpLoop cpu'))
-    ⊢ wpLoop (GF := GF) c := by
-  subst hpj hs
-  have h := EO.wp_end_op_eb (hlc := hlc) (GF := GF) Γ c k' icfgLog γl fscBio
-    (fsView fscFs fscDisk icfgDev fscCov) fscDlock fscFs pd pav pu j fscLogst icfgDev u pidv dqp
-    hj hproc hK hnoff htier hgeom rfl rfl rfl hpd
-  unfold wp_end_op_eb_body at h
-  simp only [endOpAddr] at h
   exact h
 
 /-! ## The exit: the epilogue at `(KernelSyms.«fileclose» + 0x8e)` -/

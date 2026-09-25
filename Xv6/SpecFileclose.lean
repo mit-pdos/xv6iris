@@ -97,6 +97,9 @@ open LeanRV64D
 
 set_option linter.unusedSectionVars false
 
+/-- `fileclose`'s entry (D13: the address lives with its Spec). -/
+def filecloseAddr : BitVec 64 := KA.«fileclose»
+
 /-- fileclose's own 8-slot frame over its deepest callee, `end_op` (Rocq
 `fileclose_stack := 8 + K_end_op`); iput, begin_op and pipeclose fit under. -/
 def filecloseSlots : Nat := 8 + endOpSlots

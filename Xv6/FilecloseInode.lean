@@ -95,7 +95,7 @@ theorem fc_inode (BO : BEGIN_OP) (IP : IPUT) (EO : END_OP) [Fscfg] [Icfg] [CurCt
   k_step_e (wp_s_jal cpu _ (KA.«fileclose» + 0xaa#64) false 2095772#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [fileclose_br_begin_op]
   iintro Hk Hpc
-  iapply (fc_begin_op BO Γ cpu _ j pidv dqp k.proc (by k_norm_g) k.sie (by k_norm_g) hj
+  iapply (beginOp_callF BO Γ cpu _ j pidv dqp k.proc (by k_norm_g) k.sie (by k_norm_g) hj
       ?bproc ?bK ?bnoff ?btier)
     $$ [- $Hk $Hpc $Hpi $Hte $Hce $Hlc $Hpid]
   rotate_right 1
@@ -118,10 +118,10 @@ theorem fc_inode (BO : BEGIN_OP) (IP : IPUT) (EO : END_OP) [Fscfg] [Icfg] [CurCt
   k_step_e (wp_s_jal cpu _ (KA.«fileclose» + 0xb0#64) false 2093486#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [fileclose_br_iput]
   iintro Hk Hpc
-  iapply (fc_iput IP Γ cpu _ γbl pd pav pu j γil γisl kk q inum MAXOPBLOCKS pidv dqp
+  iapply (iput_sconf_callF IP Γ cpu _ γbl pd pav pu j γil γisl kk q inum MAXOPBLOCKS pidv dqp
       DFrac.discard DFrac.discard k.sie (by k_norm_g) hj ?iproc ?iK ?inoff ?itier hkk
       hg.fgoLog hg.fgoBitmap (hg.iblockCov inum hnib) (hg.iblockOut inum hnib) hnib hg.below
-      fc_iput_units hpd ?ia0)
+      iputUnits_le_max hpd ?ia0)
     $$ [- $Hk $Hpc $Hpi $Hte $Hpe $Hbc $Hlc $Hdc $Hit $Hiti $Hesc $Hireg $Hopen $Hslk $Hrefp
         $Hsb $Hsi $Hbmi $Hbs $Hop]
   rotate_right 1
@@ -143,7 +143,7 @@ theorem fc_inode (BO : BEGIN_OP) (IP : IPUT) (EO : END_OP) [Fscfg] [Icfg] [CurCt
   k_step_e (wp_s_jal cpu _ (KA.«fileclose» + 0xb4#64) false 2095902#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [fileclose_br_end_op]
   iintro Hk Hpc
-  iapply (fc_end_op EO Γ cpu _ γbl pd pav pu j n' pidv dqp k.proc (by k_norm_g) k.sie
+  iapply (endOp_callF EO Γ cpu _ γbl pd pav pu j n' pidv dqp k.proc (by k_norm_g) k.sie
       (by k_norm_g) hj ?eproc ?eK ?enoff ?etier hg.fgoLog hpd)
     $$ [- $Hk $Hpc $Hpi $Hte $Hce $Hbc $Hdc $Hpe $Hlc $Hpid $Hop]
   rotate_right 1
