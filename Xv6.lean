@@ -1127,3 +1127,4 @@ import Xv6.LinkMainSecondary
 import Xv6.FsCfgKits
 import Xv6.FsBootSupply
 import Xv6.FileBoot
+import Xv6.UsertrapRes
