@@ -183,8 +183,8 @@ theorem fwr_arm_pipe (PW : PIPEWRITE) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF
   have hK' : 12 + writeiSlots ≤ k.avail := hK
   iintro ⟨Hk, Hpc, Hframe, Hte, Hce, #Hpi, #Hkl, #Hav, Htok, Hfields, Hpay, Hpriv, HΦ⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
-  icases fwr_fields_pipe fk q C $$ Hfields with ⟨Hpcell, Hfw⟩
-  icases fwr_pay_pipe γ fk q C rb wb hty $$ Hpay with ⟨%γl, %γp, #Hpp, Hpref, Hpback⟩
+  icases filerw_fields_pipe fk q C $$ Hfields with ⟨Hpcell, Hfw⟩
+  icases filerw_pay_pipe γ fk q C rb wb hty $$ Hpay with ⟨%γl, %γp, #Hpp, Hpref, Hpback⟩
   -- +0x5c  c.ld a0,16(a0)
   k_step_e (wp_s_ld cpu _ (KA.«filewrite» + 0x5c#64) true 16#12 10#5 10#5 (by decide) (by decide)
       (DFrac.own q) C.pipe)
@@ -228,7 +228,7 @@ theorem fwr_arm_pipe (PW : PIPEWRITE) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF
   iintro %c' %R' %⟨hcs, h10'⟩ Hk Hpc Hte Hce
   ihave Hpay := Hpback $$ Hpref
   ihave Hfields := Hfw $$ Hpcell
-  ihave Href := fwr_ref_close γ fk q (.open rb wb .pipe) C $$ [Htok Hfields Hpay]
+  ihave Href := filerw_ref_close γ fk q (.open rb wb .pipe) C $$ [Htok Hfields Hpay]
   · iframe
   unfold fwrK
   iapply HΦ $$ %c' %spie1 %spp1 %R' %P' [] Hk Hpc Hte Hce Href Hpriv [] []
@@ -307,7 +307,7 @@ theorem fwr_dev_m1 (cpu : CPU) (k : KCtx) (spie spp : Bool) (R : RegMap) (γl : 
   iintro %c' %R' %⟨hcs, h10'⟩ Hk Hpc Hte Hce
   have ha0 : R' 10#5 = -1#64 := by rw [h10', h10]
   ihave Hpriv := fwr_priv_self (procAddr j) pid V M $$ Hpriv
-  ihave Href := fwr_ref_close γ fk q _ C $$ [Htok Hfields Hpay]
+  ihave Href := filerw_ref_close γ fk q _ C $$ [Htok Hfields Hpay]
   · iframe
   unfold fwrK
   iapply HΦ $$ %c' %spie %spp %R' %V.upt [] Hk Hpc Hte Hce Href Hpriv [] [Hin]
@@ -353,7 +353,7 @@ theorem fwr_arm_dev (CW : CONSOLEWRITE) (Γ : SchedNames) [ClaimIs (hlc := hlc) 
   have hK' : 12 + writeiSlots ≤ k.avail := hK
   iintro ⟨Hk, Hpc, Hframe, Hte, Hce, #Hpi, #Hkl, #Hav, Htok, Hfields, Hpay, Hpriv, #Henv, Hin, HΦ⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
-  icases fwr_fields_major fk q C $$ Hfields with ⟨Hmaj, Hfw⟩
+  icases filerw_fields_major fk q C $$ Hfields with ⟨Hmaj, Hfw⟩
   -- +0x64  lh a5,36(a0)
   k_step_e (wp_s_lh cpu _ (KA.«filewrite» + 0x64#64) false 36#12 15#5 10#5 (by decide) (by decide)
       (DFrac.own q) C.major)
@@ -497,7 +497,7 @@ theorem fwr_arm_dev (CW : CONSOLEWRITE) (Γ : SchedNames) [ClaimIs (hlc := hlc) 
   k_norm_g
   iframe
   iintro %c' %R' %⟨hcs, h10'⟩ Hk Hpc Hte Hce
-  ihave Href := fwr_ref_close γ fk q _ C $$ [Htok Hfields Hpay]
+  ihave Href := filerw_ref_close γ fk q _ C $$ [Htok Hfields Hpay]
   · iframe
   have hin : (i : Int) ≤ n := by omega
   unfold fwrK

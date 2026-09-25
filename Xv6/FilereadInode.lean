@@ -209,7 +209,7 @@ theorem frd_post_ghost (cpu : CPU) (ik fk : Nat) (q : Qp) (γb : BoxNames) (γo 
       pfAt (areadCommitAt (fsGammaL fscFs) appE inum.toNat γo) F ∗
       topFragQ (fsGammaL fscFs) (DFrac.own Qp.quarter) inum.toNat (eraNode dn bm data) ∗
       offGv γo (1 : Qp).half (v.toNat : Int) ∗
-      wordPointsTo (fnode fk + 32#64) 4 (DFrac.own 1) (frdOffW v dd) ∗
+      wordPointsTo (fnode fk + 32#64) 4 (DFrac.own 1) (filerwOffW v dd) ∗
       frdOut (GF := GF) ik fk q γb γo m T0 Tr ∗
       inodeMeta (ientry ik) dn ∗ inodeMapQ fscFs (DFrac.own Qp.quarter) (ientry ik) bm ∗
       inodeBlocksQ fscFs (DFrac.own Qp.quarter) bm data ⊢
@@ -217,9 +217,9 @@ theorem frd_post_ghost (cpu : CPU) (ik fk : Nat) (q : Qp) (γb : BoxNames) (γo 
         icDepHeld fscFs fscIreg fscCov fscLogst (.depRd s icfgDev inum g lo) ik inum dn bm ∗
         ∃ av : Aview, ⌜arowAt av inum.toNat (absRow (eraNode dn bm data))⌝ ∗
           F.pfRecv av v.toNat (absRow (eraNode dn bm data)) dd := by
-  have hw : (frdOffW v dd).toNat = v.toNat + dd :=
-    frdOffW_toNat v dd (by have : MAXFILE * BSIZE = 274432 := rfl; omega)
-  have hwf' : offWf (frdOffW v dd) := by unfold offWf; rw [hw]; exact hcap
+  have hw : (filerwOffW v dd).toNat = v.toNat + dd :=
+    filerwOffW_toNat v dd (by have : MAXFILE * BSIZE = 274432 := rfl; omega)
+  have hwf' : offWf (filerwOffW v dd) := by unfold offWf; rw [hw]; exact hcap
   have hE : (↑ftopN : CoPset) ∪ ↑appN ⊆ ⊤ := CoPset.subseteq_top
   have hsz := arfSize_ok_era dn bm data hok.2.2.2.2.1
   have hnz := arfEra_typed dn bm data hok.2.2.2.1
@@ -230,7 +230,7 @@ theorem frd_post_ghost (cpu : CPU) (ik fk : Nat) (q : Qp) (γb : BoxNames) (γo 
   imod (arfRead_fire fscFs ⊤ (DFrac.own Qp.quarter) F inum.toNat γo v.toNat dd
     (eraNode dn bm data) hE hwf hsz hnz) $$ Hft Hoinv Hcm Htop Hgv with ⟨Htop, Hgv, Hav⟩
   -- CHECK IN the cell: the half came back at exactly its word
-  ihave Hres := offResident_of curCtx γo fk (frdOffW v dd) hwf' $$ [Hcell] [Hgv]
+  ihave Hres := offResident_of curCtx γo fk (filerwOffW v dd) hwf' $$ [Hcell] [Hgv]
   · rw [wordAtN_cur]; unfold aFoff; iexact Hcell
   · rw [hw]; iexact Hgv
   unfold frdOut
@@ -358,7 +358,7 @@ theorem frd_seg_read (RD : READI) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
       pcIs c' (KA.«fileread» + 0x54#64) -∗
       trapCsrsExt c' k.sie -∗ cpuClaimExt c' k.sie k.proc -∗
       wordPointsTo (fnode fk + 24#64) 8 (DFrac.own q) ipv -∗
-      wordPointsTo (fnode fk + 32#64) 4 (DFrac.own 1) (frdOffW v dd) -∗
+      wordPointsTo (fnode fk + 32#64) 4 (DFrac.own 1) (filerwOffW v dd) -∗
       wordPointsTo (iDev (ientry ik)) 4 (DFrac.own (1 : Qp).half) icfgDev -∗
       inodeMeta (ientry ik) dn -∗ inodeMapQ fscFs (DFrac.own Qp.quarter) (ientry ik) bm -∗
       inodeBlocksQ fscFs (DFrac.own Qp.quarter) bm data -∗
@@ -431,10 +431,10 @@ theorem frd_seg_read (RD : READI) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
   · -- +0x4a  blez a0 : taken (nothing counted), straight to +0x54
     have hb : bcond bop.BGE 0#64 (R1 10#5) = true := by
       rcases hret with h0 | ⟨h0, -⟩
-      · rw [h0]; exact frd_bge0_m1
+      · rw [h0]; exact filerw_bge0_m1
       · rcases hz with hm | h0'
-        · rw [hm]; exact frd_bge0_m1
-        · rw [h0, frd_bge0_nat tot (by omega), h0']; rfl
+        · rw [hm]; exact filerw_bge0_m1
+        · rw [h0, filerw_bge0_nat tot (by omega), h0']; rfl
     k_step_e (wp_s_branch0 cpu _ (KA.«fileread» + 0x4a#64) false 10#13 10#5 (by decide) bop.BGE)
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hb]
     iintro Hk Hpc
@@ -448,7 +448,7 @@ theorem frd_seg_read (RD : READI) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
     iapply HK $$ %cpu %spie1 %spp1 %_ %tot %0 %P' %M' %(R1 10#5) [] Hk Hpc Hte Hce Hip [Hoff] Hdev
       Hmeta Hmap Hblk Hpriv Hbs
     · ipureintro; exact ⟨hr2, hle, harm, hext, himg⟩
-    · rw [frdOffW_zero]; iexact Hoff
+    · rw [filerwOffW_zero]; iexact Hoff
   · -- +0x4a  blez a0 : falls (a positive count), `f->off += r`
     have hpos : R1 10#5 = BitVec.ofNat 64 tot ∧ tot = rdClamp dn.diSize v.toNat n.toNat := by
       rcases hret with h0 | h
@@ -457,7 +457,7 @@ theorem frd_seg_read (RD : READI) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
     have htz : tot ≠ 0 := fun h => hz (Or.inr h)
     have hadv := fileread_off_advance dn.diSize v.toNat n.toNat tot hle hok.2.2.2.2.1 hwf
     have hb : bcond bop.BGE 0#64 (R1 10#5) = false := by
-      rw [hpos.1, frd_bge0_nat tot (by omega)]; simp [htz]
+      rw [hpos.1, filerw_bge0_nat tot (by omega)]; simp [htz]
     k_step_e (wp_s_branch0 cpu _ (KA.«fileread» + 0x4a#64) false 10#13 10#5 (by decide) bop.BGE)
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hb]
     iintro Hk Hpc
@@ -473,7 +473,7 @@ theorem frd_seg_read (RD : READI) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
     -- +0x52  c.sw a5,32(s1)
     k_step_e (wp_s_sw cpu _ (KA.«fileread» + 0x52#64) true 32#12 9#5 15#5 (by decide) v)
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
-      with [s9, hpos.1, frd_offadd v tot (by omega)]
+      with [s9, hpos.1, filerw_offadd v tot (by omega)]
     iintro Hk Hpc Hoff
     iapply HK $$ %cpu %spie1 %spp1 %_ %tot %tot %P' %M' %(R1 10#5) [] Hk Hpc Hte Hce Hip Hoff Hdev
       Hmeta Hmap Hblk Hpriv Hbs

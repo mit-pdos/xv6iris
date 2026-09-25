@@ -244,7 +244,7 @@ variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [Fdslot
   [Icfg] [X : CurCtx]
 
 /-- At the kernel-page-table tier fileread's block IS the ambient
-`procPrivExt` (FilereadParts' `frd_priv_conv`). -/
+`procPrivExt` (FilereadParts' `filerw_priv_conv`). -/
 theorem srd_priv_conv (h : curTier = KTier.kpt) (pa : BitVec 64) (pid : BitVec 32)
     (V : ProcPriv) (P : UPtd) (M : Nat → List (BitVec 8)) :
     procPrivNoctxAt (GF := GF) curCtx pa pid { V with upt := P } M ⊣⊢ procPrivExt pa pid V P M := by

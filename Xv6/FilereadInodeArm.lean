@@ -101,16 +101,16 @@ theorem frd_arm_inode (IL : ILOCK) (RD : READI) (IU : IUNLOCK) (Γ : SchedNames)
   iintro ⟨Hk, Hpc, Hframe, Hte, Hce, #Hpi, #Hpe, #Hfs, #Hkl, #Hav, #Hoinv, Href, Hpriv, Hbs, HP, Hcm,
     HΦ⟩
   -- THE REFERENCE, OPENED, AND THE CARVE
-  icases frd_ref_open γ fk q _ $$ Href with ⟨%C, %-, Htok, Hfields, Hpay⟩
+  icases filerw_ref_open γ fk q _ $$ Href with ⟨%C, %-, Htok, Hfields, Hpay⟩
   icases frd_pay_carve γ fk q C true wb i γo .parked $$ Hpay with ⟨%ik, %inum, %s, %g, %ty,
     %lo, %tl, %γb, %⟨hip, hik, hnib, hle, hi, hty, -⟩, #Hfl, #Hshot, Hshr, Hoffd, Hback⟩
   subst hi
-  icases frd_fields_ip fk q C $$ Hfields with ⟨Hip, Hfw⟩
+  icases filerw_fields_ip fk q C $$ Hfields with ⟨Hip, Hfw⟩
   icases protoReadLlb fk q γb γo C $$ Hoffd with ⟨%m, Hat, #Hllb⟩
   icases offFdAt_qsum fk q γb γo C m $$ Hat with ⟨%hq, Hat⟩
   icases fsReady_icache $$ Hfs with ⟨-, -, #Hslks⟩
   icases icSleeplocks_lookup fscIc ik hik $$ Hslks with ⟨%γil, %γisl, #Hslk⟩
-  icases frd_priv_pid (procAddr j) pid V V.upt M $$ Hpriv with ⟨Hpid, Hpback⟩
+  icases filerw_priv_pid (procAddr j) pid V V.upt M $$ Hpriv with ⟨Hpid, Hpback⟩
   ihave Hpid : wordPointsTo (pPid k.proc) 4 pidPriv pid $$ [Hpid]
   · rw [hproc]; iexact Hpid
   -- +0x34 .. +0x36 : ilock
@@ -159,7 +159,7 @@ theorem frd_arm_inode (IL : ILOCK) (RD : READI) (IU : IUNLOCK) (Γ : SchedNames)
   -- +0x54 .. +0x5c : iunlock and the lazy restores
   ihave Hlk : frdLk ik s g lo inum γisl pid $$ [Hsl Hdep Hdev Hin Hval Hfrz]
   · unfold frdLk; iframe
-  icases frd_priv_pid (procAddr j) pid V P' M' $$ Hpriv with ⟨Hpid, Hpback⟩
+  icases filerw_priv_pid (procAddr j) pid V P' M' $$ Hpriv with ⟨Hpid, Hpback⟩
   ihave Hpid : wordPointsTo (pPid k.proc) 4 pidPriv pid $$ [Hpid]
   · rw [hproc]; iexact Hpid
   iapply (frd_seg_unlock IU Γ cpu k spie2 spp2 R2 fk ik q C.ip s g lo tl inum dn bm γil γisl pid a0
@@ -172,7 +172,7 @@ theorem frd_arm_inode (IL : ILOCK) (RD : READI) (IU : IUNLOCK) (Γ : SchedNames)
   ihave Hpriv := Hpback $$ Hpid
   ihave Hfields := Hfw $$ Hip
   ihave Hpay := Hback $$ Hshr Hoffd
-  ihave Href := frd_ref_close γ fk q _ C $$ [Htok Hfields Hpay]
+  ihave Href := filerw_ref_close γ fk q _ C $$ [Htok Hfields Hpay]
   · iframe
   -- +0x5e : the tail
   iapply (frd_tail cpu k spie3 spp3 R3 a0 (k.regs 9#5) (k.regs 19#5) hK6 hr3)

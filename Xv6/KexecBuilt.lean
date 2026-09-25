@@ -106,11 +106,6 @@ the kexec predicates are stated over. -/
 def umemView (P : UPtd) (M : Nat → List (BitVec 8)) : Int → Option (BitVec 8) :=
   fun a => if 0 ≤ a then umemGet P M a.toNat else none
 
-/-- Every mapped page is a full page (what `umPages` pins, Rocq's
-`dom M = uva_dom P`). -/
-def umPageLen (P : UPtd) (M : Nat → List (BitVec 8)) : Prop :=
-  ∀ k w, get? P.um k = some w → (M k).length = 4096
-
 namespace KexecBuilt
 
 theorem umemView_ofNat (P : UPtd) (M : Nat → List (BitVec 8)) (n : Nat) :

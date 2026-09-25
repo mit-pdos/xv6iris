@@ -42,39 +42,12 @@ theorem fwr_addiw0 (c : Nat) (hc : c < 2 ^ 31) :
       BitVec.ofNat 64 c := by
   rw [show BitVec.signExtend 64 0#12 = 0#64 by decide, BitVec.add_zero, fw_w32 c hc, fw_sext32 c hc]
 
-/-- `blez a0` on writei's `-1`. -/
-theorem fwr_bge0_m1 : bcond bop.BGE 0#64 (-1#64) = true := by decide
-
-/-- `blez a0` on a count. -/
-theorem fwr_bge0_nat (tot : Nat) (h : tot < 2 ^ 31) :
-    bcond bop.BGE 0#64 (BitVec.ofNat 64 tot) = decide (tot = 0) := by
-  by_cases h0 : tot = 0
-  · subst h0; decide
-  · simp only [h0, decide_false, bcond, Bool.not_eq_false']
-    rw [BitVec.slt_iff_toInt_lt]
-    have ha : (0#64 : BitVec 64).toInt = 0 := by decide
-    have hb : (BitVec.ofNat 64 tot).toInt = (tot : Int) := by
-      rw [BitVec.toInt_eq_toNat_of_msb]
-      · simp only [BitVec.toNat_ofNat]; omega
-      · rw [BitVec.msb_eq_decide]; simp only [BitVec.toNat_ofNat, decide_eq_false_iff_not]; omega
-    rw [ha, hb]; omega
-
 /-- `lw a3,32(s2)`: a wf offset, sign-extended, is its own value. -/
 theorem fwr_lw_off (v : BitVec 32) (h : v.toNat < 2 ^ 31) :
     BitVec.signExtend 64 v = BitVec.ofNat 64 v.toNat := by
   have hv : v = BitVec.ofNat 32 v.toNat := by simp
   rw [hv, fw_sext32 _ (by simpa using h)]
   simp
-
-/-- `lw ; c.addw ; sw`: `f->off += r` at a small sum. -/
-theorem fwr_offadd (v : BitVec 32) (tot : Nat) (h : v.toNat + tot < 2 ^ 31) :
-    BitVec.extractLsb' 0 32 (BitVec.signExtend 64 (BitVec.extractLsb' 0 32 (BitVec.signExtend 64 v) +
-      BitVec.extractLsb' 0 32 (BitVec.ofNat 64 tot))) = fwrOffW v tot := by
-  rw [fw_ext32, fw_ext32, fw_w32 tot (by omega)]
-  unfold fwrOffW
-  apply BitVec.eq_of_toNat_eq
-  simp only [BitVec.toNat_add, BitVec.toNat_ofNat]
-  omega
 
 section
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
@@ -221,7 +194,7 @@ theorem fwr_seg_write (WI : WRITEI) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF �
       pcIs c' (KA.«filewrite» + 0xbc#64) -∗
       trapCsrsExt c' k.sie -∗ cpuClaimExt c' k.sie k.proc -∗
       wordPointsTo (fnode fk + 24#64) 8 (DFrac.own q) ipv -∗
-      wordPointsTo (fnode fk + 32#64) 4 (DFrac.own 1) (fwrOffW v tot) -∗
+      wordPointsTo (fnode fk + 32#64) 4 (DFrac.own 1) (filerwOffW v tot) -∗
       wordPointsTo (iDev (ientry ik)) 4 (DFrac.own (1 : Qp).half) icfgDev -∗
       wordPointsTo (iInum (ientry ik)) 4 (DFrac.own (1 : Qp).half) inum -∗
       inodeMeta (ientry ik) dn' -∗ inodeMap fscFs (ientry ik) bm' -∗
@@ -301,12 +274,12 @@ theorem fwr_seg_write (WI : WRITEI) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF �
   · -- +0xae  blez a0 : taken (nothing counted), straight to +0xbc
     have hb : bcond bop.BGE 0#64 (R1 10#5) = true := by
       rcases hsk with ⟨h0, -⟩ | ⟨h0, -⟩
-      · rw [h0]; exact fwr_bge0_m1
-      · rw [h0, fwr_bge0_nat tot (by omega), hz]; rfl
+      · rw [h0]; exact filerw_bge0_m1
+      · rw [h0, filerw_bge0_nat tot (by omega), hz]; rfl
     k_step_e (wp_s_branch0 cpu _ (KA.«filewrite» + 0xae#64) false 14#13 10#5 (by decide) bop.BGE)
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hb]
     iintro Hk Hpc
-    have hv : fwrOffW v tot = v := by rw [hz]; exact fwrOffW_zero v
+    have hv : filerwOffW v tot = v := by rw [hz]; exact filerwOffW_zero v
     iapply HK $$ %cpu %spie1 %spp1 %_ %tot %bm' %data' %dn' %dn0' %n' %wrote %dist %dstb %P' %Sb'
       %(R1 10#5) [] Hk Hpc Hte Hce Hip [Hoff] Hdev Hin Hmeta Hmap Hblk Hdi Hpriv Hbs Hop
     · ipureintro; exact ⟨hr2, hout⟩
@@ -317,7 +290,7 @@ theorem fwr_seg_write (WI : WRITEI) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF �
       · exact absurd h hz
       · exact h
     have hb : bcond bop.BGE 0#64 (R1 10#5) = false := by
-      rw [hpos.1, fwr_bge0_nat tot (by omega)]; simp [hz]
+      rw [hpos.1, filerw_bge0_nat tot (by omega)]; simp [hz]
     k_step_e (wp_s_branch0 cpu _ (KA.«filewrite» + 0xae#64) false 14#13 10#5 (by decide) bop.BGE)
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hb]
     iintro Hk Hpc
@@ -332,7 +305,7 @@ theorem fwr_seg_write (WI : WRITEI) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF �
     iintro Hk Hpc
     -- +0xb8  sw a5,32(s2)
     k_step_e (wp_s_sw cpu _ (KA.«filewrite» + 0xb8#64) false 32#12 18#5 15#5 (by decide) v)
-      from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [s18, hpos.1, fwr_offadd v tot (by omega)]
+      from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [s18, hpos.1, filerw_offadd v tot (by omega)]
     iintro Hk Hpc Hoff
     iapply HK $$ %cpu %spie1 %spp1 %_ %tot %bm' %data' %dn' %dn0' %n' %wrote %dist %dstb %P' %Sb'
       %(R1 10#5) [] Hk Hpc Hte Hce Hip Hoff Hdev Hin Hmeta Hmap Hblk Hdi Hpriv Hbs Hop

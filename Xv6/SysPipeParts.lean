@@ -13,6 +13,7 @@ they are pipealloc's out-parameters).
 -/
 import Xv6.LazyFree
 import Xv6.SpecSysPipe
+import Xv6.SysfileCalls
 import Xv6.SpecMyproc
 import Xv6.ArgLemmas
 import Xv6.UMemWindow
@@ -296,25 +297,6 @@ theorem sys_pipe_myproc (MP : MYPROC) (c : CPU) (k' : KCtx) (hnoff : k'.noff + 1
   have h := MP.wp_myproc (hlc := hlc) (GF := GF) c k' hnoff hK
   unfold wp_myproc_body at h
   simp only [myprocAddr] at h
-  exact h
-
-theorem sys_pipe_argaddr (AA : ARGADDR) (c : CPU) (k' : KCtx) (i : Nat) (tfp : BitVec 44)
-    (ws : List (BitVec 64)) (v : BitVec 64) (old : BitVec 64) (dqt : DFrac)
-    (hi : i < NARG) (ha0 : k'.regs 10#5 = BitVec.ofNat 64 i) (hws : ws[tfArgIdx i]? = some v)
-    (hnoff : k'.noff + 1 < 2 ^ 31) (hK : argaddrSlots ≤ k'.avail) :
-    kctx c k' ∗ pcIs c KA.«argaddr» ∗
-    wordPointsTo (pTrapframe k'.proc) 8 dqt (pageAddr tfp) ∗ tfPageAt tfp ws ∗
-    wordPointsTo (k'.regs 11#5) 8 (DFrac.own 1) old ∗
-    wpNext k'.sie k'.proc c (fun cpu' => iprop(∀ spie : Bool, ∀ spp : Bool, ∀ R' : RegMap,
-      ⌜k'.sie = false → spie = k'.spie ∧ spp = k'.spp⌝ -∗
-      kctx cpu' ((k'.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k'.regs 1#5)) -∗
-      ⌜calleeSaved k'.regs R'⌝ -∗
-      wordPointsTo (pTrapframe k'.proc) 8 dqt (pageAddr tfp) -∗ tfPageAt tfp ws -∗
-      wordPointsTo (k'.regs 11#5) 8 (DFrac.own 1) v -∗ wpLoop cpu'))
-    ⊢ wpLoop (GF := GF) c := by
-  have h := AA.wp_argaddr (hlc := hlc) (GF := GF) c k' i tfp ws v old dqt hi ha0 hws hnoff hK
-  unfold wp_argaddr_body at h
-  simp only [argaddrAddr] at h
   exact h
 
 theorem sys_pipe_pipealloc (PA : PIPEALLOC) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ] (c : CPU)

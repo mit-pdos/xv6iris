@@ -24,6 +24,7 @@ the complement at the entry hart (one wide hop to the call), and after
 fileclose everything is at its return hart.
 -/
 import Xv6.SpecSysClose
+import Xv6.SysfileCalls
 import Xv6.SpecMyproc
 import Xv6.ArgLemmas
 import Xv6.CodeTactics
@@ -147,27 +148,6 @@ theorem sc_ofdOut_elim (a : BitVec 64) (w : BitVec 32) (h : a ≠ 0#64) :
   unfold ofdOut; rw [if_neg h]
 
 /-! ## The callees -/
-
-theorem sc_argfd (AF : ARGFD) (c : CPU) (k' : KCtx) (γ : FileNames) (pa : BitVec 64)
-    (pid : BitVec 32) (V : ProcPriv) (M : Nat → List (BitVec 8)) (D : List Nat) (i : Nat) (v : BitVec 64)
-    (oldfd : BitVec 32) (oldf : BitVec 64)
-    (hi : i < NARG) (ha0 : k'.regs 10#5 = BitVec.ofNat 64 i) (hv : V.tf[tfArgIdx i]? = some v)
-    (hpf : k'.regs 12#5 ≠ 0#64) (hproc : k'.proc = pa) (htier : k'.tier = KTier.kpt)
-    (hnoff : k'.noff + 1 < 2 ^ 31) (hK : argfdSlots ≤ k'.avail) :
-    kctx c k' ∗ pcIs c KA.«argfd» ∗
-    procPrivCoreNoctxAt curCtx pa pid V M ∗ procOfilesOwe γ V.fdg pa V.ofile D ∗
-    ofdOut (k'.regs 11#5) oldfd ∗ wordPointsTo (k'.regs 12#5) 8 (DFrac.own 1) oldf ∗
-    wpNext k'.sie k'.proc c (fun cpu' => iprop(∀ spie : Bool, ∀ spp : Bool, ∀ R' : RegMap,
-      ⌜k'.sie = false → spie = k'.spie ∧ spp = k'.spp⌝ -∗
-      kctx cpu' ((k'.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k'.regs 1#5)) -∗
-      ⌜calleeSaved k'.regs R'⌝ -∗
-      procPrivCoreNoctxAt curCtx pa pid V M -∗ procOfilesOwe γ V.fdg pa V.ofile D -∗
-      argfdPost (k'.regs 11#5) (k'.regs 12#5) oldfd oldf v V.ofile (R' 10#5) -∗ wpLoop cpu'))
-    ⊢ wpLoop (GF := GF) c := by
-  have h := AF.wp_argfd (hlc := hlc) (GF := GF) c k' γ pa pid V M D i v oldfd oldf hi ha0 hv hpf hproc htier hnoff hK
-  unfold wp_argfd_body at h
-  simp only [argfdAddr] at h
-  exact h
 
 theorem sc_myproc (MP : MYPROC) (c : CPU) (k' : KCtx) (hnoff : k'.noff + 1 < 2 ^ 31) (hK : 10 ≤ k'.avail) :
     kctx c k' ∗ pcIs c KA.«myproc» ∗
@@ -383,7 +363,7 @@ theorem sys_close_proof (AF : ARGFD) (MP : MYPROC) (FC : FILECLOSE) : SYSCLOSE :
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [sys_close_br_fffffffffffffd26] next c5 hp5
   iintro Hk Hpc
   ihave Hpfd := sc_ofdOut_intro afd oldfd hafd_nz $$ Hfd
-  iapply (sc_argfd AF c5 _ γ pa pid V M [] 0 v oldfd wf (by decide) ?ha0 hv ?hpf ?hpr ?ht ?hn ?hKa)
+  iapply (sysfile_argfd_wp AF c5 _ γ pa pid V M [] 0 v oldfd wf (by decide) ?ha0 hv ?hpf ?hpr ?ht ?hn ?hKa)
     $$ [- $Hk $Hpc]
   rotate_right 1
   k_norm_g [sc_ret_4e42, sc_li0, sc_fd_addr, hafd]

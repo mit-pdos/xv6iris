@@ -611,7 +611,7 @@ theorem kxcB2_ls_da (RD : READI) (IUP : IUNLOCKPUT) (EO : END_OP) (PFP : PROC_FR
   icases kxcB2_open_size A.pidv kf qf sf gyf loyf tlyf inumf dnf bmf data gilf gislf $$ Hop
     with ⟨%hsz, Hop⟩
   rw [kxcB2_maxfile] at hsz
-  icases KexecPtImage.procPtAt_pageLen P Mi $$ Hpt with ⟨%hplen, Hpt⟩
+  icases UMemL.procPtAt_pageLen P Mi $$ Hpt with ⟨%hplen, Hpt⟩
   icases KexecPtImage.procPtAt_page_load_split P Mi kv w nn hkv hnn1 $$ Hpt with ⟨Hpg, Hrest, Hback⟩
   icases bslots_uncons 2 $$ Hbs with ⟨Hb1, Hbs2⟩
   have hMl : (Mi kv).length = 4096 := hplen kv w hkv

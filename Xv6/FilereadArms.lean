@@ -122,8 +122,8 @@ theorem frd_arm_pipe (PR : PIPEREAD) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF 
   have hK6 : 6 ≤ k.avail := by unfold readiSlots bmapSlots ballocSlots breadSlots panicSlots at hK'; omega
   iintro ⟨Hk, Hpc, Hframe, Hte, Hce, #Hpi, #Hkl, #Hav, Htok, Hfields, Hpay, Hpriv, HP, HΦ⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
-  icases frd_fields_pipe fk q C $$ Hfields with ⟨Hpcell, Hfw⟩
-  icases frd_pay_pipe γ fk q C true wb hty $$ Hpay with ⟨%γl, %γp, #Hpp, Hpref, Hpback⟩
+  icases filerw_fields_pipe fk q C $$ Hfields with ⟨Hpcell, Hfw⟩
+  icases filerw_pay_pipe γ fk q C true wb hty $$ Hpay with ⟨%γl, %γp, #Hpp, Hpref, Hpback⟩
   -- +0x6a  c.ld a0,16(a0)
   k_step_e (wp_s_ld cpu _ (KA.«fileread» + 0x6a#64) true 16#12 10#5 10#5 (by decide) (by decide)
       (DFrac.own q) C.pipe)
@@ -184,7 +184,7 @@ theorem frd_arm_pipe (PR : PIPEREAD) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF 
   iintro %c' %R' %⟨hcs, h10'⟩ Hk Hpc Hte Hce
   ihave Hpay := Hpback $$ Hpref
   ihave Hfields := Hfw $$ Hpcell
-  ihave Href := frd_ref_close γ fk q (.open true wb .pipe) C $$ [Htok Hfields Hpay]
+  ihave Href := filerw_ref_close γ fk q (.open true wb .pipe) C $$ [Htok Hfields Hpay]
   · iframe
   have hr10 : R' 10#5 = BitVec.ofNat 64 d ∨ R' 10#5 = -1#64 := by
     rw [h10']

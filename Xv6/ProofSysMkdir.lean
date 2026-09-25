@@ -75,21 +75,6 @@ theorem sys_mkdir_ite_t (X Y : IProp GF) : (if true = true then X else Y) ⊢ X 
 theorem sys_mkdir_ite_f (X Y : IProp GF) : (if false = true then X else Y) ⊢ Y := by
   simp only [Bool.false_eq_true, ite_false]; exact .rfl
 
-/-- argstr takes the bare block and hands it back at a grown descriptor,
-which re-closes the WHOLE block there (the array and the reference do not
-mention `upt`). -/
-theorem sys_mkdir_blk_bare (γ : FileNames) (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv)
-    (M : Nat → List (BitVec 8)) :
-    procPrivFd (GF := GF) γ pa pid V M ⊢
-      procPrivBareAt curCtx pa pid V M ∗
-      (∀ (P' : UPtd) (M' : Nat → List (BitVec 8)), procPrivBareAt curCtx pa pid { V with upt := P' } M' -∗
-        procPrivFd γ pa pid { V with upt := P' } M') := by
-  unfold procPrivFd procPrivCoreNoctxAt
-  iintro ⟨⟨Hb, Hc⟩, Ho⟩
-  iframe Hb
-  iintro %P' %M' Hb
-  iframe
-
 /-! ## +0x2c: create came back -/
 
 set_option maxHeartbeats 32000000 in
@@ -333,7 +318,7 @@ theorem sys_mkdir_args (AS : ARGSTR) (CR : CREATE) (IUP : IUNLOCKPUT) (EO : END_
   k_step_e (wp_s_jal cpu _ (KA.«sys_mkdir» + 0x16#64) false 2086366#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [sys_mkdir_br_argstr]
   iintro Hk Hpc
-  icases sys_mkdir_blk_bare _ _ _ _ _ $$ Hblk with ⟨Hbare, Hclose⟩
+  icases sysfile_blk_bare _ _ _ _ _ $$ Hblk with ⟨Hbare, Hclose⟩
   ihave Hbuf := (show byteBuf (GF := GF) (sysMkdirBuf (k.regs 2#5)) (DFrac.own 1) old ⊢
     byteBuf (k.regs 2#5 + 0xFFFFFFFFFFFFFF70#64) (DFrac.own 1) old from .rfl) $$ Hbuf
   iapply (sysfile_argstr AS Γ cpu _ k.sie (by k_norm_g) (procAddr A.j) (by k_norm_g; exact hproc)

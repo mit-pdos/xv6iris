@@ -40,7 +40,7 @@ list (`Xv6/NamexParts.lean` deviation 4), not Rocq's `bytes_own` /
    `proc_priv_bare_acc`, a fraction of the same row), the trapframe
    quarter and page through `ProcPrivAcc.procPrivFd_tf` (Rocq
    `proc_priv_tf`), and argstr takes the bare block by `procPrivFd`'s own
-   definition (the `sys_chdir_blk_bare` shape).
+   definition (`SysfileCalls.sysfile_blk_bare`).
 4. The fetched string's shape is `UMemL.umemStr_nul`; the path buffer and
    the slots↔bytes carve are the shared `Xv6/SysfileCalls.lean` helpers;
    the fold is the landed `KstackMap.byteBuf_stackOwn`.
@@ -543,20 +543,6 @@ theorem sys_mknod_tf (hct : curTier = KTier.kpt) (γ : FileNames) (pa : BitVec 6
   have h := procPrivFd_tf (GF := GF) γ pa pid V M
   rw [sysfile_cur_kpt hct] at h
   exact h
-
-/-- ...and argstr's: the bare block out, and the WHOLE block back at a grown
-descriptor (the array and the reference do not mention `upt`). -/
-theorem sys_mknod_blk_bare (γ : FileNames) (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv)
-    (M : Nat → List (BitVec 8)) :
-    procPrivFd (GF := GF) γ pa pid V M ⊢
-      procPrivBareAt curCtx pa pid V M ∗
-      (∀ (P' : UPtd) (M' : Nat → List (BitVec 8)), procPrivBareAt curCtx pa pid { V with upt := P' } M' -∗
-        procPrivFd γ pa pid { V with upt := P' } M') := by
-  unfold procPrivFd procPrivCoreNoctxAt
-  iintro ⟨⟨Hb, Hc⟩, Ho⟩
-  iframe Hb
-  iintro %P' %M' Hb
-  iframe
 
 /-- What every exit hands the epilogue beside the machine state: the two
 allowances whole, the block at the grown descriptor, and the armed post. -/

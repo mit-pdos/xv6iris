@@ -40,7 +40,7 @@ THEOREM, the frozen `sysExecStepBody`).
    wrappers.
 2. fetchaddr takes the block as `procPrivExt` at the round's descriptor
    (the array's cells lent out of `procOfiles`, `sys_exec_blk_ext`), fetchstr
-   the bare block (`sys_exec_blk_bare`): Rocq hands both `proc_priv_core
+   the bare block (`sysfile_blk_bare`): Rocq hands both `proc_priv_core
    (us_upt U P)`.  PROCESS LAYER (flagged, as `SysExecParts` deviation 4):
    the block is `procPrivFd` at `sysExecV2 A P` / `sysExecM2 A P`.
 
@@ -177,7 +177,7 @@ theorem sys_exec_step_str (FS : FETCHSTR) (Γ : SchedNames) (k : KCtx) (A : SysE
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [sys_exec_br_fetchstr]
   iintro Hk Hpc
   ihave #Hrdy := sysExecEnv_ready Γ A $$ Henv
-  icases sys_exec_blk_bare A.γ (procAddr A.j) A.pid (sysExecV2 A P) (sysExecM2 A P) $$ Hblk
+  icases sysfile_blk_bare A.γ (procAddr A.j) A.pid (sysExecV2 A P) (sysExecM2 A P) $$ Hblk
     with ⟨Hbare, Hclose⟩
   iapply (sys_exec_fetchstr FS cpu _ k.sie (by k_norm_g) k.proc (by k_norm_g) (procAddr A.j) A.pid
       (sysExecV2 A P) (sysExecM2 A P) (List.replicate 4096 5#8) ?gpr ?gt ?gn ?gK ?gmx (by rw [List.length_replicate]; decide))

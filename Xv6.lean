@@ -922,6 +922,7 @@ import Xv6.CreateAlloc
 import Xv6.SpecFilewrite
 import Xv6.FilewriteChain
 import Xv6.FileOffProto
+import Xv6.FileRwShared
 import Xv6.FilewriteParts
 import Xv6.FilewriteCalls
 import Xv6.FilewriteFire

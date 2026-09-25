@@ -433,7 +433,7 @@ theorem sys_mknod_args (AS : ARGSTR) (CR : CREATE) (IUP : IUNLOCKPUT) (EO : END_
   k_step_e (wp_s_jal cpu _ (KA.«sys_mknod» + 0x2a#64) false 2086274#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [sys_mknod_br_argstr]
   iintro Hk Hpc
-  icases sys_mknod_blk_bare _ _ _ _ _ $$ Hblk with ⟨Hbare, Hclose⟩
+  icases sysfile_blk_bare _ _ _ _ _ $$ Hblk with ⟨Hbare, Hclose⟩
   ihave Hbuf := (show byteBuf (GF := GF) (sysMknodBuf (k.regs 2#5)) (DFrac.own 1) old ⊢
     byteBuf (k.regs 2#5 + 18446744073709551472#64) (DFrac.own 1) old from .rfl) $$ Hbuf
   iapply (sysfile_argstr AS Γ cpu _ k.sie (by k_norm_g) (procAddr A.j) (by k_norm_g; exact hproc)

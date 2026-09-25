@@ -31,7 +31,7 @@ Three lemmas, one per call site (each a few seconds):
 3. PROCESS LAYER (flagged, as `SysExecParts` deviation 4): argaddr reads the
    trapframe quarter out of the block's core (`SysfileCalls.sysfile_core_tf`,
    the sys_read idiom); argstr runs over the bare block split off `procPrivFd`
-   (`sys_exec_head_bare`, the sys_mkdir `sys_mkdir_blk_bare` idiom), which
+   (`SysfileCalls.sysfile_blk_bare`), which
    comes back at `{A.V with upt := P'}` / `viewFaulted A.V.upt P' A.M`
    (Rocq `us_upt U P'`).
 4. Rocq's `copyinstr_got (us_M U) v0 pfun plen` / `bb_cstr` are the body's
@@ -93,20 +93,6 @@ theorem sys_exec_head_env (Γ : SchedNames) (A : SysExecArgs) :
   unfold sysExecEnv fsFabric sysfileEnv
   iintro ⟨#Hr, #Hp, #Hs, -⟩
   iframe #
-
-/-- The bare block out of `procPrivFd`, and back at a grown table (the
-sys_mkdir `sys_mkdir_blk_bare` idiom; Rocq `proc_priv_lend`'s bare half). -/
-theorem sys_exec_head_bare (γ : FileNames) (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv)
-    (M : Nat → List (BitVec 8)) :
-    procPrivFd (GF := GF) γ pa pid V M ⊢
-      procPrivBareAt curCtx pa pid V M ∗
-      (∀ (P' : UPtd) (M' : Nat → List (BitVec 8)), procPrivBareAt curCtx pa pid { V with upt := P' } M' -∗
-        procPrivFd γ pa pid { V with upt := P' } M') := by
-  unfold procPrivFd procPrivCoreNoctxAt
-  iintro ⟨⟨Hb, Hc⟩, Ho⟩
-  iframe Hb
-  iintro %P' %M' Hb
-  iframe
 
 set_option maxHeartbeats 16000000 in
 /-- **+0x020 .. +0x024** (Rocq `sx_head`'s tail): `c.mv a5,a0`, `c.li
@@ -234,7 +220,7 @@ theorem sys_exec_head_str (AS : ARGSTR) (Γ : SchedNames) (k : KCtx) (A : SysExe
   k_step_e (wp_s_jal cpu _ (KA.«sys_exec» + 0x1c#64) false 2086064#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [sys_exec_head_br_argstr]
   iintro Hk Hpc
-  icases sys_exec_head_bare _ _ _ _ _ $$ Hblk with ⟨Hbare, Hclose⟩
+  icases sysfile_blk_bare _ _ _ _ _ $$ Hblk with ⟨Hbare, Hclose⟩
   ihave Hbuf := (show byteBuf (GF := GF) (sysExecPath (k.regs 2#5)) (DFrac.own 1) old ⊢
     byteBuf (k.regs 2#5 + 0xFFFFFFFFFFFFFF30#64) (DFrac.own 1) old from .rfl) $$ Hbuf
   iapply (sysfile_argstr AS Γ cpu _ k.sie (by k_norm_g) k.proc (by k_norm_g)

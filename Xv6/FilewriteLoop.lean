@@ -327,17 +327,17 @@ theorem fwr_iter (BO : BEGIN_OP) (IL : ILOCK) (WI : WRITEI) (IU : IUNLOCK) (EO :
   unfold fwrEnv
   icases Henv' with ⟨#Hpi, #Hpe, #Hfs, #Hkl, #Hav, #Hoinv⟩
   -- THE REFERENCE, OPENED, AND THE CARVE (per iteration)
-  icases fwr_ref_open A.γ A.fk A.q A.st $$ Href with ⟨%C, %-, Htok, Hfields, Hpay⟩
+  icases filerw_ref_open A.γ A.fk A.q A.st $$ Href with ⟨%C, %-, Htok, Hfields, Hpay⟩
   icases fwr_pay_carve A.γ A.fk A.q C A.rb A.i A.γo .parked $$ Hpay with ⟨%ik, %inum, %s, %g, %ty,
     %lo, %tl, %γb, %⟨hip, hik, hnib, hle, hi, hty, -, hwr, hnd, hnv⟩, #Hfl, #Hshot, Hshr, Hoffd,
     Hback⟩
-  icases fwr_fields_ip A.fk A.q C $$ Hfields with ⟨Hip, Hfw⟩
+  icases filerw_fields_ip A.fk A.q C $$ Hfields with ⟨Hip, Hfw⟩
   icases protoReadLlb A.fk A.q γb A.γo C $$ Hoffd with ⟨%m, Hat, #Hllb⟩
   icases offFdAt_qsum A.fk A.q γb A.γo C m $$ Hat with ⟨%hq, Hat⟩
   icases fsReady_icache $$ Hfs with ⟨-, -, #Hslks⟩
   icases icSleeplocks_lookup fscIc ik hik $$ Hslks with ⟨%γil, %γisl, #Hslk⟩
   icases bslots_uncons 2 $$ Hbs with ⟨Hbs1, Hbs2⟩
-  icases fwr_priv_pid (procAddr A.j) A.pid A.V P A.img $$ Hpriv with ⟨Hpid, Hpback⟩
+  icases filerw_priv_pid (procAddr A.j) A.pid A.V P A.img $$ Hpriv with ⟨Hpid, Hpback⟩
   ihave Hpid : wordPointsTo (pPid k.proc) 4 pidPriv A.pid $$ [Hpid]
   · rw [hA.hproc]; iexact Hpid
   -- +0x8a .. +0x94 : begin_op, ilock
@@ -405,7 +405,7 @@ theorem fwr_iter (BO : BEGIN_OP) (IL : ILOCK) (WI : WRITEI) (IU : IUNLOCK) (EO :
   · unfold fwrLk; iframe
   ihave #Hshot'' : ityShot g dn'.diType $$ []
   · rw [hty', htyeq]; iexact Hshot
-  icases fwr_priv_pid (procAddr A.j) A.pid A.V P' (viewFaulted P P' A.img) $$ Hpriv
+  icases filerw_priv_pid (procAddr A.j) A.pid A.V P' (viewFaulted P P' A.img) $$ Hpriv
     with ⟨Hpid, Hpback⟩
   ihave Hpid : wordPointsTo (pPid k.proc) 4 pidPriv A.pid $$ [Hpid]
   · rw [hA.hproc]; iexact Hpid
@@ -426,7 +426,7 @@ theorem fwr_iter (BO : BEGIN_OP) (IL : ILOCK) (WI : WRITEI) (IU : IUNLOCK) (EO :
   ihave Hpriv := hpv $$ Hpriv
   ihave Hfields := Hfw $$ Hip
   ihave Hpay := Hback $$ Hshr Hoffd
-  ihave Href := fwr_ref_close A.γ A.fk A.q A.st C $$ [Htok Hfields Hpay]
+  ihave Href := filerw_ref_close A.γ A.fk A.q A.st C $$ [Htok Hfields Hpay]
   · iframe
   ihave Hst : ((⌜tot = fwrChunk A.n.toNat t⌝ ∗ fwrRaw (hlc := hlc) (fsGammaL fscFs) A.i A.γo A.n A.img
         (k.regs 11#5) Q (t + fwrChunk A.n.toNat t) (p + 1) 0) ∨

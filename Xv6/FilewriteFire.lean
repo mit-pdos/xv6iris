@@ -341,7 +341,7 @@ theorem fwr_post_ghost (cpu : CPU) (ik fk : Nat) (q : Qp) (γb : BoxNames) (C : 
       topFrag (fsGammaL fscFs) inum.toNat (eraNode dn bm data) ∗
       offGv γo (1 : Qp).half (v.toNat : Int) ∗
       fwrRaw (hlc := hlc) (fsGammaL fscFs) inum.toNat γo n Mimg ua Q t p 0 ∗
-      wordPointsTo (fnode fk + 32#64) 4 (DFrac.own 1) (fwrOffW v tot) ∗
+      wordPointsTo (fnode fk + 32#64) 4 (DFrac.own 1) (filerwOffW v tot) ∗
       fwrOut (GF := GF) ik fk q γb γo m T0 Tr ∗
       dinodeAt fscIreg inum dn0' ∗ inodeMeta (ientry ik) dn' ∗ inodeMap fscFs (ientry ik) bm' ∗
       inodeBlocks fscFs bm' data' ⊢
@@ -353,9 +353,9 @@ theorem fwr_post_ghost (cpu : CPU) (ik fk : Nat) (q : Qp) (γb : BoxNames) (C : 
   have hloc : InodeLocal inum.toNat (eraNode dn' bm' data') :=
     inodeLocal_ofOkRec inum.toNat fscCov fscLogst dn' bm' data' hok' hrl'
       (dirUniq_not_dir dn' data' hnd') (dirDotsIx_not_dir inum.toNat dn' data' hnd')
-  have hw : (fwrOffW v tot).toNat = v.toNat + tot :=
-    fwrOffW_toNat v tot (by have : MAXFILE * BSIZE = 274432 := rfl; omega)
-  have hwf : offWf (fwrOffW v tot) := by unfold offWf; rw [hw]; exact hcap
+  have hw : (filerwOffW v tot).toNat = v.toNat + tot :=
+    filerwOffW_toNat v tot (by have : MAXFILE * BSIZE = 274432 := rfl; omega)
+  have hwf : offWf (filerwOffW v tot) := by unfold offWf; rw [hw]; exact hcap
   iintro ⟨Hrun, #Hfs, #Hoinv, Htop, Hgv, Hst, Hcell, Hout, Hdi, Hmeta, Hmap, Hblk⟩
   icases fsReady_region $$ Hfs with ⟨#Hireg, -⟩
   ihave #Hft := iregInv_ftop fscIreg fscFs icfgIst icfgNib $$ Hireg
@@ -364,7 +364,7 @@ theorem fwr_post_ghost (cpu : CPU) (ik fk : Nat) (q : Qp) (γb : BoxNames) (C : 
     htn htie hcpos hty hty' hnl' hh hh' hcap0 hcap htotc hdistle hdistf hloc hrange harms hchunk)
     $$ Hft Hai Hoinv Htop Hgv Hst with ⟨Htop, Hgv, Hst⟩
   -- CHECK IN the cell: the half came back at exactly its word
-  ihave Hres := offResident_of curCtx γo fk (fwrOffW v tot) hwf $$ [Hcell] [Hgv]
+  ihave Hres := offResident_of curCtx γo fk (filerwOffW v tot) hwf $$ [Hcell] [Hgv]
   · rw [wordAtN_cur]; unfold aFoff; iexact Hcell
   · rw [hw]; iexact Hgv
   unfold fwrOut

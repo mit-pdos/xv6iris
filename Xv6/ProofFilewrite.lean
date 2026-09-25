@@ -34,7 +34,7 @@ shared `FileOffProto`).
    `sie`-generic crossing.
 2. THE CONTEXT's tier is pinned once at entry (`kctx_tier` + `htier`), so
    the contract's `procPrivNoctxAt curCtx …` IS the stage files' ambient
-   `EitherDefs.procPrivExt … V.upt …` (`fwr_priv_conv0`), as ProofFilestat.
+   `EitherDefs.procPrivExt … V.upt …` (`filerw_priv_conv0`), as ProofFilestat.
 3. Rocq's `fw_offupd` / `fw_test` diamonds are lemmas with a hart-free
    continuation (`fwr_seg_write`'s collapsed outcome, `fwr_test`), and its
    `Hjoin` assert is `fwr_join`; the per-chunk fire / checkin / re-park is
@@ -55,36 +55,14 @@ set_option linter.unusedVariables false
 
 /-! ## The dispatch's readings -/
 
-theorem fwr_beqz (w : BitVec 8) : bcond bop.BEQ (BitVec.setWidth 64 w) 0#64 = decide (w = 0#8) := by
-  simp only [bcond]; bv_decide
 theorem fwr_beq00 : bcond bop.BEQ 0#64 0#64 = true := by decide
-theorem fwr_beq1 (t : BitVec 32) :
-    bcond bop.BEQ (BitVec.signExtend 64 t) 1#64 = decide (t = FD_PIPE) := by
-  simp only [bcond, FD_PIPE]; bv_decide
-theorem fwr_beq3 (t : BitVec 32) :
-    bcond bop.BEQ (BitVec.signExtend 64 t) 3#64 = decide (t = FD_DEVICE) := by
-  simp only [bcond, FD_DEVICE]; bv_decide
-theorem fwr_bne2 (t : BitVec 32) :
-    bcond bop.BNE (BitVec.signExtend 64 t) 2#64 = !decide (t = FD_INODE) := by
-  simp only [bcond, FD_INODE]; bv_decide
-
-theorem fwr_bnez_sign (n : Int) (hn : -2 ^ 31 ≤ n ∧ n < 2 ^ 31) :
-    bcond bop.BNE (BitVec.signExtend 64 (BitVec.extractLsb' 0 32 (BitVec.ofInt 64 n) >>> 31)) 0#64 =
-      decide (n < 0) := by
-  have h := fwr_sign n hn
-  simp only [bcond, bne_iff_ne, ne_eq]
-  by_cases hl : n < 0
-  · have hne : ¬ (BitVec.signExtend 64 (BitVec.extractLsb' 0 32 (BitVec.ofInt 64 n) >>> 31) = 0#64) :=
-      fun he => by have := h.1 he; omega
-    simp [hl, hne]
-  · rw [h.2 (by omega)]; simp [hl]
 
 theorem fwr_blez (n : Int) (hn : 0 ≤ n ∧ n < 2 ^ 31) :
     bcond bop.BGE 0#64 (BitVec.ofInt 64 n) = decide (n = 0) := by
   have e : BitVec.ofInt 64 n = BitVec.ofNat 64 n.toNat := by
     apply BitVec.eq_of_toNat_eq
     rw [BitVec.toNat_ofInt, BitVec.toNat_ofNat]; omega
-  rw [e, fwr_bge0_nat _ (by omega)]
+  rw [e, filerw_bge0_nat _ (by omega)]
   by_cases h : n = 0
   · simp [h]
   · have : n.toNat ≠ 0 := by omega
@@ -177,7 +155,7 @@ theorem fwr_dispatch (PW : PIPEWRITE) (IL : ILOCK) (WI : WRITEI) (IU : IUNLOCK) 
     Henv, Hin, HΦ⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
   -- +0x24  c.lw a5,0(a0)
-  icases fwr_fields_type fk q C $$ Hfields with ⟨Hty, Hft⟩
+  icases filerw_fields_type fk q C $$ Hfields with ⟨Hty, Hft⟩
   k_step_e (wp_s_lw cpu _ (KA.«filewrite» + 0x24#64) true 0#12 15#5 10#5 (by decide) (by decide)
       (DFrac.own q) C.type)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h10]
@@ -190,7 +168,7 @@ theorem fwr_dispatch (PW : PIPEWRITE) (IL : ILOCK) (WI : WRITEI) (IU : IUNLOCK) 
   by_cases h1 : C.type = FD_PIPE
   · -- FD_PIPE: taken, to +0x5c
     k_step_e (wp_s_branch cpu _ (KA.«filewrite» + 0x28#64) false 52#13 15#5 14#5 (by decide) bop.BEQ)
-      from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [fwr_beq1, decide_eq_true h1]
+      from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [filerw_beq1, decide_eq_true h1]
     iintro Hk Hpc
     obtain ⟨rb, wb, rfl⟩ := fwr_st_pipe inumC γoC C st hok h1
     iapply (fwr_arm_pipe PW Γ cpu k k.spie k.spp _ γl γu γ fk q C rb wb j pid V M γkl γk n Q w2 w4 w5 w8 w9
@@ -206,7 +184,7 @@ theorem fwr_dispatch (PW : PIPEWRITE) (IL : ILOCK) (WI : WRITEI) (IU : IUNLOCK) 
     case h12p => simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true]; exact h12
   -- FD_PIPE: falls
   k_step_e (wp_s_branch cpu _ (KA.«filewrite» + 0x28#64) false 52#13 15#5 14#5 (by decide) bop.BEQ)
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [fwr_beq1, decide_eq_false h1]
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [filerw_beq1, decide_eq_false h1]
   iintro Hk Hpc
   -- +0x2c  c.li a4,3
   k_step_e (wp_s_addi cpu _ (KA.«filewrite» + 0x2c#64) true 3#12 14#5 0#5 (by decide))
@@ -215,7 +193,7 @@ theorem fwr_dispatch (PW : PIPEWRITE) (IL : ILOCK) (WI : WRITEI) (IU : IUNLOCK) 
   by_cases h3 : C.type = FD_DEVICE
   · -- +0x2e  beq a5,a4 : taken, FD_DEVICE (to +0x64)
     k_step_e (wp_s_branch cpu _ (KA.«filewrite» + 0x2e#64) false 54#13 15#5 14#5 (by decide) bop.BEQ)
-      from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [fwr_beq3, decide_eq_true h3]
+      from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [filerw_beq3, decide_eq_true h3]
     iintro Hk Hpc
     obtain ⟨rb, mj, rfl, hmj⟩ := fwr_st_device inumC γoC C st hok h3 hw
     unfold filewriteEnv
@@ -233,7 +211,7 @@ theorem fwr_dispatch (PW : PIPEWRITE) (IL : ILOCK) (WI : WRITEI) (IU : IUNLOCK) 
     case h12v => simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true]; exact h12
   -- +0x2e  beq a5,a4 : falls
   k_step_e (wp_s_branch cpu _ (KA.«filewrite» + 0x2e#64) false 54#13 15#5 14#5 (by decide) bop.BEQ)
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [fwr_beq3, decide_eq_false h3]
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [filerw_beq3, decide_eq_false h3]
   iintro Hk Hpc
   -- +0x32  c.li a4,2 ; +0x34  bne a5,a4
   k_step_e (wp_s_addi cpu _ (KA.«filewrite» + 0x32#64) true 2#12 14#5 0#5 (by decide))
@@ -242,7 +220,7 @@ theorem fwr_dispatch (PW : PIPEWRITE) (IL : ILOCK) (WI : WRITEI) (IU : IUNLOCK) 
   by_cases h2 : C.type ≠ FD_INODE
   · -- the ELSE arm: taken, to `panic("filewrite")`
     k_step_e (wp_s_branch cpu _ (KA.«filewrite» + 0x34#64) false 206#13 15#5 14#5 (by decide) bop.BNE)
-      from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [fwr_bne2, decide_eq_false h2, Bool.not_false]
+      from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [filerw_bne2, decide_eq_false h2, Bool.not_false]
     iintro Hk Hpc
     iapply (fwr_arm_panic PA cpu k k.spie k.spp _ fk n (k.regs 9#5) (k.regs 19#5) (k.regs 20#5)
       (k.regs 23#5) (k.regs 24#5) (k.regs 25#5) (k.regs 1#5) (k.regs 8#5) w2 (k.regs 18#5) w4 w5
@@ -257,10 +235,10 @@ theorem fwr_dispatch (PW : PIPEWRITE) (IL : ILOCK) (WI : WRITEI) (IU : IUNLOCK) 
   -- FD_INODE: falls
   replace h2 : C.type = FD_INODE := Decidable.of_not_not h2
   k_step_e (wp_s_branch cpu _ (KA.«filewrite» + 0x34#64) false 206#13 15#5 14#5 (by decide) bop.BNE)
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [fwr_bne2, decide_eq_true h2, Bool.not_true]
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [filerw_bne2, decide_eq_true h2, Bool.not_true]
   iintro Hk Hpc
   obtain ⟨rb, i, rfl⟩ := fwr_st_inode inumC γoC C st hok h2 hw
-  ihave Href := fwr_ref_close γ fk q _ C $$ [Htok Hfields Hpay]
+  ihave Href := filerw_ref_close γ fk q _ C $$ [Htok Hfields Hpay]
   · iframe
   by_cases hz : n = 0
   · -- +0x38  blez a2 : taken, the zero trip
@@ -329,11 +307,11 @@ theorem filewrite_main (PW : PIPEWRITE) (IL : ILOCK) (WI : WRITEI) (IU : IUNLOCK
   · unfold fwrK filewritePost
     iintro %c %spie %spp %R' %P' %hp Hk Hpc Hte Hce Href Hpriv Henv Harms
     ihave HK := wpNext_at true k.proc cpu c _ (fwr_pin hj k hproc c cpu) $$ Hnext
-    ihave Hpriv := (fwr_priv_conv ht0 (procAddr j) pid V P' _).2 $$ Hpriv
+    ihave Hpriv := (filerw_priv_conv ht0 (procAddr j) pid V P' _).2 $$ Hpriv
     iapply HK $$ %spie %spp %R' %P' %hp Hk Hpc Hte Hce Href Hpriv Henv Harms
-  ihave Hpriv := (fwr_priv_conv0 ht0 (procAddr j) pid V M).1 $$ Hpriv
+  ihave Hpriv := (filerw_priv_conv0 ht0 (procAddr j) pid V M).1 $$ Hpriv
   -- the reference, taken apart
-  icases fwr_ref_open γ fk q st $$ Href with ⟨%C, %⟨inumC, γoC, hok⟩, Htok, Hfields, Hpay⟩
+  icases filerw_ref_open γ fk q st $$ Href with ⟨%C, %⟨inumC, γoC, hok⟩, Htok, Hfields, Hpay⟩
   icases fwr_fields_writable fk q C $$ Hfields with ⟨Hw, Hfw⟩
   simp only [filewriteAddr]
   have e0 : kctx (GF := GF) cpu k ⊢ kctx cpu (k.withRegs k.regs) := .rfl
@@ -360,7 +338,7 @@ theorem filewrite_main (PW : PIPEWRITE) (IL : ILOCK) (WI : WRITEI) (IU : IUNLOCK
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
     iintro Hk Hpc
     ihave Hk := ek _ _ $$ Hk
-    ihave Href := fwr_ref_close γ fk q st C $$ [Htok Hfields Hpay]
+    ihave Href := filerw_ref_close γ fk q st C $$ [Htok Hfields Hpay]
     · iframe
     ihave Hpriv := fwr_priv_self (procAddr j) pid V M $$ Hpriv
     ihave Henv := filewrite_env_out_of_env γl γu st $$ Henv
@@ -376,7 +354,7 @@ theorem filewrite_main (PW : PIPEWRITE) (IL : ILOCK) (WI : WRITEI) (IU : IUNLOCK
       iapply filewriteExtra_unwritable inumC γoC C st n _ _ Q _ hok hw
   -- +0x04  beqz a5 : falls (a writable descriptor)
   k_step_e (wp_s_branch cpu _ (KA.«filewrite» + 4#64) false 310#13 15#5 0#5 (by decide) bop.BEQ)
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [fwr_beqz, decide_eq_false hw]
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [filerw_beqz, decide_eq_false hw]
   iintro Hk Hpc
   -- +0x08 .. +0x14  the prologue
   iapply (wp_prologue_filewrite cpu (k.withRegs (k.regs.set 15#5 (BitVec.setWidth 64 C.writable)))
@@ -406,10 +384,10 @@ theorem filewrite_main (PW : PIPEWRITE) (IL : ILOCK) (WI : WRITEI) (IU : IUNLOCK
   · -- +0x20  bnez a5 : taken, to the sign guard's exit
     k_step_e (wp_s_branch cpu _ (KA.«filewrite» + 0x20#64) false 250#13 15#5 0#5 (by decide) bop.BNE)
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
-      with [fwr_bnez_sign n hn, decide_eq_true hneg]
+      with [filerw_bnez_sign n hn, decide_eq_true hneg]
     iintro Hk Hpc
     ihave Hk := fwr_ctx_entry _ _ _ _ $$ Hk
-    ihave Href := fwr_ref_close γ fk q st C $$ [Htok Hfields Hpay]
+    ihave Href := filerw_ref_close γ fk q st C $$ [Htok Hfields Hpay]
     · iframe
     iapply (fwr_arm_neg cpu k k.spie k.spp _ γl γu γ fk q st j pid V M n Q w2 w4 w5 w8 w9 w10 w11 hK12
       ?hrn hneg) $$ [- $Hk $Hpc]
@@ -423,7 +401,7 @@ theorem filewrite_main (PW : PIPEWRITE) (IL : ILOCK) (WI : WRITEI) (IU : IUNLOCK
   -- +0x20  bnez a5 : falls
   k_step_e (wp_s_branch cpu _ (KA.«filewrite» + 0x20#64) false 250#13 15#5 0#5 (by decide) bop.BNE)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
-    with [fwr_bnez_sign n hn, decide_eq_false hneg]
+    with [filerw_bnez_sign n hn, decide_eq_false hneg]
   iintro Hk Hpc
   ihave Hk := fwr_ctx_entry _ _ _ _ $$ Hk
   iapply (fwr_dispatch PW IL WI IU BO EO CW PA Γ cpu k _ γ fk q st C inumC γoC j pid V M γkl γk γl γu

@@ -420,6 +420,34 @@ theorem umemWrite_off (M : Nat → List (BitVec 8)) (va : Nat) (bs : List (BitVe
   · have : k < i := by omega
     omega
 
+/-- Every mapped page is full (Rocq `proc_pt_dom`, `dom M = uva_dom P`). -/
+theorem umPages_pageLen (P : UPtd) (M : Nat → List (BitVec 8)) :
+    umPages (GF := GF) P M ⊢ ⌜umPageLen P M⌝ ∗ umPages P M := by
+  unfold umPages
+  rw [BigSepM.bigSepM_sep_eq]
+  iintro ⟨H1, H2⟩
+  ihave %h := (BigSepM.bigSepM_pure_intro (PROP := IProp GF)
+    (φ := fun k (_ : BitVec 64) => (M k).length = 4096) (m := P.um)) $$ H1
+  isplitr
+  · ipureintro; exact fun k w hk => h k w hk
+  · isplitl []
+    · iapply (BigSepM.bigSepM_pure (PROP := IProp GF)
+        (φ := fun k (_ : BitVec 64) => (M k).length = 4096) (m := P.um)).2
+      ipureintro; exact h
+    · iexact H2
+
+/-- ... and at the table (`KexecB2`/`KexecB3`, fileread's receipts). -/
+theorem procPtAt_pageLen (P : UPtd) (M : Nat → List (BitVec 8)) :
+    procPtAt (GF := GF) P M ⊢ ⌜umPageLen P M⌝ ∗ procPtAt P M := by
+  unfold procPtAt
+  iintro ⟨%hwf, Ht, Hu⟩
+  icases umPages_pageLen P M $$ Hu with ⟨%h, Hu⟩
+  isplitr
+  · ipureintro; exact h
+  · isplitr
+    · ipureintro; exact hwf
+    · iframe
+
 end res
 
 /-! ## Page-table entries and the fixed leaves -/
@@ -734,5 +762,37 @@ theorem ptRep_leaf (t : PTree) (L : RegMapF (BitVec 64)) (vpn : BitVec 27) (w : 
   have hc : t.complete 2 vpn := complete_of_walk 2 t vpn hrep.1 (by rw [hw]; simp)
   obtain ⟨-, he⟩ := PTree.walk_addr 2 t vpn addr v hw
   exact ⟨hc, PtRun.slot_snd_of_complete 2 t vpn hc, by rw [he]; exact had⟩
+
+/-! ## A byte of a written run, read back -/
+
+/-- A byte of a written run, read back (under the page's length). -/
+theorem umemByte_write (V : Nat → List (BitVec 8)) (a : Nat) (bs : List (BitVec 8)) (j : Nat)
+    (hj : j < bs.length) (hlen : (V ((a + j) / 4096)).length = 4096) :
+    umemByte (umemWrite V a bs) (a + j) = bs[j]! := by
+  unfold umemByte
+  rw [umemWrite_getElem?]
+  have hm : (a + j) % 4096 < (V ((a + j) / 4096)).length := by rw [hlen]; exact Nat.mod_lt _ (by decide)
+  rw [List.getElem?_eq_getElem hm]
+  simp only [Option.map_some, Option.getD_some]
+  have he : (a + j) / 4096 * 4096 + (a + j) % 4096 = a + j := by
+    have := Nat.div_add_mod (a + j) 4096
+    rw [Nat.mul_comm] at this; exact this
+  rw [he, if_pos (by omega), Nat.add_sub_cancel_left, List.getElem?_eq_getElem hj]
+  simp only [Option.getD_some]
+  exact (getElem!_pos bs j hj).symm
+
+/-- ...at the resume image, through the linearity the caller asks for. -/
+theorem umemByte_at (P' : UPtd) (Vw M' : Nat → List (BitVec 8)) (addr : BitVec 64)
+    (bs : List (BitVec 8)) (j : Nat) (hj : j < bs.length)
+    (hM : M' = umemWrite Vw addr.toNat bs) (hmap : umMapped P' addr.toNat bs.length)
+    (hpl : umPageLen P' M')
+    (hlin : (addr + BitVec.ofNat 64 j).toNat = addr.toNat + j) :
+    umemByte M' (addr + BitVec.ofNat 64 j).toNat = bs[j]! := by
+  have hsome := hmap j hj
+  obtain ⟨w, hw⟩ := Option.isSome_iff_exists.mp hsome
+  have hl := hpl _ w hw
+  rw [hM, umemWrite_length] at hl
+  rw [hlin, hM]
+  exact umemByte_write Vw addr.toNat bs j hj hl
 
 end Xv6.UMemL

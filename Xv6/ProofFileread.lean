@@ -30,7 +30,7 @@ contract's continuation as a hart-free `frdK`.  The stage files are
    contract, iunlock carries it across its `sie`-generic crossing.
 2. THE CONTEXT's tier is pinned once at entry (`kctx_tier` + `htier`), so
    the contract's `procPrivNoctxAt curCtx …` IS the stage files' ambient
-   `EitherDefs.procPrivExt … V.upt …` (`frd_priv_conv0`).
+   `EitherDefs.procPrivExt … V.upt …` (`filerw_priv_conv0`).
 -/
 import Xv6.FilereadDev
 import Xv6.FilereadInodeArm
@@ -129,7 +129,7 @@ theorem frd_dispatch (PR : PIPEREAD) (IL : ILOCK) (RD : READI) (IU : IUNLOCK) (C
     Hpriv, Henv, Hin, HP, HΦ⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
   -- +0x20  c.lw a5,0(a0)
-  icases frd_fields_type fk q C $$ Hfields with ⟨Hty, Hft⟩
+  icases filerw_fields_type fk q C $$ Hfields with ⟨Hty, Hft⟩
   k_step_e (wp_s_lw cpu _ (KA.«fileread» + 0x20#64) true 0#12 15#5 10#5 (by decide) (by decide)
       (DFrac.own q) C.type)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h10]
@@ -142,7 +142,7 @@ theorem frd_dispatch (PR : PIPEREAD) (IL : ILOCK) (RD : READI) (IU : IUNLOCK) (C
   by_cases h1 : C.type = FD_PIPE
   · -- FD_PIPE: taken, to +0x6a
     k_step_e (wp_s_branch cpu _ (KA.«fileread» + 0x24#64) false 70#13 15#5 14#5 (by decide) bop.BEQ)
-      from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [frd_beq1, decide_eq_true h1]
+      from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [filerw_beq1, decide_eq_true h1]
     iintro Hk Hpc
     obtain ⟨wb, rfl⟩ := frd_st_pipe inumC γoC C st hok h1 hrd
     iapply (frd_arm_pipe PR Γ cpu k k.spie k.spp _ γ fk q C wb j pid V M γkl γk n F Rd Rin P
@@ -159,7 +159,7 @@ theorem frd_dispatch (PR : PIPEREAD) (IL : ILOCK) (RD : READI) (IU : IUNLOCK) (C
     case h12p => simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true]; exact h12
   -- FD_PIPE: falls
   k_step_e (wp_s_branch cpu _ (KA.«fileread» + 0x24#64) false 70#13 15#5 14#5 (by decide) bop.BEQ)
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [frd_beq1, decide_eq_false h1]
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [filerw_beq1, decide_eq_false h1]
   iintro Hk Hpc
   -- +0x28  c.li a4,3 ; +0x2a  beq a5,a4
   k_step_e (wp_s_addi cpu _ (KA.«fileread» + 0x28#64) true 3#12 14#5 0#5 (by decide))
@@ -168,7 +168,7 @@ theorem frd_dispatch (PR : PIPEREAD) (IL : ILOCK) (RD : READI) (IU : IUNLOCK) (C
   by_cases h3 : C.type = FD_DEVICE
   · -- FD_DEVICE: taken, to +0x78
     k_step_e (wp_s_branch cpu _ (KA.«fileread» + 0x2a#64) false 78#13 15#5 14#5 (by decide) bop.BEQ)
-      from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [frd_beq3, decide_eq_true h3]
+      from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [filerw_beq3, decide_eq_true h3]
     iintro Hk Hpc
     obtain ⟨wb, rfl⟩ := frd_st_device inumC γoC C st hok h3 hrd
     ihave Henv := frd_env_dev true wb C.major.toNat $$ Henv
@@ -186,7 +186,7 @@ theorem frd_dispatch (PR : PIPEREAD) (IL : ILOCK) (RD : READI) (IU : IUNLOCK) (C
     case h12d => simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true]; exact h12
   -- FD_DEVICE: falls
   k_step_e (wp_s_branch cpu _ (KA.«fileread» + 0x2a#64) false 78#13 15#5 14#5 (by decide) bop.BEQ)
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [frd_beq3, decide_eq_false h3]
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [filerw_beq3, decide_eq_false h3]
   iintro Hk Hpc
   -- +0x2e  c.li a4,2 ; +0x30  bne a5,a4
   k_step_e (wp_s_addi cpu _ (KA.«fileread» + 0x2e#64) true 2#12 14#5 0#5 (by decide))
@@ -196,7 +196,7 @@ theorem frd_dispatch (PR : PIPEREAD) (IL : ILOCK) (RD : READI) (IU : IUNLOCK) (C
   · -- the ELSE arm: taken, to `panic("fileread")`
     k_step_e (wp_s_branch cpu _ (KA.«fileread» + 0x30#64) false 116#13 15#5 14#5 (by decide) bop.BNE)
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
-      with [frd_bne2, decide_eq_false h2, Bool.not_false]
+      with [filerw_bne2, decide_eq_false h2, Bool.not_false]
     iintro Hk Hpc
     iapply (frd_arm_panic PA cpu k k.spie k.spp _ (fnode fk) (k.regs 11#5) (BitVec.ofInt 64 n) hK
       hnoff hlocks ?hrq) $$ [- $Hk $Hpc]
@@ -211,10 +211,10 @@ theorem frd_dispatch (PR : PIPEREAD) (IL : ILOCK) (RD : READI) (IU : IUNLOCK) (C
   replace h2 : C.type = FD_INODE := Decidable.of_not_not h2
   k_step_e (wp_s_branch cpu _ (KA.«fileread» + 0x30#64) false 116#13 15#5 14#5 (by decide) bop.BNE)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
-    with [frd_bne2, decide_eq_true h2, Bool.not_true]
+    with [filerw_bne2, decide_eq_true h2, Bool.not_true]
   iintro Hk Hpc
   obtain ⟨wb, i, rfl⟩ := frd_st_inode inumC γoC C st hok h2 hrd
-  ihave Href := frd_ref_close γ fk q _ C $$ [Htok Hfields Hpay]
+  ihave Href := filerw_ref_close γ fk q _ C $$ [Htok Hfields Hpay]
   · iframe
   icases frd_env_inode true wb i γoC .parked $$ Henv with ⟨#Hfs, Hbs⟩
   ihave #Hoinv := frd_foff_inode true wb i γoC $$ Hfoff
@@ -260,11 +260,11 @@ theorem fileread_main (PR : PIPEREAD) (IL : ILOCK) (RD : READI) (IU : IUNLOCK) (
   · unfold frdK filereadPost
     iintro %c %spie %spp %R' %P' %M' %d %hp Hk Hpc Hte Hce Href Hpriv Henv Harms
     ihave HK := wpNext_at true k.proc cpu c _ (frd_pin hj k hproc c cpu) $$ Hnext
-    ihave Hpriv := (frd_priv_conv ht0 (procAddr j) pid V P' M').2 $$ Hpriv
+    ihave Hpriv := (filerw_priv_conv ht0 (procAddr j) pid V P' M').2 $$ Hpriv
     iapply HK $$ %spie %spp %R' %P' %M' %d %hp Hk Hpc Hte Hce Href Hpriv Henv Harms
-  ihave Hpriv := (frd_priv_conv0 ht0 (procAddr j) pid V M).1 $$ Hpriv
+  ihave Hpriv := (filerw_priv_conv0 ht0 (procAddr j) pid V M).1 $$ Hpriv
   -- the reference, taken apart
-  icases frd_ref_open γ fk q st $$ Href with ⟨%C, %⟨inumC, γoC, hok⟩, Htok, Hfields, Hpay⟩
+  icases filerw_ref_open γ fk q st $$ Href with ⟨%C, %⟨inumC, γoC, hok⟩, Htok, Hfields, Hpay⟩
   simp only [filereadAddr]
   have e0 : kctx (GF := GF) cpu k ⊢ kctx cpu (k.withRegs k.regs) := .rfl
   ihave Hk := e0 $$ Hk
@@ -293,14 +293,14 @@ theorem fileread_main (PR : PIPEREAD) (IL : ILOCK) (RD : READI) (IU : IUNLOCK) (
   by_cases hrz : C.readable = 0#8
   · -- +0x0e  c.beqz a5 : taken, the `!readable` return
     k_step_e (wp_s_branch cpu _ (KA.«fileread» + 0x0e#64) true 166#13 15#5 0#5 (by decide) bop.BEQ)
-      from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [frd_beqz, decide_eq_true hrz]
+      from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [filerw_beqz, decide_eq_true hrz]
     iintro Hk Hpc
     iapply (frd_exit_m1 cpu k k.spie k.spp _ (k.regs 18#5) w1 w3 hK6 hr0) $$ [- $Hk $Hpc $Hframe $Hte $Hce]
     rotate_right 1
     k_norm_g
     iframe
     iintro %c' %R' %⟨hcs, h10⟩ Hk Hpc Hte Hce
-    ihave Href := frd_ref_close γ fk q st C $$ [Htok Hfields Hpay]
+    ihave Href := filerw_ref_close γ fk q st C $$ [Htok Hfields Hpay]
     · iframe
     ihave Henv := fileread_env_out_of_env st $$ Henv
     ihave HP := filereadIn_unreadable F Rd Rin P inumC γoC C st hok hrz $$ Hin HP
@@ -315,7 +315,7 @@ theorem fileread_main (PR : PIPEREAD) (IL : ILOCK) (RD : READI) (IU : IUNLOCK) (
       iapply filereadExtra_unreadable F Rd Rin P inumC γoC C st n M (k.regs 11#5) hok hrz $$ HP
   -- +0x0e  c.beqz a5 : falls (a readable descriptor)
   k_step_e (wp_s_branch cpu _ (KA.«fileread» + 0x0e#64) true 166#13 15#5 0#5 (by decide) bop.BEQ)
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [frd_beqz, decide_eq_false hrz]
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [filerw_beqz, decide_eq_false hrz]
   iintro Hk Hpc
   -- +0x10  sd s1,24(sp) ; +0x12  sd s3,8(sp)
   iapply (frd_spill2 cpu (k.withSpie k.spie k.spp) _ (KA.«fileread» + 0x10#64) hr0.1 (k.regs 1#5)
@@ -345,7 +345,7 @@ theorem fileread_main (PR : PIPEREAD) (IL : ILOCK) (RD : READI) (IU : IUNLOCK) (
   · -- +0x1e  c.bnez a5 : taken, to the sign guard's exit
     k_step_e (wp_s_branch cpu _ (KA.«fileread» + 0x1e#64) true 146#13 15#5 0#5 (by decide) bop.BNE)
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
-      with [frd_bnez_sign n hn, decide_eq_true hneg]
+      with [filerw_bnez_sign n hn, decide_eq_true hneg]
     iintro Hk Hpc
     have hrb : frdRegs k (k.regs 10#5) (k.regs 11#5) (BitVec.ofInt 64 n)
         (((((((k.regs.set 2#5 (k.regs 2#5 + 0xFFFFFFFFFFFFFFD0#64)).set 8#5 (k.regs 2#5)).set 15#5
@@ -372,7 +372,7 @@ theorem fileread_main (PR : PIPEREAD) (IL : ILOCK) (RD : READI) (IU : IUNLOCK) (
     k_norm_g
     iframe
     iintro %c' %R' %⟨hcs, h10⟩ Hk Hpc Hte Hce
-    ihave Href := frd_ref_close γ fk q st C $$ [Htok Hfields Hpay]
+    ihave Href := filerw_ref_close γ fk q st C $$ [Htok Hfields Hpay]
     · iframe
     ihave Henv := fileread_env_out_of_env st $$ Henv
     iapply wpLoop_fupd
@@ -390,7 +390,7 @@ theorem fileread_main (PR : PIPEREAD) (IL : ILOCK) (RD : READI) (IU : IUNLOCK) (
   -- +0x1e  c.bnez a5 : falls
   k_step_e (wp_s_branch cpu _ (KA.«fileread» + 0x1e#64) true 146#13 15#5 0#5 (by decide) bop.BNE)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
-    with [frd_bnez_sign n hn, decide_eq_false hneg]
+    with [filerw_bnez_sign n hn, decide_eq_false hneg]
   iintro Hk Hpc
   iapply (frd_dispatch PR IL RD IU CR PA Γ cpu k _ γ fk q st C inumC γoC j pid V M γkl γk n F Rd Rin P
     hK hj hproc hnoff htier ht0 hlocks hn (by omega) hok hrz ?hrd ?h10d ?h11d ?h12d) $$ [- $Hk $Hpc]

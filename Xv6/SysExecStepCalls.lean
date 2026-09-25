@@ -13,7 +13,7 @@ sys_exec's FILL-LOOP CALL SITES AND BOOKKEEPING (stage file of
 * THE BLOCK'S TWO SEAMS: fetchaddr is stated over `EitherDefs.procPrivExt`
   at the round's descriptor (the bare block and the array's CELLS, the
   payloads and the cwd reference waiting aside: `sys_exec_blk_ext`), fetchstr
-  over the bare block (`sys_exec_blk_bare`); both re-close the WHOLE block
+  over the bare block (`SysfileCalls.sysfile_blk_bare`); both re-close the WHOLE block
   (`procPrivFd`) at the grown descriptor;
 * the pure bookkeeping of a round: fetchstr's buffer as the page's byte
   function (`sys_exec_fstr_ok`, `sys_exec_bview_full`), the pages pushed
@@ -22,8 +22,7 @@ sys_exec's FILL-LOOP CALL SITES AND BOOKKEEPING (stage file of
 
 ## Deviations from Rocq
 
-1. `sys_exec_blk_bare` is `SysOpenPlainA.sys_open_blk_bare` (a sys_open
-   stage file, not importable here); `sys_exec_blk_ext` is
+1. `sys_exec_blk_ext` is
    `SysReadParts.srd_block_open` with the array's cells lent from
    `procOfiles` (`FdTable.procOfilesOwe_cells_acc`) -- restated with the
    sys_exec prefix rather than importing another syscall's stage files.
@@ -155,21 +154,6 @@ variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [Fdslot
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
   [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
   [Appcfg GF] [FileG GF] [Fscfg] [Icfg] [X : CurCtx]
-
-/-- fetchstr's side: the bare block out, the WHOLE block back at any grown
-descriptor (the array and the cwd reference do not mention `upt`). -/
-theorem sys_exec_blk_bare (γ : FileNames) (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv)
-    (M : Nat → List (BitVec 8)) :
-    procPrivFd (GF := GF) γ pa pid V M ⊢
-      procPrivBareAt curCtx pa pid V M ∗
-      (∀ (P' : UPtd) (M' : Nat → List (BitVec 8)),
-        procPrivBareAt curCtx pa pid { V with upt := P' } M' -∗
-        procPrivFd γ pa pid { V with upt := P' } M') := by
-  unfold procPrivFd procPrivCoreNoctxAt
-  iintro ⟨⟨Hb, Hc⟩, Ho⟩
-  iframe Hb
-  iintro %P' %M' Hb
-  iframe
 
 /-- fetchaddr's side (Rocq `proc_priv_lend`'s cell half): the bare block
 beside the array's CELLS is the running block at the round's descriptor

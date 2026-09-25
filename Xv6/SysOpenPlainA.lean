@@ -30,7 +30,7 @@ the state at +0x36 (`sysOpenAt36`), whose proof per side is in
 2. **PROCESS LAYER (flagged).**  argint is lent the trapframe quarter and
    page (`ProcPrivAcc.procPrivFd_tf`, Rocq `proc_priv_tf`); argstr takes the
    bare block by `procPrivFd`'s own definition and hands it back at the
-   grown page table (`sys_open_blk_bare`, the `sys_mkdir_blk_bare` shape;
+   grown page table (`SysfileCalls.sysfile_blk_bare`;
    Rocq's `proc_priv` is threaded whole there); begin_op is lent the pid
    cell at the block's share `pidPriv` (`SysOpenParts.sysOpen_pid_fd`; Rocq
    `proc_priv_bare_acc`'s `1/4`).  Rocq's `proc_priv_tfp_valid` premise of
@@ -168,22 +168,6 @@ variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [Fdslot
   [Appcfg GF] [FileG GF] [Fscfg] [Icfg] [CurCtx]
 
 /-! ## The block's seams -/
-
-/-- argstr takes the bare block and hands it back at a grown descriptor,
-which re-closes the WHOLE block there (the array and the reference do not
-mention `upt`); the `sys_mkdir_blk_bare` shape. -/
-theorem sys_open_blk_bare (γ : FileNames) (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv)
-    (M : Nat → List (BitVec 8)) :
-    procPrivFd (GF := GF) γ pa pid V M ⊢
-      procPrivBareAt curCtx pa pid V M ∗
-      (∀ (P' : UPtd) (M' : Nat → List (BitVec 8)),
-        procPrivBareAt curCtx pa pid { V with upt := P' } M' -∗
-        procPrivFd γ pa pid { V with upt := P' } M') := by
-  unfold procPrivFd procPrivCoreNoctxAt
-  iintro ⟨⟨Hb, Hc⟩, Ho⟩
-  iframe Hb
-  iintro %P' %M' Hb
-  iframe
 
 /-- The trapframe quarter and page, at the ambient tier (argint's premise;
 `ProcPrivAcc.procPrivFd_tf`). -/
@@ -486,7 +470,7 @@ theorem sys_open_args (AI : ARGINT) (AS : ARGSTR) (BO : BEGIN_OP) (Γ : SchedNam
   k_step_e (wp_s_jal cpu _ (KA.«sys_open» + 0x1c#64) false 2086702#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [sys_open_br_argstr]
   iintro Hk Hpc
-  icases sys_open_blk_bare _ _ _ _ _ $$ Hblk with ⟨Hbare, Hclose⟩
+  icases sysfile_blk_bare _ _ _ _ _ $$ Hblk with ⟨Hbare, Hclose⟩
   unfold sysOpenAny
   icases Hbuf with ⟨%old, %hold, Hbuf⟩
   ihave Hbuf := (show byteBuf (GF := GF) (sysOpenPath (k.regs 2#5)) (DFrac.own 1) old ⊢

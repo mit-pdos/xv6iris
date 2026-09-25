@@ -15,7 +15,7 @@ In Lean most of that dissolves (each drop recorded with its consumers):
   * §1 `umem_write_mono`/`umem_write_ext` (the lazy witness `Mz` survives a
     write; the source is only read below `n`): DROPPED, there is no lazy
     witness and the Lean write takes a list.  Consumers: this file only.
-  * §2 `proc_pt_dom` is `procPtAt_pageLen` here (Lean's form of
+  * §2 `proc_pt_dom` is `UMemL.procPtAt_pageLen` (Lean's form of
     `dom M = uva_dom P`: every mapped page is full).  `proc_pt_fresh_above(_z)`
     and `proc_pt_page_bytes` are PURE in Lean (`KexecBuilt.umemGet_none_above`,
     `umemGet_some_of_mapped`): the view is a function of `P`.
@@ -48,35 +48,6 @@ open Iris.Std (get? delete)
 
 section
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CurCtx]
-
-/-! ## §2 The mapped view's book-keeping fact -/
-
-/-- Every mapped page is full (Rocq `proc_pt_dom`, `dom M = uva_dom P`). -/
-theorem umPages_pageLen (P : UPtd) (M : Nat → List (BitVec 8)) :
-    umPages (GF := GF) P M ⊢ ⌜umPageLen P M⌝ ∗ umPages P M := by
-  unfold umPages
-  rw [BigSepM.bigSepM_sep_eq]
-  iintro ⟨H1, H2⟩
-  ihave %h := (BigSepM.bigSepM_pure_intro (PROP := IProp GF)
-    (φ := fun k (_ : BitVec 64) => (M k).length = 4096) (m := P.um)) $$ H1
-  isplitr
-  · ipureintro; exact fun k w hk => h k w hk
-  · isplitl []
-    · iapply (BigSepM.bigSepM_pure (PROP := IProp GF)
-        (φ := fun k (_ : BitVec 64) => (M k).length = 4096) (m := P.um)).2
-      ipureintro; exact h
-    · iexact H2
-
-theorem procPtAt_pageLen (P : UPtd) (M : Nat → List (BitVec 8)) :
-    procPtAt (GF := GF) P M ⊢ ⌜umPageLen P M⌝ ∗ procPtAt P M := by
-  unfold procPtAt
-  iintro ⟨%hwf, Ht, Hu⟩
-  icases umPages_pageLen P M $$ Hu with ⟨%h, Hu⟩
-  isplitr
-  · ipureintro; exact h
-  · isplitr
-    · ipureintro; exact hwf
-    · iframe
 
 /-! ## §3–§5 THE LOADSEG FORM: the page carved at `nn`, back at a write -/
 

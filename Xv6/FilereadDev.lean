@@ -124,14 +124,14 @@ theorem frd_arm_dev (CR : CONSOLEREAD) (Γ : SchedNames) [ClaimIs (hlc := hlc) G
   iintro ⟨Hk, Hpc, Hframe, Hte, Hce, #Hpi, #Hkl, #Hav, Htok, Hfields, Hpay, Hpriv, #Henv, Hin, HP,
     HΦ⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
-  icases frd_fields_major fk q C $$ Hfields with ⟨Hmcell, Hfw⟩
+  icases filerw_fields_major fk q C $$ Hfields with ⟨Hmcell, Hfw⟩
   -- +0x78  lh a5,36(a0)
   k_step_e (wp_s_lh cpu _ (KA.«fileread» + 0x78#64) false 36#12 15#5 10#5 (by decide) (by decide)
       (DFrac.own q) C.major)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h10]
   iintro Hk Hpc Hmcell
   ihave Hfields := Hfw $$ Hmcell
-  ihave Href := frd_ref_close γ fk q (.open true wb (.device mj)) C $$ [Htok Hfields Hpay]
+  ihave Href := filerw_ref_close γ fk q (.open true wb (.device mj)) C $$ [Htok Hfields Hpay]
   · iframe
   -- +0x7c  slli a3,a5,48 ; +0x80  c.srli a3,48
   k_step_e (wp_s_slli cpu _ (KA.«fileread» + 0x7c#64) false 48#6 13#5 15#5 (by decide))

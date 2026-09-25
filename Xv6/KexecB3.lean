@@ -898,7 +898,7 @@ theorem kxcB3_checks (RD : READI) (WA : WALKADDR) (PA : PANIC) (IUP : IUNLOCKPUT
     with ⟨%hsz, Hop⟩
   rw [kxcB2_maxfile] at hsz
   have hflen : (kxcFb data dnf).length < 2 ^ 32 := by rw [kxcB3_fb_length]; omega
-  icases KexecPtImage.procPtAt_pageLen P Mi $$ Hpt with ⟨%hplen, Hpt⟩
+  icases UMemL.procPtAt_pageLen P Mi $$ Hpt with ⟨%hplen, Hpt⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
   icases kxcFramePh_acc (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) (k.regs 9#5) (k.regs 18#5)
       (k.regs 10#5) (k.regs 11#5) (k.regs 19#5) (k.regs 20#5) (k.regs 21#5) (k.regs 22#5)

@@ -110,7 +110,7 @@ theorem sys_pipe_proof (MP : MYPROC) (AA : ARGADDR) (PA : PIPEALLOC) (FD : FDALL
   ihave Htf := (show wordPointsTo (GF := GF) (pTrapframe pa) 8 (DFrac.own 1) V.trapframe ⊢
       wordPointsTo (pTrapframe k.proc) 8 (DFrac.own 1) (pageAddr V.upt.tfp) from by rw [htf, hproc]) $$ Htf
   icases sys_pipe_frame_fa_w _ _ _ _ _ _ _ $$ Hfr with ⟨Hfa, Hfrw⟩
-  iapply (sys_pipe_argaddr AA c7 _ 0 V.upt.tfp V.tf v fa (DFrac.own 1) (by decide) ?ha0 hv ?hna ?hKa)
+  iapply (sysfile_argaddr_wp AA c7 _ 0 V.upt.tfp V.tf v fa (DFrac.own 1) (by decide) ?ha0 hv ?hna ?hKa)
     $$ [- $Hk $Hpc]
   rotate_right 1
   k_norm_g [sys_pipe_ret_1a, p8, sys_pipe_a40]

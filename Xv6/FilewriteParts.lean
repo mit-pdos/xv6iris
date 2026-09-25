@@ -24,6 +24,7 @@ epilogue `+0xf4 .. +0x100` restores the eager five and pops.
 -/
 import Xv6.FilewriteChain
 import Xv6.FileOffProto
+import Xv6.FileRwShared
 import Xv6.FsCallSites
 import MachCSL.WpSmodeFrame12
 
@@ -77,42 +78,6 @@ theorem fwrChunk_cap (n i : Nat) (h : i + fwrChunk n i < n) : fwrChunk n i = 307
 /-- Rocq `fw_budget_ok`: every chunk is payable out of one begin_op grant. -/
 theorem fwr_budget_ok (off c : Nat) (hc : c ≤ 3072) : wiCostBmonly off c ≤ MAXOPBLOCKS :=
   wiCostBmonly_fits off c hc
-
-/-- The `srliw a5,a2,31` sign test at `+0x1c`: the word is nonzero exactly
-at a negative `int`. -/
-theorem fwr_sign (n : Int) (hn : -2 ^ 31 ≤ n ∧ n < 2 ^ 31) :
-    (BitVec.signExtend 64 (BitVec.extractLsb' 0 32 (BitVec.ofInt 64 n) >>> 31) = 0#64) ↔ 0 ≤ n := by
-  have hlo : ∀ (hlt : n < 0), BitVec.extractLsb' 0 32 (BitVec.ofInt 64 n) >>> 31 = 1#32 := by
-    intro hlt
-    apply BitVec.eq_of_toNat_eq
-    simp only [BitVec.toNat_ushiftRight, BitVec.extractLsb'_toNat, BitVec.toNat_ofInt,
-      BitVec.toNat_ofNat, Nat.shiftRight_zero, Nat.shiftRight_eq_div_pow]
-    omega
-  have hhi : ∀ (hge : 0 ≤ n), BitVec.extractLsb' 0 32 (BitVec.ofInt 64 n) >>> 31 = 0#32 := by
-    intro hge
-    apply BitVec.eq_of_toNat_eq
-    simp only [BitVec.toNat_ushiftRight, BitVec.extractLsb'_toNat, BitVec.toNat_ofInt,
-      BitVec.toNat_ofNat, Nat.shiftRight_zero, Nat.shiftRight_eq_div_pow]
-    omega
-  constructor
-  · intro h
-    rcases Int.lt_or_le n 0 with hlt | hge
-    · rw [hlo hlt] at h; exact absurd h (by decide)
-    · exact hge
-  · intro h
-    rw [hhi h]; decide
-
-/-- The word `f->off` holds after a chunk that counted `tot` bytes
-(named, so no normaliser splits the sum). -/
-def fwrOffW (v : BitVec 32) (tot : Nat) : BitVec 32 := BitVec.ofNat 32 (v.toNat + tot)
-
-theorem fwrOffW_zero (v : BitVec 32) : fwrOffW v 0 = v := by
-  unfold fwrOffW; simp
-
-theorem fwrOffW_toNat (v : BitVec 32) (tot : Nat) (h : v.toNat + tot < 2 ^ 32) :
-    (fwrOffW v tot).toNat = v.toNat + tot := by
-  unfold fwrOffW; simp only [BitVec.toNat_ofNat]; omega
-
 
 /-! ## 3.  The frame -/
 
@@ -446,43 +411,7 @@ theorem fwr_priv_back (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv) (P' : UP
   | some w' => simp
   | none => simp [hk]
 
-/-- The pid cell out of the block and back (Rocq's
-`proc_priv_core_bare_acc`, lent around each of begin_op, ilock, iunlock,
-end_op). -/
-theorem fwr_priv_pid (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv) (P : UPtd)
-    (M : Nat → List (BitVec 8)) :
-    procPrivExt (GF := GF) pa pid V P M ⊢
-      wordPointsTo (pPid pa) 4 pidPriv pid ∗
-      (wordPointsTo (pPid pa) 4 pidPriv pid -∗ procPrivExt pa pid V P M) := by
-  unfold procPrivExt
-  iintro ⟨%hf, Hpid, Hr⟩
-  iframe Hpid
-  iintro Hpid
-  iframe
-  ipureintro; exact hf
-
 end Block
-
-/-- At the kernel-page-table tier the contracts' block IS the ambient
-`procPrivExt` (`EitherDefs.procPrivExt_eq`, by `rfl` once the ambient
-context is taken apart; ProofFilestat's `filestat_priv_conv`). -/
-theorem fwr_priv_conv {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [X : CurCtx]
-    (h : curTier = KTier.kpt) (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv) (P : UPtd)
-    (M : Nat → List (BitVec 8)) :
-    procPrivNoctxAt (GF := GF) curCtx pa pid { V with upt := P } M ⊣⊢ procPrivExt pa pid V P M := by
-  obtain ⟨ξ, t⟩ := X
-  simp only at h
-  subst h
-  exact .rfl
-
-theorem fwr_priv_conv0 {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [X : CurCtx]
-    (h : curTier = KTier.kpt) (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv)
-    (M : Nat → List (BitVec 8)) :
-    procPrivNoctxAt (GF := GF) curCtx pa pid V M ⊣⊢ procPrivExt pa pid V V.upt M := by
-  obtain ⟨ξ, t⟩ := X
-  simp only at h
-  subst h
-  exact .rfl
 
 /-! ## 6.  The chunk's bytes (the content seam: SpecFilewrite deviations 4-5) -/
 
@@ -523,33 +452,6 @@ variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [Fdslot
   [FileG GF] [IcacheG GF] [SleepLockG GF] [IcboxG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [OffboxG GF] [OffboxBoxG GF]
   [Icfg] [CurCtx]
 
-/-- The reference, taken apart (Rocq's opening `iDestruct "Href"` +
-`file_pay_st_ok`): the content the code branches on, and the fact that the
-state the caller keyed its environment on IS its reading. -/
-theorem fwr_ref_open (γ : FileNames) (fk : Nat) (q : Qp) (st : FdState) :
-    fileRef (GF := GF) γ fk q st ⊢
-      ∃ C : FContent, ⌜∃ (inum : BitVec 32) (γo : GName), fdstateOk inum γo C st⌝ ∗
-        frefTok γ fk q ∗ fileFieldsAt curCtx fk q C ∗ filePaySt γ fk q C st := by
-  unfold fileRef
-  iintro ⟨%C, Htok, Hf, Hp⟩
-  iexists C
-  unfold filePaySt
-  icases Hp with ⟨%pn, %hok, Hpt, Hc⟩
-  iframe Htok Hf
-  isplitr
-  · ipureintro; exact ⟨pn.inum, pn.ooff, hok⟩
-  iexists pn
-  iframe Hpt Hc
-  ipureintro; exact hok
-
-theorem fwr_ref_close (γ : FileNames) (fk : Nat) (q : Qp) (st : FdState) (C : FContent) :
-    frefTok (GF := GF) γ fk q ∗ fileFieldsAt curCtx fk q C ∗ filePaySt γ fk q C st ⊢
-      fileRef γ fk q st := by
-  unfold fileRef
-  iintro ⟨Htok, Hf, Hp⟩
-  iexists C
-  iframe
-
 /-- `lbu a5,9(a0)`: the writable byte, borrowed. -/
 theorem fwr_fields_writable (fk : Nat) (q : Qp) (C : FContent) :
     fileFieldsAt (GF := GF) curCtx fk q C ⊢
@@ -561,75 +463,6 @@ theorem fwr_fields_writable (fk : Nat) (q : Qp) (C : FContent) :
   iframe H3
   iintro H3
   iframe H1 H2 H3 H4 H5 H6
-
-/-- `lw a5,0(s2)`: the type cell. -/
-theorem fwr_fields_type (fk : Nat) (q : Qp) (C : FContent) :
-    fileFieldsAt (GF := GF) curCtx fk q C ⊢
-      wordPointsTo (fnode fk) 4 (DFrac.own q) C.type ∗
-      (wordPointsTo (fnode fk) 4 (DFrac.own q) C.type -∗ fileFieldsAt curCtx fk q C) := by
-  unfold fileFieldsAt aFtype
-  simp only [wordAtN_cur]
-  iintro ⟨H1, H2, H3, H4, H5, H6⟩
-  iframe H1
-  iintro H1
-  iframe H1 H2 H3 H4 H5 H6
-
-/-- `ld a0,16(a0)`: the pipe cell. -/
-theorem fwr_fields_pipe (fk : Nat) (q : Qp) (C : FContent) :
-    fileFieldsAt (GF := GF) curCtx fk q C ⊢
-      wordPointsTo (fnode fk + 16#64) 8 (DFrac.own q) C.pipe ∗
-      (wordPointsTo (fnode fk + 16#64) 8 (DFrac.own q) C.pipe -∗ fileFieldsAt curCtx fk q C) := by
-  unfold fileFieldsAt aFpipe
-  simp only [wordAtN_cur]
-  iintro ⟨H1, H2, H3, H4, H5, H6⟩
-  iframe H4
-  iintro H4
-  iframe H1 H2 H3 H4 H5 H6
-
-/-- `ld a0,24(s2)`: the `ip` cell. -/
-theorem fwr_fields_ip (fk : Nat) (q : Qp) (C : FContent) :
-    fileFieldsAt (GF := GF) curCtx fk q C ⊢
-      wordPointsTo (fnode fk + 24#64) 8 (DFrac.own q) C.ip ∗
-      (wordPointsTo (fnode fk + 24#64) 8 (DFrac.own q) C.ip -∗ fileFieldsAt curCtx fk q C) := by
-  unfold fileFieldsAt aFip
-  simp only [wordAtN_cur]
-  iintro ⟨H1, H2, H3, H4, H5, H6⟩
-  iframe H5
-  iintro H5
-  iframe H1 H2 H3 H4 H5 H6
-
-/-- `lh a5,36(a0)`: the major cell (the FD_DEVICE arm). -/
-theorem fwr_fields_major (fk : Nat) (q : Qp) (C : FContent) :
-    fileFieldsAt (GF := GF) curCtx fk q C ⊢
-      wordPointsTo (fnode fk + 36#64) 2 (DFrac.own q) C.major ∗
-      (wordPointsTo (fnode fk + 36#64) 2 (DFrac.own q) C.major -∗ fileFieldsAt curCtx fk q C) := by
-  unfold fileFieldsAt aFmajor
-  simp only [wordAtN_cur]
-  iintro ⟨H1, H2, H3, H4, H5, H6⟩
-  iframe H6
-  iintro H6
-  iframe H1 H2 H3 H4 H5 H6
-
-/-- THE PIPE ARM'S PAYLOAD (Rocq's `file_core_noff` pipe arm, read by
-pipewrite): the pipe's handle and the end's reference, lent. -/
-theorem fwr_pay_pipe (γ : FileNames) (fk : Nat) (q : Qp) (C : FContent) (r w : Bool)
-    (h : C.type = FD_PIPE) :
-    filePaySt (GF := GF) γ fk q C (.open r w .pipe) ⊢
-      ∃ (γl : GName) (γp : PipeNames), isPipe γl γp C.pipe ∗ pipeRef γp (fcWbool C) q ∗
-        (pipeRef γp (fcWbool C) q -∗ filePaySt γ fk q C (.open r w .pipe)) := by
-  unfold filePaySt fileCore
-  iintro ⟨%pn, %hok, Htok, Hnoff, Hoff⟩
-  ihave Hnoff := (fileCoreNoff_pipe q pn C h).1 $$ Hnoff
-  icases Hnoff with ⟨#Hpi, Href, Hir⟩
-  iexists pn.lock, pn.pipe
-  iframe Hpi Href
-  iintro Href
-  iexists pn
-  iframe Htok Hoff
-  isplitr
-  · ipureintro; exact hok
-  iapply (fileCoreNoff_pipe q pn C h).2
-  iframe Hpi Href Hir
 
 /-- **THE CARVE** (Rocq `fwau_pay_carve`: `SpecFileread.fileread_pay_carve`
 with the state fact as a sixth output, and `carve_off_inode`): a writable

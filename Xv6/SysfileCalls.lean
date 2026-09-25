@@ -13,7 +13,11 @@ the frames' layouts, pins and cells).
 * the call sites: `sysfile_argint` (was `sys_mknod_argint`),
   `sysfile_argaddr` / `sysfile_argfd` and the block's `sysfile_core_tf` /
   `sysfile_ofdOut_null` (were SysFstatParts' `sfs_*`; sys_fstat /
-  sys_write),
+  sys_write), their unpacked `wpNext` forms `sysfile_argaddr_wp` /
+  `sysfile_argfd_wp` (were `sw_argaddr` / `sys_pipe_argaddr`, `sd_argfd` /
+  `sc_argfd`), and `sysfile_blk_bare` (the bare block around argstr /
+  fetchstr; was `sys_{chdir,mkdir,mknod,open,exec}_blk_bare`,
+  `sys_exec_head_bare`, `sys_link_block_bare`),
   `sysfile_argstr` (sys_chdir / sys_mkdir / sys_mknod), `sysfile_begin_op`
   / `sysfile_end_op` at a caller-named pid share (all five; sys_link /
   sys_unlink pass `pidPriv`, which their copies had fixed),
@@ -550,6 +554,25 @@ theorem sysfile_core_tf (h : curTier = KTier.kpt) (pa : BitVec 64) (pid : BitVec
   · ipureintro; exact hf
   · ipureintro; exact hlz
 
+/-- THE BLOCK AROUND A BARE-BLOCK CALLEE (Rocq `proc_priv_split_cwd` +
+`proc_priv_nocwd_bare`; argstr / fetchstr / create's allocation): the bare
+block out; the cwd reference and the descriptor array wait in the wand,
+which re-closes the WHOLE block at whatever descriptor and view the callee
+returns (neither mentions `upt`).  One copy for sys_chdir / sys_exec /
+sys_link / sys_mkdir / sys_mknod / sys_open. -/
+theorem sysfile_blk_bare (γ : FileNames) (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv)
+    (M : Nat → List (BitVec 8)) :
+    procPrivFd (GF := GF) γ pa pid V M ⊢
+      procPrivBareAt curCtx pa pid V M ∗
+      (∀ (P' : UPtd) (M' : Nat → List (BitVec 8)),
+        procPrivBareAt curCtx pa pid { V with upt := P' } M' -∗
+        procPrivFd γ pa pid { V with upt := P' } M') := by
+  unfold procPrivFd procPrivCoreNoctxAt
+  iintro ⟨⟨Hb, Hc⟩, Ho⟩
+  iframe Hb
+  iintro %P' %M' Hb
+  iframe
+
 end
 
 section
@@ -618,6 +641,67 @@ theorem sysfile_argfd (AF : ARGFD) (c : CPU) (k' : KCtx) (γ : FileNames) (pa : 
   ihave Hte := trapCsrsExt_move _ _ _ hpin' $$ Hte
   ihave Hce := cpuClaimExt_move _ _ _ _ hpin' $$ Hce
   iapply HK $$ %c' %spie %spp %R' %hcs Hk Hpc Hte Hce Hcore Howe Hpost
+
+end
+
+/-! ## argaddr / argfd at the callee's own `wpNext` form
+
+The two contracts unpacked as they stand (the complement NOT carried): the
+form the syscalls that keep the trap-CSR complement at the entry hart and
+move it by the pins use (sys_wait, sys_pipe; sys_dup, sys_close). -/
+
+section
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+  [IrefslotG GF] [CtokG GF] [WchG GF] [CurCtx]
+
+/-- `argaddr(i, ip)` (Rocq `Argaddr.wp_argaddr_sconf`), unpacked. -/
+theorem sysfile_argaddr_wp (AA : ARGADDR) (c : CPU) (k' : KCtx) (i : Nat) (tfp : BitVec 44)
+    (ws : List (BitVec 64)) (v : BitVec 64) (old : BitVec 64) (dqt : DFrac)
+    (hi : i < NARG) (ha0 : k'.regs 10#5 = BitVec.ofNat 64 i) (hws : ws[tfArgIdx i]? = some v)
+    (hnoff : k'.noff + 1 < 2 ^ 31) (hK : argaddrSlots ≤ k'.avail) :
+    kctx c k' ∗ pcIs c KA.«argaddr» ∗
+    wordPointsTo (pTrapframe k'.proc) 8 dqt (pageAddr tfp) ∗ tfPageAt tfp ws ∗
+    wordPointsTo (k'.regs 11#5) 8 (DFrac.own 1) old ∗
+    wpNext k'.sie k'.proc c (fun cpu' => iprop(∀ spie : Bool, ∀ spp : Bool, ∀ R' : RegMap,
+      ⌜k'.sie = false → spie = k'.spie ∧ spp = k'.spp⌝ -∗
+      kctx cpu' ((k'.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k'.regs 1#5)) -∗
+      ⌜calleeSaved k'.regs R'⌝ -∗
+      wordPointsTo (pTrapframe k'.proc) 8 dqt (pageAddr tfp) -∗ tfPageAt tfp ws -∗
+      wordPointsTo (k'.regs 11#5) 8 (DFrac.own 1) v -∗ wpLoop cpu'))
+    ⊢ wpLoop (GF := GF) c := by
+  have h := AA.wp_argaddr (hlc := hlc) (GF := GF) c k' i tfp ws v old dqt hi ha0 hws hnoff hK
+  unfold wp_argaddr_body at h
+  simp only [argaddrAddr] at h
+  exact h
+
+end
+
+section
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+  [FileG GF] [IcacheG GF] [SleepLockG GF] [IcboxG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [OffboxG GF]
+  [OffboxBoxG GF] [Icfg] [CurCtx]
+
+/-- `argfd(i, pfd, pf)` (Rocq `Argfd.wp_argfd_sconf`), unpacked. -/
+theorem sysfile_argfd_wp (AF : ARGFD) (c : CPU) (k' : KCtx) (γ : FileNames) (pa : BitVec 64)
+    (pid : BitVec 32) (V : ProcPriv) (M : Nat → List (BitVec 8)) (D : List Nat) (i : Nat) (v : BitVec 64)
+    (oldfd : BitVec 32) (oldf : BitVec 64)
+    (hi : i < NARG) (ha0 : k'.regs 10#5 = BitVec.ofNat 64 i) (hv : V.tf[tfArgIdx i]? = some v)
+    (hpf : k'.regs 12#5 ≠ 0#64) (hproc : k'.proc = pa) (htier : k'.tier = KTier.kpt)
+    (hnoff : k'.noff + 1 < 2 ^ 31) (hK : argfdSlots ≤ k'.avail) :
+    kctx c k' ∗ pcIs c KA.«argfd» ∗
+    procPrivCoreNoctxAt curCtx pa pid V M ∗ procOfilesOwe γ V.fdg pa V.ofile D ∗
+    ofdOut (k'.regs 11#5) oldfd ∗ wordPointsTo (k'.regs 12#5) 8 (DFrac.own 1) oldf ∗
+    wpNext k'.sie k'.proc c (fun cpu' => iprop(∀ spie : Bool, ∀ spp : Bool, ∀ R' : RegMap,
+      ⌜k'.sie = false → spie = k'.spie ∧ spp = k'.spp⌝ -∗
+      kctx cpu' ((k'.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k'.regs 1#5)) -∗
+      ⌜calleeSaved k'.regs R'⌝ -∗
+      procPrivCoreNoctxAt curCtx pa pid V M -∗ procOfilesOwe γ V.fdg pa V.ofile D -∗
+      argfdPost (k'.regs 11#5) (k'.regs 12#5) oldfd oldf v V.ofile (R' 10#5) -∗ wpLoop cpu'))
+    ⊢ wpLoop (GF := GF) c := by
+  have h := AF.wp_argfd (hlc := hlc) (GF := GF) c k' γ pa pid V M D i v oldfd oldf hi ha0 hv hpf hproc htier hnoff hK
+  unfold wp_argfd_body at h
+  simp only [argfdAddr] at h
+  exact h
 
 end
 

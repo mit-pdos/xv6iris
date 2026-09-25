@@ -23,6 +23,7 @@ the source's state with the bundle's fragment, `fdSt_update`) and `fd0`,
 and the block is whole again.
 -/
 import Xv6.SpecSysDup
+import Xv6.SysfileCalls
 import Xv6.SpecFiledup
 import Xv6.CodeTactics
 import MachCSL.WpSmodeFrame6
@@ -104,27 +105,6 @@ section
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [FileG GF] [IcacheG GF] [SleepLockG GF] [IcboxG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [OffboxG GF] [OffboxBoxG GF] [Icfg] [CurCtx]
 
 /-! ## The callees -/
-
-theorem sd_argfd (AF : ARGFD) (c : CPU) (k' : KCtx) (γ : FileNames) (pa : BitVec 64)
-    (pid : BitVec 32) (V : ProcPriv) (M : Nat → List (BitVec 8)) (D : List Nat) (i : Nat) (v : BitVec 64)
-    (oldfd : BitVec 32) (oldf : BitVec 64)
-    (hi : i < NARG) (ha0 : k'.regs 10#5 = BitVec.ofNat 64 i) (hv : V.tf[tfArgIdx i]? = some v)
-    (hpf : k'.regs 12#5 ≠ 0#64) (hproc : k'.proc = pa) (htier : k'.tier = KTier.kpt)
-    (hnoff : k'.noff + 1 < 2 ^ 31) (hK : argfdSlots ≤ k'.avail) :
-    kctx c k' ∗ pcIs c KA.«argfd» ∗
-    procPrivCoreNoctxAt curCtx pa pid V M ∗ procOfilesOwe γ V.fdg pa V.ofile D ∗
-    ofdOut (k'.regs 11#5) oldfd ∗ wordPointsTo (k'.regs 12#5) 8 (DFrac.own 1) oldf ∗
-    wpNext k'.sie k'.proc c (fun cpu' => iprop(∀ spie : Bool, ∀ spp : Bool, ∀ R' : RegMap,
-      ⌜k'.sie = false → spie = k'.spie ∧ spp = k'.spp⌝ -∗
-      kctx cpu' ((k'.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k'.regs 1#5)) -∗
-      ⌜calleeSaved k'.regs R'⌝ -∗
-      procPrivCoreNoctxAt curCtx pa pid V M -∗ procOfilesOwe γ V.fdg pa V.ofile D -∗
-      argfdPost (k'.regs 11#5) (k'.regs 12#5) oldfd oldf v V.ofile (R' 10#5) -∗ wpLoop cpu'))
-    ⊢ wpLoop (GF := GF) c := by
-  have h := AF.wp_argfd (hlc := hlc) (GF := GF) c k' γ pa pid V M D i v oldfd oldf hi ha0 hv hpf hproc htier hnoff hK
-  unfold wp_argfd_body at h
-  simp only [argfdAddr] at h
-  exact h
 
 theorem sd_fdalloc (FD : FDALLOC) (c : CPU) (k' : KCtx) (γ : FileNames) (γd : GName) (kk : Nat)
     (fs : List (BitVec 64)) (D : List Nat)
@@ -316,7 +296,7 @@ theorem sys_dup_proof (AF : ARGFD) (FD : FDALLOC) (FU : FILEDUP) : SYSDUP := ⟨
   iintro Hk Hpc
   ihave Hpfd : ofdOut (GF := GF) 0#64 0#32 $$ []
   case' _ => unfold ofdOut; rw [if_pos rfl]; iempintro
-  iapply (sd_argfd AF c5 _ γ pa pid V M [] 0 v 0#32 wf (by decide) ?ha0 hv ?hpf ?hpr ?ht ?hn ?hKa)
+  iapply (sysfile_argfd_wp AF c5 _ γ pa pid V M [] 0 v 0#32 wf (by decide) ?ha0 hv ?hpf ?hpr ?ht ?hn ?hKa)
     $$ [- $Hk $Hpc]
   rotate_right 1
   k_norm_g [sd_ret_4d64, sd_li0, sd_f_addr]

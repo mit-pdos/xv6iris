@@ -560,22 +560,6 @@ theorem sys_link_walk_ip (IL : ILOCK) (IU : IUPDATE) (IUP : IUNLOCKPUT) (EO : EN
 theorem sys_link_upt_upt (V : ProcPriv) (P1 P2 : UPtd) :
     ({ { V with upt := P1 } with upt := P2 } : ProcPriv) = { V with upt := P2 } := rfl
 
-/-- The block around argstr (Rocq `proc_priv_split_cwd` + `proc_priv_nocwd_bare`):
-argstr takes the bare part; the cwd reference and the descriptor array wait,
-and the block re-closes at whatever descriptor and view argstr returns. -/
-theorem sys_link_block_bare (γ : FileNames) (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv)
-    (M : Nat → List (BitVec 8)) :
-    procPrivFd (GF := GF) γ pa pid V M ⊢
-      procPrivBareAt curCtx pa pid V M ∗
-      (∀ (P' : UPtd) (M' : Nat → List (BitVec 8)),
-        procPrivBareAt curCtx pa pid { V with upt := P' } M' -∗
-        procPrivFd γ pa pid { V with upt := P' } M') := by
-  unfold procPrivFd procPrivCoreNoctxAt
-  iintro ⟨⟨Hb, Hc⟩, Ho⟩
-  iframe Hb
-  iintro %P' %M' Hb
-  iframe
-
 set_option maxHeartbeats 64000000 in
 set_option maxRecDepth 20000 in
 /-- **`+0x30 .. +0x40`** (Rocq `ProofSysLink.v` 1165-1335): s1's late save,
@@ -741,7 +725,7 @@ theorem sys_link_walk_a (AS : ARGSTR) (BO : BEGIN_OP) (NI : NAMEI) (IL : ILOCK) 
   obtain ⟨hKas, -⟩ := sys_link_K _ hK
   unfold sysLinkBufs
   icases Hbufs with ⟨Hnm, Hnew, Hold⟩
-  icases sys_link_block_bare A.γ (procAddr A.j) A.pid A.V A.M $$ Hblk with ⟨Hbare, Hbw⟩
+  icases sysfile_blk_bare A.γ (procAddr A.j) A.pid A.V A.M $$ Hblk with ⟨Hbare, Hbw⟩
   -- +0x08  li a2,128 ; +0x0c  addi a1,s0,-304 ; +0x10  li a0,0
   k_step_e (wp_s_addi cpu _ (KA.«sys_link» + 0x8#64) false 128#12 12#5 0#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]

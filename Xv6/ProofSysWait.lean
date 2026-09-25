@@ -14,6 +14,7 @@ block.  `kwait` parks (`wpNext true`), so from its return on the hart is
 arbitrary and the spec's own `wpNext true` post is reached with `wpNext_at`.
 -/
 import Xv6.SpecSysWait
+import Xv6.SysfileCalls
 import Xv6.CodeTactics
 import MachCSL.WpSmodeFrame6
 
@@ -65,25 +66,6 @@ section
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [CurCtx]
 
 /-! ## The callees -/
-
-theorem sw_argaddr (AA : ARGADDR) (c : CPU) (k' : KCtx) (i : Nat) (tfp : BitVec 44)
-    (ws : List (BitVec 64)) (v : BitVec 64) (old : BitVec 64) (dqt : DFrac)
-    (hi : i < NARG) (ha0 : k'.regs 10#5 = BitVec.ofNat 64 i) (hws : ws[tfArgIdx i]? = some v)
-    (hnoff : k'.noff + 1 < 2 ^ 31) (hK : argaddrSlots ≤ k'.avail) :
-    kctx c k' ∗ pcIs c KA.«argaddr» ∗
-    wordPointsTo (pTrapframe k'.proc) 8 dqt (pageAddr tfp) ∗ tfPageAt tfp ws ∗
-    wordPointsTo (k'.regs 11#5) 8 (DFrac.own 1) old ∗
-    wpNext k'.sie k'.proc c (fun cpu' => iprop(∀ spie : Bool, ∀ spp : Bool, ∀ R' : RegMap,
-      ⌜k'.sie = false → spie = k'.spie ∧ spp = k'.spp⌝ -∗
-      kctx cpu' ((k'.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k'.regs 1#5)) -∗
-      ⌜calleeSaved k'.regs R'⌝ -∗
-      wordPointsTo (pTrapframe k'.proc) 8 dqt (pageAddr tfp) -∗ tfPageAt tfp ws -∗
-      wordPointsTo (k'.regs 11#5) 8 (DFrac.own 1) v -∗ wpLoop cpu'))
-    ⊢ wpLoop (GF := GF) c := by
-  have h := AA.wp_argaddr (hlc := hlc) (GF := GF) c k' i tfp ws v old dqt hi ha0 hws hnoff hK
-  unfold wp_argaddr_body at h
-  simp only [argaddrAddr] at h
-  exact h
 
 theorem sw_kwait (KW : KWAIT) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
     (c : CPU) (k' : KCtx) (γw γp γl : GName) (γk : KmemNames) (j : Nat) (pid : BitVec 32)
@@ -267,7 +249,7 @@ theorem sys_wait_proof (AA : ARGADDR) (KW : KWAIT) : SYSWAIT := ⟨
   k_step_gen (wp_s_jal c3 _ (KA.«sys_wait» + 0xe#64) false 2096892#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [sys_wait_br_ffffffffffffff0a] next c4 hp4
   iintro Hk Hpc
-  iapply (sw_argaddr AA c4 _ 0 V.upt.tfp V.tf v w1 (DFrac.own 1) (by decide) ?ha0 hv ?hn ?hKa)
+  iapply (sysfile_argaddr_wp AA c4 _ 0 V.upt.tfp V.tf v w1 (DFrac.own 1) (by decide) ?ha0 hv ?hn ?hKa)
     $$ [- $Hk $Hpc]
   rotate_right 1
   k_norm_g [sw_ret_2984, sw_li0, sw_p_addr]

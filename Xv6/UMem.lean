@@ -57,4 +57,9 @@ def umemStr (M : Nat → List (BitVec 8)) (va max : Nat) : Option (List (BitVec 
   | some i => some (bs.take (i + 1))
   | none => none
 
+/-- Every mapped page is a full page (what `umPages` pins, Rocq's
+`dom M = uva_dom P`; `UMemL.procPtAt_pageLen`). -/
+def umPageLen (P : UPtd) (M : Nat → List (BitVec 8)) : Prop :=
+  ∀ k w, Iris.Std.PartialMap.get? P.um k = some w → (M k).length = 4096
+
 end Xv6
