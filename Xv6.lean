@@ -862,3 +862,7 @@ import Xv6.CreateParts
 import Xv6.CreateFreshTy
 import Xv6.CreateBudget
 import Xv6.SysOpenBudget
+import Xv6.SpecNamexEra
+import Xv6.SpecNparEra
+import Xv6.SpecNameiEra
+import Xv6.SpecNparWrapEra
