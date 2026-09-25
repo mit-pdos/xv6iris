@@ -245,7 +245,7 @@ set_option maxHeartbeats 4000000 in
 context threaded linearly.  The shape of the proof is `wpDev_dma`'s; the
 only difference is that the context is handed over rather than duplicated,
 which is what lets a task hold an exclusive resource across its steps. -/
-theorem wpDev_dmaL (N : Namespace) (d : DevId) (R : DevSt d → IProp GF) [∀ s, Timeless (R s)]
+theorem wpDev_dmaL (N : Namespace) (d : DevId) (hsil : DevSilent d) (R : DevSt d → IProp GF) [∀ s, Timeless (R s)]
     (Lt : DevTask d → IProp GF) (Cr : IProp GF) (hloc : DevSig.LeaseL d R Lt Cr) :
     devInvR N d R ∗ genCert ⊢@{IProp GF}
       ∀ (tid : TaskId) (m : DevProg d) (C : IProp GF),
@@ -257,7 +257,7 @@ theorem wpDev_dmaL (N : Namespace) (d : DevId) (R : DevSt d → IProp GF) [∀ s
   iintro %tid %m %C %hm HC
   iapply wpDev_elim d tid m
   iframe Hcert
-  iapply wpDev_lift d tid m
+  iapply wpDev_lift d hsil tid m
   iintro %σ Hσ
   iinv Hinv with Hbody Hclose
   icases Hbody with ⟨%s, >Hfrag, >HR⟩
@@ -544,13 +544,13 @@ theorem wpDev_dmaL (N : Namespace) (d : DevId) (R : DevSt d → IProp GF) [∀ s
 /-- The root thread of a bus-mastering device, as the power thread forks it:
 it starts at the end of an (empty) iteration, so the client must hand it the
 loop's own resource `Cr` once, at power-on. -/
-theorem wpDev_dmaL_root (N : Namespace) (d : DevId) (R : DevSt d → IProp GF)
+theorem wpDev_dmaL_root (N : Namespace) (d : DevId) (hsil : DevSilent d) (R : DevSt d → IProp GF)
     [∀ s, Timeless (R s)] (Lt : DevTask d → IProp GF) (Cr : IProp GF)
     (hloc : DevSig.LeaseL d R Lt Cr) :
     devInvR N d R ∗ genCert ∗ Cr ⊢@{IProp GF}
       devWP (genId (hlc := hlc) (GF := GF)) d rootTask (DevM.pure ()) := by
   iintro ⟨Hinv, Hcert, HCr⟩
-  ihave H := wpDev_dmaL N d R Lt Cr hloc $$ [Hinv Hcert]
+  ihave H := wpDev_dmaL N d hsil R Lt Cr hloc $$ [Hinv Hcert]
   case' _ => iframe Hinv Hcert
   iapply H $$ %rootTask %(DevM.pure ()) %Cr
     %(by rw [if_pos rfl]; exact DevM.LeaseL.pure _ () .rfl) HCr

@@ -64,6 +64,7 @@ theorem wp_dead (gen : Nat) (cpu : CPU) (m : SailM Unit) :
   iapply wp_lift_step rfl
   iintro %g %ns %obs %obs' %nt Hσ
   rw [stateInterp_eq]
+  icases Hσ with ⟨Hσ, Hobs⟩
   unfold powerInterp
   icases Hσ with ⟨Hgen, Hrest⟩
   ihave %Hlt := genAuth_dead _ _ $$ Hgen Hdead
@@ -83,8 +84,10 @@ theorem wp_dead (gen : Nat) (cpu : CPU) (m : SailM Unit) :
   · exact absurd hl hnl
   imod Hclose
   imodintro
+  ihave Hobs := obsInterp_silent_nil _ _ _ _ _ obs' Hstep $$ Hobs
   rw [stateInterp_eq]
   unfold powerInterp
+  iframe Hobs
   iframe Hgen Hrest
   isplit
   · iexact IH
@@ -173,6 +176,7 @@ theorem wpHart_lift (cpu : CPU) (m : SailM Unit) :
   iapply wp_lift_step rfl
   iintro %g %ns %obs %obs' %nt Hσ
   rw [stateInterp_eq]
+  icases Hσ with ⟨Hσ, Hobs⟩
   unfold powerInterp
   icases Hσ with ⟨Hgen, Hstart, %R, HR, %Hok, Hcur⟩
   ihave %Hb' := genAuth_born _ _ $$ Hgen Hborn
@@ -206,8 +210,10 @@ theorem wpHart_lift (cpu : CPU) (m : SailM Unit) :
     rcases h with ⟨_, m', σ', rfl, hs, rfl⟩ | ⟨hnl, _, _⟩
     · imod H $$ %m' %σ' %hs Hcred with ⟨Hσ', Hwp⟩
       imodintro
+      ihave Hobs := obsInterp_silent_nil _ _ _ _ _ obs' Hstep $$ Hobs
       rw [stateInterp_eq]
       unfold powerInterp
+      iframe Hobs
       rw [show startCount { g with m := σ' } = startCount g from rfl]
       iframe Hgen Hstart
       isplitl [HR Hσ']
@@ -244,8 +250,10 @@ theorem wpHart_lift (cpu : CPU) (m : SailM Unit) :
     · exact absurd hl hnl
     imod Hclose
     imodintro
+    ihave Hobs := obsInterp_silent_nil _ _ _ _ _ obs' Hstep $$ Hobs
     rw [stateInterp_eq]
     unfold powerInterp
+    iframe Hobs
     iframe Hgen Hstart
     isplitl [HR Hcur]
     · iexists R

@@ -36,7 +36,11 @@ values, and the memory-model step invariant `mmOk` holds (the Rocq
 prototype's `mm_ok`/`itv_ok`/`hr_ok`/`resv_ok`).
 -/
 import MachCSL.Lang
+import MachCSL.ObsTrace
+import MachCSL.LogEntryDefs
 import Iris.BI.Lib.GenHeap
+import Iris.BI.Lib.MonoList
+import Iris.Instances.Lib.Invariants
 import Iris.BI.Lib.MonoNat
 import Iris.Instances.Lib.GhostMap
 import Iris.Instances.Lib.GhostVar
@@ -136,6 +140,10 @@ class MachGpreS (hlc : outParam HasLC) (GF : BundledGFunctors) extends InvGpreS 
   kptroot_pre : GhostVarG GF (BitVec 44)
   /-- the device mirrors' functor -/
   dev_pre : GhostVarG GF DevVal
+  /-- the observation history's functor -/
+  obsVar_pre : GhostVarG GF (List Obs)
+  /-- the history's growth authority's functor -/
+  obsHist_pre : MonoListG GF Obs
 
 attribute [reducible, instance] MachGpreS.reg_pre
 attribute [reducible, instance] MachGpreS.mem_pre
@@ -149,6 +157,8 @@ attribute [reducible, instance] MachGpreS.lock_pre
 attribute [reducible, instance] MachGpreS.kmap_pre
 attribute [reducible, instance] MachGpreS.kptroot_pre
 attribute [reducible, instance] MachGpreS.dev_pre
+attribute [reducible, instance] MachGpreS.obsVar_pre
+attribute [reducible, instance] MachGpreS.obsHist_pre
 
 /-- The fixed layer: allocated once, survives every power cycle. -/
 class MachFixedGS (hlc : outParam HasLC) (GF : BundledGFunctors) where
@@ -181,6 +191,65 @@ class MachFixedGS (hlc : outParam HasLC) (GF : BundledGFunctors) where
   startName : GName
   /-- the era registry: generation ↦ its era's ghost names -/
   registryName : GName
+  /-- THE OBSERVABLE TRACE (Rocq `riscvF_obsGS`, `riscv_obs_name`,
+  `riscv_obs_total`, `riscv_obs_pred`).  The language emits the power
+  events and the devices' wire events, and Iris threads them through the
+  state interpretation; these fields let the logic READ them.  `obsName` is
+  a ghost variable over the HISTORY SO FAR: the state interpretation holds
+  one half (`obsAuth`), the client's trace predicate the other (`obsFrag`),
+  so every event is appended with the client's consent -- a UART thread's
+  proof at its observed arms (`MachCSL.WpDev.devObsPermit`), the power
+  thread through its hook (`MachCSL.wp_power`'s `Hobs`).  `obsTotal` is the
+  run's WHOLE trace, a constant of the run: `obsInterp` ties the history to
+  the future as `h ++ κs = obsTotal`, which makes the history the actual
+  trace at the end of the run.  `obsPred` is the client's TRACE PREDICATE,
+  sealed into `obsInv`. -/
+  obsVarG : GhostVarG GF (List Obs)
+  obsName : GName
+  obsTotal : List Obs
+  obsPred : IProp GF
+  /-- HISTORIES ONLY GROW, AS A RESOURCE (Rocq `riscvF_obshGS`,
+  `riscv_obs_hist`).  The ghost variable says what the history IS and
+  nothing about what it WAS; so the machine's half (`obsAuth`) carries,
+  beside it, a MONO-LIST AUTHORITY at the same history, and its persistent
+  lower bound `obsHistLb h0` is "`h0` is a prefix of the history the run has
+  reached".  Stepped in lockstep with the variable (`obsUpdate`).  A MACHINE
+  field and not a client one: the receive column is maintained by the UART
+  thread under every application. -/
+  obsHistG : MonoListG GF Obs
+  obsHist : GName
+  /-- THE INPUT TAG FAMILY (Rocq `riscv_rx_tag`): every byte the environment
+  pushes into a UART carries an application-chosen, PERSISTENT claim about
+  the history it arrived at, minted at the push and copied out by every
+  reader of the receive FIFO; a kernel contract that carries a tag names no
+  new parameter.  Persistent and timeless by construction (fields), since it
+  is filed in the UART's invariant. -/
+  rxTag : List Obs → IProp GF
+  rxTag_persistent : ∀ h, Persistent (rxTag h)
+  rxTag_timeless : ∀ h, Timeless (rxTag h)
+  /-- THE KILL CREDENTIAL (Rocq `riscv_kill_cred`): the ambient price of a
+  kill, an application-chosen persistent proposition every party a kill
+  touches is handed (the killer, the killed slot's public payload, the trap
+  that observes it, the -1 the process exits with and the -1 a console read
+  returns).  A field rather than a parameter threaded through every
+  `procsInv`; `killCredTriv` (`True`) for an application that prices
+  nothing. -/
+  killCred : IProp GF
+  killCred_persistent : Persistent killCred
+  killCred_timeless : Timeless killCred
+  /-- THE CONSOLE RESOURCE (Rocq `riscv_cons_res`, redesign R2): the
+  application's claim over the whole console history -- the bytes the UART
+  accepted, the accepted-input log, what has been delivered, the arm in
+  progress (`ConsHist`) -- read against an input history.  ERA-INDEXED (the
+  first argument is the era number, `genId + 1` at the kernel, which is
+  `obsBoots h` of every history that era hands the application), so a
+  stale writer of a dead era cannot pay the current era's claim.  A
+  resource and not a `Prop` (the application needs exclusive state tied to
+  the log); TIMELESS (it rides the port invariant), NOT persistent.
+  Founded at the power-on step (`wp_power`'s `Hobs`) and carried to the
+  boot (`powerBootRes`). -/
+  consRes : Nat → List Obs → ConsHist → IProp GF
+  consRes_timeless : ∀ k h H, Timeless (consRes k h H)
 
 attribute [reducible, instance] MachFixedGS.reg
 attribute [reducible, instance] MachFixedGS.memPre
@@ -194,6 +263,11 @@ attribute [reducible, instance] MachFixedGS.lockG
 attribute [reducible, instance] MachFixedGS.kmapG
 attribute [reducible, instance] MachFixedGS.kptRootG
 attribute [reducible, instance] MachFixedGS.devG
+attribute [reducible, instance] MachFixedGS.obsVarG
+attribute [reducible, instance] MachFixedGS.obsHistG
+attribute [instance] MachFixedGS.rxTag_persistent MachFixedGS.rxTag_timeless
+attribute [instance] MachFixedGS.killCred_persistent MachFixedGS.killCred_timeless
+attribute [instance] MachFixedGS.consRes_timeless
 
 /-- A context: a thread of control's ghost identity -- its bound (a monotone
 counter) and its dirty set (a ghost map keyed by timestamp).  The laws live
@@ -871,11 +945,182 @@ def powerInterp (g : GState) : IProp GF := iprop%
     (MachFixedGS.registryName (hlc := hlc) (GF := GF) ↪●MAP R) ∗ ⌜registryOk R (startCount g)⌝ ∗
     eraCur R g
 
+/-! ### The observation history (Rocq `RiscvPtsto`: `obs_hist_lb` … `obs_interp`) -/
+
+/-- "`h` is a prefix of the history the run has reached" (persistent). -/
+def obsHistLb (h : List Obs) : IProp GF := MonoList.lb_own (MachFixedGS.obsHist (hlc := hlc) (GF := GF)) h
+/-- The history's growth authority. -/
+def obsHistAuth (h : List Obs) : IProp GF :=
+  MonoList.auth_own (MachFixedGS.obsHist (hlc := hlc) (GF := GF)) (DFrac.own 1) h
+/-- The machine's half WITHOUT the growth authority.  A CLIENT HOOK MOVES
+THIS ONE (the power hook, `wp_power`'s `Hobs`), so the monotone authority is
+stepped beside it by the power loop rather than by the hook. -/
+def obsHalf (h : List Obs) : IProp GF :=
+  MachFixedGS.obsName (hlc := hlc) (GF := GF) ↪VAR{.own (1 : Qp).half} h
+/-- The machine's half: it CARRIES THE GROWTH AUTHORITY TOO, so every mover
+of the history steps it, and "the history only grows" is a fact no arm can
+sidestep. -/
+def obsAuth (h : List Obs) : IProp GF := iprop% obsHalf h ∗ obsHistAuth h
+/-- The client's half. -/
+def obsFrag (h : List Obs) : IProp GF :=
+  MachFixedGS.obsName (hlc := hlc) (GF := GF) ↪VAR{.own (1 : Qp).half} h
+
+instance (h : List Obs) : Persistent (PROP := IProp GF) (obsHistLb h) := by
+  unfold obsHistLb; infer_instance
+instance (h : List Obs) : Timeless (PROP := IProp GF) (obsHistLb h) := by
+  unfold obsHistLb; infer_instance
+instance (h : List Obs) : Timeless (PROP := IProp GF) (obsHalf h) := by
+  unfold obsHalf; infer_instance
+instance (h : List Obs) : Timeless (PROP := IProp GF) (obsFrag h) := by
+  unfold obsFrag; infer_instance
+instance (h : List Obs) : Timeless (PROP := IProp GF) (obsAuth h) := by
+  unfold obsAuth obsHistAuth; infer_instance
+
+/-- THE GROWTH AUTHORITY'S OWN STEP, for the one mover that does not hold the
+client's half: the power loop, whose hook moves `obsHalf` alone. -/
+theorem obsHistAuth_step (h h' : List Obs) (hpre : h <+: h') :
+    obsHistAuth (GF := GF) h ⊢ |==> obsHistAuth h' := by
+  unfold obsHistAuth
+  iintro Ha
+  imod MonoList.auth_own_update _ h' hpre $$ Ha with ⟨Ha, _⟩
+  iexact Ha
+
+/-- A snapshot is free. -/
+theorem obsAuth_lb (h : List Obs) : obsAuth (GF := GF) h ⊢ obsAuth h ∗ obsHistLb h := by
+  unfold obsAuth obsHistAuth obsHistLb
+  iintro ⟨Hv, Ha⟩
+  ihave #Hlb := MonoList.lb_own_get _ _ h $$ Ha
+  iframe Hv Ha Hlb
+
+/-- A snapshot and the authority together order the two histories. -/
+theorem obsHistLb_prefix (h h0 : List Obs) :
+    obsAuth (GF := GF) h ∗ obsHistLb h0 ⊢ ⌜h0 <+: h⌝ := by
+  unfold obsAuth obsHistAuth obsHistLb
+  iintro ⟨⟨_, Ha⟩, Hlb⟩
+  ihave %hv := MonoList.auth_lb_own_valid _ _ h h0 $$ Ha Hlb
+  ipureintro; exact hv.2
+
+/-- TWO LOWER BOUNDS ON ONE MONOTONE HISTORY ARE COMPARABLE: the one fact
+that lets a writer's view shift place its byte's history against the one a
+claim is read at, without either side holding the authority. -/
+theorem obsHistLb_cmp (h1 h2 : List Obs) :
+    obsHistLb (GF := GF) h1 ∗ obsHistLb h2 ⊢ ⌜h1 <+: h2 ∨ h2 <+: h1⌝ := by
+  unfold obsHistLb
+  iintro ⟨H1, H2⟩
+  iapply MonoList.lb_own_valid _ h1 h2 $$ H1 H2
+
+/-- A bound weakens to any prefix of itself. -/
+theorem obsHistLb_mono (h0 h1 : List Obs) (hp : h0 <+: h1) :
+    obsHistLb (GF := GF) h1 ⊢ obsHistLb h0 := by
+  unfold obsHistLb
+  iintro H
+  iapply MonoList.lb_own_le _ h0 hp $$ H
+
+/-- THE TRIVIAL TAG FAMILY: what an application that claims nothing about its
+input fills the tag slot with. -/
+def rxTagTriv {GF : BundledGFunctors} : List Obs → IProp GF := fun _ => iprop(True)
+instance {GF : BundledGFunctors} (h : List Obs) : Persistent (rxTagTriv (GF := GF) h) := by
+  unfold rxTagTriv; infer_instance
+instance {GF : BundledGFunctors} (h : List Obs) : Timeless (rxTagTriv (GF := GF) h) := by
+  unfold rxTagTriv; infer_instance
+
+/-- THE TRIVIAL KILL CREDENTIAL: `True`, so the `□` every party holds it
+under is free. -/
+def killCredTriv {GF : BundledGFunctors} : IProp GF := iprop(True)
+instance {GF : BundledGFunctors} : Persistent (killCredTriv (GF := GF)) := by
+  unfold killCredTriv; infer_instance
+instance {GF : BundledGFunctors} : Timeless (killCredTriv (GF := GF)) := by
+  unfold killCredTriv; infer_instance
+
+/-- THE TRIVIAL CONSOLE CLAIM: an application that claims nothing of the
+console; the founding and every route that returns it are `emp`. -/
+def consResTriv {GF : BundledGFunctors} : Nat → List Obs → ConsHist → IProp GF :=
+  fun _ _ _ => iprop(emp)
+instance {GF : BundledGFunctors} (k : Nat) (h : List Obs) (H : ConsHist) :
+    Timeless (consResTriv (GF := GF) k h H) := by
+  unfold consResTriv; infer_instance
+
+/-- The TRIVIAL trace predicate -- the client's half and nothing about it. -/
+def obsPredTriv : IProp GF := iprop% ∃ h : List Obs, obsFrag h
+
+instance : Timeless (PROP := IProp GF) obsPredTriv := by unfold obsPredTriv; infer_instance
+
+/-- THE LEDGER: the trace predicate of a client with a TRACE-INDEXED RESOURCE
+`R` -- its half of the history ghost and `R` at that history. -/
+def obsLedger (R : List Obs → IProp GF) : IProp GF := iprop% ∃ h : List Obs, obsFrag h ∗ R h
+
+theorem obsAgree (h1 h2 : List Obs) : obsAuth (GF := GF) h1 ∗ obsFrag h2 ⊢ ⌜h1 = h2⌝ := by
+  unfold obsAuth obsHalf obsFrag
+  iintro ⟨⟨H1, _⟩, H2⟩
+  iapply ghost_var_agree $$ H1 H2
+
+/-- The two halves of the history variable move together. -/
+theorem obsHalf_update (h h' : List Obs) :
+    obsHalf (GF := GF) h ∗ obsFrag h ⊢ |==> (obsHalf h' ∗ obsFrag h') := by
+  unfold obsHalf obsFrag
+  iintro ⟨H1, H2⟩
+  iapply ghost_var_update_halves h' (MachFixedGS.obsName (hlc := hlc) (GF := GF)) h h $$ H1 H2
+
+/-- THE APPEND.  The prefix premise is the growth law itself, and it costs
+nothing: every mover of the history appends. -/
+theorem obsUpdate (h h' : List Obs) (hpre : h <+: h') :
+    obsAuth (GF := GF) h ∗ obsFrag h ⊢ |==> (obsAuth h' ∗ obsFrag h') := by
+  unfold obsAuth
+  iintro ⟨⟨H1, Ha⟩, H2⟩
+  imod obsHalf_update h h' $$ [H1 H2] with ⟨H1, H2⟩
+  · iframe H1 H2
+  imod obsHistAuth_step h h' hpre $$ Ha with Ha
+  imodintro
+  iframe H1 H2 Ha
+
+/-- THE TRACE CONJUNCT OF THE STATE INTERPRETATION.  `κs` is Iris's FUTURE
+observation list; `h` is the PAST.  Three facts: the two concatenate to the
+run's whole trace; the history is well-formed for the machine (`obsWf`, a
+pure step invariant of the language, `primStep_obsWf`); and the machine's
+half of the history ghost.  A silent step re-packs at the same `h`
+(`obsInterp_silent`); an observed one re-packs at `h ++ κ` after the client
+has moved the ghost (`obsInterp_close`). -/
+def obsInterp (g : GState) (κs : List Obs) : IProp GF := iprop%
+  ∃ h : List Obs, ⌜h ++ κs = MachFixedGS.obsTotal (hlc := hlc) (GF := GF)⌝ ∗ ⌜obsWf h g⌝ ∗ obsAuth h
+
+theorem obsInterp_silent (e : Expr) (g : GState) (e' : Expr) (g' : GState) (efs : List Expr)
+    (κs : List Obs) (hstep : PrimStep.primStep (e, g) ([] : List Obs) (e', g', efs)) :
+    obsInterp (GF := GF) g κs ⊢ obsInterp g' κs := by
+  unfold obsInterp
+  iintro ⟨%h, %htot, %hwf, Ha⟩
+  iexists h
+  iframe Ha
+  ipureintro
+  refine ⟨htot, ?_⟩
+  have := primStep_obsWf e g [] e' g' efs hstep h hwf
+  rwa [List.append_nil] at this
+
+/-- `obsInterp_silent` as the lifting lemmas meet it: Iris hands the step's
+own (empty) observation list prepended to the future. -/
+theorem obsInterp_silent_nil (e : Expr) (g : GState) (e' : Expr) (g' : GState) (efs : List Expr)
+    (κs : List Obs) (hstep : PrimStep.primStep (e, g) ([] : List Obs) (e', g', efs)) :
+    obsInterp (GF := GF) g ([] ++ κs) ⊢ obsInterp g' κs :=
+  obsInterp_silent e g e' g' efs κs hstep
+
+theorem obsInterp_close (e : Expr) (g : GState) (κ : List Obs) (e' : Expr) (g' : GState)
+    (efs : List Expr) (h κs : List Obs) (hstep : PrimStep.primStep (e, g) κ (e', g', efs))
+    (hwf : obsWf h g) (htot : h ++ (κ ++ κs) = MachFixedGS.obsTotal (hlc := hlc) (GF := GF)) :
+    obsAuth (GF := GF) (h ++ κ) ⊢ obsInterp g' κs := by
+  unfold obsInterp
+  iintro Ha
+  iexists (h ++ κ)
+  iframe Ha
+  ipureintro
+  exact ⟨by rw [List.append_assoc]; exact htot, primStep_obsWf e g κ e' g' efs hstep h hwf⟩
+
+/-- The state interpretation: the fixed ghosts and the current era (the
+power interpretation), and the trace conjunct (Rocq `riscv_irisGS`'s
+`power_interp g ∗ obs_interp g κs`). -/
 instance : StateInterp GState Obs GF where
-  stateInterp g _ _ _ := powerInterp g
+  stateInterp g _ κs _ := iprop(powerInterp g ∗ obsInterp g κs)
 
 theorem stateInterp_eq (g : GState) (ns : Nat) (κs : List Obs) (nt : Nat) :
-    stateInterp (GF := GF) g ns κs nt = powerInterp g := rfl
+    stateInterp (GF := GF) g ns κs nt = iprop(powerInterp g ∗ obsInterp g κs) := rfl
 
 instance instIrisGS : IrisGS_gen hlc Expr GF where
   invGS := MachFixedGS.invGS
@@ -884,6 +1129,16 @@ instance instIrisGS : IrisGS_gen hlc Expr GF where
   stateInterp_mono σ ns obs nt := by
     let := @MachFixedGS.invGS hlc GF _
     iintro $
+
+/-- THE TRACE INVARIANT's namespace.  (Rocq `obsN := nroot .@ "obs"`.) -/
+def obsN : Namespace := ndot nroot "obs"
+
+/-- THE TRACE INVARIANT: the client's trace predicate, in its own fixed-layer
+slot.  Opened by the power arms (through `wp_power`'s hook) and by the UART
+threads' observed arms (through their permits). -/
+def obsInv : IProp GF := inv obsN (MachFixedGS.obsPred (hlc := hlc) (GF := GF))
+
+instance : Persistent (PROP := IProp GF) obsInv := by unfold obsInv; infer_instance
 
 /-! ### Facts the counters give against their certificates -/
 

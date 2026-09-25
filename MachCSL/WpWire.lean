@@ -145,7 +145,7 @@ set_option maxHeartbeats 4000000 in
 /-- `wpDev_localR` for a device that also drives pins: the device's own
 updates stay inside `rel`, along which the client updates `R`, and every
 pin write is answered by the wire invariant. -/
-theorem wpDev_wireR (N : Namespace) (d : DevId) (rel : DevSt d → DevSt d → Prop)
+theorem wpDev_wireR (N : Namespace) (d : DevId) (hsil : DevSilent d) (rel : DevSt d → DevSt d → Prop)
     (R : DevSt d → IProp GF) [∀ s, Timeless (R s)] (hloc : DevSig.WireR d rel)
     (hR : ∀ s s', rel s s' → R s ⊢@{IProp GF} |==> R s') (_hN : N ## wireN) :
     devInvR N d R ∗ wireInv ∗ genCert ⊢@{IProp GF}
@@ -157,7 +157,7 @@ theorem wpDev_wireR (N : Namespace) (d : DevId) (rel : DevSt d → DevSt d → P
   iintro %tid %m %hm
   iapply wpDev_elim d tid m
   iframe Hcert
-  iapply wpDev_lift d tid m
+  iapply wpDev_lift d hsil tid m
   iintro %σ Hσ
   iinv Hinv with Hbody Hclose
   icases Hbody with ⟨%s, >Hfrag, >HR⟩

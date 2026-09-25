@@ -347,7 +347,11 @@ theorem devs_alloc (ds : DevStates) :
 the booted machine `σ`: the generation's certificate, every hart's register
 cells, every byte's history (the image's byte at timestamp 0), per hart a
 fresh running context with its memory token, and every device's mirror
-half (the device's invariant is the client's to build). -/
+half (the device's invariant is the client's to build) -- and THE ERA'S
+CONSOLE CLAIM, FOUNDED (Rocq `power_boot_res`'s `riscv_cons_res (S gen) []
+(MkCH [] [] [] None)`): the application's yield at the power-on step
+(`wp_power`'s `Hobs`), carried here to the boot, which founds the console
+port's invariant with it.  `gen + 1` is this era's number. -/
 def powerBootRes [KernelMap] (E : EraGS GF) (gen : Nat) (σ : MState) : IProp GF := iprop%
   (∃ r : BitVec 44, E.kptRootName ↪VAR r) ∗
   genCertAt gen E ∗
@@ -357,7 +361,8 @@ def powerBootRes [KernelMap] (E : EraGS GF) (gen : Nat) (σ : MState) : IProp GF
   ([∗list] cpu ∈ cpus, lockSetAt E cpu []) ∗
   (E.kmapName ↪●MAP KernelMap.static) ∗ kmapStaticAt E ∗
   wireInvAt E ∗
-  ([∗list] d ∈ DevId.all, devFragAt E d (σ.devs.st d))
+  ([∗list] d ∈ DevId.all, devFragAt E d (σ.devs.st d)) ∗
+  MachFixedGS.consRes (hlc := hlc) (GF := GF) (gen + 1) [] ⟨[], [], [], none⟩
 
 /-- A hart at its cycle boundary, as the power thread forks it. -/
 theorem hartWP_loop (gen : Nat) (cpu : CPU) :
@@ -382,25 +387,80 @@ theorem registryOk_none {R : RegMapF (EraGS GF)} {n : Nat} (h : registryOk R n) 
   · rw [hh] at this
     simp at this
 
-/-- The power thread is safe, given the boot client: at every `PowerOn`, from
-the boot resources of the fresh era at the booted machine, the WPs of the new
-generation's harts. -/
+/-- The event a power arm emits: `PowerOff` with the power on, `PowerOn` with
+it off. -/
+def powerEv (on : Bool) : Obs := if on then .powerOff else .powerOn
+
+/-- What the client's trace hook yields at a power event: nothing at a
+power loss (it starts no era), the era's founded console claim at a
+power-on, at the era number `obsBoots h + 1` of the post-event history. -/
+def powerYield (on : Bool) (h : List Obs) : IProp GF :=
+  if on then iprop(emp) else MachFixedGS.consRes (hlc := hlc) (GF := GF) (obsBoots h + 1) [] ⟨[], [], [], none⟩
+
+/-- The power thread is safe, given the client's TRACE HOOK and the boot
+client: at every `PowerOn`, from the boot resources of the fresh era at the
+booted machine, the WPs of the new generation's harts.
+
+THE TRACE HOOK (Rocq `wp_power_loop`'s `Hobs`).  Both power arms are
+OBSERVED, and the history ghost can only move with the client's half, which
+lives in its trace predicate -- so each arm opens `obsN` and runs this:
+given the shape of the history so far (the power is `on`), the client moves
+its half by the arm's event.  At `obsHalf`, NOT `obsAuth`: the growth
+authority riding in `obsAuth` beside it is stepped by the arm itself.  On
+the power-on arm ONLY it FOUNDS THE ERA'S CONSOLE CLAIM (`powerYield`): the
+one step of the machine that runs the client's ledger exactly once per era,
+which is what makes a linear per-era seed mintable here and nowhere else;
+`powerBootRes` carries it to the boot.  A basic update under a `◇`, so the
+client may strip its predicate's later.  The boot client gets the trace
+invariant, which it threads to the UART threads' permits.
+
+Deviation from Rocq: the Rocq hook also LENDS the fixed durable-disk auth
+(`disk_fixed_auth`); the Lean state interpretation has no fixed disk
+conjunct, so there is nothing to lend.  Rocq's power-on yield also carries
+the echo window token (`riscv_win_res`) and the init turn (`Tn`); neither is
+ported yet (io-trace track, steps 2/4). -/
 theorem wp_power [KernelMap]
+    (Hobs : ∀ (h : List Obs) (on : Bool), traceShape h on →
+      ▷ MachFixedGS.obsPred (hlc := hlc) (GF := GF) ∗ obsHalf h ⊢@{IProp GF}
+        |==> ◇ (▷ MachFixedGS.obsPred (hlc := hlc) (GF := GF) ∗ obsHalf (h ++ [powerEv on]) ∗
+          powerYield on h))
     (Hboot : ∀ (E : EraGS GF) (gen : Nat) (σ : MState) (image : Mem), bootFacts σ image →
-      powerBootRes E gen σ ⊢@{IProp GF} |={⊤}=>
+      obsInv ∗ powerBootRes E gen σ ⊢@{IProp GF} |={⊤}=>
         ([∗list] cpu ∈ cpus, hartWP gen cpu (pure ())) ∗
         ([∗list] d ∈ DevId.all, devWP gen d rootTask (pure ()))) :
-    ⊢@{IProp GF} WP Expr.power @ Stuckness.NotStuck; ⊤ {{ _v, True }} := by
+    obsInv ⊢@{IProp GF} WP Expr.power @ Stuckness.NotStuck; ⊤ {{ _v, True }} := by
+  unfold obsInv
+  iintro #Hoinv
   iloeb as IH
   iapply wp_lift_step rfl
   iintro %g %ns %obs %obs' %nt Hσ
   rw [stateInterp_eq]
+  icases Hσ with ⟨Hσ, Hobsi⟩
   unfold powerInterp
   icases Hσ with ⟨Hgen, Hstart, %R, HR, %Hok, Hcur⟩
+  -- THE TRACE STEP, FIRST: a power event is observed, and the client's trace
+  -- predicate authorises it.  Run at ⊤, before the step's mask shrink.
+  unfold obsInterp
+  icases Hobsi with ⟨%h, %htot, %hwf, Ha⟩
+  unfold obsAuth
+  icases Ha with ⟨Hhalf, Hhist⟩
+  imod (inv_acc (E := ⊤) (N := obsN) (P := MachFixedGS.obsPred (hlc := hlc) (GF := GF))
+    CoPset.subseteq_top) $$ Hoinv with ⟨HP, Hoclose⟩
+  imod Hobs h g.pow hwf.1 $$ [HP Hhalf] with >⟨HP, Hhalf, Hyield⟩
+  · iframe HP Hhalf
+  imod Hoclose $$ HP
+  imod obsHistAuth_step h (h ++ [powerEv g.pow]) (List.prefix_append _ _) $$ Hhist with Hhist
+  have hbt := hwf.2.1
   iapply fupd_mask_intro LawfulSet.empty_subset
   iintro Hclose
   cases hpow : g.pow
   · -- powered off: `PowerOn`
+    unfold powerEv powerYield
+    simp only [Bool.false_eq_true, ↓reduceIte]
+    -- THE ERA THE YIELD IS AT, MATCHED TO THE ERA THE BOOT MINTS: the machine
+    -- is powered OFF here, so `obsWf`'s boot count reads `obsBoots h = gen`
+    have hbt' : obsBoots h = g.gen := by rw [hpow] at hbt; simpa using hbt
+    rw [hbt']
     rw [eraCur_false hpow]
     have hcount : startCount g = g.gen := by simp [startCount, hpow]
     rw [hcount] at Hok
@@ -469,12 +529,12 @@ theorem wp_power [KernelMap]
     imod (wireInvAt_alloc ⟨names, G, vn, ivn, rvn, γtop, γauth, γresv, lsn, γkmap, γkroot, dn⟩ ⊤
       (fun c => g₂.m.regs c Register.sig_seip) (fun c => g₂.m.regs c Register.sig_meip))
       $$ Hpins with #Hwire
-    ihave Hres : powerBootRes ⟨names, G, vn, ivn, rvn, γtop, γauth, γresv, lsn, γkmap, γkroot, dn⟩ g.gen g₂.m $$ [Hrc Hpts Hctx Hfrags' Hls Hkmap Hkst Hkroot Hdf]
+    ihave Hres : powerBootRes ⟨names, G, vn, ivn, rvn, γtop, γauth, γresv, lsn, γkmap, γkroot, dn⟩ g.gen g₂.m $$ [Hrc Hpts Hctx Hfrags' Hls Hkmap Hkst Hkroot Hdf Hyield]
     · unfold powerBootRes genCertAt memCells kmapStaticAt
       isplitl [Hkroot]
       · iexists 0#44
         iexact Hkroot
-      iframe Hrc Hpts Hkmap Hkst Hwire Hdf
+      iframe Hrc Hpts Hkmap Hkst Hwire Hdf Hyield
       isplitr [Hctx Hfrags' Hls]
       · isplit
         · iexact Hborn
@@ -488,11 +548,18 @@ theorem wp_power [KernelMap]
           iapply BigSepL.bigSepL_mono (fun {_ c} _ => hfrag c) $$ Hfrags'
         · unfold lockSetAt locksMap
           iexact Hls
-    imod (Hboot ⟨names, G, vn, ivn, rvn, γtop, γauth, γresv, lsn, γkmap, γkroot, dn⟩ g.gen g₂.m g.image hbf) $$ Hres with ⟨Hwps, Hdwps⟩
+    imod (Hboot ⟨names, G, vn, ivn, rvn, γtop, γauth, γresv, lsn, γkmap, γkroot, dn⟩ g.gen g₂.m g.image hbf) $$ [Hres] with ⟨Hwps, Hdwps⟩
+    · isplitl []
+      · unfold obsInv; iexact Hoinv
+      · iexact Hres
     imodintro
+    -- the trace conjunct, at the extended history
+    ihave Hobsi := obsInterp_close _ _ _ _ _ _ h obs' Hstep hwf htot $$ [Hhalf Hhist]
+    · unfold obsAuth; iframe Hhalf Hhist
     -- the state interpretation at the booted state
     rw [stateInterp_eq]
     unfold powerInterp
+    iframe Hobsi
     rw [hgen, show startCount g₂ = g.gen + 1 by simp [startCount, hgen, hpow']]
     iframe Hgen Hstart
     isplitl [HR Hheap Hri Hva Hiv Hrv Htop Hauth Hresv Hda]
@@ -536,6 +603,8 @@ theorem wp_power [KernelMap]
       · rw [BigSepL.bigSepL_map, BigSepL.bigSepL_eq (fun _ => (devWP_loop g.gen _).symm)]
         iexact Hdwps
   · -- powered on: `PowerOff`
+    unfold powerEv powerYield
+    simp only [↓reduceIte]
     rw [eraCur_true hpow]
     have hcount : startCount g = g.gen + 1 := by simp [startCount, hpow]
     rw [hcount] at Hok
@@ -549,8 +618,11 @@ theorem wp_power [KernelMap]
     · imod Hclose
       imod genAuth_bump _ $$ Hgen with Hgen
       imodintro
+      ihave Hobsi := obsInterp_close _ _ _ _ _ _ h obs' Hstep hwf htot $$ [Hhalf Hhist]
+      · unfold obsAuth; iframe Hhalf Hhist
       rw [stateInterp_eq]
       unfold powerInterp
+      iframe Hobsi
       rw [show startCount { g with gen := g.gen + 1, pow := false } = g.gen + 1 by
         simp [startCount], hcount]
       iframe Hgen Hstart

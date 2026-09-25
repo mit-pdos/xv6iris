@@ -241,13 +241,39 @@ theorem uartGhosts_step (γ : UartNames) (u u' : UartState) (h : uartRel u u') :
       rw [hrx, hfifo, List.drop_append_of_le_length hk]
     · ipureintro; rw [hlb]; exact hloop
 
-/-- **The port's thread is safe under its invariant.** -/
+/-- **The port's thread is safe under its invariant**, given the client's
+trace permit for the port (the Rocq `WpUart.wp_uart_loop`'s
+`uart_obs_permit i γ`): the port's tx/rx arms are OBSERVED, and the history
+ghost moves only with the client's consent. -/
 theorem wpDev_uart_inv (i : UartId) (γ : UartNames) :
-    uartInv i γ ∗ genCert ⊢@{IProp GF} devWP (genId (hlc := hlc) (GF := GF)) (.uart i) rootTask (DevM.pure ()) := by
+    uartInv i γ ∗ devObsPermit (uartN i) (.uart i) (fun u => uartGhosts γ u) ∗ genCert ⊢@{IProp GF}
+      devWP (genId (hlc := hlc) (GF := GF)) (.uart i) rootTask (DevM.pure ()) := by
   unfold uartInv
   iintro H
   iapply wpDev_localR (uartN i) (.uart i) uartRel (fun u => uartGhosts γ u) (uart_localR i)
     (fun u u' h => uartGhosts_step γ u u' h) $$ H %rootTask %(DevM.pure ()) %(DevM.LocalR.pure ())
+
+/-- The trace namespace is not a port's. -/
+theorem uart_obsN_mask (i : UartId) : (↑obsN : CoPset) ⊆ ⊤ \ ↑(uartN i) := by
+  have hd : (↑obsN : CoPset) ## ↑(uartN i) := by
+    cases i
+    · exact ndot_ne_disjoint nroot (by decide)
+    · exact ndot_ne_disjoint nroot (by decide)
+  intro p hp
+  rw [CoPset.in_diff]
+  exact ⟨CoPset.subseteq_top p hp, fun hc => hd p ⟨hp, hc⟩⟩
+
+/-- ...and at the TRIVIAL trace predicate the permit is free (Rocq
+`uart_obs_permit_triv`), so the thread needs only the trace invariant. -/
+theorem wpDev_uart_inv_triv (i : UartId) (γ : UartNames)
+    (heq : MachFixedGS.obsPred (hlc := hlc) (GF := GF) = obsPredTriv) :
+    uartInv i γ ∗ obsInv ∗ genCert ⊢@{IProp GF}
+      devWP (genId (hlc := hlc) (GF := GF)) (.uart i) rootTask (DevM.pure ()) := by
+  iintro ⟨Hinv, #Hoinv, Hcert⟩
+  ihave #Hperm := devObsPermit_triv (uartN i) (.uart i) (fun u => uartGhosts γ u)
+    (uart_obsN_mask i) heq $$ Hoinv
+  iapply wpDev_uart_inv i γ
+  iframe Hinv Hperm Hcert
 
 /-! ## Facts the accessors rest on -/
 

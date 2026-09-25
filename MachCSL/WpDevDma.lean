@@ -24,8 +24,11 @@ replaces them here:
 
 `.setPin` stays excluded exactly as in `wpDev_localR` (the PLIC's wire is a
 separate obligation), and `wpDev_localR` itself is untouched: the UARTs
-still use it.  `DevM.Lease` subsumes `DevM.LocalR` -- see `uart_lease` and
-`wpDev_uart_lease` at the end of the file.
+still use it.  `DevM.Lease` subsumes `DevM.LocalR` -- see `uart_lease` at the
+end of the file.  The loop is for a SILENT device (`DevSilent`: the disk);
+an observing device (a UART) goes through `wpDev_localR` and its trace
+permit (the former sanity check `wpDev_uart_lease`, the UART loop through
+this lemma, is retired with the trace ghost).
 -/
 import MachCSL.WpDev
 import MachCSL.WpDma
@@ -199,7 +202,7 @@ arm (a hart reserves a byte of the footprint) and the silent no-op arms (the
 guard is off, or the footprint is not DRAM) leave the state alone and are
 closed with the lease untouched -- `wpDev_lift` asks for non-stuckness only,
 so there is no fairness obligation anywhere. -/
-theorem wpDev_dma (N : Namespace) (d : DevId) (rel : DevSt d → DevSt d → Prop)
+theorem wpDev_dma (N : Namespace) (d : DevId) (hsil : DevSilent d) (rel : DevSt d → DevSt d → Prop)
     (R : DevSt d → IProp GF) [∀ s, Timeless (R s)] (hloc : DevSig.Lease d rel R)
     (hR : ∀ s s', rel s s' → R s ⊢@{IProp GF} |==> R s') :
     devInvR N d R ∗ genCert ⊢@{IProp GF}
@@ -211,7 +214,7 @@ theorem wpDev_dma (N : Namespace) (d : DevId) (rel : DevSt d → DevSt d → Pro
   iintro %tid %m %C %hm #HC
   iapply wpDev_elim d tid m
   iframe Hcert
-  iapply wpDev_lift d tid m
+  iapply wpDev_lift d hsil tid m
   iintro %σ Hσ
   iinv Hinv with Hbody Hclose
   icases Hbody with ⟨%s, >Hfrag, >HR⟩
@@ -466,13 +469,13 @@ theorem wpDev_dma (N : Namespace) (d : DevId) (rel : DevSt d → DevSt d → Pro
         · exact BigSepL.bigSepL_nil_intro
 
 /-- The root thread of a bus-mastering device, as the power thread forks it. -/
-theorem wpDev_dma_root (N : Namespace) (d : DevId) (rel : DevSt d → DevSt d → Prop)
+theorem wpDev_dma_root (N : Namespace) (d : DevId) (hsil : DevSilent d) (rel : DevSt d → DevSt d → Prop)
     (R : DevSt d → IProp GF) [∀ s, Timeless (R s)] (hloc : DevSig.Lease d rel R)
     (hR : ∀ s s', rel s s' → R s ⊢@{IProp GF} |==> R s') :
     devInvR N d R ∗ genCert ⊢@{IProp GF}
       devWP (genId (hlc := hlc) (GF := GF)) d rootTask (DevM.pure ()) := by
   iintro H
-  iapply wpDev_dma N d rel R hloc hR $$ H %rootTask %(DevM.pure ()) %iprop(True)
+  iapply wpDev_dma N d hsil rel R hloc hR $$ H %rootTask %(DevM.pure ()) %iprop(True)
     %(DevM.Lease.pure _ ())
   imodintro
   itrivial
@@ -517,14 +520,5 @@ theorem uart_lease (i : UartId) (R : DevSt (.uart i) → IProp GF) :
     exact DevM.Lease.op _ _ _ (fun _ _ _ _ => nofun) (fun _ _ => nofun) nofun
       (fun _ _ _ => nofun) (fun _ _ _ _ _ _ => trivial) fun _ => DevM.Lease.pure _ ()
   · exact DevM.Lease.pure _ ()
-
-/-- `wpDev_dma` applies to the UART loop: the same safety `wpDev_uart` gets
-from `wpDev_local`, now through the DMA-aware loop lemma. -/
-theorem wpDev_uart_lease (N : Namespace) (i : UartId) :
-    devInvR N (.uart i) (fun _ => iprop(True)) ∗ genCert ⊢@{IProp GF}
-      devWP (genId (hlc := hlc) (GF := GF)) (.uart i) rootTask (DevM.pure ()) := by
-  iintro H
-  iapply wpDev_dma_root N (.uart i) (fun _ _ => True) (fun _ => iprop(True))
-    (uart_lease i _) (fun _ _ _ => by iintro H; imodintro; iexact H) $$ H
 
 end MachCSL

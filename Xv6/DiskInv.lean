@@ -3168,7 +3168,7 @@ theorem wpDev_disk_inv (γ : DiskNames) :
       devWP (genId (hlc := hlc) (GF := GF)) .virtio rootTask (DevM.pure ()) := by
   unfold diskInv
   iintro ⟨Hinv, Hcert, Hroot⟩
-  iapply wpDev_dmaV_root diskN .virtio (diskProto γ) (diskTaskRes γ) (diskRoot γ)
+  iapply wpDev_dmaV_root diskN .virtio devSilent_virtio (diskProto γ) (diskTaskRes γ) (diskRoot γ)
     (disk_leaseV γ)
   iframe Hinv Hcert Hroot
 

@@ -94,6 +94,7 @@ theorem wp_dev_dead (gen : Nat) (d : DevId) (tid : TaskId) (m : DevProg d) :
   iapply wp_lift_step rfl
   iintro %g %ns %obs %obs' %nt Hσ
   rw [stateInterp_eq]
+  icases Hσ with ⟨Hσ, Hobs⟩
   unfold powerInterp
   icases Hσ with ⟨Hgen, Hrest⟩
   ihave %Hlt := genAuth_dead _ _ $$ Hgen Hdead
@@ -112,8 +113,10 @@ theorem wp_dev_dead (gen : Nat) (d : DevId) (tid : TaskId) (m : DevProg d) :
   · exact absurd hl hnl
   imod Hclose
   imodintro
+  ihave Hobs := obsInterp_silent_nil _ _ _ _ _ obs' Hstep $$ Hobs
   rw [stateInterp_eq]
   unfold powerInterp
+  iframe Hobs
   iframe Hgen Hrest
   isplit
   · iexact IH
@@ -144,12 +147,25 @@ theorem wpDev_elim (d : DevId) (tid : TaskId) (m : DevProg d) :
   iintro ⟨H, Hc⟩
   iapply H $$ Hc
 
-/-- The lifting lemma for device tasks. -/
-theorem wpDev_lift (d : DevId) (tid : TaskId) (m : DevProg d) :
-    (∀ σ, machInterp σ ={⊤,∅}=∗
+/-- **The lifting lemma for device tasks, OBSERVED** (the Rocq
+`RiscvExec.wp_uart_step`, device-generic).  A device step may be observed
+(the UARTs' tx/rx arms), so this rule hands its callback the state
+interpretation's half of the HISTORY ghost (`obsAuth h`) at the history so
+far -- with the three facts about it the callback can use: the power is on
+(`traceShape h true`), the WIRE TIE (the outputs of the open cycle are
+exactly each port's `wire`), and the ERA STAMP (`obsBoots h = genId + 1`:
+the history belongs to THIS generation's era) -- and takes it back at
+`h ++ obs`.  The client can only get there with the OTHER half, which lives
+in its trace predicate (`obsInv`): that is how every observation is
+authorised by the client (`devObsPermit`). -/
+theorem wpDev_lift_obs (d : DevId) (tid : TaskId) (m : DevProg d) :
+    (∀ σ (h : List Obs),
+      ⌜traceShape h true ∧ (∀ i, obsWire i (openSeg h) = σ.devs.wire i) ∧
+        obsBoots h = genId (hlc := hlc) (GF := GF) + 1⌝ -∗
+      machInterp σ ∗ obsAuth h ={⊤,∅}=∗
       ⌜∃ obs m' σ' efs, devStep (genId (hlc := hlc) (GF := GF)) d tid m σ obs m' σ' efs⌝ ∗
       ▷ ∀ obs m' σ' efs, ⌜devStep (genId (hlc := hlc) (GF := GF)) d tid m σ obs m' σ' efs⌝ -∗
-        £ 1 ={∅,⊤}=∗ machInterp σ' ∗ wpDev d tid m' ∗
+        £ 1 ={∅,⊤}=∗ machInterp σ' ∗ obsAuth (h ++ obs) ∗ wpDev d tid m' ∗
           [∗list] ef ∈ efs, WP ef @ Stuckness.NotStuck; ⊤ {{ _v, True }})
     ⊢@{IProp GF} wpDev d tid m := by
   unfold wpDev devWP
@@ -159,6 +175,7 @@ theorem wpDev_lift (d : DevId) (tid : TaskId) (m : DevProg d) :
   iapply wp_lift_step rfl
   iintro %g %ns %obs %obs' %nt Hσ
   rw [stateInterp_eq]
+  icases Hσ with ⟨Hσ, Hobs⟩
   unfold powerInterp
   icases Hσ with ⟨Hgen, Hstart, %R, HR, %Hok, Hcur⟩
   ihave %Hb' := genAuth_born _ _ $$ Hgen Hborn
@@ -179,7 +196,16 @@ theorem wpDev_lift (d : DevId) (tid : TaskId) (m : DevProg d) :
       exact Option.some.inj HRg'
     subst hEq
     rw [eraInterp_ambient]
-    imod H $$ %g.m Hera with ⟨%Hred, H⟩
+    -- the history so far, and what the callback may know about it
+    unfold obsInterp
+    icases Hobs with ⟨%h, %htot, %hwf, Ha⟩
+    have hfacts : traceShape h true ∧ (∀ i, obsWire i (openSeg h) = g.m.devs.wire i) ∧
+        obsBoots h = genId (hlc := hlc) (GF := GF) + 1 := by
+      obtain ⟨hsh, hbt, hwire⟩ := hwf
+      rw [hpow] at hsh hbt
+      exact ⟨hsh, hwire hpow, by rw [hbt, hge]; rfl⟩
+    imod H $$ %g.m %h %hfacts [Hera Ha] with ⟨%Hred, H⟩
+    · iframe Hera Ha
     imodintro
     isplit
     · ipureintro
@@ -188,10 +214,14 @@ theorem wpDev_lift (d : DevId) (tid : TaskId) (m : DevProg d) :
     inext
     iintro %e₂ %g₂ %eₜ %Hstep Hcred
     rcases primStep_dev_inv Hstep with ⟨_, m', σ', rfl, hs, rfl⟩ | ⟨hnl, _⟩
-    · imod H $$ %obs %m' %σ' %eₜ %hs Hcred with ⟨Hσ', Hwp, Hefs⟩
+    · imod H $$ %obs %m' %σ' %eₜ %hs Hcred with ⟨Hσ', Ha, Hwp, Hefs⟩
       imodintro
+      -- the trace conjunct, re-packed at the extended history: the client
+      -- moved the ghost, the language's step invariant does the rest
+      ihave Hobs := obsInterp_close _ _ _ _ _ _ h obs' Hstep hwf htot $$ Ha
       rw [stateInterp_eq]
       unfold powerInterp
+      iframe Hobs
       rw [show startCount { g with m := σ' } = startCount g from rfl]
       iframe Hgen Hstart
       isplitl [HR Hσ']
@@ -226,8 +256,10 @@ theorem wpDev_lift (d : DevId) (tid : TaskId) (m : DevProg d) :
     · exact absurd hl hnl
     imod Hclose
     imodintro
+    ihave Hobs := obsInterp_silent_nil _ _ _ _ _ obs' Hstep $$ Hobs
     rw [stateInterp_eq]
     unfold powerInterp
+    iframe Hobs
     iframe Hgen Hstart
     isplitl [HR Hcur]
     · iexists R
@@ -238,6 +270,68 @@ theorem wpDev_lift (d : DevId) (tid : TaskId) (m : DevProg d) :
     · iapply wp_dev_dead' (genId (hlc := hlc) (GF := GF)) d tid m
       iexact Hdead
     · exact BigSepL.bigSepL_nil_intro
+
+
+/-- A SILENT device's step observes nothing (the PLIC, the disk). -/
+theorem devStep_silent (gen : Nat) (d : DevId) (hsil : DevSilent d) (tid : TaskId) (m : DevProg d)
+    (σ : MState) (obs : List Obs) (m' : DevProg d) (σ' : MState) (efs : List Expr)
+    (h : devStep gen d tid m σ obs m' σ' efs) : obs = [] := by
+  cases m with
+  | pure _ => exact h.1
+  | op o k =>
+    rcases h with ⟨v, _, hop⟩ | ⟨_, _, _, rfl, _⟩
+    · cases o with
+      | step g =>
+        obtain ⟨s', os, _, hok, _, rfl, _⟩ := hop
+        rw [hsil _ _ _ hok]; rfl
+      | get => exact hop.2.2.1
+      | choose => exact hop.2.1
+      | dmaRead pa n => exact hop.2.2.1
+      | dmaWrite g pa n w => exact hop.1
+      | sample src => exact hop.2.2.1
+      | setPin c mm b => exact hop.1
+      | fork t => exact hop.2.1
+      | join tid => exact hop.2.2.1
+    · rfl
+
+/-- Every primitive but the guarded update is silent. -/
+theorem devOpStep_obs_nil (gen : Nat) (d : DevId) (o : DevOp (DevSt d) (DevTask d)) (σ : MState)
+    (v : o.ret) (σ' : MState) (obs : List Obs) (efs : List Expr) (ho : ∀ g, o ≠ .step g)
+    (hop : devOpStep gen d o σ v σ' obs efs) : obs = [] := by
+  cases o with
+  | step g => exact absurd rfl (ho g)
+  | get => exact hop.2.2.1
+  | choose => exact hop.2.1
+  | dmaRead pa n => exact hop.2.2.1
+  | dmaWrite g pa n w => exact hop.1
+  | sample src => exact hop.2.2.1
+  | setPin c mm b => exact hop.1
+  | fork t => exact hop.2.1
+  | join tid => exact hop.2.2.1
+
+/-- The lifting lemma for the tasks of a SILENT device (every device but the
+UARTs): its steps observe nothing, so the history ghost is framed and the
+callback is the unobserved one. -/
+theorem wpDev_lift (d : DevId) (hsil : DevSilent d) (tid : TaskId) (m : DevProg d) :
+    (∀ σ, machInterp σ ={⊤,∅}=∗
+      ⌜∃ obs m' σ' efs, devStep (genId (hlc := hlc) (GF := GF)) d tid m σ obs m' σ' efs⌝ ∗
+      ▷ ∀ obs m' σ' efs, ⌜devStep (genId (hlc := hlc) (GF := GF)) d tid m σ obs m' σ' efs⌝ -∗
+        £ 1 ={∅,⊤}=∗ machInterp σ' ∗ wpDev d tid m' ∗
+          [∗list] ef ∈ efs, WP ef @ Stuckness.NotStuck; ⊤ {{ _v, True }})
+    ⊢@{IProp GF} wpDev d tid m := by
+  iintro H
+  iapply wpDev_lift_obs d tid m
+  iintro %σ %h %_ ⟨Hσ, Ha⟩
+  imod H $$ %σ Hσ with ⟨%Hred, H⟩
+  imodintro
+  isplit
+  · ipureintro; exact Hred
+  inext
+  iintro %obs %m' %σ' %efs %hs Hcred
+  imod H $$ %obs %m' %σ' %efs %hs Hcred with ⟨Hσ', Hwp, Hefs⟩
+  imodintro
+  rw [devStep_silent _ d hsil tid m σ obs m' σ' efs hs, List.append_nil]
+  iframe Hσ' Ha Hwp Hefs
 
 /-! ## The device mirrors in the interpretation -/
 
@@ -462,7 +556,7 @@ theorem devOpStep_local (gen : Nat) (d : DevId) (o : DevOp (DevSt d) (DevTask d)
 
 set_option maxHeartbeats 4000000 in
 /-- Every task of a local device is safe under its mirror invariant. -/
-theorem wpDev_local (N : Namespace) (d : DevId) (hloc : DevSig.Local d) :
+theorem wpDev_local (N : Namespace) (d : DevId) (hsil : DevSilent d) (hloc : DevSig.Local d) :
     devInv N d ∗ genCert ⊢@{IProp GF} ∀ (tid : TaskId) (m : DevProg d), ⌜DevM.Local m⌝ →
       devWP (genId (hlc := hlc) (GF := GF)) d tid m := by
   unfold devInv
@@ -471,7 +565,7 @@ theorem wpDev_local (N : Namespace) (d : DevId) (hloc : DevSig.Local d) :
   iintro %tid %m %hm
   iapply wpDev_elim d tid m
   iframe Hcert
-  iapply wpDev_lift d tid m
+  iapply wpDev_lift d hsil tid m
   iintro %σ Hσ
   iinv Hinv with Hbody Hclose
   icases Hbody with ⟨%s, >Hfrag⟩
@@ -580,21 +674,81 @@ theorem wpDev_local (N : Namespace) (d : DevId) (hloc : DevSig.Local d) :
 def devInvR (N : Namespace) (d : DevId) (R : DevSt d → IProp GF) : IProp GF :=
   inv N iprop(∃ s : DevSt d, devFrag d s ∗ R s)
 
+/-- THE TRACE PERMIT (the Rocq `WpUart.uart_obs_permit`, device-generic).
+`wpDev_lift_obs` hands a device thread the state interpretation's half of
+the HISTORY ghost and wants it back at `h ++ obs`; the other half lives in
+the client's trace predicate (`obsInv`), so the move is the CLIENT's step,
+and this is its shape: with the step's own faithful events (at the device
+state it leaves and the one it reaches), the facts the machine layer knows
+about the history -- the power is on, the open cycle's outputs ARE the
+wires, the era stamp -- and the client's ghosts AFTER the step in hand, move
+the history by the events.  It runs inside the device's invariant (hence
+the mask), so a client's trace predicate may relate the history to the
+device ghosts.  A client that files an input TAG (Rocq `uart_tag_of`) does
+so into its own `R s'`.  `devObsPermit_silent` discharges it for a device
+that never observes; `devObsPermit_triv` for the trivial trace predicate. -/
+def devObsPermit (N : Namespace) (d : DevId) (R : DevSt d → IProp GF) : IProp GF := iprop%
+  □ ∀ (h : List Obs) (ds : DevStates) (s' : DevSt d) (os : List DevObs),
+    ⌜devObsOk d (ds.st d) s' os ∧ traceShape h true ∧
+      (∀ i, obsWire i (openSeg h) = ds.wire i) ∧ obsBoots h = genId (hlc := hlc) (GF := GF) + 1⌝ -∗
+    R s' -∗ obsAuth h ={⊤ \ ↑N}=∗ R s' ∗ obsAuth (h ++ os.map Obs.dev)
+
+instance devObsPermit_persistent (N : Namespace) (d : DevId) (R : DevSt d → IProp GF) :
+    Persistent (devObsPermit N d R) := by
+  unfold devObsPermit; infer_instance
+
+/-- A device that never observes needs no consent. -/
+theorem devObsPermit_silent (N : Namespace) (d : DevId) (R : DevSt d → IProp GF)
+    (hsil : DevSilent d) : ⊢@{IProp GF} devObsPermit N d R := by
+  unfold devObsPermit
+  iintro !> %h %ds %s' %os %hf HR Ha
+  rw [hsil _ _ _ hf.1, List.map_nil, List.append_nil]
+  imodintro
+  iframe HR Ha
+
+/-- THE PERMIT OF THE TRIVIAL TRACE PREDICATE (Rocq `uart_obs_permit_triv`):
+a client that states no trace property moves the ghost and ignores the
+events. -/
+theorem devObsPermit_triv (N : Namespace) (d : DevId) (R : DevSt d → IProp GF)
+    (hN : (↑obsN : CoPset) ⊆ ⊤ \ ↑N)
+    (heq : MachFixedGS.obsPred (hlc := hlc) (GF := GF) = obsPredTriv) :
+    obsInv ⊢@{IProp GF} devObsPermit N d R := by
+  unfold devObsPermit
+  iintro #Hoinv !> %h %ds %s' %os %_ HR Ha
+  unfold obsInv
+  rw [heq]
+  imod (inv_acc_timeless (E := ⊤ \ ↑N) (N := obsN) (P := obsPredTriv (GF := GF)) hN) $$ Hoinv
+    with ⟨HP, Hclose⟩
+  unfold obsPredTriv
+  icases HP with ⟨%h', Hfrag⟩
+  ihave %he := obsAgree h h' $$ [Ha Hfrag]
+  · iframe Ha Hfrag
+  subst he
+  imod obsUpdate h (h ++ os.map Obs.dev) (List.prefix_append _ _) $$ [Ha Hfrag] with ⟨Ha, Hfrag⟩
+  · iframe Ha Hfrag
+  imod Hclose $$ [Hfrag]
+  · iexists (h ++ os.map Obs.dev)
+    iexact Hfrag
+  imodintro
+  iframe HR Ha
+
 /-- `wpDev_local` for an invariant carrying `R`: the device's own updates
-stay inside `rel`, along which the client updates `R`. -/
+stay inside `rel`, along which the client updates `R`; its observed moves are
+authorised by the client's permit. -/
 theorem wpDev_localR (N : Namespace) (d : DevId) (rel : DevSt d → DevSt d → Prop)
     (R : DevSt d → IProp GF) [∀ s, Timeless (R s)] (hloc : DevSig.LocalR d rel)
     (hR : ∀ s s', rel s s' → R s ⊢@{IProp GF} |==> R s') :
-    devInvR N d R ∗ genCert ⊢@{IProp GF} ∀ (tid : TaskId) (m : DevProg d), ⌜DevM.LocalR rel m⌝ →
+    devInvR N d R ∗ devObsPermit N d R ∗ genCert ⊢@{IProp GF}
+      ∀ (tid : TaskId) (m : DevProg d), ⌜DevM.LocalR rel m⌝ →
       devWP (genId (hlc := hlc) (GF := GF)) d tid m := by
-  unfold devInvR
-  iintro ⟨#Hinv, #Hcert⟩
+  unfold devInvR devObsPermit
+  iintro ⟨#Hinv, #Hperm, #Hcert⟩
   iloeb as IH
   iintro %tid %m %hm
   iapply wpDev_elim d tid m
   iframe Hcert
-  iapply wpDev_lift d tid m
-  iintro %σ Hσ
+  iapply wpDev_lift_obs d tid m
+  iintro %σ %h %hfacts ⟨Hσ, Ha⟩
   iinv Hinv with Hbody Hclose
   icases Hbody with ⟨%s, >Hfrag, >HR⟩
   icases machInterp_acc_dev σ d $$ Hσ with ⟨Hauth, Hσclose⟩
@@ -620,12 +774,14 @@ theorem wpDev_localR (N : Namespace) (d : DevId) (rel : DevSt d → DevSt d → 
   cases m with
   | pure a =>
     obtain ⟨rfl, rfl, h⟩ := hstep
+    rw [List.append_nil]
     ihave Hcl := Hclose $$ [Hfrag HR]
     case' _ => inext; iexists (σ.devs.st d); iframe Hfrag HR
     imod Hcl
     imodintro
     ihave Hσ := machInterp_acc_dev_self σ d $$ [Hσclose Hauth]
     case' _ => iframe
+    iframe Ha
     rcases h with ⟨_, rfl, rfl⟩ | ⟨_, rfl, hσ'⟩
     · iframe Hσ
       isplitl []
@@ -644,54 +800,65 @@ theorem wpDev_localR (N : Namespace) (d : DevId) (rel : DevSt d → DevSt d → 
     cases hm with
     | op _ _ hw hp hs hk =>
     rcases hstep with ⟨v, rfl, hop⟩ | ⟨hb, rfl, hσ, rfl, rfl⟩
-    · rcases devOpStep_localR _ d o σ v σ' obs efs hw hp hop with
-        ⟨g, s', os, rfl, hg, rfl, rfl⟩ | ⟨hσ, rfl⟩ | ⟨rt, t, tid', hrt, rfl, rfl⟩
-      · -- the device's own state moved inside `rel`: both halves and the client's ghosts follow
+    · by_cases hstp : ∃ g, o = .step g
+      · -- the device's own state moved inside `rel`: both halves and the
+        -- client's ghosts follow, and the client authorises the events
+        obtain ⟨g, rfl⟩ := hstp
+        obtain ⟨s', os, hg, hok, rfl, rfl, rfl⟩ := hop
         have hrel := hs g rfl _ _ _ hg
         imod (devUpdateAt _ d (σ.devs.st d) (σ.devs.st d) s') $$ [Hauth Hfrag] with ⟨Hauth, Hfrag⟩
         · iframe
         imod (hR _ _ hrel) $$ HR with HR
+        imod Hperm $$ %h %σ.devs %s' %os %⟨hok, hfacts⟩ HR Ha with ⟨HR, Ha⟩
         ihave Hcl := Hclose $$ [Hfrag HR]
         case' _ => inext; iexists s'; iframe Hfrag HR
         imod Hcl
         imodintro
+        iframe Ha
         isplitl [Hauth Hσclose]
         · iapply Hσclose $$ %s' Hauth
         isplitl []
         · iapply hmk _ (hk v) $$ IH
         · exact BigSepL.bigSepL_nil_intro
-      · rw [hσ]
-        ihave Hcl := Hclose $$ [Hfrag HR]
-        case' _ => inext; iexists (σ.devs.st d); iframe Hfrag HR
-        imod Hcl
-        imodintro
-        ihave Hσ := machInterp_acc_dev_self σ d $$ [Hσclose Hauth]
-        case' _ => iframe
-        iframe Hσ
-        isplitl []
-        · iapply hmk _ (hk v) $$ IH
-        · exact BigSepL.bigSepL_nil_intro
-      · ihave Hcl := Hclose $$ [Hfrag HR]
-        case' _ => inext; iexists (σ.devs.st d); iframe Hfrag HR
-        imod Hcl
-        imodintro
-        ihave Hσ := machInterp_acc_dev_self σ d $$ [Hσclose Hauth]
-        case' _ => iframe
-        isplitl [Hσ]
-        · iapply machInterp_setRt _ _ rt (fun _ => hrt) $$ Hσ
-        isplitl []
-        · iapply hmk _ (hk v) $$ IH
-        · iapply BigSepL.bigSepL_singleton.2
-          unfold devWP
-          iapply IH $$ %tid' %((devSig d).task t) %(hloc.2 t)
-    · rw [hσ]
+      · have hnil := devOpStep_obs_nil _ d o σ v σ' obs efs (fun g h => hstp ⟨g, h⟩) hop
+        subst hnil
+        rw [List.append_nil]
+        rcases devOpStep_localR _ d o σ v σ' [] efs hw hp hop with
+          ⟨g, _, _, rfl, _, _, _⟩ | ⟨hσ, rfl⟩ | ⟨rt, t, tid', hrt, rfl, rfl⟩
+        · exact absurd ⟨g, rfl⟩ hstp
+        · rw [hσ]
+          ihave Hcl := Hclose $$ [Hfrag HR]
+          case' _ => inext; iexists (σ.devs.st d); iframe Hfrag HR
+          imod Hcl
+          imodintro
+          ihave Hσ := machInterp_acc_dev_self σ d $$ [Hσclose Hauth]
+          case' _ => iframe
+          iframe Hσ Ha
+          isplitl []
+          · iapply hmk _ (hk v) $$ IH
+          · exact BigSepL.bigSepL_nil_intro
+        · ihave Hcl := Hclose $$ [Hfrag HR]
+          case' _ => inext; iexists (σ.devs.st d); iframe Hfrag HR
+          imod Hcl
+          imodintro
+          ihave Hσ := machInterp_acc_dev_self σ d $$ [Hσclose Hauth]
+          case' _ => iframe
+          iframe Ha
+          isplitl [Hσ]
+          · iapply machInterp_setRt _ _ rt (fun _ => hrt) $$ Hσ
+          isplitl []
+          · iapply hmk _ (hk v) $$ IH
+          · iapply BigSepL.bigSepL_singleton.2
+            unfold devWP
+            iapply IH $$ %tid' %((devSig d).task t) %(hloc.2 t)
+    · rw [hσ, List.append_nil]
       ihave Hcl := Hclose $$ [Hfrag HR]
       case' _ => inext; iexists (σ.devs.st d); iframe Hfrag HR
       imod Hcl
       imodintro
       ihave Hσ := machInterp_acc_dev_self σ d $$ [Hσclose Hauth]
       case' _ => iframe
-      iframe Hσ
+      iframe Hσ Ha
       isplitl []
       · iapply hmk _ hm' $$ IH
       · exact BigSepL.bigSepL_nil_intro
@@ -709,13 +876,5 @@ theorem uart_local (i : UartId) : DevSig.Local (.uart i) := by
   · refine DevM.Local.op _ _ (fun _ _ _ _ => nofun) (fun _ _ _ => nofun) fun _ => ?_
     exact DevM.Local.op _ _ (fun _ _ _ _ => nofun) (fun _ _ _ => nofun) fun _ => DevM.Local.pure ()
   · exact DevM.Local.pure ()
-
-/-- **The UART threads are safe** under their mirror invariants: the root
-loop of port `i`, and every task it could fork (none). -/
-theorem wpDev_uart (N : Namespace) (i : UartId) :
-    devInv N (.uart i) ∗ genCert ⊢@{IProp GF}
-      devWP (genId (hlc := hlc) (GF := GF)) (.uart i) rootTask (DevM.pure ()) := by
-  iintro H
-  iapply wpDev_local N (.uart i) (uart_local i) $$ H %rootTask %(DevM.pure ()) %(DevM.Local.pure ())
 
 end MachCSL

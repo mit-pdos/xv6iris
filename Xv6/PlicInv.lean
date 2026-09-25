@@ -553,7 +553,7 @@ theorem wpDev_plic_inv (γ0 γ1 : UartNames) :
       devWP (genId (hlc := hlc) (GF := GF)) .plic rootTask (DevM.pure ()) := by
   unfold plicInv
   iintro H
-  iapply wpDev_wireR plicN .plic plicRel (fun p => plicGhosts γ0 γ1 p) plic_wireR
+  iapply wpDev_wireR plicN .plic devSilent_plic plicRel (fun p => plicGhosts γ0 γ1 p) plic_wireR
     (fun p p' h => plicGhosts_step γ0 γ1 p p' h) plicN_wireN $$ H %rootTask
     %(DevM.pure ()) %(DevM.WireR.pure ())
 
