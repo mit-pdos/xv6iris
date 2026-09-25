@@ -55,7 +55,27 @@ REFUSED-OPEN DEPOSIT -- when cat f cannot open f, the layer expects
 (fd 1) while the console writer printing `cat: cannot open f` is a
 separate device (fd 2): the producer's two devices need shared state
 (one coupled resource), or a pure coupled device kind as the copy device
-was; see UShPipesDefs.v's header.
+was; see UShPipesDefs.v's header.  C9d' LANDED (00468647b..d718903ca, VM c9dmerge1, audits
+13/13/14/14): the refused-open deposit is resolved by a PURE producer
+device -- `ProgTree.DProd outs xs ds`/`DProdHalt ds` on cat f's fd 1 and
+fd 2 (a failure report can be chosen only while the pipe owes `[]`, and
+leaves it owing `[[]]`; the first pipe byte retires the reports), with
+`cat_file_prod_conforms`/`_absent_conforms_gen`, interface fields
+`ei_prod`/`ei_prod_halt` and five laws.  WHY NOT instance-level shared
+state: with separate devices the spec admits both 'write the pipe, then
+report' and 'report, then write', both needing the one permit `wcur (P
+0) 0`; whichever comes second cannot be refuted by any sharing in
+`ei_fds` -- only the spec can pair them.  S5: the file interface is
+claim-generic (`UkFileIfaceGen`); the pipe interface already was
+(`peclV`).  `UkCatFIface.cif_iface` (the producer-only registry: `UDIn s
+nm i γo` pinned to `fname_f` -- seam b; `UDProd pn gp w A X`; scope over
+`uname := (= fname_f)` -- seam c; the deed in the core, back through the
+exit wand, dropped at node 0 -- B3), `UkCatFEntries.pse_catf_image_entry`
+(+ absent twin).  The landed `stage_catf_law`'s premise carries no deed,
+so `UShCatFStage.stage_catf_law_d` takes an extra lend `Rd` (the deed)
+and `stage_catf_law_holds` discharges it with the entry; threading the
+deed from the shell into `Rd` is C9f2's.  LEFT: `reach_exit` has no
+`DProd` rules yet (unused so far).
 
 ## Review amendments (override the plan below)
 
