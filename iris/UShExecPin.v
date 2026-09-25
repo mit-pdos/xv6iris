@@ -346,7 +346,7 @@ Section UShExecPin.
          ⌜Fd (take NSTD sts)⌝ -∗
          UkRun.urun_nopipe sts -∗
          image_entry elf M (mword_of_int (t + 8) : mword 64)
-           sts FsImg.ROOTINO cs pidv (fun _ : Z => Qv) Cr uslot) -∗
+           sts FsImg.ROOTINO ProcDefs.secc_all cs pidv (fun _ : Z => Qv) Cr uslot) -∗
     □ (app_taint -∗ Qv) -∗
     sh_pin_slot pins T -∗
     UkShEcho.sh_exec_sup_echo_at (SG := uexecSG_xv6) Fd ws (fun _ : Z => Qv) Cr.
@@ -400,7 +400,7 @@ Section UShExecPin.
          ⌜Fd (take NSTD sts)⌝ -∗
          UkRun.urun_nopipe sts -∗
          image_entry (filt_elf F) M (mword_of_int (t + 8) : mword 64)
-           sts FsImg.ROOTINO cs pidv (fun _ : Z => Qv) Cr uslot) -∗
+           sts FsImg.ROOTINO ProcDefs.secc_all cs pidv (fun _ : Z => Qv) Cr uslot) -∗
     □ (app_taint -∗ Qv) -∗
     sh_pin_slot (filt_pins F) T -∗
     UkShEcho.sh_exec_sup_echo_at (SG := uexecSG_xv6) Fd (filt_words F) (fun _ : Z => Qv) Cr.

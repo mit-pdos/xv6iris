@@ -336,7 +336,7 @@ Section UkUnionEntries.
   (* ------------------------------------------------------------------- *)
   Lemma uecho_cons_image_entry (ws : list (list (bv 8))) (M : gmap Z (bv 8))
       (s0 t : Z) (gb : nat -> bv 8) (sts : list fdstate)
-      (cw : Z) (cs : gset gname) (pidv : mword 32)
+      (cw : Z) (secc : mword 64) (cs : gset gname) (pidv : mword 32)
       (v : era_pins) (sb : fstate) (I0 : list (bv 8))
       (r : file_names) (q : Qp) (s : dst)
       (rb : bool) (jo : option Z) (Q : Z -> iProp Σ) (F : iProp Σ) :
@@ -358,7 +358,7 @@ Section UkUnionEntries.
     era_pin (fgn_echo gf) (S gen_id) v -∗
     UkRun.urun_nopipe sts -∗ udep -∗
     image_entry ElfUser.echo_elf M (mword_of_int (t + 8) : mword 64) sts
-      cw cs pidv Q
+      cw secc cs pidv Q
       (gwc_blk U (PA sb) (S gen_id) v I0 0%nat 0%nat ∗ fdq r q s ∗ F) uslot.
   Proof using Hcons fifRegG0 ufdG0.
     intros HQc Heq Hline Himg Hbytes Hfdl Hcw Hl1 Hfl Hshort.
@@ -384,7 +384,7 @@ Section UkUnionEntries.
                   (LINKS_pers := union_links_persistent ug)
                   (union_links_gl_w_at ug sb) (union_links_gl_blk_at ug sb)
                   (union_links_gl_taint_at ug sb)).
-    iPoseProof (echo_image_entry_env_c ws M s0 t gb sts cw cs pidv Q
+    iPoseProof (echo_image_entry_env_c ws M s0 t gb sts cw secc cs pidv Q
                   (own γreg (fif_pool ∅ w0)
                    ∗ (gwc_blk U (PA sb) (S gen_id) v I0 0%nat 0%nat ∗ fdq r q s ∗ F))%I
                   I E {[0%nat]}
@@ -436,7 +436,7 @@ Section UkUnionEntries.
   (* [UkFileEntries.cat_image_entry_env_f_c] at the positional file name *)
   Lemma ucat_image_entry_env_c (ws : list (list (bv 8))) (Mn : gmap Z (bv 8))
       (sv t : Z) (gn : nat -> bv 8)
-      (sts : list fdstate) (cw : Z) (cs : gset gname) (pidv : mword 32)
+      (sts : list fdstate) (cw : Z) (secc : mword 64) (cs : gset gname) (pidv : mword 32)
       (Q : Z -> iProp Σ) (Pay : iProp Σ)
       {Dp : list nat}
       (I : forall N' : uk_names Σ, ukn_pay N' = Q -> ep_ifaceP (Dp := Dp) N' (cat_prog N'))
@@ -461,14 +461,14 @@ Section UkUnionEntries.
     UkRun.urun_nopipe sts -∗
     udep -∗
     image_entry ElfUser.cat_elf Mn (mword_of_int (t + 8) : mword 64) sts
-      cw cs pidv Q Pay uslot.
+      cw secc cs pidv Q Pay uslot.
   Proof using .
     intros Hok Himg Hbytes Hfdl Hws2 Halen Hfname Hc Hs Hdp.
     assert (Htail : cat_tree ws = cat_tree [sb "cat"; FsImgCheck.fname_f]).
     { apply cat_tree_tail. rewrite (ucat_f_tail ws Hws2 Halen Hfname). reflexivity. }
     rewrite <- Htail in Hc, Hs.
     iIntros "#Henv #Hnpw #Hdep".
-    iApply (cat_image_entry_env_c ws Mn sv t gn sts cw cs pidv Q Pay I E ds
+    iApply (cat_image_entry_env_c ws Mn sv t gn sts cw secc cs pidv Q Pay I E ds
               Hok Himg Hbytes Hfdl Hc Hs Hdp with "Henv Hnpw Hdep").
   Qed.
 
@@ -478,7 +478,7 @@ Section UkUnionEntries.
      the drained console names, the deed and the frame. *)
   Lemma ucat_image_entry (ws : list (list (bv 8))) (Mn : gmap Z (bv 8))
       (sv t : Z) (gn : nat -> bv 8)
-      (sts : list fdstate) (cw : Z) (cs : gset gname) (pidv : mword 32)
+      (sts : list fdstate) (cw : Z) (secc : mword 64) (cs : gset gname) (pidv : mword 32)
       (v : era_pins) (ps0 cs0 : list nat) (sq : fstate) (I0 : list (bv 8)) (P : nat)
       (r : file_names) (q : Qp) (s : dst)
       (rb rb2 : bool) (jo : option Z) (Q : Z -> iProp Σ) (F : iProp Σ) :
@@ -510,7 +510,7 @@ Section UkUnionEntries.
     era_pin (fgn_echo gf) (S gen_id) v -∗
     UkRun.urun_nopipe sts -∗ udep -∗
     image_entry ElfUser.cat_elf Mn (mword_of_int (t + 8) : mword 64) sts
-      cw cs pidv Q
+      cw secc cs pidv Q
       (cons_cur U (PA sq) v ps0 cs0 sq I0 P 0%nat 0%nat ∗ fdq r q s ∗ F) uslot.
   Proof using Hcons fifRegG0 ufdG0.
     intros HQc Heq Hwb Hfl Htie Hshort Hok Himg Hbytes Hfdl Hws2 Halen Hfname Hcw Hl1 Hl2.
@@ -548,7 +548,7 @@ Section UkUnionEntries.
                   (LINKS_pers := union_links_persistent ug)
                   (union_links_gl_w_at ug sq) (union_links_gl_blk_at ug sq)
                   (union_links_gl_taint_at ug sq)).
-    iPoseProof (ucat_image_entry_env_c ws Mn sv t gn sts cw cs pidv Q
+    iPoseProof (ucat_image_entry_env_c ws Mn sv t gn sts cw secc cs pidv Q
                   (own γreg (fif_pool ∅ w0)
                    ∗ (cons_cur U (PA sq) v ps0 cs0 sq I0 P 0%nat 0%nat ∗ fdq r q s ∗ F))%I
                   I (cat_env0 (ucat_alts (snd <$> s)) (fif_files (snd <$> s))
@@ -598,7 +598,7 @@ Section UkUnionEntries.
   (* ------------------------------------------------------------------- *)
   Lemma uefile_image_entry (sb : fstate) (ws : wordline) (M : gmap Z (bv 8))
       (s0 t : Z) (gb : nat -> bv 8) (sts : list fdstate)
-      (cw : Z) (cs : gset gname) (pidv : mword 32)
+      (cw : Z) (secc : mword 64) (cs : gset gname) (pidv : mword 32)
       (r : file_names) (Wq : iProp Σ)
       (i : Z) (γo : gname) (rb : bool)
       (Q : Z -> iProp Σ) :
@@ -619,7 +619,7 @@ Section UkUnionEntries.
     UkRun.urun_nopipe sts -∗
     udep -∗
     image_entry ElfUser.echo_elf M (mword_of_int (t + 8) : mword 64) sts
-      cw cs pidv Q (UEchoFile.ef_pay c r Wq i γo ws) uslot.
+      cw secc cs pidv Q (UEchoFile.ef_pay c r Wq i γo ws) uslot.
   Proof using fifRegG0 fileOutG0 pipeOutG0 ufdG0.
     intros HQc Heq Hline Himg Hbytes Hfdl Hcw Hl1 Hi1 Hi2 Hi3 Hi4 Hi5.
     iIntros "#HQ #Hbr #Hkc #HQt #Hinv #Hnpw #Hdep".
@@ -645,7 +645,7 @@ Section UkUnionEntries.
                   (LINKS_pers := union_links_persistent ug)
                   (union_links_gl_w_at ug sb) (union_links_gl_blk_at ug sb)
                   (union_links_gl_taint_at ug sb)).
-    iPoseProof (echo_image_entry_env_c ws M s0 t gb sts cw cs pidv Q
+    iPoseProof (echo_image_entry_env_c ws M s0 t gb sts cw secc cs pidv Q
                   (own γreg (fif_pool ∅ w0) ∗ UEchoFile.ef_pay c r Wq i γo ws)%I
                   I E {[0%nat]}
                   Hline Himg Hbytes Hfdl (echo_file_conforms ws _ Hne Hnn)

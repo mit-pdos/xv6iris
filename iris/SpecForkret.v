@@ -520,7 +520,7 @@ Definition wp_forkret_gen_body
      mints nothing.  [InitBoot.init_boot_bundle], [ParkCap.park_pkg]'s row.
      ---- *)
   (if steady then FirstTok.first_done
-   else init_boot_bundle (pv_cwi (us_V U)) sts
+   else init_boot_bundle (pv_cwi (us_V U)) (pv_secc (us_V U)) sts
         ∗ ConsoleInv.cons_reader fsc_cons 0%nat) -∗
   (* ---- the residue closer -- see the header, and [forkret_closer] above
      for why it is a name rather than the wand spelled out ---- *)

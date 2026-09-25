@@ -122,7 +122,7 @@ Section ExecBundle.
   Lemma exec_slot_of_entry_at (X : uvis -d> iPropO Σ) (T : iProp Σ)
       (Pfin : Z -> iProp Σ) (Φo : aview -> Z -> anode -> iProp Σ)
       (f : elf_bytes) (nl : nat) (Pay : iProp Σ) (Q : Z -> iProp Σ)
-      (cw : Z) (na : nat) (alen : nat -> nat) (afun : nat -> nat -> bv 8)
+      (cw : Z) (secc : mword 64) (na : nat) (alen : nat -> nat) (afun : nat -> nat -> bv 8)
       (sts : list fdstate) (cs : gset gname) (pidv : mword 32) :
     kexec_loadable f ->
     (* ...AND NO ALL-PARKED ROW ON EITHER ARM (lane OFF-HAND-6, H3).  Lane
@@ -133,10 +133,10 @@ Section ExecBundle.
        it.  So a held row crosses an exec on both arms and this builder
        says nothing at all about offsets. *)
     ex_node_id T Pfin Φo (MkAnode (AFile f) nl) -∗
-    image_entry_at f na alen afun sts cw cs pidv Q Pay X -∗
+    image_entry_at f na alen afun sts cw secc cs pidv Q Pay X -∗
     image_entry_taint T Q X -∗
     Pay -∗
-    exec_slot_pre X Q Pfin Φo cw na alen afun sts cs pidv.
+    exec_slot_pre X Q Pfin Φo cw secc na alen afun sts cs pidv.
   Proof using .
     intros Hload. iIntros "#Hid #Hcon #Hgen HPay".
     rewrite /exec_slot_pre /ex_node_id /image_entry_at /image_entry_taint.
@@ -181,15 +181,15 @@ Section ExecBundle.
   Lemma sys_exec_slot_of_entry (X : uvis -d> iPropO Σ) (T : iProp Σ)
       (P : nat -> Z -> iProp Σ) (Φo : aview -> Z -> anode -> iProp Σ)
       (f : elf_bytes) (nl : nat) (Pay : iProp Σ) (Q : Z -> iProp Σ)
-      (cw : Z) (pl : list (bv 8)) (M : gmap Z (bv 8)) (pv av : mword 64)
+      (cw : Z) (secc : mword 64) (pl : list (bv 8)) (M : gmap Z (bv 8)) (pv av : mword 64)
       (sts : list fdstate) (cs : gset gname) (pidv : mword 32) :
     kexec_loadable f ->
     exec_path_of M pv pl ->
     ex_node_id T (P (length (path_elems pl))) Φo (MkAnode (AFile f) nl) -∗
-    image_entry f M av sts cw cs pidv Q Pay X -∗
+    image_entry f M av sts cw secc cs pidv Q Pay X -∗
     image_entry_taint T Q X -∗
     Pay -∗
-    pf_at (fun S => sys_exec_slot_pre S Q P Φo cw M pv av sts cs pidv)
+    pf_at (fun S => sys_exec_slot_pre S Q P Φo cw secc M pv av sts cs pidv)
       (MkPfam X Pay).
   Proof using .
     intros Hload Hpath. iIntros "#Hid #Hcon #Hgen HPay".
@@ -197,9 +197,9 @@ Section ExecBundle.
     rewrite /sys_exec_slot_pre. iIntros (pl' na alen afun) "%Hpath' %Hargs".
     rewrite (exec_path_of_uniq M pv pl' pl Hpath' Hpath).
     iApply (exec_slot_of_entry_at X T (P (length (path_elems pl))) Φo f nl
-              Pay Q cw na alen afun sts cs pidv Hload
+              Pay Q cw secc na alen afun sts cs pidv Hload
               with "Hid [] Hgen HPay").
-    iApply (image_entry_at_of f M av sts cw cs pidv Q Pay X na alen afun Hargs
+    iApply (image_entry_at_of f M av sts cw secc cs pidv Q Pay X na alen afun Hargs
               with "Hcon").
   Qed.
 
@@ -214,7 +214,7 @@ Section ExecBundle.
   Lemma exec_bundle_of (γfs : fs_names) (X : uvis -d> iPropO Σ) (T : iProp Σ)
       (P Pmiss : nat -> Z -> iProp Σ)
       (Fo : pfam Σ (aview -> Z -> anode -> iProp Σ))
-      (cw : Z) (pl : list (bv 8)) (f : elf_bytes) (nl : nat)
+      (cw : Z) (secc : mword 64) (pl : list (bv 8)) (f : elf_bytes) (nl : nat)
       (Pay : iProp Σ) (Q : Z -> iProp Σ)
       (M : gmap Z (bv 8)) (pv av : mword 64) (sts : list fdstate)
       (cs : gset gname) (pidv : mword 32) :
@@ -228,10 +228,10 @@ Section ExecBundle.
     ex_node_id T (P (length (path_elems pl))) Fo.(pf_recv)
       (MkAnode (AFile f) nl) -∗
     (* (E) *)
-    image_entry f M av sts cw cs pidv Q Pay X -∗
+    image_entry f M av sts cw secc cs pidv Q Pay X -∗
     image_entry_taint T Q X -∗
     Pay -∗
-    sys_exec_au_pre (MkPfam X Pay) (fs_gamma_L γfs) γfs cw Q P Pmiss Fo
+    sys_exec_au_pre (MkPfam X Pay) (fs_gamma_L γfs) γfs cw secc Q P Pmiss Fo
       M pv av sts cs pidv.
   Proof using .
     intros Hload Hpath. iIntros "Hwalk Hobs #Hid #Hcon #Hgen HPay".
@@ -251,7 +251,7 @@ Section ExecBundle.
   Lemma exec_bundle_of_at (γfs : fs_names) (X : uvis -d> iPropO Σ)
       (T : iProp Σ) (P Pmiss : nat -> Z -> iProp Σ)
       (Fo : pfam Σ (aview -> Z -> anode -> iProp Σ))
-      (cw : Z) (pl : list (bv 8)) (f : elf_bytes) (nl : nat)
+      (cw : Z) (secc : mword 64) (pl : list (bv 8)) (f : elf_bytes) (nl : nat)
       (Pay : iProp Σ) (Q : Z -> iProp Σ)
       (na : nat) (alen : nat -> nat) (afun : nat -> nat -> bv 8)
       (sts : list fdstate) (cs : gset gname) (pidv : mword 32) :
@@ -260,10 +260,10 @@ Section ExecBundle.
     pf_at (aopen_commit_at (fs_gamma_L γfs) appE) Fo -∗
     ex_node_id T (P (length (path_elems pl))) Fo.(pf_recv)
       (MkAnode (AFile f) nl) -∗
-    image_entry_at f na alen afun sts cw cs pidv Q Pay X -∗
+    image_entry_at f na alen afun sts cw secc cs pidv Q Pay X -∗
     image_entry_taint T Q X -∗
     Pay -∗
-    exec_au_pre (MkPfam X Pay) (fs_gamma_L γfs) γfs cw Q P Pmiss Fo
+    exec_au_pre (MkPfam X Pay) (fs_gamma_L γfs) γfs cw secc Q P Pmiss Fo
       pl na alen afun sts cs pidv.
   Proof using .
     intros Hload. iIntros "Hwalk Hobs #Hid #Hcon #Hgen HPay".

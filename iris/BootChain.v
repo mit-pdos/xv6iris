@@ -442,7 +442,7 @@ Section BootPrimary.
        chain neither reads nor spends it -- main forwards it to userinit,
        whose park hands it to forkret's boot arm.  LINEAR, so only the BOOT
        hart's chain carries it: the secondaries never call userinit. *)
-    init_boot_bundle (bv_unsigned InodeInv.ROOTINO) fdt0 -∗
+    init_boot_bundle (bv_unsigned InodeInv.ROOTINO) ProcDefs.secc_all fdt0 -∗
     uart_tx_own γd l0 -∗ uart_sent γd l0 -∗ uart_out_lb γd l0 -∗
     (* THE RECEIVE TOKEN, born with the device invariant: main carries it to
        uartinit's FCR flush and parks it in the PLIC invariant afterwards. *)

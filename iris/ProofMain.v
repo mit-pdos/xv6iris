@@ -1616,7 +1616,7 @@ Section ProofMain.
     (* ...and THE FIRST PROCESS'S EXEC BUNDLE beside them
        ([InitBoot.init_boot_bundle]): this group does not read it either,
        and userinit's park hands it to forkret's boot arm *)
-    init_boot_bundle (bv_unsigned InodeInv.ROOTINO) fdt0 -∗
+    init_boot_bundle (bv_unsigned InodeInv.ROOTINO) ProcDefs.secc_all fdt0 -∗
     (* ...AND THE CONSOLE'S READER TOKEN beside it (app-echo.md, "SH-LINE
        RULING", R3): the bundle is a wand from it, this group does not read
        it either, and userinit stages it at the park for forkret's boot arm.

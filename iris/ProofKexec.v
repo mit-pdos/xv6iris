@@ -606,11 +606,11 @@ Section KexecAUExit.
       (plen : nat) (pv : mword 64) (dqpv : dfrac) (pfun : nat -> bv 8)
       (av : mword 64) (dqa : dfrac) (avf : nat -> mword 64) (dqas : dfrac) :
     kxau_ret (CID := CIDx)
-      (SpecKexec.exec_arms Fs ΓL fsc_fs (pv_cwi (us_V U)) Qpay P Pmiss Fo
+      (SpecKexec.exec_arms Fs ΓL fsc_fs (pv_cwi (us_V U)) (pv_secc (us_V U)) Qpay P Pmiss Fo
          (bview plen pfun) na alen afun sts gn cs pidv U)
       gf fsc_kalloc pj pidv m ret_tgt K b eb lks dqb dqs fsc_bmapstart
       na plen pv dqpv pfun av dqa avf aslen dqas afun -∗
-    SpecKexec.exec_post_fail Fs ΓL fsc_fs (pv_cwi (us_V U)) Qpay P Pmiss Fo
+    SpecKexec.exec_post_fail Fs ΓL fsc_fs (pv_cwi (us_V U)) (pv_secc (us_V U)) Qpay P Pmiss Fo
       (bview plen pfun) na alen afun sts cs pidv -∗
     KexecOkQ.kexec_closer (CID := CIDx)
       kxau_QF (fun _ : KexecOkQ.kxf_cause => Logic.True)
@@ -659,7 +659,7 @@ Section KexecAUExit.
        it costs the caller nothing. *)
     my_pay gn Qpay -∗
     kxau_ret (CID := CIDx)
-      (SpecKexec.exec_arms Fs ΓL fsc_fs (pv_cwi (us_V U)) Qpay P Pmiss Fo
+      (SpecKexec.exec_arms Fs ΓL fsc_fs (pv_cwi (us_V U)) (pv_secc (us_V U)) Qpay P Pmiss Fo
          pl na alen afun sts gn cs pidv U)
       gf fsc_kalloc pj pidv m ret_tgt K b eb lks dqb dqs fsc_bmapstart
       na plen pv dqpv pfun av dqa avf aslen dqas afun -∗
@@ -729,7 +729,7 @@ Section KexecAUExit.
         iDestruct (pf_at_au with "Hsl") as "[Hsl _]".
         iApply ("Hsl" $! av0 zi (kxc_fb datl dn) nl
                   (SpecKexec.exec_key U' sts gn cs pidv na)
-                  with "HP HΦ [%] [%] [%] [%] [%] [%] Hmp");
+                  with "HP HΦ [%] [%] [%] [%] [%] [%] [%] Hmp");
           [ exact Hload | exact Himg
           (* THE KEY'S CWD is the caller's: exec does not chdir, so the
              post-exec block's inum is the entry block's
@@ -740,6 +740,9 @@ Section KexecAUExit.
              is eager, and [KexecDefs.kexec_ok]'s own row says so *)
           | rewrite SpecKexec.exec_key_lazy;
             exact (SpecKexec.kexec_ok_exec_lazy _ _ _ _ _ _ Hokx)
+          (* ...AND ITS MASK IS THE CALLER'S: exec keeps [p->seccomp] *)
+          | rewrite SpecKexec.exec_key_secc;
+            exact (SpecKexec.kexec_ok_exec_secc _ _ _ _ _ _ Hokx)
           (* ...AND ITS CHILDREN SET AND PID ARE THE CALLER'S (lane
              EXEC-SEAM): both go straight into the key, by reflexivity *)
           | exact (SpecKexec.exec_key_ch U' sts gn cs pidv na)
@@ -784,7 +787,7 @@ Section KexecAUExit.
         iDestruct (pf_at_au with "Hsl") as "[_ Hsl]".
         iApply ("Hsl" $! av0 zi (abs_row (FsStateEra.era_node dn bm datl))
                   (SpecKexec.exec_key U' sts gn cs pidv na)
-                  with "HP HΦ [%] [%] [%] [%] [%] [%] Hmp").
+                  with "HP HΦ [%] [%] [%] [%] [%] [%] [%] Hmp").
         { exact Hnl. }
         { exact (SpecKexec.kexec_ok_exec_key_ok U U' sts gn cs pidv
                    (mf !!! Regidx Ra0)
@@ -794,6 +797,8 @@ Section KexecAUExit.
           exact (SpecKexec.kexec_ok_cwi _ _ _ _ _ _ _ _ Hne Hkok). }
         { rewrite SpecKexec.exec_key_lazy.
           exact (SpecKexec.kexec_ok_lazy _ _ _ _ _ _ _ _ Hne Hkok). }
+        { rewrite SpecKexec.exec_key_secc.
+          exact (SpecKexec.kexec_ok_secc _ _ _ _ _ _ _ _ Hne Hkok). }
         (* ...and the two identity rows, by reflexivity (lane EXEC-SEAM) *)
         { exact (SpecKexec.exec_key_ch U' sts gn cs pidv na). }
         { exact (SpecKexec.exec_key_pid U' sts gn cs pidv na). }
@@ -872,7 +877,7 @@ Section KexecAUMain.
     (* ---- THE EXIT, NAMED.  [kxau_ret] IS the contract's continuation. ---- *)
     iAssert (wp_next true (proc_addr jp) (fun CID : CpuId =>
                kxau_ret (CID := CID)
-                 (SpecKexec.exec_arms Fs ΓL fsc_fs (pv_cwi (us_V U)) Qpay P Pmiss Fo
+                 (SpecKexec.exec_arms Fs ΓL fsc_fs (pv_cwi (us_V U)) (pv_secc (us_V U)) Qpay P Pmiss Fo
                     (bview plen pfun) na alen afun sts gn cs pidv U)
                  gf fsc_kalloc (proc_addr jp) pidv m
                  (ret_pc (m !!! Regidx Rra)) K eb eb ∅ dqb dqs fsc_bmapstart

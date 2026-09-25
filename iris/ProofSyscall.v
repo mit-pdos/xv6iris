@@ -3821,7 +3821,7 @@ Section SyscallArms.
     ∃ (P Pmiss : nat -> Z -> iProp Σ)
       (Fo : pfam Σ (gmap Z FsAbsDefs.anode -> Z -> FsAbsDefs.anode -> iProp Σ)),
       sys_exec_au_pre (MkPfam uslot (sexec_refund f)) (fs_gamma_L fsc_fs) fsc_fs
-        (pv_cwi (us_V U)) (kf_xpay f) P Pmiss Fo (us_M U) v0 v1 sts cs pid.
+        (pv_cwi (us_V U)) (pv_secc (us_V U)) (kf_xpay f) P Pmiss Fo (us_M U) v0 v1 sts cs pid.
   Proof using .
     intros Hn Hv0 Hv1. iIntros "H".
     iDestruct (sysc_sys_in_at U sts gn cs pid f 7 Hn ltac:(vm_compute; discriminate) with "H") as "H".

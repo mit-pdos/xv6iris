@@ -542,6 +542,20 @@ Proof.
                   & _ & Hlz & _). exact Hlz.
 Qed.
 
+(* ...AND ITS MASK IS THE CALLER'S (upstream a083670): exec keeps
+   [p->seccomp], so the block the swap installs carries the entry block's
+   [ProcDefs.pv_secc].  This pays [exec_slot_pre]'s mask row. *)
+Lemma kexec_ok_secc (V V' : pprivate) (r entry spv szv' : mword 64)
+    (na : nat) (alen : nat -> nat) :
+  r <> (mword_of_int (-1) : mword 64) ->
+  kexec_ok V V' r entry spv szv' na alen -> pv_secc V' = pv_secc V.
+Proof.
+  intros Hne Hok.
+  destruct Hok as [[Hr _] | Hs]; [ contradiction (Hne Hr) | ].
+  destruct Hs as (_ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _
+                  & _ & _ & Hsc). exact Hsc.
+Qed.
+
 (* ...and the cwd's inum off the same arm, for the callers that hold
    [kexec_ok] rather than [kexec_ok_exec] (the node that is NOT a loadable
    file has no ELF entry to exhibit). *)
@@ -562,6 +576,20 @@ Proof.
   intros (e & spv & szv' & _ & Hne & Hok).
   exact (kexec_ok_lazy V V' r _ spv szv' na alen Hne Hok).
 Qed.
+
+Lemma kexec_ok_exec_secc (f : elf_bytes) (V V' : pprivate) (r : mword 64)
+    (na : nat) (alen : nat -> nat) :
+  kexec_ok_exec f V V' r na alen -> pv_secc V' = pv_secc V.
+Proof.
+  intros (e & spv & szv' & _ & Hne & Hok).
+  exact (kexec_ok_secc V V' r _ spv szv' na alen Hne Hok).
+Qed.
+
+(* ...and the key's mask reading, beside [exec_key_lazy] *)
+Lemma exec_key_secc (U' : ustate) (sts : list fdstate) (gn : gname)
+    (cs : gset gname) (pidv : mword 32) (na : nat) :
+  uvis_secc (exec_key U' sts gn cs pidv na) = pv_secc (us_V U').
+Proof. destruct U' as [V' M']. destruct V'. reflexivity. Qed.
 
 (* the key's eleventh reading, beside [exec_key_cwd]: the resume key carries
    the block's bit, and exec's block is at [false]. *)
@@ -858,7 +886,7 @@ Section KexecAU.
   Definition exec_slot_pre (S : uvis -> iProp Σ) (Q : Z -> iProp Σ)
       (Pfin : Z -> iProp Σ)
       (Φo : aview -> Z -> anode -> iProp Σ)
-      (cw : Z)
+      (cw : Z) (secc : mword 64)
       (na : nat) (alen : nat -> nat) (afun : nat -> nat -> bv 8)
       (sts : list fdstate) (cs : gset gname) (pidv : mword 32) : iProp Σ :=
     ((∀ (av : aview) (i : Z) (f : elf_bytes) (nl : nat) (W' : uvis),
@@ -868,6 +896,7 @@ Section KexecAU.
         ⌜kexec_image_ok f na alen afun sts W'⌝ -∗
         ⌜uvis_cwd W' = cw⌝ -∗
         ⌜uvis_lazy W' = false⌝ -∗
+        ⌜uvis_secc W' = secc⌝ -∗
         ⌜uvis_ch W' = cs⌝ -∗
         ⌜uvis_pid W' = pidv⌝ -∗
         (* ...AND NO ALL-PARKED ROW (lane OFF-HAND-5, D1; design/app-file.md
@@ -895,6 +924,7 @@ Section KexecAU.
           ⌜exec_key_ok na alen sts W'⌝ -∗
           ⌜uvis_cwd W' = cw⌝ -∗
           ⌜uvis_lazy W' = false⌝ -∗
+          ⌜uvis_secc W' = secc⌝ -∗
           ⌜uvis_ch W' = cs⌝ -∗
           ⌜uvis_pid W' = pidv⌝ -∗
           (* ...and no all-parked row here either (lane OFF-HAND-5, D1) *)
@@ -916,7 +946,7 @@ Section KexecAU.
      something about the inums THIS walk visits, which the universally
      quantified form cannot. *)
   Definition exec_au_pre (Fs : pfam Σ (uvis -> iProp Σ)) Γ (γfs : fs_names)
-      (cw : Z) (Q : Z -> iProp Σ)
+      (cw : Z) (secc : mword 64) (Q : Z -> iProp Σ)
       (P Pmiss : nat -> Z -> iProp Σ)
       (Fo : pfam Σ (aview -> Z -> anode -> iProp Σ))
       (pl : list (bv 8))
@@ -925,7 +955,7 @@ Section KexecAU.
     (ex_start γfs cw P Pmiss pl
      ∗ pf_at (aopen_commit_at Γ appE) Fo
      ∗ pf_at (fun S => exec_slot_pre S Q (P (length (path_elems pl)))
-                         Fo.(pf_recv) cw na alen afun sts cs pidv) Fs)%I.
+                         Fo.(pf_recv) cw secc na alen afun sts cs pidv) Fs)%I.
 
   (* THE BUNDLE A CALLER THAT TRACKS NOTHING HANDS IN, and it is free
      wherever it has a slot at every key: every hop says yes at a [True]
@@ -946,7 +976,7 @@ Section KexecAU.
      from -- is paid HERE, by the party that knows the table exec hands
      over.  [kexec_image_ok_parked] / [exec_key_ok_parked] are the two
      steps from [sts] to the resumed key. *)
-  Lemma exec_au_pre_triv_at (S : uvis -> iProp Σ) Γ (γfs : fs_names) (cw : Z)
+  Lemma exec_au_pre_triv_at (S : uvis -> iProp Σ) Γ (γfs : fs_names) (cw : Z) (secc : mword 64)
       (pl : list (bv 8))
       (na : nat) (alen : nat -> nat) (afun : nat -> nat -> bv 8)
       (sts : list fdstate) (cs : gset gname) (pidv : mword 32) :
@@ -954,7 +984,7 @@ Section KexecAU.
        carries none, because the half a held row's fire needs is in the
        descriptor bundle (design/app-file.md SS3 fact 4). *)
     □ (∀ W : uvis, my_pay (uvis_gen W) (fun _ => True)%I -∗ S W) -∗
-    exec_au_pre (MkPfam S True%I) Γ γfs cw (fun _ => True%I)
+    exec_au_pre (MkPfam S True%I) Γ γfs cw secc (fun _ => True%I)
       (fun _ _ => True%I) (fun _ _ => True%I) (pfam_triv (fun _ _ _ => True%I))
       pl na alen afun sts cs pidv.
   Proof using .
@@ -978,14 +1008,14 @@ Section KexecAU.
   (* ...and the one a caller that wants nothing back hands in: the slot
      predicate at [emp].  It is [exec_au_pre_triv_at]'s instance at the
      family every [emp] satisfies. *)
-  Lemma exec_au_pre_triv Γ (γfs : fs_names) (cw : Z) (pl : list (bv 8))
+  Lemma exec_au_pre_triv Γ (γfs : fs_names) (cw : Z) (secc : mword 64) (pl : list (bv 8))
       (na : nat) (alen : nat -> nat) (afun : nat -> nat -> bv 8)
       (sts : list fdstate) (cs : gset gname) (pidv : mword 32) :
-    ⊢ exec_au_pre (MkPfam (fun _ => emp%I) True%I) Γ γfs cw (fun _ => True%I)
+    ⊢ exec_au_pre (MkPfam (fun _ => emp%I) True%I) Γ γfs cw secc (fun _ => True%I)
         (fun _ _ => True%I) (fun _ _ => True%I) (pfam_triv (fun _ _ _ => True%I))
         pl na alen afun sts cs pidv.
   Proof using .
-    iApply (exec_au_pre_triv_at (fun _ => emp%I) Γ γfs cw pl na alen afun
+    iApply (exec_au_pre_triv_at (fun _ => emp%I) Γ γfs cw secc pl na alen afun
               sts cs pidv).
     iIntros "!>" (W) "_". iEmpIntro.
   Qed.
@@ -996,30 +1026,30 @@ Section KexecAU.
   Lemma exec_slot_pre_ne (n : nat) (S S' : uvis -d> iPropO Σ)
       (Q : Z -> iProp Σ) (Pfin : Z -> iProp Σ)
       (Φo : aview -> Z -> anode -> iProp Σ)
-      (cw : Z)
+      (cw : Z) (secc : mword 64)
       (na : nat) (alen : nat -> nat) (afun : nat -> nat -> bv 8)
       (sts : list fdstate) (cs : gset gname) (pidv : mword 32) :
     S ≡{n}≡ S' ->
-    exec_slot_pre S Q Pfin Φo cw na alen afun sts cs pidv
-    ≡{n}≡ exec_slot_pre S' Q Pfin Φo cw na alen afun sts cs pidv.
+    exec_slot_pre S Q Pfin Φo cw secc na alen afun sts cs pidv
+    ≡{n}≡ exec_slot_pre S' Q Pfin Φo cw secc na alen afun sts cs pidv.
   Proof using . intros HS. rewrite /exec_slot_pre. solve_proper. Qed.
 
   (* ...and at the PAIR the bundle takes: the refund does not move with the
      fixpoint, so it is an ordinary binder here. *)
   Lemma exec_au_pre_ne (n : nat) (S S' : uvis -d> iPropO Σ) (Rs : iProp Σ)
-      Γ (γfs : fs_names) (cw : Z) (Q : Z -> iProp Σ)
+      Γ (γfs : fs_names) (cw : Z) (secc : mword 64) (Q : Z -> iProp Σ)
       (P Pmiss : nat -> Z -> iProp Σ)
       (Fo : pfam Σ (aview -> Z -> anode -> iProp Σ))
       (pl : list (bv 8))
       (na : nat) (alen : nat -> nat) (afun : nat -> nat -> bv 8)
       (sts : list fdstate) (cs : gset gname) (pidv : mword 32) :
     S ≡{n}≡ S' ->
-    exec_au_pre (MkPfam S Rs) Γ γfs cw Q P Pmiss Fo pl na alen afun sts cs pidv
-    ≡{n}≡ exec_au_pre (MkPfam S' Rs) Γ γfs cw Q P Pmiss Fo pl na alen afun sts cs pidv.
+    exec_au_pre (MkPfam S Rs) Γ γfs cw secc Q P Pmiss Fo pl na alen afun sts cs pidv
+    ≡{n}≡ exec_au_pre (MkPfam S' Rs) Γ γfs cw secc Q P Pmiss Fo pl na alen afun sts cs pidv.
   Proof using .
     intros HS. rewrite /exec_au_pre /pf_at. cbn [pf_recv pf_refund].
     by rewrite (exec_slot_pre_ne n S S' Q (P (length (path_elems pl)))
-                  Fo.(pf_recv) cw na alen afun sts cs pidv HS).
+                  Fo.(pf_recv) cw secc na alen afun sts cs pidv HS).
   Qed.
 
   (* ------------------------------------------------------------------ *)
@@ -1073,19 +1103,19 @@ Section KexecAU.
 
   (* ret = -1 (header, OUT): the three-way fold of the bundle *)
   Definition exec_post_fail (Fs : pfam Σ (uvis -> iProp Σ)) Γ
-      (γfs : fs_names) (cw : Z) (Q : Z -> iProp Σ)
+      (γfs : fs_names) (cw : Z) (secc : mword 64) (Q : Z -> iProp Σ)
       (P Pmiss : nat -> Z -> iProp Σ)
       (Fo : pfam Σ (aview -> Z -> anode -> iProp Σ))
       (pl : list (bv 8))
       (na : nat) (alen : nat -> nat) (afun : nat -> nat -> bv 8)
       (sts : list fdstate) (cs : gset gname) (pidv : mword 32) : iProp Σ :=
     ((* (i) nothing fs-visible happened *)
-     exec_au_pre Fs Γ γfs cw Q P Pmiss Fo pl na alen afun sts cs pidv
+     exec_au_pre Fs Γ γfs cw secc Q P Pmiss Fo pl na alen afun sts cs pidv
      ∨ ((* (ii) the walk died at some hop: the era refund shape *)
           (namei_walk_dead_era γfs P Pmiss pl
              ∗ pf_at (aopen_commit_at Γ appE) Fo
              ∗ pf_at (fun S => exec_slot_pre S Q (P (length (path_elems pl)))
-                                 Fo.(pf_recv) cw na alen afun sts cs pidv)
+                                 Fo.(pf_recv) cw secc na alen afun sts cs pidv)
                  Fs)
           ∨ (* (iii) the walk completed and the node was observed; exec
                failed past the lock, and the arm says WHY (header,
@@ -1096,7 +1126,7 @@ Section KexecAU.
              ∗ ⌜arow_at av i a⌝ ∗ Fo.(pf_recv) av i a
              ∗ ⌜exec_fail_ok a na alen c⌝
              ∗ pf_at (fun S => exec_slot_pre S Q (P (length (path_elems pl)))
-                                 Fo.(pf_recv) cw na alen afun sts cs pidv)
+                                 Fo.(pf_recv) cw secc na alen afun sts cs pidv)
                  Fs)))%I.
 
   (* THE FAILURE ARM REFUNDS THE DEPOSIT (app-echo.md, lane KILL-PAY,
@@ -1111,13 +1141,13 @@ Section KexecAU.
      comes back.  SPENDING, not splitting: [pf_at] is an [∧], and a
      caller that reads the refund has decided not to fire the piece. *)
   Lemma exec_post_fail_refund (Fs : pfam Σ (uvis -> iProp Σ)) Γ
-      (γfs : fs_names) (cw : Z) (Q : Z -> iProp Σ)
+      (γfs : fs_names) (cw : Z) (secc : mword 64) (Q : Z -> iProp Σ)
       (P Pmiss : nat -> Z -> iProp Σ)
       (Fo : pfam Σ (aview -> Z -> anode -> iProp Σ))
       (pl : list (bv 8))
       (na : nat) (alen : nat -> nat) (afun : nat -> nat -> bv 8)
       (sts : list fdstate) (cs : gset gname) (pidv : mword 32) :
-    exec_post_fail Fs Γ γfs cw Q P Pmiss Fo pl na alen afun sts cs pidv
+    exec_post_fail Fs Γ γfs cw secc Q P Pmiss Fo pl na alen afun sts cs pidv
       ⊢ Fs.(pf_refund).
   Proof using .
     rewrite /exec_post_fail /exec_au_pre.
@@ -1131,7 +1161,7 @@ Section KexecAU.
   (* the armed disjunction the continuation receives, keyed on a0, beside
      the landed result relation's own failure equation *)
   Definition exec_arms (Fs : pfam Σ (uvis -> iProp Σ)) Γ (γfs : fs_names)
-      (cw : Z) (Q : Z -> iProp Σ)
+      (cw : Z) (secc : mword 64) (Q : Z -> iProp Σ)
       (P Pmiss : nat -> Z -> iProp Σ)
       (Fo : pfam Σ (aview -> Z -> anode -> iProp Σ))
       (pl : list (bv 8))
@@ -1139,7 +1169,7 @@ Section KexecAU.
       (sts : list fdstate) (gn : gname) (cs : gset gname) (pidv : mword 32)
       (U U' : ustate) (r : mword 64) : iProp Σ :=
     ((⌜r = (mword_of_int (-1) : mword 64) /\ us_V U' = us_V U /\ us_M U' = us_M U⌝
-      ∗ exec_post_fail Fs Γ γfs cw Q P Pmiss Fo pl na alen afun sts cs pidv)
+      ∗ exec_post_fail Fs Γ γfs cw secc Q P Pmiss Fo pl na alen afun sts cs pidv)
      ∨ exec_post_ok Fs Γ Q P Fo pl na alen afun sts gn cs pidv U U' r)%I.
 
   (* SANITY: the arms imply the landed result relation, so the parallel
@@ -1147,7 +1177,7 @@ Section KexecAU.
      landed one on the nose, the success arm's pure conjunct IS the landed
      success arm at the file's entry. *)
   Lemma exec_arms_landed (Fs : pfam Σ (uvis -> iProp Σ)) Γ (γfs : fs_names)
-      (cw : Z)
+      (cw : Z) (secc : mword 64)
       (Q : Z -> iProp Σ)
       (P Pmiss : nat -> Z -> iProp Σ)
       (Fo : pfam Σ (aview -> Z -> anode -> iProp Σ))
@@ -1155,7 +1185,7 @@ Section KexecAU.
       (na : nat) (alen : nat -> nat) (afun : nat -> nat -> bv 8)
       (sts : list fdstate) (gn : gname) (cs : gset gname) (pidv : mword 32)
     (U U' : ustate) (r : mword 64) :
-    exec_arms Fs Γ γfs cw Q P Pmiss Fo pl na alen afun sts gn cs pidv U U' r ⊢
+    exec_arms Fs Γ γfs cw secc Q P Pmiss Fo pl na alen afun sts gn cs pidv U U' r ⊢
       ⌜exists (entry spv szv' : mword 64),
          kexec_ok (us_V U) (us_V U') r entry spv szv' na alen⌝.
   Proof using .
@@ -1180,7 +1210,7 @@ Section KexecAU.
      consequence of a linear resource is; the proofmode splits it into
      [%] and the resource. *)
   Lemma exec_arms_landed_keep (Fs : pfam Σ (uvis -> iProp Σ)) Γ (γfs : fs_names)
-      (cw : Z)
+      (cw : Z) (secc : mword 64)
       (Q : Z -> iProp Σ)
       (P Pmiss : nat -> Z -> iProp Σ)
       (Fo : pfam Σ (aview -> Z -> anode -> iProp Σ))
@@ -1188,10 +1218,10 @@ Section KexecAU.
       (na : nat) (alen : nat -> nat) (afun : nat -> nat -> bv 8)
       (sts : list fdstate) (gn : gname) (cs : gset gname) (pidv : mword 32)
     (U U' : ustate) (r : mword 64) :
-    exec_arms Fs Γ γfs cw Q P Pmiss Fo pl na alen afun sts gn cs pidv U U' r ⊢
+    exec_arms Fs Γ γfs cw secc Q P Pmiss Fo pl na alen afun sts gn cs pidv U U' r ⊢
       ⌜exists (entry spv szv' : mword 64),
          kexec_ok (us_V U) (us_V U') r entry spv szv' na alen⌝
-      ∧ exec_arms Fs Γ γfs cw Q P Pmiss Fo pl na alen afun sts gn cs pidv U U' r.
+      ∧ exec_arms Fs Γ γfs cw secc Q P Pmiss Fo pl na alen afun sts gn cs pidv U U' r.
   Proof using .
     iIntros "H". iSplit; [| iExact "H"].
     iApply (exec_arms_landed with "H").
@@ -1368,9 +1398,9 @@ Definition wp_kexec_sconf_body
        the block's own copy is at an existential payload and the caller's
        wands are at ITS naming of it. *)
     (my_pay gn Q ∗
-     exec_au_pre Fs Γfs fsc_fs (pv_cwi (us_V U)) Q P Pmiss Fo
+     exec_au_pre Fs Γfs fsc_fs (pv_cwi (us_V U)) (pv_secc (us_V U)) Q P Pmiss Fo
        (bview plen pfun) na alen afun sts cs pidv)
-    (exec_arms Fs Γfs fsc_fs (pv_cwi (us_V U)) Q P Pmiss Fo
+    (exec_arms Fs Γfs fsc_fs (pv_cwi (us_V U)) (pv_secc (us_V U)) Q P Pmiss Fo
        (bview plen pfun) na alen afun sts gn cs pidv U).
 
 (* ===================================================================== *)

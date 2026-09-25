@@ -501,7 +501,7 @@ Section UexecExecInst.
       : iProp Σ :=
     (my_pay (uvis_gen W) (kf_xpay f) ∗
      sys_exec_au_pre (MkPfam X (xf_Rs f)) (fs_gamma_L fsc_fs) fsc_fs
-       (uvis_cwd W) (kf_xpay f) (xf_P f) (xf_Pmiss f) (xf_Fo f)
+       (uvis_cwd W) (uvis_secc W) (kf_xpay f) (xf_P f) (xf_Pmiss f) (xf_Fo f)
        (uvis_M W) (tf_w (uvis_tf W) (tf_arg_idx 0))
        (tf_w (uvis_tf W) (tf_arg_idx 1)) (uvis_fd W) (uvis_ch W) (uvis_pid W))%I.
 
@@ -512,7 +512,7 @@ Section UexecExecInst.
     (* the pay row does not mention the slot predicate, so it is untouched
        by the distance; only the AU half moves *)
     rewrite (sys_exec_au_pre_ne n X Y (xf_Rs f) (fs_gamma_L fsc_fs) fsc_fs
-               (uvis_cwd W) (kf_xpay f) (xf_P f) (xf_Pmiss f) (xf_Fo f)
+               (uvis_cwd W) (uvis_secc W) (kf_xpay f) (xf_P f) (xf_Pmiss f) (xf_Fo f)
                (uvis_M W) (tf_w (uvis_tf W) (tf_arg_idx 0))
                (tf_w (uvis_tf W) (tf_arg_idx 1)) (uvis_fd W) (uvis_ch W) (uvis_pid W) HXY).
     reflexivity.
@@ -1600,7 +1600,7 @@ Section UexecExecInst.
       (P Pmiss : nat -> Z -> iProp Σ)
       (Fo : pfam Σ (aview -> Z -> anode -> iProp Σ)) (Rs : iProp Σ) :
     my_pay (uvis_gen W) (fun _ => True)%I -∗
-    sys_exec_au_pre (MkPfam X Rs) (fs_gamma_L fsc_fs) fsc_fs (uvis_cwd W)
+    sys_exec_au_pre (MkPfam X Rs) (fs_gamma_L fsc_fs) fsc_fs (uvis_cwd W) (uvis_secc W)
       (fun _ => True)%I P Pmiss Fo
       (uvis_M W) (tf_w (uvis_tf W) (tf_arg_idx 0))
       (tf_w (uvis_tf W) (tf_arg_idx 1)) (uvis_fd W) (uvis_ch W) (uvis_pid W) -∗
@@ -1616,7 +1616,7 @@ Section UexecExecInst.
       (P Pmiss : nat -> Z -> iProp Σ)
       (Fo : pfam Σ (aview -> Z -> anode -> iProp Σ)) (Rs : iProp Σ) :
     my_pay (uvis_gen W) (fun _ => True)%I -∗
-    sys_exec_au_pre (MkPfam X Rs) (fs_gamma_L fsc_fs) fsc_fs (uvis_cwd W)
+    sys_exec_au_pre (MkPfam X Rs) (fs_gamma_L fsc_fs) fsc_fs (uvis_cwd W) (uvis_secc W)
       (fun _ => True)%I P Pmiss Fo
       (uvis_M W) (tf_w (uvis_tf W) (tf_arg_idx 0))
       (tf_w (uvis_tf W) (tf_arg_idx 1)) (uvis_fd W) (uvis_ch W) (uvis_pid W) -∗
@@ -1638,7 +1638,7 @@ Section UexecExecInst.
       (P Pmiss : nat -> Z -> iProp Σ)
       (Fo : pfam Σ (aview -> Z -> anode -> iProp Σ)) (Rs : iProp Σ) :
     my_pay (uvis_gen W) Q -∗
-    sys_exec_au_pre (MkPfam X Rs) (fs_gamma_L fsc_fs) fsc_fs (uvis_cwd W)
+    sys_exec_au_pre (MkPfam X Rs) (fs_gamma_L fsc_fs) fsc_fs (uvis_cwd W) (uvis_secc W)
       Q P Pmiss Fo
       (uvis_M W) (tf_w (uvis_tf W) (tf_arg_idx 0))
       (tf_w (uvis_tf W) (tf_arg_idx 1)) (uvis_fd W) (uvis_ch W) (uvis_pid W) -∗
@@ -1663,7 +1663,7 @@ Section UexecExecInst.
       (Fo : pfam Σ (aview -> Z -> anode -> iProp Σ)) (Rs : iProp Σ) :
     □ (Rs -∗ Q (-1)) -∗
     my_pay (uvis_gen W) Q -∗
-    sys_exec_au_pre (MkPfam X Rs) (fs_gamma_L fsc_fs) fsc_fs (uvis_cwd W)
+    sys_exec_au_pre (MkPfam X Rs) (fs_gamma_L fsc_fs) fsc_fs (uvis_cwd W) (uvis_secc W)
       Q P Pmiss Fo
       (uvis_M W) (tf_w (uvis_tf W) (tf_arg_idx 0))
       (tf_w (uvis_tf W) (tf_arg_idx 1)) (uvis_fd W) (uvis_ch W) (uvis_pid W) -∗
@@ -1683,7 +1683,7 @@ Section UexecExecInst.
     sbundle_at X USYS_exec f W -∗
     my_pay (uvis_gen W) (kf_xpay f) ∗
     sys_exec_au_pre (MkPfam X (xf_Rs f)) (fs_gamma_L fsc_fs) fsc_fs
-      (uvis_cwd W) (kf_xpay f) (xf_P f) (xf_Pmiss f) (xf_Fo f)
+      (uvis_cwd W) (uvis_secc W) (kf_xpay f) (xf_P f) (xf_Pmiss f) (xf_Fo f)
       (uvis_M W) (tf_w (uvis_tf W) (tf_arg_idx 0))
       (tf_w (uvis_tf W) (tf_arg_idx 1)) (uvis_fd W) (uvis_ch W) (uvis_pid W).
   Proof using .
@@ -1698,7 +1698,7 @@ Section UexecExecInst.
     ∃ (Q : Z -> iProp Σ) (P Pmiss : nat -> Z -> iProp Σ)
       (Fo : pfam Σ (aview -> Z -> anode -> iProp Σ)) (Rs : iProp Σ),
       my_pay (uvis_gen W) Q ∗
-      sys_exec_au_pre (MkPfam X Rs) (fs_gamma_L fsc_fs) fsc_fs (uvis_cwd W)
+      sys_exec_au_pre (MkPfam X Rs) (fs_gamma_L fsc_fs) fsc_fs (uvis_cwd W) (uvis_secc W)
         Q P Pmiss Fo
         (uvis_M W) (tf_w (uvis_tf W) (tf_arg_idx 0))
         (tf_w (uvis_tf W) (tf_arg_idx 1)) (uvis_fd W) (uvis_ch W) (uvis_pid W).

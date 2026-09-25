@@ -976,7 +976,7 @@ Lemma fkr_boot
      +0x46, and what comes back is the slot the tail runs the trap loop on.
      THE KERNEL MINTS NOTHING -- the bundle is the application's, handed
      down from [SystemAdequacy.xv6_power_adequacy_gen]'s [Hinit_boot]. *)
-  init_boot_bundle (pv_cwi (us_V U)) sts -∗
+  init_boot_bundle (pv_cwi (us_V U)) (pv_secc (us_V U)) sts -∗
   (* ...AND THE CONSOLE'S READER TOKEN, off the same row and for the same
      reason (app-echo.md, "SH-LINE RULING", R3): the bundle is a WAND from
      it, and this arm is where it is applied -- the token born with the

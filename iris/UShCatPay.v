@@ -345,7 +345,7 @@ Section UShCatPay.
            ⌜length sts = NOFILE⌝ -∗ ⌜Fd0 (take NSTD sts)⌝ -∗
            UkRun.urun_nopipe sts -∗
            image_entry ElfUser.cat_elf M (mword_of_int (t + 8) : mword 64)
-             sts FsImg.ROOTINO cs pidv (fun _ : Z => Qc) Cr uslot) -∗
+             sts FsImg.ROOTINO ProcDefs.secc_all cs pidv (fun _ : Z => Qc) Cr uslot) -∗
       sh_cat_slot T -∗
       UkShCat.sh_exec_sup_cat_at Fd0 a b (fun _ : Z => Qc) Cr.
   Proof using xv6G0 ghost_varG0 ghost_varG1 ufdG0 uartGhostG0.
@@ -430,7 +430,7 @@ Section UShCatPay.
            ⌜length sts = NOFILE⌝ -∗ ⌜Fd0 (take NSTD sts)⌝ -∗
            UkRun.urun_nopipe sts -∗
            image_entry ElfUser.cat_elf M (mword_of_int (t + 8) : mword 64)
-             sts FsImg.ROOTINO cs pidv (fun _ : Z => Qc) Cr uslot) -∗
+             sts FsImg.ROOTINO ProcDefs.secc_all cs pidv (fun _ : Z => Qc) Cr uslot) -∗
       sh_cat_slot T -∗
       shk_code (ukn_t N) -∗
       UkShDiag.ush_execfail_law_at PipeDisc.alt_execR 16%nat Cr Cd -∗

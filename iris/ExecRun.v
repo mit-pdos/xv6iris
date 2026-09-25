@@ -194,7 +194,7 @@ Section ExecRun.
       (Fo : pfam Σ (aview -> Z -> anode -> iProp Σ)) (Rs : iProp Σ) :
     □ (Rs -∗ R) -∗
     my_pay (uvis_gen W) Q -∗
-    sys_exec_au_pre (MkPfam X Rs) (fs_gamma_L fsc_fs) fsc_fs (uvis_cwd W)
+    sys_exec_au_pre (MkPfam X Rs) (fs_gamma_L fsc_fs) fsc_fs (uvis_cwd W) (uvis_secc W)
       Q P Pmiss Fo
       (uvis_M W) (tf_w (uvis_tf W) (tf_arg_idx 0))
       (tf_w (uvis_tf W) (tf_arg_idx 1)) (uvis_fd W) (uvis_ch W) (uvis_pid W) -∗
@@ -240,7 +240,7 @@ Section ExecRun.
     □ (Pay -∗ R) -∗
     my_pay gn (ukn_pay N) -∗
     exec_walk_of c T pl (MkAnode (AFile f) nl) -∗
-    image_entry f M av fdv c cs pidv (ukn_pay N) Pay X -∗
+    image_entry f M av fdv c secc_all cs pidv (ukn_pay N) Pay X -∗
     image_entry_taint T (ukn_pay N) X -∗
     Pay -∗
     sbundle_pay_refR X (ukn_pay N) R
@@ -259,8 +259,8 @@ Section ExecRun.
               (uvis_of_run m pc M pm sz fdv c gn cs pidv false secc_all)
               (ukn_pay N) R P Pmiss Fo Pay with "Hrf [Hmp]").
     { cbn [uvis_gen uvis_of_run]. iExact "Hmp". }
-    rewrite Ea0 Ea1. cbn [uvis_M uvis_cwd uvis_fd uvis_ch uvis_pid uvis_of_run].
-    iApply (exec_bundle_of fsc_fs X T P Pmiss Fo c pl f nl Pay (ukn_pay N)
+    rewrite Ea0 Ea1. cbn [uvis_M uvis_cwd uvis_secc uvis_fd uvis_ch uvis_pid uvis_of_run].
+    iApply (exec_bundle_of fsc_fs X T P Pmiss Fo c secc_all pl f nl Pay (ukn_pay N)
               M pv av fdv cs pidv
               Hload Hpath with "Hst Hobs Hid Hcon Hgen HPay").
   Qed.
@@ -309,7 +309,7 @@ Section ExecRun.
        (* (W) *)
        exec_walk_of c T pl (MkAnode (AFile f) nl) ∗
        (* (E) *)
-       image_entry f M av fdv c cs pidv
+       image_entry f M av fdv c secc_all cs pidv
          (ukn_pay N) Pay uslot ∗
        (* ...AND THE LINEAR PAYLOAD ITSELF, HANDED OVER HERE and not beside
           the rule.  It has to be here: what a supplier may need the loan
@@ -342,7 +342,7 @@ Section ExecRun.
        urun_ids N cs pidv ∗
        ⌜exec_path_of M pv pl⌝ ∗
        exec_walk_of c T pl (MkAnode (AFile f) nl) ∗
-       image_entry f M av fdv c cs pidv
+       image_entry f M av fdv c secc_all cs pidv
          (ukn_pay N) Pay uslot ∗
        Pay)%I.
 
@@ -503,7 +503,7 @@ Section ExecRun.
      specific entry is the generic one with the taint spent inside.  This is
      the whole content of "exec'ing an unverified binary is the same rule". *)
   Lemma image_entry_of_taint (f : elf_bytes) (M : gmap Z (bv 8))
-      (av : mword 64) (sts : list fdstate) (cw : Z) (cs : gset gname)
+      (av : mword 64) (sts : list fdstate) (cw : Z) (secc : mword 64) (cs : gset gname)
       (pidv : mword 32) (Q : Z -> iProp Σ) (Pay : iProp Σ)
       (T : iProp Σ) (X : uvis -d> iPropO Σ) :
     (* ...AND IT TAKES NOTHING ABOUT THE CALLER'S OFFSETS (lane
@@ -512,7 +512,7 @@ Section ExecRun.
        fact 4 deletes it, so a tainted caller with a HELD descriptor
        execs exactly as one without. *)
     □ T -∗ image_entry_taint T Q X -∗
-    image_entry f M av sts cw cs pidv Q Pay X.
+    image_entry f M av sts cw secc cs pidv Q Pay X.
   Proof using .
     iIntros "#HT #Hgen". rewrite /image_entry /image_entry_taint.
     iIntros "!>" (na alen afun W') "%Hok _ _ _ _ _ Hmp _".
@@ -566,7 +566,7 @@ Section ExecRun.
     uexec_args_reading N av na alen afun -∗
     exec_walk_of c T pl (MkAnode (AFile f) nl) -∗
     □ (∀ (fdv : list fdstate) (cs : gset gname) (pidv : mword 32),
-         image_entry_at f na alen afun fdv c cs pidv (ukn_pay N) Pay uslot) -∗
+         image_entry_at f na alen afun fdv c secc_all cs pidv (ukn_pay N) Pay uslot) -∗
     Pay -∗
     uexec_sup_run N pv av c T pl f nl Pay.
   Proof using .
@@ -577,7 +577,7 @@ Section ExecRun.
     iFrame "Hheap Hufd". iSplitR; [ by iPureIntro | ]. iFrame "Hw".
     iSplitR "HPay"; [ | iExact "HPay" ].
     iDestruct ("Hcon" $! fdv cs pidv) as "#He".
-    iApply (image_entry_of_at_reading f M av fdv c cs pidv (ukn_pay N) Pay
+    iApply (image_entry_of_at_reading f M av fdv c secc_all cs pidv (ukn_pay N) Pay
               uslot na alen afun Hargs with "He").
   Qed.
 
@@ -612,7 +612,7 @@ Section ExecRun.
     (* (E): the exec'd program's own theorem, at the caller's readings *)
     □ (∀ (M : gmap Z (bv 8)) (fdv : list fdstate) (cs : gset gname)
          (pidv : mword 32),
-         image_entry f M av fdv c cs pidv (ukn_pay N) Pay uslot) -∗
+         image_entry f M av fdv c secc_all cs pidv (ukn_pay N) Pay uslot) -∗
     image_entry_taint T (ukn_pay N) uslot -∗
     □ (Pay -∗ R) -∗
     Pay -∗
@@ -788,17 +788,17 @@ Section ExecRun.
   Lemma exec_slot_of_entry_at_abs (X : uvis -d> iPropO Σ) (T : iProp Σ)
       (Pfin : Z -> iProp Σ) (Φo : aview -> Z -> anode -> iProp Σ)
       (f : elf_bytes) (Pay : iProp Σ) (Q : Z -> iProp Σ)
-      (cw : Z) (na : nat) (alen : nat -> nat) (afun : nat -> nat -> bv 8)
+      (cw : Z) (secc : mword 64) (na : nat) (alen : nat -> nat) (afun : nat -> nat -> bv 8)
       (sts : list fdstate) (cs : gset gname) (pidv : mword 32) :
     kexec_loadable f ->
     (* NO ALL-PARKED ROW (lane OFF-HAND-6, H3): the taint arm asks for
        none, because the half a held row's fire needs is in the descriptor
        bundle and the kernel holds it (design/app-file.md SS3 fact 4). *)
     ex_node_abs T Pfin Φo (AFile f) -∗
-    image_entry_at f na alen afun sts cw cs pidv Q Pay X -∗
+    image_entry_at f na alen afun sts cw secc cs pidv Q Pay X -∗
     image_entry_taint T Q X -∗
     Pay -∗
-    exec_slot_pre X Q Pfin Φo cw na alen afun sts cs pidv.
+    exec_slot_pre X Q Pfin Φo cw secc na alen afun sts cs pidv.
   Proof using .
     intros Hload. iIntros "#Hid #Hcon #Hgen HPay".
     rewrite /exec_slot_pre /ex_node_abs /image_entry_at /image_entry_taint.
@@ -825,7 +825,7 @@ Section ExecRun.
   Lemma sys_exec_slot_of_entry_abs (X : uvis -d> iPropO Σ) (T : iProp Σ)
       (P : nat -> Z -> iProp Σ) (Φo : aview -> Z -> anode -> iProp Σ)
       (f : elf_bytes) (Pay : iProp Σ) (Q : Z -> iProp Σ)
-      (cw : Z) (pl : list (bv 8)) (M : gmap Z (bv 8)) (pv av : mword 64)
+      (cw : Z) (secc : mword 64) (pl : list (bv 8)) (M : gmap Z (bv 8)) (pv av : mword 64)
       (sts : list fdstate) (cs : gset gname) (pidv : mword 32) :
     kexec_loadable f ->
     exec_path_of M pv pl ->
@@ -833,10 +833,10 @@ Section ExecRun.
        none, because the half a held row's fire needs is in the descriptor
        bundle and the kernel holds it (design/app-file.md SS3 fact 4). *)
     ex_node_abs T (P (length (path_elems pl))) Φo (AFile f) -∗
-    image_entry f M av sts cw cs pidv Q Pay X -∗
+    image_entry f M av sts cw secc cs pidv Q Pay X -∗
     image_entry_taint T Q X -∗
     Pay -∗
-    pf_at (fun S => sys_exec_slot_pre S Q P Φo cw M pv av sts cs pidv)
+    pf_at (fun S => sys_exec_slot_pre S Q P Φo cw secc M pv av sts cs pidv)
       (MkPfam X Pay).
   Proof using .
     intros Hload Hpath. iIntros "#Hid #Hcon #Hgen HPay".
@@ -844,16 +844,16 @@ Section ExecRun.
     rewrite /sys_exec_slot_pre. iIntros (pl' na alen afun) "%Hpath' %Hargs".
     rewrite (exec_path_of_uniq M pv pl' pl Hpath' Hpath).
     iApply (exec_slot_of_entry_at_abs X T (P (length (path_elems pl))) Φo f
-              Pay Q cw na alen afun sts cs pidv Hload
+              Pay Q cw secc na alen afun sts cs pidv Hload
               with "Hid [] Hgen HPay").
-    iApply (image_entry_at_of f M av sts cw cs pidv Q Pay X na alen afun Hargs
+    iApply (image_entry_at_of f M av sts cw secc cs pidv Q Pay X na alen afun Hargs
               with "Hcon").
   Qed.
 
   Lemma exec_bundle_of_abs (X : uvis -d> iPropO Σ) (T : iProp Σ)
       (P Pmiss : nat -> Z -> iProp Σ)
       (Fo : pfam Σ (aview -> Z -> anode -> iProp Σ))
-      (cw : Z) (pl : list (bv 8)) (f : elf_bytes)
+      (cw : Z) (secc : mword 64) (pl : list (bv 8)) (f : elf_bytes)
       (Pay : iProp Σ) (Q : Z -> iProp Σ)
       (M : gmap Z (bv 8)) (pv av : mword 64) (sts : list fdstate)
       (cs : gset gname) (pidv : mword 32) :
@@ -865,10 +865,10 @@ Section ExecRun.
     ex_start fsc_fs cw P Pmiss pl -∗
     pf_at (aopen_commit_at (fs_gamma_L fsc_fs) appE) Fo -∗
     ex_node_abs T (P (length (path_elems pl))) Fo.(pf_recv) (AFile f) -∗
-    image_entry f M av sts cw cs pidv Q Pay X -∗
+    image_entry f M av sts cw secc cs pidv Q Pay X -∗
     image_entry_taint T Q X -∗
     Pay -∗
-    sys_exec_au_pre (MkPfam X Pay) (fs_gamma_L fsc_fs) fsc_fs cw Q P Pmiss Fo
+    sys_exec_au_pre (MkPfam X Pay) (fs_gamma_L fsc_fs) fsc_fs cw secc Q P Pmiss Fo
       M pv av sts cs pidv.
   Proof using .
     intros Hload Hpath. iIntros "Hwalk Hobs #Hid #Hcon #Hgen HPay".
@@ -898,7 +898,7 @@ Section ExecRun.
     □ (Pay -∗ R) -∗
     my_pay gn (ukn_pay N) -∗
     exec_walk_of_abs c T pl (AFile f) -∗
-    image_entry f M av fdv c cs pidv (ukn_pay N) Pay X -∗
+    image_entry f M av fdv c secc_all cs pidv (ukn_pay N) Pay X -∗
     image_entry_taint T (ukn_pay N) X -∗
     Pay -∗
     sbundle_pay_refR X (ukn_pay N) R
@@ -917,8 +917,8 @@ Section ExecRun.
               (uvis_of_run m pc M pm sz fdv c gn cs pidv false secc_all)
               (ukn_pay N) R P Pmiss Fo Pay with "Hrf [Hmp]").
     { cbn [uvis_gen uvis_of_run]. iExact "Hmp". }
-    rewrite Ea0 Ea1. cbn [uvis_M uvis_cwd uvis_fd uvis_ch uvis_pid uvis_of_run].
-    iApply (exec_bundle_of_abs X T P Pmiss Fo c pl f Pay (ukn_pay N)
+    rewrite Ea0 Ea1. cbn [uvis_M uvis_cwd uvis_secc uvis_fd uvis_ch uvis_pid uvis_of_run].
+    iApply (exec_bundle_of_abs X T P Pmiss Fo c secc_all pl f Pay (ukn_pay N)
               M pv av fdv cs pidv Hload Hpath
               with "Hst Hobs Hid Hcon Hgen HPay").
   Qed.
@@ -941,7 +941,7 @@ Section ExecRun.
        uheap (ukn_t N) (ukn_d N) (ukn_s N) M pm sz ∗ ufd_auth (ukn_fd N) fdv ∗
        ⌜exec_path_of M pv pl⌝ ∗
        exec_walk_of_abs c T pl (AFile f) ∗
-       image_entry f M av fdv c cs pidv (ukn_pay N) Pay uslot ∗
+       image_entry f M av fdv c secc_all cs pidv (ukn_pay N) Pay uslot ∗
        Pay)%I.
 
   Lemma udepw_at_refR_of_sup_abs (N : uk_names Σ) (m : regfile) (pc : mword 64)

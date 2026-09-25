@@ -110,7 +110,7 @@ Section ParkCap.
          row the parker captured is restricted to it ([park_token_park] and
          [park_token_park_steady] below), so the closer needs the resumed
          record to agree *)
-      (cw : Z)
+      (cw : Z) (secc : mword 64)
       (* ...AND THE PARKED PROCESS'S DESCRIPTOR STATES.  The parker holds
          the [FdSlots.fd_frags] bundle and therefore names the list; the
          closer hands the residue back at it and the BOOT mode's bundle is
@@ -188,7 +188,7 @@ Section ParkCap.
         ([InitBoot]'s header). *)
      (match Wk with
       | Some _ => first_done
-      | None => init_boot_bundle cw sts ∗ cons_reader fsc_cons 0%nat
+      | None => init_boot_bundle cw secc sts ∗ cons_reader fsc_cons 0%nat
       end) ∗
      (* THE CLOSER IS UNDER A LATER, the rows above are not: the cap needs
         the rows now, to deposit them into the twin, and only the closer is
@@ -351,7 +351,7 @@ Section ParkCap.
           -- see [ProofForkretPark]. *)
        own_context (CID := hp) ξp -∗
        park_pkg (XI := ξp) URB W γs γw γft γf γtl pa ks (pv_fdg (us_V U))
-         (pv_chg (us_V U)) (pv_cwi (us_V U)) sts (pv_gen (us_V U)) cs
+         (pv_chg (us_V U)) (pv_cwi (us_V U)) (pv_secc (us_V U)) sts (pv_gen (us_V U)) cs
          (if steady then Some (uvis_of U [] (pv_gen (us_V U)) cs pid) else None)
          pid av -∗
        (* ...and [W] itself, for forkret to hand the closer: under the same
@@ -488,7 +488,7 @@ Section ParkCap.
        AT THE PARKED BLOCK'S WORKING DIRECTORY AND TABLE, the two key
        fields the resume does not choose: kexec inherits the cwd and does
        not touch the descriptor array. *)
-    init_boot_bundle (pv_cwi (us_V U)) sts -∗
+    init_boot_bundle (pv_cwi (us_V U)) (pv_secc (us_V U)) sts -∗
     (* ...and the reader token the bundle is a wand from (R3) *)
     cons_reader fsc_cons 0%nat -∗
     (* THE CHILD'S ROWS, WITH THE BLOCK SPLIT: this parker is parking the

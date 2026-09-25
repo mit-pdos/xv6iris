@@ -165,7 +165,7 @@ Definition forkret_park_pkg
        slot. *)
     (γch : gname)
     (* ...and its cwd's inum -- see [ParkCap.park_pkg] *)
-    (cw : Z)
+    (cw : Z) (secc : mword 64)
     (* ...and its descriptor states, which the parker names off the
        fragment bundle it holds -- see [ParkCap.park_pkg] *)
     (sts : list fdstate)
@@ -207,7 +207,7 @@ Definition forkret_park_pkg
           [ParkCap.park_pkg] is this verbatim. ---- *)
    (match Wk with
     | Some _ => FirstTok.first_done
-    | None => init_boot_bundle cw sts ∗ ConsoleInv.cons_reader fsc_cons 0%nat
+    | None => init_boot_bundle cw secc sts ∗ ConsoleInv.cons_reader fsc_cons 0%nat
     end) ∗
    (* ---- the residue closer, at every hart the record may resume on.
           It takes the two ALLOWANCES the park's own arguments carry
@@ -324,7 +324,7 @@ Definition forkret_park_paid_body
      token only under a later. *)
   ⊢ own_context cur_ctx -∗
     forkret_park_pkg URes W γs γw γft γf γtl pa ks (pv_fdg (us_V U))
-      (pv_chg (us_V U)) (pv_cwi (us_V U)) sts (pv_gen (us_V U)) cs
+      (pv_chg (us_V U)) (pv_cwi (us_V U)) (pv_secc (us_V U)) sts (pv_gen (us_V U)) cs
       (if steady then Some (uvis_of U [] (pv_gen (us_V U)) cs pid) else None)
       pid av -∗
     ▷ W -∗

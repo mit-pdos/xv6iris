@@ -234,7 +234,7 @@ Definition wp_userinit_sconf_body
      [namei("/")] result) and its all-closed descriptor table [fdt0]
      (allocproc's, [SpecAllocproc]'s postcondition).  Boot hands it down
      from [SystemAdequacy.xv6_power_adequacy_gen]'s [Hinit_boot]. *)
-  init_boot_bundle (bv_unsigned InodeInv.ROOTINO) fdt0 -∗
+  init_boot_bundle (bv_unsigned InodeInv.ROOTINO) ProcDefs.secc_all fdt0 -∗
   (* ...AND THE CONSOLE'S READER TOKEN (app-echo.md, "SH-LINE RULING",
      R3), which the bundle above is a wand FROM.  It is born with the ring
      at boot ([ConsoleInv.cons_ghosts_boot]) and main has held it since;

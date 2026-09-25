@@ -1148,7 +1148,7 @@ Section UShKernel.
      ∨ (□ (∀ N : uk_names Σ, UkSh.ush_open_absent_leaf N T K) ∗ K)
      ∨ T) -∗
     image_entry_taint T Q uslot -∗
-    image_entry_at sh_elf na alen afun sts FsImg.ROOTINO cs pidv Q
+    image_entry_at sh_elf na alen afun sts FsImg.ROOTINO ProcDefs.secc_all cs pidv Q
       (upos γp n ∗ Ql (-1)
        ∗ ((∃ I : list (bv 8), ⌜length I = n⌝
             ∗ UkSh.ush_wcp Wc Wb (take NSTD sts) I 0%nat) ∨ T))

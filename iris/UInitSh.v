@@ -1166,7 +1166,7 @@ Section UInitSh.
     UkSh.ush_fd0 T (take NSTD fdv) -∗
     image_entry_taint T (ucons_pay cn γp T (UkInit.init_rd (cc_rd Cr) (cc_wbn Cr))) uslot -∗
     image_entry ElfUser.sh_elf M (mword_of_int 0x1000 : mword 64) fdv
-      FsImg.ROOTINO cs pidv
+      FsImg.ROOTINO ProcDefs.secc_all cs pidv
       (ucons_pay cn γp T (UkInit.init_rd (cc_rd Cr) (cc_wbn Cr)))
       (sh_pay_at Dl T Cr Rsh n0 ∗ upos γp np
          ∗ ucons_pay cn γp T (cc_rd Cr) (-1)
@@ -1304,7 +1304,7 @@ Section UInitSh.
     UkSh.ush_fd0 T (take NSTD fdv) -∗
     image_entry_taint T (ucons_pay cn γp T (UkInit.init_rd (cc_rd Cr) (cc_wbn Cr))) uslot -∗
     image_entry ElfUser.sh_elf M (mword_of_int 0x1000 : mword 64) fdv
-      FsImg.ROOTINO cs pidv
+      FsImg.ROOTINO ProcDefs.secc_all cs pidv
       (ucons_pay cn γp T (UkInit.init_rd (cc_rd Cr) (cc_wbn Cr)))
       (sh_pay T Cr Rsh n0 ∗ upos γp np
          ∗ ucons_pay cn γp T (cc_rd Cr) (-1)

@@ -155,7 +155,7 @@ Section UnionInitBoot.
     @riscvF_app_iface Σ (@riscv_fixedGS Σ HR) = union_ifc ug ->
     ⊢ app_inv fsc_fs -∗ file_boot (fgn_cl (ugn_file ug)) (S gen_id) r -∗
       fturn (ugn_file ug) (S gen_id) -∗
-      |==> init_boot_bundle (bv_unsigned InodeInv.ROOTINO) fdt0.
+      |==> init_boot_bundle (bv_unsigned InodeInv.ROOTINO) ProcDefs.secc_all fdt0.
   Proof using HU HfifR cifRegG0 pipeProtoG0 pnsRegG0 pipesNG0.
     intros Heq Hiface.
     (* the three projections, off the one equation *)

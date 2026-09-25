@@ -349,7 +349,7 @@ Section UInitBoot.
     □ (∀ W' : uvis, T -∗ my_pay (uvis_gen W') (fun _ => True)%I -∗ uslot W') -∗
     (* the linear half, as a wand from the token the kernel hands in *)
     (cons_reader fsc_cons 0%nat -∗ Pay) -∗
-    init_boot_bundle (bv_unsigned InodeInv.ROOTINO) fdt0.
+    init_boot_bundle (bv_unsigned InodeInv.ROOTINO) ProcDefs.secc_all fdt0.
   Proof using .
     iIntros "#Hcl #Hinv #Hcon #Hgen HPay".
     rewrite /init_boot_bundle.
@@ -357,7 +357,7 @@ Section UInitBoot.
     iDestruct ("HPay" with "Hrd") as "HPay".
     rewrite init_boot_cw.
     iDestruct (pinned_exec_bundle_boot fsc_fs uslot era0_pins T
-                 FsImg.ROOTINO init_boot_path [FsImg.ROOTINO; INIT_INO]
+                 FsImg.ROOTINO ProcDefs.secc_all init_boot_path [FsImg.ROOTINO; INIT_INO]
                  INIT_INO ElfUser.init_elf 1%nat Pay (fun _ => True)%I
                  1%nat (fun _ => 5%nat) (fun _ => init_boot_bytes) fdt0
                  init_boot_pin_resolves init_elf_loadable

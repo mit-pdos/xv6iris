@@ -364,7 +364,7 @@ Section UnionLaws.
       @riscvF_genGS Σ (@riscv_fixedGS Σ HR) = riscv_pre_genGS ->
       ⊢ AppInv.app_inv FsCfg.fsc_fs -∗ app_boot app_union c (S gen_id) r -∗
         app_turn app_union c (S gen_id) -∗
-        |==> init_boot_bundle (bv_unsigned InodeInv.ROOTINO) fdt0).
+        |==> init_boot_bundle (bv_unsigned InodeInv.ROOTINO) ProcDefs.secc_all fdt0).
 
   Global Instance union_laws : App.xv6_app_laws (app_union (Σ := Σ)).
   Proof using Hprog ufdG0.

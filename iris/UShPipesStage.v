@@ -244,7 +244,7 @@ Section UShPipesStage.
                   with "[] [] Hslot") as "#Hsup".
     { iIntros "!>" (M s1 t1 g1 sts cs pidv rb) "%Hi1 %Hb1 %Hl1 %Hr1 #Hnp".
       iApply (image_entry_pay_mono ElfUser.echo_elf M (mword_of_int (t1 + 8) : mword 64)
-                sts FsImg.ROOTINO cs pidv (fun _ : Z => QcR 0)
+                sts FsImg.ROOTINO ProcDefs.secc_all cs pidv (fun _ : Z => QcR 0)
                 (pns_echo_lend LM CP L γc γm (P 0) γp (fun _ : Z => QcR 0)) Cr uslot
                 with "[] [Hnp]").
       - iIntros "!> (Hw & HsL & Hcw & Hmw)". rewrite /pns_echo_lend.
@@ -273,7 +273,7 @@ Section UShPipesStage.
           iFrame "Hlb'". by iLeft.
       - iApply (pse_echo_image_entry (PS := uprogSG_free) g LM PV CP sd WA Hext Hcons Hkill Hsup
                   v I sR lR HlR Hfc Hadmit Hplok L HL31 termw TOKN pdepR (pdep_timeless LM PV sR lR L pr P gF gG)
-                  γc γm ws M s1 t1 g1 sts FsImg.ROOTINO cs pidv rb (fun _ : Z => QcR 0)
+                  γc γm ws M s1 t1 g1 sts FsImg.ROOTINO ProcDefs.secc_all cs pidv rb (fun _ : Z => QcR 0)
                   (P 0) γp (fun _ _ => eq_refl) Hok Hi1 Hb1 Hl1 Hr1 HLw
                   with "Hnp []").
         iApply UexecExecMint.udep_free. }
@@ -417,7 +417,7 @@ Section UShPipesStage.
     take NSTD sts !! 2%nat = Some (FdOpen rb2 true (FdDevice ConsoleInv.CONSOLE)) ->
     fok F L ->
     UkRun.urun_nopipe sts -∗
-    image_entry (filt_elf F) M (mword_of_int (t1 + 8) : mword 64) sts FsImg.ROOTINO cs pidv Q
+    image_entry (filt_elf F) M (mword_of_int (t1 + 8) : mword 64) sts FsImg.ROOTINO ProcDefs.secc_all cs pidv Q
       (pns_copy_lend g LM PV CP v I sR lR L termw TOKN pdepR γc γm w2 (mid_alts F) (mid_alts F)
          pin gin F (CSPipe pn gp) Q) uslot.
   Proof using HL31 Hadmit Hcons Hext Hsup HlR Hfc Hkill Hplok pnsRegG0 ufdG0.
@@ -425,14 +425,14 @@ Section UShPipesStage.
     destruct F as [| wp].
     - iApply (pse_mid_image_entry (PS := uprogSG_free) g LM PV CP sd WA Hext Hcons Hkill Hsup
                 v I sR lR HlR Hfc Hadmit Hplok L HL31 termw TOKN pdepR (pdep_timeless LM PV sR lR L pr P gF gG)
-                γc γm M s1 t1 g1 sts FsImg.ROOTINO cs pidv Q w2 _ _ pin gin pn gp wb rb1 rb2
+                γc γm M s1 t1 g1 sts FsImg.ROOTINO ProcDefs.secc_all cs pidv Q w2 _ _ pin gin pn gp wb rb1 rb2
                 HQ Hok Hi Hb Hl Hr0 Hr1 Hr2
                 (elem_of_list_here _ _) (elem_of_list_further _ _ _ (elem_of_list_here _ _))
                 with "Hnp []").
       iApply UexecExecMint.udep_free.
     - iApply (pse_grep_mid_image_entry (PS := uprogSG_free) g LM PV CP sd WA Hext Hcons Hkill Hsup
                 v I sR lR HlR Hfc Hadmit Hplok L HL31 termw TOKN pdepR (pdep_timeless LM PV sR lR L pr P gF gG)
-                γc γm wp M s1 t1 g1 sts FsImg.ROOTINO cs pidv Q w2 _ _ pin gin pn gp wb rb1 rb2
+                γc γm wp M s1 t1 g1 sts FsImg.ROOTINO ProcDefs.secc_all cs pidv Q w2 _ _ pin gin pn gp wb rb1 rb2
                 HQ Hok Hi Hb Hl Hr0 Hr1 Hr2 (proj2 Hfok) (elem_of_list_here _ _)
                 with "Hnp []").
       iApply UexecExecMint.udep_free.
@@ -452,20 +452,20 @@ Section UShPipesStage.
     take NSTD sts !! 2%nat = Some (FdOpen rb2 true (FdDevice ConsoleInv.CONSOLE)) ->
     fok F L ->
     UkRun.urun_nopipe sts -∗
-    image_entry (filt_elf F) M (mword_of_int (t1 + 8) : mword 64) sts FsImg.ROOTINO cs pidv Q
+    image_entry (filt_elf F) M (mword_of_int (t1 + 8) : mword 64) sts FsImg.ROOTINO ProcDefs.secc_all cs pidv Q
       (pns_copy_lend_m g LM PV CP v I sR lR L termw TOKN pdepR γc γm pin gin F (CSCon wL) Q) uslot.
   Proof using HL31 Hadmit Hcons Hext Hsup HlR Hfc Hkill Hplok pnsRegG0 ufdG0.
     intros HQ Hok Hi Hb Hl Hr0 Hr1 Hr2 Hfok. iIntros "#Hnp".
     destruct F as [| wp].
     - iApply (pse_last_image_entry_m (PS := uprogSG_free) g LM PV CP sd WA Hext Hcons Hkill Hsup
                 v I sR lR HlR Hfc Hadmit Hplok L HL31 termw TOKN pdepR (pdep_timeless LM PV sR lR L pr P gF gG)
-                γc γm M s1 t1 g1 sts FsImg.ROOTINO cs pidv Q pin gin wL wb rb1 rb2
+                γc γm M s1 t1 g1 sts FsImg.ROOTINO ProcDefs.secc_all cs pidv Q pin gin wL wb rb1 rb2
                 HQ Hok Hi Hb Hl Hr0 Hr1 Hr2
                 with "Hnp []").
       iApply UexecExecMint.udep_free.
     - iApply (pse_grep_last_image_entry (PS := uprogSG_free) g LM PV CP sd WA Hext Hcons Hkill Hsup
                 v I sR lR HlR Hfc Hadmit Hplok L HL31 termw TOKN pdepR (pdep_timeless LM PV sR lR L pr P gF gG)
-                γc γm wp M s1 t1 g1 sts FsImg.ROOTINO cs pidv Q pin gin wL wb rb1 rb2
+                γc γm wp M s1 t1 g1 sts FsImg.ROOTINO ProcDefs.secc_all cs pidv Q pin gin wL wb rb1 rb2
                 HQ Hok Hi Hb Hl Hr0 Hr1 Hr2 (proj2 Hfok)
                 with "Hnp []").
       iApply UexecExecMint.udep_free.
@@ -558,7 +558,7 @@ Section UShPipesStage.
     { iIntros "!>" (M s1 t1 g1 sts cs pidv) "%Hi1 %Hb1 %Hl1 %Hf1 #Hnp".
       destruct Hf1 as ([wb Hr0] & [rb1 Hr1] & [rb2 Hr2]).
       iApply (image_entry_pay_mono (filt_elf F) M (mword_of_int (t1 + 8) : mword 64)
-                sts FsImg.ROOTINO cs pidv (fun _ : Z => QcR (S k'))
+                sts FsImg.ROOTINO ProcDefs.secc_all cs pidv (fun _ : Z => QcR (S k'))
                 (pns_copy_lend g LM PV CP v I sR lR L termw TOKN pdepR γc γm (WLeft (S k'))
                    (mid_alts F) (mid_alts F) (P k') gin F (CSPipe (P (S k')) γp) (fun _ : Z => QcR (S k')))
                 Cr uslot
@@ -708,7 +708,7 @@ Section UShPipesStage.
     { iIntros "!>" (M s1 t1 g1 sts cs pidv) "%Hi1 %Hb1 %Hl1 %Hf1 #Hnp".
       destruct Hf1 as ([wb Hr0] & [rb1 Hr1] & [rb2 Hr2]).
       iApply (image_entry_pay_mono (filt_elf F) M (mword_of_int (t1 + 8) : mword 64)
-                sts FsImg.ROOTINO cs pidv (fun _ : Z => QcR m)
+                sts FsImg.ROOTINO ProcDefs.secc_all cs pidv (fun _ : Z => QcR m)
                 (pns_copy_lend_m g LM PV CP v I sR lR L termw TOKN pdepR γc γm (P m) γp F (CSCon WLast)
                    (fun _ : Z => QcR m)) Cr uslot
                 with "[] [Hnp]").

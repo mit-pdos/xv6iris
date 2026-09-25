@@ -2113,6 +2113,11 @@ Section UkRun.
        eager ([SpecKexec.exec_slot_pre]'s success wands; lane LAZY-FLAG's
        K4 is what puts the fact on them). *)
     uvis_lazy W = false ->
+    (* ...AND ITS MASK IS FULL (upstream a083670): [urun] is keyed at
+       [ProcDefs.secc_all], as it is at [false] above.  WHO SUPPLIES IT:
+       userinit's first record, fork's copy, exec's keep
+       ([SpecKexec.exec_slot_pre]'s mask row). *)
+    uvis_secc W = ProcDefs.secc_all ->
     (* ...AND NO HONESTY ROW ON THE HELD SET (lane OFF-HAND-6's H3 emptied
        it, lane OFF-LINK-2's L6 deleted the field): a constructor says
        nothing about offsets and an entry may be taken at a key with a HELD
@@ -2190,9 +2195,9 @@ Section UkRun.
        mWP (Loop : expr riscv_lang))
     -∗ uslot W.
   Proof using .
-    intros Hal8 Hroom Hstk Hfdlen Hstop Hlzf.
+    intros Hal8 Hroom Hstk Hfdlen Hstop Hlzf Hscf.
     iIntros "#Hdep #Hnpx #Hpay Hprog".
-    rewrite uslot_ukc /ukc Hlzf.
+    rewrite uslot_ukc /ukc Hlzf Hscf.
     iIntros (h xi C pt Rfd Rut HRut) "%Hlo %Hpm %Hlzr Hb".
     set (sz := uvis_sz W).
     assert (Hwf : proc_pt_wf pt)
@@ -2308,6 +2313,11 @@ Section UkRun.
        bv_unsigned p * 4096 < UserPtTree.pgroundup (uvis_sz W)) ->
     (* ...AND THE KEY'S LAZY BIT IS [false] -- see [uslot_of_urun_all]. *)
     uvis_lazy W = false ->
+    (* ...AND ITS MASK IS FULL (upstream a083670): [urun] is keyed at
+       [ProcDefs.secc_all], as it is at [false] above.  WHO SUPPLIES IT:
+       userinit's first record, fork's copy, exec's keep
+       ([SpecKexec.exec_slot_pre]'s mask row). *)
+    uvis_secc W = ProcDefs.secc_all ->
     (* ...AND NO HONESTY ROW ON THE HELD SET (lane OFF-HAND-6's H3 emptied
        it, lane OFF-LINK-2's L6 deleted the field): a constructor says
        nothing about offsets and an entry may be taken at a key with a HELD
@@ -2387,8 +2397,8 @@ Section UkRun.
        mWP (Loop : expr riscv_lang))
     -∗ uslot W.
   Proof using .
-    intros Hal8 Hroom Hstk Hfdlen Hstop Hlzf.
-    iIntros "#Hdep #Hnpx #Hpay Hprog". rewrite uslot_ukc /ukc Hlzf.
+    intros Hal8 Hroom Hstk Hfdlen Hstop Hlzf Hscf.
+    iIntros "#Hdep #Hnpx #Hpay Hprog". rewrite uslot_ukc /ukc Hlzf Hscf.
     iIntros (h xi C pt Rfd Rut HRut) "%Hlo %Hpm %Hlzr Hb".
     set (sz := uvis_sz W).
     assert (Hwf : proc_pt_wf pt)
@@ -2488,6 +2498,11 @@ Section UkRun.
        bv_unsigned p * 4096 < UserPtTree.pgroundup (uvis_sz W)) ->
     (* ...AND THE KEY'S LAZY BIT IS [false] -- see [uslot_of_urun_all]. *)
     uvis_lazy W = false ->
+    (* ...AND ITS MASK IS FULL (upstream a083670): [urun] is keyed at
+       [ProcDefs.secc_all], as it is at [false] above.  WHO SUPPLIES IT:
+       userinit's first record, fork's copy, exec's keep
+       ([SpecKexec.exec_slot_pre]'s mask row). *)
+    uvis_secc W = ProcDefs.secc_all ->
     (* ...AND NO HONESTY ROW ON THE HELD SET (lane OFF-HAND-6's H3 emptied
        it, lane OFF-LINK-2's L6 deleted the field): a constructor says
        nothing about offsets and an entry may be taken at a key with a HELD
@@ -2572,8 +2587,8 @@ Section UkRun.
        mWP (Loop : expr riscv_lang))
     -∗ uslot W.
   Proof using .
-    intros Hal8 Hroom Hstk Hfdlen Hstop Hlzf.
-    iIntros "#Hdep #Hnpx #Hpay Hprog". rewrite uslot_ukc /ukc Hlzf.
+    intros Hal8 Hroom Hstk Hfdlen Hstop Hlzf Hscf.
+    iIntros "#Hdep #Hnpx #Hpay Hprog". rewrite uslot_ukc /ukc Hlzf Hscf.
     iIntros (h xi C pt Rfd Rut HRut) "%Hlo %Hpm %Hlzr Hb".
     set (sz := uvis_sz W).
     assert (Hwf : proc_pt_wf pt)

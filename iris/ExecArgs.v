@@ -739,13 +739,13 @@ Section ExecArgsLift.
      and is done -- which is what section 1's second ruling (the argv
      reading is a premise the entry may consume) costs once general. *)
   Lemma image_entry_of_at_reading (f : elf_bytes) (M : gmap Z (bv 8))
-      (av : mword 64) (sts : list fdstate) (cw : Z) (cs : gset gname)
+      (av : mword 64) (sts : list fdstate) (cw : Z) (secc : mword 64) (cs : gset gname)
       (pidv : mword 32) (Q : Z -> iProp Σ) (Pay : iProp Σ)
       (X : uvis -d> iPropO Σ)
       (na : nat) (alen : nat -> nat) (afun : nat -> nat -> bv 8) :
     exec_args_of M av na alen afun ->
-    image_entry_at f na alen afun sts cw cs pidv Q Pay X -∗
-    image_entry f M av sts cw cs pidv Q Pay X.
+    image_entry_at f na alen afun sts cw secc cs pidv Q Pay X -∗
+    image_entry f M av sts cw secc cs pidv Q Pay X.
   Proof using .
     intros Hargs. iIntros "#H". rewrite /image_entry.
     iIntros "!>" (na' alen' afun' W')

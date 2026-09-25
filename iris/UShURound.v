@@ -498,7 +498,7 @@ Section UShURound.
     iDestruct "Hdeed" as (cs s v') "(Hown & %Htie & #Hty & #Hpin' & #Hcs)".
     rewrite /fown /fdeed. iDestruct "Hown" as "[Hdq Htk]".
     iPoseProof (uecho_cons_image_entry (PS := uprogSG_free)
-                  ug Hcons (last_ws I) M sa t gb fdv FsImg.ROOTINO chs pidv
+                  ug Hcons (last_ws I) M sa t gb fdv FsImg.ROOTINO ProcDefs.secc_all chs pidv
                   v s0 I r (1/2)%Qp s rb jo
                   (fun _ : Z => UkShFork.ushf_wq Wcu I) (ftkt r s)
                   (fun _ _ => eq_refl) Heq Hokws Himg Hbytes Hflen
@@ -641,7 +641,7 @@ Section UShURound.
       intros i bs Hs. injection Hs as _ Hbs. rewrite -Hbs. lia. }
     iPoseProof (ucat_image_entry (PS := uprogSG_free)
                   ug Hcons ucat_ws M sa t gb fdv
-                  FsImg.ROOTINO chs pidv v ps cs s0 I P r
+                  FsImg.ROOTINO ProcDefs.secc_all chs pidv v ps cs s0 I P r
                   (1/2)%Qp s rb1 rb2 jo
                   (fun _ : Z => UkShFork.ushf_wq Wcu I) (ftkt r s)
                   (fun _ _ => eq_refl) Heq Hw Hul (eq_sym Hcon) Hshort
@@ -945,7 +945,7 @@ Section UShURound.
     iDestruct (UserOff.foff_pub_of_held with "Hpub") as "Hu".
     (* the entry, at what is left of the lend *)
     iPoseProof (uefile_image_entry (PS := uprogSG_free)
-                  ug s0 ws M sa t gb fdv FsImg.ROOTINO chs pidv
+                  ug s0 ws M sa t gb fdv FsImg.ROOTINO ProcDefs.secc_all chs pidv
                   r (UserFd.ustd (ukn_fd N') ld ∗ Wcl I 3%nat)%I
                   i γo false
                   (fun _ : Z => UkShFork.ushf_wq Wcu I)
