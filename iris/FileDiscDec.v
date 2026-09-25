@@ -1,44 +1,20 @@
-(* FileDiscDec.v -- [FileDisc.disc_f] IS DECIDABLE, so the file ledger's
-   taint counter can be at [decide (disc_f h)].
+(* FileDiscDec.v -- THE FILE MODEL'S FINITE ENUMERATORS, which the union
+   discipline's decider ([UnionDecU]) searches over.
 
-   Design of record: claude-notes/design/app-file.md section 4.3a, ruling
-   "Blocker 1"; lane FILE-DEC.  [EchoDisc.disc_seg'_dec] decides the echo
-   discipline by a finite search over the prologue resolutions
-   ([pro_cands], through [pro_canon]) and the per-line choices
-   ([bounded_lists 4]).  Two things stop that search from porting verbatim:
+   Design of record: claude-notes/design/app-file.md section 4.3a (lane
+   FILE-DEC).  A round's code decodes to a [FileDisc.ralt], and [RFRan sel]
+   carries a chunk subset through a countable encoding, so the codes a line
+   admits are not an initial segment of the naturals.  They ARE finite per
+   line: [ralt_ok] pins [sel] to [FileState.sel_ok (echo_chunks ws)], a
+   strictly increasing list over [seq 0 (length (echo_chunks ws))], of which
+   there are 2^n.  [sel_cands] enumerates those and [ralt_cands] the codes;
+   the enumerator lists only CANONICAL codes [ralt_enc a], and a witness is
+   canonicalised to those because every consumer reads a code only through
+   [ralt_dec].  The content and the state are decidable ([fcont_ok_dec],
+   [fstate_ok_dec]).
 
-   - THE CHOICES ARE NO LONGER BOUNDED BY 4.  A round's code decodes to a
-     [FileDisc.ralt], and [RFRan sel] carries a chunk subset through a
-     countable encoding, so the codes a line admits are not an initial
-     segment of the naturals.  They ARE finite per line: [ralt_ok] pins
-     [sel] to [FileState.sel_ok (echo_chunks ws)], i.e. to a strictly
-     increasing list over [seq 0 (length (echo_chunks ws))], of which there
-     are 2^n.  [sel_cands] enumerates those and [alts_cands] the codes.
-     The enumerator lists only CANONICAL codes [ralt_enc a]; a witness is
-     canonicalised to those by [cs_canon], which is sound because every
-     consumer of [cs] -- [pro_idx_f], [fstate_upto], [alt_cont_f], [sessf],
-     [pro_ok_f], [disc_pt_f], [alts_ok] -- reads it ONLY through
-     [ralt_at = ralt_dec o (!!!)], and [ralt_dec (ralt_enc (ralt_dec c)) =
-     ralt_dec c].
-   - THE BOOT STATE RANGES OVER ALL BYTE LISTS.  [disc_f] is
-     [exists s : fstate, fstate_ok s /\ disc_seg_f' s seg], and [s] is not bounded
-     by anything syntactic.  [disc_seg_f'_canon] is the design's
-     canonicalisation lemma: the witness may always be taken from
-     [scands seg = None :: Some [] :: (Some <$> substrings (obs_wire Uart0
-     seg))].  WHY.  [cont] reads the file state at ONE alternative,
-     [RCRan], where it prints the content VERBATIM; and the state before a
-     round is either the boot state itself or a value the boot state does
-     not enter ([fstate_upto_vs_nil]: the chain at [s] and the chain at
-     [Some []] agree from the first round that moves the file, and until
-     then the first is [s] and the second is [Some []]).  So either some
-     checked prefix's transcript prints the boot content -- and then it is
-     a contiguous substring of that prefix's wire, hence of the segment's
-     -- or every checked transcript is the one at [Some []] and that state
-     serves.
-
-   Nothing here is evaluated: the instance is a decision procedure for the
-   ledger to case on, never a computation on a literal.  [FileDisc]'s own
-   witnesses ([demo_f1] .. [demo_f_bad]) are proved by other means. *)
+   The file application's own decider over its one-name boot states went
+   with that application; the union's boot-state search is [UnionDecU]'s. *)
 From Stdlib Require Import ZArith Lia List.
 From Stdlib Require Import Sorted.        (* [StronglySorted], [sel_ok]'s order *)
 From stdpp Require Import list list_numbers countable bitvector.definitions.
@@ -99,7 +75,7 @@ Proof using.
 Defined.
 
 Global Instance fstate_ok_dec s : Decision (fstate_ok s).
-Proof using. destruct s as [bs |]; rewrite /fstate_ok; apply _. Defined.
+Proof using. rewrite /fstate_ok. apply _. Defined.
 
 (* ====================================================================== *)
 (*  2.  THE CHUNK SUBSETS OF ONE LINE                                      *)
@@ -178,8 +154,8 @@ Proof using. rewrite elem_of_sel_cands. by rewrite /sel_ok. Qed.
 Definition ralt_fix_cands (l : uline) : list ralt :=
   match l with
   | LEcho _ => [REcho 0%nat; REcho 1%nat; REcho 2%nat; REcho 3%nat]
-  | LEchoF _ => [RFExec; RFOpenU; RFOpenM; RFSilent; RFFork]
-  | LCat => [RCRan; RCNoOpen; RCExec; RCSilent; RCFork]
+  | LEchoF _ _ => [RFExec; RFOpenU; RFOpenM; RFSilent; RFFork]
+  | LCat _ => [RCRan; RCNoOpen; RCExec; RCSilent; RCFork]
   (* the DEAD arm: [FileDisc.ralt_ok] gives [LPipe] exactly [LCat]'s five *)
   | LPipe _ _ => [RCRan; RCNoOpen; RCExec; RCSilent; RCFork]
   end.
@@ -187,7 +163,7 @@ Definition ralt_fix_cands (l : uline) : list ralt :=
 Definition ralt_cands (l : uline) : list nat :=
   (ralt_enc <$> ralt_fix_cands l)
   ++ match l with
-     | LEchoF ws =>
+     | LEchoF ws _ =>
          (fun sel => ralt_enc (RFRan sel))
            <$> sel_cands (length (echo_chunks ws))
      | _ => []
@@ -195,7 +171,7 @@ Definition ralt_cands (l : uline) : list nat :=
 
 Lemma ralt_fix_cands_ok l : Forall (ralt_ok l) (ralt_fix_cands l).
 Proof using.
-  destruct l as [ws | ws | | ws npc]; cbn [ralt_fix_cands].
+  destruct l as [ws | ws N | N | ws npc]; cbn [ralt_fix_cands].
   - repeat (constructor; [cbn [ralt_ok]; lia |]). constructor.
   - repeat (constructor; [exact I |]). constructor.
   - repeat (constructor; [exact I |]). constructor.
@@ -211,7 +187,7 @@ Proof using.
   - apply elem_of_list_fmap in Hin as (a & -> & Ha).
     rewrite ralt_dec_enc.
     exact (proj1 (Forall_forall _ _) (ralt_fix_cands_ok l) a Ha).
-  - destruct l as [ws | ws | | ws npc]; try (by apply elem_of_nil in Hin).
+  - destruct l as [ws | ws N | N | ws npc]; try (by apply elem_of_nil in Hin).
     apply elem_of_list_fmap in Hin as (sel & -> & Hsel).
     rewrite ralt_dec_enc. cbn [ralt_ok].
     by apply (sel_ok_cands (echo_chunks ws) sel).
@@ -221,7 +197,7 @@ Lemma ralt_cands_canon l c :
   ralt_ok l (ralt_dec c) -> ralt_enc (ralt_dec c) ∈ ralt_cands l.
 Proof using.
   intro H. rewrite /ralt_cands elem_of_app.
-  destruct l as [ws | ws | | ws npc];
+  destruct l as [ws | ws N | N | ws npc];
     destruct (ralt_dec c) as [k | sel | | | | | | | | | |];
     cbn [ralt_ok] in H; try done.
   - left. apply elem_of_list_fmap. exists (REcho k). split; [reflexivity |].
@@ -419,235 +395,16 @@ Proof using.
 Qed.
 
 (* ====================================================================== *)
-(*  7.  THE BOOT-STATE CANONICALISATION                                    *)
+(*  7.  TWO FACTS THE UNION'S DECIDER READS                                *)
+(*                                                                        *)
+(*  The file application's own decider ([disc_f_dec], over the one-name   *)
+(*  boot states) went with that application (union cut C9h, filenames.md  *)
+(*  cut W1); the union decides its discipline in [UnionDecU].              *)
 (* ====================================================================== *)
-
-Definition scands (seg : list mobs) : list fstate :=
-  None :: Some [] :: (Some <$> substrings (obs_wire Uart0 seg)).
-
-(* THE STATE CHAIN AT [s] AGAINST THE ONE AT [Some []].  Until a round
-   moves the file the two are their own boot states; from the first round
-   that moves it they agree forever.  [RFOpenM] is the only arm that reads
-   the state, and it keeps a present one and creates at an absent one --
-   which is exactly why the disjunction is stated at [Some []] and not at
-   an arbitrary second state. *)
-Lemma fstate_upto_vs_nil cs s bs i :
-  (fstate_upto cs s bs i = s /\ fstate_upto cs (Some []) bs i = Some [])
-  \/ fstate_upto cs s bs i = fstate_upto cs (Some []) bs i.
-Proof using.
-  induction i as [| i IH]; [by left |].
-  cbn [fstate_upto]. destruct IH as [[Hu Hv] | He]; [| by rewrite He; right].
-  rewrite Hu Hv.
-  destruct (uline_of (bs !!! i)) as [ws | ws | | ws npc]; [by left | | by left | by left].
-  destruct (ralt_at cs i) as [k | sel | | | | | | | | | |];
-    cbn [fsm]; try (by left); try (by right).
-  destruct s as [b0 |]; [by left | by right].
-Qed.
-
-Lemma alt_cont_f_state ps cs s s' bs i :
-  fstate_upto cs s bs i = fstate_upto cs s' bs i ->
-  alt_cont_f ps cs s bs i = alt_cont_f ps cs s' bs i.
-Proof using. intro H. by rewrite /alt_cont_f H. Qed.
 
 Lemma cont_state_ne s s' l a : cont s l a <> cont s' l a -> a = RCRan.
 Proof using. destruct a; intro H; try (exfalso; by apply H); reflexivity. Qed.
 
-Lemma cont_rcran_some l b0 : cont (Some b0) l RCRan = b0 ++ u_prompt.
-Proof using. reflexivity. Qed.
-
-Lemma alt_cont_f_cat ps cs s bs i b0 :
-  ralt_at cs i = RCRan -> fstate_upto cs s bs i = Some b0 ->
-  exists D, alt_cont_f ps cs s bs i = b0 ++ D.
-Proof using.
-  intros Ha Hs. rewrite /alt_cont_f Hs Ha cont_rcran_some.
-  eexists. by rewrite -app_assoc.
-Qed.
-
-Lemma alt_blk_f_infix ps cs s bs i b0 :
-  ralt_at cs i = RCRan -> fstate_upto cs s bs i = Some b0 ->
-  infixed b0 (alt_blk_f ps cs s bs i).
-Proof using.
-  intros Ha Hs.
-  destruct (alt_cont_f_cat ps cs s bs i b0 Ha Hs) as (D & HD).
-  rewrite /alt_blk_f HD.
-  destruct (fdd_infix_cons wl_nl (bs !!! i) b0 D) as (C & E & HE).
-  rewrite HE. apply infixed_here.
-Qed.
-
-Lemma alt_seq_f_split ps cs s bs q i :
-  (i < q)%nat ->
-  exists A B, alt_seq_f ps cs s bs q = A ++ alt_blk_f ps cs s bs i ++ B.
-Proof using.
-  induction q as [| q IH]; intro Hi; [lia |].
-  rewrite alt_seq_f_S.
-  destruct (decide (i = q)) as [-> | Hne].
-  - exists (alt_seq_f ps cs s bs q), []. by rewrite app_nil_r.
-  - destruct (IH ltac:(lia)) as (A & B & HE).
-    exists A, (B ++ alt_blk_f ps cs s bs q). rewrite HE. by rewrite -!app_assoc.
-Qed.
-
-Lemma sessf_infix_blk ps cs s I i :
-  (i < nlines I)%nat ->
-  infixed (alt_blk_f ps cs s (bodies_of I) i) (sessf ps cs s I).
-Proof using.
-  intro Hi.
-  destruct (alt_seq_f_split ps cs s (bodies_of I) (nlines I) i Hi)
-    as (A & B & HE).
-  rewrite /sessf HE. apply infixed_app_ctx, infixed_here.
-Qed.
-
 Lemma obs_wire_prefix (i : uart_id) (p seg : list mobs) :
   p `prefix_of` seg -> obs_wire i p `prefix_of` obs_wire i seg.
 Proof using. intros [k ->]. rewrite obs_wire_app. by eexists. Qed.
-
-Lemma alt_seq_f_cont_ext ps cs s s' bs q :
-  (forall i, (i < q)%nat ->
-     alt_cont_f ps cs s bs i = alt_cont_f ps cs s' bs i) ->
-  alt_seq_f ps cs s bs q = alt_seq_f ps cs s' bs q.
-Proof using.
-  intro H. induction q as [| q IH]; [reflexivity |].
-  rewrite !alt_seq_f_S IH; [| intros i Hi; apply H; lia].
-  by rewrite /alt_blk_f (H q ltac:(lia)).
-Qed.
-
-(* the design's lemma: the boot-state witness may be taken from a finite
-   list read off the segment's own wire *)
-Lemma disc_seg_f'_canon (seg : list mobs) :
-  (exists s, fstate_ok s /\ disc_seg_f' s seg)
-  <-> (exists s, s ∈ scands seg /\ fstate_ok s /\ disc_seg_f' s seg).
-Proof using.
-  split; [| intros (s & _ & H); by exists s].
-  intros (s & Hok & Hd).
-  destruct s as [b0 |];
-    [| exists None; split; [apply elem_of_list_here | by split]].
-  destruct Hd as (Hseg & ps & cs & Hal & Hpt).
-  destruct (decide (Exists (fun p =>
-      Exists (fun i =>
-        alt_cont_f ps cs (Some b0) (bodies_of (ins p)) i
-        <> alt_cont_f ps cs (Some []) (bodies_of (ins p)) i)
-        (List.seq 0 (nlines (ins p))))
-      (in_pres seg))) as [HB | HB].
-  - (* SOME checked transcript prints the boot content, so it is on the
-       segment's wire *)
-    apply Exists_exists in HB as (p & Hp & Hi).
-    apply Exists_exists in Hi as (i & Hiin & Hne).
-    apply elem_of_list_In, in_seq in Hiin.
-    destruct (fstate_upto_vs_nil cs (Some b0) (bodies_of (ins p)) i)
-      as [[Hu Hv] | He];
-      [| by destruct (Hne (alt_cont_f_state ps cs _ _ _ i He))].
-    assert (Ha : ralt_at cs i = RCRan).
-    { apply (cont_state_ne (fstate_upto cs (Some b0) (bodies_of (ins p)) i)
-                           (fstate_upto cs (Some []) (bodies_of (ins p)) i)
-                           (uline_of (bodies_of (ins p) !!! i))).
-      intro Hc. apply Hne. by rewrite /alt_cont_f Hc. }
-    assert (Hinf : infixed b0 (obs_wire Uart0 seg)).
-    { eapply infixed_prefix;
-        [| exact (obs_wire_prefix Uart0 p seg
-                    (proj1 (Forall_forall _ _) (in_pres_prefix_all seg) p Hp))].
-      eapply infixed_prefix; [| exact (proj2 (Hpt p Hp))].
-      destruct (sessf_infix_blk ps cs (Some b0) (done_of (ins p)) i
-                  ltac:(rewrite nlines_done; lia))
-        as (A & B & HE).
-      rewrite HE bodies_of_done. apply infixed_app_ctx.
-      exact (alt_blk_f_infix ps cs (Some b0) (bodies_of (ins p)) i b0 Ha Hu). }
-    exists (Some b0). split.
-    { apply elem_of_list_further, elem_of_list_further, elem_of_list_fmap.
-      exists b0. split; [reflexivity |]. by apply elem_of_substrings. }
-    split; [exact Hok |]. split; [exact Hseg |]. by exists ps, cs.
-  - (* NO checked transcript reads the boot state: the era is the one at
-       [Some []] *)
-    exists (Some []).
-    split; [by apply elem_of_list_further, elem_of_list_here |].
-    split; [by left |].
-    split; [exact Hseg |]. exists ps, cs. split; [exact Hal |].
-    intros p Hp. destruct (Hpt p Hp) as [Hpo Hpf]. split; [exact Hpo |].
-    rewrite /disc_pt_f.
-    assert (Heq : sessf ps cs (Some []) (done_of (ins p))
-                  = sessf ps cs (Some b0) (done_of (ins p))).
-    { rewrite /sessf bodies_of_done nlines_done. f_equal. f_equal.
-      symmetry. apply (alt_seq_f_cont_ext ps cs (Some b0) (Some [])).
-      intros i Hi. apply dec_stable. intro Hne. apply HB.
-      apply Exists_exists. exists p. split; [exact Hp |].
-      apply Exists_exists. exists i.
-      split; [apply elem_of_list_In, in_seq; lia | exact Hne]. }
-    rewrite Heq. exact Hpf.
-Qed.
-
-(* ====================================================================== *)
-(*  8.  THE DECISION                                                       *)
-(* ====================================================================== *)
-
-(* [EchoDisc.disc_seg'_dec]'s search, at the three enumerators: the boot
-   states off the wire, the resolutions off the lines, the prologues off
-   [pro_canon].  NOTHING HERE IS MEANT TO RUN: the ledger cases on it. *)
-Global Instance disc_seg_f'_ex_dec seg :
-  Decision (exists s : fstate, fstate_ok s /\ disc_seg_f' s seg).
-Proof using.
-  destruct (decide (disc_seg_f seg)) as [Hd | Hd];
-    [| right; intros (s & _ & Hs & _); by apply Hd].
-  destruct (decide (Exists (fun s =>
-      fstate_ok s /\
-      Exists (fun cs =>
-        Exists (fun ps => disc_pt_all_f ps cs s seg)
-          (pro_cands (S (pro_idx_f cs (nlines_max (in_pres seg))))
-                     (length seg)))
-        (alts_cands (lines_of (ins seg))))
-      (scands seg))) as [HE | HE].
-  - left. apply Exists_exists in HE as (s & _ & Hok & HC).
-    apply Exists_exists in HC as (cs & Hcs & HP).
-    apply Exists_exists in HP as (ps & _ & Hall).
-    exists s. split; [exact Hok |].
-    eapply disc_seg_f'_intro; [exact Hd | | exact Hall].
-    by apply alts_cands_alts_ok.
-  - right. intro Hex. apply HE.
-    apply disc_seg_f'_canon in Hex as (s & Hsin & Hok & Hd').
-    apply Exists_exists. exists s. split; [exact Hsin |].
-    split; [exact Hok |].
-    destruct Hd' as (_ & ps & cs & Hal & Hall).
-    apply Exists_exists. exists (cs_canon cs).
-    split; [by apply alts_ok_cs_canon |].
-    rewrite pro_idx_f_canon. apply Exists_exists.
-    (* the deepest checked point bounds every round the transcript enters *)
-    destruct (decide (in_pres seg = [])) as [Hz | Hz].
-    { destruct (pro_cands_nonempty
-                  (S (pro_idx_f cs (nlines_max (in_pres seg)))) (length seg))
-        as [g Hg].
-      exists g. split; [exact Hg |]. rewrite /disc_pt_all_f Hz. constructor. }
-    destruct (nlines_max_mem (in_pres seg) Hz) as (pl & Hplin & Hpleq).
-    destruct (Hall pl Hplin) as [[HFps Hltl] Hptl].
-    assert (Hplp : pl `prefix_of` seg)
-      by exact (proj1 (Forall_forall _ _) (in_pres_prefix_all seg) pl Hplin).
-    destruct (pro_canon (S (pro_idx_f cs (nlines_max (in_pres seg))))
-                (length seg) ps HFps) as (ps0 & Hin0 & Hrd0 & Hag0).
-    { intros r Hr. rewrite -Hpleq in Hr. split; [lia |].
-      etrans; [apply (sessf_pro_len ps cs s (done_of (ins pl)) r);
-               rewrite nlines_done; lia |].
-      etrans; [apply prefix_length, Hptl |].
-      etrans; [apply obs_wire_length |].
-      exact (prefix_length _ _ Hplp). }
-    exists ps0. split; [exact Hin0 |].
-    apply disc_pt_all_f_canon.
-    rewrite /disc_pt_all_f. apply Forall_forall. intros p Hp.
-    destruct (Hall p Hp) as [[_ Hltp] Hptp].
-    assert (Hidxle : (pro_idx_f cs (nlines (ins p))
-                      <= pro_idx_f cs (nlines_max (in_pres seg)))%nat)
-      by (apply pro_idx_f_mono, nlines_max_ge, Hp).
-    assert (Hsame : sessf ps0 cs s (done_of (ins p))
-                    = sessf ps cs s (done_of (ins p))).
-    { apply sessf_ps_ext. intros r Hr. rewrite nlines_done in Hr.
-      apply Hag0. lia. }
-    split.
-    + rewrite /pro_ok_f. split; [by eapply pro_cands_Forall | lia].
-    + by rewrite /disc_pt_f Hsame.
-Defined.
-
-(* THE DELIVERABLE.  The file discipline is decidable, so
-   [FileOut.file_led]'s taint counter reads [decide (disc_f h)] and
-   [FileOut.v] takes no hypothesis. *)
-(* OPAQUE ON PURPOSE, as [EchoDisc.disc_dec] is: the ledger's counter is
-   [if decide (disc_f h) then 0 else 1] and every proof that touches it
-   rewrites with a closure law.  A transparent instance would let
-   [rewrite /file_led] iota-reduce the counter at a literal history and
-   those rewrites would stop matching. *)
-Global Instance disc_f_dec h : Decision (disc_f h).
-Proof using. rewrite /disc_f. apply _. Qed.

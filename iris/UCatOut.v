@@ -2,7 +2,7 @@
 (*  UCatOut.v -- cat's CONSOLE OUTPUT AT THE FILE STAGE.                  *)
 (*                                                                       *)
 (*  [UEchoOut.v] is echo's share of a completed line at the ECHO stage;   *)
-(*  this file is cat's at the FILE stage.  cat's round is the [LCat]      *)
+(*  this file is cat's at the FILE stage.  cat's round is the [LCat_f]      *)
 (*  line, and the alternative it takes is decided by THE DEED and not by  *)
 (*  the return value of its own open:                                    *)
 (*                                                                       *)
@@ -71,7 +71,7 @@ Local Open Scope list_scope.
 
 (* WHERE THE ERA STANDS WHEN cat RUNS.  [UEchoOut.echo_stage] with the
    line NAMED BY ITS SHAPE rather than by its words: cat's round is the
-   [LCat] line the shell parsed, the era's input has no partial line, and
+   [LCat_f] line the shell parsed, the era's input has no partial line, and
    every line below this one is resolved.  The boot state [s0] is the one
    [FileOut.f0_lb] pins and the state at cat's own round is a FUNCTION of
    it ([FileDisc.fstate_upto]), so the stage names no history. *)
@@ -79,7 +79,7 @@ Definition cat_stage (ps0 cs0 : list nat) (s0 : fstate) (I0 : list (bv 8))
     (P : nat) : Prop :=
   rest_of I0 = []
   /\ nlines I0 = S (length cs0)
-  /\ uline_of (bodies_of I0 !!! (nlines I0 - 1)%nat) = LCat
+  /\ uline_of (bodies_of I0 !!! (nlines I0 - 1)%nat) = LCat_f
   /\ P = length (proc_before_f ps0 cs0 (Some s0) I0)
   /\ pro_pin_f ps0 cs0 I0.
 
@@ -147,7 +147,7 @@ Lemma cat_blk_pending ps0 cs0 s0 I0 P a :
   cat_stage ps0 cs0 s0 I0 P ->
   ralt_panic (ralt_dec a) = false ->
   pending_at_f ps0 (cs0 ++ [a]) (Some s0) I0
-  = cont (cat_st cs0 s0 I0) LCat (ralt_dec a).
+  = cont (cat_st cs0 s0 I0) LCat_f (ralt_dec a).
 Proof using.
   intros Hst Hnp.
   pose proof (cat_stage_nonnil ps0 cs0 s0 I0 P Hst) as Hne.
@@ -174,7 +174,7 @@ Qed.
 Lemma cat_blk_byte ps0 cs0 s0 I0 P a j b :
   cat_stage ps0 cs0 s0 I0 P ->
   ralt_panic (ralt_dec a) = false ->
-  cont (cat_st cs0 s0 I0) LCat (ralt_dec a) !! j = Some b ->
+  cont (cat_st cs0 s0 I0) LCat_f (ralt_dec a) !! j = Some b ->
   proc_stream_f ps0 (cs0 ++ [a]) (Some s0) I0 !! (P + j)%nat = Some b.
 Proof using.
   intros Hst Hnp Hb. pose proof Hst as (_ & _ & _ & HP & _).
@@ -189,10 +189,10 @@ Qed.
 (*  2.  THE TWO ALTERNATIVES, AND WHAT EACH PRINTS                        *)
 (* ===================================================================== *)
 
-Lemma cat_ralt_ok_ran : ralt_ok LCat RCRan.
+Lemma cat_ralt_ok_ran : ralt_ok LCat_f RCRan.
 Proof using. exact I. Qed.
 
-Lemma cat_ralt_ok_noopen : ralt_ok LCat RCNoOpen.
+Lemma cat_ralt_ok_noopen : ralt_ok LCat_f RCNoOpen.
 Proof using. exact I. Qed.
 
 Lemma cat_ralt_panic_ran : ralt_panic (ralt_dec (ralt_enc RCRan)) = false.
@@ -205,47 +205,53 @@ Proof using. by rewrite ralt_dec_enc. Qed.
 (* the CONTENT arm: what cat reads is what it prints, and the prompt is
    the shell's *)
 Lemma cat_cont_ran_some (s : fstate) (bs : list (bv 8)) :
-  s = Some bs -> cont s LCat RCRan = bs ++ u_prompt.
-Proof using. intros ->. reflexivity. Qed.
+  s !! fname_f = Some bs -> cont s LCat_f RCRan = bs ++ u_prompt.
+Proof using. intros Hs. cbn [cont lname line_file default]. by rewrite Hs. Qed.
 
 (* THE EMPTY CONTENT: the block's whole continuation is the prompt, so cat
    writes nothing and the shell's own prompt byte is the block's first. *)
-Lemma cat_cont_ran_nil : cont (Some []) LCat RCRan = u_prompt.
-Proof using. reflexivity. Qed.
+Lemma cat_cont_ran_nil : cont {[fname_f := []]} LCat_f RCRan = u_prompt.
+Proof using. apply (cat_cont_ran_some _ []). apply lookup_singleton. Qed.
 
-(* the ABSENT arm: at [s = None] the round's continuation IS cat's
+(* the ABSENT arm: at an absent [f] the round's continuation IS cat's
    diagnostic -- so an absent deed is [RCRan], not [RCNoOpen] *)
-Lemma cat_cont_ran_none : cont None LCat RCRan = alt_catopen.
-Proof using. reflexivity. Qed.
+Lemma cat_cont_ran_absent (s : fstate) :
+  s !! fname_f = None -> cont s LCat_f RCRan = alt_catopen.
+Proof using. intros Hs. cbn [cont lname line_file default]. by rewrite Hs. Qed.
+
+Lemma cat_cont_ran_none : cont ∅ LCat_f RCRan = alt_catopen.
+Proof using. apply cat_cont_ran_absent. apply lookup_empty. Qed.
 
 (* ...and the PRESENT-but-unopenable one prints the same bytes *)
-Lemma cat_cont_noopen (s : fstate) : cont s LCat RCNoOpen = alt_catopen.
+Lemma cat_cont_noopen (s : fstate) : cont s LCat_f RCNoOpen = alt_catopen.
 Proof using. reflexivity. Qed.
 
 (* the two are byte-identical at an absent file, which is why the
    observer cannot tell them apart and the DEED is what decides which is
    filed ([FileOpen.fdq_agree] at cat's fraction) *)
-Lemma cat_cont_none_eq : cont None LCat RCRan = cont None LCat RCNoOpen.
-Proof using. reflexivity. Qed.
+Lemma cat_cont_none_eq : cont ∅ LCat_f RCRan = cont ∅ LCat_f RCNoOpen.
+Proof using. by rewrite cat_cont_ran_none cat_cont_noopen. Qed.
 
 (* WHAT THE DEED BUYS: the fraction agrees on [s], the tie says [s] is the
    model's state, and the two together name cat's own output. *)
 Lemma cat_out_of_tie (cs0 : list nat) (s0 : fstate) (I0 : list (bv 8))
     (s : dst) (i : Z) (bs : list (bv 8)) :
   cat_tie cs0 s0 I0 s -> s = Some (i, bs) ->
-  cont (cat_st cs0 s0 I0) LCat RCRan = bs ++ u_prompt.
+  cont (cat_st cs0 s0 I0) LCat_f RCRan = bs ++ u_prompt.
 Proof using.
-  intros Htie Hs. rewrite /cat_tie Hs /dst_content /= in Htie.
-  by rewrite -Htie.
+  intros Htie Hs. rewrite /cat_tie Hs /dst_content in Htie.
+  cbn [fmap option_fmap option_map fst_of snd] in Htie.
+  rewrite -Htie. apply cat_cont_ran_some. apply lookup_singleton.
 Qed.
 
 Lemma cat_out_of_tie_none (cs0 : list nat) (s0 : fstate) (I0 : list (bv 8))
     (s : dst) :
   cat_tie cs0 s0 I0 s -> s = None ->
-  cont (cat_st cs0 s0 I0) LCat RCRan = alt_catopen.
+  cont (cat_st cs0 s0 I0) LCat_f RCRan = alt_catopen.
 Proof using.
-  intros Htie Hs. rewrite /cat_tie Hs /dst_content /= in Htie.
-  by rewrite -Htie.
+  intros Htie Hs. rewrite /cat_tie Hs /dst_content in Htie.
+  cbn [fmap option_fmap option_map fst_of snd] in Htie.
+  rewrite -Htie. apply cat_cont_ran_none.
 Qed.
 
 (* ===================================================================== *)
@@ -262,7 +268,7 @@ Qed.
 (* ===================================================================== *)
 Definition cat_out_len (cs0 : list nat) (s0 : fstate) (I0 : list (bv 8))
     (a : nat) : nat :=
-  (length (cont (cat_st cs0 s0 I0) LCat (ralt_dec a)) - length u_prompt)%nat.
+  (length (cont (cat_st cs0 s0 I0) LCat_f (ralt_dec a)) - length u_prompt)%nat.
 
 Lemma cat_prompt_len : length u_prompt = 2%nat.
 Proof using. vm_compute. reflexivity. Qed.
@@ -349,9 +355,9 @@ Section UCatOut.
       (ps0 cs0 : list nat) (s0 : fstate) (I0 : list (bv 8))
       (a P p : nat) (b : bv 8) (Φ : iProp Σ) :
     cat_stage ps0 cs0 s0 I0 P ->
-    ralt_ok LCat (ralt_dec a) ->
+    ralt_ok LCat_f (ralt_dec a) ->
     ralt_panic (ralt_dec a) = false ->
-    cont (cat_st cs0 s0 I0) LCat (ralt_dec a) !! p = Some b ->
+    cont (cat_st cs0 s0 I0) LCat_f (ralt_dec a) !! p = Some b ->
     era_pin (fgn_echo g) k v -∗ file_era_pin g k vf -∗
     cch v vf ps0 cs0 s0 I0 a P p -∗
     (cch v vf ps0 cs0 s0 I0 a P (S p) -∗ Φ) -∗
@@ -398,11 +404,11 @@ Section UCatOut.
       (a P p : nat) (M : gmap Z (bv 8)) (ua : mword 64)
       (fb : nat -> bv 8) :
     cat_stage ps0 cs0 s0 I0 P ->
-    ralt_ok LCat (ralt_dec a) ->
+    ralt_ok LCat_f (ralt_dec a) ->
     ralt_panic (ralt_dec a) = false ->
     forall (c i : nat),
     (forall j : nat, (i <= j)%nat -> (j < i + c)%nat ->
-       cont (cat_st cs0 s0 I0) LCat (ralt_dec a) !! (p + j)%nat
+       cont (cat_st cs0 s0 I0) LCat_f (ralt_dec a) !! (p + j)%nat
        = Some (fb j)) ->
     (forall j : nat, (i <= j)%nat -> (j < i + c)%nat ->
        M !! uint (add_vec_int ua (Z.of_nat j)) = Some (fb j)) ->
@@ -500,7 +506,7 @@ Section UCatOut.
      round's whole continuation is the shell's prompt. *)
   Lemma cch_empty_unfiled (v : era_pins) (vf : file_era)
       (ps0 cs0 : list nat) (s0 : fstate) (I0 : list (bv 8)) (a P : nat) :
-    cat_st cs0 s0 I0 = Some [] ->
+    (cat_st cs0 s0 I0 : fstate) !! fname_f = Some [] ->
     cch v vf ps0 cs0 s0 I0 a P 0%nat -∗
     catq_unfiled v vf ps0 cs0 s0 I0 P (-1).
   Proof using .

@@ -24,7 +24,7 @@
                     application's good alternative. *)
 From Stdlib Require Import ZArith Lia List.
 From Stdlib Require Import Sorted.
-From stdpp Require Import list list_numbers sorting bitvector.definitions.
+From stdpp Require Import gmap list list_numbers sorting bitvector.definitions.
 Require Import LineWords.       (* [wl_sp], [wl_nl], [wl_line], [wl_body] *)
 From stdpp Require Import ssreflect.
 Local Open Scope nat_scope.
@@ -34,7 +34,33 @@ Local Open Scope list_scope.
 (*  1.  THE STATE                                                          *)
 (* ====================================================================== *)
 
-Definition fstate : Type := option (list (bv 8)).
+(* THE STATE IS A MAP from file names to contents (cut W1 of
+   claude-notes/design/filenames.md): the files of the name class that
+   exist, each with its bytes.  An absent name is an absent file.  Which
+   names may appear is the model's [FileDisc.fstate_ok] (the class
+   [FileDisc.uname]); this file fixes the representation only. *)
+Definition fstate : Type := gmap (list (bv 8)) (list (bv 8)).
+
+(* THE ONE NAME the claim's deed still speaks of (the byte [f]):
+   [FileDisc.fname_f] is this constant, and [AppFile.dst_content] files
+   the deed's content under it.  Kept here because the claim does not
+   import the model's cone. *)
+Definition fname_m : list (bv 8) := [Z_to_bv 8 102].
+
+(* the one-name state an option content denotes: the bridge from the
+   deed's [option] to the model's map *)
+Definition fst_of (o : option (list (bv 8))) : fstate :=
+  match o with None => ∅ | Some bs => {[fname_m := bs]} end.
+
+Lemma fst_of_lookup (o : option (list (bv 8))) : fst_of o !! fname_m = o.
+Proof using. destruct o as [bs |]; cbn [fst_of]; [apply lookup_singleton | apply lookup_empty]. Qed.
+
+Lemma fst_of_lookup_ne (o : option (list (bv 8))) (N : list (bv 8)) :
+  N <> fname_m -> fst_of o !! N = None.
+Proof using.
+  intros HN. destruct o as [bs |]; cbn [fst_of];
+    [apply lookup_singleton_ne; congruence | apply lookup_empty].
+Qed.
 
 (* ====================================================================== *)
 (*  2.  ECHO'S CHUNKS                                                      *)

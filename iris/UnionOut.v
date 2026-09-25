@@ -6,7 +6,7 @@
 (*  THE CLAIM is the N-writer claim [PipeOutN.peclV] at the union model   *)
 (*  [UnionDisc.ulmG]:                                                     *)
 (*                                                                        *)
-(*    ucl := gcl ulmG ucparams None uwa ∨ popenU                          *)
+(*    ucl := gcl ulmG ucparams ∅ uwa ∨ popenU                          *)
 (*                                                                        *)
 (*  - [ucparams]: the FILE's taint, era pin and writer's witness          *)
 (*    ([FileOut.file_cparams]' fields) at the union's laws and hooks;     *)
@@ -112,8 +112,8 @@ Section union_out.
       UPIN _ _ (era_pin_agree (fgn_echo gf)) (f0cw gf) _ _.
 
   (* the file's witness authority, the pipeline's byte ledger beside it *)
-  Definition uwa : gen_wa U ucparams None :=
-    @MkGWA Σ _ U ucparams None (f0wa gf) _ (f0wa_agree_d gf) (f0_typed gf) _
+  Definition uwa : gen_wa U ucparams ∅ :=
+    @MkGWA Σ _ U ucparams ∅ (f0wa gf) _ (f0wa_agree_d gf) (f0_typed gf) _
       (f0wa_W gf) (f0boot gf) (f0wa_file gf) True (fun _ => f0wa_agree gf)
       False (fun Hf => match Hf with end)
       (pext pg) _ (pext_grow pg).
@@ -125,14 +125,14 @@ Section union_out.
      authority [f0wa] of the stage's filed state *)
   Definition popenU (k : nat) (ho : list mobs) (H : LogEntryDefs.cons_hist)
       : iProp Σ :=
-    popenV pg U UPIN (f0wa gf) None k ho H.
+    popenV pg U UPIN (f0wa gf) ∅ k ho H.
 
   (* THE CLAIM *)
   Definition ucl : nat -> list mobs -> LogEntryDefs.cons_hist -> iProp Σ :=
-    peclV pg U ucparams None uwa.
+    peclV pg U ucparams ∅ uwa.
 
   Lemma ucl_unfold (k : nat) (ho : list mobs) (H : LogEntryDefs.cons_hist) :
-    ucl k ho H ⊣⊢ gcl U ucparams None uwa k ho H ∨ popenU k ho H.
+    ucl k ho H ⊣⊢ gcl U ucparams ∅ uwa k ho H ∨ popenU k ho H.
   Proof using . done. Qed.
 
   Global Instance ucl_timeless k ho H : Timeless (ucl k ho H).
@@ -140,7 +140,7 @@ Section union_out.
 
   Lemma ucl_taint (k : nat) (ho : list mobs) (H : LogEntryDefs.cons_hist) :
     UT -∗ ucl k ho H.
-  Proof using . iIntros "#HT". iApply (peclV_taint pg U ucparams None uwa k ho H with "HT"). Qed.
+  Proof using . iIntros "#HT". iApply (peclV_taint pg U ucparams ∅ uwa k ho H with "HT"). Qed.
 
   (* =================================================================== *)
   (*  2.  THE FILE LINES' EVENTS: the generic claim's, the open round     *)
@@ -160,7 +160,7 @@ Section union_out.
       ∗ ((turn v 1 ∗ ps_lb v [a] ∗ cs_lb v [] ∗ inp_lb v [] ∗ f0cw gf k s0) ∨ UT).
   Proof using .
     intros Hok Halt Hhead. iIntros "Hpin Ht Hps Hcs HE Hbt Hcl".
-    iApply (peclV_step_write_first pg U ucparams None uwa k v a b s0 ho H Hok Halt Hhead
+    iApply (peclV_step_write_first pg U ucparams ∅ uwa k v a b s0 ho H Hok Halt Hhead
               with "Hpin Ht Hps Hcs HE Hbt Hcl").
   Qed.
 
@@ -177,7 +177,7 @@ Section union_out.
       ∗ ((turn v (S P) ∗ ps_lb v ps0 ∗ cs_lb v cs0 ∗ inp_lb v I0 ∗ f0cw gf k s0) ∨ UT).
   Proof using .
     intros Hn Hpin0 Hb. iIntros "Hpin Ht Hps Hcs HE HW Hcl".
-    iApply (peclV_step_write pg U ucparams None uwa k v P b ps0 cs0 s0 I0 ho H Hn Hpin0 Hb
+    iApply (peclV_step_write pg U ucparams ∅ uwa k v P b ps0 cs0 s0 I0 ho H Hn Hpin0 Hb
               with "Hpin Ht Hps Hcs HE HW Hcl").
   Qed.
 
@@ -203,7 +203,7 @@ Section union_out.
   Proof using .
     intros Hne0 Hr0 Hdiv Hpin0 HPeq Hok Hterm Hhead.
     iIntros "Hpin Ht Hps Hcs HE HW Hcl".
-    iApply (peclV_step_write_blk pg U ucparams UB None uwa k v P a b ps0 cs0 s0 I0 ho H
+    iApply (peclV_step_write_blk pg U ucparams UB ∅ uwa k v P a b ps0 cs0 s0 I0 ho H
               Hne0 Hr0 Hdiv Hpin0 HPeq Hok Hterm Hhead
               with "Hpin Ht Hps Hcs HE HW Hcl").
   Qed.
@@ -229,7 +229,7 @@ Section union_out.
   Proof using .
     intros Hr0 Hopen Hdiv Hpin0 Hnd HPeq Halt Hhead.
     iIntros "Hpin Ht Hps Hcs HE HW Hcl".
-    iApply (peclV_step_write_pro pg U ucparams None uwa k v P a b ps0 cs0 s0 I0 ho CH
+    iApply (peclV_step_write_pro pg U ucparams ∅ uwa k v P a b ps0 cs0 s0 I0 ho CH
               (or_intror (or_introl I)) Hr0 Hopen Hdiv Hpin0 Hnd HPeq Halt Hhead
               with "Hpin Ht Hps Hcs HE HW Hcl").
   Qed.
@@ -255,7 +255,7 @@ Section union_out.
     ucl k ho CH -∗ ucl k ho CH ∗ udrain_ret k seg.
   Proof using .
     intros Hsh Hk Hpre Hins Hwire Hne. iIntros "Hcl".
-    iDestruct (peclV_drain pg U ucparams UB None uwa k h ho CH seg
+    iDestruct (peclV_drain pg U ucparams UB ∅ uwa k h ho CH seg
                  Hsh Hk Hpre Hins Hwire Hne with "Hcl") as "[$ Hd]".
     rewrite /udrain_ret /gdrain_ret.
     iDestruct "Hd" as "[#HT | (%s0 & %Hgo & %Hok & #Hty & #Hw)]"; [by iLeft |].
@@ -313,7 +313,7 @@ Section union_out.
   (* THE CLAIM PAYS THE FAMILY'S ONE OBLIGATION, at the round's state *)
   Theorem pblkU_ecl_holds (v : era_pins) (I : list (bv 8)) (sR : fstate) :
     ⊢ eclN ucl (pwc_blkU v I sR) (ptkU v I) (pwitU I sR).
-  Proof using . exact (pblkV_ecl_holds pg U ucparams None uwa uwa_ext v I sR). Qed.
+  Proof using . exact (pblkV_ecl_holds pg U ucparams ∅ uwa uwa_ext v I sR). Qed.
 
   (* THE MODEL'S BLOCKS ARE THE CLAIM'S NON-TERMINAL WITNESS, through the
      union's view, at a well-formed round state *)
@@ -343,7 +343,7 @@ Section union_out.
             ∗ ps_lb v ps ∗ cs_lb v (cs ++ [pv_enc pview_unionU lR (PLRun pre)]) ∗ inp_lb v I) ∨ UT).
   Proof using .
     intros HlR Ha Hbl Hne Hbv. iIntros "Hpw Hcl".
-    iApply (pwc_blkV_file pg U ucparams UB None uwa uwa_ext pview_unionU v I sR lR
+    iApply (pwc_blkV_file pg U ucparams UB ∅ uwa uwa_ext pview_unionU v I sR lR
               k ho H pre b HlR Ha Hbl Hne Hbv with "Hpw Hcl").
   Qed.
 
@@ -361,7 +361,7 @@ Section union_out.
             ∗ ps_lb v ps ∗ cs_lb v (cs ++ [pv_enc pview_unionU lR (PLRun [])]) ∗ inp_lb v I) ∨ UT).
   Proof using .
     intros HlR Hbv. iIntros "Hpw Hcl".
-    iApply (pwc_blkV_file_empty pg U ucparams UB None uwa pview_unionU v I sR lR
+    iApply (pwc_blkV_file_empty pg U ucparams UB ∅ uwa pview_unionU v I sR lR
               k ho H b HlR Hbv with "Hpw Hcl").
   Qed.
 
@@ -374,7 +374,7 @@ Section union_out.
      list -- which is how a typed line reaches the child's create step *)
   Definition utag (h : list mobs) : iProp Σ :=
     (⌜trace_shape h true⌝ ∗ (⌜lm_disc U h⌝ ∨ UT)
-     ∗ fl_lb (fgn_cl gf) (echof_lines_of h))%I.
+     ∗ fl_lb (fgn_cl gf) (efl_of h))%I.
 
   Global Instance utag_persistent h : Persistent (utag h).
   Proof using . rewrite /utag. apply _. Qed.
@@ -409,8 +409,8 @@ Section union_out.
       iSplitL "Hblk Hcur1 Hrb".
       { rewrite uwa_ext /pext.
         iExists w, 0%nat, gb, [], false. iFrame "Hpera Hcur1 Hrb".
-        rewrite (_ : lm_stream U None _ = []); [iExact "Hblk" | reflexivity]. }
-      rewrite (_ : lm_pcount U [] [] (gs_state U None (gstage0 U)) [] [] = 0%nat);
+        rewrite (_ : lm_stream U ∅ _ = []); [iExact "Hblk" | reflexivity]. }
+      rewrite (_ : lm_pcount U [] [] (gs_state U ∅ (gstage0 U)) [] [] = 0%nat);
         [| reflexivity].
       iFrame "Ht1 Hcs Hps HE Hdl1 Hdll".
       iPureIntro.
@@ -418,9 +418,9 @@ Section union_out.
       cbn [LogEntryDefs.ch_acc LogEntryDefs.ch_log LogEntryDefs.ch_dl
            LogEntryDefs.ch_arm].
       split_and!.
-      - exact (lm_out_pure_0 U None k [] I).
+      - exact (lm_out_pure_0 U ∅ k [] fstate_ok_empty).
       - exact (lm_cs_len_ok_0 U).
-      - exact (lm_ps_len_ok_0 U None).
+      - exact (lm_ps_len_ok_0 U ∅).
       - exact (gin_pure_0 U k).
       - by rewrite /garm_era.
       - rewrite /ch_E. cbn [LogEntryDefs.ch_log LogEntryDefs.ch_arm ch_arm_E].
@@ -451,7 +451,7 @@ Section union_out.
      ∗ pin_map (fgn_echo gf) h
      ∗ f0_map gf h
      ∗ pera_map pg h
-     ∗ fl_auth (fgn_cl gf) (echof_lines_of h)
+     ∗ fl_auth (fgn_cl gf) (efl_of h)
      ∗ (union_phi_res h ∨ UT))%I.
 
   Global Instance union_led_timeless h : Timeless (union_led h).
@@ -467,8 +467,8 @@ Section union_out.
       /f0_map /pera_map.
     iIntros "[[[[Ht Hm] Hfl] Hmf] Hme]".
     rewrite decide_True; [| exact (lm_disc_nil U)].
-    rewrite (_ : echof_lines_of [] = []); last first.
-    { rewrite /echof_lines_of /cycles_of /cycles_rev /=. reflexivity. }
+    rewrite (_ : efl_of [] = []); last first.
+    { rewrite /efl_of /echof_lines_of /cycles_of /cycles_rev /=. reflexivity. }
     iFrame "Ht Hfl".
     iSplitL "Hm"; [iExists ∅; iFrame "Hm"; iPureIntro; apply pin_dom_empty |].
     iSplitL "Hmf"; [iExists ∅; iFrame "Hmf"; iPureIntro; apply pin_dom_empty |].
@@ -491,8 +491,8 @@ Section union_out.
     iIntros "(Ht & Hpm & Hfm & Hme & Hfl & Hphi)". rewrite /union_led.
     rewrite (decide_ext _ (lm_disc U h) 0%nat 1%nat
                (lm_disc_power U h on union_st_ok)).
-    rewrite (_ : echof_lines_of (h ++ [if on then ObsPowerOff else ObsPowerOn])
-                 = echof_lines_of h); [| exact (efl_of_power h on)].
+    rewrite (_ : efl_of (h ++ [if on then ObsPowerOff else ObsPowerOn])
+                 = efl_of h); [| exact (efl_of_power h on)].
     destruct on.
     - iDestruct (pin_map_step (fgn_echo gf) h ObsPowerOff eq_refl with "Hpm") as "Hpm".
       iDestruct (f0_map_step gf h ObsPowerOff eq_refl with "Hfm") as "Hfm".
@@ -517,7 +517,7 @@ Section union_out.
       + iFrame "Ht Hpm Hfm Hme Hfl".
         iDestruct "Hphi" as "[Hphi | HT]"; [| by iRight].
         iLeft. iDestruct "Hphi" as (s0s) "[%Hb _]".
-        iExists (s0s ++ [None]). iSplitR.
+        iExists (s0s ++ [∅]). iSplitR.
         { iPureIntro. intros Hd.
           exact (union_phi_body_on h s0s
                    (Hb (proj1 (lm_disc_power U h false union_st_ok) Hd))). }
@@ -548,7 +548,7 @@ Section union_out.
     iDestruct (pera_map_step pg h (ObsUartOut i b) eq_refl with "Hme") as "Hme".
     rewrite /union_led.
     rewrite (decide_ext _ (lm_disc U h) 0%nat 1%nat (lm_disc_out U h i b Hsh)).
-    rewrite (_ : echof_lines_of (h ++ [ObsUartOut i b]) = echof_lines_of h);
+    rewrite (_ : efl_of (h ++ [ObsUartOut i b]) = efl_of h);
       [| exact (efl_of_out h i b Hsh)].
     iFrame "Ht Hpm Hfm Hme".
     iDestruct "Hphi" as "[Hphi | HT]"; last first.
@@ -565,7 +565,8 @@ Section union_out.
     iDestruct "Hgo" as "[#HT | Hgo]".
     { iModIntro. iFrame "Hfl". by iRight. }
     iDestruct "Hgo" as (s0 vf) "(%Hgo & #Hty & #Hfp & #Hlb)".
-    iDestruct (f0_typed_adm gf (echof_lines_of h) s0 with "Hfl Hty") as "[Hfl %Hadm]".
+    iDestruct (f0_typed_adm gf (echof_lines_of h) s0 (echof_lines_of_names h)
+                 with "Hfl Hty") as "[Hfl %Hadm]".
     iAssert (⌜obs_wire Uart0 (open_seg h) <> [] ->
                exists u1, s0s = u1 ++ [s0]⌝)%I as "%Hlast".
     { destruct (decide (obs_wire Uart0 (open_seg h) = [])) as [Hw | Hw].
@@ -593,8 +594,8 @@ Section union_out.
                  with "Hpm") as "Hpm".
     iDestruct (f0_map_step gf h (ObsUartIn i b) eq_refl with "Hfm") as "Hfm".
     iDestruct (pera_map_step pg h (ObsUartIn i b) eq_refl with "Hme") as "Hme".
-    iMod (fl_auth_grow_pre gf (echof_lines_of h) (echof_lines_of (h ++ [ObsUartIn i b]))
-            (echof_lines_of_snoc h (ObsUartIn i b)) with "Hfl")
+    iMod (fl_auth_grow_pre gf (efl_of h) (efl_of (h ++ [ObsUartIn i b]))
+            (efl_of_snoc h (ObsUartIn i b)) with "Hfl")
       as "[Hfl #Hfllb]".
     assert (Hin : lm_disc U (h ++ [ObsUartIn i b]) -> lm_disc U h).
     { destruct i;

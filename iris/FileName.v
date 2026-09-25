@@ -42,6 +42,7 @@ Require Import FsTree.          (* [fname], [DOT], [DOTDOT] *)
 Require Import FsImgCheck.      (* [fsimg_byte], the pinned names, [fname_f] *)
 Require Import FsConsPin.       (* [fname_console] *)
 Require Import TreeImg.         (* [img_root_ents] *)
+Require FileState FileDisc.     (* the model's class [FileDisc.uname] *)
 From stdpp Require Import ssreflect.
 Local Open Scope Z_scope.
 
@@ -306,3 +307,20 @@ Qed.
    alphanumeric byte *)
 Lemma f_name_one (N : fname) : f_name N -> one_name N.
 Proof using. intros ->. apply one_nameb_spec. vm_compute. reflexivity. Qed.
+
+(* THE MODEL'S CLASS ([FileDisc.uname], cut W1) IS [f_name]: the model
+   spells [f] as [FileState.fname_m], the same byte *)
+Lemma uname_f_name (N : fname) : FileDisc.uname N <-> f_name N.
+Proof using.
+  assert (E : FileState.fname_m = fname_f) by (vm_compute; reflexivity).
+  rewrite /FileDisc.uname /f_name E. reflexivity.
+Qed.
+
+Lemma uname_laws : name_laws FileDisc.uname.
+Proof using.
+  destruct f_laws as [H1 H2 H3 H4]. split.
+  - intros N HN. apply H1, uname_f_name, HN.
+  - intros N HN. apply H2, uname_f_name, HN.
+  - intros N HN. apply H3, uname_f_name, HN.
+  - intros nm z Hnm HN. exact (H4 nm z Hnm (proj1 (uname_f_name nm) HN)).
+Qed.

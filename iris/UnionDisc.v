@@ -29,13 +29,11 @@
 (*  [UPC] one and a [cat f] pipeline no [UPE] one.                        *)
 (*                                                                        *)
 (*  THE ADMISSION [adm] IS A PARAMETER.  [adm_u_g] admits every echo      *)
-(*  pipeline and every [cat f | ..] pipeline at the model's one file name *)
-(*  [fname_f], each filter stage [cat] or [grep w] of one alphanumeric    *)
-(*  word (grep-pipes.md cut G8).  WHETHER OTHER FILE NAMES ARE ADMITTED   *)
-(*  IS AN OPEN OWNER RULING (review S4): the file model has one name, so  *)
-(*  [cat g | cat] at [g <> f] would read a file the model does not        *)
-(*  describe (its content function answers [None] there, which is honest *)
-(*  -- the open fails -- only if no other file exists).                   *)
+(*  pipeline and every [cat g | ..] pipeline at a name [g] of the file    *)
+(*  model's class ([FileDisc.uname], filenames.md), each filter stage     *)
+(*  [cat] or [grep w] of one alphanumeric word (grep-pipes.md cut G8).    *)
+(*  A name outside the class is not admitted (owner ruling: a class of   *)
+(*  user files, never the image's binaries).                             *)
 (*                                                                        *)
 (*  THE LAWS hold at EVERY admission ([ulm_laws]): the pipeline half is   *)
 (*  [PipesDisc.pipes_lm_laws_fc] at the round's content function, whose   *)
@@ -325,7 +323,7 @@ Definition adm_u_g (l : pline') : bool :=
   match l with
   | LEcho' _ => false
   | LPipes (PrEcho _) fs => filts_okb fs
-  | LPipes (PrCatF g) fs => bool_decide (g = fname_f) && filts_okb fs
+  | LPipes (PrCatF g) fs => bool_decide (uname g) && filts_okb fs
   end.
 
 Definition ulmG : lmodel := ulm adm_u_g.
@@ -335,7 +333,7 @@ Lemma adm_u_g_echo (ws : list (list (bv 8))) (fs : list filt) :
 Proof using. intros H. exact (proj2 (filts_okb_true fs) H). Qed.
 
 Lemma adm_u_g_catf (g : list (bv 8)) (fs : list filt) :
-  adm_u_g (LPipes (PrCatF g) fs) = true <-> g = fname_f /\ Forall filt_ok fs.
+  adm_u_g (LPipes (PrCatF g) fs) = true <-> uname g /\ Forall filt_ok fs.
 Proof using.
   cbn [adm_u_g]. rewrite andb_true_iff, bool_decide_eq_true, filts_okb_true. reflexivity.
 Qed.
@@ -357,8 +355,8 @@ Qed.
 (* the round's content function has a word line's shape *)
 Lemma files_of_fc_ok (s : fstate) : fstate_ok s -> fc_ok (files_of s).
 Proof using.
-  intros Hs g c Hg. apply files_of_some in Hg. subst s. cbn [fstate_ok] in Hs.
-  split; [exact (fcont_ok_nodollar c Hs) | exact (fcont_ok_nl c Hs)].
+  intros Hs g c Hg. apply files_of_some in Hg. pose proof (proj2 (Hs g c Hg)) as Hc.
+  split; [exact (fcont_ok_nodollar c Hc) | exact (fcont_ok_nl c Hc)].
 Qed.
 
 Lemma uline_of_u_ok (adm : pline' -> bool) (b : list (bv 8)) :
@@ -420,7 +418,7 @@ Section laws.
     fstate_ok s -> uline_ok l -> uok adm s l a -> fstate_ok (ustep s l a).
   Proof using.
     intros Hs Hl Ha. destruct a as [r | x | x]; cbn [ustep]; [| exact Hs | exact Hs].
-    destruct l as [ws | ws | | p n]; cbn [uok] in Ha;
+    destruct l as [ws | ws N | N | p n]; cbn [uok] in Ha;
       [exact (fstate_ok_fsm s _ r Hs Hl Ha) | exact (fstate_ok_fsm s _ r Hs Hl Ha)
       | exact (fstate_ok_fsm s _ r Hs Hl Ha) | contradiction].
   Qed.
@@ -440,7 +438,7 @@ Section laws.
   Lemma ulm_term_merge s l a :
     fstate_ok s -> uok adm s l a -> uterm a = true -> umerge adm (ucont s l a).
   Proof using.
-    intros Hs Hok Ht. destruct l as [ws | ws | | p n].
+    intros Hs Hok Ht. destruct l as [ws | ws N | N | p n].
     1-3: destruct a as [r | x | x]; cbn [uok uterm] in Hok, Ht;
          first [discriminate Ht | contradiction].
     destruct (uok_pipe _ _ _ _ _ Hok) as (x & -> & Hx).
@@ -466,7 +464,7 @@ Section laws.
                     Forall (fun x => x < length pro_alts) ps ->
                     lm_below_panic u Y ps W -> u = alt_panic).
   Proof using.
-    intros Hs Hl Hok Hp Ht. destruct l as [ws | ws | | p n].
+    intros Hs Hl Hok Hp Ht. destruct l as [ws | ws N | N | p n].
     (* a file alternative at a file line: the file model's law *)
     1-3: destruct a as [r | x | x]; cbn [uok] in Hok; try contradiction;
          exact (lml_cont_shape file_lm_laws s _ r Hs Hl Hok Hp eq_refl).
@@ -484,7 +482,7 @@ Section laws.
     uok adm s l c -> uterm c = true ->
     forall s', exists c', uok adm s' l c' /\ uterm c' = true.
   Proof using.
-    intros Hok Ht s'. destruct l as [ws | ws | | p n].
+    intros Hok Ht s'. destruct l as [ws | ws N | N | p n].
     1-3: destruct c as [r | x | x]; cbn [uok uterm] in Hok, Ht;
          first [discriminate Ht | contradiction].
     destruct (uok_pipe _ _ _ _ _ Hok) as (x & -> & Hx).
@@ -574,7 +572,7 @@ Section hooks.
   (* THE STATE-INDEPENDENCE of the free alternatives *)
   Lemma ufree_ok s s' l a : ufree a = true -> uok adm s l a -> uok adm s' l a.
   Proof using.
-    intros Hfr Hok. destruct l as [ws | ws | | [ws | f] n].
+    intros Hfr Hok. destruct l as [ws | ws N | N | [ws | f] n].
     1-3: destruct a as [r | x | x]; cbn [uok] in Hok |- *; first [exact Hok | contradiction].
     - (* an echo pipeline: its admission reads no state *)
       exact (uok_echo_st adm s s' ws n a Hok).
@@ -604,7 +602,7 @@ Section hooks.
 
   Lemma upan_ok s l : uok adm s l (ualt_dec (upan l)).
   Proof using.
-    destruct l as [ws | ws | | p n]; cbn [upan];
+    destruct l as [ws | ws N | N | p n]; cbn [upan];
       [rewrite ualt_dec_R; exact (fpan_of_ok _) | rewrite ualt_dec_R; exact (fpan_of_ok _)
       | rewrite ualt_dec_R; exact (fpan_of_ok _) |].
     rewrite ualt_dec_code. apply uok_upl. left. left. reflexivity.
@@ -612,7 +610,7 @@ Section hooks.
 
   Lemma upan_free l : ufree (ualt_dec (upan l)) = true.
   Proof using.
-    destruct l as [ws | ws | | p n]; cbn [upan];
+    destruct l as [ws | ws N | N | p n]; cbn [upan];
       [rewrite ualt_dec_R; exact (fpan_of_free _) | rewrite ualt_dec_R; exact (fpan_of_free _)
       | rewrite ualt_dec_R; exact (fpan_of_free _) |].
     rewrite ualt_dec_code. by destruct p.
@@ -620,7 +618,7 @@ Section hooks.
 
   Lemma upan_panic l : upanic (ualt_dec (upan l)) = true.
   Proof using.
-    destruct l as [ws | ws | | p n]; cbn [upan];
+    destruct l as [ws | ws N | N | p n]; cbn [upan];
       [rewrite ualt_dec_R; exact (fpan_of_panic _) | rewrite ualt_dec_R; exact (fpan_of_panic _)
       | rewrite ualt_dec_R; exact (fpan_of_panic _) |].
     rewrite ualt_dec_code, upl_panic. reflexivity.
@@ -628,7 +626,7 @@ Section hooks.
 
   Lemma uexf_ok s l : uok adm s l (ualt_dec (uexf l)).
   Proof using.
-    destruct l as [ws | ws | | p n]; cbn [uexf];
+    destruct l as [ws | ws N | N | p n]; cbn [uexf];
       [rewrite ualt_dec_R; exact (fexf_of_ok _) | rewrite ualt_dec_R; exact (fexf_of_ok _)
       | rewrite ualt_dec_R; exact (fexf_of_ok _) |].
     rewrite ualt_dec_code. apply uok_upl. left. right. right. reflexivity.
@@ -639,7 +637,7 @@ Section hooks.
      no state), [exec cat failed] at a [cat f] pipeline *)
   Lemma uexf_free l : ufree (ualt_dec (uexf l)) = true.
   Proof using.
-    destruct l as [ws | ws | | [ws | f] n]; cbn [uexf];
+    destruct l as [ws | ws N | N | [ws | f] n]; cbn [uexf];
       [rewrite ualt_dec_R; exact (fexf_of_free _) | rewrite ualt_dec_R; exact (fexf_of_free _)
       | rewrite ualt_dec_R; exact (fexf_of_free _) | |];
       rewrite ualt_dec_code; cbn [upl ufree pl_exfb st_dg_exec]; [reflexivity |].
@@ -648,7 +646,7 @@ Section hooks.
 
   Lemma uexf_nopanic l : upanic (ualt_dec (uexf l)) = false.
   Proof using.
-    destruct l as [ws | ws | | p n]; cbn [uexf];
+    destruct l as [ws | ws N | N | p n]; cbn [uexf];
       [rewrite ualt_dec_R; exact (fexf_of_nopanic _) | rewrite ualt_dec_R; exact (fexf_of_nopanic _)
       | rewrite ualt_dec_R; exact (fexf_of_nopanic _) |].
     rewrite ualt_dec_code, upl_panic. reflexivity.
@@ -656,7 +654,7 @@ Section hooks.
 
   Lemma uexf_cont s l : ucont s l (ualt_dec (uexf l)) = uexfb l.
   Proof using.
-    destruct l as [ws | ws | | p n]; cbn [uexf uexfb];
+    destruct l as [ws | ws N | N | p n]; cbn [uexf uexfb];
       [rewrite ualt_dec_R; exact (cont_fexf _ _) | rewrite ualt_dec_R; exact (cont_fexf _ _)
       | rewrite ualt_dec_R; exact (cont_fexf _ _) |].
     rewrite ualt_dec_code, upl_cont. reflexivity.
@@ -664,7 +662,7 @@ Section hooks.
 
   Lemma unoc_ok s l : uok adm s l (ualt_dec (unoc l)).
   Proof using.
-    destruct l as [ws | ws | | p n]; cbn [unoc];
+    destruct l as [ws | ws N | N | p n]; cbn [unoc];
       [rewrite ualt_dec_R; exact (fnoc_of_ok _) | rewrite ualt_dec_R; exact (fnoc_of_ok _)
       | rewrite ualt_dec_R; exact (fnoc_of_ok _) |].
     rewrite ualt_dec_code. apply uok_upl. left. right. left. reflexivity.
@@ -672,7 +670,7 @@ Section hooks.
 
   Lemma unoc_free l : ufree (ualt_dec (unoc l)) = true.
   Proof using.
-    destruct l as [ws | ws | | [ws | f] n]; cbn [unoc];
+    destruct l as [ws | ws N | N | [ws | f] n]; cbn [unoc];
       [rewrite ualt_dec_R; exact (fnoc_of_free _) | rewrite ualt_dec_R; exact (fnoc_of_free _)
       | rewrite ualt_dec_R; exact (fnoc_of_free _) | |];
       rewrite ualt_dec_code; cbn [upl ufree]; [reflexivity |].
@@ -681,7 +679,7 @@ Section hooks.
 
   Lemma unoc_nopanic l : upanic (ualt_dec (unoc l)) = false.
   Proof using.
-    destruct l as [ws | ws | | p n]; cbn [unoc];
+    destruct l as [ws | ws N | N | p n]; cbn [unoc];
       [rewrite ualt_dec_R; exact (fnoc_of_nopanic _) | rewrite ualt_dec_R; exact (fnoc_of_nopanic _)
       | rewrite ualt_dec_R; exact (fnoc_of_nopanic _) |].
     rewrite ualt_dec_code, upl_panic. reflexivity.
@@ -689,7 +687,7 @@ Section hooks.
 
   Lemma unoc_cont s l : ucont s l (ualt_dec (unoc l)) = u_prompt.
   Proof using.
-    destruct l as [ws | ws | | p n]; cbn [unoc];
+    destruct l as [ws | ws N | N | p n]; cbn [unoc];
       [rewrite ualt_dec_R; exact (cont_fnoc _ _) | rewrite ualt_dec_R; exact (cont_fnoc _ _)
       | rewrite ualt_dec_R; exact (cont_fnoc _ _) |].
     rewrite ualt_dec_code, upl_cont. reflexivity.
@@ -699,7 +697,7 @@ Section hooks.
     uok adm s l a -> upanic a = false -> uterm a = false ->
     exists u, ucont s l a = u ++ u_prompt.
   Proof using.
-    intros Hok Hp Ht. destruct l as [ws | ws | | p n].
+    intros Hok Hp Ht. destruct l as [ws | ws N | N | p n].
     1-3: destruct a as [r | x | x]; cbn [uok] in Hok; try contradiction;
          exact (cont_prompt s _ r Hok Hp).
     destruct (uok_pipe _ _ _ _ _ Hok) as (x & -> & _).
@@ -712,14 +710,14 @@ Section hooks.
   Proof using.
     intros Ha. destruct a as [r | x | x].
     { apply (cont_nonnil_dec s l r). destruct Ha as [Hok | Hq].
-      - left. destruct l as [ws | ws | | p n]; cbn [uok] in Hok;
+      - left. destruct l as [ws | ws N | N | p n]; cbn [uok] in Hok;
           [exact Hok | exact Hok | exact Hok | contradiction].
       - right. rewrite ualt_dec_0 in Hq. injection Hq as ->. reflexivity. }
     (* a pipeline alternative: the panic line and a block before the
        prompt are never empty, and a terminal one is nonempty by the
        range condition (it is not the out-of-range decode) *)
     all: destruct Ha as [Hok | Hq]; [| rewrite ualt_dec_0 in Hq; discriminate Hq].
-    all: destruct l as [ws | ws | | p n]; try (cbn [uok] in Hok; contradiction).
+    all: destruct l as [ws | ws N | N | p n]; try (cbn [uok] in Hok; contradiction).
     all: destruct (uok_pipe _ _ _ _ _ Hok) as (x' & Hx' & Hx).
     all: destruct p; cbn [upl] in Hx'; try discriminate Hx'; injection Hx' as <-.
     all: cbn [ucont]; destruct x as [| b | b]; cbn [plcont].

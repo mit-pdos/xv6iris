@@ -100,12 +100,8 @@ Import Defs.
 (*  0.  THE NAME CLASS (seam (c)) AND THE REGISTRY                        *)
 (* ===================================================================== *)
 
-(* the user files a line may name: the one name `f` for now
-   (claude-notes/design/filenames.md, W0 widens it) *)
-Definition uname (nm : list (bv 8)) : Prop := nm = fname_f.
-
-Global Instance uname_dec nm : Decision (uname nm).
-Proof using . unfold uname. apply _. Defined.
+(* the user files a line may name: the model's class [FileDisc.uname]
+   (claude-notes/design/filenames.md) *)
 
 Inductive cfdev :=
   | UDIn (s : bool) (nm : list (bv 8)) (i : Z) (γo : gname)

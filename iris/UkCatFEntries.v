@@ -139,8 +139,8 @@ Section UkCatFEntries.
     iIntros "#Hnpw #Hdep".
     set (wv := fun _ : nat => UDProd pn gp w A X).
     set (kds := [(0%nat, UDProd pn gp w A X)]).
-    set (files := files_of (snd <$> sf)).
-    assert (Hfs : files fname_f = snd <$> sf) by exact (files_of_f _).
+    set (files := files_of (dst_content sf)).
+    assert (Hfs : files fname_f = snd <$> sf) by exact (dst_content_f sf).
     assert (Hc : conforms (catp_env (DProd [L; []] xs ds) files [fname_f])
                    (cat_tree (prod_words (PrCatF fname_f)))).
     { change (cat_tree (prod_words (PrCatF fname_f))) with (cat_tree [sb "cat"; fname_f]).

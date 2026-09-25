@@ -552,10 +552,10 @@ Proof.
   intro Hok.
   assert (Hval : bv_unsigned (FileDisc.line_bytes lu !!! 0%nat) = 101%Z
                  \/ bv_unsigned (FileDisc.line_bytes lu !!! 0%nat) = 99%Z).
-  { destruct lu as [ws | ws | | ws npc]; cbn [FileDisc.uline_ok] in Hok.
+  { destruct lu as [ws | ws Nf | Nf | ws npc]; cbn [FileDisc.uline_ok] in Hok.
     - left. rewrite FileDisc.line_bytes_echo.
       exact (line_ok_head_byte0 ws Hok).
-    - left.
+    - left. pose proof (proj1 (proj2 Hok)) as Hu. rewrite /FileDisc.uname in Hu. subst Nf.
       pose proof (ush_wl_body_pos ws (proj1 Hok)) as Hwb.
       rewrite FileDisc.line_bytes_body. cbn [FileDisc.line_body].
       rewrite (wl_lta_app_l (wl_body ws ++ FileDisc.suf_gtf) [wl_nl] 0%nat
@@ -564,7 +564,8 @@ Proof.
       pose proof (line_ok_head_byte0 ws (proj1 Hok)) as Hh.
       rewrite /wl_line (wl_lta_app_l (wl_body ws) [wl_nl] 0%nat Hwb) in Hh.
       exact Hh.
-    - right. rewrite FileDisc.line_bytes_body. cbn [FileDisc.line_body].
+    - right. rewrite /FileDisc.uname in Hok. subst Nf.
+      rewrite FileDisc.line_bytes_body. cbn [FileDisc.line_body].
       rewrite (wl_lta_app_l FileDisc.cmd_cat_f [wl_nl] 0%nat
                  ltac:(rewrite FileDisc.cmd_cat_f_len; lia)).
       by vm_compute.

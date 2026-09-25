@@ -53,7 +53,7 @@ Section file_links.
     file_taint (fgn_cl g) -∗ (file_taint (fgn_cl g) -∗ Φ) -∗
     out_link Uart0 k b Φ.
   Proof using Hcons.
-    exact (gwrite_link_taint file_lm (file_cparams g) None (file_wa g) Hcons k b Φ).
+    exact (gwrite_link_taint file_lm (file_cparams g) ∅ (file_wa g) Hcons k b Φ).
   Qed.
 
   (* (W) THE WRITE LINK, INSIDE A BLOCK -- [EchoOut.echo_write_link] with
@@ -74,7 +74,7 @@ Section file_links.
     intros Hn Hpin0 Hb.
     iIntros "#Hpin #Hfp Ht #Hpslb #Hcslb #Hilb #Hf0lb HΦ".
     rewrite proc_stream_f_lm in Hb.
-    iApply (gwrite_link file_lm (file_cparams g) None (file_wa g) Hcons k v P b ps0 cs0 s0 I0 Φ
+    iApply (gwrite_link file_lm (file_cparams g) ∅ (file_wa g) Hcons k v P b ps0 cs0 s0 I0 Φ
               Hn (proj1 (pro_pin_f_lm _ _ _) Hpin0) Hb
               with "Hpin Ht Hpslb Hcslb Hilb [] [HΦ]").
     { iExists vf. iFrame "Hfp Hf0lb". }
@@ -108,7 +108,7 @@ Section file_links.
     intros Hne0 Hr0 Hdiv Hpin0 HPeq Halt Hhead.
     iIntros "#Hpin #Hfp Ht #Hpslb #Hcslb #Hilb #Hf0lb HΦ".
     rewrite proc_before_f_lm in HPeq. rewrite fstate_upto_lm in Hhead.
-    iApply (gwrite_link_blk file_lm (file_cparams g) file_lm_byte_laws None (file_wa g) Hcons k v P a b ps0 cs0 s0 I0 Φ
+    iApply (gwrite_link_blk file_lm (file_cparams g) file_lm_byte_laws ∅ (file_wa g) Hcons k v P a b ps0 cs0 s0 I0 Φ
               Hne0 Hr0 Hdiv (proj1 (pro_pin_f_lm _ _ _) Hpin0) HPeq Halt eq_refl Hhead
               with "Hpin Ht Hpslb Hcslb Hilb [] [HΦ]").
     { iExists vf. iFrame "Hfp Hf0lb". }

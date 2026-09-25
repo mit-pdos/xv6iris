@@ -103,7 +103,7 @@ Section union_link_inst_at.
   Lemma union_links_gl_at (s0 : fstate) : union_links ug -∗ glinks U (union_params_at s0).
   Proof using .
     iIntros "Hlk". iDestruct (union_links_eq with "Hlk") as %Hc.
-    iApply (peclV_glinks (ugn_pipe ug) U (ucparams ug) (ulm_byte_laws adm_u_g) None
+    iApply (peclV_glinks (ugn_pipe ug) U (ucparams ug) (ulm_byte_laws adm_u_g) ∅
               (uwa ug) Hc (union_params_at s0) eq_refl eq_refl (f0w_at_cw gf s0)
               (or_introl I) (fhead_at_boot gf s0)).
   Qed.

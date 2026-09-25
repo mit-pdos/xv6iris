@@ -129,7 +129,7 @@ Proof using.
     - exists (uline_of J). destruct (fbody_ok_line J Hf) as [Hok HJ].
       split; [| split; [exact Hok | split; [exact HJ | exact (uline_ws_words J Hf)]]].
       pose proof (uline_of_nopipe J) as Hnp. rewrite /ush_line_union.
-      destruct (uline_of J) as [ws | ws | | p n] eqn:He; try exact Logic.I.
+      destruct (uline_of J) as [ws | ws Nf | Nf | p n] eqn:He; try exact Logic.I.
       exfalso. exact (Hnp p n eq_refl).
     - destruct Hlast as [Hf | Hp]; [contradiction |].
       revert Hp. rewrite /upipe_ok.

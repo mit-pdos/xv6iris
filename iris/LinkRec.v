@@ -93,7 +93,7 @@ Section linkrec.
     (* THE SHELL'S OWN TWO ALTERNATIVES ARE PER-LINE (lane LINK-GEN-2).
        At the echo application there is one line shape and the fork panic
        is the constant 3; [FileDisc.ralt_ok] admits [RFFork] only at an
-       [LEchoF] line, [RCFork] only at an [LCat] one and [REcho 3] only at
+       [LEchoF] line, [RCFork] only at an [LCat_f] one and [REcho 3] only at
        an [LEcho] one.  The panic's BYTES are uniform ([alt_panic] at all
        three); the exec-failed child's are NOT -- sh prints
        "exec %s failed" with the command name -- hence [lk_exfb]. *)

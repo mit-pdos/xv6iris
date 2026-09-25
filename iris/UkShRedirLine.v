@@ -243,7 +243,7 @@ Qed.
 (* [UkSh.ush_rest_line_at]'s payload says the buffer at [k] holds the     *)
 (* bytes of an admissible line of [FileDisc.uline].  At [LEcho ws] that IS *)
 (* [UkSh.ush_line_is] ([UkSh.ush_line_at_echo], by conversion); at         *)
-(* [LEchoF ws] it is the redirect shape at the model's own file name, and  *)
+(* [LEchoF_f ws] it is the redirect shape at the model's own file name, and  *)
 (* this section is that one step.  It lives HERE, below [UkShFork], because *)
 (* that is where the command loop's three-way case needs it -- the         *)
 (* TOKENS ([UShLexRedir]) are a file above and are not needed to know       *)
@@ -273,13 +273,13 @@ Proof using. apply bv_eq; vm_compute; reflexivity. Qed.
 (* THE BRIDGE: the typed line, read positionally. *)
 Lemma ushs_line_is_of_at (ws : list (list (bv 8))) (f : nat -> bv 8)
     (k len : nat) :
-  UkSh.ush_line_at (LEchoF ws) f k len ->
+  UkSh.ush_line_at (LEchoF_f ws) f k len ->
   ushs_line_is ws fname_f f k len.
 Proof using.
   intros (Hok & Hlen & Hby).
   destruct Hok as [ Hok _ ].
   (* the line's bytes are [wl_body ws ++ suf_gtf] and then the newline *)
-  assert (Hlb : length (line_bytes (LEchoF ws))
+  assert (Hlb : length (line_bytes (LEchoF_f ws))
                 = (length (wl_body ws) + 4 + 1)%nat).
   { unfold line_bytes, line_body.
     rewrite length_app. rewrite length_app. rewrite suf_gtf_len.

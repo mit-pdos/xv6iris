@@ -728,7 +728,7 @@ Section file_links_line.
   Definition flw (I : list (bv 8)) : iProp Σ :=
     (⌜echof_lines_in I = []⌝
      ∨ ∃ ls : list (list (list (bv 8))),
-         fl_lb (fgn_cl g) ls ∗ ⌜forall w, w ∈ echof_lines_in I -> w ∈ ls⌝)%I.
+         fl_lb (fgn_cl g) ls ∗ ⌜forall w, w ∈ echof_lines_in I -> w.2 ∈ ls⌝)%I.
 
   Global Instance flw_persistent I : Persistent (flw I).
   Proof using . rewrite /flw. apply _. Qed.

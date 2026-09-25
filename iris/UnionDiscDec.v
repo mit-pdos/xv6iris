@@ -5,8 +5,8 @@
 (*  [uok_dec] decides [UnionDisc.uok] at every admission, state, line and *)
 (*  alternative (the pipeline half is [PipesDiscDec.plalt_ok_dec] at the  *)
 (*  round's content function).  The demos:                                *)
-(*    - [cat f | cat | cat] prints [f]'s content at [Some c], and cat's   *)
-(*      open diagnostic at [None];                                        *)
+(*    - [cat f | cat | cat] prints [f]'s content at a state holding it,   *)
+(*      and cat's open diagnostic at the empty state;                     *)
 (*    - [echo x > f] then [cat f | cat]: the state the first round leaves *)
 (*      is what the second prints, through the model's own [lm_upto];    *)
 (*    - NEGATIVE (amendment B2): the file's [RCRan] is not admitted at    *)
@@ -29,7 +29,7 @@
 (*  and [ulmG_hooks] at the union application's.                          *)
 (* ===================================================================== *)
 From Stdlib Require Import ZArith Lia List String.
-From stdpp Require Import list countable bitvector.definitions.
+From stdpp Require Import gmap list countable bitvector.definitions.
 Require Import RiscvLang ObsTrace.
 Require Import LineWords EchoDisc LineBytes LineModel LineModelLinks.
 Require Import StringBytes ProgTree ProgTreePipes PipesPair PipesDisc PipesDiscDec.
@@ -45,7 +45,7 @@ Local Open Scope nat_scope.
 (* ===================================================================== *)
 
 Global Instance uok_dec adm s l a : Decision (uok adm s l a).
-Proof using. destruct l as [ws | ws | | [ws | f] n], a as [r | x | x]; cbn [uok]; apply _. Defined.
+Proof using. destruct l as [ws | ws N | N | [ws | f] n], a as [r | x | x]; cbn [uok]; apply _. Defined.
 
 Global Instance ulm_ok_dec adm s l a : Decision (lm_ok (ulm adm) s l a) := uok_dec adm s l a.
 
@@ -55,10 +55,10 @@ Global Instance ulm_ok_dec adm s l a : Decision (lm_ok (ulm adm) s l a) := uok_d
 (*  Free: the file's state-free alternatives, every non-terminal echo-    *)
 (*  pipeline alternative, and at a [cat f] pipeline the panic, the silent *)
 (*  round and [exec cat failed] ([UnionDisc.ufree]).  The boot state      *)
-(*  [lmh_st0] is the file's, [None].                                      *)
+(*  [lmh_st0] is the file's, the empty map.                                      *)
 (* ===================================================================== *)
 Definition ulm_hooks (adm : pline' -> bool) : lm_hooks (ulm adm) :=
-  MkLMH (ulm adm) ufree None upan uexf uexfb unoc (ulm_ok_dec adm)
+  MkLMH (ulm adm) ufree ∅ upan uexf uexfb unoc (ulm_ok_dec adm)
     ufree_cont ufree_term (ufree_ok adm)
     (upan_ok adm) upan_free upan_panic
     (uexf_ok adm) uexf_free uexf_nopanic uexf_cont
@@ -93,25 +93,25 @@ Example demo_parse_cf2 :
   uline_of_u (sb "cat f | cat | cat") = l_cf2 /\ ubody_ok adm_u_g (sb "cat f | cat | cat").
 Proof using. split; [vm_compute; reflexivity | dec_yes]. Qed.
 
-(* at [Some c]: the content, then the prompt *)
+(* at a state holding [c]: the content, then the prompt *)
 Example demo_cf2_some :
-  lm_ok ulmG (Some c_hi) l_cf2 (UPC (PLRun c_hi))
-  /\ lm_cont ulmG (Some c_hi) l_cf2 (UPC (PLRun c_hi)) = c_hi ++ u_prompt.
+  lm_ok ulmG {[fname_f := c_hi]} l_cf2 (UPC (PLRun c_hi))
+  /\ lm_cont ulmG {[fname_f := c_hi]} l_cf2 (UPC (PLRun c_hi)) = c_hi ++ u_prompt.
 Proof using. split; [cbn [ulmG ulm lm_ok]; dec_yes | reflexivity]. Qed.
 
 (* ...and not someone else's *)
-Example demo_cf2_some_neg : ~ uok adm_u_g (Some c_hi) l_cf2 (UPC (PLRun (sb "bye" ++ nl1))).
+Example demo_cf2_some_neg : ~ uok adm_u_g {[fname_f := c_hi]} l_cf2 (UPC (PLRun (sb "bye" ++ nl1))).
 Proof using. dec_no. Qed.
 
-(* at [None]: cat's open diagnostic *)
+(* at the empty map: cat's open diagnostic *)
 Example demo_cf2_none :
-  lm_ok ulmG None l_cf2 (UPC (PLRun (cat_dg_open fname_f)))
-  /\ lm_cont ulmG None l_cf2 (UPC (PLRun (cat_dg_open fname_f)))
+  lm_ok ulmG ∅ l_cf2 (UPC (PLRun (cat_dg_open fname_f)))
+  /\ lm_cont ulmG ∅ l_cf2 (UPC (PLRun (cat_dg_open fname_f)))
      = sb "cat: cannot open f" ++ nl1 ++ u_prompt.
 Proof using. split; [cbn [ulmG ulm lm_ok]; dec_yes | vm_compute; reflexivity]. Qed.
 
-(* ...and at [None] no content *)
-Example demo_cf2_none_neg : ~ uok adm_u_g None l_cf2 (UPC (PLRun c_hi)).
+(* ...and at the empty map no content *)
+Example demo_cf2_none_neg : ~ uok adm_u_g ∅ l_cf2 (UPC (PLRun c_hi)).
 Proof using. dec_no. Qed.
 
 (* ---- echo x > f, then cat f | cat: the state threaded ---- *)
@@ -128,7 +128,7 @@ Definition cs_thr : list nat := [ualt_code a_thr1; ualt_code a_thr2].
 Lemma thr_bodies : bodies_of I_thr = [b_thr1; b_thr2].
 Proof using. vm_compute. reflexivity. Qed.
 
-Lemma thr_line1 : uline_of_u b_thr1 = LEchoF ws_x.
+Lemma thr_line1 : uline_of_u b_thr1 = LEchoF ws_x fname_f.
 Proof using. vm_compute. reflexivity. Qed.
 
 Lemma thr_line2 : uline_of_u b_thr2 = LPipe (PrCatF fname_f) (cats 1).
@@ -147,7 +147,7 @@ Proof using.
 Qed.
 
 (* the first round leaves [f] holding [x] *)
-Example demo_thread_upto : lm_upto ulmG cs_thr None (bodies_of I_thr) 1 = Some x_nl.
+Example demo_thread_upto : lm_upto ulmG cs_thr ∅ (bodies_of I_thr) 1 = {[fname_f := x_nl]}.
 Proof using.
   cbn [lm_upto]. rewrite thr_at0 thr_bodies.
   change ([b_thr1; b_thr2] !!! 0) with b_thr1.
@@ -155,7 +155,7 @@ Proof using.
 Qed.
 
 (* both rounds are in range, each at the state ITS round starts in *)
-Example demo_thread_ok : lm_alts_ok ulmG None I_thr cs_thr.
+Example demo_thread_ok : lm_alts_ok ulmG ∅ I_thr cs_thr.
 Proof using.
   split; [rewrite /nlines thr_bodies; reflexivity |].
   intros i Hi. rewrite /nlines thr_bodies in Hi. cbn [length] in Hi.
@@ -170,7 +170,7 @@ Qed.
 
 (* ...and the second round prints what the first wrote *)
 Example demo_thread_cont :
-  lm_cont ulmG (lm_upto ulmG cs_thr None (bodies_of I_thr) 1)
+  lm_cont ulmG (lm_upto ulmG cs_thr ∅ (bodies_of I_thr) 1)
     (lm_of ulmG (bodies_of I_thr !!! 1)) (lm_at ulmG cs_thr 1) = x_nl ++ u_prompt.
 Proof using. rewrite thr_at1. reflexivity. Qed.
 
@@ -178,10 +178,10 @@ Proof using. rewrite thr_at1. reflexivity. Qed.
 Definition l_hi1 : uline := LPipe (PrEcho [cmd_echo; sb "hi"]) (cats 1).
 
 (* the dead arm of [FileDisc.ralt_ok] admits [RCRan] here, and [RCRan]'s
-   continuation at [Some c] is the file's content ... *)
+   continuation at a state holding [c] is the file content ... *)
 Example demo_B2_deadarm :
-  ralt_ok l_hi1 RCRan /\ cont (Some c_hi) l_hi1 RCRan = c_hi ++ u_prompt.
-Proof using. split; [exact I | reflexivity]. Qed.
+  ralt_ok l_hi1 RCRan /\ cont {[fname_f := c_hi]} l_hi1 RCRan = c_hi ++ u_prompt.
+Proof using. split; [exact I | vm_compute; reflexivity]. Qed.
 
 (* ... which the union does NOT admit, at any state *)
 Example demo_B2_neg : forall s, ~ lm_ok ulmG s l_hi1 (UR RCRan).
@@ -192,16 +192,16 @@ Definition l_cf1 : uline := LPipe (PrCatF fname_f) (cats 1).
 Definition corner_blk : list (bv 8) := sb "h" ++ cat_dg_write.
 
 (* at [cat f | cat] the producer's write error beside a printed prefix *)
-Example demo_S3_corner : uok adm_u_g (Some c_hi) l_cf1 (UPC (PLRun corner_blk)).
+Example demo_S3_corner : uok adm_u_g {[fname_f := c_hi]} l_cf1 (UPC (PLRun corner_blk)).
 Proof using. dec_yes. Qed.
 
 (* ... and beside the whole content *)
 Example demo_S3_corner_full :
-  uok adm_u_g (Some c_hi) l_cf1 (UPC (PLRun (c_hi ++ cat_dg_write))).
+  uok adm_u_g {[fname_f := c_hi]} l_cf1 (UPC (PLRun (c_hi ++ cat_dg_write))).
 Proof using. dec_yes. Qed.
 
 (* ... while at [echo hi | cat] (echo's halt is silent) it is not *)
-Example demo_S3_echo_neg : ~ uok adm_u_g (Some c_hi) l_hi1 (UPE (PLRun corner_blk)).
+Example demo_S3_echo_neg : ~ uok adm_u_g {[fname_f := c_hi]} l_hi1 (UPE (PLRun corner_blk)).
 Proof using. dec_no. Qed.
 
 (* ---- THE ADMISSION: [cat g] at another name is not admitted ---- *)
@@ -229,8 +229,8 @@ Definition c_foo : list (bv 8) := sb "foo" ++ nl1.
 
 Example demo_grep_pass :
   uline_of_u (sb "echo foo | grep o | cat") = l_eg_o
-  /\ lm_ok ulmG None l_eg_o (UPE (PLRun c_foo))
-  /\ lm_cont ulmG None l_eg_o (UPE (PLRun c_foo)) = c_foo ++ u_prompt.
+  /\ lm_ok ulmG ∅ l_eg_o (UPE (PLRun c_foo))
+  /\ lm_cont ulmG ∅ l_eg_o (UPE (PLRun c_foo)) = c_foo ++ u_prompt.
 Proof using. split_and!; [vm_compute; reflexivity | cbn [ulmG ulm lm_ok]; dec_yes | reflexivity]. Qed.
 
 (* echo foo | grep z | cat: the gate is shut, the round prints nothing
@@ -239,15 +239,15 @@ Definition l_eg_z : uline := LPipe (PrEcho [cmd_echo; sb "foo"]) [FGrep (sb "z")
 
 Example demo_grep_block :
   uline_of_u (sb "echo foo | grep z | cat") = l_eg_z
-  /\ lm_ok ulmG None l_eg_z (UPE (PLRun []))
-  /\ lm_cont ulmG None l_eg_z (UPE (PLRun [])) = u_prompt.
+  /\ lm_ok ulmG ∅ l_eg_z (UPE (PLRun []))
+  /\ lm_cont ulmG ∅ l_eg_z (UPE (PLRun [])) = u_prompt.
 Proof using. split_and!; [vm_compute; reflexivity | cbn [ulmG ulm lm_ok]; dec_yes | reflexivity]. Qed.
 
 (* ... and never the line *)
 Example demo_grep_block_neg : forall s, ~ lm_ok ulmG s l_eg_z (UPE (PLRun c_foo)).
 Proof using.
-  enough (Hn : ~ uok adm_u_g None l_eg_z (UPE (PLRun c_foo)))
-    by (intros s H; apply Hn; exact (uok_echo_st adm_u_g s None _ _ _ H)).
+  enough (Hn : ~ uok adm_u_g ∅ l_eg_z (UPE (PLRun c_foo)))
+    by (intros s H; apply Hn; exact (uok_echo_st adm_u_g s ∅ _ _ _ H)).
   dec_no.
 Qed.
 
@@ -258,10 +258,10 @@ Definition c_box : list (bv 8) := sb "box" ++ nl1.
 
 Example demo_grep_catf :
   uline_of_u (sb "cat f | grep x | cat") = l_cg_x
-  /\ lm_ok ulmG (Some c_box) l_cg_x (UPC (PLRun c_box))
-  /\ lm_cont ulmG (Some c_box) l_cg_x (UPC (PLRun c_box)) = c_box ++ u_prompt
-  /\ ~ lm_ok ulmG (Some c_hi) l_cg_x (UPC (PLRun c_hi))
-  /\ lm_ok ulmG (Some c_hi) l_cg_x (UPC (PLRun [])).
+  /\ lm_ok ulmG {[fname_f := c_box]} l_cg_x (UPC (PLRun c_box))
+  /\ lm_cont ulmG {[fname_f := c_box]} l_cg_x (UPC (PLRun c_box)) = c_box ++ u_prompt
+  /\ ~ lm_ok ulmG {[fname_f := c_hi]} l_cg_x (UPC (PLRun c_hi))
+  /\ lm_ok ulmG {[fname_f := c_hi]} l_cg_x (UPC (PLRun [])).
 Proof using.
   split_and!; [vm_compute; reflexivity | cbn [ulmG ulm lm_ok]; dec_yes | reflexivity
               | cbn [ulmG ulm lm_ok]; dec_no | cbn [ulmG ulm lm_ok]; dec_yes].
@@ -276,11 +276,12 @@ Proof using. intros s x. split; intros H; exact H. Qed.
 (* [exec echo failed] is a content [f] may hold ([echo exec echo failed >
    f]); at [cat f | cat] the last cat then prints it *)
 Example demo_execL_state_dep :
-  fstate_ok (Some PipeDisc.dg_execL)
-  /\ uok adm_u_g (Some PipeDisc.dg_execL) l_cf1 (UPC (PLRun PipeDisc.dg_execL))
-  /\ ~ uok adm_u_g None l_cf1 (UPC (PLRun PipeDisc.dg_execL)).
+  fstate_ok {[fname_f := PipeDisc.dg_execL]}
+  /\ uok adm_u_g {[fname_f := PipeDisc.dg_execL]} l_cf1 (UPC (PLRun PipeDisc.dg_execL))
+  /\ ~ uok adm_u_g ∅ l_cf1 (UPC (PLRun PipeDisc.dg_execL)).
 Proof using.
   split_and!; [| dec_yes | dec_no].
+  rewrite /fstate_ok map_Forall_singleton. split; [reflexivity |].
   right. exists (sb "exec echo failed"). split; [| vm_compute; reflexivity].
   apply (bool_decide_unpack _). vm_compute. exact I.
 Qed.

@@ -238,21 +238,23 @@ Proof using.
   pose proof (w_filts_bar fs Hn) as Hbar.
   assert (Hin : FileDisc.fd_w_bar ∈ wl_words (FileDisc.line_body l)).
   { rewrite Hw. cbn [FileDisc.uline_ws]. apply elem_of_app. right. exact Hbar. }
-  destruct l as [ws' | ws' | | ws' fs'].
+  destruct l as [ws' | ws' N' | N' | ws' fs'].
   - (* LEcho: its words are alphanumeric, and the bar is not *)
     exfalso. cbn [FileDisc.line_body] in Hin.
     rewrite (wl_words_body ws' (line_ok_wf _ Hok)) in Hin.
     exact (proj1 (Forall_forall _ _) (line_ok_no_bar ws' Hok) _ Hin eq_refl).
   - (* LEchoF: the command's words, `>' and [f] *)
-    exfalso. destruct Hok as [Hok' _].
-    rewrite (FileDisc.uline_ws_gtf ws' Hok') in Hin. cbn [FileDisc.uline_ws] in Hin.
+    exfalso. destruct Hok as (Hok' & Hu' & _).
+    rewrite /FileDisc.uname in Hu'. subst N'.
+    rewrite (FileDisc.uline_ws_gtf ws' FileDisc.fname_f Hok' eq_refl) in Hin.
+    cbn [FileDisc.uline_ws] in Hin.
     apply elem_of_app in Hin as [Hin | Hin].
     + exact (proj1 (Forall_forall _ _) (line_ok_no_bar ws' Hok') _ Hin eq_refl).
     + assert (Hn' : FileDisc.fd_w_bar ∉ [FileDisc.fd_w_gt; FileDisc.fname_f])
         by (apply (bool_decide_unpack _); vm_compute; exact I).
       exact (Hn' Hin).
   - (* LCat: [cat] and [f] *)
-    exfalso.
+    exfalso. rewrite /FileDisc.uline_ok /FileDisc.uname in Hok. subst N'.
     assert (Hn' : FileDisc.fd_w_bar ∉ wl_words FileDisc.cmd_cat_f)
       by (apply (bool_decide_unpack _); vm_compute; exact I).
     exact (Hn' Hin).

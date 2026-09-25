@@ -37,11 +37,11 @@ Definition fline (I : list (bv 8)) : uline :=
    redirect lines -- which is what turns the read's witness
    ([flw]: every [echof_lines_in I] word list is in the claim's ledger)
    into the [ws ∈ ls] the open and the write credential ask for. *)
-Lemma fline_echof_in (I : list (bv 8)) (ws : list (list (bv 8))) :
-  (0 < nlines I)%nat -> fline I = LEchoF ws -> ws ∈ echof_lines_in I.
+Lemma fline_echof_in (I : list (bv 8)) (ws : list (list (bv 8))) (N : list (bv 8)) :
+  (0 < nlines I)%nat -> fline I = LEchoF ws N -> (N, ws) ∈ echof_lines_in I.
 Proof using.
   intros Hp Hf. rewrite /echof_lines_in. apply elem_of_list_omap.
-  exists (LEchoF ws). split; [ | reflexivity ].
+  exists (LEchoF ws N). split; [ | reflexivity ].
   rewrite /lines_of -Hf /fline. apply elem_of_list_fmap.
   eexists. split; [ reflexivity | ].
   apply elem_of_list_lookup. exists (nlines I - 1)%nat.
@@ -63,7 +63,7 @@ Proof using. destruct a; cbn [fstate_free]; try discriminate; reflexivity. Qed.
    and state-free -- which is what makes the block-byte step premise-free. *)
 Definition fab (I : list (bv 8)) (a : nat) : list (bv 8) :=
   if decide (ralt_ok (fline I) (ralt_dec a) /\ fstate_free (ralt_dec a) = true)
-  then cont None (fline I) (ralt_dec a) else [].
+  then cont ∅ (fline I) (ralt_dec a) else [].
 
 (* THE RECORD'S [lk_apr]: the alternative ends with the shell's prompt,
    i.e. it is admissible, state-free and does NOT reopen the prologue. *)
@@ -86,8 +86,8 @@ Definition fapr (I : list (bv 8)) (a : nat) : Prop :=
 Definition fpan_of (l : uline) : nat :=
   match l with
   | LEcho _ => 3%nat
-  | LEchoF _ => ralt_enc RFFork
-  | LCat => ralt_enc RCFork
+  | LEchoF _ _ => ralt_enc RFFork
+  | LCat _ => ralt_enc RCFork
   (* the DEAD arm: [FileDisc.ralt_ok] gives [LPipe] exactly [LCat]'s five,
      so all four of this file's per-line choices are [LCat]'s verbatim *)
   | LPipe _ _ => ralt_enc RCFork
@@ -96,8 +96,8 @@ Definition fpan_of (l : uline) : nat :=
 Definition fexf_of (l : uline) : nat :=
   match l with
   | LEcho _ => 1%nat
-  | LEchoF _ => ralt_enc RFExec
-  | LCat => ralt_enc RCExec
+  | LEchoF _ _ => ralt_enc RFExec
+  | LCat _ => ralt_enc RCExec
   | LPipe _ _ => ralt_enc RCExec
   end.
 
@@ -105,8 +105,8 @@ Definition fexf_of (l : uline) : nat :=
 Definition fexfb (l : uline) : list (bv 8) :=
   match l with
   | LEcho _ => alt_execfail
-  | LEchoF _ => alt_execfail
-  | LCat => alt_execcat
+  | LEchoF _ _ => alt_execfail
+  | LCat _ => alt_execcat
   | LPipe _ _ => alt_execcat
   end.
 
@@ -159,7 +159,7 @@ Definition faprs (I : list (bv 8)) (a : nat) : Prop :=
 (* ---- the two PER-LINE alternatives, and the "nobody chose" one ---- *)
 Lemma fpan_of_ok (l : uline) : ralt_ok l (ralt_dec (fpan_of l)).
 Proof using.
-  destruct l as [ws | ws | | ws npc]; cbn [fpan_of].
+  destruct l as [ws | ws N | N | ws npc]; cbn [fpan_of].
   - rewrite (ralt_dec_lt4 3%nat ltac:(lia)) /ralt_ok. lia.
   - by rewrite (ralt_dec_enc RFFork).
   - by rewrite (ralt_dec_enc RCFork).
@@ -168,7 +168,7 @@ Qed.
 
 Lemma fpan_of_free (l : uline) : fstate_free (ralt_dec (fpan_of l)) = true.
 Proof using.
-  destruct l as [ws | ws | | ws npc]; cbn [fpan_of].
+  destruct l as [ws | ws N | N | ws npc]; cbn [fpan_of].
   - by rewrite (ralt_dec_lt4 3%nat ltac:(lia)).
   - by rewrite (ralt_dec_enc RFFork).
   - by rewrite (ralt_dec_enc RCFork).
@@ -177,7 +177,7 @@ Qed.
 
 Lemma fpan_of_panic (l : uline) : ralt_panic (ralt_dec (fpan_of l)) = true.
 Proof using.
-  destruct l as [ws | ws | | ws npc]; cbn [fpan_of].
+  destruct l as [ws | ws N | N | ws npc]; cbn [fpan_of].
   - rewrite (ralt_dec_lt4 3%nat ltac:(lia)). by vm_compute.
   - by rewrite (ralt_dec_enc RFFork).
   - by rewrite (ralt_dec_enc RCFork).
@@ -187,7 +187,7 @@ Qed.
 Lemma cont_fpan (s : fstate) (l : uline) :
   cont s l (ralt_dec (fpan_of l)) = alt_panic.
 Proof using.
-  destruct l as [ws | ws | | ws npc]; cbn [fpan_of].
+  destruct l as [ws | ws N | N | ws npc]; cbn [fpan_of].
   - rewrite (ralt_dec_lt4 3%nat ltac:(lia)). cbn [cont uline_ws].
     exact (line_alts_of_3 ws).
   - by rewrite (ralt_dec_enc RFFork).
@@ -198,7 +198,7 @@ Qed.
 
 Lemma fexf_of_ok (l : uline) : ralt_ok l (ralt_dec (fexf_of l)).
 Proof using.
-  destruct l as [ws | ws | | ws npc]; cbn [fexf_of].
+  destruct l as [ws | ws N | N | ws npc]; cbn [fexf_of].
   - rewrite (ralt_dec_lt4 1%nat ltac:(lia)) /ralt_ok. lia.
   - by rewrite (ralt_dec_enc RFExec).
   - by rewrite (ralt_dec_enc RCExec).
@@ -207,7 +207,7 @@ Qed.
 
 Lemma fexf_of_free (l : uline) : fstate_free (ralt_dec (fexf_of l)) = true.
 Proof using.
-  destruct l as [ws | ws | | ws npc]; cbn [fexf_of].
+  destruct l as [ws | ws N | N | ws npc]; cbn [fexf_of].
   - by rewrite (ralt_dec_lt4 1%nat ltac:(lia)).
   - by rewrite (ralt_dec_enc RFExec).
   - by rewrite (ralt_dec_enc RCExec).
@@ -216,7 +216,7 @@ Qed.
 
 Lemma fexf_of_nopanic (l : uline) : ralt_panic (ralt_dec (fexf_of l)) = false.
 Proof using.
-  destruct l as [ws | ws | | ws npc]; cbn [fexf_of].
+  destruct l as [ws | ws N | N | ws npc]; cbn [fexf_of].
   - rewrite (ralt_dec_lt4 1%nat ltac:(lia)). by vm_compute.
   - by rewrite (ralt_dec_enc RFExec).
   - by rewrite (ralt_dec_enc RCExec).
@@ -226,7 +226,7 @@ Qed.
 Lemma cont_fexf (s : fstate) (l : uline) :
   cont s l (ralt_dec (fexf_of l)) = fexfb l.
 Proof using.
-  destruct l as [ws | ws | | ws npc]; cbn [fexf_of fexfb].
+  destruct l as [ws | ws N | N | ws npc]; cbn [fexf_of fexfb].
   - rewrite (ralt_dec_lt4 1%nat ltac:(lia)). cbn [cont uline_ws].
     exact (line_alts_of_1 ws).
   - by rewrite (ralt_dec_enc RFExec).
@@ -243,14 +243,14 @@ Qed.
 Definition fnoc_of (l : uline) : nat :=
   match l with
   | LEcho _ => 2%nat
-  | LEchoF _ => ralt_enc RFSilent
-  | LCat => ralt_enc RCSilent
+  | LEchoF _ _ => ralt_enc RFSilent
+  | LCat _ => ralt_enc RCSilent
   | LPipe _ _ => ralt_enc RCSilent
   end.
 
 Lemma fnoc_of_ok (l : uline) : ralt_ok l (ralt_dec (fnoc_of l)).
 Proof using.
-  destruct l as [ws | ws | | ws npc]; cbn [fnoc_of].
+  destruct l as [ws | ws N | N | ws npc]; cbn [fnoc_of].
   - rewrite (ralt_dec_lt4 2%nat ltac:(lia)) /ralt_ok. lia.
   - by rewrite (ralt_dec_enc RFSilent).
   - by rewrite (ralt_dec_enc RCSilent).
@@ -259,7 +259,7 @@ Qed.
 
 Lemma fnoc_of_free (l : uline) : fstate_free (ralt_dec (fnoc_of l)) = true.
 Proof using.
-  destruct l as [ws | ws | | ws npc]; cbn [fnoc_of].
+  destruct l as [ws | ws N | N | ws npc]; cbn [fnoc_of].
   - by rewrite (ralt_dec_lt4 2%nat ltac:(lia)).
   - by rewrite (ralt_dec_enc RFSilent).
   - by rewrite (ralt_dec_enc RCSilent).
@@ -268,7 +268,7 @@ Qed.
 
 Lemma fnoc_of_nopanic (l : uline) : ralt_panic (ralt_dec (fnoc_of l)) = false.
 Proof using.
-  destruct l as [ws | ws | | ws npc]; cbn [fnoc_of].
+  destruct l as [ws | ws N | N | ws npc]; cbn [fnoc_of].
   - rewrite (ralt_dec_lt4 2%nat ltac:(lia)). by vm_compute.
   - by rewrite (ralt_dec_enc RFSilent).
   - by rewrite (ralt_dec_enc RCSilent).
@@ -278,7 +278,7 @@ Qed.
 Lemma cont_fnoc (s : fstate) (l : uline) :
   cont s l (ralt_dec (fnoc_of l)) = u_prompt.
 Proof using.
-  destruct l as [ws | ws | | ws npc]; cbn [fnoc_of].
+  destruct l as [ws | ws N | N | ws npc]; cbn [fnoc_of].
   - rewrite (ralt_dec_lt4 2%nat ltac:(lia)). cbn [cont uline_ws].
     reflexivity.
   - by rewrite (ralt_dec_enc RFSilent).
@@ -304,7 +304,7 @@ Proof using.
   intros Hok Hp. revert s.
   destruct a as [k | sel | | | | | | | | | |]; intros st.
   { (* [REcho]: on its own, so no [vm_compute] meets the line *)
-    rewrite /ralt_ok in Hok. destruct l as [ws | ws | | ws npc];
+    rewrite /ralt_ok in Hok. destruct l as [ws | ws N | N | ws npc];
       cbn in Hok; try done.
     cbn [ralt_panic] in Hp. apply bool_decide_eq_false in Hp.
     cbn [cont uline_ws].
@@ -324,7 +324,9 @@ Proof using.
   all: try (cbn [ralt_panic] in Hp; by discriminate Hp).
   all: cbn [cont].
   (* [RCRan]: the contents, then the prompt -- or the diagnostic *)
-  all: try (destruct st as [bs |]; [ by exists bs | ]).
+  all: try (destruct (st !! lname l) as [bs |]; [ by exists bs | ]).
+  (* a diagnostic at the line's name: its own line, then the prompt *)
+  all: try (eexists; reflexivity).
   (* a CONSTANT block: its own bytes but the last two *)
   all: match goal with
        | |- exists pre : list (bv 8), ?c = pre ++ u_prompt =>
@@ -339,7 +341,7 @@ Proof using.
 Qed.
 
 Definition file_hooks : lm_hooks file_lm :=
-  MkLMH file_lm fstate_free None fpan_of fexf_of fexfb fnoc_of (fun _ => ralt_ok_dec)
+  MkLMH file_lm fstate_free ∅ fpan_of fexf_of fexfb fnoc_of (fun _ => ralt_ok_dec)
     cont_state_free (fun _ _ => eq_refl) (fun _ _ _ _ _ H => H)
     (fun _ => fpan_of_ok) fpan_of_free fpan_of_panic
     (fun _ => fexf_of_ok) fexf_of_free fexf_of_nopanic cont_fexf
@@ -367,7 +369,7 @@ Lemma faprs_lm (I : list (bv 8)) (a : nat) : faprs I a <-> lm_aprs file_lm I a.
 Proof using.
   split.
   - intros [H1 H2]. exact (conj (fun _ => H1) (conj H2 eq_refl)).
-  - intros (H1 & H2 & _). exact (conj (H1 None) H2).
+  - intros (H1 & H2 & _). exact (conj (H1 ∅) H2).
 Qed.
 
 (* the stream, at a boot state that may be unfiled *)
@@ -401,7 +403,7 @@ Qed.
 
 Lemma fab_is (I : list (bv 8)) (a : nat) :
   ralt_ok (fline I) (ralt_dec a) -> fstate_free (ralt_dec a) = true ->
-  fab I a = cont None (fline I) (ralt_dec a).
+  fab I a = cont ∅ (fline I) (ralt_dec a).
 Proof using.
   rewrite fab_lm fline_lm. apply (lm_ab_is file_lm file_hooks).
 Qed.

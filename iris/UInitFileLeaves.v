@@ -101,9 +101,9 @@ Section UInitFileLeaves.
   (* THE BOOT FILING (RULING F0-BOOT).  The deed's typed witness names the
      era's boot state; init files it into the boot ledger it holds in
      [fturn], and what comes out is the head precondition AT THAT STATE.
-     Under the taint the witness names nothing, so the state is [None]. *)
+     Under the taint the witness names nothing, so the state is empty. *)
   Definition boot_at (s0 : fstate) (s : dst) : iProp Σ :=
-    ((⌜s0 = dst_content s⌝ ∗ f_typed (fgn_cl g) s) ∨ (⌜s0 = None⌝ ∗ FT))%I.
+    ((⌜s0 = dst_content s⌝ ∗ f_typed (fgn_cl g) s) ∨ (⌜s0 = ∅⌝ ∗ FT))%I.
 
   Global Instance boot_at_persistent s0 s : Persistent (boot_at s0 s).
   Proof using . rewrite /boot_at. apply _. Qed.
@@ -129,20 +129,21 @@ Section UInitFileLeaves.
   Proof using .
     iIntros "#Hbw Hb". rewrite /FileLinkGen.f0pre_at.
     iDestruct "Hb" as "[[-> Hty] | [-> #HT]]".
-    - destruct s as [[i bs] | ];
-        cbn [dst_content fmap option_fmap option_map].
+    - destruct s as [[i bs] | ].
       + iEval (rewrite /f_typed /=) in "Hty".
         iDestruct "Hty" as (ls) "[#Hlb %Hbt]".
         iSplitR.
-        { iPureIntro. destruct Hbt as (ws & sel & _ & Hok & Hsel & ->).
+        { iPureIntro. cbn [dst_content fmap option_fmap option_map snd].
+          apply (fstate_ok_fst_of_iff (Some bs)).
+          destruct Hbt as (ws & sel & _ & Hok & Hsel & ->).
           exact (FileDisc.fcont_ok_subseq ws sel Hok Hsel). }
         iSplitR; [ | iExact "Hbw" ].
-        iLeft. iEval (rewrite /FileOut.f0_typed /=).
-        iExists ls. iFrame "Hlb". by iPureIntro.
-      + iSplitR; [ iPureIntro; exact I | ].
+        iLeft. iApply (FileOut.f0_typed_of_f_typed g (Some (i, bs))).
+        rewrite /f_typed /=. iExists ls. iFrame "Hlb". by iPureIntro.
+      + iSplitR; [ iPureIntro; exact fstate_ok_empty | ].
         iSplitR; [ | iExact "Hbw" ].
         iLeft. iApply (FileOut.f0_typed_none g).
-    - iSplitR; [ iPureIntro; exact I | ].
+    - iSplitR; [ iPureIntro; exact fstate_ok_empty | ].
       iSplitR; [ | iExact "Hbw" ]. by iRight.
   Qed.
 

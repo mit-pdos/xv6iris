@@ -129,7 +129,7 @@ Proof.
   change (lm_ok ulmG) with (uok adm_u_g). change (lm_dec ulmG) with ualt_dec.
   change (lm_term ulmG) with uterm. rewrite ualt_dec_code.
   split; [| reflexivity].
-  revert Hnp Hok. destruct (lm_line_at U I) as [ws | ws | | p n]; intros Hnp Hok;
+  revert Hnp Hok. destruct (lm_line_at U I) as [ws | ws Nf | Nf | p n]; intros Hnp Hok;
     cbn [uok]; [exact Hok | exact Hok | exact Hok |].
   exfalso. exact (Hnp p n eq_refl).
 Qed.
@@ -165,29 +165,29 @@ Qed.
 (* cat's two bodies at a present content, its one at an absent one *)
 Lemma ulm_cat_body_ran (s0 : fstate) (cs : list nat) (I : list (bv 8))
     (content : list (bv 8)) :
-  lm_line_at U I = LCat ->
-  lm_upto U cs s0 (bodies_of I) (nlines I - 1) = Some content ->
+  lm_line_at U I = LCat_f ->
+  (lm_upto U cs s0 (bodies_of I) (nlines I - 1) : fstate) !! fname_f = Some content ->
   lm_body U s0 cs I (ualt_code (UR RCRan)) = content.
 Proof.
-  intros Hfl Hst. rewrite /lm_body ulm_abs_R Hfl Hst.
-  rewrite (UCatOut.cat_cont_ran_some (Some content) content eq_refl).
+  intros Hfl Hst. rewrite /lm_body ulm_abs_R Hfl.
+  rewrite (UCatOut.cat_cont_ran_some _ content Hst).
   rewrite length_app UCatOut.cat_prompt_len.
   replace (length content + 2 - 2)%nat with (length content) by lia.
   rewrite take_app_length. reflexivity.
 Qed.
 
 Lemma ulm_cat_body_ran_none (s0 : fstate) (cs : list nat) (I : list (bv 8)) :
-  lm_line_at U I = LCat ->
-  lm_upto U cs s0 (bodies_of I) (nlines I - 1) = None ->
+  lm_line_at U I = LCat_f ->
+  (lm_upto U cs s0 (bodies_of I) (nlines I - 1) : fstate) !! fname_f = None ->
   lm_body U s0 cs I (ualt_code (UR RCRan)) = cat_dg_open fname_f.
 Proof.
-  intros Hfl Hst. rewrite /lm_body ulm_abs_R Hfl Hst UCatOut.cat_cont_ran_none
+  intros Hfl Hst. rewrite /lm_body ulm_abs_R Hfl (UCatOut.cat_cont_ran_absent _ Hst)
     fif_cat_dg_open.
   apply (bool_decide_unpack _). vm_compute. exact Logic.I.
 Qed.
 
 Lemma ulm_cat_body_noopen (s0 : fstate) (cs : list nat) (I : list (bv 8)) :
-  lm_line_at U I = LCat ->
+  lm_line_at U I = LCat_f ->
   lm_body U s0 cs I (ualt_code (UR RCNoOpen)) = cat_dg_open fname_f.
 Proof.
   intros Hfl. rewrite /lm_body ulm_abs_R Hfl UCatOut.cat_cont_noopen fif_cat_dg_open.
@@ -241,16 +241,16 @@ Section UkUnionLend.
   (* cat's lend: the round's cursor at the block's first byte, the round's
      state named ([content]) -- the console owing the content or the
      diagnostic at a present file, the diagnostic at an absent one *)
-  Definition ucat_alts (content : fstate) : list (list (bv 8)) :=
+  Definition ucat_alts (content : option (list (bv 8))) : list (list (bv 8)) :=
     match content with
     | Some bs => [bs; cat_dg_open fname_f]
     | None => [cat_dg_open fname_f]
     end.
 
   Lemma ucat_lend (sb : fstate) (v : era_pins) (ps cs : list nat) (I : list (bv 8))
-      (pos : nat) (content : fstate) :
-    lm_wr_blk_t U ps cs sb I pos -> lm_line_at U I = LCat ->
-    lm_upto U cs sb (bodies_of I) (nlines I - 1) = content ->
+      (pos : nat) (content : option (list (bv 8))) :
+    lm_wr_blk_t U ps cs sb I pos -> lm_line_at U I = LCat_f ->
+    (lm_upto U cs sb (bodies_of I) (nlines I - 1) : fstate) !! fname_f = content ->
     cons_short (ucat_alts content) ->
     LK -∗ era_pin (fgn_echo gf) (S gen_id) v -∗
     cons_cur U (PA sb) v ps cs sb I pos 0%nat 0%nat -∗
@@ -292,7 +292,8 @@ Section UkUnionLend.
                 with "Hlk Hpin Hc").
   Qed.
 
-  Lemma ucat_lend_taint (sb : fstate) (v : era_pins) (I : list (bv 8)) (content : fstate) :
+  Lemma ucat_lend_taint (sb : fstate) (v : era_pins) (I : list (bv 8))
+      (content : option (list (bv 8))) :
     cons_short (ucat_alts content) ->
     LK -∗ UT -∗
     cons_dev_atc U (PA sb) LK [ualt_code (UR RCRan); ualt_code (UR RCNoOpen)] v I
@@ -484,7 +485,7 @@ Section UkUnionEntries.
     (forall x y : Z, Q x = Q y) ->
     file_app = MkAppcfg file_names (file_pred c) r ->
     lm_wr_blk_t U ps0 cs0 sq I0 P ->
-    lm_line_at U I0 = LCat ->
+    lm_line_at U I0 = LCat_f ->
     lm_upto U cs0 sq (bodies_of I0) (nlines I0 - 1) = dst_content s ->
     (forall (i : Z) (bs : list (bv 8)), s = Some (i, bs) ->
        (Z.of_nat (length bs) < 2 ^ 31)%Z) ->
@@ -515,21 +516,21 @@ Section UkUnionEntries.
     intros HQc Heq Hwb Hfl Htie Hshort Hok Himg Hbytes Hfdl Hws2 Halen Hfname Hcw Hl1 Hl2.
     iIntros "#Hbr #Hkc #HQ #HQt #Hmade #Hinv #Hpin #Hnpw #Hdep".
     iPoseProof (union_links_holds ug Hcons) as "#Hlk".
-    assert (Hs : cons_short (ucat_alts (dst_content s))).
+    assert (Hs : cons_short (ucat_alts (snd <$> s))).
     { unfold cons_short. destruct s as [[i bs] |].
-      - change (dst_content (Some (i, bs))) with (Some bs). cbn [ucat_alts].
+      - cbn [ucat_alts fmap option_fmap option_map snd].
         constructor; [exact (Hshort i bs eq_refl) |]. constructor; [| constructor].
         cbv beta. rewrite fif_cat_dg_open. vm_compute. reflexivity.
-      - change (dst_content None) with (@None (list (bv 8))). cbn [ucat_alts].
+      - cbn [ucat_alts fmap option_fmap option_map].
         constructor; [| constructor]. cbv beta. rewrite fif_cat_dg_open. vm_compute. reflexivity. }
-    assert (Hconf : conforms (cat_env0 (ucat_alts (dst_content s)) (fif_files (snd <$> s))
+    assert (Hconf : conforms (cat_env0 (ucat_alts (snd <$> s)) (fif_files (snd <$> s))
                                 [FileDisc.fname_f])
                       (cat_tree [sb "cat"; FsImgCheck.fname_f])).
     { rewrite -fif_fname_img. destruct s as [[i bs] |].
-      - change (dst_content (Some (i, bs))) with (Some bs). cbn [ucat_alts].
-        apply cat_file_conforms. by apply fif_files_some with (i := i).
-      - change (dst_content None) with (@None (list (bv 8))). cbn [ucat_alts].
-        apply cat_file_absent_conforms. by apply fif_files_none. }
+      - cbn [ucat_alts fmap option_fmap option_map snd].
+        apply cat_file_conforms. exact (fif_files_f (Some bs)).
+      - cbn [ucat_alts fmap option_fmap option_map].
+        apply cat_file_absent_conforms. exact (fif_files_f None). }
     set (C := [ualt_code (UR RCRan); ualt_code (UR RCNoOpen)]).
     set (w0 := fun _ : nat => FDCons v I0 C).
     assert (Hw0 : forall d, d ∈ [0%nat] -> forall i γo, w0 d <> FDIn false i γo)
@@ -550,13 +551,13 @@ Section UkUnionEntries.
     iPoseProof (ucat_image_entry_env_c ws Mn sv t gn sts cw cs pidv Q
                   (own γreg (fif_pool ∅ w0)
                    ∗ (cons_cur U (PA sq) v ps0 cs0 sq I0 P 0%nat 0%nat ∗ fdq r q s ∗ F))%I
-                  I (cat_env0 (ucat_alts (dst_content s)) (fif_files (snd <$> s))
+                  I (cat_env0 (ucat_alts (snd <$> s)) (fif_files (snd <$> s))
                        [FileDisc.fname_f]) {[0%nat]}
                   Hok Himg Hbytes Hfdl Hws2 Halen Hfname Hconf
                   (cat_tree_safe _ _) (fif_dp0 [0%nat] eq_refl)
                   with "[] Hnpw Hdep") as "#He".
     { iIntros "!>" (N' Hpq) "Hstd Hcwd (Hpool & Hc & Hdq & HF)".
-      destruct (fif_cat_env_pure w0 (take NSTD sts) rb rb2 v I0 _ (ucat_alts (dst_content s))
+      destruct (fif_cat_env_pure w0 (take NSTD sts) rb rb2 v I0 _ (ucat_alts (snd <$> s))
                   (fif_files (snd <$> s)) eq_refl Hl1 Hl2) as (Hd0 & Hrow & Hbnd).
       iAssert (fif_exit_k gf r N' γreg [0%nat] w0 q s U (PA sq) LK)%I
         with "[HF]" as "Hk".
@@ -570,7 +571,7 @@ Section UkUnionEntries.
                 U (PA sq) LK (LINKS_pers := union_links_persistent ug)
                 (union_links_gl_w_at ug sq) (union_links_gl_blk_at ug sq)
                 (union_links_gl_taint_at ug sq)
-                (cat_env0 (ucat_alts (dst_content s)) (fif_files (snd <$> s))
+                (cat_env0 (ucat_alts (snd <$> s)) (fif_files (snd <$> s))
                    [FileDisc.fname_f])
                 (take NSTD sts) eq_refl Hd0 Hrow Hbnd ltac:(discriminate)
                 ltac:(intros; reflexivity)
@@ -584,7 +585,8 @@ Section UkUnionEntries.
       - rewrite /fif_dq Hrd. iExact "Hdq".
       - iIntros "Htk". cbn [cat_env0 pe_dev]. case_decide as Hc0; [| done]. simpl.
         iExists v, I0, C. iFrame "Htk".
-        iApply (ucat_lend ug sq v ps0 cs0 I0 P (dst_content s) Hwb Hfl Htie Hs
+        iApply (ucat_lend ug sq v ps0 cs0 I0 P (snd <$> s) Hwb Hfl
+                  (eq_trans (f_equal (fun t : fstate => t !! fname_f) Htie) (dst_content_f s)) Hs
                   with "Hlk Hpin Hc"). }
     iApply ("He" $! na alen afun W' with "[%] [%] [%] [%] [%] [%] Hmp [Hpool HPay]");
       [ exact Hok' | exact Hcw' | exact Hlz | exact Hch | exact Hpid | exact Hargs | ].

@@ -175,7 +175,7 @@ Section UnionInitBoot.
     iAssert (∃ s0 : fstate, ▷ boot_at (ugn_file ug) s0 s)%I with "[Hty]" as (s0) "#Hbt".
     { iDestruct "Hty" as "[#Hty | #HT]".
       - iExists (dst_content s). iNext. rewrite /boot_at. iLeft. by iFrame "Hty".
-      - iExists None. iNext. rewrite /boot_at. iRight. by iFrame "HT". }
+      - iExists ∅. iNext. rewrite /boot_at. iRight. by iFrame "HT". }
     iMod (file_f0bw_of_boot (ugn_file ug) s0 with "Hturn") as "[Hturn #Hbw]".
     iAssert (▷ f0pre_at (ugn_file ug) s0)%I as "#Hpre".
     { iNext. iApply (file_f0pre_at_of_bw (ugn_file ug) s0 s with "Hbw Hbt"). }

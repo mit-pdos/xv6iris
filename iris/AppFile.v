@@ -115,9 +115,14 @@ Record file_names := MkFileNames {
    The inum is what lets a holder identify the row its descriptor sits on
    with [f]'s (lane F-WRITE's finding: at an existential inum the deed says
    what [f] holds and never which row is [f], and a free step could even
-   relocate it); the model reads the content only ([dst_content]). *)
+   relocate it); the model reads the content only ([dst_content]: the
+   one-name map the deed's content denotes, cut W1 of
+   claude-notes/design/filenames.md -- the deed itself widens at W2). *)
 Definition dst : Type := option (Z * list (bv 8)).
-Definition dst_content (s : dst) : fstate := (fun p => p.2) <$> s.
+Definition dst_content (s : dst) : fstate := fst_of ((fun p => p.2) <$> s).
+
+Lemma dst_content_f (s : dst) : dst_content s !! fname_m = snd <$> s.
+Proof using . exact (fst_of_lookup _). Qed.
 
 (* ONE ESCROW, as the claim's ledger records it: the content the deed was
    parked AT, and the one-shot name whose token the holder keeps.  The

@@ -26,7 +26,7 @@
 (*     ush_line_lexable_holds]'s twin -- the existential form.             *)
 (*   S3 is the bridge FROM THE TYPED LINE: the file application's tag      *)
 (*     ([FileOut.ftag]) gives [FileDisc.disc_f], whose content at one line *)
-(*     is [FileDisc.parse_line J = Some l]; at [l = LEchoF ws] that body   *)
+(*     is [FileDisc.parse_line J = Some l]; at [l = LEchoF_f ws] that body   *)
 (*     IS [wl_body ws ++ suf_gtf] ([FileDisc.line_body_parse]), which is   *)
 (*     the redirect line positionally.  [sh_redir_line_lexable] is that    *)
 (*     chain in one step: from the line sh READ to the four parser         *)
@@ -342,20 +342,20 @@ Proof using. apply bv_eq; vm_compute; reflexivity. Qed.
    -- the body the read delivered, the buffer holding it at [k] and the
    newline the loop stored past it -- with [EchoDisc.body_ok J] replaced by
    the file discipline's own reading of the same body, [FileDisc.parse_line
-   J = Some (LEchoF ws)].  That is exactly what [FileOut.ftag]'s
+   J = Some (LEchoF_f ws)].  That is exactly what [FileOut.ftag]'s
    [FileDisc.disc_f] says about one line of the input. *)
 Lemma sh_redir_line_of_typed (J : list (bv 8)) (ws : list (list (bv 8)))
     (f : nat -> bv 8) (k len : nat) :
-  parse_line J = Some (LEchoF ws) ->
+  parse_line J = Some (LEchoF_f ws) ->
   len = S (length J) ->
   (forall j : nat, (j < length J)%nat -> f (k + j)%nat = J !!! j) ->
   f (k + length J)%nat = wl_nl ->
   ushs_line_is ws fname_f f k len.
 Proof using.
   intros Hp Hlen Hf Hnl.
-  pose proof (line_body_parse J (LEchoF ws) Hp) as HJ.
+  pose proof (line_body_parse J (LEchoF_f ws) Hp) as HJ.
   cbn [line_body] in HJ.
-  pose proof (parse_line_ok J (LEchoF ws) Hp) as [ Hok _ ].
+  pose proof (parse_line_ok J (LEchoF_f ws) Hp) as [ Hok _ ].
   assert (HlenJ : length J = (length (wl_body ws) + 4)%nat)
     by (rewrite HJ; rewrite length_app; rewrite suf_gtf_len; lia).
   (* every byte of the suffix, off the body's own layout *)
@@ -399,7 +399,7 @@ Qed.
    [fe := |wl_body ws| + 3 + |fname_f|]. *)
 Lemma sh_redir_line_lexable (J : list (bv 8)) (ws : list (list (bv 8)))
     (f : nat -> bv 8) (k len : nat) :
-  parse_line J = Some (LEchoF ws) ->
+  parse_line J = Some (LEchoF_f ws) ->
   len = S (length J) ->
   (forall j : nat, (j < length J)%nat -> f (k + j)%nat = J !!! j) ->
   f (k + length J)%nat = wl_nl ->
@@ -421,19 +421,19 @@ Qed.
 (* §4 A DEMO: THE MODEL'S OWN LINE                                        *)
 (*                                                                        *)
 (* [UkShWords] §6 is the mould.  This is not decoration: [ushs_line_is]    *)
-(* and [parse_line _ = Some (LEchoF _)] are PREMISES of everything above,  *)
+(* and [parse_line _ = Some (LEchoF_f _)] are PREMISES of everything above,  *)
 (* so a lane that never instantiates them cannot tell a threaded premise   *)
 (* from an unsatisfiable one (durable-notes, Vacuity).  [FileDisc.fd_ws]   *)
 (* is the model's own [echo hello world], [FileDisc.fd_b0] the body        *)
-(* [FileDisc.parse_line] answers [LEchoF fd_ws] on, and the tokens below   *)
+(* [FileDisc.parse_line] answers [LEchoF_f fd_ws] on, and the tokens below   *)
 (* are the three the child's argv is built from.                           *)
 (* ===================================================================== *)
 
 Definition fd_demo_f : nat -> bv 8 := fun j : nat => (fd_b0 ++ [wl_nl]) !!! j.
 
-Lemma fd_demo_parse : parse_line fd_b0 = Some (LEchoF fd_ws).
+Lemma fd_demo_parse : parse_line fd_b0 = Some (LEchoF_f fd_ws).
 Proof using.
-  apply (parse_line_body (LEchoF fd_ws)); [ exact (uline_nopipe_echof fd_ws) |].
+  apply (parse_line_body (LEchoF_f fd_ws)); [ exact (uline_nopipe_echof fd_ws fname_f) |].
   apply (bool_decide_unpack _); vm_compute; exact I.
 Qed.
 

@@ -289,20 +289,36 @@ Section file_out.
 
   (* ---- THE TYPED WITNESS: what the deed's evidence for the era's boot
          state looks like once it is inside the claim ---- *)
+  (* the state holds the deed's one file alone (cut W1 of
+     claude-notes/design/filenames.md: the claim is at [f] until W2) *)
   Definition f0_typed (s : fstate) : iProp Σ :=
-    match s with
-    | None => emp
-    | Some bs =>
-        (∃ ls : list wordline, fl_lb (fgn_cl g) ls ∗ ⌜f_bytes_typed ls bs⌝)%I
-    end.
+    (⌜forall N c, s !! N = Some c -> N = fname_m⌝
+     ∗ match s !! fname_m with
+       | None => emp
+       | Some bs =>
+           (∃ ls : list wordline, fl_lb (fgn_cl g) ls ∗ ⌜f_bytes_typed ls bs⌝)%I
+       end)%I.
 
   Global Instance f0_typed_persistent s : Persistent (f0_typed s).
-  Proof using . destruct s as [bs |]; rewrite /f0_typed; apply _. Qed.
+  Proof using . rewrite /f0_typed. case_match; apply _. Qed.
   Global Instance f0_typed_timeless s : Timeless (f0_typed s).
-  Proof using . destruct s as [bs |]; rewrite /f0_typed; apply _. Qed.
+  Proof using . rewrite /f0_typed. case_match; apply _. Qed.
 
-  Lemma f0_typed_none : ⊢ f0_typed None.
-  Proof using . by rewrite /f0_typed. Qed.
+  Lemma f0_typed_none : ⊢ f0_typed ∅.
+  Proof using .
+    rewrite /f0_typed lookup_empty. iSplit; [| done].
+    iPureIntro. intros N c Hc. by rewrite lookup_empty in Hc.
+  Qed.
+
+  (* the deed's typed witness, as the ledger's *)
+  Lemma f0_typed_of_f_typed (s : dst) : f_typed (fgn_cl g) s -∗ f0_typed (dst_content s).
+  Proof using .
+    iIntros "Hty". destruct s as [[i bs] |]; cbn [dst_content fmap option_fmap option_map fst_of snd];
+      [| iApply f0_typed_none].
+    rewrite /f0_typed lookup_singleton. iSplit.
+    - iPureIntro. intros N c Hc. by apply lookup_singleton_Some in Hc as [-> _].
+    - iExact "Hty".
+  Qed.
 
   (* ====================================================================== *)
   (*  3.  THE CLAIM, THE TAG AND THE TURN                                   *)
@@ -330,7 +346,7 @@ Section file_out.
 
   Definition f0wa (k : nat) (st : option fstate) : iProp Σ :=
     (∃ vf : file_era, file_era_pin k vf ∗ f0f_auth vf (opt_list st)
-       ∗ f0_wit vf st ∗ f0_typed (default None st))%I.
+       ∗ f0_wit vf st ∗ f0_typed (default ∅ st))%I.
 
   Global Instance f0wa_timeless k st : Timeless (f0wa k st).
   Proof using . rewrite /f0wa. apply _. Qed.
@@ -350,7 +366,7 @@ Section file_out.
   Qed.
 
   Lemma f0wa_agree_d (k : nat) (st : option fstate) (s0 : fstate) :
-    f0wa k st -∗ f0cw k s0 -∗ ⌜default None st = s0⌝.
+    f0wa k st -∗ f0cw k s0 -∗ ⌜default ∅ st = s0⌝.
   Proof using .
     iIntros "Ha Hw". by iDestruct (f0wa_agree with "Ha Hw") as %->.
   Qed.
@@ -381,22 +397,22 @@ Section file_out.
     (emp : iProp Σ) ==∗ emp.
   Proof using . by iIntros "_". Qed.
 
-  Definition file_wa : gen_wa file_lm file_cparams None :=
-    @MkGWA Σ _ file_lm file_cparams None f0wa _ f0wa_agree_d f0_typed _ f0wa_W
+  Definition file_wa : gen_wa file_lm file_cparams ∅ :=
+    @MkGWA Σ _ file_lm file_cparams ∅ f0wa _ f0wa_agree_d f0_typed _ f0wa_W
       f0boot f0wa_file True (fun _ => f0wa_agree)
       False (fun Hf => match Hf with end)
       (fun _ _ => emp%I) _ file_gext_grow.
 
   Definition fecl (k : nat) (ho : list mobs)
       (H : LogEntryDefs.cons_hist) : iProp Σ :=
-    gcl file_lm file_cparams None file_wa k ho H.
+    gcl file_lm file_cparams ∅ file_wa k ho H.
 
   Global Instance fecl_timeless k ho H : Timeless (fecl k ho H).
   Proof using . rewrite /fecl. apply _. Qed.
 
   (* THE LINE LIST the console has received, as a pure function of the
      history: the words of every complete [echo … > f] line, in order. *)
-  Definition efl_of (h : list mobs) : list wordline := echof_lines_of h.
+  Definition efl_of (h : list mobs) : list wordline := snd <$> echof_lines_of h.
 
   (* THE TAG: [EchoOut.etag] at the FILE discipline, with a lower bound of
      the ledger's line list beside it -- which is how a typed line reaches
@@ -496,17 +512,22 @@ Section file_out.
 
   (* ---- the history's own line list moves ---- *)
 
-  Lemma efl_of_io (h : list mobs) (e : mobs) :
+  Lemma echof_lines_of_io (h : list mobs) (e : mobs) :
     trace_shape h true -> is_io e = true -> ins [e] = [] ->
-    efl_of (h ++ [e]) = efl_of h.
+    echof_lines_of (h ++ [e]) = echof_lines_of h.
   Proof using .
     intros Hsh Hio Hin.
     destruct (cycles_of_io h [e] Hsh (io_singleton e Hio)) as (cs & H1 & H2).
-    rewrite /efl_of /echof_lines_of H1 H2 !fmap_app !concat_app.
+    rewrite /echof_lines_of H1 H2 !fmap_app !concat_app.
     f_equal. cbn [fmap list_fmap concat].
     rewrite /echof_cyc ins_app Hin (app_nil_r (ins (open_seg h))).
     reflexivity.
   Qed.
+
+  Lemma efl_of_io (h : list mobs) (e : mobs) :
+    trace_shape h true -> is_io e = true -> ins [e] = [] ->
+    efl_of (h ++ [e]) = efl_of h.
+  Proof using . intros Hsh Hio Hin. by rewrite /efl_of echof_lines_of_io. Qed.
 
   Lemma efl_of_out (h : list mobs) (i : uart_id) (b : bv 8) :
     trace_shape h true -> efl_of (h ++ [ObsUartOut i b]) = efl_of h.
@@ -514,10 +535,22 @@ Section file_out.
     intros Hsh. apply efl_of_io; [exact Hsh | by destruct i | by destruct i].
   Qed.
 
-  Lemma efl_of_power (h : list mobs) (on : bool) :
-    efl_of (h ++ [if on then ObsPowerOff else ObsPowerOn]) = efl_of h.
+  Lemma echof_lines_of_out (h : list mobs) (i : uart_id) (b : bv 8) :
+    trace_shape h true -> echof_lines_of (h ++ [ObsUartOut i b]) = echof_lines_of h.
   Proof using .
-    rewrite /efl_of /echof_lines_of. destruct on.
+    intros Hsh. apply echof_lines_of_io; [exact Hsh | by destruct i | by destruct i].
+  Qed.
+
+  Lemma efl_of_snoc (h : list mobs) (e : mobs) : efl_of h `prefix_of` efl_of (h ++ [e]).
+  Proof using .
+    destruct (echof_lines_of_snoc h e) as [z Hz]. exists (snd <$> z).
+    by rewrite /efl_of Hz fmap_app.
+  Qed.
+
+  Lemma echof_lines_of_power (h : list mobs) (on : bool) :
+    echof_lines_of (h ++ [if on then ObsPowerOff else ObsPowerOn]) = echof_lines_of h.
+  Proof using .
+    rewrite /echof_lines_of. destruct on.
     - by rewrite cycles_of_off.
     - rewrite cycles_of_on fmap_app concat_app.
       cbn [fmap list_fmap concat]. rewrite /echof_cyc.
@@ -525,6 +558,11 @@ Section file_out.
       rewrite /echof_lines_in /lines_of bodies_of_nil fmap_nil.
       by rewrite !app_nil_r.
   Qed.
+
+  Lemma efl_of_power (h : list mobs) (on : bool) :
+    efl_of (h ++ [if on then ObsPowerOff else ObsPowerOn]) = efl_of h.
+  Proof using . by rewrite /efl_of echof_lines_of_power. Qed.
+
 
   (* ---- THE ERA'S PIN IN THE LEDGER.
          The OPEN cycle's entry of [s0s] is PROVISIONAL until the era's
@@ -612,16 +650,20 @@ Section file_out.
 
 
   (* the deed's typed witness, read against the ledger's own line list *)
-  Lemma f0_typed_adm (Ls : list wordline) (s0 : fstate) :
-    fl_auth (fgn_cl g) Ls -∗ f0_typed s0 -∗
-      fl_auth (fgn_cl g) Ls ∗ ⌜fadm_boot Ls s0⌝.
+  Lemma f0_typed_adm (Lp : list (list (bv 8) * wordline)) (s0 : fstate) :
+    Forall (fun p => uname p.1) Lp ->
+    fl_auth (fgn_cl g) (snd <$> Lp) -∗ f0_typed s0 -∗
+      fl_auth (fgn_cl g) (snd <$> Lp) ∗ ⌜fadm_boot Lp s0⌝.
   Proof using .
-    iIntros "Ha Hty". destruct s0 as [bs |]; last first.
-    { iFrame "Ha". iPureIntro. by left. }
-    rewrite /f0_typed. iDestruct "Hty" as (ls) "[Hlb %Hbt]".
+    intros HN. iIntros "Ha [%Hdom Hty]".
+    rewrite (fst_of_dom s0 Hdom).
+    change fname_f with fname_m.
+    destruct (s0 !! fname_m) as [bs |]; last first.
+    { iFrame "Ha". iPureIntro. apply fadm_boot_fst_of; [exact HN | by left]. }
+    iDestruct "Hty" as (ls) "[Hlb %Hbt]".
     iDestruct (fl_lb_prefix with "Ha Hlb") as %Hpre.
-    iFrame "Ha". iPureIntro. right.
-    destruct (f_bytes_typed_mono ls Ls bs Hpre Hbt)
+    iFrame "Ha". iPureIntro. apply fadm_boot_fst_of; [exact HN |]. right.
+    destruct (f_bytes_typed_mono ls _ bs Hpre Hbt)
       as (ws & sel & Hin & _ & Hsel & ->).
     by exists ws, sel.
   Qed.

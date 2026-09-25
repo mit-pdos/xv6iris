@@ -392,7 +392,7 @@ Section UShCatFStage.
   (* THE PREMISE of [stage_catf_law] at the deed: [cat f]'s exec supply
      from the entry, at every pipe *)
   Lemma catf_stage_sup (f : list (bv 8)) (qf : Qp) (sf : dst) (ds : list (list (bv 8))) :
-    pr = PrCatF f -> uname f -> (0 < nc)%nat ->
+    pr = PrCatF f -> FileDisc.uname f -> (0 < nc)%nat ->
     (snd <$> sf = Some L /\ fcR f = Some L /\ ds = [[]; cat_dg_write])
     \/ (sf = None /\ ds = [[]]) ->
     FAM -∗ UShCatPay.sh_cat_slot T -∗
@@ -403,7 +403,7 @@ Section UShCatFStage.
            (catf_rows γp) (FileDisc.prod_words (PrCatF f))
            (fun _ : Z => QcR (fdq rf qf sf) 0) (prod_crD γp (fdq rf qf sf))).
   Proof using HL31 Hadmit Hcons Heq Hext Hfc Hfire Hkill HlR Hplok Hsup cifRegG0.
-    intros Hpr Hf Hn Hcase. rewrite /uname in Hf. subst f.
+    intros Hpr Hf Hn Hcase. rewrite /FileDisc.uname in Hf. subst f.
     iIntros "#Hfam #Hslot #Hbr #Hrb #Hai #Hcr !>" (γp).
     assert (Hds : (ds = [[]; cat_dg_write] /\ is_Some (fcR fname_f)) \/ ds = [[]]).
     { destruct Hcase as [(_ & Hfc' & ->) | (_ & ->)]; [left; split; [done | by eexists] | by right]. }
@@ -436,7 +436,7 @@ Section UShCatFStage.
   (* ...AND THE PRODUCER'S STAGE LAW, PAID: [stage_catf_law] at the deed *)
   Lemma stage_catf_law_holds (f : list (bv 8)) (s0 : Z) (gs : nat -> bv 8)
       (qf : Qp) (sf : dst) (ds : list (list (bv 8))) :
-    pr = PrCatF f -> uname f -> ExecWords.exec_ok (FileDisc.prod_words (PrCatF f)) ->
+    pr = PrCatF f -> FileDisc.uname f -> ExecWords.exec_ok (FileDisc.prod_words (PrCatF f)) ->
     echo_argv_bytes (FileDisc.prod_words (PrCatF f)) gs -> (0 < nc)%nat ->
     (snd <$> sf = Some L /\ fcR f = Some L /\ ds = [[]; cat_dg_write])
     \/ (sf = None /\ ds = [[]]) ->

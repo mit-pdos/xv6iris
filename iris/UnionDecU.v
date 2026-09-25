@@ -20,30 +20,35 @@
 (*     each round's candidates at the state the earlier choices leave);  *)
 (*   - the coverage-ending outputs ([umerge]) gain the cat producer's    *)
 (*     three diagnostics ([cat_dg_open f], [cat_dg_write], [dg_execR]);  *)
-(*     [umerge]'s [exists s] is taken at [Some []] ([umerge_spec]);      *)
+(*     [umerge]'s [exists s] is taken at the state holding an empty [f]  *)
+(*     ([umerge_spec]);                                                   *)
 (*   - the BOOT STATE is no longer printed contiguously: a pipeline's    *)
-(*     last cat prints a PREFIX of [f] (the ruled corner B) interleaved  *)
-(*     with the other stages' diagnostics.  So the boot-state witness is *)
-(*     canonicalised by TRUNCATION ([blocks_trunc], [terms_trunc]): a    *)
-(*     run at content [b0] stays a run, with the same console streams, *)
-(*     at any prefix of [b0] its printed content fits in (at a grep too: *)
-(*     each pipe's new content is related to its old one, not a uniform *)
-(*     cut of it, section 4) -- and the                                  *)
-(*     longest such printed prefix is a SUBSEQUENCE of the segment's     *)
-(*     wire.  If [b0] itself is not one, no checked round printed [f]   *)
-(*     whole ([cat f] alone does, contiguously), and the era is the one *)
-(*     at the longest printed prefix ([u_canon_s]).  The one round the  *)
-(*     wire never checks (the last line, typed as the last input byte)  *)
-(*     is re-resolved to the silent round, which ends no coverage.       *)
+(*     last cat prints a PREFIX of a file (the ruled corner B)           *)
+(*     interleaved with the other stages' diagnostics.  So the boot      *)
+(*     state is canonicalised by TRUNCATION ([blocks_trunc],             *)
+(*     [terms_trunc]): a run at content [b0] stays a run, with the same  *)
+(*     console streams, at any prefix of [b0] its printed content fits  *)
+(*     in (at a grep too: each pipe's new content is related to its old  *)
+(*     one, not a uniform cut of it, section 4) -- and the longest such  *)
+(*     printed prefix is a SUBSEQUENCE of the segment's wire.  If [b0]   *)
+(*     itself is not one, no checked round printed the file whole ([cat  *)
+(*     N] alone does, contiguously), and the era is the one at the       *)
+(*     longest printed prefix.  The one round the wire never checks (the *)
+(*     last line, typed as the last input byte) is re-resolved to the    *)
+(*     silent round, which ends no coverage.                              *)
 (*                                                                        *)
-(*  SEAM (a) for the later widening (filenames.md section 5): the         *)
-(*  canonicalisation reads the state through [line_file] and two          *)
-(*  name-locality lemmas -- a round moves only its line's file            *)
-(*  ([ustep_local]), and admits and prints reading only that file         *)
-(*  ([uok_local], [ucont_local]) -- although the model has one name.     *)
+(*  THE STATE IS A MAP OF FILES (filenames.md cut W1), and the            *)
+(*  canonicalisation works ONE NAME AT A TIME through seam (a): a round  *)
+(*  moves only its line's file ([ustep_local], [ustep_ins_cases]), and   *)
+(*  admits and prints reading only that file ([uok_local],               *)
+(*  [ucont_local]).  A file no line names is dropped ([disc_agree]); each *)
+(*  named file's content is cut with every other file carried along      *)
+(*  ([u_canon_name]); the candidates are the PRODUCT over the named       *)
+(*  files of the wire's subsequences ([prod_maps], [scandsU]), a finite  *)
+(*  list that is only ever decided.                                       *)
 (* ===================================================================== *)
 From Stdlib Require Import ZArith Lia List.
-From stdpp Require Import list list_numbers bitvector.definitions.
+From stdpp Require Import gmap list list_numbers bitvector.definitions.
 Require Import RiscvLang ObsTrace.
 Require Import LineWords EchoDisc LineBytes LineModel LineModelLinks.
 Require Import ProgTree PipesPair PipesDisc PipesDiscDec PipesDecE.
@@ -55,7 +60,7 @@ From stdpp Require Import ssreflect.
 Local Open Scope nat_scope.
 Local Open Scope list_scope.
 
-Local Notation fc0 := (files_of (Some [])).
+Local Notation fc0 := (files_of {[fname_f := []]}).
 
 Ltac ud_elem :=
   solve [ repeat first [ apply elem_of_list_here | apply elem_of_list_further ] ].
@@ -180,9 +185,15 @@ Qed.
 Lemma umergeb_prompt gp : umergeb gp u_prompt = false.
 Proof using. destruct gp; vm_compute; reflexivity. Qed.
 
+(* the state the coverage-ending outputs are realised at *)
+Lemma fstate_ok_nil1 : fstate_ok {[fname_f := []]}.
+Proof using.
+  rewrite /fstate_ok map_Forall_singleton. split; [reflexivity | left; constructor].
+Qed.
+
 (* WHAT THE DECIDER NEEDS OF AN ADMISSION *)
 Record ud_adm (adm : pline' -> bool) (gp : bool) (gpat : bytes) : Prop := {
-  uda_catf : forall g fs, adm (LPipes (PrCatF g) fs) = true -> g = fname_f;
+  uda_catf : forall g fs, adm (LPipes (PrCatF g) fs) = true -> uname g;
   uda_filt : forall p fs, adm (LPipes p fs) = true -> Forall (fun F => gp = true \/ F = FCat) fs;
   uda_real : forall p fs,
     p = PrEcho [] \/ p = PrCatF fname_f ->
@@ -240,7 +251,7 @@ Section umerge.
     unfold prodU. destruct p as [ws | g]; cbn [ud_prod]; intros Ha Hx;
       apply elem_of_list_In in Hx.
     - destruct Hx as [<- | [<- | []]]; ud_elem.
-    - pose proof (@uda_catf _ _ _ Hadm g fs Ha) as ->.
+    - pose proof (@uda_catf _ _ _ Hadm g fs Ha) as Hg. rewrite /uname in Hg. subst g.
       destruct Hx as [<- | [<- | [<- | [<- | []]]]]; ud_elem.
   Qed.
 
@@ -304,7 +315,7 @@ Section umerge.
       exists (MkSO cat_dg_write None (Some (WrHalt []))).
       split; [| reflexivity].
       apply (so_catf_halt _ _ fname_f []); [| apply prefix_nil].
-      cbn [prod_content]. rewrite !files_of_f. reflexivity.
+      cbn [prod_content]. rewrite !files_of_f lookup_singleton. reflexivity.
     - exists (PrCatF fname_f). split; [exact HC |]. eexists. split; [apply so_catf_open | reflexivity].
   Qed.
 
@@ -375,14 +386,14 @@ Section umerge.
   Proof using Hadm.
     split.
     - intros (s & _ & Hm). exact (umergeb_complete _ u Hm).
-    - intros Hb. exists (Some []). split; [cbn [fstate_ok]; left; constructor |].
+    - intros Hb. exists {[fname_f := []]}. split; [exact fstate_ok_nil1 |].
       exact (umergeb_sound u Hb).
   Qed.
 
   Lemma umerge_some_nil u : umerge adm u <-> pl_merge fc0 adm u.
   Proof using Hadm.
     split; [intros Hm; apply umergeb_sound, umerge_spec, Hm |].
-    intros Hm. exists (Some []). split; [cbn [fstate_ok]; left; constructor | exact Hm].
+    intros Hm. exists {[fname_f := []]}. split; [exact fstate_ok_nil1 | exact Hm].
   Qed.
 
   Lemma umerge_dec (u : bytes) : Decision (umerge adm u).
@@ -412,7 +423,7 @@ Lemma utermex_iff adm s l :
   (exists c, uok adm s l c /\ uterm c = true) <-> uterm_line adm l.
 Proof using.
   split.
-  - intros (c & Hok & Ht). destruct l as [ws | ws | | p n].
+  - intros (c & Hok & Ht). destruct l as [ws | ws N | N | p n].
     1-3: destruct c as [r | x | x]; cbn [uok uterm] in Hok, Ht;
          first [discriminate Ht | contradiction].
     destruct (uok_pipe _ _ _ _ _ Hok) as (x & -> & Hx).
@@ -420,7 +431,7 @@ Proof using.
     destruct Hx as [Hsafe | [Ha (_ & b' & (W & t & Wm & sp & Hlt & _) & _)]].
     { exfalso. destruct Hsafe as [H | [H | H]]; discriminate H. }
     split; [exact Ha | exact (line_term_pos _ _ _ _ _ Hlt)].
-  - destruct l as [ws | ws | | p n]; cbn [uterm_line]; [intros [] | intros [] | intros [] |].
+  - destruct l as [ws | ws N | N | p n]; cbn [uterm_line]; [intros [] | intros [] | intros [] |].
     intros [Ha Hn]. exists (upl p (PLTerm dg_fork_b)). split; [| rewrite upl_term; reflexivity].
     apply uok_upl. right. split; [exact Ha | exact (plterm_fork_ok _ p n Hn)].
 Qed.
@@ -428,28 +439,47 @@ Qed.
 (* ===================================================================== *)
 (*  3.  SEAM (a): THE FILE A LINE TOUCHES, AND NAME-LOCALITY              *)
 (*                                                                        *)
-(*  [line_file l]: the one file a round of [l] may create, change or     *)
-(*  read -- [f] at a redirect and at [cat f], the producer's file at a   *)
-(*  [cat g | ..] pipeline, none at an echo line or an echo pipeline.     *)
-(*  Names are byte strings ([FsTree.fname]).                              *)
+(*  [FileDisc.line_file l]: the one file a round of [l] may create,       *)
+(*  change or read -- [N] at a redirect and at [cat N], the producer's    *)
+(*  file at a [cat g | ..] pipeline, none at an echo line or an echo      *)
+(*  pipeline.  The canonicalisation below works ONE NAME AT A TIME         *)
+(*  through the two locality lemmas: a round moves only its line's file   *)
+(*  ([ustep_local], and [ustep_ins_cases] for the shape of that move),    *)
+(*  and admits and prints reading only that file ([uok_local],            *)
+(*  [ucont_local]).                                                       *)
 (* ===================================================================== *)
-
-Definition line_file (l : uline) : option bytes :=
-  match l with
-  | LEcho _ => None
-  | LEchoF _ | LCat => Some fname_f
-  | LPipe (PrEcho _) _ => None
-  | LPipe (PrCatF g) _ => Some g
-  end.
 
 (* LOCALITY 1: a round changes only its line's file *)
 Lemma ustep_local s l a g :
   line_file l <> Some g -> files_of (ustep s l a) g = files_of s g.
 Proof using.
-  intros Hl. destruct (decide (g = fname_f)) as [-> | Hg]; [| by rewrite !files_of_ne].
-  rewrite !files_of_f. destruct a as [r | x | x]; cbn [ustep]; [| reflexivity | reflexivity].
-  destruct l as [ws | ws | | p n]; [reflexivity | | | reflexivity];
-    exfalso; apply Hl; reflexivity.
+  intros Hl. rewrite /files_of. destruct a as [r | x | x]; cbn [ustep]; [| reflexivity | reflexivity].
+  destruct l as [ws | ws N | N | p n]; cbn [fsm]; [reflexivity | | reflexivity | reflexivity].
+  assert (HgN : N <> g) by (intros ->; exact (Hl eq_refl)).
+  destruct r; try reflexivity; try (by rewrite lookup_insert_ne).
+  destruct (s !! N); [reflexivity | by rewrite lookup_insert_ne].
+Qed.
+
+(* THE SHAPE OF A ROUND'S MOVE AT ONE NAME [N]: either the round commutes
+   with setting [N] (it does not touch [N], or it only reads it present),
+   or its result does not depend on what [N] held (it set [N]) *)
+Lemma ustep_ins_cases l a N :
+  (forall x t, ustep (<[N := x]> t) l a = <[N := x]> (ustep t l a))
+  \/ (forall x x' t, ustep (<[N := x]> t) l a = ustep (<[N := x']> t) l a).
+Proof using.
+  destruct a as [r | y | y]; cbn [ustep]; [| left; intros x t; reflexivity | left; intros x t; reflexivity].
+  destruct l as [ws | ws M | M | p n]; cbn [fsm];
+    [left; intros x t; reflexivity | | left; intros x t; reflexivity | left; intros x t; reflexivity].
+  destruct (decide (M = N)) as [-> | HMN].
+  - destruct r; try (left; intros x t; reflexivity).
+    + right. intros x x' t. by rewrite !insert_insert.
+    + right. intros x x' t. by rewrite !insert_insert.
+    + left. intros x t. rewrite lookup_insert.
+      destruct (t !! N); [reflexivity |]. by rewrite insert_insert.
+  - left. intros x t. destruct r; try reflexivity; try (by apply insert_commute).
+    destruct (t !! M) as [v |] eqn:E.
+    + rewrite lookup_insert_ne; [| congruence]. rewrite E. reflexivity.
+    + rewrite lookup_insert_ne; [| congruence]. rewrite E. by apply insert_commute.
 Qed.
 
 (* the content function is read only at the producer's file *)
@@ -517,7 +547,7 @@ Lemma uok_local adm s s' l a :
   (forall g, line_file l = Some g -> files_of s g = files_of s' g) ->
   uok adm s l a -> uok adm s' l a.
 Proof using.
-  intros Hf Hok. destruct l as [ws | ws | | [ws | g] n]; [exact Hok | exact Hok | exact Hok | |].
+  intros Hf Hok. destruct l as [ws | ws N | N | [ws | g] n]; [exact Hok | exact Hok | exact Hok | |].
   - exact (uok_echo_st adm s s' ws n a Hok).
   - destruct a as [r | x | x]; cbn [uok] in Hok |- *; try contradiction.
     destruct Hok as [Hs | [Ha Hb]]; [left; exact Hs | right; split; [exact Ha |]].
@@ -532,20 +562,27 @@ Proof using.
   intros Hf Hok. destruct a as [r | x | x]; cbn [ucont]; [| reflexivity | reflexivity].
   destruct (decide (cont s l r = cont s' l r)) as [E | Hne]; [exact E |].
   pose proof (cont_state_ne _ _ _ _ Hne) as ->. exfalso.
-  destruct l as [ws | ws | | p n]; cbn [uok ralt_ok] in Hok; try contradiction.
-  apply Hne. pose proof (Hf fname_f eq_refl) as E. rewrite !files_of_f in E. by rewrite E.
+  destruct l as [ws | ws N | N | p n]; cbn [uok ralt_ok] in Hok; try contradiction.
+  apply Hne. pose proof (Hf N eq_refl) as E. rewrite /files_of in E.
+  cbn [cont lname line_file default]. by rewrite E.
 Qed.
 
-(* a round at the file's own entry keeps a present content, or sets one
-   whatever it was *)
-Lemma ustep_some_cases l a :
-  (forall c, ustep (Some c) l a = Some c)
-  \/ (forall c c', ustep (Some c) l a = ustep (Some c') l a).
+(* two states that agree on a line's file stay so after its round, at
+   every name a round's file can be *)
+Lemma ustep_agree (Ns : list (list (bv 8))) s s' l a :
+  (forall N, N ∈ Ns -> s !! N = s' !! N) ->
+  (forall g, line_file l = Some g -> g ∈ Ns) ->
+  forall N, N ∈ Ns -> ustep s l a !! N = ustep s' l a !! N.
 Proof using.
-  destruct a as [r | x | x]; cbn [ustep]; [| left; intros c; reflexivity | left; intros c; reflexivity].
-  destruct l as [ws | ws | | p n];
-    [left; intros c; reflexivity | | left; intros c; reflexivity | left; intros c; reflexivity].
-  destruct r; first [left; intros c; reflexivity | right; intros c c'; reflexivity].
+  intros Hag Hl N HN. destruct a as [r | x | x]; cbn [ustep]; [| exact (Hag N HN) | exact (Hag N HN)].
+  destruct l as [ws | ws M | M | p n]; cbn [fsm]; try exact (Hag N HN).
+  pose proof (Hl M eq_refl) as HM.
+  destruct r; try exact (Hag N HN);
+    try (destruct (decide (M = N)) as [-> | HMN];
+         [by rewrite !lookup_insert | rewrite !lookup_insert_ne; [exact (Hag N HN) | done | done]]).
+  destruct (s' !! M) as [v |] eqn:E'; rewrite (Hag M HM) E'; [exact (Hag N HN) |].
+  destruct (decide (M = N)) as [-> | HMN];
+    [by rewrite !lookup_insert | rewrite !lookup_insert_ne; [exact (Hag N HN) | done | done]].
 Qed.
 
 (* ===================================================================== *)
@@ -774,80 +811,87 @@ Proof using.
     rewrite -Hc. apply stt_next; [exact Hso' | rewrite Hrd; exact Hp' | exact (IH _ Hw')].
 Qed.
 
-(* the round's content function, cut to [P] *)
-Lemma files_trunc (b0 P : bytes) f :
-  fcont_ok b0 -> P `prefix_of` b0 ->
-  GrepFilt.oneline (prod_content (files_of (Some b0)) (PrCatF f))
-  /\ prod_content (files_of (Some P)) (PrCatF f) `prefix_of` prod_content (files_of (Some b0)) (PrCatF f)
-  /\ (files_of (Some b0) f = Some (prod_content (files_of (Some b0)) (PrCatF f)) ->
-      files_of (Some P) f = Some (prod_content (files_of (Some P)) (PrCatF f)))
+(* the round's content function, cut to [P] at ONE name [N] whose content
+   is [b0]; every other file is left as it is *)
+Lemma files_trunc (c : fstate) (N : list (bv 8)) (b0 P : bytes) f :
+  fstate_ok c -> c !! N = Some b0 -> P `prefix_of` b0 ->
+  GrepFilt.oneline (prod_content (files_of c) (PrCatF f))
+  /\ prod_content (files_of (<[N := P]> c)) (PrCatF f) `prefix_of` prod_content (files_of c) (PrCatF f)
+  /\ (files_of c f = Some (prod_content (files_of c) (PrCatF f)) ->
+      files_of (<[N := P]> c) f = Some (prod_content (files_of (<[N := P]> c)) (PrCatF f)))
   /\ (forall x, (x `prefix_of` b0 -> x `prefix_of` P) ->
-                x `prefix_of` prod_content (files_of (Some b0)) (PrCatF f) ->
-                x `prefix_of` prod_content (files_of (Some P)) (PrCatF f)).
+                x `prefix_of` prod_content (files_of c) (PrCatF f) ->
+                x `prefix_of` prod_content (files_of (<[N := P]> c)) (PrCatF f)).
 Proof using.
-  intros Hb HP. cbn [prod_content]. destruct (decide (f = fname_f)) as [-> | Hf].
-  - rewrite !files_of_f. cbn [default].
-    split_and!; [exact (fcont_ok_nl b0 Hb) | exact HP | intros _; reflexivity | intros x Hx; exact Hx].
-  - rewrite !files_of_ne; [| exact Hf | exact Hf]. cbn [default].
-    split_and!; [unfold GrepFilt.oneline; left; apply not_elem_of_nil | reflexivity | intros H; discriminate H
-                | intros x _ Hx; exact Hx].
+  intros Hc HN HP. cbn [prod_content]. rewrite /files_of. cbv beta.
+  destruct (decide (f = N)) as [-> | Hf].
+  - rewrite lookup_insert HN. cbn [default].
+    split_and!; [exact (fcont_ok_nl b0 (proj2 (Hc N b0 HN))) | exact HP | intros _; reflexivity
+                | intros x Hx; exact Hx].
+  - destruct (c !! f) as [cf |] eqn:Hcf;
+      rewrite lookup_insert_ne; try congruence; rewrite Hcf; cbn [default].
+    + split_and!; [exact (fcont_ok_nl cf (proj2 (Hc f cf Hcf))) | reflexivity | intros H; exact H
+                  | intros x _ Hx; exact Hx].
+    + split_and!; [unfold GrepFilt.oneline; left; apply not_elem_of_nil | reflexivity
+                  | intros H; discriminate H | intros x _ Hx; exact Hx].
 Qed.
 
-Lemma line_run_trunc b0 P f fs ss :
-  fcont_ok b0 -> P `prefix_of` b0 ->
-  line_run (files_of (Some b0)) (LPipes (PrCatF f) fs) ss ->
+Lemma line_run_trunc c N b0 P f fs ss :
+  fstate_ok c -> c !! N = Some b0 -> P `prefix_of` b0 ->
+  line_run (files_of c) (LPipes (PrCatF f) fs) ss ->
   (forall x, last ss = Some x -> x `prefix_of` b0 -> x `prefix_of` P) ->
-  line_run (files_of (Some P)) (LPipes (PrCatF f) fs) ss.
+  line_run (files_of (<[N := P]> c)) (LPipes (PrCatF f) fs) ss.
 Proof using.
-  intros Hb HP H Hx. destruct (files_trunc b0 P f Hb HP) as (HL & HLP & Hfc & Hfit).
+  intros Hc HN HP H Hx. destruct (files_trunc c N b0 P f Hc HN HP) as (HL & HLP & Hfc & Hfit).
   remember (LPipes (PrCatF f) fs) as l eqn:Hl.
   destruct H as [ws | ws | ws | p fs' Hn | p fs' so ss' Hso Hr]; try discriminate Hl;
     injection Hl as -> ->.
   - apply lr_pipe_fail. exact Hn.
-  - destruct (prod_trunc _ (files_of (Some P)) _ _ f so HLP Hfc Hso) as (so' & Hso' & Hc & Hw).
-    rewrite -Hc. apply lr_node; [exact Hso' |].
-    apply (sfx_trunc (files_of (Some b0)) _ _ _ _ _ _ _ _ HL HLP Hr Hw).
+  - destruct (prod_trunc _ (files_of (<[N := P]> c)) _ _ f so HLP Hfc Hso) as (so' & Hso' & Hcs & Hw).
+    rewrite -Hcs. apply lr_node; [exact Hso' |].
+    apply (sfx_trunc (files_of c) _ _ _ _ _ _ _ _ HL HLP Hr Hw).
     apply (fits_cons _ _ (so_cons so) ss'); [exact (sfx_run_ne _ _ _ _ _ _ Hr) |].
     intros x Hlx Hxl. apply (Hfit x); [exact (Hx x Hlx) | exact Hxl].
 Qed.
 
-Lemma line_term_trunc b0 P f fs W s :
-  fcont_ok b0 -> P `prefix_of` b0 ->
-  line_term (files_of (Some b0)) (LPipes (PrCatF f) fs) W s ->
-  line_term (files_of (Some P)) (LPipes (PrCatF f) fs) W s.
+Lemma line_term_trunc c N b0 P f fs W s :
+  fstate_ok c -> c !! N = Some b0 -> P `prefix_of` b0 ->
+  line_term (files_of c) (LPipes (PrCatF f) fs) W s ->
+  line_term (files_of (<[N := P]> c)) (LPipes (PrCatF f) fs) W s.
 Proof using.
-  intros Hb HP H. destruct (files_trunc b0 P f Hb HP) as (HL & HLP & Hfc & _).
+  intros Hc HN HP H. destruct (files_trunc c N b0 P f Hc HN HP) as (HL & HLP & Hfc & _).
   remember (LPipes (PrCatF f) fs) as l eqn:Hl.
   destruct H as [p fs' so Hn Hso | p fs' so W' s' Hso Ht]; injection Hl as -> ->.
-  - destruct (prod_trunc _ (files_of (Some P)) _ _ f so HLP Hfc Hso) as (so' & Hso' & Hc & _).
-    rewrite -Hc. apply lt_here; [exact Hn | exact Hso'].
-  - destruct (prod_trunc _ (files_of (Some P)) _ _ f so HLP Hfc Hso) as (so' & Hso' & Hc & Hw).
-    rewrite -Hc. apply lt_next; [exact Hso' |].
-    exact (sfx_term_trunc (files_of (Some b0)) _ _ _ _ _ _ _ _ _ HL HLP Ht Hw).
+  - destruct (prod_trunc _ (files_of (<[N := P]> c)) _ _ f so HLP Hfc Hso) as (so' & Hso' & Hcs & _).
+    rewrite -Hcs. apply lt_here; [exact Hn | exact Hso'].
+  - destruct (prod_trunc _ (files_of (<[N := P]> c)) _ _ f so HLP Hfc Hso) as (so' & Hso' & Hcs & Hw).
+    rewrite -Hcs. apply lt_next; [exact Hso' |].
+    exact (sfx_term_trunc (files_of c) _ _ _ _ _ _ _ _ _ HL HLP Ht Hw).
 Qed.
 
-(* THE TRUNCATION LEMMA (review S2, at every filter stage list): a run at
-   content [b0] whose printed content, if a prefix of [b0], is a prefix of
-   [P] stays a run -- with the SAME block -- at [b0]'s prefix [P] *)
-Theorem blocks_trunc b0 P f fs ss b :
-  fcont_ok b0 -> P `prefix_of` b0 ->
-  line_run (files_of (Some b0)) (LPipes (PrCatF f) fs) ss -> merge_all ss b ->
+(* THE TRUNCATION LEMMA (review S2, at every filter stage list, at one
+   name): a run at a state whose file [N] holds [b0], whose printed
+   content, if a prefix of [b0], is a prefix of [P], stays a run -- with
+   the SAME block -- at the state whose [N] holds [b0]'s prefix [P] *)
+Theorem blocks_trunc c N b0 P f fs ss b :
+  fstate_ok c -> c !! N = Some b0 -> P `prefix_of` b0 ->
+  line_run (files_of c) (LPipes (PrCatF f) fs) ss -> merge_all ss b ->
   (forall x, last ss = Some x -> x `prefix_of` b0 -> x `prefix_of` P) ->
-  line_blocks (files_of (Some P)) (LPipes (PrCatF f) fs) b.
+  line_blocks (files_of (<[N := P]> c)) (LPipes (PrCatF f) fs) b.
 Proof using.
-  intros Hb HP Hr Hm Hx. exists ss.
-  split; [exact (line_run_trunc b0 P f fs ss Hb HP Hr Hx) | exact Hm].
+  intros Hc HN HP Hr Hm Hx. exists ss.
+  split; [exact (line_run_trunc c N b0 P f fs ss Hc HN HP Hr Hx) | exact Hm].
 Qed.
 
 (* ...and a terminal block is one at every prefix *)
-Theorem terms_trunc b0 P f fs b :
-  fcont_ok b0 -> P `prefix_of` b0 ->
-  plalt_ok (files_of (Some b0)) (LPipes (PrCatF f) fs) (PLTerm b) ->
-  plalt_ok (files_of (Some P)) (LPipes (PrCatF f) fs) (PLTerm b).
+Theorem terms_trunc c N b0 P f fs b :
+  fstate_ok c -> c !! N = Some b0 -> P `prefix_of` b0 ->
+  plalt_ok (files_of c) (LPipes (PrCatF f) fs) (PLTerm b) ->
+  plalt_ok (files_of (<[N := P]> c)) (LPipes (PrCatF f) fs) (PLTerm b).
 Proof using.
-  intros Hb HP [Hne (b' & (W & t & Wm & sp & Hlt & HWm & Hsp & Hm) & Hp)].
+  intros Hc HN HP [Hne (b' & (W & t & Wm & sp & Hlt & HWm & Hsp & Hm) & Hp)].
   split; [exact Hne |]. exists b'. split; [| exact Hp]. exists W, t, Wm, sp.
-  split_and!; [exact (line_term_trunc b0 P f fs W t Hb HP Hlt) | exact HWm | exact Hsp | exact Hm].
+  split_and!; [exact (line_term_trunc c N b0 P f fs W t Hc HN HP Hlt) | exact HWm | exact Hsp | exact Hm].
 Qed.
 
 (* ===================================================================== *)
@@ -902,7 +946,7 @@ Definition ucands (s : fstate) (l : uline) : list nat :=
 
 Lemma ucands_complete adm s l a : uok adm s l a -> ualt_code a ∈ ucands s l.
 Proof using.
-  intros H. destruct l as [ws | ws | | p n].
+  intros H. destruct l as [ws | ws N | N | p n].
   1-3: destruct a as [r | x | x]; cbn [uok] in H; try contradiction;
        cbn [ucands ualt_code]; apply elem_of_list_fmap; exists (ralt_enc r);
        split; [reflexivity | exact (ralt_cands_enc _ r H)].
@@ -1011,12 +1055,66 @@ Section wire.
 End wire.
 
 (* ===================================================================== *)
-(*  7.  THE BOOT-STATE CANONICALISATION                                   *)
+(*  7.  THE BOOT-STATE CANONICALISATION, ONE NAME AT A TIME               *)
+(*                                                                        *)
+(*  A disciplined era has a disciplined boot state among [scandsU seg]:   *)
+(*  the maps over the files the era's lines name, each content a         *)
+(*  subsequence of the wire ([prod_maps]).  Two steps, both through the   *)
+(*  seam.  A file no line names is never read or moved, so it may be     *)
+(*  dropped ([disc_agree]).  A named file's content may be cut to the     *)
+(*  longest prefix of it the checked rounds printed, every other file     *)
+(*  carried along unchanged ([u_canon_name]) -- and that is done one name *)
+(*  at a time.                                                            *)
 (* ===================================================================== *)
 
-(* the boot states worth trying: absent, or a subsequence of the wire *)
+(* the files an era's complete lines name *)
+Definition seg_names (seg : list mobs) : list (list (bv 8)) :=
+  remove_dups (omap line_file (uline_of_u <$> bodies_of (ins seg))).
+
+Lemma seg_names_line seg i g :
+  i < nlines (ins seg) ->
+  line_file (uline_of_u (bodies_of (ins seg) !!! i)) = Some g -> g ∈ seg_names seg.
+Proof using.
+  intros Hi Hg. rewrite /seg_names elem_of_remove_dups. apply elem_of_list_omap.
+  exists (uline_of_u (bodies_of (ins seg) !!! i)). split; [| exact Hg].
+  apply elem_of_list_fmap. exists (bodies_of (ins seg) !!! i). split; [reflexivity |].
+  apply elem_of_list_lookup_total_2. exact Hi.
+Qed.
+
+(* THE PRODUCT BOOT-STATE CHOOSER: every map over the names [Ns] whose
+   contents are drawn from [vs] -- a finite list, only ever decided *)
+Fixpoint prod_maps (Ns : list (list (bv 8))) (vs : list bytes) : list fstate :=
+  match Ns with
+  | [] => [∅]
+  | N :: Ns' =>
+      prod_maps Ns' vs ++ (vs ≫= fun v => (fun m => <[N := v]> m) <$> prod_maps Ns' vs)
+  end.
+
+Lemma prod_maps_complete Ns vs (s : fstate) :
+  NoDup Ns -> (forall N c, s !! N = Some c -> N ∈ Ns /\ c ∈ vs) -> s ∈ prod_maps Ns vs.
+Proof using.
+  revert s. induction Ns as [| N Ns IH]; intros s Hnd Hs; cbn [prod_maps].
+  - assert (Hs0 : s = ∅).
+    { apply map_empty. intros M. destruct (s !! M) as [c |] eqn:Hc; [| exact Hc].
+      destruct (Hs M c Hc) as [HM _]. by apply elem_of_nil in HM. }
+    rewrite Hs0. apply elem_of_list_here.
+  - apply NoDup_cons in Hnd as [HN Hnd].
+    apply elem_of_app. destruct (s !! N) as [c |] eqn:Hc.
+    + right. apply elem_of_list_bind. exists c. split; [| exact (proj2 (Hs N c Hc))].
+      apply elem_of_list_fmap. exists (delete N s). split; [by rewrite insert_delete |].
+      apply IH; [exact Hnd |]. intros M c' HM.
+      destruct (decide (M = N)) as [-> | HMN]; [by rewrite lookup_delete in HM |].
+      rewrite lookup_delete_ne in HM; [| congruence].
+      destruct (Hs M c' HM) as [HMin Hc']. split; [| exact Hc'].
+      apply elem_of_cons in HMin as [-> | HMin]; [done | exact HMin].
+    + left. apply IH; [exact Hnd |]. intros M c' HM.
+      destruct (Hs M c' HM) as [HMin Hc']. split; [| exact Hc'].
+      apply elem_of_cons in HMin as [-> | HMin]; [congruence | exact HMin].
+Qed.
+
+(* the boot states worth trying *)
 Definition scandsU (seg : list mobs) : list fstate :=
-  None :: (Some <$> ud_sublists (obs_wire Uart0 seg)).
+  prod_maps (seg_names seg) (ud_sublists (obs_wire Uart0 seg)).
 
 (* ...at an admission [ud_adm] describes, to the end of the file *)
 Section canon.
@@ -1024,70 +1122,153 @@ Section canon.
   Hypothesis Hadm : ud_adm adm gp gpat.
   Local Notation U := (ulm adm).
 
-(* THE PRISTINE PAIR: until a round sets [f], the chains at two present
-   boot contents are their own boot contents; from then on they agree.
-   Read through the seam: a round off [f] moves nothing of it
-   ([ustep_local]); a round on [f] keeps it or sets it whatever it was. *)
-Lemma upto_pristine cs b0 P bs i :
-  (lm_upto U cs (Some b0) bs i = Some b0 /\ lm_upto U cs (Some P) bs i = Some P)
-  \/ lm_upto U cs (Some b0) bs i = lm_upto U cs (Some P) bs i.
+(* the state a checked round starts in is a state *)
+Lemma upto_fok seg (s : fstate) cs i :
+  fstate_ok s -> lm_disc_input U (ins seg) -> lm_alts_ok U s (ins seg) cs ->
+  i <= nlines (ins seg) -> fstate_ok (lm_upto U cs s (bodies_of (ins seg)) i).
 Proof using.
-  induction i as [| i IH]; [by left |].
-  cbn [lm_upto]. destruct IH as [[H1 H2] | He]; [| right; by rewrite He].
-  rewrite H1 H2. change (lm_step U) with ustep. change (lm_of U) with uline_of_u.
-  set (l := uline_of_u (bs !!! i)). set (a := lm_at U cs i).
-  destruct (decide (line_file l = Some fname_f)) as [Hf | Hf].
-  - destruct (ustep_some_cases l a) as [Hk | Ho]; [left; split; apply Hk | right; apply Ho].
-  - left. split.
-    + pose proof (ustep_local (Some b0) l a fname_f Hf) as E. by rewrite !files_of_f in E.
-    + pose proof (ustep_local (Some P) l a fname_f Hf) as E. by rewrite !files_of_f in E.
+  intros Hs Hin Halts Hi. apply (lm_upto_st_ok U (ulm_laws adm)); [exact Hs | |].
+  - intros j Hj. apply (uline_of_u_ok adm).
+    destruct (lookup_lt_is_Some_2 (bodies_of (ins seg)) j ltac:(rewrite /nlines in Hi; lia))
+      as [b Hb].
+    rewrite (list_lookup_total_correct _ _ _ Hb). exact (Forall_lookup_1 _ _ _ _ (proj1 Hin) Hb).
+  - intros j Hj. apply (proj2 Halts). lia.
 Qed.
 
-(* a present content printed differently at two contents: only [cat f] *)
-Lemma ucont_pristine b0 P l a : ucont (Some b0) l a <> ucont (Some P) l a -> a = UR RCRan.
+(* ---- STEP ONE: the files no line names are dropped ---- *)
+
+(* the chains at two boot states agreeing on the era's named files agree
+   there at every round *)
+Lemma upto_agree seg cs (s s' : fstate) i :
+  (forall N, N ∈ seg_names seg -> s !! N = s' !! N) ->
+  i <= nlines (ins seg) ->
+  forall N, N ∈ seg_names seg ->
+    (lm_upto U cs s (bodies_of (ins seg)) i : fstate) !! N = lm_upto U cs s' (bodies_of (ins seg)) i !! N.
+Proof using.
+  intros Hag. induction i as [| i IH]; intros Hi; [exact Hag |].
+  cbn [lm_upto]. change (lm_step U) with ustep. change (lm_of U) with uline_of_u.
+  apply (ustep_agree (seg_names seg)); [apply IH; lia |].
+  intros g Hg. exact (seg_names_line seg i g ltac:(lia) Hg).
+Qed.
+
+Lemma disc_agree seg (s s' : fstate) :
+  (forall N, N ∈ seg_names seg -> s !! N = s' !! N) ->
+  lm_disc_seg' U s seg -> lm_disc_seg' U s' seg.
+Proof using.
+  intros Hag [Hin (ps & cs & Halts & Hd4 & Hall)].
+  assert (Hf : forall i, i < nlines (ins seg) -> forall g,
+             line_file (uline_of_u (bodies_of (ins seg) !!! i)) = Some g ->
+             files_of (lm_upto U cs s (bodies_of (ins seg)) i) g
+             = files_of (lm_upto U cs s' (bodies_of (ins seg)) i) g).
+  { intros i Hi g Hg. apply (upto_agree seg cs s s' i Hag); [lia |].
+    exact (seg_names_line seg i g Hi Hg). }
+  assert (Hok : forall i, i < nlines (ins seg) ->
+             lm_ok U (lm_upto U cs s (bodies_of (ins seg)) i)
+               (lm_of U (bodies_of (ins seg) !!! i)) (lm_at U cs i))
+    by exact (proj2 Halts).
+  assert (Hcont : forall i, i < nlines (ins seg) ->
+             lm_cont U (lm_upto U cs s' (bodies_of (ins seg)) i)
+               (lm_of U (bodies_of (ins seg) !!! i)) (lm_at U cs i)
+             = lm_cont U (lm_upto U cs s (bodies_of (ins seg)) i)
+                 (lm_of U (bodies_of (ins seg) !!! i)) (lm_at U cs i)).
+  { intros i Hi. symmetry. exact (ucont_local adm _ _ _ _ (Hf i Hi) (Hok i Hi)). }
+  split; [exact Hin |]. exists ps, cs. split_and!.
+  - split; [exact (proj1 Halts) |]. intros i Hi.
+    exact (uok_local adm _ _ _ _ (Hf i Hi) (Hok i Hi)).
+  - intros i Hi Hex Hm. apply (Hd4 i Hi).
+    + destruct Hex as (c & Hc & Ht). exists c. split; [| exact Ht].
+      apply (uok_local adm (lm_upto U cs s' (bodies_of (ins seg)) i)); [| exact Hc].
+      intros g Hg. symmetry. exact (Hf i Hi g Hg).
+    + rewrite -(Hcont i Hi). exact Hm.
+  - intros p Hp. destruct (Hall p Hp) as [Hpo Hpt]. split; [exact Hpo |].
+    assert (Hq : nlines (ins p) <= nlines (ins seg)).
+    { apply nlines_prefix, ins_prefix.
+      exact (proj1 (Forall_forall _ _) (in_pres_prefix_all seg) p Hp). }
+    assert (E : lm_seq U ps cs s' (bodies_of (ins p)) (nlines (ins p))
+                = lm_seq U ps cs s (bodies_of (ins p)) (nlines (ins p))).
+    { apply um_seq_cont_ext. intros i Hi. rewrite /lm_cont_at. f_equal.
+      assert (Hbs : forall j, j <= i -> bodies_of (ins p) !!! j = bodies_of (ins seg) !!! j)
+        by (intros j Hj; apply (um_pres_bodies seg p j Hp); lia).
+      rewrite (lm_upto_bs_ext U cs s' (bodies_of (ins p)) (bodies_of (ins seg)) i);
+        [| intros j Hj; apply Hbs; lia].
+      rewrite (lm_upto_bs_ext U cs s (bodies_of (ins p)) (bodies_of (ins seg)) i);
+        [| intros j Hj; apply Hbs; lia].
+      rewrite (Hbs i ltac:(lia)). exact (Hcont i ltac:(lia)). }
+    rewrite /lm_disc_pt /lm_sess bodies_of_done nlines_done E.
+    rewrite /lm_disc_pt /lm_sess bodies_of_done nlines_done in Hpt. exact Hpt.
+Qed.
+
+(* ---- STEP TWO: one named file's content, cut ---- *)
+
+(* THE PRISTINE PAIR AT ONE NAME: until a round sets [N], the chain at the
+   cut boot state is the chain at [b0] with [N] cut to [P]; from the first
+   round that sets [N] the two agree.  Read through the seam: a round
+   either commutes with setting [N] or does not depend on it
+   ([ustep_ins_cases]). *)
+Lemma upto_pristine cs (s : fstate) N b0 P bs i :
+  s !! N = Some b0 ->
+  ((lm_upto U cs s bs i : fstate) !! N = Some b0
+   /\ lm_upto U cs (<[N := P]> s) bs i = <[N := P]> (lm_upto U cs s bs i : fstate))
+  \/ lm_upto U cs s bs i = lm_upto U cs (<[N := P]> s) bs i.
+Proof using.
+  intros Hs. induction i as [| i IH]; [left; split; [exact Hs | reflexivity] |].
+  cbn [lm_upto]. destruct IH as [[H1 H2] | He]; [| right; by rewrite He].
+  rewrite H2. change (lm_step U) with ustep. change (lm_of U) with uline_of_u.
+  destruct (ustep_ins_cases (uline_of_u (bs !!! i)) (lm_at U cs i) N) as [Hc | Hi].
+  - left. rewrite (Hc P (lm_upto U cs s bs i)). split; [| reflexivity].
+    rewrite -(insert_id (lm_upto U cs s bs i : fstate) N b0 H1).
+    rewrite (Hc b0 (lm_upto U cs s bs i)). apply lookup_insert.
+  - right. rewrite -{1}(insert_id (lm_upto U cs s bs i : fstate) N b0 H1). apply Hi.
+Qed.
+
+(* a round printing differently at the two chains is [cat N] *)
+Lemma ucont_pristine t N P l a :
+  ucont t l a <> ucont (<[N := P]> t) l a -> a = UR RCRan /\ lname l = N.
 Proof using.
   destruct a as [r | x | x]; cbn [ucont];
     [| intros H; exfalso; exact (H eq_refl) | intros H; exfalso; exact (H eq_refl)].
-  intros H. f_equal. exact (cont_state_ne _ _ l r H).
+  intros H. pose proof (cont_state_ne _ _ l r H) as ->. split; [reflexivity |].
+  destruct (decide (lname l = N)) as [E | E]; [exact E |]. exfalso. apply H.
+  cbn [cont]. rewrite lookup_insert_ne; [reflexivity | congruence].
 Qed.
 
-(* WHAT A CHECKED ROUND AT THE BOOT CONTENT NEEDS OF [P]: at a [cat g |
-   ..] pipeline that printed [b], a run of [b] whose printed content, if
-   it is [f]'s, fits in [P] *)
-Definition ud_good (b0 P : bytes) (l : uline) (a : ualt) : Prop :=
+(* WHAT A CHECKED ROUND AT A STATE [c] WHOSE [N] HOLDS [b0] NEEDS OF [P]:
+   at a [cat g | ..] pipeline that printed [b], a run of [b] whose printed
+   content, if it is a prefix of [b0], fits in [P] *)
+Definition ud_good (c : fstate) (b0 P : bytes) (l : uline) (a : ualt) : Prop :=
   forall g n b, l = LPipe (PrCatF g) n -> a = UPC (PLRun b) ->
     adm (LPipes (PrCatF g) n) = true ->
-    plalt_ok (files_of (Some b0)) (LPipes (PrCatF g) n) (PLRun b) ->
-    exists ss, line_run (files_of (Some b0)) (LPipes (PrCatF g) n) ss /\ merge_all ss b
+    plalt_ok (files_of c) (LPipes (PrCatF g) n) (PLRun b) ->
+    exists ss, line_run (files_of c) (LPipes (PrCatF g) n) ss /\ merge_all ss b
                /\ (forall x, last ss = Some x -> x `prefix_of` b0 -> x `prefix_of` P).
 
-Lemma ud_good_mono b0 P P' l a : P `prefix_of` P' -> ud_good b0 P l a -> ud_good b0 P' l a.
+Lemma ud_good_mono c b0 P P' l a : P `prefix_of` P' -> ud_good c b0 P l a -> ud_good c b0 P' l a.
 Proof using.
   intros HP H g n b Hl Ha Had Hok. destruct (H g n b Hl Ha Had Hok) as (ss & Hr & Hm & Hx).
   exists ss. split_and!; [exact Hr | exact Hm |]. intros x Hl' Hxb. etrans; [exact (Hx x Hl' Hxb) | exact HP].
 Qed.
 
 (* one more round: [P] grows to the round's printed content when that is
-   a longer prefix of [f] *)
-Lemma ud_good_step b0 P l a (Wr : bytes) :
+   a longer prefix of [b0] *)
+Lemma ud_good_step c b0 P l a (Wr : bytes) :
   P `prefix_of` b0 -> P `sublist_of` Wr ->
   (forall b, a = UPC (PLRun b) -> b `sublist_of` Wr) ->
-  exists P', P `prefix_of` P' /\ P' `prefix_of` b0 /\ P' `sublist_of` Wr /\ ud_good b0 P' l a.
+  exists P', P `prefix_of` P' /\ P' `prefix_of` b0 /\ P' `sublist_of` Wr /\ ud_good c b0 P' l a.
 Proof using.
   intros HPb HPw Hbw.
-  assert (Hkeep : ud_good b0 P l a -> exists P', P `prefix_of` P' /\ P' `prefix_of` b0
-                                           /\ P' `sublist_of` Wr /\ ud_good b0 P' l a)
+  assert (Hkeep : ud_good c b0 P l a -> exists P', P `prefix_of` P' /\ P' `prefix_of` b0
+                                           /\ P' `sublist_of` Wr /\ ud_good c b0 P' l a)
     by (intros Hg; exists P; split_and!; [reflexivity | exact HPb | exact HPw | exact Hg]).
-  destruct l as [ws | ws | | [ws | g] n];
+  destruct l as [ws | ws N | N | [ws | g] n];
     try (apply Hkeep; intros g' n' b' Hl; discriminate Hl).
   destruct a as [r | x | [| b | b]];
     try (apply Hkeep; intros g' n' b' _ Ha; discriminate Ha).
   destruct (decide (adm (LPipes (PrCatF g) n) = true
-                    /\ plalt_ok (files_of (Some b0)) (LPipes (PrCatF g) n) (PLRun b)))
+                    /\ plalt_ok (files_of c) (LPipes (PrCatF g) n) (PLRun b)))
     as [[Had (ss & Hr & Hm)] | Hno].
   2: { apply Hkeep. intros g' n' b' [= <- <-] [= <-] Had Hok. exfalso. apply Hno. by split. }
   assert (Hwit : forall P', (forall x, last ss = Some x -> x `prefix_of` b0 -> x `prefix_of` P') ->
-                            ud_good b0 P' (LPipe (PrCatF g) n) (UPC (PLRun b))).
+                            ud_good c b0 P' (LPipe (PrCatF g) n) (UPC (PLRun b))).
   { intros P' Hx g' n' b' [= <- <-] [= <-] _ _. exists ss. split_and!; [exact Hr | exact Hm | exact Hx]. }
   destruct (last ss) as [x |] eqn:Hl.
   2: { exists P. split_and!; [reflexivity | exact HPb | exact HPw |].
@@ -1105,64 +1286,74 @@ Proof using.
     apply Hwit. intros x' Hx' _. try rewrite Hl in Hx'. injection Hx' as <-. exact HxP.
 Qed.
 
-(* ADMISSIBILITY AT THE TRUNCATED BOOT CONTENT, at a round still at the
-   boot content.  Off [f]: locality.  On [f]: a redirect and [cat f] read
-   no state to admit; a [cat f] pipeline's blocks truncate. *)
-Lemma uok_trunc b0 P l a :
-  fcont_ok b0 -> P `prefix_of` b0 -> ud_good b0 P l a -> uok adm (Some b0) l a -> uok adm (Some P) l a.
+(* ADMISSIBILITY AT THE CUT STATE, at a round whose [N] still holds [b0].
+   Off [N]: locality.  On [N]: a redirect and [cat N] read no state to
+   admit; a [cat N] pipeline's blocks truncate. *)
+Lemma uok_trunc c N b0 P l a :
+  fstate_ok c -> c !! N = Some b0 -> P `prefix_of` b0 -> ud_good c b0 P l a ->
+  uok adm c l a -> uok adm (<[N := P]> c) l a.
 Proof using.
-  intros Hb0 HP Hg Hok.
-  destruct (decide (line_file l = Some fname_f)) as [Hf | Hf].
-  2: { apply (uok_local _ (Some b0)); [| exact Hok].
-       intros g Hg'. rewrite !files_of_ne; [done | |]; intros ->; exact (Hf Hg'). }
-  destruct l as [ws | ws | | [ws | g] n]; cbn [line_file] in Hf; try discriminate Hf;
+  intros Hc HN HP Hg Hok.
+  destruct (decide (line_file l = Some N)) as [Hf | Hf].
+  2: { apply (uok_local _ c); [| exact Hok].
+       intros g Hg'. rewrite /files_of lookup_insert_ne; [reflexivity |].
+       intros ->. exact (Hf Hg'). }
+  destruct l as [ws | ws M | M | [ws | g] n]; cbn [line_file] in Hf; try discriminate Hf;
     [exact Hok | exact Hok |].
   injection Hf as ->.
   destruct (uok_pipe _ _ _ _ _ Hok) as (x & -> & Hx). apply uok_upl.
   destruct Hx as [Hs | [Ha Hb]]; [left; exact Hs | right; split; [exact Ha |]].
   destruct x as [| b | b].
   - exact I.
-  - destruct (Hg fname_f n b eq_refl eq_refl Ha Hb) as (ss & Hr & Hm & Hx).
-    exact (blocks_trunc b0 P fname_f n ss b Hb0 HP Hr Hm Hx).
-  - exact (terms_trunc b0 P fname_f n b Hb0 HP Hb).
+  - destruct (Hg N n b eq_refl eq_refl Ha Hb) as (ss & Hr & Hm & Hx).
+    exact (blocks_trunc c N b0 P N n ss b Hc HN HP Hr Hm Hx).
+  - exact (terms_trunc c N b0 P N n b Hc HN HP Hb).
 Qed.
 
-(* THE CANONICALISATION: a disciplined era has a disciplined boot state
-   among [scandsU] *)
-Theorem u_canon_s seg s :
-  fstate_ok s -> lm_disc_seg' U s seg ->
-  exists s', s' ∈ scandsU seg /\ fstate_ok s' /\ lm_disc_seg' U s' seg.
+(* THE CANONICALISATION AT ONE NAME: a disciplined era whose boot file [N]
+   holds [b0] is disciplined at the boot state whose [N] holds a prefix of
+   [b0] that is a subsequence of the wire, every other file unchanged *)
+Theorem u_canon_name seg (s : fstate) N b0 :
+  fstate_ok s -> s !! N = Some b0 -> lm_disc_seg' U s seg ->
+  exists P, P `prefix_of` b0 /\ P ∈ ud_sublists (obs_wire Uart0 seg)
+            /\ lm_disc_seg' U (<[N := P]> s) seg.
 Proof using Hadm.
-  intros Hok Hd. rewrite /scandsU.
-  destruct s as [b0 |]; [| exists None; split; [apply elem_of_list_here | by split]].
+  intros Hok HN Hd.
   destruct (decide (b0 ∈ ud_sublists (obs_wire Uart0 seg))) as [Hb | Hnb].
-  { exists (Some b0). split; [| by split].
-    apply elem_of_list_further, elem_of_list_fmap. by exists b0. }
+  { exists b0. split_and!; [reflexivity | exact Hb |]. by rewrite insert_id. }
   destruct Hd as (Hin & ps & cs & Halts & Hd4 & Hall).
-  assert (Hpt : forall p, p ∈ in_pres seg -> lm_disc_pt U ps cs (Some b0) p)
+  assert (Hpt : forall p, p ∈ in_pres seg -> lm_disc_pt U ps cs s p)
     by (intros p Hp; exact (proj2 (Hall p Hp))).
   assert (Hwire : forall i, i < nlines_max (in_pres seg) ->
-            infixed (lm_blk U ps cs (Some b0) (bodies_of (ins seg)) i) (obs_wire Uart0 seg))
-    by (intros i Hi; exact (um_blk_on_wire U seg ps cs (Some b0) i Hpt Hi)).
-  (* a checked round at the boot content never prints [f] whole *)
+            infixed (lm_blk U ps cs s (bodies_of (ins seg)) i) (obs_wire Uart0 seg))
+    by (intros i Hi; exact (um_blk_on_wire U seg ps cs s i Hpt Hi)).
+  assert (Hmax : nlines_max (in_pres seg) <= nlines (ins seg)).
+  { destruct (decide (in_pres seg = [])) as [Hz | Hz]; [rewrite Hz; cbn; lia |].
+    destruct (nlines_max_mem (in_pres seg) Hz) as (pl & Hplin & Hpleq). rewrite -Hpleq.
+    apply nlines_prefix, ins_prefix.
+    exact (proj1 (Forall_forall _ _) (in_pres_prefix_all seg) pl Hplin). }
+  (* a checked round still at [b0] never prints [N] whole *)
   assert (Hnran : forall i, i < nlines_max (in_pres seg) ->
-            lm_upto U cs (Some b0) (bodies_of (ins seg)) i = Some b0 ->
-            lm_at U cs i <> UR RCRan).
-  { intros i Hi Hs Ha. apply Hnb, elem_of_ud_sublists, ud_infixed_sublist.
-    apply (ud_infixed_trans _ (lm_blk U ps cs (Some b0) (bodies_of (ins seg)) i));
+            (lm_upto U cs s (bodies_of (ins seg)) i : fstate) !! N = Some b0 ->
+            lm_at U cs i = UR RCRan -> lname (lm_of U (bodies_of (ins seg) !!! i)) = N -> False).
+  { intros i Hi Hs Ha Hl. apply Hnb, elem_of_ud_sublists, ud_infixed_sublist.
+    apply (ud_infixed_trans _ (lm_blk U ps cs s (bodies_of (ins seg)) i));
       [| exact (Hwire i Hi)].
-    assert (Hc : lm_cont U (Some b0) (lm_of U (bodies_of (ins seg) !!! i)) (UR RCRan)
-                 = b0 ++ u_prompt) by reflexivity.
-    rewrite /lm_blk /lm_cont_at Hs Ha Hc. apply ud_infixed_mid. }
+    assert (Hc : lm_cont U (lm_upto U cs s (bodies_of (ins seg)) i)
+                   (lm_of U (bodies_of (ins seg) !!! i)) (UR RCRan) = b0 ++ u_prompt).
+    { change (lm_cont U) with ucont. cbn [ucont cont]. rewrite Hl Hs. reflexivity. }
+    rewrite /lm_blk /lm_cont_at Ha Hc. apply ud_infixed_mid. }
   (* THE LONGEST PRINTED PREFIX *)
   assert (HP : exists P, P `prefix_of` b0 /\ P `sublist_of` obs_wire Uart0 seg
                  /\ forall i, i < nlines_max (in_pres seg) ->
-                      lm_upto U cs (Some b0) (bodies_of (ins seg)) i = Some b0 ->
-                      ud_good b0 P (lm_of U (bodies_of (ins seg) !!! i)) (lm_at U cs i)).
+                      (lm_upto U cs s (bodies_of (ins seg)) i : fstate) !! N = Some b0 ->
+                      ud_good (lm_upto U cs s (bodies_of (ins seg)) i) b0 P
+                        (lm_of U (bodies_of (ins seg) !!! i)) (lm_at U cs i)).
   { cut (forall js, exists P, P `prefix_of` b0 /\ P `sublist_of` obs_wire Uart0 seg
             /\ Forall (fun i => i < nlines_max (in_pres seg) ->
-                               lm_upto U cs (Some b0) (bodies_of (ins seg)) i = Some b0 ->
-                               ud_good b0 P (lm_of U (bodies_of (ins seg) !!! i)) (lm_at U cs i))
+                               (lm_upto U cs s (bodies_of (ins seg)) i : fstate) !! N = Some b0 ->
+                               ud_good (lm_upto U cs s (bodies_of (ins seg)) i) b0 P
+                                 (lm_of U (bodies_of (ins seg) !!! i)) (lm_at U cs i))
                       js).
     { intros Hc. destruct (Hc (seq 0 (nlines_max (in_pres seg)))) as (P & H1 & H2 & H3).
       exists P. split_and!; [exact H1 | exact H2 |]. intros i Hi Hs.
@@ -1171,20 +1362,21 @@ Proof using Hadm.
     { exists []. split_and!; [apply prefix_nil | apply sublist_nil_l | constructor]. }
     destruct IH as (P & HPb & HPw & HF).
     destruct (decide (i < nlines_max (in_pres seg)
-                      /\ lm_upto U cs (Some b0) (bodies_of (ins seg)) i = Some b0))
+                      /\ (lm_upto U cs s (bodies_of (ins seg)) i : fstate) !! N = Some b0))
       as [[Hi Hs] | Hno].
     2: { exists P. split_and!; [exact HPb | exact HPw |]. constructor; [| exact HF].
          intros Hi Hs. exfalso. apply Hno. by split. }
-    destruct (ud_good_step b0 P (lm_of U (bodies_of (ins seg) !!! i)) (lm_at U cs i)
+    destruct (ud_good_step (lm_upto U cs s (bodies_of (ins seg)) i) b0 P
+                (lm_of U (bodies_of (ins seg) !!! i)) (lm_at U cs i)
                 (obs_wire Uart0 seg) HPb HPw) as (P' & HPP & HP'b & HP'w & Hg).
     { intros b Hab. apply ud_infixed_sublist.
-      apply (ud_infixed_trans _ (lm_blk U ps cs (Some b0) (bodies_of (ins seg)) i));
+      apply (ud_infixed_trans _ (lm_blk U ps cs s (bodies_of (ins seg)) i));
         [| exact (Hwire i Hi)].
-      assert (Hc : forall s l, lm_cont U s l (UPC (PLRun b)) = b ++ u_prompt) by reflexivity.
+      assert (Hc : forall s' l, lm_cont U s' l (UPC (PLRun b)) = b ++ u_prompt) by reflexivity.
       rewrite /lm_blk /lm_cont_at Hab Hc. apply ud_infixed_mid. }
     exists P'. split_and!; [exact HP'b | exact HP'w |]. constructor; [intros _ _; exact Hg |].
     eapply Forall_impl; [exact HF |]. intros j Hj HjN Hjs.
-    exact (ud_good_mono b0 P P' _ _ HPP (Hj HjN Hjs)). }
+    exact (ud_good_mono _ b0 P P' _ _ HPP (Hj HjN Hjs)). }
   destruct HP as (P & HPb & HPw & HPg).
   (* the unchecked rounds re-resolved to the silent round *)
   pose (cs' := imap (fun j c => if decide (j < nlines_max (in_pres seg)) then c
@@ -1204,37 +1396,39 @@ Proof using Hadm.
   { intros j Hj Hjl. unfold lm_at, cs'. rewrite list_lookup_total_imap; [| rewrite (proj1 Halts); exact Hjl].
     cbv beta. rewrite decide_False; [reflexivity | lia]. }
   assert (Hup : forall i, i <= nlines_max (in_pres seg) ->
-            lm_upto U cs' (Some P) (bodies_of (ins seg)) i
-            = lm_upto U cs (Some P) (bodies_of (ins seg)) i).
+            lm_upto U cs' (<[N := P]> s) (bodies_of (ins seg)) i
+            = lm_upto U cs (<[N := P]> s) (bodies_of (ins seg)) i).
   { intros i Hi. apply lm_upto_cs_ext. intros j Hj. apply Hlt. lia. }
-  (* the checked rounds print the same at the truncated boot content *)
+  (* the checked rounds print the same at the cut boot state *)
   assert (Hcont : forall i, i < nlines_max (in_pres seg) ->
-            lm_cont U (lm_upto U cs (Some P) (bodies_of (ins seg)) i)
+            lm_cont U (lm_upto U cs (<[N := P]> s) (bodies_of (ins seg)) i)
               (lm_of U (bodies_of (ins seg) !!! i)) (lm_at U cs i)
-            = lm_cont U (lm_upto U cs (Some b0) (bodies_of (ins seg)) i)
+            = lm_cont U (lm_upto U cs s (bodies_of (ins seg)) i)
                 (lm_of U (bodies_of (ins seg) !!! i)) (lm_at U cs i)).
-  { intros i Hi. destruct (upto_pristine cs b0 P (bodies_of (ins seg)) i) as [[H1 H2] | He];
+  { intros i Hi. destruct (upto_pristine cs s N b0 P (bodies_of (ins seg)) i HN) as [[H1 H2] | He];
       [| by rewrite He].
-    rewrite H1 H2.
-    destruct (decide (ucont (Some P) (uline_of_u (bodies_of (ins seg) !!! i)) (lm_at U cs i)
-                      = ucont (Some b0) (uline_of_u (bodies_of (ins seg) !!! i)) (lm_at U cs i)))
+    rewrite H2.
+    destruct (decide (ucont (<[N := P]> (lm_upto U cs s (bodies_of (ins seg)) i))
+                        (uline_of_u (bodies_of (ins seg) !!! i)) (lm_at U cs i)
+                      = ucont (lm_upto U cs s (bodies_of (ins seg)) i)
+                          (uline_of_u (bodies_of (ins seg) !!! i)) (lm_at U cs i)))
       as [E | Hne]; [exact E |].
-    exfalso. apply (Hnran i Hi H1).
-    apply (ucont_pristine b0 P (uline_of_u (bodies_of (ins seg) !!! i))).
-    intros E. apply Hne. by symmetry. }
-  exists (Some P). split.
-  { apply elem_of_list_further, elem_of_list_fmap. exists P.
-    split; [reflexivity | exact (elem_of_ud_sublists _ _ HPw)]. }
-  split; [exact (fcont_ok_prefix P b0 HPb Hok) |].
+    exfalso.
+    destruct (ucont_pristine (lm_upto U cs s (bodies_of (ins seg)) i) N P
+                (uline_of_u (bodies_of (ins seg) !!! i)) (lm_at U cs i)) as [Ha Hl].
+    { intros E. apply Hne. by symmetry. }
+    exact (Hnran i Hi H1 Ha Hl). }
+  exists P. split_and!; [exact HPb | exact (elem_of_ud_sublists _ _ HPw) |].
   split; [exact Hin |]. exists ps, cs'. split_and!.
   - (* the range condition *)
     split; [rewrite Hlen; exact (proj1 Halts) |]. intros i Hi.
     destruct (decide (i < nlines_max (in_pres seg))) as [HiN | HiN].
     + rewrite (Hup i ltac:(lia)) (Hat i HiN).
       pose proof (proj2 Halts i Hi) as Ho.
-      destruct (upto_pristine cs b0 P (bodies_of (ins seg)) i) as [[H1 H2] | He].
-      * rewrite H2. rewrite H1 in Ho.
-        exact (uok_trunc b0 P _ _ Hok HPb (HPg i HiN H1) Ho).
+      destruct (upto_pristine cs s N b0 P (bodies_of (ins seg)) i HN) as [[H1 H2] | He].
+      * rewrite H2.
+        exact (uok_trunc _ N b0 P _ _ (upto_fok seg s cs i Hok Hin Halts ltac:(lia))
+                 H1 HPb (HPg i HiN H1) Ho).
       * rewrite -He. exact Ho.
     + rewrite (Hge i ltac:(lia) Hi). exact (unoc_ok adm _ _).
   - (* D4 *)
@@ -1243,7 +1437,7 @@ Proof using Hadm.
       apply (Hd4 i Hi); [| exact Hm].
       destruct Hex as (c & Hc & Ht). exact (lml_term_st (ulm_laws adm) _ _ _ Hc Ht _).
     + exfalso. rewrite (Hge i ltac:(lia) Hi) in Hm. apply (umerge_prompt adm gp gpat Hadm).
-      rewrite -(unoc_cont (lm_upto U cs' (Some P) (bodies_of (ins seg)) i)
+      rewrite -(unoc_cont (lm_upto U cs' (<[N := P]> s) (bodies_of (ins seg)) i)
                  (uline_of_u (bodies_of (ins seg) !!! i))).
       exact Hm.
   - (* the checked points *)
@@ -1252,20 +1446,80 @@ Proof using Hadm.
     split.
     + rewrite /lm_pro_ok (lm_pro_idx_ext U cs' cs (nlines_max (in_pres seg)) Hlt (nlines (ins p)) Hq).
       exact Hpo.
-    + rewrite /lm_disc_pt (lm_sess_cs_ext U ps cs' cs (Some P) (done_of (ins p)));
+    + rewrite /lm_disc_pt (lm_sess_cs_ext U ps cs' cs (<[N := P]> s) (done_of (ins p)));
         [| intros j Hj; rewrite nlines_done in Hj; apply Hlt; lia].
-      assert (E : lm_seq U ps cs (Some P) (bodies_of (ins p)) (nlines (ins p))
-                  = lm_seq U ps cs (Some b0) (bodies_of (ins p)) (nlines (ins p))).
+      assert (E : lm_seq U ps cs (<[N := P]> s) (bodies_of (ins p)) (nlines (ins p))
+                  = lm_seq U ps cs s (bodies_of (ins p)) (nlines (ins p))).
       { apply um_seq_cont_ext. intros i Hi. rewrite /lm_cont_at. f_equal.
         assert (Hbs : forall j, j <= i -> bodies_of (ins p) !!! j = bodies_of (ins seg) !!! j)
           by (intros j Hj; apply (um_pres_bodies seg p j Hp); lia).
-        rewrite (lm_upto_bs_ext U cs (Some P) (bodies_of (ins p)) (bodies_of (ins seg)) i);
+        rewrite (lm_upto_bs_ext U cs (<[N := P]> s) (bodies_of (ins p)) (bodies_of (ins seg)) i);
           [| intros j Hj; apply Hbs; lia].
-        rewrite (lm_upto_bs_ext U cs (Some b0) (bodies_of (ins p)) (bodies_of (ins seg)) i);
+        rewrite (lm_upto_bs_ext U cs s (bodies_of (ins p)) (bodies_of (ins seg)) i);
           [| intros j Hj; apply Hbs; lia].
         rewrite (Hbs i ltac:(lia)). exact (Hcont i ltac:(lia)). }
       rewrite /lm_sess bodies_of_done nlines_done E.
       rewrite /lm_disc_pt /lm_sess bodies_of_done nlines_done in Hpt'. exact Hpt'.
+Qed.
+
+(* THE CANONICALISATION: a disciplined era has a disciplined boot state
+   among [scandsU] -- the unnamed files dropped, then each named file's
+   content cut, one name at a time *)
+Theorem u_canon_s seg (s : fstate) :
+  fstate_ok s -> lm_disc_seg' U s seg ->
+  exists s', s' ∈ scandsU seg /\ fstate_ok s' /\ lm_disc_seg' U s' seg.
+Proof using Hadm.
+  intros Hok Hd.
+  (* the files no line names are dropped *)
+  assert (Hs1 : exists s1 : fstate,
+            (forall N c, s1 !! N = Some c -> s !! N = Some c /\ N ∈ seg_names seg)
+            /\ (forall N, N ∈ seg_names seg -> s !! N = s1 !! N)).
+  { exists (filter (fun kv : list (bv 8) * list (bv 8) => kv.1 ∈ seg_names seg) s). split.
+    - intros N c Hc. apply map_lookup_filter_Some in Hc as [Hc HN]. by split.
+    - intros N HN. destruct (s !! N) as [c |] eqn:Hc.
+      + symmetry. apply map_lookup_filter_Some_2; [exact Hc | exact HN].
+      + symmetry. apply map_lookup_filter_None. by left. }
+  destruct Hs1 as (s1 & H1 & H1ag).
+  assert (Hok1 : fstate_ok s1) by (intros N c Hc; exact (Hok N c (proj1 (H1 N c Hc)))).
+  assert (Hd1 : lm_disc_seg' U s1 seg) by exact (disc_agree seg s s1 H1ag Hd).
+  (* each named file's content cut, one name at a time *)
+  assert (Hcanon : forall (L : list (list (bv 8))) t,
+            fstate_ok t -> lm_disc_seg' U t seg ->
+            (forall N c, t !! N = Some c -> N ∈ seg_names seg) ->
+            (forall N c, t !! N = Some c -> N ∉ L -> c ∈ ud_sublists (obs_wire Uart0 seg)) ->
+            exists t', fstate_ok t' /\ lm_disc_seg' U t' seg
+                       /\ forall N c, t' !! N = Some c ->
+                                      N ∈ seg_names seg /\ c ∈ ud_sublists (obs_wire Uart0 seg)).
+  { intros L. induction L as [| N L IH]; intros t Hot Hdt Hnm Hsub.
+    - exists t. split_and!; [exact Hot | exact Hdt |]. intros N c Hc.
+      split; [exact (Hnm N c Hc) | exact (Hsub N c Hc (not_elem_of_nil N))].
+    - destruct (t !! N) as [b0 |] eqn:HtN.
+      + destruct (u_canon_name seg t N b0 Hot HtN Hdt) as (P & HPb & HPs & HdP).
+        apply (IH (<[N := P]> t)).
+        * intros M c Hc. destruct (decide (M = N)) as [-> | HMN].
+          { rewrite lookup_insert in Hc. injection Hc as <-.
+            destruct (Hot N b0 HtN) as [Hu Hb0].
+            split; [exact Hu | exact (fcont_ok_prefix P b0 HPb Hb0)]. }
+          rewrite lookup_insert_ne in Hc; [| congruence]. exact (Hot M c Hc).
+        * exact HdP.
+        * intros M c Hc. destruct (decide (M = N)) as [-> | HMN]; [exact (Hnm N b0 HtN) |].
+          rewrite lookup_insert_ne in Hc; [| congruence]. exact (Hnm M c Hc).
+        * intros M c Hc HM. destruct (decide (M = N)) as [-> | HMN].
+          { rewrite lookup_insert in Hc. injection Hc as <-. exact HPs. }
+          rewrite lookup_insert_ne in Hc; [| congruence].
+          apply (Hsub M c Hc). intros Hin. apply elem_of_cons in Hin as [Hin | Hin];
+            [exact (HMN Hin) | exact (HM Hin)].
+      + apply (IH t Hot Hdt Hnm). intros M c Hc HM. apply (Hsub M c Hc).
+        intros Hin. apply elem_of_cons in Hin as [Hin | Hin]; [| exact (HM Hin)].
+        subst M. rewrite HtN in Hc. discriminate Hc. }
+  assert (Hsub1 : forall N c, s1 !! N = Some c -> N ∉ (map_to_list s1).*1 ->
+                    c ∈ ud_sublists (obs_wire Uart0 seg)).
+  { intros N c Hc HN. exfalso. apply HN. apply elem_of_list_fmap. exists (N, c).
+    split; [reflexivity | by apply elem_of_map_to_list]. }
+  destruct (Hcanon _ s1 Hok1 Hd1 (fun N c Hc => proj2 (H1 N c Hc)) Hsub1)
+    as (s' & Hok' & Hd' & Hs').
+  exists s'. split_and!; [| exact Hok' | exact Hd'].
+  apply prod_maps_complete; [apply NoDup_remove_dups | exact Hs'].
 Qed.
 
 (* ===================================================================== *)

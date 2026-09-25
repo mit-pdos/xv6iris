@@ -33,7 +33,7 @@ Definition uv_line (l : uline) : option pline' :=
 Lemma uv_line_some (l : uline) (pl : pline') :
   uv_line l = Some pl -> exists p fs, l = LPipe p fs /\ pl = LPipes p fs.
 Proof using.
-  destruct l as [ws | ws | | p fs]; cbn [uv_line]; try discriminate.
+  destruct l as [ws | ws N | N | p fs]; cbn [uv_line]; try discriminate.
   intros Hq. injection Hq as <-. by exists p, fs.
 Qed.
 
@@ -93,8 +93,8 @@ Proof using.
                   (lb_Forall_drop _ 1 ws (line_ok_wf ws Hp)) Hb) as Hv.
     rewrite H0 in Hv. lia.
   - destruct (files_of s g) as [c |] eqn:Hf; cbn [default]; [| constructor].
-    apply files_of_some in Hf. subst s. cbn [fstate_ok] in Hs.
-    destruct Hs as [HF | (v & HF & ->)].
+    apply files_of_some in Hf. pose proof (proj2 (Hs g c Hf)) as Hc.
+    destruct Hc as [HF | (v & HF & ->)].
     + exact (Forall_impl _ _ _ HF body_byte_not_nul).
     + apply Forall_app. split; [exact (Forall_impl _ _ _ HF body_byte_not_nul) |].
       constructor; [| constructor]. intros Hq.

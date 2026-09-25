@@ -83,7 +83,7 @@ Qed.
 (* ...AND THE WITNESS: the [echo ... > f] lines of the consumed input are
    lines of the history its last byte is tagged with *)
 Lemma echof_lines_of_consumed (k : nat) (E : list (list mobs * bv 8))
-    (h : list mobs) (b : bv 8) (w : list (list (bv 8))) :
+    (h : list mobs) (b : bv 8) (w : list (bv 8) * list (list (bv 8))) :
   E_index (seg_of E) -> hist_chain E ->
   (forall x, x ∈ E -> obs_boots x.1 = k) ->
   last E = Some (h, b) ->

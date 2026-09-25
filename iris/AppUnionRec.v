@@ -119,7 +119,7 @@ Section UnionApp.
            union_cons c k h H ==∗ union_cons c k h (ConsLog.cons_step H ev)).
   Proof using .
     rewrite /union_cons /union_kill. iIntros "#Ht !>" (k h H ev) "Ho".
-    iApply (peclV_sup (ugn_pipe c) U (ucparams c) None (uwa c) k h H ev with "Ht Ho").
+    iApply (peclV_sup (ugn_pipe c) U (ucparams c) ∅ (uwa c) k h H ev with "Ht Ho").
   Qed.
 
   Definition union_ifc (c : union_gn) : app_iface Σ :=
@@ -170,7 +170,7 @@ Section UnionApp.
     iIntros "#Hs".
     iDestruct (file_taint_of_sup (fgn_cl (ugn_file c)) r with "Hs") as "#Ht".
     iIntros "!>" (k h H ev) "Ho".
-    iApply (peclV_sup (ugn_pipe c) U (ucparams c) None (uwa c) k h H ev with "Ht Ho").
+    iApply (peclV_sup (ugn_pipe c) U (ucparams c) ∅ (uwa c) k h H ev with "Ht Ho").
   Qed.
 
   Lemma union_al_R0 (c : app_fixed app_union) :

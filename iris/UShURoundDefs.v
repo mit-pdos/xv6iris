@@ -123,10 +123,10 @@ Lemma ustep_noc (s : fstate) (l : uline) :
 Proof using.
   change (lm_step ulmG) with ustep. change (lm_dec ulmG) with ualt_dec.
   change (lmh_noc ulmG_hooks) with unoc.
-  destruct l as [ws | ws | | p n]; cbn [unoc].
+  destruct l as [ws | ws Nf | Nf | p n]; cbn [unoc].
   - rewrite ualt_dec_R. exact (UShFileRedir.fsm_fnoc s (LEcho ws)).
-  - rewrite ualt_dec_R. exact (UShFileRedir.fsm_fnoc s (LEchoF ws)).
-  - rewrite ualt_dec_R. exact (UShFileRedir.fsm_fnoc s LCat).
+  - rewrite ualt_dec_R. exact (UShFileRedir.fsm_fnoc s (LEchoF ws Nf)).
+  - rewrite ualt_dec_R. exact (UShFileRedir.fsm_fnoc s (LCat Nf)).
   - rewrite ualt_dec_code. by destruct p.
 Qed.
 
@@ -268,10 +268,10 @@ Proof using.
 Qed.
 
 (* ---- VACUITY: every tie has an inhabitant ---- *)
-Example upre_tie_inhabited : upre_tie [] None [] None.
+Example upre_tie_inhabited : upre_tie [] ∅ [] ∅.
 Proof using. split; vm_compute; reflexivity. Qed.
 
-Example udone_tie_inhabited : udone_tie [] None [] None.
+Example udone_tie_inhabited : udone_tie [] ∅ [] ∅.
 Proof using. split; vm_compute; reflexivity. Qed.
 
 (* ---- a file line's alternatives at the union ---- *)
@@ -285,7 +285,7 @@ Proof using.
   change (lm_step ulmG) with ustep. by destruct a.
 Qed.
 
-Lemma ustep_id_cat (s : fstate) (a : lm_alt U) : lm_step U s LCat a = s.
+Lemma ustep_id_cat (s : fstate) (a : lm_alt U) : lm_step U s LCat_f a = s.
 Proof using.
   change (lm_step ulmG) with ustep. by destruct a.
 Qed.

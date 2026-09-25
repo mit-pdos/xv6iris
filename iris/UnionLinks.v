@@ -73,20 +73,20 @@ Section union_links.
   Context (Hcons : @riscv_cons_res Σ (@riscv_fixedGS Σ HRg) = ucl ug).
 
   Local Lemma Hcons' :
-    @riscv_cons_res Σ (@riscv_fixedGS Σ HRg) = peclV pg U (ucparams ug) None (uwa ug).
+    @riscv_cons_res Σ (@riscv_fixedGS Σ HRg) = peclV pg U (ucparams ug) ∅ (uwa ug).
   Proof using Hcons. exact Hcons. Qed.
 
   (* ---- the taint route ---- *)
   Lemma union_cons_link_of_taint (k : nat) (ev : ConsLog.cons_ev) (Φ : iProp Σ) :
     UT -∗ Φ -∗ cons_link Uart0 k ev Φ.
   Proof using Hcons.
-    exact (vcons_link_of_taint pg U (ucparams ug) None (uwa ug) Hcons' k ev Φ).
+    exact (vcons_link_of_taint pg U (ucparams ug) ∅ (uwa ug) Hcons' k ev Φ).
   Qed.
 
   Lemma union_write_link_taint (k : nat) (b : bv 8) (Φ : iProp Σ) :
     UT -∗ (UT -∗ Φ) -∗ out_link Uart0 k b Φ.
   Proof using Hcons.
-    exact (vwrite_link_taint pg U (ucparams ug) None (uwa ug) Hcons' k b Φ).
+    exact (vwrite_link_taint pg U (ucparams ug) ∅ (uwa ug) Hcons' k b Φ).
   Qed.
 
   (* (H) THE ERA'S HEAD WRITE: the first process byte files the boot
@@ -102,7 +102,7 @@ Section union_links.
     out_link Uart0 k b Φ.
   Proof using Hcons.
     intros Hok Halt Hhead.
-    exact (vwrite_link_first pg U (ucparams ug) None (uwa ug) Hcons' k v a b s0 Φ
+    exact (vwrite_link_first pg U (ucparams ug) ∅ (uwa ug) Hcons' k v a b s0 Φ
              Hok Halt Hhead).
   Qed.
 
@@ -120,7 +120,7 @@ Section union_links.
     out_link Uart0 k b Φ.
   Proof using Hcons.
     intros Hn Hpin0 Hb.
-    exact (vwrite_link pg U (ucparams ug) None (uwa ug) Hcons' k v P b ps0 cs0 s0 I0 Φ
+    exact (vwrite_link pg U (ucparams ug) ∅ (uwa ug) Hcons' k v P b ps0 cs0 s0 I0 Φ
              Hn Hpin0 Hb).
   Qed.
 
@@ -144,7 +144,7 @@ Section union_links.
     out_link Uart0 k b Φ.
   Proof using Hcons.
     intros Hne Hr Hn Hpin0 HP Hok Hfk Hb.
-    exact (vwrite_link_blk pg U (ucparams ug) UB None (uwa ug) Hcons'
+    exact (vwrite_link_blk pg U (ucparams ug) UB ∅ (uwa ug) Hcons'
              k v P a b ps0 cs0 s0 I0 Φ Hne Hr Hn Hpin0 HP Hok Hfk Hb).
   Qed.
 
@@ -166,7 +166,7 @@ Section union_links.
     out_link Uart0 k b Φ.
   Proof using Hcons.
     intros Hr Hop Hn Hpin0 Hnd HP Halt Hb.
-    exact (vwrite_link_pro pg U (ucparams ug) None (uwa ug) Hcons'
+    exact (vwrite_link_pro pg U (ucparams ug) ∅ (uwa ug) Hcons'
              k v P a b ps0 cs0 s0 I0 Φ (or_intror (or_introl I))
              Hr Hop Hn Hpin0 Hnd HP Halt Hb).
   Qed.
@@ -183,24 +183,24 @@ Section union_links.
     UPIN k v -∗ dl_cnt v (1/2) n -∗ (uread_ret k v n ws -∗ Φ) -∗
     cons_link Uart0 k (ConsLog.EvRead ws) Φ.
   Proof using Hcons.
-    exact (vread_link pg U (ucparams ug) UB None (uwa ug) Hcons' k v n ws Φ).
+    exact (vread_link pg U (ucparams ug) UB ∅ (uwa ug) Hcons' k v n ws Φ).
   Qed.
 
   (* ---- the arm's close and its bytes, both free ---- *)
   Lemma union_close_link (k : nat) (Φ : iProp Σ) :
     Φ -∗ cons_link Uart0 k ConsLog.EvClose Φ.
-  Proof using Hcons. exact (vclose_link pg U (ucparams ug) None (uwa ug) Hcons' k Φ). Qed.
+  Proof using Hcons. exact (vclose_link pg U (ucparams ug) ∅ (uwa ug) Hcons' k Φ). Qed.
 
   Lemma union_byte_link (k : nat) (b : bv 8) (Φ : iProp Σ) :
     Φ -∗ cons_link Uart0 k (ConsLog.EvByte b) Φ.
   Proof using Hcons.
-    exact (vbyte_link pg U (ucparams ug) UB None (uwa ug) Hcons' k b Φ).
+    exact (vbyte_link pg U (ucparams ug) UB ∅ (uwa ug) Hcons' k b Φ).
   Qed.
 
   Lemma union_cons_run (k : nat) (cs : list (bv 8)) (Φ : iProp Σ) :
     Φ -∗ cons_run k cs Φ.
   Proof using Hcons.
-    exact (vcons_run pg U (ucparams ug) UB None (uwa ug) Hcons' k cs Φ).
+    exact (vcons_run pg U (ucparams ug) UB ∅ (uwa ug) Hcons' k cs Φ).
   Qed.
 
   (* (F) THE FILING LINK OF AN N-WRITER ROUND, through the union's view *)
@@ -217,7 +217,7 @@ Section union_links.
     out_link Uart0 k b Φ.
   Proof using Hcons.
     intros HlR Ha Hbl Hbv.
-    exact (vfile_link pg U (ucparams ug) UB None (uwa ug) (uwa_ext ug) Hcons'
+    exact (vfile_link pg U (ucparams ug) UB ∅ (uwa ug) (uwa_ext ug) Hcons'
              pview_unionU k v I sR lR pre b Φ HlR Ha Hbl Hbv).
   Qed.
 
@@ -235,12 +235,12 @@ Section union_links.
     { iApply (union_cons_link_of_taint with "HT [HΦ]").
       by iApply union_cons_run. }
     iIntros (o H) "#Hlb Hres %Hok %Hev".
-    rewrite (vchist_at0 pg U (ucparams ug) None (uwa ug) Hcons').
+    rewrite (vchist_at0 pg U (ucparams ug) ∅ (uwa ug) Hcons').
     destruct (um_disc_open_seg U h Hsh Hdisc) as (s & _ & Hseg).
-    iDestruct (peclV_open pg U (ucparams ug) UB None (uwa ug) (S gen_id) (default [] o) H
+    iDestruct (peclV_open pg U (ucparams ug) UB ∅ (uwa ug) (S gen_id) (default [] o) H
                  h c cs Hok Hev (proj1 Hseg) Hk Hdisc Hsh with "Hres") as "Hres".
     iModIntro. iExists (Some h). cbn [obs_hist_lb_o from_option id].
-    rewrite (vchist_at0 pg U (ucparams ug) None (uwa ug) Hcons').
+    rewrite (vchist_at0 pg U (ucparams ug) ∅ (uwa ug) Hcons').
     iFrame "Hlbh Hres".
     by iApply union_cons_run.
   Qed.

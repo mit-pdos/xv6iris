@@ -84,7 +84,7 @@ Section UkShCatForkTwin.
     (forall j : nat, (j < len)%nat -> f (k + j)%nat <> ubyte0) ->
     f (k + len)%nat = ubyte0 ->
     (k + len < sh_nbuf)%nat ->
-    UkSh.ush_line_at FileDisc.LCat f k len ->
+    UkSh.ush_line_at FileDisc.LCat_f f k len ->
     8344 <= sz ->
     UserPtTree.pgroundup sz = sz ->
     usz_ok (sz + 65536) ->
@@ -102,7 +102,7 @@ Section UkShCatForkTwin.
     UkShFork.ushf_child_law_at Wc UkShRedirBody.ushs_lp_cat Dc -∗
     UkShDiag.ush_panic_law Wc Wb -∗
     ⌜ UkSh.ush_fd0p l ⌝ -∗
-    UkSh.ush_bstate N γp T Wc Wb Pm l (FileDisc.uline_ws FileDisc.LCat) -∗
+    UkSh.ush_bstate N γp T Wc Wb Pm l (FileDisc.uline_ws FileDisc.LCat_f) -∗
     UkShLoop.ushl_dat γd -∗ usz γs sz -∗
     ubytes γd sh_buf sh_nbuf f -∗
     urun N h m (mword_of_int 0x97a) (16 + (UkSh.ush_Dbody + n)) -∗
@@ -121,7 +121,7 @@ Section UkShCatForkTwin.
     UkShFork.ushf_kill_law Wc -∗
     UkShFork.ushf_child_law_at Wc UkShRedirBody.ushs_lp_cat 68 -∗
     UkShDiag.ush_panic_law Wc Wb -∗
-    UkShFork.ushf_body_law N γp T Wc Wb Pm (fun l : uline => l = LCat) sz.
+    UkShFork.ushf_body_law N γp T Wc Wb Pm (fun l : uline => l = LCat_f) sz.
   Proof using HT Hpay Hpsok_free.
     intros Hszlo Hszal Hszok Hwbl.
     iIntros "#Hkl #Hchl #Hplaw".

@@ -14,7 +14,7 @@
 (*  any line model ([lm_disc_first_out]).                                 *)
 (* ===================================================================== *)
 From Stdlib Require Import ZArith Lia List.
-From stdpp Require Import list bitvector.definitions.
+From stdpp Require Import gmap list bitvector.definitions.
 Require Import RiscvLang.
 Require Import ObsTrace.
 Require Import LineWords.
@@ -97,14 +97,14 @@ Definition union_phi (h : list mobs) : Prop :=
   lm_disc U h ->
   exists s0s : list fstate,
     length s0s = length (cycles_of h)
-    /\ (forall s, s0s !! 0%nat = Some s -> s = None)
+    /\ (forall s, s0s !! 0%nat = Some s -> s = ∅)
     /\ (forall k s, s0s !! S k = Some s ->
           fadm_boot (echof_lines_before h (S k)) s)
     /\ Forall2 (lm_good_out U) s0s (cycles_of h).
 
 Definition union_phi_body (h : list mobs) (s0s : list fstate) : Prop :=
   length s0s = length (cycles_of h)
-  /\ (forall s, s0s !! 0%nat = Some s -> s = None)
+  /\ (forall s, s0s !! 0%nat = Some s -> s = ∅)
   /\ (forall k s, s0s !! S k = Some s ->
         fadm_boot (echof_lines_before h (S k)) s)
   /\ Forall2 (lm_good_out U) s0s (cycles_of h).
@@ -126,10 +126,10 @@ Proof using.
   - constructor.
 Qed.
 
-(* the union's state [None] is well formed: the discipline survives a
+(* the union's empty state is well formed: the discipline survives a
    power step *)
 Lemma union_st_ok : exists s, lm_st_ok U s.
-Proof using. by exists None. Qed.
+Proof using. exists ∅. exact fstate_ok_empty. Qed.
 
 (* the era's first drain: the ledger's line list is the list of lines
    typed in the cycles strictly before the open one *)
@@ -182,7 +182,7 @@ Proof using.
 Qed.
 
 Lemma union_phi_body_on (h : list mobs) (s0s : list fstate) :
-  union_phi_body h s0s -> union_phi_body (h ++ [ObsPowerOn]) (s0s ++ [None]).
+  union_phi_body h s0s -> union_phi_body (h ++ [ObsPowerOn]) (s0s ++ [∅]).
 Proof using.
   intros (Hlen & H0 & Hadm & HF). rewrite /union_phi_body cycles_of_on.
   assert (Hcut : forall j, (j <= length s0s)%nat ->
@@ -203,9 +203,9 @@ Proof using.
       assert (Hje : S k = length s0s).
       { apply lookup_lt_Some in Hs. cbn [length] in Hs. lia. }
       rewrite Hje Nat.sub_diag in Hs. cbn in Hs.
-      injection Hs as <-. by left.
+      injection Hs as <-. apply fadm_boot_empty.
   - apply Forall2_app; [exact HF |].
-    constructor; [exact (lm_good_out_nil U None) | constructor].
+    constructor; [exact (lm_good_out_nil U ∅) | constructor].
 Qed.
 
 (* the admissibility the OPEN cycle's entry already carries *)
@@ -222,7 +222,7 @@ Proof using.
   assert (Hlk : (u1 ++ [x]) !! length u1 = Some x)
     by (rewrite lookup_app_r; [by rewrite Nat.sub_diag | lia]).
   destruct (length u1) as [| n] eqn:Hn.
-  - rewrite (H0 x Hlk). by left.
+  - rewrite (H0 x Hlk). apply fadm_boot_empty.
   - assert (Hcut : echof_lines_before (h ++ [e]) (S n)
                    = echof_lines_before h (S n)).
     { rewrite /echof_lines_before H1 H2 !take_app_le; [reflexivity | lia | lia]. }
@@ -254,9 +254,8 @@ Proof using.
   - rewrite !length_app. rewrite H1 !length_app in Hlen. exact Hlen.
   - intros s Hs. destruct u1 as [| y u1].
     + cbn in Hs. injection Hs as <-. cbn [length] in Hadm0.
-      destruct Hadm0 as [Hz | (ws & sel & Hws & _)]; [exact Hz |].
-      exfalso. revert Hws. rewrite /echof_lines_before take_0.
-      cbn [fmap list_fmap concat]. apply not_elem_of_nil.
+      apply fadm_boot_nil. revert Hadm0. rewrite /echof_lines_before take_0.
+      cbn [fmap list_fmap concat]. done.
     + apply (H0 s). exact Hs.
   - intros k s Hs.
     destruct (decide (S k < length u1)%nat) as [Hk | Hk].

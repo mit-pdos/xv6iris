@@ -224,7 +224,7 @@ Section file_link_gen.
   Lemma file_links_gl : file_links g -∗ glinks file_lm file_params.
   Proof using .
     iIntros "%Hc".
-    iApply (gcl_glinks file_lm (file_cparams g) file_lm_byte_laws None (file_wa g) Hc file_params eq_refl eq_refl f0w_cw
+    iApply (gcl_glinks file_lm (file_cparams g) file_lm_byte_laws ∅ (file_wa g) Hc file_params eq_refl eq_refl f0w_cw
               (or_introl I) fhead_boot).
   Qed.
   (* =================================================================== *)
