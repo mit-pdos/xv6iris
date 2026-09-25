@@ -5,7 +5,7 @@ the interface of `myproc` (Rocq `ProofSysGetpid.v`).
     uint64 sys_getpid(void) { return myproc()->pid; }
 
 Eleven instructions, and the interesting content is one of them: the
-`c.lw a0,48(a0)` reads `p->pid` out of `procPrivNoctxAt`'s own fraction of
+`c.lw a0,48(a0)` reads `p->pid` out of the block's (`procPrivFd`) own fraction of
 the cell, with NO lock held -- while another core may be reading the very
 same field under `p->lock`.  Everything else is the standard two-slot
 frame around a call, at either `SIE` (`myproc` runs its interior with
@@ -41,24 +41,28 @@ theorem sg_withSpie_pushed (k : KCtx) (m : Nat) (a b : Bool) :
     (k.pushed m).withSpie a b = (k.withSpie a b).pushed m := rfl
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+  [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
+  [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
+  [Appcfg GF] [FileG GF] [Fscfg] [Icfg]
 
 /-- **The pid cell**, out of the running process's private block and back
 (Rocq `ProcInv.proc_priv_pid`).  The block is stated at the kernel-page-
 table context, which at `curTier = kpt` is the ambient one. -/
-theorem sg_pid_acc [X : CurCtx] (h : curTier = KTier.kpt) (pa : BitVec 64) (pid : BitVec 32)
-    (V : ProcPriv) (M : Nat → List (BitVec 8)) :
-    procPrivNoctxAt (GF := GF) curCtx pa pid V M ⊢
+theorem sg_pid_acc [X : CurCtx] (h : curTier = KTier.kpt) (γ : FileNames) (pa : BitVec 64)
+    (pid : BitVec 32) (V : ProcPriv) (M : Nat → List (BitVec 8)) :
+    procPrivFd (GF := GF) γ pa pid V M ⊢
       wordPointsTo (pa + 48#64) 4 pidPriv pid ∗
-      (wordPointsTo (pa + 48#64) 4 pidPriv pid -∗ procPrivNoctxAt curCtx pa pid V M) := by
+      (wordPointsTo (pa + 48#64) 4 pidPriv pid -∗ procPrivFd γ pa pid V M) := by
   obtain ⟨ξ, t⟩ := X
   simp only at h
   subst h
-  simp only [procPrivNoctxAt, pPid]
-  iintro ⟨%hf, Hpid, Hfields, Hpt, Htf⟩
+  simp only [procPrivFd, procPrivCoreNoctxAt, procPrivBareAt, pPid]
+  iintro ⟨⟨⟨%hf, Hpid, Hfields, Hpt, Htf⟩, Hc⟩, Ho⟩
   isplitl [Hpid]
   · iexact Hpid
   iintro Hpid
+  iframe Hc Ho
   isplitl []
   · ipureintro; exact hf
   iframe Hpid Hfields Hpt Htf
@@ -83,7 +87,7 @@ end
 
 set_option maxHeartbeats 4000000 in
 theorem sys_getpid_proof (MP : MYPROC) : SYSGETPID :=
-  ⟨fun {hlc GF} _ _ _ _ _ _ _ _ cpu k pa pid V M hproc htier hnoff hK => by
+  ⟨fun {hlc GF} _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ cpu k γ pa pid V M hproc htier hnoff hK => by
   unfold wp_sys_getpid_body
   simp only [sysGetpidAddr]
   iintro ⟨Hk, Hpc, Hpriv, Hnext⟩
@@ -119,7 +123,7 @@ theorem sys_getpid_proof (MP : MYPROC) : SYSGETPID :=
   obtain ⟨f2, f8, f9, f18, f19, f20, f21, f22, f23, f24, f25, f26, f27⟩ := hcs1
   have ha0' : R1 10#5 = pa := ha0.trans hproc
   -- lw a0,48(a0): the pid read
-  icases sg_pid_acc htc pa pid V M $$ Hpriv with ⟨Hpid, Hback⟩
+  icases sg_pid_acc htc γ pa pid V M $$ Hpriv with ⟨Hpid, Hback⟩
   k_step_gen (wp_s_lw c3 _ (KA.«sys_getpid» + 0xc#64) true 48#12 10#5 10#5
       (by decide) (by decide) pidPriv pid)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [ha0'] next c4 hp4
@@ -148,7 +152,6 @@ theorem sys_getpid_proof (MP : MYPROC) : SYSGETPID :=
   · unfold calleeSaved
     simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true]
     exact ⟨trivial, trivial, f9, f18, f19, f20, f21, f22, f23, f24, f25, f26, f27⟩
-  · simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true]
-    trace_state⟩
+  · simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true]⟩
 
 end Xv6
