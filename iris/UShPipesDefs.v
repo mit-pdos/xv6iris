@@ -62,6 +62,7 @@ Require Import ProgTree.
 Require Import CtxIdDefs.
 Require Import UkPipesIface.
 Require Import PipesFire.
+Require GrepFilt.
 Local Open Scope Z_scope.
 
 (* ===================================================================== *)
@@ -193,18 +194,18 @@ Section UShPipesDefs.
            else if bool_decide (s = alt_forkc) then osP (gF k) else True)
     | WLeft k =>
         shotsF k ∗ osS (gG k)
-        ∗ (if bool_decide (fail_src pr k s) then wcur (P k) 0 else True)
+        ∗ (if bool_decide (fail_src pr (lfilts lR) k s) then wcur (P k) 0 else True)
     | WLast =>
         (* the content: a byte of every pipe, and every filter of the
            line passing it (grep-pipes SS3.3) *)
-        shotsF nc ∗ (if bool_decide (s = L) then (pws_all ∗ ⌜passes (lfilts lR) L⌝) ∨ ⌜L = dg_execR⌝
+        shotsF nc ∗ (if bool_decide (s = L) then (pws_all ∗ ⌜passes (lfilts lR) L⌝) ∨ ⌜L = ldg (lfilts lR)⌝
                      else True)
     end%I.
 
   (* ...and a source no process commits deposits nothing payable *)
   Definition pdep (w : wid) (s : list (bv 8)) : iProp Σ :=
     if bool_decide (s = []) then True%I
-    else if bool_decide (fire_src fcR pr L w s) then pdep_ne w s else False%I.
+    else if bool_decide (fire_src fcR pr (lfilts lR) L w s) then pdep_ne w s else False%I.
 
   Global Instance pdep_timeless w s : Timeless (pdep w s).
   Proof using .
@@ -213,10 +214,10 @@ Section UShPipesDefs.
   Qed.
 
   Lemma pdep_unfold (w : wid) (s : list (bv 8)) :
-    s <> [] -> fire_src fcR pr L w s -> pdep w s = pdep_ne w s.
+    s <> [] -> fire_src fcR pr (lfilts lR) L w s -> pdep w s = pdep_ne w s.
   Proof using . intros Hs Hf. by rewrite /pdep bool_decide_false // bool_decide_true. Qed.
 
-  Lemma pdep_gsrc (w : wid) (s : list (bv 8)) : gsrc fcR pr L w s -> pdep w s ⊢ False.
+  Lemma pdep_gsrc (w : wid) (s : list (bv 8)) : gsrc fcR pr (lfilts lR) L w s -> pdep w s ⊢ False.
   Proof using .
     intros [Hs Hf]. rewrite /pdep bool_decide_false; [| exact Hs].
     rewrite bool_decide_false; [| exact Hf]. iIntros "[]".
@@ -224,9 +225,9 @@ Section UShPipesDefs.
 
   (* a deposit, read at a source some process commits, or refuted *)
   Lemma pdep_cases (w : wid) (s : list (bv 8)) :
-    s <> [] -> pdep w s ⊢ ⌜fire_src fcR pr L w s⌝ ∗ pdep_ne w s.
+    s <> [] -> pdep w s ⊢ ⌜fire_src fcR pr (lfilts lR) L w s⌝ ∗ pdep_ne w s.
   Proof using .
-    intros Hs. destruct (decide (fire_src fcR pr L w s)) as [Hf | Hf].
+    intros Hs. destruct (decide (fire_src fcR pr (lfilts lR) L w s)) as [Hf | Hf].
     - rewrite (pdep_unfold w s Hs Hf). iIntros "$". done.
     - iIntros "H". iDestruct (pdep_gsrc w s (conj Hs Hf) with "H") as "[]".
   Qed.
@@ -323,7 +324,8 @@ Section UShPipesDefs.
   Lemma pdep_last_of_lb :
     L <> [] -> (0 < nc)%nat ->
     shotsF nc -∗ ([∗ list] i ∈ seq 0 nc, pinv i) -∗
-    □ (pws_lb (P (nc - 1)) (take 1 L) -∗ ⌜fapp (lfilt lR nc) L = L⌝ ={↑pipeN}=∗ pdep WLast L).
+    □ (pws_lb (P (nc - 1)) (take 1 L) -∗ ⌜fapp (lfilt lR nc) L = L⌝
+       ={↑pipeN}=∗ pdep WLast L ∗ ⌜passes (lfilts lR) L⌝).
   Proof using GEN.
     intros HL Hn.
     assert (Hnc : exists m, nc = S m) by (exists (nc - 1)%nat; lia).
@@ -331,20 +333,22 @@ Section UShPipesDefs.
     replace (S m - 1)%nat with m by lia.
     iIntros "#Hs #Hinvs !> #Hlb %Hlast".
     iMod (flow_down m HL with "Hinvs Hlb") as "[Hall %Hps]".
-    iModIntro. rewrite (pdep_unfold WLast L HL (or_introl (conj eq_refl HL))) /pdep_ne bool_decide_true; [| done].
-    rewrite /pws_all Hm. iFrame "Hs". iLeft. iFrame "Hall". iPureIntro.
-    rewrite /passes Forall_lookup. intros i F Hi.
-    assert (Hlen : length (lfilts lR) = S m) by (rewrite -lcats_lfilts; exact Hm).
-    pose proof (lookup_lt_Some _ _ _ Hi) as Hlt.
-    assert (HF : lfilt lR (S i) = F).
-    { rewrite /lfilt. replace (S i - 1)%nat with i by lia. exact (nth_lookup_Some _ _ _ _ Hi). }
-    rewrite -HF. destruct (decide (i = m)) as [-> | Hne]; [exact Hlast |]. apply Hps. lia.
+    assert (Hpass : passes (lfilts lR) L).
+    { rewrite /passes Forall_lookup. intros i F Hi.
+      assert (Hlen : length (lfilts lR) = S m) by (rewrite -lcats_lfilts; exact Hm).
+      pose proof (lookup_lt_Some _ _ _ Hi) as Hlt.
+      assert (HF : lfilt lR (S i) = F).
+      { rewrite /lfilt. replace (S i - 1)%nat with i by lia. exact (nth_lookup_Some _ _ _ _ Hi). }
+      rewrite -HF. destruct (decide (i = m)) as [-> | Hne]; [exact Hlast |]. apply Hps. lia. }
+    iModIntro.
+    rewrite (pdep_unfold WLast L HL (or_introl (conj eq_refl (conj HL Hpass)))) /pdep_ne bool_decide_true; [| done].
+    rewrite /pws_all Hm. iSplitL; [| by iPureIntro]. iFrame "Hs". iLeft. iFrame "Hall". by iPureIntro.
   Qed.
 
   (* ---- THE EXCLUSIONS, REFUTED BY THE DEPOSITS ---- *)
   Lemma pexcl_sh (k : nat) (s : list (bv 8)) :
     (k < nc)%nat -> panic_src s ->
-    ⊢ □ (∀ w' s', ⌜EXf fcR pr nc L (WSh k) s w' s'⌝ -∗ pdep w' s' -∗ pdep (WSh k) s
+    ⊢ □ (∀ w' s', ⌜EXf fcR pr (lfilts lR) nc L (WSh k) s w' s'⌝ -∗ pdep w' s' -∗ pdep (WSh k) s
                   ={↑pipeN}=∗ False).
   Proof using .
     intros Hk Hs. iIntros "!>" (w' s' Hx) "Hd' Hd".
@@ -374,7 +378,7 @@ Section UShPipesDefs.
   Lemma pexcl_left (k : nat) (s : list (bv 8)) :
     (k < nc)%nat -> s <> [] ->
     pinv k -∗
-    □ (∀ w' s', ⌜EXf fcR pr nc L (WLeft k) s w' s'⌝ -∗ pdep w' s' -∗ pdep (WLeft k) s
+    □ (∀ w' s', ⌜EXf fcR pr (lfilts lR) nc L (WLeft k) s w' s'⌝ -∗ pdep w' s' -∗ pdep (WLeft k) s
                 ={↑pipeN}=∗ False).
   Proof using .
     intros Hk Hs. iIntros "#Hinv !>" (w' s' Hx) "Hd' Hd".
@@ -396,7 +400,8 @@ Section UShPipesDefs.
          against the failed stage's untouched permit on it *)
       rewrite (pdep_unfold (WLeft k) s Hs (or_introl Hfl)) /pdep_ne bool_decide_true; [| done].
       iDestruct "Hd" as "(_ & _ & Hw)".
-      rewrite (pdep_unfold WLast L HL (or_introl (conj eq_refl HL))) /pdep_ne bool_decide_true; [| done].
+      iDestruct (pdep_cases WLast L HL with "Hd'") as "[_ Hd']".
+      rewrite /pdep_ne bool_decide_true; [| done].
       iDestruct "Hd'" as "(_ & [[Hall _] | %Hq])"; [| by destruct (HLx Hq)].
       rewrite /pws_all.
       iDestruct (big_sepL_elem_of _ _ k with "Hall") as "Hlb";
@@ -410,7 +415,7 @@ Section UShPipesDefs.
   Lemma pexcl_last (s : list (bv 8)) :
     s <> [] ->
     ([∗ list] i ∈ seq 0 nc, pinv i) -∗
-    □ (∀ w' s', ⌜EXf fcR pr nc L WLast s w' s'⌝ -∗ pdep w' s' -∗ pdep WLast s
+    □ (∀ w' s', ⌜EXf fcR pr (lfilts lR) nc L WLast s w' s'⌝ -∗ pdep w' s' -∗ pdep WLast s
                 ={↑pipeN}=∗ False).
   Proof using .
     intros Hs. iIntros "#Hinvs !>" (w' s' Hx) "Hd' Hd".
@@ -420,9 +425,10 @@ Section UShPipesDefs.
       iDestruct (pdep_last_shots s Hs with "Hd") as "#Hsn".
       iDestruct (shotsF_at nc j Hj with "Hsn") as "HS".
       iDestruct (os_excl with "HF HS") as %[].
-    - rewrite (pdep_unfold WLast L HL (or_introl (conj eq_refl HL))) /pdep_ne bool_decide_true; [| done].
+    - iDestruct (pdep_cases WLast L HL with "Hd") as "[_ Hd]".
+      rewrite /pdep_ne bool_decide_true; [| done].
       iDestruct "Hd" as "(_ & [[Hall _] | %Hq])"; [| by destruct (HLx Hq)].
-      rewrite (pdep_unfold (WLeft j) s' (fail_src_ne pr j s' Hfl) (or_introl Hfl)) /pdep_ne bool_decide_true; [| done].
+      rewrite (pdep_unfold (WLeft j) s' (fail_src_ne pr (lfilts lR) j s' Hfl) (or_introl Hfl)) /pdep_ne bool_decide_true; [| done].
       iDestruct "Hd'" as "(_ & _ & Hw)".
       rewrite /pws_all.
       iDestruct (big_sepL_elem_of _ _ j with "Hall") as "Hlb";
@@ -443,12 +449,12 @@ Section UShPipesDefs.
      writer that is not a node's (no prompt byte is its) *)
   Lemma pkit_of (w : wid) (s : list (bv 8)) :
     (forall k, w <> WSh k) ->
-    fire_okN wsN RUNN WITN termw TOKN w s (EXf fcR pr nc L w s) ->
-    □ (∀ w' s', ⌜EXf fcR pr nc L w s w' s'⌝ -∗ pdep w' s' -∗ pdep w s ={↑pipeN}=∗ False) -∗
+    fire_okN wsN RUNN WITN termw TOKN w s (EXf fcR pr (lfilts lR) nc L w s) ->
+    □ (∀ w' s', ⌜EXf fcR pr (lfilts lR) nc L w s w' s'⌝ -∗ pdep w' s' -∗ pdep w s ={↑pipeN}=∗ False) -∗
     pns_kit LM PV I sR lR termw TOKN pdep w s.
   Proof using HlR Hadmit.
     intros Hnsh Hok. iIntros "#Hex". rewrite /pns_kit. iSplit.
-    - iExists (EXf fcR pr nc L w s). iSplitR; [by iPureIntro | iExact "Hex"].
+    - iExists (EXf fcR pr (lfilts lR) nc L w s). iSplitR; [by iPureIntro | iExact "Hex"].
     - iPureIntro. intros c [Hc Hlt].
       apply (cstep_okV_tok LM PV I sR lR HlR Hadmit w s c Hc Hlt).
       intros k Hk. by destruct (Hnsh k Hk).
@@ -571,7 +577,7 @@ Section UShPipesDefs.
     ∃ ro, rd_final (P (j - 1)) ro ∗ suf j ro.
   Definition lrep (k : nat) : iProp Σ :=
     ∃ o, pns_wfin γc γm (WLeft k) o
-      ∗ (⌜exists s, o = Some s /\ fail_src pr k s⌝
+      ∗ (⌜exists s, o = Some s /\ fail_src pr (lfilts lR) k s⌝
          ∨ ∃ wo, wr_final (P k) L wo
              ∗ match k with
                | O => ⌜forall D, wo = WrAll D -> D = L⌝
@@ -672,34 +678,37 @@ Section fire_glue.
   Hypothesis HlR : pv_line PV (lineV LM I) = Some lR.
   Context (Ha : pns_admV PV lR).
   Local Notation fc := (pv_fc PV sR).
-  (* the line: its producer [pr] (echo, or [cat f]) and its [n] cats *)
-  Context (pr : producer) (n : nat) (Hn : (1 <= n)%nat).
-  Context (Hline : lR = LPipes pr (cats n)).
+  (* the line: its producer [pr] (echo, or [cat f]) and its filter stages
+     [fs]; its content one line (the union's every content is) *)
+  Context (pr : producer) (fs : list filt) (Hn : fs <> []).
+  Context (Hline : lR = LPipes pr fs).
   Local Notation L := (prod_content fc pr).
+  Hypothesis HL1 : GrepFilt.oneline L.
 
   (* THE FIRING PREMISE: every commit a process of the round makes is
      admitted by the run model, or refuted by a committed deposit *)
   Lemma pipes_fire_ok (w : wid) (s : list (bv 8)) :
-    w ∈ wids (lcats (lR)) -> fire_src fc pr L w s ->
+    w ∈ wids (lcats (lR)) -> fire_src fc pr (lfilts lR) L w s ->
     fire_okN (wids (lcats (lR))) (runN fc (lR)) (pwitV LM I sR)
-      termw (tokN fc (lR)) w s (EXf fc pr (lcats (lR)) L w s).
-  Proof using HlR Ha Hline Hn.
+      termw (tokN fc (lR)) w s (EXf fc pr (lfilts lR) (lcats (lR)) L w s).
+  Proof using HlR Ha Hline Hn HL1.
     intros Hwin Hf.
-    assert (Hnc : lcats (lR) = n) by (rewrite Hline; exact (lcats_cats pr n)).
-    rewrite Hnc in Hwin.
-    apply (fire_okV_tok LM PV I sR lR HlR Ha w s _ (fire_src_ne fc pr w s Hf)).
+    assert (Hfs : lfilts lR = fs) by (rewrite Hline; reflexivity).
+    assert (Hnc : lcats (lR) = length fs) by (rewrite Hline; reflexivity).
+    rewrite Hfs in Hf |- *. rewrite Hnc in Hwin.
+    apply (fire_okV_tok LM PV I sR lR HlR Ha w s _ (fire_src_ne fc pr fs w s Hf)).
     - intros md sel Hfam Hmw Hws Htm. rewrite Hnc.
       pose proof Hfam as (_ & _ & _ & _ & Hinv).
       assert (Htm' : tmN termw (mdupd md w s) sel = tmN termw md sel).
       { apply tmN_ext. intros x Hx. rewrite /mdupd decide_False //. intros ->. exact (Hws Hx). }
       rewrite tmN_snoc Htm' srcN_mdupd_self in Htm. apply orb_false_iff in Htm as [Htm0 Hw0].
       destruct Hinv as [Hrun _]. destruct (Hrun Htm0) as (src & Hr & Hsrc).
-      rewrite Hline in Hr. pose proof (run_real fc pr n Hn src Hr) as Hre.
+      rewrite Hline in Hr. pose proof (run_real fc pr fs Hn HL1 src Hr) as Hre.
       assert (Hsw : src w = []) by (rewrite Hsrc /rmd Hmw; by destruct (cmtN md sel w)).
-      destruct (fire_nt fc pr n Hn src w s Hre Hsw Hwin Hf Hw0) as [Hre' | Hx].
-      + left. exists (vupd src w s). split; [rewrite Hline; exact (real_run fc pr n Hn _ Hre') |].
+      destruct (fire_nt fc pr fs Hn src w s Hre Hsw Hwin Hf Hw0) as [Hre' | Hx].
+      + left. exists (vupd src w s). split; [rewrite Hline; exact (real_run fc pr fs Hn HL1 _ Hre') |].
         exact (vsrc_fire md sel w s src Hws Hsrc).
-      + right. exact (ex_of_src md sel src (EXf fc pr n L w s) Hsrc Hx).
+      + right. exact (ex_of_src md sel src (EXf fc pr fs (length fs) L w s) Hsrc Hx).
     - intros md sel Hfam Hmw Hws Htm. rewrite Hnc.
       pose proof Hfam as (_ & Hmin & _ & _ & Hinv).
       assert (Htm' : tmN termw (mdupd md w s) sel = tmN termw md sel).
@@ -707,28 +716,28 @@ Section fire_glue.
       rewrite tmN_snoc Htm' srcN_mdupd_self in Htm.
       destruct (tmN termw md sel) eqn:Htm0.
       + destruct Hinv as [_ Htok]. destruct (Htok Htm0) as [(src & Hr & Hsrc) _].
-        rewrite Hline in Hr. destruct (terms_realT fc pr n Hn src Hr) as [i Hi].
+        rewrite Hline in Hr. destruct (terms_realT fc pr fs src Hr) as [i Hi].
         assert (Hsw : src w = []) by (rewrite Hsrc /rmd Hmw; by destruct (cmtN md sel w)).
-        destruct (fire_t2 fc pr n src i w s Hi Hsw Hwin Hf) as [Hi' | Hx].
+        destruct (fire_t2 fc pr fs src i w s Hi Hsw Hwin Hf) as [Hi' | Hx].
         * left. exists (vupd src w s).
-          split; [rewrite Hline; exact (realT_terms fc pr n Hn _ i Hi') |].
+          split; [rewrite Hline; exact (realT_terms fc pr fs Hn _ i Hi') |].
           exact (vsrc_fire md sel w s src Hws Hsrc).
-        * right. exact (ex_of_src md sel src (EXf fc pr n L w s) Hsrc Hx).
+        * right. exact (ex_of_src md sel src (EXf fc pr fs (length fs) L w s) Hsrc Hx).
       + cbn [orb] in Htm.
         destruct Hinv as [Hrun _]. destruct (Hrun Htm0) as (src & Hr & Hsrc).
-        rewrite Hline in Hr. pose proof (run_real fc pr n Hn src Hr) as Hre.
+        rewrite Hline in Hr. pose proof (run_real fc pr fs Hn HL1 src Hr) as Hre.
         assert (Hsw : src w = []) by (rewrite Hsrc /rmd Hmw; by destruct (cmtN md sel w)).
-        assert (Hdom : forall x, x ∉ wids n -> src x = []).
+        assert (Hdom : forall x, x ∉ wids (length fs) -> src x = []).
         { intros x Hx. rewrite Hsrc /rmd. destruct (cmtN md sel x); [| done].
           destruct (md x) eqn:Hmx; [| done]. exfalso. apply Hx. rewrite -Hnc.
           apply Hmin. by rewrite Hmx. }
         destruct w as [k | k |]; cbn [termw] in Htm; try discriminate Htm.
         apply bool_decide_eq_true in Htm. subst s.
-        assert (Hk : (k < n)%nat) by (rewrite wids_elem in Hwin; exact Hwin).
-        destruct (fire_t1 fc pr n src k Hre Hdom Hsw Hk) as [HT | Hx].
+        assert (Hk : (k < length fs)%nat) by (rewrite wids_elem in Hwin; exact Hwin).
+        destruct (fire_t1 fc pr fs src k Hre Hdom Hsw Hk) as [HT | Hx].
         * left. exists (vupd src (WSh k) alt_forkc).
-          split; [rewrite Hline; exact (realT_terms fc pr n Hn _ k HT) |].
+          split; [rewrite Hline; exact (realT_terms fc pr fs Hn _ k HT) |].
           exact (vsrc_fire md sel (WSh k) alt_forkc src Hws Hsrc).
-        * right. exact (ex_of_src md sel src (EXf fc pr n L (WSh k) alt_forkc) Hsrc Hx).
+        * right. exact (ex_of_src md sel src (EXf fc pr fs (length fs) L (WSh k) alt_forkc) Hsrc Hx).
   Qed.
 End fire_glue.

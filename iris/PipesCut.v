@@ -26,6 +26,7 @@ Require Import UkShPipesCmd.
 Require UkShEcho.
 Require UkShCat.
 Require UkSh.
+Require ExecWords.
 Local Open Scope nat_scope.
 
 (* ---- the bytes of a list at an offset ---- *)
@@ -436,4 +437,36 @@ Lemma map_lookup_fmap {A B : Type} (f : A -> B) (l : list A) (k : nat) :
 Proof using.
   revert k. induction l as [| x l IH]; intros [| k]; [done | done | done |].
   exact (IH k).
+Qed.
+
+(* ===================================================================== *)
+(*  A CAT STAGE's ARGV, READ AS ITS WORDS (cut G7): the one token [cat] at *)
+(*  its line offset is the rebase of the word list [[cat]]'s token, and   *)
+(*  its bytes are the words' argv at that offset                          *)
+(* ===================================================================== *)
+Lemma cat_rebase_toks (a : nat) :
+  ushq_rebase a (wl_toks (FileDisc.filt_words FileDisc.FCat)) = UkShCat.cat_toks a (a + 3).
+Proof using.
+  replace (wl_toks (FileDisc.filt_words FileDisc.FCat)) with [(0, 3)] by (vm_compute; reflexivity).
+  cbn. rewrite Nat.add_0_r. reflexivity.
+Qed.
+
+Lemma cat_words_exec_ok : ExecWords.exec_ok (FileDisc.filt_words FileDisc.FCat).
+Proof using. apply (bool_decide_unpack _). vm_compute. exact I. Qed.
+
+Lemma cat_argv_bytes_echo (a b : nat) (g : nat -> bv 8) :
+  UkShCat.cat_argv_bytes a b g ->
+  UkShEcho.echo_argv_bytes (FileDisc.filt_words FileDisc.FCat) (fun j : nat => g (a + j)).
+Proof using.
+  intros Hab. pose proof (UkShCat.cat_argv_bytes_end a b g Hab) as Hb3.
+  destruct Hab as (_ & Hin & Hnul). rewrite UkShCat.cmd_cat_len in Hin.
+  assert (Hoff : UkShEcho.echo_off (FileDisc.filt_words FileDisc.FCat) 0 = 0) by apply UkShEcho.echo_off_0.
+  assert (Halen : UkShEcho.echo_alen (FileDisc.filt_words FileDisc.FCat) 0 = 3) by reflexivity.
+  split.
+  - intros i j Hi Hj. cbn [FileDisc.filt_words length] in Hi. assert (i = 0) as -> by lia.
+    rewrite Halen in Hj. rewrite Hoff. cbn [Nat.add].
+    rewrite (Hin j Hj).
+    do 3 (destruct j as [| j]; [vm_compute; reflexivity |]). lia.
+  - intros i Hi. cbn [FileDisc.filt_words length] in Hi. assert (i = 0) as -> by lia.
+    rewrite Hoff Halen. cbn [Nat.add]. rewrite <- Hb3. exact Hnul.
 Qed.

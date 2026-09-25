@@ -695,6 +695,20 @@ Section UkPipesIface.
     - iIntros "HcW HmW _". iApply ("HΦ" with "HcW HmW").
   Qed.
 
+  (* THE CONTENT WRITER'S CREDENTIAL (the last stage's console sink): the
+     step premise at every later byte, and -- at its FIRST byte, from the
+     input's first byte and its own filter's pass -- its firing kit and its
+     deposit.  The kit is earned there, not lent: whether the content is a
+     commit of the round at all is whether every filter of the line passes
+     it ([PipesFire.fire_src]'s [passes]), and the flow chain the first
+     byte runs is what says so (grep-pipes SS3.3). *)
+  Definition pns_ckit (pin : pnames) (F : filt) (w : wid) : iProp Σ :=
+    (⌜forall c : nat, (0 < c < length L)%nat -> cstep_okN wsN RUNN WITN TERM TOK w L c⌝
+     ∗ □ (pws_lb pin (take 1 L) -∗ ⌜fapp F L = L⌝ ={↑pipeN}=∗ pns_kit w L ∗ dep w L))%I.
+
+  Global Instance pns_ckit_persistent pin F w : Persistent (pns_ckit pin F w).
+  Proof using . rewrite /pns_ckit. apply _. Qed.
+
   (* ------------------------------------------------------------------- *)
   (*  2b. THE CONSOLE WRITER'S DEVICE ([PDCon w A])                       *)
   (* ------------------------------------------------------------------- *)
@@ -818,14 +832,14 @@ Section UkPipesIface.
   Definition pns_wD (pin : pnames) (F : filt) (w : wid) (c : nat) (alts : list (list (bv 8)))
       : iProp Σ :=
     (⌜(c <= length L)%nat /\ fok F L⌝ ∗ (⌜c = 0%nat⌝ ∨ pws_lb pin (take 1 L)) ∗ ⌜w ∈ wsN⌝ ∗ FAM
-     ∗ pns_kit w L ∗ □ (pws_lb pin (take 1 L) -∗ ⌜fapp F L = L⌝ ={↑pipeN}=∗ dep w L)
+     ∗ pns_ckit pin F w
      ∗ ∃ wc : nat, ⌜alts = [drop wc (fapp F (take c L))] /\ (wc <= length (fapp F (take c L)))%nat⌝
          ∗ wcurN γc w (1/2) wc ∗ wmodeN γm w (1/2) (pns_cmode L wc))%I.
 
   Lemma pns_wD_short (pin : pnames) (F : filt) (w : wid) (c : nat) (alts : list (list (bv 8))) :
     pns_wD pin F w c alts -∗ ⌜cons_short alts⌝.
   Proof using HL31.
-    iIntros "([%HcL %Hfok] & _ & _ & _ & _ & _ & %wc & [%Halts _] & _)". iPureIntro. subst alts.
+    iIntros "([%HcL %Hfok] & _ & _ & _ & _ & %wc & [%Halts _] & _)". iPureIntro. subst alts.
     pose proof HL31 as HL. rewrite /pns_short in HL.
     pose proof (prefix_length _ _ (fok_prefix F L (take c L) Hfok (prefix_take L c))) as Hpl.
     rewrite /cons_short Forall_singleton length_drop. lia.
@@ -835,10 +849,10 @@ Section UkPipesIface.
       (a : list (bv 8)) :
     a ∈ alts -> pns_wD pin F w c alts -∗ pns_wD pin F w c [a].
   Proof using .
-    intros Ha'. iIntros "(%HcL & #H0 & %Hw & #Hinv & #Hkit & #Hdw & %wc & [%Halts %Hwc] & Hcw & Hmw)".
+    intros Ha'. iIntros "(%HcL & #H0 & %Hw & #Hinv & #Hck & %wc & [%Halts %Hwc] & Hcw & Hmw)".
     subst alts. apply elem_of_list_singleton in Ha'. subst a.
     iSplitR; [by iPureIntro |]. iSplitR; [iExact "H0" |]. iSplitR; [by iPureIntro |].
-    iSplitR; [iExact "Hinv" |]. iSplitR; [iExact "Hkit" |]. iSplitR; [iModIntro; iExact "Hdw" |].
+    iSplitR; [iExact "Hinv" |]. iSplitR; [iExact "Hck" |].
     iExists wc. iFrame "Hcw Hmw". by iPureIntro.
   Qed.
 
@@ -847,7 +861,7 @@ Section UkPipesIface.
     pns_wD pin F w c [x] -∗ out_link Uart0 (S gen_id) b (pns_wD pin F w c [drop 1 x]).
   Proof using Hadmit Hext HlR Hcons Hfc Hplok dep_tl.
     intros Hb.
-    iIntros "([%HcL %Hfok] & #H0 & %Hw & #Hinv & #Hkit & #Hdw & %wc & [%Hx %Hwc] & Hcw & Hmw)".
+    iIntros "([%HcL %Hfok] & #H0 & %Hw & #Hinv & #Hck & %wc & [%Hx %Hwc] & Hcw & Hmw)".
     injection Hx as ->.
     rewrite lookup_drop Nat.add_0_r in Hb.
     pose proof (fok_prefix F L (take c L) Hfok (prefix_take L c)) as HXL.
@@ -858,7 +872,7 @@ Section UkPipesIface.
                -∗ pns_wD pin F w c [drop 1 (drop wc (fapp F (take c L)))])%I as "Hback".
     { iIntros (wc' ->) "Hcw Hmw".
       iSplitR; [by iPureIntro |]. iSplitR; [iExact "H0" |]. iSplitR; [by iPureIntro |].
-      iSplitR; [iExact "Hinv" |]. iSplitR; [iExact "Hkit" |]. iSplitR; [iModIntro; iExact "Hdw" |].
+      iSplitR; [iExact "Hinv" |]. iSplitR; [iExact "Hck" |].
       iExists (S wc). iFrame "Hcw Hmw". iPureIntro. split; [| lia].
       rewrite drop_drop. do 2 f_equal. lia. }
     destruct wc as [| wc0].
@@ -868,14 +882,15 @@ Section UkPipesIface.
       assert (HXne : fapp F (take c L) <> []) by (intros Hq; rewrite Hq in Hb; discriminate Hb).
       destruct (fok_pass F L (take c L) Hfok (prefix_take L c) HXne) as [_ Hpass].
       iDestruct "H0" as "[%Hc0 | #Hlb]"; [by destruct (pns_fowed_pos F L c HXne Hc0) |].
-      iApply (pns_out_link_fupd b (dep w L) with "[]").
+      iDestruct "Hck" as "[_ #Hdw]".
+      iApply (pns_out_link_fupd b (pns_kit w L ∗ dep w L) with "[]").
       { iApply (fupd_mask_mono (↑pipeN)); [exact pns_pipeN_uart |].
         iApply ("Hdw" with "Hlb [//]"). }
-      iIntros "Hdep".
+      iIntros "[#Hkit Hdep]".
       cbn [pns_cmode].
       iApply (pns_fam_fire w L b with "Hkit Hinv Hcw Hmw Hdep"); [exact Hw | exact HbL |].
       iIntros "Hcw Hmw". iApply ("Hback" $! 1%nat with "[%] Hcw Hmw"). reflexivity.
-    - iDestruct "Hkit" as "[_ %Hst]".
+    - iDestruct "Hck" as "[%Hst _]".
       cbn [pns_cmode].
       iApply (pns_fam_cstep w L (S wc0) b with "Hinv Hcw Hmw");
         [exact Hw | lia | exact HbL | apply Hst; split; [lia | exact (lookup_lt_Some _ _ _ HbL)] |].
@@ -1258,7 +1273,7 @@ Section UkPipesIface.
            whose sink never writes; the deposit wants the stage's own
            filter to pass the line too (grep-pipes SS3.3) *)
         ⌜w ∈ wsN⌝ ∗ FAM
-        ∗ (⌜L = []⌝ ∨ (pns_kit w L ∗ □ (pws_lb pin (take 1 L) -∗ ⌜fapp F L = L⌝ ={↑pipeN}=∗ dep w L)))
+        ∗ (⌜L = []⌝ ∨ pns_ckit pin F w)
         ∗ wcurN γc w (1/2) wc ∗ wmodeN γm w (1/2) (pns_cmode L wc)
     | CSPipe pn _ => wcur pn wc ∗ pws_lb pn (take wc L)
     end%I.
@@ -1845,7 +1860,7 @@ Section UkPipesIface.
   Proof using HL31 HPc Hadmit Hext HlR Hcons Hfc Hplok Hsw dep_tl.
     intros Hne Hl1 Hfok Hwc HcL Hp Hpre.
     iIntros "Hstd #H0 (%Hw & #Hinv & #Hk & Hcw & Hmw) HK".
-    iDestruct "Hk" as "[%HL0 | [#Hkit #Hdw]]".
+    iDestruct "Hk" as "[%HL0 | #Hck]".
     { (* an empty line: nothing was read, so nothing is owed or written *)
       exfalso. apply Hne. rewrite HL0 in Hp. subst p. rewrite take_nil fapp_nil drop_nil in Hpre.
       by apply prefix_nil_inv. }
@@ -1856,13 +1871,13 @@ Section UkPipesIface.
               with "Hstd [Hcw Hmw]").
     { iSplitR; [iPureIntro; split; [exact HcL | exact Hfok] |]. iSplitR; [iExact "H0" |].
       iSplitR; [iPureIntro; exact Hw |]. iSplitR; [iExact "Hinv" |].
-      iSplitR; [iExact "Hkit" |]. iSplitR; [iModIntro; iExact "Hdw" |].
+      iSplitR; [iExact "Hck" |].
       iExists wc. iFrame "Hcw Hmw". iPureIntro. split; [by rewrite Hp | exact Hwc]. }
-    iIntros "Hstd HD". iDestruct "HD" as "(_ & _ & _ & _ & _ & _ & %wc2 & [%Hw2 %Hw2c] & Hcw & Hmw)".
+    iIntros "Hstd HD". iDestruct "HD" as "(_ & _ & _ & _ & _ & %wc2 & [%Hw2 %Hw2c] & Hcw & Hmw)".
     injection Hw2 as Hw2.
     iApply ("HK" $! wc2 with "[%] Hstd [Hcw Hmw]"); [split; [exact Hw2 | exact Hw2c] |].
     iSplitR; [iPureIntro; exact Hw |]. iSplitR; [iExact "Hinv" |].
-    iSplitR; [iRight; iSplitR; [iExact "Hkit" | iModIntro; iExact "Hdw"] |]. iFrame "Hcw Hmw".
+    iSplitR; [iRight; iExact "Hck" |]. iFrame "Hcw Hmw".
   Qed.
 
   (* [ei_write_copy]: the LAST stage (the sink is the console writer) *)

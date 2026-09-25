@@ -1717,6 +1717,7 @@ UkPipesIface.v
 UkPipesEntries.v
 UkCatFIface.v
 UkCatFEntries.v
+UShExecPin.v
 UShCatFStage.v
 PipesFire.v
 PipesView.v

@@ -510,28 +510,45 @@ Proof using. destruct F as [| w]; [reflexivity | exact (GrepFilt.grep_out_nil w)
 Lemma fapp_app (F : filt) (R c : bytes) : fapp F (R ++ c) = fapp F R ++ flt_new (filt_pf F) R c.
 Proof using. rewrite <- !filt_pf_out. apply flt_app. Qed.
 
-(* THE GATE A FILTER NEEDS OF THE LINE: nothing for cat, one line for grep
-   (the union's every content is one, [lshape]) *)
+(* a filter that owes a byte of a prefix of a one-line content passed it
+   whole: what it owes is what it read, and it passes the line *)
+Lemma fapp_pass (F : filt) (L D : bytes) :
+  GrepFilt.oneline L -> D `prefix_of` L -> fapp F D <> [] -> fapp F D = D /\ fapp F L = L.
+Proof using.
+  intros HF HD Hne. destruct F as [| w]; [split; reflexivity |]. cbn [fapp] in *.
+  destruct (GrepFilt.grep_out_line w L D HF HD) as [Hq | [-> Hq]]; [by destruct (Hne Hq) |].
+  split; exact Hq.
+Qed.
+
+(* THE GATE A FILTER NEEDS OF THE LINE: nothing for cat; for grep one line
+   (the union's every content is one, [lshape]) with no NUL in it (what
+   grep's conformance asks, [GrepFilt.grep_filter_conforms]) *)
 Definition fok (F : filt) (L : bytes) : Prop :=
-  match F with FCat => True | FGrep _ => GrepFilt.oneline L end.
+  match F with FCat => True | FGrep _ => GrepFilt.oneline L /\ GrepTree.grep_ok L end.
 
 Lemma fok_prefix (F : filt) (L D : bytes) :
   fok F L -> D `prefix_of` L -> fapp F D `prefix_of` L.
-Proof using. intros HF HD. destruct F as [| w]; [exact HD | exact (fapp_prefix (FGrep w) L D HF HD)]. Qed.
+Proof using. intros HF HD. destruct F as [| w]; [exact HD | exact (fapp_prefix (FGrep w) L D (proj1 HF) HD)]. Qed.
 
 (* ...and a filter that owes a byte of a prefix of the line passed it
    whole: what it owes is what it read, and it passes the line *)
 Lemma fok_pass (F : filt) (L D : bytes) :
   fok F L -> D `prefix_of` L -> fapp F D <> [] -> fapp F D = D /\ fapp F L = L.
 Proof using.
-  intros HF HD Hne. destruct F as [| w]; [split; reflexivity |]. cbn [fapp fok] in *.
-  destruct (GrepFilt.grep_out_line w L D HF HD) as [Hq | [-> Hq]]; [by destruct (Hne Hq) |].
-  split; exact Hq.
+  intros HF HD Hne. destruct F as [| w]; [split; reflexivity |].
+  exact (fapp_pass (FGrep w) L D (proj1 HF) HD Hne).
 Qed.
+
+(* the gate at a grep stage: the line's shape and its bytes *)
+Lemma fok_grep (w L : bytes) : fok (FGrep w) L <-> GrepFilt.oneline L /\ GrepTree.grep_ok L.
+Proof using. reflexivity. Qed.
 
 (* EVERY FILTER OF THE LINE PASSES ITS CONTENT: what the content writer's
    commit needs (the flow chain's filters and its own) *)
 Definition passes (fs : list filt) (L : bytes) : Prop := Forall (fun F => fapp F L = L) fs.
+
+Lemma fok_cats (n : nat) (L : bytes) : Forall (fun F => fok F L) (FileDisc.cats n).
+Proof using. unfold FileDisc.cats. apply Forall_replicate. exact I. Qed.
 
 Lemma passes_cats (n : nat) (L : bytes) : passes (cats n) L.
 Proof using. unfold passes, FileDisc.cats. apply Forall_replicate. reflexivity. Qed.

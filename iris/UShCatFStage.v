@@ -55,7 +55,7 @@ Require Import UShEcho UShEchoPipePay UShCatPay UShCat.
 Require Import UShPipeLeaves.
 Require Import UkConsOut.
 Require Import UkPipesIface UkPipesEntries.
-Require Import PipesFire UShPipesDefs UShPipesStage.
+Require Import PipesFire UShPipesDefs UShPipesStage UShExecPin.
 Require Import UkCatFIface UkCatFEntries.
 Require ExecWords UkShDiagAt FileDisc.
 Require User.ShSyms.
@@ -121,8 +121,8 @@ Section UShCatFStage.
   Local Notation QcR Rd k := (QcK LM CP v I lR L pr Rd γc γm P k).
   Local Notation a0_idx := (mword_of_int 10 : mword 5).
 
-  Hypothesis Hfire : forall w s, w ∈ wsN -> fire_src fcR pr L w s ->
-    fire_okN wsN RUNN WITN termw TOKN w s (EXf fcR pr nc L w s).
+  Hypothesis Hfire : forall w s, w ∈ wsN -> fire_src fcR pr (lfilts lR) L w s ->
+    fire_okN wsN RUNN WITN termw TOKN w s (EXf fcR pr (lfilts lR) nc L w s).
 
   #[local] Instance cfs_kit_pers0 w s : Persistent (pkitR w s) | 0 :=
     pns_kit_persistent LM PV I sR lR termw TOKN pdepR w s.
@@ -231,7 +231,7 @@ Section UShCatFStage.
     mWP (Loop : expr riscv_lang).
   Proof using Hadmit Hcons Hext Hfc Hfire HlR Hplok.
     intros Hpr Hok Hbytes Hn Hpeq Ha0 Hfd1 Hfd2 Hav.
-    assert (Hdg0 : dg_execR = dg_st pr 0) by (rewrite Hpr; reflexivity).
+    assert (Hdg0 : dg_execR = dg_st pr (lfilts lR) 0) by (rewrite Hpr; reflexivity).
     iIntros "#Hinv #Hsup #Hcode #Hjt #Hcmd Hsz Hstd Hcwd Hch Hraw HRd Hrun".
     pose proof (ukn_const_of_eq N' _ Hpeq (fun x y => eq_refl)) as Hc.
     iDestruct "Hraw" as "(#Hpi & Hw & #Hlb & HsL & Hcw & Hmw & HG)".
@@ -242,7 +242,7 @@ Section UShCatFStage.
                alt_execR 16%nat (prod_crD γp Rd) Cd)%I as "Hxl".
     { iApply (exf_writer g LM PV CP sd WA Hext Hcons v I sR lR HlR Hfc Hadmit Hplok L pr
                 γc γm P gF gG (WLeft 0) dg_execR alt_execR 16%nat
-                (EXf fcR pr nc L (WLeft 0) dg_execR) (prod_crD γp Rd) (side_L (P 0) ∗ Rd)%I Cd Hw0 ltac:(lia)
+                (EXf fcR pr (lfilts lR) nc L (WLeft 0) dg_execR) (prod_crD γp Rd) (side_L (P 0) ∗ Rd)%I Cd Hw0 ltac:(lia)
                 ltac:(intros j b Hj Hb; exact (dg_app_lookup dg_execR u_prompt j b
                                ltac:(rewrite dg_execR_len; lia) Hb))
                 (Hfire (WLeft 0) dg_execR Hw0 (or_introl (or_introl Hdg0)))
@@ -304,7 +304,7 @@ Section UShCatFStage.
 
   (* the writer's kit at a diagnostic of [cat f], or at its report *)
   Lemma catf_kit (s : list (bv 8)) (γp : pipe_names) :
-    pr = PrCatF fname_f -> (0 < nc)%nat -> s <> [] -> fire_src fcR pr L (WLeft 0) s ->
+    pr = PrCatF fname_f -> (0 < nc)%nat -> s <> [] -> fire_src fcR pr (lfilts lR) L (WLeft 0) s ->
     pipe_inv (P 0) γp L -∗ pkitR (WLeft 0) s.
   Proof using Hadmit Hfire HlR.
     intros Hpr Hn Hs Hf. iIntros "#Hpi".
@@ -329,9 +329,9 @@ Section UShCatFStage.
     intros Hpr Hn Hds. iIntros "#Hfam #Hbr #Hrb #Hai #Hcr".
     iIntros "!> ((Hw & HsL & Hcw & Hmw) & #HGs & #Hpi & #Hlb & Hdq)".
     assert (Hw0 : WLeft 0 ∈ wsN) by (apply wids_elem; exact Hn).
-    assert (Hfo : fire_src fcR pr L (WLeft 0) (cat_dg_open fname_f)).
+    assert (Hfo : fire_src fcR pr (lfilts lR) L (WLeft 0) (cat_dg_open fname_f)).
     { cbn [fire_src]. left. right. split; [reflexivity | by rewrite Hpr]. }
-    assert (Hfso : fail_src pr 0 (cat_dg_open fname_f)).
+    assert (Hfso : fail_src pr (lfilts lR) 0 (cat_dg_open fname_f)).
     { right. split; [reflexivity | by rewrite Hpr]. }
     iPoseProof (catf_kit (cat_dg_open fname_f) γp Hpr Hn (cat_dg_open_ne _) Hfo with "Hpi")
       as "#Hko".
@@ -348,11 +348,11 @@ Section UShCatFStage.
       iSplitL.
       + destruct Hds as [[-> Hsome] | ->].
         * assert (Hh : prod_halts fcR pr) by (rewrite Hpr; exact Hsome).
-          assert (Hfw : fire_src fcR pr L (WLeft 0) cat_dg_write).
-          { cbn [fire_src]. right. split; [right; exact Hh | reflexivity]. }
+          assert (Hfw : fire_src fcR pr (lfilts lR) L (WLeft 0) cat_dg_write).
+          { cbn [fire_src]. right. split; [exact Hh | reflexivity]. }
           rewrite big_sepL_cons big_sepL_singleton. iSplitR; [by iLeft |]. iRight.
           iSplitR; [iApply (catf_kit cat_dg_write γp Hpr Hn cat_dg_write_ne Hfw with "Hpi") |].
-          iApply (pdep_left_write LM PV sR lR L pr P gF gG 0 (or_intror Hh) with "[] HGs").
+          iApply (pdep_left_write LM PV sR lR L pr P gF gG 0 Hh with "[] HGs").
           rewrite /shotsF. done.
         * rewrite big_sepL_singleton. by iLeft.
       + rewrite big_sepL_singleton. iRight. iFrame "Hko". iIntros "!> Hw0".

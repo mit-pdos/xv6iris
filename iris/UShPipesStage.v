@@ -4,15 +4,19 @@
 (* C7a).                                                                  *)
 (*                                                                        *)
 (* A stage is the forked sh that runs [runcmd] on one EXEC leaf of the    *)
-(* right spine: echo at the head (the left child of node 0), a middle cat *)
-(* (the left child of node k > 0) or the last cat (the right child of the *)
-(* last node).  Each lemma here is sh's exec arm at that stage, both its  *)
-(* arms paid:                                                             *)
-(*   - EXEC SUCCEEDS: the arm's supply takes C6's entry                   *)
-(*     ([UkPipesEntries.pse_echo_image_entry] / [pse_mid_image_entry] /   *)
-(*     [pse_last_image_entry_m]) at a lend built out of the stage's raw   *)
-(*     lend, whose exit wand reads the program's final devices into the   *)
-(*     node's side-tagged payload [UShPipesDefs.QcK];                     *)
+(* right spine: echo at the head (the left child of node 0), a middle     *)
+(* filter stage (the left child of node k > 0) or the last one (the right *)
+(* child of the last node) -- a [cat] or a [grep w] (cut G7, grep-pipes   *)
+(* SS4), the stage's filter [F] a parameter of its law.  Each lemma here  *)
+(* is sh's exec arm at that stage, both its arms paid:                    *)
+(*   - EXEC SUCCEEDS: the arm's supply ([UShExecPin.                      *)
+(*     sh_exec_sup_filt_of_entry], the program's pin from its slot) takes *)
+(*     C6's entry at the stage's program ([UkPipesEntries.                *)
+(*     pse_echo_image_entry], [pse_filt_mid_image_entry] /                *)
+(*     [pse_filt_last_image_entry] here: cat's or grep's) at a lend built *)
+(*     out of the stage's raw lend, whose exit wand reads the program's   *)
+(*     final devices into the node's side-tagged payload                  *)
+(*     [UShPipesDefs.QcK];                                                *)
 (*   - EXEC FAILS: sh prints [exec %s failed] as the stage's family       *)
 (*     writer ([exf_writer]: the first byte fires the family, every       *)
 (*     further byte steps it, each through [UShPipeAssembly.              *)
@@ -61,30 +65,10 @@ Require Import UShPipeLeaves.   (* [ksh_w1_of_step], [alt_execfail_app] *)
 Require Import UkConsOut.   (* [cons_short] *)
 Require Import UkPipesIface UkPipesEntries.
 Require Import PipesFire UShPipesDefs.
-Require ExecWords UkShDiagAt FileDisc.
+Require Import ExecWords UkShPipesLex UShExecPin.
+Require UkShDiagAt FileDisc GrepTree.
 Require User.ShSyms.
 Local Open Scope Z_scope.
-
-(* sh's [exec cat failed], around the command's name *)
-Lemma catf_execfail_bytes : UkShDiagAt.ush_execfail_bytes alt_execR FileDisc.fd_w_cat.
-Proof using .
-  rewrite /UkShDiagAt.ush_execfail_bytes. split_and!.
-  - vm_compute. lia.
-  - intros j Hj.
-    assert (Hl : (j < length alt_execR)%nat) by (vm_compute in Hj |- *; lia).
-    exact (list_lookup_lookup_total_lt alt_execR j Hl).
-  - intros j Hj.
-    apply (UkShDiag.ush_bytes_of_forallb (UkShDiag.shd_lit 0x12a8)
-             (fun i : nat => alt_execR !!! i) 0%nat 5%nat);
-      [vm_compute; reflexivity | lia].
-  - intros j Hj.
-    assert (Hj3 : (j < 3)%nat) by (vm_compute in Hj; lia).
-    destruct j as [| [| [| j]]]; try lia; vm_compute; reflexivity.
-  - intros j Hj.
-    apply (UkShDiag.ush_bytes_of_forallb (UkShDiag.shd_lit 0x12a8)
-             (fun i : nat => alt_execR !!! (i + 1)%nat) 7%nat 8%nat);
-      [vm_compute; reflexivity | lia].
-Qed.
 
 Section UShPipesStage.
   (* [UShPipeLaw]'s binder list, and C6's two classes *)
@@ -207,13 +191,8 @@ Section UShPipesStage.
 
   (* THE ROUND'S FIRING PREMISE: every commit a process of the round
      makes is admitted by the model, or refuted by a committed deposit *)
-  Hypothesis Hfire : forall w s, w ∈ wsN -> fire_src fcR pr L w s ->
-    fire_okN wsN RUNN WITN termw TOKN w s (EXf fcR pr nc L w s).
-
-  (* THE ROUND'S STAGES ARE CATS: the stage laws here run cat's image
-     entry ([UkPipesEntries.pse_mid_image_entry] / [pse_last_image_entry_m]
-     at [FCat]); a grep stage's laws are cut G7's (grep-pipes SS5) *)
-  Hypothesis Hstg_cat : forall j, lfilt lR j = FCat.
+  Hypothesis Hfire : forall w s, w ∈ wsN -> fire_src fcR pr (lfilts lR) L w s ->
+    fire_okN wsN RUNN WITN termw TOKN w s (EXf fcR pr (lfilts lR) nc L w s).
 
   Lemma dg_execL_len : length dg_execL = 17%nat.
   Proof using . vm_compute. reflexivity. Qed.
@@ -251,7 +230,7 @@ Section UShPipesStage.
     mWP (Loop : expr riscv_lang).
   Proof using HL31 Hadmit Hcons Hext Hsup HlR Hfc Hfire Hkill Hplok pnsRegG0.
     intros Hpr Hok Hbytes HLw Hn Hpeq Ha0 Hfd1 Hfd2 Hav.
-    assert (Hdg0 : dg_execL = dg_st pr 0) by (rewrite Hpr; reflexivity).
+    assert (Hdg0 : dg_execL = dg_st pr (lfilts lR) 0) by (rewrite Hpr; reflexivity).
     iIntros "#Hinv #Hslot #Hcode #Hjt #Hcmd Hsz Hstd Hcwd Hch Hraw #HRd Hrun".
     pose proof (ukn_const_of_eq N' _ Hpeq (fun x y => eq_refl)) as Hc.
     iDestruct "Hraw" as "(#Hpi & Hw & #Hlb & HsL & Hcw & Hmw & HG)".
@@ -304,7 +283,7 @@ Section UShPipesStage.
       as "#Hxl".
     { rewrite /UkShDiag.ush_execfail_law.
       iApply (exf_writer (WLeft 0) dg_execL EchoDisc.alt_execfail 17%nat
-                (EXf fcR pr nc L (WLeft 0) dg_execL) Cr (side_L (P 0)) Cd Hw0 ltac:(lia)
+                (EXf fcR pr (lfilts lR) nc L (WLeft 0) dg_execL) Cr (side_L (P 0)) Cd Hw0 ltac:(lia)
                 ltac:(intros p b Hp Hb; rewrite alt_execfail_app in Hb;
                       exact (dg_app_lookup dg_execL u_prompt p b
                                ltac:(rewrite dg_execL_len; lia) Hb))
@@ -396,17 +375,109 @@ Section UShPipesStage.
 
   (* a halted cat's deposit: a middle cat, or the [cat f] producer *)
   Lemma pdep_left_write (k : nat) :
-    (k <> 0%nat \/ prod_halts fcR pr) -> shotsF gF k -∗ osS (gG k) -∗ pdepR (WLeft k) cat_dg_write.
+    halts_at fcR pr (lfilts lR) k -> shotsF gF k -∗ osS (gG k) -∗ pdepR (WLeft k) cat_dg_write.
   Proof using .
     intros Hk. iIntros "#Hs #HG".
     rewrite (pdep_unfold LM PV sR lR L pr P gF gG (WLeft k) cat_dg_write
                ltac:(vm_compute; discriminate) (or_intror (conj Hk eq_refl))) /pdep_ne.
-    rewrite bool_decide_false; [| intros Hq; exact (fail_src_ne_write pr k _ Hq eq_refl)].
+    rewrite bool_decide_false; [| intros Hq; exact (fail_src_ne_write pr (lfilts lR) k _ Hq eq_refl)].
     iFrame "Hs HG".
   Qed.
 
+
   (* ================================================================= *)
-  (*  3.  A MIDDLE CAT: the left child of node [k = S k']                *)
+  (*  3.  A FILTER STAGE's PROGRAM: its entry, its fd 2, its diagnostic   *)
+  (* ================================================================= *)
+
+  (* what a middle stage's fd 2 is lent: a cat may halt with [cat: write
+     error], a grep never writes it *)
+  Definition mid_alts (F : filt) : list (list (bv 8)) :=
+    match F with FCat => [[]; cat_dg_write] | FGrep _ => [[]] end.
+
+  Lemma mid_alts_short (F : filt) : cons_short (mid_alts F).
+  Proof using .
+    destruct F; [exact cons_short_A2 |].
+    rewrite /cons_short. repeat constructor; vm_compute; reflexivity.
+  Qed.
+
+  (* A MIDDLE STAGE's ENTRY, at its program: cat's
+     ([UkPipesEntries.pse_mid_image_entry]) or grep's
+     ([pse_grep_mid_image_entry]) *)
+  Lemma pse_filt_mid_image_entry (F : filt) (M : gmap Z (bv 8)) (s1 t1 : Z) (g1 : nat -> bv 8)
+      (sts : list fdstate) (cs : gset gname) (pidv : mword 32) (Q : Z -> iProp Σ)
+      (w2 : wid) (pin : pnames) (gin : pipe_names) (pn : pnames) (gp : pipe_names)
+      (wb rb1 rb2 : bool) :
+    (forall x y : Z, Q x = Q y) ->
+    exec_ok (filt_words F) ->
+    UShEcho.echo_node_img (filt_words F) M s1 t1 g1 ->
+    UkShEcho.echo_argv_bytes (filt_words F) g1 ->
+    length sts = NOFILE ->
+    take NSTD sts !! 0%nat = Some (FdOpen true wb (FdPipe gin)) ->
+    take NSTD sts !! 1%nat = Some (FdOpen rb1 true (FdPipe gp)) ->
+    take NSTD sts !! 2%nat = Some (FdOpen rb2 true (FdDevice ConsoleInv.CONSOLE)) ->
+    fok F L ->
+    UkRun.urun_nopipe sts -∗
+    image_entry (filt_elf F) M (mword_of_int (t1 + 8) : mword 64) sts FsImg.ROOTINO cs pidv Q
+      (pns_copy_lend g LM PV CP v I sR lR L termw TOKN pdepR γc γm w2 (mid_alts F) (mid_alts F)
+         pin gin F (CSPipe pn gp) Q) uslot.
+  Proof using HL31 Hadmit Hcons Hext Hsup HlR Hfc Hkill Hplok pnsRegG0 ufdG0.
+    intros HQ Hok Hi Hb Hl Hr0 Hr1 Hr2 Hfok. iIntros "#Hnp".
+    destruct F as [| wp].
+    - iApply (pse_mid_image_entry (PS := uprogSG_free) g LM PV CP sd WA Hext Hcons Hkill Hsup
+                v I sR lR HlR Hfc Hadmit Hplok L HL31 termw TOKN pdepR (pdep_timeless LM PV sR lR L pr P gF gG)
+                γc γm M s1 t1 g1 sts FsImg.ROOTINO cs pidv Q w2 _ _ pin gin pn gp wb rb1 rb2
+                HQ Hok Hi Hb Hl Hr0 Hr1 Hr2
+                (elem_of_list_here _ _) (elem_of_list_further _ _ _ (elem_of_list_here _ _))
+                with "Hnp []").
+      iApply UexecExecMint.udep_free.
+    - iApply (pse_grep_mid_image_entry (PS := uprogSG_free) g LM PV CP sd WA Hext Hcons Hkill Hsup
+                v I sR lR HlR Hfc Hadmit Hplok L HL31 termw TOKN pdepR (pdep_timeless LM PV sR lR L pr P gF gG)
+                γc γm wp M s1 t1 g1 sts FsImg.ROOTINO cs pidv Q w2 _ _ pin gin pn gp wb rb1 rb2
+                HQ Hok Hi Hb Hl Hr0 Hr1 Hr2 (proj2 Hfok) (elem_of_list_here _ _)
+                with "Hnp []").
+      iApply UexecExecMint.udep_free.
+  Qed.
+
+  (* THE LAST STAGE's ENTRY, fd 2 mute *)
+  Lemma pse_filt_last_image_entry (F : filt) (M : gmap Z (bv 8)) (s1 t1 : Z) (g1 : nat -> bv 8)
+      (sts : list fdstate) (cs : gset gname) (pidv : mword 32) (Q : Z -> iProp Σ)
+      (pin : pnames) (gin : pipe_names) (wL : wid) (wb rb1 rb2 : bool) :
+    (forall x y : Z, Q x = Q y) ->
+    exec_ok (filt_words F) ->
+    UShEcho.echo_node_img (filt_words F) M s1 t1 g1 ->
+    UkShEcho.echo_argv_bytes (filt_words F) g1 ->
+    length sts = NOFILE ->
+    take NSTD sts !! 0%nat = Some (FdOpen true wb (FdPipe gin)) ->
+    take NSTD sts !! 1%nat = Some (FdOpen rb1 true (FdDevice ConsoleInv.CONSOLE)) ->
+    take NSTD sts !! 2%nat = Some (FdOpen rb2 true (FdDevice ConsoleInv.CONSOLE)) ->
+    fok F L ->
+    UkRun.urun_nopipe sts -∗
+    image_entry (filt_elf F) M (mword_of_int (t1 + 8) : mword 64) sts FsImg.ROOTINO cs pidv Q
+      (pns_copy_lend_m g LM PV CP v I sR lR L termw TOKN pdepR γc γm pin gin F (CSCon wL) Q) uslot.
+  Proof using HL31 Hadmit Hcons Hext Hsup HlR Hfc Hkill Hplok pnsRegG0 ufdG0.
+    intros HQ Hok Hi Hb Hl Hr0 Hr1 Hr2 Hfok. iIntros "#Hnp".
+    destruct F as [| wp].
+    - iApply (pse_last_image_entry_m (PS := uprogSG_free) g LM PV CP sd WA Hext Hcons Hkill Hsup
+                v I sR lR HlR Hfc Hadmit Hplok L HL31 termw TOKN pdepR (pdep_timeless LM PV sR lR L pr P gF gG)
+                γc γm M s1 t1 g1 sts FsImg.ROOTINO cs pidv Q pin gin wL wb rb1 rb2
+                HQ Hok Hi Hb Hl Hr0 Hr1 Hr2
+                with "Hnp []").
+      iApply UexecExecMint.udep_free.
+    - iApply (pse_grep_last_image_entry (PS := uprogSG_free) g LM PV CP sd WA Hext Hcons Hkill Hsup
+                v I sR lR HlR Hfc Hadmit Hplok L HL31 termw TOKN pdepR (pdep_timeless LM PV sR lR L pr P gF gG)
+                γc γm wp M s1 t1 g1 sts FsImg.ROOTINO cs pidv Q pin gin wL wb rb1 rb2
+                HQ Hok Hi Hb Hl Hr0 Hr1 Hr2 (proj2 Hfok)
+                with "Hnp []").
+      iApply UexecExecMint.udep_free.
+  Qed.
+
+  (* the diagnostic of stage [j]'s exec failure is its program's *)
+  Lemma dg_st_filt (j : nat) (F : filt) :
+    lfilt lR (S j) = F -> filt_dg_exec F = dg_st pr (lfilts lR) (S j).
+  Proof using . intros HF. cbn [dg_st]. rewrite -lfilt_sfilt HF. reflexivity. Qed.
+
+  (* ================================================================= *)
+  (*  4.  A MIDDLE STAGE: the left child of node [k = S k']              *)
   (* ================================================================= *)
 
   (* what node [k] lends its left child: the input pipe's read permit (its
@@ -425,16 +496,40 @@ Section UShPipesStage.
     /\ (exists rb, l !! 1%nat = Some (FdOpen rb true (FdPipe γp)))
     /\ (exists rb, l !! 2%nat = Some (FdOpen rb true (FdDevice ConsoleInv.CONSOLE))).
 
-  Lemma stage_mid (k' a b : nat) (s0 : Z) (gs : nat -> bv 8)
+  (* the middle stage's fd 2 kits: a cat's write error, fired as the
+     halted cat's report; nothing for a grep *)
+  Lemma mid_kits (k' : nat) (F : filt) :
+    lfilt lR (S k') = F -> (S k' < nc)%nat ->
+    shotsF gF (S k') -∗ osS (gG (S k')) -∗ pinv lR L P (S k') -∗
+    [∗ list] a ∈ mid_alts F, (⌜a = []⌝ ∨ (pkitR (WLeft (S k')) a ∗ pdepR (WLeft (S k')) a)).
+  Proof using Hadmit Hfire HlR.
+    intros HF Hk. iIntros "#Hsk #HGs #Hpk".
+    assert (Hwk : WLeft (S k') ∈ wsN) by (apply wids_elem; exact Hk).
+    destruct F as [| wp]; cbn [mid_alts].
+    - rewrite big_sepL_cons big_sepL_singleton. iSplitR; [by iLeft |]. iRight.
+      assert (Hh : halts_at fcR pr (lfilts lR) (S k')) by (cbn [halts_at]; rewrite -lfilt_sfilt; exact HF).
+      iSplitR.
+      + iApply (pkit_of LM PV I sR lR HlR Hadmit L pr P gF gG (WLeft (S k')) cat_dg_write
+                  ltac:(intros j Hj; discriminate Hj)
+                  (Hfire (WLeft (S k')) cat_dg_write Hwk (or_intror (conj Hh eq_refl)))).
+        iApply (pexcl_left LM PV sR lR L pr P gF gG (S k') cat_dg_write Hk
+                  ltac:(vm_compute; discriminate) with "Hpk").
+      + iApply (pdep_left_write (S k') Hh with "Hsk HGs").
+    - rewrite big_sepL_singleton. by iLeft.
+  Qed.
+
+  Lemma stage_mid (k' : nat) (F : filt) (co : nat) (s0 : Z) (gs : nat -> bv 8)
       (N' : uk_names Σ) (h' : CpuId) (m' : regfile) (gin γp : pipe_names) (q szv : Z)
       (ld : list fdstate) (av : nat) :
-    UkShCat.cat_argv_bytes a b gs -> (S k' < nc)%nat ->
+    lfilt lR (S k') = F -> fok F L ->
+    exec_ok (filt_words F) -> UkShEcho.echo_argv_bytes (filt_words F) (fun j : nat => gs (co + j)%nat) ->
+    (S k' < nc)%nat ->
     ukn_pay N' = (fun _ : Z => QcR (S k')) ->
     m' !!! Regidx a0_idx = (mword_of_int q : mword 64) ->
     mid_fd0 gin γp ld -> (6 <= av)%nat ->
-    FAM -∗ UShCatPay.sh_cat_slot T -∗
+    FAM -∗ sh_pin_slot (filt_pins F) T -∗
     shk_code (ukn_t N') -∗ ush_jtab (ukn_t N') -∗
-    ush_cmd (ukn_d N') q (UkShCat.cat_cmd a b s0 gs) -∗
+    ush_cmd (ukn_d N') q (UExec (UkShMain.ush_args s0 gs (ushq_rebase co (wl_toks (filt_words F))))) -∗
     usz (ukn_s N') szv -∗ UserFd.ustd (ukn_fd N') ld -∗
     UserCwd.ucwd (ukn_cwd N') FsImg.ROOTINO -∗
     UserChildren.uch (ukn_ch N') (∅ : gset gname) -∗
@@ -442,58 +537,43 @@ Section UShPipesStage.
     urun (SG := uexecSG_xv6) (PS := uprogSG_free) N' h' m' (mword_of_int ShSyms.runcmd)
       (2 + (UkShDiag.ush_Dg + av)) -∗
     mWP (Loop : expr riscv_lang).
-  Proof using HL31 Hadmit Hcons Hext Hsup HlR Hfc Hfire Hkill Hplok Hstg_cat pnsRegG0 uartGhostG0.
-    intros Hbytes Hk Hpeq Ha0 Hfd Hav.
-    iIntros "#Hinv #Hslot #Hcode #Hjt #Hcmd Hsz Hstd Hcwd Hch Hraw Hrun".
+  Proof using HL31 Hadmit Hcons Hext Hsup HlR Hfc Hfire Hkill Hplok pnsRegG0.
+    intros HF Hfok Hok Hbytes Hk Hpeq Ha0 Hfd Hav.
+    iIntros "#Hinv #Hslot #Hcode #Hjt #Hcmd0 Hsz Hstd Hcwd Hch Hraw Hrun".
+    iDestruct (ush_cmd_rebase_l (ukn_d N') q s0 gs co (filt_words F) with "Hcmd0") as "#Hcmd".
     pose proof (ukn_const_of_eq N' _ Hpeq (fun x y => eq_refl)) as Hc.
     iDestruct "Hraw" as "(#Hpin & #Hpo & Hr & Hw & #Hlb & HsL & Hcw & Hmw & HG & #Hsk)".
     iApply stg_fupd_mwp. iMod (os_shoot with "HG") as "#HGs". iModIntro.
     assert (Hwk : WLeft (S k') ∈ wsN) by (apply wids_elem; exact Hk).
     assert (Hfd2 : UkSh.ush_fd2p ld) by (destruct Hfd as (_ & _ & Hf2); exact Hf2).
+    pose proof (dg_st_filt k' F HF) as Hdgs.
     iAssert (pinv lR L P (S k')) as "#Hpk".
     { rewrite /pinv. iExists γp. iExact "Hpo". }
-    iAssert (pkitR (WLeft (S k')) cat_dg_write) as "#Hkw".
-    { rewrite /pns_kit. iSplit.
-      - iExists (EXf fcR pr nc L (WLeft (S k')) cat_dg_write). iSplitR.
-        + iPureIntro. apply (Hfire (WLeft (S k')) cat_dg_write Hwk).
-          cbn [fire_src]. right. split; [left; lia | reflexivity].
-        + iApply (pexcl_left LM PV sR lR L pr P gF gG (S k') cat_dg_write Hk
-                    ltac:(vm_compute; discriminate) with "Hpk").
-      - iPureIntro. intros c [Hc0 Hcl].
-        apply (cstep_okV_tok LM PV I sR lR HlR Hadmit (WLeft (S k')) cat_dg_write c Hc0 Hcl).
-        intros j Hj; discriminate Hj. }
-    set (A2 := [[]; cat_dg_write]).
     set (Cr := (rcur (P k') 0 ∗ wcur (P (S k')) 0 ∗ side_L (P (S k'))
                 ∗ wcurN γc (WLeft (S k')) (1/2) 0 ∗ wmodeN γm (WLeft (S k')) (1/2) None)%I).
-    set (Cd := (side_L (P (S k')) ∗ pns_wfin γc γm (WLeft (S k')) (Some dg_execR))%I).
-    replace (2 + (UkShDiag.ush_Dg + av))%nat
-      with (6 + (2 + (UkShDiag.ush_Dg + (av - 6))))%nat by lia.
-    iApply (wp_kshr_exec_cat_paid_of_entry (PS := uprogSG_free) (mid_fd0 gin γp) a b T
-              (QcR (S k')) Cr Cd N' Hc h' m' q szv s0 gs ld (av - 6)%nat
-              Hpeq Ha0 Hbytes Hfd Hfd2
-              with "[] [] Hslot Hcode [] [] Hjt Hcmd Hsz Hstd Hcwd [Hch] [Hr Hw HsL Hcw Hmw] Hrun").
-    - iIntros "!> #Ht". rewrite Hkill. by iLeft.
-    - (* ---- THE EXEC SUPPLY, AT C6'S ENTRY ---- *)
-      iIntros "!>" (M s1 t1 g1 sts cs pidv) "%Ht1 %Hs1 %Hb1 %Hi1 %Hl1 %Hf1 #Hnp".
+    set (Cd := (side_L (P (S k')) ∗ pns_wfin γc γm (WLeft (S k')) (Some (filt_dg_exec F)))%I).
+    (* ---- THE EXEC SUPPLY, AT THE STAGE PROGRAM's ENTRY ---- *)
+    iPoseProof (sh_exec_sup_filt_of_entry (mid_fd0 gin γp) F T (QcR (S k')) Cr Hok
+                  with "[] [] Hslot") as "#Hsup".
+    { iIntros "!>" (M s1 t1 g1 sts cs pidv) "%Hi1 %Hb1 %Hl1 %Hf1 #Hnp".
       destruct Hf1 as ([wb Hr0] & [rb1 Hr1] & [rb2 Hr2]).
-      iApply (image_entry_pay_mono ElfUser.cat_elf M (mword_of_int (t1 + 8) : mword 64)
+      iApply (image_entry_pay_mono (filt_elf F) M (mword_of_int (t1 + 8) : mword 64)
                 sts FsImg.ROOTINO cs pidv (fun _ : Z => QcR (S k'))
-                (pns_copy_lend g LM PV CP v I sR lR L termw TOKN pdepR γc γm (WLeft (S k')) A2 A2
-                   (P k') gin FCat (CSPipe (P (S k')) γp) (fun _ : Z => QcR (S k'))) Cr uslot
+                (pns_copy_lend g LM PV CP v I sR lR L termw TOKN pdepR γc γm (WLeft (S k'))
+                   (mid_alts F) (mid_alts F) (P k') gin F (CSPipe (P (S k')) γp) (fun _ : Z => QcR (S k')))
+                Cr uslot
                 with "[] [Hnp]").
       + iIntros "!> (Hr & Hw & HsL & Hcw & Hmw)". rewrite /pns_copy_lend.
         iSplitR.
-        { cbn [pns_pk_inv]. iSplitR; [iPureIntro; exact Logic.I |].
+        { cbn [pns_pk_inv]. iSplitR; [iPureIntro; exact Hfok |].
           iSplitR; [iExists (prevP P k'), (fapp (lfilt lR k')); iExact "Hpin" |].
-          rewrite -(pflow_cat lR L P k' (Hstg_cat (S k'))). iExact "Hpo". }
+          rewrite -HF. iExact "Hpo". }
         iFrame "Hr". iSplitL "Hw".
         { rewrite /pns_sink take_0. iFrame "Hw Hlb". }
         iSplitR.
-        { iPureIntro. split_and!; [exact cons_short_A2 | exact Hwk | done]. }
+        { iPureIntro. split_and!; [exact (mid_alts_short F) | exact Hwk | done]. }
         iSplitR; [iExact "Hinv" |]. iFrame "Hcw Hmw".
-        iSplitR.
-        { rewrite /A2. iSplitR; [by iLeft |]. iSplitR; [| done]. iRight.
-          iFrame "Hkw". iApply (pdep_left_write (S k') ltac:(left; lia) with "Hsk HGs"). }
+        iSplitR; [iApply (mid_kits k' F HF Hk with "Hsk HGs Hpk") |].
         rewrite /pns_xkQ. iIntros "[#HT | (Hf0 & Hf1 & _)]"; [by iLeft |].
         cbn [pns_final snd].
         iDestruct "Hf0" as (o) "[_ Ho]".
@@ -509,56 +589,65 @@ Section UShPipesStage.
           iExists (RdEof (take c L)). cbn [rd_final]. iFrame "Heof".
           iPureIntro. split.
           -- intros W HW. injection HW as <-. exists (take c L). split; [reflexivity |].
-             rewrite (Hstg_cat (S k')). exact Hwt.
+             rewrite HF. exact Hwt.
           -- intros D HD. injection HD as <-. apply prefix_take.
         * iDestruct "Hf1" as (c wc) "(_ & Hw' & #Hro)".
           iExists (WrHalt (take wc L)). cbn [wr_final].
           iSplitL "Hw'"; [iExists wc; iFrame "Hw' Hro"; done |].
           iExists RdGone. cbn [rd_final]. iSplit; [done |].
           iPureIntro. split; [intros W HW; discriminate HW | intros D HD; discriminate HD].
-        * (* halted, then read on to its end: a cat reports its reader gone *)
+        * (* halted, then read on to its end (a grep does): its reader's
+             report is what a gone one's is *)
           iDestruct "Hf1" as (c wc) "(_ & _ & Hw' & #Hro)".
           iExists (WrHalt (take wc L)). cbn [wr_final].
           iSplitL "Hw'"; [iExists wc; iFrame "Hw' Hro"; done |].
           iExists RdGone. cbn [rd_final]. iSplit; [done |].
           iPureIntro. split; [intros W HW; discriminate HW | intros D HD; discriminate HD].
-      + iApply (pse_mid_image_entry (PS := uprogSG_free) g LM PV CP sd WA Hext Hcons Hkill Hsup
-                  v I sR lR HlR Hfc Hadmit Hplok L HL31 termw TOKN pdepR (pdep_timeless LM PV sR lR L pr P gF gG)
-                  γc γm a b M s1 t1 g1 sts FsImg.ROOTINO cs pidv (fun _ : Z => QcR (S k'))
-                  (WLeft (S k')) A2 A2 (P k') gin (P (S k')) γp wb rb1 rb2
-                  (fun _ _ => eq_refl) Ht1 Hs1 Hb1 Hi1 Hl1 Hr0 Hr1 Hr2
-                  (elem_of_list_here _ _) (elem_of_list_further _ _ _ (elem_of_list_here _ _))
-                  with "Hnp []").
-        iApply UexecExecMint.udep_free.
-    - (* ---- THE EXEC-FAILED LAW: the stage's family writer ---- *)
-      iApply (exf_writer (WLeft (S k')) dg_execR alt_execR 16%nat
-                (EXf fcR pr nc L (WLeft (S k')) dg_execR) Cr (side_L (P (S k'))) Cd Hwk ltac:(lia)
-                ltac:(intros p b' Hp Hb; exact (dg_app_lookup dg_execR u_prompt p b'
-                               ltac:(rewrite dg_execR_len; lia) Hb))
-                (Hfire (WLeft (S k')) dg_execR Hwk (or_introl (or_introl eq_refl)))
+      + iApply (pse_filt_mid_image_entry F M s1 t1 g1 sts cs pidv (fun _ : Z => QcR (S k'))
+                  (WLeft (S k')) (P k') gin (P (S k')) γp wb rb1 rb2
+                  (fun _ _ => eq_refl) Hok Hi1 Hb1 Hl1 Hr0 Hr1 Hr2 Hfok with "Hnp"). }
+    { iIntros "!> #Ht". rewrite Hkill. by iLeft. }
+    (* ---- THE EXEC-FAILED LAW: the stage's family writer, at its
+            program's diagnostic ---- *)
+    iAssert (UkShDiag.ush_execfail_law_at (SG := uexecSG_xv6) (PS := uprogSG_free)
+               (filt_alt F) (13 + length (filt_words F !!! 0%nat))%nat Cr Cd)%I as "#Hxl".
+    { iApply (exf_writer (WLeft (S k')) (filt_dg_exec F) (filt_alt F)
+                (13 + length (filt_words F !!! 0%nat))%nat
+                (EXf fcR pr (lfilts lR) nc L (WLeft (S k')) (filt_dg_exec F)) Cr (side_L (P (S k'))) Cd
+                Hwk ltac:(lia) (filt_alt_lookup F)
+                (Hfire (WLeft (S k')) (filt_dg_exec F) Hwk (or_introl (or_introl Hdgs)))
                 ltac:(intros c Hcx;
-                      apply (cstep_okV_tok LM PV I sR lR HlR Hadmit (WLeft (S k')) dg_execR c);
-                      [lia | rewrite dg_execR_len; lia | intros j Hj; discriminate Hj])
+                      apply (cstep_okV_tok LM PV I sR lR HlR Hadmit (WLeft (S k')) (filt_dg_exec F) c);
+                      [lia | rewrite filt_dg_exec_len; lia | intros j Hj; discriminate Hj])
                 with "Hinv [] [] []").
-      + iApply (pexcl_left LM PV sR lR L pr P gF gG (S k') dg_execR Hk (dg_st_ne pr (S k'))
+      - iApply (pexcl_left LM PV sR lR L pr P gF gG (S k') (filt_dg_exec F) Hk (filt_dg_exec_ne F)
                   with "Hpk").
-      + iIntros "!> (_ & Hw & HsL & Hcw & Hmw)". iFrame "HsL Hcw Hmw".
-        rewrite (pdep_unfold LM PV sR lR L pr P gF gG (WLeft (S k')) dg_execR (dg_st_ne pr (S k'))
-                   (or_introl (or_introl eq_refl)))
+      - iIntros "!> (_ & Hw & HsL & Hcw & Hmw)". iFrame "HsL Hcw Hmw".
+        rewrite (pdep_unfold LM PV sR lR L pr P gF gG (WLeft (S k')) (filt_dg_exec F) (filt_dg_exec_ne F)
+                   (or_introl (or_introl Hdgs)))
           /pdep_ne.
         rewrite bool_decide_true; [| by left].
         iFrame "Hw HGs Hsk".
-      + iIntros "!> HsL Hcw Hmw _". rewrite /Cd. iFrame "HsL".
-        cbn [pns_wfin]. rewrite dg_execR_len. iFrame "Hcw Hmw".
+      - iIntros "!> HsL Hcw Hmw _". rewrite /Cd. iFrame "HsL".
+        cbn [pns_wfin]. rewrite filt_dg_exec_len. iFrame "Hcw Hmw". }
+    (* ---- ...AND THE ARM ---- *)
+    replace (2 + (UkShDiag.ush_Dg + av))%nat
+      with (6 + (2 + (UkShDiag.ush_Dg + (av - 6))))%nat by lia.
+    iApply (UkShEcho.wp_kshr_exec_x_at_holds (SG := uexecSG_xv6) (PS := uprogSG_free)
+              (mid_fd0 gin γp) (filt_words F) (filt_alt F)
+              (fun _ : Z => QcR (S k')) Cr Cd
+              N' Hc h' m' q szv (s0 + Z.of_nat co) (fun j : nat => gs (co + j)%nat) ld (av - 6)%nat
+              Hok (filt_execfail_bytes F) Hpeq Ha0 Hbytes Hfd Hfd2
+              with "Hcode Hsup Hxl [] Hjt Hcmd Hsz Hstd Hcwd [Hch] [Hr Hw HsL Hcw Hmw] Hrun").
     - iIntros "!> [HsL Hf]". iRight. iLeft. iFrame "HsL". iSplitR; [iApply lrd_S |]. rewrite /lrep.
-      iExists (Some dg_execR). iFrame "Hf". iLeft. iPureIntro.
-      exists dg_execR. split; [reflexivity | by left].
+      iExists (Some (filt_dg_exec F)). iFrame "Hf". iLeft. iPureIntro.
+      exists (filt_dg_exec F). split; [reflexivity | left; exact Hdgs].
     - iApply (UserChildren.uch_any_of with "Hch").
     - rewrite /Cr. iFrame.
   Qed.
 
   (* ================================================================= *)
-  (*  4.  THE LAST CAT: the right child of the last node [m]             *)
+  (*  5.  THE LAST STAGE: the right child of the last node [m]           *)
   (* ================================================================= *)
 
   (* what node [m] lends its right child: the last pipe's read side and
@@ -579,16 +668,17 @@ Section UShPipesStage.
   Lemma wsub_last (m : nat) : nc = S m -> wsub lR (S m) = [WLast].
   Proof using . intros Hm. rewrite /wsub Hm Nat.sub_diag. reflexivity. Qed.
 
-  Lemma stage_last (m a b : nat) (s0 : Z) (gs : nat -> bv 8)
+  Lemma stage_last (m : nat) (F : filt) (co : nat) (s0 : Z) (gs : nat -> bv 8)
       (N' : uk_names Σ) (h' : CpuId) (m' : regfile) (γp : pipe_names) (q szv : Z)
       (ld : list fdstate) (av : nat) :
-    UkShCat.cat_argv_bytes a b gs -> nc = S m ->
+    nc = S m -> lfilt lR (S m) = F -> fok F L ->
+    exec_ok (filt_words F) -> UkShEcho.echo_argv_bytes (filt_words F) (fun j : nat => gs (co + j)%nat) ->
     ukn_pay N' = (fun _ : Z => QcR m) ->
     m' !!! Regidx a0_idx = (mword_of_int q : mword 64) ->
     last_fd0 γp ld -> (6 <= av)%nat ->
-    FAM -∗ UShCatPay.sh_cat_slot T -∗
+    FAM -∗ sh_pin_slot (filt_pins F) T -∗
     shk_code (ukn_t N') -∗ ush_jtab (ukn_t N') -∗
-    ush_cmd (ukn_d N') q (UkShCat.cat_cmd a b s0 gs) -∗
+    ush_cmd (ukn_d N') q (UExec (UkShMain.ush_args s0 gs (ushq_rebase co (wl_toks (filt_words F))))) -∗
     usz (ukn_s N') szv -∗ UserFd.ustd (ukn_fd N') ld -∗
     UserCwd.ucwd (ukn_cwd N') FsImg.ROOTINO -∗
     UserChildren.uch (ukn_ch N') (∅ : gset gname) -∗
@@ -596,105 +686,118 @@ Section UShPipesStage.
     urun (SG := uexecSG_xv6) (PS := uprogSG_free) N' h' m' (mword_of_int ShSyms.runcmd)
       (2 + (UkShDiag.ush_Dg + av)) -∗
     mWP (Loop : expr riscv_lang).
-  Proof using HL31 Hadmit Hcons Hext Hsup HlR Hfc Hfire Hkill Hplok Hstg_cat pnsRegG0 uartGhostG0.
-    intros Hbytes Hm Hpeq Ha0 Hfd Hav.
-    iIntros "#Hinv #Hslot #Hcode #Hjt #Hcmd Hsz Hstd Hcwd Hch Hraw Hrun".
+  Proof using HL31 Hadmit Hcons Hext Hsup HlR Hfc Hfire Hkill Hplok pnsRegG0.
+    intros Hm HF Hfok Hok Hbytes Hpeq Ha0 Hfd Hav.
+    iIntros "#Hinv #Hslot #Hcode #Hjt #Hcmd0 Hsz Hstd Hcwd Hch Hraw Hrun".
+    iDestruct (ush_cmd_rebase_l (ukn_d N') q s0 gs co (filt_words F) with "Hcmd0") as "#Hcmd".
     pose proof (ukn_const_of_eq N' _ Hpeq (fun x y => eq_refl)) as Hc.
     iDestruct "Hraw" as "(#Hpo & #Hinvs & Hr & HsR & Hcw & Hmw & HF & #Hsm)".
     iApply stg_fupd_mwp. iMod (os_shoot with "HF") as "#HFs". iModIntro.
     iDestruct (shotsF_snoc with "Hsm HFs") as "#Hsn". rewrite -Hm.
     assert (Hwl : WLast ∈ wsN) by (apply wids_elem; done).
     assert (Hfd2 : UkSh.ush_fd2p ld) by (destruct Hfd as (_ & _ & Hf2); exact Hf2).
-    (* THE CONTENT WRITER'S KIT AND DEPOSIT, at a nonempty line *)
-    iAssert (⌜L = []⌝ ∨ (pkitR WLast L
-               ∗ □ (pws_lb (P (nc - 1)) (take 1 L) -∗ ⌜fapp FCat L = L⌝ ={↑pipeN}=∗ pdepR WLast L)))%I
-      as "#Hkd".
-    { destruct (decide (L = [])) as [HL0 | HLne]; [by iLeft |]. iRight. iSplit.
-      - rewrite /pns_kit. iSplit.
-        + iExists (EXf fcR pr nc L WLast L). iSplitR.
-          * iPureIntro. exact (Hfire WLast L Hwl (or_introl (conj eq_refl HLne))).
-          * iApply (pexcl_last LM PV sR lR L pr P gF gG L HLne with "Hinvs").
-        + iPureIntro. intros c [Hc0 Hcl].
-          apply (cstep_okV_tok LM PV I sR lR HlR Hadmit WLast L c Hc0 Hcl).
-          intros j Hj; discriminate Hj.
-      - iPoseProof (pdep_last_of_lb LM PV sR lR L pr P gF gG HLne ltac:(lia) with "Hsn Hinvs")
-          as "#Hdl".
-        iIntros "!> #Hlb %Hp". iApply ("Hdl" with "Hlb"). iPureIntro.
-        rewrite (Hstg_cat nc). exact Hp. }
-    replace (nc - 1)%nat with m by lia.
+    assert (HFn : lfilt lR nc = F) by (rewrite Hm; exact HF).
+    assert (Hldg : filt_dg_exec F = ldg (lfilts lR))
+      by (rewrite /ldg -lcats_lfilts -lfilt_sfilt HFn; reflexivity).
     set (Cr := (rcur (P m) 0 ∗ side_R (P m)
                 ∗ wcurN γc WLast (1/2) 0 ∗ wmodeN γm WLast (1/2) None)%I).
-    set (Cd := (side_R (P m) ∗ pns_wfin γc γm WLast (Some dg_execR))%I).
-    replace (2 + (UkShDiag.ush_Dg + av))%nat
-      with (6 + (2 + (UkShDiag.ush_Dg + (av - 6))))%nat by lia.
-    iApply (wp_kshr_exec_cat_paid_of_entry (PS := uprogSG_free) (last_fd0 γp) a b T
-              (QcR m) Cr Cd N' Hc h' m' q szv s0 gs ld (av - 6)%nat
-              Hpeq Ha0 Hbytes Hfd Hfd2
-              with "[] [] Hslot Hcode [] [] Hjt Hcmd Hsz Hstd Hcwd [Hch] [Hr HsR Hcw Hmw] Hrun").
-    - iIntros "!> #Ht". rewrite Hkill. by iLeft.
-    - (* ---- THE EXEC SUPPLY, AT C6'S ENTRY (fd 2 mute) ---- *)
-      iIntros "!>" (M s1 t1 g1 sts cs pidv) "%Ht1 %Hs1 %Hb1 %Hi1 %Hl1 %Hf1 #Hnp".
+    set (Cd := (side_R (P m) ∗ pns_wfin γc γm WLast (Some (filt_dg_exec F)))%I).
+    (* ---- THE EXEC SUPPLY, AT THE STAGE PROGRAM's ENTRY (fd 2 mute) ---- *)
+    iPoseProof (sh_exec_sup_filt_of_entry (last_fd0 γp) F T (QcR m) Cr Hok
+                  with "[] [] Hslot") as "#Hsup".
+    { iIntros "!>" (M s1 t1 g1 sts cs pidv) "%Hi1 %Hb1 %Hl1 %Hf1 #Hnp".
       destruct Hf1 as ([wb Hr0] & [rb1 Hr1] & [rb2 Hr2]).
-      iApply (image_entry_pay_mono ElfUser.cat_elf M (mword_of_int (t1 + 8) : mword 64)
+      iApply (image_entry_pay_mono (filt_elf F) M (mword_of_int (t1 + 8) : mword 64)
                 sts FsImg.ROOTINO cs pidv (fun _ : Z => QcR m)
-                (pns_copy_lend_m g LM PV CP v I sR lR L termw TOKN pdepR γc γm (P m) γp FCat (CSCon WLast)
+                (pns_copy_lend_m g LM PV CP v I sR lR L termw TOKN pdepR γc γm (P m) γp F (CSCon WLast)
                    (fun _ : Z => QcR m)) Cr uslot
                 with "[] [Hnp]").
       + iIntros "!> (Hr & HsR & Hcw & Hmw)". rewrite /pns_copy_lend_m.
         iSplitR.
-        { cbn [pns_pk_inv]. iSplitR; [iPureIntro; exact Logic.I |].
+        { cbn [pns_pk_inv]. iSplitR; [iPureIntro; exact Hfok |].
           iSplit; [iExists (prevP P m), (fapp (lfilt lR m)); iExact "Hpo" | done]. }
         iFrame "Hr". iSplitL "Hcw Hmw".
         { rewrite /pns_sink. iSplitR; [by iPureIntro |]. iSplitR; [iExact "Hinv" |].
-          iSplitR; [iExact "Hkd" |]. cbn [pns_cmode]. iFrame "Hcw Hmw". }
+          iSplitR.
+          { (* THE CONTENT WRITER's CREDENTIAL: its kit and deposit, at its
+               first byte -- where the flow chain says every filter of the
+               line passes the line *)
+            destruct (decide (L = [])) as [HL0 | HLne]; [by iLeft |]. iRight.
+            rewrite /pns_ckit. iSplit.
+            - iPureIntro. intros c [Hc0 Hcl].
+              apply (cstep_okV_tok LM PV I sR lR HlR Hadmit WLast L c Hc0 Hcl).
+              intros j Hj; discriminate Hj.
+            - iPoseProof (pdep_last_of_lb LM PV sR lR L pr P gF gG HLne ltac:(lia) with "Hsn Hinvs")
+                as "#Hdl".
+              assert (Hm1 : (nc - 1)%nat = m) by lia.
+              iEval (rewrite Hm1 HFn) in "Hdl".
+              iIntros "!> #Hlb %Hp".
+              iMod ("Hdl" with "Hlb [//]") as "[Hd %Hpass]". iModIntro. iFrame "Hd".
+              iApply (pkit_of LM PV I sR lR HlR Hadmit L pr P gF gG WLast L
+                        ltac:(intros j Hj; discriminate Hj)
+                        (Hfire WLast L Hwl (or_introl (conj eq_refl (conj HLne Hpass))))).
+              iApply (pexcl_last LM PV sR lR L pr P gF gG L HLne with "Hinvs"). }
+          cbn [pns_cmode]. iFrame "Hcw Hmw". }
         rewrite /pns_xkQ. iIntros "[#HT | (_ & Hf1 & _)]"; [by iLeft |].
         cbn [pns_final snd].
         iDestruct "Hf1" as (c) "(%HcL & #Heof & _ & Hcw & Hmw)".
-        (* a cat owes what it read *)
-        assert (Hlc : length (fapp FCat (take c L)) = c) by (cbn [fapp]; rewrite length_take; lia).
-        iEval (rewrite Hlc) in "Hcw". iEval (rewrite Hlc) in "Hmw".
         iRight. iRight. iFrame "HsR". rewrite /rrep.
         iExists (RdEof (take c L)). replace (S m - 1)%nat with m by lia.
         cbn [rd_final]. iFrame "Heof". iLeft. rewrite /sufN.
-        destruct c as [| c'].
-        * iExists None. iSplitR; [iPureIntro; intros c Hc'; discriminate Hc' |].
+        destruct (decide (fapp F (take c L) = [])) as [H0 | Hne].
+        * (* its filter owed nothing: it never fired *)
+          iEval (rewrite H0) in "Hcw". iEval (rewrite H0) in "Hmw".
+          iExists None. iSplitR; [iPureIntro; intros c' Hc'; discriminate Hc' |].
           iSplitL; [| rewrite (wsub_last m Hm) big_sepL_singleton; done].
           rewrite /wlast /wfin. iExists None.
-          cbn [pns_wfin pns_cmode]. iFrame "Hcw Hmw". iPureIntro. intros s Hs; discriminate Hs.
-        * iExists (Some (S c')). iSplitR.
+          cbn [pns_wfin pns_cmode length]. iFrame "Hcw Hmw". iPureIntro. intros s Hs; discriminate Hs.
+        * (* it owed what it read: the gate *)
+          destruct (fok_pass F L (take c L) Hfok (prefix_take L c) Hne) as [HfD _].
+          destruct c as [| c'].
+          { exfalso. apply Hne. rewrite take_0. apply fapp_nil. }
+          assert (Hlc : length (fapp F (take (S c') L)) = S c') by (rewrite HfD length_take; lia).
+          iEval (rewrite Hlc) in "Hcw". iEval (rewrite Hlc) in "Hmw".
+          iExists (Some (S c')). iSplitR.
           { iPureIntro. intros c Hc'. injection Hc' as <-. reflexivity. }
           iSplitL; [| rewrite (wsub_last m Hm) big_sepL_singleton; done].
           rewrite /wlast. cbn [pns_cmode]. iFrame "Hcw Hmw".
           iPureIntro. lia.
-      + iApply (pse_last_image_entry_m (PS := uprogSG_free) g LM PV CP sd WA Hext Hcons Hkill Hsup
-                  v I sR lR HlR Hfc Hadmit Hplok L HL31 termw TOKN pdepR (pdep_timeless LM PV sR lR L pr P gF gG)
-                  γc γm a b M s1 t1 g1 sts FsImg.ROOTINO cs pidv (fun _ : Z => QcR m)
+      + iApply (pse_filt_last_image_entry F M s1 t1 g1 sts cs pidv (fun _ : Z => QcR m)
                   (P m) γp WLast wb rb1 rb2
-                  (fun _ _ => eq_refl) Ht1 Hs1 Hb1 Hi1 Hl1 Hr0 Hr1 Hr2
-                  with "Hnp []").
-        iApply UexecExecMint.udep_free.
-    - (* ---- THE EXEC-FAILED LAW: the content writer ---- *)
-      iApply (exf_writer WLast dg_execR alt_execR 16%nat
-                (EXf fcR pr nc L WLast dg_execR) Cr (side_R (P m)) Cd Hwl ltac:(lia)
-                ltac:(intros p b' Hp Hb; exact (dg_app_lookup dg_execR u_prompt p b'
-                               ltac:(rewrite dg_execR_len; lia) Hb))
-                (Hfire WLast dg_execR Hwl (or_intror eq_refl))
+                  (fun _ _ => eq_refl) Hok Hi1 Hb1 Hl1 Hr0 Hr1 Hr2 Hfok with "Hnp"). }
+    { iIntros "!> #Ht". rewrite Hkill. by iLeft. }
+    (* ---- THE EXEC-FAILED LAW: the content writer ---- *)
+    iAssert (UkShDiag.ush_execfail_law_at (SG := uexecSG_xv6) (PS := uprogSG_free)
+               (filt_alt F) (13 + length (filt_words F !!! 0%nat))%nat Cr Cd)%I as "#Hxl".
+    { iApply (exf_writer WLast (filt_dg_exec F) (filt_alt F) (13 + length (filt_words F !!! 0%nat))%nat
+                (EXf fcR pr (lfilts lR) nc L WLast (filt_dg_exec F)) Cr (side_R (P m)) Cd Hwl ltac:(lia)
+                (filt_alt_lookup F)
+                (Hfire WLast (filt_dg_exec F) Hwl (or_intror Hldg))
                 ltac:(intros c Hcx;
-                      apply (cstep_okV_tok LM PV I sR lR HlR Hadmit WLast dg_execR c);
-                      [lia | rewrite dg_execR_len; lia | intros j Hj; discriminate Hj])
+                      apply (cstep_okV_tok LM PV I sR lR HlR Hadmit WLast (filt_dg_exec F) c);
+                      [lia | rewrite filt_dg_exec_len; lia | intros j Hj; discriminate Hj])
                 with "Hinv [] [] []").
-      + iApply (pexcl_last LM PV sR lR L pr P gF gG dg_execR (dg_st_ne pr 1) with "Hinvs").
-      + iIntros "!> (_ & HsR & Hcw & Hmw)". iFrame "HsR Hcw Hmw".
-        rewrite (pdep_unfold LM PV sR lR L pr P gF gG WLast dg_execR (dg_st_ne pr 1)
-                   (or_intror eq_refl)) /pdep_ne.
-        iFrame "Hsn". case_bool_decide as Hq; [| done]. iRight. by iPureIntro.
-      + iIntros "!> HsR Hcw Hmw _". rewrite /Cd. iFrame "HsR".
-        cbn [pns_wfin]. rewrite dg_execR_len. iFrame "Hcw Hmw".
+      - iApply (pexcl_last LM PV sR lR L pr P gF gG (filt_dg_exec F) (filt_dg_exec_ne F) with "Hinvs").
+      - iIntros "!> (_ & HsR & Hcw & Hmw)". iFrame "HsR Hcw Hmw".
+        rewrite (pdep_unfold LM PV sR lR L pr P gF gG WLast (filt_dg_exec F) (filt_dg_exec_ne F)
+                   (or_intror Hldg)) /pdep_ne.
+        iFrame "Hsn". case_bool_decide as Hq; [| done]. iRight. iPureIntro. rewrite -Hq. exact Hldg.
+      - iIntros "!> HsR Hcw Hmw _". rewrite /Cd. iFrame "HsR".
+        cbn [pns_wfin]. rewrite filt_dg_exec_len. iFrame "Hcw Hmw". }
+    replace (2 + (UkShDiag.ush_Dg + av))%nat
+      with (6 + (2 + (UkShDiag.ush_Dg + (av - 6))))%nat by lia.
+    iApply (UkShEcho.wp_kshr_exec_x_at_holds (SG := uexecSG_xv6) (PS := uprogSG_free)
+              (last_fd0 γp) (filt_words F) (filt_alt F)
+              (fun _ : Z => QcR m) Cr Cd
+              N' Hc h' m' q szv (s0 + Z.of_nat co) (fun j : nat => gs (co + j)%nat) ld (av - 6)%nat
+              Hok (filt_execfail_bytes F) Hpeq Ha0 Hbytes Hfd Hfd2
+              with "Hcode Hsup Hxl [] Hjt Hcmd Hsz Hstd Hcwd [Hch] [Hr HsR Hcw Hmw] Hrun").
     - iIntros "!> [HsR Hf]". iRight. iRight. iFrame "HsR". rewrite /rrep.
       iExists RdGone. replace (S m - 1)%nat with m by lia. cbn [rd_final].
       iSplitR; [done |]. iLeft. rewrite /sufN.
       iExists None. iSplitR; [iPureIntro; intros c Hc'; discriminate Hc' |].
-      iSplitL; [| rewrite (wsub_last m Hm) big_sepL_singleton; done]. rewrite /wlast /wfin. iExists (Some dg_execR). iFrame "Hf".
+      iSplitL; [| rewrite (wsub_last m Hm) big_sepL_singleton; done]. rewrite /wlast /wfin.
+      iExists (Some (filt_dg_exec F)). iFrame "Hf".
       iPureIntro. intros s Hs. reflexivity.
     - iApply (UserChildren.uch_any_of with "Hch").
     - rewrite /Cr. iFrame.
