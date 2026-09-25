@@ -166,6 +166,7 @@ theorem either_copyin_proof (MP : MYPROC) (CI : COPYIN) (MM : MEMMOVE) : EITHER_
     iintro %c22 %hp22 %spie2 %spp2 %R2 %hsp2 Hk Hpc Hres %hcs2
     k_norm_g
     icases Hres with ⟨%P', %bs', %hpost, Hspace, Hold⟩
+    icases UMemL.procPtAt_wf _ _ $$ Hspace with ⟨Hspace, %hwf'⟩
     rw [e19] at hpost
     unfold calleeSaved at hcs2
     k_norm_g at hcs2
@@ -190,7 +191,8 @@ theorem either_copyin_proof (MP : MYPROC) (CI : COPYIN) (MM : MEMMOVE) : EITHER_
     ihave Hout : (∃ (Q : UPtd) (cs : List (BitVec 8)),
         ⌜P.extSz V.sz Q ∧
           ((R3 10#5 = 0#64 ∧
-              cs = umemRead (viewFaulted P Q M) (k.regs 12#5).toNat old.length) ∨
+              cs = umemRead (viewFaulted P Q M) (k.regs 12#5).toNat old.length ∧
+              (k.regs 12#5).toNat + old.length < 2 ^ 64) ∨
            (R3 10#5 = 18446744073709551615#64 ∧ (∃ d, d ≤ old.length ∧
               cs = umemRead (viewFaulted P Q M) (k.regs 12#5).toNat d ++ old.drop d) ∧
             ∃ e, e < old.length ∧ ¬ uvaRmapped P (k.regs 12#5 + BitVec.ofNat 64 e).toNat))⌝ ∗
@@ -200,7 +202,8 @@ theorem either_copyin_proof (MP : MYPROC) (CI : COPYIN) (MM : MEMMOVE) : EITHER_
       iexists P'
       iexists bs'
       isplitl []
-      · ipureintro; rw [x10]; exact ⟨hpost.1, hpost.2.imp (fun h => ⟨h.1, h.2.1⟩) id⟩
+      · ipureintro; rw [x10]; exact ⟨hpost.1, hpost.2.imp
+        (fun h => ⟨h.1, h.2.1, UMemL.umMapped_nowrap hwf' h.2.2 (BitVec.isLt _)⟩) id⟩
       · isplitl [Hsz Hpg Hspace Hrest]
         · iapply (ec_priv_close (procAddr j) pid V P P' (viewFaulted P P' M) hpost.1
             hfacts)

@@ -264,13 +264,12 @@ theorem fwr_dispatch (PW : PIPEWRITE) (IL : ILOCK) (WI : WRITEI) (IU : IUNLOCK) 
     with [h12, fwr_blez n ⟨hn0, hn.2⟩, decide_eq_false hz]
   iintro Hk Hpc
   unfold filewriteIn
-  icases Hin with ⟨%hnw, Hc⟩
   unfold filewriteEnv filewriteFsEnv
   icases Henv with ⟨#Hfs, Hbs⟩
   unfold foffRow
   have hpos : 0 < n ∧ n < 2 ^ 31 := ⟨by omega, hn.2⟩
   let A : FwrA := ⟨γ, fk, q, rb, i, γoC, j, pid, V, M, γkl, γk, γl, γu, n⟩
-  have hA : FwrFacts k A := ⟨hK, hfk, hj, hproc, hnoff, hlocks, htier, ht0, hpos, hnw⟩
+  have hA : FwrFacts k A := ⟨hK, hfk, hj, hproc, hnoff, hlocks, htier, ht0, hpos⟩
   iapply (fwr_arm_inode BO IL WI IU EO Γ cpu k k.spie k.spp _ A hA Q w2 w4 w5 w8 w9 w10 w11 ?hri)
     $$ [- $Hk $Hpc]
   rotate_right 1

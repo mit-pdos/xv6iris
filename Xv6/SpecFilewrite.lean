@@ -106,8 +106,7 @@ untouched); the `n < 0` test (+0x1c); the three-way dispatch; FD_PIPE
      is Rocq's.  The inode arm's `writeArmsAt` takes the same `P` (Rocq
      lane WRITE-RELAY-2): its partial arms carry writei's own short-write
      reason (`SpecWritei`'s `WriteiOut.why`, `SysWriteDefs.wrFailWhy`).
-   * the device input carries the no-wrap conjunct of deviation 5 (the
-     callee's premise `hnw`, SpecConsolewrite deviation 2).
+   * (the device input's no-wrap conjunct is retired with deviation 5.)
 4. **THE IMAGE `M`** (the question FsAbsWriteFire deviation 2 / SysWriteDefs
    deviation 3 left to this file).  Rocq states the chain at `us_M U`, the
    process image in which every lazily unmapped live page READS ZERO, and
@@ -127,16 +126,13 @@ untouched); the `n < 0` test (+0x1c); the three-way dispatch; FD_PIPE
    above the break) is `None` in Rocq's image and `0` here, so the
    caller's tie there is uninformative -- no copy can succeed on such a
    page, so no chunk ever carries one.
-5. **THE NO-WRAP CONJUNCT** of the FD_INODE input (`filewriteIn`):
-   `ua.toNat + n.toNat ≤ 2^64`.  SpecWritei's user-arm seam
-   (`Xv6.wiUsrGot`, its deviation 5) pins only the NON-WRAPPING bytes of a
-   run ("every successful user copy's, since copyin refuses any va at or
-   above MAXVA"), without exposing that bound, so a chunk whose source
-   crosses 2^64 would carry bytes nothing names, and the chain's per-chunk
-   tie (`ubytesAt`, which wraps as Rocq's `add_vec_int` does) could not be
-   discharged.  The conjunct is the caller's (a user buffer below MAXVA
-   satisfies it); it goes away if `WriteiOut.usr` also reports `src.toNat +
-   tot ≤ 2^64` (reported, landed file).
+5. (retired: the FD_INODE and FD_DEVICE inputs carried a no-wrap conjunct
+   `ua.toNat + n.toNat ≤ 2^64`; they no longer do, as in Rocq.  The bound
+   is now the CALLEES' report: `either_copyin`'s success arm says its run
+   does not cross 2^64 (copyin's `umMapped` against `uptWf`), so writei's
+   user seam `wiUsrGot` carries `src.toNat + tot < 2^64` for each chunk
+   and consolewrite needs no `hnw` premise; the chain's per-chunk tie
+   (`ubytesAt`, wrapping as Rocq's `add_vec_int`) is discharged from it.)
 6. **THE PROCESS BLOCK is `procPrivCoreNoctxAt curCtx (procAddr j) pid V
    M`**, Rocq's `proc_priv_core pj pidv U` literally (the bare block, the
    cwd reference, the generation row; no descriptor array).  The user-copy
@@ -525,16 +521,14 @@ theorem writeConsArms_of_cursor (P : UPtd) (ua : BitVec 64) (Q : Nat → IProp G
 writable INODE the commit CHAIN at the cursor `Q`, one node per possible
 chunk; on an open, writable DEVICE (at EVERY major: the walk calls whatever
 the cell holds) consolewrite's output CHAIN, one node per byte; both with
-the no-wrap conjunct (deviations 3, 5); nothing elsewhere. -/
+nothing elsewhere. -/
 def filewriteIn (st : FdState) (n : Int) (M : Nat → List (BitVec 8)) (ua : BitVec 64)
     (Q : Nat → IProp GF) : IProp GF :=
   match st with
   | .open _ true (.inode i γo _) =>
-    iprop(⌜ua.toNat + n.toNat ≤ 2 ^ 64⌝ ∗
-      awriteChain (hlc := hlc) (fsGammaL fscFs) appE i γo M ua n Q 0 (wchunks n))
+    awriteChain (hlc := hlc) (fsGammaL fscFs) appE i γo M ua n Q 0 (wchunks n)
   | .open _ true (.device _) =>
-    iprop(⌜ua.toNat + n.toNat ≤ 2 ^ 64⌝ ∗
-      consOutChain (genId (hlc := hlc) (GF := GF) + 1) M ua Q 0 n.toNat)
+    consOutChain (genId (hlc := hlc) (GF := GF) + 1) M ua Q 0 n.toNat
   | _ => emp
 
 /-- WHAT THE ARM PAYS BEYOND THE LANDED BLANKET (Rocq `filewrite_extra`;
@@ -569,15 +563,13 @@ theorem filewriteArms_ret (P : UPtd) (st : FdState) (n : Int) (M : Nat → List 
 theorem filewriteIn_inode (rb : Bool) (i : Nat) (γo : GName) (n : Int) (M : Nat → List (BitVec 8))
     (ua : BitVec 64) (Q : Nat → IProp GF) :
     filewriteIn (hlc := hlc) (.open rb true (.inode i γo .parked)) n M ua Q ⊣⊢
-      iprop(⌜ua.toNat + n.toNat ≤ 2 ^ 64⌝ ∗
-        awriteChain (hlc := hlc) (fsGammaL fscFs) appE i γo M ua n Q 0 (wchunks n)) := .rfl
+      awriteChain (hlc := hlc) (fsGammaL fscFs) appE i γo M ua n Q 0 (wchunks n) := .rfl
 
 /-- Rocq `filewrite_in_cons`. -/
 theorem filewriteIn_cons (rb : Bool) (mj : Nat) (n : Int) (M : Nat → List (BitVec 8))
     (ua : BitVec 64) (Q : Nat → IProp GF) :
     filewriteIn (hlc := hlc) (.open rb true (.device mj)) n M ua Q ⊣⊢
-      iprop(⌜ua.toNat + n.toNat ≤ 2 ^ 64⌝ ∗
-        consOutChain (genId (hlc := hlc) (GF := GF) + 1) M ua Q 0 n.toNat) := .rfl
+      consOutChain (genId (hlc := hlc) (GF := GF) + 1) M ua Q 0 n.toNat := .rfl
 
 /-- Rocq `filewrite_extra_inode`. -/
 theorem filewriteExtra_inode (P : UPtd) (rb : Bool) (i : Nat) (γo : GName) (n : Int)
@@ -662,7 +654,7 @@ theorem filewriteExtra_neg (P : UPtd) (st : FdState) (n : Int) (M : Nat → List
         iapply filewriteExtra_pipe P rb true n M ua Q (-1#64) (fun _ => by
           rw [show n.toNat = 0 by omega]; exact pipeWpostR_neg P ua)
       · unfold filewriteIn filewriteExtra
-        iintro ⟨-, Hc⟩
+        iintro Hc
         iapply writeArmsAt_neg _ i g P n M ua Q hn $$ Hc
       · iintro -
         by_cases hc : mj = CONSOLE

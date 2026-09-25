@@ -68,7 +68,6 @@ structure FwrFacts [CurCtx] (k : KCtx) (A : FwrA) : Prop where
   htier : k.tier = KTier.kpt
   ht : curTier = KTier.kpt
   hn : 0 < A.n ∧ A.n < 2 ^ 31
-  hnw : (k.regs 11#5).toNat + A.n.toNat ≤ 2 ^ 64
 
 theorem fwr_ww (K : KCtx) (a b c d : Bool) : (K.withSpie a b).withSpie c d = K.withSpie c d := rfl
 theorem fwr_psw (K : KCtx) (m : Nat) (a b : Bool) :

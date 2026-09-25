@@ -206,41 +206,43 @@ theorem writei_ker_step (user : Bool) (sbs : List (BitVec 8)) (wroteI : Nat → 
 theorem writei_usr_le (P0 P' : UPtd) (M : Nat → List (BitVec 8)) (src : BitVec 64)
     (wrote : Nat → BitVec 8) (t tot : Nat) (hle : t ≤ tot)
     (h : wiUsrGot P0 P' M src tot wrote) : wiUsrGot P0 P' M src t wrote :=
-  fun i hi hw => h i (by omega) hw
+  ⟨by have := h.1; omega, fun i hi => h.2 i (by omega)⟩
 
 /-- ...and it survives a later extension of the descriptor. -/
 theorem writei_usr_ext (P0 P' P'' : UPtd) (M : Nat → List (BitVec 8)) (src : BitVec 64)
     (wrote : Nat → BitVec 8) (tot : Nat) (hx : P'.ext P'')
     (h : wiUsrGot P0 P' M src tot wrote) : wiUsrGot P0 P'' M src tot wrote := by
-  intro i hi hw
-  obtain ⟨P1, h1, h2, h3⟩ := h i hi hw
+  refine ⟨h.1, fun i hi => ?_⟩
+  obtain ⟨P1, h1, h2, h3⟩ := h.2 i hi
   exact ⟨P1, h1, UMemL.ext_trans h2 hx, h3⟩
 
 theorem writei_usr_zero (P0 P' : UPtd) (M : Nat → List (BitVec 8)) (src : BitVec 64)
     (wrote : Nat → BitVec 8) : wiUsrGot P0 P' M src 0 wrote :=
-  fun i hi _ => absurd hi (by omega)
+  ⟨by simpa using src.isLt, fun i hi => absurd hi (by omega)⟩
 
 /-- THE USER-ARM TIE, extended by one chunk (Rocq's `wi_usr_step`): the
 chunk was copied from `src + tot`, out of the view at the descriptor
 `either_copyin` returned. -/
 theorem writei_usr_step (P0 PI P2 : UPtd) (M : Nat → List (BitVec 8)) (src : BitVec 64)
     (wroteI : Nat → BitVec 8) (tot mm : Nat) (h0 : P0.ext PI) (h2 : PI.ext P2)
+    (hnw : (src + BitVec.ofNat 64 tot).toNat + mm < 2 ^ 64)
     (h : wiUsrGot P0 PI M src tot wroteI) :
     wiUsrGot P0 P2 M src (tot + mm)
       (writei_wrote2 wroteI tot
         (umemRead (viewFaulted P0 P2 M) (src + BitVec.ofNat 64 tot).toNat mm)) := by
-  intro i hi hw
+  obtain ⟨hb, h⟩ := h
+  have hsrc : (src + BitVec.ofNat 64 tot).toNat = src.toNat + tot := by
+    rw [BitVec.toNat_add, BitVec.toNat_ofNat]
+    have : tot < 2 ^ 64 := by omega
+    rw [Nat.mod_eq_of_lt this, Nat.mod_eq_of_lt (by omega)]
+  refine ⟨by omega, fun i hi => ?_⟩
   unfold writei_wrote2
   by_cases hlt : i < tot
   · rw [if_pos hlt]
-    obtain ⟨P1, e1, e2, e3⟩ := h i hlt hw
+    obtain ⟨P1, e1, e2, e3⟩ := h i hlt
     exact ⟨P1, e1, UMemL.ext_trans e2 h2, e3⟩
   · rw [if_neg hlt]
     refine ⟨P2, UMemL.ext_trans h0 h2, UMemL.ext_refl P2, ?_⟩
-    have hsrc : (src + BitVec.ofNat 64 tot).toNat = src.toNat + tot := by
-      rw [BitVec.toNat_add, BitVec.toNat_ofNat]
-      have : tot < 2 ^ 64 := by omega
-      rw [Nat.mod_eq_of_lt this, Nat.mod_eq_of_lt (by omega)]
     simp only [getElem!_def, UMemL.umemRead_getElem?, hsrc]
     rw [if_pos (by omega)]
     simp only [Option.getD_some]

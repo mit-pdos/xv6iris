@@ -289,12 +289,12 @@ theorem cw_buf_join (a : BitVec 64) (l1 l2 : List (BitVec 8)) (m : Nat) (hm : l1
   exact (byteBuf_append (GF := GF) a (DFrac.own 1) l1 l2).2
 
 /-- The length of what `either_copyin` hands back. -/
-theorem cw_copyin_len {X : Prop} (M' : Nat → List (BitVec 8)) (src : Nat) (old bs' : List (BitVec 8))
+theorem cw_copyin_len {X Y : Prop} (M' : Nat → List (BitVec 8)) (src : Nat) (old bs' : List (BitVec 8))
     (r : BitVec 64)
-    (h : (r = 0#64 ∧ bs' = umemRead M' src old.length) ∨
+    (h : (r = 0#64 ∧ bs' = umemRead M' src old.length ∧ Y) ∨
          (r = -1#64 ∧ (∃ d, d ≤ old.length ∧ bs' = umemRead M' src d ++ old.drop d) ∧ X)) :
     bs'.length = old.length := by
-  rcases h with ⟨-, rfl⟩ | ⟨-, ⟨d, hd, rfl⟩, -⟩
+  rcases h with ⟨-, rfl, -⟩ | ⟨-, ⟨d, hd, rfl⟩, -⟩
   · rw [UMemL.umemRead_length]
   · rw [List.length_append, UMemL.umemRead_length, List.length_drop]; omega
 
@@ -302,24 +302,26 @@ end
 
 /-- A chunk's bytes at the writer's image, in the chain's (wrapping) address
 form: the copy reads `umemRead` from the register sum `a = src + i`, and the
-run does not cross 2^64 (the contract's no-wrap premise). -/
-theorem cw_at (M : Nat → List (BitVec 8)) (ua a : BitVec 64) (i nn N : Nat)
-    (ha : a = BitVec.ofNat 64 i + ua) (hnw : ua.toNat + N ≤ 2 ^ 64) (hin : i + nn ≤ N)
+chunk's run does not cross 2^64 (`either_copyin`'s success arm says so). -/
+theorem cw_at (M : Nat → List (BitVec 8)) (ua a : BitVec 64) (i nn : Nat)
+    (ha : a = BitVec.ofNat 64 i + ua) (hnw : a.toNat + nn < 2 ^ 64)
     (bs : List (BitVec 8)) (hbs : bs = umemRead M a.toNat nn) :
     ∀ (d : Nat) (c : BitVec 8), bs[d]? = some c →
       umemByte M (ua + BitVec.ofNat 64 (i + d)).toNat = c := by
   intro d c hd
-  subst hbs ha
+  subst hbs
   rw [UMemL.umemRead_getElem?] at hd
   by_cases hdl : d < nn
   · rw [if_pos hdl, Option.some.injEq] at hd
     rw [← hd]
     congr 1
-    have hu := ua.isLt
-    simp only [BitVec.toNat_add, BitVec.toNat_ofNat]
-    rw [Nat.mod_eq_of_lt (a := i) (by omega), Nat.mod_eq_of_lt (a := i + d) (by omega),
-      Nat.mod_eq_of_lt (by omega), Nat.mod_eq_of_lt (by omega)]
-    omega
+    have hadd : ua + BitVec.ofNat 64 (i + d) = a + BitVec.ofNat 64 d := by
+      subst ha
+      apply BitVec.eq_of_toNat_eq
+      simp only [BitVec.toNat_add, BitVec.toNat_ofNat]
+      omega
+    rw [hadd, BitVec.toNat_add, BitVec.toNat_ofNat, Nat.mod_eq_of_lt (a := d) (by omega),
+      Nat.mod_eq_of_lt (by omega)]
   · rw [if_neg hdl] at hd; cases hd
 
 /-- THE SHORT COUNT'S REASON (Rocq `ProofConsolewrite`'s relay, lane
@@ -515,7 +517,8 @@ theorem cw_either_copyin (EC : EITHER_COPYIN) (c : CPU) (k' : KCtx) (γl : GName
       kctx cpu' ((k'.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k'.regs 1#5)) -∗
       (∃ (P' : UPtd) (bs' : List (BitVec 8)),
         ⌜P.extSz V.sz P' ∧
-          ((R' 10#5 = 0#64 ∧ bs' = umemRead (viewFaulted P P' M) (k'.regs 12#5).toNat old.length) ∨
+          ((R' 10#5 = 0#64 ∧ bs' = umemRead (viewFaulted P P' M) (k'.regs 12#5).toNat old.length ∧
+              (k'.regs 12#5).toNat + old.length < 2 ^ 64) ∨
            (R' 10#5 = -1#64 ∧ (∃ d, d ≤ old.length ∧
               bs' = umemRead (viewFaulted P P' M) (k'.regs 12#5).toNat d ++ old.drop d) ∧
             ∃ e, e < old.length ∧ ¬ uvaRmapped P (k'.regs 12#5 + BitVec.ofNat 64 e).toNat))⌝ ∗
@@ -912,7 +915,6 @@ theorem cw_body (EC : EITHER_COPYIN) (UW : UARTWRITE) (Γ : SchedNames) [ClaimIs
     (hK : consolewriteSlots ≤ k.avail) (huser : k.regs 10#5 ≠ 0#64)
     (hal : (k.regs 2#5 + 0xFFFFFFFFFFFFFF80#64).toNat % 8 = 0)
     (hN : N < 2 ^ 31) (hNn : (N : Int) ≤ max 0 n) (hnN : n ≤ (N : Int))
-    (hnw : (k.regs 11#5).toNat + N ≤ 2 ^ 64)
     (a b : Bool) (R : RegMap) (hfix : cwFix k N R)
     (i nn : Nat) (h9 : R 9#5 = BitVec.ofNat 64 i) (h18 : R 18#5 = BitVec.ofNat 64 nn)
     (hnn0 : 0 < nn) (hnn32 : nn ≤ 32) (hin : i + nn ≤ N)
@@ -1014,7 +1016,7 @@ theorem cw_body (EC : EITHER_COPYIN) (UW : UARTWRITE) (Γ : SchedNames) [ClaimIs
       procPrivBareAt curCtx (procAddr j) pid { V with upt := P2 } (writerImg V.upt M) from by
     rw [hfix2]
     unfold procPrivBareAt procPrivExt procFieldsNoOfile; iintro H; iexact H) $$ Hpriv
-  rcases hpost with ⟨hr0, hbsE⟩ | ⟨hr1, -, hwhyC⟩
+  rcases hpost with ⟨hr0, hbsE, hnwC⟩ | ⟨hr1, -, hwhyC⟩
   case inr =>
     -- the copy faulted: `beq a0,s8` taken, restore `s2..s10` at `+0x86`, return `i`
     k_step_e (wp_s_branch cpu _ (KA.«consolewrite» + 0x4a#64) false 60#13 10#5 24#5 (by decide) bop.BEQ)
@@ -1072,8 +1074,8 @@ theorem cw_body (EC : EITHER_COPYIN) (UW : UARTWRITE) (Γ : SchedNames) [ClaimIs
     iintro Hk Hpc
     ihave Hch := consOutChain_run (genId (hlc := hlc) (GF := GF) + 1) (writerImg V.upt M) (k.regs 11#5)
       Q bs' i (N - i) (by omega)
-      (cw_at (writerImg V.upt M) (k.regs 11#5) _ i nn N (by first | rfl | simp only [h9, g23] | skip)
-        hnw hin bs' (by rw [hbsE, htk])) $$ Hch
+      (cw_at (writerImg V.upt M) (k.regs 11#5) _ i nn (by first | rfl | simp only [h9, g23] | skip)
+        (by rw [htk] at hnwC; exact hnwC) bs' (by rw [hbsE, htk])) $$ Hch
     rw [hbs', show i + nn = nn + i by omega, show N - i - nn = N - (nn + i) by omega]
     iapply (cw_uartwrite UW Γ cpu _ γl γ j bs' nn k.sie k.proc
         (consOutChain (genId (hlc := hlc) (GF := GF) + 1) (writerImg V.upt M) (k.regs 11#5) Q (nn + i)
@@ -1190,8 +1192,7 @@ theorem cw_loop (EC : EITHER_COPYIN) (UW : UARTWRITE) (Γ : SchedNames) [ClaimIs
     (hnoff : k.noff = 0) (hlocks : k.locks = []) (htier : k.tier = KTier.kpt)
     (hK : consolewriteSlots ≤ k.avail) (huser : k.regs 10#5 ≠ 0#64)
     (hal : (k.regs 2#5 + 0xFFFFFFFFFFFFFF80#64).toNat % 8 = 0)
-    (hN : N < 2 ^ 31) (hNn : (N : Int) ≤ max 0 n) (hnN : n ≤ (N : Int))
-    (hnw : (k.regs 11#5).toNat + N ≤ 2 ^ 64) :
+    (hN : N < 2 ^ 31) (hNn : (N : Int) ≤ max 0 n) (hnN : n ≤ (N : Int)) :
     procsInv (GF := GF) Γ -∗ uartPort .uart0 γl γ -∗
     isLock γkl kmemLockAddr "kmem" (kmemRes γk) -∗ kallocAvail γk none -∗
     cwLoopInv c0 k j pid V M n Q N := by
@@ -1217,7 +1218,7 @@ theorem cw_loop (EC : EITHER_COPYIN) (UW : UARTWRITE) (Γ : SchedNames) [ClaimIs
       with [g25, cw_bge32 (N - i) (by omega), decide_eq_true hsmall]
     iintro Hk Hpc
     iapply (cw_body EC UW Γ c0 cpu k γl γ γkl γk j pid V M n Q N P hj hkproc hnoff hlocks
-        htier hK huser hal hN hNn hnN hnw a b _
+        htier hK huser hal hN hNn hnN a b _
         (by unfold cwFix at hfix ⊢
             simp only [RegMap.set_apply, BitVec.reduceEq, ite_false]; exact hfix)
         i (N - i)
@@ -1238,7 +1239,7 @@ theorem cw_loop (EC : EITHER_COPYIN) (UW : UARTWRITE) (Γ : SchedNames) [ClaimIs
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
     iintro Hk Hpc
     iapply (cw_body EC UW Γ c0 cpu k γl γ γkl γk j pid V M n Q N P hj hkproc hnoff hlocks
-        htier hK huser hal hN hNn hnN hnw a b _
+        htier hK huser hal hN hNn hnN a b _
         (by unfold cwFix at hfix ⊢
             simp only [RegMap.set_apply, BitVec.reduceEq, ite_false]; exact hfix)
         i 32
@@ -1256,7 +1257,7 @@ set_option maxHeartbeats 16000000 in
 /-- **`consolewrite` meets its specification.** -/
 theorem consolewrite_proof (EC : EITHER_COPYIN) (UW : UARTWRITE) : CONSOLEWRITE := ⟨
   fun {hlc GF} _ _ _ _ _ _ _ X Γ _ cpu k γl γ γkl γk j pid V M n Q hj hproc hK hnoff htier
-      huser hn hn' hnw => by
+      huser hn hn' => by
   unfold wp_consolewrite_eb_body
   simp only [consolewriteAddr]
   iintro ⟨Hk, Hpc, #Hpinv, Hte, Hce, #Hport, Hch, #Hkl, #Hav, Hpriv, HΦ⟩
@@ -1362,9 +1363,8 @@ theorem consolewrite_proof (EC : EITHER_COPYIN) (UW : UARTWRITE) : CONSOLEWRITE 
     iintro Hk Hpc
     ihave HΦ := wpNext_shift true k.proc _ cpu _ (fun h => h.elim (fun h => absurd h (by decide))
       (fun h => absurd h (by rw [hproc]; exact procAddr_nonzero hj))) $$ HΦ
-    have hnw' : (k.regs 11#5).toNat + N ≤ 2 ^ 64 := by rw [hnN] at hnw; simpa using hnw
     ihave IH := cw_loop EC UW Γ cpu k γl γ γkl γk j pid V M n Q N hj hproc hnoff hlocks
-      htier hK huser hal hN hNn (by omega) hnw' $$ Hpinv Hport Hkl Hav
+      htier hK huser hal hN hNn (by omega) $$ Hpinv Hport Hkl Hav
     ihave Hch : consOutChain (genId (hlc := hlc) (GF := GF) + 1) (writerImg V.upt M) (k.regs 11#5) Q 0
       (N - 0) $$ [Hch]
     · rw [hnN, Nat.sub_zero]; simp only [Int.toNat_natCast]; iexact Hch

@@ -362,7 +362,8 @@ theorem writei_either_copyin (EC : EITHER_COPYIN) (c : CPU) (k' : KCtx) (γl : G
       (if user then
         (∃ (P' : UPtd) (bs' : List (BitVec 8)),
           ⌜P.extSz V.sz P' ∧
-            ((R' 10#5 = 0#64 ∧ bs' = umemRead (viewFaulted P P' M) (k'.regs 12#5).toNat old.length) ∨
+            ((R' 10#5 = 0#64 ∧ bs' = umemRead (viewFaulted P P' M) (k'.regs 12#5).toNat old.length ∧
+                (k'.regs 12#5).toNat + old.length < 2 ^ 64) ∨
              (R' 10#5 = -1#64 ∧ (∃ d, d ≤ old.length ∧
                 bs' = umemRead (viewFaulted P P' M) (k'.regs 12#5).toNat d ++ old.drop d) ∧
               ∃ e, e < old.length ∧ ¬ uvaRmapped P (k'.regs 12#5 + BitVec.ofNat 64 e).toNat))⌝ ∗

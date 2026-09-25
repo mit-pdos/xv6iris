@@ -70,11 +70,10 @@ Rocq's header, point for point:
    `rf_pq`/`rf_pqe`/`wf_Qe`/`cl_P`, and `srow_reg` -- not a field of the
    landed class).  `of_om` is dropped: Lean's `openReceipt` takes no
    offset mode.
-5. **WRITE'S NO-WRAP CONJUNCT** (SpecFilewrite deviation 5) is not payable
-   from the supply, so row 16 is `FsAbsInvFire.filewriteChainIn` (the input
-   without it); the write arm re-adds it with `filewriteIn_of_chain` at the
-   caller's no-wrap fact.  FLAGGED: until SpecWritei/SpecFilewrite drop the
-   conjunct, the write arm cannot discharge it at a key whose buffer wraps.
+5. (retired: row 16 was the interim `filewriteChainIn` while
+   `filewriteIn` carried a no-wrap conjunct; SpecFilewrite deviation 5 is
+   retired, so row 16 is Rocq's `filewrite_in`, `SpecFilewrite.filewriteIn`,
+   paid from the supply at every key.)
 6. **UNLINK/MKDIR ARE NOT PATH-FIXED** (Lean's `unlinkAuPre`/`mkdirAuPre`
    quantify the walk at every path; Rocq's `unlink_au_at`/`mkdir_au_at`
    read argument 0): the rows are the landed Lean bundles.
@@ -349,11 +348,10 @@ def xrowOpen (P Pmiss : Nat → Nat → IProp GF) (Farm Fun : Pfam GF (Aview →
     openIn (hlc := hlc) (fsGammaL fscFs) fscFs W.cwd Mv (xkA W 0).toNat (xkA W 1)
       P Pmiss Farm Fun Fok Fex Fo Ft)
 
-/-- row 16: write's chains (deviation 5) at the key's descriptor, count and
-buffer. -/
+/-- row 16: write's chains at the key's descriptor, count and buffer. -/
 def xrowWrite (Q : Nat → IProp GF) (W : Uvis) : IProp GF :=
   iprop(∀ Mv : Nat → List (BitVec 8), ⌜imgAgrees W.M Mv⌝ -∗
-    filewriteChainIn (hlc := hlc) (fdStOfKey (xkA W 0) W.fd) (argZ (xkA W 2)) Mv (xkA W 1) Q)
+    filewriteIn (hlc := hlc) (fdStOfKey (xkA W 0) W.fd) (argZ (xkA W 2)) Mv (xkA W 1) Q)
 
 /-- row 17: mknod's bundle at argument 0 (the path) and the two devices. -/
 def xrowMknod (P Pmiss : Nat → Nat → IProp GF) (Farm Fun : Pfam GF (Aview → Nat → IProp GF))
@@ -616,7 +614,7 @@ theorem xrowWrite_supply (W : Uvis) :
     □ xv6Ssupply (hlc := hlc) (GF := GF) ⊢ xrowWrite (hlc := hlc) (xfamPt (GF := GF)).wQ W := by
   dsimp only [xrowWrite, xfamPt, xv6Ssupply]
   iintro #⟨Hsup, -, Hlic⟩ %Mv %_
-  iapply (fsabsFilewriteChainIn (hlc := hlc)) $$ Hsup Hlic
+  iapply (fsabsFilewriteIn (hlc := hlc)) $$ Hsup Hlic
 
 theorem xrowMknod_supply (W : Uvis) :
     □ xv6Ssupply (hlc := hlc) (GF := GF) ⊢
@@ -1007,11 +1005,11 @@ theorem syscDepOpen_xv6 (f : Xfam GF) (W : Uvis) :
     ipureintro; exact hag
 
 /-- **`SyscDepWrite`** (Rocq `sbundle_at_write_elim` + `spost_at_write_intro`;
-deviations 1, 2, 5). -/
+deviations 1, 2). -/
 theorem syscDepWrite_xv6 (f : Xfam GF) (W : Uvis) :
     @UexecSG.sbundleAt GF _ uexecSGXv6 (uslot (hlc := hlc)) 16 f W ⊢
       (∀ Mv : Nat → List (BitVec 8), ⌜imgAgrees W.M Mv⌝ -∗
-        filewriteChainIn (hlc := hlc) (fdStOfKey (xkA W 0) W.fd) (argZ (xkA W 2)) Mv (xkA W 1) f.wQ) ∗
+        filewriteIn (hlc := hlc) (fdStOfKey (xkA W 0) W.fd) (argZ (xkA W 2)) Mv (xkA W 1) f.wQ) ∗
       (∀ (r : BitVec 64) (M' : ElfMem) (fdv' : List FdState) (cw' : Nat) (cs' : ExtTreeSet GName compare),
         xpostWrite (hlc := hlc) f.wQ W r -∗
           @UexecSG.spostAt GF _ uexecSGXv6 (uslot (hlc := hlc)) 16 f W r M' fdv' cw' cs') := by

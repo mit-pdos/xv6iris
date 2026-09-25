@@ -140,7 +140,7 @@ theorem fwr_arm_zero (cpu : CPU) (k : KCtx) (spie spp : Bool) (R : RegMap) (γl 
   · ipureintro; exact ⟨hcs, UMemL.extSz_refl _ _⟩
   · unfold filewriteArms filewriteIn filewriteExtra
     rw [ha0]
-    icases Hin with ⟨-, Hc⟩
+    icases Hin with Hc
     isplitr
     · ipureintro; exact filewriteRet_all 0 (Int.le_refl 0)
     unfold writeArmsAt writePostOkAt
@@ -465,9 +465,8 @@ theorem fwr_arm_dev (CW : CONSOLEWRITE) (Γ : SchedNames) [ClaimIs (hlc := hlc) 
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [devswWriteVal_console, fwr_jump_cw]
   iintro Hk Hpc
   unfold filewriteIn
-  icases Hin with ⟨%hnw, Hch⟩
   iapply (fwr_consolewrite CW Γ cpu _ γl γu γkl γk j pid V M n Q ht hj ?cproc ?cK ?cnoff ?ctier
-      ?cuser ?cn hn ?cnw) $$ [- $Hk $Hpc]
+      ?cuser ?cn hn) $$ [- $Hk $Hpc]
   rotate_right 1
   k_norm_g [fwr_ret_88, h11]
   iframe
@@ -481,7 +480,6 @@ theorem fwr_arm_dev (CW : CONSOLEWRITE) (Γ : SchedNames) [ClaimIs (hlc := hlc) 
   case ctier => k_norm_g; exact htier
   case cuser => k_norm_g; decide
   case cn => k_norm_g; exact h12
-  case cnw => k_norm_g; rw [h11]; exact hnw
   -- ===== back from consolewrite =====
   iintro %cpu %spie1 %spp1 %R1 %P' %i %⟨hcs1, hext, hret, hi, hwhy⟩ Hk Hpc Hte Hce Hpriv HQ
   k_norm_g [fwr_ret_88, fwr_ww, fwr_psw]

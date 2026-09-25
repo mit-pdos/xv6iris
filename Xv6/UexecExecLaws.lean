@@ -6,7 +6,7 @@ half of Rocq `ProofSyscall`'s `sysc_dep_<n>`/`sysc_out_<n>` over
 Each syscall arm file states the deposit law it consumes as a `Prop`
 hypothesis over an ABSTRACT `[UexecSG GF]` (`SyscallArmsPath.SyscDep{Chdir,
 Open,Mknod,Unlink,Link,Mkdir}`, `SyscallArmsProc.SyscDepKill`,
-`SyscallArmsExec.SyscDepExec`, `SyscallArmsFdDefs.SyscDep{Read,Pipe,Close}`),
+`SyscallArmsExec.SyscDepExec`, `SyscallArmsFdDefs.SyscDep{Read,Write,Pipe,Close}`),
 and the syscall seal specialises `SYSCALL` to `UexecExecInst.uexecSGXv6`
 (Rocq's single global instance).  This file proves each of them there, in
 exactly the arm file's statement, beside `SyscSpostEmp`
@@ -14,17 +14,10 @@ exactly the arm file's statement, beside `SyscSpostEmp`
 
 ## Deviations / blockers
 
-1. **`SyscDepWrite` is NOT proved unconditionally**: it asks for
-   `SpecFilewrite.filewriteIn` at the key, whose inode and device arms carry
-   the caller's NO-WRAP conjunct `ua.toNat + n.toNat ≤ 2^64` (SpecFilewrite
-   deviation 5).  That conjunct is a fact about the caller's buffer, not
-   payable from the class's supply at every key, so the instance's row 16 is
-   `FsAbsInvFire.filewriteChainIn` (UexecExecInst deviation 5) and the law is
-   proved here only AT A NO-WRAP KEY (`syscDepWrite_at_nw`).  Unblocking:
-   SpecWritei's `WriteiOut.usr` reports `src.toNat + tot ≤ 2^64` and
-   SpecFilewrite drops the conjunct (a landed edit), after which
-   `filewriteIn = filewriteChainIn` and the law is `syscDepWrite_at_nw`
-   without its premise.
+1. (retired: `SyscDepWrite` was proved only at a no-wrap key while
+   `filewriteIn` carried the caller's no-wrap conjunct; SpecFilewrite
+   deviation 5 is retired -- the callees report the bound -- so
+   `syscDepWrite_holds` is unconditional, as Rocq's `sysc_dep_write`.)
 2. `syscFdKey` (SyscallArmsFdDefs) and `fdStOfKey` (UexecExecInst) are the
    same definition (Rocq `fd_st_of_key`), equal by `rfl`
    (`fdStOfKey_eq_syscFdKey`); recommended cleanup: keep one.
@@ -139,27 +132,16 @@ theorem syscDepRead_holds : SyscDepRead (hlc := hlc) (GF := GF) := by
   · ipureintro; rfl
   · ipureintro; exact permOf_extSz hext
 
-/-- **`SyscDepWrite`, AT A NO-WRAP KEY** (deviation 1: the unconditional
-law is blocked on SpecFilewrite deviation 5). -/
-theorem syscDepWrite_at_nw (f : Xfam GF) (V : ProcPriv) (M : Nat → List (BitVec 8)) (sts : List FdState)
-    (gn : GName) (cs : ExtTreeSet GName compare) (pid : BitVec 32)
-    (hnw : (tfW V.tf (tfArgIdx 1)).toNat + (argZ (tfW V.tf (tfArgIdx 2))).toNat ≤ 2 ^ 64) :
-    @UexecSG.sbundleAt GF _ uexecSGXv6 (uslot (hlc := hlc)) 16 f (uvisOf V M sts gn cs pid) ⊢
-      ∃ Q : Nat → IProp GF,
-        filewriteIn (hlc := hlc) (syscFdKey (tfW V.tf (tfArgIdx 0)) sts) (argZ (tfW V.tf (tfArgIdx 2)))
-          (writerImg V.upt M) (tfW V.tf (tfArgIdx 1)) Q ∗
-        (∀ r : BitVec 64, ⌜filewriteRet (argZ (tfW V.tf (tfArgIdx 2))) r⌝ -∗
-          filewriteExtra (hlc := hlc) V.upt (syscFdKey (tfW V.tf (tfArgIdx 0)) sts)
-            (argZ (tfW V.tf (tfArgIdx 2))) (writerImg V.upt M) (tfW V.tf (tfArgIdx 1)) Q r -∗
-          @UexecSG.spostAt GF _ uexecSGXv6 (uslot (hlc := hlc)) 16 f (uvisOf V M sts gn cs pid) r
-            (syscImg V M) sts V.cwi cs) := by
+/-- **`SyscDepWrite`** at the instance: the input at the writer's image
+(`imgAgrees_writerImg`), and the receipt at the unmoved image. -/
+theorem syscDepWrite_holds : SyscDepWrite (hlc := hlc) (GF := GF) := by
+  intro f V M sts gn cs pid
   refine (syscDepWrite_xv6 (hlc := hlc) f (uvisOf V M sts gn cs pid)).trans ?_
   dsimp only [uvisOf, xkA, fdStOfKey, syscFdKey, xpostWrite]
   iintro ⟨H, Hw⟩
   iexists f.wQ
   isplitl [H]
-  · iapply (filewriteIn_of_chain (hlc := hlc) _ _ _ _ _ hnw)
-    iapply H
+  · iapply H
     ipureintro
     exact imgAgrees_writerImg V.upt V.sz.toNat M
   · iintro %r %hret Hx

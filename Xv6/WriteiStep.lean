@@ -63,7 +63,8 @@ structure WiChunk (A : WiArgs) (src : BitVec 64) (tot mm : Nat) (PI P2 : UPtd)
   ext : PI.extSz A.V.sz P2
   ker : A.user = false → ok = true ∧ c = (A.sbs.drop tot).take mm
   usr : A.user = true → ok = true →
-    c = umemRead (viewFaulted A.V.upt P2 A.M) (src + BitVec.ofNat 64 tot).toNat mm
+    c = umemRead (viewFaulted A.V.upt P2 A.M) (src + BitVec.ofNat 64 tot).toNat mm ∧
+      (src + BitVec.ofNat 64 tot).toNat + mm < 2 ^ 64
   failUser : ok = false → A.user = true
   /-- ...and a failure carries `either_copyin`'s reason, at the table the
   copy was handed (Rocq's `Hnorm`'s `wr_fail_why` conjunct) -/
@@ -291,8 +292,9 @@ theorem writei_next {A : WiArgs} {src : BitVec 64} {W tot : Nat} {bmI : Blkmap}
         lp.ker hu
     usr := by
       intro hu
-      rw [hch.usr hu rfl]
-      exact writei_usr_step A.V.upt PI P2 A.M src wroteI tot mm lp.ext.1 hch.ext.1 (lp.usr hu)
+      rw [(hch.usr hu rfl).1]
+      exact writei_usr_step A.V.upt PI P2 A.M src wroteI tot mm lp.ext.1 hch.ext.1
+        (hch.usr hu rfl).2 (lp.usr hu)
     ext := UMemL.extSz_trans lp.ext hch.ext
     fuel := by omega
     bud := hinv.1
@@ -366,8 +368,9 @@ theorem writei_exit_ok {A : WiArgs} {src : BitVec 64} {W tot : Nat} {bmI : Blkma
         lp.ker hu
     usr := by
       intro hu
-      rw [hch.usr hu rfl]
-      exact writei_usr_step A.V.upt PI P2 A.M src wroteI tot mm lp.ext.1 hch.ext.1 (lp.usr hu)
+      rw [(hch.usr hu rfl).1]
+      exact writei_usr_step A.V.upt PI P2 A.M src wroteI tot mm lp.ext.1 hch.ext.1
+        (hch.usr hu rfl).2 (lp.usr hu)
     totle := by omega
     lo := hex.1
     hi1 := by have := h.lb; have := lp.nle; split at huY <;> omega

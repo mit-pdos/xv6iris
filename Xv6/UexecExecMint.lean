@@ -26,8 +26,7 @@ Rocq's header, point for point:
    `udepw_law_of_sup*`, `udepw_row_of_reg_close`, `udepw_cl_of_reg_close`:
    their statements are over `UkRun.udep`/`udepw`/`udepw_law`/`uk_names`,
    the wave-9 program tier (D24), which does not exist in Lean; they return
-   with it.  `filewrite_in_of_sup` is `FsAbsInvFire.fsabsFilewriteChainIn`
-   (the input without the no-wrap conjunct, UexecExecInst deviation 5).
+   with it.  `filewrite_in_of_sup` is `FsAbsInvFire.fsabsFilewriteIn`.
 3. **`uslot_mint` is not gated** (UexecCond deviation 1: the verified-program
    gate chain is empty until wave 9), and its all-parked key narrowing
    (lane OFF-HAND-2) is vacuous here (Lean's generic fires need no offset

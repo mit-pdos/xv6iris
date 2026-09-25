@@ -346,8 +346,7 @@ theorem fwr_consolewrite (CW : CONSOLEWRITE) (Γ : SchedNames) [ClaimIs (hlc := 
     (Q : Nat → IProp GF) (ht : curTier = KTier.kpt)
     (hj : j < NPROC) (hproc : k'.proc = procAddr j) (hK : consolewriteSlots ≤ k'.avail)
     (hnoff : k'.noff = 0) (htier : k'.tier = KTier.kpt) (huser : k'.regs 10#5 ≠ 0#64)
-    (hn : k'.regs 12#5 = BitVec.ofInt 64 n) (hn' : -2 ^ 31 ≤ n ∧ n < 2 ^ 31)
-    (hnw : (k'.regs 11#5).toNat + n.toNat ≤ 2 ^ 64) :
+    (hn : k'.regs 12#5 = BitVec.ofInt 64 n) (hn' : -2 ^ 31 ≤ n ∧ n < 2 ^ 31) :
     kctx c k' ∗ pcIs c KA.«consolewrite» ∗ procsInv Γ ∗
     trapCsrsExt c k'.sie ∗ cpuClaimExt c k'.sie k'.proc ∗
     uartPort .uart0 γl γu ∗
@@ -362,7 +361,7 @@ theorem fwr_consolewrite (CW : CONSOLEWRITE) (Γ : SchedNames) [ClaimIs (hlc := 
       procPrivExt (procAddr j) pid V P' (viewFaulted V.upt P' M) -∗ Q i -∗ wpLoop c')
     ⊢ wpLoop (GF := GF) c := by
   have h := CW.wp_consolewrite_eb (hlc := hlc) (GF := GF) Γ c k' γl γu γkl γk j pid V M n Q
-    hj hproc hK hnoff htier huser hn hn' hnw
+    hj hproc hK hnoff htier huser hn hn'
   unfold wp_consolewrite_eb_body at h
   simp only [consolewriteAddr] at h
   iintro ⟨Hk, Hpc, #Hpi, Hte, Hce, #Hport, Hch, #Hkl, #Hav, Hpriv, HK⟩

@@ -320,7 +320,6 @@ theorem fwr_iter (BO : BEGIN_OP) (IL : ILOCK) (WI : WRITEI) (IU : IUNLOCK) (EO :
   have hcle := fwrChunk_le A.n.toNat t
   have hcrem := fwrChunk_le_rem A.n.toNat t
   have hcpos := fwrChunk_pos A.n.toNat t (by omega)
-  have hnw := hA.hnw
   unfold fwrHead
   iintro ⟨Hk, Hpc, Hte, Hce, Hframe, #Henv, Href, Hpriv, Hbs, Hst, HΦ⟩
   ihave Henv' := Henv
@@ -384,7 +383,6 @@ theorem fwr_iter (BO : BEGIN_OP) (IL : ILOCK) (WI : WRITEI) (IU : IUNLOCK) (EO :
   have hnd' : dn'.diType.toNat ≠ T_DIR_z := by rw [hty']; exact hnd0
   have hPP : P.extSz A.V.sz P' := hout.ext
   have hchunk := fwr_bytes A.V.upt P P' A.M (k.regs 11#5) t tot wrote hext.1 (hout.usr rfl)
-    (by omega)
   -- THE SHORT REASON (Rocq lane WRITE-RELAY-2): writei's, at the chunk's
   -- table and base, moved to the whole request at the writer's entry table
   have hwhy : 0 < dist → wrFailWhy A.V.upt (k.regs 11#5) A.n.toNat := fun h =>

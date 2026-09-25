@@ -36,12 +36,11 @@ Rocq's header, point for point:
 2. **NO OFFSET-MODE SPLIT.**  Lean's `filereadIn`/`filewriteIn` inode arms
    do not branch on the row's `held`/`parked` mode (no `filewrite_in_held`
    right arm), so the dischargers take the one arm.
-3. **THE WRITE INPUT'S NO-WRAP CONJUNCT** (SpecFilewrite deviation 5,
-   `ua.toNat + n.toNat ≤ 2^64`) is NOT payable from the supply: it is a
-   fact about the caller's buffer, not about the abstract state.  So the
-   discharger here is for `filewriteChainIn` (the input WITHOUT that
-   conjunct), and `filewriteIn_of_chain` re-adds it at the caller's own
-   no-wrap fact.  Rocq's `fsabs_filewrite_in` has no such premise.
+3. (retired: the write input's no-wrap conjunct is gone from
+   `filewriteIn` -- SpecFilewrite deviation 5 retired, the callees report
+   the bound -- so the discharger is for `filewriteIn` itself, at every
+   key, as Rocq's `fsabs_filewrite_in`; the interim `filewriteChainIn` /
+   `filewriteIn_of_chain` pair is deleted.)
 4. Rocq's `fsabs_filewrite_in` is bupd-shaped (the old trace seed); every
    Lean arm is update-free, so the discharger is a plain entailment.
 5. `fsabs_open_pre_plain`/`fsabs_open_pre_create`/`fsabs_trunc_piece` are
@@ -201,40 +200,15 @@ theorem fsabsFilereadIn [Xv6G GF] [OffboxG GF] [Fscfg] (st : FdState) (P : IProp
       · iapply (consReadPay_triv (hlc := hlc) (GF := GF) _) $$ Hlic
     · iexact HP
 
-/-- **Rocq `filewrite_in` WITHOUT the no-wrap conjunct** (deviation 3): the
-two chains alone.  `filewriteIn = ⌜no-wrap⌝ ∗ this` at the two arms that
-carry the conjunct. -/
-def filewriteChainIn [OffboxG GF] [Fscfg] (st : FdState) (n : Int) (M : Nat → List (BitVec 8))
-    (ua : BitVec 64) (Q : Nat → IProp GF) : IProp GF :=
-  match st with
-  | .open _ true (.inode i γo _) => awriteChain (hlc := hlc) (fsGammaL fscFs) appE i γo M ua n Q 0 (wchunks n)
-  | .open _ true (.device _) => consOutChain (genId (hlc := hlc) (GF := GF) + 1) M ua Q 0 n.toNat
-  | _ => iprop(emp)
-
-/-- ...and the caller's no-wrap fact turns it into the landed input. -/
-theorem filewriteIn_of_chain [OffboxG GF] [Fscfg] (st : FdState) (n : Int)
-    (M : Nat → List (BitVec 8)) (ua : BitVec 64) (Q : Nat → IProp GF)
-    (hnw : ua.toNat + n.toNat ≤ 2 ^ 64) :
-    filewriteChainIn (hlc := hlc) st n M ua Q ⊢ filewriteIn (hlc := hlc) st n M ua Q := by
-  unfold filewriteChainIn filewriteIn
-  rcases st with _ | ⟨rb, wb, ty⟩
-  · exact .rfl
-  cases wb
-  · exact .rfl
-  rcases ty with _ | ⟨i, γo, om⟩ | mj
-  · exact .rfl
-  · dsimp only; iintro H; iframe H; ipureintro; exact hnw
-  · dsimp only; iintro H; iframe H; ipureintro; exact hnw
-
-/-- **Rocq `fsabs_filewrite_in`** (deviations 3, 4): write's chains at the
+/-- **Rocq `fsabs_filewrite_in`** (deviation 4): write's chains at the
 trivial cursor, the inode arm out of the supply, the console arm out of the
 licence. -/
-theorem fsabsFilewriteChainIn [Xv6G GF] [OffboxG GF] [Fscfg] (st : FdState) (n : Int)
+theorem fsabsFilewriteIn [Xv6G GF] [OffboxG GF] [Fscfg] (st : FdState) (n : Int)
     (M : Nat → List (BitVec 8)) (ua : BitVec 64) :
     ⊢ appSup (GF := GF) -∗ consLicence (hlc := hlc) (GF := GF) -∗
-      filewriteChainIn (hlc := hlc) st n M ua (fun _ => iprop(True)) := by
+      filewriteIn (hlc := hlc) st n M ua (fun _ => iprop(True)) := by
   iintro #Hsup #Hlic
-  unfold filewriteChainIn
+  unfold filewriteIn
   rcases st with _ | ⟨rb, wb, ty⟩
   · iempintro
   cases wb

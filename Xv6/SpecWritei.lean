@@ -110,9 +110,11 @@ running-process bundle; its crossing is the literal `true`.
    the view at SOME descriptor between the entry one and `P'` (the view
    the chunk holding `i` was copied from).  Rocq's `copyin_got` reads at
    the WRAPPED address `src + i mod 2^64`; this port's `umemRead` reads at
-   `Nat` addresses without wrapping, so the clause is stated for the
-   non-wrapping bytes (`src.toNat + i < 2 ^ 64`) -- every successful user
-   copy's, since `copyin` refuses any va at or above `MAXVA`.
+   `Nat` addresses without wrapping, so the seam ALSO reports that the run
+   does not wrap (`src.toNat + tot < 2 ^ 64`): every chunk is a successful
+   user copy, whose run `either_copyin` reports non-wrapping (copyin's
+   `umMapped` against `uptWf`).  So the two readings agree on every byte,
+   and a caller (filewrite) needs no no-wrap premise of its own.
 6. THE PURE POSTCONDITION IS ONE NAMED STRUCTURE (`Xv6.WriteiOut`, one
    field per Rocq conjunct, in Rocq's order), so a caller destructures by
    name instead of counting twenty wands.
@@ -252,13 +254,15 @@ def wiDinode (dn : Dinode) (bm' : Blkmap) (off tot : Nat) : Dinode :=
     diSize := if dn.diSize.toNat < off + tot then BitVec.ofNat 32 (off + tot) else dn.diSize
     diAddrs := bmCells bm' }
 
-/-- THE USER ARM'S CONTENT SEAM (deviation 5; Rocq's `copyin_got`): byte
-`i` of the written run is the process's byte at user va `src + i` in the
-lazy view at some descriptor `P1` between the entry one `P0` and the
-returned one `P'` -- stated for every byte whose address does not wrap. -/
+/-- THE USER ARM'S CONTENT SEAM (deviation 5; Rocq's `copyin_got`): the
+written run does not cross `2^64` (every chunk was a successful user copy,
+whose run `either_copyin` reports non-wrapping), and byte `i` of it is the
+process's byte at user va `src + i` in the lazy view at some descriptor
+`P1` between the entry one `P0` and the returned one `P'`. -/
 def wiUsrGot (P0 P' : UPtd) (M : Nat → List (BitVec 8)) (src : BitVec 64) (tot : Nat)
     (wrote : Nat → BitVec 8) : Prop :=
-  ∀ i, i < tot → src.toNat + i < 2 ^ 64 →
+  src.toNat + tot < 2 ^ 64 ∧
+  ∀ i, i < tot →
     ∃ P1 : UPtd, P0.ext P1 ∧ P1.ext P' ∧ wrote i = umemByte (viewFaulted P0 P1 M) (src.toNat + i)
 
 /-- **THE PURE POSTCONDITION** (deviation 6): one field per Rocq conjunct

@@ -44,14 +44,13 @@ Deviations from Rocq:
    the live pages; a page that can never be mapped reads `0` rather than
    `None`, so a caller's tie there is uninformative -- no copy can succeed
    on such a page).
-2. THE NO-WRAP PREMISE `hnw : src.toNat + n ≤ 2^64` (for `n > 0`):
-   `either_copyin`'s success arm reads `umemRead` at `Nat` addresses from
-   the (wrapped) register sum, and the chain's node pins the byte at the
-   WRAPPED address `src + j` as Rocq's `add_vec_int` does; the two agree
-   exactly when the run does not cross 2^64 (every successful user copy's,
-   since copyin refuses any va at or above MAXVA -- which the Lean copyin
-   contract does not expose).  `filewrite` carries the same conjunct on its
-   FD_INODE input (its deviation 5).
+2. (retired: the no-wrap premise `hnw : src.toNat + n ≤ 2^64` is gone, as
+   in Rocq.  `either_copyin`'s success arm reads `umemRead` at `Nat`
+   addresses from the (wrapped) register sum while the chain's node pins
+   the byte at the WRAPPED address `src + j` (Rocq's `add_vec_int`); the
+   two agree because that arm now reports that the chunk's run does not
+   cross 2^64 -- copyin's `umMapped` against the table's `uptWf`,
+   `SpecEitherCopyin` -- so each chunk pays its own bound.)
 3. (retired: the short answer's reason, Rocq lane TRAP-ROWS T1, is now
    reported -- `writeConsShort`, relayed from `either_copyin`'s failure
    arm.)
@@ -190,8 +189,7 @@ def wp_consolewrite_eb_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF
     (hj : j < NPROC) (hproc : k.proc = procAddr j) (hK : consolewriteSlots ≤ k.avail)
     (hnoff : k.noff = 0)
     (htier : k.tier = KTier.kpt) (huser : k.regs 10#5 ≠ 0#64)
-    (hn : k.regs 12#5 = BitVec.ofInt 64 n) (hn' : -2 ^ 31 ≤ n ∧ n < 2 ^ 31)
-    (hnw : (k.regs 11#5).toNat + n.toNat ≤ 2 ^ 64) : Prop :=
+    (hn : k.regs 12#5 = BitVec.ofInt 64 n) (hn' : -2 ^ 31 ≤ n ∧ n < 2 ^ 31) : Prop :=
   kctx cpu k ∗ pcIs cpu consolewriteAddr ∗ procsInv Γ ∗
   trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗
   uartPort .uart0 γl γ ∗
@@ -214,9 +212,9 @@ structure CONSOLEWRITE : Prop where
     (cpu : CPU) (k : KCtx) (γl : GName) (γ : UartNames)
     (γkl : GName) (γk : KmemNames) (j : Nat) (pid : BitVec 32)
     (V : ProcPriv) (M : Nat → List (BitVec 8)) (n : Int) (Q : Nat → IProp GF)
-    hj hproc hK hnoff htier huser hn hn' hnw,
+    hj hproc hK hnoff htier huser hn hn',
     wp_consolewrite_eb_body (hlc := hlc) (GF := GF) Γ cpu k γl γ γkl γk j pid V M n Q hj hproc hK hnoff
-      htier huser hn hn' hnw
+      htier huser hn hn'
 
 theorem consWriteRet_of (n : Int) (i : Nat) (h : (i : Int) ≤ max 0 n) :
     consWriteRet n (BitVec.ofNat 64 i) :=

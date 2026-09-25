@@ -29,6 +29,13 @@ the BARE block at an explicit descriptor -- Rocq `proc_priv_bare` + the lazy
 claim, where Rocq's contract takes `proc_priv_core`: a strictly weaker
 premise, reported in `EitherDefs`' header).
 
+AND THE SUCCESS ARM SAYS THE RUN DOES NOT WRAP (`src.toNat + len <
+2^64`): copyin's own `umMapped P' src len` read against the table's
+`uptWf` (`UMemL.umMapped_nowrap`: every mapped page lies below
+`TRAPFRAME`).  It is what lets a chunked caller (consolewrite, writei) tie
+the `Nat`-addressed read to the WRAPPED user address `src + i` Rocq's
+`add_vec_int` names, with no no-wrap premise of its own (Rocq has none).
+
 AND THE USER ARM IS DESCRIPTOR-RELATIVE, like `SpecCopyin`'s: it takes the
 block at the descriptor `P` its caller has already grown to and hands it
 back at `P'` with `P.extSz V.sz P'` (Rocq `uptd_ext_sz (pv_sz V)`: what
@@ -73,7 +80,8 @@ def wp_either_copyin_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] 
     (if user then
       (∃ (P' : UPtd) (bs' : List (BitVec 8)),
         ⌜P.extSz V.sz P' ∧
-          ((R' 10#5 = 0#64 ∧ bs' = umemRead (viewFaulted P P' M) (k.regs 12#5).toNat old.length) ∨
+          ((R' 10#5 = 0#64 ∧ bs' = umemRead (viewFaulted P P' M) (k.regs 12#5).toNat old.length ∧
+              (k.regs 12#5).toNat + old.length < 2 ^ 64) ∨
            (R' 10#5 = -1#64 ∧ (∃ d, d ≤ old.length ∧
               bs' = umemRead (viewFaulted P P' M) (k.regs 12#5).toNat d ++ old.drop d) ∧
             ∃ e, e < old.length ∧ ¬ uvaRmapped P (k.regs 12#5 + BitVec.ofNat 64 e).toNat))⌝ ∗

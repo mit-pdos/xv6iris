@@ -419,31 +419,27 @@ end Block
 `ubytes_at_of_got` at the loop's own offset): writei was called with
 `src = i + ua` (the `add a2,s4,s6` at `+0x9e`) at a table `P0 ⊇ V.upt` and
 the block's view at the writer's image; the run it wrote is the image's
-bytes at `ua + t` (`t = i`), provided the run does not wrap. -/
+bytes at `ua + t` (`t = i`).  The run does not wrap: writei's seam says so
+(`wiUsrGot`'s bound), so no caller premise is needed. -/
 theorem fwr_bytes (Pv P0 P' : UPtd) (M : Nat → List (BitVec 8)) (ua : BitVec 64) (t tot : Nat)
     (wrote : Nat → BitVec 8) (hv : Pv.ext P0)
-    (hgot : wiUsrGot P0 P' (writerImg Pv M) (BitVec.ofNat 64 t + ua) tot wrote)
-    (hnw : ua.toNat + t + tot ≤ 2 ^ 64) :
+    (hgot : wiUsrGot P0 P' (writerImg Pv M) (BitVec.ofNat 64 t + ua) tot wrote) :
     ubytesAt (writerImg Pv M) (ua + BitVec.ofNat 64 t) (wrfRun wrote tot) := by
+  obtain ⟨hb, hgot⟩ := hgot
   intro d c hd
   have hdl : d < tot := by
     have := (List.getElem?_eq_some_iff.mp hd).1
     rw [wrfRun_length] at this; exact this
-  have hsrc : (BitVec.ofNat 64 t + ua).toNat = ua.toNat + t := by
-    rw [BitVec.toNat_add, BitVec.toNat_ofNat]
-    have : ua.toNat < 2 ^ 64 := ua.isLt
-    omega
-  obtain ⟨P1, h01, h1', hw⟩ := hgot d hdl (by rw [hsrc]; omega)
+  obtain ⟨P1, h01, h1', hw⟩ := hgot d hdl
   rw [writerImg_fault Pv P0 P1 M hv h01] at hw
   have hc : c = wrote d := by
     rw [wrfRun, List.getElem?_map, List.getElem?_range hdl] at hd
     simp only [Option.map_some, Option.some.injEq] at hd
     exact hd.symm
-  rw [hc, hw, hsrc]
+  rw [hc, hw]
   congr 1
-  rw [BitVec.toNat_add, BitVec.toNat_add, BitVec.toNat_ofNat, BitVec.toNat_ofNat]
-  have : ua.toNat < 2 ^ 64 := ua.isLt
-  omega
+  rw [BitVec.add_comm ua, BitVec.toNat_add (BitVec.ofNat 64 t + ua) (BitVec.ofNat 64 d),
+    BitVec.toNat_ofNat, Nat.mod_eq_of_lt (a := d) (by omega), Nat.mod_eq_of_lt (by omega)]
 
 /-! ## 7.  The reference: its cells, its state, its payload -/
 

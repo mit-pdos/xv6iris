@@ -686,6 +686,16 @@ theorem umMapped_bound {P : UPtd} {va n : Nat} (hwf : uptWf P) (h : umMapped P v
     unfold uvmMaxsz
     omega
 
+/-- ...so a mapped run's end is a 64-bit address: the run does not cross
+`2^64` (an empty run trivially). -/
+theorem umMapped_nowrap {P : UPtd} {va n : Nat} (hwf : uptWf P) (h : umMapped P va n)
+    (hva : va < 2 ^ 64) : va + n < 2 ^ 64 := by
+  rcases Nat.eq_zero_or_pos n with h0 | hpos
+  · subst h0; simpa using hva
+  · have := umMapped_bound hwf h hpos
+    unfold uvmMaxsz at this
+    omega
+
 /-- A later extension's zeroing commutes with a write whose pages were
 already mapped: it zeroes only pages new to it. -/
 theorem viewFaulted_umemWrite {P1 P2 : UPtd} (X : Nat → List (BitVec 8)) (va : Nat)
