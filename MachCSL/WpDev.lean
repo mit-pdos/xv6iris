@@ -732,16 +732,66 @@ theorem devObsPermit_triv (N : Namespace) (d : DevId) (R : DevSt d → IProp GF)
   imodintro
   iframe HR Ha
 
-/-- `wpDev_local` for an invariant carrying `R`: the device's own updates
-stay inside `rel`, along which the client updates `R`; its observed moves are
-authorised by the client's permit. -/
-theorem wpDev_localR (N : Namespace) (d : DevId) (rel : DevSt d → DevSt d → Prop)
-    (R : DevSt d → IProp GF) [∀ s, Timeless (R s)] (hloc : DevSig.LocalR d rel)
-    (hR : ∀ s s', rel s s' → R s ⊢@{IProp GF} |==> R s') :
-    devInvR N d R ∗ devObsPermit N d R ∗ genCert ⊢@{IProp GF}
-      ∀ (tid : TaskId) (m : DevProg d), ⌜DevM.LocalR rel m⌝ →
+/-- A local program whose every atomic state update is a move of `rel`,
+the relation naming the move's EVENTS as well as its two states: what an
+OBSERVING client needs (the UARTs' receive column files the history an
+arrival happened at, so it has to know which arm moved and what it emitted). -/
+inductive DevM.LocalO {S T : Type} (rel : S → S → List DevObs → Prop) : DevM S T Unit → Prop
+  | pure (a : Unit) : LocalO rel (.pure a)
+  | op (o : DevOp S T) (k : o.ret → DevM S T Unit)
+      (hw : ∀ g pa n w, o ≠ .dmaWrite g pa n w) (hp : ∀ c mm b, o ≠ .setPin c mm b)
+      (hs : ∀ g, o = .step g → ∀ s s' os, g s = some (s', os) → rel s s' os)
+      (hk : ∀ r, LocalO rel (k r)) : LocalO rel (.op o k)
+
+/-- A device all of whose programs are local and move by `rel`. -/
+def DevSig.LocalO (d : DevId) (rel : DevSt d → DevSt d → List DevObs → Prop) : Prop :=
+  DevM.LocalO rel (devSig d).body ∧ ∀ t, DevM.LocalO rel ((devSig d).task t)
+
+theorem DevM.LocalR.localO {S T : Type} {rel : S → S → Prop} {m : DevM S T Unit}
+    (h : DevM.LocalR rel m) : DevM.LocalO (fun s s' _ => rel s s') m := by
+  induction h with
+  | pure a => exact .pure a
+  | op o k hw hp hs _ ih => exact .op o k hw hp (fun g hg s s' os h => hs g hg s s' os h) ih
+
+/-- THE STEP PERMIT: the client's whole ghost step at a device move, from the
+ghosts BEFORE it to the ghosts after, with the history ghost in hand ACROSS
+the move (the Rocq `wp_uart_loop`'s arms, device-generic).  `devObsPermit`
+is the special case of a client whose ghosts follow the device by a plain
+update and whose trace predicate moves after it (`devStepPermit_of_obs`);
+a client that files the history an event happened AT (the UARTs' receive
+column: the arrival's history, its tag, its lower bound) needs the auth on
+both sides of the move, and states its step here. -/
+def devStepPermit (N : Namespace) (d : DevId) (rel : DevSt d → DevSt d → List DevObs → Prop)
+    (R : DevSt d → IProp GF) : IProp GF := iprop%
+  □ ∀ (h : List Obs) (ds : DevStates) (s' : DevSt d) (os : List DevObs),
+    ⌜rel (ds.st d) s' os ∧ devObsOk d (ds.st d) s' os ∧ traceShape h true ∧
+      (∀ i, obsWire i (openSeg h) = ds.wire i) ∧ obsBoots h = genId (hlc := hlc) (GF := GF) + 1⌝ -∗
+    R (ds.st d) -∗ obsAuth h ={⊤ \ ↑N}=∗ R s' ∗ obsAuth (h ++ os.map Obs.dev)
+
+instance devStepPermit_persistent (N : Namespace) (d : DevId)
+    (rel : DevSt d → DevSt d → List DevObs → Prop) (R : DevSt d → IProp GF) :
+    Persistent (devStepPermit N d rel R) := by
+  unfold devStepPermit; infer_instance
+
+/-- The observation permit, preceded by the client's plain update along
+`rel`, is a step permit. -/
+theorem devStepPermit_of_obs (N : Namespace) (d : DevId) (rel : DevSt d → DevSt d → Prop)
+    (R : DevSt d → IProp GF) (hR : ∀ s s', rel s s' → R s ⊢@{IProp GF} |==> R s') :
+    devObsPermit N d R ⊢@{IProp GF} devStepPermit N d (fun s s' _ => rel s s') R := by
+  unfold devObsPermit devStepPermit
+  iintro #Hp !> %h %ds %s' %os %⟨hrel, hok, hf⟩ HR Ha
+  imod (hR _ _ hrel) $$ HR with HR
+  iapply Hp $$ %h %ds %s' %os %⟨hok, hf⟩ HR Ha
+
+/-- `wpDev_local` for an invariant carrying `R`: every move of the device is
+a move of `rel`, and the client's step permit carries its ghosts (and the
+history) across it. -/
+theorem wpDev_localO (N : Namespace) (d : DevId) (rel : DevSt d → DevSt d → List DevObs → Prop)
+    (R : DevSt d → IProp GF) [∀ s, Timeless (R s)] (hloc : DevSig.LocalO d rel) :
+    devInvR N d R ∗ devStepPermit N d rel R ∗ genCert ⊢@{IProp GF}
+      ∀ (tid : TaskId) (m : DevProg d), ⌜DevM.LocalO rel m⌝ →
       devWP (genId (hlc := hlc) (GF := GF)) d tid m := by
-  unfold devInvR devObsPermit
+  unfold devInvR devStepPermit
   iintro ⟨#Hinv, #Hperm, #Hcert⟩
   iloeb as IH
   iintro %tid %m %hm
@@ -763,8 +813,8 @@ theorem wpDev_localR (N : Namespace) (d : DevId) (rel : DevSt d → DevSt d → 
   inext
   iintro %obs %m' %σ' %efs %hstep Hcred
   imod Hmask
-  have hmk : ∀ (m'' : DevProg d), DevM.LocalR rel m'' →
-      ⊢@{IProp GF} (∀ (tid : TaskId) (m : DevProg d), ⌜DevM.LocalR rel m⌝ →
+  have hmk : ∀ (m'' : DevProg d), DevM.LocalO rel m'' →
+      ⊢@{IProp GF} (∀ (tid : TaskId) (m : DevProg d), ⌜DevM.LocalO rel m⌝ →
         devWP (genId (hlc := hlc) (GF := GF)) d tid m) -∗ wpDev d tid m'' := by
     intro m'' hm''
     iintro IH
@@ -793,7 +843,7 @@ theorem wpDev_localR (N : Namespace) (d : DevId) (rel : DevSt d → DevSt d → 
         · iexact Hσ
         · iapply machInterp_setRt_done _ _ _ $$ Hσ
       isplitl []
-      · iapply hmk _ (DevM.LocalR.pure ()) $$ IH
+      · iapply hmk _ (DevM.LocalO.pure ()) $$ IH
       · exact BigSepL.bigSepL_nil_intro
   | op o k =>
     have hm' := hm
@@ -808,8 +858,7 @@ theorem wpDev_localR (N : Namespace) (d : DevId) (rel : DevSt d → DevSt d → 
         have hrel := hs g rfl _ _ _ hg
         imod (devUpdateAt _ d (σ.devs.st d) (σ.devs.st d) s') $$ [Hauth Hfrag] with ⟨Hauth, Hfrag⟩
         · iframe
-        imod (hR _ _ hrel) $$ HR with HR
-        imod Hperm $$ %h %σ.devs %s' %os %⟨hok, hfacts⟩ HR Ha with ⟨HR, Ha⟩
+        imod Hperm $$ %h %σ.devs %s' %os %⟨hrel, hok, hfacts⟩ HR Ha with ⟨HR, Ha⟩
         ihave Hcl := Hclose $$ [Hfrag HR]
         case' _ => inext; iexists s'; iframe Hfrag HR
         imod Hcl
@@ -862,6 +911,21 @@ theorem wpDev_localR (N : Namespace) (d : DevId) (rel : DevSt d → DevSt d → 
       isplitl []
       · iapply hmk _ hm' $$ IH
       · exact BigSepL.bigSepL_nil_intro
+
+/-- `wpDev_local` for an invariant carrying `R`: the device's own updates
+stay inside `rel`, along which the client updates `R`; its observed moves are
+authorised by the client's permit. -/
+theorem wpDev_localR (N : Namespace) (d : DevId) (rel : DevSt d → DevSt d → Prop)
+    (R : DevSt d → IProp GF) [∀ s, Timeless (R s)] (hloc : DevSig.LocalR d rel)
+    (hR : ∀ s s', rel s s' → R s ⊢@{IProp GF} |==> R s') :
+    devInvR N d R ∗ devObsPermit N d R ∗ genCert ⊢@{IProp GF}
+      ∀ (tid : TaskId) (m : DevProg d), ⌜DevM.LocalR rel m⌝ →
+      devWP (genId (hlc := hlc) (GF := GF)) d tid m := by
+  iintro ⟨Hinv, #Hperm, Hcert⟩ %tid %m %hm
+  ihave #Hstep := devStepPermit_of_obs N d rel R hR $$ Hperm
+  iapply wpDev_localO N d (fun s s' _ => rel s s') R ⟨hloc.1.localO, fun t => (hloc.2 t).localO⟩
+    $$ [Hinv Hcert] %tid %m %hm.localO
+  iframe Hinv Hstep Hcert
 
 /-- The UARTs are local devices. -/
 theorem uart_local (i : UartId) : DevSig.Local (.uart i) := by
