@@ -49,6 +49,7 @@ Require Import ProgTree.
 Require Import PipesDisc.
 Require Import PipesDiscDec.
 Require Import PipeOutN.
+Require Import PipesView.
 (* stdpp's list names over the ones the Stdlib import above re-exports *)
 From stdpp Require Import list.
 Local Open Scope list_scope.
@@ -505,156 +506,171 @@ Section open_events_pure.
 End open_events_pure.
 
 (* ===================================================================== *)
-(*  2.  THE EVENTS AT [popenN] AND AT [pecl']                             *)
+(*  2a.  THE EVENTS AT [popenV] AND AT [peclV], OVER ANY LINE MODEL       *)
+(*       (cut C9c'): the pipeline application's section 2b below is     *)
+(*       this at [pipes_lm]; the union's claim answers them here.         *)
 (* ===================================================================== *)
 
-Section pipes_events.
+Section pipes_events_v.
   Context {Σ : gFunctors}.
   Context `{!echoOutG Σ, !pipeOutG Σ}.
   Context (g : pipe_gn).
-  Local Notation γ := (pgn_cl g).
-  Notation T := (echo_taint γ).
-  Context (fc : bytes -> option bytes) (adm : pline' -> bool).
-  Context (Lw : lm_laws (pipes_lm fc adm)).
-  Local Notation PM := (pipes_lm fc adm).
-  Local Notation PB := (pipes_lm_byte_laws fc adm).
-  Local Notation K := (pipes_hooks fc adm).
-  Local Notation PO := (popenN g fc adm).
-  Local Notation PC := (pecl' g fc adm Lw).
-  Local Notation GC := (gcl PM (pipesN_cparams g fc adm Lw) tt (pipesN_wa g fc adm Lw)).
+  Context (M : lmodel) (G : gen_cparams M) (B : lm_byte_laws M) (sd : lm_st M).
+  Context (WA : gen_wa M G sd).
+  Local Notation T := (gcT G).
+  Local Notation PIN := (gcPIN G).
+  Local Notation K := (gcK G).
+  Local Notation st so := (gs_state M sd so).
+  Local Notation POV := (popenV g M (gcPIN G) (gwa WA) sd).
+  Local Notation PCV := (peclV g M G sd WA).
+  Local Notation GCV := (gcl M G sd WA).
 
-  Lemma pecl'_gen (k : nat) (ho : list mobs) (H : LogEntryDefs.cons_hist) :
-    PC k ho H ⊣⊢ GC k ho H ∨ PO k ho H.
+  Lemma peclV_gen (k : nat) (ho : list mobs) (H : LogEntryDefs.cons_hist) :
+    PCV k ho H ⊣⊢ GCV k ho H ∨ POV k ho H.
   Proof using . done. Qed.
 
-  Lemma cs_lb_weakenN (v : era_pins) (l l' : list nat) :
+  Lemma cs_lb_weakenV (v : era_pins) (l l' : list nat) :
     l' `prefix_of` l -> cs_lb v l -∗ cs_lb v l'.
   Proof using .
     intros Hp. rewrite /cs_lb. iIntros "H".
     iApply (own_mono with "H"). by apply mono_list_lb_mono.
   Qed.
 
+  (* an open round has FILED its state: it has written *)
+  Lemma popenV_filed k ho so r pre H :
+    gcl_pure_o M sd k ho so r pre H -> gs_st M so = Some (st so).
+  Proof using .
+    intros (Hout & Hop & _).
+    pose proof Hout as (_ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & Hf0n & _).
+    pose proof Hop as (_ & Hwp & Hne & _).
+    rewrite /gs_state. destruct (gs_st M so) as [sx |] eqn:Hfx; [reflexivity |].
+    exfalso. destruct (proj1 Hf0n eq_refl) as [_ Hw0]. apply Hne. by rewrite -Hwp.
+  Qed.
+
   (* ---- FILING THE LOG ENTRY, AND OPENING ONE, TAKE NOTHING ---- *)
-  Lemma popenN_close (k : nat) (ho : list mobs) (H : LogEntryDefs.cons_hist) :
+  Lemma popenV_close (k : nat) (ho : list mobs) (H : LogEntryDefs.cons_hist) :
     ConsLog.cons_hist_ok H ->
     ConsLog.cons_ev_ok H ConsLog.EvClose ->
-    PO k ho H -∗ PO k ho (ConsLog.cons_step H ConsLog.EvClose).
+    POV k ho H -∗ POV k ho (ConsLog.cons_step H ConsLog.EvClose).
   Proof using .
     intros Hok Hev. iIntros "Hp".
     iDestruct "Hp" as (v w so r gb pre tm)
-      "(Hpin & Hpera & _ & Hblk & Hcur & Hrb & Htn & Hcs & Hps & HE & Hdl & Hdll & %Hpure)".
-    iExists v, w, so, r, gb, pre, tm. iFrame "Hpin Hpera Hblk Hcur Hrb Htn Hcs Hps HE".
+      "(Hpin & Hpera & Hwa & Hblk & Hcur & Hrb & Htn & Hcs & Hps & HE & Hdl & Hdll & %Hpure)".
+    iExists v, w, so, r, gb, pre, tm. iFrame "Hpin Hpera Hwa Hblk Hcur Hrb Htn Hcs Hps HE".
     rewrite ch_dl_close. iFrame "Hdl Hdll". iPureIntro.
-    exact (gcl_pure_o_close PM tt k ho so r pre H Hok Hev Hpure).
+    exact (gcl_pure_o_close M sd k ho so r pre H Hok Hev Hpure).
   Qed.
 
-  Lemma popenN_open (k : nat) (ho : list mobs) (H : LogEntryDefs.cons_hist)
+  Lemma popenV_open (k : nat) (ho : list mobs) (H : LogEntryDefs.cons_hist)
       (h : list mobs) (c : bv 8) (cs : list (bv 8)) :
     ConsLog.cons_hist_ok H ->
     ConsLog.cons_ev_ok H (ConsLog.EvOpen h c cs) ->
-    lm_disc_input PM (ins (open_seg h)) -> obs_boots h = k ->
-    lm_disc PM h -> trace_shape h true ->
-    PO k ho H -∗ PO k h (ConsLog.cons_step H (ConsLog.EvOpen h c cs)).
-  Proof using .
+    lm_disc_input M (ins (open_seg h)) -> obs_boots h = k ->
+    lm_disc M h -> trace_shape h true ->
+    POV k ho H -∗ POV k h (ConsLog.cons_step H (ConsLog.EvOpen h c cs)).
+  Proof using B.
     intros Hok Hev Hd Hb Hdh Hsh. iIntros "Hp".
     iDestruct "Hp" as (v w so r gb pre tm)
-      "(Hpin & Hpera & _ & Hblk & Hcur & Hrb & Htn & Hcs & Hps & HE & Hdl & Hdll & %Hpure)".
-    iExists v, w, so, r, gb, pre, tm. iFrame "Hpin Hpera Hblk Hcur Hrb Htn Hcs Hps HE".
+      "(Hpin & Hpera & Hwa & Hblk & Hcur & Hrb & Htn & Hcs & Hps & HE & Hdl & Hdll & %Hpure)".
+    iExists v, w, so, r, gb, pre, tm. iFrame "Hpin Hpera Hwa Hblk Hcur Hrb Htn Hcs Hps HE".
     rewrite /ConsLog.cons_step. cbn [LogEntryDefs.ch_dl]. iFrame "Hdl Hdll".
-    iPureIntro. exact (gcl_pure_o_open PM tt PB k ho so r pre H h c cs Hok Hev Hd Hb Hdh Hsh Hpure).
+    iPureIntro. exact (gcl_pure_o_open M sd B k ho so r pre H h c cs Hok Hev Hd Hb Hdh Hsh Hpure).
   Qed.
 
-  Lemma popenN_arm (k : nat) (ho : list mobs) (CH : LogEntryDefs.cons_hist) :
-    PO k ho CH -∗ PO k ho CH ∗ ⌜garm_era PM k ho CH⌝.
+  Lemma popenV_arm (k : nat) (ho : list mobs) (CH : LogEntryDefs.cons_hist) :
+    POV k ho CH -∗ POV k ho CH ∗ ⌜garm_era M k ho CH⌝.
   Proof using .
     iIntros "Hp".
     iDestruct "Hp" as (v w so r gb pre tm)
-      "(#Hpin & #Hpera & _ & Hblk & Hcur & Hrb & Htn & Hcs & Hps & HE & Hdl & Hdll & %Hall)".
+      "(#Hpin & #Hpera & Hwa & Hblk & Hcur & Hrb & Htn & Hcs & Hps & HE & Hdl & Hdll & %Hall)".
     iSplitL.
     - iExists v, w, so, r, gb, pre, tm.
-      iFrame "Hpin Hpera Hblk Hcur Hrb Htn Hcs Hps HE Hdl Hdll". by iPureIntro.
-    - iPureIntro. exact (gcl_pure_o_arm PM tt k ho so r pre CH Hall).
+      iFrame "Hpin Hpera Hwa Hblk Hcur Hrb Htn Hcs Hps HE Hdl Hdll". by iPureIntro.
+    - iPureIntro. exact (gcl_pure_o_arm M sd k ho so r pre CH Hall).
   Qed.
 
-  Lemma pecl'_close (k : nat) (ho : list mobs) (H : LogEntryDefs.cons_hist) :
+  Lemma peclV_close (k : nat) (ho : list mobs) (H : LogEntryDefs.cons_hist) :
     ConsLog.cons_hist_ok H ->
     ConsLog.cons_ev_ok H ConsLog.EvClose ->
-    PC k ho H -∗ PC k ho (ConsLog.cons_step H ConsLog.EvClose).
+    PCV k ho H -∗ PCV k ho (ConsLog.cons_step H ConsLog.EvClose).
   Proof using .
-    intros Hok Hev. rewrite !pecl'_gen. iIntros "[Hc | Hc]".
+    intros Hok Hev. rewrite !peclV_gen. iIntros "[Hc | Hc]".
     - iLeft. by iApply (gcl_close with "Hc").
-    - iRight. by iApply (popenN_close with "Hc").
+    - iRight. by iApply (popenV_close with "Hc").
   Qed.
 
-  Lemma pecl'_open (k : nat) (ho : list mobs) (H : LogEntryDefs.cons_hist)
+  Lemma peclV_open (k : nat) (ho : list mobs) (H : LogEntryDefs.cons_hist)
       (h : list mobs) (c : bv 8) (cs : list (bv 8)) :
     ConsLog.cons_hist_ok H ->
     ConsLog.cons_ev_ok H (ConsLog.EvOpen h c cs) ->
-    lm_disc_input PM (ins (open_seg h)) -> obs_boots h = k ->
-    lm_disc PM h -> trace_shape h true ->
-    PC k ho H -∗ PC k h (ConsLog.cons_step H (ConsLog.EvOpen h c cs)).
-  Proof using .
-    intros Hok Hev Hd Hb Hdh Hsh. rewrite !pecl'_gen. iIntros "[Hc | Hc]".
-    - iLeft. iApply (gcl_open with "Hc"); first [exact PB | done].
-    - iRight. by iApply (popenN_open with "Hc").
+    lm_disc_input M (ins (open_seg h)) -> obs_boots h = k ->
+    lm_disc M h -> trace_shape h true ->
+    PCV k ho H -∗ PCV k h (ConsLog.cons_step H (ConsLog.EvOpen h c cs)).
+  Proof using B.
+    intros Hok Hev Hd Hb Hdh Hsh. rewrite !peclV_gen. iIntros "[Hc | Hc]".
+    - iLeft. iApply (gcl_open with "Hc"); first [exact B | done].
+    - iRight. by iApply (popenV_open with "Hc").
   Qed.
 
   (* THE SUPPLY'S LAW: a tainted era answers any event out of its taint *)
-  Lemma pecl'_sup (k : nat) (ho : list mobs) (H : LogEntryDefs.cons_hist)
+  Lemma peclV_sup (k : nat) (ho : list mobs) (H : LogEntryDefs.cons_hist)
       (ev : ConsLog.cons_ev) :
-    T -∗ PC k ho H ==∗ PC k ho (ConsLog.cons_step H ev).
-  Proof using . iIntros "#HT _". iModIntro. by iApply (pecl'_taint with "HT"). Qed.
+    T -∗ PCV k ho H ==∗ PCV k ho (ConsLog.cons_step H ev).
+  Proof using . iIntros "#HT _". iModIntro. by iApply (peclV_taint with "HT"). Qed.
 
-  Lemma pecl'_arm (k : nat) (ho : list mobs) (CH : LogEntryDefs.cons_hist) :
-    PC k ho CH -∗ PC k ho CH ∗ (T ∨ ⌜garm_era PM k ho CH⌝).
+  Lemma peclV_arm (k : nat) (ho : list mobs) (CH : LogEntryDefs.cons_hist) :
+    PCV k ho CH -∗ PCV k ho CH ∗ (T ∨ ⌜garm_era M k ho CH⌝).
   Proof using .
-    rewrite !pecl'_gen. iIntros "[Hc | Hc]".
+    rewrite !peclV_gen. iIntros "[Hc | Hc]".
     - iDestruct (gcl_arm with "Hc") as "[Hc Ha]". iSplitL "Hc"; [by iLeft | done].
-    - iDestruct (popenN_arm with "Hc") as "[Hc Ha]". iSplitL "Hc"; [by iRight |].
+    - iDestruct (popenV_arm with "Hc") as "[Hc Ha]". iSplitL "Hc"; [by iRight |].
       by iRight.
   Qed.
 
   (* ---- THE READ ---- *)
 
-  (* the reader's receipt: [GenOut.gcl_step_read]'s, at the pipeline *)
-  Definition rd_retN (k : nat) (v : era_pins) (n : nat) (CH : LogEntryDefs.cons_hist)
+  (* the reader's receipt: [GenOut.gcl_step_read]'s *)
+  Definition rd_retV (k : nat) (v : era_pins) (n : nat) (CH : LogEntryDefs.cons_hist)
       (ws : list (list mobs * bv 8)) : iProp Σ :=
     ((T ∗ dl_cnt v (1/2) n)
      ∨ dl_cnt v (1/2) (n + length ws)%nat
        ∗ ⌜length (LogEntryDefs.ch_dl CH) = n⌝
        ∗ ⌜(LogEntryDefs.ch_dl CH ++ ws) `prefix_of` echoed (LogEntryDefs.ch_log CH)⌝
        ∗ ⌜E_index (seg_of (echoed (LogEntryDefs.ch_log CH)))⌝
-       ∗ ⌜lm_E_disc PM (seg_of (echoed (LogEntryDefs.ch_log CH)))⌝
+       ∗ ⌜lm_E_disc M (seg_of (echoed (LogEntryDefs.ch_log CH)))⌝
        ∗ ⌜forall x : list mobs * bv 8,
             x ∈ LogEntryDefs.ch_dl CH ++ ws -> obs_boots x.1 = k⌝
        ∗ inp_lb v (snd <$> (LogEntryDefs.ch_dl CH ++ ws))
-       ∗ ⌜lm_disc_input PM (snd <$> (LogEntryDefs.ch_dl CH ++ ws))⌝
+       ∗ ⌜lm_disc_input M (snd <$> (LogEntryDefs.ch_dl CH ++ ws))⌝
        ∗ (⌜ws = []⌝
-          ∨ ∃ (cs0 ps0 : list nat) (s0 : lm_st PM),
-              cs_lb v cs0 ∗ ps_lb v ps0 ∗ gcW (pipesN_cparams g fc adm Lw) k s0
+          ∨ ∃ (cs0 ps0 : list nat) (s0 : lm_st M),
+              cs_lb v cs0 ∗ ps_lb v ps0 ∗ gcW G k s0
               ∗ ⌜(nlines (snd <$> (LogEntryDefs.ch_dl CH ++ ws)) <= S (length cs0))%nat⌝
-              ∗ turn_lb v (length (lm_proc_before PM ps0 cs0 s0
+              ∗ turn_lb v (length (lm_proc_before M ps0 cs0 s0
                              (snd <$> (LogEntryDefs.ch_dl CH ++ ws))))
-              ∗ ⌜lm_rd_stage PM ps0 cs0 s0 (snd <$> (LogEntryDefs.ch_dl CH ++ ws))⌝))%I.
-
-  Lemma popenN_step_read (k : nat) (v : era_pins) (n : nat) (ho : list mobs)
+              ∗ ⌜lm_rd_stage M ps0 cs0 s0 (snd <$> (LogEntryDefs.ch_dl CH ++ ws))⌝))%I.
+  Lemma popenV_step_read (k : nat) (v : era_pins) (n : nat) (ho : list mobs)
       (CH : LogEntryDefs.cons_hist) (ws : list (list mobs * bv 8)) :
     read_ok (LogEntryDefs.ch_log CH) (LogEntryDefs.ch_dl CH) ws ->
-    era_pin γ k v -∗ dl_cnt v (1/2) n -∗ PO k ho CH ==∗
-      PO k ho (ConsLog.cons_step CH (ConsLog.EvRead ws)) ∗ rd_retN k v n CH ws.
-  Proof using .
+    PIN k v -∗ dl_cnt v (1/2) n -∗ POV k ho CH ==∗
+      POV k ho (ConsLog.cons_step CH (ConsLog.EvRead ws)) ∗ rd_retV k v n CH ws.
+  Proof using B.
     intros Hread. iIntros "#Hpinr Hdlr Hp".
     iDestruct "Hp" as (v2 w so r gb pre tm)
-      "(#Hpin & #Hpera & _ & Hblk & Hcur & Hrb & Hta & Hcs & Hps & HE & Hdl & Hdll & %Hall)".
-    iDestruct (era_pin_agree with "Hpin Hpinr") as %->.
+      "(#Hpin & #Hpera & Hwa & Hblk & Hcur & Hrb & Hta & Hcs & Hps & HE & Hdl & Hdll & %Hall)".
+    iDestruct (gcPIN_agree G with "Hpin Hpinr") as %->.
     iDestruct (dl_cnt_agree with "Hdl Hdlr") as %Hdleq.
     pose proof Hall as Hall0.
     destruct Hall as (Hpure & Hop & Hpsl & Hin & Hera & HEtie & Hdlok).
     pose proof Hin as Hin2.
     destruct Hin2 as (_ & _ & Hbt & _ & Hidx & Hbyte & Hbnd0 & _).
-    destruct (gin_read_pure PM PB k (LogEntryDefs.ch_log CH) (LogEntryDefs.ch_dl CH)
-                ws (gs_cs PM so) Hread Hin) as (Hpref & Hp' & Hbnd').
-    assert (Hst : gs_state PM tt so = tt) by (by destruct (gs_state PM tt so)).
+    destruct (gin_read_pure M B k (LogEntryDefs.ch_log CH) (LogEntryDefs.ch_dl CH)
+                ws (gs_cs M so) Hread Hin) as (Hpref & Hp' & Hbnd').
+    (* the open round has filed its state: the reader's witness at it *)
+    pose proof (popenV_filed k ho so r pre CH Hall0) as Hsome.
+    iEval (rewrite Hsome) in "Hwa".
+    iDestruct (gwa_W WA _ (st so) with "Hwa") as "(Hwa & #HW & _)".
+    iEval (rewrite -Hsome) in "Hwa".
     assert (Hboots : forall x : list mobs * bv 8,
               x ∈ LogEntryDefs.ch_dl CH ++ ws -> obs_boots x.1 = k).
     { intros x Hx.
@@ -662,68 +678,75 @@ Section pipes_events.
                   (elem_of_prefix _ _ _ Hx Hpref)) as (e & He & _ & <-).
       exact (Hbt e He). }
     assert (HEpre : (snd <$> (LogEntryDefs.ch_dl CH ++ ws))
-                    `prefix_of` (snd <$> gs_E PM so)).
-    { rewrite (gcl_pure_o_E PM tt k ho so r pre CH Hall0) /ch_E.
+                    `prefix_of` (snd <$> gs_E M so)).
+    { rewrite (gcl_pure_o_E M sd k ho so r pre CH Hall0) /ch_E.
       etrans; [exact (epu_fmap_prefix snd _ _ Hpref) |].
       rewrite -(seg_of_snd (echoed (LogEntryDefs.ch_log CH))).
       apply epu_fmap_prefix. by apply prefix_app_r. }
-    assert (Hdi : lm_disc_input PM (snd <$> (LogEntryDefs.ch_dl CH ++ ws))).
-    { apply (lm_disc_input_prefix PM PB _ (snd <$> gs_E PM so) HEpre).
+    assert (Hdi : lm_disc_input M (snd <$> (LogEntryDefs.ch_dl CH ++ ws))).
+    { apply (lm_disc_input_prefix M B _ (snd <$> gs_E M so) HEpre).
       by destruct Hpure as (_ & _ & Hd & _). }
-    pose proof (gcl_pure_o_rd_stage PM tt k ho so r pre CH Hall0) as Hrd.
+    pose proof (gcl_pure_o_rd_stage M sd k ho so r pre CH Hall0) as Hrd.
     pose proof Hrd as (Hpsb & Hcsb' & Hpinf & Hbd).
     (* the reader's own list: the claim's, cut to its own line count *)
     set (Iw := (snd <$> (LogEntryDefs.ch_dl CH ++ ws))).
     set (q := nlines Iw).
-    set (csq := take q (gs_cs PM so)).
+    set (csq := take q (gs_cs M so)).
     assert (Hqle : (nlines (removelast Iw) <= length csq)%nat).
     { rewrite /csq length_take.
       assert (H1 : (nlines (removelast Iw) <= q)%nat)
         by (apply nlines_prefix, gop_removelast_prefix).
-      assert (H2 : (nlines (removelast Iw) <= length (gs_cs PM so))%nat).
+      assert (H2 : (nlines (removelast Iw) <= length (gs_cs M so))%nat).
       { etrans; [| exact Hbd].
         apply nlines_prefix, pop_prefix_removelast, HEpre. }
       lia. }
-    assert (Hagree : forall j, (j < q)%nat -> csq !!! j = gs_cs PM so !!! j).
+    assert (Hagree : forall j, (j < q)%nat -> csq !!! j = gs_cs M so !!! j).
     { intros j Hj. rewrite /csq !list_lookup_total_alt.
-      destruct (decide (j < length (gs_cs PM so))%nat) as [Hl | Hl].
+      destruct (decide (j < length (gs_cs M so))%nat) as [Hl | Hl].
       - rewrite lookup_take; [done | lia].
-      - rewrite (lookup_ge_None_2 (gs_cs PM so) j ltac:(lia)).
-        rewrite (lookup_ge_None_2 (take q (gs_cs PM so)) j);
+      - rewrite (lookup_ge_None_2 (gs_cs M so) j ltac:(lia)).
+        rewrite (lookup_ge_None_2 (take q (gs_cs M so)) j);
           [done | rewrite length_take; lia]. }
     assert (Hqbnd : (q <= S (length csq))%nat).
     { rewrite /csq length_take.
-      destruct (decide (q <= length (gs_cs PM so))%nat) as [Hl | Hl]; [lia |].
+      destruct (decide (q <= length (gs_cs M so))%nat) as [Hl | Hl]; [lia |].
       rewrite /q /Iw. lia. }
-    assert (Hpbq : lm_proc_before PM (gs_ps PM so) csq tt Iw
-                   = lm_proc_before PM (gs_ps PM so) (gs_cs PM so) tt Iw).
-    { apply (lm_proc_before_ext PM). intros J HJ Hne.
-      apply (lm_pending_at_cs_ext PM (gs_ps PM so) csq (gs_cs PM so) tt J).
+    assert (Hpbq : lm_proc_before M (gs_ps M so) csq (st so) Iw
+                   = lm_proc_before M (gs_ps M so) (gs_cs M so) (st so) Iw).
+    { apply (lm_proc_before_ext M). intros J HJ Hne.
+      apply (lm_pending_at_cs_ext M (gs_ps M so) csq (gs_cs M so) (st so) J).
       - rewrite /csq. apply prefix_take.
       - etrans; [| exact Hqle].
         apply nlines_prefix, (pop_prefix_of_removelast J Iw HJ Hne). }
-    assert (Hrdq : lm_rd_stage PM (gs_ps PM so) csq tt Iw).
+    assert (Hrdq : lm_rd_stage M (gs_ps M so) csq (st so) Iw).
     { rewrite /lm_rd_stage. split_and!; [exact Hpsb | | | exact Hqle].
       - intros i c Hc.
-        assert (Hci : gs_cs PM so !! i = Some c)
+        assert (Hci : gs_cs M so !! i = Some c)
           by (rewrite /csq in Hc; by apply lookup_take_Some in Hc as [? _]).
         assert (Hiq : (i < q)%nat).
         { apply lookup_lt_Some in Hc. rewrite /csq length_take in Hc. lia. }
         destruct (Hcsb' i c Hci) as [_ Hok].
         split; [exact Hiq |].
-        destruct (bodies_of_prefix Iw (snd <$> gs_E PM so) HEpre) as [z Hz].
-        rewrite Hz !list_lookup_total_alt lookup_app_l in Hok;
-          [| rewrite /q /nlines in Hiq; lia].
-        rewrite -!list_lookup_total_alt in Hok. exact Hok.
+        destruct (bodies_of_prefix Iw (snd <$> gs_E M so) HEpre) as [z Hz].
+        assert (Hbod : forall j, (j < q)%nat ->
+                  bodies_of (snd <$> gs_E M so) !!! j = bodies_of Iw !!! j).
+        { intros j Hj. rewrite Hz !list_lookup_total_alt lookup_app_l;
+            [done | rewrite /q /nlines in Hj; lia]. }
+        rewrite (Hbod i Hiq) in Hok.
+        rewrite (lm_upto_ext M csq (gs_cs M so) (st so) (bodies_of Iw)
+                   (bodies_of (snd <$> gs_E M so)) i
+                   ltac:(intros j Hj; apply Hagree; lia)
+                   ltac:(intros j Hj; symmetry; apply Hbod; lia)).
+        exact Hok.
       - intros q' Hq'.
         assert (Hq'q : (q' <= q)%nat).
         { pose proof (nstarted_le_S Iw). rewrite /q. lia. }
-        rewrite (lm_pro_idx_ext PM csq (gs_cs PM so) q
+        rewrite (lm_pro_idx_ext M csq (gs_cs M so) q
                    ltac:(intros j Hj; apply Hagree; lia) q' Hq'q).
-        apply Hpinf. pose proof (nstarted_prefix Iw (snd <$> gs_E PM so) HEpre).
+        apply Hpinf. pose proof (nstarted_prefix Iw (snd <$> gs_E M so) HEpre).
         lia. }
     iDestruct (pcs_lb_get with "Hcs") as "[Hcs #Hcslb]".
-    iDestruct (cs_lb_weakenN v (gs_cs PM so) csq
+    iDestruct (cs_lb_weakenV v (gs_cs M so) csq
                  ltac:(rewrite /csq; apply prefix_take) with "Hcslb") as "#Hcslbq".
     iDestruct (ps_lb_get with "Hps") as "[Hps #Hpslb]".
     iDestruct (Elist_lb_get with "HE") as "[HE #HElb]".
@@ -732,13 +755,13 @@ Section pipes_events.
             (n + length ws)%nat with "Hdl Hdlr") as "[Hdl Hdlr]".
     iMod (dl_list_auth_grow v (LogEntryDefs.ch_dl CH) ws with "Hdll")
       as "[Hdll #Hdllb]".
-    iModIntro. iSplitL "Hta Hcs Hps HE Hdl Hdll Hblk Hcur Hrb".
+    iModIntro. iSplitL "Hwa Hta Hcs Hps HE Hdl Hdll Hblk Hcur Hrb".
     { iExists v, w, so, r, gb, pre, tm.
       rewrite /ConsLog.cons_step. cbn [LogEntryDefs.ch_dl].
       rewrite length_app Hdleq.
-      iFrame "Hpin Hpera Hblk Hcur Hrb Hta Hcs Hps HE Hdl Hdll".
-      iPureIntro. exact (gcl_pure_o_read PM tt k ho so r pre CH ws Hpref Hall0). }
-    rewrite /rd_retN. iRight. iFrame "Hdlr".
+      iFrame "Hpin Hpera Hwa Hblk Hcur Hrb Hta Hcs Hps HE Hdl Hdll".
+      iPureIntro. exact (gcl_pure_o_read M sd k ho so r pre CH ws Hpref Hall0). }
+    rewrite /rd_retV. iRight. iFrame "Hdlr".
     iSplitR; [by iPureIntro |]. iSplitR; [by iPureIntro |].
     iSplitR; [by iPureIntro |]. iSplitR; [by iPureIntro |].
     iSplitR; [iPureIntro; exact Hboots |].
@@ -747,41 +770,39 @@ Section pipes_events.
       iExact "Hdllb". }
     iSplitR; [by iPureIntro |].
     destruct (decide (ws = [])) as [-> | Hne]; [by iLeft |].
-    iRight. iExists csq, (gs_ps PM so), tt. iFrame "Hcslbq Hpslb".
-    iSplitR; [done |].
+    iRight. iExists csq, (gs_ps M so), (st so). iFrame "Hcslbq Hpslb HW".
     iSplitR; [iPureIntro; exact Hqbnd |].
     iSplitR.
-    { assert (Hle2 : (length (lm_proc_before PM (gs_ps PM so) csq tt Iw)
-                      <= lm_pcount PM (gs_ps PM so) (gs_cs PM so) (gs_state PM tt so)
-                           (gs_E PM so) (gs_w PM so))%nat).
-      { rewrite /lm_pcount Hst Hpbq.
+    { assert (Hle2 : (length (lm_proc_before M (gs_ps M so) csq (st so) Iw)
+                      <= lm_pcount M (gs_ps M so) (gs_cs M so) (gs_state M sd so)
+                           (gs_E M so) (gs_w M so))%nat).
+      { rewrite /lm_pcount Hpbq.
         pose proof (prefix_length _ _
-                      (lm_proc_before_prefix PM (gs_ps PM so) (gs_cs PM so)
-                         tt Iw (snd <$> gs_E PM so) HEpre)) as Hlp.
+                      (lm_proc_before_prefix M (gs_ps M so) (gs_cs M so)
+                         (st so) Iw (snd <$> gs_E M so) HEpre)) as Hlp.
         lia. }
       iApply (turn_lb_weaken with "Htlb"). exact Hle2. }
     iPureIntro. exact Hrdq.
   Qed.
 
-  Lemma pecl'_step_read (k : nat) (v : era_pins) (n : nat) (ho : list mobs)
+  Lemma peclV_step_read (k : nat) (v : era_pins) (n : nat) (ho : list mobs)
       (CH : LogEntryDefs.cons_hist) (ws : list (list mobs * bv 8)) :
     read_ok (LogEntryDefs.ch_log CH) (LogEntryDefs.ch_dl CH) ws ->
-    era_pin γ k v -∗ dl_cnt v (1/2) n -∗ PC k ho CH ==∗
-      PC k ho (ConsLog.cons_step CH (ConsLog.EvRead ws)) ∗ rd_retN k v n CH ws.
-  Proof using .
-    intros Hread. iIntros "#Hpin Hdl Hcl". rewrite !pecl'_gen.
+    PIN k v -∗ dl_cnt v (1/2) n -∗ PCV k ho CH ==∗
+      PCV k ho (ConsLog.cons_step CH (ConsLog.EvRead ws)) ∗ rd_retV k v n CH ws.
+  Proof using B.
+    intros Hread. iIntros "#Hpin Hdl Hcl". rewrite !peclV_gen.
     iDestruct "Hcl" as "[Hc | Hc]".
-    - iMod (gcl_step_read PM (pipesN_cparams g fc adm Lw) PB tt (pipesN_wa g fc adm Lw)
-              with "Hpin Hdl Hc") as "[Hc Hr]"; [exact Hread |].
-      iModIntro. iSplitL "Hc"; [by iLeft |]. rewrite /rd_retN. iExact "Hr".
-    - iMod (popenN_step_read with "Hpin Hdl Hc") as "[Hc Hr]"; [exact Hread |].
+    - iMod (gcl_step_read M G B sd WA with "Hpin Hdl Hc") as "[Hc Hr]"; [exact Hread |].
+      iModIntro. iSplitL "Hc"; [by iLeft |]. rewrite /rd_retV. iExact "Hr".
+    - iMod (popenV_step_read with "Hpin Hdl Hc") as "[Hc Hr]"; [exact Hread |].
       iModIntro. iFrame "Hr". by iRight.
   Qed.
 
   (* ---- THE ECHO: refuted while a round is open ---- *)
-  Lemma pecl'_step_echo (k : nat) (h : list mobs) (c : bv 8)
+  Lemma peclV_step_echo (L : lm_laws M) (k : nat) (h : list mobs) (c : bv 8)
       (ho : list mobs) (CH : LogEntryDefs.cons_hist) :
-    lm_disc PM h ->
+    lm_disc M h ->
     trace_shape h true ->
     obs_boots h = k ->
     obs_ends_in Uart0 h c ->
@@ -789,29 +810,28 @@ Section pipes_events.
     (forall e, e ∈ LogEntryDefs.ch_log CH -> hist_ext (le_hist e) h) ->
     (length (LogEntryDefs.ch_log CH) + 1)%nat = length (ins (open_seg h)) ->
     LogEntryDefs.ch_arm CH = Some (h, c, [echo_of c], 0%nat) ->
-    PC k ho CH ==∗ PC k h (ConsLog.cons_step CH (ConsLog.EvByte (echo_of c))).
-  Proof using .
-    intros Hdisc Hsh Hk Hends Hwire Hord HK1 Harm. rewrite !pecl'_gen.
+    PCV k ho CH ==∗ PCV k h (ConsLog.cons_step CH (ConsLog.EvByte (echo_of c))).
+  Proof using B.
+    intros Hdisc Hsh Hk Hends Hwire Hord HK1 Harm. rewrite !peclV_gen.
     iIntros "[Hc | Hp]".
-    - iMod (gcl_step_echo PM (pipesN_cparams g fc adm Lw) PB tt (pipesN_wa g fc adm Lw)
-              with "Hc") as "Hc"; try done.
+    - iMod (gcl_step_echo M G B sd WA with "Hc") as "Hc"; try done.
       iModIntro. by iLeft.
     - iDestruct "Hp" as (v w so r gb pre tm)
         "(_ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & %Hopen)".
-      subst k. by destruct (gcl_pure_o_no_echo PM tt Lw K PB h c ho CH so r pre
+      subst k. by destruct (gcl_pure_o_no_echo M sd L K B h c ho CH so r pre
                               Hdisc Hsh Hends Hwire Hord HK1 Harm Hopen).
   Qed.
 
   (* ...AND THE BYTE, which takes NOTHING *)
-  Lemma pecl'_step_byte (k : nat) (ho : list mobs)
+  Lemma peclV_step_byte (L : lm_laws M) (k : nat) (ho : list mobs)
       (CH : LogEntryDefs.cons_hist) (b : bv 8) :
     ConsLog.cons_hist_ok CH ->
     ConsLog.cons_ev_ok CH (ConsLog.EvByte b) ->
-    PC k ho CH ==∗ PC k ho (ConsLog.cons_step CH (ConsLog.EvByte b)).
-  Proof using .
+    PCV k ho CH ==∗ PCV k ho (ConsLog.cons_step CH (ConsLog.EvByte b)).
+  Proof using B.
     intros Hok Hev. iIntros "Hcl".
-    iDestruct (pecl'_arm with "Hcl") as "[Hcl [#HT | %Hera]]".
-    { iModIntro. by iApply (pecl'_taint with "HT"). }
+    iDestruct (peclV_arm with "Hcl") as "[Hcl [#HT | %Hera]]".
+    { iModIntro. by iApply (peclV_taint with "HT"). }
     pose proof Hev as Hev0.
     destruct Hev0 as (a & Ha & Hlk). destruct a as [[[ha ca] csa] ja].
     cbn [LogEntryDefs.ca_echo LogEntryDefs.ca_sent] in Hlk.
@@ -833,16 +853,273 @@ Section pipes_events.
         { destruct (open_seg_ends_in ho ca Hends) as [h0 Hh0].
           rewrite Hh0 ins_app ins_in.
           apply elem_of_app. right. apply elem_of_list_here. }
-        destruct (lm_disc_drop_byte PM PB _ ca Hdseg Hcin) as (_ & _ & Hno).
+        destruct (lm_disc_drop_byte M B _ ca Hdseg Hcin) as (_ & _ & Hno).
         rewrite Hno in Herase. discriminate. }
     destruct Hshape as (Hcsa & Hja & Hb).
     subst b. rewrite Hcsa Hja in Ha.
-    iApply (pecl'_step_echo k ho ca ho CH Hdisc Hsh Hbts Hends Hwire Hord HK1 Ha
+    iApply (peclV_step_echo L k ho ca ho CH Hdisc Hsh Hbts Hends Hwire Hord HK1 Ha
               with "Hcl").
   Qed.
 
   (* ---- THE DRAIN: F4 at an unfiled block, its witness the round's own
-          code ---- *)
+          code; the receipt is [GenOut.gdrain_ret]'s ---- *)
+  Lemma popenV_drain (k : nat) (h ho : list mobs) (CH : LogEntryDefs.cons_hist)
+      (seg : list mobs) :
+    trace_shape h true ->
+    obs_boots h = k ->
+    ho `prefix_of` h ->
+    ins seg = ins (open_seg h) ->
+    obs_wire Uart0 seg `prefix_of` LogEntryDefs.ch_acc CH ->
+    POV k ho CH -∗ POV k ho CH
+      ∗ ∃ s0 : lm_st M, ⌜lm_good_out M s0 seg⌝ ∗ ⌜lm_st_ok M s0⌝ ∗ gwa_ty WA s0 ∗ gcW G k s0.
+  Proof using B.
+    intros Hsh Hk Hpre Hins Hwire. subst k.
+    iIntros "Hp".
+    iDestruct "Hp" as (v w so r gb pre tm)
+      "(#Hpin & #Hpera & Hwa & Hblk & Hcur & Hrb & Hta & Hcs & Hps & HE & Hdl & Hdll & %Hpo)".
+    pose proof (proj1 Hpo)
+      as (Hacc & Hidx & Hbyte & Hpsb & Hpinf & Hcs' & Hdsc & Hpre1 & Hpre2 & Hpre3
+          & Hnofk & Hf0n & Hfok0).
+    pose proof (popenV_filed _ ho so r pre CH Hpo) as Hsome.
+    iEval (rewrite Hsome) in "Hwa".
+    iDestruct (gwa_W WA _ (st so) with "Hwa") as "(Hwa & #HW & #Hty)".
+    iEval (rewrite -Hsome) in "Hwa".
+    iSplitL "Hwa Hblk Hcur Hrb Hta Hcs Hps HE Hdl Hdll".
+    { iExists v, w, so, r, gb, pre, tm.
+      iFrame "Hpin Hpera Hwa Hblk Hcur Hrb Hta Hcs Hps HE Hdl Hdll". by iPureIntro. }
+    iExists (st so). iFrame "Hty HW".
+    assert (Hbytes : (snd <$> gs_E M so) `prefix_of` ins seg).
+    { destruct Hpre3 as [HEnil | Hbo].
+      - rewrite HEnil fmap_nil. apply prefix_nil.
+      - assert (Hpl : forall j x, gs_E M so !! j = Some x ->
+                        x.1 `prefix_of` open_seg ho)
+          by (intros j x Hx; exact (Forall_lookup_1 _ _ _ _ Hpre1 Hx)).
+        rewrite (E_bytes_of_hist (gs_E M so) (open_seg ho) Hidx Hpl Hpre2).
+        etrans; [apply prefix_take |].
+        rewrite Hins. apply ins_prefix_of, open_seg_prefix_boots;
+          [exact Hpre | by rewrite Hbo | exact Hsh]. }
+    destruct Hpo as (_ & Hop & _).
+    pose proof Hop as (_ & Hwp' & _ & ao & Hb2 & _).
+    iSplitR; [| by iPureIntro].
+    iPureIntro.
+    apply (lm_good_out_of_stage_open M K B (gs_ps M so) (gs_cs M so)
+             (st so) (gs_E M so) (gs_w M so) ao seg Hpsb).
+    - apply (lm_alts_pre_mono M _ (snd <$> gs_E M so)); [exact Hbytes | exact Hcs'].
+    - exact Hbyte.
+    - exact Hpinf.
+    - rewrite Hwp'. exact Hb2.
+    - rewrite -Hacc. exact Hwire.
+    - exact Hbytes.
+  Qed.
+
+  Lemma peclV_drain (k : nat) (h ho : list mobs) (CH : LogEntryDefs.cons_hist)
+      (seg : list mobs) :
+    trace_shape h true ->
+    obs_boots h = k ->
+    ho `prefix_of` h ->
+    ins seg = ins (open_seg h) ->
+    obs_wire Uart0 seg `prefix_of` LogEntryDefs.ch_acc CH ->
+    obs_wire Uart0 seg <> [] ->
+    PCV k ho CH -∗ PCV k ho CH ∗ gdrain_ret M G sd WA k seg.
+  Proof using B.
+    intros Hsh Hk Hpre Hins Hwire Hne. rewrite !peclV_gen. iIntros "[Hc | Hc]".
+    - iDestruct (gcl_drain M G B sd WA k h ho CH seg Hsh Hk Hpre Hins Hwire Hne
+                   with "Hc") as "[Hc Hd]".
+      iSplitL "Hc"; [by iLeft | iExact "Hd"].
+    - iDestruct (popenV_drain with "Hc") as "[Hc Hd]"; try done.
+      iSplitL "Hc"; [by iRight | rewrite /gdrain_ret; by iRight].
+  Qed.
+
+  (* ---- FILING AN EMPTY BLOCK, through the view: no writer wrote, so the
+          prompt is the block's first byte, and the claim -- between
+          rounds -- files the round at the view's [PLRun []] by
+          [GenOut.gcl_step_write_blk] ---- *)
+  Lemma pwc_blkV_file_empty (V : pview M) (v : era_pins) (I : list (bv 8)) (sR : lm_st M)
+      (lR : pline') (k : nat) (ho : list mobs) (H : LogEntryDefs.cons_hist) (b : bv 8) :
+    pv_line V (lineV M I) = Some lR ->
+    b = u_prompt !!! 0%nat ->
+    pwc_blkV g M PIN (gcW G) T v I sR k [] false -∗ PCV k ho H ==∗
+      PCV k ho (ConsLog.cons_step H (ConsLog.EvOut b))
+      ∗ ((∃ (ps cs : list nat) (s0 : lm_st M) (P : nat),
+            ⌜wr_blkV M ps cs s0 I P /\ lm_upto M cs s0 (bodies_of I) (nlines I - 1)%nat = sR⌝
+            ∗ gcW G k s0 ∗ turn v (S P)
+            ∗ ps_lb v ps ∗ cs_lb v (cs ++ [pv_enc V lR (PLRun [])]) ∗ inp_lb v I) ∨ T).
+  Proof using B.
+    intros HlR Hbv. iIntros "Hpw Hcl".
+    iDestruct "Hpw" as "[Hx | #HT]"; last first.
+    { iModIntro. iSplitR; [by iApply (peclV_taint with "HT") | by iRight]. }
+    iDestruct "Hx" as (ps cs s0 P) "([%Hw %Htie] & #Hpin & #HW & Htn & #Hps & #Hcs & _ & #HE)".
+    pose proof Hw as ((Hpp & Hr & Hn & HP) & _).
+    assert (HneI : I <> []) by (intros ->; rewrite nlines_nil in Hn; lia).
+    replace (P + length (@nil (bv 8)))%nat with P by (cbn [length]; lia).
+    rewrite peclV_gen. iDestruct "Hcl" as "[Hc | Hp]"; last first.
+    { (* AN OPEN ROUND has already written a byte: the turn refutes it *)
+      iDestruct "Hp" as (v2 w so r gb pre tm)
+        "(#Hpin2 & #Hpera & Hwa & Hblk & Hcur & Hrb & Hta & Hcs2 & Hps2 & HE2 & Hdl & Hdll & %Hopen)".
+      iDestruct (gcPIN_agree G with "Hpin2 Hpin") as %->.
+      iDestruct (gwa_agree WA with "Hwa HW") as %Hst.
+      assert (Hst' : st so = s0) by exact Hst.
+      clear Hst. subst s0.
+      iDestruct (turn_agree with "Htn Hta") as %HP2.
+      iDestruct (pcs_lb_prefix with "Hcs2 Hcs") as %Hcsp.
+      iDestruct (ps_lb_prefix with "Hps2 Hps") as %Hpsp.
+      iDestruct (inp_lb_le with "Hdll HE") as %HI0dl.
+      assert (HI0 : I `prefix_of` (snd <$> gs_E M so)).
+      { etrans; [exact HI0dl | exact (gcl_pure_o_dl_E M sd _ _ _ _ _ _ Hopen)]. }
+      destruct Hopen as (_ & Hop & _).
+      pose proof Hop as (_ & Hwpre' & Hne' & _).
+      assert (Hs2 : lm_proc_before M ps cs (st so) I
+                    = lm_proc_before M (gs_ps M so) (gs_cs M so) (st so) I).
+      { apply (lm_proc_before_cs_prefix M ps (gs_ps M so) cs (gs_cs M so) (st so) I
+                 Hpsp Hcsp Hpp).
+        rewrite (ll_nlines_removelast I Hr). lia. }
+      pose proof (prefix_length _ _
+        (lm_proc_before_prefix M (gs_ps M so) (gs_cs M so) (st so) I
+           (snd <$> gs_E M so) HI0)) as Hle2.
+      assert (Hwne : (1 <= length (gs_w M so))%nat).
+      { rewrite Hwpre'. destruct pre; [by destruct (Hne' eq_refl) | cbn; lia]. }
+      rewrite /lm_pcount in HP2. rewrite HP Hs2 in HP2.
+      exfalso. lia. }
+    assert (Hok : lm_ok M (lm_upto M cs s0 (bodies_of I) (nlines I - 1)%nat)
+                    (lineV M I) (lm_dec M (pv_enc V lR (PLRun [])))).
+    { exact (pv_ok_safe V _ (lineV M I) lR (PLRun []) HlR (or_intror (or_introl eq_refl))). }
+    assert (Hhead : lm_cont M (lm_upto M cs s0 (bodies_of I) (nlines I - 1))
+                      (lineV M I) (lm_dec M (pv_enc V lR (PLRun []))) !! 0%nat = Some b).
+    { rewrite (pv_run_cont V _ (lineV M I) lR [] HlR) Hbv. vm_compute. reflexivity. }
+    iMod (gcl_step_write_blk M G B sd WA
+            k v P (pv_enc V lR (PLRun [])) b ps cs s0 I ho H HneI Hr ltac:(lia) Hpp HP
+            Hok (pv_run_term V lR []) Hhead
+            with "Hpin Htn Hps Hcs HE HW Hc") as "[Hc Hret]".
+    iModIntro. iSplitL "Hc"; [by iLeft |].
+    iDestruct "Hret" as "[(Htn & _ & #Hcs' & _ & _) | #HT]"; [| by iRight].
+    iLeft. iExists ps, cs, s0, P. iFrame "Htn Hps Hcs' HE HW".
+    iPureIntro. split; [exact Hw | exact Htie].
+  Qed.
+End pipes_events_v.
+
+
+(* ===================================================================== *)
+(*  2b.  THE EVENTS AT [popenN] AND AT [pecl']: section 2a's at the      *)
+(*       pipeline application's model                                    *)
+(* ===================================================================== *)
+
+Section pipes_events.
+  Context {Σ : gFunctors}.
+  Context `{!echoOutG Σ, !pipeOutG Σ}.
+  Context (g : pipe_gn).
+  Local Notation γ := (pgn_cl g).
+  Notation T := (echo_taint γ).
+  Context (fc : bytes -> option bytes) (adm : pline' -> bool).
+  Context (Lw : lm_laws (pipes_lm fc adm)).
+  Local Notation PM := (pipes_lm fc adm).
+  Local Notation PB := (pipes_lm_byte_laws fc adm).
+  Local Notation K := (pipes_hooks fc adm).
+  Local Notation PO := (popenN g fc adm).
+  Local Notation PC := (pecl' g fc adm Lw).
+  Local Notation GP := (pipesN_cparams g fc adm Lw).
+  Local Notation GA := (pipesN_wa g fc adm Lw).
+  Local Notation GC := (gcl PM GP tt GA).
+
+  Lemma pecl'_gen (k : nat) (ho : list mobs) (H : LogEntryDefs.cons_hist) :
+    PC k ho H ⊣⊢ GC k ho H ∨ PO k ho H.
+  Proof using . done. Qed.
+
+  Lemma cs_lb_weakenN (v : era_pins) (l l' : list nat) :
+    l' `prefix_of` l -> cs_lb v l -∗ cs_lb v l'.
+  Proof using .
+    intros Hp. rewrite /cs_lb. iIntros "H".
+    iApply (own_mono with "H"). by apply mono_list_lb_mono.
+  Qed.
+
+  (* ---- FILING THE LOG ENTRY, AND OPENING ONE, TAKE NOTHING ---- *)
+  Lemma popenN_close (k : nat) (ho : list mobs) (H : LogEntryDefs.cons_hist) :
+    ConsLog.cons_hist_ok H ->
+    ConsLog.cons_ev_ok H ConsLog.EvClose ->
+    PO k ho H -∗ PO k ho (ConsLog.cons_step H ConsLog.EvClose).
+  Proof using Lw. exact (popenV_close g PM GP tt GA k ho H). Qed.
+
+  Lemma popenN_open (k : nat) (ho : list mobs) (H : LogEntryDefs.cons_hist)
+      (h : list mobs) (c : bv 8) (cs : list (bv 8)) :
+    ConsLog.cons_hist_ok H ->
+    ConsLog.cons_ev_ok H (ConsLog.EvOpen h c cs) ->
+    lm_disc_input PM (ins (open_seg h)) -> obs_boots h = k ->
+    lm_disc PM h -> trace_shape h true ->
+    PO k ho H -∗ PO k h (ConsLog.cons_step H (ConsLog.EvOpen h c cs)).
+  Proof using Lw. exact (popenV_open g PM GP PB tt GA k ho H h c cs). Qed.
+
+  Lemma popenN_arm (k : nat) (ho : list mobs) (CH : LogEntryDefs.cons_hist) :
+    PO k ho CH -∗ PO k ho CH ∗ ⌜garm_era PM k ho CH⌝.
+  Proof using Lw. exact (popenV_arm g PM GP tt GA k ho CH). Qed.
+
+  Lemma pecl'_close (k : nat) (ho : list mobs) (H : LogEntryDefs.cons_hist) :
+    ConsLog.cons_hist_ok H ->
+    ConsLog.cons_ev_ok H ConsLog.EvClose ->
+    PC k ho H -∗ PC k ho (ConsLog.cons_step H ConsLog.EvClose).
+  Proof using . exact (peclV_close g PM GP tt GA k ho H). Qed.
+
+  Lemma pecl'_open (k : nat) (ho : list mobs) (H : LogEntryDefs.cons_hist)
+      (h : list mobs) (c : bv 8) (cs : list (bv 8)) :
+    ConsLog.cons_hist_ok H ->
+    ConsLog.cons_ev_ok H (ConsLog.EvOpen h c cs) ->
+    lm_disc_input PM (ins (open_seg h)) -> obs_boots h = k ->
+    lm_disc PM h -> trace_shape h true ->
+    PC k ho H -∗ PC k h (ConsLog.cons_step H (ConsLog.EvOpen h c cs)).
+  Proof using . exact (peclV_open g PM GP PB tt GA k ho H h c cs). Qed.
+
+  (* THE SUPPLY'S LAW: a tainted era answers any event out of its taint *)
+  Lemma pecl'_sup (k : nat) (ho : list mobs) (H : LogEntryDefs.cons_hist)
+      (ev : ConsLog.cons_ev) :
+    T -∗ PC k ho H ==∗ PC k ho (ConsLog.cons_step H ev).
+  Proof using . exact (peclV_sup g PM GP tt GA k ho H ev). Qed.
+
+  Lemma pecl'_arm (k : nat) (ho : list mobs) (CH : LogEntryDefs.cons_hist) :
+    PC k ho CH -∗ PC k ho CH ∗ (T ∨ ⌜garm_era PM k ho CH⌝).
+  Proof using . exact (peclV_arm g PM GP tt GA k ho CH). Qed.
+
+  (* ---- THE READ ---- *)
+
+  (* the reader's receipt: [rd_retV] at the pipeline *)
+  Definition rd_retN (k : nat) (v : era_pins) (n : nat) (CH : LogEntryDefs.cons_hist)
+      (ws : list (list mobs * bv 8)) : iProp Σ :=
+    rd_retV PM GP k v n CH ws.
+
+  Lemma popenN_step_read (k : nat) (v : era_pins) (n : nat) (ho : list mobs)
+      (CH : LogEntryDefs.cons_hist) (ws : list (list mobs * bv 8)) :
+    read_ok (LogEntryDefs.ch_log CH) (LogEntryDefs.ch_dl CH) ws ->
+    era_pin γ k v -∗ dl_cnt v (1/2) n -∗ PO k ho CH ==∗
+      PO k ho (ConsLog.cons_step CH (ConsLog.EvRead ws)) ∗ rd_retN k v n CH ws.
+  Proof using Lw. exact (popenV_step_read g PM GP PB tt GA k v n ho CH ws). Qed.
+
+  Lemma pecl'_step_read (k : nat) (v : era_pins) (n : nat) (ho : list mobs)
+      (CH : LogEntryDefs.cons_hist) (ws : list (list mobs * bv 8)) :
+    read_ok (LogEntryDefs.ch_log CH) (LogEntryDefs.ch_dl CH) ws ->
+    era_pin γ k v -∗ dl_cnt v (1/2) n -∗ PC k ho CH ==∗
+      PC k ho (ConsLog.cons_step CH (ConsLog.EvRead ws)) ∗ rd_retN k v n CH ws.
+  Proof using . exact (peclV_step_read g PM GP PB tt GA k v n ho CH ws). Qed.
+
+  (* ---- THE ECHO: refuted while a round is open ---- *)
+  Lemma pecl'_step_echo (k : nat) (h : list mobs) (c : bv 8)
+      (ho : list mobs) (CH : LogEntryDefs.cons_hist) :
+    lm_disc PM h ->
+    trace_shape h true ->
+    obs_boots h = k ->
+    obs_ends_in Uart0 h c ->
+    obs_wire Uart0 (open_seg h) `prefix_of` LogEntryDefs.ch_acc CH ->
+    (forall e, e ∈ LogEntryDefs.ch_log CH -> hist_ext (le_hist e) h) ->
+    (length (LogEntryDefs.ch_log CH) + 1)%nat = length (ins (open_seg h)) ->
+    LogEntryDefs.ch_arm CH = Some (h, c, [echo_of c], 0%nat) ->
+    PC k ho CH ==∗ PC k h (ConsLog.cons_step CH (ConsLog.EvByte (echo_of c))).
+  Proof using . exact (peclV_step_echo g PM GP PB tt GA Lw k h c ho CH). Qed.
+
+  (* ...AND THE BYTE, which takes NOTHING *)
+  Lemma pecl'_step_byte (k : nat) (ho : list mobs)
+      (CH : LogEntryDefs.cons_hist) (b : bv 8) :
+    ConsLog.cons_hist_ok CH ->
+    ConsLog.cons_ev_ok CH (ConsLog.EvByte b) ->
+    PC k ho CH ==∗ PC k ho (ConsLog.cons_step CH (ConsLog.EvByte b)).
+  Proof using . exact (peclV_step_byte g PM GP PB tt GA Lw k ho CH b). Qed.
+
+  (* ---- THE DRAIN ---- *)
   Lemma popenN_drain (k : nat) (h ho : list mobs) (CH : LogEntryDefs.cons_hist)
       (seg : list mobs) :
     trace_shape h true ->
@@ -851,40 +1128,11 @@ Section pipes_events.
     ins seg = ins (open_seg h) ->
     obs_wire Uart0 seg `prefix_of` LogEntryDefs.ch_acc CH ->
     PO k ho CH -∗ PO k ho CH ∗ ⌜lm_good_out PM tt seg⌝.
-  Proof using .
-    intros Hsh Hk Hpre Hins Hwire. subst k.
-    iIntros "Hp".
-    iDestruct "Hp" as (v w so r gb pre tm)
-      "(#Hpin & #Hpera & _ & Hblk & Hcur & Hrb & Hta & Hcs & Hps & HE & Hdl & Hdll & %Hpo)".
-    pose proof (proj1 Hpo)
-      as (Hacc & Hidx & Hbyte & Hpsb & Hpinf & Hcs' & Hdsc & Hpre1 & Hpre2 & Hpre3
-          & Hnofk & Hf0n & Hfok0).
-    iSplitL "Hblk Hcur Hrb Hta Hcs Hps HE Hdl Hdll".
-    { iExists v, w, so, r, gb, pre, tm.
-      iFrame "Hpin Hpera Hblk Hcur Hrb Hta Hcs Hps HE Hdl Hdll". by iPureIntro. }
-    iPureIntro.
-    assert (Hbytes : (snd <$> gs_E PM so) `prefix_of` ins seg).
-    { destruct Hpre3 as [HEnil | Hbo].
-      - rewrite HEnil fmap_nil. apply prefix_nil.
-      - assert (Hpl : forall j x, gs_E PM so !! j = Some x ->
-                        x.1 `prefix_of` open_seg ho)
-          by (intros j x Hx; exact (Forall_lookup_1 _ _ _ _ Hpre1 Hx)).
-        rewrite (E_bytes_of_hist (gs_E PM so) (open_seg ho) Hidx Hpl Hpre2).
-        etrans; [apply prefix_take |].
-        rewrite Hins. apply ins_prefix_of, open_seg_prefix_boots;
-          [exact Hpre | by rewrite Hbo | exact Hsh]. }
-    destruct Hpo as (_ & Hop & _).
-    pose proof Hop as (_ & Hwp' & _ & ao & Hb2 & _).
-    assert (Hst : gs_state PM tt so = tt) by (by destruct (gs_state PM tt so)).
-    rewrite -{1}Hst.
-    apply (lm_good_out_of_stage_open PM K PB (gs_ps PM so) (gs_cs PM so)
-             (gs_state PM tt so) (gs_E PM so) (gs_w PM so) ao seg Hpsb).
-    - apply (lm_alts_pre_mono PM _ (snd <$> gs_E PM so)); [exact Hbytes | exact Hcs'].
-    - exact Hbyte.
-    - exact Hpinf.
-    - rewrite Hwp'. exact Hb2.
-    - rewrite -Hacc. exact Hwire.
-    - exact Hbytes.
+  Proof using Lw.
+    intros Hsh Hk Hpre Hins Hwire. iIntros "Hp".
+    iDestruct (popenV_drain g PM GP PB tt GA k h ho CH seg Hsh Hk Hpre Hins Hwire
+                 with "Hp") as "[Hp (%s0 & %Hgo & _)]".
+    iFrame "Hp". iPureIntro. by destruct s0.
   Qed.
 
   Lemma pecl'_drain (k : nat) (h ho : list mobs) (CH : LogEntryDefs.cons_hist)
@@ -897,20 +1145,15 @@ Section pipes_events.
     obs_wire Uart0 seg <> [] ->
     PC k ho CH -∗ PC k ho CH ∗ (T ∨ ⌜lm_good_out PM tt seg⌝).
   Proof using .
-    intros Hsh Hk Hpre Hins Hwire Hne. rewrite !pecl'_gen. iIntros "[Hc | Hc]".
-    - iDestruct (gcl_drain PM (pipesN_cparams g fc adm Lw) PB tt (pipesN_wa g fc adm Lw)
-                   k h ho CH seg Hsh Hk Hpre Hins Hwire Hne with "Hc") as "[Hc Hd]".
-      iSplitL "Hc"; [by iLeft |].
-      iDestruct "Hd" as "[#HT | (%s0 & %Hgo & _)]"; [by iLeft |].
-      iRight. iPureIntro. by destruct s0.
-    - iDestruct (popenN_drain with "Hc") as "[Hc %Hgo]"; try done.
-      iSplitL "Hc"; [by iRight |]. by iRight.
+    intros Hsh Hk Hpre Hins Hwire Hne. iIntros "Hc".
+    iDestruct (peclV_drain g PM GP PB tt GA k h ho CH seg Hsh Hk Hpre Hins Hwire Hne
+                 with "Hc") as "[Hc Hd]".
+    iFrame "Hc". rewrite /gdrain_ret.
+    iDestruct "Hd" as "[#HT | (%s0 & %Hgo & _)]"; [by iLeft |].
+    iRight. iPureIntro. by destruct s0.
   Qed.
 
-  (* ---- FILING AN EMPTY BLOCK: no writer wrote, so the prompt is the
-          block's first byte, and the claim -- between rounds -- files the
-          round at [PLRun []] by [GenOut.gcl_step_write_blk] (an open
-          round would have written a byte, and the turn refutes it) ---- *)
+  (* ---- FILING AN EMPTY BLOCK ---- *)
   Lemma pwc_blkN_file_empty (v : era_pins) (I : list (bv 8)) (k : nat) (ho : list mobs)
       (H : LogEntryDefs.cons_hist) (b : bv 8) :
     adm (lineN fc adm I) = true -> line_blocks fc (lineN fc adm I) [] ->
@@ -922,59 +1165,13 @@ Section pipes_events.
             ∗ ps_lb v ps ∗ cs_lb v (cs ++ [plalt_code (PLRun [])]) ∗ inp_lb v I) ∨ T).
   Proof using .
     intros Ha Hbl Hbv. iIntros "Hpw Hcl".
-    iDestruct "Hpw" as "[Hx | #HT]"; last first.
-    { iModIntro. iSplitR; [by iApply (pecl'_taint with "HT") | by iRight]. }
-    iDestruct "Hx" as (ps cs s0 P) "([%Hw _] & #Hpin & _ & Htn & #Hps & #Hcs & _ & #HE)".
-    destruct s0.
-    pose proof Hw as ((Hpp & Hr & Hn & HP) & _).
-    assert (HneI : I <> []) by (intros ->; rewrite nlines_nil in Hn; lia).
-    replace (P + length (@nil (bv 8)))%nat with P by (cbn [length]; lia).
-    rewrite pecl'_gen. iDestruct "Hcl" as "[Hc | Hp]"; last first.
-    { (* AN OPEN ROUND has already written a byte: the turn refutes it *)
-      iDestruct "Hp" as (v2 w so r gb pre tm)
-        "(#Hpin2 & #Hpera & _ & Hblk & Hcur & Hrb & Hta & Hcs2 & Hps2 & HE2 & Hdl & Hdll & %Hopen)".
-      iDestruct (era_pin_agree with "Hpin2 Hpin") as %->.
-      iDestruct (turn_agree with "Htn Hta") as %HP2.
-      iDestruct (pcs_lb_prefix with "Hcs2 Hcs") as %Hcsp.
-      iDestruct (ps_lb_prefix with "Hps2 Hps") as %Hpsp.
-      iDestruct (inp_lb_le with "Hdll HE") as %HI0dl.
-      assert (HI0 : I `prefix_of` (snd <$> gs_E PM so)).
-      { etrans; [exact HI0dl | exact (gcl_pure_o_dl_E PM tt _ _ _ _ _ _ Hopen)]. }
-      destruct Hopen as (_ & Hop & _).
-      pose proof Hop as (_ & Hwpre' & Hne' & _).
-      assert (Hst : gs_state PM tt so = tt) by (by destruct (gs_state PM tt so)).
-      rewrite Hst in HP2.
-      assert (Hs2 : lm_proc_before PM ps cs tt I
-                    = lm_proc_before PM (gs_ps PM so) (gs_cs PM so) tt I).
-      { apply (lm_proc_before_cs_prefix PM ps (gs_ps PM so) cs (gs_cs PM so) tt I
-                 Hpsp Hcsp Hpp).
-        rewrite (ll_nlines_removelast I Hr). lia. }
-      pose proof (prefix_length _ _
-        (lm_proc_before_prefix PM (gs_ps PM so) (gs_cs PM so) tt I
-           (snd <$> gs_E PM so) HI0)) as Hle2.
-      assert (Hwne : (1 <= length (gs_w PM so))%nat).
-      { rewrite Hwpre'. destruct pre; [by destruct (Hne' eq_refl) | cbn; lia]. }
-      rewrite /lm_pcount in HP2. rewrite HP Hs2 in HP2.
-      exfalso. lia. }
-    assert (Hok : lm_ok PM tt (lm_of PM (bodies_of I !!! (nlines I - 1)%nat))
-                    (lm_dec PM (plalt_code (PLRun [])))).
-    { cbn [pipes_lm lm_ok lm_dec]. rewrite plalt_of_code. right.
-      split; [exact Ha | exact Hbl]. }
-    assert (Hterm : lm_term PM (lm_dec PM (plalt_code (PLRun []))) = false).
-    { cbn [pipes_lm lm_term lm_dec]. by rewrite plalt_of_code. }
-    assert (Hhead : lm_cont PM (lm_upto PM cs tt (bodies_of I) (nlines I - 1))
-                      (lm_of PM (bodies_of I !!! (nlines I - 1)%nat))
-                      (lm_dec PM (plalt_code (PLRun []))) !! 0%nat = Some b).
-    { rewrite Hbv. cbn [pipes_lm lm_cont lm_dec]. rewrite plalt_of_code.
-      vm_compute. reflexivity. }
-    iAssert (gcW (pipesN_cparams g fc adm Lw) k tt) as "HW"; [done |].
-    iMod (gcl_step_write_blk PM (pipesN_cparams g fc adm Lw) PB tt (pipesN_wa g fc adm Lw)
-            k v P (plalt_code (PLRun [])) b ps cs tt I ho H HneI Hr ltac:(lia) Hpp HP
-            Hok Hterm Hhead
-            with "Hpin Htn Hps Hcs HE HW Hc") as "[Hc Hret]".
-    iModIntro. iSplitL "Hc"; [by iLeft |].
-    iDestruct "Hret" as "[(Htn & _ & #Hcs' & _ & _) | #HT]"; [| by iRight].
-    iLeft. iExists ps, cs, P. iFrame "Htn Hps Hcs' HE". by iPureIntro.
+    iMod (pwc_blkV_file_empty g PM GP PB tt GA (pview_pipes fc adm) v I tt (lineN fc adm I)
+            k ho H b eq_refl Hbv with "Hpw Hcl") as "[Hcl Hr]".
+    iModIntro. iFrame "Hcl".
+    iDestruct "Hr" as "[(%ps & %cs & %s0 & %P & [%Hw _] & _ & Ht & Hps & Hcs & HE) | HT]";
+      [| by iRight].
+    destruct s0. iLeft. iExists ps, cs, P. iSplitR; [by iPureIntro |].
+    iFrame "Ht Hps HE". iExact "Hcs".
   Qed.
 End pipes_events.
 
