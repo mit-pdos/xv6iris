@@ -440,10 +440,21 @@ admitted until S4.
 `EchoOut.era_pins` gains `ep_secc : gname` (a `mono_nat`); `era_full`
 gains `mono_nat_auth_own (ep_secc v) 1 0`.  `secc_flag v n :=
 mono_nat_auth_own (ep_secc v) 1 n` -- the FULL authority, held by the
-claim and by nobody else, so no process ever carries a half; `secc_tok k
-:= ∃ v, UPIN k v ∗ mono_nat_lb_own (ep_secc v) 1` (persistent, timeless);
-`secc_tok k -∗ UPIN k v -∗ secc_flag v 0 -∗ False`.  The union's
-`ai_wild k := secc_tok k`; the trivial and echo instances stay at `False`.
+claim and by nobody else, so no process ever carries a half.  THE TOKEN
+CARRIES THE FREEZE: 
+
+    secc_tok k := ∃ v I0, UPIN k v ∗ mono_nat_lb_own (ep_secc v) 1
+                  ∗ inp_lb v I0 ∗ ⌜0 < nlines I0 ∧ rest_of I0 = []⌝
+                  ∗ cs_frozen_at v (nlines I0 - 1)
+
+(persistent, timeless: two `mono_list` lower bounds, a `mono_nat` lower
+bound and a discarded authority); `secc_tok k -∗ UPIN k v -∗ secc_flag v
+0 -∗ False`.  `I0` is the era's input up to and including the seccomp
+line.  The union's `ai_wild k := secc_tok k`; the trivial and echo
+instances stay at `False`.  Every holder of the token -- the universe,
+sh after its read, sh after a dirty read outcome, init after a panic --
+therefore holds the two facts the wild read law needs, and nothing has
+to travel beside the token.
 
 ### 10.2 The licence is for the two process events only
 
@@ -550,41 +561,51 @@ from `garm_era`'s `lm_disc M h`; every other step leaves `pops` alone).
 An entry beyond a seccomp newline then contradicts D4.  This is the one
 change in the generic tier.
 
-### 10.5 The wild shape of sh, and of init
+### 10.5 The wild shape of sh, and of init; the union's `lk_T`
 
+    T' := UT ∨ secc_tok (S gen_id)
     useccomp_shape I := secc_tok (S gen_id) ∗ ∃ v, era_pin (fgn_echo gf) (S gen_id) v
-                        ∗ inp_lb v I ∗ ⌜0 < nlines I⌝ ∗ cs_frozen_at v (nlines I - 1)
 
-`uWcu I p` gains it as a fourth arm (`uWbf I` a wild arm of the same
-resources, for the fork-panic path where sh's exit payload restarts init);
-no deed (B3).  The laws:
-- `uWcu_read` at the wild arm is VACUOUS: the post-read `Pm (I ++ l ++
-  [wl_nl])` carries `lk_rres v (I ++ l ++ [wl_nl])`, i.e. a `cs_lb v cs0`
-  with `length cs0 >= nlines I`, absurd against the freeze
-  (`cs_frozen_at_lb_absurd`), exactly `uterm_read_law`'s argument.  This
-  matches the kernel: the console marks its escrow dirty only when a
-  tokenless reader CONSUMES bytes (`ProofConsoleread.cr_racc` at `None`:
-  `⌜d = 0⌝ ∨ cons_dirty_lb`), and in this arm nobody consumes, so sh's
-  token read never takes the dirty arm and gets the claim's `ws = []`.
-- the prompt law and the panic law at the wild arm write through
-  `out_link_of_licence_at` (from `secc_tok`); the kill law is from `UT`
-  as today.
-- `ush_read_pay_era_at`'s two premises become `(⊢ app_rdcred -∗ lk_T L)`
-  and `(⊢ lk_T L -∗ app_rdcred)`; both hold at the union with `lk_T :=
-  UT` (S0's `False` instance goes away: `riscv_wild -∗ UT` is not needed,
-  because a wild-era sh never reaches the dirty arm -- see above -- and
-  the premise form `app_rdcred -∗ lk_T` is discharged from `app_sup -∗ UT`
-  plus `riscv_wild (S gen_id) -∗ UT`... which is FALSE at the union.  So
-  the union keeps S0's third outcome for the dirty arm after all: `ush_rd_ret`
-  gains `(riscv_wild (S gen_id) ∗ ∃ n', upos γp n')`, refuted in the clean
-  laws by `secc_flag`... no: by nothing the clean shell holds.  RULING:
-  the dirty arm's third outcome is ABSORBED into the wild shape (it hands
-  sh `secc_tok`, and sh already holds `inp_lb`/the freeze it needs from
-  the transition, since a dirty outcome at a clean line is impossible in
-  fact but unrefutable in the proof); the clean read laws therefore end
-  in `Wcu … 3` at the wild arm in that outcome, which is a legal state.
-  (This is the one place the clean tier absorbs the token without a
-  refutation; it costs nothing because the wild arm is absorbing.)
+The union's `LinkRec` sets `lk_T := T'` (today `UT`): every LinkRec
+family's taint arm and the lease's tainted arm (`ush_lease`, `ush_rd_ret`'s
+right arm) absorb the token as they absorb the taint, and the two
+premises of `ush_read_pay_era_at` are discharged at the union as
+`app_rdcred -∗ T'` (`app_sup -∗ UT` as today, `riscv_wild (S gen_id) -∗
+secc_tok` by definition) and `T' -∗ app_rdcred` (both disjuncts).  S0's
+interim premise `(⊢ riscv_wild (S gen_id) -∗ lk_T L)` is then the
+`iRight` of `T'`, and its `False` discharge goes away.  The deed
+(`ush_deed_at`) and the pipeline families (`pwc_blkU`, `ptkU`, the
+shapes `PT`/`PD`) stay at `UT`: no clean presenter survives the third arm
+(10.3), so they never meet the token.
+
+`uWcu I p` gains `useccomp_shape I` as a fourth arm, `uWbf I` a wild arm
+of the same two resources (the fork-panic path hands it to init through
+sh's exit payload).  No deed in the wild arm (B3).  `uWcu_taint` becomes
+`era_pin -∗ T' -∗ uWcu I p` (the `UT` half as today, the token half the
+wild arm), so every law that today ends a taint case with `uWcu_taint`
+ends a token case the same way.  The laws at the wild arm:
+- `uWcu_read` is VACUOUS.  The post-read `Pm (I ++ l ++ [wl_nl])` carries
+  `lk_rres v (I ++ l ++ [wl_nl])`, i.e. `cs_lb v cs0` with `length cs0 >=
+  nlines I`, and the reading's `⌜length (ch_dl CH) = length I⌝` beside
+  `inp_lb v (snd <$> ch_dl CH)`; the token's `inp_lb v I0` is a bound of
+  the same list, so `I0 `prefix_of` I` and `nlines I0 <= nlines I`, and
+  `cs_frozen_at_lb_absurd` closes it (`uterm_read_law`'s argument).
+  This matches the kernel: the console marks its escrow dirty only when
+  a tokenless reader CONSUMES bytes (`ProofConsoleread.cr_racc` at `None`:
+  `⌜d = 0⌝ ∨ cons_dirty_lb`), and under the third arm nobody consumes, so
+  a wild-era read never returns.  The union's `lk_rr` must carry the
+  count and the bound; check `urr`.
+- a DIRTY read outcome at the token (`ush_rd_ret`'s right arm at the
+  `secc_tok` half of `T'`: another reader consumed bytes while the call
+  slept) is unreachable in fact and unrefutable in the proof; the clean
+  read laws send it to the wild arm like the taint case, which is a
+  legal state at any `I` because the token carries its own `I0`.
+- the prompt law and the panic law write through `out_link_of_licence_at`
+  (from the token); the kill law is from `UT` as today; `uHwbl_u`,
+  `uWcu_inp`, `ush_prompt_law_u`, `uHpanic`, `ush_kill_law_u` each gain
+  the arm.
+- init's prologue after a wild-era fork panic goes through the licence
+  from `uWbf`'s wild arm (S4 proves the path; S2 states the arm).
 
 ### 10.6 What S2 delivers and what it leaves to S4
 
