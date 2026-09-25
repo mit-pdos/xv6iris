@@ -54,7 +54,8 @@ untouched); the `n < 0` test (+0x1c); the three-way dispatch; FD_PIPE
   `MAXFILE*BSIZE + n < 2^31`, and `n` is an unchecked `int`.
 * THE POSTCONDITION: the landed blanket `filewriteRet n r` (`pipeRwRet`), and
   beside it what the arm the descriptor selects proved (`filewriteArms`):
-  on a writable inode the chunk chain's two posts (`writeArmsAt`): every
+  on a writable inode the chunk chain's two posts (`writeArmsAt`, at the
+  writer's table `P`, whose partial arms carry the short reason): every
   byte landed (`r = n`) and the fired chunks concatenate to the caller's own
   run, the cursor `Q` at the stop; or `-1` with a prefix fired and the
   cursor one node past it iff a short chunk moved the row.
@@ -101,9 +102,9 @@ untouched); the `n < 0` test (+0x1c); the three-way dispatch; FD_PIPE
    * `write_cons_arms` (`writeConsArms`) WITH the short arm's reason
      (Rocq lane TRAP-ROWS T1, `write_cons_short` = SpecConsolewrite's
      `writeConsShort`), so `filewrite_extra`'s writer-table parameter `P`
-     is Rocq's.  (The inode arm's own short reason -- Rocq `write_arms_at`
-     takes `P` too -- is still not relayed: `writeArmsAt` has no `P`; that
-     is the writei chain's, SpecWritei.)
+     is Rocq's.  The inode arm's `writeArmsAt` takes the same `P` (Rocq
+     lane WRITE-RELAY-2): its partial arms carry writei's own short-write
+     reason (`SpecWritei`'s `WriteiOut.why`, `SysWriteDefs.wrFailWhy`).
    * the device input carries the no-wrap conjunct of deviation 5 (the
      callee's premise `hnw`, SpecConsolewrite deviation 2).
 4. **THE IMAGE `M`** (the question FsAbsWriteFire deviation 2 / SysWriteDefs
@@ -390,35 +391,38 @@ variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [FsTopG GF] [Offb
 fired chunks concatenate to the whole count, their concatenation IS the
 caller's own run at `ua` in the image it lent, and the chain's node at the
 stop position hands back the cursor. -/
-def writePostOkAt (Γ : FsViewNames GF) (i : Nat) (γo : GName) (n : Int)
+def writePostOkAt (Γ : FsViewNames GF) (i : Nat) (γo : GName) (P : UPtd) (n : Int)
     (M : Nat → List (BitVec 8)) (ua : BitVec 64) (Q : Nat → IProp GF) : IProp GF :=
   iprop(∃ bss : List (List (BitVec 8)),
     ⌜(bss.flatten.length : Int) = n⌝ ∗ ⌜bss.length ≤ wchunks n⌝ ∗
     ⌜ubytesAt M ua bss.flatten⌝ ∗
-    awriteChain (hlc := hlc) Γ appE i γo M ua Q bss.length (wchunks n - bss.length))
+    awriteChainAt (hlc := hlc) Γ appE i γo M ua P n Q bss.length (wchunks n - bss.length))
 
 /-- ret -1: the honest partial arm (Rocq `write_post_fail_at`): a PREFIX of
 chunks fired, possibly empty, the total falls short of the count, and the
 chain resumes `x ≤ 1` nodes past the prefix (`x = 1` exactly when a short
 chunk took the chain's partial arm). -/
-def writePostFailAt (Γ : FsViewNames GF) (i : Nat) (γo : GName) (n : Int)
+def writePostFailAt (Γ : FsViewNames GF) (i : Nat) (γo : GName) (P : UPtd) (n : Int)
     (M : Nat → List (BitVec 8)) (ua : BitVec 64) (Q : Nat → IProp GF) : IProp GF :=
   iprop(∃ (bss : List (List (BitVec 8))) (x : Nat),
     ⌜(bss.flatten.length : Int) < n ∨ (n < 0 ∧ bss = [])⌝ ∗
     ⌜bss.length + x ≤ wchunks n⌝ ∗ ⌜x ≤ 1⌝ ∗
     ⌜ubytesAt M ua bss.flatten⌝ ∗
-    awriteChain (hlc := hlc) Γ appE i γo M ua Q (bss.length + x) (wchunks n - bss.length - x))
+    awriteChainAt (hlc := hlc) Γ appE i γo M ua P n Q (bss.length + x) (wchunks n - bss.length - x))
 
-/-- The two arms, keyed on the return value alone (Rocq `write_arms_at`). -/
-def writeArmsAt (Γ : FsViewNames GF) (i : Nat) (γo : GName) (n : Int)
+/-- The two arms, keyed on the return value alone (Rocq `write_arms_at`).
+`P` IS THE WRITER'S OWN TABLE (Rocq lane WRITE-RELAY-2): the chain the
+caller gets back names it, because its partial arms carry the reason a copy
+gave up (`FsAbsWriteFire.awritePartAt`). -/
+def writeArmsAt (Γ : FsViewNames GF) (i : Nat) (γo : GName) (P : UPtd) (n : Int)
     (M : Nat → List (BitVec 8)) (ua : BitVec 64) (Q : Nat → IProp GF) (r : BitVec 64) : IProp GF :=
-  iprop((⌜r = BitVec.ofInt 64 n ∧ 0 ≤ n⌝ ∗ writePostOkAt (hlc := hlc) Γ i γo n M ua Q) ∨
-    (⌜r = -1#64⌝ ∗ writePostFailAt (hlc := hlc) Γ i γo n M ua Q))
+  iprop((⌜r = BitVec.ofInt 64 n ∧ 0 ≤ n⌝ ∗ writePostOkAt (hlc := hlc) Γ i γo P n M ua Q) ∨
+    (⌜r = -1#64⌝ ∗ writePostFailAt (hlc := hlc) Γ i γo P n M ua Q))
 
 /-- Rocq `write_arms_at_ret`: the arms refine the landed blanket. -/
-theorem writeArmsAt_ret (Γ : FsViewNames GF) (i : Nat) (γo : GName) (n : Int)
+theorem writeArmsAt_ret (Γ : FsViewNames GF) (i : Nat) (γo : GName) (P : UPtd) (n : Int)
     (M : Nat → List (BitVec 8)) (ua : BitVec 64) (Q : Nat → IProp GF) (r : BitVec 64) :
-    writeArmsAt (hlc := hlc) Γ i γo n M ua Q r ⊢ ⌜filewriteRet n r⌝ := by
+    writeArmsAt (hlc := hlc) Γ i γo P n M ua Q r ⊢ ⌜filewriteRet n r⌝ := by
   unfold writeArmsAt
   iintro (⟨%h, -⟩ | ⟨%h, -⟩)
   · ipureintro; rw [h.1]; exact filewriteRet_all n h.2
@@ -426,12 +430,13 @@ theorem writeArmsAt_ret (Γ : FsViewNames GF) (i : Nat) (γo : GName) (n : Int)
 
 /-- THE SIGN GUARD'S EXIT (Rocq `write_arms_at_neg`): at a negative count
 `wchunks n = 0`, so the input IS the cursor at the empty prefix. -/
-theorem writeArmsAt_neg (Γ : FsViewNames GF) (i : Nat) (γo : GName) (n : Int)
+theorem writeArmsAt_neg (Γ : FsViewNames GF) (i : Nat) (γo : GName) (P : UPtd) (n : Int)
     (M : Nat → List (BitVec 8)) (ua : BitVec 64) (Q : Nat → IProp GF) (hn : n < 0) :
-    awriteChain (hlc := hlc) Γ appE i γo M ua Q 0 (wchunks n) ⊢
-      writeArmsAt Γ i γo n M ua Q (-1#64) := by
+    awriteChain (hlc := hlc) Γ appE i γo M ua n Q 0 (wchunks n) ⊢
+      writeArmsAt Γ i γo P n M ua Q (-1#64) := by
   unfold writeArmsAt writePostFailAt
   iintro Hc
+  ihave Hc := awriteChainAt_of Γ appE i γo M ua n Q 0 (wchunks n) P $$ Hc
   iright
   isplitr
   · ipureintro; rfl
@@ -521,7 +526,7 @@ def filewriteIn (st : FdState) (n : Int) (M : Nat → List (BitVec 8)) (ua : Bit
   match st with
   | .open _ true (.inode i γo _) =>
     iprop(⌜ua.toNat + n.toNat ≤ 2 ^ 64⌝ ∗
-      awriteChain (hlc := hlc) (fsGammaL fscFs) appE i γo M ua Q 0 (wchunks n))
+      awriteChain (hlc := hlc) (fsGammaL fscFs) appE i γo M ua n Q 0 (wchunks n))
   | .open _ true (.device _) =>
     iprop(⌜ua.toNat + n.toNat ≤ 2 ^ 64⌝ ∗
       consOutChain (genId (hlc := hlc) (GF := GF) + 1) M ua Q 0 n.toNat)
@@ -534,7 +539,7 @@ know the callee was consolewrite. -/
 def filewriteExtra (P : UPtd) (st : FdState) (n : Int) (M : Nat → List (BitVec 8)) (ua : BitVec 64)
     (Q : Nat → IProp GF) (r : BitVec 64) : IProp GF :=
   match st with
-  | .open _ true (.inode i γo _) => writeArmsAt (hlc := hlc) (fsGammaL fscFs) i γo n M ua Q r
+  | .open _ true (.inode i γo _) => writeArmsAt (hlc := hlc) (fsGammaL fscFs) i γo P n M ua Q r
   | .open _ true (.device mj) => if mj = CONSOLE then writeConsArms P ua Q n r else emp
   | _ => emp
 
@@ -557,7 +562,7 @@ theorem filewriteIn_inode (rb : Bool) (i : Nat) (γo : GName) (n : Int) (M : Nat
     (ua : BitVec 64) (Q : Nat → IProp GF) :
     filewriteIn (hlc := hlc) (.open rb true (.inode i γo .parked)) n M ua Q ⊣⊢
       iprop(⌜ua.toNat + n.toNat ≤ 2 ^ 64⌝ ∗
-        awriteChain (hlc := hlc) (fsGammaL fscFs) appE i γo M ua Q 0 (wchunks n)) := .rfl
+        awriteChain (hlc := hlc) (fsGammaL fscFs) appE i γo M ua n Q 0 (wchunks n)) := .rfl
 
 /-- Rocq `filewrite_in_cons`. -/
 theorem filewriteIn_cons (rb : Bool) (mj : Nat) (n : Int) (M : Nat → List (BitVec 8))
@@ -569,7 +574,7 @@ theorem filewriteIn_cons (rb : Bool) (mj : Nat) (n : Int) (M : Nat → List (Bit
 /-- Rocq `filewrite_extra_inode`. -/
 theorem filewriteExtra_inode (P : UPtd) (rb : Bool) (i : Nat) (γo : GName) (n : Int)
     (M : Nat → List (BitVec 8)) (ua : BitVec 64) (Q : Nat → IProp GF) (r : BitVec 64) :
-    writeArmsAt (hlc := hlc) (fsGammaL fscFs) i γo n M ua Q r ⊢
+    writeArmsAt (hlc := hlc) (fsGammaL fscFs) i γo P n M ua Q r ⊢
       filewriteExtra (hlc := hlc) P (.open rb true (.inode i γo .parked)) n M ua Q r := .rfl
 
 /-- Rocq `filewrite_extra_cons`. -/
@@ -642,7 +647,7 @@ theorem filewriteExtra_neg (P : UPtd) (st : FdState) (n : Int) (M : Nat → List
       · exact .rfl
       · unfold filewriteIn filewriteExtra
         iintro ⟨-, Hc⟩
-        iapply writeArmsAt_neg _ i g n M ua Q hn $$ Hc
+        iapply writeArmsAt_neg _ i g P n M ua Q hn $$ Hc
       · iintro -
         by_cases hc : mj = CONSOLE
         · subst hc

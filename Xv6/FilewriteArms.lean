@@ -154,6 +154,8 @@ theorem fwr_arm_zero (cpu : CPU) (k : KCtx) (spie spp : Bool) (R : RegMap) (γl 
     · ipureintro; simp
     isplitr
     · ipureintro; exact ubytesAt_nil _ _
+    ihave Hc := awriteChainAt_of (hlc := hlc) (fsGammaL fscFs) appE i γo (writerImg V.upt M)
+      (k.regs 11#5) 0 Q 0 (wchunks 0) V.upt $$ Hc
     iexact Hc
 
 set_option maxHeartbeats 16000000 in
@@ -583,7 +585,7 @@ theorem fwr_arm_inode (BO : BEGIN_OP) (IL : ILOCK) (WI : WRITEI) (IU : IUNLOCK) 
     trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗
     fwrEnv (hlc := hlc) Γ A ∗ fileRef A.γ A.fk A.q A.st ∗
     procPrivExt (procAddr A.j) A.pid A.V A.V.upt A.M ∗ bslots 3 ∗
-    awriteChain (hlc := hlc) (fsGammaL fscFs) appE A.i A.γo A.img (k.regs 11#5) Q 0 (wchunks A.n) ∗
+    awriteChain (hlc := hlc) (fsGammaL fscFs) appE A.i A.γo A.img (k.regs 11#5) A.n Q 0 (wchunks A.n) ∗
     fwrK (hlc := hlc) k A.γul A.γuu A.γ A.fk A.q A.st A.j A.pid A.V A.M A.n Q
     ⊢ wpLoop (GF := GF) cpu := by
   obtain ⟨r2, r8, r9, r18, r19, r20, r21, r22, r23, r24, r25, r26, r27⟩ := id hr
@@ -635,7 +637,7 @@ theorem fwr_arm_inode (BO : BEGIN_OP) (IL : ILOCK) (WI : WRITEI) (IU : IUNLOCK) 
     refine ⟨?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_⟩ <;>
       simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true] <;> first | assumption | rfl
   ihave Hpriv := fwr_priv_img (procAddr A.j) A.pid A.V A.M $$ Hpriv
-  ihave Hst := fwrRaw_init (fsGammaL fscFs) A.i A.γo A.n A.img (k.regs 11#5) Q $$ Hc
+  ihave Hst := fwrRaw_init (fsGammaL fscFs) A.i A.γo A.V.upt A.n A.img (k.regs 11#5) Q $$ Hc
   iapply (fwr_loop BO IL WI IU EO Γ k A hA Q A.n.toNat cpu spie spp _ 0 0 A.V.upt (k.regs 9#5)
     (k.regs 19#5) w11 (by omega) (by have := hA.hn.1; omega) (by unfold FW_MAX; omega)
     (UMemL.extSz_refl _ _) hr')

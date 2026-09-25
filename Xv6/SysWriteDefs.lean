@@ -39,12 +39,18 @@ Rocq's header, kept because the reasons are the content:
    `SpecFilewrite`'s choice (W7-D).  Recommended home once that is fixed:
    `Xv6/UMem.lean` or `Xv6/SpecCopyin.lean`.
 
+4. Section 1d (`wrFailWhy`, Rocq lane WRITE-RELAY-2) is Rocq main's, ported
+   after the rest: the address is `(src + BitVec.ofNat 64 d).toNat` (Rocq's
+   `uint (add_vec_int src d)`, wrapping modulo 2^64 the same way), and the
+   entry lemma takes `P.ext Pc` (the part of Rocq's `uptd_ext_sz` it reads).
+
 ## Dropped/simplified vs Rocq
 
 Nothing.
 -/
 import Xv6.FsAbsDelta
 import Xv6.UMem
+import Xv6.UMemLemmas
 
 namespace Xv6
 
@@ -86,6 +92,52 @@ theorem wchunks_nonpos (n : Int) (hn : n ≤ 0) : wchunks n = 0 := by
   unfold wchunks FW_MAX
   have : (n + 3072 - 1) / 3072 ≤ 0 := by omega
   omega
+
+/-! ## 1d.  Why a write leaves bytes nobody named -- the copyin's reason
+
+Rocq's section 1d (lane WRITE-RELAY-2): writei's DISTURBED TAIL exists for
+exactly one reason, `either_copyin` giving up part-way on the USER arm, and
+its contract names the byte it died on -- an address of the SOURCE run the
+process's page table does not map for READING (`uvaRmapped`: present and
+V&U, walkaddr's test; there is no `PTE_R` re-walk on this side).  STATED AT
+THE ENTRY DESCRIPTOR, the weaker and usable form: the rounds' tables only
+grow.  WHICH byte is existential and the bound is the REQUEST. -/
+
+/-- Rocq's `wr_fail_why`: some byte of the `n`-byte source run at `src` is
+not readable-mapped at `P`. -/
+def wrFailWhy (P : UPtd) (src : BitVec 64) (n : Nat) : Prop :=
+  ∃ d : Nat, d < n ∧ ¬ uvaRmapped P (src + BitVec.ofNat 64 d).toNat
+
+/-- the round's verdict, brought back to the ENTRY table (Rocq's
+`wr_fail_why_entry`; `wr_nrmapped_entry` is `UMemL.uvaRmapped_mono`). -/
+theorem wrFailWhy_entry {P Pc : UPtd} (hext : P.ext Pc) {src : BitVec 64} {n : Nat}
+    (h : wrFailWhy Pc src n) : wrFailWhy P src n := by
+  obtain ⟨d, hd, hn⟩ := h
+  exact ⟨d, hd, fun hc => hn (UMemL.uvaRmapped_mono hext hc)⟩
+
+/-- the reason survives a WIDER request (Rocq's `wr_fail_why_mono`). -/
+theorem wrFailWhy_mono (P : UPtd) (src : BitVec 64) {n n' : Nat} (hle : n ≤ n')
+    (h : wrFailWhy P src n) : wrFailWhy P src n' := by
+  obtain ⟨d, hd, hn⟩ := h
+  exact ⟨d, by omega, hn⟩
+
+/-- THE REASON, MOVED TO THE WHOLE RUN'S BASE (Rocq's `wr_fail_why_shift`):
+a chunk's failing byte is a byte of the request the chunk sits inside.  No
+no-wrap side condition: the addition composes modulo 2^64. -/
+theorem wrFailWhy_shift (P : UPtd) (src : BitVec 64) {b c n : Nat} (hle : b + c ≤ n)
+    (h : wrFailWhy P (src + BitVec.ofNat 64 b) c) : wrFailWhy P src n := by
+  obtain ⟨d, hd, hn⟩ := h
+  refine ⟨b + d, by omega, ?_⟩
+  rwa [BitVec.add_assoc, ← BitVec.ofNat_add] at hn
+
+/-- THE REFUTATION (Rocq's `wr_fail_why_refute`): a caller whose whole
+source run is readable-mapped at the table the reason is stated at has no
+copyin fault to answer for. -/
+theorem wrFailWhy_refute (P : UPtd) (src : BitVec 64) {k n : Nat} (hnk : n ≤ k)
+    (hmap : ∀ j, j < k → uvaRmapped P (src + BitVec.ofNat 64 j).toNat)
+    (h : wrFailWhy P src n) : False := by
+  obtain ⟨d, hd, hn⟩ := h
+  exact hn (hmap d (by omega))
 
 /-! ## 2.  The content seam (Rocq `SpecCopyin.ubytes_at`; deviation 3) -/
 

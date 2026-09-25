@@ -133,6 +133,7 @@ theorem writei_out_join (A : WiArgs) (src : BitVec 64) (tot : Nat) (bm' : Blkmap
     distLe := hS.distLe
     distFull := hS.distFull
     distKer := hS.distKer
+    why := hS.why
     range := hS.range
     ker := hS.ker
     usr := hS.usr

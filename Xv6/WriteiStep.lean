@@ -65,6 +65,9 @@ structure WiChunk (A : WiArgs) (src : BitVec 64) (tot mm : Nat) (PI P2 : UPtd)
   usr : A.user = true → ok = true →
     c = umemRead (viewFaulted A.V.upt P2 A.M) (src + BitVec.ofNat 64 tot).toNat mm
   failUser : ok = false → A.user = true
+  /-- ...and a failure carries `either_copyin`'s reason, at the table the
+  copy was handed (Rocq's `Hnorm`'s `wr_fail_why` conjunct) -/
+  why : ok = false → wrFailWhy PI (src + BitVec.ofNat 64 tot) mm
 
 section
 variable [Fscfg]
@@ -133,6 +136,7 @@ theorem writei_exit_bmap {A : WiArgs} {src : BitVec 64} {W tot : Nat} {bmI : Blk
     distLe := Nat.zero_le _
     distFull := fun _ => rfl
     distKer := fun _ => rfl
+    why := fun h => absurd h (Nat.lt_irrefl 0)
     range := by
       intro k
       rw [writei_bmap_data bmI dataI data2 fbn lp.holes hfbnlt h.dep k]
@@ -344,6 +348,7 @@ theorem writei_exit_ok {A : WiArgs} {src : BitVec 64} {W tot : Nat} {bmI : Blkma
     distLe := Nat.zero_le _
     distFull := fun _ => rfl
     distKer := fun _ => rfl
+    why := fun h => absurd h (Nat.lt_irrefl 0)
     range := by
       intro k
       have hr := writei_range_step A.data data2 A.off tot fbn o c wroteI (by omega) hlen hdm
@@ -420,6 +425,7 @@ theorem writei_exit_fail {A : WiArgs} {src : BitVec 64} {W tot : Nat} {bmI : Blk
     distLe := by omega
     distFull := fun ht => absurd ht (by have := lp.totlt; omega)
     distKer := fun hk => absurd (hk.symm.trans hu) (by decide)
+    why := fun _ => wrFailWhy_shift A.V.upt src (by omega) (wrFailWhy_entry lp.ext.1 (hch.why rfl))
     range := by
       intro k
       have hr := writei_range_fail A.data data2 A.off tot fbn o c wroteI (by omega) hlen hdm

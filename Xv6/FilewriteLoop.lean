@@ -128,7 +128,7 @@ def fwrHead (Γ : SchedNames) (k : KCtx) (A : FwrA) (Q : Nat → IProp GF) (t p 
     (k.regs 20#5) (k.regs 21#5) (k.regs 22#5) (k.regs 23#5) (k.regs 24#5) (k.regs 25#5) v11 ∗
   fwrEnv (hlc := hlc) Γ A ∗ fileRef A.γ A.fk A.q A.st ∗
   procPrivExt (procAddr A.j) A.pid A.V P A.img ∗ bslots 3 ∗
-  fwrRaw (hlc := hlc) (fsGammaL fscFs) A.i A.γo A.n A.img (k.regs 11#5) Q t p 0 ∗
+  fwrRaw (hlc := hlc) (fsGammaL fscFs) A.i A.γo A.V.upt A.n A.img (k.regs 11#5) Q t p 0 ∗
   fwrK (hlc := hlc) k A.γul A.γuu A.γ A.fk A.q A.st A.j A.pid A.V A.M A.n Q
 
 /-- **THE LOOP INVARIANT** at the bottom test `+0xd4`, over the fuel. -/
@@ -159,10 +159,10 @@ theorem fwr_tests (Γ : SchedNames) (k : KCtx) (A : FwrA) (hA : FwrFacts k A) (Q
       (k.regs 20#5) (k.regs 21#5) (k.regs 22#5) (k.regs 23#5) (k.regs 24#5) (k.regs 25#5) v11 ∗
     fwrEnv (hlc := hlc) Γ A ∗ fileRef A.γ A.fk A.q A.st ∗
     procPrivExt (procAddr A.j) A.pid A.V P A.img ∗ bslots 3 ∗
-    ((⌜tot = c⌝ ∗ fwrRaw (hlc := hlc) (fsGammaL fscFs) A.i A.γo A.n A.img (k.regs 11#5) Q (t + c)
+    ((⌜tot = c⌝ ∗ fwrRaw (hlc := hlc) (fsGammaL fscFs) A.i A.γo A.V.upt A.n A.img (k.regs 11#5) Q (t + c)
         (p + 1) 0) ∨
      (⌜tot < c⌝ ∗ ∃ x : Nat, ⌜x ≤ 1⌝ ∗
-        fwrRaw (hlc := hlc) (fsGammaL fscFs) A.i A.γo A.n A.img (k.regs 11#5) Q t p x)) ∗
+        fwrRaw (hlc := hlc) (fsGammaL fscFs) A.i A.γo A.V.upt A.n A.img (k.regs 11#5) Q t p x)) ∗
     fwrK (hlc := hlc) k A.γul A.γuu A.γ A.fk A.q A.st A.j A.pid A.V A.M A.n Q
     ⊢ wpLoop (GF := GF) cpu := by
   have hn := hA.hn
@@ -385,16 +385,21 @@ theorem fwr_iter (BO : BEGIN_OP) (IL : ILOCK) (WI : WRITEI) (IU : IUNLOCK) (EO :
   have hPP : P.extSz A.V.sz P' := hout.ext
   have hchunk := fwr_bytes A.V.upt P P' A.M (k.regs 11#5) t tot wrote hext.1 (hout.usr rfl)
     (by omega)
+  -- THE SHORT REASON (Rocq lane WRITE-RELAY-2): writei's, at the chunk's
+  -- table and base, moved to the whole request at the writer's entry table
+  have hwhy : 0 < dist → wrFailWhy A.V.upt (k.regs 11#5) A.n.toNat := fun h =>
+    wrFailWhy_shift A.V.upt (k.regs 11#5) (b := t) (c := fwrChunk A.n.toNat t) (by omega)
+      (wrFailWhy_entry hext.1 (by rw [BitVec.add_comm]; exact hout.why h))
   -- the lock-held ghost steps after writei: THE FIRE, the checkin, the re-park
   iapply wpLoop_fupd
   icases kctx_token_acc _ _ $$ Hk with ⟨Hrun, Hkb⟩
-  ihave Hst : fwrRaw (hlc := hlc) (fsGammaL fscFs) inum.toNat A.γo A.n A.img (k.regs 11#5) Q t p 0
+  ihave Hst : fwrRaw (hlc := hlc) (fsGammaL fscFs) inum.toNat A.γo A.V.upt A.n A.img (k.regs 11#5) Q t p 0
     $$ [Hst]
   · rw [← hi]; iexact Hst
-  imod fwr_post_ghost cpu ik A.fk A.q γb C m T0 Tr inum A.γo A.n A.img (k.regs 11#5) Q t p
+  imod fwr_post_ghost cpu ik A.fk A.q γb C m T0 Tr inum A.γo A.V.upt A.n A.img (k.regs 11#5) Q t p
     (fwrChunk A.n.toNat t) dn dn' dn0' bm bm' data data' v tot dist wrote dstb a0 hip hik hq htn htie
     hcpos htyF hty' hnl' hok.2.2.2.2.2.1 hout.holes hok.2.2.2.2.1 hcap htotc hout.distLe
-    hout.distFull hout.range harms hchunk hok' hrl' hnd' hdn0
+    hout.distFull hwhy hout.range harms hchunk hok' hrl' hnd' hdn0
     $$ [Hrun Htop Hgv Hst Hcell Hout Hdi Hmeta Hmap Hblk] with ⟨Hrun, Hoffd, Hrows, Hload, Hst⟩
   · iframe Hrun Htop Hgv Hst Hcell Hout Hdi Hmeta Hmap Hblk
     iframe #
@@ -428,10 +433,10 @@ theorem fwr_iter (BO : BEGIN_OP) (IL : ILOCK) (WI : WRITEI) (IU : IUNLOCK) (EO :
   ihave Hpay := Hback $$ Hshr Hoffd
   ihave Href := filerw_ref_close A.γ A.fk A.q A.st C $$ [Htok Hfields Hpay]
   · iframe
-  ihave Hst : ((⌜tot = fwrChunk A.n.toNat t⌝ ∗ fwrRaw (hlc := hlc) (fsGammaL fscFs) A.i A.γo A.n A.img
+  ihave Hst : ((⌜tot = fwrChunk A.n.toNat t⌝ ∗ fwrRaw (hlc := hlc) (fsGammaL fscFs) A.i A.γo A.V.upt A.n A.img
         (k.regs 11#5) Q (t + fwrChunk A.n.toNat t) (p + 1) 0) ∨
       (⌜tot < fwrChunk A.n.toNat t⌝ ∗ ∃ x : Nat, ⌜x ≤ 1⌝ ∗
-        fwrRaw (hlc := hlc) (fsGammaL fscFs) A.i A.γo A.n A.img (k.regs 11#5) Q t p x)) $$ [Hst]
+        fwrRaw (hlc := hlc) (fsGammaL fscFs) A.i A.γo A.V.upt A.n A.img (k.regs 11#5) Q t p x)) $$ [Hst]
   · rw [hi]; iexact Hst
   -- +0xc8 .. : the tests
   have ha0 : (a0 = -1#64 ∧ tot = 0) ∨ a0 = BitVec.ofNat 64 tot := by

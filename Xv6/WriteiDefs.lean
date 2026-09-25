@@ -202,6 +202,7 @@ structure WiSizeOk [Fscfg] (A : WiArgs) (src : BitVec 64) (tot : Nat) (bm' : Blk
   distLe : dist ≤ BSIZE
   distFull : tot = A.n → dist = 0
   distKer : A.user = false → dist = 0
+  why : 0 < dist → wrFailWhy A.V.upt src A.n
   range : ∀ k, fileByte data' k =
     if A.off ≤ k ∧ k < A.off + tot then wrote (k - A.off)
     else if A.off + tot ≤ k ∧ k < A.off + tot + dist then dstb (k - (A.off + tot))
@@ -362,8 +363,9 @@ theorem writei_either_copyin (EC : EITHER_COPYIN) (c : CPU) (k' : KCtx) (γl : G
         (∃ (P' : UPtd) (bs' : List (BitVec 8)),
           ⌜P.extSz V.sz P' ∧
             ((R' 10#5 = 0#64 ∧ bs' = umemRead (viewFaulted P P' M) (k'.regs 12#5).toNat old.length) ∨
-             (R' 10#5 = -1#64 ∧ ∃ d, d ≤ old.length ∧
-                bs' = umemRead (viewFaulted P P' M) (k'.regs 12#5).toNat d ++ old.drop d))⌝ ∗
+             (R' 10#5 = -1#64 ∧ (∃ d, d ≤ old.length ∧
+                bs' = umemRead (viewFaulted P P' M) (k'.regs 12#5).toNat d ++ old.drop d) ∧
+              ∃ e, e < old.length ∧ ¬ uvaRmapped P (k'.regs 12#5 + BitVec.ofNat 64 e).toNat))⌝ ∗
           procPrivExt (procAddr j) pid V P' (viewFaulted P P' M) ∗
           byteBuf (k'.regs 10#5) (DFrac.own 1) bs')
        else ⌜R' 10#5 = 0#64⌝ ∗ byteBuf (k'.regs 12#5) dqs bs ∗
@@ -374,21 +376,7 @@ theorem writei_either_copyin (EC : EITHER_COPYIN) (c : CPU) (k' : KCtx) (γl : G
     bs old hj hproc hnoff hK hlk huser hlen hlen' hbs
   unfold wp_either_copyin_body at h
   simp only [eitherCopyinAddr] at h
-  -- writei's inode arm does not relay the failure's reason (yet): drop it
-  iintro ⟨Hk, Hpc, #Hl, Ha, Hd, Hs, HΦ⟩
-  iapply h
-  iframe Hk Hpc Hl Ha Hd Hs
-  iapply wpNext_mono _ _ _ _ _ $$ HΦ
-  iintro %cpu' HK %spie %spp %R' %hsp Hk Hpc Hpost %hcs
-  iapply HK $$ %spie %spp %R' %hsp Hk Hpc [Hpost] %hcs
-  cases user
-  · simp only [Bool.false_eq_true, if_false]; iexact Hpost
-  · simp only [if_true]
-    icases Hpost with ⟨%P', %bs', %hp, Hpriv, Hb⟩
-    iexists P', bs'
-    iframe Hpriv Hb
-    ipureintro
-    exact ⟨hp.1, hp.2.imp id (fun h => ⟨h.1, h.2.1⟩)⟩
+  exact h
 
 end
 

@@ -46,21 +46,22 @@ section FilewriteChain
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [FsTopG GF] [OffboxG GF] [Appcfg GF]
 
 /-- THE LOOP'S CARRIED COMMIT STATE (Rocq `fw_au_raw`). -/
-def fwrRaw (Γ : FsViewNames GF) (i : Nat) (γo : GName) (n : Int) (M : Nat → List (BitVec 8))
+def fwrRaw (Γ : FsViewNames GF) (i : Nat) (γo : GName) (P : UPtd) (n : Int) (M : Nat → List (BitVec 8))
     (ua : BitVec 64) (Q : Nat → IProp GF) (t p x : Nat) : IProp GF :=
   iprop(∃ bss : List (List (BitVec 8)),
     ⌜bss.length = p⌝ ∗ ⌜bss.flatten.length = t⌝ ∗ ⌜p + x ≤ wchunks n⌝ ∗ ⌜x ≤ 1⌝ ∗
     -- THE CONTENT HALF (RULING A): what has been spliced so far IS the
     -- caller's own run at `ua`
     ⌜ubytesAt M ua bss.flatten⌝ ∗
-    awriteChain (hlc := hlc) Γ appE i γo M ua Q (p + x) (wchunks n - p - x))
+    awriteChainAt (hlc := hlc) Γ appE i γo M ua P n Q (p + x) (wchunks n - p - x))
 
 /-- Rocq `fw_au_raw_init`. -/
-theorem fwrRaw_init (Γ : FsViewNames GF) (i : Nat) (γo : GName) (n : Int)
+theorem fwrRaw_init (Γ : FsViewNames GF) (i : Nat) (γo : GName) (P : UPtd) (n : Int)
     (M : Nat → List (BitVec 8)) (ua : BitVec 64) (Q : Nat → IProp GF) :
-    awriteChain (hlc := hlc) Γ appE i γo M ua Q 0 (wchunks n) ⊢ fwrRaw Γ i γo n M ua Q 0 0 0 := by
+    awriteChain (hlc := hlc) Γ appE i γo M ua n Q 0 (wchunks n) ⊢ fwrRaw Γ i γo P n M ua Q 0 0 0 := by
   unfold fwrRaw
   iintro Hc
+  ihave Hc := awriteChainAt_of Γ appE i γo M ua n Q 0 (wchunks n) P $$ Hc
   iexists []
   isplitr
   · ipureintro; rfl
@@ -79,20 +80,20 @@ FULL arm comes out at the index the chain handed it out at (its
 continuation IS the rest of the chain), and the closer takes that rest back
 with the chunk's bytes.  The chain's own `Q p` conjunct is DROPPED -- the
 kernel eliminates to an arm when it fires. -/
-theorem fwrRaw_take (Γ : FsViewNames GF) (i : Nat) (γo : GName) (n : Int)
+theorem fwrRaw_take (Γ : FsViewNames GF) (i : Nat) (γo : GName) (P : UPtd) (n : Int)
     (M : Nat → List (BitVec 8)) (ua : BitVec 64) (Q : Nat → IProp GF) (t p : Nat)
     (htn : (t : Int) < n) (htie : (t : Int) = FW_MAX * p) :
-    fwrRaw (hlc := hlc) Γ i γo n M ua Q t p 0 ⊢
-      awriteFullAt Γ appE i γo M ua p (awriteChain Γ appE i γo M ua Q (p + 1) (wchunks n - (p + 1))) ∗
+    fwrRaw (hlc := hlc) Γ i γo P n M ua Q t p 0 ⊢
+      awriteFullAt Γ appE i γo M ua p (awriteChainAt Γ appE i γo M ua P n Q (p + 1) (wchunks n - (p + 1))) ∗
       (∀ bs : List (BitVec 8),
         ⌜ubytesAt M (ua + BitVec.ofNat 64 t) bs⌝ -∗
-        awriteChain Γ appE i γo M ua Q (p + 1) (wchunks n - (p + 1)) -∗
-        fwrRaw Γ i γo n M ua Q (t + bs.length) (p + 1) 0) := by
+        awriteChainAt Γ appE i γo M ua P n Q (p + 1) (wchunks n - (p + 1)) -∗
+        fwrRaw Γ i γo P n M ua Q (t + bs.length) (p + 1) 0) := by
   have hsp := wriCount_step n t p (by omega) htn htie
   unfold fwrRaw
   iintro ⟨%bss, %hlen, %htot, %hp, %hx, %hby, Hcm⟩
   have hcnt : wchunks n - p - 0 = (wchunks n - (p + 1)) + 1 := by omega
-  rw [hcnt, Nat.add_zero, awriteChain_S]
+  rw [hcnt, Nat.add_zero, awriteChainAt_S]
   icases Hcm with ⟨-, Hhead, -⟩
   iframe Hhead
   iintro %bs %hbyc Htail
@@ -115,18 +116,18 @@ theorem fwrRaw_take (Γ : FsViewNames GF) (i : Nat) (γo : GName) (n : Int)
 /-- ONE SHORT CHUNK'S INSTANT (Rocq `fw_au_raw_spend_part`): the head
 node's PARTIAL arm comes out, and the closer takes the rest of the chain
 back one node further on. -/
-theorem fwrRaw_spendPart (Γ : FsViewNames GF) (i : Nat) (γo : GName) (n : Int)
+theorem fwrRaw_spendPart (Γ : FsViewNames GF) (i : Nat) (γo : GName) (P : UPtd) (n : Int)
     (M : Nat → List (BitVec 8)) (ua : BitVec 64) (Q : Nat → IProp GF) (t p : Nat)
     (htn : (t : Int) < n) (htie : (t : Int) = FW_MAX * p) :
-    fwrRaw (hlc := hlc) Γ i γo n M ua Q t p 0 ⊢
-      awritePartAt Γ appE i γo M ua p (awriteChain Γ appE i γo M ua Q (p + 1) (wchunks n - (p + 1))) ∗
-      (awriteChain Γ appE i γo M ua Q (p + 1) (wchunks n - (p + 1)) -∗
-        fwrRaw Γ i γo n M ua Q t p 1) := by
+    fwrRaw (hlc := hlc) Γ i γo P n M ua Q t p 0 ⊢
+      awritePartAt Γ appE i γo M ua P n p (awriteChainAt Γ appE i γo M ua P n Q (p + 1) (wchunks n - (p + 1))) ∗
+      (awriteChainAt Γ appE i γo M ua P n Q (p + 1) (wchunks n - (p + 1)) -∗
+        fwrRaw Γ i γo P n M ua Q t p 1) := by
   have hsp := wriCount_step n t p (by omega) htn htie
   unfold fwrRaw
   iintro ⟨%bss, %hlen, %htot, %hp, %hx, %hby, Hcm⟩
   have hcnt : wchunks n - p - 0 = (wchunks n - (p + 1)) + 1 := by omega
-  rw [hcnt, Nat.add_zero, awriteChain_S]
+  rw [hcnt, Nat.add_zero, awriteChainAt_S]
   icases Hcm with ⟨-, -, Hpart⟩
   iframe Hpart
   iintro Htail
@@ -146,10 +147,10 @@ theorem fwrRaw_spendPart (Γ : FsViewNames GF) (i : Nat) (γo : GName) (n : Int)
   iexact Htail
 
 /-- THE OK EXIT (Rocq `fw_au_raw_ok`). -/
-theorem fwrRaw_ok (Γ : FsViewNames GF) (i : Nat) (γo : GName) (n : Int)
+theorem fwrRaw_ok (Γ : FsViewNames GF) (i : Nat) (γo : GName) (P : UPtd) (n : Int)
     (M : Nat → List (BitVec 8)) (ua : BitVec 64) (Q : Nat → IProp GF) (t p : Nat)
     (hn : (t : Int) = n) :
-    fwrRaw (hlc := hlc) Γ i γo n M ua Q t p 0 ⊢ writePostOkAt (hlc := hlc) Γ i γo n M ua Q := by
+    fwrRaw (hlc := hlc) Γ i γo P n M ua Q t p 0 ⊢ writePostOkAt (hlc := hlc) Γ i γo P n M ua Q := by
   unfold fwrRaw writePostOkAt
   iintro ⟨%bss, %hlen, %htot, %hp, %hx, %hby, Hcm⟩
   iexists bss
@@ -165,10 +166,10 @@ theorem fwrRaw_ok (Γ : FsViewNames GF) (i : Nat) (γo : GName) (n : Int)
 /-- THE FAIL EXIT, AT BOTH OF ITS TWO SHAPES (Rocq `fw_au_raw_fail`): the
 loop's own short-write break (`t < n`), and the never-entered loop at
 `n < 0` (`p = 0`). -/
-theorem fwrRaw_fail (Γ : FsViewNames GF) (i : Nat) (γo : GName) (n : Int)
+theorem fwrRaw_fail (Γ : FsViewNames GF) (i : Nat) (γo : GName) (P : UPtd) (n : Int)
     (M : Nat → List (BitVec 8)) (ua : BitVec 64) (Q : Nat → IProp GF) (t p x : Nat)
     (hex : (t : Int) < n ∨ (n < 0 ∧ p = 0)) :
-    fwrRaw (hlc := hlc) Γ i γo n M ua Q t p x ⊢ writePostFailAt (hlc := hlc) Γ i γo n M ua Q := by
+    fwrRaw (hlc := hlc) Γ i γo P n M ua Q t p x ⊢ writePostFailAt (hlc := hlc) Γ i γo P n M ua Q := by
   unfold fwrRaw writePostFailAt
   iintro ⟨%bss, %hlen, %htot, %hp, %hx, %hby, Hcm⟩
   iexists bss, x

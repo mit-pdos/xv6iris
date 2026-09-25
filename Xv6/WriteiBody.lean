@@ -446,9 +446,11 @@ theorem writei_copy_norm (A : WiArgs) (src : BitVec 64) (tot mm : Nat) (PI : UPt
           ⌜PI.extSz A.V.sz P' ∧
             ((r = 0#64 ∧ bs' = umemRead (viewFaulted PI P' (viewFaulted A.V.upt PI A.M))
                 (src + BitVec.ofNat 64 tot).toNat old.length) ∨
-             (r = 0xFFFFFFFFFFFFFFFF#64 ∧ ∃ d, d ≤ old.length ∧
+             (r = 0xFFFFFFFFFFFFFFFF#64 ∧ (∃ d, d ≤ old.length ∧
                 bs' = umemRead (viewFaulted PI P' (viewFaulted A.V.upt PI A.M))
-                  (src + BitVec.ofNat 64 tot).toNat d ++ old.drop d))⌝ ∗
+                  (src + BitVec.ofNat 64 tot).toNat d ++ old.drop d) ∧
+              ∃ e, e < old.length ∧
+                ¬ uvaRmapped PI (src + (BitVec.ofNat 64 tot + BitVec.ofNat 64 e)).toNat))⌝ ∗
           procPrivExt (procAddr A.j) A.pidv A.V P' (viewFaulted PI P' (viewFaulted A.V.upt PI A.M)) ∗
           byteBuf dst (DFrac.own 1) bs')
        else ⌜r = 0#64⌝ ∗ byteBuf (src + BitVec.ofNat 64 tot) A.dqs ((A.sbs.drop tot).take mm) ∗
@@ -469,7 +471,7 @@ theorem writei_copy_norm (A : WiArgs) (src : BitVec 64) (tot mm : Nat) (PI : UPt
     isplitl []
     · ipureintro
       refine ⟨⟨hcl, UMemL.extSz_refl _ _, fun _ => ⟨rfl, rfl⟩, fun h => absurd (hu.symm.trans h)
-        (by decide), fun h => absurd h (by decide)⟩, fun _ => hr,
+        (by decide), fun h => absurd h (by decide), fun h => absurd h (by decide)⟩, fun _ => hr,
         fun h => absurd h (by decide)⟩
     · have hl' : A.sbs = A.sbs.take tot ++ ((A.sbs.drop tot).take mm ++ A.sbs.drop (tot + mm)) := by
         rw [← List.drop_drop, List.take_append_drop, List.take_append_drop]
@@ -482,13 +484,14 @@ theorem writei_copy_norm (A : WiArgs) (src : BitVec 64) (tot mm : Nat) (PI : UPt
     iintro ⟨⟨%P', %bs', ⟨%hx, %hpost⟩, Hpriv, Hd⟩, -⟩
     have e := UMemL.viewFaulted_trans A.M hext.1 hx.1
     rw [e] at hpost
-    rcases hpost with ⟨hr, hbs⟩ | ⟨hr, dd, hdd, hbs⟩
+    rcases hpost with ⟨hr, hbs⟩ | ⟨hr, ⟨dd, hdd, hbs⟩, hwhy⟩
     · iexists P', bs', true
       rw [← e]
       iframe Hpriv Hd
       ipureintro
       refine ⟨⟨by rw [hbs, UMemL.umemRead_length, hold], hx, fun h => absurd (hu.symm.trans h)
-        (by decide), fun _ _ => by rw [hbs, hold], fun _ => hu⟩, fun _ => hr,
+        (by decide), fun _ _ => by rw [hbs, hold], fun _ => hu, fun h => absurd h (by decide)⟩,
+        fun _ => hr,
         fun h => absurd h (by decide)⟩
     · iexists P', bs', false
       rw [← e]
@@ -496,7 +499,10 @@ theorem writei_copy_norm (A : WiArgs) (src : BitVec 64) (tot mm : Nat) (PI : UPt
       ipureintro
       refine ⟨⟨by rw [hbs, List.length_append, UMemL.umemRead_length, List.length_drop]; omega,
         hx, fun h => absurd (hu.symm.trans h) (by decide), fun _ h => absurd h (by decide),
-        fun _ => hu⟩, fun h => absurd h (by decide), fun _ => hr⟩
+        fun _ => hu, fun _ => by
+          obtain ⟨e, he, hn⟩ := hwhy
+          exact ⟨e, by rw [← hold]; exact he, by rwa [BitVec.add_assoc]⟩⟩, fun h => absurd h (by decide),
+        fun _ => hr⟩
 
 theorem writei_dst (kk o : Nat) :
     bnode kk + (88#64 + BitVec.ofNat 64 o) = aBufData (bnode kk) + BitVec.ofNat 64 o := by

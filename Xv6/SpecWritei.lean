@@ -36,7 +36,9 @@ five conditionally-saved registers.
   of `dist ≤ BSIZE` bytes `dstb` follows it (the chunk a part-way failed
   `either_copyin` left, which writei now COMMITS -- kernel defect D1's fix),
   and every other byte is unchanged.  `dist = 0` when `tot = n`, and on the
-  KERNEL arm outright (`either_copyin`'s kernel post is a bare `r = 0`).
+  KERNEL arm outright (`either_copyin`'s kernel post is a bare `r = 0`);
+  and a nonempty region CARRIES ITS REASON (`why`, Rocq lane WRITE-RELAY-2:
+  `SysWriteDefs.wrFailWhy` at the entry descriptor).
 * THE CONTENT: on the kernel arm `wrote i` is the caller's source byte; on
   the user arm it is the process's byte at `src + i` (deviation 5).
 * HOLES READ AS ZEROS (`Xv6.blkHolesZero`), threaded in and back out.
@@ -147,6 +149,7 @@ import Xv6.SpecLogWrite
 import Xv6.SpecBmap
 import Xv6.SpecIupdate
 import Xv6.SpecEitherCopyin
+import Xv6.SysWriteDefs
 
 namespace Xv6
 
@@ -281,6 +284,14 @@ structure WriteiOut (cov : ExtTreeSet Nat compare) (logst bmapstart : Nat)
   distFull : tot = n → dist = 0
   /-- ...and empty outright on the KERNEL arm -/
   distKer : user = false → dist = 0
+  /-- ...AND WHEN IT IS NOT EMPTY IT CARRIES ITS REASON (Rocq lane
+  WRITE-RELAY-2, RELAY 4; `SysWriteDefs.wrFailWhy`): a disturbed tail exists
+  only where `either_copyin` gave up part-way on the USER arm, and its
+  contract names a byte of the SOURCE run the process's table does not map
+  for reading -- relayed at the ENTRY descriptor `V.upt`, the weaker and
+  usable form.  A caller whose source run is readable-mapped refutes it
+  (`wrFailWhy_refute`): then nothing unnamed reached the file. -/
+  why : 0 < dist → wrFailWhy V.upt src n
   /-- THE RANGE CLAUSE -/
   range : ∀ k, fileByte data' k =
     if off ≤ k ∧ k < off + tot then wrote (k - off)

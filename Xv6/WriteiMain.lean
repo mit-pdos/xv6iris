@@ -52,6 +52,7 @@ theorem writei_out_m1 (A : WiArgs) (k : KCtx) (hA : WiFactsEb k A) (src a0 : Bit
   distLe := Nat.zero_le _
   distFull := fun _ => rfl
   distKer := fun _ => rfl
+  why := fun h => absurd h (Nat.lt_irrefl 0)
   range := fun k => by
     rw [if_neg (by omega), if_neg (by omega)]
   ker := fun _ i hi => absurd hi (by omega)
@@ -107,6 +108,7 @@ theorem writei_zero_ok (A : WiArgs) (k : KCtx) (hA : WiFactsEb k A) (hn : A.n = 
     distLe := Nat.zero_le _
     distFull := fun _ => rfl
     distKer := fun _ => rfl
+    why := fun h => absurd h (Nat.lt_irrefl 0)
     range := fun k => by rw [if_neg (by omega), if_neg (by omega)]
     ker := fun _ i hi => absurd hi (by omega)
     usr := fun _ => writei_usr_zero _ _ _ _ _
