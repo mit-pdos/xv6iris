@@ -55,7 +55,14 @@ ruling); FRONTIER print of the decider at C9e; (S3) corner (B) now also
 appears at TWO stages (`cat f | cat`: a cat producer's write error beside
 a printed prefix) -- an honest limit, demo it; (S4) `adm_u` admitting
 only `fname_f` is an input restriction forced by the file model's
-one-name scope -- OWNER RULING needed; (S5) C9d depends on C9e's link
+one-name scope -- RULED (owner, 2026-09-24): WIDEN the file model beyond
+the one name `f`: 'i'd be OK with allowing some set of files, like
+*.txt, if that makes the reasoning simpler.  otherwise, if it's possible
+to cat /sh, then the transcript spec has to say precisely what bytes
+will be dumped out from /sh.  that seems not terribly interesting to
+specify.'  So: a class of user files (e.g. names ending in `.txt`),
+created and read by the user's lines, and NOT the image's binaries (design
+of the widening in progress; see below); (S5) C9d depends on C9e's link
 record: state it over abstract link projections; only the producer `cat
 f` needs a merged registry; (S6) C9f is larger (UShRound's ties call the
 file model directly; PipesFire needs PrCatF); (S7) `pwc_blkN` also
