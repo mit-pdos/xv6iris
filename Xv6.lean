@@ -985,3 +985,11 @@ import Xv6.KexecCParts
 import Xv6.KexecCSetup
 import Xv6.KexecCArgv
 import Xv6.KexecC
+import Xv6.SysOpenShared
+import Xv6.SysOpenJoin
+import Xv6.SysOpenWalkCalls
+import Xv6.SysOpenWalk
+import Xv6.SysOpenPlainA
+import Xv6.SysOpenPlain
+import Xv6.SysOpenCreArm
+import Xv6.SysOpenEntryC

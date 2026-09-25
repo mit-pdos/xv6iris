@@ -969,6 +969,12 @@ abbrev sysOpenM2 (A : SysOpenArgs GF) (P2 : UPtd) : Nat → List (BitVec 8) :=
 /-- `omode` as argint stored it. -/
 abbrev sysOpenOm (A : SysOpenArgs GF) : BitVec 32 := BitVec.extractLsb' 0 32 A.vom
 
+/-- THE IMAGE THE PATH IS READ AT (Rocq's `us_M U` at entry): the entry view
+with every lazy page read as zeros (`UMemLazy.viewLazy`), which is where
+argstr reads its string.  `A.M` itself when the block has no lazy page
+(`UMemL.viewLazy_of_lazyFree`). -/
+abbrev sysOpenIm (A : SysOpenArgs GF) : Nat → List (BitVec 8) := viewLazy A.V.upt A.V.sz A.M
+
 section Vocab
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
@@ -990,16 +996,16 @@ instance sysOpenEnv_persistent (Γ : SchedNames) (A : SysOpenArgs GF) :
 `openArmsPlain`; deviation 3). -/
 abbrev sysOpenPostP (k : KCtx) (A : SysOpenArgs GF) (c : CPU) : IProp GF :=
   sysOpenK (hlc := hlc) k A.ns A.V A.M
-    (openArmsPlain (hlc := hlc) (fsGammaL fscFs) fscFs A.V.cwi A.γ (procAddr A.j) A.pid A.M
-      A.v.toNat A.vom A.P A.Pmiss A.Fo A.Ft A.sts) c
+    (openArmsPlain (hlc := hlc) (fsGammaL fscFs) fscFs A.V.cwi A.γ (procAddr A.j) A.pid
+      (sysOpenIm A) A.v.toNat A.vom A.P A.Pmiss A.Fo A.Ft A.sts) c
 
 /-- ...and at the CREATE arms (Rocq's `so_cont0_au_create`). -/
 abbrev sysOpenPostC (k : KCtx) (A : SysOpenArgs GF)
     (Farm Fun : Pfam GF (Aview → Nat → IProp GF))
     (Fok Fex : Pfam GF (Aview → Nat → Fname → Nat → IProp GF)) (c : CPU) : IProp GF :=
   sysOpenK (hlc := hlc) k A.ns A.V A.M
-    (openArmsCreate (hlc := hlc) (fsGammaL fscFs) fscFs A.V.cwi A.γ (procAddr A.j) A.pid A.M
-      A.v.toNat A.vom A.P A.Pmiss Farm Fun Fok Fex A.Fo A.Ft A.sts) c
+    (openArmsCreate (hlc := hlc) (fsGammaL fscFs) fscFs A.V.cwi A.γ (procAddr A.j) A.pid
+      (sysOpenIm A) A.v.toNat A.vom A.P A.Pmiss Farm Fun Fok Fex A.Fo A.Ft A.sts) c
 
 /-- The contract's `wpNext` continuation, HART-FREE (a `true` crossing at a
 process pins nothing; `CreateSharedBody.create_post_pin`). -/
@@ -1149,7 +1155,7 @@ def sysOpenOffCell (kf : Nat) (C : FContent) (γo : GName) : IProp GF :=
 at the path the caller passed. -/
 def sysOpenResidue (A : SysOpenArgs GF) (pl : List (BitVec 8)) (inum : BitVec 32) (dn : Dinode)
     (bm : Blkmap) (data : Nat → List (BitVec 8)) : IProp GF :=
-  iprop(⌜argPathOf A.M A.v.toNat pl⌝ ∗ A.P (pathElems pl).length inum.toNat ∗
+  iprop(⌜argPathOf (sysOpenIm A) A.v.toNat pl⌝ ∗ A.P (pathElems pl).length inum.toNat ∗
     sysOpenObs A.Fo inum.toNat (eraNode dn bm data) ∗
     openTruncPiece (hlc := hlc) (fsGammaL fscFs) A.vom A.Ft)
 
@@ -1158,10 +1164,9 @@ end Vocab
 /-! ## §3b.  THE ONE argstr CALL SITE
 
 sys_open goes through ONE argstr wrapper (the coordinator's ruling, Sept
-25): argstr's success arm is being restated to Rocq's form (a
-`umMapped`-style conjunct, so the path is read at `argPathOf M` rather than
-at the faulted view), and the switch is then an edit HERE.  Today it relays
-the landed post verbatim (`SpecSysOpen` deviation 10). -/
+25).  argstr's success arm now reads the string at Rocq's single image
+`viewLazy V.upt V.sz M` (`UMemLazy`), which is the contract's reading
+(`sysOpenIm`; `SpecSysOpen` deviation 10). -/
 
 section Argstr
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
@@ -1446,7 +1451,7 @@ def sysOpenPubBody (Γ : SchedNames) (k : KCtx) (A : SysOpenArgs GF) : IProp GF 
     (∀ r : BitVec 64,
       openFdOk A.γ (procAddr A.j) A.pid (sysOpenV2 A P2) (sysOpenM2 A P2)
         (omReadable A.vom) (omWritable A.vom) t A.sts r -∗
-      openPostOkPlain (hlc := hlc) (fsGammaL fscFs) A.γ (procAddr A.j) A.pid A.M A.v.toNat A.vom
+      openPostOkPlain (hlc := hlc) (fsGammaL fscFs) A.γ (procAddr A.j) A.pid (sysOpenIm A) A.v.toNat A.vom
         A.P A.Fo A.Ft A.sts (sysOpenV2 A P2) (sysOpenM2 A P2) r) -∗
     (∀ c' : CPU, sysOpenPostP (hlc := hlc) k A c') -∗
     wpLoop c)
@@ -1556,14 +1561,14 @@ OBSERVATION FIRED (`FsAbsOpenFire.opfOpen_fire_1`) off the peeled payload,
 the T_DIR test (-> the join at +0x4a) and the O_RDONLY test (-> the alloc
 block at +0x5e, or ARM C-FAIL).  s1 is free (its entry value is in slot 3,
 saved at +0x28); the path buffer is argstr's, NUL-terminated at `plen`, and
-it IS the caller's argument 0 (`argPathOf A.M`; `SpecSysOpen` deviation
-10). -/
+it IS the caller's argument 0 (`argPathOf (sysOpenIm A)`, Rocq's reading at
+the entry image; `SpecSysOpen` deviation 10). -/
 def sysOpenEntryNBody (Γ : SchedNames) (k : KCtx) (A : SysOpenArgs GF) : IProp GF :=
   iprop(∀ (c : CPU) (spie spp : Bool) (R : RegMap) (s1v w4 w5 w6 : BitVec 64) (lo : BitVec 32)
       (w24 : BitVec 64) (P2 : UPtd) (plen : Nat) (bp : Nat → BitVec 8) (Sb : List Nat),
     ⌜A.V.upt.extSz A.V.sz P2⌝ -∗
     ⌜(∀ i, i < plen → bp i ≠ 0#8) ∧ bp plen = 0#8 ∧ plen < 128 ∧
-      argPathOf A.M A.v.toNat (bview plen bp)⌝ -∗
+      argPathOf (sysOpenIm A) A.v.toNat (bview plen bp)⌝ -∗
     ⌜sysOpenPins k R s1v (k.regs 18#5) (k.regs 19#5)⌝ -∗
     ⌜(sysOpenPath (k.regs 2#5)).toNat % 8 = 0⌝ -∗
     kctx c (((k.withSpie spie spp).pushed 24).withRegs R) -∗ pcIs c (sysOpenAddr + 0xdc#64) -∗
@@ -1591,7 +1596,7 @@ def sysOpenEntryCBody (Γ : SchedNames) (k : KCtx) (A : SysOpenArgs GF)
       (w24 : BitVec 64) (P2 : UPtd) (plen : Nat) (bp : Nat → BitVec 8) (Sb : List Nat),
     ⌜A.V.upt.extSz A.V.sz P2⌝ -∗
     ⌜(∀ i, i < plen → bp i ≠ 0#8) ∧ bp plen = 0#8 ∧ plen < 128 ∧
-      argPathOf A.M A.v.toNat (bview plen bp)⌝ -∗
+      argPathOf (sysOpenIm A) A.v.toNat (bview plen bp)⌝ -∗
     ⌜sysOpenPins k R s1v (k.regs 18#5) (k.regs 19#5)⌝ -∗
     ⌜(sysOpenPath (k.regs 2#5)).toNat % 8 = 0⌝ -∗
     kctx c (((k.withSpie spie spp).pushed 24).withRegs R) -∗ pcIs c (sysOpenAddr + 0x38#64) -∗

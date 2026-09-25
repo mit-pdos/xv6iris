@@ -55,7 +55,8 @@ reaches this contract.
   the O_CREATE bit of the caller's own omode argument (the `andi a5,a5,512`
   / `c.beqz` pair).  On the `false` side `openAuPlainAt` / `openArmsPlain`;
   on the `true` side `openAuCreateAt` / `openArmsCreate`.
-* ...AND BOTH ARE AT THE PATH THE CALLER PASSED (`argPathOf M v.toNat pl`,
+* ...AND BOTH ARE AT THE PATH THE CALLER PASSED (`argPathOf (viewLazy V.upt
+  V.sz M) v.toNat pl`, deviation 10;
   sys_exec's guard): the success arms and the receipt bind `pl` with that
   reading; the failure fold carries the whole uninstantiated wand back on its
   first disjunct (argstr's own failure, where no `pl` satisfies the reading).
@@ -158,18 +159,16 @@ reaches this contract.
    `wp_sys_open_body` / `_plain_body` / `_create_body` →
    `wp_sys_open_eb_body` / `wp_sys_open_plain_eb_body` /
    `wp_sys_open_create_eb_body`, `SYSOPEN` kept (field `wp_sys_open_eb`).
-10. **THE PATH READING IS ROCQ'S SINGLE ONE -- INTERIM FOR THE PROOF.**
-   The contract is stated at Rocq's reading of argument 0 at the ENTRY
-   image, `argPathOf M v.toNat pl` (the input wand, the failure fold's
-   first disjunct, and every arm that ran the walk), as the coordinator
-   ruled (Sept 25).  The Lean argstr's success arm reads the string at the
-   FAULTED view (`viewFaulted V.upt P' M`, `SpecArgstr` / `fetchstrRet`) and
-   says nothing about which pages it touched, so the seal's step from that
-   reading to `argPathOf M` WAITS on the cleanup restating fetchstr/argstr's
-   success arm to Rocq's form (a `umMapped`-style conjunct).  sys_open goes
-   through ONE argstr call-site wrapper (`SysOpenParts.sys_open_argstr`), so
-   the switch is a one-place edit.  (`SpecSysMknod` deviation 5 states the
-   faulted-view form instead; the two will agree once argstr is restated.)
+10. **THE PATH READING IS ROCQ'S SINGLE ONE.**  The contract is stated at
+   Rocq's reading of argument 0 at the ENTRY image (the input wand, the
+   failure fold's first disjunct, and every arm that ran the walk).  Rocq's
+   image `us_M U` holds every lazy page as zeros; the Lean view `M` does
+   not, so the image is `viewLazy V.upt V.sz M` (`Xv6/UMemLazy.lean`; `M`
+   itself when the block has no lazy page, `UMemL.viewLazy_of_lazyFree`),
+   which is exactly where the restated argstr reads its string
+   (`SpecArgstr`).  So the reading is `argPathOf (viewLazy V.upt V.sz M)
+   v.toNat pl` (`SysOpenParts.sysOpenIm` at the stage record); the block
+   itself returns at the faulted view as before.
 
 ## Dropped/simplified vs Rocq
 
@@ -1065,7 +1064,8 @@ def wp_sys_open_frame (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ] (cpu : CPU)
 
 /-- **THE ONE BODY** (Rocq's `wp_sys_open_body`): the abstract state at the
 LIVE Γ `fsGammaL fscFs`, the walk starting at the block's own cwd inum, the
-image read at argument 0 (`v.toNat`), input and arms keyed on
+path read at argument 0 (`v.toNat`) in the lazy image `viewLazy V.upt V.sz M`
+(deviation 10), input and arms keyed on
 `omCreate vom`. -/
 def wp_sys_open_eb_body (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ] (cpu : CPU) (k : KCtx)
     (γl : GName) (γ : FileNames) (j : Nat) (ns : Nat) (v vom : BitVec 64) (pid : BitVec 32)
@@ -1079,10 +1079,10 @@ def wp_sys_open_eb_body (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ] (cpu : CP
     (hnoff : k.noff = 0) (hK : sysOpenSlots ≤ k.avail) (hns : sysOpenIrefs ≤ ns)
     (hv0 : V.tf[tfArgIdx 0]? = some v) (hv1 : V.tf[tfArgIdx 1]? = some vom) : Prop :=
   wp_sys_open_frame Γ cpu k γl γ j ns v vom pid V M sts
-    (openIn (hlc := hlc) (fsGammaL fscFs) fscFs V.cwi M v.toNat vom
+    (openIn (hlc := hlc) (fsGammaL fscFs) fscFs V.cwi (viewLazy V.upt V.sz M) v.toNat vom
       P Pmiss Farm Fun Fok Fex Fo Ft)
     (openArms (hlc := hlc) (fsGammaL fscFs) fscFs V.cwi γ (procAddr j) pid
-      M v.toNat vom
+      (viewLazy V.upt V.sz M) v.toNat vom
       P Pmiss Farm Fun Fok Fex Fo Ft sts)
     hj hproc htier hnoff hK hns hv0 hv1
 
@@ -1099,10 +1099,10 @@ def wp_sys_open_plain_eb_body (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ] (cp
     (hv0 : V.tf[tfArgIdx 0]? = some v) (hv1 : V.tf[tfArgIdx 1]? = some vom)
     (hc : omCreate vom = false) : Prop :=
   wp_sys_open_frame Γ cpu k γl γ j ns v vom pid V M sts
-    (openAuPlainAt (hlc := hlc) (fsGammaL fscFs) fscFs V.cwi M v.toNat vom
+    (openAuPlainAt (hlc := hlc) (fsGammaL fscFs) fscFs V.cwi (viewLazy V.upt V.sz M) v.toNat vom
       P Pmiss Fo Ft)
     (openArmsPlain (hlc := hlc) (fsGammaL fscFs) fscFs V.cwi γ (procAddr j) pid
-      M v.toNat vom
+      (viewLazy V.upt V.sz M) v.toNat vom
       P Pmiss Fo Ft sts)
     hj hproc htier hnoff hK hns hv0 hv1
 
@@ -1121,10 +1121,10 @@ def wp_sys_open_create_eb_body (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ] (c
     (hv0 : V.tf[tfArgIdx 0]? = some v) (hv1 : V.tf[tfArgIdx 1]? = some vom)
     (hc : omCreate vom = true) : Prop :=
   wp_sys_open_frame Γ cpu k γl γ j ns v vom pid V M sts
-    (openAuCreateAt (hlc := hlc) (fsGammaL fscFs) fscFs V.cwi M v.toNat vom
+    (openAuCreateAt (hlc := hlc) (fsGammaL fscFs) fscFs V.cwi (viewLazy V.upt V.sz M) v.toNat vom
       P Pmiss Farm Fun Fok Fex Fo Ft)
     (openArmsCreate (hlc := hlc) (fsGammaL fscFs) fscFs V.cwi γ (procAddr j) pid
-      M v.toNat vom
+      (viewLazy V.upt V.sz M) v.toNat vom
       P Pmiss Farm Fun Fok Fex Fo Ft sts)
     hj hproc htier hnoff hK hns hv0 hv1
 
