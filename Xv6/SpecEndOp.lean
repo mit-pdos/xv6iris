@@ -33,9 +33,9 @@ restored (crash batch C-2b, D38): the crash seam `fsCrashSeam` and the era
 certificate `genCert`, which the commit path's four sequential permits
 (`fsLogfillV_seqPermit`, `fsCommitL_seqPermit`, `fsInstallV_seqPermit`,
 `fsClearKeep_seqPermit`) consume; the receipt the closing clear takes is
-deposited in `logResAt`'s bank.  A caller holding `logCtx` can produce both
-for free (`Xv6.logCtx_seam`, `Xv6.wpLoop_cert`), which is how the call
-sites above the log supply them until `fsReady` carries them (C-4).
+deposited in `logResAt`'s bank.  The call sites above the log take both
+off `fsReady` (`fsReady_seam` / `fsReady_gen`, crash batch C-4); the
+pre-seal callers (ireclaim, via fsinit) take them as their own premises.
 
 **Deviation in spelling (reported).**  Rocq runs the bio layer at
 `fs_view γfs γd dev cov` literally; this port keeps the client view `V` a

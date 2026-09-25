@@ -109,7 +109,7 @@ theorem ireclaim_orphan (PK : PRINTK) (BE : BRELSE) (IG : IGET) (BO : BEGIN_OP) 
   icases kctx_kernelData _ _ $$ Hk with ⟨#HD, Hk⟩
   ihave #Hfmt := ireclaim_cstr_fmt (GF := GF) $$ HS HD
   unfold ireclaimEnv
-  icases Henv with ⟨#Hpe, #Hpi, #Hbc, #Hdc, #Hlc, #Hinv, #Hit2, #Hiti, #Hslks, #Hbmi⟩
+  icases Henv with ⟨#Hpe, #Hpi, #Hbc, #Hdc, #Hlc, #Hinv, #Hit2, #Hiti, #Hslks, #Hbmi, #Hseam, #Hcert⟩
   unfold ireclaimTurn
   icases Hturn with ⟨Hte, Hce, Hsn, Hsi, Hsb, Hpid, Hframe, Hnext⟩
   ihave #Hreg := iregInv_reg (hlc := hlc) fscIreg fscFs icfgIst icfgNib $$ Hinv

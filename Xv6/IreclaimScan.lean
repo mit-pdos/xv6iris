@@ -271,7 +271,7 @@ theorem ireclaim_scan_head (PK : PRINTK) (BD : BREAD) (BE : BRELSE) (IG : IGET) 
   iintro ⟨Hk, Hpc, #Henv, Hturn, Hsl, Hiref, Hboot⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
   unfold ireclaimEnv
-  icases Henv with ⟨#Hpe, #Hpi, #Hbc, #Hdc, #Hlc, #Hinv, #Hit2, #Hiti, #Hslks, #Hbmi⟩
+  icases Henv with ⟨#Hpe, #Hpi, #Hbc, #Hdc, #Hlc, #Hinv, #Hit2, #Hiti, #Hslks, #Hbmi, #Hseam, #Hcert⟩
   unfold ireclaimTurn
   icases Hturn with ⟨Hte, Hce, Hsn, Hsi, Hsb, Hpid, Hframe, Hnext⟩
   icases ireclaim_slots_split3 fscBio $$ Hsl with ⟨Hsl1, Hsl⟩

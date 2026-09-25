@@ -169,16 +169,6 @@ section
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
 variable [BcacheG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [CurCtx]
 
-/-- THE ERA CERTIFICATE IS FREE AT A CYCLE BOUNDARY: `MachCSL.wpLoop` is
-stated at the ambient generation and takes the generation's certificate
-(`MachCSL.wpHart`), so a proof of `wpLoop` may assume it.  This is how the
-call sites above the log hand `end_op` its `genCert` premise (Rocq threads it
-from `fs_ready`; the fsReady row is crash batch C-4's). -/
-theorem wpLoop_cert (cpu : CPU) : (genCert (hlc := hlc) (GF := GF) -∗ wpLoop cpu) ⊢ wpLoop (GF := GF) cpu := by
-  unfold wpLoop wpHart
-  iintro H #Hcert
-  iapply H $$ Hcert Hcert
-
 /-! ## The bank (Rocq `log_flushed_bank`)
 
 WHAT THE LOG INVARIANT CARRIES FOR A LATER READER: the batch counter stands
@@ -753,19 +743,6 @@ theorem logCtx_snapLaw (γ : LogNames) (γb : BcacheNames) (γfs : FsNames)
     (cov : Std.ExtTreeSet Nat compare) (logstart : Nat) (dev : BitVec 32) :
     logCtx (GF := GF) γ γb γfs cov logstart dev ⊢ snapLaw (hlc := hlc) γ γfs cov logstart := by
   unfold logCtx; iintro ⟨-, -, -, -, -, H⟩; iexact H
-
-variable [FsLinkG GF] [FsTopG GF] in
-/-- The crash seam at SOME guest, off the law's handle: what a call site
-above the log hands `end_op` (Rocq threads `fs_crash_seam` from `fs_ready`;
-this is the same seam, read off the context every caller already holds). -/
-theorem logCtx_seam (γ : LogNames) (γb : BcacheNames) (γfs : FsNames)
-    (cov : Std.ExtTreeSet Nat compare) (logstart : Nat) (dev : BitVec 32) :
-    logCtx (GF := GF) γ γb γfs cov logstart dev ⊢ fsCrashSeam (hlc := hlc) (GF := GF) cov logstart := by
-  iintro #H
-  ihave #Hl := logCtx_snapLaw γ γb γfs cov logstart dev $$ H
-  unfold snapLaw
-  icases Hl with ⟨%N, %G, -, #Hs, -⟩
-  iapply fsCrashSeam_ofAt G cov logstart $$ Hs
 
 variable [FsLinkG GF] [FsTopG GF] in
 /-- **The byte view's row, off the context every log function threads**

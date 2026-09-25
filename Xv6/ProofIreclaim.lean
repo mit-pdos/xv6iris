@@ -212,7 +212,7 @@ theorem ireclaim_entry (PK : PRINTK) (BD : BREAD) (BE : BRELSE) (IG : IGET) (BO 
     wp_ireclaim_eb_body (hlc := hlc) (GF := GF) Γ cpu k γl pd pav pu j pidv dqp dqb dqs dqn
       hj hproc hK hnoff htier hgeom hblk hbg hbel hn1 hnnib hn31 hpd ha0 := by
   unfold wp_ireclaim_eb_body
-  iintro ⟨Hk, Hpc, #Hpi, Hte, Hce, #Hpe, #Hbc, #Hlc, #Hdc, Hsn, Hsi, Hsb, #Hinv, Hboot,
+  iintro ⟨Hk, Hpc, #Hpi, Hte, Hce, #Hpe, #Hbc, #Hlc, #Hseam, #Hcert, #Hdc, Hsn, Hsi, Hsb, #Hinv, Hboot,
     #Hit2, #Hiti, #Hslks, #Hbmi, Hpid, Hsl, Hiref, Hnext⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
   icases kctx_wf _ _ $$ Hk with ⟨%hkwf, Hk⟩

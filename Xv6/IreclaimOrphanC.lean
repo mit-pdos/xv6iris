@@ -81,7 +81,7 @@ theorem ireclaim_orphan_c (IP : IPUT) (EO : END_OP) [Fscfg] [Icfg] [CurCtx]
   iintro ⟨Hk, Hpc, #Henv, Hturn, Hsl, Hboot, Href, Hru, HopS, Htx⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
   unfold ireclaimEnv
-  icases Henv with ⟨#Hpe, #Hpi, #Hbc, #Hdc, #Hlc, #Hinv, #Hit2, #Hiti, #Hslks, #Hbmi⟩
+  icases Henv with ⟨#Hpe, #Hpi, #Hbc, #Hdc, #Hlc, #Hinv, #Hit2, #Hiti, #Hslks, #Hbmi, #Hseam, #Hcert⟩
   unfold ireclaimTurn
   icases Hturn with ⟨Hte, Hce, Hsn, Hsi, Hsb, Hpid, Hframe, Hnext⟩
   -- the run's slot: its escrow and its sleeplock, projected out of the families
@@ -137,7 +137,7 @@ theorem ireclaim_orphan_c (IP : IPUT) (EO : END_OP) [Fscfg] [Icfg] [CurCtx]
   iintro Hk Hpc
   iapply (ireclaim_end_op EO Γ cpu _ γl pd pav pu j n' pidv dqp k.proc (by k_norm_g) k.sie
       (by k_norm_g) hj ?eproc ?eK ?enoff ?etier hgeom hpd)
-    $$ [- $Hk $Hpc $Hpi $Hte $Hce $Hbc $Hdc $Hpe $Hlc $Hpid $Hop]
+    $$ [- $Hk $Hpc $Hpi $Hte $Hce $Hbc $Hdc $Hpe $Hlc $Hseam $Hcert $Hpid $Hop]
   rotate_right 1
   k_norm_g [ireclaim_ret_6e]
   iframe #

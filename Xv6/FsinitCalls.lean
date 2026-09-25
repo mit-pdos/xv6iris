@@ -41,6 +41,8 @@ theorem fsinit_ireclaim_call (IR : IRECLAIM) [Fscfg] [Icfg] [CurCtx]
     trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗ panicEnv ∗
     bioCtx γl fscBio (fsView fscFs fscDisk icfgDev fscCov) ∗
     logCtx icfgLog fscBio fscFs fscCov fscLogst icfgDev ∗
+    -- end_op's crash seam and era certificate (ireclaim's premises)
+    fsCrashSeam (hlc := hlc) (GF := GF) fscCov fscLogst ∗ genCert (hlc := hlc) (GF := GF) ∗
     diskCaps fscDisk fscDlock pd pav pu ∗
     -- the three superblock fields, read and handed straight back
     wordPointsTo sbNinodes 4 dqn (BitVec.ofNat 32 fscNinodes) ∗

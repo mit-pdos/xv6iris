@@ -204,7 +204,7 @@ theorem ireclaim_release (BE : BRELSE) [Fscfg] [Icfg] [CurCtx] (Γ : SchedNames)
   iintro ⟨Hk, Hpc, #Henv, Hturn, Hsl, Hlk, Hiref, Hboot⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
   unfold ireclaimEnv
-  icases Henv with ⟨#Hpe, #Hpi, #Hbc, #Hdc, #Hlc, #Hinv, #Hit2, #Hiti, #Hslks, #Hbmi⟩
+  icases Henv with ⟨#Hpe, #Hpi, #Hbc, #Hdc, #Hlc, #Hinv, #Hit2, #Hiti, #Hslks, #Hbmi, #Hseam, #Hcert⟩
   unfold ireclaimTurn
   icases Hturn with ⟨Hte, Hce, Hsn, Hsi, Hsb, Hpid, Hframe, Hnext⟩
   -- +0xaa  c.mv a0,s2 ; +0xac  jal brelse

@@ -155,7 +155,9 @@ def ireclaimEnv [Fscfg] [Icfg] [CurCtx] (Γ : SchedNames) (γl : GName) (pd pav 
   iregInv (hlc := hlc) fscIreg fscFs icfgIst icfgNib ∗
   isItable2 fscItlock fscIc fscFs fscIreg fscCov fscLogst icfgNib icfgDev ∗
   itableInv (hlc := hlc) ∗ icSleeplocks fscIc ∗
-  bitmapInv fscFs fscBmapstart fscCov fscLogst fscSize
+  bitmapInv fscFs fscBmapstart fscCov fscLogst fscSize ∗
+  -- end_op's crash seam and era certificate (the contract's, LAST)
+  fsCrashSeam (hlc := hlc) (GF := GF) fscCov fscLogst ∗ genCert (hlc := hlc) (GF := GF)
 
 instance ireclaimEnv_persistent [Fscfg] [Icfg] [CurCtx] (Γ : SchedNames) (γl : GName)
     (pd pav pu : BitVec 64) : Persistent (ireclaimEnv (hlc := hlc) (GF := GF) Γ γl pd pav pu) := by
@@ -336,6 +338,8 @@ theorem ireclaim_end_op [Fscfg] [Icfg] [CurCtx] (EO : END_OP) (Γ : SchedNames)
     bioCtx γl fscBio (fsView fscFs fscDisk icfgDev fscCov) ∗
     diskCaps fscDisk fscDlock pd pav pu ∗ panicEnv ∗
     logCtx icfgLog fscBio fscFs fscCov fscLogst icfgDev ∗
+    -- the crash seam and the era certificate (ireclaim's own premises)
+    fsCrashSeam (hlc := hlc) (GF := GF) fscCov fscLogst ∗ genCert (hlc := hlc) (GF := GF) ∗
     wordPointsTo (pPid pj) 4 dqp pidv ∗
     logOp icfgLog u ∗
     wpNext true pj c (fun cpu' => iprop(∀ (spie spp : Bool) (R' : RegMap),
@@ -350,14 +354,7 @@ theorem ireclaim_end_op [Fscfg] [Icfg] [CurCtx] (EO : END_OP) (Γ : SchedNames)
     hj hproc hK hnoff htier hgeom rfl rfl rfl hpd
   unfold wp_end_op_eb_body at h
   simp only [endOpAddr, fsView_gd, fsView_cov] at h
-  -- the crash seam and the era certificate end_op takes (D38): off the log
-  -- context and the cycle boundary
-  iintro ⟨H0, H1, H2, H3, H4, H5, H6, H7, #H8, H9, H10, H11⟩
-  iapply wpLoop_cert
-  iintro #Hcert
-  ihave #Hseam := logCtx_seam _ _ _ _ _ _ $$ H8
-  iapply h
-  iframe H0 H1 H2 H3 H4 H5 H6 H7 H8 Hseam Hcert H9 H10 H11
+  exact h
 
 set_option maxHeartbeats 1000000 in
 /-- `ilock(ip)` at `+0x5a`, THE TRANSACTIONAL FORM (Rocq 1702,

@@ -86,8 +86,10 @@ fsinit presents exactly Rocq's premises and receives exactly Rocq's post
    bitmap-geometry premises are `bitmapGeomOk fscCov fscLogst fscBmapstart
    fscSize` (SpecItrunc deviation 3); `0 ≤ icfg_ist` / `0 ≤ fsc_bmapstart`
    vanish at `Nat`.
-3. `fs_crash_seam` / `gen_cert` (end_op's crash seam and era certificate)
-   are dropped with the crash layer (`Xv6/SpecEndOp.lean`'s header).
+3. (RETIRED by crash batch C-4.)  `fs_crash_seam fsc_cov fsc_logst` and
+   `gen_cert` -- end_op's crash seam and era certificate -- are premises,
+   right after `logCtx`, as Rocq's (ireclaim runs before the seal, so it has
+   no `fsReady` to project them from; fsinit hands in its own, D38).
 4. The post's `∀ mf` with `callee_saved m mf` is `∀ spie spp R'` with
    `⌜calleeSaved k.regs R'⌝` and the exit context
    `(k.withSpie spie spp).withRegs R'`.
@@ -157,6 +159,8 @@ def wp_ireclaim_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G
   trapCsrs cpu ∗ cpuClaim cpu k.proc ∗ intrRes cpu ∗ panicEnv ∗
   bioCtx γl fscBio (fsView fscFs fscDisk icfgDev fscCov) ∗
   logCtx icfgLog fscBio fscFs fscCov fscLogst icfgDev ∗
+  -- end_op's crash seam and era certificate (Rocq's)
+  fsCrashSeam (hlc := hlc) (GF := GF) fscCov fscLogst ∗ genCert (hlc := hlc) (GF := GF) ∗
   diskCaps fscDisk fscDlock pd pav pu ∗
   -- the three superblock fields, read and handed straight back
   wordPointsTo sbNinodes 4 dqn (BitVec.ofNat 32 fscNinodes) ∗
@@ -220,6 +224,8 @@ def wp_ireclaim_eb_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [X
   trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗ panicEnv ∗
   bioCtx γl fscBio (fsView fscFs fscDisk icfgDev fscCov) ∗
   logCtx icfgLog fscBio fscFs fscCov fscLogst icfgDev ∗
+  -- end_op's crash seam and era certificate (Rocq's)
+  fsCrashSeam (hlc := hlc) (GF := GF) fscCov fscLogst ∗ genCert (hlc := hlc) (GF := GF) ∗
   diskCaps fscDisk fscDlock pd pav pu ∗
   -- the three superblock fields, read and handed straight back
   wordPointsTo sbNinodes 4 dqn (BitVec.ofNat 32 fscNinodes) ∗
@@ -285,9 +291,9 @@ theorem IRECLAIM.wp_ireclaim (A : IRECLAIM) {hlc : HasLC} {GF : BundledGFunctors
   unfold wp_ireclaim_body
   rw [hsie] at h
   simp only [trapCsrsExt_false, cpuClaimExt_false] at h
-  iintro ⟨H0, H1, H2, Htc, Hcl, Hir, H6, H7, H8, H9, H10, H11, H12, H13, H14, H15, H16, H17, H18, H19, H20, H21, Hnext⟩
+  iintro ⟨H0, H1, H2, Htc, Hcl, Hir, H6, H7, H8, Hs, Hc, H9, H10, H11, H12, H13, H14, H15, H16, H17, H18, H19, H20, H21, Hnext⟩
   iapply h
-  iframe H0 H1 H2 Htc Hcl Hir H6 H7 H8 H9 H10 H11 H12 H13 H14 H15 H16 H17 H18 H19 H20 H21
+  iframe H0 H1 H2 Htc Hcl Hir H6 H7 H8 Hs Hc H9 H10 H11 H12 H13 H14 H15 H16 H17 H18 H19 H20 H21
   iapply wpNext_mono $$ Hnext
   iintro %cpu' HK %spie %spp %R' %p0 H1 H2 ⟨Htc, Hir⟩ Hcl H6 H7 H8 H9 H10 H11 H12
   iapply HK $$ %spie %spp %R' %p0 H1 H2 Htc Hcl Hir H6 H7 H8 H9 H10 H11 H12

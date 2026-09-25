@@ -214,7 +214,7 @@ theorem fsinit_reclaim (IR : IRECLAIM) [Fscfg] [Icfg] [CurCtx]
   iapply (fsinit_ireclaim_call IR Γ cpu _ γl pd pav pu j pidv dqp (DFrac.own 1)
       (DFrac.own 1) (DFrac.own 1) hj ?dproc ?dK ?dnoff ?dtier hgeom hblk hbg hbel hn1 hnnib hn31
       hpd ?da0)
-    $$ [- $Hk $Hpc $Hpi $Hpe $Hbc $Hlc $Hdc $C3 $C6 $C7 $Hinv $Hboot $Hit2 $Hiti $Hslks
+    $$ [- $Hk $Hpc $Hpi $Hpe $Hbc $Hlc $Hseam $Hcert $Hdc $C3 $C6 $C7 $Hinv $Hboot $Hit2 $Hiti $Hslks
         $Hbmi $Hsl $Hiref]
   rotate_right 1
   k_norm_g [fsinit_ret_58]

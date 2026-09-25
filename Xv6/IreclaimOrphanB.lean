@@ -85,7 +85,7 @@ theorem ireclaim_orphan_b (BO : BEGIN_OP) (IL : ILOCK) (IU : IUNLOCK) (IP : IPUT
   iintro ⟨Hk, Hpc, #Henv, Hturn, Hsl, Hboot, Href, Hru⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
   unfold ireclaimEnv
-  icases Henv with ⟨#Hpe, #Hpi, #Hbc, #Hdc, #Hlc, #Hinv, #Hit2, #Hiti, #Hslks, #Hbmi⟩
+  icases Henv with ⟨#Hpe, #Hpi, #Hbc, #Hdc, #Hlc, #Hinv, #Hit2, #Hiti, #Hslks, #Hbmi, #Hseam, #Hcert⟩
   unfold ireclaimTurn
   icases Hturn with ⟨Hte, Hce, Hsn, Hsi, Hsb, Hpid, Hframe, Hnext⟩
   -- the run's slot: escrow, sleeplock, the address claims; the trivial receipt
