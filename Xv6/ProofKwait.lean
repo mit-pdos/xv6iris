@@ -92,6 +92,7 @@ import Xv6.UPtLemmas
 import Xv6.UMemLemmas
 import Xv6.KvmLemmas
 import Xv6.SpecKwait
+import Xv6.ProcPrivAcc
 import Xv6.WordFrac
 import Xv6.SpecCopyout
 import Xv6.SpecFreeproc
@@ -532,7 +533,7 @@ sealed pid -/
 def kwG (j : Nat) (pid : BitVec 32) (V : ProcPriv) (cs : ExtTreeSet GName compare) : IProp GF :=
   iprop(kwaitGen (procAddr j) pid V.gen ∗ chFrag V.chg (procAddr j) cs ∗ initPidIs 1#32)
 
-/-- the specification's post (`wp_kwait_eb_body`'s `wpNext`) -/
+/-- the cells-level post (`kwCellsEbBody`'s `wpNext`) -/
 def kwPost (cpu : CPU) (k : KCtx) (j : Nat) (pid : BitVec 32) (V : ProcPriv)
     (M : Nat → List (BitVec 8)) (cs : ExtTreeSet GName compare) : IProp GF :=
   wpNext true k.proc cpu (fun cpu' => iprop(∀ (spie spp : Bool) (R' : RegMap) (P' : UPtd)
@@ -546,6 +547,24 @@ def kwPost (cpu : CPU) (k : KCtx) (j : Nat) (pid : BitVec 32) (V : ProcPriv)
     procPrivNoctxAt curCtx (procAddr j) pid { V with upt := P' }
       (umemWrite (viewFaulted V.upt P' M) (k.regs 10#5).toNat ((xstateBytes xw).take d)) -∗
     wpLoop cpu'))
+
+/-- **The cells-level contract** the body is proved against (the landed
+pre-8-P form of `wp_kwait_eb_body`): the caller's cells `procPrivNoctxAt`
+and the generation pieces the reap reads (`kwaitGen`) in place of the whole
+block.  `kwait_proof` lends both out of Rocq's `proc_priv`
+(`ProcPrivAcc.procPrivFd_noctxGen`) and takes them back. -/
+def kwCellsEbBody (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+    (cpu : CPU) (k : KCtx) (γw γp γl : GName) (γk : KmemNames) (j : Nat) (pid : BitVec 32)
+    (V : ProcPriv) (M : Nat → List (BitVec 8)) (cs : ExtTreeSet GName compare) : Prop :=
+  kctx cpu k ∗ pcIs cpu kwaitAddr ∗ procsInv Γ ∗
+  trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗
+  isLock γw waitLockAddr "wait_lock" waitLockPay ∗
+  isLock γp pidLockAddr "nextpid" pidLockPay ∗
+  isLock γl kmemLockAddr "kmem" (kmemRes γk) ∗ kallocAvail γk none ∗
+  procPrivNoctxAt curCtx (procAddr j) pid V M ∗
+  kwaitGen (procAddr j) pid V.gen ∗ chFrag V.chg (procAddr j) cs ∗ initPidIs 1#32 ∗
+  kwPost cpu k j pid V M cs
+  ⊢ wpLoop (GF := GF) cpu
 
 /-- the answer the post receives, bundled with the rows it hands back -/
 def kwAns (j : Nat) (pid : BitVec 32) (V : ProcPriv) (cs : ExtTreeSet GName compare)
@@ -2796,16 +2815,21 @@ theorem kwait_br_fffffffffffff73a : KA.«kwait» + 0xfffffffffffff73a#64 = KA.«
 
 theorem kwait_br_16012 : KA.«kwait» + 0x16012#64 = KA.«tickslock» := by decide
 
-theorem kwait_proof (MP : MYPROC) (AC : ACQUIRE) (RE : RELEASE) (CO : COPYOUT)
-    (FP : FREEPROC) (KL : KILLED) (SP : SLEEP_PREPARE) (SL : SLEEP) : KWAIT :=
-  ⟨fun {hlc GF} _ _ _ _ _ _ _ X Γ _ cpu k γw γp γl γk j pid V M cs hj hproc hK hnoff htier => by
-  unfold wp_kwait_eb_body
+theorem kwait_cells (MP : MYPROC) (AC : ACQUIRE) (RE : RELEASE) (CO : COPYOUT)
+    (FP : FREEPROC) (KL : KILLED) (SP : SLEEP_PREPARE) (SL : SLEEP)
+    {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+    [IrefslotG GF] [CtokG GF] [WchG GF] [X : CurCtx]
+    (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+    (cpu : CPU) (k : KCtx) (γw γp γl : GName) (γk : KmemNames) (j : Nat) (pid : BitVec 32)
+    (V : ProcPriv) (M : Nat → List (BitVec 8)) (cs : ExtTreeSet GName compare)
+    (hj : j < NPROC) (hproc : k.proc = procAddr j) (hK : kwaitSlots ≤ k.avail)
+    (hnoff : k.noff = 0) (htier : k.tier = KTier.kpt) :
+    kwCellsEbBody (hlc := hlc) (GF := GF) Γ cpu k γw γp γl γk j pid V M cs := by
+  unfold kwCellsEbBody
   simp only [kwaitAddr]
   iintro ⟨Hk, Hpc, #Hpinv, Hte, Hce, #Hlw, #Hlp, #Hlk, Hav, Hpriv, Hkg, Hrow, #Hipis, HΦ⟩
   ihave Hg : kwG j pid V cs $$ [Hkg Hrow]
   · unfold kwG; iframe Hkg Hrow Hipis
-  ihave HΦ : kwPost cpu k j pid V M cs $$ [HΦ]
-  · unfold kwPost; iexact HΦ
   icases kctx_wf _ _ $$ Hk with ⟨%hwf, Hk⟩
   have hlocks : k.locks = [] := List.eq_nil_of_length_eq_zero (by have := hwf.2.2.2.1; omega)
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
@@ -3020,6 +3044,50 @@ theorem kwait_proof (MP : MYPROC) (AC : ACQUIRE) (RE : RELEASE) (CO : COPYOUT)
     ipureintro; exact hkwfix
   case han => k_norm_g; omega
   case haK => k_norm_g; unfold kwaitSlots at hK; omega
-  case hal => k_norm_g; rw [hlocks]; simp⟩
+  case hal => k_norm_g; rw [hlocks]; simp
+
+/-! ## The whole block (Rocq `proc_priv`) around the cells-level body -/
+
+section
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+  [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
+  [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
+  [Appcfg GF] [FileG GF] [Fscfg] [Icfg]
+
+/-- The block's generation row is `firstTok`, the pieces the reap reads
+(`kwaitGen`) and the xstate half. -/
+theorem kw_procGen_split (ξ : CtxId) (pa : BitVec 64) (pid : BitVec 32) (g : GName) :
+    procGenAt (GF := GF) ξ pa pid g ⊢
+      kwaitGen pa pid g ∗ (kwaitGen pa pid g -∗ procGenAt ξ pa pid g) := by
+  unfold procGenAt kwaitGen
+  iintro ⟨Hf, Hq, Hx, Hh⟩
+  iframe Hq Hh
+  iintro ⟨Hq, Hh⟩
+  iframe Hf Hq Hx Hh
+
+end
+
+theorem kwait_proof (MP : MYPROC) (AC : ACQUIRE) (RE : RELEASE) (CO : COPYOUT)
+    (FP : FREEPROC) (KL : KILLED) (SP : SLEEP_PREPARE) (SL : SLEEP) : KWAIT :=
+  ⟨fun {hlc GF} _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ X Γ _ cpu k γw γp γl γk γ j pid V M cs
+      hj hproc hK hnoff htier => by
+  have h := kwait_cells MP AC RE CO FP KL SP SL (hlc := hlc) (GF := GF) Γ cpu k γw γp γl γk j pid V M cs
+    hj hproc hK hnoff htier
+  unfold kwCellsEbBody kwPost at h
+  unfold wp_kwait_eb_body
+  iintro ⟨Hk, Hpc, #Hpinv, Hte, Hce, #Hlw, #Hlp, #Hlk, Hav, Hblk, Hrow, #Hipis, HΦ⟩
+  icases kctx_tier cpu k $$ Hk with ⟨%hct, Hk⟩
+  have hkpt : curTier = KTier.kpt := hct.symm.trans htier
+  icases procPrivFd_noctxGen hkpt γ (procAddr j) pid V M $$ Hblk with ⟨Hn, Hgen, Hback⟩
+  icases kw_procGen_split curCtx (procAddr j) pid V.gen $$ Hgen with ⟨Hkg, Hgw⟩
+  iapply h
+  iframe Hk Hpc Hte Hce Hav Hn Hkg Hrow
+  iframe #
+  iapply wpNext_mono $$ HΦ
+  iintro %cpu' HK %spie %spp %R' %P' %rv %xw %d %cs' %hp Hans Hkg Hrow Hk Hpc Hte Hce Hn
+  ihave Hgen := Hgw $$ Hkg
+  ihave Hblk := Hback $$ %{ V with upt := P' } %_ [] Hn Hgen
+  · ipureintro; exact ⟨rfl, rfl, rfl, rfl⟩
+  iapply HK $$ %spie %spp %R' %P' %rv %xw %d %cs' %hp Hans Hrow Hk Hpc Hte Hce Hblk⟩
 
 end Xv6

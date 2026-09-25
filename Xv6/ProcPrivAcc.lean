@@ -446,4 +446,80 @@ theorem procPrivFd_settle (γ : FileNames) (pa : BitVec 64) (pid : BitVec 32) (V
 
 end
 
+section
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [FileG GF] [IcacheG GF] [SleepLockG GF] [IcboxG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [OffboxG GF] [OffboxBoxG GF] [BcacheG GF] [DiskG GF] [LogG GF] [FsBlocksG GF] [IregG GF] [FsTopG GF] [FsLinkG GF] [Appcfg GF] [Fscfg] [Icfg]
+
+/-! ## The cells-level block (D31: the dispatch's entry-shape adapter) -/
+
+/-- **The block as cells, with its generation row lent out**: `procPrivFd`
+is `procPrivNoctxAt` (every cell, the descriptor array's cells included)
+beside the D8 generation row `procGenAt`, and back -- at any record `V'`
+that keeps the descriptor array, its ghost, the working directory and its
+inum (the payloads and the cwd reference are keyed on exactly those), and
+at the generation row `V'.gen` names.  kwait / sys_wait (Rocq's whole
+`proc_priv`) run their cells-level bodies through this. -/
+theorem procPrivFd_noctxGen [X : CurCtx] (h : curTier = KTier.kpt) (γ : FileNames) (pa : BitVec 64)
+    (pid : BitVec 32) (V : ProcPriv) (M : Nat → List (BitVec 8)) :
+    procPrivFd (GF := GF) γ pa pid V M ⊢
+      procPrivNoctxAt curCtx pa pid V M ∗ procGenAt curCtx pa pid V.gen ∗
+      (∀ (V' : ProcPriv) (M' : Nat → List (BitVec 8)),
+        ⌜V'.ofile = V.ofile ∧ V'.fdg = V.fdg ∧ V'.cwd = V.cwd ∧ V'.cwi = V.cwi⌝ -∗
+        procPrivNoctxAt curCtx pa pid V' M' -∗ procGenAt curCtx pa pid V'.gen -∗
+        procPrivFd γ pa pid V' M') := by
+  have hcells := procOfilesOwe_cells_acc (GF := GF) γ V.fdg pa V.ofile []
+  have hs1 := procPrivNoctxAt_split (GF := GF) curCtx pa pid V M
+  have hs2 := fun (V' : ProcPriv) (M' : Nat → List (BitVec 8)) =>
+    procPrivNoctxAt_split (GF := GF) curCtx pa pid V' M'
+  have hback := fun (V' : ProcPriv) (h1 : V'.ofile = V.ofile) (h2 : V'.fdg = V.fdg) =>
+    (show procOfilesOwe (GF := GF) γ V.fdg pa V.ofile [] ⊢ procOfilesOwe γ V'.fdg pa V'.ofile []
+      from by rw [h1, h2])
+  have hcw := fun (V' : ProcPriv) (h3 : V'.cwd = V.cwd) (h4 : V'.cwi = V.cwi) =>
+    (show cwdRefAt (GF := GF) V.cwd V.cwi ⊢ cwdRefAt V'.cwd V'.cwi from by rw [h3, h4])
+  have hoc := fun (V' : ProcPriv) (h1 : V'.ofile = V.ofile) =>
+    (show ofileCells (GF := GF) pa (DFrac.own 1) V'.ofile ⊢ ofileCells pa (DFrac.own 1) V.ofile
+      from by rw [h1])
+  obtain ⟨ξ, t⟩ := X
+  simp only at h
+  subst h
+  unfold procPrivFd procPrivCoreNoctxAt procOfiles
+  iintro ⟨⟨Hb, Hc, Hg⟩, Ho⟩
+  icases hcells $$ Ho with ⟨Hcells, Hw⟩
+  iframe Hg
+  isplitl [Hb Hcells]
+  · iapply hs1.2
+    iframe Hb Hcells
+  iintro %V' %M' %hV Hn Hg
+  obtain ⟨h1, h2, h3, h4⟩ := hV
+  icases (hs2 V' M').1 $$ Hn with ⟨Hb, Hcells⟩
+  ihave Hcells := hoc V' h1 $$ Hcells
+  ihave Ho := Hw $$ Hcells
+  ihave Ho := hback V' h1 h2 $$ Ho
+  ihave Hc := hcw V' h3 h4 $$ Hc
+  iframe Hb Hc Hg Ho
+
+/-- **D31's accessor** (wave 8, the dispatch's entry-shape adapter for the
+arms whose landed contracts take the cells form -- getpid, sbrk, wait):
+`procPrivFd ⊢ procPrivNoctxAt ∗ (procPrivNoctxAt -∗ procPrivFd)`, the wand
+at any record that keeps the descriptor array, its ghost, the working
+directory, its inum and the generation (sbrk moves `sz`/`upt`, a
+`copyout` grows `upt`, none touches those). -/
+theorem procPrivFd_noctx [X : CurCtx] (h : curTier = KTier.kpt) (γ : FileNames) (pa : BitVec 64)
+    (pid : BitVec 32) (V : ProcPriv) (M : Nat → List (BitVec 8)) :
+    procPrivFd (GF := GF) γ pa pid V M ⊢
+      procPrivNoctxAt curCtx pa pid V M ∗
+      (∀ (V' : ProcPriv) (M' : Nat → List (BitVec 8)),
+        ⌜V'.ofile = V.ofile ∧ V'.fdg = V.fdg ∧ V'.cwd = V.cwd ∧ V'.cwi = V.cwi ∧ V'.gen = V.gen⌝ -∗
+        procPrivNoctxAt curCtx pa pid V' M' -∗ procPrivFd γ pa pid V' M') := by
+  iintro H
+  icases procPrivFd_noctxGen h γ pa pid V M $$ H with ⟨Hn, Hg, Hw⟩
+  iframe Hn
+  iintro %V' %M' %hV Hn
+  obtain ⟨h1, h2, h3, h4, h5⟩ := hV
+  ihave Hg := (show procGenAt (GF := GF) curCtx pa pid V.gen ⊢ procGenAt curCtx pa pid V'.gen
+      from by rw [h5]) $$ Hg
+  iapply Hw $$ %V' %M' [] Hn Hg
+  ipureintro; exact ⟨h1, h2, h3, h4⟩
+
+end
+
 end Xv6

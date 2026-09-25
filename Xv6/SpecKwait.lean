@@ -49,16 +49,17 @@ it does, and the reap MOVES the row: the reaped generation leaves the set
 its ESCROW (`ChildTok.exitTok`, handed over out of the ZOMBIE block, keyed
 at the status word copied out), the pid uniqueness that makes the number
 name a generation, and "the generation was in the caller's own column, or
-the caller is init" -- read off the caller's own generation row
-(`kwaitGen`: the kernel's quarter and the slot/pid halves, LENT and given
-back) against init's sealed identity (`initPidIs 1`, Rocq
-`init_pid_is 1`).  `kwaitAns` (Lean's pure summary) is kept beside it.
+the caller is init" -- read off the caller's own generation row (the
+block's `FdTable.procGenAt`, of which the reap reads `kwaitGen`: the
+kernel's quarter and the slot/pid halves) against init's sealed identity
+(`initPidIs 1`, Rocq `init_pid_is 1`).  `kwaitAns` (Lean's pure summary) is
+kept beside it.
 
-PROCESS-LAYER DEVIATION (flagged): Rocq's kwait takes the whole block
-`proc_priv`; Lean's takes the cells as `procPrivNoctxAt` (as before D8) and
-the generation pieces the reap reads as `kwaitGen` -- the D8 row
-(`FdTable.procGenAt`) minus `firstTok` and the xstate half, which kwait
-never touches.
+THE CALLER'S BLOCK IS ROCQ'S WHOLE `proc_priv` (`FdTable.procPrivFd`, batch
+8-P; the W7-C deviation "kwait takes `procPrivNoctxAt ∗ kwaitGen`" is
+closed): the proof runs over the cells (`procPrivNoctxAt`) and the
+generation pieces (`kwaitGen`), lent out of the block by
+`ProcPrivAcc.procPrivFd_noctxGen` and given back at the grown descriptor.
 
 THE BLOCK COMES BACK WHOLE at the descriptor `copyout`'s lazy faults grew
 (Rocq: `uptd_ext_sz (pv_sz V)` and `proc_priv (us_upt U P')`): `copyout`
@@ -78,6 +79,7 @@ import Xv6.SpecEitherCopyout
 import Xv6.SpecCopyout
 import Xv6.SpecFreeproc
 import Xv6.SpecSleep
+import Xv6.FdTable
 import MachCSL.Lock
 import MachCSL.WpSmodeIntr
 import Iris.ProofMode
@@ -115,9 +117,12 @@ def kwaitGen {GF : BundledGFunctors} [CtokG GF] [WchG GF] (pa : BitVec 64) (pid 
   iprop((∃ Q : Int → IProp GF, genKq g pa pid Q ∗ myPay g Q) ∗ genHalvesPriv pa pid g)
 
 /-- **WP of `kwait(addr = a0)`.** -/
-def wp_kwait_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [CurCtx]
+def wp_kwait_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+    [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
+    [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
+    [Appcfg GF] [FileG GF] [Fscfg] [Icfg] [CurCtx]
     (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
-    (cpu : CPU) (k : KCtx) (γw γp γl : GName) (γk : KmemNames) (j : Nat) (pid : BitVec 32)
+    (cpu : CPU) (k : KCtx) (γw γp γl : GName) (γk : KmemNames) (γ : FileNames) (j : Nat) (pid : BitVec 32)
     (V : ProcPriv) (M : Nat → List (BitVec 8)) (cs : ExtTreeSet GName compare)
     (hj : j < NPROC) (hproc : k.proc = procAddr j) (hK : kwaitSlots ≤ k.avail)
     (hsie : k.sie = false) (hnoff : k.noff = 0) (hlocks : k.locks = [])
@@ -127,17 +132,16 @@ def wp_kwait_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF
   isLock γw waitLockAddr "wait_lock" waitLockPay ∗
   isLock γp pidLockAddr "nextpid" pidLockPay ∗
   isLock γl kmemLockAddr "kmem" (kmemRes γk) ∗ kallocAvail γk none ∗
-  procPrivNoctxAt curCtx (procAddr j) pid V M ∗
-  kwaitGen (procAddr j) pid V.gen ∗ chFrag V.chg (procAddr j) cs ∗ initPidIs 1#32 ∗
+  procPrivFd γ (procAddr j) pid V M ∗ chFrag V.chg (procAddr j) cs ∗ initPidIs 1#32 ∗
   wpNext true k.proc cpu (fun cpu' => iprop(∀ (spie spp : Bool) (R' : RegMap) (P' : UPtd)
     (rv xw : BitVec 32) (d : Nat) (cs' : ExtTreeSet GName compare),
     ⌜calleeSaved k.regs R' ∧ R' 10#5 = BitVec.signExtend 64 rv ∧ V.upt.extSz V.sz P' ∧ d ≤ 4 ∧
       kwaitAns rv (k.regs 10#5) d⌝ -∗
     waitAns rv (xstateVal xw) cs cs' V.gen (decide (k.regs 10#5 = 0#64)) pid -∗
-    kwaitGen (procAddr j) pid V.gen -∗ chFrag V.chg (procAddr j) cs' -∗
+    chFrag V.chg (procAddr j) cs' -∗
     kctx cpu' ((k.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k.regs 1#5)) -∗
     trapCsrs cpu' -∗ cpuClaim cpu' k.proc -∗ intrRes cpu' -∗
-    procPrivNoctxAt curCtx (procAddr j) pid { V with upt := P' }
+    procPrivFd γ (procAddr j) pid { V with upt := P' }
       (umemWrite (viewFaulted V.upt P' M) (k.regs 10#5).toNat ((xstateBytes xw).take d)) -∗
     wpLoop cpu'))
   ⊢ wpLoop (GF := GF) cpu
@@ -150,9 +154,12 @@ form, the Rocq kexit/sys_sync shape): `cpu_own 0 eb`, the trap-CSR complement
 (the complement is `emp`), at `sie = false` the caller brings the pair.
 Depth 0, so no spinlock held (`KCtx.wf`).  It parks: the crossing is the
 literal `true`. -/
-def wp_kwait_eb_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [CurCtx]
+def wp_kwait_eb_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+    [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
+    [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
+    [Appcfg GF] [FileG GF] [Fscfg] [Icfg] [CurCtx]
     (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
-    (cpu : CPU) (k : KCtx) (γw γp γl : GName) (γk : KmemNames) (j : Nat) (pid : BitVec 32)
+    (cpu : CPU) (k : KCtx) (γw γp γl : GName) (γk : KmemNames) (γ : FileNames) (j : Nat) (pid : BitVec 32)
     (V : ProcPriv) (M : Nat → List (BitVec 8)) (cs : ExtTreeSet GName compare)
     (hj : j < NPROC) (hproc : k.proc = procAddr j) (hK : kwaitSlots ≤ k.avail)
     (hnoff : k.noff = 0)
@@ -162,48 +169,52 @@ def wp_kwait_eb_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G
   isLock γw waitLockAddr "wait_lock" waitLockPay ∗
   isLock γp pidLockAddr "nextpid" pidLockPay ∗
   isLock γl kmemLockAddr "kmem" (kmemRes γk) ∗ kallocAvail γk none ∗
-  procPrivNoctxAt curCtx (procAddr j) pid V M ∗
-  kwaitGen (procAddr j) pid V.gen ∗ chFrag V.chg (procAddr j) cs ∗ initPidIs 1#32 ∗
+  procPrivFd γ (procAddr j) pid V M ∗ chFrag V.chg (procAddr j) cs ∗ initPidIs 1#32 ∗
   wpNext true k.proc cpu (fun cpu' => iprop(∀ (spie spp : Bool) (R' : RegMap) (P' : UPtd)
     (rv xw : BitVec 32) (d : Nat) (cs' : ExtTreeSet GName compare),
     ⌜calleeSaved k.regs R' ∧ R' 10#5 = BitVec.signExtend 64 rv ∧ V.upt.extSz V.sz P' ∧ d ≤ 4 ∧
       kwaitAns rv (k.regs 10#5) d⌝ -∗
     waitAns rv (xstateVal xw) cs cs' V.gen (decide (k.regs 10#5 = 0#64)) pid -∗
-    kwaitGen (procAddr j) pid V.gen -∗ chFrag V.chg (procAddr j) cs' -∗
+    chFrag V.chg (procAddr j) cs' -∗
     kctx cpu' ((k.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k.regs 1#5)) -∗
     trapCsrsExt cpu' k.sie -∗ cpuClaimExt cpu' k.sie k.proc -∗
-    procPrivNoctxAt curCtx (procAddr j) pid { V with upt := P' }
+    procPrivFd γ (procAddr j) pid { V with upt := P' }
       (umemWrite (viewFaulted V.upt P' M) (k.regs 10#5).toNat ((xstateBytes xw).take d)) -∗
     wpLoop cpu'))
   ⊢ wpLoop (GF := GF) cpu
 
 /-- The interface of `kwait`. -/
 structure KWAIT : Prop where
-  wp_kwait_eb : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [CurCtx]
+  wp_kwait_eb : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+    [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
+    [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
+    [Appcfg GF] [FileG GF] [Fscfg] [Icfg] [CurCtx]
     (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
-    (cpu : CPU) (k : KCtx) (γw γp γl : GName) (γk : KmemNames) (j : Nat) (pid : BitVec 32)
+    (cpu : CPU) (k : KCtx) (γw γp γl : GName) (γk : KmemNames) (γ : FileNames) (j : Nat) (pid : BitVec 32)
     (V : ProcPriv) (M : Nat → List (BitVec 8)) (cs : ExtTreeSet GName compare) hj hproc hK hnoff htier,
-    wp_kwait_eb_body (hlc := hlc) (GF := GF) Γ cpu k γw γp γl γk j pid V M cs
+    wp_kwait_eb_body (hlc := hlc) (GF := GF) Γ cpu k γw γp γl γk γ j pid V M cs
       hj hproc hK hnoff htier
 
 /-- The interrupts-off instance of `wp_kwait_eb` (the complement is the whole
 bundle): the contract every not-yet-generalized caller states. -/
-theorem KWAIT.wp_kwait (A : KWAIT) {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
-    [CurCtx] (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
-    (cpu : CPU) (k : KCtx) (γw γp γl : GName) (γk : KmemNames) (j : Nat) (pid : BitVec 32)
+theorem KWAIT.wp_kwait (A : KWAIT) {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+    [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
+    [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
+    [Appcfg GF] [FileG GF] [Fscfg] [Icfg] [CurCtx] (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+    (cpu : CPU) (k : KCtx) (γw γp γl : GName) (γk : KmemNames) (γ : FileNames) (j : Nat) (pid : BitVec 32)
     (V : ProcPriv) (M : Nat → List (BitVec 8)) (cs : ExtTreeSet GName compare) hj hproc hK hsie hnoff hlocks htier :
-    wp_kwait_body (hlc := hlc) (GF := GF) Γ cpu k γw γp γl γk j pid V M cs
+    wp_kwait_body (hlc := hlc) (GF := GF) Γ cpu k γw γp γl γk γ j pid V M cs
       hj hproc hK hsie hnoff hlocks htier := by
-  have h := A.wp_kwait_eb (hlc := hlc) (GF := GF) Γ cpu k γw γp γl γk j pid V M cs hj hproc hK hnoff htier
+  have h := A.wp_kwait_eb (hlc := hlc) (GF := GF) Γ cpu k γw γp γl γk γ j pid V M cs hj hproc hK hnoff htier
   unfold wp_kwait_eb_body at h
   unfold wp_kwait_body
   rw [hsie] at h
   simp only [trapCsrsExt_false, cpuClaimExt_false] at h
-  iintro ⟨H0, H1, H2, Htc, Hcl, Hir, H6, H7, H8, H9, H10, H11, H12, H13, Hnext⟩
+  iintro ⟨H0, H1, H2, Htc, Hcl, Hir, H6, H7, H8, H9, H10, H11, H12, Hnext⟩
   iapply h
-  iframe H0 H1 H2 Htc Hcl Hir H6 H7 H8 H9 H10 H11 H12 H13
+  iframe H0 H1 H2 Htc Hcl Hir H6 H7 H8 H9 H10 H11 H12
   iapply wpNext_mono $$ Hnext
-  iintro %cpu' HK %spie %spp %R' %P' %rv %xw %d %cs' %p0 Ha Hg Hc H1 H2 ⟨Htc, Hir⟩ Hcl H6
-  iapply HK $$ %spie %spp %R' %P' %rv %xw %d %cs' %p0 Ha Hg Hc H1 H2 Htc Hcl Hir H6
+  iintro %cpu' HK %spie %spp %R' %P' %rv %xw %d %cs' %p0 Ha Hc H1 H2 ⟨Htc, Hir⟩ Hcl H6
+  iapply HK $$ %spie %spp %R' %P' %rv %xw %d %cs' %p0 Ha Hc H1 H2 Htc Hcl Hir H6
 
 end Xv6
