@@ -56,8 +56,10 @@ Specification of `readi` (kernel/fs.c): the public contract.  Mirrors Rocq
    `Xv6/SpecBmap.lean`; `fs_bytes_any` is `fsBytesAny γfs`.
 3. THE PROCESS BLOCK.  Rocq's `if user then proc_priv_core pj pidv U else
    (dst bytes ∗ proc_priv_bare pj pidv U)` is, on the user arm,
-   `Xv6.procPrivRun (procAddr j) pidv Vp M` (the running block, as
-   `Xv6.EITHER_COPYOUT` takes it; the pid share bmap/bread/brelse need is
+   `Xv6.procPrivRun (procAddr j) pidv Vp M` (the BARE running block,
+   Rocq `proc_priv_bare` + the lazy claim, as `Xv6.EITHER_COPYOUT` takes
+   it: a strictly weaker premise than `proc_priv_core`, whose cwd
+   reference and generation row the file layer frames; the pid share bmap/bread/brelse need is
    BORROWED out of it, Rocq's `rd_dst_bare`), and on the kernel arm the
    destination `byteBuf dst olds` plus the bread bundle's
    `wordPointsTo (pPid k.proc) 4 dqp pidv` (Rocq's `proc_priv_bare`, which

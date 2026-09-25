@@ -16,10 +16,11 @@ nothing else runs; on its success arm the descriptor's reference is LENT out
 of the array (`procOfilesOwe_lend`, Rocq `proc_priv_lend`), the descriptor
 bundle's fragment for it pins its state (`fdSt_agree`) and hands out its
 offset row (`fdFrags_acc`, closed back unchanged), fileread runs over the
-reference, its block (`srd_block_open`) and the environment the state
-selects (`fileread_env_split`, Rocq `read_env_frame`), and the loan is
-REPAID (`procOfilesOwe_repay`) and the WHOLE block joined at fileread's
-grown descriptor.
+reference, the block's core (Rocq `proc_priv_core`, fileread's own form:
+no descriptor array, so nothing is carved out of the array for the call)
+and the environment the state selects (`fileread_env_split`, Rocq
+`read_env_frame`), and the loan is REPAID (`procOfilesOwe_repay`) and the
+WHOLE block joined at fileread's grown descriptor.
 
 **Deviations from Rocq** (beyond SpecSysRead's):
 
@@ -142,22 +143,15 @@ theorem srd_ok_back (cpu : CPU) (k : KCtx) (γ : FileNames) (j : Nat) (pid : Bit
     pcIs cpu (KA.«sys_read» + 0x40#64) ∗
     srdCells (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) wf lo hi wp ∗
     trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗
-    procPrivNoctxAt curCtx (procAddr j) pid { V with upt := P' } M' ∗
-    (∀ (P'' : UPtd) (M'' : Nat → List (BitVec 8)), procPrivExt (procAddr j) pid V P'' M'' -∗
-      procPrivCoreNoctxAt curCtx (procAddr j) pid { V with upt := P'' } M'' ∗
-        ofileCells (procAddr j) (DFrac.own 1) V.ofile) ∗
-    (ofileCells (procAddr j) (DFrac.own 1) V.ofile -∗
-      procOfilesOwe γ V.fdg (procAddr j) V.ofile [fd0]) ∗
+    procPrivCoreNoctxAt curCtx (procAddr j) pid { V with upt := P' } M' ∗
+    procOfilesOwe γ V.fdg (procAddr j) V.ofile [fd0] ∗
     fileRef γ kk q st ∗ fdStAuth V.fdg fd0 st ∗ fdFrags V.fdg sts ∗
     filereadEnvOut (hlc := hlc) st ∗ (filereadEnvOut (hlc := hlc) st -∗ filereadFsOut) ∗
     filereadArms (hlc := hlc) st (argZ v2) F Rd Rin P (R 10#5) M' a1 ∗
     (∀ c : CPU, sysReadPost (hlc := hlc) k γ j pid V M sts v v1 v2 F Rd Rin P c)
     ⊢ wpLoop (GF := GF) cpu := by
   subst a1
-  iintro ⟨Hk, Hpc, Hcells, Hte, Hce, Hpriv, Hjoin, Hcb, Href, Hauth, Hfr, Henvo, Henvb, Harms, HΦ⟩
-  ihave Hpriv := (srd_priv_conv ht0 (procAddr j) pid V P' M').1 $$ Hpriv
-  icases Hjoin $$ %P' %M' Hpriv with ⟨Hcore, Hcells'⟩
-  ihave Howe := Hcb $$ Hcells'
+  iintro ⟨Hk, Hpc, Hcells, Hte, Hce, Hcore, Howe, Href, Hauth, Hfr, Henvo, Henvb, Harms, HΦ⟩
   ihave Howe := procOfilesOwe_repay γ V.fdg (procAddr j) V.ofile [] fd0 kk q st (by simp) hfv hkk hst
     $$ [Howe Href Hauth]
   · iframe
@@ -233,11 +227,6 @@ theorem srd_ok_jal (FR : FILEREAD) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ
   -- the environment the state selects, and the keyed input
   icases fileread_env_split st $$ Henv Hready with ⟨Henv, Henvb⟩
   ihave Hin := sysReadIn_of F Rd Rin P V v sts fd0 (fnode kk) st hsome hsts $$ Hin
-  -- the block fileread runs over
-  icases procOfilesOwe_cells_acc γ V.fdg (procAddr j) V.ofile [fd0] $$ Howe with ⟨Hcells', Hcb⟩
-  icases srd_block_open ht0 (procAddr j) pid V M $$ [Hcore Hcells'] with ⟨Hpriv, Hjoin⟩
-  · iframe
-  ihave Hpriv := (srd_priv_conv0 ht0 (procAddr j) pid V M).2 $$ Hpriv
   iapply (srd_fileread FR Γ cpu _ γ kk q st j pid V M γkl γk (argZ v2) F Rd Rin P ?hKf hkk hj
       ?hpf ?hnf ?htf ?ha0 ?ha2 (argZ_range v2)) $$ [- $Hk $Hpc]
   rotate_right 1
@@ -253,7 +242,7 @@ theorem srd_ok_jal (FR : FILEREAD) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ
   -- ===== back from fileread (at any hart) =====
   iintro %cpu
   unfold filereadPost
-  iintro %spie3 %spp3 %R3 %P' %M' %d %⟨hcs3, hext, hdle, hr10, hwin⟩ Hk Hpc Hte Hce Href Hpriv
+  iintro %spie3 %spp3 %R3 %P' %M' %d %⟨hcs3, hext, hdle, hr10, hwin⟩ Hk Hpc Hte Hce Href Hcore
     Henvo Harms
   k_norm_g [srd_ret_40, srd_ww, srd_psw, srd_rsw]
   k_norm_g [h11] at hwin
@@ -263,7 +252,7 @@ theorem srd_ok_jal (FR : FILEREAD) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ
     exact hr
   iapply (srd_ok_back cpu k γ j pid V M sts v v1 v2 F Rd Rin P spie3 spp3 R3 fd0 kk q st P' M' d wf wp
       lo hi hK6 hr5 ht0 hsome hfv hkk hst hsts hext hdle hr10 hwin hal _ h11)
-    $$ [$Hk $Hpc $Hcells $Hte $Hce $Hpriv $Hjoin $Hcb $Href $Hauth $Hfr $Henvo $Henvb $Harms $HΦ]
+    $$ [$Hk $Hpc $Hcells $Hte $Hce $Hcore $Howe $Href $Hauth $Hfr $Henvo $Henvb $Harms $HΦ]
 
 set_option maxHeartbeats 16000000 in
 /-- **argfd SUCCEEDED** (`a0 = 0`): `mv a5,a0`, the hoisted `li a0,-1`,

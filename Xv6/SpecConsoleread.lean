@@ -41,6 +41,11 @@ Deviations from Rocq:
    `-1 ≤ r ≤ max 0 n` with `0 ≤ r → r = d`.
 5. The interrupts-off derived form `wp_consoleread_body` is dropped (no
    users).
+6. THE PROCESS BLOCK is the BARE block `procPrivBareAt curCtx (procAddr j)
+   pid V M` (Rocq `proc_priv_bare` + the lazy claim) where Rocq's contract
+   takes `proc_priv_core` (bare ∗ cwd reference ∗ generation row): a
+   strictly weaker premise -- the function touches neither -- so the
+   file layer frames them around the call (`FileRwShared.filerw_core_conv`).
 
 Imports only definitional files.
 -/
@@ -92,7 +97,7 @@ def wp_consoleread_eb_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF]
   isConslock cn Wd γc ∗ consPay cn Wd ord ∗
   consReadPay (genId (hlc := hlc) (GF := GF) + 1) Rin ∗ uartInv .uart0 cn.uart ∗
   isLock γkl kmemLockAddr "kmem" (kmemRes γk) ∗ kallocAvail γk none ∗
-  procPrivNoctxAt curCtx (procAddr j) pid V M ∗
+  procPrivBareAt curCtx (procAddr j) pid V M ∗
   wpNext true k.proc cpu (fun cpu' => iprop(∀ (spie spp : Bool) (R' : RegMap) (P' : UPtd)
     (M' : Nat → List (BitVec 8)) (d dc cur : Nat) (bs : Nat → BitVec 8) (hs : List (List Obs))
     (sl : List (List Obs × BitVec 8)),
@@ -112,7 +117,7 @@ def wp_consoleread_eb_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF]
     consOut cn Wd ord cur dc -∗
     kctx cpu' ((k.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k.regs 1#5)) -∗
     trapCsrsExt cpu' k.sie -∗ cpuClaimExt cpu' k.sie k.proc -∗
-    procPrivNoctxAt curCtx (procAddr j) pid { V with upt := P' } M' -∗ wpLoop cpu'))
+    procPrivBareAt curCtx (procAddr j) pid { V with upt := P' } M' -∗ wpLoop cpu'))
   ⊢ wpLoop (GF := GF) cpu
 
 /-- The interface of `consoleread`. -/

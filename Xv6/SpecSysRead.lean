@@ -48,10 +48,10 @@ slots 1/2, `f` at `s0-24`, the `int n` the UPPER word of the slot at
    (`hnoff`), the crossing the literal `wpNext true`.
 2. **THE PROCESS BLOCK is `procPrivFd γ (procAddr j) pid V M`** (Rocq
    `proc_priv γf pj pidv U`, the WHOLE block; user rule D16).  The body
-   lends the descriptor's reference (`procOfilesOwe_lend`) and hands
-   fileread the bare block with the ofile CELLS (fileread's block,
-   SpecFileread deviation 6), keeping the cwd reference aside; everything
-   is joined back.
+   lends the descriptor's reference (`procOfilesOwe_lend`, Rocq
+   `proc_priv_lend`) and hands fileread the core (`procPrivCoreNoctxAt`,
+   Rocq `proc_priv_core`, SpecFileread deviation 6); the array waits aside
+   and everything is joined back.
 3. **THE FS ENVIRONMENT is `filereadFsEnv`** = `fsReady ∗ bslot`
    (SpecFileread deviation 2), and what comes back is `filereadFsOut` (the
    `bslot`).  Rocq's `fread_names fn` and its two pinning premises

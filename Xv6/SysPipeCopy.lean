@@ -69,7 +69,7 @@ theorem sys_pipe_stage_f (FC : FILECLOSE) (Γ : SchedNames) [ClaimIs (hlc := hlc
     wordPointsTo (k.regs 2#5 + 0xFFFFFFFFFFFFFFD0#64) 8 (DFrac.own 1) (fnode k0) ∗
     wordPointsTo (k.regs 2#5 + 0xFFFFFFFFFFFFFFC8#64) 8 (DFrac.own 1) (fnode k1) ∗
     fileRef γ k0 1 (.open true false .pipe) ∗ fileRef γ k1 1 (.open false true .pipe) ∗
-    sysPipeCoreExt pa pid V P2 M2 ∗
+    procPrivCoreNoctxAt curCtx pa pid { V with upt := P2 } M2 ∗
     procOfilesOwe γ V.fdg pa ((V.ofile.set fd0 (fnode k0)).set fd1 (fnode k1)) [fd1, fd0] ∗
     fdSlot ∗ fdStAuth V.fdg fd0 .closed ∗ fdSlot ∗ fdStAuth V.fdg fd1 .closed ∗ fdFrags V.fdg sts ∗
     sysPipeTurn cpu k γ V.fdg pa pid V M sts v
@@ -125,7 +125,7 @@ theorem sys_pipe_stage_f (FC : FILECLOSE) (Γ : SchedNames) [ClaimIs (hlc := hlc
     ihave Howe := procOfilesOwe_repay γ V.fdg pa ((V.ofile.set fd0 (fnode k0)).set fd1 (fnode k1)) [] fd0 k0 1
       (.open true false .pipe) (by simp) hl0 hk0 (by intro h; cases h) $$ [Howe Hr0 Ha0]
     · iframe
-    ihave Hcore := (show sysPipeCoreExt (GF := GF) pa pid V P2 M2 ⊢
+    ihave Hcore := (show procPrivCoreNoctxAt (GF := GF) curCtx pa pid { V with upt := P2 } M2 ⊢
         procPrivCoreNoctxAt curCtx pa pid
           { V with ofile := (V.ofile.set fd0 (fnode k0)).set fd1 (fnode k1), upt := P2 } M2 from
       .rfl) $$ Hcore

@@ -584,25 +584,6 @@ theorem sys_pipe_core_split (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv) (M
   · ipureintro; exact hf
   · ipureintro; exact hlz
 
-/-- `procPrivCoreNoctxAt` at the descriptor `copyout` grew the space to
-(`EitherDefs.procPrivExt`'s descriptor form, fd-free): the same resource as
-the core at `{ V with upt := P' }` (`sysPipeCoreExt_eq`). -/
-def sysPipeCoreExt (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv) (P' : UPtd)
-    (M' : Nat → List (BitVec 8)) : IProp GF := iprop%
-  (⌜V.sz.toNat ≤ uvmMaxsz ∧ umBelow V.sz P' ∧
-    V.pagetable = pageAddr P'.root ∧ V.trapframe = pageAddr P'.tfp⌝ ∗
-  @wordPointsTo hlc GF _ ⟨curCtx, KTier.kpt⟩ (pPid pa) 4 pidPriv pid ∗
-  @procFieldsNoOfile hlc GF _ ⟨curCtx, KTier.kpt⟩ pa (DFrac.own 1) V ∗
-  @procPtAt hlc GF _ ⟨curCtx, KTier.kpt⟩ P' M' ∗
-  @tfPageAt hlc GF _ ⟨curCtx, KTier.kpt⟩ P'.tfp V.tf ∗
-  ⌜V.pvLazy = false → lazyFree P'.um V.sz⌝) ∗
-  @cwdRefAt hlc GF _ _ _ _ _ ⟨curCtx, KTier.kpt⟩ V.cwd V.cwi ∗ procGenAt curCtx pa pid V.gen
-
-theorem sysPipeCoreExt_eq (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv) (P' : UPtd)
-    (M' : Nat → List (BitVec 8)) :
-    sysPipeCoreExt (GF := GF) pa pid V P' M' = procPrivCoreNoctxAt curCtx pa pid { V with upt := P' } M' :=
-  rfl
-
 /-- Close at the grown space. -/
 theorem sys_pipe_core_ext (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv) (P' : UPtd)
     (M' : Nat → List (BitVec 8)) (hext : V.upt.extSz V.sz P')
@@ -611,8 +592,8 @@ theorem sys_pipe_core_ext (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv) (P' 
     @wordPointsTo hlc GF _ ⟨curCtx, KTier.kpt⟩ (pSz pa) 8 (DFrac.own 1) V.sz ∗
     @wordPointsTo hlc GF _ ⟨curCtx, KTier.kpt⟩ (pPagetable pa) 8 (DFrac.own 1) V.pagetable ∗
     @procPtAt hlc GF _ ⟨curCtx, KTier.kpt⟩ P' M' ∗ sysPipeCoreRest pa pid V ⊢
-      sysPipeCoreExt pa pid V P' M' := by
-  unfold sysPipeCoreExt sysPipeCoreRest procFieldsNoOfile
+      procPrivCoreNoctxAt curCtx pa pid { V with upt := P' } M' := by
+  unfold procPrivCoreNoctxAt procPrivBareAt sysPipeCoreRest procFieldsNoOfile
   rw [hext.1.1, hext.1.2.1]
   iintro ⟨Hsz, Hpg, Hpt, Hpid, Hks, Htf, Hcwd, Hnm, Htfp, %hlz, Hcw⟩
   iframe Hsz Hpg Hpt Hpid Hks Htf Hcwd Hnm Htfp Hcw
@@ -634,11 +615,6 @@ theorem sys_pipe_core_join (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv) (M 
   isplitl []
   · ipureintro; exact hf
   · ipureintro; exact hlz
-
-/-- The core does not mention the array. -/
-theorem sys_pipe_coreExt_ofile (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv) (P' : UPtd)
-    (M' : Nat → List (BitVec 8)) (fs : List (BitVec 64)) :
-    sysPipeCoreExt (GF := GF) pa pid V P' M' = sysPipeCoreExt pa pid { V with ofile := fs } P' M' := rfl
 
 /-! ## The exit: `mv a0,a5` and the epilogue at `sys_pipe+0xdc` -/
 

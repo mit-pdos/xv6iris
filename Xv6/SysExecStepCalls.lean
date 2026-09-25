@@ -10,11 +10,10 @@ sys_exec's FILL-LOOP CALL SITES AND BOOKKEEPING (stage file of
   `sys_exec_kalloc` (Rocq `Kalloc.wp_kalloc_sconf`), `sys_exec_fetchstr`
   (Rocq `Fetchstr.wp_fetchstr_sconf`); the kmem lock and `kallocAvail` come
   out of `fsReady` (`fsReady_kmem`, Rocq `kalloc_env`);
-* THE BLOCK'S TWO SEAMS: fetchaddr is stated over `EitherDefs.procPrivExt`
-  at the round's descriptor (the bare block and the array's CELLS, the
-  payloads and the cwd reference waiting aside: `sys_exec_blk_ext`), fetchstr
-  over the bare block (`SysfileCalls.sysfile_blk_bare`); both re-close the WHOLE block
-  (`procPrivFd`) at the grown descriptor;
+* THE BLOCK'S SEAM: fetchaddr (at its ambient `EitherDefs.procPrivExt`
+  form) and fetchstr are both stated over the bare block, carved out of the
+  WHOLE block and re-closed at the grown descriptor by
+  `SysfileCalls.sysfile_blk_bare`;
 * the pure bookkeeping of a round: fetchstr's buffer as the page's byte
   function (`sys_exec_fstr_ok`, `sys_exec_bview_full`), the pages pushed
   (`sysExecPages_push`, Rocq `sx_pages_close`), the argument address
@@ -22,11 +21,7 @@ sys_exec's FILL-LOOP CALL SITES AND BOOKKEEPING (stage file of
 
 ## Deviations from Rocq
 
-1. `sys_exec_blk_ext` is
-   `SysReadParts.srd_block_open` with the array's cells lent from
-   `procOfiles` (`FdTable.procOfilesOwe_cells_acc`) -- restated with the
-   sys_exec prefix rather than importing another syscall's stage files.
-2. The callees are at their landed interrupt-generic contracts; the
+1. The callees are at their landed interrupt-generic contracts; the
    complement is carried (`SysExecParts` deviation 2).
 
 Imports only the shared vocabulary and callee Specs.
@@ -146,42 +141,6 @@ theorem sysExecPages_push (pg : Nat → BitVec 64) (afun : Nat → Nat → BitVe
     iexact Hp
 
 end Pages
-
-/-! ## The block's two seams -/
-
-section Blk
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
-  [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
-  [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
-  [Appcfg GF] [FileG GF] [Fscfg] [Icfg] [X : CurCtx]
-
-/-- fetchaddr's side (Rocq `proc_priv_lend`'s cell half): the bare block
-beside the array's CELLS is the running block at the round's descriptor
-`P`; the payloads and the cwd reference wait aside, and the wand re-closes
-the WHOLE block at any grown descriptor. -/
-theorem sys_exec_blk_ext (hct : curTier = KTier.kpt) (γ : FileNames) (pa : BitVec 64)
-    (pid : BitVec 32) (V : ProcPriv) (P : UPtd) (M : Nat → List (BitVec 8)) :
-    procPrivFd (GF := GF) γ pa pid { V with upt := P } M ⊢
-      procPrivExt pa pid V P M ∗
-      (∀ (P' : UPtd) (M' : Nat → List (BitVec 8)), procPrivExt pa pid V P' M' -∗
-        procPrivFd γ pa pid { V with upt := P' } M') := by
-  obtain ⟨ξ, t⟩ := X
-  simp only at hct
-  subst hct
-  letI : CurCtx := ⟨ξ, KTier.kpt⟩
-  unfold procPrivFd procPrivCoreNoctxAt procOfiles
-  simp only [procPrivExt_eq]
-  iintro ⟨⟨Hbare, Hcw⟩, Ho⟩
-  icases procOfilesOwe_cells_acc γ V.fdg pa V.ofile [] $$ Ho with ⟨Hc, Hcb⟩
-  isplitl [Hbare Hc]
-  · iapply (procPrivNoctxAt_split ξ pa pid { V with upt := P } M).2
-    iframe Hbare Hc
-  · iintro %P' %M' Hpriv
-    icases (procPrivNoctxAt_split ξ pa pid { V with upt := P' } M').1 $$ Hpriv with ⟨Hbare, Hc⟩
-    ihave Ho := Hcb $$ Hc
-    iframe Hbare Hcw Ho
-
-end Blk
 
 /-- The allocator and the rest of `fsReady` out of the fabric. -/
 theorem sysExecEnv_ready {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF]

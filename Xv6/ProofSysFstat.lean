@@ -35,7 +35,7 @@ WHOLE block is joined back.
 3. THE CONTEXT's tier is pinned once at entry (`kctx_tier` + `htier`), so
    the ambient-context cells argaddr wants and the block's own
    `⟨curCtx, kpt⟩` cells are converted by `sysfile_core_tf` under
-   `curTier = kpt` (filestat's `filestat_priv_conv` pattern).
+   `curTier = kpt` (`FileRwShared.filerw_core_conv`'s pattern).
 4. STAGES (speed; every theorem well under 3 s): `sys_fstat_main` is the
    prologue and argaddr; `sfs_argfd_call` (`+0x12`) is argfd and the
    dispatch on its answer; `sfs_fail_arm` (`+0x1e`, the -1 arm to the

@@ -12,6 +12,7 @@ import MachCSL.ByteWord
 import MachCSL.WpSmodeFrame
 import Xv6.PipeInvDefs
 import Xv6.SchedCtx
+import Xv6.FdTable
 import Xv6.UMem
 import Xv6.UMemLemmas
 import Xv6.LazyFree
@@ -175,49 +176,14 @@ theorem pw_bytes_to_word8 (a : BitVec 64) (dq : DFrac) (w : BitVec 64) (hal : a.
   icases Hb0 with ⟨Hb0, _⟩
   iframe Hb0 Hc1 Hc2 Hc3 Hc4 Hc5 Hc6 Hc7
 
-/-! ## The ctx-free process block, opened for `copyin`/`copyout` -/
+/-! ## The bare process block, at its own descriptor -/
 
-/-- `procPrivNoctx` minus its address space and the `pagetable`/`sz` fields
-the copy reads (the pipe analogue of `ProofKwait.kwRest`). -/
-def pwRest (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv) : IProp GF := iprop%
-  @wordPointsTo hlc GF _ ⟨curCtx, KTier.kpt⟩ (pPid pa) 4 pidPriv pid ∗
-  @wordPointsTo hlc GF _ ⟨curCtx, KTier.kpt⟩ (pKstack pa) 8 (DFrac.own 1) V.kstack ∗
-  @wordPointsTo hlc GF _ ⟨curCtx, KTier.kpt⟩ (pTrapframe pa) 8 (DFrac.own 1) V.trapframe ∗
-  @ofileCells hlc GF _ ⟨curCtx, KTier.kpt⟩ pa (DFrac.own 1) V.ofile ∗
-  @wordPointsTo hlc GF _ ⟨curCtx, KTier.kpt⟩ (pCwd pa) 8 (DFrac.own 1) V.cwd ∗
-  @pnameCells hlc GF _ ⟨curCtx, KTier.kpt⟩ pa (DFrac.own 1) V.name ∗
-  @tfPageAt hlc GF _ ⟨curCtx, KTier.kpt⟩ V.upt.tfp V.tf ∗
-  ⌜V.pvLazy = false → lazyFree V.upt.um V.sz⌝
-
-theorem pw_priv_split (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv)
+/-- The running block at its own descriptor (`rfl`): the entry form a
+copying loop re-enters (the bare `{ V with upt := P }` shape the contracts
+state). -/
+theorem pw_bare_to_ext (ξ : CtxId) (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv)
     (M : Nat → List (BitVec 8)) :
-    procPrivNoctxAt (GF := GF) curCtx pa pid V M ⊢
-      ⌜V.sz.toNat ≤ uvmMaxsz ∧ umBelow V.sz V.upt ∧ V.pagetable = pageAddr V.upt.root ∧
-         V.trapframe = pageAddr V.upt.tfp⌝ ∗
-      @wordPointsTo hlc GF _ ⟨curCtx, KTier.kpt⟩ (pSz pa) 8 (DFrac.own 1) V.sz ∗
-      @wordPointsTo hlc GF _ ⟨curCtx, KTier.kpt⟩ (pPagetable pa) 8 (DFrac.own 1) V.pagetable ∗
-      @procPtAt hlc GF _ ⟨curCtx, KTier.kpt⟩ V.upt M ∗ pwRest pa pid V := by
-  unfold procPrivNoctxAt pwRest procFieldsNoctx
-  iintro ⟨%hf, Hpid, ⟨Hks, Hszc, Hpgc, Htfc, Hof, Hcwd, Hnm⟩, Hspace, Htfp⟩
-  isplitl []
-  · ipureintro; exact hf
-  · iframe
-
-theorem pw_priv_close (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv) (P' : UPtd)
-    (M' : Nat → List (BitVec 8)) (hext : V.upt.extSz V.sz P')
-    (hf : V.sz.toNat ≤ uvmMaxsz ∧ umBelow V.sz V.upt ∧ V.pagetable = pageAddr V.upt.root ∧
-      V.trapframe = pageAddr V.upt.tfp) :
-    @wordPointsTo hlc GF _ ⟨curCtx, KTier.kpt⟩ (pSz pa) 8 (DFrac.own 1) V.sz ∗
-    @wordPointsTo hlc GF _ ⟨curCtx, KTier.kpt⟩ (pPagetable pa) 8 (DFrac.own 1) V.pagetable ∗
-    @procPtAt hlc GF _ ⟨curCtx, KTier.kpt⟩ P' M' ∗ pwRest pa pid V ⊢
-      procPrivExtNoctxAt (GF := GF) curCtx pa pid V P' M' := by
-  unfold procPrivExtNoctxAt pwRest procFieldsNoctx
-  rw [hext.1.1, hext.1.2.1]
-  iintro ⟨Hszc, Hpgc, Hspace, Hpid, Hks, Htfc, Hof, Hcwd, Hnm, Htfp, %hlz⟩
-  isplitl []
-  · ipureintro; exact ⟨hf.1, UMemL.umBelow_extSz hf.2.1 hext, hf.2.2.1, hf.2.2.2⟩
-  · iframe
-    ipureintro; exact fun h => LazyFree.lazyFree_extSz hext (hlz h)
+    procPrivBareAt (GF := GF) ξ pa pid V M ⊢ procPrivBareAt ξ pa pid { V with upt := V.upt } M := .rfl
 
 /-! ## One byte of the pipe's data buffer -/
 
@@ -438,7 +404,6 @@ def pwRestExt (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv) (P : UPtd) : IPr
   @wordPointsTo hlc GF _ ⟨curCtx, KTier.kpt⟩ (pPid pa) 4 pidPriv pid ∗
   @wordPointsTo hlc GF _ ⟨curCtx, KTier.kpt⟩ (pKstack pa) 8 (DFrac.own 1) V.kstack ∗
   @wordPointsTo hlc GF _ ⟨curCtx, KTier.kpt⟩ (pTrapframe pa) 8 (DFrac.own 1) V.trapframe ∗
-  @ofileCells hlc GF _ ⟨curCtx, KTier.kpt⟩ pa (DFrac.own 1) V.ofile ∗
   @wordPointsTo hlc GF _ ⟨curCtx, KTier.kpt⟩ (pCwd pa) 8 (DFrac.own 1) V.cwd ∗
   @pnameCells hlc GF _ ⟨curCtx, KTier.kpt⟩ pa (DFrac.own 1) V.name ∗
   @tfPageAt hlc GF _ ⟨curCtx, KTier.kpt⟩ P.tfp V.tf ∗
@@ -446,14 +411,14 @@ def pwRestExt (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv) (P : UPtd) : IPr
 
 theorem pw_privExt_split (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv) (P : UPtd)
     (M' : Nat → List (BitVec 8)) :
-    procPrivExtNoctxAt (GF := GF) curCtx pa pid V P M' ⊢
+    procPrivBareAt (GF := GF) curCtx pa pid { V with upt := P } M' ⊢
       ⌜V.sz.toNat ≤ uvmMaxsz ∧ umBelow V.sz P ∧ V.pagetable = pageAddr P.root ∧
         V.trapframe = pageAddr P.tfp⌝ ∗
       @wordPointsTo hlc GF _ ⟨curCtx, KTier.kpt⟩ (pSz pa) 8 (DFrac.own 1) V.sz ∗
       @wordPointsTo hlc GF _ ⟨curCtx, KTier.kpt⟩ (pPagetable pa) 8 (DFrac.own 1) V.pagetable ∗
       @procPtAt hlc GF _ ⟨curCtx, KTier.kpt⟩ P M' ∗ pwRestExt pa pid V P := by
-  unfold procPrivExtNoctxAt pwRestExt procFieldsNoctx
-  iintro ⟨%hf, Hpid, ⟨Hks, Hszc, Hpgc, Htfc, Hof, Hcwd, Hnm⟩, Hspace, Htfp⟩
+  unfold procPrivBareAt pwRestExt procFieldsNoOfile
+  iintro ⟨%hf, Hpid, ⟨Hks, Hszc, Hpgc, Htfc, Hcwd, Hnm⟩, Hspace, Htfp⟩
   isplitl []
   · ipureintro; exact hf
   · iframe
@@ -465,10 +430,10 @@ theorem pw_privExt_close (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv) (P P'
     @wordPointsTo hlc GF _ ⟨curCtx, KTier.kpt⟩ (pSz pa) 8 (DFrac.own 1) V.sz ∗
     @wordPointsTo hlc GF _ ⟨curCtx, KTier.kpt⟩ (pPagetable pa) 8 (DFrac.own 1) V.pagetable ∗
     @procPtAt hlc GF _ ⟨curCtx, KTier.kpt⟩ P' M'' ∗ pwRestExt pa pid V P ⊢
-      procPrivExtNoctxAt (GF := GF) curCtx pa pid V P' M'' := by
-  unfold procPrivExtNoctxAt pwRestExt procFieldsNoctx
+      procPrivBareAt (GF := GF) curCtx pa pid { V with upt := P' } M'' := by
+  unfold procPrivBareAt pwRestExt procFieldsNoOfile
   rw [hext.1.1, hext.1.2.1]
-  iintro ⟨Hszc, Hpgc, Hspace, Hpid, Hks, Htfc, Hof, Hcwd, Hnm, Htfp, %hlz⟩
+  iintro ⟨Hszc, Hpgc, Hspace, Hpid, Hks, Htfc, Hcwd, Hnm, Htfp, %hlz⟩
   isplitl []
   · ipureintro; exact ⟨hf.1, UMemL.umBelow_extSz hf.2.1 hext, hf.2.2.1, hf.2.2.2⟩
   · iframe

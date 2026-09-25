@@ -19,7 +19,7 @@ continuation that carries the trap-CSR complement (`trapCsrsExt` /
   Its environment comes out of `fsReady`.
 * `fwr_writei`: the set-form contract on the USER arm (`a1 = 1`), the
   kernel source a dummy of the chunk's length, the block converted at the
-  kernel-page-table tier (`filerw_priv_conv`).
+  kernel-page-table tier (`EitherDefs.procPrivExt_conv`).
 * `fwr_iunlock`: the tx form; iunlock does not thread the complement, so it
   is carried across its own crossing (the WIDE HOP, NamexCalls').
 * `fwr_pipewrite`: the eb contract, the block converted.
@@ -284,14 +284,14 @@ theorem fwr_writei (WI : WRITEI) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
     (by simp only [if_true]; rw [ha1]; decide) ha3 ha4
   unfold wp_writei_gen_eb_body at h
   simp only [writeiAddr, if_true] at h
-  ihave Hpriv := (filerw_priv_conv ht (procAddr j) pid V P Mv).2 $$ Hpriv
+  ihave Hpriv := (procPrivExt_conv ht (procAddr j) pid V P Mv).2 $$ Hpriv
   iapply h
   iframe Hk Hpc Hpi Hte Hce Hpe Hbc Hlc Hdc Hkl Hav Hdev Hin Hmeta Hmap Hblk Hsi Hss Hsb Hbmi
     Hinv Hdi Hpriv Hbs Hop
   iapply wpNext_intro
   iintro %c' %spie %spp %R' %tot %bm' %data' %dn' %dn0' %n' %wrote %dist %dstb %P' %Sb' %hcs
     %hout Hk Hpc Hte Hce Hdev Hin Hmeta Hmap Hblk - - - Hdi Hpriv Hbs Hop
-  ihave Hpriv := (filerw_priv_conv ht (procAddr j) pid V P' (viewFaulted P P' Mv)).1 $$ Hpriv
+  ihave Hpriv := (procPrivExt_conv ht (procAddr j) pid V P' (viewFaulted P P' Mv)).1 $$ Hpriv
   iapply HK $$ %c' %spie %spp %R' %tot %bm' %data' %dn' %dn0' %n' %wrote %dist %dstb %P' %Sb' []
     Hk Hpc Hte Hce Hdev Hin Hmeta Hmap Hblk Hdi Hpriv Hbs Hop
   ipureintro; exact ⟨hcs, hout⟩
@@ -324,12 +324,12 @@ theorem fwr_pipewrite (PW : PIPEWRITE) (Γ : SchedNames) [ClaimIs (hlc := hlc) G
   unfold wp_pipewrite_eb_body at h
   simp only [pipewriteAddr] at h
   iintro ⟨Hk, Hpc, #Hpi, Hte, Hce, #Hpp, Href, #Hkl, #Hav, Hpriv, HK⟩
-  ihave Hpriv := (filerw_priv_conv0 ht (procAddr j) pid V M).2 $$ Hpriv
+  ihave Hpriv := (procPrivExt_conv0 ht (procAddr j) pid V M).2 $$ Hpriv
   iapply h
   iframe Hk Hpc Hpi Hte Hce Hpp Href Hkl Hav Hpriv
   iapply wpNext_intro
   iintro %c' %spie %spp %R' %P' %hp Hk Hpc Hte Hce Href Hpriv
-  ihave Hpriv := (filerw_priv_conv ht (procAddr j) pid V P' (viewFaulted V.upt P' M)).1 $$ Hpriv
+  ihave Hpriv := (procPrivExt_conv ht (procAddr j) pid V P' (viewFaulted V.upt P' M)).1 $$ Hpriv
   iapply HK $$ %c' %spie %spp %R' %P' %hp Hk Hpc Hte Hce Href Hpriv
 
 set_option maxHeartbeats 8000000 in
@@ -363,12 +363,12 @@ theorem fwr_consolewrite (CW : CONSOLEWRITE) (Γ : SchedNames) [ClaimIs (hlc := 
   unfold wp_consolewrite_eb_body at h
   simp only [consolewriteAddr] at h
   iintro ⟨Hk, Hpc, #Hpi, Hte, Hce, #Hport, Hch, #Hkl, #Hav, Hpriv, HK⟩
-  ihave Hpriv := (filerw_priv_conv0 ht (procAddr j) pid V M).2 $$ Hpriv
+  ihave Hpriv := (procPrivExt_conv0 ht (procAddr j) pid V M).2 $$ Hpriv
   iapply h
   iframe Hk Hpc Hpi Hte Hce Hport Hch Hkl Hav Hpriv
   iapply wpNext_intro
   iintro %c' %spie %spp %R' %P' %i %hp Hk Hpc Hte Hce Hpriv HQ
-  ihave Hpriv := (filerw_priv_conv ht (procAddr j) pid V P' (viewFaulted V.upt P' M)).1 $$ Hpriv
+  ihave Hpriv := (procPrivExt_conv ht (procAddr j) pid V P' (viewFaulted V.upt P' M)).1 $$ Hpriv
   iapply HK $$ %c' %spie %spp %R' %P' %i %hp Hk Hpc Hte Hce Hpriv HQ
 
 end

@@ -9,7 +9,7 @@ applies it with one `iapply` (the `FilestatCalls` / `FilewriteCalls`
 pattern).
 
 * `frd_piperead` / `frd_consoleread`: the eb contracts, the block at the
-  ambient `procPrivExt` form (`filerw_priv_conv`).
+  ambient `procPrivExt` form (`EitherDefs.procPrivExt_conv`).
 * `frd_ilock`: THE READ ARM (`depRd`: fileread holds no transaction, Rocq's
   "the other true read-locker"), the `shotK ty` licence, and `Tl := maxStamp
   m` -- the fd's off-box share's stamps, presented at the acquire so that
@@ -66,12 +66,12 @@ theorem frd_piperead (PR : PIPEREAD) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF 
   unfold wp_piperead_eb_body at h
   simp only [pipereadAddr] at h
   iintro ⟨Hk, Hpc, #Hpi, Hte, Hce, #Hpp, Href, #Hkl, #Hav, Hpriv, HK⟩
-  ihave Hpriv := (filerw_priv_conv0 ht (procAddr j) pid V M).2 $$ Hpriv
+  ihave Hpriv := (procPrivExt_conv0 ht (procAddr j) pid V M).2 $$ Hpriv
   iapply h
   iframe Hk Hpc Hpi Hte Hce Hpp Href Hkl Hav Hpriv
   iapply wpNext_intro
   iintro %c' %spie %spp %R' %P' %M' %d %hp Hk Hpc Hte Hce Href Hpriv
-  ihave Hpriv := (filerw_priv_conv ht (procAddr j) pid V P' M').1 $$ Hpriv
+  ihave Hpriv := (procPrivExt_conv ht (procAddr j) pid V P' M').1 $$ Hpriv
   iapply HK $$ %c' %spie %spp %R' %P' %M' %d %hp Hk Hpc Hte Hce Href Hpriv
 
 set_option maxHeartbeats 8000000 in
@@ -117,13 +117,13 @@ theorem frd_consoleread (CR : CONSOLEREAD) (Γ : SchedNames) [ClaimIs (hlc := hl
   unfold wp_consoleread_eb_body at h
   simp only [consolereadAddr] at h
   iintro ⟨Hk, Hpc, #Hpi, Hte, Hce, #Hcl, Hpay, Hrin, #Hui, #Hkl, #Hav, Hpriv, HK⟩
-  ihave Hpriv := (filerw_priv_conv0 ht (procAddr j) pid V M).2 $$ Hpriv
+  ihave Hpriv := (procPrivExt_conv0 ht (procAddr j) pid V M).2 $$ Hpriv
   iapply h
   iframe Hk Hpc Hpi Hte Hce Hcl Hpay Hrin Hui Hkl Hav Hpriv
   iapply wpNext_intro
   iintro %c' %spie %spp %R' %P' %M' %d %dc %cur %bs %hs %sl %hp Hts Hlb Hwin Hout Hk Hpc Hte Hce
     Hpriv
-  ihave Hpriv := (filerw_priv_conv ht (procAddr j) pid V P' M').1 $$ Hpriv
+  ihave Hpriv := (procPrivExt_conv ht (procAddr j) pid V P' M').1 $$ Hpriv
   iapply HK $$ %c' %spie %spp %R' %P' %M' %d %dc %cur %bs %hs %sl %hp Hts Hlb Hwin Hout Hk Hpc Hte
     Hce Hpriv
 

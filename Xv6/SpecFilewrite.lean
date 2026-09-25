@@ -136,15 +136,13 @@ untouched); the `n < 0` test (+0x1c); the three-way dispatch; FD_PIPE
    discharged.  The conjunct is the caller's (a user buffer below MAXVA
    satisfies it); it goes away if `WriteiOut.usr` also reports `src.toNat +
    tot ≤ 2^64` (reported, landed file).
-6. **THE PROCESS BLOCK is `procPrivNoctxAt curCtx (procAddr j) pid V M`**
-   (Rocq `proc_priv_core pj pidv U`): the form the landed user-copy callees
-   (`WRITEI`'s user arm, `PIPEWRITE`, `CONSOLEWRITE`) are stated over, as
-   SpecFilestat's (its deviation 3).  PROCESS-LAYER NOTE for the
-   coordinator: Rocq's `proc_priv_core` is `bare ∗ cwd_ref_at` (Lean
-   `FdTable.procPrivCoreNoctxAt`) and does NOT contain the ofile array;
-   Lean's `procPrivNoctxAt` = bare ∗ the ofile CELLS and no cwd reference.
-   Stating filewrite at the Rocq-literal core would need writei's /
-   pipewrite's user arms re-stated over `procPrivBareAt` (landed files).
+6. **THE PROCESS BLOCK is `procPrivCoreNoctxAt curCtx (procAddr j) pid V
+   M`**, Rocq's `proc_priv_core pj pidv U` literally (the bare block, the
+   cwd reference, the generation row; no descriptor array).  The user-copy
+   callees below it (`WRITEI`'s user arm, `PIPEWRITE`, `CONSOLEWRITE`,
+   `EITHER_COPYIN`) take only the bare block (`procPrivBareAt`, Rocq
+   `proc_priv_bare` + the lazy claim): the cwd reference and the
+   generation row are framed around them (`FileRwShared.filerw_core_conv`).
    The post's block is at `{ V with upt := P' }` and `viewFaulted V.upt P'
    M` (Rocq `proc_priv_core pj pidv (us_upt U P')` at the unmoved image).
 7. **`kalloc_env fsc_kalloc None`** is the pair `isLock γkl kmemLockAddr
@@ -697,7 +695,7 @@ def filewritePost (k : KCtx) (γl : GName) (γu : UartNames) (γ : FileNames) (f
     kctx cpu' ((k.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k.regs 1#5)) -∗
     trapCsrsExt cpu' k.sie -∗ cpuClaimExt cpu' k.sie k.proc -∗
     fileRef γ fk q st -∗
-    procPrivNoctxAt curCtx (procAddr j) pid { V with upt := P' } (viewFaulted V.upt P' M) -∗
+    procPrivCoreNoctxAt curCtx (procAddr j) pid { V with upt := P' } (viewFaulted V.upt P' M) -∗
     filewriteEnvOut γl γu st -∗
     filewriteArms (hlc := hlc) V.upt st n (writerImg V.upt M) (k.regs 11#5) Q (R' 10#5) -∗
     wpLoop cpu')
@@ -729,7 +727,7 @@ def wp_filewrite_eb_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [
   -- THE BORROWED REFERENCE, at an ARBITRARY fraction, given back
   fileRef γ fk q st ∗
   -- AMBIENT: three of the arms copy from user memory (deviation 6)
-  procPrivNoctxAt curCtx (procAddr j) pid V M ∗
+  procPrivCoreNoctxAt curCtx (procAddr j) pid V M ∗
   isLock γkl kmemLockAddr "kmem" (kmemRes γk) ∗ kallocAvail γk none ∗
   -- ... and what the file's TYPE selects (the FD_DEVICE arm: the devsw
   -- cell and the console port, deviation 3; Rocq's devsw PIN premise is

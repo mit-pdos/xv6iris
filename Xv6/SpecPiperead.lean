@@ -9,7 +9,11 @@ contract `wp_piperead_body` is derived), on proc `j`; `a0 = pi`, `a1 = addr` (th
 destination), `a2 = n` as a 32-bit int.  The pipe (`isPipe`) and a share of
 one end (`pipeRef`) are the credential that the lock is alive; `killed`,
 `sleep_prepare`/`sleep`/`wakeup` need `procsInv`; `copyout` needs the kmem
-lock and the ctx-free process block.
+lock and the BARE process block `procPrivBareAt curCtx` (Rocq
+`proc_priv_bare` + the lazy claim).  DEVIATION: Rocq's contract takes
+`proc_priv_core` (bare ∗ cwd reference ∗ generation row); the bare part is
+a strictly weaker premise -- piperead touches neither -- so the file layer
+frames them around the call (`FileRwShared.filerw_core_conv`).
 
 Exit at the caller's return address on whichever hart `sleep` resumed on:
 the callee-saved registers restored, the reference back, and the process
@@ -27,6 +31,7 @@ import Xv6.SpecSleep
 import Xv6.PipeInvDefs
 import Xv6.KallocDefs
 import Xv6.SchedCtx
+import Xv6.FdTable
 import Xv6.UMem
 import Xv6.UMemWindow
 import Xv6.Image
@@ -60,7 +65,7 @@ def wp_piperead_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G
   trapCsrs cpu ∗ cpuClaim cpu k.proc ∗ intrRes cpu ∗
   isPipe γl γp (k.regs 10#5) ∗ pipeRef γp w q ∗
   isLock γkl kmemLockAddr "kmem" (kmemRes γk) ∗ kallocAvail γk none ∗
-  procPrivNoctxAt curCtx (procAddr j) pid V M ∗
+  procPrivBareAt curCtx (procAddr j) pid V M ∗
   wpNext true k.proc cpu (fun cpu' => iprop(∀ (spie spp : Bool) (R' : RegMap) (P' : UPtd)
     (M' : Nat → List (BitVec 8)) (d : Nat),
     ⌜calleeSaved k.regs R' ∧ V.upt.extSz V.sz P' ∧ (d : Int) ≤ max 0 n ∧ pipeReadRet d (R' 10#5) ∧
@@ -68,7 +73,7 @@ def wp_piperead_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G
     kctx cpu' ((k.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k.regs 1#5)) -∗
     trapCsrs cpu' -∗ cpuClaim cpu' k.proc -∗ intrRes cpu' -∗
     pipeRef γp w q -∗
-    procPrivNoctxAt curCtx (procAddr j) pid { V with upt := P' } M' -∗ wpLoop cpu'))
+    procPrivBareAt curCtx (procAddr j) pid { V with upt := P' } M' -∗ wpLoop cpu'))
   ⊢ wpLoop (GF := GF) cpu
 
 /-- **WP of `piperead`, at either entry `SIE`** (Rocq `SpecPiperead.v`
@@ -91,7 +96,7 @@ def wp_piperead_eb_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [X
   trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗
   isPipe γl γp (k.regs 10#5) ∗ pipeRef γp w q ∗
   isLock γkl kmemLockAddr "kmem" (kmemRes γk) ∗ kallocAvail γk none ∗
-  procPrivNoctxAt curCtx (procAddr j) pid V M ∗
+  procPrivBareAt curCtx (procAddr j) pid V M ∗
   wpNext true k.proc cpu (fun cpu' => iprop(∀ (spie spp : Bool) (R' : RegMap) (P' : UPtd)
     (M' : Nat → List (BitVec 8)) (d : Nat),
     ⌜calleeSaved k.regs R' ∧ V.upt.extSz V.sz P' ∧ (d : Int) ≤ max 0 n ∧ pipeReadRet d (R' 10#5) ∧
@@ -99,7 +104,7 @@ def wp_piperead_eb_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [X
     kctx cpu' ((k.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k.regs 1#5)) -∗
     trapCsrsExt cpu' k.sie -∗ cpuClaimExt cpu' k.sie k.proc -∗
     pipeRef γp w q -∗
-    procPrivNoctxAt curCtx (procAddr j) pid { V with upt := P' } M' -∗ wpLoop cpu'))
+    procPrivBareAt curCtx (procAddr j) pid { V with upt := P' } M' -∗ wpLoop cpu'))
   ⊢ wpLoop (GF := GF) cpu
 
 structure PIPEREAD : Prop where

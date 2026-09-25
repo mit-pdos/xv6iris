@@ -7,23 +7,15 @@ epilogue at `+0x40`.
 
 * THE BLOCK AROUND ARGADDR / ARGINT (`SysfileCalls.sysfile_core_tf`): the
   trapframe pointer and page out of the core and back (Rocq `proc_priv_tf`).
-* THE BLOCK AROUND FILEREAD (`srd_block_open` / `srd_block_close`, Rocq's
-  `proc_priv_lend` … `proc_priv_join` seam): after the reference is lent
-  (`procOfilesOwe_lend`), fileread's block (the bare block with the ofile
-  CELLS, SpecFileread deviation 6) is the core's bare half beside the
-  array's cells (`FdTable.procOfilesOwe_cells_acc`); the cwd reference
-  waits beside, and both are rejoined at fileread's grown descriptor.
+* THE BLOCK AROUND FILEREAD: fileread takes the core (Rocq
+  `proc_priv_core`, SpecFileread deviation 6), so after the reference is
+  lent (`procOfilesOwe_lend`) the core goes to fileread as it is and the
+  array waits aside (Rocq's `proc_priv_lend` … `proc_priv_join` seam).
 * THE CALLEES: `SysfileCalls.sysfile_argaddr` / `sysfile_argint` /
   `sysfile_argfd`, and `srd_fileread` here, each with a HART-FREE
   continuation carrying the trap-CSR complement.
 * THE TAIL (`srd_tail`): ONE epilogue over the value the arm left in `a0`
   (the error return is hoisted).
-
-## Deviations from Rocq
-
-1. `srd_block_open` is SysWriteParts' `swr_blk_lend` at fileread's
-   ambient form (a stage file of another Proof cannot be imported;
-   promotion to `SysfileCalls`: reported).
 -/
 import Xv6.SpecSysRead
 import Xv6.SysfileCalls
@@ -236,57 +228,6 @@ theorem srd_tail (cpu : CPU) (k : KCtx) (spie spp : Bool) (R : RegMap) (hK : 6 �
 
 end
 
-/-! ## The block -/
-
-section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
-  [FileG GF] [IcacheG GF] [SleepLockG GF] [IcboxG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [OffboxG GF] [OffboxBoxG GF]
-  [BcacheG GF] [DiskG GF] [LogG GF] [FsBlocksG GF] [IregG GF] [FsTopG GF] [FsLinkG GF] [Appcfg GF] [Fscfg] [Icfg] [X : CurCtx]
-
-/-- At the kernel-page-table tier fileread's block IS the ambient
-`procPrivExt` (FilereadParts' `filerw_priv_conv`). -/
-theorem srd_priv_conv (h : curTier = KTier.kpt) (pa : BitVec 64) (pid : BitVec 32)
-    (V : ProcPriv) (P : UPtd) (M : Nat → List (BitVec 8)) :
-    procPrivNoctxAt (GF := GF) curCtx pa pid { V with upt := P } M ⊣⊢ procPrivExt pa pid V P M := by
-  obtain ⟨ξ, t⟩ := X
-  simp only at h
-  subst h
-  exact .rfl
-
-theorem srd_priv_conv0 (h : curTier = KTier.kpt) (pa : BitVec 64) (pid : BitVec 32)
-    (V : ProcPriv) (M : Nat → List (BitVec 8)) :
-    procPrivNoctxAt (GF := GF) curCtx pa pid V M ⊣⊢ procPrivExt pa pid V V.upt M := by
-  obtain ⟨ξ, t⟩ := X
-  simp only at h
-  subst h
-  exact .rfl
-
-/-- THE BLOCK FILEREAD RUNS OVER (Rocq `proc_priv_lend`'s other half): the
-core's bare half beside the array's cells IS fileread's block at the
-ambient form; the cwd reference waits aside, and the wand rejoins the core
-at fileread's grown descriptor. -/
-theorem srd_block_open (h : curTier = KTier.kpt) (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv)
-    (M : Nat → List (BitVec 8)) :
-    procPrivCoreNoctxAt (GF := GF) curCtx pa pid V M ∗ ofileCells pa (DFrac.own 1) V.ofile ⊢
-      procPrivExt pa pid V V.upt M ∗
-      (∀ (P' : UPtd) (M' : Nat → List (BitVec 8)), procPrivExt pa pid V P' M' -∗
-        procPrivCoreNoctxAt curCtx pa pid { V with upt := P' } M' ∗ ofileCells pa (DFrac.own 1) V.ofile) := by
-  obtain ⟨ξ, t⟩ := X
-  simp only at h
-  subst h
-  letI : CurCtx := ⟨ξ, KTier.kpt⟩
-  unfold procPrivCoreNoctxAt
-  simp only [procPrivExt_eq]
-  iintro ⟨⟨Hbare, Hcw⟩, Hc⟩
-  isplitl [Hbare Hc]
-  · iapply (procPrivNoctxAt_split ξ pa pid V M).2
-    iframe Hbare Hc
-  · iintro %P' %M' Hpriv
-    icases (procPrivNoctxAt_split ξ pa pid { V with upt := P' } M').1 $$ Hpriv with ⟨Hbare, Hc⟩
-    iframe Hbare Hc Hcw
-
-end
-
 /-! ## The callees at their call sites -/
 
 section
@@ -311,7 +252,7 @@ theorem srd_fileread (FR : FILEREAD) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF 
     (hn : -2 ^ 31 ≤ n ∧ n < 2 ^ 31) :
     kctx c k' ∗ pcIs c KA.«fileread» ∗ procsInv Γ ∗
     trapCsrsExt c k'.sie ∗ cpuClaimExt c k'.sie k'.proc ∗ panicEnv ∗
-    fileRef γ fk q st ∗ procPrivNoctxAt curCtx (procAddr j) pid V M ∗
+    fileRef γ fk q st ∗ procPrivCoreNoctxAt curCtx (procAddr j) pid V M ∗
     isLock γkl kmemLockAddr "kmem" (kmemRes γk) ∗ kallocAvail γk none ∗
     filereadEnv (hlc := hlc) st ∗ foffRow st ∗
     filereadIn (hlc := hlc) st F Rd Rin P ∗ P ∗

@@ -123,7 +123,7 @@ theorem writei_entry (IU : IUPDATE) (BM : BMAP) (BR : BREAD) (LW : LOG_WRITE) (B
     wordPointsTo sbBmapstartAddr 4 A.dqb (BitVec.ofNat 32 fscBmapstart) ∗
     bitmapInv fscFs fscBmapstart fscCov fscLogst fscSize ∗
     iregInv (hlc := hlc) fscIreg fscFs icfgIst icfgNib ∗ dinodeAt fscIreg A.inum A.dn0 ∗
-    (if A.user then procPrivNoctxAt curCtx (procAddr A.j) A.pidv A.V A.M
+    (if A.user then procPrivBareAt curCtx (procAddr A.j) A.pidv A.V A.M
      else iprop(byteBuf (k.regs 12#5) A.dqs A.sbs ∗ wordPointsTo (pPid k.proc) 4 A.dqp A.pidv)) ∗
     bslots 3 ∗
     logOpS icfgLog A.ncount A.Sb ∗
@@ -143,7 +143,7 @@ theorem writei_entry (IU : IUPDATE) (BM : BMAP) (BR : BREAD) (LW : LOG_WRITE) (B
       wordPointsTo sbSizeAddr 4 A.dqz (BitVec.ofNat 32 fscSize) -∗
       wordPointsTo sbBmapstartAddr 4 A.dqb (BitVec.ofNat 32 fscBmapstart) -∗
       dinodeAt fscIreg A.inum dn0' -∗
-      (if A.user then procPrivNoctxAt curCtx (procAddr A.j) A.pidv { A.V with upt := P' }
+      (if A.user then procPrivBareAt curCtx (procAddr A.j) A.pidv { A.V with upt := P' }
           (viewFaulted A.V.upt P' A.M)
        else iprop(byteBuf (k.regs 12#5) A.dqs A.sbs ∗ wordPointsTo (pPid k.proc) 4 A.dqp A.pidv)) -∗
       bslots 3 -∗

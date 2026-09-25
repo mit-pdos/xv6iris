@@ -59,6 +59,11 @@ Deviations from Rocq:
    and `i ≤ max 0 n` (Rocq `0 ≤ r ≤ Z.max 0 n`, `a0 = r`, `Q (Z.to_nat r)`).
 5. The console's credential is `uartPort .uart0` (Rocq `dev_inv` ∗
    `is_txlock` ∗ `uart_base_word Uart0`).
+6. THE PROCESS BLOCK is the BARE block `procPrivBareAt curCtx (procAddr j)
+   pid V M` (Rocq `proc_priv_bare` + the lazy claim) where Rocq's contract
+   takes `proc_priv_core` (bare ∗ cwd reference ∗ generation row): a
+   strictly weaker premise -- the function touches neither -- so the
+   file layer frames them around the call (`FileRwShared.filerw_core_conv`).
 
 Imports only definitional files.
 -/
@@ -192,13 +197,13 @@ def wp_consolewrite_eb_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF
   uartPort .uart0 γl γ ∗
   consOutChain (genId (hlc := hlc) (GF := GF) + 1) (writerImg V.upt M) (k.regs 11#5) Q 0 n.toNat ∗
   isLock γkl kmemLockAddr "kmem" (kmemRes γk) ∗ kallocAvail γk none ∗
-  procPrivNoctxAt curCtx (procAddr j) pid V M ∗
+  procPrivBareAt curCtx (procAddr j) pid V M ∗
   wpNext true k.proc cpu (fun cpu' => iprop(∀ (spie spp : Bool) (R' : RegMap) (P' : UPtd) (i : Nat),
     ⌜calleeSaved k.regs R' ∧ V.upt.extSz V.sz P' ∧ R' 10#5 = BitVec.ofNat 64 i ∧
       (i : Int) ≤ max 0 n ∧ ((i : Int) < n → writeConsShort V.upt (k.regs 11#5) i n)⌝ -∗
     kctx cpu' ((k.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k.regs 1#5)) -∗
     trapCsrsExt cpu' k.sie -∗ cpuClaimExt cpu' k.sie k.proc -∗
-    procPrivNoctxAt curCtx (procAddr j) pid { V with upt := P' } (viewFaulted V.upt P' M) -∗
+    procPrivBareAt curCtx (procAddr j) pid { V with upt := P' } (viewFaulted V.upt P' M) -∗
     Q i -∗ wpLoop cpu'))
   ⊢ wpLoop (GF := GF) cpu
 

@@ -1,17 +1,16 @@
 /-
 `sys_write`'s stage lemmas (stage file of `ProofSysWrite`; Rocq
 ProofSysWrite.v's local lemmas): the constants, the register bundle, the
-frame and its cells, the block's lend to filewrite, filewrite at its call
+frame and its cells, filewrite at its call
 site, and the shared epilogue at `+0x40`.
 
 * THE FRAME (`frame6s0`, sys_dup's): `f` at `sp₀-24`, the `int n` in the
   UPPER half of the slot at `sp₀-32` (split once, `word8_split4`, and
   rejoined at the exit), `p` at `sp₀-40`, the slot at `sp₀-48` unused;
   `swrCells` bundles the four.
-* THE BLOCK AROUND FILEWRITE (`swr_blk_lend`, deviation 2 of SpecSysWrite):
-  filewrite is stated over `procPrivNoctxAt` (bare ∗ the ofile cells), so
-  the cells are lent out of the array (`procOfilesOwe_cells_acc`) and the
-  cwd reference is kept aside; both come back at filewrite's descriptor.
+* THE BLOCK AROUND FILEWRITE: filewrite takes the core (Rocq
+  `proc_priv_core`, SpecFilewrite deviation 6), so after the reference is
+  lent the core goes to filewrite as it is and the array waits aside.
 * THE CALLEES: argaddr / argint / argfd are SysfileCalls'
   (`sysfile_argaddr`, `sysfile_argint`, `sysfile_argfd`); filewrite's
   wrapper (`swr_filewrite`) is here, its `true` crossing taken at every
@@ -228,45 +227,6 @@ theorem swr_tail (cpu : CPU) (k : KCtx) (spie spp : Bool) (R : RegMap) (hK : 6 �
 
 end
 
-/-! ## The block around filewrite -/
-
-section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
-  [FileG GF] [IcacheG GF] [SleepLockG GF] [IcboxG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [OffboxG GF] [OffboxBoxG GF]
-  [BcacheG GF] [DiskG GF] [LogG GF] [FsBlocksG GF] [IregG GF] [FsTopG GF] [FsLinkG GF] [Appcfg GF] [Fscfg] [Icfg] [X : CurCtx]
-
-/-- **THE LEND TO FILEWRITE** (SpecSysWrite deviation 2): the core and the
-array become filewrite's block form (bare ∗ the ofile cells), the cwd
-reference and the array's payloads kept aside; they rejoin at filewrite's
-descriptor. -/
-theorem swr_blk_lend (h : curTier = KTier.kpt) (γ : FileNames) (pa : BitVec 64) (pid : BitVec 32)
-    (V : ProcPriv) (M : Nat → List (BitVec 8)) (D : List Nat) :
-    procPrivCoreNoctxAt (GF := GF) curCtx pa pid V M ∗ procOfilesOwe γ V.fdg pa V.ofile D ⊢
-      procPrivNoctxAt curCtx pa pid V M ∗
-      (∀ (P' : UPtd) (M' : Nat → List (BitVec 8)),
-        procPrivNoctxAt curCtx pa pid { V with upt := P' } M' -∗
-          procPrivCoreNoctxAt curCtx pa pid { V with upt := P' } M' ∗
-          procOfilesOwe γ V.fdg pa V.ofile D) := by
-  have hcells := procOfilesOwe_cells_acc (GF := GF) γ V.fdg pa V.ofile D
-  have hs1 := procPrivNoctxAt_split (GF := GF) curCtx pa pid V M
-  have hs2 := fun (P' : UPtd) (M' : Nat → List (BitVec 8)) =>
-    procPrivNoctxAt_split (GF := GF) curCtx pa pid { V with upt := P' } M'
-  obtain ⟨ξ, t⟩ := X
-  simp only at h
-  subst h
-  unfold procPrivCoreNoctxAt
-  iintro ⟨⟨Hbare, Hcwd⟩, Howe⟩
-  icases hcells $$ Howe with ⟨Hcells, Hback⟩
-  isplitl [Hbare Hcells]
-  · iapply hs1.2
-    iframe Hbare Hcells
-  iintro %P' %M' Hn
-  icases (hs2 P' M').1 $$ Hn with ⟨Hbare, Hcells⟩
-  iframe Hbare Hcwd
-  iapply Hback $$ Hcells
-
-end
-
 /-! ## filewrite at its call site -/
 
 section
@@ -298,7 +258,7 @@ theorem swr_filewrite (FW : FILEWRITE) (Γ : SchedNames) [ClaimIs (hlc := hlc) G
     (hn : -2 ^ 31 ≤ n ∧ n < 2 ^ 31) :
     kctx c k' ∗ pcIs c KA.«filewrite» ∗ procsInv Γ ∗
     trapCsrsExt c k'.sie ∗ cpuClaimExt c k'.sie k'.proc ∗ panicEnv ∗
-    fileRef γ fk q st ∗ procPrivNoctxAt curCtx (procAddr j) pid V M ∗
+    fileRef γ fk q st ∗ procPrivCoreNoctxAt curCtx (procAddr j) pid V M ∗
     isLock γkl kmemLockAddr "kmem" (kmemRes γk) ∗ kallocAvail γk none ∗
     filewriteEnv (hlc := hlc) γl γu st ∗ foffRow st ∗
     filewriteIn (hlc := hlc) st n (writerImg V.upt M) (k'.regs 11#5) Q ∗

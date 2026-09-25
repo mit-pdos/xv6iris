@@ -22,6 +22,7 @@ the front of the buffer (`byteBuf_append`), and strlen answers `|pl|`.
 -/
 import Xv6.LazyFree
 import Xv6.SpecFetchstr
+import Xv6.EitherDefs
 import Xv6.SpecMyproc
 import Xv6.SpecStrlen
 import Xv6.CodeTactics
@@ -99,17 +100,6 @@ variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [Fdslot
 
 /-! ## The block, opened at the two cells and the address space -/
 
-/-- The core block (at descriptor `P`) minus the two cells fetchstr reads and
-the address space. -/
-def fetchstrRest [CurCtx] (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv) (P : UPtd) : IProp GF := iprop%
-  wordPointsTo (pPid pa) 4 pidPriv pid ∗
-  wordPointsTo (pKstack pa) 8 (DFrac.own 1) V.kstack ∗
-  wordPointsTo (pTrapframe pa) 8 (DFrac.own 1) V.trapframe ∗
-  wordPointsTo (pCwd pa) 8 (DFrac.own 1) V.cwd ∗
-  pnameCells pa (DFrac.own 1) V.name ∗
-  tfPageAt P.tfp V.tf ∗
-  ⌜V.pvLazy = false → lazyFree P.um V.sz⌝
-
 theorem fetchstr_priv_split [X : CurCtx] (ξ : CtxId) (hX : X = ⟨ξ, KTier.kpt⟩) (pa : BitVec 64)
     (pid : BitVec 32) (V : ProcPriv) (M : Nat → List (BitVec 8)) :
     procPrivBareAt (GF := GF) ξ pa pid V M ⊢
@@ -117,9 +107,9 @@ theorem fetchstr_priv_split [X : CurCtx] (ξ : CtxId) (hX : X = ⟨ξ, KTier.kpt
         V.trapframe = pageAddr V.upt.tfp⌝ ∗
       wordPointsTo (pSz pa) 8 (DFrac.own 1) V.sz ∗
       wordPointsTo (pPagetable pa) 8 (DFrac.own 1) V.pagetable ∗
-      procPtAt V.upt M ∗ fetchstrRest pa pid V V.upt := by
+      procPtAt V.upt M ∗ ecRest pa pid V V.upt := by
   subst hX
-  unfold procPrivBareAt fetchstrRest procFieldsNoOfile
+  unfold procPrivBareAt ecRest procFieldsNoOfile
   iintro ⟨%hf, Hpid, ⟨Hks, Hsz, Hpg, Htf, Hcwd, Hnm⟩, Hpt, Htfp⟩
   isplitl []
   · ipureintro; exact hf
@@ -131,7 +121,7 @@ theorem fetchstr_priv_close [X : CurCtx] (ξ : CtxId) (hX : X = ⟨ξ, KTier.kpt
       V.trapframe = pageAddr P.tfp) :
     wordPointsTo (pSz pa) 8 (DFrac.own 1) V.sz ∗
     wordPointsTo (pPagetable pa) 8 (DFrac.own 1) V.pagetable ∗
-    procPtAt P' M' ∗ fetchstrRest pa pid V P ⊢
+    procPtAt P' M' ∗ ecRest pa pid V P ⊢
       procPrivBareAt (GF := GF) ξ pa pid { V with upt := P' } M' := by
   subst hX
   letI : CurCtx := ⟨ξ, KTier.kpt⟩
@@ -139,7 +129,7 @@ theorem fetchstr_priv_close [X : CurCtx] (ξ : CtxId) (hX : X = ⟨ξ, KTier.kpt
       V.trapframe = pageAddr P'.tfp⌝ ∗ wordPointsTo (pPid pa) 4 pidPriv pid ∗
     procFieldsNoOfile pa (DFrac.own 1) V ∗ procPtAt P' M' ∗ tfPageAt P'.tfp V.tf ∗
     ⌜V.pvLazy = false → lazyFree P'.um V.sz⌝)
-  unfold fetchstrRest procFieldsNoOfile
+  unfold ecRest procFieldsNoOfile
   rw [hext.1.1, hext.1.2.1]
   iintro ⟨Hsz, Hpg, Hpt, Hpid, Hks, Htf, Hcwd, Hnm, Htfp, %hlz⟩
   isplitl []

@@ -98,8 +98,10 @@ running-process bundle; its crossing is the literal `true`.
    `List.replicate n 0`): Rocq's `src_bytes` is a total function on both
    arms, and `either_copyin`'s own length premise is unconditional.
 5. THE USER ARM IS STATED OVER THIS PORT'S LAZY VIEW.  Rocq's
-   `proc_priv_core pj pidv U` is `procPrivNoctxAt curCtx (procAddr j) pidv
-   V M` (the running block, as `SpecConsolewrite`), handed back at the
+   `proc_priv_core pj pidv U` is the BARE block `procPrivBareAt curCtx
+   (procAddr j) pidv V M` (Rocq `proc_priv_bare` + the lazy claim, as
+   `SpecConsolewrite`: a strictly weaker premise, the cwd reference and the
+   generation row framed by the file layer), handed back at the
    grown descriptor `P'` and the view `viewFaulted V.upt P' M` with
    `V.upt.extSz V.sz P'` (Rocq's `uptd_ext_sz`).  Rocq's image is
    same-`U`; Lean's copy moves the view (freshly faulted pages read zero),
@@ -377,7 +379,7 @@ def wp_writei_gen_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv
   iregInv (hlc := hlc) fscIreg fscFs icfgIst icfgNib ∗ dinodeAt fscIreg inum dn0 ∗
   -- THE SOURCE: the running block on the user arm, the caller's buffer and
   -- the pid share on the kernel arm (ONE OR THE OTHER, never both)
-  (if user then procPrivNoctxAt curCtx (procAddr j) pidv V M
+  (if user then procPrivBareAt curCtx (procAddr j) pidv V M
    else iprop(byteBuf (k.regs 12#5) dqs sbs ∗ wordPointsTo (pPid k.proc) 4 dqp pidv)) ∗
   -- THREE slot units -- bmap's peak
   bslots 3 ∗
@@ -399,7 +401,7 @@ def wp_writei_gen_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv
     wordPointsTo sbBmapstartAddr 4 dqb (BitVec.ofNat 32 fscBmapstart) -∗
     dinodeAt fscIreg inum dn0' -∗
     -- the source goes back the way it came
-    (if user then procPrivNoctxAt curCtx (procAddr j) pidv { V with upt := P' }
+    (if user then procPrivBareAt curCtx (procAddr j) pidv { V with upt := P' }
         (viewFaulted V.upt P' M)
      else iprop(byteBuf (k.regs 12#5) dqs sbs ∗ wordPointsTo (pPid k.proc) 4 dqp pidv)) -∗
     bslots 3 -∗
@@ -466,7 +468,7 @@ def wp_writei_gen_eb_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] 
   iregInv (hlc := hlc) fscIreg fscFs icfgIst icfgNib ∗ dinodeAt fscIreg inum dn0 ∗
   -- THE SOURCE: the running block on the user arm, the caller's buffer and
   -- the pid share on the kernel arm (ONE OR THE OTHER, never both)
-  (if user then procPrivNoctxAt curCtx (procAddr j) pidv V M
+  (if user then procPrivBareAt curCtx (procAddr j) pidv V M
    else iprop(byteBuf (k.regs 12#5) dqs sbs ∗ wordPointsTo (pPid k.proc) 4 dqp pidv)) ∗
   -- THREE slot units -- bmap's peak
   bslots 3 ∗
@@ -488,7 +490,7 @@ def wp_writei_gen_eb_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] 
     wordPointsTo sbBmapstartAddr 4 dqb (BitVec.ofNat 32 fscBmapstart) -∗
     dinodeAt fscIreg inum dn0' -∗
     -- the source goes back the way it came
-    (if user then procPrivNoctxAt curCtx (procAddr j) pidv { V with upt := P' }
+    (if user then procPrivBareAt curCtx (procAddr j) pidv { V with upt := P' }
         (viewFaulted V.upt P' M)
      else iprop(byteBuf (k.regs 12#5) dqs sbs ∗ wordPointsTo (pPid k.proc) 4 dqp pidv)) -∗
     bslots 3 -∗

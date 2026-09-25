@@ -347,7 +347,7 @@ theorem sys_pipe_unfd2 (FC : FILECLOSE) (Γ : SchedNames) [ClaimIs (hlc := hlc) 
     wordPointsTo (k.regs 2#5 + 0xFFFFFFFFFFFFFFD0#64) 8 (DFrac.own 1) (fnode k0) ∗
     wordPointsTo (k.regs 2#5 + 0xFFFFFFFFFFFFFFC8#64) 8 (DFrac.own 1) (fnode k1) ∗
     fileRef γ k0 1 (.open true false .pipe) ∗ fileRef γ k1 1 (.open false true .pipe) ∗
-    sysPipeCoreExt pa pid V P' M' ∗
+    procPrivCoreNoctxAt curCtx pa pid { V with upt := P' } M' ∗
     procOfilesOwe γ V.fdg pa ((V.ofile.set fd0 (fnode k0)).set fd1 (fnode k1)) [fd1, fd0] ∗
     fdSlot ∗ fdStAuth V.fdg fd0 .closed ∗ fdSlot ∗ fdStAuth V.fdg fd1 .closed ∗ fdFrags V.fdg sts ∗
     sysPipeTurn cpu k γ V.fdg pa pid V M sts v
@@ -417,7 +417,6 @@ theorem sys_pipe_unfd2 (FC : FILECLOSE) (Γ : SchedNames) [ClaimIs (hlc := hlc) 
   have hpin10 : k.sie = false ∨ k.proc = 0#64 → c10 = cpu := fun h =>
     (hp10 h).trans ((hp9 h).trans ((hp8 h).trans ((hp7 h).trans ((hp6 h).trans ((hp5 h).trans
       ((hp4 h).trans ((hp3 h).trans ((hp2 h).trans ((hp1 h).trans (hpin h))))))))))
-  rw [sysPipeCoreExt_eq] at *
   icases sys_pipe_core_pid pa pid { V with upt := P' } M' $$ Hcore with ⟨Hpid, Hcw⟩
   iapply (sys_pipe_close2_a0 FC Γ cpu c10 k γl γ pa pid V M sts v γkl γk spie spp _ k0 k1
       hk0 hk1 hct hproc htier hnoff hK hpin10 (by sys_pipe_pins hpins) fa (BitVec.ofNat 32 fd0)

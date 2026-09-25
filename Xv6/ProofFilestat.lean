@@ -33,8 +33,9 @@ epilogue with an ABSTRACT continuation.  The stage files are
    across their crossing (FilestatCalls).
 2. THE CONTEXT's tier is pinned once, at entry (`kctx_tier` + `htier`),
    so the contract's core `procPrivCoreNoctxAt curCtx …` IS the stage
-   files' ambient bare block `FilestatParts.fstatPrivExt … V.upt …` and
-   the cwd reference (`filestat_priv_conv`, by `rfl`).  The cwd reference
+   files' ambient bare block `EitherDefs.procPrivExt … V.upt …` and
+   the cwd reference with the generation row (`FileRwShared.filerw_core_conv`,
+   by `rfl`).  The cwd reference
    is parked in the continuation (`HΦ`) at entry and handed back with the
    block at exit: filestat never touches `p->cwd` (Rocq carries it inside
    `proc_priv_core` through every step; same resource, fewer frames).
@@ -68,22 +69,6 @@ theorem filestat_ctx_entry {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF]
     kctx (GF := GF) c ((k.pushed 10).withRegs R) ⊢
       kctx c (((k.withSpie k.spie k.spp).pushed 10).withRegs R) := .rfl
 
-/-- At the kernel-page-table tier the contract's block (the core, Rocq
-`proc_priv_core`) IS the stage files' bare `fstatPrivExt` and the cwd
-reference at the ambient context (by `rfl` once the ambient context is
-taken apart). -/
-theorem filestat_priv_conv {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
-    [FdslotG GF] [BioslotG GF] [IcacheG GF] [SleepLockG GF] [IcboxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
-    [OffboxG GF] [OffboxBoxG GF] [FileG GF] [BcacheG GF] [DiskG GF] [LogG GF] [FsBlocksG GF] [IregG GF] [FsTopG GF] [FsLinkG GF] [Appcfg GF] [Fscfg] [Icfg] [X : CurCtx]
-    (h : curTier = KTier.kpt) (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv) (P : UPtd)
-    (M : Nat → List (BitVec 8)) :
-    procPrivCoreNoctxAt (GF := GF) curCtx pa pid { V with upt := P } M ⊣⊢
-      fstatPrivExt pa pid V P M ∗ (cwdRefAt V.cwd V.cwi ∗ procGenAt curCtx pa pid V.gen) := by
-  obtain ⟨ξ, t⟩ := X
-  simp only at h
-  subst h
-  exact .rfl
-
 section
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
@@ -114,12 +99,12 @@ theorem filestat_main (MP : MYPROC) (IL : ILOCK) (ST : STATI) (IU : IUNLOCK) (CO
   icases kctx_wf _ _ $$ Hk with ⟨%hkwf, Hk⟩
   have hlocks : k.locks = [] := List.eq_nil_of_length_eq_zero (by have := hkwf.2.2.2.1; omega)
   -- THE CONTRACT'S CONTINUATION, hart-free, at the ambient block form
-  icases (filestat_priv_conv ht0 (procAddr j) pid V V.upt M).1 $$ Hpriv with ⟨Hpriv, Hcwd⟩
+  icases (filerw_core_conv ht0 (procAddr j) pid V V.upt M).1 $$ Hpriv with ⟨Hpriv, Hcwd⟩
   ihave HΦ : fstatK k γ fk q st (procAddr j) pid V M $$ [Hnext Hcwd]
   · unfold fstatK filestatPost
     iintro %c %spie %spp %R' %P' %M' %d %hp Hk Hpc Hte Hce Href Hpriv Henv
     ihave HK := wpNext_at true k.proc cpu c _ (filestat_pin hj k hproc c cpu) $$ Hnext
-    ihave Hpriv := (filestat_priv_conv ht0 (procAddr j) pid V P' M').2 $$ [Hpriv Hcwd]
+    ihave Hpriv := (filerw_core_conv ht0 (procAddr j) pid V P' M').2 $$ [Hpriv Hcwd]
     · iframe
     iapply HK $$ %spie %spp %R' %P' %M' %d %hp Hk Hpc Hte Hce Href Hpriv Henv
   simp only [filestatAddr]

@@ -8,9 +8,9 @@ under its own prefix -- `frd_*` / `fwr_*`, with identical statements).
   `srliw a5,a2,31` sign test `filerw_sign` / `filerw_bnez_sign`, the
   callee's answer `filerw_bge0_m1` / `filerw_bge0_nat`;
 * `f->off += r`: `filerwOffW` (+ `_zero`, `_toNat`) and `filerw_offadd`;
-* the block: `filerw_priv_conv` / `filerw_priv_conv0` (the contracts' block
-  IS the ambient `EitherDefs.procPrivExt` at the kernel-page-table tier)
-  and `filerw_priv_pid` (the pid cell lent around begin_op / ilock /
+* the block: `filerw_core_conv` (the contracts' core IS the ambient
+  `EitherDefs.procPrivExt` beside the cwd reference and the generation row
+  at the kernel-page-table tier) and `filerw_priv_pid` (the pid cell lent around begin_op / ilock /
   iunlock / end_op, Rocq `proc_priv_core_bare_acc`);
 * the reference: `filerw_ref_open` / `filerw_ref_close`, the four field
   borrows `filerw_fields_type/_pipe/_ip/_major`, and the pipe arm's payload
@@ -144,22 +144,21 @@ theorem filerw_priv_pid (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv) (P : U
 
 end Block
 
-/-- At the kernel-page-table tier the contracts' block IS the ambient
-`procPrivExt` (`EitherDefs.procPrivExt_eq`, by `rfl` once the ambient
-context is taken apart; ProofFilestat's `filestat_priv_conv`). -/
-theorem filerw_priv_conv {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [X : CurCtx]
+/-- **The contracts' block** (the core, Rocq `proc_priv_core`) at the
+kernel-page-table tier IS the ambient bare `procPrivExt` and the cwd
+reference with the generation row (by `rfl` once the ambient context is
+taken apart).  fileread / filewrite / filestat never touch `p->cwd` or the
+generation row: the two are parked in the continuation at entry and handed
+back with the block at exit (Rocq carries them inside `proc_priv_core`
+through every step; same resource, fewer frames). -/
+theorem filerw_core_conv {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
+    [FdslotG GF] [BioslotG GF] [IcacheG GF] [SleepLockG GF] [IcboxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
+    [OffboxG GF] [OffboxBoxG GF] [FileG GF] [BcacheG GF] [DiskG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
+    [FsTopG GF] [FsLinkG GF] [Appcfg GF] [Fscfg] [Icfg] [X : CurCtx]
     (h : curTier = KTier.kpt) (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv) (P : UPtd)
     (M : Nat → List (BitVec 8)) :
-    procPrivNoctxAt (GF := GF) curCtx pa pid { V with upt := P } M ⊣⊢ procPrivExt pa pid V P M := by
-  obtain ⟨ξ, t⟩ := X
-  simp only at h
-  subst h
-  exact .rfl
-
-theorem filerw_priv_conv0 {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [X : CurCtx]
-    (h : curTier = KTier.kpt) (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv)
-    (M : Nat → List (BitVec 8)) :
-    procPrivNoctxAt (GF := GF) curCtx pa pid V M ⊣⊢ procPrivExt pa pid V V.upt M := by
+    procPrivCoreNoctxAt (GF := GF) curCtx pa pid { V with upt := P } M ⊣⊢
+      procPrivExt pa pid V P M ∗ (cwdRefAt V.cwd V.cwi ∗ procGenAt curCtx pa pid V.gen) := by
   obtain ⟨ξ, t⟩ := X
   simp only at h
   subst h

@@ -19,7 +19,9 @@ with the return value `0` (the code returns the flag register itself).
 The frame is 48 bytes (six slots), so `either_copyout` needs 6 + 52 slots.
 
 The private block travels as `procPrivExt` (see `Xv6/EitherDefs.lean`:
-the block at an explicit descriptor, and the ctx-free running block).
+the BARE block at an explicit descriptor -- Rocq `proc_priv_bare` + the lazy
+claim, where Rocq's contract takes `proc_priv_core`: a strictly weaker
+premise, reported in `EitherDefs`' header).
 
 AND THE USER ARM IS DESCRIPTOR-RELATIVE, like `SpecCopyout`'s: it takes the
 block at the descriptor `P` its caller has already grown to and hands it

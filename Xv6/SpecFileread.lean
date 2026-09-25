@@ -98,17 +98,14 @@ joins the shared epilogue (+0x5e) with the answer in `s2`.
    addr d P' M'` (the piperead/filestat spelling; the bytes existential) and
    the receipts read the resume image `M'` by `umemByte`
    (FsAbsReadFire deviation 3).
-6. **THE PROCESS BLOCK is `procPrivNoctxAt curCtx (procAddr j) pid V M`**
-   (Rocq `proc_priv_core pj pidv U`) -- SpecFilewrite's deviation 6, for the
-   same reason: the landed user-copy callees (`PIPEREAD`, `CONSOLEREAD`,
-   readi's user arm `procPrivRun`) are stated over that form (bare block ∗
-   the ofile CELLS, no cwd reference).  PROCESS-LAYER NOTE for the
-   coordinator: Rocq's `proc_priv_core` is `bare ∗ cwd_ref_at` (Lean
-   `FdTable.procPrivCoreNoctxAt`); stating fileread at the literal core
-   needs piperead / consoleread / readi's user arm re-stated over
-   `procPrivBareAt` (landed files).  sys_read (over the WHOLE block
-   `procPrivFd`, D16) bridges: it lends the cwd reference aside and the
-   ofile cells out of `procOfilesOwe` for the call.
+6. **THE PROCESS BLOCK is `procPrivCoreNoctxAt curCtx (procAddr j) pid V
+   M`**, Rocq's `proc_priv_core pj pidv U` literally (the bare block, the
+   cwd reference, the generation row; no descriptor array).  The user-copy
+   callees below it (`PIPEREAD`, `CONSOLEREAD`, readi's user arm
+   `procPrivRun`, `EITHER_COPYOUT`) take only the bare block
+   (`procPrivBareAt`, Rocq `proc_priv_bare` + the lazy claim): the cwd
+   reference and the generation row are framed around them
+   (`FileRwShared.filerw_core_conv`).
 7. **`kalloc_env fsc_kalloc None`** is the pair `isLock γkl kmemLockAddr
    "kmem" (kmemRes γk) ∗ kallocAvail γk none` (SpecFilestat deviation 4).
 8. **The machine vocabulary** (fs1 §1): `sie_cap_gpr` + `cpu_own 0 eb` is
@@ -635,7 +632,7 @@ def filereadPost (k : KCtx) (γ : FileNames) (fk : Nat) (q : Qp) (st : FdState) 
     kctx cpu' ((k.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k.regs 1#5)) -∗
     trapCsrsExt cpu' k.sie -∗ cpuClaimExt cpu' k.sie k.proc -∗
     fileRef γ fk q st -∗
-    procPrivNoctxAt curCtx (procAddr j) pid { V with upt := P' } M' -∗
+    procPrivCoreNoctxAt curCtx (procAddr j) pid { V with upt := P' } M' -∗
     filereadEnvOut (hlc := hlc) st -∗
     filereadArms (hlc := hlc) st n F Rd Rin P (R' 10#5) M' (k.regs 11#5) -∗
     wpLoop cpu')
@@ -670,7 +667,7 @@ def wp_fileread_eb_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [X
   -- THE BORROWED REFERENCE, at an ARBITRARY fraction, given back
   fileRef γ fk q st ∗
   -- AMBIENT: three of the four arms copy into user memory (deviation 6)
-  procPrivNoctxAt curCtx (procAddr j) pid V M ∗
+  procPrivCoreNoctxAt curCtx (procAddr j) pid V M ∗
   isLock γkl kmemLockAddr "kmem" (kmemRes γk) ∗ kallocAvail γk none ∗
   -- ... and what the file's TYPE selects
   filereadEnv (hlc := hlc) st ∗

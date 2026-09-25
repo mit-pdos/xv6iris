@@ -21,7 +21,14 @@ in `SpecEitherCopyin` (the Lean template for exactly this bridge), the
 block travels as `EitherDefs.procPrivExt` at the descriptor `P` the caller
 has already grown to, and comes back at `P'` with `P.extSz V.sz P'`: `sys_exec`
 calls `fetchaddr` in a loop, so the contract must be re-enterable after a
-first call faulted a page in (see `EitherDefs`' descriptor form).  The size
+first call faulted a page in (see `EitherDefs`' descriptor form).
+DEVIATION (process layer, reported): Rocq's `wp_fetchaddr_sconf` takes the
+WHOLE block `proc_priv γf p pid U` (the descriptor array included); this
+port takes only its bare part (`procPrivExt` = `FdTable.procPrivBareAt` at
+the kernel-page-table tier, Rocq `proc_priv_bare` + the lazy claim), a
+strictly weaker premise: fetchaddr touches neither the array nor the cwd
+reference, and its one caller (`sys_exec`) carves the bare part out of the
+whole block and re-closes it (`SysfileCalls.sysfile_blk_bare`).  The size
 bound `p->sz ≤ uvmMaxsz` is NOT a premise: it lives in the block, and the
 proof pays `copyin`'s `psz ≤ 2^38` out of it (Rocq: likewise).
 

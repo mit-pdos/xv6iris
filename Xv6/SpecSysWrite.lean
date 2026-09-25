@@ -53,11 +53,9 @@ three `jal` targets changed.
    post's is `procPrivFd … { V with upt := P' } (viewFaulted V.upt P' M)`
    (Rocq `proc_priv γf pj pidv (us_upt U P')` at the unmoved image: the
    landed user-copy convention, SpecFilewrite deviation 4).
-   PROCESS-LAYER NOTE: filewrite is stated over `procPrivNoctxAt` (bare ∗
-   the ofile CELLS, SpecFilewrite deviation 6) where Rocq's takes
-   `proc_priv_core` (bare ∗ cwd); so the proof lends filewrite the cells
-   out of the array (`FdTable.procOfilesOwe_cells_acc`) and keeps the cwd
-   reference aside, besides Rocq's `proc_priv_lend` of the reference.
+   The proof lends the descriptor's reference (Rocq `proc_priv_lend`) and
+   hands filewrite the core (`procPrivCoreNoctxAt`, Rocq `proc_priv_core`,
+   SpecFilewrite deviation 6) as Rocq does; the array waits aside.
 3. **THE FS ENVIRONMENT is `filewriteFsEnv` ∗ `filewriteDevsw γl γu`**
    (SpecFilewrite deviations 2/3): Rocq's `fwrite_names fn` and its
    premises (`fwn_j`, `fwn_procs`, the devsw pins `fwn_wp`/`fwn_dqv`) are

@@ -38,10 +38,10 @@ THEOREM, the frozen `sysExecStepBody`).
 1. Premise-passing / hart-free / eb-generic (`SysExecParts` deviations
    1-3): the callees' complement is carried by the `SysExecStepCalls`
    wrappers.
-2. fetchaddr takes the block as `procPrivExt` at the round's descriptor
-   (the array's cells lent out of `procOfiles`, `sys_exec_blk_ext`), fetchstr
-   the bare block (`sysfile_blk_bare`): Rocq hands both `proc_priv_core
-   (us_upt U P)`.  PROCESS LAYER (flagged, as `SysExecParts` deviation 4):
+2. fetchaddr and fetchstr both take the bare block at the round's
+   descriptor (`sysfile_blk_bare`; fetchaddr's ambient `procPrivExt` form
+   by `EitherDefs.procPrivExt_conv`): Rocq hands fetchaddr the whole
+   `proc_priv γf … (us_upt U P)` and fetchstr `proc_priv_core`.  PROCESS LAYER (flagged, as `SysExecParts` deviation 4):
    the block is `procPrivFd` at `sysExecV2 A P` / `sysExecM2 A P`.
 
 Imports only the shared vocabulary, the call sites and callee Specs.
@@ -432,8 +432,9 @@ theorem sys_exec_step (FA : FETCHADDR) (KL : KALLOC) (FS : FETCHSTR) (Γ : Sched
   k_step_e (wp_s_jal cpu _ (KA.«sys_exec» + 0x62#64) false 2085798#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [sys_exec_br_fetchaddr]
   iintro Hk Hpc
-  icases sys_exec_blk_ext hct' A.γ (procAddr A.j) A.pid A.V P (sysExecM2 A P) $$ Hblk
+  icases sysfile_blk_bare A.γ (procAddr A.j) A.pid (sysExecV2 A P) (sysExecM2 A P) $$ Hblk
     with ⟨Hext, Hclose⟩
+  ihave Hext := (procPrivExt_conv hct' (procAddr A.j) A.pid A.V P (sysExecM2 A P)).1 $$ Hext
   iapply (sys_exec_fetchaddr FA cpu _ k.sie (by k_norm_g) k.proc (by k_norm_g) A.j A.pid A.V P
       (sysExecM2 A P) w0 hS.hj ?gpr ?gn ?gK)
     $$ [- $Hk $Hpc $Hte $Hce $Hext]
@@ -454,6 +455,8 @@ theorem sys_exec_step (FA : FETCHADDR) (KL : KALLOC) (FS : FETCHSTR) (Γ : Sched
   have hext2 : A.V.upt.extSz A.V.sz P2 := UMemL.extSz_trans hext hext1
   have hvf : viewFaulted P P2 (sysExecM2 A P) = sysExecM2 A P2 :=
     UMemL.viewFaulted_trans A.M hext.1 hext1.1
+  ihave Hext := (procPrivExt_conv hct' (procAddr A.j) A.pid A.V P2
+    (viewFaulted P P2 (sysExecM2 A P))).2 $$ Hext
   ihave Hblk := Hclose $$ %P2 %(viewFaulted P P2 (sysExecM2 A P)) Hext
   rw [hvf]
   rw [sysExec_viewLazy_faulted A.V P A.M hext, sys_exec_uargv_i A.v1 i hi] at hans

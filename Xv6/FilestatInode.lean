@@ -5,8 +5,8 @@ Rocq `ProofFilestat.v`'s `FD_INODE or FD_DEVICE` arm), in three stages:
 * `filestat_copy` (`+0x3c .. +0x54`): `copyout(p->pagetable, p->sz, addr,
   &st, 24)` over the stat buffer as ONE named 24-byte run
   (`fstat_stat_bytes`), the private block split around the call
-  (`fstat_priv_split` / `fstat_priv_close`, EitherDefs' `ec_priv_*` pair
-  on the bare block: copyout reads `p->sz` and `p->pagetable` and grows
+  (EitherDefs' `ec_priv_split` / `ec_priv_close` on the bare block:
+  copyout reads `p->sz` and `p->pagetable` and grows
   the address space), `sraiw a0,a0,31`, the two
   lazy restores, and the shared epilogue (`filestat_tail`).  The window
   `umemWrote V.upt M addr d P' M'` is copyout's own disjunction read as "a
@@ -21,7 +21,7 @@ Rocq `ProofFilestat.v`'s `FD_INODE or FD_DEVICE` arm), in three stages:
   sleeplock out of the family by the slot the payload named.
 
 THE PID CELL is lent out of the block immediately around each of ilock and
-iunlock (`fstat_priv_pid`, Rocq's `proc_priv_core_bare_acc` discipline).
+iunlock (`filerw_priv_pid`, Rocq's `proc_priv_core_bare_acc` discipline).
 -/
 import Xv6.FilestatCalls
 import Xv6.FilestatTail
@@ -74,7 +74,7 @@ theorem filestat_copy (CO : COPYOUT) (cpu : CPU) (k : KCtx) (spie spp : Bool) (R
     wordPointsTo (fstatBufAddr (k.regs 2#5) + 12#64) 4 (DFrac.own 1) h ∗
     trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗
     isLock γkl kmemLockAddr "kmem" (kmemRes γk) ∗ kallocAvail γk none ∗
-    fileRef γ fk q st ∗ fstatPrivExt (procAddr j) pid V V.upt M ∗ bslot ∗
+    fileRef γ fk q st ∗ procPrivExt (procAddr j) pid V V.upt M ∗ bslot ∗
     fstatK k γ fk q st (procAddr j) pid V M
     ⊢ wpLoop (GF := GF) cpu := by
   rw [filestatSlots_eq] at hK
@@ -95,7 +95,7 @@ theorem filestat_copy (CO : COPYOUT) (cpu : CPU) (k : KCtx) (spie spp : Bool) (R
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
   -- the block split around the call: `p->sz`, `p->pagetable`, the table
-  icases fstat_priv_split (procAddr j) pid V V.upt M $$ Hpriv with ⟨%hf, Hsz, Hpg, Hpt, Hrest⟩
+  icases ec_priv_split (procAddr j) pid V V.upt M $$ Hpriv with ⟨%hf, Hsz, Hpg, Hpt, Hrest⟩
   -- +0x42  ld a1,72(s2)
   k_step_e (wp_s_ld cpu _ (KA.«filestat» + 0x42#64) false 72#12 11#5 18#5 (by decide) (by decide)
       (DFrac.own 1) V.sz)
@@ -156,7 +156,7 @@ theorem filestat_copy (CO : COPYOUT) (cpu : CPU) (k : KCtx) (spie spp : Bool) (R
       (k.regs 19#5) (k.regs 20#5) v9 $$ [Hf8 Hf16 Hf24 Hf32 Hf40 Hf48 Hf80]
   · unfold fstatFrame; iframe
   ihave Hcells := fstat_buf_close (k.regs 2#5) hal _ (fstatBytes_length _ _ _ _ _ _) $$ Hbuf
-  ihave Hpriv := fstat_priv_close (procAddr j) pid V V.upt P' M' hext hf $$ [Hsz Hpg Hpt Hrest]
+  ihave Hpriv := ec_priv_close (procAddr j) pid V V.upt P' M' hext hf $$ [Hsz Hpg Hpt Hrest]
   · iframe
   ihave Henv := (show bslot (GF := GF) ⊢ filestatEnvOut st from
     filestat_env_out_in st hst) $$ Hbs
@@ -205,7 +205,7 @@ theorem filestat_stat (ST : STATI) (IU : IUNLOCK) (CO : COPYOUT) (Γ : SchedName
     credFloor lo tl ∗ fstatLk ik s g lo inum dn bm γisl pid ∗
     frefTok γ fk q ∗ fileFieldsAt curCtx fk q C ∗
     (inodeShrGenlo ik s icfgDev inum g lo -∗ filePaySt γ fk q C st) ∗
-    fstatPrivExt (procAddr j) pid V V.upt M ∗ bslot ∗
+    procPrivExt (procAddr j) pid V V.upt M ∗ bslot ∗
     fstatK k γ fk q st (procAddr j) pid V M
     ⊢ wpLoop (GF := GF) cpu := by
   rw [filestatSlots_eq] at hK
@@ -270,7 +270,7 @@ theorem filestat_stat (ST : STATI) (IU : IUNLOCK) (CO : COPYOUT) (Γ : SchedName
   k_step_e (wp_s_jal cpu _ (KA.«filestat» + 0x38#64) false 2093200#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [filestat_br_iunlock]
   iintro Hk Hpc
-  icases fstat_priv_pid (procAddr j) pid V V.upt M $$ Hpriv with ⟨Hpid, Hpw⟩
+  icases filerw_priv_pid (procAddr j) pid V V.upt M $$ Hpriv with ⟨Hpid, Hpw⟩
   unfold fstatEnvP
   icases Henv with ⟨#Hpi, #Hpe, #Hfs, #Hkl, #Hav⟩
   iapply (fstat_iunlock IU Γ cpu _ ik s g lo tl inum dn bm γil γisl pid ?hKu ?hnu ?hlu ?htu hik
@@ -335,7 +335,7 @@ theorem filestat_lock (IL : ILOCK) (ST : STATI) (IU : IUNLOCK) (CO : COPYOUT) (�
     credFloor lo tl ∗ ityShot g ty ∗ inodeShrGenlo ik s icfgDev inum g lo ∗
     frefTok γ fk q ∗ fileFieldsAt curCtx fk q C ∗
     (inodeShrGenlo ik s icfgDev inum g lo -∗ filePaySt γ fk q C st) ∗
-    fstatPrivExt (procAddr j) pid V V.upt M ∗ bslot ∗
+    procPrivExt (procAddr j) pid V V.upt M ∗ bslot ∗
     fstatK k γ fk q st (procAddr j) pid V M
     ⊢ wpLoop (GF := GF) cpu := by
   have hK76 := hK
@@ -376,7 +376,7 @@ theorem filestat_lock (IL : ILOCK) (ST : STATI) (IU : IUNLOCK) (CO : COPYOUT) (�
   icases Henv with ⟨#Hpi, #Hpe, #Hfs, #Hkl, #Hav⟩
   icases fsReady_icache $$ Hfs with ⟨-, -, #Hslks⟩
   icases icSleeplocks_lookup fscIc ik hik $$ Hslks with ⟨%γil, %γisl, #Hslk⟩
-  icases fstat_priv_pid (procAddr j) pid V V.upt M $$ Hpriv with ⟨Hpid, Hpw⟩
+  icases filerw_priv_pid (procAddr j) pid V V.upt M $$ Hpriv with ⟨Hpid, Hpw⟩
   iapply (fstat_ilock IL Γ cpu _ j ik s g lo tl ty inum γil γisl pid hj ?hpr ?hKl ?hnl ?htl hik
       hnib ?ha0l hle) $$ [- $Hk $Hpc]
   rotate_right 1

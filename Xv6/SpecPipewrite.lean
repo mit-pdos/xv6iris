@@ -29,7 +29,11 @@ run at the ENTRY table.
 (`PipeQueue.v`) are not ported; the post states `pipe_wpost`'s pure
 projection `pipeWpostR` (the answer and its reason) only.  2. Rocq pins the
 WRITE end (`w = true`, lane PQ-FLAG) for the queue's link; with no queue the
-end stays free here.
+end stays free here.  3. THE PROCESS BLOCK is the BARE block `procPrivBareAt
+curCtx (procAddr j) pid V M` (Rocq `proc_priv_bare` + the lazy claim) where
+Rocq's contract takes `proc_priv_core` (bare ∗ cwd reference ∗ generation
+row): a strictly weaker premise -- pipewrite touches neither -- so the file
+layer frames them around the call (`FileRwShared.filerw_core_conv`).
 
 THE IMAGE DOES NOT MOVE: pipewrite only READS user memory (one byte per
 round through `copyin`), so the process block comes back at the caller's own
@@ -47,6 +51,7 @@ import Xv6.SpecSleep
 import Xv6.PipeInvDefs
 import Xv6.KallocDefs
 import Xv6.SchedCtx
+import Xv6.FdTable
 import Xv6.UMem
 import Xv6.Image
 import Xv6.Geom
@@ -99,14 +104,14 @@ def wp_pipewrite_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6
   trapCsrs cpu ∗ cpuClaim cpu k.proc ∗ intrRes cpu ∗
   isPipe γl γp (k.regs 10#5) ∗ pipeRef γp w q ∗
   isLock γkl kmemLockAddr "kmem" (kmemRes γk) ∗ kallocAvail γk none ∗
-  procPrivNoctxAt curCtx (procAddr j) pid V M ∗
+  procPrivBareAt curCtx (procAddr j) pid V M ∗
   wpNext true k.proc cpu (fun cpu' => iprop(∀ (spie spp : Bool) (R' : RegMap) (P' : UPtd),
     ⌜calleeSaved k.regs R' ∧ V.upt.extSz V.sz P' ∧ pipeRwRet n (R' 10#5) ∧
       pipeWpostR V.upt (k.regs 11#5) n.toNat (R' 10#5)⌝ -∗
     kctx cpu' ((k.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k.regs 1#5)) -∗
     trapCsrs cpu' -∗ cpuClaim cpu' k.proc -∗ intrRes cpu' -∗
     pipeRef γp w q -∗
-    procPrivNoctxAt curCtx (procAddr j) pid { V with upt := P' } (viewFaulted V.upt P' M) -∗ wpLoop cpu'))
+    procPrivBareAt curCtx (procAddr j) pid { V with upt := P' } (viewFaulted V.upt P' M) -∗ wpLoop cpu'))
   ⊢ wpLoop (GF := GF) cpu
 
 /-- **WP of `pipewrite`, at either entry `SIE`** (Rocq `SpecPipewrite.v`
@@ -129,14 +134,14 @@ def wp_pipewrite_eb_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [
   trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗
   isPipe γl γp (k.regs 10#5) ∗ pipeRef γp w q ∗
   isLock γkl kmemLockAddr "kmem" (kmemRes γk) ∗ kallocAvail γk none ∗
-  procPrivNoctxAt curCtx (procAddr j) pid V M ∗
+  procPrivBareAt curCtx (procAddr j) pid V M ∗
   wpNext true k.proc cpu (fun cpu' => iprop(∀ (spie spp : Bool) (R' : RegMap) (P' : UPtd),
     ⌜calleeSaved k.regs R' ∧ V.upt.extSz V.sz P' ∧ pipeRwRet n (R' 10#5) ∧
       pipeWpostR V.upt (k.regs 11#5) n.toNat (R' 10#5)⌝ -∗
     kctx cpu' ((k.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k.regs 1#5)) -∗
     trapCsrsExt cpu' k.sie -∗ cpuClaimExt cpu' k.sie k.proc -∗
     pipeRef γp w q -∗
-    procPrivNoctxAt curCtx (procAddr j) pid { V with upt := P' } (viewFaulted V.upt P' M) -∗ wpLoop cpu'))
+    procPrivBareAt curCtx (procAddr j) pid { V with upt := P' } (viewFaulted V.upt P' M) -∗ wpLoop cpu'))
   ⊢ wpLoop (GF := GF) cpu
 
 /-- The interface of `pipewrite`. -/

@@ -33,8 +33,10 @@ shared `FileOffProto`).
    the complement at its eb contract, iunlock carries it across its
    `sie`-generic crossing.
 2. THE CONTEXT's tier is pinned once at entry (`kctx_tier` + `htier`), so
-   the contract's `procPrivNoctxAt curCtx …` IS the stage files' ambient
-   `EitherDefs.procPrivExt … V.upt …` (`filerw_priv_conv0`), as ProofFilestat.
+   the contract's core `procPrivCoreNoctxAt curCtx …` IS the stage files'
+   ambient bare `EitherDefs.procPrivExt … V.upt …` and the cwd reference
+   with the generation row (`filerw_core_conv`), which are parked in the
+   continuation at entry and handed back with the block at exit.
 3. Rocq's `fw_offupd` / `fw_test` diamonds are lemmas with a hart-free
    continuation (`fwr_seg_write`'s collapsed outcome, `fwr_test`), and its
    `Hjoin` assert is `fwr_join`; the per-chunk fire / checkin / re-park is
@@ -303,14 +305,16 @@ theorem filewrite_main (PW : PIPEWRITE) (IL : ILOCK) (WI : WRITEI) (IU : IUNLOCK
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
   icases kctx_wf _ _ $$ Hk with ⟨%hkwf, Hk⟩
   have hlocks : k.locks = [] := List.eq_nil_of_length_eq_zero (by have := hkwf.2.2.2.1; omega)
-  -- THE CONTRACT'S CONTINUATION, hart-free, at the ambient block form
-  ihave HΦ : fwrK (hlc := hlc) k γl γu γ fk q st j pid V M n Q $$ [Hnext]
+  -- THE CONTRACT'S CONTINUATION, hart-free, at the ambient block form (the cwd
+  -- reference and the generation row parked in it)
+  icases (filerw_core_conv ht0 (procAddr j) pid V V.upt M).1 $$ Hpriv with ⟨Hpriv, Hcwd⟩
+  ihave HΦ : fwrK (hlc := hlc) k γl γu γ fk q st j pid V M n Q $$ [Hnext Hcwd]
   · unfold fwrK filewritePost
     iintro %c %spie %spp %R' %P' %hp Hk Hpc Hte Hce Href Hpriv Henv Harms
     ihave HK := wpNext_at true k.proc cpu c _ (fwr_pin hj k hproc c cpu) $$ Hnext
-    ihave Hpriv := (filerw_priv_conv ht0 (procAddr j) pid V P' _).2 $$ Hpriv
+    ihave Hpriv := (filerw_core_conv ht0 (procAddr j) pid V P' _).2 $$ [Hpriv Hcwd]
+    · iframe
     iapply HK $$ %spie %spp %R' %P' %hp Hk Hpc Hte Hce Href Hpriv Henv Harms
-  ihave Hpriv := (filerw_priv_conv0 ht0 (procAddr j) pid V M).1 $$ Hpriv
   -- the reference, taken apart
   icases filerw_ref_open γ fk q st $$ Href with ⟨%C, %⟨inumC, γoC, hok⟩, Htok, Hfields, Hpay⟩
   icases fwr_fields_writable fk q C $$ Hfields with ⟨Hw, Hfw⟩

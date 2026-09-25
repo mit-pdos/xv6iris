@@ -28,10 +28,7 @@ block joined back.
    stretch (`k_step_e`), the contract's `true` crossing is made hart-free
    once at entry (`swr_pin`), and each callee is entered through a wrapper
    that carries the complement (SysfileCalls, `swr_filewrite`).
-2. THE BLOCK around filewrite: besides Rocq's lend / repay / join, the
-   ofile CELLS go to filewrite and back (`swr_blk_lend`; SpecSysWrite
-   deviation 2's process-layer note).
-3. STAGES (speed): `sys_write_main` (prologue, argaddr), `swr_argint_call`
+2. STAGES (speed): `sys_write_main` (prologue, argaddr), `swr_argint_call`
    (`+0x12`), `swr_argfd_call` (`+0x1c`, and the dispatch), `swr_fail_arm`
    (`+0x28`, the -1 arm), `swr_ok_loads` (`+0x28 .. +0x38`), `swr_ok_jal`
    (`+0x3c`: the lend, the key, the call) and `swr_ok_back` (repay, join,
@@ -57,8 +54,8 @@ variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [Fdslot
   [Appcfg GF] [FileG GF] [Fscfg] [Icfg] [CurCtx]
 
 set_option maxHeartbeats 8000000 in
-/-- **Back from filewrite**: the block rejoined at filewrite's descriptor
-(`swr_blk_lend`'s closer), the loan REPAID (Rocq `proc_ofiles_repay`), the
+/-- **Back from filewrite**: the core back at filewrite's descriptor, the
+loan REPAID (Rocq `proc_ofiles_repay`), the
 environment's output returned, the frame closed, the epilogue over
 filewrite's answer. -/
 theorem swr_ok_back (cpu : CPU) (k : KCtx) (γ : FileNames) (j : Nat) (pid : BitVec 32)
@@ -106,7 +103,8 @@ set_option maxHeartbeats 16000000 in
 /-- **`+0x3c`: `jal filewrite`** over the LENT reference (Rocq
 `proc_priv_lend`), its state read against the descriptor bundle (the key),
 the environment it selects and its offset row, and filewrite's block
-(`swr_blk_lend`); filewrite's return goes to `swr_ok_back`. -/
+(the core as it is, the array aside); filewrite's return goes to
+`swr_ok_back`. -/
 theorem swr_ok_jal (FW : FILEWRITE) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
     (cpu : CPU) (k : KCtx) (γ : FileNames) (j : Nat) (pid : BitVec 32)
     (V : ProcPriv) (M : Nat → List (BitVec 8)) (sts : List FdState) (v v1 v2 : BitVec 64)
@@ -164,9 +162,6 @@ theorem swr_ok_jal (FW : FILEWRITE) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF �
   -- the environment the state selects
   icases filewrite_env_split γl γu st $$ [Hfs Hdev] with ⟨Hfenv, Henvb⟩
   · iframe Hfs Hdev
-  -- filewrite's block (the cells lent, the cwd reference aside)
-  icases swr_blk_lend ht0 γ (procAddr j) pid V M [fd0] $$ [Hcore Howe] with ⟨Hpriv, Hblkb⟩
-  · iframe
   iapply (swr_filewrite FW Γ cpu _ γ kk q st j pid V M γkl γk γl γu (argZ v2) Q ?hKs hkk hj ?hps ?hno
       ?hts ?has ?han (argZ_range v2))
     $$ [- $Hk $Hpc]
@@ -183,13 +178,12 @@ theorem swr_ok_jal (FW : FILEWRITE) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF �
   -- ===== back from filewrite (at any hart) =====
   iintro %cpu
   unfold filewritePost
-  iintro %spie3 %spp3 %R3 %P' %⟨hcs3, hext⟩ Hk Hpc Hte Hce Href Hpriv Henvo Harms
+  iintro %spie3 %spp3 %R3 %P' %⟨hcs3, hext⟩ Hk Hpc Hte Hce Href Hcore Henvo Harms
   k_norm_g [swr_ret_40, h11, sysfile_ww, sysfile_psw, swr_withRegs_withSpie]
   have hr5 : swrRegs k R3 := by
     refine swrRegs_cs _ _ _ ?_ hcs3
     repeat (refine swrRegs_set _ _ _ _ ?_ (by decide))
     exact hr
-  icases Hblkb $$ %P' %_ Hpriv with ⟨Hcore, Howe⟩
   iapply (swr_ok_back cpu k γ j pid V M sts v v1 v2 γl γu Q spie3 spp3 R3 fd0 kk (fnode kk) q st P'
       wn hK6 hr5 hsome hfv hkk hst hsts0 hext)
     $$ [$Hk $Hpc $Hra $Hs0 $Hcells $Hte $Hce $Hcore $Howe $Href $Hauth $Hfr $Henvo $Henvb $Harms
