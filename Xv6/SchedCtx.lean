@@ -801,36 +801,6 @@ instance instCtxMorphProcPrivNoctxAt (pa : BitVec 64) (pid : BitVec 32) (V : Pro
         (@instCtxMorphSep hlc GF _ _ _ (instCtxMorphProcPtAt _ _ _)
           (@instCtxMorphSep hlc GF _ _ _ (instCtxMorphTfPageAt _ _ _) (instCtxMorphConst _)))))
 
-/-- The running block at an explicit descriptor `P'` (`EitherDefs.procPrivExt`
-ctx-free): the table `copyout`/`copyin`'s lazy faults grew, named rather than
-read off `V.upt` -- the same resource as `procPrivNoctxAt ξ pa pid { V with
-upt := P' } M'` (`procPrivExtNoctxAt_eq`, by `rfl`), which is the shape every
-contract states (Rocq's `proc_priv (us_upt U P')`); proofs that copy in a
-loop carry this one. -/
-def procPrivExtNoctxAt (ξ : CtxId) (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv)
-    (P' : UPtd) (M' : Nat → List (BitVec 8)) : IProp GF := iprop%
-  ⌜V.sz.toNat ≤ uvmMaxsz ∧ umBelow V.sz P' ∧
-    V.pagetable = pageAddr P'.root ∧ V.trapframe = pageAddr P'.tfp⌝ ∗
-  @wordPointsTo hlc GF _ ⟨ξ, KTier.kpt⟩ (pPid pa) 4 pidPriv pid ∗
-  @procFieldsNoctx hlc GF _ ⟨ξ, KTier.kpt⟩ pa (DFrac.own 1) V ∗
-  @procPtAt hlc GF _ ⟨ξ, KTier.kpt⟩ P' M' ∗
-  @tfPageAt hlc GF _ ⟨ξ, KTier.kpt⟩ P'.tfp V.tf ∗
-  ⌜V.pvLazy = false → lazyFree P'.um V.sz⌝
-
-theorem procPrivExtNoctxAt_eq (ξ : CtxId) (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv)
-    (P' : UPtd) (M' : Nat → List (BitVec 8)) :
-    procPrivExtNoctxAt (GF := GF) ξ pa pid V P' M' = procPrivNoctxAt ξ pa pid { V with upt := P' } M' :=
-  rfl
-
-theorem procPrivNoctx_to_ext (ξ : CtxId) (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv)
-    (M : Nat → List (BitVec 8)) :
-    procPrivNoctxAt (GF := GF) ξ pa pid V M ⊢ procPrivExtNoctxAt ξ pa pid V V.upt M := .rfl
-
-theorem procPrivExtNoctx_close (ξ : CtxId) (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv)
-    (P' : UPtd) (M' : Nat → List (BitVec 8)) :
-    procPrivExtNoctxAt (GF := GF) ξ pa pid V P' M' ⊢ procPrivNoctxAt ξ pa pid { V with upt := P' } M' :=
-  .rfl
-
 instance instCtxMorphContextCells (tier : KTier) (pa : BitVec 64) (dq : DFrac) (ws : List (BitVec 64)) :
     CtxMorph (GF := GF) (fun ξ => @contextCells hlc GF _ ⟨ξ, tier⟩ pa dq ws) :=
   @instCtxMorphSep hlc GF _ (fun _ => iprop(⌜ws.length = 14⌝)) _ (instCtxMorphConst _)

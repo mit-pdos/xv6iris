@@ -13,7 +13,7 @@ Proof of `kwait`'s contract (`SpecKwait.KWAIT`), the reaper.
     reap arm, else `release(&pp->lock)` and `havekids = 1`;
   * the reap arm: `copyout` of the child's four `xstate` bytes into the
     caller's own address space (the block at the grown descriptor,
-    `procPrivNoctx` -> `procPrivExtNoctx`, `umBelow` kept by `extSz`), then `freeproc` reaping the
+    `kw_priv_copy`, Rocq `proc_priv_copy`: `umBelow` kept by `extSz`), then `freeproc` reaping the
     ZOMBIE's dormant block, both releases, return the pid;
   * the copyout-failure arm: both releases, return `-1`;
   * the no-child / `killed(p)` arm: release `wait_lock`, return `-1`;
@@ -22,7 +22,7 @@ Proof of `kwait`'s contract (`SpecKwait.KWAIT`), the reaper.
 
 This file collects the resource-level infrastructure the proof rests on
 -- the ZOMBIE reap protocol (`procDormant ZOMBIE` -> `freeprocIn`), the
-UNUSED payload reassembly, the `procPrivNoctx`/`procPrivExtNoctx` seam
+UNUSED payload reassembly, the `proc_priv_copy` borrow (`kw_priv_copy`)
 that `copyout` opens, the `kwaitAns` bookkeeping -- together with the
 callee call-site helpers, and drives the function body.
 
@@ -775,55 +775,46 @@ theorem kw_nokids_ghost (j : Nat) (hj : j < NPROC) (parents : Nat → BitVec 64)
 
 end
 
-/-! ## The `procPrivNoctx` / `procPrivExtNoctx` seam (`copyout`) -/
+/-! ## The `copyout` seam (Rocq `proc_priv_copy`) -/
 
 section
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [CurCtx]
 
-/-- `procPrivNoctx` minus its address space and the `pagetable`/`sz` fields
-`copyout` reads (the ctx-free analogue of `EitherDefs.ecRest`). -/
-def kwRest (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv) : IProp GF := iprop%
-  @wordPointsTo hlc GF _ ⟨curCtx, KTier.kpt⟩ (pPid pa) 4 pidPriv pid ∗
-  @wordPointsTo hlc GF _ ⟨curCtx, KTier.kpt⟩ (pKstack pa) 8 (DFrac.own 1) V.kstack ∗
-  @wordPointsTo hlc GF _ ⟨curCtx, KTier.kpt⟩ (pTrapframe pa) 8 (DFrac.own 1) V.trapframe ∗
-  @ofileCells hlc GF _ ⟨curCtx, KTier.kpt⟩ pa (DFrac.own 1) V.ofile ∗
-  @wordPointsTo hlc GF _ ⟨curCtx, KTier.kpt⟩ (pCwd pa) 8 (DFrac.own 1) V.cwd ∗
-  @pnameCells hlc GF _ ⟨curCtx, KTier.kpt⟩ pa (DFrac.own 1) V.name ∗
-  @tfPageAt hlc GF _ ⟨curCtx, KTier.kpt⟩ V.upt.tfp V.tf ∗
-  ⌜V.pvLazy = false → lazyFree V.upt.um V.sz⌝
-
-/-- Split off the two fields `copyout` reads and the address space it grows;
-`⟨curCtx, kpt⟩` is the ambient context, so these cells are `copyout`'s. -/
-theorem kw_priv_split (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv)
+/-- **The copy borrow** (Rocq `ProcInv.proc_priv_copy`, the cells-level
+twin of `ProcPrivAcc.procPrivFd_copy`): the two fields `copyout` reads and
+the address space it grows out, with the block's pure row; back at a
+descriptor that only grew under the same size (`UPtd.extSz`), `umBelow` and
+the lazy claim re-established here once.  `⟨curCtx, kpt⟩` is the ambient
+context, so these cells are `copyout`'s. -/
+theorem kw_priv_copy (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv)
     (M : Nat → List (BitVec 8)) :
     procPrivNoctxAt (GF := GF) curCtx pa pid V M ⊢
       ⌜V.sz.toNat ≤ uvmMaxsz ∧ umBelow V.sz V.upt ∧ V.pagetable = pageAddr V.upt.root ∧
          V.trapframe = pageAddr V.upt.tfp⌝ ∗
       @wordPointsTo hlc GF _ ⟨curCtx, KTier.kpt⟩ (pSz pa) 8 (DFrac.own 1) V.sz ∗
       @wordPointsTo hlc GF _ ⟨curCtx, KTier.kpt⟩ (pPagetable pa) 8 (DFrac.own 1) V.pagetable ∗
-      @procPtAt hlc GF _ ⟨curCtx, KTier.kpt⟩ V.upt M ∗ kwRest pa pid V := by
-  unfold procPrivNoctxAt kwRest procFieldsNoctx
-  iintro ⟨%hf, Hpid, ⟨Hks, Hszc, Hpgc, Htfc, Hof, Hcwd, Hnm⟩, Hspace, Htfp⟩
+      @procPtAt hlc GF _ ⟨curCtx, KTier.kpt⟩ V.upt M ∗
+      (∀ (P' : UPtd) (M' : Nat → List (BitVec 8)),
+        ⌜V.upt.extSz V.sz P'⌝ -∗
+        (@wordPointsTo hlc GF _ ⟨curCtx, KTier.kpt⟩ (pSz pa) 8 (DFrac.own 1) V.sz ∗
+          @wordPointsTo hlc GF _ ⟨curCtx, KTier.kpt⟩ (pPagetable pa) 8 (DFrac.own 1) V.pagetable ∗
+          @procPtAt hlc GF _ ⟨curCtx, KTier.kpt⟩ P' M') -∗
+        procPrivNoctxAt curCtx pa pid { V with upt := P' } M') := by
+  unfold procPrivNoctxAt procFieldsNoctx
+  iintro ⟨%hf, Hpid, ⟨Hks, Hszc, Hpgc, Htfc, Hof, Hcwd, Hnm⟩, Hspace, Htfp, %hlz⟩
   isplitl []
   · ipureintro; exact hf
-  · iframe
-
-/-- ... and close, at the grown descriptor `P'` (`procPrivExtNoctx`). -/
-theorem kw_priv_close (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv) (P' : UPtd)
-    (M' : Nat → List (BitVec 8)) (hext : V.upt.extSz V.sz P')
-    (hf : V.sz.toNat ≤ uvmMaxsz ∧ umBelow V.sz V.upt ∧ V.pagetable = pageAddr V.upt.root ∧
-      V.trapframe = pageAddr V.upt.tfp) :
-    @wordPointsTo hlc GF _ ⟨curCtx, KTier.kpt⟩ (pSz pa) 8 (DFrac.own 1) V.sz ∗
-    @wordPointsTo hlc GF _ ⟨curCtx, KTier.kpt⟩ (pPagetable pa) 8 (DFrac.own 1) V.pagetable ∗
-    @procPtAt hlc GF _ ⟨curCtx, KTier.kpt⟩ P' M' ∗ kwRest pa pid V ⊢
-      procPrivExtNoctxAt (GF := GF) curCtx pa pid V P' M' := by
-  unfold procPrivExtNoctxAt kwRest procFieldsNoctx
-  rw [hext.1.1, hext.1.2.1]
-  iintro ⟨Hszc, Hpgc, Hspace, Hpid, Hks, Htfc, Hof, Hcwd, Hnm, Htfp, %hlz⟩
+  iframe Hszc Hpgc Hspace
+  iintro %P' %M' %hext ⟨Hszc, Hpgc, Hspace⟩
+  have htfp : P'.tfp = V.upt.tfp := hext.1.2.1
+  ihave Htfp := (show @tfPageAt hlc GF _ ⟨curCtx, KTier.kpt⟩ V.upt.tfp V.tf ⊢
+      @tfPageAt hlc GF _ ⟨curCtx, KTier.kpt⟩ P'.tfp V.tf from by rw [htfp]) $$ Htfp
+  iframe Hpid Hks Hszc Hpgc Htfc Hof Hcwd Hnm Hspace Htfp
   isplitl []
-  · ipureintro; exact ⟨hf.1, UMemL.umBelow_extSz hf.2.1 hext, hf.2.2.1, hf.2.2.2⟩
-  · iframe
-    ipureintro; exact fun h => LazyFree.lazyFree_extSz hext (hlz h)
+  · ipureintro
+    exact ⟨hf.1, UMemL.umBelow_extSz hf.2.1 hext, by rw [hext.1.1]; exact hf.2.2.1,
+      by rw [htfp]; exact hf.2.2.2⟩
+  · ipureintro; exact fun h => LazyFree.lazyFree_extSz hext (hlz h)
 
 end
 
@@ -1057,7 +1048,7 @@ theorem kw_epi (Γ : SchedNames) (cpu cur : CPU) (k : KCtx) (γw γp γl : GName
     kctx cur (((k.withSpie spie spp).pushed 10).withRegs R) ∗ pcIs cur (KA.«kwait» + 0x7c#64) ∗
     kwFrame (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) (k.regs 9#5) (k.regs 18#5) (k.regs 19#5)
       (k.regs 20#5) (k.regs 21#5) (k.regs 22#5) (k.regs 23#5) w9 ∗
-    procPrivExtNoctxAt curCtx (procAddr j) pid V P'
+    procPrivNoctxAt curCtx (procAddr j) pid { V with upt := P' }
       (umemWrite (viewFaulted V.upt P' M) (k.regs 10#5).toNat ((xstateBytes xw).take d)) ∗
     trapCsrsExt cur k.sie ∗ cpuClaimExt cur k.sie k.proc ∗
     kwAns j pid V cs rv xw (decide (k.regs 10#5 = 0#64)) ∗
@@ -1132,7 +1123,6 @@ theorem kw_epi (Γ : SchedNames) (cpu cur : CPU) (k : KCtx) (γw γp γl : GName
     (fun hc => hc.elim (fun h => absurd h (by decide))
       (fun h => absurd h (by rw [hproc]; exact procAddr_nonzero hj))) $$ HΦ
   k_norm_g
-  ihave Hpriv := procPrivExtNoctx_close curCtx (procAddr j) pid V P' _ $$ Hpriv
   iapply HΦ $$ %spie %spp %_ %P' %rv %xw %d %cs' [] Hans Hkg Hrow Hk Hpc Hte Hce Hpriv
   ipureintro
   refine ⟨?cs, ?r10, hext, hd, hans⟩
@@ -1336,7 +1326,7 @@ theorem kw_reap (CO : COPYOUT) (FP : FREEPROC) (RE : RELEASE)
       wordPointsTo (pPid (procAddr n)) 4 pidPub pid0 -∗
       killPaidAt (MachFixedGS.killCred (hlc := hlc) (GF := GF)) pid0 kl -∗
       procSlotsAt Γ curCtx (procAddr n) ZOMBIE -∗
-      procPrivExtNoctxAt curCtx (procAddr j) pid V P' M'' -∗
+      procPrivNoctxAt curCtx (procAddr j) pid { V with upt := P' } M'' -∗
       trapCsrs cur -∗ cpuClaim cur k.proc -∗ intrRes cur -∗
       kwFrame (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) (k.regs 9#5) (k.regs 18#5) (k.regs 19#5)
         (k.regs 20#5) (k.regs 21#5) (k.regs 22#5) (k.regs 23#5) w9 -∗
@@ -1516,7 +1506,8 @@ theorem kw_reap (CO : COPYOUT) (FP : FREEPROC) (RE : RELEASE)
   · -- addr == 0: skip copyout, funnel to Hcommon with P' = V.upt, d = 0.
     ihave Hpc := (show pcIs (GF := GF) cur (if k.regs 10#5 = 0#64 then (KA.«kwait» + 0x60#64) else (KA.«kwait» + 0x48#64))
       ⊢ pcIs cur (KA.«kwait» + 0x60#64) from by rw [if_pos haddr]) $$ Hpc
-    ihave HprivE := procPrivNoctx_to_ext curCtx (procAddr j) pid V M $$ Hpriv
+    ihave HprivE := (show procPrivNoctxAt (GF := GF) curCtx (procAddr j) pid V M ⊢
+        procPrivNoctxAt curCtx (procAddr j) pid { V with upt := V.upt } M from .rfl) $$ Hpriv
     iapply Hcommon $$ %(R2.set 19#5 (BitVec.signExtend 64 pid0)) %V.upt %M %0 []
       Hk Hpc Hlockp Hlockw Hwr Hwrest Hg Hstate Hpl Hchan Hkilled Hxs Hpid Hkp Hslots HprivE Htc Hcl Hir
       Hframe HΦ
@@ -1537,7 +1528,7 @@ theorem kw_reap (CO : COPYOUT) (FP : FREEPROC) (RE : RELEASE)
     ihave Hpc := (show pcIs (GF := GF) cur
         (if k.regs 10#5 = 0#64 then (KA.«kwait» + 0x60#64) else (KA.«kwait» + 0x48#64)) ⊢ pcIs cur (KA.«kwait» + 0x48#64)
         from by rw [if_neg haddr]) $$ Hpc
-    icases kw_priv_split (procAddr j) pid V M $$ Hpriv with ⟨%hpf, Hsz, Hpg, HptP, Hrest⟩
+    icases kw_priv_copy (procAddr j) pid V M $$ Hpriv with ⟨%hpf, Hsz, Hpg, HptP, Hback⟩
     ihave Hbytes := kw_word4_to_bytes (pXstate (procAddr n)) xsHalf xs
       (kw_pXstate_align4 n hn) $$ Hxs
     -- c.li a4,4
@@ -1628,10 +1619,10 @@ theorem kw_reap (CO : COPYOUT) (FP : FREEPROC) (RE : RELEASE)
         iintro Hk Hpc
         ihave Hxs := kw_bytes_to_word4 (pXstate (procAddr n)) xsHalf xs
           (kw_pXstate_align4 n hn) $$ Hbytes
-        ihave HprivE : procPrivExtNoctxAt curCtx (procAddr j) pid V P' M' $$ [Hsz Hpg HptP' Hrest]
+        ihave HprivE : procPrivNoctxAt curCtx (procAddr j) pid { V with upt := P' } M' $$ [Hsz Hpg HptP' Hback]
         case' _ =>
-          iapply kw_priv_close (procAddr j) pid V P' M' hext' hpf
-          iframe Hsz Hpg HptP' Hrest
+          iapply Hback $$ %P' %M' %hext'
+          iframe Hsz Hpg HptP'
         iapply Hcommon $$ %RC %P' %M' %(4 : Nat) []
           Hk Hpc Hlockp Hlockw Hwr Hwrest Hg Hstate Hpl Hchan Hkilled Hxs Hpid Hkp Hslots HprivE Htc Hcl
           Hir Hframe HΦ
@@ -1655,12 +1646,12 @@ theorem kw_reap (CO : COPYOUT) (FP : FREEPROC) (RE : RELEASE)
         ihave Hpay := kw_wait_pay_intro curCtx parents $$ [Hwr Hwrest]
         · iframe Hwr Hwrest
         -- the grown parent priv-ext for the epilogue
-        ihave HprivE : procPrivExtNoctxAt curCtx (procAddr j) pid V P'
+        ihave HprivE : procPrivNoctxAt curCtx (procAddr j) pid { V with upt := P' }
             (umemWrite (viewFaulted V.upt P' M) (k.regs 10#5).toNat ((xstateBytes xs).take dd))
-            $$ [Hsz Hpg HptP' Hrest]
+            $$ [Hsz Hpg HptP' Hback]
         case' _ =>
-          iapply kw_priv_close (procAddr j) pid V P' _ hext' hpf
-          iframe Hsz Hpg HptP' Hrest
+          iapply Hback $$ %P' %_ %hext'
+          iframe Hsz Hpg HptP'
         -- concrete-kb field facts (needed for the balanced releases)
         have hkbn : kb.noff = 0 := by
           rw [hkbstruct]; simp only [KCtx.withRegs_noff, KCtx.withSpie_noff, KCtx.pushed_noff]
@@ -2436,11 +2427,10 @@ theorem kw_noKids (CO : COPYOUT) (FP : FREEPROC) (RE : RELEASE) (AC : ACQUIRE) (
       have hc67 : k.sie = false → c7 = cur := fun h => (hq7 (Or.inl h)).trans (hq6 (Or.inl h))
       ihave Hte := trapCsrsExt_move cur c7 k.sie hc67 $$ Hte
       ihave Hce := cpuClaimExt_move cur c7 k.sie k.proc hc67 $$ Hce
-      ihave HprivE := procPrivNoctx_to_ext curCtx (procAddr j) pid V M $$ Hpriv
-      ihave HprivE := (show procPrivExtNoctxAt (GF := GF) curCtx (procAddr j) pid V V.upt M
-        ⊢ procPrivExtNoctxAt curCtx (procAddr j) pid V V.upt
+      ihave HprivE := (show procPrivNoctxAt (GF := GF) curCtx (procAddr j) pid V M
+        ⊢ procPrivNoctxAt curCtx (procAddr j) pid { V with upt := V.upt }
           (umemWrite (viewFaulted V.upt V.upt M) (k.regs 10#5).toNat ((xstateBytes 0#32).take 0))
-        from by rw [List.take_zero, umemWrite_nil, viewFaulted_self]) $$ HprivE
+        from by rw [List.take_zero, umemWrite_nil, viewFaulted_self]) $$ Hpriv
       k_norm_g
       ihave Hans : kwAns j pid V cs (-1#32) 0#32 (decide (k.regs 10#5 = 0#64)) $$ [Hg]
       · iapply kw_ans_neg_ghost j pid V cs 0#32 _
