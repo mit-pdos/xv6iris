@@ -425,7 +425,7 @@ Section UShCatFStage.
       iApply (pse_catf_image_entry_gen (PS := uprogSG_free) cf rf Heq g LM PV CP sd WA Hext
                 Hcons Hkill Hsup v I sR lR HlR Hfc Hadmit Hplok L HL31 termw TOKN pdepR
                 (pdep_timeless LM PV sR lR L pr P gF gG) γc γm fname_f M s1 t1 g1 sts
-                FsImg.ROOTINO ProcDefs.secc_all cs pidv (fun _ : Z => QcR (fdq rf qf sf) 0) (P 0) γp (WLeft 0)
+                FsImg.ROOTINO cs pidv (fun _ : Z => QcR (fdq rf qf sf) 0) (P 0) γp (WLeft 0)
                 ds [cat_dg_open fname_f] ds [cat_dg_open fname_f] qf sf rb1 rb2
                 (fun _ _ => eq_refl) eq_refl catf_ws_exec_ok Hi1 Hb1 Hl1 eq_refl Hr1 Hr2
                 Hc2 with "Hnp []").

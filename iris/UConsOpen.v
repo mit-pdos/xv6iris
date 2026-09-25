@@ -540,7 +540,7 @@ Section UConsOpen.
     iDestruct (cons_ro_sub N Img M pm sz with "Hheap Hro") as %Hsro.
     iFrame "Hheap Hufd".
     iApply (sbundle_at_open_intro_at uslot (init_cons_absent_fam T K (ukn_pay N))
-              (uvis_of_run m pc M pm sz fdv FsImg.ROOTINO gn cs pidv false)
+              (uvis_of_run m pc M pm sz fdv FsImg.ROOTINO gn cs pidv false secc_all)
               FsImg.ROOTINO M pv (mword_of_int 2)
               eq_refl eq_refl
               (eq_trans (tf_of_arg0 m pc) Ha0)
@@ -590,7 +590,7 @@ Section UConsOpen.
     iFrame "Hheap Hufd".
     iApply (sbundle_at_open_intro_at uslot
               (init_cons_console_fam T i (ukn_pay N))
-              (uvis_of_run m pc M pm sz fdv FsImg.ROOTINO gn cs pidv false)
+              (uvis_of_run m pc M pm sz fdv FsImg.ROOTINO gn cs pidv false secc_all)
               FsImg.ROOTINO M pv (mword_of_int 2)
               eq_refl eq_refl
               (eq_trans (tf_of_arg0 m pc) Ha0)

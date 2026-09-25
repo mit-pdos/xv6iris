@@ -253,7 +253,7 @@ Section UkTreeEntry.
      equation-free reading, a corollary. *)
   Lemma echo_image_entry_env_c (ws : list (list (bv 8))) (M : gmap Z (bv 8))
       (s0 t : Z) (g : nat -> bv 8) (sts : list fdstate)
-      (cw : Z) (secc : mword 64) (cs : gset gname) (pidv : mword 32)
+      (cw : Z) (cs : gset gname) (pidv : mword 32)
       (Q : Z -> iProp Σ) (Pay : iProp Σ)
       {Dp : list nat} (I : forall N' : uk_names Σ, ukn_pay N' = Q -> ep_ifaceP (Dp := Dp) N' (echo_prog N'))
       (E : penv) (ds : gset nat) :
@@ -272,7 +272,7 @@ Section UkTreeEntry.
     UkRun.urun_nopipe sts -∗
     udep -∗
     image_entry ElfUser.echo_elf M (mword_of_int (t + 8) : mword 64) sts
-      cw secc cs pidv Q Pay uslot.
+      cw ProcDefs.secc_all cs pidv Q Pay uslot.
   Proof using .
     intros Hline Himg Hbytes Hfdl Hc Hs Hdp.
     iIntros "#Henv #Hnpw #Hdep".
@@ -350,7 +350,7 @@ Section UkTreeEntry.
      statement, unchanged) *)
   Lemma echo_image_entry_env (ws : list (list (bv 8))) (M : gmap Z (bv 8))
       (s0 t : Z) (g : nat -> bv 8) (sts : list fdstate)
-      (cw : Z) (secc : mword 64) (cs : gset gname) (pidv : mword 32)
+      (cw : Z) (cs : gset gname) (pidv : mword 32)
       (Q : Z -> iProp Σ) (Pay : iProp Σ)
       {Dp : list nat} (I : forall N' : uk_names Σ, ep_ifaceP (Dp := Dp) N' (echo_prog N'))
       (E : penv) (ds : gset nat) :
@@ -370,11 +370,11 @@ Section UkTreeEntry.
     UkRun.urun_nopipe sts -∗
     udep -∗
     image_entry ElfUser.echo_elf M (mword_of_int (t + 8) : mword 64) sts
-      cw secc cs pidv Q Pay uslot.
+      cw ProcDefs.secc_all cs pidv Q Pay uslot.
   Proof using .
     intros Hline Himg Hbytes Hfdl Hc Hs Hdp.
     iIntros "#Henv #Hnpw #Hdep".
-    iApply (echo_image_entry_env_c ws M s0 t g sts cw secc cs pidv Q Pay
+    iApply (echo_image_entry_env_c ws M s0 t g sts cw cs pidv Q Pay
               (fun N' _ => I N') E ds Hline Himg Hbytes Hfdl Hc Hs Hdp
               with "[] Hnpw Hdep").
     iIntros "!>" (N' Hpq) "Hstd Hcwf HPay".
@@ -393,7 +393,7 @@ Section UkTreeEntry.
      note); [cat_image_entry_env] is the equation-free corollary. *)
   Lemma cat_image_entry_env_c (ws : list (list (bv 8))) (Mn : gmap Z (bv 8))
       (sv t : Z) (gn : nat -> bv 8)
-      (sts : list fdstate) (cw : Z) (secc : mword 64) (cs : gset gname) (pidv : mword 32)
+      (sts : list fdstate) (cw : Z) (cs : gset gname) (pidv : mword 32)
       (Q : Z -> iProp Σ) (Pay : iProp Σ)
       {Dp : list nat} (I : forall N' : uk_names Σ, ukn_pay N' = Q -> ep_ifaceP (Dp := Dp) N' (cat_prog N'))
       (E : penv) (ds : gset nat) :
@@ -412,7 +412,7 @@ Section UkTreeEntry.
     UkRun.urun_nopipe sts -∗
     udep -∗
     image_entry ElfUser.cat_elf Mn (mword_of_int (t + 8) : mword 64) sts
-      cw secc cs pidv Q Pay uslot.
+      cw ProcDefs.secc_all cs pidv Q Pay uslot.
   Proof using .
     intros Hok Himg Hbytes Hfdl Hc Hs Hdp.
     iIntros "#Henv #Hnpw #Hdep".
@@ -501,7 +501,7 @@ Section UkTreeEntry.
      statement, unchanged) *)
   Lemma cat_image_entry_env (ws : list (list (bv 8))) (Mn : gmap Z (bv 8))
       (sv t : Z) (gn : nat -> bv 8)
-      (sts : list fdstate) (cw : Z) (secc : mword 64) (cs : gset gname) (pidv : mword 32)
+      (sts : list fdstate) (cw : Z) (cs : gset gname) (pidv : mword 32)
       (Q : Z -> iProp Σ) (Pay : iProp Σ)
       {Dp : list nat} (I : forall N' : uk_names Σ, ep_ifaceP (Dp := Dp) N' (cat_prog N'))
       (E : penv) (ds : gset nat) :
@@ -521,11 +521,11 @@ Section UkTreeEntry.
     UkRun.urun_nopipe sts -∗
     udep -∗
     image_entry ElfUser.cat_elf Mn (mword_of_int (t + 8) : mword 64) sts
-      cw secc cs pidv Q Pay uslot.
+      cw ProcDefs.secc_all cs pidv Q Pay uslot.
   Proof using .
     intros Hok Himg Hbytes Hfdl Hc Hs Hdp.
     iIntros "#Henv #Hnpw #Hdep".
-    iApply (cat_image_entry_env_c ws Mn sv t gn sts cw secc cs pidv Q Pay
+    iApply (cat_image_entry_env_c ws Mn sv t gn sts cw cs pidv Q Pay
               (fun N' _ => I N') E ds Hok Himg Hbytes Hfdl Hc Hs Hdp
               with "[] Hnpw Hdep").
     iIntros "!>" (N' Hpq) "Hstd Hcwf HPay".
@@ -536,7 +536,7 @@ Section UkTreeEntry.
      [cat_image_entry_env] through [ProgTree.cat_tree_tail]. *)
   Lemma cat_image_entry_env_f (ws : list (list (bv 8))) (Mn : gmap Z (bv 8))
       (sv t : Z) (gn : nat -> bv 8)
-      (sts : list fdstate) (cw : Z) (secc : mword 64) (cs : gset gname) (pidv : mword 32)
+      (sts : list fdstate) (cw : Z) (cs : gset gname) (pidv : mword 32)
       (Q : Z -> iProp Σ) (Pay : iProp Σ)
       {Dp : list nat} (I : forall N' : uk_names Σ, ep_ifaceP (Dp := Dp) N' (cat_prog N'))
       (E : penv) (ds : gset nat) :
@@ -561,14 +561,14 @@ Section UkTreeEntry.
     UkRun.urun_nopipe sts -∗
     udep -∗
     image_entry ElfUser.cat_elf Mn (mword_of_int (t + 8) : mword 64) sts
-      cw secc cs pidv Q Pay uslot.
+      cw ProcDefs.secc_all cs pidv Q Pay uslot.
   Proof using .
     intros Hok Himg Hbytes Hfdl Hws2 Halen1 Hfname Hc Hs Hdp.
     assert (Htail : cat_tree ws = cat_tree [sb "cat"; FsImgCheck.fname_f]).
     { apply cat_tree_tail. rewrite (cat_f_tail ws Hws2 Halen1 Hfname). reflexivity. }
     rewrite <- Htail in Hc, Hs.
     iIntros "#Henv #Hnpw #Hdep".
-    iApply (cat_image_entry_env ws Mn sv t gn sts cw secc cs pidv Q Pay I E ds
+    iApply (cat_image_entry_env ws Mn sv t gn sts cw cs pidv Q Pay I E ds
               Hok Himg Hbytes Hfdl Hc Hs Hdp with "Henv Hnpw Hdep").
   Qed.
 
@@ -587,7 +587,7 @@ Section UkTreeEntry.
          vector that need. *)
   Lemma grep_image_entry_env_c (ws : list (list (bv 8))) (Mn : gmap Z (bv 8))
       (sv t : Z) (gn : nat -> bv 8)
-      (sts : list fdstate) (cw : Z) (secc : mword 64) (cs : gset gname) (pidv : mword 32)
+      (sts : list fdstate) (cw : Z) (cs : gset gname) (pidv : mword 32)
       (Q : Z -> iProp Σ) (Pay : iProp Σ)
       {Dp : list nat} (I : forall N' : uk_names Σ, ukn_pay N' = Q -> ep_ifaceP (Dp := Dp) N' (grep_prog N'))
       (E : penv) (ds : gset nat) :
@@ -605,7 +605,7 @@ Section UkTreeEntry.
     UkRun.urun_nopipe sts -∗
     udep -∗
     image_entry ElfUser.grep_elf Mn (mword_of_int (t + 8) : mword 64) sts
-      cw secc cs pidv Q Pay uslot.
+      cw ProcDefs.secc_all cs pidv Q Pay uslot.
   Proof using .
     intros Hok Himg Hbytes Hfdl Hc Hdp.
     iIntros "#Henv #Hnpw #Hdep".
@@ -694,7 +694,7 @@ Section UkTreeEntry.
   (* ...and at an interface that does not read the equation *)
   Lemma grep_image_entry_env (ws : list (list (bv 8))) (Mn : gmap Z (bv 8))
       (sv t : Z) (gn : nat -> bv 8)
-      (sts : list fdstate) (cw : Z) (secc : mword 64) (cs : gset gname) (pidv : mword 32)
+      (sts : list fdstate) (cw : Z) (cs : gset gname) (pidv : mword 32)
       (Q : Z -> iProp Σ) (Pay : iProp Σ)
       {Dp : list nat} (I : forall N' : uk_names Σ, ep_ifaceP (Dp := Dp) N' (grep_prog N'))
       (E : penv) (ds : gset nat) :
@@ -713,11 +713,11 @@ Section UkTreeEntry.
     UkRun.urun_nopipe sts -∗
     udep -∗
     image_entry ElfUser.grep_elf Mn (mword_of_int (t + 8) : mword 64) sts
-      cw secc cs pidv Q Pay uslot.
+      cw ProcDefs.secc_all cs pidv Q Pay uslot.
   Proof using .
     intros Hok Himg Hbytes Hfdl Hc Hdp.
     iIntros "#Henv #Hnpw #Hdep".
-    iApply (grep_image_entry_env_c ws Mn sv t gn sts cw secc cs pidv Q Pay
+    iApply (grep_image_entry_env_c ws Mn sv t gn sts cw cs pidv Q Pay
               (fun N' _ => I N') E ds Hok Himg Hbytes Hfdl Hc Hdp
               with "[] Hnpw Hdep").
     iIntros "!>" (N' Hpq) "Hstd Hcwf HPay".

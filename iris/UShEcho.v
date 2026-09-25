@@ -1602,7 +1602,7 @@ Section UShEcho.
   (*    caller's own image DETERMINES the shape ([echo_args_det]).         *)
   Lemma echo_image_entry (ws : list (list (bv 8))) (M : gmap Z (bv 8))
       (s0 t : Z) (g : nat -> bv 8)
-      (sts : list fdstate) (cw : Z) (secc : mword 64) (cs : gset gname) (pidv : mword 32) :
+      (sts : list fdstate) (cw : Z) (cs : gset gname) (pidv : mword 32) :
     line_ok ws ->
     echo_node_img ws M s0 t g ->
     UkShEcho.echo_argv_bytes ws g ->
@@ -1616,7 +1616,7 @@ Section UShEcho.
        "The exit path") *)
     UkRun.urun_nopipe sts -∗ udep -∗
     image_entry ElfUser.echo_elf M (mword_of_int (t + 8) : mword 64) sts
-      cw secc cs pidv (fun _ : Z => True)%I emp uslot.
+      cw ProcDefs.secc_all cs pidv (fun _ : Z => True)%I emp uslot.
   Proof.
     intros Hok Himg Hbytes Hfdl. iIntros "#Hwr #Hnpw #Hdep".
     iApply image_entry_of_at. iIntros "!>" (na alen afun) "%Hargs".

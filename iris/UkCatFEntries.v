@@ -117,7 +117,7 @@ Section UkCatFEntries.
 
   (* THE ENTRY, at either state of `f` *)
   Lemma pse_catf_image_entry_gen (f : list (bv 8)) (Mn : gmap Z (bv 8)) (sv t : Z)
-      (gn : nat -> bv 8) (sts : list fdstate) (cw : Z) (secc : mword 64) (cs : gset gname) (pidv : mword 32)
+      (gn : nat -> bv 8) (sts : list fdstate) (cw : Z) (cs : gset gname) (pidv : mword 32)
       (Q : Z -> iProp Σ) (pn : pnames) (gp : pipe_names) (w : wid)
       (A X ds xs : list (list (bv 8))) (qf : Qp) (sf : dst) (rb1 rb2 : bool) :
     (forall x y : Z, Q x = Q y) ->
@@ -131,7 +131,7 @@ Section UkCatFEntries.
     (snd <$> sf = Some L /\ cat_dg_open f ∈ xs /\ [] ∈ ds /\ cat_dg_write ∈ ds)
     \/ (sf = None /\ cat_dg_open f ∈ xs) ->
     UkRun.urun_nopipe sts -∗ udep -∗
-    image_entry ElfUser.cat_elf Mn (mword_of_int (t + 8) : mword 64) sts cw secc cs pidv Q
+    image_entry ElfUser.cat_elf Mn (mword_of_int (t + 8) : mword 64) sts cw ProcDefs.secc_all cs pidv Q
       (LEND qf sf pn gp w A X ds xs Q) uslot.
   Proof using HL31 Hadmit Hcons Heq Hext Hfc Hkill HlR Hplok Hsup cifRegG0 dep_tl ufdG0.
     intros HQc Hf Hok Hnode Hab Hfdl Hcw Hl1 Hl2 Hcase.
@@ -156,7 +156,7 @@ Section UkCatFEntries.
     set (If := fun (N' : uk_names Σ) (Hpq : ukn_pay N' = Q) =>
                  cfe_iface γreg kds (cfe_nodup0 _) (cfe_kdp0 pn gp w A X) qf sf N'
                    (ukn_const_of_eq N' Q Hpq HQc)).
-    iPoseProof (cat_image_entry_env_c (PS := PS) (prod_words (PrCatF fname_f)) Mn sv t gn sts cw secc cs
+    iPoseProof (cat_image_entry_env_c (PS := PS) (prod_words (PrCatF fname_f)) Mn sv t gn sts cw cs
                   pidv Q (own γreg (cif_pool ∅ wv) ∗ LEND qf sf pn gp w A X ds xs Q)%I
                   If (catp_env (DProd [L; []] xs ds) files [fname_f]) {[0%nat]}
                   Hok Hnode Hab Hfdl Hc (cat_tree_safe _ _) (cfe_dp0 _)
@@ -179,7 +179,7 @@ Section UkCatFEntries.
 
   (* `f` PRESENT: its content is the round's line *)
   Lemma pse_catf_image_entry (f : list (bv 8)) (Mn : gmap Z (bv 8)) (sv t : Z)
-      (gn : nat -> bv 8) (sts : list fdstate) (cw : Z) (secc : mword 64) (cs : gset gname) (pidv : mword 32)
+      (gn : nat -> bv 8) (sts : list fdstate) (cw : Z) (cs : gset gname) (pidv : mword 32)
       (Q : Z -> iProp Σ) (pn : pnames) (gp : pipe_names) (w : wid)
       (qf : Qp) (i : Z) (rb1 rb2 : bool) :
     (forall x y : Z, Q x = Q y) ->
@@ -191,19 +191,19 @@ Section UkCatFEntries.
     take NSTD sts !! 1%nat = Some (FdOpen rb1 true (FdPipe gp)) ->
     take NSTD sts !! 2%nat = Some (FdOpen rb2 true (FdDevice CONSOLE)) ->
     UkRun.urun_nopipe sts -∗ udep -∗
-    image_entry ElfUser.cat_elf Mn (mword_of_int (t + 8) : mword 64) sts cw secc cs pidv Q
+    image_entry ElfUser.cat_elf Mn (mword_of_int (t + 8) : mword 64) sts cw ProcDefs.secc_all cs pidv Q
       (LEND qf (Some (i, L)) pn gp w [[]; cat_dg_write] [cat_dg_open f]
          [[]; cat_dg_write] [cat_dg_open f] Q) uslot.
   Proof using HL31 Hadmit Hcons Heq Hext Hfc Hkill HlR Hplok Hsup cifRegG0 dep_tl ufdG0.
     intros HQc Hf Hok Hnode Hab Hfdl Hcw Hl1 Hl2.
-    apply (pse_catf_image_entry_gen f Mn sv t gn sts cw secc cs pidv Q pn gp w _ _ _ _ qf _ rb1 rb2
+    apply (pse_catf_image_entry_gen f Mn sv t gn sts cw cs pidv Q pn gp w _ _ _ _ qf _ rb1 rb2
              HQc Hf Hok Hnode Hab Hfdl Hcw Hl1 Hl2).
     left. split_and!; [reflexivity | by left | by left | by right; left].
   Qed.
 
   (* ...and ABSENT: the refused open's report, nothing on the pipe *)
   Lemma pse_catf_image_entry_absent (f : list (bv 8)) (Mn : gmap Z (bv 8)) (sv t : Z)
-      (gn : nat -> bv 8) (sts : list fdstate) (cw : Z) (secc : mword 64) (cs : gset gname) (pidv : mword 32)
+      (gn : nat -> bv 8) (sts : list fdstate) (cw : Z) (cs : gset gname) (pidv : mword 32)
       (Q : Z -> iProp Σ) (pn : pnames) (gp : pipe_names) (w : wid)
       (qf : Qp) (rb1 rb2 : bool) :
     (forall x y : Z, Q x = Q y) ->
@@ -215,11 +215,11 @@ Section UkCatFEntries.
     take NSTD sts !! 1%nat = Some (FdOpen rb1 true (FdPipe gp)) ->
     take NSTD sts !! 2%nat = Some (FdOpen rb2 true (FdDevice CONSOLE)) ->
     UkRun.urun_nopipe sts -∗ udep -∗
-    image_entry ElfUser.cat_elf Mn (mword_of_int (t + 8) : mword 64) sts cw secc cs pidv Q
+    image_entry ElfUser.cat_elf Mn (mword_of_int (t + 8) : mword 64) sts cw ProcDefs.secc_all cs pidv Q
       (LEND qf None pn gp w [[]] [cat_dg_open f] [[]] [cat_dg_open f] Q) uslot.
   Proof using HL31 Hadmit Hcons Heq Hext Hfc Hkill HlR Hplok Hsup cifRegG0 dep_tl ufdG0.
     intros HQc Hf Hok Hnode Hab Hfdl Hcw Hl1 Hl2.
-    apply (pse_catf_image_entry_gen f Mn sv t gn sts cw secc cs pidv Q pn gp w _ _ _ _ qf _ rb1 rb2
+    apply (pse_catf_image_entry_gen f Mn sv t gn sts cw cs pidv Q pn gp w _ _ _ _ qf _ rb1 rb2
              HQc Hf Hok Hnode Hab Hfdl Hcw Hl1 Hl2).
     right. split; [reflexivity | by left].
   Qed.

@@ -1187,7 +1187,7 @@ Section UInitSh.
     iIntros "#Hnpw #Hdep #Hdp #Hplaw #Hcons #Hfd0 #Hgen'".
     rewrite /image_entry. iModIntro.
     iIntros (na alen afun W')
-      "%Hok %Hcwd0 %Hlzf %Hchq %Hpiq %Hargs #Hmp
+      "%Hok %Hcwd0 %Hlzf %Hscf %Hchq %Hpiq %Hargs #Hmp
        [[#Hp1 [#Hp2 #Htag]] [Hps [Hls [Hstd' Hcred]]]]".
     assert (Hch0 : uvis_ch W' = ∅) by (rewrite Hchq; exact Hcs).
     assert (Hpid1 : bv_unsigned (uvis_pid W') <> 1)
@@ -1250,7 +1250,7 @@ Section UInitSh.
                   1%nat alen afun fdv W' n0 np
                   Hbd
                   (ucons_pay_const cn γp T (UkInit.init_rd (cc_rd Cr) (cc_wbn Cr))) Hok Hcwd0
-                  (init_sh_room alen n0 Halen Hn0) Hlen Hlzf Hch0 Hpid1)
+                  (init_sh_room alen n0 Halen Hn0) Hlen Hlzf Hscf Hch0 Hpid1)
       as Hsk.
     iApply (Hsk with "[] Hnpw Hdep Hdp Htag Hplaw [] [] Hcons Hgen' Hmp Hps
                       Hls Hwcp").

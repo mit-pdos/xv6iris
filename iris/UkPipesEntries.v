@@ -220,7 +220,7 @@ Section UkPipesEntries.
   (*  2a. ECHO AT THE HEAD                                                *)
   (* ------------------------------------------------------------------- *)
   Lemma pse_echo_image_entry (ws : list (list (bv 8))) (M : gmap Z (bv 8)) (s0 t : Z)
-      (gb : nat -> bv 8) (sts : list fdstate) (cw : Z) (secc : mword 64) (cs : gset gname) (pidv : mword 32)
+      (gb : nat -> bv 8) (sts : list fdstate) (cw : Z) (cs : gset gname) (pidv : mword 32)
       (rb : bool) (Q : Z -> iProp Σ) (pn : pnames) (gp : pipe_names) :
     (forall x y : Z, Q x = Q y) ->
     EchoDisc.line_ok ws ->
@@ -231,7 +231,7 @@ Section UkPipesEntries.
     L = wl_line (drop 1 ws) ->
     UkRun.urun_nopipe sts -∗ udep -∗
     image_entry ElfUser.echo_elf M (mword_of_int (t + 8) : mword 64) sts
-      cw secc cs pidv Q (pns_echo_lend LM CP L γc γm pn gp Q) uslot.
+      cw ProcDefs.secc_all cs pidv Q (pns_echo_lend LM CP L γc γm pn gp Q) uslot.
   Proof using HL31 Hadmit Hcons Hext Hsup HlR Hfc Hkill Hplok TERM TOK dep_tl pnsRegG0 ufdG0 v.
     intros HQc Hok Hnode Hab Hfdl Hl1 HLw.
     iIntros "#Hnpw #Hdep".
@@ -245,7 +245,7 @@ Section UkPipesEntries.
                    (ukn_const_of_eq N' Q Hpq HQc)).
     assert (Hc : conforms (pipe_env (DOutH [L]) (fun _ => None)) (echo_tree ws)).
     { rewrite HLw. exact (echo_pipe_conforms ws _ (pe_drop1_ne ws Hok) (pe_line_len ws Hok)). }
-    iPoseProof (echo_image_entry_env_c (PS := PS) ws M s0 t gb sts cw secc cs pidv Q
+    iPoseProof (echo_image_entry_env_c (PS := PS) ws M s0 t gb sts cw cs pidv Q
                   (own γreg (pns_pool ∅ wv) ∗ pns_echo_lend LM CP L γc γm pn gp Q)%I
                   If (pipe_env (DOutH [L]) (fun _ => None)) {[0%nat]}
                   Hok Hnode Hab Hfdl Hc (echo_tree_safe _ _) (pse_dp0 _)
@@ -270,7 +270,7 @@ Section UkPipesEntries.
   (*      sink a parameter                                                *)
   (* ------------------------------------------------------------------- *)
   Lemma pse_copy_image_entry (Mn : gmap Z (bv 8)) (sv t : Z) (gn : nat -> bv 8)
-      (sts : list fdstate) (cw : Z) (secc : mword 64) (cs : gset gname) (pidv : mword 32) (Q : Z -> iProp Σ)
+      (sts : list fdstate) (cw : Z) (cs : gset gname) (pidv : mword 32) (Q : Z -> iProp Σ)
       (w2 : wid) (A2 alts2 : list (list (bv 8))) (pin : pnames) (gin : pipe_names)
       (sk : csink) (wb rb1 rb2 : bool) :
     (forall x y : Z, Q x = Q y) ->
@@ -283,7 +283,7 @@ Section UkPipesEntries.
     take NSTD sts !! 2%nat = Some (FdOpen rb2 true (FdDevice CONSOLE)) ->
     [] ∈ alts2 -> (pns_sink_h sk = true -> cat_dg_write ∈ alts2) ->
     UkRun.urun_nopipe sts -∗ udep -∗
-    image_entry ElfUser.cat_elf Mn (mword_of_int (t + 8) : mword 64) sts cw secc cs pidv Q
+    image_entry ElfUser.cat_elf Mn (mword_of_int (t + 8) : mword 64) sts cw ProcDefs.secc_all cs pidv Q
       (pns_copy_lend g LM PV CP v I sR lR L TERM TOK dep γc γm w2 A2 alts2 pin gin FCat sk Q) uslot.
   Proof using HL31 Hadmit Hcons Hext Hsup HlR Hfc Hkill Hplok dep_tl pnsRegG0 ufdG0.
     intros HQc Hok Hnode Hab Hfdl Hl0 Hl1 Hl2 Hnil Hdg.
@@ -296,7 +296,7 @@ Section UkPipesEntries.
     set (If := fun (N' : uk_names Σ) (Hpq : ukn_pay N' = Q) =>
                  pse_iface_cat γreg [(0%nat, PDCon w2 A2); (1%nat, PDCopy (pin, gin) FCat sk)]
                    (pse_nodup01 _ _) N' (ukn_const_of_eq N' Q Hpq HQc)).
-    iPoseProof (cat_image_entry_env_c (PS := PS) (filt_words FCat) Mn sv t gn sts cw secc cs pidv Q
+    iPoseProof (cat_image_entry_env_c (PS := PS) (filt_words FCat) Mn sv t gn sts cw cs pidv Q
                   (own γreg (pns_pool ∅ wv)
                    ∗ pns_copy_lend g LM PV CP v I sR lR L TERM TOK dep γc γm w2 A2 alts2 pin gin FCat sk Q)%I
                   If (copy_env (DCopy flt_id (pns_sink_h sk) [] L []) alts2 (fun _ => None) [])
@@ -324,7 +324,7 @@ Section UkPipesEntries.
   (* THE MIDDLE CAT: the sink the next pipe's write end ([h = true]), fd 2
      owing [cat_dg_write] among its alternatives *)
   Lemma pse_mid_image_entry (Mn : gmap Z (bv 8)) (sv t : Z) (gn : nat -> bv 8)
-      (sts : list fdstate) (cw : Z) (secc : mword 64) (cs : gset gname) (pidv : mword 32) (Q : Z -> iProp Σ)
+      (sts : list fdstate) (cw : Z) (cs : gset gname) (pidv : mword 32) (Q : Z -> iProp Σ)
       (w2 : wid) (A2 alts2 : list (list (bv 8))) (pin : pnames) (gin : pipe_names)
       (pn : pnames) (gp : pipe_names) (wb rb1 rb2 : bool) :
     (forall x y : Z, Q x = Q y) ->
@@ -337,12 +337,12 @@ Section UkPipesEntries.
     take NSTD sts !! 2%nat = Some (FdOpen rb2 true (FdDevice CONSOLE)) ->
     [] ∈ alts2 -> cat_dg_write ∈ alts2 ->
     UkRun.urun_nopipe sts -∗ udep -∗
-    image_entry ElfUser.cat_elf Mn (mword_of_int (t + 8) : mword 64) sts cw secc cs pidv Q
+    image_entry ElfUser.cat_elf Mn (mword_of_int (t + 8) : mword 64) sts cw ProcDefs.secc_all cs pidv Q
       (pns_copy_lend g LM PV CP v I sR lR L TERM TOK dep γc γm w2 A2 alts2 pin gin FCat (CSPipe pn gp) Q)
       uslot.
   Proof using HL31 Hadmit Hcons Hext Hsup HlR Hfc Hkill Hplok dep_tl pnsRegG0 ufdG0.
     intros HQc Hok Hnode Hab Hfdl Hl0 Hl1 Hl2 Hnil Hdg.
-    exact (pse_copy_image_entry Mn sv t gn sts cw secc cs pidv Q w2 A2 alts2 pin gin
+    exact (pse_copy_image_entry Mn sv t gn sts cw cs pidv Q w2 A2 alts2 pin gin
              (CSPipe pn gp) wb rb1 rb2 HQc Hok Hnode Hab Hfdl Hl0 Hl1 Hl2 Hnil
              (fun _ => Hdg)).
   Qed.
@@ -351,7 +351,7 @@ Section UkPipesEntries.
      no writer of the model's, so the only console writer it holds is the
      sink's [wL] *)
   Lemma pse_last_image_entry_m (Mn : gmap Z (bv 8)) (sv t : Z) (gn : nat -> bv 8)
-      (sts : list fdstate) (cw : Z) (secc : mword 64) (cs : gset gname) (pidv : mword 32) (Q : Z -> iProp Σ)
+      (sts : list fdstate) (cw : Z) (cs : gset gname) (pidv : mword 32) (Q : Z -> iProp Σ)
       (pin : pnames) (gin : pipe_names) (wL : wid) (wb rb1 rb2 : bool) :
     (forall x y : Z, Q x = Q y) ->
     exec_ok (filt_words FCat) ->
@@ -362,7 +362,7 @@ Section UkPipesEntries.
     take NSTD sts !! 1%nat = Some (FdOpen rb1 true (FdDevice CONSOLE)) ->
     take NSTD sts !! 2%nat = Some (FdOpen rb2 true (FdDevice CONSOLE)) ->
     UkRun.urun_nopipe sts -∗ udep -∗
-    image_entry ElfUser.cat_elf Mn (mword_of_int (t + 8) : mword 64) sts cw secc cs pidv Q
+    image_entry ElfUser.cat_elf Mn (mword_of_int (t + 8) : mword 64) sts cw ProcDefs.secc_all cs pidv Q
       (pns_copy_lend_m g LM PV CP v I sR lR L TERM TOK dep γc γm pin gin FCat (CSCon wL) Q) uslot.
   Proof using HL31 Hadmit Hcons Hext Hsup HlR Hfc Hkill Hplok dep_tl pnsRegG0 ufdG0.
     intros HQc Hok Hnode Hab Hfdl Hl0 Hl1 Hl2.
@@ -375,7 +375,7 @@ Section UkPipesEntries.
     set (If := fun (N' : uk_names Σ) (Hpq : ukn_pay N' = Q) =>
                  pse_iface_cat γreg [(0%nat, PDMute); (1%nat, PDCopy (pin, gin) FCat (CSCon wL))]
                    (pse_nodup01 _ _) N' (ukn_const_of_eq N' Q Hpq HQc)).
-    iPoseProof (cat_image_entry_env_c (PS := PS) (filt_words FCat) Mn sv t gn sts cw secc cs pidv Q
+    iPoseProof (cat_image_entry_env_c (PS := PS) (filt_words FCat) Mn sv t gn sts cw cs pidv Q
                   (own γreg (pns_pool ∅ wv)
                    ∗ pns_copy_lend_m g LM PV CP v I sR lR L TERM TOK dep γc γm pin gin FCat (CSCon wL) Q)%I
                   If (copy_env (DCopy flt_id false [] L []) [[]] (fun _ => None) [])
@@ -413,7 +413,7 @@ Section UkPipesEntries.
   (* A MIDDLE GREP (or any grep whose fd 2 is a lent console writer): the
      sink a parameter, as at [pse_copy_image_entry] *)
   Lemma pse_grep_image_entry (wp : list (bv 8)) (Mn : gmap Z (bv 8)) (s0 t : Z) (gb : nat -> bv 8)
-      (sts : list fdstate) (cw : Z) (secc : mword 64) (cs : gset gname) (pidv : mword 32) (Q : Z -> iProp Σ)
+      (sts : list fdstate) (cw : Z) (cs : gset gname) (pidv : mword 32) (Q : Z -> iProp Σ)
       (w2 : wid) (A2 alts2 : list (list (bv 8))) (pin : pnames) (gin : pipe_names)
       (sk : csink) (wb rb1 rb2 : bool) :
     (forall x y : Z, Q x = Q y) ->
@@ -426,7 +426,7 @@ Section UkPipesEntries.
     take NSTD sts !! 2%nat = Some (FdOpen rb2 true (FdDevice CONSOLE)) ->
     GrepTree.grep_ok L -> [] ∈ alts2 ->
     UkRun.urun_nopipe sts -∗ udep -∗
-    image_entry ElfUser.grep_elf Mn (mword_of_int (t + 8) : mword 64) sts cw secc cs pidv Q
+    image_entry ElfUser.grep_elf Mn (mword_of_int (t + 8) : mword 64) sts cw ProcDefs.secc_all cs pidv Q
       (pns_copy_lend g LM PV CP v I sR lR L TERM TOK dep γc γm w2 A2 alts2 pin gin (FGrep wp) sk Q)
       uslot.
   Proof using HL31 Hadmit Hcons Hext Hsup HlR Hfc Hkill Hplok dep_tl pnsRegG0 ufdG0.
@@ -440,7 +440,7 @@ Section UkPipesEntries.
     set (If := fun (N' : uk_names Σ) (Hpq : ukn_pay N' = Q) =>
                  pse_iface_grep γreg [(0%nat, PDCon w2 A2); (1%nat, PDCopy (pin, gin) (FGrep wp) sk)]
                    (pse_nodup01 _ _) N' (ukn_const_of_eq N' Q Hpq HQc)).
-    iPoseProof (grep_image_entry_env_c (PS := PS) (filt_words (FGrep wp)) Mn s0 t gb sts cw secc cs pidv Q
+    iPoseProof (grep_image_entry_env_c (PS := PS) (filt_words (FGrep wp)) Mn s0 t gb sts cw cs pidv Q
                   (own γreg (pns_pool ∅ wv)
                    ∗ pns_copy_lend g LM PV CP v I sR lR L TERM TOK dep γc γm w2 A2 alts2 pin gin
                        (FGrep wp) sk Q)%I
@@ -469,7 +469,7 @@ Section UkPipesEntries.
   (* THE MIDDLE GREP: the sink the next pipe's write end, fd 2 lent a
      console writer owing nothing *)
   Lemma pse_grep_mid_image_entry (wp : list (bv 8)) (Mn : gmap Z (bv 8)) (s0 t : Z)
-      (gb : nat -> bv 8) (sts : list fdstate) (cw : Z) (secc : mword 64) (cs : gset gname) (pidv : mword 32)
+      (gb : nat -> bv 8) (sts : list fdstate) (cw : Z) (cs : gset gname) (pidv : mword 32)
       (Q : Z -> iProp Σ) (w2 : wid) (A2 alts2 : list (list (bv 8))) (pin : pnames)
       (gin : pipe_names) (pn : pnames) (gp : pipe_names) (wb rb1 rb2 : bool) :
     (forall x y : Z, Q x = Q y) ->
@@ -482,19 +482,19 @@ Section UkPipesEntries.
     take NSTD sts !! 2%nat = Some (FdOpen rb2 true (FdDevice CONSOLE)) ->
     GrepTree.grep_ok L -> [] ∈ alts2 ->
     UkRun.urun_nopipe sts -∗ udep -∗
-    image_entry ElfUser.grep_elf Mn (mword_of_int (t + 8) : mword 64) sts cw secc cs pidv Q
+    image_entry ElfUser.grep_elf Mn (mword_of_int (t + 8) : mword 64) sts cw ProcDefs.secc_all cs pidv Q
       (pns_copy_lend g LM PV CP v I sR lR L TERM TOK dep γc γm w2 A2 alts2 pin gin (FGrep wp)
          (CSPipe pn gp) Q)
       uslot.
   Proof using HL31 Hadmit Hcons Hext Hsup HlR Hfc Hkill Hplok dep_tl pnsRegG0 ufdG0.
     intros HQc Hok Hnode Hab Hfdl Hl0 Hl1 Hl2 HLg Hnil.
-    exact (pse_grep_image_entry wp Mn s0 t gb sts cw secc cs pidv Q w2 A2 alts2 pin gin
+    exact (pse_grep_image_entry wp Mn s0 t gb sts cw cs pidv Q w2 A2 alts2 pin gin
              (CSPipe pn gp) wb rb1 rb2 HQc Hok Hnode Hab Hfdl Hl0 Hl1 Hl2 HLg Hnil).
   Qed.
 
   (* THE LAST GREP, fd 2 MUTE: the sink the content writer [wL] *)
   Lemma pse_grep_last_image_entry (wp : list (bv 8)) (Mn : gmap Z (bv 8)) (s0 t : Z)
-      (gb : nat -> bv 8) (sts : list fdstate) (cw : Z) (secc : mword 64) (cs : gset gname) (pidv : mword 32)
+      (gb : nat -> bv 8) (sts : list fdstate) (cw : Z) (cs : gset gname) (pidv : mword 32)
       (Q : Z -> iProp Σ) (pin : pnames) (gin : pipe_names) (wL : wid) (wb rb1 rb2 : bool) :
     (forall x y : Z, Q x = Q y) ->
     exec_ok (filt_words (FGrep wp)) ->
@@ -506,7 +506,7 @@ Section UkPipesEntries.
     take NSTD sts !! 2%nat = Some (FdOpen rb2 true (FdDevice CONSOLE)) ->
     GrepTree.grep_ok L ->
     UkRun.urun_nopipe sts -∗ udep -∗
-    image_entry ElfUser.grep_elf Mn (mword_of_int (t + 8) : mword 64) sts cw secc cs pidv Q
+    image_entry ElfUser.grep_elf Mn (mword_of_int (t + 8) : mword 64) sts cw ProcDefs.secc_all cs pidv Q
       (pns_copy_lend_m g LM PV CP v I sR lR L TERM TOK dep γc γm pin gin (FGrep wp) (CSCon wL) Q) uslot.
   Proof using HL31 Hadmit Hcons Hext Hsup HlR Hfc Hkill Hplok dep_tl pnsRegG0 ufdG0.
     intros HQc Hok Hnode Hab Hfdl Hl0 Hl1 Hl2 HLg.
@@ -519,7 +519,7 @@ Section UkPipesEntries.
     set (If := fun (N' : uk_names Σ) (Hpq : ukn_pay N' = Q) =>
                  pse_iface_grep γreg [(0%nat, PDMute); (1%nat, PDCopy (pin, gin) (FGrep wp) (CSCon wL))]
                    (pse_nodup01 _ _) N' (ukn_const_of_eq N' Q Hpq HQc)).
-    iPoseProof (grep_image_entry_env_c (PS := PS) (filt_words (FGrep wp)) Mn s0 t gb sts cw secc cs pidv Q
+    iPoseProof (grep_image_entry_env_c (PS := PS) (filt_words (FGrep wp)) Mn s0 t gb sts cw cs pidv Q
                   (own γreg (pns_pool ∅ wv)
                    ∗ pns_copy_lend_m g LM PV CP v I sR lR L TERM TOK dep γc γm pin gin (FGrep wp)
                        (CSCon wL) Q)%I

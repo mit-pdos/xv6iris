@@ -408,7 +408,7 @@ Section UInitConsK.
     iFrame "Hheap Hufd".
     iApply (sbundle_at_mknod_intro_at uslot
               (init_cons_mknod_fam Pv T K r (ukn_pay N))
-              (uvis_of_run m pc M pm sz fdv FsImg.ROOTINO gn cs pidv false)
+              (uvis_of_run m pc M pm sz fdv FsImg.ROOTINO gn cs pidv false secc_all)
               FsImg.ROOTINO M (mword_of_int 0x980) CONSOLE 0
               eq_refl eq_refl
               (eq_trans (tf_of_arg0 m pc) Ha0)
