@@ -18,7 +18,7 @@ read-only `uarts[i]` words (`MachCSL.wordPointsTo`, whose bytes transport)
 -- hence `instCtxMorphEnvFam`, the re-homing witness `envMorph` needs.  A
 lock handle transports only because its PAYLOAD is a genuine function of
 the holder's context (`procLockPay`, `ticksResAt`, `diskRes`, and -- since
-this file demanded it -- `consRes`); the instances below say so at the
+this file demanded it -- `consResAt`); the instances below say so at the
 kernel tier, where a handler always runs.
 
 The family is pinned at that tier (`KTier.kpt`): `procsInv` does not see
@@ -56,18 +56,25 @@ instance instCtxMorphUartRxWord (i : UartId) :
   unfold uartRxWord
   infer_instance
 
-/-- The console lock. -/
-instance instCtxMorphIsConsLock (γc : GName) :
-    CtxMorph (GF := GF) (fun ξ => @isConsLock hlc GF _ ⟨ξ, KTier.kpt⟩ γc) :=
+/-- The console lock's handle over the ring (the step-4 payload
+`ConsoleInvDefs.consResAt`, a closed function of the holder's context). -/
+instance instCtxMorphIsConsLock (γc : GName) (cn : ConsNames) :
+    CtxMorph (GF := GF) (fun ξ => @isLock hlc GF _ _ ⟨ξ, KTier.kpt⟩ γc consAddr "cons"
+      (@consResAt hlc GF _ _ ⟨ξ, KTier.kpt⟩ cn)) :=
   show CtxMorph (GF := GF) (fun ξ => @isLock hlc GF _ _ ⟨ξ, KTier.kpt⟩ γc consAddr "cons"
-      (fun ζ => @consBody hlc GF _ ⟨ζ, KTier.kpt⟩)) from
+      (fun ζ => @consResCur hlc GF _ _ ⟨ζ, KTier.kpt⟩ cn)) from
     instCtxMorphIsLock _ _ _ _ _
 
+/-- The console's bundle (Rocq `console_caps_morph`). -/
+instance instCtxMorphConsoleCaps (γc γl : GName) (γ : UartNames) :
+    CtxMorph (GF := GF) (fun ξ => @consoleCaps hlc GF _ _ ⟨ξ, KTier.kpt⟩ γc γl γ) := by
+  unfold consoleCaps
+  infer_instance
+
 /-- The console's credentials at port 0 (nothing at port 1). -/
-instance instCtxMorphUartRxCaps (i : UartId) (γc γl : GName) (γ : UartNames)
-    (bs : List (BitVec 8)) :
-    CtxMorph (GF := GF) (fun ξ => @uartRxCaps hlc GF _ ⟨ξ, KTier.kpt⟩ _ i γc γl γ bs) := by
-  cases i <;> (unfold uartRxCaps; infer_instance)
+instance instCtxMorphUartRxCaps (i : UartId) (γc γl : GName) (γ : UartNames) :
+    CtxMorph (GF := GF) (fun ξ => @uartRxCaps hlc GF _ _ ⟨ξ, KTier.kpt⟩ i γc γl γ) := by
+  cases i <;> unfold uartRxCaps <;> infer_instance
 
 /-- The ticks lock. -/
 instance instCtxMorphIsTickslock (γt : GName) :

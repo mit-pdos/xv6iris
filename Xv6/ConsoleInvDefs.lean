@@ -63,7 +63,8 @@ Deviations from Rocq:
    `ConsoleDefs.consRes`'s role); Rocq `is_conslock` is `isConslock`
    (camelCase of the Rocq name; the landed `isConsLock` is the raw ring's
    handle).  The geometry (`consAddr`, `consBufAddr`, `consRAddr`,
-   `consWAddr`, `consEAddr`) is REUSED from ConsoleDefs.
+   `consWAddr`, `consEAddr`) lives HERE since step 5 (moved out of
+   ConsoleDefs).
 2. `pa_add a_cons (cons_buf_off + j) ↦ₘ b` is `ConsoleDefs`' byte buffer
    (`byteBuf consBufAddr`: byte `j` at `consBufAddr + j`); `↦₄` is
    `wordPointsTo _ 4 (DFrac.own 1)`, `↦₈□` is `wordPointsTo _ 8
@@ -93,7 +94,11 @@ Deviations from Rocq:
 import MachCSL.CtxBox
 import Xv6.ConsNames
 import Xv6.ConsoleTags
-import Xv6.ConsoleDefs
+import MachCSL.CallConv
+import MachCSL.Lock
+import MachCSL.KCtxMove
+import Xv6.Image
+import Xv6.UartInv
 
 namespace Xv6
 
@@ -101,7 +106,25 @@ open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
 
 set_option linter.unusedSectionVars false
 
-/-! ## Geometry -/
+/-! ## Geometry
+
+```
+struct { struct spinlock lock; char buf[128]; uint r, w, e; } cons;
+```
+at `KA.«cons»`: the lock at +0 (24 bytes), the ring at +24, `r` at +152,
+`w` at +156, `e` at +160 (moved here from the retired raw-ring file
+`Xv6/ConsoleDefs.lean`). -/
+
+/-- `&cons` (= `&cons.lock`). -/
+def consAddr : BitVec 64 := KA.«cons»
+/-- `cons.buf`. -/
+def consBufAddr : BitVec 64 := KA.«cons» + 24#64
+/-- `&cons.r` (sleep/wakeup channel of the readers). -/
+def consRAddr : BitVec 64 := KA.«cons» + 152#64
+/-- `&cons.w`. -/
+def consWAddr : BitVec 64 := KA.«cons» + 156#64
+/-- `&cons.e`. -/
+def consEAddr : BitVec 64 := KA.«cons» + 160#64
 
 /-- `&cons.r` is the sleep channel; it is a static address, so it is not
 null -- which refutes sleep's zero-channel panic. -/

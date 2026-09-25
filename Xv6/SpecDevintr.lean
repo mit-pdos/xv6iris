@@ -73,7 +73,7 @@ def devintrCaps {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] 
   plicInv γ0 γ1 ∗ uartInited γ0 ∗ uartInited γ1 ∗
   uartPort .uart0 γl0 γ0 ∗ uartPort .uart1 γl1 γ1 ∗
   uartRxWord .uart0 ∗ uartRxWord .uart1 ∗
-  uartRxCaps .uart0 γc γl0 γ0 bs ∗ uartRxCaps .uart1 γc γl1 γ1 bs ∗
+  uartRxCaps .uart0 γc γl0 γ0 ∗ uartRxCaps .uart1 γc γl1 γ1 ∗
   diskCaps γd γdl pd pav pu ∗ isTickslock γt ∗ procsInv Γ)
 
 instance devintrCaps_persistent {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]

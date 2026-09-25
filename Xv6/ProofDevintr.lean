@@ -177,16 +177,16 @@ theorem dv_call_plic_complete (PM : PLIC_COMPLETE) (cpu : CPU) (k' : KCtx) (γ0 
 /-- `uartintr`'s contract at `+0x50` / `+0x62`: the receive token in, some
 receive token out. -/
 theorem dv_call_uartintr (UI : UARTINTR) (Γ : SchedNames) (cpu : CPU) (k' : KCtx) (i : UartId)
-    (γc γl : GName) (γ : UartNames) (kp : Nat) (hl : Option (List Obs)) (bs : List (BitVec 8))
+    (γc γl : GName) (γ : UartNames) (kp : Nat) (hl : Option (List Obs))
     (hsie : k'.sie = false) (hnoff : k'.noff + 2 < 2 ^ 31) (hK : uartintrSlots ≤ k'.avail)
     (hlk : "cons" ∉ k'.locks ∧ "proc" ∉ k'.locks ∧ "uart0" ∉ k'.locks)
     (htier : k'.tier = KTier.kpt) (hid : k'.regs 10#5 = BitVec.ofNat 64 i.idx) :
     kctx cpu k' ∗ pcIs cpu KA.«uartintr» ∗ procsInv Γ ∗ uartPort i γl γ ∗ uartRxWord i ∗
-    uartRxWriter γ kp hl ∗ uartRxCaps i γc γl γ bs ∗
+    uartRxWriter γ kp hl ∗ uartRxCaps i γc γl γ ∗
     (∀ R' : RegMap, kctx cpu (k'.withRegs R') -∗ pcIs cpu (jumpPc (k'.regs 1#5)) -∗
       ⌜calleeSaved k'.regs R'⌝ -∗ (∃ (kp' : Nat) (hl' : Option (List Obs)), uartRxWriter γ kp' hl') -∗ wpLoop cpu)
     ⊢ wpLoop (GF := GF) cpu := by
-  have h := UI.wp_uartintr (hlc := hlc) (GF := GF) Γ cpu k' i γc γl γ kp hl bs hsie hnoff hK hlk htier hid
+  have h := UI.wp_uartintr (hlc := hlc) (GF := GF) Γ cpu k' i γc γl γ kp hl hsie hnoff hK hlk htier hid
   unfold wp_uartintr_body at h
   simp only [uartintrAddr] at h
   iintro ⟨Hk, Hpc, HΓ, Hp, Hw, Ht, Hc, HΦ⟩
@@ -420,7 +420,7 @@ theorem dv_arm_uart0 (PM : PLIC_COMPLETE) (UI : UARTINTR) (Γ : SchedNames) (cpu
     kctx cpu ((k.pushed 4).withRegs R) ∗ pcIs cpu (KA.«devintr» + 0x4e#64) ∗
     frame4s1 (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) (k.regs 9#5) ∗ uartRxWriter γ0 kp hl ∗
     plicInv γ0 γ1 ∗ uartInited γ0 ∗ uartInited γ1 ∗
-    uartPort .uart0 γl0 γ0 ∗ uartRxWord .uart0 ∗ uartRxCaps .uart0 γc γl0 γ0 bs ∗ procsInv Γ ∗
+    uartPort .uart0 γl0 γ0 ∗ uartRxWord .uart0 ∗ uartRxCaps .uart0 γc γl0 γ0 ∗ procsInv Γ ∗
     Register.scause ↦ᵣ[cpu] sc ∗ dvPost cpu k sc ⊢ wpLoop (GF := GF) cpu := by
   iintro ⟨Hk, Hpc, Hframe, Htok, #Hinv, #Hi0, #Hi1, #Hport, #Hrxw, #Hrc, #HΓ, Hsc, HΦ⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
@@ -432,7 +432,7 @@ theorem dv_arm_uart0 (PM : PLIC_COMPLETE) (UI : UARTINTR) (Γ : SchedNames) (cpu
   k_step (wp_s_jal cpu _ (KA.«devintr» + 0x50#64) false 2089908#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [dv_br_uartintr]
   iintro Hk Hpc
-  iapply (dv_call_uartintr UI Γ cpu _ UartId.uart0 γc γl0 γ0 kp hl bs ?hs ?hn ?hKu ?hl ?ht ?hid)
+  iapply (dv_call_uartintr UI Γ cpu _ UartId.uart0 γc γl0 γ0 kp hl ?hs ?hn ?hKu ?hl ?ht ?hid)
     $$ [- $Hk $Hpc]
   rotate_right 1
   k_norm
@@ -473,7 +473,7 @@ theorem dv_arm_uart1 (PM : PLIC_COMPLETE) (UI : UARTINTR) (Γ : SchedNames) (cpu
     kctx cpu ((k.pushed 4).withRegs R) ∗ pcIs cpu (KA.«devintr» + 0x60#64) ∗
     frame4s1 (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) (k.regs 9#5) ∗ uartRxWriter γ1 kp hl ∗
     plicInv γ0 γ1 ∗ uartInited γ0 ∗ uartInited γ1 ∗
-    uartPort .uart1 γl1 γ1 ∗ uartRxWord .uart1 ∗ uartRxCaps .uart1 γc γl1 γ1 bs ∗ procsInv Γ ∗
+    uartPort .uart1 γl1 γ1 ∗ uartRxWord .uart1 ∗ uartRxCaps .uart1 γc γl1 γ1 ∗ procsInv Γ ∗
     Register.scause ↦ᵣ[cpu] sc ∗ dvPost cpu k sc ⊢ wpLoop (GF := GF) cpu := by
   iintro ⟨Hk, Hpc, Hframe, Htok, #Hinv, #Hi0, #Hi1, #Hport, #Hrxw, #Hrc, #HΓ, Hsc, HΦ⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
@@ -485,7 +485,7 @@ theorem dv_arm_uart1 (PM : PLIC_COMPLETE) (UI : UARTINTR) (Γ : SchedNames) (cpu
   k_step (wp_s_jal cpu _ (KA.«devintr» + 0x62#64) false 2089890#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [dv_br_uartintr]
   iintro Hk Hpc
-  iapply (dv_call_uartintr UI Γ cpu _ UartId.uart1 γc γl1 γ1 kp hl bs ?hs ?hn ?hKu ?hl ?ht ?hid)
+  iapply (dv_call_uartintr UI Γ cpu _ UartId.uart1 γc γl1 γ1 kp hl ?hs ?hn ?hKu ?hl ?ht ?hid)
     $$ [- $Hk $Hpc]
   rotate_right 1
   k_norm
@@ -600,7 +600,7 @@ theorem dv_disp_10 (PM : PLIC_COMPLETE) (UI : UARTINTR) (Γ : SchedNames) (cpu :
     kctx cpu ((k.pushed 4).withRegs R) ∗ pcIs cpu (KA.«devintr» + 0x30#64) ∗
     frame4s1 (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) (k.regs 9#5) ∗ uartRxWriter γ0 kp hl ∗
     plicInv γ0 γ1 ∗ uartInited γ0 ∗ uartInited γ1 ∗
-    uartPort .uart0 γl0 γ0 ∗ uartRxWord .uart0 ∗ uartRxCaps .uart0 γc γl0 γ0 bs ∗ procsInv Γ ∗
+    uartPort .uart0 γl0 γ0 ∗ uartRxWord .uart0 ∗ uartRxCaps .uart0 γc γl0 γ0 ∗ procsInv Γ ∗
     Register.scause ↦ᵣ[cpu] sc ∗ dvPost cpu k sc ⊢ wpLoop (GF := GF) cpu := by
   iintro ⟨Hk, Hpc, Hframe, Htok, #Hinv, #Hi0, #Hi1, #Hport, #Hrxw, #Hrc, #HΓ, Hsc, HΦ⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
@@ -636,7 +636,7 @@ theorem dv_disp_12 (PM : PLIC_COMPLETE) (UI : UARTINTR) (Γ : SchedNames) (cpu :
     kctx cpu ((k.pushed 4).withRegs R) ∗ pcIs cpu (KA.«devintr» + 0x30#64) ∗
     frame4s1 (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) (k.regs 9#5) ∗ uartRxWriter γ1 kp hl ∗
     plicInv γ0 γ1 ∗ uartInited γ0 ∗ uartInited γ1 ∗
-    uartPort .uart1 γl1 γ1 ∗ uartRxWord .uart1 ∗ uartRxCaps .uart1 γc γl1 γ1 bs ∗ procsInv Γ ∗
+    uartPort .uart1 γl1 γ1 ∗ uartRxWord .uart1 ∗ uartRxCaps .uart1 γc γl1 γ1 ∗ procsInv Γ ∗
     Register.scause ↦ᵣ[cpu] sc ∗ dvPost cpu k sc ⊢ wpLoop (GF := GF) cpu := by
   iintro ⟨Hk, Hpc, Hframe, Htok, #Hinv, #Hi0, #Hi1, #Hport, #Hrxw, #Hrc, #HΓ, Hsc, HΦ⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
@@ -798,7 +798,7 @@ theorem dv_caps_open (Γ : SchedNames) (γ0 γ1 : UartNames) (γc γl0 γl1 : GN
       plicInv γ0 γ1 ∗ uartInited γ0 ∗ uartInited γ1 ∗
       uartPort .uart0 γl0 γ0 ∗ uartPort .uart1 γl1 γ1 ∗
       uartRxWord .uart0 ∗ uartRxWord .uart1 ∗
-      uartRxCaps .uart0 γc γl0 γ0 bs ∗ uartRxCaps .uart1 γc γl1 γ1 bs ∗
+      uartRxCaps .uart0 γc γl0 γ0 ∗ uartRxCaps .uart1 γc γl1 γ1 ∗
       diskCaps γd γdl pd pav pu ∗ isTickslock γt ∗ procsInv Γ := by
   unfold devintrCaps; iintro H; iexact H
 
@@ -818,7 +818,7 @@ theorem dv_ext (PC : PLIC_CLAIM) (PM : PLIC_COMPLETE) (UI : UARTINTR) (VI : VIRT
     plicInv γ0 γ1 ∗ uartInited γ0 ∗ uartInited γ1 ∗
     uartPort .uart0 γl0 γ0 ∗ uartPort .uart1 γl1 γ1 ∗
     uartRxWord .uart0 ∗ uartRxWord .uart1 ∗
-    uartRxCaps .uart0 γc γl0 γ0 bs ∗ uartRxCaps .uart1 γc γl1 γ1 bs ∗
+    uartRxCaps .uart0 γc γl0 γ0 ∗ uartRxCaps .uart1 γc γl1 γ1 ∗
     diskCaps γd γdl pd pav pu ∗ procsInv Γ ∗
     Register.scause ↦ᵣ[cpu] sc ∗ dvPost cpu k sc ⊢ wpLoop (GF := GF) cpu := by
   iintro ⟨Hk, Hpc, Hframe, #Hinv, #Hi0, #Hi1, #Hp0, #Hp1, #Hw0, #Hw1, #Hc0, #Hc1, #Hdc, #HΓ,

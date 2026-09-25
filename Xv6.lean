@@ -396,6 +396,10 @@ import Xv6.LinkConsoleinit
 import Xv6.ProofUartwrite
 import Xv6.LinkUartwrite
 import Xv6.ProofUartintr
+import Xv6.ConsoleintrGhost
+import Xv6.ConsoleintrParts
+import Xv6.ConsoleintrArms
+import Xv6.ConsoleintrKill
 import Xv6.ProofConsoleintr
 import Xv6.LinkConsoleintr
 import Xv6.LinkUartintr
