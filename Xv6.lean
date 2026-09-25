@@ -1150,3 +1150,8 @@ import Xv6.SyscallArmsProc
 import Xv6.SyscallArmsSbrk
 import Xv6.SyscallArmsExit
 import Xv6.SyscallArmsWait
+import Xv6.FsAbsInvFire
+import Xv6.UexecExecInst
+import Xv6.InitBoot
+import Xv6.UexecExecMint
+import Xv6.UexecExecLaws
