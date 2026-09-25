@@ -104,6 +104,14 @@ left.  Audits (/tmp/k4audit.log on the VM): system 13, union 14, tree
 `gen-ucode` on the VM: all nine UCode*.v unchanged (md5).  Local
 `make check-decode`: passes.
 
+Then W4 (`origin/main` 2eac5dc78, the class is stem.txt) merged as
+5e3e07a19 with NO textual conflict and no semantic fallout (W4 adds no
+binary literal; the files both sides changed carry disjoint edits).
+vmbuild k5r1: COMPILED=208, EXIT=0, zero `Error`, 0 compiles left.
+Audits (/tmp/k5audit.log): 13 / 14 / 13, each list textually identical
+to k4's; the only diff is W4's intended removal of the union file's
+`txt_laws` frontier print.  gen-ucode unchanged; check-decode passes.
+
 ## Lane U -- the user tier (design §0, §4 last bullet)
 
 1. `make gen-ucode` on the VM against the OLD build (the remote tree's
