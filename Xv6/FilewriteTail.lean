@@ -47,13 +47,15 @@ structure FwrA where
   M : Nat → List (BitVec 8)
   γkl : GName
   γk : KmemNames
+  γul : GName
+  γuu : UartNames
   n : Int
 
 /-- The descriptor's state. -/
 abbrev FwrA.st (A : FwrA) : FdState := .open A.rb true (.inode A.i A.γo .parked)
 
 /-- The writer's image (SpecFilewrite deviation 4). -/
-abbrev FwrA.img (A : FwrA) : Nat → List (BitVec 8) := filewriteImg A.V.upt A.M
+abbrev FwrA.img (A : FwrA) : Nat → List (BitVec 8) := writerImg A.V.upt A.M
 
 /-- The static facts the whole FD_INODE arm stands on. -/
 structure FwrFacts [CurCtx] (k : KCtx) (A : FwrA) : Prop where
@@ -98,15 +100,15 @@ instance fwrEnv_persistent (Γ : SchedNames) (A : FwrA) :
 /-- **THE CONTRACT'S CONTINUATION, HART-FREE, AT THE AMBIENT BLOCK FORM**
 (filestat's `fstatK`): `SpecFilewrite.filewritePost` with the hart
 quantified and the block as `EitherDefs.procPrivExt`. -/
-def fwrK (k : KCtx) (γ : FileNames) (fk : Nat) (q : Qp) (st : FdState) (j : Nat) (pid : BitVec 32)
+def fwrK (k : KCtx) (γl : GName) (γu : UartNames) (γ : FileNames) (fk : Nat) (q : Qp) (st : FdState) (j : Nat) (pid : BitVec 32)
     (V : ProcPriv) (M : Nat → List (BitVec 8)) (n : Int) (Q : Nat → IProp GF) : IProp GF :=
   iprop(∀ (c : CPU) (spie spp : Bool) (R' : RegMap) (P' : UPtd),
     ⌜calleeSaved k.regs R' ∧ V.upt.extSz V.sz P'⌝ -∗
     kctx c ((k.withSpie spie spp).withRegs R') -∗ pcIs c (jumpPc (k.regs 1#5)) -∗
     trapCsrsExt c k.sie -∗ cpuClaimExt c k.sie k.proc -∗
     fileRef γ fk q st -∗ procPrivExt (procAddr j) pid V P' (viewFaulted V.upt P' M) -∗
-    filewriteEnvOut st -∗
-    filewriteArms (hlc := hlc) st n (filewriteImg V.upt M) (k.regs 11#5) Q (R' 10#5) -∗ wpLoop c)
+    filewriteEnvOut γl γu st -∗
+    filewriteArms (hlc := hlc) st n (writerImg V.upt M) (k.regs 11#5) Q (R' 10#5) -∗ wpLoop c)
 
 set_option maxHeartbeats 8000000 in
 /-- **`+0xf4 .. +0x100`: THE TAIL** (Rocq's `fw_epi`). -/
@@ -173,7 +175,7 @@ theorem fwr_exit_ok (cpu : CPU) (k : KCtx) (A : FwrA) (hA : FwrFacts k A) (Q : N
     trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗
     fileRef A.γ A.fk A.q A.st ∗ procPrivExt (procAddr A.j) A.pid A.V P A.img ∗ bslots 3 ∗
     fwrRaw (hlc := hlc) (fsGammaL fscFs) A.i A.γo A.n A.img (k.regs 11#5) Q t p 0 ∗
-    fwrK (hlc := hlc) k A.γ A.fk A.q A.st A.j A.pid A.V A.M A.n Q
+    fwrK (hlc := hlc) k A.γul A.γuu A.γ A.fk A.q A.st A.j A.pid A.V A.M A.n Q
     ⊢ wpLoop (GF := GF) cpu := by
   have hK12 : 12 ≤ k.avail := by have := hA.hK; rw [filewriteSlots_eq] at this; omega
   obtain ⟨r2, r8, r9, r18, r19, r20, r21, r22, r23, r24, r25, r26, r27⟩ := id hr
@@ -216,7 +218,7 @@ theorem fwr_exit_ok (cpu : CPU) (k : KCtx) (A : FwrA) (hA : FwrFacts k A) (Q : N
   unfold fwrK
   iapply HΦ $$ %c' %spie %spp %R' %P [] Hk Hpc Hte Hce Href Hpriv [Hbs] [Hst]
   · ipureintro; exact ⟨hcs, hext⟩
-  · iapply (filewrite_env_out_inode (GF := GF) A.rb true A.i A.γo .parked)
+  · iapply (filewrite_env_out_inode (GF := GF) A.γul A.γuu A.rb true A.i A.γo .parked)
     unfold filewriteFsOut; iexact Hbs
   · unfold filewriteArms
     rw [ha0]
@@ -243,7 +245,7 @@ theorem fwr_exit_fail (cpu : CPU) (k : KCtx) (A : FwrA) (hA : FwrFacts k A) (Q :
     trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗
     fileRef A.γ A.fk A.q A.st ∗ procPrivExt (procAddr A.j) A.pid A.V P A.img ∗ bslots 3 ∗
     fwrRaw (hlc := hlc) (fsGammaL fscFs) A.i A.γo A.n A.img (k.regs 11#5) Q t p x ∗
-    fwrK (hlc := hlc) k A.γ A.fk A.q A.st A.j A.pid A.V A.M A.n Q
+    fwrK (hlc := hlc) k A.γul A.γuu A.γ A.fk A.q A.st A.j A.pid A.V A.M A.n Q
     ⊢ wpLoop (GF := GF) cpu := by
   have hK12 : 12 ≤ k.avail := by have := hA.hK; rw [filewriteSlots_eq] at this; omega
   obtain ⟨r2, r8, r9, r18, r19, r20, r21, r22, r23, r24, r25, r26, r27⟩ := id hr
@@ -291,7 +293,7 @@ theorem fwr_exit_fail (cpu : CPU) (k : KCtx) (A : FwrA) (hA : FwrFacts k A) (Q :
   unfold fwrK
   iapply HΦ $$ %c' %spie %spp %R' %P [] Hk Hpc Hte Hce Href Hpriv [Hbs] [Hst]
   · ipureintro; exact ⟨hcs, hext⟩
-  · iapply (filewrite_env_out_inode (GF := GF) A.rb true A.i A.γo .parked)
+  · iapply (filewrite_env_out_inode (GF := GF) A.γul A.γuu A.rb true A.i A.γo .parked)
     unfold filewriteFsOut; iexact Hbs
   · unfold filewriteArms
     rw [ha0]

@@ -8,12 +8,11 @@ owns only the mapped ones), and a user copy returns the block at
 `viewFaulted P P' M` (freshly faulted pages read zero).  `writerImg P M`
 is the view with every page the entry table `P` does not map read as
 zeros: it IS Rocq's image on the live pages, and the one against which a
-lazy copy's bytes are constant (`writerImg_fault`).  Shared by the
-console's writer (`SpecConsolewrite.consOutChain`) and filewrite's
-(`SpecFilewrite.filewriteImg`, which is this definition, spelled out --
-the two are definitionally equal; cleanup candidate: make
-`filewriteImg` an abbreviation and drop `FilewriteParts`' private copies
-of `writerImg_fault` / the congruences).
+lazy copy's bytes are constant (`writerImg_fault`).  The ONE image both
+user-buffer writers state their chains at: the console's
+(`SpecConsolewrite.consOutChain`) and filewrite's (`SpecFilewrite`,
+deviation 4; its former private copy `filewriteImg` and `FilewriteParts`'
+duplicate lemmas are gone).
 -/
 import Xv6.UMem
 import Xv6.UPtDefs

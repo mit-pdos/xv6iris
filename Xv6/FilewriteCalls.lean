@@ -331,6 +331,45 @@ theorem fwr_pipewrite (PW : PIPEWRITE) (Γ : SchedNames) [ClaimIs (hlc := hlc) G
   ihave Hpriv := (fwr_priv_conv ht (procAddr j) pid V P' (viewFaulted V.upt P' M)).1 $$ Hpriv
   iapply HK $$ %c' %spie %spp %R' %P' %hp Hk Hpc Hte Hce Href Hpriv
 
+set_option maxHeartbeats 8000000 in
+/-- `devsw[CONSOLE].write(1, addr, n)` -- consolewrite -- at `+0x86`
+(Rocq's `+0x7e` `Consolewrite.wp_consolewrite_sconf`): the eb contract,
+the caller's output chain relayed whole, the block converted at the
+kernel-page-table tier. -/
+theorem fwr_consolewrite (CW : CONSOLEWRITE) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+    (c : CPU) (k' : KCtx) (γl : GName) (γu : UartNames) (γkl : GName) (γk : KmemNames)
+    (j : Nat) (pid : BitVec 32) (V : ProcPriv) (M : Nat → List (BitVec 8)) (n : Int)
+    (Q : Nat → IProp GF) (ht : curTier = KTier.kpt)
+    (hj : j < NPROC) (hproc : k'.proc = procAddr j) (hK : consolewriteSlots ≤ k'.avail)
+    (hnoff : k'.noff = 0) (htier : k'.tier = KTier.kpt) (huser : k'.regs 10#5 ≠ 0#64)
+    (hn : k'.regs 12#5 = BitVec.ofInt 64 n) (hn' : -2 ^ 31 ≤ n ∧ n < 2 ^ 31)
+    (hnw : (k'.regs 11#5).toNat + n.toNat ≤ 2 ^ 64) :
+    kctx c k' ∗ pcIs c KA.«consolewrite» ∗ procsInv Γ ∗
+    trapCsrsExt c k'.sie ∗ cpuClaimExt c k'.sie k'.proc ∗
+    uartPort .uart0 γl γu ∗
+    consOutChain (genId (hlc := hlc) (GF := GF) + 1) (writerImg V.upt M) (k'.regs 11#5) Q 0 n.toNat ∗
+    isLock γkl kmemLockAddr "kmem" (kmemRes γk) ∗ kallocAvail γk none ∗
+    procPrivExt (procAddr j) pid V V.upt M ∗
+    (∀ (c' : CPU) (spie spp : Bool) (R' : RegMap) (P' : UPtd) (i : Nat),
+      ⌜calleeSaved k'.regs R' ∧ V.upt.extSz V.sz P' ∧ R' 10#5 = BitVec.ofNat 64 i ∧
+        (i : Int) ≤ max 0 n⌝ -∗
+      kctx c' ((k'.withSpie spie spp).withRegs R') -∗ pcIs c' (jumpPc (k'.regs 1#5)) -∗
+      trapCsrsExt c' k'.sie -∗ cpuClaimExt c' k'.sie k'.proc -∗
+      procPrivExt (procAddr j) pid V P' (viewFaulted V.upt P' M) -∗ Q i -∗ wpLoop c')
+    ⊢ wpLoop (GF := GF) c := by
+  have h := CW.wp_consolewrite_eb (hlc := hlc) (GF := GF) Γ c k' γl γu γkl γk j pid V M n Q
+    hj hproc hK hnoff htier huser hn hn' hnw
+  unfold wp_consolewrite_eb_body at h
+  simp only [consolewriteAddr] at h
+  iintro ⟨Hk, Hpc, #Hpi, Hte, Hce, #Hport, Hch, #Hkl, #Hav, Hpriv, HK⟩
+  ihave Hpriv := (fwr_priv_conv0 ht (procAddr j) pid V M).2 $$ Hpriv
+  iapply h
+  iframe Hk Hpc Hpi Hte Hce Hport Hch Hkl Hav Hpriv
+  iapply wpNext_intro
+  iintro %c' %spie %spp %R' %P' %i %hp Hk Hpc Hte Hce Hpriv HQ
+  ihave Hpriv := (fwr_priv_conv ht (procAddr j) pid V P' (viewFaulted V.upt P' M)).1 $$ Hpriv
+  iapply HK $$ %c' %spie %spp %R' %P' %i %hp Hk Hpc Hte Hce Hpriv HQ
+
 end
 
 /-! ## The panic -/

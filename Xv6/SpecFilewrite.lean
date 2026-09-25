@@ -83,26 +83,28 @@ untouched); the `n < 0` test (+0x1c); the three-way dispatch; FD_PIPE
    3).  So Rocq's `fwrite_names` record is GONE: its per-arm fields were
    ambient names or fractions `fsReady` already fixes; the device-arm
    fields go with deviation 3.  `filewriteFsOut` is `bslots 3`.
-3. **THE FD_DEVICE ARM IS STOPPED** (the coordinator's instruction for
-   W7-D: "if consolewrite's Rocq post needs the console ghost, stop at the
-   device arm and report").  IT DOES: Rocq `SpecConsolewrite.v`'s contract
-   takes the caller's output chain `cons_out_chain (S gen_id) (us_M U)
-   uaddr Q 0 (Z.to_nat n)` (over `WpUart.out_link Uart0`) and returns the
-   cursor `Q (Z.to_nat r)` with the short arm's reason, and Rocq's
-   `filewrite_in` / `filewrite_extra` state the device arm over exactly
-   those (`write_cons_arms`).  The landed Lean `CONSOLEWRITE` still carries
-   the retired located receipt (`uartSentSub γ bs`), and the I/O-trace
-   track (notes/briefs/io_trace_track.md step 5) re-proves consolewrite
-   with the Rocq post.  Until then the device arm's environment is
-   `⌜False⌝` (`filewriteDevEnv`): the contract claims nothing about a
-   device descriptor, and the walk refutes the arm at the dispatch.  When
-   `cons_out_chain` lands: `filewriteDevEnv mj` becomes Rocq's
-   `filewrite_dev_env` (the devsw cell at `KA.«devsw» + 16 mj + 8`,
-   null-or-consolewrite, the uart credentials), `filewriteIn` / `filewriteExtra`
-   gain Rocq's device arms (`cons_out_chain` / `write_cons_arms` with the
-   writer's table `V.upt`), the contract gains Rocq's devsw pin premise, and
-   the walk adds +0x64..+0x80 (`lh`, the range test, `fw_devidx`, the null
-   test, `jalr`).  `filewriteSlots` already covers consolewrite (72).
+3. **THE FD_DEVICE ARM** (Rocq `filewrite_dev_env` / `filewrite_in` /
+   `filewrite_extra`'s device arms, over consolewrite's Rocq contract,
+   I/O track step 5):
+   * `fwrite_names`' `fwn_wp` / `fwn_dqv` are FIXED at the only values any
+     Rocq caller passes (`SpecSysWrite`'s `Hwp`/`Hdq`, ProofSyscall's
+     `sysc_fwrite_names`): `ConsoleInvDefs.devswWriteVal` at
+     `DFrac.discard`, the cells of the persistent `devswTable`.  So
+     `filewriteDevEnv γl γu mj` is the cell at `aDevswWrite mj` (`KA.«devsw»
+     + 16 mj + 8`) holding `devswWriteVal mj` (null or consolewrite:
+     `devswWriteVal_cases`, Rocq's disjunct) beside `uartPort .uart0 γl γu`
+     (Rocq `filewrite_dev_caps`: `dev_inv` ∗ `is_txlock` ∗
+     `uart_base_word Uart0`), and Rocq's DEVSW PIN premise (`Hconw`) is the
+     theorem `devswWriteVal_console`.  Consequence: at a non-console major
+     the walk reads null and answers -1 (Rocq's walk would call consolewrite
+     if the cell held it; the extra there is `emp` in both).
+   * `write_cons_arms` (`writeConsArms`) WITHOUT the short arm's reason
+     (Rocq lane TRAP-ROWS T1, `write_cons_short`): SpecConsolewrite's
+     deviation 3 (the Lean `either_copyin` failure arm carries none), so
+     `filewrite_extra`'s writer-table parameter `P` (there only for T1) is
+     dropped as well.
+   * the device input carries the no-wrap conjunct of deviation 5 (the
+     callee's premise `hnw`, SpecConsolewrite deviation 2).
 4. **THE IMAGE `M`** (the question FsAbsWriteFire deviation 2 / SysWriteDefs
    deviation 3 left to this file).  Rocq states the chain at `us_M U`, the
    process image in which every lazily unmapped live page READS ZERO, and
@@ -110,11 +112,12 @@ untouched); the `n < 0` test (+0x1c); the three-way dispatch; FD_PIPE
    Lean block's view `M` is unconstrained on unmapped pages (`umPages`
    owns only the mapped ones), and a user copy returns the block at
    `viewFaulted V.upt P' M` (freshly faulted pages read zero).  So the
-   chain is stated at `filewriteImg V.upt M` -- the view with every page
-   the entry table does not map read as zeros -- which IS Rocq's image on
-   the live pages (a lazily unmapped page reads zero in both), and the one
-   against which a lazy copy's bytes are constant: `viewFaulted P P'
-   (filewriteImg V.upt M) = filewriteImg V.upt M` for every `P ⊇ V.upt`.
+   chain is stated at `UMemImg.writerImg V.upt M` (consolewrite's image
+   too) -- the view with every page the entry table does not map read as
+   zeros -- which IS Rocq's image on the live pages (a lazily unmapped page
+   reads zero in both), and the one against which a lazy copy's bytes are
+   constant: `viewFaulted P P' (writerImg V.upt M) = writerImg V.upt M` for
+   every `P ⊇ V.upt` (`writerImg_fault`).
    The block itself still comes back at the landed convention
    `viewFaulted V.upt P' M` (writei/pipewrite/consolewrite's).  WEAKER
    THAN ROCQ at one place: a byte on a page that can never be mapped (at or
@@ -165,12 +168,12 @@ untouched); the `n < 0` test (+0x1c); the three-way dispatch; FD_PIPE
   checked (comment-stripped grep of `/shared/xv6rocq/iris/*.v`):
   SpecFilewrite.v, ProofFilewrite*.v (threaded), SpecSysWrite.v /
   ProofSysWrite.v (passed through), ProofSyscall.v (built from fs_ready).
-* `filewrite_dev_caps` / `filewrite_devsw` / `filewrite_devsw_of_console` /
-  `filewrite_devsw_acc` / `write_cons_short` / `write_cons_arms(_ret,_zero,
-  _of_cursor)` / `filewrite_in_cons` / `filewrite_extra_cons` /
-  `filewrite_extra_dev_other` / `filewrite_extra_dev_drop` -- NOT dropped:
-  deferred with the device arm (deviation 3); their users are the device
-  walk and sys_write.
+* `filewrite_dev_caps` is `uartPort .uart0` (deviation 3); `filewrite_devsw`
+  is `filewriteDevsw` (the caps beside the whole persistent `devswTable`),
+  so `filewrite_devsw_of_console` is definitional and `filewrite_devsw_acc`
+  is `filewriteDevsw_env` (persistent: nothing to give back);
+  `filewrite_dev_out` is `filewriteDevEnv` (Rocq's own definition).
+* `write_cons_short` -- deviation 3 (T1).
 
 Imports only definitional files and callee `Spec*` files.
 -/
@@ -181,6 +184,7 @@ import Xv6.SpecIlock
 import Xv6.SpecIunlock
 import Xv6.SpecWritei
 import Xv6.SpecConsolewrite
+import Xv6.ConsoleInvDefs
 import Xv6.SpecPanic
 import Xv6.FsReady
 import Xv6.FilePay
@@ -239,14 +243,6 @@ theorem fwrOffAdvance (off tot n1 : Nat) (hle : ¬ MAXFILE * BSIZE < off + n1) (
     off + tot ≤ MAXFILE * BSIZE := by
   omega
 
-/-! ## The image the chain is stated at (deviation 4) -/
-
-/-- **THE WRITER'S IMAGE** (Rocq `us_M U`, the image at which a lazily
-unmapped page reads zero): the block's view with every page the entry table
-`P` does not map read as zeros. -/
-def filewriteImg (P : UPtd) (M : Nat → List (BitVec 8)) : Nat → List (BitVec 8) :=
-  fun k => if (Iris.Std.PartialMap.get? P.um k).isSome then M k else List.replicate 4096 0#8
-
 /-! ## The environment, keyed on the descriptor's state -/
 
 section Env
@@ -267,27 +263,59 @@ def filewriteFsEnv : IProp GF := iprop(fsReady (hlc := hlc) ∗ bslots 3)
 it never left the reference's payload. -/
 def filewriteFsOut : IProp GF := iprop(bslots 3)
 
-/-- THE FD_DEVICE ARM'S ENVIRONMENT: STOPPED (deviation 3).  Rocq's
-`filewrite_dev_env` needs consolewrite's output-chain contract, which the
-I/O track is porting. -/
-def filewriteDevEnv (mj : Nat) : IProp GF := iprop(⌜False⌝)
+/-- THE FD_DEVICE ARM'S ENVIRONMENT (Rocq `filewrite_dev_env`, deviation
+3): at a major the range test admits, the WRITE cell of its devsw entry
+(`KA.«devsw» + 16 mj + 8`, null or consolewrite) and what consolewrite
+itself asks for (Rocq `filewrite_dev_caps`); nothing at any other major
+(the code answers -1 before reading the table).  Persistent. -/
+def filewriteDevEnv (γl : GName) (γu : UartNames) (mj : Nat) : IProp GF :=
+  if mj ≤ NDEV_max then
+    iprop(wordPointsTo (aDevswWrite mj) 8 DFrac.discard (devswWriteVal mj) ∗ uartPort .uart0 γl γu)
+  else iprop(emp)
+
+instance filewriteDevEnv_persistent (γl : GName) (γu : UartNames) (mj : Nat) :
+    Persistent (filewriteDevEnv (GF := GF) γl γu mj) := by
+  unfold filewriteDevEnv; split <;> infer_instance
+
+/-- THE WHOLE COLUMN (Rocq `filewrite_devsw`, at `filewrite_devsw_of_console`'s
+instantiation): the caps beside consoleinit's persistent table -- what a
+caller that cannot name its descriptor's major owns. -/
+def filewriteDevsw (γl : GName) (γu : UartNames) : IProp GF :=
+  iprop(uartPort .uart0 γl γu ∗ devswTable)
+
+instance filewriteDevsw_persistent (γl : GName) (γu : UartNames) :
+    Persistent (filewriteDevsw (GF := GF) γl γu) := by
+  unfold filewriteDevsw; infer_instance
+
+/-- One entry out of the column (Rocq `filewrite_devsw_acc`; persistent, so
+nothing goes back). -/
+theorem filewriteDevsw_env (γl : GName) (γu : UartNames) (mj : Nat) :
+    filewriteDevsw (GF := GF) γl γu ⊢ filewriteDevEnv γl γu mj := by
+  unfold filewriteDevsw filewriteDevEnv
+  split
+  · rename_i h
+    iintro ⟨#Hp, #Ht⟩
+    icases devswTable_at mj h $$ Ht with ⟨-, #Hw⟩
+    iframe Hw Hp
+  · iintro -; iempintro
 
 /-- The environment, keyed on the descriptor's STATE (Rocq
 `filewrite_env`). -/
-def filewriteEnv (st : FdState) : IProp GF :=
+def filewriteEnv (γl : GName) (γu : UartNames) (st : FdState) : IProp GF :=
   match st with
   | .closed => emp
   | .open _ _ .pipe => emp
   | .open _ _ (.inode _ _ _) => filewriteFsEnv (hlc := hlc)
-  | .open _ _ (.device mj) => filewriteDevEnv mj
+  | .open _ _ (.device mj) => filewriteDevEnv γl γu mj
 
-/-- ... and what comes back (Rocq `filewrite_env_out`). -/
-def filewriteEnvOut (st : FdState) : IProp GF :=
+/-- ... and what comes back (Rocq `filewrite_env_out`; the device arm's is
+Rocq's `filewrite_dev_out` = the environment, only read). -/
+def filewriteEnvOut (γl : GName) (γu : UartNames) (st : FdState) : IProp GF :=
   match st with
   | .closed => emp
   | .open _ _ .pipe => emp
   | .open _ _ (.inode _ _ _) => filewriteFsOut
-  | .open _ _ (.device _) => emp
+  | .open _ _ (.device mj) => filewriteDevEnv γl γu mj
 
 /-- Rocq `filewrite_fs_env_out`: the `!writable` return is before the
 prologue, so the environment must already hold everything the post
@@ -298,50 +326,56 @@ theorem filewrite_fs_env_out : filewriteFsEnv (hlc := hlc) (GF := GF) ⊢ filewr
   iexact H
 
 /-- Rocq `filewrite_env_out_of_env`. -/
-theorem filewrite_env_out_of_env (st : FdState) :
-    filewriteEnv (hlc := hlc) (GF := GF) st ⊢ filewriteEnvOut st := by
+theorem filewrite_env_out_of_env (γl : GName) (γu : UartNames) (st : FdState) :
+    filewriteEnv (hlc := hlc) (GF := GF) γl γu st ⊢ filewriteEnvOut γl γu st := by
   unfold filewriteEnv filewriteEnvOut
   rcases st with _ | ⟨r, w, _ | ⟨n, g, om⟩ | mj⟩
   · exact .rfl
   · exact .rfl
   · exact filewrite_fs_env_out
-  · unfold filewriteDevEnv; iintro %h; exact h.elim
+  · exact .rfl
 
 /-- Rocq `filewrite_env_none`: a file that is neither a pipe, a device nor
 an inode costs its writer nothing (the arm is the panic). -/
-theorem filewrite_env_none : ⊢ filewriteEnv (hlc := hlc) (GF := GF) .closed := by
+theorem filewrite_env_none (γl : GName) (γu : UartNames) :
+    ⊢ filewriteEnv (hlc := hlc) (GF := GF) γl γu .closed := by
   unfold filewriteEnv; exact .rfl
 
 /-- The FD_INODE arm's environment, opened. -/
-theorem filewrite_env_inode (r w : Bool) (i : Nat) (γo : GName) (om : OffMode) :
-    filewriteEnv (hlc := hlc) (GF := GF) (.open r w (.inode i γo om)) ⊢ filewriteFsEnv (hlc := hlc) :=
+theorem filewrite_env_inode (γl : GName) (γu : UartNames) (r w : Bool) (i : Nat) (γo : GName)
+    (om : OffMode) :
+    filewriteEnv (hlc := hlc) (GF := GF) γl γu (.open r w (.inode i γo om)) ⊢
+      filewriteFsEnv (hlc := hlc) :=
   .rfl
 
 /-- ... and closed. -/
-theorem filewrite_env_out_inode (r w : Bool) (i : Nat) (γo : GName) (om : OffMode) :
-    filewriteFsOut (GF := GF) ⊢ filewriteEnvOut (.open r w (.inode i γo om)) := .rfl
+theorem filewrite_env_out_inode (γl : GName) (γu : UartNames) (r w : Bool) (i : Nat) (γo : GName)
+    (om : OffMode) :
+    filewriteFsOut (GF := GF) ⊢ filewriteEnvOut γl γu (.open r w (.inode i γo om)) := .rfl
 
-/-- THE SYSCALL'S SPLIT (for sys_write; filestat's `filestat_env_split`
-shape): a caller holding the content-independent environment opens the
-state-keyed one and gets its own back.  At a device state the stopped arm's
-`False` cannot be produced, so the split is stated off the device arm. -/
-theorem filewrite_env_split (st : FdState) (hdev : ∀ r w mj, st ≠ .open r w (.device mj)) :
-    filewriteFsEnv (hlc := hlc) (GF := GF) ⊢
-      filewriteEnv (hlc := hlc) st ∗ (filewriteEnvOut st -∗ filewriteFsOut) := by
+/-- THE SYSCALL'S SPLIT (Rocq SpecSysWrite's `filewrite_env_split`): a
+caller holding the content-independent environment and the persistent
+column opens the state-keyed one and gets its own back. -/
+theorem filewrite_env_split (γl : GName) (γu : UartNames) (st : FdState) :
+    filewriteFsEnv (hlc := hlc) (GF := GF) ∗ filewriteDevsw γl γu ⊢
+      filewriteEnv (hlc := hlc) γl γu st ∗ (filewriteEnvOut γl γu st -∗ filewriteFsOut) := by
   unfold filewriteEnv filewriteEnvOut
   rcases st with _ | ⟨r, w, _ | ⟨n, g, om⟩ | mj⟩
-  · iintro H
+  · iintro ⟨H, -⟩
     isplitr
     · iempintro
     · iintro -; iapply filewrite_fs_env_out $$ H
-  · iintro H
+  · iintro ⟨H, -⟩
     isplitr
     · iempintro
     · iintro -; iapply filewrite_fs_env_out $$ H
-  · iintro H
+  · iintro ⟨H, -⟩
     iframe H
     iintro H; iexact H
-  · exact absurd rfl (hdev r w mj)
+  · iintro ⟨H, #Hd⟩
+    isplitr
+    · iapply filewriteDevsw_env γl γu mj $$ Hd
+    · iintro -; iapply filewrite_fs_env_out $$ H
 
 end Env
 
@@ -416,26 +450,85 @@ end Arms
 /-! ## The one input and the one output, keyed on the state -/
 
 section Keyed
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [FsTopG GF] [OffboxG GF] [Appcfg GF]
-  [FsBytesG GF] [Fscfg]
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FsTopG GF] [OffboxG GF]
+  [Appcfg GF] [FsBytesG GF] [Fscfg]
+
+/-! ### The console arm (Rocq `write_cons_arms`) -/
+
+/-- THE ARMED DISJUNCTION AT THE CALLER'S OWN CURSOR (Rocq
+`write_cons_arms`, minus the short arm's reason: deviation 3): every byte
+went out and the cursor is at the count; or a short count `k` with the
+cursor there; or the sign guard's `-1`. -/
+def writeConsArms (Q : Nat → IProp GF) (n : Int) (r : BitVec 64) : IProp GF :=
+  iprop((⌜r = BitVec.ofInt 64 n ∧ 0 ≤ n⌝ ∗ Q n.toNat) ∨
+    (∃ k : Nat, ⌜r = BitVec.ofInt 64 (k : Int) ∧ (k : Int) < n⌝ ∗ Q k) ∨
+    ⌜r = -1#64 ∧ n < 0⌝)
+
+/-- Rocq `write_cons_arms_ret`. -/
+theorem writeConsArms_ret (Q : Nat → IProp GF) (n : Int) (r : BitVec 64) :
+    writeConsArms Q n r ⊢ ⌜filewriteRet n r⌝ := by
+  unfold writeConsArms
+  iintro (⟨%h, -⟩ | ⟨%k, %h, -⟩ | %h)
+  · ipureintro; rw [h.1]; exact filewriteRet_all n h.2
+  · ipureintro; exact Or.inr ⟨(k : Int), h.1, by omega, by omega⟩
+  · ipureintro; rw [h.1]; exact filewriteRet_m1 n
+
+/-- Rocq `write_cons_arms_zero`. -/
+theorem writeConsArms_zero (Q : Nat → IProp GF) : Q 0 ⊢ writeConsArms Q 0 (BitVec.ofInt 64 0) := by
+  unfold writeConsArms
+  iintro H
+  ileft
+  rw [show Int.toNat 0 = 0 from rfl]
+  iframe H
+  ipureintro; exact ⟨rfl, Int.le_refl 0⟩
+
+/-- THE CALLEE'S POST, IN THE ARMS' VOCABULARY (Rocq
+`write_cons_arms_of_cursor`): the FD_DEVICE arm relays consolewrite's count
+untouched, so it IS the cursor's index. -/
+theorem writeConsArms_of_cursor (Q : Nat → IProp GF) (n : Int) (i : Nat) (hn : 0 ≤ n)
+    (hi : (i : Int) ≤ n) : Q i ⊢ writeConsArms Q n (BitVec.ofNat 64 i) := by
+  unfold writeConsArms
+  iintro H
+  by_cases he : (i : Int) = n
+  · ileft
+    have : n.toNat = i := by omega
+    rw [this]
+    iframe H
+    ipureintro
+    refine ⟨?_, hn⟩
+    rw [← he, BitVec.ofInt_natCast]
+  · iright; ileft
+    iexists i
+    iframe H
+    ipureintro
+    exact ⟨by rw [BitVec.ofInt_natCast], by omega⟩
+
+/-! ### The one input and the one output -/
 
 /-- WHAT THE CALLER HANDS IN, by `st` (Rocq `filewrite_in`): on an open,
 writable INODE the commit CHAIN at the cursor `Q`, one node per possible
-chunk (with the no-wrap conjunct, deviation 5); nothing elsewhere (the
-device arm: deviation 3). -/
+chunk; on an open, writable DEVICE (at EVERY major: the walk calls whatever
+the cell holds) consolewrite's output CHAIN, one node per byte; both with
+the no-wrap conjunct (deviations 3, 5); nothing elsewhere. -/
 def filewriteIn (st : FdState) (n : Int) (M : Nat → List (BitVec 8)) (ua : BitVec 64)
     (Q : Nat → IProp GF) : IProp GF :=
   match st with
   | .open _ true (.inode i γo _) =>
     iprop(⌜ua.toNat + n.toNat ≤ 2 ^ 64⌝ ∗
       awriteChain (hlc := hlc) (fsGammaL fscFs) appE i γo M ua Q 0 (wchunks n))
+  | .open _ true (.device _) =>
+    iprop(⌜ua.toNat + n.toNat ≤ 2 ^ 64⌝ ∗
+      consOutChain (genId (hlc := hlc) (GF := GF) + 1) M ua Q 0 n.toNat)
   | _ => emp
 
-/-- WHAT THE ARM PAYS BEYOND THE LANDED BLANKET (Rocq `filewrite_extra`). -/
+/-- WHAT THE ARM PAYS BEYOND THE LANDED BLANKET (Rocq `filewrite_extra`,
+less its T1 table `P`: deviation 3).  The console's arm only: elsewhere the
+caller cannot know the callee was consolewrite. -/
 def filewriteExtra (st : FdState) (n : Int) (M : Nat → List (BitVec 8)) (ua : BitVec 64)
     (Q : Nat → IProp GF) (r : BitVec 64) : IProp GF :=
   match st with
   | .open _ true (.inode i γo _) => writeArmsAt (hlc := hlc) (fsGammaL fscFs) i γo n M ua Q r
+  | .open _ true (.device mj) => if mj = CONSOLE then writeConsArms Q n r else emp
   | _ => emp
 
 /-- THE WHOLE POST'S ARMED PART (Rocq `filewrite_arms`): the landed blanket
@@ -459,11 +552,42 @@ theorem filewriteIn_inode (rb : Bool) (i : Nat) (γo : GName) (n : Int) (M : Nat
       iprop(⌜ua.toNat + n.toNat ≤ 2 ^ 64⌝ ∗
         awriteChain (hlc := hlc) (fsGammaL fscFs) appE i γo M ua Q 0 (wchunks n)) := .rfl
 
+/-- Rocq `filewrite_in_cons`. -/
+theorem filewriteIn_cons (rb : Bool) (mj : Nat) (n : Int) (M : Nat → List (BitVec 8))
+    (ua : BitVec 64) (Q : Nat → IProp GF) :
+    filewriteIn (hlc := hlc) (.open rb true (.device mj)) n M ua Q ⊣⊢
+      iprop(⌜ua.toNat + n.toNat ≤ 2 ^ 64⌝ ∗
+        consOutChain (genId (hlc := hlc) (GF := GF) + 1) M ua Q 0 n.toNat) := .rfl
+
 /-- Rocq `filewrite_extra_inode`. -/
 theorem filewriteExtra_inode (rb : Bool) (i : Nat) (γo : GName) (n : Int)
     (M : Nat → List (BitVec 8)) (ua : BitVec 64) (Q : Nat → IProp GF) (r : BitVec 64) :
     writeArmsAt (hlc := hlc) (fsGammaL fscFs) i γo n M ua Q r ⊢
       filewriteExtra (hlc := hlc) (.open rb true (.inode i γo .parked)) n M ua Q r := .rfl
+
+/-- Rocq `filewrite_extra_cons`. -/
+theorem filewriteExtra_cons (rb : Bool) (n : Int) (M : Nat → List (BitVec 8)) (ua : BitVec 64)
+    (Q : Nat → IProp GF) (r : BitVec 64) :
+    writeConsArms Q n r ⊢ filewriteExtra (hlc := hlc) (.open rb true (.device CONSOLE)) n M ua Q r := by
+  unfold filewriteExtra; simp only [if_true]; exact .rfl
+
+/-- Rocq `filewrite_extra_dev_other`: a device at any OTHER major arms
+nothing. -/
+theorem filewriteExtra_dev_other (rb wb : Bool) (mj : Nat) (hmj : mj ≠ CONSOLE) (n : Int)
+    (M : Nat → List (BitVec 8)) (ua : BitVec 64) (Q : Nat → IProp GF) (r : BitVec 64) :
+    ⊢ filewriteExtra (hlc := hlc) (.open rb wb (.device mj)) n M ua Q r := by
+  unfold filewriteExtra
+  cases wb
+  · exact .rfl
+  · simp only [hmj, if_false]; exact .rfl
+
+/-- Rocq `filewrite_extra_dev_drop`: ... so the chain is simply dropped. -/
+theorem filewriteExtra_dev_drop (rb : Bool) (mj : Nat) (hmj : mj ≠ CONSOLE) (n : Int)
+    (M : Nat → List (BitVec 8)) (ua : BitVec 64) (Q : Nat → IProp GF) (r : BitVec 64) :
+    filewriteIn (hlc := hlc) (.open rb true (.device mj)) n M ua Q ⊢
+      filewriteExtra (hlc := hlc) (.open rb true (.device mj)) n M ua Q r := by
+  iintro -
+  iapply filewriteExtra_dev_other rb true mj hmj
 
 /-- Rocq `filewrite_extra_pipe`. -/
 theorem filewriteExtra_pipe (rb wb : Bool) (n : Int) (M : Nat → List (BitVec 8)) (ua : BitVec 64)
@@ -477,44 +601,49 @@ theorem filewriteExtra_unwritable (inum : BitVec 32) (γo : GName) (C : FContent
     (n : Int) (M : Nat → List (BitVec 8)) (ua : BitVec 64) (Q : Nat → IProp GF) (r : BitVec 64)
     (hok : fdstateOk inum γo C st) (hw : C.writable = 0#8) :
     ⊢ filewriteExtra (hlc := hlc) st n M ua Q r := by
-  rcases st with _ | ⟨rb, wb, _ | ⟨i, g, om⟩ | mj⟩
+  rcases st with _ | ⟨rb, wb, t⟩
   · exact .rfl
-  · unfold filewriteExtra; cases wb <;> exact .rfl
   · cases wb
-    · exact .rfl
+    · unfold filewriteExtra; rcases t with _ | ⟨i, g, om⟩ | mj <;> exact .rfl
     · obtain ⟨-, hw', -⟩ := hok
       rw [hw] at hw'; exact absurd hw' (by decide)
-  · unfold filewriteExtra; cases wb <;> exact .rfl
 
-/-- ... and its input is dropped there (the chain is only asked of a
+/-- ... and its input is dropped there (the chains are only asked of a
 writable descriptor). -/
 theorem filewriteIn_unwritable (inum : BitVec 32) (γo : GName) (C : FContent) (st : FdState)
     (n : Int) (M : Nat → List (BitVec 8)) (ua : BitVec 64) (Q : Nat → IProp GF)
     (hok : fdstateOk inum γo C st) (hw : C.writable = 0#8) :
     filewriteIn (hlc := hlc) st n M ua Q ⊢ emp := by
-  rcases st with _ | ⟨rb, wb, _ | ⟨i, g, om⟩ | mj⟩
+  rcases st with _ | ⟨rb, wb, t⟩
   · exact .rfl
-  · unfold filewriteIn; cases wb <;> exact .rfl
   · cases wb
-    · exact .rfl
+    · unfold filewriteIn; rcases t with _ | ⟨i, g, om⟩ | mj <;> exact .rfl
     · obtain ⟨-, hw', -⟩ := hok
       rw [hw] at hw'; exact absurd hw' (by decide)
-  · unfold filewriteIn; cases wb <;> exact .rfl
 
 /-- THE SIGN GUARD'S EXIT, AT EVERY ARM AT ONCE (Rocq
-`filewrite_extra_neg`): the `n < 0` test fires before the type dispatch. -/
+`filewrite_extra_neg`): the `n < 0` test fires before the type dispatch;
+the console arm's NEG disjunct is pure. -/
 theorem filewriteExtra_neg (st : FdState) (n : Int) (M : Nat → List (BitVec 8)) (ua : BitVec 64)
     (Q : Nat → IProp GF) (hn : n < 0) :
     filewriteIn (hlc := hlc) st n M ua Q ⊢ filewriteExtra (hlc := hlc) st n M ua Q (-1#64) := by
-  rcases st with _ | ⟨rb, wb, _ | ⟨i, g, om⟩ | mj⟩
+  rcases st with _ | ⟨rb, wb, t⟩
   · exact .rfl
-  · unfold filewriteIn filewriteExtra; cases wb <;> exact .rfl
   · cases wb
-    · exact .rfl
-    · unfold filewriteIn filewriteExtra
-      iintro ⟨-, Hc⟩
-      iapply writeArmsAt_neg _ i g n M ua Q hn $$ Hc
-  · unfold filewriteIn filewriteExtra; cases wb <;> exact .rfl
+    · unfold filewriteIn filewriteExtra; rcases t with _ | ⟨i, g, om⟩ | mj <;> exact .rfl
+    · rcases t with _ | ⟨i, g, om⟩ | mj
+      · exact .rfl
+      · unfold filewriteIn filewriteExtra
+        iintro ⟨-, Hc⟩
+        iapply writeArmsAt_neg _ i g n M ua Q hn $$ Hc
+      · iintro -
+        by_cases hc : mj = CONSOLE
+        · subst hc
+          iapply filewriteExtra_cons
+          unfold writeConsArms
+          iright; iright
+          ipureintro; exact ⟨rfl, hn⟩
+        · iapply filewriteExtra_dev_other rb true mj hc
 
 end Keyed
 
@@ -531,17 +660,17 @@ of Rocq's `wp_filewrite_sconf_body`): the registers, the complement, the
 reference unchanged, the block at the grown descriptor (deviation 6), the
 environment's output, and the armed output keyed on the state at the
 return value `R' 10#5`. -/
-def filewritePost (k : KCtx) (γ : FileNames) (fk : Nat) (q : Qp) (st : FdState) (j : Nat)
-    (pid : BitVec 32) (V : ProcPriv) (M : Nat → List (BitVec 8)) (n : Int) (Q : Nat → IProp GF)
-    (cpu' : CPU) : IProp GF :=
+def filewritePost (k : KCtx) (γl : GName) (γu : UartNames) (γ : FileNames) (fk : Nat) (q : Qp)
+    (st : FdState) (j : Nat) (pid : BitVec 32) (V : ProcPriv) (M : Nat → List (BitVec 8)) (n : Int)
+    (Q : Nat → IProp GF) (cpu' : CPU) : IProp GF :=
   iprop(∀ (spie spp : Bool) (R' : RegMap) (P' : UPtd),
     ⌜calleeSaved k.regs R' ∧ V.upt.extSz V.sz P'⌝ -∗
     kctx cpu' ((k.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k.regs 1#5)) -∗
     trapCsrsExt cpu' k.sie -∗ cpuClaimExt cpu' k.sie k.proc -∗
     fileRef γ fk q st -∗
     procPrivNoctxAt curCtx (procAddr j) pid { V with upt := P' } (viewFaulted V.upt P' M) -∗
-    filewriteEnvOut st -∗
-    filewriteArms (hlc := hlc) st n (filewriteImg V.upt M) (k.regs 11#5) Q (R' 10#5) -∗
+    filewriteEnvOut γl γu st -∗
+    filewriteArms (hlc := hlc) st n (writerImg V.upt M) (k.regs 11#5) Q (R' 10#5) -∗
     wpLoop cpu')
 
 end Post
@@ -557,7 +686,7 @@ def wp_filewrite_eb_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [
     (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
     (cpu : CPU) (k : KCtx) (γ : FileNames) (fk : Nat) (q : Qp) (st : FdState)
     (j : Nat) (pid : BitVec 32) (V : ProcPriv) (M : Nat → List (BitVec 8))
-    (γkl : GName) (γk : KmemNames) (n : Int) (Q : Nat → IProp GF)
+    (γkl : GName) (γk : KmemNames) (γl : GName) (γu : UartNames) (n : Int) (Q : Nat → IProp GF)
     (hK : filewriteSlots ≤ k.avail) (hfk : fk < NFILE)
     (hj : j < NPROC) (hproc : k.proc = procAddr j)
     (hnoff : k.noff = 0) (htier : k.tier = KTier.kpt)
@@ -573,14 +702,16 @@ def wp_filewrite_eb_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [
   -- AMBIENT: three of the arms copy from user memory (deviation 6)
   procPrivNoctxAt curCtx (procAddr j) pid V M ∗
   isLock γkl kmemLockAddr "kmem" (kmemRes γk) ∗ kallocAvail γk none ∗
-  -- ... and what the file's TYPE selects
-  filewriteEnv (hlc := hlc) st ∗
+  -- ... and what the file's TYPE selects (the FD_DEVICE arm: the devsw
+  -- cell and the console port, deviation 3; Rocq's devsw PIN premise is
+  -- the theorem `devswWriteVal_console`)
+  filewriteEnv (hlc := hlc) γl γu st ∗
   -- THE DESCRIPTOR'S OFFSET ROW (persistent): what advances `f->off`
   foffRow st ∗
   -- THE CALLER'S INPUT, KEYED ON `st`
-  filewriteIn (hlc := hlc) st n (filewriteImg V.upt M) (k.regs 11#5) Q ∗
+  filewriteIn (hlc := hlc) st n (writerImg V.upt M) (k.regs 11#5) Q ∗
   -- THE CROSSING IS THE LITERAL `true`: every arm can park
-  wpNext true k.proc cpu (filewritePost (hlc := hlc) k γ fk q st j pid V M n Q)
+  wpNext true k.proc cpu (filewritePost (hlc := hlc) k γl γu γ fk q st j pid V M n Q)
   ⊢ wpLoop (GF := GF) cpu
 
 /-- The interface of `filewrite` (Rocq's `Module Type FILEWRITE`): ONE
@@ -593,9 +724,9 @@ structure FILEWRITE : Prop where
     (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
     (cpu : CPU) (k : KCtx) (γ : FileNames) (fk : Nat) (q : Qp) (st : FdState)
     (j : Nat) (pid : BitVec 32) (V : ProcPriv) (M : Nat → List (BitVec 8))
-    (γkl : GName) (γk : KmemNames) (n : Int) (Q : Nat → IProp GF)
+    (γkl : GName) (γk : KmemNames) (γl : GName) (γu : UartNames) (n : Int) (Q : Nat → IProp GF)
     hK hfk hj hproc hnoff htier ha0 ha2 hn,
-    wp_filewrite_eb_body (hlc := hlc) (GF := GF) Γ cpu k γ fk q st j pid V M γkl γk n Q
+    wp_filewrite_eb_body (hlc := hlc) (GF := GF) Γ cpu k γ fk q st j pid V M γkl γk γl γu n Q
       hK hfk hj hproc hnoff htier ha0 ha2 hn
 
 end Xv6

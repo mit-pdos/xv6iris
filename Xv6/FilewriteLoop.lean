@@ -129,7 +129,7 @@ def fwrHead (Γ : SchedNames) (k : KCtx) (A : FwrA) (Q : Nat → IProp GF) (t p 
   fwrEnv (hlc := hlc) Γ A ∗ fileRef A.γ A.fk A.q A.st ∗
   procPrivExt (procAddr A.j) A.pid A.V P A.img ∗ bslots 3 ∗
   fwrRaw (hlc := hlc) (fsGammaL fscFs) A.i A.γo A.n A.img (k.regs 11#5) Q t p 0 ∗
-  fwrK (hlc := hlc) k A.γ A.fk A.q A.st A.j A.pid A.V A.M A.n Q
+  fwrK (hlc := hlc) k A.γul A.γuu A.γ A.fk A.q A.st A.j A.pid A.V A.M A.n Q
 
 /-- **THE LOOP INVARIANT** at the bottom test `+0xd4`, over the fuel. -/
 def FwrLoopGoal (Γ : SchedNames) (k : KCtx) (A : FwrA) (Q : Nat → IProp GF) (W : Nat) : Prop :=
@@ -163,7 +163,7 @@ theorem fwr_tests (Γ : SchedNames) (k : KCtx) (A : FwrA) (hA : FwrFacts k A) (Q
         (p + 1) 0) ∨
      (⌜tot < c⌝ ∗ ∃ x : Nat, ⌜x ≤ 1⌝ ∗
         fwrRaw (hlc := hlc) (fsGammaL fscFs) A.i A.γo A.n A.img (k.regs 11#5) Q t p x)) ∗
-    fwrK (hlc := hlc) k A.γ A.fk A.q A.st A.j A.pid A.V A.M A.n Q
+    fwrK (hlc := hlc) k A.γul A.γuu A.γ A.fk A.q A.st A.j A.pid A.V A.M A.n Q
     ⊢ wpLoop (GF := GF) cpu := by
   have hn := hA.hn
   have hcle := fwrChunk_le A.n.toNat t
@@ -420,9 +420,9 @@ theorem fwr_iter (BO : BEGIN_OP) (IL : ILOCK) (WI : WRITEI) (IU : IUNLOCK) (EO :
   ihave Hpriv := Hpback $$ Hpid
   have hpv : procPrivExt (GF := GF) (procAddr A.j) A.pid A.V P' (viewFaulted P P' A.img) ⊢
       procPrivExt (procAddr A.j) A.pid A.V P' A.img := by
-    show procPrivExt (GF := GF) (procAddr A.j) A.pid A.V P' (viewFaulted P P' (filewriteImg A.V.upt A.M)) ⊢
-      procPrivExt (procAddr A.j) A.pid A.V P' (filewriteImg A.V.upt A.M)
-    rw [filewriteImg_fault A.V.upt P P' A.M hext.1 hPP.1]
+    show procPrivExt (GF := GF) (procAddr A.j) A.pid A.V P' (viewFaulted P P' (writerImg A.V.upt A.M)) ⊢
+      procPrivExt (procAddr A.j) A.pid A.V P' (writerImg A.V.upt A.M)
+    rw [writerImg_fault A.V.upt P P' A.M hext.1 hPP.1]
   ihave Hpriv := hpv $$ Hpriv
   ihave Hfields := Hfw $$ Hip
   ihave Hpay := Hback $$ Hshr Hoffd

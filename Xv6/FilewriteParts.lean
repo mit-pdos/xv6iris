@@ -406,46 +406,10 @@ theorem fwr_cs_epi (k : KCtx) (fk : Nat) (n : Int) (R : RegMap)
     simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true] <;>
     first | rfl | assumption
 
-/-! ## 5.  The writer's image (SpecFilewrite deviation 4) -/
+/-! ## 5.  The writer's image (SpecFilewrite deviation 4)
 
-/-- A lazy copy's bytes are constant at the writer's image: every table
-between the entry one and the returned one faults in only pages that
-already read zero there. -/
-theorem filewriteImg_fault (Pv P P' : UPtd) (M : Nat → List (BitVec 8)) (hv : Pv.ext P)
-    (h : P.ext P') : viewFaulted P P' (filewriteImg Pv M) = filewriteImg Pv M := by
-  funext kp
-  obtain ⟨-, -, hsub⟩ := hv
-  unfold viewFaulted filewriteImg
-  cases h0 : Iris.Std.PartialMap.get? Pv.um kp with
-  | some w =>
-    have h1 := hsub kp w h0
-    rw [h1]
-    simp only [Option.isNone_some, Bool.false_eq_true, false_and, if_false, Option.isSome_some,
-      if_true]
-  | none =>
-    simp only [Option.isSome_none, Bool.false_eq_true, if_false]
-    split <;> rfl
-
-/-- `umPages` reads a view only on the mapped pages. -/
-theorem fwr_umPages_congr {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CurCtx]
-    (P : UPtd) (M M' : Nat → List (BitVec 8))
-    (h : ∀ kp w, Iris.Std.PartialMap.get? P.um kp = some w → M kp = M' kp) :
-    umPages (GF := GF) P M ⊢ umPages P M' := by
-  unfold umPages
-  apply BigSepM.bigSepM_mono
-  intro kp w hk
-  rw [h kp w hk]
-
-theorem fwr_procPtAt_congr {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CurCtx]
-    (P : UPtd) (M M' : Nat → List (BitVec 8))
-    (h : ∀ kp w, Iris.Std.PartialMap.get? P.um kp = some w → M kp = M' kp) :
-    procPtAt (GF := GF) P M ⊢ procPtAt P M' := by
-  unfold procPtAt
-  iintro ⟨%hwf, Ht, Hp⟩
-  iframe Ht
-  isplitr
-  · ipureintro; exact hwf
-  iapply fwr_umPages_congr P M M' h $$ Hp
+`UMemImg.writerImg` and its lemmas (`writerImg_fault`, `umPages_congr`,
+`procPtAt_congr`) -- shared with consolewrite's chain. -/
 
 section Block
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CurCtx]
@@ -460,24 +424,24 @@ theorem fwr_priv_congr (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv) (P : UP
   isplitr
   · ipureintro; exact hf
   isplitl [Hpt]
-  · iapply fwr_procPtAt_congr P M M' h $$ Hpt
+  · iapply procPtAt_congr P M M' h $$ Hpt
   · ipureintro; exact hlz
 
 /-- THE ENTRY NORMALISATION: the block's view read at the writer's image
 (free: `umPages` owns only the mapped pages). -/
 theorem fwr_priv_img (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv) (M : Nat → List (BitVec 8)) :
-    procPrivExt (GF := GF) pa pid V V.upt M ⊢ procPrivExt pa pid V V.upt (filewriteImg V.upt M) :=
-  fwr_priv_congr pa pid V V.upt M _ (fun kp w hk => by simp [filewriteImg, hk])
+    procPrivExt (GF := GF) pa pid V V.upt M ⊢ procPrivExt pa pid V V.upt (writerImg V.upt M) :=
+  fwr_priv_congr pa pid V V.upt M _ (fun kp w hk => by simp [writerImg, hk])
 
 /-- THE EXIT: at any grown table, the writer's image IS the landed
 `viewFaulted` view (on every mapped page). -/
 theorem fwr_priv_back (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv) (P' : UPtd)
     (M : Nat → List (BitVec 8)) (hext : V.upt.ext P') :
-    procPrivExt (GF := GF) pa pid V P' (filewriteImg V.upt M) ⊢
+    procPrivExt (GF := GF) pa pid V P' (writerImg V.upt M) ⊢
       procPrivExt pa pid V P' (viewFaulted V.upt P' M) := by
   apply fwr_priv_congr
   intro kp w hk
-  unfold filewriteImg viewFaulted
+  unfold writerImg viewFaulted
   cases h0 : Iris.Std.PartialMap.get? V.upt.um kp with
   | some w' => simp
   | none => simp [hk]
@@ -529,9 +493,9 @@ the block's view at the writer's image; the run it wrote is the image's
 bytes at `ua + t` (`t = i`), provided the run does not wrap. -/
 theorem fwr_bytes (Pv P0 P' : UPtd) (M : Nat → List (BitVec 8)) (ua : BitVec 64) (t tot : Nat)
     (wrote : Nat → BitVec 8) (hv : Pv.ext P0)
-    (hgot : wiUsrGot P0 P' (filewriteImg Pv M) (BitVec.ofNat 64 t + ua) tot wrote)
+    (hgot : wiUsrGot P0 P' (writerImg Pv M) (BitVec.ofNat 64 t + ua) tot wrote)
     (hnw : ua.toNat + t + tot ≤ 2 ^ 64) :
-    ubytesAt (filewriteImg Pv M) (ua + BitVec.ofNat 64 t) (wrfRun wrote tot) := by
+    ubytesAt (writerImg Pv M) (ua + BitVec.ofNat 64 t) (wrfRun wrote tot) := by
   intro d c hd
   have hdl : d < tot := by
     have := (List.getElem?_eq_some_iff.mp hd).1
@@ -541,7 +505,7 @@ theorem fwr_bytes (Pv P0 P' : UPtd) (M : Nat → List (BitVec 8)) (ua : BitVec 6
     have : ua.toNat < 2 ^ 64 := ua.isLt
     omega
   obtain ⟨P1, h01, h1', hw⟩ := hgot d hdl (by rw [hsrc]; omega)
-  rw [filewriteImg_fault Pv P0 P1 M hv h01] at hw
+  rw [writerImg_fault Pv P0 P1 M hv h01] at hw
   have hc : c = wrote d := by
     rw [wrfRun, List.getElem?_map, List.getElem?_range hdl] at hd
     simp only [Option.map_some, Option.some.injEq] at hd
@@ -632,6 +596,18 @@ theorem fwr_fields_ip (fk : Nat) (q : Qp) (C : FContent) :
   iintro ⟨H1, H2, H3, H4, H5, H6⟩
   iframe H5
   iintro H5
+  iframe H1 H2 H3 H4 H5 H6
+
+/-- `lh a5,36(a0)`: the major cell (the FD_DEVICE arm). -/
+theorem fwr_fields_major (fk : Nat) (q : Qp) (C : FContent) :
+    fileFieldsAt (GF := GF) curCtx fk q C ⊢
+      wordPointsTo (fnode fk + 36#64) 2 (DFrac.own q) C.major ∗
+      (wordPointsTo (fnode fk + 36#64) 2 (DFrac.own q) C.major -∗ fileFieldsAt curCtx fk q C) := by
+  unfold fileFieldsAt aFmajor
+  simp only [wordAtN_cur]
+  iintro ⟨H1, H2, H3, H4, H5, H6⟩
+  iframe H6
+  iintro H6
   iframe H1 H2 H3 H4 H5 H6
 
 /-- THE PIPE ARM'S PAYLOAD (Rocq's `file_core_noff` pipe arm, read by
