@@ -75,7 +75,19 @@ exit wand, dropped at node 0 -- B3), `UkCatFEntries.pse_catf_image_entry`
 so `UShCatFStage.stage_catf_law_d` takes an extra lend `Rd` (the deed)
 and `stage_catf_law_holds` discharges it with the entry; threading the
 deed from the shell into `Rd` is C9f2's.  LEFT: `reach_exit` has no
-`DProd` rules yet (unused so far).
+`DProd` rules yet (unused so far).  C9e' LANDED (f3edb6331/464d4037a, VM c9emerge1, audits
+13/13/14/14; both FRONTIER prints 'Closed under the global context'):
+`UnionOut.ucl := peclV pg U ucparams None uwa` (= `gcl ulmU … ∨
+popenU`, `popenU` carrying `gwa k (gs_st so)`), `union_gn`,
+`pwc_blkU_tie` (S7); `UnionLinkInst.union_link_inst` (the file's witness
+and head, `union_X` = `pipes_X` at the round's state `sR`, new pure
+`lm_wr_blk_sp_run` since a `cat f` block is not admissible at every
+state); `union_links_gl` via the new generic `PipesLinksV.peclV_glinks`;
+the ledger `union_led` (taint counter by `lm_disc_ulmU_dec`, conclusion
+`union_phi`), `union_read_inst`; the file lines' claim/link events with
+the open round refuted; the pipeline events at `ucl`.  LEFT to C9f:
+instantiating the family lemmas (`pipesV_*`) at `ucl` where used (they
+already apply, since `ucl` is `peclV` by definition).
 
 ## Review amendments (override the plan below)
 
