@@ -520,7 +520,6 @@ Proof using. split_and!; dec_no. Qed.
 (*  seccomp round is proved; these demos run at the model with the knob   *)
 (*  on, [ulmS]: every nonempty word list after [seccomp] admitted.        *)
 (* ===================================================================== *)
-Set Default Timeout 30.
 Definition adm_s_on (ws : list (list (bv 8))) : bool := bool_decide (ws <> []).
 Definition ulmS : lmodel := ulm adm_u_g adm_s_on.
 
@@ -614,26 +613,42 @@ Proof using.
   change (uok adm_u_g {[txt_a := c_hi]} (LSecc ws_rmf) a_sc2). cbn [uok a_sc2]. discriminate.
 Qed.
 
-Example demo_secc_alts : lm_alts_ok ulmS ∅ I_sc1 cs_sc1.
+Lemma sc1_len : length cs_sc1 = nlines I_sc1.
+Proof using. rewrite /nlines sc1_bodies. reflexivity. Qed.
+
+Lemma sc1_alt0 :
+  lm_ok ulmS (lm_upto ulmS cs_sc1 ∅ (bodies_of I_sc1) 0) (lm_of ulmS (bodies_of I_sc1 !!! 0))
+    (lm_at ulmS cs_sc1 0).
+Proof using. cbn [lm_upto]. rewrite sc1_at0. exact sc1_ok0. Qed.
+
+Lemma sc1_alt1 :
+  lm_ok ulmS (lm_upto ulmS cs_sc1 ∅ (bodies_of I_sc1) 1) (lm_of ulmS (bodies_of I_sc1 !!! 1))
+    (lm_at ulmS cs_sc1 1).
+Proof using. rewrite sc1_upto1 sc1_at1. exact sc1_ok1. Qed.
+
+Lemma sc1_alts_at i : i < nlines I_sc1 ->
+  lm_ok ulmS (lm_upto ulmS cs_sc1 ∅ (bodies_of I_sc1) i) (lm_of ulmS (bodies_of I_sc1 !!! i))
+    (lm_at ulmS cs_sc1 i).
 Proof using.
-  split; [rewrite /nlines sc1_bodies; reflexivity |].
-  intros i Hi. rewrite /nlines sc1_bodies in Hi. cbn [length] in Hi.
-  destruct i as [| [| i]]; [| | lia].
-  - cbn [lm_upto]. rewrite sc1_at0. exact sc1_ok0.
-  - rewrite sc1_upto1 sc1_at1. exact sc1_ok1.
+  intros Hi. destruct i as [| [| i]]; [exact sc1_alt0 | exact sc1_alt1 |].
+  exfalso. assert (H2 : nlines I_sc1 = 2) by (rewrite /nlines sc1_bodies; reflexivity).
+  rewrite H2 in Hi. lia.
 Qed.
+
+Example demo_secc_alts : lm_alts_ok ulmS ∅ I_sc1 cs_sc1.
+Proof using. exact (conj sc1_len sc1_alts_at). Qed.
 
 (* D4: the seccomp line is the input's last, typed as its last byte *)
 Example demo_secc_d4 : lm_d4 ulmS cs_sc1 ∅ I_sc1.
 Proof using.
-  intros i Hi Hex _. rewrite /nlines sc1_bodies in Hi. cbn [length] in Hi.
-  destruct i as [| [| i]]; [| | lia].
+  assert (H2 : nlines I_sc1 = 2) by (rewrite /nlines sc1_bodies; reflexivity).
+  intros i Hi Hex _. destruct i as [| [| i]]; [| | rewrite H2 in Hi; lia].
   - (* the redirect line ends no coverage *)
     exfalso. destruct Hex as (c & Hc & Ht). cbn [lm_upto] in Hc. rewrite sc1_bodies in Hc.
     change ([b_hif; b_secc] !!! 0) with b_hif in Hc.
     cbn [ulmS ulm lm_of lm_ok lm_term] in Hc, Ht. rewrite sc1_line1 in Hc.
     destruct c as [r | x | x | u]; cbn [uok uterm] in Hc, Ht; first [discriminate Ht | contradiction].
-  - split; [by rewrite /nlines sc1_bodies | vm_compute; reflexivity].
+  - split; [exact H2 | vm_compute; reflexivity].
 Qed.
 
 (* THE STATE SURVIVED: the next cycle's boot state [a.txt := hi] is admissible
@@ -660,8 +675,9 @@ Proof using.
     + dec_yes.
     + apply sel_all_ok.
     + vm_compute. reflexivity.
-  - split; [by rewrite /nlines Hb2 |]. intros i Hi. rewrite /nlines Hb2 in Hi. cbn [length] in Hi.
-    destruct i as [| i]; [| lia]. cbn [lm_upto]. rewrite Ha2 Hb2.
+  - assert (H1 : nlines I_sc2 = 1) by (rewrite /nlines Hb2; reflexivity).
+    split; [by rewrite H1 |]. intros i Hi.
+    destruct i as [| i]; [| rewrite H1 in Hi; lia]. cbn [lm_upto]. rewrite Ha2 Hb2.
     change ([cmd_cat txt_a] !!! 0) with cmd_cat txt_a.
     cbn [ulmS ulm lm_of lm_ok]. rewrite Hl2. exact I.
   - rewrite Ha2 Hb2. change ([cmd_cat txt_a] !!! 0) with cmd_cat txt_a.
