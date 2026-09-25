@@ -1018,3 +1018,7 @@ import Xv6.FilereadDev
 import Xv6.FilereadInodeArm
 import Xv6.ProofFileread
 import Xv6.LinkFileread
+import Xv6.SpecSysRead
+import Xv6.SysReadParts
+import Xv6.ProofSysRead
+import Xv6.LinkSysRead
