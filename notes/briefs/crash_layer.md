@@ -1,3 +1,5 @@
+> **USER RULINGS (2026-09-25):** D35 = fully Rocq-literal. D37 = generic application slot, as Rocq. D36, D38–D45 = approved as recommended.
+
 # Brief: reinstating the crash layer (wave C)
 
 **Why this wave exists.** The user ruled D23 (2026-09-25): the final theorem is Rocq's full

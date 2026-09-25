@@ -1032,3 +1032,12 @@ import Xv6.SyscallDefs
 import Xv6.UsysMemOkSpec
 import Xv6.StartedInv
 import Xv6.SysExecHead
+import Xv6.SysExecFree
+import Xv6.SysExecTails
+import Xv6.SysExecBreak
+import Xv6.TfUser
+import Xv6.UserFd
+import Xv6.UexecSG
+import Xv6.UserExec
+import Xv6.SpecUser
+import Xv6.UexecWp
