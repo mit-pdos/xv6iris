@@ -9,7 +9,15 @@ loose corner, alphanumeric patterns, no grep producer yet).  G0 LANDED
 `grep_out_nil`/`_mono`/`_len`, the gate `grep_out_line` under `oneline
 L` (the newline half of `lshape`, to avoid importing PipesDisc; pass
 `proj2` of an `lshape`), the exact pass condition `grep_out_line_pass`,
-`grep_out_line_prefix`; demos incl. the 1022/1023-byte boundary.
+`grep_out_line_prefix`; demos incl. the 1022/1023-byte boundary.  G1
+LANDED (8560af60a, VM g1merge1, audits 13/13/14): the FILTER device --
+`ProgTree.pfilter` (named `pfilter`: `filter` would hide stdpp's list
+filter), `flt_id`; `DCopy F h R S p`, `DCopyEnd F h p`, `DCopyHalt
+(oS : option bytes)` with halted reads (`cf_read_copy_halt`/`_halt_end`);
+cat at `flt_id`; `reach_exit` + `cat_copy_exits` restated; interface
+`ei_copy d F h R S p` etc. with `ei_read_copy_halt`/`_halt_end`; the
+pipes instance at `flt_id` (`pns_copy` carries `R = take c L`, real
+halted-read laws via `pns_read_atU`/`pns_read_eofU`).
 
 I've planned this from reading only; nothing was edited or built. Grep fits the landed machinery more cheaply than the question expects. Every content in the union is a single line, and on one line grep is just a gate. The real costs are elsewhere: grep has no exec image, pins, stubs or kexec facts yet (the biggest cut), the decider's truncation lemma needs rework (the riskiest cut), and there is one owner ruling on corner B.
 

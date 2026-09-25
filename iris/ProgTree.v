@@ -574,6 +574,25 @@ Proof. etransitivity; [apply force_eq |]. reflexivity. Qed.
 (*  once, by coinduction.                                                 *)
 (* ===================================================================== *)
 
+(* A FILTER (claude-notes/design/grep-pipes.md SS1): what a stage owes on
+   its output, as a function of what it has read.  [flt_out R] is the
+   output owed after reading [R]; [flt_new R c] is what a chunk [c] read
+   after [R] adds to it (for a line filter, the lines [c] completes).
+   [flt_app] says the two agree along the input, [flt_nil] that nothing is
+   owed before the first byte.  cat is the identity, [flt_id], whose
+   [flt_new] is the chunk itself -- so its device's read rule is the
+   copy's [p ++ c] definitionally.  (Named [pfilter], not [filter]: a
+   Record named [filter] here would shadow stdpp's list filter in every
+   file that imports this one.) *)
+Record pfilter := MkFilter {
+  flt_out : bytes -> bytes;
+  flt_new : bytes -> bytes -> bytes;
+  flt_app : forall R c, flt_out (R ++ c) = flt_out R ++ flt_new R c;
+  flt_nil : flt_out [] = [] }.
+
+Definition flt_id : pfilter :=
+  MkFilter (fun R => R) (fun _ c => c) (fun _ _ => eq_refl) eq_refl.
+
 Inductive dspec :=
   | DOut (alts : list bytes)      (* what is still owed, one of these *)
   | DOutH (alts : list bytes)     (* ...at a device that may HALT: a pipe whose
@@ -590,16 +609,21 @@ Inductive dspec :=
                                      whose writer may close before the line
                                      is in; a read then answers end of file *)
   | DInEnd                        (* ended: every read answers end of file *)
-  (* THE COPY DEVICE (design SS3.4f): cat at a pipe's end is a FILTER, and
-     ONE device number is bound to both its descriptors -- the pipe's read
-     end on 0 and the sink on 1.  [S] is the input still to come, [pending]
-     the bytes read but not yet written; [h] says whether the sink may halt
-     (a pipe's write end) or not (the console).  A read takes a chunk of
-     [S] into [pending] or ends the input; a write drains a prefix of
-     [pending]; the device is drained when [pending] is empty. *)
-  | DCopy (h : bool) (S : bytes) (pending : bytes)
-  | DCopyEnd (h : bool) (pending : bytes)   (* the writer closed: reads answer end of file *)
-  | DCopyHalt                     (* the sink's reader went: writes answer -1 *)
+  (* THE FILTER DEVICE (design SS3.4f, generalised by grep-pipes.md SS1):
+     a filter at a pipe's end -- cat, grep -- and ONE device number bound
+     to both its descriptors, the pipe's read end on 0 and the sink on 1.
+     [F] is the filter, [R] the input read so far, [S] the input still to
+     come, [pending] the output owed and not yet written; [h] says whether
+     the sink may halt (a pipe's write end) or not (the console).  A read
+     of a chunk [c] of [S] adds [flt_new F R c] to [pending], or ends the
+     input; a write drains a prefix of [pending]; the device is drained
+     when [pending] is empty at the end of the input. *)
+  | DCopy (F : pfilter) (h : bool) (R S : bytes) (pending : bytes)
+  | DCopyEnd (F : pfilter) (h : bool) (pending : bytes)   (* the writer closed: reads answer end of file *)
+  (* the sink's reader went: writes answer -1.  The filter may go on
+     READING (grep reads to the end of its input whatever became of its
+     output): [Some S] is the input still to come, [None] its end *)
+  | DCopyHalt (oS : option bytes)
   (* THE PRODUCER'S DEVICE (union.md C9d'): a producer that may FAIL
      BEFORE its output -- [cat f], whose open may be refused -- writes its
      output on [prod_out] (a pipe's write end: the reader may go) and its
@@ -662,9 +686,10 @@ Definition drained (x : dspec) : Prop :=
   | DOutM chunks => chunks = []
   (* a copy device is drained only at its END (lane copyinst): the exit
      payoff of a pipe's reader is the end-of-file shot, which an open
-     device does not hold; cat reads until 0 and never exits open *)
-  | DCopy _ _ _ => False
-  | DCopyEnd _ pending => pending = []
+     device does not hold; cat reads until 0 and never exits open.  A
+     halted one is drained (cat exits right after its sink halts) *)
+  | DCopy _ _ _ _ _ => False
+  | DCopyEnd _ _ pending => pending = []
   (* the producer device: the output and the diagnostics both done *)
   | DProd outs _ ds => [] ∈ outs /\ [] ∈ ds
   | DProdHalt ds => [] ∈ ds
@@ -685,7 +710,7 @@ Definition fd_last (fdm : gmap Z nat) (fd : Z) (d : nat) : Prop :=
 
 Definition drained_at_close (x : dspec) : Prop :=
   match x with
-  | DOutH _ | DHalt | DCopy _ _ _ | DCopyEnd _ _ | DCopyHalt
+  | DOutH _ | DHalt | DCopy _ _ _ _ _ | DCopyEnd _ _ _ | DCopyHalt _
   | DProd _ _ _ | DProdHalt _ => drained x
   | _ => True
   end.
@@ -713,14 +738,14 @@ Definition cf_step (R : penv -> proc -> Prop) (E : penv) (t : proc) : Prop :=
               /\ R (env_set_dev E d (DOutM rest)) (k (Z.of_nat (length bs)))
               /\ R (env_set_dev E d (DOutM rest)) (k (-1)))
            \/ (bs <> [] /\ Z.of_nat (length bs) < 2 ^ 31 /\ pe_dev E d = DHalt /\ R E (k (-1)))
-           \/ (bs <> [] /\ fd = copy_out /\ exists h S p, pe_dev E d = DCopy h S p /\ bs `prefix_of` p
-              /\ R (env_set_dev E d (DCopy h S (drop (length bs) p))) (k (Z.of_nat (length bs)))
-              /\ (h = true -> R (env_set_dev E d DCopyHalt) (k (-1))))
-           \/ (bs <> [] /\ fd = copy_out /\ exists h p, pe_dev E d = DCopyEnd h p /\ bs `prefix_of` p
-              /\ R (env_set_dev E d (DCopyEnd h (drop (length bs) p))) (k (Z.of_nat (length bs)))
-              /\ (h = true -> R (env_set_dev E d DCopyHalt) (k (-1))))
+           \/ (bs <> [] /\ fd = copy_out /\ exists F h Rr S p, pe_dev E d = DCopy F h Rr S p /\ bs `prefix_of` p
+              /\ R (env_set_dev E d (DCopy F h Rr S (drop (length bs) p))) (k (Z.of_nat (length bs)))
+              /\ (h = true -> R (env_set_dev E d (DCopyHalt (Some S))) (k (-1))))
+           \/ (bs <> [] /\ fd = copy_out /\ exists F h p, pe_dev E d = DCopyEnd F h p /\ bs `prefix_of` p
+              /\ R (env_set_dev E d (DCopyEnd F h (drop (length bs) p))) (k (Z.of_nat (length bs)))
+              /\ (h = true -> R (env_set_dev E d (DCopyHalt None)) (k (-1))))
            \/ (bs <> [] /\ Z.of_nat (length bs) < 2 ^ 31 /\ fd = copy_out
-               /\ pe_dev E d = DCopyHalt /\ R E (k (-1)))
+               /\ exists oS, pe_dev E d = DCopyHalt oS /\ R E (k (-1)))
            \/ (bs <> [] /\ fd = prod_out /\ exists outs xs ds a, pe_dev E d = DProd outs xs ds
               /\ a ∈ outs /\ bs `prefix_of` a
               /\ R (env_set_dev E d (DProd [drop (length bs) a] [] ds)) (k (Z.of_nat (length bs)))
@@ -744,11 +769,16 @@ Definition cf_step (R : penv -> proc -> Prop) (E : penv) (t : proc) : Prop :=
               /\ (forall c S', chunk_ok n S c S' -> R (env_set_dev E d (DInE S')) (k (RdBytes c)))
               /\ R (env_set_dev E d DInEnd) (k (RdBytes [])))
            \/ (pe_dev E d = DInEnd /\ R E (k (RdBytes [])))
-           \/ (fd = copy_in /\ exists h S p, pe_dev E d = DCopy h S p
+           \/ (fd = copy_in /\ exists F h Rr S p, pe_dev E d = DCopy F h Rr S p
               /\ (forall c S', chunk_ok n S c S' -> c <> [] ->
-                    R (env_set_dev E d (DCopy h S' (p ++ c))) (k (RdBytes c)))
-              /\ R (env_set_dev E d (DCopyEnd h p)) (k (RdBytes [])))
-           \/ (fd = copy_in /\ exists h p, pe_dev E d = DCopyEnd h p /\ R E (k (RdBytes []))))
+                    R (env_set_dev E d (DCopy F h (Rr ++ c) S' (p ++ flt_new F Rr c))) (k (RdBytes c)))
+              /\ R (env_set_dev E d (DCopyEnd F h p)) (k (RdBytes [])))
+           \/ (fd = copy_in /\ exists F h p, pe_dev E d = DCopyEnd F h p /\ R E (k (RdBytes [])))
+           \/ (fd = copy_in /\ exists S, pe_dev E d = DCopyHalt (Some S)
+              /\ (forall c S', chunk_ok n S c S' -> c <> [] ->
+                    R (env_set_dev E d (DCopyHalt (Some S'))) (k (RdBytes c)))
+              /\ R (env_set_dev E d (DCopyHalt None)) (k (RdBytes [])))
+           \/ (fd = copy_in /\ pe_dev E d = DCopyHalt None /\ R E (k (RdBytes []))))
       | EOpen p m => fun k =>
           p ∈ pe_paths E /\
           ((m = 0 /\ exists content, pe_files E p = Some content
@@ -813,23 +843,23 @@ CoInductive conforms : penv -> proc -> Prop :=
   (* at the copy device a write drains a prefix of what was read; when the
      sink may halt ([h = true]) the tree is also ready for -1, after which
      the device is halted *)
-  | cf_write_copy E fd d h S p bs k :
+  | cf_write_copy E fd d F h Rr S p bs k :
       bs <> [] -> fd = copy_out ->
-      pe_fd E !! fd = Some d -> pe_dev E d = DCopy h S p ->
+      pe_fd E !! fd = Some d -> pe_dev E d = DCopy F h Rr S p ->
       bs `prefix_of` p ->
-      conforms (env_set_dev E d (DCopy h S (drop (length bs) p))) (k (Z.of_nat (length bs))) ->
-      (h = true -> conforms (env_set_dev E d DCopyHalt) (k (-1))) ->
+      conforms (env_set_dev E d (DCopy F h Rr S (drop (length bs) p))) (k (Z.of_nat (length bs))) ->
+      (h = true -> conforms (env_set_dev E d (DCopyHalt (Some S))) (k (-1))) ->
       conforms E (Vis (EWrite fd bs) k)
-  | cf_write_copy_end E fd d h p bs k :
+  | cf_write_copy_end E fd d F h p bs k :
       bs <> [] -> fd = copy_out ->
-      pe_fd E !! fd = Some d -> pe_dev E d = DCopyEnd h p ->
+      pe_fd E !! fd = Some d -> pe_dev E d = DCopyEnd F h p ->
       bs `prefix_of` p ->
-      conforms (env_set_dev E d (DCopyEnd h (drop (length bs) p))) (k (Z.of_nat (length bs))) ->
-      (h = true -> conforms (env_set_dev E d DCopyHalt) (k (-1))) ->
+      conforms (env_set_dev E d (DCopyEnd F h (drop (length bs) p))) (k (Z.of_nat (length bs))) ->
+      (h = true -> conforms (env_set_dev E d (DCopyHalt None)) (k (-1))) ->
       conforms E (Vis (EWrite fd bs) k)
-  | cf_write_copy_halt E fd d bs k :
+  | cf_write_copy_halt E fd d oS bs k :
       bs <> [] -> Z.of_nat (length bs) < 2 ^ 31 -> fd = copy_out ->
-      pe_fd E !! fd = Some d -> pe_dev E d = DCopyHalt ->
+      pe_fd E !! fd = Some d -> pe_dev E d = DCopyHalt oS ->
       conforms E (k (-1)) ->
       conforms E (Vis (EWrite fd bs) k)
   (* at the PRODUCER device an output write takes a prefix of an owed
@@ -889,21 +919,34 @@ CoInductive conforms : penv -> proc -> Prop :=
       pe_fd E !! fd = Some d -> pe_dev E d = DInEnd ->
       conforms E (k (RdBytes [])) ->
       conforms E (Vis (ERead fd n) k)
-  (* at the copy device a read moves a NONEMPTY chunk of the input into
-     [pending] (a pipe answers 0 only at its end), and (the writer may
-     close first) the tree is ready for end of file; a read at a HALTED
-     copy device is not a conformance event: cat never reads after a
-     failed write (it prints its diagnostic and exits) *)
-  | cf_read_copy E fd d h S p n k :
+  (* at the filter device a read of a NONEMPTY chunk of the input (a pipe
+     answers 0 only at its end) adds what the chunk owes to [pending], and
+     (the writer may close first) the tree is ready for end of file *)
+  | cf_read_copy E fd d F h Rr S p n k :
       (0 < n)%nat -> fd = copy_in ->
-      pe_fd E !! fd = Some d -> pe_dev E d = DCopy h S p ->
+      pe_fd E !! fd = Some d -> pe_dev E d = DCopy F h Rr S p ->
       (forall c S', chunk_ok n S c S' -> c <> [] ->
-         conforms (env_set_dev E d (DCopy h S' (p ++ c))) (k (RdBytes c))) ->
-      conforms (env_set_dev E d (DCopyEnd h p)) (k (RdBytes [])) ->
+         conforms (env_set_dev E d (DCopy F h (Rr ++ c) S' (p ++ flt_new F Rr c))) (k (RdBytes c))) ->
+      conforms (env_set_dev E d (DCopyEnd F h p)) (k (RdBytes [])) ->
       conforms E (Vis (ERead fd n) k)
-  | cf_read_copy_end E fd d h p n k :
+  | cf_read_copy_end E fd d F h p n k :
       (0 < n)%nat -> fd = copy_in ->
-      pe_fd E !! fd = Some d -> pe_dev E d = DCopyEnd h p ->
+      pe_fd E !! fd = Some d -> pe_dev E d = DCopyEnd F h p ->
+      conforms E (k (RdBytes [])) ->
+      conforms E (Vis (ERead fd n) k)
+  (* ...and at a HALTED one the input goes on: a chunk, or end of file
+     (grep reads to its end whatever became of its output; cat never
+     reads there, it prints its diagnostic and exits) *)
+  | cf_read_copy_halt E fd d S n k :
+      (0 < n)%nat -> fd = copy_in ->
+      pe_fd E !! fd = Some d -> pe_dev E d = DCopyHalt (Some S) ->
+      (forall c S', chunk_ok n S c S' -> c <> [] ->
+         conforms (env_set_dev E d (DCopyHalt (Some S'))) (k (RdBytes c))) ->
+      conforms (env_set_dev E d (DCopyHalt None)) (k (RdBytes [])) ->
+      conforms E (Vis (ERead fd n) k)
+  | cf_read_copy_halt_end E fd d n k :
+      (0 < n)%nat -> fd = copy_in ->
+      pe_fd E !! fd = Some d -> pe_dev E d = DCopyHalt None ->
       conforms E (k (RdBytes [])) ->
       conforms E (Vis (ERead fd n) k)
   | cf_open_present E p content k :
@@ -942,10 +985,11 @@ Proof.
   - exists d. split; [assumption |]. right. right. right. left. split; [assumption |]. exists rest. auto.
   - exists d. split; [assumption |]. do 4 right. left. auto.
   - exists d. split; [assumption |]. do 5 right. left. split; [assumption |].
-    split; [assumption |]. exists h, S, p. auto.
+    split; [assumption |]. exists F, h, Rr, S, p. auto.
   - exists d. split; [assumption |]. do 6 right. left. split; [assumption |].
-    split; [assumption |]. exists h, p. auto.
-  - exists d. split; [assumption |]. do 7 right. left. auto.
+    split; [assumption |]. exists F, h, p. auto.
+  - exists d. split; [assumption |]. do 7 right. left. do 3 (split; [assumption |]).
+    exists oS. auto.
   - exists d. split; [assumption |]. do 8 right. left. split; [assumption |].
     split; [assumption |]. exists outs, xs, ds, a. auto.
   - exists d. split; [assumption |]. do 9 right. left. do 3 (split; [assumption |]).
@@ -960,9 +1004,12 @@ Proof.
   - exists d. split; [assumption |]. split; [assumption |]. right. left. exists S. auto.
   - exists d. split; [assumption |]. split; [assumption |]. do 2 right. left. auto.
   - exists d. split; [assumption |]. split; [assumption |]. do 3 right. left.
-    split; [assumption |]. exists h, S, p. auto.
-  - exists d. split; [assumption |]. split; [assumption |]. do 4 right.
-    split; [assumption |]. exists h, p. auto.
+    split; [assumption |]. exists F, h, Rr, S, p. auto.
+  - exists d. split; [assumption |]. split; [assumption |]. do 4 right. left.
+    split; [assumption |]. exists F, h, p. auto.
+  - exists d. split; [assumption |]. split; [assumption |]. do 5 right. left.
+    split; [assumption |]. exists S. auto.
+  - exists d. split; [assumption |]. split; [assumption |]. do 6 right. auto.
   - split; [assumption |]. left. split; [reflexivity |]. exists content. auto.
   - split; [assumption |]. right. auto.
   - exists d. auto.
@@ -1387,19 +1434,19 @@ Proof.
   destruct (decide (d = 1%nat)); [exact Hdr | by left].
 Qed.
 
-(* one call of cat(0) at the copy device: each chunk read is written whole
-   before the next read, so [pending] is empty at every read and at the
-   exit, whether the input ran out or the writer closed first; a halted
-   sink ([h = true]) sends cat to its diagnostic on descriptor 2, which the
-   console must then owe *)
-Lemma cat_copy_loop_conforms (h : bool) (S : bytes) (alts : list bytes) files paths (rest : proc) :
+(* one call of cat(0) at the filter device at [flt_id]: each chunk read
+   is written whole before the next read, so [pending] is empty at every
+   read and at the exit, whatever was read so far ([R]), whether the input
+   ran out or the writer closed first; a halted sink ([h = true]) sends cat
+   to its diagnostic on descriptor 2, which the console must then owe *)
+Lemma cat_copy_loop_conforms (h : bool) (R S : bytes) (alts : list bytes) files paths (rest : proc) :
   [] ∈ alts -> (h = true -> cat_dg_write ∈ alts) ->
-  conforms (copy_env (DCopyEnd h []) alts files paths) rest ->
-  conforms (copy_env (DCopy h S []) alts files paths) (cat_loop 0 rest).
+  conforms (copy_env (DCopyEnd flt_id h []) alts files paths) rest ->
+  conforms (copy_env (DCopy flt_id h R S []) alts files paths) (cat_loop 0 rest).
 Proof.
-  intros Hnil Hdg Hrest_end. revert S. cofix CIH. intros S.
+  intros Hnil Hdg Hrest_end. revert R S. cofix CIH. intros R S.
   rewrite cat_loop_unfold.
-  eapply cf_read_copy with (d := 1%nat) (h := h) (S := S) (p := []).
+  eapply cf_read_copy with (d := 1%nat) (F := flt_id) (h := h) (Rr := R) (S := S) (p := []).
   { unfold cat_bufsz. lia. }
   { reflexivity. }
   { cbv [copy_env pe_fd]. apply lookup_insert. }
@@ -1407,7 +1454,7 @@ Proof.
   2: { rewrite copy_env_set. exact Hrest_end. }
   intros c S' (HS & Hlen & Hnil') Hne. rewrite copy_env_set.
   destruct c as [| b c']; [by destruct Hne |].
-  eapply cf_write_copy with (d := 1%nat) (h := h) (S := S') (p := b :: c').
+  eapply cf_write_copy with (d := 1%nat) (F := flt_id) (h := h) (Rr := R ++ b :: c') (S := S') (p := b :: c').
   { done. }
   { reflexivity. }
   { cbv [copy_env pe_fd]. rewrite lookup_insert_ne; [| lia]. apply lookup_insert. }
@@ -1425,13 +1472,14 @@ Proof.
     intros alts' Hin'. rewrite copy_env_out. apply copy_env_exit; [exact Hin' | exact I].
 Qed.
 
-(* cat with no argument at the copy device: [cat_stdin_conforms] re-proved at
-   [DCopy h L []] (the pipeline's cat: pipe in, pipe or console out); the
-   console on descriptor 2 owes nothing, and, when the sink may halt, the
-   write diagnostic as an alternative *)
+(* cat with no argument at the filter device: [cat_stdin_conforms]
+   re-proved at [DCopy flt_id h [] L []] (the pipeline's cat: pipe in,
+   pipe or console out, nothing read yet); the console on descriptor 2
+   owes nothing, and, when the sink may halt, the write diagnostic as an
+   alternative *)
 Theorem cat_copy_conforms (h : bool) (L : bytes) (alts : list bytes) files paths :
   [] ∈ alts -> (h = true -> cat_dg_write ∈ alts) ->
-  conforms (copy_env (DCopy h L []) alts files paths) (cat_tree [sb "cat"]).
+  conforms (copy_env (DCopy flt_id h [] L []) alts files paths) (cat_tree [sb "cat"]).
 Proof.
   intros Hnil Hdg. simpl. apply cat_copy_loop_conforms; [exact Hnil | exact Hdg |].
   apply copy_env_exit; [exact Hnil | exact eq_refl].
