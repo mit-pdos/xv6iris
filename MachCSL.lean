@@ -15,6 +15,7 @@ import MachCSL.Wp
 import MachCSL.WpDev
 import MachCSL.WpSmodeDev
 import MachCSL.Power
+import MachCSL.Adequacy
 import MachCSL.SimpAttr
 import MachCSL.ModelFacts
 import MachCSL.Tactics
