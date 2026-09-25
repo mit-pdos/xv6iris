@@ -1,0 +1,429 @@
+SYS_EXEC (wave 7b, item X-A) -- FROZEN INTERFACES AND PROPOSED STAGE SPLIT
+=======================================================================
+Main tree at 2402efd53 (+ X-A files below, uncommitted).  All X-A files build
+(`lake build Xv6.SysExecDefs Xv6.SpecSysExec Xv6.SysExecParts Xv6.SysExecLoop
+Xv6.SysExecSetup`), no sorry, tools/check_layering.sh ok.
+
+FILES (X-A)
+-----------
+  Xv6/SysExecDefs.lean   EDITED (the sanctioned append): + `import Xv6.FdTable`
+                         (top), + `sysExecPost` (Rocq sys_exec_post, over
+                         procPrivFd), header "DEFERRED" -> "appended".
+  Xv6/SpecSysExec.lean   NEW  the contract: execArgsShape / execArgsOf, the AU
+                         (sysExecSlotPre / sysExecAuPre / sysExecPostFail(+_refund)
+                         / sysExecArms(+_landed)), sysExecK, wp_sys_exec_eb_body,
+                         SYSEXEC (field wp_sys_exec_eb).
+  Xv6/SysExecParts.lean  NEW  shared vocabulary + PROVED: frame carve/fold,
+                         prologue, epilogue, THE JOIN POINT sys_exec_exit (+0x104),
+                         pins, pure bookkeeping, image lemma, seams
+                         (sysExecAuPre_at, sys_exec_post_pin), every stage body,
+                         and THE COMPOSITION sys_exec_compose (the five
+                         top-level bodies ⊢ wp_sys_exec_eb_body).
+  Xv6/SysExecLoop.lean   NEW  PROVED sys_exec_loop (hstep ⊢ loop body; Rocq sx_loop)
+  Xv6/SysExecSetup.lean  NEW  PROVED sys_exec_setup (MEMSET; Rocq sx_setup)
+
+Xv6.lean imports to add (coordinator):
+  import Xv6.SpecSysExec
+  import Xv6.SysExecParts
+  import Xv6.SysExecLoop
+  import Xv6.SysExecSetup
+(Xv6.SysExecDefs is already imported.)
+
+THE CONTRACT (Xv6/SpecSysExec.lean, frozen)
+-------------------------------------------
+wp_sys_exec_eb_body Γ cpu k γ j pd pav pu v0 v1 pid V M sts gn cs Fs Q P Pmiss Fo
+    hK(sysExecSlots ≤ k.avail) hnoff(k.noff = 0) htier hj hproc(k.proc = procAddr j)
+    hv0(V.tf[tfArgIdx 0]? = some v0) hv1 :=
+  kctx cpu k ∗ pcIs cpu sysExecAddr ∗ trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗
+  fsFabric Γ pd pav pu ∗ bslots 3 ∗ irefSlots 2 ∗ procPrivFd γ (procAddr j) pid V M ∗
+  myPay gn Q ∗
+  sysExecAuPre Fs (fsGammaL fscFs) fscFs V.cwi Q P Pmiss Fo (viewLazy V.upt V.sz M) v0 v1 sts cs pid ∗
+  wpNext true k.proc cpu (sysExecK k γ j v0 v1 pid V M sts gn cs Fs Q P Pmiss Fo)
+  ⊢ wpLoop cpu
+sysExecK … cpu' := ∀ spie spp R' P', ⌜calleeSaved k.regs R'⌝ -∗ ⌜V.upt.extSz V.sz P'⌝ -∗
+  kctx cpu' ((k.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k.regs 1#5)) -∗
+  trapCsrsExt cpu' k.sie -∗ cpuClaimExt cpu' k.sie k.proc -∗ bslots 3 -∗ irefSlots 2 -∗
+  sysExecArms Fs (fsGammaL fscFs) fscFs V.cwi γ (procAddr j) pid Q P Pmiss Fo
+    (viewLazy V.upt V.sz M) v0 v1 sts gn cs {V with upt := P'} (viewFaulted V.upt P' M) (R' 10#5) -∗
+  wpLoop cpu'
+sysExecArms … Mim pv av sts gn cs VW MW r := ∃ V' M', procPrivFd γ pa pid V' M' ∗
+  ((⌜r = -1 ∧ V' = VW ∧ M' = MW⌝ ∗ sysExecPostFail … Mim pv av sts cs pid) ∨
+   (∃ pl na alen afun, ⌜argPathOf Mim pv.toNat pl⌝ ∗ ⌜execArgsOf Mim av na alen afun⌝ ∗
+      execPostOk Fs na alen afun sts gn cs pid VW V' M' r))
+sysExecPostFail := sysExecAuPre … (the 4th, pre-kexec disjunct) ∨
+  ∃ pl na alen afun, ⌜argPathOf⌝ ∗ ⌜execArgsOf⌝ ∗ execPostFail … pl na alen afun …
+execArgsOf M av na alen afun := execArgsShape na alen afun ∧ ∃ avf,
+  (∀ i ≤ na, bytesToWord (umemRead M (av + ofNat(8i)).toNat 8) = avf i) ∧
+  (∀ i < na, avf i ≠ 0) ∧ avf na = 0 ∧ (∀ i < na, ∀ q ≤ alen i, umemByte M ((avf i).toNat + q) = afun i q)
+
+SHARED VOCABULARY (Xv6/SysExecParts.lean, frozen)
+-------------------------------------------------
+Frame (sp0 = k.regs 2#5, slot n = sp0 - 8n):
+  sysExecPath sp0 = sp0-208 (path[128]);  sysExecArgv sp0 = sp0-464;
+  sysExecArgvAt sp0 i = argv + 8i;  sysExecUargv sp0 = sp0-472;  sysExecUarg sp0 = sp0-480.
+  sysExecRaS0 sp0 ra s0 (slots 1,2) ; sysExecSpills sp0 s1..s7 (slots 3..9) ;
+  sysExecSpillsFree sp0 ; sysExecSlot10 sp0 ; sysExecPathBuf sp0 pl rest
+  (⌜|pl|+1+|rest| = 128⌝ ∗ byteBuf path (bview (|pl|+1) (sysfilePfun pl)) ∗ byteBuf (sysfileRestAddr path |pl|) rest);
+  sysExecArgvArr sp0 ws ([∗list] i ↦ w ∈ ws, word (argvAt i) w) + sysExecArgvArr_acc (open/close one slot, List.set);
+  sysExecArgvFree sp0 (∃ ws, |ws| = 32 ∗ arr ws);  sysExecRest sp0 (what the epilogue folds);
+  sysExecCarry k pl rest (RaS0 at entry ra/s0 ∗ Spills at entry s1..s7 ∗ Slot10 ∗ PathBuf);
+  sysExecPages pg afun m t ([∗list] j ∈ range' m (t-m), byteBuf (pg j) (bview 4096 (afun j)));
+  sysExecArgvFrom sp0 m t pg (free-loop view) ; sysExecArgvFrom_intro / _free.
+  PROVED: sys_exec_carve / sys_exec_fold, wp_prologue_sys_exec (+0x00..+0x06),
+  wp_epilogue_sys_exec, sys_exec_exit (THE JOIN POINT at +0x104, hart-free,
+  needs sysExecPinsE k R, ra/s0 cells, sysExecRest), sysExecCarry_rest,
+  sysExecArgvFree_stack, sysExecArgvAny_stack, sys_exec_words_stack.
+Pins: sysExecPins k R s1..s7 (sp = sp0-480, s0 = sp0, s8..s11 entry);
+  sysExecPinsE (s1..s7 = entry's); sysExecLoopPins k R i (s1=s4=argv, s2=i,
+  s3=argvAt i, s5=uarg, s6=4096, s7=32); sysExecBadPins (s1=s4=argv);
+  sysExecPins_cs / _set (ra, a0..a7) / _entry / _exit; sysExecKeepS1.
+Pure: sysExecAvf pg t i (pg i below t, 0 from t); sysExecArgvL pg t (the 32-word list)
+  + _length/_get/_zero/_set (fill's store)/_set0 (break's sd zero);
+  sysExecUpd (+_eq/_lt); sysExecOk / sysExecPgOk / sysExecAvOk (+_push, _pgOk);
+  sysExec_argsOf (the reading at the break: Ok ∧ AvOk ∧ NULL ⇒ execArgsOf);
+  sysExec_viewLazy_faulted (V.upt.extSz V.sz P ⇒ viewLazy P V.sz (viewFaulted V.upt P M)
+    = viewLazy V.upt V.sz M: every round's fetchstr reads the ENTRY image);
+  sysExec_bview_path (bview |pl| (sysfilePfun pl) = pl); sys_exec_K (budget split);
+  sys_exec_al / _path_al / _argv_al; sysExecArgvAt_32 (argv + 256 = path).
+Records: SysExecArgs {γ j pid V M v0 v1 pd pav pu}; SysExecStatic k A {hK hnoff htier hj
+  hproc hv0 hv1}; SysExecAU GF {sts gn cs Fs Q P Pmiss Fo}; sysExecIm A = viewLazy A.V.upt A.V.sz A.M;
+  sysExecV2 A P = {A.V with upt := P}; sysExecM2 A P = viewFaulted A.V.upt P A.M;
+  sysExecEnv Γ A = fsFabric Γ A.pd A.pav A.pu (persistent).
+Seams: sysExecAuPre_at (Rocq ProofSysExec.sys_exec_au_pre_at), sys_exec_post_pin.
+
+THE STAGE STATEMENTS (frozen; the bodies below are verbatim from SysExecParts §4/§5)
+----------------------------------------------------------------------------------
+Stage theorem signatures (what each set must deliver, exactly):
+  [A] theorem sys_exec_head (AA : ARGADDR) (AS : ARGSTR) (Γ : SchedNames) (k : KCtx)
+        (A : SysExecArgs) (hS : SysExecStatic k A) : ⊢ sysExecHeadBody (hlc := hlc) (GF := GF) Γ k A
+      (file Xv6/SysExecHead.lean; may add Xv6/SysExecHeadCalls.lean)
+      DONE: theorem sys_exec_setup (MS : MEMSET) (k) (hK : sysExecSlots ≤ k.avail) : ⊢ sysExecSetupBody k
+  [B] theorem sys_exec_step (FA : FETCHADDR) (KA : KALLOC) (FS : FETCHSTR) (Γ) (k) (A)
+        (hS : SysExecStatic k A) : ⊢ sysExecStepBody (hlc := hlc) (GF := GF) Γ k A
+      (file Xv6/SysExecStep.lean; may add Xv6/SysExecStepCalls.lean)
+      DONE: theorem sys_exec_loop (Γ k A) (hstep : ⊢ sysExecStepBody Γ k A) : ⊢ sysExecLoopBody Γ k A
+  [C] theorem sys_exec_free_bad  (KF : KFREE) (Γ k A) (hS) : ⊢ sysExecFreeBody Γ k A 0x96#64 0xf4#64
+      theorem sys_exec_free_succ (KF : KFREE) (Γ k A) (hS) : ⊢ sysExecFreeBody Γ k A 0xd4#64 0xe2#64
+        (file Xv6/SysExecFree.lean: ONE generic lemma at a base/exit pair, two instances)
+      theorem sys_exec_bad_tail (Γ k A) (hS) (hfree : ⊢ sysExecFreeBody Γ k A 0x96#64 0xf4#64) :
+        ⊢ sysExecBadTailBody Γ k A
+      theorem sys_exec_succ_tail (Γ k A) (hS) (hfree : ⊢ sysExecFreeBody Γ k A 0xd4#64 0xe2#64) :
+        ⊢ sysExecSuccTailBody Γ k A
+        (file Xv6/SysExecTails.lean; the seven-reload block is shared by both, Rocq sx_reload)
+      theorem sys_exec_break (KX : KEXEC) (Γ) [ClaimIs (hlc := hlc) GF Γ] (k A) (U : SysExecAU GF)
+        (hS) (hsucc : ⊢ sysExecSuccTailBody Γ k A) : ⊢ sysExecBreakBody Γ k A U
+        (file Xv6/SysExecBreak.lean)
+  SEAL (after A, B, C): Xv6/ProofSysExec.lean
+      theorem sys_exec_proof (AA : ARGADDR) (AS : ARGSTR) (MS : MEMSET) (FA : FETCHADDR)
+          (KA : KALLOC) (FS : FETCHSTR) (KF : KFREE) (KX : KEXEC) : SYSEXEC := ⟨fun Γ _ cpu k γ j pd
+          pav pu v0 v1 pid V M sts gn cs Fs Q P Pmiss Fo hK hnoff htier hj hproc hv0 hv1 => by
+        let A : SysExecArgs := ⟨γ, j, pid, V, M, v0, v1, pd, pav, pu⟩
+        let U : SysExecAU _ := ⟨sts, gn, cs, Fs, Q, P, Pmiss, Fo⟩
+        have hS : SysExecStatic k A := ⟨hK, hnoff, htier, hj, hproc, hv0, hv1⟩
+        exact sys_exec_compose Γ cpu k A U hS (sys_exec_head AA AS Γ k A hS) (sys_exec_setup MS k hK)
+          (sys_exec_loop Γ k A (sys_exec_step FA KA FS Γ k A hS))
+          (sys_exec_break KX Γ k A U hS (sys_exec_succ_tail Γ k A hS (sys_exec_free_succ KF Γ k A hS)))
+          (sys_exec_bad_tail Γ k A hS (sys_exec_free_bad KF Γ k A hS))⟩
+      (sys_exec_compose is PROVED against these exact bodies.)
+  LINK: Xv6/LinkSysExec.lean (Rocq `SysExec := SysExecProof Argaddr Argstr MemsetArray Fetchaddr
+      Kalloc Fetchstr Kfree Kexec`): Argaddr / Argstr / Memset / Fetchaddr / Kalloc / Fetchstr /
+      Kfree from their Link* files (see LinkSysOpen for Argstr's closure: Argstr (Argraw Myproc)
+      (Fetchstr Myproc (Copyinstr WA VF) Strlen)); Kexec from LinkKexec (closed) -- the vm.c
+      walkers stay parameters exactly as LinkSysOpen keeps WA/VF.
+
+THE BODIES AND STATES (verbatim):
+def sysExecLoopSt (k : KCtx) (A : SysExecArgs) (spie spp : Bool) (R : RegMap) (P : UPtd) (i : Nat)
+    (pg : Nat → BitVec 64) (alen : Nat → Nat) (afun : Nat → Nat → BitVec 8)
+    (uvf : Nat → BitVec 64) (pl rest : List (BitVec 8)) (pc : BitVec 64) (c : CPU) : IProp GF :=
+  iprop(⌜i < 32 ∧ A.V.upt.extSz A.V.sz P ∧ sysExecOk pg alen afun i ∧
+      sysExecAvOk (sysExecIm A) A.v1 uvf alen afun i ∧ sysExecLoopPins k R i ∧
+      (k.regs 2#5).toNat % 8 = 0⌝ ∗
+    kctx c (((k.withSpie spie spp).pushed 60).withRegs R) ∗ pcIs c pc ∗
+    trapCsrsExt c k.sie ∗ cpuClaimExt c k.sie k.proc ∗
+    procPrivFd A.γ (procAddr A.j) A.pid (sysExecV2 A P) (sysExecM2 A P) ∗
+    sysExecCarry k pl rest ∗ wordPointsTo (sysExecUargv (k.regs 2#5)) 8 (DFrac.own 1) A.v1 ∗
+    (∃ w : BitVec 64, wordPointsTo (sysExecUarg (k.regs 2#5)) 8 (DFrac.own 1) w) ∗
+    sysExecArgvArr (k.regs 2#5) (sysExecArgvL pg i) ∗ sysExecPages pg afun 0 i)
+
+/-- **bad: at +0x092** (Rocq `sx_bad`): the string half of the bookkeeping is
+gone (a failing fetchstr's page has nothing said about its bytes). -/
+def sysExecBadSt (k : KCtx) (A : SysExecArgs) (spie spp : Bool) (R : RegMap) (P : UPtd) (t : Nat)
+    (pg : Nat → BitVec 64) (afun : Nat → Nat → BitVec 8) (pl rest : List (BitVec 8)) (c : CPU) :
+    IProp GF :=
+  iprop(⌜t ≤ 32 ∧ A.V.upt.extSz A.V.sz P ∧ sysExecPgOk pg t ∧ sysExecBadPins k R ∧
+      (k.regs 2#5).toNat % 8 = 0⌝ ∗
+    kctx c (((k.withSpie spie spp).pushed 60).withRegs R) ∗ pcIs c (sysExecAddr + 0x92#64) ∗
+    trapCsrsExt c k.sie ∗ cpuClaimExt c k.sie k.proc ∗
+    procPrivFd A.γ (procAddr A.j) A.pid (sysExecV2 A P) (sysExecM2 A P) ∗
+    sysExecCarry k pl rest ∗ wordPointsTo (sysExecUargv (k.regs 2#5)) 8 (DFrac.own 1) A.v1 ∗
+    (∃ w : BitVec 64, wordPointsTo (sysExecUarg (k.regs 2#5)) 8 (DFrac.own 1) w) ∗
+    sysExecArgvArr (k.regs 2#5) (sysExecArgvL pg t) ∗ sysExecPages pg afun 0 t)
+
+
+def sysExecHeadBody (Γ : SchedNames) (k : KCtx) (A : SysExecArgs) : IProp GF :=
+  iprop(∀ c : CPU,
+    kctx c k -∗ pcIs c sysExecAddr -∗ trapCsrsExt c k.sie -∗ cpuClaimExt c k.sie k.proc -∗
+    sysExecEnv (hlc := hlc) Γ A -∗ procPrivFd A.γ (procAddr A.j) A.pid A.V A.M -∗
+    ((∀ (c' : CPU) (spie spp : Bool) (R' : RegMap) (P' : UPtd),
+        ⌜calleeSaved k.regs R' ∧ R' 10#5 = 0xFFFFFFFFFFFFFFFF#64 ∧ A.V.upt.extSz A.V.sz P'⌝ -∗
+        kctx c' ((k.withSpie spie spp).withRegs R') -∗ pcIs c' (jumpPc (k.regs 1#5)) -∗
+        trapCsrsExt c' k.sie -∗ cpuClaimExt c' k.sie k.proc -∗
+        procPrivFd A.γ (procAddr A.j) A.pid (sysExecV2 A P') (sysExecM2 A P') -∗ wpLoop c') ∧
+     (∀ (c' : CPU) (spie spp : Bool) (R : RegMap) (P' : UPtd) (pl rest : List (BitVec 8)),
+        ⌜sysExecPinsE k R ∧ A.V.upt.extSz A.V.sz P' ∧ pl.length < 128 ∧
+          argPathOf (sysExecIm A) A.v0.toNat pl ∧ (k.regs 2#5).toNat % 8 = 0⌝ -∗
+        kctx c' (((k.withSpie spie spp).pushed 60).withRegs R) -∗ pcIs c' (sysExecAddr + 0x28#64) -∗
+        trapCsrsExt c' k.sie -∗ cpuClaimExt c' k.sie k.proc -∗
+        procPrivFd A.γ (procAddr A.j) A.pid (sysExecV2 A P') (sysExecM2 A P') -∗
+        sysExecRaS0 (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) -∗ sysExecSpillsFree (k.regs 2#5) -∗
+        sysExecSlot10 (k.regs 2#5) -∗ sysExecPathBuf (k.regs 2#5) pl rest -∗
+        sysfileAny (sysExecArgv (k.regs 2#5)) 256 -∗
+        wordPointsTo (sysExecUargv (k.regs 2#5)) 8 (DFrac.own 1) A.v1 -∗
+        (∃ w : BitVec 64, wordPointsTo (sysExecUarg (k.regs 2#5)) 8 (DFrac.own 1) w) -∗
+        wpLoop c')) -∗
+    wpLoop c)
+
+/-- **+0x028 .. +0x054** (Rocq `sx_setup`): the seven LAZY spills (at the
+entry's s1 .. s7, what the reloads read back), `memset(argv, 0, 256)` --
+memset's bytes come back as 32 zero WORDS (`PtOwnLemmas.byteBuf_zero_words`,
+Rocq `sx_zeros_slots`) -- and the loop registers (`sysExecLoopPins` at 0). -/
+def sysExecSetupBody (k : KCtx) : IProp GF :=
+  iprop(∀ (c : CPU) (spie spp : Bool) (R : RegMap),
+    ⌜sysExecPinsE k R ∧ (k.regs 2#5).toNat % 8 = 0⌝ -∗
+    kctx c (((k.withSpie spie spp).pushed 60).withRegs R) -∗ pcIs c (sysExecAddr + 0x28#64) -∗
+    trapCsrsExt c k.sie -∗ cpuClaimExt c k.sie k.proc -∗
+    sysExecSpillsFree (k.regs 2#5) -∗ sysfileAny (sysExecArgv (k.regs 2#5)) 256 -∗
+    (∀ (c' : CPU) (R' : RegMap), ⌜sysExecLoopPins k R' 0⌝ -∗
+      kctx c' (((k.withSpie spie spp).pushed 60).withRegs R') -∗ pcIs c' (sysExecAddr + 0x56#64) -∗
+      trapCsrsExt c' k.sie -∗ cpuClaimExt c' k.sie k.proc -∗
+      sysExecSpills (k.regs 2#5) (k.regs 9#5) (k.regs 18#5) (k.regs 19#5) (k.regs 20#5) (k.regs 21#5)
+        (k.regs 22#5) (k.regs 23#5) -∗
+      sysExecArgvArr (k.regs 2#5) (List.replicate 32 0#64) -∗ wpLoop c') -∗
+    wpLoop c)
+
+/-- **ONE ITERATION, +0x056 .. +0x090** (Rocq `sx_step`): `fetchaddr(uargv +
+8 i, &uarg)` (-> bad: on -1), the NULL test (-> the break at +0x0b6, CARRYING
+THE TERMINATING NULL: the word this round read at `uargv + 8 i`, at the
+entry image), `kalloc` (-> bad: on 0, the zero stored), `fetchstr(uarg,
+argv[i], 4096)` (-> bad: on -1, the page kept but unread), and the back
+edge (`i' = i + 1`; at `i' = 32` it falls into bad:).  This round's
+fetchaddr / fetchstr fault user pages in: the table grows, the ENTRY image
+does not move (`sysExec_viewLazy_faulted`). -/
+def sysExecStepBody (Γ : SchedNames) (k : KCtx) (A : SysExecArgs) : IProp GF :=
+  iprop(∀ (c : CPU) (spie spp : Bool) (R : RegMap) (P : UPtd) (i : Nat) (pg : Nat → BitVec 64)
+      (alen : Nat → Nat) (afun : Nat → Nat → BitVec 8) (uvf : Nat → BitVec 64)
+      (pl rest : List (BitVec 8)),
+    sysExecLoopSt (hlc := hlc) k A spie spp R P i pg alen afun uvf pl rest (sysExecAddr + 0x56#64) c -∗
+    sysExecEnv (hlc := hlc) Γ A -∗
+    (∀ (c' : CPU) (spie' spp' : Bool) (R' : RegMap) (P' : UPtd) (i' : Nat) (pg' : Nat → BitVec 64)
+        (alen' : Nat → Nat) (afun' : Nat → Nat → BitVec 8) (uvf' : Nat → BitVec 64),
+      ((⌜i' = i + 1⌝ ∗ sysExecLoopSt (hlc := hlc) k A spie' spp' R' P' i' pg' alen' afun' uvf' pl rest
+          (sysExecAddr + 0x56#64) c') ∨
+       (⌜bytesToWord (umemRead (sysExecIm A) (A.v1 + BitVec.ofNat 64 (8 * i')).toNat 8) = 0#64⌝ ∗
+          sysExecLoopSt (hlc := hlc) k A spie' spp' R' P' i' pg' alen' afun' uvf' pl rest
+            (sysExecAddr + 0xb6#64) c') ∨
+       sysExecBadSt (hlc := hlc) k A spie' spp' R' P' i' pg' afun' pl rest c') -∗
+      wpLoop c') -∗
+    wpLoop c)
+
+/-- **THE FILL LOOP, +0x056 .. +0x090** (Rocq `sx_loop`, the induction on
+`32 - i` over `sysExecStepBody`): from the loop head to the break (with its
+NULL) or to bad:. -/
+def sysExecLoopBody (Γ : SchedNames) (k : KCtx) (A : SysExecArgs) : IProp GF :=
+  iprop(∀ (c : CPU) (spie spp : Bool) (R : RegMap) (P : UPtd) (i : Nat) (pg : Nat → BitVec 64)
+      (alen : Nat → Nat) (afun : Nat → Nat → BitVec 8) (uvf : Nat → BitVec 64)
+      (pl rest : List (BitVec 8)),
+    sysExecLoopSt (hlc := hlc) k A spie spp R P i pg alen afun uvf pl rest (sysExecAddr + 0x56#64) c -∗
+    sysExecEnv (hlc := hlc) Γ A -∗
+    (∀ (c' : CPU) (spie' spp' : Bool) (R' : RegMap) (P' : UPtd) (i' : Nat) (pg' : Nat → BitVec 64)
+        (alen' : Nat → Nat) (afun' : Nat → Nat → BitVec 8) (uvf' : Nat → BitVec 64),
+      ((⌜bytesToWord (umemRead (sysExecIm A) (A.v1 + BitVec.ofNat 64 (8 * i')).toNat 8) = 0#64⌝ ∗
+          sysExecLoopSt (hlc := hlc) k A spie' spp' R' P' i' pg' alen' afun' uvf' pl rest
+            (sysExecAddr + 0xb6#64) c') ∨
+       sysExecBadSt (hlc := hlc) k A spie' spp' R' P' i' pg' afun' pl rest c') -∗
+      wpLoop c') -∗
+    wpLoop c)
+
+/-- Every callee-saved register but `s1` (the free loops' cursor) unchanged
+(Rocq's `∀ c, is_cs_idx c → c ≠ Rs1 → M' c = M c`). -/
+def sysExecKeepS1 (R R' : RegMap) : Prop :=
+  R' 2#5 = R 2#5 ∧ R' 8#5 = R 8#5 ∧ R' 18#5 = R 18#5 ∧ R' 19#5 = R 19#5 ∧ R' 20#5 = R 20#5 ∧
+  R' 21#5 = R 21#5 ∧ R' 22#5 = R 22#5 ∧ R' 23#5 = R 23#5 ∧ R' 24#5 = R 24#5 ∧ R' 25#5 = R 25#5 ∧
+  R' 26#5 = R 26#5 ∧ R' 27#5 = R 27#5
+
+/-- **THE FREE LOOP at `base`** (Rocq `sx_free_loop`, with `sx_free_exit`;
+five instructions: `c.ld a0,0(s1)`; `c.beqz a0,ea`; `jal kfree`; `c.addi
+s1,8`; `bne s1,s4,base`), entered at the cursor `m ≤ t`, `m < 32`, `s4 =
+argv + 256`: every live page below the first NULL `t` is kfree'd, and the
+loop leaves at `ea` (the NULL) or at `base + 14` (the fall-through at `m =
+32`) with the array whole.  ONE body at the two pairs `(0x96, 0xf4)`
+(bad:) and `(0xd4, 0xe2)` (the success tail), deviation 7. -/
+def sysExecFreeBody (Γ : SchedNames) (k : KCtx) (A : SysExecArgs) (base ea : BitVec 64) : IProp GF :=
+  iprop(∀ (c : CPU) (spie spp : Bool) (R : RegMap) (pg : Nat → BitVec 64)
+      (afun : Nat → Nat → BitVec 8) (m t : Nat),
+    ⌜m ≤ t ∧ m < 32 ∧ t ≤ 32 ∧ sysExecPgOk pg t ∧ R 9#5 = sysExecArgvAt (k.regs 2#5) m ∧
+      R 20#5 = sysExecPath (k.regs 2#5)⌝ -∗
+    kctx c (((k.withSpie spie spp).pushed 60).withRegs R) -∗ pcIs c (sysExecAddr + base) -∗
+    trapCsrsExt c k.sie -∗ cpuClaimExt c k.sie k.proc -∗ sysExecEnv (hlc := hlc) Γ A -∗
+    sysExecArgvFrom (k.regs 2#5) m t pg -∗ sysExecPages pg afun m t -∗
+    (∀ (c' : CPU) (spie' spp' : Bool) (R' : RegMap) (pcx : BitVec 64),
+      ⌜pcx = sysExecAddr + ea ∨ pcx = sysExecAddr + base + 14#64⌝ -∗ ⌜sysExecKeepS1 R R'⌝ -∗
+      kctx c' (((k.withSpie spie' spp').pushed 60).withRegs R') -∗ pcIs c' pcx -∗
+      trapCsrsExt c' k.sie -∗ cpuClaimExt c' k.sie k.proc -∗ sysExecArgvFree (k.regs 2#5) -∗
+      wpLoop c') -∗
+    wpLoop c)
+
+/-- **bad: +0x092 .. +0x0b4 and +0x0f4 .. +0x102** (Rocq `sx_bad_tail`, with
+`sx_reload`): `s4 = argv + 256`, the free loop at +0x096
+(`sysExecFreeBody … 0x96 0xf4`, a premise of its proof), `a0 = -1`, the seven
+reloads, the jump to +0x104 (`sys_exec_exit`).  The block comes back at the
+table the loop grew. -/
+def sysExecBadTailBody (Γ : SchedNames) (k : KCtx) (A : SysExecArgs) : IProp GF :=
+  iprop(∀ (c : CPU) (spie spp : Bool) (R : RegMap) (P : UPtd) (t : Nat) (pg : Nat → BitVec 64)
+      (afun : Nat → Nat → BitVec 8) (pl rest : List (BitVec 8)),
+    sysExecBadSt (hlc := hlc) k A spie spp R P t pg afun pl rest c -∗ sysExecEnv (hlc := hlc) Γ A -∗
+    (∀ (c' : CPU) (spie' spp' : Bool) (R' : RegMap),
+      ⌜calleeSaved k.regs R' ∧ R' 10#5 = 0xFFFFFFFFFFFFFFFF#64 ∧ A.V.upt.extSz A.V.sz P⌝ -∗
+      kctx c' ((k.withSpie spie' spp').withRegs R') -∗ pcIs c' (jumpPc (k.regs 1#5)) -∗
+      trapCsrsExt c' k.sie -∗ cpuClaimExt c' k.sie k.proc -∗
+      procPrivFd A.γ (procAddr A.j) A.pid (sysExecV2 A P) (sysExecM2 A P) -∗ wpLoop c') -∗
+    wpLoop c)
+
+/-- **THE SUCCESS TAIL, +0x0ce .. +0x102** (Rocq `sx_succ_tail`, with
+`sx_reload`): `mv s2,a0` (kexec's answer `rv`), `s4 = argv + 256`, the free
+loop at +0x0d4 (`sysExecFreeBody … 0xd4 0xe2`, a premise of its proof), `a0 =
+s2`, the seven reloads, the jump to +0x104.  The block is not touched (the
+seal frames whatever kexec returned through the continuation). -/
+def sysExecSuccTailBody (Γ : SchedNames) (k : KCtx) (A : SysExecArgs) : IProp GF :=
+  iprop(∀ (c : CPU) (spie spp : Bool) (R : RegMap) (t : Nat) (pg : Nat → BitVec 64)
+      (afun : Nat → Nat → BitVec 8) (pl rest : List (BitVec 8)) (rv : BitVec 64),
+    ⌜t ≤ 32 ∧ sysExecPgOk pg t ∧ sysExecBadPins k R ∧ R 10#5 = rv ∧ (k.regs 2#5).toNat % 8 = 0⌝ -∗
+    kctx c (((k.withSpie spie spp).pushed 60).withRegs R) -∗ pcIs c (sysExecAddr + 0xce#64) -∗
+    trapCsrsExt c k.sie -∗ cpuClaimExt c k.sie k.proc -∗ sysExecEnv (hlc := hlc) Γ A -∗
+    sysExecCarry k pl rest -∗ wordPointsTo (sysExecUargv (k.regs 2#5)) 8 (DFrac.own 1) A.v1 -∗
+    (∃ w : BitVec 64, wordPointsTo (sysExecUarg (k.regs 2#5)) 8 (DFrac.own 1) w) -∗
+    sysExecArgvArr (k.regs 2#5) (sysExecArgvL pg t) -∗ sysExecPages pg afun 0 t -∗
+    (∀ (c' : CPU) (spie' spp' : Bool) (R' : RegMap), ⌜calleeSaved k.regs R' ∧ R' 10#5 = rv⌝ -∗
+      kctx c' ((k.withSpie spie' spp').withRegs R') -∗ pcIs c' (jumpPc (k.regs 1#5)) -∗
+      trapCsrsExt c' k.sie -∗ cpuClaimExt c' k.sie k.proc -∗ wpLoop c') -∗
+    wpLoop c)
+
+/-- **THE BREAK, +0x0b6 .. +0x0cc, THE CALL TO kexec, AND THE SUCCESS TAIL**
+(Rocq `ProofSysExec.sx_break_au`): `argv[i] = 0` (already zero,
+`sysExecArgvL_set0`), `kexec(path, argv)` at `SpecKexec.KEXEC` with the
+record `⟨A.γ, A.j, A.pid, V2 P, M2 P, |pl|, sysfilePfun pl, i, sysExecAvf pg
+i, alen, fun _ => 4096, afun, …⟩` (the argv words and the kalloc'd pages
+are `kxcBufs`), the bundle instantiated at the vector the loop built
+(`sysExecAuPre_at` at `sysExec_argsOf`), then the success tail
+(`sysExecSuccTailBody`, a premise of its proof).  The continuation gets
+kexec's ARMED post at the reading, the reading itself, and the block kexec
+returned. -/
+def sysExecBreakBody (Γ : SchedNames) (k : KCtx) (A : SysExecArgs) (U : SysExecAU GF) : IProp GF :=
+  iprop(∀ (c : CPU) (spie spp : Bool) (R : RegMap) (P : UPtd) (i : Nat) (pg : Nat → BitVec 64)
+      (alen : Nat → Nat) (afun : Nat → Nat → BitVec 8) (uvf : Nat → BitVec 64)
+      (pl rest : List (BitVec 8)),
+    ⌜bytesToWord (umemRead (sysExecIm A) (A.v1 + BitVec.ofNat 64 (8 * i)).toNat 8) = 0#64⌝ -∗
+    ⌜pl.length < 128 ∧ argPathOf (sysExecIm A) A.v0.toNat pl⌝ -∗
+    sysExecLoopSt (hlc := hlc) k A spie spp R P i pg alen afun uvf pl rest (sysExecAddr + 0xb6#64) c -∗
+    sysExecEnv (hlc := hlc) Γ A -∗ bslots 3 -∗ irefSlots 2 -∗
+    myPay U.gn U.Q -∗
+    sysExecAuPre (hlc := hlc) U.Fs (fsGammaL fscFs) fscFs A.V.cwi U.Q U.P U.Pmiss U.Fo (sysExecIm A)
+      A.v0 A.v1 U.sts U.cs A.pid -∗
+    (∀ (c' : CPU) (spie' spp' : Bool) (R' : RegMap) (V' : ProcPriv) (M' : Nat → List (BitVec 8)),
+      ⌜calleeSaved k.regs R'⌝ -∗ ⌜execArgsOf (sysExecIm A) A.v1 i alen afun⌝ -∗
+      ⌜A.V.upt.extSz A.V.sz P⌝ -∗
+      execArms (hlc := hlc) U.Fs (fsGammaL fscFs) fscFs A.V.cwi U.Q U.P U.Pmiss U.Fo pl i alen afun
+        U.sts U.gn U.cs A.pid (sysExecV2 A P) (sysExecM2 A P) V' M' (R' 10#5) -∗
+      kctx c' ((k.withSpie spie' spp').withRegs R') -∗ pcIs c' (jumpPc (k.regs 1#5)) -∗
+      trapCsrsExt c' k.sie -∗ cpuClaimExt c' k.sie k.proc -∗ bslots 3 -∗ irefSlots 2 -∗
+      procPrivFd A.γ (procAddr A.j) A.pid V' M' -∗ wpLoop c') -∗
+    wpLoop c)
+
+
+PROPOSED SPLIT (disjoint files; all three can start now, B has a flagged blocker)
+--------------------------------------------------------------------------------
+SET A -- front (Rocq sx_head):  Xv6/SysExecHead.lean (+ optional SysExecHeadCalls.lean)
+  +0x00..+0x06 wp_prologue_sys_exec (PROVED in Parts; lands on the carved frame);
+  +0x08 addi a1,s0,-472 ; c.li a0,1 ; jal argaddr  -- ARGADDR, via a local
+     `sysfile_argint`-style wrapper (argaddr does not thread the complement); the
+     trapframe quarter + page come out of procPrivFd (ProcPrivAcc.procPrivFd_trapframe /
+     _tf, the sys_open `sys_open_tf` idiom); slot 59 (sysExecUargv) := A.v1.
+  +0x12 li a2,128 ; addi a1,s0,-208 ; c.li a0,0 ; jal argstr -- SysfileCalls.sysfile_argstr
+     over sysfileEnv (fsFabric ⊢ sysfileEnv: fsReady ∗ panicEnv ∗ procsInv), the bare block
+     split off procPrivFd (the sys_open `sys_open_blk_bare` idiom), fetchstrRet at
+     viewLazy A.V.upt A.V.sz A.M = sysExecIm A; success -> UMemL.umemStr_nul +
+     ArgPath.argPathOf_umemStr give pl, sysfile_buf_split gives sysExecPathBuf.
+  +0x20 c.mv a5,a0 ; c.li a0,-1 ; bltz a5,+0x104 : taken -> sys_exec_exit (PROVED) with
+     sysExecRest from SpillsFree/Slot10/sysfileAny path (argstr's failure keeps
+     bs.length = 128)/sysExecArgvAny_stack/uargv/uarg; pins = sysExecPinsE (nothing spilled).
+  Not taken -> the fall-through continuation at +0x28.  (setup is DONE.)
+SET B -- the fill step (Rocq sx_step):  Xv6/SysExecStep.lean (+ optional SysExecStepCalls.lean)
+  +0x56 slli a0,s2,3 ; c.mv a1,s5 ; ld a5,-472(s0) ; c.add a0,a5 ; jal fetchaddr ;
+  bltz a0 -> bad (+0x92) ; ld a5,-480(s0) ; c.beqz a5 -> +0xb6 (the NULL) ; jal kalloc ;
+  c.mv a1,a0 ; sd a0,0(s3) ; c.beqz a0 -> bad ; c.mv a2,s6 ; ld a0,-480(s0) ; jal fetchstr ;
+  bltz a0 -> bad ; c.addi s2,1 ; c.addi s3,8 ; bne s2,s7,+0x56 (falls into bad at i = 32).
+  fetchaddr takes EitherDefs.procPrivExt pa pid A.V P M' (= procPrivRun at {A.V with upt:=P}):
+     build it from procPrivFd (sysExecV2 A P) (sysExecM2 A P) = bare ∗ cwd ∗ procOfiles by
+     lending the ofile cells (FdTable.procPrivNoctxAt_split / procOfilesOwe_*); it returns
+     at viewFaulted P P' (sysExecM2 A P) = sysExecM2 A P' (UMemLemmas.viewFaulted_trans).
+  fetchstr over procPrivBareAt at V2 P' / M2 P': its reading viewLazy P' A.V.sz (M2 P')
+     = sysExecIm A by sysExec_viewLazy_faulted; kalloc/kfree from fsReady_kmem;
+     "kmem" ∉ locks from depth 0 (sysfile_nolocks).
+  Bookkeeping: sysExecOk_push / sysExecPgOk_push / sysExecAvOk_push, sysExecArgvL_set
+     (success store), sysExecArgvL_set0 (kalloc returned 0: the store writes the 0 already
+     there), fetchstr's failure keeps the page as bview 4096 of its bytes.
+  **BLOCKER (FLAG, see FLAGS 1)**: sysExecAvOk wants fetchaddr's word AT sysExecIm A;
+     the landed FETCHADDR gives it at viewFaulted with no mapping fact.
+SET C -- the back end:  Xv6/SysExecFree.lean, Xv6/SysExecTails.lean, Xv6/SysExecBreak.lean
+  Free (Rocq sx_free_loop + sx_free_exit): ONE generic lemma over (base, ea) (the
+     instructions at base..base+10 are the same five at +0x96 and +0xd4; get the instr
+     facts with text_instr at each concrete address, e.g. by stating the generic lemma
+     with the five `instr` facts as premises and instantiating), fuel induction on t - m;
+     kfree (KFREE) takes pageOwn (from byteBuf (pg j) (bview 4096 _)) + pageValid (sysExecPgOk).
+  Tails (Rocq sx_bad_tail, sx_succ_tail, sx_reload): bad: +0x92 addi s4,s4,256 (s4 =
+     sysExecPath, sysExecArgvAt_32) -> free at +0x96 from m = 0 (sysExecArgvFrom_intro) ->
+     exits +0xa4 (li -1; seven c.ldsp; c.j +0x104) / +0xf4 (li -1; seven c.ldsp; falls into
+     +0x104) -> sys_exec_exit via sysExecCarry_rest.  succ: +0xce c.mv s2,a0 ; addi s4 ;
+     free at +0xd4 -> +0xe2 c.mv a0,s2 ; seven c.ldsp ; c.j +0x104.
+  Break (Rocq sx_break_au): +0xb6 sext.w a5,s2 ; addi a1,s0,-464 ; c.slli a5,3 ; c.add a5,a1 ;
+     sd zero,0(a5) (sysExecArgvArr_acc + sysExecArgvL_set0) ; addi a0,s0,-208 ; jal kexec.
+     KEXEC.wp_kexec_eb at KexecArgs ⟨A.γ, A.j, A.pid, sysExecV2 A P, sysExecM2 A P, pl.length,
+     sysfilePfun pl, i, sysExecAvf pg i, alen, fun _ => 4096, afun, own 1, own 1, own 1,
+     A.pd, A.pav, A.pu⟩; kxcBufs from PathBuf's first half, the first i+1 words of
+     sysExecArgvArr (take/drop of sysExecArgvL pg i) and sysExecPages pg afun 0 i;
+     hnn/hterm/hplen from argPathOf's shape + SysfileCalls.sysfile_pfun_nn/_term;
+     havfnz/havf/hna/hargs from sysExecOk + i < 32; the bundle: sysExecAuPre_at at
+     sysExec_argsOf (rewrite bview |pl| (sysfilePfun pl) = pl, sysExec_bview_path);
+     kexec's kctx comes back as (((…pushed 60).withRegs N).withSpie a b).withRegs R'
+     (sysfile_ww / sysfile_psw); then sysExecSuccTailBody at t = i, rv = R' 10.
+Order: A, B, C in parallel; then the seal + LinkSysExec (one small item).
+
+FLAGS / DEVIATIONS (report to coordinator)
+------------------------------------------
+1. **fetchaddr's contract DIFFERS from argstr/fetchstr's (the kexec agent asked to check).**
+   SpecFetchaddr states fetchaddrAns at `viewFaulted P P' M` and SpecCopyin's success arm
+   has no `umMapped P' srcva n` conjunct, so the word fetchaddr read cannot be moved to
+   Rocq's single image `viewLazy V.upt V.sz M` (on an unmapped page below sz the faulted
+   view reads M, the lazy image reads zeros).  Needed: the b1848c322 treatment --
+   (a) SpecCopyin success arm += `umMapped P' srcva old.length` (ProofCopyin threads it,
+   as ProofCopyinstr did); (b) SpecFetchaddr's fetchaddrAns read at `viewLazy P V.sz M`
+   (ProofFetchaddr via UMemL.umemRead_viewLazy).  With it, set B pushes sysExecAvOk at
+   sysExecIm A by sysExec_viewLazy_faulted.  Consumers to re-check (grep -w):
+   FETCHADDR: ProofFetchaddr, LinkFetchaddr (+ SysExecParts, statement-only import);
+   COPYIN (wp_copyin_body): ProofCopyin, ProofFetchaddr, EitherDefs (ec_copyin_call),
+   ProofEitherCopyin, ProofPipewrite; the Link* files only pass the structure.  Adding a
+   pure conjunct changes those sites' icases patterns only.  Without it the contract
+   (Rocq-literal: argv read at us_M) is not provable.
+2. PROCESS LAYER (flagged): proc_priv γf pj pid U = procPrivFd γ (procAddr j) pid V M (D16);
+   D8 conjuncts (first_tok, GenId) absent from the Lean block (as SpecKexec/SpecSysOpen);
+   ustate U = (V, M), us_upt U P' = {V with upt := P'} at viewFaulted V.upt P' M; the arms
+   take the reading image Mim apart from the returned block (VW, MW); the failure
+   equation us_V U' = V ∧ us_M U' = M is V' = VW ∧ M' = MW; sysExecPost binds M' too.
+3. eb-GENERIC (stronger than Rocq's eb = true): trapCsrsExt/cpuClaimExt in and out, k.noff = 0.
+4. Frame follows SpecKexec/KexecOkQ dev. 4: no kalloc_env / sb cells / bitmap_inv rows
+   (inside fsFabric's fsReady); no geometry premises.
+5. Dropped: Rocq's six exec_path_* notations (the contract states argPathOf);
+   sys_exec_slot_pre_ne / sys_exec_au_pre_ne DEFERRED with exec_au_pre_ne (wave 8,
+   UexecExecInst); ufdG binder; the continuation's unused existential image.
+6. Stage bodies are premise-passing and hart-free (SysOpenParts precedent); the head's
+   two exits are an ∧ of two continuations (Rocq: one continuation over a ∨).

@@ -1,0 +1,40 @@
+- stale comments: InodeRegion.lean 'ireg_wd_lic ... deferred with the icache' -> InodeRegionWithdraw; IcacheRef.lean ~893 InodeRegion.inode_claimed_to_ClaimK -> inodeClaimed_to_claimK
+- InodeRegion helper dedupe: public iregSlotKey (Withdraw) / iregKey_nat (Link) / private mvKey (Movers); logN_sub_diff_iregN; iregCouple_set — hoist ONE public set into InodeRegionInv. Range premise: Link uses Nat 'inum.toNat < 16*nib', Withdraw/Movers use Rocq's Int form (matches iregBi_lt) — switch Link to Int form.
+- IcacheInvRef: make liveGenlo_gather3 / frzsel_halves public, delete duplicates liveGenlo_unit / frzsel_whole in IcacheInvStore
+- IcacheBootTable: move lockFreeTok/lockGhostAlloc/newlockAt_llb → MachCSL/LockBornHook.lean, bigSepL_fupd_thread → a MachCSL big-op file, slFresh_newGenl → Xv6/SleepLockDefs.lean; merge funOfBig with BioInit.bd_funChoose
+- promote shared call-site helpers (iu_log_write/iuRegionAu, ba_w32/ba_sext32/ba_bgeu_nat/ba_succ64, slot_align (3 copies), il_hold_k/il_set_self, printk/memset/bread/brelse wrappers) into a shared definitional file (e.g. Xv6/FsCallSites.lean)
+- USER-APPROVED (Sept 24): add `diblkSlot_acc_buf (kk k) (hkk : kk < NBUF) (hk : k < 16) hwf` to Xv6/DinodeSlot.lean (after diblkSlot_acc; alignment discharged internally via dsAlign), switch IupdateMain/IlockBlk/IallocScan/IallocClaim to it, delete iu_slot_align/il_slot_align/ialloc_slot_align (+ iu_add_add if unused). Lift the other duplicated call-site helpers into DinodeSlot.lean or a shared definitional file.
+- itrunc copies: itrunc_calleeSaved_epi (= BreadTail bd_calleeSaved_epi), itrunc_bread/brelse (= iu_bread/iu_brelse), itrunc_view_gd/_cov (rfl projections of fsView → FsBlocks.lean next to fsView_clean)
+- fetchaddr_copyin_call (ProofFetchaddr) = ec_copyin_call (ProofEitherCopyin): move into EitherDefs.lean
+- bmap copies of balloc helpers: bm_bread/brelse/log_write_gen/view_eq/sext32/sext_zero/ext_sext (+ new bm_balloc) → shared file
+- prepare_return_wp_csrw_sepc (any value, legalized) and prepare_return_wp_csrr_satp → MachCSL/WpSmodeTrapCsr.lean
+- iput copies: id_ci_live/id_ent_of_eq (IdupCore), id_sw_au (ProofIdup), iul_releasesleep (ProofIunlock), ig_ciwf_update (iget), iupdate bno/andi/slli arithmetic (iput_ofl_*); readi copies: rd_view_eq/rd_pay_contentQ (= bm_view_eq/bm_pay_contentQ), rd_hold_win/_len/rd_pid_eq, ReadiFrame rules → MachCSL
+- shared variant of k_step_e/k_next_e for a hart named other than cpu (replaces k_step_prc/k_step_pwc in ProofPiperead/Pipewrite); add KCtx.setReg_sie to k_norm_simps (ProofKexit workaround); kfork post lacks SPIE/SPP-match at sie=false (Rocq-parity gap)
+- after namex lands: DirlookupDefs: delete dirlookupVp/dirlookup_readi, import FsCallSitesI; DirlookupRead: dirlookup_readi → readi_kcall. Move dirlink_dirlookup/dirlink_iput + namex_dirlookup/namex_iput into FsCallSitesI; dirlink_* copies of dirlookup_* byte/branch lemmas → shared
+- KexecLoad header: mark kexec_image_ok/exec_key* as living in Xv6/KexecImageOk.lean
+- filestat_main/_copy/_stat/_lock at ~4-5s under load (over target) — split into stages
+- create pieces: merge near-twin helpers (bare_pid, call wrappers, quarter join, j70) of CreateFail/CreateFailMkdir into a shared create call-site file
+- filewrite: block is procPrivNoctxAt (not Rocq core); restate WRITEI/PIPEWRITE/CONSOLEWRITE user arms over procPrivBareAt, then filewrite over procPrivCoreNoctxAt
+- writei seam: report src.toNat + tot ≤ 2^64 (removes filewriteIn's extra condition)
+- shared sysfile call-site file: SysLinkCalls/SysChdirCalls/create wrappers (bare_pid, iunlockput/iupdate/dirlink/begin_op/end_op wrappers); fw_ext16 vs create_alloc_ext16; createFound_beqz_tym1/bltu literal-form restatements
+- K-D: needs Rocq's kxc_a2_r (header oracle fired between ilock and readi; R/RX generalisation) — landed kxc_a2 can't be wrapped from outside; add kxc_a2_r in KexecACode or a sibling
+- AFTER W7-C merges: restate SAFESTRCPY over sscSrcOk (Rocq ssc_src_ok), kfork passes sscSrcOk_16 hls, delete Spec/Proof/LinkSafestrcpySrc, repoint KexecD's SS
+- sys_link_block_open duplicates ProcPrivAcc.procPrivFd_cwdPid — swap
+
+## HOLD until W7-C (binder sweep) merges, then sweep+commit:
+- Xv6/KexecB.lean (kxc_b1 split, phase-B agent)
+- sys_mkdir: SpecSysMkdir, SysMkdirFrame, SysMkdirCalls, SysMkdirTails, ProofSysMkdir, LinkSysMkdir (+ Xv6.lean imports)
+- shared sysfile call-site file now covers chdir+link+mkdir(+mknod) wrappers
+- sys_unlink: 14 files (SpecSysUnlink, SysUnlink{Frame,Calls,Shared,Tails,W1,W2,W3,W5Z,W5S,W5F,W5D}, ProofSysUnlink, LinkSysUnlink) — sweep+commit. CHECK deviation 9 `hsp : 240 ≤ sp` against Rocq (how does Rocq get dirlookup poff≠0?)
+- console follow-ups (from step 5): devintrCaps unused `bs` param (ripples EnvIs/kerneltrap/kernelvec); uartintr + uartputc_sync still sie-pinned (process-layer deviation); consoleread no kill shot; consolewrite no T1 reason.
+- AFTER sys_read lands, one cleanup agent: (a) filewrite block procPrivNoctxAt → Rocq proc_priv_core (drop swr_blk_lend); (b) argaddr/argfd wrapper copies in ProofSysWait, SysPipeParts, ProofSysDup, ProofSysClose → SysfileCalls; (c) T1 short-write reason: either_copyin failure reason → consolewrite/filewrite writeConsArms; (d) user-copy image: block returns at viewFaulted vs Rocq unmoved image (audit whether viewLazy analogue fixes it).
+- sys_exec_head_bare dup of sys_mkdir_blk_bare → move to SysfileCalls
+- crash deferrals (from CC/CD): fs_recovery_sb_parse → CE (FsDurSnap); wr_nsectors_block, wr_sector_blk0/1 → CG (after CM); fs_boot_pure (one-liner in FsBootParams header) → after FsDurSnap; fs_boot_snap_wf → needs CA fs_state_rec + CE snap_ok + W8-H fs_cov_in; fs_boot_supply shape → W8-H/C-4 decision; FsCfgBoot image readings → after CN (FsImg dinode reader).
+- DONE (74d1541ef/aef1f5940): argaddr/argfd dedupe, blk_bare → sysfile_blk_bare, frd_* → FileRwShared, pageLen/umemByte moves, devintrCaps bs.
+- OPEN, big (~45 files): Rocq-literal block for the user-copy chain — make EitherDefs.procPrivExt/ecRest + PipeRw rests bare, then either_copy/fetchaddr → readi/writei/pipe/console → fileread/filewrite over procPrivCoreNoctxAt → drop swr_blk_lend/srd_block_open, sys_exec_blk_ext, fstatPrivExt, sysPipeCoreExt; then sweep the 9+ "block minus sz/pt" rest defs. Candidate for 8-P or its own worktree after 8-P.
+- W8-F landed-file moves: zeroRf/tfResumeGpr* → UexecSlot; UexecRet §0 (userPtmInv, userTrapFrameAt(m), uvRegs) → UserExec (8-M review); exitXs → ProcGeom (share with kexit/sys_exit).
+- CD: fsCovIn lives in FsCfgBoot (W8-H must import, not redefine). imgNodes via foldIns: CE uses imgNodes_lookup instead of img_nodes_keys.
+- CA: DiskImg (CM) must reuse FsBytesG.gmBytes camera (GhostMapG Nat (BitVec 8)) — one instance per camera.
+- wave 9 (from W8-M review): add G = 0 to uptWf's leaf clause so USER can keep utlbOk; rename .kpt satp tag (cosmetic).
+- userret: trampoline claim kmapAt trampVpn (kLeaf trampPpn .rx 0 0) is a premise; nothing mints it yet (kvminithart has no such claim) → W8-L closed loop / W8-N main must supply it.
+- W8-J deferred: main_globals_raw/main_locks_raw + boot_* carves → with SpecMain (W8-I); GOT word stack0Slot fractions across 8 harts + per-hart boot stacks → BootShared (8-4).

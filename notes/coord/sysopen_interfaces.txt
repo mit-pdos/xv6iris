@@ -1,0 +1,937 @@
+SYS_OPEN WAVE 7b -- FROZEN INTERFACES FOR THE STAGE-SET AGENTS
+================================================================
+Written by the first sys_open agent (S-A: {Parts, Pub} + SpecSysOpen + the SysOpenDefs 2e append).
+Tree: main tree at 472bae031 (+ untracked work).  All three files below BUILD against it:
+  timeout 1800 lake build Xv6.SysOpenDefs Xv6.SpecSysOpen Xv6.SysOpenParts
+Binder style: the D8 sweep's `[IrefslotG GF] [CtokG GF] [WchG GF]` everywhere; section-wide
+[CurCtx] only in the sections whose every declaration needs it (the landed Spec pattern).
+
+FILES (new / edited)
+  Xv6/SysOpenDefs.lean   EDITED (appended 2e/2e': openFdFragsAny, openFdOk, openFdOk_split;
+                         + import Xv6.SpecFdalloc; header's partial-port list updated)
+  Xv6/SpecSysOpen.lean   NEW  -- THE CONTRACT (sysOpenK, wp_sys_open_frame, wp_sys_open_eb_body,
+                         wp_sys_open_plain_eb_body, wp_sys_open_create_eb_body, SYSOPEN,
+                         wp_sys_open_eb_of_arms = the seal's case split, already proved)
+  Xv6/SysOpenParts.lean  NEW  -- Rocq ProofSysOpenParts.v + THE SHARED STAGE VOCABULARY + THE
+                         STAGE BODIES (every cross-set statement lives here; import only this
+                         (+ callee Specs / SysOpenBits / FsAbsOpenFire) from your stage file)
+  Xv6/SysOpenPub.lean    NEW, DONE: `sys_open_pub (hS) (hTS : ⊢ sysOpenTailSBody Γ k A) :
+                         ⊢ sysOpenPubBody Γ k A` (Rocq so_tail_pub_au), 7s build.
+
+THE DESIGN (read SysOpenParts' header, deviations 1-9)
+  * Rocq's stage lemmas (module-functor calls) are PREMISE-PASSING BODIES (the CreateSharedBody
+    pattern): each stage file PROVES `⊢ body` for its own body(ies), taking the bodies it calls
+    as LEAN HYPOTHESES `(hX : ⊢ sysOpenXBody (hlc := hlc) Γ k A)`, plus `(hS : SysOpenStatic k A)`
+    and the callee interface structures it needs (`(IUP : IUNLOCKPUT) (EO : END_OP)` ...,
+    the SysLinkTails pattern).  The seal (ProofSysOpen) composes them.  No stage imports another
+    stage's file; all import Xv6.SysOpenParts.
+  * Bodies are HART-FREE (`∀ c : CPU, … -∗ wpLoop c`), eb-generic (trapCsrsExt c k.sie /
+    cpuClaimExt c k.sie k.proc in every body; no eb = true, no lks), over `fsReady` via the
+    persistent `sysOpenEnv Γ A` (procsInv, panicEnv, fsReady, isFtable A.γl A.γ).
+  * `k` is sys_open's ENTRY context; machine state inside a body is
+    `kctx c (((k.withSpie spie spp).pushed 24).withRegs R)` at `pcIs c (sysOpenAddr + off#64)`,
+    registers by `⌜sysOpenPins k R s1 s2 s3⌝` (sp = sp0-192, s0 = sp0, s1/s2/s3 the walk's
+    current values, s4..s11 = entry), frame = `sysOpenCells (k.regs 2#5) (k.regs 1#5)
+    (k.regs 8#5) w3 w4 w5 w6 lo om w24` (slot 3/4/5 = the shrink-wrapped save slots of
+    s1/s2/s3: `k.regs 9#5` / `18#5` / `19#5` once saved, junk before) + the path buffer
+    (`sysOpenAny (sysOpenPath (k.regs 2#5)) 128`, or `byteBuf … (bview 128 bp)` at the walk
+    entries) + `⌜(sysOpenPath (k.regs 2#5)).toNat % 8 = 0⌝` (Rocq so_al).
+    The omode cell is `wordPointsTo (sysOpenOmode sp0) 4 (own 1) om` inside the cells, at
+    `om = sysOpenOm A = BitVec.extractLsb' 0 32 A.vom` from the walk entries on.
+  * The block is at `procAddr A.j` everywhere (rewrite a callee's k.proc with hS.hproc).  After
+    argstr it is `sysOpenV2 A P2 = { A.V with upt := P2 }` at `sysOpenM2 A P2 = viewFaulted
+    A.V.upt P2 A.M`, with `⌜A.V.upt.extSz A.V.sz P2⌝`.  Callees take the pid cell only:
+    `sysOpenPid A = wordPointsTo (pPid (procAddr A.j)) 4 pidPriv A.pid`, lent by
+    `sysOpen_pid_fd` / `sysOpen_pid_core` (need `hct : curTier = KTier.kpt`, from `kctx_tier`
+    + hS.htier).
+  * Every exit leaves through `sys_open_exit` (+0xca, PROVED) with s1/s2/s3 restored to the
+    entry's (`sysOpenPins k R (k.regs 9#5) (k.regs 18#5) (k.regs 19#5)`), then a hart-free
+    continuation `∀ c' R', ⌜calleeSaved k.regs R' ∧ R' 10#5 = R 10#5⌝ -∗ kctx c' … -∗ …`.
+    A failure tail's own continuation is `sysOpenRet k Φ` (Φ keyed on the returned a0).
+  * The contract's continuation at the plain arms is `sysOpenPostP k A c`
+    (= SpecSysOpen.sysOpenK at openArmsPlain, Rocq so_cont_au/so_cont0_au); at the create arms
+    `sysOpenPostC k A Farm Fun Fok Fex c`.  `sys_open_post_pin` turns the contract's
+    `wpNext true k.proc cpu (sysOpenK …)` into `∀ c, …`; `sysOpenK_mono` converts ARMS
+    (what the CreArm shim needs).
+  * The LOCKED NODE is `sysOpenLk γil γisl loc tlc A.pid kk s g inum dn` (iunlock's write-arm
+    precondition minus the payload: isSleeplockGen, sleeplockedQ γisl s, credFloor loc tlc,
+    icTxDep fscIc kk s icfgDev inum g loc, offRows, iDev/iInum halves, iValid, ityShot g
+    dn.diType, ifreezeOff) + the payload (`icLoaded … kk inum dn bm`, or PEELED:
+    `sysOpenFlat kk inum dn bm data` = Rocq so_flat) + the kept parent
+    `sysOpenKeep kk s g inum` ((∃ lo tl, ⌜lo ≤ tl⌝ ∗ credFloor lo tl ∗ inodeRefShortGenlo kk
+    (s + s) s icfgDev inum g lo) ∗ runitAny inum.toNat; Rocq's qi = s).  create's payout
+    converts by `sysOpen_of_createLocked`.
+  * The AU residue below the fire: `sysOpenResidue A pl inum dn bm data`
+    (⌜argPathOf A.M A.v.toNat pl⌝ ∗ A.P (pathElems pl).length inum.toNat ∗
+    sysOpenObs A.Fo inum.toNat (eraNode dn bm data) ∗ openTruncPiece (fsGammaL fscFs) A.vom A.Ft).
+  * The fd's off cell after the store block: `sysOpenOffCell kf C γo` (FD_INODE: ∃ vo,
+    wordAtN curCtx (aFoff kf) 4 (own 1) vo ∗ ⌜offWf vo⌝ ∗ offGv γo 1 vo; else offFree kf 1).
+
+WHO PROVES WHAT (the brief's §8.5 split)
+  {Parts, Pub}          (S-A)  SysOpenParts (DONE), SysOpenPub (DONE): ⊢ sysOpenPubBody  [needs ⊢ TailS]
+  {Alloc, Stores, Tails}       SysOpenTails: ⊢ sysOpenTailABody, …TailBBody, …TailCBody,
+                               …TailDBody, …TailEBody, …TailFBody, …TailSBody
+                               (callees: END_OP, IUNLOCKPUT, IUNLOCK, FILECLOSE; the four C/D/E/F
+                               iunlockputs are the COUNTED form at logOpb u, iputUnits ≤ u);
+                               SysOpenStores: ⊢ sysOpenStoresBody  [needs ⊢ PubBody; ITRUNC,
+                               opfAtrunc_fire, sys_open_loaded_open / sys_open_trunc_loaded];
+                               SysOpenAlloc: ⊢ sysOpenAllocBody  [needs ⊢ StoresBody, ⊢ TailEBody,
+                               ⊢ TailFBody; FILEALLOC, FDALLOC; sys_open_open_slot]
+  {Walk, Join, Shared}         SysOpenShared: Rocq's so_flat_open/_close/_ok/_pure/_top/_meta,
+                               accessors, so_arm_* builders (the DEFS so_flat/so_obs/so_cont*
+                               already live in SysOpenParts as sysOpenFlat/sysOpenObs/
+                               sysOpenPostP -- do not redefine);
+                               SysOpenJoin: ⊢ sysOpenJoinBody  [needs ⊢ AllocBody, ⊢ TailDBody];
+                               SysOpenWalk: ⊢ sysOpenEntryNBody  [needs ⊢ JoinBody, ⊢ AllocBody,
+                               ⊢ TailBBody, ⊢ TailCBody; NAMEI_ERA (SpecNameiEra), ILOCK,
+                               opfOpen_fire_1]
+  {Plain, CreArm, EntryC}      SysOpenCreArm: Rocq's socr_* families + socr_arms_fresh/_exists
+                               (plain arms at the shim families ⇒ create arms; use
+                               sysOpenK_mono); SysOpenEntryC: ⊢ sysOpenEntryCBody Γ k A Farm Fun
+                               Fok Fex  [needs ⊢ JoinBody at A' := {A with P, Pmiss, Fo, Ft :=
+                               the shim's}, ⊢ TailABody; CREATE (SpecCreate) at T_FILE,
+                               sysOpen_of_createLocked, creOkArms_file / creFailArms_file,
+                               creFailToOpen];  SysOpenPlain: the prologue (wp_prologue_sys_open,
+                               PROVED), argint, argstr THROUGH `sys_open_argstr` (PROVED, the one
+                               call site), ARM 0 (bltz → +0xca, sys_open_exit), sd s1, begin_op,
+                               the O_CREATE test → ⊢ wp_sys_open_plain_eb_body from ⊢ EntryNBody
+                               (and the create twin from ⊢ EntryCBody);
+  the seal ProofSysOpen: SYSOPEN via `wp_sys_open_eb_of_arms` (SpecSysOpen, PROVED).
+
+INTERIM (coordinator's rulings, Sept 25)
+  * THE PATH READING IS ROCQ'S: the contract (openIn / openArms*) and the walk bodies state
+    `argPathOf A.M A.v.toNat …` at the ENTRY image.  argstr's landed success arm reads at the
+    faulted view; the cleanup agent is restating fetchstr/argstr (umMapped conjunct).  Go
+    through `sys_open_argstr` (SysOpenParts §3b) ONLY: the switch is then one edit there.  Until
+    it lands, the Plain/EntryC seal's step `fetchstrRet (viewFaulted …) → argPathOf A.M` is the
+    one open obligation (SpecSysOpen deviation 10).
+  * A shared Xv6/SysfileCalls.lean (argstr/begin_op/end_op/iunlockput wrappers) is being added
+    by the cleanup agent: prefer it when it lands; SysOpenParts' sys_open_argstr will then
+    delegate to it.
+
+REUSE (grep before writing): SysLinkCalls (ilock/iunlock/iunlockput/iput/end_op/begin_op call
+sites at fsReady: copy the pattern, not the file), CreateCalls, FsCallSites*, SysMkdirTails
+(tail shape), CreateSharedBody (body pattern), SysOpenBits (omode chain), SysOpenBudget (ledger),
+FsAbsOpenFire (opfOpen_fire_1, opfAtrunc_fire, opfEra_*_row), FilePay/FileFrac/OffBox/UserOff
+(publication), ProcPrivAcc.procPrivFd_settle, FdTable.fdFrags_acc/fdSt_agree'.
+
+=====================================================================================
+SpecSysOpen (Xv6/SpecSysOpen.lean) -- the key names
+=====================================================================================
+  211: def sysOpenAddr : BitVec 64 := KA.«sys_open»
+  218: def sysOpenSlots : Nat := 24 + createSlots
+  220: theorem sysOpenSlots_eq : sysOpenSlots = 152 := by decide
+  224: def sysOpenIrefs : Nat := createIrefSlots
+  226: theorem sysOpenIrefs_eq : sysOpenIrefs = 3 := rfl
+  234: def soRdOf (om : BitVec 32) : Bool := decide (om.toNat % 2 = 0)
+  237: def soWrOf (om : BitVec 32) : Bool := !decide (om.toNat % 4 = 0)
+  241: theorem omArg_extract (v : BitVec 64) : (BitVec.extractLsb' 0 32 v).toNat = omArg v := by
+  245: theorem omModes_landed (v : BitVec 64) :
+  270: def sysOpenPost (γ : FileNames) (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv)
+  282: theorem sysOpenPost_any (γ : FileNames) (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv)
+  316: def openPostOkPlain (Γ : FsViewNames GF) (γ : FileNames) (pa : BitVec 64) (pid : BitVec 32)
+  354: def openPostFailPlain (Γ : FsViewNames GF) (γfs : FsNames) (cw : Nat)
+  371: def openArmsPlain (Γ : FsViewNames GF) (γfs : FsNames) (cw : Nat) (γ : FileNames)
+  390: def openPostOkCreate (Γ : FsViewNames GF) (γ : FileNames) (pa : BitVec 64) (pid : BitVec 32)
+  442: def openPostFailCreate (Γ : FsViewNames GF) (γfs : FsNames) (cw : Nat)
+  490: def openArmsCreate (Γ : FsViewNames GF) (γfs : FsNames) (cw : Nat) (γ : FileNames)
+  507: theorem openFdOk_landed (γ : FileNames) (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv)
+  540: theorem openArmsPlain_landed (Γ : FsViewNames GF) (γfs : FsNames) (cw : Nat) (γ : FileNames)
+  563: theorem openArmsCreate_landed (Γ : FsViewNames GF) (γfs : FsNames) (cw : Nat) (γ : FileNames)
+  592: def openIn (Γ : FsViewNames GF) (γfs : FsNames) (cw : Nat) (Mim : Nat → List (BitVec 8))
+  602: def openArms (Γ : FsViewNames GF) (γfs : FsNames) (cw : Nat) (γ : FileNames)
+  622: def openReceiptPlain (Γ : FsViewNames GF) (γfs : FsNames) (cw : Nat)
+  652: def openReceiptCreate (Γ : FsViewNames GF) (γfs : FsNames) (cw : Nat)
+  698: def openReceipt (Γ : FsViewNames GF) (γfs : FsNames) (cw : Nat)
+  715: def openSplitRow (r : BitVec 64) (V V' : ProcPriv) (sts sts' : List FdState) : Prop :=
+  724: theorem openArmsPlain_split (Γ : FsViewNames GF) (γfs : FsNames) (cw : Nat) (γ : FileNames)
+  810: theorem openArmsCreate_split (Γ : FsViewNames GF) (γfs : FsNames) (cw : Nat) (γ : FileNames)
+  922: theorem openArms_split (Γ : FsViewNames GF) (γfs : FsNames) (cw : Nat) (γ : FileNames)
+  942: theorem openArms_landed (Γ : FsViewNames GF) (γfs : FsNames) (cw : Nat) (γ : FileNames)
+  966: theorem creFailToOpen (Γ : FsViewNames GF) (γfs : FsNames) (cw : Nat)
+  1024: def sysOpenK (k : KCtx) (ns : Nat) (V : ProcPriv) (M : Nat → List (BitVec 8))
+  1043: def wp_sys_open_frame (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ] (cpu : CPU) (k : KCtx)
+  1070: def wp_sys_open_eb_body (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ] (cpu : CPU) (k : KCtx)
+  1091: def wp_sys_open_plain_eb_body (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ] (cpu : CPU)
+  1111: def wp_sys_open_create_eb_body (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ] (cpu : CPU)
+  1134: theorem wp_sys_open_eb_of_arms (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ] (cpu : CPU)
+  1163: structure SYSOPEN : Prop where
+
+
+  def sysOpenK (k : KCtx) (ns : Nat) (V : ProcPriv) (M : Nat → List (BitVec 8))
+      (ARMS : ProcPriv → (Nat → List (BitVec 8)) → BitVec 64 → IProp GF) (cpu' : CPU) : IProp GF :=
+    iprop(∀ (spie spp : Bool) (R' : RegMap) (P' : UPtd),
+      ⌜calleeSaved k.regs R'⌝ -∗ ⌜V.upt.extSz V.sz P'⌝ -∗
+      kctx cpu' ((k.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k.regs 1#5)) -∗
+      trapCsrsExt cpu' k.sie -∗ cpuClaimExt cpu' k.sie k.proc -∗
+      bslots 3 -∗ irefSlots ns -∗
+      ARMS { V with upt := P' } (viewFaulted V.upt P' M) (R' 10#5) -∗ wpLoop cpu')
+  openArmsPlain Γ γfs cw γ pa pid Mim pv vom P Pmiss Fo Ft sts VW MW r
+    := ((⌜r = -1⌝ ∗ procPrivFd γ pa pid VW MW ∗ fdFrags VW.fdg sts ∗
+          openPostFailPlain Γ γfs cw Mim pv vom P Pmiss Fo Ft) ∨
+        openPostOkPlain Γ γ pa pid Mim pv vom P Fo Ft sts VW MW r) ∗ fdSlot
+  (openArmsCreate likewise with Farm Fun Fok Fex after Pmiss.)
+  SysOpenDefs.openFdOk γ pa pid V M rb wb t sts r
+    := ∃ fd l k, ⌜r = BitVec.ofNat 64 fd ∧ fdFrees V.ofile = fd :: l ∧ sts[fd]? = some .closed⌝ ∗
+        procPrivFd γ pa pid { V with ofile := V.ofile.set fd (fnode k) } M ∗
+        fdFrags V.fdg (sts.set fd (.open rb wb t))
+
+=====================================================================================
+SysOpenParts §0-§2 (pure, publication, frame): names
+=====================================================================================
+  175: theorem sys_open_imm_m192 : BitVec.signExtend 64 3904#12 = -(8#64 * BitVec.ofNat 64 24) := by
+  177: theorem sys_open_imm_p192 : BitVec.signExtend 64 192#12 = 8#64 * BitVec.ofNat 64 24 := by
+  182: def sysOpenPath (sp0 : BitVec 64) : BitVec 64 := sp0 + 0xFFFFFFFFFFFFFF50#64
+  185: def sysOpenOmode (sp0 : BitVec 64) : BitVec 64 := sp0 + 0xFFFFFFFFFFFFFF4C#64
+  187: theorem sys_open_path_addr (x : BitVec 64) :
+  191: theorem sys_open_omode_addr (x : BitVec 64) :
+  195: theorem sysOpenSlots_24 (a : Nat) (h : sysOpenSlots ≤ a) : 24 ≤ a := by
+  200: theorem sys_open_K (a : Nat) (h : sysOpenSlots ≤ a) :
+  224: theorem sys_open_bud_iput (n' : Nat) (w ok : Bool)
+  232: theorem sys_open_bltz_nat (n : Nat) (h : n < 2 ^ 31) :
+  241: theorem sys_open_bltz_m1 : bcond bop.BLT 0xFFFFFFFFFFFFFFFF#64 0#64 = true := by decide
+  244: theorem sys_open_bltz_fd (fd : Nat) (h : fd < NOFILE) :
+  248: theorem sys_open_beqz (x : BitVec 64) : bcond bop.BEQ x 0#64 = decide (x = 0#64) := by
+  253: theorem sys_open_m1 : 0#64 + BitVec.signExtend 64 4095#12 = 0xFFFFFFFFFFFFFFFF#64 := by decide
+  262: theorem sys_open_ty_dir (t : BitVec 16) : BitVec.signExtend 64 t = 1#64 ↔ t = 1#16 := by
+  266: theorem sys_open_ty_file (t : BitVec 16) : BitVec.signExtend 64 t = 2#64 ↔ t = 2#16 := by
+  270: theorem sys_open_ty_dev (t : BitVec 16) : BitVec.signExtend 64 t = 3#64 ↔ t = 3#16 := by
+  273: theorem sys_open_ty_toNat (t : BitVec 16) (n : Nat) (hn : n < 2 ^ 16) :
+  281: theorem sys_open_tdir_z (t : BitVec 16) : t = 1#16 ↔ t.toNat = T_DIR_z :=
+  283: theorem sys_open_tfile_z (t : BitVec 16) : t = 2#16 ↔ t.toNat = T_FILE :=
+  285: theorem sys_open_tdev_z (t : BitVec 16) : t = 3#16 ↔ t.toNat = T_DEVICE :=
+  295: theorem sys_open_omode_eqz (om : BitVec 32) : soOmv om = 0#64 ↔ om = 0#32 := by
+  299: theorem sys_open_omode_arg (vom : BitVec 64) :
+  308: theorem sys_open_wr_rdonly : BitVec.extractLsb' 0 8 (soWrWord 0#32) = 0#8 := by decide
+  314: theorem sys_open_pay_witness (om : BitVec 32) (ty : BitVec 16) (C : FContent)
+  348: theorem sys_open_open_slot [Icfg] [CurCtx] (γ : FileNames) (kf : Nat) :
+  363: theorem sys_open_shr_held [Icfg] [CurCtx] (kk : Nat) (s : Qp) (g : GName) (inum : BitVec 32)
+  381: theorem sys_open_deposit [Icfg] [CurCtx] (cpu : CPU) (E : CoPset) (kk kf : Nat) (γo : GName)
+  420: theorem sys_open_publish [Icfg] [CurCtx] (E : CoPset) (γ : FileNames) (kf kk : Nat) (s : Qp)
+  484: theorem sys_open_trunc_ok (cov : Std.ExtTreeSet Nat compare) (logstart : Nat) (dn : Dinode)
+  494: theorem sys_open_trunc_rec_local (dn : Dinode) (hrl : inodeRecLocal dn) :
+  504: theorem sys_open_loaded_open [Icfg] [CurCtx] (γfs : FsNames) (γi : GName)
+  525: theorem sys_open_trunc_loaded [Icfg] [CurCtx] (γfs : FsNames) (γi : GName)
+  550: theorem sys_open_cell_eq [CurCtx] {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF]
+  560: def sysOpenAny [CurCtx] (a : BitVec 64) (n : Nat) : IProp GF :=
+  566: theorem sys_open_stack_bytes [CurCtx] (a : BitVec 64) (n : Nat) :
+  614: def sysOpenCells [CurCtx] (sp0 ra s0 w3 w4 w5 w6 : BitVec 64) (lo om : BitVec 32)
+  628: theorem sysOpenCells_om [CurCtx] (sp0 ra s0 w3 w4 w5 w6 : BitVec 64) (lo om : BitVec 32)
+  642: theorem sys_open_carve [CurCtx] (sp0 : BitVec 64) :
+  677: theorem sys_open_fold [CurCtx] (sp0 : BitVec 64) (hal : (sysOpenPath sp0).toNat % 8 = 0)
+  715: theorem wp_prologue_sys_open [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU) (k : KCtx)
+  755: theorem wp_epilogue_sys_open [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU) (k : KCtx)
+  799: def sysOpenPins (k : KCtx) (R : RegMap) (s1 s2 s3 : BitVec 64) : Prop :=
+  807: theorem sysOpenPins_cs (k : KCtx) (R R' : RegMap) (s1 s2 s3 : BitVec 64)
+  817: theorem sysOpenPins_set (k : KCtx) (R : RegMap) (s1 s2 s3 : BitVec 64) (r : BitVec 5) (v : BitVec 64)
+  827: theorem sysOpenPins_s1 (k : KCtx) (R : RegMap) (s1 s2 s3 v : BitVec 64)
+  834: theorem sysOpenPins_s2 (k : KCtx) (R : RegMap) (s1 s2 s3 v : BitVec 64)
+  841: theorem sysOpenPins_s3 (k : KCtx) (R : RegMap) (s1 s2 s3 v : BitVec 64)
+  849: theorem sysOpenPins_entry (k : KCtx) :
+  857: theorem sysOpenPins_exit (k : KCtx) (R : RegMap)
+  867: theorem sys_open_ctx (X : CurCtx) (h : X.curTier = KTier.kpt) : X = ⟨X.curCtx, KTier.kpt⟩ := by
+  870: theorem sys_open_cur_kpt [inst : CurCtx] (hct : curTier = KTier.kpt) :
+  883: theorem sys_open_exit (cpu : CPU) (k : KCtx) (spie spp : Bool) (R : RegMap)
+
+=====================================================================================
+SysOpenParts §3 THE SHARED VOCABULARY (verbatim)
+=====================================================================================
+/-! ## §3.  THE SHARED STAGE VOCABULARY -/
+
+/-- The contract's parameters, as ONE record (the `SysLinkArgs` /
+`SysMkdirArgs` pattern): the ftable lock's and the file table's names, the
+process slot, its pid, the block at ENTRY (`V`, `M`), the two syscall
+argument words (`v` the path pointer, `vom` the omode word), the caller's
+descriptor view `sts`, the reference allowance `ns`, and the PLAIN side's
+four families.  The create side's four (`Farm Fun Fok Fex`) are separate
+parameters of the create entry (`sysOpenEntryCBody`): every body below the
+join is stated at the plain arms, and the create entry reaches them through
+`SysOpenCreArm`'s families (Rocq's `socr_*`, the "shim"). -/
+structure SysOpenArgs (GF : BundledGFunctors) where
+  γl : GName
+  γ : FileNames
+  j : Nat
+  pid : BitVec 32
+  V : ProcPriv
+  M : Nat → List (BitVec 8)
+  v : BitVec 64
+  vom : BitVec 64
+  sts : List FdState
+  ns : Nat
+  P : Nat → Nat → IProp GF
+  Pmiss : Nat → Nat → IProp GF
+  Fo : Pfam GF (Aview → Nat → Anode → IProp GF)
+  Ft : Pfam GF (Aview → Nat → List (BitVec 8) → IProp GF)
+
+/-- THE STATIC PREMISES (Rocq's `K_sys_open <= K -> … -> eb = true ->`
+block, minus `eb`): the contract's own, fixed for the whole call.  `k` is
+sys_open's ENTRY context. -/
+structure SysOpenStatic (k : KCtx) (A : SysOpenArgs GF) : Prop where
+  hj : A.j < NPROC
+  hproc : k.proc = procAddr A.j
+  htier : k.tier = KTier.kpt
+  hnoff : k.noff = 0
+  hK : sysOpenSlots ≤ k.avail
+  hns : sysOpenIrefs ≤ A.ns
+  hv0 : A.V.tf[tfArgIdx 0]? = some A.v
+  hv1 : A.V.tf[tfArgIdx 1]? = some A.vom
+
+/-- The block after argstr: the page table grown to `P2`, the view faulted
+(argstr's post; Rocq's `us_upt U P2`). -/
+abbrev sysOpenV2 (A : SysOpenArgs GF) (P2 : UPtd) : ProcPriv := { A.V with upt := P2 }
+abbrev sysOpenM2 (A : SysOpenArgs GF) (P2 : UPtd) : Nat → List (BitVec 8) :=
+  viewFaulted A.V.upt P2 A.M
+
+/-- `omode` as argint stored it. -/
+abbrev sysOpenOm (A : SysOpenArgs GF) : BitVec 32 := BitVec.extractLsb' 0 32 A.vom
+
+section Vocab
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+  [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
+  [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
+  [Appcfg GF] [FileG GF] [Fscfg] [Icfg] [CurCtx]
+
+/-- THE PERSISTENT CONTEXT every stage reads and hands back untouched (the
+`sysLinkEnv` / `createEnv` idiom; deviation 4): the scheduler's invariant,
+the panic environment, the file system and the file table. -/
+def sysOpenEnv (Γ : SchedNames) (A : SysOpenArgs GF) : IProp GF :=
+  iprop(procsInv Γ ∗ panicEnv ∗ fsReady (hlc := hlc) ∗ isFtable A.γl A.γ)
+
+instance sysOpenEnv_persistent (Γ : SchedNames) (A : SysOpenArgs GF) :
+    Persistent (sysOpenEnv (hlc := hlc) (GF := GF) Γ A) := by
+  unfold sysOpenEnv; infer_instance
+
+/-- The contract's continuation at the PLAIN arms, hart-free (Rocq's
+`so_cont_au` / `so_cont0_au`, which are `SpecSysOpen.sysOpenK` at
+`openArmsPlain`; deviation 3). -/
+abbrev sysOpenPostP (k : KCtx) (A : SysOpenArgs GF) (c : CPU) : IProp GF :=
+  sysOpenK (hlc := hlc) k A.ns A.V A.M
+    (openArmsPlain (hlc := hlc) (fsGammaL fscFs) fscFs A.V.cwi A.γ (procAddr A.j) A.pid A.M
+      A.v.toNat A.vom A.P A.Pmiss A.Fo A.Ft A.sts) c
+
+/-- ...and at the CREATE arms (Rocq's `so_cont0_au_create`). -/
+abbrev sysOpenPostC (k : KCtx) (A : SysOpenArgs GF)
+    (Farm Fun : Pfam GF (Aview → Nat → IProp GF))
+    (Fok Fex : Pfam GF (Aview → Nat → Fname → Nat → IProp GF)) (c : CPU) : IProp GF :=
+  sysOpenK (hlc := hlc) k A.ns A.V A.M
+    (openArmsCreate (hlc := hlc) (fsGammaL fscFs) fscFs A.V.cwi A.γ (procAddr A.j) A.pid A.M
+      A.v.toNat A.vom A.P A.Pmiss Farm Fun Fok Fex A.Fo A.Ft A.sts) c
+
+/-- The contract's `wpNext` continuation, HART-FREE (a `true` crossing at a
+process pins nothing; `CreateSharedBody.create_post_pin`). -/
+theorem sys_open_post_pin (k : KCtx) (A : SysOpenArgs GF) (hS : SysOpenStatic k A)
+    (cpu : CPU) (ARMS : ProcPriv → (Nat → List (BitVec 8)) → BitVec 64 → IProp GF) :
+    wpNext true k.proc cpu (sysOpenK (hlc := hlc) k A.ns A.V A.M ARMS) ⊢
+      ∀ c : CPU, sysOpenK (hlc := hlc) k A.ns A.V A.M ARMS c := by
+  iintro H %c
+  iapply (wpNext_at true k.proc cpu c _ (fun h => h.elim (fun h => absurd h (by decide))
+    (fun h => absurd h (by rw [hS.hproc]; exact procAddr_nonzero hS.hj)))) $$ H
+
+/-- THE CONTINUATION IS MONOTONE IN ITS ARMS: what `SysOpenCreArm`'s shim
+needs (the create entry reaches the plain-arm bodies at the shim's families
+and converts their arms back into the create arms). -/
+theorem sysOpenK_mono (k : KCtx) (ns : Nat) (V : ProcPriv) (M : Nat → List (BitVec 8))
+    (ARMS ARMS' : ProcPriv → (Nat → List (BitVec 8)) → BitVec 64 → IProp GF) (c : CPU) :
+    sysOpenK (hlc := hlc) k ns V M ARMS c ⊢
+      (∀ (VW : ProcPriv) (MW : Nat → List (BitVec 8)) (r : BitVec 64), ARMS' VW MW r -∗ ARMS VW MW r) -∗
+      sysOpenK (hlc := hlc) k ns V M ARMS' c := by
+  unfold sysOpenK
+  iintro H Hw %spie %spp %R' %P' %hcs %hext Hk Hpc Hte Hce Hbs Hir Harms
+  ihave Harms := Hw $$ %_ %_ %_ Harms
+  iapply H $$ %spie %spp %R' %P' %hcs %hext Hk Hpc Hte Hce Hbs Hir Harms
+
+/-- A FAILURE TAIL's own continuation (Rocq's generic `wp_next true pj (fun
+_ => ∀ mf, ⌜callee_saved m mf⌝ -∗ … -∗ WP)`): at the returned registers,
+callee-saved against the entry, whatever the tail hands back keyed on the
+returned `a0`.  Hart-free. -/
+def sysOpenRet (k : KCtx) (Φ : BitVec 64 → IProp GF) : IProp GF :=
+  iprop(∀ (c : CPU) (spie spp : Bool) (R' : RegMap), ⌜calleeSaved k.regs R'⌝ -∗
+    kctx c ((k.withSpie spie spp).withRegs R') -∗ pcIs c (jumpPc (k.regs 1#5)) -∗
+    trapCsrsExt c k.sie -∗ cpuClaimExt c k.sie k.proc -∗ Φ (R' 10#5) -∗ wpLoop c)
+
+/-- THE PID SEAM (Rocq's `proc_priv_bare_acc` + lend, deviation 5): the pid
+share out of the block and back at the same record. -/
+theorem sysOpen_pid_fd (hct : curTier = KTier.kpt) (γ : FileNames) (pa : BitVec 64)
+    (pid : BitVec 32) (V : ProcPriv) (M : Nat → List (BitVec 8)) :
+    procPrivFd (GF := GF) γ pa pid V M ⊢
+      wordPointsTo (pPid pa) 4 pidPriv pid ∗
+      (wordPointsTo (pPid pa) 4 pidPriv pid -∗ procPrivFd γ pa pid V M) := by
+  unfold procPrivFd procPrivCoreNoctxAt procPrivBareAt
+  rw [sys_open_cur_kpt hct]
+  iintro ⟨⟨⟨%h, Hpid, Hf, Hpt, Htfp, %hlz⟩, Hc⟩, Hof⟩
+  iframe Hpid
+  iintro Hpid
+  iframe Hpid Hf Hpt Htfp Hc Hof
+  isplitl []
+  · ipureintro; exact h
+  · ipureintro; exact hlz
+
+/-- ...and the same out of the block's core (after fdalloc split it off
+the descriptor array). -/
+theorem sysOpen_pid_core (hct : curTier = KTier.kpt) (pa : BitVec 64)
+    (pid : BitVec 32) (V : ProcPriv) (M : Nat → List (BitVec 8)) :
+    procPrivCoreNoctxAt (GF := GF) curCtx pa pid V M ⊢
+      wordPointsTo (pPid pa) 4 pidPriv pid ∗
+      (wordPointsTo (pPid pa) 4 pidPriv pid -∗ procPrivCoreNoctxAt curCtx pa pid V M) := by
+  unfold procPrivCoreNoctxAt procPrivBareAt
+  rw [sys_open_cur_kpt hct]
+  iintro ⟨⟨%h, Hpid, Hf, Hpt, Htfp, %hlz⟩, Hc⟩
+  iframe Hpid
+  iintro Hpid
+  iframe Hpid Hf Hpt Htfp Hc
+  isplitl []
+  · ipureintro; exact h
+  · ipureintro; exact hlz
+
+/-- THE PAYLOAD, PEELED AT AN EXPLICIT `data` (Rocq `ProofSysOpenShared.so_flat`
+= `icLoadedFlatBody` with its `data` exposed): THE OBSERVED-ROW TIE IS A DATA
+TIE -- the terminal observation fires EARLY off this `topFrag` and the
+O_TRUNC receipt LATE, at the retag, and both must read the SAME `data`, so
+the blocks between the fire and the stores carry this form (Rocq's
+header). `SysOpenShared` holds its open / close / accessor lemmas. -/
+def sysOpenFlat (kk : Nat) (inum : BitVec 32) (dn : Dinode) (bm : Blkmap)
+    (data : Nat → List (BitVec 8)) : IProp GF :=
+  iprop(⌜inodeOk fscCov fscLogst dn bm data⌝ ∗ ⌜inodeRecLocal dn⌝ ∗ ⌜dirOk icfgNib dn data⌝ ∗
+    ⌜dirDotsIx inum.toNat dn data⌝ ∗ ⌜dirOrphanClean dn data⌝ ∗ ⌜dirUniq dn data⌝ ∗
+    dlinks fscFs inum.toNat dn bm data ∗ dinodeAt fscIreg inum dn ∗ inodeMeta (ientry kk) dn ∗
+    inodeAddrs (ientry kk) (bmCells bm) ∗ indRes fscFs bm ∗ inodeBlocks fscFs bm data ∗
+    topFrag (fsGammaL fscFs) inum.toNat (eraNode dn bm data))
+
+/-- THE RESIDUE the blocks below the fire carry (Rocq `so_obs`): the FIRED
+terminal observation, at the whole row the locked node reads as. -/
+def sysOpenObs (Fo : Pfam GF (Aview → Nat → Anode → IProp GF)) (i : Nat) (n : FsNode) :
+    IProp GF :=
+  iprop(∃ av : Aview, ⌜arowAt av i (absRow n)⌝ ∗ Fo.pfRecv av i (absRow n))
+
+/-- THE LOCK WINDOW OF `ip` (deviation 6): exactly `SpecIunlock`'s write-arm
+precondition minus the payload -- the sleeplock handle and the holder's
+share, the floored transactional checkout, the off rows, the three
+identity/valid cells, the generation's one-shot and the freeze token --
+with its names explicit. -/
+def sysOpenLk (γil γisl : GName) (loc tlc : Nat) (pid : BitVec 32) (kk : Nat) (s : Qp)
+    (g : GName) (inum : BitVec 32) (dn : Dinode) : IProp GF :=
+  iprop(isSleeplockGen γil γisl (iLock (ientry kk)) (icSlp fscIc kk) (slhTok (icfgIsl kk)) ∗
+    sleeplockedQ γisl s (iLock (ientry kk)) pid ∗
+    credFloor loc tlc ∗ icTxDep fscIc kk s icfgDev inum g loc ∗
+    offRows offCfg kk curCtx ∗
+    wordPointsTo (iDev (ientry kk)) 4 (DFrac.own (1 : Qp).half) icfgDev ∗
+    wordPointsTo (iInum (ientry kk)) 4 (DFrac.own (1 : Qp).half) inum ∗
+    wordPointsTo (iValid (ientry kk)) 4 (DFrac.own 1) (validWord true) ∗
+    ityShot g dn.diType ∗ ifreezeOff inum.toNat)
+
+/-- THE REFERENCE THE WALK KEEPS (Rocq's `∃ loK tlK, … inode_ref_short_genlo
+kk (qi + s) qi …` and `runit_any`): the parent, short by the share it lent
+ilock (the parked ident fraction IS that share, `qi = s`), with its
+provenance unit -- what `iunlockput` spends on a failure arm and what the
+publication parks in `f->ip`. -/
+def sysOpenKeep (kk : Nat) (s : Qp) (g : GName) (inum : BitVec 32) : IProp GF :=
+  iprop((∃ lo tl : Nat, ⌜lo ≤ tl⌝ ∗ credFloor lo tl ∗
+      inodeRefShortGenlo kk (s + s) s icfgDev inum g lo) ∗ runitAny inum.toNat)
+
+/-- create's LOCKED-INODE PAYOUT is the lock window, the payload and the kept
+reference (`CreateDefs.createLocked`, read in this file's pieces; what
+`SysOpenEntryC` hands the join). -/
+theorem sysOpen_of_createLocked (pid : BitVec 32) (kk : Nat) (qi s : Qp) (g : GName)
+    (inum : BitVec 32) (dn : Dinode) (bm : Blkmap) :
+    createLocked (GF := GF) pid kk qi s g inum dn bm ⊢
+      ∃ (γil γisl : GName) (loc tlc : Nat), ⌜qi = s ∧ loc ≤ tlc⌝ ∗
+        sysOpenLk γil γisl loc tlc pid kk s g inum dn ∗
+        icLoaded fscFs fscIreg fscCov fscLogst kk inum dn bm ∗ sysOpenKeep kk s g inum := by
+  unfold createLocked sysOpenLk sysOpenKeep
+  iintro ⟨%γil, %γisl, %hqs, #Hslk, Hsl, ⟨%loc, %tlc, %hle, #Hfl, Hdep⟩, Hoff, Hdev, Hinum, Hval,
+    Hload, Hshot, Hfrz, Href, Hru⟩
+  subst hqs
+  iexists γil, γisl, loc, tlc
+  isplitr
+  · ipureintro; exact ⟨rfl, hle⟩
+  isplitl [Hsl Hdep Hoff Hdev Hinum Hval Hshot Hfrz]
+  · iframe Hslk Hsl Hfl Hdep Hoff Hdev Hinum Hval Hshot Hfrz
+  iframe Hload Hru
+  iexact Href
+
+/-- THE OFF CELL AFTER THE STORE BLOCK, TYPE-INDEXED (Rocq's `if bool_decide
+(fc_type C = FD_INODE) then a_foff kf ↦₄ voff ∗ off_gv g 1 (bv_unsigned
+voff) else off_free kf 1`): the inode arm stored zero into the free cell
+and holds the word, WELL-FORMED, beside the WHOLE offset shadow at `γo`
+(minted beside the store); the device arm never touches `f->off`. -/
+def sysOpenOffCell (kf : Nat) (C : FContent) (γo : GName) : IProp GF :=
+  if C.type = FD_INODE then
+    iprop(∃ vo : BitVec 32, wordAtN curCtx (aFoff kf) 4 (DFrac.own 1) vo ∗ ⌜offWf vo⌝ ∗
+      offGv γo 1 (vo.toNat : Int))
+  else offFree kf 1
+
+/-- The walk's AU RESIDUE below the fire (Rocq's three rows `P (length
+(path_elems pl)) (bv_unsigned inum) -∗ so_obs Fo … -∗ open_trunc_piece …`),
+at the path the caller passed. -/
+def sysOpenResidue (A : SysOpenArgs GF) (pl : List (BitVec 8)) (inum : BitVec 32) (dn : Dinode)
+    (bm : Blkmap) (data : Nat → List (BitVec 8)) : IProp GF :=
+  iprop(⌜argPathOf A.M A.v.toNat pl⌝ ∗ A.P (pathElems pl).length inum.toNat ∗
+    sysOpenObs A.Fo inum.toNat (eraNode dn bm data) ∗
+    openTruncPiece (hlc := hlc) (fsGammaL fscFs) A.vom A.Ft)
+
+end Vocab
+
+
+=====================================================================================
+SysOpenParts §3b/§4 THE argstr CALL SITE AND THE STAGE BODIES (verbatim)
+=====================================================================================
+/-! ## §3b.  THE ONE argstr CALL SITE
+
+sys_open goes through ONE argstr wrapper (the coordinator's ruling, Sept
+25): argstr's success arm is being restated to Rocq's form (a
+`umMapped`-style conjunct, so the path is read at `argPathOf M` rather than
+at the faulted view), and the switch is then an edit HERE.  Today it relays
+the landed post verbatim (`SpecSysOpen` deviation 10). -/
+
+section Argstr
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+  [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
+  [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
+  [Appcfg GF] [FileG GF] [Fscfg] [Icfg] [CurCtx]
+
+/-- A context at depth 0 holds no lock (`KCtx.wf`). -/
+theorem sys_open_nolocks (cpu : CPU) (k' : KCtx) (hnoff : k'.noff = 0) :
+    kctx (GF := GF) cpu k' ⊢ ⌜k'.locks = []⌝ ∗ kctx cpu k' := by
+  iintro Hk
+  icases kctx_wf _ _ $$ Hk with ⟨%hwf, Hk⟩
+  iframe Hk
+  ipureintro
+  exact List.eq_nil_of_length_eq_zero (by have := hwf.2.2.2.1; omega)
+
+set_option maxHeartbeats 8000000 in
+/-- `argstr(0, path, MAXPATH)` at +0x1c (Rocq `Argstr.wp_argstr_sconf`):
+argstr does not thread the complement, so it is carried across its own
+`k'.sie` crossing (the wide hop). -/
+theorem sys_open_argstr (AS : ARGSTR) (Γ : SchedNames) (A : SysOpenArgs GF) (cpu : CPU)
+    (k' : KCtx) (se : Bool) (hs : k'.sie = se) (pj : BitVec 64) (hpj : k'.proc = pj)
+    (pa : BitVec 64) (V : ProcPriv) (M : Nat → List (BitVec 8)) (i : Nat) (v : BitVec 64)
+    (old : List (BitVec 8))
+    (hi : i < NARG) (ha0 : k'.regs 10#5 = BitVec.ofNat 64 i) (hv : V.tf[tfArgIdx i]? = some v)
+    (hproc : k'.proc = pa) (htier : k'.tier = KTier.kpt) (hnoff : k'.noff = 0)
+    (hK : argstrSlots ≤ k'.avail)
+    (hmax : k'.regs 12#5 = BitVec.ofNat 64 old.length) (hmax' : old.length < 2 ^ 31) :
+    kctx cpu k' ∗ pcIs cpu KA.«argstr» ∗
+    trapCsrsExt cpu se ∗ cpuClaimExt cpu se pj ∗ sysOpenEnv (hlc := hlc) Γ A ∗
+    procPrivBareAt curCtx pa A.pid V M ∗ byteBuf (k'.regs 11#5) (DFrac.own 1) old ∗
+    (∀ (c : CPU) (spie spp : Bool) (R' : RegMap) (P' : UPtd) (bs : List (BitVec 8)),
+      ⌜calleeSaved k'.regs R' ∧ V.upt.extSz V.sz P' ∧
+        fetchstrRet (viewFaulted V.upt P' M) v.toNat old bs (R' 10#5)⌝ -∗
+      kctx c ((k'.withSpie spie spp).withRegs R') -∗ pcIs c (jumpPc (k'.regs 1#5)) -∗
+      trapCsrsExt c se -∗ cpuClaimExt c se pj -∗
+      procPrivBareAt curCtx pa A.pid { V with upt := P' } (viewFaulted V.upt P' M) -∗
+      byteBuf (k'.regs 11#5) (DFrac.own 1) bs -∗ wpLoop c)
+    ⊢ wpLoop (GF := GF) cpu := by
+  subst hs hpj
+  iintro ⟨Hk, Hpc, Hte, Hce, #Henv, Hblk, Hbuf, HK⟩
+  icases sys_open_nolocks cpu k' hnoff $$ Hk with ⟨%hlocks, Hk⟩
+  unfold sysOpenEnv
+  icases Henv with ⟨#Hpi, #Hpe, #Hrdy, #Hft⟩
+  icases fsReady_kmem $$ Hrdy with ⟨#Hkl, #Hav⟩
+  have h := AS.wp_argstr (hlc := hlc) (GF := GF) cpu k' fscKalloc fsReadyKmem pa A.pid V M i v old
+    hi ha0 hv hproc htier (by rw [hnoff]; omega) hK (by rw [hlocks]; simp) hmax hmax'
+  unfold wp_argstr_body at h
+  simp only [argstrAddr] at h
+  iapply h
+  iframe Hk Hpc Hblk Hbuf
+  iframe #
+  iapply wpNext_intro_pin
+  iintro %c %hpin %spie %spp %R' %- Hk Hpc ⟨%P', %bs, %hf, Hblk, Hbuf⟩ %hcs
+  have hpin' : k'.sie = false → c = cpu := fun h => hpin (Or.inl h)
+  ihave Hte := trapCsrsExt_move _ _ _ hpin' $$ Hte
+  ihave Hce := cpuClaimExt_move _ _ _ _ hpin' $$ Hce
+  iapply HK $$ %c %spie %spp %R' %P' %bs [] Hk Hpc Hte Hce Hblk Hbuf
+  ipureintro
+  exact ⟨hcs, hf.1, hf.2⟩
+
+end Argstr
+
+/-! ## §4.  THE STAGE BODIES (deviation 1)
+
+Each is the Rocq stage lemma's statement, HART-FREE, as an `IProp` whose
+entailment `⊢ body` its stage file proves; a stage that calls another takes
+that body as a Lean hypothesis `⊢ body'`.  Common shape: at the named pc,
+the machine `kctx c (((k.withSpie spie spp).pushed 24).withRegs R)`, the
+pins `sysOpenPins k R s1 s2 s3` (Rocq's `so_sp` / `so_thr` / save
+equations), the frame (`sysOpenCells` with each shrink-wrapped slot at the
+register it saved, or junk before its save; the path buffer) and its
+alignment (Rocq `so_al`), the complement at the current hart, the
+persistent `sysOpenEnv`.  The block is at `procAddr A.j` (the contract's
+`pa`; `SysOpenStatic.hproc` rewrites a callee's `k.proc`).
+
+| body | pc | Rocq | proved in |
+| --- | --- | --- | --- |
+| `sysOpenTailABody` | +0xd2 | `so_tail_a` (create returned 0) | SysOpenTails |
+| `sysOpenTailBBody` | +0x10c | `so_tail_b` (namei returned 0) | SysOpenTails |
+| `sysOpenTailCBody` | +0xfc | `so_tail_c` (T_DIR for writing) | SysOpenTails |
+| `sysOpenTailDBody` | +0x116 | `so_tail_d` (bad device major) | SysOpenTails |
+| `sysOpenTailEBody` | +0x12e | `so_tail_e` (filealloc refused) | SysOpenTails |
+| `sysOpenTailFBody` | +0x126 | `so_tail_f` (fdalloc refused) | SysOpenTails |
+| `sysOpenTailSBody` | +0xb8 | `so_tail_s` (iunlock, end_op, return fd) | SysOpenTails |
+| `sysOpenPubBody` | +0xb8 | `so_tail_pub_au` (ARM S + the publication) | SysOpenPub |
+| `sysOpenStoresBody` | +0x88 | `so_stores_au` (stores, O_TRUNC) | SysOpenStores |
+| `sysOpenAllocBody` | +0x5e | `so_alloc_au` (filealloc, fdalloc, types) | SysOpenAlloc |
+| `sysOpenJoinBody` | +0x4a | `so_join_au` (the major test) | SysOpenJoin |
+| `sysOpenEntryNBody` | +0xdc | `so_entry_n_au` (namei-era, ilock, T_DIR) | SysOpenWalk |
+| `sysOpenEntryCBody` | +0x38 | `so_entry_c_au` (create at T_FILE) | SysOpenEntryC |
+-/
+
+section Bodies
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+  [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
+  [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
+  [Appcfg GF] [FileG GF] [Fscfg] [Icfg] [CurCtx]
+
+/-- The pid share every pid-taking callee is lent (deviation 5). -/
+abbrev sysOpenPid (A : SysOpenArgs GF) : IProp GF :=
+  wordPointsTo (pPid (procAddr A.j)) 4 pidPriv A.pid
+
+/-- **ARM A-FAIL, +0xd2** (Rocq `so_tail_a`): create returned 0 --
+`end_op`, `a0 = -1`, the s1 reload, the jump to the epilogue.  Nothing is
+held; the continuation gets the pid share back. -/
+def sysOpenTailABody (Γ : SchedNames) (k : KCtx) (A : SysOpenArgs GF) : IProp GF :=
+  iprop(∀ (c : CPU) (spie spp : Bool) (R : RegMap) (s1v w4 w5 w6 : BitVec 64) (lo om : BitVec 32)
+      (w24 : BitVec 64) (u : Nat),
+    ⌜sysOpenPins k R s1v (k.regs 18#5) (k.regs 19#5)⌝ -∗
+    ⌜(sysOpenPath (k.regs 2#5)).toNat % 8 = 0⌝ -∗
+    kctx c (((k.withSpie spie spp).pushed 24).withRegs R) -∗ pcIs c (sysOpenAddr + 0xd2#64) -∗
+    trapCsrsExt c k.sie -∗ cpuClaimExt c k.sie k.proc -∗ sysOpenEnv (hlc := hlc) Γ A -∗
+    sysOpenCells (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) (k.regs 9#5) w4 w5 w6 lo om w24 -∗
+    sysOpenAny (sysOpenPath (k.regs 2#5)) 128 -∗
+    sysOpenPid A -∗ logOp icfgLog u -∗
+    sysOpenRet (hlc := hlc) k (fun r => iprop(⌜r = 0xFFFFFFFFFFFFFFFF#64⌝ ∗ sysOpenPid A)) -∗
+    wpLoop c)
+
+/-- **ARM B-FAIL, +0x10c** (Rocq `so_tail_b`): namei returned 0 -- the same
+four instructions at another address. -/
+def sysOpenTailBBody (Γ : SchedNames) (k : KCtx) (A : SysOpenArgs GF) : IProp GF :=
+  iprop(∀ (c : CPU) (spie spp : Bool) (R : RegMap) (s1v w4 w5 w6 : BitVec 64) (lo om : BitVec 32)
+      (w24 : BitVec 64) (u : Nat),
+    ⌜sysOpenPins k R s1v (k.regs 18#5) (k.regs 19#5)⌝ -∗
+    ⌜(sysOpenPath (k.regs 2#5)).toNat % 8 = 0⌝ -∗
+    kctx c (((k.withSpie spie spp).pushed 24).withRegs R) -∗ pcIs c (sysOpenAddr + 0x10c#64) -∗
+    trapCsrsExt c k.sie -∗ cpuClaimExt c k.sie k.proc -∗ sysOpenEnv (hlc := hlc) Γ A -∗
+    sysOpenCells (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) (k.regs 9#5) w4 w5 w6 lo om w24 -∗
+    sysOpenAny (sysOpenPath (k.regs 2#5)) 128 -∗
+    sysOpenPid A -∗ logOp icfgLog u -∗
+    sysOpenRet (hlc := hlc) k (fun r => iprop(⌜r = 0xFFFFFFFFFFFFFFFF#64⌝ ∗ sysOpenPid A)) -∗
+    wpLoop c)
+
+/-- The shape of ARMS C / D (Rocq `so_tail_c` / `so_tail_d`, the same six
+instructions at two addresses): `ip` LOCKED and LOADED with its kept
+reference -- `iunlockput(ip)` (the COUNTED ledger: entered at the join's
+`iputUnits`), `end_op`, `a0 = -1`, the s1 reload, the jump.  What comes
+back: the pid share, the slot supply and the ONE iref unit the iput
+released. -/
+def sysOpenTailCDBody (Γ : SchedNames) (k : KCtx) (A : SysOpenArgs GF) (off : BitVec 64) :
+    IProp GF :=
+  iprop(∀ (c : CPU) (spie spp : Bool) (R : RegMap) (w4 w5 w6 : BitVec 64) (lo om : BitVec 32)
+      (w24 : BitVec 64) (γil γisl : GName) (loc tlc kk : Nat) (s : Qp) (g : GName)
+      (inum : BitVec 32) (dn : Dinode) (bm : Blkmap) (u : Nat),
+    ⌜kk < NINODE ∧ inum.toNat < 16 * icfgNib ∧ loc ≤ tlc ∧ iputUnits ≤ u⌝ -∗
+    ⌜sysOpenPins k R (ientry kk) (k.regs 18#5) (k.regs 19#5)⌝ -∗
+    ⌜(sysOpenPath (k.regs 2#5)).toNat % 8 = 0⌝ -∗
+    kctx c (((k.withSpie spie spp).pushed 24).withRegs R) -∗ pcIs c (sysOpenAddr + off) -∗
+    trapCsrsExt c k.sie -∗ cpuClaimExt c k.sie k.proc -∗ sysOpenEnv (hlc := hlc) Γ A -∗
+    sysOpenCells (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) (k.regs 9#5) w4 w5 w6 lo om w24 -∗
+    sysOpenAny (sysOpenPath (k.regs 2#5)) 128 -∗
+    sysOpenLk γil γisl loc tlc A.pid kk s g inum dn -∗
+    icLoaded fscFs fscIreg fscCov fscLogst kk inum dn bm -∗ sysOpenKeep kk s g inum -∗
+    sysOpenPid A -∗ bslots 3 -∗ logOpb icfgLog u -∗
+    sysOpenRet (hlc := hlc) k (fun r => iprop(⌜r = 0xFFFFFFFFFFFFFFFF#64⌝ ∗ sysOpenPid A ∗
+      bslots 3 ∗ irefSlot)) -∗
+    wpLoop c)
+
+/-- **ARM C-FAIL, +0xfc**: a T_DIR inode opened for writing. -/
+abbrev sysOpenTailCBody (Γ : SchedNames) (k : KCtx) (A : SysOpenArgs GF) : IProp GF :=
+  sysOpenTailCDBody (hlc := hlc) Γ k A 0xfc#64
+
+/-- **ARM D-FAIL, +0x116**: T_DEVICE with an out-of-range major. -/
+abbrev sysOpenTailDBody (Γ : SchedNames) (k : KCtx) (A : SysOpenArgs GF) : IProp GF :=
+  sysOpenTailCDBody (hlc := hlc) Γ k A 0x116#64
+
+/-- **ARM E-FAIL, +0x12e** (Rocq `so_tail_e`): filealloc returned 0 -- ARM
+C's six plus the s2 reload (the `sd s2` at +0x5e is above this branch). -/
+def sysOpenTailEBody (Γ : SchedNames) (k : KCtx) (A : SysOpenArgs GF) : IProp GF :=
+  iprop(∀ (c : CPU) (spie spp : Bool) (R : RegMap) (s2v w5 w6 : BitVec 64) (lo om : BitVec 32)
+      (w24 : BitVec 64) (γil γisl : GName) (loc tlc kk : Nat) (s : Qp) (g : GName)
+      (inum : BitVec 32) (dn : Dinode) (bm : Blkmap) (u : Nat),
+    ⌜kk < NINODE ∧ inum.toNat < 16 * icfgNib ∧ loc ≤ tlc ∧ iputUnits ≤ u⌝ -∗
+    ⌜sysOpenPins k R (ientry kk) s2v (k.regs 19#5)⌝ -∗
+    ⌜(sysOpenPath (k.regs 2#5)).toNat % 8 = 0⌝ -∗
+    kctx c (((k.withSpie spie spp).pushed 24).withRegs R) -∗ pcIs c (sysOpenAddr + 0x12e#64) -∗
+    trapCsrsExt c k.sie -∗ cpuClaimExt c k.sie k.proc -∗ sysOpenEnv (hlc := hlc) Γ A -∗
+    sysOpenCells (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) (k.regs 9#5) (k.regs 18#5) w5 w6 lo om w24 -∗
+    sysOpenAny (sysOpenPath (k.regs 2#5)) 128 -∗
+    sysOpenLk γil γisl loc tlc A.pid kk s g inum dn -∗
+    icLoaded fscFs fscIreg fscCov fscLogst kk inum dn bm -∗ sysOpenKeep kk s g inum -∗
+    sysOpenPid A -∗ bslots 3 -∗ logOpb icfgLog u -∗
+    sysOpenRet (hlc := hlc) k (fun r => iprop(⌜r = 0xFFFFFFFFFFFFFFFF#64⌝ ∗ sysOpenPid A ∗
+      bslots 3 ∗ irefSlot)) -∗
+    wpLoop c)
+
+/-- **ARM F-FAIL, +0x126** (Rocq `so_tail_f`): fdalloc refused --
+`fileclose(f)` (FREE: the file is still untyped, `filecloseEnv_none`, so
+Rocq's `fileclose_env` / `_out` rows are `emp`: specialised to the state
+sys_open's file is in, `.closed`), the s3 reload, and ARM E's instructions
+(it falls into +0x12e).  fileclose BORROWS one iref unit (`irefSlot`, in)
+and repays it; the iput releases another: TWO come back, with the file
+table's unit. -/
+def sysOpenTailFBody (Γ : SchedNames) (k : KCtx) (A : SysOpenArgs GF) : IProp GF :=
+  iprop(∀ (c : CPU) (spie spp : Bool) (R : RegMap) (s3v w6 : BitVec 64) (lo om : BitVec 32)
+      (w24 : BitVec 64) (γil γisl : GName) (loc tlc kk : Nat) (s : Qp) (g : GName)
+      (inum : BitVec 32) (dn : Dinode) (bm : Blkmap) (kf u : Nat),
+    ⌜kk < NINODE ∧ inum.toNat < 16 * icfgNib ∧ loc ≤ tlc ∧ iputUnits ≤ u ∧ kf < NFILE⌝ -∗
+    ⌜sysOpenPins k R (ientry kk) (fnode kf) s3v⌝ -∗
+    ⌜(sysOpenPath (k.regs 2#5)).toNat % 8 = 0⌝ -∗
+    kctx c (((k.withSpie spie spp).pushed 24).withRegs R) -∗ pcIs c (sysOpenAddr + 0x126#64) -∗
+    trapCsrsExt c k.sie -∗ cpuClaimExt c k.sie k.proc -∗ sysOpenEnv (hlc := hlc) Γ A -∗
+    sysOpenCells (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) (k.regs 9#5) (k.regs 18#5) (k.regs 19#5)
+      w6 lo om w24 -∗
+    sysOpenAny (sysOpenPath (k.regs 2#5)) 128 -∗
+    fileRef A.γ kf 1 .closed -∗
+    sysOpenLk γil γisl loc tlc A.pid kk s g inum dn -∗
+    icLoaded fscFs fscIreg fscCov fscLogst kk inum dn bm -∗ sysOpenKeep kk s g inum -∗
+    sysOpenPid A -∗ bslots 3 -∗ irefSlot -∗ logOpb icfgLog u -∗
+    sysOpenRet (hlc := hlc) k (fun r => iprop(⌜r = 0xFFFFFFFFFFFFFFFF#64⌝ ∗ sysOpenPid A ∗
+      bslots 3 ∗ irefSlots 2 ∗ fdSlot)) -∗
+    wpLoop c)
+
+/-- **ARM S, +0xb8** (Rocq `so_tail_s`): `iunlock(ip)`, `end_op`, `a0 = fd`,
+the three reloads, the epilogue.  THE SHARE COMES BACK GENERATION-NAMED
+(the Lean iunlock's post; Rocq's is erased and re-pinned in the
+publication): it is the other half of `sys_open_publish`'s input. -/
+def sysOpenTailSBody (Γ : SchedNames) (k : KCtx) (A : SysOpenArgs GF) : IProp GF :=
+  iprop(∀ (c : CPU) (spie spp : Bool) (R : RegMap) (s2v w6 : BitVec 64) (lo om : BitVec 32)
+      (w24 : BitVec 64) (γil γisl : GName) (loc tlc kk : Nat) (s : Qp) (g : GName)
+      (inum : BitVec 32) (dn : Dinode) (bm : Blkmap) (u : Nat) (fdw : BitVec 64),
+    ⌜kk < NINODE ∧ inum.toNat < 16 * icfgNib ∧ loc ≤ tlc⌝ -∗
+    ⌜sysOpenPins k R (ientry kk) s2v fdw⌝ -∗
+    ⌜(sysOpenPath (k.regs 2#5)).toNat % 8 = 0⌝ -∗
+    kctx c (((k.withSpie spie spp).pushed 24).withRegs R) -∗ pcIs c (sysOpenAddr + 0xb8#64) -∗
+    trapCsrsExt c k.sie -∗ cpuClaimExt c k.sie k.proc -∗ sysOpenEnv (hlc := hlc) Γ A -∗
+    sysOpenCells (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) (k.regs 9#5) (k.regs 18#5) (k.regs 19#5)
+      w6 lo om w24 -∗
+    sysOpenAny (sysOpenPath (k.regs 2#5)) 128 -∗
+    sysOpenLk γil γisl loc tlc A.pid kk s g inum dn -∗
+    icLoaded fscFs fscIreg fscCov fscLogst kk inum dn bm -∗
+    sysOpenPid A -∗ logOpb icfgLog u -∗
+    sysOpenRet (hlc := hlc) k (fun r => iprop(⌜r = fdw⌝ ∗ sysOpenPid A ∗
+      inodeShrGenlo kk s icfgDev inum g loc)) -∗
+    wpLoop c)
+
+/-- **ARM S AND THE PUBLICATION, +0xb8** (Rocq `so_tail_pub_au`): the tail
+at the ARMED post.  The off box is born under the lock (`sys_open_deposit`,
+mode PARK: `UserOff.off_pub_park`), ARM S runs (`sysOpenTailSBody`, a
+premise of its proof), and in its continuation the ONE ghost step
+(`sys_open_publish`) and the settle (`ProcPrivAcc.procPrivFd_settle`) move
+the descriptor to its typed state.  THE ARM IS THE CALLER'S: which of the
+three success arms is delivered is the store block's knowledge, so it
+arrives as a wand from `openFdOk` and this block only earns its antecedent. -/
+def sysOpenPubBody (Γ : SchedNames) (k : KCtx) (A : SysOpenArgs GF) : IProp GF :=
+  iprop(∀ (c : CPU) (spie spp : Bool) (R : RegMap) (s2v w6 : BitVec 64) (lo : BitVec 32)
+      (w24 : BitVec 64) (γil γisl : GName) (loc tlc kk : Nat) (s : Qp) (g : GName)
+      (inum : BitVec 32) (dn : Dinode) (bm : Blkmap) (kf fd : Nat) (l : List Nat) (C : FContent)
+      (pn : FPNames) (γo : GName) (P2 : UPtd) (u nsj : Nat) (t : FdType),
+    ⌜kk < NINODE ∧ inum.toNat < 16 * icfgNib ∧ 0 < inum.toNat ∧ loc ≤ tlc⌝ -∗
+    ⌜kf < NFILE ∧ fd < NOFILE ∧ (sysOpenV2 A P2).ofile.length = NOFILE ∧
+      fdFrees (sysOpenV2 A P2).ofile = fd :: l⌝ -∗
+    ⌜C.ip = ientry kk ∧ (C.type = FD_INODE ∨ C.type = FD_DEVICE) ∧
+      C.writable = BitVec.extractLsb' 0 8 (soWrWord (sysOpenOm A)) ∧
+      C.readable = BitVec.extractLsb' 0 8 (soRdWord (sysOpenOm A))⌝ -∗
+    ⌜(dn.diType.toNat = T_DIR_z → sysOpenOm A = 0#32) ∧
+      (C.type = FD_INODE → dn.diType.toNat ≠ T_DEVICE)⌝ -∗
+    ⌜(C.type = FD_INODE ∧ t = .inode inum.toNat γo .parked) ∨
+      (C.type = FD_DEVICE ∧ t = .device C.major.toNat)⌝ -∗
+    ⌜nsj + 1 = A.ns ∧ A.V.upt.extSz A.V.sz P2⌝ -∗
+    ⌜sysOpenPins k R (ientry kk) s2v (BitVec.ofNat 64 fd)⌝ -∗
+    ⌜(sysOpenPath (k.regs 2#5)).toNat % 8 = 0⌝ -∗
+    kctx c (((k.withSpie spie spp).pushed 24).withRegs R) -∗ pcIs c (sysOpenAddr + 0xb8#64) -∗
+    trapCsrsExt c k.sie -∗ cpuClaimExt c k.sie k.proc -∗ sysOpenEnv (hlc := hlc) Γ A -∗
+    sysOpenCells (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) (k.regs 9#5) (k.regs 18#5) (k.regs 19#5)
+      w6 lo (sysOpenOm A) w24 -∗
+    sysOpenAny (sysOpenPath (k.regs 2#5)) 128 -∗
+    sysOpenLk γil γisl loc tlc A.pid kk s g inum dn -∗
+    icLoaded fscFs fscIreg fscCov fscLogst kk inum dn bm -∗ sysOpenKeep kk s g inum -∗
+    -- the fresh slot's raw pieces, carried across the tail
+    frefTok A.γ kf 1 -∗ fileFieldsAt curCtx kf 1 C -∗ fpayTok A.γ kf 1 pn -∗
+    sysOpenOffCell kf C γo -∗
+    -- the untyped slot's own unit, released when the slot was opened
+    irefSlot -∗
+    -- the process, split at the descriptor table by fdalloc
+    procPrivCoreNoctxAt curCtx (procAddr A.j) A.pid (sysOpenV2 A P2) (sysOpenM2 A P2) -∗
+    procOfilesOwe A.γ A.V.fdg (procAddr A.j) ((sysOpenV2 A P2).ofile.set fd (fnode kf)) [fd] -∗
+    logOpb icfgLog u -∗ bslots 3 -∗ irefSlots nsj -∗ fdSlot -∗
+    fdFrags A.V.fdg A.sts -∗ fdStAuth A.V.fdg fd .closed -∗
+    -- THE ARM, as a wand
+    (∀ r : BitVec 64,
+      openFdOk A.γ (procAddr A.j) A.pid (sysOpenV2 A P2) (sysOpenM2 A P2)
+        (omReadable A.vom) (omWritable A.vom) t A.sts r -∗
+      openPostOkPlain (hlc := hlc) (fsGammaL fscFs) A.γ (procAddr A.j) A.pid A.M A.v.toNat A.vom
+        A.P A.Fo A.Ft A.sts (sysOpenV2 A P2) (sysOpenM2 A P2) r) -∗
+    (∀ c' : CPU, sysOpenPostP (hlc := hlc) k A c') -∗
+    wpLoop c)
+
+/-- **+0x88 .. +0xb4 AND THE +0x14e itrunc BLOCK** (Rocq `so_stores_au`):
+the `f->ip` / mode stores, the O_TRUNC test, itrunc with THE TRUNC FIRE
+REPLACING THE RETAG (`FsAbsOpenFire.opfAtrunc_fire`), the three success
+arms built where `ip->type` is known, and the re-seal
+(`sys_open_trunc_loaded` / `SysOpenShared`'s flat close) into ARM S.  The
+payload arrives PEELED (`sysOpenFlat`) so the trunc receipt reads the
+observation's `data`.  `C0` is the content after the type/off/major stores
+of the alloc block. -/
+def sysOpenStoresBody (Γ : SchedNames) (k : KCtx) (A : SysOpenArgs GF) : IProp GF :=
+  iprop(∀ (c : CPU) (spie spp : Bool) (R : RegMap) (w6 : BitVec 64) (lo : BitVec 32)
+      (w24 : BitVec 64) (γil γisl : GName) (loc tlc kk : Nat) (s : Qp) (g : GName)
+      (inum : BitVec 32) (dn : Dinode) (bm : Blkmap) (data : Nat → List (BitVec 8))
+      (kf fd : Nat) (l : List Nat) (C0 : FContent) (pn : FPNames) (γo : GName) (P2 : UPtd)
+      (u nsj : Nat) (t : FdType) (pl : List (BitVec 8)),
+    ⌜kk < NINODE ∧ inum.toNat < 16 * icfgNib ∧ 0 < inum.toNat ∧ loc ≤ tlc ∧ 2 ≤ u⌝ -∗
+    ⌜kf < NFILE ∧ fd < NOFILE ∧ (sysOpenV2 A P2).ofile.length = NOFILE ∧
+      fdFrees (sysOpenV2 A P2).ofile = fd :: l⌝ -∗
+    ⌜(C0.type = FD_INODE ∨ C0.type = FD_DEVICE) ∧
+      (dn.diType.toNat = T_DIR_z → sysOpenOm A = 0#32)⌝ -∗
+    ⌜(dn.diType.toNat = T_DEVICE →
+        C0.type = FD_DEVICE ∧ C0.major = dn.diMajor ∧ dn.diMajor.toNat ≤ NDEV_max ∧
+        t = .device dn.diMajor.toNat) ∧
+      (dn.diType.toNat ≠ T_DEVICE → C0.type = FD_INODE ∧ t = .inode inum.toNat γo .parked)⌝ -∗
+    ⌜nsj + 1 = A.ns ∧ A.V.upt.extSz A.V.sz P2⌝ -∗
+    ⌜sysOpenPins k R (ientry kk) (fnode kf) (BitVec.ofNat 64 fd)⌝ -∗
+    ⌜(sysOpenPath (k.regs 2#5)).toNat % 8 = 0⌝ -∗
+    kctx c (((k.withSpie spie spp).pushed 24).withRegs R) -∗ pcIs c (sysOpenAddr + 0x88#64) -∗
+    trapCsrsExt c k.sie -∗ cpuClaimExt c k.sie k.proc -∗ sysOpenEnv (hlc := hlc) Γ A -∗
+    sysOpenCells (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) (k.regs 9#5) (k.regs 18#5) (k.regs 19#5)
+      w6 lo (sysOpenOm A) w24 -∗
+    sysOpenAny (sysOpenPath (k.regs 2#5)) 128 -∗
+    sysOpenLk γil γisl loc tlc A.pid kk s g inum dn -∗
+    sysOpenFlat kk inum dn bm data -∗ sysOpenKeep kk s g inum -∗
+    frefTok A.γ kf 1 -∗ fileFieldsAt curCtx kf 1 C0 -∗ fpayTok A.γ kf 1 pn -∗
+    sysOpenOffCell kf C0 γo -∗ irefSlot -∗
+    procPrivCoreNoctxAt curCtx (procAddr A.j) A.pid (sysOpenV2 A P2) (sysOpenM2 A P2) -∗
+    procOfilesOwe A.γ A.V.fdg (procAddr A.j) ((sysOpenV2 A P2).ofile.set fd (fnode kf)) [fd] -∗
+    logOpb icfgLog u -∗ bslots 3 -∗ irefSlots nsj -∗ fdSlot -∗
+    fdFrags A.V.fdg A.sts -∗ fdStAuth A.V.fdg fd .closed -∗
+    -- THE AU RESIDUE: the cursor, the FIRED observation, the trunc commit
+    sysOpenResidue (hlc := hlc) A pl inum dn bm data -∗
+    (∀ c' : CPU, sysOpenPostP (hlc := hlc) k A c') -∗
+    wpLoop c)
+
+/-- **+0x5e .. +0x84 AND THE +0x140 FD_DEVICE BLOCK** (Rocq `so_alloc_au`):
+`filealloc` (ARM E-FAIL on 0), `fdalloc` (ARM F-FAIL on -1), and the
+descriptor's TYPE decided by the `beq` at +0x7a (FD_DEVICE with its major,
+or FD_INODE with `f->off = 0` and the offset shadow minted); then the
+stores.  NOTHING ABSTRACT HAPPENS HERE: the residue is inert.  The device
+arm's major bound is the join's `bltu`, relayed. -/
+def sysOpenAllocBody (Γ : SchedNames) (k : KCtx) (A : SysOpenArgs GF) : IProp GF :=
+  iprop(∀ (c : CPU) (spie spp : Bool) (R : RegMap) (w4 w5 w6 : BitVec 64) (lo : BitVec 32)
+      (w24 : BitVec 64) (γil γisl : GName) (loc tlc kk : Nat) (s : Qp) (g : GName)
+      (inum : BitVec 32) (dn : Dinode) (bm : Blkmap) (data : Nat → List (BitVec 8))
+      (P2 : UPtd) (u nsj : Nat) (pl : List (BitVec 8)),
+    ⌜kk < NINODE ∧ inum.toNat < 16 * icfgNib ∧ 0 < inum.toNat ∧ loc ≤ tlc ∧ iputUnits ≤ u⌝ -∗
+    ⌜(dn.diType.toNat = T_DIR_z → sysOpenOm A = 0#32) ∧
+      (dn.diType.toNat = T_DEVICE → dn.diMajor.toNat ≤ NDEV_max)⌝ -∗
+    ⌜nsj + 1 = A.ns ∧ A.V.upt.extSz A.V.sz P2⌝ -∗
+    ⌜sysOpenPins k R (ientry kk) (k.regs 18#5) (k.regs 19#5)⌝ -∗
+    ⌜(sysOpenPath (k.regs 2#5)).toNat % 8 = 0⌝ -∗
+    kctx c (((k.withSpie spie spp).pushed 24).withRegs R) -∗ pcIs c (sysOpenAddr + 0x5e#64) -∗
+    trapCsrsExt c k.sie -∗ cpuClaimExt c k.sie k.proc -∗ sysOpenEnv (hlc := hlc) Γ A -∗
+    sysOpenCells (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) (k.regs 9#5) w4 w5 w6 lo (sysOpenOm A) w24 -∗
+    sysOpenAny (sysOpenPath (k.regs 2#5)) 128 -∗
+    sysOpenLk γil γisl loc tlc A.pid kk s g inum dn -∗
+    sysOpenFlat kk inum dn bm data -∗ sysOpenKeep kk s g inum -∗
+    procPrivFd A.γ (procAddr A.j) A.pid (sysOpenV2 A P2) (sysOpenM2 A P2) -∗
+    logOpb icfgLog u -∗ bslots 3 -∗ irefSlots nsj -∗ fdSlot -∗ fdFrags A.V.fdg A.sts -∗
+    sysOpenResidue (hlc := hlc) A pl inum dn bm data -∗
+    (∀ c' : CPU, sysOpenPostP (hlc := hlc) k A c') -∗
+    wpLoop c)
+
+/-- **THE JOIN AT +0x4a AND ARM D-FAIL** (Rocq `so_join_au`): the `lhu` +
+`bltu` SINGLE unsigned compare that decides `ma ≤ NDEV_max` for a device
+(a negative short zero-extends past 9) -- EARNED here, relayed below. -/
+def sysOpenJoinBody (Γ : SchedNames) (k : KCtx) (A : SysOpenArgs GF) : IProp GF :=
+  iprop(∀ (c : CPU) (spie spp : Bool) (R : RegMap) (w4 w5 w6 : BitVec 64) (lo : BitVec 32)
+      (w24 : BitVec 64) (γil γisl : GName) (loc tlc kk : Nat) (s : Qp) (g : GName)
+      (inum : BitVec 32) (dn : Dinode) (bm : Blkmap) (data : Nat → List (BitVec 8))
+      (P2 : UPtd) (u nsj : Nat) (pl : List (BitVec 8)),
+    ⌜kk < NINODE ∧ inum.toNat < 16 * icfgNib ∧ 0 < inum.toNat ∧ loc ≤ tlc ∧ iputUnits ≤ u⌝ -∗
+    ⌜dn.diType.toNat = T_DIR_z → sysOpenOm A = 0#32⌝ -∗
+    ⌜nsj + 1 = A.ns ∧ A.V.upt.extSz A.V.sz P2⌝ -∗
+    ⌜sysOpenPins k R (ientry kk) (k.regs 18#5) (k.regs 19#5)⌝ -∗
+    ⌜(sysOpenPath (k.regs 2#5)).toNat % 8 = 0⌝ -∗
+    kctx c (((k.withSpie spie spp).pushed 24).withRegs R) -∗ pcIs c (sysOpenAddr + 0x4a#64) -∗
+    trapCsrsExt c k.sie -∗ cpuClaimExt c k.sie k.proc -∗ sysOpenEnv (hlc := hlc) Γ A -∗
+    sysOpenCells (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) (k.regs 9#5) w4 w5 w6 lo (sysOpenOm A) w24 -∗
+    sysOpenAny (sysOpenPath (k.regs 2#5)) 128 -∗
+    sysOpenLk γil γisl loc tlc A.pid kk s g inum dn -∗
+    sysOpenFlat kk inum dn bm data -∗ sysOpenKeep kk s g inum -∗
+    procPrivFd A.γ (procAddr A.j) A.pid (sysOpenV2 A P2) (sysOpenM2 A P2) -∗
+    logOpb icfgLog u -∗ bslots 3 -∗ irefSlots nsj -∗ fdSlot -∗ fdFrags A.V.fdg A.sts -∗
+    sysOpenResidue (hlc := hlc) A pl inum dn bm data -∗
+    (∀ c' : CPU, sysOpenPostP (hlc := hlc) k A c') -∗
+    wpLoop c)
+
+/-- **THE else ARM, +0xdc .. +0xfa, AND ARMS B-FAIL / C-FAIL** (Rocq
+`so_entry_n_au`): namei-ERA at the string argstr fetched (the walk one-shot
+arrives specialised: `exStart` at `bview plen bp`), ilock, THE TERMINAL
+OBSERVATION FIRED (`FsAbsOpenFire.opfOpen_fire_1`) off the peeled payload,
+the T_DIR test (-> the join at +0x4a) and the O_RDONLY test (-> the alloc
+block at +0x5e, or ARM C-FAIL).  s1 is free (its entry value is in slot 3,
+saved at +0x28); the path buffer is argstr's, NUL-terminated at `plen`, and
+it IS the caller's argument 0 (`argPathOf A.M`; `SpecSysOpen` deviation
+10). -/
+def sysOpenEntryNBody (Γ : SchedNames) (k : KCtx) (A : SysOpenArgs GF) : IProp GF :=
+  iprop(∀ (c : CPU) (spie spp : Bool) (R : RegMap) (s1v w4 w5 w6 : BitVec 64) (lo : BitVec 32)
+      (w24 : BitVec 64) (P2 : UPtd) (plen : Nat) (bp : Nat → BitVec 8) (Sb : List Nat),
+    ⌜A.V.upt.extSz A.V.sz P2⌝ -∗
+    ⌜(∀ i, i < plen → bp i ≠ 0#8) ∧ bp plen = 0#8 ∧ plen < 128 ∧
+      argPathOf A.M A.v.toNat (bview plen bp)⌝ -∗
+    ⌜sysOpenPins k R s1v (k.regs 18#5) (k.regs 19#5)⌝ -∗
+    ⌜(sysOpenPath (k.regs 2#5)).toNat % 8 = 0⌝ -∗
+    kctx c (((k.withSpie spie spp).pushed 24).withRegs R) -∗ pcIs c (sysOpenAddr + 0xdc#64) -∗
+    trapCsrsExt c k.sie -∗ cpuClaimExt c k.sie k.proc -∗ sysOpenEnv (hlc := hlc) Γ A -∗
+    sysOpenCells (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) (k.regs 9#5) w4 w5 w6 lo (sysOpenOm A) w24 -∗
+    byteBuf (sysOpenPath (k.regs 2#5)) (DFrac.own 1) (bview 128 bp) -∗
+    procPrivFd A.γ (procAddr A.j) A.pid (sysOpenV2 A P2) (sysOpenM2 A P2) -∗
+    logOpS icfgLog MAXOPBLOCKS Sb -∗ logTx icfgLog -∗
+    bslots 3 -∗ irefSlots A.ns -∗ fdSlot -∗ fdFrags A.V.fdg A.sts -∗
+    -- THE AU BUNDLE, at the string argstr fetched
+    exStart (hlc := hlc) fscFs A.V.cwi A.P A.Pmiss (bview plen bp) -∗
+    pfAt (aopenCommitAt (hlc := hlc) (fsGammaL fscFs) appE) A.Fo -∗
+    openTruncPiece (hlc := hlc) (fsGammaL fscFs) A.vom A.Ft -∗
+    (∀ c' : CPU, sysOpenPostP (hlc := hlc) k A c') -∗
+    wpLoop c)
+
+/-- **THE O_CREATE ARM, +0x38 .. +0x48, AND ARM A-FAIL** (Rocq
+`so_entry_c_au`): create at T_FILE (`SpecCreate.CREATE`), the join entered
+through `SysOpenCreArm`'s shim.  The bundle is the contract's O_CREATE side
+verbatim at the fetched string. -/
+def sysOpenEntryCBody (Γ : SchedNames) (k : KCtx) (A : SysOpenArgs GF)
+    (Farm Fun : Pfam GF (Aview → Nat → IProp GF))
+    (Fok Fex : Pfam GF (Aview → Nat → Fname → Nat → IProp GF)) : IProp GF :=
+  iprop(∀ (c : CPU) (spie spp : Bool) (R : RegMap) (s1v w4 w5 w6 : BitVec 64) (lo : BitVec 32)
+      (w24 : BitVec 64) (P2 : UPtd) (plen : Nat) (bp : Nat → BitVec 8) (Sb : List Nat),
+    ⌜A.V.upt.extSz A.V.sz P2⌝ -∗
+    ⌜(∀ i, i < plen → bp i ≠ 0#8) ∧ bp plen = 0#8 ∧ plen < 128 ∧
+      argPathOf A.M A.v.toNat (bview plen bp)⌝ -∗
+    ⌜sysOpenPins k R s1v (k.regs 18#5) (k.regs 19#5)⌝ -∗
+    ⌜(sysOpenPath (k.regs 2#5)).toNat % 8 = 0⌝ -∗
+    kctx c (((k.withSpie spie spp).pushed 24).withRegs R) -∗ pcIs c (sysOpenAddr + 0x38#64) -∗
+    trapCsrsExt c k.sie -∗ cpuClaimExt c k.sie k.proc -∗ sysOpenEnv (hlc := hlc) Γ A -∗
+    sysOpenCells (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) (k.regs 9#5) w4 w5 w6 lo (sysOpenOm A) w24 -∗
+    byteBuf (sysOpenPath (k.regs 2#5)) (DFrac.own 1) (bview 128 bp) -∗
+    procPrivFd A.γ (procAddr A.j) A.pid (sysOpenV2 A P2) (sysOpenM2 A P2) -∗
+    logOpS icfgLog MAXOPBLOCKS Sb -∗ logTx icfgLog -∗
+    bslots 3 -∗ irefSlots A.ns -∗ fdSlot -∗ fdFrags A.V.fdg A.sts -∗
+    -- THE AU BUNDLE (the contract's O_CREATE side), at the fetched string
+    epStart (hlc := hlc) fscFs A.V.cwi A.P A.Pmiss (bview plen bp) -∗
+    pfAt (acreCommitAt (hlc := hlc) (fsGammaL fscFs) appE (.AFile []) Farm) Fok -∗
+    pfAt (dlookupCommitAt (hlc := hlc) (fsGammaL fscFs) appE) Fex -∗
+    pfAt (aopenCommitAt (hlc := hlc) (fsGammaL fscFs) appE) A.Fo -∗
+    openTruncPiece (hlc := hlc) (fsGammaL fscFs) A.vom A.Ft -∗
+    creChildUnfired (hlc := hlc) (fsGammaL fscFs) (.AFile []) Farm Fun -∗
+    (∀ c' : CPU, sysOpenPostC (hlc := hlc) k A Farm Fun Fok Fex c') -∗
+    wpLoop c)
+
+end Bodies
+
+end Xv6
+

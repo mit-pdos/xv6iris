@@ -1,0 +1,83 @@
+W8-C STATEMENT PLAN (TfUser, UserFd, SpecUser, UexecWp, UexecSG) -- Sept 25 2026
+Rocq authority: /shared/xv6rocq/iris.  Main tree, new files only.
+
+1. Xv6/TfUser.lean  (Rocq TfUser.v, 85 lines; pure)
+   tfUeq tf tf' := tfW tf tfEpcIdx = tfW tf' tfEpcIdx ∧ ∀ i, 5 ≤ i ≤ 35 → tfW tf i = tfW tf' i   [tf_ueq; `!!!` = tfW]
+   tfUeq_refl/_symm/_trans/_epc/_arg (k<8, tfArgIdx k)/_set_r/_set_l (insert at i∉{3}∪[5,35], List.set)
+   + the corollaries deferred by UsysMemOk dev 7 and UexecSlot:
+     usysNum_tfUeq (Rocq tf_ueq_num), tfResumePc_tfUeq (Rocq tf_ueq_resume_pc).
+   (usys_mem_ok_ueq: add if the landed argCong is directly usable.)
+
+2. Xv6/UserFd.lean  (Rocq UserFd.v, 818 lines; D29)
+   Camera: Rocq ufdG = ghost_mapG Σ nat fdstate.  NO existing Lean capacity instance for
+   GhostMapG GF Nat FdState RegMapF (FdstUR is a no-authority RegMapF(DFracAgree) camera, a
+   different type).  => ONE Xv6G field needed (reported, not added):
+       [gmFdstG : GhostMapG GF Nat FdState RegMapF]   + `Xv6G.gmFdstG` in the reducible-instance attribute line.
+   The file itself binds `[GhostMapG GF Nat FdState RegMapF]` as a section instance (no class),
+   so it builds now and resolves from Xv6G once the field lands.
+   Defs: NSTD := 3 [NSTD]; ufdMap fdv : RegMapF FdState  [ufd_map := filter (k<NSTD ∨ st≠closed) (map_seq 0 fdv)];
+   ufdMapHi [ufd_map_hi]; ufdAuth γ fdv := γ ↪●MAP ufdMap fdv ∗ ⌜len = NOFILE⌝ [ufd_auth];
+   ufd γ fd st := γ ↪◯MAP[fd] st ∗ ⌜st ≠ closed ∧ NSTD ≤ fd⌝ [ufd]; ufdShut [ufd_shut];
+   ustd γ l := ⌜len l = NSTD⌝ ∗ [∗map] map_seq 0 l, elem [ustd]; ufdOwn [ufd_own];
+   ustdAfter/uallocAt/ualloc [ustd_after/ualloc_at/ualloc]; ustdAny, ufdState [ustd_any/ufd_state];
+   fdt0 := replicate NOFILE closed [FdSlots.fdt0].
+   Lemmas: all of Rocq §1–§5 (agree/excl/bound/acc/ustd_agree/alloc_least/close_hi/close_std/
+   alloc_std/alloc_fdt0/sub/sub_hi/open_at ...), ported one-for-one.
+   Deviation: `st ≠ FdClosed` is `st.isClosed = false` (FdState has no DecidableEq).
+
+3. Xv6/UserExec.lean  (NEW, Rocq UserExec.v §2–§4 + UserFrame.u_regs + UserPtTree.user_pt_inv/any
+   + UmodeText.user_pt_inv_x + RiscvFetchExec.hw_config: the STATEMENT vocabulary USER needs).
+   D24: the tower that PROVES USER is wave 9; its statement vocabulary has to exist now, since
+   SpecUser/UexecWp and the 8-M/8-V/8-U kernel side are stated over it.  Lean-native, over
+   MachCSL's existing resources (regPointsTo, gprFile, clockCells, procPtAt-style ownership):
+   UCfg {stvec mie mideleg medeleg dqc; tvd : stvecDirect stvec; mm : mie &&& ~~~mideleg = 0;
+         del : ∀ e, userExc e → medeleg bit (exceptionType_bits_forwards e)}          [ucfg]
+   userExc [user_exc]; userHartOk [user_hart_ok]; userMstatusOk / trapMstatusOk [user/trap_mstatus_ok]
+     (bit positions as KCtx.smFacts); stvecBase [WpIntrCore.stvec_base].
+   uRegs cpu hs ms sc stv sep va va' g  [UserFrame.u_regs]: hart_state, cur_privilege=User, mstatus,
+     scause, stval, sepc, PC, nextPC, clockCells, gprFile.  (resv_any rides MachCSL's ctxTok.)
+   userCfg cpu C [user_cfg]: stvec/mie/mideleg at C.dqc, medeleg + the frozen cells (hw_config's).
+   userPtInv cpu P M / userPtAny / userPtInvX [user_pt_inv/any/_x]: satp at P.root, PMP cells,
+     the tree + user pages (UPtDefs.procPtAt).  _x = no stamp (no MachCSL icache model; flagged).
+   userInv cpu C pt Rut, userTrapFrame cpu C pt Rut, stvecHandlerWp [user_inv/user_trap_frame/stvec_handler_wp].
+   DEVIATIONS (flagged, for 8-M/wave-9 review): hw_config is NOT a separate persistent premise
+   (MachCSL owns the frozen config cells exclusively in confCells; they ride userCfg and come
+   back in the trap frame); minstret_inv (Rocq: emp) dropped; the memory view M is Lean's
+   page view `Nat → List (BitVec 8)` (procPtAt/uvisOf), not a va-keyed gmap.
+
+4. Xv6/SpecUser.lean  (Rocq SpecUser.v; D24(a))
+   wpUserExecClosedBody cpu C pt Rut := (∀ pt', Rut pt' ⊢ ctxTok cpu curCtx ∗ (ctxTok -∗ Rut pt')) →
+       ⊢ wireInv -∗ userInv cpu C pt Rut -∗ ▷ stvecHandlerWp cpu C pt Rut -∗ wpLoop cpu
+   structure USER : wp_user_exec_closed : ∀ cpu [CurCtx] C pt Rut, wpUserExecClosedBody ...
+   (a PARAMETER structure, as DISK_INIT_WM/PRINTK; the one assumed interface D24 allows.)
+
+5. Xv6/UexecWp.lean  (Rocq UexecWp.v)
+   loopOk C pt := C.stvec = TRAMPOLINE ∧ C.dqc = own 1 ∧ C.mie = MIE_S ∧ C.medeleg = MEDELEG_S ∧ uptWf pt   [loop_ok]
+     (ud_data = ud_pas dropped: Lean UPtd has no ud_data field.)
+   uexecF X := ∀ h xi C pt Rut, HRut → ∀ M g ms sc stv sep va, ⌜loopOk⌝ -∗ ⌜userMstatusOk ms⌝ -∗
+      wireInv -∗ uRegs h (active) ms sc stv sep va va g -∗ userPtInvX h pt M -∗ userCfg h C -∗ Rut pt -∗
+      ▷ (userTrapFrame h C pt Rut ∗ X -∗ wpLoop h) -∗ wpLoop h                                    [uexec_F]
+   uexecF_contractive (SwtchCtx.validCtxF precedent); uexecWp := fixpoint uexecF; uexecWp_unfold.
+   structure UEXEC_GEN : uexec_wp_gen : ⊢ □ uexecWp   [Module Type UEXEC_GEN]
+
+6. Xv6/UexecSG.lean  (Rocq UexecSG.v)
+   skeyEq W W' [skey_eq] (+refl/symm); class UexecSG GF [CtokG GF] with the Rocq fields:
+   sfam, sfamPt, sforkPay, sforkLend, sfamPay, sforkPay_pay, sforkLend_pay, sforkPay_pt, sforkLend_pt,
+   sexitPay, sfamAt, sexitPay_at, sforkPay_at, sforkLend_at, sexitPay_pt, sbundleAt, spostAt,
+   sbundleAt_ne, spostAt_ne (dist-Proper in X), sbundleAt_cong, spostAt_cong, sbundleAt_at,
+   spostAt_at, sbundleAt_mono, ssupply, sbundleOfSupplyNe, sbundleOfSupply, sexecRefund,
+   spostAt_exec, sexecRefund_at.   (Z → Int; mword 64 → BitVec 64; gmap Z (bv 8) → ElfMem
+   (Uvis.M's type); list fdstate → List FdState; Z cwd → Nat (Uvis.cwd); gset gname → ExtTreeSet GName.)
+   SBundle: sbundle/sbundlePay/sbundlePayRef + of_pay/pay_of_ref/pay_of_sbundle/ne/cong/mono.
+   class UprogSG {Dsup; psok}; freeNum + Decidable.  One-instance-per-camera: UexecSG is NOT a
+   camera class (no ghost state), it is Rocq's data class -- kept as a class, as Rocq.
+   f_equiv_wide / solve_contractive_wide: Rocq tactic workarounds, not ported (Lean proves
+   contractivity by explicit ne lemmas).
+
+HELD DECISIONS: none of D27/D28/D30-D33 is touched.  D33 (exec _ne) is not needed here:
+UexecSG only states the ne FIELDS; their instance is UexecExecInst (8-3).
+
+AMENDMENT (after implementation): the ufd camera cannot be an Xv6G field -- Xv6G is in
+UartTrace.lean, below FileDefs.lean where FdState is defined.  Recommended home: FileDefs.FileG
+(already owns the FdState camera fdstG): add `[gmUfdG : GhostMapG GF Nat FdState RegMapF]` and
+`FileG.gmUfdG` to its `attribute [reducible, instance]` line.
