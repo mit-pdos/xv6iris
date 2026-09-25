@@ -665,7 +665,7 @@ Example demo_secc_cycle :
        (lm_at ulmS cs_sc2 0) = c_hi ++ u_prompt.
 Proof using.
   assert (Hb2 : bodies_of I_sc2 = [cmd_cat txt_a]) by (vm_compute; reflexivity).
-  assert (Hl2 : uline_of_u cmd_cat txt_a = LCat txt_a) by (vm_compute; reflexivity).
+  assert (Hl2 : uline_of_u (cmd_cat txt_a) = LCat txt_a) by (vm_compute; reflexivity).
   assert (Ha2 : lm_at ulmS cs_sc2 0 = UR RCRan) by exact (ualt_dec_code (UR RCRan)).
   rewrite demo_secc_after. split_and!.
   - exact demo_secc_alts.
@@ -678,9 +678,9 @@ Proof using.
   - assert (H1 : nlines I_sc2 = 1) by (rewrite /nlines Hb2; reflexivity).
     split; [by rewrite H1 |]. intros i Hi.
     destruct i as [| i]; [| rewrite H1 in Hi; lia]. cbn [lm_upto]. rewrite Ha2 Hb2.
-    change ([cmd_cat txt_a] !!! 0) with cmd_cat txt_a.
+    change ([cmd_cat txt_a] !!! 0) with (cmd_cat txt_a).
     cbn [ulmS ulm lm_of lm_ok]. rewrite Hl2. exact I.
-  - rewrite Ha2 Hb2. change ([cmd_cat txt_a] !!! 0) with cmd_cat txt_a.
+  - rewrite Ha2 Hb2. change ([cmd_cat txt_a] !!! 0) with (cmd_cat txt_a).
     cbn [ulmS ulm lm_of lm_cont]. rewrite Hl2. vm_compute. reflexivity.
 Qed.
 
