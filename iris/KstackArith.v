@@ -1,12 +1,14 @@
 (* KstackArith.v -- the pure arithmetic behind KSTACK(i), separated from the
    two proofs that need it.
 
-   gcc compiles [p - proc] (an array of 360-byte elements) into an arithmetic
-   shift by 3 followed by a multiply by the modular inverse of 45:
+   gcc compiles [p - proc] (an array of 368-byte elements) into an arithmetic
+   shift by 4 followed by a multiply by the modular inverse of 23:
 
-     45 * 0x4fa4fa4fa4fa4fa5 = 1 + 14 * 2^64,
+     23 * 0xd37a6f4de9bd37a7 = 1 + 19 * 2^64,
 
-   so [(360*i >>s 3) * magic] IS [i] mod 2^64, and the rest of the sequence
+   so [(368*i >>s 4) * magic] IS [i] mod 2^64 (the magic is NEGATIVE as a
+   signed word, which the signed-signed [mul] sees; the product is still
+   [i] mod 2^64), and the rest of the sequence
    ([slli 13], [addw 0x2000], [sub] from TRAMPOLINE) is
    [0x3FFFFFF000 - (i+1)*8192] -- i.e. KvmMap.kstack_va i.
 
@@ -32,7 +34,7 @@ Local Open Scope Z_scope.
 
 
 (* magic reciprocal fact *)
-Lemma magic_recip : (45 * 0x4fa4fa4fa4fa4fa5 = 1 + 14 * 18446744073709551616)%Z.
+Lemma magic_recip : (23 * 0xd37a6f4de9bd37a7 = 1 + 19 * 18446744073709551616)%Z.
 Proof. vm_compute. reflexivity. Qed.
 
 (* sint of a small nonnegative mword_of_int *)
@@ -102,20 +104,23 @@ Proof.
   rewrite (Z.mod_mod_divide (sint a * sint b) (2^64*2^64) (2^64)); [reflexivity | exists (2^64); ring].
 Qed.
 
-(* the KSTACK mul step: (45*i) * magic ≡ i (mod 2^64) for i < 64 *)
+(* the KSTACK mul step: (23*i) * magic ≡ i (mod 2^64) for i < 64 *)
 Lemma kstack_mul_step (i : nat) : (i < 64)%nat ->
   mult_to_bits_half 64 Signed Signed
-    (mword_of_int (45 * Z.of_nat i)) (mword_of_int 0x4fa4fa4fa4fa4fa5) Low
+    (mword_of_int (23 * Z.of_nat i)) (mword_of_int 0xd37a6f4de9bd37a7) Low
   = mword_of_int (Z.of_nat i).
 Proof.
   intro Hi. apply bv_eq. rewrite mult_low_unsigned.
-  rewrite (sint_moi_small (45 * Z.of_nat i) ltac:(split; [lia | change (2^63) with 9223372036854775808; lia])).
-  rewrite (sint_moi_small 0x4fa4fa4fa4fa4fa5 ltac:(split; [lia | vm_compute; reflexivity])).
+  rewrite (sint_moi_small (23 * Z.of_nat i) ltac:(split; [lia | change (2^63) with 9223372036854775808; lia])).
+  assert (Hm : sint (mword_of_int 0xd37a6f4de9bd37a7 : mword 64)
+               = 0xd37a6f4de9bd37a7 - 18446744073709551616) by (vm_compute; reflexivity).
+  rewrite Hm.
   rewrite moi64_mod. change 18446744073709551616 with (2^64).
-  (* 45*i*magic = i + (i*14)*2^64 ≡ i mod 2^64 *)
-  assert (Hprod : (45 * Z.of_nat i * 5738987045154082725
-                   = Z.of_nat i + (Z.of_nat i * 14) * 2 ^ 64)%Z)
+  (* 23*i*(magic - 2^64) = i + (i*19 - i*23)*2^64 ≡ i mod 2^64 *)
+  assert (Hprod : (23 * Z.of_nat i * (15238614669586151335 - 2 ^ 64)
+                   = Z.of_nat i + (Z.of_nat i * 19 - Z.of_nat i * 23) * 2 ^ 64)%Z)
     by (change (2 ^ 64)%Z with 18446744073709551616%Z; ring).
+  change 0xd37a6f4de9bd37a7 with 15238614669586151335.
   rewrite Hprod. rewrite Z_mod_plus_full. reflexivity.
 Qed.
 
@@ -124,22 +129,22 @@ Qed.
 Lemma bvsigned_moi_small (z : Z) : (0 <= z < 2^63)%Z -> bv_signed (mword_of_int z : mword 64) = z.
 Proof. intro Hz. change (bv_signed ?x) with (sint x). apply sint_moi_small; exact Hz. Qed.
 
-Lemma srai3 (z : Z) : (0 <= z < 9223372036854775808)%Z ->
-  shift_bits_right_arith (mword_of_int z : mword 64) (subrange_vec_dec (mword_of_int 3 : mword 6) 5 0)
-  = mword_of_int (z / 8).
+Lemma srai4 (z : Z) : (0 <= z < 9223372036854775808)%Z ->
+  shift_bits_right_arith (mword_of_int z : mword 64) (subrange_vec_dec (mword_of_int 4 : mword 6) 5 0)
+  = mword_of_int (z / 16).
 Proof.
   intro Hz. apply bv_eq.
   unfold shift_bits_right_arith, arith_shiftr, with_word, get_word, MachineWord.MachineWord.arith_shift_right.
   rewrite bv_ashiftr_unsigned.
   replace (bv_unsigned (MachineWord.MachineWord.N_to_word (MachineWord.MachineWord.Z_idx 64)
-                  (MachineWord.MachineWord.Z_idx (int_of_mword false (subrange_vec_dec (mword_of_int 3 : mword 6) 5 0))))) with 3
+                  (MachineWord.MachineWord.Z_idx (int_of_mword false (subrange_vec_dec (mword_of_int 4 : mword 6) 5 0))))) with 4
     by (vm_compute; reflexivity).
   rewrite (bvsigned_moi_small z ltac:(change (2^63)%Z with 9223372036854775808%Z; lia)).
-  rewrite Z.shiftr_div_pow2; [| lia]. change (2^3) with 8.
-  assert (Hdlt : 0 <= z / 8 < 18446744073709551616).
+  rewrite Z.shiftr_div_pow2; [| lia]. change (2^4) with 16.
+  assert (Hdlt : 0 <= z / 16 < 18446744073709551616).
   { split; [apply Z.div_pos; lia|].
     apply Z.le_lt_trans with z; [apply Z.div_le_upper_bound; lia | lia]. }
-  rewrite (moi64_small (z/8) ltac:(exact Hdlt)).
+  rewrite (moi64_small (z/16) ltac:(exact Hdlt)).
   apply bv_wrap_small. unfold bv_modulus.
   change (2 ^ Z.of_N 64)%Z with 18446744073709551616%Z. exact Hdlt.
 Qed.

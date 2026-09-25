@@ -224,10 +224,10 @@ Definition ut_round (sepc_v sc_v : mword 64) (U U' : ustate) : Prop :=
   uround_ok sc_v
     (<[tf_epc_idx := ret_pc sepc_v]> (pv_tf (us_V U)))
     (us_M U) (perm_of (ud_um (pv_upt (us_V U))) (uint (pv_sz (us_V U))))
-    (uint (pv_sz (us_V U))) (pv_cwi (us_V U)) (pv_lazy (us_V U))
+    (uint (pv_sz (us_V U))) (pv_cwi (us_V U)) (pv_lazy (us_V U)) (pv_secc (us_V U))
     (pv_tf (us_V U')) (us_M U')
     (perm_of (ud_um (pv_upt (us_V U'))) (uint (pv_sz (us_V U'))))
-    (uint (pv_sz (us_V U'))) (pv_cwi (us_V U')) (pv_lazy (us_V U')).
+    (uint (pv_sz (us_V U'))) (pv_cwi (us_V U')) (pv_lazy (us_V U')) (pv_secc (us_V U')).
 
 (* THE DESCRIPTOR HALF OF THE ROUND, and the reason it is CONDITIONAL.
    [ut_round] speaks the trapframe, image, permission map and break; it says
@@ -255,10 +255,10 @@ Definition ut_fd_kept (sc_v : mword 64) (sts sts' : list fdstate) : Prop :=
    token ([ut_fork_out] below) and wait's carries the escrow the reap
    redeems.  The guard is [UexecApply.uexec_ret_round_slot]'s own, so the
    premise travels to the loop verbatim. *)
-Definition ut_ch_kept (sc_v : mword 64) (tf : list (mword 64))
+Definition ut_ch_kept (sc_v : mword 64) (secc : mword 64) (tf : list (mword 64))
     (cs cs' : gset gname) : Prop :=
   ~ (sc_v = uecall_scause /\
-     (usys_num tf = USYS_fork \/ usys_num tf = USYS_wait)) -> cs' = cs.
+     (usys_eff secc tf = USYS_fork \/ usys_eff secc tf = USYS_wait)) -> cs' = cs.
 
 (* ...AND THE GENERATION'S, WITH NO GUARD AT ALL.  A round never
    re-incarnates the process it runs: the generation is minted once, at
@@ -275,12 +275,12 @@ Definition ut_gen_kept (U U' : ustate) : Prop :=
 (* ...across any two frames the save walk leaves agreeing on the syscall
    number, which is how it travels from usertrap's post to uservec's --
    [ut_fd_ecall_in]'s route exactly. *)
-Lemma ut_ch_kept_cong (sc_v : mword 64) (tf1 tf2 : list (mword 64))
+Lemma ut_ch_kept_cong (sc_v : mword 64) (secc : mword 64) (tf1 tf2 : list (mword 64))
     (cs cs' : gset gname) :
   usys_num tf1 = usys_num tf2 ->
-  ut_ch_kept sc_v tf1 cs cs' -> ut_ch_kept sc_v tf2 cs cs'.
+  ut_ch_kept sc_v secc tf1 cs cs' -> ut_ch_kept sc_v secc tf2 cs cs'.
 Proof.
-  intros Hn H Hg. apply H. intros [He Hf]. apply Hg. split; [exact He |].
+  intros Hn0 H Hg. pose proof (usys_eff_num_cong secc _ _ Hn0) as Hn. apply H. intros [He Hf]. apply Hg. split; [exact He |].
   rewrite <- Hn. exact Hf.
 Qed.
 
@@ -306,10 +306,10 @@ Qed.
    trapframe pair to speak of, while the ecall arm proves this one and
    nothing else.  A fused definition would make every arm carry both
    trapframes to say the half it does not use. *)
-Definition ut_fd_ecall (sc_v : mword 64) (tf tf' : list (mword 64))
+Definition ut_fd_ecall (sc_v : mword 64) (secc : mword 64) (tf tf' : list (mword 64))
     (sts sts' : list fdstate) : Prop :=
   sc_v = uecall_scause ->
-  UsysMemOk.usys_fd_ok (UsysMemOk.usys_num tf) tf
+  UsysMemOk.usys_fd_ok (UsysMemOk.usys_eff secc tf) tf
     (tf' !!! tf_arg_idx 0) sts sts'.
 
 (* THE ROW READS THE OUTGOING TRAPFRAME AT ONE WORD ONLY, so a tail that
@@ -322,21 +322,21 @@ Definition ut_fd_ecall (sc_v : mword 64) (tf tf' : list (mword 64))
    [TfUser.tf_ueq] -- the caller that wants it (uservec, restating the row
    at [tf_of g] after the save walk) has an epc rewrite in between, and
    [tf_ueq] is not blind to the epc. *)
-Lemma ut_fd_ecall_in (sc_v : mword 64) (tf1 tf2 tf' : list (mword 64))
+Lemma ut_fd_ecall_in (sc_v : mword 64) (secc : mword 64) (tf1 tf2 tf' : list (mword 64))
     (sts sts' : list fdstate) :
   tf1 !!! tf_arg_idx 7 = tf2 !!! tf_arg_idx 7 ->
   tf1 !!! tf_arg_idx 0 = tf2 !!! tf_arg_idx 0 ->
-  ut_fd_ecall sc_v tf1 tf' sts sts' -> ut_fd_ecall sc_v tf2 tf' sts sts'.
+  ut_fd_ecall sc_v secc tf1 tf' sts sts' -> ut_fd_ecall sc_v secc tf2 tf' sts sts'.
 Proof.
   intros H7 H0 H Hc.
-  rewrite <- (UsysMemOk.usys_num_arg_cong _ _ H7).
+  rewrite <- (UsysMemOk.usys_eff_arg_cong secc _ _ H7).
   exact (UsysMemOk.usys_fd_ok_arg_cong _ tf1 tf2 _ _ _ H0 (H Hc)).
 Qed.
 
-Lemma ut_fd_ecall_out (sc_v : mword 64) (tf tf1 tf2 : list (mword 64))
+Lemma ut_fd_ecall_out (sc_v : mword 64) (secc : mword 64) (tf tf1 tf2 : list (mword 64))
     (sts sts' : list fdstate) :
   tf1 !!! tf_arg_idx 0 = tf2 !!! tf_arg_idx 0 ->
-  ut_fd_ecall sc_v tf tf1 sts sts' -> ut_fd_ecall sc_v tf tf2 sts sts'.
+  ut_fd_ecall sc_v secc tf tf1 sts sts' -> ut_fd_ecall sc_v secc tf tf2 sts sts'.
 Proof. intros He H Hc. rewrite <- He. exact (H Hc). Qed.
 
 (* ...AND GETPID'S ANSWER, carried out of the ecall arm on [ut_fd_ecall]'s
@@ -351,35 +351,35 @@ Proof. intros He H Hc. rewrite <- He. exact (H Hc). Qed.
    reasons: the NUMBER off the entry frame [tf], the ANSWER off the a0 word
    of the outgoing one.  There is no non-ecall half: an interrupt or a page
    fault answers nothing, and the process's own row is quiet there. *)
-Definition ut_ret_pid (sc_v : mword 64) (tf tf' : list (mword 64))
+Definition ut_ret_pid (sc_v : mword 64) (secc : mword 64) (tf tf' : list (mword 64))
     (pid : mword 32) : Prop :=
   sc_v = uecall_scause ->
-  UsysMemOk.usys_ret_pid (UsysMemOk.usys_num tf)
+  UsysMemOk.usys_ret_pid (UsysMemOk.usys_eff secc tf)
     (tf' !!! tf_arg_idx 0) pid.
 
 (* the entry frame is read at ONE word, a7 -- the number -- so the row
    crosses uservec's save walk exactly as [ut_fd_ecall_in] does *)
-Lemma ut_ret_pid_in (sc_v : mword 64) (tf1 tf2 tf' : list (mword 64))
+Lemma ut_ret_pid_in (sc_v : mword 64) (secc : mword 64) (tf1 tf2 tf' : list (mword 64))
     (pid : mword 32) :
   tf1 !!! tf_arg_idx 7 = tf2 !!! tf_arg_idx 7 ->
-  ut_ret_pid sc_v tf1 tf' pid -> ut_ret_pid sc_v tf2 tf' pid.
+  ut_ret_pid sc_v secc tf1 tf' pid -> ut_ret_pid sc_v secc tf2 tf' pid.
 Proof.
-  intros H7 H Hc. rewrite <- (UsysMemOk.usys_num_arg_cong _ _ H7).
+  intros H7 H Hc. rewrite <- (UsysMemOk.usys_eff_arg_cong secc _ _ H7).
   exact (H Hc).
 Qed.
 
 (* ...and the outgoing frame at a0, [ut_fd_ecall_out]'s twin *)
-Lemma ut_ret_pid_out (sc_v : mword 64) (tf tf1 tf2 : list (mword 64))
+Lemma ut_ret_pid_out (sc_v : mword 64) (secc : mword 64) (tf tf1 tf2 : list (mword 64))
     (pid : mword 32) :
   tf1 !!! tf_arg_idx 0 = tf2 !!! tf_arg_idx 0 ->
-  ut_ret_pid sc_v tf tf1 pid -> ut_ret_pid sc_v tf tf2 pid.
+  ut_ret_pid sc_v secc tf tf1 pid -> ut_ret_pid sc_v secc tf tf2 pid.
 Proof. intros He H Hc. rewrite <- He. exact (H Hc). Qed.
 
 (* ...and the row at a non-getpid number, which is how every other arm
    pays it *)
-Lemma ut_ret_pid_ne (sc_v : mword 64) (tf tf' : list (mword 64))
+Lemma ut_ret_pid_ne (sc_v : mword 64) (secc : mword 64) (tf tf' : list (mword 64))
     (pid : mword 32) :
-  UsysMemOk.usys_num tf <> UsysMemOk.USYS_getpid -> ut_ret_pid sc_v tf tf' pid.
+  UsysMemOk.usys_eff secc tf <> UsysMemOk.USYS_getpid -> ut_ret_pid sc_v secc tf tf' pid.
 Proof. intros Hne _. exact (UsysMemOk.usys_ret_pid_ne _ _ _ Hne). Qed.
 
 (* ...AND PIPE'S JOIN, carried out of the ecall arm beside the row above.
@@ -389,38 +389,38 @@ Proof. intros Hne _. exact (UsysMemOk.usys_ret_pid_ne _ _ _ Hne). Qed.
    two trapframes, read at the same two words, so the two travel together
    and cross the prologue's epc rewrite by the same lemma
    ([UsysMemOk.usys_pipe_ok_epc]).  See [UsysMemOk.v]'s SS2c. *)
-Definition ut_pipe_ecall (sc_v : mword 64) (tf tf' : list (mword 64))
+Definition ut_pipe_ecall (sc_v : mword 64) (secc : mword 64) (tf tf' : list (mword 64))
     (M M' : gmap Z (bv 8)) (sts sts' : list fdstate) : Prop :=
   sc_v = uecall_scause ->
-  UsysMemOk.usys_pipe_ok (UsysMemOk.usys_num tf) tf
+  UsysMemOk.usys_pipe_ok (UsysMemOk.usys_eff secc tf) tf
     (tf' !!! tf_arg_idx 0) M M' sts sts'.
 
 (* the two congruences, in the shapes [ut_fd_ecall] has them: the entry
    frame at a7 and a0, the outgoing frame at a0. *)
-Lemma ut_pipe_ecall_in (sc_v : mword 64) (tf1 tf2 tf' : list (mword 64))
+Lemma ut_pipe_ecall_in (sc_v : mword 64) (secc : mword 64) (tf1 tf2 tf' : list (mword 64))
     (M M' : gmap Z (bv 8)) (sts sts' : list fdstate) :
   tf1 !!! tf_arg_idx 7 = tf2 !!! tf_arg_idx 7 ->
   tf1 !!! tf_arg_idx 0 = tf2 !!! tf_arg_idx 0 ->
-  ut_pipe_ecall sc_v tf1 tf' M M' sts sts' ->
-  ut_pipe_ecall sc_v tf2 tf' M M' sts sts'.
+  ut_pipe_ecall sc_v secc tf1 tf' M M' sts sts' ->
+  ut_pipe_ecall sc_v secc tf2 tf' M M' sts sts'.
 Proof.
   intros H7 H0 H Hc.
-  rewrite <- (UsysMemOk.usys_num_arg_cong _ _ H7).
+  rewrite <- (UsysMemOk.usys_eff_arg_cong secc _ _ H7).
   exact (UsysMemOk.usys_pipe_ok_arg_cong _ tf1 tf2 _ _ _ _ _ H0 (H Hc)).
 Qed.
 
-Lemma ut_pipe_ecall_out (sc_v : mword 64) (tf tf1 tf2 : list (mword 64))
+Lemma ut_pipe_ecall_out (sc_v : mword 64) (secc : mword 64) (tf tf1 tf2 : list (mword 64))
     (M M' : gmap Z (bv 8)) (sts sts' : list fdstate) :
   tf1 !!! tf_arg_idx 0 = tf2 !!! tf_arg_idx 0 ->
-  ut_pipe_ecall sc_v tf tf1 M M' sts sts' ->
-  ut_pipe_ecall sc_v tf tf2 M M' sts sts'.
+  ut_pipe_ecall sc_v secc tf tf1 M M' sts sts' ->
+  ut_pipe_ecall sc_v secc tf tf2 M M' sts sts'.
 Proof. intros He H Hc. rewrite <- He. exact (H Hc). Qed.
 
 (* the quiet reading, for the four non-ecall causes: they never reach the
    dispatch, so the guard is unreachable through [sc_v]. *)
-Lemma ut_pipe_ecall_quiet (sc_v : mword 64) (tf tf' : list (mword 64))
+Lemma ut_pipe_ecall_quiet (sc_v : mword 64) (secc : mword 64) (tf tf' : list (mword 64))
     (M M' : gmap Z (bv 8)) (sts sts' : list fdstate) :
-  sc_v <> uecall_scause -> ut_pipe_ecall sc_v tf tf' M M' sts sts'.
+  sc_v <> uecall_scause -> ut_pipe_ecall sc_v secc tf tf' M M' sts sts'.
 Proof. intros Hne Hc. contradiction (Hne Hc). Qed.
 
 (* ===================================================================== *)
@@ -477,7 +477,7 @@ Definition ut_sys_in `{!riscvGS Σ, !xv6G Σ, !fileG Σ} `{GEN : GenId} `{XI : C
     : iProp Σ :=
   (* ...AND EXIT DEPOSITS LIKE ANY RETURNING NUMBER (design/pipe.md, "The
      exit path"): its row is the table's close payments. *)
-  (⌜sc_v = uecall_scause /\ usys_num tf = n /\ n <> USYS_fork⌝ -∗
+  (⌜sc_v = uecall_scause /\ usys_eff (pv_secc (us_V U)) tf = n /\ n <> USYS_fork⌝ -∗
      sbundle_at uslot n f (uvis_of U sts gn cs pid))%I.
 
 (* ...AND THE ARMED POST BACK, at the same key, THE SAME FAMILIES and the
@@ -504,7 +504,7 @@ Definition ut_sys_out `{!riscvGS Σ, !xv6G Σ, !fileG Σ} `{GEN : GenId} `{XI : 
     (M' : gmap Z (bv 8))
     (sts' : list fdstate) (cw' : Z) (cs' : gset gname)
     : iProp Σ :=
-  (⌜sc_v = uecall_scause /\ usys_num tf = n
+  (⌜sc_v = uecall_scause /\ usys_eff (pv_secc (us_V U)) tf = n
     /\ n <> USYS_exit /\ n <> USYS_fork⌝ -∗
      spost_at uslot n f (uvis_of U sts gn cs pid) r M' sts' cw' cs')%I.
 
@@ -521,11 +521,11 @@ Definition ut_exec_out `{!riscvGS Σ, !xv6G Σ, !fileG Σ} `{GEN : GenId} `{XI :
     {SG : uexecSG Σ}
     (f : sfam)
     (sc_v : mword 64) (tf : list (mword 64)) (M : gmap Z (bv 8))
-    (π : gmap (mword 27) uperm) (szv : Z) (lz : bool)
+    (π : gmap (mword 27) uperm) (szv : Z) (lz : bool) (secc : mword 64)
     (U' : ustate) (sts sts' : list fdstate) (gn : gname) (cs : gset gname)
     (pid : mword 32)
     : iProp Σ :=
-  (⌜sc_v = uecall_scause /\ usys_num tf = USYS_exec⌝ -∗
+  (⌜sc_v = uecall_scause /\ usys_eff secc tf = USYS_exec⌝ -∗
      (⌜exists r : mword 64,
          uround_bump_ok tf (pv_tf (us_V U')) r
          /\ usys_mem_ok USYS_exec tf r M π szv lz (us_M U')
@@ -558,10 +558,10 @@ Definition ut_exec_out `{!riscvGS Σ, !xv6G Σ, !fileG Σ} `{GEN : GenId} `{XI :
    wants, so the row IS it. *)
 Definition ut_fork_out `{!riscvGS Σ, !xv6G Σ, !fileG Σ} `{GEN : GenId} `{XI : CurCtx}
     {SG : uexecSG Σ}
-    (f : sfam) (sc_v : mword 64) (tf : list (mword 64)) (r : mword 64)
+    (f : sfam) (sc_v : mword 64) (secc : mword 64) (tf : list (mword 64)) (r : mword 64)
     (cs cs' : gset gname)
     : iProp Σ :=
-  (⌜sc_v = uecall_scause /\ usys_num tf = USYS_fork⌝ -∗
+  (⌜sc_v = uecall_scause /\ usys_eff secc tf = USYS_fork⌝ -∗
      ufork_ans (sfork_pay f) (sfork_lend f) r cs cs')%I.
 
 (* THE ROW READS THE FRAME ONLY THROUGH ITS a7 WORD, so it transports
@@ -569,21 +569,22 @@ Definition ut_fork_out `{!riscvGS Σ, !xv6G Σ, !fileG Σ} `{GEN : GenId} `{XI :
    which is what carries it from usertrap's post to uservec's. *)
 Lemma ut_fork_out_cong `{!riscvGS Σ, !xv6G Σ, !fileG Σ} `{GEN : GenId} `{XI : CurCtx}
     {SG : uexecSG Σ}
-    (f : sfam) (sc_v : mword 64) (tf1 tf2 : list (mword 64)) (r1 r2 : mword 64)
+    (f : sfam) (sc_v : mword 64) (secc : mword 64) (tf1 tf2 : list (mword 64)) (r1 r2 : mword 64)
     (cs cs' : gset gname) :
   usys_num tf1 = usys_num tf2 -> r1 = r2 ->
-  ut_fork_out f sc_v tf1 r1 cs cs' -∗ ut_fork_out f sc_v tf2 r2 cs cs'.
+  ut_fork_out f sc_v secc tf1 r1 cs cs' -∗ ut_fork_out f sc_v secc tf2 r2 cs cs'.
 Proof.
-  intros Hn Hr. rewrite /ut_fork_out. subst r2. iIntros "H %Hc".
+  intros Hn0 Hr. pose proof (usys_eff_num_cong secc _ _ Hn0) as Hn.
+  rewrite /ut_fork_out. subst r2. iIntros "H %Hc".
   iApply "H". iPureIntro. split; [exact (proj1 Hc) |].
   rewrite Hn. exact (proj2 Hc).
 Qed.
 
 Lemma ut_fork_out_quiet `{!riscvGS Σ, !xv6G Σ, !fileG Σ} `{GEN : GenId} `{XI : CurCtx}
     {SG : uexecSG Σ}
-    (f : sfam) (sc_v : mword 64) (tf : list (mword 64)) (r : mword 64)
+    (f : sfam) (sc_v : mword 64) (secc : mword 64) (tf : list (mword 64)) (r : mword 64)
     (cs cs' : gset gname) :
-  sc_v <> uecall_scause -> ⊢ ut_fork_out f sc_v tf r cs cs'.
+  sc_v <> uecall_scause -> ⊢ ut_fork_out f sc_v secc tf r cs cs'.
 Proof.
   intros Hne. rewrite /ut_fork_out. iIntros "%Hc". exfalso.
   exact (Hne (proj1 Hc)).
@@ -602,25 +603,26 @@ Qed.
    the process ([UexecRet.uwait_ans_at_m]). *)
 Definition ut_wait_out `{!riscvGS Σ, !xv6G Σ, !fileG Σ} `{GEN : GenId} `{XI : CurCtx}
     {SG : uexecSG Σ}
-    (sc_v : mword 64) (tf : list (mword 64)) (M M' : gmap Z (bv 8))
+    (sc_v : mword 64) (secc : mword 64) (tf : list (mword 64)) (M M' : gmap Z (bv 8))
     (r : mword 64)
     (cs cs' : gset gname) (gn : gname) (pidv : mword 32)
     : iProp Σ :=
-  (⌜sc_v = uecall_scause /\ usys_num tf = USYS_wait⌝ -∗
+  (⌜sc_v = uecall_scause /\ usys_eff secc tf = USYS_wait⌝ -∗
      uwait_ans_at_m r M M' (tf !!! tf_arg_idx 0) cs cs' gn
        (bool_decide (tf !!! tf_arg_idx 0 = (zero_reg : mword 64))) pidv)%I.
 
 Lemma ut_wait_out_cong `{!riscvGS Σ, !xv6G Σ, !fileG Σ} `{GEN : GenId} `{XI : CurCtx}
     {SG : uexecSG Σ}
-    (sc_v : mword 64) (tf1 tf2 : list (mword 64)) (M M' : gmap Z (bv 8))
+    (sc_v : mword 64) (secc : mword 64) (tf1 tf2 : list (mword 64)) (M M' : gmap Z (bv 8))
     (r1 r2 : mword 64)
     (cs cs' : gset gname) (gn : gname) (pidv : mword 32) :
   usys_num tf1 = usys_num tf2 -> r1 = r2 ->
   tf1 !!! tf_arg_idx 0 = tf2 !!! tf_arg_idx 0 ->
-  ut_wait_out sc_v tf1 M M' r1 cs cs' gn pidv -∗
-  ut_wait_out sc_v tf2 M M' r2 cs cs' gn pidv.
+  ut_wait_out sc_v secc tf1 M M' r1 cs cs' gn pidv -∗
+  ut_wait_out sc_v secc tf2 M M' r2 cs cs' gn pidv.
 Proof.
-  intros Hn Hr Ha0. rewrite /ut_wait_out. subst r2. rewrite Ha0.
+  intros Hn0 Hr Ha0. pose proof (usys_eff_num_cong secc _ _ Hn0) as Hn.
+  rewrite /ut_wait_out. subst r2. rewrite Ha0.
   iIntros "H %Hc".
   iApply "H". iPureIntro. split; [exact (proj1 Hc) |].
   rewrite Hn. exact (proj2 Hc).
@@ -632,11 +634,11 @@ Qed.
    ([ut_live_out]).  (lane TRAP-ROWS, T4) *)
 Lemma ut_wait_out_forget `{!riscvGS Σ, !xv6G Σ, !fileG Σ} `{GEN : GenId} `{XI : CurCtx}
     {SG : uexecSG Σ}
-    (sc_v : mword 64) (tf : list (mword 64)) (M M' : gmap Z (bv 8))
+    (sc_v : mword 64) (secc : mword 64) (tf : list (mword 64)) (M M' : gmap Z (bv 8))
     (r : mword 64)
     (cs cs' : gset gname) (gn : gname) (pidv : mword 32) :
-  ut_wait_out sc_v tf M M' r cs cs' gn pidv -∗
-  (⌜sc_v = uecall_scause /\ usys_num tf = USYS_wait⌝ -∗
+  ut_wait_out sc_v secc tf M M' r cs cs' gn pidv -∗
+  (⌜sc_v = uecall_scause /\ usys_eff secc tf = USYS_wait⌝ -∗
      uwait_ans r cs cs').
 Proof.
   rewrite /ut_wait_out. iIntros "H %Hc".
@@ -652,11 +654,11 @@ Qed.
    still absorbed -- those the U tier genuinely cannot name. *)
 Lemma ut_wait_out_pid `{!riscvGS Σ, !xv6G Σ, !fileG Σ} `{GEN : GenId} `{XI : CurCtx}
     {SG : uexecSG Σ}
-    (sc_v : mword 64) (tf : list (mword 64)) (M M' : gmap Z (bv 8))
+    (sc_v : mword 64) (secc : mword 64) (tf : list (mword 64)) (M M' : gmap Z (bv 8))
     (r : mword 64)
     (cs cs' : gset gname) (gn : gname) (pidv : mword 32) :
-  ut_wait_out sc_v tf M M' r cs cs' gn pidv -∗
-  (⌜sc_v = uecall_scause /\ usys_num tf = USYS_wait⌝ -∗
+  ut_wait_out sc_v secc tf M M' r cs cs' gn pidv -∗
+  (⌜sc_v = uecall_scause /\ usys_eff secc tf = USYS_wait⌝ -∗
      uwait_ans_pid_m r M M' (tf !!! tf_arg_idx 0) cs cs' pidv).
 Proof.
   rewrite /ut_wait_out. iIntros "H %Hc".
@@ -707,16 +709,16 @@ Qed.
    exit and +0xa6's unfired one-shot killing the killed exit, a -1 means the
    caller's children column was EMPTY -- and the reap-nothing arm's set did
    not move, so the caller's own reading is [∅]. *)
-Definition ut_live_out (sc_v : mword 64) (tf : list (mword 64))
+Definition ut_live_out (sc_v : mword 64) (secc : mword 64) (tf : list (mword 64))
     (sts : list fdstate) (r : mword 64) (cs' : gset gname) : Prop :=
-  (sc_v = uecall_scause -> usys_num tf = USYS_read ->
+  (sc_v = uecall_scause -> usys_eff secc tf = USYS_read ->
    (0 <= sys_rw_count (tf !!! tf_arg_idx 2))%Z ->
    forall rb : bool,
      fd_st_of_key (tf !!! tf_arg_idx 0) sts
        = FdOpen true rb (FdDevice CONSOLE) ->
      r <> (mword_of_int (-1) : mword 64))
   /\
-  (sc_v = uecall_scause -> usys_num tf = USYS_wait ->
+  (sc_v = uecall_scause -> usys_eff secc tf = USYS_wait ->
    uint (tf !!! tf_arg_idx 0) = 0%Z ->
    r = (mword_of_int (-1) : mword 64) ->
    cs' = (∅ : gset gname)).
@@ -742,35 +744,35 @@ Proof.
   right. intros [rb Hrb]. destruct rb; [ exact (H1 Hrb) | exact (H2 Hrb) ].
 Defined.
 
-Definition ut_live_read_g (sc_v : mword 64) (tf : list (mword 64))
+Definition ut_live_read_g (sc_v : mword 64) (secc : mword 64) (tf : list (mword 64))
     (sts : list fdstate) (r : mword 64) : Prop :=
-  sc_v = uecall_scause /\ usys_num tf = USYS_read
+  sc_v = uecall_scause /\ usys_eff secc tf = USYS_read
   /\ (0 <= sys_rw_count (tf !!! tf_arg_idx 2))%Z
   /\ ut_live_fd_g tf sts
   /\ r = (mword_of_int (-1) : mword 64).
 
 Global Instance ut_live_read_g_dec sc_v tf sts r :
-  Decision (ut_live_read_g sc_v tf sts r).
+  Decision (ut_live_read_g sc_v secc tf sts r).
 Proof. rewrite /ut_live_read_g. apply _. Defined.
 
 (* ...AND WAIT'S GUARD, the same way: the four facts +0xa6 has to have as
    Coq cases before it can spend the unfired one-shot on the wait clause. *)
-Definition ut_live_wait_g (sc_v : mword 64) (tf : list (mword 64))
+Definition ut_live_wait_g (sc_v : mword 64) (secc : mword 64) (tf : list (mword 64))
     (r : mword 64) : Prop :=
-  sc_v = uecall_scause /\ usys_num tf = USYS_wait
+  sc_v = uecall_scause /\ usys_eff secc tf = USYS_wait
   /\ uint (tf !!! tf_arg_idx 0) = 0%Z
   /\ r = (mword_of_int (-1) : mword 64).
 
 Global Instance ut_live_wait_g_dec sc_v tf r :
-  Decision (ut_live_wait_g sc_v tf r).
+  Decision (ut_live_wait_g sc_v secc tf r).
 Proof. rewrite /ut_live_wait_g. apply _. Defined.
 
 (* ...and the row, out of the two refutations *)
-Lemma ut_live_out_of (sc_v : mword 64) (tf : list (mword 64))
+Lemma ut_live_out_of (sc_v : mword 64) (secc : mword 64) (tf : list (mword 64))
     (sts : list fdstate) (r : mword 64) (cs' : gset gname) :
-  ~ ut_live_read_g sc_v tf sts r ->
-  (ut_live_wait_g sc_v tf r -> cs' = (∅ : gset gname)) ->
-  ut_live_out sc_v tf sts r cs'.
+  ~ ut_live_read_g sc_v secc tf sts r ->
+  (ut_live_wait_g sc_v secc tf r -> cs' = (∅ : gset gname)) ->
+  ut_live_out sc_v secc tf sts r cs'.
 Proof.
   intros Hr Hw. split.
   - intros He Hn Hc rb Hfd Hm1. apply Hr.
@@ -784,11 +786,11 @@ Qed.
    program holding its table wants; this is the one hop between that and
    [FdSlots.fd_st_of_key], and it is the [decide] in [fd_st_of_key]
    itself. *)
-Lemma uexec_live_ok_of_live (sc_v : mword 64) (tf : list (mword 64))
+Lemma uexec_live_ok_of_live (sc_v : mword 64) (secc : mword 64) (tf : list (mword 64))
     (sts : list fdstate) (r : mword 64) (cs' : gset gname) :
   sc_v = uecall_scause ->
-  ut_live_out sc_v tf sts r cs' ->
-  UexecRet.uexec_live_ok (usys_num tf) tf sts r cs'.
+  ut_live_out sc_v secc tf sts r cs' ->
+  UexecRet.uexec_live_ok (usys_eff secc tf) tf sts r cs'.
 Proof.
   intros He H. split.
   - intros Hn Hc rb Hlt Hfd.
@@ -799,18 +801,18 @@ Proof.
 Qed.
 
 (* the row is FREE at a non-ecall cause: both clauses are guarded on it *)
-Lemma ut_live_out_ne (sc_v : mword 64) (tf : list (mword 64))
+Lemma ut_live_out_ne (sc_v : mword 64) (secc : mword 64) (tf : list (mword 64))
     (sts : list fdstate) (r : mword 64) (cs' : gset gname) :
-  sc_v <> uecall_scause -> ut_live_out sc_v tf sts r cs'.
+  sc_v <> uecall_scause -> ut_live_out sc_v secc tf sts r cs'.
 Proof.
   intro Hne. split; [intro Hc | intro Hc]; exfalso; exact (Hne Hc).
 Qed.
 
 (* ...and at any number that is neither the read nor the wait *)
-Lemma ut_live_out_num (sc_v : mword 64) (tf : list (mword 64))
+Lemma ut_live_out_num (sc_v : mword 64) (secc : mword 64) (tf : list (mword 64))
     (sts : list fdstate) (r : mword 64) (cs' : gset gname) :
-  usys_num tf <> USYS_read -> usys_num tf <> USYS_wait ->
-  ut_live_out sc_v tf sts r cs'.
+  usys_eff secc tf <> USYS_read -> usys_eff secc tf <> USYS_wait ->
+  ut_live_out sc_v secc tf sts r cs'.
 Proof.
   intros Hr Hw. split.
   - intros _ Hn. exfalso. exact (Hr Hn).
@@ -819,14 +821,15 @@ Qed.
 
 (* the two readings the row is stated at do not move across the save walk,
    so the row transports like [ut_wait_out_cong] does *)
-Lemma ut_live_out_cong (sc_v : mword 64) (tf1 tf2 : list (mword 64))
+Lemma ut_live_out_cong (sc_v : mword 64) (secc : mword 64) (tf1 tf2 : list (mword 64))
     (sts : list fdstate) (r1 r2 : mword 64) (cs' : gset gname) :
   usys_num tf1 = usys_num tf2 -> r1 = r2 ->
   tf1 !!! tf_arg_idx 0 = tf2 !!! tf_arg_idx 0 ->
   tf1 !!! tf_arg_idx 2 = tf2 !!! tf_arg_idx 2 ->
-  ut_live_out sc_v tf1 sts r1 cs' -> ut_live_out sc_v tf2 sts r2 cs'.
+  ut_live_out sc_v secc tf1 sts r1 cs' -> ut_live_out sc_v secc tf2 sts r2 cs'.
 Proof.
-  intros Hn Hr Ha0 Ha2 H1. subst r2. split.
+  intros Hn0 Hr Ha0 Ha2 H1. pose proof (usys_eff_num_cong secc _ _ Hn0) as Hn.
+  subst r2. split.
   - intros He Hnum Hcnt rb Hfd. rewrite <- Ha0 in Hfd. rewrite <- Ha2 in Hcnt.
     exact (proj1 H1 He ltac:(rewrite Hn; exact Hnum) Hcnt rb Hfd).
   - intros He Hnum Ha Hm1. rewrite <- Ha0 in Ha.
@@ -843,10 +846,10 @@ Qed.
 
 Lemma ut_wait_out_quiet `{!riscvGS Σ, !xv6G Σ, !fileG Σ} `{GEN : GenId} `{XI : CurCtx}
     {SG : uexecSG Σ}
-    (sc_v : mword 64) (tf : list (mword 64)) (M M' : gmap Z (bv 8))
+    (sc_v : mword 64) (secc : mword 64) (tf : list (mword 64)) (M M' : gmap Z (bv 8))
     (r : mword 64)
     (cs cs' : gset gname) (gn : gname) (pidv : mword 32) :
-  sc_v <> uecall_scause -> ⊢ ut_wait_out sc_v tf M M' r cs cs' gn pidv.
+  sc_v <> uecall_scause -> ⊢ ut_wait_out sc_v secc tf M M' r cs cs' gn pidv.
 Proof.
   intros Hne. rewrite /ut_wait_out. iIntros "%Hc". exfalso.
   exact (Hne (proj1 Hc)).
@@ -854,10 +857,10 @@ Qed.
 
 Lemma ut_wait_out_quiet_n `{!riscvGS Σ, !xv6G Σ, !fileG Σ} `{GEN : GenId} `{XI : CurCtx}
     {SG : uexecSG Σ}
-    (sc_v : mword 64) (tf : list (mword 64)) (M M' : gmap Z (bv 8))
+    (sc_v : mword 64) (secc : mword 64) (tf : list (mword 64)) (M M' : gmap Z (bv 8))
     (r : mword 64)
     (cs cs' : gset gname) (gn : gname) (pidv : mword 32) :
-  usys_num tf <> USYS_wait -> ⊢ ut_wait_out sc_v tf M M' r cs cs' gn pidv.
+  usys_eff secc tf <> USYS_wait -> ⊢ ut_wait_out sc_v secc tf M M' r cs cs' gn pidv.
 Proof.
   intros Hne. rewrite /ut_wait_out. iIntros "%Hc". exfalso.
   exact (Hne (proj2 Hc)).
@@ -865,9 +868,9 @@ Qed.
 
 Lemma ut_fork_out_quiet_n `{!riscvGS Σ, !xv6G Σ, !fileG Σ} `{GEN : GenId} `{XI : CurCtx}
     {SG : uexecSG Σ}
-    (f : sfam) (sc_v : mword 64) (tf : list (mword 64)) (r : mword 64)
+    (f : sfam) (sc_v : mword 64) (secc : mword 64) (tf : list (mword 64)) (r : mword 64)
     (cs cs' : gset gname) :
-  usys_num tf <> USYS_fork -> ⊢ ut_fork_out f sc_v tf r cs cs'.
+  usys_eff secc tf <> USYS_fork -> ⊢ ut_fork_out f sc_v secc tf r cs cs'.
 Proof.
   intros Hne. rewrite /ut_fork_out. iIntros "%Hc". exfalso.
   exact (Hne (proj2 Hc)).
@@ -883,7 +886,7 @@ Lemma uvis_of_us_tf (U : ustate) (ws : list (mword 64)) (sts : list fdstate)
   = MkUvis ws (us_M U)
            (perm_of (ud_um (pv_upt (us_V U))) (uint (pv_sz (us_V U))))
            (uint (pv_sz (us_V U))) sts (pv_cwi (us_V U)) gn cs pid
-           (pv_lazy (us_V U)).
+           (pv_lazy (us_V U)) (pv_secc (us_V U)).
 Proof. reflexivity. Qed.
 
 (* ===================================================================== *)
@@ -913,7 +916,7 @@ Definition ut_fork_in `{!riscvGS Σ, !xv6G Σ, !fileG Σ} `{GEN : GenId} `{XI : 
     (f : sfam)
     (sc_v : mword 64) (tf : list (mword 64)) (U : ustate)
     (sts : list fdstate) : iProp Σ :=
-  (⌜sc_v = uecall_scause /\ usys_num tf = USYS_fork⌝ -∗
+  (⌜sc_v = uecall_scause /\ usys_eff (pv_secc (us_V U)) tf = USYS_fork⌝ -∗
      (* THE CHILD'S GENERATION IS ∀-BOUND HERE, and its children set is [∅]
         on the nose.  allocproc mints a FRESH generation for the child's
         slot, so the depositing process cannot name it and undertakes to be
@@ -976,9 +979,11 @@ Lemma ut_fork_in_ueq `{!riscvGS Σ, !xv6G Σ, !fileG Σ} `{GEN : GenId} `{XI : C
   pv_cwi (us_V U') = pv_cwi (us_V U) ->
   (* ...and the lazy bit, which fork's child key reads *)
   pv_lazy (us_V U') = pv_lazy (us_V U) ->
+  (* ...and the mask, which the child key and the guard read *)
+  pv_secc (us_V U') = pv_secc (us_V U) ->
   ut_fork_in f sc_v tf U sts -∗ ut_fork_in f sc_v tf' U' sts.
 Proof.
-  intros Hl Hl' Hu HM Hpi Hsz Hcw Hlzq.
+  intros Hl Hl' Hu HM Hpi Hsz Hcw Hlzq Hscq.
   assert (Hla : (tf_arg_idx 0 < length tf)%nat)
     by (rewrite Hl; unfold tf_arg_idx, TFWORDS; lia).
   assert (Hla' : (tf_arg_idx 0 < length tf')%nat)
@@ -1000,7 +1005,8 @@ Proof.
   rewrite /ut_fork_in. iIntros "H %Hc".
   iDestruct ("H" with "[%]") as "H";
     [ split; [ exact (proj1 Hc)
-             | rewrite (tf_ueq_num tf tf' Hu); exact (proj2 Hc) ] |].
+             | rewrite -Hscq (usys_eff_num_cong _ tf tf' (tf_ueq_num tf tf' Hu));
+               exact (proj2 Hc) ] |].
   iDestruct "H" as "(#Hkw & HRc & H)". iSplitR; [ iExact "Hkw" | ].
   iFrame "HRc". iIntros (g' pidc) "%Hne Hp HRc".
   iSpecialize ("H" $! g' pidc). iSpecialize ("H" with "[%] Hp HRc");
@@ -1010,14 +1016,14 @@ Proof.
                     (MkUvis (bump_tf tf (mword_of_int 0)) (us_M U)
                        (perm_of (ud_um (pv_upt (us_V U))) (uint (pv_sz (us_V U))))
                        (uint (pv_sz (us_V U))) sts (pv_cwi (us_V U)) g' ∅ pidc
-                       (pv_lazy (us_V U)))
+                       (pv_lazy (us_V U)) (pv_secc (us_V U)))
                     (MkUvis (bump_tf tf' (mword_of_int 0)) (us_M U')
                        (perm_of (ud_um (pv_upt (us_V U'))) (uint (pv_sz (us_V U'))))
                        (uint (pv_sz (us_V U'))) sts (pv_cwi (us_V U')) g' ∅ pidc
-                       (pv_lazy (us_V U')))
+                       (pv_lazy (us_V U')) (pv_secc (us_V U')))
                     Hg Hp (eq_sym HM) (eq_sym Hpi)
                     (f_equal uint (eq_sym Hsz)) eq_refl (eq_sym Hcw)
-                    eq_refl eq_refl eq_refl (eq_sym Hlzq))) in "H".
+                    eq_refl eq_refl eq_refl (eq_sym Hlzq) (eq_sym Hscq))) in "H".
   iExact "H".
 Qed.
 
@@ -1057,7 +1063,7 @@ Qed.
 Definition ut_pay_in `{!riscvGS Σ, !xv6G Σ, !fileG Σ} `{GEN : GenId} `{XI : CurCtx}
     {SG : uexecSG Σ}
     (f : sfam) (sc_v : mword 64) (tf : list (mword 64)) (U : ustate) : iProp Σ :=
-  upay_at (pv_gen (us_V U)) sc_v tf f.
+  upay_at (pv_gen (us_V U)) sc_v (pv_secc (us_V U)) tf f.
 
 (* the row's congruence: it reads the number and argument 0, both of which
    [TfUser.tf_ueq] carries (its second clause covers indices 5..35, and
@@ -1067,10 +1073,12 @@ Lemma ut_pay_in_ueq `{!riscvGS Σ, !xv6G Σ, !fileG Σ} `{GEN : GenId} `{XI : Cu
     (f : sfam) (sc_v : mword 64) (tf tf' : list (mword 64)) (U U' : ustate) :
   tf_ueq tf tf' ->
   pv_gen (us_V U') = pv_gen (us_V U) ->
+  (* ...and the mask, which the row's number reads *)
+  pv_secc (us_V U') = pv_secc (us_V U) ->
   ut_pay_in f sc_v tf U -∗ ut_pay_in f sc_v tf' U'.
 Proof.
-  intros Hu Hg. rewrite /ut_pay_in.
-  iApply (upay_at_ueq _ _ sc_v tf tf' f
+  intros Hu Hg Hsc. rewrite /ut_pay_in. rewrite Hsc.
+  iApply (upay_at_ueq _ _ sc_v _ tf tf' f
             (tf_ueq_num tf tf' Hu)
             (proj2 Hu (tf_arg_idx 0) ltac:(unfold tf_arg_idx; lia))
             (eq_sym Hg)).
@@ -1235,10 +1243,10 @@ Lemma ut_exec_out_quiet `{!riscvGS Σ, !xv6G Σ, !fileG Σ} `{GEN : GenId} `{XI 
     {SG : uexecSG Σ}
     (f : sfam)
     (sc_v : mword 64) (tf : list (mword 64)) (M : gmap Z (bv 8))
-    (π : gmap (mword 27) uperm) (szv : Z) (lz : bool)
+    (π : gmap (mword 27) uperm) (szv : Z) (lz : bool) (secc : mword 64)
     (U' : ustate) (sts sts' : list fdstate) (gn : gname) (cs : gset gname)
     (pid : mword 32) :
-  sc_v <> uecall_scause -> ⊢ ut_exec_out f sc_v tf M π szv lz U' sts sts' gn cs pid.
+  sc_v <> uecall_scause -> ⊢ ut_exec_out f sc_v tf M π szv lz secc U' sts sts' gn cs pid.
 Proof.
   intros Hne. rewrite /ut_exec_out. iIntros "%Hc". exfalso. exact (Hne (proj1 Hc)).
 Qed.
@@ -1269,13 +1277,15 @@ Lemma ut_sys_in_cong `{!riscvGS Σ, !xv6G Σ, !fileG Σ} `{GEN : GenId} `{XI : C
   (* ...AND THE LAZY BIT, which the same receipt row reads beside them
      (lane LAZY-FLAG): the two records store the same bit. *)
   pv_lazy (us_V U) = pv_lazy (us_V U') ->
+  (* ...AND THE MASK, which the guard's effective number reads *)
+  pv_secc (us_V U) = pv_secc (us_V U') ->
   ut_sys_in n f sc_v tf U sts gn cs pid -∗
   ut_sys_in n f sc_v tf' U' sts gn cs pid.
 Proof.
-  intros Hn HM Ha0 Ha1 Ha2 Hcw Hpi Hsz Hlz. rewrite /ut_sys_in. iIntros "H %Hc".
+  intros Hn HM Ha0 Ha1 Ha2 Hcw Hpi Hsz Hlz Hsc. rewrite /ut_sys_in. iIntros "H %Hc".
   destruct Hc as (Hce & Hcn & Hcf).
   iDestruct ("H" with "[%]") as "H";
-    [ split_and!; [ exact Hce | rewrite Hn; exact Hcn | exact Hcf ] |].
+    [ split_and!; [ exact Hce | rewrite Hsc (usys_eff_num_cong _ _ _ Hn); exact Hcn | exact Hcf ] |].
   iEval (rewrite (sbundle_at_cong uslot n f (uvis_of U sts gn cs pid)
                     (uvis_of U' sts gn cs pid)
                     ltac:(rewrite /skey_eq; split_and!;
@@ -1283,7 +1293,7 @@ Proof.
                           | reflexivity | exact Hcw
                           | reflexivity | reflexivity
                           | reflexivity | exact Hpi | exact Hsz
-                          | exact Hlz ]))) in "H".
+                          | exact Hlz | exact Hsc ]))) in "H".
   iExact "H".
 Qed.
 
@@ -1310,13 +1320,14 @@ Lemma ut_sys_out_cong `{!riscvGS Σ, !xv6G Σ, !fileG Σ} `{GEN : GenId} `{XI : 
     = perm_of (ud_um (pv_upt (us_V U'))) (uint (pv_sz (us_V U'))) ->
   uint (pv_sz (us_V U)) = uint (pv_sz (us_V U')) ->
   pv_lazy (us_V U) = pv_lazy (us_V U') ->
+  pv_secc (us_V U) = pv_secc (us_V U') ->
   ut_sys_out n f sc_v tf U sts gn cs pid r M' sts' cw' cs' -∗
   ut_sys_out n f sc_v tf' U' sts gn cs pid r M' sts' cw' cs'.
 Proof.
-  intros Hn HM Ha0 Ha1 Ha2 Hcw Hpi Hsz Hlz. rewrite /ut_sys_out. iIntros "H %Hc".
+  intros Hn HM Ha0 Ha1 Ha2 Hcw Hpi Hsz Hlz Hsc. rewrite /ut_sys_out. iIntros "H %Hc".
   destruct Hc as (Hce & Hcn & Hcx & Hcf).
   iDestruct ("H" with "[%]") as "H";
-    [ split_and!; [ exact Hce | rewrite <- Hn; exact Hcn | exact Hcx | exact Hcf ] |].
+    [ split_and!; [ exact Hce | rewrite Hsc -(usys_eff_num_cong _ _ _ Hn); exact Hcn | exact Hcx | exact Hcf ] |].
   iEval (rewrite (spost_at_cong uslot n f (uvis_of U sts gn cs pid)
                     (uvis_of U' sts gn cs pid) r
                     M' sts' cw' cs'
@@ -1325,7 +1336,7 @@ Proof.
                           | reflexivity | exact Hcw
                           | reflexivity | reflexivity
                           | reflexivity | exact Hpi | exact Hsz
-                          | exact Hlz ]))) in "H".
+                          | exact Hlz | exact Hsc ]))) in "H".
   iExact "H".
 Qed.
 
@@ -1340,7 +1351,7 @@ Lemma ut_exec_out_ueq `{!riscvGS Σ, !xv6G Σ, !fileG Σ} `{GEN : GenId} `{XI : 
     {SG : uexecSG Σ}
     (f : sfam)
     (sc_v : mword 64) (tf tf' : list (mword 64)) (M : gmap Z (bv 8))
-    (π : gmap (mword 27) uperm) (szv : Z) (lz : bool)
+    (π : gmap (mword 27) uperm) (szv : Z) (lz : bool) (secc : mword 64)
     (U' U'' : ustate) (sts sts' : list fdstate) (gn : gname)
     (cs : gset gname) (pid : mword 32) :
   tf_ueq tf tf' ->
@@ -1353,12 +1364,14 @@ Lemma ut_exec_out_ueq `{!riscvGS Σ, !xv6G Σ, !fileG Σ} `{GEN : GenId} `{XI : 
   pv_cwi (us_V U'') = pv_cwi (us_V U') ->
   (* ...and the lazy bit, which the exec row reads beside the break *)
   pv_lazy (us_V U'') = pv_lazy (us_V U') ->
-  ut_exec_out f sc_v tf M π szv lz U' sts sts' gn cs pid -∗
-  ut_exec_out f sc_v tf' M π szv lz U'' sts sts' gn cs pid.
+  (* ...and the mask *)
+  pv_secc (us_V U'') = pv_secc (us_V U') ->
+  ut_exec_out f sc_v tf M π szv lz secc U' sts sts' gn cs pid -∗
+  ut_exec_out f sc_v tf' M π szv lz secc U'' sts sts' gn cs pid.
 Proof.
-  intros Hu Hu' HM Hpi Hsz Hcwi Hlzq. rewrite /ut_exec_out. iIntros "H %Hc".
+  intros Hu Hu' HM Hpi Hsz Hcwi Hlzq Hscq. rewrite /ut_exec_out. iIntros "H %Hc".
   iDestruct ("H" with "[%]") as "[%Hf | Hs]";
-    [ split; [exact (proj1 Hc) | rewrite (tf_ueq_num tf tf' Hu); exact (proj2 Hc)]
+    [ split; [exact (proj1 Hc) | rewrite (usys_eff_num_cong _ tf tf' (tf_ueq_num tf tf' Hu)); exact (proj2 Hc)]
     | | ].
   - iLeft. iPureIntro. destruct Hf as (r & [Hb1 Hb2] & Hm & Hst).
     exists r. split; [split |].
@@ -1373,7 +1386,8 @@ Proof.
                       (uvis_of U'' sts' gn cs pid)
                       (tf_ueq_resume_gpr0 _ _ Hu') (tf_ueq_resume_pc _ _ Hu')
                       (eq_sym HM) (eq_sym Hpi) (f_equal uint (eq_sym Hsz)) eq_refl
-                      (eq_sym Hcwi) eq_refl eq_refl eq_refl (eq_sym Hlzq)))
+                      (eq_sym Hcwi) eq_refl eq_refl eq_refl (eq_sym Hlzq)
+                      (eq_sym Hscq)))
       in "Hs".
     iExact "Hs".
 Qed.
@@ -1395,7 +1409,9 @@ Definition ut_pro (sepc_v : mword 64) (U U' : ustate) : Prop :=
   /\ pv_gen (us_V U') = pv_gen (us_V U)
   (* ...AND THE LAZY BIT, on the generation's footing exactly: the prologue
      writes ONE trapframe word and no block field ([ProcDefs.pv_lazy]). *)
-  /\ pv_lazy (us_V U') = pv_lazy (us_V U).
+  /\ pv_lazy (us_V U') = pv_lazy (us_V U)
+  (* ...and the mask, likewise ([ProcDefs.pv_secc]) *)
+  /\ pv_secc (us_V U') = pv_secc (us_V U).
 
 (* THE ENTRY INSTANCE: at the record the prologue hands on, the round has
    done nothing yet, so every arm of the relation is an identity. *)
@@ -1406,10 +1422,10 @@ Lemma ut_round_entry (sepc_v sc_v : mword 64) (U U' : ustate) :
   sc_v <> uecall_scause ->
   ut_pro sepc_v U U' -> ut_round sepc_v sc_v U U'.
 Proof.
-  intros Hne (Htf & Hupt & Hsz & HM & Hcwi & Hgn & Hlz).
+  intros Hne (Htf & Hupt & Hsz & HM & Hcwi & Hgn & Hlz & Hsc).
   unfold ut_round, uround_ok.
   destruct (decide (sc_v = uecall_scause)) as [Heq | _]; [ contradiction (Hne Heq) | ].
-  rewrite Htf Hupt Hsz HM Hcwi Hlz. unfold uround_id_ok.
+  rewrite Htf Hupt Hsz HM Hcwi Hlz Hsc. unfold uround_id_ok.
   split_and!; reflexivity.
 Qed.
 
@@ -1427,10 +1443,12 @@ Lemma ut_round_same (sepc_v sc_v : mword 64) (U U' U'' : ustate) :
   (* ...and the lazy bit, which the block stores ([ProcDefs.pv_lazy]) and
      which no block-preserving step writes *)
   pv_lazy (us_V U'') = pv_lazy (us_V U') ->
+  (* ...and the mask, likewise *)
+  pv_secc (us_V U'') = pv_secc (us_V U') ->
   ut_round sepc_v sc_v U U' -> ut_round sepc_v sc_v U U''.
 Proof.
-  intros H1 H2 H3 H4 H5 H6 H. unfold ut_round in H |- *.
-  rewrite H1 H2 H3 H4 H5 H6. exact H.
+  intros H1 H2 H3 H4 H5 H6 H7 H. unfold ut_round in H |- *.
+  rewrite H1 H2 H3 H4 H5 H6 H7. exact H.
 Qed.
 
 (* ...and one that moves it only in the four KERNEL words (prepare_return). *)
@@ -1442,10 +1460,11 @@ Lemma ut_round_ueq (sepc_v sc_v : mword 64) (U U' U'' : ustate) :
   pv_sz (us_V U'') = pv_sz (us_V U') ->
   pv_cwi (us_V U'') = pv_cwi (us_V U') ->
   pv_lazy (us_V U'') = pv_lazy (us_V U') ->
+  pv_secc (us_V U'') = pv_secc (us_V U') ->
   ut_round sepc_v sc_v U U' -> ut_round sepc_v sc_v U U''.
 Proof.
-  intros Hu H2 H3 H4 H5 H6 H. unfold ut_round in H |- *.
-  rewrite H2 H3 H4 H5 H6.
+  intros Hu H2 H3 H4 H5 H6 H7 H. unfold ut_round in H |- *.
+  rewrite H2 H3 H4 H5 H6 H7.
   eapply uround_ok_ueq_r; [ exact Hu | exact H ].
 Qed.
 
@@ -1519,17 +1538,17 @@ Definition usertrap_post `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fi
        did. *)
     ⌜ut_fd_kept sc_v sts sts'⌝ -∗
     (* ...and the children set's, guarded off fork -- see [ut_ch_kept] *)
-    ⌜ut_ch_kept sc_v (pv_tf (us_V U)) cs cs'⌝ -∗
+    ⌜ut_ch_kept sc_v (pv_secc (us_V U)) (pv_tf (us_V U)) cs cs'⌝ -∗
     (* ...and the generation's, unguarded -- see [ut_gen_kept] *)
     ⌜ut_gen_kept U U'⌝ -∗
-    ⌜ut_fd_ecall sc_v (pv_tf (us_V U)) (pv_tf (us_V U')) sts sts'⌝ -∗
+    ⌜ut_fd_ecall sc_v (pv_secc (us_V U)) (pv_tf (us_V U)) (pv_tf (us_V U')) sts sts'⌝ -∗
     (* ...and pipe's join, off the same pair -- see [ut_pipe_ecall] *)
-    ⌜ut_pipe_ecall sc_v (pv_tf (us_V U)) (pv_tf (us_V U'))
+    ⌜ut_pipe_ecall sc_v (pv_secc (us_V U)) (pv_tf (us_V U)) (pv_tf (us_V U'))
                    (us_M U) (us_M U') sts sts'⌝ -∗
     (* ...and GETPID'S ANSWER, off the same pair of frames -- see
        [ut_ret_pid].  It is the row that makes the user-execution round
        able to say what getpid(2) returned. *)
-    ⌜ut_ret_pid sc_v (pv_tf (us_V U)) (pv_tf (us_V U')) pid⌝ -∗
+    ⌜ut_ret_pid sc_v (pv_secc (us_V U)) (pv_tf (us_V U)) (pv_tf (us_V U')) pid⌝ -∗
     ⌜ret_pc uepc = tf_resume_pc (pv_tf (us_V U'))⌝ -∗
     (* [mideleg]'s VALUE is not pinned to whatever usertrap was handed at
        entry -- unlike [mie_v]/[menvcfg0] (each a unique architectural
@@ -1612,20 +1631,20 @@ Definition usertrap_post `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fi
        record the round left -- see [ut_exec_out] *)
     ut_exec_out f sc_v (<[tf_epc_idx := ret_pc sepc_v]> (pv_tf (us_V U)))
       (us_M U) (perm_of (ud_um (pv_upt (us_V U))) (uint (pv_sz (us_V U))))
-      (uint (pv_sz (us_V U))) (pv_lazy (us_V U)) U' sts sts' gn cs pid -∗
+      (uint (pv_sz (us_V U))) (pv_lazy (us_V U)) (pv_secc (us_V U)) U' sts sts' gn cs pid -∗
     (* ...AND FORK'S: the parent's child token -- see [ut_fork_out] *)
-    ut_fork_out f sc_v (<[tf_epc_idx := ret_pc sepc_v]> (pv_tf (us_V U)))
+    ut_fork_out f sc_v (pv_secc (us_V U)) (<[tf_epc_idx := ret_pc sepc_v]> (pv_tf (us_V U)))
       (pv_tf (us_V U') !!! tf_arg_idx 0) cs cs' -∗
     (* ...AND WAIT'S: what the reap left the caller's reading -- see
        [ut_wait_out] *)
-    ut_wait_out sc_v (<[tf_epc_idx := ret_pc sepc_v]> (pv_tf (us_V U)))
+    ut_wait_out sc_v (pv_secc (us_V U)) (<[tf_epc_idx := ret_pc sepc_v]> (pv_tf (us_V U)))
       (us_M U) (us_M U')
       (pv_tf (us_V U') !!! tf_arg_idx 0) cs cs' gn pid -∗
     (* ...AND WHAT A RESUME ITSELF PROVES (lane TRAP-ROWS, T2(iii) / T4):
        the two rows above answer at the incarnation, the process cannot
        name it, and this is what survives the refutation -- see
        [ut_live_out]. *)
-    ⌜ut_live_out sc_v (<[tf_epc_idx := ret_pc sepc_v]> (pv_tf (us_V U)))
+    ⌜ut_live_out sc_v (pv_secc (us_V U)) (<[tf_epc_idx := ret_pc sepc_v]> (pv_tf (us_V U)))
         sts (pv_tf (us_V U') !!! tf_arg_idx 0) cs'⌝ -∗
     (* ...AND THE UNTAKEN CONTINUATION (lane TRAP-ROWS, T3): at a non-ecall
        cause the process handed the kernel the additive pair, and a resume

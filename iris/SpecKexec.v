@@ -539,7 +539,7 @@ Proof.
   intros Hne Hok.
   destruct Hok as [[Hr _] | Hs]; [ contradiction (Hne Hr) | ].
   destruct Hs as (_ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _
-                  & _ & Hlz). exact Hlz.
+                  & _ & Hlz & _). exact Hlz.
 Qed.
 
 (* ...and the cwd's inum off the same arm, for the callers that hold

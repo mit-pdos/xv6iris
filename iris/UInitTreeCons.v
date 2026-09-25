@@ -297,7 +297,7 @@ Section UInitTreeCons.
     iApply (sbundle_at_open_intro_at uslot
               (tree_open_fam (tree_taint c) (fun v => subtree v root = Some t)
                  (resolve_hops t d pl) (ukn_pay N))
-              (uvis_of_run m pc M pm sz fdv cw gn cs pidv false)
+              (uvis_of_run m pc M pm sz fdv cw gn cs pidv false secc_all)
               cw M pv (m !!! Regidx a1_idx)
               eq_refl eq_refl
               (eq_trans (tf_of_arg0 m pc) Ha0)

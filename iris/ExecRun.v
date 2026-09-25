@@ -244,19 +244,19 @@ Section ExecRun.
     image_entry_taint T (ukn_pay N) X -∗
     Pay -∗
     sbundle_pay_refR X (ukn_pay N) R
-      (uvis_of_run m pc M pm sz fdv c gn cs pidv false).
+      (uvis_of_run m pc M pm sz fdv c gn cs pidv false secc_all).
   Proof using .
     intros Hload Ha0 Ha1 Hpath.
     iIntros "#Hrf Hmp Hw #Hcon #Hgen HPay".
     iDestruct "Hw" as (P Pmiss Fo) "(Hst & Hobs & #Hid)".
-    assert (Ea0 : tf_w (uvis_tf (uvis_of_run m pc M pm sz fdv c gn cs pidv false))
+    assert (Ea0 : tf_w (uvis_tf (uvis_of_run m pc M pm sz fdv c gn cs pidv false secc_all))
                     (tf_arg_idx 0) = pv)
       by (etransitivity; [ exact (tf_of_arg0 m pc) | exact Ha0 ]).
-    assert (Ea1 : tf_w (uvis_tf (uvis_of_run m pc M pm sz fdv c gn cs pidv false))
+    assert (Ea1 : tf_w (uvis_tf (uvis_of_run m pc M pm sz fdv c gn cs pidv false secc_all))
                     (tf_arg_idx 1) = av)
       by (etransitivity; [ exact (tf_of_arg1 m pc) | exact Ha1 ]).
     iApply (sbundle_pay_exec_intro_refR X
-              (uvis_of_run m pc M pm sz fdv c gn cs pidv false)
+              (uvis_of_run m pc M pm sz fdv c gn cs pidv false secc_all)
               (ukn_pay N) R P Pmiss Fo Pay with "Hrf [Hmp]").
     { cbn [uvis_gen uvis_of_run]. iExact "Hmp". }
     rewrite Ea0 Ea1. cbn [uvis_M uvis_cwd uvis_fd uvis_ch uvis_pid uvis_of_run].
@@ -902,19 +902,19 @@ Section ExecRun.
     image_entry_taint T (ukn_pay N) X -∗
     Pay -∗
     sbundle_pay_refR X (ukn_pay N) R
-      (uvis_of_run m pc M pm sz fdv c gn cs pidv false).
+      (uvis_of_run m pc M pm sz fdv c gn cs pidv false secc_all).
   Proof using .
     intros Hload Ha0 Ha1 Hpath.
     iIntros "#Hrf Hmp Hw #Hcon #Hgen HPay".
     iDestruct "Hw" as (P Pmiss Fo) "(Hst & Hobs & #Hid)".
-    assert (Ea0 : tf_w (uvis_tf (uvis_of_run m pc M pm sz fdv c gn cs pidv false))
+    assert (Ea0 : tf_w (uvis_tf (uvis_of_run m pc M pm sz fdv c gn cs pidv false secc_all))
                     (tf_arg_idx 0) = pv)
       by (etransitivity; [ exact (tf_of_arg0 m pc) | exact Ha0 ]).
-    assert (Ea1 : tf_w (uvis_tf (uvis_of_run m pc M pm sz fdv c gn cs pidv false))
+    assert (Ea1 : tf_w (uvis_tf (uvis_of_run m pc M pm sz fdv c gn cs pidv false secc_all))
                     (tf_arg_idx 1) = av)
       by (etransitivity; [ exact (tf_of_arg1 m pc) | exact Ha1 ]).
     iApply (sbundle_pay_exec_intro_refR X
-              (uvis_of_run m pc M pm sz fdv c gn cs pidv false)
+              (uvis_of_run m pc M pm sz fdv c gn cs pidv false secc_all)
               (ukn_pay N) R P Pmiss Fo Pay with "Hrf [Hmp]").
     { cbn [uvis_gen uvis_of_run]. iExact "Hmp". }
     rewrite Ea0 Ea1. cbn [uvis_M uvis_cwd uvis_fd uvis_ch uvis_pid uvis_of_run].

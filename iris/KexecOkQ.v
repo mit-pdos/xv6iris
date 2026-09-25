@@ -134,7 +134,11 @@ Definition kexec_ok_q (Q : mword 64 -> Prop) (V V' : pprivate) (r : mword 64)
    (uint spv <= uint szv')%Z /\
    (* ...and the lazy bit -- see [KexecDefs.kexec_ok]'s own row: exec's
       image is eager, so the block the swap installs is at [false]. *)
-   pv_lazy V' = false).
+   pv_lazy V' = false /\
+   (* ...AND THE MASK IS KEPT (upstream a083670): exec does not touch
+      [p->seccomp], so [ProcDefs.pv_secc] survives it -- a masked process
+      stays masked across exec, which is the whole point of the mask. *)
+   pv_secc V' = pv_secc V).
 
 (* THE ROW THAT TIES THE HOLE TO THE LANDED RELATION: at a vacuous [Q] the
    two are the same claim. *)
@@ -244,7 +248,11 @@ Definition kexec_ok_qf (Q : mword 64 -> Prop) (QF : kxf_cause -> Prop)
    (uint spv <= uint szv')%Z /\
    (* ...and the lazy bit -- see [KexecDefs.kexec_ok]'s own row: exec's
       image is eager, so the block the swap installs is at [false]. *)
-   pv_lazy V' = false).
+   pv_lazy V' = false /\
+   (* ...AND THE MASK IS KEPT (upstream a083670): exec does not touch
+      [p->seccomp], so [ProcDefs.pv_secc] survives it -- a masked process
+      stays masked across exec, which is the whole point of the mask. *)
+   pv_secc V' = pv_secc V).
 
 (* the landed reading, dropping both holes *)
 Lemma kexec_ok_qf_weaken (Q : mword 64 -> Prop) (QF : kxf_cause -> Prop)

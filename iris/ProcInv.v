@@ -132,7 +132,7 @@ Qed.
 (* functional update of one fd slot -- fdalloc / sys_close / kexit. *)
 Definition upd_ofile (V : pprivate) (fd : nat) (v : mword 64) : pprivate :=
   MkPPriv (pv_sz V) (pv_upt V) (pv_tf V) (<[fd := v]> (pv_ofile V)) (pv_fdg V)
-          (pv_cwd V) (pv_name V) (pv_cwi V) (pv_gen V) (pv_chg V) (pv_lazy V).
+          (pv_cwd V) (pv_name V) (pv_cwi V) (pv_gen V) (pv_chg V) (pv_lazy V) (pv_secc V).
 
 (* THE ONE UPDATE THAT MOVES THE GHOST NAME: allocproc's mint.  A slot comes
    out of [proc_dormant] with whatever junk name its existential carried (a
@@ -142,11 +142,11 @@ Definition upd_ofile (V : pprivate) (fd : nat) (v : mword 64) : pprivate :=
    for why the name must not outlive the incarnation. *)
 Definition upd_fdg (V : pprivate) (g : gname) : pprivate :=
   MkPPriv (pv_sz V) (pv_upt V) (pv_tf V) (pv_ofile V) g (pv_cwd V) (pv_name V)
-          (pv_cwi V) (pv_gen V) (pv_chg V) (pv_lazy V).
+          (pv_cwi V) (pv_gen V) (pv_chg V) (pv_lazy V) (pv_secc V).
 
 Definition upd_sz (V : pprivate) (v : mword 64) : pprivate :=
   MkPPriv v (pv_upt V) (pv_tf V) (pv_ofile V) (pv_fdg V) (pv_cwd V) (pv_name V)
-          (pv_cwi V) (pv_gen V) (pv_chg V) (pv_lazy V).
+          (pv_cwi V) (pv_gen V) (pv_chg V) (pv_lazy V) (pv_secc V).
 
 (* functional update of the trapframe words -- what prepare_return does to
    the four KERNEL slots (kernel_satp / kernel_sp / kernel_trap /
@@ -155,13 +155,13 @@ Definition upd_sz (V : pprivate) (v : mword 64) : pprivate :=
    only [pv_tf]'s contents move. *)
 Definition upd_tf (V : pprivate) (ws : list (mword 64)) : pprivate :=
   MkPPriv (pv_sz V) (pv_upt V) ws (pv_ofile V) (pv_fdg V) (pv_cwd V) (pv_name V)
-          (pv_cwi V) (pv_gen V) (pv_chg V) (pv_lazy V).
+          (pv_cwi V) (pv_gen V) (pv_chg V) (pv_lazy V) (pv_secc V).
 
 (* the descriptor moves, everything else stays -- what copyin / copyout /
    vmfault do to a process when they fault a page in ([uptd_ext], below). *)
 Definition upd_upt (V : pprivate) (P : uptd) : pprivate :=
   MkPPriv (pv_sz V) P (pv_tf V) (pv_ofile V) (pv_fdg V) (pv_cwd V) (pv_name V)
-          (pv_cwi V) (pv_gen V) (pv_chg V) (pv_lazy V).
+          (pv_cwi V) (pv_gen V) (pv_chg V) (pv_lazy V) (pv_secc V).
 
 (* [upd_cwd] and [upd_cwd_id] live in [ProcDefs], next to [pprivate]
    itself and to [proc_priv_bare_cwd], the borrow that needs them. *)
@@ -171,13 +171,13 @@ Definition upd_upt (V : pprivate) (P : uptd) : pprivate :=
    the trapframe page and proc_pagetable the table. *)
 Definition upd_pt (V : pprivate) (P : uptd) (ws : list (mword 64)) : pprivate :=
   MkPPriv (pv_sz V) P ws (pv_ofile V) (pv_fdg V) (pv_cwd V) (pv_name V) (pv_cwi V)
-          (pv_gen V) (pv_chg V) (pv_lazy V).
+          (pv_gen V) (pv_chg V) (pv_lazy V) (pv_secc V).
 
 (* the 16 debug-name bytes -- kfork's [safestrcpy(np->name, p->name, 16)] and
    kexec's [safestrcpy(p->name, last, 16)]. *)
 Definition upd_name (V : pprivate) (ns : list (bv 8)) : pprivate :=
   MkPPriv (pv_sz V) (pv_upt V) (pv_tf V) (pv_ofile V) (pv_fdg V) (pv_cwd V) ns
-          (pv_cwi V) (pv_gen V) (pv_chg V) (pv_lazy V).
+          (pv_cwi V) (pv_gen V) (pv_chg V) (pv_lazy V) (pv_secc V).
 
 (* EXEC'S MOVE: a process REPLACES its address space.  The size, the
    descriptor, the trapframe words and the name all change at once; the
@@ -189,7 +189,7 @@ Definition upd_name (V : pprivate) (ns : list (bv 8)) : pprivate :=
 Definition upd_exec (V : pprivate) (szv : mword 64) (P : uptd)
     (ws : list (mword 64)) (ns : list (bv 8)) : pprivate :=
   MkPPriv szv P ws (pv_ofile V) (pv_fdg V) (pv_cwd V) ns (pv_cwi V)
-          (pv_gen V) (pv_chg V) false.
+          (pv_gen V) (pv_chg V) false (pv_secc V).
 
 (* EXEC CLEARS THE LAZY BIT, and that is the one field [upd_exec] does not
    carry over -- it installs a NEW address space, so the old bit's claim is
@@ -269,6 +269,20 @@ Definition us_name (U : ustate) (ns : list (bv 8)) : ustate :=
 Definition us_exec (U : ustate) (szv : mword 64) (P : uptd)
     (ws : list (mword 64)) (ns : list (bv 8)) : ustate :=
   upd_usV U (upd_exec (us_V U) szv P ws ns).
+
+(* THE MASK'S TWO WRITES, lifted (upstream a083670): sys_seccomp's AND and
+   the raw store (userinit's [secc_all], kfork's copy of the parent's). *)
+Definition us_secc (U : ustate) (m : mword 64) : ustate :=
+  upd_usV U (upd_secc (us_V U) m).
+Definition us_set_secc (U : ustate) (m : mword 64) : ustate :=
+  upd_usV U (set_secc (us_V U) m).
+
+Lemma us_secc_set (U : ustate) (m : mword 64) :
+  us_secc U m = us_set_secc U (and_vec (pv_secc (us_V U)) m).
+Proof. reflexivity. Qed.
+
+Lemma us_set_secc_id (U : ustate) : us_set_secc U (pv_secc (us_V U)) = U.
+Proof. destruct U as [V M]. rewrite /us_set_secc /upd_usV /=. by rewrite set_secc_id. Qed.
 
 (* ...and exec CLEARS the lazy bit here too -- [us_lazy] is the lift of
    [ProcDefs.upd_lazy], and the extra step is [upd_exec_compose]'s.  See
@@ -1750,13 +1764,13 @@ Section ProcInv.
        p_cwd pa ↦₈ v' -∗ proc_priv_nocwd γf pa pid (us_cwd U v')).
   Proof using .
     iIntros "(%Hszb & %Hbel & Hpid & Hf & Hpt & Htfp & %Hlz & Ho)".
-    rewrite /proc_fields. iDestruct "Hf" as "(Hsz & Hcwd & %Hnl & Hnm)".
+    rewrite /proc_fields. iDestruct "Hf" as "(Hsz & Hcwd & %Hnl & Hnm & Hsecc)".
     iFrame "Hcwd". iIntros (v') "Hcwd".
     rewrite /proc_priv_nocwd /proc_fields.
-    cbn [upd_cwd pv_sz pv_upt pv_tf pv_ofile pv_cwd pv_name pv_fdg pv_cwi pv_gen pv_chg pv_lazy].
+    cbn [upd_cwd pv_sz pv_upt pv_tf pv_ofile pv_cwd pv_name pv_fdg pv_cwi pv_gen pv_chg pv_lazy pv_secc].
     iSplitR; [done|]. iSplitR; [done|]. iFrame "Hpid".
-    iSplitL "Hsz Hcwd Hnm".
-    { iFrame "Hsz Hcwd Hnm". iPureIntro; exact Hnl. }
+    iSplitL "Hsz Hcwd Hnm Hsecc".
+    { iFrame "Hsz Hcwd Hnm Hsecc". iPureIntro; exact Hnl. }
     iFrame "Hpt Htfp Ho". iPureIntro; exact Hlz.
   Qed.
 
@@ -1778,17 +1792,17 @@ Section ProcInv.
        proc_priv_nocwd γf pa pid (us_cwd U v')).
   Proof using .
     iIntros "(%Hszb & %Hbel & Hpid & Hf & Hpt & Htfp & %Hlz & Ho)".
-    rewrite /proc_fields. iDestruct "Hf" as "(Hsz & Hcwd & %Hnl & Hnm)".
+    rewrite /proc_fields. iDestruct "Hf" as "(Hsz & Hcwd & %Hnl & Hnm & Hsecc)".
     assert (Hq : (1/2)%Qp = (1/4 + 1/4)%Qp) by compute_done.
     rewrite Hq ctx_word4_pointsto_frac_split.
     iDestruct "Hpid" as "[Hq1 Hq2]".
     iFrame "Hcwd Hq1". iIntros (v') "Hcwd Hq1".
     rewrite /proc_priv_nocwd /proc_fields.
-    cbn [upd_cwd pv_sz pv_upt pv_tf pv_ofile pv_cwd pv_name pv_fdg pv_cwi pv_gen pv_chg pv_lazy].
+    cbn [upd_cwd pv_sz pv_upt pv_tf pv_ofile pv_cwd pv_name pv_fdg pv_cwi pv_gen pv_chg pv_lazy pv_secc].
     iSplitR; [done|]. iSplitR; [done|].
     rewrite Hq ctx_word4_pointsto_frac_split. iFrame "Hq1 Hq2".
-    iSplitL "Hsz Hcwd Hnm".
-    { iFrame "Hsz Hcwd Hnm". iPureIntro; exact Hnl. }
+    iSplitL "Hsz Hcwd Hnm Hsecc".
+    { iFrame "Hsz Hcwd Hnm Hsecc". iPureIntro; exact Hnl. }
     iFrame "Hpt Htfp Ho". iPureIntro; exact Hlz.
   Qed.
 
@@ -1847,7 +1861,7 @@ Section ProcInv.
     iDestruct (big_sepL_insert_acc with "Ho") as "[$ Hback]"; first exact Hfd.
     iIntros (v') "Hslot". iDestruct ("Hback" $! v' with "Hslot") as "Ho".
     rewrite /proc_priv_nocwd /proc_ofiles.
-    cbn [upd_ofile pv_sz pv_upt pv_tf pv_ofile pv_cwd pv_name pv_fdg pv_lazy].
+    cbn [upd_ofile pv_sz pv_upt pv_tf pv_ofile pv_cwd pv_name pv_fdg pv_lazy pv_secc].
     iSplitR; [iPureIntro; exact Hszb|].
     iSplitR; [iPureIntro; exact Hbel|].
     iFrame "Hpid Hf Hpt Htfp".
@@ -1908,7 +1922,7 @@ Section ProcInv.
   Proof using .
     iIntros (Hsz Hbel Hlz) "Hpid Hf Hpt Htf Ho".
     rewrite /proc_priv_nocwd.
-    cbn [upd_pt pv_sz pv_upt pv_tf pv_ofile pv_cwd pv_name pv_fdg pv_lazy].
+    cbn [upd_pt pv_sz pv_upt pv_tf pv_ofile pv_cwd pv_name pv_fdg pv_lazy pv_secc].
     iSplitR; [iPureIntro; exact Hsz|].
     iSplitR; [iPureIntro; exact Hbel|]. iFrame "Hpid Hf Hpt Htf".
     iSplitR; [iPureIntro; exact Hlz|]. iFrame "Ho".
@@ -2270,7 +2284,7 @@ Section ProcInv.
        proc_priv γf pa pid (us_cwi (us_cwd U v') z')).
   Proof using .
     iIntros "[(%Hszb & %Hbel & Hpid & Hf & Hpt & Htfp & %Hlz & Hc & Hft & Hgq & Hxs) Ho]".
-    rewrite /proc_fields. iDestruct "Hf" as "(Hsz & Hcwd & %Hnl & Hnm)".
+    rewrite /proc_fields. iDestruct "Hf" as "(Hsz & Hcwd & %Hnl & Hnm & Hsecc)".
     iSplitL "Hcwd"; [iExact "Hcwd"|].
     (* [iExact], not [iFrame]: the hypothesis and the goal are the same
        FOLDED [cwd_ref _] and conversion closes it.  (This is what kept the
@@ -2279,12 +2293,12 @@ Section ProcInv.
     iIntros (v' z') "Hcwd Hc".
     rewrite /proc_priv /proc_priv_core /proc_fields.
     cbn [us_cwi us_cwd upd_usV us_V us_M upd_cwi upd_cwd
-         pv_sz pv_upt pv_tf pv_ofile pv_cwd pv_name pv_fdg pv_cwi pv_gen pv_chg pv_lazy].
+         pv_sz pv_upt pv_tf pv_ofile pv_cwd pv_name pv_fdg pv_cwi pv_gen pv_chg pv_lazy pv_secc].
     iSplitR "Ho"; [| iExact "Ho"].
     iSplitR; [done|]. iSplitR; [done|].
     iFrame "Hpid".
-    iSplitL "Hsz Hcwd Hnm".
-    { iFrame "Hsz Hcwd Hnm". iPureIntro; exact Hnl. }
+    iSplitL "Hsz Hcwd Hnm Hsecc".
+    { iFrame "Hsz Hcwd Hnm Hsecc". iPureIntro; exact Hnl. }
     iSplitL "Hpt"; [iExact "Hpt"|].
     iSplitL "Htfp"; [iExact "Htfp"|].
     iSplitR; [iPureIntro; exact Hlz|].
@@ -2335,7 +2349,7 @@ Section ProcInv.
        proc_priv γf pa pid (us_cwi (us_cwd U v') z')).
   Proof using .
     iIntros "[(%Hszb & %Hbel & Hpid & Hf & Hpt & Htfp & %Hlz & Hc & Hft & Hgq & Hxs) Ho]".
-    rewrite /proc_fields. iDestruct "Hf" as "(Hsz & Hcwd & %Hnl & Hnm)".
+    rewrite /proc_fields. iDestruct "Hf" as "(Hsz & Hcwd & %Hnl & Hnm & Hsecc)".
     assert (Hq : (1/2)%Qp = (1/4 + 1/4)%Qp) by compute_done.
     rewrite Hq ctx_word4_pointsto_frac_split.
     iDestruct "Hpid" as "[Hq1 Hq2]".
@@ -2346,12 +2360,12 @@ Section ProcInv.
     iIntros (v' z') "Hcwd Hc Hq1".
     rewrite /proc_priv /proc_priv_core /proc_fields.
     cbn [us_cwi us_cwd upd_usV us_V us_M upd_cwi upd_cwd
-         pv_sz pv_upt pv_tf pv_ofile pv_cwd pv_name pv_fdg pv_cwi pv_gen pv_chg pv_lazy].
+         pv_sz pv_upt pv_tf pv_ofile pv_cwd pv_name pv_fdg pv_cwi pv_gen pv_chg pv_lazy pv_secc].
     iSplitR "Ho"; [| iExact "Ho"].
     iSplitR; [done|]. iSplitR; [done|].
     rewrite Hq ctx_word4_pointsto_frac_split. iFrame "Hq1 Hq2".
-    iSplitL "Hsz Hcwd Hnm".
-    { iFrame "Hsz Hcwd Hnm". iPureIntro; exact Hnl. }
+    iSplitL "Hsz Hcwd Hnm Hsecc".
+    { iFrame "Hsz Hcwd Hnm Hsecc". iPureIntro; exact Hnl. }
     iSplitL "Hpt"; [iExact "Hpt"|].
     iSplitL "Htfp"; [iExact "Htfp"|].
     iSplitR; [iPureIntro; exact Hlz|].
@@ -2494,7 +2508,7 @@ Section ProcInv.
     iFrame "Htfc Htfp".
     iIntros (ws') "Htfc Htfp".
     rewrite /proc_priv /proc_priv_core /proc_ptm_at.
-    cbn [upd_tf pv_sz pv_upt pv_tf pv_ofile pv_cwd pv_name pv_fdg pv_lazy].
+    cbn [upd_tf pv_sz pv_upt pv_tf pv_ofile pv_cwd pv_name pv_fdg pv_lazy pv_secc].
     iSplitR "Ho"; [| iFrame "Ho"].
     iSplitR; [iPureIntro; exact Hszb|].
     iSplitR; [iPureIntro; exact Hbel|].
@@ -2566,20 +2580,20 @@ Section ProcInv.
   Proof using .
     iIntros "[(%Hszb & %Hbel & Hpid & Hf & Hpt & Htfp & Hc & Hft & Hgq & Hxs) Ho]".
     rewrite /proc_fields /proc_ptm_at.
-    iDestruct "Hf" as "(Hsz & Hcwd & %Hnl & Hnm)".
+    iDestruct "Hf" as "(Hsz & Hcwd & %Hnl & Hnm & Hsecc)".
     iDestruct "Hpt" as "(Hpg & Htfc & Hptt)".
     iFrame "Hsz Hpg Hptt".
     iIntros (P' szv M' lz') "%Hroot %Htf %Hszb' %Hbel' %Hlz' Hsz Hpg Hptt".
     rewrite /proc_priv /proc_priv_core /proc_fields /proc_ptm_at.
     cbn [upd_lazy upd_sz upd_upt pv_sz pv_upt pv_tf pv_ofile pv_cwd pv_name
-         pv_fdg pv_cwi pv_gen pv_chg pv_lazy].
+         pv_fdg pv_cwi pv_gen pv_chg pv_lazy pv_secc].
     rewrite Hroot Htf.
     iSplitR "Ho"; [|iFrame "Ho"].
     iSplitR; [iPureIntro; exact Hszb'|].
     iSplitR; [iPureIntro; exact Hbel'|].
     iFrame "Hpid".
-    iSplitL "Hsz Hcwd Hnm".
-    { iFrame "Hsz Hcwd Hnm". iPureIntro. exact Hnl. }
+    iSplitL "Hsz Hcwd Hnm Hsecc".
+    { iFrame "Hsz Hcwd Hnm Hsecc". iPureIntro. exact Hnl. }
     iFrame "Hpg Htfc Hptt Htfp".
     iSplitR; [iPureIntro; exact Hlz' |].
     iFrame "Hft Hgq Hxs".
@@ -2745,18 +2759,18 @@ Section ProcInv.
   Proof using .
     iIntros "(%Hszb & %Hbel & Hpid & Hf & Hpt & Htfp & Hc & Hft & Hgq & Hxs)".
     rewrite /proc_fields /proc_ptm_at.
-    iDestruct "Hf" as "(Hsz & Hcwd & %Hnl & Hnm)".
+    iDestruct "Hf" as "(Hsz & Hcwd & %Hnl & Hnm & Hsecc)".
     iDestruct "Hpt" as "(Hpg & Htfc & Hptt)".
     iFrame "Hsz Hpg Hptt".
     iIntros (P' szv M') "%Hroot %Htf %Hszb' %Hbel' %Hlz' Hsz Hpg Hptt".
     rewrite /proc_priv_core /proc_fields /proc_ptm_at.
-    cbn [upd_sz upd_upt pv_sz pv_upt pv_tf pv_ofile pv_cwd pv_name pv_fdg pv_lazy].
+    cbn [upd_sz upd_upt pv_sz pv_upt pv_tf pv_ofile pv_cwd pv_name pv_fdg pv_lazy pv_secc].
     rewrite Hroot Htf.
     iSplitR; [iPureIntro; exact Hszb'|].
     iSplitR; [iPureIntro; exact Hbel'|].
     iFrame "Hpid".
-    iSplitL "Hsz Hcwd Hnm".
-    { iFrame "Hsz Hcwd Hnm". iPureIntro. exact Hnl. }
+    iSplitL "Hsz Hcwd Hnm Hsecc".
+    { iFrame "Hsz Hcwd Hnm Hsecc". iPureIntro. exact Hnl. }
     iFrame "Hpg Htfc Hptt Htfp".
     iSplitR; [iPureIntro; exact Hlz' |].
     iFrame "Hft Hgq Hxs".
@@ -2855,7 +2869,7 @@ Section ProcInv.
   Proof using .
     iIntros "[(%Hszb & %Hbel & Hpid & Hf & Hpt & Htfp & Hc & Hft & Hgq & Hxs) Ho]".
     rewrite /proc_fields /proc_ptm_at.
-    iDestruct "Hf" as "(Hsz & Hcwd & %Hnl & Hnm)".
+    iDestruct "Hf" as "(Hsz & Hcwd & %Hnl & Hnm & Hsecc)".
     iDestruct "Hpt" as "(Hpg & Htfc & Hptt)".
     iSplitR; [iPureIntro; exact Hszb|].
     iSplitR; [iPureIntro; exact Hbel|].
@@ -2863,13 +2877,13 @@ Section ProcInv.
     iIntros (P' szv ws' M' b) "%Htf %Hszb' %Hbel' %Hlz' Hsz Hpg Htfc Hptt Htfp".
     rewrite /proc_priv /proc_priv_core /proc_fields /proc_ptm_at.
     cbn [upd_lazy upd_sz upd_pt pv_sz pv_upt pv_tf pv_ofile pv_cwd pv_name
-         pv_fdg pv_lazy].
+         pv_fdg pv_lazy pv_secc].
     iSplitR "Ho"; [|iFrame "Ho"].
     iSplitR; [iPureIntro; exact Hszb'|].
     iSplitR; [iPureIntro; exact Hbel'|].
     iFrame "Hpid Hpg Htfc Hptt Htfp".
-    iSplitL "Hsz Hcwd Hnm".
-    { iFrame "Hsz Hcwd Hnm". iPureIntro. exact Hnl. }
+    iSplitL "Hsz Hcwd Hnm Hsecc".
+    { iFrame "Hsz Hcwd Hnm Hsecc". iPureIntro. exact Hnl. }
     iSplitR; [iPureIntro; exact Hlz' |].
     iFrame "Hft Hgq Hxs".
   Qed.
@@ -2877,6 +2891,52 @@ Section ProcInv.
   (* p->name: the sixteen debug bytes, out and back.  PROMOTED HERE from
      ProofKforkB4's [kfk_name_open], whose own comment asked for it once there
      was a second consumer; kexec's [safestrcpy(p->name, last, 16)] is it. *)
+  (* THE MASK CELL out of the field block (upstream a083670): the one cell
+     sys_seccomp reads and writes, the syscall dispatcher reads, userinit
+     writes and kfork copies.  The block comes back at [set_secc], which
+     [us_secc] (the AND) and every raw store are instances of. *)
+  Lemma proc_fields_secc (pa : mword 64) (V : pprivate) :
+    proc_fields pa (DfracOwn 1) V -∗
+    p_secc pa ↦₈ pv_secc V ∗
+    (∀ v : mword 64, p_secc pa ↦₈ v -∗ proc_fields pa (DfracOwn 1) (set_secc V v)).
+  Proof using .
+    rewrite /proc_fields. iIntros "(Hsz & Hcwd & %Hnl & Hnm & Hsecc)".
+    iFrame "Hsecc". iIntros (v) "Hsecc".
+    cbn [set_secc pv_sz pv_cwd pv_name pv_secc].
+    iFrame "Hsz Hcwd Hnm Hsecc". iPureIntro; exact Hnl.
+  Qed.
+
+  Lemma proc_priv_secc (γf : gname) (pa : mword 64) (pid : mword 32) (U : ustate) :
+    proc_priv γf pa pid U -∗
+    p_secc pa ↦₈ pv_secc (us_V U) ∗
+    (∀ v : mword 64, p_secc pa ↦₈ v -∗ proc_priv γf pa pid (us_set_secc U v)).
+  Proof using .
+    iIntros "[(%Hszb & %Hbel & Hpid & Hf & Hrest) Ho]".
+    iDestruct (proc_fields_secc with "Hf") as "[Hsecc Hf]".
+    iFrame "Hsecc". iIntros (v) "Hsecc".
+    iDestruct ("Hf" with "Hsecc") as "Hf".
+    rewrite /proc_priv /proc_priv_core.
+    iSplitR "Ho"; [| iExact "Ho"].
+    iSplitR; [iPureIntro; exact Hszb|]. iSplitR; [iPureIntro; exact Hbel|].
+    iSplitL "Hpid"; [iExact "Hpid"|]. iSplitL "Hf"; [iExact "Hf"|].
+    iExact "Hrest".
+  Qed.
+
+  Lemma proc_priv_nocwd_secc (γf : gname) (pa : mword 64) (pid : mword 32) (U : ustate) :
+    proc_priv_nocwd γf pa pid U -∗
+    p_secc pa ↦₈ pv_secc (us_V U) ∗
+    (∀ v : mword 64, p_secc pa ↦₈ v -∗ proc_priv_nocwd γf pa pid (us_set_secc U v)).
+  Proof using .
+    iIntros "(%Hszb & %Hbel & Hpid & Hf & Hrest)".
+    iDestruct (proc_fields_secc with "Hf") as "[Hsecc Hf]".
+    iFrame "Hsecc". iIntros (v) "Hsecc".
+    iDestruct ("Hf" with "Hsecc") as "Hf".
+    rewrite /proc_priv_nocwd.
+    iSplitR; [iPureIntro; exact Hszb|]. iSplitR; [iPureIntro; exact Hbel|].
+    iSplitL "Hpid"; [iExact "Hpid"|]. iSplitL "Hf"; [iExact "Hf"|].
+    iExact "Hrest".
+  Qed.
+
   Lemma proc_priv_name (γf : gname) (pa : mword 64) (pid : mword 32) (U : ustate) :
     proc_priv γf pa pid U -∗
     ⌜length (pv_name (us_V U)) = PNAMELEN⌝ ∗
@@ -2887,16 +2947,16 @@ Section ProcInv.
   Proof using .
     iIntros "[(%Hszb & %Hbel & Hpid & Hf & Hpt & Htfp & Hc & Hft & Hgq & Hxs) Ho]".
     rewrite /proc_fields.
-    iDestruct "Hf" as "(Hsz & Hcwd & %Hnl & Hnm)".
+    iDestruct "Hf" as "(Hsz & Hcwd & %Hnl & Hnm & Hsecc)".
     iSplitR; [iPureIntro; exact Hnl|].
     iFrame "Hnm".
     iIntros (ns) "%Hnl' Hnm".
     rewrite /proc_priv /proc_priv_core /proc_fields.
-    cbn [upd_name pv_sz pv_upt pv_tf pv_ofile pv_cwd pv_name pv_fdg pv_lazy].
+    cbn [upd_name pv_sz pv_upt pv_tf pv_ofile pv_cwd pv_name pv_fdg pv_lazy pv_secc].
     iSplitR "Ho"; [|iFrame "Ho"].
     iSplitR; [iPureIntro; exact Hszb|].
     iSplitR; [iPureIntro; exact Hbel|].
-    iFrame "Hpid Hpt Htfp Hc Hft Hgq Hxs Hsz Hcwd Hnm".
+    iFrame "Hpid Hpt Htfp Hc Hft Hgq Hxs Hsz Hcwd Hnm Hsecc".
     iPureIntro. exact Hnl'.
   Qed.
 
@@ -2971,10 +3031,10 @@ Section ProcInv.
     iDestruct (big_sepL_insert_acc with "Ho") as "[$ Hback]"; first exact Hfd.
     iIntros (v') "Hb Hslot". iDestruct ("Hback" $! v' with "Hslot") as "Ho".
     rewrite /proc_priv /proc_ofiles.
-    cbn [upd_ofile pv_sz pv_upt pv_tf pv_ofile pv_cwd pv_name pv_fdg pv_lazy].
+    cbn [upd_ofile pv_sz pv_upt pv_tf pv_ofile pv_cwd pv_name pv_fdg pv_lazy pv_secc].
     iSplitR "Ho".
     { rewrite proc_priv_core_bare /proc_priv_bare.
-      cbn [upd_ofile pv_sz pv_upt pv_tf pv_ofile pv_cwd pv_name pv_fdg pv_lazy].
+      cbn [upd_ofile pv_sz pv_upt pv_tf pv_ofile pv_cwd pv_name pv_fdg pv_lazy pv_secc].
       iFrame "Hb Hc". }
     iFrame "Ho". iPureIntro. rewrite length_insert. exact Hlen.
   Qed.
@@ -3497,7 +3557,7 @@ Section ProcInv.
        at [true] promises nothing. *)
     iExists (upd_lazy (us_V U) true), pid.
     cbn [upd_lazy pv_sz pv_upt pv_tf pv_ofile pv_fdg pv_cwd pv_name pv_cwi
-         pv_gen pv_chg pv_lazy].
+         pv_gen pv_chg pv_lazy pv_secc].
     iSplit; [by iPureIntro|].
     iFrame "Hpid Hf Ho Hs Hsp Hir Hbs Hkst Hrow Hghd".
     iSplitL "Hxs Hkq HQ".

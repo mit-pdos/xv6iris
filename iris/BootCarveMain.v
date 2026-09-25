@@ -2047,8 +2047,8 @@ Section BootCarveMain.
   Lemma boot_proc_slot `{XI : CtxIdDefs.CurCtx} (g : gstate) (A : Z) :
     (forall x : Z, ram_lo <= x < ram_hi ->
        g.(gmem) !! pa_of_z x = Some (boot_byte x)) ->
-    img_end <= A -> A + 360 <= ram_hi -> A mod 8 = 0 ->
-    kmap_static_claims -∗ boot_cran g A (A + 360)
+    img_end <= A -> A + 368 <= ram_hi -> A mod 8 = 0 ->
+    kmap_static_claims -∗ boot_cran g A (A + 368)
     -∗ proc_slot_raw (pa_of_z A).
   Proof using .
     intros Hmem Hbss Hhi Hal. iIntros "#Hcl H".
@@ -2078,72 +2078,81 @@ Section BootCarveMain.
     assert (M88 : (A + 88) mod 8 = 0) by exact (z_mod_addo 8 A 88 Hal eq_refl).
     assert (M96 : (A + 96) mod 8 = 0) by exact (z_mod_addo 8 A 96 Hal eq_refl).
     assert (M336 : (A + 336) mod 8 = 0) by exact (z_mod_addo 8 A 336 Hal eq_refl).
+    assert (M360 : (A + 360) mod 8 = 0) by exact (z_mod_addo 8 A 360 Hal eq_refl).
+    assert (E360 : (sign_extend' 64 (mword_of_int 360 : mword 12) : mword 64)
+                  = mword_of_int 360) by (apply bv_eq; vm_compute; reflexivity).
     (* the fourteen windows, in address order.  A window is re-anchored by an
        EMPTY split, so every cut's [lo] is literally the [A + off] its cell
        lemma asks for. *)
-    iDestruct (boot_cran_split g A (A + 24) (A + 360) ltac:(lia) ltac:(lia)
+    iDestruct (boot_cran_split g A (A + 24) (A + 368) ltac:(lia) ltac:(lia)
                  with "H") as "[Hlk H]".
-    iDestruct (boot_cran_split g (A + 24) (A + 24 + 4) (A + 360)
+    iDestruct (boot_cran_split g (A + 24) (A + 24 + 4) (A + 368)
                  ltac:(lia) ltac:(lia) with "H") as "[Hst H]".
-    iDestruct (boot_cran_split g (A + 24 + 4) (A + 32) (A + 360)
+    iDestruct (boot_cran_split g (A + 24 + 4) (A + 32) (A + 368)
                  ltac:(lia) ltac:(lia) with "H") as "[_ H]".
-    iDestruct (boot_cran_split g (A + 32) (A + 32 + 8) (A + 360)
+    iDestruct (boot_cran_split g (A + 32) (A + 32 + 8) (A + 368)
                  ltac:(lia) ltac:(lia) with "H") as "[Hch H]".
-    iDestruct (boot_cran_split g (A + 32 + 8) (A + 40) (A + 360)
+    iDestruct (boot_cran_split g (A + 32 + 8) (A + 40) (A + 368)
                  ltac:(lia) ltac:(lia) with "H") as "[_ H]".
-    iDestruct (boot_cran_split g (A + 40) (A + 40 + 4) (A + 360)
+    iDestruct (boot_cran_split g (A + 40) (A + 40 + 4) (A + 368)
                  ltac:(lia) ltac:(lia) with "H") as "[Hkl H]".
-    iDestruct (boot_cran_split g (A + 40 + 4) (A + 44) (A + 360)
+    iDestruct (boot_cran_split g (A + 40 + 4) (A + 44) (A + 368)
                  ltac:(lia) ltac:(lia) with "H") as "[_ H]".
-    iDestruct (boot_cran_split g (A + 44) (A + 44 + 4) (A + 360)
+    iDestruct (boot_cran_split g (A + 44) (A + 44 + 4) (A + 368)
                  ltac:(lia) ltac:(lia) with "H") as "[Hxs H]".
-    iDestruct (boot_cran_split g (A + 44 + 4) (A + 48) (A + 360)
+    iDestruct (boot_cran_split g (A + 44 + 4) (A + 48) (A + 368)
                  ltac:(lia) ltac:(lia) with "H") as "[_ H]".
-    iDestruct (boot_cran_split g (A + 48) (A + 48 + 4) (A + 360)
+    iDestruct (boot_cran_split g (A + 48) (A + 48 + 4) (A + 368)
                  ltac:(lia) ltac:(lia) with "H") as "[Hpid H]".
-    iDestruct (boot_cran_split g (A + 48 + 4) (A + 56) (A + 360)
+    iDestruct (boot_cran_split g (A + 48 + 4) (A + 56) (A + 368)
                  ltac:(lia) ltac:(lia) with "H") as "[_ H]".
     (* +56 IS [p_parent], and it used to be dropped with the padding.  It is
        the only cell of the slot that belongs to a lock OTHER than p->lock:
        [WaitInv.parents_res] is [∃ ps, parents_own ps], the NPROC parent cells,
        and wait_lock is what kexit and kwait take to touch them.  Carving it
        here is what finally gives that lock a resource to be over. *)
-    iDestruct (boot_cran_split g (A + 56) (A + 56 + 8) (A + 360)
+    iDestruct (boot_cran_split g (A + 56) (A + 56 + 8) (A + 368)
                  ltac:(lia) ltac:(lia) with "H") as "[Hpar H]".
     (* the empty re-anchoring cut, so the next window's [lo] is literally
        [A + 64] -- the header's rule, and [A + 56 + 8] is not it *)
-    iDestruct (boot_cran_split g (A + 56 + 8) (A + 64) (A + 360)
+    iDestruct (boot_cran_split g (A + 56 + 8) (A + 64) (A + 368)
                  ltac:(lia) ltac:(lia) with "H") as "[_ H]".
-    iDestruct (boot_cran_split g (A + 64) (A + 64 + 8) (A + 360)
+    iDestruct (boot_cran_split g (A + 64) (A + 64 + 8) (A + 368)
                  ltac:(lia) ltac:(lia) with "H") as "[Hks H]".
-    iDestruct (boot_cran_split g (A + 64 + 8) (A + 72) (A + 360)
+    iDestruct (boot_cran_split g (A + 64 + 8) (A + 72) (A + 368)
                  ltac:(lia) ltac:(lia) with "H") as "[_ H]".
-    iDestruct (boot_cran_split g (A + 72) (A + 72 + 8) (A + 360)
+    iDestruct (boot_cran_split g (A + 72) (A + 72 + 8) (A + 368)
                  ltac:(lia) ltac:(lia) with "H") as "[Hsz H]".
-    iDestruct (boot_cran_split g (A + 72 + 8) (A + 80) (A + 360)
+    iDestruct (boot_cran_split g (A + 72 + 8) (A + 80) (A + 368)
                  ltac:(lia) ltac:(lia) with "H") as "[_ H]".
-    iDestruct (boot_cran_split g (A + 80) (A + 80 + 8) (A + 360)
+    iDestruct (boot_cran_split g (A + 80) (A + 80 + 8) (A + 368)
                  ltac:(lia) ltac:(lia) with "H") as "[Hpg H]".
-    iDestruct (boot_cran_split g (A + 80 + 8) (A + 88) (A + 360)
+    iDestruct (boot_cran_split g (A + 80 + 8) (A + 88) (A + 368)
                  ltac:(lia) ltac:(lia) with "H") as "[_ H]".
-    iDestruct (boot_cran_split g (A + 88) (A + 88 + 8) (A + 360)
+    iDestruct (boot_cran_split g (A + 88) (A + 88 + 8) (A + 368)
                  ltac:(lia) ltac:(lia) with "H") as "[Htf H]".
-    iDestruct (boot_cran_split g (A + 88 + 8) (A + 96) (A + 360)
+    iDestruct (boot_cran_split g (A + 88 + 8) (A + 96) (A + 368)
                  ltac:(lia) ltac:(lia) with "H") as "[_ H]".
-    iDestruct (boot_cran_split g (A + 96) (A + 96 + 112) (A + 360)
+    iDestruct (boot_cran_split g (A + 96) (A + 96 + 112) (A + 368)
                  ltac:(lia) ltac:(lia) with "H") as "[Hctx H]".
-    iDestruct (boot_cran_split g (A + 96 + 112) (A + 208) (A + 360)
+    iDestruct (boot_cran_split g (A + 96 + 112) (A + 208) (A + 368)
                  ltac:(lia) ltac:(lia) with "H") as "[_ H]".
-    iDestruct (boot_cran_split g (A + 208) (A + 208 + 8 * Z.of_nat NOFILE) (A + 360)
+    iDestruct (boot_cran_split g (A + 208) (A + 208 + 8 * Z.of_nat NOFILE) (A + 368)
                  ltac:(lia) ltac:(unfold NOFILE; lia) with "H") as "[Hof H]".
-    iDestruct (boot_cran_split g (A + 208 + 8 * Z.of_nat NOFILE) (A + 336) (A + 360)
+    iDestruct (boot_cran_split g (A + 208 + 8 * Z.of_nat NOFILE) (A + 336) (A + 368)
                  ltac:(unfold NOFILE; lia) ltac:(lia) with "H") as "[_ H]".
-    iDestruct (boot_cran_split g (A + 336) (A + 336 + 8) (A + 360)
+    iDestruct (boot_cran_split g (A + 336) (A + 336 + 8) (A + 368)
                  ltac:(lia) ltac:(lia) with "H") as "[Hcwd H]".
-    iDestruct (boot_cran_split g (A + 336 + 8) (A + 344) (A + 360)
+    iDestruct (boot_cran_split g (A + 336 + 8) (A + 344) (A + 368)
                  ltac:(lia) ltac:(lia) with "H") as "[_ H]".
-    iDestruct (boot_cran_split g (A + 344) (A + 344 + Z.of_nat PNAMELEN) (A + 360)
-                 ltac:(lia) ltac:(unfold PNAMELEN; lia) with "H") as "[Hnm _]".
+    iDestruct (boot_cran_split g (A + 344) (A + 344 + Z.of_nat PNAMELEN) (A + 368)
+                 ltac:(lia) ltac:(unfold PNAMELEN; lia) with "H") as "[Hnm H]".
+    iDestruct (boot_cran_split g (A + 344 + Z.of_nat PNAMELEN) (A + 360) (A + 368)
+                 ltac:(unfold PNAMELEN; lia) ltac:(lia) with "H") as "[_ H]".
+    (* +360 IS [p_secc], the mask (upstream a083670): the LAST field, a
+       pinned zero like [sz] and [cwd] -- [struct proc] is .bss. *)
+    iDestruct (boot_cran_split g (A + 360) (A + 360 + 8) (A + 368)
+                 ltac:(lia) ltac:(lia) with "H") as "[Hsc _]".
     (* the cells *)
     iDestruct (boot_lk_raw g A Hmem Hlo ltac:(lia) Hal with "Hcl Hlk") as "Hlk".
     iDestruct (boot_cran_cell4 g (A + 24) Hmem ltac:(lia) ltac:(lia) M24
@@ -2184,6 +2193,9 @@ Section BootCarveMain.
     iDestruct (boot_cran_cell8_bss g (A + 336) (zero_reg : mword 64) Hmem
                  ltac:(lia) ltac:(lia) ltac:(lia) M336 nth_byte_zero8
                  with "Hcl Hcwd") as "Hcwd".
+    iDestruct (boot_cran_cell8_bss g (A + 360) (zero_reg : mword 64) Hmem
+                 ltac:(lia) ltac:(lia) ltac:(lia) M360 nth_byte_zero8
+                 with "Hcl Hsc") as "Hsc".
     (* the five ↦₈ cells whose CONSUMERS are above the seam ([p_kstack] and
        [proc_fields]' / [proc_dormant_nofd]'s words): named crossings, one
        each.  [p_chan] and [p_parent] stay RAW -- they are conjuncts of this
@@ -2223,9 +2235,9 @@ Section BootCarveMain.
     rewrite /proc_slot_raw /proc_raw /proc_pub /proc_dormant_nofd /proc_fields
             /pid_lock_share /pid_lock_share_at
             /p_state /p_chan /p_parent /p_killed /p_xstate /p_pid /p_kstack /p_sz
-            /p_pagetable /p_trapframe /p_context /p_cwd
-            E48 E72 E80 E88 !off_of_z.
-    iSplitL "Hlk Hst Hks Hpid1 Hsz Hcwd Hnm Hof Hxs1 Hctx Hpg Htf".
+            /p_pagetable /p_trapframe /p_context /p_cwd /p_secc
+            E48 E72 E80 E88 E360 !off_of_z.
+    iSplitL "Hlk Hst Hks Hpid1 Hsz Hcwd Hnm Hsc Hof Hxs1 Hctx Hpg Htf".
     { iExists vst, vks.
       iSplitL "Hlk"; [iExact "Hlk" |]. iSplitL "Hst"; [iExact "Hst" |].
       iSplitL "Hks"; [iExact "Hks" |].
@@ -2238,19 +2250,24 @@ Section BootCarveMain.
                  (zero_reg : mword 64) bs 0 1%positive 1%positive
                  (* the lazy bit on a DORMANT slot (lane LAZY-FLAG): [true],
                     where [ProcInv.proc_priv_core]'s claim is vacuous. *)
-                 true),
+                 true
+                 (* ...and the mask, the BSS zero (userinit stores [secc_all]
+                    into the first process; every other slot's mask comes
+                    from kfork's copy) *)
+                 (zero_reg : mword 64)),
         (mword_of_int 0 : mword 32).
       cbn [pv_sz pv_upt pv_tf pv_ofile pv_cwd pv_name pv_fdg pv_cwi pv_gen pv_chg
-           pv_lazy].
+           pv_lazy pv_secc].
       iSplitR; [iPureIntro; split_and!;
                 [reflexivity | reflexivity | vm_compute; discriminate
                  | vm_compute; reflexivity
                  (* the dormant slot's lazy bit (lane LAZY-FLAG, K2) *)
                  | reflexivity] |].
       iSplitL "Hpid1"; [iExact "Hpid1" |].
-      iSplitL "Hsz Hcwd Hnm".
+      iSplitL "Hsz Hcwd Hnm Hsc".
       { iSplitL "Hsz"; [iExact "Hsz" |]. iSplitL "Hcwd"; [iExact "Hcwd" |].
-        iSplitR; [iPureIntro; exact Hbs |]. iExact "Hnm". }
+        iSplitR; [iPureIntro; exact Hbs |].
+        iSplitL "Hnm"; [iExact "Hnm" | iExact "Hsc"]. }
       iSplitL "Hof"; [iExact "Hof" |].
       iSplitL "Hxs1"; [iExists vxs; iExact "Hxs1" |].
       iSplitL "Hctx"; [iExact "Hctx" |].
@@ -2296,7 +2313,7 @@ Section BootCarveMain.
                  KernelSyms.proc proc_size NPROC
                  ltac:(unfold proc_size; lia)
                  ltac:(intros i A Hi HA _ _;
-                       destruct (z_stride_side KernelSyms.proc proc_size NPROC 360
+                       destruct (z_stride_side KernelSyms.proc proc_size NPROC 368
                                    img_end ram_hi i A Hi HA
                                    ltac:(unfold proc_size; lia)
                                    ltac:(vm_compute; discriminate)
@@ -2304,11 +2321,11 @@ Section BootCarveMain.
                                    ltac:(vm_compute; reflexivity)
                                    ltac:(vm_compute; reflexivity))
                          as (Q1 & Q2 & Q3);
-                       assert (T1 : A <= A + 360) by lia;
-                       assert (T2 : A + 360 <= A + proc_size)
+                       assert (T1 : A <= A + 368) by lia;
+                       assert (T2 : A + 368 <= A + proc_size)
                          by (unfold proc_size; lia);
                        iIntros "#Hcl H";
-                       iDestruct (boot_cran_split g A (A + 360) (A + proc_size)
+                       iDestruct (boot_cran_split g A (A + 368) (A + proc_size)
                                     T1 T2 with "H") as "[H _]";
                        iApply (boot_proc_slot g A Hmem Q1 Q2 Q3 with "Hcl H"))
                  with "Hcl H") as "H".

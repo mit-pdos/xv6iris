@@ -571,7 +571,7 @@ Section UkRunSys.
                    ltac:(vm_compute; reflexivity) Hp Hc)
               with "Hb Hmy").
     rewrite (uexec_ret_ecall _ _ eq_refl).
-    assert (Hnum : usys_num (uvis_tf (uvis_of_run m pc M pm sz fdv cw gn cs pidv false)) = n).
+    assert (Hnum : usys_num (uvis_tf (uvis_of_run m pc M pm sz fdv cw gn cs pidv false secc_all)) = n).
     { cbn [uvis_tf uvis_of_run]. rewrite tf_of_num. exact Hn. }
     (* the PAYMENT's guard IS the deposit's own, so it is opened BEFORE the
        number is rewritten and the destructs below then reduce both copies
@@ -638,7 +638,7 @@ Section UkRunSys.
     pose proof (usys_fd_ok_quiet n _ r _ _ Hcl Hdp Hop H4 Hfdok) as ->.
     cbn [uvis_M uvis_perm uvis_of_run].
     (* the resumed key is at the SAME view, so the bump is at [fdv] twice *)
-    rewrite (uslot_bump_run m pc M M pm pm sz sz fdv fdv cw cw' gn gn cs cs pidv false false r Hx0 Hal4).
+    rewrite (uslot_bump_run m pc M M pm pm sz sz fdv fdv cw cw' gn gn cs cs pidv false false secc_all secc_all r Hx0 Hal4).
     (* the arm handed the payload back, so the close spends it on
        [UexecRet.ukcq]'s own wand and the run keeps the copy *)
     iApply ukcq_ukc.
@@ -710,7 +710,7 @@ Section UkRunSys.
                    ltac:(vm_compute; reflexivity) Hp Hc)
               with "Hb Hmy").
     rewrite (uexec_ret_ecall _ _ eq_refl).
-    assert (Hnum : usys_num (uvis_tf (uvis_of_run m pc M pm sz fdv c gn cs pidv false))
+    assert (Hnum : usys_num (uvis_tf (uvis_of_run m pc M pm sz fdv c gn cs pidv false secc_all))
                    = USYS_chdir).
     { cbn [uvis_tf uvis_of_run]. rewrite tf_of_num. exact Hn. }
     (* the PAYMENT's guard IS the deposit's own, so it is opened BEFORE the
@@ -766,7 +766,7 @@ Section UkRunSys.
     iApply uslot_bupd.
     iMod (ucwd_move N c cw' with "Hcwda Hcwd") as "[Hcwda Hcwd]".
     iModIntro.
-    rewrite (uslot_bump_run m pc M M pm pm sz sz fdv fdv c cw' gn gn cs cs pidv false false r Hx0 Hal4).
+    rewrite (uslot_bump_run m pc M M pm pm sz sz fdv fdv c cw' gn gn cs cs pidv false false secc_all secc_all r Hx0 Hal4).
     iApply ukcq_ukc.
     iApply (urun_close_upd _ _ _ m (mword_of_int 10) _ _ _ _ _ _ _ _ _
               ltac:(unfold unot_sp; vm_compute; discriminate)
@@ -873,7 +873,7 @@ Section UkRunSys.
                    ltac:(vm_compute; reflexivity) Hp Hc)
               with "Hb Hmy").
     rewrite (uexec_ret_ecall _ _ eq_refl).
-    assert (Hnum : usys_num (uvis_tf (uvis_of_run m pc M pm sz fdv cw gn cs pidv false)) = USYS_open).
+    assert (Hnum : usys_num (uvis_tf (uvis_of_run m pc M pm sz fdv cw gn cs pidv false secc_all)) = USYS_open).
     { cbn [uvis_tf uvis_of_run]. rewrite tf_of_num. exact Hn. }
     (* the PAYMENT's guard IS the deposit's own, so it is opened BEFORE the
        number is rewritten and the destructs below then reduce both copies
@@ -949,7 +949,7 @@ Section UkRunSys.
       iDestruct (urun_rows_insert N fdv fd (FdOpen rd wr t) Hnpo
                    with "Hnpx") as "#Hnpo".
       rewrite (uslot_bump_run m pc M M pm pm sz sz fdv
-                 (<[fd := FdOpen rd wr t]> fdv) cw cw' gn gn cs cs pidv false false r Hx0 Hal4).
+                 (<[fd := FdOpen rd wr t]> fdv) cw cw' gn gn cs cs pidv false false secc_all secc_all r Hx0 Hal4).
       iApply ukcq_ukc.
       iApply (urun_close_upd _ _ _ m (mword_of_int 10) _ _ _ _ _ _ _ _ _
                 ltac:(unfold unot_sp; vm_compute; discriminate)
@@ -962,7 +962,7 @@ Section UkRunSys.
       rewrite <- Hfdlen. exact (fd_least_closed_lt _ _ Hcl).
     - (* the call failed: nothing moved, and the ledger comes straight back *)
       iModIntro.
-      rewrite (uslot_bump_run m pc M M pm pm sz sz fdv fdv cw cw' gn gn cs cs pidv false false r Hx0 Hal4).
+      rewrite (uslot_bump_run m pc M M pm pm sz sz fdv fdv cw cw' gn gn cs cs pidv false false secc_all secc_all r Hx0 Hal4).
       iApply ukcq_ukc.
       iApply (urun_close_upd _ _ _ m (mword_of_int 10) _ _ _ _ _ _ _ _ _
                 ltac:(unfold unot_sp; vm_compute; discriminate)
@@ -1055,7 +1055,7 @@ Section UkRunSys.
                    ltac:(vm_compute; reflexivity) Hp Hc)
               with "Hb Hmy").
     rewrite (uexec_ret_ecall _ _ eq_refl).
-    assert (Hnum : usys_num (uvis_tf (uvis_of_run m pc M pm sz fdv cw gn cs pidv false)) = USYS_dup).
+    assert (Hnum : usys_num (uvis_tf (uvis_of_run m pc M pm sz fdv cw gn cs pidv false secc_all)) = USYS_dup).
     { cbn [uvis_tf uvis_of_run]. rewrite tf_of_num. exact Hn. }
     (* the PAYMENT's guard IS the deposit's own, so it is opened BEFORE the
        number is rewritten and the destructs below then reduce both copies
@@ -1134,7 +1134,7 @@ Section UkRunSys.
          pipe either (design/pipe.md, "The exit path") *)
       iDestruct (urun_rows_dup N fdv fd0 fd1 st Hsrc with "Hnpx") as "#Hnpo".
       rewrite (uslot_bump_run m pc M M pm pm sz sz fdv
-                 (<[fd1 := st]> fdv) cw cw' gn gn cs cs pidv false false r Hx0 Hal4).
+                 (<[fd1 := st]> fdv) cw cw' gn gn cs cs pidv false false secc_all secc_all r Hx0 Hal4).
       iApply ukcq_ukc.
       iApply (urun_close_upd _ _ _ m (mword_of_int 10) _ _ _ _ _ _ _ _ _
                 ltac:(unfold unot_sp; vm_compute; discriminate)
@@ -1160,7 +1160,7 @@ Section UkRunSys.
           exfalso. rewrite <- (take_drop NSTD fdv) in Hfull.
           rewrite fd_lowest_closed_app Hk in Hfull. discriminate Hfull. }
       iModIntro.
-      rewrite (uslot_bump_run m pc M M pm pm sz sz fdv fdv cw cw' gn gn cs cs pidv false false r Hx0 Hal4).
+      rewrite (uslot_bump_run m pc M M pm pm sz sz fdv fdv cw cw' gn gn cs cs pidv false false secc_all secc_all r Hx0 Hal4).
       iApply ukcq_ukc.
       iApply (urun_close_upd _ _ _ m (mword_of_int 10) _ _ _ _ _ _ _ _ _
                 ltac:(unfold unot_sp; vm_compute; discriminate)
@@ -1213,7 +1213,7 @@ Section UkRunSys.
                    ltac:(vm_compute; reflexivity) Hp Hc)
               with "Hb Hmy").
     rewrite (uexec_ret_ecall _ _ eq_refl).
-    assert (Hnum : usys_num (uvis_tf (uvis_of_run m pc M pm sz fdv cw gn cs pidv false)) = USYS_dup).
+    assert (Hnum : usys_num (uvis_tf (uvis_of_run m pc M pm sz fdv cw gn cs pidv false secc_all)) = USYS_dup).
     { cbn [uvis_tf uvis_of_run]. rewrite tf_of_num. exact Hn. }
     (* the PAYMENT's guard IS the deposit's own, so it is opened BEFORE the
        number is rewritten and the destructs below then reduce both copies
@@ -1291,7 +1291,7 @@ Section UkRunSys.
       iDestruct (urun_rows_copy N fdv (Z.to_nat (usys_argfd (tf_of m pc))) fd1
                    with "Hnpx") as "#Hnpo".
       rewrite (uslot_bump_run m pc M M pm pm sz sz fdv
-                 (<[fd1 := fdv !!! Z.to_nat (usys_argfd (tf_of m pc))]> fdv) cw cw' gn gn cs cs pidv false false
+                 (<[fd1 := fdv !!! Z.to_nat (usys_argfd (tf_of m pc))]> fdv) cw cw' gn gn cs cs pidv false false secc_all secc_all
                  r Hx0 Hal4).
       iApply ukcq_ukc.
       iApply (urun_close_upd _ _ _ m (mword_of_int 10) _ _ _ _ _ _ _ _ _
@@ -1299,7 +1299,7 @@ Section UkRunSys.
                 with "Hheap Hstk Hufd Hcwda Hcha Hmy Hdep Hnpo").
       iIntros (h') "Hrun". iApply ("Hcont" $! h' r l' with "Hstd Hrun").
     - iModIntro.
-      rewrite (uslot_bump_run m pc M M pm pm sz sz fdv fdv cw cw' gn gn cs cs pidv false false r Hx0 Hal4).
+      rewrite (uslot_bump_run m pc M M pm pm sz sz fdv fdv cw cw' gn gn cs cs pidv false false secc_all secc_all r Hx0 Hal4).
       iApply ukcq_ukc.
       iApply (urun_close_upd _ _ _ m (mword_of_int 10) _ _ _ _ _ _ _ _ _
                 ltac:(unfold unot_sp; vm_compute; discriminate)
@@ -1386,7 +1386,7 @@ Section UkRunSys.
                    ltac:(vm_compute; reflexivity) Hp Hc)
               with "Hb Hmy").
     rewrite (uexec_ret_ecall _ _ eq_refl).
-    assert (Hnum : usys_num (uvis_tf (uvis_of_run m pc M pm sz fdv cw gn cs pidv false)) = USYS_dup).
+    assert (Hnum : usys_num (uvis_tf (uvis_of_run m pc M pm sz fdv cw gn cs pidv false secc_all)) = USYS_dup).
     { cbn [uvis_tf uvis_of_run]. rewrite tf_of_num. exact Hn. }
     rewrite /uexec_pay_dep /upay_at.
     rewrite Hnum. cbv zeta.
@@ -1433,7 +1433,7 @@ Section UkRunSys.
          own ledger says it was CLOSED. *)
       exfalso. rewrite Hai in Hop. exact (Hop Htk).
     - (* the call failed: nothing moved at all, and the row names the -1 *)
-      rewrite (uslot_bump_run m pc M M pm pm sz sz fdv fdv cw cw' gn gn cs cs pidv false false r Hx0 Hal4).
+      rewrite (uslot_bump_run m pc M M pm pm sz sz fdv fdv cw cw' gn gn cs cs pidv false false secc_all secc_all r Hx0 Hal4).
       iApply ukcq_ukc.
       iApply (urun_close_upd _ _ _ m (mword_of_int 10) _ _ _ _ _ _ _ _ _
                 ltac:(unfold unot_sp; vm_compute; discriminate)
@@ -1558,7 +1558,7 @@ Section UkRunSys.
                    ltac:(vm_compute; reflexivity) Hp Hc)
               with "Hb Hmy").
     rewrite (uexec_ret_ecall _ _ eq_refl).
-    assert (Hnum : usys_num (uvis_tf (uvis_of_run m pc M pm sz fdv cw gn cs pidv false)) = USYS_close).
+    assert (Hnum : usys_num (uvis_tf (uvis_of_run m pc M pm sz fdv cw gn cs pidv false secc_all)) = USYS_close).
     { cbn [uvis_tf uvis_of_run]. rewrite tf_of_num. exact Hn. }
     (* the PAYMENT's guard IS the deposit's own, so it is opened BEFORE the
        number is rewritten and the destructs below then reduce both copies
@@ -1619,7 +1619,7 @@ Section UkRunSys.
     iMod (ufd_close_hi (ukn_fd N) fdv fd st with "Hufd Hh") as "Hufd".
     iModIntro.
     rewrite (uslot_bump_run m pc M M pm pm sz sz fdv
-               (<[fd := FdClosed]> fdv) cw cw' gn gn cs cs pidv false false r Hx0 Hal4).
+               (<[fd := FdClosed]> fdv) cw cw' gn gn cs cs pidv false false secc_all secc_all r Hx0 Hal4).
     (* ...and close installs [FdClosed], which is not a pipe row *)
     iDestruct (urun_rows_insert N fdv fd FdClosed fdst_nopipe_closed
                  with "Hnpx") as "#Hnpo".
@@ -1673,7 +1673,7 @@ Section UkRunSys.
                    ltac:(vm_compute; reflexivity) Hp Hc)
               with "Hb Hmy").
     rewrite (uexec_ret_ecall _ _ eq_refl).
-    assert (Hnum : usys_num (uvis_tf (uvis_of_run m pc M pm sz fdv cw gn cs pidv false)) = USYS_close).
+    assert (Hnum : usys_num (uvis_tf (uvis_of_run m pc M pm sz fdv cw gn cs pidv false secc_all)) = USYS_close).
     { cbn [uvis_tf uvis_of_run]. rewrite tf_of_num. exact Hn. }
     (* the PAYMENT's guard IS the deposit's own, so it is opened BEFORE the
        number is rewritten and the destructs below then reduce both copies
@@ -1733,7 +1733,7 @@ Section UkRunSys.
     iMod (ufd_close_std (ukn_fd N) fdv l fd st Hs Hkl with "Hufd Hstd") as "[Hufd Hstd]".
     iModIntro.
     rewrite (uslot_bump_run m pc M M pm pm sz sz fdv
-               (<[fd := FdClosed]> fdv) cw cw' gn gn cs cs pidv false false r Hx0 Hal4).
+               (<[fd := FdClosed]> fdv) cw cw' gn gn cs cs pidv false false secc_all secc_all r Hx0 Hal4).
     (* ...and close installs [FdClosed], which is not a pipe row *)
     iDestruct (urun_rows_insert N fdv fd FdClosed fdst_nopipe_closed
                  with "Hnpx") as "#Hnpo".
@@ -1798,7 +1798,7 @@ Section UkRunSys.
                    ltac:(vm_compute; reflexivity) Hp Hc)
               with "Hb Hmy").
     rewrite (uexec_ret_ecall _ _ eq_refl).
-    assert (Hnum : usys_num (uvis_tf (uvis_of_run m pc M pm sz fdv cw gn cs pidv false)) = USYS_exec).
+    assert (Hnum : usys_num (uvis_tf (uvis_of_run m pc M pm sz fdv cw gn cs pidv false secc_all)) = USYS_exec).
     { cbn [uvis_tf uvis_of_run]. rewrite tf_of_num. exact Hn. }
     (* the PAYMENT's guard IS the deposit's own, so it is opened BEFORE the
        number is rewritten and the destructs below then reduce both copies
@@ -1860,7 +1860,7 @@ Section UkRunSys.
     { refine (usys_fd_ok_quiet _ _ _ _ _ _ _ _ _ Hfdok);
         vm_compute; discriminate. }
     subst fdv'.
-    rewrite (uslot_bump_run m pc M M pm pm sz sz fdv fdv cw cw' gn gn cs cs pidv false false
+    rewrite (uslot_bump_run m pc M M pm pm sz sz fdv fdv cw cw' gn gn cs cs pidv false false secc_all secc_all
                (mword_of_int (-1) : mword 64) Hx0 Hal4).
     iApply ukcq_ukc.
     iApply (urun_close_upd _ _ _ m (mword_of_int 10) _ _ _ _ _ _ _ _ _
@@ -1941,7 +1941,7 @@ Section UkRunSys.
                    ltac:(vm_compute; reflexivity) Hp Hc)
               with "Hb Hmy").
     rewrite (uexec_ret_ecall _ _ eq_refl).
-    assert (Hnum : usys_num (uvis_tf (uvis_of_run m pc M pm sz fdv c gn cs pidv false)) = USYS_exec).
+    assert (Hnum : usys_num (uvis_tf (uvis_of_run m pc M pm sz fdv c gn cs pidv false secc_all)) = USYS_exec).
     { cbn [uvis_tf uvis_of_run]. rewrite tf_of_num. exact Hn. }
     (* the PAYMENT's guard IS the deposit's own, so it is opened BEFORE the
        number is rewritten and the destructs below then reduce both copies
@@ -2001,7 +2001,7 @@ Section UkRunSys.
     { refine (usys_fd_ok_quiet _ _ _ _ _ _ _ _ _ Hfdok);
         vm_compute; discriminate. }
     subst fdv'.
-    rewrite (uslot_bump_run m pc M M pm pm sz sz fdv fdv c cw' gn gn cs cs pidv false false
+    rewrite (uslot_bump_run m pc M M pm pm sz sz fdv fdv c cw' gn gn cs cs pidv false false secc_all secc_all
                (mword_of_int (-1) : mword 64) Hx0 Hal4).
     iApply ukcq_ukc.
     iApply (urun_close_upd _ _ _ m (mword_of_int 10) _ _ _ _ _ _ _ _ _
@@ -2167,9 +2167,9 @@ Section UkRunSys.
                    ltac:(vm_compute; reflexivity) Hp Hc)
               with "Hb Hmy").
     rewrite (uexec_ret_ecall _ _ eq_refl).
-    assert (Hnum : usys_num (uvis_tf (uvis_of_run m pc M pm sz fdv cw gn cs pidv false)) = USYS_wait).
+    assert (Hnum : usys_num (uvis_tf (uvis_of_run m pc M pm sz fdv cw gn cs pidv false secc_all)) = USYS_wait).
     { cbn [uvis_tf uvis_of_run]. rewrite tf_of_num. exact Hn. }
-    assert (Ha0 : uint (uvis_tf (uvis_of_run m pc M pm sz fdv cw gn cs pidv false) !!! tf_arg_idx 0) = 0).
+    assert (Ha0 : uint (uvis_tf (uvis_of_run m pc M pm sz fdv cw gn cs pidv false secc_all) !!! tf_arg_idx 0) = 0).
     { cbn [uvis_tf uvis_of_run]. rewrite tf_of_arg0. exact Hz. }
     (* the PAYMENT's guard IS the deposit's own, so it is opened BEFORE the
        number is rewritten and the destructs below then reduce both copies
@@ -2251,7 +2251,7 @@ Section UkRunSys.
     { refine (usys_fd_ok_quiet _ _ _ _ _ _ _ _ _ Hfdok);
         vm_compute; discriminate. }
     subst fdv'.
-    rewrite (uslot_bump_run m pc M M pm pm sz sz fdv fdv cw cw' gn gn cs cs' pidv false false r Hx0 Hal4).
+    rewrite (uslot_bump_run m pc M M pm pm sz sz fdv fdv cw cw' gn gn cs cs' pidv false false secc_all secc_all r Hx0 Hal4).
     iApply ukcq_ukc.
     iApply (urun_close_upd _ _ _ m (mword_of_int 10) _ _ _ _ _ _ _ _ _
               ltac:(unfold unot_sp; vm_compute; discriminate) with "Hheap Hstk Hufd Hcwda Hcha Hmy Hdep Hnpx").
@@ -2512,7 +2512,7 @@ Section UkRunSys.
                    ltac:(vm_compute; reflexivity) Hp Hc)
               with "Hb Hmy").
     rewrite (uexec_ret_ecall _ _ eq_refl).
-    assert (Hnum : usys_num (uvis_tf (uvis_of_run m pc M pm sz fdv cw gn cs pidv false)) = USYS_wait).
+    assert (Hnum : usys_num (uvis_tf (uvis_of_run m pc M pm sz fdv cw gn cs pidv false secc_all)) = USYS_wait).
     { cbn [uvis_tf uvis_of_run]. rewrite tf_of_num. exact Hn. }
     rewrite /uexec_pay_dep /upay_at.
     rewrite Hnum. cbv zeta.
@@ -2587,7 +2587,7 @@ Section UkRunSys.
     destruct Hpsz as [-> ->].
     cbn [uvis_M uvis_perm uvis_sz uvis_of_run].
     rewrite (uslot_bump_run m pc M (umem_write M (uint dst) d g) pm pm sz sz
-               fdv fdv cw cw' gn gn cs cs' pidv false false r Hx0 Hal4).
+               fdv fdv cw cw' gn gn cs cs' pidv false false secc_all secc_all r Hx0 Hal4).
     rewrite /ukc. iIntros (h' xi' C' pt' Rfd' Rut') "%Hlo' %Hpm' %Hlzf' Hb'".
     iEval (rewrite (ubytes_split (ukn_d N) (uint dst) d k f Hdk)) in "Hbuf".
     iDestruct "Hbuf" as "[Hblo Hbhi]".
@@ -2722,9 +2722,9 @@ Section UkRunSys.
                    ltac:(vm_compute; reflexivity) Hp Hc)
               with "Hb Hmy").
     rewrite (uexec_ret_ecall _ _ eq_refl).
-    assert (Hnum : usys_num (uvis_tf (uvis_of_run m pc M pm sz fdv cw gn cs pidv false)) = n).
+    assert (Hnum : usys_num (uvis_tf (uvis_of_run m pc M pm sz fdv cw gn cs pidv false secc_all)) = n).
     { cbn [uvis_tf uvis_of_run]. rewrite tf_of_num. exact Hn. }
-    assert (Hw : usys_win n (uvis_tf (uvis_of_run m pc M pm sz fdv cw gn cs pidv false))
+    assert (Hw : usys_win n (uvis_tf (uvis_of_run m pc M pm sz fdv cw gn cs pidv false secc_all))
                  = Some (dst, cap)).
     { cbn [uvis_tf uvis_of_run]. rewrite usyswin_tf_of. exact Hwin. }
     destruct (usys_win_num n _ dst cap Hw) as (Hexit & Hfork & _ & Hsbk & Hchd).
@@ -2804,7 +2804,7 @@ Section UkRunSys.
       by exact (usys_fd_ok_quiet _ _ _ _ _ Hcl Hdp Hop Hpp Hfdok).
     subst fdv'.
     rewrite (uslot_bump_run m pc M (umem_write M (uint dst) d g) pm pm sz sz
-               fdv fdv cw cw' gn gn cs cs pidv false false r Hx0 Hal4).
+               fdv fdv cw cw' gn gn cs cs pidv false false secc_all secc_all r Hx0 Hal4).
     (* [uheap_store_run] is a basic update and [ukc] is not a [WP], so the
        re-assembly runs under [ukc]'s own binders -- which is why this leaf
        opens the close by hand instead of applying it to the goal. *)
@@ -3045,9 +3045,9 @@ Section UkRunSys.
                    ltac:(vm_compute; reflexivity) Hp Hc)
               with "Hb Hmy").
     rewrite (uexec_ret_ecall _ _ eq_refl).
-    assert (Hnum : usys_num (uvis_tf (uvis_of_run m pc M pm sz fdv cw gn cs pidv false)) = USYS_pipe).
+    assert (Hnum : usys_num (uvis_tf (uvis_of_run m pc M pm sz fdv cw gn cs pidv false secc_all)) = USYS_pipe).
     { cbn [uvis_tf uvis_of_run]. rewrite tf_of_num. exact Hn. }
-    assert (Hw : usys_win USYS_pipe (uvis_tf (uvis_of_run m pc M pm sz fdv cw gn cs pidv false))
+    assert (Hw : usys_win USYS_pipe (uvis_tf (uvis_of_run m pc M pm sz fdv cw gn cs pidv false secc_all))
                  = Some (dst, 8%nat)).
     { cbn [uvis_tf uvis_of_run]. rewrite usyswin_tf_of.
       unfold usyswin.
@@ -3057,7 +3057,7 @@ Section UkRunSys.
         [ reflexivity | exfalso; exact (Hc eq_refl) ]. }
     (* the row reads a0 at the trapframe; the buffer is owned at the
        REGISTER's spelling.  They are the same word. *)
-    assert (Ha0 : uvis_tf (uvis_of_run m pc M pm sz fdv cw gn cs pidv false) !!! tf_arg_idx 0 = dst)
+    assert (Ha0 : uvis_tf (uvis_of_run m pc M pm sz fdv cw gn cs pidv false secc_all) !!! tf_arg_idx 0 = dst)
       by (cbn [uvis_tf uvis_of_run]; reflexivity).
     (* the PAYMENT's guard IS the deposit's own, so it is opened BEFORE the
        number is rewritten and the destructs below then reduce both copies
@@ -3185,7 +3185,7 @@ Section UkRunSys.
        what lets [subst] pick the joined one. *)
     clear HM'. subst M'.
     rewrite (uslot_bump_run m pc M (umem_write M (uint dst) dd gg) pm pm sz sz
-               fdv fdv' cw cw' gn gn cs cs pidv false false r Hx0 Hal4).
+               fdv fdv' cw cw' gn gn cs cs pidv false false secc_all secc_all r Hx0 Hal4).
     rewrite /ukc. iIntros (h' xi' C' pt' Rfd' Rut') "%Hlo' %Hpm' %Hlzf' Hb'".
     iEval (rewrite (ubytes_split (ukn_d N) (uint dst) dd 8 f Hdd8)) in "Hbuf".
     iDestruct "Hbuf" as "[Hblo Hbhi]".
@@ -3263,7 +3263,7 @@ Section UkRunSys.
        the WP the registrar's fancy update can be absorbed into *)
     iIntros "Hb2".
     iApply fupd_wp.
-    iMod ("Hreg" $! fdep (uvis_of_run m pc M pm sz fdv cw gn cs pidv false) r
+    iMod ("Hreg" $! fdep (uvis_of_run m pc M pm sz fdv cw gn cs pidv false secc_all) r
             (umem_write M (uint dst) dd gg) fdv' cw' cs
             with "[%] Hnp Hsp") as "[#Hnpr HRp]";
       [ exact (fun Hc => proj2 (Hfail Hc)) | ].
@@ -3275,7 +3275,7 @@ Section UkRunSys.
                  with "Hheap Hstk Hufd Hcwda Hcha Hmy Hdep Hnpo [Hcont Hbuf Hhs HRp]") as "Hkc";
       [ iIntros (h'') "Hrun";
         iApply ("Hcont" $! h'' r gg
-                  (uvis_of_run m pc M pm sz fdv cw gn cs pidv false) fdep
+                  (uvis_of_run m pc M pm sz fdv cw gn cs pidv false secc_all) fdep
                   (umem_write M (uint dst) dd gg) fdv' cw' cs
                   with "Hhs HRp Hrun Hbuf") | ].
     iDestruct (ukcq_ukc with "Hkc") as "Hkc".
@@ -3517,7 +3517,7 @@ Section UkRunSys.
        uheap (ukn_t N) (ukn_d N) (ukn_s N) M pm sz -∗ ufd_auth (ukn_fd N) fdv -∗
        uheap (ukn_t N) (ukn_d N) (ukn_s N) M pm sz ∗ ufd_auth (ukn_fd N) fdv ∗
        sbundle_at uslot n fdep
-         (uvis_of_run m pc M pm sz fdv cw gn cs pidv false))%I.
+         (uvis_of_run m pc M pm sz fdv cw gn cs pidv false secc_all))%I.
 
   Lemma udepwf_K_std (N : uk_names Σ) (m : regfile) (pc : mword 64)
       (n : Z) (fdep : sfam) (l : list fdstate) :
@@ -3677,9 +3677,9 @@ Section UkRunSys.
                    ltac:(vm_compute; reflexivity) Hp Hc)
               with "Hb Hmy").
     rewrite (uexec_ret_ecall _ _ eq_refl).
-    assert (Hnum : usys_num (uvis_tf (uvis_of_run m pc M pm sz fdv cw gn cs pidv false)) = USYS_read).
+    assert (Hnum : usys_num (uvis_tf (uvis_of_run m pc M pm sz fdv cw gn cs pidv false secc_all)) = USYS_read).
     { cbn [uvis_tf uvis_of_run]. rewrite tf_of_num. exact Hn. }
-    assert (Hw : usys_win USYS_read (uvis_tf (uvis_of_run m pc M pm sz fdv cw gn cs pidv false))
+    assert (Hw : usys_win USYS_read (uvis_tf (uvis_of_run m pc M pm sz fdv cw gn cs pidv false secc_all))
                  = Some (dst, cap)).
     { cbn [uvis_tf uvis_of_run]. rewrite usyswin_tf_of. exact Hwin. }
     rewrite /uexec_pay_dep /upay_at.
@@ -3734,7 +3734,7 @@ Section UkRunSys.
         vm_compute; discriminate. }
     subst fdv'.
     rewrite (uslot_bump_run m pc M (umem_write M (uint dst) d g) pm pm sz sz
-               fdv fdv cw cw' gn gn cs cs pidv false false r Hx0 Hal4).
+               fdv fdv cw cw' gn gn cs cs pidv false false secc_all secc_all r Hx0 Hal4).
     rewrite /ukc. iIntros (h' xi' C' pt' Rfd' Rut') "%Hlo' %Hpm' %Hlzf' Hb'".
     iEval (rewrite (ubytes_split (ukn_d N) (uint dst) d k f Hdk)) in "Hbuf".
     iDestruct "Hbuf" as "[Hblo Hbhi]".
@@ -3751,7 +3751,7 @@ Section UkRunSys.
                  ltac:(unfold unot_sp; vm_compute; discriminate)
                  with "Hheap Hstk Hufd Hcwda Hcha Hmy Hdep Hnpx [Hcont Hbuf Hstd Hpost]") as "Hkc".
     { iIntros (h'') "Hrun".
-      iApply ("Hcont" $! h'' r d g (uvis_of_run m pc M pm sz fdv cw gn cs pidv false)
+      iApply ("Hcont" $! h'' r d g (uvis_of_run m pc M pm sz fdv cw gn cs pidv false secc_all)
                 _ _ _ _
                 with "[%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] Hstd Hpost Hrun Hbuf").
       - exact Hdcap.
@@ -3777,7 +3777,7 @@ Section UkRunSys.
       - rewrite /tf_w. cbn [uvis_tf uvis_of_run]. exact (tf_of_arg0 m pc).
       - rewrite /tf_w. cbn [uvis_tf uvis_of_run]. exact (tf_of_arg1 m pc).
       - rewrite /tf_w. cbn [uvis_tf uvis_of_run]. exact (tf_of_arg2 m pc).
-      - rewrite (uvis_of_run_fd m pc M pm sz fdv cw gn cs pidv false). exact Htake.
+      - rewrite (uvis_of_run_fd m pc M pm sz fdv cw gn cs pidv false secc_all). exact Htake.
       (* definitional: the run is at [false] *)
       - reflexivity.
       (* ...and what the resume proved, straight off the arm's own row
@@ -3987,7 +3987,7 @@ Section UkRunSys.
                    ltac:(vm_compute; reflexivity) Hp Hc)
               with "Hb Hmy").
     rewrite (uexec_ret_ecall _ _ eq_refl).
-    assert (Hnum : usys_num (uvis_tf (uvis_of_run m pc M pm sz fdv c gn cs pidv false)) = USYS_open).
+    assert (Hnum : usys_num (uvis_tf (uvis_of_run m pc M pm sz fdv c gn cs pidv false secc_all)) = USYS_open).
     { cbn [uvis_tf uvis_of_run]. rewrite tf_of_num. exact Hn. }
     rewrite /uexec_pay_dep /upay_at.
     rewrite Hnum. cbv zeta.
@@ -4039,35 +4039,35 @@ Section UkRunSys.
       iDestruct (urun_rows_insert N fdv fd (FdOpen rd wr t) Hnpo
                    with "Hnpx") as "#Hnpi".
       rewrite (uslot_bump_run m pc M M pm pm sz sz fdv
-                 (<[fd := FdOpen rd wr t]> fdv) c c gn gn cs cs pidv false false r Hx0 Hal4).
+                 (<[fd := FdOpen rd wr t]> fdv) c c gn gn cs cs pidv false false secc_all secc_all r Hx0 Hal4).
       iApply ukcq_ukc.
       iApply (urun_close_upd _ _ _ m (mword_of_int 10) _ _ _ _ _ _ _ _ _
                 ltac:(unfold unot_sp; vm_compute; discriminate)
                 with "Hheap Hstk Hufd Hcwda Hcha Hmy Hdep Hnpi").
       iIntros (h') "Hrun".
-      iApply ("Hcont" $! h' r (uvis_of_run m pc M pm sz fdv c gn cs pidv false)
+      iApply ("Hcont" $! h' r (uvis_of_run m pc M pm sz fdv c gn cs pidv false secc_all)
                 _ _ _ _ with "[%] [%] [%] [%] [Hh] Hpost Hcwd Hrun").
       { rewrite /tf_w. cbn [uvis_tf uvis_of_run]. exact (tf_of_arg0 m pc). }
       { rewrite /tf_w. cbn [uvis_tf uvis_of_run]. exact (tf_of_arg1 m pc). }
-      { exact (uvis_of_run_cwd m pc M pm sz fdv c gn cs pidv false). }
-      { rewrite (uvis_of_run_fd m pc M pm sz fdv c gn cs pidv false). exact Htake. }
+      { exact (uvis_of_run_cwd m pc M pm sz fdv c gn cs pidv false secc_all). }
+      { rewrite (uvis_of_run_fd m pc M pm sz fdv c gn cs pidv false secc_all). exact Htake. }
       iLeft. iExists fd, rd, wr, t. iFrame "Hh". iPureIntro.
       split_and!; [ exact Hr | | exact Hnpo ].
       rewrite <- Hfdlen. exact (fd_least_closed_lt _ _ Hcl).
     - (* the call failed: nothing moved, and the ledger comes straight back *)
       iModIntro.
-      rewrite (uslot_bump_run m pc M M pm pm sz sz fdv fdv c c gn gn cs cs pidv false false r Hx0 Hal4).
+      rewrite (uslot_bump_run m pc M M pm pm sz sz fdv fdv c c gn gn cs cs pidv false false secc_all secc_all r Hx0 Hal4).
       iApply ukcq_ukc.
       iApply (urun_close_upd _ _ _ m (mword_of_int 10) _ _ _ _ _ _ _ _ _
                 ltac:(unfold unot_sp; vm_compute; discriminate)
                 with "Hheap Hstk Hufd Hcwda Hcha Hmy Hdep Hnpx").
       iIntros (h') "Hrun".
-      iApply ("Hcont" $! h' r (uvis_of_run m pc M pm sz fdv c gn cs pidv false)
+      iApply ("Hcont" $! h' r (uvis_of_run m pc M pm sz fdv c gn cs pidv false secc_all)
                 _ _ _ _ with "[%] [%] [%] [%] [Hstd] Hpost Hcwd Hrun").
       { rewrite /tf_w. cbn [uvis_tf uvis_of_run]. exact (tf_of_arg0 m pc). }
       { rewrite /tf_w. cbn [uvis_tf uvis_of_run]. exact (tf_of_arg1 m pc). }
-      { exact (uvis_of_run_cwd m pc M pm sz fdv c gn cs pidv false). }
-      { rewrite (uvis_of_run_fd m pc M pm sz fdv c gn cs pidv false). exact Htake. }
+      { exact (uvis_of_run_cwd m pc M pm sz fdv c gn cs pidv false secc_all). }
+      { rewrite (uvis_of_run_fd m pc M pm sz fdv c gn cs pidv false secc_all). exact Htake. }
       iRight. iFrame "Hstd". iPureIntro. exact Hrm.
   Qed.
 
@@ -4143,7 +4143,7 @@ Section UkRunSys.
                    ltac:(vm_compute; reflexivity) Hp Hc)
               with "Hb Hmy").
     rewrite (uexec_ret_ecall _ _ eq_refl).
-    assert (Hnum : usys_num (uvis_tf (uvis_of_run m pc M pm sz fdv c gn cs pidv false)) = n).
+    assert (Hnum : usys_num (uvis_tf (uvis_of_run m pc M pm sz fdv c gn cs pidv false secc_all)) = n).
     { cbn [uvis_tf uvis_of_run]. rewrite tf_of_num. exact Hn. }
     rewrite /uexec_pay_dep /upay_at.
     rewrite Hnum. cbv zeta.
@@ -4175,19 +4175,19 @@ Section UkRunSys.
       as [-> [-> ->]].
     pose proof (usys_fd_ok_quiet n _ r _ _ Hcl Hdp Hop H4 Hfdok) as ->.
     cbn [uvis_M uvis_perm uvis_of_run].
-    rewrite (uslot_bump_run m pc M M pm pm sz sz fdv fdv c c gn gn cs cs pidv false false r Hx0 Hal4).
+    rewrite (uslot_bump_run m pc M M pm pm sz sz fdv fdv c c gn gn cs cs pidv false false secc_all secc_all r Hx0 Hal4).
     iApply ukcq_ukc.
     iApply (urun_close_upd _ _ _ m (mword_of_int 10) _ _ _ _ _ _ _ _ _
               ltac:(unfold unot_sp; vm_compute; discriminate)
               with "Hheap Hstk Hufd Hcwda Hcha Hmy Hdep Hnpx").
     iIntros (h') "Hrun".
-    iApply ("Hcont" $! h' r (uvis_of_run m pc M pm sz fdv c gn cs pidv false) cs
+    iApply ("Hcont" $! h' r (uvis_of_run m pc M pm sz fdv c gn cs pidv false secc_all) cs
               with "[%] [%] [%] [%] [Hpost] Hcwd Hrun").
     { rewrite /tf_w. cbn [uvis_tf uvis_of_run]. exact (tf_of_arg0 m pc). }
     { rewrite /tf_w. cbn [uvis_tf uvis_of_run]. exact (tf_of_arg1 m pc). }
     { rewrite /tf_w. cbn [uvis_tf uvis_of_run]. exact (tf_of_arg2 m pc). }
-    { exact (uvis_of_run_cwd m pc M pm sz fdv c gn cs pidv false). }
-    rewrite (uvis_of_run_fd m pc M pm sz fdv c gn cs pidv false).
+    { exact (uvis_of_run_cwd m pc M pm sz fdv c gn cs pidv false secc_all). }
+    rewrite (uvis_of_run_fd m pc M pm sz fdv c gn cs pidv false secc_all).
     cbn [uvis_M uvis_of_run]. iExact "Hpost".
   Qed.
 
@@ -4426,7 +4426,7 @@ Section UkRunSys.
                    ltac:(vm_compute; reflexivity) Hp Hc)
               with "Hb Hmy").
     rewrite (uexec_ret_ecall _ _ eq_refl).
-    assert (Hnum : usys_num (uvis_tf (uvis_of_run m pc M pm sz fdv cw gn cs pidv false)) = 16).
+    assert (Hnum : usys_num (uvis_tf (uvis_of_run m pc M pm sz fdv cw gn cs pidv false secc_all)) = 16).
     { cbn [uvis_tf uvis_of_run]. rewrite tf_of_num. exact Hn. }
     rewrite /uexec_pay_dep /upay_at.
     rewrite Hnum. cbv zeta.
@@ -4460,21 +4460,21 @@ Section UkRunSys.
                   ltac:(discriminate) ltac:(discriminate)
                   ltac:(discriminate) ltac:(discriminate) Hfdok) as ->.
     cbn [uvis_M uvis_perm uvis_of_run].
-    rewrite (uslot_bump_run m pc M M pm pm sz sz fdv fdv cw cw gn gn cs cs pidv false false r Hx0 Hal4).
+    rewrite (uslot_bump_run m pc M M pm pm sz sz fdv fdv cw cw gn gn cs cs pidv false false secc_all secc_all r Hx0 Hal4).
     iApply ukcq_ukc.
     iApply (urun_close_upd _ _ _ m (mword_of_int 10) _ _ _ _ _ _ _ _ _
               ltac:(unfold unot_sp; vm_compute; discriminate)
               with "Hheap Hstk Hufd Hcwda Hcha Hmy Hdep Hnpx").
     iIntros (h') "Hrun".
-    iApply ("Hcont" $! h' r (uvis_of_run m pc M pm sz fdv cw gn cs pidv false) cw cs
+    iApply ("Hcont" $! h' r (uvis_of_run m pc M pm sz fdv cw gn cs pidv false secc_all) cw cs
               with "[%] [%] [%] [%] [%] [%] Hstd Hbuf [Hpost] Hrun").
     { rewrite /tf_w. cbn [uvis_tf uvis_of_run]. exact (tf_of_arg0 m pc). }
     { rewrite /tf_w. cbn [uvis_tf uvis_of_run]. exact (tf_of_arg1 m pc). }
     { rewrite /tf_w. cbn [uvis_tf uvis_of_run]. exact (tf_of_arg2 m pc). }
-    { rewrite (uvis_of_run_fd m pc M pm sz fdv cw gn cs pidv false). exact Htake. }
+    { rewrite (uvis_of_run_fd m pc M pm sz fdv cw gn cs pidv false secc_all). exact Htake. }
     { reflexivity. }
     { cbn [uvis_M uvis_perm uvis_sz uvis_of_run]. exact Hnf. }
-    rewrite (uvis_of_run_fd m pc M pm sz fdv cw gn cs pidv false).
+    rewrite (uvis_of_run_fd m pc M pm sz fdv cw gn cs pidv false secc_all).
     cbn [uvis_M uvis_of_run]. iExact "Hpost".
   Qed.
 
@@ -4862,7 +4862,7 @@ Section UkRunSys.
                    ltac:(vm_compute; reflexivity) Hp Hc)
               with "Hb Hmy").
     rewrite (uexec_ret_ecall _ _ eq_refl).
-    assert (Hnum : usys_num (uvis_tf (uvis_of_run m pc M pm sz fdv c gn cs pidv false)) = USYS_open).
+    assert (Hnum : usys_num (uvis_tf (uvis_of_run m pc M pm sz fdv c gn cs pidv false secc_all)) = USYS_open).
     { cbn [uvis_tf uvis_of_run]. rewrite tf_of_num. exact Hn. }
     rewrite /uexec_pay_dep /upay_at.
     rewrite Hnum. cbv zeta.
@@ -4914,42 +4914,42 @@ Section UkRunSys.
       iDestruct (urun_rows_insert N fdv fd (FdOpen rd wr t) Hnpo
                    with "Hnpx") as "#Hnpi".
       rewrite (uslot_bump_run m pc M M pm pm sz sz fdv
-                 (<[fd := FdOpen rd wr t]> fdv) c c gn gn cs cs pidv false false r Hx0 Hal4).
+                 (<[fd := FdOpen rd wr t]> fdv) c c gn gn cs cs pidv false false secc_all secc_all r Hx0 Hal4).
       iApply ukcq_ukc.
       iApply (urun_close_upd _ _ _ m (mword_of_int 10) _ _ _ _ _ _ _ _ _
                 ltac:(unfold unot_sp; vm_compute; discriminate)
                 with "Hheap Hstk Hufd Hcwda Hcha Hmy Hdep Hnpi").
       iIntros (h') "Hrun".
-      iApply ("Hcont" $! h' r (uvis_of_run m pc M pm sz fdv c gn cs pidv false)
+      iApply ("Hcont" $! h' r (uvis_of_run m pc M pm sz fdv c gn cs pidv false secc_all)
                 _ _ _ _ with "[%] [%] [%] [%] [%] [%] [Hh] Hpost Hcwd Hrun").
       { exact Hsimg. }
-      { rewrite (uvis_of_run_fd m pc M pm sz fdv c gn cs pidv false). exact Hfdlen. }
+      { rewrite (uvis_of_run_fd m pc M pm sz fdv c gn cs pidv false secc_all). exact Hfdlen. }
       { rewrite /tf_w. cbn [uvis_tf uvis_of_run]. exact (tf_of_arg0 m pc). }
       { rewrite /tf_w. cbn [uvis_tf uvis_of_run]. exact (tf_of_arg1 m pc). }
-      { exact (uvis_of_run_cwd m pc M pm sz fdv c gn cs pidv false). }
-      { rewrite (uvis_of_run_fd m pc M pm sz fdv c gn cs pidv false). exact Htake. }
+      { exact (uvis_of_run_cwd m pc M pm sz fdv c gn cs pidv false secc_all). }
+      { rewrite (uvis_of_run_fd m pc M pm sz fdv c gn cs pidv false secc_all). exact Htake. }
       iLeft. iExists fd, rd, wr, t. iFrame "Hh". iPureIntro.
       split_and!; [ exact Hr | | | exact Hnpo ].
       { rewrite <- Hfdlen. exact (fd_least_closed_lt _ _ Hcl). }
-      rewrite (uvis_of_run_fd m pc M pm sz fdv c gn cs pidv false). reflexivity.
+      rewrite (uvis_of_run_fd m pc M pm sz fdv c gn cs pidv false secc_all). reflexivity.
     - (* the call failed: nothing moved, and the ledger comes straight back *)
       iModIntro.
-      rewrite (uslot_bump_run m pc M M pm pm sz sz fdv fdv c c gn gn cs cs pidv false false r Hx0 Hal4).
+      rewrite (uslot_bump_run m pc M M pm pm sz sz fdv fdv c c gn gn cs cs pidv false false secc_all secc_all r Hx0 Hal4).
       iApply ukcq_ukc.
       iApply (urun_close_upd _ _ _ m (mword_of_int 10) _ _ _ _ _ _ _ _ _
                 ltac:(unfold unot_sp; vm_compute; discriminate)
                 with "Hheap Hstk Hufd Hcwda Hcha Hmy Hdep Hnpx").
       iIntros (h') "Hrun".
-      iApply ("Hcont" $! h' r (uvis_of_run m pc M pm sz fdv c gn cs pidv false)
+      iApply ("Hcont" $! h' r (uvis_of_run m pc M pm sz fdv c gn cs pidv false secc_all)
                 _ _ _ _ with "[%] [%] [%] [%] [%] [%] [Hstd] Hpost Hcwd Hrun").
       { exact Hsimg. }
-      { rewrite (uvis_of_run_fd m pc M pm sz fdv c gn cs pidv false). exact Hfdlen. }
+      { rewrite (uvis_of_run_fd m pc M pm sz fdv c gn cs pidv false secc_all). exact Hfdlen. }
       { rewrite /tf_w. cbn [uvis_tf uvis_of_run]. exact (tf_of_arg0 m pc). }
       { rewrite /tf_w. cbn [uvis_tf uvis_of_run]. exact (tf_of_arg1 m pc). }
-      { exact (uvis_of_run_cwd m pc M pm sz fdv c gn cs pidv false). }
-      { rewrite (uvis_of_run_fd m pc M pm sz fdv c gn cs pidv false). exact Htake. }
+      { exact (uvis_of_run_cwd m pc M pm sz fdv c gn cs pidv false secc_all). }
+      { rewrite (uvis_of_run_fd m pc M pm sz fdv c gn cs pidv false secc_all). exact Htake. }
       iRight. iFrame "Hstd". iPureIntro. split; [ exact Hrm | ].
-      rewrite (uvis_of_run_fd m pc M pm sz fdv c gn cs pidv false). reflexivity.
+      rewrite (uvis_of_run_fd m pc M pm sz fdv c gn cs pidv false secc_all). reflexivity.
   Qed.
 
   (* =================================================================== *)
@@ -5110,7 +5110,7 @@ Section UkRunSys.
                    ltac:(vm_compute; reflexivity) Hp Hc)
               with "Hb Hmy").
     rewrite (uexec_ret_ecall _ _ eq_refl).
-    assert (Hnum : usys_num (uvis_tf (uvis_of_run m pc M pm sz fdv c gn cs pidv false)) = USYS_open).
+    assert (Hnum : usys_num (uvis_tf (uvis_of_run m pc M pm sz fdv c gn cs pidv false secc_all)) = USYS_open).
     { cbn [uvis_tf uvis_of_run]. rewrite tf_of_num. exact Hn. }
     rewrite /uexec_pay_dep /upay_at.
     rewrite Hnum. cbv zeta.
@@ -5162,42 +5162,42 @@ Section UkRunSys.
       iDestruct (urun_rows_insert N fdv fd (FdOpen rd wr t) Hnpo
                    with "Hnpx") as "#Hnpi".
       rewrite (uslot_bump_run m pc M M pm pm sz sz fdv
-                 (<[fd := FdOpen rd wr t]> fdv) c c gn gn cs cs pidv false false r Hx0 Hal4).
+                 (<[fd := FdOpen rd wr t]> fdv) c c gn gn cs cs pidv false false secc_all secc_all r Hx0 Hal4).
       iApply ukcq_ukc.
       iApply (urun_close_upd _ _ _ m (mword_of_int 10) _ _ _ _ _ _ _ _ _
                 ltac:(unfold unot_sp; vm_compute; discriminate)
                 with "Hheap Hstk Hufd Hcwda Hcha Hmy Hdep Hnpi").
       iIntros (h') "Hrun".
-      iApply ("Hcont" $! h' r (uvis_of_run m pc M pm sz fdv c gn cs pidv false)
+      iApply ("Hcont" $! h' r (uvis_of_run m pc M pm sz fdv c gn cs pidv false secc_all)
                 _ _ _ _ with "[%] [%] [%] [%] [%] [%] [Hh] Hpost Hcwd Hrun").
       { exact Hsimg. }
-      { rewrite (uvis_of_run_fd m pc M pm sz fdv c gn cs pidv false). exact Hfdlen. }
+      { rewrite (uvis_of_run_fd m pc M pm sz fdv c gn cs pidv false secc_all). exact Hfdlen. }
       { rewrite /tf_w. cbn [uvis_tf uvis_of_run]. exact (tf_of_arg0 m pc). }
       { rewrite /tf_w. cbn [uvis_tf uvis_of_run]. exact (tf_of_arg1 m pc). }
-      { exact (uvis_of_run_cwd m pc M pm sz fdv c gn cs pidv false). }
-      { rewrite (uvis_of_run_fd m pc M pm sz fdv c gn cs pidv false). exact Htake. }
+      { exact (uvis_of_run_cwd m pc M pm sz fdv c gn cs pidv false secc_all). }
+      { rewrite (uvis_of_run_fd m pc M pm sz fdv c gn cs pidv false secc_all). exact Htake. }
       iLeft. iExists fd, rd, wr, t. iFrame "Hh". iPureIntro.
       split_and!; [ exact Hr | | | exact Hnpo ].
       { rewrite <- Hfdlen. exact (fd_least_closed_lt _ _ Hcl). }
-      rewrite (uvis_of_run_fd m pc M pm sz fdv c gn cs pidv false). reflexivity.
+      rewrite (uvis_of_run_fd m pc M pm sz fdv c gn cs pidv false secc_all). reflexivity.
     - (* the call failed: nothing moved, and the ledger comes straight back *)
       iModIntro.
-      rewrite (uslot_bump_run m pc M M pm pm sz sz fdv fdv c c gn gn cs cs pidv false false r Hx0 Hal4).
+      rewrite (uslot_bump_run m pc M M pm pm sz sz fdv fdv c c gn gn cs cs pidv false false secc_all secc_all r Hx0 Hal4).
       iApply ukcq_ukc.
       iApply (urun_close_upd _ _ _ m (mword_of_int 10) _ _ _ _ _ _ _ _ _
                 ltac:(unfold unot_sp; vm_compute; discriminate)
                 with "Hheap Hstk Hufd Hcwda Hcha Hmy Hdep Hnpx").
       iIntros (h') "Hrun".
-      iApply ("Hcont" $! h' r (uvis_of_run m pc M pm sz fdv c gn cs pidv false)
+      iApply ("Hcont" $! h' r (uvis_of_run m pc M pm sz fdv c gn cs pidv false secc_all)
                 _ _ _ _ with "[%] [%] [%] [%] [%] [%] [Hstd] Hpost Hcwd Hrun").
       { exact Hsimg. }
-      { rewrite (uvis_of_run_fd m pc M pm sz fdv c gn cs pidv false). exact Hfdlen. }
+      { rewrite (uvis_of_run_fd m pc M pm sz fdv c gn cs pidv false secc_all). exact Hfdlen. }
       { rewrite /tf_w. cbn [uvis_tf uvis_of_run]. exact (tf_of_arg0 m pc). }
       { rewrite /tf_w. cbn [uvis_tf uvis_of_run]. exact (tf_of_arg1 m pc). }
-      { exact (uvis_of_run_cwd m pc M pm sz fdv c gn cs pidv false). }
-      { rewrite (uvis_of_run_fd m pc M pm sz fdv c gn cs pidv false). exact Htake. }
+      { exact (uvis_of_run_cwd m pc M pm sz fdv c gn cs pidv false secc_all). }
+      { rewrite (uvis_of_run_fd m pc M pm sz fdv c gn cs pidv false secc_all). exact Htake. }
       iRight. iFrame "Hstd". iPureIntro. split; [ exact Hrm | ].
-      rewrite (uvis_of_run_fd m pc M pm sz fdv c gn cs pidv false). reflexivity.
+      rewrite (uvis_of_run_fd m pc M pm sz fdv c gn cs pidv false secc_all). reflexivity.
   Qed.
 
   (* ---- THE DATA-IMAGE LEAF, which is what cat and the redirect child
@@ -5307,7 +5307,7 @@ Section UkRunSys.
                    ltac:(vm_compute; reflexivity) Hp Hc)
               with "Hb Hmy").
     rewrite (uexec_ret_ecall _ _ eq_refl).
-    assert (Hnum : usys_num (uvis_tf (uvis_of_run m pc M pm sz fdv c gn cs pidv false)) = n).
+    assert (Hnum : usys_num (uvis_tf (uvis_of_run m pc M pm sz fdv c gn cs pidv false secc_all)) = n).
     { cbn [uvis_tf uvis_of_run]. rewrite tf_of_num. exact Hn. }
     rewrite /uexec_pay_dep /upay_at.
     rewrite Hnum. cbv zeta.
@@ -5339,20 +5339,20 @@ Section UkRunSys.
       as [-> [-> ->]].
     pose proof (usys_fd_ok_quiet n _ r _ _ Hcl Hdp Hop H4 Hfdok) as ->.
     cbn [uvis_M uvis_perm uvis_of_run].
-    rewrite (uslot_bump_run m pc M M pm pm sz sz fdv fdv c c gn gn cs cs pidv false false r Hx0 Hal4).
+    rewrite (uslot_bump_run m pc M M pm pm sz sz fdv fdv c c gn gn cs cs pidv false false secc_all secc_all r Hx0 Hal4).
     iApply ukcq_ukc.
     iApply (urun_close_upd _ _ _ m (mword_of_int 10) _ _ _ _ _ _ _ _ _
               ltac:(unfold unot_sp; vm_compute; discriminate)
               with "Hheap Hstk Hufd Hcwda Hcha Hmy Hdep Hnpx").
     iIntros (h') "Hrun".
-    iApply ("Hcont" $! h' r (uvis_of_run m pc M pm sz fdv c gn cs pidv false) cs
+    iApply ("Hcont" $! h' r (uvis_of_run m pc M pm sz fdv c gn cs pidv false secc_all) cs
               with "[%] [%] [%] [%] [%] [Hpost] Hcwd Hrun").
     { exact Hsimg. }
     { rewrite /tf_w. cbn [uvis_tf uvis_of_run]. exact (tf_of_arg0 m pc). }
     { rewrite /tf_w. cbn [uvis_tf uvis_of_run]. exact (tf_of_arg1 m pc). }
     { rewrite /tf_w. cbn [uvis_tf uvis_of_run]. exact (tf_of_arg2 m pc). }
-    { exact (uvis_of_run_cwd m pc M pm sz fdv c gn cs pidv false). }
-    rewrite (uvis_of_run_fd m pc M pm sz fdv c gn cs pidv false).
+    { exact (uvis_of_run_cwd m pc M pm sz fdv c gn cs pidv false secc_all). }
+    rewrite (uvis_of_run_fd m pc M pm sz fdv c gn cs pidv false secc_all).
     cbn [uvis_M uvis_of_run]. iExact "Hpost".
   Qed.
 
@@ -5490,7 +5490,7 @@ Section UkRunSys.
                    ltac:(vm_compute; reflexivity) Hp Hc)
               with "Hb Hmy").
     rewrite (uexec_ret_ecall _ _ eq_refl).
-    assert (Hnum : usys_num (uvis_tf (uvis_of_run m pc M pm sz fdv cw gn cs pidv false))
+    assert (Hnum : usys_num (uvis_tf (uvis_of_run m pc M pm sz fdv cw gn cs pidv false secc_all))
                    = USYS_sbrk).
     { cbn [uvis_tf uvis_of_run]. rewrite tf_of_num. exact Hn. }
     (* the PAYMENT's guard IS the deposit's own, so it is opened BEFORE the
@@ -5553,11 +5553,11 @@ Section UkRunSys.
     (* the descriptor view does not move: sbrk is none of the four *)
     assert (Hview : fdv' = fdv).
     { apply (usys_fd_ok_quiet USYS_sbrk
-               (uvis_tf (uvis_of_run m pc M pm sz fdv cw gn cs pidv false)) r fdv fdv');
+               (uvis_tf (uvis_of_run m pc M pm sz fdv cw gn cs pidv false secc_all)) r fdv fdv');
         [ | | | | exact Hfdok ]; vm_compute; discriminate. }
     rewrite Hview.
     (* the argument the row reads is the one the caller named *)
-    assert (Harg' : usys_sbrk_arg (uvis_tf (uvis_of_run m pc M pm sz fdv cw gn cs pidv false))
+    assert (Harg' : usys_sbrk_arg (uvis_tf (uvis_of_run m pc M pm sz fdv cw gn cs pidv false secc_all))
                     = sign_extend' 64 (trunc32 (m !!! Regidx (mword_of_int 10)))).
     { cbn [uvis_tf uvis_of_run]. unfold usys_sbrk_arg.
       rewrite tf_of_arg0. reflexivity. }
@@ -5583,7 +5583,7 @@ Section UkRunSys.
       { rewrite Hui38. apply umem_grow_id.
         intros a Ha. exact (proj2 (ukp_img pt sz M Mp a Hpure) (or_intror Ha)). }
       subst M'. rewrite HMg.
-      rewrite (uslot_bump_run m pc M M pm pm sz sz fdv fdv cw cw' gn gn cs cs pidv false false r Hx0 Hal4).
+      rewrite (uslot_bump_run m pc M M pm pm sz sz fdv fdv cw cw' gn gn cs cs pidv false false secc_all secc_all r Hx0 Hal4).
       iApply ukcq_ukc.
       iApply (urun_close_upd N M pm m (mword_of_int 10) r sz fdv cw' gn cs pidv
                 (add_vec_int pc 4) avail
@@ -5668,7 +5668,7 @@ Section UkRunSys.
       (* ---- the heap grows, and the caller gets the run ---- *)
       rewrite Himg.
       rewrite (uslot_bump_run m pc M (umem_grow M (sz + n)) pm pm'
-                 sz (sz + n) fdv fdv cw cw' gn gn cs cs pidv false false r Hx0 Hal4).
+                 sz (sz + n) fdv fdv cw cw' gn gn cs cs pidv false false secc_all secc_all r Hx0 Hal4).
       rewrite /ukc. iIntros (h' xi' C' pt' Rfd' Rut') "%Hlo' %Hpm' %Hlzf' Hb'".
       iMod (uheap_grow_run (ukn_t N) (ukn_d N) (ukn_s N) M pm pm' sz n Hsz0 Hn0 Hfresh Hext
               Hcan' Hstop' with "Hheap Hsz") as "(Hheap & Hsz & Hrun')".
@@ -5729,7 +5729,7 @@ Section UkRunSys.
                    ltac:(vm_compute; reflexivity) Hp Hc)
               with "Hb Hmy").
     rewrite (uexec_ret_ecall _ _ eq_refl).
-    assert (Hnum : usys_num (uvis_tf (uvis_of_run m pc M pm sz fdv cw gn cs pidv false)) = USYS_exit).
+    assert (Hnum : usys_num (uvis_tf (uvis_of_run m pc M pm sz fdv cw gn cs pidv false secc_all)) = USYS_exit).
     { cbn [uvis_tf uvis_of_run]. rewrite tf_of_num. exact Hn. }
     (* the PAYMENT's guard IS the deposit's own, so it is opened BEFORE the
        number is rewritten and the destructs below then reduce both copies

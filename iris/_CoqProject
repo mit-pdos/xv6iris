@@ -804,6 +804,10 @@ SpecSysGetpid.v
 CodeSysGetpid.v
 ProofSysGetpid.v
 LinkSysGetpid.v
+SpecSysSeccomp.v
+CodeSysSeccomp.v
+ProofSysSeccomp.v
+LinkSysSeccomp.v
 SpecArgraw.v
 CodeArgraw.v
 ProofArgraw.v

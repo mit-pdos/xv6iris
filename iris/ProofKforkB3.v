@@ -199,7 +199,7 @@ Qed.
 Definition kfk_childV (V0 : pprivate) (Vp_of : list (mword 64)) (i : nat) : pprivate :=
   MkPPriv (pv_sz V0) (pv_upt V0) (pv_tf V0)
           (kfk_at Vp_of (pv_ofile V0) i) (pv_fdg V0) (pv_cwd V0) (pv_name V0) (pv_cwi V0)
-          (pv_gen V0) (pv_chg V0) (pv_lazy V0).
+          (pv_gen V0) (pv_chg V0) (pv_lazy V0) (pv_secc V0).
 
 Lemma kfk_childV_0 (V0 : pprivate) (Vp_of : list (mword 64)) :
   kfk_childV V0 Vp_of 0 = V0.
@@ -635,7 +635,7 @@ Section KforkB3Proof.
                      (zero_reg : mword 64) Hvc with "Hpv2") as "[Hslot2 Hback2]".
         iDestruct (ofile_slot_null with "Hslot2") as "(Hcell2 & Hfds & Hst2)".
         (* ---- +0x9a: jal ra,filedup ---- *)
-        iApply (wp_jal_s_sconf (mword_of_int (KF + 0x9a)) Rra (mword_of_int 9238 : mword 21)
+        iApply (wp_jal_s_sconf (mword_of_int (KF + 0x9a)) Rra (mword_of_int 9312 : mword 21)
                   L1 (rsv + (K - 8))%nat b ltac:(vm_compute; discriminate) ltac:(rdok)
                   ltac:(vm_compute; reflexivity)
                   with "Hcg Hpc []").
@@ -646,7 +646,7 @@ Section KforkB3Proof.
         change (<[Regidx Rra := regval_into_reg
                       (add_vec_int (mword_of_int (KF + 0x9a) : mword 64) 4)]> L1) with L2.
         assert (Hjmp : add_vec (mword_of_int (KF + 0x9a) : mword 64)
-                         (sign_extend' 64 (mword_of_int 9238 : mword 21))
+                         (sign_extend' 64 (mword_of_int 9312 : mword 21))
                        = mword_of_int KernelSyms.filedup) by (apply bv_eq; vm_compute; reflexivity).
         iEval (rewrite Hjmp) in "Hpc".
         assert (HL2ra : L2 !!! Regidx Rra = add_vec_int (mword_of_int (KF + 0x9a) : mword 64) 4)

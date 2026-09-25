@@ -17,7 +17,7 @@
    two standalone initlock calls, and then the loop's SIX live registers, all
    of them constants the compiler hoisted out of the body:
 
-     s1 = p (the cursor)      s2 = 0x4fa4fa4fa4fa4fa5 (the /360 magic)
+     s1 = p (the cursor)      s2 = 0xd37a6f4de9bd37a7 (the /368 magic)
      s3 = 0x3FFFFFF000 (TRAMPOLINE)                    s4 = &proc[NPROC]
      s5 = proc (the base, for p - proc)                s6 = &"proc"
 
@@ -25,11 +25,11 @@
    fuel induction on the number of processes left, NOT iLoeb (the packaged
    sconf leaves strip the step's later).  The cursor is [SpecProcinit.pacur],
    so the [bne s1,s4] back edge becomes the index test [S j =? NPROC]
-   ([ArrCursor.acur_neq]) and [addi s1,s1,360] becomes [S j]
+   ([ArrCursor.acur_neq]) and [addi s1,s1,368] becomes [S j]
    ([ProcGeom.proc_addr_succ]).
 
    (3) The KSTACK address, shared verbatim with proc_mapstacks: gcc divides
-   [p - proc] by 360 with a multiply by the modular inverse of 45, and
+   [p - proc] by 368 with a multiply by the modular inverse of 23, and
    KstackArith.v is that arithmetic.  The helper lemmas at the top of this
    file are the four steps of the chain instantiated at procinit's registers,
    stated OUTSIDE the Iris section so their [lia]s run without an mword in
@@ -88,36 +88,36 @@ Set Printing Depth 40.
 (*  here runs with no mword in context.                                   *)
 (* ===================================================================== *)
 
-(* +0x84 [sub a5,s1,s5]: the cursor minus the base IS 360*j.  The two
+(* +0x84 [sub a5,s1,s5]: the cursor minus the base IS 368*j.  The two
    operands are the loop's [proc_addr j] and the hoisted [proc]. *)
 Lemma pi_sub_base (j : nat) : (j < NPROC)%nat ->
   sub_vec (proc_addr j) (mword_of_int KernelSyms.proc : mword 64)
-  = (mword_of_int (360 * Z.of_nat j) : mword 64).
+  = (mword_of_int (368 * Z.of_nat j) : mword 64).
 Proof.
   intro Hj. unfold NPROC in Hj.
-  assert (Hnn : (0 <= 360 * Z.of_nat j)%Z) by (apply Z.mul_nonneg_nonneg; lia).
-  assert (Hle : (360 * Z.of_nat j <= 360 * 64)%Z)
+  assert (Hnn : (0 <= 368 * Z.of_nat j)%Z) by (apply Z.mul_nonneg_nonneg; lia).
+  assert (Hle : (368 * Z.of_nat j <= 368 * 64)%Z)
     by (apply Z.mul_le_mono_nonneg_l; lia).
   rewrite proc_addr_acur. unfold pacur, acur, proc_size.
-  rewrite (subvec_moi (KernelSyms.proc + 360 * Z.of_nat j) KernelSyms.proc
+  rewrite (subvec_moi (KernelSyms.proc + 368 * Z.of_nat j) KernelSyms.proc
              ltac:(unfold KernelSyms.proc; lia)
              ltac:(lia)
              ltac:(unfold KernelSyms.proc; lia)).
   f_equal. lia.
 Qed.
 
-(* +0x88 [srai a5,a5,3]: 360*j >>s 3 = 45*j. *)
+(* +0x88 [srai a5,a5,4]: 368*j >>s 4 = 23*j. *)
 Lemma pi_srai (j : nat) : (j < NPROC)%nat ->
-  shift_bits_right_arith (mword_of_int (360 * Z.of_nat j) : mword 64)
-    (subrange_vec_dec (mword_of_int 3 : mword 6) 5 0)
-  = (mword_of_int (45 * Z.of_nat j) : mword 64).
+  shift_bits_right_arith (mword_of_int (368 * Z.of_nat j) : mword 64)
+    (subrange_vec_dec (mword_of_int 4 : mword 6) 5 0)
+  = (mword_of_int (23 * Z.of_nat j) : mword 64).
 Proof.
   intro Hj. unfold NPROC in Hj.
-  assert (Hle : (360 * Z.of_nat j <= 360 * 64)%Z)
+  assert (Hle : (368 * Z.of_nat j <= 368 * 64)%Z)
     by (apply Z.mul_le_mono_nonneg_l; lia).
-  rewrite (srai3 (360 * Z.of_nat j)
+  rewrite (srai4 (368 * Z.of_nat j)
              ltac:(split; [apply Z.mul_nonneg_nonneg; lia | lia])).
-  replace (360 * Z.of_nat j)%Z with (45 * Z.of_nat j * 8)%Z by ring.
+  replace (368 * Z.of_nat j)%Z with (23 * Z.of_nat j * 16)%Z by ring.
   rewrite Z.div_mul; [reflexivity | lia].
 Qed.
 
@@ -209,7 +209,7 @@ Section ProofProcinit.
   Ltac peel_reg := peel_reg_step; reflexivity.
 
   (* the three hoisted constants, named *)
-  Definition pi_magic : mword 64 := mword_of_int 0x4fa4fa4fa4fa4fa5.
+  Definition pi_magic : mword 64 := mword_of_int 0xd37a6f4de9bd37a7.
   Definition pi_tramp : mword 64 := mword_of_int 0x3FFFFFF000.
 
   (* ================================================================= *)
@@ -711,32 +711,32 @@ Section ProofProcinit.
     iEval (rewrite Hils1r pi_state_addr) in "Hst".
     assert (Hp84 : add_vec_int (mword_of_int (KernelSyms.procinit + 0x80) : mword 64) 4 = mword_of_int (KernelSyms.procinit + 0x84)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hp84) in "Hpc".
-    (* +0x84 sub a5,s1,s5 -- 360*j *)
+    (* +0x84 sub a5,s1,s5 -- 368*j *)
     iApply (wp_sub_s_sconf (CID:=CID55) (mword_of_int (KernelSyms.procinit + 0x84)) a5i s1i s5i
-              (mword_of_int (360 * Z.of_nat j))
+              (mword_of_int (368 * Z.of_nat j))
               mil (K - 8)%nat b ltac:(vm_compute; discriminate) ltac:(rdok)
               ltac:(rgne; rgne; rewrite Hils1 Hils5; exact (pi_sub_base j Hj))
               with "Hcg Hpc []").
     { iApply (pii_84 with "Htext"). }
     iIntros (CID56 Hs56) "Hcg Hpc".
-    set (N1 := <[Regidx a5i := regval_into_reg (mword_of_int (360 * Z.of_nat j))]> mil).
-    assert (HN1a5 : N1 !!! Regidx a5i = (mword_of_int (360 * Z.of_nat j) : mword 64))
+    set (N1 := <[Regidx a5i := regval_into_reg (mword_of_int (368 * Z.of_nat j))]> mil).
+    assert (HN1a5 : N1 !!! Regidx a5i = (mword_of_int (368 * Z.of_nat j) : mword 64))
       by (rewrite /N1 upd_eq; reflexivity).
     assert (Hp88 : add_vec_int (mword_of_int (KernelSyms.procinit + 0x84) : mword 64) 4 = mword_of_int (KernelSyms.procinit + 0x88)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hp88) in "Hpc".
-    (* +0x88 srai a5,a5,3 -- 45*j *)
-    iApply (wp_srai_s_sconf (mword_of_int (KernelSyms.procinit + 0x88)) a5i (mword_of_int 3 : mword 6)
+    (* +0x88 srai a5,a5,4 -- 23*j *)
+    iApply (wp_srai_s_sconf (mword_of_int (KernelSyms.procinit + 0x88)) a5i (mword_of_int 4 : mword 6)
               N1 (K - 8)%nat b ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc []").
     { iApply (pii_88 with "Htext"). }
     iIntros (CID57 Hs57) "Hcg Hpc".
     iEval (rgne) in "Hcg".
-    set (N2 := <[Regidx a5i := regval_into_reg (shift_bits_right_arith (N1 !!! Regidx a5i) (subrange_vec_dec (mword_of_int 3 : mword 6) (Z.sub log2_xlen 1) 0))]> N1).
-    assert (HN2a5 : N2 !!! Regidx a5i = (mword_of_int (45 * Z.of_nat j) : mword 64)).
+    set (N2 := <[Regidx a5i := regval_into_reg (shift_bits_right_arith (N1 !!! Regidx a5i) (subrange_vec_dec (mword_of_int 4 : mword 6) (Z.sub log2_xlen 1) 0))]> N1).
+    assert (HN2a5 : N2 !!! Regidx a5i = (mword_of_int (23 * Z.of_nat j) : mword 64)).
     { rewrite /N2 upd_eq. rewrite HN1a5. exact (pi_srai j Hj). }
     assert (Hp8a : add_vec_int (mword_of_int (KernelSyms.procinit + 0x88) : mword 64) 2 = mword_of_int (KernelSyms.procinit + 0x8a)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hp8a) in "Hpc".
-    (* +0x8a mul a5,a5,s2 -- j (the modular inverse of 45) *)
+    (* +0x8a mul a5,a5,s2 -- j (the modular inverse of 23) *)
     assert (HN2s2 : N2 !!! Regidx s2i = pi_magic) by (rewrite /N2 upd_ne; [| reg_neq]; rewrite /N1 upd_ne; [exact Hils2 | reg_neq]).
     iApply (wp_mul_s_sconf (CID:=CID57) (mword_of_int (KernelSyms.procinit + 0x8a)) a5i a5i s2i
               (mword_of_int (Z.of_nat j))
@@ -828,17 +828,17 @@ Section ProofProcinit.
     iAssert ([∗ list] i ∈ seq 0 (S j), proc_ready i)%I with "[Hdone Hrdy]" as "Hdone".
     { rewrite seq_S. rewrite big_sepL_app. iFrame "Hdone".
       rewrite Nat.add_0_l. cbn [seq]. by iFrame "Hrdy". }
-    (* +0x9a addi s1,s1,360 -- bump the cursor to process j+1 *)
-    iApply (wp_addi4_s_sconf (mword_of_int (KernelSyms.procinit + 0x9a)) s1i s1i (mword_of_int 0x168 : mword 12)
+    (* +0x9a addi s1,s1,368 -- bump the cursor to process j+1 *)
+    iApply (wp_addi4_s_sconf (mword_of_int (KernelSyms.procinit + 0x9a)) s1i s1i (mword_of_int 0x170 : mword 12)
               N7 (K - 8)%nat b ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc []").
     { iApply (pii_9a with "Htext"). }
     iIntros (CID64 Hs64) "Hcg Hpc".
     iEval (rgne) in "Hcg".
-    set (N8 := <[Regidx s1i := regval_into_reg (add_vec (N7 !!! Regidx s1i) (sign_extend' 64 (mword_of_int 0x168 : mword 12)))]> N7).
+    set (N8 := <[Regidx s1i := regval_into_reg (add_vec (N7 !!! Regidx s1i) (sign_extend' 64 (mword_of_int 368 : mword 12)))]> N7).
     assert (HN8s1 : N8 !!! Regidx s1i = proc_addr (S j)).
     { rewrite /N8 upd_eq. rewrite HN7s1.
-      change (mword_of_int 0x168 : mword 12) with (mword_of_int proc_size : mword 12).
+      change (mword_of_int 368 : mword 12) with (mword_of_int proc_size : mword 12).
       apply proc_addr_succ. }
     assert (HN8s2 : N8 !!! Regidx s2i = pi_magic).
     { rewrite /N8 upd_ne; [| reg_neq]. exact HN2s2. }
@@ -1136,13 +1136,13 @@ Section ProofProcinit.
     set (R5 := <[Regidx a0i := regval_into_reg (add_vec (mword_of_int (KernelSyms.procinit + 0x1c) : mword 64) (auipc_off (mword_of_int 0x11 : mword 20)))]> R4).
     assert (Hp20 : add_vec_int (mword_of_int (KernelSyms.procinit + 0x1c) : mword 64) 4 = mword_of_int (KernelSyms.procinit + 0x20)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hp20) in "Hpc".
-    iApply (wp_addi4_s_sconf (mword_of_int (KernelSyms.procinit + 0x20)) a0i a0i (mword_of_int 0xb76 : mword 12)
+    iApply (wp_addi4_s_sconf (mword_of_int (KernelSyms.procinit + 0x20)) a0i a0i (mword_of_int 0xba6 : mword 12)
               R5 (K - 8)%nat b ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc []").
     { iApply (pii_20 with "Htext"). }
     iIntros (CID24 Hs24) "Hcg Hpc".
     iEval (rgne) in "Hcg".
-    set (R6 := <[Regidx a0i := regval_into_reg (add_vec (R5 !!! Regidx a0i) (sign_extend' 64 (mword_of_int 2934 : mword 12)))]> R5).
+    set (R6 := <[Regidx a0i := regval_into_reg (add_vec (R5 !!! Regidx a0i) (sign_extend' 64 (mword_of_int 2982 : mword 12)))]> R5).
     assert (HR6a0 : R6 !!! Regidx a0i = pid_lock_addr).
     { rewrite /R6 upd_eq. rewrite /R5 upd_eq. unfold pid_lock_addr, KernelSyms.pid_lock.
       apply bv_eq; vm_compute; reflexivity. }
@@ -1234,13 +1234,13 @@ Section ProofProcinit.
     set (T3 := <[Regidx a0i := regval_into_reg (add_vec (mword_of_int (KernelSyms.procinit + 0x30) : mword 64) (auipc_off (mword_of_int 0x11 : mword 20)))]> T2).
     assert (Hp34 : add_vec_int (mword_of_int (KernelSyms.procinit + 0x30) : mword 64) 4 = mword_of_int (KernelSyms.procinit + 0x34)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hp34) in "Hpc".
-    iApply (wp_addi4_s_sconf (mword_of_int (KernelSyms.procinit + 0x34)) a0i a0i (mword_of_int 0xb7a : mword 12)
+    iApply (wp_addi4_s_sconf (mword_of_int (KernelSyms.procinit + 0x34)) a0i a0i (mword_of_int 0xbaa : mword 12)
               T3 (K - 8)%nat b ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc []").
     { iApply (pii_34 with "Htext"). }
     iIntros (CID30 Hs30) "Hcg Hpc".
     iEval (rgne) in "Hcg".
-    set (T4 := <[Regidx a0i := regval_into_reg (add_vec (T3 !!! Regidx a0i) (sign_extend' 64 (mword_of_int 2938 : mword 12)))]> T3).
+    set (T4 := <[Regidx a0i := regval_into_reg (add_vec (T3 !!! Regidx a0i) (sign_extend' 64 (mword_of_int 2986 : mword 12)))]> T3).
     assert (HT4a0 : T4 !!! Regidx a0i = wait_lock_addr).
     { rewrite /T4 upd_eq. rewrite /T3 upd_eq. unfold wait_lock_addr, KernelSyms.wait_lock.
       apply bv_eq; vm_compute; reflexivity. }
@@ -1310,13 +1310,13 @@ Section ProofProcinit.
     set (U1 := <[Regidx s1i := regval_into_reg (add_vec (mword_of_int (KernelSyms.procinit + 0x3c) : mword 64) (auipc_off (mword_of_int 0x11 : mword 20)))]> mil2).
     assert (Hp40 : add_vec_int (mword_of_int (KernelSyms.procinit + 0x3c) : mword 64) 4 = mword_of_int (KernelSyms.procinit + 0x40)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hp40) in "Hpc".
-    iApply (wp_addi4_s_sconf (mword_of_int (KernelSyms.procinit + 0x40)) s1i s1i (mword_of_int 0xf86 : mword 12)
+    iApply (wp_addi4_s_sconf (mword_of_int (KernelSyms.procinit + 0x40)) s1i s1i (mword_of_int 0xfb6 : mword 12)
               U1 (K - 8)%nat b ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc []").
     { iApply (pii_40 with "Htext"). }
     iIntros (CID34 Hs34) "Hcg Hpc".
     iEval (rgne) in "Hcg".
-    set (U2 := <[Regidx s1i := regval_into_reg (add_vec (U1 !!! Regidx s1i) (sign_extend' 64 (mword_of_int 3974 : mword 12)))]> U1).
+    set (U2 := <[Regidx s1i := regval_into_reg (add_vec (U1 !!! Regidx s1i) (sign_extend' 64 (mword_of_int 4022 : mword 12)))]> U1).
     assert (HU2s1 : U2 !!! Regidx s1i = (mword_of_int KernelSyms.proc : mword 64)).
     { rewrite /U2 upd_eq. rewrite /U1 upd_eq. unfold KernelSyms.proc.
       apply bv_eq; vm_compute; reflexivity. }
@@ -1357,79 +1357,65 @@ Section ProofProcinit.
     { rewrite /U5 upd_eq. rewrite HU4s1. apply add_vec_zero_l. }
     assert (Hp4e : add_vec_int (mword_of_int (KernelSyms.procinit + 0x4c) : mword 64) 2 = mword_of_int (KernelSyms.procinit + 0x4e)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hp4e) in "Hpc".
-    (* +0x4e .. +0x66 : s2 := 0x4fa4fa4fa4fa4fa5 (via a5) *)
-    iApply (wp_lui_s_sconf (mword_of_int (KernelSyms.procinit + 0x4e)) a5i (mword_of_int 165 : mword 20) (luival (mword_of_int 165 : mword 20))
-              U5 (K - 8)%nat b ltac:(vm_compute; discriminate) ltac:(rdok) ltac:(reflexivity)
-              with "Hcg Hpc []").
+    (* +0x4e .. +0x64 : s2 := pi_magic = 0xd37a6f4de9bd37a7, the inverse of 23 mod 2^64 *)
+    iApply (wp_lui_s_sconf (mword_of_int (KernelSyms.procinit + 0x4e)) s2i (mword_of_int 1045727 : mword 20) (luival (mword_of_int 1045727 : mword 20))
+              U5 (K - 8)%nat b ltac:(vm_compute; discriminate) ltac:(rdok) ltac:(reflexivity) with "Hcg Hpc []").
     { iApply (pii_4e with "Htext"). }
     iIntros (CID38 Hs38) "Hcg Hpc".
-    set (U6 := <[Regidx a5i := regval_into_reg (luival (mword_of_int 165 : mword 20))]> U5).
+    set (U6 := <[Regidx s2i := regval_into_reg (luival (mword_of_int 1045727 : mword 20))]> U5).
     assert (Hp52 : add_vec_int (mword_of_int (KernelSyms.procinit + 0x4e) : mword 64) 4 = mword_of_int (KernelSyms.procinit + 0x52)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hp52) in "Hpc".
-    iApply (wp_addi4_s_sconf (mword_of_int (KernelSyms.procinit + 0x52)) a5i a5i (mword_of_int 0xfa5 : mword 12)
-              U6 (K - 8)%nat b ltac:(vm_compute; discriminate) ltac:(rdok)
-              with "Hcg Hpc []").
+    iApply (wp_addi4_s_sconf (mword_of_int (KernelSyms.procinit + 0x52)) s2i s2i (mword_of_int 2493 : mword 12)
+              U6 (K - 8)%nat b ltac:(vm_compute; discriminate) ltac:(rdok) with "Hcg Hpc []").
     { iApply (pii_52 with "Htext"). }
-    iIntros (CID39 Hs39) "Hcg Hpc".
-    iEval (rgne) in "Hcg".
-    set (U7 := <[Regidx a5i := regval_into_reg (add_vec (U6 !!! Regidx a5i) (sign_extend' 64 (mword_of_int 0xfa5 : mword 12)))]> U6).
+    iIntros (CID39 Hs39) "Hcg Hpc". iEval (rgne) in "Hcg".
+    set (U7 := <[Regidx s2i := regval_into_reg (add_vec (U6 !!! Regidx s2i) (sign_extend' 64 (mword_of_int 2493 : mword 12)))]> U6).
     assert (Hp56 : add_vec_int (mword_of_int (KernelSyms.procinit + 0x52) : mword 64) 4 = mword_of_int (KernelSyms.procinit + 0x56)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hp56) in "Hpc".
-    iApply (wp_cslli_s_sconf (mword_of_int (KernelSyms.procinit + 0x56)) (Regidx a5i) a5i (mword_of_int 12 : mword 6)
-              U7 (K - 8)%nat b ltac:(reflexivity) ltac:(vm_compute; discriminate) ltac:(rdok)
-              with "Hcg Hpc []").
+    iApply (wp_cslli_s_sconf (mword_of_int (KernelSyms.procinit + 0x56)) (Regidx s2i) s2i (mword_of_int 13 : mword 6)
+              U7 (K - 8)%nat b ltac:(reflexivity) ltac:(vm_compute; discriminate) ltac:(rdok) with "Hcg Hpc []").
     { iApply (pii_56 with "Htext"). }
-    iIntros (CID40 Hs40) "Hcg Hpc".
-    iEval (rgne) in "Hcg".
-    set (U8 := <[Regidx a5i := regval_into_reg (shift_bits_left (U7 !!! Regidx a5i) (subrange_vec_dec (mword_of_int 12 : mword 6) (Z.sub log2_xlen 1) 0))]> U7).
+    iIntros (CID40 Hs40) "Hcg Hpc". iEval (rgne) in "Hcg".
+    set (U8 := <[Regidx s2i := regval_into_reg (shift_bits_left (U7 !!! Regidx s2i) (subrange_vec_dec (mword_of_int 13 : mword 6) (Z.sub log2_xlen 1) 0))]> U7).
     assert (Hp58 : add_vec_int (mword_of_int (KernelSyms.procinit + 0x56) : mword 64) 2 = mword_of_int (KernelSyms.procinit + 0x58)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hp58) in "Hpc".
-    iApply (wp_addi4_s_sconf (mword_of_int (KernelSyms.procinit + 0x58)) a5i a5i (mword_of_int 0xfa5 : mword 12)
-              U8 (K - 8)%nat b ltac:(vm_compute; discriminate) ltac:(rdok)
-              with "Hcg Hpc []").
+    iApply (wp_addi4_s_sconf (mword_of_int (KernelSyms.procinit + 0x58)) s2i s2i (mword_of_int 1781 : mword 12)
+              U8 (K - 8)%nat b ltac:(vm_compute; discriminate) ltac:(rdok) with "Hcg Hpc []").
     { iApply (pii_58 with "Htext"). }
-    iIntros (CID41 Hs41) "Hcg Hpc".
-    iEval (rgne) in "Hcg".
-    set (U9 := <[Regidx a5i := regval_into_reg (add_vec (U8 !!! Regidx a5i) (sign_extend' 64 (mword_of_int 0xfa5 : mword 12)))]> U8).
+    iIntros (CID41 Hs41) "Hcg Hpc". iEval (rgne) in "Hcg".
+    set (U9 := <[Regidx s2i := regval_into_reg (add_vec (U8 !!! Regidx s2i) (sign_extend' 64 (mword_of_int 1781 : mword 12)))]> U8).
     assert (Hp5c : add_vec_int (mword_of_int (KernelSyms.procinit + 0x58) : mword 64) 4 = mword_of_int (KernelSyms.procinit + 0x5c)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hp5c) in "Hpc".
-    iApply (wp_lui_s_sconf (mword_of_int (KernelSyms.procinit + 0x5c)) s2i (mword_of_int 0x4fa50 : mword 20) (luival (mword_of_int 0x4fa50 : mword 20))
-              U9 (K - 8)%nat b ltac:(vm_compute; discriminate) ltac:(rdok) ltac:(reflexivity)
-              with "Hcg Hpc []").
+    iApply (wp_cslli_s_sconf (mword_of_int (KernelSyms.procinit + 0x5c)) (Regidx s2i) s2i (mword_of_int 13 : mword 6)
+              U9 (K - 8)%nat b ltac:(reflexivity) ltac:(vm_compute; discriminate) ltac:(rdok) with "Hcg Hpc []").
     { iApply (pii_5c with "Htext"). }
-    iIntros (CID42 Hs42) "Hcg Hpc".
-    set (U10 := <[Regidx s2i := regval_into_reg (luival (mword_of_int 0x4fa50 : mword 20))]> U9).
-    assert (Hp60 : add_vec_int (mword_of_int (KernelSyms.procinit + 0x5c) : mword 64) 4 = mword_of_int (KernelSyms.procinit + 0x60)) by (apply bv_eq; vm_compute; reflexivity).
-    iEval (rewrite Hp60) in "Hpc".
-    iApply (wp_addi4_s_sconf (mword_of_int (KernelSyms.procinit + 0x60)) s2i s2i (mword_of_int 0xa4f : mword 12)
-              U10 (K - 8)%nat b ltac:(vm_compute; discriminate) ltac:(rdok)
-              with "Hcg Hpc []").
-    { iApply (pii_60 with "Htext"). }
-    iIntros (CID43 Hs43) "Hcg Hpc".
-    iEval (rgne) in "Hcg".
-    set (U11 := <[Regidx s2i := regval_into_reg (add_vec (U10 !!! Regidx s2i) (sign_extend' 64 (mword_of_int 0xa4f : mword 12)))]> U10).
-    assert (Hp64 : add_vec_int (mword_of_int (KernelSyms.procinit + 0x60) : mword 64) 4 = mword_of_int (KernelSyms.procinit + 0x64)) by (apply bv_eq; vm_compute; reflexivity).
+    iIntros (CID42 Hs42) "Hcg Hpc". iEval (rgne) in "Hcg".
+    set (U10 := <[Regidx s2i := regval_into_reg (shift_bits_left (U9 !!! Regidx s2i) (subrange_vec_dec (mword_of_int 13 : mword 6) (Z.sub log2_xlen 1) 0))]> U9).
+    assert (Hp5e : add_vec_int (mword_of_int (KernelSyms.procinit + 0x5c) : mword 64) 2 = mword_of_int (KernelSyms.procinit + 0x5e)) by (apply bv_eq; vm_compute; reflexivity).
+    iEval (rewrite Hp5e) in "Hpc".
+    iApply (wp_addi4_s_sconf (mword_of_int (KernelSyms.procinit + 0x5e)) s2i s2i (mword_of_int 3027 : mword 12)
+              U10 (K - 8)%nat b ltac:(vm_compute; discriminate) ltac:(rdok) with "Hcg Hpc []").
+    { iApply (pii_5e with "Htext"). }
+    iIntros (CID43 Hs43) "Hcg Hpc". iEval (rgne) in "Hcg".
+    set (U11 := <[Regidx s2i := regval_into_reg (add_vec (U10 !!! Regidx s2i) (sign_extend' 64 (mword_of_int 3027 : mword 12)))]> U10).
+    assert (Hp62 : add_vec_int (mword_of_int (KernelSyms.procinit + 0x5e) : mword 64) 4 = mword_of_int (KernelSyms.procinit + 0x62)) by (apply bv_eq; vm_compute; reflexivity).
+    iEval (rewrite Hp62) in "Hpc".
+    iApply (wp_cslli_s_sconf (mword_of_int (KernelSyms.procinit + 0x62)) (Regidx s2i) s2i (mword_of_int 12 : mword 6)
+              U11 (K - 8)%nat b ltac:(reflexivity) ltac:(vm_compute; discriminate) ltac:(rdok) with "Hcg Hpc []").
+    { iApply (pii_62 with "Htext"). }
+    iIntros (CID44 Hs44) "Hcg Hpc". iEval (rgne) in "Hcg".
+    set (U12 := <[Regidx s2i := regval_into_reg (shift_bits_left (U11 !!! Regidx s2i) (subrange_vec_dec (mword_of_int 12 : mword 6) (Z.sub log2_xlen 1) 0))]> U11).
+    assert (Hp64 : add_vec_int (mword_of_int (KernelSyms.procinit + 0x62) : mword 64) 2 = mword_of_int (KernelSyms.procinit + 0x64)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hp64) in "Hpc".
-    iApply (wp_cslli_s_sconf (mword_of_int (KernelSyms.procinit + 0x64)) (Regidx s2i) s2i (mword_of_int 32 : mword 6)
-              U11 (K - 8)%nat b ltac:(reflexivity) ltac:(vm_compute; discriminate) ltac:(rdok)
-              with "Hcg Hpc []").
+    iApply (wp_addi4_s_sconf (mword_of_int (KernelSyms.procinit + 0x64)) s2i s2i (mword_of_int 1959 : mword 12)
+              U12 (K - 8)%nat b ltac:(vm_compute; discriminate) ltac:(rdok) with "Hcg Hpc []").
     { iApply (pii_64 with "Htext"). }
-    iIntros (CID44 Hs44) "Hcg Hpc".
-    iEval (rgne) in "Hcg".
-    set (U12 := <[Regidx s2i := regval_into_reg (shift_bits_left (U11 !!! Regidx s2i) (subrange_vec_dec (mword_of_int 32 : mword 6) (Z.sub log2_xlen 1) 0))]> U11).
-    assert (Hp66 : add_vec_int (mword_of_int (KernelSyms.procinit + 0x64) : mword 64) 2 = mword_of_int (KernelSyms.procinit + 0x66)) by (apply bv_eq; vm_compute; reflexivity).
-    iEval (rewrite Hp66) in "Hpc".
-    iApply (wp_cadd_s_sconf (mword_of_int (KernelSyms.procinit + 0x66)) s2i a5i
-              U12 (K - 8)%nat b ltac:(vm_compute; discriminate) ltac:(rdok)
-              with "Hcg Hpc []").
-    { iApply (pii_66 with "Htext"). }
-    iIntros (CID45 Hs45) "Hcg Hpc".
-    iEval (rgne) in "Hcg". iEval (rgne) in "Hcg".
-    set (U13 := <[Regidx s2i := regval_into_reg (add_vec (U12 !!! Regidx s2i) (U12 !!! Regidx a5i))]> U12).
+    iIntros (CID45 Hs45) "Hcg Hpc". iEval (rgne) in "Hcg".
+    set (U13 := <[Regidx s2i := regval_into_reg (add_vec (U12 !!! Regidx s2i) (sign_extend' 64 (mword_of_int 1959 : mword 12)))]> U12).
+    assert (Hp68 : add_vec_int (mword_of_int (KernelSyms.procinit + 0x64) : mword 64) 4 = mword_of_int (KernelSyms.procinit + 0x68)) by (apply bv_eq; vm_compute; reflexivity).
+    iEval (rewrite Hp68) in "Hpc".
     assert (HU13s2 : U13 !!! Regidx s2i = pi_magic).
     { rewrite /U13 upd_eq. unfold pi_magic. apply bv_eq; vm_compute; reflexivity. }
-    assert (Hp68 : add_vec_int (mword_of_int (KernelSyms.procinit + 0x66) : mword 64) 2 = mword_of_int (KernelSyms.procinit + 0x68)) by (apply bv_eq; vm_compute; reflexivity).
-    iEval (rewrite Hp68) in "Hpc".
     (* +0x68 .. +0x6e : s3 := TRAMPOLINE *)
     iApply (wp_lui_s_sconf (mword_of_int (KernelSyms.procinit + 0x68)) s3i (mword_of_int 0x4000 : mword 20) (luival (mword_of_int 0x4000 : mword 20))
               U13 (K - 8)%nat b ltac:(vm_compute; discriminate) ltac:(rdok) ltac:(reflexivity)
@@ -1468,13 +1454,13 @@ Section ProofProcinit.
     set (U17 := <[Regidx s4i := regval_into_reg (add_vec (mword_of_int (KernelSyms.procinit + 0x70) : mword 64) (auipc_off (mword_of_int 0x17 : mword 20)))]> U16).
     assert (Hp74 : add_vec_int (mword_of_int (KernelSyms.procinit + 0x70) : mword 64) 4 = mword_of_int (KernelSyms.procinit + 0x74)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hp74) in "Hpc".
-    iApply (wp_addi4_s_sconf (mword_of_int (KernelSyms.procinit + 0x74)) s4i s4i (mword_of_int 0x952 : mword 12)
+    iApply (wp_addi4_s_sconf (mword_of_int (KernelSyms.procinit + 0x74)) s4i s4i (mword_of_int 0xb82 : mword 12)
               U17 (K - 8)%nat b ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc []").
     { iApply (pii_74 with "Htext"). }
     iIntros (CID50 Hs50) "Hcg Hpc".
     iEval (rgne) in "Hcg".
-    set (U18 := <[Regidx s4i := regval_into_reg (add_vec (U17 !!! Regidx s4i) (sign_extend' 64 (mword_of_int 2386 : mword 12)))]> U17).
+    set (U18 := <[Regidx s4i := regval_into_reg (add_vec (U17 !!! Regidx s4i) (sign_extend' 64 (mword_of_int 2946 : mword 12)))]> U17).
     assert (HU18s4 : U18 !!! Regidx s4i = pacur NPROC).
     { rewrite /U18 upd_eq. rewrite /U17 upd_eq. rewrite proc_end_is_tickslock.
       unfold KernelSyms.tickslock. apply bv_eq; vm_compute; reflexivity. }

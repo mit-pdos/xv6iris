@@ -158,10 +158,10 @@ Section UkReadCons.
     iIntros (M pm sz fdv cw gn cs pidv) "%Htake #Hmpay Hheap Hufd".
     iFrame "Hheap Hufd".
     iApply (sbundle_at_read_intro uslot (read_cons_fam (ukn_pay N) Rd Rin)
-              (uvis_of_run m pc M pm sz fdv cw gn cs pidv false)
+              (uvis_of_run m pc M pm sz fdv cw gn cs pidv false secc_all)
               (m !!! Regidx a0_idx) (m !!! Regidx a2_idx) fdv
               (tf_of_arg0 m pc) (tf_of_arg2 m pc)
-              (uvis_of_run_fd m pc M pm sz fdv cw gn cs pidv false)).
+              (uvis_of_run_fd m pc M pm sz fdv cw gn cs pidv false secc_all)).
     rewrite (std_fd_st_of_key (m !!! Regidx a0_idx) fdv l fd
                (FdOpen true wr (FdDevice CONSOLE)) Ha0 Hlt Htake Hl0).
     cbn [read_cons_fam xfam_rd rf_F rf_ret rf_in kf_xpay].

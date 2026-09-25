@@ -175,11 +175,11 @@ Section UkWritePipe.
     iDestruct ("Hch" $! M pm sz with "Hheap") as "[Hheap Hpay]".
     iFrame "Hheap Hufd".
     iApply (sbundle_at_write_intro_at uslot (write_pipe_fam Q Qe (ukn_pay N))
-              (uvis_of_run m pc M pm sz fdv cw gn cs pidv false)
+              (uvis_of_run m pc M pm sz fdv cw gn cs pidv false secc_all)
               (m !!! Regidx a0_idx) (m !!! Regidx a1_idx)
               (m !!! Regidx a2_idx) fdv M _ _ _
               (tf_of_arg0 m pc) (tf_of_arg1 m pc) (tf_of_arg2 m pc)
-              (uvis_of_run_fd m pc M pm sz fdv cw gn cs pidv false)
+              (uvis_of_run_fd m pc M pm sz fdv cw gn cs pidv false secc_all)
               eq_refl eq_refl eq_refl eq_refl).
     rewrite Hkey. rewrite /filewrite_in /= Hcnt Nat2Z.id. iExact "Hpay".
   Qed.
@@ -394,11 +394,11 @@ Section UkWritePipe.
     iDestruct ("Hch" $! M pm sz with "Hheap") as "[Hheap Hpay]".
     iFrame "Hheap Hufd".
     iApply (sbundle_at_write_intro_at uslot (write_pipe_fam Q Qe (ukn_pay N))
-              (uvis_of_run m pc M pm sz fdv cw gn cs pidv false)
+              (uvis_of_run m pc M pm sz fdv cw gn cs pidv false secc_all)
               (m !!! Regidx a0_idx) (m !!! Regidx a1_idx)
               (m !!! Regidx a2_idx) fdv M _ _ _
               (tf_of_arg0 m pc) (tf_of_arg1 m pc) (tf_of_arg2 m pc)
-              (uvis_of_run_fd m pc M pm sz fdv cw gn cs pidv false)
+              (uvis_of_run_fd m pc M pm sz fdv cw gn cs pidv false secc_all)
               eq_refl eq_refl eq_refl eq_refl).
     rewrite (std_fd_st_of_key (m !!! Regidx a0_idx) fdv l fd
                (FdOpen rb true (FdPipe γp)) H0 Hlt Htake Hl).

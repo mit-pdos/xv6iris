@@ -235,7 +235,11 @@ Definition skey_eq (W W' : uvis) : Prop :=
      fix it too.  It is a stored field ([ProcDefs.pv_lazy]) that only a
      syscall writes, so every prover of this congruence, which re-keys
      WITHIN one side of a call, discharges it componentwise. *)
-  /\ uvis_lazy W = uvis_lazy W'.
+  /\ uvis_lazy W = uvis_lazy W'
+  (* ...AND THE MASK (upstream a083670), for the lazy bit's reason: a
+     bundle is keyed on the EFFECTIVE number ([UexecSlot.uvis_num]), which
+     reads the mask, and only a syscall writes it ([ProcDefs.pv_secc]). *)
+  /\ uvis_secc W = uvis_secc W'.
 
 Lemma skey_eq_refl (W : uvis) : skey_eq W W.
 Proof. rewrite /skey_eq. split_and!; reflexivity. Qed.
@@ -243,10 +247,11 @@ Proof. rewrite /skey_eq. split_and!; reflexivity. Qed.
 Lemma skey_eq_sym (W W' : uvis) : skey_eq W W' -> skey_eq W' W.
 Proof.
   rewrite /skey_eq.
-  intros (HM & H0 & H1 & H2 & Hfd & Hcw & Hg & Hch & Hpid & Hpi & Hsz & Hlz).
+  intros (HM & H0 & H1 & H2 & Hfd & Hcw & Hg & Hch & Hpid & Hpi & Hsz & Hlz & Hsc).
   split_and!; symmetry;
     [ exact HM | exact H0 | exact H1 | exact H2 | exact Hfd | exact Hcw
-    | exact Hg | exact Hch | exact Hpid | exact Hpi | exact Hsz | exact Hlz ].
+    | exact Hg | exact Hch | exact Hpid | exact Hpi | exact Hsz | exact Hlz
+    | exact Hsc ].
 Qed.
 
 (* THE CLASS IS INDEXED BY [ChildTok.ctokG], and by nothing else new.  The

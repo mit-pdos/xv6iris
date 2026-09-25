@@ -215,8 +215,20 @@ Definition sysc_init_id `{!riscvGS Σ, !xv6G Σ, !wchG Σ} `{GEN : GenId} `{XI :
   ((mword_of_int KernelSyms.initproc : mword 64) ↦₈{dqi} ip ∗
    WaitInv.init_ident ip)%I.
 
-Definition sysc_num (V : pprivate) : Z :=
+(* THE RAW NUMBER: the a7 word as the C reads it.  This is what the range
+   check and the table lookup see ([ld a5,168(s2)] / [sext.w a3,a5]). *)
+Definition sysc_raw (V : pprivate) : Z :=
   bv_signed (subrange_vec_dec (pv_tf V !!! tf_arg_idx 7) 31 0 : mword 32).
+
+(* THE EFFECTIVE NUMBER (upstream a083670): the raw one where the process's
+   mask allows it, 0 where it blocks it -- a blocked call IS the
+   unknown-number call ([UsysMemOk.usys_eff]).  Every row of this contract
+   is keyed on it, so each row, textually unchanged, now speaks of the call
+   that actually RAN. *)
+Definition sysc_num (V : pprivate) : Z := usys_eff (pv_secc V) (pv_tf V).
+
+Lemma sysc_raw_usys (V : pprivate) : sysc_raw V = usys_num (pv_tf V).
+Proof. reflexivity. Qed.
 
 (* [read]'s count, as the C reads it: argument 2 into an [int].  The read
    row is the one whose length is not a constant. *)
@@ -1034,6 +1046,14 @@ Definition wp_syscall_sconf_body
          Read at the OUTGOING a0 word, as the fd and cwd rows are; every
          other entry escapes by its number ([sysc_ret_pid_ne]). *)
       ⌜ sysc_ret_pid (us_V U) (pv_tf (us_V U') !!! tf_arg_idx 0) pid ⌝ -∗
+      (* ...AND THE MASK (upstream a083670): sys_seccomp (23) ANDs it with
+         its argument 0 and answers 0, every other entry -- exec included,
+         [KexecDefs.kexec_ok] keeps it -- hands the block back at the mask
+         it came in with.  LAST among the pure rows.  Read at the outgoing
+         a0 word, as the fd and cwd rows are. *)
+      ⌜ usys_secc_ok (sysc_num (us_V U)) (pv_tf (us_V U))
+          (pv_secc (us_V U)) (pv_secc (us_V U'))
+          (pv_tf (us_V U') !!! tf_arg_idx 0) ⌝ -∗
       sie_cap_gpr KT1 mf av true pj -∗
       cpu_own 0%nat true pj true lks -∗
       bslots 3 -∗

@@ -1061,6 +1061,104 @@ Lemma usys_ret_pid_getpid (r : mword 64) (pid : mword 32) :
   usys_ret_pid USYS_getpid r pid -> r = (sign_extend' 64 pid : mword 64).
 Proof. intros H. exact (H eq_refl). Qed.
 
+(* ===================================================================== *)
+(* SS2h THE MASK (upstream a083670): the EFFECTIVE number, and the one     *)
+(* entry that moves the mask.                                             *)
+(*                                                                         *)
+(* [p->seccomp] decides whether an in-range number runs: bit [n] clear and *)
+(* the dispatcher stores -1 and runs nothing.  That is exactly what the    *)
+(* unknown-number arm does (minus its diagnostic), so A BLOCKED CALL IS    *)
+(* THE UNKNOWN-NUMBER CALL: the number every row below is keyed on is the  *)
+(* EFFECTIVE one, [usys_eff], which is the raw a7 reading where the mask   *)
+(* allows it and 0 -- a number no table entry has -- where it does not.    *)
+(* Out of range the raw reading is unknown either way, so the effective    *)
+(* one is too (a negative number tests no bit; a large one tests bit       *)
+(* [n] or none, and both answers are unknown numbers).                     *)
+(* ===================================================================== *)
+Definition usys_eff (secc : mword 64) (tf : list (mword 64)) : Z :=
+  if Z.testbit (bv_unsigned secc) (usys_num tf) then usys_num tf else 0.
+
+(* kernel/syscall.h *)
+Definition USYS_seccomp : Z := 23.
+
+(* two frames that agree on the raw number agree on the effective one *)
+Lemma usys_eff_num_cong (secc : mword 64) (tf1 tf2 : list (mword 64)) :
+  usys_num tf1 = usys_num tf2 -> usys_eff secc tf1 = usys_eff secc tf2.
+Proof. intros H. unfold usys_eff. rewrite H. reflexivity. Qed.
+
+(* the mask that allows everything, as the key reads it: every bit of the
+   64 set.  (The block's [ProcDefs.secc_all] is this word.) *)
+Lemma usys_eff_all (tf : list (mword 64)) :
+  0 <= usys_num tf < 64 ->
+  usys_eff (mword_of_int (-1)) tf = usys_num tf.
+Proof.
+  intros Hn. unfold usys_eff.
+  assert (Hu : bv_unsigned (mword_of_int (-1) : mword 64) = Z.ones 64)
+    by (vm_compute; reflexivity).
+  rewrite Hu. rewrite Z.ones_spec_low; [reflexivity | lia].
+Qed.
+
+(* a number the mask allows is itself; one it blocks is 0 *)
+Lemma usys_eff_allowed (secc : mword 64) (tf : list (mword 64)) :
+  Z.testbit (bv_unsigned secc) (usys_num tf) = true ->
+  usys_eff secc tf = usys_num tf.
+Proof. intros H. unfold usys_eff. rewrite H. reflexivity. Qed.
+
+Lemma usys_eff_blocked (secc : mword 64) (tf : list (mword 64)) :
+  Z.testbit (bv_unsigned secc) (usys_num tf) = false ->
+  usys_eff secc tf = 0.
+Proof. intros H. unfold usys_eff. rewrite H. reflexivity. Qed.
+
+(* the effective number reads the same word the raw one does *)
+Lemma usys_eff_arg_cong (secc : mword 64) (tf1 tf2 : list (mword 64)) :
+  tf1 !!! tf_arg_idx 7 = tf2 !!! tf_arg_idx 7 ->
+  usys_eff secc tf1 = usys_eff secc tf2.
+Proof.
+  intros He. unfold usys_eff. rewrite (usys_num_arg_cong tf1 tf2 He).
+  reflexivity.
+Qed.
+
+(* THE MASK ROW.  sys_seccomp (23) ANDs the mask with its argument 0 and
+   returns 0; every other entry leaves the mask alone.  Keyed, like every
+   row, on the EFFECTIVE number -- a blocked seccomp call is number 0 and
+   moves nothing. *)
+Definition usys_secc_ok (n : Z) (tf : list (mword 64))
+    (secc secc' : mword 64) (r : mword 64) : Prop :=
+  if decide (n = USYS_seccomp)
+  then secc' = and_vec secc (tf !!! tf_arg_idx 0) /\ r = (mword_of_int 0 : mword 64)
+  else secc' = secc.
+
+Lemma usys_secc_ok_quiet (n : Z) (tf : list (mword 64)) (secc secc' r : mword 64) :
+  n <> USYS_seccomp -> usys_secc_ok n tf secc secc' r -> secc' = secc.
+Proof.
+  intros Hn H. unfold usys_secc_ok in H.
+  destruct (decide (n = USYS_seccomp)); [contradiction | exact H].
+Qed.
+
+(* ...and the row in the direction a quiet entry supplies it *)
+Lemma usys_secc_ok_refl (n : Z) (tf : list (mword 64)) (secc r : mword 64) :
+  n <> USYS_seccomp -> usys_secc_ok n tf secc secc r.
+Proof.
+  intros Hn. unfold usys_secc_ok.
+  destruct (decide (n = USYS_seccomp)); [contradiction | reflexivity].
+Qed.
+
+(* ...and the row seccomp's own arm supplies *)
+Lemma usys_secc_ok_seccomp (tf : list (mword 64)) (secc r : mword 64) :
+  r = (mword_of_int 0 : mword 64) ->
+  usys_secc_ok USYS_seccomp tf secc (and_vec secc (tf !!! tf_arg_idx 0)) r.
+Proof.
+  intros Hr. unfold usys_secc_ok.
+  destruct (decide (USYS_seccomp = USYS_seccomp)) as [_ | Hc];
+    [ split; [reflexivity | exact Hr] | contradiction (Hc eq_refl) ].
+Qed.
+
+(* the row reads argument 0 and nothing else of the frame *)
+Lemma usys_secc_ok_arg_cong (n : Z) (tf1 tf2 : list (mword 64)) (secc secc' r : mword 64) :
+  tf1 !!! tf_arg_idx 0 = tf2 !!! tf_arg_idx 0 ->
+  usys_secc_ok n tf1 secc secc' r -> usys_secc_ok n tf2 secc secc' r.
+Proof. intros He. unfold usys_secc_ok. rewrite He. exact id. Qed.
+
 (* the sixteen quiet entries, by name: what a program calling one of them
    learns.  Stated for the row shape rather than per number so a program
    proof picks it up with one [apply] after [vm_compute]-ing the number. *)

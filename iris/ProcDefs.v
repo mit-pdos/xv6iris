@@ -110,29 +110,57 @@ Record pprivate := MkPPriv {
      and [ProcInv.proc_fields] does not mention it.  LAST in the record, so
      every positional [MkPPriv] only gained a trailing argument. *)
   pv_lazy  : bool;
+  (* THE SYSCALL MASK, [p->seccomp] (upstream a083670): bit [n] set means
+     syscall [n] is allowed.  A CELL, unlike [pv_cwi]/[pv_lazy] -- it is the
+     uint64 at +360 ([ProcGeom.p_secc]) and [proc_fields] owns it -- and a
+     process-visible one: the dispatcher's blocked arm makes a call's effect
+     depend on it, so the key carries it ([UexecSlot.uvis_secc]).  userinit
+     stores [secc_all], kfork copies the parent's, sys_seccomp ANDs it with
+     its argument ([upd_secc]) and nothing else writes it: exec keeps it and
+     every other [upd_*] below preserves it.  LAST in the record, so every
+     positional [MkPPriv] only gained a trailing argument. *)
+  pv_secc  : mword 64;
 }.
+
+(* the mask that allows everything -- userinit's [p->seccomp = ~0ULL] *)
+Definition secc_all : mword 64 := mword_of_int (-1).
+
+(* sys_seccomp's move: [myproc()->seccomp &= mask].  The mask only shrinks. *)
+Definition upd_secc (V : pprivate) (m : mword 64) : pprivate :=
+  MkPPriv (pv_sz V) (pv_upt V) (pv_tf V) (pv_ofile V) (pv_fdg V) (pv_cwd V)
+          (pv_name V) (pv_cwi V) (pv_gen V) (pv_chg V) (pv_lazy V)
+          (and_vec (pv_secc V) m).
+
+(* ...and the raw store of a whole mask, for the two writers that do not AND
+   (userinit's [secc_all], kfork's copy of the parent's). *)
+Definition set_secc (V : pprivate) (m : mword 64) : pprivate :=
+  MkPPriv (pv_sz V) (pv_upt V) (pv_tf V) (pv_ofile V) (pv_fdg V) (pv_cwd V)
+          (pv_name V) (pv_cwi V) (pv_gen V) (pv_chg V) (pv_lazy V) m.
+
+Lemma set_secc_id (V : pprivate) : set_secc V (pv_secc V) = V.
+Proof. destruct V; reflexivity. Qed.
 
 Definition upd_cwd (V : pprivate) (v : mword 64) : pprivate :=
   MkPPriv (pv_sz V) (pv_upt V) (pv_tf V) (pv_ofile V) (pv_fdg V) v (pv_name V)
-          (pv_cwi V) (pv_gen V) (pv_chg V) (pv_lazy V).
+          (pv_cwi V) (pv_gen V) (pv_chg V) (pv_lazy V) (pv_secc V).
 
 (* the inum alone -- chdir's second write, beside the pointer's *)
 Definition upd_cwi (V : pprivate) (z : Z) : pprivate :=
   MkPPriv (pv_sz V) (pv_upt V) (pv_tf V) (pv_ofile V) (pv_fdg V) (pv_cwd V)
-          (pv_name V) z (pv_gen V) (pv_chg V) (pv_lazy V).
+          (pv_name V) z (pv_gen V) (pv_chg V) (pv_lazy V) (pv_secc V).
 
 (* THE GENERATION, INSTALLED: allocproc's mint of a fresh incarnation
    ([ChildTok.gen_alloc]) writes the name it chose into the block. *)
 Definition upd_gen (V : pprivate) (g : gname) : pprivate :=
   MkPPriv (pv_sz V) (pv_upt V) (pv_tf V) (pv_ofile V) (pv_fdg V) (pv_cwd V)
-          (pv_name V) (pv_cwi V) g (pv_chg V) (pv_lazy V).
+          (pv_name V) (pv_cwi V) g (pv_chg V) (pv_lazy V) (pv_secc V).
 
 (* ...AND THE CHILDREN ROW'S NAME, installed by whoever creates the process
    at the moment it holds <wait_lock> and can put the row in the map
    ([SpecKfork]'s [acquire(&wait_lock); np->parent = p]). *)
 Definition upd_chg (V : pprivate) (g : gname) : pprivate :=
   MkPPriv (pv_sz V) (pv_upt V) (pv_tf V) (pv_ofile V) (pv_fdg V) (pv_cwd V)
-          (pv_name V) (pv_cwi V) (pv_gen V) g (pv_lazy V).
+          (pv_name V) (pv_cwi V) (pv_gen V) g (pv_lazy V) (pv_secc V).
 
 (* ...AND THE LAZY BIT, the one field a SYSCALL writes without any C store
    behind it: sbrk's LAZY arm raises [p->sz] with the table untouched, which
@@ -140,7 +168,7 @@ Definition upd_chg (V : pprivate) (g : gname) : pprivate :=
    ([SpecSysSbrk]'s own row).  exec's success clears it ([upd_exec]). *)
 Definition upd_lazy (V : pprivate) (b : bool) : pprivate :=
   MkPPriv (pv_sz V) (pv_upt V) (pv_tf V) (pv_ofile V) (pv_fdg V) (pv_cwd V)
-          (pv_name V) (pv_cwi V) (pv_gen V) (pv_chg V) b.
+          (pv_name V) (pv_cwi V) (pv_gen V) (pv_chg V) b (pv_secc V).
 
 Lemma upd_lazy_id (V : pprivate) : upd_lazy V (pv_lazy V) = V.
 Proof. destruct V; reflexivity. Qed.
@@ -343,11 +371,15 @@ Section ProcDefs.
     iApply pname_bytes_split. iFrame "Hs Hp".
   Qed.
 
+  (* [p_secc] is LAST (the mask, upstream a083670): the cell sits after
+     [name[16]] in [struct proc] and is written only by userinit, kfork (the
+     dormant child's) and sys_seccomp (the owner's), the [name] discipline. *)
   Definition proc_fields (pa : mword 64) (dq : dfrac) (V : pprivate) : iProp Σ :=
     (p_sz pa        ↦₈{dq} pv_sz V ∗
      p_cwd pa       ↦₈{dq} pv_cwd V ∗
      ⌜length (pv_name V) = PNAMELEN⌝ ∗
-     pname_cells pa dq (pv_name V))%I.
+     pname_cells pa dq (pv_name V) ∗
+     p_secc pa      ↦₈{dq} pv_secc V)%I.
 
   Definition ofile_cells (pa : mword 64) (fs : list (mword 64)) : iProp Σ :=
     ([∗ list] fd ↦ v ∈ fs, p_ofile pa fd ↦₈ v)%I.
@@ -605,14 +637,14 @@ Section ProcDefs.
        p_cwd pa ↦₈ v' -∗ proc_priv_bare pa pid (us_cwd U v')).
   Proof using .
     iIntros "(%Hszb & %Hbel & Hpid & Hf & Hpt & Htfp)".
-    rewrite /proc_fields. iDestruct "Hf" as "(Hsz & Hcwd & %Hnl & Hnm)".
+    rewrite /proc_fields. iDestruct "Hf" as "(Hsz & Hcwd & %Hnl & Hnm & Hsecc)".
     iFrame "Hcwd". iIntros (v') "Hcwd".
     rewrite /proc_priv_bare /proc_fields.
     cbn [us_cwd upd_usV us_V us_M upd_cwd
          pv_sz pv_upt pv_tf pv_ofile pv_cwd pv_name pv_fdg pv_cwi pv_gen pv_chg].
     iSplitR; [done|]. iSplitR; [done|]. iFrame "Hpid".
-    iSplitL "Hsz Hcwd Hnm".
-    { iFrame "Hsz Hcwd Hnm". iPureIntro; exact Hnl. }
+    iSplitL "Hsz Hcwd Hnm Hsecc".
+    { iFrame "Hsz Hcwd Hnm Hsecc". iPureIntro; exact Hnl. }
     iFrame.
   Qed.
 
@@ -840,10 +872,11 @@ Qed.
     CtxMorph (fun xi : CtxId => proc_fields (XI := xi) pa dq V).
   Proof using .
     iIntros (ξ ξ') "Hd H". rewrite /proc_fields.
-    iDestruct "H" as "(H1 & H2 & %Hl & H3)".
+    iDestruct "H" as "(H1 & H2 & %Hl & H3 & H4)".
     iMod (ctx_morph_word _ _ _ _ ξ ξ' with "Hd H1") as "[Hd H1]".
     iMod (ctx_morph_word _ _ _ _ ξ ξ' with "Hd H2") as "[Hd H2]".
     iMod (pname_cells_morph pa dq (pv_name V) ξ ξ' with "Hd H3") as "[Hd H3]".
+    iMod (ctx_morph_word _ _ _ _ ξ ξ' with "Hd H4") as "[Hd H4]".
     iModIntro. iFrame. done.
 Qed.
 

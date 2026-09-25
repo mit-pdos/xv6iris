@@ -1063,7 +1063,7 @@ Section UtSysBlock.
          of the outgoing trapframe -- so the two epc inserts peel off by
          [UsysMemOk.usys_fd_ok_epc], the descriptor twin of the
          [usys_mem_ok_epc] the image row above crosses by. *)
-      assert (Hfde : ut_fd_ecall scv (pv_tf (us_V U0))
+      assert (Hfde : ut_fd_ecall scv (pv_secc (us_V U0)) (pv_tf (us_V U0))
                        (pv_tf (us_V (MkUstate V2 M2))) sts stsR).
       { intros _. destruct Hpro as (Hp1 & _ & _ & _).
         assert (Hlen1 : (tf_epc_idx < length (pv_tf (us_V U)))%nat)
@@ -1084,7 +1084,7 @@ Section UtSysBlock.
          -- and the IMAGE side crosses on the nose: the prologue rewrites a
          trapframe word, and [ut_pro]'s fourth conjunct is exactly that it
          leaves [us_M] alone. *)
-      assert (Hpipe : ut_pipe_ecall scv (pv_tf (us_V U0))
+      assert (Hpipe : ut_pipe_ecall scv (pv_secc (us_V U0)) (pv_tf (us_V U0))
                         (pv_tf (us_V (MkUstate V2 M2)))
                         (us_M U0) (us_M (MkUstate V2 M2)) sts stsR).
       { intros _. destruct Hpro as (Hp1 & _ & _ & HM1 & _).
@@ -1106,7 +1106,7 @@ Section UtSysBlock.
          prologue's epc rewrite nor the epilogue's bump touches either --
          this is the hop that takes [SpecSysGetpid]'s [a0 = sign_extend' 64
          pid] out to the user-execution round ([SpecUsertrap.ut_ret_pid]). *)
-      assert (Hpidr : ut_ret_pid scv (pv_tf (us_V U0))
+      assert (Hpidr : ut_ret_pid scv (pv_secc (us_V U0)) (pv_tf (us_V U0))
                         (pv_tf (us_V (MkUstate V2 M2))) pid).
       { intros _. destruct Hpro as (Hp1 & _ & _ & _).
         assert (Hnum0 : usys_num (pv_tf (us_V U0)) = sysc_num V1).
@@ -1121,7 +1121,7 @@ Section UtSysBlock.
       iAssert (ut_exec_out fdep scv (<[tf_epc_idx := ret_pc epv]> (pv_tf (us_V U0)))
                  (us_M U0)
                  (perm_of (ud_um (pv_upt (us_V U0))) (uint (pv_sz (us_V U0))))
-                 (uint (pv_sz (us_V U0))) (pv_lazy (us_V U0))
+                 (uint (pv_sz (us_V U0))) (pv_lazy (us_V U0)) (pv_secc (us_V U0))
                  (MkUstate V2 M2) sts stsR gn cs pid)
         with "[Hxo]" as "Hxo".
       { rewrite /ut_exec_out. iIntros "%Hc". destruct Hc as [_ Hc7].
@@ -1176,7 +1176,7 @@ Section UtSysBlock.
          the two are the same disjunction, read at the same a0 word, and
          the guard differs only in the cause conjunct the dispatcher does
          not carry ([SpecUsertrap.ut_fork_out]). *)
-      iAssert (ut_fork_out fdep scv (<[tf_epc_idx := ret_pc epv]> (pv_tf (us_V U0)))
+      iAssert (ut_fork_out fdep scv (pv_secc (us_V U0)) (<[tf_epc_idx := ret_pc epv]> (pv_tf (us_V U0)))
                  (pv_tf (us_V (MkUstate V2 M2)) !!! tf_arg_idx 0) cs csR)%I
         with "[Hfo]" as "Hfo".
       { rewrite /ut_fork_out /sysc_fork_out. iIntros "%Hc".
@@ -1195,7 +1195,7 @@ Section UtSysBlock.
           | unfold tf_epc_idx, tf_arg_idx; lia ]. }
       assert (Hgnw : pv_gen V1 = gn)
         by (rewrite HV1gen Hgnq; exact Hpr6).
-      iAssert (ut_wait_out scv (<[tf_epc_idx := ret_pc epv]> (pv_tf (us_V U0)))
+      iAssert (ut_wait_out scv (pv_secc (us_V U0)) (<[tf_epc_idx := ret_pc epv]> (pv_tf (us_V U0)))
                  (us_M U0) (us_M (MkUstate V2 M2))
                  (pv_tf (us_V (MkUstate V2 M2)) !!! tf_arg_idx 0) cs csR gn pid)%I
         with "[Hwo]" as "Hwo".

@@ -1908,7 +1908,7 @@ Section UservecAllPt.
         cbn [us_V pv_cwi us_upt upd_upt upd_usV upd_usM us_tf upd_tf pv_gen pv_chg].
         reflexivity.
       + (* ...nor the lazy bit (lane LAZY-FLAG) *)
-        cbn [us_V pv_lazy us_upt upd_upt upd_usV upd_usM us_tf upd_tf pv_gen
+        cbn [us_V pv_lazy pv_secc us_upt upd_upt upd_usV upd_usM us_tf upd_tf pv_gen
              pv_chg pv_cwi].
         reflexivity.
       + cbn [us_V pv_tf us_upt upd_upt upd_usV us_tf upd_tf]. exact Hws1.
@@ -1916,7 +1916,7 @@ Section UservecAllPt.
         rewrite Huptpt2. reflexivity.
       + cbn [us_V pv_sz us_upt upd_upt upd_usV us_tf upd_tf]. reflexivity.
       + cbn [us_V pv_cwi us_upt upd_upt upd_usV us_tf upd_tf pv_gen pv_chg]. reflexivity.
-      + cbn [us_V pv_lazy us_upt upd_upt upd_usV us_tf upd_tf pv_gen pv_chg
+      + cbn [us_V pv_lazy pv_secc us_upt upd_upt upd_usV us_tf upd_tf pv_gen pv_chg
              pv_cwi]. reflexivity.
     - (* THE ROUND'S DESCRIPTOR HALF, forwarded verbatim: this boundary
          moves no descriptor state of its own -- it saves and restores a
@@ -1995,7 +1995,7 @@ Section UservecAllPt.
                           reflexivity)
                     (* ...and the lazy bit, which neither move touches
                        (lane LAZY-FLAG) *)
-                    ltac:(cbn [us_V pv_lazy us_upt upd_upt upd_usV us_tf upd_tf
+                    ltac:(cbn [us_V pv_lazy pv_secc us_upt upd_upt upd_usV us_tf upd_tf
                                pv_gen pv_chg pv_cwi];
                           reflexivity)
                     with "Hxo2")

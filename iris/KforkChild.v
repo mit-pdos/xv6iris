@@ -104,7 +104,7 @@ Lemma uvis_of_kfork_child (Up : ustate) (sts : list fdstate)
            (uint (pv_sz (us_V Up)))
            sts
            (pv_cwi (us_V Up))
-           gn cs pidc (pv_lazy (us_V Up)).
+           gn cs pidc (pv_lazy (us_V Up)) (pv_secc (us_V Up)).
 Proof. reflexivity. Qed.
 
 (* ===================================================================== *)
@@ -403,11 +403,14 @@ Lemma urun_eq_kfork_child (Up Uc : ustate) (sts : list fdstate)
      block invariant hold of the child -- uvmcopy gives it the parent's
      vpns ([UserPerm.lazy_free_dom]). *)
   pv_lazy (us_V Uc) = pv_lazy (us_V Up) ->
+  (* ...AND ITS MASK IS THE PARENT'S: kfork copies [p->seccomp]
+     ([ld a5,360(s5); sd a5,360(s3)], upstream a083670). *)
+  pv_secc (us_V Uc) = pv_secc (us_V Up) ->
   urun_eq (uvis_of (kfork_child Up) sts gn cs pidc) Uc.
 Proof.
-  intros Htf HM Hperm Hsz Hcw Hlz.
+  intros Htf HM Hperm Hsz Hcw Hlz Hsc.
   unfold urun_eq. rewrite uvis_of_kfork_child.
-  cbn [uvis_tf uvis_M uvis_perm uvis_sz uvis_cwd uvis_lazy].
+  cbn [uvis_tf uvis_M uvis_perm uvis_sz uvis_cwd uvis_lazy uvis_secc].
   rewrite Htf. rewrite HM. rewrite Hperm. rewrite Hsz. rewrite Hcw.
-  rewrite Hlz. repeat split.
+  rewrite Hlz. rewrite Hsc. repeat split.
 Qed.

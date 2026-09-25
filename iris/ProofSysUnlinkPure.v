@@ -191,14 +191,14 @@ Proof. vm_compute. reflexivity. Qed.
 Lemma su_dotaddr `{XI : CurCtx} :
   add_vec (add_vec (mword_of_int (SU + 0x34) : mword 64)
                    (auipc_off (mword_of_int 2 : mword 20)))
-          (sign_extend' 64 (mword_of_int 1330 : mword 12))
+          (sign_extend' 64 (mword_of_int 1250 : mword 12))
   = (mword_of_int su_dot_addr : mword 64).
 Proof. apply bv_eq; vm_compute; reflexivity. Qed.
 
 Lemma su_dotdotaddr `{XI : CurCtx} :
   add_vec (add_vec (mword_of_int (SU + 0x48) : mword 64)
                    (auipc_off (mword_of_int 2 : mword 20)))
-          (sign_extend' 64 (mword_of_int 1318 : mword 12))
+          (sign_extend' 64 (mword_of_int 1238 : mword 12))
   = (mword_of_int su_dotdot_addr : mword 64).
 Proof. apply bv_eq; vm_compute; reflexivity. Qed.
 
@@ -343,7 +343,8 @@ Qed.
 Definition su_dummyV : pprivate :=
   MkPPriv (mword_of_int 0)
           (UPTD (mword_of_int 0) (mword_of_int 0) ∅ ∅)
-          [] [] 1%positive (mword_of_int 0) [] 0 1%positive 1%positive true.
+          [] [] 1%positive (mword_of_int 0) [] 0 1%positive 1%positive true
+          (mword_of_int 0).
 
 (* readi's delivered byte at [tot = 16] is the file's byte *)
 Lemma su_rdd_eq `{XI : CurCtx} (data : nat -> list (bv 8)) (olds : nat -> bv 8)

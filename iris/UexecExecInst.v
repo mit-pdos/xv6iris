@@ -868,7 +868,7 @@ Section UexecExecInst.
   Proof using .
     intros Hk.
     pose proof Hk as (HM & Ha0 & Ha1 & Ha2 & Hfd & Hcw & Hgn & Hch & Hpi
-                      & Hpm & Hsz & Hlz).
+                      & Hpm & Hsz & Hlz & Hsc).
     rewrite /xv6_sbundle.
     destruct (decide (n = USYS_exec)) as [_ | _];
       [ exact (exec_sbundle_cong X f W W' HM Ha0 Ha1 Hfd Hcw Hgn Hch Hpi) | ].
@@ -889,7 +889,7 @@ Section UexecExecInst.
   Proof using .
     intros Hk.
     pose proof Hk as (HM & Ha0 & Ha1 & Ha2 & Hfd & Hcw & Hgn & _ & _ & Hpi & Hsz
-                      & Hlz).
+                      & Hlz & Hsc).
     rewrite /xv6_spost /xk_a /tf_w HM Ha0 Ha1 Ha2 Hfd Hcw Hgn Hpi Hsz Hlz.
     reflexivity.
   Qed.

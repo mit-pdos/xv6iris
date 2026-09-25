@@ -90,34 +90,42 @@ Definition uround_bump_ok (tf tf' : list (mword 64)) (r : mword 64) : Prop :=
    (exec's successful record is a different program's; the FAILED arm's row
    is the table's own equation); the transparent arm KEEPS it -- vmfault
    writes no field of the block. *)
+(* [secc] / [secc'] are the MASK before and after ([UexecSlot.uvis_secc], off
+   [ProcDefs.pv_secc]; upstream a083670).  The number every disjunct reads is
+   the EFFECTIVE one ([UsysMemOk.usys_eff]) -- a blocked call is the
+   unknown-number call.  exec keeps the mask ([KexecDefs.kexec_ok]), the
+   returning disjunct carries [UsysMemOk.usys_secc_ok] (sys_seccomp's AND),
+   and the transparent arm keeps it. *)
 Definition uround_ok (sc : mword 64)
     (tf : list (mword 64)) (M : gmap Z (bv 8)) (pi : gmap (mword 27) uperm)
-    (szv : Z) (cw : Z) (lz : bool)
+    (szv : Z) (cw : Z) (lz : bool) (secc : mword 64)
     (tf' : list (mword 64)) (M' : gmap Z (bv 8)) (pi' : gmap (mword 27) uperm)
-    (szv' : Z) (cw' : Z) (lz' : bool) : Prop :=
+    (szv' : Z) (cw' : Z) (lz' : bool) (secc' : mword 64) : Prop :=
   if decide (sc = uecall_scause) then
-    (usys_num tf = USYS_exec /\ cw' = cw)
-    \/ (usys_num tf <> USYS_exit
+    (usys_eff secc tf = USYS_exec /\ cw' = cw /\ secc' = secc)
+    \/ (usys_eff secc tf <> USYS_exit
         /\ exists r : mword 64,
              uround_bump_ok tf tf' r
-             /\ usys_mem_ok (usys_num tf) tf r M pi szv lz M' pi' szv' lz'
-             /\ usys_cwd_ok (usys_num tf) r cw cw')
+             /\ usys_mem_ok (usys_eff secc tf) tf r M pi szv lz M' pi' szv' lz'
+             /\ usys_cwd_ok (usys_eff secc tf) r cw cw'
+             /\ usys_secc_ok (usys_eff secc tf) tf secc secc' r)
   else uround_id_ok tf tf' /\ M' = M /\ pi' = pi /\ szv' = szv /\ cw' = cw
-       /\ lz' = lz.
+       /\ lz' = lz /\ secc' = secc.
 
 (* ===================================================================== *)
 (* SS3 The readers -- unpack the [decide].                                 *)
 (* ===================================================================== *)
 Lemma uround_ok_ecall (tf : list (mword 64)) (M M' : gmap Z (bv 8))
     (pi pi' : gmap (mword 27) uperm) (szv szv' : Z) (cw cw' : Z)
-    (lz lz' : bool) (tf' : list (mword 64)) :
-  uround_ok uecall_scause tf M pi szv cw lz tf' M' pi' szv' cw' lz' ->
-  (usys_num tf = USYS_exec /\ cw' = cw)
-  \/ (usys_num tf <> USYS_exit
+    (lz lz' : bool) (secc secc' : mword 64) (tf' : list (mword 64)) :
+  uround_ok uecall_scause tf M pi szv cw lz secc tf' M' pi' szv' cw' lz' secc' ->
+  (usys_eff secc tf = USYS_exec /\ cw' = cw /\ secc' = secc)
+  \/ (usys_eff secc tf <> USYS_exit
       /\ exists r : mword 64,
            uround_bump_ok tf tf' r
-           /\ usys_mem_ok (usys_num tf) tf r M pi szv lz M' pi' szv' lz'
-           /\ usys_cwd_ok (usys_num tf) r cw cw').
+           /\ usys_mem_ok (usys_eff secc tf) tf r M pi szv lz M' pi' szv' lz'
+           /\ usys_cwd_ok (usys_eff secc tf) r cw cw'
+           /\ usys_secc_ok (usys_eff secc tf) tf secc secc' r).
 Proof.
   unfold uround_ok.
   destruct (decide (uecall_scause = uecall_scause)) as [_ | Hne];
@@ -126,11 +134,11 @@ Qed.
 
 Lemma uround_ok_transparent (sc : mword 64) (tf : list (mword 64))
     (M M' : gmap Z (bv 8)) (pi pi' : gmap (mword 27) uperm) (szv szv' : Z)
-    (cw cw' : Z) (lz lz' : bool) (tf' : list (mword 64)) :
+    (cw cw' : Z) (lz lz' : bool) (secc secc' : mword 64) (tf' : list (mword 64)) :
   sc <> uecall_scause ->
-  uround_ok sc tf M pi szv cw lz tf' M' pi' szv' cw' lz' ->
+  uround_ok sc tf M pi szv cw lz secc tf' M' pi' szv' cw' lz' secc' ->
   uround_id_ok tf tf' /\ M' = M /\ pi' = pi /\ szv' = szv /\ cw' = cw
-  /\ lz' = lz.
+  /\ lz' = lz /\ secc' = secc.
 Proof.
   intros Hne. unfold uround_ok.
   destruct (decide (sc = uecall_scause)) as [Heq | _];
@@ -146,27 +154,31 @@ Qed.
 (* ===================================================================== *)
 Lemma uround_ok_ueq_l (sc : mword 64) (tf tfa : list (mword 64))
     (M M' : gmap Z (bv 8)) (pi pi' : gmap (mword 27) uperm) (szv szv' : Z)
-    (cw cw' : Z) (lz lz' : bool) (tf' : list (mword 64)) :
+    (cw cw' : Z) (lz lz' : bool) (secc secc' : mword 64) (tf' : list (mword 64)) :
   tf_ueq tf tfa ->
-  uround_ok sc tf M pi szv cw lz tf' M' pi' szv' cw' lz'
-  -> uround_ok sc tfa M pi szv cw lz tf' M' pi' szv' cw' lz'.
+  uround_ok sc tf M pi szv cw lz secc tf' M' pi' szv' cw' lz' secc'
+  -> uround_ok sc tfa M pi szv cw lz secc tf' M' pi' szv' cw' lz' secc'.
 Proof.
   intros Hu H.
-  pose proof (tf_ueq_num tf tfa Hu) as Hn.
+  pose proof (tf_ueq_num tf tfa Hu) as Hn0.
+  assert (Hn : usys_eff secc tf = usys_eff secc tfa)
+    by (unfold usys_eff; rewrite Hn0; reflexivity).
+  pose proof (proj2 Hu (tf_arg_idx 0) ltac:(unfold tf_arg_idx; lia)) as Ha0.
   pose proof (tf_ueq_resume_gpr0 tf tfa Hu) as Hg.
   pose proof (tf_ueq_resume_pc tf tfa Hu) as Hp.
   pose proof (tf_ueq_epc tf tfa Hu) as He.
   unfold uround_ok in H |- *.
   destruct (decide (sc = uecall_scause)).
-  - destruct H as [[Hx Hcw] | [Hnx [r [[Hb1 Hb2] [Hm Hc]]]]].
+  - destruct H as [[Hx Hcw] | [Hnx [r [[Hb1 Hb2] [Hm [Hc Hs]]]]]].
     + left. split; [ rewrite <- Hn; exact Hx | exact Hcw ].
-    + right. split; [ rewrite <- Hn; exact Hnx | ]. exists r. split; [ split | split ].
+    + right. split; [ rewrite <- Hn; exact Hnx | ]. exists r. split; [ split | split_and! ].
       * rewrite <- Hg. exact Hb1.
       * unfold tf_w in Hb2 |- *. rewrite <- He. exact Hb2.
       * rewrite <- Hn.
-        exact (usys_mem_ok_ueq (usys_num tf) tf tfa r M M' pi pi' szv szv'
+        exact (usys_mem_ok_ueq (usys_eff secc tf) tf tfa r M M' pi pi' szv szv'
                  lz lz' Hu Hm).
       * rewrite <- Hn. exact Hc.
+      * rewrite <- Hn. exact (usys_secc_ok_arg_cong _ tf tfa _ _ _ Ha0 Hs).
   - destruct H as [[Hi1 Hi2] Hrest].
     split; [ split | exact Hrest ].
     + rewrite <- Hg. exact Hi1.
@@ -175,10 +187,10 @@ Qed.
 
 Lemma uround_ok_ueq_r (sc : mword 64) (tf : list (mword 64))
     (M M' : gmap Z (bv 8)) (pi pi' : gmap (mword 27) uperm) (szv szv' : Z)
-    (cw cw' : Z) (lz lz' : bool) (tf' tfa' : list (mword 64)) :
+    (cw cw' : Z) (lz lz' : bool) (secc secc' : mword 64) (tf' tfa' : list (mword 64)) :
   tf_ueq tf' tfa' ->
-  uround_ok sc tf M pi szv cw lz tf' M' pi' szv' cw' lz'
-  -> uround_ok sc tf M pi szv cw lz tfa' M' pi' szv' cw' lz'.
+  uround_ok sc tf M pi szv cw lz secc tf' M' pi' szv' cw' lz' secc'
+  -> uround_ok sc tf M pi szv cw lz secc tfa' M' pi' szv' cw' lz' secc'.
 Proof.
   intros Hu H.
   pose proof (tf_ueq_resume_gpr0 tf' tfa' Hu) as Hg.

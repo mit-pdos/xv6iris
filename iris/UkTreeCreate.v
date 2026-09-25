@@ -382,7 +382,7 @@ Section UkTreeCreate.
     iFrame "Hheap Hufd".
     iApply (sbundle_at_mknod_intro_tr uslot
               (tree_mknod_fam c r g t ma mi (ukn_pay N))
-              (uvis_of_run m pc M pm sz fdv cw gn cs pidv false)
+              (uvis_of_run m pc M pm sz fdv cw gn cs pidv false secc_all)
               cw M pv ma mi eq_refl eq_refl
               (eq_trans (tf_of_arg0 m pc) Ha0)
               ltac:(unfold tf_w; cbn [uvis_tf uvis_of_run];
@@ -593,7 +593,7 @@ Section UkTreeCreate.
     iFrame "Hheap Hufd".
     iApply (sbundle_at_mkdir_intro_tr uslot
               (tree_mkdir_fam c r g t (ukn_pay N))
-              (uvis_of_run m pc M pm sz fdv cw gn cs pidv false)
+              (uvis_of_run m pc M pm sz fdv cw gn cs pidv false secc_all)
               cw M pv eq_refl eq_refl
               (eq_trans (tf_of_arg0 m pc) Ha0)).
     cbn [tree_mkdir_fam xfam_tree df_P df_Pmiss df_Farm df_Fdots df_Fun
@@ -789,7 +789,7 @@ Section UkTreeCreate.
     iFrame "Hheap Hufd".
     iApply (sbundle_at_open_intro_at uslot
               (tree_opencreate_fam c r g t (ukn_pay N))
-              (uvis_of_run m pc M pm sz fdv cw gn cs pidv false)
+              (uvis_of_run m pc M pm sz fdv cw gn cs pidv false secc_all)
               cw M pv (m !!! Regidx a1_idx) eq_refl eq_refl
               (eq_trans (tf_of_arg0 m pc) Ha0)
               (tf_of_arg1 m pc)).

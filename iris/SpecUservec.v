@@ -168,11 +168,11 @@ Definition uv_round (U : ustate) (M : gmap Z (bv 8)) (g : regfile)
     (uint (pv_sz (us_V U)))
     (* the cwd's inum rides inside the block on both sides, so the round
        reads it there and the post needs no binder for it *)
-    (pv_cwi (us_V U)) (pv_lazy (us_V U))
+    (pv_cwi (us_V U)) (pv_lazy (us_V U)) (pv_secc (us_V U))
     (pv_tf (us_V U'))
     (us_M U')
     (perm_of (ud_um (pv_upt (us_V U'))) (uint (pv_sz (us_V U'))))
-    (uint (pv_sz (us_V U'))) (pv_cwi (us_V U')) (pv_lazy (us_V U')).
+    (uint (pv_sz (us_V U'))) (pv_cwi (us_V U')) (pv_lazy (us_V U')) (pv_secc (us_V U')).
 
 (* the bridge: usertrap's round, read at the machine that trapped.  The
    premise is the SAVE WALK's own fact -- the 31 words uservec stored are
@@ -189,11 +189,14 @@ Lemma uv_round_of_ut (Uut U : ustate) (M : gmap Z (bv 8)) (g : regfile)
   (* ...and the lazy bit, on the cwd inum's footing (lane LAZY-FLAG): the
      round is stated at the block's own [ProcDefs.pv_lazy] on both sides. *)
   pv_lazy (us_V Uut) = pv_lazy (us_V U) ->
+  (* ...and the mask, likewise ([ProcDefs.pv_secc]) *)
+  pv_secc (us_V Uut) = pv_secc (us_V U) ->
   SpecUsertrap.ut_round sepc_v sc_v Uut U' ->
   uv_round U M g sepc_v sc_v U'.
 Proof.
-  intros Hu Hpi Hm Hs Hc Hlz Hr. unfold uv_round.
+  intros Hu Hpi Hm Hs Hc Hlz Hsc Hr. unfold uv_round.
   rewrite <- Hpi. rewrite <- Hm. rewrite <- Hs. rewrite <- Hc. rewrite <- Hlz.
+  rewrite <- Hsc.
   eapply uround_ok_ueq_l; [ exact Hu | exact Hr ].
 Qed.
 
@@ -378,16 +381,16 @@ Definition uservec_post `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fileG Σ} `{GEN 
        boundary's own entry trapframe -- [SpecUsertrap.ut_exec_out] *)
     ut_exec_out f sc_v (tf_of g (ret_pc sepc_v)) M
       (perm_of (ud_um (pv_upt (us_V U))) (uint (pv_sz (us_V U))))
-      (uint (pv_sz (us_V U))) (pv_lazy (us_V U)) U' sts sts' gn cs pid -∗
+      (uint (pv_sz (us_V U))) (pv_lazy (us_V U)) (pv_secc (us_V U)) U' sts sts' gn cs pid -∗
     (* ...AND FORK'S, forwarded the same way -- [SpecUsertrap.ut_fork_out] *)
-    ut_fork_out f sc_v (tf_of g (ret_pc sepc_v))
+    ut_fork_out f sc_v (pv_secc (us_V U)) (tf_of g (ret_pc sepc_v))
       (pv_tf (us_V U') !!! tf_arg_idx 0) cs cs' -∗
     (* ...AND WAIT'S, forwarded the same way -- [SpecUsertrap.ut_wait_out] *)
-    ut_wait_out sc_v (tf_of g (ret_pc sepc_v)) M (us_M U')
+    ut_wait_out sc_v (pv_secc (us_V U)) (tf_of g (ret_pc sepc_v)) M (us_M U')
       (pv_tf (us_V U') !!! tf_arg_idx 0) cs cs' gn pid -∗
     (* ...AND WHAT A RESUME PROVES, forwarded the same way (lane TRAP-ROWS,
        T2(iii) / T4) -- [SpecUsertrap.ut_live_out] *)
-    ⌜ut_live_out sc_v (tf_of g (ret_pc sepc_v)) sts
+    ⌜ut_live_out sc_v (pv_secc (us_V U)) (tf_of g (ret_pc sepc_v)) sts
         (pv_tf (us_V U') !!! tf_arg_idx 0) cs'⌝ -∗
     (* ...AND THE UNTAKEN CONTINUATION, forwarded the same way (lane
        TRAP-ROWS, T3) -- [SpecUsertrap.ut_kill_out] *)

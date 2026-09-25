@@ -511,7 +511,7 @@ Section UserretClosed.
           iEval (rewrite (uslot_key_cong
                             (bump_at W (mword_of_int 0) (uvis_M W) (uvis_perm W)
                                (uvis_sz W) (uvis_fd W) (uvis_cwd W) g' ∅ pidc
-                               (uvis_lazy W))
+                               (uvis_lazy W) (uvis_secc W))
                             (MkUvis
                                (bump_tf (tf_of (tf_resume_gpr0 (uvis_tf W))
                                            (ret_pc (tf_w (uvis_tf W) tf_epc_idx)))
