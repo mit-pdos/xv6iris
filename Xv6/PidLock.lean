@@ -18,8 +18,7 @@ open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
 `pidLockAddr`). -/
 def nextpidAddr : BitVec 64 := KA.«nextpid»
 def initprocAddr : BitVec 64 := KA.«initproc»
-/-- `PIDMAX`. -/
-def PIDMAX : Nat := 1000
+-- `PIDMAX` is `Xv6/ProcGeom.lean`'s (Rocq `ProcGeom.PIDMAX`).
 
 /-- The pids are distinct where nonzero, and in range. -/
 def pidsOk (pids : Nat → BitVec 32) : Prop :=

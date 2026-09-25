@@ -28,6 +28,7 @@ import Xv6.ProofMemmove
 import Xv6.LinkMemcmp
 import Xv6.LinkMemmove
 import Xv6.LinkMemcpy
+import Xv6.ProcGeom
 import Xv6.ProcDefs
 import Xv6.SpecCpuid
 import Xv6.SpecMycpu

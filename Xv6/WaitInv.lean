@@ -69,6 +69,7 @@ Imports only definitional files.
 -/
 import Xv6.UserChildren
 import Xv6.KallocDefs
+import Xv6.IrefSlots
 
 namespace Xv6
 

@@ -85,7 +85,8 @@ party that threads a lock's gname.
    `proc_addr_inj`).  `procAddr_inj` lives in `Xv6/SchedCtx.lean`, above
    this file; the boot caller discharges `((List.range NPROC).map
    procAddr).Nodup` with it.
-6. **Geometry comes from `Xv6/ProcDefs.lean`** (Rocq `ProcGeom.v`): `NPROC`,
+6. **Geometry comes from `Xv6/ProcGeom.lean`** (Rocq `ProcGeom.v`; the split
+   of ProcDefs this note asked for, landed with the D8 wiring): `NPROC`,
    `procAddr`, `ZOMBIE`.  When the process block starts carrying these
    halves (`procDormant`, W7-C), the geometry has to move below this file
    (a `ProcGeom.lean` split of ProcDefs), exactly as Rocq has it.  Reported.
@@ -93,7 +94,7 @@ party that threads a lock's gname.
 Imports only definitional files.
 -/
 import Xv6.ChildTok
-import Xv6.ProcDefs
+import Xv6.ProcGeom
 import Iris.Instances.Lib.GhostMap
 import Iris.Instances.Lib.GhostVar
 import Iris.Algebra.Lib.DFracAgree
@@ -158,6 +159,10 @@ abbrev qeighth : Qp := Qp.quarter.half
 
 /-- Rocq `PIDMAX` (deviation 3). -/
 def genPidMax : Nat := 1000
+
+/-- ...and it IS the geometry's `PIDMAX` (now that `Xv6/ProcGeom.lean` sits
+below this file). -/
+theorem genPidMax_eq : genPidMax = PIDMAX := rfl
 
 /-! ## The element, and the map the boot mint hands out -/
 

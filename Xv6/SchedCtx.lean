@@ -110,44 +110,7 @@ theorem parkOk_not_RUNNING {st : BitVec 32} (h : parkOk st) : st ≠ RUNNING := 
 @[simp] theorem notRunning_RUNNING : ¬ notRunning RUNNING := by decide
 @[simp] theorem unclaimed_RUNNING : ¬ unclaimed RUNNING := by decide
 
-/-! ## `&proc[j]` is injective -/
 
-/-- `&proc[]` as a number: the symbol's value (below `2^32`). -/
-theorem procs_toNat : (procsAddr : BitVec 64).toNat = KernelSyms.«proc» := by decide
-theorem procs_lt : KernelSyms.«proc» < 2 ^ 32 := by decide
-
-theorem procAddr_toNat (j : Nat) (hj : j < NPROC) : (procAddr j).toNat = KernelSyms.«proc» + 360 * j := by
-  have h1 : (BitVec.ofNat 64 (procSize * j)).toNat = 360 * j := by
-    simp only [BitVec.toNat_ofNat, procSize]
-    exact Nat.mod_eq_of_lt (by unfold NPROC at hj; omega)
-  have hp := procs_lt
-  unfold procAddr
-  rw [BitVec.toNat_add, h1, procs_toNat]
-  exact Nat.mod_eq_of_lt (by unfold NPROC at hj; omega)
-
-theorem procAddr_inj {j j' : Nat} (hj : j < NPROC) (hj' : j' < NPROC) (h : procAddr j = procAddr j') :
-    j = j' := by
-  have := congrArg BitVec.toNat h
-  rw [procAddr_toNat j hj, procAddr_toNat j' hj'] at this
-  omega
-
-theorem procAddr_nonzero {j : Nat} (hj : j < NPROC) : procAddr j ≠ 0#64 := by
-  intro h
-  have := congrArg BitVec.toNat h
-  rw [procAddr_toNat j hj] at this
-  simp only [BitVec.toNat_ofNat] at this
-  have hpos : 0 < KernelSyms.«proc» := by decide
-  omega
-
-/-- `&p->context` determines the slot. -/
-theorem pContext_addr_cancel (a b : BitVec 64) (h : pContext a 0 = pContext b 0) : a = b := by
-  unfold pContext at h
-  simp only [Nat.mul_zero] at h
-  bv_omega
-
-theorem pContext_inj {j j' : Nat} (hj : j < NPROC) (hj' : j' < NPROC)
-    (h : pContext (procAddr j) 0 = pContext (procAddr j') 0) : j = j' :=
-  procAddr_inj hj hj' (pContext_addr_cancel _ _ h)
 
 section
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF]

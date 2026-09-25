@@ -30,6 +30,7 @@ import Xv6.Geom
 import Xv6.KernelText
 import Xv6.UPtDefs
 import Xv6.IrefSlots
+import Xv6.ProcGeom
 
 set_option linter.unusedSectionVars false
 
@@ -39,55 +40,6 @@ open Iris Iris.ProgramLogic Iris.BI Std MachCSL
 open LeanRV64D
 
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CurCtx]
-
-/-! ## Geometry (Rocq `ProcGeom.v`) -/
-
-/-- `proc[NPROC]` (kernel/proc.c) in this image: `procinit`'s and
-`proc_mapstacks`' `auipc s1,0x11; addi s1,s1,-116` / `addi s1,s1,82`
-both land on `KernelSyms.«proc»`, and `&proc[NPROC] = KernelSyms.«tickslock» = tickslock`
-(`KernelSyms.«proc» + 64 * 360`).  (The Rocq `KernelSyms.proc` is (KernelSyms.«cpus» + 0x3b0): a
-different build of the same kernel.) -/
-def procsAddr : BitVec 64 := KA.«proc»
-
--- `NPROC` / `NOFILE` are `Xv6/SlotSupply.lean`'s (the slot supplies'
--- bounds need them below this file).
-/-- `sizeof (struct proc)` (Rocq `proc_size`). -/
-def procSize : Nat := 360
-/-- `sizeof (p->name)` (Rocq `PNAMELEN`). -/
-def PNAMELEN : Nat := 16
-/-- `MAXVA` (kernel/riscv.h): `1 << 38`. -/
-def MAXVA : Nat := 2 ^ 38
-
-/-- `&proc[i]` (Rocq `proc_addr`). -/
-def procAddr (i : Nat) : BitVec 64 := procsAddr + BitVec.ofNat 64 (procSize * i)
-
-/-- `&p->lock` (offset 0; `locked` at 0, `name` at 8, `cpu` at 16). -/
-def pLock (pa : BitVec 64) : BitVec 64 := pa
-def pState (pa : BitVec 64) : BitVec 64 := pa + 24#64
-def pChan (pa : BitVec 64) : BitVec 64 := pa + 32#64
-def pKilled (pa : BitVec 64) : BitVec 64 := pa + 40#64
-def pXstate (pa : BitVec 64) : BitVec 64 := pa + 44#64
-def pPid (pa : BitVec 64) : BitVec 64 := pa + 48#64
-def pParent (pa : BitVec 64) : BitVec 64 := pa + 56#64
-def pKstack (pa : BitVec 64) : BitVec 64 := pa + 64#64
-def pSz (pa : BitVec 64) : BitVec 64 := pa + 72#64
-def pPagetable (pa : BitVec 64) : BitVec 64 := pa + 80#64
-def pTrapframe (pa : BitVec 64) : BitVec 64 := pa + 88#64
-/-- word `j` of `p->context` (`ra sp s0 .. s11`, `j < 14`). -/
-def pContext (pa : BitVec 64) (j : Nat) : BitVec 64 := pa + 96#64 + BitVec.ofNat 64 (8 * j)
-/-- `&p->ofile[j]` (`j < NOFILE`). -/
-def pOfile (pa : BitVec 64) (j : Nat) : BitVec 64 := pa + 208#64 + BitVec.ofNat 64 (8 * j)
-def pCwd (pa : BitVec 64) : BitVec 64 := pa + 336#64
-/-- `&p->name` (16 bytes). -/
-def pName (pa : BitVec 64) : BitVec 64 := pa + 344#64
-
-/-- `enum procstate`. -/
-def UNUSED : BitVec 32 := 0#32
-def USED : BitVec 32 := 1#32
-def SLEEPING : BitVec 32 := 2#32
-def RUNNABLE : BitVec 32 := 3#32
-def RUNNING : BitVec 32 := 4#32
-def ZOMBIE : BitVec 32 := 5#32
 
 /-! ## The private block (Rocq `pprivate` / `proc_fields` / `proc_priv_bare`) -/
 
