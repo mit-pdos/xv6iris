@@ -1,6 +1,6 @@
 # Design: ONE application — the file lines and the pipeline line together (proposal, 2026-09-22)
 
-**Status: RULED (2026-09-22, the owner): ROUTE B — abstract first, then the union; the union REPLACES the file and pipe applications (their theorems become corollaries, their tiers and audits are retired).  The abstraction is the campaign; its worklist is `../projects/app-both.md`.**  Asked by the owner on 2026-09-22 ("can
+**Status: RULED (2026-09-22, the owner): ROUTE B — abstract first, then the union; the union REPLACES the file and pipe applications (their theorems become corollaries, their tiers and audits are retired).  The abstraction is the campaign; its worklist was `../projects/app-both.md`, archived as `../completed/app-both.md` once the effort landed (2026-09-25).**  Asked by the owner on 2026-09-22 ("can
 you unify the app-file app with the app-pipe app"), after the file theorem
 closed (`UInitFile.file_adequacy_closed`) beside the pipeline theorem
 (`UInitPipeAdequacy.pipe_adequacy_pipeΣ_final`, which already subsumes echo:

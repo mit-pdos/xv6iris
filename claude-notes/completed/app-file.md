@@ -3,7 +3,7 @@
 **STATUS: COMPLETE, ARCHIVED 2026-09-23.**  The theorem is closed since
 `cb28f045c` (`UInitFile.file_adequacy_closed`, audited by `FileAssumptions.v`
 at fourteen; RULING F0-BOOT).  Its successor is the `app-both` campaign
-(`../projects/app-both.md`), whose union retires this tier's theorem into a
+(`app-both.md`, now archived here), whose union retires this tier's theorem into a
 corollary.  Lane findings: `app-file-findings/` beside this file.  The
 worklist below is kept as it stood (started 2026-09-17).  Design of record:
 [`../design/app-file.md`](../design/app-file.md).  Read that first; this
