@@ -7,6 +7,10 @@ A new coordinator session should read, in order: this file; `notes/coord/wave7b_
 `notes/briefs/crash_layer.md` (USER RULINGS at the top of each are final);
 `notes/coord/pending_edits.txt` (queued cleanups and deferrals).
 
+## CURRENT USER DIRECTIVE (2026-09-25)
+Do NOT start new subagents; only land results from the agents already running (usage limits are
+near). Resume launching the NEXT list only when the user says so.
+
 ## Workflow (how every result lands)
 - Main-tree agents write new files in /shared/lean-xv6 (no git, no Xv6.lean edits); the
   coordinator appends `import Xv6.<M>` to Xv6.lean, commits, then VERIFIES in the clean worktree
