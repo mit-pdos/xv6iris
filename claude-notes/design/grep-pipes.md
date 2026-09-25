@@ -2,7 +2,14 @@
 
 Owner (2026-09-24): after the union lands, add grep into the pipeline.
 The union has landed (`union_adequacy_closed`).  STATUS: proposal of
-record; cut G0 in flight; owner questions in §6 OPEN.
+record; owner questions in §6 OPEN (proceeding on the recommendations:
+loose corner, alphanumeric patterns, no grep producer yet).  G0 LANDED
+(cca414d46, VM g0merge1): `GrepFilt.v` -- `lastpart`, `grep_out_app`
+(exactly the `flt_app` shape, `flt_new R c := gout pat (lastpart R) c`),
+`grep_out_nil`/`_mono`/`_len`, the gate `grep_out_line` under `oneline
+L` (the newline half of `lshape`, to avoid importing PipesDisc; pass
+`proj2` of an `lshape`), the exact pass condition `grep_out_line_pass`,
+`grep_out_line_prefix`; demos incl. the 1022/1023-byte boundary.
 
 I've planned this from reading only; nothing was edited or built. Grep fits the landed machinery more cheaply than the question expects. Every content in the union is a single line, and on one line grep is just a gate. The real costs are elsewhere: grep has no exec image, pins, stubs or kexec facts yet (the biggest cut), the decider's truncation lemma needs rework (the riskiest cut), and there is one owner ruling on corner B.
 
