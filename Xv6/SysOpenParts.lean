@@ -1195,7 +1195,7 @@ theorem sys_open_argstr (AS : ARGSTR) (Γ : SchedNames) (A : SysOpenArgs GF) (cp
     procPrivBareAt curCtx pa A.pid V M ∗ byteBuf (k'.regs 11#5) (DFrac.own 1) old ∗
     (∀ (c : CPU) (spie spp : Bool) (R' : RegMap) (P' : UPtd) (bs : List (BitVec 8)),
       ⌜calleeSaved k'.regs R' ∧ V.upt.extSz V.sz P' ∧
-        fetchstrRet (viewFaulted V.upt P' M) v.toNat old bs (R' 10#5)⌝ -∗
+        fetchstrRet (viewLazy V.upt V.sz M) v.toNat old bs (R' 10#5)⌝ -∗
       kctx c ((k'.withSpie spie spp).withRegs R') -∗ pcIs c (jumpPc (k'.regs 1#5)) -∗
       trapCsrsExt c se -∗ cpuClaimExt c se pj -∗
       procPrivBareAt curCtx pa A.pid { V with upt := P' } (viewFaulted V.upt P' M) -∗
