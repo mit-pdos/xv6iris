@@ -1182,3 +1182,10 @@ import Xv6.LinkSyscall
 import Xv6.FsCfgSnapFirst
 import Xv6.FsCfgSnapVocab
 import Xv6.FsCfgSnap
+import Xv6.SpecUserretClosed
+import Xv6.UserretClosedDefs
+import Xv6.UserretClosedResume
+import Xv6.UserretClosedRows
+import Xv6.UserretClosedRound
+import Xv6.ProofUserretClosed
+import Xv6.LinkUserretClosed
