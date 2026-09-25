@@ -52,7 +52,18 @@ D`; `blocks_trunc`/`terms_trunc` take `fcont_ok b0` instead of
 (`lm_disc_ulmU_dec`, statement unchanged) and the widened `adm_u_g`
 (echo and `cat f` producers, any `filt_ok` stage list:
 `lm_disc_ulmG_dec`).  The loose corner (B) after a filter is kept
-(owner acknowledged, 2026-09-25).  G8 removes the frontier print.
+(owner acknowledged, 2026-09-25).  G8 removes the frontier print.  G5 LANDED (3eb584781/
+b88c81bab, VM g5merge1, audits 13/13/14): the vector runs over the stage
+list (`sfx_runV`/`line_runV` at `list filt`, `Hcat` gone); the flow
+parameter `flowF L g prev` (`True` at the producer's pipe, else the byte
+lower bound and `⌜g L = L⌝`), `flow_chain` also returns
+`flow_passes`; the content deposit carries `⌜passes (lfilts lR) L⌝`;
+`PDCopy (pin, gin) F sk`, `pns_pipe_filt_write`, `pns_final`'s halted
+read-to-EOF arm (grep's `RdEof`/`WrHalt`); `filterer` replaces `copier`.
+Differences: the gate's one-line premise is stored in the registry as
+`⌜fok F L⌝` (True for cat); `lrep` also records `rd_pre`; the STAGE LAWS
+still assume cats (`UShPipesStage.Hstg_cat`, discharged at the node) --
+G7 removes it.
 
 I've planned this from reading only; nothing was edited or built. Grep fits the landed machinery more cheaply than the question expects. Every content in the union is a single line, and on one line grep is just a gate. The real costs are elsewhere: grep has no exec image, pins, stubs or kexec facts yet (the biggest cut), the decider's truncation lemma needs rework (the riskiest cut), and there is one owner ruling on corner B.
 
