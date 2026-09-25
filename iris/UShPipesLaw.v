@@ -40,9 +40,9 @@ Require Import UexecSlot UexecRet UexecSG UexecExecInst UexecExecMint.
 Require Import LineWords EchoDisc EchoOut AppEcho.
 Require Import LineModel.
 Require Import PipeOut.
-Require Import PipesDisc PipeBothNPure PipeBothN PipeOutN PipeOutNEv.
+Require Import PipesDisc PipeBothNPure PipeBothN PipeOutN PipeOutNEv PipesView.
 Require Import PipeNames PipeProto.
-Require Import AppCfg AppInv AppPipeClaim.
+Require Import AppCfg AppInv AppPipeClaim AppPipeCons.
 Require Import ProgTree.
 Require Import CtxIdDefs.
 Require Import UCodeShK UCodeShP.
@@ -143,6 +143,18 @@ Section UShPipesLaw.
   Context (Hkill : @app_taint Σ (@riscv_fixedGS Σ HRg) = T).
   Context (rn : echo_names).
   Context (Heq : file_app = MkAppcfg echo_names (pipe_pred γ) rn).
+  (* the N-stage layer at the application's model: its own view and claim *)
+  Local Notation VPE := (pview_pipes fcE adm_echo).
+  Local Notation GPE := (pipesN_cparams g fcE adm_echo pipes_lm_echo_laws).
+  Local Notation GAE := (pipesN_wa g fcE adm_echo pipes_lm_echo_laws).
+  Local Notation HXE := (pipesN_ext g fcE adm_echo pipes_lm_echo_laws).
+
+  (* the application's supply answers out of the taint *)
+  Lemma pls_sup : ⊢ □ (T -∗ app_sup).
+  Proof using Heq.
+    iIntros "!> #Ht". rewrite /AppInv.app_sup. rewrite Heq. cbn [app_pred app_run].
+    iApply (pipe_sup_of_taint γ rn with "Ht").
+  Qed.
 
   #[local] Instance pls_T_pers0 : Persistent T | 0 := echo_taint_persistent γ.
 
@@ -174,8 +186,8 @@ Section UShPipesLaw.
     adm_echo (lE I) = true -> pl_ok (lE I) -> (1 <= nlines I)%nat ->
     (era_pin γ (S gen_id) v ∗ (inp_lb v I ∨ T))
     ∗ blkN_inv (wids (lcats (lE I))) (runN fcE (lE I)) (pwc_blkN g fcE adm_echo v I)
-        termw (tokN fcE (lE I)) (pdep fcE adm_echo I L pr P gF gG) pnsN (S gen_id) γc γm
-    ∗ Qtop g fcE adm_echo v I γc γm
+        termw (tokN fcE (lE I)) (pdep pipes_lmE VPE tt (lE I) L pr P gF gG) pnsN (S gen_id) γc γm
+    ∗ Qtop pipes_lmE GPE v I (lE I) γc γm
     ⊢ UkShFork.ushf_wq (pterm_wcN g) I.
   Proof using .
     intros Ha Hl Hpos.
@@ -186,7 +198,7 @@ Section UShPipesLaw.
     - iApply (pterm_payN_taint g v I with "Hpin HT").
     - (* committed *)
       rewrite /pterm_payN. iRight. iRight. rewrite /pdone_shapeN.
-      iExists v, γc, γm, (pdep fcE adm_echo I L pr P gF gG).
+      iExists v, γc, γm, (pdep pipes_lmE VPE tt (lE I) L pr P gF gG).
       iSplitR; [iPureIntro; split_and!; [intros ??; apply pdep_timeless | exact Ha | exact Hl] |].
       iFrame "Hpin Hlb Hinv".
       iApply (big_sepL_mono with "Hall"). iIntros (k w _) "Hw".
@@ -203,7 +215,7 @@ Section UShPipesLaw.
         iEval (cbn [pns_wfin]) in "Hw". iExists s. iExact "Hw". }
       iDestruct (big_sepL_exist_fun [] (seq 0 i) _ (NoDup_seq 0 i) with "Hws") as (sw) "Hws".
       rewrite /pterm_payN. iRight. iLeft. rewrite /pterm_shapeN.
-      iExists v, γc, γm, (pdep fcE adm_echo I L pr P gF gG), i, sw.
+      iExists v, γc, γm, (pdep pipes_lmE VPE tt (lE I) L pr P gF gG), i, sw.
       iSplitR; [iPureIntro; split_and!; [intros ??; apply pdep_timeless | exact Ha | exact Hl | exact Hi
                                         | exact Hpos] |].
       iFrame "Hpin Hlb". rewrite /pwc_fork_exitN. iFrame "Hinv Hc Hm Htk".
@@ -300,7 +312,7 @@ Section UShPipesLaw.
     iApply pls_fupd_mwp.
     iMod (pls_nodes_alloc (lcats (lE I))) as (P gF gG) "Hnodes".
     iMod (pipesN_alloc g fcE adm_echo v I Hplok ⊤ pnsN (S gen_id) termw
-            (tokN fcE (lE I)) (pdep fcE adm_echo I (wl_line (drop 1 ws)) (PrEcho ws) P gF gG)
+            (tokN fcE (lE I)) (pdep pipes_lmE VPE tt (lE I) (wl_line (drop 1 ws)) (PrEcho ws) P gF gG)
             with "HPW") as (γc γm) "[#Hfam Hh]".
     iModIntro.
     (* ---- THE STAGES, at the parser's cut ---- *)
@@ -327,13 +339,13 @@ Section UShPipesLaw.
       by (rewrite length_map !rtoks_cats_length; unfold UkShDiag.ush_Dg; lia).
     iEval (rewrite E2) in "Hrun".
     (* THE PRODUCER'S LAW: echo's *)
-    iPoseProof (plaw_echo g fcE adm_echo pipes_lm_echo_laws Hcons Hkill rn Heq fc_none_ok
-                  v I Hadmit Hplok (wl_line (drop 1 ws))
+    iPoseProof (plaw_echo g pipes_lmE VPE GPE tt GAE HXE Hcons Hkill pls_sup
+                  v I tt (lE I) eq_refl fc_none_ok Hadmit Hplok (wl_line (drop 1 ws))
                   (UkPipesEntries.pe_line_len ws Hok) (PrEcho ws) γc γm P gF gG
                   ltac:(rewrite HlN; reflexivity) eq_refl s0 (pcut ws (S n') len gf)
                   ws eq_refl Hok Hbytes with "Hfam Hes") as "#Hpl".
-    iApply (wp_pipes_round_alloc g fcE adm_echo pipes_lm_echo_laws Hcons Hkill rn Heq fc_none_ok
-              v I Hadmit Hplok (wl_line (drop 1 ws))
+    iApply (wp_pipes_round_alloc g pipes_lmE VPE GPE tt GAE HXE Hcons Hkill pls_sup
+              v I tt (lE I) eq_refl fc_none_ok Hadmit Hplok (wl_line (drop 1 ws))
               (UkPipesEntries.pe_line_len ws Hok) (PrEcho ws) γc γm P gF gG
               (UkShFork.ushf_wq (pterm_wcN g) I)
               (era_pin γ (S gen_id) v ∗ (inp_lb v I ∨ T))%I

@@ -45,7 +45,7 @@ Require Import Xv6Cameras Xv6G IrefSlots ProcAvail FileInvDefs FdSlots UserFd.
 Require Import LineWords EchoDisc EchoOut AppEcho.
 Require Import LineModel.
 Require Import PipeOut PipeDisc.
-Require Import PipesPair PipesDisc PipeBothNPure PipeBothN PipeOutN.
+Require Import PipesPair PipesDisc PipeBothNPure PipeBothN GenOut PipeOutN PipesView.
 Require Import PipeNames PipeProto.
 Require Import AppCfg AppInv AppPipeClaim.
 Require Import ProgTree.
@@ -80,15 +80,17 @@ Section UShPipesDefs.
   (* [UkPipesIface]'s pin of the family's cursor camera *)
   #[local] Existing Instance eo_turn | 0.
 
+  (* THE ROUND'S CLAIM at a line model with a pipeline view (cut C9c') *)
   Context (g : pipe_gn).
-  Local Notation γ := (pgn_cl g).
-  Local Notation T := (echo_taint γ).
-  Context (fc : bytes -> option bytes) (adm : pline' -> bool).
-  Context (LW : lm_laws (pipes_lm fc adm)).
-  Context (Hcons : @riscv_cons_res Σ (@riscv_fixedGS Σ HRg) = pecl' g fc adm LW).
-  Context (Hfc : fc_ok fc).
-  Context (v : era_pins) (I : list (bv 8)).
-  Context (Hadmit : pns_adm fc adm I) (Hplok : pl_ok (lineN fc adm I)).
+  Context (LM : lmodel) (PV : pview LM) (CP : gen_cparams LM) (sd : lm_st LM).
+  Context (WA : gen_wa LM CP sd).
+  Hypothesis Hext : forall k l, gext WA k l = pext g k l.
+  Local Notation T := (gcT CP).
+  Context (Hcons : @riscv_cons_res Σ (@riscv_fixedGS Σ HRg) = peclV g LM CP sd WA).
+  Context (v : era_pins) (I : list (bv 8)) (sR : lm_st LM) (lR : pline').
+  Hypothesis HlR : pv_line PV (lineV LM I) = Some lR.
+  Hypothesis Hfc : fc_ok (pv_fc PV sR).
+  Context (Hadmit : pns_admV PV lR) (Hplok : pl_ok lR).
   Context (L : list (bv 8)).
   (* THE PRODUCER at the head of the line (echo, or [cat f]): its failures
      ([PipesFire.fail_src]) and whether it may halt *)
@@ -98,12 +100,13 @@ Section UShPipesDefs.
      one-shots of its two forks *)
   Context (P : nat -> pnames) (gF gG : nat -> gname).
 
-  Local Notation nc := (lcats (lineN fc adm I)).
+  Local Notation fcR := (pv_fc PV sR).
+  Local Notation nc := (lcats lR).
   Local Notation wsN := (wids nc).
-  Local Notation RUNN := (runN fc (lineN fc adm I)).
-  Local Notation PWN := (pwc_blkN g fc adm v I).
-  Local Notation WITN := (pwitN fc adm I).
-  Local Notation TOKN := (tokN fc (lineN fc adm I)).
+  Local Notation RUNN := (runN fcR lR).
+  Local Notation PWN := (pwc_blkV g LM (gcPIN CP) (gcW CP) T v I sR).
+  Local Notation WITN := (pwitV LM I sR).
+  Local Notation TOKN := (tokN fcR lR).
 
   (* ---- the one-shots ---- *)
   Definition osP (γo : gname) : iProp Σ := own γo (Cinl (Excl ()) : pipe_roR).
@@ -140,7 +143,7 @@ Section UShPipesDefs.
   Proof using . rewrite /shotsF. apply _. Qed.
 
   Lemma shotsF_at (k j : nat) : (j < k)%nat -> shotsF k -∗ osS (gF j).
-  Proof using L P fc gG.
+  Proof using L P gG.
     intros Hj. iIntros "H". rewrite /shotsF.
     iApply (big_sepL_elem_of with "H"). apply elem_of_seq. lia.
   Qed.
@@ -171,7 +174,7 @@ Section UShPipesDefs.
   (* ...and a source no process commits deposits nothing payable *)
   Definition pdep (w : wid) (s : list (bv 8)) : iProp Σ :=
     if bool_decide (s = []) then True%I
-    else if bool_decide (fire_src fc pr L w s) then pdep_ne w s else False%I.
+    else if bool_decide (fire_src fcR pr L w s) then pdep_ne w s else False%I.
 
   Global Instance pdep_timeless w s : Timeless (pdep w s).
   Proof using .
@@ -180,10 +183,10 @@ Section UShPipesDefs.
   Qed.
 
   Lemma pdep_unfold (w : wid) (s : list (bv 8)) :
-    s <> [] -> fire_src fc pr L w s -> pdep w s = pdep_ne w s.
+    s <> [] -> fire_src fcR pr L w s -> pdep w s = pdep_ne w s.
   Proof using . intros Hs Hf. by rewrite /pdep bool_decide_false // bool_decide_true. Qed.
 
-  Lemma pdep_gsrc (w : wid) (s : list (bv 8)) : gsrc fc pr L w s -> pdep w s ⊢ False.
+  Lemma pdep_gsrc (w : wid) (s : list (bv 8)) : gsrc fcR pr L w s -> pdep w s ⊢ False.
   Proof using .
     intros [Hs Hf]. rewrite /pdep bool_decide_false; [| exact Hs].
     rewrite bool_decide_false; [| exact Hf]. iIntros "[]".
@@ -191,9 +194,9 @@ Section UShPipesDefs.
 
   (* a deposit, read at a source some process commits, or refuted *)
   Lemma pdep_cases (w : wid) (s : list (bv 8)) :
-    s <> [] -> pdep w s ⊢ ⌜fire_src fc pr L w s⌝ ∗ pdep_ne w s.
+    s <> [] -> pdep w s ⊢ ⌜fire_src fcR pr L w s⌝ ∗ pdep_ne w s.
   Proof using .
-    intros Hs. destruct (decide (fire_src fc pr L w s)) as [Hf | Hf].
+    intros Hs. destruct (decide (fire_src fcR pr L w s)) as [Hf | Hf].
     - rewrite (pdep_unfold w s Hs Hf). iIntros "$". done.
     - iIntros "H". iDestruct (pdep_gsrc w s (conj Hs Hf) with "H") as "[]".
   Qed.
@@ -286,7 +289,7 @@ Section UShPipesDefs.
   (* ---- THE EXCLUSIONS, REFUTED BY THE DEPOSITS ---- *)
   Lemma pexcl_sh (k : nat) (s : list (bv 8)) :
     (k < nc)%nat -> panic_src s ->
-    ⊢ □ (∀ w' s', ⌜EXf fc pr nc L (WSh k) s w' s'⌝ -∗ pdep w' s' -∗ pdep (WSh k) s
+    ⊢ □ (∀ w' s', ⌜EXf fcR pr nc L (WSh k) s w' s'⌝ -∗ pdep w' s' -∗ pdep (WSh k) s
                   ={↑pipeN}=∗ False).
   Proof using .
     intros Hk Hs. iIntros "!>" (w' s' Hx) "Hd' Hd".
@@ -316,7 +319,7 @@ Section UShPipesDefs.
   Lemma pexcl_left (k : nat) (s : list (bv 8)) :
     (k < nc)%nat -> s <> [] ->
     pinv k -∗
-    □ (∀ w' s', ⌜EXf fc pr nc L (WLeft k) s w' s'⌝ -∗ pdep w' s' -∗ pdep (WLeft k) s
+    □ (∀ w' s', ⌜EXf fcR pr nc L (WLeft k) s w' s'⌝ -∗ pdep w' s' -∗ pdep (WLeft k) s
                 ={↑pipeN}=∗ False).
   Proof using .
     intros Hk Hs. iIntros "#Hinv !>" (w' s' Hx) "Hd' Hd".
@@ -352,7 +355,7 @@ Section UShPipesDefs.
   Lemma pexcl_last (s : list (bv 8)) :
     s <> [] ->
     ([∗ list] i ∈ seq 0 nc, pinv i) -∗
-    □ (∀ w' s', ⌜EXf fc pr nc L WLast s w' s'⌝ -∗ pdep w' s' -∗ pdep WLast s
+    □ (∀ w' s', ⌜EXf fcR pr nc L WLast s w' s'⌝ -∗ pdep w' s' -∗ pdep WLast s
                 ={↑pipeN}=∗ False).
   Proof using .
     intros Hs. iIntros "#Hinvs !>" (w' s' Hx) "Hd' Hd".
@@ -385,14 +388,14 @@ Section UShPipesDefs.
      writer that is not a node's (no prompt byte is its) *)
   Lemma pkit_of (w : wid) (s : list (bv 8)) :
     (forall k, w <> WSh k) ->
-    fire_okN wsN RUNN WITN termw TOKN w s (EXf fc pr nc L w s) ->
-    □ (∀ w' s', ⌜EXf fc pr nc L w s w' s'⌝ -∗ pdep w' s' -∗ pdep w s ={↑pipeN}=∗ False) -∗
-    pns_kit fc adm I termw TOKN pdep w s.
-  Proof using Hadmit.
+    fire_okN wsN RUNN WITN termw TOKN w s (EXf fcR pr nc L w s) ->
+    □ (∀ w' s', ⌜EXf fcR pr nc L w s w' s'⌝ -∗ pdep w' s' -∗ pdep w s ={↑pipeN}=∗ False) -∗
+    pns_kit LM PV I sR lR termw TOKN pdep w s.
+  Proof using HlR Hadmit.
     intros Hnsh Hok. iIntros "#Hex". rewrite /pns_kit. iSplit.
-    - iExists (EXf fc pr nc L w s). iSplitR; [by iPureIntro | iExact "Hex"].
+    - iExists (EXf fcR pr nc L w s). iSplitR; [by iPureIntro | iExact "Hex"].
     - iPureIntro. intros c [Hc Hlt].
-      apply (cstep_okN_tok fc adm I Hadmit w s c Hc Hlt).
+      apply (cstep_okV_tok LM PV I sR lR HlR Hadmit w s c Hc Hlt).
       intros k Hk. by destruct (Hnsh k Hk).
   Qed.
 
@@ -401,9 +404,9 @@ Section UShPipesDefs.
     ↑pnsN ⊆ E -> w ∈ wsN -> silence_okN wsN RUNN termw TOKN w (fun _ _ => False) ->
     FAM -∗ wcurN γc w (1/2) 0 -∗ wmodeN γm w (1/2) None ={E}=∗
     wcurN γc w (1/2) 0 ∗ wmodeN γm w (1/2) (Some []).
-  Proof using Hadmit Hcons Hfc Hplok.
+  Proof using HlR Hadmit Hcons Hfc Hplok.
     intros HE Hw Hok. iIntros "#Hinv Hc Hm".
-    iApply (blkN_silence wsN (wids_NoDup _) RUNN PWN (pwc_blkN_timeless g fc adm v I)
+    iApply (blkN_silence wsN (wids_NoDup _) RUNN PWN (PWN_tl g LM CP v I sR)
               termw TOKN pdep pdep_timeless E pnsN ∅ (S gen_id) γc γm w
               (fun _ _ => False) HE ltac:(set_solver) Hw Hok with "[] Hinv Hc Hm []").
     - iIntros "!>" (w' s' []).
@@ -499,7 +502,7 @@ Section UShPipesDefs.
   Definition sufN (j : nat) (ro : rd_out) : iProp Σ :=
     ∃ oc, ⌜chain L ro oc⌝ ∗ wlast oc ∗ [∗ list] w ∈ wsub j, wst w.
   Definition terT (i : nat) : iProp Σ :=
-    wcurN γc (WSh i) (1/2) 5 ∗ wmodeN γm (WSh i) (1/2) (Some alt_forkc) ∗ ptkN g v I (S gen_id).
+    wcurN γc (WSh i) (1/2) 5 ∗ wmodeN γm (WSh i) (1/2) (Some alt_forkc) ∗ ptkV T v I (S gen_id).
   Definition sufT (j : nat) : iProp Σ :=
     ∃ i, ⌜(j <= i < nc)%nat⌝ ∗ terT i ∗ [∗ list] j' ∈ seq j (i - j), wdone (WLeft j').
   Definition suf (j : nat) (ro : rd_out) : iProp Σ := sufN j ro ∨ sufT j.
@@ -540,8 +543,8 @@ Section UShPipesDefs.
   Proof using . rewrite /wlast. destruct oc; apply _. Qed.
   Global Instance wst_timeless w : Timeless (wst w).
   Proof using . rewrite /wst. destruct w; apply _. Qed.
-  Global Instance ptkN_timeless0 k : Timeless (ptkN g v I k).
-  Proof using . rewrite /ptkN. apply _. Qed.
+  Global Instance ptkV_timeless0 k : Timeless (ptkV T v I k).
+  Proof using . rewrite /ptkV. apply _. Qed.
   Global Instance terT_timeless i : Timeless (terT i).
   Proof using . rewrite /terT. apply _. Qed.
   Global Instance sufN_timeless j ro : Timeless (sufN j ro).
@@ -601,24 +604,26 @@ Proof using.
 Qed.
 
 Section fire_glue.
-  Context (fc : bytes -> option bytes) (adm : pline' -> bool) (I : list (bv 8)).
-  Context (Ha : adm (lineN fc adm I) = true).
+  Context (LM : lmodel) (PV : pview LM) (I : list (bv 8)) (sR : lm_st LM) (lR : pline').
+  Hypothesis HlR : pv_line PV (lineV LM I) = Some lR.
+  Context (Ha : pns_admV PV lR).
+  Local Notation fc := (pv_fc PV sR).
   (* the line: its producer [pr] (echo, or [cat f]) and its [n] cats *)
   Context (pr : producer) (n : nat) (Hn : (1 <= n)%nat).
-  Context (Hline : lineN fc adm I = LPipes pr n).
+  Context (Hline : lR = LPipes pr n).
   Local Notation L := (prod_content fc pr).
 
   (* THE FIRING PREMISE: every commit a process of the round makes is
      admitted by the run model, or refuted by a committed deposit *)
   Lemma pipes_fire_ok (w : wid) (s : list (bv 8)) :
-    w ∈ wids (lcats (lineN fc adm I)) -> fire_src fc pr L w s ->
-    fire_okN (wids (lcats (lineN fc adm I))) (runN fc (lineN fc adm I)) (pwitN fc adm I)
-      termw (tokN fc (lineN fc adm I)) w s (EXf fc pr (lcats (lineN fc adm I)) L w s).
-  Proof using Ha Hline Hn.
+    w ∈ wids (lcats (lR)) -> fire_src fc pr L w s ->
+    fire_okN (wids (lcats (lR))) (runN fc (lR)) (pwitV LM I sR)
+      termw (tokN fc (lR)) w s (EXf fc pr (lcats (lR)) L w s).
+  Proof using HlR Ha Hline Hn.
     intros Hwin Hf.
-    assert (Hnc : lcats (lineN fc adm I) = n) by (rewrite Hline; reflexivity).
+    assert (Hnc : lcats (lR) = n) by (rewrite Hline; reflexivity).
     rewrite Hnc in Hwin.
-    apply (fire_okN_tok fc adm I Ha w s _ (fire_src_ne fc pr w s Hf)).
+    apply (fire_okV_tok LM PV I sR lR HlR Ha w s _ (fire_src_ne fc pr w s Hf)).
     - intros md sel Hfam Hmw Hws Htm. rewrite Hnc.
       pose proof Hfam as (_ & _ & _ & _ & Hinv).
       assert (Htm' : tmN termw (mdupd md w s) sel = tmN termw md sel).

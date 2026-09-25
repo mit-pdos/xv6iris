@@ -76,7 +76,7 @@ Require Import LineWords LineBytes EchoDisc ExecWords.
 Require Import EchoOut AppEcho.
 Require Import LineModel LineModelLinks.
 Require Import PipeOut.
-Require Import PipesDisc PipeBothNPure PipeBothN PipeOutN.
+Require Import PipesDisc PipeBothNPure PipeBothN GenOut PipeOutN PipesView.
 Require Import PipeNames PipeProto.
 Require Import AppCfg AppInv AppPipeClaim.
 Require Import CtxIdDefs.
@@ -218,17 +218,17 @@ Section UkPipesEntries.
 
   (* THE ROUND ([UkPipesIface]'s section context, name for name) *)
   Context (g : pipe_gn).
-  Local Notation γ := (pgn_cl g).
-  Local Notation T := (echo_taint γ).
-  Context (fc : bytes -> option bytes) (adm : pline' -> bool).
-  Context (LW : lm_laws (pipes_lm fc adm)).
-  Context (Hcons : @riscv_cons_res Σ (@riscv_fixedGS Σ HRg) = pecl' g fc adm LW).
+  Context (LM : lmodel) (PV : pview LM) (CP : gen_cparams LM) (sd : lm_st LM).
+  Context (WA : gen_wa LM CP sd).
+  Hypothesis Hext : forall k l, gext WA k l = pext g k l.
+  Local Notation T := (gcT CP).
+  Context (Hcons : @riscv_cons_res Σ (@riscv_fixedGS Σ HRg) = peclV g LM CP sd WA).
   Context (Hkill : @app_taint Σ (@riscv_fixedGS Σ HRg) = T).
-  Context (rn : echo_names).
-  Context (Heq : file_app = MkAppcfg echo_names (pipe_pred γ) rn).
-  Context (Hfc : fc_ok fc).
-  Context (v : era_pins) (I : list (bv 8)).
-  Context (Hadmit : pns_adm fc adm I) (Hplok : pl_ok (lineN fc adm I)).
+  Hypothesis Hsup : ⊢ □ (T -∗ app_sup).
+  Context (v : era_pins) (I : list (bv 8)) (sR : lm_st LM) (lR : pline').
+  Hypothesis HlR : pv_line PV (lineV LM I) = Some lR.
+  Hypothesis Hfc : fc_ok (pv_fc PV sR).
+  Context (Hadmit : pns_admV PV lR) (Hplok : pl_ok lR).
   Context (L : list (bv 8)) (HL31 : pns_short L).
   Context (TERM : wid -> list (bv 8) -> bool)
           (TOK : (wid -> option (list (bv 8))) -> list wid -> Prop).
@@ -247,7 +247,7 @@ Section UkPipesEntries.
   Definition pse_iface_cat (γreg : gname) (kds : list (nat * pdev))
       (Hkds : stdpp.base.NoDup kds.*1) (N' : uk_names Σ) (HNc : ukn_const N') :
       ep_ifaceP (Dp := kds.*1) N' (cat_prog N') :=
-    pipes_iface g fc adm LW Hcons Hkill Hfc v I Hadmit Hplok L HL31 TERM TOK dep dep_tl
+    pipes_iface g LM PV CP sd WA Hext Hcons Hkill v I sR lR HlR Hfc Hadmit Hplok L HL31 TERM TOK dep dep_tl
       γc γm N' (cat_prog N') (HNc := HNc)
       (cat_stub_read N') (cat_stub_write N') (cat_stub_open N')
       (cat_stub_close N') (cat_stub_exit N') γreg kds Hkds.
@@ -255,7 +255,7 @@ Section UkPipesEntries.
   Definition pse_iface_echo (γreg : gname) (kds : list (nat * pdev))
       (Hkds : stdpp.base.NoDup kds.*1) (N' : uk_names Σ) (HNc : ukn_const N') :
       ep_ifaceP (Dp := kds.*1) N' (echo_prog N') :=
-    pipes_iface g fc adm LW Hcons Hkill Hfc v I Hadmit Hplok L HL31 TERM TOK dep dep_tl
+    pipes_iface g LM PV CP sd WA Hext Hcons Hkill v I sR lR HlR Hfc Hadmit Hplok L HL31 TERM TOK dep dep_tl
       γc γm N' (echo_prog N') (HNc := HNc)
       (echo_stub_read N') (echo_stub_write N') (echo_stub_open N')
       (echo_stub_close N') (echo_stub_exit N') γreg kds Hkds.
@@ -289,8 +289,8 @@ Section UkPipesEntries.
     L = wl_line (drop 1 ws) ->
     UkRun.urun_nopipe sts -∗ udep -∗
     image_entry ElfUser.echo_elf M (mword_of_int (t + 8) : mword 64) sts
-      cw cs pidv Q (pns_echo_lend g L γc γm pn gp Q) uslot.
-  Proof using HL31 Hadmit Hcons Heq Hfc Hkill Hplok TERM TOK dep_tl pnsRegG0 ufdG0 v.
+      cw cs pidv Q (pns_echo_lend LM CP L γc γm pn gp Q) uslot.
+  Proof using HL31 Hadmit Hcons Hext Hsup HlR Hfc Hkill Hplok TERM TOK dep_tl pnsRegG0 ufdG0 v.
     intros HQc Hok Hnode Hab Hfdl Hl1 HLw.
     iIntros "#Hnpw #Hdep".
     set (wv := fun _ : nat => PDWr pn gp).
@@ -304,14 +304,14 @@ Section UkPipesEntries.
     assert (Hc : conforms (pipe_env (DOutH [L]) (fun _ => None)) (echo_tree ws)).
     { rewrite HLw. exact (echo_pipe_conforms ws _ (pe_drop1_ne ws Hok) (pe_line_len ws Hok)). }
     iPoseProof (echo_image_entry_env_c (PS := PS) ws M s0 t gb sts cw cs pidv Q
-                  (own γreg (pns_pool ∅ wv) ∗ pns_echo_lend g L γc γm pn gp Q)%I
+                  (own γreg (pns_pool ∅ wv) ∗ pns_echo_lend LM CP L γc γm pn gp Q)%I
                   If (pipe_env (DOutH [L]) (fun _ => None)) {[0%nat]}
                   Hok Hnode Hab Hfdl Hc (echo_tree_safe _ _) (pse_dp0 _)
                   with "[] Hnpw Hdep") as "#He".
     { iIntros "!>" (N' Hpq) "Hstd _ [Hpool Hlend]".
       rewrite /If /pse_iface_echo.
       iEval (rewrite -Hpq) in "Hlend".
-      iApply (pns_echo_env_res g fc adm LW Hcons Hkill rn Heq Hfc v I Hadmit Hplok L HL31
+      iApply (pns_echo_env_res g LM PV CP sd WA Hext Hcons Hkill Hsup v I sR lR HlR Hfc Hadmit Hplok L HL31
                 TERM TOK dep dep_tl γc γm N' (echo_prog N')
                 (HNc := ukn_const_of_eq N' Q Hpq HQc)
                 (echo_stub_read N') (echo_stub_write N') (echo_stub_open N')
@@ -343,8 +343,8 @@ Section UkPipesEntries.
     [] ∈ alts2 -> (pns_sink_h sk = true -> cat_dg_write ∈ alts2) ->
     UkRun.urun_nopipe sts -∗ udep -∗
     image_entry ElfUser.cat_elf Mn (mword_of_int (t + 8) : mword 64) sts cw cs pidv Q
-      (pns_copy_lend g fc adm v I L TERM TOK dep γc γm w2 A2 alts2 pin gin sk Q) uslot.
-  Proof using HL31 Hadmit Hcons Heq Hfc Hkill Hplok dep_tl pnsRegG0 ufdG0.
+      (pns_copy_lend g LM PV CP v I sR lR L TERM TOK dep γc γm w2 A2 alts2 pin gin sk Q) uslot.
+  Proof using HL31 Hadmit Hcons Hext Hsup HlR Hfc Hkill Hplok dep_tl pnsRegG0 ufdG0.
     intros HQc Ht Hs Hbytes Himg Hfdl Hl0 Hl1 Hl2 Hnil Hdg.
     destruct (pe_cat_1w_args a b Mn sv t gn Ht Hs Hbytes Himg) as (Hok & Hnode & Hab).
     iIntros "#Hnpw #Hdep".
@@ -359,7 +359,7 @@ Section UkPipesEntries.
     iPoseProof (cat_image_entry_env_c (PS := PS) [UkShCat.cmd_cat] Mn (sv + Z.of_nat a) t
                   (fun j : nat => gn (a + j)%nat) sts cw cs pidv Q
                   (own γreg (pns_pool ∅ wv)
-                   ∗ pns_copy_lend g fc adm v I L TERM TOK dep γc γm w2 A2 alts2 pin gin sk Q)%I
+                   ∗ pns_copy_lend g LM PV CP v I sR lR L TERM TOK dep γc γm w2 A2 alts2 pin gin sk Q)%I
                   If (copy_env (DCopy (pns_sink_h sk) L []) alts2 (fun _ => None) [])
                   {[0%nat; 1%nat]}
                   Hok Hnode Hab Hfdl
@@ -369,7 +369,7 @@ Section UkPipesEntries.
     { iIntros "!>" (N' Hpq) "Hstd _ [Hpool Hlend]".
       rewrite /If /pse_iface_cat.
       iEval (rewrite -Hpq) in "Hlend".
-      iApply (pns_copy_env_res g fc adm LW Hcons Hkill rn Heq Hfc v I Hadmit Hplok L HL31
+      iApply (pns_copy_env_res g LM PV CP sd WA Hext Hcons Hkill Hsup v I sR lR HlR Hfc Hadmit Hplok L HL31
                 TERM TOK dep dep_tl γc γm N' (cat_prog N')
                 (HNc := ukn_const_of_eq N' Q Hpq HQc)
                 (cat_stub_read N') (cat_stub_write N') (cat_stub_open N')
@@ -400,9 +400,9 @@ Section UkPipesEntries.
     [] ∈ alts2 -> cat_dg_write ∈ alts2 ->
     UkRun.urun_nopipe sts -∗ udep -∗
     image_entry ElfUser.cat_elf Mn (mword_of_int (t + 8) : mword 64) sts cw cs pidv Q
-      (pns_copy_lend g fc adm v I L TERM TOK dep γc γm w2 A2 alts2 pin gin (CSPipe pn gp) Q)
+      (pns_copy_lend g LM PV CP v I sR lR L TERM TOK dep γc γm w2 A2 alts2 pin gin (CSPipe pn gp) Q)
       uslot.
-  Proof using HL31 Hadmit Hcons Heq Hfc Hkill Hplok dep_tl pnsRegG0 ufdG0.
+  Proof using HL31 Hadmit Hcons Hext Hsup HlR Hfc Hkill Hplok dep_tl pnsRegG0 ufdG0.
     intros HQc Ht Hs Hbytes Himg Hfdl Hl0 Hl1 Hl2 Hnil Hdg.
     exact (pse_copy_image_entry a b Mn sv t gn sts cw cs pidv Q w2 A2 alts2 pin gin
              (CSPipe pn gp) wb rb1 rb2 HQc Ht Hs Hbytes Himg Hfdl Hl0 Hl1 Hl2 Hnil
@@ -426,9 +426,9 @@ Section UkPipesEntries.
     [] ∈ alts2 ->
     UkRun.urun_nopipe sts -∗ udep -∗
     image_entry ElfUser.cat_elf Mn (mword_of_int (t + 8) : mword 64) sts cw cs pidv Q
-      (pns_copy_lend g fc adm v I L TERM TOK dep γc γm w2 A2 alts2 pin gin (CSCon wL) Q)
+      (pns_copy_lend g LM PV CP v I sR lR L TERM TOK dep γc γm w2 A2 alts2 pin gin (CSCon wL) Q)
       uslot.
-  Proof using HL31 Hadmit Hcons Heq Hfc Hkill Hplok dep_tl pnsRegG0 ufdG0.
+  Proof using HL31 Hadmit Hcons Hext Hsup HlR Hfc Hkill Hplok dep_tl pnsRegG0 ufdG0.
     intros HQc Ht Hs Hbytes Himg Hfdl Hl0 Hl1 Hl2 Hnil.
     exact (pse_copy_image_entry a b Mn sv t gn sts cw cs pidv Q w2 A2 alts2 pin gin
              (CSCon wL) wb rb1 rb2 HQc Ht Hs Hbytes Himg Hfdl Hl0 Hl1 Hl2 Hnil
@@ -452,8 +452,8 @@ Section UkPipesEntries.
     take NSTD sts !! 2%nat = Some (FdOpen rb2 true (FdDevice CONSOLE)) ->
     UkRun.urun_nopipe sts -∗ udep -∗
     image_entry ElfUser.cat_elf Mn (mword_of_int (t + 8) : mword 64) sts cw cs pidv Q
-      (pns_copy_lend_m g fc adm v I L TERM TOK dep γc γm pin gin (CSCon wL) Q) uslot.
-  Proof using HL31 Hadmit Hcons Heq Hfc Hkill Hplok dep_tl pnsRegG0 ufdG0.
+      (pns_copy_lend_m g LM PV CP v I sR lR L TERM TOK dep γc γm pin gin (CSCon wL) Q) uslot.
+  Proof using HL31 Hadmit Hcons Hext Hsup HlR Hfc Hkill Hplok dep_tl pnsRegG0 ufdG0.
     intros HQc Ht Hs Hbytes Himg Hfdl Hl0 Hl1 Hl2.
     destruct (pe_cat_1w_args a b Mn sv t gn Ht Hs Hbytes Himg) as (Hok & Hnode & Hab).
     iIntros "#Hnpw #Hdep".
@@ -468,7 +468,7 @@ Section UkPipesEntries.
     iPoseProof (cat_image_entry_env_c (PS := PS) [UkShCat.cmd_cat] Mn (sv + Z.of_nat a) t
                   (fun j : nat => gn (a + j)%nat) sts cw cs pidv Q
                   (own γreg (pns_pool ∅ wv)
-                   ∗ pns_copy_lend_m g fc adm v I L TERM TOK dep γc γm pin gin (CSCon wL) Q)%I
+                   ∗ pns_copy_lend_m g LM PV CP v I sR lR L TERM TOK dep γc γm pin gin (CSCon wL) Q)%I
                   If (copy_env (DCopy false L []) [[]] (fun _ => None) [])
                   {[0%nat; 1%nat]}
                   Hok Hnode Hab Hfdl
@@ -479,7 +479,7 @@ Section UkPipesEntries.
     { iIntros "!>" (N' Hpq) "Hstd _ [Hpool Hlend]".
       rewrite /If /pse_iface_cat.
       iEval (rewrite -Hpq) in "Hlend".
-      iApply (pns_copy_env_res_m g fc adm LW Hcons Hkill rn Heq Hfc v I Hadmit Hplok L HL31
+      iApply (pns_copy_env_res_m g LM PV CP sd WA Hext Hcons Hkill Hsup v I sR lR HlR Hfc Hadmit Hplok L HL31
                 TERM TOK dep dep_tl γc γm N' (cat_prog N')
                 (HNc := ukn_const_of_eq N' Q Hpq HQc)
                 (cat_stub_read N') (cat_stub_write N') (cat_stub_open N')
