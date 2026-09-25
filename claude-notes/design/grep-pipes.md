@@ -29,7 +29,17 @@ L []`, premise `grep_ok L` = NUL-free, the owner's; device invariant
 `grep_argv_fits` for every `exec_ok` line), `grep_image_entry_env(_c)`;
 the claim's fixed part now pins grep too (`era0_grep_pins`, `i <>
 GREP_INO`) -- internal only.  Both merged at e24a89617, VM g2merge1,
-audits 13/13/14.
+audits 13/13/14.  G3 LANDED (d1b4ea1d9, VM g3merge1, audits 13/13/14;
+admission still cats only, top theorem untouched): `filt := FCat | FGrep
+pat`, `LPipe p (fs : list filt)`, the ` | `-splitting parser,
+`stage := SProd p | SMid F | SLast F`, `fapp`, `stage_out` rows
+`so_mid_f`/`so_grep_halt`/`so_last_f`, `dg_execG`, `sfx_run` over the
+stage list (a grep writer pairs exactly), exit bridges from
+`grep_filt_exits`, demos (`echo foo | grep o | cat`, the loose corner
+after a filter).  SCOPED to cats, for later cuts: the vector runs
+(`PipeBothNPure.sfx_runV`/`line_runV` -> G5; `pipesV_alloc` gained
+`Hcat`), the decider's truncation (`blocks_trunc` etc. take `all_cats`
+-> G4), the shell-side lemmas (`PipesCut`, `pipes_lp` -> G7).
 
 I've planned this from reading only; nothing was edited or built. Grep fits the landed machinery more cheaply than the question expects. Every content in the union is a single line, and on one line grep is just a gate. The real costs are elsewhere: grep has no exec image, pins, stubs or kexec facts yet (the biggest cut), the decider's truncation lemma needs rework (the riskiest cut), and there is one owner ruling on corner B.
 
