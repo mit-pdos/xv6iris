@@ -1265,3 +1265,8 @@ stages are any mix of `cat` and `grep pat` (alphanumeric patterns) after
 an `echo` or `cat f` producer, at the model `ulmG`; audits system 13,
 tree 13, union 14.  NEXT: the *.txt widening (design/filenames.md).
 
+*.txt WIDENING (design/filenames.md): W0 (FileName.v, the class and its
+laws) and W1 (the model over a map of named files, class still `{f}`)
+LANDED 2026-09-25; `union_phi`'s boot state is now a map.  NEXT: W2 claim,
+W3 handler/programs at a general name, W4 the `*.txt` instance.
+

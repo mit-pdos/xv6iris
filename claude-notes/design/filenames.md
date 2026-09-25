@@ -1,11 +1,43 @@
-# Design: widening the file model to a class of user files (DEFERRED)
+# Design: widening the file model to a class of user files (IN PROGRESS: W0, W1 landed)
 
 Owner ruling (2026-09-24): widen beyond the one name `f` to a class of
 user files (e.g. `*.txt`), not the image's binaries; ORDER: after the
-union application lands (union.md C9h), and grep-in-the-pipeline is also
-queued after the union.  STATUS: design of record for that later effort
-(cuts W0-W4); only its four cheap seams (a-d) are applied during the
-union cuts.
+union application and grep-in-the-pipeline (both landed 2026-09-25).
+STATUS: cuts W0-W4 below are the plan of record; the text below predates
+the union, so files it names that C9h deleted (UShRound, UkFileIface,
+UInitFile*, AppFileRec, `adm_u_f`) map onto the union's survivors.
+
+W0 LANDED (60b62c101, VM w0a; audits 13/13/14): iris/FileName.v.
+`name_laws P` = L1-L4, indexed by the `Decision` instance (L5); proved
+for `f_name` (`= fname_f`), `txt_name` (alphanumeric stem of at most 9
+bytes, then `.txt`) and the one-byte fallback `one_name`; L3/L4 each one
+VM computation (over `sys_names`, the image root).  `uname_laws`
+transfers them to the model's class `FileDisc.uname`.  FRONTIER print of
+`txt_laws` below the union anchor in UnionAssumptions.v, out at W4.
+
+W1 LANDED (ee62b18ba, VM w1p full build; audits 13/13/14; TCB report
+runs): the model over a map of named files, class still `{f}`.
+`fstate := gmap fname bytes`, `fstate_ok` = keys in the class with valid
+content, `files_of s p := s !! p`; lines carry the file (`LEchoF ws N`,
+`LCat N`, `PrCatF N`), `fsm`/`cont` touch only the line's file
+(`line_file`, `lname`); diagnostics by name (`dg_openN`,
+`alt_catopenN`); `adm_u_g` admits `cat g | ..` iff `uname g`.
+`union_phi`'s cycle 0 is `s = ∅` and `fadm_boot` is per name
+(`map_Forall`, each file tied to a line typed at its own name).  THE
+CLAIM IS UNTOUCHED: `dst_content` maps the deed's option to the one-name
+map; the Iris tier stays at `f` through notations `LEchoF_f`/`LCat_f`,
+the ledger's list `efl_of := snd <$> echof_lines_of`; the redirect exits
+in UShURound.v take the round's pre-tie as a premise.  Decider
+(UnionDecU, statement of `lm_disc_ulmG_dec` unchanged), lifted per name
+via seam (a): locality (`ustep_local`, `ustep_ins_cases`, `uok_local`,
+`ucont_local`), drop files no line names (`disc_agree`), cut each named
+file to its longest printed prefix (`u_canon_name`), candidates =
+product of wire subsequences over the named files (`prod_maps`,
+`scandsU`, `prod_maps_complete`).  No fallback taken.  Deleted as dead:
+`FileDiscDec.disc_f_dec`/`scands`, FileOutPure §13's `file_phi_body`
+lemmas.  W4 CAVEAT: the parser takes the name generically but its proofs
+substitute `N = fname_f`; W4 redoes them from the class laws.
+NEXT: W2 (the claim's `dst` becomes a map).
 
 ## Design: widening the file model from the one name `f` to a class of user files
 
