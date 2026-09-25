@@ -849,3 +849,4 @@ import Xv6.KexecDefs
 import Xv6.SysExecDefs
 import Xv6.KexecLoad
 import Xv6.KexecParts
+import Xv6.ConsLog
