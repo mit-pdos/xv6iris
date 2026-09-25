@@ -38,7 +38,24 @@ C9g) is 'Closed under the global context'; `umerge_spec` (the `∃ s` is
 boot-state canonicalisation `u_canon_s` over the finite `scandsU`,
 state-dependent candidates `ualts_dep`; seam (a): `line_file`,
 `ustep_local`, `uok_local`, `ucont_local`.  The review's fallback (a
-finite per-history boot set) was NOT needed.
+finite per-history boot set) was NOT needed.  C9c' LANDED (1b91e092d..20f782589, VM
+c9cmerge2 after a preemption, audits 13/13/14/14,
+`pipe_adequacy_pipeΣ_final` byte-identical): `PipesView.pview M` (line
+-> pline', content function, admission, encoding, and the laws `pv_ok`/
+`pv_cont`/`pv_panic`/`pv_term`/`pv_step`/`pv_onto`); instances
+`pview_pipes` (the landed application, by conversion) and
+`UnionView.pview_union adm` (UPC at PrCatF lines, UPE otherwise,
+`pv_fc := files_of`); the claim `peclV`, its events, the N-writer family
+and the stage/node laws over any model + view; the PrCatF producer
+(`fire_src`, `fail_src` covering exec failure AND the refused open,
+`pns_outh` unfired `[L; []]`, `pns_final PDWr` with a `wcur pn 0` arm,
+`stage_catf` stated over an abstract entry premise).  OPEN for C9d': the
+REFUSED-OPEN DEPOSIT -- when cat f cannot open f, the layer expects
+`wcur (P 0) 0` deposited, but that permit is held by cat f's pipe device
+(fd 1) while the console writer printing `cat: cannot open f` is a
+separate device (fd 2): the producer's two devices need shared state
+(one coupled resource), or a pure coupled device kind as the copy device
+was; see UShPipesDefs.v's header.
 
 ## Review amendments (override the plan below)
 
