@@ -88,7 +88,6 @@ Require Import ExecWords.
 Require Import UkShDiagAt.
 Require Import UShCat.
 Require Import UShCatPay.
-Require Import UShRest.
 Require Import UserOff.
 Require Import ElfUser.
 Require Import UkSh.

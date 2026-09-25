@@ -73,7 +73,7 @@ Require Import UkCatFIface UShCatFStage.
 Require Import UnionDisc UnionView UnionOut UnionLinks UnionLinkInst UnionLinkInstAt.
 Require Import UShLine UShURoundDefs UShURound UShURoundShapes.
 Require Import UkShPipeForkTwin UkShCatForkTwin UkShRedirBody.
-Require UShRest UInitSh SpecKexec ElfUser UkPipesEntries FileDeltas UkFileIface.
+Require UShKernel UInitSh SpecKexec ElfUser UkPipesEntries FileDeltas UkFileIface.
 Require User.ShSyms.
 Local Open Scope Z_scope.
 
@@ -798,7 +798,7 @@ Section UShUPipes.
     iPoseProof (upipes_child_law_catf with "Hslot Hcat Hmade") as "#Hchc".
     rewrite /ush_pipes_branch.
     iApply (ushq_body_law_upipes N (SpecKexec.kexec_sz ElfUser.sh_elf)
-              UShRest.sh_sz_lo UShRest.sh_sz_al UShRest.sh_sz_ok
+              UShKernel.sh_sz_lo UShKernel.sh_sz_al UShKernel.sh_sz_ok
               with "Hkl Hche Hchc Hplaw").
   Qed.
 
@@ -829,17 +829,17 @@ Section UShUPipes.
     iPoseProof (upipes_child_law_catf with "Hslot Hcat Hmade") as "#Hchc".
     iIntros "!>" (l) "%Hc".
     iPoseProof (ushq_body_law_upipes N (Hp := Hc) (SpecKexec.kexec_sz ElfUser.sh_elf)
-                  UShRest.sh_sz_lo UShRest.sh_sz_al UShRest.sh_sz_ok
+                  UShKernel.sh_sz_lo UShKernel.sh_sz_al UShKernel.sh_sz_ok
                   with "Hkl Hche Hchc Hplaw") as "#Hpipes".
     iPoseProof (ushq_body_law_union ug r s0 PT PD γp N (Hp := Hc)
                   (SpecKexec.kexec_sz ElfUser.sh_elf)
-                  UShRest.sh_sz_lo UShRest.sh_sz_al UShRest.sh_sz_ok
+                  UShKernel.sh_sz_lo UShKernel.sh_sz_al UShKernel.sh_sz_ok
                   with "Hkl Hchl Hred Hcatl Hplaw Hpipes") as "#Hbody".
     iPoseProof (UkShPipeForkTwin.ushf_rest_of_body_at_pipe
                   (PS := uprogSG_free) (SG := uexecSG_xv6) (ghost_varG0 := offbox_offG)
                   (Hpay := Hc) N γp T Wcu Wbu Pm (fun k H => H) ush_line_union
                   (SpecKexec.kexec_sz ElfUser.sh_elf)
-                  UShRest.sh_sz_lo UShRest.sh_sz_al UShRest.sh_sz_ok
+                  UShKernel.sh_sz_lo UShKernel.sh_sz_al UShKernel.sh_sz_ok
                   (uHwbl_u ug r s0 PT PD) with "Hbody") as "Hb".
     rewrite /UkSh.ush_rest_l_at.
     iDestruct ("Hb" $! l with "[%]") as "Hb'"; [exact Hc | iExact "Hb'"].

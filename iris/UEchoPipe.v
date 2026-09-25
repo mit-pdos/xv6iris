@@ -62,7 +62,6 @@ Require Import ElfUser.                 (* [echo_elf] *)
 Require Import UkShEcho.                (* [echo_argv_bytes] *)
 Require Import UShEcho.                 (* [echo_node_img], the room bound *)
 Require Import UShEchoOut.              (* [echo_out_argv_of_image] *)
-Require UShEchoPay.                     (* [echo_data_of_elf_image] *)
 Require Import CtxIdDefs.
 Require User.EchoSyms.
 Local Open Scope Z_scope.

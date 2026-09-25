@@ -191,6 +191,27 @@ Proof. unfold kexec_top. rewrite sh_elf_end. reflexivity. Qed.
 Lemma sh_kexec_sz : kexec_sz sh_elf = 0x5000.
 Proof. unfold kexec_sz. rewrite sh_kexec_top. reflexivity. Qed.
 
+(* ===================================================================== *)
+(*  SH'S BREAK, AS [exec] LEAVES IT -- three closed side conditions      *)
+(*      [UShKernel.sh_kexec_sz] is the one computation; everything below   *)
+(*      is arithmetic on the literal 0x5000.                              *)
+(* ===================================================================== *)
+Lemma sh_sz_lo : 8344 <= kexec_sz ElfUser.sh_elf.
+Proof. rewrite sh_kexec_sz. lia. Qed.
+
+Lemma sh_sz_al :
+  UserPtTree.pgroundup (kexec_sz ElfUser.sh_elf) = kexec_sz ElfUser.sh_elf.
+Proof. rewrite sh_kexec_sz. vm_compute. reflexivity. Qed.
+
+Lemma sh_sz_ok : usz_ok (kexec_sz ElfUser.sh_elf + 65536).
+Proof.
+  rewrite sh_kexec_sz. unfold usz_ok.
+  assert (E : UserPtTree.pgroundup (0x5000 + 65536) = 86016)
+    by (vm_compute; reflexivity).
+  rewrite E. lia.
+Qed.
+
+
 (* the entry, as the resume pc reads it: 0x9d0 is 2-aligned, so [ret_pc]
    is the identity on it, and [ShData.shEntry] IS [ShSyms.start] *)
 Lemma sh_start_pc :
