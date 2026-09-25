@@ -1213,11 +1213,14 @@ Section UkPipesIface.
     match kd with
     | PDCon w A => pns_con_final w A
     | PDMute => True
-    | PDWr pn _ => pns_lexit pn
+    | PDWr pn _ =>
+        (* the landed left exit, or (the [cat f] producer, whose open was
+           refused) the write end untouched: [WrNone] at the node *)
+        pns_lexit pn ∨ wcur pn 0%nat
     | PDRd pn _ => ∃ c : nat, rcur pn c
     | PDCopy (pin, _) (CSCon w) =>
         (* read EOF at [c], and the console writer wrote [take c L] *)
-        ∃ c : nat, eof_shot pin (take c L) ∗ rcur pin c
+        ∃ c : nat, ⌜(c <= length L)%nat⌝ ∗ eof_shot pin (take c L) ∗ rcur pin c
                    ∗ wcurN γc w (1/2) c ∗ wmodeN γm w (1/2) (pns_cmode L c)
     | PDCopy (pin, _) (CSPipe pn _) =>
         (* read EOF at [c] and wrote [take c L] to the next pipe; or the
@@ -1246,9 +1249,13 @@ Section UkPipesIface.
     ((∃ (w : wid) (A : list (list (bv 8))), pns_tok d (1/2) (PDCon w A) ∗ pns_con w A alts)
      ∨ (pns_tok d (1/2) PDMute ∗ ⌜alts = [[]]⌝))%I.
 
+  (* the write end owing [S] -- or, UNFIRED, owing the whole line or
+     nothing ([L; []]: the [cat f] producer, whose open may be refused;
+     [ProgTreePipes.cat_file_pipe_conforms] at [DOutH [c; []]]) *)
   Definition pns_outh (d : nat) (alts : list (list (bv 8))) : iProp Σ :=
     (∃ (pn : pnames) (gp : pipe_names), pns_tok d (1/2) (PDWr pn gp)
-       ∗ ∃ S : list (bv 8), ⌜alts = [S]⌝ ∗ pipe_out pn L S)%I.
+       ∗ ((∃ S : list (bv 8), ⌜alts = [S]⌝ ∗ pipe_out pn L S)
+          ∨ (⌜alts = [L; []]⌝ ∗ wcur pn 0%nat ∗ pws_lb pn [])))%I.
   Definition pns_halt (d : nat) : iProp Σ :=
     (∃ (pn : pnames) (gp : pipe_names), pns_tok d (1/2) (PDWr pn gp) ∗ pipe_halt pn)%I.
 
@@ -1262,7 +1269,10 @@ Section UkPipesIface.
   Definition pns_sink (pin : pnames) (sk : csink) (wc : nat) : iProp Σ :=
     match sk with
     | CSCon w =>
-        ⌜w ∈ wsN⌝ ∗ FAM ∗ pns_kit w L ∗ □ (pws_lb pin (take 1 L) ={↑pipeN}=∗ dep w L)
+        (* the content writer's kit and deposit: none at an empty line,
+           whose sink never writes *)
+        ⌜w ∈ wsN⌝ ∗ FAM
+        ∗ (⌜L = []⌝ ∨ (pns_kit w L ∗ □ (pws_lb pin (take 1 L) ={↑pipeN}=∗ dep w L)))
         ∗ wcurN γc w (1/2) wc ∗ wmodeN γm w (1/2) (pns_cmode L wc)
     | CSPipe pn _ => wcur pn wc ∗ pws_lb pn (take wc L)
     end%I.
@@ -1396,9 +1406,19 @@ Section UkPipesIface.
      ∧ (pns_fds fdm -∗ pns_halt d -∗ K (-1))
      ∧ (∀ x, pns_taint (dom fdm) -∗ K x)) -∗
     wr_obl N P fd bs K.
-  Proof using Hkill Hsw TERM dep fc.
+  Proof using HL31 Hkill Hsw TERM dep fc.
     intros Hne Hfd Ha' Hpre. iIntros "Hfds Hout HK".
-    iDestruct "Hout" as (pn gp) "[Htk Hd]". iDestruct "Hd" as (S) "[-> Hd]".
+    iDestruct "Hout" as (pn gp) "[Htk Hd]".
+    (* the unfired write end owes the whole line: a nonempty write is its *)
+    iAssert (∃ S : list (bv 8), ⌜a ∈ [S]⌝ ∗ pipe_out pn L S)%I with "[Hd]" as (S) "[%Ha1 Hd]".
+    { iDestruct "Hd" as "[(%S & -> & Hd) | (-> & Hw & #Hlb)]".
+      - iExists S. iFrame "Hd". by iPureIntro.
+      - iExists L. iSplitR.
+        + iPureIntro. apply elem_of_cons in Ha' as [-> | Ha']; [by left |].
+          apply elem_of_list_singleton in Ha'. subst a. exfalso. apply Hne.
+          by apply prefix_nil_inv.
+        + rewrite /pipe_out. iExists 0%nat. rewrite drop_0 take_0. iFrame "Hw Hlb".
+          iPureIntro. split; [reflexivity | exact HL31]. }
     iDestruct "Hfds" as (l vs wv) "(Hstd & Hxk & %Hok & %Hkd & Hpool & Htoks & #He)".
     destruct (pns_ok_lookup _ _ _ _ _ Hok Hfd) as [kd Hv].
     iDestruct (pns_toks_agree vs d kd with "Htoks Htk") as "(%Hvv & Htoks & Htk)"; [exact Hv |].
@@ -1406,12 +1426,12 @@ Section UkPipesIface.
     destruct (pns_fds_row _ _ _ _ _ _ Hok Hfd Hv) as (k & -> & Hlt & Hrow).
     destruct Hrow as (_ & rb & Hrow). rewrite Nat2Z.id in Hrow.
     iPoseProof (pns_env_lookup vs d _ Hv with "He") as "#Hinv". cbn [pns_pk_inv].
-    iApply (pipe_write N P Hsw pn gp L S l k rb a bs K Hlt Hrow Ha' Hpre Hne
+    iApply (pipe_write N P Hsw pn gp L S l k rb a bs K Hlt Hrow Ha1 Hpre Hne
               with "Hinv Hstd Hd").
     iSplit; [| iSplit].
     - iIntros "Hstd Hd". iDestruct "HK" as "[HK _]".
       iApply ("HK" with "[-Hd Htk] [Htk Hd]"); [pns_repack |].
-      iExists pn, gp. iFrame "Htk". iExists (drop (length bs) a). iFrame "Hd". by iPureIntro.
+      iExists pn, gp. iFrame "Htk". iLeft. iExists (drop (length bs) a). iFrame "Hd". by iPureIntro.
     - iIntros "Hstd Hh". iDestruct "HK" as "[_ [HK _]]".
       iApply ("HK" with "[-Hh Htk] [Htk Hh]"); [pns_repack |].
       iExists pn, gp. iFrame "Htk Hh".
@@ -1749,7 +1769,11 @@ Section UkPipesIface.
     wr_obl N P copy_out bs K.
   Proof using HL31 HPc Hadmit Hcons Hfc Hplok Hsw dep_tl.
     intros Hne Hl1 Hwc HcL Hp Hpre.
-    iIntros "Hstd #H0 (%Hw & #Hinv & #Hkit & #Hdw & Hcw & Hmw) HK".
+    iIntros "Hstd #H0 (%Hw & #Hinv & #Hk & Hcw & Hmw) HK".
+    iDestruct "Hk" as "[%HL0 | [#Hkit #Hdw]]".
+    { (* an empty line: nothing was read, so nothing is written *)
+      exfalso. apply Hne. rewrite HL0 in Hp. subst p. rewrite take_nil drop_nil in Hpre.
+      by apply prefix_nil_inv. }
     change copy_out with (Z.of_nat 1%nat).
     iApply (cons_write N P (HPc := HPc) Hsw (pns_wD pin w c) (pns_wD_short pin w c)
               (pns_wD_sub pin w c) (pns_wD_step pin w c) l 1 rb [p] p bs K
@@ -1763,7 +1787,7 @@ Section UkPipesIface.
     injection Hw2 as Hw2.
     iApply ("HK" $! wc2 with "[%] Hstd [Hcw Hmw]"); [split; [exact Hw2 | exact Hw2c] |].
     iSplitR; [iPureIntro; exact Hw |]. iSplitR; [iExact "Hinv" |].
-    iSplitR; [iExact "Hkit" |]. iSplitR; [iModIntro; iExact "Hdw" |]. iFrame "Hcw Hmw".
+    iSplitR; [iRight; iSplitR; [iExact "Hkit" | iModIntro; iExact "Hdw"] |]. iFrame "Hcw Hmw".
   Qed.
 
   (* [ei_write_copy]: the LAST cat (the sink is the console writer) *)
@@ -2123,18 +2147,21 @@ Section UkPipesIface.
         iApply (pns_con_drained w A alts Hdr with "Hd").
       + iDestruct (pns_toks_agree vs d kd with "Htoks Htk") as "(%Hkk & Htoks & _)"; [exact Hv |].
         subst kd. iModIntro. by iFrame "Htoks".
-    - iDestruct "Hd" as (pn gp) "[Htk Hd]". iDestruct "Hd" as (S) "[-> Hd]".
+    - iDestruct "Hd" as (pn gp) "[Htk Hd]".
       iDestruct (pns_toks_agree vs d kd with "Htoks Htk") as "(%Hkk & Htoks & _)"; [exact Hv |].
       subst kd. cbn [pns_pk_inv pns_final].
-      apply elem_of_list_singleton in Hdr. subst S.
-      iMod (pns_lexit_of_lend pn gp with "Hi [Hd]") as "Hle"; [by iLeft |].
-      iModIntro. iFrame "Htoks Hle".
+      iDestruct "Hd" as "[(%S & -> & Hd) | (-> & Hw & _)]".
+      + apply elem_of_list_singleton in Hdr. subst S.
+        iMod (pns_lexit_of_lend pn gp with "Hi [Hd]") as "Hle"; [by iLeft |].
+        iModIntro. iFrame "Htoks". by iLeft.
+      + (* the unfired write end: nothing written *)
+        iModIntro. iFrame "Htoks". by iRight.
     - iDestruct "Hd" as "[]".
     - iDestruct "Hd" as (pn gp) "[Htk Hh]".
       iDestruct (pns_toks_agree vs d kd with "Htoks Htk") as "(%Hkk & Htoks & _)"; [exact Hv |].
       subst kd. cbn [pns_pk_inv pns_final].
       iMod (pns_lexit_of_lend pn gp with "Hi [Hh]") as "Hle"; [by iRight |].
-      iModIntro. iFrame "Htoks Hle".
+      iModIntro. iFrame "Htoks". by iLeft.
     - iDestruct "Hd" as "[]".
     - iDestruct "Hd" as (pn gp) "[Htk Hd]". iDestruct "Hd" as (c) "[_ Hr]".
       iDestruct (pns_toks_agree vs d kd with "Htoks Htk") as "(%Hkk & Htoks & _)"; [exact Hv |].
@@ -2148,8 +2175,8 @@ Section UkPipesIface.
       iDestruct (pns_toks_agree vs d kd with "Htoks Htk") as "(%Hkk & Htoks & _)"; [exact Hv |].
       subst kd. pose proof (pns_drained_eq L c wc Hwc HcL Hp) as ->.
       destruct sk as [w | pn gp]; cbn [pns_sink pns_final].
-      + iDestruct "Hsk" as "(_ & _ & _ & _ & Hcw & Hmw)". iModIntro. iFrame "Htoks".
-        iExists c. iFrame "Heof Hr Hcw Hmw".
+      + iDestruct "Hsk" as "(_ & _ & _ & Hcw & Hmw)". iModIntro. iFrame "Htoks".
+        iExists c. iFrame "Heof Hr Hcw Hmw". by iPureIntro.
       + iDestruct "Hsk" as "[Hw #Hlb]". iModIntro. iFrame "Htoks".
         iLeft. iExists c. iFrame "Heof Hr Hw Hlb".
     - iDestruct "Hd" as (pin gin pn gp) "(Htk & %c & %wc & Hr & Hw & #Hsh)".
@@ -2476,7 +2503,7 @@ Section UkPipesIface.
     rewrite /dev_res big_sepS_singleton pns_dev_of.
     assert (E0 : pe_dev (pipe_env (DOutH [L]) files) 0%nat = DOutH [L]) by reflexivity.
     rewrite E0. cbn [pns_dev].
-    iExists pn, gp. iFrame "Htk2". iExists L. iSplitR; [by iPureIntro |].
+    iExists pn, gp. iFrame "Htk2". iLeft. iExists L. iSplitR; [by iPureIntro |].
     rewrite /pipe_out. iExists 0%nat. iFrame "Hw". rewrite take_0. iFrame "Hlb".
     iPureIntro. split; [reflexivity | exact HL31].
   Qed.

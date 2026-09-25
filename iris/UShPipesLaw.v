@@ -167,12 +167,12 @@ Section UShPipesLaw.
   Qed.
 
   (* THE TOP NODE'S PAYMENT, read into the child's exit payload *)
-  Lemma pipes_fin (v : era_pins) (I L : list (bv 8)) (P : nat -> pnames)
+  Lemma pipes_fin (v : era_pins) (I L : list (bv 8)) (pr : producer) (P : nat -> pnames)
       (gF gG : nat -> gname) (γc γm : wid -> gname) :
     adm_echo (lE I) = true -> pl_ok (lE I) -> (1 <= nlines I)%nat ->
     (era_pin γ (S gen_id) v ∗ (inp_lb v I ∨ T))
     ∗ blkN_inv (wids (lcats (lE I))) (runN fcE (lE I)) (pwc_blkN g fcE adm_echo v I)
-        termw (tokN fcE (lE I)) (pdep fcE adm_echo I L P gF gG) pnsN (S gen_id) γc γm
+        termw (tokN fcE (lE I)) (pdep fcE adm_echo I L pr P gF gG) pnsN (S gen_id) γc γm
     ∗ Qtop g fcE adm_echo v I γc γm
     ⊢ UkShFork.ushf_wq (pterm_wcN g) I.
   Proof using .
@@ -184,7 +184,7 @@ Section UShPipesLaw.
     - iApply (pterm_payN_taint g v I with "Hpin HT").
     - (* committed *)
       rewrite /pterm_payN. iRight. iRight. rewrite /pdone_shapeN.
-      iExists v, γc, γm, (pdep fcE adm_echo I L P gF gG).
+      iExists v, γc, γm, (pdep fcE adm_echo I L pr P gF gG).
       iSplitR; [iPureIntro; split_and!; [intros ??; apply pdep_timeless | exact Ha | exact Hl] |].
       iFrame "Hpin Hlb Hinv".
       iApply (big_sepL_mono with "Hall"). iIntros (k w _) "Hw".
@@ -201,7 +201,7 @@ Section UShPipesLaw.
         iEval (cbn [pns_wfin]) in "Hw". iExists s. iExact "Hw". }
       iDestruct (big_sepL_exist_fun [] (seq 0 i) _ (NoDup_seq 0 i) with "Hws") as (sw) "Hws".
       rewrite /pterm_payN. iRight. iLeft. rewrite /pterm_shapeN.
-      iExists v, γc, γm, (pdep fcE adm_echo I L P gF gG), i, sw.
+      iExists v, γc, γm, (pdep fcE adm_echo I L pr P gF gG), i, sw.
       iSplitR; [iPureIntro; split_and!; [intros ??; apply pdep_timeless | exact Ha | exact Hl | exact Hi
                                         | exact Hpos] |].
       iFrame "Hpin Hlb". rewrite /pwc_fork_exitN. iFrame "Hinv Hc Hm Htk".
@@ -298,7 +298,7 @@ Section UShPipesLaw.
     iApply pls_fupd_mwp.
     iMod (pls_nodes_alloc (lcats (lE I))) as (P gF gG) "Hnodes".
     iMod (pipesN_alloc g fcE adm_echo v I Hplok ⊤ pnsN (S gen_id) termw
-            (tokN fcE (lE I)) (pdep fcE adm_echo I (wl_line (drop 1 ws)) P gF gG)
+            (tokN fcE (lE I)) (pdep fcE adm_echo I (wl_line (drop 1 ws)) (PrEcho ws) P gF gG)
             with "HPW") as (γc γm) "[#Hfam Hh]".
     iModIntro.
     (* ---- THE STAGES, at the parser's cut ---- *)
@@ -324,15 +324,22 @@ Section UShPipesLaw.
                        + (6 + (32 + (96 + nn - 6 * S n')))))))%nat)
       by (rewrite length_map !rtoks_cats_length; unfold UkShDiag.ush_Dg; lia).
     iEval (rewrite E2) in "Hrun".
+    (* THE PRODUCER'S LAW: echo's *)
+    iPoseProof (plaw_echo g fcE adm_echo pipes_lm_echo_laws Hcons Hkill rn Heq fc_none_ok
+                  v I Hadmit Hplok (wl_line (drop 1 ws))
+                  (UkPipesEntries.pe_line_len ws Hok) (PrEcho ws) γc γm P gF gG
+                  ltac:(rewrite HlN; reflexivity) eq_refl s0 (pcut ws (S n') len gf)
+                  ws eq_refl Hok Hbytes with "Hfam Hes") as "#Hpl".
     iApply (wp_pipes_round_alloc g fcE adm_echo pipes_lm_echo_laws Hcons Hkill rn Heq fc_none_ok
               v I Hadmit Hplok (wl_line (drop 1 ws))
-              (UkPipesEntries.pe_line_len ws Hok) γc γm P gF gG
+              (UkPipesEntries.pe_line_len ws Hok) (PrEcho ws) γc γm P gF gG
               (UkShFork.ushf_wq (pterm_wcN g) I)
               (era_pin γ (S gen_id) v ∗ (inp_lb v I ∨ T))%I
-              (pipes_fin v I (wl_line (drop 1 ws)) P gF gG γc γm Hadmit Hplok Hpos)
-              ws ltac:(rewrite HlN; reflexivity) eq_refl s0 (pcut ws (S n') len gf)
-              (STG ws (S n') len gf s0) Hlenst eq_refl Hstc
-              Hok Hbytes ld rb1 rb2 Hl1 Hl2 Hnone
+              (pipes_fin v I (wl_line (drop 1 ws)) (PrEcho ws) P gF gG γc γm Hadmit Hplok Hpos)
+              ltac:(rewrite HlN; reflexivity) eq_refl s0 (pcut ws (S n') len gf)
+              (STG ws (S n') len gf s0) Hlenst
+              (UkShMain.ush_args s0 (pcut ws (S n') len gf) (wl_toks ws)) eq_refl Hstc
+              ld rb1 rb2 Hl1 Hl2 Hnone
               (REST ws n' len gf s0)
               (UkShMain.ush_args s0 (pcut ws (S n') len gf) (wl_toks ws))
               (UkShMain.ush_args s0 (pcut ws (S n') len gf)
@@ -340,7 +347,7 @@ Section UShPipesLaw.
               N' h' m' q (sz + 65536) (FdOpen true wr0 (FdDevice ConsoleInv.CONSOLE))
               (32 + (96 + nn - 6 * S n'))%nat
               eq_refl Hpeq Ha0' Hl0 ltac:(discriminate)
-              with "Hfam Hes Hcs Hh Hnodes [] Hpid Hcode Hjt Hcmd Hsz Hstd Hcd0 Hcwd Hch Hrun").
+              with "Hfam Hpl Hcs Hh Hnodes [] Hpid Hcode Hjt Hcmd Hsz Hstd Hcd0 Hcwd Hch Hrun").
     iFrame "Hpin Hlb".
   Qed.
 End UShPipesLaw.

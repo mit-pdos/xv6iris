@@ -1746,6 +1746,7 @@ UShPipeAssembly.v
 UkPipesIface.v
 UkPipesEntries.v
 PipesFire.v
+PipesView.v
 UShPipesDefs.v
 UShPipesStage.v
 UShPipesNode.v
