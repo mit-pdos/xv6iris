@@ -549,33 +549,31 @@ Lemma lcats_cats (p : producer) (n : nat) : lcats (LPipes p (cats n)) = n.
 Proof using. exact (FileDisc.cats_length n). Qed.
 
 (* ---- THE PER-WRITER RUNS: [PipesDisc.sfx_run] / [line_run] with the
-       silent writers' streams in place, in [wids] order.  They are the
-       ALL-CAT instance ([n] cats, [LPipes p (cats n)]): the round's
-       per-writer machinery is exercised only at the admission, which is
-       cats only (grep-pipes.md cut G3; a grep stage's vector runs are
-       cut G5's) ---- *)
+       silent writers' streams in place, in [wids] order, over the line's
+       filter stages (cut G5; at [cats n] they are the all-cat runs the
+       round is exercised at) ---- *)
 
 Inductive sfx_runV (fc : bytes -> option bytes) (L : bytes)
-    : nat -> wr_out -> bool -> list bytes -> Prop :=
-  | srv_last win wc so :
-      stage_out fc L (SLast FCat) so -> pipe_pairB L wc win (rd_of so) ->
-      sfx_runV fc L 1 win wc [so_cons so]
-  | srv_pipe_fail m win wc :
-      sfx_runV fc L (S (S m)) win wc (dg_pipe_b :: replicate (2 * S m) [])
-  | srv_node m win wc so vs :
-      stage_out fc L (SMid FCat) so -> pipe_pairB L wc win (rd_of so) ->
-      sfx_runV fc L (S m) (wr_of so) true vs ->
-      sfx_runV fc L (S (S m)) win wc ([] :: so_cons so :: vs).
+    : list filt -> wr_out -> bool -> list bytes -> Prop :=
+  | srv_last F win wc so :
+      stage_out fc L (SLast F) so -> pipe_pairB L wc win (rd_of so) ->
+      sfx_runV fc L [F] win wc [so_cons so]
+  | srv_pipe_fail F F' fs win wc :
+      sfx_runV fc L (F :: F' :: fs) win wc (dg_pipe_b :: replicate (2 * length (F' :: fs)) [])
+  | srv_node F F' fs win wc so vs :
+      stage_out fc L (SMid F) so -> pipe_pairB L wc win (rd_of so) ->
+      sfx_runV fc L (F' :: fs) (wr_of so) (filt_is_cat F) vs ->
+      sfx_runV fc L (F :: F' :: fs) win wc ([] :: so_cons so :: vs).
 
 Inductive line_runV (fc : bytes -> option bytes) : pline' -> list bytes -> Prop :=
   | lrv_echo ws : line_runV fc (LEcho' ws) [wl_line (drop 1 ws)]
   | lrv_echo_exec ws : line_runV fc (LEcho' ws) [dg_execL]
   | lrv_echo_silent ws : line_runV fc (LEcho' ws) [[]]
-  | lrv_pipe_fail p n : 1 <= n -> line_runV fc (LPipes p (cats n)) (dg_pipe_b :: replicate (2 * n) [])
-  | lrv_node p n so vs :
+  | lrv_pipe_fail p fs : fs <> [] -> line_runV fc (LPipes p fs) (dg_pipe_b :: replicate (2 * length fs) [])
+  | lrv_node p fs so vs :
       stage_out fc (prod_content fc p) (SProd p) so ->
-      sfx_runV fc (prod_content fc p) n (wr_of so) (prod_cat p) vs ->
-      line_runV fc (LPipes p (cats n)) ([] :: so_cons so :: vs).
+      sfx_runV fc (prod_content fc p) fs (wr_of so) (prod_cat p) vs ->
+      line_runV fc (LPipes p fs) ([] :: so_cons so :: vs).
 
 Lemma lcats_pos (p : producer) (fs : list filt) : fs <> [] -> 1 <= lcats (LPipes p fs).
 Proof using. destruct fs as [| F fs]; [intros H; exfalso; exact (H eq_refl) | cbn; lia]. Qed.
@@ -584,10 +582,6 @@ Proof using. destruct fs as [| F fs]; [intros H; exfalso; exact (H eq_refl) | cb
 Lemma lpipes_cats_eq (p : producer) (n : nat) :
   LPipes p (cats n) = LPipes p (cats (lcats (LPipes p (cats n)))).
 Proof using. rewrite lcats_cats. reflexivity. Qed.
-
-(* the lines whose stages are all cats, where the vector runs live *)
-Definition lall_cats (l : pline') : Prop :=
-  match l with LPipes _ fs => all_cats fs = true | LEcho' _ => True end.
 
 (* THE COMPLETE RUNS, as source vectors *)
 Definition runN (fc : bytes -> option bytes) (l : pline') (src : wid -> bytes) : Prop :=
@@ -636,30 +630,30 @@ Proof using.
     apply (ma_take _ i' x s); [exact Hi' | exact (IH _ Hne')].
 Qed.
 
-Lemma sfx_runV_run fc L m win wc vs :
-  sfx_runV fc L m win wc vs -> exists ss, sfx_run fc L (cats m) win wc ss /\ nil_ext ss vs.
+Lemma sfx_runV_run fc L fs win wc vs :
+  sfx_runV fc L fs win wc vs -> exists ss, sfx_run fc L fs win wc ss /\ nil_ext ss vs.
 Proof using.
-  induction 1 as [win wc so Hso Hp | m win wc | m win wc so vs Hso Hp Hr (ss & Hss & Hne)].
-  - exists [so_cons so]. split; [exact (sr_last fc L FCat win wc so Hso Hp) |].
+  induction 1 as [F win wc so Hso Hp | F F' fs win wc
+                 | F F' fs win wc so vs Hso Hp Hr (ss & Hss & Hne)].
+  - exists [so_cons so]. split; [exact (sr_last fc L F win wc so Hso Hp) |].
     constructor. constructor.
   - exists [dg_pipe_b]. split; [apply sr_pipe_fail |]. constructor. apply nil_ext_rep.
   - exists (so_cons so :: ss).
-    split; [exact (sr_node fc L FCat FCat (cats m) win wc so ss Hso Hp Hss) |].
+    split; [exact (sr_node fc L F F' fs win wc so ss Hso Hp Hss) |].
     apply ne_drop. constructor. exact Hne.
 Qed.
 
 Lemma line_runV_run fc l vs :
   line_runV fc l vs -> exists ss, line_run fc l ss /\ nil_ext ss vs.
 Proof using.
-  destruct 1 as [ws | ws | ws | p n Hn | p n so vs Hso Hr].
+  destruct 1 as [ws | ws | ws | p fs Hn | p fs so vs Hso Hr].
   - exists [wl_line (drop 1 ws)]. split; [apply lr_echo | repeat constructor].
   - exists [dg_execL]. split; [apply lr_echo_exec | repeat constructor].
   - exists [[]]. split; [apply lr_echo_silent | repeat constructor].
-  - exists [dg_pipe_b].
-    split; [apply (lr_pipe_fail fc p (cats n)); destruct n as [| n]; [lia | discriminate] |].
+  - exists [dg_pipe_b]. split; [exact (lr_pipe_fail fc p fs Hn) |].
     constructor. apply nil_ext_rep.
   - destruct (sfx_runV_run _ _ _ _ _ _ Hr) as (ss & Hss & Hne).
-    exists (so_cons so :: ss). split; [exact (lr_node fc p (cats n) so ss Hso Hss) |].
+    exists (so_cons so :: ss). split; [exact (lr_node fc p fs so ss Hso Hss) |].
     apply ne_drop. constructor. exact Hne.
 Qed.
 

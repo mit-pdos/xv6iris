@@ -333,14 +333,14 @@ Section build.
     stage_out fc L (SLast FCat) (so (j + m)) -> so_cons (so (j + m)) = v WLast ->
     pipe_pairB L wc win (rd_of (so j)) ->
     (forall i, j <= i < j + m -> pipe_pairB L true (wr_of (so i)) (rd_of (so (S i)))) ->
-    sfx_runV fc L (S m) win wc (v <$> wids_from j m).
+    sfx_runV fc L (cats (S m)) win wc (v <$> wids_from j m).
   Proof using.
     induction m as [| m IH]; intros j win wc Hst Hl Hlc Hp Hps.
     - rewrite Nat.add_0_r in Hl, Hlc. cbn [wids_from]. rewrite fmap_cons, fmap_nil.
-      rewrite <- Hlc. exact (srv_last fc L win wc (so j) Hl Hp).
+      rewrite <- Hlc. exact (srv_last fc L FCat win wc (so j) Hl Hp).
     - cbn [wids_from]. rewrite !fmap_cons.
       destruct (Hst j ltac:(lia)) as (Hsh & Hso & Hc). rewrite Hsh, <- Hc.
-      apply (srv_node fc L m win wc (so j) _ Hso Hp).
+      apply (srv_node fc L FCat FCat (cats m) win wc (so j) _ Hso Hp).
       apply (IH (S j) (wr_of (so j)) true).
       + intros i Hi. apply Hst. lia.
       + replace (S j + m) with (j + S m) by lia. exact Hl.
@@ -360,7 +360,7 @@ Section build.
     (forall i, j + d <= i < j + S m -> v (WLeft i) = []) -> v WLast = [] ->
     (0 < d -> pipe_pairB L wc win (rd_of (so j))) ->
     (forall i, j <= i -> S i < j + d -> pipe_pairB L true (wr_of (so i)) (rd_of (so (S i)))) ->
-    sfx_runV fc L (S (S m)) win wc (v <$> wids_from j (S m)).
+    sfx_runV fc L (cats (S (S m))) win wc (v <$> wids_from j (S m)).
   Proof using.
     induction d as [| d IH]; intros j m win wc Hd Hst Hpf Hsh Hlf Hlast Hp Hps.
     - rewrite Nat.add_0_r in Hpf, Hsh, Hlf. cbn [wids_from]. rewrite !fmap_cons.
@@ -369,11 +369,13 @@ Section build.
       { apply (wids_from_nil v (S j) m); [| exact Hlast].
         intros i Hi. split; [apply Hsh | apply Hlf]; lia. }
       rewrite Hrest.
-      rewrite <- rep_S2. exact (srv_pipe_fail fc L m win wc).
+      rewrite <- rep_S2.
+      pose proof (srv_pipe_fail fc L FCat FCat (cats m) win wc) as Hpf'.
+      cbn [length] in Hpf'. rewrite FileDisc.cats_length in Hpf'. exact Hpf'.
     - destruct m as [| m]; [lia |].
       cbn [wids_from]. rewrite !fmap_cons.
       destruct (Hst j ltac:(lia)) as (Hsj & Hso & Hc). rewrite Hsj, <- Hc.
-      apply (srv_node fc L (S m) win wc (so j) _ Hso (Hp ltac:(lia))).
+      apply (srv_node fc L FCat FCat (cats (S m)) win wc (so j) _ Hso (Hp ltac:(lia))).
       apply (IH (S j) m (wr_of (so j)) true ltac:(lia)).
       + intros i Hi. apply Hst. lia.
       + replace (S j + d) with (j + S d) by lia. exact Hpf.
@@ -390,26 +392,29 @@ Section inv.
   Context (fc : bytes -> option bytes) (L : bytes).
 
   Lemma sfx_runV_1_inv win wc vs :
-    sfx_runV fc L 1 win wc vs ->
+    sfx_runV fc L (cats 1) win wc vs ->
     exists so, vs = [so_cons so] /\ stage_out fc L (SLast FCat) so /\ pipe_pairB L wc win (rd_of so).
   Proof using.
-    intros H. remember 1 as mm eqn:Hmm.
-    destruct H as [win' wc' so Hso Hp | m' win' wc' | m' win' wc' so vs' Hso Hp Hr];
-      [| lia | lia].
-    exists so. done.
+    intros H. remember (cats 1) as mm eqn:Hmm. unfold FileDisc.cats in Hmm. cbn [replicate] in Hmm.
+    destruct H as [F win' wc' so Hso Hp | F F' fs win' wc' | F F' fs win' wc' so vs' Hso Hp Hr];
+      [| injection Hmm as _ Hq; discriminate Hq | injection Hmm as _ Hq; discriminate Hq].
+    injection Hmm as ->. exists so. done.
   Qed.
 
   Lemma sfx_runV_SS_inv m win wc a b vs :
-    sfx_runV fc L (S (S m)) win wc (a :: b :: vs) ->
+    sfx_runV fc L (cats (S (S m))) win wc (a :: b :: vs) ->
     (a = dg_pipe_b /\ b :: vs = replicate (2 * S m) [])
     \/ exists so, a = [] /\ b = so_cons so /\ stage_out fc L (SMid FCat) so
-                  /\ pipe_pairB L wc win (rd_of so) /\ sfx_runV fc L (S m) (wr_of so) true vs.
+                  /\ pipe_pairB L wc win (rd_of so) /\ sfx_runV fc L (cats (S m)) (wr_of so) true vs.
   Proof using.
-    intros H. remember (S (S m)) as mm eqn:Hmm. remember (a :: b :: vs) as l eqn:Hl.
-    destruct H as [win' wc' so Hso Hp | m' win' wc' | m' win' wc' so vs' Hso Hp Hr].
-    - lia.
-    - injection Hmm as ->. left. split; congruence.
-    - injection Hmm as ->. injection Hl as Ha Hb Hvs. subst. right. exists so. done.
+    intros H. remember (cats (S (S m))) as mm eqn:Hmm. remember (a :: b :: vs) as l eqn:Hl.
+    unfold FileDisc.cats in Hmm. cbn [replicate] in Hmm.
+    destruct H as [F win' wc' so Hso Hp | F F' fs win' wc' | F F' fs win' wc' so vs' Hso Hp Hr].
+    - injection Hmm as _ Hq. discriminate Hq.
+    - injection Hmm as -> -> ->. cbn [length] in Hl. rewrite length_replicate in Hl.
+      left. split; congruence.
+    - injection Hmm as -> -> ->. injection Hl as Ha Hb Hvs. subst. right. exists so.
+      split_and!; [reflexivity | reflexivity | exact Hso | exact Hp | exact Hr].
   Qed.
 
   Lemma replicate_nil_elem (vs : list bytes) (k : nat) (x : bytes) :
@@ -444,7 +449,7 @@ Section real2.
 
   Lemma sfx_inv (v : wid -> bytes) (m : nat) :
     forall (j : nat) (win : wr_out) (wc : bool),
-    sfx_runV fc L (S m) win wc (v <$> wids_from j m) -> sreal v j m win wc.
+    sfx_runV fc L (cats (S m)) win wc (v <$> wids_from j m) -> sreal v j m win wc.
   Proof using.
     induction m as [| m IH]; intros j win wc H.
     - cbn [wids_from] in H. rewrite fmap_cons, fmap_nil in H.
@@ -504,13 +509,12 @@ Lemma line_runV_SS_inv (fc : bytes -> option bytes) (p : producer) (n : nat) (a 
   line_runV fc (LPipes p (cats n)) (a :: b :: vs) ->
   (a = dg_pipe_b /\ b :: vs = replicate (2 * n) [])
   \/ exists so, a = [] /\ b = so_cons so /\ stage_out fc (prod_content fc p) (SProd p) so
-                /\ sfx_runV fc (prod_content fc p) n (wr_of so) (prod_cat p) vs.
+                /\ sfx_runV fc (prod_content fc p) (cats n) (wr_of so) (prod_cat p) vs.
 Proof using.
   intros H. remember (LPipes p (cats n)) as l eqn:Hl. remember (a :: b :: vs) as ls eqn:Hls.
-  destruct H as [ws' | ws' | ws' | p' n' Hn' | p' n' so vs' Hso Hr]; try discriminate Hl.
-  - injection Hl as -> Hc. apply FileDisc.cats_inj in Hc. subst n'. left. split; congruence.
-  - injection Hl as -> Hc. apply FileDisc.cats_inj in Hc. subst n'.
-    injection Hls as Ha Hb Hvs. subst. right. exists so. done.
+  destruct H as [ws' | ws' | ws' | p' fs' Hn' | p' fs' so vs' Hso Hr]; try discriminate Hl.
+  - injection Hl as -> ->. rewrite FileDisc.cats_length in Hls. left. split; congruence.
+  - injection Hl as -> ->. injection Hls as Ha Hb Hvs. subst. right. exists so. done.
 Qed.
 
 Lemma aS_mid (fc : bytes -> option bytes) (p : producer) (i : nat) (s : bytes) :
@@ -616,14 +620,16 @@ Section real3.
       + (* the top node's pipe(2) failed *)
         rewrite Hpf, (Hlf 0 ltac:(lia)).
         rewrite (wids_from_nil v 1 m); [| intros j Hj; split; [apply Hsh; lia | apply Hlf; lia] | exact Hlast].
-        rewrite <- rep_S2. exact (lrv_pipe_fail fc p (S m) Hn).
+        rewrite <- rep_S2.
+        pose proof (lrv_pipe_fail fc p (cats (S m)) (FileDisc.cats_ne (S m) Hn)) as Hpf'.
+        rewrite FileDisc.cats_length in Hpf'. exact Hpf'.
       + (* node [S k']'s *)
         destruct m as [| m']; [lia |].
         rewrite (Hsh 0 ltac:(lia) ltac:(lia)).
         set (so := fun i : nat => so_mid (v (WLeft i))).
         pose proof (so_prod_ok fc p (v (WLeft 0)) (Hab 0 ltac:(lia))) as Hso0.
         rewrite <- (so_prod_cons (v (WLeft 0))) at 1.
-        apply (lrv_node fc p (S (S m')) (so_prod (v (WLeft 0))) _ Hso0).
+        apply (lrv_node fc p (cats (S (S m'))) (so_prod (v (WLeft 0))) _ Hso0).
         apply (sfx_build_pf fc p v so k' 1 m' _ _ ltac:(lia)).
         * intros i Hi. split; [apply Hsh; lia |].
           split; [unfold so; apply (so_mid_ok fc p); exact (aS_mid fc p i _ ltac:(lia) (Hab i ltac:(lia))) | apply so_mid_cons].
@@ -640,7 +646,7 @@ Section real3.
       + (* no data demand: every stage's outcome is its own, every reader gone *)
         set (so := fun i : nat => if decide (i = S m) then so_lastd (v WLast) else so_mid (v (WLeft i))).
         rewrite <- (so_prod_cons (v (WLeft 0))) at 1.
-        apply (lrv_node fc p (S m) (so_prod (v (WLeft 0))) _ Hso0).
+        apply (lrv_node fc p (cats (S m)) (so_prod (v (WLeft 0))) _ Hso0).
         apply (sfx_build fc p v so m 1 _ _).
         * intros i Hi. unfold so. rewrite decide_False by lia.
           split; [apply Hsh; lia |].
@@ -684,7 +690,7 @@ Section real3.
           { intros i H1 H2. unfold so. rewrite decide_False by lia. rewrite decide_True by lia.
             reflexivity. }
           rewrite <- (so_prod_cons (v (WLeft 0))) at 1.
-          apply (lrv_node fc p (S m) (so_prod (v (WLeft 0))) _ Hso0).
+          apply (lrv_node fc p (cats (S m)) (so_prod (v (WLeft 0))) _ Hso0).
           apply (sfx_build fc p v so m 1 _ _).
           -- intros i Hi. unfold so. rewrite decide_False by lia.
              split; [apply Hsh; lia |]. destruct (decide (i0 < i)) as [Hlt | Hge].
@@ -720,7 +726,7 @@ Section real3.
           assert (Hwhole := so_whole_ok fc p HLne).
           rewrite (Hall 0 ltac:(lia)).
           change (@nil (bv 8)) with (so_cons (MkSO [] None (Some (WrAll L)))) at 1.
-          apply (lrv_node fc p (S m) (MkSO [] None (Some (WrAll L))) _ Hwhole).
+          apply (lrv_node fc p (cats (S m)) (MkSO [] None (Some (WrAll L))) _ Hwhole).
           apply (sfx_build fc p v so m 1 (WrAll L) (prod_cat p)).
           -- intros i Hi. unfold so. rewrite decide_False by lia.
              split; [apply Hsh; lia |]. split; [exact (so_copy_ok fc p D HDL) |].

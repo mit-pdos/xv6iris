@@ -517,7 +517,7 @@ Section UShUPipes.
     iApply uup_fupd_mwp.
     iMod (pls_nodes_alloc (lcats (LPipes (PrEcho ws) (cats (S n'))))) as (P gF gG) "Hnodes".
     iMod (pipesV_alloc pg U pview_unionU CPU v I (dst_content s) (LPipes (PrEcho ws) (cats (S n')))
-            Hplok (FileDisc.all_cats_cats (S n')) ⊤ pnsN (S gen_id) termw
+            Hplok ⊤ pnsN (S gen_id) termw
             (tokN (pv_fc pview_unionU (dst_content s)) (LPipes (PrEcho ws) (cats (S n'))))
             (pdep U pview_unionU (dst_content s) (LPipes (PrEcho ws) (cats (S n')))
                (wl_line (drop 1 ws)) (PrEcho ws) P gF gG)
@@ -656,7 +656,7 @@ Section UShUPipes.
     iApply uup_fupd_mwp.
     iMod (pls_nodes_alloc (lcats (LPipes (PrCatF fname_f) (cats (S n'))))) as (P gF gG) "Hnodes".
     iMod (pipesV_alloc pg U pview_unionU CPU v I (dst_content s) (LPipes (PrCatF fname_f) (cats (S n')))
-            Hplok (FileDisc.all_cats_cats (S n')) ⊤ pnsN (S gen_id) termw
+            Hplok ⊤ pnsN (S gen_id) termw
             (tokN (pv_fc pview_unionU (dst_content s)) (LPipes (PrCatF fname_f) (cats (S n'))))
             (pdep U pview_unionU (dst_content s) (LPipes (PrCatF fname_f) (cats (S n')))
                (prod_content (pv_fc pview_unionU (dst_content s)) (PrCatF fname_f))
