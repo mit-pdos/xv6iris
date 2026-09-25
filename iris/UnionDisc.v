@@ -184,7 +184,8 @@ Qed.
 Lemma stage_out_fc fc fc' L st so :
   stage_out fc L st so -> (forall f, st <> SProd (PrCatF f)) -> stage_out fc' L st so.
 Proof using.
-  destruct 1 as [st | st | ws Hl | ws D Hl HD | f Hf | f D Hf HD | f | D HD | D HD | D HD];
+  destruct 1 as [st | st | ws Hl | ws D Hl HD | f Hf | f D Hf HD | f | F D HD | D HD
+                | w D W HD HW | F D HD];
     intros Hst.
   - apply so_exec.
   - apply so_silent.
@@ -193,14 +194,15 @@ Proof using.
   - exfalso. exact (Hst f eq_refl).
   - exfalso. exact (Hst f eq_refl).
   - apply so_catf_open.
-  - apply so_mid_copy. exact HD.
+  - apply so_mid_f. exact HD.
   - apply so_mid_halt. exact HD.
-  - apply so_last. exact HD.
+  - apply so_grep_halt; [exact HD | exact HW].
+  - apply so_last_f. exact HD.
 Qed.
 
-Lemma sfx_run_fc fc fc' L m w wc ss : sfx_run fc L m w wc ss -> sfx_run fc' L m w wc ss.
+Lemma sfx_run_fc fc fc' L fs w wc ss : sfx_run fc L fs w wc ss -> sfx_run fc' L fs w wc ss.
 Proof using.
-  induction 1 as [win wc so Hso Hp | m win wc | m win wc so ss Hso Hp Hr IH].
+  induction 1 as [F win wc so Hso Hp | F F' fs win wc | F F' fs win wc so ss Hso Hp Hr IH].
   - apply sr_last; [| exact Hp].
     apply (stage_out_fc fc); [exact Hso | intros f Hf; discriminate Hf].
   - apply sr_pipe_fail.
@@ -208,10 +210,10 @@ Proof using.
     apply (stage_out_fc fc); [exact Hso | intros f Hf; discriminate Hf].
 Qed.
 
-Lemma sfx_term_fc fc fc' L m w wc W t :
-  sfx_term fc L m w wc W t -> sfx_term fc' L m w wc W t.
+Lemma sfx_term_fc fc fc' L fs w wc W t :
+  sfx_term fc L fs w wc W t -> sfx_term fc' L fs w wc W t.
 Proof using.
-  induction 1 as [m win wc so Hso | m win wc so W t Hso Hp Ht IH].
+  induction 1 as [F F' fs win wc so Hso | F F' fs win wc so W t Hso Hp Ht IH].
   - apply stt_here. apply (stage_out_fc fc); [exact Hso | intros f Hf; discriminate Hf].
   - apply stt_next; [| exact Hp | exact IH].
     apply (stage_out_fc fc); [exact Hso | intros f Hf; discriminate Hf].
@@ -304,14 +306,46 @@ Definition ulm (adm : pline' -> bool) : lmodel :=
        (ubody_ok adm) ubyte uline_ok fstate_ok uterm (umerge adm).
 
 (* THE ADMISSION the union application instantiates: every echo pipeline
-   and every [cat f | ..] at the model's file name.  An echo line alone is
-   the file's [LEcho], so [LEcho'] is not admitted here. *)
+   and every [cat f | ..] at the model's file name, their filter stages
+   ALL CATS (grep-pipes.md cut G3: the model has grep stages, the round
+   admits none yet, cut G8).  An echo line alone is the file's [LEcho], so
+   [LEcho'] is not admitted here. *)
 Definition adm_u_f (l : pline') : bool :=
   match l with
   | LEcho' _ => false
-  | LPipes (PrEcho _) _ => true
-  | LPipes (PrCatF g) _ => bool_decide (g = fname_f)
+  | LPipes (PrEcho _) fs => all_cats fs
+  | LPipes (PrCatF g) fs => bool_decide (g = fname_f) && all_cats fs
   end.
+
+(* an admitted pipeline's stages are cats *)
+Lemma adm_u_f_cats (p : producer) (fs : list filt) :
+  adm_u_f (LPipes p fs) = true -> fs = cats (length fs).
+Proof using.
+  intros Ha. apply FileDisc.all_cats_eq. destruct p as [ws | g]; [exact Ha |].
+  apply andb_true_iff in Ha as [_ Ha]. exact Ha.
+Qed.
+
+Lemma adm_u_f_all (p : producer) (fs : list filt) :
+  adm_u_f (LPipes p fs) = true -> all_cats fs = true.
+Proof using.
+  destruct p as [ws | g]; cbn [adm_u_f]; [exact id |].
+  intros Ha. apply andb_true_iff in Ha as [_ Ha]. exact Ha.
+Qed.
+
+Lemma adm_u_f_echo_cats (ws : list (list (bv 8))) (n : nat) :
+  adm_u_f (LPipes (PrEcho ws) (cats n)) = true.
+Proof using. exact (FileDisc.all_cats_cats n). Qed.
+
+Lemma adm_u_f_catf_cats (n : nat) : adm_u_f (LPipes (PrCatF fname_f) (cats n)) = true.
+Proof using.
+  cbn [adm_u_f]. rewrite bool_decide_true; [exact (FileDisc.all_cats_cats n) | reflexivity].
+Qed.
+
+Lemma adm_u_f_catf (g : list (bv 8)) (fs : list filt) :
+  adm_u_f (LPipes (PrCatF g) fs) = true <-> g = fname_f /\ all_cats fs = true.
+Proof using.
+  cbn [adm_u_f]. rewrite andb_true_iff, bool_decide_eq_true. reflexivity.
+Qed.
 
 Definition ulmU : lmodel := ulm adm_u_f.
 
@@ -336,23 +370,23 @@ Proof using.
   exact (uline_ok_of_pl_all (LPipes p n) Hok).
 Qed.
 
-(* a run proves its line has a cat *)
-Lemma sfx_run_pos fc L m w wc ss : sfx_run fc L m w wc ss -> 1 <= m.
-Proof using. destruct 1; lia. Qed.
+(* a run proves its line has a stage *)
+Lemma sfx_run_pos fc L fs w wc ss : sfx_run fc L fs w wc ss -> fs <> [].
+Proof using. destruct 1; discriminate. Qed.
 
-Lemma line_blocks_pos fc p n b : line_blocks fc (LPipes p n) b -> 1 <= n.
+Lemma line_blocks_pos fc p fs b : line_blocks fc (LPipes p fs) b -> fs <> [].
 Proof using.
-  intros (ss & Hr & _). remember (LPipes p n) as l eqn:Hl.
+  intros (ss & Hr & _). remember (LPipes p fs) as l eqn:Hl.
   destruct Hr as [ws | ws | ws | p' n' Hn | p' n' so ss' Hso Hsr]; try discriminate Hl;
     injection Hl as -> ->; [exact Hn | exact (sfx_run_pos _ _ _ _ _ _ Hsr)].
 Qed.
 
-Lemma sfx_term_pos fc L m w wc W t : sfx_term fc L m w wc W t -> 1 <= m.
-Proof using. destruct 1; lia. Qed.
+Lemma sfx_term_pos fc L fs w wc W t : sfx_term fc L fs w wc W t -> fs <> [].
+Proof using. destruct 1; discriminate. Qed.
 
-Lemma line_term_pos fc p n W t : line_term fc (LPipes p n) W t -> 1 <= n.
+Lemma line_term_pos fc p fs W t : line_term fc (LPipes p fs) W t -> fs <> [].
 Proof using.
-  intros H. remember (LPipes p n) as l eqn:Hl.
+  intros H. remember (LPipes p fs) as l eqn:Hl.
   destruct H as [p' n' so Hn Hso | p' n' so W' t' Hso Hst];
     injection Hl as -> ->; [exact Hn | exact (sfx_term_pos _ _ _ _ _ _ _ Hst)].
 Qed.
@@ -361,7 +395,7 @@ Qed.
    the producer fails after the producer was forked, and the producer's
    exec fails -- [lt_here] and [so_exec], whatever [f] holds *)
 Lemma plterm_fork_ok fc p n :
-  1 <= n -> plalt_ok fc (LPipes p n) (PLTerm dg_fork_b).
+  n <> [] -> plalt_ok fc (LPipes p n) (PLTerm dg_fork_b).
 Proof using.
   intros Hn. split.
   { intros H. apply (f_equal length) in H. unfold dg_fork_b in H.
@@ -508,8 +542,8 @@ Proof using. exact (ulm_laws adm_u_f). Qed.
 (*  state ([uok_echo_st]), and its continuation names its whole block --  *)
 (*  so the exec alternative [exec echo failed] is free there.  At [UPC]   *)
 (*  only the genuinely state-free ones are: the panic, the silent round   *)
-(*  and [exec cat failed] -- a cat stage's exec failure is a block of     *)
-(*  EVERY pipeline at every content ([blocks_execR]); any other [PLRun]   *)
+(*  and [exec cat failed] -- the [cat f] producer's exec failure, one of *)
+(*  the shell's own three ([plsafe]) at every content; any other [PLRun]  *)
 (*  block is read at the round's content, and a [PLTerm] is never free.   *)
 (* ===================================================================== *)
 
@@ -521,36 +555,6 @@ Definition ufree (a : ualt) : bool :=
   | UPC (PLRun b) => bool_decide (b = [] \/ b = PipeDisc.dg_execR)
   | UPC (PLTerm _) => false
   end.
-
-(* [exec cat failed] below every producer, at every content: the first
-   cat stage's exec fails, every other stage exits silently *)
-Lemma merge_all_cons_nil' ss b : merge_all ss b -> merge_all ([] :: ss) b.
-Proof using.
-  induction 1 as [ss HF | ss i x t b Hi Hm IH].
-  - apply ma_done. constructor; [reflexivity | exact HF].
-  - apply (ma_take _ (S i) x t); [exact Hi | exact IH].
-Qed.
-
-Lemma blocks_execR fc p n : 1 <= n -> line_blocks fc (LPipes p n) PipeDisc.dg_execR.
-Proof using.
-  intros Hn. destruct n as [| [| m]]; [lia | |].
-  - exists [[]; PipeDisc.dg_execR]. split.
-    + apply (lr_node fc p 1 (MkSO [] (st_rd_dead (SProd p)) (st_wr_dead (SProd p))));
-        [apply so_silent |].
-      apply (sr_last fc _ _ (prod_cat p)
-               (MkSO (st_dg_exec SLast) (st_rd_dead SLast) (st_wr_dead SLast)));
-        [apply so_exec | cbn; exact I].
-    + apply merge2_shuf2, shuf2_nil_l. reflexivity.
-  - exists ([] :: PipeDisc.dg_execR :: replicate (S m) []). split.
-    + apply (lr_node fc p (S (S m)) (MkSO [] (st_rd_dead (SProd p)) (st_wr_dead (SProd p))));
-        [apply so_silent |].
-      apply (sr_node fc _ m _ (prod_cat p)
-               (MkSO (st_dg_exec SMid) (st_rd_dead SMid) (st_wr_dead SMid)));
-        [apply so_exec | cbn; exact I |].
-      exact (sfx_run_silent _ _ (S m) _ _ ltac:(lia)).
-    + apply merge_all_cons_nil'. exact (merge_all_nils _ (S m)).
-Qed.
-
 
 Section hooks.
   Context (adm : pline' -> bool).
@@ -575,9 +579,10 @@ Section hooks.
       destruct a as [r | x | x]; cbn [uok] in Hok |- *; try contradiction.
       destruct Hok as [Hsafe | [Ha Hb]]; [left; exact Hsafe |].
       destruct x as [| b | b]; cbn [ufree] in Hfr; [left; left; reflexivity | | discriminate Hfr].
+      (* [exec cat failed] is the [cat f] producer's own exec diagnostic,
+         one of the shell's three *)
       apply bool_decide_eq_true in Hfr as [-> | ->]; [left; right; left; reflexivity |].
-      right. split; [exact Ha |].
-      exact (blocks_execR _ (PrCatF f) n (line_blocks_pos _ _ _ _ Hb)).
+      left. right. right. reflexivity.
   Qed.
 
   (* the shell's own three, per line: the file's at a file line, the

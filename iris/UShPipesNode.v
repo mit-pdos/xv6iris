@@ -134,13 +134,14 @@ Section UShPipesNode.
      commit is always admitted ([PipeOutN.silence_okN_tok]). *)
   (* THE LINE the model reads: the producer, then [cat] [nc] times; the
      content that flows is the producer's *)
-  Hypothesis Hline : lR = LPipes pr nc.
+  Hypothesis Hline : lR = LPipes pr (cats nc).
   Hypothesis HLw : L = prod_content fcR pr.
 
   (* the line has a cat: the model's line is well formed *)
   Lemma nc_pos : (1 <= nc)%nat.
   Proof using Hline Hplok.
-    pose proof Hplok as Hok. rewrite Hline in Hok. rewrite Hline. exact (proj1 (proj2 Hok)).
+    pose proof Hplok as Hok. rewrite Hline in Hok. destruct Hok as (_ & Hne & _).
+    rewrite Hline. exact (lcats_pos pr _ Hne).
   Qed.
 
   Lemma Hfire : forall w s, w ∈ wsN -> fire_src fcR pr L w s ->

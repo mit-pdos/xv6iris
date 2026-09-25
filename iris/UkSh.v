@@ -575,9 +575,9 @@ Proof.
         pose proof (ush_wl_body_pos ws (proj1 Hok)) as Hwb.
         rewrite FileDisc.line_bytes_body.
         cbn [FileDisc.line_body FileDisc.prod_body FileDisc.prod_words].
-        rewrite (wl_lta_app_l (wl_body ws ++ FileDisc.suf_barcats npc) [wl_nl] 0%nat
+        rewrite (wl_lta_app_l (wl_body ws ++ FileDisc.suf_filts npc) [wl_nl] 0%nat
                    ltac:(rewrite length_app; lia)).
-        rewrite (wl_lta_app_l (wl_body ws) (FileDisc.suf_barcats npc) 0%nat Hwb).
+        rewrite (wl_lta_app_l (wl_body ws) (FileDisc.suf_filts npc) 0%nat Hwb).
         pose proof (line_ok_head_byte0 ws (proj1 Hok)) as Hh.
         rewrite /wl_line (wl_lta_app_l (wl_body ws) [wl_nl] 0%nat Hwb) in Hh.
         exact Hh.

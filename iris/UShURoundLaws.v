@@ -104,7 +104,7 @@ Local Notation U := ulmU.
 (* ===================================================================== *)
 
 (* a pipeline line leaves the state alone, at every alternative *)
-Lemma ustep_pipe (s : fstate) (p : producer) (n : nat) (a : lm_alt U) :
+Lemma ustep_pipe (s : fstate) (p : producer) (n : list filt) (a : lm_alt U) :
   lm_step U s (LPipe p n) a = s.
 Proof using. destruct a; reflexivity. Qed.
 

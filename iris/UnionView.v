@@ -3,8 +3,8 @@
 (* claude-notes/design/union.md, review amendment B4).  Pure.            *)
 (*                                                                        *)
 (* [UnionDisc.ulm adm] read at its pipeline lines ([PipesView.pview]):   *)
-(* a line [LPipe p n] is the pipeline [LPipes p n], its content function  *)
-(* at the round's state is [FileDisc.files_of], and a pipeline            *)
+(* a line [LPipe p fs] is the pipeline [LPipes p fs], its content        *)
+(* function at the round's state is [FileDisc.files_of], and a pipeline  *)
 (* alternative is coded as the union's [UPE] (an echo pipeline) or      *)
 (* [UPC] (a [cat f] one).  Every law holds at EVERY                       *)
 (* admission: the cross cases of [UnionDisc.uok] are [False]              *)
@@ -27,13 +27,13 @@ Local Open Scope nat_scope.
 
 (* which lines are pipelines *)
 Definition uv_line (l : uline) : option pline' :=
-  match l with LPipe p n => Some (LPipes p n) | _ => None end.
+  match l with LPipe p fs => Some (LPipes p fs) | _ => None end.
 
 Lemma uv_line_some (l : uline) (pl : pline') :
-  uv_line l = Some pl -> exists p n, l = LPipe p n /\ pl = LPipes p n.
+  uv_line l = Some pl -> exists p fs, l = LPipe p fs /\ pl = LPipes p fs.
 Proof using.
-  destruct l as [ws | ws | | p n]; cbn [uv_line]; try discriminate.
-  intros Hq. injection Hq as <-. by exists p, n.
+  destruct l as [ws | ws | | p fs]; cbn [uv_line]; try discriminate.
+  intros Hq. injection Hq as <-. by exists p, fs.
 Qed.
 
 (* the union's code of a pipeline alternative: [UPE] at an echo

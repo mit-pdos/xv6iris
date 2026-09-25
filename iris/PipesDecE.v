@@ -326,16 +326,19 @@ Lemma pde_prod_cons (L : bytes) (ws : list (list (bv 8))) (so : st_out) :
 Proof using. intros H. inversion H; subst; simpl; auto. Qed.
 
 Lemma pde_mid_cons (L : bytes) (so : st_out) :
-  stage_out fcE L SMid so -> pde_midok (so_cons so).
+  stage_out fcE L (SMid FCat) so -> pde_midok (so_cons so).
 Proof using. intros H. unfold pde_midok. inversion H; subst; simpl; auto. Qed.
 
-Lemma pde_sfx_shape (L : bytes) (m : nat) (win : wr_out) (wc : bool) (W : list bytes) (s : bytes) :
-  sfx_term fcE L m win wc W s ->
+(* the admission is cats only, so every middle stage is a cat *)
+Lemma pde_sfx_shape (L : bytes) (fs : list filt) (win : wr_out) (wc : bool) (W : list bytes)
+    (s : bytes) :
+  sfx_term fcE L fs win wc W s -> all_cats fs = true ->
   exists mids, W = mids ++ [dg_fork_b] /\ Forall pde_midok mids /\ pde_midok s.
 Proof using.
-  induction 1 as [m win wc so Hso | m win wc so W s Hso Hp Hsfx IH].
+  induction 1 as [F F' fs win wc so Hso | F F' fs win wc so W s Hso Hp Hsfx IH]; intros Hc;
+    apply FileDisc.all_cats_cons in Hc as [-> Hc].
   - exists []. split; [reflexivity |]. split; [constructor | exact (pde_mid_cons _ _ Hso)].
-  - destruct IH as (mids & -> & HF & Hs). exists (so_cons so :: mids).
+  - destruct (IH Hc) as (mids & -> & HF & Hs). exists (so_cons so :: mids).
     split; [reflexivity |]. split; [constructor; [exact (pde_mid_cons _ _ Hso) | exact HF] | exact Hs].
 Qed.
 
@@ -345,11 +348,11 @@ Lemma pde_lterm_shape (l : pline') (W : list bytes) (s : bytes) :
   \/ (exists p mids, W = p :: mids ++ [dg_fork_b] /\ (p = dg_execL \/ p = [])
                      /\ Forall pde_midok mids /\ pde_midok s).
 Proof using.
-  intros Ha H. revert Ha. destruct H as [p n so Hn Hso | p n so W0 s0 Hso Hsfx]; intros Ha.
+  intros Ha H. revert Ha. destruct H as [p fs so Hn Hso | p fs so W0 s0 Hso Hsfx]; intros Ha.
   - left. split; [reflexivity |].
     destruct p as [ws | f]; [| discriminate Ha]. exact (pde_prod_cons _ _ _ Hso).
   - right. destruct p as [ws | f]; [| discriminate Ha].
-    destruct (pde_sfx_shape _ _ _ _ _ _ Hsfx) as (mids & -> & HF & Hs).
+    destruct (pde_sfx_shape _ _ _ _ _ _ Hsfx Ha) as (mids & -> & HF & Hs).
     exists (so_cons so), mids. split; [reflexivity |].
     split; [exact (pde_prod_cons _ _ _ Hso) |]. split; [exact HF | exact Hs].
 Qed.
@@ -362,7 +365,7 @@ Proof using.
 Qed.
 
 Lemma pde_mid_so (L : bytes) (m : bytes) :
-  pde_midok m -> exists so, stage_out fcE L SMid so /\ so_cons so = m /\ rd_of so = RdGone.
+  pde_midok m -> exists so, stage_out fcE L (SMid FCat) so /\ so_cons so = m /\ rd_of so = RdGone.
 Proof using.
   intros [-> | [-> | ->]]; eexists.
   - split; [apply so_exec | split; reflexivity].
@@ -375,7 +378,7 @@ Proof using. destruct w; exact I. Qed.
 
 Lemma pde_sfx_build (L : bytes) (mids : list bytes) (s : bytes) :
   Forall pde_midok mids -> pde_midok s ->
-  forall win wc, sfx_term fcE L (S (S (length mids))) win wc (mids ++ [dg_fork_b]) s.
+  forall win wc, sfx_term fcE L (cats (S (S (length mids)))) win wc (mids ++ [dg_fork_b]) s.
 Proof using.
   intros HF Hs. induction HF as [| m mids Hm HF IH]; intros win wc.
   - destruct (pde_mid_so L s Hs) as (so & Hso & Hc & _). simpl. rewrite -Hc.
@@ -385,11 +388,12 @@ Proof using.
 Qed.
 
 Lemma pde_merge_of_lt (n : nat) (W : list bytes) (s u : bytes) :
-  line_term fcE (LPipes (PrEcho []) n) W s -> pde_pmt W u_prompt s u ->
+  line_term fcE (LPipes (PrEcho []) (cats n)) W s -> pde_pmt W u_prompt s u ->
   pl_merge fcE adm_echo u.
 Proof using.
   intros Hlt Hp. destruct (pde_pmt_blk _ _ _ _ Hp) as (Wm & b & HW & Hb & Hu).
-  exists (LPipes (PrEcho []) n), b. split; [reflexivity |]. split; [| exact Hu].
+  exists (LPipes (PrEcho []) (cats n)), b. split; [exact (FileDisc.all_cats_cats n) |].
+  split; [| exact Hu].
   split.
   - intros ->. pose proof (pde_merge_len _ _ Hb) as Hl. unfold pde_total in Hl.
     simpl in Hl. rewrite !length_app ll_prompt_len in Hl. simpl in Hl. lia.
@@ -445,7 +449,7 @@ Proof using.
       destruct Mu as [| m Mu]; [| apply Forall_cons in HF as [[Hf _] _]; discriminate Hf].
       apply (pde_merge_of_lt 1 [dg_fork_b] s u); [| by rewrite app_nil_r in Hp].
       destruct (pde_prod_so s Hs) as (so & Hso & Hc'). rewrite -Hc'.
-      apply lt_here; [lia | exact Hso].
+      apply lt_here; [discriminate | exact Hso].
 Qed.
 
 Global Instance pl_mergeE_dec (u : bytes) : Decision (pl_merge fcE adm_echo u).

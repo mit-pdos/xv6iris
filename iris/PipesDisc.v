@@ -3,13 +3,15 @@
 (* length (design: claude-notes/design/pipes-general.md SS3.2, SS2.3,     *)
 (* SS2.4, cut C2).  Pure; nothing in the application imports it yet.      *)
 (*                                                                        *)
-(*   1. The lines: [LEcho' ws] and [LPipes p n], the producer [p] (echo  *)
-(*      or [cat f]) followed by n >= 1 bare cats; their bodies and the   *)
-(*      parser that inverts them.                                        *)
+(*   1. The lines: [LEcho' ws] and [LPipes p fs], the producer [p]     *)
+(*      (echo or [cat f]) followed by its filter stages [fs] (at least    *)
+(*      one; each [cat] or [grep w], cut G3); their bodies and the parser *)
+(*      that splits them at the bars.                                     *)
 (*   2. The STAGE OUTCOMES [stage_out]: one constructor per behaviour a   *)
 (*      stage has (exec failure, the argv[0] death, echo, echo halted,    *)
-(*      cat f copied / halted / refused its open, a middle cat copied /   *)
-(*      halted, the last cat copied), each read as a console stream, an   *)
+(*      cat f copied / halted / refused its open, a middle filter wrote   *)
+(*      what it owes ([fapp]), a middle cat or grep halted, the last      *)
+(*      filter printed what it owes), each read as a console stream, an   *)
 (*      optional reader outcome and an optional writer outcome            *)
 (*      ([PipesPair.rd_out]/[wr_out], adopted as they are).              *)
 (*   3. The PAIRING through a pipe, [pipe_pairB], with the ruled corner   *)
@@ -35,6 +37,7 @@ From stdpp Require Import list countable bitvector.definitions.
 Require Import RiscvLang ObsTrace.
 Require Import LineWords EchoDisc LineBytes LineModel PipeDisc.
 Require Import StringBytes ProgTree ProgTreePipes PipesPair.
+Require GrepTree GrepFilt.       (* the filter a grep stage applies (cut G3) *)
 Require FileDisc.                (* [producer], moved down (cut C9b) *)
 (* stdpp's list lemmas over the ones [ProgTree]'s Stdlib import re-exports *)
 From stdpp Require Import list.
@@ -60,43 +63,180 @@ Notation cmd_cat_word := FileDisc.fd_w_cat_word.
 Notation prod_wf := FileDisc.prod_wf.
 Notation prod_body_bytes := FileDisc.prod_body_bytes.
 
-(* a line: a plain echo line, or the producer followed by [n] bare cats *)
+(* THE FILTER STAGES (cut G3) -- every stage after the producer is [cat]
+   or [grep w] -- live in [FileDisc] beside the producer; these are their
+   names here *)
+Notation filt := FileDisc.filt.
+Notation FCat := FileDisc.FCat.
+Notation FGrep := FileDisc.FGrep.
+Notation filt_words := FileDisc.filt_words.
+Notation filt_ok := FileDisc.filt_ok.
+Notation filt_is_cat := FileDisc.filt_is_cat.
+Notation cats := FileDisc.cats.
+Notation all_cats := FileDisc.all_cats.
+
+(* a line: a plain echo line, or the producer followed by its filter
+   stages [fs] *)
 Inductive pline' :=
   | LEcho' (ws : list bytes)
-  | LPipes (p : producer) (n : nat).
+  | LPipes (p : producer) (fs : list filt).
 
 Global Instance pline'_eq_dec : EqDecision pline'.
 Proof using. solve_decision. Defined.
 
-(* [n] times the canonical pipe suffix [ | cat] *)
-Definition suf_n (n : nat) : bytes := concat (replicate n suf_pipecat).
+(* the canonical separator [ | ], and one filter stage's own body *)
+Definition pl_sep : bytes := [wl_sp; wl_bar; wl_sp].
+Definition filt_body (F : filt) : bytes := wl_body (filt_words F).
+
+Lemma suf_filt_sep (F : filt) : FileDisc.suf_filt F = pl_sep ++ filt_body F.
+Proof using. reflexivity. Qed.
 
 Definition pl_body (l : pline') : bytes :=
   match l with
   | LEcho' ws => wl_body ws
-  | LPipes p n => prod_body p ++ suf_n n
+  | LPipes p fs => prod_body p ++ FileDisc.suf_filts fs
   end.
 
 (* a well-formed line: an admissible echo line, or a producer with at
-   least one cat, the whole line within sh's buffer *)
+   least one admissible filter stage, the whole line within sh's buffer *)
 Definition pl_ok (l : pline') : Prop :=
   match l with
   | LEcho' ws => line_ok ws
-  | LPipes p n => prod_ok p /\ 1 <= n /\ S (length (pl_body l)) < line_max
+  | LPipes p fs =>
+      prod_ok p /\ fs <> [] /\ Forall filt_ok fs /\ S (length (pl_body l)) < line_max
   end.
 
 Global Instance pl_ok_dec l : Decision (pl_ok l).
 Proof using. destruct l; unfold pl_ok; apply _. Defined.
 
-(* ---- THE PARSER: peel every trailing [ | cat], then read the producer *)
+(* ---- THE PARSER: split the body at every [ | ], read the first segment
+        as the producer and every later one as a filter stage.  The bar is
+        never a word byte, so the split is the line's own. *)
 
-Fixpoint strip_all (k : nat) (b : bytes) : nat * bytes :=
-  match k with
-  | 0 => (0, b)
-  | S k' =>
-      match strip_pipecat b with
-      | Some c => (S (strip_all k' c).1, (strip_all k' c).2)
-      | None => (0, b)
+Definition hd_cons (x : bv 8) (ss : list bytes) : list bytes :=
+  match ss with [] => [[x]] | s :: ss' => (x :: s) :: ss' end.
+
+Fixpoint split_sep (b : bytes) : list bytes :=
+  match b with
+  | [] => [[]]
+  | x :: t =>
+      match t with
+      | y :: z :: r =>
+          if decide ([x; y; z] = pl_sep) then [] :: split_sep r else hd_cons x (split_sep t)
+      | _ => hd_cons x (split_sep t)
+      end
+  end.
+
+Definition join_sep (ss : list bytes) : bytes :=
+  match ss with [] => [] | s :: ss' => s ++ concat (map (fun t => pl_sep ++ t) ss') end.
+
+Lemma split_sep_cons3 x y z r :
+  split_sep (x :: y :: z :: r)
+  = if decide ([x; y; z] = pl_sep) then [] :: split_sep r else hd_cons x (split_sep (y :: z :: r)).
+Proof using. reflexivity. Qed.
+
+Lemma hd_cons_ne x ss : hd_cons x ss <> [].
+Proof using. destruct ss; discriminate. Qed.
+
+Lemma split_sep_ne b : split_sep b <> [].
+Proof using.
+  destruct b as [| x [| y [| z r]]]; [discriminate | intros H; discriminate H
+                                     | intros H; discriminate H |].
+  rewrite split_sep_cons3. case_decide; [discriminate | apply hd_cons_ne].
+Qed.
+
+Lemma wl_sp_ne_bar : wl_sp <> wl_bar.
+Proof using. apply (bool_decide_unpack _). vm_compute. exact I. Qed.
+
+(* a byte in front of a list that does not start on the bar starts the
+   first segment *)
+Lemma split_sep_nb x u : head u <> Some wl_bar -> split_sep (x :: u) = hd_cons x (split_sep u).
+Proof using.
+  intros Hh. destruct u as [| y [| z r]]; [reflexivity | reflexivity |].
+  rewrite split_sep_cons3, decide_False; [reflexivity |].
+  intros Heq. unfold pl_sep in Heq. injection Heq as _ Hy _. apply Hh. rewrite Hy. reflexivity.
+Qed.
+
+Lemma split_sep_nosep (s : bytes) : wl_bar ∉ s -> split_sep s = [s].
+Proof using.
+  induction s as [| x t IH]; intros Hs; [reflexivity |].
+  assert (Ht : wl_bar ∉ t) by (intros H; apply Hs; apply elem_of_list_further; exact H).
+  assert (Hh : head t <> Some wl_bar).
+  { destruct t as [| y t']; cbn [head]; [discriminate |].
+    intros Hy. injection Hy as ->. apply Ht. apply elem_of_list_here. }
+  rewrite (split_sep_nb x t Hh), (IH Ht). reflexivity.
+Qed.
+
+Lemma split_sep_app (s t : bytes) : wl_bar ∉ s -> split_sep (s ++ pl_sep ++ t) = s :: split_sep t.
+Proof using.
+  induction s as [| x s' IH]; intros Hs.
+  - cbn [app]. unfold pl_sep. cbn [app].
+    rewrite split_sep_cons3. rewrite decide_True by reflexivity. reflexivity.
+  - assert (Hs' : wl_bar ∉ s') by (intros H; apply Hs; apply elem_of_list_further; exact H).
+    assert (Hh : head (s' ++ pl_sep ++ t) <> Some wl_bar).
+    { destruct s' as [| y s'']; cbn [head app].
+      - unfold pl_sep. cbn [app head]. intros Hy. exact (wl_sp_ne_bar (f_equal (default wl_sp) Hy)).
+      - intros Hy. injection Hy as ->. apply Hs'. apply elem_of_list_here. }
+    cbn [app]. rewrite (split_sep_nb x _ Hh), (IH Hs'). reflexivity.
+Qed.
+
+Lemma join_sep_cons2 s s' ss : join_sep (s :: s' :: ss) = s ++ pl_sep ++ join_sep (s' :: ss).
+Proof using. cbn [join_sep map concat]. rewrite <- !app_assoc. reflexivity. Qed.
+
+Lemma join_hd_cons x ss : ss <> [] -> join_sep (hd_cons x ss) = x :: join_sep ss.
+Proof using.
+  destruct ss as [| s ss]; [intros H; exfalso; exact (H eq_refl) | intros _; reflexivity].
+Qed.
+
+Lemma join_nil_cons ss : ss <> [] -> join_sep ([] :: ss) = pl_sep ++ join_sep ss.
+Proof using.
+  destruct ss as [| s ss]; [intros H; exfalso; exact (H eq_refl) |]. intros _.
+  cbn [join_sep map concat app].
+  rewrite <- app_assoc. reflexivity.
+Qed.
+
+(* the split loses nothing *)
+Lemma split_sep_join_aux k b : length b <= k -> join_sep (split_sep b) = b.
+Proof using.
+  revert b. induction k as [| k IH]; intros b Hk.
+  - destruct b; [reflexivity | cbn in Hk; lia].
+  - destruct b as [| x [| y [| z r]]]; [reflexivity | reflexivity | reflexivity |].
+    rewrite split_sep_cons3. case_decide as Hs.
+    + rewrite join_nil_cons by apply split_sep_ne. rewrite (IH r) by (cbn in Hk; lia).
+      rewrite <- Hs. reflexivity.
+    + rewrite join_hd_cons by apply split_sep_ne.
+      rewrite (IH (y :: z :: r)) by (cbn in Hk |- *; lia). reflexivity.
+Qed.
+
+Lemma split_sep_join b : join_sep (split_sep b) = b.
+Proof using. exact (split_sep_join_aux (length b) b (le_n _)). Qed.
+
+(* ...and a join of bar-free segments splits back into them *)
+Lemma split_sep_join_nb (s : bytes) (ss : list bytes) :
+  wl_bar ∉ s -> Forall (fun t => wl_bar ∉ t) ss -> split_sep (join_sep (s :: ss)) = s :: ss.
+Proof using.
+  revert s. induction ss as [| s' ss IH]; intros s Hs HF.
+  - cbn [join_sep map concat]. rewrite app_nil_r. exact (split_sep_nosep s Hs).
+  - apply Forall_cons_1 in HF as [Hs' HF].
+    rewrite join_sep_cons2, (split_sep_app s _ Hs), (IH s' Hs' HF). reflexivity.
+Qed.
+
+Definition filt_parse (s : bytes) : option filt :=
+  if decide (s = cmd_cat) then Some FCat
+  else match wl_words s with
+       | [g; w] =>
+           if decide (g = FileDisc.fd_w_grep /\ wl_word w /\ wl_body [g; w] = s)
+           then Some (FGrep w) else None
+       | _ => None
+       end.
+
+Fixpoint filts_parse (segs : list bytes) : option (list filt) :=
+  match segs with
+  | [] => Some []
+  | s :: segs' =>
+      match filt_parse s, filts_parse segs' with
+      | Some F, Some fs => Some (F :: fs)
+      | _, _ => None
       end
   end.
 
@@ -109,57 +249,20 @@ Definition prod_parse (r : bytes) : option producer :=
        | _ => None
        end.
 
-Definition pl_build (n : nat) (r : bytes) (len : nat) : option pline' :=
-  match n with
-  | 0 => if decide (body_ok r) then Some (LEcho' (wl_words r)) else None
-  | S _ =>
-      if decide (S len < line_max)
-      then match prod_parse r with Some p => Some (LPipes p n) | None => None end
+Definition pl_parse (b : bytes) : option pline' :=
+  match split_sep b with
+  | [r] => if decide (body_ok r) then Some (LEcho' (wl_words r)) else None
+  | r :: segs =>
+      if decide (S (length b) < line_max)
+      then match prod_parse r, filts_parse segs with
+           | Some p, Some fs => Some (LPipes p fs)
+           | _, _ => None
+           end
       else None
+  | [] => None
   end.
 
-Definition pl_parse (b : bytes) : option pline' :=
-  pl_build (strip_all (length b) b).1 (strip_all (length b) b).2 (length b).
-
 Definition pl_of (b : bytes) : pline' := default (LEcho' []) (pl_parse b).
-
-Lemma suf_n_S n : suf_n (S n) = suf_n n ++ suf_pipecat.
-Proof using.
-  unfold suf_n. rewrite replicate_S_end, concat_app. cbn [concat]. by rewrite app_nil_r.
-Qed.
-
-Lemma suf_n_length n : length (suf_n n) = 6 * n.
-Proof using.
-  induction n as [| n IH]; [reflexivity |].
-  rewrite suf_n_S, length_app, IH, suf_pipecat_len. lia.
-Qed.
-
-Lemma strip_all_inv k b : b = (strip_all k b).2 ++ suf_n (strip_all k b).1.
-Proof using.
-  revert b. induction k as [| k IH]; intros b; cbn [strip_all].
-  - cbn [fst snd]. unfold suf_n. cbn. by rewrite app_nil_r.
-  - destruct (strip_pipecat b) as [c |] eqn:Hs; cbn [fst snd].
-    + rewrite suf_n_S, app_assoc, <- (IH c). exact (strip_pipecat_Some b c Hs).
-    + unfold suf_n. cbn. by rewrite app_nil_r.
-Qed.
-
-Lemma strip_pipecat_body (c : bytes) : Forall wl_body_byte c -> strip_pipecat c = None.
-Proof using.
-  intros Hc. destruct (strip_pipecat c) as [c' |] eqn:Hs; [| reflexivity].
-  exfalso. rewrite (strip_pipecat_Some c c' Hs) in Hc.
-  apply Forall_app in Hc as [_ Hsuf].
-  exact (wl_bar_not_body (proj1 (Forall_forall _ _) Hsuf wl_bar suf_pipecat_bar)).
-Qed.
-
-Lemma strip_all_suf (k n : nat) (c : bytes) :
-  strip_pipecat c = None -> n <= k -> strip_all k (c ++ suf_n n) = (n, c).
-Proof using.
-  revert k. induction n as [| n IH]; intros k Hc Hk.
-  - unfold suf_n. cbn [replicate concat]. rewrite app_nil_r.
-    destruct k; cbn [strip_all]; [reflexivity | rewrite Hc; reflexivity].
-  - destruct k as [| k]; [lia |]. rewrite suf_n_S, app_assoc. cbn [strip_all].
-    rewrite strip_pipecat_app, (IH k Hc ltac:(lia)). reflexivity.
-Qed.
 
 Lemma cmd_cat_ne_echo : cmd_cat <> cmd_echo.
 Proof using. intros H. apply (f_equal (@length _)) in H. vm_compute in H. discriminate H. Qed.
@@ -193,45 +296,119 @@ Proof using.
     split; [exact Hf |]. unfold prod_body. cbn [prod_words]. symmetry. exact Hr.
 Qed.
 
+Lemma filt_parse_body (F : filt) : filt_ok F -> filt_parse (filt_body F) = Some F.
+Proof using.
+  intros HF. unfold filt_parse. destruct F as [| w].
+  - rewrite decide_True; reflexivity.
+  - rewrite decide_False.
+    + change (filt_body (FGrep w)) with (wl_body (filt_words (FGrep w))).
+      rewrite (wl_words_body _ (FileDisc.filt_wf _ HF)). cbn [filt_words].
+      rewrite decide_True; [reflexivity |].
+      split; [reflexivity | split; [exact HF | reflexivity]].
+    + intros H. apply (f_equal wl_words) in H.
+      change (filt_body (FGrep w)) with (wl_body (filt_words (FGrep w))) in H.
+      rewrite (wl_words_body _ (FileDisc.filt_wf _ HF)) in H.
+      change (wl_words cmd_cat) with [cmd_cat] in H. discriminate H.
+Qed.
+
+Lemma filt_parse_some s F : filt_parse s = Some F -> filt_ok F /\ s = filt_body F.
+Proof using.
+  unfold filt_parse. case_decide as Hc.
+  - intros [= <-]. split; [exact I | exact Hc].
+  - destruct (wl_words s) as [| g [| w [| x rest]]]; try discriminate.
+    case_decide as H; [| discriminate]. intros [= <-]. destruct H as (-> & Hw & Hs).
+    split; [exact Hw | symmetry; exact Hs].
+Qed.
+
+Lemma filts_parse_body (fs : list filt) :
+  Forall filt_ok fs -> filts_parse (map filt_body fs) = Some fs.
+Proof using.
+  induction fs as [| F fs IH]; intros HF; [reflexivity |].
+  apply Forall_cons_1 in HF as [HF1 HF]. cbn [map filts_parse].
+  rewrite (filt_parse_body F HF1), (IH HF). reflexivity.
+Qed.
+
+Lemma filts_parse_some segs fs :
+  filts_parse segs = Some fs -> Forall filt_ok fs /\ segs = map filt_body fs.
+Proof using.
+  revert fs. induction segs as [| s segs IH]; intros fs; cbn [filts_parse].
+  - intros [= <-]. split; [constructor | reflexivity].
+  - destruct (filt_parse s) as [F |] eqn:Hs; [| discriminate].
+    destruct (filts_parse segs) as [fs' |] eqn:Hr; [| discriminate].
+    intros [= <-]. destruct (filt_parse_some s F Hs) as [HF ->].
+    destruct (IH fs' eq_refl) as [HF' ->]. split; [constructor; assumption | reflexivity].
+Qed.
+
+(* the bar is in no producer and no filter stage *)
+Lemma prod_body_nobar p : prod_ok p -> wl_bar ∉ prod_body p.
+Proof using.
+  intros Hp Hin. exact (wl_bar_not_body (proj1 (Forall_forall _ _) (prod_body_bytes p Hp) _ Hin)).
+Qed.
+
+Lemma filt_body_nobar F : filt_ok F -> wl_bar ∉ filt_body F.
+Proof using.
+  intros HF Hin.
+  exact (wl_bar_not_body
+           (proj1 (Forall_forall _ _) (wl_body_bytes _ (FileDisc.filt_wf F HF)) _ Hin)).
+Qed.
+
+Lemma suf_filts_join (fs : list filt) :
+  FileDisc.suf_filts fs = concat (map (fun t => pl_sep ++ t) (map filt_body fs)).
+Proof using. unfold FileDisc.suf_filts. rewrite map_map. reflexivity. Qed.
+
+Lemma pl_body_join (p : producer) (fs : list filt) :
+  pl_body (LPipes p fs) = join_sep (prod_body p :: map filt_body fs).
+Proof using. cbn [pl_body join_sep]. rewrite suf_filts_join. reflexivity. Qed.
+
+Lemma split_sep_pl (p : producer) (fs : list filt) :
+  prod_ok p -> Forall filt_ok fs ->
+  split_sep (pl_body (LPipes p fs)) = prod_body p :: map filt_body fs.
+Proof using.
+  intros Hp HF. rewrite pl_body_join. apply split_sep_join_nb; [exact (prod_body_nobar p Hp) |].
+  apply Forall_forall. intros t Ht. apply elem_of_list_fmap in Ht as (F & -> & HFin).
+  exact (filt_body_nobar F (proj1 (Forall_forall _ _) HF F HFin)).
+Qed.
+
 (* the parser inverts the body at every well-formed line *)
 Lemma pl_parse_body (l : pline') : pl_ok l -> pl_parse (pl_body l) = Some l.
 Proof using.
-  destruct l as [ws | p n]; intros Hok.
+  destruct l as [ws | p fs]; intros Hok.
   - unfold pl_parse. cbn [pl_body].
-    pose proof (strip_all_suf (length (wl_body ws)) 0 (wl_body ws)
-                  (strip_pipecat_body _ (wl_body_bytes ws (line_ok_wf ws Hok)))
-                  ltac:(lia)) as Hs.
-    unfold suf_n in Hs. cbn [replicate concat] in Hs. rewrite app_nil_r in Hs.
-    rewrite Hs. cbn [fst snd pl_build].
+    rewrite (split_sep_nosep (wl_body ws) (fun H => wl_bar_not_body
+               (proj1 (Forall_forall _ _) (wl_body_bytes ws (line_ok_wf ws Hok)) _ H))).
+    cbv beta iota.
     rewrite decide_True; [by rewrite (wl_words_body ws (line_ok_wf ws Hok)) |].
     unfold body_ok. rewrite (wl_words_body ws (line_ok_wf ws Hok)).
     split; [reflexivity | exact Hok].
-  - destruct Hok as (Hp & Hn & Hlen). unfold pl_parse.
-    change (pl_body (LPipes p n)) with (prod_body p ++ suf_n n) in *.
-    rewrite (strip_all_suf _ n _ (strip_pipecat_body _ (prod_body_bytes p Hp)));
-      [| rewrite length_app, suf_n_length; lia].
-    cbn [fst snd]. destruct n as [| n']; [lia |]. cbn [pl_build].
-    rewrite decide_True; [| exact Hlen].
-    rewrite (prod_parse_body p Hp). reflexivity.
+  - destruct Hok as (Hp & Hne & HF & Hlen). unfold pl_parse.
+    rewrite (split_sep_pl p fs Hp HF).
+    destruct fs as [| F fs']; [exfalso; exact (Hne eq_refl) |]. cbn [map].
+    rewrite decide_True by exact Hlen.
+    rewrite (prod_parse_body p Hp).
+    change (filt_body F :: map filt_body fs') with (map filt_body (F :: fs')).
+    rewrite (filts_parse_body _ HF). reflexivity.
 Qed.
 
 (* ...and answers only well-formed lines, whose body is what was parsed *)
 Lemma pl_parse_some b l : pl_parse b = Some l -> pl_ok l /\ b = pl_body l.
 Proof using.
-  unfold pl_parse. pose proof (strip_all_inv (length b) b) as Hinv.
-  destruct (strip_all (length b) b) as [n r] eqn:Hs.
-  cbn [fst snd] in Hinv |- *.
-  destruct n as [| n'].
-  - cbn [pl_build]. case_decide as Hb; [| discriminate]. intros [= <-].
-    destruct Hb as [Hbody Hok]. split; [exact Hok |]. cbn [pl_body].
-    rewrite Hbody, Hinv. unfold suf_n. cbn. apply app_nil_r.
-  - cbn [pl_build]. case_decide as Hlen; [| discriminate].
-    destruct (prod_parse r) as [p |] eqn:Hp; [| discriminate]. intros [= <-].
-    destruct (prod_parse_some r p Hp) as [Hok Hr]. subst r.
-    split; [| exact Hinv].
-    split; [exact Hok | split; [lia |]].
-    change (pl_body (LPipes p (S n'))) with (prod_body p ++ suf_n (S n')).
-    rewrite <- Hinv. exact Hlen.
+  pose proof (split_sep_join b) as Hj. revert Hj. unfold pl_parse.
+  destruct (split_sep b) as [| r [| s segs]]; intros Hj; [discriminate | |].
+  - case_decide as Hb; [| discriminate]. intros [= <-].
+    destruct Hb as [Hbody Hok]. split; [exact Hok |].
+    cbn [join_sep map concat] in Hj. rewrite app_nil_r in Hj. subst b.
+    cbn [pl_body]. symmetry. exact Hbody.
+  - case_decide as Hlen; [| discriminate].
+    destruct (prod_parse r) as [p |] eqn:Hp; [| discriminate].
+    destruct (filts_parse (s :: segs)) as [fs |] eqn:Hf; [| discriminate].
+    intros [= <-].
+    destruct (prod_parse_some r p Hp) as [Hpok ->].
+    destruct (filts_parse_some _ _ Hf) as [HF Hseg].
+    assert (Hb : b = pl_body (LPipes p fs)).
+    { rewrite pl_body_join, <- Hseg. symmetry. exact Hj. }
+    split; [| exact Hb].
+    split; [exact Hpok |]. split; [intros ->; discriminate Hseg |].
+    split; [exact HF |]. rewrite <- Hb. exact Hlen.
 Qed.
 
 Lemma pl_of_body (l : pline') : pl_ok l -> pl_of (pl_body l) = l.
@@ -274,8 +451,8 @@ Record st_out := MkSO {
 
 Inductive stage :=
   | SProd (p : producer)
-  | SMid
-  | SLast.
+  | SMid (F : filt)
+  | SLast (F : filt).
 
 Definition rd_of (so : st_out) : rd_out :=
   match so_rd so with Some r => r | None => RdGone end.
@@ -286,12 +463,37 @@ Definition wr_of (so : st_out) : wr_out :=
 Definition st_rd_dead (st : stage) : option rd_out :=
   match st with SProd _ => None | _ => Some RdGone end.
 Definition st_wr_dead (st : stage) : option wr_out :=
-  match st with SLast => None | _ => Some WrNone end.
+  match st with SLast _ => None | _ => Some WrNone end.
 
 (* sh's [fprintf(2, exec %s failed, argv[0])] (user/sh.c:80): argv[0] is
-   [echo] at an echo producer and [cat] everywhere else *)
+   [echo] at an echo producer, [grep] at a grep stage and [cat]
+   everywhere else *)
+Definition dg_exec_grep : list bytes := [sb "exec"%string; sb "grep"%string; sb "failed"%string].
+Definition dg_execG : bytes := wl_line dg_exec_grep.
+
+Definition filt_dg_exec (F : filt) : bytes :=
+  match F with FCat => dg_execR | FGrep _ => dg_execG end.
+
 Definition st_dg_exec (st : stage) : bytes :=
-  match st with SProd (PrEcho _) => dg_execL | _ => dg_execR end.
+  match st with
+  | SProd (PrEcho _) => dg_execL
+  | SProd (PrCatF _) => dg_execR
+  | SMid F | SLast F => filt_dg_exec F
+  end.
+
+(* WHAT A FILTER STAGE OWES for the input [D] it read: a cat copies it, a
+   grep prints the matching complete lines ([GrepTree.grep_out]) *)
+Definition fapp (F : filt) (D : bytes) : bytes :=
+  match F with FCat => D | FGrep w => GrepTree.grep_out w D end.
+
+(* on a content of one line (the union's every content) a filter passes
+   the line or nothing, so what it owes of a prefix is a prefix
+   ([GrepFilt.grep_out_line_prefix], the gate) *)
+Lemma fapp_prefix (F : filt) (L D : bytes) :
+  GrepFilt.oneline L -> D `prefix_of` L -> fapp F D `prefix_of` L.
+Proof using.
+  intros HL HD. destruct F as [| w]; [exact HD | exact (GrepFilt.grep_out_line_prefix w L D HL HD)].
+Qed.
 
 (* THE LINE'S CONTENT: what the producer writes when all goes well --
    echo's words minus the command name, or the file's content (the empty
@@ -336,18 +538,32 @@ Inductive stage_out (fc : bytes -> option bytes) (L : bytes) : stage -> st_out -
   (* the open answered -1 (absent, or refused on a present file) *)
   | so_catf_open f :
       stage_out fc L (SProd (PrCatF f)) (MkSO (cat_dg_open f) None (Some WrNone))
-  (* a middle cat read to end of file and copied what it read *)
-  | so_mid_copy D :
+  (* a middle filter read to end of file and wrote what it owes *)
+  | so_mid_f F D :
       D `prefix_of` L ->
-      stage_out fc L SMid (MkSO [] (Some (RdEof D)) (Some (WrAll D)))
+      stage_out fc L (SMid F) (MkSO [] (Some (RdEof D)) (Some (WrAll (fapp F D))))
   (* a middle cat's reader went: [cat: write error] *)
   | so_mid_halt D :
       D `prefix_of` L ->
-      stage_out fc L SMid (MkSO cat_dg_write (Some RdGone) (Some (WrHalt D)))
-  (* the last cat read to end of file and printed what it read *)
-  | so_last D :
+      stage_out fc L (SMid FCat) (MkSO cat_dg_write (Some RdGone) (Some (WrHalt D)))
+  (* a middle grep's reader went: its write answered -1, it went on
+     reading to end of file, silently (grep ignores its write's return) *)
+  | so_grep_halt w D W :
+      D `prefix_of` L -> W `prefix_of` GrepTree.grep_out w D ->
+      stage_out fc L (SMid (FGrep w)) (MkSO [] (Some (RdEof D)) (Some (WrHalt W)))
+  (* the last filter read to end of file and printed what it owes *)
+  | so_last_f F D :
       D `prefix_of` L ->
-      stage_out fc L SLast (MkSO D (Some (RdEof D)) None).
+      stage_out fc L (SLast F) (MkSO (fapp F D) (Some (RdEof D)) None).
+
+(* the cat instances, by their landed names *)
+Lemma so_mid_copy fc L D :
+  D `prefix_of` L -> stage_out fc L (SMid FCat) (MkSO [] (Some (RdEof D)) (Some (WrAll D))).
+Proof using. exact (so_mid_f fc L FCat D). Qed.
+
+Lemma so_last fc L D :
+  D `prefix_of` L -> stage_out fc L (SLast FCat) (MkSO D (Some (RdEof D)) None).
+Proof using. exact (so_last_f fc L FCat D). Qed.
 
 (* ===================================================================== *)
 (*  3.  THE PAIRING THROUGH A PIPE, WITH THE RULED CORNER (B)             *)
@@ -356,7 +572,11 @@ Inductive stage_out (fc : bytes -> option bytes) (L : bytes) : stage -> st_out -
 (* [wc]: the writer is a CAT.  A halted cat writer beside an end-of-file
    reader is the loose corner (design SS2.4, ruled (B)): the reader may
    have seen any prefix of the line.  Everywhere else the pairing is
-   [PipesPair.pipe_pair] (an echo writer's halt keeps [False]). *)
+   [PipesPair.pipe_pair] (an echo writer's halt keeps [False], and so does
+   a grep writer's: grep's halt prints nothing, so it pairs EXACTLY).
+   Below a filter the corner stays the LOOSE one (grep-pipes.md section 2,
+   the owner's question 1 open): a reader behind a halted cat may see any
+   prefix of the LINE, even bytes a grep above it filtered out. *)
 Definition pipe_pairB (L : bytes) (wc : bool) (w : wr_out) (r : rd_out) : Prop :=
   match w, r with
   | WrHalt _, RdEof D' => wc = true /\ D' `prefix_of` L
@@ -404,37 +624,38 @@ Inductive merge_all : list bytes -> bytes -> Prop :=
 Definition dg_pipe_b : bytes := wl_line dg_pipe.
 Definition dg_fork_b : bytes := wl_line dg_fork.
 
-(* THE SUFFIX BELOW A PIPE: [m >= 1] bare cats reading a pipe whose
-   writer did [win] ([wc]: the writer is a cat).  At [m = 1] it is the
-   last cat itself; at [m >= 2] it is the sh node that runs [cat | ...]:
-   its [pipe()] fails (it prints [pipe] and nothing below it runs; the
-   incoming reader is gone), or it forks the middle cat and the next
-   suffix, the middle cat's writer paired with the suffix's reader.  The
-   node's own stream is empty; the streams are the stages', in order. *)
+(* THE SUFFIX BELOW A PIPE: the filter stages [fs] (at least one)
+   reading a pipe whose writer did [win] ([wc]: the writer is a cat, whose
+   halt is the ruled corner).  At [[F]] it is the last stage itself; at
+   two or more it is the sh node that runs [F | ...]: its [pipe()] fails
+   (it prints [pipe] and nothing below it runs; the incoming reader is
+   gone), or it forks the middle stage and the next suffix, the middle
+   stage's writer paired with the suffix's reader.  The node's own stream
+   is empty; the streams are the stages', in order. *)
 Inductive sfx_run (fc : bytes -> option bytes) (L : bytes)
-    : nat -> wr_out -> bool -> list bytes -> Prop :=
-  | sr_last win wc so :
-      stage_out fc L SLast so -> pipe_pairB L wc win (rd_of so) ->
-      sfx_run fc L 1 win wc [so_cons so]
-  | sr_pipe_fail m win wc :
-      sfx_run fc L (S (S m)) win wc [dg_pipe_b]
-  | sr_node m win wc so ss :
-      stage_out fc L SMid so -> pipe_pairB L wc win (rd_of so) ->
-      sfx_run fc L (S m) (wr_of so) true ss ->
-      sfx_run fc L (S (S m)) win wc (so_cons so :: ss).
+    : list filt -> wr_out -> bool -> list bytes -> Prop :=
+  | sr_last F win wc so :
+      stage_out fc L (SLast F) so -> pipe_pairB L wc win (rd_of so) ->
+      sfx_run fc L [F] win wc [so_cons so]
+  | sr_pipe_fail F F' fs win wc :
+      sfx_run fc L (F :: F' :: fs) win wc [dg_pipe_b]
+  | sr_node F F' fs win wc so ss :
+      stage_out fc L (SMid F) so -> pipe_pairB L wc win (rd_of so) ->
+      sfx_run fc L (F' :: fs) (wr_of so) (filt_is_cat F) ss ->
+      sfx_run fc L (F :: F' :: fs) win wc (so_cons so :: ss).
 
 (* A ROUND THAT RAN: the runcmd child execs echo, or runs the pipeline's
    top node (its [pipe()] fails, or it forks the producer and the suffix
-   of [n] cats) *)
+   of its filter stages) *)
 Inductive line_run (fc : bytes -> option bytes) : pline' -> list bytes -> Prop :=
   | lr_echo ws : line_run fc (LEcho' ws) [wl_line (drop 1 ws)]
   | lr_echo_exec ws : line_run fc (LEcho' ws) [dg_execL]
   | lr_echo_silent ws : line_run fc (LEcho' ws) [[]]
-  | lr_pipe_fail p n : 1 <= n -> line_run fc (LPipes p n) [dg_pipe_b]
-  | lr_node p n so ss :
+  | lr_pipe_fail p fs : fs <> [] -> line_run fc (LPipes p fs) [dg_pipe_b]
+  | lr_node p fs so ss :
       stage_out fc (prod_content fc p) (SProd p) so ->
-      sfx_run fc (prod_content fc p) n (wr_of so) (prod_cat p) ss ->
-      line_run fc (LPipes p n) (so_cons so :: ss).
+      sfx_run fc (prod_content fc p) fs (wr_of so) (prod_cat p) ss ->
+      line_run fc (LPipes p fs) (so_cons so :: ss).
 
 (* THE BLOCKS A ROUND MAY PRINT before sh's prompt *)
 Definition line_blocks (fc : bytes -> option bytes) (l : pline') (b : bytes) : Prop :=
@@ -447,23 +668,23 @@ Definition line_blocks (fc : bytes -> option bytes) (l : pline') (b : bytes) : P
    any time.  The waited writer just above the failing node is paired
    with a reader that vouches for nothing. *)
 Inductive sfx_term (fc : bytes -> option bytes) (L : bytes)
-    : nat -> wr_out -> bool -> list bytes -> bytes -> Prop :=
-  | stt_here m win wc so :
-      stage_out fc L SMid so ->
-      sfx_term fc L (S (S m)) win wc [dg_fork_b] (so_cons so)
-  | stt_next m win wc so W s :
-      stage_out fc L SMid so -> pipe_pairB L wc win (rd_of so) ->
-      sfx_term fc L (S m) (wr_of so) true W s ->
-      sfx_term fc L (S (S m)) win wc (so_cons so :: W) s.
+    : list filt -> wr_out -> bool -> list bytes -> bytes -> Prop :=
+  | stt_here F F' fs win wc so :
+      stage_out fc L (SMid F) so ->
+      sfx_term fc L (F :: F' :: fs) win wc [dg_fork_b] (so_cons so)
+  | stt_next F F' fs win wc so W s :
+      stage_out fc L (SMid F) so -> pipe_pairB L wc win (rd_of so) ->
+      sfx_term fc L (F' :: fs) (wr_of so) (filt_is_cat F) W s ->
+      sfx_term fc L (F :: F' :: fs) win wc (so_cons so :: W) s.
 
 Inductive line_term (fc : bytes -> option bytes) : pline' -> list bytes -> bytes -> Prop :=
-  | lt_here p n so :
-      1 <= n -> stage_out fc (prod_content fc p) (SProd p) so ->
-      line_term fc (LPipes p n) [dg_fork_b] (so_cons so)
-  | lt_next p n so W s :
+  | lt_here p fs so :
+      fs <> [] -> stage_out fc (prod_content fc p) (SProd p) so ->
+      line_term fc (LPipes p fs) [dg_fork_b] (so_cons so)
+  | lt_next p fs so W s :
       stage_out fc (prod_content fc p) (SProd p) so ->
-      sfx_term fc (prod_content fc p) n (wr_of so) (prod_cat p) W s ->
-      line_term fc (LPipes p n) (so_cons so :: W) s.
+      sfx_term fc (prod_content fc p) fs (wr_of so) (prod_cat p) W s ->
+      line_term fc (LPipes p fs) (so_cons so :: W) s.
 
 (* the waited streams, then sh's prompt, shuffled with a prefix of the
    stray's stream *)
@@ -567,12 +788,13 @@ Definition plsafe (l : pline') (a : plalt) : Prop :=
 Global Instance plsafe_dec l a : Decision (plsafe l a).
 Proof using. unfold plsafe. apply _. Defined.
 
-(* a line with at least one cat, or an echo line: a line with runs *)
+(* a line with at least one filter stage, or an echo line: a line with
+   runs *)
 Definition pl_nz (l : pline') : Prop :=
-  match l with LPipes _ 0 => False | _ => True end.
+  match l with LPipes _ [] => False | _ => True end.
 
 Lemma pl_ok_nz l : pl_ok l -> pl_nz l.
-Proof using. destruct l as [ws | p [| n]]; cbn; [done | lia | done]. Qed.
+Proof using. destruct l as [ws | p [| F fs]]; cbn; [done | intros (_ & H & _); exact (H eq_refl) | done]. Qed.
 
 (* THE LINE MODEL.  State [unit]: nothing survives a round; [fc] is the
    content function [cat f] reads, [adm] the line shapes the application
@@ -847,6 +1069,8 @@ Lemma nohd_execL : nohd alt_panic dg_execL.
 Proof using. bdec. Qed.
 Lemma nohd_execR : nohd alt_panic dg_execR.
 Proof using. bdec. Qed.
+Lemma nohd_execG : nohd alt_panic dg_execG.
+Proof using. bdec. Qed.
 Lemma nohd_write : nohd alt_panic cat_dg_write.
 Proof using. bdec. Qed.
 Lemma nohd_pipe : nohd alt_panic dg_pipe_b.
@@ -856,13 +1080,16 @@ Proof using.
   unfold cat_dg_open. apply nohd_app; [discriminate | bdec].
 Qed.
 
+(* a stage that is not the last *)
+Definition st_notlast (st : stage) : Prop := match st with SLast _ => False | _ => True end.
+
 Lemma stage_out_nohd fc L st so :
-  stage_out fc L st so -> st <> SLast -> nohd alt_panic (so_cons so).
+  stage_out fc L st so -> st_notlast st -> nohd alt_panic (so_cons so).
 Proof using.
-  destruct 1 as [st | st | | | | | f | | |]; intros Hst; cbn [so_cons];
-    try exact I; try exact nohd_write; try exact (nohd_open f); try (exfalso; exact (Hst eq_refl)).
-  destruct st as [[ws | f] | |]; cbn [st_dg_exec];
-    [exact nohd_execL | exact nohd_execR | exact nohd_execR | exfalso; exact (Hst eq_refl)].
+  destruct 1 as [st | st | | | | | f | | | | F D HD]; intros Hst; cbn [so_cons];
+    try exact I; try exact nohd_write; try exact (nohd_open f); try (exfalso; exact Hst).
+  destruct st as [[ws | f] | [| w] | F]; cbn [st_dg_exec filt_dg_exec];
+    [exact nohd_execL | exact nohd_execR | exact nohd_execR | exact nohd_execG | exfalso; exact Hst].
 Qed.
 
 (* NOR DOES ANY START ON 'i', the letter every line of init's opens on:
@@ -880,6 +1107,8 @@ Lemma nohd_i_execL : nohd pan_i dg_execL.
 Proof using. bdec. Qed.
 Lemma nohd_i_execR : nohd pan_i dg_execR.
 Proof using. bdec. Qed.
+Lemma nohd_i_execG : nohd pan_i dg_execG.
+Proof using. bdec. Qed.
 Lemma nohd_i_write : nohd pan_i cat_dg_write.
 Proof using. bdec. Qed.
 Lemma nohd_i_pipe : nohd pan_i dg_pipe_b.
@@ -889,14 +1118,17 @@ Proof using.
   unfold cat_dg_open. apply nohd_app; [discriminate | bdec].
 Qed.
 
+Lemma nohd_i_filt_exec F : nohd pan_i (filt_dg_exec F).
+Proof using. destruct F; [exact nohd_i_execR | exact nohd_i_execG]. Qed.
+
 Lemma stage_out_nohd_i fc L st so :
-  stage_out fc L st so -> st <> SLast -> nohd pan_i (so_cons so).
+  stage_out fc L st so -> st_notlast st -> nohd pan_i (so_cons so).
 Proof using.
-  destruct 1 as [st | st | | | | | f | | |]; intros Hst; cbn [so_cons];
+  destruct 1 as [st | st | | | | | f | | | | F D HD]; intros Hst; cbn [so_cons];
     try exact I; try exact nohd_i_write; try exact (nohd_i_open f);
-    try (exfalso; exact (Hst eq_refl)).
-  destruct st as [[ws | f] | |]; cbn [st_dg_exec];
-    [exact nohd_i_execL | exact nohd_i_execR | exact nohd_i_execR | exfalso; exact (Hst eq_refl)].
+    try (exfalso; exact Hst).
+  destruct st as [[ws | f] | F | F]; cbn [st_dg_exec];
+    [exact nohd_i_execL | exact nohd_i_execR | exact (nohd_i_filt_exec F) | exfalso; exact Hst].
 Qed.
 
 (* ---- the inversions, one per stage kind ---- *)
@@ -908,7 +1140,7 @@ Lemma stage_out_echo_inv fc L ws so :
   \/ exists D, L = wl_line (drop 1 ws) /\ D `prefix_of` L /\ so = MkSO [] None (Some (WrHalt D)).
 Proof using.
   intros H. remember (SProd (PrEcho ws)) as st eqn:Hst.
-  destruct H as [st' | st' | ws' HL | ws' D HL HD | | | | | |]; try discriminate Hst.
+  destruct H as [st' | st' | ws' HL | ws' D HL HD | | | | | | |]; try discriminate Hst.
   - subst st'. left. reflexivity.
   - subst st'. right; left. reflexivity.
   - injection Hst as ->. right; right; left. split; [exact HL | reflexivity].
@@ -923,7 +1155,7 @@ Lemma stage_out_catf_inv fc L f so :
   \/ so = MkSO (cat_dg_open f) None (Some WrNone).
 Proof using.
   intros H. remember (SProd (PrCatF f)) as st eqn:Hst.
-  destruct H as [st' | st' | | | f' Hf | f' D Hf HD | f' | | |]; try discriminate Hst.
+  destruct H as [st' | st' | | | f' Hf | f' D Hf HD | f' | | | |]; try discriminate Hst.
   - subst st'. left. reflexivity.
   - subst st'. right; left. reflexivity.
   - injection Hst as ->. right; right; left. split; [exact Hf | reflexivity].
@@ -931,83 +1163,120 @@ Proof using.
   - injection Hst as ->. right; right; right; right. reflexivity.
 Qed.
 
+(* a middle cat *)
 Lemma stage_out_mid_inv fc L so :
-  stage_out fc L SMid so ->
+  stage_out fc L (SMid FCat) so ->
   so = MkSO dg_execR (Some RdGone) (Some WrNone) \/ so = MkSO [] (Some RdGone) (Some WrNone)
   \/ (exists D, D `prefix_of` L /\ so = MkSO [] (Some (RdEof D)) (Some (WrAll D)))
   \/ (exists D, D `prefix_of` L /\ so = MkSO cat_dg_write (Some RdGone) (Some (WrHalt D))).
 Proof using.
-  intros H. remember SMid as st eqn:Hst.
-  destruct H as [st' | st' | | | | | | D HD | D HD |]; try discriminate Hst.
+  intros H. remember (SMid FCat) as st eqn:Hst.
+  destruct H as [st' | st' | | | | | | F D HD | D HD | w D W HD HW |]; try discriminate Hst.
   - subst st'. left. reflexivity.
   - subst st'. right; left. reflexivity.
-  - right; right; left. exists D. split; [exact HD | reflexivity].
+  - injection Hst as ->. right; right; left. exists D. split; [exact HD | reflexivity].
   - right; right; right. exists D. split; [exact HD | reflexivity].
 Qed.
 
+(* a middle grep: never a diagnostic of its own, and it reads to the end
+   whether its reader stayed or went *)
+Lemma stage_out_mid_grep_inv fc L w so :
+  stage_out fc L (SMid (FGrep w)) so ->
+  so = MkSO dg_execG (Some RdGone) (Some WrNone) \/ so = MkSO [] (Some RdGone) (Some WrNone)
+  \/ (exists D, D `prefix_of` L
+                /\ so = MkSO [] (Some (RdEof D)) (Some (WrAll (GrepTree.grep_out w D))))
+  \/ (exists D W, D `prefix_of` L /\ W `prefix_of` GrepTree.grep_out w D
+                  /\ so = MkSO [] (Some (RdEof D)) (Some (WrHalt W))).
+Proof using.
+  intros H. remember (SMid (FGrep w)) as st eqn:Hst.
+  destruct H as [st' | st' | | | | | | F D HD | D HD | w' D W HD HW |]; try discriminate Hst.
+  - subst st'. left. reflexivity.
+  - subst st'. right; left. reflexivity.
+  - injection Hst as ->. right; right; left. exists D. split; [exact HD | reflexivity].
+  - injection Hst as ->. right; right; right. exists D, W. split_and!; [exact HD | exact HW | reflexivity].
+Qed.
+
+(* the last cat *)
 Lemma stage_out_last_inv fc L so :
-  stage_out fc L SLast so ->
+  stage_out fc L (SLast FCat) so ->
   so = MkSO dg_execR (Some RdGone) None \/ so = MkSO [] (Some RdGone) None
   \/ exists D, D `prefix_of` L /\ so = MkSO D (Some (RdEof D)) None.
 Proof using.
-  intros H. remember SLast as st eqn:Hst.
-  destruct H as [st' | st' | | | | | | | | D HD]; try discriminate Hst.
+  intros H. remember (SLast FCat) as st eqn:Hst.
+  destruct H as [st' | st' | | | | | | | | | F D HD]; try discriminate Hst.
   - subst st'. left. reflexivity.
   - subst st'. right; left. reflexivity.
-  - right; right. exists D. split; [exact HD | reflexivity].
+  - injection Hst as ->. right; right. exists D. split; [exact HD | reflexivity].
+Qed.
+
+(* the last stage, at any filter *)
+Lemma stage_out_last_f_inv fc L F so :
+  stage_out fc L (SLast F) so ->
+  so = MkSO (filt_dg_exec F) (Some RdGone) None \/ so = MkSO [] (Some RdGone) None
+  \/ exists D, D `prefix_of` L /\ so = MkSO (fapp F D) (Some (RdEof D)) None.
+Proof using.
+  intros H. remember (SLast F) as st eqn:Hst.
+  destruct H as [st' | st' | | | | | | | | | F' D HD]; try discriminate Hst.
+  - subst st'. left. reflexivity.
+  - subst st'. right; left. reflexivity.
+  - injection Hst as ->. right; right. exists D. split; [exact HD | reflexivity].
 Qed.
 
 (* EVERY STREAM OF A RUN IS A DIAGNOSTIC (no stream starts inside the
-   panic line, nor on init's 'i') BUT THE LAST CAT'S, which is a prefix of
-   the line *)
-Lemma sfx_run_shape_i fc L m w wc ss :
-  sfx_run fc L m w wc ss ->
+   panic line, nor on init's 'i') BUT THE LAST STAGE'S, which is a prefix
+   of the line -- on a content of one line, the gate *)
+Lemma sfx_run_shape_i fc L fs w wc ss :
+  GrepFilt.oneline L -> sfx_run fc L fs w wc ss ->
   Forall (nohd pan_i) ss
   \/ exists ds c, ss = ds ++ [c] /\ Forall (nohd pan_i) ds /\ c `prefix_of` L.
 Proof using.
-  induction 1 as [win wc so Hso Hp | m win wc | m win wc so ss Hso Hp Hr IH].
-  - destruct (stage_out_last_inv fc L so Hso) as [-> | [-> | (D & HD & ->)]].
-    + left. constructor; [exact nohd_i_execR | constructor].
+  intros HL.
+  induction 1 as [F win wc so Hso Hp | F F' fs win wc | F F' fs win wc so ss Hso Hp Hr IH].
+  - destruct (stage_out_last_f_inv fc L F so Hso) as [-> | [-> | (D & HD & ->)]].
+    + left. constructor; [exact (nohd_i_filt_exec F) | constructor].
     + left. constructor; [exact I | constructor].
-    + right. exists [], D. split; [reflexivity | split; [constructor | exact HD]].
+    + right. exists [], (fapp F D).
+      split; [reflexivity | split; [constructor | exact (fapp_prefix F L D HL HD)]].
   - left. constructor; [exact nohd_i_pipe | constructor].
-  - pose proof (stage_out_nohd_i fc L SMid so Hso ltac:(discriminate)) as Hn.
+  - pose proof (stage_out_nohd_i fc L (SMid F) so Hso I) as Hn.
     destruct IH as [IH | (ds & c & -> & Hds & Hc)]; [left; constructor; [exact Hn | exact IH] | right].
     exists (so_cons so :: ds), c. split; [reflexivity | split; [constructor; [exact Hn | exact Hds] | exact Hc]].
 Qed.
 
-Lemma line_run_shape_i fc p n ss :
-  line_run fc (LPipes p n) ss ->
+Lemma line_run_shape_i fc p fs ss :
+  GrepFilt.oneline (prod_content fc p) ->
+  line_run fc (LPipes p fs) ss ->
   Forall (nohd pan_i) ss
   \/ exists ds c, ss = ds ++ [c] /\ Forall (nohd pan_i) ds /\ c `prefix_of` prod_content fc p.
 Proof using.
-  intros H. remember (LPipes p n) as l eqn:Hl.
-  destruct H as [ws | ws | ws | p' n' Hn | p' n' so ss Hso Hr]; try discriminate Hl.
+  intros HL H. remember (LPipes p fs) as l eqn:Hl.
+  destruct H as [ws | ws | ws | p' fs' Hn | p' fs' so ss Hso Hr]; try discriminate Hl.
   - left. constructor; [exact nohd_i_pipe | constructor].
   - injection Hl as -> ->.
-    pose proof (stage_out_nohd_i _ _ _ _ Hso ltac:(discriminate)) as Hn.
-    destruct (sfx_run_shape_i _ _ _ _ _ _ Hr) as [Hf | (ds & c & -> & Hds & Hc)];
+    pose proof (stage_out_nohd_i _ _ _ _ Hso I) as Hn.
+    destruct (sfx_run_shape_i _ _ _ _ _ _ HL Hr) as [Hf | (ds & c & -> & Hds & Hc)];
       [left; constructor; [exact Hn | exact Hf] | right].
     exists (so_cons so :: ds), c. split; [reflexivity | split; [constructor; [exact Hn | exact Hds] | exact Hc]].
 Qed.
 
 (* ...and read against the panic line alone *)
-Lemma sfx_run_shape fc L m w wc ss :
-  sfx_run fc L m w wc ss ->
+Lemma sfx_run_shape fc L fs w wc ss :
+  GrepFilt.oneline L -> sfx_run fc L fs w wc ss ->
   Forall (nohd alt_panic) ss
   \/ exists ds c, ss = ds ++ [c] /\ Forall (nohd alt_panic) ds /\ c `prefix_of` L.
 Proof using.
-  intros Hr. destruct (sfx_run_shape_i fc L m w wc ss Hr) as [HF | (ds & c & -> & Hds & Hc)];
+  intros HL Hr. destruct (sfx_run_shape_i fc L fs w wc ss HL Hr) as [HF | (ds & c & -> & Hds & Hc)];
     [left; exact (Forall_impl _ _ _ HF nohd_pan_i) | right].
   exists ds, c. split; [reflexivity | split; [exact (Forall_impl _ _ _ Hds nohd_pan_i) | exact Hc]].
 Qed.
 
-Lemma line_run_shape fc p n ss :
-  line_run fc (LPipes p n) ss ->
+Lemma line_run_shape fc p fs ss :
+  GrepFilt.oneline (prod_content fc p) ->
+  line_run fc (LPipes p fs) ss ->
   Forall (nohd alt_panic) ss
   \/ exists ds c, ss = ds ++ [c] /\ Forall (nohd alt_panic) ds /\ c `prefix_of` prod_content fc p.
 Proof using.
-  intros Hr. destruct (line_run_shape_i fc p n ss Hr) as [HF | (ds & c & -> & Hds & Hc)];
+  intros HL Hr. destruct (line_run_shape_i fc p fs ss HL Hr) as [HF | (ds & c & -> & Hds & Hc)];
     [left; exact (Forall_impl _ _ _ HF nohd_pan_i) | right].
   exists ds, c. split; [reflexivity | split; [exact (Forall_impl _ _ _ Hds nohd_pan_i) | exact Hc]].
 Qed.
@@ -1015,19 +1284,19 @@ Qed.
 (* ...AND AT [echo ws | cat] THE CONTENT COMES ALONE: the last cat printed
    something only if echo wrote it all, silently *)
 Lemma line_run_one fc ws ss :
-  line_run fc (LPipes (PrEcho ws) 1) ss ->
+  line_run fc (LPipes (PrEcho ws) [FCat]) ss ->
   Forall (nohd alt_panic) ss \/ ss = [[]; wl_line (drop 1 ws)].
 Proof using.
-  intros H. remember (LPipes (PrEcho ws) 1) as l eqn:Hl.
-  destruct H as [ws0 | ws0 | ws0 | p n Hn | p n so ss Hso Hr]; try discriminate Hl.
+  intros H. remember (LPipes (PrEcho ws) [FCat]) as l eqn:Hl.
+  destruct H as [ws0 | ws0 | ws0 | p fs Hn | p fs so ss Hso Hr]; try discriminate Hl.
   - left. constructor; [exact nohd_pipe | constructor].
   - injection Hl as -> ->. cbn [prod_content prod_cat] in Hso, Hr.
     set (L := wl_line (drop 1 ws)) in Hso, Hr.
-    remember 1 as m eqn:Hm in Hr. remember (wr_of so) as w0 eqn:Hw in Hr.
+    remember [FCat] as m eqn:Hm in Hr. remember (wr_of so) as w0 eqn:Hw in Hr.
     remember false as b0 eqn:Hb in Hr.
-    destruct Hr as [win wc so1 Hso1 Hp | m' win wc | m' win wc so' ss' Hso' Hp Hr'];
+    destruct Hr as [F win wc so1 Hso1 Hp | F F' fs' win wc | F F' fs' win wc so' ss' Hso' Hp Hr'];
       [| discriminate Hm | discriminate Hm].
-    subst win wc.
+    injection Hm as ->. subst win wc.
     destruct (stage_out_echo_inv _ _ _ _ Hso) as [-> | [-> | [[_ ->] | (D0 & _ & HD0 & ->)]]];
     destruct (stage_out_last_inv _ _ _ Hso1) as [-> | [-> | (D & HD & ->)]];
     cbn [so_cons so_rd so_wr rd_of wr_of pipe_pairB pipe_pair] in Hp |- *;
@@ -1051,14 +1320,21 @@ Lemma prefix_forall {A} (P : A -> Prop) (l1 l2 : list A) :
   l1 `prefix_of` l2 -> Forall P l2 -> Forall P l1.
 Proof using. intros [k ->] H. apply Forall_app in H as [H _]. exact H. Qed.
 
+Lemma dg_execG_nodollar : Forall nodollar dg_execG.
+Proof using. bdec. Qed.
+
+Lemma filt_dg_exec_nodollar F : Forall nodollar (filt_dg_exec F).
+Proof using. destruct F; [exact dg_execR_nodollar | exact dg_execG_nodollar]. Qed.
+
 Lemma stage_out_nodollar fc L st so :
-  Forall nodollar L -> (forall f, st = SProd (PrCatF f) -> wl_word f) ->
+  Forall nodollar L -> GrepFilt.oneline L -> (forall f, st = SProd (PrCatF f) -> wl_word f) ->
   stage_out fc L st so -> Forall nodollar (so_cons so).
 Proof using.
-  intros HL Hf H.
-  destruct H as [st | st | | | | | f | D HD | D HD | D HD]; cbn [so_cons].
-  - destruct st as [[ws | f] | |]; cbn [st_dg_exec];
-      [exact dg_execL_nodollar | exact dg_execR_nodollar | exact dg_execR_nodollar | exact dg_execR_nodollar].
+  intros HL HL1 Hf H.
+  destruct H as [st | st | | | | | f | F D HD | D HD | w D W HD HW | F D HD]; cbn [so_cons].
+  - destruct st as [[ws | f] | F | F]; cbn [st_dg_exec];
+      [exact dg_execL_nodollar | exact dg_execR_nodollar
+      | exact (filt_dg_exec_nodollar F) | exact (filt_dg_exec_nodollar F)].
   - constructor.
   - constructor.
   - constructor.
@@ -1068,18 +1344,19 @@ Proof using.
     apply Forall_app. split; [exact (word_nodollar f (Hf f eq_refl)) | bdec].
   - constructor.
   - bdec.
-  - exact (prefix_forall _ D L HD HL).
+  - constructor.
+  - exact (prefix_forall _ _ L (fapp_prefix F L D HL1 HD) HL).
 Qed.
 
-Lemma sfx_run_nodollar fc L m w wc ss :
-  Forall nodollar L -> sfx_run fc L m w wc ss -> Forall (Forall nodollar) ss.
+Lemma sfx_run_nodollar fc L fs w wc ss :
+  Forall nodollar L -> GrepFilt.oneline L -> sfx_run fc L fs w wc ss -> Forall (Forall nodollar) ss.
 Proof using.
-  intros HL. induction 1 as [win wc so Hso Hp | m win wc | m win wc so ss Hso Hp Hr IH].
+  intros HL HL1. induction 1 as [F win wc so Hso Hp | F F' fs win wc | F F' fs win wc so ss Hso Hp Hr IH].
   - constructor; [| constructor].
-    apply (stage_out_nodollar fc L SLast so HL); [intros f Hf; discriminate Hf | exact Hso].
+    apply (stage_out_nodollar fc L (SLast F) so HL HL1); [intros f Hf; discriminate Hf | exact Hso].
   - constructor; [bdec | constructor].
   - constructor; [| exact IH].
-    apply (stage_out_nodollar fc L SMid so HL); [intros f Hf; discriminate Hf | exact Hso].
+    apply (stage_out_nodollar fc L (SMid F) so HL HL1); [intros f Hf; discriminate Hf | exact Hso].
 Qed.
 
 (* ===================================================================== *)
@@ -1110,8 +1387,8 @@ Definition fc_ok (fc : bytes -> option bytes) : Prop :=
 
 (* an admitted line whose content IS the panic line has no cat writer *)
 Definition adm_ok (fc : bytes -> option bytes) (adm : pline' -> bool) : Prop :=
-  forall p n, adm (LPipes p n) = true -> pl_ok (LPipes p n) ->
-    prod_content fc p = alt_panic -> exists ws, p = PrEcho ws /\ n = 1.
+  forall p fs, adm (LPipes p fs) = true -> pl_ok (LPipes p fs) ->
+    prod_content fc p = alt_panic -> exists ws, p = PrEcho ws /\ fs = [FCat].
 
 Lemma prod_content_shape fc p : fc_ok fc -> prod_ok p -> lshape (prod_content fc p).
 Proof using.
@@ -1125,17 +1402,17 @@ Qed.
 Lemma line_run_nodollar fc l ss :
   fc_ok fc -> pl_ok l -> line_run fc l ss -> Forall (Forall nodollar) ss.
 Proof using.
-  intros Hfc Hl Hr. destruct Hr as [ws | ws | ws | p n Hn | p n so ss Hso Hr].
+  intros Hfc Hl Hr. destruct Hr as [ws | ws | ws | p fs Hn | p fs so ss Hso Hr].
   - constructor; [| constructor].
     exact (proj1 (pd_wl_line_shape (drop 1 ws) (lb_Forall_drop _ 1 ws (line_ok_wf ws Hl)))).
   - constructor; [exact dg_execL_nodollar | constructor].
   - constructor; constructor.
   - constructor; [bdec | constructor].
-  - destruct Hl as (Hp & _ & _). pose proof (proj1 (prod_content_shape fc p Hfc Hp)) as HL.
+  - destruct Hl as (Hp & _ & _). pose proof (prod_content_shape fc p Hfc Hp) as [HL HL1].
     constructor.
-    + apply (stage_out_nodollar fc _ (SProd p) so HL); [| exact Hso].
+    + apply (stage_out_nodollar fc _ (SProd p) so HL HL1); [| exact Hso].
       intros f Hf. injection Hf as Hf. subst p. exact Hp.
-    + exact (sfx_run_nodollar _ _ _ _ _ _ HL Hr).
+    + exact (sfx_run_nodollar _ _ _ _ _ _ HL HL1 Hr).
 Qed.
 
 (* below one wire with the panic line, a '$'-free run followed by the
@@ -1203,18 +1480,19 @@ Qed.
 
 (* a suffix every stage of which exits silently: nothing below a pipe
    vouches for anything *)
-Lemma sfx_run_silent fc L m win wc :
-  1 <= m -> sfx_run fc L m win wc (replicate m []).
+Lemma sfx_run_silent fc L fs win wc :
+  fs <> [] -> sfx_run fc L fs win wc (replicate (length fs) []).
 Proof using.
-  intros Hm. revert win wc. induction m as [| [| m] IH]; intros win wc; [lia | |].
-  - apply (sr_last fc L win wc (MkSO [] (st_rd_dead SLast) (st_wr_dead SLast))).
+  intros Hne. revert win wc. induction fs as [| F fs IH]; intros win wc; [exfalso; exact (Hne eq_refl) |].
+  destruct fs as [| F' fs'].
+  - apply (sr_last fc L F win wc (MkSO [] (st_rd_dead (SLast F)) (st_wr_dead (SLast F)))).
     + apply so_silent.
     + cbn. destruct win; exact I.
-  - cbn [replicate].
-    apply (sr_node fc L m win wc (MkSO [] (st_rd_dead SMid) (st_wr_dead SMid))).
+  - cbn [length replicate].
+    apply (sr_node fc L F F' fs' win wc (MkSO [] (st_rd_dead (SMid F)) (st_wr_dead (SMid F)))).
     + apply so_silent.
     + cbn. destruct win; exact I.
-    + exact (IH ltac:(lia) _ _).
+    + exact (IH ltac:(discriminate) _ _).
 Qed.
 
 (* one stream beside silent ones merges to itself *)
@@ -1228,21 +1506,21 @@ Qed.
 Lemma plsafe_ok fc l a : pl_nz l -> plsafe l a -> plalt_ok fc l a.
 Proof using.
   intros Hnz [-> | [-> | ->]]; [exact I | |].
-  - destruct l as [ws | p [| n]]; [| destruct Hnz |].
+  - destruct l as [ws | p [| F fs]]; [| destruct Hnz |].
     + exists [[]]. split; [apply lr_echo_silent | apply merge_all_one; reflexivity].
-    + exists ([] :: replicate (S n) []).
-      split; [| exact (merge_all_nils [] (S n))].
-      apply (lr_node fc p (S n) (MkSO [] (st_rd_dead (SProd p)) (st_wr_dead (SProd p)))).
+    + exists ([] :: replicate (length (F :: fs)) []).
+      split; [| exact (merge_all_nils [] _)].
+      apply (lr_node fc p (F :: fs) (MkSO [] (st_rd_dead (SProd p)) (st_wr_dead (SProd p)))).
       * apply so_silent.
-      * exact (sfx_run_silent _ _ (S n) _ _ ltac:(lia)).
-  - destruct l as [ws | p [| n]]; [| destruct Hnz |].
+      * exact (sfx_run_silent _ _ (F :: fs) _ _ ltac:(discriminate)).
+  - destruct l as [ws | p [| F fs]]; [| destruct Hnz |].
     + exists [dg_execL]. split; [apply lr_echo_exec | apply merge_all_one; reflexivity].
-    + exists (st_dg_exec (SProd p) :: replicate (S n) []).
-      split; [| exact (merge_all_nils _ (S n))].
-      apply (lr_node fc p (S n)
+    + exists (st_dg_exec (SProd p) :: replicate (length (F :: fs)) []).
+      split; [| exact (merge_all_nils _ _)].
+      apply (lr_node fc p (F :: fs)
                (MkSO (st_dg_exec (SProd p)) (st_rd_dead (SProd p)) (st_wr_dead (SProd p)))).
       * apply so_exec.
-      * exact (sfx_run_silent _ _ (S n) _ _ ltac:(lia)).
+      * exact (sfx_run_silent _ _ (F :: fs) _ _ ltac:(discriminate)).
 Qed.
 
 (* AT AN ADMITTED LINE WITH RUNS the range condition is [plalt_ok] *)
@@ -1261,7 +1539,7 @@ Proof using. intros Ha Hnz. exact (pipes_lm_ok_iff fc adm s l (PLRun b) Ha Hnz).
 (* the exec diagnostic has a word line's shape *)
 Lemma pl_exfb_shape l : lshape (pl_exfb l).
 Proof using.
-  destruct l as [ws | [ws | f] n]; cbn [pl_exfb st_dg_exec].
+  destruct l as [ws | [ws | f] fs]; cbn [pl_exfb st_dg_exec].
   - exact (pd_wl_line_shape' dg_exec ltac:(bdec)).
   - exact (pd_wl_line_shape' dg_exec ltac:(bdec)).
   - exact (pd_wl_line_shape' dg_exec_cat ltac:(bdec)).
@@ -1275,7 +1553,7 @@ Lemma pipes_block_shape fc adm l b :
                    \/ (alt_panic ++ Z) `prefix_of` (b ++ u_prompt ++ Y)) -> b = alt_panic).
 Proof using.
   intros Hfc Hadm Ha Hl (ss & Hr & Hm).
-  destruct l as [ws | p n].
+  destruct l as [ws | p fs].
   - (* an echo line: the line, the exec diagnostic, or nothing *)
     assert (Hsh : lshape b).
     { assert (Hwf : wl_wf ws) by exact (line_ok_wf ws Hl).
@@ -1285,11 +1563,11 @@ Proof using.
       - split; [constructor | left; apply not_elem_of_nil]. }
     destruct Hsh as [Hnd Hnl]. split; [exact Hnd |].
     intros Y Z Hcmp. exact (lb_out_eq_panic b Y Z Hnd Hnl Hcmp).
-  - pose proof Hl as (Hp & Hn & Hlen).
+  - pose proof Hl as (Hp & Hn & _).
     pose proof (prod_content_shape fc p Hfc Hp) as HL.
     split; [exact (merge_all_forall _ ss b Hm (line_run_nodollar fc _ ss Hfc Hl Hr)) |].
     intros Y Z Hcmp. pose proof (cmp_panic_prefix b Y Z Hcmp) as Hpb.
-    destruct (line_run_shape fc p n ss Hr) as [HF | (ds & c & -> & Hds & Hc)].
+    destruct (line_run_shape fc p fs ss (proj2 HL) Hr) as [HF | (ds & c & -> & Hds & Hc)].
     + exfalso. exact (nohd_no_panic _ _ Hm HF Hpb).
     + destruct Hpb as [r ->].
       destruct (merge_prefix_from alt_panic (ds ++ [c]) (length ds) c r Hm) as [Hpc _].
@@ -1298,7 +1576,7 @@ Proof using.
         - exact (Forall_lookup_1 _ _ _ _ Hds Hi).
         - apply list_lookup_singleton_Some in Hi as [Hi0 _]. lia. }
       destruct (panic_prefix_shape _ c HL Hc Hpc) as [HLp _].
-      destruct (Hadm p n Ha Hl HLp) as (ws & -> & ->).
+      destruct (Hadm p fs Ha Hl HLp) as (ws & -> & ->).
       destruct (line_run_one fc ws _ Hr) as [HF | Hss].
       * exfalso. apply (nohd_no_panic _ _ Hm HF). by exists r.
       * rewrite Hss in Hm. apply merge2_shuf2, shuf2_nil_l in Hm.
@@ -1307,19 +1585,24 @@ Qed.
 
 Lemma pl_body_bytes l : pl_ok l -> Forall pbody_byte (pl_body l).
 Proof using.
-  destruct l as [ws | p n]; cbn [pl_ok pl_body]; intros Hok.
+  destruct l as [ws | p fs]; cbn [pl_ok pl_body]; intros Hok.
   - eapply Forall_impl; [exact (wl_body_bytes ws (line_ok_wf ws Hok)) | exact pbody_byte_of_body].
-  - destruct Hok as (Hp & _ & _). apply Forall_app. split.
+  - destruct Hok as (Hp & _ & HF & _). apply Forall_app. split.
     + eapply Forall_impl; [exact (prod_body_bytes p Hp) | exact pbody_byte_of_body].
-    + induction n as [| n IH]; [constructor |].
-      rewrite suf_n_S. apply Forall_app. split; [exact IH | exact suf_pipecat_bytes].
+    + clear Hp. induction fs as [| F fs IH]; [constructor |].
+      apply Forall_cons_1 in HF as [HF1 HF].
+      rewrite FileDisc.suf_filts_cons, suf_filt_sep. apply Forall_app. split; [| exact (IH HF)].
+      apply Forall_app. split.
+      * unfold pl_sep. constructor; [left; right; reflexivity |].
+        constructor; [right; reflexivity |]. constructor; [left; right; reflexivity | constructor].
+      * eapply Forall_impl; [exact (wl_body_bytes _ (FileDisc.filt_wf F HF1)) | exact pbody_byte_of_body].
 Qed.
 
 Lemma pl_body_short l : pl_ok l -> S (length (pl_body l)) < line_max.
 Proof using.
-  destruct l as [ws | p n]; intros Hok.
+  destruct l as [ws | p fs]; intros Hok.
   - pose proof (line_ok_len ws Hok) as H. rewrite wl_line_length in H. cbn [pl_body]. lia.
-  - destruct Hok as (_ & _ & H). exact H.
+  - destruct Hok as (_ & _ & _ & H). exact H.
 Qed.
 
 (* ---- THE BYTES AFTER A PANIC LINE: init's next round ---- *)
@@ -1385,7 +1668,7 @@ Qed.
 Lemma pipes_block_nodollar fc l b :
   fc_ok fc -> pl_ok l -> line_blocks fc l b -> Forall nodollar b.
 Proof using.
-  intros Hfc Hl Hb. destruct l as [ws | p n].
+  intros Hfc Hl Hb. destruct l as [ws | p fs].
   - exact (proj1 (echo_block_shape fc ws b Hl Hb)).
   - destruct Hb as (ss & Hr & Hm).
     exact (merge_all_forall _ ss b Hm (line_run_nodollar fc _ ss Hfc Hl Hr)).
@@ -1402,7 +1685,7 @@ Lemma pipes_block_below_panic fc l b Y ps W :
 Proof using.
   intros Hfc Hl Hb Hps Hbp.
   pose proof (lm_below_panic_any b Y ps W Hbp) as Hcmp.
-  destruct l as [ws | p n].
+  destruct l as [ws | p fs].
   - destruct (echo_block_shape fc ws b Hl Hb) as [Hnd Hnl].
     exact (lb_out_eq_panic b Y _ Hnd Hnl Hcmp).
   - pose proof (pipes_block_nodollar fc _ b Hfc Hl Hb) as Hnd.
@@ -1410,7 +1693,7 @@ Proof using.
     pose proof Hl as (Hp & _ & _).
     pose proof (prod_content_shape fc p Hfc Hp) as HL.
     pose proof (cmp_panic_prefix b Y _ Hcmp) as Hpb.
-    destruct (line_run_shape_i fc p n ss Hr) as [HF | (ds & c & -> & Hds & Hc)].
+    destruct (line_run_shape_i fc p fs ss (proj2 HL) Hr) as [HF | (ds & c & -> & Hds & Hc)].
     + exfalso. exact (nohd_no_panic _ _ Hm (Forall_impl _ _ _ HF nohd_pan_i) Hpb).
     + destruct Hpb as [r ->].
       destruct (merge_prefix_from alt_panic (ds ++ [c]) (length ds) c r Hm) as [Hpc Hr'].
@@ -1495,31 +1778,33 @@ Proof using. intros f c H. discriminate H. Qed.
 
 (* the landed one-pipe application's lines: [echo ..] and [echo .. | cat] *)
 Definition adm1 (l : pline') : bool :=
-  match l with LEcho' _ => true | LPipes (PrEcho _) 1 => true | _ => false end.
+  match l with LEcho' _ => true | LPipes (PrEcho _) [FCat] => true | _ => false end.
 (* every echo pipeline: THE PIPELINE APPLICATION'S ADMISSION (owner ruling
    2026-09-24: the user may type [echo fork | cat | cat]; its output need
    not be distinguishable from a panic) *)
 Definition adm_echo (l : pline') : bool :=
-  match l with LEcho' _ => true | LPipes (PrEcho _) _ => true | _ => false end.
+  match l with LEcho' _ => true | LPipes (PrEcho _) fs => all_cats fs | _ => false end.
 (* every echo pipeline but [echo fork | cat | cat ..]: what the laws
    asked before the ruling, kept for the demos *)
 Definition adm_echo_safe (l : pline') : bool :=
   match l with
   | LEcho' _ => true
-  | LPipes (PrEcho ws) n => bool_decide (n = 1 \/ wl_line (drop 1 ws) <> alt_panic)
+  | LPipes (PrEcho ws) fs =>
+      all_cats fs && bool_decide (fs = [FCat] \/ wl_line (drop 1 ws) <> alt_panic)
   | _ => false
   end.
 
 Lemma adm1_ok fc : adm_ok fc adm1.
 Proof using.
-  intros p n Ha _ _. destruct p as [ws | f]; [| discriminate Ha].
-  destruct n as [| [| n]]; try discriminate Ha. exists ws. split; reflexivity.
+  intros p fs Ha _ _. destruct p as [ws | f]; [| discriminate Ha].
+  destruct fs as [| [| w] [| F fs]]; try discriminate Ha. exists ws. split; reflexivity.
 Qed.
 
 Lemma adm_echo_safe_ok fc : adm_ok fc adm_echo_safe.
 Proof using.
-  intros p n Ha _ Hc. destruct p as [ws | f]; [| discriminate Ha].
-  cbn [adm_echo_safe] in Ha. apply bool_decide_eq_true in Ha. cbn [prod_content] in Hc.
+  intros p fs Ha _ Hc. destruct p as [ws | f]; [| discriminate Ha].
+  cbn [adm_echo_safe] in Ha. apply andb_true_iff in Ha as [_ Ha].
+  apply bool_decide_eq_true in Ha. cbn [prod_content] in Hc.
   destruct Ha as [-> | Hne]; [exists ws; split; reflexivity | exfalso; exact (Hne Hc)].
 Qed.
 
@@ -1547,7 +1832,7 @@ Definition pipes_echo_sess_prefix_det :=
 (* ---- [echo fork | cat | cat]: AN OUTPUT THAT OPENS ON THE PANIC LINE ---- *)
 
 Definition ws_fork : list bytes := [cmd_echo; sb "fork"%string].
-Definition l_fork2 : pline' := LPipes (PrEcho ws_fork) 2.
+Definition l_fork2 : pline' := LPipes (PrEcho ws_fork) (cats 2).
 
 Lemma l_fork2_ok : pl_ok l_fork2.
 Proof using. bdec. Qed.
@@ -1563,15 +1848,16 @@ Qed.
 Lemma fork2_corner fc : line_blocks fc l_fork2 (alt_panic ++ cat_dg_write).
 Proof using.
   exists [[]; cat_dg_write; alt_panic]. split.
-  - apply (lr_node fc (PrEcho ws_fork) 2 (MkSO [] None (Some (WrAll alt_panic)))).
+  - apply (lr_node fc (PrEcho ws_fork) (cats 2) (MkSO [] None (Some (WrAll alt_panic)))).
     + change (prod_content fc (PrEcho ws_fork)) with alt_panic.
       apply so_echo. reflexivity.
     + change (prod_content fc (PrEcho ws_fork)) with alt_panic.
-      apply (sr_node fc alt_panic 0 (WrAll alt_panic) false
+      apply (sr_node fc alt_panic FCat FCat [] (WrAll alt_panic) false
                (MkSO cat_dg_write (Some RdGone) (Some (WrHalt [])))).
       * apply so_mid_halt. apply prefix_nil.
       * exact I.
-      * apply (sr_last fc alt_panic (WrHalt []) true (MkSO alt_panic (Some (RdEof alt_panic)) None)).
+      * apply (sr_last fc alt_panic FCat (WrHalt []) true
+                 (MkSO alt_panic (Some (RdEof alt_panic)) None)).
         -- apply so_last. reflexivity.
         -- split; reflexivity.
   - apply (merge_all_block' _ 2 alt_panic cat_dg_write); [reflexivity | | reflexivity].
@@ -1625,10 +1911,11 @@ Qed.
 Theorem cat_mid_stage_of_exit fc (L S : bytes) files paths (E' : penv) :
   reach_exit (copy_env (DCopy flt_id true [] S []) [[]; cat_dg_write] files paths) (cat_tree [sb "cat"]) E' ->
   (E' = copy_env (DCopyEnd flt_id true []) [[]; cat_dg_write] files paths
-   /\ forall D, D `prefix_of` L -> stage_out fc L SMid (MkSO [] (Some (RdEof D)) (Some (WrAll D))))
+   /\ forall D, D `prefix_of` L ->
+        stage_out fc L (SMid FCat) (MkSO [] (Some (RdEof D)) (Some (WrAll D))))
   \/ ((exists S', E' = copy_env (DCopyHalt (Some S')) [[]] files paths)
       /\ forall D, D `prefix_of` L ->
-           stage_out fc L SMid (MkSO cat_dg_write (Some RdGone) (Some (WrHalt D)))).
+           stage_out fc L (SMid FCat) (MkSO cat_dg_write (Some RdGone) (Some (WrHalt D)))).
 Proof using.
   intros Hr. destruct (cat_copy_exits true S _ files paths E' Hr) as [-> | (_ & _ & S' & ->)].
   - left. split; [reflexivity |]. intros D HD. apply so_mid_copy. exact HD.
@@ -1639,11 +1926,49 @@ Qed.
 Theorem cat_last_stage_of_exit fc (L S : bytes) files paths (E' : penv) :
   reach_exit (copy_env (DCopy flt_id false [] S []) [[]] files paths) (cat_tree [sb "cat"]) E' ->
   E' = copy_env (DCopyEnd flt_id false []) [[]] files paths
-  /\ forall D, D `prefix_of` L -> stage_out fc L SLast (MkSO D (Some (RdEof D)) None).
+  /\ forall D, D `prefix_of` L -> stage_out fc L (SLast FCat) (MkSO D (Some (RdEof D)) None).
 Proof using.
   intros Hr. destruct (cat_copy_exits false S _ files paths E' Hr) as [-> | (Hf & _)];
     [| discriminate Hf].
   split; [reflexivity |]. intros D HD. apply so_last. exact HD.
+Qed.
+
+(* a middle grep (cut G3): the filter device at a sink that may halt.  It
+   reads to end of file either way, prints nothing of its own, and owes
+   [GrepTree.grep_out w] of what it read -- all of it, or (its reader
+   gone) a prefix *)
+Theorem grep_mid_stage_of_exit fc (w L S : bytes) (alts : list bytes) files paths (E' : penv) :
+  reach_exit (copy_env (DCopy (GrepFilt.flt_grep w) true [] S []) alts files paths)
+             (GrepTree.grep_tree [sb "grep"%string; w]) E' ->
+  [] ∈ alts
+  /\ ((E' = copy_env (DCopyEnd (GrepFilt.flt_grep w) true []) alts files paths
+       /\ forall D, D `prefix_of` L ->
+            stage_out fc L (SMid (FGrep w))
+              (MkSO [] (Some (RdEof D)) (Some (WrAll (GrepTree.grep_out w D)))))
+      \/ (E' = copy_env (DCopyHalt None) alts files paths
+          /\ forall D W, D `prefix_of` L -> W `prefix_of` GrepTree.grep_out w D ->
+               stage_out fc L (SMid (FGrep w)) (MkSO [] (Some (RdEof D)) (Some (WrHalt W))))).
+Proof using.
+  intros Hr. destruct (GrepFilt.grep_filt_exits w true S alts files paths E' Hr) as [Ha [-> | [_ ->]]].
+  - split; [exact Ha |]. left. split; [reflexivity |].
+    intros D HD. exact (so_mid_f fc L (FGrep w) D HD).
+  - split; [exact Ha |]. right. split; [reflexivity |].
+    intros D W HD HW. exact (so_grep_halt fc L w D W HD HW).
+Qed.
+
+(* the last grep: the filter device at the console, which never halts *)
+Theorem grep_last_stage_of_exit fc (w L S : bytes) (alts : list bytes) files paths (E' : penv) :
+  reach_exit (copy_env (DCopy (GrepFilt.flt_grep w) false [] S []) alts files paths)
+             (GrepTree.grep_tree [sb "grep"%string; w]) E' ->
+  [] ∈ alts
+  /\ E' = copy_env (DCopyEnd (GrepFilt.flt_grep w) false []) alts files paths
+  /\ forall D, D `prefix_of` L ->
+       stage_out fc L (SLast (FGrep w)) (MkSO (GrepTree.grep_out w D) (Some (RdEof D)) None).
+Proof using.
+  intros Hr. destruct (GrepFilt.grep_filt_exits w false S alts files paths E' Hr)
+    as [Ha [-> | [Hf _]]]; [| discriminate Hf].
+  split; [exact Ha |]. split; [reflexivity |].
+  intros D HD. exact (so_last_f fc L (FGrep w) D HD).
 Qed.
 
 (* cat f at a pipe's write end, the file present with content [c] *)
@@ -1680,7 +2005,7 @@ Qed.
 Definition ptr (l : pline) : pline' :=
   match l with
   | PipeDisc.LEcho ws => LEcho' ws
-  | LPipe ws => LPipes (PrEcho ws) 1
+  | LPipe ws => LPipes (PrEcho ws) [FCat]
   end.
 
 (* the landed alternatives, read as this model's: the block they print *)
@@ -1736,21 +2061,21 @@ Local Ltac pick6 :=
 
 (* THE RUNS OF [echo ws | cat], all six *)
 Lemma line_run_one_iff fc ws ss :
-  line_run fc (LPipes (PrEcho ws) 1) ss <->
+  line_run fc (LPipes (PrEcho ws) [FCat]) ss <->
   ss = [dg_pipe_b] \/ ss = [dg_execL; dg_execR] \/ ss = [dg_execL; []]
   \/ ss = [[]; dg_execR] \/ ss = [[]; []] \/ ss = [[]; wl_line (drop 1 ws)].
 Proof using.
   split.
-  - intros H. remember (LPipes (PrEcho ws) 1) as l eqn:Hl.
-    destruct H as [ws0 | ws0 | ws0 | p n Hn | p n so ss Hso Hr]; try discriminate Hl.
+  - intros H. remember (LPipes (PrEcho ws) [FCat]) as l eqn:Hl.
+    destruct H as [ws0 | ws0 | ws0 | p fs Hn | p fs so ss Hso Hr]; try discriminate Hl.
     + left. reflexivity.
     + injection Hl as -> ->. cbn [prod_content prod_cat] in Hso, Hr.
       set (L := wl_line (drop 1 ws)) in Hso, Hr.
-      remember 1 as m eqn:Hm in Hr. remember (wr_of so) as w0 eqn:Hw in Hr.
+      remember [FCat] as m eqn:Hm in Hr. remember (wr_of so) as w0 eqn:Hw in Hr.
       remember false as b0 eqn:Hb in Hr.
-      destruct Hr as [win wc so1 Hso1 Hp | m' win wc | m' win wc so' ss' Hso' Hp Hr'];
+      destruct Hr as [F win wc so1 Hso1 Hp | F F' fs' win wc | F F' fs' win wc so' ss' Hso' Hp Hr'];
         [| discriminate Hm | discriminate Hm].
-      subst win wc.
+      injection Hm as ->. subst win wc.
       destruct (stage_out_echo_inv _ _ _ _ Hso) as [-> | [-> | [[_ ->] | (D0 & _ & HD0 & ->)]]];
       destruct (stage_out_last_inv _ _ _ Hso1) as [-> | [-> | (D & HD & ->)]];
       cbn [so_cons so_rd so_wr rd_of wr_of pipe_pairB pipe_pair] in Hp |- *;
@@ -1763,22 +2088,22 @@ Proof using.
       by exact (so_silent fc L (SProd (PrEcho ws))).
     assert (Hok : stage_out fc L (SProd (PrEcho ws)) (MkSO [] None (Some (WrAll L))))
       by (apply so_echo; reflexivity).
-    assert (Rex : forall w, sfx_run fc L 1 w false [dg_execR]).
-    { intros w. refine (sr_last fc L w false (MkSO dg_execR (Some RdGone) None) _ _).
-      - exact (so_exec fc L SLast).
+    assert (Rex : forall w, sfx_run fc L [FCat] w false [dg_execR]).
+    { intros w. refine (sr_last fc L FCat w false (MkSO dg_execR (Some RdGone) None) _ _).
+      - exact (so_exec fc L (SLast FCat)).
       - cbn. destruct w; exact I. }
-    assert (Rsi : forall w, sfx_run fc L 1 w false [[]]).
-    { intros w. refine (sr_last fc L w false (MkSO [] (Some RdGone) None) _ _).
-      - exact (so_silent fc L SLast).
+    assert (Rsi : forall w, sfx_run fc L [FCat] w false [[]]).
+    { intros w. refine (sr_last fc L FCat w false (MkSO [] (Some RdGone) None) _ _).
+      - exact (so_silent fc L (SLast FCat)).
       - cbn. destruct w; exact I. }
     intros [-> | [-> | [-> | [-> | [-> | ->]]]]].
-    + apply lr_pipe_fail. lia.
-    + exact (lr_node fc (PrEcho ws) 1 _ _ Hex (Rex _)).
-    + exact (lr_node fc (PrEcho ws) 1 _ _ Hex (Rsi _)).
-    + exact (lr_node fc (PrEcho ws) 1 _ _ Hok (Rex _)).
-    + exact (lr_node fc (PrEcho ws) 1 _ _ Hsi (Rsi _)).
-    + refine (lr_node fc (PrEcho ws) 1 _ [L] Hok _).
-      refine (sr_last fc L (WrAll L) false (MkSO L (Some (RdEof L)) None) _ _).
+    + apply lr_pipe_fail. discriminate.
+    + exact (lr_node fc (PrEcho ws) [FCat] _ _ Hex (Rex _)).
+    + exact (lr_node fc (PrEcho ws) [FCat] _ _ Hex (Rsi _)).
+    + exact (lr_node fc (PrEcho ws) [FCat] _ _ Hok (Rex _)).
+    + exact (lr_node fc (PrEcho ws) [FCat] _ _ Hsi (Rsi _)).
+    + refine (lr_node fc (PrEcho ws) [FCat] _ [L] Hok _).
+      refine (sr_last fc L FCat (WrAll L) false (MkSO L (Some (RdEof L)) None) _ _).
       * apply so_last. reflexivity.
       * exact eq_refl.
 Qed.
@@ -1802,14 +2127,14 @@ Proof using.
 Qed.
 
 Lemma line_term_one fc ws W s :
-  line_term fc (LPipes (PrEcho ws) 1) W s -> W = [dg_fork_b] /\ (s = dg_execL \/ s = []).
+  line_term fc (LPipes (PrEcho ws) [FCat]) W s -> W = [dg_fork_b] /\ (s = dg_execL \/ s = []).
 Proof using.
-  intros H. remember (LPipes (PrEcho ws) 1) as l eqn:Hl.
-  destruct H as [p n so Hn Hso | p n so W s Hso Ht]; injection Hl as -> ->.
+  intros H. remember (LPipes (PrEcho ws) [FCat]) as l eqn:Hl.
+  destruct H as [p fs so Hn Hso | p fs so W s Hso Ht]; injection Hl as -> ->.
   - split; [reflexivity |].
     destruct (stage_out_echo_inv _ _ _ _ Hso) as [-> | [-> | [[_ ->] | (D0 & _ & HD0 & ->)]]];
       [left | right | right | right]; reflexivity.
-  - exfalso. remember 1 as m eqn:Hm in Ht. destruct Ht; discriminate Hm.
+  - exfalso. remember [FCat] as m eqn:Hm in Ht. destruct Ht; discriminate Hm.
 Qed.
 
 (* ---- the two directions of the n = 1 bridge, alternative by alternative *)
@@ -1851,7 +2176,8 @@ Proof using.
       * exists (pmerge sel dg_execL alt_forkc ++ drop (length sel - c) alt_forkc).
         split; [| by exists (drop (length sel - c) alt_forkc)].
         exists [dg_fork_b], dg_execL, dg_fork_b, p1. split.
-        { refine (lt_here fc (PrEcho ws) 1 (MkSO dg_execL None (Some WrNone)) _ _); [lia |].
+        { refine (lt_here fc (PrEcho ws) [FCat] (MkSO dg_execL None (Some WrNone)) _ _);
+            [discriminate |].
           exact (so_exec fc _ (SProd (PrEcho ws))). }
         split; [apply merge_all_one; reflexivity |]. split; [apply prefix_take |].
         apply merge2_shuf2. rewrite Hu.
@@ -1901,8 +2227,8 @@ Qed.
    exactly the landed ones, read as the blocks they print, with the same
    continuation, the same panic bit and the same coverage-ending bit *)
 Theorem pipes_one_iff fc adm s ws a :
-  adm (LPipes (PrEcho ws) 1) = true ->
-  (lm_ok (pipes_lm fc adm) s (LPipes (PrEcho ws) 1) a
+  adm (LPipes (PrEcho ws) [FCat]) = true ->
+  (lm_ok (pipes_lm fc adm) s (LPipes (PrEcho ws) [FCat]) a
    <-> exists pa, palt_ok (LPipe ws) pa /\ a = palt_to (LPipe ws) pa).
 Proof using.
   intros Ha. rewrite (pipes_lm_ok_iff fc adm s _ a Ha I). split.
@@ -1937,7 +2263,7 @@ Lemma pl_merge1_pmergeable fc u : pl_merge fc adm1 u <-> pmergeable u.
 Proof using.
   split.
   - intros (l & b & Ha & Hok & Hu).
-    destruct l as [ws | [ws | f] [| [| n]]]; cbn [adm1] in Ha; try discriminate Ha.
+    destruct l as [ws | [ws | f] [| [| w] [| F fs]]]; cbn [adm1] in Ha; try discriminate Ha.
     + exfalso. destruct Hok as (_ & b' & (W & s & Wm & sp & Ht & _) & _). inversion Ht.
     + destruct (palt_of_ok fc (LPipe ws) (PLTerm b) Hok) as (pa & Hpa & Heq).
       destruct pa as [[| [| [| [| k]]]] | | | | sel | | sel |]; cbn [palt_to] in Heq;
@@ -1947,12 +2273,12 @@ Proof using.
   - intros Hm. apply shufb_shuf2 in Hm as (p1 & p2 & H1 & H2 & Hs).
     set (ws := [cmd_echo]).
     destruct u as [| x u'].
-    + exists (LPipes (PrEcho ws) 1), (pmerge sel_forkc dg_execL alt_forkc).
+    + exists (LPipes (PrEcho ws) [FCat]), (pmerge sel_forkc dg_execL alt_forkc).
       split; [reflexivity | split; [| apply prefix_nil]].
       exact (palt_to_ok fc (LPipe ws) (PForkS sel_forkc) (palt_ok_forkS_old ws)).
     + destruct (forks_sel p1 p2 (x :: u') dg_execL alt_forkc H1 H2 Hs)
         as (sel & Hc1 & Hc2 & Hu & Hlen).
-      exists (LPipes (PrEcho ws) 1), (x :: u').
+      exists (LPipes (PrEcho ws) [FCat]), (x :: u').
       split; [reflexivity | split; [| reflexivity]].
       assert (Hpa : palt_ok (LPipe ws) (PForkS sel)).
       { split; [intros ->; discriminate Hlen | split; [exact Hc1 | exact Hc2]]. }
@@ -1965,13 +2291,13 @@ Qed.
 (* the one-pipe application's model, as an instance of this one *)
 Definition pipes_lm1 : lmodel := pipes_lm (fun _ => None) adm1.
 
-Lemma suf_n_1 : suf_n 1 = suf_pipecat.
-Proof using. unfold suf_n. cbn [replicate concat]. apply app_nil_r. Qed.
+Lemma suf_filts_1 : FileDisc.suf_filts [FCat] = suf_pipecat.
+Proof using. vm_compute. reflexivity. Qed.
 
 Lemma ptr_body l : pl_body (ptr l) = line_body l.
 Proof using.
   destruct l as [ws | ws]; cbn [ptr pl_body line_body]; [reflexivity |].
-  rewrite suf_n_1. reflexivity.
+  rewrite suf_filts_1. reflexivity.
 Qed.
 
 Lemma ptr_pl_ok l : pl_ok (ptr l) <-> pline_ok l.
@@ -1979,8 +2305,9 @@ Proof using.
   destruct l as [ws | ws]; [reflexivity |].
   pose proof (ptr_body (LPipe ws)) as E. cbn [ptr] in E.
   cbn [ptr pl_ok pline_ok prod_ok]. rewrite E. unfold line_bytes. rewrite length_app. cbn [length].
-  split; [intros (H1 & _ & H2); split; [exact H1 | lia]
-         | intros [H1 H2]; split; [exact H1 | split; lia]].
+  split; [intros (H1 & _ & _ & H2); split; [exact H1 | lia]
+         | intros [H1 H2]; split; [exact H1 |]].
+  split; [discriminate | split; [constructor; [exact I | constructor] | lia]].
 Qed.
 
 Lemma ptr_adm1 l : adm1 (ptr l) = true.
@@ -2000,7 +2327,7 @@ Proof using.
     apply pl_body_ok_of; [apply ptr_adm1 | apply ptr_pl_ok; exact Hok].
   - intros Hb. destruct (pl_body_ok_line adm1 b Hb) as (Ha & Hok & Hbeq).
     rewrite Hbeq. revert Ha Hok.
-    destruct (pl_of b) as [ws | [ws | f] [| [| n]]]; intros Ha Hok; cbn [adm1] in Ha;
+    destruct (pl_of b) as [ws | [ws | f] [| [| w] [| F fs]]]; intros Ha Hok; cbn [adm1] in Ha;
       try discriminate Ha.
     + exact (pbody_ok_of (PipeDisc.LEcho ws) Hok).
     + change (pbody_ok (pl_body (ptr (LPipe ws)))). rewrite ptr_body.
@@ -2048,7 +2375,7 @@ Proof using.
 Qed.
 
 Lemma adm1_nz l : adm1 l = true -> pl_nz l.
-Proof using. destruct l as [ws | [ws | f] [| [| n]]]; cbn; done. Qed.
+Proof using. destruct l as [ws | [ws | f] [| [| w] [| F fs]]]; cbn; done. Qed.
 
 (* ...at a line the landed application admits: the shell's own
    alternatives at a line it does not admit have no landed twin *)

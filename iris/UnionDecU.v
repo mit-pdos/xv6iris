@@ -140,16 +140,16 @@ Proof using.
 Qed.
 
 Lemma ud_lterm_shape fc p n W s :
-  line_term fc (LPipes p n) W s ->
+  all_cats n = true -> line_term fc (LPipes p n) W s ->
   (W = [dg_fork_b] /\ s ∈ ud_prod p)
   \/ (exists pc mids, W = pc :: mids ++ [dg_fork_b] /\ pc ∈ ud_prod p
                       /\ Forall pde_midok mids /\ pde_midok s).
 Proof using.
-  intros H. remember (LPipes p n) as l eqn:Hl.
+  intros Hc H. remember (LPipes p n) as l eqn:Hl.
   destruct H as [p' n' so Hn Hso | p' n' so W' s' Hso Ht]; injection Hl as -> ->.
   - left. split; [reflexivity | exact (ud_prod_cons _ _ _ _ Hso)].
   - right.
-    destruct (pde_sfx_shape _ _ _ _ _ _ (sfx_term_fc fc (fun _ => None) _ _ _ _ _ _ Ht))
+    destruct (pde_sfx_shape _ _ _ _ _ _ (sfx_term_fc fc (fun _ => None) _ _ _ _ _ _ Ht) Hc)
       as (mids & -> & HF & Hs).
     exists (so_cons so), mids. split_and!; [reflexivity | exact (ud_prod_cons _ _ _ _ Hso)
                                           | exact HF | exact Hs].
@@ -161,23 +161,24 @@ Definition prodU : list bytes :=
 
 Lemma ud_prod_U p n x : adm_u_f (LPipes p n) = true -> x ∈ ud_prod p -> x ∈ prodU.
 Proof using.
-  unfold prodU. destruct p as [ws | g]; cbn [adm_u_f ud_prod]; intros Ha Hx;
+  unfold prodU. destruct p as [ws | g]; cbn [ud_prod]; intros Ha Hx;
     apply elem_of_list_In in Hx.
   - destruct Hx as [<- | [<- | []]]; ud_elem.
-  - apply bool_decide_eq_true in Ha as ->.
+  - apply adm_u_f_catf in Ha as [-> _].
     destruct Hx as [<- | [<- | [<- | [<- | []]]]]; ud_elem.
 Qed.
 
 (* each of them is a producer's stream at [Some []] *)
 Lemma ud_real pc :
   pc ∈ prodU ->
-  exists p, (forall n, adm_u_f (LPipes p n) = true)
+  exists p, (forall n, adm_u_f (LPipes p (cats n)) = true)
             /\ exists so, stage_out fc0 (prod_content fc0 p) (SProd p) so /\ so_cons so = pc.
 Proof using.
   unfold prodU. intros Hpc. apply elem_of_list_In in Hpc.
-  assert (HE : forall n, adm_u_f (LPipes (PrEcho []) n) = true) by reflexivity.
-  assert (HC : forall n, adm_u_f (LPipes (PrCatF fname_f) n) = true)
-    by (intros n; cbn [adm_u_f]; by apply bool_decide_eq_true).
+  assert (HE : forall n, adm_u_f (LPipes (PrEcho []) (cats n)) = true)
+    by (intros n; exact (FileDisc.all_cats_cats n)).
+  assert (HC : forall n, adm_u_f (LPipes (PrCatF fname_f) (cats n)) = true)
+    by (intros n; apply adm_u_f_catf; split; [reflexivity | exact (FileDisc.all_cats_cats n)]).
   destruct Hpc as [<- | [<- | [<- | [<- | [<- | []]]]]].
   - exists (PrEcho []). split; [exact HE |]. eexists. split; [apply so_silent | reflexivity].
   - exists (PrEcho []). split; [exact HE |]. eexists. split; [apply so_exec | reflexivity].
@@ -190,11 +191,11 @@ Proof using.
 Qed.
 
 Lemma ud_merge_of_lt p n W s u :
-  (forall n, adm_u_f (LPipes p n) = true) ->
-  line_term fc0 (LPipes p n) W s -> pde_pmt W u_prompt s u -> pl_merge fc0 adm_u_f u.
+  (forall n, adm_u_f (LPipes p (cats n)) = true) ->
+  line_term fc0 (LPipes p (cats n)) W s -> pde_pmt W u_prompt s u -> pl_merge fc0 adm_u_f u.
 Proof using.
   intros Ha Hlt Hp. destruct (pde_pmt_blk _ _ _ _ Hp) as (Wm & b & HW & Hb & Hu).
-  exists (LPipes p n), b. split; [exact (Ha n) |]. split; [| exact Hu].
+  exists (LPipes p (cats n)), b. split; [exact (Ha n) |]. split; [| exact Hu].
   split.
   - intros ->. pose proof (pde_merge_len _ _ Hb) as Hl. unfold pde_total in Hl.
     simpl in Hl. rewrite !length_app ll_prompt_len in Hl. simpl in Hl. lia.
@@ -217,7 +218,8 @@ Proof using.
                    ltac:(etrans; [exact Hu | exact Hbb])) Hsp) as Hp.
   destruct l as [ws | p n]; [discriminate Ha |].
   unfold umergeb. apply orb_true_iff.
-  destruct (ud_lterm_shape _ _ _ _ _ Hlt) as [[-> Hs] | (pc & mids & -> & Hpc & HF & Hs)].
+  destruct (ud_lterm_shape _ _ _ _ _ (adm_u_f_all _ _ Ha) Hlt)
+    as [[-> Hs] | (pc & mids & -> & Hpc & HF & Hs)].
   - right. apply existsb_exists. exists s.
     split; [apply elem_of_list_In; exact (ud_prod_U p n s Ha Hs) |].
     apply (pde_chk_complete _ _ _ _ Hp [dg_fork_b] [] false); [by rewrite app_nil_r | constructor].
@@ -249,7 +251,7 @@ Proof using.
     destruct Mu as [| m Mu]; [| apply Forall_cons in HF as [[Hf _] _]; discriminate Hf].
     destruct (ud_real s (proj2 (elem_of_list_In _ _) Hsin)) as (p & Ha & so & Hso & Hc').
     apply (ud_merge_of_lt p 1 [dg_fork_b] s u Ha); [| by rewrite app_nil_r in Hp].
-    rewrite -Hc'. apply lt_here; [lia | exact Hso].
+    rewrite -Hc'. apply lt_here; [discriminate | exact Hso].
 Qed.
 
 (* [umerge]'s [exists s] IS [s = Some []] *)
@@ -282,7 +284,7 @@ Proof using. intros H. apply umerge_spec in H. vm_compute in H. discriminate H. 
 (* ===================================================================== *)
 
 Definition uterm_line (adm : pline' -> bool) (l : uline) : Prop :=
-  match l with LPipe p n => adm (LPipes p n) = true /\ 1 <= n | _ => False end.
+  match l with LPipe p n => adm (LPipes p n) = true /\ n <> [] | _ => False end.
 
 Global Instance uterm_line_dec adm l : Decision (uterm_line adm l).
 Proof using. destruct l; cbn [uterm_line]; apply _. Defined.
@@ -338,7 +340,8 @@ Lemma stage_out_at fc fc' g L st so :
   stage_out fc L st so -> (forall f, st = SProd (PrCatF f) -> f = g) -> fc g = fc' g ->
   stage_out fc' L st so.
 Proof using.
-  destruct 1 as [st | st | ws Hl | ws D Hl HD | f Hf | f D Hf HD | f | D HD | D HD | D HD];
+  destruct 1 as [st | st | ws Hl | ws D Hl HD | f Hf | f D Hf HD | f | F D HD | D HD
+                | w D W HD HW | F D HD];
     intros Hst Hg.
   - apply so_exec.
   - apply so_silent.
@@ -347,9 +350,10 @@ Proof using.
   - rewrite (Hst f eq_refl) in Hf |- *. apply so_catf. by rewrite -Hg.
   - rewrite (Hst f eq_refl) in Hf |- *. apply so_catf_halt; [by rewrite -Hg | exact HD].
   - apply so_catf_open.
-  - apply so_mid_copy. exact HD.
+  - apply so_mid_f. exact HD.
   - apply so_mid_halt. exact HD.
-  - apply so_last. exact HD.
+  - apply so_grep_halt; [exact HD | exact HW].
+  - apply so_last_f. exact HD.
 Qed.
 
 Lemma line_run_at fc fc' g n ss :
@@ -432,6 +436,8 @@ Qed.
 (*                                                                        *)
 (*  Every pipe of a [cat f] pipeline carries a prefix of [f]'s content    *)
 (*  [L]; cutting every such prefix at [k] bytes keeps every pairing and   *)
+(*  (at the admission's ALL-CAT stages: a grep does not commute with a   *)
+(*  uniform cut, grep-pipes.md section 2, cut G4)                        *)
 (*  every stage's behaviour, at the content [take k L].  The console      *)
 (*  streams are unchanged provided the one stream that PRINTS content --  *)
 (*  the last cat's -- fits in [k] ([fits]).                               *)
@@ -459,15 +465,20 @@ Proof using.
   - subst. by rewrite take_nil.
 Qed.
 
+(* a stage that is not a grep *)
+Definition st_cat (st : stage) : Prop :=
+  match st with SMid F | SLast F => F = FCat | SProd _ => True end.
+
 Lemma stage_trunc fc fc' L k st so :
   stage_out fc L st so ->
-  (forall ws, st <> SProd (PrEcho ws)) ->
+  (forall ws, st <> SProd (PrEcho ws)) -> st_cat st ->
   (forall f, st = SProd (PrCatF f) -> fc f = Some L -> fc' f = Some (take k L)) ->
-  (forall D, st = SLast -> so_rd so = Some (RdEof D) -> length D <= k) ->
+  (forall F D, st = SLast F -> so_rd so = Some (RdEof D) -> length D <= k) ->
   stage_out fc' (take k L) st (tr_so k so).
 Proof using.
-  destruct 1 as [st | st | ws Hl | ws D Hl HD | f Hf | f D Hf HD | f | D HD | D HD | D HD];
-    intros Hne Hfc Hlast.
+  destruct 1 as [st | st | ws Hl | ws D Hl HD | f Hf | f D Hf HD | f | F D HD | D HD
+                | w D W HD HW | F D HD];
+    intros Hne Hcat Hfc Hlast.
   - replace (tr_so k (MkSO (st_dg_exec st) (st_rd_dead st) (st_wr_dead st)))
       with (MkSO (st_dg_exec st) (st_rd_dead st) (st_wr_dead st)) by (destruct st; reflexivity).
     apply so_exec.
@@ -479,9 +490,12 @@ Proof using.
   - rewrite /tr_so /=. apply so_catf. exact (Hfc f eq_refl Hf).
   - rewrite /tr_so /=. apply so_catf_halt; [exact (Hfc f eq_refl Hf) | exact (ud_prefix_take k D L HD)].
   - rewrite /tr_so /=. apply so_catf_open.
-  - rewrite /tr_so /=. apply so_mid_copy. exact (ud_prefix_take k D L HD).
+  - cbn [st_cat] in Hcat. subst F.
+    rewrite /tr_so /=. apply so_mid_copy. exact (ud_prefix_take k D L HD).
   - rewrite /tr_so /=. apply so_mid_halt. exact (ud_prefix_take k D L HD).
-  - pose proof (Hlast D eq_refl eq_refl) as Hk.
+  - cbn [st_cat] in Hcat. discriminate Hcat.
+  - cbn [st_cat] in Hcat. subst F.
+    pose proof (Hlast FCat D eq_refl eq_refl) as Hk.
     rewrite /tr_so /= (take_ge D k Hk). apply so_last. exact (ud_prefix_take_ge k D L HD Hk).
 Qed.
 
@@ -498,43 +512,52 @@ Lemma sfx_run_ne fc L m w wc ss : sfx_run fc L m w wc ss -> ss <> [].
 Proof using. destruct 1; discriminate. Qed.
 
 Lemma ud_last_rd fc L so D :
-  stage_out fc L SLast so -> so_rd so = Some (RdEof D) -> so_cons so = D /\ D `prefix_of` L.
+  stage_out fc L (SLast FCat) so -> so_rd so = Some (RdEof D) -> so_cons so = D /\ D `prefix_of` L.
 Proof using.
   intros H Hr. inversion H; subst; cbn in Hr; try discriminate Hr.
   injection Hr as Hr. subst. split; [reflexivity | assumption].
 Qed.
 
 Lemma sfx_trunc fc fc' L k m w wc ss :
-  sfx_run fc L m w wc ss -> fits k L ss -> sfx_run fc' (take k L) m (tr_wr k w) wc ss.
+  sfx_run fc L m w wc ss -> all_cats m = true -> fits k L ss ->
+  sfx_run fc' (take k L) m (tr_wr k w) wc ss.
 Proof using.
-  induction 1 as [win wc so Hso Hp | m win wc | m win wc so ss Hso Hp Hr IH]; intros Hf.
-  - assert (Hso' : stage_out fc' (take k L) SLast (tr_so k so)).
-    { apply (stage_trunc fc); [exact Hso | intros ws; discriminate | intros f Hff; discriminate Hff |].
-      intros D _ HD. destruct (ud_last_rd _ _ _ _ Hso HD) as [Hc HDL].
+  induction 1 as [F win wc so Hso Hp | F F' m win wc | F F' m win wc so ss Hso Hp Hr IH];
+    intros Hc Hf.
+  - apply FileDisc.all_cats_cons in Hc as [-> _].
+    assert (Hso' : stage_out fc' (take k L) (SLast FCat) (tr_so k so)).
+    { apply (stage_trunc fc); [exact Hso | intros ws; discriminate | reflexivity
+                              | intros f Hff; discriminate Hff |].
+      intros F D _ HD. destruct (ud_last_rd _ _ _ _ Hso HD) as [Hc HDL].
       apply (Hf D); [cbn; rewrite Hc; reflexivity | exact HDL]. }
     change [so_cons so] with [so_cons (tr_so k so)].
     apply sr_last; [exact Hso' | rewrite tr_rd_of; exact (pair_trunc _ _ _ _ _ Hp)].
   - apply sr_pipe_fail.
-  - assert (Hso' : stage_out fc' (take k L) SMid (tr_so k so)).
-    { apply (stage_trunc fc); [exact Hso | intros ws; discriminate | intros f Hff; discriminate Hff |].
-      intros D Hd; discriminate Hd. }
+  - apply FileDisc.all_cats_cons in Hc as [-> Hc].
+    assert (Hso' : stage_out fc' (take k L) (SMid FCat) (tr_so k so)).
+    { apply (stage_trunc fc); [exact Hso | intros ws; discriminate | reflexivity
+                              | intros f Hff; discriminate Hff |].
+      intros F D Hd; discriminate Hd. }
     change (so_cons so :: ss) with (so_cons (tr_so k so) :: ss).
     apply sr_node; [exact Hso' | rewrite tr_rd_of; exact (pair_trunc _ _ _ _ _ Hp) |].
-    rewrite tr_wr_of. apply IH. exact (fits_cons _ _ _ _ (sfx_run_ne _ _ _ _ _ _ Hr) Hf).
+    rewrite tr_wr_of. apply IH; [exact Hc |]. exact (fits_cons _ _ _ _ (sfx_run_ne _ _ _ _ _ _ Hr) Hf).
 Qed.
 
 Lemma sfx_term_trunc fc fc' L k m w wc W s :
-  sfx_term fc L m w wc W s -> sfx_term fc' (take k L) m (tr_wr k w) wc W s.
+  sfx_term fc L m w wc W s -> all_cats m = true -> sfx_term fc' (take k L) m (tr_wr k w) wc W s.
 Proof using.
-  induction 1 as [m win wc so Hso | m win wc so W s Hso Hp Ht IH].
+  induction 1 as [F F' m win wc so Hso | F F' m win wc so W s Hso Hp Ht IH]; intros Hc;
+    apply FileDisc.all_cats_cons in Hc as [-> Hc].
   - change (so_cons so) with (so_cons (tr_so k so)). apply stt_here.
-    apply (stage_trunc fc); [exact Hso | intros ws; discriminate | intros f Hff; discriminate Hff |].
-    intros D Hd; discriminate Hd.
+    apply (stage_trunc fc); [exact Hso | intros ws; discriminate | reflexivity
+                            | intros f Hff; discriminate Hff |].
+    intros F D Hd; discriminate Hd.
   - change (so_cons so :: W) with (so_cons (tr_so k so) :: W). apply stt_next.
-    + apply (stage_trunc fc); [exact Hso | intros ws; discriminate | intros f Hff; discriminate Hff |].
-      intros D Hd; discriminate Hd.
+    + apply (stage_trunc fc); [exact Hso | intros ws; discriminate | reflexivity
+                              | intros f Hff; discriminate Hff |].
+      intros F D Hd; discriminate Hd.
     + rewrite tr_rd_of. exact (pair_trunc _ _ _ _ _ Hp).
-    + rewrite tr_wr_of. exact IH.
+    + rewrite tr_wr_of. exact (IH Hc).
 Qed.
 
 (* the round's content function, cut at [k] *)
@@ -550,56 +573,60 @@ Proof using.
 Qed.
 
 Lemma line_run_trunc b0 k f n ss :
+  all_cats n = true ->
   line_run (files_of (Some b0)) (LPipes (PrCatF f) n) ss ->
   fits k (prod_content (files_of (Some b0)) (PrCatF f)) ss ->
   line_run (files_of (Some (take k b0))) (LPipes (PrCatF f) n) ss.
 Proof using.
-  intros H Hf. destruct (files_trunc b0 k f) as [Hfc Hpc].
+  intros Hcat H Hf. destruct (files_trunc b0 k f) as [Hfc Hpc].
   remember (LPipes (PrCatF f) n) as l eqn:Hl.
   destruct H as [ws | ws | ws | p n' Hn | p n' so ss' Hso Hr]; try discriminate Hl;
     injection Hl as -> ->.
   - apply lr_pipe_fail. exact Hn.
   - change (so_cons so :: ss') with (so_cons (tr_so k so) :: ss').
     apply lr_node.
-    + rewrite Hpc. apply (stage_trunc (files_of (Some b0))); [exact Hso | intros ws; discriminate | |].
+    + rewrite Hpc. apply (stage_trunc (files_of (Some b0)));
+        [exact Hso | intros ws; discriminate | exact I | |].
       * intros f' [= <-]. exact (Hfc _).
-      * intros D Hd; discriminate Hd.
-    + rewrite Hpc tr_wr_of. apply (sfx_trunc (files_of (Some b0))); [exact Hr |].
+      * intros F D Hd; discriminate Hd.
+    + rewrite Hpc tr_wr_of. apply (sfx_trunc (files_of (Some b0))); [exact Hr | exact Hcat |].
       exact (fits_cons _ _ _ _ (sfx_run_ne _ _ _ _ _ _ Hr) Hf).
 Qed.
 
 Lemma line_term_trunc b0 k f n W s :
+  all_cats n = true ->
   line_term (files_of (Some b0)) (LPipes (PrCatF f) n) W s ->
   line_term (files_of (Some (take k b0))) (LPipes (PrCatF f) n) W s.
 Proof using.
-  intros H. destruct (files_trunc b0 k f) as [Hfc Hpc].
+  intros Hcat H. destruct (files_trunc b0 k f) as [Hfc Hpc].
   remember (LPipes (PrCatF f) n) as l eqn:Hl.
   assert (Hst : forall so, stage_out (files_of (Some b0)) (prod_content (files_of (Some b0)) (PrCatF f))
                              (SProd (PrCatF f)) so ->
                 stage_out (files_of (Some (take k b0))) (prod_content (files_of (Some (take k b0))) (PrCatF f))
                              (SProd (PrCatF f)) (tr_so k so)).
-  { intros so Hso. rewrite Hpc. apply (stage_trunc (files_of (Some b0))); [exact Hso | intros ws; discriminate | |].
+  { intros so Hso. rewrite Hpc.
+    apply (stage_trunc (files_of (Some b0))); [exact Hso | intros ws; discriminate | exact I | |].
     - intros f' [= <-]. exact (Hfc _).
-    - intros D Hd; discriminate Hd. }
+    - intros F D Hd; discriminate Hd. }
   destruct H as [p n' so Hn Hso | p n' so W' s' Hso Ht]; injection Hl as -> ->.
   - change (so_cons so) with (so_cons (tr_so k so)). apply lt_here; [exact Hn | exact (Hst so Hso)].
   - change (so_cons so :: W') with (so_cons (tr_so k so) :: W'). apply lt_next; [exact (Hst so Hso) |].
-    rewrite Hpc tr_wr_of. exact (sfx_term_trunc _ _ _ _ _ _ _ _ _ Ht).
+    rewrite Hpc tr_wr_of. exact (sfx_term_trunc _ _ _ _ _ _ _ _ _ Ht Hcat).
 Qed.
 
 (* THE TRUNCATION LEMMA (review S2): a run at content [b0] whose printed
    content, if any, is a prefix of [P] stays a run -- with the SAME block
    -- at [b0]'s prefix [P] *)
 Theorem blocks_trunc b0 P f n ss b :
-  P `prefix_of` b0 ->
+  all_cats n = true -> P `prefix_of` b0 ->
   line_run (files_of (Some b0)) (LPipes (PrCatF f) n) ss -> merge_all ss b ->
   (forall x, last ss = Some x -> x `prefix_of` b0 -> x `prefix_of` P) ->
   line_blocks (files_of (Some P)) (LPipes (PrCatF f) n) b.
 Proof using.
-  intros HP Hr Hm Hx.
+  intros Hcat HP Hr Hm Hx.
   assert (HPe : take (length P) b0 = P) by (destruct HP as [z ->]; by rewrite take_app_length).
   rewrite -HPe. exists ss. split; [| exact Hm].
-  apply line_run_trunc; [exact Hr |].
+  apply line_run_trunc; [exact Hcat | exact Hr |].
   intros x Hl Hxp. cbn [prod_content] in Hxp. destruct (decide (f = fname_f)) as [-> | Hf].
   - rewrite files_of_f in Hxp. exact (prefix_length _ _ (Hx x Hl Hxp)).
   - rewrite files_of_ne in Hxp; [| exact Hf]. cbn [default] in Hxp.
@@ -608,14 +635,14 @@ Qed.
 
 (* ...and a terminal block is one at every prefix *)
 Theorem terms_trunc b0 P f n b :
-  P `prefix_of` b0 ->
+  all_cats n = true -> P `prefix_of` b0 ->
   plalt_ok (files_of (Some b0)) (LPipes (PrCatF f) n) (PLTerm b) ->
   plalt_ok (files_of (Some P)) (LPipes (PrCatF f) n) (PLTerm b).
 Proof using.
-  intros HP [Hne (b' & (W & t & Wm & sp & Hlt & HWm & Hsp & Hm) & Hp)].
+  intros Hcat HP [Hne (b' & (W & t & Wm & sp & Hlt & HWm & Hsp & Hm) & Hp)].
   assert (HPe : take (length P) b0 = P) by (destruct HP as [z ->]; by rewrite take_app_length).
   split; [exact Hne |]. exists b'. split; [| exact Hp]. exists W, t, Wm, sp.
-  rewrite -HPe. split_and!; [exact (line_term_trunc _ _ _ _ _ _ Hlt) | exact HWm | exact Hsp | exact Hm].
+  rewrite -HPe. split_and!; [exact (line_term_trunc _ _ _ _ _ _ Hcat Hlt) | exact HWm | exact Hsp | exact Hm].
 Qed.
 
 (* ===================================================================== *)
@@ -884,8 +911,8 @@ Proof using.
   destruct x as [| b | b].
   - exact I.
   - destruct (Hg fname_f n b eq_refl eq_refl Ha Hb) as (ss & Hr & Hm & Hx).
-    exact (blocks_trunc b0 P fname_f n ss b HP Hr Hm Hx).
-  - exact (terms_trunc b0 P fname_f n b HP Hb).
+    exact (blocks_trunc b0 P fname_f n ss b (adm_u_f_all _ _ Ha) HP Hr Hm Hx).
+  - exact (terms_trunc b0 P fname_f n b (adm_u_f_all _ _ Ha) HP Hb).
 Qed.
 
 (* THE CANONICALISATION: a disciplined era has a disciplined boot state

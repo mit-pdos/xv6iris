@@ -1225,22 +1225,25 @@ Lemma sfx_runV_silent (fc : bytes -> option bytes) (L : bytes) (m : nat) (win : 
   sfx_runV fc L (S m) win wc (replicate (2 * m + 1) []).
 Proof using.
   revert win wc. induction m as [| m IH]; intros win wc.
-  - cbn. apply (srv_last fc L win wc (MkSO [] (Some RdGone) None) (so_silent fc L SLast)).
+  - cbn. apply (srv_last fc L win wc (MkSO [] (Some RdGone) None) (so_silent fc L (SLast FCat))).
     cbn. destruct win; exact I.
   - replace (2 * S m + 1)%nat with (S (S (2 * m + 1))) by lia. cbn [replicate].
     apply (srv_node fc L m win wc (MkSO [] (Some RdGone) (Some WrNone)) _
-             (so_silent fc L SMid)); [cbn; destruct win; exact I |].
+             (so_silent fc L (SMid FCat))); [cbn; destruct win; exact I |].
     exact (IH WrNone true).
 Qed.
 
 Lemma runN_silent (fc : bytes -> option bytes) (l : pline') :
-  pl_ok l -> runS (runN fc l) (fun _ => None).
+  pl_ok l -> lall_cats l -> runS (runN fc l) (fun _ => None).
 Proof using.
-  intros Hl. exists (fun _ => []). split; [| intros w; reflexivity].
-  destruct l as [ws | p n].
+  intros Hl Hc. exists (fun _ => []). split; [| intros w; reflexivity].
+  destruct l as [ws | p fs].
   - rewrite /runN. cbn. apply lrv_echo_silent.
-  - destruct Hl as (_ & Hn & _). rewrite /runN. cbn [lcats].
-    destruct n as [| n]; [lia |]. rewrite /wids. cbn [wids_from].
+  - destruct Hl as (_ & Hn & _). cbn [lall_cats] in Hc.
+    pose proof (FileDisc.all_cats_eq fs Hc) as Hfs. set (m := length fs) in Hfs.
+    clearbody m. subst fs.
+    rewrite /runN lcats_cats.
+    destruct m as [| n]; [exfalso; exact (Hn eq_refl) |]. rewrite /wids. cbn [wids_from].
     rewrite !fmap_cons (wids_from_silent (fun _ => []) 1 n ltac:(lia) (fun _ _ => conj eq_refl eq_refl)
                          eq_refl).
     exact (lrv_node fc p (S n) (MkSO [] None (Some WrNone)) (replicate (2 * n + 1) [])
@@ -1273,6 +1276,8 @@ Section pipes_family_v.
   Hypothesis Hfc : fc_ok (pv_fc V sR).
   Hypothesis Ha : pv_adm V lR = true.
   Hypothesis Hl : pl_ok lR.
+  (* the vector runs are the all-cat instance (cut G3) *)
+  Hypothesis Hcat : lall_cats lR.
 
   Local Notation fcR := (pv_fc V sR).
   Local Notation wsN := (wids (lcats lR)).
@@ -1297,10 +1302,10 @@ Section pipes_family_v.
     ∃ γc γm : wid -> gname,
       blkN_inv wsN RUNN PWN TERM TOK dep N k γc γm
       ∗ [∗ list] w ∈ wsN, wcurN γc w (1/2) 0 ∗ wmodeN γm w (1/2) None.
-  Proof using Hl.
+  Proof using Hl Hcat.
     iIntros "HPW".
     iApply (blkN_alloc wsN (wids_NoDup _) RUNN PWN
-              TERM TOK dep E N k (runN_silent fcR lR Hl) with "HPW").
+              TERM TOK dep E N k (runN_silent fcR lR Hl Hcat) with "HPW").
   Qed.
 
   (* A FURTHER BYTE by any writer of the pipeline *)

@@ -633,7 +633,7 @@ Section fire_glue.
   Local Notation fc := (pv_fc PV sR).
   (* the line: its producer [pr] (echo, or [cat f]) and its [n] cats *)
   Context (pr : producer) (n : nat) (Hn : (1 <= n)%nat).
-  Context (Hline : lR = LPipes pr n).
+  Context (Hline : lR = LPipes pr (cats n)).
   Local Notation L := (prod_content fc pr).
 
   (* THE FIRING PREMISE: every commit a process of the round makes is
@@ -644,7 +644,7 @@ Section fire_glue.
       termw (tokN fc (lR)) w s (EXf fc pr (lcats (lR)) L w s).
   Proof using HlR Ha Hline Hn.
     intros Hwin Hf.
-    assert (Hnc : lcats (lR) = n) by (rewrite Hline; reflexivity).
+    assert (Hnc : lcats (lR) = n) by (rewrite Hline; exact (lcats_cats pr n)).
     rewrite Hnc in Hwin.
     apply (fire_okV_tok LM PV I sR lR HlR Ha w s _ (fire_src_ne fc pr w s Hf)).
     - intros md sel Hfam Hmw Hws Htm. rewrite Hnc.

@@ -85,18 +85,18 @@ Local Notation U := ulmU.
 
 (* an admissible pipeline's body parses as that pipeline, at either
    producer *)
-Lemma uline_of_u_pipe (p : producer) (n : nat) :
+Lemma uline_of_u_pipe (p : producer) (n : list filt) :
   FileDisc.uline_ok (FileDisc.LPipe p n) ->
   uline_of_u (FileDisc.line_body (FileDisc.LPipe p n)) = FileDisc.LPipe p n.
 Proof using.
-  intros Hok. pose proof Hok as (Hp & Hn & _).
+  intros Hok. pose proof Hok as (Hp & Hn & HF & _).
   rewrite /uline_of_u.
   destruct (FileDisc.parse_line (FileDisc.line_body (FileDisc.LPipe p n))) as [l |] eqn:Hpl.
   - exfalso. pose proof (FileDisc.line_body_parse _ _ Hpl) as Hb.
     pose proof (FileDisc.parse_line_ok _ _ Hpl) as Hl.
     assert (Hw : wl_words (FileDisc.line_body l) = FileDisc.uline_ws (FileDisc.LPipe p n)).
-    { rewrite -Hb. exact (FileDisc.uline_ws_pipe p n Hp). }
-    pose proof (uline_pipes_words l p n Hl Hp Hn Hw) as ->.
+    { rewrite -Hb. exact (FileDisc.uline_ws_pipe p n Hp HF). }
+    pose proof (uline_pipes_words l p n Hl Hp Hn HF Hw) as ->.
     exact (FileDisc.parse_line_not_pipe _ p n Hpl).
   - rewrite (_ : FileDisc.LPipe p n = uline_of_pl (LPipes p n)); [| reflexivity].
     rewrite (line_body_of_pl_all (LPipes p n))
@@ -105,19 +105,19 @@ Proof using.
 Qed.
 
 (* ...AND THE ROUND'S LINE IS IT, off the fork's words *)
-Lemma ul_pipe (I : list (bv 8)) (p : producer) (n : nat) :
+Lemma ul_pipe (I : list (bv 8)) (p : producer) (n : list filt) :
   FileDisc.fline_ok (UkSh.ush_lastbody I) -> FileDisc.uline_ok (FileDisc.LPipe p n) ->
   last_ws I = FileDisc.uline_ws (FileDisc.LPipe p n) ->
   ul I = FileDisc.LPipe p n.
 Proof using.
-  intros Hfb Hok Hlws. pose proof Hok as (Hp & Hn & _).
+  intros Hfb Hok Hlws. pose proof Hok as (Hp & Hn & HF & _).
   assert (Hb : UkSh.ush_lastbody I = FileDisc.line_body (FileDisc.LPipe p n)).
-  { apply (fline_ok_pipes_words_p _ p n Hfb Hp Hn).
+  { apply (fline_ok_pipes_words_p _ p n Hfb Hp Hn HF).
     rewrite /UkSh.ush_lastbody -last_ws_lastbody. exact Hlws. }
   rewrite ul_lastbody Hb. exact (uline_of_u_pipe p n Hok).
 Qed.
 
-Lemma upv_line_pipe (I : list (bv 8)) (p : producer) (n : nat) :
+Lemma upv_line_pipe (I : list (bv 8)) (p : producer) (n : list filt) :
   ul I = FileDisc.LPipe p n ->
   pv_line pview_unionU (lineV U I) = Some (LPipes p n).
 Proof using.
@@ -148,14 +148,14 @@ Qed.
 
 (* at most sixteen cats fit a line, at either producer *)
 Lemma upls_cats_le (p : producer) (n : nat) :
-  FileDisc.uline_ok (FileDisc.LPipe p n) -> (n <= 16)%nat.
+  FileDisc.uline_ok (FileDisc.LPipe p (cats n)) -> (n <= 16)%nat.
 Proof using.
-  intros (_ & _ & Hlm). rewrite line_bytes_pipe_length_p in Hlm.
+  intros (_ & _ & _ & Hlm). rewrite line_bytes_pipe_length_p in Hlm.
   unfold EchoDisc.line_max in Hlm. lia.
 Qed.
 
 (* the input is not empty: its last line has words *)
-Lemma unlines_pos (I : list (bv 8)) (p : producer) (n : nat) :
+Lemma unlines_pos (I : list (bv 8)) (p : producer) (n : list filt) :
   FileDisc.prod_ok p ->
   last_ws I = FileDisc.uline_ws (FileDisc.LPipe p n) -> (1 <= nlines I)%nat.
 Proof using.
@@ -407,7 +407,7 @@ Section UShUPipes.
   Proof using . rewrite length_map. cbn [length]. by rewrite rtoks_cats_length. Qed.
 
   Lemma ustg_cats (p : producer) (n : nat) (len : nat) (gb : nat -> bv 8) (sa : Z) :
-    UkSh.ush_line_at (FileDisc.LPipe p n) gb 0 len ->
+    UkSh.ush_line_at (FileDisc.LPipe p (cats n)) gb 0 len ->
     forall k, (1 <= k <= n)%nat ->
       exists a b, STG (prod_words p) n len gb sa !! k
                     = Some (UkShMain.ush_args sa (pcut (prod_words p) n len gb) (UkShCat.cat_toks a b))
@@ -464,21 +464,21 @@ Section UShUPipes.
     pose proof Hlat as (Hok_u & Hlen & Hby).
     pose proof Hok_u as (Hok & Hn & _).
     pose proof (upls_cats_le (PrEcho ws) n Hok_u) as Hn16.
-    assert (Hlws' : last_ws I = FileDisc.uline_ws (FileDisc.LPipe (PrEcho ws) n))
+    assert (Hlws' : last_ws I = FileDisc.uline_ws (FileDisc.LPipe (PrEcho ws) (cats n)))
       by (rewrite -Hlws; exact Hwsf).
-    pose proof (ul_pipe I (PrEcho ws) n Hfbk Hok_u Hlws') as Hul.
-    pose proof (unlines_pos I (PrEcho ws) n Hok Hlws') as Hpos.
+    pose proof (ul_pipe I (PrEcho ws) (cats n) Hfbk Hok_u Hlws') as Hul.
+    pose proof (unlines_pos I (PrEcho ws) (cats n) Hok Hlws') as Hpos.
     pose proof (ukn_const_of_eq N' _ Hpeq (fun x y => eq_refl)) as Hcst.
     destruct Hrows as (Hfd0c & Hfd1p & Hfd2p).
     iDestruct (UserFd.ustd_len with "Hstd") as %Hlen3.
     pose proof (pls_fd_lowest_none ld Hlen3 Hfd0c Hfd1p Hfd2p) as Hnone.
     destruct Hfd0c as [wr0 Hl0]. destruct Hfd1p as [rb1 Hl1]. destruct Hfd2p as [rb2 Hl2].
-    destruct n as [| n']; [lia |].
+    destruct n as [| n']; [exfalso; exact (Hn eq_refl) |].
     (* ---- the line is the lexer's ---- *)
-    assert (Hbat : bat gb 0 (FileDisc.line_bytes (FileDisc.LPipe (PrEcho ws) (S n')))).
+    assert (Hbat : bat gb 0 (FileDisc.line_bytes (FileDisc.LPipe (PrEcho ws) (cats (S n'))))).
     { intros j Hj. apply Hby. rewrite Hlen. exact Hj. }
     pose proof (ushq_lines_bars ws (replicate (S n') ushq_cat) gb 0%nat len
-                  (lines_of_pipe ws (S n') gb len Hok Hn Hbat Hlen)) as Hbars.
+                  (lines_of_pipe ws (S n') gb len Hok ltac:(lia) Hbat Hlen)) as Hbars.
     (* ---- THE PARSE ---- *)
     assert (E1 : (68 + UkSh.ush_Dpipe + (8 + (UkShDiag.ush_Dg + nn)))%nat
                  = (68 + (length (RT ws (S n')) * 6 + (96 + nn - 6 * S n')))%nat)
@@ -507,18 +507,19 @@ Section UShUPipes.
                 with "Hgenw HT Hrun"). }
     iDestruct "Hop" as (v cs s) "(%Htie & #Hpin & #Hlb & #Hcsl & #Hcw & #Hty & Hown & HPW)".
     iDestruct (udeed_typed s with "Hty") as %[Hsok _].
-    pose proof (upv_line_pipe I (PrEcho ws) (S n') Hul) as HlR.
+    pose proof (upv_line_pipe I (PrEcho ws) (cats (S n')) Hul) as HlR.
     assert (Hfc : fc_ok (pv_fc pview_unionU (dst_content s)))
       by exact (pview_union_fc_ok adm_u_f (dst_content s) Hsok).
-    assert (Hadmit : pns_admV pview_unionU (LPipes (PrEcho ws) (S n'))) by reflexivity.
-    assert (Hplok : pl_ok (LPipes (PrEcho ws) (S n'))) by exact (pl_ok_of_uline _ _ Hok_u).
+    assert (Hadmit : pns_admV pview_unionU (LPipes (PrEcho ws) (cats (S n'))))
+      by exact (adm_u_f_echo_cats ws (S n')).
+    assert (Hplok : pl_ok (LPipes (PrEcho ws) (cats (S n')))) by exact (pl_ok_of_uline _ _ Hok_u).
     (* ---- THE ROUND'S ALLOCATION, at the deed's state ---- *)
     iApply uup_fupd_mwp.
-    iMod (pls_nodes_alloc (lcats (LPipes (PrEcho ws) (S n')))) as (P gF gG) "Hnodes".
-    iMod (pipesV_alloc pg U pview_unionU CPU v I (dst_content s) (LPipes (PrEcho ws) (S n'))
-            Hplok ⊤ pnsN (S gen_id) termw
-            (tokN (pv_fc pview_unionU (dst_content s)) (LPipes (PrEcho ws) (S n')))
-            (pdep U pview_unionU (dst_content s) (LPipes (PrEcho ws) (S n'))
+    iMod (pls_nodes_alloc (lcats (LPipes (PrEcho ws) (cats (S n'))))) as (P gF gG) "Hnodes".
+    iMod (pipesV_alloc pg U pview_unionU CPU v I (dst_content s) (LPipes (PrEcho ws) (cats (S n')))
+            Hplok (FileDisc.all_cats_cats (S n')) ⊤ pnsN (S gen_id) termw
+            (tokN (pv_fc pview_unionU (dst_content s)) (LPipes (PrEcho ws) (cats (S n'))))
+            (pdep U pview_unionU (dst_content s) (LPipes (PrEcho ws) (cats (S n')))
                (wl_line (drop 1 ws)) (PrEcho ws) P gF gG)
             with "HPW") as (γc γm) "[#Hfam Hh]".
     iModIntro.
@@ -537,24 +538,25 @@ Section UShUPipes.
     iEval (rewrite E2) in "Hrun".
     (* THE PRODUCER'S LAW: echo's, the loan [True] *)
     iPoseProof (plaw_echo (ghost_varG0 := offbox_offG) pg U pview_unionU CPU None WAU
-                  (uwa_ext ug) Hcons Hkill usup v I (dst_content s) (LPipes (PrEcho ws) (S n'))
+                  (uwa_ext ug) Hcons Hkill usup v I (dst_content s) (LPipes (PrEcho ws) (cats (S n')))
                   HlR Hfc Hadmit Hplok (wl_line (drop 1 ws))
                   (UkPipesEntries.pe_line_len ws Hok) (PrEcho ws) True%I γc γm P gF gG
-                  eq_refl eq_refl sa (pcut ws (S n') len gb) ws eq_refl Hok Hbytes
+                  (lpipes_cats_eq _ _) eq_refl sa (pcut ws (S n') len gb) ws eq_refl Hok Hbytes
                   with "Hfam Hes") as "#Hpl".
     iApply (wp_pipes_round_alloc (ghost_varG0 := offbox_offG) pg U pview_unionU CPU None WAU
-              (uwa_ext ug) Hcons Hkill usup v I (dst_content s) (LPipes (PrEcho ws) (S n'))
+              (uwa_ext ug) Hcons Hkill usup v I (dst_content s) (LPipes (PrEcho ws) (cats (S n')))
               HlR Hfc Hadmit Hplok (wl_line (drop 1 ws))
               (UkPipesEntries.pe_line_len ws Hok) (PrEcho ws) True%I γc γm P gF gG
               (UkShFork.ushf_wq Wcu I)
               (era_pin (fgn_echo gf) (S gen_id) v ∗ inp_lb v I ∗ f0cw gf (S gen_id) s0
                ∗ DPRE I)%I
-              (ufin v I (dst_content s) (LPipes (PrEcho ws) (S n')) (wl_line (drop 1 ws))
-                 (PrEcho ws) True%I (DPRE I) P gF gG γc γm HlR Hfc eq_refl Hplok Hpos
+              (ufin v I (dst_content s) (LPipes (PrEcho ws) (cats (S n'))) (wl_line (drop 1 ws))
+                 (PrEcho ws) True%I (DPRE I) P gF gG γc γm HlR Hfc (adm_u_f_echo_cats ws (S n'))
+                 Hplok Hpos
                  ltac:(iIntros "[$ _]"))
-              eq_refl eq_refl sa (pcut ws (S n') len gb)
-              (STG ws (S n') len gb sa) (ustg_len ws (S n') len gb sa)
-              (UkShMain.ush_args sa (pcut ws (S n') len gb) (wl_toks ws)) eq_refl Hstc
+              (lpipes_cats_eq _ _) eq_refl sa (pcut ws (S n') len gb)
+              (STG ws (S n') len gb sa) ltac:(rewrite lcats_cats; exact (ustg_len ws (S n') len gb sa))
+              (UkShMain.ush_args sa (pcut ws (S n') len gb) (wl_toks ws)) eq_refl ltac:(rewrite lcats_cats; exact Hstc)
               ld rb1 rb2 Hl1 Hl2 Hnone
               (REST ws n' len gb sa)
               (UkShMain.ush_args sa (pcut ws (S n') len gb) (wl_toks ws))
@@ -591,21 +593,22 @@ Section UShUPipes.
     pose proof Hlat as (Hok_u & Hlen & Hby).
     pose proof Hok_u as (Hok & Hn & _).
     pose proof (upls_cats_le (PrCatF fname_f) n Hok_u) as Hn16.
-    assert (Hlws' : last_ws I = FileDisc.uline_ws (FileDisc.LPipe (PrCatF fname_f) n))
+    assert (Hlws' : last_ws I = FileDisc.uline_ws (FileDisc.LPipe (PrCatF fname_f) (cats n)))
       by (rewrite -Hlws; exact Hwsf).
-    pose proof (ul_pipe I (PrCatF fname_f) n Hfbk Hok_u Hlws') as Hul.
-    pose proof (unlines_pos I (PrCatF fname_f) n Hok Hlws') as Hpos.
+    pose proof (ul_pipe I (PrCatF fname_f) (cats n) Hfbk Hok_u Hlws') as Hul.
+    pose proof (unlines_pos I (PrCatF fname_f) (cats n) Hok Hlws') as Hpos.
     pose proof (ukn_const_of_eq N' _ Hpeq (fun x y => eq_refl)) as Hcst.
     destruct Hrows as (Hfd0c & Hfd1p & Hfd2p).
     iDestruct (UserFd.ustd_len with "Hstd") as %Hlen3.
     pose proof (pls_fd_lowest_none ld Hlen3 Hfd0c Hfd1p Hfd2p) as Hnone.
     destruct Hfd0c as [wr0 Hl0]. destruct Hfd1p as [rb1 Hl1]. destruct Hfd2p as [rb2 Hl2].
-    destruct n as [| n']; [lia |].
+    destruct n as [| n']; [exfalso; exact (Hn eq_refl) |].
     (* ---- the line is the lexer's ---- *)
-    assert (Hbat : bat gb 0 (FileDisc.line_bytes (FileDisc.LPipe (PrCatF fname_f) (S n')))).
+    assert (Hbat : bat gb 0 (FileDisc.line_bytes (FileDisc.LPipe (PrCatF fname_f) (cats (S n'))))).
     { intros j Hj. apply Hby. rewrite Hlen. exact Hj. }
     pose proof (ushq_lines_bars PWC (replicate (S n') ushq_cat) gb 0%nat len
-                  (lines_of_pipe_p (PrCatF fname_f) (S n') gb len Hok Hn Hbat Hlen)) as Hbars.
+                  (lines_of_pipe_p (PrCatF fname_f) (S n') gb len Hok ltac:(lia) Hbat Hlen))
+      as Hbars.
     (* ---- THE PARSE ---- *)
     assert (E1 : (68 + UkSh.ush_Dpipe + (8 + (UkShDiag.ush_Dg + nn)))%nat
                  = (68 + (length (RT PWC (S n')) * 6 + (96 + nn - 6 * S n')))%nat)
@@ -642,21 +645,20 @@ Section UShUPipes.
     { iIntros "[(Htk & #Hty' & #Hpin' & #Hcs') Hdq]". rewrite /ush_deed_at. iLeft.
       iExists cs, s, v. rewrite /fown /fdeed /FileOpen.fdq.
       iFrame "Hdq Htk Hty' Hpin' Hcs'". by iPureIntro. }
-    pose proof (upv_line_pipe I (PrCatF fname_f) (S n') Hul) as HlR.
+    pose proof (upv_line_pipe I (PrCatF fname_f) (cats (S n')) Hul) as HlR.
     assert (Hfc : fc_ok (pv_fc pview_unionU (dst_content s)))
       by exact (pview_union_fc_ok adm_u_f (dst_content s) Hsok).
-    assert (Hadmit : pns_admV pview_unionU (LPipes (PrCatF fname_f) (S n'))).
-    { rewrite /pns_admV. cbn [pv_adm pview_unionU pview_union adm_u_f].
-      by apply bool_decide_eq_true_2. }
-    assert (Hplok : pl_ok (LPipes (PrCatF fname_f) (S n'))) by exact (pl_ok_of_uline _ _ Hok_u).
+    assert (Hadmit : pns_admV pview_unionU (LPipes (PrCatF fname_f) (cats (S n'))))
+      by exact (adm_u_f_catf_cats (S n')).
+    assert (Hplok : pl_ok (LPipes (PrCatF fname_f) (cats (S n')))) by exact (pl_ok_of_uline _ _ Hok_u).
     pose proof (catf_short (dst_content s) Hshort) as HL31.
     (* ---- THE ROUND'S ALLOCATION, at the deed's state ---- *)
     iApply uup_fupd_mwp.
-    iMod (pls_nodes_alloc (lcats (LPipes (PrCatF fname_f) (S n')))) as (P gF gG) "Hnodes".
-    iMod (pipesV_alloc pg U pview_unionU CPU v I (dst_content s) (LPipes (PrCatF fname_f) (S n'))
-            Hplok ⊤ pnsN (S gen_id) termw
-            (tokN (pv_fc pview_unionU (dst_content s)) (LPipes (PrCatF fname_f) (S n')))
-            (pdep U pview_unionU (dst_content s) (LPipes (PrCatF fname_f) (S n'))
+    iMod (pls_nodes_alloc (lcats (LPipes (PrCatF fname_f) (cats (S n'))))) as (P gF gG) "Hnodes".
+    iMod (pipesV_alloc pg U pview_unionU CPU v I (dst_content s) (LPipes (PrCatF fname_f) (cats (S n')))
+            Hplok (FileDisc.all_cats_cats (S n')) ⊤ pnsN (S gen_id) termw
+            (tokN (pv_fc pview_unionU (dst_content s)) (LPipes (PrCatF fname_f) (cats (S n'))))
+            (pdep U pview_unionU (dst_content s) (LPipes (PrCatF fname_f) (cats (S n')))
                (prod_content (pv_fc pview_unionU (dst_content s)) (PrCatF fname_f))
                (PrCatF fname_f) P gF gG)
             with "HPW") as (γc γm) "[#Hfam Hh]".
@@ -677,20 +679,20 @@ Section UShUPipes.
     (* THE PRODUCER'S LAW: [cat f]'s, at the deed *)
     iPoseProof (stage_catf_law_holds (ghost_varG0 := offbox_offG) (fgn_cl gf) r Heq pg U
                   pview_unionU CPU None WAU (uwa_ext ug) Hcons Hkill usup v I (dst_content s)
-                  (LPipes (PrCatF fname_f) (S n')) HlR Hfc Hadmit Hplok
+                  (LPipes (PrCatF fname_f) (cats (S n'))) HlR Hfc Hadmit Hplok
                   (prod_content (pv_fc pview_unionU (dst_content s)) (PrCatF fname_f)) HL31
                   (PrCatF fname_f) γc γm P gF gG
-                  (Hfire U pview_unionU I (dst_content s) (LPipes (PrCatF fname_f) (S n'))
+                  (Hfire U pview_unionU I (dst_content s) (LPipes (PrCatF fname_f) (cats (S n')))
                      HlR Hadmit Hplok
                      (prod_content (pv_fc pview_unionU (dst_content s)) (PrCatF fname_f))
-                     (PrCatF fname_f) eq_refl eq_refl)
+                     (PrCatF fname_f) (lpipes_cats_eq _ _) eq_refl)
                   fname_f sa (pcut PWC (S n') len gb) (1/2)%Qp s (catf_ds s)
-                  eq_refl eq_refl catf_ws_exec_ok Hbytes ltac:(cbn [lcats]; lia) (catf_case s)
+                  eq_refl eq_refl catf_ws_exec_ok Hbytes ltac:(rewrite lcats_cats; lia) (catf_case s)
                   with "Hfam Hcs [] [] Hinv Hmade") as "#Hpl".
     { iIntros "!> H". rewrite Hkill. iExact "H". }
     { iIntros "!> H". rewrite Hkill. iExact "H". }
     iApply (wp_pipes_round_alloc (ghost_varG0 := offbox_offG) pg U pview_unionU CPU None WAU
-              (uwa_ext ug) Hcons Hkill usup v I (dst_content s) (LPipes (PrCatF fname_f) (S n'))
+              (uwa_ext ug) Hcons Hkill usup v I (dst_content s) (LPipes (PrCatF fname_f) (cats (S n')))
               HlR Hfc Hadmit Hplok
               (prod_content (pv_fc pview_unionU (dst_content s)) (PrCatF fname_f)) HL31
               (PrCatF fname_f) (fdq r (1/2)%Qp s) γc γm P gF gG
@@ -698,13 +700,13 @@ Section UShUPipes.
               (era_pin (fgn_echo gf) (S gen_id) v ∗ inp_lb v I ∗ f0cw gf (S gen_id) s0
                ∗ (ftkt r s ∗ f_typed (fgn_cl gf) s ∗ era_pin (fgn_echo gf) (S gen_id) v
                   ∗ cs_lb v cs))%I
-              (ufin v I (dst_content s) (LPipes (PrCatF fname_f) (S n'))
+              (ufin v I (dst_content s) (LPipes (PrCatF fname_f) (cats (S n')))
                  (prod_content (pv_fc pview_unionU (dst_content s)) (PrCatF fname_f))
                  (PrCatF fname_f) (fdq r (1/2)%Qp s) _ P gF gG γc γm HlR Hfc
-                 ltac:(cbn; by apply bool_decide_eq_true_2) Hplok Hpos Hdeed)
-              eq_refl eq_refl sa (pcut PWC (S n') len gb)
-              (STG PWC (S n') len gb sa) (ustg_len PWC (S n') len gb sa)
-              (UkShMain.ush_args sa (pcut PWC (S n') len gb) (wl_toks PWC)) eq_refl Hstc
+                 (adm_u_f_catf_cats (S n')) Hplok Hpos Hdeed)
+              (lpipes_cats_eq _ _) eq_refl sa (pcut PWC (S n') len gb)
+              (STG PWC (S n') len gb sa) ltac:(rewrite lcats_cats; exact (ustg_len PWC (S n') len gb sa))
+              (UkShMain.ush_args sa (pcut PWC (S n') len gb) (wl_toks PWC)) eq_refl ltac:(rewrite lcats_cats; exact Hstc)
               ld rb1 rb2 Hl1 Hl2 Hnone
               (REST PWC n' len gb sa)
               (UkShMain.ush_args sa (pcut PWC (S n') len gb) (wl_toks PWC))
@@ -749,31 +751,36 @@ Section UShUPipes.
     destruct Hd as (p & np & -> & Ha & Hplok).
     iDestruct (UkSh.ush_jtab_ro (ukn_t N) with "Hjt") as "#Hro".
     destruct p as [ws | g].
-    - (* [echo ws | cat^n] -- the pipe era's body walk *)
+    - (* [echo ws | cat^n] -- the pipe era's body walk; the admission's
+         stages are all cats *)
+      pose proof (adm_u_f_cats _ _ Ha) as Hnp. set (n0 := length np) in Hnp.
+      clearbody n0. subst np.
       iApply (UkShPipeForkTwin.wp_kshm_body_pipe (PS := uprogSG_free)
                 (SG := uexecSG_xv6) (ghost_varG0 := offbox_offG) N γp T Wcu Wbu Pm
                 (fun k0 H => H) pipes_lp (68 + UkSh.ush_Dpipe) h m f k len
-                (FileDisc.uline_ws (FileDisc.LPipe (PrEcho ws) np)) sz l n
+                (FileDisc.uline_ws (FileDisc.LPipe (PrEcho ws) (cats n0))) sz l n
                 ltac:(lia) pipes_lp0
                 Hregs Hs1 Ha5 Hnn Hnul Hkl2
-                (pipes_lp_of_at ws np f k len Hlat)
+                (pipes_lp_of_at ws n0 f k len Hlat)
                 Hszlo Hszal Hszok Hpm1 Hpmwb (uHwbl_u ug r s0 PT PD)
                 with "Hgen Hhead Hcode Hro [] Hjt Hkl Hche Hplaw [%] Hstd
                       Hdat Hsz Hbuf Hrun").
       + iApply (UkShFork.ushf_code_shp (ukn_t N) with "Hcode").
       + exact Hfd0.
     - (* [cat f | cat^n] -- the cat body walk at the pipeline's line *)
-      cbn [adm_u_f] in Ha. apply bool_decide_eq_true_1 in Ha. subst g.
-      destruct (pipes_lpc_bytes _ f k len (ex_intro _ np (conj eq_refl Hlat)))
+      apply adm_u_f_catf in Ha as [-> Hc].
+      pose proof (FileDisc.all_cats_eq np Hc) as Hnp. set (n0 := length np) in Hnp.
+      clearbody n0. subst np.
+      destruct (pipes_lpc_bytes _ f k len (ex_intro _ n0 (conj eq_refl Hlat)))
         as (Hb0 & Hb1 & Hl2).
       iApply (UkShRedirBody.wp_kshm_body_ca_with (PS := uprogSG_free) (SG := uexecSG_xv6)
                 (ghost_varG0 := offbox_offG) N γp T Wcu Wbu Pm
                 (UkShCatForkTwin.kshf_fork_law_pipe (PS := uprogSG_free) (SG := uexecSG_xv6)
                    (ghost_varG0 := offbox_offG) N γp T Wcu Wbu Pm (fun k0 H => H))
                 pipes_lpc (68 + UkSh.ush_Dpipe) h m f k len
-                (FileDisc.uline_ws (FileDisc.LPipe (PrCatF fname_f) np)) sz l n
+                (FileDisc.uline_ws (FileDisc.LPipe (PrCatF fname_f) (cats n0))) sz l n
                 ltac:(lia) Hregs Hs1 Ha5 Hnn Hnul Hkl2
-                (pipes_lpc_of_at np f k len Hlat) Hb0 Hb1 Hl2
+                (pipes_lpc_of_at n0 f k len Hlat) Hb0 Hb1 Hl2
                 Hszlo Hszal Hszok Hpm1 Hpmwb (uHwbl_u ug r s0 PT PD)
                 with "Hgen Hhead Hcode Hro [] Hjt Hkl Hchc Hplaw [%] Hstd
                       Hdat Hsz Hbuf Hrun").

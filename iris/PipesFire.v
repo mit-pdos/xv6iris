@@ -269,13 +269,13 @@ Section real.
         [exact (so_catf fc c f Hf) | by destruct Hne].
   Qed.
 
-  Lemma so_mid_ok s : aM s -> stage_out fc L SMid (so_mid s).
+  Lemma so_mid_ok s : aM s -> stage_out fc L (SMid FCat) (so_mid s).
   Proof using.
     intros Hs. unfold so_mid. case_decide as Hw.
     - subst s. exact (so_mid_halt fc L [] (prefix_nil _)).
     - destruct Hs as [-> | [-> | ->]]; [| | by destruct Hw].
-      + exact (so_silent fc L SMid).
-      + exact (so_exec fc L SMid).
+      + exact (so_silent fc L (SMid FCat)).
+      + exact (so_exec fc L (SMid FCat)).
   Qed.
 
   Lemma so_mid_cons s : so_cons (so_mid s) = s.
@@ -284,10 +284,10 @@ Section real.
   Lemma so_mid_rd s : rd_of (so_mid s) = RdGone.
   Proof using. unfold so_mid. case_decide; reflexivity. Qed.
 
-  Lemma so_lastd_ok s : aT s -> stage_out fc L SLast (so_lastd s).
+  Lemma so_lastd_ok s : aT s -> stage_out fc L (SLast FCat) (so_lastd s).
   Proof using.
-    intros Hs. unfold so_lastd. case_decide as He; [subst s; exact (so_exec fc L SLast) |].
-    case_decide as Hz; [subst s; exact (so_silent fc L SLast) |].
+    intros Hs. unfold so_lastd. case_decide as He; [subst s; exact (so_exec fc L (SLast FCat)) |].
+    case_decide as Hz; [subst s; exact (so_silent fc L (SLast FCat)) |].
     destruct Hs as [Hs | Hs]; [by destruct He |]. exact (so_last fc L s Hs).
   Qed.
 
@@ -297,7 +297,7 @@ Section real.
     reflexivity.
   Qed.
 
-  Lemma so_copy_ok D : D `prefix_of` L -> stage_out fc L SMid (so_copy D).
+  Lemma so_copy_ok D : D `prefix_of` L -> stage_out fc L (SMid FCat) (so_copy D).
   Proof using. intros HD. exact (so_mid_copy fc L D HD). Qed.
 
 End real.
@@ -329,8 +329,8 @@ Section build.
   Lemma sfx_build (v : wid -> bytes) (so : nat -> st_out) (m : nat) :
     forall (j : nat) (win : wr_out) (wc : bool),
     (forall i, j <= i < j + m ->
-       v (WSh i) = [] /\ stage_out fc L SMid (so i) /\ so_cons (so i) = v (WLeft i)) ->
-    stage_out fc L SLast (so (j + m)) -> so_cons (so (j + m)) = v WLast ->
+       v (WSh i) = [] /\ stage_out fc L (SMid FCat) (so i) /\ so_cons (so i) = v (WLeft i)) ->
+    stage_out fc L (SLast FCat) (so (j + m)) -> so_cons (so (j + m)) = v WLast ->
     pipe_pairB L wc win (rd_of (so j)) ->
     (forall i, j <= i < j + m -> pipe_pairB L true (wr_of (so i)) (rd_of (so (S i)))) ->
     sfx_runV fc L (S m) win wc (v <$> wids_from j m).
@@ -354,7 +354,7 @@ Section build.
     forall (j m : nat) (win : wr_out) (wc : bool),
     d < S m ->
     (forall i, j <= i < j + d ->
-       v (WSh i) = [] /\ stage_out fc L SMid (so i) /\ so_cons (so i) = v (WLeft i)) ->
+       v (WSh i) = [] /\ stage_out fc L (SMid FCat) (so i) /\ so_cons (so i) = v (WLeft i)) ->
     v (WSh (j + d)) = dg_pipe_b ->
     (forall i, j + d < i < j + S m -> v (WSh i) = []) ->
     (forall i, j + d <= i < j + S m -> v (WLeft i) = []) -> v WLast = [] ->
@@ -391,7 +391,7 @@ Section inv.
 
   Lemma sfx_runV_1_inv win wc vs :
     sfx_runV fc L 1 win wc vs ->
-    exists so, vs = [so_cons so] /\ stage_out fc L SLast so /\ pipe_pairB L wc win (rd_of so).
+    exists so, vs = [so_cons so] /\ stage_out fc L (SLast FCat) so /\ pipe_pairB L wc win (rd_of so).
   Proof using.
     intros H. remember 1 as mm eqn:Hmm.
     destruct H as [win' wc' so Hso Hp | m' win' wc' | m' win' wc' so vs' Hso Hp Hr];
@@ -402,7 +402,7 @@ Section inv.
   Lemma sfx_runV_SS_inv m win wc a b vs :
     sfx_runV fc L (S (S m)) win wc (a :: b :: vs) ->
     (a = dg_pipe_b /\ b :: vs = replicate (2 * S m) [])
-    \/ exists so, a = [] /\ b = so_cons so /\ stage_out fc L SMid so
+    \/ exists so, a = [] /\ b = so_cons so /\ stage_out fc L (SMid FCat) so
                   /\ pipe_pairB L wc win (rd_of so) /\ sfx_runV fc L (S m) (wr_of so) true vs.
   Proof using.
     intros H. remember (S (S m)) as mm eqn:Hmm. remember (a :: b :: vs) as l eqn:Hl.
@@ -501,15 +501,16 @@ End real2.
 
 Lemma line_runV_SS_inv (fc : bytes -> option bytes) (p : producer) (n : nat) (a b : bytes)
     (vs : list bytes) :
-  line_runV fc (LPipes p n) (a :: b :: vs) ->
+  line_runV fc (LPipes p (cats n)) (a :: b :: vs) ->
   (a = dg_pipe_b /\ b :: vs = replicate (2 * n) [])
   \/ exists so, a = [] /\ b = so_cons so /\ stage_out fc (prod_content fc p) (SProd p) so
                 /\ sfx_runV fc (prod_content fc p) n (wr_of so) (prod_cat p) vs.
 Proof using.
-  intros H. remember (LPipes p n) as l eqn:Hl. remember (a :: b :: vs) as ls eqn:Hls.
+  intros H. remember (LPipes p (cats n)) as l eqn:Hl. remember (a :: b :: vs) as ls eqn:Hls.
   destruct H as [ws' | ws' | ws' | p' n' Hn' | p' n' so vs' Hso Hr]; try discriminate Hl.
-  - injection Hl as -> ->. left. split; congruence.
-  - injection Hl as -> ->. injection Hls as Ha Hb Hvs. subst. right. exists so. done.
+  - injection Hl as -> Hc. apply FileDisc.cats_inj in Hc. subst n'. left. split; congruence.
+  - injection Hl as -> Hc. apply FileDisc.cats_inj in Hc. subst n'.
+    injection Hls as Ha Hb Hvs. subst. right. exists so. done.
 Qed.
 
 Lemma aS_mid (fc : bytes -> option bytes) (p : producer) (i : nat) (s : bytes) :
@@ -565,12 +566,12 @@ Section real3.
   Context (fc : bytes -> option bytes) (p : producer) (n : nat).
   Hypothesis Hn : 1 <= n.
   Local Notation L := (prod_content fc p).
-  Local Notation lp := (LPipes p n).
+  Local Notation lp := (LPipes p (cats n)).
 
   (* A RUN IS REAL *)
   Lemma run_real (v : wid -> bytes) : runN fc lp v -> real fc p n v.
   Proof using Hn.
-    intros H. unfold runN in H. cbn [lcats] in H.
+    intros H. unfold runN in H. rewrite lcats_cats in H.
     destruct n as [| m] eqn:Hnm; [lia |]. unfold wids in H. cbn [wids_from] in H.
     rewrite !fmap_cons in H.
     destruct (line_runV_SS_inv fc p (S m) _ _ _ H)
@@ -608,7 +609,7 @@ Section real3.
   (* A REAL VECTOR IS A RUN *)
   Lemma real_run (v : wid -> bytes) : real fc p n v -> runN fc lp v.
   Proof using Hn.
-    intros Hre. unfold runN. cbn [lcats]. destruct n as [| m] eqn:Hnm; [lia |].
+    intros Hre. unfold runN. rewrite lcats_cats. destruct n as [| m] eqn:Hnm; [lia |].
     unfold wids. cbn [wids_from]. rewrite !fmap_cons.
     destruct Hre as [(k & Hk & Hpf & Hsh & Hlf & Hlast & Hab) | (Hsh & Hab & HT & Hch)].
     - destruct k as [| k'].
@@ -742,17 +743,18 @@ Section term.
   Lemma sfx_term_build (v : wid -> bytes) (d : nat) :
     forall (j m : nat) (win : wr_out) (wc : bool),
     d < S m -> (forall i, j <= i <= j + d -> aM (v (WLeft i))) ->
-    sfx_term fc L (S (S m)) win wc ((v <$> (WLeft <$> seq j d)) ++ [dg_fork_b])
+    sfx_term fc L (cats (S (S m))) win wc ((v <$> (WLeft <$> seq j d)) ++ [dg_fork_b])
       (v (WLeft (j + d))).
   Proof using.
     induction d as [| d IH]; intros j m win wc Hd Ha.
     - rewrite Nat.add_0_r. cbn [seq fmap list_fmap app].
       rewrite <- (so_mid_cons (v (WLeft j))).
-      exact (stt_here fc L m win wc (so_mid (v (WLeft j))) (so_mid_ok fc p _ (Ha j ltac:(lia)))).
+      exact (stt_here fc L FCat FCat (cats m) win wc (so_mid (v (WLeft j)))
+               (so_mid_ok fc p _ (Ha j ltac:(lia)))).
     - destruct m as [| m]; [lia |].
       cbn [seq]. rewrite !fmap_cons. cbn [app].
       rewrite <- (so_mid_cons (v (WLeft j))) at 1.
-      apply (stt_next fc L (S m) win wc (so_mid (v (WLeft j))) _ _
+      apply (stt_next fc L FCat FCat (cats (S m)) win wc (so_mid (v (WLeft j))) _ _
                (so_mid_ok fc p _ (Ha j ltac:(lia)))).
       + rewrite so_mid_rd. apply pipe_pairB_gone.
       + replace (j + S d) with (S j + d) by lia.
@@ -760,27 +762,29 @@ Section term.
   Qed.
 
   Lemma sfx_term_inv (v : wid -> bytes) (d : nat) :
-    forall (j m : nat) (win : wr_out) (wc : bool) (W : list bytes) (sv : bytes),
-    sfx_term fc L m win wc W sv ->
+    forall (j : nat) (m : list filt) (win : wr_out) (wc : bool) (W : list bytes) (sv : bytes),
+    all_cats m = true -> sfx_term fc L m win wc W sv ->
     W = (v <$> (WLeft <$> seq j d)) ++ [dg_fork_b] -> sv = v (WLeft (j + d)) ->
     forall i, j <= i <= j + d -> aM (v (WLeft i)).
   Proof using.
-    induction d as [| d IH]; intros j m win wc W sv H HW Hsv i Hi.
+    induction d as [| d IH]; intros j m win wc W sv Hc H HW Hsv i Hi.
     - rewrite Nat.add_0_r in Hsv. cbn [seq fmap list_fmap app] in HW.
-      destruct H as [m' win' wc' so Hso | m' win' wc' so W' s' Hso Hp Hr].
+      destruct H as [F F' m' win' wc' so Hso | F F' m' win' wc' so W' s' Hso Hp Hr];
+        apply FileDisc.all_cats_cons in Hc as [-> Hc].
       + assert (i = j) by lia. subst i.
         destruct (stage_out_mid_inv fc L so Hso) as [-> | [-> | [(D & _ & ->) | (D & _ & ->)]]];
           cbn in Hsv; rewrite <- Hsv; unfold aM; tauto.
       + exfalso. injection HW as _ HW'. destruct Hr; discriminate HW'.
     - cbn [seq] in HW. rewrite !fmap_cons in HW. cbn [app] in HW.
-      destruct H as [m' win' wc' so Hso | m' win' wc' so W' s' Hso Hp Hr].
+      destruct H as [F F' m' win' wc' so Hso | F F' m' win' wc' so W' s' Hso Hp Hr];
+        apply FileDisc.all_cats_cons in Hc as [-> Hc].
       + exfalso. injection HW as _ HW'. destruct (seq (S j) d); cbn in HW'; discriminate HW'.
       + injection HW as Hl0 HW'.
         destruct (decide (i = j)) as [-> | Hne].
         * rewrite <- Hl0.
           destruct (stage_out_mid_inv fc L so Hso) as [-> | [-> | [(D & _ & ->) | (D & _ & ->)]]];
             cbn; unfold aM; tauto.
-        * apply (IH (S j) _ _ _ W' s' Hr HW'); [| lia].
+        * apply (IH (S j) _ _ _ W' s' Hc Hr HW'); [| lia].
           rewrite Hsv. f_equal. f_equal. lia.
   Qed.
 End term.
@@ -789,7 +793,7 @@ Section term2.
   Context (fc : bytes -> option bytes) (p : producer) (n : nat).
   Hypothesis Hn : 1 <= n.
   Local Notation L := (prod_content fc p).
-  Local Notation lp := (LPipes p n).
+  Local Notation lp := (LPipes p (cats n)).
 
   Lemma waitedN_S (k : nat) : waitedN (S k) = WLeft 0 :: (WLeft <$> seq 1 k).
   Proof using. unfold waitedN. cbn [seq]. rewrite fmap_cons. reflexivity. Qed.
@@ -797,16 +801,16 @@ Section term2.
   Lemma realT_terms (v : wid -> bytes) (k : nat) : realT fc p n v k -> termsN fc lp v.
   Proof using Hn.
     intros (Hk & Hf & Hsh & Hlf & Hlast & Hab). exists k.
-    split; [exact Hk |]. split; [exact Hf |]. split; [exact Hsh |].
+    split; [rewrite lcats_cats; exact Hk |]. split; [exact Hf |]. split; [exact Hsh |].
     split; [exact Hlf |]. split; [exact Hlast |].
     destruct k as [| k'].
     - unfold waitedN. cbn [seq fmap list_fmap app].
       rewrite <- (so_prod_cons (v (WLeft 0))).
-      exact (lt_here fc p n (so_prod (v (WLeft 0))) Hn
+      exact (lt_here fc p (cats n) (so_prod (v (WLeft 0))) (FileDisc.cats_ne n Hn)
                (so_prod_ok fc p _ (Hab 0 ltac:(lia)))).
     - rewrite waitedN_S, fmap_cons. cbn [app].
       rewrite <- (so_prod_cons (v (WLeft 0))) at 1.
-      apply (lt_next fc p n (so_prod (v (WLeft 0))) _ _
+      apply (lt_next fc p (cats n) (so_prod (v (WLeft 0))) _ _
                (so_prod_ok fc p _ (Hab 0 ltac:(lia)))).
       destruct n as [| [| m]]; [lia | lia |].
       replace (S k') with (1 + k') by lia.
@@ -820,7 +824,7 @@ Section term2.
   Proof using Hn.
     intros H HW Hsv j Hj. remember lp as l eqn:Hl.
     destruct H as [p' n' so Hn' Hso | p' n' so W' s' Hso Hr];
-      injection Hl as Hp Hnn; subst p'; cbn [prod_content prod_cat] in *.
+      injection Hl as Hp Hnn; subst p' n'; cbn [prod_content prod_cat] in *.
     - destruct k as [| k'].
       + assert (j = 0) by lia. subst j. cbn [aS]. rewrite <- Hsv. exact (prod_aP fc p so Hso).
       + exfalso. rewrite waitedN_S, fmap_cons in HW. cbn [app] in HW.
@@ -831,14 +835,15 @@ Section term2.
       + rewrite waitedN_S, fmap_cons in HW. cbn [app] in HW. injection HW as Hl0 HW'.
         destruct j as [| j].
         * cbn [aS]. rewrite <- Hl0. exact (prod_aP fc p so Hso).
-        * cbn [aS]. apply (sfx_term_inv fc p v k' 1 _ _ _ W' s' Hr HW'); [| lia].
+        * cbn [aS]. apply (sfx_term_inv fc p v k' 1 _ _ _ W' s' (FileDisc.all_cats_cats n) Hr HW');
+            [| lia].
           by rewrite Hsv.
   Qed.
 
   Lemma terms_realT (v : wid -> bytes) : termsN fc lp v -> exists k, realT fc p n v k.
   Proof using Hn.
     intros (k & Hk & Hf & Hsh & Hlf & Hlast & Hlt). exists k.
-    split; [exact Hk |]. split; [exact Hf |]. split; [exact Hsh |].
+    split; [rewrite lcats_cats in Hk; exact Hk |]. split; [exact Hf |]. split; [exact Hsh |].
     split; [exact Hlf |]. split; [exact Hlast |].
     exact (line_term_inv v k _ _ Hlt eq_refl eq_refl).
   Qed.

@@ -83,7 +83,7 @@ Definition nl1 : list (bv 8) := [wl_nl].
 Definition c_hi : list (bv 8) := sb "hi" ++ nl1.
 
 (* ---- cat f | cat | cat ---- *)
-Definition l_cf2 : uline := LPipe (PrCatF fname_f) 2.
+Definition l_cf2 : uline := LPipe (PrCatF fname_f) (cats 2).
 
 Example demo_parse_cf2 :
   uline_of_u (sb "cat f | cat | cat") = l_cf2 /\ ubody_ok adm_u_f (sb "cat f | cat | cat").
@@ -127,7 +127,7 @@ Proof using. vm_compute. reflexivity. Qed.
 Lemma thr_line1 : uline_of_u b_thr1 = LEchoF ws_x.
 Proof using. vm_compute. reflexivity. Qed.
 
-Lemma thr_line2 : uline_of_u b_thr2 = LPipe (PrCatF fname_f) 1.
+Lemma thr_line2 : uline_of_u b_thr2 = LPipe (PrCatF fname_f) (cats 1).
 Proof using. vm_compute. reflexivity. Qed.
 
 Lemma thr_at0 : lm_at ulmU cs_thr 0 = a_thr1.
@@ -171,7 +171,7 @@ Example demo_thread_cont :
 Proof using. rewrite thr_at1. reflexivity. Qed.
 
 (* ---- NEGATIVE (B2): the file's alternatives are not a pipeline's ---- *)
-Definition l_hi1 : uline := LPipe (PrEcho [cmd_echo; sb "hi"]) 1.
+Definition l_hi1 : uline := LPipe (PrEcho [cmd_echo; sb "hi"]) (cats 1).
 
 (* the dead arm of [FileDisc.ralt_ok] admits [RCRan] here, and [RCRan]'s
    continuation at [Some c] is the file's content ... *)
@@ -184,7 +184,7 @@ Example demo_B2_neg : forall s, ~ lm_ok ulmU s l_hi1 (UR RCRan).
 Proof using. intros s H. exact H. Qed.
 
 (* ---- THE TWO-STAGE CORNER (S3) ---- *)
-Definition l_cf1 : uline := LPipe (PrCatF fname_f) 1.
+Definition l_cf1 : uline := LPipe (PrCatF fname_f) (cats 1).
 Definition corner_blk : list (bv 8) := sb "h" ++ cat_dg_write.
 
 (* at [cat f | cat] the producer's write error beside a printed prefix *)
@@ -203,6 +203,17 @@ Proof using. dec_no. Qed.
 (* ---- THE ADMISSION: [cat g] at another name is not admitted ---- *)
 Example demo_adm_other : ~ ubody_ok adm_u_f (sb "cat g | cat").
 Proof using. dec_no. Qed.
+
+(* ---- ...NOR, YET, A GREP STAGE (cut G3: the lines parse, the round
+        admits cats only) ---- *)
+Example demo_grep_parse :
+  uline_of_u (sb "echo hi | grep h | cat")
+  = LPipe (PrEcho [cmd_echo; sb "hi"]) [FGrep (sb "h"); FCat].
+Proof using. vm_compute. reflexivity. Qed.
+
+Example demo_adm_grep :
+  ~ ubody_ok adm_u_f (sb "echo hi | grep h | cat") /\ ~ ubody_ok adm_u_f (sb "cat f | grep h").
+Proof using. split; dec_no. Qed.
 
 (* ---- THE PRODUCER SPLIT: the cross cases ---- *)
 Example demo_split_cross :
@@ -239,6 +250,6 @@ Example demo_execL_echo :
   /\ (forall s, lm_ok ulmU s l_hi1 (UPE (PLRun PipeDisc.dg_execL)))
   /\ lmh_free ulmU_hooks (UPE (PLRun PipeDisc.dg_execL)) = true.
 Proof using.
-  split_and!; [exact (ulm_hooks_exf adm_u_f (PrEcho [cmd_echo; sb "hi"]) 1) | | reflexivity].
+  split_and!; [exact (ulm_hooks_exf adm_u_f (PrEcho [cmd_echo; sb "hi"]) (cats 1)) | | reflexivity].
   intros s. left. right. right. reflexivity.
 Qed.

@@ -277,14 +277,14 @@ Qed.
 
 (* the union's admitted line shapes: the file's three, and the pipelines
    the union's admission lets through *)
-Definition ush_line_pipeU (p : producer) (n : nat) : Prop :=
+Definition ush_line_pipeU (p : producer) (n : list filt) : Prop :=
   adm_u_f (LPipes p n) = true /\ pl_ok (LPipes p n).
 
 Definition ush_line_union (l : uline) : Prop :=
   match l with LPipe p n => ush_line_pipeU p n | _ => True end.
 
 Definition ush_line_upipe (l : uline) : Prop :=
-  exists (p : producer) (n : nat), l = LPipe p n /\ ush_line_pipeU p n.
+  exists (p : producer) (n : list filt), l = LPipe p n /\ ush_line_pipeU p n.
 
 (* the echo child's guard: an admissible echo line, at the union's parse *)
 Definition union_D (I : list (bv 8)) : Prop :=
