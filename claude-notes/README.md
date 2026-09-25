@@ -299,6 +299,13 @@ in `durable-notes.md` for what belongs where and what gets deleted.
   long for its buffer is skipped, and the walks down to the entry
   `wp_kgrep_start_tree` — the recursion's pattern-dependent stack.
 
+- **[`grep-pipes.md`](design/grep-pipes.md)** — GREP AS A PIPELINE STAGE
+  (proposal): on the union's one-line contents grep is a gate, the copy
+  device generalised to a filter device with cat as its identity
+  instance, `grep_filter_conforms` from the owner's grep tree, the model
+  at `LPipe p (fs : list filt)`, the decider's per-pipe truncation, the
+  grep exec lane, cuts G0-G8 and five owner questions.
+
 - **[`filenames.md`](design/filenames.md)** — WIDENING THE FILE MODEL
   to a class of user files such as `*.txt` (deferred until the union
   lands): an abstract name class with five laws, the state as a map, one
