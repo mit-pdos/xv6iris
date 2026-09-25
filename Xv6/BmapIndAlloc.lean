@@ -35,7 +35,7 @@ set_option linter.unusedVariables false
 
 section
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
-  [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [CurCtx]
+  [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [FsLinkG GF] [FsTopG GF] [CurCtx]
 
 set_option maxHeartbeats 8000000 in
 /-- **`+0xa2 .. +0xa4`: balloc FAILED** -- brelse and return 0. -/

@@ -38,7 +38,7 @@ theorem ba_sz_addr : KA.«sb» + 4#64 = sbSizeAddr := rfl
 
 section
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
-  [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [CurCtx]
+  [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [FsLinkG GF] [FsTopG GF] [CurCtx]
 
 set_option maxHeartbeats 4000000 in
 /-- **`+0x7e .. +0x88`: THE JOIN** (Rocq's `ba_epilogue`). -/

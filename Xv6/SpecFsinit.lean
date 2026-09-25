@@ -74,17 +74,17 @@ Every one of those has its Lean counterpart below (deviations listed).
    `logCtx icfgLog …` exactly as Rocq's `log_ctx icfg_log …`, and
    `ireclaim` runs at the ambient configuration.  The number is kept so
    the other deviations' cross-references stand.
-2. BLOCK 1 COMES BACK (Rocq's pre-C-3a shape).  Lean's `initlog` has no
-   `SbPark` park (`Xv6/SbPark.lean` is standalone, `Xv6.logCtx` unchanged),
-   so the run `fsblock fscFs.bytes 1 bsSb` is returned in the post, and
-   Rocq's `fs_parse_sb … = Some sbrec` / `fs_sb_ok sbrec` premises (the
-   park's) are dropped with it.
-3. THE CRASH LAYER IS DROPPED (as `Xv6/SpecInitlog.lean`,
-   `Xv6/SpecEndOp.lean`): `fs_crash_seam_at`, `app_xfer`, `gen_cert`,
-   `log_mirror_born M`, the snapshot law's geometry (`col_geom`, the two
-   `sb_bmapstart`/`sb_size` ties), the exception set's slot values (g'') and
-   the era's two readings (g').  So `Xv`, `M`, `sbrec` are not parameters.
-   The block-map authority `L` stays (initlog's `fsCacheAuth`).
+2. (RETIRED by crash batch C-2b.)  Block 1's run is PARKED by `initlog`
+   (Rocq's C-3a shape) and not returned; Rocq's `fs_parse_sb … = Some
+   sbrec` / `fs_sb_ok sbrec` ride `fsinitCrashPure`.
+3. THE CRASH LAYER, PASS-THROUGH SHAPE (crash batch C-2b): `initlog`'s
+   restored premises -- the seam, `log_mirror_born M`, the law minus the
+   park, and the era's readings (g') -- are threaded as `fsinitCrash` /
+   `fsinitCrashPure`; `gen_cert` comes off the cycle boundary
+   (`Xv6.wpLoop_cert`).  STILL MISSING vs Rocq (crash batch C-4's):
+   `fs_crash_seam_at app_guest`, `app_xfer`, the law BUILT here
+   (`fs_snap_law_build`) with its geometry, the exception set's slot values
+   (g''), and D42's drop of `hhdr0`.
 4. `hhdr0 : hdrN bsHdr = 0` -- AS ROCQ'S premise (g), which Rocq's
    fsinit still carries although its initlog is general in `n`: a dirty
    header costs initlog the slot-value premise (`Xv6/SpecInitlog.lean`'s
@@ -164,6 +164,27 @@ def sbImage (magic fssize nblocks ninodes nlog logstart inodestart bmapstart : B
   wordToBytes4 ninodes ++ wordToBytes4 nlog ++ wordToBytes4 logstart ++
   wordToBytes4 inodestart ++ wordToBytes4 bmapstart
 
+/-- THE CRASH PREMISES `fsinit` THREADS TO `initlog` (crash batch C-2b):
+exactly `initlog`'s restored Rocq premises -- the crash seam, the era's
+born-true mirror, and the file system's law minus block 1's park.  A
+PASS-THROUGH SHAPE: crash batch C-4 restates `fsinit` Rocq-literally (the law
+is BUILT here by `fs_snap_law_build` out of the seam at the application's
+guest, D42 drops `hhdr0`, and the era's readings (g')/(g'') become this
+contract's own premises). -/
+def fsinitCrash {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF]
+    [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [BcacheG GF] [DiskG GF] [FsBlocksG GF]
+    [LogG GF] [FsLinkG GF] [FsTopG GF] [Fscfg] [Icfg] [CurCtx]
+    (M : LogMirror) (sbrec : FsSb) : IProp GF :=
+  iprop(fsCrashSeam (hlc := hlc) (GF := GF) fscCov fscLogst ∗ logMirrorBorn (hlc := hlc) M ∗
+    □ (sbPark fscFs sbrec -∗ snapLaw (hlc := hlc) icfgLog fscFs fscCov fscLogst))
+
+/-- ...and their pure side: the era's two readings of one image (Rocq's
+(g')), and block 1's two facts. -/
+def fsinitCrashPure [Fscfg] (L : BlockMap) (M : LogMirror) (bsSb : List (BitVec 8))
+    (sbrec : FsSb) : Prop :=
+  (∀ b ∈ fscCov, PartialMap.get? L b = some (M.view b)) ∧ FsSbOk sbrec ∧
+    fsParseSb (fun _ => bsSb) = some sbrec
+
 /-- **WP of `fsinit(dev = a0)`** at either entry `SIE` (Rocq's
 `wp_fsinit_sconf_body`). -/
 def wp_fsinit_eb_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
@@ -179,7 +200,7 @@ def wp_fsinit_eb_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6
     -- initlog's own bundle, threaded verbatim
     (bsHdr : List (BitVec 8)) (L : BlockMap) (D : RegMapF Bool)
     (vlock : BitVec 32) (vname vcpu : BitVec 64) (vStart vDev vNc vN : BitVec 32)
-    (pidv : BitVec 32) (dqp : DFrac)
+    (pidv : BitVec 32) (dqp : DFrac) (M : LogMirror) (sbrec : FsSb)
     (hj : j < NPROC) (hproc : k.proc = procAddr j) (hK : fsinitSlots ≤ k.avail)
     (hnoff : k.noff = 0)
     (htier : k.tier = KTier.kpt)
@@ -205,6 +226,8 @@ def wp_fsinit_eb_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6
     (hhdrHome : ∀ b ∈ (hdrDec bsHdr).2, fsHome fscCov fscLogst b ∧ b ≠ SB_BNO)
     -- ...and CLEAN (initlog's own premise; deviation 4)
     (hhdr0 : hdrN bsHdr = 0)
+    -- initlog's crash premises, pure side (see `fsinitCrashPure`)
+    (hcrash : fsinitCrashPure L M bsSb sbrec)
     -- the raw bytes are the record's width
     (hsbOld : sbOld.length = 32)
     (hpd : descPageRw pd)
@@ -221,6 +244,8 @@ def wp_fsinit_eb_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6
   -- THE SUPERBLOCK, BEFORE: block 1's run (which pins the bytes bread
   -- returns) and 32 bytes of RAW .bss at `&sb`
   fsblock fscFs.bytes 1 bsSb ∗
+  -- initlog's crash premises (see `fsinitCrash`)
+  fsinitCrash (hlc := hlc) M sbrec ∗
   byteBuf KA.«sb» (DFrac.own 1) sbOld ∗
   -- THE BYTE VIEW'S EXCEPTION HANDLE, at the on-disk header's write set:
   -- spent once at the `readsb` crossing, then threaded into initlog
@@ -271,8 +296,7 @@ def wp_fsinit_eb_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6
     wordPointsTo sbLogstartAddr 4 (DFrac.own 1) (BitVec.ofNat 32 fscLogst) -∗
     wordPointsTo sbInodestart 4 (DFrac.own 1) (BitVec.ofNat 32 icfgIst) -∗
     wordPointsTo sbBmapstartAddr 4 (DFrac.own 1) (BitVec.ofNat 32 fscBmapstart) -∗
-    -- block 1's run, handed back (deviation 2)
-    fsblock fscFs.bytes 1 bsSb -∗
+    -- (block 1's run is PARKED by initlog: deviation 2 retired)
     -- THE LOG LAYER, BUILT by initlog at +0x4e and already USED by ireclaim
     -- AT `icfgLog`, the names handed in (what `fs_ready` seals)
     logCtx icfgLog fscBio fscFs fscCov fscLogst icfgDev -∗
@@ -295,12 +319,12 @@ structure FSINIT : Prop where
     (sbOld : List (BitVec 8))
     (bsHdr : List (BitVec 8)) (L : BlockMap) (D : RegMapF Bool)
     (vlock : BitVec 32) (vname vcpu : BitVec 64) (vStart vDev vNc vN : BitVec 32)
-    (pidv : BitVec 32) (dqp : DFrac)
+    (pidv : BitVec 32) (dqp : DFrac) (M : LogMirror) (sbrec : FsSb)
     hj hproc hK hnoff htier hgeom h1cov hsbImg hmagic hn1 hnnib hn31 hblk hbg hbel
-    hhdrLen hhdrNodup hhdrHome hhdr0 hsbOld hpd ha0,
+    hhdrLen hhdrNodup hhdrHome hhdr0 hcrash hsbOld hpd ha0,
     wp_fsinit_eb_body (hlc := hlc) (GF := GF) Γ cpu k γl pd pav pu j
       vMagic vSize vNblocks vNlog bsSb sbOld bsHdr L D vlock vname vcpu vStart vDev vNc vN
-      pidv dqp hj hproc hK hnoff htier hgeom h1cov hsbImg hmagic hn1 hnnib hn31 hblk hbg hbel
-      hhdrLen hhdrNodup hhdrHome hhdr0 hsbOld hpd ha0
+      pidv dqp M sbrec hj hproc hK hnoff htier hgeom h1cov hsbImg hmagic hn1 hnnib hn31 hblk hbg
+      hbel hhdrLen hhdrNodup hhdrHome hhdr0 hcrash hsbOld hpd ha0
 
 end Xv6

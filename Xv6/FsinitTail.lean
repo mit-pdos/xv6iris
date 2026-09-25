@@ -79,7 +79,6 @@ def fsinitCont [Fscfg] [Icfg] [CurCtx] (k : KCtx) (pidv : BitVec 32) (dqp : DFra
     wordPointsTo sbLogstartAddr 4 (DFrac.own 1) (BitVec.ofNat 32 fscLogst) -∗
     wordPointsTo sbInodestart 4 (DFrac.own 1) (BitVec.ofNat 32 icfgIst) -∗
     wordPointsTo sbBmapstartAddr 4 (DFrac.own 1) (BitVec.ofNat 32 fscBmapstart) -∗
-    fsblock fscFs.bytes 1 bsSb -∗
     logCtx icfgLog fscBio fscFs fscCov fscLogst icfgDev -∗
     bslots 3 -∗ irefSlot -∗ iregBoot -∗ wpLoop cpu')
 
@@ -101,8 +100,7 @@ theorem fsinit_cont_of_spec [Fscfg] [Icfg] [CurCtx] {j : Nat} (hj : j < NPROC) (
       wordPointsTo sbLogstartAddr 4 (DFrac.own 1) (BitVec.ofNat 32 fscLogst) -∗
       wordPointsTo sbInodestart 4 (DFrac.own 1) (BitVec.ofNat 32 icfgIst) -∗
       wordPointsTo sbBmapstartAddr 4 (DFrac.own 1) (BitVec.ofNat 32 fscBmapstart) -∗
-      fsblock fscFs.bytes 1 bsSb -∗
-      logCtx icfgLog fscBio fscFs fscCov fscLogst icfgDev -∗
+        logCtx icfgLog fscBio fscFs fscCov fscLogst icfgDev -∗
       bslots 3 -∗ irefSlot -∗ iregBoot -∗ wpLoop cpu'))
     ⊢ fsinitCont (GF := GF) k pidv dqp vMagic vSize vNblocks vNlog bsSb := by
   unfold fsinitCont
@@ -124,12 +122,12 @@ theorem fsinit_epilogue [Fscfg] [Icfg] [CurCtx] (cpu : CPU) (k : KCtx) (spie spp
     trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗
     frame4s2 (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) (k.regs 9#5) (k.regs 18#5) ∗
     wordPointsTo (pPid k.proc) 4 dqp pidv ∗
-    fsinitCells vMagic vSize vNblocks vNlog ∗ fsblock fscFs.bytes 1 bsSb ∗
+    fsinitCells vMagic vSize vNblocks vNlog ∗
     logCtx icfgLog fscBio fscFs fscCov fscLogst icfgDev ∗
     bslots 3 ∗ irefSlot ∗ iregBoot ∗
     fsinitCont k pidv dqp vMagic vSize vNblocks vNlog bsSb
     ⊢ wpLoop (GF := GF) cpu := by
-  iintro ⟨Hk, Hpc, Hte, Hce, Hframe, Hpid, Hcells, Hfsb, #Hlc, Hsl, Hiref, Hboot, Hnext⟩
+  iintro ⟨Hk, Hpc, Hte, Hce, Hframe, Hpid, Hcells, #Hlc, Hsl, Hiref, Hboot, Hnext⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
   ihave Hframe := (show frame4s2 (GF := GF) (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) (k.regs 9#5)
         (k.regs 18#5) ⊢
@@ -153,7 +151,7 @@ theorem fsinit_epilogue [Fscfg] [Icfg] [CurCtx] (cpu : CPU) (k : KCtx) (spie spp
   icases Hcells with ⟨C0, C1, C2, C3, C4, C5, C6, C7⟩
   ispecialize Hnext $$ %cpu
   have hcs := bc_calleeSaved_epi2 k.regs R p19 p20 p21 p22 p23 p24 p25 p26 p27
-  iapply Hnext $$ %spie %spp %_ %hcs [Hk] Hpc Hte Hce Hpid C0 C1 C2 C3 C4 C5 C6 C7 Hfsb Hlc
+  iapply Hnext $$ %spie %spp %_ %hcs [Hk] Hpc Hte Hce Hpid C0 C1 C2 C3 C4 C5 C6 C7 Hlc
     Hsl Hiref Hboot
   iexact Hk
 
@@ -185,7 +183,7 @@ theorem fsinit_reclaim (IR : IRECLAIM) [Fscfg] [Icfg] [CurCtx]
     trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗
     frame4s2 (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) (k.regs 9#5) (k.regs 18#5) ∗
     wordPointsTo (pPid k.proc) 4 dqp pidv ∗
-    fsinitCells vMagic vSize vNblocks vNlog ∗ fsblock fscFs.bytes 1 bsSb ∗
+    fsinitCells vMagic vSize vNblocks vNlog ∗
     logCtx icfgLog fscBio fscFs fscCov fscLogst icfgDev ∗
     bslots 3 ∗ irefSlot ∗ iregBoot ∗
     fsinitCont k pidv dqp vMagic vSize vNblocks vNlog bsSb
@@ -197,7 +195,7 @@ theorem fsinit_reclaim (IR : IRECLAIM) [Fscfg] [Icfg] [CurCtx]
       (K.pushed m).withSpie a b = (K.withSpie a b).pushed m := fun _ _ _ _ => rfl
   unfold fsinitEnv fsinitCells
   iintro ⟨Hk, Hpc, ⟨#Hpe, #Hpi, #Hbc, #Hdc, #Hreg, #Hbreg, #Hit2, #Hiti, #Hslks⟩, Hte, Hce,
-    Hframe, Hpid, ⟨C0, C1, C2, C3, C4, C5, C6, C7⟩, Hfsb, #Hlc, Hsl, Hiref, Hboot, Hnext⟩
+    Hframe, Hpid, ⟨C0, C1, C2, C3, C4, C5, C6, C7⟩, #Hlc, Hsl, Hiref, Hboot, Hnext⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
   -- RECOVERY IS DONE: the seal, and the two upgrades
   ihave #Hseal := logCtx_seal _ _ _ _ _ _ $$ Hlc
@@ -234,7 +232,7 @@ theorem fsinit_reclaim (IR : IRECLAIM) [Fscfg] [Icfg] [CurCtx]
   iapply (fsinit_epilogue cpu k spie2 spp2 R2 pidv dqp vMagic vSize vNblocks vNlog bsSb hK4
       (e2.trans hR2) (e19.trans p19) (e20.trans p20) (e21.trans p21) (e22.trans p22)
       (e23.trans p23) (e24.trans p24) (e25.trans p25) (e26.trans p26) (e27.trans p27))
-  iframe Hk Hpc Hte Hce Hframe Hpid Hfsb Hlc Hsl Hiref Hboot Hnext
+  iframe Hk Hpc Hte Hce Hframe Hpid Hlc Hsl Hiref Hboot Hnext
   unfold fsinitCells
   iframe C0 C1 C2 C3 C4 C5 C6 C7
 

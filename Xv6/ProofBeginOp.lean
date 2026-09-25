@@ -324,7 +324,7 @@ theorem bo_calleeSaved_epi (KR R : RegMap)
 
 section
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
-variable [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [CurCtx]
+variable [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [FsLinkG GF] [FsTopG GF] [CurCtx]
 
 /-- Rocq `bo_batch_lhn`: the batch, opened just for its `lh.n` cell. -/
 theorem bo_batch_lhn (γb : BcacheNames) (γfs : FsNames) (cov : Std.ExtTreeSet Nat compare)
@@ -334,21 +334,22 @@ theorem bo_batch_lhn (γb : BcacheNames) (γfs : FsNames) (cov : Std.ExtTreeSet 
       (wordAtN ξ lhNAddr 4 (DFrac.own 1) (BitVec.ofNat 32 n) -∗
         logStateAt γb γfs cov ls n LB pend ξ) := by
   unfold logStateAt
-  iintro ⟨%W, %L, %D, %h1, %h2, %h3, %h4, Hn, Hblk, Hjunk, HL, HD, Hd, Hhdr, Hsl, Hpool⟩
-  isplitr [Hn Hblk Hjunk HL HD Hd Hhdr Hsl Hpool]
+  iintro ⟨%W, %L, %D, %M, %h1, %h2, %h3, %h4, Hn, Hblk, Hjunk, HL, HD, Hd, Hhdr, Hsl, Hpool,
+    Hrest⟩
+  isplitr [Hn Hblk Hjunk HL HD Hd Hhdr Hsl Hpool Hrest]
   · ipureintro; exact h1.2
   iframe Hn
   iintro Hn
-  iexists W, L, D
-  isplitr [Hn Hblk Hjunk HL HD Hd Hhdr Hsl Hpool]
+  iexists W, L, D, M
+  isplitr [Hn Hblk Hjunk HL HD Hd Hhdr Hsl Hpool Hrest]
   · ipureintro; exact h1
-  isplitr [Hn Hblk Hjunk HL HD Hd Hhdr Hsl Hpool]
+  isplitr [Hn Hblk Hjunk HL HD Hd Hhdr Hsl Hpool Hrest]
   · ipureintro; exact h2
-  isplitr [Hn Hblk Hjunk HL HD Hd Hhdr Hsl Hpool]
+  isplitr [Hn Hblk Hjunk HL HD Hd Hhdr Hsl Hpool Hrest]
   · ipureintro; exact h3
-  isplitr [Hn Hblk Hjunk HL HD Hd Hhdr Hsl Hpool]
+  isplitr [Hn Hblk Hjunk HL HD Hd Hhdr Hsl Hpool Hrest]
   · ipureintro; exact h4
-  iframe Hn Hblk Hjunk HL HD Hd Hhdr Hsl Hpool
+  iframe Hn Hblk Hjunk HL HD Hd Hhdr Hsl Hpool Hrest
 
 /-- The `cmt = false` arm of `logResAt`, named. -/
 def boBatch (γ : LogNames) (γb : BcacheNames) (γfs : FsNames)
@@ -404,6 +405,7 @@ theorem bo_res_elim (γ : LogNames) (γb : BcacheNames) (γfs : FsNames)
       wordAtN ξ lOut 4 (DFrac.own 1) (BitVec.ofNat 32 out) ∗
       wordAtN ξ lNcommit 4 (DFrac.own 1) nc ∗
       (γ.ops ↪●MAP om) ∗ logEpochAuth γ E ∗ logRegAuth γ X ∗ logTxAuth γ T ∗
+      logFlushedBank (hlc := hlc) γ E ∗
       ⌜(FiniteMap.toList om).length = out⌝ ∗
       ⌜∀ i e, PartialMap.get? om i = some e → e.bud ≤ MAXOPBLOCKS⌝ ∗ ⌜out ≤ 3⌝ ∗
       ⌜∀ i, nxo ≤ i → PartialMap.get? om i = none⌝ ∗ ⌜1 ≤ E⌝ ∗
@@ -418,10 +420,12 @@ theorem bo_res_elim (γ : LogNames) (γb : BcacheNames) (γfs : FsNames)
   unfold logResAt boBatch
   iintro ⟨%out, %cmt, %nc, %om, %E, %X, %T, %nxo, %nxt, %nxl,
     Hout, Hcmt, Hnc, Hops, %hlen, %hp, %hfresho, Hep, %hE, Hreg, %hfreshl, %hlive, %hcap,
-    Htx, %hfresht, %hTlen, Harm⟩
+    Htx, %hfresht, %hTlen, #Hbank, Harm⟩
   obtain ⟨hbud, hout3, hcmt0⟩ := hp
   iexists out, nc, om, E, X, T, nxo, nxt, nxl
   iframe Hout Hnc Hops Hep Hreg Htx
+  isplitr
+  · iexact Hbank
   isplitr [Hcmt Harm]
   · ipureintro; exact hlen
   isplitr [Hcmt Harm]
@@ -472,10 +476,11 @@ theorem bo_res_intro (γ : LogNames) (γb : BcacheNames) (γfs : FsNames)
     wordAtN ξ lCmt 4 (DFrac.own 1) (if cmt then 1#32 else 0#32) ∗
     wordAtN ξ lNcommit 4 (DFrac.own 1) nc ∗
     (γ.ops ↪●MAP om) ∗ logEpochAuth γ E ∗ logRegAuth γ X ∗ logTxAuth γ T ∗
+    logFlushedBank (hlc := hlc) γ E ∗
     (if cmt then iprop(emp) else boBatch γ γb γfs cov ls om E X ξ)
     ⊢ logResAt (GF := GF) γ γb γfs cov ls ξ := by
   unfold logResAt boBatch
-  iintro ⟨Hout, Hcmt, Hnc, Hops, Hep, Hreg, Htx, Harm⟩
+  iintro ⟨Hout, Hcmt, Hnc, Hops, Hep, Hreg, Htx, #Hbank, Harm⟩
   iexists out, cmt, nc, om, E, X, T, nxo, nxt, nxl
   iframe Hout Hcmt Hnc Hops Hep Hreg Htx
   isplitr [Harm]
@@ -496,6 +501,8 @@ theorem bo_res_intro (γ : LogNames) (γb : BcacheNames) (γfs : FsNames)
   · ipureintro; exact hfresht
   isplitr [Harm]
   · ipureintro; exact hTlen
+  isplitr [Harm]
+  · iexact Hbank
   iexact Harm
 
 /-- The `committing = 0` re-close. -/
@@ -517,6 +524,7 @@ theorem bo_res_intro_f (γ : LogNames) (γb : BcacheNames) (γfs : FsNames)
     wordAtN ξ lCmt 4 (DFrac.own 1) (0#32 : BitVec 32) ∗
     wordAtN ξ lNcommit 4 (DFrac.own 1) nc ∗
     (γ.ops ↪●MAP om) ∗ logEpochAuth γ E ∗ logRegAuth γ X ∗ logTxAuth γ T ∗
+    logFlushedBank (hlc := hlc) γ E ∗
     boBatch γ γb γfs cov ls om E X ξ
     ⊢ logResAt (GF := GF) γ γb γfs cov ls ξ :=
   bo_res_intro γ γb γfs cov ls ξ out false nc om E X T nxo nxt nxl hlen
@@ -541,13 +549,17 @@ theorem bo_res_intro_t (γ : LogNames) (γb : BcacheNames) (γfs : FsNames)
     wordAtN ξ lOut 4 (DFrac.own 1) (BitVec.ofNat 32 out) ∗
     wordAtN ξ lCmt 4 (DFrac.own 1) (1#32 : BitVec 32) ∗
     wordAtN ξ lNcommit 4 (DFrac.own 1) nc ∗
-    (γ.ops ↪●MAP om) ∗ logEpochAuth γ E ∗ logRegAuth γ X ∗ logTxAuth γ T
+    (γ.ops ↪●MAP om) ∗ logEpochAuth γ E ∗ logRegAuth γ X ∗ logTxAuth γ T ∗
+    logFlushedBank (hlc := hlc) γ E
     ⊢ logResAt (GF := GF) γ γb γfs cov ls ξ := by
-  iintro ⟨Hout, Hcmt, Hnc, Hops, Hep, Hreg, Htx⟩
+  iintro ⟨Hout, Hcmt, Hnc, Hops, Hep, Hreg, Htx, #Hbank⟩
   iapply (bo_res_intro γ γb γfs cov ls ξ out true nc om E X T nxo nxt nxl hlen
     ⟨hbud, hout3, fun _ => hout0⟩ hfresho hE hfreshl hlive hcap hfresht hTlen)
   isimp only [if_true]
   iframe Hout Hcmt Hnc Hops Hep Hreg Htx
+  isplitr
+  · iexact Hbank
+  iempintro
 
 /-! ## The loop's proposition -/
 
@@ -1163,7 +1175,7 @@ theorem bo_loop (SP : SLEEP_PREPARE) (AC : ACQUIRE) (RE : RELEASE) (SL : SLEEP)
   obtain ⟨q2, q8, q9, q18, q19, q20, q21, q22, q23, q24, q25, q26, q27⟩ := id hR
   icases bo_res_elim γ γb γfs cov ls curCtx $$ Hpay
     with ⟨%out, %nc, %om, %E, %X, %T, %nxo, %nxt, %nxl,
-      Hout, Hnc, Hops, Hep, Hreg, Htx,
+      Hout, Hnc, Hops, Hep, Hreg, Htx, #Hbank,
       %hlen, %hbud, %hout3, %hfresho, %hE, %hfreshl, %hlive, %hcap, %hfresht, %hTlen, Harm⟩
   isimp only [wordAtN_cur] at Hout
   icases Harm with ⟨⟨Hcmt, Hbatch⟩ | ⟨Hcmt, %hout0⟩⟩
@@ -1300,7 +1312,9 @@ theorem bo_loop (SP : SLEEP_PREPARE) (AC : ACQUIRE) (RE : RELEASE) (SL : SLEEP)
         (by rw [hlenI, hlen]) hbud' (by omega) hfresh' hE hfreshl hlive' hcap
         (fresh_insert T nxt () hfresht) (by rw [hlenI, hlenT, hTlen])
         $$ [Hout Hcmt Hnc Hops Hep Hreg Htx Hbatch]
-      case' _ => iframe Hout Hcmt Hnc Hops Hep Hreg Htx Hbatch
+      case' _ =>
+        iframe Hout Hcmt Hnc Hops Hep Hreg Htx Hbatch
+        iexact Hbank
       -- the exit: release and the epilogue
       iapply (bo_exit_body RE c (k.withSpie a b) γ γb γfs cov ls dev pidv dqp _ jp
         hjp hproc hK hnoff hlocks htier hint ?hRx) $$ [- $Hk $Hpc]
@@ -1331,7 +1345,9 @@ theorem bo_loop (SP : SLEEP_PREPARE) (AC : ACQUIRE) (RE : RELEASE) (SL : SLEEP)
       ihave Hpay := bo_res_intro_f γ γb γfs cov ls curCtx out nc om E X T nxo nxt nxl
         hlen hbud hout3 hfresho hE hfreshl hlive hcap hfresht hTlen
         $$ [Hout Hcmt Hnc Hops Hep Hreg Htx Hbatch]
-      case' _ => iframe Hout Hcmt Hnc Hops Hep Hreg Htx Hbatch
+      case' _ =>
+        iframe Hout Hcmt Hnc Hops Hep Hreg Htx Hbatch
+        iexact Hbank
       iapply (bo_park2 SP AC RE SL Γ c (k.withSpie a b) γ γb γfs cov ls dev jp pidv dqp _
         hjp hproc hK hnoff hlocks htier hint ?hRy)
         $$ [- $Hk $Hpc]
@@ -1361,7 +1377,9 @@ theorem bo_loop (SP : SLEEP_PREPARE) (AC : ACQUIRE) (RE : RELEASE) (SL : SLEEP)
     ihave Hpay := bo_res_intro_t γ γb γfs cov ls curCtx out nc om E X T nxo nxt nxl
       hlen hbud hout3 hout0 hfresho hE hfreshl hlive hcap hfresht hTlen
       $$ [Hout Hcmt Hnc Hops Hep Hreg Htx]
-    case' _ => iframe Hout Hcmt Hnc Hops Hep Hreg Htx
+    case' _ =>
+      iframe Hout Hcmt Hnc Hops Hep Hreg Htx
+      iexact Hbank
     iapply (bo_park1 SP AC RE SL Γ c (k.withSpie a b) γ γb γfs cov ls dev jp pidv dqp _
       hjp hproc hK hnoff hlocks htier hint ?hRz)
       $$ [- $Hk $Hpc]
@@ -1493,7 +1511,7 @@ set_option maxHeartbeats 16000000 in
 /-- **`begin_op` meets its specification**, at either entry `SIE`. -/
 theorem beginOp_proof (SP : SLEEP_PREPARE) (AC : ACQUIRE) (RE : RELEASE) (SL : SLEEP) :
     BEGIN_OP := ⟨
-  fun {hlc GF} _ _ _ _ _ _ _ _ _ _ _ _ _ Γ _ cpu k γ γb V γfs j logstart dev pidv dqp
+  fun {hlc GF} _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ Γ _ cpu k γ γb V γfs j logstart dev pidv dqp
     hj hproc hK hnoff htier => by
   unfold wp_begin_op_eb_body
   simp only [beginOpAddr]

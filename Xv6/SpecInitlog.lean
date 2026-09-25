@@ -42,18 +42,21 @@ There is no clean-header premise: `read_head`'s copy loop is live,
 `install_trans(1)` installs every entry and the closing `write_head` clears
 a header that said `n`.  What a dirty header costs the caller is Rocq's
 last pure premise, `hxslot` below: at every entry the byte view `Xv` holds
-the slot's logged content (Rocq states it against the era's mirror `M`,
-which this port drops with the crash layer, so the slot's content is read
-off the logged view `L` -- Rocq's other premise `L !! b = lm_view M b` on
-the covered range, composed).  At a clean header the decoded write set is
-`[]` (`Xv6.hdrDec_zero`) and `hxslot` is vacuous, which is how
-`Xv6/SpecFsinit.lean` -- which, like Rocq's, still carries the clean-header
-premise -- calls it.
+the slot's logged content, named by the era's born-true mirror `M` (plus the
+length, the Lean port's one addition: the recovering install asks it).  At a
+clean header the decoded write set is `[]` (`Xv6.hdrDec_zero`) and `hxslot`
+is vacuous, which is how `Xv6/SpecFsinit.lean` still calls it (D42 is crash
+batch C-4's).
 
-**Deviations, all the log port's standing ones** (see `Xv6/LogInv.lean`):
-the crash seam, the era certificate, the era's born-true mirror, block 1's
-park and the file system's snapshot law are all dropped with the layers
-they belong to.
+**THE CRASH PREMISES ARE ROCQ'S** (restored by crash batch C-2b): the crash
+seam, the era certificate, the era's born-true mirror `logMirrorBorn M` with
+the (g') reading `hLM` (on the covered range the logged view IS the mirror),
+block 1's run at fraction 1 with its two facts (`hsbok`/`hsbparse`), and the
+law minus the park `□ (sbPark γfs sbrec -∗ snapLaw …)`.  The recovering
+installs and the closing clear run through the value-chained permits
+(`Xv6.eo_install_gen`, `Xv6.eo_clear_fam`); the clear's copy is the GENESIS
+BANK; block 1 is parked (`Xv6.sbPark_alloc`) and the law composed with the
+park, all sealed into the `Xv6.logCtx` returned.
 
 AN `_at` FORM IN ALL FIVE GHOST NAMES, as Rocq's: the caller hands in
 `Xv6.logFreeTok γ` -- the "log" spinlock's free token included -- and the
@@ -88,12 +91,13 @@ def initlogSlots : Nat := 6 + installTransSlots
 
 /-- **WP of `initlog(dev = a0, sb = a1)`**. -/
 def wp_initlog_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
-    [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [CurCtx]
+    [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [FsLinkG GF] [FsTopG GF] [CurCtx]
     (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
     (cpu : CPU) (k : KCtx) (γ : LogNames) (γl : GName) (γb : BcacheNames) (V : BioView GF)
     (γdl : GName) (γfs : FsNames) (pd pav pu : BitVec 64)
     (j : Nat) (logstart : Nat) (dev : BitVec 32) (sb : BitVec 64)
     (bsHdr : List (BitVec 8)) (Xv : Nat → List (BitVec 8)) (L : BlockMap) (D : RegMapF Bool)
+    (M : LogMirror) (bsSb : List (BitVec 8)) (sbrec : FsSb)
     (vlock : BitVec 32) (vname vcpu : BitVec 64) (vStart vDev vNc vN : BitVec 32)
     (pidv : BitVec 32) (dqp dqs : DFrac)
     (hj : j < NPROC) (hproc : k.proc = procAddr j) (hK : initlogSlots ≤ k.avail)
@@ -107,19 +111,28 @@ def wp_initlog_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G 
     (hhdrNodup : (hdrDec bsHdr).2.Nodup)
     (hhdrHome : ∀ b ∈ (hdrDec bsHdr).2, fsHome V.cov logstart b)
     -- THE EXCEPTION SET'S VALUES ARE THE SLOTS' (Rocq `SpecInitlog.v`'s
-    -- last pure premise, `Xv b = lm_view M (log_slot_bno logstart i)`, with
-    -- the dropped mirror's reading of the slot spelled by the logged view
-    -- `L`, which is Rocq's `L !! b = Some (lm_view M b)` on the region):
-    -- entry `i`'s home block's byte view holds log slot `i`'s content, a
-    -- full block.
+    -- last pure premise, `Xv b = lm_view M (log_slot_bno logstart i)`): the
+    -- era's byte view holds, at a pending home block, log slot `i`'s content,
+    -- which the born-true mirror names -- a full block (the length is the
+    -- Lean port's one addition: the recovering install's contract asks it)
     (hxslot : ∀ (i b : Nat), (hdrDec bsHdr).2[i]? = some b →
-      PartialMap.get? L (logSlotBno logstart i) = some (Xv b) ∧ (Xv b).length = BSIZE)
+      Xv b = M.view (logSlotBno logstart i) ∧ (Xv b).length = BSIZE)
     -- nothing is pinned in a fresh era
     (hclean : ∀ b ∈ V.cov, PartialMap.get? D b = some false)
+    -- THE ERA'S TWO READINGS OF ONE IMAGE (Rocq's (g')): on the covered
+    -- range the logged view IS the era's born-true mirror
+    (hLM : ∀ b ∈ V.cov, PartialMap.get? L b = some (M.view b))
+    -- BLOCK 1'S TWO PURE FACTS (Rocq's `fs_sb_ok sbrec`, `fs_parse_sb … = Some sbrec`)
+    (hsbok : FsSbOk sbrec) (hsbparse : fsParseSb (fun _ => bsSb) = some sbrec)
     (hpd : descPageRw pd) : Prop :=
   kctx cpu k ∗ pcIs cpu initlogAddr ∗ procsInv Γ ∗
   trapCsrs cpu ∗ cpuClaim cpu k.proc ∗ intrRes cpu ∗
   bioCtx γl γb V ∗ diskCaps V.gd γdl pd pav pu ∗ panicEnv ∗
+  -- THE CRASH SEAM, THE ERA CERTIFICATE AND THE ERA'S BORN-TRUE MIRROR (Rocq's):
+  -- what lets initlog's writes -- the recovering installs and the closing
+  -- clear -- carry REAL durability fupds
+  fsCrashSeam (hlc := hlc) (GF := GF) V.cov logstart ∗ genCert (hlc := hlc) (GF := GF) ∗
+  logMirrorBorn (hlc := hlc) M ∗
   wordPointsTo (pPid k.proc) 4 dqp pidv ∗
   -- THE BYTE VIEW'S ROW AND THE WAL'S EXCEPTION HANDLE (Rocq
   -- `SpecInitlog.v:352`).  `initlog` is the function that SEALS the handle
@@ -157,6 +170,10 @@ def wp_initlog_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G 
      fsChalf γfs (logSlotBno logstart i) bs) ∗
   -- the slot pool, stocked: the batch's 32 plus initlog's own working pair
   bslots ((LOGBLOCKS + 2) + 2) ∗
+  -- BLOCK 1'S BYTE RUN, AT FULL FRACTION (Rocq's): parked in `sbN` here
+  fsblock γfs.bytes SB_BNO bsSb ∗
+  -- THE FILE SYSTEM'S LAW, MINUS BLOCK 1 (Rocq's): composed with the park
+  □ (sbPark γfs sbrec -∗ snapLaw (hlc := hlc) γ γfs V.cov logstart) ∗
   wpNext true k.proc cpu (fun cpu' => iprop(∀ (spie spp : Bool) (R' : RegMap),
     ⌜calleeSaved k.regs R'⌝ -∗
     kctx cpu' ((k.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k.regs 1#5)) -∗
@@ -171,12 +188,13 @@ def wp_initlog_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G 
 complement `trap_csrs_ext` / `cpu_claim_ext` in and out; depth 0, so no
 spinlock held by `KCtx.wf`). -/
 def wp_initlog_eb_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
-    [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [CurCtx]
+    [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [FsLinkG GF] [FsTopG GF] [CurCtx]
     (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
     (cpu : CPU) (k : KCtx) (γ : LogNames) (γl : GName) (γb : BcacheNames) (V : BioView GF)
     (γdl : GName) (γfs : FsNames) (pd pav pu : BitVec 64)
     (j : Nat) (logstart : Nat) (dev : BitVec 32) (sb : BitVec 64)
     (bsHdr : List (BitVec 8)) (Xv : Nat → List (BitVec 8)) (L : BlockMap) (D : RegMapF Bool)
+    (M : LogMirror) (bsSb : List (BitVec 8)) (sbrec : FsSb)
     (vlock : BitVec 32) (vname vcpu : BitVec 64) (vStart vDev vNc vN : BitVec 32)
     (pidv : BitVec 32) (dqp dqs : DFrac)
     (hj : j < NPROC) (hproc : k.proc = procAddr j) (hK : initlogSlots ≤ k.avail)
@@ -190,19 +208,28 @@ def wp_initlog_eb_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv
     (hhdrNodup : (hdrDec bsHdr).2.Nodup)
     (hhdrHome : ∀ b ∈ (hdrDec bsHdr).2, fsHome V.cov logstart b)
     -- THE EXCEPTION SET'S VALUES ARE THE SLOTS' (Rocq `SpecInitlog.v`'s
-    -- last pure premise, `Xv b = lm_view M (log_slot_bno logstart i)`, with
-    -- the dropped mirror's reading of the slot spelled by the logged view
-    -- `L`, which is Rocq's `L !! b = Some (lm_view M b)` on the region):
-    -- entry `i`'s home block's byte view holds log slot `i`'s content, a
-    -- full block.
+    -- last pure premise, `Xv b = lm_view M (log_slot_bno logstart i)`): the
+    -- era's byte view holds, at a pending home block, log slot `i`'s content,
+    -- which the born-true mirror names -- a full block (the length is the
+    -- Lean port's one addition: the recovering install's contract asks it)
     (hxslot : ∀ (i b : Nat), (hdrDec bsHdr).2[i]? = some b →
-      PartialMap.get? L (logSlotBno logstart i) = some (Xv b) ∧ (Xv b).length = BSIZE)
+      Xv b = M.view (logSlotBno logstart i) ∧ (Xv b).length = BSIZE)
     -- nothing is pinned in a fresh era
     (hclean : ∀ b ∈ V.cov, PartialMap.get? D b = some false)
+    -- THE ERA'S TWO READINGS OF ONE IMAGE (Rocq's (g')): on the covered
+    -- range the logged view IS the era's born-true mirror
+    (hLM : ∀ b ∈ V.cov, PartialMap.get? L b = some (M.view b))
+    -- BLOCK 1'S TWO PURE FACTS (Rocq's `fs_sb_ok sbrec`, `fs_parse_sb … = Some sbrec`)
+    (hsbok : FsSbOk sbrec) (hsbparse : fsParseSb (fun _ => bsSb) = some sbrec)
     (hpd : descPageRw pd) : Prop :=
   kctx cpu k ∗ pcIs cpu initlogAddr ∗ procsInv Γ ∗
   trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗
   bioCtx γl γb V ∗ diskCaps V.gd γdl pd pav pu ∗ panicEnv ∗
+  -- THE CRASH SEAM, THE ERA CERTIFICATE AND THE ERA'S BORN-TRUE MIRROR (Rocq's):
+  -- what lets initlog's writes -- the recovering installs and the closing
+  -- clear -- carry REAL durability fupds
+  fsCrashSeam (hlc := hlc) (GF := GF) V.cov logstart ∗ genCert (hlc := hlc) (GF := GF) ∗
+  logMirrorBorn (hlc := hlc) M ∗
   wordPointsTo (pPid k.proc) 4 dqp pidv ∗
   -- THE BYTE VIEW'S ROW AND THE WAL'S EXCEPTION HANDLE (Rocq
   -- `SpecInitlog.v:352`).  `initlog` is the function that SEALS the handle
@@ -240,6 +267,10 @@ def wp_initlog_eb_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv
      fsChalf γfs (logSlotBno logstart i) bs) ∗
   -- the slot pool, stocked: the batch's 32 plus initlog's own working pair
   bslots ((LOGBLOCKS + 2) + 2) ∗
+  -- BLOCK 1'S BYTE RUN, AT FULL FRACTION (Rocq's): parked in `sbN` here
+  fsblock γfs.bytes SB_BNO bsSb ∗
+  -- THE FILE SYSTEM'S LAW, MINUS BLOCK 1 (Rocq's): composed with the park
+  □ (sbPark γfs sbrec -∗ snapLaw (hlc := hlc) γ γfs V.cov logstart) ∗
   wpNext true k.proc cpu (fun cpu' => iprop(∀ (spie spp : Bool) (R' : RegMap),
     ⌜calleeSaved k.regs R'⌝ -∗
     kctx cpu' ((k.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k.regs 1#5)) -∗
@@ -253,46 +284,48 @@ def wp_initlog_eb_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv
 /-- The interface of `initlog`. -/
 structure INITLOG : Prop where
   wp_initlog_eb : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
-    [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [CurCtx]
+    [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [FsLinkG GF] [FsTopG GF] [CurCtx]
     (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
     (cpu : CPU) (k : KCtx) (γ : LogNames) (γl : GName) (γb : BcacheNames) (V : BioView GF)
     (γdl : GName) (γfs : FsNames) (pd pav pu : BitVec 64)
     (j : Nat) (logstart : Nat) (dev : BitVec 32) (sb : BitVec 64)
     (bsHdr : List (BitVec 8)) (Xv : Nat → List (BitVec 8)) (L : BlockMap) (D : RegMapF Bool)
+    (M : LogMirror) (bsSb : List (BitVec 8)) (sbrec : FsSb)
     (vlock : BitVec 32) (vname vcpu : BitVec 64) (vStart vDev vNc vN : BitVec 32)
     (pidv : BitVec 32) (dqp dqs : DFrac)
     hj hproc hK hnoff htier hgeom hdev hcl hdt ha0 ha1
-    hhdrLen hhdrNodup hhdrHome hxslot hclean hpd,
+    hhdrLen hhdrNodup hhdrHome hxslot hclean hLM hsbok hsbparse hpd,
     wp_initlog_eb_body (hlc := hlc) (GF := GF) Γ cpu k γ γl γb V γdl γfs pd pav pu j
-      logstart dev sb bsHdr Xv L D vlock vname vcpu vStart vDev vNc vN pidv dqp dqs
+      logstart dev sb bsHdr Xv L D M bsSb sbrec vlock vname vcpu vStart vDev vNc vN pidv dqp dqs
       hj hproc hK hnoff htier hgeom hdev hcl hdt ha0 ha1
-      hhdrLen hhdrNodup hhdrHome hxslot hclean hpd
+      hhdrLen hhdrNodup hhdrHome hxslot hclean hLM hsbok hsbparse hpd
 
 /-- The interrupts-off instance of `wp_initlog_eb` (the complement is the whole
 bundle): the contract every not-yet-generalized caller states. -/
 theorem INITLOG.wp_initlog (A : INITLOG) {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
-    [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [CurCtx]
+    [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [FsLinkG GF] [FsTopG GF] [CurCtx]
     (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
     (cpu : CPU) (k : KCtx) (γ : LogNames) (γl : GName) (γb : BcacheNames) (V : BioView GF)
     (γdl : GName) (γfs : FsNames) (pd pav pu : BitVec 64)
     (j : Nat) (logstart : Nat) (dev : BitVec 32) (sb : BitVec 64)
     (bsHdr : List (BitVec 8)) (Xv : Nat → List (BitVec 8)) (L : BlockMap) (D : RegMapF Bool)
+    (M : LogMirror) (bsSb : List (BitVec 8)) (sbrec : FsSb)
     (vlock : BitVec 32) (vname vcpu : BitVec 64) (vStart vDev vNc vN : BitVec 32)
     (pidv : BitVec 32) (dqp dqs : DFrac)
     hj hproc hK hsie hnoff hlocks htier hgeom hdev hcl hdt ha0 ha1
-    hhdrLen hhdrNodup hhdrHome hxslot hclean hpd :
+    hhdrLen hhdrNodup hhdrHome hxslot hclean hLM hsbok hsbparse hpd :
     wp_initlog_body (hlc := hlc) (GF := GF) Γ cpu k γ γl γb V γdl γfs pd pav pu j
-      logstart dev sb bsHdr Xv L D vlock vname vcpu vStart vDev vNc vN pidv dqp dqs
+      logstart dev sb bsHdr Xv L D M bsSb sbrec vlock vname vcpu vStart vDev vNc vN pidv dqp dqs
       hj hproc hK hsie hnoff hlocks htier hgeom hdev hcl hdt ha0 ha1
-      hhdrLen hhdrNodup hhdrHome hxslot hclean hpd := by
-  have h := A.wp_initlog_eb (hlc := hlc) (GF := GF) (Γ := Γ) (cpu := cpu) (k := k) (γ := γ) (γl := γl) (γb := γb) (V := V) (γdl := γdl) (γfs := γfs) (pd := pd) (pav := pav) (pu := pu) (j := j) (logstart := logstart) (dev := dev) (sb := sb) (bsHdr := bsHdr) (Xv := Xv) (L := L) (D := D) (vlock := vlock) (vname := vname) (vcpu := vcpu) (vStart := vStart) (vDev := vDev) (vNc := vNc) (vN := vN) (pidv := pidv) (dqp := dqp) (dqs := dqs) (hj := hj) (hproc := hproc) (hK := hK) (hnoff := hnoff) (htier := htier) (hgeom := hgeom) (hdev := hdev) (hcl := hcl) (hdt := hdt) (ha0 := ha0) (ha1 := ha1) (hhdrLen := hhdrLen) (hhdrNodup := hhdrNodup) (hhdrHome := hhdrHome) (hxslot := hxslot) (hclean := hclean) (hpd := hpd)
+      hhdrLen hhdrNodup hhdrHome hxslot hclean hLM hsbok hsbparse hpd := by
+  have h := A.wp_initlog_eb (hlc := hlc) (GF := GF) (Γ := Γ) (cpu := cpu) (k := k) (γ := γ) (γl := γl) (γb := γb) (V := V) (γdl := γdl) (γfs := γfs) (pd := pd) (pav := pav) (pu := pu) (j := j) (logstart := logstart) (dev := dev) (sb := sb) (bsHdr := bsHdr) (Xv := Xv) (L := L) (D := D) (M := M) (bsSb := bsSb) (sbrec := sbrec) (vlock := vlock) (vname := vname) (vcpu := vcpu) (vStart := vStart) (vDev := vDev) (vNc := vNc) (vN := vN) (pidv := pidv) (dqp := dqp) (dqs := dqs) (hj := hj) (hproc := hproc) (hK := hK) (hnoff := hnoff) (htier := htier) (hgeom := hgeom) (hdev := hdev) (hcl := hcl) (hdt := hdt) (ha0 := ha0) (ha1 := ha1) (hhdrLen := hhdrLen) (hhdrNodup := hhdrNodup) (hhdrHome := hhdrHome) (hxslot := hxslot) (hclean := hclean) (hLM := hLM) (hsbok := hsbok) (hsbparse := hsbparse) (hpd := hpd)
   unfold wp_initlog_eb_body at h
   unfold wp_initlog_body
   rw [hsie] at h
   simp only [trapCsrsExt_false, cpuClaimExt_false] at h
-  iintro ⟨H0, H1, H2, Htc, Hcl, Hir, H6, H7, H8, H9, H10, H11, H12, H13, H14, H15, H16, H17, H18, H19, H20, H21, H22, H23, H24, H25, H26, H27, H28, H29, H30, H31, Hnext⟩
+  iintro ⟨H0, H1, H2, Htc, Hcl, Hir, H6, H7, H8, Hs, Hc, Hm, H9, H10, H11, H12, H13, H14, H15, H16, H17, H18, H19, H20, H21, H22, H23, H24, H25, H26, H27, H28, H29, H30, H31, Hb1, Hlaw, Hnext⟩
   iapply h
-  iframe H0 H1 H2 Htc Hcl Hir H6 H7 H8 H9 H10 H11 H12 H13 H14 H15 H16 H17 H18 H19 H20 H21 H22 H23 H24 H25 H26 H27 H28 H29 H30 H31
+  iframe H0 H1 H2 Htc Hcl Hir H6 H7 H8 Hs Hc Hm H9 H10 H11 H12 H13 H14 H15 H16 H17 H18 H19 H20 H21 H22 H23 H24 H25 H26 H27 H28 H29 H30 H31 Hb1 Hlaw
   iapply wpNext_mono $$ Hnext
   iintro %cpu' HK %spie %spp %R' %p0 H1 H2 ⟨Htc, Hir⟩ Hcl H6 H7 H8 H9
   iapply HK $$ %spie %spp %R' %p0 H1 H2 Htc Hcl Hir H6 H7 H8 H9

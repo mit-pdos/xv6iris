@@ -46,7 +46,7 @@ cleared bitmap `bitmapBytes (used \ {bi})` and its payload still at
 `bitmapBytes used`. -/
 theorem bf_tail (LW : LOG_WRITE) (BE : BRELSE)
     {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
-    [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [CurCtx]
+    [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [FsLinkG GF] [FsTopG GF] [CurCtx]
     (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
     (c0 cpu : CPU) (k : KCtx) (spie1 spp1 : Bool) (R : RegMap)
     (γl : GName) (γb : BcacheNames) (V : BioView GF) (γ : LogNames) (γfs : FsNames)

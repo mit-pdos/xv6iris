@@ -87,7 +87,7 @@ set_option linter.unusedVariables false
 
 section Small
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF]
-  [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [LogG GF]
+  [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [LogG GF] [FsLinkG GF] [FsTopG GF]
 
 /-- The two quarter shares the `depTx` descriptors parked join into a half
 (Rocq's `log_tx_add … Qp.quarter_quarter`). -/

@@ -126,7 +126,7 @@ end
 /-! ## The dinode record's `log_write` -/
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [LogG GF]
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [LogG GF] [FsLinkG GF] [FsTopG GF]
   [FsBlocksG GF]
 
 /-- THE GHOST STEP `log_write` runs at one dinode's record, at the
@@ -160,7 +160,7 @@ theorem dislot_shape (ds : List Dinode) (inum : BitVec 32) (dn : Dinode) (hds : 
 
 section
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
-  [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [CurCtx]
+  [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [FsLinkG GF] [FsTopG GF] [CurCtx]
 
 set_option maxHeartbeats 1000000 in
 /-- `log_write(bp)`'s byte-range, credited form at a dinode record's

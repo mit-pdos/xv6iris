@@ -4,13 +4,13 @@ eight-slot frame with its lazily saved `s3`/`s4`/`s5`, the OPENED batch the
 committer carries across the whole commit cycle, and the two `[∗list]`
 surgeries the commit's book-keeping needs.
 
-A port of the `EndOpDefs` section of Rocq `ProofEndOp.v`, minus everything
-the crash layer carried: Rocq's `log_mirror_half` (and the whole
-`eo_open`'s mirror row), `fs_crash_seam`, `snap_law_out`, `fs_bank` and the
-durability fupds are dropped with `Xv6/DiskInvDefs.lean`'s crash permits --
-see `Xv6/SpecEndOp.lean`'s header.  What is left is the resource algebra of
-the commit: the write set's cells, the two block-view authorities, the
-pin halves split along the write set, the log region's client halves split
+A port of the `EndOpDefs` section of Rocq `ProofEndOp.v`.  The checkout
+(`eoOpen_of_batch`) hands the era's mirror half out AT A NAME with its two
+rows (Rocq's), and the deposit (`eoOpen_to_batch`) takes them back; the
+crash vocabulary the commit runs on (the law's reading, the three permit
+families, the chained picture) is `Xv6/EndOpCrash.lean`.  What is here is the
+resource algebra of the commit: the write set's cells, the two block-view
+authorities, the pin halves split along the write set, the log region's client halves split
 at the copy loop's CURSOR, and the buffer-slot pool.
 
 This is a definitional file (no `Code*`/`Proof*` import); it holds the
@@ -768,12 +768,13 @@ end
 Rocq's `eo_open`: `Xv6.logStateAt` taken apart, with the log region's
 client halves SPLIT at the copy loop's cursor `t` (the prefix is at the
 contents the loop has already written, the suffix is still opaque).  The
-mirror row and the crash seam Rocq carries beside it are dropped with the
-crash layer (see the file header). -/
+era's mirror half travels OUTSIDE it, by value (Rocq's): the commit moves the
+on-disk header away from clean and back, so it cannot ride a bundle held
+across `write_head`. -/
 
 section
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
-variable [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [CurCtx]
+variable [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [FsLinkG GF] [FsTopG GF] [CurCtx]
 
 def eoOpen (γb : BcacheNames) (γfs : FsNames) (cov : Std.ExtTreeSet Nat compare)
     (logstart n : Nat) (W : List (BitVec 32)) (L : BlockMap) (D : RegMapF Bool)
@@ -830,25 +831,36 @@ theorem eoOpen_of_batch (γb : BcacheNames) (γfs : FsNames)
     (cov : Std.ExtTreeSet Nat compare) (logstart n : Nat) (LB : List Nat)
     (pend : Nat → Prop) :
     logStateAt (GF := GF) γb γfs cov logstart n LB pend curCtx ⊢
-      ∃ (W : List (BitVec 32)) (L : BlockMap) (D : RegMapF Bool),
+      ∃ (W : List (BitVec 32)) (L : BlockMap) (D : RegMapF Bool) (M0 : LogMirror),
         ⌜n = W.length ∧ n ≤ LOGBLOCKS⌝ ∗ ⌜LB = W.map (fun w => w.toNat)⌝ ∗
-        ⌜(W.map (fun w => w.toNat)).Nodup⌝ ∗ ⌜∀ w ∈ W, fsHome cov logstart w.toNat⌝ ∗
+        ⌜(W.map (fun w => w.toNat)).Nodup⌝ ∗
+        ⌜∀ w ∈ W, fsHome cov logstart w.toNat ∧ w.toNat ≠ SB_BNO⌝ ∗
+        -- THE ERA'S MIRROR HALF LEAVES THE CHECKOUT AT A NAME, with its two rows
+        ⌜lmHdr M0 logstart = (0, [])⌝ ∗
+        ⌜logMirrorTieBody M0 L cov logstart (W.map (fun w => w.toNat))⌝ ∗
+        logMirrorHalf (hlc := hlc) M0 ∗
         eoOpen γb γfs cov logstart n W L D eoNullLw 0 := by
   unfold logStateAt eoOpen
-  iintro ⟨%W, %L, %D, %h1, %h2, %h3, %h4, Hn, Hblk, Hjunk, HL, HD, Hd, Hhdr, Hsl, Hpool⟩
+  iintro ⟨%W, %L, %D, %M0, %h1, %h2, %h3, %h4, Hn, Hblk, Hjunk, HL, HD, Hd, Hhdr, Hsl, Hpool,
+    Hmir, %hMhdr, %hMtie⟩
   isimp only [wordAtN_cur] at Hn
   isimp only [wordAtN_cur] at Hblk
   isimp only [wordAtN_cur] at Hjunk
-  iexists W, L, D
-  isplitr [Hn Hblk Hjunk HL HD Hd Hhdr Hsl Hpool]
+  iexists W, L, D, M0
+  isplitr [Hn Hblk Hjunk HL HD Hd Hhdr Hsl Hpool Hmir]
   · ipureintro; exact h1
-  isplitr [Hn Hblk Hjunk HL HD Hd Hhdr Hsl Hpool]
+  isplitr [Hn Hblk Hjunk HL HD Hd Hhdr Hsl Hpool Hmir]
   · ipureintro; exact h2
-  isplitr [Hn Hblk Hjunk HL HD Hd Hhdr Hsl Hpool]
+  isplitr [Hn Hblk Hjunk HL HD Hd Hhdr Hsl Hpool Hmir]
   · ipureintro; exact h3
-  isplitr [Hn Hblk Hjunk HL HD Hd Hhdr Hsl Hpool]
+  isplitr [Hn Hblk Hjunk HL HD Hd Hhdr Hsl Hpool Hmir]
   · ipureintro; exact h4
+  isplitr [Hn Hblk Hjunk HL HD Hd Hhdr Hsl Hpool Hmir]
+  · ipureintro; exact hMhdr
   subst h2
+  isplitr [Hn Hblk Hjunk HL HD Hd Hhdr Hsl Hpool Hmir]
+  · ipureintro; exact hMtie
+  iframe Hmir
   ihave Hsl := BigSepL.bigSepL_mono (PROP := IProp GF)
     (Φ := fun _ (i : Nat) => iprop(∃ bs : List (BitVec 8),
       fsChalf γfs (logSlotBno logstart i) bs))
@@ -865,12 +877,14 @@ theorem eoOpen_of_batch (γb : BcacheNames) (γfs : FsNames)
 back.  The slot rows rejoin whatever the loop left in them. -/
 theorem eoOpen_to_batch (γb : BcacheNames) (γfs : FsNames)
     (cov : Std.ExtTreeSet Nat compare) (logstart : Nat) (L : BlockMap) (D : RegMapF Bool)
-    (Lw : Nat → List (BitVec 8)) (t : Nat) (ht : t ≤ LOGBLOCKS) (pend : Nat → Prop) :
-    eoOpen (GF := GF) γb γfs cov logstart 0 [] L D Lw t ⊢
+    (Lw : Nat → List (BitVec 8)) (t : Nat) (ht : t ≤ LOGBLOCKS) (pend : Nat → Prop)
+    (M : LogMirror) (hMhdr : lmHdr M logstart = (0, []))
+    (hMtie : logMirrorTieBody M L cov logstart []) :
+    logMirrorHalf (hlc := hlc) M ⊢ eoOpen (GF := GF) γb γfs cov logstart 0 [] L D Lw t -∗
       logStateAt γb γfs cov logstart 0 [] pend curCtx := by
   unfold logStateAt eoOpen
-  iintro ⟨Hn, Hblk, Hjunk, HL, HD, Hd, Hhdr, Hdone, Hrest, Hpool⟩
-  iexists ([] : List (BitVec 32)), L, D
+  iintro Hmir ⟨Hn, Hblk, Hjunk, HL, HD, Hd, Hhdr, Hdone, Hrest, Hpool⟩
+  iexists ([] : List (BitVec 32)), L, D, M
   isimp only [← wordAtN_cur] at Hn
   isimp only [← wordAtN_cur] at Hjunk
   iclear Hblk
@@ -900,15 +914,18 @@ theorem eoOpen_to_batch (γb : BcacheNames) (γfs : FsNames)
     rw [show t + (LOGBLOCKS - t) = LOGBLOCKS from by omega] at hsp
     exact hsp) $$ [Hdone Hrest]
   case' _ => iframe Hdone Hrest
-  isplitr [Hn Hblk Hjunk HL HD Hd Hhdr Hsl Hpool]
+  isplitr [Hn Hblk Hjunk HL HD Hd Hhdr Hsl Hpool Hmir]
   · ipureintro; exact ⟨rfl, by unfold LOGBLOCKS; omega⟩
-  isplitr [Hn Hblk Hjunk HL HD Hd Hhdr Hsl Hpool]
+  isplitr [Hn Hblk Hjunk HL HD Hd Hhdr Hsl Hpool Hmir]
   · ipureintro; rfl
-  isplitr [Hn Hblk Hjunk HL HD Hd Hhdr Hsl Hpool]
+  isplitr [Hn Hblk Hjunk HL HD Hd Hhdr Hsl Hpool Hmir]
   · ipureintro; simp
-  isplitr [Hn Hblk Hjunk HL HD Hd Hhdr Hsl Hpool]
+  isplitr [Hn Hblk Hjunk HL HD Hd Hhdr Hsl Hpool Hmir]
   · ipureintro; intro w hw; cases hw
-  iframe Hn Hblk Hjunk HL HD Hd Hhdr Hsl Hpool
+  iframe Hn Hblk Hjunk HL HD Hd Hhdr Hsl Hpool Hmir
+  isplitr
+  · ipureintro; exact hMhdr
+  · ipureintro; exact hMtie
 
 /-- The write set's header cells, merged back into the junk run at the
 clear (`lh.n := 0`). -/
@@ -950,7 +967,7 @@ end
 
 section
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
-variable [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [CurCtx]
+variable [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [FsLinkG GF] [FsTopG GF] [CurCtx]
 
 /-- The caller's continuation, at whichever hart the thread ends on.
 NOTHING LOG-SPECIFIC COMES BACK: the operation is retired. -/
@@ -1030,6 +1047,7 @@ theorem eo_res_elim (γ : LogNames) (γb : BcacheNames) (γfs : FsNames)
       wordAtN ξ lOut 4 (DFrac.own 1) (BitVec.ofNat 32 out) ∗
       wordAtN ξ lNcommit 4 (DFrac.own 1) nc ∗
       (γ.ops ↪●MAP om) ∗ logEpochAuth γ E ∗ logRegAuth γ X ∗ logTxAuth γ T ∗
+      logFlushedBank (hlc := hlc) γ E ∗
       ⌜(FiniteMap.toList om).length = out⌝ ∗
       ⌜∀ i e, PartialMap.get? om i = some e → e.bud ≤ MAXOPBLOCKS⌝ ∗ ⌜out ≤ 3⌝ ∗
       ⌜∀ i, nxo ≤ i → PartialMap.get? om i = none⌝ ∗ ⌜1 ≤ E⌝ ∗
@@ -1044,10 +1062,12 @@ theorem eo_res_elim (γ : LogNames) (γb : BcacheNames) (γfs : FsNames)
   unfold logResAt eoBatch
   iintro ⟨%out, %cmt, %nc, %om, %E, %X, %T, %nxo, %nxt, %nxl,
     Hout, Hcmt, Hnc, Hops, %hlen, %hp, %hfresho, Hep, %hE, Hreg, %hfreshl, %hlive, %hcap,
-    Htx, %hfresht, %hTlen, Harm⟩
+    Htx, %hfresht, %hTlen, #Hbank, Harm⟩
   obtain ⟨hbud, hout3, hcmt0⟩ := hp
   iexists out, nc, om, E, X, T, nxo, nxt, nxl
   iframe Hout Hnc Hops Hep Hreg Htx
+  isplitr
+  · iexact Hbank
   isplitr [Hcmt Harm]
   · ipureintro; exact hlen
   isplitr [Hcmt Harm]
@@ -1098,10 +1118,11 @@ theorem eo_res_intro (γ : LogNames) (γb : BcacheNames) (γfs : FsNames)
     wordAtN ξ lCmt 4 (DFrac.own 1) (if cmt then 1#32 else 0#32) ∗
     wordAtN ξ lNcommit 4 (DFrac.own 1) nc ∗
     (γ.ops ↪●MAP om) ∗ logEpochAuth γ E ∗ logRegAuth γ X ∗ logTxAuth γ T ∗
+    logFlushedBank (hlc := hlc) γ E ∗
     (if cmt then iprop(emp) else eoBatch γ γb γfs cov ls om E X ξ)
     ⊢ logResAt (GF := GF) γ γb γfs cov ls ξ := by
   unfold logResAt eoBatch
-  iintro ⟨Hout, Hcmt, Hnc, Hops, Hep, Hreg, Htx, Harm⟩
+  iintro ⟨Hout, Hcmt, Hnc, Hops, Hep, Hreg, Htx, #Hbank, Harm⟩
   iexists out, cmt, nc, om, E, X, T, nxo, nxt, nxl
   iframe Hout Hcmt Hnc Hops Hep Hreg Htx
   isplitr [Harm]
@@ -1122,6 +1143,8 @@ theorem eo_res_intro (γ : LogNames) (γb : BcacheNames) (γfs : FsNames)
   · ipureintro; exact hfresht
   isplitr [Harm]
   · ipureintro; exact hTlen
+  isplitr [Harm]
+  · iexact Hbank
   iexact Harm
 
 /-- The `committing = 0` re-close. -/
@@ -1143,6 +1166,7 @@ theorem eo_res_intro_f (γ : LogNames) (γb : BcacheNames) (γfs : FsNames)
     wordAtN ξ lCmt 4 (DFrac.own 1) (0#32 : BitVec 32) ∗
     wordAtN ξ lNcommit 4 (DFrac.own 1) nc ∗
     (γ.ops ↪●MAP om) ∗ logEpochAuth γ E ∗ logRegAuth γ X ∗ logTxAuth γ T ∗
+    logFlushedBank (hlc := hlc) γ E ∗
     eoBatch γ γb γfs cov ls om E X ξ
     ⊢ logResAt (GF := GF) γ γb γfs cov ls ξ :=
   eo_res_intro γ γb γfs cov ls ξ out false nc om E X T nxo nxt nxl hlen
@@ -1167,13 +1191,17 @@ theorem eo_res_intro_t (γ : LogNames) (γb : BcacheNames) (γfs : FsNames)
     wordAtN ξ lOut 4 (DFrac.own 1) (BitVec.ofNat 32 out) ∗
     wordAtN ξ lCmt 4 (DFrac.own 1) (1#32 : BitVec 32) ∗
     wordAtN ξ lNcommit 4 (DFrac.own 1) nc ∗
-    (γ.ops ↪●MAP om) ∗ logEpochAuth γ E ∗ logRegAuth γ X ∗ logTxAuth γ T
+    (γ.ops ↪●MAP om) ∗ logEpochAuth γ E ∗ logRegAuth γ X ∗ logTxAuth γ T ∗
+    logFlushedBank (hlc := hlc) γ E
     ⊢ logResAt (GF := GF) γ γb γfs cov ls ξ := by
-  iintro ⟨Hout, Hcmt, Hnc, Hops, Hep, Hreg, Htx⟩
+  iintro ⟨Hout, Hcmt, Hnc, Hops, Hep, Hreg, Htx, #Hbank⟩
   iapply (eo_res_intro γ γb γfs cov ls ξ out true nc om E X T nxo nxt nxl hlen
     ⟨hbud, hout3, fun _ => hout0⟩ hfresho hE hfreshl hlive hcap hfresht hTlen)
   isimp only [if_true]
   iframe Hout Hcmt Hnc Hops Hep Hreg Htx
+  isplitr
+  · iexact Hbank
+  iempintro
 
 end
 

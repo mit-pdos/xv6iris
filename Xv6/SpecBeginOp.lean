@@ -43,7 +43,7 @@ def beginOpSlots : Nat := 4 + sleepSlots
 
 /-- **WP of `begin_op()`**. -/
 def wp_begin_op_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
-    [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [CurCtx]
+    [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [FsLinkG GF] [FsTopG GF] [CurCtx]
     (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
     (cpu : CPU) (k : KCtx) (γ : LogNames) (γb : BcacheNames) (V : BioView GF)
     (γfs : FsNames) (j : Nat) (logstart : Nat) (dev : BitVec 32)
@@ -67,7 +67,7 @@ def wp_begin_op_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G
 complement `trap_csrs_ext` / `cpu_claim_ext` in and out; depth 0, so no
 spinlock held by `KCtx.wf`). -/
 def wp_begin_op_eb_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
-    [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [CurCtx]
+    [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [FsLinkG GF] [FsTopG GF] [CurCtx]
     (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
     (cpu : CPU) (k : KCtx) (γ : LogNames) (γb : BcacheNames) (V : BioView GF)
     (γfs : FsNames) (j : Nat) (logstart : Nat) (dev : BitVec 32)
@@ -90,7 +90,7 @@ def wp_begin_op_eb_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [X
 /-- The interface of `begin_op`. -/
 structure BEGIN_OP : Prop where
   wp_begin_op_eb : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
-    [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [CurCtx]
+    [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [FsLinkG GF] [FsTopG GF] [CurCtx]
     (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
     (cpu : CPU) (k : KCtx) (γ : LogNames) (γb : BcacheNames) (V : BioView GF)
     (γfs : FsNames) (j : Nat) (logstart : Nat) (dev : BitVec 32)
@@ -101,7 +101,7 @@ structure BEGIN_OP : Prop where
 /-- The interrupts-off instance of `wp_begin_op_eb` (the complement is the whole
 bundle): the contract every not-yet-generalized caller states. -/
 theorem BEGIN_OP.wp_begin_op (A : BEGIN_OP) {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
-    [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [CurCtx]
+    [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [FsLinkG GF] [FsTopG GF] [CurCtx]
     (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
     (cpu : CPU) (k : KCtx) (γ : LogNames) (γb : BcacheNames) (V : BioView GF)
     (γfs : FsNames) (j : Nat) (logstart : Nat) (dev : BitVec 32)

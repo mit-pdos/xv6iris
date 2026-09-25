@@ -38,7 +38,7 @@ theorem ba_ret_ac : jumpPc (KA.«balloc» + 0xac#64) = KA.«balloc» + 0xac#64 :
 
 section
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
-  [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [CurCtx]
+  [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [FsLinkG GF] [FsTopG GF] [CurCtx]
 
 set_option maxHeartbeats 8000000 in
 /-- **From `bread`'s return at `+0xac` to the scan** (Rocq's `ba_main`, its

@@ -52,7 +52,7 @@ set_option linter.unusedVariables false
 
 section
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
-  [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [CurCtx]
+  [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [FsLinkG GF] [FsTopG GF] [CurCtx]
 
 theorem rd_ctx_entry (c : CPU) (k : KCtx) (X R : RegMap) :
     kctx (GF := GF) c (((k.withRegs X).pushed 14).withRegs R) ⊢
@@ -339,7 +339,7 @@ end
 /-- `readi`'s proof, from its callees' interfaces (Rocq's `ReadiProof`). -/
 theorem readi_proof (BM : BMAP_NOALLOC) (BR : BREAD) (BE : BRELSE) (EC : EITHER_COPYOUT) :
     READI :=
-  ⟨fun {hlc GF} _ _ _ _ _ _ _ _ _ _ _ _ _ Γ _ cpu k γl γb V γdl pd pav pu j γfs logstart dev γkl γk ip bm
+  ⟨fun {hlc GF} _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ Γ _ cpu k γl γb V γdl pd pav pu j γfs logstart dev γkl γk ip bm
     data dn user off n olds pidv Vp M dqp dq dqd hj hproc hK hnoff htier hgeom hwf
     hcov hsz hoff hjoint hdev hcl hdt hpd ha0 huser ha3 ha4 holds =>
   readi_main BM BR BE EC Γ cpu k γl γb V γdl pd pav pu j γfs logstart dev γkl γk ip bm data dn user

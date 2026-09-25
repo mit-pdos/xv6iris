@@ -32,17 +32,13 @@ bundle `logFreeTok` with its allocation.
    `fsHomeList cov ls` is `fsHome cov ls`, so every Rocq statement reads
    across unchanged.
 
-3. THE ERA'S MIRROR IS THE PURE PICTURE ONLY.  Rocq pairs `log_mirror`
-   with a ghost variable (`log_mirror_half`, `log_mirror_born`) whose two
-   halves the crash record and the era hold, so that a WAL write's view
-   shift can know what earlier writes established.  This port's disk layer
-   deliberately drops Rocq's crash story (see `Xv6/DiskInvDefs.lean`,
-   "No crash permits, no `Q`, no `disk_seq_permit`"), so there is no era,
-   no custody arm and no `swap_lb` to hold a half against: the RESOURCE is
-   dropped and the PICTURE -- which is what the recovery specification is
-   actually about -- is ported whole, as pure functions.  Everything a
-   crash argument would need of it (`lmCommittedClean`, `lmCommittedUpdNe`,
-   `lmInstallHit`/`Miss`/`Hdr`) is here and proved.
+3. THE ERA'S MIRROR'S RESOURCE LIVES IN `Xv6/LogMirrorHalf.lean`.  Rocq
+   pairs `log_mirror` with a ghost variable (`log_mirror_half`,
+   `log_mirror_born`) whose two halves the crash record and the era hold;
+   the picture and its readings are here, the half is `Xv6.logMirrorHalf`
+   (crash batch C-1, a file of its own so the seq permits could state it
+   before the log re-proof), and `Xv6.logStateAt` carries it (crash batch
+   C-2b).
 
 The registry (`loggedAt`) is the one ghost construction that changes
 shape; see its own comment.
@@ -235,8 +231,8 @@ theorem fsInstall_nil (P : Nat → List (BitVec 8)) (logstart : Nat) (D : BlockM
 /-! ## The era's picture of the durable disk
 
 Rocq's `log_mirror` is one total block view; the readings below are what
-the log layer states its assertions at.  The GHOST half is dropped (see
-the file header, deviation 3); the picture and its readings are here. -/
+the log layer states its assertions at.  The GHOST half is
+`Xv6.logMirrorHalf` (the file header, deviation 3). -/
 
 -- The whole durable disk, as one total block view (Rocq's
 -- `RiscvPtsto.log_mirror`), is `MachCSL.LogMirror`: the era's ghost variable

@@ -325,7 +325,7 @@ anywhere in this function. -/
 
 section
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
-variable [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [CurCtx]
+variable [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [FsLinkG GF] [FsTopG GF] [CurCtx]
 
 /-- `Xv6.logResAt`, opened for its three word cells. -/
 theorem ss_res_acc (γ : LogNames) (γb : BcacheNames) (γfs : FsNames)
@@ -374,7 +374,7 @@ end
 
 section
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
-variable [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [CurCtx]
+variable [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [FsLinkG GF] [FsTopG GF] [CurCtx]
 
 /-- The caller's continuation, at whichever hart the thread ends on. -/
 def ssPost (k : KCtx) (pidv : BitVec 32) (dqp : DFrac) : CPU → IProp GF :=
@@ -560,7 +560,7 @@ callee-saved map is back at the caller's. -/
 
 section
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
-variable [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [CurCtx]
+variable [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [FsLinkG GF] [FsTopG GF] [CurCtx]
 
 theorem ss_frame_weaken (sp ra s0 s1 s2 : BitVec 64) :
     frame4s2 (GF := GF) sp ra s0 s1 s2 ⊢ frame4s0 sp ra s0 := by
@@ -671,7 +671,7 @@ under an `iloeb`. -/
 
 section
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
-variable [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [CurCtx]
+variable [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [FsLinkG GF] [FsTopG GF] [CurCtx]
 
 set_option maxHeartbeats 16000000 in
 theorem ss_body (SP : SLEEP_PREPARE) (AC : ACQUIRE) (RE : RELEASE) (SL : SLEEP)
@@ -913,7 +913,7 @@ end
 
 section
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
-variable [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [CurCtx]
+variable [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [FsLinkG GF] [FsTopG GF] [CurCtx]
 
 set_option maxHeartbeats 16000000 in
 theorem ss_loop (SP : SLEEP_PREPARE) (AC : ACQUIRE) (RE : RELEASE) (SL : SLEEP)
@@ -948,7 +948,7 @@ the fall into the loop head at `+0x3e`. -/
 
 section
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
-variable [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [CurCtx]
+variable [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [FsLinkG GF] [FsTopG GF] [CurCtx]
 
 set_option maxHeartbeats 8000000 in
 /-- The four-slot prologue at `+0x00 .. +0x06` (only `ra`/`s0` are saved;
@@ -1211,7 +1211,7 @@ set_option maxHeartbeats 16000000 in
 /-- **`sys_sync` meets its specification**, at either entry `SIE`. -/
 theorem sysSync_proof (SP : SLEEP_PREPARE) (AC : ACQUIRE) (RE : RELEASE) (SL : SLEEP) :
     SYS_SYNC := ⟨
-  fun {hlc GF} _ _ _ _ _ _ _ _ _ _ _ _ _ Γ _ cpu k γ γb V γfs j logstart dev e pidv dqp
+  fun {hlc GF} _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ Γ _ cpu k γ γb V γfs j logstart dev e pidv dqp
     hj hproc hK hnoff htier => by
   unfold wp_sys_sync_eb_body
   simp only [sysSyncAddr]

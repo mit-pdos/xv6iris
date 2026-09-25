@@ -75,7 +75,7 @@ end
 
 section
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
-  [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [Fscfg] [Icfg] [CurCtx]
+  [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [FsLinkG GF] [FsTopG GF] [Fscfg] [Icfg] [CurCtx]
 
 /-- The resources at a point of the indirect loop, cursor `q` (Rocq's
 `it_ent_state` + the unchanged buffer, the machine bundle, and the frame

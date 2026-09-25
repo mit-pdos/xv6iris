@@ -43,7 +43,7 @@ theorem create_name_addr (sp : BitVec 64) :
   unfold createBuf; rfl
 
 section Tx
-variable {GF : BundledGFunctors} [Xv6G GF] [LogG GF]
+variable {GF : BundledGFunctors} [Xv6G GF] [LogG GF] [FsLinkG GF] [FsTopG GF]
 
 /-- The transaction element's join (Rocq's `log_tx_join_q`). -/
 theorem create_tx_join [Icfg] (t : Nat) (q q1 q2 : Qp) (hq : q = q1 + q2) :

@@ -412,7 +412,7 @@ end
 
 section
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
-  [BcacheG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [Fscfg] [Icfg] [CurCtx]
+  [BcacheG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [FsLinkG GF] [FsTopG GF] [Fscfg] [Icfg] [CurCtx]
 
 /-- THE ONE STEP bfree TAKES, and why the loops never case-split (Rocq's
 `bm_paidS_use`): whichever disjunct `bmPaidS` is in, it yields a budget
@@ -460,7 +460,7 @@ end
 
 section
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
-  [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [Fscfg] [Icfg] [CurCtx]
+  [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [FsLinkG GF] [FsTopG GF] [Fscfg] [Icfg] [CurCtx]
 
 end
 
@@ -486,7 +486,7 @@ walk carries may be anchored at the entry hart. -/
 
 section
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
-  [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [Fscfg] [Icfg] [CurCtx]
+  [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [FsLinkG GF] [FsTopG GF] [Fscfg] [Icfg] [CurCtx]
 
 /-- `Xv6.itrunc_bfree_eb` at either entry `SIE` (`BFREE.wp_bfree_eb`). -/
 theorem itrunc_bfree_eb (BF : BFREE) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]

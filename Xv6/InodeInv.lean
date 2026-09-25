@@ -125,14 +125,14 @@ Rocq gets these from stdpp (`lookup_total_replicate_2`,
 `list_lookup_total_insert`, `list_lookup_total_insert_ne`); this port's
 total lookup is `[·]!`. -/
 
-private theorem replicate_getElem! {α : Type _} [Inhabited α] (n : Nat) (a : α) (k : Nat)
+private theorem ii_replicate_getElem! {α : Type _} [Inhabited α] (n : Nat) (a : α) (k : Nat)
     (hk : k < n) : (List.replicate n a)[k]! = a :=
   getElem!_of_getElem? (by rw [List.getElem?_replicate, if_pos hk])
 
 private theorem replicate_zero_getElem! (n k : Nat) :
     (List.replicate n (0 : BitVec 32))[k]! = 0 := by
   rcases Nat.lt_or_ge k n with h | h
-  · exact replicate_getElem! n 0 k h
+  · exact ii_replicate_getElem! n 0 k h
   · rw [List.getElem!_eq_getElem?_getD,
       List.getElem?_eq_none (by rw [List.length_replicate]; exact h)]
     rfl
@@ -343,7 +343,7 @@ theorem blkmapWf_ind_nz {cov : ExtTreeSet Nat compare} {ls : Nat} {bm : Blkmap} 
   apply hnz
   unfold blkmapGet
   rw [if_neg (by omega), blkmapWf_no_ind h hiz,
-    replicate_getElem! NINDIRECT (0 : BitVec 32) (i - NDIRECT)
+    ii_replicate_getElem! NINDIRECT (0 : BitVec 32) (i - NDIRECT)
       (by unfold MAXFILE NDIRECT NINDIRECT at *; omega)]
   rfl
 

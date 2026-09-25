@@ -155,7 +155,7 @@ theorem rd_arg32_small (x : Nat) (h : x < 2 ^ 31) :
 
 /-- **readi** (Rocq's `wp_readi_sconf_body`). -/
 def wp_readi_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
-    [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [CurCtx]
+    [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [FsLinkG GF] [FsTopG GF] [CurCtx]
     (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
     (cpu : CPU) (k : KCtx) (γl : GName) (γb : BcacheNames) (V : BioView GF) (γdl : GName)
     (pd pav pu : BitVec 64) (j : Nat) (γfs : FsNames) (logstart : Nat) (dev : BitVec 32)
@@ -216,7 +216,7 @@ def wp_readi_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF
 complement `trap_csrs_ext` / `cpu_claim_ext` in and out; depth 0, so no
 spinlock held by `KCtx.wf`). -/
 def wp_readi_eb_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
-    [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [CurCtx]
+    [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [FsLinkG GF] [FsTopG GF] [CurCtx]
     (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
     (cpu : CPU) (k : KCtx) (γl : GName) (γb : BcacheNames) (V : BioView GF) (γdl : GName)
     (pd pav pu : BitVec 64) (j : Nat) (γfs : FsNames) (logstart : Nat) (dev : BitVec 32)
@@ -276,7 +276,7 @@ def wp_readi_eb_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G
 /-- The interface of `readi` (Rocq's `Module Type READI`). -/
 structure READI : Prop where
   wp_readi_eb : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
-    [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [CurCtx]
+    [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [FsLinkG GF] [FsTopG GF] [CurCtx]
     (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
     (cpu : CPU) (k : KCtx) (γl : GName) (γb : BcacheNames) (V : BioView GF) (γdl : GName)
     (pd pav pu : BitVec 64) (j : Nat) (γfs : FsNames) (logstart : Nat) (dev : BitVec 32)
@@ -294,7 +294,7 @@ structure READI : Prop where
 /-- The interrupts-off instance of `wp_readi_eb` (the complement is the whole
 bundle): the contract every not-yet-generalized caller states. -/
 theorem READI.wp_readi (A : READI) {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
-    [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [CurCtx]
+    [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [FsLinkG GF] [FsTopG GF] [CurCtx]
     (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
     (cpu : CPU) (k : KCtx) (γl : GName) (γb : BcacheNames) (V : BioView GF) (γdl : GName)
     (pd pav pu : BitVec 64) (j : Nat) (γfs : FsNames) (logstart : Nat) (dev : BitVec 32)

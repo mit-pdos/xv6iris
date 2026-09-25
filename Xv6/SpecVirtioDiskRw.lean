@@ -40,8 +40,10 @@ and the epilogue's instruction stream pays one of the two off (Rocq's
 comment verbatim).
 
 `diskCaps` carries the permit channel beside the disk invariant (Rocq's
-`dev_inv` bundles `perm_inv gen_id (dn_perm γd)`), and -- TEMPORARILY --
-`Xv6.diskWriteAny` (see its header).
+`dev_inv` bundles `perm_inv gen_id (dn_perm γd)`).  (The temporary any-write
+permit C-2a left for `bwrite`'s three log callers is gone: `write_head`,
+`install_trans` and `end_op` carry Rocq's own permit families, crash batch
+C-2b.)
 
 Imports only definitional files.
 -/
@@ -65,28 +67,11 @@ def virtioDiskRwAddr : BitVec 64 := KA.«virtio_disk_rw»
 /-- The stack `virtio_disk_rw`'s cone needs: its 12-slot frame over `sleep`'s. -/
 def virtioDiskRwSlots : Nat := 12 + sleepSlots
 
-/-- **TEMPORARY (crash batch C-2a; C-2b removes it)**: a persistent
-permit for ANY write -- Rocq's deleted `crash_pred_indifferent` in permit
-form.  C-2a moved it here from the device (where batch C-M had put it, as a
-premise of `Xv6.wpDev_disk_inv`): the device now spends each request's OWN
-permit, and `virtio_disk_rw`/`bwrite` take Rocq's permit premise, so the
-only callers still without a permit of their own are `bwrite`'s three --
-`write_head`, `install_trans` and `end_op` -- whose permit families
-(Rocq `SpecWriteHead`/`SpecInstallTrans`/`SpecEndOp`) are batch C-2b's.  A
-PREMISE carried in `diskCaps`, never an axiom; nothing else uses it. -/
-def diskWriteAny {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] : IProp GF := iprop%
-  □ (∀ w : DiskWr, diskSeqPermit (genId (hlc := hlc) (GF := GF)) w iprop(True))
-
-instance diskWriteAny_persistent {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] :
-    Persistent (diskWriteAny (hlc := hlc) (GF := GF)) := by
-  unfold diskWriteAny; infer_instance
-
 /-- The crash half of the disk credentials: the era's permit channel (Rocq
-`dev_inv`'s `perm_inv gen_id (dn_perm γd)`) and, temporarily,
-`Xv6.diskWriteAny`. -/
+`dev_inv`'s `perm_inv gen_id (dn_perm γd)`). -/
 def diskCrashCaps {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [DiskG GF]
     (γ : DiskNames) : IProp GF := iprop%
-  crashPermInv (genId (hlc := hlc) (GF := GF)) γ.cperm ∗ diskWriteAny (hlc := hlc) (GF := GF)
+  crashPermInv (genId (hlc := hlc) (GF := GF)) γ.cperm
 
 instance diskCrashCaps_persistent {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
     [DiskG GF] (γ : DiskNames) : Persistent (diskCrashCaps (hlc := hlc) (GF := GF) γ) := by

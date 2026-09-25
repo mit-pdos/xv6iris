@@ -54,7 +54,7 @@ theorem fsinit_entry (BD : BREAD) (MM : MEMMOVE) (BE : BRELSE) (IL : INITLOG) (I
     (sbOld : List (BitVec 8))
     (bsHdr : List (BitVec 8)) (L : BlockMap) (D : RegMapF Bool)
     (vlock : BitVec 32) (vname vcpu : BitVec 64) (vStart vDev vNc vN : BitVec 32)
-    (pidv : BitVec 32) (dqp : DFrac)
+    (pidv : BitVec 32) (dqp : DFrac) (M : LogMirror) (sbrec : FsSb)
     (hj : j < NPROC) (hproc : k.proc = procAddr j) (hK : fsinitSlots ≤ k.avail)
     (hnoff : k.noff = 0)
     (htier : k.tier = KTier.kpt)
@@ -71,20 +71,21 @@ theorem fsinit_entry (BD : BREAD) (MM : MEMMOVE) (BE : BRELSE) (IL : INITLOG) (I
     (hhdrNodup : (hdrDec bsHdr).2.Nodup)
     (hhdrHome : ∀ b ∈ (hdrDec bsHdr).2, fsHome fscCov fscLogst b ∧ b ≠ SB_BNO)
     (hhdr0 : hdrN bsHdr = 0)
+    (hcrash : fsinitCrashPure L M bsSb sbrec)
     (hsbOld : sbOld.length = 32)
     (hpd : descPageRw pd)
     (ha0 : k.regs 10#5 = BitVec.signExtend 64 icfgDev) :
     wp_fsinit_eb_body (hlc := hlc) (GF := GF) Γ cpu k γl pd pav pu j
       vMagic vSize vNblocks vNlog bsSb sbOld bsHdr L D vlock vname vcpu vStart vDev vNc vN
-      pidv dqp hj hproc hK hnoff htier hgeom h1cov hsbImg hmagic hn1 hnnib hn31 hblk hbg hbel
-      hhdrLen hhdrNodup hhdrHome hhdr0 hsbOld hpd ha0 := by
+      pidv dqp M sbrec hj hproc hK hnoff htier hgeom h1cov hsbImg hmagic hn1 hnnib hn31 hblk hbg
+      hbel hhdrLen hhdrNodup hhdrHome hhdr0 hcrash hsbOld hpd ha0 := by
   obtain ⟨hK4, hKbr, -, -, -, -⟩ := fsinit_slots k.avail hK
   have hww : ∀ (K : KCtx) (a b c d : Bool), (K.withSpie a b).withSpie c d = K.withSpie c d :=
     fun _ _ _ _ _ => rfl
   have hpsw : ∀ (K : KCtx) (m : Nat) (a b : Bool),
       (K.pushed m).withSpie a b = (K.withSpie a b).pushed m := fun _ _ _ _ => rfl
   unfold wp_fsinit_eb_body
-  iintro ⟨Hk, Hpc, #Hpi, Hte, Hce, #Hpe, #Hbc, #Hdc, Hpid, Hfree, Hfsb, Hold, Hxo, #Hreg, #Hbreg,
+  iintro ⟨Hk, Hpc, #Hpi, Hte, Hce, #Hpe, #Hbc, #Hdc, Hpid, Hfree, Hfsb, Hcr, Hold, Hxo, #Hreg, #Hbreg,
     Hboot, #Hit2, #Hiti, #Hslks, #Hkm0, #Hkm16, Hl0, Hl8, Hl16, Hls, Hld, Hlo, Hlc, Hlnc, Hlhn,
     Hlhb, HauthL, HauthD, Hdirty, Hhdr, Hslots, Hsl, Hiref, Hnext⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
@@ -143,10 +144,11 @@ theorem fsinit_entry (BD : BREAD) (MM : MEMMOVE) (BE : BRELSE) (IL : INITLOG) (I
   k_norm_g at hcsa
   obtain ⟨e2, e8, e9, e18, e19, e20, e21, e22, e23, e24, e25, e26, e27⟩ := hcsa
   iapply (fsinit_readsb MM BE IL IR Γ cpu k spie2 spp2 R2 γl pd pav pu j pidv dqp vMagic vSize
-      vNblocks vNlog bsSb sbOld kk bs bsd d bsHdr L D vlock vname vcpu vStart vDev vNc vN hj hproc
+      vNblocks vNlog bsSb sbOld kk bs bsd d bsHdr L D vlock vname vcpu vStart vDev vNc vN M sbrec
+      hcrash hj hproc
       hK hnoff hlocks htier hgeom hsbImg hmagic hn1 hnnib hn31 hblk hbg hbel hhdrLen hhdrNodup
       hhdrHome hhdr0 hsbOld hpd ha0kk e18 e2 e19 e20 e21 e22 e23 e24 e25 e26 e27)
-  iframe Hk Hpc Henv Hte Hce Hframe Hpid Hlk Hfsb Hold Hxo Hlog Hsl Hiref Hboot Hnext
+  iframe Hk Hpc Henv Hte Hce Hframe Hpid Hlk Hfsb Hcr Hold Hxo Hlog Hsl Hiref Hboot Hnext
 
 end
 
@@ -156,10 +158,11 @@ theorem fsinit_proof (BR : BREAD) (MM : MEMMOVE) (BL : BRELSE) (IL : INITLOG) (I
     FSINIT :=
   ⟨fun {hlc GF} _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ Γ _ cpu k γl pd pav pu j
     vMagic vSize vNblocks vNlog bsSb sbOld bsHdr L D vlock vname vcpu vStart vDev vNc vN pidv dqp
-    hj hproc hK hnoff htier hgeom h1cov hsbImg hmagic hn1 hnnib hn31 hblk hbg hbel
-    hhdrLen hhdrNodup hhdrHome hhdr0 hsbOld hpd ha0 =>
+    M sbrec hj hproc hK hnoff htier hgeom h1cov hsbImg hmagic hn1 hnnib hn31 hblk hbg hbel
+    hhdrLen hhdrNodup hhdrHome hhdr0 hcrash hsbOld hpd ha0 =>
   fsinit_entry BR MM BL IL IR Γ cpu k γl pd pav pu j vMagic vSize vNblocks vNlog bsSb sbOld bsHdr
-    L D vlock vname vcpu vStart vDev vNc vN pidv dqp hj hproc hK hnoff htier hgeom h1cov hsbImg
-    hmagic hn1 hnnib hn31 hblk hbg hbel hhdrLen hhdrNodup hhdrHome hhdr0 hsbOld hpd ha0⟩
+    L D vlock vname vcpu vStart vDev vNc vN pidv dqp M sbrec hj hproc hK hnoff htier hgeom h1cov
+    hsbImg hmagic hn1 hnnib hn31 hblk hbg hbel hhdrLen hhdrNodup hhdrHome hhdr0 hcrash hsbOld hpd
+    ha0⟩
 
 end Xv6

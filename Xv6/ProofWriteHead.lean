@@ -51,7 +51,7 @@ theorem whBytes_length (n : Nat) (W : List (BitVec 32)) (t : Nat) (bs0 : List (B
     List.length_drop]
   omega
 
-theorem leAssemble_wordToBytes4 (w : BitVec 32) : leAssemble (MachCSL.wordToBytes4 w) = w.toNat := by
+theorem wh_leAssemble_wordToBytes4 (w : BitVec 32) : leAssemble (MachCSL.wordToBytes4 w) = w.toNat := by
   have hw : w.toNat < 2 ^ 32 := w.isLt
   simp only [MachCSL.wordToBytes4, leAssemble, nthByte, BitVec.extractLsb'_toNat,
     Nat.shiftRight_eq_div_pow, Nat.reduceMul, Nat.reducePow]
@@ -62,7 +62,7 @@ theorem leWord_mid (pre : List (BitVec 8)) (w : BitVec 32) (post : List (BitVec 
     leWord (pre ++ MachCSL.wordToBytes4 w ++ post) i = w.toNat := by
   unfold leWord
   rw [List.append_assoc, List.drop_left' h, List.take_left' (MachCSL.wordToBytes4_length w)]
-  exact leAssemble_wordToBytes4 w
+  exact wh_leAssemble_wordToBytes4 w
 
 theorem wbytes_split (W : List (BitVec 32)) (i : Nat) (hi : i < W.length) :
     wbytes W = wbytes (W.take i) ++ (MachCSL.wordToBytes4 W[i] ++ wbytes (W.drop (i + 1))) := by

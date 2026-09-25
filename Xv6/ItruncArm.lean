@@ -106,7 +106,7 @@ end
 
 section
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
-  [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [Fscfg] [Icfg] [CurCtx]
+  [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [FsLinkG GF] [FsTopG GF] [Fscfg] [Icfg] [CurCtx]
 
 /-- The resources at the JOIN `+0x38` both predecessors reach (the machine
 bundle, the frame whole again, the emptied map, the budget, and the frame

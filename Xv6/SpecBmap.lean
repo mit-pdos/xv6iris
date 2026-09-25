@@ -99,7 +99,7 @@ their lemmas; ProofCreate*/WriteiBudget use them by name.
    `printk_env γpr γu γd`, forwarded to balloc): this port's `panicEnv` is
    exactly printk's three persistent credentials, and `kernel_data` rides in
    `kctx`.  `γpr` is gone with it.
-6. THE NO-ALLOC CONTRACT'S CLASS CONTEXT INCLUDES `[LogG GF]` although it
+6. THE NO-ALLOC CONTRACT'S CLASS CONTEXT INCLUDES `[LogG GF]` (and, since crash batch C-2b, `[FsLinkG GF] [FsTopG GF]`) although it
    mentions no log resource: both contracts are sealed from one core whose
    allocation kit (`Xv6.bmKit`, `emp` at `none`) names `logCtx` in its `some`
    arm.  Rocq's single `xv6G` bundle hides the same dependency.
@@ -236,7 +236,7 @@ theorem bmapAi_true (bm bm' : Blkmap) (h1 : bm.bmInd.toNat = 0) (h2 : bm'.bmInd.
 
 /-- **THE CREDITED / SET-FORM CONTRACT** (Rocq's `wp_bmap_gen_body`). -/
 def wp_bmap_gen_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
-    [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [CurCtx]
+    [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [FsLinkG GF] [FsTopG GF] [CurCtx]
     (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
     (cpu : CPU) (k : KCtx) (γl : GName) (γb : BcacheNames) (V : BioView GF) (γdl : GName)
     (pd pav pu : BitVec 64) (j : Nat) (γ : LogNames) (γfs : FsNames)
@@ -318,7 +318,7 @@ def wp_bmap_gen_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G
 complement `trap_csrs_ext` / `cpu_claim_ext` in and out; depth 0, so no
 spinlock held by `KCtx.wf`). -/
 def wp_bmap_gen_eb_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
-    [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [CurCtx]
+    [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [FsLinkG GF] [FsTopG GF] [CurCtx]
     (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
     (cpu : CPU) (k : KCtx) (γl : GName) (γb : BcacheNames) (V : BioView GF) (γdl : GName)
     (pd pav pu : BitVec 64) (j : Nat) (γ : LogNames) (γfs : FsNames)
@@ -401,7 +401,7 @@ def wp_bmap_gen_eb_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [X
 allocation sites are dead; the block resources at a SHARE `dq`; one
 `bslot`; the postcondition exact. -/
 def wp_bmap_noalloc_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
-    [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [CurCtx]
+    [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [FsLinkG GF] [FsTopG GF] [CurCtx]
     (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
     (cpu : CPU) (k : KCtx) (γl : GName) (γb : BcacheNames) (V : BioView GF) (γdl : GName)
     (pd pav pu : BitVec 64) (j : Nat) (γfs : FsNames) (logstart : Nat) (dev : BitVec 32)
@@ -444,7 +444,7 @@ def wp_bmap_noalloc_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [
 complement `trap_csrs_ext` / `cpu_claim_ext` in and out; depth 0, so no
 spinlock held by `KCtx.wf`). -/
 def wp_bmap_noalloc_eb_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
-    [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [CurCtx]
+    [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [FsLinkG GF] [FsTopG GF] [CurCtx]
     (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
     (cpu : CPU) (k : KCtx) (γl : GName) (γb : BcacheNames) (V : BioView GF) (γdl : GName)
     (pd pav pu : BitVec 64) (j : Nat) (γfs : FsNames) (logstart : Nat) (dev : BitVec 32)
@@ -487,7 +487,7 @@ def wp_bmap_noalloc_eb_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF
 the dropped counted form). -/
 structure BMAP : Prop where
   wp_bmap_gen_eb : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
-    [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [CurCtx]
+    [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [FsLinkG GF] [FsTopG GF] [CurCtx]
     (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
     (cpu : CPU) (k : KCtx) (γl : GName) (γb : BcacheNames) (V : BioView GF) (γdl : GName)
     (pd pav pu : BitVec 64) (j : Nat) (γ : LogNames) (γfs : FsNames)
@@ -504,7 +504,7 @@ structure BMAP : Prop where
 /-- The interrupts-off instance of `wp_bmap_gen_eb` (the complement is the whole
 bundle): the contract every not-yet-generalized caller states. -/
 theorem BMAP.wp_bmap_gen (A : BMAP) {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
-    [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [CurCtx]
+    [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [FsLinkG GF] [FsTopG GF] [CurCtx]
     (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
     (cpu : CPU) (k : KCtx) (γl : GName) (γb : BcacheNames) (V : BioView GF) (γdl : GName)
     (pd pav pu : BitVec 64) (j : Nat) (γ : LogNames) (γfs : FsNames)
@@ -532,7 +532,7 @@ theorem BMAP.wp_bmap_gen (A : BMAP) {hlc : HasLC} {GF : BundledGFunctors} [MachG
 /-- The interface of the no-alloc `bmap` (Rocq's `Module Type BMAP_NOALLOC`). -/
 structure BMAP_NOALLOC : Prop where
   wp_bmap_noalloc_eb : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
-    [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [CurCtx]
+    [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [FsLinkG GF] [FsTopG GF] [CurCtx]
     (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
     (cpu : CPU) (k : KCtx) (γl : GName) (γb : BcacheNames) (V : BioView GF) (γdl : GName)
     (pd pav pu : BitVec 64) (j : Nat) (γfs : FsNames) (logstart : Nat) (dev : BitVec 32)
@@ -546,7 +546,7 @@ structure BMAP_NOALLOC : Prop where
 /-- The interrupts-off instance of `wp_bmap_noalloc_eb` (the complement is the whole
 bundle): the contract every not-yet-generalized caller states. -/
 theorem BMAP_NOALLOC.wp_bmap_noalloc (A : BMAP_NOALLOC) {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
-    [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [CurCtx]
+    [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [FsLinkG GF] [FsTopG GF] [CurCtx]
     (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
     (cpu : CPU) (k : KCtx) (γl : GName) (γb : BcacheNames) (V : BioView GF) (γdl : GName)
     (pd pav pu : BitVec 64) (j : Nat) (γfs : FsNames) (logstart : Nat) (dev : BitVec 32)

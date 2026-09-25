@@ -94,7 +94,7 @@ theorem bm_ledger_gen (a : BmAlloc) (cr : Bool) (bm bm' : Blkmap) (fbn n n' : Na
 
 section
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
-  [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [CurCtx]
+  [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [FsLinkG GF] [FsTopG GF] [CurCtx]
 
 set_option maxHeartbeats 8000000 in
 /-- **THE SET-FORM CONTRACT** (Rocq's `BmapProof.wp_bmap_gen`): the core,
@@ -206,7 +206,7 @@ theorem bmap_noalloc (BR : BREAD) (BE : BRELSE)
 end
 
 theorem bmap_proof (BA : BALLOC) (BR : BREAD) (BL : BRELSE) (LW : LOG_WRITE) : BMAP :=
-  ⟨fun {hlc GF} _ _ _ _ _ _ _ _ _ _ _ _ _ Γ _ cpu k γl γb V γdl pd pav pu j γ γfs logstart bmapstart size
+  ⟨fun {hlc GF} _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ Γ _ cpu k γl γb V γdl pd pav pu j γ γfs logstart bmapstart size
     dev ip bm data fbn n cr Sb pidv dqp dqd dqb dqs hj hproc hK hnoff htier hneed
     hgeom hbm hcredit hfbn hwf hdev hcl hdt hpd ha0 ha1 =>
   bmap_gen BA BR BL LW Γ cpu k γl γb V γdl pd pav pu j γ γfs logstart bmapstart size dev ip bm
@@ -214,7 +214,7 @@ theorem bmap_proof (BA : BALLOC) (BR : BREAD) (BL : BRELSE) (LW : LOG_WRITE) : B
     hcredit hfbn hwf hdev hcl hdt hpd ha0 ha1⟩
 
 theorem bmap_noalloc_proof (BR : BREAD) (BL : BRELSE) : BMAP_NOALLOC :=
-  ⟨fun {hlc GF} _ _ _ _ _ _ _ _ _ _ _ _ _ Γ _ cpu k γl γb V γdl pd pav pu j γfs logstart dev ip bm data fbn
+  ⟨fun {hlc GF} _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ Γ _ cpu k γl γb V γdl pd pav pu j γfs logstart dev ip bm data fbn
     pidv dqp dq dqd hj hproc hK hnoff htier hgeom hfbn hwf hnz hdev hcl hdt hpd ha0
     ha1 =>
   bmap_noalloc BR BL Γ cpu k γl γb V γdl pd pav pu j γfs logstart dev ip bm data fbn pidv dqp dq

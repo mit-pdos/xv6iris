@@ -349,8 +349,15 @@ theorem ireclaim_end_op [Fscfg] [Icfg] [CurCtx] (EO : END_OP) (Γ : SchedNames)
     (fsView fscFs fscDisk icfgDev fscCov) fscDlock fscFs pd pav pu j fscLogst icfgDev u pidv dqp
     hj hproc hK hnoff htier hgeom rfl rfl rfl hpd
   unfold wp_end_op_eb_body at h
-  simp only [endOpAddr] at h
-  exact h
+  simp only [endOpAddr, fsView_gd, fsView_cov] at h
+  -- the crash seam and the era certificate end_op takes (D38): off the log
+  -- context and the cycle boundary
+  iintro ⟨H0, H1, H2, H3, H4, H5, H6, H7, #H8, H9, H10, H11⟩
+  iapply wpLoop_cert
+  iintro #Hcert
+  ihave #Hseam := logCtx_seam _ _ _ _ _ _ $$ H8
+  iapply h
+  iframe H0 H1 H2 H3 H4 H5 H6 H7 H8 Hseam Hcert H9 H10 H11
 
 set_option maxHeartbeats 1000000 in
 /-- `ilock(ip)` at `+0x5a`, THE TRANSACTIONAL FORM (Rocq 1702,

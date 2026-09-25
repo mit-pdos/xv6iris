@@ -114,65 +114,6 @@ structure BWRITE : Prop where
     wp_bwrite_eb_body (hlc := hlc) (GF := GF) Γ cpu k γl γ V γdl pd pav pu j kk
       pidv dev bno dqp bs bsd Q hj hproc hK hnoff htier hkk ha0 hbno hbsd hpd
 
-/-- **TEMPORARY (crash batch C-2a; C-2b removes it)**: `bwrite` at the
-pre-permit shape, the permit taken from `Xv6.diskWriteAny` (in `diskCaps`)
-at the trivial receipt.  Its only users are the three callers whose permit
-families are C-2b's (`write_head`, `install_trans`, `end_op`). -/
-theorem BWRITE.wp_bwrite_eb_any (A : BWRITE) {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
-    [BcacheG GF] [SleepLockG GF] [DiskG GF] [CurCtx]
-    (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
-    (cpu : CPU) (k : KCtx) (γl : GName) (γ : BcacheNames) (V : BioView GF) (γdl : GName)
-    (pd pav pu : BitVec 64) (j : Nat) (kk : Nat)
-    (pidv dev bno : BitVec 32) (dqp : DFrac) (bs bsd : List (BitVec 8))
-    (hj : j < NPROC) (hproc : k.proc = procAddr j) (hK : bwriteSlots ≤ k.avail)
-    (hnoff : k.noff = 0)
-    (htier : k.tier = KTier.kpt)
-    (hkk : kk < NBUF) (ha0 : k.regs 10#5 = bnode kk)
-    (hbno : bno.toNat < 2 ^ 31) (hbsd : bsd.length = BSIZE) (hpd : descPageRw pd) :
-    kctx cpu k ∗ pcIs cpu bwriteAddr ∗ procsInv Γ ∗
-    trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗
-    bioCtx γl γ V ∗ diskCaps V.gd γdl pd pav pu ∗
-    wordPointsTo (pPid k.proc) 4 dqp pidv ∗
-    bufHold0 γ V kk pidv dev bno bs bsd ∗
-    wpNext true k.proc cpu (fun cpu' => iprop(∀ (spie spp : Bool) (R' : RegMap),
-      ⌜calleeSaved k.regs R'⌝ -∗
-      kctx cpu' ((k.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k.regs 1#5)) -∗
-      trapCsrsExt cpu' k.sie -∗ cpuClaimExt cpu' k.sie k.proc -∗
-      wordPointsTo (pPid k.proc) 4 dqp pidv -∗
-      bufHold0 γ V kk pidv dev bno bs bs -∗ wpLoop cpu'))
-    ⊢ wpLoop (GF := GF) cpu := by
-  have h := A.wp_bwrite_eb (hlc := hlc) (GF := GF) Γ cpu k γl γ V γdl pd pav pu j kk pidv dev bno
-    dqp bs bsd iprop(True) hj hproc hK hnoff htier hkk ha0 hbno hbsd hpd
-  unfold wp_bwrite_eb_body at h
-  iintro ⟨Hk, Hpc, Hpi, Hte, Hce, #Hbc, #Hdc, Hpid, Hhold, Hnext⟩
-  ihave #Hany : iprop(diskWriteAny (hlc := hlc) (GF := GF)) $$ [Hdc]
-  · unfold diskCaps diskCrashCaps
-    icases Hdc with ⟨-, -, -, -, #Ha⟩
-    iexact Ha
-  iapply h
-  iframe Hk Hpc Hpi Hte Hce Hbc Hdc Hpid Hhold
-  isplitl []
-  · unfold diskWriteAny
-    iapply Hany
-  iapply wpNext_mono $$ Hnext
-  iintro %cpu' HK %spie %spp %R' %hcs Hk Hpc Hte Hce Hpid Hhold _
-  iapply HK $$ %spie %spp %R' %hcs Hk Hpc Hte Hce Hpid Hhold
-
-/-- **TEMPORARY (crash batch C-2b removes it with `Xv6.diskWriteAny`)**: the
-any-write permit, read off `diskCaps` and handed back beside it. -/
-theorem diskCaps_writeAny {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
-    [DiskG GF] [CurCtx] (γ : DiskNames) (γl : GName) (pd pav pu : BitVec 64) :
-    diskCaps (GF := GF) γ γl pd pav pu ⊢
-      diskCaps γ γl pd pav pu ∗
-        □ (∀ w : DiskWr, diskSeqPermit (genId (hlc := hlc) (GF := GF)) w iprop(True)) := by
-  iintro #Hdc
-  isplitl []
-  · iexact Hdc
-  unfold diskCaps diskCrashCaps
-  icases Hdc with ⟨-, -, -, -, #Ha⟩
-  unfold diskWriteAny
-  iexact Ha
-
 /-- The interrupts-off instance of `wp_bwrite_eb` (the complement is the whole
 bundle): the contract every not-yet-generalized caller states. -/
 theorem BWRITE.wp_bwrite (A : BWRITE) {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]

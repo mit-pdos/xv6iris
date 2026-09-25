@@ -101,8 +101,11 @@ theorem fwr_end_op (EO : END_OP) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ] 
   unfold wp_end_op_eb_body at h
   rw [(fsReadyView (GF := GF)).1, (fsReadyView (GF := GF)).2.2.1] at h
   simp only [endOpAddr] at h
+  iapply wpLoop_cert
+  iintro #Hcert
+  ihave #Hseam := logCtx_seam _ _ _ _ _ _ $$ Hlc
   iapply h
-  iframe Hk Hpc Hpi Hte Hce Hbc Hdc Hpe Hlc Hpid Hop
+  iframe Hk Hpc Hpi Hte Hce Hbc Hdc Hpe Hlc Hseam Hcert Hpid Hop
   iapply wpNext_intro
   iintro %c' %spie %spp %R' %hcs Hk Hpc Hte Hce Hpid
   iapply HK $$ %c' %spie %spp %R' %hcs Hk Hpc Hte Hce Hpid

@@ -85,7 +85,7 @@ end
 
 section
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
-variable [BcacheG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [CurCtx]
+variable [BcacheG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [FsLinkG GF] [FsTopG GF] [CurCtx]
 
 /-- The persistent bundle `initlog` returns, out of the sealed lock, the
 two frozen cells and THE BYTE VIEW'S SEALED ROW (`Xv6.logCtx`'s third
@@ -94,7 +94,9 @@ certificate that the exception set is empty). -/
 theorem logCtx_mk (γ : LogNames) (γb : BcacheNames) (γfs : FsNames)
     (cov : Std.ExtTreeSet Nat compare) (logstart : Nat) (dev : BitVec 32) :
     isLock γ.lk logAddr "log" (logResAt (GF := GF) γ γb γfs cov logstart) ∗
-    logFrozen logstart dev ∗ fsBytesAnyAt γfs (fsHomeList cov logstart)
+    logFrozen logstart dev ∗ fsBytesAnyAt γfs (fsHomeList cov logstart) ∗
+    swapLb (hlc := hlc) (GF := GF) (genId (hlc := hlc) (GF := GF) + 1) ∗
+    sbParked γfs ∗ snapLaw (hlc := hlc) γ γfs cov logstart
     ⊢ logCtx γ γb γfs cov logstart dev := by
   unfold logCtx; iintro H; iexact H
 
@@ -123,7 +125,7 @@ block's content moves inside `Xv6.fsBytesInv` through
 
 section
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
-variable [BcacheG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [CurCtx]
+variable [BcacheG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [FsLinkG GF] [FsTopG GF] [CurCtx]
 
 /-- **THE TWO FROZEN CELLS**, minted at `initlog`'s two stores.  Rocq's
 `initlog` publishes them the same way, and `Xv6.logFrozen` is exactly what
@@ -147,7 +149,10 @@ authorities, the log side's pin halves over the whole covered range at
 `false`, the log region's client halves, and the pool's thirty-two units. -/
 theorem logStateAt_boot (γb : BcacheNames) (γfs : FsNames)
     (cov : Std.ExtTreeSet Nat compare) (logstart : Nat) (pend : Nat → Prop)
-    (L : BlockMap) (D : RegMapF Bool) (bsh : List (BitVec 8)) :
+    (L : BlockMap) (D : RegMapF Bool) (bsh : List (BitVec 8))
+    (M : LogMirror) (hMhdr : lmHdr M logstart = (0, []))
+    (hMtie : logMirrorTieBody M L cov logstart []) :
+    logMirrorHalf (hlc := hlc) M ∗
     wordPointsTo (GF := GF) lhNAddr 4 (DFrac.own 1) 0#32 ∗
     ([∗list] i ∈ List.range LOGBLOCKS, ∃ w : BitVec 32,
        wordPointsTo (lhBlock i) 4 (DFrac.own 1) w) ∗
@@ -159,7 +164,7 @@ theorem logStateAt_boot (γb : BcacheNames) (γfs : FsNames)
     bslots (LOGBLOCKS + 2)
     ⊢ logStateAt (GF := GF) γb γfs cov logstart 0 [] pend curCtx := by
   unfold logStateAt
-  iintro ⟨Hn, Hjunk, HL, HD, Hd, Hhdr, Hsl, Hpool⟩
+  iintro ⟨Hmir, Hn, Hjunk, HL, HD, Hd, Hhdr, Hsl, Hpool⟩
   ihave Hn := (show wordPointsTo (GF := GF) lhNAddr 4 (DFrac.own 1) 0#32 ⊢
       wordAtN curCtx lhNAddr 4 (DFrac.own 1) 0#32 from by rw [wordAtN_cur]) $$ Hn
   ihave Hjunk := (show iprop([∗list] i ∈ List.range LOGBLOCKS, ∃ w : BitVec 32,
@@ -167,20 +172,20 @@ theorem logStateAt_boot (γb : BcacheNames) (γfs : FsNames)
       iprop([∗list] i ∈ List.range LOGBLOCKS, ∃ w : BitVec 32,
         wordAtN (GF := GF) curCtx (lhBlock i) 4 (DFrac.own 1) w) from by
     simp only [wordAtN_cur]; iintro H; iexact H) $$ Hjunk
-  iexists ([] : List (BitVec 32)), L, D
-  isplitr [Hn Hjunk HL HD Hd Hhdr Hsl Hpool]
+  iexists ([] : List (BitVec 32)), L, D, M
+  isplitr [Hn Hjunk HL HD Hd Hhdr Hsl Hpool Hmir]
   · ipureintro; exact ⟨rfl, by unfold LOGBLOCKS; omega⟩
-  isplitr [Hn Hjunk HL HD Hd Hhdr Hsl Hpool]
+  isplitr [Hn Hjunk HL HD Hd Hhdr Hsl Hpool Hmir]
   · ipureintro; rfl
-  isplitr [Hn Hjunk HL HD Hd Hhdr Hsl Hpool]
+  isplitr [Hn Hjunk HL HD Hd Hhdr Hsl Hpool Hmir]
   · ipureintro; exact List.nodup_nil
-  isplitr [Hn Hjunk HL HD Hd Hhdr Hsl Hpool]
+  isplitr [Hn Hjunk HL HD Hd Hhdr Hsl Hpool Hmir]
   · ipureintro; intro w hw; exact absurd hw List.not_mem_nil
   -- the `lh.n` cell
   isplitl [Hn]
   · iexact Hn
   -- the (empty) write-set cells
-  isplitr [Hjunk HL HD Hd Hhdr Hsl Hpool]
+  isplitr [Hjunk HL HD Hd Hhdr Hsl Hpool Hmir]
   · iapply BigSepL.bigSepL_nil.2; iempintro
   -- the junk cells: `LOGBLOCKS - 0` of them, at `lhBlock (0 + i)`
   isplitl [Hjunk]
@@ -198,9 +203,13 @@ theorem logStateAt_boot (γb : BcacheNames) (γfs : FsNames)
         rw [show (decide (b ∈ ([] : List Nat))) = false from by simp])) $$ Hd
   isplitl [Hhdr]
   · iexists bsh; iexact Hhdr
-  iframe Hsl
-  isimp only [Nat.sub_zero]
-  iexact Hpool
+  iframe Hsl Hmir
+  isplitl [Hpool]
+  · isimp only [Nat.sub_zero]
+    iexact Hpool
+  isplitr
+  · ipureintro; exact hMhdr
+  · ipureintro; exact hMtie
 
 /-! ## The lock's resource, at genesis -/
 
@@ -225,10 +234,12 @@ theorem logResAt_boot (γ : LogNames) (γb : BcacheNames) (γfs : FsNames)
     wordPointsTo lNcommit 4 (DFrac.own 1) nc ∗
     ((γ.ops ↪●MAP (∅ : RegMapF OpEntry)) ∗ logEpochAuth γ 1 ∗
       logRegAuth γ (∅ : RegMapF (Nat × Nat)) ∗ logTxAuth γ (∅ : RegMapF Unit)) ∗
+    -- THE GENESIS BANK (Rocq's, off the header CLEAR that ends recovery)
+    logFlushedBank (hlc := hlc) γ 1 ∗
     logStateAt γb γfs cov logstart 0 [] (opPending (∅ : RegMapF OpEntry)) curCtx
     ⊢ logResAt (GF := GF) γ γb γfs cov logstart curCtx := by
   unfold logResAt
-  iintro ⟨Hout, Hcmt, Hnc, ⟨Hops, Hep, Hreg, Htx⟩, Hbatch⟩
+  iintro ⟨Hout, Hcmt, Hnc, ⟨Hops, Hep, Hreg, Htx⟩, #Hbank, Hbatch⟩
   ihave Hout := (show wordPointsTo (GF := GF) lOut 4 (DFrac.own 1) 0#32 ⊢
       wordAtN curCtx lOut 4 (DFrac.own 1) 0#32 from by rw [wordAtN_cur]) $$ Hout
   ihave Hcmt := (show wordPointsTo (GF := GF) lCmt 4 (DFrac.own 1) 0#32 ⊢
@@ -278,6 +289,8 @@ theorem logResAt_boot (γ : LogNames) (γb : BcacheNames) (γfs : FsNames)
   · ipureintro; intro i _; exact hempT i
   isplitr [Hbatch]
   · ipureintro; rw [hlistO, hlistT]; rfl
+  isplitr [Hbatch]
+  · iexact Hbank
   isimp only [Bool.false_eq_true, if_false]
   iexists 0, ([] : List Nat)
   isplitr [Hbatch]

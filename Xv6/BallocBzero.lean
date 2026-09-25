@@ -37,7 +37,7 @@ theorem ba_ret_70 : jumpPc (KA.«balloc» + 0x70#64) = KA.«balloc» + 0x70#64 :
 
 section
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
-  [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [CurCtx]
+  [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [FsLinkG GF] [FsTopG GF] [CurCtx]
 
 set_option maxHeartbeats 16000000 in
 /-- **`+0x54 .. +0x6c`: the fill** (Rocq's `ba_bzero`, after its `bread`):
@@ -277,8 +277,7 @@ theorem ba_bzero (BR : BREAD) (LW : LOG_WRITE) (BE : BRELSE) (MS : MEMSET)
   -- THE FRESH BLOCK'S RUN PINS THE BYTES bread RETURNED (Rocq's `iu_held_content`)
   icases (bioLocked_split γb V kk2 pidv dev (BitVec.ofNat 32 bi) bs2 bsd2 d2).1 $$ Hlk
     with ⟨Hhold, Hpay⟩
-  ihave #Hany := (show logCtx (GF := GF) γ γb γfs V.cov logstart dev ⊢ fsBytesAny γfs from by
-    unfold logCtx; iintro ⟨-, -, H⟩; iapply fsBytesAnyAt_any γfs _ $$ H) $$ Hlc
+  ihave #Hany := logCtx_bytesAny γ γb γfs V.cov logstart dev $$ Hlc
   iapply wpLoop_fupd
   imod (ba_pay_content ⊤ γb γfs V hcl hdt kk2 dev (BitVec.ofNat 32 bi) bi hbno bs2 bsd2 bsD d2
       logN_top) $$ Hany HfsbD Hpay with ⟨%hbs2, HfsbD, Hpay⟩

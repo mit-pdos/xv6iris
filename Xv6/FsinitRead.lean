@@ -53,6 +53,7 @@ theorem fsinit_readsb (MM : MEMMOVE) (BE : BRELSE) (IL : INITLOG) (IR : IRECLAIM
     (bsSb sbOld : List (BitVec 8)) (kk : Nat) (bs bsd : List (BitVec 8)) (d : Bool)
     (bsHdr : List (BitVec 8)) (L : BlockMap) (D : RegMapF Bool)
     (vlock : BitVec 32) (vname vcpu : BitVec 64) (vStart vDev vNc vN : BitVec 32)
+    (M : LogMirror) (sbrec : FsSb) (hcrash : fsinitCrashPure L M bsSb sbrec)
     (hj : j < NPROC) (hproc : k.proc = procAddr j) (hK : fsinitSlots ≤ k.avail)
     (hnoff : k.noff = 0) (hlocks : k.locks = []) (htier : k.tier = KTier.kpt)
     (hgeom : logGeomOk fscCov fscLogst)
@@ -81,7 +82,8 @@ theorem fsinit_readsb (MM : MEMMOVE) (BE : BRELSE) (IL : INITLOG) (IR : IRECLAIM
     frame4s2 (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) (k.regs 9#5) (k.regs 18#5) ∗
     wordPointsTo (pPid k.proc) 4 dqp pidv ∗
     bioLocked fscBio (fsView fscFs fscDisk icfgDev fscCov) kk pidv icfgDev 1#32 bs bsd d ∗
-    fsblock fscFs.bytes 1 bsSb ∗ byteBuf KA.«sb» (DFrac.own 1) sbOld ∗
+    fsblock fscFs.bytes 1 bsSb ∗ fsinitCrash (hlc := hlc) M sbrec ∗
+    byteBuf KA.«sb» (DFrac.own 1) sbOld ∗
     excOwn fscFs.exc (hdrDec bsHdr).2 ∗
     fsinitLogRes bsHdr L D vlock vname vcpu vStart vDev vNc vN ∗
     bslots ((LOGBLOCKS + 2) + 2) ∗ irefSlot ∗ iregBoot ∗
@@ -93,7 +95,7 @@ theorem fsinit_readsb (MM : MEMMOVE) (BE : BRELSE) (IL : INITLOG) (IR : IRECLAIM
   have hpsw : ∀ (K : KCtx) (m : Nat) (a b : Bool),
       (K.pushed m).withSpie a b = (K.withSpie a b).pushed m := fun _ _ _ _ => rfl
   have hnin : 1 ∉ (hdrDec bsHdr).2 := fun h => (hhdrHome 1 h).2 rfl
-  iintro ⟨Hk, Hpc, #Henv, Hte, Hce, Hframe, Hpid, Hlk, Hfsb, Hold, Hxo, Hlog, Hsl, Hiref,
+  iintro ⟨Hk, Hpc, #Henv, Hte, Hce, Hframe, Hpid, Hlk, Hfsb, Hcr, Hold, Hxo, Hlog, Hsl, Hiref,
     Hboot, Hnext⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
   -- THE BYTES bread RETURNED ARE THE IMAGE'S BLOCK 1
@@ -194,14 +196,14 @@ theorem fsinit_readsb (MM : MEMMOVE) (BE : BRELSE) (IL : INITLOG) (IR : IRECLAIM
   k_norm_g at hcs4
   obtain ⟨f2, f8, f9, f18, f19, f20, f21, f22, f23, f24, f25, f26, f27⟩ := hcs4
   iapply (fsinit_log IL IR Γ cpu k spie3 spp3 R4 γl pd pav pu j pidv dqp vMagic vSize vNblocks
-      vNlog bs bsHdr L D vlock vname vcpu vStart vDev vNc vN hj hproc hK hnoff htier hgeom hmagic
+      vNlog bs bsHdr L D vlock vname vcpu vStart vDev vNc vN M sbrec hcrash hj hproc hK hnoff htier hgeom hmagic
       hn1 hnnib hn31 hblk hbg hbel hhdrLen hhdrNodup hhdrHome hhdr0 hpd
       ((f18.trans e18).trans hs2) ((f2.trans e2).trans hR2) ((f19.trans e19).trans p19)
       ((f20.trans e20).trans p20) ((f21.trans e21).trans p21) ((f22.trans e22).trans p22)
       ((f23.trans e23).trans p23) ((f24.trans e24).trans p24) ((f25.trans e25).trans p25)
       ((f26.trans e26).trans p26) ((f27.trans e27).trans p27))
   unfold fsinitEnv
-  iframe Hk Hpc Henv Hte Hce Hframe Hpid Hfsb Hxo Hlog Hsl Hsl1 Hiref Hboot Hnext
+  iframe Hk Hpc Henv Hte Hce Hframe Hpid Hfsb Hcr Hxo Hlog Hsl Hsl1 Hiref Hboot Hnext
   unfold fsinitCells
   iframe C0 C1 C2 C3 C4 C5 C6 C7
 

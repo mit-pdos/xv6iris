@@ -48,7 +48,7 @@ set_option maxHeartbeats 16000000 in
 the NEW dinode, and into the tail. -/
 theorem iu_mm (LW : LOG_WRITE) (BE : BRELSE) (MM : MEMMOVE)
     {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
-    [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [IregG GF]
+    [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [FsLinkG GF] [FsTopG GF] [IregG GF]
     [Fscfg] [Icfg] [CurCtx]
     (Γ : SchedNames)
     (c0 cpu : CPU) (k : KCtx) (spie1 spp1 : Bool) (R : RegMap) (γl : GName)
@@ -167,7 +167,7 @@ set_option maxHeartbeats 16000000 in
 /-- `+0x32 .. +0x54`, the five field copies, then `iu_mm`. -/
 theorem iu_copy (LW : LOG_WRITE) (BE : BRELSE) (MM : MEMMOVE)
     {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
-    [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [IregG GF]
+    [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [FsLinkG GF] [FsTopG GF] [IregG GF]
     [Fscfg] [Icfg] [CurCtx]
     (Γ : SchedNames)
     (c0 cpu : CPU) (k : KCtx) (spie1 spp1 : Bool) (R : RegMap) (γl : GName)

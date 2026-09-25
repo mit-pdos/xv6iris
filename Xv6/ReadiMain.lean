@@ -31,7 +31,7 @@ theorem rd_priv_eta (Vp : ProcPriv) : { Vp with upt := Vp.upt } = Vp := rfl
 
 section
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
-  [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [CurCtx]
+  [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [FsLinkG GF] [FsTopG GF] [CurCtx]
 
 /-- The destination as the contract hands it over, at `tot = 0`. -/
 theorem rdDst_init (k : KCtx) (user : Bool) (j : Nat) (pidv : BitVec 32) (Vp : ProcPriv)

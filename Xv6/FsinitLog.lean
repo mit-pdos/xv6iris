@@ -64,6 +64,7 @@ theorem fsinit_log (IL : INITLOG) (IR : IRECLAIM) [Fscfg] [Icfg] [CurCtx]
     (bsSb : List (BitVec 8))
     (bsHdr : List (BitVec 8)) (L : BlockMap) (D : RegMapF Bool)
     (vlock : BitVec 32) (vname vcpu : BitVec 64) (vStart vDev vNc vN : BitVec 32)
+    (M : LogMirror) (sbrec : FsSb) (hcrash : fsinitCrashPure L M bsSb sbrec)
     (hj : j < NPROC) (hproc : k.proc = procAddr j) (hK : fsinitSlots ≤ k.avail)
     (hnoff : k.noff = 0) (htier : k.tier = KTier.kpt)
     (hgeom : logGeomOk fscCov fscLogst)
@@ -88,6 +89,7 @@ theorem fsinit_log (IL : INITLOG) (IR : IRECLAIM) [Fscfg] [Icfg] [CurCtx]
     frame4s2 (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) (k.regs 9#5) (k.regs 18#5) ∗
     wordPointsTo (pPid k.proc) 4 dqp pidv ∗
     fsinitCells vMagic vSize vNblocks vNlog ∗ fsblock fscFs.bytes 1 bsSb ∗
+    fsinitCrash (hlc := hlc) M sbrec ∗
     excOwn fscFs.exc (hdrDec bsHdr).2 ∗
     fsinitLogRes bsHdr L D vlock vname vcpu vStart vDev vNc vN ∗
     bslots ((LOGBLOCKS + 2) + 2) ∗ bslot ∗ irefSlot ∗ iregBoot ∗
@@ -98,7 +100,7 @@ theorem fsinit_log (IL : INITLOG) (IR : IRECLAIM) [Fscfg] [Icfg] [CurCtx]
     fun _ _ _ _ _ => rfl
   have hpsw : ∀ (K : KCtx) (m : Nat) (a b : Bool),
       (K.pushed m).withSpie a b = (K.withSpie a b).pushed m := fun _ _ _ _ => rfl
-  iintro ⟨Hk, Hpc, #Henv, Hte, Hce, Hframe, Hpid, Hcells, Hfsb, Hxo, Hlog, Hsl, Hsl1, Hiref,
+  iintro ⟨Hk, Hpc, #Henv, Hte, Hce, Hframe, Hpid, Hcells, Hfsb, Hcr, Hxo, Hlog, Hsl, Hsl1, Hiref,
     Hboot, Hnext⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
   unfold fsinitCells
@@ -146,11 +148,11 @@ theorem fsinit_log (IL : INITLOG) (IR : IRECLAIM) [Fscfg] [Icfg] [CurCtx]
   icases fsinit_dirty_all_false fscFs D fscCov.toList $$ HauthD Hdirty with ⟨%hclean, HauthD, Hdirty⟩
   ihave #Hbat := bitmapInv_bytes_at fscFs fscBmapstart fscCov fscLogst fscSize $$ Hbreg
   iapply (fsinit_initlog_call IL Γ cpu _ γl pd pav pu j bsHdr L D vlock vname vcpu vStart vDev
-      vNc vN pidv dqp (DFrac.own 1) hj ?dproc ?dK ?dnoff ?dtier hgeom ?da0 ?da1 hhdrLen hhdrNodup
+      vNc vN pidv dqp (DFrac.own 1) M bsSb sbrec hcrash hj ?dproc ?dK ?dnoff ?dtier hgeom ?da0 ?da1 hhdrLen hhdrNodup
       (fun b hb => (hhdrHome b hb).1) hhdr0
       (fun b hb => hclean b (Std.ExtTreeSet.mem_toList.2 hb)) hpd)
     $$ [- $Hk $Hpc $Hpi $Hpe $Hbc $Hdc $Hbat $Hxo $Hfree $C5 $Hkm0 $Hkm16 $Hl0 $Hl8 $Hl16 $Hls
-        $Hld $Hlo $Hlc $Hlnc $Hlhn $Hlhb $HauthL $HauthD $Hdirty $Hhdr $Hslots $Hsl]
+        $Hld $Hlo $Hlc $Hlnc $Hlhn $Hlhb $HauthL $HauthD $Hdirty $Hhdr $Hslots $Hsl $Hcr $Hfsb]
   rotate_right 1
   k_norm_g [fsinit_ret_52]
   iframe Hte Hce Hpid
@@ -175,7 +177,7 @@ theorem fsinit_log (IL : INITLOG) (IR : IRECLAIM) [Fscfg] [Icfg] [CurCtx]
       vNlog bsSb hj hproc hK hnoff htier hgeom hblk hbg hbel hn1 hnnib hn31 hpd (e18.trans hs2)
       (e2.trans hR2) (e19.trans p19) (e20.trans p20) (e21.trans p21) (e22.trans p22)
       (e23.trans p23) (e24.trans p24) (e25.trans p25) (e26.trans p26) (e27.trans p27))
-  iframe Hk Hpc Hte Hce Hframe Hpid Hfsb Hlctx Hsl3 Hiref Hboot Hnext
+  iframe Hk Hpc Hte Hce Hframe Hpid Hlctx Hsl3 Hiref Hboot Hnext
   isplitr
   · unfold fsinitEnv
     iframe #

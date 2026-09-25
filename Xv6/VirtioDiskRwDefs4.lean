@@ -465,7 +465,7 @@ theorem vdrwNext_collect (k : KCtx) (γ : DiskNames) (bno : BitVec 32) (wr : Boo
 theorem vdrwCaps_of_diskCaps (γ : DiskNames) (γl : GName) (pd pav pu : BitVec 64) :
     diskCaps (GF := GF) γ γl pd pav pu ⊢ vdrwCaps γ γl pd pav pu := by
   unfold diskCaps vdrwCaps diskCrashCaps
-  iintro ⟨#H1, #H2, #H3, #H4, -⟩
+  iintro ⟨#H1, #H2, #H3, #H4⟩
   iframe H1 H2 H3 H4
 
 end caps4

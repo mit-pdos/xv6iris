@@ -462,7 +462,7 @@ end Bytes
 /-! ## The transaction share, quartered (Rocq's `log_tx_split` / `log_tx_add`) -/
 
 section Tx
-variable {GF : BundledGFunctors} [Xv6G GF] [LogG GF]
+variable {GF : BundledGFunctors} [Xv6G GF] [LogG GF] [FsLinkG GF] [FsTopG GF]
 
 theorem sys_unlink_quarter : (1 : Qp).half = (1 : Qp).half.half + (1 : Qp).half.half :=
   (Qp.half_add_half _).symm

@@ -101,7 +101,7 @@ end Join
 
 section Fire
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
-  [IrefslotG GF] [CtokG GF] [WchG GF] [IcacheG GF] [LogG GF] [FsTopG GF] [FsBytesG GF] [OffboxG GF] [Appcfg GF] [Fscfg] [Icfg]
+  [IrefslotG GF] [CtokG GF] [WchG GF] [IcacheG GF] [LogG GF] [FsLinkG GF] [FsTopG GF] [FsBytesG GF] [OffboxG GF] [Appcfg GF] [Fscfg] [Icfg]
 
 set_option maxHeartbeats 8000000 in
 /-- **THE FIRE, IN PLACE OF THE RETAG** (Rocq's AU EDIT block): the era

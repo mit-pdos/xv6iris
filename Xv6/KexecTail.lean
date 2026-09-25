@@ -738,6 +738,9 @@ theorem kxc_call_endop (EO : END_OP) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF 
   unfold wp_end_op_eb_body at h
   simp only [endOpAddr] at h
   rw [(fsReadyView (GF := GF)).2.2.1, (fsReadyView (GF := GF)).1] at h
+  iapply wpLoop_cert
+  iintro #Hcert
+  ihave #Hseam := logCtx_seam _ _ _ _ _ _ $$ Hlc
   iapply h
   k_norm_g
   iframe

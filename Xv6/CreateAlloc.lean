@@ -115,7 +115,7 @@ theorem create_alloc_iinum (x : Nat) : ientry x + 4#64 = iInum (ientry x) := rfl
 theorem create_alloc_bltz_m1 : bcond bop.BLT 0xFFFFFFFFFFFFFFFF#64 0#64 = true := by decide
 
 section Tx
-variable {GF : BundledGFunctors} [Xv6G GF] [LogG GF]
+variable {GF : BundledGFunctors} [Xv6G GF] [LogG GF] [FsLinkG GF] [FsTopG GF]
 
 /-- The element's own splitting (Rocq's `log_tx_split`). -/
 theorem create_alloc_tx_split [Icfg] (t : Nat) (q q1 q2 : Qp) (hq : q = q1 + q2) :

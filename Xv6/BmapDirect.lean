@@ -48,7 +48,7 @@ theorem bm_cells_restore_dir (bm : Blkmap) (j : Nat) (hlen : bm.bmDir.length = N
 
 section
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
-  [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [CurCtx]
+  [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [FsLinkG GF] [FsTopG GF] [CurCtx]
 
 set_option maxHeartbeats 16000000 in
 /-- **`+0x2e .. +0x36`: balloc SUCCEEDED** -- install `ip->addrs[bn] = blk`

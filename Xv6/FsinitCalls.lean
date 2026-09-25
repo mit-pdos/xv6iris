@@ -84,7 +84,7 @@ end
 
 section
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
-  [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF]
+  [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [FsLinkG GF] [FsTopG GF]
 
 set_option maxHeartbeats 1000000 in
 /-- `initlog(dev, &sb)` at `+0x4e`, at the ambient view: the log's five
@@ -95,6 +95,8 @@ theorem fsinit_initlog_call (IL : INITLOG) [Fscfg] [Icfg] [CurCtx]
     (bsHdr : List (BitVec 8)) (L : BlockMap) (D : RegMapF Bool)
     (vlock : BitVec 32) (vname vcpu : BitVec 64) (vStart vDev vNc vN : BitVec 32)
     (pidv : BitVec 32) (dqp dqs : DFrac)
+    (M : LogMirror) (bsSb : List (BitVec 8)) (sbrec : FsSb)
+    (hcrash : fsinitCrashPure L M bsSb sbrec)
     (hj : j < NPROC) (hproc : k.proc = procAddr j) (hK : initlogSlots ≤ k.avail)
     (hnoff : k.noff = 0) (htier : k.tier = KTier.kpt)
     (hgeom : logGeomOk fscCov fscLogst)
@@ -145,6 +147,8 @@ theorem fsinit_initlog_call (IL : INITLOG) [Fscfg] [Icfg] [CurCtx]
        fsChalf fscFs (logSlotBno fscLogst i) bs) ∗
     -- the slot pool, stocked: the batch's 32 plus initlog's own working pair
     bslots ((LOGBLOCKS + 2) + 2) ∗
+    -- initlog's crash premises, and block 1's run (PARKED by initlog)
+    fsinitCrash (hlc := hlc) M sbrec ∗ fsblock fscFs.bytes 1 bsSb ∗
     wpNext true k.proc cpu (fun cpu' => iprop(∀ (spie spp : Bool) (R' : RegMap),
       ⌜calleeSaved k.regs R'⌝ -∗
       kctx cpu' ((k.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k.regs 1#5)) -∗
@@ -154,21 +158,37 @@ theorem fsinit_initlog_call (IL : INITLOG) [Fscfg] [Icfg] [CurCtx]
       bslots 2 -∗
       logCtx icfgLog fscBio fscFs fscCov fscLogst icfgDev -∗ wpLoop cpu'))
       ⊢ wpLoop (GF := GF) cpu := by
+  obtain ⟨hLM, hsbok, hsbparse⟩ := hcrash
   unfold fsBytesAt
-  iintro ⟨Hk, Hpc, Hpi, Hte, Hce, Hbc, Hdc, Hpe, Hpid, ⟨%Xv, Hbinv⟩, Hrest⟩
+  iintro ⟨Hk, Hpc, Hpi, Hte, Hce, Hbc, Hdc, Hpe, Hpid, ⟨%Xv, Hbinv⟩, Hxo, Hfree, Hsb, Hm0, Hm16,
+    Hl0, Hl8, Hl16, Hls, Hld, Hlo, Hlc, Hlnc, Hlhn, Hlhb, HauthL, HauthD, Hdirty, Hhdr, Hslots,
+    Hpool, Hcr, Hfsb, Hnext⟩
+  -- the era certificate is free at the cycle boundary
+  iapply wpLoop_cert
+  iintro #Hcert
+  unfold fsinitCrash
+  icases Hcr with ⟨#Hseam, Hborn, #Hlaw⟩
   -- at a CLEAN header the write set is empty, so initlog's slot-value
   -- premise is vacuous
   have h := IL.wp_initlog_eb (hlc := hlc) (GF := GF) Γ cpu k icfgLog γl fscBio
     (fsView fscFs fscDisk icfgDev fscCov) fscDlock fscFs pd pav pu j fscLogst icfgDev KA.«sb»
-    bsHdr Xv L D vlock vname vcpu vStart vDev vNc vN pidv dqp dqs hj hproc hK hnoff htier hgeom rfl
-    rfl rfl ha0 ha1 hhdrLen hhdrNodup hhdrHome
-    (fun i b hb => by rw [hdrDec_zero bsHdr hhdr0] at hb; simp at hb) hclean hpd
+    bsHdr Xv L D M bsSb sbrec vlock vname vcpu vStart vDev vNc vN pidv dqp dqs hj hproc hK hnoff
+    htier hgeom rfl rfl rfl ha0 ha1 hhdrLen hhdrNodup hhdrHome
+    (fun i b hb => by rw [hdrDec_zero bsHdr hhdr0] at hb; simp at hb) hclean hLM hsbok hsbparse hpd
   unfold wp_initlog_eb_body initlogAddr at h
   simp only [fsView_gd, fsView_cov] at h
   rw [show KA.«sb» + 20#64 = sbLogstartAddr from rfl] at h
+  ihave Hfsb := (show fsblock (GF := GF) fscFs.bytes 1 bsSb ⊢ fsblock fscFs.bytes SB_BNO bsSb
+    from .rfl) $$ Hfsb
   iapply h
-  iframe Hk Hpc Hpi Hte Hce Hbc Hdc Hpe Hpid Hbinv
-  iexact Hrest
+  iframe Hk Hpc Hpi Hte Hce Hbc Hdc Hpe Hpid Hbinv Hborn Hxo Hfree Hsb Hm0 Hm16 Hl0 Hl8 Hl16
+    Hls Hld Hlo Hlc Hlnc Hlhn Hlhb HauthL HauthD Hdirty Hhdr Hslots Hpool Hfsb Hnext
+  isplitr
+  · iexact Hseam
+  isplitr
+  · iexact Hcert
+  imodintro
+  iexact Hlaw
 
 end
 

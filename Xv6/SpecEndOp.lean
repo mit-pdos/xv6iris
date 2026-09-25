@@ -28,11 +28,14 @@ in hand is what kills the `"log.committing"` panic (an op token forces
 
 NO FS-FACING PREMISE, exactly as in Rocq after ruling 3: `end_op` is the
 one place the durable state moves for a client, and the log proves for
-itself what it moves to.  What Rocq additionally threads and this port
-cannot -- the crash seam `fs_crash_seam`, the era certificate `gen_cert`
-and the commit's durability fupds -- is dropped with the crash layer
-(`Xv6/DiskInvDefs.lean` has no crash permits); the receipt `end_op` would
-deposit in `log_flushed_bank` goes with it.
+itself what it moves to.  What Rocq threads beside the log context is
+restored (crash batch C-2b, D38): the crash seam `fsCrashSeam` and the era
+certificate `genCert`, which the commit path's four sequential permits
+(`fsLogfillV_seqPermit`, `fsCommitL_seqPermit`, `fsInstallV_seqPermit`,
+`fsClearKeep_seqPermit`) consume; the receipt the closing clear takes is
+deposited in `logResAt`'s bank.  A caller holding `logCtx` can produce both
+for free (`Xv6.logCtx_seam`, `Xv6.wpLoop_cert`), which is how the call
+sites above the log supply them until `fsReady` carries them (C-4).
 
 **Deviation in spelling (reported).**  Rocq runs the bio layer at
 `fs_view γfs γd dev cov` literally; this port keeps the client view `V` a
@@ -66,7 +69,7 @@ def endOpSlots : Nat := 8 + installTransSlots
 
 /-- **WP of `end_op()`**. -/
 def wp_end_op_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
-    [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [CurCtx]
+    [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [FsLinkG GF] [FsTopG GF] [CurCtx]
     (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
     (cpu : CPU) (k : KCtx) (γ : LogNames) (γl : GName) (γb : BcacheNames) (V : BioView GF)
     (γdl : GName) (γfs : FsNames) (pd pav pu : BitVec 64)
@@ -82,6 +85,10 @@ def wp_end_op_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G G
   trapCsrs cpu ∗ cpuClaim cpu k.proc ∗ intrRes cpu ∗
   bioCtx γl γb V ∗ diskCaps V.gd γdl pd pav pu ∗ panicEnv ∗
   logCtx γ γb γfs V.cov logstart dev ∗
+  -- THE CRASH SEAM AND THE ERA CERTIFICATE (Rocq's, D38): what lets the
+  -- commit path's four writes carry REAL durability fupds; the swap receipt
+  -- the same squeeze needs rides `logCtx`
+  fsCrashSeam (hlc := hlc) (GF := GF) V.cov logstart ∗ genCert (hlc := hlc) (GF := GF) ∗
   wordPointsTo (pPid k.proc) 4 dqp pidv ∗
   logOp γ u ∗
   wpNext true k.proc cpu (fun cpu' => iprop(∀ (spie spp : Bool) (R' : RegMap),
@@ -95,7 +102,7 @@ def wp_end_op_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G G
 complement `trap_csrs_ext` / `cpu_claim_ext` in and out; depth 0, so no
 spinlock held by `KCtx.wf`). -/
 def wp_end_op_eb_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
-    [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [CurCtx]
+    [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [FsLinkG GF] [FsTopG GF] [CurCtx]
     (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
     (cpu : CPU) (k : KCtx) (γ : LogNames) (γl : GName) (γb : BcacheNames) (V : BioView GF)
     (γdl : GName) (γfs : FsNames) (pd pav pu : BitVec 64)
@@ -111,6 +118,10 @@ def wp_end_op_eb_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6
   trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗
   bioCtx γl γb V ∗ diskCaps V.gd γdl pd pav pu ∗ panicEnv ∗
   logCtx γ γb γfs V.cov logstart dev ∗
+  -- THE CRASH SEAM AND THE ERA CERTIFICATE (Rocq's, D38): what lets the
+  -- commit path's four writes carry REAL durability fupds; the swap receipt
+  -- the same squeeze needs rides `logCtx`
+  fsCrashSeam (hlc := hlc) (GF := GF) V.cov logstart ∗ genCert (hlc := hlc) (GF := GF) ∗
   wordPointsTo (pPid k.proc) 4 dqp pidv ∗
   logOp γ u ∗
   wpNext true k.proc cpu (fun cpu' => iprop(∀ (spie spp : Bool) (R' : RegMap),
@@ -123,7 +134,7 @@ def wp_end_op_eb_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6
 /-- The interface of `end_op`. -/
 structure END_OP : Prop where
   wp_end_op_eb : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
-    [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [CurCtx]
+    [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [FsLinkG GF] [FsTopG GF] [CurCtx]
     (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
     (cpu : CPU) (k : KCtx) (γ : LogNames) (γl : GName) (γb : BcacheNames) (V : BioView GF)
     (γdl : GName) (γfs : FsNames) (pd pav pu : BitVec 64)
@@ -135,7 +146,7 @@ structure END_OP : Prop where
 /-- The interrupts-off instance of `wp_end_op_eb` (the complement is the whole
 bundle): the contract every not-yet-generalized caller states. -/
 theorem END_OP.wp_end_op (A : END_OP) {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
-    [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [CurCtx]
+    [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [FsLinkG GF] [FsTopG GF] [CurCtx]
     (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
     (cpu : CPU) (k : KCtx) (γ : LogNames) (γl : GName) (γb : BcacheNames) (V : BioView GF)
     (γdl : GName) (γfs : FsNames) (pd pav pu : BitVec 64)
@@ -148,9 +159,9 @@ theorem END_OP.wp_end_op (A : END_OP) {hlc : HasLC} {GF : BundledGFunctors} [Mac
   unfold wp_end_op_body
   rw [hsie] at h
   simp only [trapCsrsExt_false, cpuClaimExt_false] at h
-  iintro ⟨H0, H1, H2, Htc, Hcl, Hir, H6, H7, H8, H9, H10, H11, Hnext⟩
+  iintro ⟨H0, H1, H2, Htc, Hcl, Hir, H6, H7, H8, H9, Hs, Hc, H10, H11, Hnext⟩
   iapply h
-  iframe H0 H1 H2 Htc Hcl Hir H6 H7 H8 H9 H10 H11
+  iframe H0 H1 H2 Htc Hcl Hir H6 H7 H8 H9 Hs Hc H10 H11
   iapply wpNext_mono $$ Hnext
   iintro %cpu' HK %spie %spp %R' %p0 H1 H2 ⟨Htc, Hir⟩ Hcl H6
   iapply HK $$ %spie %spp %R' %p0 H1 H2 Htc Hcl Hir H6

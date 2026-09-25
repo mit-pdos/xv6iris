@@ -54,6 +54,7 @@ bcache's slot map and the log's transaction map) is retired: both now use
 the one shared camera `Xv6G.gmUnitG`, told apart by ghost name.
 -/
 import Xv6.SpecInitlog
+import Xv6.InitlogCrash
 import Xv6.LogBoot
 import Xv6.InitlogHead
 import Xv6.CodeTactics
@@ -192,7 +193,7 @@ end
 
 section
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
-variable [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [CurCtx]
+variable [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [FsLinkG GF] [FsTopG GF] [CurCtx]
 
 set_option maxHeartbeats 2000000 in
 /-- `install_trans(1)` AT THE HEADER'S WRITE SET (Rocq's recovering call at
@@ -204,7 +205,7 @@ theorem il_install_trans (IT : INSTALL_TRANS) (Γ : SchedNames) [ClaimIs (hlc :=
     (γfs : FsNames) (pd pav pu : BitVec 64) (j : Nat) (logstart : Nat) (dev : BitVec 32)
     (n : Nat) (W : List (BitVec 32)) (Lw : Nat → List (BitVec 8))
     (L : BlockMap) (D : RegMapF Bool) (pidv : BitVec 32) (dqp : DFrac)
-    (homeL : List Nat) (Xv : Nat → List (BitVec 8)) (Xexc : List Nat)
+    (homeL : List Nat) (Xv : Nat → List (BitVec 8)) (Xexc : List Nat) (Rt : Nat → IProp GF)
     (pj : BitVec 64) (hpj : k'.proc = pj) (s : Bool) (hs : k'.sie = s)
     (hj : j < NPROC) (hproc : k'.proc = procAddr j) (hK : installTransSlots ≤ k'.avail)
     (hnoff : k'.noff = 0)
@@ -233,6 +234,10 @@ theorem il_install_trans (IT : INSTALL_TRANS) (Γ : SchedNames) [ClaimIs (hlc :=
     fsCacheAuth γfs L ∗ fsDirtyAuth γfs D ∗
     ([∗list] i ↦ _w ∈ W, fsChalf γfs (logSlotBno logstart i) (Lw i)) ∗
     bslots 2 ∗
+    □ (∀ (i : Nat) (w : BitVec 32), ⌜W[i]? = some w⌝ -∗ ⌜(Lw i).length = BSIZE⌝ -∗ ▷ Rt i -∗
+         diskSeqPermit (genId (hlc := hlc) (GF := GF)) (some (1024 * w.toNat, Lw i))
+           (Rt (i + 1))) ∗
+    ▷ Rt 0 ∗
     wpNext true pj c (fun cpu' => iprop(∀ (spie spp : Bool) (R' : RegMap),
       ⌜calleeSaved k'.regs R'⌝ -∗
       kctx cpu' ((k'.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k'.regs 1#5)) -∗
@@ -243,11 +248,11 @@ theorem il_install_trans (IT : INSTALL_TRANS) (Γ : SchedNames) [ClaimIs (hlc :=
       excOwn γfs.exc (excDelMany Xexc (W.map (fun w => w.toNat))) -∗
       fsCacheAuth γfs (itRecL W Lw L) -∗ fsDirtyAuth γfs D -∗
       ([∗list] i ↦ _w ∈ W, fsChalf γfs (logSlotBno logstart i) (Lw i)) -∗
-      bslots 2 -∗ wpLoop cpu'))
+      bslots 2 -∗ ▷ Rt n -∗ wpLoop cpu'))
     ⊢ wpLoop (GF := GF) c := by
   subst hpj hs
   have h := IT.wp_install_trans_eb (hlc := hlc) (GF := GF) Γ c k' γl γb V γdl γfs pd pav pu j
-    logstart dev true n W Lw L D pidv dqp homeL Xv Xexc (fun _ => iprop(True))
+    logstart dev true n W Lw L D pidv dqp homeL Xv Xexc Rt
     hj hproc hK hnoff htier hgeom hdev hcl hdt
     (by simp only [if_true]; exact ha0) hn hnodup hhome hlen
     (by intro hb; exact absurd hb (by simp))
@@ -255,10 +260,9 @@ theorem il_install_trans (IT : INSTALL_TRANS) (Γ : SchedNames) [ClaimIs (hlc :=
   unfold wp_install_trans_eb_body at h
   simp only [installTransAddr, if_true, Nat.add_zero] at h
   iintro ⟨Hk, Hpc, #Hpi, Hte, Hce, #Hbc, #Hdc, #Hpe, #Hfr, #Hbinv, Hpid, HlhN, HW, Hexc,
-    HL, HD, HS, Hsl, Hnext⟩
-  icases diskCaps_writeAny V.gd γdl pd pav pu $$ Hdc with ⟨-, #Hany⟩
+    HL, HD, HS, Hsl, #Hgen, HR0, Hnext⟩
   iapply h
-  iframe Hk Hpc Hpi Hte Hce Hbc Hdc Hpe Hfr Hpid Hbinv HlhN HW Hexc HL HD Hsl
+  iframe Hk Hpc Hpi Hte Hce Hbc Hdc Hpe Hfr Hpid Hbinv HlhN HW Hexc HL HD Hsl HR0
   isplitl [HS]
   · iapply BigSepL.bigSepL_mono ?_ $$ HS
     intro _ _ _
@@ -268,25 +272,22 @@ theorem il_install_trans (IT : INSTALL_TRANS) (Γ : SchedNames) [ClaimIs (hlc :=
     · iempintro
   isplitl []
   · imodintro
-    iintro %i %w %_ %_ -
-    iapply Hany
-  isplitl []
-  · inext; ipureintro; trivial
+    iexact Hgen
   iapply wpNext_intro_pin
-  iintro %cpu2 %hp2 %spie %spp %R' %hcs Hk Hpc Hte Hce Hpid HlhN HW Hexc HL HD HS Hsl -
+  iintro %cpu2 %hp2 %spie %spp %R' %hcs Hk Hpc Hte Hce Hpid HlhN HW Hexc HL HD HS Hsl HRn
   ihave HS := BigSepL.bigSepL_mono
     (Φ := fun i (_ : BitVec 32) => iprop(fsChalf (GF := GF) γfs (logSlotBno logstart i) (Lw i) ∗ emp))
     (Ψ := fun i (_ : BitVec 32) => fsChalf (GF := GF) γfs (logSlotBno logstart i) (Lw i)) (l := W)
     (fun _ => by iintro ⟨H, -⟩; iexact H) $$ HS
   ihave Hn := wpNext_at true k'.proc c cpu2 _ hp2 $$ Hnext
-  iapply Hn $$ %spie %spp %R' %hcs Hk Hpc Hte Hce Hpid HlhN HW Hexc HL HD HS Hsl
+  iapply Hn $$ %spie %spp %R' %hcs Hk Hpc Hte Hce Hpid HlhN HW Hexc HL HD HS Hsl HRn
 
 set_option maxHeartbeats 2000000 in
 /-- `write_head()` AT THE EMPTY WRITE SET. -/
 theorem il_write_head (WH : WRITE_HEAD) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
     (c : CPU) (k' : KCtx) (γl : GName) (γb : BcacheNames) (V : BioView GF) (γdl : GName)
     (γfs : FsNames) (pd pav pu : BitVec 64) (j : Nat) (logstart : Nat) (dev : BitVec 32)
-    (L : BlockMap) (pidv : BitVec 32) (dqp : DFrac)
+    (L : BlockMap) (pidv : BitVec 32) (dqp : DFrac) (Q : List (BitVec 8) → IProp GF)
     (pj : BitVec 64) (hpj : k'.proc = pj) (s : Bool) (hs : k'.sie = s)
     (hj : j < NPROC) (hproc : k'.proc = procAddr j) (hK : writeHeadSlots ≤ k'.avail)
     (hnoff : k'.noff = 0)
@@ -301,6 +302,10 @@ theorem il_write_head (WH : WRITE_HEAD) (Γ : SchedNames) [ClaimIs (hlc := hlc) 
     wordPointsTo lhNAddr 4 (DFrac.own 1) 0#32 ∗
     fsCacheAuth γfs L ∗ (∃ bsh : List (BitVec 8), fsChalf γfs (logHdrBno logstart) bsh) ∗
     bslot ∗
+    (∀ bs' : List (BitVec 8), ⌜bs'.length = BSIZE⌝ -∗ ⌜hdrN bs' = 0⌝ -∗
+       ⌜hdrDec bs' = (0, ([] : List (BitVec 32)).map (fun w => w.toNat))⌝ -∗
+       diskSeqPermit (genId (hlc := hlc) (GF := GF)) (some (1024 * logHdrBno logstart, bs'))
+         (Q bs')) ∗
     wpNext true pj c (fun cpu' => iprop(∀ (spie spp : Bool) (R' : RegMap)
         (bs' : List (BitVec 8)),
       ⌜calleeSaved k'.regs R'⌝ -∗
@@ -309,32 +314,31 @@ theorem il_write_head (WH : WRITE_HEAD) (Γ : SchedNames) [ClaimIs (hlc := hlc) 
       wordPointsTo (pPid pj) 4 dqp pidv -∗
       wordPointsTo lhNAddr 4 (DFrac.own 1) 0#32 -∗
       fsCacheAuth γfs (PartialMap.insert L (logHdrBno logstart) bs') -∗
-      fsChalf γfs (logHdrBno logstart) bs' -∗ bslot -∗ wpLoop cpu'))
+      fsChalf γfs (logHdrBno logstart) bs' -∗
+      ⌜bs'.length = BSIZE ∧ hdrN bs' = 0 ∧
+        hdrDec bs' = (0, ([] : List (BitVec 32)).map (fun w => w.toNat))⌝ -∗
+      bslot -∗ ▷ Q bs' -∗ wpLoop cpu'))
     ⊢ wpLoop (GF := GF) c := by
   subst hpj hs
   have h := WH.wp_write_head_eb (hlc := hlc) (GF := GF) Γ c k' γl γb V γdl γfs pd pav pu j
-    logstart dev 0 ([] : List (BitVec 32)) L pidv dqp (fun _ => iprop(True))
+    logstart dev 0 ([] : List (BitVec 32)) L pidv dqp Q
     hj hproc hK hnoff htier hgeom hdev hcl hdt
     ⟨rfl, by unfold LOGBLOCKS; omega⟩ hpd
   unfold wp_write_head_eb_body at h
   simp only [writeHeadAddr] at h
   iintro ⟨Hk, Hpc, #Hpi, Hte, Hce, #Hbc, #Hdc, #Hpe, #Hfr, Hpid, HlhN, HL, Hch, Hsl,
-    Hnext⟩
-  icases diskCaps_writeAny V.gd γdl pd pav pu $$ Hdc with ⟨-, #Hany⟩
+    Hfam, Hnext⟩
   iapply h
   iframe Hk Hpc Hpi Hte Hce Hbc Hdc Hpe Hfr Hpid
   isplitl [HlhN]
   · iexact HlhN
-  isplitr [HL Hch Hsl Hnext]
+  isplitr [HL Hch Hsl Hfam Hnext]
   · iapply BigSepL.bigSepL_nil.2; iempintro
-  iframe HL Hch Hsl
-  isplitl []
-  · iintro %bs' %_ %_ %_
-    iapply Hany
+  iframe HL Hch Hsl Hfam
   iapply wpNext_intro_pin
-  iintro %cpu2 %hp2 %spie %spp %R' %bs' %hcs Hk Hpc Hte Hce Hpid HlhN - HL Hch %hbs Hsl -
+  iintro %cpu2 %hp2 %spie %spp %R' %bs' %hcs Hk Hpc Hte Hce Hpid HlhN - HL Hch %hbs Hsl HQ
   ihave Hn := wpNext_at true k'.proc c cpu2 _ hp2 $$ Hnext
-  iapply Hn $$ %spie %spp %R' %bs' %hcs Hk Hpc Hte Hce Hpid HlhN HL Hch Hsl
+  iapply Hn $$ %spie %spp %R' %bs' %hcs Hk Hpc Hte Hce Hpid HlhN HL Hch %hbs Hsl HQ
 
 end
 
@@ -368,7 +372,7 @@ end
 
 section
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
-variable [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [CurCtx]
+variable [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [FsLinkG GF] [FsTopG GF] [CurCtx]
 
 set_option maxHeartbeats 8000000 in
 /-- From `write_head`'s return at `+0x74`: assemble `Xv6.logResAt` out of
@@ -380,6 +384,8 @@ theorem il_seal (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
     (γ : LogNames) (γb : BcacheNames) (γfs : FsNames) (V : BioView GF)
     (logstart : Nat) (dev pidv vNc : BitVec 32) (sb : BitVec 64) (dqp dqs : DFrac)
     (L : BlockMap) (D : RegMapF Bool) (bsh : List (BitVec 8))
+    (M : LogMirror) (hMhdr : lmHdr M logstart = (0, []))
+    (hMtie : logMirrorTieBody M L V.cov logstart [])
     (hK : 6 ≤ k.avail)
     (hR2 : R 2#5 = k.regs 2#5 + 0xFFFFFFFFFFFFFFD0#64)
     (p20 : R 20#5 = k.regs 20#5) (p21 : R 21#5 = k.regs 21#5) (p22 : R 22#5 = k.regs 22#5)
@@ -392,6 +398,9 @@ theorem il_seal (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
     wordPointsTo (pPid k.proc) 4 dqp pidv ∗
     wordPointsTo (sb + 20#64) 4 dqs (BitVec.ofNat 32 logstart) ∗
     logFrozen logstart dev ∗ fsBytesAnyAt γfs (fsHomeList V.cov logstart) ∗
+    swapLb (hlc := hlc) (GF := GF) (genId (hlc := hlc) (GF := GF) + 1) ∗
+    sbParked γfs ∗ snapLaw (hlc := hlc) γ γfs V.cov logstart ∗
+    fsBank (hlc := hlc) (GF := GF) ∗ logMirrorHalf (hlc := hlc) M ∗
     kmapId logAddr ∗ kmapId (logAddr + 16#64) ∗ lkFresh logAddr ∗
     logFreeTok γ ∗
     wordPointsTo lOut 4 (DFrac.own 1) 0#32 ∗
@@ -415,17 +424,22 @@ theorem il_seal (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
       bslots 2 -∗
       logCtx γ γb γfs V.cov logstart dev -∗ wpLoop cpu')
     ⊢ wpLoop (GF := GF) cpu := by
-  iintro ⟨Hk, Hpc, Hte, Hce, Hframe, Hpid, Hsb, #Hfroz, #Hrow, #Hm1, #Hm2, Hfresh, Htok,
+  iintro ⟨Hk, Hpc, Hte, Hce, Hframe, Hpid, Hsb, #Hfroz, #Hrow, #Hswlb, #Hpark, #Hlaw, #Hnb,
+    Hmir, #Hm1, #Hm2, Hfresh, Htok,
     Hout, Hcmt, Hnc, HlhN, Hjunk, HL, HD, Hd, Hhdr, Hslots, Hpool, Hwork, Hnext⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
-  -- the boot pack
+  -- the boot pack, with the era's mirror half at the clean picture and row (b)
   ihave Hbatch := logStateAt_boot γb γfs V.cov logstart (opPending (∅ : RegMapF OpEntry))
-      L D bsh $$ [HlhN Hjunk HL HD Hd Hhdr Hslots Hpool]
+      L D bsh M hMhdr hMtie $$ [Hmir HlhN Hjunk HL HD Hd Hhdr Hslots Hpool]
   case' _ => iframe
-  icases logFreeTok_split γ $$ Htok with ⟨Hlkf, Htok⟩
+  icases logFreeTok_split γ $$ Htok with ⟨Hlkf, Hops, Hep, Hreg, Htx⟩
+  -- THE GENESIS BANK (Rocq's): the copy the clear took, at epoch one
+  icases logFlushedBank_mk γ 1 $$ Hep Hnb with ⟨Hep, #Hbank⟩
   ihave Hres := logResAt_boot γ γb γfs V.cov logstart vNc
-      $$ [Hout Hcmt Hnc Htok Hbatch]
-  case' _ => iframe
+      $$ [Hout Hcmt Hnc Hops Hep Hreg Htx Hbatch]
+  case' _ =>
+    iframe Hout Hcmt Hnc Hops Hep Hreg Htx Hbatch
+    iexact Hbank
   -- the seal, AT THE GIVEN NAME `γ.lk` (Rocq `newlock_at`)
   iapply wpLoop_fupd
   imod (kctx_newlockAt cpu _ γ.lk logAddr "log" (logResAt γ γb γfs V.cov logstart))
@@ -433,8 +447,8 @@ theorem il_seal (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
   · iframe Hm1 Hm2
     iframe
   imodintro
-  ihave #Hctx := logCtx_mk γ γb γfs V.cov logstart dev $$ [Hlk Hfroz Hrow]
-  case' _ => iframe Hlk Hfroz Hrow
+  ihave #Hctx := logCtx_mk γ γb γfs V.cov logstart dev $$ [Hlk Hfroz Hrow Hswlb Hpark Hlaw]
+  case' _ => iframe Hlk Hfroz Hrow Hswlb Hpark Hlaw
   -- the epilogue
   ihave Hframe := (show frame6s3 (GF := GF) (k.regs 2#5) (k.regs 1#5) (k.regs 8#5)
         (k.regs 9#5) (k.regs 18#5) (k.regs 19#5) ⊢
@@ -477,10 +491,10 @@ set_option maxHeartbeats 32000000 in
 theorem initlog_proof
     (IL : INITLOCK) (BD : BREAD) (BE : BRELSE) (IT : INSTALL_TRANS) (WH : WRITE_HEAD) :
     INITLOG := ⟨
-  fun {hlc GF} _ _ _ _ _ _ _ _ _ _ _ _ _ Γ _ cpu k γ γl γb V γdl γfs pd pav pu j logstart dev sb
-    bsHdr Xv L D vlock vname vcpu vStart vDev vNc vN pidv dqp dqs
+  fun {hlc GF} _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ Γ _ cpu k γ γl γb V γdl γfs pd pav pu j logstart dev sb
+    bsHdr Xv L D M bsSb sbrec vlock vname vcpu vStart vDev vNc vN pidv dqp dqs
     hj hproc hK hnoff htier hgeom hdev hcl hdt ha0 ha1
-    hhdrLen hhdrNodup hhdrHome hxslot hpinned hpd => by
+    hhdrLen hhdrNodup hhdrHome hxslot hpinned hLM hsbok hsbparse hpd => by
   have hcovhdr : logstart ∈ V.cov := hgeom.2 logstart (logRegion_hdr logstart)
   have hls31 : logstart < 2 ^ 31 := (hgeom.1 logstart hcovhdr).2
   have hbnoNat : (BitVec.ofNat 32 logstart).toNat = logstart := by
@@ -493,9 +507,14 @@ theorem initlog_proof
       (K.pushed m).withSpie a b = (K.withSpie a b).pushed m := fun _ _ _ _ => rfl
   unfold wp_initlog_eb_body
   simp only [initlogAddr]
-  iintro ⟨Hk, Hpc, #Hpi, Hte, Hce, #Hbc, #Hdc, #Hpe, Hpid, #Hbinv, Hexc, Htok, Hsb,
-    #Hm1, #Hm2, Hlock, Hname, Hcpu, HlStart, HlDev, Hout, Hcmt, Hnc, HlhN, Hjunk, HL, HD, Hd,
-    Hhdr, Hslots, Hpool0, Hnext⟩
+  iintro ⟨Hk, Hpc, #Hpi, Hte, Hce, #Hbc, #Hdc, #Hpe, #Hseam, #Hcert, Hborn, Hpid, #Hbinv, Hexc,
+    Htok, Hsb, #Hm1, #Hm2, Hlock, Hname, Hcpu, HlStart, HlDev, Hout, Hcmt, Hnc, HlhN, Hjunk,
+    HL, HD, Hd, Hhdr, Hslots, Hpool0, Hb1, #Hlawf, Hnext⟩
+  icases genCert_parts $$ Hcert with ⟨-, -, #Hreg⟩
+  icases (show logMirrorBorn (hlc := hlc) (GF := GF) M ⊢
+      logMirrorHalf (hlc := hlc) M ∗
+        swapLb (hlc := hlc) (GF := GF) (genId (hlc := hlc) (GF := GF) + 1) from by
+    unfold logMirrorBorn; exact .rfl) $$ Hborn with ⟨Hmir, #Hswlb⟩
   ihave #Hat := fsBytesAt_of γfs (fsHomeList V.cov logstart) Xv $$ Hbinv
   -- `lh.block[]`'s cells as ONE list, and the log slots' client halves as
   -- ONE function, with what the logged view says of them
@@ -634,6 +653,13 @@ theorem initlog_proof
   ihave %hbseq := il_pay_agree γb γfs V hcl hdt kk dev (BitVec.ofNat 32 logstart)
       (logHdrBno logstart) hbnoNat bs bsd bsHdr dd $$ Hpay Hhdr
   subst hbseq
+  -- THE ERA'S MIRROR NAMES THE HEADER initlog JUST READ (Rocq's (g'))
+  ihave %hLh := fsCache_lookup γfs L (logHdrBno logstart) bs $$ HL Hhdr
+  have hMv : M.view (logHdrBno logstart) = bs := by
+    have h := hLM _ hcovhdr
+    rw [show logHdrBno logstart = logstart from rfl] at hLh
+    rw [hLh] at h
+    exact (Option.some.inj h).symm
   icases il_hold_bytes γb V kk pidv dev (BitVec.ofNat 32 logstart) bs bsd $$ Hhold
     with ⟨%hpure, Hby, Hhclose⟩
   obtain ⟨hkk, -, -, hlen, -⟩ := hpure
@@ -712,8 +738,9 @@ theorem initlog_proof
       rw [← hW]; exact (List.getElem?_eq_some_iff.mp hw).1
     obtain ⟨h1, h2⟩ := hxslot i w.toNat (hent i w hw)
     have h3 := hLs i (List.mem_range.2 (by unfold LOGBLOCKS at hnB ⊢; omega))
-    rw [h3] at h1
-    have he : Ls i = Xv w.toNat := Option.some.inj h1
+    have h4 := hLM _ (hgeom.2 _ (logRegion_slot logstart i (by unfold LOGBLOCKS at hnB ⊢; omega)))
+    rw [h3] at h4
+    have he : Ls i = Xv w.toNat := (Option.some.inj h4).trans h1.symm
     refine ⟨he.symm, ?_⟩
     show (if (Ls i).length = BSIZE then Ls i else List.replicate BSIZE 0#8) = Ls i
     rw [if_pos (by rw [he]; exact h2)]
@@ -721,6 +748,29 @@ theorem initlog_proof
     intro i hi
     have hw : (ilW bs)[i]? = some (ilW bs)[i] := List.getElem?_eq_getElem (by rw [hW]; exact hi)
     exact (hLw i _ hw).2
+  -- THE RECOVERY'S PICTURE, on the born-true mirror (Rocq's `HMi`, `Hcaught`)
+  have hhome' : ∀ w ∈ ilW bs, fsHome V.cov logstart w.toNat :=
+    fun w hw => hhdrHome w.toNat (hdec ▸ List.mem_map_of_mem hw)
+  have hnodup' : ((ilW bs).map (fun w => w.toNat)).Nodup := hdec ▸ hhdrNodup
+  have hMh : lmHdr M logstart = (hdrN bs, (ilW bs).map (fun w => w.toNat)) := by
+    unfold lmHdr; rw [hMv, ← hdec]; rfl
+  have hM1 := il_install_hdrs (ilW bs) Lw M V.cov logstart (hdrN bs) hW.symm hhome' hMh
+  have hslotM : ∀ i, i < hdrN bs → M.view (logSlotBno logstart i) = Lw i := by
+    intro i hi
+    have hiL : i < LOGBLOCKS := by unfold LOGBLOCKS at hnB ⊢; omega
+    have h3 := hLs i (List.mem_range.2 hiL)
+    have h4 := hLM _ (hgeom.2 _ (logRegion_slot logstart i hiL))
+    rw [h3] at h4
+    rw [hLwn i hi]
+    exact (Option.some.inj h4).symm
+  -- THE RECOVERING INSTALL fupds, one per entry, out of one generator
+  ihave #Hgen := eo_install_gen V.cov logstart (hdrN bs) (ilW bs) Lw M hW.symm hnB hnodup'
+    hhome' hM1 $$ Hseam Hreg Hswlb
+  ihave HR0 : ▷ logMirrorHalf (hlc := hlc) (GF := GF)
+      (lmInstall M ((ilW bs).map (fun w => w.toNat)) Lw 0) $$ [Hmir]
+  · inext
+    rw [show lmInstall M ((ilW bs).map (fun w => w.toNat)) Lw 0 = M from rfl]
+    iexact Hmir
   -- split the cells and the slots at the write set
   icases BigSepL.bigSepL_append.1 $$ HC with ⟨HW, Hrest⟩
   have hsplit := bigSepL_range_split
@@ -738,6 +788,8 @@ theorem initlog_proof
     rw [hLwn x (List.mem_range.1 (List.mem_of_getElem? hx))]) $$ HsW
   iapply (il_install_trans IT Γ cpu _ γl γb V γdl γfs pd pav pu j logstart dev
       (hdrN bs) (ilW bs) Lw L D pidv dqp (fsHomeList V.cov logstart) Xv (hdrDec bs).2
+      (fun i => logMirrorHalf (hlc := hlc) (GF := GF)
+        (lmInstall M ((ilW bs).map (fun w => w.toNat)) Lw i))
       k.proc (by k_norm_g) k.sie (by k_norm_g) hj ?tproc ?tK ?tnoff ?ttier hgeom hdev hcl hdt
       ?ta0 ⟨hW.symm, hnB⟩
       (eo_nodup_inj (ilW bs) (hdec ▸ hhdrNodup))
@@ -752,7 +804,7 @@ theorem initlog_proof
         (hLw i w hw).1.trans (hLw i w hw).2.symm⟩)
       hpd)
     $$ [- $Hk $Hpc $Hpi $Hte $Hce $Hbc $Hdc $Hpe $Hfroz $Hbinv $Hpid $HlhN $HW $Hexc $HL $HD
-         $HsW $Hs2]
+         $HsW $Hs2 $Hgen $HR0]
   rotate_right 1
   k_norm_g [il_ret_68]
   iframe #
@@ -763,7 +815,7 @@ theorem initlog_proof
   case ta0 => k_norm_g
   -- ===== back from install_trans =====
   iapply wpNext_intro_pin
-  iintro %cpu %_ %spie5 %spp5 %R4 %hcs4 Hk Hpc Hte Hce Hpid HlhN HW Hexc HL HD HsW Hs2
+  iintro %cpu %_ %spie5 %spp5 %R4 %hcs4 Hk Hpc Hte Hce Hpid HlhN HW Hexc HL HD HsW Hs2 HRn
   k_norm_g [il_ret_68, hww, hpsw]
   unfold calleeSaved at hcs4
   k_norm_g at hcs4
@@ -826,10 +878,19 @@ theorem initlog_proof
   k_step_e (wp_s_jal cpu _ (KA.«initlog» + 0x70#64) false 2096742#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [il_br_writehead]
   iintro Hk Hpc
+  -- THE CLOSING CLEAR's permit family (Rocq `fs_clear_keep_seq_permit`): it
+  -- preserves the committed view and banks the genesis copy
+  ihave Hfam := eo_clear_fam V.cov logstart (hdrN bs) ((ilW bs).map (fun w => w.toNat))
+    (lmInstall M ((ilW bs).map (fun w => w.toNat)) Lw (hdrN bs)) hnB (hM1 _ (Nat.le_refl _))
+    (il_caught (ilW bs) Lw M V.cov logstart (hdrN bs) hW.symm hnB hnodup' hhome' hslotM)
+    $$ Hseam Hreg Hswlb HRn
   iapply (il_write_head WH Γ cpu _ γl γb V γdl γfs pd pav pu j logstart dev
       (itRecL (ilW bs) Lw L) pidv dqp
+      (fun bs' => iprop(logMirrorHalf (hlc := hlc) (lmUpd
+          (lmInstall M ((ilW bs).map (fun w => w.toNat)) Lw (hdrN bs)) (logHdrBno logstart) bs') ∗
+        fsBank (hlc := hlc) (GF := GF)))
       k.proc (by k_norm_g) k.sie (by k_norm_g) hj ?wproc ?wK ?wnoff ?wtier hgeom hdev hcl hdt hpd)
-    $$ [- $Hk $Hpc $Hpi $Hte $Hce $Hbc $Hdc $Hpe $Hfroz $Hpid $HlhN $HL $Hch $Hu1]
+    $$ [- $Hk $Hpc $Hpi $Hte $Hce $Hbc $Hdc $Hpe $Hfroz $Hpid $HlhN $HL $Hch $Hu1 $Hfam]
   rotate_right 1
   k_norm_g [il_ret_74]
   iframe #
@@ -842,7 +903,7 @@ theorem initlog_proof
   case wtier => k_norm_g; exact htier
   -- ===== back from write_head: the seal =====
   iapply wpNext_intro_pin
-  iintro %cpu %_ %spie6 %spp6 %R5 %bs' %hcs5 Hk Hpc Hte Hce Hpid HlhN HL Hch Hu1
+  iintro %cpu %_ %spie6 %spp6 %R5 %bs' %hcs5 Hk Hpc Hte Hce Hpid HlhN HL Hch %hbs2 Hu1 HQ
   k_norm_g [il_ret_74, hww, hpsw]
   unfold calleeSaved at hcs5
   k_norm_g at hcs5
@@ -852,13 +913,27 @@ theorem initlog_proof
   -- **THE SEAL OF THE EXCEPTION SET** (Rocq's `exc_seal`): recovery is over,
   -- the handle is spent at `[]`, and the discarded element is the permanent
   -- certificate `Xv6.logCtx` carries.
-  iapply wpLoop_bupd
+  iapply wpLoop_fupd
+  -- the clear's receipt: the mirror half at the clean picture, and the GENESIS
+  -- durability copy (both timeless)
+  icases HQ with ⟨>Hmir3, >#Hnb⟩
   ihave Hsealed := excSeal (GF := GF) γfs.exc $$ Hexc
   imod Hsealed with #Hseal
+  -- BLOCK 1 IS PARKED, and the law is composed with the park (Rocq's
+  -- `sb_park_alloc` in the same ghost step)
+  imod (sbPark_alloc ⊤ γfs sbrec bsSb hsbparse) $$ Hb1 with #Hpark
   imodintro
+  ihave #Hparked := sbParked_of_park γfs sbrec hsbok $$ Hpark
+  ihave #Hlaw := Hlawf $$ Hpark
   ihave #Hrow := fsBytesAnyAt_of γfs (fsHomeList V.cov logstart) $$ Hat Hseal
+  have hM3hdr : lmHdr (lmUpd (lmInstall M ((ilW bs).map (fun w => w.toNat)) Lw (hdrN bs))
+      (logHdrBno logstart) bs') logstart = (0, []) := by
+    unfold lmHdr; rw [lmUpd_view_eq]; exact hbs2.2.2
   iapply (il_seal Γ cpu k spie6 spp6 R5 γ γb γfs V logstart dev pidv vNc sb dqp dqs
-      (PartialMap.insert (itRecL (ilW bs) Lw L) (logHdrBno logstart) bs') D bs' hK6
+      (PartialMap.insert (itRecL (ilW bs) Lw L) (logHdrBno logstart) bs') D bs'
+      (lmUpd (lmInstall M ((ilW bs).map (fun w => w.toNat)) Lw (hdrN bs)) (logHdrBno logstart) bs')
+      hM3hdr (il_final_tie (ilW bs) Lw M L V.cov logstart (hdrN bs) bs' hW.symm hnodup' hLM)
+      hK6
       ((g2.trans f2).trans ((d2.trans b2).trans a2'))
       ((g20.trans f20).trans ((d20.trans b20).trans a20'))
       ((g21.trans f21).trans ((d21.trans b21).trans a21'))
@@ -868,7 +943,8 @@ theorem initlog_proof
       ((g25.trans f25).trans ((d25.trans b25).trans a25'))
       ((g26.trans f26).trans ((d26.trans b26).trans a26'))
       ((g27.trans f27).trans ((d27.trans b27).trans a27')))
-    $$ [- $Hk $Hpc $Hte $Hce $Hframe $Hpid $Hsb $Hfroz $Hrow $Hm1 $Hm2 $Hfresh $Htok
+    $$ [- $Hk $Hpc $Hte $Hce $Hframe $Hpid $Hsb $Hfroz $Hrow $Hswlb $Hparked $Hlaw $Hnb $Hmir3
+         $Hm1 $Hm2 $Hfresh $Htok
          $Hout $Hcmt $Hnc $HlhN $Hjunk $HL $HD $Hd $Hch $Hslots $Hpool $Hs2 $Hnext]
   k_norm_g
   try (iframe #)⟩
