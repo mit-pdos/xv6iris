@@ -10,9 +10,10 @@ interface of `kfork` (Rocq `ProofSysFork.v`).
 
 As in Rocq, this is `sys_getpid`'s proof (`Xv6/ProofSysGetpid.lean`) with
 the `c.lw` deleted and `myproc` replaced by `kfork`; every premise is
-forwarded to `kfork` untouched.  `kfork` may sleep (`wpNext true`), so from
-its return on the hart is arbitrary (`cf`), and the spec's own `wpNext true`
-post is reached with `wpNext_at`, as in `Xv6/ProofSysWait.lean`.  The
+forwarded to `kfork` untouched.  Both contracts are balanced and generic in
+the entry `SIE` (crossing `k.sie`): every step, and kfork's return, may land
+on another hart when interrupts are on, and the client's continuation is
+re-anchored along each pinning fact (`wpNext_shift`).  The
 save/restore of ra/s0 spans the call, so `calleeSaved` is discharged
 componentwise (Rocq's `cs_through` shape).
 -/
@@ -47,28 +48,22 @@ theorem sys_fork_withRegs_withSpie (k : KCtx) (R : RegMap) (a b : Bool) :
 section
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [CurCtx]
 
-/-- `kfork`'s contract at its entry address. -/
+/-- `kfork`'s contract at its entry address (either `SIE`). -/
 theorem sys_fork_kfork (KF : KFORK) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ] [FsEnv] [ForkretIs]
     (c : CPU) (k' : KCtx) (γw γp γl : GName) (γk : KmemNames) (j : Nat) (pid : BitVec 32)
     (V : ProcPriv) (M : Nat → List (BitVec 8))
     (hj : j < NPROC) (hproc : k'.proc = procAddr j) (hK : kforkSlots ≤ k'.avail)
-    (hsie : k'.sie = false) (hnoff : k'.noff = 0) (hlocks : k'.locks = [])
-    (htier : k'.tier = KTier.kpt) :
+    (hnoff : k'.noff = 0) (htier : k'.tier = KTier.kpt) :
     kctx c k' ∗ pcIs c KA.«kfork» ∗ procsInv Γ ∗
-    trapCsrs c ∗ cpuClaim c k'.proc ∗ intrRes c ∗
     isLock γw waitLockAddr "wait_lock" waitLockPay ∗
     isLock γp pidLockAddr "nextpid" pidLockPay ∗
     isLock γl kmemLockAddr "kmem" (kmemRes γk) ∗ kallocAvail γk none ∗ procsAvail Γ none ∗
     procPrivNoctxAt curCtx (procAddr j) pid V M ∗
-    wpNext true k'.proc c (fun cpu' => iprop(∀ (spie spp : Bool) (R' : RegMap) (rv : BitVec 32),
-      ⌜calleeSaved k'.regs R' ∧ R' 10#5 = BitVec.signExtend 64 rv ∧ kforkAns rv⌝ -∗
-      kctx cpu' ((k'.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k'.regs 1#5)) -∗
-      trapCsrs cpu' -∗ cpuClaim cpu' k'.proc -∗ intrRes cpu' -∗
-      procPrivNoctxAt curCtx (procAddr j) pid V M -∗ wpLoop cpu'))
+    wpNext k'.sie k'.proc c (kforkPost k' j pid V M)
     ⊢ wpLoop (GF := GF) c := by
-  have h := KF.wp_kfork (hlc := hlc) (GF := GF) Γ c k' γw γp γl γk j pid V M
-    hj hproc hK hsie hnoff hlocks htier
-  unfold wp_kfork_body at h
+  have h := KF.wp_kfork_eb (hlc := hlc) (GF := GF) Γ c k' γw γp γl γk j pid V M
+    hj hproc hK hnoff htier
+  unfold wp_kfork_eb_body at h
   simp only [kforkAddr] at h
   exact h
 
@@ -77,11 +72,13 @@ end
 /-! ## The function -/
 
 set_option maxHeartbeats 8000000 in
+/-- At either entry `SIE`: every step is at the caller's index, the client's
+continuation re-anchored along each step's pinning fact. -/
 theorem sys_fork_proof (KF : KFORK) : SYSFORK :=
-  ⟨fun {hlc GF} _ _ _ Γ _ _ _ cpu k γw γp γl γk j pid V M hj hproc hK hsie hnoff hlocks htier => by
-  unfold wp_sys_fork_body
+  ⟨fun {hlc GF} _ _ _ Γ _ _ _ cpu k γw γp γl γk j pid V M hj hproc hK hnoff htier => by
+  unfold wp_sys_fork_eb_body
   simp only [sysForkAddr]
-  iintro ⟨Hk, Hpc, #Hpi, Htc, Hcl, Hir, #Hwl, #Hpl, #Hkl, Hav, Hpav, Hblk, Hnext⟩
+  iintro ⟨Hk, Hpc, #Hpi, #Hwl, #Hpl, #Hkl, Hav, Hpav, Hblk, Hnext⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
   have hK2 : 2 ≤ k.avail := by unfold sysForkSlots at hK; omega
   -- the prologue
@@ -96,22 +93,22 @@ theorem sys_fork_proof (KF : KFORK) : SYSFORK :=
   k_step_gen (wp_s_jal c1 _ (KA.«sys_fork» + 0x8#64) false 2093832#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [sys_fork_br_kfork] next c2 hp2
   iintro Hk Hpc
-  have hc2 : c2 = cpu := (hp2 (Or.inl hsie)).trans (hp1 (Or.inl hsie))
-  subst c2
-  iapply (sys_fork_kfork KF Γ cpu _ γw γp γl γk j pid V M hj ?hpr ?hKf ?hs ?hn ?hl ?ht)
+  ihave Hnext := wpNext_shift _ _ _ _ _ (fun h => (hp2 h).trans (hp1 h)) $$ Hnext
+  iapply (sys_fork_kfork KF Γ c2 _ γw γp γl γk j pid V M hj ?hpr ?hKf ?hn ?ht)
     $$ [- $Hk $Hpc]
   rotate_right 1
   k_norm_g [sys_fork_ret_0c]
-  iframe Hpi Htc Hcl Hir Hwl Hpl Hkl Hav Hpav Hblk
+  iframe Hpi Hwl Hpl Hkl Hav Hpav Hblk
   case hpr => k_norm_g; exact hproc
   case hKf => k_norm_g; unfold sysForkSlots at hK; omega
-  case hs => k_norm_g; exact hsie
   case hn => k_norm_g; exact hnoff
-  case hl => k_norm_g; exact hlocks
   case ht => k_norm_g; exact htier
-  -- past kfork, on some hart `cf`: the epilogue
+  -- past kfork, on some hart `cf` (pinned to `c2` when interrupts are off)
   iapply wpNext_intro_pin
-  iintro %cf %hpf %spie %spp %R1 %rv %hfacts Hk Hpc Htc Hcl Hir Hblk
+  iintro %cf %hpf
+  ihave Hnext := wpNext_shift _ _ _ _ _ hpf $$ Hnext
+  unfold kforkPost
+  iintro %spie %spp %R1 %rv %hfacts Hk Hpc Hblk
   obtain ⟨hcs1, h10, hans⟩ := hfacts
   k_norm_g [sys_fork_ret_0c, sys_fork_pushed_withSpie, sys_fork_withRegs_withSpie]
   unfold calleeSaved at hcs1
@@ -128,13 +125,10 @@ theorem sys_fork_proof (KF : KFORK) : SYSFORK :=
   inext
   iapply wpNext_intro_pin
   iintro %cz %hpz Hk Hpc
-  have hcz : cz = cf := hpz (Or.inl hsie)
-  subst cz
-  ihave Hnext := wpNext_at true k.proc cpu cf _
-    (fun h => h.elim (fun h => absurd h (by decide))
-      (fun h => absurd h (by rw [hproc]; exact procAddr_nonzero hj))) $$ Hnext
+  ihave Hnext := wpNext_shift _ _ _ _ _ hpz $$ Hnext
+  ihave Hnext := wpNext_at k.sie k.proc cz cz _ (fun _ => rfl) $$ Hnext
   k_norm_g
-  iapply Hnext $$ %spie %spp %_ %rv [] Hk Hpc Htc Hcl Hir Hblk
+  iapply Hnext $$ %spie %spp %_ %rv [] Hk Hpc Hblk
   ipureintro
   refine ⟨?_, ?_, hans⟩
   · unfold calleeSaved

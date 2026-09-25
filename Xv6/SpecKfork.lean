@@ -40,11 +40,14 @@ save area at `[forkret, kstack + PGSIZE, 0 x 12]`, and the creator owes
 the slot a parked record before it may release the lock, which is why
 `[ForkretIs]` is a premise of `fork` and not of `allocproc`.
 
-`filedup` and `idup` are the assumed file-system boundary
-(`Xv6/FsEnv.lean`) and both may SLEEP, so the whole call is sleep-shaped:
-the thread may park inside them and come back on another hart, and the
-trap CSRs, the claim and the installed handler it gets back are that
-hart's.
+`filedup` and `idup` are the assumed NON-BLOCKING file-system entries
+(`Xv6/FsEnv.lean`, `FsEntryNB`), so kfork never sleeps: as in Rocq, the
+contract is BALANCED and generic in the entry interrupt index
+(`wp_kfork_eb_body`: no trap bundle, crossing `k.sie`).  Each of its three
+lock windows -- allocproc's `np->lock` (whose arm allocproc hands back),
+`wait_lock`, the second `np->lock` -- releases at `reen = k.sie`, paying
+back the arm its acquire minted.  The old interrupts-off, trap-bundle-
+threading contract `KFORK.wp_kfork` is derived.
 
 The returned pid is the child's, which `allocproc` minted in `[1, PIDMAX]`.
 
@@ -62,10 +65,11 @@ import Xv6.SpecUvmcopy
 import Xv6.SpecSleep
 import MachCSL.Lock
 import MachCSL.WpSmodeIntr
+import Iris.ProofMode
 
 namespace Xv6
 
-open Iris Iris.ProgramLogic Iris.BI Std MachCSL
+open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
 open LeanRV64D
 
 /-- Address of `kfork`. -/
@@ -102,13 +106,67 @@ def wp_kfork_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF
     procPrivNoctxAt curCtx (procAddr j) pid V M -∗ wpLoop cpu'))
   ⊢ wpLoop (GF := GF) cpu
 
-/-- The interface of `kfork`. -/
-structure KFORK : Prop where
-  wp_kfork : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [CurCtx]
+/-- What `kfork` hands back (Rocq `kfork_post`), at whichever hart the
+thread returns on: the entry context with some `SPIE`/`SPP` (left
+unconstrained, as the interrupts-off contract always stated it), callee-saved
+registers, the answer in `a0`, and the caller's block unchanged. -/
+def kforkPost {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [CurCtx]
+    (k : KCtx) (j : Nat) (pid : BitVec 32) (V : ProcPriv) (M : Nat → List (BitVec 8)) :
+    CPU → IProp GF := fun cpu' => iprop(∀ (spie spp : Bool) (R' : RegMap) (rv : BitVec 32),
+    ⌜calleeSaved k.regs R' ∧ R' 10#5 = BitVec.signExtend 64 rv ∧ kforkAns rv⌝ -∗
+    kctx cpu' ((k.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k.regs 1#5)) -∗
+    procPrivNoctxAt curCtx (procAddr j) pid V M -∗ wpLoop cpu')
+
+/-- **WP of `kfork`, at either entry `SIE`** (Rocq `wp_kfork_sconf_body`:
+`cpu_own lvl eb pme b lks` in and out, crossing `wp_next b`).  `kfork` does
+not sleep (`filedup`/`idup` are the non-blocking fs entries), so it is
+BALANCED: every `acquire` it makes (allocproc's `np->lock`, `wait_lock`,
+the second `np->lock`) is paired with a `release` that re-enables
+interrupts exactly when the entry had them on, paying back the arm the
+acquire minted.  No trap bundle crosses the interface; the crossing is
+`k.sie`.  Entered at depth 0 (so, by `KCtx.wf`, no spinlock held). -/
+def wp_kfork_eb_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [CurCtx]
     (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ] [FsEnv] [ForkretIs]
     (cpu : CPU) (k : KCtx) (γw γp γl : GName) (γk : KmemNames) (j : Nat) (pid : BitVec 32)
-    (V : ProcPriv) (M : Nat → List (BitVec 8)) hj hproc hK hsie hnoff hlocks htier,
+    (V : ProcPriv) (M : Nat → List (BitVec 8))
+    (hj : j < NPROC) (hproc : k.proc = procAddr j) (hK : kforkSlots ≤ k.avail)
+    (hnoff : k.noff = 0) (htier : k.tier = KTier.kpt) : Prop :=
+  kctx cpu k ∗ pcIs cpu kforkAddr ∗ procsInv Γ ∗
+  isLock γw waitLockAddr "wait_lock" waitLockPay ∗
+  isLock γp pidLockAddr "nextpid" pidLockPay ∗
+  isLock γl kmemLockAddr "kmem" (kmemRes γk) ∗ kallocAvail γk none ∗ procsAvail Γ none ∗
+  procPrivNoctxAt curCtx (procAddr j) pid V M ∗
+  wpNext k.sie k.proc cpu (kforkPost k j pid V M)
+  ⊢ wpLoop (GF := GF) cpu
+
+/-- The interface of `kfork`. -/
+structure KFORK : Prop where
+  wp_kfork_eb : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [CurCtx]
+    (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ] [FsEnv] [ForkretIs]
+    (cpu : CPU) (k : KCtx) (γw γp γl : GName) (γk : KmemNames) (j : Nat) (pid : BitVec 32)
+    (V : ProcPriv) (M : Nat → List (BitVec 8)) hj hproc hK hnoff htier,
+    wp_kfork_eb_body (hlc := hlc) (GF := GF) Γ cpu k γw γp γl γk j pid V M
+      hj hproc hK hnoff htier
+
+/-- The interrupts-off instance of `wp_kfork_eb`: the hart is pinned, so the
+trap bundle frames across the call. -/
+theorem KFORK.wp_kfork (A : KFORK) {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
+    [CurCtx] (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ] [FsEnv] [ForkretIs]
+    (cpu : CPU) (k : KCtx) (γw γp γl : GName) (γk : KmemNames) (j : Nat) (pid : BitVec 32)
+    (V : ProcPriv) (M : Nat → List (BitVec 8)) hj hproc hK hsie hnoff hlocks htier :
     wp_kfork_body (hlc := hlc) (GF := GF) Γ cpu k γw γp γl γk j pid V M
-      hj hproc hK hsie hnoff hlocks htier
+      hj hproc hK hsie hnoff hlocks htier := by
+  have h := A.wp_kfork_eb (hlc := hlc) (GF := GF) Γ cpu k γw γp γl γk j pid V M hj hproc hK hnoff htier
+  unfold wp_kfork_eb_body at h
+  unfold wp_kfork_body
+  iintro ⟨H0, H1, H2, Htc, Hcl, Hir, H6, H7, H8, H9, H10, H11, Hnext⟩
+  iapply h
+  iframe H0 H1 H2 H6 H7 H8 H9 H10 H11
+  rw [hsie]
+  iapply wpNext_off_intro
+  unfold kforkPost
+  iintro %spie %spp %R' %rv %hpost Hk Hpc Hpriv
+  ihave Hn := wpNext_at true k.proc cpu cpu _ (fun _ => rfl) $$ Hnext
+  iapply Hn $$ %spie %spp %R' %rv %hpost Hk Hpc Htc Hcl Hir Hpriv
 
 end Xv6
