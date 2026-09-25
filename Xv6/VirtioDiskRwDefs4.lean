@@ -288,7 +288,7 @@ def vdrwP5Loop (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
   wordPointsTo (aBufBlockno c.bp) 4 (DFrac.own (1 : Qp).half) bno ∗
   vdrwSaved k ∗
   idxCells (k.regs 2#5) (BitVec.ofNat 32 c.hd) (BitVec.ofNat 32 c.md) (BitVec.ofNat 32 c.tl) y ∗
-  wpNext true k.proc cpu (vdrwPostK k γ bno wr dataBuf dataDisk)
+  vdrwNext k γ bno wr dataBuf dataDisk (some c.kq.2) cpu
 
 /-- `Xv6.vdrwK_withSpie` at a context that already carries the pinned
 bits, in the shape the park's `k_norm` meets. -/
@@ -377,7 +377,7 @@ def vdrwP5Exit (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
   wordPointsTo (aBufBlockno c.bp) 4 (DFrac.own (1 : Qp).half) bno ∗
   vdrwSaved k ∗
   idxCells (k.regs 2#5) (BitVec.ofNat 32 c.hd) (BitVec.ofNat 32 c.md) (BitVec.ofNat 32 c.tl) y ∗
-  wpNext true k.proc cpu (vdrwPostK k γ bno wr dataBuf dataDisk)
+  vdrwNext k γ bno wr dataBuf dataDisk (some c.kq.2) cpu
 
 /-- The loop invariant, assembled from its parts. -/
 theorem vdrwP5Loop_intro (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
@@ -395,7 +395,7 @@ theorem vdrwP5Loop_intro (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
     vdrwSaved k ∗
     idxCells (k.regs 2#5) (BitVec.ofNat 32 c.hd) (BitVec.ofNat 32 c.md)
       (BitVec.ofNat 32 c.tl) y ∗
-    wpNext true k.proc cpu (vdrwPostK k γ bno wr dataBuf dataDisk) ⊢
+    vdrwNext k γ bno wr dataBuf dataDisk (some c.kq.2) cpu ⊢
       vdrwP5Loop (GF := GF) Γ cpu k γ γl pd pav pu bno dataBuf dataDisk wr c y R := by
   unfold vdrwP5Loop
   iintro H
@@ -418,7 +418,7 @@ theorem vdrwP5Exit_intro (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
     vdrwSaved k ∗
     idxCells (k.regs 2#5) (BitVec.ofNat 32 c.hd) (BitVec.ofNat 32 c.md)
       (BitVec.ofNat 32 c.tl) y ∗
-    wpNext true k.proc cpu (vdrwPostK k γ bno wr dataBuf dataDisk) ⊢
+    vdrwNext k γ bno wr dataBuf dataDisk (some c.kq.2) cpu ⊢
       vdrwP5Exit (GF := GF) Γ cpu k γ γl pd pav pu bno dataBuf dataDisk wr c y R := by
   unfold vdrwP5Exit
   iintro H
@@ -440,12 +440,33 @@ end seam
 section caps4
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [DiskG GF] [CurCtx]
 
+/-- **The collect's receipt** (Rocq `perm_collect` after the wake): the
+spent leaf the disk handed back at the collect, matched against the
+thread's receipt, yields the caller's `Q` under TWO laters -- the channel's
+and the saved-proposition agreement's (`MachCSL.crashPerm_collect`). -/
+theorem vdrwNext_collect (k : KCtx) (γ : DiskNames) (bno : BitVec 32) (wr : Bool)
+    (dataBuf dataDisk : List (BitVec 8)) (c : Chain) (cpu : CPU) (E : CoPset)
+    (hE : (↑crashPermN : CoPset) ⊆ E) :
+    crashPermInv (genId (hlc := hlc) (GF := GF)) γ.cperm ∗
+      crashPermDone γ.cperm c.kq (chainWr c) ∗
+      vdrwNext k γ bno wr dataBuf dataDisk (some c.kq.2) cpu ⊢@{IProp GF}
+      |={E}=> ∃ Q : IProp GF, ▷ ▷ Q ∗
+        wpNext true k.proc cpu (vdrwPostQ k γ bno wr dataBuf dataDisk Q) := by
+  unfold vdrwNext vdrwTok crashPermDone
+  iintro ⟨#Hpi, Hdone, %Q, #Hrc, Hn⟩
+  imod crashPerm_collect (genId (hlc := hlc) (GF := GF)) γ.cperm c.kq.1 c.kq.2 (chainWr c) Q E hE
+    $$ [Hpi Hrc Hdone] with HQ
+  · iframe Hpi Hrc Hdone
+  imodintro
+  iexists Q
+  iframe HQ Hn
+
 /-- The spec's bundle is the phases' bundle. -/
 theorem vdrwCaps_of_diskCaps (γ : DiskNames) (γl : GName) (pd pav pu : BitVec 64) :
     diskCaps (GF := GF) γ γl pd pav pu ⊢ vdrwCaps γ γl pd pav pu := by
-  unfold diskCaps vdrwCaps
-  iintro H
-  iexact H
+  unfold diskCaps vdrwCaps diskCrashCaps
+  iintro ⟨#H1, #H2, #H3, #H4, -⟩
+  iframe H1 H2 H3 H4
 
 end caps4
 
@@ -513,7 +534,7 @@ theorem vdrw5_re (RE : RELEASE) (c : CPU) (k' : KCtx) (γ : DiskNames) (γl : GN
   simp only [releaseAddr] at h
   rw [ha0] at h
   unfold vdrwCaps
-  iintro ⟨Hk, Hpc, ⟨#Hinv, #Hgeom, #Hlk⟩, Hlocked, Hpay, Harm, HΦ⟩
+  iintro ⟨Hk, Hpc, ⟨#Hinv, #Hgeom, #Hlk, #Hcpi⟩, Hlocked, Hpay, Harm, HΦ⟩
   iapply h
   iframe Hk Hpc Hlocked Hpay Harm HΦ
   iexact Hlk
@@ -535,7 +556,7 @@ theorem vdrw5_ac (AC : ACQUIRE) (c : CPU) (k' : KCtx) (γ : DiskNames) (γl : GN
   simp only [acquireAddr] at h
   rw [ha0] at h
   unfold vdrwCaps
-  iintro ⟨Hk, Hpc, ⟨#Hinv, #Hgeom, #Hlk⟩, HΦ⟩
+  iintro ⟨Hk, Hpc, ⟨#Hinv, #Hgeom, #Hlk, #Hcpi⟩, HΦ⟩
   iapply h
   iframe Hk Hpc Hlk HΦ
 
@@ -555,7 +576,7 @@ theorem vdrw6_fd (FD : FREE_DESC) (Γ : SchedNames) (c : CPU) (k' : KCtx) (γ : 
   unfold wp_free_desc_body at h
   simp only [freeDescAddr] at h
   unfold vdrwCaps
-  iintro ⟨Hk, Hpc, #Hpi, ⟨#Hinv, #Hgeom, #Hlk⟩, Hf, Hd, HΦ⟩
+  iintro ⟨Hk, Hpc, #Hpi, ⟨#Hinv, #Hgeom, #Hlk, #Hcpi⟩, Hf, Hd, HΦ⟩
   iapply h
   iframe Hk Hpc Hpi Hgeom Hf Hd HΦ
 
@@ -570,13 +591,11 @@ theorem wpNext_here (p : BitVec 64) (cpu : CPU) (K : CPU → IProp GF) :
 /-- The caller's continuation follows the thread to whichever hart
 `sleep` brings it back on. -/
 theorem vdrw5_next_at (cpu c : CPU) (k : KCtx) (γ : DiskNames) (bno : BitVec 32) (wr : Bool)
-    (dataBuf dataDisk : List (BitVec 8)) (jp : Nat) (hj : jp < NPROC)
+    (dataBuf dataDisk : List (BitVec 8)) (rq : Option GName) (jp : Nat) (hj : jp < NPROC)
     (hproc : k.proc = procAddr jp) :
-    wpNext (GF := GF) true k.proc cpu (vdrwPostK k γ bno wr dataBuf dataDisk) ⊢
-      wpNext true k.proc c (vdrwPostK k γ bno wr dataBuf dataDisk) :=
-  wpNext_shift true k.proc cpu c _
-    (fun h => h.elim (fun h => absurd h (by decide))
-      (fun h => absurd h (by rw [hproc]; exact procAddr_nonzero hj)))
+    vdrwNext (GF := GF) k γ bno wr dataBuf dataDisk rq cpu ⊢
+      vdrwNext k γ bno wr dataBuf dataDisk rq c :=
+  vdrwNext_shift cpu c k γ bno wr dataBuf dataDisk rq jp hj hproc
 
 end calls
 

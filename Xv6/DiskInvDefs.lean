@@ -144,8 +144,16 @@ WHAT IS HERE, AND WHAT IS NOT.
   (an in-flight READ chain's block is not in `inFlightBlk`, so its
   fragment IS `blockView v c.blk`) and `capOk` for a WRITE (from the
   capture on, `blockView v c.blk` IS the payload).
-* No crash permits, no `Q`, no `disk_seq_permit` (the port drops Rocq's
-  crash story), and no TSO floor rows (`fl0`/`fl1`/`flr`/`pos`).
+* THE CRASH-PERMIT ROWS (Rocq `slot_pend_res`'s `perm_pend` and
+  `slot_perms_done`, crash_layer.md D40): per armed head, the TIMELESS
+  token of the permit channel's cell the enqueuer deposited its sequential
+  write permit at (`Xv6.crashRow`, keyed by the chain's ghost field
+  `Xv6.Chain.kq`), indexed by the sectors still to land -- a pure function
+  of the device's own state and the slot's status marker -- or, once the
+  request's LEAF has been spent, the DONE token the enqueuer collects.
+  `Xv6.cacheOwn` says whose sectors the write-back cache holds (Rocq
+  `vp_wt`), which is what identifies a DRAIN with a permit branch.
+* No TSO floor rows (`fl0`/`fl1`/`flr`/`pos`).
 -/
 import Xv6.VirtioQueue
 import Xv6.KallocDefs
@@ -153,6 +161,7 @@ import Xv6.KernelMap
 import MachCSL.WpDevDma
 import MachCSL.WordHist
 import MachCSL.WpDmaCtx
+import MachCSL.CrashPermInv
 
 namespace Xv6
 
@@ -184,10 +193,13 @@ class DiskG (GF : BundledGFunctors) where
   /-- the COMPLETION RECORDS (see `doneRec`): the lagging monotone list of
   the device's used-index writes -/
   [mlDoneG : MonoListG GF (Nat × Nat × Nat × Nat)]
+  /-- the CRASH-PERMIT CHANNEL (Rocq `permG`; `MachCSL.crashPermInv`) -/
+  [crashPermG : CrashPermG GF]
 
 attribute [reducible, instance] DiskG.gvCfgG DiskG.gvHeadG DiskG.gvStageG
 attribute [reducible, instance] DiskG.gmPermG
 attribute [reducible, instance] DiskG.mlPosG DiskG.mlDoneG
+attribute [reducible, instance] DiskG.crashPermG
 
 /-- The disk's ghost names (Rocq's `disk_names`, the subset this port
 carries). -/
@@ -232,6 +244,8 @@ structure DiskNames where
   done : GName
   /-- the bound on the stores that zeroed the used page before the flip -/
   base : GName
+  /-- the CRASH-PERMIT CHANNEL's ghost map (Rocq `dn_perm`) -/
+  cperm : GName
 
 /-- The disk invariant's namespace. -/
 def diskN : Namespace := ndot nroot "xv6disk"
@@ -4559,6 +4573,108 @@ theorem capOk_none (v : VirtioState) (st : Nat → HState) (sb : Nat → SByte)
   rw [hst i] at hs
   exact absurd hs (by simp)
 
+/-! ## The crash-permit rows (Rocq `slot_pend_res` / `slot_perms_done`)
+
+WHAT A REQUEST WRITES (Rocq `vs_wr`): nothing for a disk READ, the payload
+at the block's byte offset for a WRITE.  The enqueuer deposits its
+sequential permit (`MachCSL.diskSeqPermit`) at this write; the channel
+cell's index is the sectors still to land.
+
+THE INDEX IS A FUNCTION OF THE DEVICE.  A write's sectors land only at the
+root loop's DRAINS, one cached sector each, and the write-back cache holds
+only the sectors of a write between its capture and its `.pushed` install
+(`Xv6.cacheOwn`, and `Xv6.dryOk` under the negotiated write-through mode).
+So before the capture every sector is owed, and from the capture on the
+owed ones are exactly the cached ones (`Xv6.rowCached`).
+
+THE LEAF (the identity permit at `none`, which delivers the client's
+receipt) is spent at a step that is LENT the durable authority: a write's
+at the drain that lands its last sector, a read's (which has no sector) at
+its POP.  Rocq spends both at the completion (`virtio_proto_step`); in the
+Lean model the completion is a DMA write of the forked serving task, which
+the disk's rule lends nothing to (`MachCSL.DevM.LeaseD.stepD`), while the
+pop and the drain are root-loop steps.  The leaf moves no disk byte, so
+the image is the same at either instant.  After it the cell is DONE until
+the enqueuer's collect takes it (`Xv6.disk_collect`). -/
+
+/-- The write a chain's request lands (Rocq `vs_wr`). -/
+def chainWr (c : Chain) : DiskWr := if c.dwr then none else some (BSIZE * c.blk, c.pay)
+
+/-- Slot `i`'s head has been popped: in flight, or completed (its status
+marker is no longer `.free`; `Xv6.pendFree` says a published, unpopped
+head's is). -/
+def rowPopped (v : VirtioState) (i : Nat) (b : SByte) : Bool :=
+  (Virtio.phase v (BitVec.ofNat 16 i)).isSome || decide (b ≠ SByte.free)
+
+/-- Slot `i`'s request has been through its data phase (the capture, for a
+write): in flight at or past it, or completed. -/
+def rowCap (v : VirtioState) (i : Nat) (b : SByte) : Bool :=
+  match Virtio.phase v (BitVec.ofNat 16 i) with
+  | some ph => postCap ph
+  | none => decide (b ≠ SByte.free)
+
+/-- The chain's sectors still in the write-back cache. -/
+def rowCached (v : VirtioState) (c : Chain) : List Nat :=
+  (List.range SPB).filter (fun j => (Virtio.alistGet v.cache (Virtio.reqKey c.req j)).isSome)
+
+/-- The sectors of slot `i`'s request still to land. -/
+def rowTodo (v : VirtioState) (i : Nat) (c : Chain) (b : SByte) : List Nat :=
+  if c.dwr then [] else if rowCap v i b then rowCached v c else List.range SPB
+
+/-- Slot `i`'s leaf has been spent. -/
+def rowDoneB (v : VirtioState) (i : Nat) (c : Chain) (b : SByte) : Bool :=
+  if c.dwr then rowPopped v i b else rowCap v i b && (rowCached v c).isEmpty
+
+/-- **One armed head's crash-permit row.** -/
+def crashRow (γ : DiskNames) (v : VirtioState) (i : Nat) (s : HState) (b : SByte) : IProp GF :=
+  match s with
+  | .active c =>
+    if rowDoneB v i c b then crashPermDone γ.cperm c.kq (chainWr c)
+    else crashPermPend γ.cperm c.kq (chainWr c) (rowTodo v i c b)
+  | _ => iprop(emp)
+
+instance crashRow_timeless (γ : DiskNames) (v : VirtioState) (i : Nat) (s : HState) (b : SByte) :
+    Timeless (crashRow (GF := GF) γ v i s b) := by
+  cases s with
+  | active c =>
+    show Timeless (if rowDoneB v i c b then crashPermDone (GF := GF) γ.cperm c.kq (chainWr c)
+      else crashPermPend γ.cperm c.kq (chainWr c) (rowTodo v i c b))
+    split <;> infer_instance
+  | inactive => show Timeless (iprop(emp) : IProp GF); infer_instance
+  | member _ => show Timeless (iprop(emp) : IProp GF); infer_instance
+
+/-- The rows of all the slots. -/
+def crashRows (γ : DiskNames) (v : VirtioState) (st : Nat → HState) (sb : Nat → SByte) :
+    IProp GF := iprop% [∗list] j ∈ List.range NUM, crashRow γ v j (st j) (sb j)
+
+instance crashRows_timeless (γ : DiskNames) (v : VirtioState) (st : Nat → HState)
+    (sb : Nat → SByte) : Timeless (crashRows (GF := GF) γ v st sb) := by
+  unfold crashRows; infer_instance
+
+/-- **Whose sectors the cache holds** (Rocq `vp_wt`): every cached entry is
+one sector of an armed WRITE chain in flight between its capture and its
+`.pushed` install, at the payload's slice. -/
+def cacheOwn (v : VirtioState) (st : Nat → HState) : Prop :=
+  ∀ e ∈ v.cache, ∃ (i : Nat) (c : Chain) (j : Nat), i < NUM ∧ st i = HState.active c ∧
+    c.dwr = false ∧
+    (Virtio.phase v (BitVec.ofNat 16 i) = some (.served c.req) ∨
+      Virtio.phase v (BitVec.ofNat 16 i) = some (.status c.req)) ∧
+    j < SPB ∧ e.1 = Virtio.reqKey c.req j ∧ e.2 = wrSectorBytes (chainWr c) j
+
+/-- **A published, unpopped head's status marker is `.free`** (and the
+staged one's, once armed): what says, at the pop, that the popped head's
+row has not spent its leaf. -/
+def pendFree (st : Nat → HState) (sb : Nat → SByte) (ring : Nat → Nat) (lo np : Nat)
+    (stg : Option Nat) : Prop :=
+  (∀ p, lo ≤ p → p < np → ∀ c : Chain, st (ring (p % NUM)) = HState.active c →
+    sb (ring (p % NUM)) = SByte.free) ∧
+  (∀ i, stg = some i → ∀ c : Chain, st i = HState.active c → sb i = SByte.free)
+
+/-- The two crash clauses, as `Xv6.diskLive` carries them. -/
+def crashOk (v : VirtioState) (st : Nat → HState) (sb : Nat → SByte) (ring : Nat → Nat)
+    (lo np : Nat) (stg : Option Nat) : Prop :=
+  cacheOwn v st ∧ pendFree st sb ring lo np stg
+
 /-- The live arm: the queue, the receipts, the leases. -/
 def diskLive (γ : DiskNames) (c0 : VirtioCfg) (v : VirtioState)
     (pm : RegMapF PermVal) : IProp GF := iprop%
@@ -4573,13 +4689,13 @@ def diskLive (γ : DiskNames) (c0 : VirtioCfg) (v : VirtioState)
     diskPubAuthM γ np ∗ posAuth γ pmap ∗ diskStageAuth γ stg ∗
     usedIdxCell (usedIdxAt c0.used) b dl ∗ doneAuth γ dl0 ∗ diskBaseFrozen γ b ∗
     dlTops dl ∗ diskReadAtAuth γ nr ∗
-    ([∗list] i ∈ List.range NUM, statusRes γ (st i) (sb i)) ∗
+    ([∗list] i ∈ List.range NUM, statusRes γ (st i) (sb i)) ∗ crashRows γ v st sb ∗
     ⌜v.usedIdx = wrap16 nc ∧ v.seen = wrap16 lo ∧ lo ≤ np ∧ queueOk st ring lo np ∧
       posOk pmap ring lo np ∧ stageOk stg ring lo np ∧ inflightOff v st ring lo np stg ∧
       imgOk v m (inFlightBlk st) ∧ permOk v pm st ∧ usedOk dl dl0 nc M ∧
       unreadArmed v st dl nr ring lo np stg sb ∧ cntOk pm dl nc ∧ p3Ok v pm dl nr ∧
       ueInv pm dl nr ue ∧ epOk v st pm dl ring lo np stg ∧ dryOk v ∧ capOk v st sb ∧
-      rowDone st sb dl⌝
+      rowDone st sb dl ∧ crashOk v st sb ring lo np stg⌝
 
 /-- The dead arm: before `virtio_disk_init`, and never again after.
 

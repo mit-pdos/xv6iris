@@ -72,7 +72,7 @@ theorem bw_holdingsleep (HS : HOLDINGSLEEP) (c : CPU) (k' : KCtx) (γ : BcacheNa
 
 theorem bw_vdr (VR : VIRTIO_DISK_RW) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
     (c : CPU) (k' : KCtx) (V : BioView GF) (γdl : GName) (pd pav pu : BitVec 64) (j kk : Nat)
-    (bno : BitVec 32) (bs bsd : List (BitVec 8)) (s : Bool) (pj : BitVec 64)
+    (bno : BitVec 32) (bs bsd : List (BitVec 8)) (Q : IProp GF) (s : Bool) (pj : BitVec 64)
     (hs : k'.sie = s) (hpj : k'.proc = pj)
     (ha0 : k'.regs 10#5 = bnode kk) (ha1 : k'.regs 11#5 = 1#64)
     (hj : j < NPROC) (hproc : k'.proc = procAddr j) (hK : virtioDiskRwSlots ≤ k'.avail)
@@ -84,18 +84,19 @@ theorem bw_vdr (VR : VIRTIO_DISK_RW) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF 
     trapCsrsExt c s ∗ cpuClaimExt c s pj ∗
     diskCaps V.gd γdl pd pav pu ∗
     bufOwn (bnode kk) bno 0#32 bs ∗ diskBlock V.gd bno.toNat bsd ∗
+    diskSeqPermit (genId (hlc := hlc) (GF := GF)) (some (BSIZE * bno.toNat, bs)) Q ∗
     wpNext true pj c (fun cpu' => iprop(∀ (spie spp : Bool) (R' : RegMap),
       ⌜calleeSaved k'.regs R'⌝ -∗
       kctx cpu' ((k'.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k'.regs 1#5)) -∗
       trapCsrsExt cpu' s -∗ cpuClaimExt cpu' s pj -∗
-      bufOwn (bnode kk) bno 0#32 bs -∗ diskBlock V.gd bno.toNat bs -∗ wpLoop cpu'))
+      bufOwn (bnode kk) bno 0#32 bs -∗ diskBlock V.gd bno.toNat bs -∗ ▷ Q -∗ wpLoop cpu'))
     ⊢ wpLoop (GF := GF) c := by
   subst hpj hs
   have hkm : ∀ m, m < BSIZE →
       kmapClass (vpnOf (aBufData (k'.regs 10#5) + BitVec.ofNat 64 m)).toNat = some .rw := by
     intro m hm; rw [ha0]; exact bufData_kmapRw kk m hkk hm
   have h := VR.wp_virtio_disk_rw_eb (hlc := hlc) (GF := GF) Γ c k' V.gd γdl pd pav pu j bno 0#32 bs bsd
-    hj hproc hK hnoff htier hbno hbsd hpd hkm
+    Q hj hproc hK hnoff htier hbno hbsd hpd hkm
   unfold wp_virtio_disk_rw_eb_body at h
   simp only [virtioDiskRwAddr, ha0, ha1, ne_eq, BitVec.reduceEq, not_false_eq_true,
     decide_true, if_true] at h
@@ -112,10 +113,10 @@ function: every step runs at the caller's index, the complement
 contract). -/
 theorem bwrite_proof (HS : HOLDINGSLEEP) (VR : VIRTIO_DISK_RW) : BWRITE := ⟨
   fun {hlc GF} _ _ _ _ _ _ _ _ _ _ _ Γ _ cpu k γl γ V γdl pd pav pu j kk pidv dev bno dqp bs bsd
-    hj hproc hK hnoff htier hkk ha0 hbno hbsd hpd => by
+    Q hj hproc hK hnoff htier hkk ha0 hbno hbsd hpd => by
   unfold wp_bwrite_eb_body
   simp only [bwriteAddr]
-  iintro ⟨Hk, Hpc, Hpi, Hte, Hce, #Hbc, #Hdc, Hpid, Hhold, Hnext⟩
+  iintro ⟨Hk, Hpc, Hpi, Hte, Hce, #Hbc, #Hdc, Hpid, Hhold, Hperm, Hnext⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
   icases kctx_wf _ _ $$ Hk with ⟨%hwf, Hk⟩
   have hlocks : k.locks = [] := List.eq_nil_of_length_eq_zero (by have := hwf.2.2.2.1; omega)
@@ -126,7 +127,7 @@ theorem bwrite_proof (HS : HOLDINGSLEEP) (VR : VIRTIO_DISK_RW) : BWRITE := ⟨
       kctx c ((k.withSpie spie spp).withRegs R') -∗ pcIs c (jumpPc (k.regs 1#5)) -∗
       trapCsrsExt c k.sie -∗ cpuClaimExt c k.sie k.proc -∗
       wordPointsTo (pPid k.proc) 4 dqp pidv -∗
-      bufHold0 γ V kk pidv dev bno bs bs -∗ wpLoop c) $$ [Hnext]
+      bufHold0 γ V kk pidv dev bno bs bs -∗ ▷ Q -∗ wpLoop c) $$ [Hnext]
   · iintro %c
     iapply wpNext_at true k.proc cpu c _ (fun hc => Or.elim hc (fun hx => absurd hx (by decide))
       (fun hx => absurd (hproc ▸ hx) (procAddr_nonzero hj))) $$ Hnext
@@ -192,9 +193,9 @@ theorem bwrite_proof (HS : HOLDINGSLEEP) (VR : VIRTIO_DISK_RW) : BWRITE := ⟨
   k_step_e (wp_s_jal cpu _ (KA.«bwrite» + 0x18#64) false 11366#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [bw_br_vdr]
   iintro Hk Hpc
-  iapply (bw_vdr VR Γ cpu _ V γdl pd pav pu j kk bno bs bsd k.sie k.proc (by k_norm_g) (by k_norm_g)
-      ?va0 ?va1 hj ?vproc ?vK ?vnoff ?vtier hbno hbsd hpd hkk)
-    $$ [- $Hk $Hpc $Hpi $Hte $Hce $Hdc $Hbuf $Hblk]
+  iapply (bw_vdr VR Γ cpu _ V γdl pd pav pu j kk bno bs bsd Q k.sie k.proc (by k_norm_g)
+      (by k_norm_g) ?va0 ?va1 hj ?vproc ?vK ?vnoff ?vtier hbno hbsd hpd hkk)
+    $$ [- $Hk $Hpc $Hpi $Hte $Hce $Hdc $Hbuf $Hblk $Hperm]
   rotate_right 1
   k_norm_g [bw_ret_1c]
   iframe #
@@ -206,7 +207,7 @@ theorem bwrite_proof (HS : HOLDINGSLEEP) (VR : VIRTIO_DISK_RW) : BWRITE := ⟨
   case vtier => k_norm_g; exact htier
   -- back from virtio_disk_rw (a park: any hart): the epilogue
   iapply wpNext_intro_pin
-  iintro %cpu %_ %spie2 %spp2 %R2 %hcs2 Hk Hpc Hte Hce Hbuf Hblk
+  iintro %cpu %_ %spie2 %spp2 %R2 %hcs2 Hk Hpc Hte Hce Hbuf Hblk HQ
   have hsw1 : ∀ a b c d : Bool, ((k.pushed 4).withSpie a b).withSpie c d = (k.withSpie c d).pushed 4 :=
     fun _ _ _ _ => rfl
   k_norm_g [bw_ret_1c, hsw1]
@@ -229,7 +230,7 @@ theorem bwrite_proof (HS : HOLDINGSLEEP) (VR : VIRTIO_DISK_RW) : BWRITE := ⟨
   k_next_e
   iintro Hk Hpc
   iapply HΦ $$ %cpu %spie2 %spp2 %_ [] Hk Hpc [Hte] [Hce] [Hpid]
-    [Hsl Htok Hrt Hhd Hval Hdev Hbuf Hblk]
+    [Hsl Htok Hrt Hhd Hval Hdev Hbuf Hblk] HQ
   · ipureintro
     exact bc_calleeSaved_epi k.regs R2
       (e18.trans b18) (e19.trans b19) (e20.trans b20) (e21.trans b21) (e22.trans b22)

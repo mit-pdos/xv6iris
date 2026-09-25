@@ -522,17 +522,17 @@ theorem vdrw_ac (AC : ACQUIRE) (c : CPU) (k' : KCtx) (γ : DiskNames) (γl : GNa
   simp only [acquireAddr] at h
   rw [ha0] at h
   unfold vdrwCaps
-  iintro ⟨Hk, Hpc, ⟨#Hinv, #Hgeom, #Hlk⟩, HΦ⟩
+  iintro ⟨Hk, Hpc, ⟨#Hinv, #Hgeom, #Hlk, #Hcpi⟩, HΦ⟩
   iapply h
   iframe Hk Hpc Hlk HΦ
 
 theorem vdrwSaved_ws (k : KCtx) (a b : Bool) :
     vdrwSaved (GF := GF) (k.withSpie a b) = vdrwSaved k := rfl
 
-theorem vdrwPostK_ws (k : KCtx) (a b : Bool) (γ : DiskNames) (bno : BitVec 32) (wr : Bool)
-    (dataBuf dataDisk : List (BitVec 8)) :
-    vdrwPostK (GF := GF) (k.withSpie a b) γ bno wr dataBuf dataDisk =
-      vdrwPostK k γ bno wr dataBuf dataDisk := rfl
+theorem vdrwNext_ws (k : KCtx) (a b : Bool) (γ : DiskNames) (bno : BitVec 32) (wr : Bool)
+    (dataBuf dataDisk : List (BitVec 8)) (rq : Option GName) :
+    vdrwNext (GF := GF) (k.withSpie a b) γ bno wr dataBuf dataDisk rq =
+      vdrwNext k γ bno wr dataBuf dataDisk rq := rfl
 
 theorem vdrwRegs_ws (k : KCtx) (a b : Bool) (R : RegMap) (sec : BitVec 64) :
     vdrwRegs (k.withSpie a b) R sec = vdrwRegs k R sec := rfl
@@ -542,11 +542,9 @@ brings it back on. -/
 theorem vdrw_next_at (cpu c : CPU) (k : KCtx) (γ : DiskNames) (bno : BitVec 32) (wr : Bool)
     (dataBuf dataDisk : List (BitVec 8)) (jp : Nat) (hj : jp < NPROC)
     (hproc : k.proc = procAddr jp) :
-    wpNext (GF := GF) true k.proc cpu (vdrwPostK k γ bno wr dataBuf dataDisk) ⊢
-      wpNext true k.proc c (vdrwPostK k γ bno wr dataBuf dataDisk) :=
-  wpNext_shift true k.proc cpu c _
-    (fun h => h.elim (fun h => absurd h (by decide))
-      (fun h => absurd h (by rw [hproc]; exact procAddr_nonzero hj)))
+    vdrwNext (GF := GF) k γ bno wr dataBuf dataDisk none cpu ⊢
+      vdrwNext k γ bno wr dataBuf dataDisk none c :=
+  vdrwNext_shift cpu c k γ bno wr dataBuf dataDisk none jp hj hproc
 
 theorem vdrw_fd (FD : FREE_DESC) (Γ : SchedNames) (c : CPU) (k' : KCtx) (γ : DiskNames)
     (γl : GName) (pd pav pu : BitVec 64) (n : Nat) (w : BitVec (8 * 16))
@@ -564,7 +562,7 @@ theorem vdrw_fd (FD : FREE_DESC) (Γ : SchedNames) (c : CPU) (k' : KCtx) (γ : D
   unfold wp_free_desc_body at h
   simp only [freeDescAddr] at h
   unfold vdrwCaps
-  iintro ⟨Hk, Hpc, #Hpi, ⟨#Hinv, #Hgeom, #Hlk⟩, Hf, Hd, HΦ⟩
+  iintro ⟨Hk, Hpc, #Hpi, ⟨#Hinv, #Hgeom, #Hlk, #Hcpi⟩, Hf, Hd, HΦ⟩
   iapply h
   iframe Hk Hpc Hpi Hgeom Hf Hd HΦ
 
@@ -590,7 +588,7 @@ theorem vdrw_park (SP : SLEEP_PREPARE) (AC : ACQUIRE) (RE : RELEASE) (SL : SLEEP
     vdrwCaps γ γl pd pav pu ∗ locked γl cpu ∗ diskRes γ pd pav pu curCtx ∗
     vdrwSaved k ∗ idxCells (k.regs 2#5) x0 x1 x2 y ∗
     bufOwn (k.regs 10#5) bno dsk0 dataBuf ∗ diskBlock γ bno.toNat dataDisk ∗
-    wpNext true k.proc cpu (vdrwPostK k γ bno wr dataBuf dataDisk) ∗
+    vdrwNext k γ bno wr dataBuf dataDisk none cpu ∗
     (∀ (cpu' : CPU) (a b : Bool) (R' : RegMap),
       vdrwLoopHead Γ cpu' (k.withSpie a b) γ γl pd pav pu bno dsk0 dataBuf dataDisk wr
         x0 x1 x2 y R' -∗ wpLoop cpu')
@@ -601,7 +599,7 @@ theorem vdrw_park (SP : SLEEP_PREPARE) (AC : ACQUIRE) (RE : RELEASE) (SL : SLEEP
   iintro ⟨Hk, Hpc, #Hpi, Htc, Hcc, Hir, #Hcaps, Hlocked, Hpay, Hsv, Hidx, Hbuf, Hblk, Hnext, IH⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
   -- the caller's continuation is hart-free (a park's crossing, at a proc)
-  ihave Hnext : ∀ c : CPU, wpNext true k.proc c (vdrwPostK k γ bno wr dataBuf dataDisk) $$ [Hnext]
+  ihave Hnext : ∀ c : CPU, vdrwNext k γ bno wr dataBuf dataDisk none c $$ [Hnext]
   · iintro %c
     iapply (vdrw_next_at cpu c k γ bno wr dataBuf dataDisk jp hjp hproc) $$ Hnext
   -- auipc a0,0x1e ; addi a0,a0,-1328 ; jal sleep_prepare
@@ -720,7 +718,7 @@ theorem vdrw_park (SP : SLEEP_PREPARE) (AC : ACQUIRE) (RE : RELEASE) (SL : SLEEP
   ihave Hnext := Hnext $$ %cpu
   iapply IH $$ %cpu %s4 %p4 %R3
   unfold vdrwLoopHead
-  isimp only [vdrwSaved_ws, vdrwPostK_ws, vdrwRegs_ws, KCtx.withSpie_regs, KCtx.withSpie_proc]
+  isimp only [vdrwSaved_ws, vdrwNext_ws, vdrwRegs_ws, KCtx.withSpie_regs, KCtx.withSpie_proc]
   iframe Hk Hpc Hpi Htc Hcc Hir Hcaps Hlocked Hpay Hsv Hidx Hbuf Hblk Hnext
   ipureintro; exact hR3
 
@@ -777,7 +775,7 @@ theorem vdrw_ladder (FD : FREE_DESC) (SP : SLEEP_PREPARE) (AC : ACQUIRE) (RE : R
     diskResA γ pd pav pu curCtx (tkOut i h m) ∗ heldOut γ curCtx pd i h m ∗
     vdrwSaved k ∗ idxCells (k.regs 2#5) v0 v1 v2 y ∗
     bufOwn (k.regs 10#5) bno dsk0 dataBuf ∗ diskBlock γ bno.toNat dataDisk ∗
-    wpNext true k.proc cpu (vdrwPostK k γ bno wr dataBuf dataDisk) ∗
+    vdrwNext k γ bno wr dataBuf dataDisk none cpu ∗
     (∀ (cpu' : CPU) (a b : Bool) (R' : RegMap),
       vdrwLoopHead Γ cpu' (k.withSpie a b) γ γl pd pav pu bno dsk0 dataBuf dataDisk wr
         v0 v1 v2 y R' -∗ wpLoop cpu')
@@ -1038,7 +1036,7 @@ theorem vdrw_loop (FD : FREE_DESC) (SP : SLEEP_PREPARE) (AC : ACQUIRE) (RE : REL
     with ⟨%hR, Hk, Hpc, #Hpi, Htc, Hcc, Hir, #Hcaps, Hlocked, Hpay, Hsv, Hidx, Hbuf,
       Hblk, Hnext⟩
   try isimp only [vdrwSaved_ws] at Hsv
-  try isimp only [vdrwPostK_ws] at Hnext
+  try isimp only [vdrwNext_ws] at Hnext
   have hRk : vdrwRegs k R (sectorOf bno) := hR
   obtain ⟨c2, c8, c19, c22, c23, c9, c20, c21, c24, c25, c26, c27⟩ := id hRk
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
@@ -1087,7 +1085,7 @@ theorem vdrw_loop (FD : FREE_DESC) (SP : SLEEP_PREPARE) (AC : ACQUIRE) (RE : REL
     rotate_right 1
     ihave Hidx := idxCells_intro (k.regs 2#5) 0xffffffff#32 x1 x2 y $$ [Hi0 Hi1 Hi2 Hi3]
     case' _ => iframe Hi0 Hi1 Hi2 Hi3
-    k_norm_g [vdrwSaved_ws, vdrwPostK_ws, tkOut_0, heldOut_0]
+    k_norm_g [vdrwSaved_ws, vdrwNext_ws, tkOut_0, heldOut_0]
     iframe #
     iframe Htc Hcc Hir Hlocked Hpay Hsv Hbuf Hblk Hnext Hidx
     iintro %cq %aq %bq %Rq HLq
@@ -1121,7 +1119,7 @@ theorem vdrw_loop (FD : FREE_DESC) (SP : SLEEP_PREPARE) (AC : ACQUIRE) (RE : REL
     rotate_right 1
     ihave Hidx := idxCells_intro (k.regs 2#5) (BitVec.ofNat 32 n0) 0xffffffff#32 x2 y $$ [Hi0 Hi1 Hi2 Hi3]
     case' _ => iframe Hi0 Hi1 Hi2 Hi3
-    k_norm_g [vdrwSaved_ws, vdrwPostK_ws, tkOut_1, heldOut_1]
+    k_norm_g [vdrwSaved_ws, vdrwNext_ws, tkOut_1, heldOut_1]
     iframe #
     iframe Htc Hcc Hir Hlocked Hpay Hout0 Hsv Hbuf Hblk Hnext Hidx
     iintro %cq %aq %bq %Rq HLq
@@ -1157,7 +1155,7 @@ theorem vdrw_loop (FD : FREE_DESC) (SP : SLEEP_PREPARE) (AC : ACQUIRE) (RE : REL
     rotate_right 1
     ihave Hidx := idxCells_intro (k.regs 2#5) (BitVec.ofNat 32 n0) (BitVec.ofNat 32 n1) 0xffffffff#32 y $$ [Hi0 Hi1 Hi2 Hi3]
     case' _ => iframe Hi0 Hi1 Hi2 Hi3
-    k_norm_g [vdrwSaved_ws, vdrwPostK_ws, tkOut_2, heldOut_2]
+    k_norm_g [vdrwSaved_ws, vdrwNext_ws, tkOut_2, heldOut_2]
     iframe #
     iframe Htc Hcc Hir Hlocked Hpay Hout0 Hout1 Hsv Hbuf Hblk Hnext Hidx
     iintro %cq %aq %bq %Rq HLq
@@ -1171,7 +1169,7 @@ theorem vdrw_loop (FD : FREE_DESC) (SP : SLEEP_PREPARE) (AC : ACQUIRE) (RE : REL
     intro hh; rw [hh] at ht2; simp [updB] at ht2
   iapply HΦ $$ %c %a %b %R2 %n0 %n1 %n2 %y
   unfold vdrwP2Exit
-  isimp only [vdrwSaved_ws, vdrwPostK_ws, tk3_eq, KCtx.withSpie_regs, KCtx.withSpie_proc]
+  isimp only [vdrwSaved_ws, vdrwNext_ws, tk3_eq, KCtx.withSpie_regs, KCtx.withSpie_proc]
   iframe Hk Hpc Hpi Htc Hcc Hir Hcaps Hlocked Hpay Hout0 Hout1 Hout2 Hsv Hbuf Hblk Hnext
   isplitl []
   · ipureintro

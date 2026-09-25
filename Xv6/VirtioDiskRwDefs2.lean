@@ -426,7 +426,7 @@ def vdrwLoopHead (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
   vdrwCaps γ γl pd pav pu ∗ locked γl cpu ∗ diskRes γ pd pav pu curCtx ∗
   vdrwSaved k ∗ idxCells (k.regs 2#5) x0 x1 x2 y ∗
   bufOwn (k.regs 10#5) bno dsk0 dataBuf ∗ diskBlock γ bno.toNat dataDisk ∗
-  wpNext true k.proc cpu (vdrwPostK k γ bno wr dataBuf dataDisk)
+  vdrwNext k γ bno wr dataBuf dataDisk none cpu
 
 theorem vdrwLoopHead_elim (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
     (cpu : CPU) (k : KCtx) (γ : DiskNames) (γl : GName) (pd pav pu : BitVec 64)
@@ -439,7 +439,7 @@ theorem vdrwLoopHead_elim (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
       vdrwCaps γ γl pd pav pu ∗ locked γl cpu ∗ diskRes γ pd pav pu curCtx ∗
       vdrwSaved k ∗ idxCells (k.regs 2#5) x0 x1 x2 y ∗
       bufOwn (k.regs 10#5) bno dsk0 dataBuf ∗ diskBlock γ bno.toNat dataDisk ∗
-      wpNext true k.proc cpu (vdrwPostK k γ bno wr dataBuf dataDisk) := by
+      vdrwNext k γ bno wr dataBuf dataDisk none cpu := by
   unfold vdrwLoopHead
   iintro H
   iexact H
@@ -499,7 +499,7 @@ def vdrwP2Exit (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
   vdrwSaved k ∗
   idxCells (k.regs 2#5) (BitVec.ofNat 32 h) (BitVec.ofNat 32 m) (BitVec.ofNat 32 t) y ∗
   bufOwn (k.regs 10#5) bno dsk0 dataBuf ∗ diskBlock γ bno.toNat dataDisk ∗
-  wpNext true k.proc cpu (vdrwPostK k γ bno wr dataBuf dataDisk)
+  vdrwNext k γ bno wr dataBuf dataDisk none cpu
 
 end seams
 

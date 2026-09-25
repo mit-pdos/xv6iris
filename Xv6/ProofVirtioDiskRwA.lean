@@ -73,7 +73,7 @@ theorem vdrw_acquire (AC : ACQUIRE) (c : CPU) (k' : KCtx) (γ : DiskNames) (γl 
   simp only [acquireAddr] at h
   rw [ha0] at h
   unfold vdrwCaps
-  iintro ⟨Hk, Hpc, ⟨#Hinv, #Hgeom, #Hlk⟩, HΦ⟩
+  iintro ⟨Hk, Hpc, ⟨#Hinv, #Hgeom, #Hlk, #Hcpi⟩, HΦ⟩
   iapply h
   iframe Hk Hpc Hlk HΦ
 
@@ -98,7 +98,7 @@ theorem vdrw_P1 {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] 
     trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗
     vdrwCaps γ γl pd pav pu ∗
     bufOwn (k.regs 10#5) bno dsk0 dataBuf ∗ diskBlock γ bno.toNat dataDisk ∗
-    wpNext true k.proc cpu (vdrwPostK k γ bno (decide (k.regs 11#5 ≠ 0#64)) dataBuf dataDisk) ∗
+    vdrwNext k γ bno (decide (k.regs 11#5 ≠ 0#64)) dataBuf dataDisk none cpu ∗
     (∀ (cpu' : CPU) (a b : Bool) (R : RegMap),
       vdrwP1Exit Γ cpu' (k.withSpie a b) γ γl pd pav pu bno dsk0 dataBuf dataDisk R -∗ wpLoop cpu')
     ⊢ wpLoop (GF := GF) cpu := by
@@ -107,12 +107,10 @@ theorem vdrw_P1 {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] 
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
   -- the caller's continuation is hart-free (a park's crossing, at a proc)
   ihave Hnext : ∀ c : CPU,
-      wpNext true k.proc c (vdrwPostK k γ bno (decide (k.regs 11#5 ≠ 0#64)) dataBuf dataDisk)
+      vdrwNext k γ bno (decide (k.regs 11#5 ≠ 0#64)) dataBuf dataDisk none c
       $$ [Hnext]
   · iintro %c
-    iapply (wpNext_shift true k.proc cpu c _
-      (fun h => h.elim (fun h => absurd h (by decide))
-        (fun h => absurd h (by rw [hproc]; exact procAddr_nonzero hj)))) $$ Hnext
+    iapply (vdrwNext_shift cpu c k γ bno _ dataBuf dataDisk none j hj hproc) $$ Hnext
   unfold bufOwn
   icases Hbuf with ⟨%hlen, Hbno, Hdsk, Hdat⟩
   have hK12 : 12 ≤ k.avail := by unfold virtioDiskRwSlots sleepSlots at hK; omega
@@ -200,10 +198,11 @@ theorem vdrw_P1 {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] 
   iapply HΦ $$ %cpu %spie %spp %_
   unfold vdrwP1Exit
   ihave Hnext := Hnext $$ %cpu
-  ihave Hnext := (show wpNext (GF := GF) true k.proc cpu
-      (vdrwPostK k γ bno (decide (k.regs 11#5 ≠ 0#64)) dataBuf dataDisk) ⊢
-      wpNext true (k.withSpie spie spp).proc cpu (vdrwPostK (k.withSpie spie spp) γ bno
-        (decide ((k.withSpie spie spp).regs 11#5 ≠ 0#64)) dataBuf dataDisk) from .rfl) $$ Hnext
+  ihave Hnext := (show vdrwNext (GF := GF) k γ bno (decide (k.regs 11#5 ≠ 0#64)) dataBuf
+      dataDisk none cpu ⊢
+      vdrwNext (k.withSpie spie spp) γ bno
+        (decide ((k.withSpie spie spp).regs 11#5 ≠ 0#64)) dataBuf dataDisk none cpu from .rfl)
+    $$ Hnext
   iframe Hnext
   isimp only [vdrwFrame_withSpie, vdrwRegs_withSpie, KCtx.withSpie_regs, KCtx.withSpie_proc]
   iframe Hk Hpc Hpi Htc Hcc Hir Hcaps Hlocked Hpay Hview

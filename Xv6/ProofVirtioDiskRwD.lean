@@ -67,14 +67,14 @@ theorem vdrw_P4 (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
     (cpu : CPU) (k : KCtx) (γ : DiskNames) (γl : GName) (pd pav pu : BitVec 64)
     (bno : BitVec 32) (dataBuf dataDisk : List (BitVec 8)) (wr : Bool)
     (c : Chain) (y : BitVec 32) (R : RegMap)
-    (pw : BitVec (8 * BSIZE))
+    (pw : BitVec (8 * BSIZE)) (hdwr : c.dwr = !wr)
     (hpw0 : c.dwr = false → pw = bvOfBytes BSIZE dataBuf)
     (hpw1 : c.dwr = true → dataDisk = bytesOf pw)
     (hkm : ∀ j, j < BSIZE →
       kmapClass (vpnOf (aBufData (k.regs 10#5) + BitVec.ofNat 64 j)).toNat = some .rw) :
     vdrwP3Exit Γ cpu k γ γl pd pav pu bno dataBuf dataDisk wr c y R ∗
-    (∀ (R' : RegMap) (e : Nat),
-      vdrwP4Exit Γ cpu k γ γl pd pav pu bno dataBuf dataDisk wr (c.arm e pw curCtx) y R' -∗
+    (∀ (R' : RegMap) (e : Nat) (kq : Nat × Nat),
+      vdrwP4Exit Γ cpu k γ γl pd pav pu bno dataBuf dataDisk wr (c.arm e pw curCtx kq) y R' -∗
       wpLoop cpu)
     ⊢ wpLoop (GF := GF) cpu := by
   have hsie : (vdrwK k).sie = false := vdrwK_sie k
@@ -169,10 +169,20 @@ theorem vdrw_P4 (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
   ihave Hblk := (show diskBlock (GF := GF) γ bno.toNat dataDisk ⊢ diskBlock γ c.blk dataDisk
     from by rw [hblk]) $$ Hblk
   iapply wpLoop_fupd
-  imod disk_publish γ pd pav pu (c.arm np pw curCtx) np
+  -- the caller's permit goes into the channel, at a key the channel chooses
+  ihave #Hcpi := vdrwCaps_perm γ γl pd pav pu $$ Hcaps
+  imod vdrwNext_deposit k γ bno wr dataBuf dataDisk cpu ⊤ (fun p hp => CoPset.subseteq_top p hp)
+    $$ [Hcpi Hnext] with ⟨%kq, Hpend, Hnext⟩
+  · iframe Hcpi Hnext
+  ihave Hpend : iprop(crashPermPend (GF := GF) γ.cperm (c.arm np pw curCtx kq).kq
+      (chainWr (c.arm np pw curCtx kq)) (List.range (wrNsectors (chainWr (c.arm np pw curCtx kq)))))
+    $$ [Hpend]
+  · rw [Chain.arm_kq, vdrw_chainWr_arm c wr bno dataBuf np pw curCtx kq hdwr hblk hdl hpw0]
+    iexact Hpend
+  imod disk_publish γ pd pav pu (c.arm np pw curCtx kq) np
       dataDisk dataBuf hcwf hdl rfl rfl (fun hd => hpw0 hd) (fun hd => hpw1 hd)
       hkmc
-    $$ [Hinv HS Hgeom Hpub Hstg Hth Htm Htt Hd0 Hd1 Hd2 Hhdr Hist Hdat Hblk]
+    $$ [Hinv HS Hgeom Hpub Hstg Hth Htm Htt Hd0 Hd1 Hd2 Hhdr Hist Hdat Hblk Hpend]
     with ⟨Hpub, Hstg, Hth, Htm, Htt, Hc0, Hc1, Hc2, Hch⟩
   · isimp only [Chain.arm_hd, Chain.arm_md, Chain.arm_tl, Chain.arm_data,
       Chain.arm_status, Chain.arm_hdrAddr, Chain.arm_blk, Chain.arm_d0,
@@ -186,13 +196,13 @@ theorem vdrw_P4 (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
   -- +0x192  sh a5,2(a4)     avail->idx += 1
   ihave Hidx := wordPointsTo_ctxBytes (availIdxAt pav) 2 (DFrac.own (1 : Qp).half) (wrap16 np)
     rk $$ HS Hidxw
-  ihave HAU := vdrw4_idx_write γ pd pav pu cpu np c.hd (c.arm np pw curCtx)
+  ihave HAU := vdrw4_idx_write γ pd pav pu cpu np c.hd (c.arm np pw curCtx kq)
     $$ [Hinv Hgeom Hpub Hstg Hth Hidx]
   · iframe #
     iframe
   k_step (vdrw4_sh_au cpu _ ?hs2 (KA.«virtio_disk_rw» + 0x192#64) false 2#12 14#5 15#5
       (availIdxAt pav) ?hb2 ri ra rk (wrap16 (np + 1)) ?hd2
-      (availIdxWritePost γ pav cpu np c.hd (c.arm np pw curCtx)))
+      (availIdxWritePost γ pav cpu np c.hd (c.arm np pw curCtx kq)))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   try (case hs2 => k_norm)
   iintro Hk Hpc HΨ
@@ -226,7 +236,7 @@ theorem vdrw_P4 (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
   -- the payload, sealed
   ihave Hpay := Hclose $$ %(np + 1) %c.hd %none Hpub Hstg Hidx Hring
   isimp only [← wordAtN_cur] at Hdsk
-  ihave Hclaim : iprop(claimRes (GF := GF) γ curCtx pd (c.arm np pw curCtx))
+  ihave Hclaim : iprop(claimRes (GF := GF) γ curCtx pd (c.arm np pw curCtx kq))
     $$ [Hc0 Hc1 Hc2 Hch Hib Hdsk]
   · unfold claimRes
     isimp only [Chain.arm_hd, Chain.arm_md, Chain.arm_tl, Chain.arm_data,
@@ -236,18 +246,19 @@ theorem vdrw_P4 (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
     iexists 1#32
     isplitl [Hdsk]
     · iexact Hdsk
-    iapply claimDone_one γ (c.arm np pw curCtx)
-  icases diskResSeal γ pd pav pu (c.arm np pw curCtx)
-      ((Chain.arm_wf c np pw curCtx).2 hcwf)
+    iapply claimDone_one γ (c.arm np pw curCtx kq)
+  icases diskResSeal γ pd pav pu (c.arm np pw curCtx kq)
+      ((Chain.arm_wf c np pw curCtx kq).2 hcwf)
     $$ [Hpay Hth Hclaim Htm Hom Hinfm Htt Hot Hinft] with ⟨Hres, Hkh, Hkm, Hkt⟩
   · isimp only [Chain.arm_hd, Chain.arm_md, Chain.arm_tl]
     iframe Hpay Hth Hclaim Htm Hom Hinfm Htt Hot Hinft
-  iapply HΦ $$ %_ %np
+  iapply HΦ $$ %_ %np %kq
   unfold vdrwP4Exit
-  isimp only [Chain.arm_hd, Chain.arm_md, Chain.arm_tl, Chain.arm_bp, Chain.arm_blk]
+  isimp only [Chain.arm_hd, Chain.arm_md, Chain.arm_tl, Chain.arm_bp, Chain.arm_blk,
+    Chain.arm_kq]
   iframe Hk Hpc Hpi Htc Hcc Hir Hcaps Hlk Hres Hkh Hkm Hkt Hbno Hsv Hidxc Hnext
   ipureintro
-  refine ⟨?_, (Chain.arm_wf c np pw curCtx).2 hcwf, hbp, hblk, ?_⟩
+  refine ⟨?_, (Chain.arm_wf c np pw curCtx kq).2 hcwf, hbp, hblk, ?_⟩
   · unfold vdrwRegs
     k_norm
     exact hRk

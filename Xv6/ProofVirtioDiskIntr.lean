@@ -176,7 +176,7 @@ theorem vdis_acquire (AC : ACQUIRE) (c : CPU) (k' : KCtx) (γ : DiskNames) (γl 
   simp only [acquireAddr] at h
   rw [ha0] at h
   unfold diskCaps
-  iintro ⟨Hk, Hpc, ⟨#Hinv, #Hgeom, #Hlk⟩, HΦ⟩
+  iintro ⟨Hk, Hpc, ⟨#Hinv, #Hgeom, #Hlk, #Hcc⟩, HΦ⟩
   iapply h
   iframe Hk Hpc Hlk HΦ
 
@@ -199,7 +199,7 @@ theorem vdis_release (RE : RELEASE) (c : CPU) (k' : KCtx) (γ : DiskNames) (γl 
   simp only [releaseAddr] at h
   rw [ha0] at h
   unfold diskCaps
-  iintro ⟨Hk, Hpc, ⟨#Hinv, #Hgeom, #Hlk⟩, Hlocked, Hpay, Harm, HΦ⟩
+  iintro ⟨Hk, Hpc, ⟨#Hinv, #Hgeom, #Hlk, #Hcc⟩, Hlocked, Hpay, Harm, HΦ⟩
   iapply h
   iframe Hk Hpc Hlk Hlocked Hpay Harm HΦ
 
@@ -657,7 +657,7 @@ theorem vdis_loop (WK : WAKEUP)
   have hKav : (vdisK k).avail = k.avail - 4 := vdisK_avail k hsie
   have hK22 : 22 ≤ k.avail := by unfold virtioDiskIntrSlots wakeupSlots at hK; omega
   unfold diskCaps
-  iintro ⟨#HΓ, ⟨#Hinv, #Hgeom, #Hlck⟩, Hexit⟩
+  iintro ⟨#HΓ, ⟨#Hinv, #Hgeom, #Hlck, #Hccx⟩, Hexit⟩
   iloeb as IH
   iintro %R %nr %m %F Hk Hpc Hlocked Hnr Hrl Hui Hpay #Hlbm #Hrv #Hwm %⟨hpres, hR9, hnrm⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
@@ -932,11 +932,11 @@ variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [Fdslot
 
 theorem vdis_caps_inv (γ : DiskNames) (γl : GName) (pd pav pu : BitVec 64) :
     diskCaps (GF := GF) γ γl pd pav pu ⊢ diskInv γ := by
-  unfold diskCaps; iintro ⟨#H1, #H2, #H3⟩; iexact H1
+  unfold diskCaps; iintro ⟨#H1, #H2, #H3, #H4⟩; iexact H1
 
 theorem vdis_caps_geom (γ : DiskNames) (γl : GName) (pd pav pu : BitVec 64) :
     diskCaps (GF := GF) γ γl pd pav pu ⊢ diskGeom γ pd pav pu := by
-  unfold diskCaps; iintro ⟨#H1, #H2, #H3⟩; iexact H2
+  unfold diskCaps; iintro ⟨#H1, #H2, #H3, #H4⟩; iexact H2
 
 end
 

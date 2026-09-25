@@ -414,6 +414,7 @@ import Xv6.LinkConsoleread
 import Xv6.DiskDefs
 import Xv6.VirtioQueue
 import Xv6.DiskInvDefs
+import Xv6.DiskCrashRows
 import Xv6.DiskInv
 import Xv6.BufDefs
 import Xv6.SpecVirtioDiskInit

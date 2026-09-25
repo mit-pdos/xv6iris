@@ -1,6 +1,8 @@
 /-
 Specification of `virtio_disk_init` (kernel/virtio_disk.c), boot only (the
-Rocq `SpecVirtioDiskInit`, without crash permits):
+Rocq `SpecVirtioDiskInit`; like Rocq's, it carries no crash-permit row -- the
+permit channel is minted and sealed with the disk invariant at power-on,
+`Xv6.diskBootAlloc`, Rocq `disk_ghosts_alloc` + `dev_inv_alloc`):
 
 ```
 initlock(&disk.vdisk_lock, "virtio_disk");

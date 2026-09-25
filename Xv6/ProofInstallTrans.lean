@@ -428,9 +428,8 @@ theorem it_bwrite (BW : BWRITE) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
       bufHold0 γb V kk pidv dev bno bs bs -∗ wpLoop cpu'))
     ⊢ wpLoop (GF := GF) c := by
   subst hpj hs
-  have h := BW.wp_bwrite_eb (hlc := hlc) (GF := GF) Γ c k' γl γb V γdl pd pav pu j kk
+  have h := BW.wp_bwrite_eb_any (hlc := hlc) (GF := GF) Γ c k' γl γb V γdl pd pav pu j kk
     pidv dev bno dqp bs bsd hj hproc hK hnoff htier hkk ha0 hbno hbsd hpd
-  unfold wp_bwrite_eb_body at h
   simp only [bwriteAddr] at h
   exact h
 

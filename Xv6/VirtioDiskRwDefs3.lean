@@ -431,19 +431,63 @@ variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [Fdslot
 theorem vdrwCaps_inv (γ : DiskNames) (γl : GName) (pd pav pu : BitVec 64) :
     vdrwCaps (GF := GF) γ γl pd pav pu ⊢ diskInv γ := by
   unfold vdrwCaps
-  iintro ⟨#H1, #H2, #H3⟩
+  iintro ⟨#H1, #H2, #H3, #H4⟩
   iexact H1
 
 theorem vdrwCaps_geom (γ : DiskNames) (γl : GName) (pd pav pu : BitVec 64) :
     vdrwCaps (GF := GF) γ γl pd pav pu ⊢ diskGeom γ pd pav pu := by
   unfold vdrwCaps
-  iintro ⟨#H1, #H2, #H3⟩
+  iintro ⟨#H1, #H2, #H3, #H4⟩
   iexact H2
+
+/-- **The deposit** (Rocq `perm_deposit_kq` at `virtio_disk_rw`'s
+publication): the caller's sequential permit goes into the era's channel at
+a key the channel chooses; the thread keeps the persistent receipt, and the
+TIMELESS token comes out for the disk invariant's row. -/
+theorem vdrwNext_deposit (k : KCtx) (γ : DiskNames) (bno : BitVec 32) (wr : Bool)
+    (dataBuf dataDisk : List (BitVec 8)) (cpu : CPU) (E : CoPset)
+    (hE : (↑crashPermN : CoPset) ⊆ E) :
+    crashPermInv (genId (hlc := hlc) (GF := GF)) γ.cperm ∗
+      vdrwNext k γ bno wr dataBuf dataDisk none cpu ⊢@{IProp GF}
+      |={E}=> ∃ kq : Nat × Nat,
+        crashPermPend γ.cperm kq (vdrwWr wr bno dataBuf)
+          (List.range (wrNsectors (vdrwWr wr bno dataBuf))) ∗
+        vdrwNext k γ bno wr dataBuf dataDisk (some kq.2) cpu := by
+  unfold vdrwNext vdrwTok
+  iintro ⟨#Hpi, %Q, Hperm, Hn⟩
+  imod crashPerm_deposit_kq (genId (hlc := hlc) (GF := GF)) γ.cperm (vdrwWr wr bno dataBuf) Q E hE
+    $$ [Hpi Hperm] with ⟨%kq, Hpend, #Hrc⟩
+  · iframe Hpi Hperm
+  imodintro
+  iexists kq
+  iframe Hpend
+  iexists Q
+  iframe Hrc Hn
+
+/-- The armed chain's write IS the caller's. -/
+theorem vdrw_chainWr_arm (c : Chain) (wr : Bool) (bno : BitVec 32) (dataBuf : List (BitVec 8))
+    (e : Nat) (pw : BitVec (8 * BSIZE)) (ξ : CtxId) (kq : Nat × Nat)
+    (hdwr : c.dwr = !wr) (hblk : c.blk = bno.toNat) (hdl : dataBuf.length = BSIZE)
+    (hpw : c.dwr = false → pw = bvOfBytes BSIZE dataBuf) :
+    chainWr (c.arm e pw ξ kq) = vdrwWr wr bno dataBuf := by
+  unfold chainWr vdrwWr
+  cases wr
+  · simp only [Chain.arm_dwr, hdwr, Bool.not_false, ite_true, Bool.false_eq_true, ite_false]
+  · have hd : c.dwr = false := by rw [hdwr]; rfl
+    simp only [Chain.arm_dwr, hd, Chain.arm_blk, hblk, Chain.arm_pay, hpw hd,
+      bytesOf_bvOfBytes BSIZE dataBuf hdl, Bool.false_eq_true, ite_false, ite_true]
+
+/-- The era's crash-permit channel, out of the bundle. -/
+theorem vdrwCaps_perm (γ : DiskNames) (γl : GName) (pd pav pu : BitVec 64) :
+    vdrwCaps (GF := GF) γ γl pd pav pu ⊢ crashPermInv (genId (hlc := hlc) (GF := GF)) γ.cperm := by
+  unfold vdrwCaps
+  iintro ⟨#H1, #H2, #H3, #H4⟩
+  iexact H4
 
 theorem vdrwCaps_lock (γ : DiskNames) (γl : GName) (pd pav pu : BitVec 64) :
     vdrwCaps (GF := GF) γ γl pd pav pu ⊢ isLock γl aVdiskLock "virtio_disk" (diskRes γ pd pav pu) := by
   unfold vdrwCaps
-  iintro ⟨#H1, #H2, #H3⟩
+  iintro ⟨#H1, #H2, #H3, #H4⟩
   iexact H3
 
 end caps
@@ -488,7 +532,7 @@ def vdrwP3Exit (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
   infoWin curCtx c.md ∗ infoWin curCtx c.tl ∗
   vdrwSaved k ∗
   idxCells (k.regs 2#5) (BitVec.ofNat 32 c.hd) (BitVec.ofNat 32 c.md) (BitVec.ofNat 32 c.tl) y ∗
-  wpNext true k.proc cpu (vdrwPostK k γ bno wr dataBuf dataDisk)
+  vdrwNext k γ bno wr dataBuf dataDisk none cpu
 
 /-- **The seam at the end of P4** (`virtio_disk_rw + 0x1a2`, the `lw` of
 `b->disk` that opens the completion wait): the request is published --
@@ -518,7 +562,7 @@ def vdrwP4Exit (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
   wordPointsTo (aBufBlockno c.bp) 4 (DFrac.own (1 : Qp).half) bno ∗
   vdrwSaved k ∗
   idxCells (k.regs 2#5) (BitVec.ofNat 32 c.hd) (BitVec.ofNat 32 c.md) (BitVec.ofNat 32 c.tl) y ∗
-  wpNext true k.proc cpu (vdrwPostK k γ bno wr dataBuf dataDisk)
+  vdrwNext k γ bno wr dataBuf dataDisk (some c.kq.2) cpu
 
 end seams
 

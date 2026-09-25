@@ -975,7 +975,7 @@ theorem diskLive_pure_free (v : VirtioState) (st : Nat → HState) (pm : RegMapF
       imgOk v m (inFlightBlk st) ∧ permOk v pm st ∧ usedOk dl dl0 nc M ∧
       unreadArmed v st dl nr ring lo np stg sb ∧ cntOk pm dl nc ∧ p3Ok v pm dl nr ∧
       ueInv pm dl nr ue ∧ epOk v st pm dl ring lo np stg ∧ dryOk v ∧ capOk v st sb ∧
-      rowDone st sb dl) :
+      rowDone st sb dl ∧ crashOk v st sb ring lo np stg) :
     v.usedIdx = wrap16 nc ∧ v.seen = wrap16 lo ∧ lo ≤ np ∧
       queueOk (freeSt st i) ring lo np ∧
       posOk pmap ring lo np ∧ stageOk stg ring lo np ∧
@@ -985,9 +985,10 @@ theorem diskLive_pure_free (v : VirtioState) (st : Nat → HState) (pm : RegMapF
       unreadArmed v (freeSt st i) dl nr ring lo np stg sb ∧ cntOk pm dl nc ∧
       p3Ok v pm dl nr ∧ ueInv pm dl nr ue ∧
       epOk v (freeSt st i) pm dl ring lo np stg ∧ dryOk v ∧ capOk v (freeSt st i) sb ∧
-      rowDone (freeSt st i) sb dl := by
-  obtain ⟨e1, e2, e3, e4, e5, e5b, e6, e7, e9, e10, e11, e12, e13, e14, e15, e16, e17, e18⟩ := h
-  refine ⟨e1, e2, e3, ?_, e5, e5b, ?_, himg, ?_, e10, ?_, e12, e13, e14, ?_, e16, ?_, ?_⟩
+      rowDone (freeSt st i) sb dl ∧ crashOk v (freeSt st i) sb ring lo np stg := by
+  obtain ⟨e1, e2, e3, e4, e5, e5b, e6, e7, e9, e10, e11, e12, e13, e14, e15, e16, e17, e18,
+    e19⟩ := h
+  refine ⟨e1, e2, e3, ?_, e5, e5b, ?_, himg, ?_, e10, ?_, e12, e13, e14, ?_, e16, ?_, ?_, ?_⟩
   · refine ⟨fun p h1 h2 => ?_, e4.2⟩
     refine ⟨(e4.1 p h1 h2).1, ?_⟩
     rw [freeSt_ne st i _ (hpos p h1 h2)]
@@ -1022,6 +1023,22 @@ theorem diskLive_pure_free (v : VirtioState) (st : Nat → HState) (pm : RegMapF
   · intro j cc hj hst r hr hh he
     obtain ⟨hne, hst'⟩ := freeSt_active st i j cc hst
     exact e18 j cc hj hst' r hr hh he
+  · refine ⟨fun e he => ?_, fun p h1 h2 cc hst => ?_, fun j hj cc hst => ?_⟩
+    · obtain ⟨j, cc, jj, hj, hs, hd, hp, hjj, hk, hb⟩ := e19.1 e he
+      have hne : j ≠ i := by
+        intro he'
+        have hso : (Virtio.phase v (BitVec.ofNat 16 j)).isSome = true := by
+          rcases hp with hp | hp <;> rw [hp] <;> rfl
+        apply hfly _ hso
+        rw [← he']
+        simp only [BitVec.toNat_ofNat]
+        unfold NUM at hj
+        omega
+      exact ⟨j, cc, jj, hj, by rw [freeSt_ne st i j hne]; exact hs, hd, hp, hjj, hk, hb⟩
+    · rw [freeSt_ne st i _ (hpos p h1 h2)] at hst
+      exact e19.2.1 p h1 h2 cc hst
+    · obtain ⟨hne, hst'⟩ := freeSt_active st i j cc hst
+      exact e19.2.2 j hj cc hst'
 
 /-! ## The arming epoch, as the driver's own moves keep it -/
 

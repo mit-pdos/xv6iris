@@ -72,7 +72,7 @@ theorem vdrw_P5_loop (SP : SLEEP_PREPARE) (AC : ACQUIRE) (RE : RELEASE) (SL : SL
   have hlkK : (vdrwK (k.withSpie a b)).locks = ["virtio_disk"] := by
     rw [vdrwK_locks]; simp only [KCtx.withSpie_locks, hlocks]
   try isimp only [vdrw5_saved_ws] at Hsv
-  try isimp only [vdrw5_postK_ws, KCtx.withSpie_proc] at Hnext
+  try isimp only [vdrw5_postK_ws, vdrwNext_withSpie, KCtx.withSpie_proc] at Hnext
   have hbp' : c.bp = k.regs 10#5 := hbp
   have h19' : R 19#5 = k.regs 10#5 := h19
   have h9' : R 9#5 = aVdiskLock := h9
@@ -183,19 +183,20 @@ theorem vdrw_P5_loop (SP : SLEEP_PREPARE) (AC : ACQUIRE) (RE : RELEASE) (SL : SL
   have h18_S : RS 18#5 = 1#64 := (hcsS'.2.2.2.1).trans h18_2
   have h19_S : RS 19#5 = k.regs 10#5 := (hcsS'.2.2.2.2.1).trans h19_2
   have hR6_S : vdrwRegs6 (k.withSpie a b) RS := vdrwRegs6_call _ R2 RS hR6_2 hcsS'
-  ihave Hnext := vdrw5_next_at cc cpu2 k γ bno wr dataBuf dataDisk jp hjp hproc $$ Hnext
+  try isimp only [vdrwNext_withSpie] at Hnext
+  ihave Hnext := vdrw5_next_at cc cpu2 k γ bno wr dataBuf dataDisk (some c.kq.2) jp hjp hproc $$ Hnext
   clear hpin2
   -- +0x1c4  mv a0,s1 ; +0x1c6  jal acquire
   k_step_gen (wp_s_add cpu2 _ (KA.«virtio_disk_rw» + 0x1c4#64) true 10#5 0#5 9#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
     with [KCtx.rget_zero, h9_S] next cpu3 hpin
-  ihave Hnext := vdrw5_next_at cpu2 cpu3 k γ bno wr dataBuf dataDisk jp hjp hproc $$ Hnext
+  ihave Hnext := vdrw5_next_at cpu2 cpu3 k γ bno wr dataBuf dataDisk (some c.kq.2) jp hjp hproc $$ Hnext
   k_ext_move
   iintro Hk Hpc
   k_step_gen (wp_s_jal cpu3 _ (KA.«virtio_disk_rw» + 0x1c6#64) false 2076894#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
     with [vdrw2_br_acquire] next cpu4 hpin
-  ihave Hnext := vdrw5_next_at cpu3 cpu4 k γ bno wr dataBuf dataDisk jp hjp hproc $$ Hnext
+  ihave Hnext := vdrw5_next_at cpu3 cpu4 k γ bno wr dataBuf dataDisk (some c.kq.2) jp hjp hproc $$ Hnext
   k_ext_move
   iintro Hk Hpc
   iapply (vdrw5_ac AC cpu4 _ γ γl pd pav pu ?ha0q ?hnq ?hKq ?hsq) $$ [- $Hk $Hpc]
@@ -208,7 +209,7 @@ theorem vdrw_P5_loop (SP : SLEEP_PREPARE) (AC : ACQUIRE) (RE : RELEASE) (SL : SL
   case hsq => k_norm_g [hlocks]; simp
   iapply wpNext_intro_pin
   iintro %cpu5 %hpin
-  ihave Hnext := vdrw5_next_at cpu4 cpu5 k γ bno wr dataBuf dataDisk jp hjp hproc $$ Hnext
+  ihave Hnext := vdrw5_next_at cpu4 cpu5 k γ bno wr dataBuf dataDisk (some c.kq.2) jp hjp hproc $$ Hnext
   k_ext_move
   iintro %s4 %p4 %R3 %_ Hk Hpc %hcs4 Hlocked Hpay - Harm
   try isimp only [vdrw5_ret_1ca] at Hpc
@@ -257,7 +258,7 @@ theorem vdrw_P5_loop (SP : SLEEP_PREPARE) (AC : ACQUIRE) (RE : RELEASE) (SL : SL
       iframe Hpay Hth Hcl
     isimp only [updB_idem, updB_nil, diskResA_nil] at Hpay
     iapply IH $$ HΦ %cpu5 %s4 %p4 %(R3.set 15#5 1#64)
-    isimp only [vdrw5_saved_ws, vdrw5_postK_ws, KCtx.withSpie_regs, KCtx.withSpie_proc]
+    isimp only [vdrw5_saved_ws, vdrw5_postK_ws, vdrwNext_withSpie, KCtx.withSpie_regs, KCtx.withSpie_proc]
     iframe #
     iframe Hk Hpc Htc Hcc Hir Hlocked Hpay Hkh Hkm Hkt Hbno Hsv Hidx Hnext
     ipureintro
@@ -272,7 +273,7 @@ theorem vdrw_P5_loop (SP : SLEEP_PREPARE) (AC : ACQUIRE) (RE : RELEASE) (SL : SL
     iintro Hk Hpc
     iapply HΦ $$ %cpu5 %s4 %p4 %(R3.set 15#5 (BitVec.signExtend 64 d))
     unfold vdrwP5Exit
-    isimp only [vdrw5_saved_ws, vdrw5_postK_ws, KCtx.withSpie_regs, KCtx.withSpie_proc]
+    isimp only [vdrw5_saved_ws, vdrw5_postK_ws, vdrwNext_withSpie, KCtx.withSpie_regs, KCtx.withSpie_proc]
     iframe #
     iframe Hk Hpc Htc Hcc Hir Hlocked Hpay Hth Hkm Hkt Hbno Hsv Hidx Hnext
     isplitl []

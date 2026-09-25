@@ -33,13 +33,14 @@ DEVIATIONS from Rocq:
    fragments are minted HERE, at the reset device's blocks, rather than
    handed down by the power thread.  (This is the landed DiskInvDefs design;
    crash_layer D39 adds no per-era image field to MachCSL.)
-2. No claim map (`dn_claim`), no `disk_done_lb` token, no crash-permit
-   channel (`perm_inv_body`): the Lean protocol has no claim map, the
-   completion lower bound is `Xv6.diskDoneLb`, minted on demand from
-   `Xv6.diskDoneAuth`, and the crash permits are batch C-2a's (BLOCKED:
-   Rocq's `disk_ghosts_alloc` returns `perm_inv_body gd (dn_perm γ)`; the
-   Lean `diskProto` has no permit rows until C-2a lands, so neither does
-   this mint).
+2. No claim map (`dn_claim`) and no `disk_done_lb` token: the Lean
+   protocol has no claim map, and the completion lower bound is
+   `Xv6.diskDoneLb`, minted on demand from `Xv6.diskDoneAuth`.  The
+   CRASH-PERMIT CHANNEL is minted here AND SEALED here
+   (`MachCSL.crashPermInv genId γ.cperm`): Rocq's `disk_ghosts_alloc`
+   returns the BODY and `WpUart.dev_inv_alloc` seals it beside `disk_inv`;
+   this mint already seals the disk invariant, so it seals the channel
+   beside it.
 3. The reset facts are PREMISES (as in Rocq's `disk_ghosts_alloc`).  Their
    discharge at the boot is BLOCKED on MachCSL: `wp_power`'s `Hboot` (hence
    `MachCSL.riscvPowerAdequacy`'s) receives only `bootFacts σ image`, which
@@ -186,7 +187,8 @@ counter, and the image's first `nb` blocks. -/
 theorem diskBootAlloc (v : VirtioState) (nb : Nat) (hlive : Virtio.live v.cfg = false)
     (hinfl : v.inflight = []) (hcache : v.cache = []) (hui : v.usedIdx = 0#16) (hseen : v.seen = 0#16) :
     devFrag (hlc := hlc) (GF := GF) .virtio v ⊢ |={⊤}=> ∃ γ : DiskNames,
-      diskInv γ ∗ diskCfgOwn γ v.cfg ∗ diskInitGhosts γ ∗ diskRoot γ ∗
+      diskInv γ ∗ crashPermInv (genId (hlc := hlc) (GF := GF)) γ.cperm ∗
+      diskCfgOwn γ v.cfg ∗ diskInitGhosts γ ∗ diskRoot γ ∗
       [∗list] b ∈ List.range nb, diskBlock γ b (fsBlocks v.disk b) := by
   iintro Hf
   imod (diskBoot_gvHalves (GF := GF) v.cfg) with ⟨%gcfg, Hcfg1, Hcfg2⟩
@@ -206,8 +208,11 @@ theorem diskBootAlloc (v : VirtioState) (nb : Nat) (hlive : Virtio.live v.cfg = 
   imod (MonoList.own_alloc (GF := GF) ([] : List Nat)) with ⟨%gpos, Hpos, Hposl⟩
   imod (MonoList.own_alloc (GF := GF) ([] : List UsedRec)) with ⟨%gdone, Hdone, Hdonel⟩
   imod (ghost_var_alloc (GF := GF) (0 : Nat)) with ⟨%gbase, Hbase⟩
+  imod (crashPerm_ghost_alloc (hlc := hlc) (GF := GF) (genId (hlc := hlc) (GF := GF)))
+    with ⟨%gcperm, Hcperm⟩
+  imod crashPermInv_alloc ⊤ (genId (hlc := hlc) (GF := GF)) gcperm $$ Hcperm with #Hcpinv
   let γ : DiskNames := ⟨gcfg, gimg, ghead, gnp, gnc, glo, gnr, gnrlb, gstage, gperm, gnpm, gpos,
-    gdone, gbase⟩
+    gdone, gbase, gcperm⟩
   imod (inv_alloc diskN ⊤ (iprop(∃ s : DevSt DevId.virtio, devFrag (hlc := hlc) (GF := GF) .virtio s ∗
       diskProto γ s))) $$ [Hf Hcfg1 Himg Hlo1 Hnr1 Hst1 Hperm Hnpm Hnpml Hpos Hposl Hdone Hdonel Hbase]
     with #Hinv
@@ -276,6 +281,7 @@ theorem diskBootAlloc (v : VirtioState) (nb : Nat) (hlive : Virtio.live v.cfg = 
   iexists γ
   isplitl []
   · unfold diskInv devInvR; iexact Hinv
+  iframe Hcpinv
   isplitl [Hcfg2]
   · unfold diskCfgOwn; iexact Hcfg2
   isplitl [Hheads Hnp1 Hnp2 Hnc Hnr2 Hnrlb Hst2]

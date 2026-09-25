@@ -189,6 +189,13 @@ structure Chain where
   context has to be named where the invariant can see it.  Also a ghost
   field. -/
   ctx : CtxId := default
+  /-- **The CRASH-PERMIT KEY** (Rocq `vs_perm`): the cell of the permit
+  channel (`MachCSL.crashPermInv`) the enqueuer deposited this request's
+  sequential write permit at, and the saved-proposition name of its
+  receipt.  A ghost field, like `Xv6.Chain.ep`: the disk invariant keys the
+  request's timeless channel token on it (`Xv6.crashRow`), and the
+  enqueuer's collect matches its receipt against it. -/
+  kq : Nat × Nat := (0, 0)
   deriving DecidableEq, Repr, Inhabited
 
 namespace Chain
@@ -278,27 +285,30 @@ move. -/
 @[simp] theorem withEp_wf (c : Chain) (e : Nat) : ({c with ep := e} : Chain).wf ↔ c.wf := Iff.rfl
 
 /-- **The chain as the publication stamps it**: the queue POSITION it is
-armed at, the PAYLOAD the collect will hand back, and the CONTEXT the
-driver's buffer cells live at.  All three are ghost fields, so the bytes
+armed at, the PAYLOAD the collect will hand back, the CONTEXT the
+driver's buffer cells live at, and the CRASH-PERMIT KEY the enqueuer's
+deposit chose.  All four are ghost fields, so the bytes
 the queue holds of the chain do not move. -/
-@[reducible] def arm (c : Chain) (e : Nat) (pw : BitVec (8 * BSIZE)) (ξ : CtxId) : Chain :=
-  { c with ep := e, payw := pw, ctx := ξ }
+@[reducible] def arm (c : Chain) (e : Nat) (pw : BitVec (8 * BSIZE)) (ξ : CtxId)
+    (kq : Nat × Nat) : Chain :=
+  { c with ep := e, payw := pw, ctx := ξ, kq := kq }
 
-@[simp] theorem arm_hd (c : Chain) (e pw ξ) : (c.arm e pw ξ).hd = c.hd := rfl
-@[simp] theorem arm_md (c : Chain) (e pw ξ) : (c.arm e pw ξ).md = c.md := rfl
-@[simp] theorem arm_tl (c : Chain) (e pw ξ) : (c.arm e pw ξ).tl = c.tl := rfl
-@[simp] theorem arm_dwr (c : Chain) (e pw ξ) : (c.arm e pw ξ).dwr = c.dwr := rfl
-@[simp] theorem arm_sector (c : Chain) (e pw ξ) : (c.arm e pw ξ).sector = c.sector := rfl
-@[simp] theorem arm_bp (c : Chain) (e pw ξ) : (c.arm e pw ξ).bp = c.bp := rfl
-@[simp] theorem arm_ep (c : Chain) (e pw ξ) : (c.arm e pw ξ).ep = e := rfl
-@[simp] theorem arm_payw (c : Chain) (e pw ξ) : (c.arm e pw ξ).payw = pw := rfl
-@[simp] theorem arm_ctx (c : Chain) (e pw ξ) : (c.arm e pw ξ).ctx = ξ := rfl
-@[simp] theorem arm_data (c : Chain) (e pw ξ) : (c.arm e pw ξ).data = c.data := rfl
-@[simp] theorem arm_status (c : Chain) (e pw ξ) : (c.arm e pw ξ).status = c.status := rfl
-@[simp] theorem arm_hdrAddr (c : Chain) (e pw ξ) : (c.arm e pw ξ).hdrAddr = c.hdrAddr := rfl
-@[simp] theorem arm_blk (c : Chain) (e pw ξ) : (c.arm e pw ξ).blk = c.blk := rfl
-@[simp] theorem arm_pay (c : Chain) (e pw ξ) : (c.arm e pw ξ).pay = bytesOf pw := rfl
-@[simp] theorem arm_wf (c : Chain) (e pw ξ) : (c.arm e pw ξ).wf ↔ c.wf := Iff.rfl
+@[simp] theorem arm_hd (c : Chain) (e pw ξ kq) : (c.arm e pw ξ kq).hd = c.hd := rfl
+@[simp] theorem arm_md (c : Chain) (e pw ξ kq) : (c.arm e pw ξ kq).md = c.md := rfl
+@[simp] theorem arm_tl (c : Chain) (e pw ξ kq) : (c.arm e pw ξ kq).tl = c.tl := rfl
+@[simp] theorem arm_dwr (c : Chain) (e pw ξ kq) : (c.arm e pw ξ kq).dwr = c.dwr := rfl
+@[simp] theorem arm_sector (c : Chain) (e pw ξ kq) : (c.arm e pw ξ kq).sector = c.sector := rfl
+@[simp] theorem arm_bp (c : Chain) (e pw ξ kq) : (c.arm e pw ξ kq).bp = c.bp := rfl
+@[simp] theorem arm_ep (c : Chain) (e pw ξ kq) : (c.arm e pw ξ kq).ep = e := rfl
+@[simp] theorem arm_payw (c : Chain) (e pw ξ kq) : (c.arm e pw ξ kq).payw = pw := rfl
+@[simp] theorem arm_ctx (c : Chain) (e pw ξ kq) : (c.arm e pw ξ kq).ctx = ξ := rfl
+@[simp] theorem arm_data (c : Chain) (e pw ξ kq) : (c.arm e pw ξ kq).data = c.data := rfl
+@[simp] theorem arm_status (c : Chain) (e pw ξ kq) : (c.arm e pw ξ kq).status = c.status := rfl
+@[simp] theorem arm_hdrAddr (c : Chain) (e pw ξ kq) : (c.arm e pw ξ kq).hdrAddr = c.hdrAddr := rfl
+@[simp] theorem arm_blk (c : Chain) (e pw ξ kq) : (c.arm e pw ξ kq).blk = c.blk := rfl
+@[simp] theorem arm_pay (c : Chain) (e pw ξ kq) : (c.arm e pw ξ kq).pay = bytesOf pw := rfl
+@[simp] theorem arm_wf (c : Chain) (e pw ξ kq) : (c.arm e pw ξ kq).wf ↔ c.wf := Iff.rfl
+@[simp] theorem arm_kq (c : Chain) (e pw ξ kq) : (c.arm e pw ξ kq).kq = kq := rfl
 
 /-- The request record the device's `fetch` builds out of `d0`, `d1`,
 `d2` and `hdr`. -/
@@ -314,11 +324,11 @@ namespace Chain
 
 /-- The three descriptor words, the header and the request record do not
 see the epoch either. -/
-@[simp] theorem arm_d0 (c : Chain) (e pw ξ) : (c.arm e pw ξ).d0 = c.d0 := rfl
-@[simp] theorem arm_d1 (c : Chain) (e pw ξ) : (c.arm e pw ξ).d1 = c.d1 := rfl
-@[simp] theorem arm_d2 (c : Chain) (e pw ξ) : (c.arm e pw ξ).d2 = c.d2 := rfl
-@[simp] theorem arm_hdr (c : Chain) (e pw ξ) : (c.arm e pw ξ).hdr = c.hdr := rfl
-@[simp] theorem arm_req (c : Chain) (e pw ξ) : (c.arm e pw ξ).req = c.req := rfl
+@[simp] theorem arm_d0 (c : Chain) (e pw ξ kq) : (c.arm e pw ξ kq).d0 = c.d0 := rfl
+@[simp] theorem arm_d1 (c : Chain) (e pw ξ kq) : (c.arm e pw ξ kq).d1 = c.d1 := rfl
+@[simp] theorem arm_d2 (c : Chain) (e pw ξ kq) : (c.arm e pw ξ kq).d2 = c.d2 := rfl
+@[simp] theorem arm_hdr (c : Chain) (e pw ξ kq) : (c.arm e pw ξ kq).hdr = c.hdr := rfl
+@[simp] theorem arm_req (c : Chain) (e pw ξ kq) : (c.arm e pw ξ kq).req = c.req := rfl
 
 @[simp] theorem withEp_d0 (c : Chain) (e : Nat) : ({c with ep := e} : Chain).d0 = c.d0 := rfl
 @[simp] theorem withEp_d1 (c : Chain) (e : Nat) : ({c with ep := e} : Chain).d1 = c.d1 := rfl

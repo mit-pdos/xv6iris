@@ -50,10 +50,10 @@ set_option maxRecDepth 8000 in
 theorem virtio_disk_rw_proof
     (SP : SLEEP_PREPARE) (AC : ACQUIRE) (RE : RELEASE) (SL : SLEEP) (FD : FREE_DESC) :
     VIRTIO_DISK_RW :=
-  ⟨fun {hlc GF} _ _ _ _ _ _ _ _ _ Γ _ cpu k γ γl pd pav pu j bno dsk0 dataBuf dataDisk
+  ⟨fun {hlc GF} _ _ _ _ _ _ _ _ _ Γ _ cpu k γ γl pd pav pu j bno dsk0 dataBuf dataDisk Q
       hj hproc hK hnoff htier hbno hdata hpd hkm => by
     unfold wp_virtio_disk_rw_eb_body
-    iintro ⟨Hk, Hpc, #Hpi, Hte, Hce, #Hcaps, Hbuf, Hblk, Hnext⟩
+    iintro ⟨Hk, Hpc, #Hpi, Hte, Hce, #Hcaps, Hbuf, Hblk, Hperm, Hnext⟩
     icases kctx_wf _ _ $$ Hk with ⟨%hwf, Hk⟩
     have hintena : k.intena = k.sie := (hwf.1 hnoff).symm
     have hlocks : k.locks = [] := List.eq_nil_of_length_eq_zero (by have := hwf.2.2.2.1; omega)
@@ -80,8 +80,16 @@ theorem virtio_disk_rw_proof
     -- P1
     iapply (vdrw_P1 AC Γ cpu k γ γl pd pav pu j bno dsk0 dataBuf dataDisk hj hproc hK hnoff
       hlocks hbno)
-    unfold vdrwPostK
-    iframe Hk Hpc Hpi Hte Hce Hcaps2 Hbuf Hblk Hnext
+    iframe Hk Hpc Hpi Hte Hce Hcaps2 Hbuf Hblk
+    isplitl [Hperm Hnext]
+    · -- the caller's permit and continuation, packed at the phases' shape
+      unfold vdrwNext vdrwTok vdrwWr
+      iexists Q
+      iframe Hperm
+      iapply wpNext_mono $$ Hnext
+      unfold vdrwPostQ vdrwPostK
+      iintro %cpu' HK HQ %spie %spp %R' %hcs Hk' Hpc' Hte' Hce' Hbuf' Hblk'
+      iapply HK $$ %spie %spp %R' %hcs Hk' Hpc' Hte' Hce' Hbuf' Hblk' HQ
     iintro %c0 %a0 %b0 %R1 HP1
     -- P2
     iapply (vdrw_P2 FD SP AC RE SL Γ c0 (k.withSpie a0 b0) γ γl pd pav pu j bno dsk0 dataBuf dataDisk R1
@@ -101,7 +109,7 @@ theorem virtio_disk_rw_proof
       (decide (k.regs 11#5 ≠ 0#64))
       (vdrwChain ((k.withSpie a1 b1).regs 10#5) bno (decide (k.regs 11#5 ≠ 0#64)) hix mix tix) yy R3
       (vdrwPayw (vdrwChain ((k.withSpie a1 b1).regs 10#5) bno
-        (decide (k.regs 11#5 ≠ 0#64)) hix mix tix) dataBuf dataDisk)
+        (decide (k.regs 11#5 ≠ 0#64)) hix mix tix) dataBuf dataDisk) rfl
       (fun hd => vdrwPayw_write _ dataBuf dataDisk hd)
       (fun hd => by
         rw [vdrwPayw_read _ dataBuf dataDisk hd]
@@ -109,14 +117,14 @@ theorem virtio_disk_rw_proof
       hkm)
     isplitl [HP3]
     · iexact HP3
-    iintro %R4 %ep HP4
+    iintro %R4 %ep %kq HP4
     -- P5
     iapply (vdrw_P5 SP AC RE SL Γ c1 (k.withSpie a1 b1) γ γl pd pav pu j bno dataBuf
       dataDisk (decide (k.regs 11#5 ≠ 0#64))
       (Chain.arm (vdrwChain ((k.withSpie a1 b1).regs 10#5) bno
           (decide (k.regs 11#5 ≠ 0#64)) hix mix tix) ep
         (vdrwPayw (vdrwChain ((k.withSpie a1 b1).regs 10#5) bno
-          (decide (k.regs 11#5 ≠ 0#64)) hix mix tix) dataBuf dataDisk) curCtx)
+          (decide (k.regs 11#5 ≠ 0#64)) hix mix tix) dataBuf dataDisk) curCtx kq)
       yy R4 hj hproc hK hwf hnoff hlocks htier hintena hbz)
     isplitl [HP4]
     · iexact HP4
@@ -127,7 +135,7 @@ theorem virtio_disk_rw_proof
       (Chain.arm (vdrwChain ((k.withSpie a1 b1).regs 10#5) bno
           (decide (k.regs 11#5 ≠ 0#64)) hix mix tix) ep
         (vdrwPayw (vdrwChain ((k.withSpie a1 b1).regs 10#5) bno
-          (decide (k.regs 11#5 ≠ 0#64)) hix mix tix) dataBuf dataDisk) curCtx)
+          (decide (k.regs 11#5 ≠ 0#64)) hix mix tix) dataBuf dataDisk) curCtx kq)
       yy R5 j hj hproc hK hnoff hlocks htier hintena hwf hpd rfl rfl
       (by
         show bytesOf (vdrwPayw _ dataBuf dataDisk) = _

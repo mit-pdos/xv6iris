@@ -353,7 +353,8 @@ def vdrwFrame (k : KCtx) : IProp GF := iprop%
 /-- The disk's persistent credentials, as `Xv6.diskCaps` bundles them
 (stated here so the phase vocabulary does not depend on the spec file). -/
 def vdrwCaps (γ : DiskNames) (γl : GName) (pd pav pu : BitVec 64) : IProp GF := iprop%
-  diskInv γ ∗ diskGeom γ pd pav pu ∗ isLock γl aVdiskLock "virtio_disk" (diskRes γ pd pav pu)
+  diskInv γ ∗ diskGeom γ pd pav pu ∗ isLock γl aVdiskLock "virtio_disk" (diskRes γ pd pav pu) ∗
+  crashPermInv (genId (hlc := hlc) (GF := GF)) γ.cperm
 
 instance vdrwCaps_persistent (γ : DiskNames) (γl : GName) (pd pav pu : BitVec 64) :
     Persistent (vdrwCaps (GF := GF) γ γl pd pav pu) := by
@@ -367,6 +368,53 @@ def vdrwPostK (k : KCtx) (γ : DiskNames) (bno : BitVec 32) (wr : Bool)
     trapCsrsExt cpu' k.sie -∗ cpuClaimExt cpu' k.sie k.proc -∗
     bufOwn (k.regs 10#5) bno 0#32 (if wr then dataBuf else dataDisk) -∗
     diskBlock γ bno.toNat (if wr then dataBuf else dataDisk) -∗ wpLoop cpu')
+
+/-- The write the caller's permit is about (Rocq `if wr then Some (1024 *
+uint bno, bs_buf) else None`). -/
+def vdrwWr (wr : Bool) (bno : BitVec 32) (dataBuf : List (BitVec 8)) : DiskWr :=
+  if wr then some (BSIZE * bno.toNat, dataBuf) else none
+
+/-- The caller's continuation, owed the receipt `▷ Q` on top. -/
+def vdrwPostQ (k : KCtx) (γ : DiskNames) (bno : BitVec 32) (wr : Bool)
+    (dataBuf dataDisk : List (BitVec 8)) (Q : IProp GF) : CPU → IProp GF := fun cpu' =>
+  iprop(▷ Q -∗ vdrwPostK k γ bno wr dataBuf dataDisk cpu')
+
+/-- The crash-permit resource the thread carries: the caller's sequential
+permit until the publication deposits it (`rq = none`), the persistent
+receipt of its channel cell after (`rq = some γq`). -/
+def vdrwTok (rq : Option GName) (wr : Bool) (bno : BitVec 32) (dataBuf : List (BitVec 8))
+    (Q : IProp GF) : IProp GF :=
+  match rq with
+  | none => diskSeqPermit (genId (hlc := hlc) (GF := GF)) (vdrwWr wr bno dataBuf) Q
+  | some γq => crashPermReceipt γq Q
+
+/-- **The caller's continuation, with the crash permit that pays for it**:
+the receipt `Q` is existential, shared by the permit (or its receipt) and
+the continuation that is owed `▷ Q`. -/
+def vdrwNext (k : KCtx) (γ : DiskNames) (bno : BitVec 32) (wr : Bool)
+    (dataBuf dataDisk : List (BitVec 8)) (rq : Option GName) (cpu : CPU) : IProp GF := iprop%
+  ∃ Q : IProp GF, vdrwTok rq wr bno dataBuf Q ∗
+    wpNext true k.proc cpu (vdrwPostQ k γ bno wr dataBuf dataDisk Q)
+
+theorem vdrwNext_withSpie (k : KCtx) (a b : Bool) (γ : DiskNames) (bno : BitVec 32) (wr : Bool)
+    (dataBuf dataDisk : List (BitVec 8)) (rq : Option GName) :
+    vdrwNext (GF := GF) (k.withSpie a b) γ bno wr dataBuf dataDisk rq =
+      vdrwNext k γ bno wr dataBuf dataDisk rq := rfl
+
+/-- The continuation follows the thread to whichever hart it is resumed on
+(a park's crossing, at a proc). -/
+theorem vdrwNext_shift (cpu c : CPU) (k : KCtx) (γ : DiskNames) (bno : BitVec 32) (wr : Bool)
+    (dataBuf dataDisk : List (BitVec 8)) (rq : Option GName) (jp : Nat) (hj : jp < NPROC)
+    (hproc : k.proc = procAddr jp) :
+    vdrwNext (GF := GF) k γ bno wr dataBuf dataDisk rq cpu ⊢
+      vdrwNext k γ bno wr dataBuf dataDisk rq c := by
+  unfold vdrwNext
+  iintro ⟨%Q, Ht, Hn⟩
+  iexists Q
+  iframe Ht
+  iapply (wpNext_shift true k.proc cpu c _
+    (fun h => h.elim (fun h => absurd h (by decide))
+      (fun h => absurd h (by rw [hproc]; exact procAddr_nonzero hj)))) $$ Hn
 
 /-- **The seam between P1 and P2** (`virtio_disk_rw + 0xbc`): the lock is
 held with its payload in hand, the register pins are set, the frame is up,
@@ -382,7 +430,7 @@ def vdrwP1Exit (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
   vdrwCaps γ γl pd pav pu ∗ locked γl cpu ∗ diskRes γ pd pav pu curCtx ∗
   (∃ K : Nat, viewLb cpu K) ∗ vdrwFrame k ∗
   bufOwn (k.regs 10#5) bno dsk0 dataBuf ∗ diskBlock γ bno.toNat dataDisk ∗
-  wpNext true k.proc cpu (vdrwPostK k γ bno (decide (k.regs 11#5 ≠ 0#64)) dataBuf dataDisk)
+  vdrwNext k γ bno (decide (k.regs 11#5 ≠ 0#64)) dataBuf dataDisk none cpu
 
 /-- The phase vocabulary sees a context only through its registers and
 proc: a pinned-bits update is invisible to it. -/

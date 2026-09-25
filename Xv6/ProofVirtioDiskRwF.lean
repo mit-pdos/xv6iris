@@ -285,9 +285,14 @@ theorem vdrw_P6 (FD : FREE_DESC) (RE : RELEASE)
   iapply wpLoop_fupd
   imod disk_collect γ pd pav pu c n T nr hcwf hnle hctx hramc hkmc
     $$ [Hinv HS Hgeom Hth Htm Htt Hcl Hnr Hdone Hwmn Hfl]
-    with ⟨Hth, Htm, Htt, Hnr, Hc0, Hc1, Hc2, Hch, Hib, Hdsk, Hst, Hbuf, Hblkd⟩
+    with ⟨Hth, Htm, Htt, Hnr, Hc0, Hc1, Hc2, Hch, Hib, Hdsk, Hst, Hbuf, Hblkd, Hdone⟩
   · iframe #
     iframe
+  -- the receipt: the spent leaf against the thread's own receipt
+  ihave #Hcpi := vdrwCaps_perm γ γl pd pav pu $$ Hcaps
+  imod vdrwNext_collect k γ bno wr dataBuf dataDisk c cpu ⊤ (fun p hp => CoPset.subseteq_top p hp)
+    $$ [Hcpi Hdone Hnext] with ⟨%Q, HQ, Hnext⟩
+  · iframe Hcpi Hdone Hnext
   imodintro
   ihave Hpay := Hpback $$ Hnr Hrl
   isimp only [hpay] at Hbuf Hblkd
@@ -459,9 +464,12 @@ theorem vdrw_P6 (FD : FREE_DESC) (RE : RELEASE)
   case ha0r => k_norm
   -- past the release: at the caller's index again
   k_norm_g [vdrw6_ret_21c, hlkKK, vdrw5_filter, vdrw_popctx k k.sie rfl hlocks hwf]
-  ihave Hnext : ∀ c : CPU, wpNext true k.proc c (vdrwPostK k γ bno wr dataBuf dataDisk) $$ [Hnext]
+  ihave Hnext : ∀ c' : CPU, wpNext true k.proc c' (vdrwPostQ k γ bno wr dataBuf dataDisk Q)
+    $$ [Hnext]
   · iintro %c0
-    iapply (vdrw5_next_at cpu c0 k γ bno wr dataBuf dataDisk jp hjp hproc) $$ Hnext
+    iapply (wpNext_shift true k.proc cpu c0 _
+      (fun h => h.elim (fun h => absurd h (by decide))
+        (fun h => absurd h (by rw [hproc]; exact procAddr_nonzero hjp)))) $$ Hnext
   k_next_e
   iintro %Rf Hk Hpc %hcsf
   try isimp only [vdrw6_ret_21c] at Hpc
@@ -517,7 +525,9 @@ theorem vdrw_P6 (FD : FREE_DESC) (RE : RELEASE)
     $$ [Hbno Hdsk Hbuf]
   · iframe Hbno Hdsk Hbuf
   ihave Hnext := Hnext $$ %cpu
-  ihave HΦp := wpNext_here k.proc cpu (vdrwPostK k γ bno wr dataBuf dataDisk) $$ Hnext
+  ihave HΦq := wpNext_here k.proc cpu (vdrwPostQ k γ bno wr dataBuf dataDisk Q) $$ Hnext
+  isimp only [vdrwPostQ] at HΦq
+  ihave HΦp := HΦq $$ HQ
   isimp only [vdrwPostK] at HΦp
   ihave HΦ2 := HΦp $$ %(k.spie) %(k.spp)
   isimp only [KCtx.withSpie_self' k k.spie k.spp rfl rfl] at HΦ2
