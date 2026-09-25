@@ -53,7 +53,8 @@ theorem fsinit_readsb (MM : MEMMOVE) (BE : BRELSE) (IL : INITLOG) (IR : IRECLAIM
     (bsSb sbOld : List (BitVec 8)) (kk : Nat) (bs bsd : List (BitVec 8)) (d : Bool)
     (bsHdr : List (BitVec 8)) (L : BlockMap) (D : RegMapF Bool)
     (vlock : BitVec 32) (vname vcpu : BitVec 64) (vStart vDev vNc vN : BitVec 32)
-    (M : LogMirror) (sbrec : FsSb) (hcrash : fsinitCrashPure L M bsSb sbrec)
+    (M : LogMirror) (sbrec : FsSb) (Xv : Nat → List (BitVec 8))
+    (hcrash : fsinitCrashPure L M bsSb sbrec bsHdr Xv)
     (hj : j < NPROC) (hproc : k.proc = procAddr j) (hK : fsinitSlots ≤ k.avail)
     (hnoff : k.noff = 0) (hlocks : k.locks = []) (htier : k.tier = KTier.kpt)
     (hgeom : logGeomOk fscCov fscLogst)
@@ -67,7 +68,6 @@ theorem fsinit_readsb (MM : MEMMOVE) (BE : BRELSE) (IL : INITLOG) (IR : IRECLAIM
     (hhdrLen : (hdrDec bsHdr).1 ≤ LOGBLOCKS)
     (hhdrNodup : (hdrDec bsHdr).2.Nodup)
     (hhdrHome : ∀ b ∈ (hdrDec bsHdr).2, fsHome fscCov fscLogst b ∧ b ≠ SB_BNO)
-    (hhdr0 : hdrN bsHdr = 0)
     (hsbOld : sbOld.length = 32)
     (hpd : descPageRw pd)
     (ha0 : R 10#5 = bnode kk)
@@ -82,7 +82,7 @@ theorem fsinit_readsb (MM : MEMMOVE) (BE : BRELSE) (IL : INITLOG) (IR : IRECLAIM
     frame4s2 (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) (k.regs 9#5) (k.regs 18#5) ∗
     wordPointsTo (pPid k.proc) 4 dqp pidv ∗
     bioLocked fscBio (fsView fscFs fscDisk icfgDev fscCov) kk pidv icfgDev 1#32 bs bsd d ∗
-    fsblock fscFs.bytes 1 bsSb ∗ fsinitCrash (hlc := hlc) M sbrec ∗
+    fsblock fscFs.bytes 1 bsSb ∗ fsinitCrash (hlc := hlc) M sbrec Xv ∗
     byteBuf KA.«sb» (DFrac.own 1) sbOld ∗
     excOwn fscFs.exc (hdrDec bsHdr).2 ∗
     fsinitLogRes bsHdr L D vlock vname vcpu vStart vDev vNc vN ∗
@@ -196,8 +196,8 @@ theorem fsinit_readsb (MM : MEMMOVE) (BE : BRELSE) (IL : INITLOG) (IR : IRECLAIM
   k_norm_g at hcs4
   obtain ⟨f2, f8, f9, f18, f19, f20, f21, f22, f23, f24, f25, f26, f27⟩ := hcs4
   iapply (fsinit_log IL IR Γ cpu k spie3 spp3 R4 γl pd pav pu j pidv dqp vMagic vSize vNblocks
-      vNlog bs bsHdr L D vlock vname vcpu vStart vDev vNc vN M sbrec hcrash hj hproc hK hnoff htier hgeom hmagic
-      hn1 hnnib hn31 hblk hbg hbel hhdrLen hhdrNodup hhdrHome hhdr0 hpd
+      vNlog bs bsHdr L D vlock vname vcpu vStart vDev vNc vN M sbrec Xv hcrash hj hproc hK hnoff
+      htier hgeom hmagic hn1 hnnib hn31 hblk hbg hbel hhdrLen hhdrNodup hhdrHome hpd
       ((f18.trans e18).trans hs2) ((f2.trans e2).trans hR2) ((f19.trans e19).trans p19)
       ((f20.trans e20).trans p20) ((f21.trans e21).trans p21) ((f22.trans e22).trans p22)
       ((f23.trans e23).trans p23) ((f24.trans e24).trans p24) ((f25.trans e25).trans p25)

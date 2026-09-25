@@ -55,6 +55,7 @@ theorem fsinit_entry (BD : BREAD) (MM : MEMMOVE) (BE : BRELSE) (IL : INITLOG) (I
     (bsHdr : List (BitVec 8)) (L : BlockMap) (D : RegMapF Bool)
     (vlock : BitVec 32) (vname vcpu : BitVec 64) (vStart vDev vNc vN : BitVec 32)
     (pidv : BitVec 32) (dqp : DFrac) (M : LogMirror) (sbrec : FsSb)
+    (Xv : Nat → List (BitVec 8))
     (hj : j < NPROC) (hproc : k.proc = procAddr j) (hK : fsinitSlots ≤ k.avail)
     (hnoff : k.noff = 0)
     (htier : k.tier = KTier.kpt)
@@ -62,6 +63,9 @@ theorem fsinit_entry (BD : BREAD) (MM : MEMMOVE) (BE : BRELSE) (IL : INITLOG) (I
     (h1cov : 1 ∈ fscCov)
     (hsbImg : bsSb.take 32 = sbImage vMagic vSize vNblocks (BitVec.ofNat 32 fscNinodes) vNlog
       (BitVec.ofNat 32 fscLogst) (BitVec.ofNat 32 icfgIst) (BitVec.ofNat 32 fscBmapstart))
+    (hsbparse : fsParseSb (fun _ => bsSb) = some sbrec) (hsbok : FsSbOk sbrec)
+    (hcg : ColGeom sbrec icfgIst icfgNib (fsHomeList fscCov fscLogst))
+    (hbmq : sbrec.sbBmapstart = fscBmapstart) (hszq : sbrec.sbSize = fscSize)
     (hmagic : vMagic.toNat = FSMAGIC)
     (hn1 : 1 < fscNinodes) (hnnib : fscNinodes ≤ 16 * icfgNib) (hn31 : fscNinodes < 2 ^ 31)
     (hblk : iregBlocksOk icfgIst icfgNib fscCov fscLogst)
@@ -70,24 +74,55 @@ theorem fsinit_entry (BD : BREAD) (MM : MEMMOVE) (BE : BRELSE) (IL : INITLOG) (I
     (hhdrLen : (hdrDec bsHdr).1 ≤ LOGBLOCKS)
     (hhdrNodup : (hdrDec bsHdr).2.Nodup)
     (hhdrHome : ∀ b ∈ (hdrDec bsHdr).2, fsHome fscCov fscLogst b ∧ b ≠ SB_BNO)
-    (hhdr0 : hdrN bsHdr = 0)
-    (hcrash : fsinitCrashPure L M bsSb sbrec)
+    (hxslot : ∀ (i b : Nat), (hdrDec bsHdr).2[i]? = some b →
+      Xv b = M.view (logSlotBno fscLogst i) ∧ (Xv b).length = BSIZE)
+    (hLM : ∀ b ∈ fscCov, PartialMap.get? L b = some (M.view b))
     (hsbOld : sbOld.length = 32)
     (hpd : descPageRw pd)
     (ha0 : k.regs 10#5 = BitVec.signExtend 64 icfgDev) :
     wp_fsinit_eb_body (hlc := hlc) (GF := GF) Γ cpu k γl pd pav pu j
       vMagic vSize vNblocks vNlog bsSb sbOld bsHdr L D vlock vname vcpu vStart vDev vNc vN
-      pidv dqp M sbrec hj hproc hK hnoff htier hgeom h1cov hsbImg hmagic hn1 hnnib hn31 hblk hbg
-      hbel hhdrLen hhdrNodup hhdrHome hhdr0 hcrash hsbOld hpd ha0 := by
+      pidv dqp M sbrec Xv hj hproc hK hnoff htier hgeom h1cov hsbImg hsbparse hsbok hcg hbmq hszq
+      hmagic hn1 hnnib hn31 hblk hbg hbel hhdrLen hhdrNodup hhdrHome hxslot hLM hsbOld hpd ha0 := by
   obtain ⟨hK4, hKbr, -, -, -, -⟩ := fsinit_slots k.avail hK
   have hww : ∀ (K : KCtx) (a b c d : Bool), (K.withSpie a b).withSpie c d = K.withSpie c d :=
     fun _ _ _ _ _ => rfl
   have hpsw : ∀ (K : KCtx) (m : Nat) (a b : Bool),
       (K.pushed m).withSpie a b = (K.withSpie a b).pushed m := fun _ _ _ _ => rfl
   unfold wp_fsinit_eb_body
-  iintro ⟨Hk, Hpc, #Hpi, Hte, Hce, #Hpe, #Hbc, #Hdc, Hpid, Hfree, Hfsb, Hcr, Hold, Hxo, #Hreg, #Hbreg,
+  iintro ⟨Hk, Hpc, #Hpi, Hte, Hce, #Hpe, #Hbc, #Hdc, Hpid, #Hseamg, #Hxfer, #Hcert, Hborn, Hfree,
+    #Hbinv, Hfsb, Hold, Hxo, #Hreg, #Hbreg,
     Hboot, #Hit2, #Hiti, #Hslks, #Hkm0, #Hkm16, Hl0, Hl8, Hl16, Hls, Hld, Hlo, Hlc, Hlnc, Hlhn,
     Hlhb, HauthL, HauthD, Hdirty, Hhdr, Hslots, Hsl, Hiref, Hnext⟩
+  -- the arity-free seam initlog and ireclaim take, off the one at the
+  -- application's guest (Rocq `fs_crash_seam_of_at`)
+  ihave #Hseam := fsCrashSeam_ofAt appGuest fscCov fscLogst $$ Hseamg
+  -- THE FILE SYSTEM'S LAW, MINUS BLOCK 1'S PARK (Rocq's `Hlawf`): assembled
+  -- out of the invariants fsinit already holds, read at the record block 1
+  -- DECODES to -- the three ties (a'') are that bridge.  The park itself is
+  -- initlog's, so what goes down is the WAND.
+  have hcg' : ColGeom sbrec sbrec.sbInodestart icfgNib (fsHomeList fscCov fscLogst) := by
+    rw [hcg.cgIst]; exact hcg
+  ihave #Hreg' : iregReg (hlc := hlc) fscIreg fscFs sbrec.sbInodestart icfgNib $$ []
+  · rw [hcg.cgIst]; iexact Hreg
+  ihave #Hbreg' : bitmapReg fscFs sbrec.sbBmapstart fscCov fscLogst sbrec.sbSize $$ []
+  · rw [hbmq, hszq]; iexact Hbreg
+  ihave #Hesc := isItable2_escrows fscItlock fscIc fscFs fscIreg fscCov fscLogst icfgNib icfgDev
+    $$ Hit2
+  ihave #Hpool := isItable2_pool fscItlock fscIc fscFs fscIreg fscCov fscLogst icfgNib icfgDev
+    $$ Hit2
+  ihave #Hlaw : □ (sbPark fscFs sbrec -∗ snapLaw (hlc := hlc) icfgLog fscFs fscCov fscLogst) $$ []
+  · imodintro
+    iintro #Hpark
+    iapply fsSnapLawBuild icfgLog fscIc fscFs fscIreg fscCov fscLogst icfgNib sbrec rfl rfl hcg'
+      $$ Hseamg Hxfer Hreg' Hbreg' Hesc Hpool Hpark
+  ihave Hcr : fsinitCrash (hlc := hlc) M sbrec Xv $$ [Hborn]
+  · unfold fsinitCrash
+    iframe Hborn
+    isplitr
+    · iexact Hlaw
+    · iexact Hbinv
+  have hcrash : fsinitCrashPure L M bsSb sbrec bsHdr Xv := ⟨hLM, hsbok, hsbparse, hxslot⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
   icases kctx_wf _ _ $$ Hk with ⟨%hkwf, Hk⟩
   have hlocks : k.locks = [] := List.eq_nil_of_length_eq_zero (by have := hkwf.2.2.2.1; omega)
@@ -145,9 +180,9 @@ theorem fsinit_entry (BD : BREAD) (MM : MEMMOVE) (BE : BRELSE) (IL : INITLOG) (I
   obtain ⟨e2, e8, e9, e18, e19, e20, e21, e22, e23, e24, e25, e26, e27⟩ := hcsa
   iapply (fsinit_readsb MM BE IL IR Γ cpu k spie2 spp2 R2 γl pd pav pu j pidv dqp vMagic vSize
       vNblocks vNlog bsSb sbOld kk bs bsd d bsHdr L D vlock vname vcpu vStart vDev vNc vN M sbrec
-      hcrash hj hproc
+      Xv hcrash hj hproc
       hK hnoff hlocks htier hgeom hsbImg hmagic hn1 hnnib hn31 hblk hbg hbel hhdrLen hhdrNodup
-      hhdrHome hhdr0 hsbOld hpd ha0kk e18 e2 e19 e20 e21 e22 e23 e24 e25 e26 e27)
+      hhdrHome hsbOld hpd ha0kk e18 e2 e19 e20 e21 e22 e23 e24 e25 e26 e27)
   iframe Hk Hpc Henv Hte Hce Hframe Hpid Hlk Hfsb Hcr Hold Hxo Hlog Hsl Hiref Hboot Hnext
 
 end
@@ -158,11 +193,11 @@ theorem fsinit_proof (BR : BREAD) (MM : MEMMOVE) (BL : BRELSE) (IL : INITLOG) (I
     FSINIT :=
   ⟨fun {hlc GF} _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ Γ _ cpu k γl pd pav pu j
     vMagic vSize vNblocks vNlog bsSb sbOld bsHdr L D vlock vname vcpu vStart vDev vNc vN pidv dqp
-    M sbrec hj hproc hK hnoff htier hgeom h1cov hsbImg hmagic hn1 hnnib hn31 hblk hbg hbel
-    hhdrLen hhdrNodup hhdrHome hhdr0 hcrash hsbOld hpd ha0 =>
+    M sbrec Xv hj hproc hK hnoff htier hgeom h1cov hsbImg hsbparse hsbok hcg hbmq hszq hmagic hn1
+    hnnib hn31 hblk hbg hbel hhdrLen hhdrNodup hhdrHome hxslot hLM hsbOld hpd ha0 =>
   fsinit_entry BR MM BL IL IR Γ cpu k γl pd pav pu j vMagic vSize vNblocks vNlog bsSb sbOld bsHdr
-    L D vlock vname vcpu vStart vDev vNc vN pidv dqp M sbrec hj hproc hK hnoff htier hgeom h1cov
-    hsbImg hmagic hn1 hnnib hn31 hblk hbg hbel hhdrLen hhdrNodup hhdrHome hhdr0 hcrash hsbOld hpd
-    ha0⟩
+    L D vlock vname vcpu vStart vDev vNc vN pidv dqp M sbrec Xv hj hproc hK hnoff htier hgeom h1cov
+    hsbImg hsbparse hsbok hcg hbmq hszq hmagic hn1 hnnib hn31 hblk hbg hbel hhdrLen hhdrNodup
+    hhdrHome hxslot hLM hsbOld hpd ha0⟩
 
 end Xv6

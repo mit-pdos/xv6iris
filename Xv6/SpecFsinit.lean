@@ -76,22 +76,26 @@ Every one of those has its Lean counterpart below (deviations listed).
    the other deviations' cross-references stand.
 2. (RETIRED by crash batch C-2b.)  Block 1's run is PARKED by `initlog`
    (Rocq's C-3a shape) and not returned; Rocq's `fs_parse_sb … = Some
-   sbrec` / `fs_sb_ok sbrec` ride `fsinitCrashPure`.
-3. THE CRASH LAYER, PASS-THROUGH SHAPE (crash batch C-2b): `initlog`'s
-   restored premises -- the seam, `log_mirror_born M`, the law minus the
-   park, and the era's readings (g') -- are threaded as `fsinitCrash` /
-   `fsinitCrashPure`; `gen_cert` comes off the cycle boundary
-   (`Xv6.wpLoop_cert`).  STILL MISSING vs Rocq (crash batch C-4's):
-   `fs_crash_seam_at app_guest`, `app_xfer`, the law BUILT here
-   (`fs_snap_law_build`) with its geometry, the exception set's slot values
-   (g''), and D42's drop of `hhdr0`.
-4. `hhdr0 : hdrN bsHdr = 0` -- AS ROCQ'S premise (g), which Rocq's
-   fsinit still carries although its initlog is general in `n`: a dirty
-   header costs initlog the slot-value premise (`Xv6/SpecInitlog.lean`'s
-   `hxslot`, Rocq's (g'')), and here the byte view's `Xv` is bound inside
-   `bitmapReg`'s row, so fsinit discharges it only vacuously, at a clean
-   header (`Xv6.fsinit_initlog_call`).  Rocq's three header well-formedness
-   clauses are kept verbatim beside it.
+   sbrec` / `fs_sb_ok sbrec` are this contract's (a') premises.
+3. (RETIRED by crash batch C-4.)  THE CRASH LAYER IS ROCQ'S: the crash seam
+   at the application's guest (`fsCrashSeamAt appGuest`), the transport
+   `appXfer`, the era certificate and the era's born-true mirror
+   `logMirrorBorn M` are premises, and fsinit BUILDS the file system's law
+   here (`Xv6.fsSnapLawBuild`, Rocq `fs_snap_law_build`) out of the seam, the
+   transport and the four invariants it already holds, read at the record
+   block 1 decodes to (the premises (a'') below are the bridge), and derives
+   initlog's and ireclaim's arity-free seam (`Xv6.fsCrashSeam_ofAt`).
+4. (RETIRED by crash batch C-4, D42.)  The clean-header premise `hhdr0` is
+   GONE, as Rocq's (`SpecFsinit.v:346-348`: at era `n > 0` the header is
+   whatever the previous era left); this file's earlier claim that Rocq
+   still carried it was stale.  Rocq's (g) is the three well-formedness
+   clauses kept verbatim (`hhdrLen`/`hhdrNodup`/`hhdrHome`, i.e.
+   `hdrWf`'s), plus (g'') `hxslot` (the exception set's values are the
+   slots', named by the mirror) and (g') `hLM` (on the covered range the
+   logged view IS the mirror), both threaded into initlog.  `hxslot`
+   carries one more conjunct than Rocq's, `(Xv b).length = BSIZE`: the
+   Lean `initlog` asks it (its recovering install's contract does), and
+   it is free wherever the view is the disk's (`fsBlocks_length`).
 5. The four field ties (c) are SUBSTITUTED into `sbImage` (forkret passes
    `eq_refl`); `bv_unsigned v_magic = FSMAGIC` is `vMagic.toNat = FSMAGIC`.
 6. `icfg_dev = ROOTDEV`, `0 < icfg_nib`, `0 ≤ icfg_ist`, `0 ≤ fsc_bmapstart`
@@ -100,9 +104,10 @@ Every one of those has its Lean counterpart below (deviations listed).
    post exports no fact derived from them; `Nat` absorbs the two `0 ≤`.
    Rocq's four bitmap-geometry premises are `bitmapGeomOk` (SpecIreclaim
    deviation 2).
-7. Rocq's separate `fs_bytes_inv … Xv` premise is dropped: `bitmapReg`
-   carries the byte view's row at the named home set (`fsBytesAt`, `Xv`
-   bound), which is what both the `readsb` crossing and initlog take.
+7. (RETIRED by crash batch C-4.)  Rocq's separate `fs_bytes_inv … Xv`
+   premise is back, NAMED at `Xv` (initlog's `hxslot` speaks about it);
+   the `readsb` crossing still reads the home-set-free row off `bitmapReg`
+   (`Xv6.bitmapInv_bytes_at`), as Rocq's proof does.
 8. `ic_escrows` is dropped (as `Xv6/SpecIreclaim.lean`: `isItable2` carries
    the family).
 9. The standing spelling ones: `printk_env` / `kernel_data` are
@@ -122,6 +127,8 @@ import Xv6.SpecMemmove
 import Xv6.SpecInitlog
 import Xv6.SpecIreclaim
 import Xv6.FsImg
+import Xv6.AppDur
+import Xv6.FsCollect
 import MachCSL.ByteWord4
 
 namespace Xv6
@@ -164,27 +171,6 @@ def sbImage (magic fssize nblocks ninodes nlog logstart inodestart bmapstart : B
   wordToBytes4 ninodes ++ wordToBytes4 nlog ++ wordToBytes4 logstart ++
   wordToBytes4 inodestart ++ wordToBytes4 bmapstart
 
-/-- THE CRASH PREMISES `fsinit` THREADS TO `initlog` (crash batch C-2b):
-exactly `initlog`'s restored Rocq premises -- the crash seam, the era's
-born-true mirror, and the file system's law minus block 1's park.  A
-PASS-THROUGH SHAPE: crash batch C-4 restates `fsinit` Rocq-literally (the law
-is BUILT here by `fs_snap_law_build` out of the seam at the application's
-guest, D42 drops `hhdr0`, and the era's readings (g')/(g'') become this
-contract's own premises). -/
-def fsinitCrash {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF]
-    [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [BcacheG GF] [DiskG GF] [FsBlocksG GF]
-    [LogG GF] [FsLinkG GF] [FsTopG GF] [Fscfg] [Icfg] [CurCtx]
-    (M : LogMirror) (sbrec : FsSb) : IProp GF :=
-  iprop(fsCrashSeam (hlc := hlc) (GF := GF) fscCov fscLogst ∗ logMirrorBorn (hlc := hlc) M ∗
-    □ (sbPark fscFs sbrec -∗ snapLaw (hlc := hlc) icfgLog fscFs fscCov fscLogst))
-
-/-- ...and their pure side: the era's two readings of one image (Rocq's
-(g')), and block 1's two facts. -/
-def fsinitCrashPure [Fscfg] (L : BlockMap) (M : LogMirror) (bsSb : List (BitVec 8))
-    (sbrec : FsSb) : Prop :=
-  (∀ b ∈ fscCov, PartialMap.get? L b = some (M.view b)) ∧ FsSbOk sbrec ∧
-    fsParseSb (fun _ => bsSb) = some sbrec
-
 /-- **WP of `fsinit(dev = a0)`** at either entry `SIE` (Rocq's
 `wp_fsinit_sconf_body`). -/
 def wp_fsinit_eb_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
@@ -201,6 +187,7 @@ def wp_fsinit_eb_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6
     (bsHdr : List (BitVec 8)) (L : BlockMap) (D : RegMapF Bool)
     (vlock : BitVec 32) (vname vcpu : BitVec 64) (vStart vDev vNc vN : BitVec 32)
     (pidv : BitVec 32) (dqp : DFrac) (M : LogMirror) (sbrec : FsSb)
+    (Xv : Nat → List (BitVec 8))
     (hj : j < NPROC) (hproc : k.proc = procAddr j) (hK : fsinitSlots ≤ k.avail)
     (hnoff : k.noff = 0)
     (htier : k.tier = KTier.kpt)
@@ -211,6 +198,13 @@ def wp_fsinit_eb_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6
     -- (a) THE IMAGE PREMISES: the block IS a superblock, at the config values
     (hsbImg : bsSb.take 32 = sbImage vMagic vSize vNblocks (BitVec.ofNat 32 fscNinodes) vNlog
       (BitVec.ofNat 32 fscLogst) (BitVec.ofNat 32 icfgIst) (BitVec.ofNat 32 fscBmapstart))
+    -- (a') ...AND THE RECORD THEY DECODE TO (what initlog parks block 1 at)
+    (hsbparse : fsParseSb (fun _ => bsSb) = some sbrec) (hsbok : FsSbOk sbrec)
+    -- (a'') THE COLLECTION'S GEOMETRY AND THE TWO FIELD TIES: the bridge from
+    -- the CONFIG numbers the invariants are stated at to the record the law
+    -- is built at
+    (hcg : ColGeom sbrec icfgIst icfgNib (fsHomeList fscCov fscLogst))
+    (hbmq : sbrec.sbBmapstart = fscBmapstart) (hszq : sbrec.sbSize = fscSize)
     -- (b) the magic, which refutes the LIVE panic arm at +0x40
     (hmagic : vMagic.toNat = FSMAGIC)
     -- (d) THE THREE ninodes TIES (SpecIalloc's / SpecIreclaim's)
@@ -219,15 +213,19 @@ def wp_fsinit_eb_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6
     (hblk : iregBlocksOk icfgIst icfgNib fscCov fscLogst)
     (hbg : bitmapGeomOk fscCov fscLogst fscBmapstart fscSize)
     (hbel : covBelow fscCov fscSize)
-    -- (g) THE ON-DISK HEADER IS WELL FORMED: bounded, duplicate-free, and it
-    -- names covered HOME blocks other than the superblock...
+    -- (g) THE ON-DISK HEADER IS WELL FORMED, AND THAT IS ALL (D42: no clean-
+    -- header premise): bounded, duplicate-free, and it names covered HOME
+    -- blocks other than the superblock
     (hhdrLen : (hdrDec bsHdr).1 ≤ LOGBLOCKS)
     (hhdrNodup : (hdrDec bsHdr).2.Nodup)
     (hhdrHome : ∀ b ∈ (hdrDec bsHdr).2, fsHome fscCov fscLogst b ∧ b ≠ SB_BNO)
-    -- ...and CLEAN (initlog's own premise; deviation 4)
-    (hhdr0 : hdrN bsHdr = 0)
-    -- initlog's crash premises, pure side (see `fsinitCrashPure`)
-    (hcrash : fsinitCrashPure L M bsSb sbrec)
+    -- (g'') THE EXCEPTION SET'S VALUES ARE THE SLOTS' (threaded to initlog;
+    -- the length is the Lean port's addition, deviation 4)
+    (hxslot : ∀ (i b : Nat), (hdrDec bsHdr).2[i]? = some b →
+      Xv b = M.view (logSlotBno fscLogst i) ∧ (Xv b).length = BSIZE)
+    -- (g') THE ERA'S TWO READINGS OF ONE IMAGE: the logged view and the
+    -- era's born-true mirror agree on the covered range
+    (hLM : ∀ b ∈ fscCov, PartialMap.get? L b = some (M.view b))
     -- the raw bytes are the record's width
     (hsbOld : sbOld.length = 32)
     (hpd : descPageRw pd)
@@ -239,13 +237,21 @@ def wp_fsinit_eb_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6
   diskCaps fscDisk fscDlock pd pav pu ∗
   -- the caller's own pid cell
   wordPointsTo (pPid k.proc) 4 dqp pidv ∗
+  -- THE CRASH SEAM AT THE APPLICATION'S GUEST AND THE TRANSPORT: fsinit
+  -- builds the commit's law from them (`fsSnapLawBuild`) and derives
+  -- initlog's arity-free seam from the first.  Then the era certificate and
+  -- the era's BORN-TRUE mirror half.
+  fsCrashSeamAt (hlc := hlc) (GF := GF) appGuest fscCov fscLogst ∗
+  appXfer (GF := GF) ∗
+  genCert (hlc := hlc) (GF := GF) ∗
+  logMirrorBorn (hlc := hlc) M ∗
   -- THE LOG'S FIVE GNAMES, AT THEIR GENESIS VALUES, AND THEY ARE `icfgLog`'s
   logFreeTok icfgLog ∗
+  -- THE BYTE VIEW'S ROW, NAMED at `Xv` (straight into initlog)
+  fsBytesInv fscFs.bytes fscFs.cache fscFs.exc (fsHomeList fscCov fscLogst) Xv ∗
   -- THE SUPERBLOCK, BEFORE: block 1's run (which pins the bytes bread
   -- returns) and 32 bytes of RAW .bss at `&sb`
   fsblock fscFs.bytes 1 bsSb ∗
-  -- initlog's crash premises (see `fsinitCrash`)
-  fsinitCrash (hlc := hlc) M sbrec ∗
   byteBuf KA.«sb» (DFrac.own 1) sbOld ∗
   -- THE BYTE VIEW'S EXCEPTION HANDLE, at the on-disk header's write set:
   -- spent once at the `readsb` crossing, then threaded into initlog
@@ -320,11 +326,12 @@ structure FSINIT : Prop where
     (bsHdr : List (BitVec 8)) (L : BlockMap) (D : RegMapF Bool)
     (vlock : BitVec 32) (vname vcpu : BitVec 64) (vStart vDev vNc vN : BitVec 32)
     (pidv : BitVec 32) (dqp : DFrac) (M : LogMirror) (sbrec : FsSb)
-    hj hproc hK hnoff htier hgeom h1cov hsbImg hmagic hn1 hnnib hn31 hblk hbg hbel
-    hhdrLen hhdrNodup hhdrHome hhdr0 hcrash hsbOld hpd ha0,
+    (Xv : Nat → List (BitVec 8))
+    hj hproc hK hnoff htier hgeom h1cov hsbImg hsbparse hsbok hcg hbmq hszq hmagic hn1 hnnib
+    hn31 hblk hbg hbel hhdrLen hhdrNodup hhdrHome hxslot hLM hsbOld hpd ha0,
     wp_fsinit_eb_body (hlc := hlc) (GF := GF) Γ cpu k γl pd pav pu j
       vMagic vSize vNblocks vNlog bsSb sbOld bsHdr L D vlock vname vcpu vStart vDev vNc vN
-      pidv dqp M sbrec hj hproc hK hnoff htier hgeom h1cov hsbImg hmagic hn1 hnnib hn31 hblk hbg
-      hbel hhdrLen hhdrNodup hhdrHome hhdr0 hcrash hsbOld hpd ha0
+      pidv dqp M sbrec Xv hj hproc hK hnoff htier hgeom h1cov hsbImg hsbparse hsbok hcg hbmq hszq
+      hmagic hn1 hnnib hn31 hblk hbg hbel hhdrLen hhdrNodup hhdrHome hxslot hLM hsbOld hpd ha0
 
 end Xv6

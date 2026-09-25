@@ -54,7 +54,9 @@ def fsinitEnv [Fscfg] [Icfg] [CurCtx] (Γ : SchedNames) (γl : GName) (pd pav pu
   iregReg (hlc := hlc) fscIreg fscFs icfgIst icfgNib ∗
   bitmapReg fscFs fscBmapstart fscCov fscLogst fscSize ∗
   isItable2 fscItlock fscIc fscFs fscIreg fscCov fscLogst icfgNib icfgDev ∗
-  itableInv (hlc := hlc) ∗ icSleeplocks fscIc
+  itableInv (hlc := hlc) ∗ icSleeplocks fscIc ∗
+  -- the arity-free crash seam and the era certificate (initlog's, end_op's)
+  fsCrashSeam (hlc := hlc) (GF := GF) fscCov fscLogst ∗ genCert (hlc := hlc) (GF := GF)
 
 instance fsinitEnv_persistent [Fscfg] [Icfg] [CurCtx] (Γ : SchedNames) (γl : GName)
     (pd pav pu : BitVec 64) : Persistent (fsinitEnv (hlc := hlc) (GF := GF) Γ γl pd pav pu) := by
@@ -194,7 +196,8 @@ theorem fsinit_reclaim (IR : IRECLAIM) [Fscfg] [Icfg] [CurCtx]
   have hpsw : ∀ (K : KCtx) (m : Nat) (a b : Bool),
       (K.pushed m).withSpie a b = (K.withSpie a b).pushed m := fun _ _ _ _ => rfl
   unfold fsinitEnv fsinitCells
-  iintro ⟨Hk, Hpc, ⟨#Hpe, #Hpi, #Hbc, #Hdc, #Hreg, #Hbreg, #Hit2, #Hiti, #Hslks⟩, Hte, Hce,
+  iintro ⟨Hk, Hpc, ⟨#Hpe, #Hpi, #Hbc, #Hdc, #Hreg, #Hbreg, #Hit2, #Hiti, #Hslks, #Hseam, #Hcert⟩,
+    Hte, Hce,
     Hframe, Hpid, ⟨C0, C1, C2, C3, C4, C5, C6, C7⟩, #Hlc, Hsl, Hiref, Hboot, Hnext⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
   -- RECOVERY IS DONE: the seal, and the two upgrades

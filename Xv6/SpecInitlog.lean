@@ -45,8 +45,8 @@ last pure premise, `hxslot` below: at every entry the byte view `Xv` holds
 the slot's logged content, named by the era's born-true mirror `M` (plus the
 length, the Lean port's one addition: the recovering install asks it).  At a
 clean header the decoded write set is `[]` (`Xv6.hdrDec_zero`) and `hxslot`
-is vacuous, which is how `Xv6/SpecFsinit.lean` still calls it (D42 is crash
-batch C-4's).
+is vacuous; `Xv6/SpecFsinit.lean` threads it from its own (g'') premise
+(D42, crash batch C-4).
 
 **THE CRASH PREMISES ARE ROCQ'S** (restored by crash batch C-2b): the crash
 seam, the era certificate, the era's born-true mirror `logMirrorBorn M` with

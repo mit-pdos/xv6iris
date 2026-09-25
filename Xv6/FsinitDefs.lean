@@ -20,6 +20,7 @@ import Xv6.SpecFsinit
 import Xv6.CodeTactics
 import Xv6.FsCallSitesF
 import Xv6.DinodeSlot
+import Xv6.FsCollectAll
 
 namespace Xv6
 
@@ -28,6 +29,35 @@ open LeanRV64D
 
 set_option linter.unusedSectionVars false
 set_option linter.unusedVariables false
+
+/-! ## The crash rows the stages thread to `initlog`
+
+Built once at fsinit's entry (`Xv6.fsinit_entry`, the top of Rocq's
+`wp_fsinit_sconf`: the arity-free seam off the seam at the application's
+guest, the law by `Xv6.fsSnapLawBuild`); the arity-free seam and the
+certificate ride `fsinitEnv` (`Xv6/FsinitTail.lean`), since ireclaim takes
+them too. -/
+
+/-- The crash rows `initlog` consumes beyond the seam and the certificate:
+the era's born-true mirror, the file system's law minus block 1's park, and
+the byte view's row named at `Xv`. -/
+def fsinitCrash {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF]
+    [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [BcacheG GF] [DiskG GF] [FsBlocksG GF]
+    [LogG GF] [FsLinkG GF] [FsTopG GF] [Fscfg] [Icfg] [CurCtx]
+    (M : LogMirror) (sbrec : FsSb) (Xv : Nat → List (BitVec 8)) : IProp GF :=
+  iprop(logMirrorBorn (hlc := hlc) M ∗
+    □ (sbPark fscFs sbrec -∗ snapLaw (hlc := hlc) icfgLog fscFs fscCov fscLogst) ∗
+    fsBytesInv fscFs.bytes fscFs.cache fscFs.exc (fsHomeList fscCov fscLogst) Xv)
+
+/-- ...and their pure side, what `initlog` asks beside them: (g') the era's
+two readings of one image, block 1's two facts, (g'') the exception set's
+slot values. -/
+def fsinitCrashPure [Fscfg] (L : BlockMap) (M : LogMirror) (bsSb : List (BitVec 8))
+    (sbrec : FsSb) (bsHdr : List (BitVec 8)) (Xv : Nat → List (BitVec 8)) : Prop :=
+  (∀ b ∈ fscCov, PartialMap.get? L b = some (M.view b)) ∧ FsSbOk sbrec ∧
+    fsParseSb (fun _ => bsSb) = some sbrec ∧
+    (∀ (i b : Nat), (hdrDec bsHdr).2[i]? = some b →
+      Xv b = M.view (logSlotBno fscLogst i) ∧ (Xv b).length = BSIZE)
 
 /-! ## The constants the code computes -/
 

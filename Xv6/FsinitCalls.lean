@@ -95,8 +95,8 @@ theorem fsinit_initlog_call (IL : INITLOG) [Fscfg] [Icfg] [CurCtx]
     (bsHdr : List (BitVec 8)) (L : BlockMap) (D : RegMapF Bool)
     (vlock : BitVec 32) (vname vcpu : BitVec 64) (vStart vDev vNc vN : BitVec 32)
     (pidv : BitVec 32) (dqp dqs : DFrac)
-    (M : LogMirror) (bsSb : List (BitVec 8)) (sbrec : FsSb)
-    (hcrash : fsinitCrashPure L M bsSb sbrec)
+    (M : LogMirror) (bsSb : List (BitVec 8)) (sbrec : FsSb) (Xv : Nat → List (BitVec 8))
+    (hcrash : fsinitCrashPure L M bsSb sbrec bsHdr Xv)
     (hj : j < NPROC) (hproc : k.proc = procAddr j) (hK : initlogSlots ≤ k.avail)
     (hnoff : k.noff = 0) (htier : k.tier = KTier.kpt)
     (hgeom : logGeomOk fscCov fscLogst)
@@ -104,22 +104,15 @@ theorem fsinit_initlog_call (IL : INITLOG) [Fscfg] [Icfg] [CurCtx]
     (hhdrLen : (hdrDec bsHdr).1 ≤ LOGBLOCKS)
     (hhdrNodup : (hdrDec bsHdr).2.Nodup)
     (hhdrHome : ∀ b ∈ (hdrDec bsHdr).2, fsHome fscCov fscLogst b)
-    (hhdr0 : hdrN bsHdr = 0)
     (hclean : ∀ b ∈ fscCov, PartialMap.get? D b = some false)
     (hpd : descPageRw pd) :
     kctx cpu k ∗ pcIs cpu KA.«initlog» ∗ procsInv Γ ∗
     trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗
     bioCtx γl fscBio (fsView fscFs fscDisk icfgDev fscCov) ∗ diskCaps fscDisk fscDlock pd pav pu ∗ panicEnv ∗
     wordPointsTo (pPid k.proc) 4 dqp pidv ∗
-    -- THE BYTE VIEW'S ROW AND THE WAL'S EXCEPTION HANDLE (Rocq
-    -- `SpecInitlog.v:352`).  `initlog` is the function that SEALS the handle
-    -- and so builds `Xv6.logCtx`'s third conjunct: the invariant at the era's
-    -- home set, plus the certificate that its exception set is empty.  The
-    -- handle comes in at the ON-DISK HEADER'S WRITE SET -- the home blocks
-    -- whose byte view was minted at the committed view while the cache still
-    -- reads the crashed disk -- and the recovering `install_trans` shrinks it
-    -- entry by entry.
-    fsBytesAt fscFs (fsHomeList fscCov fscLogst) ∗
+    -- the crash seam and the era certificate (fsinit's own)
+    fsCrashSeam (hlc := hlc) (GF := GF) fscCov fscLogst ∗ genCert (hlc := hlc) (GF := GF) ∗
+    -- THE WAL'S EXCEPTION HANDLE (the byte view's row rides `fsinitCrash`)
     excOwn fscFs.exc (hdrDec bsHdr).2 ∗
     -- the five ghost names, at their genesis values (the lock's included)
     logFreeTok icfgLog ∗
@@ -148,7 +141,7 @@ theorem fsinit_initlog_call (IL : INITLOG) [Fscfg] [Icfg] [CurCtx]
     -- the slot pool, stocked: the batch's 32 plus initlog's own working pair
     bslots ((LOGBLOCKS + 2) + 2) ∗
     -- initlog's crash premises, and block 1's run (PARKED by initlog)
-    fsinitCrash (hlc := hlc) M sbrec ∗ fsblock fscFs.bytes 1 bsSb ∗
+    fsinitCrash (hlc := hlc) M sbrec Xv ∗ fsblock fscFs.bytes 1 bsSb ∗
     wpNext true k.proc cpu (fun cpu' => iprop(∀ (spie spp : Bool) (R' : RegMap),
       ⌜calleeSaved k.regs R'⌝ -∗
       kctx cpu' ((k.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k.regs 1#5)) -∗
@@ -158,23 +151,16 @@ theorem fsinit_initlog_call (IL : INITLOG) [Fscfg] [Icfg] [CurCtx]
       bslots 2 -∗
       logCtx icfgLog fscBio fscFs fscCov fscLogst icfgDev -∗ wpLoop cpu'))
       ⊢ wpLoop (GF := GF) cpu := by
-  obtain ⟨hLM, hsbok, hsbparse⟩ := hcrash
-  unfold fsBytesAt
-  iintro ⟨Hk, Hpc, Hpi, Hte, Hce, Hbc, Hdc, Hpe, Hpid, ⟨%Xv, Hbinv⟩, Hxo, Hfree, Hsb, Hm0, Hm16,
+  obtain ⟨hLM, hsbok, hsbparse, hxslot⟩ := hcrash
+  iintro ⟨Hk, Hpc, Hpi, Hte, Hce, Hbc, Hdc, Hpe, Hpid, #Hseam, #Hcert, Hxo, Hfree, Hsb, Hm0, Hm16,
     Hl0, Hl8, Hl16, Hls, Hld, Hlo, Hlc, Hlnc, Hlhn, Hlhb, HauthL, HauthD, Hdirty, Hhdr, Hslots,
     Hpool, Hcr, Hfsb, Hnext⟩
-  -- the era certificate is free at the cycle boundary
-  iapply wpLoop_cert
-  iintro #Hcert
   unfold fsinitCrash
-  icases Hcr with ⟨#Hseam, Hborn, #Hlaw⟩
-  -- at a CLEAN header the write set is empty, so initlog's slot-value
-  -- premise is vacuous
+  icases Hcr with ⟨Hborn, #Hlaw, #Hbinv⟩
   have h := IL.wp_initlog_eb (hlc := hlc) (GF := GF) Γ cpu k icfgLog γl fscBio
     (fsView fscFs fscDisk icfgDev fscCov) fscDlock fscFs pd pav pu j fscLogst icfgDev KA.«sb»
     bsHdr Xv L D M bsSb sbrec vlock vname vcpu vStart vDev vNc vN pidv dqp dqs hj hproc hK hnoff
-    htier hgeom rfl rfl rfl ha0 ha1 hhdrLen hhdrNodup hhdrHome
-    (fun i b hb => by rw [hdrDec_zero bsHdr hhdr0] at hb; simp at hb) hclean hLM hsbok hsbparse hpd
+    htier hgeom rfl rfl rfl ha0 ha1 hhdrLen hhdrNodup hhdrHome hxslot hclean hLM hsbok hsbparse hpd
   unfold wp_initlog_eb_body initlogAddr at h
   simp only [fsView_gd, fsView_cov] at h
   rw [show KA.«sb» + 20#64 = sbLogstartAddr from rfl] at h

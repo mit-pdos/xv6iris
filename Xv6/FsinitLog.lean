@@ -64,7 +64,8 @@ theorem fsinit_log (IL : INITLOG) (IR : IRECLAIM) [Fscfg] [Icfg] [CurCtx]
     (bsSb : List (BitVec 8))
     (bsHdr : List (BitVec 8)) (L : BlockMap) (D : RegMapF Bool)
     (vlock : BitVec 32) (vname vcpu : BitVec 64) (vStart vDev vNc vN : BitVec 32)
-    (M : LogMirror) (sbrec : FsSb) (hcrash : fsinitCrashPure L M bsSb sbrec)
+    (M : LogMirror) (sbrec : FsSb) (Xv : Nat → List (BitVec 8))
+    (hcrash : fsinitCrashPure L M bsSb sbrec bsHdr Xv)
     (hj : j < NPROC) (hproc : k.proc = procAddr j) (hK : fsinitSlots ≤ k.avail)
     (hnoff : k.noff = 0) (htier : k.tier = KTier.kpt)
     (hgeom : logGeomOk fscCov fscLogst)
@@ -76,7 +77,6 @@ theorem fsinit_log (IL : INITLOG) (IR : IRECLAIM) [Fscfg] [Icfg] [CurCtx]
     (hhdrLen : (hdrDec bsHdr).1 ≤ LOGBLOCKS)
     (hhdrNodup : (hdrDec bsHdr).2.Nodup)
     (hhdrHome : ∀ b ∈ (hdrDec bsHdr).2, fsHome fscCov fscLogst b ∧ b ≠ SB_BNO)
-    (hhdr0 : hdrN bsHdr = 0)
     (hpd : descPageRw pd)
     (hs2 : R 18#5 = BitVec.signExtend 64 icfgDev)
     (hR2 : R 2#5 = k.regs 2#5 + 0xFFFFFFFFFFFFFFE0#64)
@@ -89,7 +89,7 @@ theorem fsinit_log (IL : INITLOG) (IR : IRECLAIM) [Fscfg] [Icfg] [CurCtx]
     frame4s2 (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) (k.regs 9#5) (k.regs 18#5) ∗
     wordPointsTo (pPid k.proc) 4 dqp pidv ∗
     fsinitCells vMagic vSize vNblocks vNlog ∗ fsblock fscFs.bytes 1 bsSb ∗
-    fsinitCrash (hlc := hlc) M sbrec ∗
+    fsinitCrash (hlc := hlc) M sbrec Xv ∗
     excOwn fscFs.exc (hdrDec bsHdr).2 ∗
     fsinitLogRes bsHdr L D vlock vname vcpu vStart vDev vNc vN ∗
     bslots ((LOGBLOCKS + 2) + 2) ∗ bslot ∗ irefSlot ∗ iregBoot ∗
@@ -141,17 +141,16 @@ theorem fsinit_log (IL : INITLOG) (IR : IRECLAIM) [Fscfg] [Icfg] [CurCtx]
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [fsinit_br_initlog]
   iintro Hk Hpc
   unfold fsinitEnv fsinitLogRes
-  icases Henv with ⟨#Hpe, #Hpi, #Hbc, #Hdc, #Hreg, #Hbreg, #Hit2, #Hiti, #Hslks⟩
+  icases Henv with ⟨#Hpe, #Hpi, #Hbc, #Hdc, #Hreg, #Hbreg, #Hit2, #Hiti, #Hslks, #Hseam, #Hcert⟩
   icases Hlog with ⟨Hfree, #Hkm0, #Hkm16, Hl0, Hl8, Hl16, Hls, Hld, Hlo, Hlc, Hlnc, Hlhn, Hlhb,
     HauthL, HauthD, Hdirty, Hhdr, Hslots⟩
   -- the boot dirty map is `false` on the covered range
   icases fsinit_dirty_all_false fscFs D fscCov.toList $$ HauthD Hdirty with ⟨%hclean, HauthD, Hdirty⟩
-  ihave #Hbat := bitmapInv_bytes_at fscFs fscBmapstart fscCov fscLogst fscSize $$ Hbreg
   iapply (fsinit_initlog_call IL Γ cpu _ γl pd pav pu j bsHdr L D vlock vname vcpu vStart vDev
-      vNc vN pidv dqp (DFrac.own 1) M bsSb sbrec hcrash hj ?dproc ?dK ?dnoff ?dtier hgeom ?da0 ?da1 hhdrLen hhdrNodup
-      (fun b hb => (hhdrHome b hb).1) hhdr0
+      vNc vN pidv dqp (DFrac.own 1) M bsSb sbrec Xv hcrash hj ?dproc ?dK ?dnoff ?dtier hgeom ?da0 ?da1
+      hhdrLen hhdrNodup (fun b hb => (hhdrHome b hb).1)
       (fun b hb => hclean b (Std.ExtTreeSet.mem_toList.2 hb)) hpd)
-    $$ [- $Hk $Hpc $Hpi $Hpe $Hbc $Hdc $Hbat $Hxo $Hfree $C5 $Hkm0 $Hkm16 $Hl0 $Hl8 $Hl16 $Hls
+    $$ [- $Hk $Hpc $Hpi $Hpe $Hbc $Hdc $Hseam $Hcert $Hxo $Hfree $C5 $Hkm0 $Hkm16 $Hl0 $Hl8 $Hl16 $Hls
         $Hld $Hlo $Hlc $Hlnc $Hlhn $Hlhb $HauthL $HauthD $Hdirty $Hhdr $Hslots $Hsl $Hcr $Hfsb]
   rotate_right 1
   k_norm_g [fsinit_ret_52]
