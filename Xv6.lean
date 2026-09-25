@@ -1072,3 +1072,8 @@ import Xv6.UexecRound
 import Xv6.UexecApply
 import Xv6.UexecCond
 import Xv6.ProofUexecWp
+import Xv6.BootConfig
+import Xv6.BootHart
+import Xv6.BootBridge
+import Xv6.DiskBoot
+import Xv6.FsBoot
