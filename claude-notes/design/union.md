@@ -5,7 +5,55 @@ One application for every line shape: `echo ws`, `echo ws > f`, `cat f`,
 whose range condition reads the file state, with one handler, one round
 and one top theorem `union_adequacy_closed` replacing the file and
 pipeline applications' theorems (owner: no bridge back).  STATUS:
-proposal of record; C9a in flight.
+proposal of record, AMENDED by an adversarial review (2026-09-24; see
+'Review amendments' below -- they override the body where they differ);
+C9a in flight with B1/S1 folded in.
+
+## Review amendments (override the plan below)
+
+Verdict: option (b) is right, but as written the plan does not converge.
+BLOCKING: (B1) the D4 guard in `lm_cont_pair_det`/`lm_seq_prefix_det`/
+`lm_sess_prefix_det`/`lm_d4`/GenOut's `lm_d4_nomerge_snoc` is one premise
+used at both witnesses' states -- C9a adds the law `lml_term_st` (a
+terminal alternative at one state has one at every state; at the union
+`lt_here` + `so_exec` give it at every content). (B2) `uok s l (UR a) :=
+ralt_ok l a` would admit the file's LCat alternatives (e.g. RCRan = f's
+content) at pipeline lines -- make both cross cases explicitly `False`
+and add the negative demo. (B3) after a fork failure at node 0 the stray
+`cat f` still holds the deed, so the terminal shape carries NO deed; the
+next read is refuted by D4 or tainted, and the taint gives `DONE` via
+`sh_deed_taint`. (B4) do NOT port the pipeline application to `ulm
+adm_echo` in C9c (it would owe file rounds it cannot pay, and re-prove a
+decider C9h deletes): parametrise the N-stage layer over a small
+'pipeline view' of any model and keep the landed application by
+conversion.  SERIOUS: (S1) C9a also threads the state through `lm_ab`/
+`lm_apr` (read at `lmh_st0`), `cons_adm`, `lml_term_merge` (gains
+`lm_st_ok`), `alts_ok_lm`; (S2) C9e's decider is not FileDiscDec +
+PipesDecE -- candidate codes become state-dependent, `pl_merge_spec`
+must add the cat producer's diagnostics, and it needs a truncation lemma
+(runs at content b0 stay valid at b0's longest printed prefix); fallback
+if it stalls: a finite boot-state set per history (needs an owner
+ruling); FRONTIER print of the decider at C9e; (S3) corner (B) now also
+appears at TWO stages (`cat f | cat`: a cat producer's write error beside
+a printed prefix) -- an honest limit, demo it; (S4) `adm_u` admitting
+only `fname_f` is an input restriction forced by the file model's
+one-name scope -- OWNER RULING needed; (S5) C9d depends on C9e's link
+record: state it over abstract link projections; only the producer `cat
+f` needs a merged registry; (S6) C9f is larger (UShRound's ties call the
+file model directly; PipesFire needs PrCatF); (S7) `pwc_blkN` also
+carries the pure tie `lm_upto cs s0 (bodies_of I) (n-1) = sR`.  Checked
+fine: `umerge`'s `∃ s` is honest (terminal runs carry no content, so it
+equals `s = Some []`); `pns_short` from `f_bytes_typed_short`; `Heq` only
+for `app_sup`.
+
+AMENDED ORDER: C9a (+B1,S1) -> C9b (+B2 False arms, S3/negative demos) ->
+C9e-dec (pure decider, early, with FRONTIER print) in parallel with C9c'
+(N-stage layer over a pipeline view, WrNone/unfired DOutH, PipesFire for
+PrCatF) -> C9d' (claim-generic file/pipe interfaces + producer-only
+registry) -> C9e' (claim, links, record, ledger) -> C9f1 (file shapes and
+echo at the union claim) -> C9f2 (`stage_catf`, the deed through node 0,
+deed-free terminal) -> C9g -> C9h.
+
 
 # C9 plan: one application for the echo, file and pipeline lines
 
