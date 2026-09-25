@@ -867,3 +867,7 @@ import Xv6.SpecNamexEra
 import Xv6.SpecNparEra
 import Xv6.SpecNameiEra
 import Xv6.SpecNparWrapEra
+import Xv6.SpecSysFstat
+import Xv6.SysFstatParts
+import Xv6.ProofSysFstat
+import Xv6.LinkSysFstat
