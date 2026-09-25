@@ -61,12 +61,13 @@ def fetchstrSlots : Nat := 56
 
 /-- **fetchstr's answer**, keyed by the returned `a0` (Rocq `fetchstr_ret` and
 `fetchstr_got` in one): either the buffer holds the process's string at `va`
--- `pl`, its NUL, and the untouched rest -- and `r = |pl|`, or `r = -1`. -/
+-- `pl`, its NUL, and the untouched rest -- and `r = |pl|`, or `r = -1` with the
+buffer still `old.length` bytes wide (Rocq's buffer has a fixed width). -/
 def fetchstrRet (M : Nat → List (BitVec 8)) (va : Nat) (old bs : List (BitVec 8))
     (r : BitVec 64) : Prop :=
   (∃ pl : List (BitVec 8), umemStr M va old.length = some (pl ++ [0#8]) ∧
     bs = pl ++ 0#8 :: old.drop (pl.length + 1) ∧ r = BitVec.ofNat 64 pl.length) ∨
-  r = 0xFFFFFFFFFFFFFFFF#64
+  (r = 0xFFFFFFFFFFFFFFFF#64 ∧ bs.length = old.length)
 
 /-- `fetchstr(addr a0, buf a1, max a2)` in the current process `pa`: `old` is
 the buffer's `max` bytes. -/

@@ -79,8 +79,9 @@ theorem fetchstr_ret_ok (M : Nat → List (BitVec 8)) (va : Nat) (old pl : List 
   refine ⟨pl, hs, ?_, rfl⟩
   simp only [List.append_assoc, List.singleton_append, List.length_append, List.length_singleton]
 
-theorem fetchstr_ret_fail (M : Nat → List (BitVec 8)) (va : Nat) (old bs : List (BitVec 8)) :
-    fetchstrRet M va old bs 0xFFFFFFFFFFFFFFFF#64 := Or.inr rfl
+theorem fetchstr_ret_fail (M : Nat → List (BitVec 8)) (va : Nat) (old bs : List (BitVec 8))
+    (hl : bs.length = old.length) :
+    fetchstrRet M va old bs 0xFFFFFFFFFFFFFFFF#64 := Or.inr ⟨rfl, hl⟩
 
 /-! ## Constants -/
 
@@ -497,7 +498,7 @@ theorem fetchstr_proof (MP : MYPROC) (CI : COPYINSTR) (SL : STRLEN) : FETCHSTR :
     f24.trans e24, f25.trans e25, f26.trans e26, f27.trans e27⟩
   have hR2 : R2 2#5 = k.regs 2#5 + 0xFFFFFFFFFFFFFFD0#64 := f2.trans e2
   obtain ⟨hext, hpost⟩ := hpost
-  rcases hpost with ⟨h0, s, hs, hbs⟩ | ⟨hm1, -⟩
+  rcases hpost with ⟨h0, s, hs, hbs⟩ | ⟨hm1, d, hd, hbs⟩
   · -- success: strlen(buf)
     obtain ⟨pl, rfl, hnul, hlt⟩ := fetchstr_umemStr _ _ _ s hs
     subst hbs
@@ -523,6 +524,6 @@ theorem fetchstr_proof (MP : MYPROC) (CI : COPYINSTR) (SL : STRLEN) : FETCHSTR :
     iexists bs'
     iframe Hblk Hbuf
     ipureintro
-    exact ⟨hext, fetchstr_ret_fail _ _ old bs'⟩⟩
+    exact ⟨hext, fetchstr_ret_fail _ _ old bs' (by rw [hbs, List.length_append, UMemL.umemRead_length, List.length_drop]; omega)⟩⟩
 
 end Xv6
