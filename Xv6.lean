@@ -839,3 +839,10 @@ import Xv6.SysLinkParts
 import Xv6.SysUnlinkParts
 import Xv6.SysUnlinkPure
 import Xv6.KexecBuilt
+import Xv6.ElfEnc
+import Xv6.ElfFile
+import Xv6.ElfBridge
+import Xv6.KexecDefs
+import Xv6.SysExecDefs
+import Xv6.KexecLoad
+import Xv6.KexecParts
