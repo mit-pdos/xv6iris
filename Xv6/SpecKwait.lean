@@ -37,7 +37,12 @@ and only when `addr != 0` (the port of the Rocq prototype's
 `wp_kwait_sconf_body` post): `d` is the count `copyout` actually placed
 (`0` on the null-destination arm, on the no-child arm and on `killed`;
 `4` on the reaping arm; a short prefix when `copyout` itself failed), and
-the bytes are those of ONE status word `xw`, the zombie's.
+the bytes are those of ONE status word `xw`, the zombie's.  The `d` bytes
+are MAPPED in the grown descriptor (`umMapped P' addr d`, `copyout`'s own
+row, forwarded): the Lean page view zeroes a page when it is faulted in, so
+a caller turning the write into a write of the lazy image
+(`SyscallTable.syscImg_write`) needs the page set said -- Rocq's `us_M`
+already holds every lazy page, so it needs no such conjunct (`UMem.umMapped`).
 
 WHICH child was reaped IS stated (D8 wiring, Rocq `wait_ans`): the caller
 brings its CHILDREN ROW (`chFrag V.chg pa cs`, Rocq `ch_frag (pv_chg) pj
@@ -102,11 +107,13 @@ def xstateBytes (xw : BitVec 32) : List (BitVec 8) :=
 
 @[simp] theorem xstateBytes_length (xw : BitVec 32) : (xstateBytes xw).length = 4 := rfl
 
-/-- What `kwait` answered: `-1` -- no child, or `killed`, or a `copyout`
-that failed after a prefix -- or the reaped child's pid, and then the
-WHOLE status word reached `addr` (nothing at all if `addr` was null). -/
+/-- What `kwait` placed, against what it answered (Rocq
+`wp_kwait_sconf_body`'s two guards, verbatim): A NULL DESTINATION IS NOT A
+DESTINATION -- nothing at all is copied when `addr` is null, on every arm,
+`-1` included -- and a reap at a real pointer placed the WHOLE word (a
+partial `copyout` is the `-1` arm's). -/
 def kwaitAns (rv : BitVec 32) (addr : BitVec 64) (d : Nat) : Prop :=
-  rv = -1#32 ∨ (addr = 0#64 ∧ d = 0) ∨ (addr ≠ 0#64 ∧ d = 4)
+  (addr = 0#64 → d = 0) ∧ (addr ≠ 0#64 → rv ≠ -1#32 → d = 4)
 
 /-- The generation pieces of the caller's own block the reap reads (the D8
 row `FdTable.procGenAt` minus `firstTok` and the xstate half): the kernel's
@@ -136,7 +143,8 @@ def wp_kwait_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF
   wpNext true k.proc cpu (fun cpu' => iprop(∀ (spie spp : Bool) (R' : RegMap) (P' : UPtd)
     (rv xw : BitVec 32) (d : Nat) (cs' : ExtTreeSet GName compare),
     ⌜calleeSaved k.regs R' ∧ R' 10#5 = BitVec.signExtend 64 rv ∧ V.upt.extSz V.sz P' ∧ d ≤ 4 ∧
-      kwaitAns rv (k.regs 10#5) d⌝ -∗
+      kwaitAns rv (k.regs 10#5) d ∧
+      umMapped P' (k.regs 10#5).toNat d⌝ -∗
     waitAns rv (xstateVal xw) cs cs' V.gen (decide (k.regs 10#5 = 0#64)) pid -∗
     chFrag V.chg (procAddr j) cs' -∗
     kctx cpu' ((k.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k.regs 1#5)) -∗
@@ -173,7 +181,8 @@ def wp_kwait_eb_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G
   wpNext true k.proc cpu (fun cpu' => iprop(∀ (spie spp : Bool) (R' : RegMap) (P' : UPtd)
     (rv xw : BitVec 32) (d : Nat) (cs' : ExtTreeSet GName compare),
     ⌜calleeSaved k.regs R' ∧ R' 10#5 = BitVec.signExtend 64 rv ∧ V.upt.extSz V.sz P' ∧ d ≤ 4 ∧
-      kwaitAns rv (k.regs 10#5) d⌝ -∗
+      kwaitAns rv (k.regs 10#5) d ∧
+      umMapped P' (k.regs 10#5).toNat d⌝ -∗
     waitAns rv (xstateVal xw) cs cs' V.gen (decide (k.regs 10#5 = 0#64)) pid -∗
     chFrag V.chg (procAddr j) cs' -∗
     kctx cpu' ((k.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k.regs 1#5)) -∗

@@ -123,16 +123,21 @@ theorem kw_xstateBytes_take_len (xw : BitVec 32) (d : Nat) (hd : d ≤ 4) :
     ((xstateBytes xw).take d).length = d := by
   rw [List.length_take, xstateBytes_length]; omega
 
-/-- `kwaitAns (-1)` on the null-destination / no-child / killed arms. -/
-theorem kw_ans_neg (addr : BitVec 64) (d : Nat) : kwaitAns (-1#32) addr d := Or.inl rfl
+/-- `kwaitAns (-1)` on the no-child / killed arms (nothing copied) and on
+copyout's failure arm (a real pointer). -/
+theorem kw_ans_neg (addr : BitVec 64) (d : Nat) (hnull : addr = 0#64 → d = 0) :
+    kwaitAns (-1#32) addr d := ⟨hnull, fun _ h => absurd rfl h⟩
 
 /-- `kwaitAns` on the reap arm with a null destination (nothing copied). -/
 theorem kw_ans_null (rv : BitVec 32) (addr : BitVec 64) (haddr : addr = 0#64) :
-    kwaitAns rv addr 0 := Or.inr (Or.inl ⟨haddr, rfl⟩)
+    kwaitAns rv addr 0 := ⟨fun _ => rfl, fun h => absurd haddr h⟩
 
 /-- `kwaitAns` on the reap arm with the whole word copied. -/
 theorem kw_ans_full (rv : BitVec 32) (addr : BitVec 64) (haddr : addr ≠ 0#64) :
-    kwaitAns rv addr 4 := Or.inr (Or.inr ⟨haddr, rfl⟩)
+    kwaitAns rv addr 4 := ⟨fun h => absurd h haddr, fun _ _ => rfl⟩
+
+/-- Nothing written, nothing to be mapped. -/
+theorem kw_umMapped_zero (P : UPtd) (va : Nat) : umMapped P va 0 := fun _ h => absurd h (Nat.not_lt_zero _)
 
 /-- `&proc[i]` as a number, up to and including the sentinel. -/
 theorem kw_procAddr_toNat (j : Nat) (hj : j ≤ NPROC) :
@@ -539,7 +544,8 @@ def kwPost (cpu : CPU) (k : KCtx) (j : Nat) (pid : BitVec 32) (V : ProcPriv)
   wpNext true k.proc cpu (fun cpu' => iprop(∀ (spie spp : Bool) (R' : RegMap) (P' : UPtd)
     (rv xw : BitVec 32) (d : Nat) (cs' : ExtTreeSet GName compare),
     ⌜calleeSaved k.regs R' ∧ R' 10#5 = BitVec.signExtend 64 rv ∧ V.upt.extSz V.sz P' ∧ d ≤ 4 ∧
-      kwaitAns rv (k.regs 10#5) d⌝ -∗
+      kwaitAns rv (k.regs 10#5) d ∧
+      umMapped P' (k.regs 10#5).toNat d⌝ -∗
     waitAns rv (xstateVal xw) cs cs' V.gen (decide (k.regs 10#5 = 0#64)) pid -∗
     kwaitGen (procAddr j) pid V.gen -∗ chFrag V.chg (procAddr j) cs' -∗
     kctx cpu' ((k.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k.regs 1#5)) -∗
@@ -1044,7 +1050,8 @@ theorem kw_epi (Γ : SchedNames) (cpu cur : CPU) (k : KCtx) (γw γp γl : GName
     (hs3 : R 19#5 = BitVec.signExtend 64 rv)
     (h24 : R 24#5 = k.regs 24#5) (h25 : R 25#5 = k.regs 25#5) (h26 : R 26#5 = k.regs 26#5)
     (h27 : R 27#5 = k.regs 27#5)
-    (hext : V.upt.extSz V.sz P') (hd : d ≤ 4) (hans : kwaitAns rv (k.regs 10#5) d) :
+    (hext : V.upt.extSz V.sz P') (hd : d ≤ 4) (hans : kwaitAns rv (k.regs 10#5) d)
+    (hmap : umMapped P' (k.regs 10#5).toNat d) :
     kctx cur (((k.withSpie spie spp).pushed 10).withRegs R) ∗ pcIs cur (KA.«kwait» + 0x7c#64) ∗
     kwFrame (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) (k.regs 9#5) (k.regs 18#5) (k.regs 19#5)
       (k.regs 20#5) (k.regs 21#5) (k.regs 22#5) (k.regs 23#5) w9 ∗
@@ -1125,7 +1132,7 @@ theorem kw_epi (Γ : SchedNames) (cpu cur : CPU) (k : KCtx) (γw γp γl : GName
   k_norm_g
   iapply HΦ $$ %spie %spp %_ %P' %rv %xw %d %cs' [] Hans Hkg Hrow Hk Hpc Hte Hce Hpriv
   ipureintro
-  refine ⟨?cs, ?r10, hext, hd, hans⟩
+  refine ⟨?cs, ?r10, hext, hd, hans, hmap⟩
   case r10 =>
     simp only [RegMap.set_apply, BitVec.reduceEq, ite_true, ite_false]
     try exact hs3
@@ -1313,7 +1320,7 @@ theorem kw_reap (CO : COPYOUT) (FP : FREEPROC) (RE : RELEASE)
         Rc 19#5 = BitVec.signExtend 64 pid0 ∧ Rc 22#5 = waitLockAddr ∧ Rc 24#5 = k.regs 24#5 ∧
         Rc 25#5 = k.regs 25#5 ∧ Rc 26#5 = k.regs 26#5 ∧ Rc 27#5 = k.regs 27#5 ∧
         V.upt.extSz V.sz P' ∧ d ≤ 4 ∧ kwaitAns pid0 (k.regs 10#5) d ∧
-        M'' = umemWrite (viewFaulted V.upt P' M) (k.regs 10#5).toNat ((xstateBytes xs).take d)⌝ -∗
+        umMapped P' (k.regs 10#5).toNat d ∧ M'' = umemWrite (viewFaulted V.upt P' M) (k.regs 10#5).toNat ((xstateBytes xs).take d)⌝ -∗
       kctx cur (((kh.pushOffAt spie2 spp2).withLocks ("proc" :: kh.locks)).withRegs Rc) -∗
       pcIs cur (KA.«kwait» + 0x60#64) -∗
       locked (Γ.lock n) cur -∗ locked γw cur -∗ waitResAt curCtx parents -∗ kwWRest curCtx parents -∗
@@ -1334,7 +1341,7 @@ theorem kw_reap (CO : COPYOUT) (FP : FREEPROC) (RE : RELEASE)
       wpLoop cur) $$ []
   case' _ =>
     iintro %Rc %P' %M'' %d
-      %⟨hcsp, hc9, hc18, hc19, hc22, hc24, hc25, hc26, hc27, hext, hd, hans, hM⟩
+      %⟨hcsp, hc9, hc18, hc19, hc22, hc24, hc25, hc26, hc27, hext, hd, hans, hmap, hM⟩
       Hk Hpc HlpC Hlockw Hwr Hwrest Hg Hstate Hpl Hchan Hkilled Hxs Hpid Hkp Hslots Hpriv Htc Hcl Hir
       Hframe HΦ
     icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
@@ -1480,7 +1487,7 @@ theorem kw_reap (CO : COPYOUT) (FP : FREEPROC) (RE : RELEASE)
           k_norm_g [hpe2, hkbws, kwj_2226, kw_filter_wait,
             kw_strip_locks (k.withSpie spie3 spp3) (by simp only [KCtx.withSpie_locks, hklocks0])]
           iapply (kw_epi Γ cpu cur k γw γp γl γk j pid V M cs hj hkproc (by omega) spie3 spp3 R5
-              pid0 xs d P' w9 hR5_2 hR5_19 hR5_24 hR5_25 hR5_26 hR5_27 hext hd hans)
+              pid0 xs d P' w9 hR5_2 hR5_19 hR5_24 hR5_25 hR5_26 hR5_27 hext hd hans hmap)
             $$ [- $Hk $Hpc $Hframe $Hpriv $Hte $Hce $Hans $HΦ]
         case haddrw => k_norm_g
         case hsw => k_norm_g
@@ -1513,7 +1520,7 @@ theorem kw_reap (CO : COPYOUT) (FP : FREEPROC) (RE : RELEASE)
       Hframe HΦ
     · ipureintro
       refine ⟨?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, extSz_refl _ V.upt, by omega,
-        kw_ans_null pid0 (k.regs 10#5) haddr, ?_⟩
+        kw_ans_null pid0 (k.regs 10#5) haddr, kw_umMapped_zero _ _, ?_⟩
       · simp only [RegMap.set_apply, BitVec.reduceEq, ite_false]; exact hR2sp
       · simp only [RegMap.set_apply, BitVec.reduceEq, ite_false]; exact h9
       · simp only [RegMap.set_apply, BitVec.reduceEq, ite_false]; exact h18
@@ -1611,7 +1618,7 @@ theorem kw_reap (CO : COPYOUT) (FP : FREEPROC) (RE : RELEASE)
       have hRC27 : RC 27#5 = k.regs 27#5 := by
         rw [hcsC.2.2.2.2.2.2.2.2.2.2.2.2]; simp only [KCtx.setReg_regs, KCtx.withLocks_regs, KCtx.withRegs_regs,
           KCtx.pushOffAt_regs, RegMap.set_apply, BitVec.reduceEq, ite_false]; exact h27
-      rcases hdisj with ⟨h10, hMeq, -⟩ | ⟨h10, dd, hdd, hMeq, -⟩
+      rcases hdisj with ⟨h10, hMeq, hmapC⟩ | ⟨h10, dd, hdd, hMeq, hmapC⟩
       · -- copyout succeeded (a0 = 0): fall through to the common tail
         k_step (wp_s_branch cur _ (KA.«kwait» + 0x5c#64) false 56#13 10#5 0#5 (by decide) bop.BLT)
           from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
@@ -1628,7 +1635,8 @@ theorem kw_reap (CO : COPYOUT) (FP : FREEPROC) (RE : RELEASE)
           Hir Hframe HΦ
         · ipureintro
           refine ⟨hRC2, hRC9, hRC18, hRC19, hRC22, hRC24, hRC25, hRC26, hRC27, hext', by omega,
-            kw_ans_full pid0 (k.regs 10#5) haddr, ?_⟩
+            kw_ans_full pid0 (k.regs 10#5) haddr, ?_, ?_⟩
+          · simpa only [xstateBytes_length] using hmapC
           rw [hMeq, show (4 : Nat) = (xstateBytes xs).length from (xstateBytes_length xs).symm,
             List.take_length]
       · -- copyout failed (a0 = -1): release both locks, return -1
@@ -1761,7 +1769,7 @@ theorem kw_reap (CO : COPYOUT) (FP : FREEPROC) (RE : RELEASE)
               · iexact Hg
             iapply (kw_epi Γ cpu c7 k γw γp γl γk j pid V M cs hj hkproc (by omega) spie2 spp2
                 (R5.set 19#5 18446744073709551615#64) (-1#32) xs dd P' w9 ?heR2 ?heS3 ?heH24 ?heH25 ?heH26 ?heH27
-                hext' ?heD ?heAns) $$ [- $Hk $Hpc $Hframe $HprivE $Hte $Hce $Hans $HΦ]
+                hext' ?heD ?heAns hmapC) $$ [- $Hk $Hpc $Hframe $HprivE $Hte $Hce $Hans $HΦ]
             case heR2 =>
               simp only [RegMap.set_apply, BitVec.reduceEq, ite_false]; exact hR5_2
             case heS3 =>
@@ -1775,7 +1783,7 @@ theorem kw_reap (CO : COPYOUT) (FP : FREEPROC) (RE : RELEASE)
             case heH27 =>
               simp only [RegMap.set_apply, BitVec.reduceEq, ite_false]; exact hR5_27
             case heD => rw [xstateBytes_length] at hdd; exact le_of_lt hdd
-            case heAns => exact kw_ans_neg (k.regs 10#5) dd
+            case heAns => exact kw_ans_neg (k.regs 10#5) dd (fun h => absurd h haddr)
           case haddrw => k_norm_g
           case hsw => k_norm_g
           case hnw => k_norm_g; omega
@@ -2439,7 +2447,7 @@ theorem kw_noKids (CO : COPYOUT) (FP : FREEPROC) (RE : RELEASE) (AC : ACQUIRE) (
         · iexact Hg
       iapply (kw_epi Γ cpu c7 k γw γp γl γk j pid V M cs hj hkproc (by omega) spieW sppW
           (R5.set 19#5 18446744073709551615#64) (-1#32) 0#32 0 V.upt w9 ?heR2 ?heS3 ?heH24 ?heH25
-          ?heH26 ?heH27 (extSz_refl _ V.upt) (by omega) (kw_ans_neg (k.regs 10#5) 0))
+          ?heH26 ?heH27 (extSz_refl _ V.upt) (by omega) (kw_ans_neg (k.regs 10#5) 0 (fun _ => rfl)) (kw_umMapped_zero _ _))
         $$ [- $Hk $Hpc $Hframe $HprivE $Hte $Hce $Hans $HΦ]
       case heR2 => simp only [RegMap.set_apply, BitVec.reduceEq, ite_false]; exact hR5_2
       case heS3 => simp only [RegMap.set_apply, ite_true]; exact kw_neg1_ext

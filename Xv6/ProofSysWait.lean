@@ -86,7 +86,7 @@ theorem sw_kwait (KW : KWAIT) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
     wpNext true k'.proc c (fun cpu' => iprop(∀ (spie spp : Bool) (R' : RegMap) (P' : UPtd)
       (rv xw : BitVec 32) (d : Nat) (cs' : ExtTreeSet GName compare),
       ⌜calleeSaved k'.regs R' ∧ R' 10#5 = BitVec.signExtend 64 rv ∧ V.upt.extSz V.sz P' ∧ d ≤ 4 ∧
-        kwaitAns rv a d⌝ -∗
+        kwaitAns rv a d ∧ umMapped P' a.toNat d⌝ -∗
       waitAns rv (xstateVal xw) cs cs' V.gen (decide (a = 0#64)) pid -∗
       chFrag V.chg (procAddr j) cs' -∗
       kctx cpu' ((k'.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k'.regs 1#5)) -∗
@@ -159,7 +159,8 @@ theorem sw_exit (cpu cr : CPU) (k : KCtx) (γ : FileNames) (j : Nat) (pid : BitV
     (hj : j < NPROC) (hproc : k.proc = procAddr j) (hK : 4 ≤ k.avail)
     (spie spp : Bool) (R : RegMap) (hR2 : R 2#5 = k.regs 2#5 + 0xFFFFFFFFFFFFFFE0#64)
     (hpins : swPins k R) (h10 : R 10#5 = BitVec.signExtend 64 rv)
-    (hext : V.upt.extSz V.sz P') (hd : d ≤ 4) (hans : kwaitAns rv v d) :
+    (hext : V.upt.extSz V.sz P') (hd : d ≤ 4) (hans : kwaitAns rv v d)
+    (hmap : umMapped P' v.toNat d) :
     kctx cr (((k.withSpie spie spp).pushed 4).withRegs R) ∗ pcIs cr (KA.«sys_wait» + 0x1a#64) ∗
     frame4s0 (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) ∗
     trapCsrsExt cr k.sie ∗ cpuClaimExt cr k.sie k.proc ∗
@@ -170,7 +171,7 @@ theorem sw_exit (cpu cr : CPU) (k : KCtx) (γ : FileNames) (j : Nat) (pid : BitV
     wpNext true k.proc cpu (fun cpu' => iprop(∀ (spie spp : Bool) (R' : RegMap) (P' : UPtd)
       (rv xw : BitVec 32) (d : Nat) (cs' : ExtTreeSet GName compare),
       ⌜calleeSaved k.regs R' ∧ R' 10#5 = BitVec.signExtend 64 rv ∧ V.upt.extSz V.sz P' ∧ d ≤ 4 ∧
-        kwaitAns rv v d⌝ -∗
+        kwaitAns rv v d ∧ umMapped P' v.toNat d⌝ -∗
       waitAns rv (xstateVal xw) cs cs' V.gen (decide (v = 0#64)) pid -∗
       chFrag V.chg (procAddr j) cs' -∗
       kctx cpu' ((k.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k.regs 1#5)) -∗
@@ -203,7 +204,7 @@ theorem sw_exit (cpu cr : CPU) (k : KCtx) (γ : FileNames) (j : Nat) (pid : BitV
       (fun h => absurd h (by rw [hproc]; exact procAddr_nonzero hj))) $$ Hnext
   iapply Hnext $$ %spie %spp %_ %P' %rv %xw %d %cs' [] Hans Hch Hk Hpc Hte Hce Hblk
   ipureintro
-  refine ⟨sw_calleeSaved_mk _ _ p9 p18 p19 p20 p21 p22 p23 p24 p25 p26 p27, ?_, hext, hd, hans⟩
+  refine ⟨sw_calleeSaved_mk _ _ p9 p18 p19 p20 p21 p22 p23 p24 p25 p26 p27, ?_, hext, hd, hans, hmap⟩
   simp only [RegMap.set_apply, BitVec.reduceEq, ite_false]
   exact h10
 
@@ -325,7 +326,7 @@ theorem sys_wait_proof (AA : ARGADDR) (KW : KWAIT) : SYSWAIT := ⟨
   iapply wpNext_intro_pin
   iintro %cf %hpf %spie2 %spp2 %R2 %P' %rv %xw %d %cs' %hfacts Hans Hch Hk Hpc Hte Hce Hblk
   k_norm_g [sw_withSpie_withSpie, sw_pushed_withSpie, sw_withRegs_withSpie]
-  obtain ⟨hcs2, h10, hext, hd, hans⟩ := hfacts
+  obtain ⟨hcs2, h10, hext, hd, hans, hmap⟩ := hfacts
   unfold calleeSaved at hcs2
   k_norm_g at hcs2
   obtain ⟨d2, d8, d9, d18, d19, d20, d21, d22, d23, d24, d25, d26, d27⟩ := hcs2
@@ -333,7 +334,7 @@ theorem sys_wait_proof (AA : ARGADDR) (KW : KWAIT) : SYSWAIT := ⟨
       (d2.trans b2)
       ⟨d9.trans b9, d18.trans b18, d19.trans b19, d20.trans b20, d21.trans b21, d22.trans b22,
         d23.trans b23, d24.trans b24, d25.trans b25, d26.trans b26, d27.trans b27⟩
-      h10 hext hd hans)
+      h10 hext hd hans hmap)
     $$ [- $Hk $Hpc $Hframe $Hte $Hce $Hblk $Hans $Hch $Hnext]⟩
 
 end Xv6
