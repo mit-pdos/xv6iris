@@ -3,7 +3,7 @@
 Design of record: [`../design/seccomp.md`](../design/seccomp.md).
 Opened 2026-09-25.  Read `xv6-bump-playbook.md` before lane K or U.
 
-## RESUME HERE
+## RESUME HERE  (written for a FRESH agent; the session that started this may have died)
 
 OWNER'S CHECKPOINTS (2026-09-25): (1) a CLEAN BUMP to upstream `verified`
 7b2c1b1, the whole tree green, audits 13/13/14, `check-decode`,
@@ -15,29 +15,44 @@ is lanes K + U merged, committed and PUSHED TO main.  (2) then the
 theorem: lane M's model, the universe slot (S1), the claim arm (S2), the
 seccomp program (S3), the round and the knob (S4).
 
-- Lane K (kernel bump + the mask in the contracts): IN FLIGHT in
-  `/shared/xv6iris-3`, branch `secc/bump`.  STATUS LINE (keep current):
-  DONE -- sweeps (e09564a33), decode layer (7db68875e), stride + mask
-  definitions through the contracts (23224306f), sys_seccomp Proof/Link +
-  userinit (secc/sc, ff), kfork reshape (merge 24cb26c17), syscall's
-  blocked arm + entry 23 (WIP commit).  RED -- the U-tier engine's
-  literal-[secc_all] pins (UkStepGen/UkRun constructors mirror LAZY-FLAG's
-  `uvis_lazy W = false`), ProofUsertrap{Sys,Tail,Arms}, ProofForkret,
-  UserretUser, SpecUservec, ProofSyscall's remaining arms (the secc row at
-  `upd_usV U V'` needs `pv_secc V' = pv_secc (us_V U)`), user tier (UCode*,
-  waits on the `secc/user` merge).  NEXT -- VM round from the tree root
-  (`scratchpad/bin/round.sh k3rN`, logs `/tmp/k3rN.log` on the VM; last
-  k3r8), fix fallout, then merge `secc/user`, then the five checks.
-- Lane U (user tier relayout + the seccomp binary's dumps/catalog):
-  IN FLIGHT in worktree `/shared/xv6iris-3-lanes/secc-user` (branch
-  `secc/user`, from the same uncommitted base).  Textual until K lands.
-- Lane M (pure model: `LSecc`, `US`, line-indexed `lm_merge`, knob off):
-  IN FLIGHT in worktree `/shared/xv6iris-3-lanes/secc-model` (branch
-  `secc/model`, from HEAD = the OLD pin; rebased onto K+U when they land).
-- RESOLVED (owner, same day): the mask must clear `{6,15,17,18,19,20}`;
-  upstream 7b2c1b1 does; pin moved (commit c2ee5c64c on `secc/bump`).
-- Then S1 (universe slot), S2 (claim arm + licence + dirty credential),
-  S3 (the seccomp program), S4 (sh's round, knob on, top theorem, audits).
+WHERE THINGS ARE (verify with the commands; do not trust this text over
+`git log`):
+- `main` (local and origin) is still at the OLD pin 3e9926e (92cd62067).
+- Branch `secc/bump`, checked out in `/shared/xv6iris-3`: base
+  6c97101b7 (pin a083670, dumps, generated decode layer), c2ee5c64c (pin
+  7b2c1b1: FsImgRaw.v), notes commits, then LANE K's commits (prefix
+  "WIP:" while red).  `git status` there shows lane K's uncommitted
+  sweep edits if it died mid-way; `git diff --stat` says how far.  Its
+  VM tree is /mnt/rocq/trees/_shared_xv6iris-3 (log names in the Lane K
+  status line below; `gcp-rocq/run-on-gcp -q --no-sync bash -c 'ls -t
+  /tmp/*.log | head; tail -3 /tmp/<name>.log'`).
+- Branch `secc/user`, worktree `/shared/xv6iris-3-lanes/secc-user`:
+  DONE (e4a5502f5), rebased on c2ee5c64c: the user-tier relayout, the
+  seccomp binary's dumps/catalog/ELF/fs.img lemmas, `fsimg_live_set` 23.
+  To be MERGED into secc/bump when K's kernel tier is green (`git merge
+  secc/user` in /shared/xv6iris-3; then TreeImg.v's `<=? 22` -> 23 if K
+  has not done it).
+- Branch `secc/model`, worktree `/shared/xv6iris-3-lanes/secc-model`
+  (from 92cd62067, the OLD pin): LANE M in flight (design section 3;
+  status line below); its VM tree is
+  /mnt/rocq/trees/_shared_xv6iris-3-lanes_secc-model.  NOT part of
+  checkpoint 1; rebase onto main after the push.
+- Old dumps for the relayout tools: `git show 92cd62067:kernel-rocq/
+  KernelSyms.v` etc. (the scratchpad copies die with the session);
+  `RELAYOUT_OLD_REV=92cd62067`.
+
+HOW TO FINISH CHECKPOINT 1 if lane K died: read its status line, `git
+log secc/bump`, `git status`; continue its list (section "Lane K" below)
+in /shared/xv6iris-3 with `gcp-rocq/vmbuild.sh xv6iris-3 <log>`; merge
+secc/user; green; the five checks; then `git checkout main && git merge
+--ff-only secc/bump` (or a merge commit if main moved: `git fetch
+origin && git rebase origin/main secc/bump` first), `git push origin
+main`.  Then write `claude-notes/completed/xv6-bump-7b2c1b1.md` from the
+Lane K/U status lines and prune this file's checkpoint-1 text.
+
+THEN CHECKPOINT 2: rebase secc/model onto main; then S1-S4 per design
+sections 5-7 (briefs to be written into this file; the design sections
+are detailed enough to brief from).
 
 ## Lane K -- the kernel bump and the mask (design §4)
 
