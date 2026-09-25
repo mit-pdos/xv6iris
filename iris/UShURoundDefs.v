@@ -18,7 +18,10 @@
 (*  THE WIDENED CREDENTIAL [Wcu] is [UkShPipesFork.pterm_wcN]'s shape:    *)
 (*  the file family [Wcf] at every index, or below index 3 a pipeline     *)
 (*  round's TERMINAL shape [PT] (cursor [5 + p]), or at index 0 its       *)
-(*  COMMITTED shape [PD] with the deed at DONE.  Amendment B3: the         *)
+(*  COMMITTED shape [PD] with the deed at its PRE tie (C9f2: the block is *)
+(*  not filed yet, so DONE's longer lower bound does not exist; the       *)
+(*  filing makes DONE of it, a pipeline's step being the identity).       *)
+(*  Amendment B3: the                                                     *)
 (*  terminal shape carries NO deed (after a fork failure at node 0 the    *)
 (*  stray [cat f] still holds it); the next read is refuted by D4 or       *)
 (*  tainted, and the taint is DONE ([sh_deed_taint]).  The two shapes are *)
@@ -755,9 +758,15 @@ Section UShURoundDefs.
   (* THE WIDENED CREDENTIAL, at the pipeline's two shapes *)
   Context (PT : list (bv 8) -> nat -> iProp Σ) (PD : list (bv 8) -> iProp Σ).
 
+  (* the COMMITTED arm carries the deed at its PRE tie: the block is not
+     filed yet (the prompt's first byte files it), so the holder's choice
+     list is still the line's [nlines I - 1] -- DONE would need a lower
+     bound one longer, which only the filing mints; a pipeline's step is
+     the identity, so the filing turns this into DONE
+     ([udone_tie_of_pre_id]) *)
   Definition uWcu (I : list (bv 8)) (p : nat) : iProp Σ :=
     (uWcf I p ∨ (⌜(p < 3)%nat⌝ ∗ PT I (5 + p)%nat)
-     ∨ (⌜p = 0%nat⌝ ∗ PD I ∗ DONE I))%I.
+     ∨ (⌜p = 0%nat⌝ ∗ PD I ∗ ush_deed_at upre_tie s0 I))%I.
 
   Lemma uWcu_of (I : list (bv 8)) (p : nat) : uWcf I p -∗ uWcu I p.
   Proof using . iIntros "H". rewrite /uWcu. by iLeft. Qed.

@@ -21,11 +21,10 @@
 (*  [wp_kshm_body_pipe] at [UkShRedirBody.ushs_lp], [cat f] by the cat    *)
 (*  body twin [UkShCatForkTwin.ushf_body_law_cat_pipe].                    *)
 (*                                                                        *)
-(*  THE PIPELINE SHAPES ARE A PREMISE of this cut's round law             *)
-(*  ([ush_pipes_branch]: the body law at the pipeline lines), which the   *)
-(*  next cut (C9f2) discharges.  So [sh_round_holds_union] reads: at      *)
-(*  every line the union admits, the file shapes proved here and the      *)
-(*  pipeline shape from the premise.  Nothing switches the application.   *)
+(*  THE PIPELINE LINES are [ush_pipes_branch] (the body law at them),     *)
+(*  discharged in [UShUPipes] (C9f2), whose [sh_round_holds_union_closed] *)
+(*  is the round law: [ushq_body_law_union] below at the pipeline branch. *)
+(*  Nothing switches the application.                                     *)
 (* ===================================================================== *)
 From Stdlib Require Import ZArith Bool Lia List.
 From stdpp Require Import gmap list bitvector.definitions.
@@ -1187,8 +1186,8 @@ Section UShURound.
   Context (γp : gname).
   Local Notation Pm := (UShLine.ush_mid_at (lk_rres FI) (fgn_echo gf) γp).
 
-  (* THE PIPELINE SHAPES' BRANCH (C9f2's to discharge): the body law at
-     the pipeline lines the union admits *)
+  (* THE PIPELINE SHAPES' BRANCH ([UShUPipes.ush_pipes_branch_holds]): the
+     body law at the pipeline lines the union admits *)
   Definition ush_pipes_branch (N : uk_names Σ) : iProp Σ :=
     UkShFork.ushf_body_law (PS := uprogSG_free) (SG := uexecSG_xv6)
       N γp T Wcu Wbu Pm ush_line_upipe (SpecKexec.kexec_sz ElfUser.sh_elf).
@@ -1265,39 +1264,4 @@ Section UShURound.
         | exact Hfd0 ].
   Qed.
 
-  (* THE ROUND LAW OF THIS CUT: the command loop's body obligation at the
-     union's families, at every line the union admits -- the file shapes
-     and echo proved above, the pipeline shape from the premise *)
-  Lemma sh_round_holds_union (N : uk_names Σ) :
-    ⊢ union_links ug -∗
-      udep (SG := uexecSG_xv6) (PS := uprogSG_free) -∗
-      UShEcho.sh_echo_slot T -∗
-      UShCatPay.sh_cat_slot T -∗
-      (∃ v : era_pins, era_pin (fgn_echo gf) (S gen_id) v) -∗
-      (∃ jo : option Z, file_cons_cred (fgn_cl gf) r jo) -∗
-      ush_pipes_branch N -∗
-      UkSh.ush_rest_l_at (PS := uprogSG_free) (ghost_varG0 := offbox_offG)
-        N γp T Wcu Wbu Pm ush_line_union
-        (UInitSh.sh_Rsh (ukn_t N) (ukn_d N) (ukn_s N)).
-  Proof using Hcons Hkill Heq HfifR.
-    iIntros "#Hlk #Hdep #Hslot #Hcat #Hpin #Hmade #Hpipes".
-    iDestruct "Hpin" as (v) "#Hp".
-    iPoseProof (ush_kill_law_u ug r s0 PT PD Hkill v with "Hp") as "#Hkl".
-    iPoseProof (ush_child_law_union with "Hlk Hdep Hslot Hmade") as "#Hchl".
-    iPoseProof (uHchild_redir with "Hlk Hdep Hslot Hmade") as "#Hred".
-    iPoseProof (uHchild_cat with "Hlk Hdep Hcat Hmade") as "#Hcatl".
-    iPoseProof (uHpanic ug r s0 PT PD with "Hlk") as "#Hplaw".
-    iIntros "!>" (l) "%Hc".
-    iPoseProof (ushq_body_law_union N (Hp := Hc) (SpecKexec.kexec_sz ElfUser.sh_elf)
-                  UShRest.sh_sz_lo UShRest.sh_sz_al UShRest.sh_sz_ok
-                  with "Hkl Hchl Hred Hcatl Hplaw Hpipes") as "#Hbody".
-    iPoseProof (UkShPipeForkTwin.ushf_rest_of_body_at_pipe
-                  (PS := uprogSG_free) (SG := uexecSG_xv6) (Hpay := Hc)
-                  N γp T Wcu Wbu Pm (fun k H => H) ush_line_union
-                  (SpecKexec.kexec_sz ElfUser.sh_elf)
-                  UShRest.sh_sz_lo UShRest.sh_sz_al UShRest.sh_sz_ok
-                  (uHwbl_u ug r s0 PT PD) with "Hbody") as "Hb".
-    rewrite /UkSh.ush_rest_l_at.
-    iDestruct ("Hb" $! l with "[%]") as "Hb'"; [exact Hc | iExact "Hb'"].
-  Qed.
 End UShURound.

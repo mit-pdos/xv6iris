@@ -2,15 +2,14 @@
 (*  UShURoundShapes.v -- THE UNION ROUND AT THE PIPELINE'S OWN SHAPES     *)
 (*  (cut C9f1; design: claude-notes/design/union.md section 3, review B3). *)
 (*                                                                        *)
-(*  [UShURound.sh_round_holds_union] holds at ANY terminal and committed  *)
-(*  shapes, because the file shapes never read them.  These are the two  *)
-(*  shapes the union's pipeline rounds leave ([UkShPipesFork.            *)
-(*  pterm_shapeN] / [pdone_shapeN] at the union's view: the family's     *)
-(*  runs at the round's state [sR], its credential [UnionOut.pwc_blkU]),  *)
-(*  and the round law at them.  B3: the terminal shape carries NO deed;   *)
-(*  the committed one gets DONE through [UShURoundDefs.uWcu]'s index-0   *)
-(*  arm.  Whether these are EXACTLY what C9f2's stage laws hand back is   *)
-(*  C9f2's to confirm; they are its starting point.                       *)
+(*  The two shapes the union's pipeline rounds leave ([UkShPipesFork.     *)
+(*  pterm_shapeN] / [pdone_shapeN] at the union's view: the family's      *)
+(*  runs at the round's state [sR], its credential [UnionOut.pwc_blkU]).  *)
+(*  They are EXACTLY what the right spine's [Qtop] reads into (C9f2,      *)
+(*  [UShUPipes.ufin]): a fork failed at node [i] with the waited stages'  *)
+(*  halves, or every writer committed.  B3: the terminal shape carries NO *)
+(*  deed; the committed one gets the deed at its PRE tie through          *)
+(*  [UShURoundDefs.uWcu]'s index-0 arm (the block is not filed yet).      *)
 (* ===================================================================== *)
 From Stdlib Require Import ZArith Lia List.
 From stdpp Require Import gmap list bitvector.definitions.
@@ -89,50 +88,3 @@ Section UShURoundShapes.
            ∃ s, wcurN γc w (1/2) (length s) ∗ wmodeN γm w (1/2) (Some s)
                 ∗ ⌜termw w s = false⌝)%I.
 End UShURoundShapes.
-
-(* ===================================================================== *)
-(*  THE ROUND LAW AT THE TWO SHAPES                                       *)
-(* ===================================================================== *)
-Require Import Xv6Cameras Xv6G FdSlots IrefSlots ProcAvail FileInvDefs UserFd.
-Require Import AppCfg AppInv.
-Require Import UkRun UexecExecInst AppFileCons UShEcho UShCatPay UkSh UInitSh.
-Require Import LinkRec UnionLinks UnionLinkInstAt UShURoundDefs UShURound.
-Require UkFileIface.
-Require UShLine.
-
-Section UShURoundAt.
-  Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
-            !irefslotG Σ, !pavG Σ, !wchG Σ, !ufdG Σ}.
-  Context `{GEN : GenId} `{XI : CurCtx}.
-  Context `{!uartGhostG Σ}.
-  Context `{!echoOutG Σ, !inG Σ (mono_listR (leibnizO Z)), !fileAppG Σ,
-            !fileOutG Σ, !pipeOutG Σ, !pipesNG Σ}.
-  Context `{HfifR : !UkFileIface.fifRegG Σ}.
-  Context (ug : union_gn) (r : file_names).
-  Local Notation gf := (ugn_file ug).
-  Context (Heq : file_app = MkAppcfg file_names (file_pred (fgn_cl gf)) r).
-  Context (s0 : fstate).
-  Context (Hcons : @riscv_cons_res Σ (@riscv_fixedGS Σ _) = ucl ug).
-  Context (Hkill : @app_taint Σ (@riscv_fixedGS Σ _) = file_taint (fgn_cl gf)).
-  Context (γp : gname).
-
-  Local Notation PT := (upterm_shape ug).
-  Local Notation PD := (updone_shape ug).
-
-  Lemma sh_round_holds_union_at (N : uk_names Σ) :
-    ⊢ union_links ug -∗
-      udep (SG := uexecSG_xv6) (PS := uprogSG_free) -∗
-      UShEcho.sh_echo_slot (file_taint (fgn_cl gf)) -∗
-      UShCatPay.sh_cat_slot (file_taint (fgn_cl gf)) -∗
-      (∃ v : era_pins, era_pin (fgn_echo gf) (S gen_id) v) -∗
-      (∃ jo : option Z, file_cons_cred (fgn_cl gf) r jo) -∗
-      ush_pipes_branch ug r s0 PT PD γp N -∗
-      UkSh.ush_rest_l_at (PS := uprogSG_free) (ghost_varG0 := offbox_offG)
-        N γp (file_taint (fgn_cl gf)) (uWcu ug r s0 PT PD) (uWbf ug r s0)
-        (UShLine.ush_mid_at (lk_rres (union_link_inst_at ug s0)) (fgn_echo gf) γp)
-        ush_line_union
-        (UInitSh.sh_Rsh (ukn_t N) (ukn_d N) (ukn_s N)).
-  Proof using Hcons Hkill Heq HfifR.
-    exact (sh_round_holds_union ug r Heq s0 Hcons Hkill PT PD γp N).
-  Qed.
-End UShURoundAt.

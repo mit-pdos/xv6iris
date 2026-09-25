@@ -85,14 +85,14 @@ Definition union_c9e_frontier :=
 Print Assumptions union_c9e_frontier.
 
 (* ---------------------------------------------------------------------- *)
-(* FRONTIER (cut C9f1, design/union.md section 3): the union's shell round *)
-(* at the file-application line shapes and echo --                         *)
-(* [UShURoundShapes.sh_round_holds_union_at], i.e. [UShURound.             *)
-(* sh_round_holds_union] at the union's terminal and committed pipeline    *)
-(* shapes, with the pipeline branch a PREMISE until C9f2 -- is in no       *)
-(* anchor's cone until the switch (C9g).  Its print must show only axioms  *)
-(* already counted above.  DELETE this block when the union anchor lands.  *)
+(* FRONTIER (cut C9f2, design/union.md section 3): the union's shell round *)
+(* with NO premise -- [UShUPipes.sh_round_holds_union_closed], the file     *)
+(* line shapes and echo with the pipelines at either producer ([echo ws |  *)
+(* cat^n] and [cat f | cat^n], the deed through node 0) at the pipeline's  *)
+(* own terminal and committed shapes -- is in no anchor's cone until the   *)
+(* switch (C9g).  Its print must show only axioms already counted above.   *)
+(* DELETE this block when the union anchor lands.                          *)
 (* ---------------------------------------------------------------------- *)
-Require Import UShURoundShapes.
+Require Import UShUPipes.
 
-Print Assumptions sh_round_holds_union_at.
+Print Assumptions sh_round_holds_union_closed.
