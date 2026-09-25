@@ -893,3 +893,6 @@ import Xv6.SpecCreate
 import Xv6.CreateSharedRegs
 import Xv6.CreateSharedBody
 import Xv6.CreateFailMkdir
+import Xv6.KexecOkQ
+import Xv6.KexecTail
+import Xv6.KexecSeam
