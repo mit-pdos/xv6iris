@@ -12,7 +12,7 @@ bundle costs phase A:
   era DEATH RECEIPT out (it IS `nameiWalkDeadEra` by conversion) rather than
   dropping it -- `execPostFail`'s arm (ii).
 * `kxc_phaseA_au` does not relay a header oracle: it SPENDS the caller's
-  `aopenCommitAt` at the very instant `KexecA2R`'s oracle is fired -- ilock's
+  `aopenCommitAt` at the very instant `KexecACode.kxc_a2_r`'s oracle is fired -- ilock's
   payload open, readi not yet run -- through `FsAbsOpenFire.opfOpen_fire_1`
   off the payload's own era leg, and what comes back is the caller's LINEAR
   receipt (`kxaReceipt`).  A persistent claim cannot carry a linear receipt,
@@ -44,7 +44,7 @@ bundle costs phase A:
 5. **PROCESS LAYER (flagged)**: Rocq's `us_V U` is `A.V`; the slot piece's
    `cw` is `A.V.cwi` (SpecKexec deviation 2).
 -/
-import Xv6.KexecA2R
+import Xv6.KexecACode
 import Xv6.KexecBridge
 import Xv6.SpecKexec
 import Xv6.SpecNameiEra

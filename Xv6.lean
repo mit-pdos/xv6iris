@@ -1000,7 +1000,6 @@ import Xv6.SysOpenEntryC
 import Xv6.KexecCore
 import Xv6.KexecBridge
 import Xv6.SpecKexec
-import Xv6.KexecA2R
 import Xv6.KexecA
 import Xv6.ProofKexec
 import Xv6.LinkKexec
