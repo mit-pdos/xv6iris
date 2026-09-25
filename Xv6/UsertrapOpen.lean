@@ -35,8 +35,7 @@ theorem ut_own_pin (PT : SchedNames → IProp GF) (Γ : SchedNames) (j : Nat) (N
   ipureintro; exact hp
 
 set_option maxHeartbeats 4000000 in
-/-- **The contract, opened onto the entry block** (at the corrected post,
-`wp_usertrap_bodyK`). -/
+/-- **The contract, opened onto the entry block** (`wp_usertrap_body`). -/
 theorem usertrap_open (MP : MYPROC) (PT : SchedNames → IProp GF) (Γ : SchedNames)
     (HD : UT_DISPATCH (hlc := hlc) PT Γ)
     (cpu : CPU) (k : KCtx) (j : Nat) (P : UPtd) (ksp : BitVec 64) (V : ProcPriv)
@@ -44,9 +43,9 @@ theorem usertrap_open (MP : MYPROC) (PT : SchedNames → IProp GF) (Γ : SchedNa
     (pid : BitVec 32) (sep sc tv : BitVec 64) (f : UexecSG.sfam GF) (Wk : Uvis)
     (hj : j < NPROC) (hproc : k.proc = procAddr j) (hctx : utCtxOk k) (htier : k.tier = KTier.kpt)
     (hnoff : k.noff = 0) (hstk : utStackTop k ksp) (hgn : gn = V.gen) :
-    wp_usertrap_bodyK (hlc := hlc) (GF := GF) (fun h => usertrapResAt (hlc := hlc) PT Γ j h)
+    wp_usertrap_body (hlc := hlc) (GF := GF) (fun h => usertrapResAt (hlc := hlc) PT Γ j h)
       cpu k j P ksp V M sts gn cs pid sep sc tv f Wk hj hproc hctx htier hnoff hstk hgn := by
-  unfold wp_usertrap_bodyK
+  unfold wp_usertrap_body
   iintro ⟨Hk, Hpc, Hsepc, Hsc, Htv, Hstv, Hpt, Htf, Hres, Hsi, Hfi, Hpi, Hki, Hnext⟩
   icases kctx_tier _ _ $$ Hk with ⟨%hti, Hk⟩
   icases kctx_wf _ _ $$ Hk with ⟨%hwf, Hk⟩

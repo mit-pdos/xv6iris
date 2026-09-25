@@ -85,13 +85,26 @@ Rocq's (`utPayIn`, `utKillIn`, `utKillOut`, `utResumeIn`).
    closes over the return like every Lean function contract).
 8. `j` is tied to the context (`hproc : k.proc = procAddr j`); Rocq's
    `wp_next_true_swap` remark does not arise.
+9. **exec's answer is read up to the kernel words** (`utExecOut`: `∃ ws,
+   ⌜tfUeq ws V'.tf⌝ ∗ syscExecOut … { V' with tf := ws } …`).
+   `syscExecFailed` pins the WHOLE trapframe, and prepare_return rewrites
+   the four kernel words (`kernel_hartid = hartId cpu'`: a failed exec that
+   slept resumes on another hart); Rocq's failure arm goes through
+   `uround_bump_ok` (resume registers and pc only), which those words do
+   not reach either.
+10. **The contract is at the kernel's deposit instance** (`USERTRAP` has
+   no `[UexecSG GF]` binder; the instance resolves to
+   `UexecExecInst.uexecSGXv6`), because its syscall arm consumes
+   `SpecSyscallXv6.SYSCALL_XV6` -- Rocq's single global `uexecSG_xv6`.
 
-Imports only definitional files and Spec files.
+Imports only definitional files and Spec files (`UexecExecInst` for the
+instance, deviation 10).
 -/
 import Xv6.UtResFits
 import Xv6.SpecSyscall
 import Xv6.UexecRound
 import Xv6.HandlerEnv
+import Xv6.UexecExecInst
 
 namespace Xv6
 
@@ -261,12 +274,14 @@ def utWaitOut (sc sep : BitVec 64) (V : ProcPriv) (M : Nat → List (BitVec 8)) 
     (r : BitVec 64) (cs cs' : ExtTreeSet GName compare) (pidv : BitVec 32) : IProp GF :=
   iprop(⌜sc = uecallScause⌝ -∗ syscWaitOut (GF := GF) (utSysRec sep V) M M' r cs cs' pidv)
 
-/-- **Rocq `ut_exec_out`** (deviation 3): exec failed, or the process
-resumes on its own slot at the new key. -/
+/-- **Rocq `ut_exec_out`** (deviations 3, 9): exec failed, or the process
+resumes on its own slot at the new key -- read at the post record UP TO THE
+KERNEL WORDS (`tfUeq`: prepare_return re-arms them). -/
 def utExecOut (sc sep : BitVec 64) (V : ProcPriv) (M : Nat → List (BitVec 8)) (V' : ProcPriv)
     (M' : Nat → List (BitVec 8)) (sts sts' : List FdState) (gn : GName) (cs : ExtTreeSet GName compare)
     (pid : BitVec 32) : IProp GF :=
-  iprop(⌜sc = uecallScause⌝ -∗ syscExecOut (hlc := hlc) (utSysRec sep V) M V' M' sts sts' gn cs pid)
+  iprop(⌜sc = uecallScause⌝ -∗ ∃ ws : List (BitVec 64), ⌜tfUeq ws V'.tf⌝ ∗
+    syscExecOut (hlc := hlc) (utSysRec sep V) M { V' with tf := ws } M' sts sts' gn cs pid)
 
 /-- **Rocq `ut_kill_in`**: at a non-ecall cause, the process's additive
 pair (the kill deposit AND the resume slot); the key's generation is the
@@ -410,13 +425,14 @@ end Contract
 
 /-- **Rocq `Module Type USERTRAP`**: `wp_usertrap` at the pinned residue
 (deviation 2), ∀-quantified over the park token `PT` (persistent), the era's
-proc table (`ClaimIs`), its handler environment's names (`EnvIs`, which
-devintr's credentials are read from) and the deposit class. -/
+proc table (`ClaimIs`) and its handler environment's names (`EnvIs`, which
+devintr's credentials are read from), at the kernel's deposit instance
+(deviation 10). -/
 structure USERTRAP : Prop where
   wp_usertrap : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF]
     [BioslotG GF] [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF]
     [IregG GF] [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF]
-    [CtokG GF] [WchG GF] [Appcfg GF] [FileG GF] [UexecSG GF] [Fscfg] [Icfg] [CurCtx]
+    [CtokG GF] [WchG GF] [Appcfg GF] [FileG GF] [Fscfg] [Icfg] [CurCtx]
     (PT : SchedNames → IProp GF) [∀ Γ, Persistent (PT Γ)] (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
     (γ0 γ1 : UartNames) (γc γl0 γl1 : GName) (γd : DiskNames) (γdl γt : GName)
     [EnvIs (hlc := hlc) GF Γ γ0 γ1 γc γl0 γl1 γd γdl γt]

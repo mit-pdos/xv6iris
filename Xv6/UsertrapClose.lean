@@ -2,7 +2,7 @@
 `usertrap()`'s stage file: THE EXIT'S LOGICAL CLOSE (Rocq `ut_ret2`'s last
 move, ProofUsertrapTail.v): after `ret`, at the hart the thread ended on,
 the residue is re-sealed at the record prepare_return re-armed and the
-caller's continuation (`utKont`, the boundary's `usertrapPostK`) is applied.
+caller's continuation (`utKont`, the boundary's `usertrapPost`) is applied.
 No instruction stepping.
 
 The record parked is `utPrep V2 rt c` (prepare_return's four kernel words at
@@ -84,7 +84,7 @@ theorem ut_close (A : UtArgs GF) (c : CPU) (R' : RegMap) (V2 : ProcPriv) (M2 : N
   icases Hout with ⟨Hxo, Hfo, Hwo, Hso⟩
   unfold utKont
   ihave HK := Hkont $$ %c
-  unfold usertrapPostK
+  unfold usertrapPost
   iapply HK $$ %R' %V2.upt %(utPrep V2 A.k.root c) %M2 %sts2 %cs2 %(tfW V2.tf 3 &&& 0xFFFFFFFFFFFFFFFE#64)
     %⟨hcs, ha0⟩ %⟨rfl, hrows.tfp⟩ %hrows'.round %hrows'.fdk %hrows'.chk %hrows'.gen %hrows'.fde
     %hrows'.pipe %hrows'.rpid %hepc %hlive' Hk Hpc Hsepc Hsc Htv Hstv Hpt Htf Hres Hxo Hfo Hwo Hko Hso

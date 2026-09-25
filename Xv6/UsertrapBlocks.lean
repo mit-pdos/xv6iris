@@ -251,7 +251,7 @@ abbrev utRsys (A : UtArgs GF) : UtNames → BitVec 32 → IProp GF := utSysEnvAt
 /-- **The caller's continuation, hart-free** (a `true` crossing at a real
 process pins nothing). -/
 def utKont (A : UtArgs GF) : IProp GF :=
-  iprop(∀ c : CPU, usertrapPostK (hlc := hlc) (fun h => usertrapResAt (hlc := hlc) PT Γ A.j h)
+  iprop(∀ c : CPU, usertrapPost (hlc := hlc) (fun h => usertrapResAt (hlc := hlc) PT Γ A.j h)
     A.k A.P A.ksp A.V A.M A.sts A.gn A.cs A.pid A.sep A.sc A.f A.Wk c)
 
 /-- usertrap's own frame, at the entry's values. -/

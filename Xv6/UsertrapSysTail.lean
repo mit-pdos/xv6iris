@@ -42,7 +42,7 @@ theorem ut90_outs (A : UtArgs GF) (V2 : ProcPriv) (M2 : Nat → List (BitVec 8))
       syscForkOut A.f (utSysRec A.sep A.V) (syscA0 V2) A.cs cs2 ∗
       syscWaitOut (GF := GF) (utSysRec A.sep A.V) A.M (syscImg V2 M2) (syscA0 V2) A.cs cs2 A.pid ⊢
     utOuts (hlc := hlc) A V2 M2 sts2 cs2 := by
-  unfold utOuts utExecOutK utForkOut utWaitOut utSysOut
+  unfold utOuts utExecOut utForkOut utWaitOut utSysOut
   iintro ⟨Hx, Hs, Hf, Hw⟩
   isplitl [Hx]
   · iintro %_

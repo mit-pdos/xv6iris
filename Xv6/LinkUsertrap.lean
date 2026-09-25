@@ -31,13 +31,13 @@ namespace Xv6
 
 open Iris MachCSL
 
-/-- The proved `usertrap` interface (at the corrected post `USERTRAPK`),
+/-- The proved `usertrap` interface,
 given `fileclose`, `vmfault`, `LinkSyscall`'s parameters and the read
 reason. -/
 theorem Usertrap (RG : RELEASE_GEN) (RR : RELEASE_REFUTE) (RC : RELEASE_CANCEL) (KFF : KFREE_FREE)
     [ForkretIs] (FC : FILECLOSE) (VF : VMFAULT)
     (hW : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CtokG GF] [UexecSG GF],
-      UtReadWhy (GF := GF)) : USERTRAPK :=
+      UtReadWhy (GF := GF)) : USERTRAP :=
   usertrap_proof (Syscall RG RR RC KFF) Printk Myproc Killed Setkilled Devintr DevintrNone VF Yield PrepareReturn
     (Kexit FC) (Kernelvec (Kerneltrap Yield)) hW
 

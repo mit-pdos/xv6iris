@@ -1,7 +1,7 @@
 /-
 `usertrap()`'s stage file 0: THE BLOCK VOCABULARY (Rocq `ProofUsertrapParts.v`,
 the statement shapes of `ProofUsertrapTail.v` / `ProofUsertrapArms.v` /
-`ProofUsertrapSys.v`, and the corrected boundary).
+`ProofUsertrapSys.v`).
 
     +0x00 .. +0x3a  the entry and the scause dispatch   (ProofUsertrap)
     +0x3a .. +0x54  devintr and the fault demultiplexer (ProofUsertrap)
@@ -18,23 +18,6 @@ Every block is stated here as a `Prop` (`UT_<block>`: "for all block
 arguments, the block's WP"), so each stage file proves ONE of them from the
 callee interfaces and the `UT_*` of the blocks it jumps to (the Rocq
 functor layering, as hypotheses), and the seal composes them.
-
-## The corrected boundary (`USERTRAPK`, REPORTED: a SpecUsertrap edit)
-
-`SpecUsertrap.utExecOut` states exec's failure arm as
-`SpecSyscall.syscExecFailed (utSysRec sep V) M V' M' …` at the POST record
-`V'` -- the one prepare_return re-armed.  `syscExecFailed` pins the WHOLE
-trapframe (`V'.tf = V1.tf.set a0 (-1)`), and prepare_return rewrites the four
-kernel words, one of which is `kernel_hartid = hartId cpu'`: after a failed
-exec that slept (exec reads the file system) the thread resumes on another
-hart and the equation is false.  Rocq's `ut_exec_out` states the failure arm
-through `uround_bump_ok` (the resume registers and pc only), which the kernel
-words do not reach.  `utExecOutK` is the minimal repair: the failure arm up to
-`TfUser.tfUeq` (`∃ ws, ⌜tfUeq ws V'.tf⌝ ∗ syscExecOut … {V' with tf := ws} …`),
-the rest of the post verbatim.  Proposed edit (SpecUsertrap.utExecOut, old →
-new body): `⌜sc = uecallScause⌝ -∗ syscExecOut … V' M' …` →
-`⌜sc = uecallScause⌝ -∗ ∃ ws, ⌜tfUeq ws V'.tf⌝ ∗ syscExecOut … { V' with tf := ws } M' …`;
-after it `USERTRAPK` IS `USERTRAP`.
 
 ## The read reason (`UtReadWhy`, a hypothesis like `SyscSpostEmp`)
 
@@ -65,7 +48,6 @@ import Xv6.ProcPrivAcc
 import Xv6.UsysMemOkSpec
 import Xv6.KillRow
 import MachCSL.WpSmodeFrame
-import Xv6.UexecExecInst
 
 namespace Xv6
 
@@ -75,90 +57,6 @@ open LeanRV64D
 set_option linter.unusedVariables false
 set_option linter.unusedSectionVars false
 
-/-! ## §1 The corrected boundary -/
-
-section Contract
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CtokG GF] [SG : UexecSG GF] [WchG GF]
-    [CurCtx]
-
-/-- **exec's answer, up to the kernel words** (the repair of
-`SpecUsertrap.utExecOut`, see the header). -/
-def utExecOutK (sc sep : BitVec 64) (V : ProcPriv) (M : Nat → List (BitVec 8)) (V' : ProcPriv)
-    (M' : Nat → List (BitVec 8)) (sts sts' : List FdState) (gn : GName) (cs : ExtTreeSet GName compare)
-    (pid : BitVec 32) : IProp GF :=
-  iprop(⌜sc = uecallScause⌝ -∗ ∃ ws : List (BitVec 64), ⌜tfUeq ws V'.tf⌝ ∗
-    syscExecOut (hlc := hlc) (utSysRec sep V) M { V' with tf := ws } M' sts sts' gn cs pid)
-
-theorem utExecOutK_quiet (sc sep : BitVec 64) (V : ProcPriv) (M : Nat → List (BitVec 8)) (V' : ProcPriv)
-    (M' : Nat → List (BitVec 8)) (sts sts' : List FdState) (gn : GName) (cs : ExtTreeSet GName compare)
-    (pid : BitVec 32) (h : sc ≠ uecallScause) :
-    ⊢ utExecOutK (hlc := hlc) (GF := GF) sc sep V M V' M' sts sts' gn cs pid := by
-  unfold utExecOutK; iintro %hc; exact absurd hc h
-
-/-- **`SpecUsertrap.usertrapPost` with `utExecOutK`** (the one change). -/
-def usertrapPostK (R : CPU → UPtd → BitVec 64 → ProcPriv → List FdState → ExtTreeSet GName compare →
-      BitVec 32 → IProp GF)
-    (k : KCtx) (P : UPtd) (ksp : BitVec 64) (V : ProcPriv) (M : Nat → List (BitVec 8))
-    (sts : List FdState) (gn : GName) (cs : ExtTreeSet GName compare) (pid : BitVec 32)
-    (sep sc : BitVec 64) (f : UexecSG.sfam GF) (Wk : Uvis) (cpu' : CPU) : IProp GF :=
-  iprop(∀ (R' : RegMap) (P' : UPtd) (V' : ProcPriv) (M' : Nat → List (BitVec 8)) (sts' : List FdState)
-      (cs' : ExtTreeSet GName compare) (uepc : BitVec 64),
-    ⌜calleeSaved k.regs R' ∧ R' 10#5 = satpOf KTier.kpt P'.root⌝ -∗
-    ⌜V'.upt = P' ∧ P'.tfp = P.tfp⌝ -∗
-    ⌜utRound sep sc V M V' M'⌝ -∗ ⌜utFdKept sc sts sts'⌝ -∗ ⌜utChKept sc V.tf cs cs'⌝ -∗
-    ⌜utGenKept V V'⌝ -∗ ⌜utFdEcall sc V.tf V'.tf sts sts'⌝ -∗
-    ⌜utPipeEcall sc V.tf V'.tf (syscImg V M) (syscImg V' M') sts sts'⌝ -∗
-    ⌜utRetPid sc V.tf V'.tf pid⌝ -∗ ⌜retPc uepc = tfResumePc V'.tf⌝ -∗
-    ⌜utLiveOut sc (utProTf sep V) sts (tfW V'.tf (tfArgIdx 0)) cs'⌝ -∗
-    kctx cpu' ((k.intrOff true false).withRegs R') -∗ pcIs cpu' (jumpPc (k.regs 1#5)) -∗
-    Register.sepc ↦ᵣ[cpu'] uepc -∗
-    (∃ v : BitVec 64, Register.scause ↦ᵣ[cpu'] v) -∗ (∃ v : BitVec 64, Register.stval ↦ᵣ[cpu'] v) -∗
-    Register.stvec ↦ᵣ[cpu'] uservecTvec -∗
-    procPtAt P' M' -∗ tfPageAt P'.tfp V'.tf -∗ R cpu' P' ksp V' sts' cs' pid -∗
-    utExecOutK (hlc := hlc) sc sep V M V' M' sts sts' gn cs pid -∗
-    utForkOut f sc sep V (tfW V'.tf (tfArgIdx 0)) cs cs' -∗
-    utWaitOut sc sep V M (syscImg V' M') (tfW V'.tf (tfArgIdx 0)) cs cs' pid -∗
-    utKillOut (hlc := hlc) sc Wk -∗
-    utSysOut (hlc := hlc) f sc sep V M sts gn cs pid (tfW V'.tf (tfArgIdx 0)) (syscImg V' M') sts'
-      V'.cwi cs' -∗
-    wpLoop cpu')
-
-/-- **`SpecUsertrap.wp_usertrap_body` at `usertrapPostK`.** -/
-def wp_usertrap_bodyK (R : CPU → UPtd → BitVec 64 → ProcPriv → List FdState → ExtTreeSet GName compare →
-      BitVec 32 → IProp GF)
-    (cpu : CPU) (k : KCtx) (j : Nat) (P : UPtd) (ksp : BitVec 64) (V : ProcPriv)
-    (M : Nat → List (BitVec 8)) (sts : List FdState) (gn : GName) (cs : ExtTreeSet GName compare)
-    (pid : BitVec 32) (sep sc tv : BitVec 64) (f : UexecSG.sfam GF) (Wk : Uvis)
-    (hj : j < NPROC) (hproc : k.proc = procAddr j) (hctx : utCtxOk k) (htier : k.tier = KTier.kpt)
-    (hnoff : k.noff = 0) (hstk : utStackTop k ksp) (hgn : gn = V.gen) : Prop :=
-  kctx cpu k ∗ pcIs cpu usertrapPc ∗
-  Register.sepc ↦ᵣ[cpu] sep ∗ Register.scause ↦ᵣ[cpu] sc ∗ Register.stval ↦ᵣ[cpu] tv ∗
-  Register.stvec ↦ᵣ[cpu] uservecTvec ∗
-  procPtAt P M ∗ tfPageAt P.tfp V.tf ∗ R cpu P ksp V sts cs pid ∗
-  utSysIn (hlc := hlc) f sc sep V M sts gn cs pid ∗ utForkIn (hlc := hlc) f sc sep V M sts ∗
-  utPayIn f sc sep V ∗ utKillIn (hlc := hlc) f sc Wk gn sts ∗
-  wpNext true k.proc cpu (usertrapPostK (hlc := hlc) R k P ksp V M sts gn cs pid sep sc f Wk)
-  ⊢ wpLoop (GF := GF) cpu
-
-end Contract
-
-/-- **`SpecUsertrap.USERTRAP` at `wp_usertrap_bodyK`** (the header's
-repair), at the kernel's deposit instance `uexecSGXv6` (the syscall arm
-consumes `SYSCALL_XV6`): `USERTRAP`'s binders without `[UexecSG GF]`. -/
-structure USERTRAPK : Prop where
-  wp_usertrap : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF]
-    [BioslotG GF] [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF]
-    [IregG GF] [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF]
-    [CtokG GF] [WchG GF] [Appcfg GF] [FileG GF] [Fscfg] [Icfg] [CurCtx]
-    (PT : SchedNames → IProp GF) [∀ Γ, Persistent (PT Γ)] (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
-    (γ0 γ1 : UartNames) (γc γl0 γl1 : GName) (γd : DiskNames) (γdl γt : GName)
-    [EnvIs (hlc := hlc) GF Γ γ0 γ1 γc γl0 γl1 γd γdl γt]
-    (cpu : CPU) (k : KCtx) (j : Nat) (P : UPtd) (ksp : BitVec 64) (V : ProcPriv)
-    (M : Nat → List (BitVec 8)) (sts : List FdState) (gn : GName) (cs : ExtTreeSet GName compare)
-    (pid : BitVec 32) (sep sc tv : BitVec 64) (f : UexecSG.sfam GF) (Wk : Uvis)
-    hj hproc hctx htier hnoff hstk hgn,
-    wp_usertrap_bodyK (hlc := hlc) (GF := GF) (fun h => usertrapResAt (hlc := hlc) PT Γ j h)
-      cpu k j P ksp V M sts gn cs pid sep sc tv f Wk hj hproc hctx htier hnoff hstk hgn
 
 /-! ## §2 The read reason (header) -/
 
@@ -309,7 +207,7 @@ variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CtokG GF] [SG : 
 minus the kill row). -/
 def utOuts (A : UtArgs GF) (V2 : ProcPriv) (M2 : Nat → List (BitVec 8)) (sts2 : List FdState)
     (cs2 : ExtTreeSet GName compare) : IProp GF := iprop(
-  utExecOutK (hlc := hlc) A.sc A.sep A.V A.M V2 M2 A.sts sts2 A.gn A.cs A.pid ∗
+  utExecOut (hlc := hlc) A.sc A.sep A.V A.M V2 M2 A.sts sts2 A.gn A.cs A.pid ∗
   utForkOut A.f A.sc A.sep A.V (tfW V2.tf (tfArgIdx 0)) A.cs cs2 ∗
   utWaitOut A.sc A.sep A.V A.M (syscImg V2 M2) (tfW V2.tf (tfArgIdx 0)) A.cs cs2 A.pid ∗
   utSysOut (hlc := hlc) A.f A.sc A.sep A.V A.M A.sts A.gn A.cs A.pid (tfW V2.tf (tfArgIdx 0))
@@ -321,7 +219,7 @@ theorem utOuts_quiet (A : UtArgs GF) (V2 : ProcPriv) (M2 : Nat → List (BitVec 
     ⊢ utOuts (hlc := hlc) (GF := GF) A V2 M2 sts2 cs2 := by
   unfold utOuts
   isplitl []
-  · iapply utExecOutK_quiet _ _ _ _ _ _ _ _ _ _ _ h
+  · iapply utExecOut_quiet _ _ _ _ _ _ _ _ _ _ _ h
   isplitl []
   · iapply utForkOut_quiet _ _ _ _ _ _ _ h
   isplitl []
@@ -337,7 +235,7 @@ theorem utOuts_retf (A : UtArgs GF) (V2 : ProcPriv) (M2 : Nat → List (BitVec 8
   simp only [ha]
   iintro ⟨Hx, Hf, Hw, Hs⟩
   iframe Hf Hw Hs
-  unfold utExecOutK
+  unfold utExecOut
   iintro %hc
   ihave H := Hx $$ %hc
   icases H with ⟨%ws', %hu', H⟩

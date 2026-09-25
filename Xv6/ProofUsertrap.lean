@@ -16,8 +16,8 @@ Setkilled Devintr Vmfault Yield PrepareReturn Kexit Kernelvec`:
 (devintr's third arm), `VMFAULT`, `YIELD`, `PREPARE_RETURN`, `KEXIT`,
 `KERNELVEC`; plus the deposit instance's read reason `UtReadWhy` (UsertrapParts).
 
-The contract proved is `USERTRAPK` (UsertrapParts: SpecUsertrap's `USERTRAP`
-with exec's failure arm up to the kernel words -- the reported repair).
+The contract proved is SpecUsertrap's `USERTRAP` (at the kernel's deposit
+instance; exec's answer up to the kernel words, SpecUsertrap deviations 9-10).
 -/
 import Xv6.UsertrapOpen
 import Xv6.UsertrapTail
@@ -34,13 +34,13 @@ open LeanRV64D
 
 set_option linter.unusedVariables false
 
-/-- **`usertrap` meets its (corrected) specification**, given its callees'
+/-- **`usertrap` meets its specification**, given its callees'
 interfaces and the deposit instance's read reason. -/
 theorem usertrap_proof (SY : SYSCALL_XV6) (PK : PRINTK) (MP : MYPROC) (KI : KILLED) (SK : SETKILLED)
     (DI : DEVINTR) (DN : DEVINTR_NONE) (VM : VMFAULT) (YI : YIELD) (PR : PREPARE_RETURN)
     (KE : KEXIT) (KV : KERNELVEC)
     (hW : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CtokG GF] [UexecSG GF],
-      UtReadWhy (GF := GF)) : USERTRAPK :=
+      UtReadWhy (GF := GF)) : USERTRAP :=
   ⟨fun {hlc GF} _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ PT _ Γ _ γ0 γ1 γc γl0 γl1 γd γdl γt _
       cpu k j P ksp V M sts gn cs pid sep sc tv f Wk hj hproc hctx htier hnoff hstk hgn => by
     have HK := usertrap_kexit_proof PT Γ KE
