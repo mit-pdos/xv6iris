@@ -17,7 +17,7 @@ THE STRUCTURAL IDEA (Rocq's): the body is ONE borrow out of the block -- the
 hands back (`fetchstr_priv_close`), BEFORE the branch, so both arms leave with the
 same block.  The success arm is where copyinstr's and strlen's vocabularies
 meet: the string copyinstr read (`umemStr ... = some s`) is `pl ++ [0]` with
-`pl` NUL-free (`fetchstr_umemStr`), which is strlen's `cstr` precondition on
+`pl` NUL-free (`UMemL.umemStr_nul`), which is strlen's `cstr` precondition on
 the front of the buffer (`byteBuf_append`), and strlen answers `|pl|`.
 -/
 import Xv6.LazyFree
@@ -41,34 +41,6 @@ set_option linter.unusedSimpArgs false
 set_option linter.unusedVariables false
 
 /-! ## Pure facts -/
-
-/-- The string copyinstr read is a NUL-free `pl` and its terminator, inside
-the `max` bytes. -/
-theorem fetchstr_umemStr (M : Nat → List (BitVec 8)) (va max : Nat) (s : List (BitVec 8))
-    (h : umemStr M va max = some s) :
-    ∃ pl : List (BitVec 8), s = pl ++ [0#8] ∧ nonul pl ∧ pl.length < max := by
-  unfold umemStr at h
-  simp only at h
-  cases hf : (umemRead M va max).findIdx? (· = 0#8) with
-  | none => rw [hf] at h; exact absurd h (by simp)
-  | some i =>
-    rw [hf] at h
-    simp only [Option.some.injEq] at h
-    obtain ⟨hi, hzero, hmin⟩ := List.findIdx?_eq_some_iff_getElem.mp hf
-    rw [umemRead_length] at hi
-    have hgi : (umemRead M va max)[i]? = some 0#8 := by
-      rw [List.getElem?_eq_getElem (by rw [umemRead_length]; exact hi)]
-      simpa using hzero
-    refine ⟨(umemRead M va max).take i, ?_, ?_, ?_⟩
-    · rw [← h, List.take_add_one, hgi]; rfl
-    · intro b hb
-      obtain ⟨j, hj, hjb⟩ := List.getElem_of_mem hb
-      rw [List.length_take] at hj
-      have hj' : j < i := by omega
-      rw [List.getElem_take] at hjb
-      rw [← hjb]
-      simpa using hmin j hj'
-    · rw [List.length_take, umemRead_length]; omega
 
 /-- A copyinstr success is a `fetchstrRet` success, at `strlen`'s answer. -/
 theorem fetchstr_ret_ok (M : Nat → List (BitVec 8)) (va : Nat) (old pl : List (BitVec 8))
@@ -500,7 +472,7 @@ theorem fetchstr_proof (MP : MYPROC) (CI : COPYINSTR) (SL : STRLEN) : FETCHSTR :
   obtain ⟨hext, hpost⟩ := hpost
   rcases hpost with ⟨h0, s, hs, hbs, hmap⟩ | ⟨hm1, d, hd, hbs⟩
   · -- success: strlen(buf)
-    obtain ⟨pl, rfl, hnul, hlt⟩ := fetchstr_umemStr _ _ _ s hs
+    obtain ⟨pl, rfl, hnul, hlt⟩ := UMemL.umemStr_nul _ _ _ s hs
     subst hbs
     iapply (fetchstr_tail_ok SL cpu c13 k
       (fun r => iprop(∃ (Q' : UPtd) (cs : List (BitVec 8)),

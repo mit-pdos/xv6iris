@@ -57,22 +57,10 @@ theorem sys_link_era_nlink' (dn : Dinode) (bm : Blkmap) (data : Nat → List (Bi
     fnNlink (eraNode dn bm data) = dn.diNlink.toNat := rfl
 
 theorem sys_link_setnl_size' (dn : Dinode) (nl : BitVec 16) :
-    (sysLinkSetnl dn nl).diSize = dn.diSize := rfl
-
-theorem sys_link_umemStr_len (M : Nat → List (BitVec 8)) (va max : Nat) (s : List (BitVec 8))
-    (h : umemStr M va max = some s) : s.length ≤ max := by
-  unfold umemStr at h
-  simp only at h
-  cases hf : (umemRead M va max).findIdx? (· = 0#8) with
-  | none => rw [hf] at h; cases h
-  | some i =>
-    rw [hf] at h
-    simp only [Option.some.injEq] at h
-    rw [← h, List.length_take, UMemL.umemRead_length]
-    omega
+    (sysfileSetnl dn nl).diSize = dn.diSize := rfl
 
 /-- The `++`'s record (Rocq `sl_incnl`). -/
-abbrev sysLinkInc (dn : Dinode) : Dinode := sysLinkSetnl dn (dn.diNlink + 1#16)
+abbrev sysLinkInc (dn : Dinode) : Dinode := sysfileSetnl dn (dn.diNlink + 1#16)
 
 section
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
@@ -84,7 +72,7 @@ variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [Fdslot
 NUL-terminated view, and the rest of the buffer. -/
 def sysLinkPath (a : BitVec 64) (plen : Nat) (pfun : Nat → BitVec 8) : IProp GF := iprop%
   byteBuf a (DFrac.own 1) (bview (plen + 1) pfun) ∗
-  sysLinkAny (a + BitVec.ofNat 64 (plen + 1)) (128 - (plen + 1))
+  sysfileAny (a + BitVec.ofNat 64 (plen + 1)) (128 - (plen + 1))
 
 /-- THE CARVE OF argstr's SUCCESS ARM (Rocq `sl_buf_split` + `sl_bytes_name`):
 the buffer argstr filled is the path, NUL-free below its length and
@@ -100,7 +88,7 @@ theorem sys_link_path_of (a : BitVec 64) (M : Nat → List (BitVec 8)) (va : Nat
   obtain ⟨pl', hpl', hof⟩ := argPathOf_umemStr M va 128 _ (by decide) hs
   have hpl : pl = pl' := List.append_cancel_right hpl'
   subst hpl
-  have hlen := sys_link_umemStr_len M va 128 _ hs
+  have hlen := UMemL.umemStr_length_le M va 128 _ hs
   rw [List.length_append, List.length_singleton] at hlen
   have hsh := argPathOf_shape M va pl hof
   have hbs' : bs = (pl ++ [0#8]) ++ old.drop (pl.length + 1) := by rw [hbs]; simp
@@ -123,7 +111,7 @@ theorem sys_link_path_of (a : BitVec 64) (M : Nat → List (BitVec 8)) (va : Nat
     · show (pl ++ [0#8])[pl.length]! = 0#8
       rw [List.getElem!_eq_getElem?_getD, List.getElem?_append_right (Nat.le_refl _)]
       simp
-  unfold sysLinkPath sysLinkAny
+  unfold sysLinkPath sysfileAny
   rw [bview_getElem! (pl ++ [0#8]) (pl.length + 1) hl1]
   iframe B1
   iexists old.drop (pl.length + 1)
@@ -145,8 +133,8 @@ theorem sys_link_path_lend (a : BitVec 64) (plen : Nat) (pfun : Nat → BitVec 8
 /-- ...folded back into the buffer (Rocq `sl_buf_join`). -/
 theorem sys_link_path_close (a : BitVec 64) (plen : Nat) (pfun : Nat → BitVec 8)
     (hp : plen < 128) :
-    sysLinkPath (GF := GF) a plen pfun ⊢ sysLinkAny a 128 := by
-  unfold sysLinkPath sysLinkAny
+    sysLinkPath (GF := GF) a plen pfun ⊢ sysfileAny a 128 := by
+  unfold sysLinkPath sysfileAny
   iintro ⟨B1, ⟨%tl, %hl, B2⟩⟩
   iexists bview (plen + 1) pfun ++ tl
   isplitr
@@ -185,9 +173,9 @@ theorem sys_link_walk_ip (IL : ILOCK) (IU : IUPDATE) (IUP : IUNLOCKPUT) (EO : EN
     (hn1a : 9 ≤ n1) (hn1b : fscBmapstart ∉ Sb1 → 10 ≤ n1) :
     kctx cpu (((k.withSpie spie spp).pushed 38).withRegs R) ∗ pcIs cpu (KA.«sys_link» + 0x42#64) ∗
     sysLinkCells (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) (k.regs 9#5) w₄ ∗
-    sysLinkAny (sysLinkName (k.regs 2#5)) 16 ∗ sysLinkPath (sysLinkNew (k.regs 2#5)) plen2 pfun2 ∗
-    sysLinkAny (sysLinkOld (k.regs 2#5)) 128 ∗
-    trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗ sysLinkEnv (hlc := hlc) Γ ∗
+    sysfileAny (sysLinkName (k.regs 2#5)) 16 ∗ sysLinkPath (sysLinkNew (k.regs 2#5)) plen2 pfun2 ∗
+    sysfileAny (sysLinkOld (k.regs 2#5)) 128 ∗
+    trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗ sysfileEnv (hlc := hlc) Γ ∗
     sysLinkRows k.proc A.pid A.V ∗ sysLinkHole A k.proc P2 ∗ (∀ c : CPU, sysLinkPostA k A c) ∗
     inodeRefp kk q icfgDev inum ∗
     linkCommits (hlc := hlc) (fsGammaL fscFs) A.Ftgt A.Fent A.Funt ∗
@@ -229,7 +217,7 @@ theorem sys_link_walk_ip (IL : ILOCK) (IU : IUPDATE) (IUP : IUNLOCKPUT) (EO : EN
   unfold sysLinkIlockK
   iintro %cpu %spie1 %spp1 %R1 %dn %bm %hcs1 Hk Hpc Hte Hce Hpid Hb1 Hsl Hdep Hoff Hdev Hinum Hval
     Hload #Hshot Hfrz Hru
-  k_norm_g [sys_link_ret_46, sys_link_ww, sys_link_psw]
+  k_norm_g [sys_link_ret_46, sysfile_ww, sysfile_psw]
   have hp1 := sysLinkPins_cs k _ R1 (ientry kk) (k.regs 18#5)
     (sysLinkPins_set k _ _ _ 1#5 _ hpins (Or.inl rfl)) hcs1
   ihave Hbs := bslots_cons 2 $$ [$Hb1 $Hb2]
@@ -237,7 +225,7 @@ theorem sys_link_walk_ip (IL : ILOCK) (IU : IUPDATE) (IUP : IUNLOCKPUT) (EO : EN
   unfold icLoadedFlatBody
   icases Hload with ⟨%data, %hok, %hrl, %hdok, %hddix, %hdoc, %hduq, Hdl, Hdi, Hmeta, Ha, Hr, Hb, Ht⟩
   -- +0x46  lh a4,68(s1) : ip->type
-  icases sys_link_meta_type (ientry kk) dn $$ Hmeta with ⟨Hty, Hmw⟩
+  icases sysfile_meta_type (ientry kk) dn $$ Hmeta with ⟨Hty, Hmw⟩
   k_step_e (wp_s_lh cpu _ (KA.«sys_link» + 0x46#64) false 68#12 14#5 9#5 (by decide) (by decide)
       (DFrac.own 1) dn.diType)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hp1.2.2.1, iType]
@@ -247,7 +235,7 @@ theorem sys_link_walk_ip (IL : ILOCK) (IU : IUPDATE) (IUP : IUNLOCKPUT) (EO : EN
   k_step_e (wp_s_addi cpu _ (KA.«sys_link» + 0x4a#64) true 1#12 15#5 0#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
-  have hbt := sys_link_beq_tdir dn.diType
+  have hbt := sysfile_beq_tdir dn.diType
   have hp2 := sysLinkPins_set k _ _ _ 15#5 1#64 (sysLinkPins_set k R1 _ _ 14#5
     (BitVec.signExtend 64 dn.diType) hp1 (by decide)) (by decide)
   -- +0x4c  beq a4,a5 -> ARM C
@@ -344,19 +332,19 @@ theorem sys_link_walk_ip (IL : ILOCK) (IU : IUPDATE) (IUP : IUNLOCKPUT) (EO : EN
   ihave Hmeta := Hmw $$ %(dn.diNlink + 1#16) Hnl
   -- the facts the mint and its re-park owe, all off `inodeOk` / the guards
   obtain ⟨hwf, hcov, hda, htynz, hszb, hholes, hsized⟩ := hok
-  have htyI : (sysLinkInc dn).diType = dn.diType := sys_link_setnl_type dn _
+  have htyI : (sysLinkInc dn).diType = dn.diType := sysfile_setnl_type dn _
   have htynzI : (sysLinkInc dn).diType.toNat ≠ 0 := by rw [htyI]; exact htynz
   have hndI : (sysLinkInc dn).diType.toNat ≠ T_DIR_z := by rw [htyI]; exact hnd
-  have hdaI : (sysLinkInc dn).diAddrs = bmCells bm := by rw [sys_link_setnl_addrs]; exact hda
+  have hdaI : (sysLinkInc dn).diAddrs = bmCells bm := by rw [sysfile_setnl_addrs]; exact hda
   have hbump := iregNlink_bump dn.diNlink hrl.2.1 hmx
   have hnlI : (sysLinkInc dn).diNlink.toNat = dn.diNlink.toNat + 1 := by
     rw [sys_link_setnl_nlink]; exact hbump.1
   have hokI : inodeOk fscCov fscLogst (sysLinkInc dn) bm data :=
-    sys_link_setnl_inodeOk fscCov fscLogst dn bm data _ ⟨hwf, hcov, hda, htynz, hszb, hholes, hsized⟩
+    sysfile_setnl_inodeOk fscCov fscLogst dn bm data _ ⟨hwf, hcov, hda, htynz, hszb, hholes, hsized⟩
   have hrlI : inodeRecLocal (sysLinkInc dn) :=
     inodeRecLocal_sameType dn _ hrl htyI (by rw [sys_link_setnl_nlink]; exact hbump.2)
       (fun h => absurd h hndI)
-  have hdokI : dirOk icfgNib (sysLinkInc dn) data := sys_link_setnl_dirOk _ dn data _ hdok
+  have hdokI : dirOk icfgNib (sysLinkInc dn) data := sysfile_setnl_dirOk _ dn data _ hdok
   have hddixI : dirDotsIx inum.toNat (sysLinkInc dn) data := dirDotsIx_not_dir _ _ _ hndI
   have hdocI : dirOrphanClean (sysLinkInc dn) data := dirOrphanClean_not_dir _ _ hndI
   have hduqI : dirUniq (sysLinkInc dn) data := dirUniq_not_dir _ _ hndI
@@ -378,7 +366,7 @@ theorem sys_link_walk_ip (IL : ILOCK) (IU : IUPDATE) (IUP : IUNLOCKPUT) (EO : EN
   icases bslots_uncons 2 $$ Hbs with ⟨Hb1, Hb2⟩
   iapply (sys_link_iupdate_link IU Γ cpu _ k.sie (by k_norm_g) k.proc (by k_norm_g) A.j kk inum
       (sysLinkInc dn) dn bm (n1 - 1) Sb1 false true A.pid hj ?up ?uK ?un ?ut (fun h => by cases h) hnib
-      (sys_link_setnl_type_stable dn _) htynzI (sys_link_setnl_nlink dn _) hmx hdaI
+      (sysfile_setnl_type_stable dn _) htynzI (sys_link_setnl_nlink dn _) hmx hdaI
       (blkmapWf_dir_len hwf) ?ua)
     $$ [- $Hk $Hpc $Hte $Hce $Henv $Hdev $Hinum $Hmeta $Hmap $Hdi $Hpin $Hpid $Hb2 $Hop]
   rotate_right 1
@@ -390,7 +378,7 @@ theorem sys_link_walk_ip (IL : ILOCK) (IU : IUPDATE) (IUP : IUNLOCKPUT) (EO : EN
   case ua => k_norm_g
   iintro %cpu %spie2 %spp2 %R2 %hcs2 Hk Hpc Hte Hce Hpid Hdev Hinum Hmeta Hmap Hdi ⟨%w, %hw, Htok⟩
     Hpin Hb2 Hop
-  k_norm_g [sys_link_ret_6a, sys_link_ww, sys_link_psw]
+  k_norm_g [sys_link_ret_6a, sysfile_ww, sysfile_psw]
   have hp4 := sysLinkPins_cs k _ R2 (ientry kk) (k.regs 18#5)
     (sysLinkPins_set k _ _ _ 1#5 _ (sysLinkPins_set k _ _ _ 10#5 _ (sysLinkPins_set k _ _ _ 15#5 _
       hp3 (by decide)) (by decide)) (Or.inl rfl)) hcs2
@@ -413,7 +401,7 @@ theorem sys_link_walk_ip (IL : ILOCK) (IU : IUPDATE) (IUP : IUNLOCKPUT) (EO : EN
   have hokt : linkTgtOk (absRow (eraNode dn bm data)).anNode :=
     linkTgtOk_not_dir _ (lfEra_not_dir dn bm data hnd)
   have habs' := lfNlink_row dn (sysLinkInc dn) bm data htynz htyI (sys_link_setnl_size' dn _)
-    (sys_link_setnl_major dn _) (sys_link_setnl_minor dn _)
+    (sysfile_setnl_major dn _) (sysfile_setnl_minor dn _)
     (by rw [sys_link_era_nlink', sys_link_era_nlink', hnlI])
   unfold linkCommits
   icases Hcm with ⟨Hltgtc, Hlent, Hcmu⟩
@@ -455,7 +443,7 @@ theorem sys_link_walk_ip (IL : ILOCK) (IU : IUPDATE) (IUP : IUNLOCKPUT) (EO : EN
   case it => k_norm_g; exact htier
   case ia => k_norm_g
   iintro %cpu %spie3 %spp3 %R3 %hcs3 Hk Hpc Hte Hce Hpid Hshr Htx
-  k_norm_g [sys_link_ret_70, sys_link_ww, sys_link_psw]
+  k_norm_g [sys_link_ret_70, sysfile_ww, sysfile_psw]
   have hp5 := sysLinkPins_cs k _ R3 (ientry kk) (k.regs 18#5)
     (sysLinkPins_set k _ _ _ 1#5 _ (sysLinkPins_set k R2 _ _ 10#5 _ hp4 (by decide)) (Or.inl rfl))
     hcs3
@@ -491,14 +479,14 @@ theorem sys_link_walk_ip (IL : ILOCK) (IU : IUPDATE) (IUP : IUNLOCKPUT) (EO : EN
   unfold sysLinkNpK
   iintro %cpu %spie4 %spp4 %R4 %n2 %Sb2 %ok %nf %ipv %w2 %⟨hcs4, hsub, hw2, hn2, -⟩ Hk Hpc Hte Hce Hpid
     Hcwd Hcwr Hpath Hname Hbs Hop Htx Harm
-  k_norm_g [sys_link_ret_7c, sys_link_ww, sys_link_psw]
+  k_norm_g [sys_link_ret_7c, sysfile_ww, sysfile_psw]
   have hp6 := sysLinkPins_cs k _ R4 (ientry kk) (k.regs 18#5)
     (sysLinkPins_set k _ _ _ 1#5 _ (sysLinkPins_set k _ _ _ 10#5 _ (sysLinkPins_set k R3 _ _ 11#5 _
       hp5 (by decide)) (by decide)) (Or.inl rfl)) hcs4
   have hmem : IBLOCK inum icfgIst ∈ Sb2 := hsub _ List.mem_cons_self
   -- the buffers, folded back where no callee reads them again
-  ihave Hpathtl := (show sysLinkAny (GF := GF) (sysLinkNew (k.regs 2#5) + (BitVec.ofNat 64 plen2 + 1#64))
-      (128 - (plen2 + 1)) ⊢ sysLinkAny (sysLinkNew (k.regs 2#5) + BitVec.ofNat 64 (plen2 + 1))
+  ihave Hpathtl := (show sysfileAny (GF := GF) (sysLinkNew (k.regs 2#5) + (BitVec.ofNat 64 plen2 + 1#64))
+      (128 - (plen2 + 1)) ⊢ sysfileAny (sysLinkNew (k.regs 2#5) + BitVec.ofNat 64 (plen2 + 1))
       (128 - (plen2 + 1)) from by
     rw [show BitVec.ofNat 64 plen2 + 1#64 = BitVec.ofNat 64 (plen2 + 1) by
       apply BitVec.eq_of_toNat_eq; simp only [BitVec.toNat_add, BitVec.toNat_ofNat]; omega]) $$ Hpathtl
@@ -607,9 +595,9 @@ theorem sys_link_walk_ns (BO : BEGIN_OP) (NI : NAMEI) (IL : ILOCK) (IU : IUPDATE
     (hnn2 : ∀ i, i < plen2 → pfun2 i ≠ 0#8) (hterm2 : pfun2 plen2 = 0#8) (hplen2 : plen2 < 128) :
     kctx cpu (((k.withSpie spie spp).pushed 38).withRegs R) ∗ pcIs cpu (KA.«sys_link» + 0x30#64) ∗
     sysLinkCells (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) w₃ w₄ ∗
-    sysLinkAny (sysLinkName (k.regs 2#5)) 16 ∗ sysLinkPath (sysLinkNew (k.regs 2#5)) plen2 pfun2 ∗
+    sysfileAny (sysLinkName (k.regs 2#5)) 16 ∗ sysLinkPath (sysLinkNew (k.regs 2#5)) plen2 pfun2 ∗
     sysLinkPath (sysLinkOld (k.regs 2#5)) plen1 pfun1 ∗
-    trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗ sysLinkEnv (hlc := hlc) Γ ∗
+    trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗ sysfileEnv (hlc := hlc) Γ ∗
     sysLinkRows k.proc A.pid A.V ∗ sysLinkHole A k.proc P2 ∗ (∀ c : CPU, sysLinkPostA k A c) ∗
     linkCommits (hlc := hlc) (fsGammaL fscFs) A.Ftgt A.Fent A.Funt ∗
     bslots 3 ∗ irefSlots sysLinkIrefs
@@ -633,7 +621,7 @@ theorem sys_link_walk_ns (BO : BEGIN_OP) (NI : NAMEI) (IL : ILOCK) (IU : IUPDATE
   k_step_e (wp_s_jal cpu _ (KA.«sys_link» + 0x32#64) false 2092488#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [sys_link_br_begin_op]
   iintro Hk Hpc
-  iapply (sys_link_begin_op BO Γ cpu _ k.sie (by k_norm_g) k.proc (by k_norm_g) A.j A.pid hj ?bp ?bK
+  iapply (sysfile_begin_op BO Γ cpu _ k.sie (by k_norm_g) k.proc (by k_norm_g) A.j A.pid pidPriv hj ?bp ?bK
       ?bn ?bt)
     $$ [- $Hk $Hpc $Hte $Hce $Henv $Hpid]
   rotate_right 1
@@ -643,7 +631,7 @@ theorem sys_link_walk_ns (BO : BEGIN_OP) (NI : NAMEI) (IL : ILOCK) (IU : IUPDATE
   case bn => k_norm_g; exact hnoff
   case bt => k_norm_g; exact htier
   iintro %cpu %spie1 %spp1 %R1 %hcs1 Hk Hpc Hte Hce Hpid Hop
-  k_norm_g [sys_link_ret_36, sys_link_ww, sys_link_psw]
+  k_norm_g [sys_link_ret_36, sysfile_ww, sysfile_psw]
   have hp1 := sysLinkPins_cs k _ R1 (k.regs 9#5) (k.regs 18#5)
     (sysLinkPins_set k R _ _ 1#5 _ hpins (Or.inl rfl)) hcs1
   icases logOp_openS icfgLog MAXOPBLOCKS $$ Hop with ⟨%Sb0, Hop, Htx⟩
@@ -671,7 +659,7 @@ theorem sys_link_walk_ns (BO : BEGIN_OP) (NI : NAMEI) (IL : ILOCK) (IU : IUPDATE
   unfold sysLinkNameiK
   iintro %cpu %spie2 %spp2 %R2 %n1 %Sb1 %ok %ipv %w1 %⟨hcs2, hsub, hw1, hn1, -⟩ Hk Hpc Hte Hce Hpid
     Hcwd Hcwr Hpath Hbs Hop Htx Harm
-  k_norm_g [sys_link_ret_3e, sys_link_ww, sys_link_psw]
+  k_norm_g [sys_link_ret_3e, sysfile_ww, sysfile_psw]
   have hp2 := sysLinkPins_cs k _ R2 (k.regs 9#5) (k.regs 18#5)
     (sysLinkPins_set k _ _ _ 1#5 _ (sysLinkPins_set k R1 _ _ 10#5 _ hp1 (by decide)) (Or.inl rfl)) hcs2
   ihave Hold := Hpathw $$ Hpath
@@ -743,7 +731,7 @@ theorem sys_link_walk_a (AS : ARGSTR) (BO : BEGIN_OP) (NI : NAMEI) (IL : ILOCK) 
     (hv0 : A.V.tf[tfArgIdx 0]? = some v0) (hv1 : A.V.tf[tfArgIdx 1]? = some v1) :
     kctx cpu (((k.withSpie spie spp).pushed 38).withRegs R) ∗ pcIs cpu (KA.«sys_link» + 0x8#64) ∗
     sysLinkCells (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) w₃ w₄ ∗ sysLinkBufs (k.regs 2#5) ∗
-    trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗ sysLinkEnv (hlc := hlc) Γ ∗
+    trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗ sysfileEnv (hlc := hlc) Γ ∗
     procPrivFd A.γ (procAddr A.j) A.pid A.V A.M ∗ (∀ c : CPU, sysLinkPostA k A c) ∗
     linkCommits (hlc := hlc) (fsGammaL fscFs) A.Ftgt A.Fent A.Funt ∗
     bslots 3 ∗ irefSlots sysLinkIrefs
@@ -768,11 +756,11 @@ theorem sys_link_walk_a (AS : ARGSTR) (BO : BEGIN_OP) (NI : NAMEI) (IL : ILOCK) 
   k_step_e (wp_s_jal cpu _ (KA.«sys_link» + 0x12#64) false 2087388#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [sys_link_br_argstr]
   iintro Hk Hpc
-  icases (show sysLinkAny (GF := GF) (sysLinkOld (k.regs 2#5)) 128 ⊢ ∃ bs : List (BitVec 8),
+  icases (show sysfileAny (GF := GF) (sysLinkOld (k.regs 2#5)) 128 ⊢ ∃ bs : List (BitVec 8),
       ⌜bs.length = 128⌝ ∗ byteBuf (sysLinkOld (k.regs 2#5)) (DFrac.own 1) bs from .rfl) $$ Hold
     with ⟨%bo, %hbo, Hold⟩
   iapply (sys_link_argstr AS Γ cpu _ k.sie (by k_norm_g) k.proc (by k_norm_g) (procAddr A.j) A.pid A.V
-      A.M 0 v0 bo (sysLinkOld (k.regs 2#5)) ?ab sys_link_arg0_lt ?aa hv0 ?ap ?atr ?an ?aK ?am
+      A.M 0 v0 bo (sysLinkOld (k.regs 2#5)) ?ab sysfile_arg0_lt ?aa hv0 ?ap ?atr ?an ?aK ?am
       (by omega))
     $$ [- $Hk $Hpc $Hte $Hce $Henv $Hbare $Hold]
   rotate_right 1
@@ -785,23 +773,23 @@ theorem sys_link_walk_a (AS : ARGSTR) (BO : BEGIN_OP) (NI : NAMEI) (IL : ILOCK) 
   case aK => k_norm_g; exact hKas
   case am => k_norm_g; rw [hbo]
   iintro %cpu %spie1 %spp1 %R1 %P1 %bs1 %⟨hcs1, hP1, hret1⟩ Hk Hpc Hte Hce Hbare Hold
-  k_norm_g [sys_link_ret_16, sys_link_ww, sys_link_psw]
+  k_norm_g [sys_link_ret_16, sysfile_ww, sysfile_psw]
   have hp1 := sysLinkPins_cs k _ R1 (k.regs 9#5) (k.regs 18#5)
     (sysLinkPins_set k _ _ _ 1#5 _ (sysLinkPins_set k _ _ _ 10#5 _ (sysLinkPins_set k _ _ _ 11#5 _
       (sysLinkPins_set k R _ _ 12#5 _ hpins (by decide)) (by decide)) (by decide)) (Or.inl rfl)) hcs1
   -- +0x16  li a5,-1
   k_step_e (wp_s_addi cpu _ (KA.«sys_link» + 0x16#64) true 4095#12 15#5 0#5 (by decide))
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [sys_link_m1]
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [sysfile_sext_m1]
   iintro Hk Hpc
   have hp1' := sysLinkPins_set k R1 _ _ 15#5 0xFFFFFFFFFFFFFFFF#64 hp1 (by decide)
   rcases hret1 with ⟨pl1, hs1, hbs1, hr1⟩ | ⟨hr1, hbl1⟩
   case inr =>
     -- ===== ARM A (argstr 0) =====
     k_step_e (wp_s_branch cpu _ (KA.«sys_link» + 0x18#64) false 258#13 10#5 0#5 (by decide) bop.BLT)
-      from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hr1, sys_link_bltz_m1]
+      from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hr1, sysfile_bltz_m1]
     iintro Hk Hpc
-    ihave Hold : sysLinkAny (sysLinkOld (k.regs 2#5)) 128 $$ [Hold]
-    · unfold sysLinkAny; iexists bs1; iframe; ipureintro; omega
+    ihave Hold : sysfileAny (sysLinkOld (k.regs 2#5)) 128 $$ [Hold]
+    · unfold sysfileAny; iexists bs1; iframe; ipureintro; omega
     ihave Hbufs : sysLinkBufs (k.regs 2#5) $$ [Hnm Hnew Hold]
     · unfold sysLinkBufs; iframe
     ihave Hblk := Hbw $$ %P1 %_ Hbare
@@ -816,7 +804,7 @@ theorem sys_link_walk_a (AS : ARGSTR) (BO : BEGIN_OP) (NI : NAMEI) (IL : ILOCK) 
     with ⟨%pfun1, %⟨hnn1, hterm1, hplen1⟩, Hold⟩
   k_step_e (wp_s_branch cpu _ (KA.«sys_link» + 0x18#64) false 258#13 10#5 0#5 (by decide) bop.BLT)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
-    with [hr1, sys_link_bltz_nat pl1.length (by omega)]
+    with [hr1, sysfile_bltz_nat pl1.length (by omega)]
   iintro Hk Hpc
   -- +0x1c  li a2,128 ; +0x20  addi a1,s0,-176 ; +0x24  li a0,1
   k_step_e (wp_s_addi cpu _ (KA.«sys_link» + 0x1c#64) false 128#12 12#5 0#5 (by decide))
@@ -832,7 +820,7 @@ theorem sys_link_walk_a (AS : ARGSTR) (BO : BEGIN_OP) (NI : NAMEI) (IL : ILOCK) 
   k_step_e (wp_s_jal cpu _ (KA.«sys_link» + 0x26#64) false 2087368#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [sys_link_br_argstr]
   iintro Hk Hpc
-  icases (show sysLinkAny (GF := GF) (sysLinkNew (k.regs 2#5)) 128 ⊢ ∃ bs : List (BitVec 8),
+  icases (show sysfileAny (GF := GF) (sysLinkNew (k.regs 2#5)) 128 ⊢ ∃ bs : List (BitVec 8),
       ⌜bs.length = 128⌝ ∗ byteBuf (sysLinkNew (k.regs 2#5)) (DFrac.own 1) bs from .rfl) $$ Hnew
     with ⟨%bw, %hbw, Hnew⟩
   iapply (sys_link_argstr AS Γ cpu _ k.sie (by k_norm_g) k.proc (by k_norm_g) (procAddr A.j) A.pid
@@ -849,7 +837,7 @@ theorem sys_link_walk_a (AS : ARGSTR) (BO : BEGIN_OP) (NI : NAMEI) (IL : ILOCK) 
   case bK => k_norm_g; exact hKas
   case bm => k_norm_g; rw [hbw]
   iintro %cpu %spie2 %spp2 %R2 %P2 %bs2 %⟨hcs2, hP2, hret2⟩ Hk Hpc Hte Hce Hbare Hnew
-  k_norm_g [sys_link_ret_2a, sys_link_ww, sys_link_psw]
+  k_norm_g [sys_link_ret_2a, sysfile_ww, sysfile_psw]
   have hp2 := sysLinkPins_cs k _ R2 (k.regs 9#5) (k.regs 18#5)
     (sysLinkPins_set k _ _ _ 1#5 _ (sysLinkPins_set k _ _ _ 10#5 _ (sysLinkPins_set k _ _ _ 11#5 _
       (sysLinkPins_set k _ _ _ 12#5 _ hp1' (by decide)) (by decide)) (by decide)) (Or.inl rfl)) hcs2
@@ -863,17 +851,17 @@ theorem sys_link_walk_a (AS : ARGSTR) (BO : BEGIN_OP) (NI : NAMEI) (IL : ILOCK) 
     rw [hM2]) $$ Hblk
   -- +0x2a  li a5,-1
   k_step_e (wp_s_addi cpu _ (KA.«sys_link» + 0x2a#64) true 4095#12 15#5 0#5 (by decide))
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [sys_link_m1]
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [sysfile_sext_m1]
   iintro Hk Hpc
   have hp2' := sysLinkPins_set k R2 _ _ 15#5 0xFFFFFFFFFFFFFFFF#64 hp2 (by decide)
   rcases hret2 with ⟨pl2, hs2, hbs2, hr2⟩ | ⟨hr2, hbl2⟩
   case inr =>
     -- ===== ARM A (argstr 1) =====
     k_step_e (wp_s_branch cpu _ (KA.«sys_link» + 0x2c#64) false 238#13 10#5 0#5 (by decide) bop.BLT)
-      from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hr2, sys_link_bltz_m1]
+      from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hr2, sysfile_bltz_m1]
     iintro Hk Hpc
-    ihave Hnew : sysLinkAny (sysLinkNew (k.regs 2#5)) 128 $$ [Hnew]
-    · unfold sysLinkAny; iexists bs2; iframe; ipureintro; omega
+    ihave Hnew : sysfileAny (sysLinkNew (k.regs 2#5)) 128 $$ [Hnew]
+    · unfold sysfileAny; iexists bs2; iframe; ipureintro; omega
     ihave Hold := sys_link_path_close _ pl1.length pfun1 hplen1 $$ Hold
     ihave Hbufs : sysLinkBufs (k.regs 2#5) $$ [Hnm Hnew Hold]
     · unfold sysLinkBufs; iframe
@@ -887,7 +875,7 @@ theorem sys_link_walk_a (AS : ARGSTR) (BO : BEGIN_OP) (NI : NAMEI) (IL : ILOCK) 
     with ⟨%pfun2, %⟨hnn2, hterm2, hplen2⟩, Hnew⟩
   k_step_e (wp_s_branch cpu _ (KA.«sys_link» + 0x2c#64) false 238#13 10#5 0#5 (by decide) bop.BLT)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
-    with [hr2, sys_link_bltz_nat pl2.length (by omega)]
+    with [hr2, sysfile_bltz_nat pl2.length (by omega)]
   iintro Hk Hpc
   -- THE PROCESS BLOCK, OPENED for the two walks: the rows out
   icases sys_link_block_open hct A P2 hP2' $$ Hblk with ⟨Hrows, Hhole⟩

@@ -30,12 +30,12 @@ path[128]` at `sp0-144`.  The buffer is a `byteBuf` list
    alone, lent through `ProcPrivAcc.procPrivFd_cwdPid` and closed at the
    SAME cwd (`sys_mkdir_pid`): the Lean begin_op / iunlockput / end_op take
    only `p->pid`'s share, not the bare block.
-3. `sys_mkdir_umemStr` restates the pure `ProofFetchstr.fetchstr_umemStr`
-   and `sys_mkdir_stack_bytes` `SysLinkFrame.sys_link_stack_bytes` (a Proof
-   file / a stage file of another Proof cannot be imported: brief fs7b rule
-   2, the `SysChdirFrame` deviation-3 precedent); the fold is the landed
-   `KstackMap.byteBuf_stackOwn`.
+3. The fetched string's shape is `UMemL.umemStr_nul`; the path buffer and
+   the slots↔bytes carve are the shared `Xv6/SysfileCalls.lean` helpers
+   (`sysfile_stack_bytes`, `sysfile_buf_split` / `_join`); the fold is the
+   landed `KstackMap.byteBuf_stackOwn`.
 -/
+import Xv6.SysfileCalls
 import Xv6.SpecSysMkdir
 import Xv6.ProcPrivAcc
 import Xv6.KstackMap
@@ -87,27 +87,6 @@ theorem sys_mkdir_K (a : Nat) (h : sysMkdirSlots ≤ a) :
 
 /-! ## The sign cluster (the `bltz` at +0x1a) and the `beqz` at +0x2c -/
 
-theorem sys_mkdir_bltz_nat (n : Nat) (h : n < 2 ^ 31) :
-    bcond bop.BLT (BitVec.ofNat 64 n) 0#64 = false := by
-  show (BitVec.ofNat 64 n).slt 0#64 = false
-  apply Bool.eq_false_iff.2
-  intro hlt
-  rw [BitVec.slt_iff_toInt_lt, BitVec.toInt_eq_toNat_of_lt (by rw [BitVec.toNat_ofNat]; omega)] at hlt
-  simp only [BitVec.toNat_ofNat, BitVec.toInt_zero] at hlt
-  omega
-
-theorem sys_mkdir_bltz_m1 : bcond bop.BLT 0xFFFFFFFFFFFFFFFF#64 0#64 = true := by decide
-
-theorem sys_mkdir_beqz (x : BitVec 64) : bcond bop.BEQ x 0#64 = decide (x = 0#64) := by
-  simp only [bcond]; by_cases h : x = 0#64
-  · subst h; decide
-  · simp only [h, decide_false]; rw [beq_eq_false_iff_ne]; exact h
-
-theorem sys_mkdir_beq00 : bcond bop.BEQ 0#64 0#64 = true := by decide
-
-theorem sys_mkdir_li0 : 0#64 + BitVec.signExtend 64 0#12 = 0#64 := by decide
-theorem sys_mkdir_m1 : 0#64 + BitVec.signExtend 64 4095#12 = 0xFFFFFFFFFFFFFFFF#64 := by decide
-
 /-- `c.li a1,1` leaves create's `ty` argument, SIGN-extended (`T_DIR`). -/
 theorem sys_mkdir_a1 : 0#64 + BitVec.signExtend 64 1#12 = BitVec.signExtend 64 T_DIR := by decide
 /-- `c.li a2,0` / `c.li a3,0`: `major = minor = 0`. -/
@@ -117,62 +96,7 @@ theorem sys_mkdir_tdir_nz : T_DIR.toNat ≠ 0 := by decide
 theorem sys_mkdir_tdir_ne_file : T_DIR ≠ T_FILE_w := by decide
 
 /-! ## The fetched path (Rocq `md_buf_split` / `md_plen_lt` / the bview
-reading; `sys_mkdir_umemStr` is deviation 3) -/
-
-theorem sys_mkdir_umemStr (M : Nat → List (BitVec 8)) (va max : Nat) (s : List (BitVec 8))
-    (h : umemStr M va max = some s) :
-    ∃ pl : List (BitVec 8), s = pl ++ [0#8] ∧ nonul pl ∧ pl.length < max := by
-  unfold umemStr at h
-  simp only at h
-  cases hf : (umemRead M va max).findIdx? (· = 0#8) with
-  | none => rw [hf] at h; exact absurd h (by simp)
-  | some i =>
-    rw [hf] at h
-    simp only [Option.some.injEq] at h
-    obtain ⟨hi, hzero, hmin⟩ := List.findIdx?_eq_some_iff_getElem.mp hf
-    rw [UMemL.umemRead_length] at hi
-    have hgi : (umemRead M va max)[i]? = some 0#8 := by
-      rw [List.getElem?_eq_getElem (by rw [UMemL.umemRead_length]; exact hi)]
-      simpa using hzero
-    refine ⟨(umemRead M va max).take i, ?_, ?_, ?_⟩
-    · rw [← h, List.take_add_one, hgi]; rfl
-    · intro b hb
-      obtain ⟨j, hj, hjb⟩ := List.getElem_of_mem hb
-      rw [List.length_take] at hj
-      have hj' : j < i := by omega
-      rw [List.getElem_take] at hjb
-      rw [← hjb]
-      simpa using hmin j hj'
-    · rw [List.length_take, UMemL.umemRead_length]; omega
-
-/-- The string as create's function view: byte `i` of `pl`, NUL past it. -/
-def sysMkdirPfun (pl : List (BitVec 8)) (i : Nat) : BitVec 8 := pl.getD i 0#8
-
-theorem sys_mkdir_bview (pl : List (BitVec 8)) :
-    bview (pl.length + 1) (sysMkdirPfun pl) = pl ++ [0#8] := by
-  apply List.ext_getElem
-  · simp [bview_length]
-  · intro i h1 h2
-    rw [bview_length] at h1
-    unfold bview sysMkdirPfun
-    simp only [List.getElem_map, List.getElem_range]
-    by_cases hi : i < pl.length
-    · rw [List.getElem_append_left hi]
-      simp [List.getD_eq_getElem?_getD, List.getElem?_eq_getElem hi]
-    · have he : i = pl.length := by omega
-      subst he
-      simp [List.getD_eq_getElem?_getD]
-
-theorem sys_mkdir_pfun_nn (pl : List (BitVec 8)) (hn : nonul pl) :
-    ∀ i, i < pl.length → sysMkdirPfun pl i ≠ 0#8 := by
-  intro i hi
-  unfold sysMkdirPfun
-  rw [List.getD_eq_getElem?_getD, List.getElem?_eq_getElem hi]
-  exact hn _ (List.getElem_mem hi)
-
-theorem sys_mkdir_pfun_term (pl : List (BitVec 8)) : sysMkdirPfun pl pl.length = 0#8 := by
-  unfold sysMkdirPfun
-  simp [List.getD_eq_getElem?_getD]
+reading; `UMemL.umemStr_nul` is deviation 3) -/
 
 /-! ## The generic carve: slots ↔ bytes -/
 
@@ -180,114 +104,32 @@ section
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF]
 variable {lent : Bool}
 
-/-- A buffer of `n` bytes at `a`, contents unknown. -/
-def sysMkdirAny [CurCtx] (a : BitVec 64) (n : Nat) : IProp GF :=
-  iprop(∃ bs : List (BitVec 8), ⌜bs.length = n⌝ ∗ byteBuf a (DFrac.own 1) bs)
-
-/-- `n + 1` slots below `a + 8 (n + 1)` are `8 (n + 1)` bytes at `a`, and `a`
-is 8-aligned (deviation 3). -/
-theorem sys_mkdir_stack_bytes [CurCtx] (a : BitVec 64) (n : Nat) :
-    stackOwn (GF := GF) (a + BitVec.ofNat 64 (8 * (n + 1))) (n + 1) ⊢
-      ∃ bs : List (BitVec 8), ⌜bs.length = 8 * (n + 1) ∧ a.toNat % 8 = 0⌝ ∗
-        byteBuf a (DFrac.own 1) bs := by
-  induction n generalizing a with
-  | zero =>
-    unfold stackOwn
-    simp only [Nat.zero_add, List.range_one]
-    iintro H
-    icases BigSepL.bigSepL_singleton.1 $$ H with ⟨%w, H⟩
-    have ha' : a + BitVec.ofNat 64 (8 * 1) - 8#64 * BitVec.ofNat 64 (0 + 1) = a := by bv_omega
-    rw [ha']
-    ihave %hal := wordPointsTo_align _ 8 _ _ $$ H
-    ihave B := wordPointsTo_to_bytes _ (DFrac.own 1) w hal $$ H
-    iexists wordToBytes w
-    isplitr
-    · ipureintro; exact ⟨rfl, hal⟩
-    · iexact B
-  | succ n ih =>
-    have e1 : a + BitVec.ofNat 64 (8 * (n + 1 + 1)) - 8#64 * BitVec.ofNat 64 (n + 1) = a + 8#64 := by
-      bv_omega
-    have e0 : a + BitVec.ofNat 64 (8 * (n + 1 + 1)) = (a + 8#64) + BitVec.ofNat 64 (8 * (n + 1)) := by
-      bv_omega
-    iintro H
-    icases stackOwn_split (a + BitVec.ofNat 64 (8 * (n + 1 + 1))) (n + 1) 1 $$ H with ⟨Ht, Hb⟩
-    rw [e1, e0]
-    icases ih (a + 8#64) $$ Ht with ⟨%bs, ⟨%hl, %hal⟩, B⟩
-    unfold stackOwn
-    simp only [List.range_one]
-    icases BigSepL.bigSepL_singleton.1 $$ Hb with ⟨%w, Hb⟩
-    have e2 : a + 8#64 - 8#64 * BitVec.ofNat 64 (0 + 1) = a := by bv_omega
-    rw [e2]
-    ihave %hal2 := wordPointsTo_align _ 8 _ _ $$ Hb
-    ihave Bb := wordPointsTo_to_bytes _ (DFrac.own 1) w hal2 $$ Hb
-    iexists wordToBytes w ++ bs
-    isplitr
-    · ipureintro
-      refine ⟨?_, hal2⟩
-      rw [List.length_append, hl, wordToBytes_length]
-      omega
-    · iapply (byteBuf_append (GF := GF) a (DFrac.own 1) (wordToBytes w) bs).2
-      rw [wordToBytes_length]
-      iframe
-
 /-- THE CARVE (Rocq `md_frame_carve`): the sixteen low slots ARE
 `char path[128]`, 8-aligned at the base. -/
 theorem sys_mkdir_carve [CurCtx] (sp0 : BitVec 64) :
     stackOwn (GF := GF) (sp0 - 8#64 * BitVec.ofNat 64 2) 16 ⊢
-      ⌜(sysMkdirBuf sp0).toNat % 8 = 0⌝ ∗ sysMkdirAny (sysMkdirBuf sp0) 128 := by
+      ⌜(sysMkdirBuf sp0).toNat % 8 = 0⌝ ∗ sysfileAny (sysMkdirBuf sp0) 128 := by
   have e : sp0 - 8#64 * BitVec.ofNat 64 2 = sysMkdirBuf sp0 + BitVec.ofNat 64 (8 * (15 + 1)) := by
     unfold sysMkdirBuf; bv_omega
   rw [e]
   iintro H
-  icases sys_mkdir_stack_bytes (sysMkdirBuf sp0) 15 $$ H with ⟨%bs, ⟨%hl, %hal⟩, B⟩
+  icases sysfile_stack_bytes (sysMkdirBuf sp0) 15 $$ H with ⟨%bs, ⟨%hl, %hal⟩, B⟩
   isplitr
   · ipureintro; exact hal
-  · unfold sysMkdirAny
+  · unfold sysfileAny
     iexists bs
     iframe B
     ipureintro; omega
 
 /-- THE CARVE, UNDONE (Rocq `md_frame_join`). -/
 theorem sys_mkdir_fold [CurCtx] (sp0 : BitVec 64) (hal : (sysMkdirBuf sp0).toNat % 8 = 0) :
-    sysMkdirAny (GF := GF) (sysMkdirBuf sp0) 128 ⊢ stackOwn (sp0 - 8#64 * BitVec.ofNat 64 2) 16 := by
+    sysfileAny (GF := GF) (sysMkdirBuf sp0) 128 ⊢ stackOwn (sp0 - 8#64 * BitVec.ofNat 64 2) 16 := by
   have e : sp0 - 8#64 * BitVec.ofNat 64 2 = sysMkdirBuf sp0 + BitVec.ofNat 64 (8 * 16) := by
     unfold sysMkdirBuf; bv_omega
   rw [e]
-  unfold sysMkdirAny
+  unfold sysfileAny
   iintro ⟨%bs, %hl, B⟩
   iapply byteBuf_stackOwn (sysMkdirBuf sp0) hal 16 bs (by omega) $$ B
-
-/-- The rest of the buffer, past the fetched path and its NUL (a name, so
-the tactic normal forms leave it alone). -/
-def sysMkdirRestAddr (a : BitVec 64) (n : Nat) : BitVec 64 := a + BitVec.ofNat 64 (n + 1)
-
-/-- THE PATH, CUT OUT OF THE BUFFER (Rocq `md_buf_split`): argstr's success
-arm, read as create's `bview (plen + 1) pfun` and the untouched rest. -/
-theorem sys_mkdir_buf_split [CurCtx] (a : BitVec 64) (pl rest : List (BitVec 8)) :
-    byteBuf (GF := GF) a (DFrac.own 1) (pl ++ 0#8 :: rest) ⊢
-      byteBuf a (DFrac.own 1) (bview (pl.length + 1) (sysMkdirPfun pl)) ∗
-      byteBuf (sysMkdirRestAddr a pl.length) (DFrac.own 1) rest := by
-  unfold sysMkdirRestAddr
-  rw [sys_mkdir_bview, show pl ++ 0#8 :: rest = (pl ++ [0#8]) ++ rest by simp]
-  refine (byteBuf_append (GF := GF) a (DFrac.own 1) (pl ++ [0#8]) rest).1.trans ?_
-  simp only [List.length_append, List.length_singleton]
-  exact .rfl
-
-/-- ...and back (Rocq `md_buf_join`), at whatever create left. -/
-theorem sys_mkdir_buf_join [CurCtx] (a : BitVec 64) (pl rest : List (BitVec 8))
-    (hlen : pl.length + 1 + rest.length = 128) :
-    byteBuf (GF := GF) a (DFrac.own 1) (bview (pl.length + 1) (sysMkdirPfun pl)) ∗
-      byteBuf (sysMkdirRestAddr a pl.length) (DFrac.own 1) rest ⊢
-      sysMkdirAny a 128 := by
-  unfold sysMkdirRestAddr
-  iintro ⟨B1, B2⟩
-  unfold sysMkdirAny
-  iexists bview (pl.length + 1) (sysMkdirPfun pl) ++ rest
-  isplitr
-  · ipureintro; rw [List.length_append, bview_length]; omega
-  · iapply (byteBuf_append (GF := GF) a (DFrac.own 1) _ rest).2
-    rw [bview_length]
-    iframe
 
 /-! ## The frame -/
 
@@ -311,7 +153,7 @@ theorem wp_prologue_sys_mkdir [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU)
             ((k.regs.set 2#5 (k.regs 2#5 + 0xFFFFFFFFFFFFFF70#64)).set 8#5 (k.regs 2#5))) -∗
           pcIs cpu' (pc + 8#64) -∗
           sysMkdirCells (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) -∗
-          ⌜(sysMkdirBuf (k.regs 2#5)).toNat % 8 = 0⌝ -∗ sysMkdirAny (sysMkdirBuf (k.regs 2#5)) 128 -∗
+          ⌜(sysMkdirBuf (k.regs 2#5)).toNat % 8 = 0⌝ -∗ sysfileAny (sysMkdirBuf (k.regs 2#5)) 128 -∗
           wpLoop cpu'))
     ⊢ wpLoop cpu := by
   iintro ⟨#Hi0, #Hi2, #Hi4, #Hi6, Hk, Hpc, HΦ⟩
@@ -347,7 +189,7 @@ theorem wp_epilogue_sys_mkdir [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU)
     instr (GF := GF) (pc + 4#64) true (instruction.ITYPE (144#12, regidx.Regidx 2#5, regidx.Regidx 2#5, iop.ADDI)) ∗
     instr (GF := GF) (pc + 6#64) true (instruction.JALR (0#12, regidx.Regidx 1#5, regidx.Regidx 0#5)) ∗
     kctxL lent cpu ((k.pushed 18).withRegs R) ∗ pcIs cpu pc ∗
-    sysMkdirCells (k.regs 2#5) ra s0 ∗ sysMkdirAny (sysMkdirBuf (k.regs 2#5)) 128 ∗
+    sysMkdirCells (k.regs 2#5) ra s0 ∗ sysfileAny (sysMkdirBuf (k.regs 2#5)) 128 ∗
     ▷ wpNext k.sie k.proc cpu (fun cpu' =>
         iprop(kctxL lent cpu' (k.withRegs (((R.set 1#5 ra).set 8#5 s0).set 2#5 (k.regs 2#5))) -∗
           pcIs cpu' (jumpPc ra) -∗ wpLoop cpu'))
@@ -433,12 +275,6 @@ theorem sysMkdirPins_exit (k : KCtx) (R : RegMap) (h : sysMkdirPins k R) :
 
 /-! ## The ambient context, pinned at the kernel tier -/
 
-theorem sys_mkdir_ctx (X : CurCtx) (h : X.curTier = KTier.kpt) : X = ⟨X.curCtx, KTier.kpt⟩ := by
-  cases X; simp only at h; subst h; rfl
-
-theorem sys_mkdir_cur_kpt [inst : CurCtx] (hct : curTier = KTier.kpt) :
-    (⟨curCtx, KTier.kpt⟩ : CurCtx) = inst := (sys_mkdir_ctx inst hct).symm
-
 /-! ## The arguments, the pid seam, the out bundle, the join point -/
 
 /-- The contract's parameters, as one record (the `NamexArgs` pattern). -/
@@ -456,9 +292,6 @@ structure SysMkdirArgs (GF : BundledGFunctors) where
   Fun : Pfam GF (Aview → Nat → IProp GF)
   Fok : Pfam GF (Aview → Nat → Fname → Nat → IProp GF)
   Fex : Pfam GF (Aview → Nat → Fname → Nat → IProp GF)
-
-/-- the pid share every pid-taking callee is lent (Rocq's `1/4`). -/
-abbrev sysMkdirPidQ : DFrac := DFrac.own (1 : Qp).half.half
 
 section
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
@@ -483,10 +316,10 @@ quarter out of the block, and back at the same record. -/
 theorem sys_mkdir_pid (hct : curTier = KTier.kpt) (γ : FileNames) (pa : BitVec 64)
     (pid : BitVec 32) (V : ProcPriv) (M : Nat → List (BitVec 8)) :
     procPrivFd (GF := GF) γ pa pid V M ⊢
-      wordPointsTo (pPid pa) 4 sysMkdirPidQ pid ∗
-      (wordPointsTo (pPid pa) 4 sysMkdirPidQ pid -∗ procPrivFd γ pa pid V M) := by
+      wordPointsTo (pPid pa) 4 sysfilePidQ pid ∗
+      (wordPointsTo (pPid pa) 4 sysfilePidQ pid -∗ procPrivFd γ pa pid V M) := by
   have h := procPrivFd_cwdPid (GF := GF) γ pa pid V M
-  rw [sys_mkdir_cur_kpt hct] at h
+  rw [sysfile_cur_kpt hct] at h
   iintro H
   icases h $$ H with ⟨Hc, Hr, Hp, Hw⟩
   iframe Hp
@@ -513,7 +346,7 @@ theorem sys_mkdir_exit (cpu : CPU) (k : KCtx) (A : SysMkdirArgs GF)
     (hal : (sysMkdirBuf (k.regs 2#5)).toNat % 8 = 0) :
     kctx cpu (((k.withSpie spie spp).pushed 18).withRegs R) ∗ pcIs cpu (KA.«sys_mkdir» + 0x38#64) ∗
     sysMkdirCells (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) ∗
-    sysMkdirAny (sysMkdirBuf (k.regs 2#5)) 128 ∗
+    sysfileAny (sysMkdirBuf (k.regs 2#5)) 128 ∗
     trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗
     sysMkdirOut A (R 10#5) ∗ (∀ c : CPU, sysMkdirPostA k A c)
     ⊢ wpLoop (GF := GF) cpu := by
@@ -523,8 +356,8 @@ theorem sys_mkdir_exit (cpu : CPU) (k : KCtx) (A : SysMkdirArgs GF)
   have hcs := sysMkdirPins_exit k R hpins
   ihave Hcells := (show sysMkdirCells (GF := GF) (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) ⊢
       sysMkdirCells ((k.withSpie spie spp).regs 2#5) (k.regs 1#5) (k.regs 8#5) from .rfl) $$ Hcells
-  ihave Hbuf := (show sysMkdirAny (GF := GF) (sysMkdirBuf (k.regs 2#5)) 128 ⊢
-      sysMkdirAny (sysMkdirBuf ((k.withSpie spie spp).regs 2#5)) 128 from .rfl) $$ Hbuf
+  ihave Hbuf := (show sysfileAny (GF := GF) (sysMkdirBuf (k.regs 2#5)) 128 ⊢
+      sysfileAny (sysMkdirBuf ((k.withSpie spie spp).regs 2#5)) 128 from .rfl) $$ Hbuf
   iapply (wp_epilogue_sys_mkdir cpu (k.withSpie spie spp) (KA.«sys_mkdir» + 0x38#64)
       (sysMkdirSlots_18 _ hK) R hR2 (k.regs 1#5) (k.regs 8#5) hal)
     $$ [- $Hk $Hpc $Hcells $Hbuf]

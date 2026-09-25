@@ -20,6 +20,9 @@ extension `P'` of `P` under `sz` (`UPtd.extSz`) agrees with it on the pages
 For a block with no lazy page (`lazyFree`), `viewLazy` is `M` itself
 (`viewLazy_of_lazyFree`).
 
+Also the two shape facts about a fetched string every path-taking caller
+reads (`umemStr_nul`, `umemStr_length_le`), one copy each.
+
 Pure: nothing in `IProp`.
 -/
 import Xv6.UMemLemmas
@@ -110,6 +113,50 @@ theorem umemStr_viewLazy {P P' : UPtd} {sz : BitVec 64} (M : Nat → List (BitVe
     (hs : umemStr (viewFaulted P P' M) va max = some s) (hm : umMapped P' va s.length) :
     umemStr (viewLazy P sz M) va max = some s :=
   umemStr_congr _ _ va max s hs (umemRead_viewLazy M hext hm)
+
+/-- **The string a user copy read is a NUL-free `pl` and its terminator,
+inside the `max` bytes** (was `ProofFetchstr.fetchstr_umemStr` and its three
+sysfile restatements `UMemL.umemStr_nul` / `UMemL.umemStr_nul` /
+`UMemL.umemStr_nul`). -/
+theorem umemStr_nul (M : Nat → List (BitVec 8)) (va max : Nat) (s : List (BitVec 8))
+    (h : umemStr M va max = some s) :
+    ∃ pl : List (BitVec 8), s = pl ++ [0#8] ∧ nonul pl ∧ pl.length < max := by
+  unfold umemStr at h
+  simp only at h
+  cases hf : (umemRead M va max).findIdx? (· = 0#8) with
+  | none => rw [hf] at h; exact absurd h (by simp)
+  | some i =>
+    rw [hf] at h
+    simp only [Option.some.injEq] at h
+    obtain ⟨hi, hzero, hmin⟩ := List.findIdx?_eq_some_iff_getElem.mp hf
+    rw [umemRead_length] at hi
+    have hgi : (umemRead M va max)[i]? = some 0#8 := by
+      rw [List.getElem?_eq_getElem (by rw [umemRead_length]; exact hi)]
+      simpa using hzero
+    refine ⟨(umemRead M va max).take i, ?_, ?_, ?_⟩
+    · rw [← h, List.take_add_one, hgi]; rfl
+    · intro b hb
+      obtain ⟨j, hj, hjb⟩ := List.getElem_of_mem hb
+      rw [List.length_take] at hj
+      have hj' : j < i := by omega
+      rw [List.getElem_take] at hjb
+      rw [← hjb]
+      simpa using hmin j hj'
+    · rw [List.length_take, umemRead_length]; omega
+
+/-- The string fits the `max` bytes (was `UMemL.umemStr_length_le` /
+`UMemL.umemStr_length_le`). -/
+theorem umemStr_length_le (M : Nat → List (BitVec 8)) (va max : Nat) (s : List (BitVec 8))
+    (h : umemStr M va max = some s) : s.length ≤ max := by
+  unfold umemStr at h
+  simp only at h
+  cases hf : (umemRead M va max).findIdx? (· = 0#8) with
+  | none => rw [hf] at h; cases h
+  | some i =>
+    rw [hf] at h
+    simp only [Option.some.injEq] at h
+    rw [← h, List.length_take, umemRead_length]
+    omega
 
 /-- A block with no lazy page reads its own image. -/
 theorem viewLazy_of_lazyFree {P : UPtd} {sz : BitVec 64} (M : Nat → List (BitVec 8))

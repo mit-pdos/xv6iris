@@ -178,7 +178,7 @@ def sysUnlinkAtAe (Γ : SchedNames) (cpu : CPU) (k : KCtx) (A : SysUnlinkArgs GF
   suAny (sysUnlinkPath (k.regs 2#5)) 128 ∗
   wordPointsTo (sysUnlinkOff (k.regs 2#5)) 4 (DFrac.own 1) (BitVec.ofNat 32 (16 * kk)) ∗
   suAny (sysUnlinkDel (k.regs 2#5)) 16 ∗
-  trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗ sysUnlinkEnv (hlc := hlc) Γ ∗
+  trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗ sysfileEnv (hlc := hlc) Γ ∗
   wordPointsTo (pPid k.proc) 4 pidPriv A.pid ∗ sysUnlinkHole A k.proc P2 ∗
   (∀ c : CPU, sysUnlinkPostA k A c) ∗
   sysUnlinkLkAt A.pid kd q g lo tl dinum dnd γil γisl t (1 : Qp).half.half ∗
@@ -320,7 +320,7 @@ theorem sys_unlink_w5_zero (WI : WRITEI) (MS : MEMSET) (PA : PANIC) (Γ : SchedN
   unfold sysUnlinkWiK
   iintro %cpu %spie1 %spp1 %R2 %tot %bmW %datW %dnW %dn0W %nw %wrote %dist %dstb %P' %Sbw
     %⟨hcs2, hout⟩ Hk Hpc Hte Hce Hdev Hinum Hmeta Hmap Hblk Hdi Hde Hpid Hbs Hop
-  k_norm_g [sys_unlink_ret_a8, sys_unlink_ww, sys_unlink_psw]
+  k_norm_g [sys_unlink_ret_a8, sysfile_ww, sysfile_psw]
   have hp2 := sysUnlinkPins_cs k _ R2 (ientry kd) (ientry ks) (sysUnlinkDe (k.regs 2#5))
     (sysUnlinkPins_set k _ _ _ _ 1#5 _ (sysUnlinkPins_set k _ _ _ _ 10#5 _
       (sysUnlinkPins_set k _ _ _ _ 11#5 _ (sysUnlinkPins_set k _ _ _ _ 12#5 _
@@ -336,7 +336,7 @@ theorem sys_unlink_w5_zero (WI : WRITEI) (MS : MEMSET) (PA : PANIC) (Γ : SchedN
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
       with [ha0, sys_unlink_li16, (show bcond bop.BNE 0xFFFFFFFFFFFFFFFF#64 16#64 = true by decide)]
     iintro Hk Hpc
-    unfold sysUnlinkEnv
+    unfold sysfileEnv
     icases Henv with ⟨-, #Hpe, -⟩
     iapply (sys_unlink_panic_writei PA cpu k A ok spie1 spp1 _) $$ [$Hk $Hpc $Hpe]
   by_cases h16 : tot ≠ 16
@@ -345,7 +345,7 @@ theorem sys_unlink_w5_zero (WI : WRITEI) (MS : MEMSET) (PA : PANIC) (Γ : SchedN
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
       with [ha0, sys_unlink_li16, sys_unlink_bne16 tot htot, decide_eq_true h16]
     iintro Hk Hpc
-    unfold sysUnlinkEnv
+    unfold sysfileEnv
     icases Henv with ⟨-, #Hpe, -⟩
     iapply (sys_unlink_panic_writei PA cpu k A ok spie1 spp1 _) $$ [$Hk $Hpc $Hpe]
   replace h16 : tot = 16 := by omega

@@ -105,11 +105,11 @@ theorem sys_unlink_open2_file [Fscfg] [Icfg] (inum : Nat) (dni : Dinode) (bmi : 
     sysUnlinkOpenOk inum (sysUnlinkDni2 dni) bmi dati := by
   have hdec := sys_unlink_nlink_decr dni.diNlink hnl
   have htyT : (sysUnlinkDni2 dni).diType.toNat ≠ T_DIR_z := by
-    rw [sys_unlink_setnl_type]; exact htyi
-  refine ⟨sys_unlink_setnl_inodeOk _ _ dni bmi dati _ hok, ?_,
-    sys_unlink_setnl_dirOk _ dni dati _ hdok, fun hd => absurd hd htyT,
+    rw [sysfile_setnl_type]; exact htyi
+  refine ⟨sysfile_setnl_inodeOk _ _ dni bmi dati _ hok, ?_,
+    sysfile_setnl_dirOk _ dni dati _ hdok, fun hd => absurd hd htyT,
     dirOrphanClean_not_dir _ _ htyT, dirUniq_not_dir _ _ htyT⟩
-  exact inodeRecLocal_sameType dni _ hrl (sys_unlink_setnl_type dni _)
+  exact inodeRecLocal_sameType dni _ hrl (sysfile_setnl_type dni _)
     (by rw [sys_unlink_setnl_nlink]; have := hrl.2.1; omega) (fun hd => absurd hd htyT)
 
 section
@@ -278,7 +278,7 @@ theorem sys_unlink_w5_file (IU : IUPDATE) (IUP : IUNLOCKPUT) (EO : END_OP) (Γ :
   have hposi : 0 < (BitVec.setWidth 32 (dirInum datd kk)).toNat := by
     rw [sys_unlink_zext32]; exact sys_unlink_inum_pos datd kk (dirFirst_live _ _ _ _ hfn)
   -- INSTANT 1
-  unfold sysUnlinkEnv
+  unfold sysfileEnv
   icases Henv with ⟨#Hpi, #Hpe, #Hrdy⟩
   icases fsReady_region $$ Hrdy with ⟨#Hinv, #Hopen⟩
   unfold sysUnlinkCommits
@@ -303,14 +303,14 @@ theorem sys_unlink_w5_file (IU : IUPDATE) (IUP : IUNLOCKPUT) (EO : END_OP) (Γ :
   k_step_e (wp_s_branch cpu _ (KA.«sys_unlink» + 0xb4#64) false 146#13 14#5 15#5 (by decide)
       bop.BEQ)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
-    with [sys_unlink_li1, sys_unlink_beq_tdir, decide_eq_false hdir]
+    with [sys_unlink_li1, sysfile_beq_tdir, decide_eq_false hdir]
   iintro Hk Hpc
   ihave Hmetai : inodeMeta (ientry ks) dni $$ [Hty Hma Hmi Hnl Hsz]
   · unfold inodeMeta iType; iframe
   -- the target's lowered-record ghost, paid now: its link pile (one
   -- token: not a directory) and its empty `dlinks`
   have hndD : (sysUnlinkDni2 dni).diType.toNat ≠ iregDirTy := by
-    rw [sys_unlink_setnl_type]; exact htyi
+    rw [sysfile_setnl_type]; exact htyi
   ihave Htok := (show FsStateLink.linkTok (GF := GF) (fsGammaL fscFs)
       ((BitVec.setWidth 32 (dirInum datd kk)).toNat : Int) uty ⊢
       FsStateLink.linkToks (fsGammaL fscFs) ((BitVec.setWidth 32 (dirInum datd kk)).toNat : Int)
@@ -319,7 +319,7 @@ theorem sys_unlink_w5_file (IU : IUPDATE) (IUP : IUNLOCKPUT) (EO : END_OP) (Γ :
     rw [iregDotDelta_not_dir _ _ hndD, FsStateLink.linkReps_1]
     exact .rfl) $$ Htok
   ihave Hdl2 := dlinks_notDir fscFs (BitVec.setWidth 32 (dirInum datd kk)).toNat
-    (sysUnlinkDni2 dni) bmi dati (by rw [sys_unlink_setnl_type]; exact htyi)
+    (sysUnlinkDni2 dni) bmi dati (by rw [sysfile_setnl_type]; exact htyi)
   -- the buffers re-folded
   ihave Hnm := sys_unlink_name_close (k.regs 2#5) nf tln htln $$ [$Hnm $Htl]
   ihave Hoff : (∃ ov : BitVec 32, wordPointsTo (sysUnlinkOff (k.regs 2#5)) 4 (DFrac.own 1) ov)
@@ -344,7 +344,7 @@ theorem sys_unlink_w5_file (IU : IUPDATE) (IUP : IUNLOCKPUT) (EO : END_OP) (Γ :
       sys_unlink_open2_file _ dni bmi dati hoki hrli hdoki hnli htyi, hmem, h5, hlast, hpre⟩
     repeat (first | exact hpins | refine sysUnlinkPins_set _ _ _ _ _ _ _ ?_ (by decide))
   iframe
-  unfold sysUnlinkEnv
+  unfold sysfileEnv
   iframe #
   unfold inodeMap
   iframe

@@ -118,7 +118,7 @@ theorem sys_unlink_w4_loop (RD : READI) (PA : PANIC) (Γ : SchedNames) [ClaimIs 
     sysUnlinkPins k R (ientry kd) (ientry ks) (BitVec.ofNat 64 (16 * jj)) →
     kctx cpu (((k.withSpie spie spp).pushed 30).withRegs R) ∗
     pcIs cpu (KA.«sys_unlink» + 0x106#64) ∗
-    trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗ sysUnlinkEnv (hlc := hlc) Γ ∗
+    trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗ sysfileEnv (hlc := hlc) Γ ∗
     sysUnlinkIpCells ks dni bmi dati ∗ suAny (sysUnlinkDel (k.regs 2#5)) 16 ∗
     wordPointsTo (pPid k.proc) 4 pidPriv A.pid ∗ bslots 3 ∗ X
     ⊢ wpLoop (GF := GF) cpu := by
@@ -176,7 +176,7 @@ theorem sys_unlink_w4_loop (RD : READI) (PA : PANIC) (Γ : SchedNames) [ClaimIs 
   case rda => k_norm_g [hpins.2.1, sys_unlink_del_addr]
   iintro %cpu %spie1 %spp1 %R1 %tot %⟨hcs1, h10, htot⟩ Hk Hpc Hte Hce Hdev Hmeta Hmap Hblk Hdel
     Hpid Hb1
-  k_norm_g [sys_unlink_ret_116, sys_unlink_ww, sys_unlink_psw]
+  k_norm_g [sys_unlink_ret_116, sysfile_ww, sysfile_psw]
   ihave Hbs := bslots_cons 2 $$ [$Hb1 $Hb2]
   have hp1 := sysUnlinkPins_cs k _ R1 (ientry kd) (ientry ks) (BitVec.ofNat 64 (16 * jj))
     (sysUnlinkPins_set k _ _ _ _ 1#5 _ (sysUnlinkPins_set k _ _ _ _ 10#5 _
@@ -197,7 +197,7 @@ theorem sys_unlink_w4_loop (RD : READI) (PA : PANIC) (Γ : SchedNames) [ClaimIs 
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
       with [h10, sys_unlink_li32_16, sys_unlink_bne16 tot htot16, decide_eq_true hne]
     iintro Hk Hpc
-    unfold sysUnlinkEnv
+    unfold sysfileEnv
     icases Henv with ⟨-, #Hpe, -⟩
     iapply (sys_unlink_panic_readi PA cpu k A ok spie1 spp1 _) $$ [$Hk $Hpc $Hpe]
   have htot' : tot = 16 := by
@@ -400,7 +400,7 @@ def sysUnlinkAt8a (Γ : SchedNames) (cpu : CPU) (k : KCtx) (A : SysUnlinkArgs GF
   suAny (sysUnlinkPath (k.regs 2#5)) 128 ∗
   wordPointsTo (sysUnlinkOff (k.regs 2#5)) 4 (DFrac.own 1) (BitVec.ofNat 32 (16 * kk)) ∗
   suAny (sysUnlinkDel (k.regs 2#5)) 16 ∗
-  trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗ sysUnlinkEnv (hlc := hlc) Γ ∗
+  trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗ sysfileEnv (hlc := hlc) Γ ∗
   wordPointsTo (pPid k.proc) 4 pidPriv A.pid ∗ sysUnlinkHole A k.proc P2 ∗
   (∀ c : CPU, sysUnlinkPostA k A c) ∗
   sysUnlinkLkAt A.pid kd q g lo tl dinum dnd γil γisl t (1 : Qp).half.half ∗
@@ -446,7 +446,7 @@ theorem sys_unlink_w3_e (IUP : IUNLOCKPUT) (EO : END_OP) (Γ : SchedNames)
     byteBuf (sysUnlinkNameTl (k.regs 2#5)) (DFrac.own 1) tln ∗
     suAny (sysUnlinkPath (k.regs 2#5)) 128 ∗
     wordPointsTo (sysUnlinkOff (k.regs 2#5)) 4 (DFrac.own 1) (BitVec.ofNat 32 (16 * kk)) ∗
-    sysUnlinkEnv (hlc := hlc) Γ ∗ sysUnlinkHole A k.proc P2 ∗ (∀ c : CPU, sysUnlinkPostA k A c) ∗
+    sysfileEnv (hlc := hlc) Γ ∗ sysUnlinkHole A k.proc P2 ∗ (∀ c : CPU, sysUnlinkPostA k A c) ∗
     sysUnlinkLkAt A.pid kd q g lo tl dinum dnd γil γisl t (1 : Qp).half.half ∗
     sysUnlinkOpen kd dinum dnd bmd datd ∗
     sysUnlinkLkAtX A.pid ks qi gi loi tli (BitVec.setWidth 32 (dirInum datd kk)) dni γili γisli t
@@ -470,7 +470,7 @@ theorem sys_unlink_w3_e (IUP : IUNLOCKPUT) (EO : END_OP) (Γ : SchedNames)
     exact (dirView_lookup_Some _ _ _ _).2 ⟨kk, hfn, (sys_unlink_zext32 _).symm⟩
   have hne := ufNot_dots_only _ dni bmi dati jj hoki.2.2.2.2.2.1 hoki.2.2.2.2.1 htyi hnli hddixi
     (hduqi htyi) h2 hjj hlive
-  unfold sysUnlinkEnv
+  unfold sysfileEnv
   icases Henv with ⟨#Hpi, #Hpe, #Hrdy⟩
   icases fsReady_region $$ Hrdy with ⟨#Hinv, #Hopen⟩
   ihave #Hftop := iregInv_ftop fscIreg fscFs icfgIst icfgNib $$ Hinv
@@ -514,7 +514,7 @@ theorem sys_unlink_w3_e (IUP : IUNLOCKPUT) (EO : END_OP) (Γ : SchedNames)
       (by unfold iputUnits; omega))
     $$ [$Hk $Hpc $Hcells $Hbufs $Hte $Hce $Hpid $Hhole $HΦ $Hlkd $Hloadd $Hlki $Hloadi $Hres $Hbs
       $Hop $Harms]
-  unfold sysUnlinkEnv; iframe #
+  unfold sysfileEnv; iframe #
 
 
 
@@ -550,7 +550,7 @@ theorem sys_unlink_w3_dir (RD : READI) (PA : PANIC) (IUP : IUNLOCKPUT) (EO : END
     suAny (sysUnlinkPath (k.regs 2#5)) 128 ∗
     wordPointsTo (sysUnlinkOff (k.regs 2#5)) 4 (DFrac.own 1) (BitVec.ofNat 32 (16 * kk)) ∗
     suAny (sysUnlinkDel (k.regs 2#5)) 16 ∗
-    trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗ sysUnlinkEnv (hlc := hlc) Γ ∗
+    trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗ sysfileEnv (hlc := hlc) Γ ∗
     wordPointsTo (pPid k.proc) 4 pidPriv A.pid ∗ sysUnlinkHole A k.proc P2 ∗
     (∀ c : CPU, sysUnlinkPostA k A c) ∗
     sysUnlinkLkAt A.pid kd q g lo tl dinum dnd γil γisl t (1 : Qp).half.half ∗
@@ -611,7 +611,7 @@ theorem sys_unlink_w3_dir (RD : READI) (PA : PANIC) (IUP : IUNLOCKPUT) (EO : END
         byteBuf (sysUnlinkNameTl (k.regs 2#5)) (DFrac.own 1) tln ∗
         suAny (sysUnlinkPath (k.regs 2#5)) 128 ∗
         wordPointsTo (sysUnlinkOff (k.regs 2#5)) 4 (DFrac.own 1) (BitVec.ofNat 32 (16 * kk)) ∗
-        sysUnlinkEnv (hlc := hlc) Γ ∗ sysUnlinkHole A k.proc P2 ∗
+        sysfileEnv (hlc := hlc) Γ ∗ sysUnlinkHole A k.proc P2 ∗
         (∀ c : CPU, sysUnlinkPostA k A c) ∗
         sysUnlinkLkAt A.pid kd q g lo tl dinum dnd γil γisl t (1 : Qp).half.half ∗
         sysUnlinkOpen kd dinum dnd bmd datd ∗
@@ -671,7 +671,7 @@ theorem sys_unlink_w3_dir (RD : READI) (PA : PANIC) (IUP : IUNLOCKPUT) (EO : END
         byteBuf (sysUnlinkNameTl (k.regs 2#5)) (DFrac.own 1) tln ∗
         suAny (sysUnlinkPath (k.regs 2#5)) 128 ∗
         wordPointsTo (sysUnlinkOff (k.regs 2#5)) 4 (DFrac.own 1) (BitVec.ofNat 32 (16 * kk)) ∗
-        sysUnlinkEnv (hlc := hlc) Γ ∗ sysUnlinkHole A k.proc P2 ∗
+        sysfileEnv (hlc := hlc) Γ ∗ sysUnlinkHole A k.proc P2 ∗
         (∀ c : CPU, sysUnlinkPostA k A c) ∗
         sysUnlinkLkAt A.pid kd q g lo tl dinum dnd γil γisl t (1 : Qp).half.half ∗
         sysUnlinkOpen kd dinum dnd bmd datd ∗
@@ -748,7 +748,7 @@ theorem sys_unlink_w3 (IL : ILOCK) (RD : READI) (PA : PANIC) (IUP : IUNLOCKPUT) 
   icases icTxDepAt_ofHalf fscIc kd q.half icfgDev dinum g lo $$ Hdep with ⟨%t, Hdep⟩
   unfold icTxDepAt
   icases Hdep with ⟨Hdep, Hres⟩
-  unfold sysUnlinkEnv
+  unfold sysfileEnv
   icases Henv with ⟨#Hpi, #Hpe, #Hrdy⟩
   ihave #Hesc := fsReady_escrow kd hkd $$ Hrdy
   iapply wpLoop_fupd
@@ -782,10 +782,10 @@ theorem sys_unlink_w3 (IL : ILOCK) (RD : READI) (PA : PANIC) (IUP : IUNLOCKPUT) 
   case lt => k_norm_g; exact ok.htier
   case la => k_norm_g [h10]
   iframe
-  unfold sysUnlinkEnv; iframe #
+  unfold sysfileEnv; iframe #
   iintro %cpu %spie1 %spp1 %R1 %dni %bmi %γili %γisli %gi %loi %tli %⟨hcs1, hlei⟩ Hk Hpc Hte Hce
     Hpid Hb1 Hlki Hloadi
-  k_norm_g [sys_unlink_ret_78, sys_unlink_ww, sys_unlink_psw]
+  k_norm_g [sys_unlink_ret_78, sysfile_ww, sysfile_psw]
   ihave Hbs := bslots_cons 2 $$ [$Hb1 $Hb2]
   have hp1 := sysUnlinkPins_cs k _ R1 (ientry kd) (ientry ks) (k.regs 19#5)
     (sysUnlinkPins_set k R _ _ _ 1#5 _ hpins (Or.inl rfl)) hcs1
@@ -831,7 +831,7 @@ theorem sys_unlink_w3 (IL : ILOCK) (RD : READI) (PA : PANIC) (IUP : IUNLOCKPUT) 
   · k_step_e (wp_s_branch cpu _ (KA.«sys_unlink» + 0x86#64) false 114#13 14#5 15#5 (by decide)
         bop.BEQ)
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
-      with [sys_unlink_li1, sys_unlink_beq_tdir, decide_eq_true hdir]
+      with [sys_unlink_li1, sysfile_beq_tdir, decide_eq_true hdir]
     iintro Hk Hpc
     ihave Hcells : sysUnlinkCells (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) (k.regs 9#5) (k.regs 18#5)
       (k.regs 19#5) $$ [Hra Hs0 H3 H4 H5]
@@ -841,16 +841,16 @@ theorem sys_unlink_w3 (IL : ILOCK) (RD : READI) (PA : PANIC) (IUP : IUNLOCKPUT) 
         hname hn hkd hnib hpos hle hty hnd hndd hfn hks hlei hnli (sys_unlink_tdir_zof _ hdir)
         (fun cpu spie spp R s3v => hW5 gi loi tli dni bmi dati γili γisli t cpu spie spp R s3v true))
     iframe
-    unfold sysUnlinkEnv; iframe #
+    unfold sysfileEnv; iframe #
   k_step_e (wp_s_branch cpu _ (KA.«sys_unlink» + 0x86#64) false 114#13 14#5 15#5 (by decide)
       bop.BEQ)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
-    with [sys_unlink_li1, sys_unlink_beq_tdir, decide_eq_false hdir]
+    with [sys_unlink_li1, sysfile_beq_tdir, decide_eq_false hdir]
   iintro Hk Hpc
   iapply (hW5 gi loi tli dni bmi dati γili γisli t cpu spie1 spp1 _ (k.regs 19#5) false)
   unfold sysUnlinkAt8a sysUnlinkCells
   iframe
-  unfold sysUnlinkEnv; iframe #
+  unfold sysfileEnv; iframe #
   ipureintro
   refine ⟨hpA, htln, hname, hn, hkd, hnib, hpos, hle, hty, hnd, hndd, hfn, hks, hlei, hnli, ?_⟩
   show dni.diType.toNat ≠ T_DIR_z

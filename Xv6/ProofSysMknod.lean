@@ -143,10 +143,10 @@ theorem sys_mknod_created (IUP : IUNLOCKPUT) (EO : END_OP) (Γ : SchedNames)
     (hns : if ok then ns' + 1 = A.ns else ns' = A.ns) (hu : ok = true → iputUnits ≤ u') :
     kctx cpu (((k.withSpie spie spp).pushed 20).withRegs R) ∗ pcIs cpu (KA.«sys_mknod» + 0x44#64) ∗
     sysMknodCells (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) ∗
-    byteBuf (sysMknodBuf (k.regs 2#5)) (DFrac.own 1) (bview (pl.length + 1) (sysMknodPfun pl)) ∗
-    byteBuf (sysMknodRestAddr (sysMknodBuf (k.regs 2#5)) pl.length) (DFrac.own 1) rest ∗
+    byteBuf (sysMknodBuf (k.regs 2#5)) (DFrac.own 1) (bview (pl.length + 1) (sysfilePfun pl)) ∗
+    byteBuf (sysfileRestAddr (sysMknodBuf (k.regs 2#5)) pl.length) (DFrac.own 1) rest ∗
     sysMknodLow (k.regs 2#5) ∗
-    trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie (procAddr A.j) ∗ sysMknodEnv (hlc := hlc) Γ ∗
+    trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie (procAddr A.j) ∗ sysfileEnv (hlc := hlc) Γ ∗
     procPrivFd A.γ (procAddr A.j) A.pid (sysMknodV1 A P2) (sysMknodM1 A P2) ∗
     (∀ c : CPU, sysMknodPostA k A c) ∗ bslots 3 ∗ irefSlots ns' ∗ logOpS icfgLog u' Sb' ∗
     (if ok then
@@ -163,14 +163,14 @@ theorem sys_mknod_created (IUP : IUNLOCKPUT) (EO : END_OP) (Γ : SchedNames)
     ⊢ wpLoop (GF := GF) cpu := by
   iintro ⟨Hk, Hpc, Hcells, Hp, Hrest, Hlow, Hte, Hce, #Henv, Hblk, HΦ, Hbs, Hir, Hop, Harm⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
-  ihave Hbuf := sys_mknod_buf_join _ pl rest hlen $$ [$Hp $Hrest]
+  ihave Hbuf := sysfile_buf_join _ pl rest hlen $$ [$Hp $Hrest]
   cases ok
   · -- ===== ARM B: create returned 0 =====
     ihave Harm := sys_mknod_ite_f _ _ $$ Harm
     icases Harm with ⟨%h10, Htx, Hcf⟩
     simp only [Bool.false_eq_true, if_false] at hns
     k_step_e (wp_s_branch cpu _ (KA.«sys_mknod» + 0x44#64) true 20#13 10#5 0#5 (by decide) bop.BEQ)
-      from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h10, sys_mknod_beq00]
+      from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h10, sysfile_beq00]
     iintro Hk Hpc
     ihave Hop := logOpS_op icfgLog u' Sb' $$ Hop Htx
     ihave Hcf := creFailArms_dev (hlc := hlc) (fsGammaL fscFs) fscFs (devArg A.v1) (devArg A.v2)
@@ -196,7 +196,7 @@ theorem sys_mknod_created (IUP : IUNLOCKPUT) (EO : END_OP) (Γ : SchedNames)
     have hnz : ientry kk ≠ 0#64 := ientry_ne_zero kk (Nat.le_of_lt hkk)
     have hd : decide (ientry kk = 0#64) = false := by simp [hnz]
     k_step_e (wp_s_branch cpu _ (KA.«sys_mknod» + 0x44#64) true 20#13 10#5 0#5 (by decide) bop.BEQ)
-      from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h10, sys_mknod_beqz, hd]
+      from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h10, sysfile_beqz, hd]
     iintro Hk Hpc
     ihave Hcok := creOkArms_dev (hlc := hlc) (fsGammaL fscFs) (devArg A.v1) (devArg A.v2) A.P
       A.Farm (pfamTriv (fun _ _ _ _ => iprop(True))) A.Fun A.Fok A.Fex pl inum.toNat $$ Hcok
@@ -238,7 +238,7 @@ theorem sys_mknod_fetched (CR : CREATE) (IUP : IUNLOCKPUT) (EO : END_OP) (Γ : S
     sysMknodCells (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) ∗
     byteBuf (sysMknodBuf (k.regs 2#5)) (DFrac.own 1) bs ∗
     sysMknodInts (k.regs 2#5) (BitVec.extractLsb' 0 32 A.v1) (BitVec.extractLsb' 0 32 A.v2) ∗
-    trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie (procAddr A.j) ∗ sysMknodEnv (hlc := hlc) Γ ∗
+    trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie (procAddr A.j) ∗ sysfileEnv (hlc := hlc) Γ ∗
     procPrivFd A.γ (procAddr A.j) A.pid (sysMknodV1 A P2) (sysMknodM1 A P2) ∗
     (∀ c : CPU, sysMknodPostA k A c) ∗ bslots 3 ∗ irefSlots A.ns ∗ logOp icfgLog MAXOPBLOCKS ∗
     sysMknodAu (hlc := hlc) A
@@ -254,7 +254,7 @@ theorem sys_mknod_fetched (CR : CREATE) (IUP : IUNLOCKPUT) (EO : END_OP) (Γ : S
     -- +0x2e  bltz a0 : falls through
     k_step_e (wp_s_branch cpu _ (KA.«sys_mknod» + 0x2e#64) false 42#13 10#5 0#5 (by decide) bop.BLT)
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
-      with [hr, sys_mknod_bltz_nat pl.length (by omega)]
+      with [hr, sysfile_bltz_nat pl.length (by omega)]
     iintro Hk Hpc
     unfold sysMknodInts
     icases Hints with ⟨Hmin, Hmaj, Hpad⟩
@@ -305,7 +305,7 @@ theorem sys_mknod_fetched (CR : CREATE) (IUP : IUNLOCKPUT) (EO : END_OP) (Γ : S
     k_step_e (wp_s_jal cpu _ (KA.«sys_mknod» + 0x40#64) false 2095296#21 1#5 (by decide))
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [sys_mknod_br_create]
     iintro Hk Hpc
-    icases sys_mknod_buf_split _ pl _ $$ Hbuf with ⟨Hp, Hrest⟩
+    icases sysfile_buf_split _ pl _ $$ Hbuf with ⟨Hp, Hrest⟩
     -- THE ONE-SHOT, HANDED DOWN UNFIRED, AT THE PATH THE CALLER PASSED
     ihave Hau := mknodAuAt_inst (hlc := hlc) (fsGammaL fscFs) fscFs A.V.cwi (viewLazy A.V.upt A.V.sz A.M)
       A.v0.toNat pl (devArg A.v1) (devArg A.v2) A.P A.Pmiss A.Farm A.Fun A.Fok A.Fex
@@ -321,22 +321,22 @@ theorem sys_mknod_fetched (CR : CREATE) (IUP : IUNLOCKPUT) (EO : END_OP) (Γ : S
         (sysMknodHw A.v2).toNat A.Farm (pfamTriv (fun _ _ _ _ => iprop(True))) A.Fun A.Fok
       from by rw [sys_mknod_hw_dev, sys_mknod_hw_dev]) $$ Hcre
     ihave Hst := (show epStart (hlc := hlc) (GF := GF) fscFs A.V.cwi A.P A.Pmiss pl ⊢
-      epStart (hlc := hlc) fscFs A.V.cwi A.P A.Pmiss (bview pl.length (sysMknodPfun pl))
+      epStart (hlc := hlc) fscFs A.V.cwi A.P A.Pmiss (bview pl.length (sysfilePfun pl))
       from by rw [sys_mknod_bview_self]) $$ Hst
     icases logOp_openS icfgLog MAXOPBLOCKS $$ Hop with ⟨%Sb, HopS, Htx⟩
     ihave Hp := (show byteBuf (GF := GF) (sysMknodBuf (k.regs 2#5)) (DFrac.own 1)
-        (bview (pl.length + 1) (sysMknodPfun pl)) ⊢
+        (bview (pl.length + 1) (sysfilePfun pl)) ⊢
       byteBuf (k.regs 2#5 + 18446744073709551472#64) (DFrac.own 1)
-        (bview (pl.length + 1) (sysMknodPfun pl)) from .rfl) $$ Hp
+        (bview (pl.length + 1) (sysfilePfun pl)) from .rfl) $$ Hp
     ihave Hblk := (show procPrivFd (GF := GF) A.γ (procAddr A.j) A.pid (sysMknodV1 A P2)
         (sysMknodM1 A P2) ⊢ procPrivFd A.γ k.proc A.pid (sysMknodV1 A P2) (sysMknodM1 A P2)
       from by rw [hproc]) $$ Hblk
     ihave Hce := (show cpuClaimExt (GF := GF) cpu k.sie (procAddr A.j) ⊢ cpuClaimExt cpu k.sie k.proc
       from by rw [hproc]) $$ Hce
-    iapply (sys_mknod_create CR Γ cpu _ A.j pl.length (sysMknodPfun pl) (sysMknodHw A.v1)
+    iapply (sys_mknod_create CR Γ cpu _ A.j pl.length (sysfilePfun pl) (sysMknodHw A.v1)
         (sysMknodHw A.v2) A.γ A.pid (sysMknodV1 A P2) (sysMknodM1 A P2) MAXOPBLOCKS Sb A.ns A.P
-        A.Pmiss A.Farm A.Fun A.Fok A.Fex hj ?cp ?cK ?cn ?ct (sys_mknod_pfun_nn pl hnul)
-        (sys_mknod_pfun_term pl) (by omega) (by unfold createUnits; exact Nat.le_refl _) hns
+        A.Pmiss A.Farm A.Fun A.Fok A.Fex hj ?cp ?cK ?cn ?ct (sysfile_pfun_nn pl hnul)
+        (sysfile_pfun_term pl) (by omega) (by unfold createUnits; exact Nat.le_refl _) hns
         ?ca1 ?ca2 ?ca3)
       $$ [- $Hk $Hpc $Henv $Hbs $Hir $HopS $Htx $Hst $Hdl $Hcre]
     rotate_right 1
@@ -353,11 +353,11 @@ theorem sys_mknod_fetched (CR : CREATE) (IUP : IUNLOCKPUT) (EO : END_OP) (Γ : S
     unfold sysMknodCreateK createPost
     iintro %spie1 %spp1 %R1 %ok %made %kk %qi %s %g %inum %dn %bm %u' %Sb' %ns' %hcs1 Hk Hpc Hte Hce
       - - - - Hblk Hp Hbs %hns1 Hir %⟨-, -, hu1⟩ HopS Harm
-    k_norm_g [sys_mknod_ret_44, sys_mknod_ww, sys_mknod_psw]
+    k_norm_g [sys_mknod_ret_44, sysfile_ww, sysfile_psw]
     ihave Hp := (show byteBuf (GF := GF) (k.regs 2#5 + 18446744073709551472#64) (DFrac.own 1)
-        (bview (pl.length + 1) (sysMknodPfun pl)) ⊢
+        (bview (pl.length + 1) (sysfilePfun pl)) ⊢
       byteBuf (sysMknodBuf (k.regs 2#5)) (DFrac.own 1)
-        (bview (pl.length + 1) (sysMknodPfun pl)) from .rfl) $$ Hp
+        (bview (pl.length + 1) (sysfilePfun pl)) from .rfl) $$ Hp
     ihave Hblk := (show procPrivFd (GF := GF) A.γ k.proc A.pid (sysMknodV1 A P2) (sysMknodM1 A P2) ⊢
         procPrivFd A.γ (procAddr A.j) A.pid (sysMknodV1 A P2) (sysMknodM1 A P2)
       from by rw [hproc]) $$ Hblk
@@ -375,10 +375,10 @@ theorem sys_mknod_fetched (CR : CREATE) (IUP : IUNLOCKPUT) (EO : END_OP) (Γ : S
       $$ [$Hk $Hpc $Hcells $Hp $Hrest $Hlow $Hte $Hce $Henv $Hblk $HΦ $Hbs $Hir $HopS $Harm]
   · -- ===== the string did not fetch: the -1 tail =====
     k_step_e (wp_s_branch cpu _ (KA.«sys_mknod» + 0x2e#64) false 42#13 10#5 0#5 (by decide) bop.BLT)
-      from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hr, sys_mknod_bltz_m1]
+      from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hr, sysfile_bltz_m1]
     iintro Hk Hpc
-    ihave Hbuf : sysMknodAny (sysMknodBuf (k.regs 2#5)) 128 $$ [Hbuf]
-    · unfold sysMknodAny; iexists bs; iframe; ipureintro; omega
+    ihave Hbuf : sysfileAny (sysMknodBuf (k.regs 2#5)) 128 $$ [Hbuf]
+    · unfold sysfileAny; iexists bs; iframe; ipureintro; omega
     ihave Hlow := sys_mknod_ints_close (k.regs 2#5) hal8 _ _ $$ Hints
     ihave Hfail : mknodPostFail (hlc := hlc) (fsGammaL fscFs) fscFs A.V.cwi (viewLazy A.V.upt A.V.sz A.M)
         A.v0.toNat (devArg A.v1) (devArg A.v2) A.P A.Pmiss A.Farm A.Fun A.Fok
@@ -405,9 +405,9 @@ theorem sys_mknod_args (AS : ARGSTR) (CR : CREATE) (IUP : IUNLOCKPUT) (EO : END_
     (hal8 : (sysMknodMin (k.regs 2#5)).toNat % 8 = 0) :
     kctx cpu (((k.withSpie spie spp).pushed 20).withRegs R) ∗ pcIs cpu (KA.«sys_mknod» + 0x20#64) ∗
     sysMknodCells (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) ∗
-    sysMknodAny (sysMknodBuf (k.regs 2#5)) 128 ∗
+    sysfileAny (sysMknodBuf (k.regs 2#5)) 128 ∗
     sysMknodInts (k.regs 2#5) (BitVec.extractLsb' 0 32 A.v1) (BitVec.extractLsb' 0 32 A.v2) ∗
-    trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie (procAddr A.j) ∗ sysMknodEnv (hlc := hlc) Γ ∗
+    trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie (procAddr A.j) ∗ sysfileEnv (hlc := hlc) Γ ∗
     procPrivFd A.γ (procAddr A.j) A.pid A.V A.M ∗
     (∀ c : CPU, sysMknodPostA k A c) ∗ bslots 3 ∗ irefSlots A.ns ∗ logOp icfgLog MAXOPBLOCKS ∗
     sysMknodAu (hlc := hlc) A
@@ -415,7 +415,7 @@ theorem sys_mknod_args (AS : ARGSTR) (CR : CREATE) (IUP : IUNLOCKPUT) (EO : END_
   iintro ⟨Hk, Hpc, Hcells, Hbuf, Hints, Hte, Hce, #Henv, Hblk, HΦ, Hbs, Hir, Hop, Hau⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
   obtain ⟨-, hKas, -⟩ := sys_mknod_K _ hK
-  unfold sysMknodAny
+  unfold sysfileAny
   icases Hbuf with ⟨%old, %hold, Hbuf⟩
   -- +0x20  li a2,128
   k_step_e (wp_s_addi cpu _ (KA.«sys_mknod» + 0x20#64) false 128#12 12#5 0#5 (by decide))
@@ -436,7 +436,7 @@ theorem sys_mknod_args (AS : ARGSTR) (CR : CREATE) (IUP : IUNLOCKPUT) (EO : END_
   icases sys_mknod_blk_bare _ _ _ _ _ $$ Hblk with ⟨Hbare, Hclose⟩
   ihave Hbuf := (show byteBuf (GF := GF) (sysMknodBuf (k.regs 2#5)) (DFrac.own 1) old ⊢
     byteBuf (k.regs 2#5 + 18446744073709551472#64) (DFrac.own 1) old from .rfl) $$ Hbuf
-  iapply (sys_mknod_argstr AS Γ cpu _ k.sie (by k_norm_g) (procAddr A.j) (by k_norm_g; exact hproc)
+  iapply (sysfile_argstr AS Γ cpu _ k.sie (by k_norm_g) (procAddr A.j) (by k_norm_g; exact hproc)
       (procAddr A.j) A.pid A.V A.M 0 A.v0 old sys_mknod_arg0 ?ga0 hv0 ?gpr ?gt ?gn ?gK ?gmx
       (by omega))
     $$ [- $Hk $Hpc $Hte $Hce $Henv $Hbare]
@@ -450,7 +450,7 @@ theorem sys_mknod_args (AS : ARGSTR) (CR : CREATE) (IUP : IUNLOCKPUT) (EO : END_
   case gK => k_norm_g; exact hKas
   case gmx => k_norm_g [hold]
   iintro %cpu %spie1 %spp1 %R1 %P2 %bs %⟨hcs1, hext, hret⟩ Hk Hpc Hte Hce Hbare Hbuf
-  k_norm_g [sys_mknod_ret_2e, sys_mknod_ww, sys_mknod_psw]
+  k_norm_g [sys_mknod_ret_2e, sysfile_ww, sysfile_psw]
   ihave Hbuf := (show byteBuf (GF := GF) (k.regs 2#5 + 18446744073709551472#64) (DFrac.own 1) bs ⊢
     byteBuf (sysMknodBuf (k.regs 2#5)) (DFrac.own 1) bs from .rfl) $$ Hbuf
   ihave Hblk := Hclose $$ %P2 %(viewFaulted A.V.upt P2 A.M) Hbare
@@ -488,8 +488,8 @@ theorem sys_mknod_main (BO : BEGIN_OP) (AI : ARGINT) (AS : ARGSTR) (CR : CREATE)
   icases kctx_tier cpu _ $$ Hk with ⟨%hct0, Hk⟩
   have hct : curTier = KTier.kpt := hct0.symm.trans htier
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
-  ihave #Henv : sysMknodEnv (hlc := hlc) Γ $$ []
-  · unfold sysMknodEnv; iframe #
+  ihave #Henv : sysfileEnv (hlc := hlc) Γ $$ []
+  · unfold sysfileEnv; iframe #
   -- THE CONTRACT'S CONTINUATION, hart-free
   ihave HΦ : (∀ c : CPU, sysMknodPostA k
       (⟨γ, j, pid, V, M, ns, v0, v1, v2, P, Pmiss, Farm, Fun, Fok, Fex⟩ : SysMknodArgs GF) c)
@@ -521,7 +521,7 @@ theorem sys_mknod_main (BO : BEGIN_OP) (AI : ARGINT) (AS : ARGSTR) (CR : CREATE)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [sys_mknod_br_begin_op]
   iintro Hk Hpc
   icases sys_mknod_pid hct _ _ _ _ _ $$ Hblk with ⟨Hpid, Hback⟩
-  iapply (sys_mknod_begin_op BO Γ cpu _ k.sie (by k_norm_g) (procAddr j) (by k_norm_g; exact hproc)
+  iapply (sysfile_begin_op BO Γ cpu _ k.sie (by k_norm_g) (procAddr j) (by k_norm_g; exact hproc)
       j pid pidPriv hj ?bp ?bK ?bn ?bt)
     $$ [- $Hk $Hpc $Hte $Hce $Henv $Hpid]
   rotate_right 1
@@ -531,7 +531,7 @@ theorem sys_mknod_main (BO : BEGIN_OP) (AI : ARGINT) (AS : ARGSTR) (CR : CREATE)
   case bn => k_norm_g; exact hnoff
   case bt => k_norm_g; exact htier
   iintro %cpu %spie1 %spp1 %R1 %hcs1 Hk Hpc Hte Hce Hpid Hop
-  k_norm_g [sys_mknod_ret_0c, sys_mknod_ww, sys_mknod_psw]
+  k_norm_g [sys_mknod_ret_0c, sysfile_ww, sysfile_psw]
   ihave Hblk := Hback $$ Hpid
   have hp1 : sysMknodPins k R1 := by
     refine sysMknodPins_cs k _ R1 ?_ hcs1
@@ -552,7 +552,7 @@ theorem sys_mknod_main (BO : BEGIN_OP) (AI : ARGINT) (AS : ARGSTR) (CR : CREATE)
   icases sys_mknod_tf hct _ _ _ _ _ $$ Hblk with ⟨Htf, Hpg, Htfb⟩
   ihave Hmaj := (show wordPointsTo (GF := GF) (sysMknodMaj (k.regs 2#5)) 4 (DFrac.own 1) w1 ⊢
     wordPointsTo (k.regs 2#5 + 18446744073709551468#64) 4 (DFrac.own 1) w1 from .rfl) $$ Hmaj
-  iapply (sys_mknod_argint AI cpu _ k.sie (by k_norm_g) (procAddr j) (by k_norm_g; exact hproc) 1
+  iapply (sysfile_argint AI cpu _ k.sie (by k_norm_g) (procAddr j) (by k_norm_g; exact hproc) 1
       V.upt.tfp V.tf v1 w1 _ sys_mknod_arg1 ?a0 hv1 ?an ?aK)
     $$ [- $Hk $Hpc $Hte $Hce $Htf $Hpg]
   rotate_right 1
@@ -562,7 +562,7 @@ theorem sys_mknod_main (BO : BEGIN_OP) (AI : ARGINT) (AS : ARGSTR) (CR : CREATE)
   case an => k_norm_g; exact hnoff
   case aK => k_norm_g; exact hKai
   iintro %cpu %spie2 %spp2 %R2 %hcs2 Hk Hpc Hte Hce Htf Hpg Hmaj
-  k_norm_g [sys_mknod_ret_16, sys_mknod_ww, sys_mknod_psw]
+  k_norm_g [sys_mknod_ret_16, sysfile_ww, sysfile_psw]
   ihave Hblk := Htfb $$ Htf Hpg
   have hp2 : sysMknodPins k R2 := by
     refine sysMknodPins_cs k _ R2 ?_ hcs2
@@ -583,7 +583,7 @@ theorem sys_mknod_main (BO : BEGIN_OP) (AI : ARGINT) (AS : ARGSTR) (CR : CREATE)
   icases sys_mknod_tf hct _ _ _ _ _ $$ Hblk with ⟨Htf, Hpg, Htfb⟩
   ihave Hmin := (show wordPointsTo (GF := GF) (sysMknodMin (k.regs 2#5)) 4 (DFrac.own 1) w2 ⊢
     wordPointsTo (k.regs 2#5 + 18446744073709551464#64) 4 (DFrac.own 1) w2 from .rfl) $$ Hmin
-  iapply (sys_mknod_argint AI cpu _ k.sie (by k_norm_g) (procAddr j) (by k_norm_g; exact hproc) 2
+  iapply (sysfile_argint AI cpu _ k.sie (by k_norm_g) (procAddr j) (by k_norm_g; exact hproc) 2
       V.upt.tfp V.tf v2 w2 _ sys_mknod_arg2 ?b0 hv2 ?bn ?bK)
     $$ [- $Hk $Hpc $Hte $Hce $Htf $Hpg]
   rotate_right 1
@@ -593,7 +593,7 @@ theorem sys_mknod_main (BO : BEGIN_OP) (AI : ARGINT) (AS : ARGSTR) (CR : CREATE)
   case bn => k_norm_g; exact hnoff
   case bK => k_norm_g; exact hKai
   iintro %cpu %spie3 %spp3 %R3 %hcs3 Hk Hpc Hte Hce Htf Hpg Hmin
-  k_norm_g [sys_mknod_ret_20, sys_mknod_ww, sys_mknod_psw]
+  k_norm_g [sys_mknod_ret_20, sysfile_ww, sysfile_psw]
   ihave Hblk := Htfb $$ Htf Hpg
   have hp3 : sysMknodPins k R3 := by
     refine sysMknodPins_cs k _ R3 ?_ hcs3

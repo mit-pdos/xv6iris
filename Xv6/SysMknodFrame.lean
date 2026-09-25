@@ -41,11 +41,11 @@ list (`Xv6/NamexParts.lean` deviation 4), not Rocq's `bytes_own` /
    quarter and page through `ProcPrivAcc.procPrivFd_tf` (Rocq
    `proc_priv_tf`), and argstr takes the bare block by `procPrivFd`'s own
    definition (the `sys_chdir_blk_bare` shape).
-4. `sys_mknod_umemStr` restates `SysChdirFrame.sys_chdir_umemStr` and
-   `sys_mknod_stack_bytes` restates `SysLinkFrame.sys_link_stack_bytes`
-   (stage files of other Proofs cannot be imported: brief fs7b rule 2); the
-   fold is the landed `KstackMap.byteBuf_stackOwn`.
+4. The fetched string's shape is `UMemL.umemStr_nul`; the path buffer and
+   the slots↔bytes carve are the shared `Xv6/SysfileCalls.lean` helpers;
+   the fold is the landed `KstackMap.byteBuf_stackOwn`.
 -/
+import Xv6.SysfileCalls
 import Xv6.SpecSysMknod
 import Xv6.ProcPrivAcc
 import Xv6.KstackMap
@@ -112,109 +112,33 @@ theorem sys_mknod_K (a : Nat) (h : sysMknodSlots ≤ a) :
 /-! ## The sign cluster (the `bltz` at +0x2e, the `c.beqz` at +0x44) and
 the immediates -/
 
-theorem sys_mknod_bltz_nat (n : Nat) (h : n < 2 ^ 31) :
-    bcond bop.BLT (BitVec.ofNat 64 n) 0#64 = false := by
-  show (BitVec.ofNat 64 n).slt 0#64 = false
-  apply Bool.eq_false_iff.2
-  intro hlt
-  rw [BitVec.slt_iff_toInt_lt, BitVec.toInt_eq_toNat_of_lt (by rw [BitVec.toNat_ofNat]; omega)] at hlt
-  simp only [BitVec.toNat_ofNat, BitVec.toInt_zero] at hlt
-  omega
-
-theorem sys_mknod_bltz_m1 : bcond bop.BLT 0xFFFFFFFFFFFFFFFF#64 0#64 = true := by decide
-
-theorem sys_mknod_beqz (x : BitVec 64) : bcond bop.BEQ x 0#64 = decide (x = 0#64) := by
-  simp only [bcond]; by_cases h : x = 0#64
-  · subst h; decide
-  · simp only [h, decide_false]; rw [beq_eq_false_iff_ne]; exact h
-
-theorem sys_mknod_beq00 : bcond bop.BEQ 0#64 0#64 = true := by decide
-
-theorem sys_mknod_li0 : 0#64 + BitVec.signExtend 64 0#12 = 0#64 := by decide
 theorem sys_mknod_li1 : 0#64 + BitVec.signExtend 64 1#12 = BitVec.ofNat 64 1 := by decide
 theorem sys_mknod_li2 : 0#64 + BitVec.signExtend 64 2#12 = BitVec.ofNat 64 2 := by decide
 theorem sys_mknod_li3 : 0#64 + BitVec.signExtend 64 3#12 = BitVec.signExtend 64 T_DEVICE_w := by
   decide
-theorem sys_mknod_m1 : 0#64 + BitVec.signExtend 64 4095#12 = 0xFFFFFFFFFFFFFFFF#64 := by decide
-theorem sys_mknod_li128 : 0#64 + BitVec.signExtend 64 128#12 = BitVec.ofNat 64 128 := by decide
 
 theorem sys_mknod_tdev_nz : T_DEVICE_w.toNat ≠ 0 := by decide
 
 /-! ## The fetched path (Rocq `mn_buf_split` / `mn_plen_lt`;
-`sys_mknod_umemStr` is deviation 4) -/
-
-theorem sys_mknod_umemStr (M : Nat → List (BitVec 8)) (va max : Nat) (s : List (BitVec 8))
-    (h : umemStr M va max = some s) :
-    ∃ pl : List (BitVec 8), s = pl ++ [0#8] ∧ nonul pl ∧ pl.length < max := by
-  unfold umemStr at h
-  simp only at h
-  cases hf : (umemRead M va max).findIdx? (· = 0#8) with
-  | none => rw [hf] at h; exact absurd h (by simp)
-  | some i =>
-    rw [hf] at h
-    simp only [Option.some.injEq] at h
-    obtain ⟨hi, hzero, hmin⟩ := List.findIdx?_eq_some_iff_getElem.mp hf
-    rw [UMemL.umemRead_length] at hi
-    have hgi : (umemRead M va max)[i]? = some 0#8 := by
-      rw [List.getElem?_eq_getElem (by rw [UMemL.umemRead_length]; exact hi)]
-      simpa using hzero
-    refine ⟨(umemRead M va max).take i, ?_, ?_, ?_⟩
-    · rw [← h, List.take_add_one, hgi]; rfl
-    · intro b hb
-      obtain ⟨j, hj, hjb⟩ := List.getElem_of_mem hb
-      rw [List.length_take] at hj
-      have hj' : j < i := by omega
-      rw [List.getElem_take] at hjb
-      rw [← hjb]
-      simpa using hmin j hj'
-    · rw [List.length_take, UMemL.umemRead_length]; omega
-
-/-- The string as create's function view: byte `i` of `pl`, NUL past it. -/
-def sysMknodPfun (pl : List (BitVec 8)) (i : Nat) : BitVec 8 := pl.getD i 0#8
-
-theorem sys_mknod_bview (pl : List (BitVec 8)) :
-    bview (pl.length + 1) (sysMknodPfun pl) = pl ++ [0#8] := by
-  apply List.ext_getElem
-  · simp [bview_length]
-  · intro i h1 h2
-    rw [bview_length] at h1
-    unfold bview sysMknodPfun
-    simp only [List.getElem_map, List.getElem_range]
-    by_cases hi : i < pl.length
-    · rw [List.getElem_append_left hi]
-      simp [List.getD_eq_getElem?_getD, List.getElem?_eq_getElem hi]
-    · have he : i = pl.length := by omega
-      subst he
-      simp [List.getD_eq_getElem?_getD]
+`UMemL.umemStr_nul` is deviation 4) -/
 
 /-- ...and without the NUL, the path itself. -/
 theorem sys_mknod_bview_self (pl : List (BitVec 8)) :
-    bview pl.length (sysMknodPfun pl) = pl := by
+    bview pl.length (sysfilePfun pl) = pl := by
   apply List.ext_getElem
   · simp [bview_length]
   · intro i h1 h2
     rw [bview_length] at h1
-    unfold bview sysMknodPfun
+    unfold bview sysfilePfun
     simp only [List.getElem_map, List.getElem_range]
     simp [List.getD_eq_getElem?_getD, List.getElem?_eq_getElem h1]
-
-theorem sys_mknod_pfun_nn (pl : List (BitVec 8)) (hn : nonul pl) :
-    ∀ i, i < pl.length → sysMknodPfun pl i ≠ 0#8 := by
-  intro i hi
-  unfold sysMknodPfun
-  rw [List.getD_eq_getElem?_getD, List.getElem?_eq_getElem hi]
-  exact hn _ (List.getElem_mem hi)
-
-theorem sys_mknod_pfun_term (pl : List (BitVec 8)) : sysMknodPfun pl pl.length = 0#8 := by
-  unfold sysMknodPfun
-  simp [List.getD_eq_getElem?_getD]
 
 /-- argstr's success arm, read: the path, its shape, its length under the
 buffer, and THE READING OF ARGUMENT 0 at the view argstr read it in. -/
 theorem sys_mknod_path_of (M : Nat → List (BitVec 8)) (va : Nat) (pl : List (BitVec 8))
     (hs : umemStr M va 128 = some (pl ++ [0#8])) :
     nonul pl ∧ pl.length < 128 ∧ argPathOf M va pl := by
-  obtain ⟨pl', hpl', hnul, hlt⟩ := sys_mknod_umemStr M va 128 _ hs
+  obtain ⟨pl', hpl', hnul, hlt⟩ := UMemL.umemStr_nul M va 128 _ hs
   have hpl : pl' = pl := (List.append_cancel_right hpl'.symm)
   subst hpl
   obtain ⟨pl'', hpl'', hof⟩ := argPathOf_umemStr M va 128 _ (by decide) hs
@@ -228,80 +152,30 @@ section
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF]
 variable {lent : Bool}
 
-/-- A buffer of `n` bytes at `a`, contents unknown. -/
-def sysMknodAny [CurCtx] (a : BitVec 64) (n : Nat) : IProp GF :=
-  iprop(∃ bs : List (BitVec 8), ⌜bs.length = n⌝ ∗ byteBuf a (DFrac.own 1) bs)
-
-/-- `n + 1` slots below `a + 8 (n + 1)` are `8 (n + 1)` bytes at `a`, and `a`
-is 8-aligned (deviation 4). -/
-theorem sys_mknod_stack_bytes [CurCtx] (a : BitVec 64) (n : Nat) :
-    stackOwn (GF := GF) (a + BitVec.ofNat 64 (8 * (n + 1))) (n + 1) ⊢
-      ∃ bs : List (BitVec 8), ⌜bs.length = 8 * (n + 1) ∧ a.toNat % 8 = 0⌝ ∗
-        byteBuf a (DFrac.own 1) bs := by
-  induction n generalizing a with
-  | zero =>
-    unfold stackOwn
-    simp only [Nat.zero_add, List.range_one]
-    iintro H
-    icases BigSepL.bigSepL_singleton.1 $$ H with ⟨%w, H⟩
-    have ha' : a + BitVec.ofNat 64 (8 * 1) - 8#64 * BitVec.ofNat 64 (0 + 1) = a := by bv_omega
-    rw [ha']
-    ihave %hal := wordPointsTo_align _ 8 _ _ $$ H
-    ihave B := wordPointsTo_to_bytes _ (DFrac.own 1) w hal $$ H
-    iexists wordToBytes w
-    isplitr
-    · ipureintro; exact ⟨rfl, hal⟩
-    · iexact B
-  | succ n ih =>
-    have e1 : a + BitVec.ofNat 64 (8 * (n + 1 + 1)) - 8#64 * BitVec.ofNat 64 (n + 1) = a + 8#64 := by
-      bv_omega
-    have e0 : a + BitVec.ofNat 64 (8 * (n + 1 + 1)) = (a + 8#64) + BitVec.ofNat 64 (8 * (n + 1)) := by
-      bv_omega
-    iintro H
-    icases stackOwn_split (a + BitVec.ofNat 64 (8 * (n + 1 + 1))) (n + 1) 1 $$ H with ⟨Ht, Hb⟩
-    rw [e1, e0]
-    icases ih (a + 8#64) $$ Ht with ⟨%bs, ⟨%hl, %hal⟩, B⟩
-    unfold stackOwn
-    simp only [List.range_one]
-    icases BigSepL.bigSepL_singleton.1 $$ Hb with ⟨%w, Hb⟩
-    have e2 : a + 8#64 - 8#64 * BitVec.ofNat 64 (0 + 1) = a := by bv_omega
-    rw [e2]
-    ihave %hal2 := wordPointsTo_align _ 8 _ _ $$ Hb
-    ihave Bb := wordPointsTo_to_bytes _ (DFrac.own 1) w hal2 $$ Hb
-    iexists wordToBytes w ++ bs
-    isplitr
-    · ipureintro
-      refine ⟨?_, hal2⟩
-      rw [List.length_append, hl, wordToBytes_length]
-      omega
-    · iapply (byteBuf_append (GF := GF) a (DFrac.own 1) (wordToBytes w) bs).2
-      rw [wordToBytes_length]
-      iframe
-
 /-- THE CARVE (Rocq `mn_frame_carve`, the path half): slots 3..18 ARE
 `char path[128]`, 8-aligned at the base. -/
 theorem sys_mknod_carve [CurCtx] (sp0 : BitVec 64) :
     stackOwn (GF := GF) (sp0 - 8#64 * BitVec.ofNat 64 2) 16 ⊢
-      ⌜(sysMknodBuf sp0).toNat % 8 = 0⌝ ∗ sysMknodAny (sysMknodBuf sp0) 128 := by
+      ⌜(sysMknodBuf sp0).toNat % 8 = 0⌝ ∗ sysfileAny (sysMknodBuf sp0) 128 := by
   have e : sp0 - 8#64 * BitVec.ofNat 64 2 = sysMknodBuf sp0 + BitVec.ofNat 64 (8 * (15 + 1)) := by
     unfold sysMknodBuf; bv_omega
   rw [e]
   iintro H
-  icases sys_mknod_stack_bytes (sysMknodBuf sp0) 15 $$ H with ⟨%bs, ⟨%hl, %hal⟩, B⟩
+  icases sysfile_stack_bytes (sysMknodBuf sp0) 15 $$ H with ⟨%bs, ⟨%hl, %hal⟩, B⟩
   isplitr
   · ipureintro; exact hal
-  · unfold sysMknodAny
+  · unfold sysfileAny
     iexists bs
     iframe B
     ipureintro; omega
 
 /-- THE CARVE, UNDONE (Rocq `mn_frame_join`, the path half). -/
 theorem sys_mknod_fold [CurCtx] (sp0 : BitVec 64) (hal : (sysMknodBuf sp0).toNat % 8 = 0) :
-    sysMknodAny (GF := GF) (sysMknodBuf sp0) 128 ⊢ stackOwn (sp0 - 8#64 * BitVec.ofNat 64 2) 16 := by
+    sysfileAny (GF := GF) (sysMknodBuf sp0) 128 ⊢ stackOwn (sp0 - 8#64 * BitVec.ofNat 64 2) 16 := by
   have e : sp0 - 8#64 * BitVec.ofNat 64 2 = sysMknodBuf sp0 + BitVec.ofNat 64 (8 * 16) := by
     unfold sysMknodBuf; bv_omega
   rw [e]
-  unfold sysMknodAny
+  unfold sysfileAny
   iintro ⟨%bs, %hl, B⟩
   iapply byteBuf_stackOwn (sysMknodBuf sp0) hal 16 bs (by omega) $$ B
 
@@ -342,38 +216,6 @@ theorem sys_mknod_low_close [CurCtx] (sp0 : BitVec 64) :
   rw [sys_mknod_low_addr1, sys_mknod_low_addr2]
   iintro ⟨H1, H2⟩
   iframe H1 H2
-
-/-- The rest of the buffer, past the fetched path and its NUL (a name, so
-the tactic normal forms leave it alone). -/
-def sysMknodRestAddr (a : BitVec 64) (n : Nat) : BitVec 64 := a + BitVec.ofNat 64 (n + 1)
-
-/-- THE PATH, CUT OUT OF THE BUFFER (Rocq `mn_buf_split`): argstr's success
-arm, read as create's `bview (plen + 1) pfun` and the untouched rest. -/
-theorem sys_mknod_buf_split [CurCtx] (a : BitVec 64) (pl rest : List (BitVec 8)) :
-    byteBuf (GF := GF) a (DFrac.own 1) (pl ++ 0#8 :: rest) ⊢
-      byteBuf a (DFrac.own 1) (bview (pl.length + 1) (sysMknodPfun pl)) ∗
-      byteBuf (sysMknodRestAddr a pl.length) (DFrac.own 1) rest := by
-  unfold sysMknodRestAddr
-  rw [sys_mknod_bview, show pl ++ 0#8 :: rest = (pl ++ [0#8]) ++ rest by simp]
-  refine (byteBuf_append (GF := GF) a (DFrac.own 1) (pl ++ [0#8]) rest).1.trans ?_
-  simp only [List.length_append, List.length_singleton]
-  exact .rfl
-
-/-- ...and back (Rocq `mn_buf_join`), at whatever create left. -/
-theorem sys_mknod_buf_join [CurCtx] (a : BitVec 64) (pl rest : List (BitVec 8))
-    (hlen : pl.length + 1 + rest.length = 128) :
-    byteBuf (GF := GF) a (DFrac.own 1) (bview (pl.length + 1) (sysMknodPfun pl)) ∗
-      byteBuf (sysMknodRestAddr a pl.length) (DFrac.own 1) rest ⊢
-      sysMknodAny a 128 := by
-  unfold sysMknodRestAddr
-  iintro ⟨B1, B2⟩
-  unfold sysMknodAny
-  iexists bview (pl.length + 1) (sysMknodPfun pl) ++ rest
-  isplitr
-  · ipureintro; rw [List.length_append, bview_length]; omega
-  · iapply (byteBuf_append (GF := GF) a (DFrac.own 1) _ rest).2
-    rw [bview_length]
-    iframe
 
 /-! ## A word cell as two halfwords (deviation 2; Rocq
 `word4_pointsto_split2` / `word4_pointsto_join2`) -/
@@ -494,7 +336,7 @@ theorem wp_prologue_sys_mknod [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU)
             ((k.regs.set 2#5 (k.regs 2#5 + 0xFFFFFFFFFFFFFF60#64)).set 8#5 (k.regs 2#5))) -∗
           pcIs cpu' (pc + 8#64) -∗
           sysMknodCells (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) -∗
-          ⌜(sysMknodBuf (k.regs 2#5)).toNat % 8 = 0⌝ -∗ sysMknodAny (sysMknodBuf (k.regs 2#5)) 128 -∗
+          ⌜(sysMknodBuf (k.regs 2#5)).toNat % 8 = 0⌝ -∗ sysfileAny (sysMknodBuf (k.regs 2#5)) 128 -∗
           sysMknodLow (k.regs 2#5) -∗
           wpLoop cpu'))
     ⊢ wpLoop cpu := by
@@ -533,7 +375,7 @@ theorem wp_epilogue_sys_mknod [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU)
     instr (GF := GF) (pc + 4#64) true (instruction.ITYPE (160#12, regidx.Regidx 2#5, regidx.Regidx 2#5, iop.ADDI)) ∗
     instr (GF := GF) (pc + 6#64) true (instruction.JALR (0#12, regidx.Regidx 1#5, regidx.Regidx 0#5)) ∗
     kctxL lent cpu ((k.pushed 20).withRegs R) ∗ pcIs cpu pc ∗
-    sysMknodCells (k.regs 2#5) ra s0 ∗ sysMknodAny (sysMknodBuf (k.regs 2#5)) 128 ∗
+    sysMknodCells (k.regs 2#5) ra s0 ∗ sysfileAny (sysMknodBuf (k.regs 2#5)) 128 ∗
     sysMknodLow (k.regs 2#5) ∗
     ▷ wpNext k.sie k.proc cpu (fun cpu' =>
         iprop(kctxL lent cpu' (k.withRegs (((R.set 1#5 ra).set 8#5 s0).set 2#5 (k.regs 2#5))) -∗
@@ -621,12 +463,6 @@ theorem sysMknodPins_exit (k : KCtx) (R : RegMap) (h : sysMknodPins k R) :
 
 /-! ## The ambient context, pinned at the kernel tier -/
 
-theorem sys_mknod_ctx (X : CurCtx) (h : X.curTier = KTier.kpt) : X = ⟨X.curCtx, KTier.kpt⟩ := by
-  cases X; simp only at h; subst h; rfl
-
-theorem sys_mknod_cur_kpt [inst : CurCtx] (hct : curTier = KTier.kpt) :
-    (⟨curCtx, KTier.kpt⟩ : CurCtx) = inst := (sys_mknod_ctx inst hct).symm
-
 /-! ## The arguments, the block's seams, the out bundle, the join point -/
 
 /-- The contract's parameters, as one record (the `SysChdirArgs` pattern). -/
@@ -705,7 +541,7 @@ theorem sys_mknod_tf (hct : curTier = KTier.kpt) (γ : FileNames) (pa : BitVec 6
       (wordPointsTo (pTrapframe pa) 8 (DFrac.own (1 : Qp).half.half) (pageAddr V.upt.tfp) -∗
         tfPageAt V.upt.tfp V.tf -∗ procPrivFd γ pa pid V M) := by
   have h := procPrivFd_tf (GF := GF) γ pa pid V M
-  rw [sys_mknod_cur_kpt hct] at h
+  rw [sysfile_cur_kpt hct] at h
   exact h
 
 /-- ...and argstr's: the bare block out, and the WHOLE block back at a grown
@@ -742,7 +578,7 @@ theorem sys_mknod_exit (cpu : CPU) (k : KCtx) (A : SysMknodArgs GF)
     (hal : (sysMknodBuf (k.regs 2#5)).toNat % 8 = 0) :
     kctx cpu (((k.withSpie spie spp).pushed 20).withRegs R) ∗ pcIs cpu (KA.«sys_mknod» + 0x50#64) ∗
     sysMknodCells (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) ∗
-    sysMknodAny (sysMknodBuf (k.regs 2#5)) 128 ∗ sysMknodLow (k.regs 2#5) ∗
+    sysfileAny (sysMknodBuf (k.regs 2#5)) 128 ∗ sysMknodLow (k.regs 2#5) ∗
     trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗
     sysMknodOut A (R 10#5) ∗ (∀ c : CPU, sysMknodPostA k A c)
     ⊢ wpLoop (GF := GF) cpu := by
@@ -752,8 +588,8 @@ theorem sys_mknod_exit (cpu : CPU) (k : KCtx) (A : SysMknodArgs GF)
   have hcs := sysMknodPins_exit k R hpins
   ihave Hcells := (show sysMknodCells (GF := GF) (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) ⊢
       sysMknodCells ((k.withSpie spie spp).regs 2#5) (k.regs 1#5) (k.regs 8#5) from .rfl) $$ Hcells
-  ihave Hbuf := (show sysMknodAny (GF := GF) (sysMknodBuf (k.regs 2#5)) 128 ⊢
-      sysMknodAny (sysMknodBuf ((k.withSpie spie spp).regs 2#5)) 128 from .rfl) $$ Hbuf
+  ihave Hbuf := (show sysfileAny (GF := GF) (sysMknodBuf (k.regs 2#5)) 128 ⊢
+      sysfileAny (sysMknodBuf ((k.withSpie spie spp).regs 2#5)) 128 from .rfl) $$ Hbuf
   ihave Hlow := (show sysMknodLow (GF := GF) (k.regs 2#5) ⊢
       sysMknodLow ((k.withSpie spie spp).regs 2#5) from .rfl) $$ Hlow
   iapply (wp_epilogue_sys_mknod cpu (k.withSpie spie spp) (KA.«sys_mknod» + 0x50#64)

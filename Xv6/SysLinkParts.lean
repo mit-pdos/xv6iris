@@ -26,13 +26,13 @@ uses (never Rocq's comments):
    `wp_s_addiw`; `wp_s_sh`: `extractLsb' 0 16`; `wp_s_lui`; the branch
    conditions as `bcond`), as `Xv6/NamexParts.lean`.  So:
    * the sign cluster (`sl_sint_moi`, `sl_nonneg`, `sl_m1_neg`,
-     `sl_zero_nonneg`) is `sys_link_bltz_nat` / `sys_link_bltz_m1` /
+     `sl_zero_nonneg`) is `sysfile_bltz_nat` / `sysfile_bltz_m1` /
      `sys_link_bltz_0`; `sl_len_range` / `sl_plen_lt` / `sl_maxpath_lt` /
      `sl_noff0` are `Z` bookkeeping the `Nat` statements do not need;
      `sl_arg0_lt` / `sl_arg1_lt` are kept;
    * the compare cluster (`sl_sext16_inj`, `sl_sext_one`, `sl_tdir_eq/_ne`,
      `sl_sext_zero`, `sl_nlz_eq/_ne`, `sl_sext_max`, `sl_nmax_eq/_ne`) is
-     one `bcond` reading per test (`sys_link_beq_tdir`,
+     one `bcond` reading per test (`sysfile_beq_tdir`,
      `sys_link_beqz_nlink`, `sys_link_beq_nmax`) plus `sys_link_li_nmax`;
    * the `++` chain (`sl_uns16`, `sl_sext16_low`, `sl_ninner*`,
      `sl_nbump_*`, `sl_nlink_incr`) is ONE `bv_decide` (`sys_link_nlink_incr`),
@@ -43,7 +43,7 @@ uses (never Rocq's comments):
      `sys_link_ndec_decr`, the `toNat` form `wp_iupdate_unlink`'s `hdec`
      takes.
 2. `sl_setnl` is the record update `{ dn with diNlink := nl }`
-   (`sysLinkSetnl`); `sl_setnl_ddix` goes through the landed
+   (`sysfileSetnl`); `sl_setnl_ddix` goes through the landed
    `DirView.dirDotsIx_eq`.
 3. Call targets / return addresses (Rocq's `CodeSysLink` `slki_*` and the
    `ret_pc` bookkeeping) are the `sys_link_br_*` / `sys_link_ret_*` facts in
@@ -75,6 +75,7 @@ Nothing beyond deviation 1's `Z`-only bookkeeping (uses checked: the four
 are read only by ProofSysLink.v's `Z` side conditions, which the `Nat`
 statements above discharge directly).
 -/
+import Xv6.SysfileCalls
 import Xv6.FsWords
 import Xv6.InodeLock
 import Xv6.DirView
@@ -144,35 +145,12 @@ theorem sys_link_bufname (x : BitVec 64) :
 
 /-! ## The sign cluster: the three `bltz`s (+0x18, +0x2c, +0xa0) -/
 
-/-- argstr's / dirlink's nonnegative return does not take the branch (Rocq's
-`sl_nonneg`, at `sl_sint_moi`'s range). -/
-theorem sys_link_bltz_nat (n : Nat) (h : n < 2 ^ 31) :
-    bcond bop.BLT (BitVec.ofNat 64 n) 0#64 = false := by
-  show (BitVec.ofNat 64 n).slt 0#64 = false
-  apply Bool.eq_false_iff.2
-  intro hlt
-  rw [BitVec.slt_iff_toInt_lt, BitVec.toInt_eq_toNat_of_lt (by rw [BitVec.toNat_ofNat]; omega)] at hlt
-  simp only [BitVec.toNat_ofNat, BitVec.toInt_zero] at hlt
-  omega
-
-/-- Rocq's `sl_m1_neg`. -/
-theorem sys_link_bltz_m1 : bcond bop.BLT 0xFFFFFFFFFFFFFFFF#64 0#64 = true := by decide
-
 /-- Rocq's `sl_zero_nonneg`. -/
 theorem sys_link_bltz_0 : bcond bop.BLT 0#64 0#64 = false := by decide
 
-theorem sys_link_arg0_lt : 0 < NARG := by decide
 theorem sys_link_arg1_lt : 1 < NARG := by decide
 
 /-! ## The sixteen-bit compare cluster -/
-
-/-- The type test at +0x4c: `lh` leaves `signExtend 64 t`, compared against
-`c.li a5,1` (Rocq's `sl_tdir_eq` / `sl_tdir_ne`). -/
-theorem sys_link_beq_tdir (t : BitVec 16) :
-    bcond bop.BEQ (BitVec.signExtend 64 t) 1#64 = decide (t = 1#16) := by
-  simp only [bcond]; by_cases h : t = 1#16
-  · subst h; decide
-  · simp only [h, decide_false]; rw [beq_eq_false_iff_ne]; intro he; apply h; bv_decide
 
 /-- THE ORPHAN GUARD at +0x86 (xv6 f60ff58): `c.beqz` on the sign-extended
 `dp->nlink` (Rocq's `sl_nlz_eq` / `sl_nlz_ne`). -/
@@ -237,33 +215,14 @@ Both flushes move ONE halfword, so the new record is the old one with
 `diNlink` replaced -- and every pure clause a re-park owes (`inodeOk`,
 `dirOk`) reads only the type, the size and the addrs. -/
 
-def sysLinkSetnl (dn : Dinode) (nl : BitVec 16) : Dinode := { dn with diNlink := nl }
-
-theorem sys_link_setnl_type (dn : Dinode) (nl : BitVec 16) :
-    (sysLinkSetnl dn nl).diType = dn.diType := rfl
 theorem sys_link_setnl_nlink (dn : Dinode) (nl : BitVec 16) :
-    (sysLinkSetnl dn nl).diNlink = nl := rfl
-theorem sys_link_setnl_size (dn : Dinode) (nl : BitVec 16) :
-    (sysLinkSetnl dn nl).diSize = dn.diSize := rfl
-theorem sys_link_setnl_addrs (dn : Dinode) (nl : BitVec 16) :
-    (sysLinkSetnl dn nl).diAddrs = dn.diAddrs := rfl
-
-theorem sys_link_setnl_inodeOk (cov : Std.ExtTreeSet Nat compare) (ls : Nat) (dn : Dinode)
-    (bm : Blkmap) (data : Nat → List (BitVec 8)) (nl : BitVec 16)
-    (h : inodeOk cov ls dn bm data) : inodeOk cov ls (sysLinkSetnl dn nl) bm data := h
-
-theorem sys_link_setnl_dirOk (nib : Nat) (dn : Dinode) (data : Nat → List (BitVec 8))
-    (nl : BitVec 16) (h : dirOk nib dn data) : dirOk nib (sysLinkSetnl dn nl) data := h
+    (sysfileSetnl dn nl).diNlink = nl := rfl
 
 /-- the ".." index clause across the same store (Rocq's `sl_setnl_ddix`):
 `dirDotsIx` is guarded on the COUNT, so the congruence needs the home live. -/
 theorem sys_link_setnl_ddix (self : Nat) (dn : Dinode) (data : Nat → List (BitVec 8))
     (nl : BitVec 16) (hnz : dn.diNlink.toNat ≠ 0) (hd : dirDotsIx self dn data) :
-    dirDotsIx self (sysLinkSetnl dn nl) data :=
-  dirDotsIx_eq self dn (sysLinkSetnl dn nl) data data rfl (fun _ => hnz) (Nat.le_refl _) rfl hd
-
-theorem sys_link_setnl_type_stable (dn : Dinode) (nl : BitVec 16) :
-    diTypeStable (sysLinkSetnl dn nl) dn :=
-  diTypeStable_eq _ _ rfl
+    dirDotsIx self (sysfileSetnl dn nl) data :=
+  dirDotsIx_eq self dn (sysfileSetnl dn nl) data data rfl (fun _ => hnz) (Nat.le_refl _) rfl hd
 
 end Xv6

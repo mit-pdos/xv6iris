@@ -30,7 +30,7 @@ uses (never Rocq's comments):
 1. EVERYTHING IS `Nat` / `BitVec`, at the literal shapes the Lean step rules
    leave, as `Xv6/SysLinkParts.lean` deviation 1 (whose three bullets apply
    verbatim: `su_sint_moi`/`su_nonneg`/`su_m1_neg` are
-   `sys_unlink_bltz_nat`/`_m1`; `su_len_range`/`su_maxpath_lt` are `Z`
+   `sysfile_bltz_nat`/`_m1`; `su_len_range`/`su_maxpath_lt` are `Z`
    bookkeeping the `Nat` statements do not need; the compare / `--` chains
    are one `bcond` reading or one `bv_decide` each).
 2. THE PANIC GUARD (`blez a5` = `bge x0,a5`): Rocq's `su_sext16_sint`,
@@ -71,6 +71,7 @@ uses (never Rocq's comments):
 Nothing beyond deviation 1's `Z`-only bookkeeping (uses checked: read only
 by the W1..W5 walks' `Z` side conditions).
 -/
+import Xv6.SysfileCalls
 import Xv6.FsWords
 import Xv6.InodeLock
 import Xv6.DirView
@@ -165,19 +166,6 @@ theorem sys_unlink_offcell (x : BitVec 64) :
 
 /-! ## The sign cluster: the `bltz` at +0x16 (argstr's return) -/
 
-theorem sys_unlink_bltz_nat (n : Nat) (h : n < 2 ^ 31) :
-    bcond bop.BLT (BitVec.ofNat 64 n) 0#64 = false := by
-  show (BitVec.ofNat 64 n).slt 0#64 = false
-  apply Bool.eq_false_iff.2
-  intro hlt
-  rw [BitVec.slt_iff_toInt_lt, BitVec.toInt_eq_toNat_of_lt (by rw [BitVec.toNat_ofNat]; omega)] at hlt
-  simp only [BitVec.toNat_ofNat, BitVec.toInt_zero] at hlt
-  omega
-
-theorem sys_unlink_bltz_m1 : bcond bop.BLT 0xFFFFFFFFFFFFFFFF#64 0#64 = true := by decide
-
-theorem sys_unlink_arg0_lt : 0 < NARG := by decide
-
 /-! ## THE PANIC GUARD: `blez a5` at +0x7c, i.e. `bge x0,a5`
 
 The FALL-THROUGH arm is what the whole T_DIR story rests on: it is the only
@@ -206,13 +194,6 @@ theorem sys_unlink_signed_pos_nz (h : BitVec 16) (hp : 0 < h.toInt) : h.toNat �
   simp at hp
 
 /-! ## The sixteen-bit compare cluster: the two T_DIR tests (+0x86, +0xb4) -/
-
-/-- Rocq's `su_tdir_eq` / `su_tdir_ne`. -/
-theorem sys_unlink_beq_tdir (t : BitVec 16) :
-    bcond bop.BEQ (BitVec.signExtend 64 t) 1#64 = decide (t = 1#16) := by
-  simp only [bcond]; by_cases h : t = 1#16
-  · subst h; decide
-  · simp only [h, decide_false]; rw [beq_eq_false_iff_ne]; intro he; apply h; bv_decide
 
 /-- Rocq's `su_tdir_z`. -/
 theorem sys_unlink_tdir_z (t : BitVec 16) (ht : t.toNat = T_DIR_z) : t = 1#16 :=
@@ -300,27 +281,7 @@ theorem sys_unlink_nlink_decr (h : BitVec 16) (hnz : h.toNat ≠ 0) :
 
 /-! ## The record either flush writes (Rocq's `su_setnl` family) -/
 
-def sysUnlinkSetnl (dn : Dinode) (nl : BitVec 16) : Dinode := { dn with diNlink := nl }
-
-theorem sys_unlink_setnl_type (dn : Dinode) (nl : BitVec 16) :
-    (sysUnlinkSetnl dn nl).diType = dn.diType := rfl
 theorem sys_unlink_setnl_nlink (dn : Dinode) (nl : BitVec 16) :
-    (sysUnlinkSetnl dn nl).diNlink = nl := rfl
-theorem sys_unlink_setnl_size (dn : Dinode) (nl : BitVec 16) :
-    (sysUnlinkSetnl dn nl).diSize = dn.diSize := rfl
-theorem sys_unlink_setnl_addrs (dn : Dinode) (nl : BitVec 16) :
-    (sysUnlinkSetnl dn nl).diAddrs = dn.diAddrs := rfl
-
-theorem sys_unlink_setnl_inodeOk (cov : Std.ExtTreeSet Nat compare) (ls : Nat) (dn : Dinode)
-    (bm : Blkmap) (data : Nat → List (BitVec 8)) (nl : BitVec 16)
-    (h : inodeOk cov ls dn bm data) : inodeOk cov ls (sysUnlinkSetnl dn nl) bm data := h
-
-theorem sys_unlink_setnl_dirOk (nib : Nat) (dn : Dinode) (data : Nat → List (BitVec 8))
-    (nl : BitVec 16) (h : dirOk nib dn data) : dirOk nib (sysUnlinkSetnl dn nl) data := h
-
-/-- Rocq's `su_setnl_type_stable`. -/
-theorem sys_unlink_setnl_type_stable (dn : Dinode) (nl : BitVec 16) :
-    diTypeStable (sysUnlinkSetnl dn nl) dn :=
-  diTypeStable_eq _ _ rfl
+    (sysfileSetnl dn nl).diNlink = nl := rfl
 
 end Xv6

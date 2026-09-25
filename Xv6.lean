@@ -232,6 +232,7 @@ import Xv6.SpecGrowproc
 import Xv6.UMemLemmas
 import Xv6.UMemWindow
 import Xv6.UMemLazy
+import Xv6.SysfileCalls
 import Xv6.ProofUvmcreate
 import Xv6.LinkUvmcreate
 import Xv6.UPtWalkaddrLemmas

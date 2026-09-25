@@ -38,10 +38,8 @@ slots 9..10 `name[DIRSIZ]` (`s0-80`, fourteen bytes and two spare), slots
    cells' contents: a slot not yet saved holds a junk word.
 2. The two dead slots and slot 27's dead lower word are one opaque
    `sysUnlinkJunk`, never opened after the carve.
-3. The stack/bytes carve helpers `sys_unlink_stack_bytes` /
-   `sys_unlink_bytes_stack` restate `SysLinkFrame`'s (in flight, not
-   importable) and `KstackMap.byteBuf_stackOwn` (whose import cone is the
-   kernel map's).  Candidates for a hoist into MachCSL.
+3. The stack/bytes carve is the shared `SysfileCalls.sysfile_stack_bytes`
+   and the landed `KstackMap.byteBuf_stackOwn`.
 4. PROCESS LAYER (flagged, SpecSysUnlink deviation 4): the block is
    `procPrivFd`; the walk borrows ONE row out of it after nameiparent, the
    pid cell (`sysUnlinkHole`, Rocq's `proc_priv_split_cwd` +
@@ -145,98 +143,6 @@ theorem suAny_intro [CurCtx] (a : BitVec 64) (bs : List (BitVec 8)) (n : Nat) (h
   iexists bs
   iframe H
   ipureintro; exact h
-
-/-- `n + 1` slots below `a + 8 (n + 1)` are `8 (n + 1)` bytes at `a`, and `a`
-is 8-aligned. -/
-theorem sys_unlink_stack_bytes [CurCtx] (a : BitVec 64) (n : Nat) :
-    stackOwn (GF := GF) (a + BitVec.ofNat 64 (8 * (n + 1))) (n + 1) ⊢
-      ∃ bs : List (BitVec 8), ⌜bs.length = 8 * (n + 1) ∧ a.toNat % 8 = 0⌝ ∗
-        byteBuf a (DFrac.own 1) bs := by
-  induction n generalizing a with
-  | zero =>
-    unfold stackOwn
-    simp only [Nat.zero_add, List.range_one]
-    iintro H
-    icases BigSepL.bigSepL_singleton.1 $$ H with ⟨%w, H⟩
-    have ha' : a + BitVec.ofNat 64 (8 * 1) - 8#64 * BitVec.ofNat 64 (0 + 1) = a := by bv_omega
-    rw [ha']
-    ihave %hal := wordPointsTo_align _ 8 _ _ $$ H
-    ihave B := wordPointsTo_to_bytes _ (DFrac.own 1) w hal $$ H
-    iexists wordToBytes w
-    isplitr
-    · ipureintro; exact ⟨rfl, hal⟩
-    · iexact B
-  | succ n ih =>
-    have e1 : a + BitVec.ofNat 64 (8 * (n + 1 + 1)) - 8#64 * BitVec.ofNat 64 (n + 1) = a + 8#64 := by
-      bv_omega
-    have e0 : a + BitVec.ofNat 64 (8 * (n + 1 + 1)) = (a + 8#64) + BitVec.ofNat 64 (8 * (n + 1)) := by
-      bv_omega
-    iintro H
-    icases stackOwn_split (a + BitVec.ofNat 64 (8 * (n + 1 + 1))) (n + 1) 1 $$ H with ⟨Ht, Hb⟩
-    rw [e1, e0]
-    icases ih (a + 8#64) $$ Ht with ⟨%bs, ⟨%hl, %hal⟩, B⟩
-    unfold stackOwn
-    simp only [List.range_one]
-    icases BigSepL.bigSepL_singleton.1 $$ Hb with ⟨%w, Hb⟩
-    have e2 : a + 8#64 - 8#64 * BitVec.ofNat 64 (0 + 1) = a := by bv_omega
-    rw [e2]
-    ihave %hal2 := wordPointsTo_align _ 8 _ _ $$ Hb
-    ihave Bb := wordPointsTo_to_bytes _ (DFrac.own 1) w hal2 $$ Hb
-    iexists wordToBytes w ++ bs
-    isplitr
-    · ipureintro
-      refine ⟨?_, hal2⟩
-      rw [List.length_append, hl, wordToBytes_length]
-      omega
-    · iapply (byteBuf_append (GF := GF) a (DFrac.own 1) (wordToBytes w) bs).2
-      rw [wordToBytes_length]
-      iframe
-
-/-- ...and back: `8 n` bytes at an 8-aligned `a` are the `n` slots below
-`a + 8 n`. -/
-theorem sys_unlink_bytes_stack [CurCtx] (a : BitVec 64) (hal : a.toNat % 8 = 0) :
-    ∀ (n : Nat) (bs : List (BitVec 8)), bs.length = 8 * n →
-    byteBuf (GF := GF) a (DFrac.own 1) bs ⊢ stackOwn (a + BitVec.ofNat 64 (8 * n)) n := by
-  intro n
-  induction n generalizing a with
-  | zero =>
-    intro bs hl
-    iintro _
-    unfold stackOwn
-    simp only [List.range_zero]
-    exact BigSepL.bigSepL_nil_intro
-  | succ n ih =>
-    intro bs hl
-    have hsplit : bs = bs.take 8 ++ bs.drop 8 := (List.take_append_drop 8 bs).symm
-    have hl8 : (bs.take 8).length = 8 := by rw [List.length_take]; omega
-    have hld : (bs.drop 8).length = 8 * n := by rw [List.length_drop]; omega
-    rw [hsplit]
-    iintro H
-    icases (byteBuf_append (GF := GF) a (DFrac.own 1) (bs.take 8) (bs.drop 8)).1 $$ H with ⟨H1, H2⟩
-    rw [hl8]
-    have hal' : (a + 8#64).toNat % 8 = 0 := by
-      simp only [BitVec.toNat_add, BitVec.toNat_ofNat, Nat.reducePow]
-      omega
-    ihave H2 := ih (a + 8#64) hal' (bs.drop 8) hld $$ H2
-    ihave H1 := wordPointsTo_of_bytes (GF := GF) a (DFrac.own 1) (bs.take 8) hl8 hal $$ H1
-    have hsp : a + BitVec.ofNat 64 (8 * (n + 1)) = a + 8#64 + BitVec.ofNat 64 (8 * n) := by
-      apply BitVec.eq_of_toNat_eq
-      simp only [BitVec.toNat_add, BitVec.toNat_ofNat, Nat.reducePow]
-      omega
-    rw [hsp]
-    iapply stackOwn_join (a + 8#64 + BitVec.ofNat 64 (8 * n)) n 1
-    iframe H2
-    unfold stackOwn
-    simp only [List.range_one]
-    iapply BigSepL.bigSepL_singleton.2
-    iexists (bytesToWord (bs.take 8))
-    have haddr : a + 8#64 + BitVec.ofNat 64 (8 * n) - 8#64 * BitVec.ofNat 64 n -
-        8#64 * BitVec.ofNat 64 (0 + 1) = a := by
-      apply BitVec.eq_of_toNat_eq
-      simp only [BitVec.toNat_add, BitVec.toNat_sub, BitVec.toNat_mul, BitVec.toNat_ofNat, Nat.reducePow]
-      omega
-    rw [haddr]
-    iexact H1
 
 /-! ## The frame -/
 
@@ -385,11 +291,11 @@ theorem sys_unlink_carve [CurCtx] (sp0 : BitVec 64) :
       ⌜(sysUnlinkDel sp0).toNat % 8 = 0⌝ ∗ sysUnlinkBufs sp0 := by
   refine (sys_unlink_low_split sp0).1.trans ?_
   iintro ⟨H6, Hde, Hnm, Hp, H27, Hdl, H30⟩
-  icases sys_unlink_stack_bytes (sysUnlinkDe sp0) 1 $$ Hde with ⟨%bde, ⟨%hde, -⟩, Bde⟩
-  icases sys_unlink_stack_bytes (sysUnlinkName sp0) 1 $$ Hnm with ⟨%bnm, ⟨%hnm, -⟩, Bnm⟩
-  icases sys_unlink_stack_bytes (sysUnlinkPath sp0) 15 $$ Hp with ⟨%bp, ⟨%hp, -⟩, Bp⟩
-  icases sys_unlink_stack_bytes (sysUnlinkLo27 sp0) 0 $$ H27 with ⟨%b27, ⟨%h27, %hal27⟩, B27⟩
-  icases sys_unlink_stack_bytes (sysUnlinkDel sp0) 1 $$ Hdl with ⟨%bdl, ⟨%hdl, %hal⟩, Bdl⟩
+  icases sysfile_stack_bytes (sysUnlinkDe sp0) 1 $$ Hde with ⟨%bde, ⟨%hde, -⟩, Bde⟩
+  icases sysfile_stack_bytes (sysUnlinkName sp0) 1 $$ Hnm with ⟨%bnm, ⟨%hnm, -⟩, Bnm⟩
+  icases sysfile_stack_bytes (sysUnlinkPath sp0) 15 $$ Hp with ⟨%bp, ⟨%hp, -⟩, Bp⟩
+  icases sysfile_stack_bytes (sysUnlinkLo27 sp0) 0 $$ H27 with ⟨%b27, ⟨%h27, %hal27⟩, B27⟩
+  icases sysfile_stack_bytes (sysUnlinkDel sp0) 1 $$ Hdl with ⟨%bdl, ⟨%hdl, %hal⟩, Bdl⟩
   icases sys_unlink_slot27_open sp0 b27 (by omega) hal27 $$ B27 with ⟨Hlo, Hoff⟩
   isplitr
   · ipureintro; exact hal
@@ -442,11 +348,11 @@ theorem sys_unlink_fold [CurCtx] (sp0 : BitVec 64) (hal : (sysUnlinkDel sp0).toN
   icases Hnm with ⟨%bnm, %hbnm, Bnm⟩
   icases Hp with ⟨%bp, %hbp, Bp⟩
   icases Hdl with ⟨%bdl, %hbdl, Bdl⟩
-  ihave Hde := sys_unlink_bytes_stack (sysUnlinkDe sp0) hde (1 + 1) bde (by omega) $$ Bde
-  ihave Hnm := sys_unlink_bytes_stack (sysUnlinkName sp0) hnm (1 + 1) bnm (by omega) $$ Bnm
-  ihave Hp := sys_unlink_bytes_stack (sysUnlinkPath sp0) hp (15 + 1) bp (by omega) $$ Bp
-  ihave H27 := sys_unlink_bytes_stack (sysUnlinkLo27 sp0) h27 (0 + 1) b27 (by omega) $$ B27
-  ihave Hdl := sys_unlink_bytes_stack (sysUnlinkDel sp0) hal (1 + 1) bdl (by omega) $$ Bdl
+  ihave Hde := byteBuf_stackOwn (sysUnlinkDe sp0) hde (1 + 1) bde (by omega) $$ Bde
+  ihave Hnm := byteBuf_stackOwn (sysUnlinkName sp0) hnm (1 + 1) bnm (by omega) $$ Bnm
+  ihave Hp := byteBuf_stackOwn (sysUnlinkPath sp0) hp (15 + 1) bp (by omega) $$ Bp
+  ihave H27 := byteBuf_stackOwn (sysUnlinkLo27 sp0) h27 (0 + 1) b27 (by omega) $$ B27
+  ihave Hdl := byteBuf_stackOwn (sysUnlinkDel sp0) hal (1 + 1) bdl (by omega) $$ Bdl
   iframe
 
 set_option maxHeartbeats 4000000 in
@@ -610,12 +516,6 @@ theorem sysUnlinkPins_entry (k : KCtx) :
 
 /-! ## The ambient context, pinned at the kernel tier -/
 
-theorem sys_unlink_ctx (X : CurCtx) (h : X.curTier = KTier.kpt) : X = ⟨X.curCtx, KTier.kpt⟩ := by
-  cases X; simp only at h; subst h; rfl
-
-theorem sys_unlink_cur_kpt [inst : CurCtx] (hct : curTier = KTier.kpt) :
-    (⟨curCtx, KTier.kpt⟩ : CurCtx) = inst := (sys_unlink_ctx inst hct).symm
-
 /-- The contract's hart-free pin: a `true` crossing at a process pins
 nothing. -/
 theorem sys_unlink_pin {j : Nat} (hj : j < NPROC) (k : KCtx) (hproc : k.proc = procAddr j)
@@ -644,13 +544,6 @@ variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [Fdslot
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
   [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
   [Appcfg GF] [FileG GF] [Fscfg] [Icfg] [CurCtx]
-
-/-- sys_unlink's persistent environment. -/
-def sysUnlinkEnv (Γ : SchedNames) : IProp GF := iprop(procsInv Γ ∗ panicEnv ∗ fsReady (hlc := hlc))
-
-instance sysUnlinkEnv_persistent (Γ : SchedNames) :
-    Persistent (sysUnlinkEnv (hlc := hlc) (GF := GF) Γ) := by
-  unfold sysUnlinkEnv; infer_instance
 
 /-- The contract's post, at the record (hart-free: a `true` crossing at a
 process pins nothing). -/
@@ -711,7 +604,7 @@ theorem sys_unlink_bare_pid (hct : curTier = KTier.kpt) (pa : BitVec 64) (pid : 
       wordPointsTo (pPid pa) 4 pidPriv pid ∗
       (wordPointsTo (pPid pa) 4 pidPriv pid -∗ procPrivBareAt curCtx pa pid V M) := by
   unfold procPrivBareAt
-  rw [sys_unlink_cur_kpt hct]
+  rw [sysfile_cur_kpt hct]
   iintro ⟨%h, Hpid, Hflds, Hpt, Htfp, %hlz⟩
   iframe Hpid
   iintro Hpid

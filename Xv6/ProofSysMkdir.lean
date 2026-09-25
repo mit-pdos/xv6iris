@@ -110,9 +110,9 @@ theorem sys_mkdir_created (IUP : IUNLOCKPUT) (EO : END_OP) (Γ : SchedNames)
     (hf : ok = true → iputUnits ≤ u') :
     kctx cpu (((k.withSpie spie spp).pushed 18).withRegs R) ∗ pcIs cpu (KA.«sys_mkdir» + 0x2c#64) ∗
     sysMkdirCells (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) ∗
-    byteBuf (sysMkdirBuf (k.regs 2#5)) (DFrac.own 1) (bview (pl.length + 1) (sysMkdirPfun pl)) ∗
-    byteBuf (sysMkdirRestAddr (sysMkdirBuf (k.regs 2#5)) pl.length) (DFrac.own 1) rest ∗
-    trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie (procAddr A.j) ∗ sysMkdirEnv (hlc := hlc) Γ ∗
+    byteBuf (sysMkdirBuf (k.regs 2#5)) (DFrac.own 1) (bview (pl.length + 1) (sysfilePfun pl)) ∗
+    byteBuf (sysfileRestAddr (sysMkdirBuf (k.regs 2#5)) pl.length) (DFrac.own 1) rest ∗
+    trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie (procAddr A.j) ∗ sysfileEnv (hlc := hlc) Γ ∗
     procPrivFd A.γ (procAddr A.j) A.pid (sysMkdirV1 A P2) (sysMkdirM1 A P2) ∗
     (∀ c : CPU, sysMkdirPostA k A c) ∗ bslots 3 ∗ irefSlots ns' ∗ logOpS icfgLog u' Sb' ∗
     (if ok then
@@ -120,15 +120,15 @@ theorem sys_mkdir_created (IUP : IUNLOCKPUT) (EO : END_OP) (Γ : SchedNames)
           creOkPure T_DIR (0#16) (0#16) made dn⌝ ∗
         createLocked A.pid kk qi s g inum dn bm ∗
         creOkArms (hlc := hlc) (fsGammaL fscFs) T_DIR.toNat 0 0 A.P A.Farm A.Fdots A.Fun A.Fok A.Fex
-          (bview pl.length (sysMkdirPfun pl)) made inum.toNat)
+          (bview pl.length (sysfilePfun pl)) made inum.toNat)
      else
       iprop(⌜R 10#5 = 0#64⌝ ∗ logTx icfgLog ∗
         creFailArms (hlc := hlc) (fsGammaL fscFs) fscFs T_DIR.toNat 0 0 A.P A.Pmiss
-          A.Farm A.Fdots A.Fun A.Fok A.Fex (bview pl.length (sysMkdirPfun pl))))
+          A.Farm A.Fdots A.Fun A.Fok A.Fex (bview pl.length (sysfilePfun pl))))
     ⊢ wpLoop (GF := GF) cpu := by
   iintro ⟨Hk, Hpc, Hcells, Hp, Hrest, Hte, Hce, #Henv, Hblk, HΦ, Hbs, Hir, Hop, Harm⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
-  ihave Hbuf := sys_mkdir_buf_join _ pl rest hlen $$ [$Hp $Hrest]
+  ihave Hbuf := sysfile_buf_join _ pl rest hlen $$ [$Hp $Hrest]
   cases ok
   · -- ===== create REFUSED: the "-1" tail =====
     ihave Harm := sys_mkdir_ite_f _ _ $$ Harm
@@ -136,14 +136,14 @@ theorem sys_mkdir_created (IUP : IUNLOCKPUT) (EO : END_OP) (Γ : SchedNames)
     simp only [Bool.false_eq_true, if_false] at hns'
     -- +0x2c  c.beqz a0,+0x14 : taken
     k_step_e (wp_s_branch cpu _ (KA.«sys_mkdir» + 0x2c#64) true 20#13 10#5 0#5 (by decide) bop.BEQ)
-      from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h10, sys_mkdir_beq00]
+      from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h10, sysfile_beq00]
     iintro Hk Hpc
     ihave Hop := logOpS_op icfgLog u' Sb' $$ Hop Htx
     rw [hns']
     ihave Hfail : sysMkdirFail (hlc := hlc) A $$ [Hfail]
     · unfold sysMkdirFail
       iright
-      iexists bview pl.length (sysMkdirPfun pl)
+      iexists bview pl.length (sysfilePfun pl)
       iexact Hfail
     iapply (sys_mkdir_tail_40 EO Γ cpu k A P2 spie spp R u' hj hproc hK hnoff htier hct hpins hal hP2)
       $$ [$Hk $Hpc $Hcells $Hbuf $Hte $Hce $Henv $Hblk $HΦ $Hbs $Hir $Hop $Hfail]
@@ -158,10 +158,10 @@ theorem sys_mkdir_created (IUP : IUNLOCKPUT) (EO : END_OP) (Γ : SchedNames)
     have hd : decide (ientry kk = 0#64) = false := by simp [hnz]
     -- +0x2c  c.beqz a0 : falls through
     k_step_e (wp_s_branch cpu _ (KA.«sys_mkdir» + 0x2c#64) true 20#13 10#5 0#5 (by decide) bop.BEQ)
-      from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h10, sys_mkdir_beqz, hd]
+      from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h10, sysfile_beqz, hd]
     iintro Hk Hpc
     iapply (sys_mkdir_tail_ok IUP EO Γ cpu k A P2 spie spp R kk qi s g inum dn bm u' Sb' ns'
-        (bview pl.length (sysMkdirPfun pl)) inum.toNat hj hproc hK hnoff htier hct hpins h10 hal hP2
+        (bview pl.length (sysfilePfun pl)) inum.toNat hj hproc hK hnoff htier hct hpins h10 hal hP2
         hkk hnib (hf rfl) hns')
       $$ [$Hk $Hpc $Hcells $Hbuf $Hte $Hce $Henv $Hblk $HΦ $Hbs $Hir $Hop $Hlk $Harms]
 
@@ -186,7 +186,7 @@ theorem sys_mkdir_fetched (CR : CREATE) (IUP : IUNLOCKPUT) (EO : END_OP) (Γ : S
     kctx cpu (((k.withSpie spie spp).pushed 18).withRegs R) ∗ pcIs cpu (KA.«sys_mkdir» + 0x1a#64) ∗
     sysMkdirCells (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) ∗
     byteBuf (sysMkdirBuf (k.regs 2#5)) (DFrac.own 1) bs ∗
-    trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie (procAddr A.j) ∗ sysMkdirEnv (hlc := hlc) Γ ∗
+    trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie (procAddr A.j) ∗ sysfileEnv (hlc := hlc) Γ ∗
     procPrivFd A.γ (procAddr A.j) A.pid (sysMkdirV1 A P2) (sysMkdirM1 A P2) ∗
     (∀ c : CPU, sysMkdirPostA k A c) ∗ bslots 3 ∗ irefSlots A.ns ∗ logOp icfgLog MAXOPBLOCKS ∗
     mkdirAuPre (hlc := hlc) (fsGammaL fscFs) fscFs A.V.cwi A.P A.Pmiss A.Farm A.Fdots A.Fun A.Fok A.Fex
@@ -196,7 +196,7 @@ theorem sys_mkdir_fetched (CR : CREATE) (IUP : IUNLOCKPUT) (EO : END_OP) (Γ : S
   obtain ⟨-, -, -, hKcr, -⟩ := sys_mkdir_K _ hK
   rcases hret with ⟨pl, hs, hbs, hr⟩ | ⟨hr, hbl⟩
   · -- ===== the string fetched =====
-    obtain ⟨pl', hpl', hnul, hlt⟩ := sys_mkdir_umemStr _ _ _ _ hs
+    obtain ⟨pl', hpl', hnul, hlt⟩ := UMemL.umemStr_nul _ _ _ _ hs
     have hpl : pl' = pl := (List.append_cancel_right hpl'.symm)
     subst hpl
     subst hbs
@@ -204,7 +204,7 @@ theorem sys_mkdir_fetched (CR : CREATE) (IUP : IUNLOCKPUT) (EO : END_OP) (Γ : S
     -- +0x1a  bltz a0 : falls through
     k_step_e (wp_s_branch cpu _ (KA.«sys_mkdir» + 0x1a#64) false 38#13 10#5 0#5 (by decide) bop.BLT)
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
-      with [hr, sys_mkdir_bltz_nat pl'.length (by omega)]
+      with [hr, sysfile_bltz_nat pl'.length (by omega)]
     iintro Hk Hpc
     -- +0x1e  li a3,0
     k_step_e (wp_s_addi cpu _ (KA.«sys_mkdir» + 0x1e#64) true 0#12 13#5 0#5 (by decide))
@@ -226,25 +226,25 @@ theorem sys_mkdir_fetched (CR : CREATE) (IUP : IUNLOCKPUT) (EO : END_OP) (Γ : S
     k_step_e (wp_s_jal cpu _ (KA.«sys_mkdir» + 0x28#64) false 2095392#21 1#5 (by decide))
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [sys_mkdir_br_create]
     iintro Hk Hpc
-    icases sys_mkdir_buf_split _ pl' _ $$ Hbuf with ⟨Hp, Hrest⟩
+    icases sysfile_buf_split _ pl' _ $$ Hbuf with ⟨Hp, Hrest⟩
     unfold mkdirAuPre
     icases Hau with ⟨Hwp, Hdlc, Hcre⟩
     -- THE ONE-SHOT, HANDED DOWN UNFIRED: the walk picks the start
     ihave Hst := npStart_of_mknod (hlc := hlc) fscFs A.V.cwi A.P A.Pmiss
-      (bview pl'.length (sysMkdirPfun pl')) $$ Hwp
+      (bview pl'.length (sysfilePfun pl')) $$ Hwp
     icases logOp_openS icfgLog MAXOPBLOCKS $$ Hop with ⟨%Sb, HopS, Htx⟩
     ihave Hp := (show byteBuf (GF := GF) (sysMkdirBuf (k.regs 2#5)) (DFrac.own 1)
-        (bview (pl'.length + 1) (sysMkdirPfun pl')) ⊢
+        (bview (pl'.length + 1) (sysfilePfun pl')) ⊢
       byteBuf (k.regs 2#5 + 0xFFFFFFFFFFFFFF70#64) (DFrac.own 1)
-        (bview (pl'.length + 1) (sysMkdirPfun pl')) from .rfl) $$ Hp
+        (bview (pl'.length + 1) (sysfilePfun pl')) from .rfl) $$ Hp
     ihave Hcre := (show creCommits (hlc := hlc) (GF := GF) (fsGammaL fscFs) T_DIR.toNat 0 0
         A.Farm A.Fdots A.Fun A.Fok ⊢
       creCommits (hlc := hlc) (fsGammaL fscFs) T_DIR.toNat (0#16 : BitVec 16).toNat
         (0#16 : BitVec 16).toNat A.Farm A.Fdots A.Fun A.Fok from .rfl) $$ Hcre
     iapply (sys_mkdir_create CR Γ cpu _ k.sie (by k_norm_g) (procAddr A.j)
-        (by k_norm_g; exact hproc) A.j pl'.length (sysMkdirPfun pl') T_DIR (0#16) (0#16) A.γ A.pid
+        (by k_norm_g; exact hproc) A.j pl'.length (sysfilePfun pl') T_DIR (0#16) (0#16) A.γ A.pid
         (sysMkdirV1 A P2) (sysMkdirM1 A P2) MAXOPBLOCKS Sb A.ns A.P A.Pmiss A.Farm A.Fdots A.Fun
-        A.Fok A.Fex hj ?cp ?cK ?cn ?ct (sys_mkdir_pfun_nn pl' hnul) (sys_mkdir_pfun_term pl')
+        A.Fok A.Fex hj ?cp ?cK ?cn ?ct (sysfile_pfun_nn pl' hnul) (sysfile_pfun_term pl')
         (by omega) sys_mkdir_tdir_nz T_DIR_tyOk (le_refl _) hns ?c1 ?c2 ?c3)
       $$ [- $Hk $Hpc $Hte $Hce $Henv $Hblk $Hbs $Hir $HopS $Htx $Hst $Hdlc $Hcre]
     rotate_right 1
@@ -260,11 +260,11 @@ theorem sys_mkdir_fetched (CR : CREATE) (IUP : IUNLOCKPUT) (EO : END_OP) (Γ : S
     unfold sysMkdirCreateK
     iintro %cpu %spie1 %spp1 %R1 %ok %made %kk %qi %s %g %inum %dn %bm %u' %Sb' %ns' %hcs1 Hk Hpc
       Hte Hce Hblk Hp Hbs %hns' Hir %⟨-, -, hf⟩ Hop Harm
-    k_norm_g [sys_mkdir_ret_2c, sys_mkdir_ww, sys_mkdir_psw]
+    k_norm_g [sys_mkdir_ret_2c, sysfile_ww, sysfile_psw]
     ihave Hp := (show byteBuf (GF := GF) (k.regs 2#5 + 0xFFFFFFFFFFFFFF70#64) (DFrac.own 1)
-        (bview (pl'.length + 1) (sysMkdirPfun pl')) ⊢
+        (bview (pl'.length + 1) (sysfilePfun pl')) ⊢
       byteBuf (sysMkdirBuf (k.regs 2#5)) (DFrac.own 1)
-        (bview (pl'.length + 1) (sysMkdirPfun pl')) from .rfl) $$ Hp
+        (bview (pl'.length + 1) (sysfilePfun pl')) from .rfl) $$ Hp
     have hp1 : sysMkdirPins k R1 := by
       refine sysMkdirPins_cs k _ R1 ?_ hcs1
       repeat (refine sysMkdirPins_set _ _ _ _ ?_ (by decide))
@@ -279,10 +279,10 @@ theorem sys_mkdir_fetched (CR : CREATE) (IUP : IUNLOCKPUT) (EO : END_OP) (Γ : S
     · iexact Harm
   · -- ===== the string did not fetch: the "-1" tail =====
     k_step_e (wp_s_branch cpu _ (KA.«sys_mkdir» + 0x1a#64) false 38#13 10#5 0#5 (by decide) bop.BLT)
-      from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hr, sys_mkdir_bltz_m1]
+      from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hr, sysfile_bltz_m1]
     iintro Hk Hpc
-    ihave Hbuf : sysMkdirAny (sysMkdirBuf (k.regs 2#5)) 128 $$ [Hbuf]
-    · unfold sysMkdirAny; iexists bs; iframe; ipureintro; omega
+    ihave Hbuf : sysfileAny (sysMkdirBuf (k.regs 2#5)) 128 $$ [Hbuf]
+    · unfold sysfileAny; iexists bs; iframe; ipureintro; omega
     ihave Hfail : sysMkdirFail (hlc := hlc) A $$ [Hau]
     · unfold sysMkdirFail; ileft; iexact Hau
     iapply (sys_mkdir_tail_40 EO Γ cpu k A P2 spie spp R MAXOPBLOCKS hj hproc hK hnoff htier hct
@@ -306,8 +306,8 @@ theorem sys_mkdir_args (AS : ARGSTR) (CR : CREATE) (IUP : IUNLOCKPUT) (EO : END_
     (hal : (sysMkdirBuf (k.regs 2#5)).toNat % 8 = 0) :
     kctx cpu (((k.withSpie spie spp).pushed 18).withRegs R) ∗ pcIs cpu (KA.«sys_mkdir» + 0xc#64) ∗
     sysMkdirCells (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) ∗
-    sysMkdirAny (sysMkdirBuf (k.regs 2#5)) 128 ∗
-    trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie (procAddr A.j) ∗ sysMkdirEnv (hlc := hlc) Γ ∗
+    sysfileAny (sysMkdirBuf (k.regs 2#5)) 128 ∗
+    trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie (procAddr A.j) ∗ sysfileEnv (hlc := hlc) Γ ∗
     procPrivFd A.γ (procAddr A.j) A.pid A.V A.M ∗
     (∀ c : CPU, sysMkdirPostA k A c) ∗ bslots 3 ∗ irefSlots A.ns ∗ logOp icfgLog MAXOPBLOCKS ∗
     mkdirAuPre (hlc := hlc) (fsGammaL fscFs) fscFs A.V.cwi A.P A.Pmiss A.Farm A.Fdots A.Fun A.Fok A.Fex
@@ -315,7 +315,7 @@ theorem sys_mkdir_args (AS : ARGSTR) (CR : CREATE) (IUP : IUNLOCKPUT) (EO : END_
   iintro ⟨Hk, Hpc, Hcells, Hbuf, Hte, Hce, #Henv, Hblk, HΦ, Hbs, Hir, Hop, Hau⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
   obtain ⟨hKas, -⟩ := sys_mkdir_K _ hK
-  unfold sysMkdirAny
+  unfold sysfileAny
   icases Hbuf with ⟨%old, %hold, Hbuf⟩
   -- +0x0c  li a2,128
   k_step_e (wp_s_addi cpu _ (KA.«sys_mkdir» + 0xc#64) false 128#12 12#5 0#5 (by decide))
@@ -336,7 +336,7 @@ theorem sys_mkdir_args (AS : ARGSTR) (CR : CREATE) (IUP : IUNLOCKPUT) (EO : END_
   icases sys_mkdir_blk_bare _ _ _ _ _ $$ Hblk with ⟨Hbare, Hclose⟩
   ihave Hbuf := (show byteBuf (GF := GF) (sysMkdirBuf (k.regs 2#5)) (DFrac.own 1) old ⊢
     byteBuf (k.regs 2#5 + 0xFFFFFFFFFFFFFF70#64) (DFrac.own 1) old from .rfl) $$ Hbuf
-  iapply (sys_mkdir_argstr AS Γ cpu _ k.sie (by k_norm_g) (procAddr A.j) (by k_norm_g; exact hproc)
+  iapply (sysfile_argstr AS Γ cpu _ k.sie (by k_norm_g) (procAddr A.j) (by k_norm_g; exact hproc)
       (procAddr A.j) A.pid A.V A.M 0 v old sys_mkdir_arg0 ?ga0 hv ?gpr ?gt ?gn ?gK ?gmx (by omega))
     $$ [- $Hk $Hpc $Hte $Hce $Henv $Hbare]
   rotate_right 1
@@ -349,7 +349,7 @@ theorem sys_mkdir_args (AS : ARGSTR) (CR : CREATE) (IUP : IUNLOCKPUT) (EO : END_
   case gK => k_norm_g; exact hKas
   case gmx => k_norm_g [hold]
   iintro %cpu %spie1 %spp1 %R1 %P2 %bs %⟨hcs1, hext, hret⟩ Hk Hpc Hte Hce Hbare Hbuf
-  k_norm_g [sys_mkdir_ret_1a, sys_mkdir_ww, sys_mkdir_psw]
+  k_norm_g [sys_mkdir_ret_1a, sysfile_ww, sysfile_psw]
   ihave Hbuf := (show byteBuf (GF := GF) (k.regs 2#5 + 0xFFFFFFFFFFFFFF70#64) (DFrac.own 1) bs ⊢
     byteBuf (sysMkdirBuf (k.regs 2#5)) (DFrac.own 1) bs from .rfl) $$ Hbuf
   ihave Hblk := Hclose $$ %P2 %(viewFaulted A.V.upt P2 A.M) Hbare
@@ -387,8 +387,8 @@ theorem sys_mkdir_main (AS : ARGSTR) (BO : BEGIN_OP) (CR : CREATE) (IUP : IUNLOC
   icases kctx_tier cpu _ $$ Hk with ⟨%hct0, Hk⟩
   have hct : curTier = KTier.kpt := hct0.symm.trans htier
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
-  ihave #Henv : sysMkdirEnv (hlc := hlc) Γ $$ []
-  · unfold sysMkdirEnv; iframe #
+  ihave #Henv : sysfileEnv (hlc := hlc) Γ $$ []
+  · unfold sysfileEnv; iframe #
   let A : SysMkdirArgs GF := ⟨γ, j, pid, V, M, ns, P, Pmiss, Farm, Fdots, Fun, Fok, Fex⟩
   -- THE CONTRACT'S CONTINUATION, hart-free
   ihave HΦ : (∀ c : CPU, sysMkdirPostA k A c) $$ [Hnext]
@@ -416,8 +416,8 @@ theorem sys_mkdir_main (AS : ARGSTR) (BO : BEGIN_OP) (CR : CREATE) (IUP : IUNLOC
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [sys_mkdir_br_begin_op]
   iintro Hk Hpc
   icases sys_mkdir_pid hct _ _ _ _ _ $$ Hblk with ⟨Hpid, Hback⟩
-  iapply (sys_mkdir_begin_op BO Γ cpu _ k.sie (by k_norm_g) (procAddr j) (by k_norm_g; exact hproc)
-      j pid sysMkdirPidQ hj ?bp ?bK ?bn ?bt)
+  iapply (sysfile_begin_op BO Γ cpu _ k.sie (by k_norm_g) (procAddr j) (by k_norm_g; exact hproc)
+      j pid sysfilePidQ hj ?bp ?bK ?bn ?bt)
     $$ [- $Hk $Hpc $Hte $Hce $Henv $Hpid]
   rotate_right 1
   k_norm_g [sys_mkdir_ret_0c]
@@ -426,7 +426,7 @@ theorem sys_mkdir_main (AS : ARGSTR) (BO : BEGIN_OP) (CR : CREATE) (IUP : IUNLOC
   case bn => k_norm_g; exact hnoff
   case bt => k_norm_g; exact htier
   iintro %cpu %spie2 %spp2 %R2 %hcs2 Hk Hpc Hte Hce Hpid Hop
-  k_norm_g [sys_mkdir_ret_0c, sys_mkdir_ww, sys_mkdir_psw]
+  k_norm_g [sys_mkdir_ret_0c, sysfile_ww, sysfile_psw]
   ihave Hblk := Hback $$ Hpid
   have hp2 : sysMkdirPins k R2 := by
     refine sysMkdirPins_cs k _ R2 ?_ hcs2

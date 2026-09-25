@@ -114,14 +114,14 @@ theorem sys_unlink_open_dec [Fscfg] [Icfg] (inum : Nat) (dn : Dinode) (bm : Blkm
     sysUnlinkOpenOk inum (sysUnlinkDni2 dn) bm data := by
   obtain ⟨hok, hrl, hdok, hddix, hdoc, hduq⟩ := h
   have hdec := sys_unlink_nlink_decr dn.diNlink hnz0
-  refine ⟨sys_unlink_setnl_inodeOk _ _ dn bm data _ hok, ?_, sys_unlink_setnl_dirOk _ dn data _ hdok,
-    dirDotsIx_eq inum dn _ data data (sys_unlink_setnl_type dn _) (fun _ => hnz0)
-      (le_of_eq (by rw [sys_unlink_setnl_size])) rfl hddix,
+  refine ⟨sysfile_setnl_inodeOk _ _ dn bm data _ hok, ?_, sysfile_setnl_dirOk _ dn data _ hdok,
+    dirDotsIx_eq inum dn _ data data (sysfile_setnl_type dn _) (fun _ => hnz0)
+      (le_of_eq (by rw [sysfile_setnl_size])) rfl hddix,
     dirOrphanClean_live _ data hnz,
-    dirUniq_cong dn _ data (sys_unlink_setnl_type dn _) (sys_unlink_setnl_size dn _) hduq⟩
-  exact inodeRecLocal_sameType dn _ hrl (sys_unlink_setnl_type dn _)
+    dirUniq_cong dn _ data (sysfile_setnl_type dn _) (sysfile_setnl_size dn _) hduq⟩
+  exact inodeRecLocal_sameType dn _ hrl (sysfile_setnl_type dn _)
     (by show (sysUnlinkDec16 dn.diNlink).toNat ≤ 32767; have := hrl.2.1; omega)
-    (fun hd => by rw [sys_unlink_setnl_size]; exact hrl.2.2 (by rw [← sys_unlink_setnl_type dn _]; exact hd))
+    (fun hd => by rw [sysfile_setnl_size]; exact hrl.2.2 (by rw [← sysfile_setnl_type dn _]; exact hd))
 
 /-- ...and at the child's ORPHANED record (Rocq's `HddixZ` / `HdocZ` /
 `HduqZ`). -/
@@ -130,29 +130,18 @@ theorem sys_unlink_open_orphan [Fscfg] [Icfg] (inum : Nat) (dn : Dinode) (bm : B
     (hz : (sysUnlinkDni2 dn).diNlink.toNat = 0) (hdots : dirDotsOnly dn data) :
     sysUnlinkOpenOk inum (sysUnlinkDni2 dn) bm data := by
   obtain ⟨hok, hrl, hdok, hddix, hdoc, hduq⟩ := h
-  refine ⟨sys_unlink_setnl_inodeOk _ _ dn bm data _ hok, ?_, sys_unlink_setnl_dirOk _ dn data _ hdok,
+  refine ⟨sysfile_setnl_inodeOk _ _ dn bm data _ hok, ?_, sysfile_setnl_dirOk _ dn data _ hdok,
     fun _ hc => absurd hz hc,
-    dirOrphanClean_of_only _ data (dirDotsOnly_of dn _ data (by rw [sys_unlink_setnl_size]) hdots),
-    dirUniq_cong dn _ data (sys_unlink_setnl_type dn _) (sys_unlink_setnl_size dn _) hduq⟩
-  exact inodeRecLocal_sameType dn _ hrl (sys_unlink_setnl_type dn _) (by omega)
-    (fun hd => by rw [sys_unlink_setnl_size]; exact hrl.2.2 (by rw [← sys_unlink_setnl_type dn _]; exact hd))
+    dirOrphanClean_of_only _ data (dirDotsOnly_of dn _ data (by rw [sysfile_setnl_size]) hdots),
+    dirUniq_cong dn _ data (sysfile_setnl_type dn _) (sysfile_setnl_size dn _) hduq⟩
+  exact inodeRecLocal_sameType dn _ hrl (sysfile_setnl_type dn _) (by omega)
+    (fun hd => by rw [sysfile_setnl_size]; exact hrl.2.2 (by rw [← sysfile_setnl_type dn _]; exact hd))
 
 section
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
   [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
   [Appcfg GF] [FileG GF] [Fscfg] [Icfg] [CurCtx]
-
-/-- The type cell out of an `inodeMeta`, borrowed. -/
-theorem sys_unlink_meta_type (ip : BitVec 64) (dn : Dinode) :
-    inodeMeta (GF := GF) ip dn ⊢
-      wordPointsTo (iType ip) 2 (DFrac.own 1) dn.diType ∗
-      (wordPointsTo (iType ip) 2 (DFrac.own 1) dn.diType -∗ inodeMeta ip dn) := by
-  unfold inodeMeta
-  iintro ⟨Ht, Hma, Hmi, Hnl, Hsz⟩
-  iframe Ht
-  iintro Ht
-  iframe
 
 set_option maxHeartbeats 32000000 in
 /-- **THE DIR ARM'S LINK-RA LEDGER** (Rocq W5D 987–1210, 1390–1430,
@@ -267,8 +256,8 @@ theorem sys_unlink_w5d_ghost (dinum : BitVec 32) (dnd dnW : Dinode) (bmd bmW : B
   have hWd : dnW.diNlink.toNat = dnd.diNlink.toNat := by rw [hZ.nl]
   have hnlF2 : (sysUnlinkDni2 dnW).diNlink.toNat ≠ 0 := by
     show (sysUnlinkDec16 dnW.diNlink).toNat ≠ 0; omega
-  have htyF2 : (sysUnlinkDni2 dnW).diType = dnd.diType := (sys_unlink_setnl_type dnW _).trans hZ.ty
-  have hszF2 : (sysUnlinkDni2 dnW).diSize = dnd.diSize := (sys_unlink_setnl_size dnW _).trans hZ.sz
+  have htyF2 : (sysUnlinkDni2 dnW).diType = dnd.diType := (sysfile_setnl_type dnW _).trans hZ.ty
+  have hszF2 : (sysUnlinkDni2 dnW).diSize = dnd.diSize := (sysfile_setnl_size dnW _).trans hZ.sz
   icases entToks_unlink (fsGammaL fscFs) dinum.toNat dnd (sysUnlinkDni2 dnW) bmd bmW datd datW kk Dd
       hklt hklive hne' hnD hnDD (hduq htyz) hZ.zer htyz hlive hnlF2 htyF2 hszF2 hok.2.2.2.2.2.1
       hZ.ok.1.2.2.2.2.2.1 hok.2.2.2.2.1 $$ Hetkd with ⟨⟨%uty, Htoken, %hutyd⟩, Hetkd⟩
@@ -289,7 +278,7 @@ theorem sys_unlink_w5d_ghost (dinum : BitVec 32) (dnd dnW : Dinode) (bmd bmW : B
   have hne2 : dinum.toNat ≠ (BitVec.setWidth 32 (dirInum datd kk)).toNat := by
     rw [sys_unlink_zext32]; exact fun h => hne' h.symm
   icases entToks_eraOrphan (fsGammaL fscFs) _ dni (sysUnlinkDni2 dni) bmi dati dinum.toNat ∅
-      (sys_unlink_setnl_type dni _) (sys_unlink_setnl_size dni _) hnli hnl2z htyi hhi hbi (hduqi htyi)
+      (sysfile_setnl_type dni _) (sysfile_setnl_size dni _) hnli hnl2z htyi hhi hbi (hduqi htyi)
       hnr2i hlv1i hname1i hpar hlv0i hname0i hinum0 hne2 $$ Hetki
     with ⟨⟨%tyup, Htokend⟩, ⟨%tydot, Hdotf, %-⟩, Hetki⟩
   ihave Htoken := (show FsStateLink.linkTok (GF := GF) (fsGammaL fscFs) ((dirInum datd kk).toNat : Int)
@@ -310,7 +299,7 @@ theorem sys_unlink_w5d_ghost (dinum : BitVec 32) (dnd dnW : Dinode) (bmd bmW : B
   -- THE CHILD'S PILE IS TWO: its NAME in the parent and its own "."
   iexists uty
   have ht2 : (sysUnlinkDni2 dni).diType.toNat = iregDirTy := by
-    rw [sys_unlink_setnl_type]; exact htyi
+    rw [sysfile_setnl_type]; exact htyi
   have hdd2 : iregDotDelta (sysUnlinkDni2 dni).diType.toNat (sysUnlinkDni2 dni).diNlink.toNat
       = 1 + 1 := by
     simp only [iregDotDelta, hnl2z, ht2, decide_true, Bool.and_self, if_true]
@@ -369,7 +358,7 @@ theorem sys_unlink_w5_dir (IU : IUPDATE) (IUP : IUNLOCKPUT) (EO : END_OP) (Γ : 
   have hne' : (dirInum datd kk).toNat ≠ dinum.toNat := by
     rw [← sys_unlink_zext32]; exact fun h => hne h.symm
   -- the arm's whole link-RA ledger
-  unfold sysUnlinkEnv
+  unfold sysfileEnv
   icases Henv with ⟨#Hpi, #Hpe, #Hrdy⟩
   icases fsReady_region $$ Hrdy with ⟨#Hinv, #Hopen⟩
   iapply wpLoop_fupd
@@ -378,7 +367,7 @@ theorem sys_unlink_w5_dir (IU : IUPDATE) (IUP : IUNLOCKPUT) (EO : END_OP) (Γ : 
     $$ Hinv Hdl Hdli Hdii with ⟨%⟨hdp2, hnl1⟩, Hdl2, Hdli2, Hdii, ⟨%tyup, Htokd⟩, %uty, Hpile⟩
   imodintro
   -- +0xae  lh a4,68(s2) ; +0xb2  c.li a5,1 ; +0xb4  beq a4,a5 (TAKEN)
-  icases sys_unlink_meta_type (ientry ks) dni $$ Hmetai with ⟨Htyc, Hmtw⟩
+  icases sysfile_meta_type (ientry ks) dni $$ Hmetai with ⟨Htyc, Hmtw⟩
   k_step_e (wp_s_lh cpu _ (KA.«sys_unlink» + 0xae#64) false 68#12 14#5 18#5 (by decide)
       (by decide) (DFrac.own 1) dni.diType)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hpins.2.2.2.1, iType_sext, iType]
@@ -390,7 +379,7 @@ theorem sys_unlink_w5_dir (IU : IUPDATE) (IUP : IUNLOCKPUT) (EO : END_OP) (Γ : 
   k_step_e (wp_s_branch cpu _ (KA.«sys_unlink» + 0xb4#64) false 146#13 14#5 15#5 (by decide)
       bop.BEQ)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
-    with [sys_unlink_li1, sys_unlink_beq_tdir, decide_eq_true hdir]
+    with [sys_unlink_li1, sysfile_beq_tdir, decide_eq_true hdir]
   iintro Hk Hpc
   ihave Hmetai := Hmtw $$ Htyc
   -- +0x146  lhu a5,74(s1) ; +0x14a  c.addiw a5,-1 ; +0x14c  sh a5,74(s1)
@@ -416,10 +405,10 @@ theorem sys_unlink_w5_dir (IU : IUPDATE) (IUP : IUNLOCKPUT) (EO : END_OP) (Γ : 
     sys_unlink_nlink_decr dnW.diNlink hnlW
   have hnlF2 : (sysUnlinkDF2 dnW).diNlink.toNat ≠ 0 := by
     rw [hZ.nl] at hdecW; omega
-  have htyF2 : (sysUnlinkDF2 dnW).diType = dnd.diType := (sys_unlink_setnl_type dnW _).trans hZ.ty
+  have htyF2 : (sysUnlinkDF2 dnW).diType = dnd.diType := (sysfile_setnl_type dnW _).trans hZ.ty
   have htynzF2 : (sysUnlinkDF2 dnW).diType.toNat ≠ 0 := by rw [htyF2, htyz]; decide
   have hdaF2 : (sysUnlinkDF2 dnW).diAddrs = bmCells bmW := by
-    rw [sys_unlink_setnl_addrs]; exact hZ.ok.1.2.2.1
+    rw [sysfile_setnl_addrs]; exact hZ.ok.1.2.2.1
   -- +0x150  c.mv a0,s1 ; +0x152  jal iupdate(dp)
   k_step_e (wp_s_add cpu _ (KA.«sys_unlink» + 0x150#64) true 10#5 0#5 9#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hpins.2.2.1]
@@ -437,11 +426,11 @@ theorem sys_unlink_w5_dir (IU : IUPDATE) (IUP : IUNLOCKPUT) (EO : END_OP) (Γ : 
           (sysUnlinkDF2 dnW).diNlink.toNat) tyup) from by
     rw [iregDotDelta_live _ _ hnlF2, FsStateLink.linkReps_1]
     exact .rfl) $$ Htokd
-  ihave #Henv : sysUnlinkEnv (hlc := hlc) Γ $$ []
-  · unfold sysUnlinkEnv; iframe #
+  ihave #Henv : sysfileEnv (hlc := hlc) Γ $$ []
+  · unfold sysfileEnv; iframe #
   iapply (sys_unlink_iupdate_unlink IU Γ cpu _ k.sie (by k_norm_g) k.proc (by k_norm_g) A.j kd dinum
       (sysUnlinkDF2 dnW) dnW bmW u Sbw true tyup A.pid ok.hj ?ip ?iK ?inf ?it (fun _ => hmem) hnib
-      (sys_unlink_setnl_type_stable dnW _) htynzF2 hdecW hdaF2 (blkmapWf_dir_len hZ.ok.1.1) ?ia)
+      (sysfile_setnl_type_stable dnW _) htynzF2 hdecW hdaF2 (blkmapWf_dir_len hZ.ok.1.1) ?ia)
     $$ [- $Hk $Hpc $Hte $Hce $Henv $Hdev $Hinum $Hmeta $Hmap $Hdi $Htokd $Hpid $Hb2 $Hop]
   rotate_right 1
   k_norm_g [sys_unlink_ret_156]
@@ -451,7 +440,7 @@ theorem sys_unlink_w5_dir (IU : IUPDATE) (IUP : IUNLOCKPUT) (EO : END_OP) (Γ : 
   case it => k_norm_g; exact ok.htier
   case ia => k_norm_g [hpins.2.2.1]
   iintro %cpu %spie1 %spp1 %R1 %hcs1 Hk Hpc Hte Hce Hpid Hdev Hinum Hmeta Hmap Hdi Hb2 Hop
-  k_norm_g [sys_unlink_ret_156, sys_unlink_ww, sys_unlink_psw]
+  k_norm_g [sys_unlink_ret_156, sysfile_ww, sysfile_psw]
   have hp1 := sysUnlinkPins_cs k _ R1 (ientry kd) (ientry ks) (sysUnlinkDe (k.regs 2#5))
     (sysUnlinkPins_set k _ _ _ _ 1#5 _ (sysUnlinkPins_set k _ _ _ _ 10#5 _
       (sysUnlinkPins_set k _ _ _ _ 15#5 _ (sysUnlinkPins_set k _ _ _ _ 15#5 _
@@ -463,7 +452,7 @@ theorem sys_unlink_w5_dir (IU : IUPDATE) (IUP : IUNLOCKPUT) (EO : END_OP) (Γ : 
   obtain ⟨hokF, hrlF, hdokF, hddixF, hdocF, hduqF⟩ := hokF2
   have hentsD := dirEntries_unlinkEq dnd (sysUnlinkDF2 dnW) bmd bmW datd datW kk
     (dirFirst_lt _ _ _ _ hfn) (dirFirst_live _ _ _ _ hfn) (hduq htyz) hZ.zer htyz htyF2
-    ((sys_unlink_setnl_size dnW _).trans hZ.sz) hok.2.2.2.2.2.1 hZ.ok.1.2.2.2.2.2.1 hok.2.2.2.2.1
+    ((sysfile_setnl_size dnW _).trans hZ.sz) hok.2.2.2.2.2.1 hZ.ok.1.2.2.2.2.2.1 hok.2.2.2.2.1
   have hnlD : fnNlink (eraNode (sysUnlinkDF2 dnW) bmW datW) = fnNlink (eraNode dnd bmd datd) - 1 := by
     have hWd : dnW.diNlink.toNat = dnd.diNlink.toNat := by rw [hZ.nl]
     have e1 : fnNlink (eraNode (sysUnlinkDF2 dnW) bmW datW) = (sysUnlinkDF2 dnW).diNlink.toNat := rfl

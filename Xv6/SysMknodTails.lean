@@ -29,7 +29,7 @@ Rocq's header points, kept:
 
 **Deviations from Rocq.**
 
-1. The tails are stated over the walk's bundles (`sysMknodEnv`, the block
+1. The tails are stated over the walk's bundles (`sysfileEnv`, the block
    whole, the hart-free post) rather than Rocq's forty-odd separate
    premises, and eb-generically; the pid cell is lent at the bare block's
    `pidPriv` share through `sys_mknod_pid` (SysMknodFrame deviation 3).
@@ -65,10 +65,6 @@ theorem sys_mknod_ret_44 : jumpPc (KA.«sys_mknod» + 0x44#64) = KA.«sys_mknod�
 theorem sys_mknod_ret_4a : jumpPc (KA.«sys_mknod» + 0x4a#64) = KA.«sys_mknod» + 0x4a#64 := by decide
 theorem sys_mknod_ret_4e : jumpPc (KA.«sys_mknod» + 0x4e#64) = KA.«sys_mknod» + 0x4e#64 := by decide
 theorem sys_mknod_ret_5c : jumpPc (KA.«sys_mknod» + 0x5c#64) = KA.«sys_mknod» + 0x5c#64 := by decide
-
-theorem sys_mknod_ww (K : KCtx) (a b c d : Bool) : (K.withSpie a b).withSpie c d = K.withSpie c d := rfl
-theorem sys_mknod_psw (K : KCtx) (m : Nat) (a b : Bool) :
-    (K.pushed m).withSpie a b = (K.withSpie a b).pushed m := rfl
 
 section
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
@@ -130,8 +126,8 @@ theorem sys_mknod_tail_58 (EO : END_OP) (Γ : SchedNames) [ClaimIs (hlc := hlc) 
     (hal : (sysMknodBuf (k.regs 2#5)).toNat % 8 = 0) (hP2 : A.V.upt.extSz A.V.sz P2) :
     kctx cpu (((k.withSpie spie spp).pushed 20).withRegs R) ∗ pcIs cpu (KA.«sys_mknod» + 0x58#64) ∗
     sysMknodCells (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) ∗
-    sysMknodAny (sysMknodBuf (k.regs 2#5)) 128 ∗ sysMknodLow (k.regs 2#5) ∗
-    trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie (procAddr A.j) ∗ sysMknodEnv (hlc := hlc) Γ ∗
+    sysfileAny (sysMknodBuf (k.regs 2#5)) 128 ∗ sysMknodLow (k.regs 2#5) ∗
+    trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie (procAddr A.j) ∗ sysfileEnv (hlc := hlc) Γ ∗
     procPrivFd A.γ (procAddr A.j) A.pid (sysMknodV1 A P2) (sysMknodM1 A P2) ∗
     (∀ c : CPU, sysMknodPostA k A c) ∗ bslots 3 ∗ irefSlots A.ns ∗ logOp icfgLog u ∗
     mknodPostFail (hlc := hlc) (fsGammaL fscFs) fscFs A.V.cwi (viewLazy A.V.upt A.V.sz A.M) A.v0.toNat (devArg A.v1) (devArg A.v2) A.P A.Pmiss A.Farm A.Fun A.Fok A.Fex
@@ -144,7 +140,7 @@ theorem sys_mknod_tail_58 (EO : END_OP) (Γ : SchedNames) [ClaimIs (hlc := hlc) 
   k_step_e (wp_s_jal cpu _ (KA.«sys_mknod» + 0x58#64) false 2091500#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [sys_mknod_br_end_op]
   iintro Hk Hpc
-  iapply (sys_mknod_end_op EO Γ cpu _ k.sie (by k_norm_g) (procAddr A.j) (by k_norm_g; exact hproc)
+  iapply (sysfile_end_op EO Γ cpu _ k.sie (by k_norm_g) (procAddr A.j) (by k_norm_g; exact hproc)
       A.j u A.pid pidPriv hj ?ep ?eK ?en ?et)
     $$ [- $Hk $Hpc $Hte $Hce $Henv $Hpid $Hop]
   rotate_right 1
@@ -154,11 +150,11 @@ theorem sys_mknod_tail_58 (EO : END_OP) (Γ : SchedNames) [ClaimIs (hlc := hlc) 
   case en => k_norm_g; exact hnoff
   case et => k_norm_g; exact htier
   iintro %cpu %spie1 %spp1 %R1 %hcs1 Hk Hpc Hte Hce Hpid
-  k_norm_g [sys_mknod_ret_5c, sys_mknod_ww, sys_mknod_psw]
+  k_norm_g [sys_mknod_ret_5c, sysfile_ww, sysfile_psw]
   have hp1 := sysMknodPins_cs k _ R1 (sysMknodPins_set k R 1#5 _ hpins (Or.inl rfl)) hcs1
   -- +0x5c  li a0,-1
   k_step_e (wp_s_addi cpu _ (KA.«sys_mknod» + 0x5c#64) true 4095#12 10#5 0#5 (by decide))
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [sys_mknod_m1]
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [sysfile_li_m1]
   iintro Hk Hpc
   -- +0x5e  j +0x50
   k_step_e (wp_s_j cpu _ (KA.«sys_mknod» + 0x5e#64) true 2097138#21)
@@ -194,8 +190,8 @@ theorem sys_mknod_tail_46 (IUP : IUNLOCKPUT) (EO : END_OP) (Γ : SchedNames)
     (hns1 : ns1 + 1 = A.ns) :
     kctx cpu (((k.withSpie spie spp).pushed 20).withRegs R) ∗ pcIs cpu (KA.«sys_mknod» + 0x46#64) ∗
     sysMknodCells (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) ∗
-    sysMknodAny (sysMknodBuf (k.regs 2#5)) 128 ∗ sysMknodLow (k.regs 2#5) ∗
-    trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie (procAddr A.j) ∗ sysMknodEnv (hlc := hlc) Γ ∗
+    sysfileAny (sysMknodBuf (k.regs 2#5)) 128 ∗ sysMknodLow (k.regs 2#5) ∗
+    trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie (procAddr A.j) ∗ sysfileEnv (hlc := hlc) Γ ∗
     procPrivFd A.γ (procAddr A.j) A.pid (sysMknodV1 A P2) (sysMknodM1 A P2) ∗
     (∀ c : CPU, sysMknodPostA k A c) ∗
     createLocked A.pid kk qi s g inum dn bm ∗
@@ -217,7 +213,7 @@ theorem sys_mknod_tail_46 (IUP : IUNLOCKPUT) (EO : END_OP) (Γ : SchedNames)
   k_step_e (wp_s_jal cpu _ (KA.«sys_mknod» + 0x46#64) false 2089308#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [sys_mknod_br_iunlockput]
   iintro Hk Hpc
-  iapply (sys_mknod_iunlockput IUP Γ cpu _ k.sie (by k_norm_g) (procAddr A.j)
+  iapply (sysfile_iunlockput IUP Γ cpu _ k.sie (by k_norm_g) (procAddr A.j)
       (by k_norm_g; exact hproc) A.j pidPriv γil γisl kk qi s g loc tlc inum dn bm n
       A.pid hj ?up ?uK ?un ?ut hkk hnib hn ?ua hlec)
     $$ [- $Hk $Hpc $Hte $Hce $Henv $Hslk $Hflc $Hsl $Hdep $Hoff $Hdev $Hinum $Hval $Hload $Hshot $Hfrz
@@ -230,13 +226,13 @@ theorem sys_mknod_tail_46 (IUP : IUNLOCKPUT) (EO : END_OP) (Γ : SchedNames)
   case ut => k_norm_g; exact htier
   case ua => k_norm_g [h10]
   iintro %cpu %spie1 %spp1 %R1 %n' %⟨hcs1, -⟩ Hk Hpc Hte Hce Hpid Hbs Hop Hslot
-  k_norm_g [sys_mknod_ret_4a, sys_mknod_ww, sys_mknod_psw]
+  k_norm_g [sys_mknod_ret_4a, sysfile_ww, sysfile_psw]
   have hp1 := sysMknodPins_cs k _ R1 (sysMknodPins_set k R 1#5 _ hpins (Or.inl rfl)) hcs1
   -- +0x4a  jal end_op
   k_step_e (wp_s_jal cpu _ (KA.«sys_mknod» + 0x4a#64) false 2091514#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [sys_mknod_br_end_op]
   iintro Hk Hpc
-  iapply (sys_mknod_end_op EO Γ cpu _ k.sie (by k_norm_g) (procAddr A.j) (by k_norm_g; exact hproc)
+  iapply (sysfile_end_op EO Γ cpu _ k.sie (by k_norm_g) (procAddr A.j) (by k_norm_g; exact hproc)
       A.j n' A.pid pidPriv hj ?ep ?eK ?en ?et)
     $$ [- $Hk $Hpc $Hte $Hce $Henv $Hpid $Hop]
   rotate_right 1
@@ -246,11 +242,11 @@ theorem sys_mknod_tail_46 (IUP : IUNLOCKPUT) (EO : END_OP) (Γ : SchedNames)
   case en => k_norm_g; exact hnoff
   case et => k_norm_g; exact htier
   iintro %cpu %spie2 %spp2 %R2 %hcs2 Hk Hpc Hte Hce Hpid
-  k_norm_g [sys_mknod_ret_4e, sys_mknod_ww, sys_mknod_psw]
+  k_norm_g [sys_mknod_ret_4e, sysfile_ww, sysfile_psw]
   have hp2 := sysMknodPins_cs k _ R2 (sysMknodPins_set k R1 1#5 _ hp1 (Or.inl rfl)) hcs2
   -- +0x4e  li a0,0
   k_step_e (wp_s_addi cpu _ (KA.«sys_mknod» + 0x4e#64) true 0#12 10#5 0#5 (by decide))
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [sys_mknod_li0]
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [sysfile_li0]
   iintro Hk Hpc
   have hp3 := sysMknodPins_set k R2 10#5 0#64 hp2 (by decide)
   ihave Hce := (show cpuClaimExt (GF := GF) cpu k.sie (procAddr A.j) ⊢ cpuClaimExt cpu k.sie k.proc

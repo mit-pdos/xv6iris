@@ -63,8 +63,8 @@ theorem sys_link_proof (AS : ARGSTR) (BO : BEGIN_OP) (NI : NAMEI) (NP : NAMEIPAR
     unfold sysLinkCont
     iapply wpNext_at true k.proc cpu c _ (fun hc => Or.elim hc (fun hx => absurd hx (by decide))
       (fun hx => absurd (hproc ▸ hx) (procAddr_nonzero hj))) $$ Hnext
-  ihave #Henv : sysLinkEnv (hlc := hlc) Γ $$ []
-  · unfold sysLinkEnv; iframe #
+  ihave #Henv : sysfileEnv (hlc := hlc) Γ $$ []
+  · unfold sysfileEnv; iframe #
   -- +0x00 .. +0x06  the prologue
   iapply (wp_prologue_sys_link cpu k KA.«sys_link» (sysLinkSlots_38 _ hK)) $$ [- $Hk $Hpc]
   k_code (text_instr _ _ _ _ rfl rfl) Htext

@@ -33,7 +33,7 @@ built (Rocq: "it takes it already built and spends it against ARMS").
 
 **Deviations from Rocq.**
 
-1. The tails are stated over the walk's bundles (`sysUnlinkEnv`, the pid
+1. The tails are stated over the walk's bundles (`sysfileEnv`, the pid
    cell and `sysUnlinkHole`, the hart-free post, `SuOk`) rather than Rocq's
    forty-odd separate premises, and eb-generically (brief fs7b rule 4).
 2. `bad:` calls the SET-FORM `iunlockput` (`sys_unlink_iunlockput_tx`)
@@ -59,12 +59,6 @@ set_option linter.unusedVariables false
 
 /-! ## Context bookkeeping -/
 
-theorem sys_unlink_ww (K : KCtx) (a b c d : Bool) : (K.withSpie a b).withSpie c d = K.withSpie c d :=
-  rfl
-theorem sys_unlink_psw (K : KCtx) (m : Nat) (a b : Bool) :
-    (K.pushed m).withSpie a b = (K.withSpie a b).pushed m := rfl
-
-theorem sys_unlink_m1 : BitVec.signExtend 64 4095#12 = 0xFFFFFFFFFFFFFFFF#64 := by decide
 theorem sys_unlink_li0 : BitVec.signExtend 64 0#12 = 0#64 := by decide
 
 /-- The panic literals, as the `auipc` / `addi` pair leaves them. -/
@@ -94,7 +88,7 @@ theorem sys_unlink_tail_a (cpu : CPU) (k : KCtx) (A : SysUnlinkArgs GF) (ok : Su
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
   -- +0x170  li a0,-1
   k_step_e (wp_s_addi cpu _ (KA.«sys_unlink» + 0x170#64) true 4095#12 10#5 0#5 (by decide))
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [sys_unlink_m1]
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [sysfile_sext_m1]
   iintro Hk Hpc
   -- +0x172  j +0x168
   k_step_e (wp_s_j cpu _ (KA.«sys_unlink» + 0x172#64) true 2097142#21)
@@ -116,7 +110,7 @@ theorem sys_unlink_tail_b (EO : END_OP) (Γ : SchedNames) [ClaimIs (hlc := hlc) 
     pcIs cpu (KA.«sys_unlink» + 0xe2#64) ∗
     sysUnlinkCells (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) (k.regs 9#5) w₄ w₅ ∗
     sysUnlinkBufs (k.regs 2#5) ∗
-    trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗ sysUnlinkEnv (hlc := hlc) Γ ∗
+    trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗ sysfileEnv (hlc := hlc) Γ ∗
     wordPointsTo (pPid k.proc) 4 pidPriv A.pid ∗ sysUnlinkHole A k.proc P2 ∗
     (∀ c : CPU, sysUnlinkPostA k A c) ∗
     bslots 3 ∗ irefSlots sysUnlinkSlots ∗ logOp icfgLog u ∗
@@ -129,7 +123,7 @@ theorem sys_unlink_tail_b (EO : END_OP) (Γ : SchedNames) [ClaimIs (hlc := hlc) 
   k_step_e (wp_s_jal cpu _ (KA.«sys_unlink» + 0xe2#64) false 2092160#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [sys_unlink_br_end_op]
   iintro Hk Hpc
-  iapply (sys_unlink_end_op EO Γ cpu _ k.sie (by k_norm_g) k.proc (by k_norm_g) A.j u A.pid ok.hj
+  iapply (sysfile_end_op EO Γ cpu _ k.sie (by k_norm_g) k.proc (by k_norm_g) A.j u A.pid pidPriv ok.hj
       ?ep ?eK ?en ?et)
     $$ [- $Hk $Hpc $Hte $Hce $Henv $Hpid $Hop]
   rotate_right 1
@@ -139,12 +133,12 @@ theorem sys_unlink_tail_b (EO : END_OP) (Γ : SchedNames) [ClaimIs (hlc := hlc) 
   case en => k_norm_g; exact ok.hnoff
   case et => k_norm_g; exact ok.htier
   iintro %cpu %spie1 %spp1 %R1 %hcs1 Hk Hpc Hte Hce Hpid
-  k_norm_g [sys_unlink_ret_e6, sys_unlink_ww, sys_unlink_psw]
+  k_norm_g [sys_unlink_ret_e6, sysfile_ww, sysfile_psw]
   have hp1 := sysUnlinkPins_cs k _ R1 s1v (k.regs 18#5) (k.regs 19#5)
     (sysUnlinkPins_set k R s1v _ _ 1#5 _ hpins (Or.inl rfl)) hcs1
   -- +0xe6  li a0,-1
   k_step_e (wp_s_addi cpu _ (KA.«sys_unlink» + 0xe6#64) true 4095#12 10#5 0#5 (by decide))
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [sys_unlink_m1]
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [sysfile_sext_m1]
   iintro Hk Hpc
   -- +0xe8  ld s1,216(sp)
   unfold sysUnlinkCells
@@ -184,7 +178,7 @@ theorem sys_unlink_tail_bad (IUP : IUNLOCKPUT) (EO : END_OP) (Γ : SchedNames)
     pcIs cpu (KA.«sys_unlink» + 0x15a#64) ∗
     sysUnlinkCells (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) (k.regs 9#5) w₄ w₅ ∗
     sysUnlinkBufs (k.regs 2#5) ∗
-    trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗ sysUnlinkEnv (hlc := hlc) Γ ∗
+    trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗ sysfileEnv (hlc := hlc) Γ ∗
     wordPointsTo (pPid k.proc) 4 pidPriv A.pid ∗ sysUnlinkHole A k.proc P2 ∗
     (∀ c : CPU, sysUnlinkPostA k A c) ∗
     sysUnlinkLkTx A.pid kd q g lo tl dinum dn γil γisl ∗
@@ -215,7 +209,7 @@ theorem sys_unlink_tail_bad (IUP : IUNLOCKPUT) (EO : END_OP) (Γ : SchedNames)
   case ut => k_norm_g; exact ok.htier
   case ua => k_norm_g
   iintro %cpu %spie1 %spp1 %R1 %n' %Sb' %w %⟨hcs1, -⟩ Hk Hpc Hte Hce Hpid Hbs Hop Htx Hslot
-  k_norm_g [sys_unlink_ret_160, sys_unlink_ww, sys_unlink_psw]
+  k_norm_g [sys_unlink_ret_160, sysfile_ww, sysfile_psw]
   have hp1 := sysUnlinkPins_cs k _ R1 (ientry kd) (k.regs 18#5) (k.regs 19#5)
     (sysUnlinkPins_set k _ _ _ _ 1#5 _ (sysUnlinkPins_set k R _ _ _ 10#5 _ hpins (by decide))
       (Or.inl rfl)) hcs1
@@ -224,7 +218,7 @@ theorem sys_unlink_tail_bad (IUP : IUNLOCKPUT) (EO : END_OP) (Γ : SchedNames)
   k_step_e (wp_s_jal cpu _ (KA.«sys_unlink» + 0x160#64) false 2092034#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [sys_unlink_br_end_op]
   iintro Hk Hpc
-  iapply (sys_unlink_end_op EO Γ cpu _ k.sie (by k_norm_g) k.proc (by k_norm_g) A.j n' A.pid ok.hj
+  iapply (sysfile_end_op EO Γ cpu _ k.sie (by k_norm_g) k.proc (by k_norm_g) A.j n' A.pid pidPriv ok.hj
       ?ep ?eK ?en ?et)
     $$ [- $Hk $Hpc $Hte $Hce $Henv $Hpid $Hop]
   rotate_right 1
@@ -234,12 +228,12 @@ theorem sys_unlink_tail_bad (IUP : IUNLOCKPUT) (EO : END_OP) (Γ : SchedNames)
   case en => k_norm_g; exact ok.hnoff
   case et => k_norm_g; exact ok.htier
   iintro %cpu %spie2 %spp2 %R2 %hcs2 Hk Hpc Hte Hce Hpid
-  k_norm_g [sys_unlink_ret_164, sys_unlink_ww, sys_unlink_psw]
+  k_norm_g [sys_unlink_ret_164, sysfile_ww, sysfile_psw]
   have hp2 := sysUnlinkPins_cs k _ R2 (ientry kd) (k.regs 18#5) (k.regs 19#5)
     (sysUnlinkPins_set k R1 _ _ _ 1#5 _ hp1 (Or.inl rfl)) hcs2
   -- +0x164  li a0,-1
   k_step_e (wp_s_addi cpu _ (KA.«sys_unlink» + 0x164#64) true 4095#12 10#5 0#5 (by decide))
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [sys_unlink_m1]
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [sysfile_sext_m1]
   iintro Hk Hpc
   -- +0x166  ld s1,216(sp)
   unfold sysUnlinkCells
@@ -275,7 +269,7 @@ theorem sys_unlink_tail_d (IUP : IUNLOCKPUT) (EO : END_OP) (Γ : SchedNames)
     pcIs cpu (KA.«sys_unlink» + 0x158#64) ∗
     sysUnlinkCells (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) (k.regs 9#5) (k.regs 18#5) w₅ ∗
     sysUnlinkBufs (k.regs 2#5) ∗
-    trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗ sysUnlinkEnv (hlc := hlc) Γ ∗
+    trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗ sysfileEnv (hlc := hlc) Γ ∗
     wordPointsTo (pPid k.proc) 4 pidPriv A.pid ∗ sysUnlinkHole A k.proc P2 ∗
     (∀ c : CPU, sysUnlinkPostA k A c) ∗
     sysUnlinkLkTx A.pid kd q g lo tl dinum dn γil γisl ∗
@@ -321,7 +315,7 @@ theorem sys_unlink_tail_e (IUP : IUNLOCKPUT) (EO : END_OP) (Γ : SchedNames)
     sysUnlinkCells (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) (k.regs 9#5) (k.regs 18#5)
       (k.regs 19#5) ∗
     sysUnlinkBufs (k.regs 2#5) ∗
-    trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗ sysUnlinkEnv (hlc := hlc) Γ ∗
+    trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗ sysfileEnv (hlc := hlc) Γ ∗
     wordPointsTo (pPid k.proc) 4 pidPriv A.pid ∗ sysUnlinkHole A k.proc P2 ∗
     (∀ c : CPU, sysUnlinkPostA k A c) ∗
     sysUnlinkLkAt A.pid kd q g lo tl dinum dn γil γisl t (1 : Qp).half.half ∗
@@ -358,14 +352,14 @@ theorem sys_unlink_tail_e (IUP : IUNLOCKPUT) (EO : END_OP) (Γ : SchedNames)
   case ua => k_norm_g
   iintro %cpu %spie1 %spp1 %R1 %n' %Sb' %w %⟨hcs1, -, -, -, hlo, -⟩ Hk Hpc Hte Hce Hpid Hbs Hop
     Hslot Hq
-  k_norm_g [sys_unlink_ret_17a, sys_unlink_ww, sys_unlink_psw]
+  k_norm_g [sys_unlink_ret_17a, sysfile_ww, sysfile_psw]
   have hp1 := sysUnlinkPins_cs k _ R1 (ientry kd) (ientry ks) s3v
     (sysUnlinkPins_set k _ _ _ _ 1#5 _ (sysUnlinkPins_set k R _ _ _ 10#5 _ hpins (by decide))
       (Or.inl rfl)) hcs1
   -- dp's arm re-grown to the half, and closed over the residue (deviation 3)
   unfold sysUnlinkLkAt
   icases Hlkd with ⟨#Hslk, #Hfl, Hsl, Hdep, Hoff, Hdev, Hinum, Hval, Hshot, Hfrz, Hkeep, Hru⟩
-  unfold sysUnlinkEnv
+  unfold sysfileEnv
   icases Henv with ⟨#Hpi, #Hpe, #Hrdy⟩
   ihave #Hesc := fsReady_escrow kd hkd $$ Hrdy
   iapply wpLoop_fupd
@@ -404,7 +398,7 @@ theorem sys_unlink_tail_e (IUP : IUNLOCKPUT) (EO : END_OP) (Γ : SchedNames)
       lo tl dinum dn bm γil γisl n' Sb' hp2 hkd hnib hle
       (by cases w <;> simp [ipSpendW, ipBm, iputUnits] at hlo hn ⊢ <;> omega))
     $$ [$Hk $Hpc $Hcells $Hbufs $Hte $Hce $Hpid $Hhole $HΦ $Hlk $Hloadd $Hbs $Hslot $Hop $Harms]
-  unfold sysUnlinkEnv
+  unfold sysfileEnv
   iframe #
 
 /-! ## The three live panics -/
@@ -423,7 +417,7 @@ theorem sys_unlink_panic_nlink (PA : PANIC) (cpu : CPU) (k : KCtx) (A : SysUnlin
   icases kctx_kernelData _ _ $$ Hk with ⟨#HD, Hk⟩
   ihave #Hmsg := sys_unlink_cstr_nlink $$ HS HD
   obtain ⟨-, -, -, -, -, -, -, -, -, -, -, -, hKp⟩ := sys_unlink_K _ ok.hK
-  icases sys_unlink_nolocks cpu _ (by k_norm_g; exact ok.hnoff) $$ Hk with ⟨%hlocks, Hk⟩
+  icases sysfile_nolocks cpu _ (by k_norm_g; exact ok.hnoff) $$ Hk with ⟨%hlocks, Hk⟩
   -- +0xec  auipc a0,0x2 ; +0xf0  addi a0,a0,1152 ; +0xf4  jal panic
   k_step_e (wp_s_auipc cpu _ (KA.«sys_unlink» + 0xec#64) false 2#20 10#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
@@ -456,7 +450,7 @@ theorem sys_unlink_panic_readi (PA : PANIC) (cpu : CPU) (k : KCtx) (A : SysUnlin
   icases kctx_kernelData _ _ $$ Hk with ⟨#HD, Hk⟩
   ihave #Hmsg := sys_unlink_cstr_readi $$ HS HD
   obtain ⟨-, -, -, -, -, -, -, -, -, -, -, -, hKp⟩ := sys_unlink_K _ ok.hK
-  icases sys_unlink_nolocks cpu _ (by k_norm_g; exact ok.hnoff) $$ Hk with ⟨%hlocks, Hk⟩
+  icases sysfile_nolocks cpu _ (by k_norm_g; exact ok.hnoff) $$ Hk with ⟨%hlocks, Hk⟩
   -- +0x12e  auipc a0,0x2 ; +0x132  addi a0,a0,1110 ; +0x136  jal panic
   k_step_e (wp_s_auipc cpu _ (KA.«sys_unlink» + 0x12e#64) false 2#20 10#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
@@ -489,7 +483,7 @@ theorem sys_unlink_panic_writei (PA : PANIC) (cpu : CPU) (k : KCtx) (A : SysUnli
   icases kctx_kernelData _ _ $$ Hk with ⟨#HD, Hk⟩
   ihave #Hmsg := sys_unlink_cstr_writei $$ HS HD
   obtain ⟨-, -, -, -, -, -, -, -, -, -, -, -, hKp⟩ := sys_unlink_K _ ok.hK
-  icases sys_unlink_nolocks cpu _ (by k_norm_g; exact ok.hnoff) $$ Hk with ⟨%hlocks, Hk⟩
+  icases sysfile_nolocks cpu _ (by k_norm_g; exact ok.hnoff) $$ Hk with ⟨%hlocks, Hk⟩
   -- +0x13a  auipc a0,0x2 ; +0x13e  addi a0,a0,1122 ; +0x142  jal panic
   k_step_e (wp_s_auipc cpu _ (KA.«sys_unlink» + 0x13a#64) false 2#20 10#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]

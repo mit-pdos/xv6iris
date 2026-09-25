@@ -39,18 +39,13 @@ set_option linter.unusedSimpArgs false
 set_option linter.unusedVariables false
 
 /-- The target's record after `ip->nlink--` (Rocq's `su_setnl dni (su_dec16 …)`). -/
-abbrev sysUnlinkDni2 (dni : Dinode) : Dinode := sysUnlinkSetnl dni (sysUnlinkDec16 dni.diNlink)
+abbrev sysUnlinkDni2 (dni : Dinode) : Dinode := sysfileSetnl dni (sysUnlinkDec16 dni.diNlink)
 
 theorem sys_unlink_dec_store (h : BitVec 16) :
     BitVec.extractLsb' 0 16 (BitVec.signExtend 64
       (BitVec.extractLsb' 0 32 (BitVec.setWidth 64 h + 0xFFFFFFFFFFFFFFFF#64))) =
       sysUnlinkDec16 h := by
   unfold sysUnlinkDec16; bv_decide
-
-theorem sys_unlink_setnl_major (dn : Dinode) (nl : BitVec 16) :
-    (sysUnlinkSetnl dn nl).diMajor = dn.diMajor := rfl
-theorem sys_unlink_setnl_minor (dn : Dinode) (nl : BitVec 16) :
-    (sysUnlinkSetnl dn nl).diMinor = dn.diMinor := rfl
 
 theorem sys_unlink_li0_d8 : BitVec.signExtend 64 0#12 = 0#64 := by decide
 
@@ -65,12 +60,12 @@ theorem sys_unlink_meta_nlink (ip : BitVec 64) (dn : Dinode) :
     inodeMeta (GF := GF) ip dn ⊢
       wordPointsTo (iNlink ip) 2 (DFrac.own 1) dn.diNlink ∗
       (∀ nl : BitVec 16, wordPointsTo (iNlink ip) 2 (DFrac.own 1) nl -∗
-        inodeMeta ip (sysUnlinkSetnl dn nl)) := by
+        inodeMeta ip (sysfileSetnl dn nl)) := by
   unfold inodeMeta
   iintro ⟨Ht, Hma, Hmi, Hnl, Hsz⟩
   iframe Hnl
   iintro %nl Hnl
-  unfold sysUnlinkSetnl
+  unfold sysfileSetnl
   iframe
 
 /-- **THE SEAM AT +0xb8** (both arms rejoin here): the parent LOCKED and
@@ -95,7 +90,7 @@ def sysUnlinkAtB8 (Γ : SchedNames) (cpu : CPU) (k : KCtx) (A : SysUnlinkArgs GF
   pcIs cpu (KA.«sys_unlink» + 0xb8#64) ∗
   sysUnlinkCells (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) (k.regs 9#5) (k.regs 18#5) (k.regs 19#5) ∗
   sysUnlinkBufs (k.regs 2#5) ∗
-  trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗ sysUnlinkEnv (hlc := hlc) Γ ∗
+  trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗ sysfileEnv (hlc := hlc) Γ ∗
   wordPointsTo (pPid k.proc) 4 pidPriv A.pid ∗ sysUnlinkHole A k.proc P2 ∗
   (∀ c : CPU, sysUnlinkPostA k A c) ∗
   sysUnlinkLkAt A.pid kd q g lo tl dinum dnX γil γisl t (1 : Qp).half.half ∗
@@ -157,7 +152,7 @@ theorem sys_unlink_w5_spine (IU : IUPDATE) (IUP : IUNLOCKPUT) (EO : END_OP) (Γ 
   case ua => k_norm_g
   iintro %cpu %spie1 %spp1 %R1 %n2 %Sb2 %w %⟨hcs1, -, -, -, hlo, -⟩ Hk Hpc Hte Hce Hpid Hbs Hop
     Hslot1 Hq1
-  k_norm_g [sys_unlink_ret_be, sys_unlink_ww, sys_unlink_psw]
+  k_norm_g [sys_unlink_ret_be, sysfile_ww, sysfile_psw]
   have hp1 := sysUnlinkPins_cs k _ R1 (ientry kd) (ientry ks) (sysUnlinkDe (k.regs 2#5))
     (sysUnlinkPins_set k _ _ _ _ 1#5 _ (sysUnlinkPins_set k R _ _ _ 10#5 _ hpins (by decide))
       (Or.inl rfl)) hcs1
@@ -191,15 +186,15 @@ theorem sys_unlink_w5_spine (IU : IUPDATE) (IUP : IUNLOCKPUT) (EO : END_OP) (Γ 
   iintro Hk Hpc
   obtain ⟨u, rfl⟩ : ∃ u, n2 = u + 1 := ⟨n2 - 1, by omega⟩
   have htynz2 : (sysUnlinkDni2 dni).diType.toNat ≠ 0 := by
-    rw [sys_unlink_setnl_type]; exact hoki.2.2.2.1
+    rw [sysfile_setnl_type]; exact hoki.2.2.2.1
   have hda2 : (sysUnlinkDni2 dni).diAddrs = bmCells bmi := by
-    rw [sys_unlink_setnl_addrs]; exact hoki.2.2.1
+    rw [sysfile_setnl_addrs]; exact hoki.2.2.1
   icases bslots_uncons 2 $$ Hbs with ⟨Hb1, Hb2⟩
   unfold sysUnlinkLkAt
   icases Hlki with ⟨#Hslk, #Hfl, Hsl, Hdep, Hoffr, Hdev, Hinum, Hval, #Hshot, Hfrz, Hkeep, Hru⟩
   iapply (sys_unlink_iupdate_unlink IU Γ cpu _ k.sie (by k_norm_g) k.proc (by k_norm_g) A.j ks iinum
       (sysUnlinkDni2 dni) dni bmi u Sb2 false uty A.pid ok.hj ?ip ?iK ?inf ?it
-      (fun h => absurd h (by decide)) hnibi (sys_unlink_setnl_type_stable dni _) htynz2 hdec
+      (fun h => absurd h (by decide)) hnibi (sysfile_setnl_type_stable dni _) htynz2 hdec
       hda2 (blkmapWf_dir_len hoki.1) ?ia)
     $$ [- $Hk $Hpc $Hte $Hce $Henv $Hdev $Hinum $Hmeta $Hmap $Hdi $Htok $Hpid $Hb2 $Hop]
   rotate_right 1
@@ -210,13 +205,13 @@ theorem sys_unlink_w5_spine (IU : IUPDATE) (IUP : IUNLOCKPUT) (EO : END_OP) (Γ 
   case it => k_norm_g; exact ok.htier
   case ia => k_norm_g [hp1.2.2.2.1]
   iintro %cpu %spie2 %spp2 %R2 %hcs2 Hk Hpc Hte Hce Hpid Hdev Hinum Hmeta Hmap Hdi Hb2 Hop
-  k_norm_g [sys_unlink_ret_ce, sys_unlink_ww, sys_unlink_psw]
+  k_norm_g [sys_unlink_ret_ce, sysfile_ww, sysfile_psw]
   have hp2 := sysUnlinkPins_cs k _ R2 (ientry kd) (ientry ks) (sysUnlinkDe (k.regs 2#5))
     (sysUnlinkPins_set k _ _ _ _ 1#5 _ (sysUnlinkPins_set k _ _ _ _ 10#5 _
       (sysUnlinkPins_set k _ _ _ _ 15#5 _ (sysUnlinkPins_set k R1 _ _ _ 15#5 _ hp1 (by decide))
         (by decide)) (by decide)) (Or.inl rfl)) hcs2
   -- INSTANT 2: the target's row, fused with its retag
-  unfold sysUnlinkEnv
+  unfold sysfileEnv
   icases Henv with ⟨#Hpi, #Hpe, #Hrdy⟩
   icases fsReady_region $$ Hrdy with ⟨#Hinv, #Hopen⟩
   ihave #Hftop := iregInv_ftop fscIreg fscFs icfgIst icfgNib $$ Hinv
@@ -225,8 +220,8 @@ theorem sys_unlink_w5_spine (IU : IUPDATE) (IUP : IUNLOCKPUT) (EO : END_OP) (Γ 
     inodeLocal_ofOkRec iinum.toNat fscCov fscLogst _ bmi dati hok2 hrl2 hduq2 hddix2
   have hnl1 := sys_unlink_nl1 dni bmi dati hnli
   have habs' := ufNlink_row dni (sysUnlinkDni2 dni) bmi dati hoki.2.2.2.1
-    (sys_unlink_setnl_type dni _) (sys_unlink_setnl_size dni _) (sys_unlink_setnl_major dni _)
-    (sys_unlink_setnl_minor dni _)
+    (sysfile_setnl_type dni _) (sysfile_setnl_size dni _) (sysfile_setnl_major dni _)
+    (sysfile_setnl_minor dni _)
     (sys_unlink_nlink_down dni (sysUnlinkDni2 dni) bmi bmi dati dati hnli (by omega))
   iapply wpLoop_fupd
   imod (ufUtgt_fire (hlc := hlc) fscFs ⊤ A.Ftgt iinum.toNat (eraNode dni bmi dati)
@@ -239,7 +234,7 @@ theorem sys_unlink_w5_spine (IU : IUPDATE) (IUP : IUNLOCKPUT) (EO : END_OP) (Γ 
   ihave Hloadi := icMkLoaded fscFs fscIreg fscCov fscLogst ks iinum (sysUnlinkDni2 dni) bmi dati
     hok2 hrl2 hdok2 hddix2 hdoc2 hduq2 $$ Hdl2 Hdi Hmeta Ha Hr Hblk Htopi
   ihave #Hshot2 := (show ityShot (GF := GF) gi dni.diType ⊢ ityShot gi (sysUnlinkDni2 dni).diType
-    from by rw [sys_unlink_setnl_type]) $$ Hshot
+    from by rw [sysfile_setnl_type]) $$ Hshot
   ihave Hlki : sysUnlinkLkAt A.pid ks qi gi loi tli iinum (sysUnlinkDni2 dni) γili γisli t
       (1 : Qp).half.half $$ [Hsl Hdep Hoffr Hdev Hinum Hval Hfrz Hkeep Hru]
   · unfold sysUnlinkLkAt; iframe; iframe #
@@ -251,8 +246,8 @@ theorem sys_unlink_w5_spine (IU : IUPDATE) (IUP : IUNLOCKPUT) (EO : END_OP) (Γ 
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [sys_unlink_br_iunlockput]
   iintro Hk Hpc
   ihave Hbs := bslots_cons 2 $$ [$Hb1 $Hb2]
-  ihave #Henv : sysUnlinkEnv (hlc := hlc) Γ $$ []
-  · unfold sysUnlinkEnv; iframe #
+  ihave #Henv : sysfileEnv (hlc := hlc) Γ $$ []
+  · unfold sysfileEnv; iframe #
   iapply (sys_unlink_iunlockput_dep IUP Γ cpu _ k.sie (by k_norm_g) k.proc (by k_norm_g) A.j A.pid
       ks qi gi loi tli iinum (sysUnlinkDni2 dni) bmi γili γisli t (1 : Qp).half.half u
       (IBLOCK iinum icfgIst :: Sb2) false true ok.hj ?vp ?vK ?vn ?vt hks
@@ -267,7 +262,7 @@ theorem sys_unlink_w5_spine (IU : IUPDATE) (IUP : IUNLOCKPUT) (EO : END_OP) (Γ 
   case vt => k_norm_g; exact ok.htier
   case va => k_norm_g [hp2.2.2.2.1]
   iintro %cpu %spie3 %spp3 %R3 %n3 %Sb3 %w3 %⟨hcs3, -⟩ Hk Hpc Hte Hce Hpid Hbs Hop Hslot2 Hq2
-  k_norm_g [sys_unlink_ret_d4, sys_unlink_ww, sys_unlink_psw]
+  k_norm_g [sys_unlink_ret_d4, sysfile_ww, sysfile_psw]
   have hp3 := sysUnlinkPins_cs k _ R3 (ientry kd) (ientry ks) (sysUnlinkDe (k.regs 2#5))
     (sysUnlinkPins_set k _ _ _ _ 1#5 _ (sysUnlinkPins_set k R2 _ _ _ 10#5 _ hp2 (by decide))
       (Or.inl rfl)) hcs3
@@ -278,7 +273,7 @@ theorem sys_unlink_w5_spine (IU : IUPDATE) (IUP : IUNLOCKPUT) (EO : END_OP) (Γ 
   k_step_e (wp_s_jal cpu _ (KA.«sys_unlink» + 0xd4#64) false 2092174#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [sys_unlink_br_end_op]
   iintro Hk Hpc
-  iapply (sys_unlink_end_op EO Γ cpu _ k.sie (by k_norm_g) k.proc (by k_norm_g) A.j n3 A.pid ok.hj
+  iapply (sysfile_end_op EO Γ cpu _ k.sie (by k_norm_g) k.proc (by k_norm_g) A.j n3 A.pid pidPriv ok.hj
       ?ep ?eK ?en ?et)
     $$ [- $Hk $Hpc $Hte $Hce $Henv $Hpid $Hop]
   rotate_right 1
@@ -288,7 +283,7 @@ theorem sys_unlink_w5_spine (IU : IUPDATE) (IUP : IUNLOCKPUT) (EO : END_OP) (Γ 
   case en => k_norm_g; exact ok.hnoff
   case et => k_norm_g; exact ok.htier
   iintro %cpu %spie4 %spp4 %R4 %hcs4 Hk Hpc Hte Hce Hpid
-  k_norm_g [sys_unlink_ret_d8, sys_unlink_ww, sys_unlink_psw]
+  k_norm_g [sys_unlink_ret_d8, sysfile_ww, sysfile_psw]
   have hp4 := sysUnlinkPins_cs k _ R4 (ientry kd) (ientry ks) (sysUnlinkDe (k.regs 2#5))
     (sysUnlinkPins_set k R3 _ _ _ 1#5 _ hp3 (Or.inl rfl)) hcs4
   -- +0xd8  c.li a0,0 ; +0xda/+0xdc/+0xde  the three reloads ; +0xe0  c.j +0x168

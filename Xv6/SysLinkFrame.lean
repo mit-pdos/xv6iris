@@ -103,102 +103,6 @@ section
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF]
 variable {lent : Bool}
 
-/-- A buffer of `n` bytes at `a`, contents unknown. -/
-def sysLinkAny [CurCtx] (a : BitVec 64) (n : Nat) : IProp GF :=
-  iprop(∃ bs : List (BitVec 8), ⌜bs.length = n⌝ ∗ byteBuf a (DFrac.own 1) bs)
-
-/-- `n + 1` slots below `a + 8 (n + 1)` are `8 (n + 1)` bytes at `a`, and `a`
-is 8-aligned. -/
-theorem sys_link_stack_bytes [CurCtx] (a : BitVec 64) (n : Nat) :
-    stackOwn (GF := GF) (a + BitVec.ofNat 64 (8 * (n + 1))) (n + 1) ⊢
-      ∃ bs : List (BitVec 8), ⌜bs.length = 8 * (n + 1) ∧ a.toNat % 8 = 0⌝ ∗
-        byteBuf a (DFrac.own 1) bs := by
-  induction n generalizing a with
-  | zero =>
-    unfold stackOwn
-    simp only [Nat.zero_add, List.range_one]
-    iintro H
-    icases BigSepL.bigSepL_singleton.1 $$ H with ⟨%w, H⟩
-    have ha' : a + BitVec.ofNat 64 (8 * 1) - 8#64 * BitVec.ofNat 64 (0 + 1) = a := by bv_omega
-    rw [ha']
-    ihave %hal := wordPointsTo_align _ 8 _ _ $$ H
-    ihave B := wordPointsTo_to_bytes _ (DFrac.own 1) w hal $$ H
-    iexists wordToBytes w
-    isplitr
-    · ipureintro; exact ⟨rfl, hal⟩
-    · iexact B
-  | succ n ih =>
-    have e1 : a + BitVec.ofNat 64 (8 * (n + 1 + 1)) - 8#64 * BitVec.ofNat 64 (n + 1) = a + 8#64 := by
-      bv_omega
-    have e0 : a + BitVec.ofNat 64 (8 * (n + 1 + 1)) = (a + 8#64) + BitVec.ofNat 64 (8 * (n + 1)) := by
-      bv_omega
-    iintro H
-    icases stackOwn_split (a + BitVec.ofNat 64 (8 * (n + 1 + 1))) (n + 1) 1 $$ H with ⟨Ht, Hb⟩
-    rw [e1, e0]
-    icases ih (a + 8#64) $$ Ht with ⟨%bs, ⟨%hl, %hal⟩, B⟩
-    unfold stackOwn
-    simp only [List.range_one]
-    icases BigSepL.bigSepL_singleton.1 $$ Hb with ⟨%w, Hb⟩
-    have e2 : a + 8#64 - 8#64 * BitVec.ofNat 64 (0 + 1) = a := by bv_omega
-    rw [e2]
-    ihave %hal2 := wordPointsTo_align _ 8 _ _ $$ Hb
-    ihave Bb := wordPointsTo_to_bytes _ (DFrac.own 1) w hal2 $$ Hb
-    iexists wordToBytes w ++ bs
-    isplitr
-    · ipureintro
-      refine ⟨?_, hal2⟩
-      rw [List.length_append, hl, wordToBytes_length]
-      omega
-    · iapply (byteBuf_append (GF := GF) a (DFrac.own 1) (wordToBytes w) bs).2
-      rw [wordToBytes_length]
-      iframe
-
-/-- ...and back: `8 n` bytes at an 8-aligned `a` are the `n` slots below
-`a + 8 n`. -/
-theorem sys_link_bytes_stack [CurCtx] (a : BitVec 64) (hal : a.toNat % 8 = 0) :
-    ∀ (n : Nat) (bs : List (BitVec 8)), bs.length = 8 * n →
-    byteBuf (GF := GF) a (DFrac.own 1) bs ⊢ stackOwn (a + BitVec.ofNat 64 (8 * n)) n := by
-  intro n
-  induction n generalizing a with
-  | zero =>
-    intro bs hl
-    iintro _
-    unfold stackOwn
-    simp only [List.range_zero]
-    exact BigSepL.bigSepL_nil_intro
-  | succ n ih =>
-    intro bs hl
-    have hsplit : bs = bs.take 8 ++ bs.drop 8 := (List.take_append_drop 8 bs).symm
-    have hl8 : (bs.take 8).length = 8 := by rw [List.length_take]; omega
-    have hld : (bs.drop 8).length = 8 * n := by rw [List.length_drop]; omega
-    rw [hsplit]
-    iintro H
-    icases (byteBuf_append (GF := GF) a (DFrac.own 1) (bs.take 8) (bs.drop 8)).1 $$ H with ⟨H1, H2⟩
-    rw [hl8]
-    have hal' : (a + 8#64).toNat % 8 = 0 := by
-      simp only [BitVec.toNat_add, BitVec.toNat_ofNat, Nat.reducePow]
-      omega
-    ihave H2 := ih (a + 8#64) hal' (bs.drop 8) hld $$ H2
-    ihave H1 := wordPointsTo_of_bytes (GF := GF) a (DFrac.own 1) (bs.take 8) hl8 hal $$ H1
-    have hsp : a + BitVec.ofNat 64 (8 * (n + 1)) = a + 8#64 + BitVec.ofNat 64 (8 * n) := by
-      apply BitVec.eq_of_toNat_eq
-      simp only [BitVec.toNat_add, BitVec.toNat_ofNat, Nat.reducePow]
-      omega
-    rw [hsp]
-    iapply stackOwn_join (a + 8#64 + BitVec.ofNat 64 (8 * n)) n 1
-    iframe H2
-    unfold stackOwn
-    simp only [List.range_one]
-    iapply BigSepL.bigSepL_singleton.2
-    iexists (bytesToWord (bs.take 8))
-    have haddr : a + 8#64 + BitVec.ofNat 64 (8 * n) - 8#64 * BitVec.ofNat 64 n -
-        8#64 * BitVec.ofNat 64 (0 + 1) = a := by
-      apply BitVec.eq_of_toNat_eq
-      simp only [BitVec.toNat_add, BitVec.toNat_sub, BitVec.toNat_mul, BitVec.toNat_ofNat, Nat.reducePow]
-      omega
-    rw [haddr]
-    iexact H1
-
 /-! ## The frame -/
 
 /-- The four saved cells: ra and s0 (saved at entry), and the two slots
@@ -211,8 +115,8 @@ def sysLinkCells [CurCtx] (sp0 ra s0 w3 w4 : BitVec 64) : IProp GF := iprop%
 
 /-- The three buffers, any contents (what the epilogue re-folds). -/
 def sysLinkBufs [CurCtx] (sp0 : BitVec 64) : IProp GF := iprop%
-  sysLinkAny (sysLinkName sp0) 16 ∗ sysLinkAny (sysLinkNew sp0) 128 ∗
-  sysLinkAny (sysLinkOld sp0) 128
+  sysfileAny (sysLinkName sp0) 16 ∗ sysfileAny (sysLinkNew sp0) 128 ∗
+  sysfileAny (sysLinkOld sp0) 128
 
 /-- The 34 low slots are the three buffers' regions. -/
 theorem sys_link_low_split [CurCtx] (sp0 : BitVec 64) :
@@ -246,12 +150,12 @@ theorem sys_link_carve [CurCtx] (sp0 : BitVec 64) :
       ⌜(sysLinkOld sp0).toNat % 8 = 0⌝ ∗ sysLinkBufs sp0 := by
   refine (sys_link_low_split sp0).1.trans ?_
   iintro ⟨Hn, Hw, Ho⟩
-  icases sys_link_stack_bytes (sysLinkName sp0) 1 $$ Hn with ⟨%bn, ⟨%hn, -⟩, Bn⟩
-  icases sys_link_stack_bytes (sysLinkNew sp0) 15 $$ Hw with ⟨%bw, ⟨%hw, -⟩, Bw⟩
-  icases sys_link_stack_bytes (sysLinkOld sp0) 15 $$ Ho with ⟨%bo, ⟨%ho, %hal⟩, Bo⟩
+  icases sysfile_stack_bytes (sysLinkName sp0) 1 $$ Hn with ⟨%bn, ⟨%hn, -⟩, Bn⟩
+  icases sysfile_stack_bytes (sysLinkNew sp0) 15 $$ Hw with ⟨%bw, ⟨%hw, -⟩, Bw⟩
+  icases sysfile_stack_bytes (sysLinkOld sp0) 15 $$ Ho with ⟨%bo, ⟨%ho, %hal⟩, Bo⟩
   isplitr
   · ipureintro; exact hal
-  unfold sysLinkBufs sysLinkAny
+  unfold sysLinkBufs sysfileAny
   isplitl [Bn]
   · iexists bn; iframe Bn; ipureintro; omega
   isplitl [Bw]
@@ -270,11 +174,11 @@ theorem sys_link_fold [CurCtx] (sp0 : BitVec 64) (hal : (sysLinkOld sp0).toNat %
     have : sysLinkNew sp0 = sysLinkOld sp0 + 128#64 := by
       unfold sysLinkNew sysLinkOld; bv_omega
     rw [this, BitVec.toNat_add]; simp only [BitVec.toNat_ofNat]; omega
-  unfold sysLinkBufs sysLinkAny
+  unfold sysLinkBufs sysfileAny
   iintro ⟨⟨%bn, %hbn, Bn⟩, ⟨%bw, %hbw, Bw⟩, ⟨%bo, %hbo, Bo⟩⟩
-  ihave Hn := sys_link_bytes_stack (sysLinkName sp0) hn (1 + 1) bn (by omega) $$ Bn
-  ihave Hw := sys_link_bytes_stack (sysLinkNew sp0) hw (15 + 1) bw (by omega) $$ Bw
-  ihave Ho := sys_link_bytes_stack (sysLinkOld sp0) hal (15 + 1) bo (by omega) $$ Bo
+  ihave Hn := byteBuf_stackOwn (sysLinkName sp0) hn (1 + 1) bn (by omega) $$ Bn
+  ihave Hw := byteBuf_stackOwn (sysLinkNew sp0) hw (15 + 1) bw (by omega) $$ Bw
+  ihave Ho := byteBuf_stackOwn (sysLinkOld sp0) hal (15 + 1) bo (by omega) $$ Bo
   iframe
 
 set_option maxHeartbeats 4000000 in
@@ -429,12 +333,6 @@ theorem sysLinkPins_exit (k : KCtx) (R : RegMap) (h : sysLinkPins k R (k.regs 9#
 
 /-! ## The ambient context, pinned at the kernel tier -/
 
-theorem sys_link_ctx (X : CurCtx) (h : X.curTier = KTier.kpt) : X = ⟨X.curCtx, KTier.kpt⟩ := by
-  cases X; simp only at h; subst h; rfl
-
-theorem sys_link_cur_kpt [inst : CurCtx] (hct : curTier = KTier.kpt) :
-    (⟨curCtx, KTier.kpt⟩ : CurCtx) = inst := (sys_link_ctx inst hct).symm
-
 /-! ## The arguments, the out bundle, the block's cwd seam -/
 
 /-- The contract's parameters, as one record (the `NamexArgs` pattern). -/
@@ -490,7 +388,7 @@ theorem sys_link_block_open (hct : curTier = KTier.kpt) (A : SysLinkArgs GF) (P2
     procPrivFd (GF := GF) A.γ (procAddr A.j) A.pid { A.V with upt := P2 } (viewFaulted A.V.upt P2 A.M) ⊢
       sysLinkRows (procAddr A.j) A.pid A.V ∗ sysLinkHole A (procAddr A.j) P2 := by
   unfold sysLinkHole sysLinkRows procPrivFd procPrivCoreNoctxAt procPrivBareAt procFieldsNoOfile cwdRefAt
-  rw [sys_link_cur_kpt hct]
+  rw [sysfile_cur_kpt hct]
   iintro ⟨⟨⟨%h, Hpid, ⟨Hk, Hs, Hpg, Htf, Hcwd, Hnm⟩, Hpt, Htfp, %hlz⟩, Hc⟩, Hof⟩
   iframe Hpid Hcwd Hc
   isplitr

@@ -1,7 +1,7 @@
 /-
 sys_unlink's callees at their call sites (stage file of `ProofSysUnlink`):
 each interface unpacked out of its structure and restated over sys_unlink's
-environment `sysUnlinkEnv Γ` (`procsInv`, `panicEnv`, `fsReady`), with the
+environment `sysfileEnv Γ` (`procsInv`, `panicEnv`, `fsReady`), with the
 callee's `wpNext` continuation made HART-FREE (the `NamexCalls` /
 `SysLinkCalls` pattern: the wrapper discharges the callee's crossing with
 `wpNext_intro_pin`, and a callee that does not thread the trap-CSR complement
@@ -9,8 +9,8 @@ has it carried across its own crossing).  A NEW FILE (a split of the Rocq
 walk files' inline callee applications; the `Xv6/SysLinkCalls.lean`
 precedent).
 
-* `sys_unlink_argstr` (+0x12), `sys_unlink_begin_op` (+0x1c),
-  `sys_unlink_end_op` (every arm);
+* `sys_unlink_argstr` (+0x12), `sysfile_begin_op` (+0x1c),
+  `sysfile_end_op` (every arm);
 * `sys_unlink_nameiparent` (+0x28): THE ERA CONTRACT
   (`NPAR_WRAP_ERA.wp_npar_wrap_era_eb`, Rocq `NparEra.wp_npar_wrap_era`);
 * `sys_unlink_ilock_tx` (+0x30, `dp`): the WRITE ARM at the whole
@@ -66,28 +66,7 @@ variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [Fdslot
   [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
   [Appcfg GF] [FileG GF] [Fscfg] [Icfg] [CurCtx]
 
-/-- A context at depth 0 holds no lock (`KCtx.wf`). -/
-theorem sys_unlink_nolocks (cpu : CPU) (k' : KCtx) (hnoff : k'.noff = 0) :
-    kctx (GF := GF) cpu k' ⊢ ⌜k'.locks = []⌝ ∗ kctx cpu k' := by
-  iintro Hk
-  icases kctx_wf _ _ $$ Hk with ⟨%hwf, Hk⟩
-  iframe Hk
-  ipureintro
-  exact List.eq_nil_of_length_eq_zero (by have := hwf.2.2.2.1; omega)
-
 /-! ## argstr, with the buffer's width on the failure arm -/
-
-theorem sys_unlink_umemStr_len (M : Nat → List (BitVec 8)) (va max : Nat) (s : List (BitVec 8))
-    (h : umemStr M va max = some s) : s.length ≤ max := by
-  unfold umemStr at h
-  simp only at h
-  cases hf : (umemRead M va max).findIdx? (· = 0#8) with
-  | none => rw [hf] at h; cases h
-  | some i =>
-    rw [hf] at h
-    simp only [Option.some.injEq] at h
-    rw [← h, List.length_take, UMemL.umemRead_length]
-    omega
 
 /-- fetchstr keeps its buffer at a fixed width, on BOTH arms (the failure
 arm's clause landed with `fetchstr: the failure arm keeps the buffer's
@@ -95,7 +74,7 @@ length`; the success arm's is `umemStr`'s bound). -/
 theorem sys_unlink_fetch_len (M : Nat → List (BitVec 8)) (va : Nat) (old bs : List (BitVec 8))
     (r : BitVec 64) (h : fetchstrRet M va old bs r) : bs.length = old.length := by
   rcases h with ⟨pl, hs, hbs, -⟩ | ⟨-, hl⟩
-  · have := sys_unlink_umemStr_len M va old.length _ hs
+  · have := UMemL.umemStr_length_le M va old.length _ hs
     rw [hbs]
     simp only [List.length_append, List.length_cons, List.length_drop, List.length_singleton,
       List.length_nil] at this ⊢
@@ -179,7 +158,7 @@ theorem sys_unlink_argstr (AS : ARGSTR_W) (Γ : SchedNames) (cpu : CPU) (k' : KC
     (hmax : k'.regs 12#5 = BitVec.ofNat 64 old.length) (hmax' : old.length < 2 ^ 31)
     (ba : BitVec 64) (hba : k'.regs 11#5 = ba) :
     kctx cpu k' ∗ pcIs cpu KA.«argstr» ∗
-    trapCsrsExt cpu se ∗ cpuClaimExt cpu se pj ∗ sysUnlinkEnv (hlc := hlc) Γ ∗
+    trapCsrsExt cpu se ∗ cpuClaimExt cpu se pj ∗ sysfileEnv (hlc := hlc) Γ ∗
     procPrivBareAt curCtx pa pid V M ∗ byteBuf ba (DFrac.own 1) old ∗
     (∀ (c : CPU) (spie spp : Bool) (R' : RegMap) (P' : UPtd) (bs : List (BitVec 8)),
       ⌜calleeSaved k'.regs R' ∧ V.upt.extSz V.sz P' ∧
@@ -191,8 +170,8 @@ theorem sys_unlink_argstr (AS : ARGSTR_W) (Γ : SchedNames) (cpu : CPU) (k' : KC
     ⊢ wpLoop (GF := GF) cpu := by
   subst hs hpj hba
   iintro ⟨Hk, Hpc, Hte, Hce, #Henv, Hblk, Hbuf, HK⟩
-  icases sys_unlink_nolocks cpu k' hnoff $$ Hk with ⟨%hlocks, Hk⟩
-  unfold sysUnlinkEnv
+  icases sysfile_nolocks cpu k' hnoff $$ Hk with ⟨%hlocks, Hk⟩
+  unfold sysfileEnv
   icases Henv with ⟨#Hpi, #Hpe, #Hrdy⟩
   icases fsReady_kmem $$ Hrdy with ⟨#Hkl, #Hav⟩
   have h := AS.wp_argstr_w (hlc := hlc) (GF := GF) cpu k' fscKalloc fsReadyKmem pa pid V M i v old
@@ -212,76 +191,6 @@ theorem sys_unlink_argstr (AS : ARGSTR_W) (Γ : SchedNames) (cpu : CPU) (k' : KC
   exact ⟨hcs, hf.1, hf.2.1, hf.2.2⟩
 
 /-! ## begin_op / end_op -/
-
-set_option maxHeartbeats 8000000 in
-/-- `begin_op()` at +0x1c. -/
-theorem sys_unlink_begin_op (BO : BEGIN_OP) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
-    (cpu : CPU) (k' : KCtx) (se : Bool) (hs : k'.sie = se) (pj : BitVec 64)
-    (hpj : k'.proc = pj) (j : Nat) (pidv : BitVec 32)
-    (hj : j < NPROC) (hproc : k'.proc = procAddr j) (hK : beginOpSlots ≤ k'.avail)
-    (hnoff : k'.noff = 0) (htier : k'.tier = KTier.kpt) :
-    kctx cpu k' ∗ pcIs cpu KA.«begin_op» ∗
-    trapCsrsExt cpu se ∗ cpuClaimExt cpu se pj ∗ sysUnlinkEnv (hlc := hlc) Γ ∗
-    wordPointsTo (pPid pj) 4 pidPriv pidv ∗
-    (∀ (c : CPU) (spie spp : Bool) (R' : RegMap),
-      ⌜calleeSaved k'.regs R'⌝ -∗
-      kctx c ((k'.withSpie spie spp).withRegs R') -∗ pcIs c (jumpPc (k'.regs 1#5)) -∗
-      trapCsrsExt c se -∗ cpuClaimExt c se pj -∗
-      wordPointsTo (pPid pj) 4 pidPriv pidv -∗
-      logOp icfgLog MAXOPBLOCKS -∗ wpLoop c)
-    ⊢ wpLoop (GF := GF) cpu := by
-  subst hs hpj
-  have h := BO.wp_begin_op_eb (hlc := hlc) (GF := GF) Γ cpu k' icfgLog fscBio
-    (fsView fscFs fscDisk icfgDev fscCov) fscFs j fscLogst icfgDev pidv pidPriv
-    hj hproc hK hnoff htier
-  unfold wp_begin_op_eb_body at h
-  simp only [beginOpAddr, fsView_cov] at h
-  iintro ⟨Hk, Hpc, Hte, Hce, #Henv, Hpid, HK⟩
-  unfold sysUnlinkEnv
-  icases Henv with ⟨#Hpi, #Hpe, #Hrdy⟩
-  ihave #Hlc := fsReady_log $$ Hrdy
-  iapply h
-  iframe Hk Hpc Hte Hce Hpid
-  iframe #
-  iapply wpNext_intro_pin
-  iintro %c %_ %spie %spp %R' %hcs Hk Hpc Hte Hce Hpid Hop
-  iapply HK $$ %c %spie %spp %R' %hcs Hk Hpc Hte Hce Hpid Hop
-
-set_option maxHeartbeats 8000000 in
-/-- `end_op()` on every arm. -/
-theorem sys_unlink_end_op (EO : END_OP) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
-    (cpu : CPU) (k' : KCtx) (se : Bool) (hs : k'.sie = se) (pj : BitVec 64)
-    (hpj : k'.proc = pj) (j : Nat) (u : Nat) (pidv : BitVec 32)
-    (hj : j < NPROC) (hproc : k'.proc = procAddr j) (hK : endOpSlots ≤ k'.avail)
-    (hnoff : k'.noff = 0) (htier : k'.tier = KTier.kpt) :
-    kctx cpu k' ∗ pcIs cpu KA.«end_op» ∗
-    trapCsrsExt cpu se ∗ cpuClaimExt cpu se pj ∗ sysUnlinkEnv (hlc := hlc) Γ ∗
-    wordPointsTo (pPid pj) 4 pidPriv pidv ∗ logOp icfgLog u ∗
-    (∀ (c : CPU) (spie spp : Bool) (R' : RegMap),
-      ⌜calleeSaved k'.regs R'⌝ -∗
-      kctx c ((k'.withSpie spie spp).withRegs R') -∗ pcIs c (jumpPc (k'.regs 1#5)) -∗
-      trapCsrsExt c se -∗ cpuClaimExt c se pj -∗
-      wordPointsTo (pPid pj) 4 pidPriv pidv -∗ wpLoop c)
-    ⊢ wpLoop (GF := GF) cpu := by
-  subst hs hpj
-  iintro ⟨Hk, Hpc, Hte, Hce, #Henv, Hpid, Hop, HK⟩
-  unfold sysUnlinkEnv
-  icases Henv with ⟨#Hpi, #Hpe, #Hrdy⟩
-  ihave %hg := fsReady_geom $$ Hrdy
-  icases fsReady_bio $$ Hrdy with ⟨%γbl, #Hbc⟩
-  ihave #Hlc := fsReady_log $$ Hrdy
-  icases fsReady_disk $$ Hrdy with ⟨%pd, %pav, %pu, #Hdc, %hpd⟩
-  have h := EO.wp_end_op_eb (hlc := hlc) (GF := GF) Γ cpu k' icfgLog γbl fscBio
-    (fsView fscFs fscDisk icfgDev fscCov) fscDlock fscFs pd pav pu j fscLogst icfgDev u pidv pidPriv
-    hj hproc hK hnoff htier hg.fgoLog rfl rfl rfl hpd
-  unfold wp_end_op_eb_body at h
-  simp only [endOpAddr, fsView_cov, fsView_gd] at h
-  iapply h
-  iframe Hk Hpc Hte Hce Hpid Hop
-  iframe #
-  iapply wpNext_intro_pin
-  iintro %c %_ %spie %spp %R' %hcs Hk Hpc Hte Hce Hpid
-  iapply HK $$ %c %spie %spp %R' %hcs Hk Hpc Hte Hce Hpid
 
 /-! ## nameiparent, at the era contract -/
 
@@ -323,7 +232,7 @@ theorem sys_unlink_nameiparent (NP : NPAR_WRAP_ERA) (Γ : SchedNames) [ClaimIs (
     (hbud : walkNeed (pathElems (bview plen pfun)).length ≤ n)
     (pv nb : BitVec 64) (hpv : k'.regs 10#5 = pv) (hnb : k'.regs 11#5 = nb) :
     kctx cpu k' ∗ pcIs cpu KA.«nameiparent» ∗
-    trapCsrsExt cpu se ∗ cpuClaimExt cpu se pj ∗ sysUnlinkEnv (hlc := hlc) Γ ∗
+    trapCsrsExt cpu se ∗ cpuClaimExt cpu se pj ∗ sysfileEnv (hlc := hlc) Γ ∗
     procPrivCoreNoctxAt curCtx pa pid V M ∗
     byteBuf pv (DFrac.own 1) (bview (plen + 1) pfun) ∗
     byteBuf nb (DFrac.own 1) (bview 14 nfun) ∗
@@ -333,7 +242,7 @@ theorem sys_unlink_nameiparent (NP : NPAR_WRAP_ERA) (Γ : SchedNames) [ClaimIs (
     ⊢ wpLoop (GF := GF) cpu := by
   subst hs hpj hpa hpv hnb
   iintro ⟨Hk, Hpc, Hte, Hce, #Henv, Hcore, Hpath, Hnm, Hbs, Hir, Hop, Htx, Hst, HK⟩
-  unfold sysUnlinkEnv
+  unfold sysfileEnv
   icases Henv with ⟨#Hpi, #Hpe, #Hrdy⟩
   ihave %hg := fsReady_geom $$ Hrdy
   icases fsReady_bio $$ Hrdy with ⟨%γbl, #Hbc⟩
@@ -408,7 +317,7 @@ theorem sys_unlink_ilock_tx (IL : ILOCK) (Γ : SchedNames) [ClaimIs (hlc := hlc)
     (hnoff : k'.noff = 0) (htier : k'.tier = KTier.kpt) (hkk : ik < NINODE)
     (hnib : inum.toNat < 16 * icfgNib) (ha0 : k'.regs 10#5 = ientry ik) (hle : lo ≤ tl) :
     kctx cpu k' ∗ pcIs cpu KA.«ilock» ∗
-    trapCsrsExt cpu se ∗ cpuClaimExt cpu se pj ∗ sysUnlinkEnv (hlc := hlc) Γ ∗
+    trapCsrsExt cpu se ∗ cpuClaimExt cpu se pj ∗ sysfileEnv (hlc := hlc) Γ ∗
     credFloor lo tl ∗ inodeRefGenlo ik q icfgDev inum g lo ∗ runitAny inum.toNat ∗
     wordPointsTo (pPid pj) 4 pidPriv pidv ∗ bslot ∗ logTx icfgLog ∗
     (∀ (c : CPU) (spie spp : Bool) (R' : RegMap) (dn : Dinode) (bm : Blkmap) (γil γisl : GName),
@@ -421,7 +330,7 @@ theorem sys_unlink_ilock_tx (IL : ILOCK) (Γ : SchedNames) [ClaimIs (hlc := hlc)
     ⊢ wpLoop (GF := GF) cpu := by
   subst hs hpj
   iintro ⟨Hk, Hpc, Hte, Hce, #Henv, #Hfl, Href, Hru, Hpid, Hbs, Htx, HK⟩
-  unfold sysUnlinkEnv
+  unfold sysfileEnv
   icases Henv with ⟨#Hpi, #Hpe, #Hrdy⟩
   ihave %hg := fsReady_geom $$ Hrdy
   icases fsReady_bio $$ Hrdy with ⟨%γbl, #Hbc⟩
@@ -468,7 +377,7 @@ theorem sys_unlink_ilock_dep (IL : ILOCK) (Γ : SchedNames) [ClaimIs (hlc := hlc
     (hnoff : k'.noff = 0) (htier : k'.tier = KTier.kpt) (hkk : ik < NINODE)
     (hnib : inum.toNat < 16 * icfgNib) (ha0 : k'.regs 10#5 = ientry ik) :
     kctx cpu k' ∗ pcIs cpu KA.«ilock» ∗
-    trapCsrsExt cpu se ∗ cpuClaimExt cpu se pj ∗ sysUnlinkEnv (hlc := hlc) Γ ∗
+    trapCsrsExt cpu se ∗ cpuClaimExt cpu se pj ∗ sysfileEnv (hlc := hlc) Γ ∗
     inodeRef ik q icfgDev inum ∗ runitAny inum.toNat ∗
     wordPointsTo (pPid pj) 4 pidPriv pidv ∗ bslot ∗ txPin icfgLog t qa ∗
     (∀ (c : CPU) (spie spp : Bool) (R' : RegMap) (dn : Dinode) (bm : Blkmap) (γil γisl : GName)
@@ -482,7 +391,7 @@ theorem sys_unlink_ilock_dep (IL : ILOCK) (Γ : SchedNames) [ClaimIs (hlc := hlc
     ⊢ wpLoop (GF := GF) cpu := by
   subst hs hpj
   iintro ⟨Hk, Hpc, Hte, Hce, #Henv, Href, Hru, Hpid, Hbs, Htx, HK⟩
-  unfold sysUnlinkEnv
+  unfold sysfileEnv
   icases Henv with ⟨#Hpi, #Hpe, #Hrdy⟩
   ihave %hg := fsReady_geom $$ Hrdy
   icases fsReady_bio $$ Hrdy with ⟨%γbl, #Hbc⟩
@@ -603,7 +512,7 @@ theorem sys_unlink_dirlookup (DL : DIRLOOKUP) (Γ : SchedNames) [ClaimIs (hlc :=
     (ha0 : k'.regs 10#5 = ientry ik) (nb pa : BitVec 64) (hnb : k'.regs 11#5 = nb)
     (hpa : k'.regs 12#5 = pa) (ha2 : pa ≠ 0#64) :
     kctx cpu k' ∗ pcIs cpu KA.«dirlookup» ∗
-    trapCsrsExt cpu se ∗ cpuClaimExt cpu se pj ∗ sysUnlinkEnv (hlc := hlc) Γ ∗
+    trapCsrsExt cpu se ∗ cpuClaimExt cpu se pj ∗ sysfileEnv (hlc := hlc) Γ ∗
     wordPointsTo (iDev (ientry ik)) 4 (DFrac.own (1 : Qp).half) icfgDev ∗
     inodeMeta (ientry ik) dn ∗ inodeMap fscFs (ientry ik) bm ∗ inodeBlocks fscFs bm data ∗
     byteBuf nb (DFrac.own 1) (bview 14 nf) ∗
@@ -617,7 +526,7 @@ theorem sys_unlink_dirlookup (DL : DIRLOOKUP) (Γ : SchedNames) [ClaimIs (hlc :=
   have hinums := dirOk_dir icfgNib dn data htype hdok
   iintro ⟨Hk, Hpc, Hte, Hce, #Henv, Hdev, Hmeta, Hmap, Hblk, Hnm, Hoff, Hpid, Hbs, Hslot, Hlk,
     Hdi, HK⟩
-  unfold sysUnlinkEnv
+  unfold sysfileEnv
   icases Henv with ⟨#Hpi, #Hpe, #Hrdy⟩
   ihave %hg := fsReady_geom $$ Hrdy
   icases fsReady_bio $$ Hrdy with ⟨%γbl, #Hbc⟩
@@ -685,7 +594,7 @@ theorem sys_unlink_writei (WI : WRITEI) (Γ : SchedNames) [ClaimIs (hlc := hlc) 
     (ha3 : k'.regs 13#5 = BitVec.ofNat 64 off) (ha4 : k'.regs 14#5 = BitVec.ofNat 64 16)
     (sa : BitVec 64) (hsa : k'.regs 12#5 = sa) :
     kctx cpu k' ∗ pcIs cpu KA.«writei» ∗
-    trapCsrsExt cpu se ∗ cpuClaimExt cpu se pj ∗ sysUnlinkEnv (hlc := hlc) Γ ∗
+    trapCsrsExt cpu se ∗ cpuClaimExt cpu se pj ∗ sysfileEnv (hlc := hlc) Γ ∗
     wordPointsTo (iDev (ientry ik)) 4 (DFrac.own (1 : Qp).half) icfgDev ∗
     wordPointsTo (iInum (ientry ik)) 4 (DFrac.own (1 : Qp).half) inum ∗
     inodeMeta (ientry ik) dn ∗ inodeMap fscFs (ientry ik) bm ∗ inodeBlocks fscFs bm data ∗
@@ -696,7 +605,7 @@ theorem sys_unlink_writei (WI : WRITEI) (Γ : SchedNames) [ClaimIs (hlc := hlc) 
     ⊢ wpLoop (GF := GF) cpu := by
   subst hs hpj hsa
   iintro ⟨Hk, Hpc, Hte, Hce, #Henv, Hdev, Hinum, Hmeta, Hmap, Hblk, Hdi, Hsrc, Hpid, Hbs, Hop, HK⟩
-  unfold sysUnlinkEnv
+  unfold sysfileEnv
   icases Henv with ⟨#Hpi, #Hpe, #Hrdy⟩
   ihave %hg := fsReady_geom $$ Hrdy
   icases fsReady_bio $$ Hrdy with ⟨%γbl, #Hbc⟩
@@ -746,7 +655,7 @@ theorem sys_unlink_readi (RD : READI) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF
     (ha3 : k'.regs 13#5 = BitVec.ofNat 64 off) (ha4 : k'.regs 14#5 = 16#64)
     (holds : olds.length = 16) (da : BitVec 64) (hda : k'.regs 12#5 = da) :
     kctx cpu k' ∗ pcIs cpu KA.«readi» ∗
-    trapCsrsExt cpu se ∗ cpuClaimExt cpu se pj ∗ sysUnlinkEnv (hlc := hlc) Γ ∗
+    trapCsrsExt cpu se ∗ cpuClaimExt cpu se pj ∗ sysfileEnv (hlc := hlc) Γ ∗
     wordPointsTo (iDev ip) 4 (DFrac.own (1 : Qp).half) icfgDev ∗ inodeMeta ip dn ∗
     inodeMap fscFs ip bm ∗ inodeBlocks fscFs bm data ∗
     byteBuf da (DFrac.own 1) olds ∗ wordPointsTo (pPid pj) 4 pidPriv pidv ∗
@@ -763,7 +672,7 @@ theorem sys_unlink_readi (RD : READI) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF
     ⊢ wpLoop (GF := GF) cpu := by
   subst hs hpj hda
   iintro ⟨Hk, Hpc, Hte, Hce, #Henv, Hdev, Hmeta, Hmap, Hblk, Hbuf, Hpid, Hsl, HK⟩
-  unfold sysUnlinkEnv
+  unfold sysfileEnv
   icases Henv with ⟨#Hpi, #Hpe, #Hrdy⟩
   ihave %hg := fsReady_geom $$ Hrdy
   icases fsReady_bio $$ Hrdy with ⟨%γbl, #Hbc⟩
@@ -798,7 +707,7 @@ theorem sys_unlink_iupdate_unlink (IU : IUPDATE) (Γ : SchedNames) [ClaimIs (hlc
     (hda : dn.diAddrs = bmCells bm) (hdir : bm.bmDir.length = NDIRECT)
     (ha0 : k'.regs 10#5 = ientry kk) :
     kctx cpu k' ∗ pcIs cpu KA.«iupdate» ∗
-    trapCsrsExt cpu se ∗ cpuClaimExt cpu se pj ∗ sysUnlinkEnv (hlc := hlc) Γ ∗
+    trapCsrsExt cpu se ∗ cpuClaimExt cpu se pj ∗ sysfileEnv (hlc := hlc) Γ ∗
     wordPointsTo (iDev (ientry kk)) 4 (DFrac.own (1 : Qp).half) icfgDev ∗
     wordPointsTo (iInum (ientry kk)) 4 (DFrac.own (1 : Qp).half) inum ∗
     inodeMeta (ientry kk) dn ∗ inodeMap fscFs (ientry kk) bm ∗
@@ -819,7 +728,7 @@ theorem sys_unlink_iupdate_unlink (IU : IUPDATE) (Γ : SchedNames) [ClaimIs (hlc
     ⊢ wpLoop (GF := GF) cpu := by
   subst hs hpj
   iintro ⟨Hk, Hpc, Hte, Hce, #Henv, Hdev, Hinum, Hmeta, Hmap, Hdi, Htok, Hpid, Hbs, Hop, HK⟩
-  unfold sysUnlinkEnv
+  unfold sysfileEnv
   icases Henv with ⟨#Hpi, #Hpe, #Hrdy⟩
   ihave %hg := fsReady_geom $$ Hrdy
   icases fsReady_bio $$ Hrdy with ⟨%γbl, #Hbc⟩
@@ -859,7 +768,7 @@ theorem sys_unlink_iunlockput_tx (IUP : IUNLOCKPUT) (Γ : SchedNames) [ClaimIs (
     (hnib : inum.toNat < 16 * icfgNib) (hn : iputUnits ≤ n) (ha0 : k'.regs 10#5 = ientry ik)
     (hle : lo ≤ tl) :
     kctx cpu k' ∗ pcIs cpu KA.«iunlockput» ∗
-    trapCsrsExt cpu se ∗ cpuClaimExt cpu se pj ∗ sysUnlinkEnv (hlc := hlc) Γ ∗
+    trapCsrsExt cpu se ∗ cpuClaimExt cpu se pj ∗ sysfileEnv (hlc := hlc) Γ ∗
     sysUnlinkLkTx pidv ik q g lo tl inum dn γil γisl ∗
     icLoaded fscFs fscIreg fscCov fscLogst ik inum dn bm ∗
     wordPointsTo (pPid pj) 4 pidPriv pidv ∗ bslots 3 ∗ logOpS icfgLog n Sb ∗
@@ -874,7 +783,7 @@ theorem sys_unlink_iunlockput_tx (IUP : IUNLOCKPUT) (Γ : SchedNames) [ClaimIs (
   unfold sysUnlinkLkTx
   iintro ⟨Hk, Hpc, Hte, Hce, #Henv, ⟨#Hslk, #Hfl, Hsl, Hdep, Hoff, Hdev, Hinum, Hval, Hshot,
     Hfrz, Hkeep, Hru⟩, Hload, Hpid, Hbs, Hop, HK⟩
-  unfold sysUnlinkEnv
+  unfold sysfileEnv
   icases Henv with ⟨#Hpi, #Hpe, #Hrdy⟩
   ihave %hg := fsReady_geom $$ Hrdy
   icases fsReady_bio $$ Hrdy with ⟨%γbl, #Hbc⟩
@@ -927,7 +836,7 @@ theorem sys_unlink_iunlockput_dep (IUP : IUNLOCKPUT) (Γ : SchedNames) [ClaimIs 
     (hnib : inum.toNat < 16 * icfgNib) (hn : iputUnits ≤ n) (ha0 : k'.regs 10#5 = ientry ik)
     (hle : lo ≤ tl) :
     kctx cpu k' ∗ pcIs cpu KA.«iunlockput» ∗
-    trapCsrsExt cpu se ∗ cpuClaimExt cpu se pj ∗ sysUnlinkEnv (hlc := hlc) Γ ∗
+    trapCsrsExt cpu se ∗ cpuClaimExt cpu se pj ∗ sysfileEnv (hlc := hlc) Γ ∗
     sysUnlinkLkAt pidv ik q g lo tl inum dn γil γisl t qa ∗
     icLoaded fscFs fscIreg fscCov fscLogst ik inum dn bm ∗
     wordPointsTo (pPid pj) 4 pidPriv pidv ∗ bslots 3 ∗ logOpS icfgLog n Sb ∗
@@ -943,7 +852,7 @@ theorem sys_unlink_iunlockput_dep (IUP : IUNLOCKPUT) (Γ : SchedNames) [ClaimIs 
   unfold sysUnlinkLkAt
   iintro ⟨Hk, Hpc, Hte, Hce, #Henv, ⟨#Hslk, #Hfl, Hsl, Hdep, Hoff, Hdev, Hinum, Hval, Hshot,
     Hfrz, Hkeep, Hru⟩, Hload, Hpid, Hbs, Hop, HK⟩
-  unfold sysUnlinkEnv
+  unfold sysfileEnv
   icases Henv with ⟨#Hpi, #Hpe, #Hrdy⟩
   ihave %hg := fsReady_geom $$ Hrdy
   icases fsReady_bio $$ Hrdy with ⟨%γbl, #Hbc⟩

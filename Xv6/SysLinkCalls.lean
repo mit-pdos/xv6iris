@@ -1,14 +1,14 @@
 /-
 sys_link's callees at their call sites (stage file of `ProofSysLink`): each
 interface unpacked out of its structure and restated over sys_link's
-environment `sysLinkEnv Γ` (`procsInv`, `panicEnv`, `fsReady`), with the
+environment `sysfileEnv Γ` (`procsInv`, `panicEnv`, `fsReady`), with the
 callee's `wpNext` continuation made HART-FREE (the `NamexCalls` pattern:
 the wrapper discharges the callee's crossing with `wpNext_intro_pin`, and a
 callee that does not thread the trap-CSR complement has it carried across
 its own crossing).
 
-* `sys_link_argstr` (+0x12, +0x26), `sys_link_begin_op` (+0x32),
-  `sys_link_end_op` (every arm), `sys_link_namei` (+0x3a),
+* `sys_link_argstr` (+0x12, +0x26), `sysfile_begin_op` (+0x32),
+  `sysfile_end_op` (every arm), `sys_link_namei` (+0x3a),
   `sys_link_nameiparent` (+0x78): the plain set-form walks
   (Rocq `Namei.wp_namei_gen` / `Nameiparent.wp_nameiparent_gen`);
 * `sys_link_ilock` (+0x42, +0x80, +0xf6): the WRITE ARM (`ILOCK.wp_ilock_tx_eb`,
@@ -52,21 +52,6 @@ variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [Fdslot
   [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
   [Appcfg GF] [FileG GF] [Fscfg] [Icfg] [CurCtx]
 
-/-- sys_link's persistent environment. -/
-def sysLinkEnv (Γ : SchedNames) : IProp GF := iprop(procsInv Γ ∗ panicEnv ∗ fsReady (hlc := hlc))
-
-instance sysLinkEnv_persistent (Γ : SchedNames) : Persistent (sysLinkEnv (hlc := hlc) (GF := GF) Γ) := by
-  unfold sysLinkEnv; infer_instance
-
-/-- A context at depth 0 holds no lock (`KCtx.wf`). -/
-theorem sys_link_nolocks (cpu : CPU) (k' : KCtx) (hnoff : k'.noff = 0) :
-    kctx (GF := GF) cpu k' ⊢ ⌜k'.locks = []⌝ ∗ kctx cpu k' := by
-  iintro Hk
-  icases kctx_wf _ _ $$ Hk with ⟨%hwf, Hk⟩
-  iframe Hk
-  ipureintro
-  exact List.eq_nil_of_length_eq_zero (by have := hwf.2.2.2.1; omega)
-
 /-! ## argstr -/
 
 set_option maxHeartbeats 8000000 in
@@ -82,7 +67,7 @@ theorem sys_link_argstr (AS : ARGSTR) (Γ : SchedNames) (cpu : CPU) (k' : KCtx) 
     (hK : argstrSlots ≤ k'.avail)
     (hmax : k'.regs 12#5 = BitVec.ofNat 64 old.length) (hmax' : old.length < 2 ^ 31) :
     kctx cpu k' ∗ pcIs cpu KA.«argstr» ∗
-    trapCsrsExt cpu se ∗ cpuClaimExt cpu se pj ∗ sysLinkEnv (hlc := hlc) Γ ∗
+    trapCsrsExt cpu se ∗ cpuClaimExt cpu se pj ∗ sysfileEnv (hlc := hlc) Γ ∗
     procPrivBareAt curCtx pa pid V M ∗ byteBuf buf (DFrac.own 1) old ∗
     (∀ (c : CPU) (spie spp : Bool) (R' : RegMap) (P' : UPtd) (bs : List (BitVec 8)),
       ⌜calleeSaved k'.regs R' ∧ V.upt.extSz V.sz P' ∧
@@ -94,8 +79,8 @@ theorem sys_link_argstr (AS : ARGSTR) (Γ : SchedNames) (cpu : CPU) (k' : KCtx) 
     ⊢ wpLoop (GF := GF) cpu := by
   subst hs hpj hbuf
   iintro ⟨Hk, Hpc, Hte, Hce, #Henv, Hblk, Hbuf, HK⟩
-  icases sys_link_nolocks cpu k' hnoff $$ Hk with ⟨%hlocks, Hk⟩
-  unfold sysLinkEnv
+  icases sysfile_nolocks cpu k' hnoff $$ Hk with ⟨%hlocks, Hk⟩
+  unfold sysfileEnv
   icases Henv with ⟨#Hpi, #Hpe, #Hrdy⟩
   icases fsReady_kmem $$ Hrdy with ⟨#Hkl, #Hav⟩
   have h := AS.wp_argstr (hlc := hlc) (GF := GF) cpu k' fscKalloc fsReadyKmem pa pid V M i v old
@@ -115,76 +100,6 @@ theorem sys_link_argstr (AS : ARGSTR) (Γ : SchedNames) (cpu : CPU) (k' : KCtx) 
   exact ⟨hcs, hf.1, hf.2⟩
 
 /-! ## begin_op / end_op -/
-
-set_option maxHeartbeats 8000000 in
-/-- `begin_op()` at +0x32. -/
-theorem sys_link_begin_op (BO : BEGIN_OP) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
-    (cpu : CPU) (k' : KCtx) (se : Bool) (hs : k'.sie = se) (pj : BitVec 64)
-    (hpj : k'.proc = pj) (j : Nat) (pidv : BitVec 32)
-    (hj : j < NPROC) (hproc : k'.proc = procAddr j) (hK : beginOpSlots ≤ k'.avail)
-    (hnoff : k'.noff = 0) (htier : k'.tier = KTier.kpt) :
-    kctx cpu k' ∗ pcIs cpu KA.«begin_op» ∗
-    trapCsrsExt cpu se ∗ cpuClaimExt cpu se pj ∗ sysLinkEnv (hlc := hlc) Γ ∗
-    wordPointsTo (pPid pj) 4 pidPriv pidv ∗
-    (∀ (c : CPU) (spie spp : Bool) (R' : RegMap),
-      ⌜calleeSaved k'.regs R'⌝ -∗
-      kctx c ((k'.withSpie spie spp).withRegs R') -∗ pcIs c (jumpPc (k'.regs 1#5)) -∗
-      trapCsrsExt c se -∗ cpuClaimExt c se pj -∗
-      wordPointsTo (pPid pj) 4 pidPriv pidv -∗
-      logOp icfgLog MAXOPBLOCKS -∗ wpLoop c)
-    ⊢ wpLoop (GF := GF) cpu := by
-  subst hs hpj
-  have h := BO.wp_begin_op_eb (hlc := hlc) (GF := GF) Γ cpu k' icfgLog fscBio
-    (fsView fscFs fscDisk icfgDev fscCov) fscFs j fscLogst icfgDev pidv pidPriv
-    hj hproc hK hnoff htier
-  unfold wp_begin_op_eb_body at h
-  simp only [beginOpAddr, fsView_cov] at h
-  iintro ⟨Hk, Hpc, Hte, Hce, #Henv, Hpid, HK⟩
-  unfold sysLinkEnv
-  icases Henv with ⟨#Hpi, #Hpe, #Hrdy⟩
-  ihave #Hlc := fsReady_log $$ Hrdy
-  iapply h
-  iframe Hk Hpc Hte Hce Hpid
-  iframe #
-  iapply wpNext_intro_pin
-  iintro %c %_ %spie %spp %R' %hcs Hk Hpc Hte Hce Hpid Hop
-  iapply HK $$ %c %spie %spp %R' %hcs Hk Hpc Hte Hce Hpid Hop
-
-set_option maxHeartbeats 8000000 in
-/-- `end_op()` on every arm. -/
-theorem sys_link_end_op (EO : END_OP) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
-    (cpu : CPU) (k' : KCtx) (se : Bool) (hs : k'.sie = se) (pj : BitVec 64)
-    (hpj : k'.proc = pj) (j : Nat) (u : Nat) (pidv : BitVec 32)
-    (hj : j < NPROC) (hproc : k'.proc = procAddr j) (hK : endOpSlots ≤ k'.avail)
-    (hnoff : k'.noff = 0) (htier : k'.tier = KTier.kpt) :
-    kctx cpu k' ∗ pcIs cpu KA.«end_op» ∗
-    trapCsrsExt cpu se ∗ cpuClaimExt cpu se pj ∗ sysLinkEnv (hlc := hlc) Γ ∗
-    wordPointsTo (pPid pj) 4 pidPriv pidv ∗ logOp icfgLog u ∗
-    (∀ (c : CPU) (spie spp : Bool) (R' : RegMap),
-      ⌜calleeSaved k'.regs R'⌝ -∗
-      kctx c ((k'.withSpie spie spp).withRegs R') -∗ pcIs c (jumpPc (k'.regs 1#5)) -∗
-      trapCsrsExt c se -∗ cpuClaimExt c se pj -∗
-      wordPointsTo (pPid pj) 4 pidPriv pidv -∗ wpLoop c)
-    ⊢ wpLoop (GF := GF) cpu := by
-  subst hs hpj
-  iintro ⟨Hk, Hpc, Hte, Hce, #Henv, Hpid, Hop, HK⟩
-  unfold sysLinkEnv
-  icases Henv with ⟨#Hpi, #Hpe, #Hrdy⟩
-  ihave %hg := fsReady_geom $$ Hrdy
-  icases fsReady_bio $$ Hrdy with ⟨%γbl, #Hbc⟩
-  ihave #Hlc := fsReady_log $$ Hrdy
-  icases fsReady_disk $$ Hrdy with ⟨%pd, %pav, %pu, #Hdc, %hpd⟩
-  have h := EO.wp_end_op_eb (hlc := hlc) (GF := GF) Γ cpu k' icfgLog γbl fscBio
-    (fsView fscFs fscDisk icfgDev fscCov) fscDlock fscFs pd pav pu j fscLogst icfgDev u pidv pidPriv
-    hj hproc hK hnoff htier hg.fgoLog rfl rfl rfl hpd
-  unfold wp_end_op_eb_body at h
-  simp only [endOpAddr, fsView_cov, fsView_gd] at h
-  iapply h
-  iframe Hk Hpc Hte Hce Hpid Hop
-  iframe #
-  iapply wpNext_intro_pin
-  iintro %c %_ %spie %spp %R' %hcs Hk Hpc Hte Hce Hpid
-  iapply HK $$ %c %spie %spp %R' %hcs Hk Hpc Hte Hce Hpid
 
 /-! ## namei / nameiparent -/
 
@@ -218,7 +133,7 @@ theorem sys_link_namei (NI : NAMEI) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF �
     (hnn : ∀ i, i < plen → pfun i ≠ 0#8) (hterm : pfun plen = 0#8) (hplen : plen < 2 ^ 31)
     (hbud : walkNeed (pathElems (bview plen pfun)).length ≤ n) :
     kctx cpu k' ∗ pcIs cpu KA.«namei» ∗
-    trapCsrsExt cpu se ∗ cpuClaimExt cpu se pj ∗ sysLinkEnv (hlc := hlc) Γ ∗
+    trapCsrsExt cpu se ∗ cpuClaimExt cpu se pj ∗ sysfileEnv (hlc := hlc) Γ ∗
     wordPointsTo (pPid pj) 4 pidPriv pidv ∗
     wordPointsTo (pCwd pj) 8 (DFrac.own 1) cwdv ∗ inodeHeldAt cwdv cwi ∗
     byteBuf pv (DFrac.own 1) (bview (plen + 1) pfun) ∗
@@ -227,7 +142,7 @@ theorem sys_link_namei (NI : NAMEI) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF �
     ⊢ wpLoop (GF := GF) cpu := by
   subst hs hpj hpv
   iintro ⟨Hk, Hpc, Hte, Hce, #Henv, Hpid, Hcwd, Hcwr, Hpath, Hbs, Hir, Hop, Htx, HK⟩
-  unfold sysLinkEnv
+  unfold sysfileEnv
   icases Henv with ⟨#Hpi, #Hpe, #Hrdy⟩
   ihave %hg := fsReady_geom $$ Hrdy
   icases fsReady_bio $$ Hrdy with ⟨%γbl, #Hbc⟩
@@ -289,7 +204,7 @@ theorem sys_link_nameiparent (NP : NAMEIPARENT) (Γ : SchedNames) [ClaimIs (hlc 
     (hnn : ∀ i, i < plen → pfun i ≠ 0#8) (hterm : pfun plen = 0#8) (hplen : plen < 2 ^ 31)
     (hbud : walkNeed (pathElems (bview plen pfun)).length ≤ n) :
     kctx cpu k' ∗ pcIs cpu KA.«nameiparent» ∗
-    trapCsrsExt cpu se ∗ cpuClaimExt cpu se pj ∗ sysLinkEnv (hlc := hlc) Γ ∗
+    trapCsrsExt cpu se ∗ cpuClaimExt cpu se pj ∗ sysfileEnv (hlc := hlc) Γ ∗
     wordPointsTo (pPid pj) 4 pidPriv pidv ∗
     wordPointsTo (pCwd pj) 8 (DFrac.own 1) cwdv ∗ inodeHeldAt cwdv cwi ∗
     byteBuf pv (DFrac.own 1) (bview (plen + 1) pfun) ∗
@@ -299,7 +214,7 @@ theorem sys_link_nameiparent (NP : NAMEIPARENT) (Γ : SchedNames) [ClaimIs (hlc 
     ⊢ wpLoop (GF := GF) cpu := by
   subst hs hpj hpv hnb
   iintro ⟨Hk, Hpc, Hte, Hce, #Henv, Hpid, Hcwd, Hcwr, Hpath, Hnm, Hbs, Hir, Hop, Htx, HK⟩
-  unfold sysLinkEnv
+  unfold sysfileEnv
   icases Henv with ⟨#Hpi, #Hpe, #Hrdy⟩
   ihave %hg := fsReady_geom $$ Hrdy
   icases fsReady_bio $$ Hrdy with ⟨%γbl, #Hbc⟩
@@ -362,7 +277,7 @@ theorem sys_link_ilock (IL : ILOCK) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF �
     (hnoff : k'.noff = 0) (htier : k'.tier = KTier.kpt) (hkk : kk < NINODE)
     (hnib : inum.toNat < 16 * icfgNib) (ha0 : k'.regs 10#5 = ientry kk) (hle : lo ≤ tl) :
     kctx cpu k' ∗ pcIs cpu KA.«ilock» ∗
-    trapCsrsExt cpu se ∗ cpuClaimExt cpu se pj ∗ sysLinkEnv (hlc := hlc) Γ ∗
+    trapCsrsExt cpu se ∗ cpuClaimExt cpu se pj ∗ sysfileEnv (hlc := hlc) Γ ∗
     isSleeplockGen γil γisl (iLock (ientry kk)) (icSlp fscIc kk) (slhTok (icfgIsl kk)) ∗
     credFloor lo tl ∗ inodeShrGenlo kk s icfgDev inum g lo ∗ runitAny inum.toNat ∗
     wordPointsTo (pPid pj) 4 pidPriv pidv ∗ bslot ∗ logTx icfgLog ∗
@@ -370,7 +285,7 @@ theorem sys_link_ilock (IL : ILOCK) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF �
     ⊢ wpLoop (GF := GF) cpu := by
   subst hs hpj
   iintro ⟨Hk, Hpc, Hte, Hce, #Henv, #Hslk, #Hfl, Hshr, Hru, Hpid, Hbs, Htx, HK⟩
-  unfold sysLinkEnv
+  unfold sysfileEnv
   icases Henv with ⟨#Hpi, #Hpe, #Hrdy⟩
   ihave %hg := fsReady_geom $$ Hrdy
   icases fsReady_bio $$ Hrdy with ⟨%γbl, #Hbc⟩
@@ -414,7 +329,7 @@ theorem sys_link_iunlock (IU : IUNLOCK) (Γ : SchedNames) (cpu : CPU) (k' : KCtx
     (hK : iunlockSlots ≤ k'.avail) (hnoff : k'.noff = 0) (htier : k'.tier = KTier.kpt)
     (hkk : kk < NINODE) (ha0 : k'.regs 10#5 = ientry kk) (hle : lo ≤ tl) :
     kctx cpu k' ∗ pcIs cpu KA.«iunlock» ∗
-    trapCsrsExt cpu se ∗ cpuClaimExt cpu se pj ∗ sysLinkEnv (hlc := hlc) Γ ∗
+    trapCsrsExt cpu se ∗ cpuClaimExt cpu se pj ∗ sysfileEnv (hlc := hlc) Γ ∗
     isSleeplockGen γil γisl (iLock (ientry kk)) (icSlp fscIc kk) (slhTok (icfgIsl kk)) ∗
     credFloor lo tl ∗
     sleeplockedQ γisl s (iLock (ientry kk)) pidv ∗
@@ -435,8 +350,8 @@ theorem sys_link_iunlock (IU : IUNLOCK) (Γ : SchedNames) (cpu : CPU) (k' : KCtx
   subst hs hpj
   iintro ⟨Hk, Hpc, Hte, Hce, #Henv, #Hslk, #Hfl, Hsl, Hdep, Hoff, Hdev, Hinum, Hval, Hload,
     Hshot, Hfrz, Hpid, HK⟩
-  icases sys_link_nolocks cpu k' hnoff $$ Hk with ⟨%hlocks, Hk⟩
-  unfold sysLinkEnv
+  icases sysfile_nolocks cpu k' hnoff $$ Hk with ⟨%hlocks, Hk⟩
+  unfold sysfileEnv
   icases Henv with ⟨#Hpi, #Hpe, #Hrdy⟩
   icases fsReady_icache $$ Hrdy with ⟨#Hit2, #Hiti, #Hslks⟩
   ihave #Hesc := fsReady_escrow kk hkk $$ Hrdy
@@ -475,7 +390,7 @@ theorem sys_link_iupdate_link (IU : IUPDATE) (Γ : SchedNames) [ClaimIs (hlc := 
     (hda : dn.diAddrs = bmCells bm) (hdir : bm.bmDir.length = NDIRECT)
     (ha0 : k'.regs 10#5 = ientry kk) :
     kctx cpu k' ∗ pcIs cpu KA.«iupdate» ∗
-    trapCsrsExt cpu se ∗ cpuClaimExt cpu se pj ∗ sysLinkEnv (hlc := hlc) Γ ∗
+    trapCsrsExt cpu se ∗ cpuClaimExt cpu se pj ∗ sysfileEnv (hlc := hlc) Γ ∗
     wordPointsTo (iDev (ientry kk)) 4 (DFrac.own (1 : Qp).half) icfgDev ∗
     wordPointsTo (iInum (ientry kk)) 4 (DFrac.own (1 : Qp).half) inum ∗
     inodeMeta (ientry kk) dn ∗ inodeMap fscFs (ientry kk) bm ∗
@@ -498,7 +413,7 @@ theorem sys_link_iupdate_link (IU : IUPDATE) (Γ : SchedNames) [ClaimIs (hlc := 
     ⊢ wpLoop (GF := GF) cpu := by
   subst hs hpj
   iintro ⟨Hk, Hpc, Hte, Hce, #Henv, Hdev, Hinum, Hmeta, Hmap, Hdi, Hpin, Hpid, Hbs, Hop, HK⟩
-  unfold sysLinkEnv
+  unfold sysfileEnv
   icases Henv with ⟨#Hpi, #Hpe, #Hrdy⟩
   ihave %hg := fsReady_geom $$ Hrdy
   icases fsReady_bio $$ Hrdy with ⟨%γbl, #Hbc⟩
@@ -543,7 +458,7 @@ theorem sys_link_iupdate_unlink (IU : IUPDATE) (Γ : SchedNames) [ClaimIs (hlc :
     (hda : dn.diAddrs = bmCells bm) (hdir : bm.bmDir.length = NDIRECT)
     (ha0 : k'.regs 10#5 = ientry kk) :
     kctx cpu k' ∗ pcIs cpu KA.«iupdate» ∗
-    trapCsrsExt cpu se ∗ cpuClaimExt cpu se pj ∗ sysLinkEnv (hlc := hlc) Γ ∗
+    trapCsrsExt cpu se ∗ cpuClaimExt cpu se pj ∗ sysfileEnv (hlc := hlc) Γ ∗
     wordPointsTo (iDev (ientry kk)) 4 (DFrac.own (1 : Qp).half) icfgDev ∗
     wordPointsTo (iInum (ientry kk)) 4 (DFrac.own (1 : Qp).half) inum ∗
     inodeMeta (ientry kk) dn ∗ inodeMap fscFs (ientry kk) bm ∗
@@ -564,7 +479,7 @@ theorem sys_link_iupdate_unlink (IU : IUPDATE) (Γ : SchedNames) [ClaimIs (hlc :
     ⊢ wpLoop (GF := GF) cpu := by
   subst hs hpj
   iintro ⟨Hk, Hpc, Hte, Hce, #Henv, Hdev, Hinum, Hmeta, Hmap, Hdi, Htok, Hpid, Hbs, Hop, HK⟩
-  unfold sysLinkEnv
+  unfold sysfileEnv
   icases Henv with ⟨#Hpi, #Hpe, #Hrdy⟩
   ihave %hg := fsReady_geom $$ Hrdy
   icases fsReady_bio $$ Hrdy with ⟨%γbl, #Hbc⟩
@@ -604,7 +519,7 @@ theorem sys_link_iunlockput_sconf (IUP : IUNLOCKPUT) (Γ : SchedNames) [ClaimIs 
     (hnib : inum.toNat < 16 * icfgNib) (hn : iputUnits ≤ n) (ha0 : k'.regs 10#5 = ientry kk)
     (hle : lo ≤ tl) :
     kctx cpu k' ∗ pcIs cpu KA.«iunlockput» ∗
-    trapCsrsExt cpu se ∗ cpuClaimExt cpu se pj ∗ sysLinkEnv (hlc := hlc) Γ ∗
+    trapCsrsExt cpu se ∗ cpuClaimExt cpu se pj ∗ sysfileEnv (hlc := hlc) Γ ∗
     isSleeplockGen γil γisl (iLock (ientry kk)) (icSlp fscIc kk) (slhTok (icfgIsl kk)) ∗
     credFloor lo tl ∗
     sleeplockedQ γisl s (iLock (ientry kk)) pidv ∗
@@ -626,7 +541,7 @@ theorem sys_link_iunlockput_sconf (IUP : IUNLOCKPUT) (Γ : SchedNames) [ClaimIs 
   subst hs hpj
   iintro ⟨Hk, Hpc, Hte, Hce, #Henv, #Hslk, #Hfl, Hsl, Hdep, Hoff, Hdev, Hinum, Hval, Hload,
     Hshot, Hfrz, Hkeep, Hru, Hpid, Hbs, Hop, HK⟩
-  unfold sysLinkEnv
+  unfold sysfileEnv
   icases Henv with ⟨#Hpi, #Hpe, #Hrdy⟩
   ihave %hg := fsReady_geom $$ Hrdy
   icases fsReady_bio $$ Hrdy with ⟨%γbl, #Hbc⟩
@@ -672,7 +587,7 @@ theorem sys_link_iunlockput_gen (IUP : IUNLOCKPUT) (Γ : SchedNames) [ClaimIs (h
     (hnib : inum.toNat < 16 * icfgNib) (hn : iputUnits ≤ n) (ha0 : k'.regs 10#5 = ientry kk)
     (hle : lo ≤ tl) :
     kctx cpu k' ∗ pcIs cpu KA.«iunlockput» ∗
-    trapCsrsExt cpu se ∗ cpuClaimExt cpu se pj ∗ sysLinkEnv (hlc := hlc) Γ ∗
+    trapCsrsExt cpu se ∗ cpuClaimExt cpu se pj ∗ sysfileEnv (hlc := hlc) Γ ∗
     isSleeplockGen γil γisl (iLock (ientry kk)) (icSlp fscIc kk) (slhTok (icfgIsl kk)) ∗
     credFloor lo tl ∗
     sleeplockedQ γisl s (iLock (ientry kk)) pidv ∗
@@ -695,7 +610,7 @@ theorem sys_link_iunlockput_gen (IUP : IUNLOCKPUT) (Γ : SchedNames) [ClaimIs (h
   subst hs hpj
   iintro ⟨Hk, Hpc, Hte, Hce, #Henv, #Hslk, #Hfl, Hsl, Hdep, Hoff, Hdev, Hinum, Hval, Hload,
     Hshot, Hfrz, Hkeep, Hru, Hpid, Hbs, Hop, HK⟩
-  unfold sysLinkEnv
+  unfold sysfileEnv
   icases Henv with ⟨#Hpi, #Hpe, #Hrdy⟩
   ihave %hg := fsReady_geom $$ Hrdy
   icases fsReady_bio $$ Hrdy with ⟨%γbl, #Hbc⟩
@@ -737,7 +652,7 @@ theorem sys_link_iput (IP : IPUT) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
     (hnoff : k'.noff = 0) (htier : k'.tier = KTier.kpt) (hkk : kk < NINODE)
     (hnib : inum.toNat < 16 * icfgNib) (hn : iputUnits ≤ n) (ha0 : k'.regs 10#5 = ientry kk) :
     kctx cpu k' ∗ pcIs cpu KA.«iput» ∗
-    trapCsrsExt cpu se ∗ cpuClaimExt cpu se pj ∗ sysLinkEnv (hlc := hlc) Γ ∗
+    trapCsrsExt cpu se ∗ cpuClaimExt cpu se pj ∗ sysfileEnv (hlc := hlc) Γ ∗
     isSleeplockGen γil γisl (iLock (ientry kk)) (icSlp fscIc kk) (slhTok (icfgIsl kk)) ∗
     inodeRefp kk q icfgDev inum ∗
     wordPointsTo (pPid pj) 4 pidPriv pidv ∗ bslots 3 ∗ logOp icfgLog n ∗
@@ -750,7 +665,7 @@ theorem sys_link_iput (IP : IPUT) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
     ⊢ wpLoop (GF := GF) cpu := by
   subst hs hpj
   iintro ⟨Hk, Hpc, Hte, Hce, #Henv, #Hslk, Href, Hpid, Hbs, Hop, HK⟩
-  unfold sysLinkEnv
+  unfold sysfileEnv
   icases Henv with ⟨#Hpi, #Hpe, #Hrdy⟩
   ihave %hg := fsReady_geom $$ Hrdy
   icases fsReady_bio $$ Hrdy with ⟨%γbl, #Hbc⟩
@@ -822,7 +737,7 @@ theorem sys_link_dirlink (DLK : DIRLINK) (Γ : SchedNames) [ClaimIs (hlc := hlc)
       (bmapInd (16 * dirSlot data (dirNrec dn.diSize.toNat) / BSIZE)) ≤ ncount)
     (ha0 : k'.regs 10#5 = ientry kd) (ha2 : k'.regs 12#5 = BitVec.setWidth 64 inum) :
     kctx cpu k' ∗ pcIs cpu KA.«dirlink» ∗
-    trapCsrsExt cpu se ∗ cpuClaimExt cpu se pj ∗ sysLinkEnv (hlc := hlc) Γ ∗
+    trapCsrsExt cpu se ∗ cpuClaimExt cpu se pj ∗ sysfileEnv (hlc := hlc) Γ ∗
     wordPointsTo (iDev (ientry kd)) 4 (DFrac.own (1 : Qp).half) icfgDev ∗
     wordPointsTo (iInum (ientry kd)) 4 (DFrac.own (1 : Qp).half) dinum ∗
     inodeMeta (ientry kd) dn ∗ inodeMap fscFs (ientry kd) bm ∗ inodeBlocks fscFs bm data ∗
@@ -836,7 +751,7 @@ theorem sys_link_dirlink (DLK : DIRLINK) (Γ : SchedNames) [ClaimIs (hlc := hlc)
   subst hs hpj hnb
   iintro ⟨Hk, Hpc, Hte, Hce, #Henv, Hdev, Hinum, Hmeta, Hmap, Hblk, Hnm, Hdi, Hpid, Hbs, Hslot,
     Hdl, Hop, Htx, HK⟩
-  unfold sysLinkEnv
+  unfold sysfileEnv
   icases Henv with ⟨#Hpi, #Hpe, #Hrdy⟩
   ihave %hg := fsReady_geom $$ Hrdy
   icases fsReady_bio $$ Hrdy with ⟨%γbl, #Hbc⟩
@@ -869,30 +784,19 @@ theorem sys_link_dirlink (DLK : DIRLINK) (Γ : SchedNames) [ClaimIs (hlc := hlc)
 
 /-! ## The locked record's cells -/
 
-/-- The type cell, borrowed out of `inodeMeta`. -/
-theorem sys_link_meta_type (ip : BitVec 64) (dn : Dinode) :
-    inodeMeta (GF := GF) ip dn ⊢
-      wordPointsTo (iType ip) 2 (DFrac.own 1) dn.diType ∗
-      (wordPointsTo (iType ip) 2 (DFrac.own 1) dn.diType -∗ inodeMeta ip dn) := by
-  unfold inodeMeta
-  iintro ⟨Ht, Hrest⟩
-  iframe Ht
-  iintro Ht
-  iframe Ht Hrest
-
 /-- The nlink cell, borrowed out of `inodeMeta`, and put back at ANY value:
-the record becomes `sysLinkSetnl dn nl` (the `++` at +0x60, the `--` at
+the record becomes `sysfileSetnl dn nl` (the `++` at +0x60, the `--` at
 +0x100). -/
 theorem sys_link_meta_nlink (ip : BitVec 64) (dn : Dinode) :
     inodeMeta (GF := GF) ip dn ⊢
       wordPointsTo (iNlink ip) 2 (DFrac.own 1) dn.diNlink ∗
       (∀ nl : BitVec 16, wordPointsTo (iNlink ip) 2 (DFrac.own 1) nl -∗
-        inodeMeta ip (sysLinkSetnl dn nl)) := by
+        inodeMeta ip (sysfileSetnl dn nl)) := by
   unfold inodeMeta
   iintro ⟨Ht, Hma, Hmi, Hnl, Hsz⟩
   iframe Hnl
   iintro %nl Hnl
-  unfold sysLinkSetnl
+  unfold sysfileSetnl
   iframe Ht Hma Hmi Hnl Hsz
 
 /-- The nlink cell, borrowed read-only out of `inodeMeta` (the orphan
@@ -928,12 +832,12 @@ theorem sys_link_short_ident (kk : Nat) (qt qi : Qp) (dev inum : BitVec 32) (g :
 function (`name[DIRSIZ]`), two spare. -/
 def sysLinkNameBuf (sp0 : BitVec 64) (nf : Nat → BitVec 8) : IProp GF := iprop%
   byteBuf (sysLinkName sp0) (DFrac.own 1) (bview 14 nf) ∗
-  sysLinkAny (sysLinkName sp0 + 14#64) 2
+  sysfileAny (sysLinkName sp0 + 14#64) 2
 
 /-- The sixteen bytes, split fourteen + two (Rocq `sl_nm_split`). -/
 theorem sys_link_name_open (sp0 : BitVec 64) :
-    sysLinkAny (GF := GF) (sysLinkName sp0) 16 ⊢ ∃ nf : Nat → BitVec 8, sysLinkNameBuf sp0 nf := by
-  unfold sysLinkNameBuf sysLinkAny
+    sysfileAny (GF := GF) (sysLinkName sp0) 16 ⊢ ∃ nf : Nat → BitVec 8, sysLinkNameBuf sp0 nf := by
+  unfold sysLinkNameBuf sysfileAny
   iintro ⟨%bs, %hl, B⟩
   have hsplit : bs = bs.take 14 ++ bs.drop 14 := (List.take_append_drop 14 bs).symm
   have ht : (bs.take 14).length = 14 := by rw [List.length_take]; omega
@@ -951,8 +855,8 @@ theorem sys_link_name_open (sp0 : BitVec 64) :
 
 /-- ...and joined back (Rocq `sl_nm_join`). -/
 theorem sys_link_name_close (sp0 : BitVec 64) (nf : Nat → BitVec 8) :
-    sysLinkNameBuf (GF := GF) sp0 nf ⊢ sysLinkAny (sysLinkName sp0) 16 := by
-  unfold sysLinkNameBuf sysLinkAny
+    sysLinkNameBuf (GF := GF) sp0 nf ⊢ sysfileAny (sysLinkName sp0) 16 := by
+  unfold sysLinkNameBuf sysfileAny
   iintro ⟨B1, ⟨%tl, %hl, B2⟩⟩
   iexists bview 14 nf ++ tl
   isplitr
@@ -961,8 +865,8 @@ theorem sys_link_name_close (sp0 : BitVec 64) (nf : Nat → BitVec 8) :
   rw [bview_length]
   iframe
 
-theorem sys_link_env_ready (Γ : SchedNames) : sysLinkEnv (hlc := hlc) (GF := GF) Γ ⊢ fsReady (hlc := hlc) := by
-  unfold sysLinkEnv; iintro ⟨-, -, H⟩; iexact H
+theorem sys_link_env_ready (Γ : SchedNames) : sysfileEnv (hlc := hlc) (GF := GF) Γ ⊢ fsReady (hlc := hlc) := by
+  unfold sysfileEnv; iintro ⟨-, -, H⟩; iexact H
 
 end
 
