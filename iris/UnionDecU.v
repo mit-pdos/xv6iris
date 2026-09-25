@@ -1355,7 +1355,7 @@ Proof using.
        rewrite ins_app ins_in length_app. pose proof (IH p' Hp'). cbn [length]. lia. }
   all: rewrite ins_snoc_other; [| exact I].
   all: apply elem_of_list_fmap in Hp as (p' & -> & Hp').
-  all: match goal with |- length (ins (?e :: p')) < _ => change (e :: p') with ([e] ++ p') end.
+  all: match goal with |- length (ins (?e :: ?q)) < _ => change (e :: q) with ([e] ++ q) end.
   all: rewrite ins_app ins_snoc_other; [| exact I].
   all: cbn [length app]; exact (IH p' Hp').
 Qed.
@@ -1763,8 +1763,9 @@ Proof using Hadm.
     + rewrite (Hup i ltac:(lia)) in Hex Hm. rewrite (Hat i HiN) (Hcont i HiN) in Hm.
       apply (Hd4 i Hi); [| exact Hm].
       destruct Hex as (c & Hc & Ht). exact (lml_term_st (ulm_laws adm adm_s) _ _ _ Hc Ht _).
-    + destruct (decide (exists ws, lm_of U (bodies_of (ins seg) !!! i) = LSecc ws))
-        as [[ws Hws] | Hns].
+    + assert (Hsd : forall l : uline, (exists ws, l = LSecc ws) \/ (forall ws, l <> LSecc ws))
+        by (intros [| | | | ws']; [right; intros; discriminate .. | left; by exists ws']).
+      destruct (Hsd (lm_of U (bodies_of (ins seg) !!! i))) as [[ws Hws] | Hns].
       * (* an unchecked seccomp line: D4 at the original resolution, where
            the line's every output is mergeable *)
         destruct Hex as (c & Hc & Ht). apply (Hd4 i Hi).
@@ -1772,7 +1773,7 @@ Proof using Hadm.
         -- rewrite Hws. exact I.
       * exfalso. rewrite (Hge i ltac:(lia) Hi) in Hm.
         apply (umerge_prompt adm gp gpat Hadm (uline_of_u (bodies_of (ins seg) !!! i)));
-          [intros ws Hw; apply Hns; by exists ws |].
+          [exact Hns |].
         rewrite -(unoc_cont (lm_upto U cs' (<[N := P]> s) (bodies_of (ins seg)) i)
                    (uline_of_u (bodies_of (ins seg) !!! i))).
         exact Hm.

@@ -501,7 +501,7 @@ Section open_events_pure.
           { apply (lm_upto_st_ok M L); [exact Hfok0 | |].
             - intros i Hi. apply (lml_body_line L), (lm_disc_input_at M _ i Hbyte). lia.
             - intros i Hi. apply (lm_alts_pre_at M _ _ _ i Hcsb'). lia. }
-          exact (lml_term_merge L _ _ _ Hstn Hokao Hfk).
+          rewrite bodies_of_done HI. exact (lml_term_merge L _ _ _ Hstn Hokao Hfk).
   Qed.
 End open_events_pure.
 
