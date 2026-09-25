@@ -64,7 +64,12 @@ specify.'  So: a class of user files (e.g. names ending in `.txt`),
 created and read by the user's lines, and NOT the image's binaries.
 ORDER (owner, same day): 'let's land the union app first. then we'll go
 broaden it to *.txt or something.' -- the union lands at the one name
-`f` (`adm_u_f`); the widening is the NEXT effort after C9h; (S5) C9d depends on C9e's link
+`f` (`adm_u_f`); the widening is the NEXT effort after C9h;
+also AFTER the union (owner, same day): 'add support for grep into the
+pipeline' -- grep as a pipe stage (the first non-cat filter: its output
+is a function of its input, so the copy device generalises to a FILTER
+device whose owed output is `grep_out` of what was read; the owner's
+`GrepTree.v`/`UkGrepTree.v` give grep's tree and entry); (S5) C9d depends on C9e's link
 record: state it over abstract link projections; only the producer `cat
 f` needs a merged registry; (S6) C9f is larger (UShRound's ties call the
 file model directly; PipesFire needs PrCatF); (S7) `pwc_blkN` also
