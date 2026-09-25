@@ -117,19 +117,16 @@ theorem consoleinit_finish [CurCtx] (cpu c : CPU) (k : KCtx)
     wordPointsTo (consAddr + 8#64) 8 (DFrac.own 1) KStr.«cons» ∗ lkFresh consAddr ∗
     uartinitonePost .uart0 γ0 l0 (uartNameStr .uart0) ∗
     uartinitonePost .uart1 γ1 l1 (uartNameStr .uart1) ∗
-    wordPointsTo devswConsoleRead 8 (DFrac.own 1) KA.«consoleread» ∗
-    wordPointsTo devswConsoleWrite 8 (DFrac.own 1) KA.«consolewrite» ∗
+    devswTable ∗
     wpNext k.sie k.proc cpu (fun cpu' => iprop(∀ R' : RegMap,
       kctx cpu' (k.withRegs R') -∗ pcIs cpu' (jumpPc (k.regs 1#5)) -∗
       ⌜calleeSaved k.regs R'⌝ -∗
       wordPointsTo (consAddr + 8#64) 8 (DFrac.own 1) KStr.«cons» -∗ lkFresh consAddr -∗
       uartinitonePost .uart0 γ0 l0 (uartNameStr .uart0) -∗
       uartinitonePost .uart1 γ1 l1 (uartNameStr .uart1) -∗
-      wordPointsTo devswConsoleRead 8 (DFrac.own 1) KA.«consoleread» -∗
-      wordPointsTo devswConsoleWrite 8 (DFrac.own 1) KA.«consolewrite» -∗
-      wpLoop cpu'))
+      devswTable -∗ wpLoop cpu'))
     ⊢ wpLoop (GF := GF) c := by
-  iintro ⟨Hk, Hpc, Hframe, Hwname, Hfresh, Hp0, Hp1, Hread, Hwrite, HΦ⟩
+  iintro ⟨Hk, Hpc, Hframe, Hwname, Hfresh, Hp0, Hp1, Htbl, HΦ⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#HT, Hk⟩
   iapply (wp_epilogue2_gen c k (KA.«consoleinit» + 0x3c#64) hK R hR2 (k.regs 1#5) (k.regs 8#5))
     $$ [- $Hk $Hpc]
@@ -145,13 +142,12 @@ theorem consoleinit_finish [CurCtx] (cpu c : CPU) (k : KCtx)
     unfold calleeSaved
     refine ⟨?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_⟩ <;>
       simp only [RegMap.set_apply, BitVec.reduceEq, ite_true, ite_false] <;> assumption
-  iapply HΦ $$ %_ Hk Hpc %hcs [Hwname] [Hfresh] [Hp0] [Hp1] [Hread] [Hwrite]
+  iapply HΦ $$ %_ Hk Hpc %hcs [Hwname] [Hfresh] [Hp0] [Hp1] [Htbl]
   · iexact Hwname
   · iexact Hfresh
   · iexact Hp0
   · iexact Hp1
-  · iexact Hread
-  · iexact Hwrite
+  · iexact Htbl
 
 /-! ## The function -/
 
@@ -160,7 +156,7 @@ theorem consoleinit_proof (IL : INITLOCK) (UI : UARTINIT) : CONSOLEINIT :=
   ⟨fun {hlc GF} _ _ _ cpu k γ0 γ1 l0 l1 k0 k1 vlock0 vlock1 vname0 vcpu0 vname1 vcpu1
       vclock vcname vccpu vread vwrite hsie hK => by
   unfold wp_consoleinit_body
-  iintro ⟨Hk, Hpc, #Hcl, #Hcl', Hwlock, Hwname, Hwcpu, Hpre0, Hpre1, Hread, Hwrite, HΦ⟩
+  iintro ⟨Hk, Hpc, #Hcl, #Hcl', Hwlock, Hwname, Hwcpu, Hpre0, Hpre1, Hread, Hwrite, Hrest, HΦ⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
   simp only [consoleinitAddr]
   k_norm_g
@@ -262,9 +258,15 @@ theorem consoleinit_proof (IL : INITLOCK) (UI : UARTINIT) : CONSOLEINIT :=
       ((hp12 h).trans ((hp11 h).trans ((hp10 h).trans ((hp9 h).trans ((hp8 h).trans
         ((hp7 h).trans ((hp6 h).trans ((hp5 h).trans ((hp4 h).trans ((hp3 h).trans
           ((hp2 h).trans (hp1 h))))))))))))))))
+  -- the table, filled: given up for good
+  iapply wpLoop_fupd
+  rw [show devswConsoleRead = aDevswRead CONSOLE from by decide,
+    show devswConsoleWrite = aDevswWrite CONSOLE from by decide]
+  imod devswTable_of_rest $$ Hrest Hread Hwrite with #Htbl
+  imodintro
   iapply (consoleinit_finish cpu c17 k γ0 γ1 l0 l1 hpin17 (by omega)
     _ ?hR2 ?g9 ?g18 ?g19 ?g20 ?g21 ?g22 ?g23 ?g24 ?g25 ?g26 ?g27)
-    $$ [- $Hk $Hpc $Hframe $Hwname $Hfresh $Hp0 $Hp1 $Hread $Hwrite $HΦ]
+    $$ [- $Hk $Hpc $Hframe $Hwname $Hfresh $Hp0 $Hp1 $Htbl $HΦ]
   case hR2 => k_norm_g; exact b2.trans a2
   case g9 => k_norm_g; exact b9.trans a9
   case g18 => k_norm_g; exact b18.trans a18

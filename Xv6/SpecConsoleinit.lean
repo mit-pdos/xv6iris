@@ -13,8 +13,11 @@ void consoleinit(void) {
 The caller brings the raw cells of `cons.lock`, both ports' boot
 resources (`uartinitonePre`) and the two `devsw[CONSOLE]` slots
 (`struct devsw` is 16 bytes, `CONSOLE = 1`: `read` at +16, `write` at
-+24); it gets the lock as `lkFresh` with its name set, both ports'
-`uartinitonePost`, and the slots holding the two handlers.  The console
++24) and the eighteen cells it never touches, still as the BSS left them
+(`ConsoleInvDefs.devswRest`); it gets the lock as `lkFresh` with its name
+set, both ports' `uartinitonePost`, and the device table ASSEMBLED and
+DUPLICABLE (`ConsoleInvDefs.devswTable`, Rocq `devsw_table`): written once,
+here, and never again, so this is the moment to give it up for good.  The console
 ring and its indices are untouched (bss).  Stack: 2 over `uartinit`'s 6.
 
 Imports only definitional files.
@@ -50,15 +53,13 @@ def wp_consoleinit_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [X
   wordPointsTo (consAddr + 16#64) 8 (DFrac.own 1) vccpu ∗
   uartinitonePre .uart0 γ0 l0 k0 vlock0 vname0 vcpu0 ∗ uartinitonePre .uart1 γ1 l1 k1 vlock1 vname1 vcpu1 ∗
   wordPointsTo devswConsoleRead 8 (DFrac.own 1) vread ∗
-  wordPointsTo devswConsoleWrite 8 (DFrac.own 1) vwrite ∗
+  wordPointsTo devswConsoleWrite 8 (DFrac.own 1) vwrite ∗ devswRest ∗
   wpNext k.sie k.proc cpu (fun cpu' => iprop(∀ R' : RegMap,
     kctx cpu' (k.withRegs R') -∗ pcIs cpu' (jumpPc (k.regs 1#5)) -∗
     ⌜calleeSaved k.regs R'⌝ -∗
     wordPointsTo (consAddr + 8#64) 8 (DFrac.own 1) KStr.«cons» -∗ lkFresh consAddr -∗
     uartinitonePost .uart0 γ0 l0 (uartNameStr .uart0) -∗ uartinitonePost .uart1 γ1 l1 (uartNameStr .uart1) -∗
-    wordPointsTo devswConsoleRead 8 (DFrac.own 1) KA.«consoleread» -∗
-    wordPointsTo devswConsoleWrite 8 (DFrac.own 1) KA.«consolewrite» -∗
-    wpLoop cpu'))
+    devswTable -∗ wpLoop cpu'))
   ⊢ wpLoop (GF := GF) cpu
 
 /-- The interface of `consoleinit`. -/
