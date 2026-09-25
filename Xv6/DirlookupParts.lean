@@ -65,7 +65,7 @@ theorem dirlookup_br_readi : KA.«dirlookup» + 0xFFFFFFFFFFFFFDF2#64 = KA.«rea
 theorem dirlookup_br_namecmp : KA.«dirlookup» + 0xFFFFFFFFFFFFFFEA#64 = KA.«namecmp» := by
   decide
 theorem dirlookup_br_iget : KA.«dirlookup» + 0xFFFFFFFFFFFFF67A#64 = KA.«iget» := by decide
-theorem dirlookup_br_panic : KA.«dirlookup» + 0xFFFFFFFFFFFFCF58#64 = KA.«panic» := by decide
+theorem dirlookup_br_panic : KA.«dirlookup» + 0xffffffffffffcf62#64 = KA.«panic» := by decide
 
 theorem dirlookup_ret_6a : jumpPc (KA.«dirlookup» + 0x6a#64) = KA.«dirlookup» + 0x6a#64 := by
   decide
@@ -75,7 +75,7 @@ theorem dirlookup_ret_92 : jumpPc (KA.«dirlookup» + 0x92#64) = KA.«dirlookup�
   decide
 
 /-- `auipc a0,0x4` + `addi a0,a0,-1094` at `+0x46`: the panic literal. -/
-theorem dirlookup_msg_addr : KA.«dirlookup» + 0x3c00#64 = KStr.«dirlookup read» := by decide
+theorem dirlookup_msg_addr : KA.«dirlookup» + 0x3c0a#64 = KStr.«dirlookup read» := by decide
 
 /-- `dirlookup read` at `0x800074e0` (Rocq's `dlk_msg`). -/
 def dirlookupMsgStr : List (BitVec 8) :=

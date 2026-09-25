@@ -121,7 +121,7 @@ theorem namexEra_long (MM : MEMMOVE) (IL : ILOCK) (IUP : IUNLOCKPUT) (IU : IUNLO
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
   -- +0xa8  jal memmove
-  k_step_e (wp_s_jal cpu _ (KA.«namex» + 0xa8#64) false 2085700#21 1#5 (by decide))
+  k_step_e (wp_s_jal cpu _ (KA.«namex» + 0xa8#64) false 2085710#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [namex_br_memmove]
   iintro Hk Hpc
   unfold namexEraWalk namexPath
@@ -207,7 +207,7 @@ theorem namexEra_short (MM : MEMMOVE) (IL : ILOCK) (IUP : IUNLOCKPUT) (IU : IUNL
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
   -- +0x132  jal memmove
-  k_step_e (wp_s_jal cpu _ (KA.«namex» + 0x132#64) false 2085562#21 1#5 (by decide))
+  k_step_e (wp_s_jal cpu _ (KA.«namex» + 0x132#64) false 2085572#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [namex_br_memmove]
   iintro Hk Hpc
   unfold namexEraWalk namexPath

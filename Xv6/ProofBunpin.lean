@@ -31,11 +31,11 @@ set_option linter.unusedVariables false
 theorem bu_ret_18 : jumpPc (KA.«bunpin» + 0x18#64) = (KA.«bunpin» + 0x18#64) := by decide
 theorem bu_ret_2a : jumpPc (KA.«bunpin» + 0x2a#64) = (KA.«bunpin» + 0x2a#64) := by decide
 
-theorem bu_lock : KA.«bunpin» + 0x15458#64 = bcacheLockAddr := by
+theorem bu_lock : KA.«bunpin» + 0x15462#64 = bcacheLockAddr := by
   unfold bcacheLockAddr; decide
 
-theorem bu_br_acq : KA.«bunpin» + 0xffffffffffffde38#64 = KA.«acquire» := by decide
-theorem bu_br_rel : KA.«bunpin» + 0xffffffffffffdec0#64 = KA.«release» := by decide
+theorem bu_br_acq : KA.«bunpin» + 0xffffffffffffde42#64 = KA.«acquire» := by decide
+theorem bu_br_rel : KA.«bunpin» + 0xffffffffffffdeca#64 = KA.«release» := by decide
 
 section
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [BcacheG GF] [CurCtx]
@@ -106,10 +106,10 @@ theorem bunpin_proof (AC : ACQUIRE) (RE : RELEASE_HOOK) : BUNPIN := ⟨
   k_step_gen (wp_s_auipc c2 _ (KA.«bunpin» + 0xc#64) false 0x15#20 10#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c3 hp3
   iintro Hk Hpc
-  k_step_gen (wp_s_addi c3 _ (KA.«bunpin» + 0x10#64) false 1100#12 10#5 10#5 (by decide))
+  k_step_gen (wp_s_addi c3 _ (KA.«bunpin» + 0x10#64) false 1110#12 10#5 10#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [bu_lock] next c4 hp4
   iintro Hk Hpc
-  k_step_gen (wp_s_jal c4 _ (KA.«bunpin» + 0x14#64) false 2088484#21 1#5 (by decide))
+  k_step_gen (wp_s_jal c4 _ (KA.«bunpin» + 0x14#64) false 2088494#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [bu_br_acq] next c5 hp5
   iintro Hk Hpc
   iapply (bc_acquire AC c5 _ γl γ V ?ha0 ?hna ?hKa ?hla) $$ [- $Hk $Hpc]
@@ -231,10 +231,10 @@ theorem bunpin_proof (AC : ACQUIRE) (RE : RELEASE_HOOK) : BUNPIN := ⟨
   k_step (wp_s_auipc c _ (KA.«bunpin» + 0x1e#64) false 0x15#20 10#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
-  k_step (wp_s_addi c _ (KA.«bunpin» + 0x22#64) false 1082#12 10#5 10#5 (by decide))
+  k_step (wp_s_addi c _ (KA.«bunpin» + 0x22#64) false 1092#12 10#5 10#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [bu_lock]
   iintro Hk Hpc
-  k_step (wp_s_jal c _ (KA.«bunpin» + 0x26#64) false 2088602#21 1#5 (by decide))
+  k_step (wp_s_jal c _ (KA.«bunpin» + 0x26#64) false 2088612#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [bu_br_rel]
   iintro Hk Hpc
   iapply (bc_release_hook RE c _ γl γ V tl ?ha0 ?hsr ?hnr ?hKr k.sie ?hrr ?hor)

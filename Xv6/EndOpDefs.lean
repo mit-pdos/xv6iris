@@ -40,11 +40,11 @@ set_option linter.unusedVariables false
 All SIX `auipc`/`addi` pairs that materialise `&log` (`+0x0c`, `+0x2a`,
 `+0x42`, `+0x7a`, `+0x86`, `+0xac`) normalise to the same offset. -/
 
-theorem eo_log : KA.«end_op» + 0x1e612#64 = logAddr := by unfold logAddr; decide
+theorem eo_log : KA.«end_op» + 0x1e61c#64 = logAddr := by unfold logAddr; decide
 /-- `auipc s5,0x1e ; addi s5,s5,1438` at `+0xa4`: `&log.lh.block[0]`. -/
-theorem eo_lhb0 : KA.«end_op» + 0x1e642#64 = lhBlock 0 := by decide
+theorem eo_lhb0 : KA.«end_op» + 0x1e64c#64 = lhBlock 0 := by decide
 /-- `auipc a5,0x1e ; sw zero,1328(a5)` at `+0x10e`: `&log.lh.n`. -/
-theorem eo_lhn : KA.«end_op» + 0x1e63e#64 = lhNAddr := by decide
+theorem eo_lhn : KA.«end_op» + 0x1e648#64 = lhNAddr := by decide
 
 theorem eo_o_start : logAddr + 24#64 = lStart := rfl
 theorem eo_o_out : logAddr + 28#64 = lOut := rfl
@@ -63,13 +63,13 @@ theorem eo_lhBlock_succ (i : Nat) : lhBlock i + 4#64 = lhBlock (i + 1) := by
 /-- `addi a1,a0,88` / `addi a0,s1,88`: the buffer's data field. -/
 theorem eo_bufData (b : BitVec 64) : b + 88#64 = aBufData b := rfl
 
-theorem eo_br_acq : KA.«end_op» + 0xffffffffffffce6a#64 = KA.«acquire» := by decide
-theorem eo_br_rel : KA.«end_op» + 0xffffffffffffcef2#64 = KA.«release» := by decide
-theorem eo_br_wk : KA.«end_op» + 0xffffffffffffe254#64 = KA.«wakeup» := by decide
+theorem eo_br_acq : KA.«end_op» + 0xffffffffffffce74#64 = KA.«acquire» := by decide
+theorem eo_br_rel : KA.«end_op» + 0xffffffffffffcefc#64 = KA.«release» := by decide
+theorem eo_br_wk : KA.«end_op» + 0xffffffffffffe24e#64 = KA.«wakeup» := by decide
 theorem eo_br_bread : KA.«end_op» + 0xffffffffffffee72#64 = KA.«bread» := by decide
 theorem eo_br_bwrite : KA.«end_op» + 0xffffffffffffef48#64 = KA.«bwrite» := by decide
 theorem eo_br_brelse : KA.«end_op» + 0xffffffffffffef7a#64 = KA.«brelse» := by decide
-theorem eo_br_memmove : KA.«end_op» + 0xffffffffffffcf8a#64 = KA.«memmove» := by decide
+theorem eo_br_memmove : KA.«end_op» + 0xffffffffffffcf94#64 = KA.«memmove» := by decide
 theorem eo_br_wh : KA.«end_op» + 0xfffffffffffffdc8#64 = KA.«write_head» := by decide
 theorem eo_br_it : KA.«end_op» + 0xfffffffffffffe26#64 = KA.«install_trans» := by decide
 

@@ -60,10 +60,10 @@ theorem dirlookup_short (PA : PANIC) (c : CPU) (k : KCtx) (spie spp : Bool) (R :
   k_step_e (wp_s_auipc cpu _ (KA.«dirlookup» + 0x46#64) false 4#20 10#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
-  k_step_e (wp_s_addi cpu _ (KA.«dirlookup» + 0x4a#64) false 3002#12 10#5 10#5 (by decide))
+  k_step_e (wp_s_addi cpu _ (KA.«dirlookup» + 0x4a#64) false 3012#12 10#5 10#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
-  k_step_e (wp_s_jal cpu _ (KA.«dirlookup» + 0x4e#64) false 2084618#21 1#5 (by decide))
+  k_step_e (wp_s_jal cpu _ (KA.«dirlookup» + 0x4e#64) false 2084628#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [dirlookup_br_panic]
   iintro Hk Hpc
   iapply (dirlookup_panic PA cpu _ ?pa ?pK ?pn ?ppr ?pu) $$ [$Hk $Hpc $Hpe $Hmsg]

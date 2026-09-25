@@ -233,7 +233,7 @@ theorem sys_pipe_stage_e {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [
         V.pagetable)
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h9, sys_pipe_pt, sys_pipe_pt'] next c7 hp7
     iintro Hk Hpc Hpg
-    k_step_gen (wp_s_jal c7 _ (KA.«sys_pipe» + 0x76#64) false 2080694#21 1#5 (by decide))
+    k_step_gen (wp_s_jal c7 _ (KA.«sys_pipe» + 0x76#64) false 2080704#21 1#5 (by decide))
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [sys_pipe_br_copyout] next c8 hp8
     iintro Hk Hpc
     icases sys_pipe_frame_fd1 _ _ _ _ _ _ _ $$ Hfr with ⟨%hal, Hc1, Hfrw⟩
@@ -386,7 +386,7 @@ theorem sys_pipe_stage_d {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [
         V.pagetable)
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h9, sys_pipe_pt, sys_pipe_pt'] next c7 hp7
     iintro Hk Hpc Hpg
-    k_step_gen (wp_s_jal c7 _ (KA.«sys_pipe» + 0x5e#64) false 2080718#21 1#5 (by decide))
+    k_step_gen (wp_s_jal c7 _ (KA.«sys_pipe» + 0x5e#64) false 2080728#21 1#5 (by decide))
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [sys_pipe_br_copyout] next c8 hp8
     iintro Hk Hpc
     icases sys_pipe_frame_fd0 _ _ _ _ _ _ _ $$ Hfr with ⟨%hal', Hc0, Hfrw⟩

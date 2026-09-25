@@ -61,9 +61,9 @@ theorem fetchaddr_imm_m32 : BitVec.signExtend 64 4064#12 = -(8#64 * BitVec.ofNat
 theorem fetchaddr_imm_p32 : BitVec.signExtend 64 32#12 = 8#64 * BitVec.ofNat 64 4 := by
   simp only [BitVec.reduceSignExtend, BitVec.reduceMul]
 
-theorem fetchaddr_br_myproc : KA.«fetchaddr» + 0xfffffffffffff0f6#64 = KA.«myproc» := by decide
+theorem fetchaddr_br_myproc : KA.«fetchaddr» + 0xfffffffffffff100#64 = KA.«myproc» := by decide
 
-theorem fetchaddr_br_copyin : KA.«fetchaddr» + 0xffffffffffffedf6#64 = KA.«copyin» := by decide
+theorem fetchaddr_br_copyin : KA.«fetchaddr» + 0xffffffffffffee00#64 = KA.«copyin» := by decide
 
 theorem fetchaddr_ret_14 : jumpPc (KA.«fetchaddr» + 0x14#64) = (KA.«fetchaddr» + 0x14#64) := by
   decide
@@ -287,7 +287,7 @@ theorem fetchaddr_proof (MP : MYPROC) (CI : COPYIN) : FETCHADDR :=
   k_step_gen (wp_s_add c7 _ (KA.«fetchaddr» + 0xe#64) true 18#5 0#5 11#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c8 hp8
   iintro Hk Hpc
-  k_step_gen (wp_s_jal c8 _ (KA.«fetchaddr» + 0x10#64) false 2093286#21 1#5 (by decide))
+  k_step_gen (wp_s_jal c8 _ (KA.«fetchaddr» + 0x10#64) false 2093296#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [fetchaddr_br_myproc] next c9 hp9
   iintro Hk Hpc
   k_norm_g
@@ -432,7 +432,7 @@ theorem fetchaddr_proof (MP : MYPROC) (CI : COPYIN) : FETCHADDR :=
         from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
         with [hpa, pSz, pPagetable] next c18 hp18
       iintro Hk Hpc Hpg
-      k_step_gen (wp_s_jal c18 _ (KA.«fetchaddr» + 0x2a#64) false 2092492#21 1#5 (by decide))
+      k_step_gen (wp_s_jal c18 _ (KA.«fetchaddr» + 0x2a#64) false 2092502#21 1#5 (by decide))
         from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [fetchaddr_br_copyin] next c19 hp19
       iintro Hk Hpc
       k_norm_g

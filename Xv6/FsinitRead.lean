@@ -128,11 +128,11 @@ theorem fsinit_readsb (MM : MEMMOVE) (BE : BRELSE) (IL : INITLOG) (IR : IRECLAIM
   k_step_e (wp_s_auipc cpu _ (KA.«fsinit» + 0x1e#64) false 0x1d#20 10#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
-  k_step_e (wp_s_addi cpu _ (KA.«fsinit» + 0x22#64) false 742#12 10#5 10#5 (by decide))
+  k_step_e (wp_s_addi cpu _ (KA.«fsinit» + 0x22#64) false 752#12 10#5 10#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [fsinit_sb_addr]
   iintro Hk Hpc
   -- +0x26 jal memmove : WHERE THE EIGHT CELLS ARE BORN
-  k_step_e (wp_s_jal cpu _ (KA.«fsinit» + 0x26#64) false 2086686#21 1#5 (by decide))
+  k_step_e (wp_s_jal cpu _ (KA.«fsinit» + 0x26#64) false 2086696#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [fsinit_br_memmove]
   iintro Hk Hpc
   iapply (fsinit_memmove MM cpu _ (bs.take 32) sbOld 32 (DFrac.own 1) ?mK ?mn (by omega) ht32 hsbOld)

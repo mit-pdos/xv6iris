@@ -342,7 +342,7 @@ theorem pw_post_at (cpu c : CPU) (k : KCtx) (γp : PipeNames) (w : Bool) (q : Qp
 /-! ## Prologue, epilogue, and the shrink-wrapped restores -/
 
 set_option maxHeartbeats 4000000 in
-/-- The prologue at `0x80004676`: push 14, save `ra`, `s0`..`s5`, `s0 := sp`. -/
+/-- The prologue at `0x8000466c`: push 14, save `ra`, `s0`..`s5`, `s0 := sp`. -/
 theorem wp_prologuePw_gen (cpu : CPU) (k : KCtx) (pc : BitVec 64) (hK : 14 ≤ k.avail) :
     instr (GF := GF) pc true (instruction.ITYPE (3984#12, regidx.Regidx 2#5, regidx.Regidx 2#5, iop.ADDI)) ∗
     instr (GF := GF) (pc + 2#64) true (instruction.STORE (104#12, regidx.Regidx 1#5, regidx.Regidx 2#5, 8)) ∗
@@ -396,7 +396,7 @@ theorem wp_prologuePw_gen (cpu : CPU) (k : KCtx) (pc : BitVec 64) (hK : 14 ≤ k
   iframe
 
 set_option maxHeartbeats 4000000 in
-/-- The epilogue at `0x800046d0`: restore `ra`, `s0`..`s5`, pop 14, return. -/
+/-- The epilogue at `0x800046c6`: restore `ra`, `s0`..`s5`, pop 14, return. -/
 theorem wp_epiloguePw_gen (cpu : CPU) (k : KCtx) (pc : BitVec 64) (hK : 14 ≤ k.avail) (R : RegMap)
     (hR2 : R 2#5 = k.regs 2#5 + 0xFFFFFFFFFFFFFF90#64)
     (ra s0 s1 s2 s3 s4 s5 v7 v8 v9 v10 v11 v12 v13 : BitVec 64) :
@@ -503,7 +503,7 @@ theorem pw_restore5 (c : CPU) (kb : KCtx) (R : RegMap) (pc : BitVec 64) (s : Boo
   iapply HΦ' $$ Hk Hpc Hf7 Hf8 Hf9 Hf10 Hf11
 
 set_option maxHeartbeats 4000000 in
-/-- **pipewrite's epilogue** at `0x800046ce`: `mv a0,s2`, restore, pop,
+/-- **pipewrite's epilogue** at `0x800046c4`: `mv a0,s2`, restore, pop,
 return; deliver the result to the caller's continuation at this hart. -/
 theorem pw_epi (cpu c : CPU) (k : KCtx) (γp : PipeNames) (w : Bool) (q : Qp) (j : Nat)
     (pid : BitVec 32) (V : ProcPriv) (M : Nat → List (BitVec 8)) (n : Int) (P' : UPtd)
@@ -615,12 +615,12 @@ variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [Fdslot
 /-! ## The shared tail `(KernelSyms.«pipewrite» + 0x108)`: wake readers, release, return `s2` -/
 
 set_option maxHeartbeats 8000000 in
-/-- From `0x8000477e` inside the critical section (registers pinned by
+/-- From `0x80004774` inside the critical section (registers pinned by
 `pwFix`, `s6..s10` already restored): `wakeup(&pi->nread)`, `release(&pi->lock)`
 (`RELEASE_GEN`, the reference as credential), `j 0x4610`, the epilogue. -/
-theorem pipewrite_br_ffffffffffffc66a : KA.«pipewrite» + 0xffffffffffffc66a#64 = KA.«release» := by decide
+theorem pipewrite_br_ffffffffffffc674 : KA.«pipewrite» + 0xffffffffffffc674#64 = KA.«release» := by decide
 
-theorem pipewrite_br_ffffffffffffd9cc : KA.«pipewrite» + 0xffffffffffffd9cc#64 = KA.«wakeup» := by decide
+theorem pipewrite_br_ffffffffffffd9c6 : KA.«pipewrite» + 0xffffffffffffd9c6#64 = KA.«wakeup» := by decide
 
 theorem pw_tail (WK : WAKEUP) (RE : RELEASE_GEN) (Γ : SchedNames)
     (cpu c : CPU) (k kb : KCtx) (hb : PwBase k kb)
@@ -651,8 +651,8 @@ theorem pw_tail (WK : WAKEUP) (RE : RELEASE_GEN) (Γ : SchedNames)
   k_step (wp_s_addi c _ (KA.«pipewrite» + 0x108#64) false 536#12 10#5 9#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hR9]
   iintro Hk Hpc
-  k_step (wp_s_jal c _ (KA.«pipewrite» + 0x10c#64) false 2087104#21 1#5 (by decide))
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [pipewrite_br_ffffffffffffd9cc]
+  k_step (wp_s_jal c _ (KA.«pipewrite» + 0x10c#64) false 2087098#21 1#5 (by decide))
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [pipewrite_br_ffffffffffffd9c6]
   iintro Hk Hpc
   iapply (pw_wakeup WK Γ c _ ?hnw ?hKw ?hlw ?htw) $$ [- $Hk $Hpc]
   rotate_right 1
@@ -676,8 +676,8 @@ theorem pw_tail (WK : WAKEUP) (RE : RELEASE_GEN) (Γ : SchedNames)
   k_step (wp_s_add c _ (KA.«pipewrite» + 0x110#64) true 10#5 0#5 9#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [d9, hR9]
   iintro Hk Hpc
-  k_step (wp_s_jal c _ (KA.«pipewrite» + 0x112#64) false 2082136#21 1#5 (by decide))
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [pipewrite_br_ffffffffffffc66a]
+  k_step (wp_s_jal c _ (KA.«pipewrite» + 0x112#64) false 2082146#21 1#5 (by decide))
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [pipewrite_br_ffffffffffffc674]
   iintro Hk Hpc
   -- the release takes back the arm the entry acquire paid out
   icases armExt_split c k.sie k.proc $$ [$Htc $Hcl $Hir] with ⟨Harm, Hte, Hce⟩
@@ -788,8 +788,8 @@ theorem pw_minus1 (RE : RELEASE_GEN)
   k_step (wp_s_add c _ (KA.«pipewrite» + 0x46#64) true 10#5 0#5 9#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hR9]
   iintro Hk Hpc
-  k_step (wp_s_jal c _ (KA.«pipewrite» + 0x48#64) false 2082338#21 1#5 (by decide))
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [pipewrite_br_ffffffffffffc66a]
+  k_step (wp_s_jal c _ (KA.«pipewrite» + 0x48#64) false 2082348#21 1#5 (by decide))
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [pipewrite_br_ffffffffffffc674]
   iintro Hk Hpc
   -- the release takes back the arm the entry acquire paid out
   icases armExt_split c k.sie k.proc $$ [$Htc $Hcl $Hir] with ⟨Harm, Hte, Hce⟩
@@ -1039,11 +1039,11 @@ set_option maxHeartbeats 8000000 in
 /-- `wakeup(&pi->nread); sleep_prepare(&pi->nwrite); release(&pi->lock);
 sleep(); acquire(&pi->lock)`, then back to the guard through the loop
 hypothesis (`pwLoop`), at whichever hart `sleep` resumed on. -/
-theorem pipewrite_br_ffffffffffffc5e2 : KA.«pipewrite» + 0xffffffffffffc5e2#64 = KA.«acquire» := by decide
+theorem pipewrite_br_ffffffffffffc5ec : KA.«pipewrite» + 0xffffffffffffc5ec#64 = KA.«acquire» := by decide
 
-theorem pipewrite_br_ffffffffffffd99c : KA.«pipewrite» + 0xffffffffffffd99c#64 = KA.«sleep» := by decide
+theorem pipewrite_br_ffffffffffffd996 : KA.«pipewrite» + 0xffffffffffffd996#64 = KA.«sleep» := by decide
 
-theorem pipewrite_br_ffffffffffffd960 : KA.«pipewrite» + 0xffffffffffffd960#64 = KA.«sleep_prepare» := by decide
+theorem pipewrite_br_ffffffffffffd95a : KA.«pipewrite» + 0xffffffffffffd95a#64 = KA.«sleep_prepare» := by decide
 
 theorem pw_sleep_arm (AC : ACQUIRE_GEN) (RE : RELEASE_GEN) (WK : WAKEUP) (SP : SLEEP_PREPARE)
     (SL : SLEEP) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
@@ -1075,8 +1075,8 @@ theorem pw_sleep_arm (AC : ACQUIRE_GEN) (RE : RELEASE_GEN) (WK : WAKEUP) (SP : S
   k_step (wp_s_add c _ (KA.«pipewrite» + 0x6c#64) true 10#5 0#5 26#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hR26]
   iintro Hk Hpc
-  k_step (wp_s_jal c _ (KA.«pipewrite» + 0x6e#64) false 2087262#21 1#5 (by decide))
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [pipewrite_br_ffffffffffffd9cc]
+  k_step (wp_s_jal c _ (KA.«pipewrite» + 0x6e#64) false 2087256#21 1#5 (by decide))
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [pipewrite_br_ffffffffffffd9c6]
   iintro Hk Hpc
   iapply (pw_wakeup WK Γ c _ ?hnw ?hKw ?hlw ?htw) $$ [- $Hk $Hpc]
   rotate_right 1
@@ -1099,8 +1099,8 @@ theorem pw_sleep_arm (AC : ACQUIRE_GEN) (RE : RELEASE_GEN) (WK : WAKEUP) (SP : S
   k_step (wp_s_add c _ (KA.«pipewrite» + 0x72#64) true 10#5 0#5 25#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [g25]
   iintro Hk Hpc
-  k_step (wp_s_jal c _ (KA.«pipewrite» + 0x74#64) false 2087148#21 1#5 (by decide))
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [pipewrite_br_ffffffffffffd960]
+  k_step (wp_s_jal c _ (KA.«pipewrite» + 0x74#64) false 2087142#21 1#5 (by decide))
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [pipewrite_br_ffffffffffffd95a]
   iintro Hk Hpc
   iapply (pw_sleep_prepare SP Γ c _ j hj ?hspp ?hspchan ?hspn ?hspK ?hsplk ?hspt) $$ [- $Hk $Hpc]
   rotate_right 1
@@ -1125,8 +1125,8 @@ theorem pw_sleep_arm (AC : ACQUIRE_GEN) (RE : RELEASE_GEN) (WK : WAKEUP) (SP : S
   k_step (wp_s_add c _ (KA.«pipewrite» + 0x78#64) true 10#5 0#5 9#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [i9]
   iintro Hk Hpc
-  k_step (wp_s_jal c _ (KA.«pipewrite» + 0x7a#64) false 2082288#21 1#5 (by decide))
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [pipewrite_br_ffffffffffffc66a]
+  k_step (wp_s_jal c _ (KA.«pipewrite» + 0x7a#64) false 2082298#21 1#5 (by decide))
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [pipewrite_br_ffffffffffffc674]
   iintro Hk Hpc
   -- the release takes back the arm the entry acquire paid out
   icases armExt_split c k.sie k.proc $$ [$Htc $Hcl $Hir] with ⟨Harm, Hte, Hce⟩
@@ -1154,8 +1154,8 @@ theorem pw_sleep_arm (AC : ACQUIRE_GEN) (RE : RELEASE_GEN) (WK : WAKEUP) (SP : S
   k_norm_g
   have hfix6 : pwFix k j n R6 := pwFix_cs k j n _ R6 (pwFix_call k j n R5 hfix5 _ _) hcs6
   have h18_6 : R6 18#5 = BitVec.ofNat 64 m := (pw_cs18 _ _ _ _ hcs6).trans h18_5
-  k_step_pwc (wp_s_jal c _ (KA.«pipewrite» + 0x7e#64) false 2087198#21 1#5 (by decide))
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hsie, pipewrite_br_ffffffffffffd99c]
+  k_step_pwc (wp_s_jal c _ (KA.«pipewrite» + 0x7e#64) false 2087192#21 1#5 (by decide))
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hsie, pipewrite_br_ffffffffffffd996]
   iintro Hk Hpc
   iapply (pw_sleep SL Γ c _ j k.sie k.proc hj ?hslp ?hslK ?hsln ?hslt ?hsls ?hslpp)
     $$ [- $Hk $Hpc $Hte $Hce]
@@ -1179,8 +1179,8 @@ theorem pw_sleep_arm (AC : ACQUIRE_GEN) (RE : RELEASE_GEN) (WK : WAKEUP) (SP : S
   k_step_pwc (wp_s_add c _ (KA.«pipewrite» + 0x82#64) true 10#5 0#5 9#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hsie, s9]
   iintro Hk Hpc
-  k_step_pwc (wp_s_jal c _ (KA.«pipewrite» + 0x84#64) false 2082142#21 1#5 (by decide))
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hsie, pipewrite_br_ffffffffffffc5e2]
+  k_step_pwc (wp_s_jal c _ (KA.«pipewrite» + 0x84#64) false 2082152#21 1#5 (by decide))
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hsie, pipewrite_br_ffffffffffffc5ec]
   iintro Hk Hpc
   iapply (pw_acquire AC c _ γl γp (k.regs 10#5) w q ?hna ?hKa ?hla ?ha0) $$ [- $Hk $Hpc $Href]
   rotate_right 1
@@ -1218,7 +1218,7 @@ set_option maxHeartbeats 16000000 in
 the sleep arm; else copy one byte from user space into `ch`, store it into
 the data buffer, bump `nwrite` and `i`, and re-enter the guard; if `copyin`
 fails, the failure arm. -/
-theorem pipewrite_br_ffffffffffffd012 : KA.«pipewrite» + 0xffffffffffffd012#64 = KA.«copyin» := by decide
+theorem pipewrite_br_ffffffffffffd01c : KA.«pipewrite» + 0xffffffffffffd01c#64 = KA.«copyin» := by decide
 
 theorem pipewrite_br_ffffffffffffdbb8 : KA.«pipewrite» + 0xffffffffffffdbb8#64 = KA.«killed» := by decide
 
@@ -1388,8 +1388,8 @@ theorem pw_body (AC : ACQUIRE_GEN) (RE : RELEASE_GEN) (WK : WAKEUP) (SP : SLEEP_
   k_step (wp_s_ld c _ (KA.«pipewrite» + 0xb6#64) false 80#12 10#5 19#5 (by decide) (by decide) (DFrac.own 1) V.pagetable)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [j19, pw_pPagetable_r, pw_pPagetable_lit]
   iintro Hk Hpc Hpg
-  k_step (wp_s_jal c _ (KA.«pipewrite» + 0xba#64) false 2084696#21 1#5 (by decide))
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [pipewrite_br_ffffffffffffd012]
+  k_step (wp_s_jal c _ (KA.«pipewrite» + 0xba#64) false 2084706#21 1#5 (by decide))
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [pipewrite_br_ffffffffffffd01c]
   iintro Hk Hpc
   -- the `ch` slot, carved out of the frame
   icases pwFrame_elim _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ $$ Hframe
@@ -1625,7 +1625,7 @@ set_option maxHeartbeats 16000000 in
 `acquire(&pi->lock)` and the `n <= 0` early exit are driven here; the
 shrink-wrap sets up the loop registers and hands the body to `pw_body`,
 whose re-entries go through the Löb loop `pw_loop`. -/
-theorem pipewrite_br_ffffffffffffd312 : KA.«pipewrite» + 0xffffffffffffd312#64 = KA.«myproc» := by decide
+theorem pipewrite_br_ffffffffffffd31c : KA.«pipewrite» + 0xffffffffffffd31c#64 = KA.«myproc» := by decide
 
 theorem pipewrite_proof (MP : MYPROC) (AC : ACQUIRE_GEN) (RE : RELEASE_GEN) (WK : WAKEUP)
     (SP : SLEEP_PREPARE) (SL : SLEEP) (KL : KILLED) (CI : COPYIN) : PIPEWRITE := ⟨
@@ -1668,8 +1668,8 @@ theorem pipewrite_proof (MP : MYPROC) (AC : ACQUIRE_GEN) (RE : RELEASE_GEN) (WK 
   k_step_e (wp_s_add cpu _ (KA.«pipewrite» + 0x16#64) true 20#5 0#5 12#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hn]
   iintro Hk Hpc
-  k_step_e (wp_s_jal cpu _ (KA.«pipewrite» + 0x18#64) false 2085626#21 1#5 (by decide))
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [pipewrite_br_ffffffffffffd312]
+  k_step_e (wp_s_jal cpu _ (KA.«pipewrite» + 0x18#64) false 2085636#21 1#5 (by decide))
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [pipewrite_br_ffffffffffffd31c]
   iintro Hk Hpc
   iapply (pw_myproc MP cpu _ ?hnm ?hKm) $$ [- $Hk $Hpc]
   rotate_right 1
@@ -1690,8 +1690,8 @@ theorem pipewrite_proof (MP : MYPROC) (AC : ACQUIRE_GEN) (RE : RELEASE_GEN) (WK 
   k_step_e (wp_s_add cpu _ (KA.«pipewrite» + 0x1e#64) true 10#5 0#5 9#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hp9]
   iintro Hk Hpc
-  k_step_e (wp_s_jal cpu _ (KA.«pipewrite» + 0x20#64) false 2082242#21 1#5 (by decide))
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [pipewrite_br_ffffffffffffc5e2]
+  k_step_e (wp_s_jal cpu _ (KA.«pipewrite» + 0x20#64) false 2082252#21 1#5 (by decide))
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [pipewrite_br_ffffffffffffc5ec]
   iintro Hk Hpc
   -- the loop's base context: everything below the `acquire`
   generalize hkb : ((k.pushed 14).withSpie spie1 spp1).withRegs

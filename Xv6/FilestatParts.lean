@@ -53,11 +53,11 @@ set_option linter.unusedVariables false
 
 /-! ## Call targets, return addresses -/
 
-theorem filestat_br_myproc : KA.«filestat» + 0xFFFFFFFFFFFFD6AA#64 = KA.«myproc» := by decide
+theorem filestat_br_myproc : KA.«filestat» + 0xffffffffffffd6b4#64 = KA.«myproc» := by decide
 theorem filestat_br_ilock : KA.«filestat» + 0xFFFFFFFFFFFFF01A#64 = KA.«ilock» := by decide
 theorem filestat_br_stati : KA.«filestat» + 0xFFFFFFFFFFFFF3C6#64 = KA.«stati» := by decide
 theorem filestat_br_iunlock : KA.«filestat» + 0xFFFFFFFFFFFFF0C8#64 = KA.«iunlock» := by decide
-theorem filestat_br_copyout : KA.«filestat» + 0xFFFFFFFFFFFFD2E4#64 = KA.«copyout» := by decide
+theorem filestat_br_copyout : KA.«filestat» + 0xffffffffffffd2ee#64 = KA.«copyout» := by decide
 
 theorem filestat_ret_14 : jumpPc (KA.«filestat» + 0x14#64) = KA.«filestat» + 0x14#64 := by decide
 theorem filestat_ret_2a : jumpPc (KA.«filestat» + 0x2a#64) = KA.«filestat» + 0x2a#64 := by decide

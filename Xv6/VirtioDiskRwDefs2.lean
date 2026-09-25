@@ -538,9 +538,9 @@ theorem vdrw2_disk_succ (j : Nat) :
 /-- The four `jal` targets of the retry path. -/
 theorem vdrw2_br_free_desc : KA.«virtio_disk_rw» + 0xfffffffffffffdc2#64 = KA.«free_desc» := by decide
 theorem vdrw2_br_sleep_prepare :
-    KA.«virtio_disk_rw» + 0xffffffffffffc622#64 = KA.«sleep_prepare» := by decide
+    KA.«virtio_disk_rw» + 0xffffffffffffc612#64 = KA.«sleep_prepare» := by decide
 theorem vdrw2_br_release : KA.«virtio_disk_rw» + 0xffffffffffffb32c#64 = KA.«release» := by decide
-theorem vdrw2_br_sleep : KA.«virtio_disk_rw» + 0xffffffffffffc65e#64 = KA.«sleep» := by decide
+theorem vdrw2_br_sleep : KA.«virtio_disk_rw» + 0xffffffffffffc64e#64 = KA.«sleep» := by decide
 theorem vdrw2_br_acquire : KA.«virtio_disk_rw» + 0xffffffffffffb2a4#64 = KA.«acquire» := by decide
 
 /-- The six `jal` return addresses. -/

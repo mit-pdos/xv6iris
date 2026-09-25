@@ -182,17 +182,17 @@ set_option linter.unusedSectionVars false
 /-! ## Constants the code computes -/
 
 /-- `&itable.lock`, from all three `auipc a0,0x1e ; addi a0,a0,_` pairs. -/
-theorem ig_lock : KA.«iget» + 121342#64 = itableLock := by unfold itableLock; decide
+theorem ig_lock : KA.«iget» + 121352#64 = itableLock := by unfold itableLock; decide
 /-- `&itable.inode[0]`, the cursor's start. -/
-theorem ig_s1_0 : KA.«iget» + 121366#64 = ientry 0 := by decide
+theorem ig_s1_0 : KA.«iget» + 121376#64 = ientry 0 := by decide
 /-- `&itable.inode[NINODE]`, which IS the next symbol `log` (`ientry_sentinel`). -/
-theorem ig_a3_log : KA.«iget» + 128166#64 = KA.«log» := by decide
+theorem ig_a3_log : KA.«iget» + 128176#64 = KA.«log» := by decide
 /-- The `"iget: no inodes"` literal. -/
-theorem ig_msg : KA.«iget» + 0x44ae#64 = KStr.«iget: no inodes» := by decide
+theorem ig_msg : KA.«iget» + 0x44b8#64 = KStr.«iget: no inodes» := by decide
 
-theorem ig_br_acq : KA.«iget» + 0xffffffffffffdcfe#64 = KA.«acquire» := by decide
-theorem ig_br_rel : KA.«iget» + 0xffffffffffffdd86#64 = KA.«release» := by decide
-theorem ig_br_panic : KA.«iget» + 0xffffffffffffd8de#64 = KA.«panic» := by decide
+theorem ig_br_acq : KA.«iget» + 0xffffffffffffdd08#64 = KA.«acquire» := by decide
+theorem ig_br_rel : KA.«iget» + 0xffffffffffffdd90#64 = KA.«release» := by decide
+theorem ig_br_panic : KA.«iget» + 0xffffffffffffd8e8#64 = KA.«panic» := by decide
 
 theorem ig_ret_20 : jumpPc (KA.«iget» + 0x20#64) = (KA.«iget» + 0x20#64) := by decide
 theorem ig_ret_66 : jumpPc (KA.«iget» + 0x66#64) = (KA.«iget» + 0x66#64) := by decide

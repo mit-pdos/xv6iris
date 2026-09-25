@@ -535,10 +535,10 @@ theorem iput_lk_c (RH : RELEASE_HOOK) (HO : IputOfflockSpec)
   k_step (wp_s_auipc c _ (KA.«iput» + 0x8c#64) false 0x1d#20 10#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
-  k_step (wp_s_addi c _ (KA.«iput» + 0x90#64) false 1106#12 10#5 10#5 (by decide))
+  k_step (wp_s_addi c _ (KA.«iput» + 0x90#64) false 1116#12 10#5 10#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [iput_lock]
   iintro Hk Hpc
-  k_step (wp_s_jal c _ (KA.«iput» + 0x94#64) false 2086866#21 1#5 (by decide))
+  k_step (wp_s_jal c _ (KA.«iput» + 0x94#64) false 2086876#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [iput_br_release]
   iintro Hk Hpc
   iapply (iput_release RH c (k.withSpie s p) hkwf hK16 hlk

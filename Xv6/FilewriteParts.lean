@@ -45,9 +45,9 @@ theorem fwr_br_ilock : KA.«filewrite» + 0xFFFFFFFFFFFFEEE6#64 = KA.«ilock» :
 theorem fwr_br_writei : KA.«filewrite» + 0xFFFFFFFFFFFFF3B2#64 = KA.«writei» := by decide
 theorem fwr_br_iunlock : KA.«filewrite» + 0xFFFFFFFFFFFFEF94#64 = KA.«iunlock» := by decide
 theorem fwr_br_end_op : KA.«filewrite» + 0xFFFFFFFFFFFFF9DC#64 = KA.«end_op» := by decide
-theorem fwr_br_panic : KA.«filewrite» + 0xFFFFFFFFFFFFC426#64 = KA.«panic» := by decide
+theorem fwr_br_panic : KA.«filewrite» + 0xffffffffffffc430#64 = KA.«panic» := by decide
 /-- `auipc a0,0x3` + `addi a0,a0,144`: the panic literal. -/
-theorem fwr_msg_addr : KA.«filewrite» + 0x319e#64 = KStr.«filewrite» := by decide
+theorem fwr_msg_addr : KA.«filewrite» + 0x31a8#64 = KStr.«filewrite» := by decide
 
 theorem fwr_ret_62 : jumpPc (KA.«filewrite» + 0x62#64) = KA.«filewrite» + 0x62#64 := by decide
 theorem fwr_ret_90 : jumpPc (KA.«filewrite» + 0x90#64) = KA.«filewrite» + 0x90#64 := by decide

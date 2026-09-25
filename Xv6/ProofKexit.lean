@@ -139,14 +139,14 @@ theorem kx_pXstate (pa : BitVec 64) : pa + 44#64 = pXstate pa := rfl
 theorem kx_pParent (pa : BitVec 64) : pa + 56#64 = pParent pa := rfl
 theorem kx_pCwd0 (pa : BitVec 64) : pa + 336#64 = pCwd pa := rfl
 
-/-- `&wait_lock` from `auipc a0,0x10; addi a0,a0,752` at `0x8000215e`. -/
+/-- `&wait_lock` from `auipc a0,0x10; addi a0,a0,752` at `0x8000214e`. -/
 theorem kx_wl_addr1 :
-    KA.«kexit» + 0x1034a#64 = KA.«wait_lock» := by
+    KA.«kexit» + 0x1035a#64 = KA.«wait_lock» := by
   decide
 
-/-- `&wait_lock` from `auipc a0,0x10; addi a0,a0,710` at `0x80002188`. -/
+/-- `&wait_lock` from `auipc a0,0x10; addi a0,a0,710` at `0x80002178`. -/
 theorem kx_wl_addr2 :
-    KA.«kexit» + 0x1034a#64 = KA.«wait_lock» := by
+    KA.«kexit» + 0x1035a#64 = KA.«wait_lock» := by
   decide
 
 theorem kx_zombie : BitVec.extractLsb' 0 32 (5#64 : BitVec 64) = ZOMBIE := by decide
@@ -323,7 +323,7 @@ theorem kx_core_pid (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv) (M : Nat �
   · ipureintro; exact hf
   · ipureintro; exact hlz
 
-theorem kexit_br_211e : KA.«kexit» + 0x211e#64 = KA.«fileclose» := by decide
+theorem kexit_br_2124 : KA.«kexit» + 0x2124#64 = KA.«fileclose» := by decide
 
 /-- The loop's exit continuation: control at `begin_op`'s call site, every
 descriptor null (Rocq `kx_loop`'s `Hqexit`). -/
@@ -444,9 +444,9 @@ theorem kx_loop (FC : FILECLOSE) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
       · iframe
       subst hst'
       -- jal fileclose
-      k_step_e (wp_s_jal cpu _ (KA.«kexit» + 0x42#64) false 8412#21 1#5 (by decide))
+      k_step_e (wp_s_jal cpu _ (KA.«kexit» + 0x42#64) false 8418#21 1#5 (by decide))
         from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
-        with [kexit_br_211e, KCtx.setReg_sie, KCtx.setReg_proc]
+        with [kexit_br_2124, KCtx.setReg_sie, KCtx.setReg_proc]
       iintro Hk Hpc
       -- THE PID CELL, LENT out of the core ; THE ENVIRONMENT the state selects
       icases kx_core_pid (procAddr j) pid V M $$ Hcore with ⟨Hpid, Hcw⟩
@@ -566,7 +566,7 @@ theorem kx_loop (FC : FILECLOSE) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
       (k''.setReg 9#5 (pOfile (procAddr j) (fd + 1))) L' hkf h9r hlen' hinv')
     iframe Hk Hpc Hte Hce Hft Hpe Hcore Hofs Hfr Hpenv Hfenv Hir HΨ
 
-/-- `reparent`'s contract at its call site `0x800020a8`, with the `p`
+/-- `reparent`'s contract at its call site `0x80002098`, with the `p`
 argument (`a0`) named `pv` so the rewritten payload is `reparented … pv`. -/
 theorem kx_reparent (RP : REPARENT) (Γ : SchedNames) (c : CPU) (k' : KCtx)
     (parents : Nat → BitVec 64) (ip pv : BitVec 64) (ha0 : k'.regs 10#5 = pv)
@@ -585,7 +585,7 @@ theorem kx_reparent (RP : REPARENT) (Γ : SchedNames) (c : CPU) (k' : KCtx)
   rw [ha0] at h
   exact h
 
-/-- `wakeup`'s contract at its call site `0x80002042`. -/
+/-- `wakeup`'s contract at its call site `0x80002032`. -/
 theorem kx_wakeup (WU : WAKEUP) (Γ : SchedNames) (c : CPU) (k' : KCtx)
     (hnoff' : k'.noff + 1 < 2 ^ 31) (hK' : wakeupSlots ≤ k'.avail) (hlk' : "proc" ∉ k'.locks)
     (htier' : k'.tier = KTier.kpt) :
@@ -727,21 +727,21 @@ theorem kx_procGen_open (pa : BitVec 64) (pid : BitVec 32) (g : GName) (hX : cur
 
 theorem kexit_br_fffffffffffffdf0 : KA.«kexit» + 0xfffffffffffffdf0#64 = KA.«sched» := by decide
 
-theorem kexit_br_ffffffffffffebe2 : KA.«kexit» + 0xffffffffffffebe2#64 = KA.«release» := by decide
+theorem kexit_br_ffffffffffffebf2 : KA.«kexit» + 0xffffffffffffebf2#64 = KA.«release» := by decide
 
 theorem kexit_br_ffffffffffffff44 : KA.«kexit» + 0xffffffffffffff44#64 = KA.«wakeup» := by decide
 
 theorem kexit_br_ffffffffffffffaa : KA.«kexit» + 0xffffffffffffffaa#64 = KA.«reparent» := by decide
 
-theorem kexit_br_ffffffffffffeb5a : KA.«kexit» + 0xffffffffffffeb5a#64 = KA.«acquire» := by decide
+theorem kexit_br_ffffffffffffeb6a : KA.«kexit» + 0xffffffffffffeb6a#64 = KA.«acquire» := by decide
 
-theorem kexit_br_1cf0 : KA.«kexit» + 0x1cf0#64 = KA.«end_op» := by decide
+theorem kexit_br_1cf6 : KA.«kexit» + 0x1cf6#64 = KA.«end_op» := by decide
 
-theorem kexit_br_137c : KA.«kexit» + 0x137c#64 = KA.«iput» := by decide
+theorem kexit_br_1382 : KA.«kexit» + 0x1382#64 = KA.«iput» := by decide
 
-theorem kexit_br_1c64 : KA.«kexit» + 0x1c64#64 = KA.«begin_op» := by decide
+theorem kexit_br_1c6a : KA.«kexit» + 0x1c6a#64 = KA.«begin_op» := by decide
 
-theorem kexit_br_1034a : KA.«kexit» + 0x1034a#64 = KA.«wait_lock» := by decide
+theorem kexit_br_1035a : KA.«kexit» + 0x1035a#64 = KA.«wait_lock» := by decide
 
 /-- `acquire(&wait_lock)` at depth 0, at either `SIE`: the arm it pays out
 at the named index `s` / proc `p` (so the caller's complement frames
@@ -764,7 +764,7 @@ theorem kx_acw (AC : ACQUIRE) (c : CPU) (k' : KCtx) (γw : GName) (s : Bool) (p 
   exact h
 
 set_option maxHeartbeats 8000000 in
-/-- **`kexit`'s tail** from `0x8000214a`: `begin_op(); iput(p->cwd); end_op();
+/-- **`kexit`'s tail** from `0x8000213a`: `begin_op(); iput(p->cwd); end_op();
 p->cwd=0;` then the lock section and the ZOMBIE park.  At either entry
 `SIE` (`eb`): the fs window is level 0 (the complement follows the thread
 into each blocking call and back); `acquire(&wait_lock)`'s arm joined with
@@ -825,8 +825,8 @@ theorem kx_rest (AC : ACQUIRE) (RE : RELEASE) (RP : REPARENT) (WU : WAKEUP) (SC 
   -- the killed-route take.
   icases kx_procGen_open (procAddr j) pid V.gen rfl $$ Hgen with ⟨⟨%Q0, Hkq⟩, ⟨%xsb, Hxb⟩, Hgh, Htaken⟩
   -- jal begin_op
-  k_step_e (wp_s_jal cpu _ (KA.«kexit» + 0x4c#64) false 7192#21 1#5 (by decide))
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [kexit_br_1c64, KCtx.setReg_sie, KCtx.setReg_proc]
+  k_step_e (wp_s_jal cpu _ (KA.«kexit» + 0x4c#64) false 7198#21 1#5 (by decide))
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [kexit_br_1c6a, KCtx.setReg_sie, KCtx.setReg_proc]
   iintro Hk Hpc
   have hf1 : kxFrame (k.setReg 1#5 (KA.«kexit» + 0x50#64)) j k.sie status spval availval :=
     kx_setReg_frame k j status spval 1#5 _ hf (by decide) (by decide) (by decide) (by decide)
@@ -851,8 +851,8 @@ theorem kx_rest (AC : ACQUIRE) (RE : RELEASE) (RP : REPARENT) (WU : WAKEUP) (SC 
       (R1.set 10#5 V.cwd)) j k.sie status spval availval :=
     kx_setReg_frame _ j status spval 10#5 V.cwd hf1 (by decide) (by decide) (by decide) (by decide)
   -- jal iput
-  k_step_e (wp_s_jal cpu _ (KA.«kexit» + 0x54#64) false 4904#21 1#5 (by decide))
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [kexit_br_137c, KCtx.setReg_sie, KCtx.setReg_proc]
+  k_step_e (wp_s_jal cpu _ (KA.«kexit» + 0x54#64) false 4910#21 1#5 (by decide))
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [kexit_br_1382, KCtx.setReg_sie, KCtx.setReg_proc]
   iintro Hk Hpc
   have hf1b : kxFrame (((k.setReg 1#5 (KA.«kexit» + 0x50#64)).withSpie spie1 spp1).withRegs
       ((R1.set 10#5 V.cwd).set 1#5 (KA.«kexit» + 0x58#64))) j k.sie status spval availval :=
@@ -872,8 +872,8 @@ theorem kx_rest (AC : ACQUIRE) (RE : RELEASE) (RP : REPARENT) (WU : WAKEUP) (SC 
   ihave Hpc := (kx_pcIs_jump cpu _ (R1.set 10#5 V.cwd) (KA.«kexit» + 0x58#64) (by decide)) $$ Hpc
   have hf2 := kxFrame_cross hf1b spie2 spp2 R2 hcs2
   -- jal end_op
-  k_step_e (wp_s_jal cpu _ (KA.«kexit» + 0x58#64) false 7320#21 1#5 (by decide))
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [kexit_br_1cf0, KCtx.setReg_sie, KCtx.setReg_proc]
+  k_step_e (wp_s_jal cpu _ (KA.«kexit» + 0x58#64) false 7326#21 1#5 (by decide))
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [kexit_br_1cf6, KCtx.setReg_sie, KCtx.setReg_proc]
   iintro Hk Hpc
   have hf2a := kx_setReg_frame _ j status spval 1#5 (KA.«kexit» + 0x5c#64) hf2
     (by decide) (by decide) (by decide) (by decide)
@@ -910,17 +910,17 @@ theorem kx_rest (AC : ACQUIRE) (RE : RELEASE) (RP : REPARENT) (WU : WAKEUP) (SC 
     iapply (show irefSlot (GF := GF) ∗ irefSlots IREFSPARE ⊢ irefSlots (1 + IREFSPARE) from
       irefSlots_combine 1 IREFSPARE)
     iframe Hir2 Hirs
-  -- ==== the lock section (0x8000215e → 0x80002194) ====
+  -- ==== the lock section (0x8000214e → 0x80002184) ====
   -- acquire(&wait_lock): auipc a0,0x10; addi a0,a0,752; jal acquire
   k_step_e (wp_s_auipc cpu _ (KA.«kexit» + 0x60#64) false 16#20 10#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [KCtx.setReg_sie, KCtx.setReg_proc]
   iintro Hk Hpc
-  k_step_e (wp_s_addi cpu _ (KA.«kexit» + 0x64#64) false 746#12 10#5 10#5 (by decide))
+  k_step_e (wp_s_addi cpu _ (KA.«kexit» + 0x64#64) false 762#12 10#5 10#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
-    with [kexit_br_1034a, KCtx.rget_eq, kx_wl_addr1, KCtx.setReg_sie, KCtx.setReg_proc]
+    with [kexit_br_1035a, KCtx.rget_eq, kx_wl_addr1, KCtx.setReg_sie, KCtx.setReg_proc]
   iintro Hk Hpc
-  k_step_e (wp_s_jal cpu _ (KA.«kexit» + 0x68#64) false 2091762#21 1#5 (by decide))
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [kexit_br_ffffffffffffeb5a, KCtx.setReg_sie, KCtx.setReg_proc]
+  k_step_e (wp_s_jal cpu _ (KA.«kexit» + 0x68#64) false 2091778#21 1#5 (by decide))
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [kexit_br_ffffffffffffeb6a, KCtx.setReg_sie, KCtx.setReg_proc]
   iintro Hk Hpc
   -- acquire(&wait_lock) at 0x80000c58, at the entry index
   iapply (kx_acw AC cpu _ γw k.sie (procAddr j) ?hnA ?hKA ?hlA ?ha0A ?hsA ?hpA) $$ [- $Hk $Hpc $Hwl]
@@ -1037,8 +1037,8 @@ theorem kx_rest (AC : ACQUIRE) (RE : RELEASE) (RP : REPARENT) (WU : WAKEUP) (SC 
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
     with [KCtx.rget_eq, hd6_19, KCtx.rget_zero]
   iintro Hk Hpc
-  k_step (wp_s_jal cpu _ (KA.«kexit» + 0x7c#64) false 2091742#21 1#5 (by decide))
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [kexit_br_ffffffffffffeb5a, KCtx.setReg_sie, KCtx.setReg_proc]
+  k_step (wp_s_jal cpu _ (KA.«kexit» + 0x7c#64) false 2091758#21 1#5 (by decide))
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [kexit_br_ffffffffffffeb6a, KCtx.setReg_sie, KCtx.setReg_proc]
   iintro Hk Hpc
   ihave #Hlk := procsInv_lookup Γ j hj $$ Hpinv
   have hacp : ∀ (k' : KCtx) (hsie' : k'.sie = false) (hnoff' : k'.noff + 1 < 2 ^ 31)
@@ -1141,12 +1141,12 @@ theorem kx_rest (AC : ACQUIRE) (RE : RELEASE) (RP : REPARENT) (WU : WAKEUP) (SC 
   k_step (wp_s_auipc cpu _ (KA.«kexit» + 0x8a#64) false 16#20 10#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [KCtx.setReg_sie, KCtx.setReg_proc]
   iintro Hk Hpc
-  k_step (wp_s_addi cpu _ (KA.«kexit» + 0x8e#64) false 704#12 10#5 10#5 (by decide))
+  k_step (wp_s_addi cpu _ (KA.«kexit» + 0x8e#64) false 720#12 10#5 10#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
-    with [kexit_br_1034a, KCtx.rget_eq, kx_wl_addr2, KCtx.setReg_sie, KCtx.setReg_proc]
+    with [kexit_br_1035a, KCtx.rget_eq, kx_wl_addr2, KCtx.setReg_sie, KCtx.setReg_proc]
   iintro Hk Hpc
-  k_step (wp_s_jal cpu _ (KA.«kexit» + 0x92#64) false 2091856#21 1#5 (by decide))
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [kexit_br_ffffffffffffebe2, KCtx.setReg_sie, KCtx.setReg_proc]
+  k_step (wp_s_jal cpu _ (KA.«kexit» + 0x92#64) false 2091872#21 1#5 (by decide))
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [kexit_br_ffffffffffffebf2, KCtx.setReg_sie, KCtx.setReg_proc]
   iintro Hk Hpc
   have hrew : ∀ (k' : KCtx) (hsie' : k'.sie = false) (hnoff' : 1 ≤ k'.noff)
       (hK' : 10 ≤ k'.avail) (hreen0 : k'.noff ≠ 1) (ha0 : k'.regs 10#5 = waitLockAddr),
@@ -1357,9 +1357,9 @@ end
 section
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [X : CurCtx]
 
-/-- `&initproc` from `auipc a5,0x8; ld a5,536(a5)` at `0x80002116`. -/
+/-- `&initproc` from `auipc a5,0x8; ld a5,536(a5)` at `0x80002106`. -/
 theorem kx_initproc_addr :
-    KA.«kexit» + 0x8242#64 = initprocAddr := by
+    KA.«kexit» + 0x8252#64 = initprocAddr := by
   decide
 
 /-- `initprocIs` opened to its points-to (`rfl`). -/
@@ -1375,9 +1375,9 @@ end
 section
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
 
-theorem kexit_br_fffffffffffff88a : KA.«kexit» + 0xfffffffffffff88a#64 = KA.«myproc» := by decide
+theorem kexit_br_fffffffffffff89a : KA.«kexit» + 0xfffffffffffff89a#64 = KA.«myproc» := by decide
 
-theorem kexit_br_8242 : KA.«kexit» + 0x8242#64 = initprocAddr := by decide
+theorem kexit_br_8252 : KA.«kexit» + 0x8252#64 = initprocAddr := by decide
 
 set_option maxHeartbeats 8000000 in
 set_option maxRecDepth 8000 in
@@ -1450,8 +1450,8 @@ theorem kexit_proof (MP : MYPROC) (FC : FILECLOSE) (BO : BEGIN_OP) (IP : IPUT) (
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [KCtx.rget_eq, KCtx.rget_zero]
   iintro Hk Hpc
   -- jal myproc
-  k_step_e (wp_s_jal cpu _ (KA.«kexit» + 0x12#64) false 2095224#21 1#5 (by decide))
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [kexit_br_fffffffffffff88a]
+  k_step_e (wp_s_jal cpu _ (KA.«kexit» + 0x12#64) false 2095240#21 1#5 (by decide))
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [kexit_br_fffffffffffff89a]
   iintro Hk Hpc
   -- myproc()
   have hmp := MP.wp_myproc (hlc := hlc) (GF := GF)
@@ -1479,7 +1479,7 @@ theorem kexit_proof (MP : MYPROC) (FC : FILECLOSE) (BO : BEGIN_OP) (IP : IPUT) (
   k_step_e (wp_s_auipc cpu _ (KA.«kexit» + 0x18#64) false 8#20 15#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
-  iapply (wp_s_ld cpu _ (KA.«kexit» + 0x1c#64) false 554#12 15#5 15#5 (by decide) (by decide)
+  iapply (wp_s_ld cpu _ (KA.«kexit» + 0x1c#64) false 570#12 15#5 15#5 (by decide) (by decide)
       DFrac.discard ip) $$ [- $Hk $Hpc]
   rotate_right 1
   k_code (text_instr _ _ _ _ rfl rfl) Htext
@@ -1500,7 +1500,7 @@ theorem kexit_proof (MP : MYPROC) (FC : FILECLOSE) (BO : BEGIN_OP) (IP : IPUT) (
   k_step_e (wp_s_addi cpu _ (KA.«kexit» + 0x24#64) false 336#12 18#5 10#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [KCtx.rget_eq, h10]
   iintro Hk Hpc
-  -- bne a5,a0: p != initproc, so jump to the loop at 0x8000213c
+  -- bne a5,a0: p != initproc, so jump to the loop at 0x8000212c
   k_step_e (wp_s_branch cpu _ (KA.«kexit» + 0x28#64) false 22#13 15#5 10#5 (by decide) bop.BNE)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
     with [kx_ite_bne, KCtx.rget_eq, KCtx.setReg_regs, RegMap.set_apply, h10]

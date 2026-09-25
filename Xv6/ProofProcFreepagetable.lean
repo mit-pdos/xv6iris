@@ -32,9 +32,9 @@ variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [Fdslot
 
 /-! ## `proc_freepagetable` -/
 
-theorem proc_freepagetable_br_fffffffffffff950 : KA.«proc_freepagetable» + 0xfffffffffffff950#64 = KA.«uvmfree» := by decide
+theorem proc_freepagetable_br_fffffffffffff960 : KA.«proc_freepagetable» + 0xfffffffffffff960#64 = KA.«uvmfree» := by decide
 
-theorem proc_freepagetable_br_fffffffffffff77c : KA.«proc_freepagetable» + 0xfffffffffffff77c#64 = KA.«uvmunmap» := by decide
+theorem proc_freepagetable_br_fffffffffffff78c : KA.«proc_freepagetable» + 0xfffffffffffff78c#64 = KA.«uvmunmap» := by decide
 
 set_option maxHeartbeats 4000000 in
 set_option maxRecDepth 100000 in
@@ -77,8 +77,8 @@ theorem proc_freepagetable_proof (UM : UVMUNMAP) (UF : UVMFREE) : PROC_FREEPAGET
   k_step_gen (wp_s_slli c7 _ (KA.«proc_freepagetable» + 0x1a#64) true 12#6 11#5 11#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [tramp_va] next c8 hp8
   iintro Hk Hpc
-  k_step_gen (wp_s_jal c8 _ (KA.«proc_freepagetable» + 0x1c#64) false 2094944#21 1#5 (by decide))
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [proc_freepagetable_br_fffffffffffff77c] next c9 hp9
+  k_step_gen (wp_s_jal c8 _ (KA.«proc_freepagetable» + 0x1c#64) false 2094960#21 1#5 (by decide))
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [proc_freepagetable_br_fffffffffffff78c] next c9 hp9
   iintro Hk Hpc
   iapply (pp_uvmunmap_call UM c9 _ P.root P.leaves 1 ?hK1 ?hr1 ?ha1 ?hn1 ?hg1 ?hf1)
     $$ [- $Hk $Hpc]
@@ -117,8 +117,8 @@ theorem proc_freepagetable_proof (UM : UVMUNMAP) (UF : UVMFREE) : PROC_FREEPAGET
   k_step_gen (wp_s_add c15 _ (KA.«proc_freepagetable» + 0x2c#64) true 10#5 0#5 9#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c16 hp16
   iintro Hk Hpc
-  k_step_gen (wp_s_jal c16 _ (KA.«proc_freepagetable» + 0x2e#64) false 2094926#21 1#5 (by decide))
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [proc_freepagetable_br_fffffffffffff77c] next c17 hp17
+  k_step_gen (wp_s_jal c16 _ (KA.«proc_freepagetable» + 0x2e#64) false 2094942#21 1#5 (by decide))
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [proc_freepagetable_br_fffffffffffff78c] next c17 hp17
   iintro Hk Hpc
   iapply (pp_uvmunmap_call UM c17 _ P.root (delete P.leaves trampVpn.toNat) 1
     ?hK2 ?hr2 ?ha2 ?hn2 ?hg2 ?hf2) $$ [- $Hk $Hpc]
@@ -145,8 +145,8 @@ theorem proc_freepagetable_proof (UM : UVMUNMAP) (UF : UVMFREE) : PROC_FREEPAGET
   k_step_gen (wp_s_add c19 _ (KA.«proc_freepagetable» + 0x34#64) true 10#5 0#5 9#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c20 hp20
   iintro Hk Hpc
-  k_step_gen (wp_s_jal c20 _ (KA.«proc_freepagetable» + 0x36#64) false 2095386#21 1#5 (by decide))
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [proc_freepagetable_br_fffffffffffff950] next c21 hp21
+  k_step_gen (wp_s_jal c20 _ (KA.«proc_freepagetable» + 0x36#64) false 2095402#21 1#5 (by decide))
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [proc_freepagetable_br_fffffffffffff960] next c21 hp21
   iintro Hk Hpc
   iapply (pp_uvmfree_call UF c21 _ γl γk P M ?hn3 ?hK3 ?hl3 ?hr3 ?hs3 ?hw3 ?hb3) $$ [- $Hk $Hpc]
   rotate_right 1

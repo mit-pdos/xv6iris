@@ -65,9 +65,9 @@ theorem fetchstr_blt_zero : bcond bop.BLT 0#64 0#64 = false := by decide
 theorem fetchstr_blt_neg1 : bcond bop.BLT 0xFFFFFFFFFFFFFFFF#64 0#64 = true := by decide
 theorem fetchstr_li_m1 : 0#64 + BitVec.signExtend 64 4095#12 = 0xFFFFFFFFFFFFFFFF#64 := by decide
 
-theorem fetchstr_br_myproc : KA.«fetchstr» + 0xfffffffffffff0ac#64 = KA.«myproc» := by decide
-theorem fetchstr_br_copyinstr : KA.«fetchstr» + 0xffffffffffffee48#64 = KA.«copyinstr» := by decide
-theorem fetchstr_br_strlen : KA.«fetchstr» + 0xffffffffffffe5c6#64 = KA.«strlen» := by decide
+theorem fetchstr_br_myproc : KA.«fetchstr» + 0xfffffffffffff0b6#64 = KA.«myproc» := by decide
+theorem fetchstr_br_copyinstr : KA.«fetchstr» + 0xffffffffffffee52#64 = KA.«copyinstr» := by decide
+theorem fetchstr_br_strlen : KA.«fetchstr» + 0xffffffffffffe5d0#64 = KA.«strlen» := by decide
 
 theorem fetchstr_pushed_withSpie (k : KCtx) (m : Nat) (a b : Bool) :
     (k.pushed m).withSpie a b = (k.withSpie a b).pushed m := rfl
@@ -267,7 +267,7 @@ theorem fetchstr_tail_ok (SL : STRLEN) (cpu c : CPU) (k : KCtx) (Q : BitVec 64 �
   k_step_gen (wp_s_add c1 _ (KA.«fetchstr» + 0x2a#64) true 10#5 0#5 9#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c2 hp2
   iintro Hk Hpc
-  k_step_gen (wp_s_jal c2 _ (KA.«fetchstr» + 0x2c#64) false 2090394#21 1#5 (by decide))
+  k_step_gen (wp_s_jal c2 _ (KA.«fetchstr» + 0x2c#64) false 2090404#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [fetchstr_br_strlen] next c3 hp3
   iintro Hk Hpc
   k_norm_g
@@ -389,7 +389,7 @@ theorem fetchstr_proof (MP : MYPROC) (CI : COPYINSTR) (SL : STRLEN) : FETCHSTR :
   k_step_gen (wp_s_add c3 _ (KA.«fetchstr» + 0x12#64) true 18#5 0#5 12#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c4 hp4
   iintro Hk Hpc
-  k_step_gen (wp_s_jal c4 _ (KA.«fetchstr» + 0x14#64) false 2093208#21 1#5 (by decide))
+  k_step_gen (wp_s_jal c4 _ (KA.«fetchstr» + 0x14#64) false 2093218#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [fetchstr_br_myproc] next c5 hp5
   iintro Hk Hpc
   k_norm_g
@@ -430,7 +430,7 @@ theorem fetchstr_proof (MP : MYPROC) (CI : COPYINSTR) (SL : STRLEN) : FETCHSTR :
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
     with [hpa, pSz, pPagetable] next c11 hp11
   iintro Hk Hpc Hpg
-  k_step_gen (wp_s_jal c11 _ (KA.«fetchstr» + 0x22#64) false 2092582#21 1#5 (by decide))
+  k_step_gen (wp_s_jal c11 _ (KA.«fetchstr» + 0x22#64) false 2092592#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [fetchstr_br_copyinstr] next c12 hp12
   iintro Hk Hpc
   k_norm_g

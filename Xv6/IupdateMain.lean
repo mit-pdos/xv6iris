@@ -119,7 +119,7 @@ theorem iu_mm (LW : LOG_WRITE) (BE : BRELSE) (MM : MEMMOVE)
   k_step_e (wp_s_addi cpu _ (KA.«iupdate» + 0x5e#64) false 12#12 10#5 15#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [ha5]
   iintro Hk Hpc
-  k_step_e (wp_s_jal cpu _ (KA.«iupdate» + 0x62#64) false 2087634#21 1#5 (by decide))
+  k_step_e (wp_s_jal cpu _ (KA.«iupdate» + 0x62#64) false 2087644#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [iu_br_memmove]
   iintro Hk Hpc
   -- the SOURCE: the thirteen addrs cells as 52 contiguous bytes
@@ -495,7 +495,7 @@ theorem iu_main (BD : BREAD) (LW : LOG_WRITE) (BE : BRELSE) (MM : MEMMOVE)
   k_step_e (wp_s_auipc cpu _ (KA.«iupdate» + 0x14#64) false 0x1d#20 11#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
-  k_step_e (wp_s_lw cpu _ (KA.«iupdate» + 0x18#64) false 1784#12 11#5 11#5 (by decide) (by decide)
+  k_step_e (wp_s_lw cpu _ (KA.«iupdate» + 0x18#64) false 1794#12 11#5 11#5 (by decide) (by decide)
       dqs (BitVec.ofNat 32 icfgIst))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [iu_sb_addr]
   iintro Hk Hpc Hsb

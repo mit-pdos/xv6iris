@@ -62,7 +62,7 @@ theorem ti_initlock_call (IL : INITLOCK) [CurCtx] (c : CPU) (k' : KCtx)
 /-! ## The epilogue -/
 
 set_option maxHeartbeats 4000000 in
-/-- The epilogue at `0x80002524`: restore `ra`, `s0`, pop the frame and
+/-- The epilogue at `0x8000251a`: restore `ra`, `s0`, pop the frame and
 return to the caller with the name word and `lkFresh`. -/
 theorem trapinit_finish [CurCtx] (cpu c : CPU) (k : KCtx)
     (hpin : k.sie = false ∨ k.proc = 0#64 → c = cpu) (hK : 2 ≤ k.avail)
@@ -100,11 +100,11 @@ theorem trapinit_finish [CurCtx] (cpu c : CPU) (k : KCtx)
 
 /-! ## The function -/
 
-theorem trapinit_br_ffffffffffffe6d0 : KA.«trapinit» + 0xffffffffffffe6d0#64 = KA.«initlock» := by decide
+theorem trapinit_br_ffffffffffffe6da : KA.«trapinit» + 0xffffffffffffe6da#64 = KA.«initlock» := by decide
 
-theorem trapinit_br_15d58 : KA.«trapinit» + 0x15d58#64 = KA.«tickslock» := by decide
+theorem trapinit_br_15d62 : KA.«trapinit» + 0x15d62#64 = KA.«tickslock» := by decide
 
-theorem trapinit_br_4d68 : KA.«trapinit» + 0x4d68#64 = KStr.«time» := by decide
+theorem trapinit_br_4d72 : KA.«trapinit» + 0x4d72#64 = KStr.«time» := by decide
 
 set_option maxHeartbeats 4000000 in
 theorem trapinit_proof (IL : INITLOCK) : TRAPINIT :=
@@ -126,19 +126,19 @@ theorem trapinit_proof (IL : INITLOCK) : TRAPINIT :=
   k_step_gen (wp_s_auipc c1 _ (KA.«trapinit» + 0x8#64) false 5#20 11#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [ti_u5] next c2 hp2
   iintro Hk Hpc
-  k_step_gen (wp_s_addi c2 _ (KA.«trapinit» + 0xc#64) false 3424#12 11#5 11#5 (by decide))
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [trapinit_br_4d68] next c3 hp3
+  k_step_gen (wp_s_addi c2 _ (KA.«trapinit» + 0xc#64) false 3434#12 11#5 11#5 (by decide))
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [trapinit_br_4d72] next c3 hp3
   iintro Hk Hpc
   -- a0 = &tickslock
   k_step_gen (wp_s_auipc c3 _ (KA.«trapinit» + 0x10#64) false 0x16#20 10#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [ti_u16] next c4 hp4
   iintro Hk Hpc
-  k_step_gen (wp_s_addi c4 _ (KA.«trapinit» + 0x14#64) false 3400#12 10#5 10#5 (by decide))
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [trapinit_br_15d58] next c5 hp5
+  k_step_gen (wp_s_addi c4 _ (KA.«trapinit» + 0x14#64) false 3410#12 10#5 10#5 (by decide))
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [trapinit_br_15d62] next c5 hp5
   iintro Hk Hpc
   -- jal ra, initlock
-  k_step_gen (wp_s_jal c5 _ (KA.«trapinit» + 0x18#64) false 2090680#21 1#5 (by decide))
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [trapinit_br_ffffffffffffe6d0] next c6 hp6
+  k_step_gen (wp_s_jal c5 _ (KA.«trapinit» + 0x18#64) false 2090690#21 1#5 (by decide))
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [trapinit_br_ffffffffffffe6da] next c6 hp6
   iintro Hk Hpc
   have hpin6 : k.sie = false ∨ k.proc = 0#64 → c6 = cpu := fun h =>
     (hp6 h).trans ((hp5 h).trans ((hp4 h).trans ((hp3 h).trans ((hp2 h).trans (hp1 h)))))

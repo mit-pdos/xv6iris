@@ -24,7 +24,7 @@ set_option linter.unusedVariables false
 
 /-! ## Constants and register bookkeeping -/
 
-/-- `argraw` returns to `0x8000292e`. -/
+/-- `argraw` returns to `0x80002924`. -/
 theorem ai_ret_2870 : jumpPc (KA.«argint» + 0x10#64) = (KA.«argint» + 0x10#64) := by
   decide
 

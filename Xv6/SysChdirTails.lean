@@ -56,7 +56,7 @@ set_option linter.unusedVariables false
 
 /-! ## Constants -/
 
-theorem sys_chdir_br_myproc : KA.«sys_chdir» + 0xffffffffffffc57e#64 = KA.«myproc» := by decide
+theorem sys_chdir_br_myproc : KA.«sys_chdir» + 0xffffffffffffc588#64 = KA.«myproc» := by decide
 theorem sys_chdir_br_begin_op : KA.«sys_chdir» + 0xffffffffffffe958#64 = KA.«begin_op» := by decide
 theorem sys_chdir_br_argstr : KA.«sys_chdir» + 0xffffffffffffd54c#64 = KA.«argstr» := by decide
 theorem sys_chdir_br_namei : KA.«sys_chdir» + 0xffffffffffffe77a#64 = KA.«namei» := by decide

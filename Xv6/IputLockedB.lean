@@ -245,10 +245,10 @@ theorem iput_lk_b (RH : RELEASE_HOOK) (AC : ACQUIRE_LLB) (RSH : RELEASESLEEP_HOO
   k_step_c (wp_s_auipc c _ (KA.«iput» + 0x7a#64) false 0x1d#20 10#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
-  k_step_c (wp_s_addi c _ (KA.«iput» + 0x7e#64) false 1124#12 10#5 10#5 (by decide))
+  k_step_c (wp_s_addi c _ (KA.«iput» + 0x7e#64) false 1134#12 10#5 10#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [iput_lock]
   iintro Hk Hpc
-  k_step_c (wp_s_jal c _ (KA.«iput» + 0x82#64) false 2086748#21 1#5 (by decide))
+  k_step_c (wp_s_jal c _ (KA.«iput» + 0x82#64) false 2086758#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [iput_br_acquire]
   iintro Hk Hpc
   ihave Hte := iput_lk_te_ws c k s' p' $$ Hte

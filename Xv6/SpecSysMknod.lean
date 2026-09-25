@@ -25,7 +25,7 @@ contract.
       return 0;
     }
 
-`KA.«sys_mknod»` = 0x800053aa, 96 bytes / 32 instructions.  A TWENTY-slot
+`KA.«sys_mknod»` = 0x800053a0, 96 bytes / 32 instructions.  A TWENTY-slot
 frame: ra @ `sp0-8` (slot 1), s0 @ `sp0-16` (slot 2, the frame pointer, =
 the entry sp), `char path[128]` in slots 18 down to 3 (`s0-144`), THE TWO
 `int` LOCALS SHARING SLOT 19 (`minor` in its low word at `s0-152`, `major`

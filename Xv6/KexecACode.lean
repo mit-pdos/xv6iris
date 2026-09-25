@@ -88,7 +88,7 @@ set_option linter.unusedVariables false
 
 /-! ## The branch targets and return addresses of phase A's calls -/
 
-theorem kxcA_br_myproc : KA.«kexec» + 0x20#64 + BitVec.signExtend 64 2085042#21 = KA.«myproc» := by
+theorem kxcA_br_myproc : KA.«kexec» + 0x20#64 + BitVec.signExtend 64 2085052#21 = KA.«myproc» := by
   decide
 theorem kxcA_ret_24 : jumpPc (KA.«kexec» + 0x20#64 + 4#64) = KA.«kexec» + 0x20#64 + 4#64 := by decide
 theorem kxcA_br_beginop : KA.«kexec» + 0x26#64 + BitVec.signExtend 64 2094214#21 = KA.«begin_op» := by
@@ -171,9 +171,9 @@ theorem kxcA_beq (x y : BitVec 64) : bcond bop.BEQ x y = decide (x = y) := by
   · subst h; simp
   · simp only [h, decide_false]; rw [beq_eq_false_iff_ne]; exact h
 
-theorem kxcA_br_64 : KA.«kexec» + 0x50#64 + BitVec.signExtend 64 20#13 = KA.«kexec» + 0x64#64 := by
+theorem kxcA_br_50 : KA.«kexec» + 0x50#64 + BitVec.signExtend 64 20#13 = KA.«kexec» + 0x64#64 := by
   decide
-theorem kxcA_br_90 : KA.«kexec» + 0x60#64 + BitVec.signExtend 64 48#13 = KA.«kexec» + 0x90#64 := by
+theorem kxcA_br_60 : KA.«kexec» + 0x60#64 + BitVec.signExtend 64 48#13 = KA.«kexec» + 0x90#64 := by
   decide
 
 theorem kxcA_tot64 (tot : Nat) (h : tot ≤ 64) : (BitVec.ofNat 64 tot = 64#64) ↔ tot = 64 := by
@@ -187,7 +187,7 @@ theorem kxcA_tot64 (tot : Nat) (h : tot ≤ 64) : (BitVec.ofNat 64 tot = 64#64) 
 
 theorem kxcA_beqz0 : bcond bop.BEQ 0#64 0#64 = true := by decide
 
-theorem kxcA_br_88 : KA.«kexec» + 0x30#64 + BitVec.signExtend 64 88#13 = KA.«kexec» + 0x88#64 := by
+theorem kxcA_br_30 : KA.«kexec» + 0x30#64 + BitVec.signExtend 64 88#13 = KA.«kexec» + 0x88#64 := by
   decide
 theorem kxcA_j_72 : KA.«kexec» + 0x8e#64 + BitVec.signExtend 64 2097124#21 = KA.«kexec» + 0x72#64 := by
   decide
@@ -598,7 +598,7 @@ theorem kxc_a1 (MP : MYPROC) (BO : BEGIN_OP) (NI : NAMEI) (EO : END_OP)
   ihave Hk := kctx_eq_mono cpu _ (((k.withSpie k.spie k.spp).pushed 68).withRegs R)
     (by kctx_ext) $$ Hk
   -- +0x020  jal myproc
-  iapply (kxcA_call_myproc MP cpu k k.spie k.spp R (KA.«kexec» + 0x20#64) 2085042#21 kxcA_br_myproc
+  iapply (kxcA_call_myproc MP cpu k k.spie k.spp R (KA.«kexec» + 0x20#64) 2085052#21 kxcA_br_myproc
       kxcA_ret_24 hK hnoff) $$ [- $Hk $Hpc $Hte $Hce]
   isplitr
   · iapply (text_instr _ _ _ _ rfl rfl); iexact Htext
@@ -676,7 +676,7 @@ theorem kxc_a1 (MP : MYPROC) (BO : BEGIN_OP) (NI : NAMEI) (EO : END_OP)
     ihave Harm := kxcA_ite_f _ _ $$ Harm
     icases Harm with ⟨%h10, Hirs⟩
     k_step_e (wp_s_branch cpu _ (KA.«kexec» + 0x30#64) true 88#13 10#5 0#5 (by decide) bop.BEQ)
-      from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h10, kxcA_beqz0, kxcA_br_88]
+      from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h10, kxcA_beqz0, kxcA_br_30]
     iintro Hk Hpc
     -- +0x088  jal end_op
     iapply (kxc_call_endop EO Γ cpu k A spie3 spp3 R3 (KA.«kexec» + 0x88#64) 2094256#21 kxcA_br_eo_88
@@ -805,7 +805,7 @@ theorem kxcA_tests_r (IUP : IUNLOCKPUT) (EO : END_OP) (Γ : SchedNames) [ClaimIs
     have hd : decide (BitVec.ofNat 64 tot ≠ 64#64) = true := by
       simp only [decide_eq_true_eq]; rw [Ne, kxcA_tot64 tot htot64]; exact ht
     k_step_e (wp_s_branch cpu _ (KA.«kexec» + 0x50#64) false 20#13 10#5 15#5 (by decide) bop.BNE)
-      from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h10, kxcA_bne, hd, kxcA_br_64]
+      from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h10, kxcA_bne, hd, kxcA_br_50]
     iintro Hk Hpc
     ihave Hfr := kxcFrameA6x_fold (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) (k.regs 9#5) (k.regs 18#5)
       (k.regs 10#5) (k.regs 11#5) (k.regs 20#5) _ $$ Hfr
@@ -871,7 +871,7 @@ theorem kxcA_tests_r (IUP : IUNLOCKPUT) (EO : END_OP) (Γ : SchedNames) [ClaimIs
     have hd : decide (BitVec.signExtend 64 (BitVec.ofNat 32 (leAt (rdDelivered data olds 0 64) 0 4)) =
         1179403647#64) = true := by simp [hm]
     k_step_e (wp_s_branch cpu _ (KA.«kexec» + 0x60#64) false 48#13 14#5 15#5 (by decide) bop.BEQ)
-      from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [kxcA_beq, hd, kxcA_br_90]
+      from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [kxcA_beq, hd, kxcA_br_60]
     iintro Hk Hpc
     ihave HRX := Hconv $$ %(rdDelivered data olds 0 64) %dnf %bmf %data %hhdr HR
     iapply HK $$ %cpu %spie %spp %_ %kf %qf %sf %gyf %loyf %tlyf %inumf %dnf %bmf %data %gilf %gislf

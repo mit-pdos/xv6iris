@@ -164,7 +164,7 @@ theorem sysx_status (v : BitVec 64) :
 
 theorem sys_exit_br_ffffffffffffff3c : KA.«sys_exit» + 0xffffffffffffff3c#64 = KA.«argint» := by decide
 
-theorem sys_exit_br_fffffffffffff71c : KA.«sys_exit» + 0xfffffffffffff71c#64 = KA.«kexit» := by decide
+theorem sys_exit_br_fffffffffffff716 : KA.«sys_exit» + 0xfffffffffffff716#64 = KA.«kexit» := by decide
 
 set_option maxHeartbeats 64000000 in
 set_option maxRecDepth 20000 in
@@ -235,8 +235,8 @@ theorem sys_exit_proof (AI : ARGINT) (KX : KEXIT) : SYSEXIT := ⟨
         (DFrac.own 1) (BitVec.extractLsb' 0 32 v))
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [c8, sysx_n_addr]
     iintro Hk Hpc Fnn
-    k_step_e (wp_s_jal cpu _ (KA.«sys_exit» + 0x16#64) false 2094854#21 1#5 (by decide))
-      from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [sys_exit_br_fffffffffffff71c]
+    k_step_e (wp_s_jal cpu _ (KA.«sys_exit» + 0x16#64) false 2094848#21 1#5 (by decide))
+      from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [sys_exit_br_fffffffffffff716]
     iintro Hk Hpc
     -- the block, closed again
     ihave Htf := (show wordPointsTo (GF := GF) (pTrapframe k.proc) 8 (DFrac.own 1) (pageAddr V.upt.tfp) ⊢

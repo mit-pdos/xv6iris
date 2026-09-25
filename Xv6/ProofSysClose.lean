@@ -312,7 +312,7 @@ end
 
 theorem sys_close_br_fffffffffffff332 : KA.«sys_close» + 0xfffffffffffff332#64 = KA.«fileclose» := by decide
 
-theorem sys_close_br_ffffffffffffca9e : KA.«sys_close» + 0xffffffffffffca9e#64 = KA.«myproc» := by decide
+theorem sys_close_br_ffffffffffffcaa8 : KA.«sys_close» + 0xffffffffffffcaa8#64 = KA.«myproc» := by decide
 
 theorem sys_close_br_fffffffffffffd26 : KA.«sys_close» + 0xfffffffffffffd26#64 = KA.«argfd» := by decide
 
@@ -432,8 +432,8 @@ theorem sys_close_proof (AF : ARGFD) (MP : MYPROC) (FC : FILECLOSE) : SYSCLOSE :
     k_step_gen (wp_s_branch c7 _ (KA.«sys_close» + 0x18#64) false 34#13 10#5 0#5 (by decide) bop.BLT)
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hr, sc_bltz_0] next c8 hp8
     iintro Hk Hpc
-    k_step_gen (wp_s_jal c8 _ (KA.«sys_close» + 0x1c#64) false 2083458#21 1#5 (by decide))
-      from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [sys_close_br_ffffffffffffca9e] next c9 hp9
+    k_step_gen (wp_s_jal c8 _ (KA.«sys_close» + 0x1c#64) false 2083468#21 1#5 (by decide))
+      from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [sys_close_br_ffffffffffffcaa8] next c9 hp9
     iintro Hk Hpc
     iapply (sc_myproc MP c9 _ ?hnm ?hKm) $$ [- $Hk $Hpc]
     rotate_right 1

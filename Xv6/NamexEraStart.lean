@@ -256,7 +256,7 @@ theorem namexEra_rel (MM : MEMMOVE) (IL : ILOCK) (IUP : IUNLOCKPUT) (IU : IUNLOC
   icases (namexKeep_open k A).1 $$ Hkeep with ⟨Hsb, Hsi, Hpid, Hcwd, Hcwr⟩
   ihave Hcwd := (namex_cwd_cell k.proc A.dqc A.cwdv).1 $$ Hcwd
   -- +0x2e  jal myproc
-  k_step_e (wp_s_jal cpu _ (KA.«namex» + 0x2e#64) false 2088910#21 1#5 (by decide))
+  k_step_e (wp_s_jal cpu _ (KA.«namex» + 0x2e#64) false 2088920#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [namex_br_myproc]
   iintro Hk Hpc
   have h := MP.wp_myproc (hlc := hlc) (GF := GF) cpu

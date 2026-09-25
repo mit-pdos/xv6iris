@@ -141,7 +141,7 @@ theorem filestat_main (MP : MYPROC) (IL : ILOCK) (ST : STATI) (IU : IUNLOCK) (CO
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
   -- +0x10  jal myproc
-  k_step_e (wp_s_jal cpu _ (KA.«filestat» + 0x10#64) false 2086554#21 1#5 (by decide))
+  k_step_e (wp_s_jal cpu _ (KA.«filestat» + 0x10#64) false 2086564#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [filestat_br_myproc]
   iintro Hk Hpc
   iapply (fstat_myproc MP cpu _ ?hn ?hKm) $$ [- $Hk $Hpc]

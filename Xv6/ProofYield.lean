@@ -50,13 +50,13 @@ theorem yield_filter_proc :
 
 theorem yield_runnable : BitVec.extractLsb' 0 32 (3#64) = RUNNABLE := by decide
 
-theorem yield_br_ffffffffffffed36 : KA.«yield» + 0xffffffffffffed36#64 = KA.«release» := by decide
+theorem yield_br_ffffffffffffed46 : KA.«yield» + 0xffffffffffffed46#64 = KA.«release» := by decide
 
 theorem yield_br_ffffffffffffff44 : KA.«yield» + 0xffffffffffffff44#64 = KA.«sched» := by decide
 
-theorem yield_br_ffffffffffffecae : KA.«yield» + 0xffffffffffffecae#64 = KA.«acquire» := by decide
+theorem yield_br_ffffffffffffecbe : KA.«yield» + 0xffffffffffffecbe#64 = KA.«acquire» := by decide
 
-theorem yield_br_fffffffffffff9de : KA.«yield» + 0xfffffffffffff9de#64 = KA.«myproc» := by decide
+theorem yield_br_fffffffffffff9ee : KA.«yield» + 0xfffffffffffff9ee#64 = KA.«myproc» := by decide
 
 set_option maxHeartbeats 4000000 in
 theorem yield_proof (MP : MYPROC) (AC : ACQUIRE) (RE : RELEASE) (SC : SCHED) : YIELD :=
@@ -82,8 +82,8 @@ theorem yield_proof (MP : MYPROC) (AC : ACQUIRE) (RE : RELEASE) (SC : SCHED) : Y
   iintro Hk Hpc Hframe
   k_norm
   -- jal myproc
-  k_step (wp_s_jal cpu _ (KA.«yield» + 0xa#64) false 2095572#21 1#5 (by decide))
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [yield_br_fffffffffffff9de]
+  k_step (wp_s_jal cpu _ (KA.«yield» + 0xa#64) false 2095588#21 1#5 (by decide))
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [yield_br_fffffffffffff9ee]
   iintro Hk Hpc
   -- myproc()
   have hmp : ∀ (k' : KCtx) (_ : k'.sie = false) (hnoff' : k'.noff + 1 < 2 ^ 31) (hK' : 10 ≤ k'.avail),
@@ -120,8 +120,8 @@ theorem yield_proof (MP : MYPROC) (AC : ACQUIRE) (RE : RELEASE) (SC : SCHED) : Y
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [KCtx.rget_eq, h10, hproc]
   iintro Hk Hpc
   -- jal acquire
-  k_step (wp_s_jal cpu _ (KA.«yield» + 0x10#64) false 2092190#21 1#5 (by decide))
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [yield_br_ffffffffffffecae]
+  k_step (wp_s_jal cpu _ (KA.«yield» + 0x10#64) false 2092206#21 1#5 (by decide))
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [yield_br_ffffffffffffecbe]
   iintro Hk Hpc
   -- acquire(&p->lock)
   ihave #Hlk := procsInv_lookup Γ j hj $$ Hpinv
@@ -284,8 +284,8 @@ theorem yield_proof (MP : MYPROC) (AC : ACQUIRE) (RE : RELEASE) (SC : SCHED) : Y
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [KCtx.rget_eq, e4_9]
   iintro Hk Hpc
   -- jal release
-  k_step (wp_s_jal h1 _ (KA.«yield» + 0x1e#64) false 2092312#21 1#5 (by decide))
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [yield_br_ffffffffffffed36]
+  k_step (wp_s_jal h1 _ (KA.«yield» + 0x1e#64) false 2092328#21 1#5 (by decide))
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [yield_br_ffffffffffffed46]
   iintro Hk Hpc
   -- release(&p->lock)
   have hre : ∀ (k' : KCtx) (hsie' : k'.sie = false) (hnoff' : 1 ≤ k'.noff) (hK' : 10 ≤ k'.avail)

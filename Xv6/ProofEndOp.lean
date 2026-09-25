@@ -404,10 +404,10 @@ theorem eo_fast (RE : RELEASE) (WK : WAKEUP) (Γ : SchedNames) [ClaimIs (hlc := 
   k_step (wp_s_auipc cpu _ (KA.«end_op» + 0x7a#64) false 0x1e#20 10#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [eoK_sie]
   iintro Hk Hpc
-  k_step (wp_s_addi cpu _ (KA.«end_op» + 0x7e#64) false 1432#12 10#5 10#5 (by decide))
+  k_step (wp_s_addi cpu _ (KA.«end_op» + 0x7e#64) false 1442#12 10#5 10#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [eoK_sie, eo_log]
   iintro Hk Hpc
-  k_step (wp_s_jal cpu _ (KA.«end_op» + 0x82#64) false 2089426#21 1#5 (by decide))
+  k_step (wp_s_jal cpu _ (KA.«end_op» + 0x82#64) false 2089420#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [eoK_sie, eo_br_wk]
   iintro Hk Hpc
   iapply (eo_wk WK Γ cpu _ ?hnw ?hKw ?hlw ?htw) $$ [- $Hk $Hpc]
@@ -448,10 +448,10 @@ theorem eo_fast (RE : RELEASE) (WK : WAKEUP) (Γ : SchedNames) [ClaimIs (hlc := 
   k_step (wp_s_auipc cpu _ (KA.«end_op» + 0x86#64) false 0x1e#20 10#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [eoK_sie]
   iintro Hk Hpc
-  k_step (wp_s_addi cpu _ (KA.«end_op» + 0x8a#64) false 1420#12 10#5 10#5 (by decide))
+  k_step (wp_s_addi cpu _ (KA.«end_op» + 0x8a#64) false 1430#12 10#5 10#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [eoK_sie, eo_log]
   iintro Hk Hpc
-  k_step (wp_s_jal cpu _ (KA.«end_op» + 0x8e#64) false 2084452#21 1#5 (by decide))
+  k_step (wp_s_jal cpu _ (KA.«end_op» + 0x8e#64) false 2084462#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [eoK_sie, eo_br_rel]
   iintro Hk Hpc
   iapply (eo_re RE cpu _ γ γb γfs cov ls dev ?ha0r ?hsr ?hnr ?hKr k.sie ?hrr ?hor)
@@ -555,13 +555,13 @@ theorem eo_tail (AC : ACQUIRE) (RE : RELEASE) (WK : WAKEUP)
   k_step_e (wp_s_auipc cpu _ (KA.«end_op» + 0x42#64) false 0x1e#20 9#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
-  k_step_e (wp_s_addi cpu _ (KA.«end_op» + 0x46#64) false 1488#12 9#5 9#5 (by decide))
+  k_step_e (wp_s_addi cpu _ (KA.«end_op» + 0x46#64) false 1498#12 9#5 9#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [eo_log]
   iintro Hk Hpc
   k_step_e (wp_s_add cpu _ (KA.«end_op» + 0x4a#64) true 10#5 0#5 9#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [KCtx.rget_zero]
   iintro Hk Hpc
-  k_step_e (wp_s_jal cpu _ (KA.«end_op» + 0x4c#64) false 2084382#21 1#5 (by decide))
+  k_step_e (wp_s_jal cpu _ (KA.«end_op» + 0x4c#64) false 2084392#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [eo_br_acq]
   iintro Hk Hpc
   iapply (eo_ac AC cpu _ γ γb γfs cov ls dev ?ha0 ?hna ?hKa ?hla) $$ [- $Hk $Hpc]
@@ -665,7 +665,7 @@ theorem eo_tail (AC : ACQUIRE) (RE : RELEASE) (WK : WAKEUP)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
     with [eoK_sie, KCtx.rget_zero, p9]
   iintro Hk Hpc
-  k_step (wp_s_jal cpu _ (KA.«end_op» + 0x5c#64) false 2089464#21 1#5 (by decide))
+  k_step (wp_s_jal cpu _ (KA.«end_op» + 0x5c#64) false 2089458#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [eoK_sie, eo_br_wk]
   iintro Hk Hpc
   iapply (eo_wk WK Γ cpu _ ?hnw ?hKw ?hlw ?htw) $$ [- $Hk $Hpc]
@@ -707,7 +707,7 @@ theorem eo_tail (AC : ACQUIRE) (RE : RELEASE) (WK : WAKEUP)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
     with [eoK_sie, KCtx.rget_zero, u9]
   iintro Hk Hpc
-  k_step (wp_s_jal cpu _ (KA.«end_op» + 0x62#64) false 2084496#21 1#5 (by decide))
+  k_step (wp_s_jal cpu _ (KA.«end_op» + 0x62#64) false 2084506#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [eoK_sie, eo_br_rel]
   iintro Hk Hpc
   iapply (eo_re RE cpu _ γ γb γfs cov ls dev ?ha0r ?hsr ?hnr ?hKr k.sie ?hrr ?hor)
@@ -1156,7 +1156,7 @@ theorem eo_commit (WH : WRITE_HEAD) (IT : INSTALL_TRANS) (AC : ACQUIRE) (RE : RE
   k_step_e (wp_s_auipc cpu _ (KA.«end_op» + 0x10e#64) false 0x1e#20 15#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
-  k_step_e (wp_s_sw cpu _ (KA.«end_op» + 0x112#64) false 1328#12 15#5 0#5 (by decide)
+  k_step_e (wp_s_sw cpu _ (KA.«end_op» + 0x112#64) false 1338#12 15#5 0#5 (by decide)
       (BitVec.ofNat 32 n))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [eo_lhn, KCtx.rget_zero]
   iintro Hk Hpc HlhN
@@ -1600,7 +1600,7 @@ theorem eo_body (BR : BREAD) (BW : BWRITE) (BE : BRELSE) (MM : MEMMOVE)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
     with [(id hfix3).2.2.1, eo_bufData]
   iintro Hk Hpc
-  k_step_e (wp_s_jal cpu _ (KA.«end_op» + 0xe2#64) false 2084520#21 1#5 (by decide))
+  k_step_e (wp_s_jal cpu _ (KA.«end_op» + 0xe2#64) false 2084530#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [eo_br_memmove]
   iintro Hk Hpc
   iapply (eo_memmove MM cpu _ bsD bsL BSIZE (DFrac.own 1) (aBufData (bnode kkD))
@@ -1950,13 +1950,13 @@ theorem eo_entry (BR : BREAD) (BW : BWRITE) (BE : BRELSE) (MM : MEMMOVE)
   k_step_e (wp_s_auipc cpu _ (KA.«end_op» + 0xc#64) false 0x1e#20 9#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
-  k_step_e (wp_s_addi cpu _ (KA.«end_op» + 0x10#64) false 1542#12 9#5 9#5 (by decide))
+  k_step_e (wp_s_addi cpu _ (KA.«end_op» + 0x10#64) false 1552#12 9#5 9#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [eo_log]
   iintro Hk Hpc
   k_step_e (wp_s_add cpu _ (KA.«end_op» + 0x14#64) true 10#5 0#5 9#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [KCtx.rget_zero]
   iintro Hk Hpc
-  k_step_e (wp_s_jal cpu _ (KA.«end_op» + 0x16#64) false 2084436#21 1#5 (by decide))
+  k_step_e (wp_s_jal cpu _ (KA.«end_op» + 0x16#64) false 2084446#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [eo_br_acq]
   iintro Hk Hpc
   iapply (eo_ac AC cpu _ γ γb γfs V.cov ls dev ?ha0 ?hna ?hKa ?hla) $$ [- $Hk $Hpc]
@@ -2087,7 +2087,7 @@ theorem eo_entry (BR : BREAD) (BW : BWRITE) (BE : BRELSE) (MM : MEMMOVE)
     k_step (wp_s_auipc cpu _ (KA.«end_op» + 0x2a#64) false 0x1e#20 9#5 (by decide))
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [eoK_sie]
     iintro Hk Hpc
-    k_step (wp_s_addi cpu _ (KA.«end_op» + 0x2e#64) false 1512#12 9#5 9#5 (by decide))
+    k_step (wp_s_addi cpu _ (KA.«end_op» + 0x2e#64) false 1522#12 9#5 9#5 (by decide))
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [eoK_sie, eo_log]
     iintro Hk Hpc
     k_step (wp_s_addi cpu _ (KA.«end_op» + 0x32#64) true 1#12 15#5 0#5 (by decide))
@@ -2115,7 +2115,7 @@ theorem eo_entry (BR : BREAD) (BW : BWRITE) (BE : BRELSE) (MM : MEMMOVE)
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
       with [eoK_sie, KCtx.rget_zero]
     iintro Hk Hpc
-    k_step (wp_s_jal cpu _ (KA.«end_op» + 0x38#64) false 2084538#21 1#5 (by decide))
+    k_step (wp_s_jal cpu _ (KA.«end_op» + 0x38#64) false 2084548#21 1#5 (by decide))
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [eoK_sie, eo_br_rel]
     iintro Hk Hpc
     iapply (eo_re RE cpu _ γ γb γfs V.cov ls dev ?ha0r ?hsr ?hnr ?hKr k.sie ?hrr ?hor)
@@ -2211,13 +2211,13 @@ theorem eo_entry (BR : BREAD) (BW : BWRITE) (BE : BRELSE) (MM : MEMMOVE)
       k_step_e (wp_s_auipc cpu _ (KA.«end_op» + 0xa4#64) false 0x1e#20 21#5 (by decide))
         from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
       iintro Hk Hpc
-      k_step_e (wp_s_addi cpu _ (KA.«end_op» + 0xa8#64) false 1438#12 21#5 21#5 (by decide))
+      k_step_e (wp_s_addi cpu _ (KA.«end_op» + 0xa8#64) false 1448#12 21#5 21#5 (by decide))
         from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [eo_lhb0]
       iintro Hk Hpc
       k_step_e (wp_s_auipc cpu _ (KA.«end_op» + 0xac#64) false 0x1e#20 20#5 (by decide))
         from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
       iintro Hk Hpc
-      k_step_e (wp_s_addi cpu _ (KA.«end_op» + 0xb0#64) false 1382#12 20#5 20#5 (by decide))
+      k_step_e (wp_s_addi cpu _ (KA.«end_op» + 0xb0#64) false 1392#12 20#5 20#5 (by decide))
         from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [eo_log]
       iintro Hk Hpc
       -- into the loop, with the cursor at zero

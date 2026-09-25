@@ -91,11 +91,11 @@ theorem cr_wA : KA.«cons» + 156#64 = consWAddr := rfl
 
 theorem cr_br_acquire : KA.«consoleread» + 0xade#64 = KA.«acquire» := by decide
 theorem cr_br_myproc : KA.«consoleread» + 0x180e#64 = KA.«myproc» := by decide
-theorem cr_br_killed : KA.«consoleread» + 0x20b4#64 = KA.«killed» := by decide
-theorem cr_br_sleep_prepare : KA.«consoleread» + 0x1e5c#64 = KA.«sleep_prepare» := by decide
+theorem cr_br_killed : KA.«consoleread» + 0x20aa#64 = KA.«killed» := by decide
+theorem cr_br_sleep_prepare : KA.«consoleread» + 0x1e4c#64 = KA.«sleep_prepare» := by decide
 theorem cr_br_release : KA.«consoleread» + 0xb66#64 = KA.«release» := by decide
-theorem cr_br_sleep : KA.«consoleread» + 0x1e98#64 = KA.«sleep» := by decide
-theorem cr_br_either : KA.«consoleread» + 0x21e8#64 = KA.«either_copyout» := by decide
+theorem cr_br_sleep : KA.«consoleread» + 0x1e88#64 = KA.«sleep» := by decide
+theorem cr_br_either : KA.«consoleread» + 0x21de#64 = KA.«either_copyout» := by decide
 
 theorem cr_ret_28 : jumpPc (KA.«consoleread» + 0x28#64) = KA.«consoleread» + 0x28#64 := by decide
 theorem cr_ret_4c : jumpPc (KA.«consoleread» + 0x4c#64) = KA.«consoleread» + 0x4c#64 := by decide
@@ -1264,7 +1264,7 @@ theorem cr_consume (RE : RELEASE) (EC : EITHER_COPYOUT)
   k_step (wp_s_add c _ (KA.«consoleread» + 0xa6#64) true 10#5 0#5 22#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [KCtx.rget_zero, p22]
   iintro Hk Hpc
-  k_step (wp_s_jal c _ (KA.«consoleread» + 0xa8#64) false 8512#21 1#5 (by decide))
+  k_step (wp_s_jal c _ (KA.«consoleread» + 0xa8#64) false 8502#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [cr_br_either]
   iintro Hk Hpc
   ihave Hcbuf := pw_byteBuf_one_intro _ _ _ $$ Hch
@@ -1633,7 +1633,7 @@ theorem cr_empty_body (AC : ACQUIRE) (RE : RELEASE) (MP : MYPROC) (KL : KILLED)
   have ha0' : R1 10#5 = procAddr j := by
     have h : R1 10#5 = kb.proc := ha0
     rw [h, hb.proc, hkproc]
-  k_step (wp_s_jal c _ (KA.«consoleread» + 0x4c#64) false 8296#21 1#5 (by decide))
+  k_step (wp_s_jal c _ (KA.«consoleread» + 0x4c#64) false 8286#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [cr_br_killed]
   iintro Hk Hpc
   iapply (cr_killed KL Γ c _ j hj ?hkp ?hkn ?hkK ?hkl ?hkt) $$ [- $Hk $Hpc]
@@ -1680,7 +1680,7 @@ theorem cr_empty_body (AC : ACQUIRE) (RE : RELEASE) (MP : MYPROC) (KL : KILLED)
   k_step (wp_s_add c _ (KA.«consoleread» + 0x52#64) true 10#5 0#5 18#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [KCtx.rget_zero, g18]
   iintro Hk Hpc
-  k_step (wp_s_jal c _ (KA.«consoleread» + 0x54#64) false 7688#21 1#5 (by decide))
+  k_step (wp_s_jal c _ (KA.«consoleread» + 0x54#64) false 7672#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [cr_br_sleep_prepare]
   iintro Hk Hpc
   iapply (cr_sleep_prepare SP Γ c _ j hj ?hspp ?hspchan ?hspn ?hspK ?hsplk ?hspt) $$ [- $Hk $Hpc]
@@ -1753,7 +1753,7 @@ theorem cr_empty_body (AC : ACQUIRE) (RE : RELEASE) (MP : MYPROC) (KL : KILLED)
     (by simp only [RegMap.set_apply, BitVec.reduceEq, ite_false]; exact h20S)
   have h21_6 : R6 21#5 = k.regs 21#5 := hcs6.2.2.2.2.2.2.1.trans
     (by simp only [RegMap.set_apply, BitVec.reduceEq, ite_false]; exact h21S)
-  k_step_e (wp_s_jal cpu _ (KA.«consoleread» + 0x5e#64) false 7738#21 1#5 (by decide))
+  k_step_e (wp_s_jal cpu _ (KA.«consoleread» + 0x5e#64) false 7722#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [cr_br_sleep]
   iintro Hk Hpc
   iapply (cr_sleep SL Γ cpu _ j kb.sie k.proc hj ?hslp ?hslK ?hsln ?hslt ?hsls ?hslq)

@@ -145,7 +145,7 @@ end
 
 /-! ## The shared tail: `mv a0,s1`, `release` and the epilogue -/
 
-theorem sleep_br_ffffffffffffecce : KA.«sleep» + 0xffffffffffffecce#64 = KA.«release» := by decide
+theorem sleep_br_ffffffffffffecde : KA.«sleep» + 0xffffffffffffecde#64 = KA.«release» := by decide
 
 /-- The locked context sleep runs its critical section in: its own
 acquire's exit from the entry context `k` (depth 0), four slots pushed. -/
@@ -177,7 +177,7 @@ theorem sl_ctx_exit (k : KCtx) (a b : Bool) (hwf : k.wf) (hnoff : k.noff = 0) (h
   rfl
 
 set_option maxHeartbeats 4000000 in
-/-- From `0x80002032` on hart `cpu`, holding `p->lock` with the slot's
+/-- From `0x80002022` on hart `cpu`, holding `p->lock` with the slot's
 contents out at RUNNING, inside the balanced pair's critical section
 (`k.pushOffAt a b`, `k` the entry context at either `SIE`): re-form the
 claim, split it against the complement (`armExt_popArm`), release, return. -/
@@ -220,8 +220,8 @@ theorem sleep_tail (RE : RELEASE) {hlc : HasLC} {GF : BundledGFunctors} [MachGS 
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h9]
   iintro Hk Hpc
   -- jal release
-  k_step (wp_s_jal cpu _ (KA.«sleep» + 0x22#64) false 2092204#21 1#5 (by decide))
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [sleep_br_ffffffffffffecce]
+  k_step (wp_s_jal cpu _ (KA.«sleep» + 0x22#64) false 2092220#21 1#5 (by decide))
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [sleep_br_ffffffffffffecde]
   iintro Hk Hpc
   have hre : ∀ (k' : KCtx) (hsie' : k'.sie = false) (hnoff' : 1 ≤ k'.noff) (hK' : 10 ≤ k'.avail)
       (reen : Bool) (hreen : reen = (decide (k'.noff = 1) && k'.intena))
@@ -298,9 +298,9 @@ theorem sleep_tail (RE : RELEASE) {hlc : HasLC} {GF : BundledGFunctors} [MachGS 
 
 theorem sleep_br_fffffffffffffedc : KA.«sleep» + 0xfffffffffffffedc#64 = KA.«sched» := by decide
 
-theorem sleep_br_ffffffffffffec46 : KA.«sleep» + 0xffffffffffffec46#64 = KA.«acquire» := by decide
+theorem sleep_br_ffffffffffffec56 : KA.«sleep» + 0xffffffffffffec56#64 = KA.«acquire» := by decide
 
-theorem sleep_br_fffffffffffff976 : KA.«sleep» + 0xfffffffffffff976#64 = KA.«myproc» := by decide
+theorem sleep_br_fffffffffffff986 : KA.«sleep» + 0xfffffffffffff986#64 = KA.«myproc» := by decide
 
 set_option maxHeartbeats 4000000 in
 /-- **`sleep` meets its specification**, at either entry `SIE`: the
@@ -339,8 +339,8 @@ theorem sleep_proof (MP : MYPROC) (AC : ACQUIRE) (RE : RELEASE) (SC : SCHED) : S
   k_next_e
   iintro Hk Hpc Hframe
   -- jal myproc
-  k_step_e (wp_s_jal cpu _ (KA.«sleep» + 0xa#64) false 2095468#21 1#5 (by decide))
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [sleep_br_fffffffffffff976]
+  k_step_e (wp_s_jal cpu _ (KA.«sleep» + 0xa#64) false 2095484#21 1#5 (by decide))
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [sleep_br_fffffffffffff986]
   iintro Hk Hpc
   have hmp := MP.wp_myproc (hlc := hlc) (GF := GF)
   unfold wp_myproc_body at hmp
@@ -363,8 +363,8 @@ theorem sleep_proof (MP : MYPROC) (AC : ACQUIRE) (RE : RELEASE) (SC : SCHED) : S
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h10M, hproc]
   iintro Hk Hpc
   -- jal acquire
-  k_step_e (wp_s_jal cpu _ (KA.«sleep» + 0x10#64) false 2092086#21 1#5 (by decide))
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [sleep_br_ffffffffffffec46]
+  k_step_e (wp_s_jal cpu _ (KA.«sleep» + 0x10#64) false 2092102#21 1#5 (by decide))
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [sleep_br_ffffffffffffec56]
   iintro Hk Hpc
   have hac := AC.wp_acquire (hlc := hlc) (GF := GF)
   unfold wp_acquire_body at hac

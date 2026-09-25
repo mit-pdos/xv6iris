@@ -30,11 +30,11 @@ set_option linter.unusedVariables false
 theorem bp_ret_18 : jumpPc (KA.«bpin» + 0x18#64) = (KA.«bpin» + 0x18#64) := by decide
 theorem bp_ret_2a : jumpPc (KA.«bpin» + 0x2a#64) = (KA.«bpin» + 0x2a#64) := by decide
 
-theorem bp_lock : KA.«bpin» + 0x1548c#64 = bcacheLockAddr := by
+theorem bp_lock : KA.«bpin» + 0x15496#64 = bcacheLockAddr := by
   unfold bcacheLockAddr; decide
 
-theorem bp_br_acq : KA.«bpin» + 0xffffffffffffde6c#64 = KA.«acquire» := by decide
-theorem bp_br_rel : KA.«bpin» + 0xffffffffffffdef4#64 = KA.«release» := by decide
+theorem bp_br_acq : KA.«bpin» + 0xffffffffffffde76#64 = KA.«acquire» := by decide
+theorem bp_br_rel : KA.«bpin» + 0xffffffffffffdefe#64 = KA.«release» := by decide
 
 section
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [BcacheG GF] [CurCtx]
@@ -101,10 +101,10 @@ theorem bpin_proof (AC : ACQUIRE) (RE : RELEASE) : BPIN := ⟨
   k_step_gen (wp_s_auipc c2 _ (KA.«bpin» + 0xc#64) false 0x15#20 10#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c3 hp3
   iintro Hk Hpc
-  k_step_gen (wp_s_addi c3 _ (KA.«bpin» + 0x10#64) false 1152#12 10#5 10#5 (by decide))
+  k_step_gen (wp_s_addi c3 _ (KA.«bpin» + 0x10#64) false 1162#12 10#5 10#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [bp_lock] next c4 hp4
   iintro Hk Hpc
-  k_step_gen (wp_s_jal c4 _ (KA.«bpin» + 0x14#64) false 2088536#21 1#5 (by decide))
+  k_step_gen (wp_s_jal c4 _ (KA.«bpin» + 0x14#64) false 2088546#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [bp_br_acq] next c5 hp5
   iintro Hk Hpc
   iapply (bc_acquire AC c5 _ γl γ V ?ha0 ?hna ?hKa ?hla) $$ [- $Hk $Hpc]
@@ -217,10 +217,10 @@ theorem bpin_proof (AC : ACQUIRE) (RE : RELEASE) : BPIN := ⟨
   k_step (wp_s_auipc c _ (KA.«bpin» + 0x1e#64) false 0x15#20 10#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
-  k_step (wp_s_addi c _ (KA.«bpin» + 0x22#64) false 1134#12 10#5 10#5 (by decide))
+  k_step (wp_s_addi c _ (KA.«bpin» + 0x22#64) false 1144#12 10#5 10#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [bp_lock]
   iintro Hk Hpc
-  k_step (wp_s_jal c _ (KA.«bpin» + 0x26#64) false 2088654#21 1#5 (by decide))
+  k_step (wp_s_jal c _ (KA.«bpin» + 0x26#64) false 2088664#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [bp_br_rel]
   iintro Hk Hpc
   iapply (bc_release RE c _ γl γ V ?ha0 ?hsr ?hnr ?hKr k.sie ?hrr ?hor) $$ [- $Hk $Hpc $Hlocked $HR]

@@ -133,7 +133,7 @@ theorem bf_data_off' (X : BitVec 64) (q : Nat) :
 /-! ## The constants the code computes -/
 
 /-- `auipc a1,0x1e; lw a1,-1730(a1)` reads `sb.bmapstart`. -/
-theorem bf_sb_addr : KA.«bfree» + 0x1d950#64 = sbBmapstartAddr := by
+theorem bf_sb_addr : KA.«bfree» + 0x1d95a#64 = sbBmapstartAddr := by
   unfold sbBmapstartAddr; decide
 
 theorem bf_br_bread : KA.«bfree» + 0xFFFFFFFFFFFFFC5C#64 = KA.«bread» := by decide

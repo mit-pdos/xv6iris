@@ -6,7 +6,7 @@ cluster, the `++` / `--` clusters, and the record either flush writes.
 
 The walk is `SysLinkWalkA` / `SysLinkWalkB` / `ProofSysLink` (not yet
 written); the contract is `SpecSysLink` (after C0).  THE LEAN IMAGE
-(`KA.«sys_link»` = 0x80004f68, 292 B), whose offsets every lemma below
+(`KA.«sys_link»` = 0x80004f5e, 292 B), whose offsets every lemma below
 uses (never Rocq's comments):
     +0x00 `addi sp,sp,-304` ... +0x12/+0x26 `jal argstr` (old at s0-304,
     new at s0-176), +0x18/+0x2c `bltz`, +0x32 `jal begin_op`, +0x3a `jal

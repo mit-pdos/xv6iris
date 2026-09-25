@@ -35,7 +35,7 @@ set_option linter.unusedVariables false
 /-! ## Addresses -/
 
 /-- `jal ra,kfork` at `+0x08`. -/
-theorem sys_fork_br_kfork : KA.«sys_fork» + 0xfffffffffffff310#64 = KA.«kfork» := by decide
+theorem sys_fork_br_kfork : KA.«sys_fork» + 0xfffffffffffff30a#64 = KA.«kfork» := by decide
 
 /-- The link register of the call. -/
 theorem sys_fork_ret_0c : jumpPc (KA.«sys_fork» + 0xc#64) = KA.«sys_fork» + 0xc#64 := by decide
@@ -99,7 +99,7 @@ theorem sys_fork_proof (KF : KFORK) : SYSFORK :=
   iapply wpNext_intro_pin
   iintro %c1 %hp1 Hk Hpc Hframe
   -- jal kfork
-  k_step_gen (wp_s_jal c1 _ (KA.«sys_fork» + 0x8#64) false 2093832#21 1#5 (by decide))
+  k_step_gen (wp_s_jal c1 _ (KA.«sys_fork» + 0x8#64) false 2093826#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [sys_fork_br_kfork] next c2 hp2
   iintro Hk Hpc
   ihave Hnext := wpNext_shift _ _ _ _ _ (fun h => (hp2 h).trans (hp1 h)) $$ Hnext

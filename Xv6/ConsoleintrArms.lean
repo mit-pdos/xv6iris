@@ -128,7 +128,7 @@ theorem ci_wake (RE : RELEASE) (WK : WAKEUP) (Γ : SchedNames) (c : CPU) (k : KC
   k_step (wp_s_addi c _ (KA.«consoleintr» + 0x162#64) false 4034#12 10#5 10#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [ci_r_addr]
   iintro Hk Hpc
-  k_step (wp_s_jal c _ (KA.«consoleintr» + 0x166#64) false 7188#21 1#5 (by decide))
+  k_step (wp_s_jal c _ (KA.«consoleintr» + 0x166#64) false 7172#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [ci_br_wakeup]
   iintro Hk Hpc
   iapply (ci_wakeup WK Γ c _ rfl ?hnw ?hKw ?hlw ?htw) $$ [- $Hk $Hpc $Hpi]

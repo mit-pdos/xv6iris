@@ -235,10 +235,10 @@ end
 /-! ## The release tail -/
 
 set_option maxHeartbeats 4000000 in
-/-- The stretch from `0x8000206c` (`wakeup+0x2a`) that every arm of the body
+/-- The stretch from `0x8000205c` (`wakeup+0x2a`) that every arm of the body
 falls into: `release(&p->lock)`, the cursor step and the termination test.
 The lock is still held, so the hart is pinned up to the release. -/
-theorem wakeup_br_ffffffffffffec9e : KA.«wakeup» + 0xffffffffffffec9e#64 = KA.«release» := by decide
+theorem wakeup_br_ffffffffffffecae : KA.«wakeup» + 0xffffffffffffecae#64 = KA.«release» := by decide
 
 theorem wk_rel (RE : RELEASE) {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
     [CurCtx] (Γ : SchedNames) (k : KCtx) (hwf : k.wf) (hnoff : k.noff + 1 < 2 ^ 31)
@@ -267,8 +267,8 @@ theorem wk_rel (RE : RELEASE) {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc 
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h9] next c1 hq1
   iintro Hk Hpc
   -- jal ra, release
-  k_step_gen (wp_s_jal c1 _ (KA.«wakeup» + 0x2c#64) false 2092146#21 1#5 (by decide))
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [wakeup_br_ffffffffffffec9e] next c2 hq2
+  k_step_gen (wp_s_jal c1 _ (KA.«wakeup» + 0x2c#64) false 2092162#21 1#5 (by decide))
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [wakeup_br_ffffffffffffecae] next c2 hq2
   iintro Hk Hpc
   have e1 : c1 = c := hq1 (Or.inl rfl)
   subst e1
@@ -331,12 +331,12 @@ theorem wk_rel (RE : RELEASE) {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc 
 /-! ## One iteration of the scan -/
 
 set_option maxHeartbeats 4000000 in
-/-- The body at `0x8000207a` (`wakeup+0x38`) for slot `i`: `acquire(&p->lock)`,
+/-- The body at `0x8000206a` (`wakeup+0x38`) for slot `i`: `acquire(&p->lock)`,
 the chan test, the chan clear, the state test, the wake, and the release tail.
 The wake arm needs nothing from the running thread: at SLEEPING the lock owns
 both halves of the state mirror, so the scan may pass over the caller's own
 slot. -/
-theorem wakeup_br_ffffffffffffec16 : KA.«wakeup» + 0xffffffffffffec16#64 = KA.«acquire» := by decide
+theorem wakeup_br_ffffffffffffec26 : KA.«wakeup» + 0xffffffffffffec26#64 = KA.«acquire» := by decide
 
 theorem wk_iter (AC : ACQUIRE) (RE : RELEASE) {hlc : HasLC} {GF : BundledGFunctors}
     [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [X : CurCtx]
@@ -369,8 +369,8 @@ theorem wk_iter (AC : ACQUIRE) (RE : RELEASE) {hlc : HasLC} {GF : BundledGFuncto
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h9] next c1 hp1
   iintro Hk Hpc
   -- jal ra, acquire
-  k_step_gen (wp_s_jal c1 _ (KA.«wakeup» + 0x3a#64) false 2091996#21 1#5 (by decide))
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [wakeup_br_ffffffffffffec16] next c2 hp2
+  k_step_gen (wp_s_jal c1 _ (KA.«wakeup» + 0x3a#64) false 2092012#21 1#5 (by decide))
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [wakeup_br_ffffffffffffec26] next c2 hp2
   iintro Hk Hpc
   iapply (wk_acquire AC c2 _ (Γ.lock i) (procLockPay Γ i) ?hna ?hKa ?hla) $$ [- $Hk $Hpc]
   rotate_right 1
@@ -513,7 +513,7 @@ theorem wk_iter (AC : ACQUIRE) (RE : RELEASE) {hlc : HasLC} {GF : BundledGFuncto
 /-! ## The loop -/
 
 set_option maxHeartbeats 4000000 in
-/-- The scan from `0x8000207a` with `i` slots behind it (`i < NPROC`) runs to
+/-- The scan from `0x8000206a` with `i` slots behind it (`i < NPROC`) runs to
 the epilogue at `(KernelSyms.«wakeup» + 0x54)`.  A bounded loop: ordinary induction on a `fuel`
 bounding the iterations left, with the hart quantified inside (the thread may
 migrate at every interrupt window between two critical sections). -/
@@ -621,7 +621,7 @@ theorem wkFrame_join {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CurC
   unfold wkFrame; iintro H; iexact H
 
 set_option maxHeartbeats 4000000 in
-/-- The epilogue at `0x80002096`: restore `ra`, `s0`, `s1`..`s5`, pop the
+/-- The epilogue at `0x80002086`: restore `ra`, `s0`, `s1`..`s5`, pop the
 frame, return. -/
 theorem wk_epi {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CurCtx]
     (cpu cur : CPU) (k : KCtx)
@@ -698,16 +698,16 @@ theorem wk_procAddr_zero : procAddr 0 = KA.«proc» := by decide
 
 /-- `&proc`, folded out of `auipc s1,0x11; addi s1,s1,-2032`. -/
 theorem wk_proc0_addr :
-    KA.«wakeup» + 0x1081e#64
+    KA.«wakeup» + 0x1082e#64
       = KA.«proc» := by decide
 
 /-- `&proc[NPROC]`, folded out of `auipc s3,0x16; addi s3,s3,516`. -/
 theorem wk_sent_addr :
-    KA.«wakeup» + 0x1621e#64 = KA.«tickslock» := by decide
+    KA.«wakeup» + 0x1622e#64 = KA.«tickslock» := by decide
 
-theorem wakeup_br_1081e : KA.«wakeup» + 0x1081e#64 = KA.«proc» := by decide
+theorem wakeup_br_1082e : KA.«wakeup» + 0x1082e#64 = KA.«proc» := by decide
 
-theorem wakeup_br_1621e : KA.«wakeup» + 0x1621e#64 = KA.«tickslock» := by decide
+theorem wakeup_br_1622e : KA.«wakeup» + 0x1622e#64 = KA.«tickslock» := by decide
 
 set_option maxHeartbeats 4000000 in
 /-- **`wakeup` meets its specification.** -/
@@ -759,8 +759,8 @@ theorem wakeup_proof (AC : ACQUIRE) (RE : RELEASE) : WAKEUP :=
   k_step_gen (wp_s_auipc c10 _ (KA.«wakeup» + 0x14#64) false 17#20 9#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c11 hp11
   iintro Hk Hpc
-  k_step_gen (wp_s_addi c11 _ (KA.«wakeup» + 0x18#64) false 2058#12 9#5 9#5 (by decide))
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [wakeup_br_1081e, wk_proc0_addr] next c12 hp12
+  k_step_gen (wp_s_addi c11 _ (KA.«wakeup» + 0x18#64) false 2074#12 9#5 9#5 (by decide))
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [wakeup_br_1082e, wk_proc0_addr] next c12 hp12
   iintro Hk Hpc
   k_step_gen (wp_s_addi c12 _ (KA.«wakeup» + 0x1c#64) true 2#12 20#5 0#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c13 hp13
@@ -771,8 +771,8 @@ theorem wakeup_proof (AC : ACQUIRE) (RE : RELEASE) : WAKEUP :=
   k_step_gen (wp_s_auipc c14 _ (KA.«wakeup» + 0x20#64) false 22#20 19#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c15 hp15
   iintro Hk Hpc
-  k_step_gen (wp_s_addi c15 _ (KA.«wakeup» + 0x24#64) false 510#12 19#5 19#5 (by decide))
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [wakeup_br_1621e, wk_sent_addr] next c16 hp16
+  k_step_gen (wp_s_addi c15 _ (KA.«wakeup» + 0x24#64) false 526#12 19#5 19#5 (by decide))
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [wakeup_br_1622e, wk_sent_addr] next c16 hp16
   iintro Hk Hpc
   k_step_gen (wp_s_j c16 _ (KA.«wakeup» + 0x28#64) true 16#21)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c17 hp17
@@ -785,7 +785,7 @@ theorem wakeup_proof (AC : ACQUIRE) (RE : RELEASE) : WAKEUP :=
     k.spie k.spp _ ?g9 ?g18 ?g19 ?g20 ?g21 c17) $$ [- $Hk $Hpc]
   rotate_right 1
   · iframe #
-    -- the exit at 0x80002096 and the epilogue
+    -- the exit at 0x80002086 and the epilogue
     iapply wpNext_intro_pin
     iintro %cE %hpE %spie2 %spp2 %R2 %hsp2 Hk Hpc %hkept
     ihave Hframe := wkFrame_join (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) (k.regs 9#5)

@@ -101,7 +101,7 @@ theorem nc_res_iff (f g : Nat → BitVec 8) (res : BitVec 64)
 
 /-! ## The function -/
 
-theorem namecmp_br_ffffffffffffd522 : KA.«namecmp» + 0xffffffffffffd522#64 = KA.«strncmp» := by
+theorem namecmp_br_ffffffffffffd52c : KA.«namecmp» + 0xffffffffffffd52c#64 = KA.«strncmp» := by
   decide
 
 theorem namecmp_ret : jumpPc (KA.«namecmp» + 0xe#64) = KA.«namecmp» + 0xe#64 := by decide
@@ -126,9 +126,9 @@ theorem namecmp_proof (S : STRNCMP) : NAMECMP := ⟨fun {hlc GF} _ _ cpu k f g d
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [KCtx.rget_zero] next c2 hp2
   iintro Hk Hpc
   -- jal ra, strncmp
-  k_step_gen (wp_s_jal c2 _ (KA.«namecmp» + 0xa#64) false 2086168#21 1#5 (by decide))
+  k_step_gen (wp_s_jal c2 _ (KA.«namecmp» + 0xa#64) false 2086178#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
-    with [namecmp_br_ffffffffffffd522] next c3 hp3
+    with [namecmp_br_ffffffffffffd52c] next c3 hp3
   iintro Hk Hpc
   -- the call
   have hm := S.wp_strncmp (hlc := hlc) (GF := GF) c3 ((k.pushed 2).withRegs

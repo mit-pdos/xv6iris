@@ -45,11 +45,11 @@ theorem sys_pipe_ret_b0 : jumpPc (KA.«sys_pipe» + 0xb0#64) = (KA.«sys_pipe» 
 theorem sys_pipe_ret_d0 : jumpPc (KA.«sys_pipe» + 0xd0#64) = (KA.«sys_pipe» + 0xd0#64) := by decide
 theorem sys_pipe_ret_d8 : jumpPc (KA.«sys_pipe» + 0xd8#64) = (KA.«sys_pipe» + 0xd8#64) := by decide
 
-theorem sys_pipe_br_myproc : KA.«sys_pipe» + 0xffffffffffffc3f2#64 = KA.«myproc» := by decide
+theorem sys_pipe_br_myproc : KA.«sys_pipe» + 0xffffffffffffc3fc#64 = KA.«myproc» := by decide
 theorem sys_pipe_br_argaddr : KA.«sys_pipe» + 0xffffffffffffd3a4#64 = KA.«argaddr» := by decide
 theorem sys_pipe_br_pipealloc : KA.«sys_pipe» + 0xffffffffffffefba#64 = KA.«pipealloc» := by decide
 theorem sys_pipe_br_fdalloc : KA.«sys_pipe» + 0xfffffffffffff6d4#64 = KA.«fdalloc» := by decide
-theorem sys_pipe_br_copyout : KA.«sys_pipe» + 0xffffffffffffc02c#64 = KA.«copyout» := by decide
+theorem sys_pipe_br_copyout : KA.«sys_pipe» + 0xffffffffffffc036#64 = KA.«copyout» := by decide
 theorem sys_pipe_br_fileclose : KA.«sys_pipe» + 0xffffffffffffec86#64 = KA.«fileclose» := by decide
 
 theorem sys_pipe_m1 : 0#64 + BitVec.signExtend 64 4095#12 = 0xFFFFFFFFFFFFFFFF#64 := by decide

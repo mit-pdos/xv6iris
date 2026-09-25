@@ -31,9 +31,11 @@ Wave-8 specific rules:
 1. **One Lean file per Rocq file, same name.** Rocq Proof files become stage files (no `Proof`
    prefix); only the seal is `Proof<Fn>.lean` (7b rule 2). Rocq `Code*.v` decode files are not
    ported; they come from `KernelImage` plus the `k_step` family.
-2. **The addresses are Lean's.** The image is the two-UART kernel 163d39be. Rocq's offsets
-   (`syscall` @ 0x80002872) do NOT match: here `KA.«syscall»` is 0x8000297e, 100 bytes, and
-   `KA.«syscalls»` is 0x80007798 (0xb8 bytes = 23 slots). Re-derive every offset from `KernelImage`.
+2. **The addresses are Lean's.** The image is xv6 3e9926ea, which is exactly Rocq main's XV6_REV
+   (bumped from 163d39be on 2026-09-25), so Rocq main's `KernelSyms` offsets now MATCH
+   (`KA.«syscall»` = 0x80002974, 100 bytes; `KA.«syscalls»` = 0x80007798, 0xb8 bytes = 23 slots).
+   Still re-derive every offset from `KernelImage`; Rocq files ported from the older base may carry
+   the older kernel's numbers.
 3. **The knot is tied in the logic (ParkCap), never by an assumed class.** No new `…Is` class and no
    new assumed structure, except `USER` if D24(a) is taken.
 4. The crash layer stays dropped (D11). Carry the SpecEndOp/SpecIreclaim deviation text wherever

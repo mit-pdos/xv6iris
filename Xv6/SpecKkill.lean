@@ -1,7 +1,9 @@
 /-
-Specification of `kkill` (kernel/proc.c): `kkill(pid)` scans the table for
-the pid, sets the `killed` flag and wakes a sleeper (`0`), or returns `-1`.
-Generic in SIE and depth (`"proc"` not held).  kkill needs 16 slots.
+Specification of `kkill` (kernel/proc.c; Rocq `SpecKkill.v`): `kkill(pid)`
+refuses `pid == 0` (`-1`, xv6 64c58ba2: no UNUSED slot is ever marked), else
+scans the table for the pid, sets the `killed` flag and wakes a sleeper
+(`0`), or returns `-1`.  The result is `0` or `-1` and nothing more, as in
+Rocq.  Generic in SIE and depth (`"proc"` not held).  kkill needs 16 slots.
 
 Setting `p->killed` nonzero costs the application's price of a kill
 (`KillRow.killPaidAt`'s row: "zero, or paid"), so the caller hands the

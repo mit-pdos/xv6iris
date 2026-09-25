@@ -28,7 +28,7 @@ split-off `Xv6/SysLinkDefs.lean` (brief fs7b D21).
       return -1;
     }
 
-`KA.«sys_link»` = 0x80004f68, 292 bytes.  A THIRTY-EIGHT slot frame
+`KA.«sys_link»` = 0x80004f5e, 292 bytes.  A THIRTY-EIGHT slot frame
 (`addi sp,sp,-304`), carved (Rocq's header, verified against the Lean
 image): slot 1 (`sp0-8`) ra, slot 2 (`sp0-16`) s0 (the frame pointer, =
 the entry sp), slot 3 (`sp0-24`) s1 = ip -- saved LATE, at +0x30 --, slot 4

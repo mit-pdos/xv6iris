@@ -171,12 +171,12 @@ theorem scheduler_prologue [CurCtx] (cpu : CPU) (k : KCtx) (hsie : k.sie = false
   iapply HΦ $$ Hk Hpc
 
 set_option maxHeartbeats 4000000 in
-/-- The constant setup `0x80001e54 .. 0x80001e86`: `c->proc = 0` (it already
+/-- The constant setup `0x80001e44 .. 0x80001e76`: `c->proc = 0` (it already
 is), `s5 = &cpus[hartid].context`, `s8 = RUNNING`, `s6 = &pid_lock`,
 `s4 = &pid_lock + 128*hartid`, `s7 = 1`, then the jump to the loop head. -/
-theorem scheduler_br_1062e : KA.«scheduler» + 0x1062e#64 = (KA.«cpus» + 0x8#64) := by decide
+theorem scheduler_br_1063e : KA.«scheduler» + 0x1063e#64 = (KA.«cpus» + 0x8#64) := by decide
 
-theorem scheduler_br_105f6 : KA.«scheduler» + 0x105f6#64 = KA.«pid_lock» := by decide
+theorem scheduler_br_10606 : KA.«scheduler» + 0x10606#64 = KA.«pid_lock» := by decide
 
 theorem scheduler_setup [CurCtx] (cpu : CPU) (k : KCtx) (hsie : k.sie = false)
     (hproc : k.proc = 0#64) :
@@ -202,8 +202,8 @@ theorem scheduler_setup [CurCtx] (cpu : CPU) (k : KCtx) (hsie : k.sie = false)
   k_step (wp_s_auipc cpu _ (KA.«scheduler» + 0x22#64) false 16#20 14#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [BitVec.reduceAppend]
   iintro Hk Hpc
-  k_step (wp_s_addi cpu _ (KA.«scheduler» + 0x26#64) false 1492#12 14#5 14#5 (by decide))
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [scheduler_br_105f6]
+  k_step (wp_s_addi cpu _ (KA.«scheduler» + 0x26#64) false 1508#12 14#5 14#5 (by decide))
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [scheduler_br_10606]
   iintro Hk Hpc
   k_step (wp_s_add cpu _ (KA.«scheduler» + 0x2a#64) true 14#5 14#5 21#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
@@ -228,8 +228,8 @@ theorem scheduler_setup [CurCtx] (cpu : CPU) (k : KCtx) (hsie : k.sie = false)
   k_step (wp_s_auipc cpu _ (KA.«scheduler» + 0x30#64) false 16#20 14#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [BitVec.reduceAppend]
   iintro Hk Hpc
-  k_step (wp_s_addi cpu _ (KA.«scheduler» + 0x34#64) false 1534#12 14#5 14#5 (by decide))
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [scheduler_br_1062e]
+  k_step (wp_s_addi cpu _ (KA.«scheduler» + 0x34#64) false 1550#12 14#5 14#5 (by decide))
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [scheduler_br_1063e]
   iintro Hk Hpc
   k_step (wp_s_add cpu _ (KA.«scheduler» + 0x38#64) true 21#5 21#5 14#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
@@ -242,8 +242,8 @@ theorem scheduler_setup [CurCtx] (cpu : CPU) (k : KCtx) (hsie : k.sie = false)
   k_step (wp_s_auipc cpu _ (KA.«scheduler» + 0x3c#64) false 16#20 22#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [BitVec.reduceAppend]
   iintro Hk Hpc
-  k_step (wp_s_addi cpu _ (KA.«scheduler» + 0x40#64) false 1466#12 22#5 22#5 (by decide))
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [scheduler_br_105f6]
+  k_step (wp_s_addi cpu _ (KA.«scheduler» + 0x40#64) false 1482#12 22#5 22#5 (by decide))
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [scheduler_br_10606]
   iintro Hk Hpc
   -- slli a5,a5,7; add s4,s6,a5
   k_step (wp_s_slli cpu _ (KA.«scheduler» + 0x44#64) true 7#6 15#5 15#5 (by decide))
@@ -256,7 +256,7 @@ theorem scheduler_setup [CurCtx] (cpu : CPU) (k : KCtx) (hsie : k.sie = false)
   k_step (wp_s_addi cpu _ (KA.«scheduler» + 0x4a#64) true 1#12 23#5 0#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [KCtx.rget_eq]
   iintro Hk Hpc
-  -- j 0x80001ed0
+  -- j 0x80001ec0
   k_step (wp_s_j cpu _ (KA.«scheduler» + 0x4c#64) true 74#21)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
@@ -278,7 +278,7 @@ theorem scheduler_setup [CurCtx] (cpu : CPU) (k : KCtx) (hsie : k.sie = false)
 section
 variable [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [CurCtx]
 
-/-- At the loop head `0x80001ed0`, interrupts off at depth 0 with nothing
+/-- At the loop head `0x80001ec0`, interrupts off at depth 0 with nothing
 held: this hart's own `struct context` save area is free, and the interrupt
 arm's two halves are the scheduler's. -/
 def headInv (Γ : SchedNames) (cpu : CPU) (A : Nat) : IProp GF := iprop%
@@ -287,14 +287,14 @@ def headInv (Γ : SchedNames) (cpu : CPU) (A : Nat) : IProp GF := iprop%
     kctx cpu k -∗ pcIs cpu (KA.«scheduler» + 0x96#64) -∗ ownCtxCells (cpuCtxAddr cpu) -∗
     trapCsrs cpu -∗ intrRes cpu -∗ wpLoop cpu
 
-/-- At the head of the scan body `0x80001e96`, about to acquire `proc[n]`. -/
+/-- At the head of the scan body `0x80001e86`, about to acquire `proc[n]`. -/
 def scanInv (Γ : SchedNames) (cpu : CPU) (A : Nat) (n : Nat) : IProp GF := iprop%
   ∀ k : KCtx, ⌜k.sie = false ∧ k.noff = 0 ∧ k.locks = [] ∧ k.tier = KTier.kpt ∧
       k.proc = 0#64 ∧ k.avail = A ∧ scanRegs cpu k.regs n⌝ -∗
     kctx cpu k -∗ pcIs cpu (KA.«scheduler» + 0x5c#64) -∗ ownCtxCells (cpuCtxAddr cpu) -∗
     trapCsrs cpu -∗ intrRes cpu -∗ wpLoop cpu
 
-/-- At `0x80001ea2`, holding `proc[n]`'s lock with its payload opened and
+/-- At `0x80001e92`, holding `proc[n]`'s lock with its payload opened and
 the slot RUNNABLE: the dispatch is about to happen. -/
 def dispInv (Γ : SchedNames) (cpu : CPU) (A : Nat) (n : Nat) : IProp GF := iprop%
   ∀ (k : KCtx) (ch : BitVec 64) (kl xs pid : BitVec 32),
@@ -308,7 +308,7 @@ def dispInv (Γ : SchedNames) (cpu : CPU) (A : Nat) (n : Nat) : IProp GF := ipro
     procSlotsAt Γ curCtx (procAddr n) RUNNABLE -∗
     ownCtxCells (cpuCtxAddr cpu) -∗ trapCsrs cpu -∗ intrRes cpu -∗ wpLoop cpu
 
-/-- At `0x80001e88`, holding `proc[n]`'s lock with its payload, about to
+/-- At `0x80001e78`, holding `proc[n]`'s lock with its payload, about to
 release it and step the cursor. -/
 def tailInv (Γ : SchedNames) (cpu : CPU) (A : Nat) (n : Nat) : IProp GF := iprop%
   ∀ k : KCtx, ⌜k.sie = false ∧ k.noff = 1 ∧ k.locks = ["proc"] ∧ k.tier = KTier.kpt ∧
@@ -343,13 +343,13 @@ theorem sc_sieArm_off [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG
 /-! ## The loop head -/
 
 set_option maxHeartbeats 4000000 in
-/-- `0x80001ed0 .. 0x80001eec`: the `csrsi`/`csrci` window that lets a
+/-- `0x80001ec0 .. 0x80001edc`: the `csrsi`/`csrci` window that lets a
 pending interrupt in, `found = 0`, `p = proc`, and the jump into the scan.
 The trap reserve the `csrsi` carves comes straight back at the `csrci`, so
 the invariant runs at the same `avail`. -/
-theorem scheduler_br_16426 : KA.«scheduler» + 0x16426#64 = KA.«tickslock» := by decide
+theorem scheduler_br_16436 : KA.«scheduler» + 0x16436#64 = KA.«tickslock» := by decide
 
-theorem scheduler_br_10a26 : KA.«scheduler» + 0x10a26#64 = KA.«proc» := by decide
+theorem scheduler_br_10a36 : KA.«scheduler» + 0x10a36#64 = KA.«proc» := by decide
 
 theorem scheduler_head_step [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [CurCtx] (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
     (cpu : CPU) (A : Nat) (hA : kvFrameSlots ≤ A) :
@@ -383,8 +383,8 @@ theorem scheduler_head_step [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] 
   k_step (wp_s_auipc cpu _ (KA.«scheduler» + 0xa0#64) false 17#20 9#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [KCtx.setReg_eq, KCtx.rget_eq, hproc, BitVec.reduceAppend]
   iintro Hk Hpc
-  k_step (wp_s_addi cpu _ (KA.«scheduler» + 0xa4#64) false 2438#12 9#5 9#5 (by decide))
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [scheduler_br_10a26, KCtx.setReg_eq, KCtx.rget_eq, hproc]
+  k_step (wp_s_addi cpu _ (KA.«scheduler» + 0xa4#64) false 2454#12 9#5 9#5 (by decide))
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [scheduler_br_10a36, KCtx.setReg_eq, KCtx.rget_eq, hproc]
   iintro Hk Hpc
   -- li s3,3
   k_step (wp_s_addi cpu _ (KA.«scheduler» + 0xa8#64) true 3#12 19#5 0#5 (by decide))
@@ -394,10 +394,10 @@ theorem scheduler_head_step [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] 
   k_step (wp_s_auipc cpu _ (KA.«scheduler» + 0xaa#64) false 22#20 18#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [KCtx.setReg_eq, KCtx.rget_eq, hproc, BitVec.reduceAppend]
   iintro Hk Hpc
-  k_step (wp_s_addi cpu _ (KA.«scheduler» + 0xae#64) false 892#12 18#5 18#5 (by decide))
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [scheduler_br_16426, KCtx.setReg_eq, KCtx.rget_eq, hproc]
+  k_step (wp_s_addi cpu _ (KA.«scheduler» + 0xae#64) false 908#12 18#5 18#5 (by decide))
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [scheduler_br_16436, KCtx.setReg_eq, KCtx.rget_eq, hproc]
   iintro Hk Hpc
-  -- j 0x80001e96
+  -- j 0x80001e86
   k_step (wp_s_j cpu _ (KA.«scheduler» + 0xb2#64) true 2097066#21)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [KCtx.setReg_eq, KCtx.rget_eq, hproc]
   iintro Hk Hpc
@@ -446,10 +446,10 @@ theorem procAddr_ne_end {m : Nat} (h : m < NPROC) : procAddr m ≠ KA.«ticksloc
 
 /-! ## The release and the cursor step -/
 
-theorem scheduler_br_ffffffffffffeea6 : KA.«scheduler» + 0xffffffffffffeea6#64 = KA.«release» := by decide
+theorem scheduler_br_ffffffffffffeeb6 : KA.«scheduler» + 0xffffffffffffeeb6#64 = KA.«release» := by decide
 
 set_option maxHeartbeats 4000000 in
-/-- `0x80001e88 .. 0x80001e8e`: `release(&p->lock); p++`. -/
+/-- `0x80001e78 .. 0x80001e7e`: `release(&p->lock); p++`. -/
 theorem scheduler_release [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [CurCtx] (RE : RELEASE) (Γ : SchedNames) (cpu : CPU) (k : KCtx)
     (n : Nat) (hn : n < NPROC) (hsie : k.sie = false) (hnoff : k.noff = 1)
     (hlocks : k.locks = ["proc"]) (htier : k.tier = KTier.kpt) (hintena : k.intena = false)
@@ -469,8 +469,8 @@ theorem scheduler_release [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [C
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [KCtx.setReg_eq, KCtx.rget_eq]
   iintro Hk Hpc
   -- jal release
-  k_step (wp_s_jal cpu _ (KA.«scheduler» + 0x50#64) false 2092630#21 1#5 (by decide))
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [scheduler_br_ffffffffffffeea6]
+  k_step (wp_s_jal cpu _ (KA.«scheduler» + 0x50#64) false 2092646#21 1#5 (by decide))
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [scheduler_br_ffffffffffffeeb6]
   iintro Hk Hpc
   have hre : ∀ (k' : KCtx) (hsie' : k'.sie = false) (hnoff' : 1 ≤ k'.noff) (hK' : 10 ≤ k'.avail)
       (reen : Bool) (hreen : reen = (decide (k'.noff = 1) && k'.intena))
@@ -664,10 +664,10 @@ theorem sc_schedBase' (cpu : CPU) :
   bv_omega
 
 set_option maxHeartbeats 4000000 in
-/-- `0x80001ea2 .. 0x80001ec6`: the dispatch of a RUNNABLE slot -- mark it
+/-- `0x80001e92 .. 0x80001eb6`: the dispatch of a RUNNABLE slot -- mark it
 RUNNING, publish it in `c->proc`, cross into its record, and on the way back
 clear `c->intena`/`c->proc`, set `found` and rejoin the release. -/
-theorem scheduler_br_664 : KA.«scheduler» + 0x664#64 = KA.«swtch» := by decide
+theorem scheduler_br_66a : KA.«scheduler» + 0x66a#64 = KA.«swtch» := by decide
 
 theorem scheduler_dispatch (SW : SWTCH) [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [X : CurCtx] (Γ : SchedNames) (cpu : CPU) (A : Nat)
     (n : Nat) (hn : n < NPROC) :
@@ -726,8 +726,8 @@ theorem scheduler_dispatch (SW : SWTCH) [Xv6G GF] [FdslotG GF] [BioslotG GF] [Ir
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [KCtx.rget_eq, g21, KCtx.setReg_eq, KCtx.withProc_regs, KCtx.withProc_sie, KCtx.withProc_spie, KCtx.withProc_spp, KCtx.withProc_avail, KCtx.withProc_noff, KCtx.withProc_intena, KCtx.withProc_locks, KCtx.withProc_tier, KCtx.withProc_root, KCtx.withProc_proc, KCtx.withProc_sp]
   iintro Hk Hpc
   -- jal swtch
-  k_step (wp_s_jal cpu _ (KA.«scheduler» + 0x76#64) false 1518#21 1#5 (by decide))
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [scheduler_br_664, KCtx.setReg_eq, KCtx.withProc_regs, KCtx.withProc_sie, KCtx.withProc_spie, KCtx.withProc_spp, KCtx.withProc_avail, KCtx.withProc_noff, KCtx.withProc_intena, KCtx.withProc_locks, KCtx.withProc_tier, KCtx.withProc_root, KCtx.withProc_proc, KCtx.withProc_sp]
+  k_step (wp_s_jal cpu _ (KA.«scheduler» + 0x76#64) false 1524#21 1#5 (by decide))
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [scheduler_br_66a, KCtx.setReg_eq, KCtx.withProc_regs, KCtx.withProc_sie, KCtx.withProc_spie, KCtx.withProc_spp, KCtx.withProc_avail, KCtx.withProc_noff, KCtx.withProc_intena, KCtx.withProc_locks, KCtx.withProc_tier, KCtx.withProc_root, KCtx.withProc_proc, KCtx.withProc_sp]
   iintro Hk Hpc
   have hsw : ∀ (k' : KCtx) (old_vs : List (BitVec 64)),
       old_vs.length = 14 → k'.regs 10#5 = cpuCtxAddr cpu →
@@ -858,7 +858,7 @@ theorem scheduler_dispatch (SW : SWTCH) [Xv6G GF] [FdslotG GF] [BioslotG GF] [Ir
     from (text_instr _ _ _ _ rfl rfl) Htext2 $$ [- $Hk $Hpc]
     with [KCtx.setReg_eq, KCtx.rget_eq, KCtx.setReg_eq, KCtx.withProc_regs, KCtx.withProc_sie, KCtx.withProc_spie, KCtx.withProc_spp, KCtx.withProc_avail, KCtx.withProc_noff, KCtx.withProc_intena, KCtx.withProc_locks, KCtx.withProc_tier, KCtx.withProc_root, KCtx.withProc_proc, KCtx.withProc_sp, resumedK_regs, resumedK_sie, resumedK_spie, resumedK_spp, resumedK_avail, resumedK_noff, resumedK_intena, resumedK_locks, resumedK_tier, resumedK_root, resumedK_proc, resumedK_sp, KCtx.withCpu_regs, KCtx.withCpu_sie, KCtx.withCpu_spie, KCtx.withCpu_spp, KCtx.withCpu_avail, KCtx.withCpu_noff, KCtx.withCpu_intena, KCtx.withCpu_locks, KCtx.withCpu_tier, KCtx.withCpu_root, KCtx.withCpu_proc, KCtx.withCpu_sp]
   iintro Hk Hpc
-  -- j 0x80001e88
+  -- j 0x80001e78
   k_step (wp_s_j cpu _ (KA.«scheduler» + 0x8c#64) true 2097090#21)
     from (text_instr _ _ _ _ rfl rfl) Htext2 $$ [- $Hk $Hpc]
     with [KCtx.setReg_eq, KCtx.setReg_eq, KCtx.withProc_regs, KCtx.withProc_sie, KCtx.withProc_spie, KCtx.withProc_spp, KCtx.withProc_avail, KCtx.withProc_noff, KCtx.withProc_intena, KCtx.withProc_locks, KCtx.withProc_tier, KCtx.withProc_root, KCtx.withProc_proc, KCtx.withProc_sp, resumedK_regs, resumedK_sie, resumedK_spie, resumedK_spp, resumedK_avail, resumedK_noff, resumedK_intena, resumedK_locks, resumedK_tier, resumedK_root, resumedK_proc, resumedK_sp, KCtx.withCpu_regs, KCtx.withCpu_sie, KCtx.withCpu_spie, KCtx.withCpu_spp, KCtx.withCpu_avail, KCtx.withCpu_noff, KCtx.withCpu_intena, KCtx.withCpu_locks, KCtx.withCpu_tier, KCtx.withCpu_root, KCtx.withCpu_proc, KCtx.withCpu_sp]
@@ -889,10 +889,10 @@ theorem sc_bcond_bne_other (st : BitVec 32) (h : st ≠ RUNNABLE) :
   revert he
   bv_decide
 
-theorem scheduler_br_ffffffffffffee1e : KA.«scheduler» + 0xffffffffffffee1e#64 = KA.«acquire» := by decide
+theorem scheduler_br_ffffffffffffee2e : KA.«scheduler» + 0xffffffffffffee2e#64 = KA.«acquire» := by decide
 
 set_option maxHeartbeats 4000000 in
-/-- `0x80001e96 .. 0x80001e9e`: acquire `proc[n]`'s lock and look at its
+/-- `0x80001e86 .. 0x80001e8e`: acquire `proc[n]`'s lock and look at its
 state; RUNNABLE dispatches, anything else releases straight away. -/
 theorem scheduler_body (SW : SWTCH) (AC : ACQUIRE) [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [X : CurCtx] (Γ : SchedNames)
     (cpu : CPU) (A : Nat) (hA : 10 ≤ A) (n : Nat) (hn : n < NPROC) :
@@ -914,8 +914,8 @@ theorem scheduler_body (SW : SWTCH) (AC : ACQUIRE) [Xv6G GF] [FdslotG GF] [Biosl
   k_step (wp_s_add cpu _ (KA.«scheduler» + 0x5c#64) true 10#5 0#5 9#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [KCtx.setReg_eq, KCtx.rget_eq]
   iintro Hk Hpc
-  k_step (wp_s_jal cpu _ (KA.«scheduler» + 0x5e#64) false 2092480#21 1#5 (by decide))
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [scheduler_br_ffffffffffffee1e]
+  k_step (wp_s_jal cpu _ (KA.«scheduler» + 0x5e#64) false 2092496#21 1#5 (by decide))
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [scheduler_br_ffffffffffffee2e]
   iintro Hk Hpc
   have hac : ∀ (k' : KCtx) (hsie' : k'.sie = false) (hnoff' : k'.noff + 1 < 2 ^ 31)
       (hK' : 10 ≤ k'.avail) (hs' : "proc" ∉ k'.locks),

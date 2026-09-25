@@ -69,7 +69,7 @@ theorem il_load (BD : BREAD) (MM : MEMMOVE) (BL : BRELSE) (PA : PANIC) : IlLoadE
   k_step_e (wp_s_auipc cpu _ (KA.«ilock» + 0x3e#64) false 0x1d#20 11#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
-  k_step_e (wp_s_lw cpu _ (KA.«ilock» + 0x42#64) false 1562#12 11#5 11#5 (by decide) (by decide)
+  k_step_e (wp_s_lw cpu _ (KA.«ilock» + 0x42#64) false 1572#12 11#5 11#5 (by decide) (by decide)
       dqs (BitVec.ofNat 32 icfgIst))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [il_sb_addr]
   iintro Hk Hpc Hsb

@@ -1922,7 +1922,7 @@ theorem create_mkdir_dotdot (DLK : DIRLINK) (Γ : SchedNames) [ClaimIs (hlc := h
   k_step_e (wp_s_auipc cpu _ (KA.«create» + 0x110#64) false 3#20 11#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
-  k_step_e (wp_s_addi cpu _ (KA.«create» + 0x114#64) false 2102#12 11#5 11#5 (by decide))
+  k_step_e (wp_s_addi cpu _ (KA.«create» + 0x114#64) false 2112#12 11#5 11#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
   -- ===== +0x118  c.mv a0,s3 : the CHILD =====
@@ -2190,7 +2190,7 @@ theorem create_mkdir_dot (DLK : DIRLINK) (Γ : SchedNames) [ClaimIs (hlc := hlc)
   k_step_e (wp_s_auipc cpu _ (KA.«create» + 0xfc#64) false 3#20 11#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
-  k_step_e (wp_s_addi cpu _ (KA.«create» + 0x100#64) false 2114#12 11#5 11#5 (by decide))
+  k_step_e (wp_s_addi cpu _ (KA.«create» + 0x100#64) false 2124#12 11#5 11#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
   -- ===== +0x104  c.mv a0,s3 : the CHILD =====

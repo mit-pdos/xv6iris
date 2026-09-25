@@ -107,7 +107,7 @@ theorem filestat_copy (CO : COPYOUT) (cpu : CPU) (k : KCtx) (spie spp : Bool) (R
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [r18, filestat_pt, filestat_pt']
   iintro Hk Hpc Hpg
   -- +0x4a  jal copyout
-  k_step_e (wp_s_jal cpu _ (KA.«filestat» + 0x4a#64) false 2085530#21 1#5 (by decide))
+  k_step_e (wp_s_jal cpu _ (KA.«filestat» + 0x4a#64) false 2085540#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [filestat_br_copyout]
   iintro Hk Hpc
   ihave Hhole := (show wordPointsTo (GF := GF) (k.regs 2#5 + 0xFFFFFFFFFFFFFFC4#64) 4 (DFrac.own 1) h ⊢

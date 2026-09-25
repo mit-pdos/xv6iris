@@ -108,7 +108,7 @@ theorem fsinit_log (IL : INITLOG) (IR : IRECLAIM) [Fscfg] [Icfg] [CurCtx]
   k_step_e (wp_s_auipc cpu _ (KA.«fsinit» + 0x30#64) false 0x1d#20 14#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
-  k_step_e (wp_s_lw cpu _ (KA.«fsinit» + 0x34#64) false 724#12 14#5 14#5 (by decide) (by decide)
+  k_step_e (wp_s_lw cpu _ (KA.«fsinit» + 0x34#64) false 734#12 14#5 14#5 (by decide) (by decide)
       (DFrac.own 1) vMagic)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [fsinit_sb_addr]
   iintro Hk Hpc C0
@@ -128,7 +128,7 @@ theorem fsinit_log (IL : INITLOG) (IR : IRECLAIM) [Fscfg] [Icfg] [CurCtx]
   k_step_e (wp_s_auipc cpu _ (KA.«fsinit» + 0x44#64) false 0x1d#20 11#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
-  k_step_e (wp_s_addi cpu _ (KA.«fsinit» + 0x48#64) false 704#12 11#5 11#5 (by decide))
+  k_step_e (wp_s_addi cpu _ (KA.«fsinit» + 0x48#64) false 714#12 11#5 11#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [fsinit_sb_addr]
   iintro Hk Hpc
   k_step_e (wp_s_add cpu _ (KA.«fsinit» + 0x4c#64) true 10#5 0#5 18#5 (by decide))

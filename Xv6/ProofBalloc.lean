@@ -46,7 +46,7 @@ set_option linter.unusedVariables false
 
 theorem ba_imm_m80 : BitVec.signExtend 64 4016#12 = -(8#64 * BitVec.ofNat 64 10) := by decide
 /-- `auipc a5,0x1e ; lw a5,-1314(a5)` at `+0x0a`: `sb.size`. -/
-theorem ba_a_size : KA.«balloc» + 0x1dae8#64 = sbSizeAddr := by unfold sbSizeAddr; decide
+theorem ba_a_size : KA.«balloc» + 0x1daf2#64 = sbSizeAddr := by unfold sbSizeAddr; decide
 /-- `beqz a5` at `+0x12` on `sb.size`: NOT taken, from `0 < size` (Rocq's
 first dead arm). -/
 theorem ba_beqz_size (size : Nat) (h0 : 0 < size) (h : size < 2 ^ 31) :
@@ -130,7 +130,7 @@ theorem ba_entry (BR : BREAD) (LW : LOG_WRITE) (BE : BRELSE) (MS : MEMSET) (PK :
   k_step_e (wp_s_auipc cpu _ (KA.«balloc» + 0xa#64) false 0x1e#20 15#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
-  k_step_e (wp_s_lw cpu _ (KA.«balloc» + 0xe#64) false 2782#12 15#5 15#5 (by decide) (by decide)
+  k_step_e (wp_s_lw cpu _ (KA.«balloc» + 0xe#64) false 2792#12 15#5 15#5 (by decide) (by decide)
       dqs (BitVec.ofNat 32 size))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [ba_a_size]
   iintro Hk Hpc Hsz

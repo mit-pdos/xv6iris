@@ -57,11 +57,11 @@ theorem kl_ret_2192 : jumpPc (KA.«killed» + 0x12#64) = (KA.«killed» + 0x12#6
   decide
 theorem kl_ret_219c : jumpPc (KA.«killed» + 0x1c#64) = (KA.«killed» + 0x1c#64) := by
   decide
-theorem kl_ret_211c : jumpPc (KA.«kkill» + 0x26#64) = (KA.«kkill» + 0x26#64) := by
+theorem kl_ret_211c : jumpPc (KA.«kkill» + 0x28#64) = (KA.«kkill» + 0x28#64) := by
   decide
-theorem kl_ret_2128 : jumpPc (KA.«kkill» + 0x32#64) = (KA.«kkill» + 0x32#64) := by
+theorem kl_ret_2128 : jumpPc (KA.«kkill» + 0x34#64) = (KA.«kkill» + 0x34#64) := by
   decide
-theorem kl_ret_2146 : jumpPc (KA.«kkill» + 0x50#64) = (KA.«kkill» + 0x50#64) := by
+theorem kl_ret_2146 : jumpPc (KA.«kkill» + 0x52#64) = (KA.«kkill» + 0x52#64) := by
   decide
 
 /-! ## The callees, at their entry addresses -/

@@ -430,11 +430,11 @@ theorem fc_last (RE : RELEASE) (PC : PIPECLOSE) (BO : BEGIN_OP) (IP : IPUT) (EO 
   k_step (wp_s_auipc c _ (KA.«fileclose» + 0x48#64) false 0x1e#20 10#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
-  k_step (wp_s_addi c _ (KA.«fileclose» + 0x4c#64) false 740#12 10#5 10#5 (by decide))
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [fileclose_br_1e32c, fc_lock_41a6]
+  k_step (wp_s_addi c _ (KA.«fileclose» + 0x4c#64) false 750#12 10#5 10#5 (by decide))
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [fileclose_br_1e336, fc_lock_41a6]
   iintro Hk Hpc
-  k_step (wp_s_jal c _ (KA.«fileclose» + 0x50#64) false 2083444#21 1#5 (by decide))
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [fileclose_br_ffffffffffffcac4]
+  k_step (wp_s_jal c _ (KA.«fileclose» + 0x50#64) false 2083454#21 1#5 (by decide))
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [fileclose_br_ffffffffffffcace]
   iintro Hk Hpc
   iapply (fa_release RE c _ γl γ ?ha0 ?hsr ?hnr ?hKr k.sie ?hrr ?hor) $$ [- $Hk $Hpc $Hlocked $HR]
   rotate_right 1

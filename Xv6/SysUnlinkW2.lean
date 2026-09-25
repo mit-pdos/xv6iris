@@ -430,7 +430,7 @@ theorem sys_unlink_w2 (IL : ILOCK) (NC : NAMECMP) (DL : DIRLOOKUP) (IUP : IUNLOC
   k_step_e (wp_s_auipc cpu _ (KA.«sys_unlink» + 0x34#64) false 2#20 11#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
-  k_step_e (wp_s_addi cpu _ (KA.«sys_unlink» + 0x38#64) false 1320#12 11#5 11#5 (by decide))
+  k_step_e (wp_s_addi cpu _ (KA.«sys_unlink» + 0x38#64) false 1330#12 11#5 11#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
   k_step_e (wp_s_addi cpu _ (KA.«sys_unlink» + 0x3c#64) false 4016#12 10#5 8#5 (by decide))
@@ -479,7 +479,7 @@ theorem sys_unlink_w2 (IL : ILOCK) (NC : NAMECMP) (DL : DIRLOOKUP) (IUP : IUNLOC
   k_step_e (wp_s_auipc cpu _ (KA.«sys_unlink» + 0x48#64) false 2#20 11#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
-  k_step_e (wp_s_addi cpu _ (KA.«sys_unlink» + 0x4c#64) false 1308#12 11#5 11#5 (by decide))
+  k_step_e (wp_s_addi cpu _ (KA.«sys_unlink» + 0x4c#64) false 1318#12 11#5 11#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
   k_step_e (wp_s_addi cpu _ (KA.«sys_unlink» + 0x50#64) false 4016#12 10#5 8#5 (by decide))

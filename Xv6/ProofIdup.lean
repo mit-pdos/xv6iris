@@ -75,11 +75,11 @@ theorem id_ret_2a : jumpPc (KA.«idup» + 0x2a#64) = (KA.«idup» + 0x2a#64) := 
 
 /-- Both `auipc a0,0x1d ; addi a0,a0,…` pairs resolve to `&itable` (the
 spinlock is `struct itable`'s first member). -/
-theorem id_lock : KA.«idup» + 0x1d696#64 = itableLock := by
+theorem id_lock : KA.«idup» + 0x1d6a0#64 = itableLock := by
   unfold itableLock; decide
 
-theorem id_br_acq : KA.«idup» + 0xffffffffffffd996#64 = KA.«acquire» := by decide
-theorem id_br_rel : KA.«idup» + 0xffffffffffffda1e#64 = KA.«release» := by decide
+theorem id_br_acq : KA.«idup» + 0xffffffffffffd9a0#64 = KA.«acquire» := by decide
+theorem id_br_rel : KA.«idup» + 0xffffffffffffda28#64 = KA.«release» := by decide
 
 /-- The `c.addiw a5,a5,1` arithmetic: the stored word IS the successor count
 (Rocq `moi32_storeval_succ`). -/
@@ -299,10 +299,10 @@ theorem idup_core [Fscfg] [Icfg] [CurCtx] (AC : ACQUIRE) (RE : RELEASE_HOOK)
   k_step_gen (wp_s_auipc c2 _ (KA.«idup» + 0xc#64) false 0x1d#20 10#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c3 hp3
   iintro Hk Hpc
-  k_step_gen (wp_s_addi c3 _ (KA.«idup» + 0x10#64) false 1674#12 10#5 10#5 (by decide))
+  k_step_gen (wp_s_addi c3 _ (KA.«idup» + 0x10#64) false 1684#12 10#5 10#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [id_lock] next c4 hp4
   iintro Hk Hpc
-  k_step_gen (wp_s_jal c4 _ (KA.«idup» + 0x14#64) false 2087298#21 1#5 (by decide))
+  k_step_gen (wp_s_jal c4 _ (KA.«idup» + 0x14#64) false 2087308#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [id_br_acq] next c5 hp5
   iintro Hk Hpc
   iapply (id_acquire AC c5 _ ?ha0 ?hna ?hKa ?hla) $$ [- $Hk $Hpc]
@@ -376,10 +376,10 @@ theorem idup_core [Fscfg] [Icfg] [CurCtx] (AC : ACQUIRE) (RE : RELEASE_HOOK)
   k_step (wp_s_auipc c _ (KA.«idup» + 0x1e#64) false 0x1d#20 10#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
-  k_step (wp_s_addi c _ (KA.«idup» + 0x22#64) false 1656#12 10#5 10#5 (by decide))
+  k_step (wp_s_addi c _ (KA.«idup» + 0x22#64) false 1666#12 10#5 10#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [id_lock]
   iintro Hk Hpc
-  k_step (wp_s_jal c _ (KA.«idup» + 0x26#64) false 2087416#21 1#5 (by decide))
+  k_step (wp_s_jal c _ (KA.«idup» + 0x26#64) false 2087426#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [id_br_rel]
   iintro Hk Hpc
   iapply (id_release RE c _ ?ha0 ?hsr ?hnr ?hKr k.sie ?hrr ?hor) $$ [- $Hk $Hpc $Hlocked $HR]

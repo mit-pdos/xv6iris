@@ -86,7 +86,7 @@ theorem vdrw_P5_loop (SP : SLEEP_PREPARE) (AC : ACQUIRE) (RE : RELEASE) (SL : SL
     with [vdrwK_sie, KCtx.rget_zero, h19']
   iintro Hk Hpc
   -- +0x1b6  jal sleep_prepare
-  k_step (wp_s_jal cc _ (KA.«virtio_disk_rw» + 0x1b6#64) false 2081900#21 1#5 (by decide))
+  k_step (wp_s_jal cc _ (KA.«virtio_disk_rw» + 0x1b6#64) false 2081884#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
     with [vdrwK_sie, vdrw2_br_sleep_prepare]
   iintro Hk Hpc
@@ -159,7 +159,7 @@ theorem vdrw_P5_loop (SP : SLEEP_PREPARE) (AC : ACQUIRE) (RE : RELEASE) (SL : SL
   have h19_2 : R2 19#5 = k.regs 10#5 := (hcs2'.2.2.2.2.1).trans h19_1
   have hR6_2 : vdrwRegs6 (k.withSpie a b) R2 := vdrwRegs6_call _ R1 R2 hR6_1 hcs2'
   -- +0x1c0  jal sleep, at the caller's index
-  k_step_e (wp_s_jal cpu _ (KA.«virtio_disk_rw» + 0x1c0#64) false 2081950#21 1#5 (by decide))
+  k_step_e (wp_s_jal cpu _ (KA.«virtio_disk_rw» + 0x1c0#64) false 2081934#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
     with [vdrw2_br_sleep]
   iintro Hk Hpc

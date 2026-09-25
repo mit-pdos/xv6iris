@@ -12,7 +12,7 @@ D21: a split of ONE Rocq file; the constants `createSlots` /
 
 (the C text, the decode and the "RETURN IS A LOCKED INODE" / "OP-WIDE SET" /
 "ONE OPEN ITEM" discussions are Rocq `SpecCreate.v`'s header; the offsets in
-this port are the Lean image's, `KA.«create»` = 0x80004caa, 356 bytes.)
+this port are the Lean image's, `KA.«create»` = 0x80004ca0, 356 bytes.)
 
 ## What is here (Rocq `SpecCreate.v` line)
 

@@ -38,7 +38,7 @@ and the `SYSOPEN` contract.
       return fd;
     }
 
-`KA.«sys_open»` = 0x8000520c, 342 bytes.  A TWENTY-FOUR slot frame
+`KA.«sys_open»` = 0x80005202, 342 bytes.  A TWENTY-FOUR slot frame
 (`addi sp,sp,-192`), carved from the top (`sp0 - 8 n` is slot `n`): slot 1
 ra, slot 2 s0 (= the entry sp), slot 3 s1 = ip (saved LATE, after the
 `argstr < 0` branch), slot 4 s2 = f (saved LATER, after the T_DEVICE test),

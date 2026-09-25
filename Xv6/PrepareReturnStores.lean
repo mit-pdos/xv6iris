@@ -32,7 +32,7 @@ set_option linter.unusedVariables false
 /-- The two `auipc/addi` pairs land on the same `trampoline`: the `c.sub`
 yields zero (Rocq ProofPrepareReturnParts §1). -/
 theorem prepare_return_uservec_off :
-    KA.«prepare_return» + (15032#64 + -(KA.«prepare_return» + 15032#64)) = 0#64 := by decide
+    KA.«prepare_return» + (15042#64 + -(KA.«prepare_return» + 15042#64)) = 0#64 := by decide
 
 /-- The vector the `c.add` builds is `TRAMPOLINE`. -/
 theorem prepare_return_tvec_eq : 274877902848#64 = uservecTvec := by decide
@@ -64,13 +64,13 @@ theorem prepare_return_stvec (c : CPU) (kb : KCtx) (hsie : kb.sie = false) (R : 
   k_step (wp_s_auipc c _ (KA.«prepare_return» + 0x18#64) false 0x4#20 15#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
-  k_step (wp_s_addi c _ (KA.«prepare_return» + 0x1c#64) false 2720#12 15#5 15#5 (by decide))
+  k_step (wp_s_addi c _ (KA.«prepare_return» + 0x1c#64) false 2730#12 15#5 15#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
   k_step (wp_s_auipc c _ (KA.«prepare_return» + 0x20#64) false 0x4#20 13#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
-  k_step (wp_s_addi c _ (KA.«prepare_return» + 0x24#64) false 2712#12 13#5 13#5 (by decide))
+  k_step (wp_s_addi c _ (KA.«prepare_return» + 0x24#64) false 2722#12 13#5 13#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
   k_step (wp_s_sub c _ (KA.«prepare_return» + 0x28#64) true 15#5 15#5 13#5 (by decide))

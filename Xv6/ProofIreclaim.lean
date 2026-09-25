@@ -166,13 +166,13 @@ theorem ireclaim_setup (PK : PRINTK) (BD : BREAD) (BE : BRELSE) (IG : IGET) (BO 
   k_step_e (wp_s_auipc cpu _ (KA.«ireclaim» + 0x26#64) false 0x1d#20 20#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
-  k_step_e (wp_s_addi cpu _ (KA.«ireclaim» + 0x2a#64) false 934#12 20#5 20#5 (by decide))
+  k_step_e (wp_s_addi cpu _ (KA.«ireclaim» + 0x2a#64) false 944#12 20#5 20#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [ireclaim_a_sb]
   iintro Hk Hpc
   k_step_e (wp_s_auipc cpu _ (KA.«ireclaim» + 0x2e#64) false 0x4#20 22#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
-  k_step_e (wp_s_addi cpu _ (KA.«ireclaim» + 0x32#64) false 3830#12 22#5 22#5 (by decide))
+  k_step_e (wp_s_addi cpu _ (KA.«ireclaim» + 0x32#64) false 3840#12 22#5 22#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [ireclaim_a_fmt]
   iintro Hk Hpc
   -- +0x36  c.j +0x7c : INTO THE LOOP BODY
@@ -228,7 +228,7 @@ theorem ireclaim_entry (PK : PRINTK) (BD : BREAD) (BE : BRELSE) (IG : IGET) (BO 
   k_step_e (wp_s_auipc cpu _ (KA.«ireclaim») false 0x1d#20 14#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
-  k_step_e (wp_s_lw cpu _ (KA.«ireclaim» + 0x4#64) false 984#12 14#5 14#5 (by decide) (by decide)
+  k_step_e (wp_s_lw cpu _ (KA.«ireclaim» + 0x4#64) false 994#12 14#5 14#5 (by decide) (by decide)
       dqn (BitVec.ofNat 32 fscNinodes))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [ireclaim_a_ninodes]
   iintro Hk Hpc Hsn

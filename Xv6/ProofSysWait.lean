@@ -124,7 +124,7 @@ theorem sw_frame_close (sp ra s0 w1 w2 : BitVec 64) :
 /-! ## The epilogue at `(KernelSyms.«sys_wait» + 0x1a)`, after `kwait` -/
 
 set_option maxHeartbeats 4000000 in
-/-- The epilogue at `0x80002a4a` over a generic frame base `kb`. -/
+/-- The epilogue at `0x80002a40` over a generic frame base `kb`. -/
 theorem sw_tail (c : CPU) (kb : KCtx) (hK : 4 ≤ kb.avail)
     (KR : RegMap) (hregs : kb.regs = KR)
     (R : RegMap) (hR2 : R 2#5 = KR 2#5 + 0xFFFFFFFFFFFFFFE0#64) (P : IProp GF) :

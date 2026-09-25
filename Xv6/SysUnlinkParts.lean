@@ -8,7 +8,7 @@ writes.
 
 The walk is `SysUnlinkW1/W2/W3/W5F/W5D` over `SysUnlinkShared` (not yet
 written); the contract is `SpecSysUnlink` (after C0).  THE LEAN IMAGE
-(`KA.«sys_unlink»` = 0x8000508c, 384 B), whose offsets every lemma below
+(`KA.«sys_unlink»` = 0x80005082, 384 B), whose offsets every lemma below
 uses (never Rocq's comments):
     +0x12 `jal argstr` (path at s0-208) / +0x16 `bltz`; +0x1c `jal begin_op`;
     +0x28 `jal nameiparent` (name at s0-80) / +0x2e `beqz`; +0x30 `jal ilock`;
@@ -95,14 +95,14 @@ theorem sys_unlink_br_namecmp :
     KA.«sys_unlink» + 0xffffffffffffe83e#64 = KA.«namecmp» := by decide
 theorem sys_unlink_br_dirlookup :
     KA.«sys_unlink» + 0xffffffffffffe854#64 = KA.«dirlookup» := by decide
-theorem sys_unlink_br_memset : KA.«sys_unlink» + 0xffffffffffffbc8c#64 = KA.«memset» := by decide
+theorem sys_unlink_br_memset : KA.«sys_unlink» + 0xffffffffffffbc96#64 = KA.«memset» := by decide
 theorem sys_unlink_br_writei : KA.«sys_unlink» + 0xffffffffffffe738#64 = KA.«writei» := by decide
 theorem sys_unlink_br_iunlockput :
     KA.«sys_unlink» + 0xffffffffffffe4c0#64 = KA.«iunlockput» := by decide
 theorem sys_unlink_br_iupdate :
     KA.«sys_unlink» + 0xffffffffffffe1b8#64 = KA.«iupdate» := by decide
 theorem sys_unlink_br_end_op : KA.«sys_unlink» + 0xffffffffffffed62#64 = KA.«end_op» := by decide
-theorem sys_unlink_br_panic : KA.«sys_unlink» + 0xffffffffffffb7ac#64 = KA.«panic» := by decide
+theorem sys_unlink_br_panic : KA.«sys_unlink» + 0xffffffffffffb7b6#64 = KA.«panic» := by decide
 theorem sys_unlink_br_readi : KA.«sys_unlink» + 0xffffffffffffe646#64 = KA.«readi» := by decide
 
 theorem sys_unlink_ret_16 :

@@ -22,9 +22,15 @@ def main():
     ap.add_argument('--rev', default=None, help='the xv6-riscv commit the kernel was built from (recorded in the header)')
     a = ap.parse_args()
 
-    out = subprocess.run([a.objdump, '-d', '--section=.text', a.kernel],
+    # `-z`: zero padding is disassembled too (objdump otherwise folds it into
+    # `...`); only the FIRST `c.unimp` halfword of each zero run is kept below,
+    # so a compressed instruction at a 4-aligned pc just before the padding
+    # still has its following halfword in the image (the fetch reads 4 bytes;
+    # see `textDecodeWith`).
+    out = subprocess.run([a.objdump, '-d', '-z', '--section=.text', a.kernel],
                          check=True, capture_output=True, text=True).stdout
     instrs, syms = [], []
+    prev_zero_end = None
     for line in out.splitlines():
         m = SYM_RE.match(line)
         if m:
@@ -38,7 +44,11 @@ def main():
         # objdump prints one field per instruction (the assembled word)
         for w in words:
             width = len(w) // 2
-            instrs.append((addr, width, int(w, 16), (m.group(3) or '').strip()))
+            enc = int(w, 16)
+            zero = width == 2 and enc == 0
+            if not (zero and prev_zero_end == addr):
+                instrs.append((addr, width, enc, (m.group(3) or '').strip()))
+            prev_zero_end = addr + 2 if zero else None
             addr += width
 
     with open(a.out, 'w') as f:

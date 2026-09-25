@@ -100,10 +100,10 @@ theorem dirlink_short (PA : PANIC) (cpu : CPU) (k : KCtx) (spie spp : Bool) (R :
   k_step_e (wp_s_auipc cpu _ (KA.«dirlink» + 0x60#64) false 4#20 10#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
-  k_step_e (wp_s_addi cpu _ (KA.«dirlink» + 0x64#64) false 2486#12 10#5 10#5 (by decide))
+  k_step_e (wp_s_addi cpu _ (KA.«dirlink» + 0x64#64) false 2496#12 10#5 10#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
-  k_step_e (wp_s_jal cpu _ (KA.«dirlink» + 0x68#64) false 2084086#21 1#5 (by decide))
+  k_step_e (wp_s_jal cpu _ (KA.«dirlink» + 0x68#64) false 2084096#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [dirlink_br_panic]
   iintro Hk Hpc
   iapply (dirlink_panic PA cpu _ ?pa ?pK ?pn ?ppr ?pu) $$ [$Hk $Hpc $Hpe $Hmsg]

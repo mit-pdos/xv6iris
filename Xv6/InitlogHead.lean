@@ -144,7 +144,7 @@ theorem il_slli2 (n : Nat) (h : n < 2 ^ 31) :
   omega
 
 /-- `auipc a4,0x1e ; addi a4,a4,1802` at `+0x46`/`+0x4a`: `&log.lh.block[0]`. -/
-theorem il_lhb0 : KA.«initlog» + 0x1e750#64 = lhBlock 0 := by
+theorem il_lhb0 : KA.«initlog» + 0x1e75a#64 = lhBlock 0 := by
   unfold lhBlock logAddr; decide
 
 /-- The loop's source cursor `a5 = buf + 4t` (Rocq's `il_cur`). -/
@@ -493,7 +493,7 @@ theorem il_read_head {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CurC
     k_step_e (wp_s_auipc cpu _ (KA.«initlog» + 0x46#64) false 0x1e#20 14#5 (by decide))
       from (text_instr _ _ _ _ rfl rfl) HT $$ [- $Hk $Hpc]
     iintro Hk Hpc
-    k_step_e (wp_s_addi cpu _ (KA.«initlog» + 0x4a#64) false 1802#12 14#5 14#5 (by decide))
+    k_step_e (wp_s_addi cpu _ (KA.«initlog» + 0x4a#64) false 1812#12 14#5 14#5 (by decide))
       from (text_instr _ _ _ _ rfl rfl) HT $$ [- $Hk $Hpc] with [il_lhb0]
     iintro Hk Hpc
     -- +0x4e c.slli a2,a2,2 ; +0x50 c.add a2,a2,a0

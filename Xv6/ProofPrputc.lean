@@ -59,7 +59,7 @@ end
 /-! ## `prputc` -/
 
 /-- The `jal`'s target. -/
-theorem prputc_br_528 : KA.«prputc» + 0x534#64 = KA.«uartputc_sync» := by decide
+theorem prputc_br_534 : KA.«prputc» + 0x534#64 = KA.«uartputc_sync» := by decide
 
 /-- `ret` out of `uartputc_sync` lands on the instruction after the `jal`. -/
 theorem prputc_ret : jumpPc (KA.«prputc» + 0x10#64) = KA.«prputc» + 0x10#64 := by decide
@@ -90,7 +90,7 @@ theorem prputc_proof (UP : UARTPUTC_SYNC) : PRPUTC :=
   iintro Hk Hpc
   -- jal ra, uartputc_sync
   k_step (wp_s_jal cpu _ (KA.«prputc» + 0xc#64) false 0x528#21 1#5 (by decide))
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [prputc_br_528]
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [prputc_br_534]
   iintro Hk Hpc
   iapply (pp_uart_call UP cpu _ UartId.uart1 γl γd bs ?hsie1 ?hK1 ?hnoff1 ?hlk1 ?hid1 rfl) $$ [- $Hk $Hpc]
   rotate_right 1

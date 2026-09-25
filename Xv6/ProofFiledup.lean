@@ -39,9 +39,9 @@ theorem fd_ofNat32_succ (n : Nat) : BitVec.ofNat 32 n + 1#32 = BitVec.ofNat 32 (
   simp only [BitVec.toNat_add, BitVec.toNat_ofNat]
   omega
 
-theorem fd_lock_4124 : KA.«filedup» + 0x1e372#64 = ftableAddr := by
+theorem fd_lock_4124 : KA.«filedup» + 0x1e37c#64 = ftableAddr := by
   unfold ftableAddr; decide
-theorem fd_lock_413a : KA.«filedup» + 0x1e372#64 = ftableAddr := by
+theorem fd_lock_413a : KA.«filedup» + 0x1e37c#64 = ftableAddr := by
   unfold ftableAddr; decide
 
 section
@@ -117,11 +117,11 @@ end
 
 /-! ## The function -/
 
-theorem filedup_br_ffffffffffffcb0a : KA.«filedup» + 0xffffffffffffcb0a#64 = KA.«release» := by decide
+theorem filedup_br_ffffffffffffcb14 : KA.«filedup» + 0xffffffffffffcb14#64 = KA.«release» := by decide
 
-theorem filedup_br_ffffffffffffca82 : KA.«filedup» + 0xffffffffffffca82#64 = KA.«acquire» := by decide
+theorem filedup_br_ffffffffffffca8c : KA.«filedup» + 0xffffffffffffca8c#64 = KA.«acquire» := by decide
 
-theorem filedup_br_1e372 : KA.«filedup» + 0x1e372#64 = ftableAddr := by decide
+theorem filedup_br_1e37c : KA.«filedup» + 0x1e37c#64 = ftableAddr := by decide
 
 set_option maxHeartbeats 16000000 in
 theorem filedup_proof (AC : ACQUIRE) (RE : RELEASE) : FILEDUP := ⟨
@@ -150,11 +150,11 @@ theorem filedup_proof (AC : ACQUIRE) (RE : RELEASE) : FILEDUP := ⟨
   k_step_gen (wp_s_auipc c2 _ (KA.«filedup» + 0xc#64) false 0x1e#20 10#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c3 hp3
   iintro Hk Hpc
-  k_step_gen (wp_s_addi c3 _ (KA.«filedup» + 0x10#64) false 870#12 10#5 10#5 (by decide))
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [filedup_br_1e372, fd_lock_4124] next c4 hp4
+  k_step_gen (wp_s_addi c3 _ (KA.«filedup» + 0x10#64) false 880#12 10#5 10#5 (by decide))
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [filedup_br_1e37c, fd_lock_4124] next c4 hp4
   iintro Hk Hpc
-  k_step_gen (wp_s_jal c4 _ (KA.«filedup» + 0x14#64) false 2083438#21 1#5 (by decide))
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [filedup_br_ffffffffffffca82] next c5 hp5
+  k_step_gen (wp_s_jal c4 _ (KA.«filedup» + 0x14#64) false 2083448#21 1#5 (by decide))
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [filedup_br_ffffffffffffca8c] next c5 hp5
   iintro Hk Hpc
   iapply (fa_acquire AC c5 _ γl γ ?ha0 ?hna ?hKa ?hla) $$ [- $Hk $Hpc]
   rotate_right 1
@@ -257,11 +257,11 @@ theorem filedup_proof (AC : ACQUIRE) (RE : RELEASE) : FILEDUP := ⟨
   k_step (wp_s_auipc c _ (KA.«filedup» + 0x22#64) false 0x1e#20 10#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
-  k_step (wp_s_addi c _ (KA.«filedup» + 0x26#64) false 848#12 10#5 10#5 (by decide))
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [filedup_br_1e372, fd_lock_413a]
+  k_step (wp_s_addi c _ (KA.«filedup» + 0x26#64) false 858#12 10#5 10#5 (by decide))
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [filedup_br_1e37c, fd_lock_413a]
   iintro Hk Hpc
-  k_step (wp_s_jal c _ (KA.«filedup» + 0x2a#64) false 2083552#21 1#5 (by decide))
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [filedup_br_ffffffffffffcb0a]
+  k_step (wp_s_jal c _ (KA.«filedup» + 0x2a#64) false 2083562#21 1#5 (by decide))
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [filedup_br_ffffffffffffcb14]
   iintro Hk Hpc
   iapply (fa_release RE c _ γl γ ?ha0 ?hsr ?hnr ?hKr k.sie ?hrr ?hor) $$ [- $Hk $Hpc $Hlocked $HR]
   rotate_right 1

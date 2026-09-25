@@ -227,7 +227,7 @@ theorem bd_tail (VR : VIRTIO_DISK_RW) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF
     k_step_e (wp_s_add cpu _ (KA.«bread» + 0xca#64) true 10#5 0#5 9#5 (by decide))
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h9]
     iintro Hk Hpc
-    k_step_e (wp_s_jal cpu _ (KA.«bread» + 0xcc#64) false 11400#21 1#5 (by decide))
+    k_step_e (wp_s_jal cpu _ (KA.«bread» + 0xcc#64) false 11410#21 1#5 (by decide))
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [bd_br_vdr]
     iintro Hk Hpc
     iapply (bd_vdr VR Γ cpu _ V γdl pd pav pu j kk bno bs bsd k0.sie k0.proc (by k_norm_g)

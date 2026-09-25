@@ -73,7 +73,7 @@ theorem vdis_br_acquire :
     KA.«virtio_disk_intr» + 0xffffffffffffb070#64 = KA.«acquire» := by decide
 
 theorem vdis_br_wakeup :
-    KA.«virtio_disk_intr» + 0xffffffffffffc45a#64 = KA.«wakeup» := by decide
+    KA.«virtio_disk_intr» + 0xffffffffffffc44a#64 = KA.«wakeup» := by decide
 
 theorem vdis_br_release :
     KA.«virtio_disk_intr» + 0xffffffffffffb0f8#64 = KA.«release» := by decide
@@ -792,7 +792,7 @@ theorem vdis_loop (WK : WAKEUP)
     with [vdisK_sie k, vdis_bufdisk_addr c.bp]
   iintro Hk Hpc Hdsk
   -- +0x6e  jal wakeup
-  k_step (wp_s_jal cpu _ (KA.«virtio_disk_intr» + 0x6e#64) false 2081772#21 1#5 (by decide))
+  k_step (wp_s_jal cpu _ (KA.«virtio_disk_intr» + 0x6e#64) false 2081756#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [vdisK_sie k, vdis_br_wakeup]
   iintro Hk Hpc
   iapply (vdis_wakeup WK Γ cpu _ ?hsw ?hnw ?hKw ?hlw ?htw) $$ [- $Hk $Hpc]

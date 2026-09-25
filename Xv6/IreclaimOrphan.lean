@@ -135,7 +135,7 @@ theorem ireclaim_orphan (PK : PRINTK) (BE : BRELSE) (IG : IGET) (BO : BEGIN_OP) 
   k_step_e (wp_s_add cpu _ (KA.«ireclaim» + 0x3a#64) true 10#5 0#5 22#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [a22]
   iintro Hk Hpc
-  k_step_e (wp_s_jal cpu _ (KA.«ireclaim» + 0x3c#64) false 2084734#21 1#5 (by decide))
+  k_step_e (wp_s_jal cpu _ (KA.«ireclaim» + 0x3c#64) false 2084744#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [ireclaim_br_printk]
   iintro Hk Hpc
   iapply (ireclaim_printk PK cpu _ ?pK ?pnoff ?ppr ?puart ?pa0) $$ [- $Hk $Hpc $Hfmt $Hpe]

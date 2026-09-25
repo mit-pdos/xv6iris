@@ -171,11 +171,11 @@ theorem ialloc_out (PK : PRINTK) [Fscfg] [Icfg] [CurCtx] (cpu c0 : CPU) (k : KCt
   k_step_e (wp_s_auipc cpu _ (KA.«ialloc» + 0x72#64) false 0x4#20 10#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
-  k_step_e (wp_s_addi cpu _ (KA.«ialloc» + 0x76#64) false 606#12 10#5 10#5 (by decide))
+  k_step_e (wp_s_addi cpu _ (KA.«ialloc» + 0x76#64) false 616#12 10#5 10#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [ialloc_a_fmt]
   iintro Hk Hpc
   -- +0x7a  jal printk
-  k_step_e (wp_s_jal cpu _ (KA.«ialloc» + 0x7a#64) false 2085668#21 1#5 (by decide))
+  k_step_e (wp_s_jal cpu _ (KA.«ialloc» + 0x7a#64) false 2085678#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [ialloc_br_printk]
   iintro Hk Hpc
   iapply (printk_msg_call PK cpu _ _ iallocFmtStr (by unfold iallocFmtStr; decide) ialloc_pkKinds

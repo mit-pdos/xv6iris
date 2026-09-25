@@ -59,11 +59,11 @@ theorem frd_br_ilock : KA.«fileread» + 0xffffffffffffefb4#64 = KA.«ilock» :=
 theorem frd_br_readi : KA.«fileread» + 0xfffffffffffff38e#64 = KA.«readi» := by decide
 theorem frd_br_iunlock : KA.«fileread» + 0xfffffffffffff062#64 = KA.«iunlock» := by decide
 theorem frd_br_piperead : KA.«fileread» + 0x44e#64 = KA.«piperead» := by decide
-theorem frd_br_panic : KA.«fileread» + 0xffffffffffffc4f4#64 = KA.«panic» := by decide
+theorem frd_br_panic : KA.«fileread» + 0xffffffffffffc4fe#64 = KA.«panic» := by decide
 /-- `auipc a0,0x3` + `addi a0,a0,440`: the panic literal. -/
-theorem frd_msg_addr : KA.«fileread» + 0x325c#64 = KStr.«fileread» := by decide
+theorem frd_msg_addr : KA.«fileread» + 0x3266#64 = KStr.«fileread» := by decide
 /-- `auipc a4,0x1e` + `addi a4,a4,218`: the device table. -/
-theorem frd_devsw_addr : KA.«fileread» + 0x1e164#64 = KA.«devsw» := by decide
+theorem frd_devsw_addr : KA.«fileread» + 0x1e16e#64 = KA.«devsw» := by decide
 
 theorem frd_ret_3a : jumpPc (KA.«fileread» + 0x3a#64) = KA.«fileread» + 0x3a#64 := by decide
 theorem frd_ret_48 : jumpPc (KA.«fileread» + 0x48#64) = KA.«fileread» + 0x48#64 := by decide

@@ -57,7 +57,7 @@ theorem ci_eA : KA.«cons» + 160#64 = consEAddr := rfl
 theorem ci_br_acquire : KA.«consoleintr» + 0x990#64 = KA.«acquire» := by decide
 theorem ci_br_release : KA.«consoleintr» + 0xa18#64 = KA.«release» := by decide
 theorem ci_br_consputc : KA.«consoleintr» + 0xffffffffffffffc4#64 = KA.«consputc» := by decide
-theorem ci_br_wakeup : KA.«consoleintr» + 0x1d7a#64 = KA.«wakeup» := by decide
+theorem ci_br_wakeup : KA.«consoleintr» + 0x1d6a#64 = KA.«wakeup» := by decide
 
 /-- The return addresses of the five calls. -/
 theorem ci_ret_18 : jumpPc (KA.«consoleintr» + 0x18#64) = KA.«consoleintr» + 0x18#64 := by decide
