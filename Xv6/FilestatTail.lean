@@ -83,7 +83,7 @@ theorem filestat_err (cpu : CPU) (k : KCtx) (spie spp : Bool) (R : RegMap) (fk :
     fstatFrame (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) (k.regs 9#5) v2 v3 (k.regs 20#5) v9 ∗
     fstatCells (k.regs 2#5) ∗
     trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗
-    fileRef γ fk q st ∗ procPrivExt pa pid V V.upt M ∗ filestatEnvOut st ∗
+    fileRef γ fk q st ∗ fstatPrivExt pa pid V V.upt M ∗ filestatEnvOut st ∗
     fstatK k γ fk q st pa pid V M
     ⊢ wpLoop (GF := GF) cpu := by
   iintro ⟨Hk, Hpc, Hframe, Hcells, Hte, Hce, Href, Hpriv, Henv, HΦ⟩

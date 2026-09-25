@@ -80,15 +80,19 @@ spilled eagerly, `s2`/`s3` lazily on the inode arm; `struct stat` is the
    ring pages itself and holds the superblock cells at `DFrac.discard`.
    `filestatFsOut` is the `bslot` alone (`fsReady` is persistent: the
    caller keeps its copy).
-3. **THE PROCESS BLOCK is `procPrivNoctxAt curCtx (procAddr j) pid V M`**
-   (Rocq `proc_priv_core pj pidv U`), the cwd-free running block, as every
-   sibling that copies out states it (SpecPiperead / SpecConsoleread /
-   SpecKwait): filestat does not touch `p->cwd`, so the `cwdRefAt`
-   conjunct of `ProcInv.procPrivCwd` is framed by the caller (ProcInv
-   deviation 1: "callees that do not touch the working directory keep the
-   cwd-free block").  PROCESS-LAYER NOTE for the coordinator: this is the
-   A3-sanctioned convention, not a new abstraction.  The post's block is
-   at `{ V with upt := P' }` and `M'` (Rocq `upd_usM (us_upt U P') …`).
+3. **THE PROCESS BLOCK is `procPrivCoreNoctxAt curCtx (procAddr j) pid V M`**
+   (Rocq `proc_priv_core pj pidv U`, literally): the bare block
+   (`procPrivBareAt`, Rocq `proc_priv_bare` + the lazy claim) and the cwd
+   reference (`cwdRefAt`), NO descriptor-array cells -- the caller
+   (sys_fstat) keeps the array and the other descriptors' payloads and
+   LENDS only the one reference (`procPrivFd_split` +
+   `procOfilesOwe_lend`, Rocq `proc_priv_lend`).  Filestat touches
+   neither `p->cwd` nor `p->ofile`: the cwd reference is carried through
+   untouched.  The post's block is at `{ V with upt := P' }` and `M'`
+   (Rocq `upd_usM (us_upt U P') …`).  (Earlier this contract took the
+   cwd-free `procPrivNoctxAt` -- bare block + array cells -- which forced
+   sys_fstat to lend the array's cells too; coordinator decision, wave 7:
+   Rocq-literal.)
 4. **`kalloc_env fsc_kalloc None`** is the pair `isLock γkl kmemLockAddr
    "kmem" (kmemRes γk) ∗ kallocAvail γk none` at the caller's names, as
    SpecPiperead / SpecNamex (FsReady deviation 6).
@@ -141,6 +145,7 @@ import Xv6.SpecPanic
 import Xv6.FsReady
 import Xv6.FilePay
 import Xv6.UMemWindow
+import Xv6.FdTable
 
 namespace Xv6
 
@@ -368,7 +373,7 @@ def filestatPost (k : KCtx) (γ : FileNames) (fk : Nat) (q : Qp) (st : FdState) 
     kctx cpu' ((k.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k.regs 1#5)) -∗
     trapCsrsExt cpu' k.sie -∗ cpuClaimExt cpu' k.sie k.proc -∗
     fileRef γ fk q st -∗
-    procPrivNoctxAt curCtx (procAddr j) pid { V with upt := P' } M' -∗
+    procPrivCoreNoctxAt curCtx (procAddr j) pid { V with upt := P' } M' -∗
     filestatEnvOut st -∗ wpLoop cpu')
 
 end Post
@@ -395,8 +400,9 @@ def wp_filestat_eb_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [X
   panicEnv ∗
   -- THE BORROWED REFERENCE, at an ARBITRARY fraction, given back
   fileRef γ fk q st ∗
-  -- AMBIENT: myproc runs first, and the surviving arm copies out
-  procPrivNoctxAt curCtx (procAddr j) pid V M ∗
+  -- AMBIENT: myproc runs first, and the surviving arm copies out; the
+  -- block's CORE (Rocq `proc_priv_core`: bare ∗ cwd reference, no array)
+  procPrivCoreNoctxAt curCtx (procAddr j) pid V M ∗
   isLock γkl kmemLockAddr "kmem" (kmemRes γk) ∗ kallocAvail γk none ∗
   -- ... and what the file's TYPE selects
   filestatEnv (hlc := hlc) st ∗

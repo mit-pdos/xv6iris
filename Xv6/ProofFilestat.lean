@@ -32,10 +32,12 @@ epilogue with an ABSTRACT continuation.  The stage files are
    the complement at its eb contract, the `sie`-generic ones carry it
    across their crossing (FilestatCalls).
 2. THE CONTEXT's tier is pinned once, at entry (`kctx_tier` + `htier`),
-   so the contract's `procPrivNoctxAt curCtx …` IS the stage files'
-   ambient `EitherDefs.procPrivExt … V.upt …` (by `rfl`,
-   `procPrivExt_eq`), the form `ec_priv_split` / `ec_priv_close` open and
-   close around copyout.
+   so the contract's core `procPrivCoreNoctxAt curCtx …` IS the stage
+   files' ambient bare block `FilestatParts.fstatPrivExt … V.upt …` and
+   the cwd reference (`filestat_priv_conv`, by `rfl`).  The cwd reference
+   is parked in the continuation (`HΦ`) at entry and handed back with the
+   block at exit: filestat never touches `p->cwd` (Rocq carries it inside
+   `proc_priv_core` through every step; same resource, fewer frames).
 3. THE REGISTER NAMES: Rocq's header warns that gcc swapped the ROLES of
    `s2`/`s3` in the psz bump (`p` in s2, `&st` in s3) while their spill
    slots did not move (s2 at `48(sp)`, s3 at `40(sp)`).  The Lean bundle
@@ -66,22 +68,17 @@ theorem filestat_ctx_entry {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF]
     kctx (GF := GF) c ((k.pushed 10).withRegs R) ⊢
       kctx c (((k.withSpie k.spie k.spp).pushed 10).withRegs R) := .rfl
 
-/-- At the kernel-page-table tier the contract's block IS the stage files'
-ambient `procPrivExt` (`EitherDefs.procPrivExt_eq`, by `rfl` once the
-ambient context is taken apart). -/
-theorem filestat_priv_conv {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [X : CurCtx]
+/-- At the kernel-page-table tier the contract's block (the core, Rocq
+`proc_priv_core`) IS the stage files' bare `fstatPrivExt` and the cwd
+reference at the ambient context (by `rfl` once the ambient context is
+taken apart). -/
+theorem filestat_priv_conv {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
+    [FdslotG GF] [BioslotG GF] [IcacheG GF] [SleepLockG GF] [IcboxG GF] [IrefslotG GF]
+    [OffboxG GF] [OffboxBoxG GF] [FileG GF] [Icfg] [X : CurCtx]
     (h : curTier = KTier.kpt) (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv) (P : UPtd)
     (M : Nat → List (BitVec 8)) :
-    procPrivNoctxAt (GF := GF) curCtx pa pid { V with upt := P } M ⊣⊢ procPrivExt pa pid V P M := by
-  obtain ⟨ξ, t⟩ := X
-  simp only at h
-  subst h
-  exact .rfl
-
-theorem filestat_priv_conv0 {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [X : CurCtx]
-    (h : curTier = KTier.kpt) (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv)
-    (M : Nat → List (BitVec 8)) :
-    procPrivNoctxAt (GF := GF) curCtx pa pid V M ⊣⊢ procPrivExt pa pid V V.upt M := by
+    procPrivCoreNoctxAt (GF := GF) curCtx pa pid { V with upt := P } M ⊣⊢
+      fstatPrivExt pa pid V P M ∗ cwdRefAt V.cwd V.cwi := by
   obtain ⟨ξ, t⟩ := X
   simp only at h
   subst h
@@ -117,13 +114,14 @@ theorem filestat_main (MP : MYPROC) (IL : ILOCK) (ST : STATI) (IU : IUNLOCK) (CO
   icases kctx_wf _ _ $$ Hk with ⟨%hkwf, Hk⟩
   have hlocks : k.locks = [] := List.eq_nil_of_length_eq_zero (by have := hkwf.2.2.2.1; omega)
   -- THE CONTRACT'S CONTINUATION, hart-free, at the ambient block form
-  ihave HΦ : fstatK k γ fk q st (procAddr j) pid V M $$ [Hnext]
+  icases (filestat_priv_conv ht0 (procAddr j) pid V V.upt M).1 $$ Hpriv with ⟨Hpriv, Hcwd⟩
+  ihave HΦ : fstatK k γ fk q st (procAddr j) pid V M $$ [Hnext Hcwd]
   · unfold fstatK filestatPost
     iintro %c %spie %spp %R' %P' %M' %d %hp Hk Hpc Hte Hce Href Hpriv Henv
     ihave HK := wpNext_at true k.proc cpu c _ (filestat_pin hj k hproc c cpu) $$ Hnext
-    ihave Hpriv := (filestat_priv_conv ht0 (procAddr j) pid V P' M').2 $$ Hpriv
+    ihave Hpriv := (filestat_priv_conv ht0 (procAddr j) pid V P' M').2 $$ [Hpriv Hcwd]
+    · iframe
     iapply HK $$ %spie %spp %R' %P' %M' %d %hp Hk Hpc Hte Hce Href Hpriv Henv
-  ihave Hpriv := (filestat_priv_conv0 ht0 (procAddr j) pid V M).1 $$ Hpriv
   simp only [filestatAddr]
   -- +0x00 .. +0x0a  the prologue
   iapply (wp_prologue_filestat cpu k KA.«filestat» hK10)

@@ -545,16 +545,77 @@ theorem fstat_ref_close (γ : FileNames) (fk : Nat) (q : Qp) (st : FdState) (C :
   iexists C
   iframe
 
-/-! ## The private block: the pid cell, lent -/
+/-! ## The private block: Rocq's `proc_priv_bare`, at an explicit descriptor -/
+
+/-- THE BLOCK THE STAGE FILES CARRY: `FdTable.procPrivBareAt` (Rocq
+`proc_priv_bare` + the lazy claim) at the ambient context, with the table
+at an explicit descriptor `P'` -- `EitherDefs.procPrivExt` minus the
+descriptor array.  The contract's block is the core (`procPrivCoreNoctxAt`
+= bare ∗ `cwdRefAt`); the cwd reference is parked in the continuation at
+entry (`ProofFilestat`), so only this bare part travels through the
+stages.  It IS `procPrivBareAt curCtx pa pid { V with upt := P' } M'` at
+the kernel-page-table tier (`ProofFilestat.filestat_priv_conv`, `rfl`). -/
+def fstatPrivExt (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv) (P' : UPtd)
+    (M' : Nat → List (BitVec 8)) : IProp GF := iprop%
+  ⌜V.sz.toNat ≤ uvmMaxsz ∧ umBelow V.sz P' ∧
+    V.pagetable = pageAddr P'.root ∧ V.trapframe = pageAddr P'.tfp⌝ ∗
+  wordPointsTo (pPid pa) 4 pidPriv pid ∗
+  procFieldsNoOfile pa (DFrac.own 1) V ∗
+  procPtAt P' M' ∗
+  tfPageAt P'.tfp V.tf ∗
+  ⌜V.pvLazy = false → lazyFree P'.um V.sz⌝
+
+/-- What copyout does not read: `EitherDefs.ecRest` minus the array. -/
+def fstatRest (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv) (P : UPtd) : IProp GF := iprop%
+  wordPointsTo (pPid pa) 4 pidPriv pid ∗
+  wordPointsTo (pKstack pa) 8 (DFrac.own 1) V.kstack ∗
+  wordPointsTo (pTrapframe pa) 8 (DFrac.own 1) V.trapframe ∗
+  wordPointsTo (pCwd pa) 8 (DFrac.own 1) V.cwd ∗
+  pnameCells pa (DFrac.own 1) V.name ∗
+  tfPageAt P.tfp V.tf ∗
+  ⌜V.pvLazy = false → lazyFree P.um V.sz⌝
+
+/-- The block split around copyout (`EitherDefs.ec_priv_split` on the bare
+block): `p->sz`, `p->pagetable`, the table. -/
+theorem fstat_priv_split (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv) (P : UPtd)
+    (M : Nat → List (BitVec 8)) :
+    fstatPrivExt (GF := GF) pa pid V P M ⊢
+      ⌜V.sz.toNat ≤ uvmMaxsz ∧ V.pagetable = pageAddr P.root ∧
+         V.trapframe = pageAddr P.tfp ∧ umBelow V.sz P⌝ ∗
+      wordPointsTo (pSz pa) 8 (DFrac.own 1) V.sz ∗
+      wordPointsTo (pPagetable pa) 8 (DFrac.own 1) V.pagetable ∗
+      procPtAt P M ∗ fstatRest pa pid V P := by
+  unfold fstatPrivExt fstatRest procFieldsNoOfile
+  iintro ⟨%hf, Hpid, ⟨Hks, Hszc, Hpgc, Htfc, Hcwd, Hnm⟩, Hspace, Htfp⟩
+  isplitl []
+  · ipureintro; exact ⟨hf.1, hf.2.2.1, hf.2.2.2, hf.2.1⟩
+  · iframe
+
+/-- ... and closed at copyout's grown descriptor (`EitherDefs.ec_priv_close`
+on the bare block). -/
+theorem fstat_priv_close (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv) (P P' : UPtd)
+    (M' : Nat → List (BitVec 8)) (hext : P.extSz V.sz P')
+    (hf : V.sz.toNat ≤ uvmMaxsz ∧ V.pagetable = pageAddr P.root ∧
+      V.trapframe = pageAddr P.tfp ∧ umBelow V.sz P) :
+    wordPointsTo (pSz pa) 8 (DFrac.own 1) V.sz ∗
+    wordPointsTo (pPagetable pa) 8 (DFrac.own 1) V.pagetable ∗
+    procPtAt P' M' ∗ fstatRest pa pid V P ⊢ fstatPrivExt (GF := GF) pa pid V P' M' := by
+  unfold fstatPrivExt fstatRest procFieldsNoOfile
+  rw [hext.1.1, hext.1.2.1]
+  iintro ⟨Hszc, Hpgc, Hspace, Hpid, Hks, Htfc, Hcwd, Hnm, Htfp, %hlz⟩
+  isplitl []
+  · ipureintro; exact ⟨hf.1, UMemL.umBelow_extSz hf.2.2.2 hext, hf.2.1, hf.2.2.1⟩
+  · iframe
+    ipureintro; exact fun h => LazyFree.lazyFree_extSz hext (hlz h)
 
 /-- The pid cell out of the block and back (Rocq's `proc_priv_core_bare_acc`,
 lent immediately around each of ilock and iunlock). -/
 theorem fstat_priv_pid (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv) (P : UPtd)
     (M : Nat → List (BitVec 8)) :
-    procPrivExt (GF := GF) pa pid V P M ⊢
+    fstatPrivExt (GF := GF) pa pid V P M ⊢
       wordPointsTo (pPid pa) 4 pidPriv pid ∗
-      (wordPointsTo (pPid pa) 4 pidPriv pid -∗ procPrivExt pa pid V P M) := by
-  unfold procPrivExt
+      (wordPointsTo (pPid pa) 4 pidPriv pid -∗ fstatPrivExt pa pid V P M) := by
+  unfold fstatPrivExt
   iintro ⟨%hf, Hpid, Hr⟩
   iframe Hpid
   iintro Hpid
@@ -584,7 +645,8 @@ theorem fstat_rd_meta (s : Qp) (g : GName) (lo ik : Nat) (inum : BitVec 32) (dn 
 /-! ## The contract's continuation, hart-free -/
 
 /-- The specification's continuation at the ambient block form
-(`EitherDefs.procPrivExt`), with the hart quantified: a `true` crossing at a
+(`fstatPrivExt`, the bare block; the cwd reference rides in the
+closure the proof builds), with the hart quantified: a `true` crossing at a
 process may be consumed on any hart. -/
 def fstatK (k : KCtx) (γ : FileNames) (fk : Nat) (q : Qp) (st : FdState) (pa : BitVec 64)
     (pid : BitVec 32) (V : ProcPriv) (M : Nat → List (BitVec 8)) : IProp GF :=
@@ -594,7 +656,7 @@ def fstatK (k : KCtx) (γ : FileNames) (fk : Nat) (q : Qp) (st : FdState) (pa : 
       umemWrote V.upt M (k.regs 11#5) d P' M'⌝ -∗
     kctx c ((k.withSpie spie spp).withRegs R') -∗ pcIs c (jumpPc (k.regs 1#5)) -∗
     trapCsrsExt c k.sie -∗ cpuClaimExt c k.sie k.proc -∗
-    fileRef γ fk q st -∗ procPrivExt pa pid V P' M' -∗ filestatEnvOut st -∗ wpLoop c)
+    fileRef γ fk q st -∗ fstatPrivExt pa pid V P' M' -∗ filestatEnvOut st -∗ wpLoop c)
 
 end
 

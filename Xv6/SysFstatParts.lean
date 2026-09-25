@@ -6,17 +6,10 @@ the shared epilogue at `+0x32`.
 
 * THE BLOCK AROUND ARGADDR (`sfs_core_tf`): the trapframe pointer and page
   out of the core and back (Rocq `proc_priv_tf`).
-* THE BLOCK AROUND FILESTAT (`sfs_block_lend`, Rocq's `proc_priv_lend` /
-  `proc_priv_join` seam): after `procOfilesOwe_lend` has taken the
-  descriptor's reference out of the array, the core and the array with
-  its deficit give filestat's block `procPrivNoctxAt` (the bare block and
-  the array's CELLS; SpecFilestat deviation 3) and take it back at ANY
-  extended descriptor `P'` and image `M'`, keeping the cwd reference and
-  every other descriptor's payload in the wand.  Rocq needs no such lemma
-  because its filestat takes `proc_priv_core`, which has no `ofile` cells;
-  the Lean filestat's block carries them (see ProofSysFstat's deviation 2).
-  The `upd_upt` crossing is free, as in Rocq: `{ V with upt := P' }.ofile`
-  IS `V.ofile`, so the deficit the lend opened is the one the repay closes.
+* THE BLOCK AROUND FILESTAT needs no lemma (Rocq's `proc_priv_lend` …
+  `proc_priv_join` seam): filestat takes the core (`procPrivCoreNoctxAt`,
+  Rocq `proc_priv_core`), which is literally `procPrivFd_split`'s left
+  half; the array with its deficit stays with the caller.
 * THE CALLEES (`sfs_argaddr`, `sfs_argfd`, `sfs_filestat`): each restated
   with a HART-FREE continuation carrying the trap-CSR complement (the
   FilestatCalls / NamexCalls pattern), so the main proof applies each with
@@ -210,53 +203,6 @@ variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [Fdslot
 theorem sfs_ofdOut_null (w : BitVec 32) : ⊢ ofdOut (GF := GF) 0#64 w := by
   unfold ofdOut; rw [if_pos rfl]; exact .rfl
 
-/-- Descriptor `fd`'s entry without its cell: what a lent or whole slot
-owns besides `p->ofile[fd]`. -/
-def sfsOfileRest (γ : FileNames) (γd : GName) (D : List Nat) (fd : Nat) (v : BitVec 64) :
-    IProp GF :=
-  if fd ∈ D then iprop(⌜v ≠ 0#64⌝)
-  else iprop((⌜v = 0#64⌝ ∗ fdSlot ∗ fdStAuth γd fd .closed) ∨
-   (∃ (k : Nat) (q : Qp) (st : FdState), ⌜v = fnode k ∧ k < NFILE ∧ st ≠ .closed⌝ ∗
-      fileRef γ k q st ∗ fdStAuth γd fd st))
-
-theorem sfs_slot_split (γ : FileNames) (γd : GName) (pa : BitVec 64) (D : List Nat) (fd : Nat)
-    (v : BitVec 64) :
-    ofileLentOrSlot (GF := GF) γ γd pa D fd v ⊣⊢
-      wordPointsTo (pOfile pa fd) 8 (DFrac.own 1) v ∗ sfsOfileRest γ γd D fd v := by
-  unfold ofileLentOrSlot sfsOfileRest
-  split
-  · exact sep_comm
-  · unfold ofileSlot; exact .rfl
-
-/-- The array's CELLS out of the array with its deficit, and back. -/
-theorem sfs_owe_cells (γ : FileNames) (γd : GName) (pa : BitVec 64) (fs : List (BitVec 64))
-    (D : List Nat) :
-    procOfilesOwe (GF := GF) γ γd pa fs D ⊢
-      ofileCells pa (DFrac.own 1) fs ∗
-      (ofileCells pa (DFrac.own 1) fs -∗ procOfilesOwe γ γd pa fs D) := by
-  unfold procOfilesOwe ofileCells
-  iintro ⟨%hl, H⟩
-  ihave H := BigSepL.bigSepL_mono_of_forall
-    (Φ := fun fd v => ofileLentOrSlot (GF := GF) γ γd pa D fd v)
-    (Ψ := fun fd v => iprop(wordPointsTo (GF := GF) (pOfile pa fd) 8 (DFrac.own 1) v ∗
-      sfsOfileRest γ γd D fd v))
-    (fun {fd v} => (sfs_slot_split γ γd pa D fd v).1) $$ H
-  icases BigSepL.bigSepL_sep_eqv.1 $$ H with ⟨Hc, Hr⟩
-  isplitl [Hc]
-  · isplitl []
-    · ipureintro; exact hl
-    · iexact Hc
-  iintro ⟨-, Hc⟩
-  isplitl []
-  · ipureintro; exact hl
-  iapply BigSepL.bigSepL_mono_of_forall
-    (Ψ := fun fd v => ofileLentOrSlot (GF := GF) γ γd pa D fd v)
-    (Φ := fun fd v => iprop(wordPointsTo (GF := GF) (pOfile pa fd) 8 (DFrac.own 1) v ∗
-      sfsOfileRest γ γd D fd v))
-    (fun {fd v} => (sfs_slot_split γ γd pa D fd v).2)
-  iapply BigSepL.bigSepL_sep_eqv.2
-  iframe Hc Hr
-
 /-- THE TRAPFRAME around argaddr (Rocq `proc_priv_tf`): the pointer cell
 and the page, out of the core at the ambient context and back. -/
 theorem sfs_core_tf (h : curTier = KTier.kpt) (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv)
@@ -279,35 +225,6 @@ theorem sfs_core_tf (h : curTier = KTier.kpt) (pa : BitVec 64) (pid : BitVec 32)
   isplitl []
   · ipureintro; exact hf
   · ipureintro; exact hlz
-
-/-- **THE BLOCK AROUND FILESTAT** (Rocq's `proc_priv_lend` … `proc_priv_join`
-seam, at the Lean filestat's block form): the core and the array (with
-whatever deficit) give `procPrivNoctxAt`, and take it back at any extended
-descriptor and image. -/
-theorem sfs_block_lend (h : curTier = KTier.kpt) (γ : FileNames) (γd : GName) (pa : BitVec 64)
-    (pid : BitVec 32) (V : ProcPriv) (M : Nat → List (BitVec 8)) (D : List Nat) :
-    procPrivCoreNoctxAt (GF := GF) curCtx pa pid V M ∗ procOfilesOwe γ γd pa V.ofile D ⊢
-      procPrivNoctxAt curCtx pa pid V M ∗
-      (∀ (P' : UPtd) (M' : Nat → List (BitVec 8)),
-        procPrivNoctxAt curCtx pa pid { V with upt := P' } M' -∗
-        procPrivCoreNoctxAt curCtx pa pid { V with upt := P' } M' ∗
-        procOfilesOwe γ γd pa V.ofile D) := by
-  obtain ⟨ξ, t⟩ := X
-  simp only at h
-  subst h
-  letI : CurCtx := ⟨ξ, KTier.kpt⟩
-  iintro ⟨Hcore, Howe⟩
-  icases sfs_owe_cells γ γd pa V.ofile D $$ Howe with ⟨Hcells, Hback⟩
-  icases (procPrivCoreNoctxAt_bare ξ pa pid V M).1 $$ Hcore with ⟨Hbare, Hcw⟩
-  isplitl [Hbare Hcells]
-  · iapply (procPrivNoctxAt_split ξ pa pid V M).2
-    iframe Hbare Hcells
-  iintro %P' %M' Hp
-  icases (procPrivNoctxAt_split ξ pa pid { V with upt := P' } M').1 $$ Hp with ⟨Hbare, Hcells⟩
-  isplitl [Hbare Hcw]
-  · iapply (procPrivCoreNoctxAt_bare ξ pa pid { V with upt := P' } M').2
-    iframe Hbare Hcw
-  · iapply Hback $$ Hcells
 
 end
 
@@ -391,7 +308,7 @@ theorem sfs_filestat (FS : FILESTAT) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF 
     (ha0 : k'.regs 10#5 = fnode fk) :
     kctx c k' ∗ pcIs c KA.«filestat» ∗ procsInv Γ ∗
     trapCsrsExt c k'.sie ∗ cpuClaimExt c k'.sie k'.proc ∗ panicEnv ∗
-    fileRef γ fk q st ∗ procPrivNoctxAt curCtx (procAddr j) pid V M ∗
+    fileRef γ fk q st ∗ procPrivCoreNoctxAt curCtx (procAddr j) pid V M ∗
     isLock γkl kmemLockAddr "kmem" (kmemRes γk) ∗ kallocAvail γk none ∗
     filestatEnv (hlc := hlc) st ∗
     (∀ c' : CPU, filestatPost k' γ fk q st j pid V M c')
