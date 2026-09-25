@@ -937,3 +937,6 @@ import Xv6.SysLinkWalkA
 import Xv6.ProofSysLink
 import Xv6.LinkSysLink
 import Xv6.CreateMkdir
+import Xv6.CreateCalls
+import Xv6.ProofCreate
+import Xv6.LinkCreate

@@ -71,7 +71,7 @@ contract's own continuation `createPost`.
    createMkdirBody …` and `createEnv … ⊢ createFailBody …`.
 4. The transaction shares: Rocq's `log_tx_split` / `log_tx_join_q` /
    `log_tx_add` + `log_tx_full` are `create_alloc_tx_split` /
-   `create_alloc_tx_join` (the `ghost_map` element's `Fractional` instance)
+   `create_tx_join` (the `ghost_map` element's `Fractional` instance)
    and `logTx_join`; `ic_shrink_tx` / `ic_grow_tx` / `ic_tx_dep_intro` are
    `icShrinkTx` / `icGrowTx` / `icTxDep_intro`.  The choreography is Rocq's:
    the parent's arm shrinks to a quarter before the span, the claim box
@@ -92,6 +92,7 @@ contract's own continuation `createPost`.
   premise (CreateSharedBody deviation 5).
 -/
 import Xv6.CreateSharedBody
+import Xv6.CreateCalls
 import Xv6.FsStateEraResB
 
 namespace Xv6
@@ -106,17 +107,6 @@ set_option linter.unusedSimpArgs false
 set_option linter.unusedVariables false
 
 /-! ## 0.  Pure helpers -/
-
-/-- `+0xa2`'s and `+0xe8`/`+0xf4`'s slot: `sp - 80 + 40` is the frame's `s3`
-cell. -/
-theorem create_alloc_s3_addr (sp : BitVec 64) :
-    createBuf sp + BitVec.signExtend 64 40#12 = sp + 0xFFFFFFFFFFFFFFD8#64 := by
-  unfold createBuf; rw [BitVec.add_assoc]; rfl
-
-/-- `+0xd2`'s `addi a1,s0,-80` is the name buffer. -/
-theorem create_alloc_name_addr (sp : BitVec 64) :
-    sp + BitVec.signExtend 64 4016#12 = createBuf sp := by
-  unfold createBuf; rfl
 
 /-- `+0xce`'s `lw a2,4(s3)` reads the child's `inum` cell. -/
 theorem create_alloc_iinum (x : Nat) : ientry x + 4#64 = iInum (ientry x) := rfl
@@ -133,13 +123,6 @@ theorem create_alloc_tx_split [Icfg] (t : Nat) (q q1 q2 : Qp) (hq : q = q1 + q2)
   subst hq
   unfold txPin
   exact ((ghost_map_elem_fractional (GF := GF) icfgLog.tx t ()).fractional q1 q2).1
-
-/-- ...and its join (Rocq's `log_tx_join_q`). -/
-theorem create_alloc_tx_join [Icfg] (t : Nat) (q q1 q2 : Qp) (hq : q = q1 + q2) :
-    txPin (GF := GF) icfgLog t q1 ∗ txPin icfgLog t q2 ⊢ txPin icfgLog t q := by
-  subst hq
-  unfold txPin
-  exact ((ghost_map_elem_fractional (GF := GF) icfgLog.tx t ()).fractional q1 q2).2
 
 end Tx
 
@@ -580,25 +563,6 @@ variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [Fdslot
   [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF]
   [Appcfg GF] [FileG GF] [Fscfg] [Icfg] [CurCtx]
 
-/-- One slot's escrow, read off the environment (Rocq's `cr_esc_acc`). -/
-theorem create_alloc_env_esc (Γ : SchedNames) (γl : GName) (pd pav pu : BitVec 64) (γkl : GName)
-    (γk : KmemNames) (kk : Nat) (hkk : kk < NINODE) :
-    createEnv (hlc := hlc) (GF := GF) Γ γl pd pav pu γkl γk ⊢
-      icEscrow fscIc fscFs fscIreg fscCov fscLogst kk := by
-  unfold createEnv
-  iintro ⟨-, -, -, -, -, -, -, #Hit2, -, -, -, -, -⟩
-  ihave #Hescs := isItable2_escrows $$ Hit2
-  iapply icEscrows_lookup fscIc fscFs fscIreg fscCov fscLogst kk hkk $$ Hescs
-
-/-- The region's invariant, read off the environment. -/
-theorem create_alloc_env_ireg (Γ : SchedNames) (γl : GName) (pd pav pu : BitVec 64) (γkl : GName)
-    (γk : KmemNames) :
-    createEnv (hlc := hlc) (GF := GF) Γ γl pd pav pu γkl γk ⊢
-      iregInv (hlc := hlc) fscIreg fscFs icfgIst icfgNib := by
-  unfold createEnv
-  iintro ⟨-, -, -, -, -, -, -, -, -, -, #Hinv, -, -⟩
-  iexact Hinv
-
 /-- THE BLOCK, SPLIT (Rocq's `proc_priv_bare … ∗ (proc_priv_bare … -∗
 proc_priv …)`): the bare block out, the cwd reference and the descriptor
 array riding in the wand. -/
@@ -614,33 +578,6 @@ theorem create_alloc_priv_open (γ : FileNames) (pa : BitVec 64) (pid : BitVec 3
   iframe Hb Hc Ho
 
 end Env
-
-section Bare
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF]
-  [BioslotG GF] [FileG GF] [IcacheG GF] [SleepLockG GF] [IcboxG GF] [IrefslotG GF] [OffboxG GF]
-  [OffboxBoxG GF] [Icfg]
-
-/-- **The bare block's pid cell** (Rocq's `proc_priv_bare_acc`, the
-`namexEra_core_rows` shape at the bare block): at the ambient context with
-its tier pinned. -/
-theorem create_alloc_bare_pid [X : CurCtx] (hct : X.curTier = KTier.kpt) (pa : BitVec 64)
-    (pid : BitVec 32) (V : ProcPriv) (M : Nat → List (BitVec 8)) :
-    procPrivBareAt (GF := GF) curCtx pa pid V M ⊢
-      wordPointsTo (pPid pa) 4 pidPriv pid ∗
-      (wordPointsTo (pPid pa) 4 pidPriv pid -∗ procPrivBareAt curCtx pa pid V M) := by
-  obtain ⟨c, t⟩ := X
-  simp only at hct
-  subst hct
-  unfold procPrivBareAt
-  iintro ⟨%h, Hpid, Hf, Hpt, Htfp, %hlz⟩
-  iframe Hpid
-  iintro Hpid
-  iframe Hpid Hf Hpt Htfp
-  isplitl []
-  · ipureintro; exact h
-  · ipureintro; exact hlz
-
-end Bare
 
 /-! ## 4.  ARM C-OK-FILE, from +0xe0 (Rocq :1379–1662) -/
 
@@ -754,7 +691,7 @@ theorem create_alloc_cok (IUP : IUNLOCKPUT) (Γ : SchedNames) [ClaimIs (hlc := h
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
   icases kctx_tier _ _ $$ Hk with ⟨%hct, Hk⟩
   have ht0 : curTier = KTier.kpt := by rw [← hct]; exact htier
-  icases create_alloc_bare_pid ht0 k.proc pid V M $$ Hbare with ⟨Hpid, Hpw⟩
+  icases create_bare_pid ht0 k.proc pid V M $$ Hbare with ⟨Hpid, Hpw⟩
   -- +0xe0  c.mv a0,s1
   k_step_e (wp_s_add cpu _ (KA.«create» + 0xe0#64) true 10#5 0#5 9#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
@@ -787,7 +724,7 @@ theorem create_alloc_cok (IUP : IUNLOCKPUT) (Γ : SchedNames) [ClaimIs (hlc := h
   obtain ⟨e2, e8, e9, e18, e19, e20, e21, e22, e23, e24, e25, e26, e27⟩ := hcs1
   ihave Hk := kctx_eq_mono cpu _ (((k.withSpie spie1 spp1).pushed 10).withRegs R1) (by kctx_ext) $$ Hk
   -- the parent's quarter comes home into the CHILD's handle (Rocq :1551–1559)
-  ihave #Hescc := create_alloc_env_esc Γ γl pd pav pu γkl γk kslot hkslot $$ Henv
+  ihave #Hescc := create_env_esc Γ γl pd pav pu γkl γk kslot hkslot $$ Henv
   icases Hcdep with ⟨%locc, %tlcc, %hlecc, #Hcflc, Hcdep⟩
   iapply wpLoop_fupd
   imod (icGrowTx ⊤ fscIc fscFs fscIreg fscCov fscLogst kslot q.half icfgDev cinum g locc true t
@@ -1012,7 +949,7 @@ theorem create_alloc_file (IUP : IUNLOCKPUT) (DLK : DIRLINK) (Γ : SchedNames)
       (createSetf_inodeOk fscCov fscLogst dnc bmc datc major minor 1#16 hciok)
       (create_setf_rec_local dnc major minor 1#16 hrlc create_nl_short_1)
       (dirUniq_not_dir _ datc hsetty) (dirDotsIx_not_dir _ _ datc hsetty)
-  ihave #Hinv := create_alloc_env_ireg Γ γl pd pav pu γkl γk $$ Henv
+  ihave #Hinv := create_env_ireg Γ γl pd pav pu γkl γk $$ Henv
   ihave #Hft := iregInv_ftop fscIreg fscFs icfgIst icfgNib $$ Hinv
   ihave #Hap := iregInv_app fscIreg fscFs icfgIst icfgNib $$ Hinv
   iapply wpLoop_fupd
@@ -1036,7 +973,7 @@ theorem create_alloc_file (IUP : IUNLOCKPUT) (DLK : DIRLINK) (Γ : SchedNames)
   k_step_e (wp_s_jal cpu _ (KA.«create» + 0xd8#64) false 2092376#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [create_br_dirlink]
   iintro Hk Hpc
-  icases create_alloc_bare_pid ht0 k.proc pid V M $$ Hbare with ⟨Hpid, Hpw⟩
+  icases create_bare_pid ht0 k.proc pid V M $$ Hbare with ⟨Hpid, Hpw⟩
   ihave Hisl := (show irefSlots (GF := GF) (ns - 2) ⊢ irefSlots 1 ∗ irefSlots (ns - 3) by
     rw [← create_ns_2 ns hns]; exact irefSlots_split 1 (ns - 3)) $$ Hisl
   icases Hisl with ⟨Hislk, Hislr⟩
@@ -1330,7 +1267,7 @@ theorem create_alloc_made (IUP : IUNLOCKPUT) (IU : IUPDATE) (DLK : DIRLINK) (Γ 
   -- THE ARM FIRES, AND THE CHILD'S ROW IS SUSPENDED (Rocq :468–489)
   unfold creCommits
   icases Hcre with ⟨Harm, Hdots, Hun, Hacre⟩
-  ihave #Hinv := create_alloc_env_ireg Γ γl pd pav pu γkl γk $$ Henv
+  ihave #Hinv := create_env_ireg Γ γl pd pav pu γkl γk $$ Henv
   ihave #Hft := iregInv_ftop fscIreg fscFs icfgIst icfgNib $$ Hinv
   ihave #Hap := iregInv_app fscIreg fscFs icfgIst icfgNib $$ Hinv
   iapply wpLoop_fupd
@@ -1369,7 +1306,7 @@ theorem create_alloc_made (IUP : IUNLOCKPUT) (IU : IUPDATE) (DLK : DIRLINK) (Γ 
   k_step_e (wp_s_jal cpu _ (KA.«create» + 0xc4#64) false 2090198#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [create_br_iupdate]
   iintro Hk Hpc
-  icases create_alloc_bare_pid ht0 k.proc pid V M $$ Hbare with ⟨Hpid, Hpw⟩
+  icases create_bare_pid ht0 k.proc pid V M $$ Hbare with ⟨Hpid, Hpw⟩
   icases bslots_uncons 2 $$ Hbs with ⟨Hb1, Hb2⟩
   -- THE FREEZE PIN, PAID WITH THE SPAN'S TOKEN (Rocq :649–671)
   ihave Hpin : iregLinkPin true cinum.toNat dnc $$ [Hcfrz]
@@ -1544,10 +1481,10 @@ theorem create_alloc_half (IL : ILOCK) (IUP : IUNLOCKPUT) (IA : IALLOC) (IU : IU
   ihave Hisl1 : irefSlot $$ [Hisl1]
   · unfold irefSlot; iexact Hisl1
   icases create_alloc_priv_open γ k.proc pid V M $$ Hpriv with ⟨Hbare, Hbw⟩
-  icases create_alloc_bare_pid ht0 k.proc pid V M $$ Hbare with ⟨Hpid, Hpw⟩
+  icases create_bare_pid ht0 k.proc pid V M $$ Hbare with ⟨Hpid, Hpw⟩
   -- ---- THE PARENT'S ARM SHRINKS BEFORE THE SPAN (Rocq :375–386) ----
   icases Hdep with ⟨%lodc, %tldc, %hledc, #Hfl, Hdep⟩
-  ihave #Hescd := create_alloc_env_esc Γ γl pd pav pu γkl γk kd hkd $$ Henv
+  ihave #Hescd := create_env_esc Γ γl pd pav pu γkl γk kd hkd $$ Henv
   iapply wpLoop_fupd
   imod (icShrinkTx ⊤ fscIc fscFs fscIreg fscCov fscLogst kd qd.half icfgDev dind gd lodc true t
     (1 : Qp).half Qp.quarter Qp.quarter create_alloc_quarters CoPset.subseteq_top)
@@ -1576,7 +1513,7 @@ theorem create_alloc_half (IL : ILOCK) (IUP : IUNLOCKPUT) (IA : IALLOC) (IU : IU
     -- ===== ARM A-FAIL (+0xec): ialloc returned 0, nothing was claimed =====
     simp only [Bool.false_eq_true, if_false]
     icases Hres with ⟨%hs3z, Hpc, Hislg, Htp, Htcl, Hop⟩
-    ihave Htx := create_alloc_tx_join t (1 : Qp).half Qp.quarter Qp.quarter create_alloc_quarters
+    ihave Htx := create_tx_join t (1 : Qp).half Qp.quarter Qp.quarter create_alloc_quarters
       $$ [Htcl Htx]
     · iframe
     -- nothing was claimed, so the quarter goes straight back into the parent's arm
@@ -1680,7 +1617,7 @@ theorem create_alloc_half (IL : ILOCK) (IUP : IUNLOCKPUT) (IA : IALLOC) (IU : IU
       Hcshot, Hcfrz, Hckeep, Hcru, Htcl, Hop⟩
     obtain ⟨hs3, hkslot, hcpos, hclt, hcinb, htyc, hfresh, hle0⟩ := hp
     -- the claim box's quarter is home
-    ihave Htx := create_alloc_tx_join t (1 : Qp).half Qp.quarter Qp.quarter create_alloc_quarters
+    ihave Htx := create_tx_join t (1 : Qp).half Qp.quarter Qp.quarter create_alloc_quarters
       $$ [Htcl Htx]
     · iframe
     have hR1 : createRegs3 k (ientry kd) 0#64 (ientry kslot) ty major minor R1 :=

@@ -68,7 +68,7 @@ proved from the `fail:` twin `createFailMkdirBody` as a PREMISE.
 3. **PROCESS LAYER (flagged, not new).**  The body hands the bare block and
    its way back (`CreateSharedBody` deviation 2); the callees read the pid
    cell `wordPointsTo (pPid k.proc) 4 pidPriv pid`, borrowed out of the bare
-   block (`createMkdir_bare_pid`, the `namexEra_core_rows` bridge; Rocq's
+   block (`create_bare_pid`, the `namexEra_core_rows` bridge; Rocq's
    `Hppid` / `Hppback`).  Nothing else of the process is touched.
 4. **THE WALK IS CUT INTO FIVE STAGES** at +0x10e, +0x122, +0x134 and +0xe0
    (Rocq proves one 2900-line lemma).  Each stage state is a parked body of
@@ -101,16 +101,19 @@ proved from the `fail:` twin `createFailMkdirBody` as a PREMISE.
   `bslots_uncons`, `isItable2_escrows`/`icEscrows_lookup`,
   `create_buf_close` inside `create_tail`) replaces them -- reason: no Sail
   register file in Lean.
-* `createMkdir_bare_pid`, `createMkdir_dirlink`, `createMkdir_iunlockput`
-  restate the wrappers the sibling halves (`CreateFail`, `CreateFailMkdir`,
-  `CreateAlloc`) carry under their own prefixes -- the halves are proved in
-  parallel on disjoint files; a later cleanup may hoist one copy into
-  `CreateSharedBody`.
+* `createMkdir_dirlink`, `createMkdir_iunlockput` restate the wrappers the
+  sibling halves (`CreateAlloc`, `CreateFail`, `CreateFailMkdir`) carry
+  under their own prefixes, at statements that differ (dirlink's name-buffer
+  share `dqn`; iunlockput's `inodeRefShortGenlo` keep and `hireg`); the
+  identical helpers (`create_bare_pid`, `create_env_esc`/`_ireg`,
+  `create_s3_addr`, `create_name_addr`, `create_tx_join`) are ONE copy in
+  `CreateCalls`.
 * The found arms of the three `dirlink`s are REFUTED as in Rocq
   (`create_first_0`, `create_first_miss_dotdot`, the body's `dirFirst`
   miss); nothing is dropped there.
 -/
 import Xv6.CreateSharedBody
+import Xv6.CreateCalls
 import Xv6.IregLinkNz
 import Xv6.FsStateEraResB
 
@@ -127,19 +130,7 @@ set_option linter.unusedVariables false
 
 /-! ## 0.  Small pure facts -/
 
-/-- `+0x122`'s `addi a1,s0,-80` is the name buffer. -/
-theorem createMkdir_name_addr (sp : BitVec 64) :
-    sp + BitVec.signExtend 64 4016#12 = createBuf sp := by
-  unfold createBuf; rfl
-
-/-- `+0xe8`'s slot: `sp - 80 + 40` is the frame's `s3` cell. -/
-theorem createMkdir_s3_addr (sp : BitVec 64) :
-    createBuf sp + BitVec.signExtend 64 40#12 = sp + 0xFFFFFFFFFFFFFFD8#64 := by
-  unfold createBuf; rw [BitVec.add_assoc]; rfl
-
 theorem createMkdir_qq : Qp.quarter.half + Qp.quarter.half = Qp.quarter := Qp.half_add_half _
-
-theorem createMkdir_hh : Qp.quarter + Qp.quarter = (1 : Qp).half := qp_quarter_add_quarter
 
 /-- the first link's spend (Rocq's `cr_mkdir_dl1` + `cr_n3_lo`): seven are
 left. -/
@@ -170,45 +161,6 @@ theorem createMkdir_dlneed5 (ind : Bool) (n : Nat) (h : 6 ≤ n) : dlNeed true i
 direct. -/
 theorem createMkdir_dlneed4 (n : Nat) (h : 6 ≤ n) : dlNeed true false ≤ n :=
   createMkdir_dlneed5 false n h
-
-section Bare
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF]
-  [BioslotG GF] [FileG GF] [IcacheG GF] [SleepLockG GF] [IcboxG GF] [IrefslotG GF] [OffboxG GF]
-  [OffboxBoxG GF] [Icfg]
-
-/-- **The bare block's pid cell** (Rocq's `Hppid` / `Hppback`, the
-`namexEra_core_rows` shape at the bare block): at the ambient context with
-its tier pinned. -/
-theorem createMkdir_bare_pid [X : CurCtx] (hct : X.curTier = KTier.kpt) (pa : BitVec 64)
-    (pid : BitVec 32) (V : ProcPriv) (M : Nat → List (BitVec 8)) :
-    procPrivBareAt (GF := GF) curCtx pa pid V M ⊢
-      wordPointsTo (pPid pa) 4 pidPriv pid ∗
-      (wordPointsTo (pPid pa) 4 pidPriv pid -∗ procPrivBareAt curCtx pa pid V M) := by
-  obtain ⟨c, t⟩ := X
-  simp only at hct
-  subst hct
-  unfold procPrivBareAt
-  iintro ⟨%h, Hpid, Hf, Hpt, Htfp, %hlz⟩
-  iframe Hpid
-  iintro Hpid
-  iframe Hpid Hf Hpt Htfp
-  isplitl []
-  · ipureintro; exact h
-  · ipureintro; exact hlz
-
-end Bare
-
-section Tx
-variable {GF : BundledGFunctors} [Xv6G GF] [LogG GF]
-
-/-- the transaction element's own join (Rocq's `log_tx_add`). -/
-theorem createMkdir_tx_join [Icfg] (t : Nat) (q q1 q2 : Qp) (hq : q = q1 + q2) :
-    txPin (GF := GF) icfgLog t q1 ∗ txPin icfgLog t q2 ⊢ txPin icfgLog t q := by
-  subst hq
-  unfold txPin
-  exact ((ghost_map_elem_fractional (GF := GF) icfgLog.tx t ()).fractional q1 q2).2
-
-end Tx
 
 /-! ## 1.  The callees at create's environment, hart-free (the `SysLinkCalls`
 pattern) -/
@@ -1526,25 +1478,6 @@ variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [Fdslot
   [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF]
   [Appcfg GF] [FileG GF] [Fscfg] [Icfg] [CurCtx]
 
-/-- a slot's escrow, read off the environment (Rocq's `cr_esc_acc`) -/
-theorem createMkdir_env_esc (Γ : SchedNames) (γl : GName) (pd pav pu : BitVec 64) (γkl : GName)
-    (γk : KmemNames) (kk : Nat) (hkk : kk < NINODE) :
-    createEnv (hlc := hlc) (GF := GF) Γ γl pd pav pu γkl γk ⊢
-      icEscrow fscIc fscFs fscIreg fscCov fscLogst kk := by
-  unfold createEnv
-  iintro ⟨-, -, -, -, -, -, -, #Hit2, -, -, -, -, -⟩
-  ihave #Hescs := isItable2_escrows $$ Hit2
-  iapply (icEscrows_lookup fscIc fscFs fscIreg fscCov fscLogst kk hkk) $$ Hescs
-
-/-- the inode region, read off the environment -/
-theorem createMkdir_env_ireg (Γ : SchedNames) (γl : GName) (pd pav pu : BitVec 64) (γkl : GName)
-    (γk : KmemNames) :
-    createEnv (hlc := hlc) (GF := GF) Γ γl pd pav pu γkl γk ⊢
-      iregInv (hlc := hlc) fscIreg fscFs icfgIst icfgNib := by
-  unfold createEnv
-  iintro ⟨-, -, -, -, -, -, -, -, -, -, #Hinv, -, -⟩
-  iexact Hinv
-
 theorem createMkdir_bltz_m1 : bcond bop.BLT 18446744073709551615#64 0#64 = true := by decide
 
 theorem createMkdir_b146c : KA.«create» + 0x130#64 + BitVec.signExtend 64 22#13 =
@@ -1617,7 +1550,7 @@ theorem create_mkdir_name (DLK : DIRLINK) (Γ : SchedNames) [ClaimIs (hlc := hlc
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [create_br_dirlink]
   iintro Hk Hpc
   -- THE SHARE THE CALL'S OWN `iput` MAY NEED: an eighth off the CHILD's arm
-  ihave #Hescc := createMkdir_env_esc Γ γl pd pav pu γkl γk kslot hkid.hk $$ Henv
+  ihave #Hescc := create_env_esc Γ γl pd pav pu γkl γk kslot hkid.hk $$ Henv
   icases Hcdep with ⟨%locc, %tlcc, %hlecc, #Hflcc, Hcdep⟩
   iapply wpLoop_fupd
   imod (icShrinkTx ⊤ fscIc fscFs fscIreg fscCov fscLogst kslot q.half icfgDev cinum g locc true t
@@ -1637,7 +1570,7 @@ theorem create_mkdir_name (DLK : DIRLINK) (Γ : SchedNames) [ClaimIs (hlc := hlc
     $$ [- $Hk $Hpc]
   rotate_right 1
   iframe Hdev Hinum Hmeta Hmap Hblk Hsi Hss Hsb Hdi Hbs Hslot Hdl Hop Htxs
-  k_norm_g [r8, createMkdir_name_addr]
+  k_norm_g [r8, create_name_addr]
   iframe Hte Hce Hnm Hpid
   iframe #
   case dp => k_norm_g; try exact hS.hproc
@@ -1705,7 +1638,7 @@ theorem create_mkdir_name (DLK : DIRLINK) (Γ : SchedNames) [ClaimIs (hlc := hlc
     subst ht0
     obtain ⟨hfp, hpark⟩ := createMkdir_par_nop (hlc := hlc) (GF := GF) plen pfun kd dind cinum dn bm
       data nf bm3 dat3 dp3 hpar hkid.hnib hS.h16 hty3 hnl3 hszmax hiok3 hdok3 hddix3 hrng3
-    ihave #Hinv := createMkdir_env_ireg Γ γl pd pav pu γkl γk $$ Henv
+    ihave #Hinv := create_env_ireg Γ γl pd pav pu γkl γk $$ Henv
     ihave #Hft := iregInv_ftop $$ Hinv
     ihave #Hap := iregInv_app $$ Hinv
     k_step_e (wp_s_branch cpu _ (KA.«create» + 0x130#64) false 22#13 10#5 0#5 (by decide) bop.BLT)
@@ -1974,7 +1907,7 @@ theorem create_mkdir_dotdot (DLK : DIRLINK) (Γ : SchedNames) [ClaimIs (hlc := h
   icases kctx_kmapStatic _ _ $$ Hk with ⟨#HS, Hk⟩
   icases kctx_kernelData _ _ $$ Hk with ⟨#HD, Hk⟩
   ihave #Hddw := create_dotdot_window $$ HS HD
-  ihave #Hinv := createMkdir_env_ireg Γ γl pd pav pu γkl γk $$ Henv
+  ihave #Hinv := create_env_ireg Γ γl pd pav pu γkl γk $$ Henv
   ihave %hne := dinodeAt_ne fscIreg dind cinum _ _ $$ Hdi Hcdi
   -- ===== +0x10e  c.lw a2,4(s1) : dp->inum =====
   k_step_e (wp_s_lw cpu _ (KA.«create» + 0x10e#64) true 4#12 12#5 9#5 (by decide) (by decide)
@@ -2001,7 +1934,7 @@ theorem create_mkdir_dotdot (DLK : DIRLINK) (Γ : SchedNames) [ClaimIs (hlc := h
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [create_br_dirlink]
   iintro Hk Hpc
   -- the eighth off the PARENT's arm
-  ihave #Hescd := createMkdir_env_esc Γ γl pd pav pu γkl γk kd hpar.hkd $$ Henv
+  ihave #Hescd := create_env_esc Γ γl pd pav pu γkl γk kd hpar.hkd $$ Henv
   icases Hdep with ⟨%lodc, %tldc, %hled0, #Hfl0, Hdep⟩
   iapply wpLoop_fupd
   imod (icShrinkTx ⊤ fscIc fscFs fscIreg fscCov fscLogst kd qd.half icfgDev dind gd lodc true t
@@ -2222,9 +2155,9 @@ theorem create_mkdir_dot (DLK : DIRLINK) (Γ : SchedNames) [ClaimIs (hlc := hlc)
   icases kctx_tier cpu _ $$ Hk with ⟨%ht, Hk⟩
   have hct : (curTier : KTier) = KTier.kpt := by
     rw [← ht]; simp only [k_norm_simps]; exact hS.htier
-  icases createMkdir_bare_pid hct k.proc pid V M $$ Hbare with ⟨Hpid, Hpidw⟩
+  icases create_bare_pid hct k.proc pid V M $$ Hbare with ⟨Hpid, Hpidw⟩
   ihave #Hdw := create_dot_window $$ HS Hkd
-  ihave #Hinv := createMkdir_env_ireg Γ γl pd pav pu γkl γk $$ Henv
+  ihave #Hinv := create_env_ireg Γ γl pd pav pu γkl γk $$ Henv
   -- THE KEEP (deviation 4)
   have hns2 : ns - 2 = 1 + (ns - 3) := by omega
   rw [hns2]
@@ -2271,7 +2204,7 @@ theorem create_mkdir_dot (DLK : DIRLINK) (Γ : SchedNames) [ClaimIs (hlc := hlc)
   -- the fresh child's licence (deviation 6), and an eighth off the PARENT's arm
   ihave Hcdls := createMkdir_fresh_dlinks (GF := GF) cinum (createSetf dnc major minor 1#16) bmc
     datc hsz0 (createSetf_nlink _ _ _ _)
-  ihave #Hescd := createMkdir_env_esc Γ γl pd pav pu γkl γk kd hkd $$ Henv
+  ihave #Hescd := create_env_esc Γ γl pd pav pu γkl γk kd hkd $$ Henv
   icases Hdep with ⟨%lodc, %tldc, %hled0, #Hfl0, Hdep⟩
   iapply wpLoop_fupd
   imod (icShrinkTx ⊤ fscIc fscFs fscIreg fscCov fscLogst kd qd.half icfgDev dind gd lodc true t
@@ -2492,7 +2425,7 @@ theorem create_mkdir_cok (IUP : IUNLOCKPUT) (Γ : SchedNames) [ClaimIs (hlc := h
   icases (createFrame_s3 _ _ _ _ _ _ _ _ _).1 $$ Hframe with ⟨H40, Hfback⟩
   k_step_e (wp_s_ld cpu _ (KA.«create» + 0xe8#64) true 40#12 19#5 2#5 (by decide) (by decide)
       (DFrac.own 1) (k.regs 19#5))
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [e2, r2, createMkdir_s3_addr]
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [e2, r2, create_s3_addr]
   iintro Hk Hpc H40
   ihave Hframe := Hfback $$ %(k.regs 19#5) [H40]
   · iexact H40
@@ -2518,7 +2451,7 @@ theorem create_mkdir_cok (IUP : IUNLOCKPUT) (Γ : SchedNames) [ClaimIs (hlc := h
   icases Hcdep with ⟨%locc, %tlcc, %hlecc, #Hflcc, Hcdep⟩
   iapply wpLoop_fupd
   imod (icGrowTx ⊤ fscIc fscFs fscIreg fscCov fscLogst kslot q.half icfgDev cinum g locc true t
-      (1 : Qp).half Qp.quarter Qp.quarter createMkdir_hh.symm CoPset.subseteq_top)
+      (1 : Qp).half Qp.quarter Qp.quarter qp_quarter_add_quarter.symm CoPset.subseteq_top)
     $$ Hesc Hcval Hcdep Htq with ⟨Hcval, Hcdep⟩
   ihave Hcdep := icTxDep_intro fscIc kslot q.half icfgDev cinum g locc t $$ Hcdep Htx
   ihave #Hcshot2 : ityShot g dc2.diType $$ [Hcshot]

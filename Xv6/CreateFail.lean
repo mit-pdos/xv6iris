@@ -41,7 +41,7 @@ THE GHOST MOVES (Rocq's, kept):
    its way back (`procPrivBareAt curCtx k.proc pid V M ∗ (… -∗ procPrivFd
    …)`, `CreateSharedBody` deviation 2); the callees read the pid cell
    `wordPointsTo (pPid k.proc) 4 pidPriv pid`, borrowed out of the bare
-   block by `createFail_bare_pid` (the `namexEra_core_rows` bridge, at the
+   block by `create_bare_pid` (the `namexEra_core_rows` bridge, at the
    bare block) -- Rocq's `Hppid` / `Hppback`.
 3. HART-FREE (`CreateSharedBody` deviation 3): the callees' `wpNext`
    continuations are discharged by `wpNext_intro_pin` in the call wrappers;
@@ -69,6 +69,7 @@ THE GHOST MOVES (Rocq's, kept):
   reason: no Sail register file / `cpu_own` in Lean.
 -/
 import Xv6.CreateSharedBody
+import Xv6.CreateCalls
 import Xv6.FsStateEraResB
 
 namespace Xv6
@@ -99,32 +100,6 @@ theorem createFail_txPin_quarters (γ : LogNames) (t : Nat) :
 
 end Small
 
-section Bare
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF]
-  [BioslotG GF] [FileG GF] [IcacheG GF] [SleepLockG GF] [IcboxG GF] [IrefslotG GF] [OffboxG GF]
-  [OffboxBoxG GF] [Icfg]
-
-/-- **The bare block's pid cell** (Rocq's `Hppid`, the `namexEra_core_rows`
-shape at the bare block): at the ambient context with its tier pinned. -/
-theorem createFail_bare_pid [X : CurCtx] (hct : X.curTier = KTier.kpt) (pa : BitVec 64)
-    (pid : BitVec 32) (V : ProcPriv) (M : Nat → List (BitVec 8)) :
-    procPrivBareAt (GF := GF) curCtx pa pid V M ⊢
-      wordPointsTo (pPid pa) 4 pidPriv pid ∗
-      (wordPointsTo (pPid pa) 4 pidPriv pid -∗ procPrivBareAt curCtx pa pid V M) := by
-  obtain ⟨c, t⟩ := X
-  simp only at hct
-  subst hct
-  unfold procPrivBareAt
-  iintro ⟨%h, Hpid, Hf, Hpt, Htfp, %hlz⟩
-  iframe Hpid
-  iintro Hpid
-  iframe Hpid Hf Hpt Htfp
-  isplitl []
-  · ipureintro; exact h
-  · ipureintro; exact hlz
-
-end Bare
-
 /-! ## 1.  The call sites, over `createEnv` (the `SysLinkCalls` pattern) -/
 
 section Calls
@@ -132,65 +107,6 @@ variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [Fdslot
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
   [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF]
   [Appcfg GF] [FileG GF] [Fscfg] [Icfg] [CurCtx]
-
-set_option maxHeartbeats 8000000 in
-/-- `iupdate(ip)` at `+0x14c`, after the `ip->nlink = 0` (Rocq
-`IU.wp_iupdate_unlink`): the fill's pile retired, hart-free. -/
-theorem createFail_iupdate (IU : IUPDATE) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
-    (cpu : CPU) (k' : KCtx) (j : Nat) (γl : GName) (pd pav pu : BitVec 64) (γkl : GName)
-    (γk : KmemNames) (kk : Nat) (inum : BitVec 32) (dn dn0 : Dinode) (bm : Blkmap)
-    (u : Nat) (Sb : List Nat) (cru : Bool) (uty : Ity) (pidv : BitVec 32) (dqs : DFrac)
-    (hj : j < NPROC) (hproc : k'.proc = procAddr j) (hK : iupdateSlots ≤ k'.avail)
-    (hnoff : k'.noff = 0) (htier : k'.tier = KTier.kpt)
-    (hcru : cru = true → IBLOCK inum icfgIst ∈ Sb)
-    (hgeom : logGeomOk fscCov fscLogst) (hcov : IBLOCK inum icfgIst ∈ fscCov)
-    (hlog : logRegion fscLogst (IBLOCK inum icfgIst) = false) (hnib : inum.toNat < 16 * icfgNib)
-    (hstab : diTypeStable dn dn0) (hnz : dn.diType.toNat ≠ 0)
-    (hdec : dn0.diNlink.toNat = dn.diNlink.toNat + 1)
-    (hda : dn.diAddrs = bmCells bm) (hdir : bm.bmDir.length = NDIRECT) (hpd : descPageRw pd)
-    (ha0 : k'.regs 10#5 = ientry kk) :
-    kctx cpu k' ∗ pcIs cpu KA.«iupdate» ∗
-    trapCsrsExt cpu k'.sie ∗ cpuClaimExt cpu k'.sie k'.proc ∗
-    createEnv (hlc := hlc) Γ γl pd pav pu γkl γk ∗
-    wordPointsTo (iDev (ientry kk)) 4 (DFrac.own (1 : Qp).half) icfgDev ∗
-    wordPointsTo (iInum (ientry kk)) 4 (DFrac.own (1 : Qp).half) inum ∗
-    inodeMeta (ientry kk) dn ∗ inodeMap fscFs (ientry kk) bm ∗
-    wordPointsTo sbInodestart 4 dqs (BitVec.ofNat 32 icfgIst) ∗
-    dinodeAt fscIreg inum dn0 ∗
-    FsStateLink.linkToks (fsGammaL fscFs) (inum.toNat : Int)
-      (FsStateLink.linkReps (iregDotDelta dn.diType.toNat dn.diNlink.toNat) uty) ∗
-    wordPointsTo (pPid k'.proc) 4 pidPriv pidv ∗ bslots 2 ∗ logOpS icfgLog (u + 1) Sb ∗
-    (∀ (c : CPU) (spie spp : Bool) (R' : RegMap),
-      ⌜calleeSaved k'.regs R'⌝ -∗
-      kctx c ((k'.withSpie spie spp).withRegs R') -∗ pcIs c (jumpPc (k'.regs 1#5)) -∗
-      trapCsrsExt c k'.sie -∗ cpuClaimExt c k'.sie k'.proc -∗
-      wordPointsTo (pPid k'.proc) 4 pidPriv pidv -∗
-      wordPointsTo (iDev (ientry kk)) 4 (DFrac.own (1 : Qp).half) icfgDev -∗
-      wordPointsTo (iInum (ientry kk)) 4 (DFrac.own (1 : Qp).half) inum -∗
-      inodeMeta (ientry kk) dn -∗ inodeMap fscFs (ientry kk) bm -∗
-      wordPointsTo sbInodestart 4 dqs (BitVec.ofNat 32 icfgIst) -∗
-      dinodeAt fscIreg inum dn -∗ bslots 2 -∗
-      logOpS icfgLog (if cru then u + 1 else u) (IBLOCK inum icfgIst :: Sb) -∗ wpLoop c)
-    ⊢ wpLoop (GF := GF) cpu := by
-  iintro ⟨Hk, Hpc, Hte, Hce, #Henv, Hdev, Hinum, Hmeta, Hmap, Hsi, Hdi, Htok, Hpid, Hbs, Hop, HK⟩
-  unfold createEnv
-  icases Henv with ⟨#Hpi, #Hpe, #Hbc, #Hlc, #Hdc, -, -, -, -, -, #Hinv, -, -⟩
-  have h := IU.wp_iupdate_unlink_eb (hlc := hlc) (GF := GF) Γ cpu k' γl pd pav pu j (ientry kk)
-    inum dn dn0 bm u Sb cru uty pidv pidPriv (DFrac.own (1 : Qp).half)
-    (DFrac.own (1 : Qp).half) dqs hj hproc hK hnoff htier hcru hgeom hcov hlog hnib hstab hnz
-    hdec hda hdir hpd ha0
-  unfold wp_iupdate_unlink_eb_body at h
-  simp only [iupdateAddr] at h
-  iapply h
-  iframe Hk Hpc Hte Hce Hdi Htok Hpid Hbs Hop
-  iframe #
-  isplitl [Hdev Hinum Hmeta Hmap Hsi]
-  · unfold iuCells; iframe Hdev Hinum Hmeta Hmap Hsi
-  iapply wpNext_intro_pin
-  iintro %c %_ %spie %spp %R' %hcs Hk Hpc Hte Hce Hpid Hcells Hdi Hbs Hop
-  unfold iuCells
-  icases Hcells with ⟨Hdev, Hinum, Hmeta, Hmap, Hsi⟩
-  iapply HK $$ %c %spie %spp %R' %hcs Hk Hpc Hte Hce Hpid Hdev Hinum Hmeta Hmap Hsi Hdi Hbs Hop
 
 set_option maxHeartbeats 8000000 in
 /-- `iunlockput(ip)` at a WRITE-ARM descriptor `.depTx s dev inum g lo t qt`
@@ -444,15 +360,6 @@ variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [Fdslot
   [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF]
   [Appcfg GF] [FileG GF] [Fscfg] [Icfg] [CurCtx]
 
-/-- The region's invariant, off `createEnv` (both re-parks read it). -/
-theorem createFail_env_ireg (Γ : SchedNames) (γl : GName) (pd pav pu : BitVec 64) (γkl : GName)
-    (γk : KmemNames) :
-    createEnv (hlc := hlc) (GF := GF) Γ γl pd pav pu γkl γk ⊢
-      iregInv (hlc := hlc) fscIreg fscFs icfgIst icfgNib := by
-  unfold createEnv
-  iintro ⟨-, -, -, -, -, -, -, -, -, -, #Hinv, -, -⟩
-  iexact Hinv
-
 /-- The child's nlink cell, borrowed out of `inodeMeta` and put back at ANY
 value (the `sh zero,74(s3)` at `+0x146`). -/
 theorem createFail_meta_nlink (ip : BitVec 64) (dn : Dinode) (mj mn nl : BitVec 16) :
@@ -671,8 +578,8 @@ theorem create_fail_half (IUP : IUNLOCKPUT) (IU : IUPDATE) (Γ : SchedNames)
   icases kctx_tier cpu _ $$ Hk with ⟨%ht, Hk⟩
   have hct : (curTier : KTier) = KTier.kpt := by
     rw [← ht]; simp only [k_norm_simps]; exact hS.htier
-  icases createFail_bare_pid hct k.proc pid V M $$ Hbare with ⟨Hpid, Hbareback⟩
-  ihave #Hinv := createFail_env_ireg (hlc := hlc) Γ γl pd pav pu γkl γk $$ Henv
+  icases create_bare_pid hct k.proc pid V M $$ Hbare with ⟨Hpid, Hbareback⟩
+  ihave #Hinv := create_env_ireg (hlc := hlc) Γ γl pd pav pu γkl γk $$ Henv
   -- ===== +0x146  sh zero,74(s3) : ip->nlink = 0 =====
   icases createFail_meta_nlink (ientry kslot) dnc major minor 1#16 $$ Hcmeta with ⟨Hnl, Hmback⟩
   k_step_e (wp_s_sh cpu _ (KA.«create» + 0x146#64) false 74#12 19#5 0#5 (by decide) 1#16)
@@ -695,7 +602,7 @@ theorem create_fail_half (IUP : IUNLOCKPUT) (IU : IUPDATE) (Γ : SchedNames)
       (FsStateLink.linkReps (iregDotDelta (createSetf dnc major minor 0#16).diType.toNat
         (createSetf dnc major minor 0#16).diNlink.toNat) (createIty ty (dind.toNat : Int)))
     from by rw [create_delta_eq ty major minor dnc 0#16 htyc rfl]) $$ Htoken
-  iapply (createFail_iupdate IU Γ cpu _ j γl pd pav pu γkl γk kslot cinum
+  iapply (create_iupdate_unlink IU Γ cpu _ j γl pd pav pu γkl γk kslot cinum
       (createSetf dnc major minor 0#16) (createSetf dnc major minor 1#16) bmc u0 Sb4 true
       (createIty ty (dind.toNat : Int)) pid dqs hS.hj ?gp ?gK ?gn ?gt (fun _ => hmem4) hS.hgeom
       hccov hclog hcnib (diTypeStable_eq _ _ rfl) (createSetf_type_nz _ _ _ _ hfresh.1)
