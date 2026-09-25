@@ -871,3 +871,11 @@ import Xv6.SpecSysFstat
 import Xv6.SysFstatParts
 import Xv6.ProofSysFstat
 import Xv6.LinkSysFstat
+import Xv6.NamexEraDefs
+import Xv6.NamexEraExit
+import Xv6.NamexEraLook
+import Xv6.NamexEraLevel
+import Xv6.NamexEraElem
+import Xv6.NamexEraLoop
+import Xv6.NamexEraStart
+import Xv6.ProofNamexEra
