@@ -1053,3 +1053,10 @@ import Xv6.FsCrashSector
 import Xv6.FsCrashPure
 import Xv6.FsBootParams
 import Xv6.FsCfgBoot
+import Xv6.FsImgDinode
+import Xv6.FsImgTree
+import Xv6.FsImgInode
+import Xv6.FsImgUsed
+import Xv6.FsImgDir
+import Xv6.FsImgWf
+import Xv6.FsImgBridge
