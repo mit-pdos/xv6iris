@@ -11,6 +11,9 @@ the frames' layouts, pins and cells).
 * the environment `sysfileEnv Γ = procsInv Γ ∗ panicEnv ∗ fsReady` (was the
   five `sys*Env`) and `sysfile_nolocks` (depth 0 holds no lock);
 * the call sites: `sysfile_argint` (was `sys_mknod_argint`),
+  `sysfile_argaddr` / `sysfile_argfd` and the block's `sysfile_core_tf` /
+  `sysfile_ofdOut_null` (were SysFstatParts' `sfs_*`; sys_fstat /
+  sys_write),
   `sysfile_argstr` (sys_chdir / sys_mkdir / sys_mknod), `sysfile_begin_op`
   / `sysfile_end_op` at a caller-named pid share (all five; sys_link /
   sys_unlink pass `pidPriv`, which their copies had fixed),
@@ -33,6 +36,8 @@ The fetched string's shape facts are `UMemL.umemStr_nul` /
 -/
 import Xv6.SpecArgstr
 import Xv6.SpecArgint
+import Xv6.SpecArgaddr
+import Xv6.SpecArgfd
 import Xv6.SpecBeginOp
 import Xv6.SpecEndOp
 import Xv6.SpecIunlockput
@@ -508,6 +513,111 @@ theorem sysfile_meta_type (ip : BitVec 64) (dn : Dinode) :
   iframe Ht
   iintro Ht
   iframe Ht Hrest
+
+end
+
+/-! ## The block around argaddr / argfd (moved from SysFstatParts) -/
+
+section
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+  [FileG GF] [IcacheG GF] [SleepLockG GF] [IcboxG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [OffboxG GF] [OffboxBoxG GF]
+  [Icfg] [X : CurCtx]
+
+/-- A null `int *pfd` owes argfd nothing (Rocq `ofd_out_null`). -/
+theorem sysfile_ofdOut_null (w : BitVec 32) : ⊢ ofdOut (GF := GF) 0#64 w := by
+  unfold ofdOut; rw [if_pos rfl]; exact .rfl
+
+/-- THE TRAPFRAME around argaddr (Rocq `proc_priv_tf`): the pointer cell
+and the page, out of the core at the ambient context and back. -/
+theorem sysfile_core_tf (h : curTier = KTier.kpt) (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv)
+    (M : Nat → List (BitVec 8)) :
+    procPrivCoreNoctxAt (GF := GF) curCtx pa pid V M ⊢
+      ⌜V.trapframe = pageAddr V.upt.tfp⌝ ∗
+      wordPointsTo (pTrapframe pa) 8 (DFrac.own 1) V.trapframe ∗ tfPageAt V.upt.tfp V.tf ∗
+      (wordPointsTo (pTrapframe pa) 8 (DFrac.own 1) V.trapframe -∗ tfPageAt V.upt.tfp V.tf -∗
+        procPrivCoreNoctxAt curCtx pa pid V M) := by
+  obtain ⟨ξ, t⟩ := X
+  simp only at h
+  subst h
+  unfold procPrivCoreNoctxAt procPrivBareAt procFieldsNoOfile
+  iintro ⟨⟨%hf, Hpid, ⟨Hks, Hsz, Hpg, Htf, Hcwd, Hnm⟩, Hpt, Htfp, %hlz⟩, Hcw⟩
+  iframe Htf Htfp
+  isplitl []
+  · ipureintro; exact hf.2.2.2
+  iintro Htf Htfp
+  iframe Hpid Hks Hsz Hpg Htf Hcwd Hnm Hpt Htfp Hcw
+  isplitl []
+  · ipureintro; exact hf
+  · ipureintro; exact hlz
+
+end
+
+section
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+  [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
+  [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
+  [Appcfg GF] [FileG GF] [Fscfg] [Icfg] [CurCtx]
+
+set_option maxHeartbeats 4000000 in
+/-- `argaddr(i, ip)` (Rocq `Argaddr.wp_argaddr_sconf`), the complement carried across
+its own crossing (sys_fstat / sys_write). -/
+theorem sysfile_argaddr (AA : ARGADDR) (c : CPU) (k' : KCtx) (i : Nat) (tfp : BitVec 44)
+    (ws : List (BitVec 64)) (v old : BitVec 64) (dqt : DFrac)
+    (hi : i < NARG) (ha0 : k'.regs 10#5 = BitVec.ofNat 64 i) (hws : ws[tfArgIdx i]? = some v)
+    (hnoff : k'.noff + 1 < 2 ^ 31) (hK : argaddrSlots ≤ k'.avail) :
+    kctx c k' ∗ pcIs c KA.«argaddr» ∗ trapCsrsExt c k'.sie ∗ cpuClaimExt c k'.sie k'.proc ∗
+    wordPointsTo (pTrapframe k'.proc) 8 dqt (pageAddr tfp) ∗ tfPageAt tfp ws ∗
+    wordPointsTo (k'.regs 11#5) 8 (DFrac.own 1) old ∗
+    (∀ (c' : CPU) (spie spp : Bool) (R' : RegMap), ⌜calleeSaved k'.regs R'⌝ -∗
+      kctx c' ((k'.withSpie spie spp).withRegs R') -∗ pcIs c' (jumpPc (k'.regs 1#5)) -∗
+      trapCsrsExt c' k'.sie -∗ cpuClaimExt c' k'.sie k'.proc -∗
+      wordPointsTo (pTrapframe k'.proc) 8 dqt (pageAddr tfp) -∗ tfPageAt tfp ws -∗
+      wordPointsTo (k'.regs 11#5) 8 (DFrac.own 1) v -∗ wpLoop c')
+    ⊢ wpLoop (GF := GF) c := by
+  have h := AA.wp_argaddr (hlc := hlc) (GF := GF) c k' i tfp ws v old dqt hi ha0 hws hnoff hK
+  unfold wp_argaddr_body at h
+  simp only [argaddrAddr] at h
+  iintro ⟨Hk, Hpc, Hte, Hce, Htf, Htfp, Hst, HK⟩
+  iapply h
+  iframe Hk Hpc Htf Htfp Hst
+  iapply wpNext_intro_pin
+  iintro %c' %hpin %spie %spp %R' %- Hk Hpc %hcs Htf Htfp Hst
+  have hpin' : k'.sie = false → c' = c := fun h => hpin (Or.inl h)
+  ihave Hte := trapCsrsExt_move _ _ _ hpin' $$ Hte
+  ihave Hce := cpuClaimExt_move _ _ _ _ hpin' $$ Hce
+  iapply HK $$ %c' %spie %spp %R' %hcs Hk Hpc Hte Hce Htf Htfp Hst
+
+set_option maxHeartbeats 4000000 in
+/-- `argfd(i, pfd, pf)` (Rocq `Argfd.wp_argfd_sconf`), the complement carried across
+its own crossing (sys_fstat / sys_write). -/
+theorem sysfile_argfd (AF : ARGFD) (c : CPU) (k' : KCtx) (γ : FileNames) (pa : BitVec 64)
+    (pid : BitVec 32) (V : ProcPriv) (M : Nat → List (BitVec 8)) (D : List Nat) (i : Nat)
+    (v : BitVec 64) (oldfd : BitVec 32) (oldf : BitVec 64)
+    (hi : i < NARG) (ha0 : k'.regs 10#5 = BitVec.ofNat 64 i) (hv : V.tf[tfArgIdx i]? = some v)
+    (hpf : k'.regs 12#5 ≠ 0#64) (hproc : k'.proc = pa) (htier : k'.tier = KTier.kpt)
+    (hnoff : k'.noff + 1 < 2 ^ 31) (hK : argfdSlots ≤ k'.avail) :
+    kctx c k' ∗ pcIs c KA.«argfd» ∗ trapCsrsExt c k'.sie ∗ cpuClaimExt c k'.sie k'.proc ∗
+    procPrivCoreNoctxAt curCtx pa pid V M ∗ procOfilesOwe γ V.fdg pa V.ofile D ∗
+    ofdOut (k'.regs 11#5) oldfd ∗ wordPointsTo (k'.regs 12#5) 8 (DFrac.own 1) oldf ∗
+    (∀ (c' : CPU) (spie spp : Bool) (R' : RegMap), ⌜calleeSaved k'.regs R'⌝ -∗
+      kctx c' ((k'.withSpie spie spp).withRegs R') -∗ pcIs c' (jumpPc (k'.regs 1#5)) -∗
+      trapCsrsExt c' k'.sie -∗ cpuClaimExt c' k'.sie k'.proc -∗
+      procPrivCoreNoctxAt curCtx pa pid V M -∗ procOfilesOwe γ V.fdg pa V.ofile D -∗
+      argfdPost (k'.regs 11#5) (k'.regs 12#5) oldfd oldf v V.ofile (R' 10#5) -∗ wpLoop c')
+    ⊢ wpLoop (GF := GF) c := by
+  have h := AF.wp_argfd (hlc := hlc) (GF := GF) c k' γ pa pid V M D i v oldfd oldf hi ha0 hv hpf
+    hproc htier hnoff hK
+  unfold wp_argfd_body at h
+  simp only [argfdAddr] at h
+  iintro ⟨Hk, Hpc, Hte, Hce, Hcore, Howe, Hfd, Hf, HK⟩
+  iapply h
+  iframe Hk Hpc Hcore Howe Hfd Hf
+  iapply wpNext_intro_pin
+  iintro %c' %hpin %spie %spp %R' %- Hk Hpc %hcs Hcore Howe Hpost
+  have hpin' : k'.sie = false → c' = c := fun h => hpin (Or.inl h)
+  ihave Hte := trapCsrsExt_move _ _ _ hpin' $$ Hte
+  ihave Hce := cpuClaimExt_move _ _ _ _ hpin' $$ Hce
+  iapply HK $$ %c' %spie %spp %R' %hcs Hk Hpc Hte Hce Hcore Howe Hpost
 
 end
 

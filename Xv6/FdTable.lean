@@ -710,6 +710,49 @@ theorem procPrivFd_split (γ : FileNames) (pa : BitVec 64) (pid : BitVec 32) (V 
     procPrivFd (GF := GF) γ pa pid V M ⊣⊢ procPrivCoreNoctxAt curCtx pa pid V M ∗ procOfilesOwe γ V.fdg pa V.ofile [] :=
   .rfl
 
+/-- One descriptor's cell out of its lent-or-slot and back. -/
+theorem ofileLentOrSlot_cell (γ : FileNames) (γd : GName) (pa : BitVec 64) (D : List Nat) (fd : Nat)
+    (v : BitVec 64) :
+    ofileLentOrSlot (GF := GF) γ γd pa D fd v ⊢
+      wordPointsTo (pOfile pa fd) 8 (DFrac.own 1) v ∗
+      (wordPointsTo (pOfile pa fd) 8 (DFrac.own 1) v -∗ ofileLentOrSlot γ γd pa D fd v) := by
+  unfold ofileLentOrSlot
+  split
+  · iintro ⟨%h, Hc⟩
+    iframe Hc
+    iintro Hc
+    iframe Hc
+    ipureintro; exact h
+  · unfold ofileSlot
+    iintro ⟨Hc, Hr⟩
+    iframe Hc
+    iintro Hc
+    iframe Hc Hr
+
+/-- THE CELLS OUT OF THE ARRAY AND BACK, payloads kept (the block form the
+user-copy callees are stated over, `SchedCtx.procPrivNoctxAt`, owns the
+cells; sys_write lends them to filewrite). -/
+theorem procOfilesOwe_cells_acc (γ : FileNames) (γd : GName) (pa : BitVec 64) (fs : List (BitVec 64))
+    (D : List Nat) :
+    procOfilesOwe (GF := GF) γ γd pa fs D ⊢
+      ofileCells pa (DFrac.own 1) fs ∗ (ofileCells pa (DFrac.own 1) fs -∗ procOfilesOwe γ γd pa fs D) := by
+  unfold procOfilesOwe ofileCells
+  iintro ⟨%hl, H⟩
+  ihave H := BigSepL.bigSepL_mono_of_forall
+    (Φ := fun fd v => ofileLentOrSlot (GF := GF) γ γd pa D fd v)
+    (Ψ := fun fd v => iprop(wordPointsTo (GF := GF) (pOfile pa fd) 8 (DFrac.own 1) v ∗
+      (wordPointsTo (pOfile pa fd) 8 (DFrac.own 1) v -∗ ofileLentOrSlot γ γd pa D fd v)))
+    (fun {fd v} => ofileLentOrSlot_cell γ γd pa D fd v) $$ H
+  icases BigSepL.bigSepL_sep_eqv.1 $$ H with ⟨Hc, Hw⟩
+  isplitl [Hc]
+  · isplitl []
+    · ipureintro; exact hl
+    · iexact Hc
+  iintro ⟨-, Hc⟩
+  isplitl []
+  · ipureintro; exact hl
+  iapply BigSepL.bigSepL_wand $$ Hc Hw
+
 /-- The array, payloads dropped: its cells. -/
 theorem procOfilesOwe_cells (γ : FileNames) (γd : GName) (pa : BitVec 64) (fs : List (BitVec 64))
     (D : List Nat) :

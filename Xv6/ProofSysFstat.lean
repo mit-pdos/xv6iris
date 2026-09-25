@@ -34,7 +34,7 @@ WHOLE block is joined back.
    nothing else.
 3. THE CONTEXT's tier is pinned once at entry (`kctx_tier` + `htier`), so
    the ambient-context cells argaddr wants and the block's own
-   `⟨curCtx, kpt⟩` cells are converted by `sfs_core_tf` under
+   `⟨curCtx, kpt⟩` cells are converted by `sysfile_core_tf` under
    `curTier = kpt` (filestat's `filestat_priv_conv` pattern).
 4. STAGES (speed; every theorem well under 3 s): `sys_fstat_main` is the
    prologue and argaddr; `sfs_argfd_call` (`+0x12`) is argfd and the
@@ -358,8 +358,8 @@ theorem sfs_argfd_call (AF : ARGFD) (FS : FILESTAT) (Γ : SchedNames) [ClaimIs (
   k_step_e (wp_s_jal cpu _ (KA.«sys_fstat» + 0x1a#64) false 2096328#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [sys_fstat_br_argfd]
   iintro Hk Hpc
-  ihave Hpfd := sfs_ofdOut_null (GF := GF) 0#32
-  iapply (sfs_argfd AF cpu _ γ (procAddr j) pid V M [] 0 v 0#32 wf (by decide) ?ha0' hv ?hpf ?hpr
+  ihave Hpfd := sysfile_ofdOut_null (GF := GF) 0#32
+  iapply (sysfile_argfd AF cpu _ γ (procAddr j) pid V M [] 0 v 0#32 wf (by decide) ?ha0' hv ?hpf ?hpr
       ?ht ?hn ?hKf)
     $$ [- $Hk $Hpc]
   rotate_right 1
@@ -441,11 +441,11 @@ theorem sys_fstat_main (AA : ARGADDR) (AF : ARGFD) (FS : FILESTAT)
   k_step_e (wp_s_jal cpu _ (KA.«sys_fstat» + 0xe#64) false 2087422#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [sys_fstat_br_argaddr]
   iintro Hk Hpc
-  icases sfs_core_tf ht0 (procAddr j) pid V M $$ Hcore with ⟨%htf, Htf, Htfp, Hcorew⟩
+  icases sysfile_core_tf ht0 (procAddr j) pid V M $$ Hcore with ⟨%htf, Htf, Htfp, Hcorew⟩
   ihave Htf := (show wordPointsTo (GF := GF) (pTrapframe (procAddr j)) 8 (DFrac.own 1) V.trapframe ⊢
       wordPointsTo (pTrapframe k.proc) 8 (DFrac.own 1) (pageAddr V.upt.tfp) from by
     rw [htf, hproc]) $$ Htf
-  iapply (sfs_argaddr AA cpu _ 1 V.upt.tfp V.tf v1 ws (DFrac.own 1) (by decide) ?ha0 hv1 ?hna ?hKa)
+  iapply (sysfile_argaddr AA cpu _ 1 V.upt.tfp V.tf v1 ws (DFrac.own 1) (by decide) ?ha0 hv1 ?hna ?hKa)
     $$ [- $Hk $Hpc]
   rotate_right 1
   k_norm_g [sfs_ret_12, sfs_st_addr]

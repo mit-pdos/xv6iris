@@ -61,6 +61,44 @@ theorem argFd_lookup (v : BitVec 64) (fs : List (BitVec 64)) (fd : Nat) (fv : Bi
     · exact absurd h (by simp)
   · exact absurd h (by simp)
 
+/-- `argZ` is a 32-bit signed value (Rocq `SpecSysRead.sys_rw_count_range`:
+Rocq names the same reading `sys_rw_count` there, Lean keeps the one name
+`argZ`). -/
+theorem argZ_range (v : BitVec 64) : -2 ^ 31 ≤ argZ v ∧ argZ v < 2 ^ 31 := by
+  unfold argZ
+  have h1 := BitVec.toInt_lt (x := BitVec.extractLsb' 0 32 v)
+  have h2 := BitVec.le_toInt (x := BitVec.extractLsb' 0 32 v)
+  simp only [Nat.add_one_sub_one] at h1 h2
+  constructor <;> omega
+
+/-- ... and the register a `lw` of the narrowed cell leaves it in (Rocq
+`sys_rw_count_reg`). -/
+theorem argZ_reg (v : BitVec 64) :
+    BitVec.signExtend 64 (BitVec.extractLsb' 0 32 v) = BitVec.ofInt 64 (argZ v) := by
+  unfold argZ
+  apply BitVec.eq_of_toInt_eq
+  rw [BitVec.toInt_signExtend_of_le (by decide), BitVec.toInt_ofInt]
+  have h1 := BitVec.toInt_lt (x := BitVec.extractLsb' 0 32 v)
+  have h2 := BitVec.le_toInt (x := BitVec.extractLsb' 0 32 v)
+  simp only [Nat.add_one_sub_one] at h1 h2
+  rw [Int.bmod_eq_of_le] <;> omega
+
+/-- THE ARMS' KEY of sys_read / sys_write (Rocq `sys_fd_st`): the state of
+the descriptor argument `v` names, or `closed` when it names none. -/
+def sysFdSt (v : BitVec 64) (fs : List (BitVec 64)) (sts : List FdState) : FdState :=
+  match argFd v fs with
+  | some (fd, _) => (sts[fd]?).getD .closed
+  | none => .closed
+
+theorem sysFdSt_none (v : BitVec 64) (fs : List (BitVec 64)) (sts : List FdState)
+    (h : argFd v fs = none) : sysFdSt v fs sts = .closed := by
+  unfold sysFdSt; rw [h]
+
+theorem sysFdSt_some (v : BitVec 64) (fs : List (BitVec 64)) (sts : List FdState) (fd : Nat)
+    (fv : BitVec 64) (st : FdState) (h : argFd v fs = some (fd, fv)) (hst : sts[fd]? = some st) :
+    sysFdSt v fs sts = st := by
+  unfold sysFdSt; simp [h, hst]
+
 section
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [FileG GF] [IcacheG GF] [SleepLockG GF] [IcboxG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [OffboxG GF] [OffboxBoxG GF] [Icfg] [CurCtx]
 

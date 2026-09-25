@@ -4,13 +4,15 @@ ProofSysFstat.v's local lemmas): the constants, the register bundle, the
 frame, the block's two carvings, the three callees at their call sites and
 the shared epilogue at `+0x32`.
 
-* THE BLOCK AROUND ARGADDR (`sfs_core_tf`): the trapframe pointer and page
-  out of the core and back (Rocq `proc_priv_tf`).
+* THE BLOCK AROUND ARGADDR (`SysfileCalls.sysfile_core_tf`): the
+  trapframe pointer and page out of the core and back (Rocq
+  `proc_priv_tf`).
 * THE BLOCK AROUND FILESTAT needs no lemma (Rocq's `proc_priv_lend` …
   `proc_priv_join` seam): filestat takes the core (`procPrivCoreNoctxAt`,
   Rocq `proc_priv_core`), which is literally `procPrivFd_split`'s left
   half; the array with its deficit stays with the caller.
-* THE CALLEES (`sfs_argaddr`, `sfs_argfd`, `sfs_filestat`): each restated
+* THE CALLEES (`SysfileCalls.sysfile_argaddr` / `sysfile_argfd`, and
+  `sfs_filestat` here): each restated
   with a HART-FREE continuation carrying the trap-CSR complement (the
   FilestatCalls / NamexCalls pattern), so the main proof applies each with
   one `iapply`.
@@ -18,6 +20,7 @@ the shared epilogue at `+0x32`.
   arm left in `a0` (the error return is hoisted).
 -/
 import Xv6.SpecSysFstat
+import Xv6.SysfileCalls
 import Xv6.CodeTactics
 import MachCSL.WpSmodeFrame6
 import MachCSL.StackOwnBounds
@@ -206,42 +209,6 @@ theorem sfs_tail (cpu : CPU) (k : KCtx) (spie spp : Bool) (R : RegMap) (hK : 4 �
 
 end
 
-/-! ## The block -/
-
-section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
-  [FileG GF] [IcacheG GF] [SleepLockG GF] [IcboxG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [OffboxG GF] [OffboxBoxG GF]
-  [Icfg] [X : CurCtx]
-
-/-- A null `int *pfd` owes argfd nothing (Rocq `ofd_out_null`). -/
-theorem sfs_ofdOut_null (w : BitVec 32) : ⊢ ofdOut (GF := GF) 0#64 w := by
-  unfold ofdOut; rw [if_pos rfl]; exact .rfl
-
-/-- THE TRAPFRAME around argaddr (Rocq `proc_priv_tf`): the pointer cell
-and the page, out of the core at the ambient context and back. -/
-theorem sfs_core_tf (h : curTier = KTier.kpt) (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv)
-    (M : Nat → List (BitVec 8)) :
-    procPrivCoreNoctxAt (GF := GF) curCtx pa pid V M ⊢
-      ⌜V.trapframe = pageAddr V.upt.tfp⌝ ∗
-      wordPointsTo (pTrapframe pa) 8 (DFrac.own 1) V.trapframe ∗ tfPageAt V.upt.tfp V.tf ∗
-      (wordPointsTo (pTrapframe pa) 8 (DFrac.own 1) V.trapframe -∗ tfPageAt V.upt.tfp V.tf -∗
-        procPrivCoreNoctxAt curCtx pa pid V M) := by
-  obtain ⟨ξ, t⟩ := X
-  simp only at h
-  subst h
-  unfold procPrivCoreNoctxAt procPrivBareAt procFieldsNoOfile
-  iintro ⟨⟨%hf, Hpid, ⟨Hks, Hsz, Hpg, Htf, Hcwd, Hnm⟩, Hpt, Htfp, %hlz⟩, Hcw⟩
-  iframe Htf Htfp
-  isplitl []
-  · ipureintro; exact hf.2.2.2
-  iintro Htf Htfp
-  iframe Hpid Hks Hsz Hpg Htf Hcwd Hnm Hpt Htfp Hcw
-  isplitl []
-  · ipureintro; exact hf
-  · ipureintro; exact hlz
-
-end
-
 /-! ## The callees at their call sites -/
 
 section
@@ -249,65 +216,6 @@ variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [Fdslot
   [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
   [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
   [Appcfg GF] [FileG GF] [Fscfg] [Icfg] [CurCtx]
-
-set_option maxHeartbeats 4000000 in
-/-- `argaddr(1, &st)` at sys_fstat's call site. -/
-theorem sfs_argaddr (AA : ARGADDR) (c : CPU) (k' : KCtx) (i : Nat) (tfp : BitVec 44)
-    (ws : List (BitVec 64)) (v old : BitVec 64) (dqt : DFrac)
-    (hi : i < NARG) (ha0 : k'.regs 10#5 = BitVec.ofNat 64 i) (hws : ws[tfArgIdx i]? = some v)
-    (hnoff : k'.noff + 1 < 2 ^ 31) (hK : argaddrSlots ≤ k'.avail) :
-    kctx c k' ∗ pcIs c KA.«argaddr» ∗ trapCsrsExt c k'.sie ∗ cpuClaimExt c k'.sie k'.proc ∗
-    wordPointsTo (pTrapframe k'.proc) 8 dqt (pageAddr tfp) ∗ tfPageAt tfp ws ∗
-    wordPointsTo (k'.regs 11#5) 8 (DFrac.own 1) old ∗
-    (∀ (c' : CPU) (spie spp : Bool) (R' : RegMap), ⌜calleeSaved k'.regs R'⌝ -∗
-      kctx c' ((k'.withSpie spie spp).withRegs R') -∗ pcIs c' (jumpPc (k'.regs 1#5)) -∗
-      trapCsrsExt c' k'.sie -∗ cpuClaimExt c' k'.sie k'.proc -∗
-      wordPointsTo (pTrapframe k'.proc) 8 dqt (pageAddr tfp) -∗ tfPageAt tfp ws -∗
-      wordPointsTo (k'.regs 11#5) 8 (DFrac.own 1) v -∗ wpLoop c')
-    ⊢ wpLoop (GF := GF) c := by
-  have h := AA.wp_argaddr (hlc := hlc) (GF := GF) c k' i tfp ws v old dqt hi ha0 hws hnoff hK
-  unfold wp_argaddr_body at h
-  simp only [argaddrAddr] at h
-  iintro ⟨Hk, Hpc, Hte, Hce, Htf, Htfp, Hst, HK⟩
-  iapply h
-  iframe Hk Hpc Htf Htfp Hst
-  iapply wpNext_intro_pin
-  iintro %c' %hpin %spie %spp %R' %- Hk Hpc %hcs Htf Htfp Hst
-  have hpin' : k'.sie = false → c' = c := fun h => hpin (Or.inl h)
-  ihave Hte := trapCsrsExt_move _ _ _ hpin' $$ Hte
-  ihave Hce := cpuClaimExt_move _ _ _ _ hpin' $$ Hce
-  iapply HK $$ %c' %spie %spp %R' %hcs Hk Hpc Hte Hce Htf Htfp Hst
-
-set_option maxHeartbeats 4000000 in
-/-- `argfd(0, 0, &f)` at sys_fstat's call site. -/
-theorem sfs_argfd (AF : ARGFD) (c : CPU) (k' : KCtx) (γ : FileNames) (pa : BitVec 64)
-    (pid : BitVec 32) (V : ProcPriv) (M : Nat → List (BitVec 8)) (D : List Nat) (i : Nat)
-    (v : BitVec 64) (oldfd : BitVec 32) (oldf : BitVec 64)
-    (hi : i < NARG) (ha0 : k'.regs 10#5 = BitVec.ofNat 64 i) (hv : V.tf[tfArgIdx i]? = some v)
-    (hpf : k'.regs 12#5 ≠ 0#64) (hproc : k'.proc = pa) (htier : k'.tier = KTier.kpt)
-    (hnoff : k'.noff + 1 < 2 ^ 31) (hK : argfdSlots ≤ k'.avail) :
-    kctx c k' ∗ pcIs c KA.«argfd» ∗ trapCsrsExt c k'.sie ∗ cpuClaimExt c k'.sie k'.proc ∗
-    procPrivCoreNoctxAt curCtx pa pid V M ∗ procOfilesOwe γ V.fdg pa V.ofile D ∗
-    ofdOut (k'.regs 11#5) oldfd ∗ wordPointsTo (k'.regs 12#5) 8 (DFrac.own 1) oldf ∗
-    (∀ (c' : CPU) (spie spp : Bool) (R' : RegMap), ⌜calleeSaved k'.regs R'⌝ -∗
-      kctx c' ((k'.withSpie spie spp).withRegs R') -∗ pcIs c' (jumpPc (k'.regs 1#5)) -∗
-      trapCsrsExt c' k'.sie -∗ cpuClaimExt c' k'.sie k'.proc -∗
-      procPrivCoreNoctxAt curCtx pa pid V M -∗ procOfilesOwe γ V.fdg pa V.ofile D -∗
-      argfdPost (k'.regs 11#5) (k'.regs 12#5) oldfd oldf v V.ofile (R' 10#5) -∗ wpLoop c')
-    ⊢ wpLoop (GF := GF) c := by
-  have h := AF.wp_argfd (hlc := hlc) (GF := GF) c k' γ pa pid V M D i v oldfd oldf hi ha0 hv hpf
-    hproc htier hnoff hK
-  unfold wp_argfd_body at h
-  simp only [argfdAddr] at h
-  iintro ⟨Hk, Hpc, Hte, Hce, Hcore, Howe, Hfd, Hf, HK⟩
-  iapply h
-  iframe Hk Hpc Hcore Howe Hfd Hf
-  iapply wpNext_intro_pin
-  iintro %c' %hpin %spie %spp %R' %- Hk Hpc %hcs Hcore Howe Hpost
-  have hpin' : k'.sie = false → c' = c := fun h => hpin (Or.inl h)
-  ihave Hte := trapCsrsExt_move _ _ _ hpin' $$ Hte
-  ihave Hce := cpuClaimExt_move _ _ _ _ hpin' $$ Hce
-  iapply HK $$ %c' %spie %spp %R' %hcs Hk Hpc Hte Hce Hcore Howe Hpost
 
 set_option maxHeartbeats 4000000 in
 /-- `filestat(f, st)` at sys_fstat's call site, its `true` crossing taken
