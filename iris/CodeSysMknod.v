@@ -17,7 +17,6 @@ Require Import WpMmodeLeafBase.
 From Kernel Require KernelInstrs.
 From Kernel Require KernelSyms.
 Require Import KernelDecode00.
-Require Import KernelDecode02.
 Require Import KernelDecode03.
 Require Import KernelDecode04.
 Require Import KernelDecode07.
@@ -34,7 +33,9 @@ Require Import KernelDecode22.
 Require Import KernelDecode24.
 Require Import KernelDecode26.
 Require Import KernelDecode27.
+Require Import KernelDecode28.
 Require Import KernelDecode29.
+Require Import KernelDecode30.
 Local Open Scope Z_scope.
 Import Defs.
 
@@ -73,9 +74,9 @@ Section CodeSysMknod.
   Proof using . mk_rvc (KernelSyms.sys_mknod + 0x10) (mword_of_int 0x4505 : mword 16)
     (mword_of_int (KernelSyms.sys_mknod + 0x10) : mword 64) (ITYPE (sign_extend' 12 (mword_of_int 1 : mword 6), zreg, Regidx (mword_of_int 10), ADDI)) kd_4505 exec_execute_C_LI. Qed.
 
-  Lemma smni_12 : kernel_text -∗ instr (mword_of_int (KernelSyms.sys_mknod + 0x12) : mword 64) false (JAL (mword_of_int 2086242 : mword 21, Regidx (mword_of_int 1))).
-  Proof using . mk_base (KernelSyms.sys_mknod + 0x12) (mword_of_int 0xd62fd0ef : mword 32)
-    (mword_of_int (KernelSyms.sys_mknod + 0x12) : mword 64) (JAL (mword_of_int 2086242 : mword 21, Regidx (mword_of_int 1))) kd_d62fd0ef. Qed.
+  Lemma smni_12 : kernel_text -∗ instr (mword_of_int (KernelSyms.sys_mknod + 0x12) : mword 64) false (JAL (mword_of_int 2086176 : mword 21, Regidx (mword_of_int 1))).
+  Proof using . mk_base (KernelSyms.sys_mknod + 0x12) (mword_of_int 0xd20fd0ef : mword 32)
+    (mword_of_int (KernelSyms.sys_mknod + 0x12) : mword 64) (JAL (mword_of_int 2086176 : mword 21, Regidx (mword_of_int 1))) kd_d20fd0ef. Qed.
 
   Lemma smni_16 : kernel_text -∗ instr (mword_of_int (KernelSyms.sys_mknod + 0x16) : mword 64) false (ITYPE (mword_of_int 3944 : mword 12, Regidx (mword_of_int 8), Regidx (mword_of_int 11), ADDI)).
   Proof using . mk_base (KernelSyms.sys_mknod + 0x16) (mword_of_int 0xf6840593 : mword 32)
@@ -85,9 +86,9 @@ Section CodeSysMknod.
   Proof using . mk_rvc (KernelSyms.sys_mknod + 0x1a) (mword_of_int 0x4509 : mword 16)
     (mword_of_int (KernelSyms.sys_mknod + 0x1a) : mword 64) (ITYPE (sign_extend' 12 (mword_of_int 2 : mword 6), zreg, Regidx (mword_of_int 10), ADDI)) kd_4509 exec_execute_C_LI. Qed.
 
-  Lemma smni_1c : kernel_text -∗ instr (mword_of_int (KernelSyms.sys_mknod + 0x1c) : mword 64) false (JAL (mword_of_int 2086232 : mword 21, Regidx (mword_of_int 1))).
-  Proof using . mk_base (KernelSyms.sys_mknod + 0x1c) (mword_of_int 0xd58fd0ef : mword 32)
-    (mword_of_int (KernelSyms.sys_mknod + 0x1c) : mword 64) (JAL (mword_of_int 2086232 : mword 21, Regidx (mword_of_int 1))) kd_d58fd0ef. Qed.
+  Lemma smni_1c : kernel_text -∗ instr (mword_of_int (KernelSyms.sys_mknod + 0x1c) : mword 64) false (JAL (mword_of_int 2086166 : mword 21, Regidx (mword_of_int 1))).
+  Proof using . mk_base (KernelSyms.sys_mknod + 0x1c) (mword_of_int 0xd16fd0ef : mword 32)
+    (mword_of_int (KernelSyms.sys_mknod + 0x1c) : mword 64) (JAL (mword_of_int 2086166 : mword 21, Regidx (mword_of_int 1))) kd_d16fd0ef. Qed.
 
   Lemma smni_20 : kernel_text -∗ instr (mword_of_int (KernelSyms.sys_mknod + 0x20) : mword 64) false (ITYPE (mword_of_int 128 : mword 12, zreg, Regidx (mword_of_int 12), ADDI)).
   Proof using . mk_base (KernelSyms.sys_mknod + 0x20) (mword_of_int 0x08000613 : mword 32)
@@ -101,9 +102,9 @@ Section CodeSysMknod.
   Proof using . mk_rvc (KernelSyms.sys_mknod + 0x28) (mword_of_int 0x4501 : mword 16)
     (mword_of_int (KernelSyms.sys_mknod + 0x28) : mword 64) (ITYPE (sign_extend' 12 (mword_of_int 0 : mword 6), zreg, Regidx (mword_of_int 10), ADDI)) kd_4501 exec_execute_C_LI. Qed.
 
-  Lemma smni_2a : kernel_text -∗ instr (mword_of_int (KernelSyms.sys_mknod + 0x2a) : mword 64) false (JAL (mword_of_int 2086274 : mword 21, Regidx (mword_of_int 1))).
-  Proof using . mk_base (KernelSyms.sys_mknod + 0x2a) (mword_of_int 0xd82fd0ef : mword 32)
-    (mword_of_int (KernelSyms.sys_mknod + 0x2a) : mword 64) (JAL (mword_of_int 2086274 : mword 21, Regidx (mword_of_int 1))) kd_d82fd0ef. Qed.
+  Lemma smni_2a : kernel_text -∗ instr (mword_of_int (KernelSyms.sys_mknod + 0x2a) : mword 64) false (JAL (mword_of_int 2086208 : mword 21, Regidx (mword_of_int 1))).
+  Proof using . mk_base (KernelSyms.sys_mknod + 0x2a) (mword_of_int 0xd40fd0ef : mword 32)
+    (mword_of_int (KernelSyms.sys_mknod + 0x2a) : mword 64) (JAL (mword_of_int 2086208 : mword 21, Regidx (mword_of_int 1))) kd_d40fd0ef. Qed.
 
   Lemma smni_2e : kernel_text -∗ instr (mword_of_int (KernelSyms.sys_mknod + 0x2e) : mword 64) false (BTYPE (mword_of_int 42 : mword 13, zreg, Regidx (mword_of_int 10), BLT)).
   Proof using . mk_base (KernelSyms.sys_mknod + 0x2e) (mword_of_int 0x02054563 : mword 32)

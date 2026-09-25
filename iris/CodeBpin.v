@@ -19,17 +19,18 @@ From Kernel Require KernelSyms.
 Require Import KernelDecode01.
 Require Import KernelDecode04.
 Require Import KernelDecode05.
-Require Import KernelDecode08.
+Require Import KernelDecode06.
 Require Import KernelDecode10.
+Require Import KernelDecode11.
 Require Import KernelDecode12.
 Require Import KernelDecode13.
 Require Import KernelDecode14.
 Require Import KernelDecode15.
+Require Import KernelDecode17.
 Require Import KernelDecode18.
 Require Import KernelDecode19.
 Require Import KernelDecode21.
-Require Import KernelDecode24.
-Require Import KernelDecode30.
+Require Import KernelDecode23.
 Local Open Scope Z_scope.
 Import Defs.
 
@@ -68,13 +69,13 @@ Section CodeBpin.
   Proof using . mk_base (KernelSyms.bpin + 0xc) (mword_of_int 0x00015517 : mword 32)
     (mword_of_int (KernelSyms.bpin + 0xc) : mword 64) (UTYPE (mword_of_int 21 : mword 20, Regidx (mword_of_int 10), AUIPC)) kd_00015517. Qed.
 
-  Lemma bpi_10 : kernel_text -∗ instr (mword_of_int (KernelSyms.bpin + 0x10) : mword 64) false (ITYPE (mword_of_int 1162 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADDI)).
-  Proof using . mk_base (KernelSyms.bpin + 0x10) (mword_of_int 0x48a50513 : mword 32)
-    (mword_of_int (KernelSyms.bpin + 0x10) : mword 64) (ITYPE (mword_of_int 1162 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADDI)) kd_48a50513. Qed.
+  Lemma bpi_10 : kernel_text -∗ instr (mword_of_int (KernelSyms.bpin + 0x10) : mword 64) false (ITYPE (mword_of_int 1642 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADDI)).
+  Proof using . mk_base (KernelSyms.bpin + 0x10) (mword_of_int 0x66a50513 : mword 32)
+    (mword_of_int (KernelSyms.bpin + 0x10) : mword 64) (ITYPE (mword_of_int 1642 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADDI)) kd_66a50513. Qed.
 
-  Lemma bpi_14 : kernel_text -∗ instr (mword_of_int (KernelSyms.bpin + 0x14) : mword 64) false (JAL (mword_of_int 2088546 : mword 21, Regidx (mword_of_int 1))).
-  Proof using . mk_base (KernelSyms.bpin + 0x14) (mword_of_int 0xe63fd0ef : mword 32)
-    (mword_of_int (KernelSyms.bpin + 0x14) : mword 64) (JAL (mword_of_int 2088546 : mword 21, Regidx (mword_of_int 1))) kd_e63fd0ef. Qed.
+  Lemma bpi_14 : kernel_text -∗ instr (mword_of_int (KernelSyms.bpin + 0x14) : mword 64) false (JAL (mword_of_int 2088466 : mword 21, Regidx (mword_of_int 1))).
+  Proof using . mk_base (KernelSyms.bpin + 0x14) (mword_of_int 0xe13fd0ef : mword 32)
+    (mword_of_int (KernelSyms.bpin + 0x14) : mword 64) (JAL (mword_of_int 2088466 : mword 21, Regidx (mword_of_int 1))) kd_e13fd0ef. Qed.
 
   Lemma bpi_18 : kernel_text -∗ instr (mword_of_int (KernelSyms.bpin + 0x18) : mword 64) true (LOAD (mword_of_int 64 : mword 12, Regidx (mword_of_int 9), Regidx (mword_of_int 15), false, 4)).
   Proof using . mk_rvc (KernelSyms.bpin + 0x18) (mword_of_int 0x40bc : mword 16)
@@ -92,13 +93,13 @@ Section CodeBpin.
   Proof using . mk_base (KernelSyms.bpin + 0x1e) (mword_of_int 0x00015517 : mword 32)
     (mword_of_int (KernelSyms.bpin + 0x1e) : mword 64) (UTYPE (mword_of_int 21 : mword 20, Regidx (mword_of_int 10), AUIPC)) kd_00015517. Qed.
 
-  Lemma bpi_22 : kernel_text -∗ instr (mword_of_int (KernelSyms.bpin + 0x22) : mword 64) false (ITYPE (mword_of_int 1144 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADDI)).
-  Proof using . mk_base (KernelSyms.bpin + 0x22) (mword_of_int 0x47850513 : mword 32)
-    (mword_of_int (KernelSyms.bpin + 0x22) : mword 64) (ITYPE (mword_of_int 1144 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADDI)) kd_47850513. Qed.
+  Lemma bpi_22 : kernel_text -∗ instr (mword_of_int (KernelSyms.bpin + 0x22) : mword 64) false (ITYPE (mword_of_int 1624 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADDI)).
+  Proof using . mk_base (KernelSyms.bpin + 0x22) (mword_of_int 0x65850513 : mword 32)
+    (mword_of_int (KernelSyms.bpin + 0x22) : mword 64) (ITYPE (mword_of_int 1624 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADDI)) kd_65850513. Qed.
 
-  Lemma bpi_26 : kernel_text -∗ instr (mword_of_int (KernelSyms.bpin + 0x26) : mword 64) false (JAL (mword_of_int 2088664 : mword 21, Regidx (mword_of_int 1))).
-  Proof using . mk_base (KernelSyms.bpin + 0x26) (mword_of_int 0xed9fd0ef : mword 32)
-    (mword_of_int (KernelSyms.bpin + 0x26) : mword 64) (JAL (mword_of_int 2088664 : mword 21, Regidx (mword_of_int 1))) kd_ed9fd0ef. Qed.
+  Lemma bpi_26 : kernel_text -∗ instr (mword_of_int (KernelSyms.bpin + 0x26) : mword 64) false (JAL (mword_of_int 2088584 : mword 21, Regidx (mword_of_int 1))).
+  Proof using . mk_base (KernelSyms.bpin + 0x26) (mword_of_int 0xe89fd0ef : mword 32)
+    (mword_of_int (KernelSyms.bpin + 0x26) : mword 64) (JAL (mword_of_int 2088584 : mword 21, Regidx (mword_of_int 1))) kd_e89fd0ef. Qed.
 
   Lemma bpi_2a : kernel_text -∗ instr (mword_of_int (KernelSyms.bpin + 0x2a) : mword 64) true (LOAD (zero_extend' 12 (concat_vec (mword_of_int 3 : mword 6) ('b"000")), sp, Regidx (mword_of_int 1), false, 8)).
   Proof using . mk_rvc (KernelSyms.bpin + 0x2a) (mword_of_int 0x60e2 : mword 16)
@@ -150,13 +151,13 @@ Section CodeBpin.
   Proof using . mk_base (KernelSyms.bunpin + 0xc) (mword_of_int 0x00015517 : mword 32)
     (mword_of_int (KernelSyms.bunpin + 0xc) : mword 64) (UTYPE (mword_of_int 21 : mword 20, Regidx (mword_of_int 10), AUIPC)) kd_00015517. Qed.
 
-  Lemma bui_10 : kernel_text -∗ instr (mword_of_int (KernelSyms.bunpin + 0x10) : mword 64) false (ITYPE (mword_of_int 1110 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADDI)).
-  Proof using . mk_base (KernelSyms.bunpin + 0x10) (mword_of_int 0x45650513 : mword 32)
-    (mword_of_int (KernelSyms.bunpin + 0x10) : mword 64) (ITYPE (mword_of_int 1110 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADDI)) kd_45650513. Qed.
+  Lemma bui_10 : kernel_text -∗ instr (mword_of_int (KernelSyms.bunpin + 0x10) : mword 64) false (ITYPE (mword_of_int 1590 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADDI)).
+  Proof using . mk_base (KernelSyms.bunpin + 0x10) (mword_of_int 0x63650513 : mword 32)
+    (mword_of_int (KernelSyms.bunpin + 0x10) : mword 64) (ITYPE (mword_of_int 1590 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADDI)) kd_63650513. Qed.
 
-  Lemma bui_14 : kernel_text -∗ instr (mword_of_int (KernelSyms.bunpin + 0x14) : mword 64) false (JAL (mword_of_int 2088494 : mword 21, Regidx (mword_of_int 1))).
-  Proof using . mk_base (KernelSyms.bunpin + 0x14) (mword_of_int 0xe2ffd0ef : mword 32)
-    (mword_of_int (KernelSyms.bunpin + 0x14) : mword 64) (JAL (mword_of_int 2088494 : mword 21, Regidx (mword_of_int 1))) kd_e2ffd0ef. Qed.
+  Lemma bui_14 : kernel_text -∗ instr (mword_of_int (KernelSyms.bunpin + 0x14) : mword 64) false (JAL (mword_of_int 2088414 : mword 21, Regidx (mword_of_int 1))).
+  Proof using . mk_base (KernelSyms.bunpin + 0x14) (mword_of_int 0xddffd0ef : mword 32)
+    (mword_of_int (KernelSyms.bunpin + 0x14) : mword 64) (JAL (mword_of_int 2088414 : mword 21, Regidx (mword_of_int 1))) kd_ddffd0ef. Qed.
 
   Lemma bui_18 : kernel_text -∗ instr (mword_of_int (KernelSyms.bunpin + 0x18) : mword 64) true (LOAD (mword_of_int 64 : mword 12, Regidx (mword_of_int 9), Regidx (mword_of_int 15), false, 4)).
   Proof using . mk_rvc (KernelSyms.bunpin + 0x18) (mword_of_int 0x40bc : mword 16)
@@ -174,13 +175,13 @@ Section CodeBpin.
   Proof using . mk_base (KernelSyms.bunpin + 0x1e) (mword_of_int 0x00015517 : mword 32)
     (mword_of_int (KernelSyms.bunpin + 0x1e) : mword 64) (UTYPE (mword_of_int 21 : mword 20, Regidx (mword_of_int 10), AUIPC)) kd_00015517. Qed.
 
-  Lemma bui_22 : kernel_text -∗ instr (mword_of_int (KernelSyms.bunpin + 0x22) : mword 64) false (ITYPE (mword_of_int 1092 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADDI)).
-  Proof using . mk_base (KernelSyms.bunpin + 0x22) (mword_of_int 0x44450513 : mword 32)
-    (mword_of_int (KernelSyms.bunpin + 0x22) : mword 64) (ITYPE (mword_of_int 1092 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADDI)) kd_44450513. Qed.
+  Lemma bui_22 : kernel_text -∗ instr (mword_of_int (KernelSyms.bunpin + 0x22) : mword 64) false (ITYPE (mword_of_int 1572 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADDI)).
+  Proof using . mk_base (KernelSyms.bunpin + 0x22) (mword_of_int 0x62450513 : mword 32)
+    (mword_of_int (KernelSyms.bunpin + 0x22) : mword 64) (ITYPE (mword_of_int 1572 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADDI)) kd_62450513. Qed.
 
-  Lemma bui_26 : kernel_text -∗ instr (mword_of_int (KernelSyms.bunpin + 0x26) : mword 64) false (JAL (mword_of_int 2088612 : mword 21, Regidx (mword_of_int 1))).
-  Proof using . mk_base (KernelSyms.bunpin + 0x26) (mword_of_int 0xea5fd0ef : mword 32)
-    (mword_of_int (KernelSyms.bunpin + 0x26) : mword 64) (JAL (mword_of_int 2088612 : mword 21, Regidx (mword_of_int 1))) kd_ea5fd0ef. Qed.
+  Lemma bui_26 : kernel_text -∗ instr (mword_of_int (KernelSyms.bunpin + 0x26) : mword 64) false (JAL (mword_of_int 2088532 : mword 21, Regidx (mword_of_int 1))).
+  Proof using . mk_base (KernelSyms.bunpin + 0x26) (mword_of_int 0xe55fd0ef : mword 32)
+    (mword_of_int (KernelSyms.bunpin + 0x26) : mword 64) (JAL (mword_of_int 2088532 : mword 21, Regidx (mword_of_int 1))) kd_e55fd0ef. Qed.
 
   Lemma bui_2a : kernel_text -∗ instr (mword_of_int (KernelSyms.bunpin + 0x2a) : mword 64) true (LOAD (zero_extend' 12 (concat_vec (mword_of_int 3 : mword 6) ('b"000")), sp, Regidx (mword_of_int 1), false, 8)).
   Proof using . mk_rvc (KernelSyms.bunpin + 0x2a) (mword_of_int 0x60e2 : mword 16)

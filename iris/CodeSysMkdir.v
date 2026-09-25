@@ -28,7 +28,6 @@ Require Import KernelDecode16.
 Require Import KernelDecode20.
 Require Import KernelDecode22.
 Require Import KernelDecode23.
-Require Import KernelDecode24.
 Require Import KernelDecode25.
 Require Import KernelDecode26.
 Require Import KernelDecode27.
@@ -76,9 +75,9 @@ Section CodeSysMkdir.
   Proof using . mk_rvc (KernelSyms.sys_mkdir + 0x14) (mword_of_int 0x4501 : mword 16)
     (mword_of_int (KernelSyms.sys_mkdir + 0x14) : mword 64) (ITYPE (sign_extend' 12 (mword_of_int 0 : mword 6), zreg, Regidx (mword_of_int 10), ADDI)) kd_4501 exec_execute_C_LI. Qed.
 
-  Lemma smdi_16 : kernel_text -∗ instr (mword_of_int (KernelSyms.sys_mkdir + 0x16) : mword 64) false (JAL (mword_of_int 2086366 : mword 21, Regidx (mword_of_int 1))).
-  Proof using . mk_base (KernelSyms.sys_mkdir + 0x16) (mword_of_int 0xddefd0ef : mword 32)
-    (mword_of_int (KernelSyms.sys_mkdir + 0x16) : mword 64) (JAL (mword_of_int 2086366 : mword 21, Regidx (mword_of_int 1))) kd_ddefd0ef. Qed.
+  Lemma smdi_16 : kernel_text -∗ instr (mword_of_int (KernelSyms.sys_mkdir + 0x16) : mword 64) false (JAL (mword_of_int 2086300 : mword 21, Regidx (mword_of_int 1))).
+  Proof using . mk_base (KernelSyms.sys_mkdir + 0x16) (mword_of_int 0xd9cfd0ef : mword 32)
+    (mword_of_int (KernelSyms.sys_mkdir + 0x16) : mword 64) (JAL (mword_of_int 2086300 : mword 21, Regidx (mword_of_int 1))) kd_d9cfd0ef. Qed.
 
   Lemma smdi_1a : kernel_text -∗ instr (mword_of_int (KernelSyms.sys_mkdir + 0x1a) : mword 64) false (BTYPE (mword_of_int 38 : mword 13, zreg, Regidx (mword_of_int 10), BLT)).
   Proof using . mk_base (KernelSyms.sys_mkdir + 0x1a) (mword_of_int 0x02054363 : mword 32)

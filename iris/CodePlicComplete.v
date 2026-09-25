@@ -26,7 +26,6 @@ Require Import KernelDecode19.
 Require Import KernelDecode20.
 Require Import KernelDecode21.
 Require Import KernelDecode28.
-Require Import KernelDecode29.
 Require Import KernelDecode31.
 Local Open Scope Z_scope.
 Import Defs.
@@ -62,9 +61,9 @@ Section CodePlicComplete.
   Proof using . mk_rvc (KernelSyms.plic_complete + 0xa) (mword_of_int 0x84aa : mword 16)
     (mword_of_int (KernelSyms.plic_complete + 0xa) : mword 64) (RTYPE (Regidx (mword_of_int 10), zreg, Regidx (mword_of_int 9), ADD)) kd_84aa exec_execute_C_MV. Qed.
 
-  Lemma pci_0c : kernel_text -∗ instr (mword_of_int (KernelSyms.plic_complete + 0xc) : mword 64) false (JAL (mword_of_int 2081272 : mword 21, Regidx (mword_of_int 1))).
-  Proof using . mk_base (KernelSyms.plic_complete + 0xc) (mword_of_int 0x9f8fc0ef : mword 32)
-    (mword_of_int (KernelSyms.plic_complete + 0xc) : mword 64) (JAL (mword_of_int 2081272 : mword 21, Regidx (mword_of_int 1))) kd_9f8fc0ef. Qed.
+  Lemma pci_0c : kernel_text -∗ instr (mword_of_int (KernelSyms.plic_complete + 0xc) : mword 64) false (JAL (mword_of_int 2081192 : mword 21, Regidx (mword_of_int 1))).
+  Proof using . mk_base (KernelSyms.plic_complete + 0xc) (mword_of_int 0x9a8fc0ef : mword 32)
+    (mword_of_int (KernelSyms.plic_complete + 0xc) : mword 64) (JAL (mword_of_int 2081192 : mword 21, Regidx (mword_of_int 1))) kd_9a8fc0ef. Qed.
 
   Lemma pci_10 : kernel_text -∗ instr (mword_of_int (KernelSyms.plic_complete + 0x10) : mword 64) false (SHIFTIWOP (mword_of_int 13 : mword 5, Regidx (mword_of_int 10), Regidx (mword_of_int 15), SLLIW)).
   Proof using . mk_base (KernelSyms.plic_complete + 0x10) (mword_of_int 0x00d5179b : mword 32)

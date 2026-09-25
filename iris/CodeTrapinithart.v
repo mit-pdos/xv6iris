@@ -18,7 +18,6 @@ From Kernel Require KernelInstrs.
 From Kernel Require KernelSyms.
 Require Import KernelDecode00.
 Require Import KernelDecode01.
-Require Import KernelDecode05.
 Require Import KernelDecode06.
 Require Import KernelDecode07.
 Require Import KernelDecode11.
@@ -57,9 +56,9 @@ Section CodeTrapinithart.
   Proof using . mk_base (KernelSyms.trapinithart + 0x8) (mword_of_int 0x00003797 : mword 32)
     (mword_of_int (KernelSyms.trapinithart + 0x8) : mword 64) (UTYPE (mword_of_int 3 : mword 20, Regidx (mword_of_int 15), AUIPC)) kd_00003797. Qed.
 
-  Lemma tii_0c : kernel_text -∗ instr (mword_of_int (KernelSyms.trapinithart + 0xc) : mword 64) false (ITYPE (mword_of_int 342 : mword 12, Regidx (mword_of_int 15), Regidx (mword_of_int 15), ADDI)).
-  Proof using . mk_base (KernelSyms.trapinithart + 0xc) (mword_of_int 0x15678793 : mword 32)
-    (mword_of_int (KernelSyms.trapinithart + 0xc) : mword 64) (ITYPE (mword_of_int 342 : mword 12, Regidx (mword_of_int 15), Regidx (mword_of_int 15), ADDI)) kd_15678793. Qed.
+  Lemma tii_0c : kernel_text -∗ instr (mword_of_int (KernelSyms.trapinithart + 0xc) : mword 64) false (ITYPE (mword_of_int 408 : mword 12, Regidx (mword_of_int 15), Regidx (mword_of_int 15), ADDI)).
+  Proof using . mk_base (KernelSyms.trapinithart + 0xc) (mword_of_int 0x19878793 : mword 32)
+    (mword_of_int (KernelSyms.trapinithart + 0xc) : mword 64) (ITYPE (mword_of_int 408 : mword 12, Regidx (mword_of_int 15), Regidx (mword_of_int 15), ADDI)) kd_19878793. Qed.
 
   Lemma tii_10 : kernel_text -∗ instr (mword_of_int (KernelSyms.trapinithart + 0x10) : mword 64) false (CSRReg (mword_of_int 261 : mword 12, Regidx (mword_of_int 15), zreg, CSRRW)).
   Proof using . mk_base (KernelSyms.trapinithart + 0x10) (mword_of_int 0x10579073 : mword 32)

@@ -22,7 +22,6 @@ Require Import KernelDecode05.
 Require Import KernelDecode06.
 Require Import KernelDecode08.
 Require Import KernelDecode09.
-Require Import KernelDecode10.
 Require Import KernelDecode12.
 Require Import KernelDecode13.
 Require Import KernelDecode14.
@@ -95,9 +94,9 @@ Section CodeUartPutcSync.
   Proof using . mk_base (KernelSyms.uartputc_sync + 0x16) (mword_of_int 0x0000aa17 : mword 32)
     (mword_of_int (KernelSyms.uartputc_sync + 0x16) : mword 64) (UTYPE (mword_of_int 10 : mword 20, Regidx (mword_of_int 20), AUIPC)) kd_0000aa17. Qed.
 
-  Lemma upi_1a : kernel_text -∗ instr (mword_of_int (KernelSyms.uartputc_sync + 0x1a) : mword 64) false (ITYPE (mword_of_int 2302 : mword 12, Regidx (mword_of_int 20), Regidx (mword_of_int 20), ADDI)).
-  Proof using . mk_base (KernelSyms.uartputc_sync + 0x1a) (mword_of_int 0x8fea0a13 : mword 32)
-    (mword_of_int (KernelSyms.uartputc_sync + 0x1a) : mword 64) (ITYPE (mword_of_int 2302 : mword 12, Regidx (mword_of_int 20), Regidx (mword_of_int 20), ADDI)) kd_8fea0a13. Qed.
+  Lemma upi_1a : kernel_text -∗ instr (mword_of_int (KernelSyms.uartputc_sync + 0x1a) : mword 64) false (ITYPE (mword_of_int 2350 : mword 12, Regidx (mword_of_int 20), Regidx (mword_of_int 20), ADDI)).
+  Proof using . mk_base (KernelSyms.uartputc_sync + 0x1a) (mword_of_int 0x92ea0a13 : mword 32)
+    (mword_of_int (KernelSyms.uartputc_sync + 0x1a) : mword 64) (ITYPE (mword_of_int 2350 : mword 12, Regidx (mword_of_int 20), Regidx (mword_of_int 20), ADDI)) kd_92ea0a13. Qed.
 
   Lemma upi_1e : kernel_text -∗ instr (mword_of_int (KernelSyms.uartputc_sync + 0x1e) : mword 64) false (SHIFTIOP (mword_of_int 2 : mword 6, Regidx (mword_of_int 10), Regidx (mword_of_int 18), SLLI)).
   Proof using . mk_base (KernelSyms.uartputc_sync + 0x1e) (mword_of_int 0x00251913 : mword 32)

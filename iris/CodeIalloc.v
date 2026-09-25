@@ -20,11 +20,12 @@ Require Import KernelDecode00.
 Require Import KernelDecode01.
 Require Import KernelDecode02.
 Require Import KernelDecode03.
+Require Import KernelDecode04.
 Require Import KernelDecode05.
 Require Import KernelDecode06.
-Require Import KernelDecode07.
 Require Import KernelDecode08.
 Require Import KernelDecode09.
+Require Import KernelDecode10.
 Require Import KernelDecode11.
 Require Import KernelDecode12.
 Require Import KernelDecode14.
@@ -34,7 +35,7 @@ Require Import KernelDecode17.
 Require Import KernelDecode19.
 Require Import KernelDecode20.
 Require Import KernelDecode21.
-Require Import KernelDecode23.
+Require Import KernelDecode22.
 Require Import KernelDecode24.
 Require Import KernelDecode25.
 Require Import KernelDecode26.
@@ -68,13 +69,13 @@ Section CodeIalloc.
   Proof using . mk_rvc (KernelSyms.ialloc + 0x6) (mword_of_int 0x0080 : mword 16)
     (mword_of_int (KernelSyms.ialloc + 0x6) : mword 64) (ITYPE (caddi4spn_imm (mword_of_int 16 : mword 8), sp, creg2reg_idx (Cregidx (mword_of_int 0)), ADDI)) kd_0080 exec_execute_C_ADDI4SPN. Qed.
 
-  Lemma iali_08 : kernel_text -∗ instr (mword_of_int (KernelSyms.ialloc + 0x8) : mword 64) false (UTYPE (mword_of_int 29 : mword 20, Regidx (mword_of_int 14), AUIPC)).
-  Proof using . mk_base (KernelSyms.ialloc + 0x8) (mword_of_int 0x0001d717 : mword 32)
-    (mword_of_int (KernelSyms.ialloc + 0x8) : mword 64) (UTYPE (mword_of_int 29 : mword 20, Regidx (mword_of_int 14), AUIPC)) kd_0001d717. Qed.
+  Lemma iali_08 : kernel_text -∗ instr (mword_of_int (KernelSyms.ialloc + 0x8) : mword 64) false (UTYPE (mword_of_int 30 : mword 20, Regidx (mword_of_int 14), AUIPC)).
+  Proof using . mk_base (KernelSyms.ialloc + 0x8) (mword_of_int 0x0001e717 : mword 32)
+    (mword_of_int (KernelSyms.ialloc + 0x8) : mword 64) (UTYPE (mword_of_int 30 : mword 20, Regidx (mword_of_int 14), AUIPC)) kd_0001e717. Qed.
 
-  Lemma iali_0c : kernel_text -∗ instr (mword_of_int (KernelSyms.ialloc + 0xc) : mword 64) false (LOAD (mword_of_int 1982 : mword 12, Regidx (mword_of_int 14), Regidx (mword_of_int 14), false, 4)).
-  Proof using . mk_base (KernelSyms.ialloc + 0xc) (mword_of_int 0x7be72703 : mword 32)
-    (mword_of_int (KernelSyms.ialloc + 0xc) : mword 64) (LOAD (mword_of_int 1982 : mword 12, Regidx (mword_of_int 14), Regidx (mword_of_int 14), false, 4)) kd_7be72703. Qed.
+  Lemma iali_0c : kernel_text -∗ instr (mword_of_int (KernelSyms.ialloc + 0xc) : mword 64) false (LOAD (mword_of_int 2462 : mword 12, Regidx (mword_of_int 14), Regidx (mword_of_int 14), false, 4)).
+  Proof using . mk_base (KernelSyms.ialloc + 0xc) (mword_of_int 0x99e72703 : mword 32)
+    (mword_of_int (KernelSyms.ialloc + 0xc) : mword 64) (LOAD (mword_of_int 2462 : mword 12, Regidx (mword_of_int 14), Regidx (mword_of_int 14), false, 4)) kd_99e72703. Qed.
 
   Lemma iali_10 : kernel_text -∗ instr (mword_of_int (KernelSyms.ialloc + 0x10) : mword 64) true (ITYPE (sign_extend' 12 (mword_of_int 1 : mword 6), zreg, Regidx (mword_of_int 15), ADDI)).
   Proof using . mk_rvc (KernelSyms.ialloc + 0x10) (mword_of_int 0x4785 : mword 16)
@@ -120,13 +121,13 @@ Section CodeIalloc.
   Proof using . mk_rvc (KernelSyms.ialloc + 0x26) (mword_of_int 0x893e : mword 16)
     (mword_of_int (KernelSyms.ialloc + 0x26) : mword 64) (RTYPE (Regidx (mword_of_int 15), zreg, Regidx (mword_of_int 18), ADD)) kd_893e exec_execute_C_MV. Qed.
 
-  Lemma iali_28 : kernel_text -∗ instr (mword_of_int (KernelSyms.ialloc + 0x28) : mword 64) false (UTYPE (mword_of_int 29 : mword 20, Regidx (mword_of_int 20), AUIPC)).
-  Proof using . mk_base (KernelSyms.ialloc + 0x28) (mword_of_int 0x0001da17 : mword 32)
-    (mword_of_int (KernelSyms.ialloc + 0x28) : mword 64) (UTYPE (mword_of_int 29 : mword 20, Regidx (mword_of_int 20), AUIPC)) kd_0001da17. Qed.
+  Lemma iali_28 : kernel_text -∗ instr (mword_of_int (KernelSyms.ialloc + 0x28) : mword 64) false (UTYPE (mword_of_int 30 : mword 20, Regidx (mword_of_int 20), AUIPC)).
+  Proof using . mk_base (KernelSyms.ialloc + 0x28) (mword_of_int 0x0001ea17 : mword 32)
+    (mword_of_int (KernelSyms.ialloc + 0x28) : mword 64) (UTYPE (mword_of_int 30 : mword 20, Regidx (mword_of_int 20), AUIPC)) kd_0001ea17. Qed.
 
-  Lemma iali_2c : kernel_text -∗ instr (mword_of_int (KernelSyms.ialloc + 0x2c) : mword 64) false (ITYPE (mword_of_int 1938 : mword 12, Regidx (mword_of_int 20), Regidx (mword_of_int 20), ADDI)).
-  Proof using . mk_base (KernelSyms.ialloc + 0x2c) (mword_of_int 0x792a0a13 : mword 32)
-    (mword_of_int (KernelSyms.ialloc + 0x2c) : mword 64) (ITYPE (mword_of_int 1938 : mword 12, Regidx (mword_of_int 20), Regidx (mword_of_int 20), ADDI)) kd_792a0a13. Qed.
+  Lemma iali_2c : kernel_text -∗ instr (mword_of_int (KernelSyms.ialloc + 0x2c) : mword 64) false (ITYPE (mword_of_int 2418 : mword 12, Regidx (mword_of_int 20), Regidx (mword_of_int 20), ADDI)).
+  Proof using . mk_base (KernelSyms.ialloc + 0x2c) (mword_of_int 0x972a0a13 : mword 32)
+    (mword_of_int (KernelSyms.ialloc + 0x2c) : mword 64) (ITYPE (mword_of_int 2418 : mword 12, Regidx (mword_of_int 20), Regidx (mword_of_int 20), ADDI)) kd_972a0a13. Qed.
 
   Lemma iali_30 : kernel_text -∗ instr (mword_of_int (KernelSyms.ialloc + 0x30) : mword 64) false (SHIFTIOP (mword_of_int 4 : mword 6, Regidx (mword_of_int 18), Regidx (mword_of_int 11), SRLI)).
   Proof using . mk_base (KernelSyms.ialloc + 0x30) (mword_of_int 0x00495593 : mword 32)
@@ -224,13 +225,13 @@ Section CodeIalloc.
   Proof using . mk_base (KernelSyms.ialloc + 0x72) (mword_of_int 0x00004517 : mword 32)
     (mword_of_int (KernelSyms.ialloc + 0x72) : mword 64) (UTYPE (mword_of_int 4 : mword 20, Regidx (mword_of_int 10), AUIPC)) kd_00004517. Qed.
 
-  Lemma iali_76 : kernel_text -∗ instr (mword_of_int (KernelSyms.ialloc + 0x76) : mword 64) false (ITYPE (mword_of_int 616 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADDI)).
-  Proof using . mk_base (KernelSyms.ialloc + 0x76) (mword_of_int 0x26850513 : mword 32)
-    (mword_of_int (KernelSyms.ialloc + 0x76) : mword 64) (ITYPE (mword_of_int 616 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADDI)) kd_26850513. Qed.
+  Lemma iali_76 : kernel_text -∗ instr (mword_of_int (KernelSyms.ialloc + 0x76) : mword 64) false (ITYPE (mword_of_int 536 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADDI)).
+  Proof using . mk_base (KernelSyms.ialloc + 0x76) (mword_of_int 0x21850513 : mword 32)
+    (mword_of_int (KernelSyms.ialloc + 0x76) : mword 64) (ITYPE (mword_of_int 536 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADDI)) kd_21850513. Qed.
 
-  Lemma iali_7a : kernel_text -∗ instr (mword_of_int (KernelSyms.ialloc + 0x7a) : mword 64) false (JAL (mword_of_int 2085678 : mword 21, Regidx (mword_of_int 1))).
-  Proof using . mk_base (KernelSyms.ialloc + 0x7a) (mword_of_int 0xb2efd0ef : mword 32)
-    (mword_of_int (KernelSyms.ialloc + 0x7a) : mword 64) (JAL (mword_of_int 2085678 : mword 21, Regidx (mword_of_int 1))) kd_b2efd0ef. Qed.
+  Lemma iali_7a : kernel_text -∗ instr (mword_of_int (KernelSyms.ialloc + 0x7a) : mword 64) false (JAL (mword_of_int 2085598 : mword 21, Regidx (mword_of_int 1))).
+  Proof using . mk_base (KernelSyms.ialloc + 0x7a) (mword_of_int 0xadefd0ef : mword 32)
+    (mword_of_int (KernelSyms.ialloc + 0x7a) : mword 64) (JAL (mword_of_int 2085598 : mword 21, Regidx (mword_of_int 1))) kd_adefd0ef. Qed.
 
   Lemma iali_7e : kernel_text -∗ instr (mword_of_int (KernelSyms.ialloc + 0x7e) : mword 64) true (ITYPE (sign_extend' 12 (mword_of_int 0 : mword 6), zreg, Regidx (mword_of_int 10), ADDI)).
   Proof using . mk_rvc (KernelSyms.ialloc + 0x7e) (mword_of_int 0x4501 : mword 16)
@@ -264,9 +265,9 @@ Section CodeIalloc.
   Proof using . mk_rvc (KernelSyms.ialloc + 0x8e) (mword_of_int 0x854e : mword 16)
     (mword_of_int (KernelSyms.ialloc + 0x8e) : mword 64) (RTYPE (Regidx (mword_of_int 19), zreg, Regidx (mword_of_int 10), ADD)) kd_854e exec_execute_C_MV. Qed.
 
-  Lemma iali_90 : kernel_text -∗ instr (mword_of_int (KernelSyms.ialloc + 0x90) : mword 64) false (JAL (mword_of_int 2087690 : mword 21, Regidx (mword_of_int 1))).
-  Proof using . mk_base (KernelSyms.ialloc + 0x90) (mword_of_int 0xb0bfd0ef : mword 32)
-    (mword_of_int (KernelSyms.ialloc + 0x90) : mword 64) (JAL (mword_of_int 2087690 : mword 21, Regidx (mword_of_int 1))) kd_b0bfd0ef. Qed.
+  Lemma iali_90 : kernel_text -∗ instr (mword_of_int (KernelSyms.ialloc + 0x90) : mword 64) false (JAL (mword_of_int 2087610 : mword 21, Regidx (mword_of_int 1))).
+  Proof using . mk_base (KernelSyms.ialloc + 0x90) (mword_of_int 0xabbfd0ef : mword 32)
+    (mword_of_int (KernelSyms.ialloc + 0x90) : mword 64) (JAL (mword_of_int 2087610 : mword 21, Regidx (mword_of_int 1))) kd_abbfd0ef. Qed.
 
   Lemma iali_94 : kernel_text -∗ instr (mword_of_int (KernelSyms.ialloc + 0x94) : mword 64) false (STORE (mword_of_int 0 : mword 12, Regidx (mword_of_int 22), Regidx (mword_of_int 19), 2)).
   Proof using . mk_base (KernelSyms.ialloc + 0x94) (mword_of_int 0x01699023 : mword 32)

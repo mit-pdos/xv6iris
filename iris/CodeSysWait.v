@@ -16,10 +16,10 @@ Require Import KernelText.
 Require Import WpMmodeLeafBase.
 From Kernel Require KernelInstrs.
 From Kernel Require KernelSyms.
+Require Import KernelDecode00.
 Require Import KernelDecode04.
 Require Import KernelDecode08.
 Require Import KernelDecode10.
-Require Import KernelDecode11.
 Require Import KernelDecode13.
 Require Import KernelDecode14.
 Require Import KernelDecode15.
@@ -60,17 +60,17 @@ Section CodeSysWait.
   Proof using . mk_rvc (KernelSyms.sys_wait + 0xc) (mword_of_int 0x4501 : mword 16)
     (mword_of_int (KernelSyms.sys_wait + 0xc) : mword 64) (ITYPE (sign_extend' 12 (mword_of_int 0 : mword 6), zreg, Regidx (mword_of_int 10), ADDI)) kd_4501 exec_execute_C_LI. Qed.
 
-  Lemma swi_0e : kernel_text -∗ instr (mword_of_int (KernelSyms.sys_wait + 0xe) : mword 64) false (JAL (mword_of_int 2096892 : mword 21, Regidx (mword_of_int 1))).
-  Proof using . mk_base (KernelSyms.sys_wait + 0xe) (mword_of_int 0xefdff0ef : mword 32)
-    (mword_of_int (KernelSyms.sys_wait + 0xe) : mword 64) (JAL (mword_of_int 2096892 : mword 21, Regidx (mword_of_int 1))) kd_efdff0ef. Qed.
+  Lemma swi_0e : kernel_text -∗ instr (mword_of_int (KernelSyms.sys_wait + 0xe) : mword 64) false (JAL (mword_of_int 2096872 : mword 21, Regidx (mword_of_int 1))).
+  Proof using . mk_base (KernelSyms.sys_wait + 0xe) (mword_of_int 0xee9ff0ef : mword 32)
+    (mword_of_int (KernelSyms.sys_wait + 0xe) : mword 64) (JAL (mword_of_int 2096872 : mword 21, Regidx (mword_of_int 1))) kd_ee9ff0ef. Qed.
 
   Lemma swi_12 : kernel_text -∗ instr (mword_of_int (KernelSyms.sys_wait + 0x12) : mword 64) false (LOAD (mword_of_int 4072 : mword 12, Regidx (mword_of_int 8), Regidx (mword_of_int 10), false, 8)).
   Proof using . mk_base (KernelSyms.sys_wait + 0x12) (mword_of_int 0xfe843503 : mword 32)
     (mword_of_int (KernelSyms.sys_wait + 0x12) : mword 64) (LOAD (mword_of_int 4072 : mword 12, Regidx (mword_of_int 8), Regidx (mword_of_int 10), false, 8)) kd_fe843503. Qed.
 
-  Lemma swi_16 : kernel_text -∗ instr (mword_of_int (KernelSyms.sys_wait + 0x16) : mword 64) false (JAL (mword_of_int 2095122 : mword 21, Regidx (mword_of_int 1))).
-  Proof using . mk_base (KernelSyms.sys_wait + 0x16) (mword_of_int 0x813ff0ef : mword 32)
-    (mword_of_int (KernelSyms.sys_wait + 0x16) : mword 64) (JAL (mword_of_int 2095122 : mword 21, Regidx (mword_of_int 1))) kd_813ff0ef. Qed.
+  Lemma swi_16 : kernel_text -∗ instr (mword_of_int (KernelSyms.sys_wait + 0x16) : mword 64) false (JAL (mword_of_int 2095102 : mword 21, Regidx (mword_of_int 1))).
+  Proof using . mk_base (KernelSyms.sys_wait + 0x16) (mword_of_int 0xffeff0ef : mword 32)
+    (mword_of_int (KernelSyms.sys_wait + 0x16) : mword 64) (JAL (mword_of_int 2095102 : mword 21, Regidx (mword_of_int 1))) kd_ffeff0ef. Qed.
 
   Lemma swi_1a : kernel_text -∗ instr (mword_of_int (KernelSyms.sys_wait + 0x1a) : mword 64) true (LOAD (zero_extend' 12 (concat_vec (mword_of_int 3 : mword 6) ('b"000")), sp, Regidx (mword_of_int 1), false, 8)).
   Proof using . mk_rvc (KernelSyms.sys_wait + 0x1a) (mword_of_int 0x60e2 : mword 16)
