@@ -1041,3 +1041,7 @@ import Xv6.UexecSG
 import Xv6.UserExec
 import Xv6.SpecUser
 import Xv6.UexecWp
+import Xv6.CtxAmb
+import Xv6.FileMorph
+import Xv6.FsReadyMorph
+import Xv6.EnvMorph
