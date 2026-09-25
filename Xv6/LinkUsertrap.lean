@@ -10,8 +10,9 @@ prepare_return, kernelvec over the linked kerneltrap, and `syscall` by
 `SYSCALL_XV6`).  Left as parameters, as their own links leave them:
 `fileclose` (kexit's, `LinkKexit`), `vmfault` (its `LinkVmfault` takes its
 callees), `LinkSyscall`'s own parameters (the four lock / allocator leaves
-and `[ForkretIs]`), and the deposit instance's read reason `UtReadWhy`
-(UsertrapParts; W8-K's, at the instance).
+and `[ForkretIs]`).  The deposit instance's read reason `UtReadWhy` is
+proved at the instance (`UtReadWhyXv6.utReadWhy_xv6`, Rocq
+`spost_at_read_why`).
 -/
 import Xv6.ProofUsertrap
 import Xv6.LinkPrintk
@@ -31,13 +32,10 @@ namespace Xv6
 open Iris MachCSL
 
 /-- The proved `usertrap` interface,
-given `fileclose`, `vmfault`, `LinkSyscall`'s parameters and the read
-reason. -/
+given `fileclose`, `vmfault` and `LinkSyscall`'s parameters. -/
 theorem Usertrap (RG : RELEASE_GEN) (RR : RELEASE_REFUTE) (RC : RELEASE_CANCEL) (KFF : KFREE_FREE)
-    [ForkretIs] (FC : FILECLOSE) (VF : VMFAULT)
-    (hW : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CtokG GF] [UexecSG GF],
-      UtReadWhy (GF := GF)) : USERTRAP :=
+    [ForkretIs] (FC : FILECLOSE) (VF : VMFAULT) : USERTRAP :=
   usertrap_proof (Syscall RG RR RC KFF) Printk Myproc Killed Setkilled Devintr VF Yield PrepareReturn
-    (Kexit FC) (Kernelvec (Kerneltrap Yield)) hW
+    (Kexit FC) (Kernelvec (Kerneltrap Yield))
 
 end Xv6

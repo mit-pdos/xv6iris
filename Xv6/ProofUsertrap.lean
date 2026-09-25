@@ -13,7 +13,8 @@ Callees, as in Rocq's `UsertrapProof Syscall PrintkGen Myproc Killed
 Setkilled Devintr Vmfault Yield PrepareReturn Kexit Kernelvec`:
 `SYSCALL_XV6` (SpecSyscall's `SYSCALL` at the kernel's deposit instance),
 `PRINTK`, `MYPROC`, `KILLED`, `SETKILLED`, `DEVINTR`, `VMFAULT`, `YIELD`, `PREPARE_RETURN`, `KEXIT`,
-`KERNELVEC`; plus the deposit instance's read reason `UtReadWhy` (UsertrapParts).
+`KERNELVEC`.  The deposit instance's read reason `UtReadWhy` (UsertrapParts,
+Rocq `spost_at_read_why`) is `UtReadWhyXv6.utReadWhy_xv6`.
 
 The contract proved is SpecUsertrap's `USERTRAP` (at the kernel's deposit
 instance; exec's answer up to the kernel words, SpecUsertrap deviations 9-10).
@@ -25,6 +26,7 @@ import Xv6.UsertrapArms
 import Xv6.UsertrapArms56
 import Xv6.UsertrapArmsD0
 import Xv6.UsertrapSys
+import Xv6.UtReadWhyXv6
 
 namespace Xv6
 
@@ -34,12 +36,10 @@ open LeanRV64D
 set_option linter.unusedVariables false
 
 /-- **`usertrap` meets its specification**, given its callees'
-interfaces and the deposit instance's read reason. -/
+interfaces. -/
 theorem usertrap_proof (SY : SYSCALL_XV6) (PK : PRINTK) (MP : MYPROC) (KI : KILLED) (SK : SETKILLED)
     (DI : DEVINTR) (VM : VMFAULT) (YI : YIELD) (PR : PREPARE_RETURN)
-    (KE : KEXIT) (KV : KERNELVEC)
-    (hW : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CtokG GF] [UexecSG GF],
-      UtReadWhy (GF := GF)) : USERTRAP :=
+    (KE : KEXIT) (KV : KERNELVEC) : USERTRAP :=
   ⟨fun {hlc GF} _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ PT _ Γ _ γ0 γ1 γc γl0 γl1 γd γdl γt _
       cpu k j P ksp V M sts gn cs pid sep sc tv f Wk hj hproc hctx htier hnoff hstk hgn => by
     have HK := usertrap_kexit_proof PT Γ KE
@@ -49,7 +49,7 @@ theorem usertrap_proof (SY : SYSCALL_XV6) (PK : PRINTK) (MP : MYPROC) (KI : KILL
     have HEA := usertrap_ea_proof PT Γ KI HFA HK
     have H56 := usertrap_56_proof PT Γ PK SK HA6
     have HD0 := usertrap_d0_proof PT Γ VM HA6 H56
-    have H90 : UT_90 PT Γ := usertrap_90_proof PT Γ KI SY hW HA6 HK
+    have H90 : UT_90 PT Γ := usertrap_90_proof PT Γ KI SY utReadWhy_xv6 HA6 HK
     have HD := usertrap_dispatch_proof PT Γ DI KV H90 HEA HD0 H56 γ0 γ1 γc γl0 γl1 γd γdl γt
     exact usertrap_open MP PT Γ HD cpu k j P ksp V M sts gn cs pid sep sc tv f Wk hj hproc hctx
       htier hnoff hstk hgn⟩

@@ -25,10 +25,10 @@ functor layering, as hypotheses), and the seal composes them.
 console descriptor did not return -1) is Rocq's `ut_live_read_g`, discharged
 from `UexecExecInst.spost_at_read_why` (the post's receipt says the read
 failed at a negative count or the process was killed) and the zero kill flag.
-Lean's `UexecSG` class has no such law and Lean's console read carries no
-kill shot yet (pending_edits: "consoleread no kill shot"), so the reason is a
-hypothesis `UtReadWhy` of the syscall block, for W8-K to discharge at the
-instance once the console chain carries it.
+Lean's `UexecSG` class has no such law, so the reason is a hypothesis
+`UtReadWhy` of the syscall block, discharged at the instance by
+`UtReadWhyXv6.utReadWhy_xv6` (the console receipt's `-1` reason,
+consoleread's kill shot) in the seal.
 
 Definitional + pure + small proof-mode lemmas; no instruction stepping.
 -/
