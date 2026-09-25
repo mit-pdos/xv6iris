@@ -44,7 +44,7 @@ Require Import LineModel.
 Require Import PipeOut PipeDisc.
 Require Import PipesPair PipesDisc PipeBothNPure PipeBothN GenOut PipeOutN PipesView.
 Require Import PipeNames PipeProto.
-Require Import AppCfg AppInv AppPipeClaim.
+Require Import AppCfg AppInv.
 Require Import AppFile AppFileCons FileOpen.
 Require Import ProgTree ProgTreePipes.
 Require Import CtxIdDefs.
@@ -52,7 +52,7 @@ Require Import UCodeShK.
 Require Import UkSh UkShRun UkShMain UkShDiag.
 Require Import UkShEcho UkShCat.
 Require Import UShEcho UShEchoPipePay UShCatPay UShCat.
-Require Import UShPipeAssembly.
+Require Import UShPipeLeaves.
 Require Import UkConsOut.
 Require Import UkPipesIface UkPipesEntries.
 Require Import PipesFire UShPipesDefs UShPipesStage.

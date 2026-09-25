@@ -82,8 +82,7 @@ Require Import UShURoundDefs.
 Require Import UShURoundShapes.
 Require Import UShURoundLaws.
 Require Import UShURound.          (* [ush_line_union] *)
-Require Import UInitFileCons.      (* the claim's laws at /init: [file_sup_of_taint_at], [boot_at] *)
-Require Import UInitFileCC.        (* [file_cons_in_of_Cns], [file_cons_cred_of_init] *)
+Require Import UInitFileLeaves.    (* the claim's laws at /init; [file_cons_in_of_Cns], [file_cons_cred_of_init] *)
 Require Import AppFileCons.        (* [file_cons_cred] *)
 Local Open Scope Z_scope.
 
@@ -318,10 +317,10 @@ Section UnionInitCC.
     intros Hlkp.
     assert (Htsw : ⊢ file_taint (fgn_cl (ugn_file ug)) -∗ app_sup).
     { iIntros "#HT".
-      iApply (UInitFileCons.file_sup_of_taint_at (ugn_file ug) r Heq with "HT"). }
+      iApply (UInitFileLeaves.file_sup_of_taint_at (ugn_file ug) r Heq with "HT"). }
     assert (Hstw : ⊢ app_sup -∗ file_taint (fgn_cl (ugn_file ug))).
     { iIntros "#Hs".
-      iApply (UInitFileCons.file_taint_of_sup_at (ugn_file ug) r Heq with "Hs"). }
+      iApply (UInitFileLeaves.file_taint_of_sup_at (ugn_file ug) r Heq with "Hs"). }
     pose proof (uWbf_inp ug r s0) as Hwbi.
     rewrite /UInitSh.cons_cred_holds_at /union_cc /=.
     split_and!.
@@ -475,7 +474,7 @@ Section UnionInitHead.
      own content and the empty input *)
   Lemma union_Wbf_at_of_boot (s0 : fstate) (s : dst) :
     FileOut.fturn_core gf (S gen_id) -∗ f0pre_at gf s0 -∗
-    fown r s -∗ UInitFileCons.boot_at gf s0 s -∗
+    fown r s -∗ UInitFileLeaves.boot_at gf s0 s -∗
     (∃ v : era_pins, era_pin (fgn_echo gf) (S gen_id) v
        ∗ dl_cnt v (1/2) 0%nat ∗ inp_lb v [])
     ∗ uWbf ug r s0 [].

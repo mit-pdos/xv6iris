@@ -57,7 +57,7 @@ Require Import LineModel.
 Require Import PipeOut PipeDisc.
 Require Import PipesPair PipesDisc PipeBothNPure PipeBothN GenOut PipeOutN PipesView.
 Require Import PipeNames PipeProto.
-Require Import AppCfg AppInv AppPipeClaim.
+Require Import AppCfg AppInv.
 Require Import ProgTree.
 Require Import CtxIdDefs.
 Require Import UkPipesIface.

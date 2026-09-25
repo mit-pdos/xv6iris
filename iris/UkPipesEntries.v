@@ -78,7 +78,7 @@ Require Import LineModel LineModelLinks.
 Require Import PipeOut.
 Require Import PipesDisc PipeBothNPure PipeBothN GenOut PipeOutN PipesView.
 Require Import PipeNames PipeProto.
-Require Import AppCfg AppInv AppPipeClaim.
+Require Import AppCfg AppInv.
 Require Import CtxIdDefs.
 Require Import ExecArgs ExecEntry.
 Require Import ElfFile ElfUser.

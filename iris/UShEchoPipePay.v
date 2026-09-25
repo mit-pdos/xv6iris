@@ -74,7 +74,6 @@ Require Import EchoDisc.
 Require Import UEchoOut.
 Require Import UShEcho.           (* the pinned bundle's inputs *)
 Require Import UShEchoOut.
-Require Import UShEchoPay.        (* the CONSOLE mould, for reference *)
 Require Import UEchoPipe.         (* [ep_pay] / [ep_pay_of_alloc] *)
 Require User.EchoSyms.
 Local Open Scope Z_scope.

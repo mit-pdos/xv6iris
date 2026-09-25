@@ -127,7 +127,7 @@ Require Import UShURoundDefs.
 Require UkFileIface.
 Require UkFileEntries.
 Require FileDeltas.
-Require UShRound.
+Require UShFileRedir.
 Require Import CtxIdDefs.
 Local Open Scope Z_scope.
 Import Defs.
@@ -504,7 +504,7 @@ Section UShURound.
                   (fun _ : Z => UkShFork.ushf_wq Wcu I) (ftkt r s)
                   (fun _ _ => eq_refl) Heq Hokws Himg Hbytes Hflen
                   eq_refl ltac:(rewrite Hl; exact Hl1) Hul
-                  (UShRound.ush_line_len (last_ws I) Hokws)
+                  (UShFileRedir.ush_line_len (last_ws I) Hokws)
                   with "[] [] [] [] Hmade Hinv Hpin Hnp0 Hdep") as "#He".
     { iIntros "!> Hk". iApply uHktaint'. iExact "Hk". }
     { iIntros "!> HT". rewrite Hkill. iExact "HT". }
@@ -885,7 +885,7 @@ Section UShURound.
           (ghost_varG0 := offbox_offG)
           (UkShRedirBody.ushs_fd1f ty) ws
           (fun _ : Z => UkShFork.ushf_wq Wcu I)
-          (Wcl I 3%nat ∗ UShRound.redir_K' gf r ty).
+          (Wcl I 3%nat ∗ UShFileRedir.redir_K' gf r ty).
   Proof using Heq Hkill HfifR.
     intros Hul Hokws Hin Hlen Hpos.
     iIntros "#Hdep (#Hinv & #Hcl & #Hgen) #Hpin' #Hcs #Hlb" (ty).
@@ -902,7 +902,7 @@ Section UShURound.
     iApply (udepw_at_refR_of_sup (ghost_varG0 := offbox_offG) N' m pc
               (mword_of_int sa) (mword_of_int (t + 8))
               FsImg.ROOTINO T UShEcho.echo_pl ElfUser.echo_elf 1%nat
-              (UserFd.ustd (ukn_fd N') ld ∗ Wcl I 3%nat ∗ UShRound.redir_K' gf r ty)%I
+              (UserFd.ustd (ukn_fd N') ld ∗ Wcl I 3%nat ∗ UShFileRedir.redir_K' gf r ty)%I
               _ UShEcho.echo_elf_loadable Ha0 Ha1 with "[] [] [Hstd Hcr]").
     { iIntros "!> H". iExact "H". }
     { rewrite Hpeq. iExact "Hgen'". }
@@ -933,7 +933,7 @@ Section UShURound.
     { iApply ("Hgen'" $! W' with "HT Hmp"). }
     iDestruct "Hino" as (i γo) "(%Hty & %Hi)".
     destruct Hi as (Hi1 & Hi2 & Hi3 & Hi4).
-    rewrite /UShRound.redir_K /UkFileOpen.redir_K /FileOpen.file_open_fd_K.
+    rewrite /UShFileRedir.redir_K /UkFileOpen.redir_K /FileOpen.file_open_fd_K.
     iDestruct "HK" as "[HK | #HT]"; last first.
     { iApply ("Hgen'" $! W' with "HT Hmp"). }
     iDestruct "HK" as (i1 γo1) "(%Hty1 & Hd & Hpub)".
@@ -1087,8 +1087,8 @@ Section UShURound.
               h m dw dv sa len ws FsImgCheck.fname_f fb sz ld
               _ n
               (fun _ : Z => UkShFork.ushf_wq Wcu I)
-              (UShRound.redir_K gf r) (UShRound.redir_K' gf r)
-              (fun s1 : dst => fown r s1) (UShRound.redir_Kf gf r) s
+              (UShFileRedir.redir_K gf r) (UShFileRedir.redir_K' gf r)
+              (fun s1 : dst => fown r s1) (UShFileRedir.redir_Kf gf r) s
               (Wcl I 3%nat ∗ fown r s)%I (Wcl I 3%nat)
               (Wcu I 0%nat) (Wcu I 0%nat)
               Hpeq Hs1 Hline eq_refl eq_refl Hsa Hs64 Hs38 Hszlo Hszal
@@ -1100,13 +1100,13 @@ Section UShURound.
               with "Hcode Hjt Hpcode Hpro Hstr Hwsp Hsy Hstd Hcwd Hch HM
                     [] [] [] [] [] [] [] [] [] [Hc Hd] Hrun").
     - (* the open *)
-      iApply (UShRound.Hopen_hand gf r Heq N' _ _ ls ws jo Hin Hokws
+      iApply (UShFileRedir.Hopen_hand gf r Heq N' _ _ ls ws jo Hin Hokws
                 with "Hinv Hmade Hfl").
     - (* the receipt, read *)
       iIntros "!>" (ty) "HK".
-      iMod (UShRound.redir_K_inum gf r Heq ty ⊤ ltac:(set_solver) with "Hinv HK")
+      iMod (UShFileRedir.redir_K_inum gf r Heq ty ⊤ ltac:(set_solver) with "Hinv HK")
         as "[HK Hi]".
-      iModIntro. rewrite /UShRound.redir_K'. iFrame "HK Hi".
+      iModIntro. rewrite /UShFileRedir.redir_K'. iFrame "HK Hi".
     - (* exec /echo at the file *)
       iApply (uredir_exec_sup I ws v' cs ls Hul Hokws Hin Hlen Hpos
                 with "Hdep Hslot Hpin' Hcs Hfl").
@@ -1114,12 +1114,12 @@ Section UShURound.
       iIntros (ty).
       iPoseProof (UShPanic.ush_diag_law_hold_at_alt (PS := uprogSG_free)
                       (ghost_varG0 := offbox_offG) FI
-                    (UShRound.redir_K' gf r ty) I (ualt_code (UR RFExec)) with "[]") as "#Hx".
+                    (UShFileRedir.redir_K' gf r ty) I (ualt_code (UR RFExec)) with "[]") as "#Hx".
       { cbn [lk_links union_link_inst_at gen_link_inst]. iExact "Hlk". }
       iEval (rewrite Hax) in "Hx".
       iApply (uexecfail_law_at_wand with "Hx").
       iIntros "!> H". iDestruct "H" as (v) "(#Hp & Hblk & [HK _])".
-      rewrite /UShRound.redir_K /UkFileOpen.redir_K /FileOpen.file_open_fd_K.
+      rewrite /UShFileRedir.redir_K /UkFileOpen.redir_K /FileOpen.file_open_fd_K.
       iDestruct "HK" as "[HK | #HT]"; last first.
       { iApply (uWcu_taint' I 0%nat v' with "Hpin' HT"). }
       iDestruct "HK" as (i γo) "(_ & Hd & _)".
@@ -1133,7 +1133,7 @@ Section UShURound.
       iAssert (union_links ug -∗ lk_links FI)%I as "Hlkw".
       { cbn [lk_links union_link_inst_at gen_link_inst]. iIntros "$". }
       iDestruct ("Hlkw" with "Hlk") as "#Hlk'".
-      rewrite /UShRound.redir_Kf. iDestruct "HK" as "[Hd | [[%Hs Hd] | #HT]]".
+      rewrite /UShFileRedir.redir_Kf. iDestruct "HK" as "[Hd | [[%Hs Hd] | #HT]]".
       + iPoseProof (UShPanic.ush_diag_law_hold_at_alt (PS := uprogSG_free)
                       (ghost_varG0 := offbox_offG)
                       FI (fown r s) I (ualt_code (UR RFOpenU)) with "Hlk'") as "#Hx".

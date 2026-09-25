@@ -114,7 +114,7 @@ Require Import GenOutPure GenOut.
 Require Import PipeOutPure PipeOut.
 Require Import PipesPair PipesDisc PipeBothNPure PipeBothN PipeOutN PipesView.
 Require Import PipeNames PipeQueue PipeReg PipeProto.
-Require Import AppCfg AppInv AppPipeClaim AppPipeCons.   (* [pipe_pred], [pipe_sup_of_taint] *)
+Require Import AppCfg AppInv.
 Require Import CtxIdDefs.
 (* [UserHeap] LAST among the U-tier libraries, as [UkConsOut] has it *)
 Require Import UserHeap.

@@ -1751,6 +1751,7 @@ UShCatFStage.v
 PipesFire.v
 PipesView.v
 UShPipesDefs.v
+UShPipeLeaves.v
 UShPipesStage.v
 UShPipesNode.v
 PipesLedPure.v
@@ -1776,6 +1777,7 @@ UnionLinkInst.v
 UnionReadInst.v
 UnionLinkInstAt.v
 UkUnionEntries.v
+UShFileRedir.v
 UShURoundDefs.v
 UkShCatForkTwin.v
 UShURound.v
@@ -1783,6 +1785,7 @@ UShURoundShapes.v
 UShUPipes.v
 UnionReadInstAt.v
 UShURoundLaws.v
+UInitFileLeaves.v
 UInitUnionCC.v
 AppUnionRec.v
 UInitUnionBoot.v

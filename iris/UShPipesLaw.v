@@ -50,7 +50,7 @@ Require Import UkSh UkShRun UkShMain UkShDiag UkShFork UkShMalloc.
 Require Import UkShEcho UkShCat.
 Require Import UkShPipe UkShPipeLex UkShPipesRound UkShPipesSeam UkShPipesLex UkShPipesCmd.
 Require Import UShEcho UShCatPay.
-Require Import UShPipeAssembly.
+Require Import UShPipeLeaves.
 Require Import UkPipesIface.
 Require Import GenLinksLine LinkRec.
 Require Import PipesLinks PipesLinkInst.

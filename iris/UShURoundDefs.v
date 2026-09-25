@@ -82,7 +82,7 @@ Require Import UnionLinks.
 Require Import UnionLinkInst.
 Require Import UnionLinkInstAt.
 Require EchoLinks.
-Require UShRound.                 (* the file round's model-free pure lemmas *)
+Require UShFileRedir.             (* the file round's model-free pure lemmas *)
 Require Import CtxIdDefs.
 Local Open Scope Z_scope.
 
@@ -125,9 +125,9 @@ Proof using.
   change (lm_step ulmU) with ustep. change (lm_dec ulmU) with ualt_dec.
   change (lmh_noc ulmU_hooks) with unoc.
   destruct l as [ws | ws | | p n]; cbn [unoc].
-  - rewrite ualt_dec_R. exact (UShRound.fsm_fnoc s (LEcho ws)).
-  - rewrite ualt_dec_R. exact (UShRound.fsm_fnoc s (LEchoF ws)).
-  - rewrite ualt_dec_R. exact (UShRound.fsm_fnoc s LCat).
+  - rewrite ualt_dec_R. exact (UShFileRedir.fsm_fnoc s (LEcho ws)).
+  - rewrite ualt_dec_R. exact (UShFileRedir.fsm_fnoc s (LEchoF ws)).
+  - rewrite ualt_dec_R. exact (UShFileRedir.fsm_fnoc s LCat).
   - rewrite ualt_dec_code. by destruct p.
 Qed.
 
@@ -137,7 +137,7 @@ Lemma ustep_panic (s : fstate) (l : uline) (a : lm_alt U) :
 Proof using.
   change (lm_step ulmU) with ustep. change (lm_panic ulmU) with upanic.
   destruct a as [r | x | x]; cbn [upanic ustep]; [| intros _; reflexivity | intros _; reflexivity].
-  intros Hp. exact (UShRound.fsm_panic s l r Hp).
+  intros Hp. exact (UShFileRedir.fsm_panic s l r Hp).
 Qed.
 
 (* an alternative whose output is the bare prompt is not a panic *)
