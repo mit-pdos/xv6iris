@@ -764,3 +764,11 @@ import Xv6.DirlinkLoop
 import Xv6.DirlinkSetup
 import Xv6.ProofDirlink
 import Xv6.LinkDirlink
+import Xv6.SpecFsinit
+import Xv6.FsinitDefs
+import Xv6.FsinitCalls
+import Xv6.FsinitTail
+import Xv6.FsinitLog
+import Xv6.FsinitRead
+import Xv6.ProofFsinit
+import Xv6.LinkFsinit
