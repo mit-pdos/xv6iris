@@ -93,12 +93,12 @@ theorem frd_arm_inode (IL : ILOCK) (RD : READI) (IU : IUNLOCK) (Γ : SchedNames)
     procsInv Γ ∗ panicEnv ∗ fsReady (hlc := hlc) ∗
     isLock γkl kmemLockAddr "kmem" (kmemRes γk) ∗ kallocAvail γk none ∗ offUserInv (hlc := hlc) γo ∗
     fileRef γ fk q (.open true wb (.inode i γo .parked)) ∗ procPrivExt (procAddr j) pid V V.upt M ∗
-    bslot ∗ P ∗ pfAt (areadCommitAt (fsGammaL fscFs) appE i γo) F ∗
+    genHalvesPriv (procAddr j) pid V.gen ∗ bslot ∗ P ∗ pfAt (areadCommitAt (fsGammaL fscFs) appE i γo) F ∗
     frdK (hlc := hlc) k γ fk q (.open true wb (.inode i γo .parked)) j pid V M n F Rd Rin P
     ⊢ wpLoop (GF := GF) cpu := by
   have hK' : 6 + readiSlots ≤ k.avail := hK
   have hK6 : 6 ≤ k.avail := by unfold readiSlots bmapSlots ballocSlots breadSlots panicSlots at hK'; omega
-  iintro ⟨Hk, Hpc, Hframe, Hte, Hce, #Hpi, #Hpe, #Hfs, #Hkl, #Hav, #Hoinv, Href, Hpriv, Hbs, HP, Hcm,
+  iintro ⟨Hk, Hpc, Hframe, Hte, Hce, #Hpi, #Hpe, #Hfs, #Hkl, #Hav, #Hoinv, Href, Hpriv, Hgen, Hbs, HP, Hcm,
     HΦ⟩
   -- THE REFERENCE, OPENED, AND THE CARVE
   icases filerw_ref_open γ fk q _ $$ Href with ⟨%C, %-, Htok, Hfields, Hpay⟩
@@ -187,7 +187,7 @@ theorem frd_arm_inode (IL : ILOCK) (RD : READI) (IU : IUNLOCK) (Γ : SchedNames)
     · exact Or.inl h
   have hwin := frd_wrote_rdImg V.upt P' M M' (k.regs 11#5) data v.toNat tot himg
   unfold frdK
-  iapply HΦ $$ %c' %spie3 %spp3 %R' %P' %M' %tot [] Hk Hpc Hte Hce Href Hpriv [Hbs] [HP Hrecv]
+  iapply HΦ $$ %c' %spie3 %spp3 %R' %P' %M' %tot [] Hk Hpc Hte Hce Href Hpriv Hgen [Hbs] [HP Hrecv]
   · ipureintro; exact ⟨hcs, hext, by omega, hr10, hwin⟩
   · iapply frd_envout_inode $$ Hbs
   unfold filereadArms
@@ -196,7 +196,7 @@ theorem frd_arm_inode (IL : ILOCK) (RD : READI) (IU : IUNLOCK) (Γ : SchedNames)
     rcases hr10 with h | h
     · rw [h]; exact frd_ret_nat n tot (by omega)
     · rw [h]; exact filereadRet_m1 n
-  iapply filereadExtra_inode_of F Rd Rin P _ wb inum.toNat γo n (R' 10#5) M' (k.regs 11#5) rfl $$ HP
+  iapply filereadExtra_inode_of V.gen V.upt F Rd Rin P _ wb inum.toNat γo n (R' 10#5) M' (k.regs 11#5) rfl $$ HP
   rw [h10']
   iapply (frd_inode_arms inum.toNat γo n F dn bm data v.toNat tot dd a0 P' (viewFaulted V.upt P' M) M'
     (k.regs 11#5) av hn0 hn1 hok hwf hrow hle2 harm himg.1 himg.2 hpl) $$ Hrecv

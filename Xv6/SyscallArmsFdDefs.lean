@@ -329,7 +329,7 @@ def SyscDepRead : Prop :=
         (∀ (r : BitVec 64) (P' : UPtd) (M1 : Nat → List (BitVec 8)) (d : Nat),
           ⌜V.upt.extSz V.sz P' ∧ umemWrote V.upt M (tfW V.tf (tfArgIdx 1)) d P' M1 ∧
             filereadRet (argZ (tfW V.tf (tfArgIdx 2))) r⌝ -∗
-          filereadExtra (hlc := hlc) (syscFdKey (tfW V.tf (tfArgIdx 0)) sts)
+          filereadExtra (hlc := hlc) gn V.upt (syscFdKey (tfW V.tf (tfArgIdx 0)) sts)
             (argZ (tfW V.tf (tfArgIdx 2))) F Rd Rin P r M1 (tfW V.tf (tfArgIdx 1)) -∗
           UexecSG.spostAt (uslot (hlc := hlc)) 5 f (uvisOf V M sts gn cs pid) r
             (umemLazy P' V.sz.toNat M1) sts V.cwi cs)

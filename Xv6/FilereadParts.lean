@@ -493,7 +493,7 @@ end Ties
 /-! ## 8.  The console receipt, built from consoleread's post -/
 
 section Receipt
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [Appcfg GF] [Fscfg]
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [CtokG GF] [Appcfg GF] [Fscfg]
 
 /-- The per-byte ledger at the resume image (Rocq's `umem_wr_lookup_in`
 step, shared by both receipt builders). -/
@@ -519,7 +519,7 @@ theorem frd_ledger (P' : UPtd) (Vw M' : Nat → List (BitVec 8)) (addr : BitVec 
 
 /-- THE ONE STEP FROM consoleread's CLEAN POST (Rocq
 `console_receipt_of_run`). -/
-theorem frd_receipt_of_run (Rd : Nat → Nat → IProp GF) (Rin : List (List Obs × BitVec 8) → IProp GF)
+theorem frd_receipt_of_run (gn : GName) (pt : UPtd) (Rd : Nat → Nat → IProp GF) (Rin : List (List Obs × BitVec 8) → IProp GF)
     (P' : UPtd) (Vw M' : Nat → List (BitVec 8)) (addr : BitVec 64) (n : Int) (r : BitVec 64)
     (d dc cur : Nat) (bs : Nat → BitVec 8) (hs : List (List Obs)) (sl : List (List Obs × BitVec 8))
     (hd : d = r.toNat) (hdmax : (d : Int) ≤ max 0 n) (hb1 : (d : Int) = max 0 n → dc = d)
@@ -528,11 +528,12 @@ theorem frd_receipt_of_run (Rd : Nat → Nat → IProp GF) (Rin : List (List Obs
     (hpl : ∀ kp w, Iris.Std.PartialMap.get? P'.um kp = some w → (M' kp).length = 4096)
     (htag : consTagged bs hs d) (hwin : consWindow sl cur d bs hs) (hch : consChain sl) :
     ([∗list] h ∈ hs, MachFixedGS.rxTag (hlc := hlc) (GF := GF) h) ⊢
-      consStoredLb fscCons sl -∗ consSwallow fscCons True sl d dc -∗
+      consStoredLb fscCons sl -∗
+      consSwallow fscCons (¬ uvaWmapped pt (addr + BitVec.ofNat 64 d).toNat) sl d dc -∗
       (∃ sl' ws : List (List Obs × BitVec 8),
           consStoredLb fscCons sl' ∗ ⌜sl <+: sl'⌝ ∗ ⌜sl'.length = cur + dc⌝ ∗ ⌜ws.length = dc⌝ ∗
           ⌜∀ i : Nat, i < dc → ws[i]? = sl'[cur + i]?⌝ ∗ Rin ws) -∗
-      Rd cur dc -∗ consoleReceipt (hlc := hlc) Rd Rin n r M' addr := by
+      Rd cur dc -∗ consoleReceipt (hlc := hlc) gn pt Rd Rin n r M' addr := by
   obtain ⟨hsl, hhl, hw⟩ := hwin
   have hled := frd_ledger P' Vw M' addr d bs hs hM hmap hpl htag
   unfold consoleReceipt
@@ -565,7 +566,7 @@ theorem frd_receipt_of_run (Rd : Nat → Nat → IProp GF) (Rin : List (List Obs
 
 /-- ...AND THE ARM A CONCURRENT READER LEAVES (Rocq
 `console_receipt_of_dirty`). -/
-theorem frd_receipt_of_dirty (Rd : Nat → Nat → IProp GF) (Rin : List (List Obs × BitVec 8) → IProp GF)
+theorem frd_receipt_of_dirty (gn : GName) (pt : UPtd) (Rd : Nat → Nat → IProp GF) (Rin : List (List Obs × BitVec 8) → IProp GF)
     (P' : UPtd) (Vw M' : Nat → List (BitVec 8)) (addr : BitVec 64) (n : Int) (r : BitVec 64)
     (d dc cur : Nat) (bs : Nat → BitVec 8) (hs : List (List Obs)) (sl : List (List Obs × BitVec 8))
     (hd : d = r.toNat) (hdmax : (d : Int) ≤ max 0 n) (hb1 : (d : Int) = max 0 n → dc = d)
@@ -575,7 +576,7 @@ theorem frd_receipt_of_dirty (Rd : Nat → Nat → IProp GF) (Rin : List (List O
     (htag : consTagged bs hs d) :
     ([∗list] h ∈ hs, MachFixedGS.rxTag (hlc := hlc) (GF := GF) h) ⊢
       consStoredLb fscCons sl -∗ consDirtyCred (appSup (GF := GF)) -∗
-      Rd cur dc -∗ consoleReceipt (hlc := hlc) Rd Rin n r M' addr := by
+      Rd cur dc -∗ consoleReceipt (hlc := hlc) gn pt Rd Rin n r M' addr := by
   have hled := frd_ledger P' Vw M' addr d bs hs hM hmap hpl htag
   have hhl := htag.1
   unfold consoleReceipt

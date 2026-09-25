@@ -90,7 +90,7 @@ theorem frd_consoleread (CR : CONSOLEREAD) (Γ : SchedNames) [ClaimIs (hlc := hl
     isConslock fscCons (appSup (GF := GF)) γc ∗ consPay fscCons (appSup (GF := GF)) ord ∗
     consReadPay (genId (hlc := hlc) (GF := GF) + 1) Rin ∗ uartInv .uart0 fscCons.uart ∗
     isLock γkl kmemLockAddr "kmem" (kmemRes γk) ∗ kallocAvail γk none ∗
-    procPrivExt (procAddr j) pid V V.upt M ∗
+    procPrivExt (procAddr j) pid V V.upt M ∗ genHalvesPriv (procAddr j) pid V.gen ∗
     (∀ (c' : CPU) (spie spp : Bool) (R' : RegMap) (P' : UPtd)
       (M' : Nat → List (BitVec 8)) (d dc cur : Nat) (bs : Nat → BitVec 8) (hs : List (List Obs))
       (sl : List (List Obs × BitVec 8)),
@@ -100,9 +100,11 @@ theorem frd_consoleread (CR : CONSOLEREAD) (Γ : SchedNames) [ClaimIs (hlc := hl
         ((d : Int) = max 0 n → dc = d) ∧
         (R' 10#5 = BitVec.ofInt 64 (d : Int) → d = 0 → 0 < n → dc = d + 1) ∧
         consTagged bs hs d⌝ -∗
+      (⌜R' 10#5 = -1#64⌝ -∗ killShot V.gen) -∗
       ([∗list] h ∈ hs, MachFixedGS.rxTag (hlc := hlc) (GF := GF) h) -∗
       consStoredLb fscCons sl -∗
-      ((⌜consWindow sl cur d bs hs⌝ ∗ ⌜consChain sl⌝ ∗ consSwallow fscCons True sl d dc ∗
+      ((⌜consWindow sl cur d bs hs⌝ ∗ ⌜consChain sl⌝ ∗
+         consSwallow fscCons (¬ uvaWmapped V.upt ((k'.regs 11#5) + BitVec.ofNat 64 d).toNat) sl d dc ∗
          (∃ sl' ws : List (List Obs × BitVec 8),
             consStoredLb fscCons sl' ∗ ⌜sl <+: sl'⌝ ∗ ⌜sl'.length = cur + dc⌝ ∗ ⌜ws.length = dc⌝ ∗
             ⌜∀ i : Nat, i < dc → ws[i]? = sl'[cur + i]?⌝ ∗ Rin ws)) ∨
@@ -110,22 +112,22 @@ theorem frd_consoleread (CR : CONSOLEREAD) (Γ : SchedNames) [ClaimIs (hlc := hl
       consOut fscCons (appSup (GF := GF)) ord cur dc -∗
       kctx c' ((k'.withSpie spie spp).withRegs R') -∗ pcIs c' (jumpPc (k'.regs 1#5)) -∗
       trapCsrsExt c' k'.sie -∗ cpuClaimExt c' k'.sie k'.proc -∗
-      procPrivExt (procAddr j) pid V P' M' -∗ wpLoop c')
+      procPrivExt (procAddr j) pid V P' M' -∗ genHalvesPriv (procAddr j) pid V.gen -∗ wpLoop c')
     ⊢ wpLoop (GF := GF) c := by
   have h := CR.wp_consoleread_eb (hlc := hlc) (GF := GF) Γ c k' γc fscCons appSup ord Rin γkl γk j
     pid V M n hj hproc hK hnoff htier huser hn hn'
   unfold wp_consoleread_eb_body at h
   simp only [consolereadAddr] at h
-  iintro ⟨Hk, Hpc, #Hpi, Hte, Hce, #Hcl, Hpay, Hrin, #Hui, #Hkl, #Hav, Hpriv, HK⟩
+  iintro ⟨Hk, Hpc, #Hpi, Hte, Hce, #Hcl, Hpay, Hrin, #Hui, #Hkl, #Hav, Hpriv, Hgen, HK⟩
   ihave Hpriv := (procPrivExt_conv0 ht (procAddr j) pid V M).2 $$ Hpriv
   iapply h
-  iframe Hk Hpc Hpi Hte Hce Hcl Hpay Hrin Hui Hkl Hav Hpriv
+  iframe Hk Hpc Hpi Hte Hce Hcl Hpay Hrin Hui Hkl Hav Hpriv Hgen
   iapply wpNext_intro
-  iintro %c' %spie %spp %R' %P' %M' %d %dc %cur %bs %hs %sl %hp Hts Hlb Hwin Hout Hk Hpc Hte Hce
-    Hpriv
+  iintro %c' %spie %spp %R' %P' %M' %d %dc %cur %bs %hs %sl %hp Hks Hts Hlb Hwin Hout Hk Hpc Hte Hce
+    Hpriv Hgen
   ihave Hpriv := (procPrivExt_conv ht (procAddr j) pid V P' M').1 $$ Hpriv
-  iapply HK $$ %c' %spie %spp %R' %P' %M' %d %dc %cur %bs %hs %sl %hp Hts Hlb Hwin Hout Hk Hpc Hte
-    Hce Hpriv
+  iapply HK $$ %c' %spie %spp %R' %P' %M' %d %dc %cur %bs %hs %sl %hp Hks Hts Hlb Hwin Hout Hk Hpc Hte
+    Hce Hpriv Hgen
 
 /-- What ilock's read arm hands back that stays unchanged until iunlock
 (the lock, the handle, the identity halves, the valid cell, the freeze

@@ -697,13 +697,14 @@ def crRun (cn : ConsNames) (Wd : IProp GF) (Rin : List (List Obs × BitVec 8) �
 
 /-- ...and at an exit (Rocq `cr_winR`'s resource), the cursor at `dc`. -/
 def crRunOut (cn : ConsNames) (Wd : IProp GF) (Rin : List (List Obs × BitVec 8) → IProp GF)
-    (ord : Option Nat) (d dc : Nat) (bs : Nat → BitVec 8) (hs : List (List Obs)) : IProp GF :=
-  iprop(crRout cn Wd Rin (fun _ => True) ord d dc bs hs ∗
+    (fault : Nat → Prop) (ord : Option Nat) (d dc : Nat) (bs : Nat → BitVec 8) (hs : List (List Obs)) :
+    IProp GF :=
+  iprop(crRout cn Wd Rin fault ord d dc bs hs ∗
     ([∗list] h ∈ hs, MachFixedGS.rxTag (hlc := hlc) (GF := GF) h) ∗ ⌜consTagged bs hs d⌝)
 
 theorem crRunOut_of_run (cn : ConsNames) (Wd : IProp GF) (Rin : List (List Obs × BitVec 8) → IProp GF)
-    (ord : Option Nat) (d : Nat) (bs : Nat → BitVec 8) (hs : List (List Obs)) :
-    crRun (GF := GF) cn Wd Rin ord d bs hs ⊢ crRunOut cn Wd Rin ord d d bs hs := by
+    (fault : Nat → Prop) (ord : Option Nat) (d : Nat) (bs : Nat → BitVec 8) (hs : List (List Obs)) :
+    crRun (GF := GF) cn Wd Rin ord d bs hs ⊢ crRunOut cn Wd Rin fault ord d d bs hs := by
   unfold crRun crRunOut
   iintro ⟨Hr, Ht, %h⟩
   iframe Ht

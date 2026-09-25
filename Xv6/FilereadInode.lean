@@ -135,8 +135,9 @@ def frdK (k : KCtx) (γ : FileNames) (fk : Nat) (q : Qp) (st : FdState) (j : Nat
     kctx c ((k.withSpie spie spp).withRegs R') -∗ pcIs c (jumpPc (k.regs 1#5)) -∗
     trapCsrsExt c k.sie -∗ cpuClaimExt c k.sie k.proc -∗
     fileRef γ fk q st -∗ procPrivExt (procAddr j) pid V P' M' -∗
+    genHalvesPriv (procAddr j) pid V.gen -∗
     filereadEnvOut (hlc := hlc) st -∗
-    filereadArms (hlc := hlc) st n F Rd Rin P (R' 10#5) M' (k.regs 11#5) -∗ wpLoop c)
+    filereadArms (hlc := hlc) V.gen V.upt st n F Rd Rin P (R' 10#5) M' (k.regs 11#5) -∗ wpLoop c)
 
 /-! ## The lock-held ghost steps -/
 

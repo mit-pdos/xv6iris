@@ -126,11 +126,13 @@ theorem syscDepRead_holds : SyscDepRead (hlc := hlc) (GF := GF) := by
   iapply Hw
   isplitl []
   · ipureintro; exact hret
-  iexists P', M1
+  iexists P', V.upt, M1
   iframe Hc
   isplitl []
   · ipureintro; rfl
+  isplitl []
   · ipureintro; exact permOf_extSz hext
+  · ipureintro; rfl
 
 /-- **`SyscDepWrite`** at the instance: the input at the writer's image
 (`imgAgrees_writerImg`), and the receipt at the unmoved image. -/

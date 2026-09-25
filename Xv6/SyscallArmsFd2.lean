@@ -125,13 +125,14 @@ theorem syscall_arm_read (SR : SYSREAD)
     · rw [hm1, syscM1]; exact filereadRet_m1 _
     · exact h
   rw [sysFdSt_key ha] at *
+  subst hgn
   ihave Hsp := Hout $$ %(R2 10#5) %P' %M1 %d %⟨hext, hw, hfr⟩ Hx
   unfold syscallRet syscallAddr at *
-  iapply (syscall_ret_fd PT Γ c0 cpu k spie2 spp2 R2 γ j pid V M sts gn cs ip f
+  iapply (syscall_ret_fd PT Γ c0 cpu k spie2 spp2 R2 γ j pid V M sts V.gen cs ip f
     { V with upt := P' } M1 sts cs hj hproc hK htier hpins2 hs2' hrows 5 hn5
     (by decide) (by decide) (by decide))
   iframe Hk Hpc Hframe Hte Hce Hbs Hip Hfd Hir Henv Hpriv Hfr Hch Hnext
-  iapply (syscSysOut_ret f V M sts gn cs pid { V with upt := P' } M1 (R2 10#5)
+  iapply (syscSysOut_ret f V M sts V.gen cs pid { V with upt := P' } M1 (R2 10#5)
     (umemLazy P' V.sz.toNat M1) sts V.cwi cs 5 hn5 (by decide) (by decide) hl0 rfl rfl)
   iexact Hsp
 

@@ -115,12 +115,12 @@ theorem frd_arm_pipe (PR : PIPEREAD) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF 
     trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗
     procsInv Γ ∗ isLock γkl kmemLockAddr "kmem" (kmemRes γk) ∗ kallocAvail γk none ∗
     frefTok γ fk q ∗ fileFieldsAt curCtx fk q C ∗ filePaySt γ fk q C (.open true wb .pipe) ∗
-    procPrivExt (procAddr j) pid V V.upt M ∗ P ∗
+    procPrivExt (procAddr j) pid V V.upt M ∗ genHalvesPriv (procAddr j) pid V.gen ∗ P ∗
     frdK (hlc := hlc) k γ fk q (.open true wb .pipe) j pid V M n F Rd Rin P
     ⊢ wpLoop (GF := GF) cpu := by
   have hK' : 6 + readiSlots ≤ k.avail := hK
   have hK6 : 6 ≤ k.avail := by unfold readiSlots bmapSlots ballocSlots breadSlots panicSlots at hK'; omega
-  iintro ⟨Hk, Hpc, Hframe, Hte, Hce, #Hpi, #Hkl, #Hav, Htok, Hfields, Hpay, Hpriv, HP, HΦ⟩
+  iintro ⟨Hk, Hpc, Hframe, Hte, Hce, #Hpi, #Hkl, #Hav, Htok, Hfields, Hpay, Hpriv, Hgen, HP, HΦ⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
   icases filerw_fields_pipe fk q C $$ Hfields with ⟨Hpcell, Hfw⟩
   icases filerw_pay_pipe γ fk q C true wb hty $$ Hpay with ⟨%γl, %γp, #Hpp, Hpref, Hpback⟩
@@ -192,7 +192,7 @@ theorem frd_arm_pipe (PR : PIPEREAD) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF 
     · exact Or.inr hm
     · exact Or.inl (by rw [hd, BitVec.ofInt_natCast])
   unfold frdK
-  iapply HΦ $$ %c' %spie1 %spp1 %R' %P' %M' %d [] Hk Hpc Hte Hce Href Hpriv [] [HP]
+  iapply HΦ $$ %c' %spie1 %spp1 %R' %P' %M' %d [] Hk Hpc Hte Hce Href Hpriv Hgen [] [HP]
   · ipureintro; exact ⟨hcs, hext, hdle, hr10, hwin⟩
   · iapply frd_envout_pipe
   · unfold filereadArms
@@ -201,7 +201,7 @@ theorem frd_arm_pipe (PR : PIPEREAD) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF 
       rcases hr10 with hd | hm
       · rw [hd]; exact frd_ret_nat n d hdle
       · rw [hm]; exact filereadRet_m1 n
-    iapply filereadExtra_pipe F Rd Rin P wb n _ M' _ $$ HP
+    iapply filereadExtra_pipe V.gen V.upt F Rd Rin P wb n _ M' _ $$ HP
 
 set_option maxHeartbeats 8000000 in
 /-- **`+0xa4 .. +0xac`: THE ELSE ARM** (Rocq's `fr_panic`): the literal,

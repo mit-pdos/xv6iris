@@ -147,7 +147,7 @@ theorem srd_ok_back (cpu : CPU) (k : KCtx) (γ : FileNames) (j : Nat) (pid : Bit
     procOfilesOwe γ V.fdg (procAddr j) V.ofile [fd0] ∗
     fileRef γ kk q st ∗ fdStAuth V.fdg fd0 st ∗ fdFrags V.fdg sts ∗
     filereadEnvOut (hlc := hlc) st ∗ (filereadEnvOut (hlc := hlc) st -∗ filereadFsOut) ∗
-    filereadArms (hlc := hlc) st (argZ v2) F Rd Rin P (R 10#5) M' a1 ∗
+    filereadArms (hlc := hlc) V.gen V.upt st (argZ v2) F Rd Rin P (R 10#5) M' a1 ∗
     (∀ c : CPU, sysReadPost (hlc := hlc) k γ j pid V M sts v v1 v2 F Rd Rin P c)
     ⊢ wpLoop (GF := GF) cpu := by
   subst a1

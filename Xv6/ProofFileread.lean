@@ -122,13 +122,14 @@ theorem frd_dispatch (PR : PIPEREAD) (IL : ILOCK) (RD : READI) (IU : IUNLOCK) (C
     procsInv Γ ∗ panicEnv ∗ isLock γkl kmemLockAddr "kmem" (kmemRes γk) ∗ kallocAvail γk none ∗
     foffRow st ∗
     frefTok γ fk q ∗ fileFieldsAt curCtx fk q C ∗ filePaySt γ fk q C st ∗
-    procPrivExt (procAddr j) pid V V.upt M ∗ filereadEnv (hlc := hlc) st ∗
+    procPrivExt (procAddr j) pid V V.upt M ∗ genHalvesPriv (procAddr j) pid V.gen ∗
+    filereadEnv (hlc := hlc) st ∗
     filereadIn (hlc := hlc) st F Rd Rin P ∗ P ∗
     frdK (hlc := hlc) k γ fk q st j pid V M n F Rd Rin P
     ⊢ wpLoop (GF := GF) cpu := by
   obtain ⟨r2, r8, r9, r18, r19, r20, r21, r22, r23, r24, r25, r26, r27⟩ := id hr
   iintro ⟨Hk, Hpc, Hframe, Hte, Hce, #Hpi, #Hpe, #Hkl, #Hav, #Hfoff, Htok, Hfields, Hpay,
-    Hpriv, Henv, Hin, HP, HΦ⟩
+    Hpriv, Hgen, Henv, Hin, HP, HΦ⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
   -- +0x20  c.lw a5,0(a0)
   icases filerw_fields_type fk q C $$ Hfields with ⟨Hty, Hft⟩
@@ -259,13 +260,17 @@ theorem fileread_main (PR : PIPEREAD) (IL : ILOCK) (RD : READI) (IU : IUNLOCK) (
   have hlocks : k.locks = [] := List.eq_nil_of_length_eq_zero (by have := hkwf.2.2.2.1; omega)
   -- THE CONTRACT'S CONTINUATION, hart-free, at the ambient block form (the cwd
   -- reference and the generation row parked in it)
-  icases (filerw_core_conv ht0 (procAddr j) pid V V.upt M).1 $$ Hpriv with ⟨Hpriv, Hcwd⟩
-  ihave HΦ : frdK (hlc := hlc) k γ fk q st j pid V M n F Rd Rin P $$ [Hnext Hcwd]
+  icases (filerw_core_conv ht0 (procAddr j) pid V V.upt M).1 $$ Hpriv with ⟨Hpriv, Hcwd, Hpg⟩
+  -- the generation halves stay out: consoleread's kill read lends them
+  unfold procGenAt
+  icases Hpg with ⟨Hft, HQ, Hxs, Hgen⟩
+  ihave HΦ : frdK (hlc := hlc) k γ fk q st j pid V M n F Rd Rin P $$ [Hnext Hcwd Hft HQ Hxs]
   · unfold frdK filereadPost
-    iintro %c %spie %spp %R' %P' %M' %d %hp Hk Hpc Hte Hce Href Hpriv Henv Harms
+    iintro %c %spie %spp %R' %P' %M' %d %hp Hk Hpc Hte Hce Href Hpriv Hgen Henv Harms
     ihave HK := wpNext_at true k.proc cpu c _ (frd_pin hj k hproc c cpu) $$ Hnext
-    ihave Hpriv := (filerw_core_conv ht0 (procAddr j) pid V P' M').2 $$ [Hpriv Hcwd]
-    · iframe
+    ihave Hpriv := (filerw_core_conv ht0 (procAddr j) pid V P' M').2 $$ [Hpriv Hcwd Hft HQ Hxs Hgen]
+    · unfold procGenAt
+      iframe
     iapply HK $$ %spie %spp %R' %P' %M' %d %hp Hk Hpc Hte Hce Href Hpriv Henv Harms
   -- the reference, taken apart
   icases filerw_ref_open γ fk q st $$ Href with ⟨%C, %⟨inumC, γoC, hok⟩, Htok, Hfields, Hpay⟩
@@ -309,14 +314,14 @@ theorem fileread_main (PR : PIPEREAD) (IL : ILOCK) (RD : READI) (IU : IUNLOCK) (
     ihave Henv := fileread_env_out_of_env st $$ Henv
     ihave HP := filereadIn_unreadable F Rd Rin P inumC γoC C st hok hrz $$ Hin HP
     unfold frdK
-    iapply HΦ $$ %c' %k.spie %k.spp %R' %V.upt %M %0 [] Hk Hpc Hte Hce Href Hpriv Henv [HP]
+    iapply HΦ $$ %c' %k.spie %k.spp %R' %V.upt %M %0 [] Hk Hpc Hte Hce Href Hpriv Hgen Henv [HP]
     · ipureintro
       exact ⟨hcs, UMemL.extSz_refl _ _, by omega, Or.inr h10, frd_wrote0 _ _ _⟩
     · unfold filereadArms
       rw [show R' 10#5 = -1#64 by rw [h10]; decide]
       isplitr
       · ipureintro; exact filereadRet_m1 n
-      iapply filereadExtra_unreadable F Rd Rin P inumC γoC C st n M (k.regs 11#5) hok hrz $$ HP
+      iapply filereadExtra_unreadable V.gen V.upt F Rd Rin P inumC γoC C st n M (k.regs 11#5) hok hrz $$ HP
   -- +0x0e  c.beqz a5 : falls (a readable descriptor)
   k_step_e (wp_s_branch cpu _ (KA.«fileread» + 0x0e#64) true 166#13 15#5 0#5 (by decide) bop.BEQ)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [filerw_beqz, decide_eq_false hrz]
@@ -380,10 +385,10 @@ theorem fileread_main (PR : PIPEREAD) (IL : ILOCK) (RD : READI) (IU : IUNLOCK) (
     · iframe
     ihave Henv := fileread_env_out_of_env st $$ Henv
     iapply wpLoop_fupd
-    imod filereadExtra_neg F Rd Rin P st n M (k.regs 11#5) hneg $$ Hin HP with Hex
+    imod filereadExtra_neg V.gen V.upt F Rd Rin P st n M (k.regs 11#5) hneg $$ Hin HP with Hex
     imodintro
     unfold frdK
-    iapply HΦ $$ %c' %k.spie %k.spp %R' %V.upt %M %0 [] Hk Hpc Hte Hce Href Hpriv Henv [Hex]
+    iapply HΦ $$ %c' %k.spie %k.spp %R' %V.upt %M %0 [] Hk Hpc Hte Hce Href Hpriv Hgen Henv [Hex]
     · ipureintro
       exact ⟨hcs, UMemL.extSz_refl _ _, by omega, Or.inr h10, frd_wrote0 _ _ _⟩
     · unfold filereadArms

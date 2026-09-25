@@ -48,14 +48,15 @@ Rocq's header, point for point:
    view (`imgAgrees_viewLazy`, `imgAgrees_writerImg`).  The posts of 15/17
    carry the view they fired at (`∃ Mv, ⌜imgAgrees W.M Mv⌝ ∗ …`).
 2. **READ'S AND WRITE'S TABLE ROWS.**  Rocq's row-5/16 posts carry `∃ P :
-   uptd` with `perm_of` / `proc_pt_wf` / `lazy_free` rows.  Lean's
-   `filereadExtraCore` takes no table (its console receipt has no
-   copyout-fault disjunct for the lazy row to refute), so row 5 carries the
-   page view the receipt is at, `∃ P Mv, ⌜umemLazy P W.sz Mv = M'⌝ ∗
-   ⌜permOf P.um W.sz = W.perm⌝ ∗ …` (Rocq's "honest weak form": SOME table
-   projecting to the key's permission map); row 16's `filewriteExtra` does
-   take the table, `∃ P Mv, ⌜permOf P.um W.sz = W.perm⌝ ∗ ⌜imgAgrees W.M
-   Mv⌝ ∗ …`.  `proc_pt_wf`/`lazy_free` are dropped (no Lean reader).
+   uptd` with `perm_of` / `proc_pt_wf` / `lazy_free` rows.  Row 5 is
+   `filereadExtraCore W.gen Pr …` at Rocq's receipt table `Pr` (the entry
+   table, `permOf Pr.um W.sz = W.perm`), and beside it the page view the
+   receipt's bytes are read at, `∃ P Mv, ⌜umemLazy P W.sz Mv = M'⌝ ∗
+   ⌜permOf P.um W.sz = W.perm⌝` (the resume table: Lean's receipts read a
+   PAGE VIEW, which Rocq's gmap image needs no table for); row 16's
+   `filewriteExtra` takes the table, `∃ P Mv, ⌜permOf P.um W.sz = W.perm⌝ ∗
+   ⌜imgAgrees W.M Mv⌝ ∗ …`.  `proc_pt_wf`/`lazy_free` are dropped (no Lean
+   reader).
 3. **THE SUPPLY IS `appSup ∗ uKillCred ∗ consLicence`.**  Rocq's is
    `app_sup ∗ app_taint`, with the console licence read off the taint
    (`WpUart.cons_licence_of_taint`, the application interface's `ai_lic`).
@@ -386,10 +387,10 @@ def xpostRead (F : Pfam GF (Aview → Nat → Anode → Nat → IProp GF)) (Rd :
     (Rin : List (List Obs × BitVec 8) → IProp GF) (W : Uvis) (r : BitVec 64) (M' : ElfMem) :
     IProp GF :=
   iprop(⌜filereadRet (argZ (xkA W 2)) r⌝ ∗
-    ∃ (P : UPtd) (Mv : Nat → List (BitVec 8)),
-      ⌜umemLazy P W.sz Mv = M'⌝ ∗ ⌜permOf P.um W.sz = W.perm⌝ ∗
-      filereadExtraCore (hlc := hlc) (fdStOfKey (xkA W 0) W.fd) (argZ (xkA W 2)) F Rd Rin r Mv
-        (xkA W 1))
+    ∃ (P Pr : UPtd) (Mv : Nat → List (BitVec 8)),
+      ⌜umemLazy P W.sz Mv = M'⌝ ∗ ⌜permOf P.um W.sz = W.perm⌝ ∗ ⌜permOf Pr.um W.sz = W.perm⌝ ∗
+      filereadExtraCore (hlc := hlc) W.gen Pr (fdStOfKey (xkA W 0) W.fd) (argZ (xkA W 2)) F Rd Rin r
+        Mv (xkA W 1))
 
 /-- post 9: chdir's RECEIPT at the cwd the call resumes at. -/
 def xpostChdir (P Pmiss : Nat → Nat → IProp GF) (Fo : Pfam GF (Aview → Nat → Anode → IProp GF))
@@ -527,7 +528,7 @@ theorem xv6Spost_cong (X : Uvis → IProp GF) (n : Int) (f : Xfam GF) (W W' : Uv
   have e1 : xkA W 1 = xkA W' 1 := h1
   have e2 : xkA W 2 = xkA W' 2 := h2
   unfold xv6Spost xpostRead xpostChdir xpostOpen xpostWrite xpostMknod xpostUnlink xpostMkdir
-  simp only [hM, e0, e1, e2, hfd, hcw, hpi, hsz]
+  simp only [hM, e0, e1, e2, hfd, hcw, hg, hpi, hsz]
   exact .rfl
 
 /-- **Rocq `xv6_sbundle_mono`**: the family occurs only as the CONCLUSION of

@@ -106,7 +106,7 @@ def sysReadRet (V : ProcPriv) (v : BitVec 64) (n : Int) (r : BitVec 64) : Prop :
 
 section Keyed
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FsTopG GF] [OffboxG GF]
-  [Appcfg GF] [FsBytesG GF] [Fscfg]
+  [CtokG GF] [Appcfg GF] [FsBytesG GF] [Fscfg]
 
 /-- THE CALLER'S INPUT (Rocq `sys_read_in`): fileread's, at the key. -/
 def sysReadIn (V : ProcPriv) (v : BitVec 64) (sts : List FdState)
@@ -121,7 +121,7 @@ def sysReadArms (V : ProcPriv) (v : BitVec 64) (sts : List FdState) (n : Int)
     (Rin : List (List Obs × BitVec 8) → IProp GF) (P : IProp GF)
     (r : BitVec 64) (M' : Nat → List (BitVec 8)) (addr : BitVec 64) : IProp GF :=
   iprop(⌜sysReadRet V v n r⌝ ∗
-    filereadExtra (hlc := hlc) (sysFdSt v V.ofile sts) n F Rd Rin P r M' addr)
+    filereadExtra (hlc := hlc) V.gen V.upt (sysFdSt v V.ofile sts) n F Rd Rin P r M' addr)
 
 variable (F : Pfam GF (Aview → Nat → Anode → Nat → IProp GF)) (Rd : Nat → Nat → IProp GF)
   (Rin : List (List Obs × BitVec 8) → IProp GF) (P : IProp GF)
@@ -138,7 +138,7 @@ theorem sysReadArms_ret (V : ProcPriv) (v : BitVec 64) (sts : List FdState) (n :
 theorem sysReadArms_extra (V : ProcPriv) (v : BitVec 64) (sts : List FdState) (n : Int)
     (r : BitVec 64) (M' : Nat → List (BitVec 8)) (addr : BitVec 64) :
     sysReadArms (hlc := hlc) V v sts n F Rd Rin P r M' addr ⊢
-      filereadExtra (hlc := hlc) (sysFdSt v V.ofile sts) n F Rd Rin P r M' addr := by
+      filereadExtra (hlc := hlc) V.gen V.upt (sysFdSt v V.ofile sts) n F Rd Rin P r M' addr := by
   unfold sysReadArms
   iintro ⟨-, H⟩
   iexact H
@@ -147,7 +147,7 @@ theorem sysReadArms_extra (V : ProcPriv) (v : BitVec 64) (sts : List FdState) (n
 theorem sysReadArms_pay (V : ProcPriv) (v : BitVec 64) (sts : List FdState) (n : Int)
     (r : BitVec 64) (M' : Nat → List (BitVec 8)) (addr : BitVec 64) :
     sysReadArms (hlc := hlc) V v sts n F Rd Rin P r M' addr ⊢
-      P ∗ filereadExtraCore (hlc := hlc) (sysFdSt v V.ofile sts) n F Rd Rin r M' addr := by
+      P ∗ filereadExtraCore (hlc := hlc) V.gen V.upt (sysFdSt v V.ofile sts) n F Rd Rin r M' addr := by
   unfold sysReadArms
   iintro ⟨-, H⟩
   iapply filereadExtra_pay $$ H
@@ -164,7 +164,7 @@ theorem sysReadArms_none (V : ProcPriv) (v : BitVec 64) (sts : List FdState) (n 
   isplitr
   · ipureintro; exact Or.inl ⟨hr, hnone⟩
   rw [hm]
-  iapply filereadExtra_closed F Rd Rin P n M' addr $$ HP
+  iapply filereadExtra_closed V.gen V.upt F Rd Rin P n M' addr $$ HP
 
 /-- ... and its input handed straight back. -/
 theorem sysReadIn_none (V : ProcPriv) (v : BitVec 64) (sts : List FdState)
@@ -187,7 +187,7 @@ theorem sysReadIn_of (V : ProcPriv) (v : BitVec 64) (sts : List FdState) (fd : N
 theorem sysReadArms_of (V : ProcPriv) (v : BitVec 64) (sts : List FdState) (fd : Nat)
     (fv : BitVec 64) (st : FdState) (n : Int) (r : BitVec 64) (M' : Nat → List (BitVec 8))
     (addr : BitVec 64) (hsome : argFd v V.ofile = some (fd, fv)) (hst : sts[fd]? = some st) :
-    filereadArms (hlc := hlc) st n F Rd Rin P r M' addr ⊢
+    filereadArms (hlc := hlc) V.gen V.upt st n F Rd Rin P r M' addr ⊢
       sysReadArms (hlc := hlc) V v sts n F Rd Rin P r M' addr := by
   unfold sysReadArms filereadArms
   rw [sysFdSt_some v V.ofile sts fd fv st hsome hst]

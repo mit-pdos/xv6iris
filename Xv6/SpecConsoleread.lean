@@ -27,13 +27,18 @@ link's answer `Rin ws` at the consumed window -- or, if somebody read
 behind the caller's back, the CREDENTIAL; and `consOut` (the token back at
 `cur + dc`).
 
+AND A `-1` HANDS THE READER THE KILL FACT (Rocq lane TRAP-ROWS T2): the
+one `-1` exit is the `killed(myproc())` test inside the wait loop, which
+fires only at a nonzero `p->killed`; `killed()` reads out this
+incarnation's persistent one-shot beside the flag (`KILLED.wp_killed_r` at
+the reading `KillRow.killPaid_shot`, lent the block's pid half and the
+registration eighth), so the post carries `⌜r = -1⌝ -∗ killShot V.gen`.
+THE SWALLOWED BYTE'S FAULT REASON is Rocq's: `¬ uvaWmapped V.upt (dst + d)`
+(`SpecEitherCopyout`'s, relayed at the ENTRY table).
+
 Deviations from Rocq:
-1. THE KILL SHOT (Rocq lane TRAP-ROWS T2, `r < 0 → kill_shot (pv_gen)`) is
-   not relayed: the Lean `killed` contract reports the flag and nothing
-   else.
-2. THE SWALLOWED BYTE'S FAULT REASON is `True` (Rocq: `¬ uva_wmapped
-   (pv_upt V) (dst + d)`): the Lean `either_copyout` failure arm carries no
-   reason.  The `C('D')` reason is Rocq's.
+1. (retired: the kill shot is relayed.)
+2. (retired: the swallow's fault reason is Rocq's.)
 3. The run's source function is `bs : Nat → BitVec 8`, written as the list
    `(List.range d).map bs` (`umemWrite` over `viewFaulted`, the landed
    convention, with the run's pages mapped in `P'`).
@@ -42,10 +47,13 @@ Deviations from Rocq:
 5. The interrupts-off derived form `wp_consoleread_body` is dropped (no
    users).
 6. THE PROCESS BLOCK is the BARE block `procPrivBareAt curCtx (procAddr j)
-   pid V M` (Rocq `proc_priv_bare` + the lazy claim) where Rocq's contract
-   takes `proc_priv_core` (bare ∗ cwd reference ∗ generation row): a
-   strictly weaker premise -- the function touches neither -- so the
-   file layer frames them around the call (`FileRwShared.filerw_core_conv`).
+   pid V M` (Rocq `proc_priv_bare` + the lazy claim) and the generation
+   row's `genHalvesPriv (procAddr j) pid V.gen` (the registration eighth
+   the kill read lends, and the pid's nonzeroness), lent and handed back,
+   where Rocq's contract takes `proc_priv_core` (bare ∗ cwd reference ∗
+   generation row): a strictly weaker premise -- the function touches
+   nothing else -- so the file layer frames the rest around the call
+   (`FileRwShared.filerw_core_conv`).
 
 Imports only definitional files.
 -/
@@ -97,7 +105,7 @@ def wp_consoleread_eb_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF]
   isConslock cn Wd γc ∗ consPay cn Wd ord ∗
   consReadPay (genId (hlc := hlc) (GF := GF) + 1) Rin ∗ uartInv .uart0 cn.uart ∗
   isLock γkl kmemLockAddr "kmem" (kmemRes γk) ∗ kallocAvail γk none ∗
-  procPrivBareAt curCtx (procAddr j) pid V M ∗
+  procPrivBareAt curCtx (procAddr j) pid V M ∗ genHalvesPriv (procAddr j) pid V.gen ∗
   wpNext true k.proc cpu (fun cpu' => iprop(∀ (spie spp : Bool) (R' : RegMap) (P' : UPtd)
     (M' : Nat → List (BitVec 8)) (d dc cur : Nat) (bs : Nat → BitVec 8) (hs : List (List Obs))
     (sl : List (List Obs × BitVec 8)),
@@ -107,9 +115,12 @@ def wp_consoleread_eb_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF]
       ((d : Int) = max 0 n → dc = d) ∧
       (R' 10#5 = BitVec.ofInt 64 (d : Int) → d = 0 → 0 < n → dc = d + 1) ∧
       consTagged bs hs d⌝ -∗
+    -- ...AND A NEGATIVE ANSWER IS A KILL: the incarnation's one-shot
+    (⌜R' 10#5 = -1#64⌝ -∗ killShot V.gen) -∗
     ([∗list] h ∈ hs, MachFixedGS.rxTag (hlc := hlc) (GF := GF) h) -∗
     consStoredLb cn sl -∗
-    ((⌜consWindow sl cur d bs hs⌝ ∗ ⌜consChain sl⌝ ∗ consSwallow cn True sl d dc ∗
+    ((⌜consWindow sl cur d bs hs⌝ ∗ ⌜consChain sl⌝ ∗
+       consSwallow cn (¬ uvaWmapped V.upt ((k.regs 11#5) + BitVec.ofNat 64 d).toNat) sl d dc ∗
        (∃ sl' ws : List (List Obs × BitVec 8),
           consStoredLb cn sl' ∗ ⌜sl <+: sl'⌝ ∗ ⌜sl'.length = cur + dc⌝ ∗ ⌜ws.length = dc⌝ ∗
           ⌜∀ i : Nat, i < dc → ws[i]? = sl'[cur + i]?⌝ ∗ Rin ws)) ∨
@@ -117,7 +128,8 @@ def wp_consoleread_eb_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF]
     consOut cn Wd ord cur dc -∗
     kctx cpu' ((k.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k.regs 1#5)) -∗
     trapCsrsExt cpu' k.sie -∗ cpuClaimExt cpu' k.sie k.proc -∗
-    procPrivBareAt curCtx (procAddr j) pid { V with upt := P' } M' -∗ wpLoop cpu'))
+    procPrivBareAt curCtx (procAddr j) pid { V with upt := P' } M' -∗
+    genHalvesPriv (procAddr j) pid V.gen -∗ wpLoop cpu'))
   ⊢ wpLoop (GF := GF) cpu
 
 /-- The interface of `consoleread`. -/

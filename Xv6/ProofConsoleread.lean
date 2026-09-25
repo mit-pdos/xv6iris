@@ -34,10 +34,15 @@ run with `crGlue`, the write image `crWrote`) or `crPopSwallow` (`^D` at
 boundary's link (`crOut_of_rout`, Rocq `cr_out_of_rout`) BEFORE the
 release, then pays `crPost` (the spec's delivered window).
 
-Deviations from Rocq (reported): no kill shot (Rocq's `kill_shot` on the
-killed arm is not threaded; the arm returns with `dc = d`); the swallow's
-fault reason is `True` (Lean's `either_copyout` gives no failure reason);
-the delivered run is a function `bs` over `List.range d`, not a list.
+THE KILL SHOT (Rocq's `Hkacc`): the `killed` call runs at its reading form
+(`cr_killed`, `KILLED.wp_killed_r`), lent the block's pid half and the
+registration eighth (`crBlk` carries the bare block with `genHalvesPriv`);
+at a nonzero flag the `-1` arm (`cr_minus1`) holds the incarnation's shot.
+THE SWALLOW'S FAULT REASON is Rocq's (`crFault`: the byte at `dst + d` is
+not writable at the entry table), off `either_copyout`'s failing arm.
+
+Deviations from Rocq (reported): the delivered run is a function `bs` over
+`List.range d`, not a list.
 
 EITHER ENTRY SIE (`wp_consoleread_eb_body`).  The caller brings the
 complement `trapCsrsExt`/`cpuClaimExt`; the entry `acquire(&cons)`'s arm
@@ -423,20 +428,50 @@ theorem cr_myproc (MP : MYPROC) (c : CPU) (k' : KCtx)
   simp only [myprocAddr] at h
   exact h
 
-theorem cr_killed (KL : KILLED) (Γ : SchedNames) (c : CPU) (k' : KCtx) (j : Nat)
+/-- `killed(myproc())` WITH THE READING (Rocq's `Hkacc` in
+`ProofConsoleread.v`): the block's pid half and registration eighth are
+lent into the critical section, and come back beside the flag's reading,
+`⌜kl = 0⌝ ∨ killShot gn` (`KillRow.killPaid_shot`). -/
+theorem cr_killed (KL : KILLED) (Γ : SchedNames) (c : CPU) (k' : KCtx) (j : Nat) (pid : BitVec 32)
+    (gn : GName)
     (hj : j < NPROC) (hp : k'.regs 10#5 = procAddr j)
     (hnoff : k'.noff + 1 < 2 ^ 31) (hK : 14 ≤ k'.avail) (hlk : "proc" ∉ k'.locks)
-    (htier : k'.tier = KTier.kpt) :
+    (htier : k'.tier = KTier.kpt) (hnz : pid.toNat ≠ 0) :
     kctx c k' ∗ pcIs c KA.«killed» ∗ procsInv Γ ∗
+    wordPointsTo (pPid (procAddr j)) 4 pidPriv pid ∗ pidReg pid (.own qeighth) gn ∗
     wpNext k'.sie k'.proc c (fun cpu' => iprop(∀ spie : Bool, ∀ spp : Bool, ∀ R' : RegMap,
+      ∀ kl : BitVec 32,
       ⌜k'.sie = false → spie = k'.spie ∧ spp = k'.spp⌝ -∗
       kctx cpu' ((k'.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k'.regs 1#5)) -∗
-      ⌜calleeSaved k'.regs R' ∧ ∃ kl : BitVec 32, R' 10#5 = BitVec.signExtend 64 kl⌝ -∗ wpLoop cpu'))
+      ⌜calleeSaved k'.regs R' ∧ R' 10#5 = BitVec.signExtend 64 kl⌝ -∗
+      (⌜kl = 0#32⌝ ∨ killShot gn) -∗
+      wordPointsTo (pPid (procAddr j)) 4 pidPriv pid -∗ pidReg pid (.own qeighth) gn -∗
+      wpLoop cpu'))
     ⊢ wpLoop (GF := GF) c := by
-  have h := KL.wp_killed (hlc := hlc) (GF := GF) Γ c k' j hj hp hnoff hK hlk htier
-  unfold wp_killed_body at h
+  have h := KL.wp_killed_r (hlc := hlc) (GF := GF) Γ c k' j
+    (fun kl => iprop((⌜kl = 0#32⌝ ∨ killShot gn) ∗ wordPointsTo (pPid (procAddr j)) 4 pidPriv pid ∗
+      pidReg pid (.own qeighth) gn)) hj hp hnoff hK hlk htier
+  unfold wp_killed_r_body at h
   simp only [killedAddr] at h
-  exact h
+  iintro ⟨Hk, Hpc, #Hpi, Hqp, Hrg, Hnext⟩
+  iapply h
+  iframe Hk Hpc Hpi
+  isplitl [Hqp Hrg]
+  · iintro %pidr %klr Hq Hr
+    icases (show wordPointsTo (GF := GF) (pPid (procAddr j)) 4 pidPub pidr ∗
+        wordPointsTo (pPid (procAddr j)) 4 pidPriv pid ⊢
+        ⌜pidr = pid⌝ ∗ wordPointsTo (pPid (procAddr j)) 4 pidPub pidr ∗
+          wordPointsTo (pPid (procAddr j)) 4 pidPriv pid from by
+      unfold pidPub pidPriv; exact wordPointsTo_agree_keep _ _ _ _ _ _) $$ [Hq Hqp]
+      with ⟨%he, Hq, Hqp⟩
+    · iframe Hq Hqp
+    subst he
+    icases killPaid_shot _ pidr klr (.own qeighth) gn hnz $$ [Hr Hrg] with ⟨Hr, Hrg, Hs⟩
+    · iframe Hr Hrg
+    iframe Hq Hr Hs Hqp Hrg
+  iapply wpNext_mono _ _ _ _ _ $$ Hnext
+  iintro %c' HK %spie %spp %R' %kl %hs Hk Hpc %hc ⟨Hs, Hqp, Hrg⟩
+  iapply HK $$ %spie %spp %R' %kl %hs Hk Hpc %hc Hs Hqp Hrg
 
 theorem cr_sleep_prepare (SP : SLEEP_PREPARE) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
     (c : CPU) (k' : KCtx) (j : Nat)
@@ -540,6 +575,19 @@ theorem cr_m1_ne (d : Nat) (h : d < 2 ^ 31) : ¬ (-1#64 : BitVec 64) = BitVec.of
 section
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [CurCtx]
 
+/-- The swallowed byte's fault reason at a run length (Rocq's
+`¬ uva_wmapped (pv_upt V) (dst + d)`): the byte at `dst + d` is not
+writable at the ENTRY table. -/
+def crFault (P : UPtd) (dst : BitVec 64) (d : Nat) : Prop :=
+  ¬ uvaWmapped P (dst + BitVec.ofNat 64 d).toNat
+
+/-- The block the loop carries: the bare block and the generation halves
+the kill read lends (`SpecConsoleread` deviation 6). -/
+def crBlk (j : Nat) (pid : BitVec 32) (V : ProcPriv) (P : UPtd) (Mi : Nat → List (BitVec 8)) :
+    IProp GF :=
+  iprop(procPrivBareAt curCtx (procAddr j) pid { V with upt := P } Mi ∗
+    genHalvesPriv (procAddr j) pid V.gen)
+
 /-- The specification's postcondition, named. -/
 def crPost (k : KCtx) (j : Nat) (pid : BitVec 32) (V : ProcPriv)
     (M : Nat → List (BitVec 8)) (n : Int) (cn : ConsNames) (Wd : IProp GF) (ord : Option Nat)
@@ -553,9 +601,11 @@ def crPost (k : KCtx) (j : Nat) (pid : BitVec 32) (V : ProcPriv)
       ((d : Int) = max 0 n → dc = d) ∧
       (R' 10#5 = BitVec.ofInt 64 (d : Int) → d = 0 → 0 < n → dc = d + 1) ∧
       consTagged bs hs d⌝ -∗
+    (⌜R' 10#5 = -1#64⌝ -∗ killShot V.gen) -∗
     ([∗list] h ∈ hs, MachFixedGS.rxTag (hlc := hlc) (GF := GF) h) -∗
     consStoredLb cn sl -∗
-    ((⌜consWindow sl cur d bs hs⌝ ∗ ⌜consChain sl⌝ ∗ consSwallow cn True sl d dc ∗
+    ((⌜consWindow sl cur d bs hs⌝ ∗ ⌜consChain sl⌝ ∗
+       consSwallow cn (¬ uvaWmapped V.upt ((k.regs 11#5) + BitVec.ofNat 64 d).toNat) sl d dc ∗
        (∃ sl' ws : List (List Obs × BitVec 8),
           consStoredLb cn sl' ∗ ⌜sl <+: sl'⌝ ∗ ⌜sl'.length = cur + dc⌝ ∗ ⌜ws.length = dc⌝ ∗
           ⌜∀ i : Nat, i < dc → ws[i]? = sl'[cur + i]?⌝ ∗ Rin ws)) ∨
@@ -563,7 +613,8 @@ def crPost (k : KCtx) (j : Nat) (pid : BitVec 32) (V : ProcPriv)
     consOut cn Wd ord cur dc -∗
     kctx cpu' ((k.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k.regs 1#5)) -∗
     trapCsrsExt cpu' k.sie -∗ cpuClaimExt cpu' k.sie k.proc -∗
-    procPrivBareAt curCtx (procAddr j) pid { V with upt := P' } M' -∗ wpLoop cpu')
+    procPrivBareAt curCtx (procAddr j) pid { V with upt := P' } M' -∗
+    genHalvesPriv (procAddr j) pid V.gen -∗ wpLoop cpu')
 
 theorem cr_post_at (cpu c : CPU) (k : KCtx) (j : Nat) (pid : BitVec 32) (V : ProcPriv)
     (M : Nat → List (BitVec 8)) (n : Int) (cn : ConsNames) (Wd : IProp GF) (ord : Option Nat)
@@ -617,12 +668,14 @@ theorem cr_epi (cpu cE : CPU) (k : KCtx) (j : Nat) (pid : BitVec 32) (V : ProcPr
     frame12 (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) (k.regs 9#5) (k.regs 18#5) (k.regs 19#5)
       (k.regs 20#5) v6 (k.regs 22#5) (k.regs 23#5) v9 v10 v11 ∗
     trapCsrsExt cE k.sie ∗ cpuClaimExt cE k.sie k.proc ∗
-    procPrivBareAt curCtx (procAddr j) pid { V with upt := P' } M' ∗
+    crBlk j pid V P' M' ∗
     ([∗list] h ∈ hs, MachFixedGS.rxTag (hlc := hlc) (GF := GF) h) ∗
-    crOut cn Wd Rin (fun _ => True) ord d dc bs hs ∗
+    crOut cn Wd Rin (crFault V.upt (k.regs 11#5)) ord d dc bs hs ∗
+    (⌜R 10#5 = -1#64⌝ -∗ killShot V.gen) ∗
     wpNext true k.proc cpu (crPost k j pid V M n cn Wd ord Rin)
     ⊢ wpLoop (GF := GF) cE := by
-  iintro ⟨Hk, Hpc, Hframe, Hte, Hce, Hpriv, #Htags, Hout, Hnext⟩
+  unfold crBlk
+  iintro ⟨Hk, Hpc, Hframe, Hte, Hce, ⟨Hpriv, Hgh⟩, #Htags, Hout, Hks, Hnext⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
   have hK' : 12 ≤ (k.withSpie spie spp).avail := by simp only [KCtx.withSpie_avail]; exact hK
   iapply (wp_epilogue12s7_gen cE (k.withSpie spie spp) (KA.«consoleread» + 0xce#64) hK' R
@@ -641,10 +694,17 @@ theorem cr_epi (cpu cE : CPU) (k : KCtx) (j : Nat) (pid : BitVec 32) (V : ProcPr
   ihave Hce := cpuClaimExt_move cE cE' k.sie k.proc (fun h => hpin (Or.inl h)) $$ Hce
   iintro Hk Hpc
   ihave HK := cr_post_at cpu cE' k j pid V M n cn Wd ord Rin hj hkproc $$ Hnext
-  unfold crOut
+  unfold crOut crFault
   icases Hout with ⟨%cur, %sl, #Hsl, Hwin, Hco⟩
   unfold crPost
-  iapply HK $$ %spie %spp %_ %P' %M' %d %dc %cur %bs %hs %sl [] Htags Hsl Hwin Hco Hk Hpc Hte Hce Hpriv
+  iapply HK $$ %spie %spp %_ %P' %M' %d %dc %cur %bs %hs %sl [] [Hks] Htags Hsl Hwin Hco Hk Hpc Hte Hce
+    Hpriv Hgh
+  rotate_left 1
+  · iintro %h
+    iapply Hks
+    ipureintro
+    simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true] at h ⊢
+    rw [h]; rfl
   ipureintro
   obtain ⟨hM', hmap⟩ := hwr
   refine ⟨?_, hext, hd, ?_, hM', hmap, hrow1, ?_, htag⟩
@@ -676,18 +736,18 @@ theorem cr_exit (RE : RELEASE) (c0 c : CPU) (k kb : KCtx) (hb : CrBase k kb) (γ
     (v3 v7 : BitVec 64) (h19 : R 19#5 = v3) (h23 : R 23#5 = v7)
     (hret : BitVec.signExtend 64 (BitVec.extractLsb' 0 32 v7 + -BitVec.extractLsb' 0 32 v3)
       = BitVec.ofInt 64 (d : Int))
-    (hd : (d : Int) ≤ max 0 n) (hext : V.upt.extSz V.sz P')
+    (hd : (d : Int) ≤ max 0 n) (hd31 : d < 2 ^ 31) (hext : V.upt.extSz V.sz P')
     (hwr : crWrote V.upt M (k.regs 11#5) d bs P' M')
     (hrow1 : (d : Int) = max 0 n → dc = d) (hrow2 : d = 0 → 0 < n → dc = d + 1)
     (v6 v9 v10 v11 : BitVec 64) :
     kctx c (((kb.pushOffAt a b).withLocks ["cons"]).withRegs R) ∗
     pcIs c (KA.«consoleread» + 0xfc#64) ∗
     crEnv cn Wd γc ord ∗ locked γc c ∗ consResCur cn ∗
-    crRunOut cn Wd Rin ord d dc bs hs ∗
+    crRunOut cn Wd Rin (crFault V.upt (k.regs 11#5)) ord d dc bs hs ∗
     frame12 (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) (k.regs 9#5) (k.regs 18#5) (k.regs 19#5)
       (k.regs 20#5) v6 (k.regs 22#5) (k.regs 23#5) v9 v10 v11 ∗
     trapCsrs c ∗ cpuClaim c k.proc ∗ intrRes c ∗
-    procPrivBareAt curCtx (procAddr j) pid { V with upt := P' } M' ∗
+    crBlk j pid V P' M' ∗
     wpNext true k.proc c0 (crPost k j pid V M n cn Wd ord Rin)
     ⊢ wpLoop (GF := GF) c := by
   iintro ⟨Hk, Hpc, #Henv, Hlocked, Hres, Hrun, Hframe, Htc, Hcl, Hir, Hpriv, Hnext⟩
@@ -700,7 +760,7 @@ theorem cr_exit (RE : RELEASE) (c0 c : CPU) (k kb : KCtx) (hb : CrBase k kb) (γ
   unfold crRunOut
   icases Hrun with ⟨Hrout, #Htags, %htag⟩
   iapply wpLoop_fupd
-  imod crOut_of_rout cn Wd γc Rin (fun _ => True) ord d dc bs hs $$ [Henv Hres Hrout]
+  imod crOut_of_rout cn Wd γc Rin (crFault V.upt (k.regs 11#5)) ord d dc bs hs $$ [Henv Hres Hrout]
     with ⟨Hres, Hout⟩
   · unfold crEnv
     icases Henv with ⟨#H1, #H2, #H3⟩
@@ -772,7 +832,13 @@ theorem cr_exit (RE : RELEASE) (c0 c : CPU) (k kb : KCtx) (hb : CrBase k kb) (γ
           exact Or.inr rfl)
       hd hext hwr hrow1 (fun _ => hrow2) htag v6 v9 v10 v11)
     $$ [- $Hk $Hpc $Hframe $Hte $Hce $Hpriv $Hout $Hnext]
-  iexact Htags
+  isplitr
+  · iexact Htags
+  · -- a count is not `-1`
+    iintro %h
+    exfalso
+    simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true] at h
+    exact cr_m1_ne d hd31 h.symm
 
 /-! ## The killed arm `+0xc0`: `release(&cons)`, return `-1` -/
 
@@ -797,21 +863,21 @@ theorem cr_minus1 (RE : RELEASE) (c0 c : CPU) (k kb : KCtx) (hb : CrBase k kb) (
     frame12 (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) (k.regs 9#5) (k.regs 18#5) (k.regs 19#5)
       (k.regs 20#5) v6 (k.regs 22#5) (k.regs 23#5) v9 v10 v11 ∗
     trapCsrs c ∗ cpuClaim c k.proc ∗ intrRes c ∗
-    procPrivBareAt curCtx (procAddr j) pid { V with upt := P' } M' ∗
+    crBlk j pid V P' M' ∗ killShot V.gen ∗
     wpNext true k.proc c0 (crPost k j pid V M n cn Wd ord Rin)
     ⊢ wpLoop (GF := GF) c := by
-  iintro ⟨Hk, Hpc, #Henv, Hlocked, Hres, Hrun, Hframe, Htc, Hcl, Hir, Hpriv, Hnext⟩
+  iintro ⟨Hk, Hpc, #Henv, Hlocked, Hres, Hrun, Hframe, Htc, Hcl, Hir, Hpriv, #Hks, Hnext⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
   ihave #Hlk := cr_env_lock cn Wd γc ord $$ Henv
   have hsie : (kb.pushOffAt a b).sie = false := rfl
   have hksie : kb.sie = k.sie := hb.sie
   have hav : kb.avail = k.avail - 12 := hb.avail
   -- THE FIRE, with the ring sealed (nothing popped extra: `dc = d`)
-  ihave Hrun := crRunOut_of_run cn Wd Rin ord d bs hs $$ Hrun
+  ihave Hrun := crRunOut_of_run cn Wd Rin (crFault V.upt (k.regs 11#5)) ord d bs hs $$ Hrun
   unfold crRunOut
   icases Hrun with ⟨Hrout, #Htags, %htag⟩
   iapply wpLoop_fupd
-  imod crOut_of_rout cn Wd γc Rin (fun _ => True) ord d d bs hs $$ [Henv Hres Hrout]
+  imod crOut_of_rout cn Wd γc Rin (crFault V.upt (k.regs 11#5)) ord d d bs hs $$ [Henv Hres Hrout]
     with ⟨Hres, Hout⟩
   · unfold crEnv
     icases Henv with ⟨#H1, #H2, #H3⟩
@@ -880,7 +946,10 @@ theorem cr_minus1 (RE : RELEASE) (c0 c : CPU) (k kb : KCtx) (hb : CrBase k kb) (
           intro h; exact absurd (by rw [← h]; decide) (cr_m1_ne d hd31))
       htag v6 v9 v10 v11)
     $$ [- $Hk $Hpc $Hframe $Hte $Hce $Hpriv $Hout $Hnext]
-  iexact Htags
+  isplitr
+  · iexact Htags
+  · iintro -
+    iexact Hks
 
 end
 
@@ -908,7 +977,7 @@ def crLoop (cpu : CPU) (k kb : KCtx) (γc : GName) (cn : ConsNames) (Wd : IProp 
     pcIs cur (KA.«consoleread» + 0x38#64) -∗
     trapCsrs cur -∗ cpuClaim cur k.proc -∗ intrRes cur -∗
     locked γc cur -∗ consResCur cn -∗ crRun cn Wd Rin ord d bs hs -∗
-    procPrivBareAt curCtx (procAddr j) pid { V with upt := P } Mi -∗
+    crBlk j pid V P Mi -∗
     frame12 (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) (k.regs 9#5) (k.regs 18#5) (k.regs 19#5)
       (k.regs 20#5) v6 (k.regs 22#5) (k.regs 23#5) v9 v10 v11 -∗
     wpNext true k.proc cpu (crPost k j pid V M n cn Wd ord Rin) -∗ wpLoop cur)
@@ -926,7 +995,7 @@ theorem crLoop_elim (cpu : CPU) (k kb : KCtx) (γc : GName) (cn : ConsNames) (Wd
       pcIs cur (KA.«consoleread» + 0x38#64) -∗
       trapCsrs cur -∗ cpuClaim cur k.proc -∗ intrRes cur -∗
       locked γc cur -∗ consResCur cn -∗ crRun cn Wd Rin ord d bs hs -∗
-      procPrivBareAt curCtx (procAddr j) pid { V with upt := P } Mi -∗
+      crBlk j pid V P Mi -∗
       frame12 (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) (k.regs 9#5) (k.regs 18#5) (k.regs 19#5)
         (k.regs 20#5) v6 (k.regs 22#5) (k.regs 23#5) v9 v10 v11 -∗
       wpNext true k.proc cpu (crPost k j pid V M n cn Wd ord Rin) -∗ wpLoop cur := by
@@ -944,7 +1013,7 @@ theorem crLoop_intro (cpu : CPU) (k kb : KCtx) (γc : GName) (cn : ConsNames) (W
       pcIs cur (KA.«consoleread» + 0x38#64) -∗
       trapCsrs cur -∗ cpuClaim cur k.proc -∗ intrRes cur -∗
       locked γc cur -∗ consResCur cn -∗ crRun cn Wd Rin ord d bs hs -∗
-      procPrivBareAt curCtx (procAddr j) pid { V with upt := P } Mi -∗
+      crBlk j pid V P Mi -∗
       frame12 (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) (k.regs 9#5) (k.regs 18#5) (k.regs 19#5)
         (k.regs 20#5) v6 (k.regs 22#5) (k.regs 23#5) v9 v10 v11 -∗
       wpNext true k.proc cpu (crPost k j pid V M n cn Wd ord Rin) -∗ wpLoop cur) ⊢
@@ -985,7 +1054,7 @@ theorem cr_ctrld (RE : RELEASE) (cpu c : CPU) (k kb : KCtx) (hb : CrBase k kb) (
     frame12 (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) (k.regs 9#5) (k.regs 18#5) (k.regs 19#5)
       (k.regs 20#5) (k.regs 21#5) (k.regs 22#5) (k.regs 23#5) v9 v10 v11 ∗
     trapCsrs c ∗ cpuClaim c k.proc ∗ intrRes c ∗
-    procPrivBareAt curCtx (procAddr j) pid { V with upt := P } Mi ∗
+    crBlk j pid V P Mi ∗
     wpNext true k.proc cpu (crPost k j pid V M n cn Wd ord Rin)
     ⊢ wpLoop (GF := GF) c := by
   iintro ⟨Hk, Hpc, #Henv, Hlocked, Hd, #Hts, Hgh, Hrun, Hr, Hw, He, Hframe, Htc, Hcl, Hir, Hpriv,
@@ -1029,14 +1098,14 @@ theorem cr_ctrld (RE : RELEASE) (cpu c : CPU) (k kb : KCtx) (hb : CrBase k kb) (
     ihave #Hpr := (show crEnv (GF := GF) cn Wd γc ord ⊢ crPrice Wd ord from by
       unfold crEnv; iintro ⟨-, -, #H⟩; iexact H) $$ Henv
     iapply wpLoop_fupd
-    imod crPopSwallow cn Wd γc Rin ord (fun _ => True) r w e buf ts 0 bs hs h bc hge hts hends
+    imod crPopSwallow cn Wd γc Rin ord (crFault V.upt (k.regs 11#5)) r w e buf ts 0 bs hs h bc hge hts hends
       (Or.inl ⟨rfl, hD⟩) $$ [Hlk Hpr Htg Hgh Hacc] with ⟨Hgh, Hrout⟩
     · iframe Hlk Hpr Htg Hgh Hacc
     imodintro
     ihave Hres := crResSeal cn (r + 1#32) w e buf ts hlb hlt (consOk_inc_r r w e hok hrw)
       (consRow_shift r e buf ts her hrow) $$ [Hr Hw He Hd Hts Hgh]
     · iframe Hr Hw He Hd Hts Hgh
-    ihave Hrun : crRunOut cn Wd Rin ord 0 1 bs hs $$ [Hrout Htags]
+    ihave Hrun : crRunOut cn Wd Rin (crFault V.upt (k.regs 11#5)) ord 0 1 bs hs $$ [Hrout Htags]
     · unfold crRunOut; iframe Hrout Htags; ipureintro; exact htag
     iapply (cr_exit RE cpu c k kb hb γc cn Wd ord Rin j pid V M n P Mi 0 1 bs hs hj hkproc hK a b _
         (by simp only [RegMap.set_apply, BitVec.reduceEq, ite_false]; exact p2)
@@ -1048,7 +1117,7 @@ theorem cr_ctrld (RE : RELEASE) (cpu c : CPU) (k kb : KCtx) (hb : CrBase k kb) (
         (BitVec.ofNat 64 (N - 0)) (BitVec.ofNat 64 N)
         (by simp only [RegMap.set_apply, BitVec.reduceEq, ite_false]; exact h19)
         (by simp only [RegMap.set_apply, BitVec.reduceEq, ite_false]; exact p23)
-        hret (by omega) hext hwr (by rw [hnN]; omega) (fun _ _ => rfl) (k.regs 21#5) v9 v10 v11)
+        hret (by omega) (by omega) hext hwr (by rw [hnN]; omega) (fun _ _ => rfl) (k.regs 21#5) v9 v10 v11)
       $$ [- $Hk $Hpc $Hlocked $Hres $Hrun $Hframe $Htc $Hcl $Hir $Hpriv $Hnext]
     iframe #
   · -- bytes already delivered: put the `^D` back (the ghost never popped)
@@ -1076,7 +1145,7 @@ theorem cr_ctrld (RE : RELEASE) (cpu c : CPU) (k kb : KCtx) (hb : CrBase k kb) (
     case' _ => iframe
     ihave Hres := crResSeal cn r w e buf ts hlb hlt hok hrow $$ [Hr Hw He Hd Hts Hgh]
     · iframe Hr Hw He Hd Hts Hgh
-    ihave Hrun := crRunOut_of_run cn Wd Rin ord d bs hs $$ Hrun
+    ihave Hrun := crRunOut_of_run cn Wd Rin (crFault V.upt (k.regs 11#5)) ord d bs hs $$ Hrun
     iapply (cr_exit RE cpu c k kb hb γc cn Wd ord Rin j pid V M n P Mi d d bs hs hj hkproc hK a b _
         (by simp only [RegMap.set_apply, BitVec.reduceEq, ite_false]; exact p2)
         (by simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true])
@@ -1087,7 +1156,7 @@ theorem cr_ctrld (RE : RELEASE) (cpu c : CPU) (k kb : KCtx) (hb : CrBase k kb) (
         (BitVec.ofNat 64 (N - d)) (BitVec.ofNat 64 N)
         (by simp only [RegMap.set_apply, BitVec.reduceEq, ite_false]; exact h19)
         (by simp only [RegMap.set_apply, BitVec.reduceEq, ite_false]; exact p23)
-        hret (by omega) hext hwr (fun _ => rfl) (fun h0 => absurd h0 hd0) (k.regs 21#5) v9 v10 v11)
+        hret (by omega) (by omega) hext hwr (fun _ => rfl) (fun h0 => absurd h0 hd0) (k.regs 21#5) v9 v10 v11)
       $$ [- $Hk $Hpc $Hlocked $Hres $Hrun $Hframe $Htc $Hcl $Hir $Hpriv $Hnext]
     iframe #
 
@@ -1132,7 +1201,7 @@ theorem cr_consume (RE : RELEASE) (EC : EITHER_COPYOUT)
     frame12 (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) (k.regs 9#5) (k.regs 18#5) (k.regs 19#5)
       (k.regs 20#5) (k.regs 21#5) (k.regs 22#5) (k.regs 23#5) v9 v10 v11 ∗
     trapCsrs c ∗ cpuClaim c k.proc ∗ intrRes c ∗
-    procPrivBareAt curCtx (procAddr j) pid { V with upt := P } Mi ∗
+    crBlk j pid V P Mi ∗
     wpNext true k.proc cpu (crPost k j pid V M n cn Wd ord Rin) ∗
     crLoop cpu k kb γc cn Wd ord Rin j pid V M n N m
     ⊢ wpLoop (GF := GF) c := by
@@ -1248,6 +1317,8 @@ theorem cr_consume (RE : RELEASE) (EC : EITHER_COPYOUT)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [cr_br_either]
   iintro Hk Hpc
   ihave Hcbuf := pw_byteBuf_one_intro _ _ _ $$ Hch
+  unfold crBlk
+  icases Hpriv with ⟨Hpriv, Hgen⟩
   ihave HprivE := (procPrivExt_conv htc (procAddr j) pid V P Mi).1 $$ Hpriv
   iapply (cr_copyout EC c _ γkl γk j pid V P Mi buf[(BitVec.signExtend 64 r &&& 127#64).toNat]
       hj ?hpC ?hnC ?hKC ?hlC ?huC ?hlnC) $$ [- $Hk $Hpc $HprivE]
@@ -1285,15 +1356,25 @@ theorem cr_consume (RE : RELEASE) (EC : EITHER_COPYOUT)
   ihave Hch := pw_byteBuf_one_elim _ _ _ $$ Hcbuf
   ihave Hf10 := Hchcl $$ %buf[(BitVec.signExtend 64 r &&& 127#64).toNat] Hch
   ihave Hpriv := (procPrivExt_conv htc (procAddr j) pid V P2 M2).2 $$ HprivE
+  ihave Hpriv : crBlk j pid V P2 M2 $$ [Hpriv Hgen]
+  · unfold crBlk; iframe Hpriv Hgen
   -- li a5,-1 ; beq a0,a5
   k_step (wp_s_addi c _ (KA.«consoleread» + 0xac#64) true 4095#12 15#5 0#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [KCtx.rget_zero]
   iintro Hk Hpc
-  rcases hpost with ⟨hr0, hM2, hmap2⟩ | ⟨hr1, dd, hdd, hM2, -⟩
+  rcases hpost with ⟨hr0, hM2, hmap2⟩ | ⟨hr1, dd, hdd, hM2, -, hnw⟩
   case inr =>
     -- the copy failed: nothing written; the byte is SWALLOWED
     have hd0 : dd = 0 := by simp only [List.length_singleton] at hdd; omega
     subst hd0
+    -- ...and its fault reason, restated at the ENTRY table (the rounds' tables only grow)
+    have hfault : crFault V.upt (k.regs 11#5) d := by
+      intro hW
+      apply hnw
+      have hW' := UMemL.uvaWmapped_mono hext.1 hW
+      k_norm_g
+      simpa only [RegMap.set_apply, BitVec.reduceEq, ite_true, ite_false, h20, BitVec.ofNat_eq_ofNat,
+        BitVec.add_zero] using hW'
     simp only [List.take_zero, UMemL.umemWrite_nil] at hM2
     subst hM2
     have hwr2 : crWrote V.upt M (k.regs 11#5) d bs P2 (viewFaulted P P2 Mi) :=
@@ -1301,14 +1382,14 @@ theorem cr_consume (RE : RELEASE) (EC : EITHER_COPYOUT)
     unfold crRun
     icases Hrun with ⟨Hacc, #Htags, %htag⟩
     iapply wpLoop_fupd
-    imod crPopSwallow cn Wd γc Rin ord (fun _ => True) r w e buf ts d bs hs hB bc hge hts hends
-      (Or.inr trivial) $$ [Hlk Hpr Htg Hgh Hacc] with ⟨Hgh, Hrout⟩
+    imod crPopSwallow cn Wd γc Rin ord (crFault V.upt (k.regs 11#5)) r w e buf ts d bs hs hB bc hge
+      hts hends (Or.inr hfault) $$ [Hlk Hpr Htg Hgh Hacc] with ⟨Hgh, Hrout⟩
     · iframe Hlk Hpr Htg Hgh Hacc
     imodintro
     ihave Hres := crResSeal cn (r + 1#32) w e buf ts hlb hlt (consOk_inc_r r w e hok hrw)
       (consRow_shift r e buf ts her hrow) $$ [Hr Hw He Hbuf Hts Hgh]
     · unfold consData; iframe Hr Hw He Hbuf Hts Hgh
-    ihave Hrun : crRunOut cn Wd Rin ord d (d + 1) bs hs $$ [Hrout Htags]
+    ihave Hrun : crRunOut cn Wd Rin (crFault V.upt (k.regs 11#5)) ord d (d + 1) bs hs $$ [Hrout Htags]
     · unfold crRunOut; iframe Hrout Htags; ipureintro; exact htag
     k_step (wp_s_branch c _ (KA.«consoleread» + 0xae#64) false 76#13 10#5 15#5 (by decide) bop.BEQ)
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
@@ -1337,7 +1418,7 @@ theorem cr_consume (RE : RELEASE) (EC : EITHER_COPYOUT)
         (BitVec.ofNat 64 (N - d)) (BitVec.ofNat 64 N)
         (by simp only [RegMap.set_apply, BitVec.reduceEq, ite_false]; exact h19C)
         (by simp only [RegMap.set_apply, BitVec.reduceEq, ite_false]; exact q23)
-        hret (by omega) hext' hwr2 (fun h => absurd h (by rw [hnN]; omega)) (fun _ _ => rfl) (k.regs 21#5) v9 _ v11)
+        hret (by omega) (by omega) hext' hwr2 (fun h => absurd h (by rw [hnN]; omega)) (fun _ _ => rfl) (k.regs 21#5) v9 _ v11)
       $$ [- $Hk $Hpc $Hlocked $Hres $Hrun $Hframe $Htc $Hcl $Hir $Hpriv $Hnext]
     iframe #
   -- the byte reached the user: THE POP
@@ -1403,7 +1484,7 @@ theorem cr_consume (RE : RELEASE) (EC : EITHER_COPYOUT)
     ihave Hframe := frame12_intro _ _ _ _ _ _ _ _ _ _ _ _ _
       $$ [Hf0 Hf1 Hf2 Hf3 Hf4 Hf5 Hf6 Hf7 Hf8 Hf9 Hf10 Hf11]
     case' _ => iframe
-    ihave Hrun := crRunOut_of_run cn Wd Rin ord (d + 1) _ _ $$ Hrun
+    ihave Hrun := crRunOut_of_run cn Wd Rin (crFault V.upt (k.regs 11#5)) ord (d + 1) _ _ $$ Hrun
     iapply (cr_exit RE cpu c k kb hb γc cn Wd ord Rin j pid V M n P2 _ (d + 1) (d + 1) _ _ hj hkproc hK
         a b _
         (by simp only [RegMap.set_apply, BitVec.reduceEq, ite_false]; exact q2)
@@ -1415,7 +1496,7 @@ theorem cr_consume (RE : RELEASE) (EC : EITHER_COPYOUT)
         (BitVec.ofNat 64 (N - d - 1)) (BitVec.ofNat 64 N)
         (by simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true])
         (by simp only [RegMap.set_apply, BitVec.reduceEq, ite_false]; exact q23)
-        hret1 (by omega) hext' hwr2 (fun _ => rfl) (fun h0 => absurd h0 (by omega))
+        hret1 (by omega) (by omega) hext' hwr2 (fun _ => rfl) (fun h0 => absurd h0 (by omega))
         (k.regs 21#5) v9 _ v11)
       $$ [- $Hk $Hpc $Hlocked $Hres $Hrun $Hframe $Htc $Hcl $Hir $Hpriv $Hnext]
     iframe #
@@ -1493,7 +1574,7 @@ def crEmpty (cpu : CPU) (k kb : KCtx) (γc : GName) (cn : ConsNames) (Wd : IProp
     pcIs cur (KA.«consoleread» + 0x48#64) -∗
     trapCsrs cur -∗ cpuClaim cur k.proc -∗ intrRes cur -∗
     locked γc cur -∗ consResCur cn -∗ crRun cn Wd Rin ord d bs hs -∗
-    procPrivBareAt curCtx (procAddr j) pid { V with upt := P } Mi -∗
+    crBlk j pid V P Mi -∗
     frame12 (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) (k.regs 9#5) (k.regs 18#5) (k.regs 19#5)
       (k.regs 20#5) v6 (k.regs 22#5) (k.regs 23#5) v9 v10 v11 -∗
     wpNext true k.proc cpu (crPost k j pid V M n cn Wd ord Rin) -∗
@@ -1513,7 +1594,7 @@ theorem crEmpty_elim (cpu : CPU) (k kb : KCtx) (γc : GName) (cn : ConsNames) (W
       pcIs cur (KA.«consoleread» + 0x48#64) -∗
       trapCsrs cur -∗ cpuClaim cur k.proc -∗ intrRes cur -∗
       locked γc cur -∗ consResCur cn -∗ crRun cn Wd Rin ord d bs hs -∗
-      procPrivBareAt curCtx (procAddr j) pid { V with upt := P } Mi -∗
+      crBlk j pid V P Mi -∗
       frame12 (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) (k.regs 9#5) (k.regs 18#5) (k.regs 19#5)
         (k.regs 20#5) v6 (k.regs 22#5) (k.regs 23#5) v9 v10 v11 -∗
       wpNext true k.proc cpu (crPost k j pid V M n cn Wd ord Rin) -∗
@@ -1533,7 +1614,7 @@ theorem crEmpty_intro (cpu : CPU) (k kb : KCtx) (γc : GName) (cn : ConsNames) (
       pcIs cur (KA.«consoleread» + 0x48#64) -∗
       trapCsrs cur -∗ cpuClaim cur k.proc -∗ intrRes cur -∗
       locked γc cur -∗ consResCur cn -∗ crRun cn Wd Rin ord d bs hs -∗
-      procPrivBareAt curCtx (procAddr j) pid { V with upt := P } Mi -∗
+      crBlk j pid V P Mi -∗
       frame12 (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) (k.regs 9#5) (k.regs 18#5) (k.regs 19#5)
         (k.regs 20#5) v6 (k.regs 22#5) (k.regs 23#5) v9 v10 v11 -∗
       wpNext true k.proc cpu (crPost k j pid V M n cn Wd ord Rin) -∗
@@ -1573,7 +1654,7 @@ theorem cr_empty_body (AC : ACQUIRE) (RE : RELEASE) (MP : MYPROC) (KL : KILLED)
     frame12 (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) (k.regs 9#5) (k.regs 18#5) (k.regs 19#5)
       (k.regs 20#5) v6 (k.regs 22#5) (k.regs 23#5) v9 v10 v11 ∗
     trapCsrs c ∗ cpuClaim c k.proc ∗ intrRes c ∗
-    procPrivBareAt curCtx (procAddr j) pid { V with upt := P } Mi ∗
+    crBlk j pid V P Mi ∗
     wpNext true k.proc c0 (crPost k j pid V M n cn Wd ord Rin) ∗
     crLoop c0 k kb γc cn Wd ord Rin j pid V M n N m ∗
     ▷ crEmpty c0 k kb γc cn Wd ord Rin j pid V M n N m
@@ -1613,10 +1694,24 @@ theorem cr_empty_body (AC : ACQUIRE) (RE : RELEASE) (MP : MYPROC) (KL : KILLED)
   have ha0' : R1 10#5 = procAddr j := by
     have h : R1 10#5 = kb.proc := ha0
     rw [h, hb.proc, hkproc]
+  -- THE KILL READ (Rocq `Hkacc`): the pid half and the registration eighth, lent
+  icases kctx_tier c _ $$ Hk with ⟨%hct, Hk⟩
+  have htc : curTier = KTier.kpt := by
+    have h := hct
+    simp only [KCtx.withLocks_tier, KCtx.withRegs_tier, KCtx.pushOffAt_tier, KCtx.withSpie_tier,
+      KCtx.setReg_tier] at h
+    rw [hb.tier] at h; exact h.symm
+  unfold crBlk
+  icases Hpriv with ⟨Hpriv, Hgen⟩
+  ihave HprivE := (procPrivExt_conv htc (procAddr j) pid V P Mi).1 $$ Hpriv
+  unfold procPrivExt
+  icases HprivE with ⟨%hpf, Hqp, Hpfl, Hppt, Hptf, %hplz⟩
+  ihave %hpnz := genHalvesPriv_nz (procAddr j) pid V.gen $$ Hgen
+  icases genHalvesPriv_reg (procAddr j) pid V.gen $$ Hgen with ⟨Hrg, Hgb⟩
   k_step (wp_s_jal c _ (KA.«consoleread» + 0x4c#64) false 8286#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [cr_br_killed]
   iintro Hk Hpc
-  iapply (cr_killed KL Γ c _ j hj ?hkp ?hkn ?hkK ?hkl ?hkt) $$ [- $Hk $Hpc]
+  iapply (cr_killed KL Γ c _ j pid V.gen hj ?hkp ?hkn ?hkK ?hkl ?hkt hpnz) $$ [- $Hk $Hpc $Hqp $Hrg]
   rotate_right 1
   k_norm_g [cr_ret_50]
   iframe #
@@ -1626,7 +1721,17 @@ theorem cr_empty_body (AC : ACQUIRE) (RE : RELEASE) (MP : MYPROC) (KL : KILLED)
   case hkl => k_norm_g; decide
   case hkt => k_norm_g; exact hb.tier
   iapply wpNext_off_intro
-  iintro %spieK %sppK %RK %hspK Hk Hpc %⟨hcsK, kl, hkl⟩
+  iintro %spieK %sppK %RK %kl %hspK Hk Hpc %⟨hcsK, hkl⟩ Hkr Hqp Hrg
+  ihave Hgen := Hgb $$ Hrg
+  ihave HprivE : procPrivExt (procAddr j) pid V P Mi $$ [Hqp Hpfl Hppt Hptf]
+  · unfold procPrivExt
+    iframe Hqp Hpfl Hppt Hptf
+    isplitl []
+    · ipureintro; exact hpf
+    · ipureintro; exact hplz
+  ihave Hpriv := (procPrivExt_conv htc (procAddr j) pid V P Mi).2 $$ HprivE
+  ihave Hpriv : crBlk j pid V P Mi $$ [Hpriv Hgen]
+  · unfold crBlk; iframe Hpriv Hgen
   k_norm_g at hspK
   obtain ⟨e1, e2⟩ := hspK trivial
   subst spieK; subst sppK
@@ -1648,11 +1753,14 @@ theorem cr_empty_body (AC : ACQUIRE) (RE : RELEASE) (MP : MYPROC) (KL : KILLED)
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
       with [hkl, bcond_bne_sext_ne kl hkilled]
     iintro Hk Hpc
+    icases Hkr with (%hz | #Hsh)
+    · exact absurd hz hkilled
     iapply (cr_minus1 RE c0 c k kb hb γc cn Wd ord Rin j pid V M n P Mi d bs hs hj hkproc hK
         a b RK g2 h21K g24 g25 g26 g27 (by rw [hnN]; omega) (by omega) hext hwr v6 v9 v10 v11)
-      $$ [- $Hk $Hpc $Hlocked $Hres $Hrun $Hframe $Htc $Hcl $Hir $Hpriv $Hnext]
+      $$ [- $Hk $Hpc $Hlocked $Hres $Hrun $Hframe $Htc $Hcl $Hir $Hpriv $Hsh $Hnext]
     iframe #
   subst hkilled
+  iclear Hkr
   k_step (wp_s_branch c _ (KA.«consoleread» + 0x50#64) true 112#13 10#5 0#5 (by decide) bop.BNE)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hkl, pw_bne0, bcond_bne_zero]
   iintro Hk Hpc
@@ -1901,7 +2009,7 @@ theorem cr_outer_body (AC : ACQUIRE) (RE : RELEASE) (MP : MYPROC) (KL : KILLED)
     frame12 (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) (k.regs 9#5) (k.regs 18#5) (k.regs 19#5)
       (k.regs 20#5) v6 (k.regs 22#5) (k.regs 23#5) v9 v10 v11 ∗
     trapCsrs c ∗ cpuClaim c k.proc ∗ intrRes c ∗
-    procPrivBareAt curCtx (procAddr j) pid { V with upt := P } Mi ∗
+    crBlk j pid V P Mi ∗
     wpNext true k.proc cpu (crPost k j pid V M n cn Wd ord Rin) ∗
     crLoop cpu k kb γc cn Wd ord Rin j pid V M n N m
     ⊢ wpLoop (GF := GF) c := by
@@ -1922,10 +2030,10 @@ theorem cr_outer_body (AC : ACQUIRE) (RE : RELEASE) (MP : MYPROC) (KL : KILLED)
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
       with [h19, cr_blez_nat (N - d) (by omega), decide_eq_true hdone]
     iintro Hk Hpc
-    ihave Hrun := crRunOut_of_run cn Wd Rin ord d bs hs $$ Hrun
+    ihave Hrun := crRunOut_of_run cn Wd Rin (crFault V.upt (k.regs 11#5)) ord d bs hs $$ Hrun
     iapply (cr_exit RE cpu c k kb hb γc cn Wd ord Rin j pid V M n P Mi d d bs hs hj hkproc hK a b R
         p2 h21 p24 p25 p26 p27 (BitVec.ofNat 64 (N - d)) (BitVec.ofNat 64 N) h19 p23 hret
-        (by rw [hnN]; omega) hext hwr (fun _ => rfl)
+        (by rw [hnN]; omega) (by omega) hext hwr (fun _ => rfl)
         (fun h0 hn => absurd hn (by rw [hnN]; omega)) v6 v9 v10 v11)
       $$ [- $Hk $Hpc $Hlocked $Hres $Hrun $Hframe $Htc $Hcl $Hir $Hpriv $Hnext]
     iframe #
@@ -2064,12 +2172,14 @@ theorem cr_start (AC : ACQUIRE) (RE : RELEASE) (MP : MYPROC) (KL : KILLED)
     frame12 (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) (k.regs 9#5) (k.regs 18#5) (k.regs 19#5)
       (k.regs 20#5) v6 (k.regs 22#5) (k.regs 23#5) v9 v10 v11 ∗
     trapCsrs c ∗ cpuClaim c k.proc ∗ intrRes c ∗
-    procPrivBareAt curCtx (procAddr j) pid V M ∗
+    procPrivBareAt curCtx (procAddr j) pid V M ∗ genHalvesPriv (procAddr j) pid V.gen ∗
     wpNext true k.proc cpu (crPost k j pid V M n cn Wd ord Rin)
     ⊢ wpLoop (GF := GF) c := by
   iintro ⟨Hk, Hpc, #Hpinv, #Henv, #Hkl, #Hav, Hlocked, Hres, Hpay, Hrp, Hframe, Htc, Hcl, Hir,
-    Hpriv, Hnext⟩
+    Hpriv, Hgen, Hnext⟩
   ihave Hpriv := pw_bare_to_ext curCtx (procAddr j) pid V M $$ Hpriv
+  ihave Hpriv : crBlk j pid V V.upt M $$ [Hpriv Hgen]
+  · unfold crBlk; iframe Hpriv Hgen
   -- the run starts: what it has earned is the caller's payment (Rocq `cr_racc_init`)
   let bs0 : Nat → BitVec 8 := fun _ => 0#8
   icases crResOpen cn $$ Hres with
@@ -2097,10 +2207,10 @@ theorem cr_start (AC : ACQUIRE) (RE : RELEASE) (MP : MYPROC) (KL : KILLED)
     have hret0 : BitVec.signExtend 64 (BitVec.extractLsb' 0 32 (BitVec.ofInt 64 n) +
         -BitVec.extractLsb' 0 32 (BitVec.ofInt 64 n)) = BitVec.ofInt 64 ((0 : Nat) : Int) := by
       rw [cr_subw_zero]; first | rfl | decide | simp
-    ihave Hrun := crRunOut_of_run cn Wd Rin ord 0 bs0 [] $$ Hrun
+    ihave Hrun := crRunOut_of_run cn Wd Rin (crFault V.upt (k.regs 11#5)) ord 0 bs0 [] $$ Hrun
     iapply (cr_exit RE cpu c k kb hb γc cn Wd ord Rin j pid V M n V.upt M 0 0 bs0 [] hj hkproc hK
         a b R hp2 hp21 hp24 hp25 hp26 hp27 (BitVec.ofInt 64 n) (BitVec.ofInt 64 n) hp19 hp23 hret0
-        (by omega) (UMemL.extSz_refl _ _) hunt (fun _ => rfl) (fun _ hn => absurd hn (by omega))
+        (by omega) (by omega) (UMemL.extSz_refl _ _) hunt (fun _ => rfl) (fun _ hn => absurd hn (by omega))
         v6 v9 v10 v11)
       $$ [- $Hk $Hpc $Hlocked $Hres $Hrun $Hframe $Htc $Hcl $Hir $Hpriv $Hnext]
     iframe #
@@ -2137,7 +2247,7 @@ theorem consoleread_proof (AC : ACQUIRE) (RE : RELEASE) (MP : MYPROC) (KL : KILL
       huser hn hn' => by
   unfold wp_consoleread_eb_body
   simp only [consolereadAddr]
-  iintro ⟨Hk, Hpc, #Hpinv, Hte, Hce, #Hlk, Hpay, Hrp, #Huinv, #Hkl, #Hav, Hpriv, HΦ⟩
+  iintro ⟨Hk, Hpc, #Hpinv, Hte, Hce, #Hlk, Hpay, Hrp, #Huinv, #Hkl, #Hav, Hpriv, Hgen, HΦ⟩
   ihave #Hlock := isConslock_lock cn Wd γc $$ Hlk
   icases cr_price_of_pay cn Wd ord $$ Hpay with ⟨Hpay, #Hpr⟩
   ihave Henv : crEnv (GF := GF) cn Wd γc ord $$ []
@@ -2229,7 +2339,7 @@ theorem consoleread_proof (AC : ACQUIRE) (RE : RELEASE) (MP : MYPROC) (KL : KILL
       (by simp only [RegMap.set_apply, BitVec.reduceEq, ite_false]; exact c26)
       (by simp only [RegMap.set_apply, BitVec.reduceEq, ite_false]; exact c27)
       w6 w9 w10 w11)
-    $$ [- $Hk $Hpc $Henv $Hlocked $Hres $Hpay $Hrp $Hframe $Htc $Hcl $Hir $Hpriv $HΦ]
+    $$ [- $Hk $Hpc $Henv $Hlocked $Hres $Hpay $Hrp $Hframe $Htc $Hcl $Hir $Hpriv $Hgen $HΦ]
   rotate_right 1
   case hb => exact ⟨hwf, rfl, hnoff, hlocks, rfl, htier, rfl, hint, ⟨_, _, _, rfl⟩⟩
   iframe #⟩

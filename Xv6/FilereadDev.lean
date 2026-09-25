@@ -77,16 +77,16 @@ theorem frd_dev_m1_post (k : KCtx) (spie spp : Bool) (γ : FileNames) (fk : Nat)
     (Rin : List (List Obs × BitVec 8) → IProp GF) (P : IProp GF) (hne : mj ≠ CONSOLE)
     (c' : CPU) (R' : RegMap) (hcs : calleeSaved k.regs R') (h10 : R' 10#5 = -1#64) :
     fileRef γ fk q (.open true wb (.device mj)) ∗ procPrivExt (procAddr j) pid V V.upt M ∗
-    filereadDevEnv (GF := GF) mj ∗
+    genHalvesPriv (procAddr j) pid V.gen ∗ filereadDevEnv (GF := GF) mj ∗
     filereadIn (hlc := hlc) (.open true wb (.device mj)) F Rd Rin P ∗ P ∗
     frdK (hlc := hlc) k γ fk q (.open true wb (.device mj)) j pid V M n F Rd Rin P ∗
     kctx c' ((k.withSpie spie spp).withRegs R') ∗ pcIs c' (jumpPc (k.regs 1#5)) ∗
     trapCsrsExt c' k.sie ∗ cpuClaimExt c' k.sie k.proc ⊢ wpLoop (GF := GF) c' := by
-  iintro ⟨Href, Hpriv, Henv, Hin, HP, HΦ, Hk, Hpc, Hte, Hce⟩
-  ihave Hex := filereadExtra_dev_m1 F Rd Rin P true wb mj n M (k.regs 11#5) hne $$ Hin HP
+  iintro ⟨Href, Hpriv, Hgen, Henv, Hin, HP, HΦ, Hk, Hpc, Hte, Hce⟩
+  ihave Hex := filereadExtra_dev_m1 V.gen V.upt F Rd Rin P true wb mj n M (k.regs 11#5) hne $$ Hin HP
   ihave Henv := frd_envout_dev true wb mj $$ Henv
   unfold frdK
-  iapply HΦ $$ %c' %spie %spp %R' %V.upt %M %0 [] Hk Hpc Hte Hce Href Hpriv Henv [Hex]
+  iapply HΦ $$ %c' %spie %spp %R' %V.upt %M %0 [] Hk Hpc Hte Hce Href Hpriv Hgen Henv [Hex]
   · ipureintro
     exact ⟨hcs, UMemL.extSz_refl _ _, by omega, Or.inr h10, frd_wrote0 _ _ _⟩
   · unfold filereadArms
@@ -114,14 +114,15 @@ theorem frd_arm_dev (CR : CONSOLEREAD) (Γ : SchedNames) [ClaimIs (hlc := hlc) G
     trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗
     procsInv Γ ∗ isLock γkl kmemLockAddr "kmem" (kmemRes γk) ∗ kallocAvail γk none ∗
     frefTok γ fk q ∗ fileFieldsAt curCtx fk q C ∗ filePaySt γ fk q C (.open true wb (.device mj)) ∗
-    procPrivExt (procAddr j) pid V V.upt M ∗ filereadDevEnv (GF := GF) mj ∗
+    procPrivExt (procAddr j) pid V V.upt M ∗ genHalvesPriv (procAddr j) pid V.gen ∗
+    filereadDevEnv (GF := GF) mj ∗
     filereadIn (hlc := hlc) (.open true wb (.device mj)) F Rd Rin P ∗ P ∗
     frdK (hlc := hlc) k γ fk q (.open true wb (.device mj)) j pid V M n F Rd Rin P
     ⊢ wpLoop (GF := GF) cpu := by
   have hK' : 6 + readiSlots ≤ k.avail := hK
   have hK6 : 6 ≤ k.avail := by unfold readiSlots bmapSlots ballocSlots breadSlots panicSlots at hK'; omega
   obtain ⟨r2, r8, r9, r18, r19, r20, r21, r22, r23, r24, r25, r26, r27⟩ := id hr
-  iintro ⟨Hk, Hpc, Hframe, Hte, Hce, #Hpi, #Hkl, #Hav, Htok, Hfields, Hpay, Hpriv, #Henv, Hin, HP,
+  iintro ⟨Hk, Hpc, Hframe, Hte, Hce, #Hpi, #Hkl, #Hav, Htok, Hfields, Hpay, Hpriv, Hgen, #Henv, Hin, HP,
     HΦ⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
   icases filerw_fields_major fk q C $$ Hfields with ⟨Hmcell, Hfw⟩
@@ -318,11 +319,13 @@ theorem frd_arm_dev (CR : CONSOLEREAD) (Γ : SchedNames) [ClaimIs (hlc := hlc) G
   case cn => k_norm_g; exact h12
   -- ===== back from consoleread =====
   iintro %cpu %spie1 %spp1 %R1 %P' %M' %d %dc %cur %bs %hs %sl
-    %⟨hcs1, hext, hdle, hret, hM, hmap, hb1, hb4, htag⟩ #Hts #Hlb Hwin Hout Hk Hpc Hte Hce Hpriv
+    %⟨hcs1, hext, hdle, hret, hM, hmap, hb1, hb4, htag⟩ Hks #Hts #Hlb Hwin Hout Hk Hpc Hte Hce
+    Hpriv Hgen
   k_norm_g [frd_ret_9c, frd_ww, frd_psw] at hM
   k_norm_g [frd_ret_9c, frd_ww, frd_psw] at hmap
   k_norm_g [frd_ret_9c, frd_ww, frd_psw]
   rw [h11] at hM hmap
+  try rw [h11]
   iapply wpLoop_fupd
   imod Hback $$ %cur %dc Hout with ⟨HP, Hrd⟩
   imodintro
@@ -367,8 +370,8 @@ theorem frd_arm_dev (CR : CONSOLEREAD) (Γ : SchedNames) [ClaimIs (hlc := hlc) G
     ⟨(List.range d).map bs, by simp, hM, hmap⟩
   ihave Henv := frd_envout_dev true wb CONSOLE $$ Henv
   unfold frdK
-  iapply HΦ $$ %c' %spie1 %spp1 %R' %P' %M' %d [] Hk Hpc Hte Hce Href Hpriv Henv
-    [HP Hrd Hwin]
+  iapply HΦ $$ %c' %spie1 %spp1 %R' %P' %M' %d [] Hk Hpc Hte Hce Href Hpriv Hgen Henv
+    [HP Hrd Hwin Hks]
   · ipureintro; exact ⟨hcs, hext, hdle, hr10, hwin⟩
   unfold filereadArms
   rw [h10']
@@ -377,16 +380,19 @@ theorem frd_arm_dev (CR : CONSOLEREAD) (Γ : SchedNames) [ClaimIs (hlc := hlc) G
     rcases hret with hm | hd
     · rw [hm]; exact filereadRet_m1 n
     · rw [hd, BitVec.ofInt_natCast]; exact frd_ret_nat n d hdle
-  iapply filereadExtra_dev_console F Rd Rin P wb n (R1 10#5) M' (k.regs 11#5) $$ HP
+  iapply filereadExtra_dev_console V.gen V.upt F Rd Rin P wb n (R1 10#5) M' (k.regs 11#5) $$ HP
   rcases hret with hm | hd
-  · rw [hm]
-    iapply consoleReceipt_m1 Rd Rin n cur dc M' (k.regs 11#5) $$ Hrd
+  · -- THE KILLED EXIT: the reason is consoleread's kill shot
+    ihave #Hsh := Hks $$ %hm
+    rw [hm]
+    iapply consoleReceipt_m1 V.gen V.upt Rd Rin n cur dc M' (k.regs 11#5) $$ Hrd
+    iright; iexact Hsh
   · have hdr : d = (R1 10#5).toNat := by rw [hd]; exact (frd_ofInt_toNat d hd63).symm
     have hb4' := hb4 hd
     icases Hwin with (⟨%hw, %hch, #Hsw, Hin⟩ | #Hcred)
-    · iapply (frd_receipt_of_run Rd Rin P' (viewFaulted V.upt P' M) M' (k.regs 11#5) n (R1 10#5)
+    · iapply (frd_receipt_of_run V.gen V.upt Rd Rin P' (viewFaulted V.upt P' M) M' (k.regs 11#5) n (R1 10#5)
         d dc cur bs hs sl hdr hdle hb1 hb4' hM hmap hpl htag hw hch) $$ Hts Hlb Hsw Hin Hrd
-    · iapply (frd_receipt_of_dirty Rd Rin P' (viewFaulted V.upt P' M) M' (k.regs 11#5) n (R1 10#5)
+    · iapply (frd_receipt_of_dirty V.gen V.upt Rd Rin P' (viewFaulted V.upt P' M) M' (k.regs 11#5) n (R1 10#5)
         d dc cur bs hs sl hdr hdle hb1 hb4' hM hmap hpl htag) $$ Hts Hlb Hcred Hrd
 
 end
