@@ -480,7 +480,7 @@ Section UShURoundDefs.
     iIntros "[[_ Hx] _]". iDestruct "Hx" as (sR lR pre) "([%HlR _] & _)".
     iPureIntro. change (pv_line pview_unionU (lineV U I)) with (uv_line (ul I)) in HlR.
     destruct (uv_line_some (ul I) lR HlR) as (p & n & Hl & _).
-    exact (Hnp p n Hl).
+    exact (proj1 Hnp p n Hl).
   Qed.
 
   (* the record's block-owed credential, closed at the round's stage *)
