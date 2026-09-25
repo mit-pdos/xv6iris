@@ -260,6 +260,10 @@ Proof.
   apply usys_eff_all. exact Hn.
 Qed.
 
+Lemma usys_eff_secc_all (tf : list (mword 64)) :
+  0 <= usys_num tf < 64 -> usys_eff secc_all tf = usys_num tf.
+Proof. intros Hn. unfold secc_all. apply usys_eff_all. exact Hn. Qed.
+
 Lemma uvis_lz_id (W : uvis) : uvis_lz W (uvis_lazy W) = W.
 Proof. destruct W; reflexivity. Qed.
 

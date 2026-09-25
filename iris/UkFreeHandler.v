@@ -157,6 +157,7 @@ Section UkFreeHandler.
               ltac:(discriminate) ltac:(discriminate) ltac:(discriminate)
               ltac:(discriminate) ltac:(discriminate) ltac:(discriminate)
               ltac:(discriminate) ltac:(discriminate) ltac:(discriminate)
+              ltac:(lia) ltac:(discriminate)
               Hal4 with "Hi Hrun [Hlaw]").
     { iApply (udepw_of_law with "Hlaw"). }
     iIntros (h2 ret) "Hrun". iEval (rewrite E6) in "Hrun".

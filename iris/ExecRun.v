@@ -515,7 +515,7 @@ Section ExecRun.
     image_entry f M av sts cw secc cs pidv Q Pay X.
   Proof using .
     iIntros "#HT #Hgen". rewrite /image_entry /image_entry_taint.
-    iIntros "!>" (na alen afun W') "%Hok _ _ _ _ _ Hmp _".
+    iIntros "!>" (na alen afun W') "%Hok _ _ _ _ _ _ Hmp _".
     iApply ("Hgen" $! W' with "HT Hmp").
   Qed.
 

@@ -1986,10 +1986,10 @@ Section UservecAllPt.
          the image, permission map and break are the entry frame's own. *)
       match goal with
       | |- environments.envs_entails _
-             (SpecUsertrap.ut_exec_out _ _ _ _ _ _ _ ?UU' _ _ _ _ _) =>
+             (SpecUsertrap.ut_exec_out _ _ _ _ _ _ _ _ ?UU' _ _ _ _ _) =>
           iApply (SpecUsertrap.ut_exec_out_ueq _ sc_v _ (tf_of g (ret_pc sepc_v)) M
                     (UserPerm.perm_of (ud_um (pv_upt (us_V U))) (uint (pv_sz (us_V U))))
-                    (uint (pv_sz (us_V U))) (pv_lazy (us_V U))
+                    (uint (pv_sz (us_V U))) (pv_lazy (us_V U)) (pv_secc (us_V U))
                     U2 UU' sts sts2 gn cs pid Hu36
                     ltac:(cbn [us_V pv_tf us_upt upd_upt upd_usV us_tf upd_tf];
                           rewrite Hws1; apply TfUser.tf_ueq_refl)
@@ -2001,6 +2001,10 @@ Section UservecAllPt.
                           reflexivity)
                     (* ...and the lazy bit, which neither move touches
                        (lane LAZY-FLAG) *)
+                    ltac:(cbn [us_V pv_lazy pv_secc us_upt upd_upt upd_usV us_tf upd_tf
+                               pv_gen pv_chg pv_cwi];
+                          reflexivity)
+                    (* ...and the mask *)
                     ltac:(cbn [us_V pv_lazy pv_secc us_upt upd_upt upd_usV us_tf upd_tf
                                pv_gen pv_chg pv_cwi];
                           reflexivity)
@@ -2069,7 +2073,7 @@ Section UservecAllPt.
                        walk, so the key's permission projection is the same
                        term on both sides (lane CONS-SWALLOW, W4) -- and the
                        lazy bit beside them (lane LAZY-FLAG) *)
-                    eq_refl eq_refl eq_refl
+                    eq_refl eq_refl eq_refl eq_refl
                     with "Hso2")
       end.
   Qed.

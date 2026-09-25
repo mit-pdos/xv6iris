@@ -191,6 +191,7 @@ Section UkSync.
               (* ...and the three descriptor-moving numbers, and chdir *)
               ltac:(discriminate) ltac:(discriminate) ltac:(discriminate)
               ltac:(discriminate)
+              ltac:(lia) ltac:(discriminate)
               ltac:(vm_compute; reflexivity)
               with "[] Hrun []").
     { iApply (uis_sync_36a with "Hcode"). }

@@ -761,11 +761,14 @@ Section UtSysBlock.
          { rewrite list_lookup_total_insert_ne;
              [ exact (Hargw 0%nat ltac:(lia))
              | unfold tf_epc_idx, tf_arg_idx; lia ]. }
+         assert (HnumV1 : usys_num (<[tf_epc_idx := ret_pc epv]> (pv_tf (us_V U0)))
+                          = usys_num (pv_tf V1))
+           by (rewrite HV1tf0 Hpr1 !usys_num_epc; reflexivity).
          iApply (upay_at_ueq (pv_gen (us_V U0)) (pv_gen V1) uecall_scause
                    (pv_secc V1)
                    (<[tf_epc_idx := ret_pc epv]> (pv_tf (us_V U0)))
                    (pv_tf V1) fdep
-                   ltac:(rewrite HV1tf0 Hpr1 !usys_num_epc; reflexivity)
+                   HnumV1
                    Ha0e ltac:(rewrite HV1gen; symmetry; exact Hpr6)).
          (* the block's mask across the prologue: one trapframe word moved *)
          rewrite /upay_at HV1sc Hpr8. iFrame "Hmyp". rewrite Hscec. iExact "Hein". } 
@@ -817,7 +820,7 @@ Section UtSysBlock.
          read -- like [Hmemg], they are the CALLER's to consume, and the trap
          loop's own invariant is indifferent to all four. *)
       iIntros (CID2 Hk2 mg U2 stsR csR)
-        "%Hcsg %Hmemg %Hfdrow %Hpiperow %Hchrow %Hmemne2 %Hmema0 %Hmemupt %Hmemsz %Hmemlz %Htfg %Hfgg %Hchgg %Hgengg %Hcwig %Hsbrg %Hfkg %Hrdg %Hpidg Hcg Hcpu Hbs Hip Hfd Hir Hsy Hpv Hufr Hch Hpc Hxo Hso Hfo Hwo".
+        "%Hcsg %Hmemg %Hfdrow %Hpiperow %Hchrow %Hmemne2 %Hmema0 %Hmemupt %Hmemsz %Hmemlz %Htfg %Hfgg %Hchgg %Hgengg %Hcwig %Hsbrg %Hfkg %Hrdg %Hpidg %Hsecg Hcg Hcpu Hbs Hip Hfd Hir Hsy Hpv Hufr Hch Hpc Hxo Hso Hfo Hwo".
       destruct U2 as [V2 M2].
       assert (Hreta6 : ret_pc (S4 !!! Regidx Rra) = mword_of_int (UT + 0xa6))
         by (rewrite HS4ra; pcw).

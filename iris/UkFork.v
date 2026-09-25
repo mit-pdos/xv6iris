@@ -1023,7 +1023,9 @@ Section UkFork.
     iSplitR;
       [ iApply (uexec_pay_dep_ret USYS_fork m pc M pm sz fdv c gn Sc pidv
                   false secc_all _ (sfam_at (ukn_pay N) (sfam_pay Q Rc))
-                  ltac:(rewrite tf_of_num; exact Hn)
+                  ltac:(assert (Hraw' : usys_num (tf_of m pc) = USYS_fork)
+                          by (rewrite tf_of_num; exact Hn);
+                        rewrite usys_eff_secc_all; [ exact Hraw' | rewrite Hraw'; usys_range ])
                   ltac:(unfold USYS_fork, USYS_exit; lia)
                   (sexit_pay_at (ukn_pay N) (sfam_pay Q Rc)) with "Hmy") | ].
     (* the PARENT keeps the descriptor authority it had -- fork does not
