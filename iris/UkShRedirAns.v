@@ -53,7 +53,7 @@ Require Import ArgPath.            (* [arg_path_of]: the name the ecall reads *)
 Require Import PathElems.          (* [path_elems] *)
 Require Import FsAbsEra.           (* [np_elems] / [um_start_of] *)
 Require Import FsImg.              (* [ROOTINO] *)
-Require Import FsImgCheck.         (* [fname_f] *)
+Require Import FsImgCheck.
 Require Import ChildTok.
 Require Import UserCwd.
 Local Open Scope Z_scope.

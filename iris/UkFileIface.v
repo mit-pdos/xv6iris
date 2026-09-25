@@ -140,8 +140,9 @@ Import Defs.
 (*  0.  THE REGISTRY                                                      *)
 (* ===================================================================== *)
 
-(* what a device is: the console at its round and codes, `f` held for
-   writing at a standard slot at its line, or an input on `f` *)
+(* what a device is: the console at its round and codes, the file [nm]
+   held for writing at a standard slot at its line, or an input on the
+   file [nm] (cut W3: any name of the class) *)
 Inductive fdev :=
   | FDCons (v : era_pins) (I : list (bv 8)) (C : list nat)
   | FDFile (nm : list (bv 8)) (i : Z) (γo : gname) (ws : wordline)
@@ -1172,7 +1173,7 @@ Section UkFileIface.
         iApply (fif_taint_of_fds fdm l vs Hok with "Htn He Hstd Hhs").
   Qed.
 
-  (* [ei_open] for `f` present: the descriptor the LEDGER names -- the
+  (* [ei_open] for a present class name: the descriptor the LEDGER names -- the
      lowest closed standard slot, else a fresh tail handle -- with the
      token of a fresh device out of the pool; or -1; or the taint *)
   Lemma fif_open (fdm : fdmap) (files : list (bv 8) -> option (list (bv 8)))
@@ -1288,8 +1289,8 @@ Section UkFileIface.
       iApply (fif_open_taint l ret fdm vs Hlen Hok with "Htn He Hof Hhs").
   Qed.
 
-  (* [ei_open_absent] for `f`, at any mode that does not create (the
-     truncate's permit at an absent `f` is the dead walk's cursor, paid
+  (* [ei_open_absent] for a class name, at any mode that does not create
+     (the truncate's permit at an absent file is the dead walk's cursor, paid
      out of the taint: [UkFileDev.file_open_absent], lane TRUNC-PERMIT) *)
   Lemma fif_open_absent_nt (fdm : fdmap) (files : list (bv 8) -> option (list (bv 8)))
       (paths : list (list (bv 8))) (path : list (bv 8)) (m : Z) (K : Z -> iProp Σ) :

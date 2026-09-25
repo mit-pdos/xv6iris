@@ -226,8 +226,8 @@ Section UkFileDev.
 
   (* the file application's claim *)
   Context (c : file_fixed) (r : file_names).
-  (* THE DEED'S MAP (cut W2): an input reads the deed at [sf], where `f`
-     is present; an output's cursor is the deed at [sf] with `f` at the
+  (* THE DEED'S MAP (cut W2): an input reads the deed at [sf], where [nm]
+     is present; an output's cursor is the deed at [sf] with [nm] at the
      content written so far *)
   Context (sf : dst).
   (* THE FILE'S NAME (cut W3): a device is on the file the line names,
@@ -1118,11 +1118,11 @@ Section UkFileDev.
   Qed.
 
   (* =================================================================== *)
-  (*  6.  THE OPEN OF `f`                                                 *)
+  (*  6.  THE OPEN OF A CLASS NAME [nm] (cut W3: of any length)           *)
   (* =================================================================== *)
 
-  (* the path `f` at a persistent reading is a boxed view of its image *)
-  (* the path's image, at a name of any length, off either half *)
+  (* the path at a persistent reading is a boxed view of its image, at a
+     name of any length, off either half *)
   Lemma fdev_path_view (tx : bool) (pv : Z) (n : nat) (f : nat -> bv 8) :
     upath_at N tx pv n f -∗ uimg_view N (str_img pv n f).
   Proof using GEN.
@@ -1136,7 +1136,7 @@ Section UkFileDev.
       iSplitL; [ iExact "Hs" | iExact "Hn" ].
   Qed.
 
-  (* [ei_open] for `f` at a PRESENT deed, read-only (mode 0): the
+  (* [ei_open] for [nm] at a PRESENT deed, read-only (mode 0): the
      descriptor the kernel's allocation names ([UserFd.ualloc], read by the
      caller's own ledger: the lowest closed standard slot, or a fresh held
      tail handle when all three are open) with the input device at the
@@ -1250,7 +1250,7 @@ Section UkFileDev.
       iApply ("HK" with "Ht Htfd Hcwd").
   Qed.
 
-  (* [ei_open_absent] for `f`: the deed says absent, the answer is -1 with
+  (* [ei_open_absent] for [nm]: the deed says absent, the answer is -1 with
      everything back, or the taint.  At any mode that does not create (a
      create-mode open of an absent `f` is the redirect's, and it CREATES);
      O_TRUNC costs nothing here, the kernel refuses at the lookup and its

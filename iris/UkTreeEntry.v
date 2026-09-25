@@ -68,7 +68,7 @@ Require Import UEchoOut.              (* [echo_out_argv] *)
 Require Import UShEchoOut.            (* [echo_out_argv_of_image] *)
 Require Import UShCat.                (* cat's key geometry and [cat_entry_run] *)
 Require Import UShGrep.               (* grep's key geometry and [grep_entry_run] *)
-Require Import FsImgCheck.            (* [fname_f] *)
+Require Import FsImgCheck.
 Require Import ProgTree UkTree UkHandler.
 Require Import UkEcho UkEchoTree.
 Require Import UkCatMain UkCatTree.
