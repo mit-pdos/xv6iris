@@ -896,3 +896,7 @@ import Xv6.CreateFailMkdir
 import Xv6.KexecOkQ
 import Xv6.KexecTail
 import Xv6.KexecSeam
+import Xv6.ConsNames
+import Xv6.ConsoleRing
+import Xv6.ConsoleTags
+import Xv6.ConsoleInvDefs
