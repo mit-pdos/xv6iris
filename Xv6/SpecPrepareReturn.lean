@@ -62,8 +62,8 @@ the Lean context indexes the root, so the caller already names it).  The
 entry must be at the kernel-table tier (`htier`; Rocq: the KPT receipt in
 `trap_csrs`), which is what makes `csrr satp` readable.
 
-THE PROCESS BLOCK is the running thread's `procPrivNoctxAt` (Rocq
-`proc_priv`), with the four kernel words re-armed at the hart the thread
+THE PROCESS BLOCK is the running thread's whole block `procPrivFd γ`
+(Rocq `proc_priv γf`, D16), with the four kernel words re-armed at the hart the thread
 ended on (`hartId cpu'`, Rocq `cid_word`); nothing else of the block moves --
 in particular the lazy bit and `upt` are untouched, which is what the
 callers' closers read (Rocq ProofForkret's `pv_lazy V' = pv_lazy V`).
@@ -74,6 +74,7 @@ Lean hypotheses; `lks` is `k.locks`, free.
 Imports only definitional files.
 -/
 import Xv6.SchedCtx
+import Xv6.FdTable
 import Xv6.UPtDefs
 import MachCSL.WpSmodeIntr
 
@@ -142,13 +143,16 @@ end
 
 /-- **WP of `prepare_return`**, at either entry `SIE`, leaving at `SIE = 0`
 on whichever hart the thread landed on. -/
-def wp_prepare_return_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [CurCtx]
-    (cpu : CPU) (k : KCtx) (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv)
+def wp_prepare_return_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+    [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
+    [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
+    [Appcfg GF] [FileG GF] [Fscfg] [Icfg] [CurCtx]
+    (cpu : CPU) (k : KCtx) (γ : FileNames) (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv)
     (M : Nat → List (BitVec 8)) (epc : BitVec 64)
     (hproc : k.proc = pa) (hnoff : k.noff = 0) (htier : k.tier = KTier.kpt)
     (hK : prepareReturnSlots ≤ k.avail) (hepc : V.tf[3]? = some epc) : Prop :=
   kctx cpu k ∗ pcIs cpu prepareReturnAddr ∗ prepareReturnExt cpu k.sie ∗
-  procPrivNoctxAt curCtx pa pid V M ∗
+  procPrivFd γ pa pid V M ∗
   wpNext k.sie k.proc cpu (fun cpu' => iprop(∀ R' : RegMap,
     kctx cpu' ((k.intrOff true false).withRegs R') -∗ pcIs cpu' (jumpPc (k.regs 1#5)) -∗
     ⌜calleeSaved k.regs R'⌝ -∗
@@ -158,16 +162,19 @@ def wp_prepare_return_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF]
     (∃ v : BitVec 64, Register.stval ↦ᵣ[cpu'] v) -∗
     Register.stvec ↦ᵣ[cpu'] uservecTvec -∗
     envAt curCtx -∗
-    procPrivNoctxAt curCtx pa pid
+    procPrivFd γ pa pid
       { V with tf := prepareReturnTf V.tf (satpOf KTier.kpt k.root) (V.kstack + 4096#64) (hartId cpu') } M -∗
     wpLoop cpu'))
   ⊢ wpLoop (GF := GF) cpu
 
 /-- The interface of `prepare_return`. -/
 structure PREPARE_RETURN : Prop where
-  wp_prepare_return : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [CurCtx]
-    (cpu : CPU) (k : KCtx) (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv)
+  wp_prepare_return : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+    [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
+    [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
+    [Appcfg GF] [FileG GF] [Fscfg] [Icfg] [CurCtx]
+    (cpu : CPU) (k : KCtx) (γ : FileNames) (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv)
     (M : Nat → List (BitVec 8)) (epc : BitVec 64) hproc hnoff htier hK hepc,
-    wp_prepare_return_body (hlc := hlc) (GF := GF) cpu k pa pid V M epc hproc hnoff htier hK hepc
+    wp_prepare_return_body (hlc := hlc) (GF := GF) cpu k γ pa pid V M epc hproc hnoff htier hK hepc
 
 end Xv6

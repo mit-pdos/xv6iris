@@ -325,28 +325,35 @@ end
 /-! ## §6 The running block and the trapframe page -/
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CurCtx]
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+  [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
+  [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
+  [Appcfg GF] [FileG GF] [Fscfg] [Icfg] [X : CurCtx]
 
 /-- **The running block's pieces userret takes** (prepare_return's post
-hands `procPrivNoctxAt`): the address space and the trapframe page, and the
-block back from them. -/
-theorem userret_priv_acc (htc : curTier = KTier.kpt) (pa : BitVec 64) (pid : BitVec 32)
-    (V : ProcPriv) (M : Nat → List (BitVec 8)) :
-    procPrivNoctxAt (GF := GF) curCtx pa pid V M ⊢
+hands the whole block `procPrivFd γ`, Rocq `proc_priv`): the address space
+and the trapframe page, and the block back from them. -/
+theorem userret_priv_acc (htc : curTier = KTier.kpt) (γ : FileNames) (pa : BitVec 64)
+    (pid : BitVec 32) (V : ProcPriv) (M : Nat → List (BitVec 8)) :
+    procPrivFd (GF := GF) γ pa pid V M ⊢
       procPtAt V.upt M ∗ tfPageAt V.upt.tfp V.tf ∗
-      (procPtAt V.upt M -∗ tfPageAt V.upt.tfp V.tf -∗ procPrivNoctxAt curCtx pa pid V M) := by
-  rename_i X
+      (procPtAt V.upt M -∗ tfPageAt V.upt.tfp V.tf -∗ procPrivFd γ pa pid V M) := by
   obtain ⟨ξ, t⟩ := X
   simp only at htc
   subst htc
-  simp only [procPrivNoctxAt]
-  iintro ⟨%hf, Hpid, Hfields, Hppt, Hpage, %hlz⟩
+  simp only [procPrivFd, procPrivCoreNoctxAt, procPrivBareAt]
+  iintro ⟨⟨⟨%hf, Hpid, Hfields, Hppt, Hpage, %hlz⟩, Hc⟩, Ho⟩
   iframe Hppt Hpage
   iintro Hppt Hpage
-  iframe Hpid Hfields Hppt Hpage
+  iframe Hpid Hfields Hppt Hpage Hc Ho
   isplit
   · ipureintro; exact hf
   · ipureintro; exact hlz
+
+end
+
+section
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CurCtx]
 
 /-- One word of the trapframe page, read (the page comes back as it was). -/
 theorem userret_tf_acc (tfp : BitVec 44) (ws : List (BitVec 64)) (j : Nat) (hj : j < 36) :

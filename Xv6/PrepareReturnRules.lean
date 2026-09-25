@@ -179,11 +179,19 @@ theorem prepare_return_tf_store (tfp : BitVec 44) (ws : List (BitVec 64)) (j : N
   · ipureintro; rw [List.length_set]; exact hlen
   iapply Hw $$ %w' Hc
 
+end
+
+section
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF]
+  [LogG GF] [FsBlocksG GF] [IregG GF] [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF]
+  [IrefslotG GF] [CtokG GF] [WchG GF] [Appcfg GF] [FileG GF] [Fscfg] [Icfg] [X : CurCtx]
+
 /-- The running block's cells prepare_return touches: `p->kstack`,
-`p->trapframe` and the trapframe page; closed at any new word list. -/
-theorem prepare_return_priv_acc (htc : curTier = KTier.kpt) (pa : BitVec 64) (pid : BitVec 32)
-    (V : ProcPriv) (M : Nat → List (BitVec 8)) :
-    procPrivNoctxAt (GF := GF) curCtx pa pid V M ⊢
+`p->trapframe` and the trapframe page; closed at any new word list (Rocq
+`proc_priv_tf_upd` with the kstack cell beside it). -/
+theorem prepare_return_priv_acc (htc : curTier = KTier.kpt) (γ : FileNames) (pa : BitVec 64)
+    (pid : BitVec 32) (V : ProcPriv) (M : Nat → List (BitVec 8)) :
+    procPrivFd (GF := GF) γ pa pid V M ⊢
       ⌜V.trapframe = pageAddr V.upt.tfp⌝ ∗
       wordPointsTo (pa + 64#64) 8 (DFrac.own 1) V.kstack ∗
       wordPointsTo (pa + 88#64) 8 (DFrac.own 1) V.trapframe ∗
@@ -192,23 +200,23 @@ theorem prepare_return_priv_acc (htc : curTier = KTier.kpt) (pa : BitVec 64) (pi
         wordPointsTo (pa + 64#64) 8 (DFrac.own 1) V.kstack -∗
         wordPointsTo (pa + 88#64) 8 (DFrac.own 1) V.trapframe -∗
         tfPageAt V.upt.tfp ws' -∗
-        procPrivNoctxAt curCtx pa pid { V with tf := ws' } M) := by
-  rename_i X
+        procPrivFd γ pa pid { V with tf := ws' } M) := by
   obtain ⟨ξ, t⟩ := X
   simp only at htc
   subst htc
-  simp only [procPrivNoctxAt, procFieldsNoctx, pKstack, pTrapframe]
-  iintro ⟨%hf, Hpid, ⟨Hks, Hsz, Hpt, Htf, Hof, Hcwd, Hname⟩, Hppt, Hpage, %hlz⟩
+  simp only [procPrivFd, procPrivCoreNoctxAt, procPrivBareAt, procFieldsNoOfile, pKstack, pTrapframe]
+  iintro ⟨⟨⟨%hf, Hpid, ⟨Hks, Hsz, Hpt, Htf, Hcwd, Hname⟩, Hppt, Hpage, %hlz⟩, Hc⟩, Ho⟩
   isplitl []
   · ipureintro; exact hf.2.2.2
   iframe Hks Htf Hpage
   iintro %ws' Hks Htf Hpage
-  iframe Hpid Hks Hsz Hpt Htf Hof Hcwd Hname Hppt Hpage
+  iframe Hpid Hks Hsz Hpt Htf Hcwd Hname Hppt Hpage Hc Ho
   isplit
   · ipureintro; exact hf
   · ipureintro; exact hlz
 
 end
+
 
 /-! ## The flip's resources -/
 

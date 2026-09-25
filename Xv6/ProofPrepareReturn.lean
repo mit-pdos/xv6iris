@@ -85,7 +85,7 @@ end
 
 set_option maxHeartbeats 16000000 in
 theorem prepare_return_proof (MP : MYPROC) : PREPARE_RETURN :=
-  ⟨fun {hlc GF} _ _ _ _ _ _ _ _ cpu k pa pid V M epc hproc hnoff htier hK hepc => by
+  ⟨fun {hlc GF} _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ cpu k γ pa pid V M epc hproc hnoff htier hK hepc => by
   unfold wp_prepare_return_body
   simp only [prepareReturnAddr]
   iintro ⟨Hk, Hpc, Hext, Hpriv, Hnext⟩
@@ -136,7 +136,7 @@ theorem prepare_return_proof (MP : MYPROC) : PREPARE_RETURN :=
   unfold trapCsrs
   icases Hcsrs with ⟨⟨%e0, Hsepc⟩, Hscause, Hstval⟩
   icases prepare_return_intrRes_open c4 $$ Hres with ⟨⟨%h0, Hstv⟩, #Henv⟩
-  icases prepare_return_priv_acc htc pa pid V M $$ Hpriv with ⟨%htfv, Hks, Htfc, Hpage, Hclose⟩
+  icases prepare_return_priv_acc htc γ pa pid V M $$ Hpriv with ⟨%htfv, Hks, Htfc, Hpage, Hclose⟩
   ihave Htfc := prepare_return_cell_eq _ _ _ htfv $$ Htfc
   rw [KCtx.intrOff_withRegs]
   have hsieB : (((k.withSpie spie spp).pushed 2).intrOff s1 s2).sie = false := rfl
