@@ -373,7 +373,7 @@ set_option maxHeartbeats 2000000 in
 newborn's parked record, and `release(&p->lock)`. -/
 theorem userinit_br_fffffffffffff062 : KA.«userinit» + 0xfffffffffffff062#64 = KA.«release» := by decide
 
-theorem ui_finish [X : CurCtx] (RE : RELEASE) (FP : FORKRET_PARK_PAID) [SG : UexecSG GF]
+theorem ui_finish [X : CurCtx] (RE : RELEASE) (FP : FORKRET_PARK_PAID)
     (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
     (γw γtk γp γft : GName) (cpu : CPU) (kf : KCtx) (j : Nat) (ch : BitVec 64) (γ : FileNames) (pid : BitVec 32)
     (V : ProcPriv) (M : Nat → List (BitVec 8))
@@ -390,7 +390,7 @@ theorem ui_finish [X : CurCtx] (RE : RELEASE) (FP : FORKRET_PARK_PAID) [SG : Uex
     inodeHeldAt (kf.regs 10#5) ROOTINO ∗ uiBootRows (procAddr j) pid V.gen ∗
     ([∗list] _f ∈ List.replicate NOFILE (0#64 : BitVec 64), fdSlot) ∗
     ([∗list] i ∈ List.range NOFILE, fdStAt V.fdg i (.own 1) .closed) ∗
-    uiParkRows (hlc := hlc) (SG := SG) Γ γw γtk γp γft γ (procAddr j) ∗ panicEnv ∗ initprocIs (procAddr j) ∗
+    uiParkRows (hlc := hlc) (GF := GF) (SG := uexecSGXv6) Γ γw γtk γp γft γ (procAddr j) ∗ panicEnv ∗ initprocIs (procAddr j) ∗
     (∀ R5 : RegMap,
       kctx cpu ((kf.popOff.withRegs R5).withLocks (kf.locks.filter (fun x => x ≠ "proc"))) -∗
       pcIs cpu (KA.«userinit» + 0x32#64) -∗ ⌜calleeSaved kf.regs R5⌝ -∗ wpLoop cpu)
@@ -474,9 +474,9 @@ theorem ui_finish [X : CurCtx] (RE : RELEASE) (FP : FORKRET_PARK_PAID) [SG : Uex
       rw [hctx]; rfl]
     iframe Hctxc Hbare Hofs Hcwr Hfb Hkq Hgh Hxs Hfsp Hirs
     iexact Hmp
-  ihave #Htok := FP.park_token_intro (hlc := hlc) (GF := GF) (SG := SG) Γ
+  ihave #Htok := FP.park_token_intro (hlc := hlc) (GF := GF) Γ
   icases kctx_token_acc cpu _ $$ Hk with ⟨Hown, Hback⟩
-  have hup := parkToken_park (hlc := hlc) (SG := SG) cpu ξ0 ⟨γft, γ, γw, Γ, j, procAddr j, pid⟩
+  have hup := parkToken_park (hlc := hlc) (GF := GF) (SG := uexecSGXv6) cpu ξ0 ⟨γft, γ, γw, Γ, j, procAddr j, pid⟩
     (List.replicate 12 0#64) { V with cwd := kf.regs 10#5, cwi := ROOTINO, fdg := V.fdg } M
     (List.replicate NOFILE FdState.closed) ∅ hj (by simp)
   dsimp only [UtNames.pj, parkOwn, utParkCaps] at hup
@@ -554,7 +554,7 @@ theorem userinit_br_86c2 : KA.«userinit» + 0x86c2#64 = KA.«initproc» := by d
 set_option maxHeartbeats 2000000 in
 /-- **From `0x80001c8c`**: `s1 = p`, `initproc = p` (published), `a0 = "/"`,
 `namei`, then `ui_finish`. -/
-theorem ui_publish [X : CurCtx] (RE : RELEASE) (NR : NAMEI_ROOT) (FP : FORKRET_PARK_PAID) [SG : UexecSG GF]
+theorem ui_publish [X : CurCtx] (RE : RELEASE) (NR : NAMEI_ROOT) (FP : FORKRET_PARK_PAID)
     (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
     (γw γtk γp γft : GName) (cpu : CPU) (kb : KCtx) (j : Nat) (ch : BitVec 64) (γ : FileNames) (pid : BitVec 32)
     (V : ProcPriv) (M : Nat → List (BitVec 8))
@@ -575,7 +575,7 @@ theorem ui_publish [X : CurCtx] (RE : RELEASE) (NR : NAMEI_ROOT) (FP : FORKRET_P
     uiBootRows (procAddr j) pid V.gen ∗
     ([∗list] _f ∈ List.replicate NOFILE (0#64 : BitVec 64), fdSlot) ∗
     ([∗list] i ∈ List.range NOFILE, fdStAt V.fdg i (.own 1) .closed) ∗
-    uiParkRows (hlc := hlc) (SG := SG) Γ γw γtk γp γft γ (procAddr j) ∗
+    uiParkRows (hlc := hlc) (GF := GF) (SG := uexecSGXv6) Γ γw γtk γp γft γ (procAddr j) ∗
     (∀ R5 : RegMap,
       kctx cpu ((kb.popOff.withRegs R5).withLocks (kb.locks.filter (fun x => x ≠ "proc"))) -∗
       pcIs cpu (KA.«userinit» + 0x32#64) -∗ ⌜calleeSaved (kb.regs.set 9#5 (procAddr j)) R5⌝ -∗
@@ -713,7 +713,7 @@ set_option maxHeartbeats 4000000 in
 /-- **`userinit` meets its specification.** -/
 theorem userinit_proof (AP : ALLOCPROC) (RE : RELEASE) (NR : NAMEI_ROOT) (FP : FORKRET_PARK_PAID) :
     USERINIT :=
-  ⟨fun {hlc GF} _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ SG _ _ X Γ _ cpu k γp γl γk γft γ γw γtk nb np
+  ⟨fun {hlc GF} _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ X Γ _ cpu k γp γl γk γft γ γw γtk nb np
       hnoff hnoff0 hK hlk hlp hlq hlocks htier hproc hsie hnb hroot hnib0 => by
   obtain ⟨ξ0, t0⟩ := X
   letI : CurCtx := ⟨ξ0, t0⟩
@@ -823,7 +823,7 @@ theorem userinit_proof (AP : ALLOCPROC) (RE : RELEASE) (NR : NAMEI_ROOT) (FP : F
   · unfold initGen
     iexists V.gen
     iframe Hsgd Hgpid Hipis Hprd
-  ihave Hpk : uiParkRows (hlc := hlc) (SG := SG) Γ γw γtk γp γft γ (procAddr j) $$ [Hupk]
+  ihave Hpk : uiParkRows (hlc := hlc) (GF := GF) (SG := uexecSGXv6) Γ γw γtk γp γft γ (procAddr j) $$ [Hupk]
   · unfold uiParkRows
     iframe Hupk Hpml Hpav Hft Hig
   imodintro

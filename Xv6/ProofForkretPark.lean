@@ -220,13 +220,14 @@ set_option maxHeartbeats 1000000 in
 theorem forkret_park_paid (FR : FORKRET) {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
     [FdslotG GF] [BioslotG GF] [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF]
     [IregG GF] [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF]
-    [WchG GF] [Appcfg GF] [FileG GF] [SG : UexecSG GF] [Fscfg] [Icfg]
-    (PT : SchedNames → IProp GF) [hPT : ∀ Γ, Persistent (PT Γ)] (W : IProp GF)
+    [WchG GF] [Appcfg GF] [FileG GF] [Fscfg] [Icfg]
+    (W : IProp GF)
     (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
     (hp : CPU) (ξp : CtxId) (N : UtNames) (rest : List (BitVec 64)) (V : ProcPriv)
     (M : Nat → List (BitVec 8)) (sts : List FdState) (cs : ExtTreeSet GName compare) (steady : Bool) :
-    forkretParkPaidBody (hlc := hlc) (GF := GF) (SG := SG)
-      (fun j h Xc => usertrapResAt (hlc := hlc) (X := Xc) PT Γ j h) W Γ hp ξp N rest V M sts cs steady := by
+    forkretParkPaidBody (hlc := hlc) (GF := GF) (SG := uexecSGXv6)
+      (fun j h Xc => usertrapResAt (hlc := hlc) (X := Xc) (parkToken (hlc := hlc) (GF := GF) (SG := uexecSGXv6)) Γ j h)
+      W Γ hp ξp N rest V M sts cs steady := by
   intro hΓ hwf hrest
   have hj : N.j < NPROC := hwf
   iintro Hrun Hpkg HW Hchild
@@ -238,13 +239,13 @@ theorem forkret_park_paid (FR : FORKRET) {hlc : HasLC} {GF : BundledGFunctors} [
   imod (ctx_fresh (GF := GF) hp) with ⟨%ξc, Hc⟩
   ihave Hcells := (@contextCells_to_ctxCells hlc GF _ ⟨ξp, KTier.kpt⟩ N.pj
     (parkForkretPc :: (V.kstack + 4096#64) :: rest)) $$ Hctx
-  ihave Hpay : fkpPay (hlc := hlc) (SG := SG) N rest V M sts cs steady ξp
+  ihave Hpay : fkpPay (hlc := hlc) (GF := GF) (SG := uexecSGXv6) N rest V M sts cs steady ξp
       $$ [Hcells Hstk Hblk Hmode]
   · unfold fkpPay
     iframe Hcells Hstk Hblk Hmode
     isplitr; · iexact Hglob
     iexact HG
-  imod (ctx_move (fkpPay (hlc := hlc) (SG := SG) N rest V M sts cs steady) hp ξp ξc) $$ [$Hrun $Hc $Hpay]
+  imod (ctx_move (fkpPay (hlc := hlc) (GF := GF) (SG := uexecSGXv6) N rest V M sts cs steady) hp ξp ξc) $$ [$Hrun $Hc $Hpay]
     with ⟨Hrun, Hc, Hpay⟩
   -- the newborn's token parks under the parker's context
   imod (ctx_park hp ξc ξp) $$ [$Hrun $Hc] with ⟨Hrun, Hpark⟩
@@ -257,7 +258,7 @@ theorem forkret_park_paid (FR : FORKRET) {hlc : HasLC} {GF : BundledGFunctors} [
   unfold fkpPay UtNames.pj
   icases Hpay with ⟨Hcells, Hstk, #Hglob', #HG', Hblk, Hmode⟩
   -- forkret's closer: the package's, with the two allowances captured
-  ihave Hclose := fkp_closer (hlc := hlc) (SG := SG) _ W N V.fdg V.chg V.cwi sts V.gen cs
+  ihave Hclose := fkp_closer (hlc := hlc) (GF := GF) (SG := uexecSGXv6) _ W N V.fdg V.chg V.cwi sts V.gen cs
     (parkKey steady V M cs N.pid) $$ Hclose Hfsp Hirs
   iapply validCtx_intro (pSched Γ) ⟨none, pContext (procAddr N.j) 0, procAddr N.j, ξc⟩
   iexists (parkForkretPc :: (V.kstack + 4096#64) :: rest), forkretStack
@@ -311,7 +312,7 @@ theorem forkret_park_paid (FR : FORKRET) {hlc : HasLC} {GF : BundledGFunctors} [
   -- forkret, at the resuming hart and the newborn's context
   rw [hra, jumpPc_forkretAddr]
   letI : CurCtx := ⟨ξc, KTier.kpt⟩
-  have hf := FR.wp_forkret (hlc := hlc) (GF := GF) (SG := SG) PT W Γ h R spie spp eb' root N V M sts V.gen cs
+  have hf := FR.wp_forkret (hlc := hlc) (GF := GF) W Γ h R spie spp eb' root N V M sts V.gen cs
     steady hΓ hj rfl hsp
   unfold wp_forkret_gen_body UtNames.pj at hf
   iapply hf
@@ -351,36 +352,36 @@ theorem fkp_chan {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
 theorem fkp_cap (FR : FORKRET) {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
     [FdslotG GF] [BioslotG GF] [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF]
     [IregG GF] [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF]
-    [WchG GF] [Appcfg GF] [FileG GF] [SG : UexecSG GF] [Fscfg] [Icfg]
+    [WchG GF] [Appcfg GF] [FileG GF] [Fscfg] [Icfg]
     (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ] :
-    ⊢ parkCap (hlc := hlc) (SG := SG)
-      (fun j h Xc => usertrapResAt (hlc := hlc) (X := Xc) (parkToken (hlc := hlc) (SG := SG)) Γ j h)
-      (parkToken (hlc := hlc) (SG := SG) Γ) Γ := by
+    ⊢ parkCap (hlc := hlc) (GF := GF) (SG := uexecSGXv6)
+      (fun j h Xc => usertrapResAt (hlc := hlc) (X := Xc) (parkToken (hlc := hlc) (GF := GF) (SG := uexecSGXv6)) Γ j h)
+      (parkToken (hlc := hlc) (GF := GF) (SG := uexecSGXv6) Γ) Γ := by
   unfold parkCap
   imodintro
   iintro %hp %ξp %N %rest %V %M %sts %cs %steady %⟨hΓ, hwf, hrest⟩ Hrun Hpkg HW Hchild
-  iapply (forkret_park_paid FR (hlc := hlc) (GF := GF) (SG := SG) (parkToken (hlc := hlc) (SG := SG))
-    (parkToken Γ) Γ hp ξp N rest V M sts cs steady hΓ hwf hrest) $$ Hrun Hpkg HW Hchild
+  iapply (forkret_park_paid FR (hlc := hlc) (GF := GF)
+    (parkToken (hlc := hlc) (GF := GF) (SG := uexecSGXv6) Γ) Γ hp ξp N rest V M sts cs steady hΓ hwf hrest) $$ Hrun Hpkg HW Hchild
 
 /-- **Rocq `park_token_intro`**: the cap above at `W := parkToken Γ`, and the
 residue's channel at the same `W`, tied into the fixpoint. -/
 theorem park_token_intro (FR : FORKRET) {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
     [FdslotG GF] [BioslotG GF] [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF]
     [IregG GF] [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF]
-    [WchG GF] [Appcfg GF] [FileG GF] [SG : UexecSG GF] [Fscfg] [Icfg]
+    [WchG GF] [Appcfg GF] [FileG GF] [Fscfg] [Icfg]
     (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ] :
-    ⊢ parkToken (hlc := hlc) (GF := GF) (SG := SG) Γ := by
-  have hi := parkToken_intro_of (hlc := hlc) (SG := SG)
-    (fun j h Xc => usertrapResAt (hlc := hlc) (X := Xc) (parkToken (hlc := hlc) (SG := SG)) Γ j h) Γ
+    ⊢ parkToken (hlc := hlc) (GF := GF) (SG := uexecSGXv6) Γ := by
+  have hi := parkToken_intro_of (hlc := hlc) (GF := GF) (SG := uexecSGXv6)
+    (fun j h Xc => usertrapResAt (hlc := hlc) (X := Xc) (parkToken (hlc := hlc) (GF := GF) (SG := uexecSGXv6)) Γ j h) Γ
     (fun N hΓ => fkp_chan Γ N hΓ)
-  have hc := fkp_cap FR (hlc := hlc) (GF := GF) (SG := SG) Γ
+  have hc := fkp_cap FR (hlc := hlc) (GF := GF) Γ
   iapply hi
   iapply hc
 
 /-- **Rocq `ForkretParkProof`**. -/
 theorem forkret_park_proof (FR : FORKRET) : FORKRET_PARK_PAID :=
-  ⟨fun {hlc GF} _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ PT _ W Γ _ hp ξp N rest V M sts cs steady =>
-    forkret_park_paid FR PT W Γ hp ξp N rest V M sts cs steady,
-   fun {hlc GF} _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ Γ _ => park_token_intro FR Γ⟩
+  ⟨fun {hlc GF} _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ W Γ _ hp ξp N rest V M sts cs steady =>
+    forkret_park_paid FR W Γ hp ξp N rest V M sts cs steady,
+   fun {hlc GF} _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ Γ _ => park_token_intro FR Γ⟩
 
 end Xv6

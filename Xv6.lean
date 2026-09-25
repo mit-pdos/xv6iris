@@ -1194,3 +1194,12 @@ import Xv6.KforkChild
 import Xv6.ParkCap
 import Xv6.SpecForkretParkPaid
 import Xv6.ProofForkretPark
+import Xv6.ForkretLoop
+import Xv6.ForkretTail
+import Xv6.ForkretParts
+import Xv6.ForkretBoot
+import Xv6.ForkretExec
+import Xv6.ForkretClose
+import Xv6.ProofForkret
+import Xv6.LinkForkret
+import Xv6.LinkForkretParkPaid

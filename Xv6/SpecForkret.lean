@@ -83,6 +83,11 @@ the CLOSED trap loop.
    resumer's handler environment `envAt` (UsertrapRes deviation 8).
 5. `forkretCloser` is `ParkCap.parkResumeK` minus the two spare allowances
    (Rocq's `forkret_yield` / package split: the park captures them).
+6. **PROCESS LAYER (flagged)**: `FORKRET` is stated at the park token
+   (`ParkCap.parkToken`) and the kernel's deposit instance (`uexecSGXv6`),
+   not over an abstract residue: Rocq's forkret re-exports the closed loop's
+   `usertrap_res` (`UC : USERRET_CLOSED`), and the closed loop -- like the
+   usertrap / syscall seals -- lives at that instance and token.
 
 Imports only definitional files.
 -/
@@ -91,6 +96,7 @@ import Xv6.SpecAllocproc
 import Xv6.FdTable
 import MachCSL.WpSmodeIntr
 import Xv6.ParkCap
+import Xv6.UexecExecInst
 
 namespace Xv6
 
@@ -156,19 +162,20 @@ def wp_forkret_gen_body [CurCtx] (URB : ParkURB GF) (W : IProp GF)
 end Gen
 
 /-- **Rocq `Module Type FORKRET`**: forkret at the trap loop's residue
-(`UtResFits.usertrapResAt` at the park token `PT`, ∀ `PT`), at any `W`. -/
+(`UtResFits.usertrapResAt`) AT THE PARK TOKEN and the kernel's deposit
+instance (deviation 6), at any `W`. -/
 structure FORKRET : Prop where
   wp_forkret : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
     [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
     [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
-    [Appcfg GF] [FileG GF] [SG : UexecSG GF] [Fscfg] [Icfg] [CurCtx]
-    (PT : SchedNames → IProp GF) [∀ Γ, Persistent (PT Γ)] (W : IProp GF)
+    [Appcfg GF] [FileG GF] [Fscfg] [Icfg] [CurCtx]
+    (W : IProp GF)
     (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
     (cpu : CPU) (R : RegMap) (spie spp eb : Bool) (root : BitVec 44) (N : UtNames) (V : ProcPriv)
     (M : Nat → List (BitVec 8)) (sts : List FdState) (gn : GName) (cs : ExtTreeSet GName compare)
     (steady : Bool) hΓ hj hgn hsp,
-    wp_forkret_gen_body (hlc := hlc) (GF := GF) (SG := SG)
-      (fun j h Xc => usertrapResAt (hlc := hlc) (X := Xc) PT Γ j h) W Γ cpu R spie spp eb root N V M sts gn
-      cs steady hΓ hj hgn hsp
+    wp_forkret_gen_body (hlc := hlc) (GF := GF) (SG := uexecSGXv6)
+      (fun j h Xc => usertrapResAt (hlc := hlc) (X := Xc) (parkToken (hlc := hlc) (SG := uexecSGXv6)) Γ j h)
+      W Γ cpu R spie spp eb root N V M sts gn cs steady hΓ hj hgn hsp
 
 end Xv6
