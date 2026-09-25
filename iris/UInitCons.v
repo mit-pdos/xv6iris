@@ -97,7 +97,8 @@ Require Import FsAbsCreateNm.      (* [acre_commit_at_nm], [npar_nm]: the create
 Require Import SpecSysMknod.       (* [mknod_au_at], [mknod_post_ok] *)
 Require Import ConsoleInv.         (* [CONSOLE] *)
 Require Import FsConsPin.          (* the console's two states, and its pin *)
-Require Import FsImgCheck.         (* [fname_f] -- the name the FILE claim tracks *)
+Require Import FsImgCheck.
+Require FileDisc.                  (* [uname] -- the class the FILE claim tracks *)
 Require Import PinnedObs.
 Require Import PinnedOpen.
 Require Import AppEcho.            (* [echo_taint], [cons_made], [cons_tok],
@@ -1076,19 +1077,19 @@ Section UInitCons.
             (nl : nat) (i : Z),
             ⌜cre_pre av d nmn ents nl i (ADev CONSOLE 0)⌝ -∗
             ⌜d <> FsImg.ROOTINO \/ nmn <> fname_console⌝ -∗
-            (* ...AND NOT AT THE FILE APPLICATION'S OWN NAME EITHER (lane
-               INIT-FILE).  The first side condition admits [d = ROOTINO]
-               with [nmn = fname_f], and there the FILE claim's deed
-               conjunct cannot survive at ANY deed value -- a create of a
-               DEVICE called `f` in the root makes [AppFile.f_ok] false at
-               an absent deed and is refuted by [cre_pre] at a present one
-               ([UInitConsFile.file_cons_create_other_refuted] checks it).
+            (* ...AND NOT AT A NAME OF THE FILE APPLICATION'S CLASS EITHER
+               (lane INIT-FILE; the class since cut W2).  The first side
+               condition admits [d = ROOTINO] at a class name, and there
+               the FILE claim's deed conjunct cannot survive at ANY deed
+               value -- a create of a DEVICE at a class name in the root
+               makes [AppFile.f_ok] false at an absent entry and is refuted
+               by [cre_pre] at a present one.
                The syscall never reaches it: the name it creates is the
                path's last element, which [SpecSysMknod.mknod_au_at] pins.
                Echo's dischargers ignore this premise; the ONE consumer
                ([init_cons_laws_mknod_bundle] below) has [d <> ROOTINO] in
                hand and pays it by [left]. *)
-            ⌜d <> FsImg.ROOTINO \/ nmn <> FsImgCheck.fname_f⌝ -∗
+            ⌜d <> FsImg.ROOTINO \/ ~ FileDisc.uname nmn⌝ -∗
             app_pred app_run av -∗
             app_pred app_run (delta_create d nmn i (ADev CONSOLE 0) av))
      (* (h) the SHOOT: phase 2 of the commit, and the flag out *)

@@ -393,8 +393,8 @@ Section UShCatFStage.
      from the entry, at every pipe *)
   Lemma catf_stage_sup (f : list (bv 8)) (qf : Qp) (sf : dst) (ds : list (list (bv 8))) :
     pr = PrCatF f -> FileDisc.uname f -> (0 < nc)%nat ->
-    (snd <$> sf = Some L /\ fcR f = Some L /\ ds = [[]; cat_dg_write])
-    \/ (sf = None /\ ds = [[]]) ->
+    (snd <$> sf !! f = Some L /\ fcR f = Some L /\ ds = [[]; cat_dg_write])
+    \/ (sf !! f = None /\ ds = [[]]) ->
     FAM -∗ UShCatPay.sh_cat_slot T -∗
     □ (app_taint -∗ file_taint cf) -∗ □ (file_taint cf -∗ app_taint) -∗
     app_inv fsc_fs -∗ (∃ jo : option Z, file_cons_cred cf rf jo) -∗
@@ -416,9 +416,9 @@ Section UShCatFStage.
                 (fun _ : Z => QcR (fdq rf qf sf) 0) (LEND qf sf γp ds) (prod_crD γp (fdq rf qf sf))
                 uslot
                 with "Hlend [Hnp]").
-      assert (Hc2 : (snd <$> sf = Some L /\ cat_dg_open fname_f ∈ [cat_dg_open fname_f]
+      assert (Hc2 : (snd <$> sf !! fname_f = Some L /\ cat_dg_open fname_f ∈ [cat_dg_open fname_f]
                      /\ [] ∈ ds /\ cat_dg_write ∈ ds)
-                    \/ (sf = None /\ cat_dg_open fname_f ∈ [cat_dg_open fname_f])).
+                    \/ (sf !! fname_f = None /\ cat_dg_open fname_f ∈ [cat_dg_open fname_f])).
       { destruct Hcase as [(Hs & _ & ->) | (Hs & ->)].
         - left. split_and!; [exact Hs | by left | by left | by right; left].
         - right. split; [exact Hs | by left]. }
@@ -438,8 +438,8 @@ Section UShCatFStage.
       (qf : Qp) (sf : dst) (ds : list (list (bv 8))) :
     pr = PrCatF f -> FileDisc.uname f -> ExecWords.exec_ok (FileDisc.prod_words (PrCatF f)) ->
     echo_argv_bytes (FileDisc.prod_words (PrCatF f)) gs -> (0 < nc)%nat ->
-    (snd <$> sf = Some L /\ fcR f = Some L /\ ds = [[]; cat_dg_write])
-    \/ (sf = None /\ ds = [[]]) ->
+    (snd <$> sf !! f = Some L /\ fcR f = Some L /\ ds = [[]; cat_dg_write])
+    \/ (sf !! f = None /\ ds = [[]]) ->
     FAM -∗ UShCatPay.sh_cat_slot T -∗
     □ (app_taint -∗ file_taint cf) -∗ □ (file_taint cf -∗ app_taint) -∗
     app_inv fsc_fs -∗ (∃ jo : option Z, file_cons_cred cf rf jo) -∗

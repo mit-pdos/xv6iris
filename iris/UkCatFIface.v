@@ -399,11 +399,11 @@ Section cif_ok_lemmas.
 End cif_ok_lemmas.
 
 (* the deed's content, read off the scope's files *)
-Lemma cif_dst_some (s : dst) (content : list (bv 8)) :
+Lemma cif_dst_some (s : option (Z * list (bv 8))) (content : list (bv 8)) :
   snd <$> s = Some content -> exists i : Z, s = Some (i, content).
 Proof using . destruct s as [[i c] |]; simpl; [intros [= ->]; by exists i | discriminate]. Qed.
 
-Lemma cif_dst_none (s : dst) : snd <$> s = None -> s = None.
+Lemma cif_dst_none (s : option (Z * list (bv 8))) : snd <$> s = None -> s = None.
 Proof using . destruct s as [[i c] |]; simpl; [discriminate | reflexivity]. Qed.
 
 (* a mode without O_CREATE, as the kernel reads it ([UkFileIface.fif_om_create]) *)
@@ -764,7 +764,7 @@ Section UkCatFIface.
   Definition cif_in (d : nat) (S : list (bv 8)) : iProp Σ :=
     (∃ (s : bool) (nm : list (bv 8)) (i : Z) (γo : gname) (p : nat),
        cif_tok d (1/2) (UDIn s nm i γo)
-       ∗ ⌜exists content, sf = Some (i, content) /\ S = drop p content⌝
+       ∗ ⌜exists content, sf !! fname_f = Some (i, content) /\ S = drop p content⌝
        ∗ uoff γo p)%I.
 
   Definition cif_prod (d : nat) (outs xs ds : list (list (bv 8))) : iProp Σ :=
@@ -787,7 +787,7 @@ Section UkCatFIface.
      files are the deed's *)
   Definition cif_filesr (files : list (bv 8) -> option (list (bv 8)))
       (paths : list (list (bv 8))) : iProp Σ :=
-    (⌜forall p, p ∈ paths -> uname p⌝ ∗ ⌜files fname_f = snd <$> sf⌝)%I.
+    (⌜forall p, p ∈ paths -> uname p⌝ ∗ ⌜files fname_f = snd <$> sf !! fname_f⌝)%I.
 
   Global Instance cif_filesr_persistent files paths : Persistent (cif_filesr files paths).
   Proof using . rewrite /cif_filesr. apply _. Qed.
@@ -1233,23 +1233,23 @@ Section UkCatFIface.
   Lemma cif_in_file_in (d : nat) (S : list (bv 8)) :
     cif_in d S -∗ fdq rf qf sf -∗
     ∃ (s : bool) (nm : list (bv 8)) (i : Z) (γo : gname) (content : list (bv 8)),
-      ⌜sf = Some (i, content)⌝ ∗ cif_tok d (1/2) (UDIn s nm i γo)
-      ∗ file_in rf i γo qf content S.
+      ⌜sf !! fname_f = Some (i, content)⌝ ∗ cif_tok d (1/2) (UDIn s nm i γo)
+      ∗ file_in rf sf i γo qf content S.
   Proof using .
     iIntros "Hin Hd". iDestruct "Hin" as (s nm i γo p) "(Htk & %Hc & Hu)".
     destruct Hc as (content & Hsf & HS). iExists s, nm, i, γo, content.
     iSplit; [done |]. iFrame "Htk". iExists p. iFrame "Hu". iSplit; [iPureIntro; exact HS |].
-    rewrite -Hsf. iExact "Hd".
+    iSplit; [iPureIntro; exact Hsf |]. iExact "Hd".
   Qed.
 
   Lemma cif_in_of_file_in (d : nat) (S content : list (bv 8)) (s : bool) (nm : list (bv 8))
       (i : Z) (γo : gname) :
-    sf = Some (i, content) ->
-    cif_tok d (1/2) (UDIn s nm i γo) -∗ file_in rf i γo qf content S -∗
+    sf !! fname_f = Some (i, content) ->
+    cif_tok d (1/2) (UDIn s nm i γo) -∗ file_in rf sf i γo qf content S -∗
     cif_in d S ∗ fdq rf qf sf.
   Proof using .
-    intros Hsf. iIntros "Htk Hin". iDestruct "Hin" as (p) "(%HS & Hu & Hd)".
-    rewrite Hsf. iFrame "Hd". iExists s, nm, i, γo, p. iFrame "Htk Hu". iPureIntro.
+    intros Hsf. iIntros "Htk Hin". iDestruct "Hin" as (p) "(%HS & _ & Hu & Hd)".
+    iFrame "Hd". iExists s, nm, i, γo, p. iFrame "Htk Hu". iPureIntro.
     by exists content.
   Qed.
 
@@ -1276,7 +1276,7 @@ Section UkCatFIface.
     destruct (Z_of_nat_complete fd H0) as [k ->].
     destruct s.
     - destruct Hs as (Hsk & Hrow). rewrite Nat2Z.id in Hrow.
-      iApply (file_read_std cf rf Heq N P Hsr k l false i γo qf jo content Sin n K
+      iApply (file_read_std cf rf sf Heq N P Hsr k l false i γo qf jo content Sin n K
                 ltac:(unfold NSTD in *; lia) Hrow Hn with "Hbr Hrb Hm Hinv Hstd Hin").
       iSplit.
       + iIntros (cb S') "%Hc Hstd Hin". iDestruct "HK" as "[HK _]".
@@ -1287,7 +1287,7 @@ Section UkCatFIface.
         iApply (cif_T_of_file with "Htn He").
     - iDestruct (big_sepM_lookup_acc _ _ _ _ Hfd with "Hhs") as "[Hh Hcl]".
       iEval (rewrite /cif_hdl Hv) in "Hh". iEval (rewrite Nat2Z.id) in "Hh".
-      iApply (file_read cf rf Heq N P Hsr k false i γo qf jo content Sin n K
+      iApply (file_read cf rf sf Heq N P Hsr k false i γo qf jo content Sin n K
                 ltac:(lia) Hn with "Hbr Hrb Hm Hinv Hh Hin").
       iSplit.
       + iIntros (cb S') "%Hc Hh Hin". iDestruct "HK" as "[HK _]".
@@ -1407,27 +1407,27 @@ Section UkCatFIface.
     op_obl N P path 0 K.
   Proof using Heq Hkill Hso Hsup TERM dep.
     intros Hp Hf. iIntros "Hfds #Hfiles HK".
-    iAssert (⌜(forall p, p ∈ paths -> uname p) /\ files fname_f = snd <$> sf⌝)%I
+    iAssert (⌜(forall p, p ∈ paths -> uname p) /\ files fname_f = snd <$> sf !! fname_f⌝)%I
       as %[Hpaths Hfs].
     { iDestruct "Hfiles" as "[%A %B]". by iPureIntro. }
     pose proof (Hpaths path Hp) as Hun. rewrite /uname in Hun. subst path.
     rewrite Hf in Hfs.
-    destruct (cif_dst_some sf content (eq_sym Hfs)) as [i Hsf].
+    destruct (cif_dst_some (sf !! fname_f) content (eq_sym Hfs)) as [i Hsf].
     iDestruct "Hfds" as (l vs wv) "(Hstd & Hcwd & %Hok & Hpool & Htoks & Hhs & Hd & #He & Hxk)".
     iPoseProof "He" as "(_ & _ & #Hinv & _)".
     iDestruct (UserFd.ustd_len with "Hstd") as %Hlen.
-    iAssert (fdq rf qf (Some (i, content))) with "[Hd]" as "Hd"; [by rewrite -Hsf |].
-    iPoseProof (fdq_split rf (qf / 2) (qf / 2) (Some (i, content)) with "[Hd]") as "[Hd1 Hd2]".
+    iAssert (fdq rf qf sf) with "[Hd]" as "Hd"; [iExact "Hd" |].
+    iPoseProof (fdq_split rf (qf / 2) (qf / 2) sf with "[Hd]") as "[Hd1 Hd2]".
     { rewrite Qp.div_2. iExact "Hd". }
-    iAssert (□ (fdq rf (qf / 2) (Some (i, content)) -∗ fdq rf (qf / 2) (Some (i, content))
+    iAssert (□ (fdq rf (qf / 2) sf -∗ fdq rf (qf / 2) sf
                 -∗ fdq rf qf sf))%I as "#Hjoin".
     { iIntros "!> Ha Hb". iDestruct (fdq_join with "Ha Hb") as "Hd".
-      rewrite Qp.div_2 Hsf. iExact "Hd". }
-    iApply (file_open_present cf rf Heq N P Hso l FsImg.ROOTINO (qf / 2) (qf / 2) i content K
-              eq_refl with "Hinv Hstd Hcwd Hd1 Hd2").
+      rewrite Qp.div_2. iExact "Hd". }
+    iApply (file_open_present cf rf sf Heq N P Hso l FsImg.ROOTINO (qf / 2) (qf / 2) i content K
+              Hsf eq_refl with "Hinv Hstd Hcwd Hd1 Hd2").
     iSplit; [| iSplit].
     - iIntros (fd γo) "%Hfdlt Hal Hcwd Hin Hd1".
-      iDestruct "Hin" as (p) "(%Hp0 & Hu & Hd2)".
+      iDestruct "Hin" as (p) "(%Hp0 & _ & Hu & Hd2)".
       iDestruct ("Hjoin" with "Hd1 Hd2") as "Hd".
       destruct (fd_lowest_closed l) as [k0 |] eqn:Elc.
       + iDestruct (ualloc_std γfd l fd k0 _ Elc with "Hal") as "[%Hfk Hstd]". subst fd.
@@ -1512,22 +1512,22 @@ Section UkCatFIface.
     op_obl N P path m K.
   Proof using Heq Hkill Hso Hsup TERM dep.
     intros Hp Hcm Hf. iIntros "Hfds #Hfiles HK".
-    iAssert (⌜(forall p, p ∈ paths -> uname p) /\ files fname_f = snd <$> sf⌝)%I
+    iAssert (⌜(forall p, p ∈ paths -> uname p) /\ files fname_f = snd <$> sf !! fname_f⌝)%I
       as %[Hpaths Hfs].
     { iDestruct "Hfiles" as "[%A %B]". by iPureIntro. }
     pose proof (Hpaths path Hp) as Hun. rewrite /uname in Hun. subst path.
-    rewrite Hf in Hfs. pose proof (cif_dst_none sf (eq_sym Hfs)) as Hs.
+    rewrite Hf in Hfs. pose proof (cif_dst_none (sf !! fname_f) (eq_sym Hfs)) as Hs.
     iDestruct "Hfds" as (l vs wv) "(Hstd & Hcwd & %Hok & Hpool & Htoks & Hhs & Hd & #He & Hxk)".
     iPoseProof "He" as "(_ & _ & #Hinv & _)".
     iDestruct (UserFd.ustd_len with "Hstd") as %Hlen.
-    iAssert (fdq rf qf None) with "[Hd]" as "Hd"; [by rewrite -Hs |].
-    iApply (file_open_absent cf rf Heq N P Hso l FsImg.ROOTINO qf m K eq_refl
+    iAssert (fdq rf qf sf) with "[Hd]" as "Hd"; [iExact "Hd" |].
+    iApply (file_open_absent cf rf sf Heq N P Hso l FsImg.ROOTINO qf m K Hs eq_refl
               (cif_om_create m Hcm) with "Hinv Hstd Hcwd Hd").
     iSplit.
     - iIntros "Hstd Hcwd Hd". iDestruct "HK" as "[HK _]".
       iApply ("HK" with "[-] []"); [| iExact "Hfiles"].
       iApply (cif_fds_of with "Hstd Hcwd Hpool Htoks Hhs [Hd] He Hxk"); [exact Hok |].
-      by rewrite Hs.
+      iExact "Hd".
     - iIntros (ret) "#Htn Hof Hcwd". iDestruct "HK" as "[_ HK]".
       iDestruct (cif_ans_ok with "Hof") as %Hans.
       iApply ("HK" with "[%]"); [exact Hans |].
@@ -1819,7 +1819,7 @@ Section UkCatFIface.
     kds = [(0%nat, UDProd pn gp w A X)] -> wv 0%nat = UDProd pn gp w A X ->
     l !! 1%nat = Some (FdOpen rb1 true (FdPipe gp)) ->
     l !! 2%nat = Some (FdOpen rb2 true (FdDevice CONSOLE)) ->
-    files fname_f = snd <$> sf ->
+    files fname_f = snd <$> sf !! fname_f ->
     UserFd.ustd γfd l -∗ UserCwd.ucwd (ukn_cwd N) FsImg.ROOTINO -∗ own γreg (cif_pool ∅ wv) -∗
     cif_catf_lend pn gp w A X ds xs (ukn_pay N) -∗
     env_res N P cif_iface (catp_env (DProd [L; []] xs ds) files [fname_f]) {[0%nat]}.

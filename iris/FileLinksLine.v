@@ -721,14 +721,15 @@ Section file_links_line.
   (* THE TYPED LINES' WITNESS (the PROGRAM STREAM, stretch 9): every
      [echo ... > f] line of the input the reader has consumed is in a list
      the LEDGER has a lower bound of -- which is what the child that writes
-     the line to `f` owes the claim ([FileWrite.file_wq]'s [ws ∈ ls]).  It
+     the line to its file owes the claim ([FileWrite.file_wq]'s
+     [(N, ws) ∈ ls]).  It
      is read off the consumed bytes' TAGS ([FileOut.ftag]) by
      [FileLineWit.echof_lines_of_consumed], and the left arm is the era's
      head, where no lower bound exists to be had. *)
   Definition flw (I : list (bv 8)) : iProp Σ :=
     (⌜echof_lines_in I = []⌝
-     ∨ ∃ ls : list (list (list (bv 8))),
-         fl_lb (fgn_cl g) ls ∗ ⌜forall w, w ∈ echof_lines_in I -> w.2 ∈ ls⌝)%I.
+     ∨ ∃ ls : list fwline,
+         fl_lb (fgn_cl g) ls ∗ ⌜forall w, w ∈ echof_lines_in I -> w ∈ ls⌝)%I.
 
   Global Instance flw_persistent I : Persistent (flw I).
   Proof using . rewrite /flw. apply _. Qed.

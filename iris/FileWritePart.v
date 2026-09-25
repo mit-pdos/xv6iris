@@ -71,7 +71,7 @@ Section FileWritePart.
   Qed.
 
   Lemma file_awrite_part_adv (γfs : fs_names) (c : file_fixed)
-      (r : file_names) (i : Z) (ws : wordline) (sel sel' : list nat)
+      (r : file_names) (N : list (bv 8)) (s : dst) (i : Z) (ws : wordline) (sel sel' : list nat)
       (γo : gname) (M : gmap Z (bv 8)) (ua : mword 64) (P : uptd)
       (nn : Z) (k : nat) :
     file_app = MkAppcfg file_names (file_pred c) r ->
@@ -81,9 +81,9 @@ Section FileWritePart.
     (0 < Z.to_nat (wchunk_at nn k))%nat ->
     (Z.to_nat (wchunk_at nn k) <= EchoDisc.line_max)%nat ->
     □ (app_taint -∗ file_taint c) -∗
-    file_cur c r i ws sel γo -∗
+    file_cur c r N s i ws sel γo -∗
     awrite_part_adv (fs_gamma_L γfs) appE i γo M ua P nn k
-      (file_cur c r i ws sel' γo).
+      (file_cur c r N s i ws sel' γo).
   Proof using .
     intros Heq Hmap Hnpos Hnle. iIntros "#Hbr Hcur".
     iApply (awrite_part_adv_mapped_straddle (fs_gamma_L γfs) appE i γo M ua P
@@ -124,7 +124,7 @@ Section FileWritePart.
     (* ...and the content is a line's worth, so the chunk does NOT straddle *)
     iDestruct "Hq" as (ls) "(_ & _ & %Hline & %Hsel & _ & %Hin)".
     iExFalso. iPureIntro. apply Hns.
-    pose proof (f_bytes_typed_short ls (subseq (echo_chunks ws) sel)
+    pose proof (f_bytes_typed_short ls N (subseq (echo_chunks ws) sel)
                   (ex_intro _ ws (ex_intro _ sel
                      (conj Hin (conj Hline (conj Hsel eq_refl)))))) as Hshort.
     apply fwp_single_block; [ exact Hnpos | ].

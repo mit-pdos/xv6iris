@@ -128,21 +128,17 @@ Section UInitFileLeaves.
     FileLinksLine.f0bw g (S gen_id) s0 -∗ boot_at s0 s -∗ f0pre_at g s0.
   Proof using .
     iIntros "#Hbw Hb". rewrite /FileLinkGen.f0pre_at.
-    iDestruct "Hb" as "[[-> Hty] | [-> #HT]]".
-    - destruct s as [[i bs] | ].
-      + iEval (rewrite /f_typed /=) in "Hty".
-        iDestruct "Hty" as (ls) "[#Hlb %Hbt]".
-        iSplitR.
-        { iPureIntro. cbn [dst_content fmap option_fmap option_map snd].
-          apply (fstate_ok_fst_of_iff (Some bs)).
-          destruct Hbt as (ws & sel & _ & Hok & Hsel & ->).
-          exact (FileDisc.fcont_ok_subseq ws sel Hok Hsel). }
-        iSplitR; [ | iExact "Hbw" ].
-        iLeft. iApply (FileOut.f0_typed_of_f_typed g (Some (i, bs))).
-        rewrite /f_typed /=. iExists ls. iFrame "Hlb". by iPureIntro.
-      + iSplitR; [ iPureIntro; exact fstate_ok_empty | ].
-        iSplitR; [ | iExact "Hbw" ].
-        iLeft. iApply (FileOut.f0_typed_none g).
+    iDestruct "Hb" as "[[-> #Hty] | [-> #HT]]".
+    - iSplitR.
+      { rewrite /f_typed.
+        iDestruct "Hty" as "[%He | (%ls & _ & %Hall)]".
+        { iPureIntro. rewrite He dst_content_empty. exact fstate_ok_empty. }
+        iPureIntro. rewrite /fstate_ok /dst_content. apply map_Forall_fmap.
+        intros N p Hp. destruct (Hall N p Hp) as [HN Hbt]. split; [exact HN |].
+        destruct Hbt as (ws & sel & _ & Hok & Hsel & ->).
+        exact (FileDisc.fcont_ok_subseq ws sel Hok Hsel). }
+      iSplitR; [ | iExact "Hbw" ].
+      iLeft. iApply (FileOut.f0_typed_of_f_typed g s with "Hty").
     - iSplitR; [ iPureIntro; exact fstate_ok_empty | ].
       iSplitR; [ | iExact "Hbw" ]. by iRight.
   Qed.

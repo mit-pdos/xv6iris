@@ -128,8 +128,8 @@ Section UkCatFEntries.
     length sts = NOFILE -> cw = FsImg.ROOTINO ->
     take NSTD sts !! 1%nat = Some (FdOpen rb1 true (FdPipe gp)) ->
     take NSTD sts !! 2%nat = Some (FdOpen rb2 true (FdDevice CONSOLE)) ->
-    (snd <$> sf = Some L /\ cat_dg_open f ∈ xs /\ [] ∈ ds /\ cat_dg_write ∈ ds)
-    \/ (sf = None /\ cat_dg_open f ∈ xs) ->
+    (snd <$> sf !! f = Some L /\ cat_dg_open f ∈ xs /\ [] ∈ ds /\ cat_dg_write ∈ ds)
+    \/ (sf !! f = None /\ cat_dg_open f ∈ xs) ->
     UkRun.urun_nopipe sts -∗ udep -∗
     image_entry ElfUser.cat_elf Mn (mword_of_int (t + 8) : mword 64) sts cw cs pidv Q
       (LEND qf sf pn gp w A X ds xs Q) uslot.
@@ -140,7 +140,7 @@ Section UkCatFEntries.
     set (wv := fun _ : nat => UDProd pn gp w A X).
     set (kds := [(0%nat, UDProd pn gp w A X)]).
     set (files := files_of (dst_content sf)).
-    assert (Hfs : files fname_f = snd <$> sf) by exact (dst_content_f sf).
+    assert (Hfs : files fname_f = snd <$> sf !! fname_f) by exact (dst_content_lookup sf fname_f).
     assert (Hc : conforms (catp_env (DProd [L; []] xs ds) files [fname_f])
                    (cat_tree (prod_words (PrCatF fname_f)))).
     { change (cat_tree (prod_words (PrCatF fname_f))) with (cat_tree [sb "cat"; fname_f]).
@@ -181,9 +181,9 @@ Section UkCatFEntries.
   Lemma pse_catf_image_entry (f : list (bv 8)) (Mn : gmap Z (bv 8)) (sv t : Z)
       (gn : nat -> bv 8) (sts : list fdstate) (cw : Z) (cs : gset gname) (pidv : mword 32)
       (Q : Z -> iProp Σ) (pn : pnames) (gp : pipe_names) (w : wid)
-      (qf : Qp) (i : Z) (rb1 rb2 : bool) :
+      (qf : Qp) (sf : dst) (i : Z) (rb1 rb2 : bool) :
     (forall x y : Z, Q x = Q y) ->
-    uname f ->
+    uname f -> sf !! f = Some (i, L) ->
     exec_ok (prod_words (PrCatF f)) ->
     UShEcho.echo_node_img (prod_words (PrCatF f)) Mn sv t gn ->
     UkShEcho.echo_argv_bytes (prod_words (PrCatF f)) gn ->
@@ -192,22 +192,22 @@ Section UkCatFEntries.
     take NSTD sts !! 2%nat = Some (FdOpen rb2 true (FdDevice CONSOLE)) ->
     UkRun.urun_nopipe sts -∗ udep -∗
     image_entry ElfUser.cat_elf Mn (mword_of_int (t + 8) : mword 64) sts cw cs pidv Q
-      (LEND qf (Some (i, L)) pn gp w [[]; cat_dg_write] [cat_dg_open f]
+      (LEND qf sf pn gp w [[]; cat_dg_write] [cat_dg_open f]
          [[]; cat_dg_write] [cat_dg_open f] Q) uslot.
   Proof using HL31 Hadmit Hcons Heq Hext Hfc Hkill HlR Hplok Hsup cifRegG0 dep_tl ufdG0.
-    intros HQc Hf Hok Hnode Hab Hfdl Hcw Hl1 Hl2.
+    intros HQc Hf HsN Hok Hnode Hab Hfdl Hcw Hl1 Hl2.
     apply (pse_catf_image_entry_gen f Mn sv t gn sts cw cs pidv Q pn gp w _ _ _ _ qf _ rb1 rb2
              HQc Hf Hok Hnode Hab Hfdl Hcw Hl1 Hl2).
-    left. split_and!; [reflexivity | by left | by left | by right; left].
+    left. split_and!; [by rewrite HsN | by left | by left | by right; left].
   Qed.
 
   (* ...and ABSENT: the refused open's report, nothing on the pipe *)
   Lemma pse_catf_image_entry_absent (f : list (bv 8)) (Mn : gmap Z (bv 8)) (sv t : Z)
       (gn : nat -> bv 8) (sts : list fdstate) (cw : Z) (cs : gset gname) (pidv : mword 32)
       (Q : Z -> iProp Σ) (pn : pnames) (gp : pipe_names) (w : wid)
-      (qf : Qp) (rb1 rb2 : bool) :
+      (qf : Qp) (sf : dst) (rb1 rb2 : bool) :
     (forall x y : Z, Q x = Q y) ->
-    uname f ->
+    uname f -> sf !! f = None ->
     exec_ok (prod_words (PrCatF f)) ->
     UShEcho.echo_node_img (prod_words (PrCatF f)) Mn sv t gn ->
     UkShEcho.echo_argv_bytes (prod_words (PrCatF f)) gn ->
@@ -216,11 +216,11 @@ Section UkCatFEntries.
     take NSTD sts !! 2%nat = Some (FdOpen rb2 true (FdDevice CONSOLE)) ->
     UkRun.urun_nopipe sts -∗ udep -∗
     image_entry ElfUser.cat_elf Mn (mword_of_int (t + 8) : mword 64) sts cw cs pidv Q
-      (LEND qf None pn gp w [[]] [cat_dg_open f] [[]] [cat_dg_open f] Q) uslot.
+      (LEND qf sf pn gp w [[]] [cat_dg_open f] [[]] [cat_dg_open f] Q) uslot.
   Proof using HL31 Hadmit Hcons Heq Hext Hfc Hkill HlR Hplok Hsup cifRegG0 dep_tl ufdG0.
-    intros HQc Hf Hok Hnode Hab Hfdl Hcw Hl1 Hl2.
+    intros HQc Hf HsN Hok Hnode Hab Hfdl Hcw Hl1 Hl2.
     apply (pse_catf_image_entry_gen f Mn sv t gn sts cw cs pidv Q pn gp w _ _ _ _ qf _ rb1 rb2
              HQc Hf Hok Hnode Hab Hfdl Hcw Hl1 Hl2).
-    right. split; [reflexivity | by left].
+    right. split; [exact HsN | by left].
   Qed.
 End UkCatFEntries.

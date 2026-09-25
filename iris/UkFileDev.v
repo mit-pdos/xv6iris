@@ -103,6 +103,7 @@ Require Import PathElems.              (* [path_elems] *)
 Require Import FsAbsEra.               (* [um_start_of] *)
 Require Import FsImg.                  (* [ROOTINO] *)
 Require Import FsImgCheck.             (* [fname_f] *)
+Require FileName.                      (* [uname_fname_f] *)
 Require Import SysOpenDefs.            (* [om_create] / [om_readable] *)
 Require Import SysReadDefs.            (* [ard_count] *)
 Require Import UCodeCat UkCatTree.     (* the vacuity witnesses: [cat_prog] *)
@@ -279,6 +280,10 @@ Section UkFileDev.
 
   (* the file application's claim *)
   Context (c : file_fixed) (r : file_names).
+  (* THE DEED'S MAP (cut W2): an input reads the deed at [sf], where `f`
+     is present; an output's cursor is the deed at [sf] with `f` at the
+     content written so far *)
+  Context (sf : dst).
   Context (Heq : file_app = MkAppcfg file_names (file_pred c) r).
 
   (* the process, and ANY program instance with its four stubs *)
@@ -306,14 +311,15 @@ Section UkFileDev.
      the rest of the file from [p] is what is left to read *)
   Definition file_in (i : Z) (γo : gname) (q : Qp) (content S : list (bv 8))
       : iProp Σ :=
-    (∃ p : nat, ⌜S = drop p content⌝ ∗ uoff γo p ∗ fdq r q (Some (i, content)))%I.
+    (∃ p : nat, ⌜S = drop p content⌝ ∗ ⌜sf !! fname_f = Some (i, content)⌝
+       ∗ uoff γo p ∗ fdq r q sf)%I.
 
   (* OUTPUT: echo-at-a-file's cursor.  The model records the file's content
      as the SUBSEQUENCE of the line's chunks that landed ([FileWrite.
      file_wq]); [b] bounds the chunks decided so far, and [file_owed ws b]
      is what the line still owes. *)
   Definition file_out (i : Z) (γo : gname) (ws : wordline) (b : nat) : iProp Σ :=
-    efany c r i γo ws b.
+    efany c r fname_f sf i γo ws b.
 
   (* =================================================================== *)
   (*  2.  SMALL FACTS: bounds off the run, the source's two halves        *)
@@ -450,7 +456,7 @@ Section UkFileDev.
     intros Hfdlt Hn0 Hag.
     iIntros "#Hbr #Hrb #Hm #Hinv Hh Hin HK".
     iIntros (h m avail a f) "%Ha0 %Ha1 %Ha2 Hcode Hbuf Hrun Hcont".
-    iDestruct "Hin" as (p) "(%HS & Hu & Hd)".
+    iDestruct "Hin" as (p) "(%HS & %HsN & Hu & Hd)".
     iDestruct (fdev_ubytes_bnd with "Hrun Hbuf") as %Habnd; [ exact Hn0 | ].
     pose proof (fdev_cint_lt _ n Ha2) as Hn31.
     set (m1 := <[Regidx a7_idx := (mword_of_int 5 : mword 64)]> m).
@@ -485,7 +491,7 @@ Section UkFileDev.
     iEval (rewrite <- Hua) in "Hbuf".
     iPoseProof (wp_uk_read_deed_learns_held_at N h1 m1
                   (mword_of_int (up_read P + 2)) (Z.of_nat n) n f avail
-                  fd wb i γo c r q jo content p D Heq Hnum Hcnt Hcnt0 Hcapk
+                  fd wb i γo c r q jo content fname_f sf p D HsN Heq Hnum Hcnt Hcnt0 Hcapk
                   Hal4 (fun fdv => Hag (m1 !!! Regidx a0_idx) fdv Ha0r)) as "Hleaf".
     iApply ("Hleaf" with "Hbr Hrb Hi Hrun Hh Hm Hinv Hd Hu Hbuf").
     iIntros (h2 rv gb) "Hh %Hbnd Hans Hrun Hbuf".
@@ -650,13 +656,13 @@ Section UkFileDev.
   Lemma fdev_out_of_cur (i : Z) (γo : gname) (ws : wordline) (sel : list nat)
       (jx k : nat) :
     Forall (fun q => (q < jx)%nat) sel ->
-    efcur c r i γo ws sel jx k -∗ file_out i γo ws (S jx).
+    efcur c r fname_f sf i γo ws sel jx k -∗ file_out i γo ws (S jx).
   Proof using .
     intros Hlt. iIntros "Hc". rewrite /file_out.
     destruct k as [| k'].
-    - iApply (efany_of c r i γo ws (S jx) sel with "Hc").
+    - iApply (efany_of c r fname_f sf i γo ws (S jx) sel with "Hc").
       exact (fdev_forall_lt_weaken sel jx (S jx) ltac:(lia) Hlt).
-    - iApply (efany_of c r i γo ws (S jx) (sel ++ [jx]) with "Hc").
+    - iApply (efany_of c r fname_f sf i γo ws (S jx) (sel ++ [jx]) with "Hc").
       apply Forall_app. split.
       + exact (fdev_forall_lt_weaken sel jx (S jx) ltac:(lia) Hlt).
       + apply Forall_singleton. lia.
@@ -732,7 +738,7 @@ Section UkFileDev.
     iPoseProof (wp_uk_ecall_write_at N h1 m1 (mword_of_int (up_write P + 2))
                   avail
                   (write_file_fam
-                     (fun k => efcur c r i γo ws sel jx k
+                     (fun k => efcur c r fname_f sf i γo ws sel jx k
                                ∗ usrc_at N tx dq2 ua (length bs) f)%I
                      (ukn_pay N))
                   (UserFd.ustd γfd l) (usrc_at N tx dq1 ua (length bs) f)
@@ -748,7 +754,7 @@ Section UkFileDev.
         "%Hka0 %Hka1 %Hka2 %Htk %Hlz %Hnf Hstd Hs1 Hpost Hrun".
       iDestruct (spost_at_write_elim_at uslot
                    (write_file_fam
-                      (fun k => efcur c r i γo ws sel jx k
+                      (fun k => efcur c r fname_f sf i γo ws sel jx k
                                 ∗ usrc_at N tx dq2 ua (length bs) f)%I
                       (ukn_pay N)) W
                    (m1 !!! Regidx a0_idx) (m1 !!! Regidx a1_idx)
@@ -767,7 +773,7 @@ Section UkFileDev.
       rewrite /write_arms_at /write_post_ok_at /write_post_fail_at.
       iAssert (∃ k : nat,
                  ⌜bv_signed ret = Z.of_nat (length bs) \/ bv_signed ret = -1⌝
-                 ∗ efcur c r i γo ws sel jx k
+                 ∗ efcur c r fname_f sf i γo ws sel jx k
                  ∗ usrc_at N tx dq2 ua (length bs) f)%I
         with "[Hp]" as (k) "(%Hret & Hc & Hs2)".
       { iDestruct "Hp" as "[[%Hr Hp] | [%Hr Hp]]".
@@ -807,7 +813,7 @@ Section UkFileDev.
       rewrite (Hf d Hdl) in Hd. injection Hd as <-.
       exact (proj1 Hsrc d Hdl). }
     iApply (fdev_chain_adv_frame with "[Hq] Hs2").
-    iApply (ef_chain c r Heq i γo ws sel jx M pm sz Pt (m1 !!! Regidx a1_idx)
+    iApply (ef_chain c r fname_f sf Heq i γo ws sel jx M pm sz Pt (m1 !!! Regidx a1_idx)
               (length bs) f (Z.of_nat (length bs)) Hsrc Hwf Hpm (Hlf eq_refl)
               eq_refl Hnb0 ltac:(unfold FW_MAX; lia) Hnbm Hjx Hlt Hby
               ltac:(rewrite Hch; reflexivity)
@@ -1101,10 +1107,10 @@ Section UkFileDev.
       (content S : list (bv 8)) (K : Z -> iProp Σ) :
     UserFd.ufd γfd fd (FdOpen true wb (FdInode i γo OffHeld)) -∗
     file_in i γo q content S -∗
-    (fdq r q (Some (i, content)) -∗ K 0) -∗
+    (fdq r q sf -∗ K 0) -∗
     cl_obl N P (Z.of_nat fd) K.
   Proof using Hsc.
-    iIntros "Hh Hin HK". iDestruct "Hin" as (p) "(_ & _ & Hd)".
+    iIntros "Hh Hin HK". iDestruct "Hin" as (p) "(_ & _ & _ & Hd)".
     iApply (file_close fd _ K with "Hh [HK Hd]"); [ exact I | ].
     iApply ("HK" with "Hd").
   Qed.
@@ -1154,10 +1160,10 @@ Section UkFileDev.
       (q : Qp) (content S : list (bv 8)) (K : Z -> iProp Σ) :
     (fd < NSTD)%nat -> l !! fd = Some (FdOpen true wb (FdInode i γo OffHeld)) ->
     UserFd.ustd γfd l -∗ file_in i γo q content S -∗
-    (UserFd.ustd γfd (<[fd := FdClosed]> l) -∗ fdq r q (Some (i, content)) -∗ K 0) -∗
+    (UserFd.ustd γfd (<[fd := FdClosed]> l) -∗ fdq r q sf -∗ K 0) -∗
     cl_obl N P (Z.of_nat fd) K.
   Proof using Hsc.
-    intros Hs Hl. iIntros "Hstd Hin HK". iDestruct "Hin" as (p) "(_ & _ & Hd)".
+    intros Hs Hl. iIntros "Hstd Hin HK". iDestruct "Hin" as (p) "(_ & _ & _ & Hd)".
     iApply (file_close_std fd l _ K Hs Hl ltac:(discriminate) I with "Hstd [HK Hd]").
     iIntros "Hstd". iApply ("HK" with "Hstd Hd").
   Qed.
@@ -1203,24 +1209,25 @@ Section UkFileDev.
      in ghost state only once the kernel has named the descriptor. *)
   Lemma file_open_present (l : list fdstate) (cw : Z) (q1 q2 : Qp) (i : Z)
       (content : list (bv 8)) (K : Z -> iProp Σ) :
+    sf !! fname_f = Some (i, content) ->
     cw = FsImg.ROOTINO ->
     app_inv fsc_fs -∗
     UserFd.ustd γfd l -∗ UserCwd.ucwd (ukn_cwd N) cw -∗
-    fdq r q1 (Some (i, content)) -∗ fdq r q2 (Some (i, content)) -∗
+    fdq r q1 sf -∗ fdq r q2 sf -∗
     ((∀ (fd : nat) (γo : gname), ⌜(fd < NOFILE)%nat⌝ -∗
         UserFd.ualloc γfd l fd (FdOpen true false (FdInode i γo OffHeld)) -∗
         UserCwd.ucwd (ukn_cwd N) cw -∗
-        file_in i γo q2 content content -∗ fdq r q1 (Some (i, content)) -∗
+        file_in i γo q2 content content -∗ fdq r q1 sf -∗
         |==> K (Z.of_nat fd))
      ∧ (UserFd.ustd γfd l -∗ UserCwd.ucwd (ukn_cwd N) cw -∗
-        fdq r q1 (Some (i, content)) -∗ fdq r q2 (Some (i, content)) -∗
+        fdq r q1 sf -∗ fdq r q2 sf -∗
         K (-1))
      ∧ (∀ ret : mword 64, file_taint c -∗
         uk_open_taint_fd γfd l ret -∗ UserCwd.ucwd (ukn_cwd N) cw -∗
         K (bv_signed ret))) -∗
     op_obl N P fname_f 0 K.
   Proof using Heq Hso.
-    intros Hcw.
+    intros HsN Hcw.
     iIntros "#Hinv Hstd Hcwd Hd1 Hd2 HK".
     iIntros (h m avail pv tx f) "%Hf %Ha0 %Ha1 Hcode Hp Hrun Hcont".
     change (length fname_f) with 1%nat.
@@ -1258,8 +1265,8 @@ Section UkFileDev.
                      2 = true)
       by (rewrite E6; exact Al6).
     iPoseProof (wp_uk_ecall_open_read_deed_v N OffHeld h1 m1
-                  (mword_of_int (up_open P + 2)) l avail c r q1 q2 i content cw
-                  (fdev_fimg pv f) (mword_of_int pv) fname_f Heq Hnum Hal4
+                  (mword_of_int (up_open P + 2)) l avail c r q1 q2 i content fname_f sf cw
+                  (fdev_fimg pv f) (mword_of_int pv) fname_f HsN Heq Hnum Hal4
                   Hpath Ha0r Hcr Htr fdev_fname_elems Hst) as "Hleaf".
     iApply ("Hleaf" with "Hi Hv Hrun Hcwd Hstd Hinv Hd1 Hd2").
     iIntros (h2 rv) "Hans Hcwd Hrun".
@@ -1282,7 +1289,7 @@ Section UkFileDev.
         lia. }
       iDestruct "HK" as "[HK _]".
       iMod ("HK" $! fd γo with "[%] Hal Hcwd [Hpub Hd2] Hd1") as "HK"; [ exact Hfdlt | | ].
-      { iExists 0%nat. rewrite drop_0 /foff_pub. iFrame "Hpub Hd2". done. }
+      { iExists 0%nat. rewrite drop_0 /foff_pub. iFrame "Hpub Hd2". by iPureIntro. }
       iApply ("Hcont" $! h3 rv with "[%] [HK] Hp Hrun").
       { right. rewrite Hsig. split; [ lia | exact Hr ]. }
       rewrite Hsig. iExact "HK".
@@ -1311,18 +1318,19 @@ Section UkFileDev.
      truncate permit is the dead walk's own cursor (lane TRUNC-PERMIT). *)
   Lemma file_open_absent (l : list fdstate) (cw : Z) (q : Qp) (mode : Z)
       (K : Z -> iProp Σ) :
+    sf !! fname_f = None ->
     cw = FsImg.ROOTINO ->
     om_create (mword_of_int mode : mword 64) = false ->
     app_inv fsc_fs -∗
-    UserFd.ustd γfd l -∗ UserCwd.ucwd (ukn_cwd N) cw -∗ fdq r q None -∗
-    ((UserFd.ustd γfd l -∗ UserCwd.ucwd (ukn_cwd N) cw -∗ fdq r q None -∗
+    UserFd.ustd γfd l -∗ UserCwd.ucwd (ukn_cwd N) cw -∗ fdq r q sf -∗
+    ((UserFd.ustd γfd l -∗ UserCwd.ucwd (ukn_cwd N) cw -∗ fdq r q sf -∗
         K (-1))
      ∧ (∀ ret : mword 64, file_taint c -∗
         uk_open_taint_fd γfd l ret -∗ UserCwd.ucwd (ukn_cwd N) cw -∗
         K (bv_signed ret))) -∗
     op_obl N P fname_f mode K.
   Proof using Heq Hso.
-    intros Hcw Hcr0.
+    intros HsN Hcw Hcr0.
     iIntros "#Hinv Hstd Hcwd Hd HK".
     iIntros (h m avail pv tx f) "%Hf %Ha0 %Ha1 Hcode Hp Hrun Hcont".
     change (length fname_f) with 1%nat.
@@ -1354,8 +1362,9 @@ Section UkFileDev.
                      2 = true)
       by (rewrite E6; exact Al6).
     iPoseProof (wp_uk_ecall_open_miss_deed_v N h1 m1
-                  (mword_of_int (up_open P + 2)) l avail c r q cw
-                  (fdev_fimg pv f) (mword_of_int pv) fname_f Heq Hnum Hal4
+                  (mword_of_int (up_open P + 2)) l avail c r q fname_f sf cw
+                  (fdev_fimg pv f) (mword_of_int pv) fname_f FileName.uname_fname_f HsN
+                  Heq Hnum Hal4
                   Hpath Ha0r Hcr fdev_fname_elems Hst) as "Hleaf".
     iApply ("Hleaf" with "Hi Hv Hrun Hcwd Hstd Hinv Hd").
     iIntros (h2 rv) "Hans Hcwd Hrun".
@@ -1396,22 +1405,22 @@ Section UkFileDevCat.
   Context `{GEN : GenId} `{XI : CurCtx}.
   Context `{PS : UexecSG.uprogSG Σ}.
   Context `{!echoOutG Σ, !inG Σ (mono_listR (leibnizO Z)), !fileAppG Σ}.
-  Context (c : file_fixed) (r : file_names).
+  Context (c : file_fixed) (r : file_names) (sf : dst).
   Context (Heq : file_app = MkAppcfg file_names (file_pred c) r).
   Context (N : uk_names Σ).
 
   Definition file_read_cat :=
-    file_read c r Heq N (cat_prog N) (cat_stub_read N).
+    file_read c r sf Heq N (cat_prog N) (cat_stub_read N).
   Definition file_write_cat :=
-    file_write c r Heq N (cat_prog N) (cat_stub_write N).
+    file_write c r sf Heq N (cat_prog N) (cat_stub_write N).
   Definition file_write_nil_cat :=
     file_write_nil N (cat_prog N) (cat_stub_write N).
   Definition file_close_cat :=
     file_close N (cat_prog N) (cat_stub_close N).
   Definition file_close_in_cat :=
-    file_close_in r N (cat_prog N) (cat_stub_close N).
+    file_close_in r sf N (cat_prog N) (cat_stub_close N).
   Definition file_open_present_cat :=
-    file_open_present c r Heq N (cat_prog N) (cat_stub_open N).
+    file_open_present c r sf Heq N (cat_prog N) (cat_stub_open N).
   Definition file_open_absent_cat :=
-    file_open_absent c r Heq N (cat_prog N) (cat_stub_open N).
+    file_open_absent c r sf Heq N (cat_prog N) (cat_stub_open N).
 End UkFileDevCat.

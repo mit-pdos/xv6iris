@@ -115,22 +115,24 @@ Section AppFileCons.
      ([FileDeltas.f_inum_not_pinned]).  A holder of the deed reads it in
      one destructuring, with no accessor: this is [file_fs_pure_acc] and
      [AppFile.file_deed_law] together. ---- *)
-  Lemma file_deed_inum_acc (av : aview) (i : Z) (bs : list (bv 8)) :
+  Lemma file_deed_inum_acc (av : aview) (s : dst) (N : fname) (i : Z)
+      (bs : list (bv 8)) :
+    s !! N = Some (i, bs) ->
     (length bs < EchoDisc.line_max)%nat ->
-    fdeed r (Some (i, bs)) -∗ file_pred c r av -∗
-    file_pred c r av ∗ fdeed r (Some (i, bs)) ∗
+    fdeed r s -∗ file_pred c r av -∗
+    file_pred c r av ∗ fdeed r s ∗
     (⌜i <> INIT_INO /\ i <> SH_INO /\ i <> ECHO_INO /\ i <> CAT_INO /\ i <> GREP_INO⌝
      ∨ file_taint c).
   Proof using .
-    intros Hlen. iIntros "Hd Hp".
+    intros HsN Hlen. iIntros "Hd Hp".
     iPoseProof (file_deed_law c r) as "#Hlaw".
     iDestruct (file_fs_pure_acc av with "Hp") as "[Hp Hpure]".
-    iDestruct ("Hlaw" $! av (Some (i, bs)) with "Hd Hp") as "(Hp & Hd & Hres)".
+    iDestruct ("Hlaw" $! av s with "Hd Hp") as "(Hp & Hd & Hres)".
     iFrame "Hp Hd".
     iDestruct "Hres" as "[[%Hok _] | #Ht]"; [ | by iRight ].
     iDestruct "Hpure" as "[%Hpure | #Ht]"; [ | by iRight ].
     iLeft. iPureIntro.
-    exact (f_inum_not_pinned av i bs Hpure (proj2 Hok) Hlen).
+    exact (f_inum_not_pinned av i bs Hpure (proj2 (f_ok_pin av s N i bs Hok HsN)) Hlen).
   Qed.
 
   (* ---- the key's ABSENCE law ([AppEcho.echo_cons_abs_law]) ---- *)
@@ -254,7 +256,8 @@ Section AppFileCons.
               (fun s Hok =>
                  FileDeltas.f_ok_create_other FsImg.ROOTINO fname_console
                    ents nl i cdev av s Hpre file_cons_arm_nd
-                   (or_intror FileDeltas.fname_console_ne_f) Hok)
+                   (or_intror (fun Hu => FileDeltas.uname_ne_console _ Hu eq_refl))
+                   Hok)
               with "Hf").
   Qed.
 
@@ -326,12 +329,13 @@ Section AppFileCons.
       destruct (FileDeltas.node_pin_root _ _ _ av0 H1)
         as (ents & nl & Hrt & _).
       intros ->. by rewrite Hrt in Hfree. }
-    (* ...AND THE DEED IS NOT THIS ROW: [f_ok av (Some (j, bs))] pins
+    (* ...AND NO FILE IS THIS ROW: [f_ok av s] pins each entry's
        [av !! j] at a FILE node and the unarmed row is a DEVICE. *)
     assert (Hdeed : forall s : dst,
               f_ok av s ->
-              forall (j : Z) (bs : list (bv 8)), s = Some (j, bs) -> i <> j).
-    { intros s Hok j bs Hs. subst s. destruct Hok as (_ & Hrj).
+              forall (N : fname) (j : Z) (bs : list (bv 8)),
+                s !! N = Some (j, bs) -> i <> j).
+    { intros s Hok N j bs Hs. destruct (f_ok_pin av s N j bs Hok Hs) as (_ & Hrj).
       intros Hij. subst j. rewrite Hrow in Hrj.
       injection Hrj as Hnode.
       rewrite Hcn in Hnode. discriminate Hnode. }

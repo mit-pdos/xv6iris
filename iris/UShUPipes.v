@@ -167,20 +167,22 @@ Proof using. reflexivity. Qed.
 (* the reports a [cat f] producer may give: the write error only when
    [f] is there *)
 Definition catf_ds (s : dst) : list (list (bv 8)) :=
-  match s with Some _ => [[]; cat_dg_write] | None => [[]] end.
+  match s !! fname_f with Some _ => [[]; cat_dg_write] | None => [[]] end.
 
 (* the deed's state is the round's, so [cat f] reads the producer's
    content -- or finds no [f] *)
 Lemma catf_case (s : dst) :
-  (snd <$> s = Some (prod_content (pv_fc pview_unionU (dst_content s)) (PrCatF fname_f))
+  (snd <$> s !! fname_f
+     = Some (prod_content (pv_fc pview_unionU (dst_content s)) (PrCatF fname_f))
    /\ pv_fc pview_unionU (dst_content s) fname_f
       = Some (prod_content (pv_fc pview_unionU (dst_content s)) (PrCatF fname_f))
    /\ catf_ds s = [[]; cat_dg_write])
-  \/ (s = None /\ catf_ds s = [[]]).
+  \/ (s !! fname_f = None /\ catf_ds s = [[]]).
 Proof using.
-  destruct s as [[i c] |]; [left | right; split; reflexivity].
+  rewrite /catf_ds.
+  destruct (s !! fname_f) as [[i c] |] eqn:Hs; [left | right; split; reflexivity].
   change (pv_fc pview_unionU) with files_of.
-  cbn [prod_content]. rewrite files_of_f dst_content_f. split_and!; reflexivity.
+  cbn [prod_content]. rewrite files_of_f dst_content_lookup Hs. split_and!; reflexivity.
 Qed.
 
 (* ...and that content is short, as the deed's typing says *)
@@ -332,15 +334,20 @@ Section UShUPipes.
     ⌜fstate_ok (dst_content s)
      /\ forall c, dst_content s !! fname_f = Some c -> (Z.of_nat (length c) < 2 ^ 31)%Z⌝.
   Proof using .
-    destruct s as [[i0 bs0] |]; last first.
-    { iIntros "_". iPureIntro. split; [exact fstate_ok_empty |].
-      intros c Hc. rewrite dst_content_f in Hc. discriminate Hc. }
-    rewrite /f_typed. iIntros "H". iDestruct "H" as (ls0) "[_ %Hbt]". iPureIntro.
-    pose proof (FileDeltas.f_bytes_typed_short ls0 bs0 Hbt) as Hb.
-    unfold EchoDisc.line_max in Hb.
-    destruct Hbt as (ws0 & sel & _ & Hok0 & Hsel & ->). split.
-    - apply (fstate_ok_fst_of_iff (Some _)). exact (fcont_ok_subseq ws0 sel Hok0 Hsel).
-    - intros c Hc. rewrite dst_content_f in Hc. injection Hc as <-. lia.
+    rewrite /f_typed. iIntros "[%He | (%ls0 & _ & %Hall)]".
+    { subst s. iPureIntro. rewrite dst_content_empty. split; [exact fstate_ok_empty |].
+      intros c Hc. by rewrite lookup_empty in Hc. }
+    iPureIntro. split.
+    - rewrite /fstate_ok /dst_content. apply map_Forall_fmap.
+      intros N p Hp. destruct (Hall N p Hp) as [HN Hbt]. split; [exact HN |].
+      destruct Hbt as (ws0 & sel & _ & Hok0 & Hsel & ->).
+      exact (fcont_ok_subseq ws0 sel Hok0 Hsel).
+    - intros c Hc. rewrite dst_content_lookup in Hc.
+      change (snd <$> (s !! fname_f) = Some c) in Hc.
+      destruct (s !! fname_f) as [[i0 bs0] |] eqn:Hs; [| discriminate Hc].
+      injection Hc as <-. destruct (Hall fname_f (i0, bs0) Hs) as [_ Hbt].
+      pose proof (FileDeltas.f_bytes_typed_short ls0 fname_f bs0 Hbt) as Hb.
+      unfold EchoDisc.line_max in Hb. lia.
   Qed.
 
   (* THE LEND AT THE LOOP'S LINE INDEX AND THE DEED AT ITS PRE TIE, as the

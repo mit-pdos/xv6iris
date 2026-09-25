@@ -371,7 +371,7 @@ Section UkUnionEntries.
     assert (Hw0 : forall d, d ∈ [0%nat] -> forall i γo, w0 d <> FDIn false i γo)
       by (intros; discriminate).
     assert (Hrd : fif_wr [0%nat] w0 = false) by reflexivity.
-    set (E := cons_env (wl_line (drop 1 ws)) (fif_files (snd <$> s))).
+    set (E := cons_env (wl_line (drop 1 ws)) (fif_files (snd <$> s !! fname_f))).
     rewrite /image_entry.
     iIntros "!>" (na alen afun W') "%Hok' %Hcw' %Hlz %Hch %Hpid %Hargs Hmp HPay".
     iApply uslot_bupd.
@@ -487,7 +487,7 @@ Section UkUnionEntries.
     lm_wr_blk_t U ps0 cs0 sq I0 P ->
     lm_line_at U I0 = LCat_f ->
     lm_upto U cs0 sq (bodies_of I0) (nlines I0 - 1) = dst_content s ->
-    (forall (i : Z) (bs : list (bv 8)), s = Some (i, bs) ->
+    (forall (i : Z) (bs : list (bv 8)), s !! fname_f = Some (i, bs) ->
        (Z.of_nat (length bs) < 2 ^ 31)%Z) ->
     exec_ok ws ->
     UShEcho.echo_node_img ws Mn sv t gn ->
@@ -516,17 +516,17 @@ Section UkUnionEntries.
     intros HQc Heq Hwb Hfl Htie Hshort Hok Himg Hbytes Hfdl Hws2 Halen Hfname Hcw Hl1 Hl2.
     iIntros "#Hbr #Hkc #HQ #HQt #Hmade #Hinv #Hpin #Hnpw #Hdep".
     iPoseProof (union_links_holds ug Hcons) as "#Hlk".
-    assert (Hs : cons_short (ucat_alts (snd <$> s))).
-    { unfold cons_short. destruct s as [[i bs] |].
+    assert (Hs : cons_short (ucat_alts (snd <$> s !! fname_f))).
+    { unfold cons_short. destruct (s !! fname_f) as [[i bs] |] eqn:Hsf.
       - cbn [ucat_alts fmap option_fmap option_map snd].
         constructor; [exact (Hshort i bs eq_refl) |]. constructor; [| constructor].
         cbv beta. rewrite fif_cat_dg_open. vm_compute. reflexivity.
       - cbn [ucat_alts fmap option_fmap option_map].
         constructor; [| constructor]. cbv beta. rewrite fif_cat_dg_open. vm_compute. reflexivity. }
-    assert (Hconf : conforms (cat_env0 (ucat_alts (snd <$> s)) (fif_files (snd <$> s))
+    assert (Hconf : conforms (cat_env0 (ucat_alts (snd <$> s !! fname_f)) (fif_files (snd <$> s !! fname_f))
                                 [FileDisc.fname_f])
                       (cat_tree [sb "cat"; FsImgCheck.fname_f])).
-    { rewrite -fif_fname_img. destruct s as [[i bs] |].
+    { rewrite -fif_fname_img. destruct (s !! fname_f) as [[i bs] |].
       - cbn [ucat_alts fmap option_fmap option_map snd].
         apply cat_file_conforms. exact (fif_files_f (Some bs)).
       - cbn [ucat_alts fmap option_fmap option_map].
@@ -551,14 +551,14 @@ Section UkUnionEntries.
     iPoseProof (ucat_image_entry_env_c ws Mn sv t gn sts cw cs pidv Q
                   (own γreg (fif_pool ∅ w0)
                    ∗ (cons_cur U (PA sq) v ps0 cs0 sq I0 P 0%nat 0%nat ∗ fdq r q s ∗ F))%I
-                  I (cat_env0 (ucat_alts (snd <$> s)) (fif_files (snd <$> s))
+                  I (cat_env0 (ucat_alts (snd <$> s !! fname_f)) (fif_files (snd <$> s !! fname_f))
                        [FileDisc.fname_f]) {[0%nat]}
                   Hok Himg Hbytes Hfdl Hws2 Halen Hfname Hconf
                   (cat_tree_safe _ _) (fif_dp0 [0%nat] eq_refl)
                   with "[] Hnpw Hdep") as "#He".
     { iIntros "!>" (N' Hpq) "Hstd Hcwd (Hpool & Hc & Hdq & HF)".
-      destruct (fif_cat_env_pure w0 (take NSTD sts) rb rb2 v I0 _ (ucat_alts (snd <$> s))
-                  (fif_files (snd <$> s)) eq_refl Hl1 Hl2) as (Hd0 & Hrow & Hbnd).
+      destruct (fif_cat_env_pure w0 (take NSTD sts) rb rb2 v I0 _ (ucat_alts (snd <$> s !! fname_f))
+                  (fif_files (snd <$> s !! fname_f)) eq_refl Hl1 Hl2) as (Hd0 & Hrow & Hbnd).
       iAssert (fif_exit_k gf r N' γreg [0%nat] w0 q s U (PA sq) LK)%I
         with "[HF]" as "Hk".
       { iApply (fif_exit_k_cons_g gf r N' γreg [0%nat] w0 q s U (PA sq) LK C v I0 F
@@ -571,7 +571,7 @@ Section UkUnionEntries.
                 U (PA sq) LK (LINKS_pers := union_links_persistent ug)
                 (union_links_gl_w_at ug sq) (union_links_gl_blk_at ug sq)
                 (union_links_gl_taint_at ug sq)
-                (cat_env0 (ucat_alts (snd <$> s)) (fif_files (snd <$> s))
+                (cat_env0 (ucat_alts (snd <$> s !! fname_f)) (fif_files (snd <$> s !! fname_f))
                    [FileDisc.fname_f])
                 (take NSTD sts) eq_refl Hd0 Hrow Hbnd ltac:(discriminate)
                 ltac:(intros; reflexivity)
@@ -585,8 +585,9 @@ Section UkUnionEntries.
       - rewrite /fif_dq Hrd. iExact "Hdq".
       - iIntros "Htk". cbn [cat_env0 pe_dev]. case_decide as Hc0; [| done]. simpl.
         iExists v, I0, C. iFrame "Htk".
-        iApply (ucat_lend ug sq v ps0 cs0 I0 P (snd <$> s) Hwb Hfl
-                  (eq_trans (f_equal (fun t : fstate => t !! fname_f) Htie) (dst_content_f s)) Hs
+        iApply (ucat_lend ug sq v ps0 cs0 I0 P (snd <$> s !! fname_f) Hwb Hfl
+                  (eq_trans (f_equal (fun t : fstate => t !! fname_f) Htie)
+                     (dst_content_lookup s fname_f)) Hs
                   with "Hlk Hpin Hc"). }
     iApply ("He" $! na alen afun W' with "[%] [%] [%] [%] [%] [%] Hmp [Hpool HPay]");
       [ exact Hok' | exact Hcw' | exact Hlz | exact Hch | exact Hpid | exact Hargs | ].
@@ -599,7 +600,7 @@ Section UkUnionEntries.
   Lemma uefile_image_entry (sb : fstate) (ws : wordline) (M : gmap Z (bv 8))
       (s0 t : Z) (gb : nat -> bv 8) (sts : list fdstate)
       (cw : Z) (cs : gset gname) (pidv : mword 32)
-      (r : file_names) (Wq : iProp Σ)
+      (r : file_names) (s : dst) (Wq : iProp Σ)
       (i : Z) (γo : gname) (rb : bool)
       (Q : Z -> iProp Σ) :
     (forall x y : Z, Q x = Q y) ->
@@ -611,7 +612,7 @@ Section UkUnionEntries.
     cw = FsImg.ROOTINO ->
     take NSTD sts !! 1%nat = Some (FdOpen rb true (FdInode i γo OffHeld)) ->
     i <> INIT_INO -> i <> SH_INO -> i <> ECHO_INO -> i <> CAT_INO -> i <> GREP_INO ->
-    □ (UEchoFile.ef_exit c r Wq i γo ws -∗ Q (-1)) -∗
+    □ (UEchoFile.ef_exit c r FsImgCheck.fname_f s Wq i γo ws -∗ Q (-1)) -∗
     □ (app_taint -∗ UT) -∗
     □ (UT -∗ app_taint) -∗
     □ (UT -∗ Q (-1)) -∗
@@ -619,7 +620,7 @@ Section UkUnionEntries.
     UkRun.urun_nopipe sts -∗
     udep -∗
     image_entry ElfUser.echo_elf M (mword_of_int (t + 8) : mword 64) sts
-      cw cs pidv Q (UEchoFile.ef_pay c r Wq i γo ws) uslot.
+      cw cs pidv Q (UEchoFile.ef_pay c r FsImgCheck.fname_f s Wq i γo ws) uslot.
   Proof using fifRegG0 fileOutG0 pipeOutG0 ufdG0.
     intros HQc Heq Hline Himg Hbytes Hfdl Hcw Hl1 Hi1 Hi2 Hi3 Hi4 Hi5.
     iIntros "#HQ #Hbr #Hkc #HQt #Hinv #Hnpw #Hdep".
@@ -632,7 +633,7 @@ Section UkUnionEntries.
     assert (Hw0 : forall d, d ∈ [0%nat] -> forall i' γo', w0 d <> FDIn false i' γo')
       by (intros; discriminate).
     assert (Hwr : fif_wr [0%nat] w0 = true) by reflexivity.
-    set (E := pipe_env (DOutM (echo_chunks ws)) (fif_files (snd <$> (None : dst)))).
+    set (E := pipe_env (DOutM (echo_chunks ws)) (fif_files (snd <$> s !! fname_f))).
     rewrite /image_entry.
     iIntros "!>" (na alen afun W') "%Hok' %Hcw' %Hlz %Hch %Hpid %Hargs Hmp HPay".
     iApply uslot_bupd.
@@ -640,26 +641,26 @@ Section UkUnionEntries.
     set (I := fun (N' : uk_names Σ) (Hpq : ukn_pay N' = Q) =>
                 file_iface gf r Heq N' (echo_prog N') (HNc := ukn_const_of_eq N' Q Hpq HQc)
                   (echo_stub_read N') (echo_stub_write N') (echo_stub_open N')
-                  (echo_stub_close N') (echo_stub_exit N') γreg [0%nat] w0 1%Qp None Hw0
+                  (echo_stub_close N') (echo_stub_exit N') γreg [0%nat] w0 1%Qp s Hw0
                   U (PA sb) LK
                   (LINKS_pers := union_links_persistent ug)
                   (union_links_gl_w_at ug sb) (union_links_gl_blk_at ug sb)
                   (union_links_gl_taint_at ug sb)).
     iPoseProof (echo_image_entry_env_c ws M s0 t gb sts cw cs pidv Q
-                  (own γreg (fif_pool ∅ w0) ∗ UEchoFile.ef_pay c r Wq i γo ws)%I
+                  (own γreg (fif_pool ∅ w0) ∗ UEchoFile.ef_pay c r FsImgCheck.fname_f s Wq i γo ws)%I
                   I E {[0%nat]}
                   Hline Himg Hbytes Hfdl (echo_file_conforms ws _ Hne Hnn)
                   (echo_tree_safe _ _) (fif_dp0 [0%nat] eq_refl)
                   with "[] Hnpw Hdep") as "#He".
     { iIntros "!>" (N' Hpq) "Hstd Hcwd (Hpool & HWq & Hc)".
-      iAssert (fif_exit_k gf r N' γreg [0%nat] w0 1%Qp None U (PA sb) LK)%I
+      iAssert (fif_exit_k gf r N' γreg [0%nat] w0 1%Qp s U (PA sb) LK)%I
         with "[HWq]" as "Hk".
-      { iApply (fif_exit_k_redir_g gf r N' γreg [0%nat] w0 1%Qp None U (PA sb) LK
+      { iApply (fif_exit_k_redir_g gf r N' γreg [0%nat] w0 1%Qp s U (PA sb) LK
                   i γo ws Wq eq_refl eq_refl with "[] HWq").
         iIntros "!> Hx". rewrite Hpq. iApply ("HQ" with "Hx"). }
       iApply (fif_env_res_g gf r Heq N' (echo_prog N') (HNc := ukn_const_of_eq N' Q Hpq HQc)
                 (echo_stub_read N') (echo_stub_write N') (echo_stub_open N')
-                (echo_stub_close N') (echo_stub_exit N') γreg [0%nat] w0 1%Qp None Hw0
+                (echo_stub_close N') (echo_stub_exit N') γreg [0%nat] w0 1%Qp s Hw0
                 U (PA sb) LK (LINKS_pers := union_links_persistent ug)
                 (union_links_gl_w_at ug sb) (union_links_gl_blk_at ug sb)
                 (union_links_gl_taint_at ug sb)
@@ -678,12 +679,13 @@ Section UkUnionEntries.
       - by rewrite Hcw.
       - rewrite /fif_env. iFrame "Hbr Hkc Hinv".
         iIntros "!> HT". rewrite Hpq. iApply ("HQt" with "HT").
-      - iApply (fif_dq_wr r [0%nat] w0 1%Qp None Hwr).
+      - iApply (fif_dq_wr r [0%nat] w0 1%Qp s Hwr).
       - iIntros "Htk". cbn [E pipe_env pe_dev]. case_decide as Hc0; [| done]. simpl.
         iExists i, γo, ws. iFrame "Htk". iExists 0%nat.
         iSplit; [done |]. iSplit; [iPureIntro; exact Hwok |].
         rewrite /file_out.
-        iApply (UEchoFile.efany_of c r i γo ws 0%nat [] ltac:(constructor) with "Hc"). }
+        iApply (UEchoFile.efany_of c r FsImgCheck.fname_f s i γo ws 0%nat []
+                  ltac:(constructor) with "Hc"). }
     iApply ("He" $! na alen afun W' with "[%] [%] [%] [%] [%] [%] Hmp [Hpool HPay]");
       [ exact Hok' | exact Hcw' | exact Hlz | exact Hch | exact Hpid | exact Hargs | ].
     iFrame "Hpool HPay".

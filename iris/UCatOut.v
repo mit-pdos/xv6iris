@@ -236,22 +236,20 @@ Proof using. by rewrite cat_cont_ran_none cat_cont_noopen. Qed.
    model's state, and the two together name cat's own output. *)
 Lemma cat_out_of_tie (cs0 : list nat) (s0 : fstate) (I0 : list (bv 8))
     (s : dst) (i : Z) (bs : list (bv 8)) :
-  cat_tie cs0 s0 I0 s -> s = Some (i, bs) ->
+  cat_tie cs0 s0 I0 s -> s !! fname_f = Some (i, bs) ->
   cont (cat_st cs0 s0 I0) LCat_f RCRan = bs ++ u_prompt.
 Proof using.
-  intros Htie Hs. rewrite /cat_tie Hs /dst_content in Htie.
-  cbn [fmap option_fmap option_map fst_of snd] in Htie.
-  rewrite -Htie. apply cat_cont_ran_some. apply lookup_singleton.
+  intros Htie Hs. rewrite /cat_tie in Htie. rewrite -Htie.
+  apply cat_cont_ran_some. by rewrite dst_content_lookup Hs.
 Qed.
 
 Lemma cat_out_of_tie_none (cs0 : list nat) (s0 : fstate) (I0 : list (bv 8))
     (s : dst) :
-  cat_tie cs0 s0 I0 s -> s = None ->
+  cat_tie cs0 s0 I0 s -> s !! fname_f = None ->
   cont (cat_st cs0 s0 I0) LCat_f RCRan = alt_catopen.
 Proof using.
-  intros Htie Hs. rewrite /cat_tie Hs /dst_content in Htie.
-  cbn [fmap option_fmap option_map fst_of snd] in Htie.
-  rewrite -Htie. apply cat_cont_ran_none.
+  intros Htie Hs. rewrite /cat_tie in Htie. rewrite -Htie.
+  apply cat_cont_ran_absent. by rewrite dst_content_lookup Hs.
 Qed.
 
 (* ===================================================================== *)
@@ -275,7 +273,7 @@ Proof using. vm_compute. reflexivity. Qed.
 
 Lemma cat_out_len_ran_some (cs0 : list nat) (s0 : fstate) (I0 : list (bv 8))
     (s : dst) (i : Z) (bs : list (bv 8)) :
-  cat_tie cs0 s0 I0 s -> s = Some (i, bs) ->
+  cat_tie cs0 s0 I0 s -> s !! fname_f = Some (i, bs) ->
   cat_out_len cs0 s0 I0 (ralt_enc RCRan) = length bs.
 Proof using.
   intros Htie Hs. rewrite /cat_out_len ralt_dec_enc.
@@ -285,7 +283,7 @@ Qed.
 
 Lemma cat_out_len_ran_none (cs0 : list nat) (s0 : fstate) (I0 : list (bv 8))
     (s : dst) :
-  cat_tie cs0 s0 I0 s -> s = None ->
+  cat_tie cs0 s0 I0 s -> s !! fname_f = None ->
   cat_out_len cs0 s0 I0 (ralt_enc RCRan) = 19%nat.
 Proof using.
   intros Htie Hs. rewrite /cat_out_len ralt_dec_enc.

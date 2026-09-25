@@ -106,6 +106,9 @@ Section UEchoFile.
   (* the claim: its fixed part, its names, and the record equation every
      [AppFile] lemma is read at *)
   Context (c : file_fixed) (r : file_names).
+  (* the line's file and the rest of the deed's map (cut W2): the cursor is
+     the deed at [<[N := ...]> s] *)
+  Context (N : list (bv 8)) (s : dst).
   Context (Heq : file_app = MkAppcfg file_names (file_pred c) r).
 
   (* THE ERA'S CONSOLE CREDENTIAL, OPAQUE.  echo writes no console byte at
@@ -151,7 +154,7 @@ Section UEchoFile.
      [efq] is that cursor at this entry's claim; the definition is one
      name so that the node, the chain and the exit payload cannot drift. *)
   Definition efq (i : Z) (γo : gname) (ws : wordline) (sel : list nat)
-      : iProp Σ := file_cur c r i ws sel γo.
+      : iProp Σ := file_cur c r N s i ws sel γo.
 
   (* ...AND THE CHAIN CURSOR, indexed by the node number [k] the kernel is
      at.  Write call [j] fires ONE chunk (every one of echo's chunks is a
@@ -223,7 +226,7 @@ Section UEchoFile.
   Proof using Heq.
     intros Hjx Hlt Hi1 Hi2 Hi3 Hi4 Hi5 Hbsk Hlenk.
     iIntros "#Hbr #Hinv Hq". rewrite /efq.
-    iApply (file_awrite_node_adv fsc_fs c r i ws sel jx γo M ua n k
+    iApply (file_awrite_node_adv fsc_fs c r N s i ws sel jx γo M ua n k
               Heq Hjx Hlt Hi1 Hi2 Hi3 Hi4 Hi5 Hbsk Hlenk with "Hbr Hinv Hq").
   Qed.
 
@@ -290,7 +293,7 @@ Section UEchoFile.
            is fired (the offset is the content's length, a line's worth),
            paid where it is tainted *)
         rewrite /efq.
-        iApply (file_awrite_part_adv fsc_fs c r i ws sel (sel ++ [jx]) γo M ua
+        iApply (file_awrite_part_adv fsc_fs c r N s i ws sel (sel ++ [jx]) γo M ua
                   P n 0%nat Heq Hmap
                   ltac:(rewrite Hw0 Hn Nat2Z.id; exact Hnb0)
                   ltac:(rewrite Hw0 Hn Nat2Z.id; exact Hsb)
