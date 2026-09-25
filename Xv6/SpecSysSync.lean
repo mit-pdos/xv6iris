@@ -36,7 +36,7 @@ import Xv6.SpecRelease
 
 namespace Xv6
 
-open Iris Iris.ProgramLogic Iris.BI Std MachCSL
+open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
 open LeanRV64D
 
 /-- Address of `sys_sync`. -/
@@ -68,15 +68,64 @@ def wp_sys_sync_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G
     wordPointsTo (pPid k.proc) 4 dqp pidv -∗ wpLoop cpu'))
   ⊢ wpLoop (GF := GF) cpu
 
-/-- The interface of `sys_sync`. -/
-structure SYS_SYNC : Prop where
-  wp_sys_sync : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
+/-- **The eb-generic form** (Rocq `SpecSysSync.v`: `cpu_own 0 eb`, the
+complement `trap_csrs_ext` / `cpu_claim_ext` in and out, the crossing the
+literal `true`; depth 0, so no spinlock held by `KCtx.wf`).  At `sie = true`
+sys_sync's own `acquire(&log.lock)` mints the bundle the interior sleep
+needs and the caller brings nothing; at `sie = false` the caller brings it. -/
+def wp_sys_sync_eb_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
     [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [CurCtx]
     (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
     (cpu : CPU) (k : KCtx) (γ : LogNames) (γb : BcacheNames) (V : BioView GF)
     (γfs : FsNames) (j : Nat) (logstart : Nat) (dev : BitVec 32) (e : Nat)
-    (pidv : BitVec 32) (dqp : DFrac) hj hproc hK hsie hnoff hlocks htier,
+    (pidv : BitVec 32) (dqp : DFrac)
+    (hj : j < NPROC) (hproc : k.proc = procAddr j) (hK : sysSyncSlots ≤ k.avail)
+    (hnoff : k.noff = 0)
+    (htier : k.tier = KTier.kpt) : Prop :=
+  kctx cpu k ∗ pcIs cpu sysSyncAddr ∗ procsInv Γ ∗
+  trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗
+  logCtx γ γb γfs V.cov logstart dev ∗
+  logEpochLb γ e ∗
+  wordPointsTo (pPid k.proc) 4 dqp pidv ∗
+  wpNext true k.proc cpu (fun cpu' => iprop(∀ (spie spp : Bool) (R' : RegMap),
+    ⌜calleeSaved k.regs R' ∧ R' 10#5 = 0#64⌝ -∗
+    kctx cpu' ((k.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k.regs 1#5)) -∗
+    trapCsrsExt cpu' k.sie -∗ cpuClaimExt cpu' k.sie k.proc -∗
+    wordPointsTo (pPid k.proc) 4 dqp pidv -∗ wpLoop cpu'))
+  ⊢ wpLoop (GF := GF) cpu
+
+/-- The interface of `sys_sync`. -/
+structure SYS_SYNC : Prop where
+  wp_sys_sync_eb : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
+    [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [CurCtx]
+    (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+    (cpu : CPU) (k : KCtx) (γ : LogNames) (γb : BcacheNames) (V : BioView GF)
+    (γfs : FsNames) (j : Nat) (logstart : Nat) (dev : BitVec 32) (e : Nat)
+    (pidv : BitVec 32) (dqp : DFrac) hj hproc hK hnoff htier,
+    wp_sys_sync_eb_body (hlc := hlc) (GF := GF) Γ cpu k γ γb V γfs j logstart dev e pidv dqp
+      hj hproc hK hnoff htier
+
+/-- The interrupts-off instance of `wp_sys_sync_eb` (the complement is the
+whole bundle). -/
+theorem SYS_SYNC.wp_sys_sync (A : SYS_SYNC) {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF]
+    [Xv6G GF] [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [CurCtx]
+    (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+    (cpu : CPU) (k : KCtx) (γ : LogNames) (γb : BcacheNames) (V : BioView GF)
+    (γfs : FsNames) (j : Nat) (logstart : Nat) (dev : BitVec 32) (e : Nat)
+    (pidv : BitVec 32) (dqp : DFrac) hj hproc hK hsie hnoff hlocks htier :
     wp_sys_sync_body (hlc := hlc) (GF := GF) Γ cpu k γ γb V γfs j logstart dev e pidv dqp
-      hj hproc hK hsie hnoff hlocks htier
+      hj hproc hK hsie hnoff hlocks htier := by
+  have h := A.wp_sys_sync_eb (hlc := hlc) (GF := GF) Γ cpu k γ γb V γfs j logstart dev e pidv dqp
+    hj hproc hK hnoff htier
+  unfold wp_sys_sync_eb_body at h
+  unfold wp_sys_sync_body
+  rw [hsie] at h
+  simp only [trapCsrsExt_false, cpuClaimExt_false] at h
+  iintro ⟨H0, H1, H2, Htc, Hcl, Hir, H6, H7, H8, Hnext⟩
+  iapply h
+  iframe H0 H1 H2 Htc Hcl Hir H6 H7 H8
+  iapply wpNext_mono $$ Hnext
+  iintro %cpu' HK %spie %spp %R' %p0 H1 H2 ⟨Htc, Hir⟩ Hcl H6
+  iapply HK $$ %spie %spp %R' %p0 H1 H2 Htc Hcl Hir H6
 
 end Xv6

@@ -44,6 +44,18 @@ The outer driver is `kw_scan` (the 64-slot fuel scan via `kw_slot`, model
 + `sleep` hart-migration + re-acquire, model `ProofKexit.kx_loop`'s
 `wpNext true` crossing), and `kw_loop` (the `iloeb` outer loop, model
 `ap_pidloop`), wired to the loop head at `(KernelSyms.«kwait» + 0xee)`.
+
+EITHER ENTRY SIE (Rocq `cpu_own 0 eb`; `KWAIT.wp_kwait_eb`).  The caller
+brings the complement `trapCsrsExt`/`cpuClaimExt`; the prologue, `myproc`
+and the entry `acquire(&wait_lock)` run at the caller's index (the pair
+follows the thread), and the acquire's arm joins it into the whole bundle
+(`armExt_join`), which every locked stretch (`kw_loop`/`kw_scan`/`kw_slot`/
+`kw_reap`, where `kh.intena = k.sie`) carries unchanged.  Each
+`release(&wait_lock)` re-splits it (`armExt_split` + `popArm_sie`, reen =
+the entry SIE): the three return arms run the epilogue `kw_epi` at level 0
+with the complement, and the park calls `sleep` at its eb contract and
+re-joins after the re-acquire.  The nested `pp->lock` pairs stay at
+`sie = false`.
 -/
 import Xv6.LazyFree
 import MachCSL.WpSmodeFrame
@@ -634,21 +646,22 @@ theorem kw_sleep_prepare (SP : SLEEP_PREPARE) (Γ : SchedNames) [ClaimIs (hlc :=
   exact h
 
 set_option maxHeartbeats 1000000 in
-/-- `sleep`'s contract at its entry (folded to `0x80002012`). -/
+/-- `sleep`'s contract at its entry (folded to `0x80002012`), at either
+`SIE`, with the complement at a named index `s` and proc `p` (cf. `bo_sl`). -/
 theorem kw_sleep (SL : SLEEP) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
-    (c : CPU) (k' : KCtx) (j : Nat)
+    (c : CPU) (k' : KCtx) (j : Nat) (s : Bool) (p : BitVec 64)
     (hj : j < NPROC) (hproc : k'.proc = procAddr j) (hK : sleepSlots ≤ k'.avail)
-    (hsie : k'.sie = false) (hnoff : k'.noff = 0) (hlocks : k'.locks = [])
-    (htier : k'.tier = KTier.kpt) :
+    (hnoff : k'.noff = 0) (htier : k'.tier = KTier.kpt) (hs : k'.sie = s) (hp : k'.proc = p) :
     kctx c k' ∗ pcIs c KA.«sleep» ∗ procsInv Γ ∗
-    trapCsrs c ∗ cpuClaim c k'.proc ∗ intrRes c ∗
-    wpNext true k'.proc c (fun cpu' => iprop(∀ spie : Bool, ∀ spp : Bool, ∀ R' : RegMap,
+    trapCsrsExt c s ∗ cpuClaimExt c s p ∗
+    wpNext true p c (fun cpu' => iprop(∀ spie : Bool, ∀ spp : Bool, ∀ R' : RegMap,
       kctx cpu' ((k'.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k'.regs 1#5)) -∗
-      trapCsrs cpu' -∗ cpuClaim cpu' k'.proc -∗ intrRes cpu' -∗
+      trapCsrsExt cpu' s -∗ cpuClaimExt cpu' s p -∗
       ⌜calleeSaved k'.regs R'⌝ -∗ wpLoop cpu'))
     ⊢ wpLoop (GF := GF) c := by
-  have h := SL.wp_sleep (hlc := hlc) (GF := GF) Γ c k' j hj hproc hK hsie hnoff hlocks htier
-  unfold wp_sleep_body at h
+  subst hs hp
+  have h := SL.wp_sleep_eb (hlc := hlc) (GF := GF) Γ c k' j hj hproc hK hnoff htier
+  unfold wp_sleep_eb_body at h
   simp only [sleepAddr] at h
   exact h
 
@@ -698,7 +711,7 @@ pop the ten-slot frame, `ret`.  Discharges the specification's sleep-shaped
 post directly (the return may be on any hart, since `k.proc ≠ 0`). -/
 theorem kw_epi (Γ : SchedNames) (cpu cur : CPU) (k : KCtx) (γw γp γl : GName) (γk : KmemNames)
     (j : Nat) (pid : BitVec 32) (V : ProcPriv) (M : Nat → List (BitVec 8))
-    (hj : j < NPROC) (hproc : k.proc = procAddr j) (hK : 10 ≤ k.avail) (hsie : k.sie = false)
+    (hj : j < NPROC) (hproc : k.proc = procAddr j) (hK : 10 ≤ k.avail)
     (spie spp : Bool) (R : RegMap) (rv xw : BitVec 32) (d : Nat) (P' : UPtd) (w9 : BitVec 64)
     (hR2 : R 2#5 = k.regs 2#5 + 0xFFFFFFFFFFFFFFB0#64)
     (hs3 : R 19#5 = BitVec.signExtend 64 rv)
@@ -710,18 +723,18 @@ theorem kw_epi (Γ : SchedNames) (cpu cur : CPU) (k : KCtx) (γw γp γl : GName
       (k.regs 20#5) (k.regs 21#5) (k.regs 22#5) (k.regs 23#5) w9 ∗
     procPrivExtNoctxAt curCtx (procAddr j) pid V P'
       (umemWrite (viewFaulted V.upt P' M) (k.regs 10#5).toNat ((xstateBytes xw).take d)) ∗
-    trapCsrs cur ∗ cpuClaim cur k.proc ∗ intrRes cur ∗
+    trapCsrsExt cur k.sie ∗ cpuClaimExt cur k.sie k.proc ∗
     wpNext true k.proc cpu (fun cpu' => iprop(∀ (spie spp : Bool) (R' : RegMap) (P' : UPtd)
       (rv xw : BitVec 32) (d : Nat),
       ⌜calleeSaved k.regs R' ∧ R' 10#5 = BitVec.signExtend 64 rv ∧ V.upt.extSz V.sz P' ∧ d ≤ 4 ∧
         kwaitAns rv (k.regs 10#5) d⌝ -∗
       kctx cpu' ((k.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k.regs 1#5)) -∗
-      trapCsrs cpu' -∗ cpuClaim cpu' k.proc -∗ intrRes cpu' -∗
+      trapCsrsExt cpu' k.sie -∗ cpuClaimExt cpu' k.sie k.proc -∗
       procPrivNoctxAt curCtx (procAddr j) pid { V with upt := P' }
         (umemWrite (viewFaulted V.upt P' M) (k.regs 10#5).toNat ((xstateBytes xw).take d)) -∗
       wpLoop cpu'))
     ⊢ wpLoop (GF := GF) cur := by
-  iintro ⟨Hk, Hpc, Hframe, Hpriv, Htc, Hcl, Hir, HΦ⟩
+  iintro ⟨Hk, Hpc, Hframe, Hpriv, Hte, Hce, HΦ⟩
   icases kwFrame_split _ _ _ _ _ _ _ _ _ _ _ $$ Hframe with ⟨F0, F1, F2, F3, F4, F5, F6, F7, F8, F9⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
   have hK' : 10 ≤ (k.withSpie spie spp).avail := hK
@@ -776,23 +789,21 @@ theorem kw_epi (Γ : SchedNames) (cpu cur : CPU) (k : KCtx) (γw γp γl : GName
   k_step_gen (wp_s_ret c10 _ (KA.«kwait» + 0x92#64) true 1#5)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c11 hq11
   iintro Hk Hpc
-  -- the epilogue does not migrate (interrupts off): c11 = cur
-  have he : k.sie = false ∨ k.proc = 0#64 := Or.inl hsie
-  have hpinE : c11 = cur :=
-    (hq11 he).trans ((hq10 he).trans ((hq9 he).trans ((hq8 he).trans ((hq7 he).trans
+  -- the complement follows the thread (it can only move where the hart cannot)
+  have hpinE : k.sie = false → c11 = cur := fun hsie => by
+   have he : k.sie = false ∨ k.proc = 0#64 := Or.inl hsie
+   exact (hq11 he).trans ((hq10 he).trans ((hq9 he).trans ((hq8 he).trans ((hq7 he).trans
       ((hq6 he).trans ((hq5 he).trans ((hq4 he).trans ((hq3 he).trans ((hq2 he).trans
         ((hq1 he).trans (hq0 he)))))))))))
-  ihave Htc := (show trapCsrs (GF := GF) cur ⊢ trapCsrs c11 from by rw [hpinE]) $$ Htc
-  ihave Hcl := (show cpuClaim (GF := GF) cur k.proc ⊢ cpuClaim c11 k.proc from by
-    rw [hpinE]) $$ Hcl
-  ihave Hir := (show intrRes (GF := GF) cur ⊢ intrRes c11 from by rw [hpinE]) $$ Hir
+  ihave Hte := trapCsrsExt_move cur c11 k.sie hpinE $$ Hte
+  ihave Hce := cpuClaimExt_move cur c11 k.sie k.proc hpinE $$ Hce
   -- apply the sleep-shaped post (any hart, since k.proc ≠ 0)
   ihave HΦ := wpNext_at true k.proc cpu c11 _
     (fun hc => hc.elim (fun h => absurd h (by decide))
       (fun h => absurd h (by rw [hproc]; exact procAddr_nonzero hj))) $$ HΦ
   k_norm_g
   ihave Hpriv := procPrivExtNoctx_close curCtx (procAddr j) pid V P' _ $$ Hpriv
-  iapply HΦ $$ %spie %spp %_ %P' %rv %xw %d [] Hk Hpc Htc Hcl Hir Hpriv
+  iapply HΦ $$ %spie %spp %_ %P' %rv %xw %d [] Hk Hpc Hte Hce Hpriv
   ipureintro
   refine ⟨?cs, ?r10, hext, hd, hans⟩
   case r10 =>
@@ -907,11 +918,11 @@ theorem kw_reap (CO : COPYOUT) (FP : FREEPROC) (RE : RELEASE)
     (hj : j < NPROC) (hn : n < NPROC)
     (hkhsie : kh.sie = false) (hkhnoff : kh.noff = 1) (hkhlocks : kh.locks = ["wait_lock"])
     (hkhproc : kh.proc = procAddr j) (hkhtier : kh.tier = KTier.kpt) (hkhwf : kh.wf)
-    (hkhint : kh.intena = false) (hkhav : 52 ≤ kh.avail) (hkproc : k.proc = procAddr j)
-    (hksie : k.sie = false) (hklocks0 : k.locks = []) (hkav10 : 10 ≤ k.avail)
+    (hkhint : kh.intena = k.sie) (hkhav : 52 ≤ kh.avail) (hkproc : k.proc = procAddr j)
+    (hklocks0 : k.locks = []) (hkav10 : 62 ≤ k.avail)
     (hknoff0 : k.noff = 0)
     (kb : KCtx) (spieW sppW s0 s1b : Bool) (Rb : RegMap)
-    (hkbwf : kb.wf) (hkbsie : kb.sie = false)
+    (hkbwf : kb.wf) (hkbsie : kb.sie = k.sie)
     (hkbstruct : kb = ((k.pushed 10).withSpie s0 s1b).withRegs Rb)
     (hkhstruct : kh = (kb.pushOffAt spieW sppW).withLocks ["wait_lock"])
     (spie2 spp2 : Bool) (R2 : RegMap)
@@ -941,7 +952,7 @@ theorem kw_reap (CO : COPYOUT) (FP : FREEPROC) (RE : RELEASE)
       ⌜calleeSaved k.regs R' ∧ R' 10#5 = BitVec.signExtend 64 rv ∧ V.upt.extSz V.sz P' ∧ d ≤ 4 ∧
         kwaitAns rv (k.regs 10#5) d⌝ -∗
       kctx cpu' ((k.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k.regs 1#5)) -∗
-      trapCsrs cpu' -∗ cpuClaim cpu' k.proc -∗ intrRes cpu' -∗
+      trapCsrsExt cpu' k.sie -∗ cpuClaimExt cpu' k.sie k.proc -∗
       procPrivNoctxAt curCtx (procAddr j) pid { V with upt := P' }
         (umemWrite (viewFaulted V.upt P' M) (k.regs 10#5).toNat ((xstateBytes xw).take d)) -∗
       wpLoop cpu'))
@@ -958,6 +969,11 @@ theorem kw_reap (CO : COPYOUT) (FP : FREEPROC) (RE : RELEASE)
   subst ht0
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
   have hsie : kh.tier = KTier.kpt := hkhtier
+  have hkbt : kb.tier = KTier.kpt := by
+    have h := hkhtier; rw [hkhstruct] at h
+    simpa only [KCtx.withLocks_tier, KCtx.pushOffAt_tier] using h
+  have hkbav6 : 6 ≤ kb.avail := by
+    rw [hkbstruct]; simp only [KCtx.withRegs_avail, KCtx.withSpie_avail, KCtx.pushed_avail]; omega
   -- unpack procPubRest into its three words
   icases (show procPubRest (GF := GF) (procAddr n) kl xs pid0 ⊢
       iprop(wordPointsTo (pKilled (procAddr n)) 4 (DFrac.own 1) kl ∗
@@ -1002,7 +1018,7 @@ theorem kw_reap (CO : COPYOUT) (FP : FREEPROC) (RE : RELEASE)
         ⌜calleeSaved k.regs R' ∧ R' 10#5 = BitVec.signExtend 64 rv ∧ V.upt.extSz V.sz P' ∧ d ≤ 4 ∧
           kwaitAns rv (k.regs 10#5) d⌝ -∗
         kctx cpu' ((k.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k.regs 1#5)) -∗
-        trapCsrs cpu' -∗ cpuClaim cpu' k.proc -∗ intrRes cpu' -∗
+        trapCsrsExt cpu' k.sie -∗ cpuClaimExt cpu' k.sie k.proc -∗
         procPrivNoctxAt curCtx (procAddr j) pid { V with upt := P' }
           (umemWrite (viewFaulted V.upt P' M) (k.regs 10#5).toNat ((xstateBytes xw).take d)) -∗
         wpLoop cpu')) -∗
@@ -1093,7 +1109,7 @@ theorem kw_reap (CO : COPYOUT) (FP : FREEPROC) (RE : RELEASE)
         have hkbn : kb.noff = 0 := by
           rw [hkbstruct]; simp only [KCtx.withRegs_noff, KCtx.withSpie_noff, KCtx.pushed_noff]
           exact hknoff0
-        have hkbi : kb.intena = false := by
+        have hkbi : kb.intena = k.sie := by
           have h := hkhint; rw [hkhstruct] at h
           simpa only [KCtx.withLocks_intena, KCtx.pushOffAt_intena] using h
         have hkbav : kh.avail = trapRes kb.sie + kb.avail := by
@@ -1109,13 +1125,17 @@ theorem kw_reap (CO : COPYOUT) (FP : FREEPROC) (RE : RELEASE)
           from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [kwait_br_ffffffffffffea88]
         iintro Hk Hpc
         -- release(&wait_lock)
+        -- release(&wait_lock): the arm back to the pop (reen = the entry SIE), the complement kept
+        icases armExt_split cur k.sie k.proc $$ [$Htc $Hcl $Hir] with ⟨Harm, Hte, Hce⟩
         iapply (kw_rel_at RE cur _ γw waitLockAddr ?haddrw "wait_lock" waitLockPay
-            ?hsw ?hnw ?hKw false ?hrw ?how) $$ [- $Hk $Hpc $Hlw $Hlockw $Hpay]
+            ?hsw ?hnw ?hKw k.sie ?hrw ?how) $$ [- $Hk $Hpc $Hlw $Hlockw $Hpay]
         rotate_right 1
-        · isplitl []
-          · iempintro
+        · isplitl [Harm]
+          · iapply popArm_sie cur k _ (by subst hkbstruct; rfl) $$ Harm
           k_norm_g
-          iapply wpNext_off_intro
+          iapply wpNext_intro_pin
+          iintro %cur %hpin
+          k_ext_move
           iintro %R5 Hk Hpc %hcs5
           icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
           -- register facts for the epilogue (compose the callee-saved chains)
@@ -1136,7 +1156,7 @@ theorem kw_reap (CO : COPYOUT) (FP : FREEPROC) (RE : RELEASE)
             (hcs5.2.2.2.2.2.2.2.2.2.2.2.2).trans ((hcs4.2.2.2.2.2.2.2.2.2.2.2.2).trans
               ((hcs3.2.2.2.2.2.2.2.2.2.2.2.2).trans hc27))
           -- reduce the balanced-release context to the epilogue's form
-          have hpe2 : (kb.pushOffAt spie3 spp3).popExit false = kb.withSpie spie3 spp3 := by
+          have hpe2 : (kb.pushOffAt spie3 spp3).popExit k.sie = kb.withSpie spie3 spp3 := by
             rw [← hkbsie]; exact KCtx.pushOffAt_popExit kb spie3 spp3 hkbwf
           have hkbws : kb.withSpie spie3 spp3
               = ((k.withSpie spie3 spp3).pushed 10).withRegs Rb := by
@@ -1144,15 +1164,15 @@ theorem kw_reap (CO : COPYOUT) (FP : FREEPROC) (RE : RELEASE)
           subst hM
           k_norm_g [hpe2, hkbws, kwj_2226, kw_filter_wait,
             kw_strip_locks (k.withSpie spie3 spp3) (by simp only [KCtx.withSpie_locks, hklocks0])]
-          iapply (kw_epi Γ cpu cur k γw γp γl γk j pid V M hj hkproc hkav10 hksie spie3 spp3 R5
+          iapply (kw_epi Γ cpu cur k γw γp γl γk j pid V M hj hkproc (by omega) spie3 spp3 R5
               pid0 xw d P' w9 hR5_2 hR5_19 hR5_24 hR5_25 hR5_26 hR5_27 hext hd hans)
-            $$ [- $Hk $Hpc $Hframe $Hpriv $Htc $Hcl $Hir $HΦ]
+            $$ [- $Hk $Hpc $Hframe $Hpriv $Hte $Hce $HΦ]
         case haddrw => k_norm_g
         case hsw => k_norm_g
         case hnw => k_norm_g; omega
         case hKw => k_norm_g; omega
         case hrw => k_norm_g; simp [hkbn, hkbi]
-        case how => simp
+        case how => intro hon; k_norm_g; exact ⟨by first | exact hkbt | exact hkbtier, by rw [hkbsie, hon]; first | omega | (simp only [trapRes]; omega)⟩
       case haddr => k_norm_g
       case hrs => k_norm_g
       case hrn => k_norm_g; omega
@@ -1315,7 +1335,7 @@ theorem kw_reap (CO : COPYOUT) (FP : FREEPROC) (RE : RELEASE)
         have hkbn : kb.noff = 0 := by
           rw [hkbstruct]; simp only [KCtx.withRegs_noff, KCtx.withSpie_noff, KCtx.pushed_noff]
           exact hknoff0
-        have hkbi : kb.intena = false := by
+        have hkbi : kb.intena = k.sie := by
           have h := hkhint; rw [hkhstruct] at h
           simpa only [KCtx.withLocks_intena, KCtx.pushOffAt_intena] using h
         have hkbav : kh.avail = trapRes kb.sie + kb.avail := by
@@ -1368,16 +1388,20 @@ theorem kw_reap (CO : COPYOUT) (FP : FREEPROC) (RE : RELEASE)
             from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [kwait_br_ffffffffffffea88]
           iintro Hk Hpc
           -- release(&wait_lock)
+          -- release(&wait_lock): the arm back to the pop (reen = the entry SIE), the complement kept
+          icases armExt_split cur k.sie k.proc $$ [$Htc $Hcl $Hir] with ⟨Harm, Hte, Hce⟩
           iapply (kw_rel_at RE cur _ γw waitLockAddr ?haddrw "wait_lock" waitLockPay
-              ?hsw ?hnw ?hKw false ?hrw ?how) $$ [- $Hk $Hpc $Hlw $Hlockw $Hpay]
+              ?hsw ?hnw ?hKw k.sie ?hrw ?how) $$ [- $Hk $Hpc $Hlw $Hlockw $Hpay]
           rotate_right 1
-          · isplitl []
-            · iempintro
+          · isplitl [Harm]
+            · iapply popArm_sie cur k _ (by subst hkbstruct; rfl) $$ Harm
             k_norm_g
-            iapply wpNext_off_intro
+            iapply wpNext_intro_pin
+            iintro %cur %hpin
+            k_ext_move
             iintro %R5 Hk Hpc %hcs5
             icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
-            have hpe2 : (kb.pushOffAt spie2 spp2).popExit false = kb.withSpie spie2 spp2 := by
+            have hpe2 : (kb.pushOffAt spie2 spp2).popExit k.sie = kb.withSpie spie2 spp2 := by
               rw [← hkbsie]; exact KCtx.pushOffAt_popExit kb spie2 spp2 hkbwf
             have hkbws : kb.withSpie spie2 spp2
                 = ((k.withSpie spie2 spp2).pushed 10).withRegs Rb := by
@@ -1393,12 +1417,10 @@ theorem kw_reap (CO : COPYOUT) (FP : FREEPROC) (RE : RELEASE)
             k_step_gen (wp_s_j c6 _ (KA.«kwait» + 0xa8#64) true 2097108#21)
               from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c7 hq7
             iintro Hk Hpc
-            have hc6 : c6 = cur := hq6 (Or.inl hksie)
-            subst c6
-            have hc7 : c7 = cur := hq7 (Or.inl hksie)
-            subst c7
-            ihave Hpc := (show pcIs (GF := GF) cur (KA.«kwait» + 0x7c#64) ⊢ pcIs cur (KA.«kwait» + 0x7c#64)
-              from by rfl) $$ Hpc
+            -- the complement follows the thread (level 0, at the entry SIE)
+            have hc67 : k.sie = false → c7 = cur := fun h => (hq7 (Or.inl h)).trans (hq6 (Or.inl h))
+            ihave Hte := trapCsrsExt_move cur c7 k.sie hc67 $$ Hte
+            ihave Hce := cpuClaimExt_move cur c7 k.sie k.proc hc67 $$ Hce
             -- register facts for the epilogue
             have hR5_2 : R5 2#5 = k.regs 2#5 + 0xFFFFFFFFFFFFFFB0#64 :=
               (hcs5.1).trans ((hcs4.1).trans hRC2)
@@ -1411,9 +1433,9 @@ theorem kw_reap (CO : COPYOUT) (FP : FREEPROC) (RE : RELEASE)
             have hR5_27 : R5 27#5 = k.regs 27#5 :=
               (hcs5.2.2.2.2.2.2.2.2.2.2.2.2).trans ((hcs4.2.2.2.2.2.2.2.2.2.2.2.2).trans hRC27)
             k_norm_g
-            iapply (kw_epi Γ cpu cur k γw γp γl γk j pid V M hj hkproc hkav10 hksie spie2 spp2
+            iapply (kw_epi Γ cpu c7 k γw γp γl γk j pid V M hj hkproc (by omega) spie2 spp2
                 (R5.set 19#5 18446744073709551615#64) (-1#32) xs dd P' w9 ?heR2 ?heS3 ?heH24 ?heH25 ?heH26 ?heH27
-                hext' ?heD ?heAns) $$ [- $Hk $Hpc $Hframe $HprivE $Htc $Hcl $Hir $HΦ]
+                hext' ?heD ?heAns) $$ [- $Hk $Hpc $Hframe $HprivE $Hte $Hce $HΦ]
             case heR2 =>
               simp only [RegMap.set_apply, BitVec.reduceEq, ite_false]; exact hR5_2
             case heS3 =>
@@ -1433,7 +1455,7 @@ theorem kw_reap (CO : COPYOUT) (FP : FREEPROC) (RE : RELEASE)
           case hnw => k_norm_g; omega
           case hKw => k_norm_g; omega
           case hrw => k_norm_g; simp [hkbn, hkbi]
-          case how => simp
+          case how => intro hon; k_norm_g; exact ⟨by first | exact hkbt | exact hkbtier, by rw [hkbsie, hon]; first | omega | (simp only [trapRes]; omega)⟩
         case haddrp => k_norm_g
         case hrsp => k_norm_g
         case hrnp => k_norm_g; omega
@@ -1643,11 +1665,11 @@ theorem kw_slot (CO : COPYOUT) (FP : FREEPROC) (RE : RELEASE) (AC : ACQUIRE)
     (hj : j < NPROC)
     (hkhsie : kh.sie = false) (hkhnoff : kh.noff = 1) (hkhlocks : kh.locks = ["wait_lock"])
     (hkhproc : kh.proc = procAddr j) (hkhtier : kh.tier = KTier.kpt) (hkhwf : kh.wf)
-    (hkhint : kh.intena = false) (hkhav : 52 ≤ kh.avail) (hkproc : k.proc = procAddr j)
-    (hksie : k.sie = false) (hklocks0 : k.locks = []) (hkav10 : 10 ≤ k.avail)
+    (hkhint : kh.intena = k.sie) (hkhav : 52 ≤ kh.avail) (hkproc : k.proc = procAddr j)
+    (hklocks0 : k.locks = []) (hkav10 : 62 ≤ k.avail)
     (hknoff0 : k.noff = 0)
     (kb : KCtx) (spieW sppW s0 s1b : Bool) (Rb : RegMap)
-    (hkbwf : kb.wf) (hkbsie : kb.sie = false)
+    (hkbwf : kb.wf) (hkbsie : kb.sie = k.sie)
     (hkbstruct : kb = ((k.pushed 10).withSpie s0 s1b).withRegs Rb)
     (hkhstruct : kh = (kb.pushOffAt spieW sppW).withLocks ["wait_lock"])
     (w9 : BitVec 64) (parents : Nat → BitVec 64)
@@ -1666,7 +1688,7 @@ theorem kw_slot (CO : COPYOUT) (FP : FREEPROC) (RE : RELEASE) (AC : ACQUIRE)
       ⌜calleeSaved k.regs R' ∧ R' 10#5 = BitVec.signExtend 64 rv ∧ V.upt.extSz V.sz P' ∧ d ≤ 4 ∧
         kwaitAns rv (k.regs 10#5) d⌝ -∗
       kctx cpu' ((k.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k.regs 1#5)) -∗
-      trapCsrs cpu' -∗ cpuClaim cpu' k.proc -∗ intrRes cpu' -∗
+      trapCsrsExt cpu' k.sie -∗ cpuClaimExt cpu' k.sie k.proc -∗
       procPrivNoctxAt curCtx (procAddr j) pid { V with upt := P' }
         (umemWrite (viewFaulted V.upt P' M) (k.regs 10#5).toNat ((xstateBytes xw).take d)) -∗
       wpLoop cpu')) ∗
@@ -1681,7 +1703,7 @@ theorem kw_slot (CO : COPYOUT) (FP : FREEPROC) (RE : RELEASE) (AC : ACQUIRE)
         ⌜calleeSaved k.regs R' ∧ R' 10#5 = BitVec.signExtend 64 rv ∧ V.upt.extSz V.sz P' ∧ d ≤ 4 ∧
           kwaitAns rv (k.regs 10#5) d⌝ -∗
         kctx cpu' ((k.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k.regs 1#5)) -∗
-        trapCsrs cpu' -∗ cpuClaim cpu' k.proc -∗ intrRes cpu' -∗
+        trapCsrsExt cpu' k.sie -∗ cpuClaimExt cpu' k.sie k.proc -∗
         procPrivNoctxAt curCtx (procAddr j) pid { V with upt := P' }
           (umemWrite (viewFaulted V.upt P' M) (k.regs 10#5).toNat ((xstateBytes xw).take d)) -∗
         wpLoop cpu')) -∗
@@ -1748,7 +1770,7 @@ theorem kw_slot (CO : COPYOUT) (FP : FREEPROC) (RE : RELEASE) (AC : ACQUIRE)
           ⊢ pcIs cur (KA.«kwait» + 0x40#64) from by rw [if_pos rfl]) $$ Hpc
         ihave Hpay := kw_wait_pay_intro curCtx parents $$ Hwait
         iapply (kw_reap CO FP RE Γ cpu cur k kh γw γp γl γk j n pid V M hj hn hkhsie hkhnoff
-            hkhlocks hkhproc hkhtier hkhwf hkhint hkhav hkproc hksie hklocks0 hkav10 hknoff0
+            hkhlocks hkhproc hkhtier hkhwf hkhint hkhav hkproc hklocks0 hkav10 hknoff0
             kb spieW sppW s0 s1b Rb hkbwf hkbsie hkbstruct hkhstruct spie2 spp2 R2
             h2R2 h9R2 h18R2 h23R2 h22R2 h24R2 h25R2 h26R2 h27R2 ch kl xs pid0 w9)
           $$ [- $Hk $Hpc $Hpinv $Hlw $Hlp $Hlk $Hav $Htc $Hcl $Hir $Hlocked $Hlockw $Hpay
@@ -1842,11 +1864,11 @@ theorem kw_scan (CO : COPYOUT) (FP : FREEPROC) (RE : RELEASE) (AC : ACQUIRE)
     (hj : j < NPROC)
     (hkhsie : kh.sie = false) (hkhnoff : kh.noff = 1) (hkhlocks : kh.locks = ["wait_lock"])
     (hkhproc : kh.proc = procAddr j) (hkhtier : kh.tier = KTier.kpt) (hkhwf : kh.wf)
-    (hkhint : kh.intena = false) (hkhav : 52 ≤ kh.avail) (hkproc : k.proc = procAddr j)
-    (hksie : k.sie = false) (hklocks0 : k.locks = []) (hkav10 : 10 ≤ k.avail)
+    (hkhint : kh.intena = k.sie) (hkhav : 52 ≤ kh.avail) (hkproc : k.proc = procAddr j)
+    (hklocks0 : k.locks = []) (hkav10 : 62 ≤ k.avail)
     (hknoff0 : k.noff = 0)
     (kb : KCtx) (spieW sppW s0 s1b : Bool) (Rb : RegMap)
-    (hkbwf : kb.wf) (hkbsie : kb.sie = false)
+    (hkbwf : kb.wf) (hkbsie : kb.sie = k.sie)
     (hkbstruct : kb = ((k.pushed 10).withSpie s0 s1b).withRegs Rb)
     (hkhstruct : kh = (kb.pushOffAt spieW sppW).withLocks ["wait_lock"])
     (w9 : BitVec 64) (parents : Nat → BitVec 64) (fuel : Nat) :
@@ -1865,7 +1887,7 @@ theorem kw_scan (CO : COPYOUT) (FP : FREEPROC) (RE : RELEASE) (AC : ACQUIRE)
       ⌜calleeSaved k.regs R' ∧ R' 10#5 = BitVec.signExtend 64 rv ∧ V.upt.extSz V.sz P' ∧ d ≤ 4 ∧
         kwaitAns rv (k.regs 10#5) d⌝ -∗
       kctx cpu' ((k.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k.regs 1#5)) -∗
-      trapCsrs cpu' -∗ cpuClaim cpu' k.proc -∗ intrRes cpu' -∗
+      trapCsrsExt cpu' k.sie -∗ cpuClaimExt cpu' k.sie k.proc -∗
       procPrivNoctxAt curCtx (procAddr j) pid { V with upt := P' }
         (umemWrite (viewFaulted V.upt P' M) (k.regs 10#5).toNat ((xstateBytes xw).take d)) -∗
       wpLoop cpu')) ∗
@@ -1880,7 +1902,7 @@ theorem kw_scan (CO : COPYOUT) (FP : FREEPROC) (RE : RELEASE) (AC : ACQUIRE)
         ⌜calleeSaved k.regs R' ∧ R' 10#5 = BitVec.signExtend 64 rv ∧ V.upt.extSz V.sz P' ∧ d ≤ 4 ∧
           kwaitAns rv (k.regs 10#5) d⌝ -∗
         kctx cpu' ((k.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k.regs 1#5)) -∗
-        trapCsrs cpu' -∗ cpuClaim cpu' k.proc -∗ intrRes cpu' -∗
+        trapCsrsExt cpu' k.sie -∗ cpuClaimExt cpu' k.sie k.proc -∗
         procPrivNoctxAt curCtx (procAddr j) pid { V with upt := P' }
           (umemWrite (viewFaulted V.upt P' M) (k.regs 10#5).toNat ((xstateBytes xw).take d)) -∗
         wpLoop cpu')) -∗
@@ -1907,7 +1929,7 @@ theorem kw_scan (CO : COPYOUT) (FP : FREEPROC) (RE : RELEASE) (AC : ACQUIRE)
           ⌜calleeSaved k.regs R' ∧ R' 10#5 = BitVec.signExtend 64 rv ∧ V.upt.extSz V.sz P' ∧ d ≤ 4 ∧
             kwaitAns rv (k.regs 10#5) d⌝ -∗
           kctx cpu' ((k.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k.regs 1#5)) -∗
-          trapCsrs cpu' -∗ cpuClaim cpu' k.proc -∗ intrRes cpu' -∗
+          trapCsrsExt cpu' k.sie -∗ cpuClaimExt cpu' k.sie k.proc -∗
           procPrivNoctxAt curCtx (procAddr j) pid { V with upt := P' }
             (umemWrite (viewFaulted V.upt P' M) (k.regs 10#5).toNat ((xstateBytes xw).take d)) -∗
           wpLoop cpu')) -∗
@@ -1930,7 +1952,7 @@ theorem kw_scan (CO : COPYOUT) (FP : FREEPROC) (RE : RELEASE) (AC : ACQUIRE)
       ipureintro
       unfold kwFix at hfixv ⊢; simp only [RegMap.set_apply, BitVec.reduceEq, ite_false]; exact hfixv
     iapply (kw_slot CO FP RE AC Γ cpu k kh γw γp γl γk j pid V M hj hkhsie hkhnoff hkhlocks
-      hkhproc hkhtier hkhwf hkhint hkhav hkproc hksie hklocks0 hkav10 hknoff0 kb spieW sppW s0 s1b
+      hkhproc hkhtier hkhwf hkhint hkhav hkproc hklocks0 hkav10 hknoff0 kb spieW sppW s0 s1b
       Rb hkbwf hkbsie hkbstruct hkhstruct w9 parents n hn R hfix h9 cur)
     iframe Hk Hpc Hpinv Hlw Hlp Hlk Hav Htc Hcl Hir Hlockw Hwait Hpriv Hframe HΦ Hadv
   | succ fuel ih =>
@@ -1950,7 +1972,7 @@ theorem kw_scan (CO : COPYOUT) (FP : FREEPROC) (RE : RELEASE) (AC : ACQUIRE)
           ⌜calleeSaved k.regs R' ∧ R' 10#5 = BitVec.signExtend 64 rv ∧ V.upt.extSz V.sz P' ∧ d ≤ 4 ∧
             kwaitAns rv (k.regs 10#5) d⌝ -∗
           kctx cpu' ((k.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k.regs 1#5)) -∗
-          trapCsrs cpu' -∗ cpuClaim cpu' k.proc -∗ intrRes cpu' -∗
+          trapCsrsExt cpu' k.sie -∗ cpuClaimExt cpu' k.sie k.proc -∗
           procPrivNoctxAt curCtx (procAddr j) pid { V with upt := P' }
             (umemWrite (viewFaulted V.upt P' M) (k.regs 10#5).toNat ((xstateBytes xw).take d)) -∗
           wpLoop cpu')) -∗
@@ -1975,7 +1997,7 @@ theorem kw_scan (CO : COPYOUT) (FP : FREEPROC) (RE : RELEASE) (AC : ACQUIRE)
       iapply (ih (n + 1) hfuel' hnext (Radv.set 9#5 (procAddr (n + 1))) hfixv' h9next cur)
       iframe Hk Hpc Hpinv Hlw Hlp Hlk Hav Htc Hcl Hir Hlockw Hwait Hpriv Hframe HΦ Hexit
     iapply (kw_slot CO FP RE AC Γ cpu k kh γw γp γl γk j pid V M hj hkhsie hkhnoff hkhlocks
-      hkhproc hkhtier hkhwf hkhint hkhav hkproc hksie hklocks0 hkav10 hknoff0 kb spieW sppW s0 s1b
+      hkhproc hkhtier hkhwf hkhint hkhav hkproc hklocks0 hkav10 hknoff0 kb spieW sppW s0 s1b
       Rb hkbwf hkbsie hkbstruct hkhstruct w9 parents n hn R hfix h9 cur)
     iframe Hk Hpc Hpinv Hlw Hlp Hlk Hav Htc Hcl Hir Hlockw Hwait Hpriv Hframe HΦ Hadv
 
@@ -1997,11 +2019,11 @@ theorem kw_noKids (CO : COPYOUT) (FP : FREEPROC) (RE : RELEASE) (AC : ACQUIRE) (
     (hj : j < NPROC)
     (hkhsie : kh.sie = false) (hkhnoff : kh.noff = 1) (hkhlocks : kh.locks = ["wait_lock"])
     (hkhproc : kh.proc = procAddr j) (hkhtier : kh.tier = KTier.kpt) (hkhwf : kh.wf)
-    (hkhint : kh.intena = false) (hkhav : 52 ≤ kh.avail) (hkproc : k.proc = procAddr j)
-    (hksie : k.sie = false) (hklocks0 : k.locks = []) (hkav10 : 10 ≤ k.avail)
+    (hkhint : kh.intena = k.sie) (hkhav : 52 ≤ kh.avail) (hkproc : k.proc = procAddr j)
+    (hklocks0 : k.locks = []) (hkav10 : 62 ≤ k.avail)
     (hknoff0 : k.noff = 0)
     (kb : KCtx) (spieW sppW s0 s1b : Bool) (Rb : RegMap)
-    (hkbwf : kb.wf) (hkbsie : kb.sie = false) (hkbnoff : kb.noff = 0) (hkblocks : kb.locks = [])
+    (hkbwf : kb.wf) (hkbsie : kb.sie = k.sie) (hkbnoff : kb.noff = 0) (hkblocks : kb.locks = [])
     (hkbproc : kb.proc = k.proc) (hkbtier : kb.tier = KTier.kpt) (hkbav : 52 ≤ kb.avail)
     (hkbstruct : kb = ((k.pushed 10).withSpie s0 s1b).withRegs Rb)
     (hkhstruct : kh = (kb.pushOffAt spieW sppW).withLocks ["wait_lock"])
@@ -2019,7 +2041,7 @@ theorem kw_noKids (CO : COPYOUT) (FP : FREEPROC) (RE : RELEASE) (AC : ACQUIRE) (
       ⌜calleeSaved k.regs R' ∧ R' 10#5 = BitVec.signExtend 64 rv ∧ V.upt.extSz V.sz P' ∧ d ≤ 4 ∧
         kwaitAns rv (k.regs 10#5) d⌝ -∗
       kctx cpu' ((k.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k.regs 1#5)) -∗
-      trapCsrs cpu' -∗ cpuClaim cpu' k.proc -∗ intrRes cpu' -∗
+      trapCsrsExt cpu' k.sie -∗ cpuClaimExt cpu' k.sie k.proc -∗
       procPrivNoctxAt curCtx (procAddr j) pid { V with upt := P' }
         (umemWrite (viewFaulted V.upt P' M) (k.regs 10#5).toNat ((xstateBytes xw).take d)) -∗
       wpLoop cpu')) ∗
@@ -2035,7 +2057,7 @@ theorem kw_noKids (CO : COPYOUT) (FP : FREEPROC) (RE : RELEASE) (AC : ACQUIRE) (
         ⌜calleeSaved k.regs R' ∧ R' 10#5 = BitVec.signExtend 64 rv ∧ V.upt.extSz V.sz P' ∧ d ≤ 4 ∧
           kwaitAns rv (k.regs 10#5) d⌝ -∗
         kctx cpu' ((k.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k.regs 1#5)) -∗
-        trapCsrs cpu' -∗ cpuClaim cpu' k.proc -∗ intrRes cpu' -∗
+        trapCsrsExt cpu' k.sie -∗ cpuClaimExt cpu' k.sie k.proc -∗
         procPrivNoctxAt curCtx (procAddr j) pid { V with upt := P' }
           (umemWrite (viewFaulted V.upt P' M) (k.regs 10#5).toNat ((xstateBytes xw).take d)) -∗
         wpLoop cpu')) -∗
@@ -2062,7 +2084,7 @@ theorem kw_noKids (CO : COPYOUT) (FP : FREEPROC) (RE : RELEASE) (AC : ACQUIRE) (
         ⌜calleeSaved k.regs R' ∧ R' 10#5 = BitVec.signExtend 64 rv ∧ V.upt.extSz V.sz P' ∧ d ≤ 4 ∧
           kwaitAns rv (k.regs 10#5) d⌝ -∗
         kctx cpu' ((k.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k.regs 1#5)) -∗
-        trapCsrs cpu' -∗ cpuClaim cpu' k.proc -∗ intrRes cpu' -∗
+        trapCsrsExt cpu' k.sie -∗ cpuClaimExt cpu' k.sie k.proc -∗
         procPrivNoctxAt curCtx (procAddr j) pid { V with upt := P' }
           (umemWrite (viewFaulted V.upt P' M) (k.regs 10#5).toNat ((xstateBytes xw).take d)) -∗
         wpLoop cpu')) -∗
@@ -2073,7 +2095,7 @@ theorem kw_noKids (CO : COPYOUT) (FP : FREEPROC) (RE : RELEASE) (AC : ACQUIRE) (
     ihave Hk := (show kctx (GF := GF) cur (kh.withRegs RA)
       ⊢ kctx cur (((kb.pushOffAt spieW sppW).withLocks ["wait_lock"]).withRegs RA)
       from by rw [hkhstruct]) $$ Hk
-    have hkbi : kb.intena = false := by
+    have hkbi : kb.intena = k.sie := by
       have h := hkhint; rw [hkhstruct] at h
       simpa only [KCtx.withLocks_intena, KCtx.pushOffAt_intena] using h
     -- auipc a0,0x10 ; addi a0,a0,252  (a0 = &wait_lock)
@@ -2087,16 +2109,20 @@ theorem kw_noKids (CO : COPYOUT) (FP : FREEPROC) (RE : RELEASE) (AC : ACQUIRE) (
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [kwait_br_ffffffffffffea88]
     iintro Hk Hpc
     -- release(&wait_lock)
+    -- release(&wait_lock): the arm back to the pop (reen = the entry SIE), the complement kept
+    icases armExt_split cur k.sie k.proc $$ [$Htc $Hcl $Hir] with ⟨Harm, Hte, Hce⟩
     iapply (kw_rel_at RE cur _ γw waitLockAddr ?haddrw "wait_lock" waitLockPay
-        ?hsw ?hnw ?hKw false ?hrw ?how) $$ [- $Hk $Hpc $Hlw $Hlockw $Hpay]
+        ?hsw ?hnw ?hKw k.sie ?hrw ?how) $$ [- $Hk $Hpc $Hlw $Hlockw $Hpay]
     rotate_right 1
-    · isplitl []
-      · iempintro
+    · isplitl [Harm]
+      · iapply popArm_sie cur k _ (by subst hkbstruct; rfl) $$ Harm
       k_norm_g
-      iapply wpNext_off_intro
+      iapply wpNext_intro_pin
+      iintro %cur %hpin
+      k_ext_move
       iintro %R5 Hk Hpc %hcs5
       icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
-      have hpe2 : (kb.pushOffAt spieW sppW).popExit false = kb.withSpie spieW sppW := by
+      have hpe2 : (kb.pushOffAt spieW sppW).popExit k.sie = kb.withSpie spieW sppW := by
         rw [← hkbsie]; exact KCtx.pushOffAt_popExit kb spieW sppW hkbwf
       have hkbws : kb.withSpie spieW sppW = ((k.withSpie spieW sppW).pushed 10).withRegs Rb := by
         rw [hkbstruct, KCtx.withSpie_withRegs, kw_withSpie_withSpie, kw_pushed_withSpie]
@@ -2115,21 +2141,20 @@ theorem kw_noKids (CO : COPYOUT) (FP : FREEPROC) (RE : RELEASE) (AC : ACQUIRE) (
       k_step_gen (wp_s_j c6 _ (KA.«kwait» + 0x108#64) true 2097012#21)
         from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c7 hq7
       iintro Hk Hpc
-      have hc6 : c6 = cur := hq6 (Or.inl hksie)
-      subst c6
-      have hc7 : c7 = cur := hq7 (Or.inl hksie)
-      subst c7
-      ihave Hpc := (show pcIs (GF := GF) cur (KA.«kwait» + 0x7c#64) ⊢ pcIs cur (KA.«kwait» + 0x7c#64) from by rfl) $$ Hpc
+      -- the complement follows the thread (level 0, at the entry SIE)
+      have hc67 : k.sie = false → c7 = cur := fun h => (hq7 (Or.inl h)).trans (hq6 (Or.inl h))
+      ihave Hte := trapCsrsExt_move cur c7 k.sie hc67 $$ Hte
+      ihave Hce := cpuClaimExt_move cur c7 k.sie k.proc hc67 $$ Hce
       ihave HprivE := procPrivNoctx_to_ext curCtx (procAddr j) pid V M $$ Hpriv
       ihave HprivE := (show procPrivExtNoctxAt (GF := GF) curCtx (procAddr j) pid V V.upt M
         ⊢ procPrivExtNoctxAt curCtx (procAddr j) pid V V.upt
           (umemWrite (viewFaulted V.upt V.upt M) (k.regs 10#5).toNat ((xstateBytes 0#32).take 0))
         from by rw [List.take_zero, umemWrite_nil, viewFaulted_self]) $$ HprivE
       k_norm_g
-      iapply (kw_epi Γ cpu cur k γw γp γl γk j pid V M hj hkproc hkav10 hksie spieW sppW
+      iapply (kw_epi Γ cpu c7 k γw γp γl γk j pid V M hj hkproc (by omega) spieW sppW
           (R5.set 19#5 18446744073709551615#64) (-1#32) 0#32 0 V.upt w9 ?heR2 ?heS3 ?heH24 ?heH25
           ?heH26 ?heH27 (extSz_refl _ V.upt) (by omega) (kw_ans_neg (k.regs 10#5) 0))
-        $$ [- $Hk $Hpc $Hframe $HprivE $Htc $Hcl $Hir $HΦ]
+        $$ [- $Hk $Hpc $Hframe $HprivE $Hte $Hce $HΦ]
       case heR2 => simp only [RegMap.set_apply, BitVec.reduceEq, ite_false]; exact hR5_2
       case heS3 => simp only [RegMap.set_apply, ite_true]; exact kw_neg1_ext
       case heH24 => simp only [RegMap.set_apply, BitVec.reduceEq, ite_false]; exact hR5_24
@@ -2140,8 +2165,8 @@ theorem kw_noKids (CO : COPYOUT) (FP : FREEPROC) (RE : RELEASE) (AC : ACQUIRE) (
     case hsw => k_norm_g
     case hnw => k_norm_g; omega
     case hKw => k_norm_g; omega
-    case hrw => k_norm_g; simp [hkbi]
-    case how => simp
+    case hrw => k_norm_g; simp [hkbi, hkbnoff]
+    case how => intro hon; k_norm_g; exact ⟨by first | exact hkbt | exact hkbtier, by rw [hkbsie, hon]; first | omega | (simp only [trapRes]; omega)⟩
   -- ============ the branch on !havekids ============
   by_cases hbeqz : Rex 14#5 = 0#64
   · -- !havekids : go to -1 return
@@ -2215,7 +2240,7 @@ theorem kw_noKids (CO : COPYOUT) (FP : FREEPROC) (RE : RELEASE) (AC : ACQUIRE) (
           ihave Hk := (show kctx (GF := GF) cur (kh.withRegs RP)
             ⊢ kctx cur (((kb.pushOffAt spieW sppW).withLocks ["wait_lock"]).withRegs RP)
             from by rw [hkhstruct]) $$ Hk
-          have hkbi : kb.intena = false := by
+          have hkbi : kb.intena = k.sie := by
             have h := hkhint; rw [hkhstruct] at h
             simpa only [KCtx.withLocks_intena, KCtx.pushOffAt_intena] using h
           -- c.mv a0,s6 ; jal release(&wait_lock)
@@ -2225,40 +2250,42 @@ theorem kw_noKids (CO : COPYOUT) (FP : FREEPROC) (RE : RELEASE) (AC : ACQUIRE) (
           k_step (wp_s_jal cur _ (KA.«kwait» + 0xe0#64) false 2091432#21 1#5 (by decide))
             from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [kwait_br_ffffffffffffea88]
           iintro Hk Hpc
+          -- release(&wait_lock): the arm back to the pop (reen = the entry SIE), the complement kept
+          icases armExt_split cur k.sie k.proc $$ [$Htc $Hcl $Hir] with ⟨Harm, Hte, Hce⟩
           iapply (kw_rel_at RE cur _ γw waitLockAddr ?haddrs "wait_lock" waitLockPay
-              ?hss ?hns ?hKs false ?hrs ?hos) $$ [- $Hk $Hpc $Hlw $Hlockw $Hpay]
+              ?hss ?hns ?hKs k.sie ?hrs ?hos) $$ [- $Hk $Hpc $Hlw $Hlockw $Hpay]
           rotate_right 1
-          · isplitl []
-            · iempintro
+          · isplitl [Harm]
+            · iapply popArm_sie cur k _ (by subst hkbstruct; rfl) $$ Harm
             k_norm_g
-            iapply wpNext_off_intro
+            iapply wpNext_intro_pin
+            iintro %cur %hpin
+            k_ext_move
             iintro %R6 Hk Hpc %hcs6
             icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
             ihave Hpc := (show pcIs (GF := GF) cur (jumpPc (KA.«kwait» + 0xe4#64)) ⊢ pcIs cur (KA.«kwait» + 0xe4#64)
               from by rw [kwj_228e]) $$ Hpc
-            have hpe3 : (kb.pushOffAt spieW sppW).popExit false = kb.withSpie spieW sppW := by
+            have hpe3 : (kb.pushOffAt spieW sppW).popExit k.sie = kb.withSpie spieW sppW := by
               rw [← hkbsie]; exact KCtx.pushOffAt_popExit kb spieW sppW hkbwf
             k_norm_g [hpe3, kw_filter_wait,
               kw_strip_locks (kb.withSpie spieW sppW) (by simp only [KCtx.withSpie_locks, hkblocks])]
-            have hsie : kb.sie = false := hkbsie
             have hfixR6 : kwFix k R6 := kwFix_cs k RP R6 hfixP hcs6
             have hR6_22 : R6 22#5 = waitLockAddr := hcs6.2.2.2.2.2.2.2.1.trans hRP22
-            -- jal sleep()
-            k_step (wp_s_jal cur _ (KA.«kwait» + 0xe4#64) false 2096342#21 1#5 (by decide))
+            -- jal sleep()  (level 0, at the entry SIE)
+            k_step_gen (wp_s_jal cur _ (KA.«kwait» + 0xe4#64) false 2096342#21 1#5 (by decide))
               from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [kwait_br_fffffffffffffdba]
+              next c8 hq8
             iintro Hk Hpc
-            ihave Hcl := (show cpuClaim (GF := GF) cur k.proc
-              ⊢ cpuClaim cur ((kb.withSpie spieW sppW).withRegs (R6.set 1#5 (KA.«kwait» + 0xe8#64))).proc
-              from by simp only [KCtx.withRegs_proc, KCtx.withSpie_proc]; rw [hkbproc]) $$ Hcl
-            iapply (kw_sleep SL Γ cur _ j hj ?hslp ?hslK ?hsls ?hsln ?hsll ?hslt)
-              $$ [- $Hk $Hpc $Hpinv $Htc $Hcl $Hir]
+            have hc8 : k.sie = false → c8 = cur := fun h => hq8 (Or.inl (by rw [← hkbsie] at h; exact h))
+            ihave Hte := trapCsrsExt_move cur c8 k.sie hc8 $$ Hte
+            ihave Hce := cpuClaimExt_move cur c8 k.sie k.proc hc8 $$ Hce
+            iapply (kw_sleep SL Γ c8 _ j k.sie k.proc hj ?hslp ?hslK ?hsln ?hslt ?hsls ?hslpp)
+              $$ [- $Hk $Hpc $Hpinv $Hte $Hce]
             rotate_right 1
             · k_norm_g
               iapply wpNext_intro_pin
-              iintro %cpu2 %hpin2 %spieS %sppS %RS Hk Hpc Htc Hcl Hir %hcsS
+              iintro %cpu2 %hpin2 %spieS %sppS %RS Hk Hpc Hte Hce %hcsS
               icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
-              ihave Hcl := (show cpuClaim (GF := GF) cpu2 kb.proc ⊢ cpuClaim cpu2 k.proc
-                from by rw [hkbproc]) $$ Hcl
               ihave Hpc := (show pcIs (GF := GF) cpu2 (jumpPc (KA.«kwait» + 0xe8#64)) ⊢ pcIs cpu2 (KA.«kwait» + 0xe8#64)
                 from by rw [kwj_2292]) $$ Hpc
               ihave Hk := (show kctx (GF := GF) cpu2 (((kb.withSpie spieW sppW).withSpie spieS sppS).withRegs RS)
@@ -2266,30 +2293,43 @@ theorem kw_noKids (CO : COPYOUT) (FP : FREEPROC) (RE : RELEASE) (AC : ACQUIRE) (
                 from by rw [kw_withSpie_withSpie]) $$ Hk
               have hfixS : kwFix k RS := kwFix_cs k R6 RS hfixR6 hcsS
               have hRS22 : RS 22#5 = waitLockAddr := hcsS.2.2.2.2.2.2.2.1.trans hR6_22
-              -- c.mv a0,s6 ; jal acquire(&wait_lock)
-              k_step (wp_s_add cpu2 _ (KA.«kwait» + 0xe8#64) true 10#5 0#5 22#5 (by decide))
-                from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hRS22]
+              -- c.mv a0,s6 ; jal acquire(&wait_lock)  (level 0, at the entry SIE)
+              k_step_gen (wp_s_add cpu2 _ (KA.«kwait» + 0xe8#64) true 10#5 0#5 22#5 (by decide))
+                from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hRS22] next c9 hq9
               iintro Hk Hpc
-              k_step (wp_s_jal cpu2 _ (KA.«kwait» + 0xea#64) false 2091286#21 1#5 (by decide))
+              k_step_gen (wp_s_jal c9 _ (KA.«kwait» + 0xea#64) false 2091286#21 1#5 (by decide))
                 from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [kwait_br_ffffffffffffea00]
+                next c10 hq10
               iintro Hk Hpc
-              iapply (kw_acquire AC cpu2 _ γw "wait_lock" waitLockPay ?han ?haK ?hal) $$ [- $Hk $Hpc]
+              have hc10 : k.sie = false → c10 = cpu2 := fun h =>
+                (hq10 (Or.inl (by rw [← hkbsie] at h; exact h))).trans
+                  (hq9 (Or.inl (by rw [← hkbsie] at h; exact h)))
+              ihave Hte := trapCsrsExt_move cpu2 c10 k.sie hc10 $$ Hte
+              ihave Hce := cpuClaimExt_move cpu2 c10 k.sie k.proc hc10 $$ Hce
+              iapply (kw_acquire AC c10 _ γw "wait_lock" waitLockPay ?han ?haK ?hal) $$ [- $Hk $Hpc]
               rotate_right 1
-              · k_norm_g [hkbsie]
+              · k_norm_g
                 iframe #
-                k_norm_g [hkbsie]
-                iapply wpNext_off_intro
-                iintro %spie2 %spp2 %R7 %hspW Hk Hpc %hcsW Hlockw3 Hpay3 _ Harm3
+                k_norm_g
+                iapply wpNext_intro_pin
+                iintro %c11 %hq11 %spie2 %spp2 %R7 %hspW Hk Hpc %hcsW Hlockw3 Hpay3 _ Harm3
+                have hc11 : k.sie = false → c11 = c10 := fun h => hq11 (Or.inl (by rw [← hkbsie] at h; exact h))
+                ihave Hte := trapCsrsExt_move c10 c11 k.sie hc11 $$ Hte
+                ihave Hce := cpuClaimExt_move c10 c11 k.sie k.proc hc11 $$ Hce
+                -- the acquire's arm and the complement: the whole bundle again
+                ihave Harm3 := (show sieArm (GF := GF) c11 kb.sie kb.proc ⊢ sieArm c11 k.sie k.proc
+                  from by rw [hkbsie, hkbproc]) $$ Harm3
+                icases armExt_join c11 k.sie k.proc $$ [$Harm3 $Hte $Hce] with ⟨Htc, Hcl, Hir⟩
                 icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
-                ihave Hpc := (show pcIs (GF := GF) cpu2 (jumpPc (KA.«kwait» + 0xee#64)) ⊢ pcIs cpu2 (KA.«kwait» + 0xee#64)
+                ihave Hpc := (show pcIs (GF := GF) c11 (jumpPc (KA.«kwait» + 0xee#64)) ⊢ pcIs c11 (KA.«kwait» + 0xee#64)
                   from by rw [kwj_2298]) $$ Hpc
-                ihave Hk := (show kctx (GF := GF) cpu2
+                ihave Hk := (show kctx (GF := GF) c11
                     (((((kb.withSpie spieS sppS).withRegs ((RS.set 10#5 waitLockAddr).set 1#5 (KA.«kwait» + 0xee#64))).pushOffAt spie2 spp2).withLocks ("wait_lock" :: kb.locks)).withRegs R7)
-                  ⊢ kctx cpu2 (((kb.pushOffAt spie2 spp2).withLocks ["wait_lock"]).withRegs R7)
+                  ⊢ kctx c11 (((kb.pushOffAt spie2 spp2).withLocks ["wait_lock"]).withRegs R7)
                   from by rw [KCtx.pushOffAt_withRegs, kw_withSpie_pushOffAt,
                     KCtx.withRegs_withLocks, KCtx.withRegs_withRegs, hkblocks]) $$ Hk
                 have hfixW : kwFix k R7 := kwFix_cs k RS R7 hfixS hcsW
-                iapply Hreenter $$ %cpu2 %spie2 %spp2 %R7 []
+                iapply Hreenter $$ %c11 %spie2 %spp2 %R7 []
                   Hk Hpc Htc Hcl Hir Hav Hlockw3 Hpay3 Hpriv Hframe HΦ
                 ipureintro; exact hfixW
               case han => k_norm_g; omega
@@ -2297,16 +2337,16 @@ theorem kw_noKids (CO : COPYOUT) (FP : FREEPROC) (RE : RELEASE) (AC : ACQUIRE) (
               case hal => k_norm_g; simp [hkblocks]
             case hslp => k_norm_g; rw [hkbproc]; exact hkproc
             case hslK => k_norm_g; unfold sleepSlots; omega
-            case hsls => k_norm_g; exact hkbsie
             case hsln => k_norm_g; exact hkbnoff
-            case hsll => k_norm_g; exact hkblocks
             case hslt => k_norm_g; exact hkbtier
+            case hsls => k_norm_g; exact hkbsie
+            case hslpp => k_norm_g; exact hkbproc
           case haddrs => k_norm_g
           case hss => k_norm_g
           case hns => k_norm_g; omega
           case hKs => k_norm_g; omega
-          case hrs => k_norm_g; simp [hkbi]
-          case hos => simp
+          case hrs => k_norm_g; simp [hkbi, hkbnoff]
+          case hos => intro hon; k_norm_g; exact ⟨by first | exact hkbt | exact hkbtier, by rw [hkbsie, hon]; first | omega | (simp only [trapRes]; omega)⟩
         case hspp => k_norm_g; exact hkhproc
         case hspchan => k_norm_g; exact procAddr_nonzero hj
         case hspn => k_norm_g; rw [hkhnoff]; decide
@@ -2337,12 +2377,12 @@ theorem kw_loop (CO : COPYOUT) (FP : FREEPROC) (RE : RELEASE) (AC : ACQUIRE) (KL
     (cpu : CPU) (k : KCtx) (γw γp γl : GName) (γk : KmemNames)
     (j : Nat) (pid : BitVec 32) (V : ProcPriv) (M : Nat → List (BitVec 8))
     (hj : j < NPROC) (hkproc : k.proc = procAddr j)
-    (hksie : k.sie = false) (hklocks0 : k.locks = []) (hkav10 : 10 ≤ k.avail)
+    (hklocks0 : k.locks = []) (hkav10 : 62 ≤ k.avail)
     (hknoff0 : k.noff = 0)
     (kb : KCtx) (s0 s1b : Bool) (Rb : RegMap)
-    (hkbwf : kb.wf) (hkbsie : kb.sie = false) (hkbnoff : kb.noff = 0) (hkblocks : kb.locks = [])
+    (hkbwf : kb.wf) (hkbsie : kb.sie = k.sie) (hkbnoff : kb.noff = 0) (hkblocks : kb.locks = [])
     (hkbproc : kb.proc = k.proc) (hkbtier : kb.tier = KTier.kpt) (hkbav : 52 ≤ kb.avail)
-    (hkbint : kb.intena = false)
+    (hkbint : kb.intena = k.sie)
     (hkbstruct : kb = ((k.pushed 10).withSpie s0 s1b).withRegs Rb)
     (w9 : BitVec 64) :
     isLock γw waitLockAddr "wait_lock" waitLockPay ∗
@@ -2360,14 +2400,13 @@ theorem kw_loop (CO : COPYOUT) (FP : FREEPROC) (RE : RELEASE) (AC : ACQUIRE) (KL
         ⌜calleeSaved k.regs R' ∧ R' 10#5 = BitVec.signExtend 64 rv ∧ V.upt.extSz V.sz P' ∧ d ≤ 4 ∧
           kwaitAns rv (k.regs 10#5) d⌝ -∗
         kctx cpu' ((k.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k.regs 1#5)) -∗
-        trapCsrs cpu' -∗ cpuClaim cpu' k.proc -∗ intrRes cpu' -∗
+        trapCsrsExt cpu' k.sie -∗ cpuClaimExt cpu' k.sie k.proc -∗
         procPrivNoctxAt curCtx (procAddr j) pid { V with upt := P' }
           (umemWrite (viewFaulted V.upt P' M) (k.regs 10#5).toNat ((xstateBytes xw).take d)) -∗
         wpLoop cpu')) -∗
       wpLoop (GF := GF) curL := by
   obtain ⟨ξ0, t0⟩ := X
   letI : CurCtx := ⟨ξ0, t0⟩
-  have hsie : kb.sie = false := hkbsie
   iintro ⟨#Hlw, #Hlp, #Hlk, #Hpinv⟩
   iloeb as IH
   iintro %curL %spieL %sppL %Rl %hfixL Hk Hpc Htc Hcl Hir Hav Hlockw Hpay Hpriv Hframe HΦ
@@ -2378,6 +2417,7 @@ theorem kw_loop (CO : COPYOUT) (FP : FREEPROC) (RE : RELEASE) (AC : ACQUIRE) (KL
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
   -- kh facts
   have hkhsie : ((kb.pushOffAt spieL sppL).withLocks ["wait_lock"]).sie = false := rfl
+  have hsie := hkhsie
   have hkhnoff : ((kb.pushOffAt spieL sppL).withLocks ["wait_lock"]).noff = 1 := by
     simp only [KCtx.withLocks_noff, KCtx.pushOffAt_noff, hkbnoff]
   have hkhlocks : ((kb.pushOffAt spieL sppL).withLocks ["wait_lock"]).locks = ["wait_lock"] := rfl
@@ -2385,11 +2425,10 @@ theorem kw_loop (CO : COPYOUT) (FP : FREEPROC) (RE : RELEASE) (AC : ACQUIRE) (KL
     simp only [KCtx.withLocks_proc, KCtx.pushOffAt_proc]; rw [hkbproc]; exact hkproc
   have hkhtier : ((kb.pushOffAt spieL sppL).withLocks ["wait_lock"]).tier = KTier.kpt := by
     simp only [KCtx.withLocks_tier, KCtx.pushOffAt_tier]; exact hkbtier
-  have hkhint : ((kb.pushOffAt spieL sppL).withLocks ["wait_lock"]).intena = false := by
+  have hkhint : ((kb.pushOffAt spieL sppL).withLocks ["wait_lock"]).intena = k.sie := by
     simp only [KCtx.withLocks_intena, KCtx.pushOffAt_intena]; exact hkbint
   have hkhav : 52 ≤ ((kb.pushOffAt spieL sppL).withLocks ["wait_lock"]).avail := by
-    simp only [KCtx.withLocks_avail, KCtx.pushOffAt_avail, hkbsie, trapRes, Bool.false_eq_true,
-      ite_false, Nat.zero_add]; exact hkbav
+    simp only [KCtx.withLocks_avail, KCtx.pushOffAt_avail]; omega
   -- 0x80002346 c.li a4,0
   k_step (wp_s_addi curL _ (KA.«kwait» + 0xee#64) true 0#12 14#5 0#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
@@ -2420,7 +2459,7 @@ theorem kw_loop (CO : COPYOUT) (FP : FREEPROC) (RE : RELEASE) (AC : ACQUIRE) (KL
         ⌜calleeSaved k.regs R' ∧ R' 10#5 = BitVec.signExtend 64 rv ∧ V.upt.extSz V.sz P' ∧ d ≤ 4 ∧
           kwaitAns rv (k.regs 10#5) d⌝ -∗
         kctx cpu' ((k.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k.regs 1#5)) -∗
-        trapCsrs cpu' -∗ cpuClaim cpu' k.proc -∗ intrRes cpu' -∗
+        trapCsrsExt cpu' k.sie -∗ cpuClaimExt cpu' k.sie k.proc -∗
         procPrivNoctxAt curCtx (procAddr j) pid { V with upt := P' }
           (umemWrite (viewFaulted V.upt P' M) (k.regs 10#5).toNat ((xstateBytes xw).take d)) -∗
         wpLoop cpu')) -∗
@@ -2428,7 +2467,7 @@ theorem kw_loop (CO : COPYOUT) (FP : FREEPROC) (RE : RELEASE) (AC : ACQUIRE) (KL
   case' _ =>
     iintro %Rex %hfixR Hk Hpc Htc Hcl Hir Hav Hlockw Hpay Hpriv Hframe HΦ
     iapply (kw_noKids CO FP RE AC KL SP SL Γ cpu k _ γw γp γl γk j pid V M hj hkhsie hkhnoff
-      hkhlocks hkhproc hkhtier hkhwf hkhint hkhav hkproc hksie hklocks0 hkav10 hknoff0 kb spieL
+      hkhlocks hkhproc hkhtier hkhwf hkhint hkhav hkproc hklocks0 hkav10 hknoff0 kb spieL
       sppL s0 s1b Rb hkbwf hkbsie hkbnoff hkblocks hkbproc hkbtier hkbav hkbstruct rfl w9 Rex
       hfixR curL) $$ [- $Hk $Hpc $Hpinv $Hlw $Hlp $Hlk $Hav $Htc $Hcl $Hir $Hlockw $Hpay $Hpriv
         $Hframe $HΦ $IH]
@@ -2438,7 +2477,7 @@ theorem kw_loop (CO : COPYOUT) (FP : FREEPROC) (RE : RELEASE) (AC : ACQUIRE) (KL
   have h90 : (((Rl.set 14#5 0#64).set 9#5 (KA.«kwait» + 0x100F0#64)).set 9#5 (procAddr 0)) 9#5 = procAddr 0 := by
     simp only [RegMap.set_apply, if_pos]
   iapply (kw_scan CO FP RE AC Γ cpu k _ γw γp γl γk j pid V M hj hkhsie hkhnoff hkhlocks hkhproc
-    hkhtier hkhwf hkhint hkhav hkproc hksie hklocks0 hkav10 hknoff0 kb spieL sppL s0 s1b Rb hkbwf
+    hkhtier hkhwf hkhint hkhav hkproc hklocks0 hkav10 hknoff0 kb spieL sppL s0 s1b Rb hkbwf
     hkbsie hkbstruct rfl w9 parents (NPROC - 1) 0 (by unfold NPROC; decide) (by unfold NPROC; decide)
     (((Rl.set 14#5 0#64).set 9#5 (KA.«kwait» + 0x100F0#64)).set 9#5 (procAddr 0))
     hfix0 h90 curL)
@@ -2462,11 +2501,12 @@ theorem kwait_br_16008 : KA.«kwait» + 0x16008#64 = KA.«tickslock» := by deci
 
 theorem kwait_proof (MP : MYPROC) (AC : ACQUIRE) (RE : RELEASE) (CO : COPYOUT)
     (FP : FREEPROC) (KL : KILLED) (SP : SLEEP_PREPARE) (SL : SLEEP) : KWAIT :=
-  ⟨fun {hlc GF} _ _ X Γ _ cpu k γw γp γl γk j pid V M hj hproc hK hsie hnoff hlocks htier => by
-  unfold wp_kwait_body
+  ⟨fun {hlc GF} _ _ X Γ _ cpu k γw γp γl γk j pid V M hj hproc hK hnoff htier => by
+  unfold wp_kwait_eb_body
   simp only [kwaitAddr]
-  iintro ⟨Hk, Hpc, #Hpinv, Htc, Hcl, Hir, #Hlw, #Hlp, #Hlk, Hav, Hpriv, HΦ⟩
+  iintro ⟨Hk, Hpc, #Hpinv, Hte, Hce, #Hlw, #Hlp, #Hlk, Hav, Hpriv, HΦ⟩
   icases kctx_wf _ _ $$ Hk with ⟨%hwf, Hk⟩
+  have hlocks : k.locks = [] := List.eq_nil_of_length_eq_zero (by have := hwf.2.2.2.1; omega)
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
   have hK10 : 10 ≤ k.avail := by unfold kwaitSlots at hK; omega
   -- prologue: c.addi16sp sp,-80
@@ -2575,8 +2615,7 @@ theorem kwait_proof (MP : MYPROC) (AC : ACQUIRE) (RE : RELEASE) (CO : COPYOUT)
     iintro Hk Hpc
     k_norm_g
     -- ==== wire the loop head to kw_loop ====
-    have hkint : k.intena = false := by
-      have h := KCtx.reen_of_wf k hwf; rw [hsie, hnoff] at h; simpa using h
+    have hkint : k.intena = k.sie := (hwf.1 hnoff).symm
     -- the base context kb (below the wait_lock push)
     have hkbwf : (((k.pushed 10).withSpie spie0 spp0).withRegs
         ((((R14.set (18#5) k.proc).set (10#5) (KA.«kwait» + 0x1001E#64)).set
@@ -2624,7 +2663,7 @@ theorem kwait_proof (MP : MYPROC) (AC : ACQUIRE) (RE : RELEASE) (CO : COPYOUT)
       · simp only [RegMap.set_apply, BitVec.reduceEq, ite_false]; exact hRW26
       · simp only [RegMap.set_apply, BitVec.reduceEq, ite_false]; exact hRW27
     -- the pin chain: the whole prologue stays on hart `cpu`
-    have hcur19 : c19 = cpu :=
+    have hcur19 : k.sie = false → c19 = cpu := fun hsie =>
       (hp19 (Or.inl hsie)).trans ((hp18 (Or.inl hsie)).trans ((hp17 (Or.inl hsie)).trans
         ((hp16 (Or.inl hsie)).trans ((hp15 (Or.inl hsie)).trans ((hp14 (Or.inl hsie)).trans
         ((hp13 (Or.inl hsie)).trans ((hp12 (Or.inl hsie)).trans ((hp11 (Or.inl hsie)).trans
@@ -2632,14 +2671,18 @@ theorem kwait_proof (MP : MYPROC) (AC : ACQUIRE) (RE : RELEASE) (CO : COPYOUT)
         ((hp7 (Or.inl hsie)).trans ((hp6 (Or.inl hsie)).trans ((hp5 (Or.inl hsie)).trans
         ((hp4 (Or.inl hsie)).trans ((hp3 (Or.inl hsie)).trans ((hp2 (Or.inl hsie)).trans
         (hp1 (Or.inl hsie)))))))))))))))))))
-    have hcur : c26 = cpu :=
+    have hcur : c26 = c19 :=
       (hp26 (Or.inl rfl)).trans ((hp25 (Or.inl rfl)).trans ((hp24 (Or.inl rfl)).trans
         ((hp23 (Or.inl rfl)).trans ((hp22 (Or.inl rfl)).trans ((hp21 (Or.inl rfl)).trans
-        ((hp20 (Or.inl rfl)).trans hcur19))))))
-    ihave Htc := (show trapCsrs (GF := GF) cpu ⊢ trapCsrs c26 from by rw [hcur]) $$ Htc
-    ihave Hcl := (show cpuClaim (GF := GF) cpu k.proc ⊢ cpuClaim c26 k.proc from by rw [hcur]) $$ Hcl
-    ihave Hir := (show intrRes (GF := GF) cpu ⊢ intrRes c26 from by rw [hcur]) $$ Hir
-    ihave Hlocked := (show locked (GF := GF) γw c19 ⊢ locked γw c26 from by rw [hcur, hcur19]) $$ Hlocked
+        (hp20 (Or.inl rfl)))))))
+    -- the complement followed the level-0 stretch; the acquire's arm joins it
+    ihave Hte := trapCsrsExt_move cpu c19 k.sie hcur19 $$ Hte
+    ihave Hce := cpuClaimExt_move cpu c19 k.sie k.proc hcur19 $$ Hce
+    icases armExt_join c19 k.sie k.proc $$ [$Harm $Hte $Hce] with ⟨Htc, Hcl, Hir⟩
+    ihave Htc := (show trapCsrs (GF := GF) c19 ⊢ trapCsrs c26 from by rw [hcur]) $$ Htc
+    ihave Hcl := (show cpuClaim (GF := GF) c19 k.proc ⊢ cpuClaim c26 k.proc from by rw [hcur]) $$ Hcl
+    ihave Hir := (show intrRes (GF := GF) c19 ⊢ intrRes c26 from by rw [hcur]) $$ Hir
+    ihave Hlocked := (show locked (GF := GF) γw c19 ⊢ locked γw c26 from by rw [hcur]) $$ Hlocked
     -- reassemble the frame
     ihave Hframe : kwFrame (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) (k.regs 9#5) (k.regs 18#5)
       (k.regs 19#5) (k.regs 20#5) (k.regs 21#5) (k.regs 22#5) (k.regs 23#5) w9
@@ -2652,8 +2695,7 @@ theorem kwait_proof (MP : MYPROC) (AC : ACQUIRE) (RE : RELEASE) (CO : COPYOUT)
         ((((((k.pushed 10).withSpie spie0 spp0).withRegs ((((R14.set (18#5) k.proc).set (10#5) (KA.«kwait» + 0x1001E#64)).set (10#5) waitLockAddr).set 1#5 (KA.«kwait» + 0x2a#64))).pushOffAt spieW sppW).withLocks ["wait_lock"]).withRegs ((((((RW.set 20#5 5#64).set 21#5 1#64).set (19#5) (KA.«kwait» + 0x1602E#64)).set 19#5 KA.«tickslock»).set (22#5) (KA.«kwait» + 0x10036#64)).set (22#5) waitLockAddr))
       from by rw [hlocks]) $$ Hk
     ihave Hpc := (show pcIs (GF := GF) c26 (KA.«kwait» + 0xee#64) ⊢ pcIs c26 (KA.«kwait» + 0xee#64) from by rfl) $$ Hpc
-    have hkbsie : (((k.pushed 10).withSpie spie0 spp0).withRegs ((((R14.set (18#5) k.proc).set (10#5) (KA.«kwait» + 0x1001E#64)).set (10#5) waitLockAddr).set 1#5 (KA.«kwait» + 0x2a#64))).sie = false := by
-      simp only [KCtx.withRegs_sie, KCtx.withSpie_sie, KCtx.pushed_sie]; exact hsie
+    have hkbsie : (((k.pushed 10).withSpie spie0 spp0).withRegs ((((R14.set (18#5) k.proc).set (10#5) (KA.«kwait» + 0x1001E#64)).set (10#5) waitLockAddr).set 1#5 (KA.«kwait» + 0x2a#64))).sie = k.sie := rfl
     have hkbnoff : (((k.pushed 10).withSpie spie0 spp0).withRegs ((((R14.set (18#5) k.proc).set (10#5) (KA.«kwait» + 0x1001E#64)).set (10#5) waitLockAddr).set 1#5 (KA.«kwait» + 0x2a#64))).noff = 0 := by
       simp only [KCtx.withRegs_noff, KCtx.withSpie_noff, KCtx.pushed_noff]; exact hnoff
     have hkblocks : (((k.pushed 10).withSpie spie0 spp0).withRegs ((((R14.set (18#5) k.proc).set (10#5) (KA.«kwait» + 0x1001E#64)).set (10#5) waitLockAddr).set 1#5 (KA.«kwait» + 0x2a#64))).locks = [] := by
@@ -2662,10 +2704,10 @@ theorem kwait_proof (MP : MYPROC) (AC : ACQUIRE) (RE : RELEASE) (CO : COPYOUT)
       simp only [KCtx.withRegs_proc, KCtx.withSpie_proc, KCtx.pushed_proc]
     have hkbtier : (((k.pushed 10).withSpie spie0 spp0).withRegs ((((R14.set (18#5) k.proc).set (10#5) (KA.«kwait» + 0x1001E#64)).set (10#5) waitLockAddr).set 1#5 (KA.«kwait» + 0x2a#64))).tier = KTier.kpt := by
       simp only [KCtx.withRegs_tier, KCtx.withSpie_tier, KCtx.pushed_tier]; exact htier
-    have hkbint : (((k.pushed 10).withSpie spie0 spp0).withRegs ((((R14.set (18#5) k.proc).set (10#5) (KA.«kwait» + 0x1001E#64)).set (10#5) waitLockAddr).set 1#5 (KA.«kwait» + 0x2a#64))).intena = false := by
+    have hkbint : (((k.pushed 10).withSpie spie0 spp0).withRegs ((((R14.set (18#5) k.proc).set (10#5) (KA.«kwait» + 0x1001E#64)).set (10#5) waitLockAddr).set 1#5 (KA.«kwait» + 0x2a#64))).intena = k.sie := by
       simp only [KCtx.withRegs_intena, KCtx.withSpie_intena, KCtx.pushed_intena]; exact hkint
-    have hloopEnt := (kw_loop (hlc := hlc) (GF := GF) CO FP RE AC KL SP SL Γ cpu k γw γp γl γk j pid V M hj hproc hsie hlocks
-      hK10 hnoff (((k.pushed 10).withSpie spie0 spp0).withRegs ((((R14.set (18#5) k.proc).set (10#5) (KA.«kwait» + 0x1001E#64)).set (10#5) waitLockAddr).set 1#5 (KA.«kwait» + 0x2a#64))) spie0 spp0 ((((R14.set (18#5) k.proc).set (10#5) (KA.«kwait» + 0x1001E#64)).set (10#5) waitLockAddr).set 1#5 (KA.«kwait» + 0x2a#64)) hkbwf hkbsie hkbnoff hkblocks hkbproc hkbtier hkbav hkbint
+    have hloopEnt := (kw_loop (hlc := hlc) (GF := GF) CO FP RE AC KL SP SL Γ cpu k γw γp γl γk j pid V M hj hproc hlocks
+      (by unfold kwaitSlots at hK; omega) hnoff (((k.pushed 10).withSpie spie0 spp0).withRegs ((((R14.set (18#5) k.proc).set (10#5) (KA.«kwait» + 0x1001E#64)).set (10#5) waitLockAddr).set 1#5 (KA.«kwait» + 0x2a#64))) spie0 spp0 ((((R14.set (18#5) k.proc).set (10#5) (KA.«kwait» + 0x1001E#64)).set (10#5) waitLockAddr).set 1#5 (KA.«kwait» + 0x2a#64)) hkbwf hkbsie hkbnoff hkblocks hkbproc hkbtier hkbav hkbint
       rfl w9)
     ihave Hpers : (isLock γw waitLockAddr "wait_lock" waitLockPay ∗
         isLock γp pidLockAddr "nextpid" pidLockPay ∗

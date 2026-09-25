@@ -45,7 +45,7 @@ import MachCSL.WpSmodeIntr
 
 namespace Xv6
 
-open Iris Iris.ProgramLogic Iris.BI Std MachCSL
+open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
 open LeanRV64D
 
 /-- Address of `sys_pause`. -/
@@ -76,14 +76,64 @@ def wp_sys_pause_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6
     wpLoop cpu'))
   ⊢ wpLoop (GF := GF) cpu
 
-/-- The interface of `sys_pause`. -/
-structure SYSPAUSE : Prop where
-  wp_sys_pause : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [CurCtx]
+/-- **The eb-generic form** (Rocq `SpecSysPause.v` pins `eb = true`; this
+is Rocq's `cpu_own 0 eb` shape with the complement `trap_csrs_ext` /
+`cpu_claim_ext` in and out, the crossing the literal `true`, and so covers
+that instance).  At `sie = true` sys_pause's own `acquire(&tickslock)`
+mints the bundle `killed`/`sleep` need and the caller brings nothing; at
+`sie = false` the caller brings it.  Depth 0, so no spinlock is held
+(`KCtx.wf`). -/
+def wp_sys_pause_eb_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [CurCtx]
     (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
     (cpu : CPU) (k : KCtx) (γt : GName) (j : Nat)
     (tfp : BitVec 44) (ws : List (BitVec 64)) (v : BitVec 64) (dqt : DFrac)
-    hj hproc hws hK hsie hnoff hlocks htier,
+    (hj : j < NPROC) (hproc : k.proc = procAddr j) (hws : ws[tfArgIdx 0]? = some v)
+    (hK : sysPauseSlots ≤ k.avail)
+    (hnoff : k.noff = 0)
+    (htier : k.tier = KTier.kpt) : Prop :=
+  kctx cpu k ∗ pcIs cpu sysPauseAddr ∗ procsInv Γ ∗
+  trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗
+  isTickslock γt ∗
+  wordPointsTo (pTrapframe k.proc) 8 dqt (pageAddr tfp) ∗ tfPageAt tfp ws ∗
+  wpNext true k.proc cpu (fun cpu' => iprop(∀ (spie spp : Bool) (R' : RegMap),
+    ⌜calleeSaved k.regs R' ∧ (R' 10#5 = 0#64 ∨ R' 10#5 = 0xFFFFFFFFFFFFFFFF#64)⌝ -∗
+    kctx cpu' ((k.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k.regs 1#5)) -∗
+    trapCsrsExt cpu' k.sie -∗ cpuClaimExt cpu' k.sie k.proc -∗
+    wordPointsTo (pTrapframe k.proc) 8 dqt (pageAddr tfp) -∗ tfPageAt tfp ws -∗
+    wpLoop cpu'))
+  ⊢ wpLoop (GF := GF) cpu
+
+/-- The interface of `sys_pause`. -/
+structure SYSPAUSE : Prop where
+  wp_sys_pause_eb : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [CurCtx]
+    (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+    (cpu : CPU) (k : KCtx) (γt : GName) (j : Nat)
+    (tfp : BitVec 44) (ws : List (BitVec 64)) (v : BitVec 64) (dqt : DFrac)
+    hj hproc hws hK hnoff htier,
+    wp_sys_pause_eb_body (hlc := hlc) (GF := GF) Γ cpu k γt j tfp ws v dqt
+      hj hproc hws hK hnoff htier
+
+/-- The interrupts-off instance of `wp_sys_pause_eb` (the complement is the
+whole bundle). -/
+theorem SYSPAUSE.wp_sys_pause (A : SYSPAUSE) {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF]
+    [Xv6G GF] [CurCtx]
+    (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+    (cpu : CPU) (k : KCtx) (γt : GName) (j : Nat)
+    (tfp : BitVec 44) (ws : List (BitVec 64)) (v : BitVec 64) (dqt : DFrac)
+    hj hproc hws hK hsie hnoff hlocks htier :
     wp_sys_pause_body (hlc := hlc) (GF := GF) Γ cpu k γt j tfp ws v dqt
-      hj hproc hws hK hsie hnoff hlocks htier
+      hj hproc hws hK hsie hnoff hlocks htier := by
+  have h := A.wp_sys_pause_eb (hlc := hlc) (GF := GF) Γ cpu k γt j tfp ws v dqt
+    hj hproc hws hK hnoff htier
+  unfold wp_sys_pause_eb_body at h
+  unfold wp_sys_pause_body
+  rw [hsie] at h
+  simp only [trapCsrsExt_false, cpuClaimExt_false] at h
+  iintro ⟨H0, H1, H2, Htc, Hcl, Hir, H6, H7, H8, Hnext⟩
+  iapply h
+  iframe H0 H1 H2 Htc Hcl Hir H6 H7 H8
+  iapply wpNext_mono $$ Hnext
+  iintro %cpu' HK %spie %spp %R' %p0 H1 H2 ⟨Htc, Hir⟩ Hcl H6 H7
+  iapply HK $$ %spie %spp %R' %p0 H1 H2 Htc Hcl Hir H6 H7
 
 end Xv6
