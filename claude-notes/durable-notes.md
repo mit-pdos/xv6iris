@@ -122,6 +122,14 @@ pointer line per top-level and `design/` file and does NOT list `projects/` or
 
 ### After a pull
 
+**On the GCP VM, after a merge that adds or moves files under `kernel-rocq/`
+or `user-rocq/`** (e.g. an `XV6_REV` bump), `vmbuild.sh` fails with `No rule
+to make target '../user-rocq/….vo'`: it compiles only `iris/`.  Compile the
+tracked sources in place WITHOUT the dump rules (which would re-dump from the
+VM's xv6 clone): in the VM tree, for `d` in `kernel-rocq user-rocq`: `cd $d &&
+coq_makefile -f _CoqProject -o CoqMakefile && make -f CoqMakefile -j60`, then
+rerun `vmbuild.sh`.
+
 **Sequence after any pull that touches `kernel-rocq/`: `make xv6-rev-check` →
 `make kernel-rocq` → the `iris/` build.** Everything that can go wrong with the
 image surfaces as the same bogus address failure at the bottom of the tree

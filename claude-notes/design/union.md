@@ -16,6 +16,16 @@ era's boot state, hooks with `lmh_ok_dec` at every state and a new law
 `lmh_free_ok` (a FREE alternative admissible at one state is admissible
 at every state) -- CONSEQUENCE FOR C9b: a state-dependent `UP (PLRun b)`
 must NOT be counted free at the union (union.md said `negb ∘ plterm`).
+C9b LANDED (4a2eab712, VM c9bmerge2 with the owner's grep/XV6_REV bump
+merged, audits 13/13/14/14): `producer` in FileDisc, `LPipe (p) (n)`,
+`files_of` pure, `UnionDisc.ulm adm` with the explicit False cross arms
+(B2), `ulm_laws adm` at EVERY admission, `ulmU := ulm adm_u_f`,
+`UnionDiscDec` with the demos (state threading, B2 negative, S3
+two-stage corner).  OPEN (C9b2): `lm_hooks (ulm adm)` cannot be built as
+designed -- at an echo pipeline the exec alternative `UP (PLRun
+dg_execL)` is state-DEPENDENT at `cat f | cat` (f may hold those bytes),
+so it cannot be free (`no_free_execL`); FIX (b): split `UP` by producer
+(`UPE`/`UPC`), since an echo pipeline's admission reads no state.
 
 ## Review amendments (override the plan below)
 
