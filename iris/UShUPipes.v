@@ -66,14 +66,14 @@ Require Import UkShPipe UkShPipeLex UkShPipesRound UkShPipesSeam UkShPipesLex Uk
 Require Import UShEcho UShCatPay.
 Require Import UkPipesIface.
 Require Import GenLinksLine LinkRec.
-Require Import UShPipesDefs UShPipesStage UShPipesNode.
+Require Import UShPipesDefs UShPipesStage UShPipesNode UShPipeLeaves.
 Require Import UkShPipesFork.
 Require Import PipesUline PipesCut.
 Require Import UkCatFIface UShCatFStage.
 Require Import UnionDisc UnionView UnionOut UnionLinks UnionLinkInst UnionLinkInstAt.
 Require Import UShLine UShURoundDefs UShURound UShURoundShapes.
 Require Import UkShPipeForkTwin UkShCatForkTwin UkShRedirBody.
-Require UShPipesLaw UShRest UInitSh SpecKexec ElfUser UkPipesEntries FileDeltas UkFileIface.
+Require UShRest UInitSh SpecKexec ElfUser UkPipesEntries FileDeltas UkFileIface.
 Require User.ShSyms.
 Local Open Scope Z_scope.
 
@@ -125,6 +125,27 @@ Proof using.
   rewrite Hul. reflexivity.
 Qed.
 
+(* the three rows the child law hands over are the whole tracked ledger *)
+Lemma pls_fd_lowest_none (l : list fdstate) :
+  length l = NSTD ->
+  UkSh.ush_fd0c l -> UkSh.ush_fd1p l -> UkSh.ush_fd2p l ->
+  fd_lowest_closed l = None.
+Proof using.
+  intros Hlen [wr0 H0] [rb1 H1] [rb2 H2].
+  destruct l as [| a [| b [| c [| d tl]]]];
+    try (exfalso; cbn in Hlen; unfold NSTD in Hlen; lia).
+  cbn in H0, H1, H2.
+  injection H0 as ->. injection H1 as ->. injection H2 as ->.
+  reflexivity.
+Qed.
+
+Lemma nlines_pos_of_ws (I : list (bv 8)) : last_ws I <> [] -> (1 <= nlines I)%nat.
+Proof using.
+  rewrite /last_ws /nlines. destruct (bodies_of I) as [| b bs]; cbn [length].
+  - intros H. exfalso. apply H. reflexivity.
+  - intros _. lia.
+Qed.
+
 (* at most sixteen cats fit a line, at either producer *)
 Lemma upls_cats_le (p : producer) (n : nat) :
   FileDisc.uline_ok (FileDisc.LPipe p n) -> (n <= 16)%nat.
@@ -138,7 +159,7 @@ Lemma unlines_pos (I : list (bv 8)) (p : producer) (n : nat) :
   FileDisc.prod_ok p ->
   last_ws I = FileDisc.uline_ws (FileDisc.LPipe p n) -> (1 <= nlines I)%nat.
 Proof using.
-  intros Hp Hlws. apply UShPipesLaw.nlines_pos_of_ws. rewrite Hlws.
+  intros Hp Hlws. apply nlines_pos_of_ws. rewrite Hlws.
   cbn [FileDisc.uline_ws]. pose proof (FileDisc.prod_words_ne p Hp) as Hne.
   intros Hq. apply Hne. destruct (FileDisc.prod_words p); [done | discriminate Hq].
 Qed.
@@ -198,6 +219,25 @@ Section UShUPipes.
   Context (s0 : fstate).
   Context (Hcons : @riscv_cons_res Σ (@riscv_fixedGS Σ _) = ucl ug).
   Context (Hkill : @app_taint Σ (@riscv_fixedGS Σ _) = file_taint (fgn_cl gf)).
+
+  (* THE NODES' NAMES: a pipe and two one-shot names per node *)
+  Lemma pls_nodes_alloc (n : nat) :
+    ⊢ |==> ∃ (P : nat -> pnames) (gF gG : nat -> gname),
+        [∗ list] j ∈ seq 0 n, osP (gF j) ∗ osP (gG j) ∗ pbundle (P j).
+  Proof using .
+    iAssert ([∗ list] j ∈ seq 0 n, |==> ∃ x : gname * gname * pnames,
+               osP x.1.1 ∗ osP x.1.2 ∗ pbundle x.2)%I as "Hl".
+    { iApply big_sepL_intro. iIntros "!>" (k j _).
+      iMod os_alloc as (γ1) "H1". iMod os_alloc as (γ2) "H2".
+      iMod pipe_names_alloc as (pn) "Hpn".
+      iModIntro. iExists (γ1, γ2, pn). cbn [fst snd]. rewrite /pbundle.
+      iFrame "H1 H2 Hpn". }
+    iMod (big_sepL_bupd with "Hl") as "Hl2".
+    iDestruct (big_sepL_exist_fun (1%positive, 1%positive, MkPNames 1%positive 1%positive 1%positive 1%positive 1%positive 1%positive 1%positive)
+                 (seq 0 n) _ (NoDup_seq 0 n) with "Hl2") as (F) "Hl3".
+    iModIntro. iExists (fun j => (F j).2), (fun j => (F j).1.1), (fun j => (F j).1.2).
+    iExact "Hl3".
+  Qed.
 
   Local Notation T := (file_taint (fgn_cl gf)).
   Local Notation FI := (union_link_inst_at ug s0).
@@ -431,7 +471,7 @@ Section UShUPipes.
     pose proof (ukn_const_of_eq N' _ Hpeq (fun x y => eq_refl)) as Hcst.
     destruct Hrows as (Hfd0c & Hfd1p & Hfd2p).
     iDestruct (UserFd.ustd_len with "Hstd") as %Hlen3.
-    pose proof (UShPipesLaw.pls_fd_lowest_none ld Hlen3 Hfd0c Hfd1p Hfd2p) as Hnone.
+    pose proof (pls_fd_lowest_none ld Hlen3 Hfd0c Hfd1p Hfd2p) as Hnone.
     destruct Hfd0c as [wr0 Hl0]. destruct Hfd1p as [rb1 Hl1]. destruct Hfd2p as [rb2 Hl2].
     destruct n as [| n']; [lia |].
     (* ---- the line is the lexer's ---- *)
@@ -474,7 +514,7 @@ Section UShUPipes.
     assert (Hplok : pl_ok (LPipes (PrEcho ws) (S n'))) by exact (pl_ok_of_uline _ _ Hok_u).
     (* ---- THE ROUND'S ALLOCATION, at the deed's state ---- *)
     iApply uup_fupd_mwp.
-    iMod (UShPipesLaw.pls_nodes_alloc (lcats (LPipes (PrEcho ws) (S n')))) as (P gF gG) "Hnodes".
+    iMod (pls_nodes_alloc (lcats (LPipes (PrEcho ws) (S n')))) as (P gF gG) "Hnodes".
     iMod (pipesV_alloc pg U pview_unionU CPU v I (dst_content s) (LPipes (PrEcho ws) (S n'))
             Hplok ⊤ pnsN (S gen_id) termw
             (tokN (pv_fc pview_unionU (dst_content s)) (LPipes (PrEcho ws) (S n')))
@@ -558,7 +598,7 @@ Section UShUPipes.
     pose proof (ukn_const_of_eq N' _ Hpeq (fun x y => eq_refl)) as Hcst.
     destruct Hrows as (Hfd0c & Hfd1p & Hfd2p).
     iDestruct (UserFd.ustd_len with "Hstd") as %Hlen3.
-    pose proof (UShPipesLaw.pls_fd_lowest_none ld Hlen3 Hfd0c Hfd1p Hfd2p) as Hnone.
+    pose proof (pls_fd_lowest_none ld Hlen3 Hfd0c Hfd1p Hfd2p) as Hnone.
     destruct Hfd0c as [wr0 Hl0]. destruct Hfd1p as [rb1 Hl1]. destruct Hfd2p as [rb2 Hl2].
     destruct n as [| n']; [lia |].
     (* ---- the line is the lexer's ---- *)
@@ -612,7 +652,7 @@ Section UShUPipes.
     pose proof (catf_short (dst_content s) Hshort) as HL31.
     (* ---- THE ROUND'S ALLOCATION, at the deed's state ---- *)
     iApply uup_fupd_mwp.
-    iMod (UShPipesLaw.pls_nodes_alloc (lcats (LPipes (PrCatF fname_f) (S n')))) as (P gF gG) "Hnodes".
+    iMod (pls_nodes_alloc (lcats (LPipes (PrCatF fname_f) (S n')))) as (P gF gG) "Hnodes".
     iMod (pipesV_alloc pg U pview_unionU CPU v I (dst_content s) (LPipes (PrCatF fname_f) (S n'))
             Hplok ⊤ pnsN (S gen_id) termw
             (tokN (pv_fc pview_unionU (dst_content s)) (LPipes (PrCatF fname_f) (S n')))

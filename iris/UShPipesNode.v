@@ -152,9 +152,6 @@ Section UShPipesNode.
   #[local] Instance rd_final_pers0 pn ro : Persistent (rd_final pn ro).
   Proof using . destruct ro; apply _. Qed.
 
-  Lemma pipeN_pnsN : (↑pipeN : coPset) ⊆ (⊤ ∖ ↑pnsN : coPset).
-  Proof using . rewrite /pnsN /pipeN. solve_ndisj. Qed.
-
   (* ================================================================= *)
   (*  1.  THE WRITERS AT THEIR END                                       *)
   (* ================================================================= *)
@@ -1071,23 +1068,3 @@ Section UShPipesNode.
 
   (* [cat f] at the head: [UShCatFStage.stage_catf_law_holds], at the deed *)
 End UShPipesNode.
-
-(* AT THE DEFAULT MODEL [PipesDisc.pipes_lmE] (owner ruling): the round's
-   law with the model, its laws and [fc_ok] fixed -- every other premise
-   of [wp_pipes_round] stays the caller's *)
-Section UShPipesEcho.
-  Context `{HRg : !riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
-            !irefslotG Σ, !pavG Σ, !wchG Σ, !ufdG Σ}.
-  Context `{GEN : GenId} `{XI : CurCtx}.
-  Context `{!ghost_varG Σ Z}.
-  Context `{!uartGhostG Σ}.
-  Context `{!echoOutG Σ, !inG Σ (mono_listR (leibnizO Z))}.
-  Context `{!pipeOutG Σ, !pipeProtoG Σ, !pnsRegG Σ, !pipesNG Σ}.
-
-  (* the pipeline application's model, its own view, its claim *)
-  Definition wp_pipes_round_echo (g : pipe_gn) :=
-    wp_pipes_round g pipes_lmE (pview_pipes (fun _ => None) adm_echo)
-      (pipesN_cparams g (fun _ => None) adm_echo pipes_lm_echo_laws) tt
-      (pipesN_wa g (fun _ => None) adm_echo pipes_lm_echo_laws)
-      (pipesN_ext g (fun _ => None) adm_echo pipes_lm_echo_laws).
-End UShPipesEcho.

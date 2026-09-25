@@ -260,20 +260,6 @@ Section UkPipesEntries.
       (echo_stub_read N') (echo_stub_write N') (echo_stub_open N')
       (echo_stub_close N') (echo_stub_exit N') γreg kds Hkds.
 
-  (* AN ENTRY AT AN EXISTENTIAL LEND: what a stage law's lend quantifies
-     (the pipe's protocol names) is the entry's own binder *)
-  Lemma pse_image_entry_ex {A : Type} (f : elf_bytes) (M : gmap Z (bv 8)) (av : mword 64)
-      (sts : list fdstate) (cw : Z) (cs : gset gname) (pidv : mword 32)
-      (Q : Z -> iProp Σ) (Pay : A -> iProp Σ) (X : uvis -d> iPropO Σ) :
-    (∀ x : A, image_entry f M av sts cw cs pidv Q (Pay x) X) -∗
-    image_entry f M av sts cw cs pidv Q (∃ x : A, Pay x) X.
-  Proof using .
-    iIntros "#H". rewrite /image_entry.
-    iIntros "!>" (na alen afun W') "%H1 %H2 %H3 %H4 %H5 %H6 Hmp [%x HP]".
-    iSpecialize ("H" $! x). rewrite /image_entry.
-    iApply ("H" $! na alen afun W' with "[%] [%] [%] [%] [%] [%] Hmp HP"); done.
-  Qed.
-
   (* ------------------------------------------------------------------- *)
   (*  2a. ECHO AT THE HEAD                                                *)
   (* ------------------------------------------------------------------- *)
@@ -407,32 +393,6 @@ Section UkPipesEntries.
     exact (pse_copy_image_entry a b Mn sv t gn sts cw cs pidv Q w2 A2 alts2 pin gin
              (CSPipe pn gp) wb rb1 rb2 HQc Ht Hs Hbytes Himg Hfdl Hl0 Hl1 Hl2 Hnil
              (fun _ => Hdg)).
-  Qed.
-
-  (* THE LAST CAT: the sink the console writer [wL] ([h = false]) *)
-  Lemma pse_last_image_entry (a b : nat) (Mn : gmap Z (bv 8)) (sv t : Z) (gn : nat -> bv 8)
-      (sts : list fdstate) (cw : Z) (cs : gset gname) (pidv : mword 32) (Q : Z -> iProp Σ)
-      (w2 : wid) (A2 alts2 : list (list (bv 8))) (pin : pnames) (gin : pipe_names)
-      (wL : wid) (wb rb1 rb2 : bool) :
-    (forall x y : Z, Q x = Q y) ->
-    0 < t < 2 ^ 38 ->
-    0 < sv + Z.of_nat a < 2 ^ 38 ->
-    UkShCat.cat_argv_bytes a b gn ->
-    uargv_img Mn (t + 8) (UkShMain.ush_args sv gn (UkShCat.cat_toks a b)) ->
-    length sts = NOFILE ->
-    take NSTD sts !! 0%nat = Some (FdOpen true wb (FdPipe gin)) ->
-    take NSTD sts !! 1%nat = Some (FdOpen rb1 true (FdDevice CONSOLE)) ->
-    take NSTD sts !! 2%nat = Some (FdOpen rb2 true (FdDevice CONSOLE)) ->
-    [] ∈ alts2 ->
-    UkRun.urun_nopipe sts -∗ udep -∗
-    image_entry ElfUser.cat_elf Mn (mword_of_int (t + 8) : mword 64) sts cw cs pidv Q
-      (pns_copy_lend g LM PV CP v I sR lR L TERM TOK dep γc γm w2 A2 alts2 pin gin (CSCon wL) Q)
-      uslot.
-  Proof using HL31 Hadmit Hcons Hext Hsup HlR Hfc Hkill Hplok dep_tl pnsRegG0 ufdG0.
-    intros HQc Ht Hs Hbytes Himg Hfdl Hl0 Hl1 Hl2 Hnil.
-    exact (pse_copy_image_entry a b Mn sv t gn sts cw cs pidv Q w2 A2 alts2 pin gin
-             (CSCon wL) wb rb1 rb2 HQc Ht Hs Hbytes Himg Hfdl Hl0 Hl1 Hl2 Hnil
-             (fun Hf => match Bool.diff_false_true Hf with end)).
   Qed.
   (* THE LAST CAT, fd 2 MUTE (lane PIPES-C7): [pse_last_image_entry] with
      the registry's device 0 [PDMute] -- the last stage's diagnostics are

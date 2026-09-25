@@ -20,8 +20,6 @@
 #   make audit-only the same audit, against an already-built tree
 #   make audit-tree / audit-tree-only  the same, for the TREE APPLICATION's
 #                   era-0 obligation -- a cone neither of the other two walks
-#   make audit-pipe / audit-pipe-only  the same, for the PIPELINE application's
-#                   theorem (echo and pipeline lines) -- a fifth cone
 #   make audit-union / audit-union-only  the same, for THE APPLICATION theorem:
 #                   the UNION of the file and pipeline lines, power-cycled --
 #                   a cone the system audit never walks
@@ -148,7 +146,7 @@ USER_DUMPS ?= sync:Sync echo:Echo sh:Sh init:Init cat:Cat grep:Grep
 .PHONY: all proofs model kernel user dump dump-force kernel-rocq user-rocq \
         xv6-rev-check sail-rev-check gen-code check-decode update-decode \
         gen-ucode check-ucode \
-        audit audit-only audit-tree audit-tree-only audit-pipe audit-pipe-only audit-union audit-union-only audit-all audit-all-only vtest vtest-check vtest-check-ci vtest-gen vtest-deps \
+        audit audit-only audit-tree audit-tree-only audit-union audit-union-only audit-all audit-all-only vtest vtest-check vtest-check-ci vtest-gen vtest-deps \
         hwtest hwtest-gen hwtest-gen-all hwtest-probe \
         vtest-runs vtest-passes vtest-table \
         clean clean-proofs distclean model-gen
@@ -372,28 +370,12 @@ audit-tree: proofs
 audit-tree-only:
 	cd $(IRIS) && $(RUN) coqc $(AUDIT_FLAGS) -noglob TreeAssumptions.v
 
-# The SAME audit for the APPLICATION theorem (iris/PipeAssumptions.v): `Print
-# Assumptions` on UInitPipeAdequacy.pipe_adequacy_pipeSigma_final, the
-# whole-system theorem at AppPipe.app_pipe -- echo and pipeline lines at the
-# console; the echo theorem is its corollary.  A SEPARATE target because
-# neither theorem's cone contains the other -- the system audit above never
-# walks the Uk*/USh*/UInit*/UEcho* program tier, so it cannot see an
-# undischarged Spec* module Parameter hiding behind a seal there.  That file's
-# header has the argument in full.  Same reasons for -noglob and for staying
-# out of iris/_CoqProject as SystemAssumptions.v.
-audit-pipe: proofs
-	$(MAKE) audit-pipe-only
-
-audit-pipe-only:
-	cd $(IRIS) && $(RUN) coqc $(AUDIT_FLAGS) -noglob PipeAssumptions.v
-
 # The SAME audit for THE APPLICATION theorem (iris/UnionAssumptions.v): `Print
 # Assumptions` on UInitUnion.union_adequacy_closed, the whole-system theorem at
 # AppUnionRec.app_union -- the echo, echo > f and cat f lines and the pipelines
 # echo ... | cat^n and cat f | cat^n, across power cycles.  Its cone walks the
 # whole Uk*/USh*/UInit* program tier and the union stage (UnionDisc/UnionOut/
-# UnionLinks/AppUnionRec), which the system audit never does; the file and
-# pipeline audits above walk the two applications it replaces.  That file's
+# UnionLinks/AppUnionRec), which the system audit never does.  That file's
 # header says what it audits.  Same reasons for -noglob and for staying out of
 # iris/_CoqProject as SystemAssumptions.v.
 audit-union: proofs

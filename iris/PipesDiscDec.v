@@ -578,18 +578,7 @@ Section pipes_hooks.
       (fun _ => eq_trans (phk_code_panic (PLRun [])) eq_refl)
       (fun s l => phk_code_cont s l (PLRun []))
       phk_cont_prompt phk_cont_nonnil.
-
-  (* the hooks' three codes, read back *)
-  Lemma pipes_hooks_pan l : lm_dec PM (lmh_pan pipes_hooks l) = PLPanic.
-  Proof using. cbn [pipes_hooks lmh_pan pipes_lm lm_dec]. apply plalt_of_code. Qed.
-  Lemma pipes_hooks_exf l : lm_dec PM (lmh_exf pipes_hooks l) = PLRun (pl_exfb l).
-  Proof using. cbn [pipes_hooks lmh_exf pipes_lm lm_dec]. apply plalt_of_code. Qed.
-  Lemma pipes_hooks_noc l : lm_dec PM (lmh_noc pipes_hooks l) = PLRun [].
-  Proof using. cbn [pipes_hooks lmh_noc pipes_lm lm_dec]. apply plalt_of_code. Qed.
 End pipes_hooks.
-
-(* ...AT THE PIPELINE APPLICATION'S MODEL (every echo pipeline, no [cat f]) *)
-Definition pipes_hooksE : lm_hooks pipes_lmE := pipes_hooks (fun _ => None) adm_echo.
 
 (* ===================================================================== *)
 (*  3.  DEMOS                                                             *)
@@ -598,66 +587,6 @@ Definition pipes_hooksE : lm_hooks pipes_lmE := pipes_hooks (fun _ => None) adm_
 Definition fc0 : bytes -> option bytes := fun _ => None.
 Definition nlb' : bytes := [wl_nl].
 
-(* echo foo | cat | cat | cat -- parsed, well formed, admitted *)
-Definition l_foo3 : pline' := LPipes (PrEcho [cmd_echo; sb "foo"]) 3.
-
-Example demo_parse_foo3 : pl_parse (sb "echo foo | cat | cat | cat") = Some l_foo3.
-Proof using. vm_compute. reflexivity. Qed.
-
-Example demo_foo3_ok : pl_ok l_foo3.
-Proof using. apply (bool_decide_unpack _). vm_compute. exact I. Qed.
-
-(* SUCCESS: the line, and nothing else *)
-Example demo_foo3_run : line_blocks fc0 l_foo3 (sb "foo" ++ nlb').
-Proof using. apply line_blocksb_spec. vm_compute. reflexivity. Qed.
-
-Example demo_foo3_lm :
-  lm_ok (pipes_lm fc0 adm_echo) tt l_foo3 (PLRun (sb "foo" ++ nlb'))
-  /\ lm_cont (pipes_lm fc0 adm_echo) tt l_foo3 (PLRun (sb "foo" ++ nlb'))
-     = sb "foo" ++ nlb' ++ sb "$ ".
-Proof using. split; [right; split; [vm_compute; reflexivity | exact demo_foo3_run] | reflexivity]. Qed.
-
-(* every failure prints no content: a middle cat's exec failure, and two
-   of them interleaved *)
-Example demo_foo3_exec : line_blocks fc0 l_foo3 dg_execR.
-Proof using. apply line_blocksb_spec. vm_compute. reflexivity. Qed.
-
-Example demo_foo3_exec2 :
-  line_blocks fc0 l_foo3 (sb "execexec cat failed" ++ nlb' ++ sb " cat failed" ++ nlb').
-Proof using. apply line_blocksb_spec. vm_compute. reflexivity. Qed.
-
-(* NEGATIVE: the line is not someone else's *)
-Example demo_foo3_neg : ~ line_blocks fc0 l_foo3 (sb "bar" ++ nlb').
-Proof using. intros H. apply line_blocksb_spec in H. vm_compute in H. discriminate H. Qed.
-
-(* NEGATIVE: at [echo foo | cat] content never sits beside a diagnostic
-   -- echo's halt is silent, so the corner is absent at n = 1 *)
-Definition l_foo1 : pline' := LPipes (PrEcho [cmd_echo; sb "foo"]) 1.
-
-Example demo_foo1_neg_exec : ~ line_blocks fc0 l_foo1 (sb "foo" ++ nlb' ++ dg_execL).
-Proof using. intros H. apply line_blocksb_spec in H. vm_compute in H. discriminate H. Qed.
-
-Example demo_foo1_neg_corner : ~ line_blocks fc0 l_foo1 (sb "fo" ++ cat_dg_write).
-Proof using. intros H. apply line_blocksb_spec in H. vm_compute in H. discriminate H. Qed.
-
-(* THE CORNER (B), MID-STAGE WRITE ERROR: at [echo foo | cat | cat] a
-   middle cat's [cat: write error] beside a prefix of the line the last
-   cat printed -- and beside the whole line *)
-Definition l_foo2 : pline' := LPipes (PrEcho [cmd_echo; sb "foo"]) 2.
-
-Example demo_foo2_corner : line_blocks fc0 l_foo2 (sb "fo" ++ cat_dg_write).
-Proof using. apply line_blocksb_spec. vm_compute. reflexivity. Qed.
-
-Example demo_foo2_corner_full : line_blocks fc0 l_foo2 (sb "foo" ++ nlb' ++ cat_dg_write).
-Proof using. apply line_blocksb_spec. vm_compute. reflexivity. Qed.
-
-(* ...and at three cats the corner lets the first middle cat's exec
-   failure through as well (its reader, the halted cat, vouches for
-   nothing) *)
-Example demo_foo3_corner_exec :
-  line_blocks fc0 l_foo3 (sb "foo" ++ nlb' ++ cat_dg_write ++ dg_execR).
-Proof using. apply line_blocksb_spec. vm_compute. reflexivity. Qed.
-
 (* cat f as the producer, at a content function that has [f] *)
 Definition fc1 : bytes -> option bytes :=
   fun f => if decide (f = sb "f") then Some (sb "foo bar" ++ nlb') else None.
@@ -665,45 +594,3 @@ Definition fc1 : bytes -> option bytes :=
 Example demo_catf_cat_cat :
   line_blocks fc1 (LPipes (PrCatF (sb "f")) 2) (sb "foo bar" ++ nlb').
 Proof using. apply line_blocksb_spec. vm_compute. reflexivity. Qed.
-
-Example demo_catf_absent :
-  line_blocks fc1 (LPipes (PrCatF (sb "nope")) 2) (cat_dg_open (sb "nope")).
-Proof using. apply line_blocksb_spec. vm_compute. reflexivity. Qed.
-
-Example demo_catf_absent_neg :
-  ~ line_blocks fc1 (LPipes (PrCatF (sb "nope")) 1) (sb "foo bar" ++ nlb').
-Proof using. intros H. apply line_blocksb_spec in H. vm_compute in H. discriminate H. Qed.
-
-(* THE TERMINAL ROUND at three stages: the fork of the node below echo
-   fails after its left child (a middle cat) was forked; that stray's exec
-   diagnostic lands after the prompt.  It is a coverage-ending block of
-   this model and NOT one of the landed model's ([PipeDisc.pmergeable]):
-   D4 widens with the stages. *)
-Definition term_blk : bytes := dg_fork_b ++ u_prompt ++ dg_execR.
-
-Example demo_term_foo2 : plalt_ok fc0 l_foo2 (PLTerm term_blk).
-Proof using.
-  split; [discriminate |]. exists term_blk. split; [| reflexivity].
-  exists [[]; dg_fork_b], dg_execR, dg_fork_b, dg_execR. split.
-  - apply (lt_next fc0 (PrEcho [cmd_echo; sb "foo"]) 2
-             (MkSO [] None (Some (WrAll (prod_content fc0 (PrEcho [cmd_echo; sb "foo"])))))).
-    + apply so_echo. reflexivity.
-    + exact (stt_here fc0 _ 0 _ false _ (so_exec fc0 _ SMid)).
-  - split; [apply mergeb_spec; vm_compute; reflexivity |].
-    split; [reflexivity |]. apply mergeb_spec. vm_compute. reflexivity.
-Qed.
-
-Example demo_term_not_landed : ~ pmergeable term_blk.
-Proof using. unfold pmergeable. vm_compute. discriminate. Qed.
-
-Example demo_term_merge : lm_merge (pipes_lm fc0 adm_echo) term_blk.
-Proof using. exists l_foo2, term_blk. split; [vm_compute; reflexivity | split; [exact demo_term_foo2 | reflexivity]]. Qed.
-
-(* THE TERMINAL ARM, DECIDED: the demo block above, and a NEGATIVE one --
-   at [echo foo | cat] the prompt of a terminal round follows sh's [fork]
-   line, so the line and the prompt alone are no terminal prefix *)
-Example demo_term_dec : plalt_ok fc0 l_foo2 (PLTerm term_blk).
-Proof using. apply (bool_decide_unpack _). vm_compute. exact I. Qed.
-
-Example demo_term_dec_neg : ~ plalt_ok fc0 l_foo1 (PLTerm (sb "foo" ++ nlb' ++ u_prompt)).
-Proof using. apply (bool_decide_unpack _). vm_compute. exact I. Qed.

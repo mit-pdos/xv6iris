@@ -256,12 +256,6 @@ Proof.
   destruct bs; [done |]. cbn [length] in Hp. lia.
 Qed.
 
-(* the pending segment after a write of [bs] from it *)
-Lemma pns_pending_write (L bs : list (bv 8)) (c w : nat) :
-  bs `prefix_of` drop w (take c L) ->
-  drop (length bs) (drop w (take c L)) = drop (w + length bs) (take c L).
-Proof. intros _. by rewrite drop_drop. Qed.
-
 Lemma pns_short_drop (x : list (bv 8)) (n : nat) :
   cons_short [x] -> cons_short [drop n x].
 Proof.
@@ -571,8 +565,6 @@ End PipesDevU.
    section below does not read them (and drag [L] and the model into every
    arithmetic proof's section closure) *)
 Definition pns_short (L : list (bv 8)) : Prop := Z.of_nat (length L) < 2 ^ 31.
-Definition pns_adm (fc : bytes -> option bytes) (adm : pline' -> bool) (I : list (bv 8)) : Prop :=
-  adm (lineN fc adm I) = true.
 (* ...at a model's view: the round's pipeline is admitted *)
 Definition pns_admV {M : lmodel} (V : pview M) (lR : pline') : Prop := pv_adm V lR = true.
 
@@ -688,51 +680,6 @@ Section UkPipesIface.
               with "Hex [] Hinv HcW HmW Hdep [HΦ]").
     - iApply (pblkV_ecl_holds g M G sd WA Hext v I sR).
     - iIntros "HcW HmW _". iApply ("HΦ" with "HcW HmW").
-  Qed.
-
-  (* THE EXCLUSION the family spends at a content writer's first byte
-     against an exec (or open) failure at a stage whose output pipe is
-     [qj] (design SS2.2's first bullet): [PipeProto.flow_chain_excl] at the
-     round's chain of pipes -- the failed stage's untouched write permit
-     against a byte of the LAST pipe *)
-  Lemma pns_excl_content (prev : option pnames) (ps : list (pnames * pipe_names))
-      (q qj : pnames * pipe_names) :
-    L <> [] -> qj ∈ ps ++ [q] ->
-    flow_invs L prev (ps ++ [q]) -∗
-    □ (wcur qj.1 0%nat -∗ pws_lb q.1 (take 1 L) ={↑pipeN}=∗ False).
-  Proof using . intros HL Hin. exact (flow_chain_excl L prev ps q qj HL Hin). Qed.
-
-  (* ...AS THE KIT'S EXCLUSION WAND for the content writer [wc] (the last
-     cat's console sink, source [L]): whenever the round's deposits read
-     as design SS2.2 has them -- an excluded writer's deposit is the
-     untouched write permit of a pipe of the chain ([XL_i]), the content
-     writer's a byte of the LAST pipe ([YR]) -- the exclusion the family
-     spends at the content's first byte is DISCHARGED, not assumed *)
-  Lemma pns_excl_content_wand (prev : option pnames) (ps : list (pnames * pipe_names))
-      (q : pnames * pipe_names) (wc : wid) (EXCL : wid -> list (bv 8) -> Prop)
-      (pipe_of : wid -> list (bv 8) -> pnames * pipe_names) :
-    L <> [] ->
-    (forall w' s', EXCL w' s' -> pipe_of w' s' ∈ ps ++ [q]) ->
-    (forall w' s', EXCL w' s' -> dep w' s' ⊢ wcur (pipe_of w' s').1 0%nat) ->
-    (dep wc L ⊢ pws_lb q.1 (take 1 L)) ->
-    flow_invs L prev (ps ++ [q]) -∗
-    □ (∀ w' s', ⌜EXCL w' s'⌝ -∗ dep w' s' -∗ dep wc L ={↑pipeN}=∗ False).
-  Proof using .
-    intros HL Hin Hd Hc. iIntros "#Hinvs !>" (w' s' Hx) "Hd' Hdc".
-    iDestruct (pns_excl_content prev ps q (pipe_of w' s') HL (Hin w' s' Hx) with "Hinvs")
-      as "#Hex".
-    iApply ("Hex" with "[Hd'] [Hdc]").
-    - iApply (Hd w' s' Hx with "Hd'").
-    - iApply (Hc with "Hdc").
-  Qed.
-
-  (* a console byte under the taint: the claim is the taint's *)
-  Lemma pns_taint_link (b : bv 8) (Φ : iProp Σ) :
-    T -∗ Φ -∗ out_link Uart0 (S gen_id) b Φ.
-  Proof using Hcons.
-    iIntros "#HT HΦ". rewrite /out_link. iIntros (o H) "#Hlb _".
-    iModIntro. iExists o. iFrame "Hlb HΦ".
-    rewrite /chist_at Hcons. iApply (peclV_taint g M G sd WA with "HT").
   Qed.
 
   (* ------------------------------------------------------------------- *)
@@ -2519,30 +2466,5 @@ Section UkPipesIface.
     iExists pn, gp. iFrame "Htk2". iLeft. iExists L. iSplitR; [by iPureIntro |].
     rewrite /pipe_out. iExists 0%nat. iFrame "Hw". rewrite take_0. iFrame "Hlb".
     iPureIntro. split; [reflexivity | exact HL31].
-  Qed.
-
-  (* ---- the trees, paid (the landed [cat_copy_paid] / [echo_pipe_paid] at
-          this instance) ---- *)
-  Theorem pns_copy_paid (h : bool) (alts2 : list (list (bv 8)))
-      (files : list (bv 8) -> option (list (bv 8))) :
-    [] ∈ alts2 -> (h = true -> cat_dg_write ∈ alts2) -> dp_in (kds.*1) {[0%nat; 1%nat]} ->
-    env_res N P pipes_iface (copy_env (DCopy h L []) alts2 files []) {[0%nat; 1%nat]} -∗
-    tree_pay N P (cat_tree [sb "cat"]).
-  Proof using .
-    intros Hnil Hdg Hdp. iIntros "H".
-    iApply (tree_pay_of_conforms_p N P pipes_iface _ _ _
-              (cat_copy_conforms h L alts2 files [] Hnil Hdg) (cat_tree_safe _ _) Hdp with "H").
-  Qed.
-
-  Theorem pns_echo_paid (argv : list (list (bv 8)))
-      (files : list (bv 8) -> option (list (bv 8))) :
-    drop 1 argv <> [] -> L = wl_line (drop 1 argv) -> dp_in (kds.*1) {[0%nat]} ->
-    env_res N P pipes_iface (pipe_env (DOutH [L]) files) {[0%nat]} -∗
-    tree_pay N P (echo_tree argv).
-  Proof using .
-    intros Hne HL Hdp. iIntros "H".
-    pose proof HL31 as HL'. rewrite /pns_short HL in HL'. rewrite HL.
-    iApply (tree_pay_of_conforms_p N P pipes_iface _ _ _
-              (echo_pipe_conforms argv files Hne HL') (echo_tree_safe _ _) Hdp with "H").
   Qed.
 End UkPipesIface.

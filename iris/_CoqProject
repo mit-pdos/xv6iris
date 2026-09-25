@@ -1524,7 +1524,6 @@ ExecWords.v
 FileDisc.v
 FileDiscDec.v
 PipeDisc.v
-PipeDiscDec.v
 PipesDisc.v
 PipesDiscDec.v
 PipeBothNPure.v
@@ -1535,14 +1534,12 @@ GenOutPure.v
 FileOutPure.v
 PipeOutPure.v
 LineModelInst.v
-PipeBothPure.v
 EchoOut.v
 GenOutHist.v
 EchoLinks.v
 EchoLinksPro.v
 EchoLinksLine.v
 FileHooks.v
-PipeHooks.v
 EchoLinksBan.v
 LinkRec.v
 GenLinksLine.v
@@ -1562,10 +1559,6 @@ FileWrite.v
 FileWritePart.v
 FileOut.v
 PipeOut.v
-PipeLinks.v
-AppPipeClaim.v
-AppPipeCons.v
-AppPipe.v
 FileLinks.v
 FileLinksLine.v
 FileLinkGen.v
@@ -1701,9 +1694,6 @@ UShLineAtHold.v
 UShPanicHold.v
 AppFileCons.v
 UInitConsFile.v
-UInitConsPipe.v
-UPipeBootAdequacy.v
-# PipeAssumptions.v
 
 
 UEchoFile.v
@@ -1715,22 +1705,13 @@ PipeKillMark.v
 UEchoPipe.v
 UkPipeDev.v
 UShEchoPipePay.v
-PipeLinksLine.v
-PipeBoth.v
 PipeBothN.v
 PipeOutN.v
 PipeOutNEv.v
-PipeLinkInst.v
 UkShCat.v
 UShCatPay.v
-UShPipeCatSlot.v
-UInitPipe.v
-UInitPipeAdequacy.v
-UShPipeRound2.v
-UkShPipeFork.v
 UkShPipeWait.v
 UkShPipeForkTwin.v
-UShPipeAssembly.v
 UkPipesIface.v
 UkPipesEntries.v
 UkCatFIface.v
@@ -1744,17 +1725,12 @@ UShPipesStage.v
 UShPipesNode.v
 PipesLedPure.v
 PipesOut.v
-PipesLinks.v
-PipesLinkInst.v
-PipesStageInst.v
 UkShPipesFork.v
 PipesUline.v
 UnionDisc.v
 UnionDiscDec.v
 UnionView.v
 PipesCut.v
-UShPipesLaw.v
-UShPipesRound.v
 PipesDecE.v
 UnionDecU.v
 UnionOutPure.v

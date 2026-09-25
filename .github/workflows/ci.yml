@@ -412,7 +412,7 @@ jobs:
       # out to a bare `# Foo.v` (see coqproject_files' docstring), which is what
       # distinguishes a deliberate omission -- a descoped tier, or a file some
       # other target builds, as step 3b builds SystemAssumptions.v and
-      # PipeAssumptions.v --
+      # UnionAssumptions.v --
       # from the forgotten row this check is here to catch.  Either way the
       # file is counted by nobody, so a file omitted this way must carry no
       # coverage claims.  A mere coverage change never fails CI.  Runs only on a

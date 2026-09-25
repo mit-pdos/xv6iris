@@ -166,23 +166,6 @@ Proof using.
   - destruct Hs as [k ->]. apply pmt_s. apply IH. by exists k.
 Qed.
 
-Lemma pde_pmt_drop (W E : list bytes) (pr s u : bytes) :
-  pde_pmt (W ++ E) pr s u -> Forall (fun y => y = []) E -> pde_pmt W pr s u.
-Proof using.
-  intros H HE. remember (W ++ E) as Z eqn:HZ. revert W HZ.
-  induction H as [Z pr s | Z pr s i x t u Hi H IH | Z pr s x u HF H IH | Z pr s x u H IH];
-    intros W' HZ; subst Z; unfold bytes in *.
-  - constructor.
-  - destruct (decide (i < length W')) as [Hl | Hl].
-    + rewrite lookup_app_l in Hi; [| lia].
-      apply (pmt_w W' pr s i x t u Hi). apply IH.
-      rewrite insert_app_l; [reflexivity | lia].
-    + rewrite lookup_app_r in Hi; [| lia].
-      pose proof (Forall_lookup_1 _ _ _ _ HE Hi) as Hq. discriminate Hq.
-  - apply Forall_app in HF as [HF _]. exact (pmt_p W' pr s x u HF (IH W' eq_refl)).
-  - exact (pmt_s W' pr s x u (IH W' eq_refl)).
-Qed.
-
 (* ---- permutations ---- *)
 Lemma pde_insert_perm {A} (l : list A) (i : nat) (y t : A) :
   l !! i = Some y -> <[i:=t]> l ≡ₚ t :: delete i l.
