@@ -135,8 +135,8 @@ theorem dirEntries_eraOk (cov : Std.ExtTreeSet Nat compare) (logstart : Nat) (dn
   rw [if_pos hty]
 
 /-- a record with a nonzero link count has a nonzero `fnNlink` (Rocq's
-`era_nlink_nz`; E2-V2).  `FsAbsOpenFire.opfEra_live` is the same fact, in a
-file this one does not import. -/
+`era_nlink_nz`; E2-V2).  `FsAbsMknodFire.mkfEra_live` is the same fact
+(Rocq keeps both names), in a file that imports this one. -/
 theorem eraNlink_nz (dn : Dinode) (bm : Blkmap) (data : Nat → List (BitVec 8))
     (hnz : dn.diNlink.toNat ≠ 0) : fnNlink (eraNode dn bm data) ≠ 0 := hnz
 

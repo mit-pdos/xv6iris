@@ -1,9 +1,11 @@
 /-
 **THE mknod/create AU's FIRE POINTS, DISCHARGED AGAINST THE INVARIANT, plus
 the reading bridge at the parent-row update and the halfword tie on the
-device numbers.**  A PARTIAL port of Rocq `FsAbsMknodFire.v`
-(`/shared/xv6rocq/iris/FsAbsMknodFire.v`, 844 lines): sections 1 (a
-pointer only), 2, 3, 4 and 7 WHOLE; sections 5 and 6 DEFERRED (below).
+device numbers, and the era-lend walk predicates of every nameiparent
+syscall with their acceptance test.**  A port of Rocq `FsAbsMknodFire.v`
+(`/shared/xv6rocq/iris/FsAbsMknodFire.v`, 844 lines), WHOLE: sections 1 (a
+pointer only), 2-7.  Sections 5-6 were deferred at the first landing
+(they read `FsAbsEra`) and APPENDED by worktree W-A of wave 7b (below).
 
 Rocq's header, kept because the reasons are the content:
 
@@ -53,13 +55,12 @@ Rocq's header, kept because the reasons are the content:
    dance as `Xv6/FsAbsCreateFire.lean` deviations 1, 3 and 4.  The `` `{XI
    : CurCtx} `` binder of section 7 is read by nothing and is dropped (the
    `FsAbsOpenFire` deviation 1 precedent).
-2. **`mkf_era_is_dir` and `mkf_era_live` are RESTATED here** as
-   `mkfEra_is_dir`/`mkfEra_live`, although `Xv6/FsAbsOpenFire.lean` already
-   carries them as `opfEra_is_dir` (its deviation 3) / `opfEra_live`
-   (identical statements).  Importing `FsAbsOpenFire` here would be a
-   CYCLE once its sections 1-3 are appended (Rocq `FsAbsOpenFire.v`
-   imports THIS file, via `SysOpenDefs`).  Cleanup for that append: point
-   `opfEra_is_dir`'s uses at `mkfEra_is_dir` and drop the copy.
+2. `mkf_era_is_dir` and `mkf_era_live` are `mkfEra_is_dir`/`mkfEra_live`
+   here, the ONE copy: `Xv6/FsAbsOpenFire.lean` (which imports this file,
+   as Rocq's does via `SysOpenDefs`) calls them; its section-0-only
+   landing's local copies `opfEra_is_dir`/`opfEra_live` were dropped at the
+   W-A append.  `mkfEra_live` is also `FsAbsEra.eraNlink_nz`'s statement
+   (Rocq keeps both names; so does this port).
 3. **THE HALFWORD BRIDGE (section 4).**  Rocq states it over the byte
    spelling `Z_to_bv 16 (assemble_bytes [nth_byte w 0; nth_byte w 1])`
    because `hw_lo` lives in a proof file.  The Lean machine's halfword
@@ -75,24 +76,28 @@ Rocq's header, kept because the reasons are the content:
 5. Names: `mkf_abs_of_dir` → `mkfAbs_of_dir`, `mkf_parent_row` →
    `mkfParent_row`, `mkf_dlookup_fire` → `mkfDlookup_fire`,
    `caf_acre_fire(_file)` → `cafAcre_fire(_file)`, `caf_made_row(_node)` →
-   `cafMade_row(_node)`, and so on.
-
-## Deferred (not dropped): sections 5 and 6
-
-Section 5 (`npar_walk_pre_era`, `npar_walk_dead_era`: the era-lend walk
-predicates, over `FsAbsEra.elend`/`ax_hops_from`/`FsAbsStart.um_start_of`)
-and section 6 (the acceptance test: `np_elems_is_mknod_parent_elems`,
-`ep_hops_is_mknod_hops`, `np_rootino_agree`, `np_start_of_mknod`,
-`np_pre_of_mknod`, `np_dead_to_mknod`, `np_ok_is_mknod_ok`) are stated
-over `FsAbsEra`, which is not landed (wave 7b item E0).  They are APPENDED
-to this file after it lands (brief fs7b §4.3, worktree W-A), which keeps
-the one-Lean-file-per-Rocq-file rule.
+   `cafMade_row(_node)`, `npar_walk_pre_era` → `nparWalkPreEra`,
+   `np_start_of_mknod` → `npStart_of_mknod`, `np_elems_is_mknod_parent_elems`
+   → `npElems_is_nparElems`, `ep_hops_is_mknod_hops` → `epHops_is_mknodHops`,
+   and so on.
+6. **Sections 5-6 (the W-A append).**  Rocq's section-local
+   `Require FsImg` / `Require Import FsAbsEra` is the file-level
+   `import Xv6.FsAbsEra`.  The binders are `[MachGS hlc GF] [FsTopG GF]
+   [FsBytesG GF]` (what `elend`/`fsGammaL`/the fupd name; `FsAbsEra`
+   deviation 5), not `SysMknodDefs`' whole Rocq list.  The walk
+   predicates' `S k` is `k + 1`, inums `Nat`.  Rocq seals them
+   (`Typeclasses Opaque`); Lean definitions are not unfolded by the proof
+   mode unless asked, so no seal is needed.
 
 ## Dropped/simplified vs Rocq
 
-Nothing.
+`np_rootino_agree` (section 6): Lean has one `ROOTINO : Nat`
+(`Xv6/FsAbsEra.lean` deviation 2), so `np_pre_of_mknod`'s
+`P 0 (bv_unsigned InodeInv.ROOTINO)` is `P 0 ROOTINO` and the rewrite
+vanishes.  Nothing else.
 -/
 import Xv6.SysMknodDefs
+import Xv6.FsAbsEra
 
 namespace Xv6
 
@@ -223,6 +228,135 @@ theorem mkfDev_arg (v : BitVec 64) : ((v.extractLsb' 0 32).extractLsb' 0 16).toN
   unfold devArg
   simp only [BitVec.extractLsb'_toNat, Nat.shiftRight_zero]
   exact Nat.mod_mod_of_dvd _ (by decide)
+
+/-! ## 5.  The era-lend walk predicates (was Rocq iris/FsAbsEraMknod.v)
+
+The walk premise of EVERY path syscall that resolves with nameiparent --
+mknod, unlink, open's create arm, create itself -- so the `npar` prefix
+names the family's mold, not one caller.  They ride the ERA LEND
+(`FsAbsEra.elend`): the lent fragment and the carrier are the same ghost,
+which is what makes the fire points reachable.  The START is namex's rule
+(`FsAbsEra.umStartOf cw pl`): ROOTINO on an absolute fetch, the calling
+process's cwd inum `cw` on a relative one (the syscall contract passes its
+block's `cwi`). -/
+
+section EraMknod
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [FsTopG GF] [FsBytesG GF]
+
+/-- THE PARENT-PREFIX ONE-SHOT (Rocq's `npar_walk_pre_era`): one fupd,
+universally quantified over the fetched string, yielding the cursor at the
+start and one `axHop` per parent element. -/
+def nparWalkPreEra (γfs : FsNames) (cw : Nat) (P Pmiss : Nat → Nat → IProp GF) : IProp GF :=
+  iprop(∀ (pl : List (BitVec 8)) (r : Nat), ⌜r = umStartOf cw pl⌝ ={⊤}=∗
+    P 0 r ∗ axHopsFrom (elend (fsGammaL γfs)) P Pmiss (nparElems pl) 0)
+
+/-- the walk's death receipt, strict at both disjuncts (Rocq's
+`npar_walk_dead_era`; section 6's `npDead_to_mknod` records why it does not
+cover every walk failure alone). -/
+def nparWalkDeadEra (γfs : FsNames) (P Pmiss : Nat → Nat → IProp GF) (pl : List (BitVec 8)) :
+    IProp GF :=
+  iprop(∃ (k d : Nat), ⌜k < (nparElems pl).length⌝ ∗
+    ((P k d ∗ axHopsFrom (elend (fsGammaL γfs)) P Pmiss (nparElems pl) k) ∨
+     (Pmiss k d ∗ axHopsFrom (elend (fsGammaL γfs)) P Pmiss (nparElems pl) (k + 1))))
+
+end EraMknod
+
+/-! ## 6.  The acceptance test (was Rocq iris/FsAbsNparMknod.v)
+
+The two walk predicates above are exactly what the nameiparent era walk's
+contract (`SpecNparEra`) consumes and produces.  Rocq's reading, kept:
+
+> (1) THE FAMILIES ARE THE SAME FAMILY.  `np_elems pl` and `npar_elems pl`
+> are both `removelast (path_elems pl)` -- so `ep_hops_from` and the
+> `ax_hops_from` inside `npar_walk_pre_era` are the same big-op.
+>
+> (2) THE PRE.  `np_start_of_mknod` is the general form the walk actually
+> takes: the START INUM is the walk's to choose, so no firing happens at
+> all.  `np_pre_of_mknod` fires the one-shot at ROOTINO, where an absolute
+> fetch starts.
+>
+> (3) THE DEAD.  This one is NOT an identity.  `npar_walk_dead_era` bounds
+> its death index STRICTLY in BOTH disjuncts; the walk can die at `k =
+> length ps`, because namex runs the level's type test and nlink guard at
+> the PARENT's own level too, and at `k = 0 = length ps` when the path has
+> no elements at all.  So the honest statement is a DISJUNCTION: either the
+> predicate, or the cursor at the parent index -- exactly what
+> `SpecCreate.cre_fail_arms`'s walk-death arm carries.
+
+Rocq's `np_rootino_agree` is DROPPED: Lean has one `ROOTINO : Nat`
+(`Xv6/FsAbsEra.lean` deviation 2), so `np_pre_of_mknod`'s
+`P 0 (bv_unsigned InodeInv.ROOTINO)` is `P 0 ROOTINO`. -/
+
+section NparMknod
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [FsTopG GF] [FsBytesG GF]
+
+/-- Rocq's `np_elems_is_mknod_parent_elems`. -/
+theorem npElems_is_nparElems (pl : List (BitVec 8)) : npElems pl = nparElems pl := rfl
+
+/-- Rocq's `ep_hops_is_mknod_hops`. -/
+theorem epHops_is_mknodHops (γfs : FsNames) (P Pmiss : Nat → Nat → IProp GF)
+    (pl : List (BitVec 8)) (n : Nat) :
+    epHopsFrom γfs P Pmiss pl n = axHopsFrom (elend (fsGammaL γfs)) P Pmiss (nparElems pl) n :=
+  rfl
+
+/-- THE FORM THE WALK TAKES (Rocq's `np_start_of_mknod`): `epStart` at a
+fixed `pl` IS `nparWalkPreEra` specialised there -- a rename. -/
+theorem npStart_of_mknod (γfs : FsNames) (cw : Nat) (P Pmiss : Nat → Nat → IProp GF)
+    (pl : List (BitVec 8)) :
+    nparWalkPreEra (hlc := hlc) γfs cw P Pmiss ⊢ epStart (hlc := hlc) γfs cw P Pmiss pl := by
+  unfold nparWalkPreEra epStart
+  rw [epHops_is_mknodHops]
+  iintro Hpre %r %hr
+  iapply Hpre $$ %pl %r %hr
+
+/-- the absolute fetch: fire the one-shot at ROOTINO (Rocq's
+`np_pre_of_mknod`, minus the root-agreement rewrite). -/
+theorem npPre_of_mknod (γfs : FsNames) (cw : Nat) (P Pmiss : Nat → Nat → IProp GF)
+    (pl : List (BitVec 8)) (hsl : pl[0]? = some SLASH) :
+    ⊢@{IProp GF} nparWalkPreEra (hlc := hlc) γfs cw P Pmiss ={⊤}=∗
+      P 0 ROOTINO ∗ epHopsFrom γfs P Pmiss pl 0 := by
+  unfold nparWalkPreEra
+  rw [epHops_is_mknodHops]
+  iintro Hpre
+  iapply Hpre $$ %pl %ROOTINO %(umStartOf_slash cw pl hsl).symm
+
+/-- THE DEATH ARM, FOLDED (Rocq's `np_dead_to_mknod`): the strict
+predicate, or the cursor at the parent index (the parent's own level died;
+the family from there is empty). -/
+theorem npDead_to_mknod (γfs : FsNames) (P Pmiss : Nat → Nat → IProp GF)
+    (pl : List (BitVec 8)) :
+    npDead γfs P Pmiss pl ⊢
+      nparWalkDeadEra γfs P Pmiss pl ∨ ∃ d : Nat, P (nparElems pl).length d := by
+  unfold npDead nparWalkDeadEra
+  simp only [epHops_is_mknodHops]
+  iintro (⟨%k, %d, %hk, HP, Hh⟩ | ⟨%k, %d, %hk, HP, Hh⟩)
+  · by_cases hlt : k < (nparElems pl).length
+    · ileft
+      iexists k, d
+      isplitr
+      · ipureintro; exact hlt
+      · ileft
+        iframe HP Hh
+    · have hkeq : k = (nparElems pl).length := by
+        rw [npElems_is_nparElems] at hk; omega
+      iright
+      iexists d
+      rw [← hkeq]
+      iexact HP
+  · ileft
+    iexists k, d
+    isplitr
+    · ipureintro; exact hk
+    · iright
+      iframe HP Hh
+
+omit [FsTopG GF] [FsBytesG GF] in
+/-- ...and the SUCCESS side needs no lemma at all (Rocq's
+`np_ok_is_mknod_ok`). -/
+theorem npOk_is_mknodOk (P : Nat → Nat → IProp GF) (pl : List (BitVec 8)) (iL : Nat) :
+    P (npElems pl).length iL = P (nparElems pl).length iL := rfl
+
+end NparMknod
 
 /-! ## 7.  Fire 2, at the armed child (was Rocq iris/FsAbsCreateFire.v) -/
 

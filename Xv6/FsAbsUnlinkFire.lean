@@ -1,17 +1,16 @@
 /-
 **THE UNLINK AU's FIRE POINTS, discharged against the invariant, plus the
-reading bridges `SysUnlinkDefs`'s header owes its prover.**  A PARTIAL port
-of Rocq `FsAbsUnlinkFire.v` (`/shared/xv6rocq/iris/FsAbsUnlinkFire.v`, 530
-lines): section 1 (the pure reading bridges) WHOLE, and section 2 (the fire
-points) minus `uf_dex_fire`.
+reading bridges `SysUnlinkDefs`'s header owes its prover.**  A port of Rocq
+`FsAbsUnlinkFire.v` (`/shared/xv6rocq/iris/FsAbsUnlinkFire.v`, 530 lines),
+WHOLE: section 1 (the pure reading bridges) and section 2 (the fire points).
 
-WHY PARTIAL (brief fs7b §5.1 / §8.1 O-A).  `uf_dex_fire` -- the FOUND
-observation at the isdirempty refusal -- fires Rocq's
-`FsAbsMknodFire.dlookup_commit_at`, and `FsAbsMknodFire` is not ported yet
-(wave 7b, C-A).  It is APPENDED to this file by a worktree agent once
-FsAbsMknodFire's section 3 lands, so the one-Lean-file-per-Rocq-file rule
-holds (`Xv6/FsAbsOpenFire.lean` is the precedent).  Its one consumer is
-Rocq's `ProofSysUnlinkW3.v` (the isdirempty arm), not yet ported.
+`ufDex_fire` (Rocq's `uf_dex_fire`, the FOUND observation at the
+isdirempty refusal) was deferred at the first landing (brief fs7b §8.1
+O-A) and APPENDED by worktree W-A: it fires create's `dlookupCommitAt`,
+which lives in `Xv6/FsAbsCreateFire.lean` (Rocq's round-E2 home; Rocq
+reaches it through `FsAbsMknodFire`), so this file imports
+`FsAbsCreateFire` and not `FsAbsMknodFire`.  Its one consumer is Rocq's
+`ProofSysUnlinkW3.v` (the isdirempty arm), not yet ported.
 
 Rocq's header, kept because the reasons are the content:
 
@@ -33,7 +32,7 @@ Rocq's header, kept because the reasons are the content:
 >      by one.
 >   `ufDmiss_fire`  the MISS observation (`dmissCommitAt`), read-only, at
 >      dirlookup's miss under the parent's lock.
->   `uf_dex_fire`  (DEFERRED, above) the FOUND observation at the
+>   `ufDex_fire`  the FOUND observation (`dlookupCommitAt`) at the
 >      isdirempty refusal, where BOTH locks are held.
 >
 > NOTHING ABOUT THE LINK RA CROSSES THIS FILE.  `entToks_unlink`,
@@ -57,9 +56,10 @@ Rocq's header, kept because the reasons are the content:
    dance as `Xv6/FsAbsWriteFire.lean` deviations 1, 4, 5 and
    `Xv6/SysUnlinkDefs.lean` deviation 1.  The fires take `[Icfg]` and
    `[Appcfg GF]` per declaration.
-2. `FsAbsMknodFire.mkf_abs_of_dir` (which `uf_uent_fire` calls, and which
-   lives in an unported file) is the landed `FsAbsDefs.absOf_dir` -- Rocq's
-   `mkf_abs_of_dir` is `apply abs_of_dir` verbatim.
+2. `FsAbsMknodFire.mkf_abs_of_dir` (which `uf_uent_fire` and `uf_dex_fire`
+   call) is `FsAbsDefs.absOf_dir` here -- Rocq's `mkf_abs_of_dir` is `apply
+   abs_of_dir` verbatim, and calling the base lemma keeps this file off the
+   `FsAbsMknodFire` (hence `FsAbsEra`) import.
 3. `FsStateEra.DOT_dot_name` is the landed `FsStateEraPure.DOT_dot` (its
    verbatim twin; FsStateEraPure's header records the merge).
 4. The `ftopClean` re-establishment every fire inlines in Rocq is the
@@ -71,14 +71,15 @@ Rocq's header, kept because the reasons are the content:
 6. Names: `uf_parent_row` → `ufParent_row`, `uf_abs_node_nlink` →
    `ufAbs_node_nlink`, `uf_nlink_row` → `ufNlink_row`, `uf_dots_only` →
    `ufDots_only`, `uf_not_dots_only` → `ufNot_dots_only`, `uf_dmiss_fire`
-   → `ufDmiss_fire`, `uf_uent_fire` → `ufUent_fire`, `uf_utgt_fire` →
-   `ufUtgt_fire`.
+   → `ufDmiss_fire`, `uf_dex_fire` → `ufDex_fire`, `uf_uent_fire` →
+   `ufUent_fire`, `uf_utgt_fire` → `ufUtgt_fire`.
 
 ## Dropped/simplified vs Rocq
 
-Nothing.  `uf_dex_fire` is DEFERRED (above), not dropped.
+Nothing.
 -/
 import Xv6.SysUnlinkDefs
+import Xv6.FsAbsCreateFire
 import Xv6.PieceFam
 import Xv6.InodeRegionInv
 import Xv6.FsStateEraPure
@@ -230,6 +231,53 @@ theorem ufDmiss_fire [Icfg] (γfs : FsNames) (E : CoPset) (dq : DFrac)
   isplitr
   · ipureintro; exact hrow
   · ipureintro; exact hnm
+
+/-- THE FOUND OBSERVATION AT THE ISDIREMPTY REFUSAL (Rocq's `uf_dex_fire`).
+Both locks are held, so ONE `av` carries the parent's row, the entry, the
+target's dir row and its non-dots witness -- arm (iii-c)'s four pure
+conjuncts at a single instant.  Fires create's `dlookupCommitAt`
+(`Xv6/FsAbsCreateFire.lean`; Rocq reaches it through `FsAbsMknodFire`). -/
+theorem ufDex_fire [Icfg] (γfs : FsNames) (E : CoPset) (dqd dqt : DFrac)
+    (Fex : Pfam GF (Aview → Nat → Fname → Nat → IProp GF)) (d t : Nat) (nm : Fname)
+    (nd nt : FsNode) (hE : (↑ftopN : CoPset) ∪ ↑appN ⊆ E)
+    (hdird : fnIsDir nd = true) (hnld : fnNlink nd ≠ 0) (hnm : (dirEntries nd)[nm]? = some t)
+    (hdirt : fnIsDir nt = true) (hnlt : fnNlink nt ≠ 0) (hne : ¬ dotsOnly (dirEntries nt)) :
+    ⊢@{IProp GF} ftopInv (hlc := hlc) γfs -∗
+      pfAt (dlookupCommitAt (hlc := hlc) (fsGammaL γfs) appE) Fex -∗
+      topFragQ (fsGammaL γfs) dqd d nd -∗
+      topFragQ (fsGammaL γfs) dqt t nt ={E}=∗
+        topFragQ (fsGammaL γfs) dqd d nd ∗ topFragQ (fsGammaL γfs) dqt t nt ∗
+        ∃ av : Aview, ⌜PartialMap.get? av d = some ⟨.ADir (dirEntries nd), fnNlink nd⟩⌝ ∗
+          ⌜(dirEntries nd)[nm]? = some t⌝ ∗
+          ⌜PartialMap.get? av t = some ⟨.ADir (dirEntries nt), fnNlink nt⟩⌝ ∗
+          ⌜¬ dotsOnly (dirEntries nt)⌝ ∗ Fex.pfRecv av d nm t := by
+  iintro #Hi Hcm Hfd Hft
+  ihave Hcm := pfAt_au _ _ $$ Hcm
+  unfold ftopInv
+  imod (inv_acc_timeless (E := E) (N := ftopN) (P := ftopBody (GF := GF) γfs)
+    (ftopN_sub_app E hE)) $$ Hi with ⟨Hb, Hclose⟩
+  unfold ftopBody
+  icases Hb with ⟨%I, %A, Ha, Hla, Hpark, %hcl⟩
+  unfold topFragQ fsGammaL
+  ihave %hlkd := ghost_map_lookup $$ Ha Hfd
+  ihave %hlkt := ghost_map_lookup $$ Ha Hft
+  have hrowd : PartialMap.get? (absView I) d = some ⟨.ADir (dirEntries nd), fnNlink nd⟩ := by
+    rw [absView_lookup_of I d nd hlkd, absOf_dir nd hdird hnld]
+  have hrowt : PartialMap.get? (absView I) t = some ⟨.ADir (dirEntries nt), fnNlink nt⟩ := by
+    rw [absView_lookup_of I t nt hlkt, absOf_dir nt hdirt hnlt]
+  have hsub : appE ⊆ E \ ↑ftopN := appN_sub_ftop E hE
+  unfold dlookupCommitAt
+  ihave Hcm := Hcm $$ %I %d %t %nm %(dirEntries nd) %(fnNlink nd) %hrowd %hnm Ha
+  imod (fupd_mask_mono hsub) $$ Hcm with ⟨Ha, HΦ⟩
+  imod Hclose $$ [Ha Hla Hpark]
+  · iexists I, A
+    iframe Ha Hla Hpark
+    ipureintro; exact hcl
+  imodintro
+  iframe Hfd Hft
+  iexists absView I
+  iframe HΦ
+  ipureintro; exact ⟨hrowd, hnm, hrowt, hne⟩
 
 /-- INSTANT 1 -- THE PARENT ROW, FUSED WITH ITS RETAG (Rocq's
 `uf_uent_fire`).  Replaces the `iregTopRetag_*` at the parent: same premise
