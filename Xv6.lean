@@ -1092,3 +1092,14 @@ import Xv6.ProofUserret
 import Xv6.LinkUserret
 import Xv6.BootCarve
 import Xv6.BootCarveMain
+import Xv6.FsCrashRec
+import Xv6.LogMirrorHalf
+import Xv6.FsCrashArm
+import Xv6.FsCrash
+import Xv6.FsCrashSeam
+import Xv6.FsCrashLand
+import Xv6.FsCrashSeq
+import Xv6.FsCrashCommit
+import Xv6.FsFlushedCore
+import Xv6.AppDur
+import Xv6.LogSnapLaw
