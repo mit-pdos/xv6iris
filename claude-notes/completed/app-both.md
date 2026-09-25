@@ -1,8 +1,15 @@
 # Worklist: app-both — ONE application by abstraction (Route B), then the union
 
+**COMPLETED, archived 2026-09-25.**  The effort landed in full: the
+union application (`UInitUnion.union_adequacy_closed`, design/union.md),
+grep as a pipeline stage (design/grep-pipes.md) and the `*.txt` file
+class (design/filenames.md).  Its lessons live in those design files and
+in durable-notes.md; this file is the historical worklist and is not
+guidance.
+
 Design of record: [`../design/app-both.md`](../design/app-both.md) (RULED
 2026-09-22: Route B; the union replaces the file and pipe applications).
-Opened 2026-09-22.  Nothing built yet.
+Opened 2026-09-22.
 
 ## 0. The abstraction, read off the three instances
 
