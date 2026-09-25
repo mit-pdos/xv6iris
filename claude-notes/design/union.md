@@ -105,7 +105,21 @@ for C9f2: discharge `ush_pipes_branch` (confirming the shapes
 laws at the widened credential (their terminal/committed arms are
 pipeline laws).  Seam (d) still fails in the landed
 `UkShRedirChild.wp_kshm_child_file_redir` (`length file = 1`) -- for the
-widening.
+widening.  C9f2 LANDED (ca1b51b35/710345180, VM c9f2merge1,
+audits 13/13/14/14; FRONTIER print of the closed law = the anchor's 14):
+`UShUPipes.sh_round_holds_union_closed` -- the union round law with NO
+pipeline premise: both producers dispatched to the N-stage walk at the
+union; the deed crosses node 0 as a producer loan `Rd` (for `cat f` the
+half `fdq r (1/2) s`, node 0 keeping the ticket; `True` for echo),
+returned through a committed round's payload and NOT carried by a
+terminal round (B3); the round is built at the deed's own state
+(`dst_content s`), `L`/`pns_short L` from `f_typed`.  Fix to C9f1: the
+committed arm of `uWcu` carries the deed at its PRE tie (DONE needs the
+filing's lower bound; `udone_tie_of_pre_id` turns it into DONE at the
+prompt's first byte).  Its section needs `pipeProtoG`, `pnsRegG`,
+`pipesNG`, `cifRegG` -- C9g's Σ provides them.  NEXT for C9g: the
+prompt/read laws at the widened credential (not needed by the round
+law).
 
 ## Review amendments (override the plan below)
 
