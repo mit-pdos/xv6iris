@@ -1259,3 +1259,9 @@ tree 13, union 14.  This completes M4/M5.  NEXT: grep in the pipeline
 (design/grep-pipes.md, G0 landed), then the *.txt widening
 (design/filenames.md).
 
+GREP IN THE PIPELINE LANDED (2026-09-25, design/grep-pipes.md G0-G8): the
+union's top theorem `union_adequacy_closed` now covers pipelines whose
+stages are any mix of `cat` and `grep pat` (alphanumeric patterns) after
+an `echo` or `cat f` producer, at the model `ulmG`; audits system 13,
+tree 13, union 14.  NEXT: the *.txt widening (design/filenames.md).
+

@@ -1,4 +1,4 @@
-# Design: grep as a pipeline stage (proposal, 2026-09-25)
+# Design: grep as a pipeline stage (LANDED 2026-09-25, G0-G8)
 
 Owner (2026-09-24): after the union lands, add grep into the pipeline.
 The union has landed (`union_adequacy_closed`).  STATUS: proposal of
@@ -76,7 +76,22 @@ generic exec supply for any pinned program (`UShExecPin.v`,
 per stage program (`halts_at`, `passes fs L`).  `fok` for grep is now
 `oneline L ∧ grep_ok L` (NUL-free).  The content writer's kit is issued
 at its first byte.  G8 must supply: `Hgate` (grep_ok of the content),
-`sh_grep_slot T`, `UShUPipes`'s parse via `pcut_fs`, the admission.
+`sh_grep_slot T`, `UShUPipes`'s parse via `pcut_fs`, the admission.  G8
+LANDED (527de99e4, VM g8merge1; audits system 13, tree 13, union 14, the
+union list = the 13 plus `PrimString.length`; the TCB report runs): THE
+UNION ADMITS GREP PIPELINES.  The model is `ulmG` (`adm_u_g`: echo and
+`cat f` producers, any `Forall filt_ok fs` of `cat`/`grep pat`
+stages); `union_adequacy_closed`'s text is unchanged, its `union_phi`
+now names `ulmG`; the cats-only `adm_u_f`/`ulmU`/`lm_disc_ulmU_dec` are
+deleted; `Hgate` from `pview_union_gate` (one line + NUL-free:
+`prod_content_grep_ok`); `sh_grep_slot` from the claim's fixed part;
+the parse at any stage list (`pcut_fs`, `ustg_fs_rb`, `upls_fs_le`: at
+most 16 stages fit a line); the frontier print removed.  Demos:
+`echo foo | grep o | cat` prints `foo`, `echo foo | grep z | cat`
+nothing, `cat f | grep x | cat` passes or blocks by f's content; `|
+grep` with no pattern and `| grep a b` are not admitted.  THE GREP
+EFFORT IS COMPLETE (§6: loose corner okayed by the owner; Q2-Q5
+followed the recommendations).
 
 I've planned this from reading only; nothing was edited or built. Grep fits the landed machinery more cheaply than the question expects. Every content in the union is a single line, and on one line grep is just a gate. The real costs are elsewhere: grep has no exec image, pins, stubs or kexec facts yet (the biggest cut), the decider's truncation lemma needs rework (the riskiest cut), and there is one owner ruling on corner B.
 
