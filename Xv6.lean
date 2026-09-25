@@ -928,3 +928,11 @@ import Xv6.SpecSafestrcpySrc
 import Xv6.ProofSafestrcpySrc
 import Xv6.LinkSafestrcpySrc
 import Xv6.KexecD
+import Xv6.SpecSysLink
+import Xv6.SysLinkFrame
+import Xv6.SysLinkCalls
+import Xv6.SysLinkTails
+import Xv6.SysLinkWalkB
+import Xv6.SysLinkWalkA
+import Xv6.ProofSysLink
+import Xv6.LinkSysLink
