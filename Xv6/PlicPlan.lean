@@ -30,7 +30,7 @@ one of `0, 1, 10, 12` (`plic_claim_ret_ok`), which is what closes the
 `devintr` dispatch: the `printk("unexpected interrupt")` arm is dead.
 
 Everything here is pure: no Iris, no ghost state.  The ghost state that
-rides beside the mirror (`plicSlot`, the `rxTok` payloads) and the MMIO
+rides beside the mirror (`plicSlot`, the `plicPayloadUart` payloads) and the MMIO
 accessors are `Xv6.PlicInv`'s.
 -/
 import MachCSL.WpSmodeDev4

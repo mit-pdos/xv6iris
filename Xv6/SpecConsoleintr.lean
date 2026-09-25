@@ -35,7 +35,7 @@ def wp_consoleintr_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [X
     (hlk : "cons" ∉ k.locks ∧ "proc" ∉ k.locks ∧ "uart0" ∉ k.locks)
     (htier : k.tier = KTier.kpt) : Prop :=
   kctx cpu k ∗ pcIs cpu consoleintrAddr ∗ procsInv Γ ∗
-  isConsLock γc ∗ uartPort .uart0 γl γ ∗ uartSentSub γ bs ∗
+  isConsLock γc ∗ uartPort .uart0 γl γ ∗ uartSentSub γ bs ∗ consLicence ∗
   wpNext k.sie k.proc cpu (fun cpu' => iprop(∀ (R' : RegMap) (cs : List (BitVec 8)),
     kctx cpu' (k.withRegs R') -∗ pcIs cpu' (jumpPc (k.regs 1#5)) -∗
     ⌜calleeSaved k.regs R'⌝ -∗ uartSentSub γ (bs ++ cs) -∗ wpLoop cpu'))

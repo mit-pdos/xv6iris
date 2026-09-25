@@ -226,10 +226,10 @@ theorem ups_poll {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
 
 set_option maxHeartbeats 4000000 in
 theorem uartputc_sync_proof (AC : ACQUIRE) (RE : RELEASE) : UARTPUTC_SYNC :=
-  ⟨fun {hlc GF} _ _ _ cpu k i γl γ bs hsie hK hnoff hlk hid => by
+  ⟨fun {hlc GF} _ _ _ cpu k i γl γ bs Φ hsie hK hnoff hlk hid => by
   unfold wp_uartputc_sync_body
-  simp only [uartputcSyncAddr]
-  iintro ⟨Hk, Hpc, #Hport, #Hsub, Hnext⟩
+  simp only [uartputcSyncAddr, storeChain]
+  iintro ⟨Hk, Hpc, #Hport, #Hsub, Hch, Hnext⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
   icases kctx_wf _ _ $$ Hk with ⟨%hwf, Hk⟩
   unfold uartPort
@@ -334,7 +334,7 @@ theorem uartputc_sync_proof (AC : ACQUIRE) (RE : RELEASE) : UARTPUTC_SYNC :=
   iintro Hk Hpc
   ihave #HS := kernelText_kmapStatic $$ Htext
   -- the THRE poll
-  iapply (ups_poll cpu _ ?hsp2 i γ l _ ?h14) $$ [Hnext Hframe Hlocked]
+  iapply (ups_poll cpu _ ?hsp2 i γ l _ ?h14) $$ [Hnext Hframe Hlocked Hch]
     %_ %(fun _ _ => rfl) Hk Hpc Htok
   rotate_right 1
   iframe #
@@ -359,13 +359,14 @@ theorem uartputc_sync_proof (AC : ACQUIRE) (RE : RELEASE) : UARTPUTC_SYNC :=
   iintro Hk Hpc
   -- sb a5,0(a3)
   ihave #Hid0 := kmapStatic_rw (uartBaseAddr i) (ups_kmapClass0 i) $$ HS
-  ihave HAU2 := thr_write_au i γ l bs (BitVec.extractLsb' 0 8 (k.regs 11#5)) $$ [Hinv Htok Hlb Hoff Hsub]
+  ihave HAU2 := thr_write_au i γ l bs (BitVec.extractLsb' 0 8 (k.regs 11#5)) Φ
+    $$ [Hinv Htok Hlb Hoff Hsub Hch]
   case' _ => iframe; iframe #
   iapply (wp_s_sb_dev cpu _ (KA.«uartputc_sync» + 0x4e#64) false 0#12 13#5 15#5 (by decide) (by decide)
       (.uart i) 0 (uartBaseAddr i) ?haddr2 (ups_decode0 i) (ups_byteOk0 i)
       iprop(txOwn γ (l ++ [BitVec.extractLsb' 0 8 (k.regs 11#5)]) ∗
         uartSent γ (l ++ [BitVec.extractLsb' 0 8 (k.regs 11#5)]) ∗
-        uartSentSub γ (bs ++ [BitVec.extractLsb' 0 8 (k.regs 11#5)]))) $$ [- $Hk $Hpc $Hid0]
+        uartSentSub γ (bs ++ [BitVec.extractLsb' 0 8 (k.regs 11#5)]) ∗ Φ)) $$ [- $Hk $Hpc $Hid0]
   rotate_right 1
   k_code (text_instr _ _ _ _ rfl rfl) Htext
   iframe #
@@ -376,7 +377,7 @@ theorem uartputc_sync_proof (AC : ACQUIRE) (RE : RELEASE) : UARTPUTC_SYNC :=
   iapply wpNext_off_intro
   iintro Hk Hpc HΨ2
   case haddr2 => k_norm [h4_13]
-  icases HΨ2 with ⟨Htok2, #Hsent2, #Hsub2⟩
+  icases HΨ2 with ⟨Htok2, #Hsent2, #Hsub2, HP⟩
   -- mv a0,s1 ; jal release
   k_step (wp_s_add cpu _ (KA.«uartputc_sync» + 0x52#64) true 10#5 0#5 9#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h4_9]
@@ -419,7 +420,7 @@ theorem uartputc_sync_proof (AC : ACQUIRE) (RE : RELEASE) : UARTPUTC_SYNC :=
   k_norm
   iapply wpNext_off_intro
   iintro Hk Hpc
-  iapply Hnext $$ %_ Hk Hpc %?hcsf Hsub2
+  iapply Hnext $$ %_ Hk Hpc %?hcsf Hsub2 HP
   case hcsf =>
     unfold calleeSaved
     simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true]

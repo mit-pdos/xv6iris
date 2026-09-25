@@ -72,11 +72,14 @@ instance isConsLock_persistent [CurCtx] (γc : GName) : Persistent (isConsLock (
   unfold isConsLock; infer_instance
 
 /-- What `uarts[i].rx` needs when `uartintr` calls it: at port 0 the hook is
-`consoleintr` (the console lock, port 0's transmit bundle for the echo, and
-a sublist witness of its trace); at port 1 there is no hook. -/
+`consoleintr` (the console lock, port 0's transmit bundle for the echo, a
+sublist witness of its trace, and -- INTERIM, until the echo links of Rocq's
+redesign R2 reach consoleintr's contract (the I/O-trace track's step 5) --
+the console licence `UartLinks.consLicence` that pays the echo's store
+obligations); at port 1 there is no hook. -/
 def uartRxCaps [CurCtx] [Xv6G GF] (i : UartId) (γc γl : GName) (γ : UartNames) (bs : List (BitVec 8)) : IProp GF :=
   match i with
-  | .uart0 => iprop(isConsLock γc ∗ uartPort .uart0 γl γ ∗ uartSentSub γ bs)
+  | .uart0 => iprop(isConsLock γc ∗ uartPort .uart0 γl γ ∗ uartSentSub γ bs ∗ consLicence)
   | .uart1 => iprop(emp)
 
 instance uartRxCaps_persistent [CurCtx] [Xv6G GF] (i : UartId) (γc γl : GName) (γ : UartNames) (bs : List (BitVec 8)) :

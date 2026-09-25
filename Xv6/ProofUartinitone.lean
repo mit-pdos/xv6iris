@@ -86,14 +86,16 @@ theorem uartinitone_body [CurCtx] (cpu : CPU) (k : KCtx) (R : RegMap)
     (i : UartId) (γ : UartNames) (l : List (BitVec 8)) (kp : Nat)
     (hR10 : R 10#5 = uartElt i) :
     kctx cpu ((k.pushed 2).withRegs R) ∗ pcIs cpu (KA.«uartinitone» + 0x8#64) ∗
-    uartInv i γ ∗ uartBaseWord i ∗ uartRxWord i ∗ dlabOwn γ false ∗ txOwn γ l ∗ outLb γ l ∗ rxTok γ kp ∗
+    uartInv i γ ∗ uartBaseWord i ∗ uartRxWord i ∗ dlabOwn γ false ∗ txOwn γ l ∗ outLb γ l ∗
+    (∃ hl : Option (List Obs), rxTok γ kp hl) ∗
     wpNext k.sie k.proc cpu (fun cpu' => iprop(∀ R' : RegMap,
       kctx cpu' ((k.pushed 2).withRegs R') -∗ pcIs cpu' (KA.«uartinitone» + 0x42#64) -∗
       ⌜∀ r : BitVec 5, r ≠ 14#5 → r ≠ 15#5 → R' r = R r⌝ -∗
-      txOwn γ l -∗ dlabOwn γ false -∗ (∃ kp' : Nat, rxTok γ kp') -∗ wpLoop cpu'))
+      txOwn γ l -∗ dlabOwn γ false -∗ (∃ (kp' : Nat) (hl' : Option (List Obs)), rxTok γ kp' hl') -∗
+      wpLoop cpu'))
     ⊢ wpLoop (GF := GF) cpu := by
   unfold uartBaseWord uartRxWord
-  iintro ⟨Hk, Hpc, #Hinv, Hbase, Hrxw, Hdlab, Htx, #Hlb, Hrtok, HΦ⟩
+  iintro ⟨Hk, Hpc, #Hinv, Hbase, Hrxw, Hdlab, Htx, #Hlb, ⟨%hl, Hrtok⟩, HΦ⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
   icases kctx_kmapStatic _ _ $$ Hk with ⟨#HS, Hk⟩
   -- +0x08  ld a5,0(a0)
@@ -179,10 +181,11 @@ theorem uartinitone_body [CurCtx] (cpu : CPU) (k : KCtx) (R : RegMap)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c14 hp14
   iintro Hk Hpc
   -- +0x30  sb a4,2(a5)     FCR := 7 (enable and clear the FIFOs)
-  ihave HAU := fcr_write_au i γ l kp 7#8 $$ [Hinv Htx Hlb Hrtok]
+  ihave HAU := fcr_write_au i γ l kp hl 7#8 $$ [Hinv Htx Hlb Hrtok]
   · iframe #; iframe
   k_step_gen (wp_uart_sb c14 _ (KA.«uartinitone» + 0x30#64) false 2#12 15#5 14#5 (by decide) (by decide)
-      i 2 (by omega) ?hb15 (by decide) iprop(txOwn γ l ∗ ∃ k' : Nat, rxTok γ k'))
+      i 2 (by omega) ?hb15 (by decide)
+      iprop(txOwn γ l ∗ ∃ (k' : Nat) (hl' : Option (List Obs)), rxTok γ k' hl'))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c15 hp15
   iintro Hk Hpc ⟨Htx, Hrtok⟩
   case hb15 => k_norm_g
@@ -333,7 +336,7 @@ theorem uartinitone_proof (IL : INITLOCK) : UARTINITONE :=
   iapply wpLoop_bupd
   imod (dlabOwn_freeze γ) $$ Hdlab with #Hoff
   imodintro
-  ihave Hpost : iprop(txOwn γ l ∗ dlabOff γ ∗ (∃ k' : Nat, rxTok γ k') ∗
+  ihave Hpost : iprop(txOwn γ l ∗ dlabOff γ ∗ (∃ (k' : Nat) (hl' : Option (List Obs)), rxTok γ k' hl') ∗
       wordPointsTo (txLockAddr i + 8#64) 8 (DFrac.own 1) (k.regs 11#5) ∗ lkFresh (txLockAddr i))
     $$ [Htx Hrtok Hwname Hfresh]
   case' _ => iframe #; iframe

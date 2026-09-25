@@ -26,22 +26,33 @@ attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Funct
 section
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
 
-/-- `uartputc_sync`'s contract as a rule at its entry address. -/
+/-- `uartputc_sync`'s contract as a rule at its entry address, at the
+KERNEL's port: its store obligation is free (`UartLinks.storeChain_uart1`,
+Rocq `out_chain_triv`), so the payload is `emp`. -/
 theorem pp_uart_call (UP : UARTPUTC_SYNC) [CurCtx] (c : CPU) (k' : KCtx)
     (i : UartId) (γl : GName) (γ : UartNames) (bs : List (BitVec 8))
     (hsie : k'.sie = false) (hK : uartputcSyncSlots ≤ k'.avail)
     (hnoff : k'.noff + 1 < 2 ^ 31) (hlk : txLockName i ∉ k'.locks)
-    (hid : k'.regs 10#5 = BitVec.ofNat 64 i.idx) :
+    (hid : k'.regs 10#5 = BitVec.ofNat 64 i.idx) (hi : i = .uart1) :
     kctx c k' ∗ pcIs c KA.«uartputc_sync» ∗ uartPort i γl γ ∗ uartSentSub γ bs ∗
     wpNext k'.sie k'.proc c (fun cpu' => iprop(∀ R' : RegMap,
       kctx cpu' (k'.withRegs R') -∗ pcIs cpu' (jumpPc (k'.regs 1#5)) -∗
       ⌜calleeSaved k'.regs R'⌝ -∗
       uartSentSub γ (bs ++ [BitVec.extractLsb' 0 8 (k'.regs 11#5)]) -∗ wpLoop cpu'))
     ⊢ wpLoop (GF := GF) c := by
-  have h := UP.wp_uartputc_sync (hlc := hlc) (GF := GF) c k' i γl γ bs hsie hK hnoff hlk hid
+  subst hi
+  have h := UP.wp_uartputc_sync (hlc := hlc) (GF := GF) c k' .uart1 γl γ bs iprop(emp) hsie hK hnoff hlk hid
   unfold wp_uartputc_sync_body at h
   simp only [uartputcSyncAddr] at h
-  exact h
+  iintro ⟨Hk, Hpc, Hp, Hs, HΦ⟩
+  iapply h
+  iframe Hk Hpc Hp Hs
+  isplitr [HΦ]
+  · iapply storeChain_uart1
+    iempintro
+  iapply wpNext_mono $$ HΦ
+  iintro %cpu' HK %R' H1 H2 H3 H4 _
+  iapply HK $$ %R' H1 H2 H3 H4
 
 end
 
@@ -81,7 +92,7 @@ theorem prputc_proof (UP : UARTPUTC_SYNC) : PRPUTC :=
   k_step (wp_s_jal cpu _ (KA.«prputc» + 0xc#64) false 0x528#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [prputc_br_528]
   iintro Hk Hpc
-  iapply (pp_uart_call UP cpu _ UartId.uart1 γl γd bs ?hsie1 ?hK1 ?hnoff1 ?hlk1 ?hid1) $$ [- $Hk $Hpc]
+  iapply (pp_uart_call UP cpu _ UartId.uart1 γl γd bs ?hsie1 ?hK1 ?hnoff1 ?hlk1 ?hid1 rfl) $$ [- $Hk $Hpc]
   rotate_right 1
   k_norm
   iframe #

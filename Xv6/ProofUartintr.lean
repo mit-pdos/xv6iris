@@ -11,7 +11,8 @@ where the hook word is zero and the loop just goes round again).
 
 The drain is a Löb induction whose head is the LSR read at `+0x46`: the
 receive token comes back one count higher after each pop, so the loop
-invariant is only `∃ kp, rxTok γ kp` plus the register shape.  Interrupts
+invariant is only the port's PLIC payload at some count and anchor
+(`uartRxWriter`, which the pop carries forward) plus the register shape.  Interrupts
 are off throughout (`hsie`), so the hart never migrates.
 -/
 import MachCSL.WpSmodeFrame
@@ -151,7 +152,7 @@ theorem ui_call_consoleintr (CI : CONSOLEINTR) [CurCtx]
     (hlk : "cons" ∉ k'.locks ∧ "proc" ∉ k'.locks ∧ "uart0" ∉ k'.locks)
     (htier : k'.tier = KTier.kpt) :
     kctx cpu k' ∗ pcIs cpu KA.«consoleintr» ∗ procsInv Γ ∗
-    isConsLock γc ∗ uartPort .uart0 γl γ ∗ uartSentSub γ bs ∗
+    isConsLock γc ∗ uartPort .uart0 γl γ ∗ uartSentSub γ bs ∗ consLicence ∗
     (∀ (R' : RegMap) (cs : List (BitVec 8)), kctx cpu (k'.withRegs R') -∗
       pcIs cpu (jumpPc (k'.regs 1#5)) -∗ ⌜calleeSaved k'.regs R'⌝ -∗
       uartSentSub γ (bs ++ cs) -∗ wpLoop cpu)
@@ -159,9 +160,9 @@ theorem ui_call_consoleintr (CI : CONSOLEINTR) [CurCtx]
   have h := CI.wp_consoleintr (hlc := hlc) (GF := GF) Γ cpu k' γc γl γ bs hsie hnoff hK hlk htier
   unfold wp_consoleintr_body at h
   simp only [consoleintrAddr] at h
-  iintro ⟨Hk, Hpc, HΓ, Hc, Hp, Hs, HΦ⟩
+  iintro ⟨Hk, Hpc, HΓ, Hc, Hp, Hs, Hl, HΦ⟩
   iapply h
-  iframe Hk Hpc HΓ Hc Hp Hs
+  iframe Hk Hpc HΓ Hc Hp Hs Hl
   rw [hsie]
   iapply wpNext_off_intro
   iexact HΦ
@@ -212,7 +213,7 @@ theorem ui_port_base [CurCtx] (i : UartId) (γl : GName) (γ : UartNames) :
 
 theorem ui_caps0 [CurCtx] (γc γl : GName) (γ : UartNames) (bs : List (BitVec 8)) :
     uartRxCaps (GF := GF) .uart0 γc γl γ bs ⊢
-      isConsLock γc ∗ uartPort .uart0 γl γ ∗ uartSentSub γ bs := by
+      isConsLock γc ∗ uartPort .uart0 γl γ ∗ uartSentSub γ bs ∗ consLicence := by
   unfold uartRxCaps; iintro H; iexact H
 
 /-- Port 0's hook word. -/
@@ -235,9 +236,9 @@ theorem ui_rxloop (CI : CONSOLEINTR) [CurCtx]
     procsInv Γ ∗ uartPort i γl γ ∗ uartRxWord i ∗ uartRxCaps i γc γl γ bs ∗
     (∀ R' : RegMap, kctx cpu ((k.pushed 4).withRegs R') -∗
       pcIs cpu (KA.«uartintr» + 0x76#64) -∗ ⌜uiPres k R'⌝ -∗
-      (∃ kp' : Nat, rxTok γ kp') -∗ wpLoop cpu)
-    ⊢ ∀ (R : RegMap) (kp : Nat),
-      rxTok γ kp -∗ kctx cpu ((k.pushed 4).withRegs R) -∗
+      (∃ (kp' : Nat) (hl' : Option (List Obs)), uartRxWriter γ kp' hl') -∗ wpLoop cpu)
+    ⊢ ∀ (R : RegMap) (kp : Nat) (hl : Option (List Obs)),
+      uartRxWriter γ kp hl -∗ kctx cpu ((k.pushed 4).withRegs R) -∗
       pcIs cpu (KA.«uartintr» + 0x46#64) -∗
       ⌜uiPres k R ∧ R 9#5 = uartElt i ∧ R 13#5 = uartBaseAddr i + 5#64 ∧
         R 14#5 = uartBaseAddr i⌝ -∗ wpLoop (GF := GF) cpu := by
@@ -247,11 +248,11 @@ theorem ui_rxloop (CI : CONSOLEINTR) [CurCtx]
   ihave #Hbw := ui_port_base i γl γ $$ Hport
   unfold uartRxWord uartBaseWord
   iloeb as IH
-  iintro %R %kp Hrtok Hk Hpc %⟨hpres, hR9, hR13, hR14⟩
+  iintro %R %kp %hl Hrtok Hk Hpc %⟨hpres, hR9, hR13, hR14⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
   icases kctx_kmapStatic _ _ $$ Hk with ⟨#HS, Hk⟩
   -- +0x46  lbu a5,0(a3)    LSR
-  ihave HAU := lsr_read_rx_au i γ kp $$ [Hinv Hrtok]
+  ihave HAU := lsr_read_rx_au_w i γ kp hl $$ [Hinv Hrtok]
   · iframe #; iframe
   k_step (ui_lbu_dev cpu _ ?hs (KA.«uartintr» + 0x46#64) false 0#12 15#5 13#5 (by decide) (by decide)
       i 5 (by omega) ?hb1 _)
@@ -275,14 +276,14 @@ theorem ui_rxloop (CI : CONSOLEINTR) [CurCtx]
       · exact h
       · exact absurd (List.drop_eq_nil_of_le h) h1
     -- +0x4e  lbu a0,0(a4)    RHR: the byte pops
-    ihave HAU := rhr_read_au i γ kp ins hk $$ [Hinv Hrtok Hlb Hdoff]
+    ihave HAU := rhr_read_au_w i γ kp hl ins hk $$ [Hinv Hrtok Hlb Hdoff]
     · iframe #; iframe
     k_step (ui_lbu_dev cpu _ ?hs (KA.«uartintr» + 0x4e#64) false 0#12 10#5 14#5 (by decide) (by decide)
         i 0 (by omega) ?hb2 _)
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc $HS $HAU]
     iintro %b2 Hk Hpc Hpost2
     case hb2 => k_norm; exact hR14
-    icases Hpost2 with ⟨Hrtok, %hget⟩
+    icases Hpost2 with ⟨%hget, %hpop, %⟨hends, hanch⟩, #Hrider, Hrtok⟩
     -- +0x52  zext.b a0,a0
     k_step (wp_s_andi cpu _ (KA.«uartintr» + 0x52#64) false 255#12 10#5 10#5 (by decide))
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
@@ -300,7 +301,7 @@ theorem ui_rxloop (CI : CONSOLEINTR) [CurCtx]
       k_step (wp_s_branch cpu _ (KA.«uartintr» + 0x58#64) true 8174#13 15#5 0#5 (by decide) bop.BEQ)
         from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [ui_hook1_bcond]
       iintro Hk Hpc
-      iapply IH $$ Hexit %_ %(kp + 1) Hrtok Hk Hpc
+      iapply IH $$ Hexit %_ %(kp + 1) %(some hpop) Hrtok Hk Hpc
       ipureintro
       refine ⟨?_, ?_, ?_, ?_⟩
       · repeat refine uiPres_set _ _ _ _ ?_ (by decide)
@@ -317,7 +318,7 @@ theorem ui_rxloop (CI : CONSOLEINTR) [CurCtx]
       k_step (wp_s_jalr cpu _ (KA.«uartintr» + 0x5a#64) true 15#5 1#5 (by decide))
         from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [ui_hook0, ui_jump_ci]
       iintro Hk Hpc
-      icases ui_caps0 γc γl γ bs $$ Hcaps with ⟨#Hcl, #Hp0, #Hsub⟩
+      icases ui_caps0 γc γl γ bs $$ Hcaps with ⟨#Hcl, #Hp0, #Hsub, #Hlic⟩
       iapply (ui_call_consoleintr CI Γ cpu _ γc γl γ bs ?hs2 ?hn2 ?hK2 ?hl2 ?ht2) $$ [- $Hk $Hpc]
       rotate_right 1
       k_norm
@@ -354,7 +355,7 @@ theorem ui_rxloop (CI : CONSOLEINTR) [CurCtx]
       k_step (wp_s_addi cpu _ (KA.«uartintr» + 0x42#64) false 5#12 13#5 14#5 (by decide))
         from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
       iintro Hk Hpc
-      iapply IH $$ Hexit %_ %(kp + 1) Hrtok Hk Hpc
+      iapply IH $$ Hexit %_ %(kp + 1) %(some hpop) Hrtok Hk Hpc
       ipureintro
       refine ⟨?_, ?_, ?_, ?_⟩
       · repeat refine uiPres_set _ _ _ _ ?_ (by decide)
@@ -369,7 +370,7 @@ theorem ui_rxloop (CI : CONSOLEINTR) [CurCtx]
     iapply Hexit $$ %_ Hk Hpc
     · ipureintro
       simpa only [uiPres, RegMap.set_apply, BitVec.reduceEq, ite_false] using hpres
-    · iexists kp
+    · iexists kp, hl
       iexact Hrtok
 
 /-! ## The head of the drain: `&uarts[uid]` into `s1`, then the loop -/
@@ -377,14 +378,14 @@ theorem ui_rxloop (CI : CONSOLEINTR) [CurCtx]
 set_option maxHeartbeats 4000000 in
 theorem ui_l0 (CI : CONSOLEINTR) [CurCtx]
     (Γ : SchedNames) (cpu : CPU) (k : KCtx) (i : UartId) (γc γl : GName) (γ : UartNames)
-    (bs : List (BitVec 8)) (R : RegMap) (kp : Nat)
+    (bs : List (BitVec 8)) (R : RegMap) (kp : Nat) (hl : Option (List Obs))
     (hsie : k.sie = false) (hnoff : k.noff + 2 < 2 ^ 31) (hK : uartintrSlots ≤ k.avail)
     (hlk : "cons" ∉ k.locks ∧ "proc" ∉ k.locks ∧ "uart0" ∉ k.locks)
     (htier : k.tier = KTier.kpt) :
-    procsInv Γ ∗ uartPort i γl γ ∗ uartRxWord i ∗ uartRxCaps i γc γl γ bs ∗ rxTok γ kp ∗
+    procsInv Γ ∗ uartPort i γl γ ∗ uartRxWord i ∗ uartRxCaps i γc γl γ bs ∗ uartRxWriter γ kp hl ∗
     kctx cpu ((k.pushed 4).withRegs R) ∗ pcIs cpu (KA.«uartintr» + 0x2e#64) ∗
     (∀ R' : RegMap, kctx cpu ((k.pushed 4).withRegs R') -∗ pcIs cpu (KA.«uartintr» + 0x76#64) -∗
-      ⌜uiPres k R'⌝ -∗ (∃ kp' : Nat, rxTok γ kp') -∗ wpLoop cpu) ∗
+      ⌜uiPres k R'⌝ -∗ (∃ (kp' : Nat) (hl' : Option (List Obs)), uartRxWriter γ kp' hl') -∗ wpLoop cpu) ∗
     ⌜uiPres k R ∧ R 9#5 = BitVec.ofNat 64 i.idx⌝
     ⊢ wpLoop (GF := GF) cpu := by
   iintro ⟨#HΓ, #Hport, #Hrxw, #Hcaps, Hrtok, Hk, Hpc, Hexit, %⟨hpres, hR9⟩⟩
@@ -429,7 +430,7 @@ theorem ui_l0 (CI : CONSOLEINTR) [CurCtx]
   ihave Hloop := ui_rxloop CI Γ cpu k i γc γl γ bs hsie hnoff hK hlk htier
     $$ [HΓ Hport Hrxw Hcaps Hexit]
   · iframe #; iframe
-  iapply Hloop $$ %_ %kp Hrtok Hk Hpc
+  iapply Hloop $$ %_ %kp %hl Hrtok Hk Hpc
   ipureintro
   refine ⟨?_, ?_, ?_, ?_⟩
   · repeat refine uiPres_set _ _ _ _ ?_ (by decide)
@@ -445,10 +446,10 @@ theorem ui_exit [CurCtx] (cpu : CPU) (k : KCtx) (γ : UartNames)
     (hsie : k.sie = false) (hK : uartintrSlots ≤ k.avail) :
     frame4s1 (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) (k.regs 9#5) ∗
     (∀ R' : RegMap, kctx cpu (k.withRegs R') -∗ pcIs cpu (jumpPc (k.regs 1#5)) -∗
-      ⌜calleeSaved k.regs R'⌝ -∗ (∃ kp' : Nat, rxTok γ kp') -∗ wpLoop cpu)
+      ⌜calleeSaved k.regs R'⌝ -∗ (∃ (kp' : Nat) (hl' : Option (List Obs)), uartRxWriter γ kp' hl') -∗ wpLoop cpu)
     ⊢ ∀ R' : RegMap, kctx (GF := GF) cpu ((k.pushed 4).withRegs R') -∗
       pcIs cpu (KA.«uartintr» + 0x76#64) -∗ ⌜uiPres k R'⌝ -∗
-      (∃ kp' : Nat, rxTok γ kp') -∗ wpLoop cpu := by
+      (∃ (kp' : Nat) (hl' : Option (List Obs)), uartRxWriter γ kp' hl') -∗ wpLoop cpu := by
   iintro ⟨Hframe, HΦ⟩ %R' Hk Hpc %hpres' Hrtok
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
   iapply (wp_epilogue4s1 cpu k hsie (KA.«uartintr» + 0x76#64)
@@ -471,14 +472,14 @@ theorem ui_exit [CurCtx] (cpu : CPU) (k : KCtx) (γ : UartNames)
 set_option maxHeartbeats 4000000 in
 theorem ui_wake (CI : CONSOLEINTR) (WK : WAKEUP) [CurCtx]
     (Γ : SchedNames) (cpu : CPU) (k : KCtx) (i : UartId) (γc γl : GName) (γ : UartNames)
-    (bs : List (BitVec 8)) (R : RegMap) (kp : Nat)
+    (bs : List (BitVec 8)) (R : RegMap) (kp : Nat) (hl : Option (List Obs))
     (hsie : k.sie = false) (hnoff : k.noff + 2 < 2 ^ 31) (hK : uartintrSlots ≤ k.avail)
     (hlk : "cons" ∉ k.locks ∧ "proc" ∉ k.locks ∧ "uart0" ∉ k.locks)
     (htier : k.tier = KTier.kpt) :
-    procsInv Γ ∗ uartPort i γl γ ∗ uartRxWord i ∗ uartRxCaps i γc γl γ bs ∗ rxTok γ kp ∗
+    procsInv Γ ∗ uartPort i γl γ ∗ uartRxWord i ∗ uartRxCaps i γc γl γ bs ∗ uartRxWriter γ kp hl ∗
     kctx cpu ((k.pushed 4).withRegs R) ∗ pcIs cpu (KA.«uartintr» + 0x5e#64) ∗
     (∀ R' : RegMap, kctx cpu ((k.pushed 4).withRegs R') -∗ pcIs cpu (KA.«uartintr» + 0x76#64) -∗
-      ⌜uiPres k R'⌝ -∗ (∃ kp' : Nat, rxTok γ kp') -∗ wpLoop cpu) ∗
+      ⌜uiPres k R'⌝ -∗ (∃ (kp' : Nat) (hl' : Option (List Obs)), uartRxWriter γ kp' hl') -∗ wpLoop cpu) ∗
     ⌜uiPres k R ∧ R 9#5 = BitVec.ofNat 64 i.idx ∧ R 10#5 = BitVec.ofNat 64 i.idx⌝
     ⊢ wpLoop (GF := GF) cpu := by
   iintro ⟨#HΓ, #Hport, #Hrxw, #Hcaps, Hrtok, Hk, Hpc, Hexit, %⟨hpres, hR9, hR10⟩⟩
@@ -536,7 +537,7 @@ theorem ui_wake (CI : CONSOLEINTR) (WK : WAKEUP) [CurCtx]
   k_step (wp_s_j cpu _ (KA.«uartintr» + 0x74#64) true 2097082#21)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
-  iapply (ui_l0 CI Γ cpu k i γc γl γ bs R2 kp hsie hnoff hK hlk htier)
+  iapply (ui_l0 CI Γ cpu k i γc γl γ bs R2 kp hl hsie hnoff hK hlk htier)
   iframe
   iframe #
   ipureintro
@@ -546,7 +547,7 @@ theorem ui_wake (CI : CONSOLEINTR) (WK : WAKEUP) [CurCtx]
 
 set_option maxHeartbeats 4000000 in
 theorem uartintr_proof (CI : CONSOLEINTR) (WK : WAKEUP) : UARTINTR :=
-  ⟨fun {hlc GF} _ _ _ _ _ _ Γ cpu k i γc γl γ kp bs hsie hnoff hK hlk htier hid => by
+  ⟨fun {hlc GF} _ _ _ _ _ _ Γ cpu k i γc γl γ kp hl bs hsie hnoff hK hlk htier hid => by
   unfold wp_uartintr_body
   simp only [uartintrAddr]
   iintro ⟨Hk, Hpc, #HΓ, #Hport, #Hrxw, Hrtok, #Hcaps, HΦ⟩
@@ -614,7 +615,7 @@ theorem uartintr_proof (CI : CONSOLEINTR) (WK : WAKEUP) : UARTINTR :=
   iintro %bi Hk Hpc Hemp
   case hbi => k_norm
   -- +0x24  lbu a5,5(a5)     LSR
-  ihave HAU := lsr_read_rx_au i γ kp $$ [Hinv Hrtok]
+  ihave HAU := lsr_read_rx_au_w i γ kp hl $$ [Hinv Hrtok]
   · iframe #; iframe
   k_step (ui_lbu_dev cpu _ ?hs (KA.«uartintr» + 0x24#64) false 5#12 15#5 15#5 (by decide) (by decide)
       i 5 (by omega) ?hbl _)
@@ -631,7 +632,7 @@ theorem uartintr_proof (CI : CONSOLEINTR) (WK : WAKEUP) : UARTINTR :=
     k_step (wp_s_branch cpu _ (KA.«uartintr» + 0x2c#64) true 50#13 15#5 0#5 (by decide) bop.BNE)
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hb, ui_thre_taken u hth]
     iintro Hk Hpc
-    iapply (ui_wake CI WK Γ cpu k i γc γl γ bs _ kp hsie hnoff hK hlk htier)
+    iapply (ui_wake CI WK Γ cpu k i γc γl γ bs _ kp hl hsie hnoff hK hlk htier)
     iframe
     iframe #
     ipureintro
@@ -644,7 +645,7 @@ theorem uartintr_proof (CI : CONSOLEINTR) (WK : WAKEUP) : UARTINTR :=
     k_step (wp_s_branch cpu _ (KA.«uartintr» + 0x2c#64) true 50#13 15#5 0#5 (by decide) bop.BNE)
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hb, ui_thre_fall u hth]
     iintro Hk Hpc
-    iapply (ui_l0 CI Γ cpu k i γc γl γ bs _ kp hsie hnoff hK hlk htier)
+    iapply (ui_l0 CI Γ cpu k i γc γl γ bs _ kp hl hsie hnoff hK hlk htier)
     iframe
     iframe #
     ipureintro

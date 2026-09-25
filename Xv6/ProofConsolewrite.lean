@@ -478,6 +478,16 @@ theorem cw_either_copyin (EC : EITHER_COPYIN) (c : CPU) (k' : KCtx) (γl : GName
   simp only [eitherCopyinAddr] at h
   exact h
 
+/-- The console port's bundle with the console LICENCE beside it: what pays
+`uartwrite`'s output chain for the copied bytes (INTERIM: Rocq's
+`consolewrite` takes the application's `cons_out_chain` over the user
+buffer, which the I/O-trace track's step 5 ports). -/
+def cwPort [CurCtx] (γl : GName) (γ : UartNames) : IProp GF := iprop(
+  uartPort .uart0 γl γ ∗ consLicence)
+
+instance cwPort_persistent [CurCtx] (γl : GName) (γ : UartNames) : Persistent (cwPort (GF := GF) γl γ) := by
+  unfold cwPort; infer_instance
+
 /-- `uartwrite(0, buf, nn)` at consolewrite's call site, at its eb contract
 (the complement at a named index `s` and proc `p`). -/
 theorem cw_uartwrite (UW : UARTWRITE) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
@@ -489,7 +499,7 @@ theorem cw_uartwrite (UW : UARTWRITE) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF
     (hs : k'.sie = s) (hp : k'.proc = p) :
     kctx c k' ∗ pcIs c KA.«uartwrite» ∗ procsInv Γ ∗
     trapCsrsExt c s ∗ cpuClaimExt c s p ∗
-    uartPort .uart0 γl γ ∗ uartSentSub γ bs ∗ byteBuf (k'.regs 11#5) (DFrac.own 1) cs ∗
+    cwPort γl γ ∗ uartSentSub γ bs ∗ byteBuf (k'.regs 11#5) (DFrac.own 1) cs ∗
     wpNext true p c (fun cpu' => iprop(∀ (spie spp : Bool) (R' : RegMap),
       ⌜calleeSaved k'.regs R'⌝ -∗
       kctx cpu' ((k'.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k'.regs 1#5)) -∗
@@ -498,10 +508,19 @@ theorem cw_uartwrite (UW : UARTWRITE) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF
     ⊢ wpLoop (GF := GF) c := by
   subst hs hp
   have h := UW.wp_uartwrite_eb (hlc := hlc) (GF := GF) Γ c k' .uart0 γl γ j bs cs (DFrac.own 1) nn
-    hj hproc hK hnoff htier hid hn hn' hcs
+    iprop(emp) hj hproc hK hnoff htier hid hn hn' hcs
   unfold wp_uartwrite_eb_body at h
   simp only [uartwriteAddr] at h
-  exact h
+  unfold cwPort
+  iintro ⟨Hk, Hpc, HΓ, Hte, Hce, ⟨#Hport, #Hlic⟩, Hsub, Hbuf, HΦ⟩
+  iapply h
+  iframe Hk Hpc HΓ Hte Hce Hport Hsub Hbuf
+  isplitr [HΦ]
+  · iapply outChain_of_licence $$ Hlic
+    iempintro
+  iapply wpNext_mono $$ HΦ
+  iintro %cpu' HK %spie %spp %R' %hcs' H1 H2 H3 H4 H5 H6 _
+  iapply HK $$ %spie %spp %R' %hcs' H1 H2 H3 H4 H5 H6
 
 end
 
@@ -854,7 +873,7 @@ theorem cw_body (EC : EITHER_COPYIN) (UW : UARTWRITE) (Γ : SchedNames) [ClaimIs
     (hnn0 : 0 < nn) (hnn32 : nn ≤ 32) (hin : i + nn ≤ N)
     (hext : V.upt.extSz V.sz P) (buf cs : List (BitVec 8)) (hbuf : buf.length = 32) :
     kctx cpu (((k.withSpie a b).pushed 16).withRegs R) ∗ pcIs cpu (KA.«consolewrite» + 0x38#64) ∗
-    procsInv Γ ∗ uartPort .uart0 γl γ ∗ isLock γkl kmemLockAddr "kmem" (kmemRes γk) ∗
+    procsInv Γ ∗ cwPort γl γ ∗ isLock γkl kmemLockAddr "kmem" (kmemRes γk) ∗
     kallocAvail γk none ∗
     trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗ uartSentSub γ (bs ++ cs) ∗
     procPrivExtNoctxAt curCtx (procAddr j) pid V P (viewFaulted V.upt P M) ∗
@@ -1123,7 +1142,7 @@ theorem cw_loop (EC : EITHER_COPYIN) (UW : UARTWRITE) (Γ : SchedNames) [ClaimIs
     (hK : consolewriteSlots ≤ k.avail) (huser : k.regs 10#5 ≠ 0#64)
     (hal : (k.regs 2#5 + 0xFFFFFFFFFFFFFF80#64).toNat % 8 = 0)
     (hN : N < 2 ^ 31) (hNn : (N : Int) ≤ max 0 n) :
-    procsInv (GF := GF) Γ -∗ uartPort .uart0 γl γ -∗
+    procsInv (GF := GF) Γ -∗ cwPort γl γ -∗
     isLock γkl kmemLockAddr "kmem" (kmemRes γk) -∗ kallocAvail γk none -∗
     cwLoopInv c0 k γ bs j pid V M n N := by
   iintro #Hpinv #Hport #Hkl #Hav
@@ -1190,7 +1209,9 @@ theorem consolewrite_proof (EC : EITHER_COPYIN) (UW : UARTWRITE) : CONSOLEWRITE 
       huser hn hn' => by
   unfold wp_consolewrite_eb_body
   simp only [consolewriteAddr]
-  iintro ⟨Hk, Hpc, #Hpinv, Hte, Hce, #Hport, Hsent, #Hkl, #Hav, Hpriv, HΦ⟩
+  iintro ⟨Hk, Hpc, #Hpinv, Hte, Hce, #Hport0, Hsent, #Hlic, #Hkl, #Hav, Hpriv, HΦ⟩
+  ihave #Hport : cwPort γl γ $$ [Hport0 Hlic]
+  · unfold cwPort; iframe Hport0 Hlic
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
   icases kctx_wf _ _ $$ Hk with ⟨%hwf, Hk⟩
   have hlocks : k.locks = [] := List.eq_nil_of_length_eq_zero (by have := hwf.2.2.2.1; omega)

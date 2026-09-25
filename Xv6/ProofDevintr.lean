@@ -177,16 +177,16 @@ theorem dv_call_plic_complete (PM : PLIC_COMPLETE) (cpu : CPU) (k' : KCtx) (γ0 
 /-- `uartintr`'s contract at `+0x50` / `+0x62`: the receive token in, some
 receive token out. -/
 theorem dv_call_uartintr (UI : UARTINTR) (Γ : SchedNames) (cpu : CPU) (k' : KCtx) (i : UartId)
-    (γc γl : GName) (γ : UartNames) (kp : Nat) (bs : List (BitVec 8))
+    (γc γl : GName) (γ : UartNames) (kp : Nat) (hl : Option (List Obs)) (bs : List (BitVec 8))
     (hsie : k'.sie = false) (hnoff : k'.noff + 2 < 2 ^ 31) (hK : uartintrSlots ≤ k'.avail)
     (hlk : "cons" ∉ k'.locks ∧ "proc" ∉ k'.locks ∧ "uart0" ∉ k'.locks)
     (htier : k'.tier = KTier.kpt) (hid : k'.regs 10#5 = BitVec.ofNat 64 i.idx) :
     kctx cpu k' ∗ pcIs cpu KA.«uartintr» ∗ procsInv Γ ∗ uartPort i γl γ ∗ uartRxWord i ∗
-    rxTok γ kp ∗ uartRxCaps i γc γl γ bs ∗
+    uartRxWriter γ kp hl ∗ uartRxCaps i γc γl γ bs ∗
     (∀ R' : RegMap, kctx cpu (k'.withRegs R') -∗ pcIs cpu (jumpPc (k'.regs 1#5)) -∗
-      ⌜calleeSaved k'.regs R'⌝ -∗ (∃ kp' : Nat, rxTok γ kp') -∗ wpLoop cpu)
+      ⌜calleeSaved k'.regs R'⌝ -∗ (∃ (kp' : Nat) (hl' : Option (List Obs)), uartRxWriter γ kp' hl') -∗ wpLoop cpu)
     ⊢ wpLoop (GF := GF) cpu := by
-  have h := UI.wp_uartintr (hlc := hlc) (GF := GF) Γ cpu k' i γc γl γ kp bs hsie hnoff hK hlk htier hid
+  have h := UI.wp_uartintr (hlc := hlc) (GF := GF) Γ cpu k' i γc γl γ kp hl bs hsie hnoff hK hlk htier hid
   unfold wp_uartintr_body at h
   simp only [uartintrAddr] at h
   iintro ⟨Hk, Hpc, HΓ, Hp, Hw, Ht, Hc, HΦ⟩
@@ -250,7 +250,7 @@ theorem dv_frame_close (sp ra s0 w1 : BitVec 64) :
 /-! ## The claim's answer, rebuilt for `plic_complete` -/
 
 theorem dv_retOk_10 (γ0 γ1 : UartNames) :
-    (∃ n : Nat, rxTok (GF := GF) γ0 n) ⊢ plicClaimRetOk γ0 γ1 10#64 := by
+    (plicPayloadUart (GF := GF) γ0) ⊢ plicClaimRetOk γ0 γ1 10#64 := by
   unfold plicClaimRetOk
   iintro H
   isplit
@@ -260,7 +260,7 @@ theorem dv_retOk_10 (γ0 γ1 : UartNames) :
   · iintro %h; exact absurd h (by decide)
 
 theorem dv_retOk_12 (γ0 γ1 : UartNames) :
-    (∃ n : Nat, rxTok (GF := GF) γ1 n) ⊢ plicClaimRetOk γ0 γ1 12#64 := by
+    (plicPayloadUart (GF := GF) γ1) ⊢ plicClaimRetOk γ0 γ1 12#64 := by
   unfold plicClaimRetOk
   iintro H
   isplit
@@ -412,13 +412,13 @@ none (`1` is neither `10` nor `12`). -/
 set_option maxHeartbeats 4000000 in
 /-- `+0x4e`: `uartintr(0)`. -/
 theorem dv_arm_uart0 (PM : PLIC_COMPLETE) (UI : UARTINTR) (Γ : SchedNames) (cpu : CPU) (k : KCtx)
-    (sc : BitVec 64) (γ0 γ1 : UartNames) (γc γl0 : GName) (bs : List (BitVec 8)) (kp : Nat)
+    (sc : BitVec 64) (γ0 γ1 : UartNames) (γc γl0 : GName) (bs : List (BitVec 8)) (kp : Nat) (hl : Option (List Obs))
     (hsie : k.sie = false) (hnoff : k.noff + 2 < 2 ^ 31) (hlocks : k.locks = [])
     (htier : k.tier = KTier.kpt) (hK : devintrSlots ≤ k.avail)
     (hext : sc = sCause InterruptType.I_S_External)
     (R : RegMap) (hpres : dvPres k R) (h9 : R 9#5 = 10#64) :
     kctx cpu ((k.pushed 4).withRegs R) ∗ pcIs cpu (KA.«devintr» + 0x4e#64) ∗
-    frame4s1 (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) (k.regs 9#5) ∗ rxTok γ0 kp ∗
+    frame4s1 (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) (k.regs 9#5) ∗ uartRxWriter γ0 kp hl ∗
     plicInv γ0 γ1 ∗ uartInited γ0 ∗ uartInited γ1 ∗
     uartPort .uart0 γl0 γ0 ∗ uartRxWord .uart0 ∗ uartRxCaps .uart0 γc γl0 γ0 bs ∗ procsInv Γ ∗
     Register.scause ↦ᵣ[cpu] sc ∗ dvPost cpu k sc ⊢ wpLoop (GF := GF) cpu := by
@@ -432,7 +432,7 @@ theorem dv_arm_uart0 (PM : PLIC_COMPLETE) (UI : UARTINTR) (Γ : SchedNames) (cpu
   k_step (wp_s_jal cpu _ (KA.«devintr» + 0x50#64) false 2089908#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [dv_br_uartintr]
   iintro Hk Hpc
-  iapply (dv_call_uartintr UI Γ cpu _ UartId.uart0 γc γl0 γ0 kp bs ?hs ?hn ?hKu ?hl ?ht ?hid)
+  iapply (dv_call_uartintr UI Γ cpu _ UartId.uart0 γc γl0 γ0 kp hl bs ?hs ?hn ?hKu ?hl ?ht ?hid)
     $$ [- $Hk $Hpc]
   rotate_right 1
   k_norm
@@ -456,6 +456,7 @@ theorem dv_arm_uart0 (PM : PLIC_COMPLETE) (UI : UARTINTR) (Γ : SchedNames) (cpu
     simp only [KCtx.withRegs_regs, KCtx.pushed_regs, RegMap.set_apply, BitVec.reduceEq,
       ite_false, ite_true] at h
     rw [h]; exact h9
+  ihave Htok' := plicPayloadUart_intro γ0 $$ Htok'
   ihave HrOk := dv_retOk_10 γ0 γ1 $$ Htok'
   iapply (dv_join PM cpu k sc γ0 γ1 hsie hK R2 hpres2 10#64 h92 (dv_ret_of_ext sc hext))
   iframe
@@ -464,13 +465,13 @@ theorem dv_arm_uart0 (PM : PLIC_COMPLETE) (UI : UARTINTR) (Γ : SchedNames) (cpu
 set_option maxHeartbeats 4000000 in
 /-- `+0x60`: `uartintr(1)`, then `j +0x54`. -/
 theorem dv_arm_uart1 (PM : PLIC_COMPLETE) (UI : UARTINTR) (Γ : SchedNames) (cpu : CPU) (k : KCtx)
-    (sc : BitVec 64) (γ0 γ1 : UartNames) (γc γl1 : GName) (bs : List (BitVec 8)) (kp : Nat)
+    (sc : BitVec 64) (γ0 γ1 : UartNames) (γc γl1 : GName) (bs : List (BitVec 8)) (kp : Nat) (hl : Option (List Obs))
     (hsie : k.sie = false) (hnoff : k.noff + 2 < 2 ^ 31) (hlocks : k.locks = [])
     (htier : k.tier = KTier.kpt) (hK : devintrSlots ≤ k.avail)
     (hext : sc = sCause InterruptType.I_S_External)
     (R : RegMap) (hpres : dvPres k R) (h9 : R 9#5 = 12#64) :
     kctx cpu ((k.pushed 4).withRegs R) ∗ pcIs cpu (KA.«devintr» + 0x60#64) ∗
-    frame4s1 (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) (k.regs 9#5) ∗ rxTok γ1 kp ∗
+    frame4s1 (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) (k.regs 9#5) ∗ uartRxWriter γ1 kp hl ∗
     plicInv γ0 γ1 ∗ uartInited γ0 ∗ uartInited γ1 ∗
     uartPort .uart1 γl1 γ1 ∗ uartRxWord .uart1 ∗ uartRxCaps .uart1 γc γl1 γ1 bs ∗ procsInv Γ ∗
     Register.scause ↦ᵣ[cpu] sc ∗ dvPost cpu k sc ⊢ wpLoop (GF := GF) cpu := by
@@ -484,7 +485,7 @@ theorem dv_arm_uart1 (PM : PLIC_COMPLETE) (UI : UARTINTR) (Γ : SchedNames) (cpu
   k_step (wp_s_jal cpu _ (KA.«devintr» + 0x62#64) false 2089890#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [dv_br_uartintr]
   iintro Hk Hpc
-  iapply (dv_call_uartintr UI Γ cpu _ UartId.uart1 γc γl1 γ1 kp bs ?hs ?hn ?hKu ?hl ?ht ?hid)
+  iapply (dv_call_uartintr UI Γ cpu _ UartId.uart1 γc γl1 γ1 kp hl bs ?hs ?hn ?hKu ?hl ?ht ?hid)
     $$ [- $Hk $Hpc]
   rotate_right 1
   k_norm
@@ -512,6 +513,7 @@ theorem dv_arm_uart1 (PM : PLIC_COMPLETE) (UI : UARTINTR) (Γ : SchedNames) (cpu
   k_step (wp_s_j cpu _ (KA.«devintr» + 0x66#64) true 2097134#21)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
+  ihave Htok' := plicPayloadUart_intro γ1 $$ Htok'
   ihave HrOk := dv_retOk_12 γ0 γ1 $$ Htok'
   iapply (dv_join PM cpu k sc γ0 γ1 hsie hK R2 hpres2 12#64 h92 (dv_ret_of_ext sc hext))
   iframe
@@ -576,7 +578,7 @@ theorem dv_retOk_cases {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv
     (γ0 γ1 : UartNames) (v : BitVec 64) :
     plicClaimRetOk (GF := GF) γ0 γ1 v ⊢
       ⌜v = 0#64 ∨ v = 1#64 ∨ v = 10#64 ∨ v = 12#64⌝ ∗
-      (⌜v = 10#64⌝ -∗ ∃ n : Nat, rxTok γ0 n) ∗ (⌜v = 12#64⌝ -∗ ∃ n : Nat, rxTok γ1 n) := by
+      (⌜v = 10#64⌝ -∗ plicPayloadUart γ0) ∗ (⌜v = 12#64⌝ -∗ plicPayloadUart γ1) := by
   unfold plicClaimRetOk; iintro H; iexact H
 
 section
@@ -590,13 +592,13 @@ pinned `irq` to one of `0`, `1`, `10`, `12`. -/
 set_option maxHeartbeats 4000000 in
 /-- `irq = 10`: UART0. -/
 theorem dv_disp_10 (PM : PLIC_COMPLETE) (UI : UARTINTR) (Γ : SchedNames) (cpu : CPU) (k : KCtx)
-    (sc : BitVec 64) (γ0 γ1 : UartNames) (γc γl0 : GName) (bs : List (BitVec 8)) (kp : Nat)
+    (sc : BitVec 64) (γ0 γ1 : UartNames) (γc γl0 : GName) (bs : List (BitVec 8)) (kp : Nat) (hl : Option (List Obs))
     (hsie : k.sie = false) (hnoff : k.noff + 2 < 2 ^ 31) (hlocks : k.locks = [])
     (htier : k.tier = KTier.kpt) (hK : devintrSlots ≤ k.avail)
     (hext : sc = sCause InterruptType.I_S_External)
     (R : RegMap) (hpres : dvPres k R) (hv : R 10#5 = 10#64) :
     kctx cpu ((k.pushed 4).withRegs R) ∗ pcIs cpu (KA.«devintr» + 0x30#64) ∗
-    frame4s1 (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) (k.regs 9#5) ∗ rxTok γ0 kp ∗
+    frame4s1 (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) (k.regs 9#5) ∗ uartRxWriter γ0 kp hl ∗
     plicInv γ0 γ1 ∗ uartInited γ0 ∗ uartInited γ1 ∗
     uartPort .uart0 γl0 γ0 ∗ uartRxWord .uart0 ∗ uartRxCaps .uart0 γc γl0 γ0 bs ∗ procsInv Γ ∗
     Register.scause ↦ᵣ[cpu] sc ∗ dvPost cpu k sc ⊢ wpLoop (GF := GF) cpu := by
@@ -614,7 +616,7 @@ theorem dv_disp_10 (PM : PLIC_COMPLETE) (UI : UARTINTR) (Γ : SchedNames) (cpu :
   k_step (wp_s_branch cpu _ (KA.«devintr» + 0x36#64) false 24#13 10#5 15#5 (by decide) bop.BEQ)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hv, dv_beq_10_10]
   iintro Hk Hpc
-  iapply (dv_arm_uart0 PM UI Γ cpu k sc γ0 γ1 γc γl0 bs kp hsie hnoff hlocks htier hK hext
+  iapply (dv_arm_uart0 PM UI Γ cpu k sc γ0 γ1 γc γl0 bs kp hl hsie hnoff hlocks htier hK hext
     _ ?hp ?h9) $$ [- $Hk $Hpc $Hframe $Htok $Hsc $HΦ]
   rotate_right 1
   iframe #
@@ -626,13 +628,13 @@ theorem dv_disp_10 (PM : PLIC_COMPLETE) (UI : UARTINTR) (Γ : SchedNames) (cpu :
 set_option maxHeartbeats 4000000 in
 /-- `irq = 12`: UART1. -/
 theorem dv_disp_12 (PM : PLIC_COMPLETE) (UI : UARTINTR) (Γ : SchedNames) (cpu : CPU) (k : KCtx)
-    (sc : BitVec 64) (γ0 γ1 : UartNames) (γc γl1 : GName) (bs : List (BitVec 8)) (kp : Nat)
+    (sc : BitVec 64) (γ0 γ1 : UartNames) (γc γl1 : GName) (bs : List (BitVec 8)) (kp : Nat) (hl : Option (List Obs))
     (hsie : k.sie = false) (hnoff : k.noff + 2 < 2 ^ 31) (hlocks : k.locks = [])
     (htier : k.tier = KTier.kpt) (hK : devintrSlots ≤ k.avail)
     (hext : sc = sCause InterruptType.I_S_External)
     (R : RegMap) (hpres : dvPres k R) (hv : R 10#5 = 12#64) :
     kctx cpu ((k.pushed 4).withRegs R) ∗ pcIs cpu (KA.«devintr» + 0x30#64) ∗
-    frame4s1 (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) (k.regs 9#5) ∗ rxTok γ1 kp ∗
+    frame4s1 (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) (k.regs 9#5) ∗ uartRxWriter γ1 kp hl ∗
     plicInv γ0 γ1 ∗ uartInited γ0 ∗ uartInited γ1 ∗
     uartPort .uart1 γl1 γ1 ∗ uartRxWord .uart1 ∗ uartRxCaps .uart1 γc γl1 γ1 bs ∗ procsInv Γ ∗
     Register.scause ↦ᵣ[cpu] sc ∗ dvPost cpu k sc ⊢ wpLoop (GF := GF) cpu := by
@@ -656,7 +658,7 @@ theorem dv_disp_12 (PM : PLIC_COMPLETE) (UI : UARTINTR) (Γ : SchedNames) (cpu :
   k_step (wp_s_branch cpu _ (KA.«devintr» + 0x3c#64) false 36#13 10#5 15#5 (by decide) bop.BEQ)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hv, dv_beq_12_12]
   iintro Hk Hpc
-  iapply (dv_arm_uart1 PM UI Γ cpu k sc γ0 γ1 γc γl1 bs kp hsie hnoff hlocks htier hK hext
+  iapply (dv_arm_uart1 PM UI Γ cpu k sc γ0 γ1 γc γl1 bs kp hl hsie hnoff hlocks htier hK hext
     _ ?hp ?h9) $$ [- $Hk $Hpc $Hframe $Htok $Hsc $HΦ]
   rotate_right 1
   iframe #
@@ -857,14 +859,14 @@ theorem dv_ext (PC : PLIC_CLAIM) (PM : PLIC_COMPLETE) (UI : UARTINTR) (VI : VIRT
     iframe #
   · -- 10: UART0, with the token the claim carried out of the slot
     ihave Htok := H10 $$ %hv
-    icases Htok with ⟨%kp, Htok⟩
-    iapply (dv_disp_10 PM UI Γ cpu k sc γ0 γ1 γc γl0 bs kp hsie hnoff hlocks htier hK hext
+    icases plicPayloadUart_elim _ $$ Htok with ⟨%kp, %hl, Htok⟩
+    iapply (dv_disp_10 PM UI Γ cpu k sc γ0 γ1 γc γl0 bs kp hl hsie hnoff hlocks htier hK hext
       R1 hpres1 hv) $$ [- $Hk $Hpc $Hframe $Htok $Hsc $HΦ]
     iframe #
   · -- 12: UART1
     ihave Htok := H12 $$ %hv
-    icases Htok with ⟨%kp, Htok⟩
-    iapply (dv_disp_12 PM UI Γ cpu k sc γ0 γ1 γc γl1 bs kp hsie hnoff hlocks htier hK hext
+    icases plicPayloadUart_elim _ $$ Htok with ⟨%kp, %hl, Htok⟩
+    iapply (dv_disp_12 PM UI Γ cpu k sc γ0 γ1 γc γl1 bs kp hl hsie hnoff hlocks htier hK hext
       R1 hpres1 hv) $$ [- $Hk $Hpc $Hframe $Htok $Hsc $HΦ]
     iframe #
 

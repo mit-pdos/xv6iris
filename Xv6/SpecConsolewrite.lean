@@ -66,7 +66,7 @@ def wp_consolewrite_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [
     (hn : k.regs 12#5 = BitVec.ofInt 64 n) (hn' : -2 ^ 31 ≤ n ∧ n < 2 ^ 31) : Prop :=
   kctx cpu k ∗ pcIs cpu consolewriteAddr ∗ procsInv Γ ∗
   trapCsrs cpu ∗ cpuClaim cpu k.proc ∗ intrRes cpu ∗
-  uartPort .uart0 γl γ ∗ uartSentSub γ bs ∗
+  uartPort .uart0 γl γ ∗ uartSentSub γ bs ∗ consLicence ∗
   isLock γkl kmemLockAddr "kmem" (kmemRes γk) ∗ kallocAvail γk none ∗
   procPrivNoctxAt curCtx (procAddr j) pid V M ∗
   wpNext true k.proc cpu (fun cpu' => iprop(∀ (spie spp : Bool) (R' : RegMap) (P' : UPtd),
@@ -94,7 +94,7 @@ def wp_consolewrite_eb_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF
     (hn : k.regs 12#5 = BitVec.ofInt 64 n) (hn' : -2 ^ 31 ≤ n ∧ n < 2 ^ 31) : Prop :=
   kctx cpu k ∗ pcIs cpu consolewriteAddr ∗ procsInv Γ ∗
   trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗
-  uartPort .uart0 γl γ ∗ uartSentSub γ bs ∗
+  uartPort .uart0 γl γ ∗ uartSentSub γ bs ∗ consLicence ∗
   isLock γkl kmemLockAddr "kmem" (kmemRes γk) ∗ kallocAvail γk none ∗
   procPrivNoctxAt curCtx (procAddr j) pid V M ∗
   wpNext true k.proc cpu (fun cpu' => iprop(∀ (spie spp : Bool) (R' : RegMap) (P' : UPtd),
@@ -129,9 +129,9 @@ theorem CONSOLEWRITE.wp_consolewrite (A : CONSOLEWRITE) {hlc : HasLC} {GF : Bund
   unfold wp_consolewrite_body
   rw [hsie] at h
   simp only [trapCsrsExt_false, cpuClaimExt_false] at h
-  iintro ⟨H0, H1, H2, Htc, Hcl, Hir, H6, H7, H8, H9, H10, Hnext⟩
+  iintro ⟨H0, H1, H2, Htc, Hcl, Hir, H6, H7, H7', H8, H9, H10, Hnext⟩
   iapply h
-  iframe H0 H1 H2 Htc Hcl Hir H6 H7 H8 H9 H10
+  iframe H0 H1 H2 Htc Hcl Hir H6 H7 H7' H8 H9 H10
   iapply wpNext_mono $$ Hnext
   iintro %cpu' HK %spie %spp %R' %P' %p0 H1 H2 ⟨Htc, Hir⟩ Hcl H6 H7
   iapply HK $$ %spie %spp %R' %P' %p0 H1 H2 Htc Hcl Hir H6 H7

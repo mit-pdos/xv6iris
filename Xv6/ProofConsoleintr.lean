@@ -247,19 +247,37 @@ theorem ci_release (RE : RELEASE) (c : CPU) (k' : KCtx) (γc : GName)
   unfold isConsLock consAddr
   exact h
 
+/-- The console port's bundle with the console LICENCE beside it: what
+pays the echo's store obligations (INTERIM, until Rocq's echo links reach
+this contract in the I/O-trace track's step 5). -/
+def ciPort [CurCtx] (γl : GName) (γ : UartNames) : IProp GF := iprop(
+  uartPort .uart0 γl γ ∗ consLicence)
+
+instance ciPort_persistent [CurCtx] (γl : GName) (γ : UartNames) : Persistent (ciPort (GF := GF) γl γ) := by
+  unfold ciPort; infer_instance
+
 theorem ci_consputc (CP : CONSPUTC) (c : CPU) (k' : KCtx) (γl : GName) (γ : UartNames)
     (tr : List (BitVec 8))
     (hsie : k'.sie = false) (hK : 20 ≤ k'.avail) (hnoff : k'.noff + 1 < 2 ^ 31)
     (huart : "uart0" ∉ k'.locks) :
-    kctx c k' ∗ pcIs c KA.«consputc» ∗ uartPort .uart0 γl γ ∗ uartSentSub γ tr ∗
+    kctx c k' ∗ pcIs c KA.«consputc» ∗ ciPort γl γ ∗ uartSentSub γ tr ∗
     wpNext k'.sie k'.proc c (fun cpu' => iprop(∀ (R' : RegMap) (cs : List (BitVec 8)),
       kctx cpu' (k'.withRegs R') -∗ pcIs cpu' (jumpPc (k'.regs 1#5)) -∗
       ⌜calleeSaved k'.regs R'⌝ -∗ uartSentSub γ (tr ++ cs) -∗ wpLoop cpu'))
     ⊢ wpLoop (GF := GF) c := by
-  have h := CP.wp_consputc (hlc := hlc) (GF := GF) c k' γl γ tr hsie hK hnoff huart
+  have h := CP.wp_consputc (hlc := hlc) (GF := GF) c k' γl γ tr iprop(emp) hsie hK hnoff huart
   unfold wp_consputc_body at h
   simp only [consputcAddr] at h
-  exact h
+  unfold ciPort
+  iintro ⟨Hk, Hpc, ⟨#Hport, #Hlic⟩, #Hsub, HΦ⟩
+  iapply h
+  iframe Hk Hpc Hport Hsub
+  isplitr [HΦ]
+  · iapply storeChain_of_licence $$ Hlic
+    iempintro
+  iapply wpNext_mono $$ HΦ
+  iintro %cpu' HK %R' %cs H1 H2 H3 H4 _
+  iapply HK $$ %R' %cs H1 H2 H3 H4
 
 theorem ci_wakeup (WK : WAKEUP) (Γ : SchedNames) (c : CPU) (k' : KCtx)
     (hnoff : k'.noff + 1 < 2 ^ 31) (hK : wakeupSlots ≤ k'.avail) (hlk : "proc" ∉ k'.locks)
@@ -463,7 +481,7 @@ theorem ci_nl (CP : CONSPUTC) (RE : RELEASE) (WK : WAKEUP) (Γ : SchedNames)
     (R : RegMap) (hR2 : R 2#5 = k.regs 2#5 + 0xFFFFFFFFFFFFFFD0#64)
     (hsv : ciSaved k.regs R) :
     kctx cpu ((ciK k).withRegs R) ∗ pcIs cpu (KA.«consoleintr» + 0x12e#64) ∗
-    procsInv Γ ∗ isConsLock γc ∗ locked γc cpu ∗ uartPort .uart0 γl γ ∗
+    procsInv Γ ∗ isConsLock γc ∗ locked γc cpu ∗ ciPort γl γ ∗
     byteBuf consBufAddr (DFrac.own 1) buf ∗
     wordPointsTo consRAddr 4 (DFrac.own 1) r ∗
     wordPointsTo consWAddr 4 (DFrac.own 1) w ∗
@@ -584,7 +602,7 @@ theorem ci_bs (CP : CONSPUTC) (RE : RELEASE)
     (R : RegMap) (hR2 : R 2#5 = k.regs 2#5 + 0xFFFFFFFFFFFFFFD0#64)
     (hsv : ciSaved k.regs R) :
     kctx cpu ((ciK k).withRegs R) ∗ pcIs cpu (KA.«consoleintr» + 0xf0#64) ∗
-    isConsLock γc ∗ locked γc cpu ∗ uartPort .uart0 γl γ ∗
+    isConsLock γc ∗ locked γc cpu ∗ ciPort γl γ ∗
     byteBuf consBufAddr (DFrac.own 1) buf ∗
     wordPointsTo consRAddr 4 (DFrac.own 1) r ∗
     wordPointsTo consWAddr 4 (DFrac.own 1) w ∗
@@ -712,7 +730,7 @@ theorem ci_echo (CP : CONSPUTC) (RE : RELEASE) (WK : WAKEUP) (Γ : SchedNames)
     (R : RegMap) (hR2 : R 2#5 = k.regs 2#5 + 0xFFFFFFFFFFFFFFD0#64)
     (hsv : ciSaved k.regs R) :
     kctx cpu ((ciK k).withRegs R) ∗ pcIs cpu (KA.«consoleintr» + 0x4e#64) ∗
-    procsInv Γ ∗ isConsLock γc ∗ locked γc cpu ∗ uartPort .uart0 γl γ ∗
+    procsInv Γ ∗ isConsLock γc ∗ locked γc cpu ∗ ciPort γl γ ∗
     byteBuf consBufAddr (DFrac.own 1) buf ∗
     wordPointsTo consRAddr 4 (DFrac.own 1) r ∗
     wordPointsTo consWAddr 4 (DFrac.own 1) w ∗
@@ -1079,7 +1097,7 @@ theorem ci_kill_loop (CP : CONSPUTC) (RE : RELEASE) (cpu : CPU) (k : KCtx) (γc 
     (γ : UartNames)
     (hwf : k.wf) (hksie : k.sie = false) (hnoff : k.noff + 2 < 2 ^ 31)
     (hK : consoleintrSlots ≤ k.avail) (hlk : "cons" ∉ k.locks) (hlu : "uart0" ∉ k.locks) :
-    isConsLock γc -∗ uartPort .uart0 γl γ -∗ ciKillLoop (GF := GF) cpu k γc γ := by
+    isConsLock γc -∗ ciPort γl γ -∗ ciKillLoop (GF := GF) cpu k γc γ := by
   iintro #Hlk #Hport
   have hsie : (ciK k).sie = false := rfl
   have hK6 : 6 ≤ k.avail := by unfold consoleintrSlots at hK; omega
@@ -1246,7 +1264,7 @@ theorem ci_kill (CP : CONSPUTC) (RE : RELEASE)
     (R : RegMap) (hR2 : R 2#5 = k.regs 2#5 + 0xFFFFFFFFFFFFFFD0#64)
     (hsv : ciSaved k.regs R) :
     kctx cpu ((ciK k).withRegs R) ∗ pcIs cpu (KA.«consoleintr» + 0x92#64) ∗
-    isConsLock γc ∗ locked γc cpu ∗ uartPort .uart0 γl γ ∗
+    isConsLock γc ∗ locked γc cpu ∗ ciPort γl γ ∗
     byteBuf consBufAddr (DFrac.own 1) buf ∗
     wordPointsTo consRAddr 4 (DFrac.own 1) r ∗
     wordPointsTo consWAddr 4 (DFrac.own 1) w ∗
@@ -1361,7 +1379,7 @@ theorem ci_ring (CP : CONSPUTC) (RE : RELEASE) (WK : WAKEUP) (Γ : SchedNames)
     (R : RegMap) (hR2 : R 2#5 = k.regs 2#5 + 0xFFFFFFFFFFFFFFD0#64)
     (hsv : ciSaved k.regs R) :
     kctx cpu ((ciK k).withRegs R) ∗ pcIs cpu (KA.«consoleintr» + 0x2e#64) ∗
-    procsInv Γ ∗ isConsLock γc ∗ locked γc cpu ∗ uartPort .uart0 γl γ ∗
+    procsInv Γ ∗ isConsLock γc ∗ locked γc cpu ∗ ciPort γl γ ∗
     byteBuf consBufAddr (DFrac.own 1) buf ∗
     wordPointsTo consRAddr 4 (DFrac.own 1) r ∗
     wordPointsTo consWAddr 4 (DFrac.own 1) w ∗
@@ -1501,7 +1519,7 @@ theorem ci_body (CP : CONSPUTC) (RE : RELEASE) (WK : WAKEUP) (Γ : SchedNames)
     (R : RegMap) (hR2 : R 2#5 = k.regs 2#5 + 0xFFFFFFFFFFFFFFD0#64)
     (hsv : ciSaved k.regs R) :
     kctx cpu ((ciK k).withRegs R) ∗ pcIs cpu (KA.«consoleintr» + 0x18#64) ∗
-    procsInv Γ ∗ isConsLock γc ∗ locked γc cpu ∗ uartPort .uart0 γl γ ∗ consBody ∗
+    procsInv Γ ∗ isConsLock γc ∗ locked γc cpu ∗ ciPort γl γ ∗ consBody ∗
     frame6s1 (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) (k.regs 9#5) ∗
     uartSentSub γ tr ∗ cinPost cpu k γ tr
     ⊢ wpLoop (GF := GF) cpu := by
@@ -1662,7 +1680,9 @@ theorem consoleintr_proof (CP : CONSPUTC) (AC : ACQUIRE) (RE : RELEASE) (WK : WA
   fun {hlc GF} _ _ _ _ _ _ Γ cpu k γc γl γ bs hsie hnoff hK hlk htier => by
   unfold wp_consoleintr_body
   simp only [consoleintrAddr]
-  iintro ⟨Hk, Hpc, #Hpi, #Hlk, #Hport, #Hsub, Hnext⟩
+  iintro ⟨Hk, Hpc, #Hpi, #Hlk, #Hport0, #Hsub, #Hlic, Hnext⟩
+  ihave #Hport : ciPort γl γ $$ [Hport0 Hlic]
+  · unfold ciPort; iframe Hport0 Hlic
   icases kctx_wf _ _ $$ Hk with ⟨%hwf, Hk⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
   obtain ⟨hlk1, hlk2, hlk3⟩ := hlk

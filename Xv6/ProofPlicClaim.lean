@@ -77,8 +77,8 @@ theorem pc_call_cpuid (CI : CPUID) [CurCtx] (cpu : CPU) (k' : KCtx)
 /-- What the accessor answers, transported to the sign-extended `a0`. -/
 theorem pc_ret_ok [CurCtx] (γ0 γ1 : UartNames) (w : BitVec 32) :
     (⌜w = 0#32 ∨ w = 1#32 ∨ w = 10#32 ∨ w = 12#32⌝ ∗
-      (⌜w = 10#32⌝ -∗ ∃ n : Nat, rxTok γ0 n) ∗
-      (⌜w = 12#32⌝ -∗ ∃ n : Nat, rxTok γ1 n)) ⊢
+      (⌜w = 10#32⌝ -∗ plicPayloadUart γ0) ∗
+      (⌜w = 12#32⌝ -∗ plicPayloadUart γ1)) ⊢
     plicClaimRetOk (GF := GF) γ0 γ1 (BitVec.signExtend 64 w) := by
   unfold plicClaimRetOk
   iintro ⟨%hw, H10, H12⟩
@@ -142,8 +142,8 @@ theorem plic_claim_proof (CI : CPUID) : PLIC_CLAIM :=
       (by decide) (sclaimOff cpu.val) (sclaimOff_ok cpu.val cpu.isLt).1
       (sclaimOff_ok cpu.val cpu.isLt).2 ?hcl (fun w => iprop(
         ⌜w = 0#32 ∨ w = 1#32 ∨ w = 10#32 ∨ w = 12#32⌝ ∗
-        (⌜w = 10#32⌝ -∗ ∃ n : Nat, rxTok γ0 n) ∗
-        (⌜w = 12#32⌝ -∗ ∃ n : Nat, rxTok γ1 n))))
+        (⌜w = 10#32⌝ -∗ plicPayloadUart γ0) ∗
+        (⌜w = 12#32⌝ -∗ plicPayloadUart γ1))))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro %w Hk Hpc Hpost
   case hcl =>

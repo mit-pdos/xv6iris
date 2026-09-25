@@ -43,7 +43,8 @@ def uartinitoneAddr : BitVec 64 := KA.«uartinitone»
 ghosts, the lock's three raw cells). -/
 def uartinitonePre {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [CurCtx]
     (i : UartId) (γ : UartNames) (l : List (BitVec 8)) (k : Nat) (vlock : BitVec 32) (vname vcpu : BitVec 64) : IProp GF := iprop(
-  uartInv i γ ∗ uartBaseWord i ∗ uartRxWord i ∗ dlabOwn γ false ∗ txOwn γ l ∗ outLb γ l ∗ rxTok γ k ∗
+  uartInv i γ ∗ uartBaseWord i ∗ uartRxWord i ∗ dlabOwn γ false ∗ txOwn γ l ∗ outLb γ l ∗
+  (∃ hl : Option (List Obs), rxTok γ k hl) ∗
   kmapId (txLockAddr i) ∗ kmapId (txLockAddr i + 16#64) ∗
   wordPointsTo (txLockAddr i) 4 (DFrac.own 1) vlock ∗
   wordPointsTo (txLockAddr i + 8#64) 8 (DFrac.own 1) vname ∗
@@ -51,7 +52,7 @@ def uartinitonePre {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G G
 
 def uartinitonePost {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [CurCtx]
     (i : UartId) (γ : UartNames) (l : List (BitVec 8)) (name : BitVec 64) : IProp GF := iprop(
-  txOwn γ l ∗ dlabOff γ ∗ (∃ k' : Nat, rxTok γ k') ∗
+  txOwn γ l ∗ dlabOff γ ∗ (∃ (k' : Nat) (hl' : Option (List Obs)), rxTok γ k' hl') ∗
   wordPointsTo (txLockAddr i + 8#64) 8 (DFrac.own 1) name ∗ lkFresh (txLockAddr i))
 
 /-- **WP of `uartinitone`.**  `a0 = &uarts[i]`, `a1` the name.  Two stack

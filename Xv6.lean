@@ -55,8 +55,11 @@ import Xv6.LinkAcquire
 import Xv6.LinkRelease
 import Xv6.KernelData
 import Xv6.UartTrace
+import Xv6.UartGhosts
+import Xv6.UartLinks
 import Xv6.UartModel
 import Xv6.UartInv
+import Xv6.UartConsAcc
 import Xv6.SpecUartputcSync
 import Xv6.SpecUartinitone
 import Xv6.SpecUartinit

@@ -17,8 +17,10 @@ void uartintr(int uid) {
 Interrupts are off (the trap's hart stays); the depth headroom covers the
 deepest nested acquire (`consoleintr` -> `consputc`); no lock of the cone
 is held.  The caller (`devintr`) holds the port's bundle, its `rx` word,
-the RECEIVE TOKEN (the handler is the only popper) and, at port 0, the
-console's credentials (`uartRxCaps`); the token comes back at some count.
+the port's PLIC payload (Rocq `uart_rx_writer`: the RECEIVE TOKEN -- the
+handler is the only popper -- with the console's high-water halves and the
+arm's half) and, at port 0, the console's credentials (`uartRxCaps`); the
+payload comes back at some count and anchor.
 Stack: the 4-slot frame over `consoleintr`'s 26.
 
 Imports only definitional files.
@@ -42,22 +44,23 @@ def uartintrSlots : Nat := 4 + consoleintrSlots
 /-- **WP of `uartintr`.**  `a0` the port index. -/
 def wp_uartintr_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CurCtx]
     (Γ : SchedNames) (cpu : CPU) (k : KCtx) (i : UartId) (γc γl : GName) (γ : UartNames)
-    (kp : Nat) (bs : List (BitVec 8))
+    (kp : Nat) (hl : Option (List Obs)) (bs : List (BitVec 8))
     (hsie : k.sie = false) (hnoff : k.noff + 2 < 2 ^ 31) (hK : uartintrSlots ≤ k.avail)
     (hlk : "cons" ∉ k.locks ∧ "proc" ∉ k.locks ∧ "uart0" ∉ k.locks)
     (htier : k.tier = KTier.kpt) (hid : k.regs 10#5 = BitVec.ofNat 64 i.idx) : Prop :=
   kctx cpu k ∗ pcIs cpu uartintrAddr ∗ procsInv Γ ∗
-  uartPort i γl γ ∗ uartRxWord i ∗ rxTok γ kp ∗ uartRxCaps i γc γl γ bs ∗
+  uartPort i γl γ ∗ uartRxWord i ∗ uartRxWriter γ kp hl ∗ uartRxCaps i γc γl γ bs ∗
   wpNext k.sie k.proc cpu (fun cpu' => iprop(∀ R' : RegMap,
     kctx cpu' (k.withRegs R') -∗ pcIs cpu' (jumpPc (k.regs 1#5)) -∗
-    ⌜calleeSaved k.regs R'⌝ -∗ (∃ kp' : Nat, rxTok γ kp') -∗ wpLoop cpu'))
+    ⌜calleeSaved k.regs R'⌝ -∗ (∃ (kp' : Nat) (hl' : Option (List Obs)), uartRxWriter γ kp' hl') -∗
+    wpLoop cpu'))
   ⊢ wpLoop (GF := GF) cpu
 
 /-- The interface of `uartintr`. -/
 structure UARTINTR : Prop where
   wp_uartintr : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CurCtx]
     (Γ : SchedNames) (cpu : CPU) (k : KCtx) (i : UartId) (γc γl : GName) (γ : UartNames)
-    (kp : Nat) (bs : List (BitVec 8)) hsie hnoff hK hlk htier hid,
-    wp_uartintr_body (hlc := hlc) (GF := GF) Γ cpu k i γc γl γ kp bs hsie hnoff hK hlk htier hid
+    (kp : Nat) (hl : Option (List Obs)) (bs : List (BitVec 8)) hsie hnoff hK hlk htier hid,
+    wp_uartintr_body (hlc := hlc) (GF := GF) Γ cpu k i γc γl γ kp hl bs hsie hnoff hK hlk htier hid
 
 end Xv6
