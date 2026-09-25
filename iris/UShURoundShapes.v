@@ -48,7 +48,7 @@ Require Import CtxIdDefs.
 Require PipeDisc.
 Local Open Scope list_scope.
 
-Local Notation U := ulmU.
+Local Notation U := ulmG.
 
 Section UShURoundShapes.
   Context {Σ : gFunctors}.
@@ -65,7 +65,7 @@ Section UShURoundShapes.
     (∃ (v : era_pins) (γc γm : wid -> gname) (dep : wid -> list (bv 8) -> iProp Σ)
        (i : nat) (sw : nat -> list (bv 8)) (sR : fstate) (lR : pline'),
        ⌜(forall w s, Timeless (dep w s))
-        /\ pv_line pview_unionU (lineV U I) = Some lR /\ adm_u_f lR = true
+        /\ pv_line pview_unionU (lineV U I) = Some lR /\ adm_u_g lR = true
         /\ pl_ok lR /\ (i < lcats lR)%nat /\ (1 <= nlines I)%nat
         /\ fc_ok (pv_fc pview_unionU sR)⌝
        ∗ era_pin (fgn_echo gf) (S gen_id) v
@@ -81,7 +81,7 @@ Section UShURoundShapes.
     (∃ (v : era_pins) (γc γm : wid -> gname) (dep : wid -> list (bv 8) -> iProp Σ)
        (sR : fstate) (lR : pline'),
        ⌜(forall w s, Timeless (dep w s))
-        /\ pv_line pview_unionU (lineV U I) = Some lR /\ adm_u_f lR = true
+        /\ pv_line pview_unionU (lineV U I) = Some lR /\ adm_u_g lR = true
         /\ pl_ok lR /\ fc_ok (pv_fc pview_unionU sR)⌝
        ∗ era_pin (fgn_echo gf) (S gen_id) v
        ∗ inp_lb v I

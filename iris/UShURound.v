@@ -131,8 +131,8 @@ Require Import CtxIdDefs.
 Local Open Scope Z_scope.
 Import Defs.
 
-Local Notation U := ulmU.
-Local Notation K := ulmU_hooks.
+Local Notation U := ulmG.
+Local Notation K := ulmG_hooks.
 
 (* ===================================================================== *)
 (*  S0  THE UNION'S CODES AT A FILE LINE, READ BACK AS THE FILE'S         *)
@@ -140,7 +140,7 @@ Local Notation K := ulmU_hooks.
 Lemma ulm_ok_R (s : fstate) (l : uline) (a : ralt) :
   uline_nopipe l -> lm_ok U s l (lm_dec U (ualt_code (UR a))) <-> ralt_ok l a.
 Proof using.
-  intros Hnp. change (lm_ok ulmU) with (uok adm_u_f). change (lm_dec ulmU) with ualt_dec.
+  intros Hnp. change (lm_ok ulmG) with (uok adm_u_g). change (lm_dec ulmG) with ualt_dec.
   rewrite ualt_dec_code.
   destruct l as [ws | ws | | p n]; [cbn [uok]; reflexivity | cbn [uok]; reflexivity
                                    | cbn [uok]; reflexivity |].
@@ -150,32 +150,32 @@ Qed.
 Lemma ulm_cont_R (s : fstate) (l : uline) (a : ralt) :
   lm_cont U s l (lm_dec U (ualt_code (UR a))) = cont s l a.
 Proof using.
-  change (lm_cont ulmU) with ucont. change (lm_dec ulmU) with ualt_dec.
+  change (lm_cont ulmG) with ucont. change (lm_dec ulmG) with ualt_dec.
   rewrite ualt_dec_code. reflexivity.
 Qed.
 
 Lemma ulm_step_R (s : fstate) (l : uline) (a : ralt) :
   lm_step U s l (lm_dec U (ualt_code (UR a))) = fsm s l a.
 Proof using.
-  change (lm_step ulmU) with ustep. change (lm_dec ulmU) with ualt_dec.
+  change (lm_step ulmG) with ustep. change (lm_dec ulmG) with ualt_dec.
   rewrite ualt_dec_code. reflexivity.
 Qed.
 
 Lemma ulm_term_R (a : ralt) : lm_term U (lm_dec U (ualt_code (UR a))) = false.
 Proof using.
-  change (lm_term ulmU) with uterm. change (lm_dec ulmU) with ualt_dec.
+  change (lm_term ulmG) with uterm. change (lm_dec ulmG) with ualt_dec.
   rewrite ualt_dec_code. reflexivity.
 Qed.
 
 Lemma ulm_panic_R (a : ralt) : lm_panic U (lm_dec U (ualt_code (UR a))) = ralt_panic a.
 Proof using.
-  change (lm_panic ulmU) with upanic. change (lm_dec ulmU) with ualt_dec.
+  change (lm_panic ulmG) with upanic. change (lm_dec ulmG) with ualt_dec.
   rewrite ualt_dec_code. reflexivity.
 Qed.
 
 Lemma ulm_free_R (a : ralt) : lmh_free K (lm_dec U (ualt_code (UR a))) = fstate_free a.
 Proof using.
-  change (lmh_free ulmU_hooks) with ufree. change (lm_dec ulmU) with ualt_dec.
+  change (lmh_free ulmG_hooks) with ufree. change (lm_dec ulmG) with ualt_dec.
   rewrite ualt_dec_code. reflexivity.
 Qed.
 
@@ -278,7 +278,7 @@ Qed.
 (* the union's admitted line shapes: the file's three, and the pipelines
    the union's admission lets through *)
 Definition ush_line_pipeU (p : producer) (n : list filt) : Prop :=
-  adm_u_f (LPipes p n) = true /\ pl_ok (LPipes p n).
+  adm_u_g (LPipes p n) = true /\ pl_ok (LPipes p n).
 
 Definition ush_line_union (l : uline) : Prop :=
   match l with LPipe p n => ush_line_pipeU p n | _ => True end.

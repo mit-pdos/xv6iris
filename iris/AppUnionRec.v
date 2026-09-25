@@ -68,7 +68,7 @@ Require Import UnionOut.
 Require Import UnionLinks.
 Local Open Scope Z_scope.
 
-Local Notation U := ulmU.
+Local Notation U := ulmG.
 
 (* ====================================================================== *)
 (*  1.  THE CONCLUSION                                                     *)

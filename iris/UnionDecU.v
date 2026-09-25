@@ -3,15 +3,14 @@
 (* claude-notes/design/union.md, review item S2; filenames.md seam (a)).  *)
 (* Pure.                                                                  *)
 (*                                                                        *)
-(*  [lm_disc_ulmU_dec : Decision (lm_disc ulmU h)], constructively, so    *)
-(*  the union ledger's taint counter can sit at [decide (lm_disc ulmU h)] *)
+(*  [lm_disc_ulmG_dec : Decision (lm_disc ulmG h)], constructively, so    *)
+(*  the union ledger's taint counter can sit at [decide (lm_disc ulmG h)] *)
 (*  with no excluded-middle axiom.  Nothing here is meant to run.         *)
 (*                                                                        *)
 (*  AT EVERY FILTER STAGE LIST (grep-pipes.md cut G4).  The decider is   *)
 (*  proved once for any admission [ud_disc_dec] (what it needs of one:    *)
-(*  [ud_adm]) and instantiated at the landed [adm_u_f] (cats only) and at *)
-(*  the widened [adm_u_g] (every stage [cat] or [grep w]), the one cut G8 *)
-(*  switches the application to: [lm_disc_ulmG_dec].                      *)
+(*  [ud_adm]) and instantiated at the union application's [adm_u_g]      *)
+(*  (every stage [cat] or [grep w], cut G8): [lm_disc_ulmG_dec].          *)
 (*                                                                        *)
 (*  WHY IT IS NOT [FileDiscDec] + [PipesDecE] (review S2).  The state     *)
 (*  feeds the range condition: at a [cat f | cat^n] line [uok] reads the  *)
@@ -1427,41 +1426,13 @@ End canon.
 (*                                                                        *)
 (*  OPAQUE ON PURPOSE, as [FileDiscDec.disc_f_dec] and [PipesDecE.        *)
 (*  lm_disc_pipesE_dec] are: the ledger's counter is [if decide (lm_disc *)
-(*  ulmU h) then 0 else 1] and every proof that touches it rewrites with *)
+(*  ulmG h) then 0 else 1] and every proof that touches it rewrites with *)
 (*  a closure law.                                                        *)
 (*                                                                        *)
-(*  AT TWO ADMISSIONS: the landed one ([adm_u_f], cats only) and the     *)
-(*  widened one grep-pipes.md cut G8 switches to ([adm_u_g]: every echo  *)
-(*  pipeline and every [cat f | ..], each stage [cat] or [grep w] of an   *)
-(*  alphanumeric word).                                                   *)
+(*  AT THE UNION APPLICATION's ADMISSION [adm_u_g] (grep-pipes.md cut     *)
+(*  G8): every echo pipeline and every [cat f | ..], each stage [cat] or *)
+(*  [grep w] of an alphanumeric word.                                     *)
 (* ===================================================================== *)
-Lemma adm_u_f_ok : ud_adm adm_u_f false [].
-Proof using.
-  split.
-  - intros g fs Ha. exact (proj1 (proj1 (adm_u_f_catf g fs) Ha)).
-  - intros p fs Ha. rewrite (adm_u_f_cats p fs Ha). unfold cats.
-    apply Forall_replicate. by right.
-  - intros p fs Hp Hfs.
-    assert (Hc : all_cats fs = true).
-    { unfold all_cats. apply forallb_forall. intros F HF. rewrite Forall_forall in Hfs.
-      destruct (Hfs F (proj2 (elem_of_list_In _ _) HF)) as [-> | [Hf _]];
-        [reflexivity | discriminate Hf]. }
-    destruct Hp as [-> | ->]; [exact Hc |]. apply adm_u_f_catf. split; [reflexivity | exact Hc].
-Qed.
-
-Global Instance lm_disc_ulmU_dec (h : list mobs) : Decision (lm_disc ulmU h).
-Proof using. exact (ud_disc_dec adm_u_f false [] adm_u_f_ok h). Qed.
-
-(* THE WIDENED ADMISSION: grep stages admitted *)
-Definition adm_u_g (l : pline') : bool :=
-  match l with
-  | LEcho' _ => false
-  | LPipes (PrEcho _) fs => forallb (fun F => bool_decide (filt_ok F)) fs
-  | LPipes (PrCatF g) fs => bool_decide (g = fname_f) && forallb (fun F => bool_decide (filt_ok F)) fs
-  end.
-
-Definition ulmG : lmodel := ulm adm_u_g.
-
 (* the pattern the realisations use: [a] *)
 Definition ud_gpat : bytes := [Z_to_bv 8 97].
 
@@ -1475,24 +1446,12 @@ Proof using.
     exact (bool_decide_eq_true_1 _ Ha).
   - intros p fs _. apply Forall_forall. intros F _. by left.
   - intros p fs Hp Hfs.
-    assert (Hc : forallb (fun F => bool_decide (filt_ok F)) fs = true).
-    { apply forallb_forall. intros F HF. apply bool_decide_eq_true_2.
-      rewrite Forall_forall in Hfs.
-      destruct (Hfs F (proj2 (elem_of_list_In _ _) HF)) as [-> | [_ ->]];
+    assert (Hc : filts_okb fs = true).
+    { apply filts_okb_true. apply Forall_forall. intros F HF.
+      destruct (proj1 (Forall_forall _ _) Hfs F HF) as [-> | [_ ->]];
         [exact I | exact ud_gpat_word]. }
     destruct Hp as [-> | ->]; cbn [adm_u_g]; [exact Hc |].
     rewrite bool_decide_true; [exact Hc | reflexivity].
-Qed.
-
-(* the grep admission is a superset of the landed one *)
-Lemma adm_u_g_f (l : pline') : adm_u_f l = true -> adm_u_g l = true.
-Proof using.
-  assert (Hcat : forall fs, all_cats fs = true -> forallb (fun F => bool_decide (filt_ok F)) fs = true).
-  { intros fs Hc. apply forallb_forall. intros F HF. apply bool_decide_eq_true_2.
-    unfold all_cats in Hc. rewrite forallb_forall in Hc. pose proof (Hc F HF) as HF'.
-    destruct F; [exact I | discriminate HF']. }
-  destruct l as [ws | [ws | g] fs]; cbn [adm_u_f adm_u_g]; [done | exact (Hcat fs) |].
-  rewrite !andb_true_iff. intros [Hg Hc]. split; [exact Hg | exact (Hcat fs Hc)].
 Qed.
 
 Global Instance lm_disc_ulmG_dec (h : list mobs) : Decision (lm_disc ulmG h).

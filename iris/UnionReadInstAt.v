@@ -63,7 +63,7 @@ Require Import UShLine.
 Require Import CtxIdDefs.
 Local Open Scope list_scope.
 
-Local Notation U := ulmU.
+Local Notation U := ulmG.
 
 (* ===================================================================== *)
 (*  0.  A UNION-DISCIPLINED HISTORY NEVER ENDS IN ^D                      *)
@@ -82,7 +82,7 @@ Proof using.
   rewrite ins_app ins_in in Hseg.
   assert (Hin' : b ∈ ins s0 ++ [b]).
   { apply elem_of_app. right. by apply elem_of_list_singleton. }
-  pose proof (lm_disc_input_byte_val U (ulm_byte_laws adm_u_f) (ins s0 ++ [b]) b
+  pose proof (lm_disc_input_byte_val U (ulm_byte_laws adm_u_g) (ins s0 ++ [b]) b
                 Hseg Hin') as Hv.
   lia.
 Qed.

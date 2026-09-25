@@ -5,7 +5,7 @@
 (*                                                                        *)
 (* [UkFileEntries]' three entries -- echo at the console, echo > f, cat f *)
 (* -- with the file interface [UkFileIface.file_iface] instantiated at    *)
-(* the UNION's link record: the model [UnionDisc.ulmU], the parameters    *)
+(* the UNION's link record: the model [UnionDisc.ulmG], the parameters    *)
 (* [UnionLinkInstAt.union_params_at] at the round's boot state and the    *)
 (* links bundle [UnionLinks.union_links].  The glue is the interface's    *)
 (* parameter-generic one ([fif_exit_k_cons_g], [fif_exit_k_redir_g],      *)
@@ -82,7 +82,7 @@ Require Import UnionDisc UnionOut UnionLinks UnionLinkInst UnionLinkInstAt.
 Local Open Scope Z_scope.
 Import Defs.
 
-Local Notation U := ulmU.
+Local Notation U := ulmG.
 
 (* ===================================================================== *)
 (*  0.  PURE: cat's file name, positionally (seam (d)), and the union's   *)
@@ -117,7 +117,7 @@ Lemma ulm_abs_R (s0 : fstate) (cs : list nat) (I : list (bv 8)) (a : ralt) :
   lm_abs U s0 cs I (ualt_code (UR a))
   = cont (lm_upto U cs s0 (bodies_of I) (nlines I - 1)) (lm_line_at U I) a.
 Proof.
-  rewrite /lm_abs. change (lm_cont ulmU) with ucont. change (lm_dec ulmU) with ualt_dec.
+  rewrite /lm_abs. change (lm_cont ulmG) with ucont. change (lm_dec ulmG) with ualt_dec.
   rewrite ualt_dec_code. reflexivity.
 Qed.
 
@@ -126,8 +126,8 @@ Lemma ulm_cons_adm_R (s0 : fstate) (cs : list nat) (I : list (bv 8)) (a : ralt) 
   cons_adm U s0 cs I (ualt_code (UR a)).
 Proof.
   intros Hnp Hok. rewrite /cons_adm.
-  change (lm_ok ulmU) with (uok adm_u_f). change (lm_dec ulmU) with ualt_dec.
-  change (lm_term ulmU) with uterm. rewrite ualt_dec_code.
+  change (lm_ok ulmG) with (uok adm_u_g). change (lm_dec ulmG) with ualt_dec.
+  change (lm_term ulmG) with uterm. rewrite ualt_dec_code.
   split; [| reflexivity].
   revert Hnp Hok. destruct (lm_line_at U I) as [ws | ws | | p n]; intros Hnp Hok;
     cbn [uok]; [exact Hok | exact Hok | exact Hok |].
@@ -141,7 +141,7 @@ Lemma ulm_echo_body (s0 : fstate) (cs : list nat) (I : list (bv 8))
   lm_body U s0 cs I 0%nat = wl_line (drop 1 ws).
 Proof.
   intros Hfl. rewrite /lm_body /lm_abs.
-  change (lm_cont ulmU) with ucont. change (lm_dec ulmU) with ualt_dec.
+  change (lm_cont ulmG) with ucont. change (lm_dec ulmG) with ualt_dec.
   rewrite ualt_dec_0 Hfl. cbn [ucont].
   replace (ralt_dec 0%nat) with (REcho 0%nat) by (vm_compute; reflexivity).
   cbn [cont uline_ws]. rewrite EchoDisc.line_alts_of_0.
@@ -155,8 +155,8 @@ Lemma ulm_echo_adm (s0 : fstate) (cs : list nat) (I : list (bv 8))
   lm_line_at U I = LEcho ws -> cons_adm U s0 cs I 0%nat.
 Proof.
   intros Hfl. rewrite /cons_adm.
-  change (lm_ok ulmU) with (uok adm_u_f). change (lm_dec ulmU) with ualt_dec.
-  change (lm_term ulmU) with uterm. rewrite ualt_dec_0 Hfl.
+  change (lm_ok ulmG) with (uok adm_u_g). change (lm_dec ulmG) with ualt_dec.
+  change (lm_term ulmG) with uterm. rewrite ualt_dec_0 Hfl.
   split; [| reflexivity]. cbn [uok].
   replace (ralt_dec 0%nat) with (REcho 0%nat) by (vm_compute; reflexivity).
   simpl. lia.

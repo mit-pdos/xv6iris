@@ -3,11 +3,11 @@
 (*  claude-notes/design/union.md section 4).  PURE.                       *)
 (*                                                                        *)
 (*  [FileOutPure]'s conclusion body and its four steps, at the union      *)
-(*  model [UnionDisc.ulmU]: the per-cycle boot states [s0s] of            *)
+(*  model [UnionDisc.ulmG]: the per-cycle boot states [s0s] of            *)
 (*  [FileDisc.file_phi] (the first absent, each later one admissible      *)
 (*  against the lines typed in strictly earlier cycles), with the output  *)
-(*  claim [LineModel.lm_good_out ulmU] in place of [good_out_f] and the   *)
-(*  antecedent the union's discipline [lm_disc ulmU].                     *)
+(*  claim [LineModel.lm_good_out ulmG] in place of [good_out_f] and the   *)
+(*  antecedent the union's discipline [lm_disc ulmG].                     *)
 (*                                                                        *)
 (*  The one fact the era's FIRST drain reads -- a cycle whose console     *)
 (*  wire is empty has received no console input -- is stated once over    *)
@@ -88,9 +88,9 @@ End first_out.
 (* ===================================================================== *)
 (*  2.  THE UNION'S CONCLUSION, AND ITS BODY                              *)
 (* ===================================================================== *)
-Local Notation U := ulmU.
-Local Notation UB := (ulm_byte_laws adm_u_f).
-Local Notation UK := ulmU_hooks.
+Local Notation U := ulmG.
+Local Notation UB := (ulm_byte_laws adm_u_g).
+Local Notation UK := ulmG_hooks.
 
 (* THE CONCLUSION (design section 4): [FileDisc.file_phi] at the union *)
 Definition union_phi (h : list mobs) : Prop :=

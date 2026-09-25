@@ -9,9 +9,9 @@
 (*  ug s0]).  S6: this is NOT a record swap -- the file round's ties call *)
 (*  the file model directly ([fsm], [cont], [ralt_ok], [ralt_dec],        *)
 (*  [UCatOut.cat_st]), so they are restated here over the UNION model     *)
-(*  [UnionDisc.ulmU]: the round's state is [lm_upto ulmU] ([ust]), its    *)
-(*  line [lm_line_at ulmU] ([ul]), its alternatives the union's codes      *)
-(*  ([ualt_code (UR a)] at a file line), their step [lm_step ulmU].  The  *)
+(*  [UnionDisc.ulmG]: the round's state is [lm_upto ulmG] ([ust]), its    *)
+(*  line [lm_line_at ulmG] ([ul]), its alternatives the union's codes      *)
+(*  ([ualt_code (UR a)] at a file line), their step [lm_step ulmG].  The  *)
 (*  ties are stated over the model's own vocabulary, so they hold at      *)
 (*  every line shape, the pipelines included.                             *)
 (*                                                                        *)
@@ -85,8 +85,8 @@ Require UShFileRedir.             (* the file round's model-free pure lemmas *)
 Require Import CtxIdDefs.
 Local Open Scope Z_scope.
 
-Local Notation U := ulmU.
-Local Notation K := ulmU_hooks.
+Local Notation U := ulmG.
+Local Notation K := ulmG_hooks.
 
 (* ===================================================================== *)
 (*  S0  THE THREE TIES, OVER THE UNION MODEL                              *)
@@ -121,8 +121,8 @@ Definition upend_tie (cs : list nat) (sb : fstate) (I : list (bv 8)) (c : fstate
 Lemma ustep_noc (s : fstate) (l : uline) :
   lm_step U s l (lm_dec U (lmh_noc K l)) = s.
 Proof using.
-  change (lm_step ulmU) with ustep. change (lm_dec ulmU) with ualt_dec.
-  change (lmh_noc ulmU_hooks) with unoc.
+  change (lm_step ulmG) with ustep. change (lm_dec ulmG) with ualt_dec.
+  change (lmh_noc ulmG_hooks) with unoc.
   destruct l as [ws | ws | | p n]; cbn [unoc].
   - rewrite ualt_dec_R. exact (UShFileRedir.fsm_fnoc s (LEcho ws)).
   - rewrite ualt_dec_R. exact (UShFileRedir.fsm_fnoc s (LEchoF ws)).
@@ -134,7 +134,7 @@ Qed.
 Lemma ustep_panic (s : fstate) (l : uline) (a : lm_alt U) :
   lm_panic U a = true -> lm_step U s l a = s.
 Proof using.
-  change (lm_step ulmU) with ustep. change (lm_panic ulmU) with upanic.
+  change (lm_step ulmG) with ustep. change (lm_panic ulmG) with upanic.
   destruct a as [r | x | x]; cbn [upanic ustep]; [| intros _; reflexivity | intros _; reflexivity].
   intros Hp. exact (UShFileRedir.fsm_panic s l r Hp).
 Qed.
@@ -144,7 +144,7 @@ Lemma ucont_prompt_nopanic (s : fstate) (l : uline) (a : lm_alt U) :
   lm_cont U s l a = u_prompt -> lm_panic U a = false.
 Proof using.
   intros H. destruct (lm_panic U a) eqn:Hp; [| reflexivity].
-  exfalso. rewrite (lml_cont_panic ulmU_laws s l a Hp) in H.
+  exfalso. rewrite (lml_cont_panic ulmG_laws s l a Hp) in H.
   apply (f_equal length) in H.
   rewrite FileLinksLine.alt_panic_len5 EchoLinks.wr_prompt_len in H. discriminate H.
 Qed.
@@ -159,7 +159,7 @@ Proof using.
   try rewrite Hn in Hlen.
   replace (S n - 1)%nat with n in Hlen |- * by lia.
   cbn [lm_upto]. f_equal.
-  - apply (lm_upto_ext ulmU); [| intros j _; reflexivity].
+  - apply (lm_upto_ext ulmG); [| intros j _; reflexivity].
     intros j Hj. rewrite list_lookup_total_alt lookup_app_l;
       [by rewrite -list_lookup_total_alt | lia].
   - rewrite /lm_at -Hlen ll_snoc_lookup_total. reflexivity.
@@ -259,7 +259,7 @@ Proof using.
   split; [rewrite Hn; lia |].
   rewrite Hc /lm_after /ust Hn.
   replace (S (nlines I) - 1)%nat with (nlines I) by lia.
-  apply (lm_upto_ext ulmU); [intros j _; reflexivity |].
+  apply (lm_upto_ext ulmG); [intros j _; reflexivity |].
   intros j Hj.
   pose proof (bodies_of_app I (l ++ [wl_nl])) as Hpre.
   destruct (lookup_lt_is_Some_2 (bodies_of I) j Hj) as [x Hx].
@@ -282,12 +282,12 @@ Proof using. exact (ualt_dec_code (UR a)). Qed.
 Lemma ustep_id_echo (s : fstate) (ws : list (list (bv 8))) (a : lm_alt U) :
   lm_step U s (LEcho ws) a = s.
 Proof using.
-  change (lm_step ulmU) with ustep. by destruct a.
+  change (lm_step ulmG) with ustep. by destruct a.
 Qed.
 
 Lemma ustep_id_cat (s : fstate) (a : lm_alt U) : lm_step U s LCat a = s.
 Proof using.
-  change (lm_step ulmU) with ustep. by destruct a.
+  change (lm_step ulmG) with ustep. by destruct a.
 Qed.
 
 (* ===================================================================== *)

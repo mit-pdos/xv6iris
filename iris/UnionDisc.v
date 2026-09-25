@@ -5,8 +5,9 @@
 (*                                                                        *)
 (*  One line model [ulm adm] for every line shape the shell reads:        *)
 (*  [echo ws], [echo ws > f], [cat f] (the file model's lines and          *)
-(*  alternatives, [UR]) and [p | cat^n] for a producer [p] -- echo or      *)
-(*  [cat f] -- (the N-stage pipeline model's).  The state is the file's   *)
+(*  alternatives, [UR]) and [p | F1 | .. | Fn] for a producer [p] -- echo *)
+(*  or [cat f] -- and filter stages [cat] or [grep w] (the N-stage        *)
+(*  pipeline model's).  The state is the file's                           *)
 (*  ([fstate]); a pipeline round reads it through [FileDisc.files_of] (so *)
 (*  [cat f | cat] prints the round's content) and leaves it alone.        *)
 (*                                                                        *)
@@ -27,18 +28,19 @@
 (*  no [UR] alternative, a file line no pipeline one, an echo pipeline no *)
 (*  [UPC] one and a [cat f] pipeline no [UPE] one.                        *)
 (*                                                                        *)
-(*  THE ADMISSION [adm] IS A PARAMETER.  [adm_u_f] admits every echo      *)
+(*  THE ADMISSION [adm] IS A PARAMETER.  [adm_u_g] admits every echo      *)
 (*  pipeline and every [cat f | ..] pipeline at the model's one file name *)
-(*  [fname_f].  WHETHER OTHER FILE NAMES ARE ADMITTED IS AN OPEN OWNER    *)
-(*  RULING (review S4): the file model has one name, so [cat g | cat]     *)
-(*  at [g <> f] would read a file the model does not describe (its        *)
-(*  content function answers [None] there, which is honest -- the open    *)
-(*  fails -- only if no other file exists).                               *)
+(*  [fname_f], each filter stage [cat] or [grep w] of one alphanumeric    *)
+(*  word (grep-pipes.md cut G8).  WHETHER OTHER FILE NAMES ARE ADMITTED   *)
+(*  IS AN OPEN OWNER RULING (review S4): the file model has one name, so  *)
+(*  [cat g | cat] at [g <> f] would read a file the model does not        *)
+(*  describe (its content function answers [None] there, which is honest *)
+(*  -- the open fails -- only if no other file exists).                   *)
 (*                                                                        *)
 (*  THE LAWS hold at EVERY admission ([ulm_laws]): the pipeline half is   *)
 (*  [PipesDisc.pipes_lm_laws_fc] at the round's content function, whose   *)
 (*  only premise ([fc_ok]) is the file state's own shape                  *)
-(*  ([fstate_ok]).  No [adm_ok] is needed and [adm_u_f] does not satisfy  *)
+(*  ([fstate_ok]).  No [adm_ok] is needed and [adm_u_g] does not satisfy  *)
 (*  it: [echo fork > f] then [cat f | cat] prints the panic line.         *)
 (*                                                                        *)
 (*  THE HOOKS (section 4) are proved here field by field; the record      *)
@@ -305,49 +307,50 @@ Definition ulm (adm : pline' -> bool) : lmodel :=
   MkLM fstate uline uline_of_u ualt ualt_dec upanic ucont ustep (uok adm)
        (ubody_ok adm) ubyte uline_ok fstate_ok uterm (umerge adm).
 
-(* THE ADMISSION the union application instantiates: every echo pipeline
-   and every [cat f | ..] at the model's file name, their filter stages
-   ALL CATS (grep-pipes.md cut G3: the model has grep stages, the round
-   admits none yet, cut G8).  An echo line alone is the file's [LEcho], so
-   [LEcho'] is not admitted here. *)
-Definition adm_u_f (l : pline') : bool :=
+(* THE ADMISSION THE UNION APPLICATION INSTANTIATES (grep-pipes.md cut
+   G8): every echo pipeline and every [cat f | ..] at the model's file
+   name, each filter stage [cat] or [grep w] of one alphanumeric word
+   ([filt_ok]).  An echo line alone is the file's [LEcho], so [LEcho']
+   is not admitted here. *)
+Definition filts_okb (fs : list filt) : bool := forallb (fun F => bool_decide (filt_ok F)) fs.
+
+Lemma filts_okb_true (fs : list filt) : filts_okb fs = true <-> Forall filt_ok fs.
+Proof using.
+  unfold filts_okb. rewrite forallb_forall, Forall_forall. split.
+  - intros H F HF. apply (bool_decide_eq_true_1 _ (H F (proj1 (elem_of_list_In _ _) HF))).
+  - intros H F HF. apply bool_decide_eq_true_2. apply H. exact (proj2 (elem_of_list_In _ _) HF).
+Qed.
+
+Definition adm_u_g (l : pline') : bool :=
   match l with
   | LEcho' _ => false
-  | LPipes (PrEcho _) fs => all_cats fs
-  | LPipes (PrCatF g) fs => bool_decide (g = fname_f) && all_cats fs
+  | LPipes (PrEcho _) fs => filts_okb fs
+  | LPipes (PrCatF g) fs => bool_decide (g = fname_f) && filts_okb fs
   end.
 
-(* an admitted pipeline's stages are cats *)
-Lemma adm_u_f_cats (p : producer) (fs : list filt) :
-  adm_u_f (LPipes p fs) = true -> fs = cats (length fs).
+Definition ulmG : lmodel := ulm adm_u_g.
+
+Lemma adm_u_g_echo (ws : list (list (bv 8))) (fs : list filt) :
+  Forall filt_ok fs -> adm_u_g (LPipes (PrEcho ws) fs) = true.
+Proof using. intros H. exact (proj2 (filts_okb_true fs) H). Qed.
+
+Lemma adm_u_g_catf (g : list (bv 8)) (fs : list filt) :
+  adm_u_g (LPipes (PrCatF g) fs) = true <-> g = fname_f /\ Forall filt_ok fs.
 Proof using.
-  intros Ha. apply FileDisc.all_cats_eq. destruct p as [ws | g]; [exact Ha |].
-  apply andb_true_iff in Ha as [_ Ha]. exact Ha.
+  cbn [adm_u_g]. rewrite andb_true_iff, bool_decide_eq_true, filts_okb_true. reflexivity.
 Qed.
 
-Lemma adm_u_f_all (p : producer) (fs : list filt) :
-  adm_u_f (LPipes p fs) = true -> all_cats fs = true.
+Lemma adm_u_g_catf_f (fs : list filt) :
+  Forall filt_ok fs -> adm_u_g (LPipes (PrCatF fname_f) fs) = true.
+Proof using. intros H. apply adm_u_g_catf. split; [reflexivity | exact H]. Qed.
+
+(* an admitted pipeline's stages are admissible filters *)
+Lemma adm_u_g_fs (p : producer) (fs : list filt) :
+  adm_u_g (LPipes p fs) = true -> Forall filt_ok fs.
 Proof using.
-  destruct p as [ws | g]; cbn [adm_u_f]; [exact id |].
-  intros Ha. apply andb_true_iff in Ha as [_ Ha]. exact Ha.
+  destruct p as [ws | g]; [exact (proj1 (filts_okb_true fs)) |].
+  intros Ha. exact (proj2 (proj1 (adm_u_g_catf g fs) Ha)).
 Qed.
-
-Lemma adm_u_f_echo_cats (ws : list (list (bv 8))) (n : nat) :
-  adm_u_f (LPipes (PrEcho ws) (cats n)) = true.
-Proof using. exact (FileDisc.all_cats_cats n). Qed.
-
-Lemma adm_u_f_catf_cats (n : nat) : adm_u_f (LPipes (PrCatF fname_f) (cats n)) = true.
-Proof using.
-  cbn [adm_u_f]. rewrite bool_decide_true; [exact (FileDisc.all_cats_cats n) | reflexivity].
-Qed.
-
-Lemma adm_u_f_catf (g : list (bv 8)) (fs : list filt) :
-  adm_u_f (LPipes (PrCatF g) fs) = true <-> g = fname_f /\ all_cats fs = true.
-Proof using.
-  cbn [adm_u_f]. rewrite andb_true_iff, bool_decide_eq_true. reflexivity.
-Qed.
-
-Definition ulmU : lmodel := ulm adm_u_f.
 
 (* ---- the pieces ---- *)
 
@@ -529,8 +532,8 @@ Section laws.
   Qed.
 End laws.
 
-Corollary ulmU_laws : lm_laws ulmU.
-Proof using. exact (ulm_laws adm_u_f). Qed.
+Corollary ulmG_laws : lm_laws ulmG.
+Proof using. exact (ulm_laws adm_u_g). Qed.
 
 (* ===================================================================== *)
 (*  4.  THE HOOKS                                                         *)

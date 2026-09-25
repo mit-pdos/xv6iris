@@ -2,7 +2,7 @@
 (*  UnionLinkInst.v -- [LinkRec.LinkRec] AT THE UNION MODEL (cut C9e';    *)
 (*  design: claude-notes/design/union.md section 3, 'The link record').   *)
 (*                                                                        *)
-(*  [GenLinksLine.gen_link_inst ulmU union_params]:                       *)
+(*  [GenLinksLine.gen_link_inst ulmG union_params]:                       *)
 (*  - the FILE's witness and head ([FileLinksLine.f0w] / the boot-ledger  *)
 (*    entry [uf0bwk] / [FileLinksLine.fhead], as in [FileLinkGen]),       *)
 (*    the file's turn [fturn_pre] and the file's residue with the typed   *)
@@ -58,7 +58,7 @@ Require Import WpUart.
 From stdpp Require Import list.
 Local Open Scope list_scope.
 
-Local Notation U := ulmU.
+Local Notation U := ulmG.
 
 (* ===================================================================== *)
 (*  0.  THE FILED BLOCK'S CURSOR, at the round's own state (pure)         *)
@@ -152,7 +152,7 @@ Section union_link_inst.
   Qed.
 
   Definition union_params : gen_params U :=
-    MkGP U ulmU_laws ulmU_hooks
+    MkGP U ulmG_laws ulmG_hooks
       UT _ _
       UPIN _ _ (era_pin_agree (fgn_echo gf))
       (f0w gf) _ _
@@ -188,7 +188,7 @@ Section union_link_inst.
   Lemma union_links_gl : union_links ug -∗ glinks U union_params.
   Proof using .
     iIntros "Hlk". iDestruct (union_links_eq with "Hlk") as %Hc.
-    iApply (peclV_glinks pg U (ucparams ug) (ulm_byte_laws adm_u_f) None (uwa ug) Hc
+    iApply (peclV_glinks pg U (ucparams ug) (ulm_byte_laws adm_u_g) None (uwa ug) Hc
               union_params eq_refl eq_refl uf0w_cw (or_introl I) ufhead_boot).
   Qed.
 
@@ -259,7 +259,7 @@ Section union_link_inst.
   Definition union_X (k : nat) (v : era_pins) (I : list (bv 8)) : iProp Σ :=
     (⌜k = S gen_id⌝
      ∗ ∃ (sR : fstate) (lR : pline') (pre : list (bv 8)),
-         ⌜pv_line pview_unionU (lineV U I) = Some lR /\ adm_u_f lR = true
+         ⌜pv_line pview_unionU (lineV U I) = Some lR /\ adm_u_g lR = true
           /\ line_blocks (files_of sR) lR pre⌝
          ∗ pwc_blkU ug v I sR k pre false)%I.
 

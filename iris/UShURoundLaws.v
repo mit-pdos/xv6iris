@@ -97,7 +97,7 @@ Require PipeDisc.
 Require EchoLinks.
 Local Open Scope Z_scope.
 
-Local Notation U := ulmU.
+Local Notation U := ulmG.
 
 (* ===================================================================== *)
 (*  S0  THE PURE HALF                                                     *)

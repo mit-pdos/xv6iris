@@ -9,7 +9,7 @@
 (*  the banner-owed one the file family's [uWbf] (the deed DONE beside    *)
 (*  the record's banner credential), the record the union's at the era's  *)
 (*  boot state ([UnionLinkInstAt.union_link_inst_at ug s0]), the          *)
-(*  discipline the union model's ([lm_disc_input ulmU]), and the line     *)
+(*  discipline the union model's ([lm_disc_input ulmG]), and the line     *)
 (*  constructor the union's three file shapes and its admitted pipelines  *)
 (*  ([UShURound.ush_line_union]).                                         *)
 (*                                                                        *)
@@ -86,7 +86,7 @@ Require Import UInitFileLeaves.    (* the claim's laws at /init; [file_cons_in_o
 Require Import AppFileCons.        (* [file_cons_cred] *)
 Local Open Scope Z_scope.
 
-Local Notation U := ulmU.
+Local Notation U := ulmG.
 
 (* ===================================================================== *)
 (*  0.  THE UNION DISCIPLINE'S THREE LINE READINGS                        *)
@@ -97,7 +97,7 @@ Proof using.
   intros Hd.
   assert (Hin : b ∈ (I ++ [b])%list).
   { apply elem_of_app. right. by apply elem_of_list_singleton. }
-  pose proof (lm_disc_input_byte_val U (ulm_byte_laws adm_u_f) (I ++ [b])%list b Hd Hin)
+  pose proof (lm_disc_input_byte_val U (ulm_byte_laws adm_u_g) (I ++ [b])%list b Hd Hin)
     as Hv.
   lia.
 Qed.

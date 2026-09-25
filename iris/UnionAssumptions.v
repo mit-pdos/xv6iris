@@ -5,11 +5,12 @@
 (* [Print Assumptions] on [UInitUnion.union_adequacy_closed]: safety of    *)
 (* the whole machine plus the console trace property for the application  *)
 (* of claude-notes/design/union.md -- the user types lines of the shapes   *)
-(* `echo ws', `echo ws > f', `cat f', `echo ws | cat | ... | cat' and      *)
-(* `cat f | cat | ... | cat' at the console of an unmodified xv6, the     *)
+(* `echo ws', `echo ws > f', `cat f', and `p | F1 | ... | Fn' for a      *)
+(* producer `echo ws' or `cat f' and filter stages `cat' or `grep w' (w   *)
+(* one alphanumeric word) at the console of an unmodified xv6, the        *)
 (* machine is power-cycled at will, and each cycle's output is a prefix   *)
 (* of the transcript its input calls for from the cycle's boot state.     *)
-(* The claim is born at the union model [UnionDisc.ulmU].                 *)
+(* The claim is born at the union model [UnionDisc.ulmG].                 *)
 (*                                                                        *)
 (* WHY A SEPARATE FILE beside [SystemAssumptions.v] and                    *)
 (* [TreeAssumptions.v]: no two of the cones contain each other.  The       *)
@@ -46,15 +47,8 @@
 (* THE OTHER HALF OF THE TRUSTED BASE -- what a reader must READ for the   *)
 (* statement to MEAN what they think -- is [UnionOutPure.union_phi],       *)
 (* [LineModel.v]'s [lm_disc] and [lm_good_out], and [UnionDisc.v]'s model  *)
-(* [ulmU] over [FileDisc.v] and [PipesDisc.v]: they ARE the specification. *)
+(* [ulmG] over [FileDisc.v] and [PipesDisc.v]: they ARE the specification. *)
 (* ====================================================================== *)
 Require Import UInitUnion.
 
 Print Assumptions union_adequacy_closed.
-
-(* FRONTIER (grep-pipes.md cut G4, removed at G8): the union decider at the
-   widened admission [UnionDecU.adm_u_g], whose rounds admit grep stages.
-   It is pure and not yet in the anchor's cone (the anchor is still at
-   [adm_u_f]); it must print that it is closed under the global context. *)
-Require UnionDecU.
-Print Assumptions UnionDecU.lm_disc_ulmG_dec.

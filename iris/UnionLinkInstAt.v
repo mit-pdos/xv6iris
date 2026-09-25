@@ -60,7 +60,7 @@ Require Import WpUart.
 From stdpp Require Import list.
 Local Open Scope list_scope.
 
-Local Notation U := ulmU.
+Local Notation U := ulmG.
 
 Section union_link_inst_at.
   Context {Σ : gFunctors}.
@@ -85,7 +85,7 @@ Section union_link_inst_at.
   Proof using . iIntros "[H _]". iApply (uf0w_bwk0 ug with "H"). Qed.
 
   Definition union_params_at (s0 : fstate) : gen_params U :=
-    MkGP U ulmU_laws ulmU_hooks
+    MkGP U ulmG_laws ulmG_hooks
       UT _ _
       UPIN _ _ (era_pin_agree (fgn_echo gf))
       (f0w_at gf s0) _ _
@@ -103,7 +103,7 @@ Section union_link_inst_at.
   Lemma union_links_gl_at (s0 : fstate) : union_links ug -∗ glinks U (union_params_at s0).
   Proof using .
     iIntros "Hlk". iDestruct (union_links_eq with "Hlk") as %Hc.
-    iApply (peclV_glinks (ugn_pipe ug) U (ucparams ug) (ulm_byte_laws adm_u_f) None
+    iApply (peclV_glinks (ugn_pipe ug) U (ucparams ug) (ulm_byte_laws adm_u_g) None
               (uwa ug) Hc (union_params_at s0) eq_refl eq_refl (f0w_at_cw gf s0)
               (or_introl I) (fhead_at_boot gf s0)).
   Qed.

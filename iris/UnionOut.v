@@ -4,9 +4,9 @@
 (*  'The claim', review item S7).                                         *)
 (*                                                                        *)
 (*  THE CLAIM is the N-writer claim [PipeOutN.peclV] at the union model   *)
-(*  [UnionDisc.ulmU]:                                                     *)
+(*  [UnionDisc.ulmG]:                                                     *)
 (*                                                                        *)
-(*    ucl := gcl ulmU ucparams None uwa ∨ popenU                          *)
+(*    ucl := gcl ulmG ucparams None uwa ∨ popenU                          *)
 (*                                                                        *)
 (*  - [ucparams]: the FILE's taint, era pin and writer's witness          *)
 (*    ([FileOut.file_cparams]' fields) at the union's laws and hooks;     *)
@@ -29,7 +29,7 @@
 (*                                                                        *)
 (*  THE LEDGER is [FileOut.file_led]'s shape at the union discipline,     *)
 (*  plus the byte ledger's map [PipeOut.pera_map]; its taint counter      *)
-(*  cases on the landed decider [UnionDecU.lm_disc_ulmU_dec] -- no        *)
+(*  cases on the landed decider [UnionDecU.lm_disc_ulmG_dec] -- no        *)
 (*  classical axiom -- and its conclusion is [UnionOutPure.union_phi].    *)
 (* ===================================================================== *)
 From Stdlib Require Import ZArith Lia List.
@@ -70,7 +70,7 @@ Require Import PipesLedPure.
 Require Import PipesLinksV.
 Require Import UnionDisc.
 Require Import UnionDiscDec.
-Require Import UnionDecU.          (* [lm_disc_ulmU_dec]: the ledger's counter *)
+Require Import UnionDecU.          (* [lm_disc_ulmG_dec]: the ledger's counter *)
 Require Import UnionView.
 Require Import UnionOutPure.
 From stdpp Require Import list.
@@ -89,8 +89,8 @@ Record union_gn := MkUnionGn {
 Definition ugn_pipe (ug : union_gn) : pipe_gn :=
   MkPipeGn (fgn_echo (ugn_file ug)) (ugn_pera ug).
 
-Local Notation U := ulmU.
-Local Notation UB := (ulm_byte_laws adm_u_f).
+Local Notation U := ulmG.
+Local Notation UB := (ulm_byte_laws adm_u_g).
 
 Section union_out.
   Context {Σ : gFunctors}.
@@ -108,7 +108,7 @@ Section union_out.
 
   (* the file's taint, pin and writer's witness, at the union's model *)
   Definition ucparams : gen_cparams U :=
-    MkGCP U ulmU_laws ulmU_hooks UT _ _
+    MkGCP U ulmG_laws ulmG_hooks UT _ _
       UPIN _ _ (era_pin_agree (fgn_echo gf)) (f0cw gf) _ _.
 
   (* the file's witness authority, the pipeline's byte ledger beside it *)
@@ -319,13 +319,13 @@ Section union_out.
      union's view, at a well-formed round state *)
   Lemma pipesU_HWIT (I : list (bv 8)) (sR : fstate) (lR : pline') :
     pv_line pview_unionU (lineV U I) = Some lR -> fstate_ok sR ->
-    adm_u_f lR = true -> pl_ok lR ->
+    adm_u_g lR = true -> pl_ok lR ->
     forall pre bl, blkN (wids (lcats lR)) (runN (files_of sR) lR) bl ->
       pre `prefix_of` bl -> pwitU I sR false pre.
   Proof using .
     intros HlR Hok Ha Hl.
     exact (pipesV_HWIT U pview_unionU I sR lR HlR
-             (pview_union_fc_ok adm_u_f sR Hok) Ha Hl).
+             (pview_union_fc_ok adm_u_g sR Hok) Ha Hl).
   Qed.
 
   (* THE FILING at the credential: the prompt's first byte files the
@@ -333,7 +333,7 @@ Section union_out.
   Lemma pwc_blkU_file (v : era_pins) (I : list (bv 8)) (sR : fstate) (lR : pline')
       (k : nat) (ho : list mobs) (H : LogEntryDefs.cons_hist)
       (pre : list (bv 8)) (b : bv 8) :
-    pv_line pview_unionU (lineV U I) = Some lR -> adm_u_f lR = true ->
+    pv_line pview_unionU (lineV U I) = Some lR -> adm_u_g lR = true ->
     line_blocks (files_of sR) lR pre -> pre <> [] -> b = u_prompt !!! 0%nat ->
     pwc_blkU v I sR k pre false -∗ ucl k ho H ==∗
       ucl k ho (ConsLog.cons_step H (ConsLog.EvOut b))
@@ -435,7 +435,7 @@ Section union_out.
   (*                                                                      *)
   (*  [FileOut.file_led] at the union's discipline, with the pipeline     *)
   (*  byte ledger's era map beside the file's.  THE COUNTER CASES ON THE  *)
-  (*  LANDED DECIDER [UnionDecU.lm_disc_ulmU_dec]: no hypothesis, no      *)
+  (*  LANDED DECIDER [UnionDecU.lm_disc_ulmG_dec]: no hypothesis, no      *)
   (*  classical axiom.                                                    *)
   (* =================================================================== *)
   Definition union_phi_res (h : list mobs) : iProp Σ :=

@@ -871,3 +871,45 @@ Proof using.
   - rewrite (Hby 1 ltac:(lia)) (pipe_bytes_lo_fs (FileDisc.PrCatF FileDisc.fname_f) fs 1 ltac:(lia)).
     by vm_compute.
 Qed.
+
+Lemma pipes_lpg_of_at (ws : list (list (bv 8))) (fs : list FileDisc.filt) (f : nat -> bv 8) (k len : nat) :
+  UkSh.ush_line_at (FileDisc.LPipe (FileDisc.PrEcho ws) fs) f k len ->
+  pipes_lpg (FileDisc.uline_ws (FileDisc.LPipe (FileDisc.PrEcho ws) fs)) (fun j : nat => f (k + j)) 0 len.
+Proof using.
+  intros (Hok & Hlen & Hby). exists ws, fs. split; [reflexivity |].
+  split; [exact Hok |]. split; [exact Hlen |].
+  intros j Hj. rewrite Nat.add_0_l. exact (Hby j Hj).
+Qed.
+
+Lemma pipes_lpcg_of_at (fs : list FileDisc.filt) (f : nat -> bv 8) (k len : nat) :
+  UkSh.ush_line_at (FileDisc.LPipe (FileDisc.PrCatF FileDisc.fname_f) fs) f k len ->
+  pipes_lpcg (FileDisc.uline_ws (FileDisc.LPipe (FileDisc.PrCatF FileDisc.fname_f) fs))
+    (fun j : nat => f (k + j)) 0 len.
+Proof using.
+  intros (Hok & Hlen & Hby). exists fs. split; [reflexivity |].
+  split; [exact Hok |]. split; [exact Hlen |].
+  intros j Hj. rewrite Nat.add_0_l. exact (Hby j Hj).
+Qed.
+
+(* a stage costs the line at least six bytes ([ | cat]), so at most
+   sixteen stages fit it, at either producer and any filters *)
+Lemma suf_filt_len_ge (F : FileDisc.filt) : 6 <= length (FileDisc.suf_filt F).
+Proof using.
+  destruct F as [| w]; [vm_compute; lia |].
+  unfold FileDisc.suf_filt. cbn [FileDisc.filt_words length].
+  rewrite wl_body_cons length_app.
+  assert (Hg : length FileDisc.fd_w_grep = 4) by (vm_compute; reflexivity). lia.
+Qed.
+
+Lemma suf_filts_len_ge (fs : list FileDisc.filt) : 6 * length fs <= length (FileDisc.suf_filts fs).
+Proof using.
+  induction fs as [| F fs IH]; [cbn; lia |].
+  rewrite FileDisc.suf_filts_cons length_app. pose proof (suf_filt_len_ge F). cbn [length]. lia.
+Qed.
+
+Lemma upls_fs_le (p : FileDisc.producer) (fs : list FileDisc.filt) :
+  FileDisc.uline_ok (FileDisc.LPipe p fs) -> length fs <= 16.
+Proof using.
+  intros (_ & _ & _ & Hlm). rewrite line_bytes_pipe_length_fs in Hlm.
+  pose proof (suf_filts_len_ge fs). unfold EchoDisc.line_max in Hlm. lia.
+Qed.

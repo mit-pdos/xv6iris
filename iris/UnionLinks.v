@@ -55,8 +55,8 @@ Require Import SpecConsoleintr.
 From stdpp Require Import list.
 Local Open Scope list_scope.
 
-Local Notation U := ulmU.
-Local Notation UB := (ulm_byte_laws adm_u_f).
+Local Notation U := ulmG.
+Local Notation UB := (ulm_byte_laws adm_u_g).
 
 Section union_links.
   Context {Σ : gFunctors}.
@@ -206,7 +206,7 @@ Section union_links.
   (* (F) THE FILING LINK OF AN N-WRITER ROUND, through the union's view *)
   Lemma union_file_link (k : nat) (v : era_pins) (I : list (bv 8)) (sR : fstate)
       (lR : pline') (pre : list (bv 8)) (b : bv 8) (Φ : iProp Σ) :
-    pv_line pview_unionU (lineV U I) = Some lR -> adm_u_f lR = true ->
+    pv_line pview_unionU (lineV U I) = Some lR -> adm_u_g lR = true ->
     line_blocks (files_of sR) lR pre -> b = u_prompt !!! 0%nat ->
     pwc_blkU ug v I sR k pre false -∗
     (((∃ (ps cs : list nat) (s0 : fstate) (P : nat),

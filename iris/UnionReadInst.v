@@ -3,7 +3,7 @@
 (*  claude-notes/design/union.md section 3).                              *)
 (*                                                                        *)
 (*  [FileReadInst.file_read_inst] at the union: the discipline is the     *)
-(*  union model's [lm_disc_input ulmU], the read link is                  *)
+(*  union model's [lm_disc_input ulmG], the read link is                  *)
 (*  [UnionLinks.union_read_link], and the WINDOW ARM reads the receipt    *)
 (*  [UnionLinks.uread_ret] into the record's residue [urresw] -- the      *)
 (*  generic cursor bounds and the TYPED LINES' WITNESS                    *)
@@ -52,7 +52,7 @@ Require Import Xv6Cameras.
 From stdpp Require Import list.
 Local Open Scope list_scope.
 
-Local Notation U := ulmU.
+Local Notation U := ulmG.
 
 (* the ring's translation is the identity on a disciplined union input:
    every byte of it is printable or the newline *)
@@ -62,7 +62,7 @@ Proof using.
   intros Hd Hj.
   assert (Hin : I !!! j ∈ I).
   { apply elem_of_list_lookup_2 with j. apply list_lookup_lookup_total_lt. exact Hj. }
-  pose proof (lm_disc_input_byte_val U (ulm_byte_laws adm_u_f) I (I !!! j) Hd Hin) as Hv.
+  pose proof (lm_disc_input_byte_val U (ulm_byte_laws adm_u_g) I (I !!! j) Hd Hin) as Hv.
   rewrite /cons_xlate. rewrite decide_False; [reflexivity |].
   intro Hq. apply (f_equal bv_unsigned) in Hq.
   rewrite (_ : bv_unsigned (mword_of_int 13 : mword 8) = 13%Z) in Hq;

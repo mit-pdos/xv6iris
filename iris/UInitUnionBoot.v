@@ -105,6 +105,7 @@ Require Import UShURoundShapes.
 Require Import UShURoundLaws.      (* [ush_prompt_law_u] *)
 Require Import UShURound.          (* [ush_line_union] *)
 Require Import UShUPipes.          (* the round law *)
+Require UShExecPin.                (* [sh_grep_slot] *)
 Require Import UInitFileLeaves.    (* the claim's readings, the boot filing, [kinit_banner_pay_frame] *)
 Require Import UInitConsFile.      (* the console dance's file leaves *)
 Require Import UInitUnionCC.       (* [union_cc], its laws, the supply *)
@@ -218,6 +219,12 @@ Section UnionInitBoot.
     { iApply UShCatPay.sh_cat_slot_of_fs_pure_holds.
       rewrite /UShCatPay.sh_cat_slot_of_fs_pure.
       iSplitR; [iExact "Hinv" |]. iSplitR; [iExact "Hfs" | iExact "Hmint"]. }
+    (* ---- /grep's, off the same claim law: the fixed part pins grep too
+           ([FileFsPure.file_fs_pure_grep], cut G6) ---- *)
+    iAssert (UShExecPin.sh_grep_slot (file_taint (fgn_cl (ugn_file ug)))) as "#Hgrep".
+    { iApply UShExecPin.sh_grep_slot_of_fs_pure_holds.
+      rewrite /UShCatPay.sh_cat_slot_of_fs_pure.
+      iSplitR; [iExact "Hinv" |]. iSplitR; [iExact "Hfs" | iExact "Hmint"]. }
     (* ---- the shell's slot, UNDER THE CONSOLE'S FLAG: the state payload,
            the TAIL at the union's round, the tag ---- *)
     iAssert (□ (∀ jo : option Z,
@@ -237,7 +244,7 @@ Section UnionInitBoot.
         [iApply UInitSh.sh_pay_state_holds |].
       iIntros (γp N).
       iApply (sh_round_holds_union_closed ug r Heq s0 Hcons Hkill γp N
-                with "Hlks [] Hslot Hcat Hpine []").
+                with "Hlks [] Hslot Hcat Hgrep Hpine []").
       - iApply (udep_free).
       - iExists jo. iExact "Hcred". }
     (* ---- THE PROMPT'S LAW at every line boundary, at the widened
