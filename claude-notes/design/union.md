@@ -61,8 +61,10 @@ the one name `f`: 'i'd be OK with allowing some set of files, like
 to cat /sh, then the transcript spec has to say precisely what bytes
 will be dumped out from /sh.  that seems not terribly interesting to
 specify.'  So: a class of user files (e.g. names ending in `.txt`),
-created and read by the user's lines, and NOT the image's binaries (design
-of the widening in progress; see below); (S5) C9d depends on C9e's link
+created and read by the user's lines, and NOT the image's binaries.
+ORDER (owner, same day): 'let's land the union app first. then we'll go
+broaden it to *.txt or something.' -- the union lands at the one name
+`f` (`adm_u_f`); the widening is the NEXT effort after C9h; (S5) C9d depends on C9e's link
 record: state it over abstract link projections; only the producer `cat
 f` needs a merged registry; (S6) C9f is larger (UShRound's ties call the
 file model directly; PipesFire needs PrCatF); (S7) `pwc_blkN` also
