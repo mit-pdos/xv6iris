@@ -13,6 +13,7 @@ import MachCSL.DiskImg
 import MachCSL.DiskOf
 import MachCSL.Resources
 import MachCSL.DiskPermit
+import MachCSL.CrashPermInv
 import MachCSL.Ctx
 import MachCSL.Wp
 import MachCSL.WpDev
