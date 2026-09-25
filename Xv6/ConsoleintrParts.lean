@@ -23,6 +23,7 @@ import Xv6.SpecRelease
 import Xv6.SpecWakeup
 import Xv6.CodeTactics
 import Xv6.ConsoleintrGhost
+import Xv6.UartConsAcc
 
 namespace Xv6
 
@@ -222,31 +223,6 @@ theorem ci_release (RE : RELEASE) (c : CPU) (k' : KCtx) (γc : GName) (cn : Cons
   unfold ciLk consAddr
   exact h
 
-omit [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [CurCtx] in
-/-- A fresh sublist witness of port `i`'s trace, out of its invariant (what
-`consputc`'s Lean contract still threads; Rocq retired the receipt). -/
-theorem ci_sentSub (i : UartId) (γ : UartNames) :
-    uartInv (GF := GF) i γ ⊢ |={⊤}=> uartSentSub γ [] := by
-  unfold uartInv devInvR
-  iintro #Hinv
-  iinv Hinv with Hbody Hclose
-  icases Hbody with ⟨%u, >Hfrag, >HB⟩
-  icases uartBody_parts i γ u $$ HB with ⟨Hsent, Hout, Htx, Hdlab, Hcol, Hcl⟩
-  unfold sentAuth
-  ihave #Hlb := MonoList.lb_own_get γ.acc _ (Uart.acc u) $$ Hsent
-  imod Hclose $$ [Hfrag Hsent Hout Htx Hdlab Hcol Hcl] with -
-  · inext
-    iexists u
-    iframe Hfrag
-    iapply uartBody_intro i γ u
-    unfold sentAuth
-    iframe Hsent Hout Htx Hdlab Hcol Hcl
-  imodintro
-  iapply uartSentSub_nil γ (Uart.acc u)
-  iapply uartSentSub_of_sent
-  unfold uartSent
-  iexact Hlb
-
 /-- `consputc`'s contract at the call site: the caller hands in the store
 chain over the argument's bytes and gets the chain's payload back. -/
 theorem ci_consputc (CP : CONSPUTC) (c : CPU) (k' : KCtx) (γl : GName) (γ : UartNames)
@@ -265,7 +241,7 @@ theorem ci_consputc (CP : CONSPUTC) (c : CPU) (k' : KCtx) (γl : GName) (γ : Ua
   iapply wpLoop_fupd
   ihave #Hinv : uartInv .uart0 γ $$ [Hport]
   · unfold uartPort; icases Hport with ⟨#H1, -⟩; iexact H1
-  imod ci_sentSub .uart0 γ $$ Hinv with #Hsub
+  imod uartInv_sentSub .uart0 γ $$ Hinv with #Hsub
   imodintro
   iapply h
   iframe Hk Hpc Hport Hsub Hch

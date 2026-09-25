@@ -70,6 +70,7 @@ import Xv6.ConsoleDefs
 import Xv6.SpecUartwrite
 import Xv6.SpecConsoleintr
 import Xv6.SpecUartintr
+import Xv6.UMemImg
 import Xv6.SpecConsolewrite
 import Xv6.SpecConsoleread
 import Xv6.SpecConsoleinit

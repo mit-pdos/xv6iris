@@ -222,6 +222,30 @@ theorem uartInv_consRead (γ : UartNames) (dv ws : List (List Obs × BitVec 8)) 
   imodintro
   iframe Hdv Hlm HΦ
 
+/-- A fresh sublist witness of port `i`'s trace, out of its invariant (what
+the landed `uartputc_sync`/`uartwrite` contracts still thread; Rocq retired the receipt). -/
+theorem uartInv_sentSub (i : UartId) (γ : UartNames) :
+    uartInv (GF := GF) i γ ⊢ |={⊤}=> uartSentSub γ [] := by
+  unfold uartInv devInvR
+  iintro #Hinv
+  iinv Hinv with Hbody Hclose
+  icases Hbody with ⟨%u, >Hfrag, >HB⟩
+  icases uartBody_parts i γ u $$ HB with ⟨Hsent, Hout, Htx, Hdlab, Hcol, Hcl⟩
+  unfold sentAuth
+  ihave #Hlb := MonoList.lb_own_get γ.acc _ (Uart.acc u) $$ Hsent
+  imod Hclose $$ [Hfrag Hsent Hout Htx Hdlab Hcol Hcl] with -
+  · inext
+    iexists u
+    iframe Hfrag
+    iapply uartBody_intro i γ u
+    unfold sentAuth
+    iframe Hsent Hout Htx Hdlab Hcol Hcl
+  imodintro
+  iapply uartSentSub_nil γ (Uart.acc u)
+  iapply uartSentSub_of_sent
+  unfold uartSent
+  iexact Hlb
+
 end
 
 end Xv6
