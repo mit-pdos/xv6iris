@@ -89,7 +89,7 @@ theorem fwr_arm_neg (cpu : CPU) (k : KCtx) (spie spp : Bool) (R : RegMap) (γl :
     rw [ha0]
     isplitr
     · ipureintro; exact filewriteRet_m1 n
-    iapply filewriteExtra_neg st n _ _ Q hneg $$ Hin
+    iapply filewriteExtra_neg _ st n _ _ Q hneg $$ Hin
 
 set_option maxHeartbeats 8000000 in
 /-- **`+0x126`: THE ZERO TRIP** (Rocq's `+0x116`): the hoisted `n <= 0`
@@ -317,7 +317,7 @@ theorem fwr_dev_m1 (cpu : CPU) (k : KCtx) (spie spp : Bool) (R : RegMap) (γl : 
     rw [ha0]
     isplitr
     · ipureintro; exact filewriteRet_m1 n
-    iapply filewriteExtra_dev_drop rb mj hnc n _ _ Q _ $$ Hin
+    iapply filewriteExtra_dev_drop _ rb mj hnc n _ _ Q _ $$ Hin
 
 set_option maxHeartbeats 16000000 in
 /-- **`+0x64 .. +0x88`: THE FD_DEVICE ARM** (Rocq's `+0x5c .. +0x80`):
@@ -480,7 +480,7 @@ theorem fwr_arm_dev (CW : CONSOLEWRITE) (Γ : SchedNames) [ClaimIs (hlc := hlc) 
   case cn => k_norm_g; exact h12
   case cnw => k_norm_g; rw [h11]; exact hnw
   -- ===== back from consolewrite =====
-  iintro %cpu %spie1 %spp1 %R1 %P' %i %⟨hcs1, hext, hret, hi⟩ Hk Hpc Hte Hce Hpriv HQ
+  iintro %cpu %spie1 %spp1 %R1 %P' %i %⟨hcs1, hext, hret, hi, hwhy⟩ Hk Hpc Hte Hce Hpriv HQ
   k_norm_g [fwr_ret_88, fwr_ww, fwr_psw]
   have hr1 : fwrRegs k fk n (k.regs 9#5) (k.regs 19#5) (k.regs 20#5) (k.regs 23#5) (k.regs 24#5)
       (k.regs 25#5) R1 := by
@@ -506,11 +506,11 @@ theorem fwr_arm_dev (CW : CONSOLEWRITE) (Γ : SchedNames) [ClaimIs (hlc := hlc) 
   · unfold filewriteEnvOut; iexact Henv
   · unfold filewriteArms
     rw [h10', hret]
-    ihave H := writeConsArms_of_cursor Q n i hn0 hin $$ HQ
-    ihave %hr := writeConsArms_ret Q n _ $$ H
+    ihave H := writeConsArms_of_cursor V.upt _ Q n i hn0 hin hwhy $$ HQ
+    ihave %hr := writeConsArms_ret _ _ Q n _ $$ H
     isplitr
     · ipureintro; exact hr
-    iapply filewriteExtra_cons rb n _ _ Q _ $$ H
+    iapply filewriteExtra_cons _ rb n _ _ Q _ $$ H
 
 set_option maxHeartbeats 8000000 in
 /-- **`+0x102 .. +0x116`: THE ELSE ARM** (Rocq's `fw_panic`): the six lazy

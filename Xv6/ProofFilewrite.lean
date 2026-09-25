@@ -351,7 +351,7 @@ theorem filewrite_main (PW : PIPEWRITE) (IL : ILOCK) (WI : WRITEI) (IU : IUNLOCK
     · unfold filewriteArms
       isplitr
       · ipureintro; simp only [RegMap.set_apply]; exact filewriteRet_m1 n
-      iapply filewriteExtra_unwritable inumC γoC C st n _ _ Q _ hok hw
+      iapply filewriteExtra_unwritable _ inumC γoC C st n _ _ Q _ hok hw
   -- +0x04  beqz a5 : falls (a writable descriptor)
   k_step_e (wp_s_branch cpu _ (KA.«filewrite» + 4#64) false 310#13 15#5 0#5 (by decide) bop.BEQ)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [filerw_beqz, decide_eq_false hw]

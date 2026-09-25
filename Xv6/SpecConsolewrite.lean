@@ -24,7 +24,11 @@ the `outLink` for the byte the writer's image holds at `src + j`, the
 kernel picking which (`∧`).  The count returned is the cursor's index:
 `i += nn` runs only after `uartwrite` accepted the whole chunk, so at every
 exit the answer `i` is exactly the number of bytes handed to the UART, and
-the caller gets `Q i` back.
+the caller gets `Q i` back.  A SHORT count carries its reason
+(`writeConsShort`, Rocq lane TRAP-ROWS T1): the loop's one break is
+`either_copyin(...) == -1`, so some byte at or after `i` and before `n` is
+on a page the kernel could not read through, stated at the ENTRY table
+`V.upt` (the rounds' tables only grow: `UMemL.uvaRmapped_mono`).
 
 The running thread is proc `j` with a user source (`user_src != 0`, the
 only caller being `filewrite`); its private view `M` may fault pages in
@@ -48,10 +52,9 @@ Deviations from Rocq:
    since copyin refuses any va at or above MAXVA -- which the Lean copyin
    contract does not expose).  `filewrite` carries the same conjunct on its
    FD_INODE input (its deviation 5).
-3. THE SHORT ANSWER'S REASON (Rocq lane TRAP-ROWS, T1: `r < n → ∃ d, r ≤ d
-   < n ∧ ¬ uva_rmapped ...`) is NOT reported: the Lean `either_copyin`
-   failure arm carries no reason, so it cannot be relayed without
-   re-specifying copyin (reported).
+3. (retired: the short answer's reason, Rocq lane TRAP-ROWS T1, is now
+   reported -- `writeConsShort`, relayed from `either_copyin`'s failure
+   arm.)
 4. The return is stated as a `Nat` `i` with `R' 10#5 = BitVec.ofNat 64 i`
    and `i ≤ max 0 n` (Rocq `0 ≤ r ≤ Z.max 0 n`, `a0 = r`, `Q (Z.to_nat r)`).
 5. The console's credential is `uartPort .uart0` (Rocq `dev_inv` ∗
@@ -85,6 +88,16 @@ def consolewriteSlots : Nat := 16 + eitherCopyinSlots
 state the landed blanket). -/
 def consWriteRet (n : Int) (r : BitVec 64) : Prop :=
   ∃ i : Int, r = BitVec.ofInt 64 i ∧ 0 ≤ i ∧ i ≤ max 0 n
+
+/-- **WHY A COUNT FELL SHORT** (Rocq `SpecFilewrite.write_cons_short`, the
+consolewrite post's T1 clause, lane TRAP-ROWS): a byte of the run at or
+after the count `k` and before the request `n`, at the wrapped address
+`ua + d`, that the kernel could not READ through at the writer's table `P`
+(`uvaRmapped`: walkaddr's test; copyin has no `PTE_R` re-walk).  The offset
+is existential and not the cursor: the chunk the break fired in is up to 32
+bytes wide and copyin walks it a page at a time. -/
+def writeConsShort (P : UPtd) (ua : BitVec 64) (k : Nat) (n : Int) : Prop :=
+  ∃ d : Nat, k ≤ d ∧ (d : Int) < n ∧ ¬ uvaRmapped P (ua + BitVec.ofNat 64 d).toNat
 
 section ConsOutChain
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
@@ -182,7 +195,7 @@ def wp_consolewrite_eb_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF
   procPrivNoctxAt curCtx (procAddr j) pid V M ∗
   wpNext true k.proc cpu (fun cpu' => iprop(∀ (spie spp : Bool) (R' : RegMap) (P' : UPtd) (i : Nat),
     ⌜calleeSaved k.regs R' ∧ V.upt.extSz V.sz P' ∧ R' 10#5 = BitVec.ofNat 64 i ∧
-      (i : Int) ≤ max 0 n⌝ -∗
+      (i : Int) ≤ max 0 n ∧ ((i : Int) < n → writeConsShort V.upt (k.regs 11#5) i n)⌝ -∗
     kctx cpu' ((k.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k.regs 1#5)) -∗
     trapCsrsExt cpu' k.sie -∗ cpuClaimExt cpu' k.sie k.proc -∗
     procPrivNoctxAt curCtx (procAddr j) pid { V with upt := P' } (viewFaulted V.upt P' M) -∗

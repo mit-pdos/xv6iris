@@ -108,7 +108,7 @@ def fwrK (k : KCtx) (γl : GName) (γu : UartNames) (γ : FileNames) (fk : Nat) 
     trapCsrsExt c k.sie -∗ cpuClaimExt c k.sie k.proc -∗
     fileRef γ fk q st -∗ procPrivExt (procAddr j) pid V P' (viewFaulted V.upt P' M) -∗
     filewriteEnvOut γl γu st -∗
-    filewriteArms (hlc := hlc) st n (writerImg V.upt M) (k.regs 11#5) Q (R' 10#5) -∗ wpLoop c)
+    filewriteArms (hlc := hlc) V.upt st n (writerImg V.upt M) (k.regs 11#5) Q (R' 10#5) -∗ wpLoop c)
 
 set_option maxHeartbeats 8000000 in
 /-- **`+0xf4 .. +0x100`: THE TAIL** (Rocq's `fw_epi`). -/
@@ -156,10 +156,10 @@ theorem fwr_bne_lt (t : Nat) (n : Int) (h : (t : Int) < n) (hn : n < 2 ^ 31) :
   omega
 
 /-- The FD_INODE arm's extra, at a writable parked state, IS `writeArmsAt`. -/
-theorem fwr_extra_of (A : FwrA) (Mv : Nat → List (BitVec 8)) (ua : BitVec 64)
+theorem fwr_extra_of (P : UPtd) (A : FwrA) (Mv : Nat → List (BitVec 8)) (ua : BitVec 64)
     (Q : Nat → IProp GF) (r : BitVec 64) :
     writeArmsAt (hlc := hlc) (fsGammaL fscFs) A.i A.γo A.n Mv ua Q r ⊢
-      filewriteExtra (hlc := hlc) A.st A.n Mv ua Q r := .rfl
+      filewriteExtra (hlc := hlc) P A.st A.n Mv ua Q r := .rfl
 
 set_option maxHeartbeats 16000000 in
 /-- **THE OK EXIT** (`+0xe2` falls, `+0xe6 .. +0xf2`, the tail): every chunk

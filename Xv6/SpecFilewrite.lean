@@ -98,11 +98,12 @@ untouched); the `n < 0` test (+0x1c); the three-way dispatch; FD_PIPE
      theorem `devswWriteVal_console`.  Consequence: at a non-console major
      the walk reads null and answers -1 (Rocq's walk would call consolewrite
      if the cell held it; the extra there is `emp` in both).
-   * `write_cons_arms` (`writeConsArms`) WITHOUT the short arm's reason
-     (Rocq lane TRAP-ROWS T1, `write_cons_short`): SpecConsolewrite's
-     deviation 3 (the Lean `either_copyin` failure arm carries none), so
-     `filewrite_extra`'s writer-table parameter `P` (there only for T1) is
-     dropped as well.
+   * `write_cons_arms` (`writeConsArms`) WITH the short arm's reason
+     (Rocq lane TRAP-ROWS T1, `write_cons_short` = SpecConsolewrite's
+     `writeConsShort`), so `filewrite_extra`'s writer-table parameter `P`
+     is Rocq's.  (The inode arm's own short reason -- Rocq `write_arms_at`
+     takes `P` too -- is still not relayed: `writeArmsAt` has no `P`; that
+     is the writei chain's, SpecWritei.)
    * the device input carries the no-wrap conjunct of deviation 5 (the
      callee's premise `hnw`, SpecConsolewrite deviation 2).
 4. **THE IMAGE `M`** (the question FsAbsWriteFire deviation 2 / SysWriteDefs
@@ -173,7 +174,8 @@ untouched); the `n < 0` test (+0x1c); the three-way dispatch; FD_PIPE
   so `filewrite_devsw_of_console` is definitional and `filewrite_devsw_acc`
   is `filewriteDevsw_env` (persistent: nothing to give back);
   `filewrite_dev_out` is `filewriteDevEnv` (Rocq's own definition).
-* `write_cons_short` -- deviation 3 (T1).
+* `write_cons_short` is `SpecConsolewrite.writeConsShort` (consolewrite's
+  post states it; this file reuses it).
 
 Imports only definitional files and callee `Spec*` files.
 -/
@@ -456,25 +458,28 @@ variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FsTopG
 /-! ### The console arm (Rocq `write_cons_arms`) -/
 
 /-- THE ARMED DISJUNCTION AT THE CALLER'S OWN CURSOR (Rocq
-`write_cons_arms`, minus the short arm's reason: deviation 3): every byte
-went out and the cursor is at the count; or a short count `k` with the
-cursor there; or the sign guard's `-1`. -/
-def writeConsArms (Q : Nat → IProp GF) (n : Int) (r : BitVec 64) : IProp GF :=
+`write_cons_arms`): every byte went out and the cursor is at the count; or
+a short count `k` with the cursor there AND ITS REASON (lane TRAP-ROWS T1,
+`writeConsShort` at the writer's own table `P` and buffer `ua`); or the
+sign guard's `-1`. -/
+def writeConsArms (P : UPtd) (ua : BitVec 64) (Q : Nat → IProp GF) (n : Int) (r : BitVec 64) :
+    IProp GF :=
   iprop((⌜r = BitVec.ofInt 64 n ∧ 0 ≤ n⌝ ∗ Q n.toNat) ∨
-    (∃ k : Nat, ⌜r = BitVec.ofInt 64 (k : Int) ∧ (k : Int) < n⌝ ∗ Q k) ∨
+    (∃ k : Nat, ⌜r = BitVec.ofInt 64 (k : Int) ∧ (k : Int) < n ∧ writeConsShort P ua k n⌝ ∗ Q k) ∨
     ⌜r = -1#64 ∧ n < 0⌝)
 
 /-- Rocq `write_cons_arms_ret`. -/
-theorem writeConsArms_ret (Q : Nat → IProp GF) (n : Int) (r : BitVec 64) :
-    writeConsArms Q n r ⊢ ⌜filewriteRet n r⌝ := by
+theorem writeConsArms_ret (P : UPtd) (ua : BitVec 64) (Q : Nat → IProp GF) (n : Int) (r : BitVec 64) :
+    writeConsArms P ua Q n r ⊢ ⌜filewriteRet n r⌝ := by
   unfold writeConsArms
   iintro (⟨%h, -⟩ | ⟨%k, %h, -⟩ | %h)
   · ipureintro; rw [h.1]; exact filewriteRet_all n h.2
-  · ipureintro; exact Or.inr ⟨(k : Int), h.1, by omega, by omega⟩
+  · ipureintro; exact Or.inr ⟨(k : Int), h.1, by omega, by have := h.2.1; omega⟩
   · ipureintro; rw [h.1]; exact filewriteRet_m1 n
 
 /-- Rocq `write_cons_arms_zero`. -/
-theorem writeConsArms_zero (Q : Nat → IProp GF) : Q 0 ⊢ writeConsArms Q 0 (BitVec.ofInt 64 0) := by
+theorem writeConsArms_zero (P : UPtd) (ua : BitVec 64) (Q : Nat → IProp GF) :
+    Q 0 ⊢ writeConsArms P ua Q 0 (BitVec.ofInt 64 0) := by
   unfold writeConsArms
   iintro H
   ileft
@@ -485,8 +490,9 @@ theorem writeConsArms_zero (Q : Nat → IProp GF) : Q 0 ⊢ writeConsArms Q 0 (B
 /-- THE CALLEE'S POST, IN THE ARMS' VOCABULARY (Rocq
 `write_cons_arms_of_cursor`): the FD_DEVICE arm relays consolewrite's count
 untouched, so it IS the cursor's index. -/
-theorem writeConsArms_of_cursor (Q : Nat → IProp GF) (n : Int) (i : Nat) (hn : 0 ≤ n)
-    (hi : (i : Int) ≤ n) : Q i ⊢ writeConsArms Q n (BitVec.ofNat 64 i) := by
+theorem writeConsArms_of_cursor (P : UPtd) (ua : BitVec 64) (Q : Nat → IProp GF) (n : Int) (i : Nat)
+    (hn : 0 ≤ n) (hi : (i : Int) ≤ n) (hwhy : (i : Int) < n → writeConsShort P ua i n) :
+    Q i ⊢ writeConsArms P ua Q n (BitVec.ofNat 64 i) := by
   unfold writeConsArms
   iintro H
   by_cases he : (i : Int) = n
@@ -501,7 +507,7 @@ theorem writeConsArms_of_cursor (Q : Nat → IProp GF) (n : Int) (i : Nat) (hn :
     iexists i
     iframe H
     ipureintro
-    exact ⟨by rw [BitVec.ofInt_natCast], by omega⟩
+    exact ⟨by rw [BitVec.ofInt_natCast], by omega, hwhy (by omega)⟩
 
 /-! ### The one input and the one output -/
 
@@ -521,26 +527,27 @@ def filewriteIn (st : FdState) (n : Int) (M : Nat → List (BitVec 8)) (ua : Bit
       consOutChain (genId (hlc := hlc) (GF := GF) + 1) M ua Q 0 n.toNat)
   | _ => emp
 
-/-- WHAT THE ARM PAYS BEYOND THE LANDED BLANKET (Rocq `filewrite_extra`,
-less its T1 table `P`: deviation 3).  The console's arm only: elsewhere the
-caller cannot know the callee was consolewrite. -/
-def filewriteExtra (st : FdState) (n : Int) (M : Nat → List (BitVec 8)) (ua : BitVec 64)
+/-- WHAT THE ARM PAYS BEYOND THE LANDED BLANKET (Rocq `filewrite_extra`;
+`P` is the WRITER'S OWN TABLE, Rocq lane TRAP-ROWS T1, read by the console
+arm's short reason).  The console's arm only: elsewhere the caller cannot
+know the callee was consolewrite. -/
+def filewriteExtra (P : UPtd) (st : FdState) (n : Int) (M : Nat → List (BitVec 8)) (ua : BitVec 64)
     (Q : Nat → IProp GF) (r : BitVec 64) : IProp GF :=
   match st with
   | .open _ true (.inode i γo _) => writeArmsAt (hlc := hlc) (fsGammaL fscFs) i γo n M ua Q r
-  | .open _ true (.device mj) => if mj = CONSOLE then writeConsArms Q n r else emp
+  | .open _ true (.device mj) => if mj = CONSOLE then writeConsArms P ua Q n r else emp
   | _ => emp
 
 /-- THE WHOLE POST'S ARMED PART (Rocq `filewrite_arms`): the landed blanket
 beside the arm's extra. -/
-def filewriteArms (st : FdState) (n : Int) (M : Nat → List (BitVec 8)) (ua : BitVec 64)
+def filewriteArms (P : UPtd) (st : FdState) (n : Int) (M : Nat → List (BitVec 8)) (ua : BitVec 64)
     (Q : Nat → IProp GF) (r : BitVec 64) : IProp GF :=
-  iprop(⌜filewriteRet n r⌝ ∗ filewriteExtra (hlc := hlc) st n M ua Q r)
+  iprop(⌜filewriteRet n r⌝ ∗ filewriteExtra (hlc := hlc) P st n M ua Q r)
 
 /-- Rocq `filewrite_arms_ret`. -/
-theorem filewriteArms_ret (st : FdState) (n : Int) (M : Nat → List (BitVec 8)) (ua : BitVec 64)
+theorem filewriteArms_ret (P : UPtd) (st : FdState) (n : Int) (M : Nat → List (BitVec 8)) (ua : BitVec 64)
     (Q : Nat → IProp GF) (r : BitVec 64) :
-    filewriteArms (hlc := hlc) st n M ua Q r ⊢ ⌜filewriteRet n r⌝ := by
+    filewriteArms (hlc := hlc) P st n M ua Q r ⊢ ⌜filewriteRet n r⌝ := by
   unfold filewriteArms
   iintro ⟨%h, -⟩
   ipureintro; exact h
@@ -560,47 +567,47 @@ theorem filewriteIn_cons (rb : Bool) (mj : Nat) (n : Int) (M : Nat → List (Bit
         consOutChain (genId (hlc := hlc) (GF := GF) + 1) M ua Q 0 n.toNat) := .rfl
 
 /-- Rocq `filewrite_extra_inode`. -/
-theorem filewriteExtra_inode (rb : Bool) (i : Nat) (γo : GName) (n : Int)
+theorem filewriteExtra_inode (P : UPtd) (rb : Bool) (i : Nat) (γo : GName) (n : Int)
     (M : Nat → List (BitVec 8)) (ua : BitVec 64) (Q : Nat → IProp GF) (r : BitVec 64) :
     writeArmsAt (hlc := hlc) (fsGammaL fscFs) i γo n M ua Q r ⊢
-      filewriteExtra (hlc := hlc) (.open rb true (.inode i γo .parked)) n M ua Q r := .rfl
+      filewriteExtra (hlc := hlc) P (.open rb true (.inode i γo .parked)) n M ua Q r := .rfl
 
 /-- Rocq `filewrite_extra_cons`. -/
-theorem filewriteExtra_cons (rb : Bool) (n : Int) (M : Nat → List (BitVec 8)) (ua : BitVec 64)
+theorem filewriteExtra_cons (P : UPtd) (rb : Bool) (n : Int) (M : Nat → List (BitVec 8)) (ua : BitVec 64)
     (Q : Nat → IProp GF) (r : BitVec 64) :
-    writeConsArms Q n r ⊢ filewriteExtra (hlc := hlc) (.open rb true (.device CONSOLE)) n M ua Q r := by
+    writeConsArms P ua Q n r ⊢ filewriteExtra (hlc := hlc) P (.open rb true (.device CONSOLE)) n M ua Q r := by
   unfold filewriteExtra; simp only [if_true]; exact .rfl
 
 /-- Rocq `filewrite_extra_dev_other`: a device at any OTHER major arms
 nothing. -/
-theorem filewriteExtra_dev_other (rb wb : Bool) (mj : Nat) (hmj : mj ≠ CONSOLE) (n : Int)
+theorem filewriteExtra_dev_other (P : UPtd) (rb wb : Bool) (mj : Nat) (hmj : mj ≠ CONSOLE) (n : Int)
     (M : Nat → List (BitVec 8)) (ua : BitVec 64) (Q : Nat → IProp GF) (r : BitVec 64) :
-    ⊢ filewriteExtra (hlc := hlc) (.open rb wb (.device mj)) n M ua Q r := by
+    ⊢ filewriteExtra (hlc := hlc) P (.open rb wb (.device mj)) n M ua Q r := by
   unfold filewriteExtra
   cases wb
   · exact .rfl
   · simp only [hmj, if_false]; exact .rfl
 
 /-- Rocq `filewrite_extra_dev_drop`: ... so the chain is simply dropped. -/
-theorem filewriteExtra_dev_drop (rb : Bool) (mj : Nat) (hmj : mj ≠ CONSOLE) (n : Int)
+theorem filewriteExtra_dev_drop (P : UPtd) (rb : Bool) (mj : Nat) (hmj : mj ≠ CONSOLE) (n : Int)
     (M : Nat → List (BitVec 8)) (ua : BitVec 64) (Q : Nat → IProp GF) (r : BitVec 64) :
     filewriteIn (hlc := hlc) (.open rb true (.device mj)) n M ua Q ⊢
-      filewriteExtra (hlc := hlc) (.open rb true (.device mj)) n M ua Q r := by
+      filewriteExtra (hlc := hlc) P (.open rb true (.device mj)) n M ua Q r := by
   iintro -
-  iapply filewriteExtra_dev_other rb true mj hmj
+  iapply filewriteExtra_dev_other P rb true mj hmj
 
 /-- Rocq `filewrite_extra_pipe`. -/
-theorem filewriteExtra_pipe (rb wb : Bool) (n : Int) (M : Nat → List (BitVec 8)) (ua : BitVec 64)
+theorem filewriteExtra_pipe (P : UPtd) (rb wb : Bool) (n : Int) (M : Nat → List (BitVec 8)) (ua : BitVec 64)
     (Q : Nat → IProp GF) (r : BitVec 64) :
-    ⊢ filewriteExtra (hlc := hlc) (.open rb wb .pipe) n M ua Q r := by
+    ⊢ filewriteExtra (hlc := hlc) P (.open rb wb .pipe) n M ua Q r := by
   unfold filewriteExtra; cases wb <;> exact .rfl
 
 /-- Rocq `filewrite_extra_unwritable`: the `f->writable == 0` early return
 arms nothing -- every armed state is WRITABLE. -/
-theorem filewriteExtra_unwritable (inum : BitVec 32) (γo : GName) (C : FContent) (st : FdState)
+theorem filewriteExtra_unwritable (P : UPtd) (inum : BitVec 32) (γo : GName) (C : FContent) (st : FdState)
     (n : Int) (M : Nat → List (BitVec 8)) (ua : BitVec 64) (Q : Nat → IProp GF) (r : BitVec 64)
     (hok : fdstateOk inum γo C st) (hw : C.writable = 0#8) :
-    ⊢ filewriteExtra (hlc := hlc) st n M ua Q r := by
+    ⊢ filewriteExtra (hlc := hlc) P st n M ua Q r := by
   rcases st with _ | ⟨rb, wb, t⟩
   · exact .rfl
   · cases wb
@@ -624,9 +631,9 @@ theorem filewriteIn_unwritable (inum : BitVec 32) (γo : GName) (C : FContent) (
 /-- THE SIGN GUARD'S EXIT, AT EVERY ARM AT ONCE (Rocq
 `filewrite_extra_neg`): the `n < 0` test fires before the type dispatch;
 the console arm's NEG disjunct is pure. -/
-theorem filewriteExtra_neg (st : FdState) (n : Int) (M : Nat → List (BitVec 8)) (ua : BitVec 64)
+theorem filewriteExtra_neg (P : UPtd) (st : FdState) (n : Int) (M : Nat → List (BitVec 8)) (ua : BitVec 64)
     (Q : Nat → IProp GF) (hn : n < 0) :
-    filewriteIn (hlc := hlc) st n M ua Q ⊢ filewriteExtra (hlc := hlc) st n M ua Q (-1#64) := by
+    filewriteIn (hlc := hlc) st n M ua Q ⊢ filewriteExtra (hlc := hlc) P st n M ua Q (-1#64) := by
   rcases st with _ | ⟨rb, wb, t⟩
   · exact .rfl
   · cases wb
@@ -643,7 +650,7 @@ theorem filewriteExtra_neg (st : FdState) (n : Int) (M : Nat → List (BitVec 8)
           unfold writeConsArms
           iright; iright
           ipureintro; exact ⟨rfl, hn⟩
-        · iapply filewriteExtra_dev_other rb true mj hc
+        · iapply filewriteExtra_dev_other P rb true mj hc
 
 end Keyed
 
@@ -670,7 +677,7 @@ def filewritePost (k : KCtx) (γl : GName) (γu : UartNames) (γ : FileNames) (f
     fileRef γ fk q st -∗
     procPrivNoctxAt curCtx (procAddr j) pid { V with upt := P' } (viewFaulted V.upt P' M) -∗
     filewriteEnvOut γl γu st -∗
-    filewriteArms (hlc := hlc) st n (writerImg V.upt M) (k.regs 11#5) Q (R' 10#5) -∗
+    filewriteArms (hlc := hlc) V.upt st n (writerImg V.upt M) (k.regs 11#5) Q (R' 10#5) -∗
     wpLoop cpu')
 
 end Post

@@ -77,8 +77,8 @@ three `jal` targets changed.
 6. `sys_rw_count` is `SpecArgfd.argZ` (the one Lean name for the signed
    low word; `argZ_range` / `argZ_reg` are Rocq's `sys_rw_count_range` /
    `sys_rw_count_reg`); `sys_fd_st` is `SpecArgfd.sysFdSt`.
-7. `sys_write_arms`' writer table `pv_upt V` is gone with filewrite's T1
-   parameter (SpecFilewrite deviation 3).
+7. (retired: `sys_write_arms`' writer table is Rocq's `pv_upt V`, i.e.
+   `V.upt`, passed to filewrite's T1 parameter.)
 -/
 import Xv6.SpecArgfd
 import Xv6.SpecArgaddr
@@ -120,7 +120,7 @@ def sysWriteIn (V : ProcPriv) (v : BitVec 64) (sts : List FdState) (n : Int)
 filewrite's extra at the key. -/
 def sysWriteArms (V : ProcPriv) (v : BitVec 64) (sts : List FdState) (n : Int)
     (M : Nat → List (BitVec 8)) (ua : BitVec 64) (Q : Nat → IProp GF) (r : BitVec 64) : IProp GF :=
-  iprop(⌜sysWriteRet V v n r⌝ ∗ filewriteExtra (hlc := hlc) (sysFdSt v V.ofile sts) n M ua Q r)
+  iprop(⌜sysWriteRet V v n r⌝ ∗ filewriteExtra (hlc := hlc) V.upt (sysFdSt v V.ofile sts) n M ua Q r)
 
 /-- Rocq `sys_write_arms_ret`. -/
 theorem sysWriteArms_ret (V : ProcPriv) (v : BitVec 64) (sts : List FdState) (n : Int)
@@ -134,7 +134,7 @@ theorem sysWriteArms_ret (V : ProcPriv) (v : BitVec 64) (sts : List FdState) (n 
 theorem sysWriteArms_extra (V : ProcPriv) (v : BitVec 64) (sts : List FdState) (n : Int)
     (M : Nat → List (BitVec 8)) (ua : BitVec 64) (Q : Nat → IProp GF) (r : BitVec 64) :
     sysWriteArms (hlc := hlc) V v sts n M ua Q r ⊢
-      filewriteExtra (hlc := hlc) (sysFdSt v V.ofile sts) n M ua Q r := by
+      filewriteExtra (hlc := hlc) V.upt (sysFdSt v V.ofile sts) n M ua Q r := by
   unfold sysWriteArms
   iintro ⟨-, H⟩
   iexact H
@@ -173,7 +173,7 @@ theorem sysWriteArms_of (V : ProcPriv) (v : BitVec 64) (sts : List FdState) (fd 
     (fv : BitVec 64) (st : FdState) (n : Int) (M : Nat → List (BitVec 8)) (ua : BitVec 64)
     (Q : Nat → IProp GF) (r : BitVec 64) (hsome : argFd v V.ofile = some (fd, fv))
     (hst : sts[fd]? = some st) :
-    filewriteArms (hlc := hlc) st n M ua Q r ⊢ sysWriteArms (hlc := hlc) V v sts n M ua Q r := by
+    filewriteArms (hlc := hlc) V.upt st n M ua Q r ⊢ sysWriteArms (hlc := hlc) V v sts n M ua Q r := by
   unfold filewriteArms sysWriteArms
   rw [sysFdSt_some v V.ofile sts fd fv st hsome hst]
   iintro ⟨%h, H⟩
