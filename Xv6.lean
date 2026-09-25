@@ -1122,3 +1122,5 @@ import Xv6.SpecMainSecondary
 import Xv6.MainSecondaryParts
 import Xv6.ProofMainSecondary
 import Xv6.LinkMainSecondary
+import Xv6.FsCfgKits
+import Xv6.FsBootSupply
