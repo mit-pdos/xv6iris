@@ -41,7 +41,11 @@ context the interrupted bundle runs, and `ihsF` hands it to the handler at
 that context together with the witness that re-homes it
 (`MachCSL.CtxLaws.envAt`, the Rocq `IntrDefs.env_move`).  `[EnvIs GF Γ ..]`
 is the client's choice of that family -- the proc table's `procsInv`
-beside `devintrCaps` -- which is what `kernelvec` needs: it calls
+beside `devintrCaps` AT SOME DISK PAGES (`∃ pd pav pu`: Rocq's handler
+contract is `∀ pd pav pu`, SpecKernelvec.v:125, over an environment packed
+when the handler is installed; Lean's is the era instance's, fixed before
+`virtio_disk_init` picks the pages, so the quantifier moves into the
+family and every trap opens it) -- which is what `kernelvec` needs: it calls
 `kerneltrap`, whose timer path yields (and `yield` needs the table) and
 whose device path calls `devintr`.  Nothing else about the interrupted
 context is assumed -- `ihsF` quantifies it freely, and the running slot is
@@ -49,21 +53,22 @@ named by THE CLAIM the trap hands over (`Xv6.cpuClaim_proc_shape`). -/
 structure KERNELVEC : Prop where
   handler : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [DiskG GF]
     (Γ : SchedNames) (γ0 γ1 : UartNames) (γc γl0 γl1 : GName) (γd : DiskNames) (γdl γt : GName)
-    (pd pav pu : BitVec 64)
     [ClaimIs (hlc := hlc) GF Γ]
-    [EnvIs (hlc := hlc) GF Γ γ0 γ1 γc γl0 γl1 γd γdl γt pd pav pu] (cpu : CPU),
+    [EnvIs (hlc := hlc) GF Γ γ0 γ1 γc γl0 γl1 γd γdl γt] (cpu : CPU),
     ⊢ ihs (GF := GF) ⟨cpu, kernelvecAddr⟩
 
 /-- **The contract is usable at boot**: a hart holding the vector cell, the
 proc table and devintr's credentials -- both at ITS OWN context, which is
 all a boot hart ever has, and at the kernel tier (`hT`) -- installs the
-handler.  (This is what `procsInvAll`, the family over ALL contexts the
-contract used to demand, made impossible.) -/
+handler -- at WHATEVER disk pages its credentials name (the pages
+`virtio_disk_init` chose; batch 8-P, pending (e)).  (This is what
+`procsInvAll`, the family over ALL contexts the contract used to demand,
+made impossible.) -/
 theorem intrRes_of_kernelvec {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
     [DiskG GF] [CurCtx] (KV : KERNELVEC) (Γ : SchedNames) (γ0 γ1 : UartNames)
     (γc γl0 γl1 : GName) (γd : DiskNames) (γdl γt : GName) (pd pav pu : BitVec 64)
     [ClaimIs (hlc := hlc) GF Γ]
-    [EnvIs (hlc := hlc) GF Γ γ0 γ1 γc γl0 γl1 γd γdl γt pd pav pu]
+    [EnvIs (hlc := hlc) GF Γ γ0 γ1 γc γl0 γl1 γd γdl γt]
     (hT : curTier = KTier.kpt) (cpu : CPU) :
     Register.stvec ↦ᵣ[cpu] kernelvecAddr ∗ procsInv Γ ∗
       devintrCaps Γ γ0 γ1 γc γl0 γl1 γd γdl γt pd pav pu ⊢ intrRes (GF := GF) cpu := by
@@ -75,7 +80,7 @@ theorem intrRes_of_kernelvec {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc G
   · ipureintro; exact kernelvecAddr_direct
   isplit
   · imodintro
-    iapply (KV.handler Γ γ0 γ1 γc γl0 γl1 γd γdl γt pd pav pu cpu)
+    iapply (KV.handler Γ γ0 γ1 γc γl0 γl1 γd γdl γt cpu)
   · iapply envAt_of_caps' Γ γ0 γ1 γc γl0 γl1 γd γdl γt pd pav pu hT $$ [$Hpinv $Hcaps]
 
 end Xv6

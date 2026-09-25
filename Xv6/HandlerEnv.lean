@@ -118,32 +118,40 @@ instance instCtxMorphDevintrCaps (Γ : SchedNames) (γ0 γ1 : UartNames) (γc γ
 /-! ## The family and the client's choice -/
 
 /-- **The handler environment family**: the proc table and devintr's
-credentials, at the kernel tier. -/
+credentials, at the kernel tier -- the credentials AT WHATEVER DISK PAGES
+the driver chose (`∃ pd pav pu`).  Rocq states the handler contract `∀ pd
+pav pu` over an environment packed into `intr_res` when the handler is
+installed (SpecKernelvec.v:125); Lean's environment is a field of the era's
+machine instance (`MachGS.envP`), fixed before `main` runs, while
+`virtio_disk_init` picks the three pages by `kalloc` -- so the family
+quantifies them existentially, main installs the handler at the pages the
+driver chose (`intrRes_of_kernelvec`), and every trap opens the witness
+(`devintrCaps_of_envAt'`). -/
 def envFam (Γ : SchedNames) (γ0 γ1 : UartNames) (γc γl0 γl1 : GName) (γd : DiskNames)
-    (γdl γt : GName) (pd pav pu : BitVec 64) (ξ : CtxId) : IProp GF :=
+    (γdl γt : GName) (ξ : CtxId) : IProp GF :=
   iprop(@procsInv hlc GF _ _ _ _ _ _ _ ⟨ξ, KTier.kpt⟩ Γ ∗
-    @devintrCaps hlc GF _ _ _ _ _ _ _ _ ⟨ξ, KTier.kpt⟩ Γ γ0 γ1 γc γl0 γl1 γd γdl γt pd pav pu)
+    ∃ pd pav pu : BitVec 64,
+      @devintrCaps hlc GF _ _ _ _ _ _ _ _ ⟨ξ, KTier.kpt⟩ Γ γ0 γ1 γc γl0 γl1 γd γdl γt pd pav pu)
 
 instance envFam_persistent (Γ : SchedNames) (γ0 γ1 : UartNames) (γc γl0 γl1 : GName)
-    (γd : DiskNames) (γdl γt : GName) (pd pav pu : BitVec 64) (ξ : CtxId) :
-    Persistent (envFam (hlc := hlc) (GF := GF) Γ γ0 γ1 γc γl0 γl1 γd γdl γt pd pav pu ξ) := by
+    (γd : DiskNames) (γdl γt : GName) (ξ : CtxId) :
+    Persistent (envFam (hlc := hlc) (GF := GF) Γ γ0 γ1 γc γl0 γl1 γd γdl γt ξ) := by
   unfold envFam; infer_instance
 
 instance instCtxMorphEnvFam (Γ : SchedNames) (γ0 γ1 : UartNames) (γc γl0 γl1 : GName)
-    (γd : DiskNames) (γdl γt : GName) (pd pav pu : BitVec 64) :
-    CtxMorph (GF := GF) (envFam (hlc := hlc) (GF := GF) Γ γ0 γ1 γc γl0 γl1 γd γdl γt pd pav pu) := by
+    (γd : DiskNames) (γdl γt : GName) :
+    CtxMorph (GF := GF) (envFam (hlc := hlc) (GF := GF) Γ γ0 γ1 γc γl0 γl1 γd γdl γt) := by
   unfold envFam; infer_instance
 
 end
 
 /-- **The client's choice, as a class**: the boot instantiates `MachGS`
-with `envP := envFam ...` -- the proc table beside devintr's credentials,
-at the kernel tier -- and the instance is `rfl`. -/
+with `envP := envFam ...` -- the proc table beside devintr's credentials
+(at some disk pages), at the kernel tier -- and the instance is `rfl`. -/
 class EnvIs (GF : BundledGFunctors) [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [DiskG GF]
-    (Γ : SchedNames) (γ0 γ1 : UartNames) (γc γl0 γl1 : GName) (γd : DiskNames) (γdl γt : GName)
-    (pd pav pu : BitVec 64) : Prop where
+    (Γ : SchedNames) (γ0 γ1 : UartNames) (γc γl0 γl1 : GName) (γd : DiskNames) (γdl γt : GName) : Prop where
   eq : ∀ ξ : CtxId, MachGS.envP (hlc := hlc) (GF := GF) ξ =
-    envFam (hlc := hlc) (GF := GF) Γ γ0 γ1 γc γl0 γl1 γd γdl γt pd pav pu ξ
+    envFam (hlc := hlc) (GF := GF) Γ γ0 γ1 γc γl0 γl1 γd γdl γt ξ
 
 end
 
@@ -152,63 +160,59 @@ section
 /-- The environment family, spelled out. -/
 theorem envP_eq {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [DiskG GF]
     (Γ : SchedNames) (γ0 γ1 : UartNames) (γc γl0 γl1 : GName) (γd : DiskNames) (γdl γt : GName)
-    (pd pav pu : BitVec 64)
-    [EnvIs (hlc := hlc) GF Γ γ0 γ1 γc γl0 γl1 γd γdl γt pd pav pu] (ξ : CtxId) :
-    MachGS.envP (hlc := hlc) (GF := GF) ξ = envFam (hlc := hlc) (GF := GF) Γ γ0 γ1 γc γl0 γl1 γd γdl γt pd pav pu ξ := EnvIs.eq ξ
+    [EnvIs (hlc := hlc) GF Γ γ0 γ1 γc γl0 γl1 γd γdl γt] (ξ : CtxId) :
+    MachGS.envP (hlc := hlc) (GF := GF) ξ = envFam (hlc := hlc) (GF := GF) Γ γ0 γ1 γc γl0 γl1 γd γdl γt ξ := EnvIs.eq ξ
 
 /-- The environment's re-homing witness, discharged: the family transports. -/
 theorem envMorph_env {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [DiskG GF]
     (Γ : SchedNames) (γ0 γ1 : UartNames) (γc γl0 γl1 : GName) (γd : DiskNames) (γdl γt : GName)
-    (pd pav pu : BitVec 64)
-    [EnvIs (hlc := hlc) GF Γ γ0 γ1 γc γl0 γl1 γd γdl γt pd pav pu] :
+    [EnvIs (hlc := hlc) GF Γ γ0 γ1 γc γl0 γl1 γd γdl γt] :
     ⊢ envMorph (hlc := hlc) (GF := GF) := by
   unfold envMorph
   iintro !> %ξ %ξ' Hdom He
-  rw [envP_eq Γ γ0 γ1 γc γl0 γl1 γd γdl γt pd pav pu ξ, envP_eq Γ γ0 γ1 γc γl0 γl1 γd γdl γt pd pav pu ξ']
-  imod CtxMorph.morph (R := envFam (hlc := hlc) (GF := GF) Γ γ0 γ1 γc γl0 γl1 γd γdl γt pd pav pu) ξ ξ' $$ [$Hdom $He] with ⟨Hdom, He⟩
+  rw [envP_eq Γ γ0 γ1 γc γl0 γl1 γd γdl γt ξ, envP_eq Γ γ0 γ1 γc γl0 γl1 γd γdl γt ξ']
+  imod CtxMorph.morph (R := envFam (hlc := hlc) (GF := GF) Γ γ0 γ1 γc γl0 γl1 γd γdl γt) ξ ξ' $$ [$Hdom $He] with ⟨Hdom, He⟩
   imodintro
-  iframe
+  iframe Hdom He
 
 /-- The family, out of the environment. -/
 theorem env_of_envAt {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [DiskG GF]
     (Γ : SchedNames) (γ0 γ1 : UartNames) (γc γl0 γl1 : GName) (γd : DiskNames) (γdl γt : GName)
-    (pd pav pu : BitVec 64)
-    [EnvIs (hlc := hlc) GF Γ γ0 γ1 γc γl0 γl1 γd γdl γt pd pav pu] (ξ : CtxId) :
-    envAt (hlc := hlc) (GF := GF) ξ ⊢ envFam (hlc := hlc) (GF := GF) Γ γ0 γ1 γc γl0 γl1 γd γdl γt pd pav pu ξ := by
-  rw [← envP_eq Γ γ0 γ1 γc γl0 γl1 γd γdl γt pd pav pu ξ]
+    [EnvIs (hlc := hlc) GF Γ γ0 γ1 γc γl0 γl1 γd γdl γt] (ξ : CtxId) :
+    envAt (hlc := hlc) (GF := GF) ξ ⊢ envFam (hlc := hlc) (GF := GF) Γ γ0 γ1 γc γl0 γl1 γd γdl γt ξ := by
+  rw [← envP_eq Γ γ0 γ1 γc γl0 γl1 γd γdl γt ξ]
   exact envAt_env ξ
 
 /-- ...and back: the family IS the environment (with its witness). -/
 theorem envAt_of_env {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [DiskG GF]
     (Γ : SchedNames) (γ0 γ1 : UartNames) (γc γl0 γl1 : GName) (γd : DiskNames) (γdl γt : GName)
-    (pd pav pu : BitVec 64)
-    [EnvIs (hlc := hlc) GF Γ γ0 γ1 γc γl0 γl1 γd γdl γt pd pav pu] (ξ : CtxId) :
-    envFam (hlc := hlc) (GF := GF) Γ γ0 γ1 γc γl0 γl1 γd γdl γt pd pav pu ξ ⊢ envAt (hlc := hlc) (GF := GF) ξ := by
+    [EnvIs (hlc := hlc) GF Γ γ0 γ1 γc γl0 γl1 γd γdl γt] (ξ : CtxId) :
+    envFam (hlc := hlc) (GF := GF) Γ γ0 γ1 γc γl0 γl1 γd γdl γt ξ ⊢ envAt (hlc := hlc) (GF := GF) ξ := by
   iintro #H
   iapply envAt_intro ξ
   isplitl []
-  · rw [envP_eq Γ γ0 γ1 γc γl0 γl1 γd γdl γt pd pav pu ξ]; iexact H
-  · iapply envMorph_env Γ γ0 γ1 γc γl0 γl1 γd γdl γt pd pav pu
+  · rw [envP_eq Γ γ0 γ1 γc γl0 γl1 γd γdl γt ξ]; iexact H
+  · iapply envMorph_env Γ γ0 γ1 γc γl0 γl1 γd γdl γt
 
 /-- The table, out of the environment. -/
 theorem procsInv_of_envAt {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [DiskG GF]
     (Γ : SchedNames) (γ0 γ1 : UartNames) (γc γl0 γl1 : GName) (γd : DiskNames) (γdl γt : GName)
-    (pd pav pu : BitVec 64)
-    [EnvIs (hlc := hlc) GF Γ γ0 γ1 γc γl0 γl1 γd γdl γt pd pav pu] (ξ : CtxId) :
+    [EnvIs (hlc := hlc) GF Γ γ0 γ1 γc γl0 γl1 γd γdl γt] (ξ : CtxId) :
     envAt (hlc := hlc) (GF := GF) ξ ⊢ @procsInv hlc GF _ _ _ _ _ _ _ ⟨ξ, KTier.kpt⟩ Γ := by
-  refine (env_of_envAt Γ γ0 γ1 γc γl0 γl1 γd γdl γt pd pav pu ξ).trans ?_
+  refine (env_of_envAt Γ γ0 γ1 γc γl0 γl1 γd γdl γt ξ).trans ?_
   unfold envFam
   iintro ⟨H, _⟩
   iexact H
 
-/-- devintr's credentials, out of the environment. -/
+/-- devintr's credentials, out of the environment, at the pages the driver
+chose. -/
 theorem devintrCaps_of_envAt {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [DiskG GF]
     (Γ : SchedNames) (γ0 γ1 : UartNames) (γc γl0 γl1 : GName) (γd : DiskNames) (γdl γt : GName)
-    (pd pav pu : BitVec 64)
-    [EnvIs (hlc := hlc) GF Γ γ0 γ1 γc γl0 γl1 γd γdl γt pd pav pu] (ξ : CtxId) :
+    [EnvIs (hlc := hlc) GF Γ γ0 γ1 γc γl0 γl1 γd γdl γt] (ξ : CtxId) :
     envAt (hlc := hlc) (GF := GF) ξ ⊢
-      @devintrCaps hlc GF _ _ _ _ _ _ _ _ ⟨ξ, KTier.kpt⟩ Γ γ0 γ1 γc γl0 γl1 γd γdl γt pd pav pu := by
-  refine (env_of_envAt Γ γ0 γ1 γc γl0 γl1 γd γdl γt pd pav pu ξ).trans ?_
+      ∃ pd pav pu : BitVec 64,
+        @devintrCaps hlc GF _ _ _ _ _ _ _ _ ⟨ξ, KTier.kpt⟩ Γ γ0 γ1 γc γl0 γl1 γd γdl γt pd pav pu := by
+  refine (env_of_envAt Γ γ0 γ1 γc γl0 γl1 γd γdl γt ξ).trans ?_
   unfold envFam
   iintro ⟨_, H⟩
   iexact H
@@ -217,39 +221,43 @@ theorem devintrCaps_of_envAt {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc G
 does not see the tier. -/
 theorem procsInv_of_envAt' {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [DiskG GF]
     (Γ : SchedNames) (γ0 γ1 : UartNames) (γc γl0 γl1 : GName) (γd : DiskNames) (γdl γt : GName)
-    (pd pav pu : BitVec 64)
-    [EnvIs (hlc := hlc) GF Γ γ0 γ1 γc γl0 γl1 γd γdl γt pd pav pu] [X : CurCtx] :
+    [EnvIs (hlc := hlc) GF Γ γ0 γ1 γc γl0 γl1 γd γdl γt] [X : CurCtx] :
     envAt (hlc := hlc) (GF := GF) curCtx ⊢ procsInv Γ := by
   rw [procsInv_toKpt X Γ]
-  exact procsInv_of_envAt Γ γ0 γ1 γc γl0 γl1 γd γdl γt pd pav pu curCtx
+  exact procsInv_of_envAt Γ γ0 γ1 γc γl0 γl1 γd γdl γt curCtx
 
 /-- The credentials at the AMBIENT context: the family is pinned at the
 kernel tier, which is the ambient one in a trap handler
 (`MachCSL.kctx_tier` on the interrupted bundle). -/
 theorem devintrCaps_of_envAt' {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [DiskG GF]
     (Γ : SchedNames) (γ0 γ1 : UartNames) (γc γl0 γl1 : GName) (γd : DiskNames) (γdl γt : GName)
-    (pd pav pu : BitVec 64)
-    [EnvIs (hlc := hlc) GF Γ γ0 γ1 γc γl0 γl1 γd γdl γt pd pav pu] [X : CurCtx] (hT : curTier = KTier.kpt) :
-    envAt (hlc := hlc) (GF := GF) curCtx ⊢ devintrCaps (GF := GF) Γ γ0 γ1 γc γl0 γl1 γd γdl γt pd pav pu := by
-  have h : devintrCaps (GF := GF) Γ γ0 γ1 γc γl0 γl1 γd γdl γt pd pav pu =
+    [EnvIs (hlc := hlc) GF Γ γ0 γ1 γc γl0 γl1 γd γdl γt] [X : CurCtx] (hT : curTier = KTier.kpt) :
+    envAt (hlc := hlc) (GF := GF) curCtx ⊢
+      ∃ pd pav pu : BitVec 64, devintrCaps (GF := GF) Γ γ0 γ1 γc γl0 γl1 γd γdl γt pd pav pu := by
+  have h : ∀ pd pav pu : BitVec 64, devintrCaps (GF := GF) Γ γ0 γ1 γc γl0 γl1 γd γdl γt pd pav pu =
       @devintrCaps hlc GF _ _ _ _ _ _ _ _ ⟨X.curCtx, KTier.kpt⟩ Γ γ0 γ1 γc γl0 γl1 γd γdl γt pd pav pu := by
-    rw [← hT]
-  rw [h]
-  exact devintrCaps_of_envAt Γ γ0 γ1 γc γl0 γl1 γd γdl γt pd pav pu X.curCtx
+    intro pd pav pu; rw [← hT]
+  simp only [h]
+  exact devintrCaps_of_envAt Γ γ0 γ1 γc γl0 γl1 γd γdl γt X.curCtx
 
-/-- ...and the environment, from the two at the ambient context. -/
+/-- ...and the environment, from the two at the ambient context, at any
+disk pages. -/
 theorem envAt_of_caps' {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [DiskG GF]
     (Γ : SchedNames) (γ0 γ1 : UartNames) (γc γl0 γl1 : GName) (γd : DiskNames) (γdl γt : GName)
     (pd pav pu : BitVec 64)
-    [EnvIs (hlc := hlc) GF Γ γ0 γ1 γc γl0 γl1 γd γdl γt pd pav pu] [X : CurCtx] (hT : curTier = KTier.kpt) :
+    [EnvIs (hlc := hlc) GF Γ γ0 γ1 γc γl0 γl1 γd γdl γt] [X : CurCtx] (hT : curTier = KTier.kpt) :
     procsInv (GF := GF) Γ ∗ devintrCaps Γ γ0 γ1 γc γl0 γl1 γd γdl γt pd pav pu ⊢ envAt (hlc := hlc) (GF := GF) curCtx := by
   have h : devintrCaps (GF := GF) Γ γ0 γ1 γc γl0 γl1 γd γdl γt pd pav pu =
       @devintrCaps hlc GF _ _ _ _ _ _ _ _ ⟨X.curCtx, KTier.kpt⟩ Γ γ0 γ1 γc γl0 γl1 γd γdl γt pd pav pu := by
     rw [← hT]
   rw [procsInv_toKpt X Γ, h]
-  have H := envAt_of_env (hlc := hlc) (GF := GF) Γ γ0 γ1 γc γl0 γl1 γd γdl γt pd pav pu X.curCtx
+  have H := envAt_of_env (hlc := hlc) (GF := GF) Γ γ0 γ1 γc γl0 γl1 γd γdl γt X.curCtx
   unfold envFam at H
-  exact H
+  iintro ⟨#Hp, #Hc⟩
+  iapply H
+  iframe Hp
+  iexists pd, pav, pu
+  iexact Hc
 
 end
 

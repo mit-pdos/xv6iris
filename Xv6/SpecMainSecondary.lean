@@ -32,9 +32,11 @@ cannot make for itself --
   (`intrRes_of_kernelvec`) and hand the scheduler its `procsInv`.
 
 The ghost names the handler environment is stated at (`Γ γ0 γ1 γc γl0 γl1
-γd γdl γt pd pav pu`) are the client's choice of `MachGS.envP`
-(`Xv6.EnvIs`), fixed when the era's machine instance is built, so they are
-PARAMETERS here, not Rocq's existentials; what stays existential is what
+γd γdl γt`) are the client's choice of `MachGS.envP` (`Xv6.EnvIs`), fixed
+when the era's machine instance is built, so they are PARAMETERS here, not
+Rocq's existentials (the disk pages `pd pav pu` are the family's own
+existential, `HandlerEnv.envFam`; they are named here only because the
+deposit's credentials carry them); what stays existential is what
 hart 0 alone chooses: the `pr` lock's name and the table's root / tree.
 
 WHAT DOES NOT CROSS: this hart's own resources enter as preconditions --
@@ -155,7 +157,7 @@ interrupts off, depth 0, no lock, no proc), holding its own
 `started` channel at the CONCRETE deposit. -/
 def wp_main_secondary_body (X : CurCtx) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
     (γ0 γ1 : UartNames) (γc γl0 γl1 : GName) (γd : DiskNames) (γdl γt : GName)
-    (pd pav pu : BitVec 64) [EnvIs (hlc := hlc) GF Γ γ0 γ1 γc γl0 γl1 γd γdl γt pd pav pu]
+    (pd pav pu : BitVec 64) [EnvIs (hlc := hlc) GF Γ γ0 γ1 γc γl0 γl1 γd γdl γt]
     (cpu : CPU) (k : KCtx) (γi : GName) (ξd : CtxId) (tlb0 : Tlb)
     (hX : X.curTier = KTier.bare) (hcpu : cpu ≠ startedPrimary) (hK : mainSecondarySlots ≤ k.avail)
     (hsie : k.sie = false) (hnoff : k.noff = 0) (hlocks : k.locks = []) (hproc : k.proc = 0#64) :
@@ -173,7 +175,7 @@ structure MAIN_SECONDARY : Prop where
     [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [DiskG GF] (X : CurCtx)
     (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
     (γ0 γ1 : UartNames) (γc γl0 γl1 : GName) (γd : DiskNames) (γdl γt : GName)
-    (pd pav pu : BitVec 64) [EnvIs (hlc := hlc) GF Γ γ0 γ1 γc γl0 γl1 γd γdl γt pd pav pu]
+    (pd pav pu : BitVec 64) [EnvIs (hlc := hlc) GF Γ γ0 γ1 γc γl0 γl1 γd γdl γt]
     (cpu : CPU) (k : KCtx) (γi : GName) (ξd : CtxId) (tlb0 : Tlb) hX hcpu hK hsie hnoff hlocks hproc,
     wp_main_secondary_body (hlc := hlc) (GF := GF) X Γ γ0 γ1 γc γl0 γl1 γd γdl γt pd pav pu
       cpu k γi ξd tlb0 hX hcpu hK hsie hnoff hlocks hproc

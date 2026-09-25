@@ -43,7 +43,7 @@ theorem kernelvec_br_ffffffffffffd116 : KA.«kernelvec» + 0xffffffffffffd116#64
 set_option maxHeartbeats 8000000 in
 /-- **`kernelvec` meets the handler contract**, given `kerneltrap`. -/
 theorem kernelvec_proof (KT : KERNELTRAP) : KERNELVEC :=
-  ⟨fun {hlc GF} _ _ _ _ _ _ _ _ Γ γ0 γ1 γc γl0 γl1 γd γdl γt pd pav pu _ _ cpu₀ => by
+  ⟨fun {hlc GF} _ _ _ _ _ _ _ _ Γ γ0 γ1 γc γl0 γl1 γd γdl γt _ _ cpu₀ => by
   suffices h : ⊢@{IProp GF} ∀ cpu : CPU, ihs ⟨cpu, kernelvecAddr⟩ by
     exact h.trans (by iintro H; iapply H $$ %cpu₀)
   iintro
@@ -56,7 +56,7 @@ theorem kernelvec_proof (KT : KERNELTRAP) : KERNELVEC :=
   iintro !> %X %k %pc %sc %⟨hwf, hs, hpc, hsc⟩ Hk Hpc Hcsrs Hstv #Henv Hclaim Hcont
   -- THE HANDLER'S ENVIRONMENT, at THIS trap's context: the proc table
   ihave #Hpinv : procsInv (GF := GF) Γ $$ [Henv]
-  case' _ => iapply procsInv_of_envAt' Γ γ0 γ1 γc γl0 γl1 γd γdl γt pd pav pu $$ Henv
+  case' _ => iapply procsInv_of_envAt' Γ γ0 γ1 γc γl0 γl1 γd γdl γt $$ Henv
   have hn0 : k.noff = 0 := (hwf.2.2.1 hs).1
   have hi : k.intena = true := (hwf.2.2.1 hs).2.1
   have hl : k.locks = [] := (hwf.2.2.1 hs).2.2.1
@@ -67,10 +67,9 @@ theorem kernelvec_proof (KT : KERNELTRAP) : KERNELVEC :=
   icases kctx_tier cpu k.trapped $$ Hk with ⟨%htc, Hk⟩
   have hT : curTier = KTier.kpt := by
     rw [← htc, KCtx.trapped_tier]; exact (hwf.2.2.1 hs).2.2.2
-  -- ...and devintr's credentials, out of the same environment
-  ihave #Hcaps : devintrCaps (GF := GF) Γ γ0 γ1 γc γl0 γl1 γd γdl γt pd pav pu $$ [Henv]
-  case' _ =>
-    iapply devintrCaps_of_envAt' Γ γ0 γ1 γc γl0 γl1 γd γdl γt pd pav pu hT $$ Henv
+  -- ...and devintr's credentials, out of the same environment, at the disk
+  -- pages the driver chose (the family's witness)
+  icases devintrCaps_of_envAt' Γ γ0 γ1 γc γl0 γl1 γd γdl γt hT $$ Henv with ⟨%pd, %pav, %pu, #Hcaps⟩
   -- the handler's context, as a context of its own
   generalize hkt : k.trapped = kt
   have hsie : kt.sie = false := by rw [← hkt]; rfl
