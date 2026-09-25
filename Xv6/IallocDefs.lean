@@ -161,14 +161,14 @@ def iallocArms [Fscfg] [Icfg] [CurCtx] (ty : BitVec 16) (u : Nat) (Sb : List Nat
     logOpS icfgLog u (IBLOCK inum icfgIst :: Sb))
 
 /-- **THE CLIENT'S CONTINUATION, NAMED** (Rocq's `ia_cont`): the `wpNext`
-of `Xv6.wp_ialloc_gen_body`, verbatim. -/
+of `Xv6.wp_ialloc_gen_eb_body`, verbatim (the complement at the entry `SIE`). -/
 def iallocCont [Fscfg] [Icfg] [CurCtx] (k : KCtx) (cpu : CPU) (ty : BitVec 16) (u : Nat)
     (Sb : List Nat) (t : Nat) (qt : Qp) (pidv : BitVec 32) (dqp dqs dqn : DFrac) : IProp GF :=
   wpNext true k.proc cpu (fun cpu' => iprop(∀ (spie spp : Bool) (R' : RegMap)
       (alloc : Bool) (kslot : Nat) (q : Qp) (inum : BitVec 32) (dn' : Dinode),
     ⌜calleeSaved k.regs R'⌝ -∗
     kctx cpu' ((k.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k.regs 1#5)) -∗
-    trapCsrs cpu' -∗ cpuClaim cpu' k.proc -∗ intrRes cpu' -∗
+    trapCsrsExt cpu' k.sie -∗ cpuClaimExt cpu' k.sie k.proc -∗
     wordPointsTo sbNinodes 4 dqn (BitVec.ofNat 32 fscNinodes) -∗
     wordPointsTo sbInodestart 4 dqs (BitVec.ofNat 32 icfgIst) -∗
     wordPointsTo (pPid k.proc) 4 dqp pidv -∗

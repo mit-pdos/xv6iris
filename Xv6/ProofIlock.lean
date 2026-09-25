@@ -11,7 +11,7 @@ file, per the layering rule), right to left as Rocq enters them:
 * `Xv6/IlockFill.lean` -- the fill's three-case ghost step and the claim
   box's empty bundle (Rocq 700-730, 1115-1350);
 * `Xv6/IlockEpi.lean` -- the join `+0x1e .. +0x26` (`il_epilogue`), the
-  post bundle, and the uncached arm's interface `IlLoad`;
+  post bundle, and the uncached arm's interface `IlLoadEb`;
 * `Xv6/IlockCheckout.lean` -- the checkout and the two arms' ghost readings
   (Rocq 2587-2844);
 * `Xv6/IlockMain.lean` -- the prologue, the dead guards, the RACY `ref`

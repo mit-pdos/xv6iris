@@ -218,16 +218,27 @@ variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
 /-- What the walk owes its caller once `brelse` has returned: the entry
 context back, the borrowed frame `F`, the flush's payout `Pout`, both slot
 units, the ledger EPOCH-CLOSED at the grown set, and the deposit's
-receipt. -/
+receipt.  The trap-CSR complement at the entry `SIE` (Rocq's `iu_cont`:
+`trap_csrs_ext KT1 eb` / `cpu_claim_ext eb`). -/
 def iuPost [Fscfg] [Icfg] [CurCtx] (cpu : CPU) (k : KCtx) (dqp : DFrac) (pidv : BitVec 32)
     (F Pout : IProp GF) (u' : Nat) (Sbo : List Nat) (inum : BitVec 32) (v : Nat) : IProp GF :=
   wpNext true k.proc cpu (fun cpu' => iprop(∀ (spie spp : Bool) (R' : RegMap),
     ⌜calleeSaved k.regs R'⌝ -∗
     kctx cpu' ((k.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k.regs 1#5)) -∗
-    trapCsrs cpu' -∗ cpuClaim cpu' k.proc -∗ intrRes cpu' -∗
+    trapCsrsExt cpu' k.sie -∗ cpuClaimExt cpu' k.sie k.proc -∗
     wordPointsTo (pPid k.proc) 4 dqp pidv -∗
     F -∗ Pout -∗ bslots fscBio 2 -∗ logOpS icfgLog u' Sbo -∗
     (∃ e : Nat, loggedAt icfgLog e (IBLOCK inum icfgIst) ∗ ⌜v ≤ e⌝) -∗ wpLoop cpu'))
+
+/-- The continuation is a park's crossing at a process (`k.proc ≠ 0`), so it
+is hart-free: it moves to any hart. -/
+theorem iuPost_shift [Fscfg] [Icfg] [CurCtx] (c c' : CPU) (k : KCtx) (dqp : DFrac)
+    (pidv : BitVec 32) (F Pout : IProp GF) (u' : Nat) (Sbo : List Nat) (inum : BitVec 32)
+    (v : Nat) (hpn : k.proc ≠ 0#64) :
+    iuPost c k dqp pidv F Pout u' Sbo inum v ⊢ iuPost c' k dqp pidv F Pout u' Sbo inum v := by
+  unfold iuPost
+  exact wpNext_shift true k.proc c c' _
+    (fun h => h.elim (fun h => absurd h (by decide)) (fun h => absurd h hpn))
 
 end
 

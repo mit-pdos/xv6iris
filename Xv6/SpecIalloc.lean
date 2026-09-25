@@ -64,11 +64,14 @@ ialloc SLEEPS (bread), so it threads the running-process bundle exactly as
 
 **Deviations from Rocq, reported.**
 
-1. PINNED AT `k.sie = false ∧ k.noff = 0 ∧ k.locks = []` (fs1 brief §1,
-   "the `sie` question"; `Xv6/SpecIupdate.lean` deviation 1).  Rocq's
-   `eb`/`b` genericity and the `eb = true` parking premise collapse to the
-   bare `trapCsrs`/`cpuClaim`/`intrRes` bundle bread takes;
-   `locks_below lks "log"` is `k.locks = []`.
+1. **eb-GENERIC, as in Rocq** (`cpu_own 0 eb`): the `_eb` bodies take the
+   complement `trapCsrsExt cpu k.sie` / `cpuClaimExt cpu k.sie k.proc` (Rocq
+   `trap_csrs_ext` / `cpu_claim_ext`) in and out, at either entry `SIE`, and are
+   what the interface proves.  Depth 0 implies no spinlock held (`KCtx.wf`:
+   `locks.length ≤ noff`), which is Lean's reading of Rocq's `locks_below`
+   premise (Lean has no lock ranks).  The `sie = false` bodies (the whole trap
+   bundle, `k.locks = []`) are kept as DERIVED instances for the callers not yet
+   generalized.
 2. THE AMBIENT NAMES as `Xv6/SpecIupdate.lean` deviation 2 (`fsc_ninodes`
    is `fscNinodes`).  The printk credentials (`kernel_data` +
    `printk_env`) are `Xv6.panicEnv` (`Xv6/SpecBalloc.lean` deviation 5);
@@ -227,6 +230,77 @@ def wp_ialloc_gen_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv
     wpLoop cpu'))
   ⊢ wpLoop (GF := GF) cpu
 
+/-- The eb-generic form of `wp_ialloc_gen_body` (Rocq: `cpu_own 0 eb`, the
+complement `trap_csrs_ext` / `cpu_claim_ext` in and out; depth 0, so no
+spinlock held by `KCtx.wf`). -/
+def wp_ialloc_gen_eb_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
+    [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [IregG GF] [IcacheG GF]
+    [FsTopG GF] [FsLinkG GF] [IcboxG GF] [IrefslotG GF] [Appcfg GF] [Fscfg] [Icfg] [CurCtx]
+    (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+    (cpu : CPU) (k : KCtx) (γl : GName) (pd pav pu : BitVec 64) (j : Nat)
+    (ty : BitVec 16) (u : Nat) (Sb : List Nat) (t : Nat) (qt : Qp)
+    (pidv : BitVec 32) (dqp dqs dqn : DFrac)
+    (hj : j < NPROC) (hproc : k.proc = procAddr j) (hK : iallocSlots ≤ k.avail)
+    (hnoff : k.noff = 0)
+    (htier : k.tier = KTier.kpt)
+    (hgeom : logGeomOk fscCov fscLogst)
+    -- EVERY inum the region covers lives in a covered HOME block
+    (hblk : iregBlocksOk icfgIst icfgNib fscCov fscLogst)
+    -- THE THREE GEOMETRY PREMISES (see the header)
+    (hn1 : 1 < fscNinodes) (hnnib : fscNinodes ≤ 16 * icfgNib) (hn31 : fscNinodes < 2 ^ 31)
+    -- the type installs an ALLOCATED record, and it is one of the four
+    (hty : ty.toNat ≠ 0) (htyk : iregTyOk (iallocFresh ty))
+    (hpd : descPageRw pd)
+    (ha0 : k.regs 10#5 = BitVec.signExtend 64 icfgDev)
+    (ha1 : k.regs 11#5 = BitVec.signExtend 64 ty) : Prop :=
+  kctx cpu k ∗ pcIs cpu iallocAddr ∗ procsInv Γ ∗
+  trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗ panicEnv ∗
+  bioCtx γl fscBio (fsView fscFs fscDisk icfgDev fscCov) ∗
+  logCtx icfgLog fscBio fscFs fscCov fscLogst icfgDev ∗
+  diskCaps fscDisk fscDlock pd pav pu ∗
+  -- the two superblock fields, read and handed straight back
+  wordPointsTo sbNinodes 4 dqn (BitVec.ofNat 32 fscNinodes) ∗
+  wordPointsTo sbInodestart 4 dqs (BitVec.ofNat 32 icfgIst) ∗
+  -- THE INODE REGION, and the sealed regime: both persistent
+  iregInv (hlc := hlc) fscIreg fscFs icfgIst icfgNib ∗ iregOpen ∗
+  wordPointsTo (pPid k.proc) 4 dqp pidv ∗
+  -- TWO slot units: bread's reference is held across log_write
+  bslots fscBio 2 ∗
+  -- THE ICACHE, as iget takes it
+  isItable2 fscItlock fscIc fscFs fscIreg fscCov fscLogst icfgNib icfgDev ∗
+  itableInv (hlc := hlc) ∗
+  -- ONE ledger unit for the tail iget; RETURNED on the no-inodes arm
+  irefSlot ∗
+  -- THIS OPERATION'S RESERVATION, IN SET FORM
+  logOpS icfgLog (u + 1) Sb ∗
+  -- THE CLAIMING TRANSACTION'S SHARE (durable-disk C-5)
+  txPin icfgLog t qt ∗
+  wpNext true k.proc cpu (fun cpu' => iprop(∀ (spie spp : Bool) (R' : RegMap)
+      (alloc : Bool) (kslot : Nat) (q : Qp) (inum : BitVec 32) (dn' : Dinode),
+    ⌜calleeSaved k.regs R'⌝ -∗
+    kctx cpu' ((k.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k.regs 1#5)) -∗
+    trapCsrsExt cpu' k.sie -∗ cpuClaimExt cpu' k.sie k.proc -∗
+    wordPointsTo sbNinodes 4 dqn (BitVec.ofNat 32 fscNinodes) -∗
+    wordPointsTo sbInodestart 4 dqs (BitVec.ofNat 32 icfgIst) -∗
+    wordPointsTo (pPid k.proc) 4 dqp pidv -∗
+    bslots fscBio 2 -∗
+    (if alloc then
+      -- SUCCESS: iget's postcondition, at the claimed inum
+      iprop(⌜R' 10#5 = ientry kslot ∧ kslot < NINODE ∧
+          0 < inum.toNat ∧ inum.toNat < fscNinodes ∧ inum.toNat < 16 * icfgNib ∧
+          -- what the claim WROTE
+          dn' = iallocFresh ty ∧ dn'.diType = ty ∧ freshShape dn'⌝ ∗
+        -- THE RECEIPT, AS ONE ROW
+        inodeClaimed ty kslot q icfgDev inum t qt ∗
+        -- THE SET GROWTH IS DETERMINATE
+        logOpS icfgLog u (IBLOCK inum icfgIst :: Sb))
+    else
+      -- NO INODES: a0 = 0, nothing spent, the share straight back
+      iprop(⌜R' 10#5 = 0#64⌝ ∗ irefSlot ∗
+        txPin icfgLog t qt ∗ logOpS icfgLog (u + 1) Sb)) -∗
+    wpLoop cpu'))
+  ⊢ wpLoop (GF := GF) cpu
+
 /-- **THE COUNTED CONTRACT** (Rocq's `wp_ialloc_sconf_body`): the set form
 with the op's set forgotten. -/
 def wp_ialloc_sconf_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
@@ -282,20 +356,101 @@ def wp_ialloc_sconf_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [
     wpLoop cpu'))
   ⊢ wpLoop (GF := GF) cpu
 
+/-- The eb-generic form of `wp_ialloc_sconf_body` (Rocq: `cpu_own 0 eb`, the
+complement `trap_csrs_ext` / `cpu_claim_ext` in and out; depth 0, so no
+spinlock held by `KCtx.wf`). -/
+def wp_ialloc_sconf_eb_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
+    [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [IregG GF] [IcacheG GF]
+    [FsTopG GF] [FsLinkG GF] [IcboxG GF] [IrefslotG GF] [Appcfg GF] [Fscfg] [Icfg] [CurCtx]
+    (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+    (cpu : CPU) (k : KCtx) (γl : GName) (pd pav pu : BitVec 64) (j : Nat)
+    (ty : BitVec 16) (u : Nat) (t : Nat) (qt : Qp)
+    (pidv : BitVec 32) (dqp dqs dqn : DFrac)
+    (hj : j < NPROC) (hproc : k.proc = procAddr j) (hK : iallocSlots ≤ k.avail)
+    (hnoff : k.noff = 0)
+    (htier : k.tier = KTier.kpt)
+    (hgeom : logGeomOk fscCov fscLogst)
+    (hblk : iregBlocksOk icfgIst icfgNib fscCov fscLogst)
+    (hn1 : 1 < fscNinodes) (hnnib : fscNinodes ≤ 16 * icfgNib) (hn31 : fscNinodes < 2 ^ 31)
+    (hty : ty.toNat ≠ 0) (htyk : iregTyOk (iallocFresh ty))
+    (hpd : descPageRw pd)
+    (ha0 : k.regs 10#5 = BitVec.signExtend 64 icfgDev)
+    (ha1 : k.regs 11#5 = BitVec.signExtend 64 ty) : Prop :=
+  kctx cpu k ∗ pcIs cpu iallocAddr ∗ procsInv Γ ∗
+  trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗ panicEnv ∗
+  bioCtx γl fscBio (fsView fscFs fscDisk icfgDev fscCov) ∗
+  logCtx icfgLog fscBio fscFs fscCov fscLogst icfgDev ∗
+  diskCaps fscDisk fscDlock pd pav pu ∗
+  wordPointsTo sbNinodes 4 dqn (BitVec.ofNat 32 fscNinodes) ∗
+  wordPointsTo sbInodestart 4 dqs (BitVec.ofNat 32 icfgIst) ∗
+  iregInv (hlc := hlc) fscIreg fscFs icfgIst icfgNib ∗ iregOpen ∗
+  wordPointsTo (pPid k.proc) 4 dqp pidv ∗
+  bslots fscBio 2 ∗
+  isItable2 fscItlock fscIc fscFs fscIreg fscCov fscLogst icfgNib icfgDev ∗
+  itableInv (hlc := hlc) ∗
+  irefSlot ∗
+  logOp icfgLog (u + 1) ∗
+  txPin icfgLog t qt ∗
+  wpNext true k.proc cpu (fun cpu' => iprop(∀ (spie spp : Bool) (R' : RegMap)
+      (alloc : Bool) (kslot : Nat) (q : Qp) (inum : BitVec 32) (dn' : Dinode),
+    ⌜calleeSaved k.regs R'⌝ -∗
+    kctx cpu' ((k.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k.regs 1#5)) -∗
+    trapCsrsExt cpu' k.sie -∗ cpuClaimExt cpu' k.sie k.proc -∗
+    wordPointsTo sbNinodes 4 dqn (BitVec.ofNat 32 fscNinodes) -∗
+    wordPointsTo sbInodestart 4 dqs (BitVec.ofNat 32 icfgIst) -∗
+    wordPointsTo (pPid k.proc) 4 dqp pidv -∗
+    bslots fscBio 2 -∗
+    (if alloc then
+      iprop(⌜R' 10#5 = ientry kslot ∧ kslot < NINODE ∧
+          0 < inum.toNat ∧ inum.toNat < fscNinodes ∧ inum.toNat < 16 * icfgNib ∧
+          dn' = iallocFresh ty ∧ dn'.diType = ty ∧ freshShape dn'⌝ ∗
+        inodeClaimed ty kslot q icfgDev inum t qt ∗
+        logOp icfgLog u)
+    else
+      iprop(⌜R' 10#5 = 0#64⌝ ∗ irefSlot ∗
+        txPin icfgLog t qt ∗ logOp icfgLog (u + 1))) -∗
+    wpLoop cpu'))
+  ⊢ wpLoop (GF := GF) cpu
+
 /-- The interface of `ialloc` (Rocq's `Module Type IALLOC`, less the derived
 counted form -- deviation 6). -/
 structure IALLOC : Prop where
-  wp_ialloc_gen : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
+  wp_ialloc_gen_eb : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
     [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [IregG GF] [IcacheG GF]
     [FsTopG GF] [FsLinkG GF] [IcboxG GF] [IrefslotG GF] [Appcfg GF] [Fscfg] [Icfg] [CurCtx]
     (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
     (cpu : CPU) (k : KCtx) (γl : GName) (pd pav pu : BitVec 64) (j : Nat)
     (ty : BitVec 16) (u : Nat) (Sb : List Nat) (t : Nat) (qt : Qp)
     (pidv : BitVec 32) (dqp dqs dqn : DFrac)
-    hj hproc hK hsie hnoff hlocks htier hgeom hblk hn1 hnnib hn31 hty htyk hpd ha0 ha1,
+    hj hproc hK hnoff htier hgeom hblk hn1 hnnib hn31 hty htyk hpd ha0 ha1,
+    wp_ialloc_gen_eb_body (hlc := hlc) (GF := GF) Γ cpu k γl pd pav pu j ty u Sb t qt
+      pidv dqp dqs dqn
+      hj hproc hK hnoff htier hgeom hblk hn1 hnnib hn31 hty htyk hpd ha0 ha1
+
+/-- The interrupts-off instance of `wp_ialloc_gen_eb` (the complement is the whole
+bundle): the contract every not-yet-generalized caller states. -/
+theorem IALLOC.wp_ialloc_gen (A : IALLOC) {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
+    [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [IregG GF] [IcacheG GF]
+    [FsTopG GF] [FsLinkG GF] [IcboxG GF] [IrefslotG GF] [Appcfg GF] [Fscfg] [Icfg] [CurCtx]
+    (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+    (cpu : CPU) (k : KCtx) (γl : GName) (pd pav pu : BitVec 64) (j : Nat)
+    (ty : BitVec 16) (u : Nat) (Sb : List Nat) (t : Nat) (qt : Qp)
+    (pidv : BitVec 32) (dqp dqs dqn : DFrac)
+    hj hproc hK hsie hnoff hlocks htier hgeom hblk hn1 hnnib hn31 hty htyk hpd ha0 ha1 :
     wp_ialloc_gen_body (hlc := hlc) (GF := GF) Γ cpu k γl pd pav pu j ty u Sb t qt
       pidv dqp dqs dqn
-      hj hproc hK hsie hnoff hlocks htier hgeom hblk hn1 hnnib hn31 hty htyk hpd ha0 ha1
+      hj hproc hK hsie hnoff hlocks htier hgeom hblk hn1 hnnib hn31 hty htyk hpd ha0 ha1 := by
+  have h := A.wp_ialloc_gen_eb (hlc := hlc) (GF := GF) (Γ := Γ) (cpu := cpu) (k := k) (γl := γl) (pd := pd) (pav := pav) (pu := pu) (j := j) (ty := ty) (u := u) (Sb := Sb) (t := t) (qt := qt) (pidv := pidv) (dqp := dqp) (dqs := dqs) (dqn := dqn) (hj := hj) (hproc := hproc) (hK := hK) (hnoff := hnoff) (htier := htier) (hgeom := hgeom) (hblk := hblk) (hn1 := hn1) (hnnib := hnnib) (hn31 := hn31) (hty := hty) (htyk := htyk) (hpd := hpd) (ha0 := ha0) (ha1 := ha1)
+  unfold wp_ialloc_gen_eb_body at h
+  unfold wp_ialloc_gen_body
+  rw [hsie] at h
+  simp only [trapCsrsExt_false, cpuClaimExt_false] at h
+  iintro ⟨H0, H1, H2, Htc, Hcl, Hir, H6, H7, H8, H9, H10, H11, H12, H13, H14, H15, H16, H17, H18, H19, H20, Hnext⟩
+  iapply h
+  iframe H0 H1 H2 Htc Hcl Hir H6 H7 H8 H9 H10 H11 H12 H13 H14 H15 H16 H17 H18 H19 H20
+  iapply wpNext_mono $$ Hnext
+  iintro %cpu' HK %spie %spp %R' %alloc %kslot %q %inum %dn' %p0 H1 H2 ⟨Htc, Hir⟩ Hcl H6 H7 H8 H9 H10
+  iapply HK $$ %spie %spp %R' %alloc %kslot %q %inum %dn' %p0 H1 H2 Htc Hcl Hir H6 H7 H8 H9 H10
 
 /-- **THE COUNTED FORM, DERIVED** (Rocq's `wp_ialloc_sconf`, proved in
 `ProofIalloc.v` exactly so): open the op's set (`Xv6.logOp_openS`), run the
@@ -327,6 +482,48 @@ theorem IALLOC.wp_ialloc_sconf (IA : IALLOC) {hlc : HasLC} {GF : BundledGFunctor
   iintro %c' HΦ %spie %spp %R' %alloc %kslot %q %inum %dn' %hcs Hk Hpc Htc Hcl Hir Hsn Hsi
     Hpid Hsl Harm
   iapply HΦ $$ %spie %spp %R' %alloc %kslot %q %inum %dn' %hcs Hk Hpc Htc Hcl Hir Hsn Hsi
+    Hpid Hsl
+  cases alloc
+  · simp only [Bool.false_eq_true, if_false]
+    icases Harm with ⟨%h0, Hiref, Htx, HopS⟩
+    iframe Hiref Htx
+    isplitl []
+    · ipureintro; exact h0
+    · iapply logOpS_op icfgLog (u + 1) Sb $$ HopS Hltx
+  · simp only [if_true]
+    icases Harm with ⟨%hp, Hcl, HopS⟩
+    iframe Hcl
+    isplitl []
+    · ipureintro; exact hp
+    · iapply logOpS_op icfgLog u _ $$ HopS Hltx
+
+theorem IALLOC.wp_ialloc_sconf_eb (IA : IALLOC) {hlc : HasLC} {GF : BundledGFunctors}
+    [MachGS hlc GF] [Xv6G GF]
+    [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [IregG GF] [IcacheG GF]
+    [FsTopG GF] [FsLinkG GF] [IcboxG GF] [IrefslotG GF] [Appcfg GF] [Fscfg] [Icfg] [CurCtx]
+    (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+    (cpu : CPU) (k : KCtx) (γl : GName) (pd pav pu : BitVec 64) (j : Nat)
+    (ty : BitVec 16) (u : Nat) (t : Nat) (qt : Qp)
+    (pidv : BitVec 32) (dqp dqs dqn : DFrac)
+    hj hproc hK hnoff htier hgeom hblk hn1 hnnib hn31 hty htyk hpd ha0 ha1 :
+    wp_ialloc_sconf_eb_body (hlc := hlc) (GF := GF) Γ cpu k γl pd pav pu j ty u t qt
+      pidv dqp dqs dqn
+      hj hproc hK hnoff htier hgeom hblk hn1 hnnib hn31 hty htyk hpd ha0 ha1 := by
+  unfold wp_ialloc_sconf_eb_body
+  iintro ⟨Hk, Hpc, Hpi, Hte, Hce, Hpe, Hbc, Hlc, Hdc, Hsn, Hsi, Hinv, Hopen, Hpid, Hsl,
+    Hit2, Hiti, Hiref, Hop, Htx, Hnext⟩
+  icases logOp_openS icfgLog (u + 1) $$ Hop with ⟨%Sb, HopS, Hltx⟩
+  have h := IA.wp_ialloc_gen_eb (hlc := hlc) (GF := GF) Γ cpu k γl pd pav pu j ty u Sb t qt
+    pidv dqp dqs dqn hj hproc hK hnoff htier hgeom hblk hn1 hnnib hn31 hty htyk
+    hpd ha0 ha1
+  unfold wp_ialloc_gen_eb_body at h
+  iapply h
+  iframe Hk Hpc Hpi Hte Hce Hpe Hbc Hlc Hdc Hsn Hsi Hinv Hopen Hpid Hsl Hit2 Hiti Hiref
+    HopS Htx
+  iapply wpNext_mono _ _ _ _ _ $$ Hnext
+  iintro %c' HΦ %spie %spp %R' %alloc %kslot %q %inum %dn' %hcs Hk Hpc Hte Hce Hsn Hsi
+    Hpid Hsl Harm
+  iapply HΦ $$ %spie %spp %R' %alloc %kslot %q %inum %dn' %hcs Hk Hpc Hte Hce Hsn Hsi
     Hpid Hsl
   cases alloc
   · simp only [Bool.false_eq_true, if_false]

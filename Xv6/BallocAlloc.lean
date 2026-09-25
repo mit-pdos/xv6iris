@@ -47,7 +47,7 @@ variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
 set_option maxHeartbeats 16000000 in
 /-- **`+0x38 .. +0x48`: FOUND A FREE BIT** (Rocq's `ba_alloc`). -/
 theorem ba_alloc (BR : BREAD) (LW : LOG_WRITE) (BE : BRELSE) (MS : MEMSET)
-    (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ] (c cpu : CPU) (k : KCtx)
+    (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ] (cpu c0 : CPU) (k : KCtx)
     (spie spp : Bool) (R : RegMap)
     (γl : GName) (γb : BcacheNames) (V : BioView GF) (γdl : GName) (pd pav pu : BitVec 64)
     (j : Nat) (γ : LogNames) (γfs : FsNames) (logstart bmapstart size : Nat) (dev : BitVec 32)
@@ -55,7 +55,7 @@ theorem ba_alloc (BR : BREAD) (LW : LOG_WRITE) (BE : BRELSE) (MS : MEMSET)
     (used : BitSet) (bi : Nat) (kk : Nat) (bsd : List (BitVec 8)) (d : Bool)
     (pidv : BitVec 32) (dqp dqb dqs : DFrac)
     (hj : j < NPROC) (hproc : k.proc = procAddr j)
-    (hK : ballocSlots ≤ k.avail) (hsie : k.sie = false) (hnoff : k.noff = 0)
+    (hK : ballocSlots ≤ k.avail) (hnoff : k.noff = 0)
     (hlocks : k.locks = []) (htier : k.tier = KTier.kpt)
     (hgeom : logGeomOk V.cov logstart) (hbm : bitmapGeomOk V.cov logstart bmapstart size)
     (hcredit : cr = true → bmapstart ∈ Sb)
@@ -67,18 +67,18 @@ theorem ba_alloc (BR : BREAD) (LW : LOG_WRITE) (BE : BRELSE) (MS : MEMSET)
     (h15 : R 15#5 = BitVec.ofNat 64 (bi / 8))
     (h12 : R 12#5 = BitVec.setWidth 64 (bmByte used (bi / 8)))
     (h13 : R 13#5 = 1#64 <<< (bi % 8))
-    (hpin : true = false ∨ k.proc = 0#64 → c = cpu) :
-    kctx c (((k.withSpie spie spp).pushed 10).withRegs R) ∗ pcIs c (KA.«balloc» + 0x38#64) ∗
+    (hp0 : k.proc ≠ 0#64) :
+    kctx cpu (((k.withSpie spie spp).pushed 10).withRegs R) ∗ pcIs cpu (KA.«balloc» + 0x38#64) ∗
     baFrameK k ∗ panicEnv ∗ procsInv Γ ∗ bioCtx γl γb V ∗ diskCaps V.gd γdl pd pav pu ∗
     logCtx γ γb γfs V.cov logstart dev ∗ bitmapInv γfs bmapstart V.cov logstart size ∗
-    trapCsrs c ∗ cpuClaim c k.proc ∗ intrRes c ∗
+    trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗
     wordPointsTo (pPid k.proc) 4 dqp pidv ∗
     wordPointsTo sbSizeAddr 4 dqs (BitVec.ofNat 32 size) ∗
     wordPointsTo sbBmapstartAddr 4 dqb (BitVec.ofNat 32 bmapstart) ∗
     bslot γb ∗ logOpS γ (2 + u) Sb ∗
     bioLocked γb V kk pidv dev (BitVec.ofNat 32 bmapstart) (bitmapBytes used) bsd d ∗
-    baCont k cpu γ γb γfs V.cov logstart bmapstart size u cr Sb pidv dqp dqb dqs
-    ⊢ wpLoop (GF := GF) c := by
+    baCont k c0 γ γb γfs V.cov logstart bmapstart size u cr Sb pidv dqp dqb dqs
+    ⊢ wpLoop (GF := GF) cpu := by
   have hww : ∀ (K : KCtx) (a b c d : Bool), (K.withSpie a b).withSpie c d = K.withSpie c d :=
     fun _ _ _ _ _ => rfl
   have hpsw : ∀ (K : KCtx) (m : Nat) (a b : Bool),
@@ -93,7 +93,7 @@ theorem ba_alloc (BR : BREAD) (LW : LOG_WRITE) (BE : BRELSE) (MS : MEMSET)
   have hbi31 : bi < 2 ^ 31 := (hgeom.1 _ hhome.1).2
   have hq : bi / 8 < BSIZE := bit_byte_lt BSIZE bi (by unfold BPB at hbiB; exact hbiB)
   obtain ⟨a2, a18, a19, a20, a21, a22, a23, a24, hp⟩ := id hb
-  iintro ⟨Hk, Hpc, Hframe, #Hpe, #Hpi, #Hbc, #Hdc, #Hlc, #Hbmi, Htc, Hcl, Hir, Hpid, Hsz,
+  iintro ⟨Hk, Hpc, Hframe, #Hpe, #Hpi, #Hbc, #Hdc, #Hlc, #Hbmi, Hte, Hce, Hpid, Hsz,
     Hbms, Hsl, Hop, Hlk, Hnext⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
   -- the degenerate writer's anchor: nobody here owes a receipt
@@ -110,13 +110,13 @@ theorem ba_alloc (BR : BREAD) (LW : LOG_WRITE) (BE : BRELSE) (MS : MEMSET)
   icases byteBuf_upd (aBufData (bnode kk)) (bitmapBytes used) (bi / 8) (bmByte used (bi / 8))
     (bitmapBytes_lookup used _ hq) $$ Hby with ⟨Hbyte, Hbyback⟩
   -- +0x38  add a5,a5,s2 ; +0x3a  or a2,a2,a3 ; +0x3c  sb a2,88(a5)
-  k_step (wp_s_add c _ (KA.«balloc» + 0x38#64) true 15#5 15#5 18#5 (by decide))
+  k_step_e (wp_s_add cpu _ (KA.«balloc» + 0x38#64) true 15#5 15#5 18#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h15, a18]
   iintro Hk Hpc
-  k_step (wp_s_or c _ (KA.«balloc» + 0x3a#64) true 12#5 12#5 13#5 (by decide))
+  k_step_e (wp_s_or cpu _ (KA.«balloc» + 0x3a#64) true 12#5 12#5 13#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h12, h13, bmBit_set_64]
   iintro Hk Hpc
-  k_step (wp_s_sb c _ (KA.«balloc» + 0x3c#64) false 88#12 15#5 12#5 (by decide)
+  k_step_e (wp_s_sb cpu _ (KA.«balloc» + 0x3c#64) false 88#12 15#5 12#5 (by decide)
       (bmByte used (bi / 8)))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [ba_addr_byte]
   iintro Hk Hpc Hbyte
@@ -126,10 +126,10 @@ theorem ba_alloc (BR : BREAD) (LW : LOG_WRITE) (BE : BRELSE) (MS : MEMSET)
   ihave Hown := Hoback $$ %(bitmapBytes (used ∪ {bi})) %(bitmapBytes_length _) Hby
   ihave Hhold := Hhback $$ %(bitmapBytes (used ∪ {bi})) Hown
   -- +0x40  mv a0,s2 ; +0x42  jal log_write
-  k_step (wp_s_add c _ (KA.«balloc» + 0x40#64) true 10#5 0#5 18#5 (by decide))
+  k_step_e (wp_s_add cpu _ (KA.«balloc» + 0x40#64) true 10#5 0#5 18#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [a18]
   iintro Hk Hpc
-  k_step (wp_s_jal c _ (KA.«balloc» + 0x42#64) false 4218#21 1#5 (by decide))
+  k_step_e (wp_s_jal cpu _ (KA.«balloc» + 0x42#64) false 4218#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [ba_br_logwrite]
   iintro Hk Hpc
   -- THE BITMAP BLOCK'S log_write, CREDITED AND THROUGH THE INVARIANT
@@ -141,7 +141,7 @@ theorem ba_alloc (BR : BREAD) (LW : LOG_WRITE) (BE : BRELSE) (MS : MEMSET)
     CoPset.subseteq_top hszB hbi hnu $$ Hbmi
   ihave Hau := lwAu_lb0 γ γfs bmapstart (⊤ \ (↑bitmapN : CoPset))
     (bitmapBytes (used ∪ {bi})) (bitmapBytes used) (freeBlk γfs bi) e0 $$ Hau0
-  iapply (ba_log_write_au LW c _ γ γl γb V γfs logstart dev kk pidv (BitVec.ofNat 32 bmapstart)
+  iapply (ba_log_write_au LW cpu _ γ γl γb V γfs logstart dev kk pidv (BitVec.ofNat 32 bmapstart)
       bmapstart hbno (bitmapBytes (used ∪ {bi})) (bitmapBytes used) bsd d (1 + u) cr Sb e0 0
       (⊤ \ (↑bitmapN : CoPset)) (freeBlk γfs bi)
       ?wK ?wnoff ?wlk ?wbc ?wtier hkk ?wa0 hdev hcl hdt ⟨hbmcov, hbmlog⟩
@@ -156,10 +156,8 @@ theorem ba_alloc (BR : BREAD) (LW : LOG_WRITE) (BE : BRELSE) (MS : MEMSET)
   case wbc => k_norm_g; rw [hlocks]; simp
   case wtier => k_norm_g; exact htier
   case wa0 => k_norm_g
-  iapply wpNext_intro_pin
-  iintro %c1 %hp1 %spie1 %spp1 %R1 %hsp1 Hk Hpc %hcs1 Hop Hblk Hlk Hsl
-  have hc1 : c1 = c := hp1 (Or.inl (by k_norm_g; exact hsie))
-  subst hc1
+  k_next_e
+  iintro %spie1 %spp1 %R1 %hsp1 Hk Hpc %hcs1 Hop Hblk Hlk Hsl
   k_norm_g [ba_ret_46, hww, hpsw]
   unfold calleeSaved at hcs1
   k_norm_g at hcs1
@@ -172,13 +170,13 @@ theorem ba_alloc (BR : BREAD) (LW : LOG_WRITE) (BE : BRELSE) (MS : MEMSET)
   icases (show freeBlk (GF := GF) γfs bi ⊢ ∃ bs : List (BitVec 8), fsblock γfs.bytes bi bs from by
     unfold freeBlk; iintro H; iexact H) $$ Hblk with ⟨%bsD, HfsbD⟩
   -- +0x46  mv a0,s2 ; +0x48  jal brelse
-  k_step (wp_s_add c1 _ (KA.«balloc» + 0x46#64) true 10#5 0#5 18#5 (by decide))
+  k_step_e (wp_s_add cpu _ (KA.«balloc» + 0x46#64) true 10#5 0#5 18#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [b18, a18]
   iintro Hk Hpc
-  k_step (wp_s_jal c1 _ (KA.«balloc» + 0x48#64) false 2096844#21 1#5 (by decide))
+  k_step_e (wp_s_jal cpu _ (KA.«balloc» + 0x48#64) false 2096844#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [ba_br_brelse]
   iintro Hk Hpc
-  iapply (brelse_call BE Γ c1 _ γl γb V kk pidv dev (BitVec.ofNat 32 bmapstart) dqp
+  iapply (brelse_call BE Γ cpu _ γl γb V kk pidv dev (BitVec.ofNat 32 bmapstart) dqp
       (bitmapBytes (used ∪ {bi})) bsd true k.proc (by k_norm_g)
       ?rnoff ?rK ?rlk ?rsl ?rp ?rtier hkk ?ra0)
     $$ [- $Hk $Hpc $Hpi $Hbc $Hpid $Hlk]
@@ -195,20 +193,18 @@ theorem ba_alloc (BR : BREAD) (LW : LOG_WRITE) (BE : BRELSE) (MS : MEMSET)
   case rp => k_norm_g; rw [hlocks]; simp
   case rtier => k_norm_g; exact htier
   case ra0 => k_norm_g
-  iapply wpNext_intro_pin
-  iintro %c2 %hp2 %spie2 %spp2 %R2 %hsp2 Hk Hpc %hcs2 Hpid Hsl2
-  have hc2 : c2 = c1 := hp2 (Or.inl (by k_norm_g; exact hsie))
-  subst hc2
+  k_next_e
+  iintro %spie2 %spp2 %R2 %hsp2 Hk Hpc %hcs2 Hpid Hsl2
   k_norm_g [ba_ret_4c, hww, hpsw]
   unfold calleeSaved at hcs2
   k_norm_g at hcs2
   obtain ⟨d2', d8, d9, d18, d19, d20, d21, d22, d23, d24, d25, d26, d27⟩ := hcs2
   ihave Hsl := ba_slots_join2 γb $$ [Hsl Hsl2]
   case' _ => iframe
-  iapply (ba_bzero BR LW BE MS Γ c2 cpu k spie2 spp2 R2 γl γb V γdl pd pav pu j γ γfs logstart
-      bmapstart size dev u cr Sb (bnode kk) bi bsD pidv dqp dqb dqs hj hproc hK hsie hnoff
-      hlocks htier hdev hcl hdt hpd hbi31 hbnz hhome ?hb2 ?h92 hpin)
-    $$ [$Hk $Hpc $Hframe $Hpe $Hpi $Hbc $Hdc $Hlc $Htc $Hcl $Hir $Hpid $Hsz $Hbms $Hsl $Hop
+  iapply (ba_bzero BR LW BE MS Γ cpu c0 k spie2 spp2 R2 γl γb V γdl pd pav pu j γ γfs logstart
+      bmapstart size dev u cr Sb (bnode kk) bi bsD pidv dqp dqb dqs hj hproc hK hnoff
+      hlocks htier hdev hcl hdt hpd hbi31 hbnz hhome ?hb2 ?h92 hp0)
+    $$ [$Hk $Hpc $Hframe $Hpe $Hpi $Hbc $Hdc $Hlc $Hte $Hce $Hpid $Hsz $Hbms $Hsl $Hop
         $HfsbD $Hnext]
   case hb2 =>
     obtain ⟨p25, p26, p27⟩ := hp

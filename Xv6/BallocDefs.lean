@@ -133,7 +133,7 @@ def baArms (γ : LogNames) (γfs : FsNames) (cov : ExtTreeSet Nat compare)
 
 /-- **THE CLIENT'S CONTINUATION, NAMED** (Rocq's `ba_cont`), so it is not
 re-traversed by every proof-mode split: the `wpNext` of
-`Xv6.wp_balloc_gen_body`, verbatim. -/
+`Xv6.wp_balloc_gen_eb_body`, verbatim. -/
 def baCont (k : KCtx) (cpu : CPU) (γ : LogNames) (γb : BcacheNames) (γfs : FsNames)
     (cov : ExtTreeSet Nat compare) (logstart bmapstart size : Nat)
     (u : Nat) (cr : Bool) (Sb : List Nat) (pidv : BitVec 32) (dqp dqb dqs : DFrac) :
@@ -141,7 +141,7 @@ def baCont (k : KCtx) (cpu : CPU) (γ : LogNames) (γb : BcacheNames) (γfs : Fs
   wpNext true k.proc cpu (fun cpu' => iprop(∀ (spie spp : Bool) (R' : RegMap),
     ⌜calleeSaved k.regs R'⌝ -∗
     kctx cpu' ((k.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k.regs 1#5)) -∗
-    trapCsrs cpu' -∗ cpuClaim cpu' k.proc -∗ intrRes cpu' -∗
+    trapCsrsExt cpu' k.sie -∗ cpuClaimExt cpu' k.sie k.proc -∗
     wordPointsTo (pPid k.proc) 4 dqp pidv -∗
     wordPointsTo sbSizeAddr 4 dqs (BitVec.ofNat 32 size) -∗
     wordPointsTo sbBmapstartAddr 4 dqb (BitVec.ofNat 32 bmapstart) -∗

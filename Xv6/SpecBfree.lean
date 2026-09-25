@@ -82,12 +82,14 @@ as `Xv6/SpecBread.lean` does, and its crossing is the literal `true`.
 
 **Deviations from Rocq, reported.**
 
-1. PINNED AT `k.sie = false ∧ k.noff = 0 ∧ k.locks = []` (fs1 brief §1,
-   "the `sie` question").  Lean's `BREAD` is pinned there and has no `eb`
-   parameter, so Rocq's `eb`/`b` genericity and its `trap_csrs_ext` /
-   `cpu_claim_ext` complement collapse to the bare `trapCsrs`/`cpuClaim`/
-   `intrRes` bundle bread takes; `locks_below lks "log"` becomes
-   `k.locks = []`.
+1. **eb-GENERIC, as in Rocq** (`cpu_own 0 eb`): the `_eb` bodies take the
+   complement `trapCsrsExt cpu k.sie` / `cpuClaimExt cpu k.sie k.proc` (Rocq
+   `trap_csrs_ext` / `cpu_claim_ext`) in and out, at either entry `SIE`, and are
+   what the interface proves.  Depth 0 implies no spinlock held (`KCtx.wf`:
+   `locks.length ≤ noff`), which is Lean's reading of Rocq's `locks_below`
+   premise (Lean has no lock ranks).  The `sie = false` bodies (the whole trap
+   bundle, `k.locks = []`) are kept as DERIVED instances for the callers not yet
+   generalized.
 2. THE VIEW IS A PARAMETER (the log layer's convention:
    `Xv6/SpecLogWrite.lean` deviation 3, `Xv6/SpecWriteHead.lean`
    deviation 2).  Rocq runs the bio layer at `fs_view γfs γd dev cov`
@@ -120,7 +122,7 @@ import Xv6.SpecLogWrite
 
 namespace Xv6
 
-open Iris Iris.ProgramLogic Iris.BI Std MachCSL
+open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
 open LeanRV64D
 
 /-- Address of `bfree`. -/
@@ -185,21 +187,101 @@ def wp_bfree_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF
     logOpSe γ (if cr then u + 1 else u) (bmapstart :: Sb) e0 -∗ wpLoop cpu'))
   ⊢ wpLoop (GF := GF) cpu
 
-/-- The interface of `bfree` (Rocq's `Module Type BFREE`, less
-`wp_bfree_sconf`, which is derived below: deviation 5). -/
-structure BFREE : Prop where
-  /-- the credited, general form -/
-  wp_bfree : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
+/-- The eb-generic form of `wp_bfree_body` (Rocq: `cpu_own 0 eb`, the
+complement `trap_csrs_ext` / `cpu_claim_ext` in and out; depth 0, so no
+spinlock held by `KCtx.wf`). -/
+def wp_bfree_eb_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
     [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [CurCtx]
     (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
     (cpu : CPU) (k : KCtx) (γl : GName) (γb : BcacheNames) (V : BioView GF) (γdl : GName)
     (pd pav pu : BitVec 64) (j : Nat) (γ : LogNames) (γfs : FsNames)
     (logstart bmapstart size : Nat) (dev bno : BitVec 32) (bs : List (BitVec 8))
     (u : Nat) (cr : Bool) (Sb : List Nat) (e0 : Nat) (pidv : BitVec 32) (dqp dqb : DFrac)
-    hj hproc hK hsie hnoff hlocks htier hgeom hbg hdev hcl hdt hbno hbs hpd ha0 ha1,
+    (hj : j < NPROC) (hproc : k.proc = procAddr j) (hK : bfreeSlots ≤ k.avail)
+    (hnoff : k.noff = 0)
+    (htier : k.tier = KTier.kpt)
+    -- the covered range's bounds (bread's `2^31` premise; 0 is never a client block)
+    (hgeom : logGeomOk V.cov logstart)
+    -- ONE BITMAP BLOCK, a covered home block (deviation 3)
+    (hbg : bitmapGeomOk V.cov logstart bmapstart size)
+    (hdev : dev = V.dev) (hcl : V.clean = fsMclean γfs) (hdt : V.dirty = fsMdirty γfs)
+    -- the block being freed: in range for the bitmap -- all bfree needs of it
+    (hbno : bno.toNat < size)
+    -- ...and really a block's worth of bytes
+    (hbs : bs.length = BSIZE)
+    (hpd : descPageRw pd)
+    -- the two `uint` arguments arrive sign-extended (RV64 ABI)
+    (ha0 : k.regs 10#5 = BitVec.signExtend 64 dev)
+    (ha1 : k.regs 11#5 = BitVec.signExtend 64 bno) : Prop :=
+  kctx cpu k ∗ pcIs cpu bfreeAddr ∗ procsInv Γ ∗
+  trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗
+  bioCtx γl γb V ∗ diskCaps V.gd γdl pd pav pu ∗ panicEnv ∗
+  logCtx γ γb γfs V.cov logstart dev ∗
+  -- `sb.bmapstart`, read once at `+0x16`
+  wordPointsTo sbBmapstartAddr 4 dqb (BitVec.ofNat 32 bmapstart) ∗
+  -- THE BITMAP'S INVARIANT: persistent; the pool is inside
+  bitmapInv γfs bmapstart V.cov logstart size ∗
+  -- THE BLOCK BEING FREED: its EXCLUSIVE byte run -- what makes the arm dead
+  fsblock γfs.bytes bno.toNat bs ∗
+  -- the caller's pid cell (bread's acquiresleep records it)
+  wordPointsTo (pPid k.proc) 4 dqp pidv ∗
+  -- TWO slot units: bread's reference is held across log_write's own
+  bslots γb 2 ∗
+  -- THE CREDIT, AS A RESOURCE AT A NAMED EPOCH (`emp` at `cr = false`)
+  logCredit γ cr Sb e0 bmapstart ∗
+  -- THE RESERVATION, WITH THE BIRTH EPOCH NAMED: a unit in hand either way
+  logOpSe γ (u + 1) Sb e0 ∗
+  wpNext true k.proc cpu (fun cpu' => iprop(∀ (spie spp : Bool) (R' : RegMap),
+    ⌜calleeSaved k.regs R'⌝ -∗
+    kctx cpu' ((k.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k.regs 1#5)) -∗
+    trapCsrsExt cpu' k.sie -∗ cpuClaimExt cpu' k.sie k.proc -∗
+    wordPointsTo (pPid k.proc) 4 dqp pidv -∗
+    wordPointsTo sbBmapstartAddr 4 dqb (BitVec.ofNat 32 bmapstart) -∗
+    bslots γb 2 -∗
+    -- the SAME epoch back; the unit back iff credited; the bitmap block logged
+    logOpSe γ (if cr then u + 1 else u) (bmapstart :: Sb) e0 -∗ wpLoop cpu'))
+  ⊢ wpLoop (GF := GF) cpu
+
+/-- The interface of `bfree` (Rocq's `Module Type BFREE`, less
+`wp_bfree_sconf`, which is derived below: deviation 5). -/
+structure BFREE : Prop where
+  /-- the credited, general form -/
+  wp_bfree_eb : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
+    [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [CurCtx]
+    (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+    (cpu : CPU) (k : KCtx) (γl : GName) (γb : BcacheNames) (V : BioView GF) (γdl : GName)
+    (pd pav pu : BitVec 64) (j : Nat) (γ : LogNames) (γfs : FsNames)
+    (logstart bmapstart size : Nat) (dev bno : BitVec 32) (bs : List (BitVec 8))
+    (u : Nat) (cr : Bool) (Sb : List Nat) (e0 : Nat) (pidv : BitVec 32) (dqp dqb : DFrac)
+    hj hproc hK hnoff htier hgeom hbg hdev hcl hdt hbno hbs hpd ha0 ha1,
+    wp_bfree_eb_body (hlc := hlc) (GF := GF) Γ cpu k γl γb V γdl pd pav pu j γ γfs
+      logstart bmapstart size dev bno bs u cr Sb e0 pidv dqp dqb
+      hj hproc hK hnoff htier hgeom hbg hdev hcl hdt hbno hbs hpd ha0 ha1
+
+/-- The interrupts-off instance of `wp_bfree_eb` (the complement is the whole
+bundle): the contract every not-yet-generalized caller states. -/
+theorem BFREE.wp_bfree (A : BFREE) {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
+    [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [CurCtx]
+    (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+    (cpu : CPU) (k : KCtx) (γl : GName) (γb : BcacheNames) (V : BioView GF) (γdl : GName)
+    (pd pav pu : BitVec 64) (j : Nat) (γ : LogNames) (γfs : FsNames)
+    (logstart bmapstart size : Nat) (dev bno : BitVec 32) (bs : List (BitVec 8))
+    (u : Nat) (cr : Bool) (Sb : List Nat) (e0 : Nat) (pidv : BitVec 32) (dqp dqb : DFrac)
+    hj hproc hK hsie hnoff hlocks htier hgeom hbg hdev hcl hdt hbno hbs hpd ha0 ha1 :
     wp_bfree_body (hlc := hlc) (GF := GF) Γ cpu k γl γb V γdl pd pav pu j γ γfs
       logstart bmapstart size dev bno bs u cr Sb e0 pidv dqp dqb
-      hj hproc hK hsie hnoff hlocks htier hgeom hbg hdev hcl hdt hbno hbs hpd ha0 ha1
+      hj hproc hK hsie hnoff hlocks htier hgeom hbg hdev hcl hdt hbno hbs hpd ha0 ha1 := by
+  have h := A.wp_bfree_eb (hlc := hlc) (GF := GF) (Γ := Γ) (cpu := cpu) (k := k) (γl := γl) (γb := γb) (V := V) (γdl := γdl) (pd := pd) (pav := pav) (pu := pu) (j := j) (γ := γ) (γfs := γfs) (logstart := logstart) (bmapstart := bmapstart) (size := size) (dev := dev) (bno := bno) (bs := bs) (u := u) (cr := cr) (Sb := Sb) (e0 := e0) (pidv := pidv) (dqp := dqp) (dqb := dqb) (hj := hj) (hproc := hproc) (hK := hK) (hnoff := hnoff) (htier := htier) (hgeom := hgeom) (hbg := hbg) (hdev := hdev) (hcl := hcl) (hdt := hdt) (hbno := hbno) (hbs := hbs) (hpd := hpd) (ha0 := ha0) (ha1 := ha1)
+  unfold wp_bfree_eb_body at h
+  unfold wp_bfree_body
+  rw [hsie] at h
+  simp only [trapCsrsExt_false, cpuClaimExt_false] at h
+  iintro ⟨H0, H1, H2, Htc, Hcl, Hir, H6, H7, H8, H9, H10, H11, H12, H13, H14, H15, H16, Hnext⟩
+  iapply h
+  iframe H0 H1 H2 Htc Hcl Hir H6 H7 H8 H9 H10 H11 H12 H13 H14 H15 H16
+  iapply wpNext_mono $$ Hnext
+  iintro %cpu' HK %spie %spp %R' %p0 H1 H2 ⟨Htc, Hir⟩ Hcl H6 H7 H8 H9
+  iapply HK $$ %spie %spp %R' %p0 H1 H2 Htc Hcl Hir H6 H7 H8 H9
 
 /-- **THE SET-FORGETTING FORM** (Rocq's `wp_bfree_sconf_body`): the plain
 counted budget `logOp γ (u + 1)` in, `logOp γ u` out -- spend-exactly, since
@@ -234,6 +316,44 @@ def wp_bfree_sconf_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [X
     ⌜calleeSaved k.regs R'⌝ -∗
     kctx cpu' ((k.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k.regs 1#5)) -∗
     trapCsrs cpu' -∗ cpuClaim cpu' k.proc -∗ intrRes cpu' -∗
+    wordPointsTo (pPid k.proc) 4 dqp pidv -∗
+    wordPointsTo sbBmapstartAddr 4 dqb (BitVec.ofNat 32 bmapstart) -∗
+    bslots γb 2 -∗ logOp γ u -∗ wpLoop cpu'))
+  ⊢ wpLoop (GF := GF) cpu
+
+/-- The eb-generic form of `wp_bfree_sconf_body` (Rocq: `cpu_own 0 eb`, the
+complement `trap_csrs_ext` / `cpu_claim_ext` in and out; depth 0, so no
+spinlock held by `KCtx.wf`). -/
+def wp_bfree_sconf_eb_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
+    [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [CurCtx]
+    (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+    (cpu : CPU) (k : KCtx) (γl : GName) (γb : BcacheNames) (V : BioView GF) (γdl : GName)
+    (pd pav pu : BitVec 64) (j : Nat) (γ : LogNames) (γfs : FsNames)
+    (logstart bmapstart size : Nat) (dev bno : BitVec 32) (bs : List (BitVec 8))
+    (u : Nat) (pidv : BitVec 32) (dqp dqb : DFrac)
+    (hj : j < NPROC) (hproc : k.proc = procAddr j) (hK : bfreeSlots ≤ k.avail)
+    (hnoff : k.noff = 0)
+    (htier : k.tier = KTier.kpt)
+    (hgeom : logGeomOk V.cov logstart) (hbg : bitmapGeomOk V.cov logstart bmapstart size)
+    (hdev : dev = V.dev) (hcl : V.clean = fsMclean γfs) (hdt : V.dirty = fsMdirty γfs)
+    (hbno : bno.toNat < size) (hbs : bs.length = BSIZE) (hpd : descPageRw pd)
+    (ha0 : k.regs 10#5 = BitVec.signExtend 64 dev)
+    (ha1 : k.regs 11#5 = BitVec.signExtend 64 bno) : Prop :=
+  kctx cpu k ∗ pcIs cpu bfreeAddr ∗ procsInv Γ ∗
+  trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗
+  bioCtx γl γb V ∗ diskCaps V.gd γdl pd pav pu ∗ panicEnv ∗
+  logCtx γ γb γfs V.cov logstart dev ∗
+  wordPointsTo sbBmapstartAddr 4 dqb (BitVec.ofNat 32 bmapstart) ∗
+  bitmapInv γfs bmapstart V.cov logstart size ∗
+  fsblock γfs.bytes bno.toNat bs ∗
+  wordPointsTo (pPid k.proc) 4 dqp pidv ∗
+  bslots γb 2 ∗
+  -- THE RESERVATION, SPEND-EXACTLY: the one log_write always runs
+  logOp γ (u + 1) ∗
+  wpNext true k.proc cpu (fun cpu' => iprop(∀ (spie spp : Bool) (R' : RegMap),
+    ⌜calleeSaved k.regs R'⌝ -∗
+    kctx cpu' ((k.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k.regs 1#5)) -∗
+    trapCsrsExt cpu' k.sie -∗ cpuClaimExt cpu' k.sie k.proc -∗
     wordPointsTo (pPid k.proc) 4 dqp pidv -∗
     wordPointsTo sbBmapstartAddr 4 dqb (BitVec.ofNat 32 bmapstart) -∗
     bslots γb 2 -∗ logOp γ u -∗ wpLoop cpu'))
@@ -280,6 +400,44 @@ theorem BFREE.wp_bfree_sconf (BF : BFREE) {hlc : HasLC} {GF : BundledGFunctors}
   ihave HopS := logOpSe_opS γ u (bmapstart :: Sb) e0 $$ Hope
   ihave Hop := logOpS_op γ u (bmapstart :: Sb) $$ HopS Htx
   iapply HΦ $$ %spie %spp %R' [] Hk Hpc Htc Hcl Hir Hpid Hsb Hsl Hop
+  ipureintro; exact hcs
+
+theorem BFREE.wp_bfree_sconf_eb (BF : BFREE) {hlc : HasLC} {GF : BundledGFunctors}
+    [MachGS hlc GF] [Xv6G GF] [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF]
+    [CurCtx] (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+    (cpu : CPU) (k : KCtx) (γl : GName) (γb : BcacheNames) (V : BioView GF) (γdl : GName)
+    (pd pav pu : BitVec 64) (j : Nat) (γ : LogNames) (γfs : FsNames)
+    (logstart bmapstart size : Nat) (dev bno : BitVec 32) (bs : List (BitVec 8))
+    (u : Nat) (pidv : BitVec 32) (dqp dqb : DFrac)
+    (hj : j < NPROC) (hproc : k.proc = procAddr j) (hK : bfreeSlots ≤ k.avail)
+    (hnoff : k.noff = 0)
+    (htier : k.tier = KTier.kpt)
+    (hgeom : logGeomOk V.cov logstart) (hbg : bitmapGeomOk V.cov logstart bmapstart size)
+    (hdev : dev = V.dev) (hcl : V.clean = fsMclean γfs) (hdt : V.dirty = fsMdirty γfs)
+    (hbno : bno.toNat < size) (hbs : bs.length = BSIZE) (hpd : descPageRw pd)
+    (ha0 : k.regs 10#5 = BitVec.signExtend 64 dev)
+    (ha1 : k.regs 11#5 = BitVec.signExtend 64 bno) :
+    wp_bfree_sconf_eb_body Γ cpu k γl γb V γdl pd pav pu j γ γfs logstart bmapstart size dev bno
+      bs u pidv dqp dqb hj hproc hK hnoff htier hgeom hbg hdev hcl hdt hbno hbs hpd
+      ha0 ha1 := by
+  unfold wp_bfree_sconf_eb_body
+  iintro ⟨Hk, Hpc, #Hpi, Hte, Hce, #Hbio, #Hdc, #Hpe, #Hlctx, Hsb, #Hbmi, Hfsb, Hpid,
+    Hsl, Hop, Hnext⟩
+  icases logOp_openS γ (u + 1) $$ Hop with ⟨%Sb, HopS, Htx⟩
+  icases logOpS_named γ (u + 1) Sb $$ HopS with ⟨%e0, Hope⟩
+  ihave #Hcred := logCredit_own (GF := GF) γ false Sb e0 bmapstart (fun h => absurd h (by simp))
+  have h := BF.wp_bfree_eb Γ cpu k γl γb V γdl pd pav pu j γ γfs logstart bmapstart size dev bno
+    bs u false Sb e0 pidv dqp dqb hj hproc hK hnoff htier hgeom hbg hdev hcl hdt
+    hbno hbs hpd ha0 ha1
+  unfold wp_bfree_eb_body at h
+  iapply h
+  iframe Hk Hpc Hpi Hte Hce Hbio Hdc Hpe Hlctx Hsb Hbmi Hfsb Hpid Hsl Hcred Hope
+  iapply wpNext_mono _ _ _ _ _ $$ Hnext
+  iintro %c HΦ %spie %spp %R' %hcs Hk Hpc Hte Hce Hpid Hsb Hsl Hope
+  isimp only [Bool.false_eq_true, if_false] at Hope
+  ihave HopS := logOpSe_opS γ u (bmapstart :: Sb) e0 $$ Hope
+  ihave Hop := logOpS_op γ u (bmapstart :: Sb) $$ HopS Htx
+  iapply HΦ $$ %spie %spp %R' [] Hk Hpc Hte Hce Hpid Hsb Hsl Hop
   ipureintro; exact hcs
 
 end Xv6
