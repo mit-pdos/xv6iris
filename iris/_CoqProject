@@ -1768,3 +1768,9 @@ UShPipesLaw.v
 UShPipesRound.v
 PipesDecE.v
 UnionDecU.v
+UnionOutPure.v
+PipesLinksV.v
+UnionOut.v
+UnionLinks.v
+UnionLinkInst.v
+UnionReadInst.v
