@@ -74,13 +74,8 @@ Deviations from Rocq:
    the type).  `a_devsw_read mj` is `aDevswRead mj = KA.devsw + 16 mj`.
 5. `cons_swallow`'s `bv_unsigned (cons_xlate b) = 4` is `(consXlate
    b).toNat = 4`.
-6. INTERIM CAMERA BINDER: the committed sequence is a mono-list over
-   `List Obs × BitVec 8`, a camera type `Xv6G` does not have yet.  This file
-   takes it as the section binder `[MonoListG GF (List Obs × BitVec 8)]`
-   until the ONE `Xv6G` field lands (reported edit to
-   `Xv6/UartTrace.lean`); then the binder is resolved from `Xv6G` at every
-   use and can be deleted.  No class of its own is declared (one capacity
-   instance per camera).
+6. The committed sequence's camera (a mono-list over `List Obs × BitVec 8`)
+   is `Xv6G.mlStoredG` -- one capacity instance, resolved from `Xv6G`.
 7. `cons_data_of_run` takes the carve at `consBufAddr` (Rocq takes an
    arbitrary base with the Sail address bridge as a premise).
 8. `cons_byte_addr` drops Rocq's `i < INPUT_BUF_SIZE` premise (Rocq needed
@@ -178,7 +173,6 @@ theorem devswReadVal_is_console (mj : Nat) (h : devswReadVal mj = KA.«consolere
 
 section
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
-  [MonoListG GF (List Obs × BitVec 8)]
 
 /-! ## The ring's bytes and its tag column -/
 
@@ -966,7 +960,6 @@ have to be -- a deposit wants TRANSPORTABILITY. -/
 
 section
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
-  [MonoListG GF (List Obs × BitVec 8)]
 
 instance devswTable_morph (t : KTier) :
     CtxMorph (GF := GF) (fun ξ => devswTable (X := ⟨ξ, t⟩)) :=

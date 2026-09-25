@@ -49,9 +49,8 @@ reason).
 1. **FIELDS ROCQ HAS AND THIS PORT DOES NOT**, each with the layer it
    names: `fsc_fol` (the file
    table's off-borrow liveness counter; this port's file table keys
-   liveness differently, `Xv6/FileFrac.lean`), and `fsc_cons` (the console
-   ring's `cons_names`; this port's console is `Xv6/ConsoleDefs.lean` and
-   has no ring ghost).  Adding a field to a Lean class later breaks only
+   liveness differently, `Xv6/FileFrac.lean`).  (`fsc_cons`, the console
+   ring's `cons_names`, is ported: `fscCons`, `Xv6/ConsNames.lean`.)  Adding a field to a Lean class later breaks only
    INSTANCE sites, of which there will be exactly one -- the boot mint --
    so growing it incrementally is cheap; contrast Rocq, where retrofitting
    ambience was a whole-tree sweep.
@@ -96,6 +95,7 @@ import Xv6.BitmapInv
 import Xv6.InodeInv
 import Xv6.IcacheRefDefs
 import Xv6.UartTrace
+import Xv6.ConsNames
 
 namespace Xv6
 
@@ -139,9 +139,15 @@ class Fscfg where
   fscIc : IcNames
   /-- ...and the "itable" spinlock (Rocq `fsc_itlock`). -/
   fscItlock : GName
+  /-- THE CONSOLE RING'S GHOST NAMES (Rocq `fsc_cons`): the read syscall's
+  receipt names the window of the ring's stored sequence the call
+  delivered, and the trap route's per-number post row has to spell that
+  receipt with no gname parameter of its own -- so the names are AMBIENT,
+  exactly as the UART's are.  Per era, like everything else here. -/
+  fscCons : ConsNames
 
 export Fscfg (fscPrintk fscKalloc fscKpages fscUart fscDisk fscDlock fscBio fscFs
-              fscCov fscLogst fscBmapstart fscSize fscNinodes fscIreg fscIc fscItlock)
+              fscCov fscLogst fscBmapstart fscSize fscNinodes fscIreg fscIc fscItlock fscCons)
 
 /-- Rocq `FsReady.fs_geom_ok` (deviation 5).  Every clause is stated at
 the ambient fields (`Fscfg`, and `Icfg` for the four numbers the inode

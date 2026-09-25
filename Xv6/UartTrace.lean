@@ -71,11 +71,15 @@ class Xv6G (GF : BundledGFunctors) where
   [gvLogG : GhostVarG GF (List LogEntry)]
   /-- the consoleintr arm in progress (`UartNames.arm`) -/
   [gvArmG : GhostVarG GF (Option ConsArm)]
+  /-- the console ring's committed sequence of (history, byte) pairs
+  (`ConsNames.log`; Rocq's `mono_listG (list mobs * byte)`) -/
+  [mlStoredG : MonoListG GF (List Obs × BitVec 8)]
 
 attribute [instance] Xv6G.monoListG Xv6G.gvListG
 attribute [reducible, instance] Xv6G.gvNatG Xv6G.gvUnitG Xv6G.gvCpuG Xv6G.gvW32G Xv6G.gvBoolG
 attribute [reducible, instance] Xv6G.gmUnitG Xv6G.gmBlkG Xv6G.authUfracG Xv6G.cinvG
 attribute [reducible, instance] Xv6G.gvPopG Xv6G.gvOHistG Xv6G.gvDelivG Xv6G.gvLogG Xv6G.gvArmG Xv6G.mlLogG
+attribute [reducible, instance] Xv6G.mlStoredG
 
 /-- The names of one port's ghosts (the Rocq `UartNames.uart_names`, the
 subset the Lean port carries): the accepted trace (`mono_list` over
