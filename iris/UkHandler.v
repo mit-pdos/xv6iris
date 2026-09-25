@@ -173,6 +173,11 @@ Section UkHandler.
     ei_copy : nat -> bool -> bytes -> bytes -> iProp Σ;
     ei_copy_end : nat -> bool -> bytes -> iProp Σ;   (* the writer closed *)
     ei_copy_halt : nat -> iProp Σ;                   (* the sink's reader went *)
+    (* the producer device ([ProgTree.DProd], union.md C9d'): one number on
+       a producer's output and its diagnostics; the output owes one of
+       [outs], the diagnostics one of [ds] or a failure report of [xs] *)
+    ei_prod : nat -> list bytes -> list bytes -> list bytes -> iProp Σ;
+    ei_prod_halt : nat -> list bytes -> iProp Σ;     (* the output's reader went *)
     ei_files : (bytes -> option bytes) -> list bytes -> iProp Σ;
     (* THE TAINT at the descriptors the process holds: it pays the rest of
        any tree with the discipline *)
@@ -226,6 +231,7 @@ Section UkHandler.
          | DIn Sin => ei_in d Sin | DInE Sin => ei_in_e d Sin | DInEnd => ei_in_end d
          | DCopy h Sin p => ei_copy d h Sin p | DCopyEnd h p => ei_copy_end d h p
          | DCopyHalt => ei_copy_halt d
+         | DProd outs xs ds => ei_prod d outs xs ds | DProdHalt ds => ei_prod_halt d ds
          end) -∗
         ((ei_fds fdm -∗
           (match x with
@@ -234,6 +240,7 @@ Section UkHandler.
            | DIn Sin => ei_in d Sin | DInE Sin => ei_in_e d Sin | DInEnd => ei_in_end d
            | DCopy h Sin p => ei_copy d h Sin p | DCopyEnd h p => ei_copy_end d h p
            | DCopyHalt => ei_copy_halt d
+           | DProd outs xs ds => ei_prod d outs xs ds | DProdHalt ds => ei_prod_halt d ds
            end) -∗ K 0)
          ∧ (ei_fds fdm -∗
             (match x with
@@ -242,6 +249,7 @@ Section UkHandler.
              | DIn Sin => ei_in d Sin | DInE Sin => ei_in_e d Sin | DInEnd => ei_in_end d
              | DCopy h Sin p => ei_copy d h Sin p | DCopyEnd h p => ei_copy_end d h p
              | DCopyHalt => ei_copy_halt d
+             | DProd outs xs ds => ei_prod d outs xs ds | DProdHalt ds => ei_prod_halt d ds
              end) -∗ K (-1))
          ∧ (∀ y, ei_taint (dom fdm) -∗ K y)) -∗
         wr_obl N P fd [] K;
@@ -358,6 +366,7 @@ Section UkHandler.
          | DIn Sin => ei_in d Sin | DInE Sin => ei_in_e d Sin | DInEnd => ei_in_end d
          | DCopy h Sin p => ei_copy d h Sin p | DCopyEnd h p => ei_copy_end d h p
          | DCopyHalt => ei_copy_halt d
+         | DProd outs xs ds => ei_prod d outs xs ds | DProdHalt ds => ei_prod_halt d ds
          end) -∗
         ((ei_fds (delete fd fdm) -∗ ei_files files paths -∗ K 0)
          ∧ (∀ y, ei_taint (dom fdm ∖ {[fd]}) -∗ K y)) -∗
@@ -383,8 +392,50 @@ Section UkHandler.
                          | DIn Sin => ei_in d Sin | DInE Sin => ei_in_e d Sin | DInEnd => ei_in_end d
                          | DCopy h Sin p => ei_copy d h Sin p | DCopyEnd h p => ei_copy_end d h p
                          | DCopyHalt => ei_copy_halt d
+                         | DProd outs xs ds => ei_prod d outs xs ds | DProdHalt ds => ei_prod_halt d ds
                          end) -∗
         ex_obl N P s;
+    (* THE PRODUCER DEVICE'S LAWS ([ProgTree.cf_write_prod] and its four
+       siblings): an output write, as at a haltable output, retiring the
+       failure reports; a diagnostic write, as at the console, choosing a
+       diagnostic or -- the output still able to owe nothing -- a failure
+       report, after which the output owes nothing *)
+    ei_write_prod : forall (fdm : fdmap) (fd : Z) (d : nat) (outs xs ds : list bytes)
+                      (a bs : bytes) (K : Z -> iProp Σ),
+        bs <> [] -> fdm !! fd = Some d -> fd = prod_out -> a ∈ outs -> bs `prefix_of` a ->
+        ei_fds fdm -∗ ei_prod d outs xs ds -∗
+        ((ei_fds fdm -∗ ei_prod d [drop (length bs) a] [] ds -∗ K (Z.of_nat (length bs)))
+         ∧ (ei_fds fdm -∗ ei_prod_halt d ds -∗ K (-1))
+         ∧ (∀ x, ei_taint (dom fdm) -∗ K x)) -∗
+        wr_obl N P fd bs K;
+    ei_write_prod_halt : forall (fdm : fdmap) (fd : Z) (d : nat) (ds : list bytes)
+                           (bs : bytes) (K : Z -> iProp Σ),
+        bs <> [] -> Z.of_nat (length bs) < 2 ^ 31 -> fdm !! fd = Some d -> fd = prod_out ->
+        ei_fds fdm -∗ ei_prod_halt d ds -∗
+        ((ei_fds fdm -∗ ei_prod_halt d ds -∗ K (-1)) ∧ (∀ x, ei_taint (dom fdm) -∗ K x)) -∗
+        wr_obl N P fd bs K;
+    ei_write_prod_err : forall (fdm : fdmap) (fd : Z) (d : nat) (outs xs ds : list bytes)
+                          (a bs : bytes) (K : Z -> iProp Σ),
+        bs <> [] -> fdm !! fd = Some d -> fd = prod_err -> a ∈ ds -> bs `prefix_of` a ->
+        ei_fds fdm -∗ ei_prod d outs xs ds -∗
+        ((ei_fds fdm -∗ ei_prod d outs [] [drop (length bs) a] -∗ K (Z.of_nat (length bs)))
+         ∧ (∀ x, ei_taint (dom fdm) -∗ K x)) -∗
+        wr_obl N P fd bs K;
+    ei_write_prod_fail : forall (fdm : fdmap) (fd : Z) (d : nat) (outs xs ds : list bytes)
+                           (a bs : bytes) (K : Z -> iProp Σ),
+        bs <> [] -> fdm !! fd = Some d -> fd = prod_err -> [] ∈ outs -> a ∈ xs ->
+        bs `prefix_of` a ->
+        ei_fds fdm -∗ ei_prod d outs xs ds -∗
+        ((ei_fds fdm -∗ ei_prod d [[]] [] [drop (length bs) a] -∗ K (Z.of_nat (length bs)))
+         ∧ (∀ x, ei_taint (dom fdm) -∗ K x)) -∗
+        wr_obl N P fd bs K;
+    ei_write_prod_halt_err : forall (fdm : fdmap) (fd : Z) (d : nat) (ds : list bytes)
+                               (a bs : bytes) (K : Z -> iProp Σ),
+        bs <> [] -> fdm !! fd = Some d -> fd = prod_err -> a ∈ ds -> bs `prefix_of` a ->
+        ei_fds fdm -∗ ei_prod_halt d ds -∗
+        ((ei_fds fdm -∗ ei_prod_halt d [drop (length bs) a] -∗ K (Z.of_nat (length bs)))
+         ∧ (∀ x, ei_taint (dom fdm) -∗ K x)) -∗
+        wr_obl N P fd bs K;
   }.
 
   (* ------------------------------------------------------------------- *)
@@ -398,6 +449,7 @@ Section UkHandler.
     | DIn Sin => ei_in I d Sin | DInE Sin => ei_in_e I d Sin | DInEnd => ei_in_end I d
     | DCopy h Sin p => ei_copy I d h Sin p | DCopyEnd h p => ei_copy_end I d h p
     | DCopyHalt => ei_copy_halt I d
+    | DProd outs xs ds => ei_prod I d outs xs ds | DProdHalt ds => ei_prod_halt I d ds
     end.
 
   Definition dev_res (I : ep_ifaceP) (dv : nat -> dspec) (ds : gset nat) : iProp Σ :=
@@ -639,7 +691,12 @@ Section UkHandler.
                        | [(Hne & Hbnd & Hd & Hk)
                        | [(Hne & Hfd1 & h & Sin & p & Hd & Hpre & Hk & Hkh)
                        | [(Hne & Hfd1 & h & p & Hd & Hpre & Hk & Hkh)
-                       | (Hne & Hbnd & Hfd1 & Hd & Hk)]]]]]]].
+                       | [(Hne & Hbnd & Hfd1 & Hd & Hk)
+                       | [(Hne & Hfd1 & outs & xs & dss & a & Hd & Ha & Hpre & Hk & Hkh)
+                       | [(Hne & Hbnd & Hfd1 & dss & Hd & Hk)
+                       | [(Hne & Hfd1 & outs & xs & dss & a & Hd & Ha & Hpre & Hk)
+                       | [(Hne & Hfd1 & outs & xs & dss & a & Hd & Hon & Ha & Hpre & Hk)
+                       | (Hne & Hfd1 & dss & a & Hd & Ha & Hpre & Hk)]]]]]]]]]]]].
         * iApply (ei_write_nil I (pe_fd E) fd d (pe_dev E d) with "Hfds Hdr"); [exact Hfd |].
           iSplit; [| iSplit; [| iIntros (y) "Ht"; iApply (cf_inv_taint I _ with "Ht"); apply Hs]].
           { iIntros "Hfds Hdr".
@@ -722,6 +779,47 @@ Section UkHandler.
           iIntros "Hfds Hh".
           iApply (cf_inv_move I E ds d DCopyHalt with "Hfds Hfiles Hh Hrest");
             [exact Hin | by rewrite (env_set_dev_id E d _ Hd) | apply Hs | exact Hdp | exact Hdom].
+        * (* the producer device: an output write *)
+          rewrite Hd.
+          iApply (ei_write_prod I (pe_fd E) fd d outs xs dss a bs with "Hfds Hdr");
+            [exact Hne | exact Hfd | exact Hfd1 | exact Ha | exact Hpre |].
+          iSplit; [| iSplit; [| iIntros (x) "Ht"; iApply (cf_inv_taint I _ with "Ht"); apply Hs]].
+          { iIntros "Hfds Hp".
+            iApply (cf_inv_move I E ds d (DProd [drop (length bs) a] [] dss) with "Hfds Hfiles Hp Hrest");
+              [exact Hin | exact Hk | apply Hs | exact Hdp | exact Hdom]. }
+          { iIntros "Hfds Hh".
+            iApply (cf_inv_move I E ds d (DProdHalt dss) with "Hfds Hfiles Hh Hrest");
+              [exact Hin | exact Hkh | apply Hs | exact Hdp | exact Hdom]. }
+        * rewrite Hd.
+          iApply (ei_write_prod_halt I (pe_fd E) fd d dss bs with "Hfds Hdr");
+            [exact Hne | exact Hbnd | exact Hfd | exact Hfd1 |].
+          iSplit; [| iIntros (x) "Ht"; iApply (cf_inv_taint I _ with "Ht"); apply Hs].
+          iIntros "Hfds Hh".
+          iApply (cf_inv_move I E ds d (DProdHalt dss) with "Hfds Hfiles Hh Hrest");
+            [exact Hin | by rewrite (env_set_dev_id E d _ Hd) | apply Hs | exact Hdp | exact Hdom].
+        * (* ...a diagnostic write *)
+          rewrite Hd.
+          iApply (ei_write_prod_err I (pe_fd E) fd d outs xs dss a bs with "Hfds Hdr");
+            [exact Hne | exact Hfd | exact Hfd1 | exact Ha | exact Hpre |].
+          iSplit; [| iIntros (x) "Ht"; iApply (cf_inv_taint I _ with "Ht"); apply Hs].
+          iIntros "Hfds Hp".
+          iApply (cf_inv_move I E ds d (DProd outs [] [drop (length bs) a]) with "Hfds Hfiles Hp Hrest");
+            [exact Hin | exact Hk | apply Hs | exact Hdp | exact Hdom].
+        * (* ...a failure report *)
+          rewrite Hd.
+          iApply (ei_write_prod_fail I (pe_fd E) fd d outs xs dss a bs with "Hfds Hdr");
+            [exact Hne | exact Hfd | exact Hfd1 | exact Hon | exact Ha | exact Hpre |].
+          iSplit; [| iIntros (x) "Ht"; iApply (cf_inv_taint I _ with "Ht"); apply Hs].
+          iIntros "Hfds Hp".
+          iApply (cf_inv_move I E ds d (DProd [[]] [] [drop (length bs) a]) with "Hfds Hfiles Hp Hrest");
+            [exact Hin | exact Hk | apply Hs | exact Hdp | exact Hdom].
+        * rewrite Hd.
+          iApply (ei_write_prod_halt_err I (pe_fd E) fd d dss a bs with "Hfds Hdr");
+            [exact Hne | exact Hfd | exact Hfd1 | exact Ha | exact Hpre |].
+          iSplit; [| iIntros (x) "Ht"; iApply (cf_inv_taint I _ with "Ht"); apply Hs].
+          iIntros "Hfds Hp".
+          iApply (cf_inv_move I E ds d (DProdHalt [drop (length bs) a]) with "Hfds Hfiles Hp Hrest");
+            [exact Hin | exact Hk | apply Hs | exact Hdp | exact Hdom].
       + (* EExit *)
         iApply (ei_exit I s (pe_fd E) (pe_files E) (pe_paths E) (pe_dev E) ds
                   with "Hfds Hfiles Hdev"); [| by apply dom_ok_p_iff].

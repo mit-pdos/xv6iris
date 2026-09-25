@@ -652,6 +652,7 @@ Section UkFileIface.
     | DOut alts => fif_out d alts | DOutH _ => False | DOutM cs => fif_outm d cs
     | DHalt => False | DIn Sin => fif_in d Sin | DInE _ => False | DInEnd => False
     | DCopy _ _ _ => False | DCopyEnd _ _ => False | DCopyHalt => False
+    | DProd _ _ _ => False | DProdHalt _ => False
     end%I.
 
   (* the scope: `f` is the one path described, at the deed's content, and
@@ -1471,7 +1472,7 @@ Section UkFileIface.
     wr_obl N P fd [] K.
   Proof using Hsw HPc.
     intros Hfd. iIntros "Hfds Hd HK".
-    destruct x as [alts | | cs | | Sin | | | | |]; simpl; try (iDestruct "Hd" as "[]").
+    destruct x as [alts | | cs | | Sin | | | | | | |]; simpl; try (iDestruct "Hd" as "[]").
     - (* the console *)
       iDestruct "Hd" as (v I C) "[Htk Hd]".
       iDestruct "Hfds" as (l vs w) "[(Hstd & Hcwd & %Hok & Hpool & Htoks & Hhs & Hdq & #He) Hk]".
@@ -1521,7 +1522,7 @@ Section UkFileIface.
     assert (HD : d ∉ D0) by (intros H; apply Hnsp; apply fd_shared_p_iff; by left).
     assert (Hns : ~ fd_shared fdm fd d) by (intros H; apply Hnsp; apply fd_shared_p_iff; by right).
     iIntros "Hfds #Hfiles Hdev HK".
-    destruct x as [alts | alts | cs | | Sin | Sin | | | |]; simpl;
+    destruct x as [alts | alts | cs | | Sin | Sin | | | | | |]; simpl;
       try (iDestruct "Hdev" as "[]").
     - (* the console: a standard slot, its row a console row *)
       iDestruct "Hdev" as (v Ic C) "[Htk _]".
@@ -1606,9 +1607,10 @@ Section UkFileIface.
     refine (MkEIP (Dp := D0) N P fif_fds fif_out (fun _ _ => False%I) (fun _ => False%I) fif_outm
               fif_in (fun _ _ => False%I) (fun _ => False%I)
               (fun _ _ _ _ => False%I) (fun _ _ _ => False%I) (fun _ => False%I)
+              (fun _ _ _ _ => False%I) (fun _ _ => False%I)
               fif_filesr fif_taint fif_taint_pays
               fif_write _ fif_write_m _ fif_write_nil fif_read _ _ _ _ _ _ _ _ _ fif_open fif_open_absent
-              fif_close fif_close_shared fif_exit).
+              fif_close fif_close_shared fif_exit _ _ _ _ _).
     - intros. iIntros "_ []".
     - intros. iIntros "_ []".
     - intros. iIntros "_ []".
@@ -1616,6 +1618,12 @@ Section UkFileIface.
     (* the copy device (design SS3.4f): no copy device in the file application *)
     - intros. iIntros "_ []".
     - intros. iIntros "_ []".
+    - intros. iIntros "_ []".
+    - intros. iIntros "_ []".
+    - intros. iIntros "_ []".
+    - intros. iIntros "_ []".
+    - intros. iIntros "_ []".
+    (* the producer device (union.md C9d'): not the file application's *)
     - intros. iIntros "_ []".
     - intros. iIntros "_ []".
     - intros. iIntros "_ []".
@@ -1941,7 +1949,7 @@ Section UkFileIface.
     iEval (rewrite (fif_dq_rd ltac:(by rewrite (fif_wr_0 D0 w0 HD0) Hw))) in "Hdq".
     iDestruct (fif_exit_dev0 fdm l vs dv ds HD0 Hdr Hdom Hok with "Hdev") as "(%Hd0 & %Hv0 & Hd0)".
     rewrite Hw in Hv0.
-    destruct (dv 0%nat) as [alts | | cs' | | S' | | | | |]; simpl in Hd0; simpl;
+    destruct (dv 0%nat) as [alts | | cs' | | S' | | | | | | |]; simpl in Hd0; simpl;
       try (iDestruct "Hd0" as "[]").
     - iDestruct "Hd0" as (v' I' C') "[Htk Hd]".
       iDestruct (fif_toks_agree vs 0%nat _ _ _ Hv0 with "Htoks Htk") as "(%Heqv & _ & _)".
@@ -1977,7 +1985,7 @@ Section UkFileIface.
     iDestruct "Hcore" as "(_ & _ & %Hok & _ & Htoks & _ & _ & _)".
     iDestruct (fif_exit_dev0 fdm l vs dv ds HD0 Hdr Hdom Hok with "Hdev") as "(%Hd0 & %Hv0 & Hd0)".
     rewrite Hw in Hv0.
-    destruct (dv 0%nat) as [alts | | cs' | | S' | | | | |]; simpl in Hd0; simpl;
+    destruct (dv 0%nat) as [alts | | cs' | | S' | | | | | | |]; simpl in Hd0; simpl;
       try (iDestruct "Hd0" as "[]").
     - iDestruct "Hd0" as (v' I' C') "[Htk _]".
       iDestruct (fif_toks_agree vs 0%nat _ _ _ Hv0 with "Htoks Htk") as "(%Heqv & _ & _)".

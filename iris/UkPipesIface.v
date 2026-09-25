@@ -1310,6 +1310,7 @@ Section UkPipesIface.
     | DInEnd => pns_in_end d
     | DCopy h Sc p => pns_copy d h Sc p | DCopyEnd h p => pns_copy_end d h p
     | DCopyHalt => pns_copy_halt d
+    | DProd _ _ _ => False | DProdHalt _ => False
     end%I.
 
   Definition pns_filesr (files : list (bv 8) -> option (list (bv 8))) (paths : list (list (bv 8)))
@@ -1344,8 +1345,8 @@ Section UkPipesIface.
   Lemma pns_dev_tok (d : nat) (x : dspec) :
     pns_dev d x -∗ ∃ kd : pdev, pns_tok d (1/2) kd ∗ (pns_tok d (1/2) kd -∗ pns_dev d x).
   Proof using .
-    destruct x as [alts | alts | cs | | Sin | Sin | | h Sc p | h p |]; cbn [pns_dev];
-      [| | iIntros "[]" | | iIntros "[]" | | | | |].
+    destruct x as [alts | alts | cs | | Sin | Sin | | h Sc p | h p | | outs xs dss | dss];
+      cbn [pns_dev]; [| | iIntros "[]" | | iIntros "[]" | | | | | | iIntros "[]" | iIntros "[]"].
     - iIntros "[(%w & %A & Htk & Hd) | [Htk %Hm]]".
       + iExists (PDCon w A). iFrame "Htk". iIntros "Htk". iLeft. iExists w, A. iFrame "Htk Hd".
       + iExists PDMute. iFrame "Htk". iIntros "Htk". iRight. iFrame "Htk". by iPureIntro.
@@ -2144,8 +2145,8 @@ Section UkPipesIface.
   Proof using .
     intros Hv Hdr. iIntros "#He Htoks Hd".
     iPoseProof (pns_env_lookup vs d kd Hv with "He") as "#Hi".
-    destruct x as [alts | alts | cs | | Sin | Sin | | h Sc p | h p |];
-      cbn [pns_dev drained] in Hdr |- *.
+    destruct x as [alts | alts | cs | | Sin | Sin | | h Sc p | h p | | outs xs dss | dss];
+      cbn [pns_dev drained] in Hdr |- *; [.. | iDestruct "Hd" as "[]" | iDestruct "Hd" as "[]"].
     - iDestruct "Hd" as "[(%w & %A & Htk & Hd) | [Htk %Hm]]".
       + iDestruct (pns_toks_agree vs d kd with "Htoks Htk") as "(%Hkk & Htoks & _)"; [exact Hv |].
         subst kd. iModIntro. iFrame "Htoks". cbn [pns_final].
@@ -2244,16 +2245,23 @@ Section UkPipesIface.
     refine (MkEIP (Dp := kds.*1) N P pns_fds pns_out pns_outh pns_halt (fun _ _ => False%I)
               (fun _ _ => False%I) pns_in pns_in_end
               pns_copy pns_copy_end pns_copy_halt
+              (fun _ _ _ _ => False%I) (fun _ _ => False%I)
               pns_filesr pns_taint pns_taint_pays
               pns_write pns_write_h _ pns_write_halt pns_write_nil
               _ pns_read_e pns_read_end pns_read_copy pns_read_copy_end
               pns_write_copy pns_write_copy_h pns_write_copy_end pns_write_copy_end_h
               pns_write_copy_halt pns_open pns_open_absent
-              pns_close pns_close_shared pns_exit).
+              pns_close pns_close_shared pns_exit _ _ _ _ _).
     - (* [ei_write_m]: no file *)
       intros. iIntros "_ []".
     - (* [ei_read] at DIn: a pipe's read end may end early *)
       intros. iIntros "_ []".
+    (* the producer device (union.md C9d'): not this registry's *)
+    - intros. iIntros "_ []".
+    - intros. iIntros "_ []".
+    - intros. iIntros "_ []".
+    - intros. iIntros "_ []".
+    - intros. iIntros "_ []".
   Defined.
 
   Lemma pns_ei_fds : ei_fds N P pipes_iface = pns_fds.

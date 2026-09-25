@@ -599,7 +599,22 @@ Inductive dspec :=
      [pending]; the device is drained when [pending] is empty. *)
   | DCopy (h : bool) (S : bytes) (pending : bytes)
   | DCopyEnd (h : bool) (pending : bytes)   (* the writer closed: reads answer end of file *)
-  | DCopyHalt.                    (* the sink's reader went: writes answer -1 *)
+  | DCopyHalt                     (* the sink's reader went: writes answer -1 *)
+  (* THE PRODUCER'S DEVICE (union.md C9d'): a producer that may FAIL
+     BEFORE its output -- [cat f], whose open may be refused -- writes its
+     output on [prod_out] (a pipe's write end: the reader may go) and its
+     diagnostics on [prod_err] (the console), and ONE device number is
+     bound to both, as the copy device is to cat's input and output.  The
+     output owes one of [outs]; the diagnostics owe one of [ds], or --
+     while nothing is on the output yet -- one of the FAILURE REPORTS
+     [xs], which leaves the output owing nothing ([] must be among
+     [outs]).  The first byte on either descriptor retires [xs]: a report
+     after output, or output after a report, is not the producer's.  The
+     pairing is what the round's deposit needs: a failure report spends
+     the output's untouched write permit, which the output then no longer
+     holds. *)
+  | DProd (outs : list bytes) (xs : list bytes) (ds : list bytes)
+  | DProdHalt (ds : list bytes).  (* the output's reader went: output writes answer -1 *)
 
 (* THE COPY DEVICE IS A FILTER'S (found by the pipeline instance, lane
    copyinst): its input is the standard input and its output the standard
@@ -608,6 +623,10 @@ Inductive dspec :=
    write only at [copy_out]; the instance cannot pay a read at the sink. *)
 Definition copy_in : Z := 0.
 Definition copy_out : Z := 1.
+
+(* the producer device's two descriptors: its output, its diagnostics *)
+Definition prod_out : Z := 1.
+Definition prod_err : Z := 2.
 
 Record penv := MkEnv {
   pe_fd : gmap Z nat;             (* descriptor -> device *)
@@ -646,6 +665,9 @@ Definition drained (x : dspec) : Prop :=
      device does not hold; cat reads until 0 and never exits open *)
   | DCopy _ _ _ => False
   | DCopyEnd _ pending => pending = []
+  (* the producer device: the output and the diagnostics both done *)
+  | DProd outs _ ds => [] ∈ outs /\ [] ∈ ds
+  | DProdHalt ds => [] ∈ ds
   | _ => True
   end.
 
@@ -663,7 +685,8 @@ Definition fd_last (fdm : gmap Z nat) (fd : Z) (d : nat) : Prop :=
 
 Definition drained_at_close (x : dspec) : Prop :=
   match x with
-  | DOutH _ | DHalt | DCopy _ _ _ | DCopyEnd _ _ | DCopyHalt => drained x
+  | DOutH _ | DHalt | DCopy _ _ _ | DCopyEnd _ _ | DCopyHalt
+  | DProd _ _ _ | DProdHalt _ => drained x
   | _ => True
   end.
 
@@ -697,7 +720,22 @@ Definition cf_step (R : penv -> proc -> Prop) (E : penv) (t : proc) : Prop :=
               /\ R (env_set_dev E d (DCopyEnd h (drop (length bs) p))) (k (Z.of_nat (length bs)))
               /\ (h = true -> R (env_set_dev E d DCopyHalt) (k (-1))))
            \/ (bs <> [] /\ Z.of_nat (length bs) < 2 ^ 31 /\ fd = copy_out
-               /\ pe_dev E d = DCopyHalt /\ R E (k (-1))))
+               /\ pe_dev E d = DCopyHalt /\ R E (k (-1)))
+           \/ (bs <> [] /\ fd = prod_out /\ exists outs xs ds a, pe_dev E d = DProd outs xs ds
+              /\ a ∈ outs /\ bs `prefix_of` a
+              /\ R (env_set_dev E d (DProd [drop (length bs) a] [] ds)) (k (Z.of_nat (length bs)))
+              /\ R (env_set_dev E d (DProdHalt ds)) (k (-1)))
+           \/ (bs <> [] /\ Z.of_nat (length bs) < 2 ^ 31 /\ fd = prod_out
+               /\ exists ds, pe_dev E d = DProdHalt ds /\ R E (k (-1)))
+           \/ (bs <> [] /\ fd = prod_err /\ exists outs xs ds a, pe_dev E d = DProd outs xs ds
+              /\ a ∈ ds /\ bs `prefix_of` a
+              /\ R (env_set_dev E d (DProd outs [] [drop (length bs) a])) (k (Z.of_nat (length bs))))
+           \/ (bs <> [] /\ fd = prod_err /\ exists outs xs ds a, pe_dev E d = DProd outs xs ds
+              /\ [] ∈ outs /\ a ∈ xs /\ bs `prefix_of` a
+              /\ R (env_set_dev E d (DProd [[]] [] [drop (length bs) a])) (k (Z.of_nat (length bs))))
+           \/ (bs <> [] /\ fd = prod_err /\ exists ds a, pe_dev E d = DProdHalt ds
+              /\ a ∈ ds /\ bs `prefix_of` a
+              /\ R (env_set_dev E d (DProdHalt [drop (length bs) a])) (k (Z.of_nat (length bs)))))
       | ERead fd n => fun k =>
           exists d, pe_fd E !! fd = Some d /\ (0 < n)%nat /\
           ((exists S, pe_dev E d = DIn S
@@ -794,6 +832,42 @@ CoInductive conforms : penv -> proc -> Prop :=
       pe_fd E !! fd = Some d -> pe_dev E d = DCopyHalt ->
       conforms E (k (-1)) ->
       conforms E (Vis (EWrite fd bs) k)
+  (* at the PRODUCER device an output write takes a prefix of an owed
+     output and retires the failure reports; the reader may go, after
+     which every output write answers -1 *)
+  | cf_write_prod E fd d outs xs ds a bs k :
+      bs <> [] -> fd = prod_out ->
+      pe_fd E !! fd = Some d -> pe_dev E d = DProd outs xs ds ->
+      a ∈ outs -> bs `prefix_of` a ->
+      conforms (env_set_dev E d (DProd [drop (length bs) a] [] ds)) (k (Z.of_nat (length bs))) ->
+      conforms (env_set_dev E d (DProdHalt ds)) (k (-1)) ->
+      conforms E (Vis (EWrite fd bs) k)
+  | cf_write_prod_halt E fd d ds bs k :
+      bs <> [] -> Z.of_nat (length bs) < 2 ^ 31 -> fd = prod_out ->
+      pe_fd E !! fd = Some d -> pe_dev E d = DProdHalt ds ->
+      conforms E (k (-1)) ->
+      conforms E (Vis (EWrite fd bs) k)
+  (* ...a diagnostic write chooses one of [ds] (the reports retired), or
+     -- the output still able to owe nothing -- a FAILURE REPORT, after
+     which the output owes nothing *)
+  | cf_write_prod_err E fd d outs xs ds a bs k :
+      bs <> [] -> fd = prod_err ->
+      pe_fd E !! fd = Some d -> pe_dev E d = DProd outs xs ds ->
+      a ∈ ds -> bs `prefix_of` a ->
+      conforms (env_set_dev E d (DProd outs [] [drop (length bs) a])) (k (Z.of_nat (length bs))) ->
+      conforms E (Vis (EWrite fd bs) k)
+  | cf_write_prod_fail E fd d outs xs ds a bs k :
+      bs <> [] -> fd = prod_err ->
+      pe_fd E !! fd = Some d -> pe_dev E d = DProd outs xs ds ->
+      [] ∈ outs -> a ∈ xs -> bs `prefix_of` a ->
+      conforms (env_set_dev E d (DProd [[]] [] [drop (length bs) a])) (k (Z.of_nat (length bs))) ->
+      conforms E (Vis (EWrite fd bs) k)
+  | cf_write_prod_halt_err E fd d ds a bs k :
+      bs <> [] -> fd = prod_err ->
+      pe_fd E !! fd = Some d -> pe_dev E d = DProdHalt ds ->
+      a ∈ ds -> bs `prefix_of` a ->
+      conforms (env_set_dev E d (DProdHalt [drop (length bs) a])) (k (Z.of_nat (length bs))) ->
+      conforms E (Vis (EWrite fd bs) k)
   (* a read asks for at least one byte (a zero-length read answers 0
      whatever is owed) *)
   | cf_read E fd d S n k :
@@ -871,7 +945,17 @@ Proof.
     split; [assumption |]. exists h, S, p. auto.
   - exists d. split; [assumption |]. do 6 right. left. split; [assumption |].
     split; [assumption |]. exists h, p. auto.
-  - exists d. split; [assumption |]. do 7 right. auto.
+  - exists d. split; [assumption |]. do 7 right. left. auto.
+  - exists d. split; [assumption |]. do 8 right. left. split; [assumption |].
+    split; [assumption |]. exists outs, xs, ds, a. auto.
+  - exists d. split; [assumption |]. do 9 right. left. do 3 (split; [assumption |]).
+    exists ds. auto.
+  - exists d. split; [assumption |]. do 10 right. left. split; [assumption |].
+    split; [assumption |]. exists outs, xs, ds, a. auto.
+  - exists d. split; [assumption |]. do 11 right. left. split; [assumption |].
+    split; [assumption |]. exists outs, xs, ds, a. auto.
+  - exists d. split; [assumption |]. do 12 right. split; [assumption |].
+    split; [assumption |]. exists ds, a. auto.
   - exists d. split; [assumption |]. split; [assumption |]. left. exists S. auto.
   - exists d. split; [assumption |]. split; [assumption |]. right. left. exists S. auto.
   - exists d. split; [assumption |]. split; [assumption |]. do 2 right. left. auto.

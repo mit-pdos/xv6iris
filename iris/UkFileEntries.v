@@ -493,7 +493,7 @@ Section UkFileEntriesEcho.
     iDestruct (fif_exit_dev0 g r γreg D0 w0 sf fdm l vs dv ds HD0 Hdr Hdom Hok
                  with "Hdev") as "(%Hd0 & %Hv0 & Hd0)".
     rewrite Hw in Hv0.
-    destruct (dv 0%nat) as [alts | | cs' | | S' | | | | |]; simpl in Hd0; simpl;
+    destruct (dv 0%nat) as [alts | | cs' | | S' | | | | | | |]; simpl in Hd0; simpl;
       try (iDestruct "Hd0" as "[]").
     - iDestruct "Hd0" as (v' I' C') "[Htk Hd]".
       iDestruct (fif_toks_agree γreg vs 0%nat _ _ _ Hv0 with "Htoks Htk") as "(%Heqv & _ & _)".

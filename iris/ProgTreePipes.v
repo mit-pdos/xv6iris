@@ -347,6 +347,308 @@ Proof using.
   intros Hf. apply cat_file_pipe_absent_conforms_gen; [exact Hf | by left | by right; left].
 Qed.
 
+(* ===================================================================== *)
+(*  2b.  cat f AT THE PRODUCER DEVICE (union.md C9d')                     *)
+(*                                                                        *)
+(*  The same [cat f] with descriptors 1 AND 2 on ONE device, the          *)
+(*  producer device [DProd outs xs ds]: the pipe owes one of [outs], the  *)
+(*  console one of [ds] or -- nothing on the pipe yet -- the failure      *)
+(*  report [cat: cannot open f] of [xs].  What the pairing buys the       *)
+(*  instance: the report's first byte is where the round's deposit is     *)
+(*  paid, out of the pipe's untouched write permit, and after it the      *)
+(*  pipe owes nothing; the first byte on the pipe retires the report.     *)
+(* ===================================================================== *)
+
+Definition catp_env (x : dspec) (files : bytes -> option bytes) (paths : list bytes) : penv :=
+  MkEnv (<[1 := 0%nat]> {[2 := 0%nat]})
+        (fun d => if decide (d = 0%nat) then x else DOut [[]]) files paths.
+
+(* ...once f is open on [fdin], at input device [din] *)
+Definition catp_loop_env (fdin : Z) (din : nat) (S : bytes) (x : dspec)
+    (files : bytes -> option bytes) (paths : list bytes) : penv :=
+  MkEnv (<[1 := 0%nat]> (<[2 := 0%nat]> {[fdin := din]}))
+        (fun d => if decide (d = 0%nat) then x
+                  else if decide (d = din) then DIn S else DOut [[]]) files paths.
+
+Lemma catp_env_set (x x' : dspec) files paths :
+  env_set_dev (catp_env x files paths) 0 x' = catp_env x' files paths.
+Proof using.
+  unfold env_set_dev, catp_env. f_equal. apply functional_extensionality.
+  intros d. cbn [pe_dev pe_fd]. destruct (decide (d = 0%nat)); reflexivity.
+Qed.
+
+Lemma catp_loop_env_set fdin din S (x x' : dspec) files paths :
+  env_set_dev (catp_loop_env fdin din S x files paths) 0 x'
+  = catp_loop_env fdin din S x' files paths.
+Proof using.
+  unfold env_set_dev, catp_loop_env. f_equal. apply functional_extensionality.
+  intros d. cbn [pe_dev pe_fd]. destruct (decide (d = 0%nat)); reflexivity.
+Qed.
+
+Lemma catp_loop_env_in fdin din S S' (x : dspec) files paths :
+  din <> 0%nat ->
+  env_set_dev (catp_loop_env fdin din S x files paths) din (DIn S')
+  = catp_loop_env fdin din S' x files paths.
+Proof using.
+  intros H0. unfold env_set_dev, catp_loop_env. f_equal. apply functional_extensionality.
+  intros d. cbn [pe_dev pe_fd]. destruct (decide (d = din)) as [-> | Hne].
+  - rewrite decide_False; [| exact H0]. first [ by rewrite decide_True | done ].
+  - destruct (decide (d = 0%nat)); [reflexivity |].
+    first [ reflexivity | by rewrite decide_False ].
+Qed.
+
+Lemma catp_loop_env_din fdin din S (x : dspec) files paths :
+  din <> 0%nat -> pe_dev (catp_loop_env fdin din S x files paths) din = DIn S.
+Proof using.
+  intros H0. cbv [catp_loop_env pe_dev]. rewrite decide_False; [| exact H0].
+  first [ by rewrite decide_True | done ].
+Qed.
+
+Lemma catp_loop_env_fdin fdin din S (x : dspec) files paths :
+  fdin <> 1 -> fdin <> 2 ->
+  pe_fd (catp_loop_env fdin din S x files paths) !! fdin = Some din.
+Proof using.
+  intros H1 H2. cbv [catp_loop_env pe_fd]. rewrite lookup_insert_ne; [| lia].
+  rewrite lookup_insert_ne; [| lia]. apply lookup_singleton.
+Qed.
+
+Lemma catp_loop_env_fd1 fdin din S (x : dspec) files paths :
+  pe_fd (catp_loop_env fdin din S x files paths) !! prod_out = Some 0%nat.
+Proof using. cbv [catp_loop_env pe_fd prod_out]. apply lookup_insert. Qed.
+
+Lemma catp_loop_env_fd2 fdin din S (x : dspec) files paths :
+  pe_fd (catp_loop_env fdin din S x files paths) !! prod_err = Some 0%nat.
+Proof using.
+  cbv [catp_loop_env pe_fd prod_err]. rewrite lookup_insert_ne; [| lia]. apply lookup_insert.
+Qed.
+
+Lemma catp_env_fd2 (x : dspec) files paths :
+  pe_fd (catp_env x files paths) !! prod_err = Some 0%nat.
+Proof using.
+  cbv [catp_env pe_fd prod_err]. rewrite lookup_insert_ne; [| lia]. apply lookup_singleton.
+Qed.
+
+(* the open of f: a descriptor the process did not hold, at a device no
+   descriptor names *)
+Lemma catp_env_open (x : dspec) files paths (fd : Z) (d : nat) (content : bytes) :
+  pe_fd (catp_env x files paths) !! fd = None -> env_fresh (catp_env x files paths) d ->
+  env_set_dev (env_bind (catp_env x files paths) fd d) d (DIn content)
+  = catp_loop_env fd d content x files paths.
+Proof using.
+  intros Hfd Hfr. cbv [catp_env pe_fd] in Hfd.
+  assert (fd <> 1 /\ fd <> 2) as [Hf1 Hf2].
+  { split; intros ->; simplify_map_eq. }
+  assert (d <> 0%nat) as Hd0.
+  { intros ->. apply (Hfr 1). cbv [catp_env pe_fd]. apply lookup_insert. }
+  cbv [env_set_dev env_bind catp_env catp_loop_env pe_fd pe_dev pe_files pe_paths]. f_equal.
+  - apply map_eq. intros k.
+    destruct (decide (k = fd)) as [-> |]; [by simplify_map_eq |].
+    destruct (decide (k = 1)) as [-> |]; [by simplify_map_eq |].
+    destruct (decide (k = 2)) as [-> |]; by simplify_map_eq.
+  - apply functional_extensionality. intros d'.
+    destruct (decide (d' = d)) as [-> | Hne].
+    + rewrite decide_False; [| exact Hd0]. first [ reflexivity | by rewrite decide_True ].
+    + destruct (decide (d' = 0%nat)); [reflexivity |].
+      first [ reflexivity | by rewrite decide_False ].
+Qed.
+
+(* setting a device to what it already is changes nothing *)
+Lemma catp_set_dev_id (E : penv) (d : nat) (x : dspec) :
+  pe_dev E d = x -> env_set_dev E d x = E.
+Proof using.
+  intros Hd. destruct E as [f g files paths]. unfold env_set_dev. simpl in *. f_equal.
+  apply functional_extensionality. intros d'.
+  destruct (decide (d' = d)) as [-> |]; [by rewrite Hd | reflexivity].
+Qed.
+
+Lemma catp_dg_open_ne (p : bytes) : cat_dg_open p <> [].
+Proof using.
+  unfold cat_dg_open. intros H. apply app_eq_nil in H as [_ H].
+  apply app_eq_nil in H as [_ H]. discriminate H.
+Qed.
+
+(* a run of one-byte diagnostic writes on a diagnostic the device owes:
+   the reports are retired at the first byte *)
+Lemma write_bytes_prod_conforms (E : penv) (d : nat) (bs S' : bytes)
+    (outs xs ds : list bytes) (rest : proc) :
+  pe_fd E !! prod_err = Some d -> pe_dev E d = DProd outs xs ds -> bs ++ S' ∈ ds ->
+  (forall xs' ds', S' ∈ ds' -> conforms (env_set_dev E d (DProd outs xs' ds')) rest) ->
+  conforms E (write_bytes prod_err bs rest).
+Proof using.
+  revert E xs ds. induction bs as [| b bs IH]; intros E xs ds Hfd Hd Hin Hrest.
+  - simpl in Hin. simpl.
+    specialize (Hrest xs ds Hin). by rewrite (catp_set_dev_id E d _ Hd) in Hrest.
+  - simpl.
+    eapply cf_write_prod_err with (d := d) (outs := outs) (xs := xs) (ds := ds)
+      (a := b :: bs ++ S');
+      [done | reflexivity | exact Hfd | exact Hd | exact Hin | by exists (bs ++ S') |].
+    simpl.
+    apply (IH (env_set_dev E d (DProd outs [] [bs ++ S'])) [] [bs ++ S']).
+    + exact Hfd.
+    + apply env_set_dev_dev.
+    + by left.
+    + intros xs' ds' Hin'. rewrite env_set_dev_set_dev. exact (Hrest xs' ds' Hin').
+Qed.
+
+(* ...a FAILURE REPORT: the first byte chooses it, the output then owes
+   nothing *)
+Lemma write_bytes_prod_fail_conforms (E : penv) (d : nat) (bs0 S' : bytes)
+    (outs xs ds : list bytes) (rest : proc) :
+  pe_fd E !! prod_err = Some d -> pe_dev E d = DProd outs xs ds ->
+  bs0 <> [] -> [] ∈ outs -> bs0 ++ S' ∈ xs ->
+  (forall xs' ds', S' ∈ ds' -> conforms (env_set_dev E d (DProd [[]] xs' ds')) rest) ->
+  conforms E (write_bytes prod_err bs0 rest).
+Proof using.
+  intros Hfd Hd Hne Hon Hin Hrest.
+  destruct bs0 as [| b bs]; [done |]. simpl.
+  eapply cf_write_prod_fail with (d := d) (outs := outs) (xs := xs) (ds := ds)
+    (a := b :: bs ++ S');
+    [done | reflexivity | exact Hfd | exact Hd | exact Hon | exact Hin
+    | by exists (bs ++ S') |].
+  simpl.
+  apply (write_bytes_prod_conforms (env_set_dev E d (DProd [[]] [] [bs ++ S'])) d bs S'
+           [[]] [] [bs ++ S']).
+  - exact Hfd.
+  - apply env_set_dev_dev.
+  - by left.
+  - intros xs' ds' Hin'. rewrite env_set_dev_set_dev. exact (Hrest xs' ds' Hin').
+Qed.
+
+(* ...a diagnostic at the halted device *)
+Lemma write_bytes_prodh_conforms (E : penv) (d : nat) (bs S' : bytes) (ds : list bytes)
+    (rest : proc) :
+  pe_fd E !! prod_err = Some d -> pe_dev E d = DProdHalt ds -> bs ++ S' ∈ ds ->
+  (forall ds', S' ∈ ds' -> conforms (env_set_dev E d (DProdHalt ds')) rest) ->
+  conforms E (write_bytes prod_err bs rest).
+Proof using.
+  revert E ds. induction bs as [| b bs IH]; intros E ds Hfd Hd Hin Hrest.
+  - simpl in Hin. simpl.
+    specialize (Hrest ds Hin). by rewrite (catp_set_dev_id E d _ Hd) in Hrest.
+  - simpl.
+    eapply cf_write_prod_halt_err with (d := d) (ds := ds) (a := b :: bs ++ S');
+      [done | reflexivity | exact Hfd | exact Hd | exact Hin | by exists (bs ++ S') |].
+    simpl.
+    apply (IH (env_set_dev E d (DProdHalt [bs ++ S'])) [bs ++ S']).
+    + exact Hfd.
+    + apply env_set_dev_dev.
+    + by left.
+    + intros ds' Hin'. rewrite env_set_dev_set_dev. exact (Hrest ds' Hin').
+Qed.
+
+(* one call of cat(fdin) with the output at the producer device *)
+Lemma catp_loop_conforms (fdin : Z) (din : nat) (S : bytes) (outs xs ds : list bytes)
+    files paths (rest : proc) :
+  din <> 0%nat -> fdin <> 1 -> fdin <> 2 ->
+  cat_dg_write ∈ ds -> [] ∈ ds -> S ∈ outs ->
+  (forall outs' xs', [] ∈ outs' ->
+     conforms (catp_loop_env fdin din [] (DProd outs' xs' ds) files paths) rest) ->
+  conforms (catp_loop_env fdin din S (DProd outs xs ds) files paths) (cat_loop fdin rest).
+Proof using.
+  intros Hd0 Hf1 Hf2 Hdg Hnil. revert S outs xs. cofix CIH. intros S outs xs Hin Hrest.
+  rewrite cat_loop_unfold.
+  eapply cf_read with (d := din) (S := S).
+  { unfold cat_bufsz. lia. }
+  { apply catp_loop_env_fdin; assumption. }
+  { apply catp_loop_env_din; assumption. }
+  intros c S' (HS & Hlen & Hnl). rewrite catp_loop_env_in; [| exact Hd0].
+  destruct c as [| b c'].
+  - assert (S = []) as -> by exact (Hnl eq_refl).
+    simpl in HS. destruct S'; [| discriminate HS].
+    exact (Hrest outs xs Hin).
+  - rewrite HS in Hin.
+    eapply cf_write_prod with (d := 0%nat) (outs := outs) (xs := xs) (ds := ds)
+      (a := (b :: c') ++ S').
+    { done. }
+    { reflexivity. }
+    { apply catp_loop_env_fd1. }
+    { cbv [catp_loop_env pe_dev]. by rewrite decide_True. }
+    { exact Hin. }
+    { by eexists. }
+    + rewrite drop_app_length, catp_loop_env_set. cbv beta.
+      rewrite decide_True; [| reflexivity].
+      apply cf_tau. apply CIH; [by left | exact Hrest].
+    + rewrite catp_loop_env_set. cbv beta.
+      rewrite decide_False; [| lia].
+      apply (write_bytes_prodh_conforms _ 0%nat cat_dg_write [] ds);
+        [apply catp_loop_env_fd2 | cbv [catp_loop_env pe_dev]; by rewrite decide_True
+        | by rewrite app_nil_r |].
+      intros ds' Hin'. rewrite catp_loop_env_set. apply cf_exit. intros d.
+      cbn [pe_dev catp_loop_env].
+      destruct (decide (d = 0%nat)); [exact Hin' |].
+      destruct (decide (d = din)); [exact I | by left].
+Qed.
+
+(* THE GENERAL FORM: the output owes the content or nothing, the
+   diagnostics nothing or the write error, or -- the open refused -- the
+   open's report *)
+Theorem cat_file_prod_conforms_gen (f c : bytes) (outs xs ds : list bytes) files :
+  files f = Some c -> c ∈ outs -> [] ∈ outs -> cat_dg_open f ∈ xs ->
+  [] ∈ ds -> cat_dg_write ∈ ds ->
+  conforms (catp_env (DProd outs xs ds) files [f]) (cat_tree [sb "cat"; f]).
+Proof using.
+  intros Hf Hc Hon Hao Hdn Hdw. simpl.
+  eapply cf_open_present; [by left | exact Hf | |].
+  - intros fd d Hfd Hnone Hfr. rewrite catp_env_open; [| exact Hnone | exact Hfr].
+    rewrite decide_False; [| lia].
+    assert (fd <> 1 /\ fd <> 2) as [Hf1 Hf2].
+    { cbv [catp_env pe_fd] in Hnone. split; intros ->; simplify_map_eq. }
+    assert (d <> 0%nat) as Hd0.
+    { intros ->. apply (Hfr 1). cbv [catp_env pe_fd]. apply lookup_insert. }
+    apply catp_loop_conforms; [exact Hd0 | exact Hf1 | exact Hf2 | exact Hdw | exact Hdn
+                              | exact Hc |].
+    intros outs' xs' Hin.
+    eapply cf_close with (d := d).
+    { apply catp_loop_env_fdin; assumption. }
+    { (* an input: the close owes nothing *)
+      intros _. rewrite catp_loop_env_din; [exact I | exact Hd0]. }
+    simpl. apply cf_exit. intros d'. cbv [env_unbind catp_loop_env pe_dev].
+    destruct (decide (d' = 0%nat)); [cbn [drained]; split; [exact Hin | exact Hdn] |].
+    destruct (decide (d' = d)); [exact I | by left].
+  - cbv beta. rewrite decide_True; [| lia].
+    eapply (write_bytes_prod_fail_conforms _ 0%nat _ [] outs xs ds);
+      [apply catp_env_fd2 | cbv [catp_env pe_dev]; by rewrite decide_True
+      | apply catp_dg_open_ne | exact Hon | rewrite app_nil_r; exact Hao |].
+    intros xs' ds' Hin. rewrite catp_env_set. apply cf_exit. intros d.
+    cbn [pe_dev catp_env].
+    destruct (decide (d = 0%nat)); [cbn [drained]; split; [by left | exact Hin] | by left].
+Qed.
+
+Theorem cat_file_prod_absent_conforms_gen (f : bytes) (outs xs ds : list bytes) files :
+  files f = None -> [] ∈ outs -> cat_dg_open f ∈ xs ->
+  conforms (catp_env (DProd outs xs ds) files [f]) (cat_tree [sb "cat"; f]).
+Proof using.
+  intros Hf Hon Hao. simpl.
+  eapply cf_open_absent; [by left | unfold mode_create; vm_compute; intros H; exact (H eq_refl) | exact Hf |].
+  cbv beta. rewrite decide_True; [| lia].
+  eapply (write_bytes_prod_fail_conforms _ 0%nat _ [] outs xs ds);
+    [apply catp_env_fd2 | cbv [catp_env pe_dev]; by rewrite decide_True
+    | apply catp_dg_open_ne | exact Hon | rewrite app_nil_r; exact Hao |].
+  intros xs' ds' Hin. rewrite catp_env_set. apply cf_exit. intros d.
+  cbn [pe_dev catp_env].
+  destruct (decide (d = 0%nat)); [cbn [drained]; split; [by left | exact Hin] | by left].
+Qed.
+
+(* [cat_file_pipe_conforms] at the producer device: the pipe owes the
+   content or nothing, the report is the open's, the diagnostics nothing
+   or the write error *)
+Theorem cat_file_prod_conforms (f c : bytes) files :
+  files f = Some c ->
+  conforms (catp_env (DProd [c; []] [cat_dg_open f] [[]; cat_dg_write]) files [f])
+           (cat_tree [sb "cat"; f]).
+Proof using.
+  intros Hf. apply cat_file_prod_conforms_gen with (c := c);
+    [exact Hf | by left | by right; left | by left | by left | by right; left].
+Qed.
+
+(* ...and at an absent f, at the same device *)
+Theorem cat_file_prod_absent_conforms (f : bytes) (outs : list bytes) files :
+  files f = None -> [] ∈ outs ->
+  conforms (catp_env (DProd outs [cat_dg_open f] [[]; cat_dg_write]) files [f])
+           (cat_tree [sb "cat"; f]).
+Proof using.
+  intros Hf Hon. apply cat_file_prod_absent_conforms_gen; [exact Hf | exact Hon | by left].
+Qed.
+
 (* the descriptor discipline under any answer is [cat_tree_safe], which
    holds for every argv and every held set: nothing new to prove *)
 Lemma cat_file_pipe_safe (f : bytes) (held : gset Z) :
