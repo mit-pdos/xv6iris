@@ -1146,3 +1146,6 @@ import Xv6.SyscallArmsFdDefs
 import Xv6.SyscallArmsFd
 import Xv6.SyscallArmsFd2
 import Xv6.SyscallArmsFork
+import Xv6.SyscallArmsProc
+import Xv6.SyscallArmsSbrk
+import Xv6.SyscallArmsExit
