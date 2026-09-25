@@ -5,7 +5,7 @@ One application for every line shape: `echo ws`, `echo ws > f`, `cat f`,
 whose range condition reads the file state, with one handler, one round
 and one top theorem `union_adequacy_closed` replacing the file and
 pipeline applications' theorems (owner: no bridge back).  STATUS:
-proposal of record, AMENDED by an adversarial review (2026-09-24; see
+LANDED (C9a-C9h, 2026-09-25); was the proposal of record, AMENDED by an adversarial review (2026-09-24; see
 'Review amendments' below -- they override the body where they differ);
 C9a LANDED (9dc284690, VM c9amerge1, audits 13/13/14/14, top
 statements byte-identical): `lm_ok : lm_st -> lm_line -> lm_alt -> Prop`,
@@ -135,7 +135,20 @@ prints removed.  The committed arm of `uWcu` also carries the boot
 witness `f0cw gf (S gen_id) s0`.  FOR C9h: the union chain still
 imports `UInitFileCons`, `UInitFileCC`, `UInitConsFile`, `UShRound` --
 their lemmas are about `file_pred`/`file_gn`, so MOVE them before
-deleting the file application.
+deleting the file application.  C9h LANDED (d968b957c..d04a4c86b,
+VM c9hmerge1; audits system 13, tree 13, union 14): 38 files deleted
+(21,890 lines; ~32.5k removed overall with pruning) -- the file, pipeline
+and echo applications, the one-pipe family/links/assembly, `UShEchoPay`,
+`UShRest`; the audit-file/audit-pipe targets gone; moved leaves in
+`UInitFileLeaves.v`, `UShFileRedir.v`, `UShPipeLeaves.v`; KEPT (the
+union and N-stage layers are built on them, pruned): `PipeDisc` (line
+vocabulary), `PipeOut` (pipe-era ghosts), `PipeOutPure`, `PipesOut`,
+`FileLinkGen`, `UkFileIface`, `UkFileEntries`, `UInitConsFile`,
+`FileLinks`, `UkShPipesFork`.  THE UNION APPLICATION IS COMPLETE: one
+theorem `union_adequacy_closed` for `echo ws`, `echo ws > f`, `cat f`,
+`echo ws | cat^n`, `cat f | cat^n`.  Next efforts (owner): grep in the
+pipeline (design/grep-pipes.md), then the *.txt widening
+(design/filenames.md).
 
 ## Review amendments (override the plan below)
 

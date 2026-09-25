@@ -1251,3 +1251,11 @@ allowed, no bridge back).  NEXT: C9 -- M5's union: `cat f` as a producer
 (the file and pipe devices in one application), then the leftover
 one-pipe sweep.
 
+THE UNION APPLICATION LANDED (2026-09-25, design/union.md C9a-C9h): one
+application theorem `UInitUnion.union_adequacy_closed` covering `echo
+ws`, `echo ws > f`, `cat f`, `echo ws | cat^n`, `cat f | cat^n`; the
+file, pipeline and echo applications are deleted; audits system 13,
+tree 13, union 14.  This completes M4/M5.  NEXT: grep in the pipeline
+(design/grep-pipes.md, G0 landed), then the *.txt widening
+(design/filenames.md).
+

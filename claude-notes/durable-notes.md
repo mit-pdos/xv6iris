@@ -1070,10 +1070,11 @@ union model `ulmU` (concrete functor list `unionΣ`, disk at the mkfs
 image).  It must print exactly 14 distinct axioms: the 13 of
 `audit-only` plus `PrimString.length`.  `make audit-all-only` is `audit-only
 audit-union-only`, and CI runs `audit-union-only`.  The file and pipe
-targets below remain until union cut C9h deletes those applications;
-then the baseline is three audits: system 13, tree 13, union 14.  The
-paragraphs below describe the pre-union two-target setup and still hold
-for `audit-only`.
+targets below were DELETED by union cut C9h (2026-09-25): THE BASELINE IS
+THREE AUDITS -- `make audit-only` (system) 13, `make audit-tree-only` 13,
+`make audit-union-only` 14.  The paragraphs below describe the pre-union
+setup and still hold for `audit-only`; mentions of the pipe/file targets
+and of `PipeAssumptions.v`/`FileAssumptions.v` are historical.
 
 THERE ARE TWO MAIN AUDIT TARGETS, and neither cone contains the other. `make
 audit-only` (`iris/SystemAssumptions.v`) prints
