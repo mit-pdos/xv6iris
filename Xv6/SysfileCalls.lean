@@ -434,9 +434,9 @@ theorem sysfile_end_op (EO : END_OP) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF 
     hj hproc hK hnoff htier hg.fgoLog rfl rfl rfl hpd
   unfold wp_end_op_eb_body at h
   simp only [endOpAddr, fsView_cov, fsView_gd] at h
-  iapply wpLoop_cert
-  iintro #Hcert
-  ihave #Hseam := logCtx_seam _ _ _ _ _ _ $$ Hlc
+  -- the crash seam and the era certificate (D38): `fsReady`'s rows
+  ihave #Hseam := fsReady_seam $$ Hrdy
+  ihave #Hcert := fsReady_gen $$ Hrdy
   iapply h
   iframe Hk Hpc Hte Hce Hpid Hop
   iframe #

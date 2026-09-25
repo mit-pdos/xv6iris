@@ -1,7 +1,7 @@
 /-
 **THE RUNTIME FILE SYSTEM, AS ONE PERSISTENT ASSERTION** -- a port of Rocq
-`FsReady.v` (`/shared/xv6rocq/iris/FsReady.v`, 660 lines) minus the crash
-seam and `gen_cert` (wave-7 decision D11) and minus the boot-side
+`FsReady.v` (`/shared/xv6rocq/iris/FsReady.v`, 660 lines), crash seam and
+`gen_cert` included (crash batch C-4, D38), minus the boot-side
 establishment (`fs_ready_pre` / `_establish` / `_pre_of`, which wait for the
 fsinit port; see "WHAT IS LEFT" below).
 
@@ -55,13 +55,16 @@ in-progress `wp_namex_gen_eb_body` (SpecNamex deviation 2):
 | `hroot`, `hnib0`, `hgeom`, `hbg`, `hbel`, `hireg` | `fsReady_geom` + `FsGeomOk.fgoRootdev`/`.fgoNibPos`/`.fgoLog`/`.fgoBitmap`/`.below`/`.fgoIreg` |
 | per-inum `hcov`/`hlog` (iput, ilock, writei, dirlink) | `FsGeomOk.iblockCov` / `.iblockOut` (Rocq `fgo_iblock_cov`) |
 | BEGIN_OP/END_OP/READI's generic `V`, `hdev`, `hcl`, `hdt` | `fsReadyView` (all `rfl` at `V := fsView fscFs fscDisk icfgDev fscCov`) |
+| END_OP's `fsCrashSeam fscCov fscLogst`, `genCert` | `fsReady_seam`, `fsReady_gen` |
 
 ## DEVIATIONS from Rocq
 
-1. **The crash layer is dropped** (D11): the `fs_crash_seam fsc_cov
-   fsc_logst` and `gen_cert` conjuncts and their projections
-   `fs_ready_seam` / `fs_ready_gen` -- following SpecEndOp / SpecIreclaim /
-   SpecFsinit deviation 3.
+1. (RETIRED by crash batch C-4, D38.)  `fs_crash_seam fsc_cov fsc_logst`
+   and `gen_cert` are conjuncts again, with Rocq's projections
+   `fsReady_seam` / `fsReady_gen`; `end_op`'s call sites above the log take
+   both from here (Rocq threads them from `fs_ready` exactly so).  ONE
+   ORDERING DEVIATION: they are the LAST two conjuncts (Rocq has them fifth
+   and sixth), so no landed positional destructuring pattern moves.
 2. **THE BCACHE LOCK'S NAME IS BOUND, NOT AMBIENT.**  Rocq's `bio_ctx bn V`
    finds the "bcache" lock's gname inside `bn`; Lean's `bioCtx γl γ V`
    takes it as a separate `γl` (`Xv6/BcacheInv.lean`) and `Fscfg` has no
@@ -208,7 +211,8 @@ instance fsSbCells_persistent [Fscfg] [Icfg] [CurCtx] :
 handle and certificate the fs cone runs on, at the ambient names, with the
 image's arithmetic and the superblock cells.  No parameters; persistent; not
 one conjunct is boot state.  Rocq's order, less the dropped rows (header
-deviations 1, 3, 5). -/
+deviations 3, 5), with the crash seam and the era certificate LAST
+(deviation 1). -/
 def fsReady [Fscfg] [Icfg] [CurCtx] : IProp GF := iprop(
   -- the block layer (deviation 2: the "bcache" lock's name is bound)
   (∃ γl : GName, bioCtx γl fscBio (fsView fscFs fscDisk icfgDev fscCov)) ∗
@@ -232,7 +236,10 @@ def fsReady [Fscfg] [Icfg] [CurCtx] : IProp GF := iprop(
   ⌜FsGeomOk⌝ ∗
   fsSbCells ∗
   -- the block bitmap
-  bitmapInv fscFs fscBmapstart fscCov fscLogst fscSize)
+  bitmapInv fscFs fscBmapstart fscCov fscLogst fscSize ∗
+  -- THE CRASH SEAM AND THE ERA CERTIFICATE (D38; LAST, deviation 1)
+  fsCrashSeam (hlc := hlc) (GF := GF) fscCov fscLogst ∗
+  genCert (hlc := hlc) (GF := GF))
 
 instance fsReady_persistent [Fscfg] [Icfg] [CurCtx] :
     Persistent (fsReady (hlc := hlc) (GF := GF)) := by
@@ -397,12 +404,28 @@ theorem fsReady_sb_four [Fscfg] [Icfg] [CurCtx] :
 theorem fsReady_bitmap [Fscfg] [Icfg] [CurCtx] :
     fsReady (hlc := hlc) (GF := GF) ⊢ bitmapInv fscFs fscBmapstart fscCov fscLogst fscSize := by
   unfold fsReady
-  iintro ⟨-, -, -, -, -, -, -, -, -, -, -, -, H⟩
+  iintro ⟨-, -, -, -, -, -, -, -, -, -, -, -, H, -⟩
+  iexact H
+
+/-- Rocq `fs_ready_seam`: the crash seam `end_op` takes. -/
+theorem fsReady_seam [Fscfg] [Icfg] [CurCtx] :
+    fsReady (hlc := hlc) (GF := GF) ⊢ fsCrashSeam (hlc := hlc) (GF := GF) fscCov fscLogst := by
+  unfold fsReady
+  iintro ⟨-, -, -, -, -, -, -, -, -, -, -, -, -, H, -⟩
+  iexact H
+
+/-- Rocq `fs_ready_gen`: the era certificate `end_op` takes. -/
+theorem fsReady_gen [Fscfg] [Icfg] [CurCtx] :
+    fsReady (hlc := hlc) (GF := GF) ⊢ genCert (hlc := hlc) (GF := GF) := by
+  unfold fsReady
+  iintro ⟨-, -, -, -, -, -, -, -, -, -, -, -, -, -, H⟩
   iexact H
 
 /-- Rocq `fs_ready_all`: ONE persistent premise yields, in one step, the
 whole pile a runtime fs continuation can want (Rocq's `kalloc_env` row is
-the spelled pair, deviation 6; `descPageRw` rides with the caps). -/
+the spelled pair, deviation 6; `descPageRw` rides with the caps).  Rocq's
+`fs_crash_seam` / `gen_cert` rows are left to `fsReady_seam` /
+`fsReady_gen`, so this lemma's landed destructuring patterns stay put. -/
 theorem fsReady_all [Fscfg] [Icfg] [CurCtx] :
     fsReady (hlc := hlc) (GF := GF) ⊢
       (∃ γl : GName, bioCtx γl fscBio (fsView fscFs fscDisk icfgDev fscCov)) ∗
@@ -418,7 +441,7 @@ theorem fsReady_all [Fscfg] [Icfg] [CurCtx] :
   iintro #H
   ihave Hd := fsReady_disk $$ H
   unfold fsReady
-  icases H with ⟨H1, H2, -, H4, H5, H6, H7, H8, H9, H10, H11, H12, H13⟩
+  icases H with ⟨H1, H2, -, H4, H5, H6, H7, H8, H9, H10, H11, H12, H13, -⟩
   iframe H1 H2 Hd H4 H5 H6 H7 H8 H9 H10 H11 H12 H13
 
 end FsReady

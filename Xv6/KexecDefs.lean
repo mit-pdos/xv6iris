@@ -331,6 +331,14 @@ theorem fsFabric_all [Fscfg] [Icfg] [CurCtx] (Γ : SchedNames) (pd pav pu : BitV
   ipureintro
   exact hpd
 
+/-- The bundle's `fsReady`, whole: what the crash rows `end_op` takes are
+projected from (`fsReady_seam` / `fsReady_gen`, D38). -/
+theorem fsFabric_ready [Fscfg] [Icfg] [CurCtx] (Γ : SchedNames) (pd pav pu : BitVec 64) :
+    fsFabric (hlc := hlc) (GF := GF) Γ pd pav pu ⊢ fsReady (hlc := hlc) := by
+  unfold fsFabric
+  iintro ⟨#Hr, -⟩
+  iexact Hr
+
 end Fabric
 
 end Xv6

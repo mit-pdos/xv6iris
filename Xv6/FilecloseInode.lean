@@ -143,9 +143,11 @@ theorem fc_inode (BO : BEGIN_OP) (IP : IPUT) (EO : END_OP) [Fscfg] [Icfg] [CurCt
   k_step_e (wp_s_jal cpu _ (KA.«fileclose» + 0xb4#64) false 2095902#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [fileclose_br_end_op]
   iintro Hk Hpc
+  ihave #Hseam := fsReady_seam $$ Hrdy
+  ihave #Hcert := fsReady_gen $$ Hrdy
   iapply (endOp_callF EO Γ cpu _ γbl pd pav pu j n' pidv dqp k.proc (by k_norm_g) k.sie
       (by k_norm_g) hj ?eproc ?eK ?enoff ?etier hg.fgoLog hpd)
-    $$ [- $Hk $Hpc $Hpi $Hte $Hce $Hbc $Hdc $Hpe $Hlc $Hpid $Hop]
+    $$ [- $Hk $Hpc $Hpi $Hte $Hce $Hbc $Hdc $Hpe $Hlc $Hseam $Hcert $Hpid $Hop]
   rotate_right 1
   k_norm_g [fc_ret_b8]
   case eproc => k_norm_g; exact hproc

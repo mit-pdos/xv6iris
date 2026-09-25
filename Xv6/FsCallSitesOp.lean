@@ -147,6 +147,8 @@ theorem endOp_callF [Fscfg] [Icfg] [CurCtx] (EO : END_OP) (Γ : SchedNames)
     bioCtx γl fscBio (fsView fscFs fscDisk icfgDev fscCov) ∗
     diskCaps fscDisk fscDlock pd pav pu ∗ panicEnv ∗
     logCtx icfgLog fscBio fscFs fscCov fscLogst icfgDev ∗
+    -- the crash seam and the era certificate (Rocq's END_OP premises, D38)
+    fsCrashSeam (hlc := hlc) (GF := GF) fscCov fscLogst ∗ genCert (hlc := hlc) (GF := GF) ∗
     wordPointsTo (pPid pj) 4 dqp pidv ∗
     logOp icfgLog u ∗
     wpNext true pj c (fun cpu' => iprop(∀ (spie spp : Bool) (R' : RegMap),
@@ -161,14 +163,7 @@ theorem endOp_callF [Fscfg] [Icfg] [CurCtx] (EO : END_OP) (Γ : SchedNames)
     hj hproc hK hnoff htier hgeom rfl rfl rfl hpd
   unfold wp_end_op_eb_body at h
   simp only [endOpAddr, fsView_gd, fsView_cov] at h
-  -- the crash seam and the era certificate end_op takes (D38): off the log
-  -- context and the cycle boundary
-  iintro ⟨H0, H1, H2, H3, H4, H5, H6, H7, #H8, H9, H10, H11⟩
-  iapply wpLoop_cert
-  iintro #Hcert
-  ihave #Hseam := logCtx_seam _ _ _ _ _ _ $$ H8
-  iapply h
-  iframe H0 H1 H2 H3 H4 H5 H6 H7 H8 Hseam Hcert H9 H10 H11
+  exact h
 
 /-- `fileclose(f)` (Rocq `Fileclose.wp_fileclose_sconf`), eb-generic at depth 0. -/
 theorem fileclose_call [Fscfg] [Icfg] [CurCtx] [FileG GF] (FC : FILECLOSE) (Γ : SchedNames)
@@ -240,9 +235,11 @@ theorem endOp_callR [Fscfg] [Icfg] [CurCtx] (EO : END_OP) (Γ : SchedNames)
   icases fsReady_bio $$ Hrdy with ⟨%γbl, #Hbc⟩
   ihave #Hlc := fsReady_log $$ Hrdy
   icases fsReady_disk $$ Hrdy with ⟨%pd, %pav, %pu, #Hdc, %hpd⟩
+  ihave #Hseam := fsReady_seam $$ Hrdy
+  ihave #Hcert := fsReady_gen $$ Hrdy
   iapply (endOp_callF EO Γ c k' γbl pd pav pu j u pidv dqp pj hpj s hs hj hproc hK hnoff htier
     hg.fgoLog hpd)
-  iframe Hk Hpc Hpi Hte Hce Hbc Hdc Hpe Hlc Hpid Hop Hnext
+  iframe Hk Hpc Hpi Hte Hce Hbc Hdc Hpe Hlc Hseam Hcert Hpid Hop Hnext
 
 set_option maxHeartbeats 1600000 in
 /-- `iput(v)` at `fsReady`, over the reference PACKAGE `inodeHeld v` (a0 = v)

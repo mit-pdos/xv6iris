@@ -244,7 +244,10 @@ def firstBootPersist [Fscfg] [Icfg] [CurCtx] : IProp GF := iprop(
   iregReg (hlc := hlc) fscIreg fscFs icfgIst icfgNib ∗
   bitmapReg fscFs fscBmapstart fscCov fscLogst fscSize ∗
   isLock fscKalloc kmemLockAddr "kmem" (kmemRes fsReadyKmem) ∗
-  ⌜FsGeomOk⌝)
+  ⌜FsGeomOk⌝ ∗
+  -- the crash seam and the era certificate (D38; LAST, as in `fsReady`)
+  fsCrashSeam (hlc := hlc) (GF := GF) fscCov fscLogst ∗
+  genCert (hlc := hlc) (GF := GF))
 
 instance firstBootPersist_persistent [Fscfg] [Icfg] [CurCtx] :
     Persistent (firstBootPersist (hlc := hlc) (GF := GF)) := by
@@ -255,7 +258,7 @@ of `wp_fsinit_eb_body` is a projection of it, deviation 3). -/
 theorem firstBootPersist_geom [Fscfg] [Icfg] [CurCtx] :
     firstBootPersist (hlc := hlc) (GF := GF) ⊢ ⌜FsGeomOk⌝ := by
   unfold firstBootPersist
-  iintro ⟨-, -, -, -, -, -, -, -, -, %h⟩
+  iintro ⟨-, -, -, -, -, -, -, -, -, %h, -⟩
   ipureintro; exact h
 
 /-! ## 2.  THE PURE BLOCK -/
@@ -490,7 +493,7 @@ theorem firstPersistPre [Fscfg] [Icfg] [CurCtx] :
       logCtx icfgLog fscBio fscFs fscCov fscLogst icfgDev -∗
       fsSbCells -∗ iregOpen -∗ fsReady (hlc := hlc) := by
   unfold firstBootPersist fsReady
-  iintro ⟨#Hp, #Hb, #Hd, #Hi, #Ht, #Hs, #Hr, #Hm, #Hk, %Hg⟩ #HK #HL #HC #HO
+  iintro ⟨#Hp, #Hb, #Hd, #Hi, #Ht, #Hs, #Hr, #Hm, #Hk, %Hg, #Hseam, #Hcert⟩ #HK #HL #HC #HO
   ihave #Hseal := logCtx_seal icfgLog fscBio fscFs fscCov fscLogst icfgDev $$ HL
   ihave #Hinv := iregInv_of (hlc := hlc) fscIreg fscFs icfgIst icfgNib $$ Hr Hseal
   ihave #Hbmi := bitmapInv_of fscFs fscBmapstart fscCov fscLogst fscSize $$ Hm Hseal
@@ -506,7 +509,9 @@ theorem firstPersistPre [Fscfg] [Icfg] [CurCtx] :
   isplitr; · iexact HK
   isplitr; · ipureintro; exact Hg
   isplitr; · iexact HC
-  iexact Hbmi
+  isplitr; · iexact Hbmi
+  isplitr; · iexact Hseam
+  iexact Hcert
 
 end FirstTok
 

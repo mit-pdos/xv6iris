@@ -738,9 +738,10 @@ theorem kxc_call_endop (EO : END_OP) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF 
   unfold wp_end_op_eb_body at h
   simp only [endOpAddr] at h
   rw [(fsReadyView (GF := GF)).2.2.1, (fsReadyView (GF := GF)).1] at h
-  iapply wpLoop_cert
-  iintro #Hcert
-  ihave #Hseam := logCtx_seam _ _ _ _ _ _ $$ Hlc
+  -- the crash seam and the era certificate (D38): `fsReady`'s rows
+  ihave #Hrdy := fsFabric_ready Γ A.pd A.pav A.pu $$ Hfab
+  ihave #Hseam := fsReady_seam $$ Hrdy
+  ihave #Hcert := fsReady_gen $$ Hrdy
   iapply h
   k_norm_g
   iframe

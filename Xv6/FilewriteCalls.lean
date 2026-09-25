@@ -101,9 +101,9 @@ theorem fwr_end_op (EO : END_OP) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ] 
   unfold wp_end_op_eb_body at h
   rw [(fsReadyView (GF := GF)).1, (fsReadyView (GF := GF)).2.2.1] at h
   simp only [endOpAddr] at h
-  iapply wpLoop_cert
-  iintro #Hcert
-  ihave #Hseam := logCtx_seam _ _ _ _ _ _ $$ Hlc
+  -- the crash seam and the era certificate (D38): `fsReady`'s rows
+  ihave #Hseam := fsReady_seam $$ Hfs
+  ihave #Hcert := fsReady_gen $$ Hfs
   iapply h
   iframe Hk Hpc Hpi Hte Hce Hbc Hdc Hpe Hlc Hseam Hcert Hpid Hop
   iapply wpNext_intro
