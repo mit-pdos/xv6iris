@@ -12,7 +12,8 @@ bundles at `main`'s altitude are `Xv6.BootCarveMain`.
 
 * §0 `BootImage` -- THE IMAGE HYPOTHESIS (see DEVIATION 1): the boot image
   holds the ELF's text (`Kernel.text`), rodata (`Kernel.rodata`), the GOT
-  word, a zero `.bss`, and some byte at every RAM address.  The text/rodata
+  word, the initialized writable image `[_data, _bss)` (`Kernel.dataInit`),
+  a zero `.bss`, and some byte at every RAM address.  The text/rodata
   address bounds are closed by chunked `decide +kernel` (`bc_text*`,
   `bc_ro*`; each well under a second; the literals are never unfolded in
   the proof mode).
@@ -54,9 +55,11 @@ DEVIATIONS from Rocq (none process-layer):
    `GState.image` to `MachFixedGS.bootImage`, and
    `MachCSL.riscvPowerAdequacy`'s `Hboot` receives `bootFacts σ g.image` at
    the initial `g`, so `BootImage g.image` holds at every boot.
-2. The `.data` section other than the GOT slot (`first`, `nextpid`,
-   `uarts`) is not in `BootImage`: the kernel dump (tools/dump_kernel.py)
-   emits no `.data` bytes.  Its consumers are `main`'s bundles (SpecMain).
+2. `.data` (`first`, `nextpid`, `uarts`), `.got` and `.got.plt` are in
+   `BootImage.data` (`Kernel.dataInit`, 136 bytes, emitted by
+   tools/gen_kernel_data.py; `bc_dataInit_addrs`: exactly `[_data, _bss)`).
+   Its consumers are `main`'s bundles (SpecMain).  `.eh_frame` (read-only,
+   never read) is not in `BootImage`.
 3. Rocq §9/§11-§12 (the LEDGER element half `boot_led_*`, `boot_cran*`)
    have no Lean counterpart: Lean's `ctxByte` needs no per-byte ledger
    element for a timestamp-0 byte.  The M-mode boot stack
@@ -374,9 +377,18 @@ structure BootImage (image : Mem) : Prop where
   rodata : ∀ p ∈ Kernel.rodata, bootImgHas image (BitVec.ofNat 64 p.1) 1 (BitVec.ofNat 8 p.2)
   /-- the GOT slot `_entry` loads `&stack0` from -/
   got : bootImgHas image stack0Slot 8 KA.«stack0»
+  /-- the initialized writable image `[_data, _bss)` (`.data`: `first`,
+  `nextpid`, `uarts`; `.got`; `.got.plt`) -/
+  data : ∀ p ∈ Kernel.dataInit, bootImgHas image (BitVec.ofNat 64 p.1) 1 (BitVec.ofNat 8 p.2)
   /-- `.bss` is zero-filled -/
   bss : ∀ a : PAddr, MachCSL.KernelSyms.«_bss» ≤ a.toNat → a.toNat < MachCSL.KernelSyms.«end» →
     image[a]? = some 0#8
+
+/-- `Kernel.dataInit` is exactly the bytes `[_data, _bss)`, in order. -/
+theorem bc_dataInit_addrs :
+    Kernel.dataInit.map Prod.fst =
+      List.range' MachCSL.KernelSyms.«_data» (MachCSL.KernelSyms.«_bss» - MachCSL.KernelSyms.«_data») := by
+  decide
 
 /-- **The kernel text** out of the persisted window (Rocq `kernel_text_intro`). -/
 theorem kernelText_intro (image : Mem) (himg : BootImage image) :
