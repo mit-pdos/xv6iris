@@ -7,8 +7,9 @@ Proof of `argstr` (`Xv6/SpecArgstr.lean`; Rocq ProofArgstr.v), given
     +0x14: mv a2,s1; mv a1,s2; jal fetchstr
     +0x1c: epilogue (wp_epilogue4s2_gen)
 
-The block is split for argraw only (`argstr_priv_split`: the `p->trapframe` cell
-and the trapframe page) and closed again before fetchstr, which takes it
+The block is borrowed for argraw only (`argstr_priv_tf`, Rocq
+`proc_priv_tf`: the `p->trapframe` cell and the trapframe page) and closed
+again before fetchstr, which takes it
 whole; fetchstr's post is argstr's, at the address argraw returned.
 -/
 import Xv6.LazyFree
@@ -58,50 +59,31 @@ variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [Fdslot
 
 /-! ## The block, opened at the trapframe -/
 
-/-- The core block (at descriptor `P`) minus the `p->trapframe` cell and the trapframe page. -/
-def argstrRest [CurCtx] (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv) (P : UPtd)
-    (M : Nat → List (BitVec 8)) : IProp GF := iprop%
-  wordPointsTo (pPid pa) 4 pidPriv pid ∗
-  wordPointsTo (pKstack pa) 8 (DFrac.own 1) V.kstack ∗
-  wordPointsTo (pSz pa) 8 (DFrac.own 1) V.sz ∗
-  wordPointsTo (pPagetable pa) 8 (DFrac.own 1) V.pagetable ∗
-  wordPointsTo (pCwd pa) 8 (DFrac.own 1) V.cwd ∗
-  pnameCells pa (DFrac.own 1) V.name ∗
-  procPtAt P M ∗
-  ⌜V.pvLazy = false → lazyFree P.um V.sz⌝
-
-theorem argstr_priv_split [X : CurCtx] (ξ : CtxId) (hX : X = ⟨ξ, KTier.kpt⟩) (pa : BitVec 64)
+/-- **The trapframe borrow** (Rocq `ProcInv.proc_priv_tf`, as Rocq's
+`ProofArgstr` destructs it around argraw, at the bare block argstr is stated
+over): the `p->trapframe` cell and the page it names out, and back unmoved. -/
+theorem argstr_priv_tf [X : CurCtx] (ξ : CtxId) (hX : X = ⟨ξ, KTier.kpt⟩) (pa : BitVec 64)
     (pid : BitVec 32) (V : ProcPriv) (M : Nat → List (BitVec 8)) :
     procPrivBareAt (GF := GF) ξ pa pid V M ⊢
-      ⌜V.sz.toNat ≤ uvmMaxsz ∧ umBelow V.sz V.upt ∧ V.pagetable = pageAddr V.upt.root ∧
-        V.trapframe = pageAddr V.upt.tfp⌝ ∗
       wordPointsTo (pTrapframe pa) 8 (DFrac.own 1) (pageAddr V.upt.tfp) ∗
-      tfPageAt V.upt.tfp V.tf ∗ argstrRest pa pid V V.upt M := by
+      tfPageAt V.upt.tfp V.tf ∗
+      (wordPointsTo (pTrapframe pa) 8 (DFrac.own 1) (pageAddr V.upt.tfp) -∗
+        tfPageAt V.upt.tfp V.tf -∗ procPrivBareAt ξ pa pid V M) := by
   subst hX
-  unfold procPrivBareAt argstrRest procFieldsNoOfile
+  letI : CurCtx := ⟨ξ, KTier.kpt⟩
+  unfold procPrivBareAt procFieldsNoOfile
   iintro ⟨%hf, Hpid, ⟨Hks, Hsz, Hpg, Htf, Hcwd, Hnm⟩, Hpt, Htfp, %hlz⟩
-  obtain ⟨h1, h0, h2, h3⟩ := hf
-  rw [h3]
+  have h3 : V.trapframe = pageAddr V.upt.tfp := hf.2.2.2
+  ihave Htf := (show wordPointsTo (GF := GF) (pTrapframe pa) 8 (DFrac.own 1) V.trapframe ⊢
+      wordPointsTo (pTrapframe pa) 8 (DFrac.own 1) (pageAddr V.upt.tfp) from by rw [h3]) $$ Htf
+  iframe Htf Htfp
+  iintro Htf Htfp
+  ihave Htf := (show wordPointsTo (GF := GF) (pTrapframe pa) 8 (DFrac.own 1) (pageAddr V.upt.tfp) ⊢
+      wordPointsTo (pTrapframe pa) 8 (DFrac.own 1) V.trapframe from by rw [h3]) $$ Htf
+  iframe Hpid Hks Hsz Hpg Htf Hcwd Hnm Hpt Htfp
   isplitl []
-  · ipureintro; exact ⟨h1, h0, h2, rfl⟩
-  · iframe
-    ipureintro; exact hlz
-
-theorem argstr_priv_close [X : CurCtx] (ξ : CtxId) (hX : X = ⟨ξ, KTier.kpt⟩) (pa : BitVec 64)
-    (pid : BitVec 32) (V : ProcPriv) (M : Nat → List (BitVec 8))
-    (hf : V.sz.toNat ≤ uvmMaxsz ∧ umBelow V.sz V.upt ∧ V.pagetable = pageAddr V.upt.root ∧
-      V.trapframe = pageAddr V.upt.tfp) :
-    wordPointsTo (pTrapframe pa) 8 (DFrac.own 1) (pageAddr V.upt.tfp) ∗
-    tfPageAt V.upt.tfp V.tf ∗ argstrRest pa pid V V.upt M ⊢ procPrivBareAt (GF := GF) ξ pa pid V M := by
-  subst hX
-  unfold procPrivBareAt argstrRest procFieldsNoOfile
-  obtain ⟨h1, h0, h2, h3⟩ := hf
-  rw [← h3]
-  iintro ⟨Htf, Htfp, Hpid, Hks, Hsz, Hpg, Hcwd, Hnm, Hpt, %hlz⟩
-  isplitl []
-  · ipureintro; exact ⟨h1, h0, h2, rfl⟩
-  · iframe
-    ipureintro; exact hlz
+  · ipureintro; exact hf
+  · ipureintro; exact hlz
 
 variable [CurCtx]
 
@@ -207,7 +189,7 @@ theorem argstr_proof (AR : ARGRAW) (FS : FETCHSTR) : ARGSTR :=
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
   have hK60 : 60 ≤ k.avail := hK
   have hK4 : 4 ≤ k.avail := by omega
-  icases argstr_priv_split (GF := GF) ξ0 rfl pa pid V M $$ Hpriv with ⟨%hfacts, Htf, Htfp, Hrest⟩
+  icases argstr_priv_tf (GF := GF) ξ0 rfl pa pid V M $$ Hpriv with ⟨Htf, Htfp, Hback⟩
   -- the prologue
   iapply (wp_prologue4s2_gen cpu k KA.«argstr» hK4)
   k_code (text_instr _ _ _ _ rfl rfl) Htext
@@ -247,8 +229,7 @@ theorem argstr_proof (AR : ARGRAW) (FS : FETCHSTR) : ARGSTR :=
   k_norm_g
   ihave Htf := (show wordPointsTo (GF := GF) (pTrapframe k.proc) 8 (DFrac.own 1) (pageAddr V.upt.tfp) ⊢
       wordPointsTo (pTrapframe pa) 8 (DFrac.own 1) (pageAddr V.upt.tfp) from by rw [hproc]) $$ Htf
-  ihave Hpriv := argstr_priv_close (GF := GF) ξ0 rfl pa pid V M hfacts $$ [Htf Htfp Hrest]
-  case' _ => iframe
+  ihave Hpriv := Hback $$ Htf Htfp
   -- mv a2,s1 ; mv a1,s2 ; jal fetchstr
   k_step_gen (wp_s_add c5 _ (KA.«argstr» + 0x14#64) true 12#5 0#5 9#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c6 hp6
