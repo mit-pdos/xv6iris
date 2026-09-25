@@ -1,7 +1,8 @@
 /-
 Specification of `kerneltrap` (kernel/trap.c): the C handler `kernelvec`
-calls, ASSUMED as an interface for now (its proof needs devintr's cone:
-the UART and disk interrupt handlers, clockintr, and `yield`).
+calls, stated independently of its proof (proved in `ProofKerneltrap`,
+linked in `LinkKerneltrap`, over devintr's cone: the UART and disk
+interrupt handlers, clockintr, and `yield`).
 
 It takes the proc table's invariant (`procsInv`, persistent) because the
 timer path calls `yield`, and `devintrCaps` (persistent too) because it

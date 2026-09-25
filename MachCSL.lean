@@ -112,3 +112,8 @@ import MachCSL.BigSepLib
 import MachCSL.ByteWord4
 import MachCSL.WpSmodeDivRem
 import MachCSL.WpStoreFree4
+import MachCSL.WpSmodeSscratch
+import MachCSL.WpSmodeCycleT
+import MachCSL.WpSmodeSretU
+import MachCSL.WpPtWalkOwn
+import MachCSL.WpSmodeSatpU
