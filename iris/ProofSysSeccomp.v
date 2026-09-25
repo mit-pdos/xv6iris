@@ -35,6 +35,7 @@ Require Import IntrDefs WpNext.
 Require Import CpuOwn.
 Require Import ProcGeom.
 Require Import UserPtTree.
+Require Import PageGeom ProcPtOwn.
 Require Import FdSlots.
 Require Import FileInvDefs.
 Require Import ProcInv.
@@ -87,6 +88,19 @@ Section ProofSysSeccomp.
   Notation Ra1 := (mword_of_int 11 : mword 5).
   Notation Ra4 := (mword_of_int 14 : mword 5).
   Notation Ra5 := (mword_of_int 15 : mword 5).
+
+  (* argaddr's page-validity premise off the block ([ProofKforkParts]'s
+     [proc_priv_tfp_valid], restated here to keep this proof off kfork's
+     cone). *)
+  Local Lemma scc_tfp_valid (γf : gname) (pa : mword 64) (pid : mword 32)
+      (U : ustate) :
+    proc_priv γf pa pid U -∗ ⌜page_valid (page_base (ud_tfp (pv_upt (us_V U))))⌝.
+  Proof using .
+    iIntros "[(_ & _ & _ & _ & Hpt & _) _]".
+    rewrite /proc_ptm_at. iDestruct "Hpt" as "(_ & _ & Hptt)".
+    iDestruct (proc_ptm_wf with "Hptt") as "%Hwf".
+    iPureIntro. exact (proj2 (proj2 (proj2 (proj2 Hwf)))).
+  Qed.
 
   Lemma wp_sys_seccomp_sconf (γf : gname)
       (m : regfile) (av : nat) (n : nat) (eb : bool) (p : mword 64)
@@ -220,7 +234,7 @@ Section ProofSysSeccomp.
       rewrite /A3 upd_ne; [| vm_compute; discriminate].
       rewrite /A2 upd_ne; [| vm_compute; discriminate]. exact HA1sp. }
     (* ===================== argaddr(0, &mask) ===================== *)
-    iDestruct (proc_priv_tfp_valid with "Hpriv") as %Hpv.
+    iDestruct (scc_tfp_valid with "Hpriv") as %Hpv.
     iDestruct (proc_priv_tf γf p pid U with "Hpriv") as "(Htf & Hpage & Hback)".
     iEval (rewrite -HA4a1) in "Hb3".
     iDestruct (cpu_own_transport CID CID7 n eb p b ltac:(wp_next_chain) with "Hcpu") as "Hcpu".
@@ -319,11 +333,11 @@ Section ProofSysSeccomp.
               with "Hcg Hpc []").
     { iEval (rewrite -Hcr6 -Hcr7). iApply (secci_1e with "Htext"). }
     iIntros (CID13 Hk13) "Hcg Hpc".
-    assert (HC2a5 : rget (CID := CID13) C2 Ra5 = pv_secc (us_V U)).
-    { rewrite (rget_ne (CID := CID13) C2 Ra5 ltac:(vm_compute; discriminate)).
+    assert (HC2a5 : rget (CID := CID12) C2 Ra5 = pv_secc (us_V U)).
+    { rewrite (rget_ne (CID := CID12) C2 Ra5 ltac:(vm_compute; discriminate)).
       rewrite /C2 upd_ne; [| vm_compute; discriminate]. rewrite /C1. apply upd_eq. }
-    assert (HC2a4 : rget (CID := CID13) C2 Ra4 = v0).
-    { rewrite (rget_ne (CID := CID13) C2 Ra4 ltac:(vm_compute; discriminate)).
+    assert (HC2a4 : rget (CID := CID12) C2 Ra4 = v0).
+    { rewrite (rget_ne (CID := CID12) C2 Ra4 ltac:(vm_compute; discriminate)).
       rewrite /C2. apply upd_eq. }
     iEval (rewrite HC2a5 HC2a4) in "Hcg".
     set (C3 := <[Regidx Ra5 := regval_into_reg (and_vec (pv_secc (us_V U)) v0)]> C2).
@@ -346,14 +360,10 @@ Section ProofSysSeccomp.
               with "Hcg Hpc [] Hsecc").
     { iApply (secci_20 with "Htext"). }
     iIntros (CID14 Hk14) "Hcg Hpc Hsecc".
-    assert (Hstv : rget (CID := CID14) C3 Ra5 = and_vec (pv_secc (us_V U)) v0).
-    { rewrite (rget_ne (CID := CID14) C3 Ra5 ltac:(vm_compute; discriminate)).
+    assert (Hstv : rget (CID := CID13) C3 Ra5 = and_vec (pv_secc (us_V U)) v0).
+    { rewrite (rget_ne (CID := CID13) C3 Ra5 ltac:(vm_compute; discriminate)).
       rewrite /C3. apply upd_eq. }
-    assert (Hsaddr4 : add_vec (rget (CID := CID14) C3 Ra0)
-                        (sign_extend' 64 (mword_of_int 360 : mword 12)) = p_secc p).
-    { rewrite (rget_ne (CID := CID14) C3 Ra0 ltac:(vm_compute; discriminate)) HC3a0.
-      reflexivity. }
-    iEval (rewrite Hstv Hsaddr4) in "Hsecc".
+    iEval (rewrite Hstv Hsaddr3) in "Hsecc".
     iDestruct ("Hsback" with "Hsecc") as "Hpriv".
     rewrite -(us_secc_set U v0).
     assert (Hpp24 : add_vec_int (mword_of_int (SC + 0x20) : mword 64) 4 = mword_of_int (SC + 0x24)) by pcstep.
