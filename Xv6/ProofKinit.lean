@@ -3,18 +3,18 @@ Proof of `kinit`'s specification (`SpecKinit.KINIT`), given the interfaces
 of `initlock` and `freerange`.
 
 The shape: the two-slot frame, the two address computations, the call to
-`initlock` (which mints the two lock words), the birth of the allocator's
-ghosts and of the lock itself between the calls (`kmemGhost_alloc`,
-`MachCSL.kctx_newlock`, under `wpLoop_bupd`/`wpLoop_fupd`), the second pair
+`initlock` (which mints the two lock words), the birth of the lock itself
+between the calls, at the caller's names (`MachCSL.kctx_newlockAt` over the
+genesis count the caller hands in, under `wpLoop_fupd`), the second pair
 of address computations, the call to `freerange`, and the epilogue.  Stated
 at either interrupt index, as `freerange` is.
 -/
 import MachCSL.WpSmodeFrame
 import MachCSL.Lock
+import MachCSL.LockBornHook
 import Xv6.SpecKinit
 import Xv6.SpecInitlock
 import Xv6.SpecFreerange
-import Xv6.KmemGhost
 import Xv6.CodeTactics
 
 namespace Xv6
@@ -138,11 +138,10 @@ theorem kinit_finish [CurCtx] (cpu c : CPU) (k : KCtx)
     frame2 (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) ∗
     isLock γl kmemLockAddr "kmem" (kmemRes γk) ∗ kallocAvail γk (some kinitPages) ∗
     wordPointsTo (kmemLockAddr + 8#64) 8 (DFrac.own 1) kmemNameAddr ∗
-    wpNext k.sie k.proc cpu (fun cpu' => iprop(∀ spie' : Bool, ∀ spp' : Bool,
-      ∀ (R' : RegMap) (γl' : GName) (γk' : KmemNames),
+    wpNext k.sie k.proc cpu (fun cpu' => iprop(∀ spie' : Bool, ∀ spp' : Bool, ∀ R' : RegMap,
       ⌜k.sie = false → spie' = k.spie ∧ spp' = k.spp⌝ -∗
       kctx cpu' ((k.withSpie spie' spp').withRegs R') -∗ pcIs cpu' (jumpPc (k.regs 1#5)) -∗
-      isLock γl' kmemLockAddr "kmem" (kmemRes γk') -∗ kallocAvail γk' (some kinitPages) -∗
+      isLock γl kmemLockAddr "kmem" (kmemRes γk) -∗ kallocAvail γk (some kinitPages) -∗
       wordPointsTo (kmemLockAddr + 8#64) 8 (DFrac.own 1) kmemNameAddr -∗
       ⌜calleeSaved k.regs R'⌝ -∗ wpLoop cpu'))
     ⊢ wpLoop (GF := GF) c := by
@@ -160,7 +159,7 @@ theorem kinit_finish [CurCtx] (cpu c : CPU) (k : KCtx)
   ihave HΦ := wpNext_shift _ _ _ _ _ hpin $$ HΦ
   iapply wpNext_mono _ _ _ _ _ $$ HΦ
   iintro %c' HΦ Hk Hpc
-  iapply HΦ $$ %spie %spp %_ %γl %γk %hsp Hk Hpc Hlk Hav Hwname
+  iapply HΦ $$ %spie %spp %_ %hsp Hk Hpc Hlk Hav Hwname
   ipureintro
   unfold calleeSaved
   refine ⟨?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_⟩ <;>
@@ -181,9 +180,9 @@ theorem kinit_br_64fe : KA.«kinit» + 0x64fe#64 = KStr.«kmem» := by decide
 
 set_option maxHeartbeats 4000000 in
 theorem kinit_proof (IL : INITLOCK) (FR : FREERANGE) : KINIT :=
-  ⟨fun {hlc GF} _ _ _ cpu k vlock vname vcpu hnoff hK hlk => by
+  ⟨fun {hlc GF} _ _ _ cpu k γl γk vlock vname vcpu hnoff hK hlk => by
   unfold wp_kinit_body
-  iintro ⟨Hk, Hpc, #Hcl, #Hcl', Hwlock, Hwname, Hwcpu, Hfl, Hpages, HΦ⟩
+  iintro ⟨Hk, Hpc, #Hcl, #Hcl', Hwlock, Hwname, Hwcpu, Hfl, Hpages, Hlkf, Hav, Hauth, HΦ⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
   simp only [kinitAddr]
   k_norm_g
@@ -231,17 +230,16 @@ theorem kinit_proof (IL : INITLOCK) (FR : FREERANGE) : KINIT :=
   unfold calleeSaved at hcs1
   k_norm_g at hcs1
   obtain ⟨e2, e8, e9, e18, e19, e20, e21, e22, e23, e24, e25, e26, e27⟩ := hcs1
-  -- the allocator's ghosts, and the lock
-  iapply wpLoop_bupd
-  imod kmemGhost_alloc with ⟨%γk, Hav, Hauth⟩
-  imodintro
+  -- the lock, at the caller's names, over the genesis count
   ihave HR := ki_kmemRes_intro γk $$ [Hfl Hauth]
   case' _ => iframe
   iapply wpLoop_fupd
-  imod (kctx_newlock c7 _ kmemLockAddr "kmem" (kmemRes γk)) $$ [Hk HR Hfresh Hcl Hcl']
-    with ⟨Hk, %γl, #Hlk⟩
-  · iframe Hcl Hcl'
-    iframe
+  imod (kctx_newlockAt c7 _ γl kmemLockAddr "kmem" (kmemRes γk)) $$ [Hk Hlkf HR Hfresh Hcl Hcl']
+    with ⟨Hk, #Hlk⟩
+  · iframe Hk Hlkf HR Hfresh
+    isplit
+    · iexact Hcl
+    · iexact Hcl'
   imodintro
   -- a1 = PHYSTOP
   k_step_gen (wp_s_addi c7 _ (KA.«kinit» + 0x1c#64) true 17#12 11#5 0#5 (by decide))

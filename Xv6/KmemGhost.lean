@@ -1,5 +1,8 @@
 /-
-The allocator's ghosts, born: the count at zero, tracked by the client.
+The allocator's ghosts, born: the count at zero, tracked by the client
+(Rocq `KallocInv.kalloc_avail_alloc`).  `wp_kinit` no longer mints them
+(SpecKinit, "debt (E)"): this is the era-side allocation whose output is
+`Xv6.fsKitKalloc`'s count rows, handed to `wp_kinit` at `fsReadyKmem`.
 -/
 import Xv6.KallocDefs
 

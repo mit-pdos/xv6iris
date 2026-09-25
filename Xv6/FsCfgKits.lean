@@ -54,10 +54,10 @@ the arity-free `fsCrashSeam` ride `SpecMain`/`firstBootPersist`, not a kit.
    (no `bslots` rows, no `bn_mid`) are in its docstring.
 3. **Kit 1's kinit rows are Rocq's** (`lockFreeTok fscKalloc`,
    `kallocAvail fsReadyKmem (some 0)`, `kmemAuth fsReadyKmem 0` = Rocq
-   `kmem_avail_auth`, the same disjunction), but Lean's `wp_kinit` still
-   MINTS its lock and count names (`∀ γl γk` in its post), so its consumer
-   is a Rocq-shaped `_at` kinit contract that Lean does not have yet (Rocq
-   SpecKinit's three premises, "debt (E)").  Reported, same kind as 2.
+   `kmem_avail_auth`, the same disjunction), consumed by `Xv6.KINIT`'s
+   `wp_kinit` at `γl := fscKalloc`, `γk := fsReadyKmem` (Rocq SpecKinit's
+   three premises, "debt (E)"); its post `isLock fscKalloc … (kmemRes
+   fsReadyKmem)` is `fsReady_kmem`'s row.
 4. **Kit 1's icache rows are `icacheBootAt`'s Lean spellings**
    (IcacheBootTable deviations 4/5): `sl_free_tok (icfg_isl k) ∗ slh_auth
    (icfg_isl k) None` is `slhAuth (icfgIsl k) none` alone; `mono_nat_auth_own
@@ -132,7 +132,7 @@ def fsKitIcache [Fscfg] [Icfg] : IProp GF := iprop(
   lockFreeTok fscKalloc ∗
   lockFreeTok fscDlock ∗
   lockFreeTok fscPrintk ∗
-  -- kinit's page count, at zero (deviation 3)
+  -- kinit's page count, at zero (deviation 3: `wp_kinit`'s premises)
   kallocAvail fsReadyKmem (some 0) ∗
   kmemAuth fsReadyKmem 0 ∗
   -- THE LOCK-WINDOW PIN, one whole element per slot at `none`
