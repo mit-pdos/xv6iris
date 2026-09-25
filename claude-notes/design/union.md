@@ -87,7 +87,25 @@ the ledger `union_led` (taint counter by `lm_disc_ulmU_dec`, conclusion
 `union_phi`), `union_read_inst`; the file lines' claim/link events with
 the open round refuted; the pipeline events at `ucl`.  LEFT to C9f:
 instantiating the family lemmas (`pipesV_*`) at `ucl` where used (they
-already apply, since `ucl` is `peclV` by definition).
+already apply, since `ucl` is `peclV` by definition).  C9f1 LANDED (3c4b8bd4e/
+f23454e1d, VM c9f1merge1, audits 13/13/14/14; FRONTIER print of the
+round law lists only the counted 14): `UShURound.sh_round_holds_union`
+-- the union's round law with the file line shapes and echo PROVED and
+the pipeline lines as the premise `ush_pipes_branch N` (the body law at
+`LPipe p n` admitted with `pl_ok`); the credential `uWcu I p` = the file
+family, or the terminal pipeline shape (NO deed, B3), or the committed
+shape with the deed at DONE; the ties restated over the union model
+(`upre_tie`/`udone_tie`/`upend_tie`, `UShURoundDefs.v`); child laws
+`ush_child_law_union` (echo via the tree-route supply, not
+`UShEchoPay`), `uHchild_redir`, `uHchild_cat`; entries
+`UkUnionEntries`; dispatch through the fork twin with a new
+`UkShCatForkTwin` (`wp_kshm_body_cat_with` takes the fork step).  LEFT
+for C9f2: discharge `ush_pipes_branch` (confirming the shapes
+`upterm_shape`/`updone_shape` match its stage laws), the prompt/read
+laws at the widened credential (their terminal/committed arms are
+pipeline laws).  Seam (d) still fails in the landed
+`UkShRedirChild.wp_kshm_child_file_redir` (`length file = 1`) -- for the
+widening.
 
 ## Review amendments (override the plan below)
 
