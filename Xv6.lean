@@ -1149,3 +1149,4 @@ import Xv6.SyscallArmsFork
 import Xv6.SyscallArmsProc
 import Xv6.SyscallArmsSbrk
 import Xv6.SyscallArmsExit
+import Xv6.SyscallArmsWait
