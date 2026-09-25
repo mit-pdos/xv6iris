@@ -1,7 +1,9 @@
 > **COORDINATOR DECISIONS (Sept 25 2026):** D14 one era stage set generic in `npar` (mirrors the landed
 > namex); D15 defer FsAbs.v's iProp half (record); D18 re-base kexec's user memory onto Lean's
 > representation — the agent posts its plan first; D19, D20, D21 approved; D22: fix fs-rocq-summary §7.9.
-> D16 / D17: pending the user.
+> **USER: D16 = Rocq-literal block everywhere** (era walks, create and the sys_* frames state Rocq's whole
+> proc_priv, so they wait for C0's block; the landed fs leaves namex/namei keep their cwd rows as Rocq's do).
+> **USER: D17 = minimal `uvis` + `uperm` now** (K-B ports Xv6/UexecSlot.lean + Xv6/UserPerm.lean subset).
 
 > **COORDINATOR / USER DECISIONS PENDING.** §9 lists them (D14–D22). The definitional batch 7b-0
 > (§8.1) needs **none** of them and can start now. The era walks need D14. kexec's contract needs D17
