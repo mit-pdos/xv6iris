@@ -146,7 +146,7 @@ KDUMP_SRCS := $(KDUMP)/KernelInstrs.v $(KDUMP)/KernelData.v $(KDUMP)/KernelSyms.
 # prefix> pairs (the ELF is $(USER_DIR)/_<program>).  Adding one here also needs
 # its dumped .v files listed in user-rocq/_CoqProject (three, plus the
 # <P>ElfRaw.v where a program's whole-file raw is wanted -- cat has four).
-USER_DUMPS ?= sync:Sync echo:Echo sh:Sh init:Init cat:Cat grep:Grep
+USER_DUMPS ?= sync:Sync echo:Echo sh:Sh init:Init cat:Cat grep:Grep seccomp:Seccomp
 
 .PHONY: all proofs model kernel user dump dump-force kernel-rocq user-rocq \
         xv6-rev-check sail-rev-check gen-code check-decode update-decode \

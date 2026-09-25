@@ -322,6 +322,7 @@ UCodeInit.v
 UInitArgv.v
 UCodeCat.v
 UCodeGrep.v
+UCodeSeccomp.v
 UkGrepLib.v
 UkGrepMatch.v
 UkGrepPutc.v

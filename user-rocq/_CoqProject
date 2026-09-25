@@ -26,3 +26,10 @@ GrepInstrs.v
 GrepData.v
 GrepSyms.v
 GrepElfRaw.v
+# seccomp (lane U of the seccomp bump): the binary that runs its argument
+# under a syscall mask.  [iris/ElfUser.v] states its ELF theorems and
+# [iris/FsImgCheck.v] pins the image's inum-23 bytes to SeccompElfRaw.v.
+SeccompInstrs.v
+SeccompData.v
+SeccompSyms.v
+SeccompElfRaw.v

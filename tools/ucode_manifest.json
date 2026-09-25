@@ -4,6 +4,7 @@
   { "module": "Init", "spec": "tools/ucode_init.txt", "out": "iris/UCodeInit.v" },
   { "module": "Cat",  "spec": "tools/ucode_cat.txt",  "out": "iris/UCodeCat.v"  },
   { "module": "Grep", "spec": "tools/ucode_grep.txt", "out": "iris/UCodeGrep.v" },
+  { "module": "Seccomp", "spec": "tools/ucode_seccomp.txt", "out": "iris/UCodeSeccomp.v" },
 
   { "module": "Sh", "prog": "shk", "spec": "tools/ucode_shk.txt", "out": "iris/UCodeShK.v" },
   { "module": "Sh", "prog": "shm", "spec": "tools/ucode_shm.txt", "out": "iris/UCodeShM.v" },

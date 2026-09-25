@@ -1,0 +1,52 @@
+# ucode_seccomp.txt -- the pc set of iris/UCodeSeccomp.v, for tools/gen_ucode.py.
+#
+# tools/ucode_manifest.json binds this spec to iris/UCodeSeccomp.v; `make
+# gen-ucode` rewrites that file from it, and `make check-ucode` fails if it
+# moved.
+#
+# seccomp (user/seccomp.c, new at a083670) is the program that runs its
+# argument under a syscall mask: fork; the child ANDs its mask with the
+# complement of {SYS_kill 6, SYS_open 15, SYS_mknod 17, SYS_unlink 18,
+# SYS_link 19, SYS_mkdir 20} (upstream 7b2c1b1; the lui/addi pair at
+# main+0x1c builds 0xffff_ffff_ffe1_7fbf) and execs argv[1] with argv+1;
+# the parent waits and exits 0.  Its four diagnostics (usage, fork failed, seccomp failed, exec %s
+# failed) all go through fprintf on fd 2, with at most a %s.  It never
+# uses printf.
+#
+# Unreachable branches inside a listed function are kept (ucode_cat.txt's
+# rule); whole functions never entered are left out, with the reason.
+
+note This catalog covers seccomp as it runs: start, main's fork / mask /
+note exec / wait, the six syscall stubs main issues, and the
+note fprintf cone under its four diagnostics.
+
+# ---- the program ------------------------------------------------------
+func start
+func main
+
+# ---- the fprintf cone (all four diagnostics, fd 2) --------------------
+func fprintf
+func vprintf
+func putc
+
+# ---- the syscall stubs it issues --------------------------------------
+func fork
+func exit
+func wait
+func exec
+func seccomp
+func write
+
+# ---- and what is deliberately absent ---------------------------------
+skipfunc printf unreachable: every diagnostic is an fprintf(2, ...)
+skipfunc printint unreachable: vprintf reaches it only from the %d/%u/%x arms, and seccomp's only conversion is %s
+skipfunc malloc unreachable: seccomp allocates nothing
+skipfunc free unreachable: seccomp allocates nothing
+skipfunc sbrk unreachable: only malloc calls it
+skipfunc sbrklazy unreachable: only malloc calls it
+skipfunc sys_sbrk unreachable: only malloc calls it
+skipfunc gets unreachable: seccomp reads nothing
+skipfunc stat unreachable: seccomp never stats
+skipfunc fstat unreachable: only stat calls it
+
+skipdefault library function or other syscall stub that seccomp never calls
