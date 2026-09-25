@@ -1062,6 +1062,19 @@ downgrade, never an error.
 
 ## The adequacy-print baseline
 
+**UPDATE (2026-09-25, union C9g):** the application audit is now `make
+audit-union-only` (`iris/UnionAssumptions.v`), which prints
+`UInitUnion.union_adequacy_closed` -- ONE application for `echo ws`,
+`echo ws > f`, `cat f`, `echo ws | cat^n` and `cat f | cat^n` at the
+union model `ulmU` (concrete functor list `unionΣ`, disk at the mkfs
+image).  It must print exactly 14 distinct axioms: the 13 of
+`audit-only` plus `PrimString.length`.  `make audit-all-only` is `audit-only
+audit-union-only`, and CI runs `audit-union-only`.  The file and pipe
+targets below remain until union cut C9h deletes those applications;
+then the baseline is three audits: system 13, tree 13, union 14.  The
+paragraphs below describe the pre-union two-target setup and still hold
+for `audit-only`.
+
 THERE ARE TWO MAIN AUDIT TARGETS, and neither cone contains the other. `make
 audit-only` (`iris/SystemAssumptions.v`) prints
 `xv6_fs_adequacy_xv6Σ` — the chain at the TRIVIAL application, which never

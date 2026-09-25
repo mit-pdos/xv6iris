@@ -119,7 +119,23 @@ filing's lower bound; `udone_tie_of_pre_id` turns it into DONE at the
 prompt's first byte).  Its section needs `pipeProtoG`, `pnsRegG`,
 `pipesNG`, `cifRegG` -- C9g's Σ provides them.  NEXT for C9g: the
 prompt/read laws at the widened credential (not needed by the round
-law).
+law).  C9g LANDED (706ce65da/9392bf0d4/9000d0d1e, VM c9gmerge1;
+audits system 13, tree 13, file 14, pipe 14, UNION 14 -- the union list is
+the 13 plus `PrimString.length`): `UInitUnion.union_adequacy_closed`
+(for every run from power-on, every thread reducible and `union_phi
+κs`: under the union discipline, per-cycle boot states -- the first
+absent, each later one admissible against earlier cycles' lines -- and
+`Forall2 (lm_good_out ulmU)`), `unionΣ` (keeps `fifRegΣ`: the union
+round's file children still run the file entries), `AppUnionRec`,
+`UInitUnionBoot`/`UInitUnionCC`, `UUnionBootAdequacy`, the prompt/read
+laws at `uWcu` (`UShURoundLaws.v`), `UnionReadInstAt.v`,
+`UnionAssumptions.v`; Makefile `audit-union(-only)`, `audit-all-only`
+= `audit-only audit-union-only`, CI on `audit-union-only`; the FRONTIER
+prints removed.  The committed arm of `uWcu` also carries the boot
+witness `f0cw gf (S gen_id) s0`.  FOR C9h: the union chain still
+imports `UInitFileCons`, `UInitFileCC`, `UInitConsFile`, `UShRound` --
+their lemmas are about `file_pred`/`file_gn`, so MOVE them before
+deleting the file application.
 
 ## Review amendments (override the plan below)
 
