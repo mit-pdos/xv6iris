@@ -172,8 +172,8 @@ Section union_read_leaf_at.
   Context `{!riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
             !irefslotG Σ, !pavG Σ, !wchG Σ, !ufdG Σ}.
   Context `{GEN : GenId} `{XI : CurCtx}.
-  Context `{!ghost_varG Σ Z}.
-  Context `{!ghost_varG Σ (gset gname)}.
+  (* NO [ghost_varG] BINDER ([UShRound]'s header): the loop's leaf is read
+     at the kernel's own instance, the one the round is pinned at *)
   Context `{!echoOutG Σ, !inG Σ (mono_listR (leibnizO Z)), !fileAppG Σ,
             !fileOutG Σ, !pipeOutG Σ}.
   Context (ug : union_gn).
