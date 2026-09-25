@@ -444,12 +444,14 @@ theorem uexecPayDep_exit (m : RegMap) (pc : BitVec 64) (M : ElfMem) (pm : Nat �
 
 /-- **Rocq `ufork_ans`**: WHAT FORK ANSWERS ITS PARENT -- it failed (-1, the
 set unmoved, the LEND refunded) or it created a child at a pid in
-`[1, PIDMAX]`, whose generation joined the set, with the parent's token. -/
+`[1, PIDMAX]`, whose generation -- FRESH, Rocq's `γ ∉ cs` (kfork's post,
+`WaitFresh.childrenInv_row_fresh`) -- joined the set, with the parent's
+token. -/
 def uforkAns (Q : Int → IProp GF) (Rc : IProp GF) (r : BitVec 64) (cs cs' : ExtTreeSet GName compare) :
     IProp GF :=
   iprop((⌜r = -1#64 ∧ cs' = cs⌝ ∗ Rc) ∨
     ∃ (γ : GName) (pidv : BitVec 32), ⌜r = BitVec.signExtend 64 pidv⌝ ∗
-      ⌜1 ≤ pidv.toNat ∧ pidv.toNat ≤ PIDMAX⌝ ∗ ⌜cs' = cs ∪ {γ}⌝ ∗ childTok γ pidv Q)
+      ⌜1 ≤ pidv.toNat ∧ pidv.toNat ≤ PIDMAX⌝ ∗ ⌜γ ∉ cs⌝ ∗ ⌜cs' = cs ∪ {γ}⌝ ∗ childTok γ pidv Q)
 
 /-- **Rocq `uwait_ans_at`**: the kernel's own answer (`waitAns`) at the a0
 WORD, at the caller's generation and status pointer. -/

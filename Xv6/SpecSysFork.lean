@@ -30,8 +30,9 @@ its kill wand, `firstDone`, the caller's children row `chFrag V.chg pa csP`
 `procsAvailAt Γ none false`.  DEVIATION FROM ROCQ, inherited from the Lean
 `kfork` contract: Rocq's `kfork` additionally threads the child's
 user-execution slot (`uslot`), the parent's lend `Rc` and
-`park_world`/`park_token` (8-P's park rows; the child is parked under
-`procsInv` via `[ForkretIs]`), so neither does this wrapper.
+`park_world`/`park_token` (the park rows, open until `ParkCap` (8-2) and
+the forkret park (8-4) land; the child is parked under `procsInv` via
+`[ForkretIs]`), so neither does this wrapper.
 
 `kfork` does not sleep (`filedup`/`idup` are non-blocking):
 like `kfork`'s, the contract is BALANCED and generic in the entry interrupt

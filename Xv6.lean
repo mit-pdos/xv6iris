@@ -834,6 +834,7 @@ import Xv6.SlotGen
 import Xv6.UserChildren
 import Xv6.WaitInv
 import Xv6.WaitInvTies
+import Xv6.WaitFresh
 import Xv6.KillRow
 import Xv6.FirstTok
 import Xv6.SpecFilestat

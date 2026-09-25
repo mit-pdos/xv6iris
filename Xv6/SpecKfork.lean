@@ -90,8 +90,10 @@ PROCESS-LAYER DEVIATIONS (flagged):
    (moved to `csP ∪ {γc}` under `wait_lock` at `np->parent = p`,
    `WaitInvTies.childrenInv_fork`), the ledger's steady regime
    `procsAvailAt Γ none false`, and the parent's quarter `childTok γc pid Q`
-   in the post.  Rocq's `Rc` / `uslot` / `park_world` / `park_token` are
-   8-P's (the park rows; `[ForkretIs]` stays until 8-4).
+   in the post, with the freshness `γc ∉ csP` (batch 8-P).  STILL OPEN:
+   Rocq's `Rc` (the lend) / the child's `uslot` premise / `park_world` /
+   `park_token` -- the park rows, which need `ParkCap` (8-2) and the
+   forkret park (8-4); `[ForkretIs]` stays until 8-4.
 
 Imports only definitional files (never a `Code*` or `Proof*` file).
 -/
@@ -137,7 +139,12 @@ and THE CALLER'S CHILDREN ROW -- back at `csP` on the `-1` arm (no child was
 created), or MOVED on the success arm: kfork holds `wait_lock` while it
 writes `np->parent`, so the set the parent gets back has the child's
 generation in it, beside the PARENT's quarter of that generation
-(`ChildTok.childTok γc rv Q`), at the pid the answer returns. -/
+(`ChildTok.childTok γc rv Q`), at the pid the answer returns -- AND THE
+GENERATION IS FRESH (`γc ∉ csP`, Rocq's `⌜ γ ∉ csP ⌝`, batch 8-P): read off
+the wait-lock invariant's row converse at the store that fills the child's
+parent cell (`WaitFresh.childrenInv_row_fresh`), so the union is a growth
+by one.  (Rocq's `pme ≠ 0` premise is Lean's `procAddr j`, nonzero by
+`procAddr_nonzero`.) -/
 def kforkRet {hlc : HasLC} {GF : BundledGFunctors}
     [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
     [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
@@ -148,7 +155,7 @@ def kforkRet {hlc : HasLC} {GF : BundledGFunctors}
     IProp GF := iprop%
   procPrivFd γ (procAddr j) pid V M ∗ fdFrags V.fdg stsP ∗
   ((⌜rv = -1#32⌝ ∗ chFrag V.chg (procAddr j) csP) ∨
-   (∃ γc : GName, ⌜1 ≤ rv.toNat ∧ rv.toNat ≤ PIDMAX⌝ ∗ childTok γc rv Q ∗
+   (∃ γc : GName, ⌜1 ≤ rv.toNat ∧ rv.toNat ≤ PIDMAX⌝ ∗ ⌜γc ∉ csP⌝ ∗ childTok γc rv Q ∗
       chFrag V.chg (procAddr j) (csP ∪ {γc})))
 
 /-- **WP of `kfork`.** -/

@@ -91,6 +91,7 @@ Study `ProofYield.lean` (lock acquire/release + held-half agreement),
 `ProofAllocproc.lean` (callee calls + `allocprocPost`), `ProofUvmcopy.lean`
 (the word loop `uvmcopy_loop`), `ForkretRecord.lean` (`forkret_record`).
 -/
+import Xv6.WaitFresh
 import Xv6.LazyFree
 import MachCSL.WpSmodeFrame
 import MachCSL.ByteWord
@@ -1615,10 +1616,10 @@ the caller's row reads the authority (`childrenOwn_lookup`) and moves to
 (`childrenInv_fork`: the three quarters and the two readings).  What is
 handed back closes the payload once the cell holds the parent's address. -/
 theorem kf_wait_fork [CurCtx] (i : Nat) (hi : i < NPROC) (pa : BitVec 64) (g γp : GName) (pid : BitVec 32)
-    (cs : ExtTreeSet GName compare) :
+    (cs : ExtTreeSet GName compare) (hpa : pa ≠ 0#64) :
     waitInvResAt (GF := GF) curCtx ∗ slotGen (procAddr i) (.own Qp.threeQuarters) g ∗
       pidReg pid (.own Qp.threeQuarters) g ∗ genSlot g (procAddr i) ∗ genPid g pid ∗ chFrag γp pa cs ⊢
-      |==> ((∃ v : BitVec 64, wordAtN curCtx (pParent (procAddr i)) 8 (DFrac.own 1) v) ∗
+      |==> (⌜g ∉ cs⌝ ∗ (∃ v : BitVec 64, wordAtN curCtx (pParent (procAddr i)) 8 (DFrac.own 1) v) ∗
         (wordAtN curCtx (pParent (procAddr i)) 8 (DFrac.own 1) pa -∗ waitInvResAt curCtx) ∗
         chFrag γp pa (cs ∪ {g})) := by
   unfold waitInvResAt
@@ -1631,6 +1632,12 @@ theorem kf_wait_fork [CurCtx] (i : Nat) (hi : i < NPROC) (pa : BitVec 64) (g γp
   · isplitl [Hch]
     · iexact Hch
     · iexact Hrow
+  -- THE GENERATION IS FRESH (Rocq `WaitFresh.children_inv_row_fresh`)
+  icases waitInv_keep (childrenInv_row_fresh curCtx ps gs m O i pa g γp cs hi hno hm hpa) $$ [Hci]
+    with ⟨%hfresh, Hci, -⟩
+  · isplitl [Hci]
+    · iexact Hci
+    · iexact Hgs
   imod childrenOwn_upd m γp pa cs (cs ∪ {g}) $$ [Hch Hrow] with ⟨Hch, Hrow⟩
   · isplitl [Hch]
     · iexact Hch
@@ -1648,6 +1655,8 @@ theorem kf_wait_fork [CurCtx] (i : Nat) (hi : i < NPROC) (pa : BitVec 64) (g γp
     · iexact Hgp
   icases parentsOwn_acc curCtx ps i hi $$ Hpo with ⟨Hcell, Hpoback⟩
   imodintro
+  isplitl []
+  · ipureintro; exact hfresh
   isplitl [Hcell]
   · iexists (ps i); iexact Hcell
   isplitl [Hpoback Hch Ho Hci]
@@ -2486,8 +2495,8 @@ theorem kf_publish [X : CurCtx] (AC : ACQUIRE) (RE : RELEASE) (SS : SAFESTRCPY) 
     ihave HW := (show waitLockPay (GF := GF) curCtx ⊢ waitInvResAt curCtx
       from by unfold waitLockPay; iintro H; iexact H) $$ HW
     iapply wpLoop_bupd
-    imod (kf_wait_fork i hi (procAddr j) V_c.gen V.chg pid_c csP) $$ [HW Hsg34 Hpr34 Hrowp]
-      with ⟨⟨%pv, Hword⟩, Hback, Hrowp⟩
+    imod (kf_wait_fork i hi (procAddr j) V_c.gen V.chg pid_c csP (procAddr_nonzero hj)) $$ [HW Hsg34 Hpr34 Hrowp]
+      with ⟨%hfresh, ⟨%pv, Hword⟩, Hback, Hrowp⟩
     · isplitl [HW]
       · iexact HW
       isplitl [Hsg34]
@@ -2701,6 +2710,8 @@ theorem kf_publish [X : CurCtx] (AC : ACQUIRE) (RE : RELEASE) (SS : SAFESTRCPY) 
           iexists V_c.gen
           isplitl []
           · ipureintro; exact ⟨hpid1, hpid2⟩
+          isplitl []
+          · ipureintro; exact hfresh
           iframe Htok Hrowp
         ihave Hs2' : wordPointsTo (GF := GF) (k.regs 2#5 + 0xFFFFFFFFFFFFFFE0#64) 8 (DFrac.own 1) (k.regs 18#5) $$ [Fs2]
         case' _ => rw [← hR3_18]; iexact Fs2
