@@ -1128,3 +1128,8 @@ import Xv6.FsCfgKits
 import Xv6.FsBootSupply
 import Xv6.FileBoot
 import Xv6.UsertrapRes
+import Xv6.SyscallEnv
+import Xv6.SpecSyscall
+import Xv6.SyscallTable
+import Xv6.SyscallRet
+import Xv6.UtResFits

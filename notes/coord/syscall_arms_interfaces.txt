@@ -1,0 +1,300 @@
+SYSCALL DISPATCH, WAVE 8 -- FROZEN INTERFACES FOR THE ARM AGENTS (W8-S1..S4) AND THE SEAL (W8-E2)
+=====================================================================================================
+Written by W8-E (SyscallEnv / SpecSyscall / SyscallTable / SyscallRet), main tree at 6cbf7d5eb + these
+four new files.  All four BUILD:  timeout 1800 lake build Xv6.SyscallRet   (pulls the other three)
+No sorry; check_layering ok; every file elaborates in <= 4 s (whole file).
+
+THE FILES (import only Xv6.SyscallRet from an arm file; it re-exports the other three)
+  Xv6/SyscallEnv.lean    D30: syscallEnv PT Γ γ (concrete, Rocq content), its producer and projections,
+                         the per-callee env builders, syscInitId, parkWorld, syscParkExtra.
+  Xv6/SpecSyscall.lean   THE CONTRACT: syscallAddr, syscallSlots (= 4 + sysExecSlots = 252, checked against
+                         all 22 Specs + myproc + printk), SyscRows (the post's 18 pure rows, one record),
+                         the deposit channels (syscSysIn/Out, syscForkIn/Out, syscPayIn, syscWaitOut,
+                         syscExecOut + _ne/_at/_quiet/_exec/_fork helpers), syscallPost, syscallCloser,
+                         wp_syscall_body, structure SYSCALL.
+  Xv6/SyscallTable.lean  stage 1: addresses (syscallRet = +0x3a, syscallFallback = +0x40, syscallEpi = +0x58,
+                         branch/auipc folds, syscTarget_<name> : syscTarget n = sys<Name>Addr for all 22),
+                         syscall_num_of_idx / syscall_nofs_of_range, the IMAGE lemmas syscImg_faulted /
+                         syscImg_write, syscPins, syscall_post_at, and THE ARM INTERFACE syscArmBody n /
+                         syscFallbackBody.
+  Xv6/SyscallRet.lean    stage 2 (PROVED): syscall_ret_tail (+0x3a sd a0,112(s2); c.j; epilogue; post) and
+                         syscall_epilogue_tail (+0x58..), syscStore, syscRows_keep, syscall_tf_acc,
+                         syscall_tf_len.
+  Xv6.lean imports to add (coordinator): Xv6.SyscallEnv, Xv6.SpecSyscall, Xv6.SyscallTable, Xv6.SyscallRet.
+
+----------------------------------------------------------------------------------------------------
+1. THE CONTRACT (SpecSyscall.wp_syscall_body; D32 eb-generic)
+----------------------------------------------------------------------------------------------------
+  binders: PT (park token, SchedNames → IProp GF, persistent -- abstract until W8-P2), Γ [ClaimIs Γ],
+    cpu k γw γ j pid V M sts gn cs ip (f : UexecSG.sfam GF); hj hproc (k.proc = procAddr j)
+    hK (syscallSlots ≤ k.avail) hnoff (k.noff = 0) htier (k.tier = kpt) hgn (gn = V.gen).
+    SYSCALL additionally binds [∀ Γ, Persistent (PT Γ)] and [UexecSG GF] (the deposit class; W8-K's instance).
+  pre:  kctx cpu k ∗ pcIs cpu syscallAddr ∗ procsInv Γ ∗ trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc
+        ∗ isLock γw waitLockAddr "wait_lock" waitLockPay
+        ∗ bslots 3 ∗ syscInitId ip ∗ fdSlots FDSPARE ∗ irefSlots IREFSPARE      (the four explicit families)
+        ∗ syscallEnv PT Γ γ
+        ∗ procPrivFd γ (procAddr j) pid V M ∗ fdFrags V.fdg sts ∗ chFrag V.chg (procAddr j) cs
+        ∗ syscSysIn f V M sts gn cs pid ∗ syscForkIn f V M sts ∗ syscPayIn f V
+        ∗ (wpNext true k.proc cpu (syscallPost PT Γ k γ j pid V M sts gn cs ip f) ∧ syscallCloser k V)
+  post (syscallPost, at every hart): ∀ spie spp R' V' M' sts' cs',
+        ⌜calleeSaved k.regs R'⌝ -∗ ⌜SyscRows V M V' M' sts sts' cs cs' pid⌝ -∗
+        kctx cpu' ((k.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k.regs 1#5)) -∗
+        trapCsrsExt cpu' k.sie -∗ cpuClaimExt cpu' k.sie k.proc -∗ <the 4 families> -∗ syscallEnv PT Γ γ -∗
+        procPrivFd γ (procAddr j) pid V' M' -∗ fdFrags V.fdg sts' -∗ chFrag V.chg (procAddr j) cs' -∗
+        syscExecOut V M V' M' sts sts' gn cs pid -∗
+        syscSysOut f V M sts gn cs pid (syscA0 V') (syscImg V' M') sts' V'.cwi cs' -∗
+        syscForkOut f V (syscA0 V') cs cs' -∗ syscWaitOut V M (syscImg V' M') (syscA0 V') cs cs' pid -∗ wpLoop cpu'
+  closer (syscallCloser): stackOwn k.sp (trapRes k.sie + k.avail) -∗ stackOwn (V.kstack + 4096#64) 512
+  syscImg V M := umemLazy V.upt V.sz.toNat M   (the key's lazy image);  syscA0 V := tfW V.tf (tfArgIdx 0).
+
+  syscallEnv PT Γ γ = syscProcEnv Γ γ ∗ consoleReadyApp ∗ syscFsEnv ∗ firstDone ∗ parkWorld Γ ∗ PT Γ
+    syscProcEnv Γ γ = ∃ γp γw γft γtk, nextpid lock ∗ procsAvailAt Γ none false ∗ wait_lock ∗ isFtable γft γ ∗ isTickslock γtk
+    syscFsEnv       = panicEnv ∗ fsReady
+    parkWorld Γ     = (∃ ports/locks/pages, devintrCaps Γ … fscDisk fscDlock …) ∗ consoleReadyApp ∗ nextpid lock ∗
+                      procsAvailAt Γ none false ∗ wireInv ∗ kmapAt trampVpn (kLeaf trampPpn .rx 0 0) ∗
+                      (∃ ip, initIdentCell curCtx ip ∗ initGen ip 1)
+  Projections (all `syscallEnv PT Γ γ ⊢ …`): _console _first _world _token _fsReady _panic _all _ftable _ticks
+    _pid _kmem (at fscKalloc/fsReadyKmem, none) _devsw (∃ γl γu, filewriteDevsw γl γu);
+    builders: _filereadFsEnv (⊢ bslot -∗ …) _filestatFsEnv (bslot) _filewriteFsEnv (bslots 3)
+    _fileclosePipeEnv (procsInv Γ -∗ fileclosePipeEnv Γ fscKalloc fsReadyKmem none)
+    _filecloseFsEnv j hj (procsInv Γ -∗ bslots 3 -∗ filecloseFsEnv Γ j (procAddr j))
+    _fsFabric (procsInv Γ -∗ ∃ pd pav pu, fsFabric Γ pd pav pu).
+  The environment is persistent ONLY under [∀ Γ, Persistent (PT Γ)] -- every arm theorem binds
+  `(PT : SchedNames → IProp GF) [hPT : ∀ Γ, Persistent (PT Γ)]` so `#Henv` works.
+
+----------------------------------------------------------------------------------------------------
+2. THE ARM INTERFACE (SyscallTable.syscArmBody -- FROZEN)
+----------------------------------------------------------------------------------------------------
+  Each arm proves, for its table index n (1..22):
+
+  theorem syscall_arm_<name> (<callee interface(s)>) (<deposit law(s), §4>)
+      {hlc GF} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [BcacheG GF] [SleepLockG GF] [DiskG GF]
+      [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF] [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF]
+      [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [Appcfg GF] [FileG GF] [SG : UexecSG GF]
+      [Fscfg] [Icfg] [CurCtx]
+      (PT : SchedNames → IProp GF) [hPT : ∀ Γ, Persistent (PT Γ)] (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+      (c0 cpu : CPU) (k : KCtx) (spie spp : Bool) (R : RegMap) (γw : GName) (γ : FileNames) (j : Nat)
+      (pid : BitVec 32) (V : ProcPriv) (M : Nat → List (BitVec 8)) (sts : List FdState) (gn : GName)
+      (cs : ExtTreeSet GName compare) (ip : BitVec 64) (f : UexecSG.sfam GF)
+      (hE : SyscSpostEmp (GF := GF))
+      (hj : j < NPROC) (hproc : k.proc = procAddr j) (hK : syscallSlots ≤ k.avail)
+      (hnoff : k.noff = 0) (htier : k.tier = KTier.kpt) (hgn : gn = V.gen)
+      (hnum : syscNum V = ((n : Nat) : Int)) (hpins : syscPins k R) (hs1 : R 9#5 = procAddr j)
+      (hs2 : R 18#5 = pageAddr V.upt.tfp) (hra : R 1#5 = syscallRet) :
+      syscArmBody n PT Γ c0 cpu k spie spp R γw γ j pid V M sts gn cs ip f hE hj hproc hK hnoff htier hgn
+        hnum hpins hs1 hs2 hra
+
+  syscArmBody n unfolds to (entered right after the `jalr a5`):
+    kctx cpu (((k.withSpie spie spp).pushed 4).withRegs R) ∗ pcIs cpu (syscTarget n) ∗
+    frame4s2 (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) (k.regs 9#5) (k.regs 18#5) ∗
+    procsInv Γ ∗ trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗ wait_lock γw ∗
+    bslots 3 ∗ syscInitId ip ∗ fdSlots FDSPARE ∗ irefSlots IREFSPARE ∗ syscallEnv PT Γ γ ∗
+    procPrivFd γ (procAddr j) pid V M ∗ fdFrags V.fdg sts ∗ chFrag V.chg (procAddr j) cs ∗
+    syscSysIn f V M sts gn cs pid ∗ syscForkIn f V M sts ∗ syscPayIn f V ∗
+    (wpNext true k.proc c0 (syscallPost …) ∧ syscallCloser k V)  ⊢ wpLoop cpu
+  (c0 = the dispatch's entry hart, the post's key; syscall_post_at turns it into any hart since k.proc ≠ 0.)
+
+  Standard recipe for a RETURNING arm (VALIDATED end to end on sys_uptime, template in §6):
+   1. `unfold syscArmBody`; iintro the 20 rows; `icases Hslot with ⟨Hnext, -⟩` (left conjunct);
+      drop the deposit rows you don't need (`-`).
+   2. `kctx_tier` → hct : curTier = kpt; `kctx_wf` → hwf (gives k.locks = [] at noff 0 for `"x" ∉ locks`).
+   3. `rw [syscTarget_<name>]`, instantiate the callee at k' := ((k.withSpie spie spp).pushed 4).withRegs R;
+      side conditions: noff via KCtx.{withRegs,pushed,withSpie}_noff; avail via `k_norm_g; have :=
+      syscallSlots_val; unfold sys<Name>Slots; omega`.
+   4. after the callee: `k_next_e` (moves Hte/Hce; names MUST be Hte/Hce), iintro the callee's post,
+      `k_norm_g [hra, syscallRet_jumpPc, hww, hpsw]` (hww/hpsw: withSpie∘withSpie, pushed∘withSpie),
+      `k_norm_g at hcs`, hpins2 := syscPins_calleeSaved k R R2 hpins hcs, hs2' := hcs.2.2.2.1.trans hs2.
+   5. build `SyscRows V M (syscStore V1 (R2 10#5)) M1 sts sts' cs cs' pid` (syscRows_keep for entries that
+      move nothing but a0; needs tfArgIdx 0 < V.tf.length from syscall_tf_len), then
+      `unfold syscallRet syscallAddr at *` and
+      iapply (syscall_ret_tail PT Γ c0 cpu k spie2 spp2 R2 γ j pid V M sts gn cs ip f V1 M1 sts' cs'
+              hj hproc hK htier hpins2 hs2' hrows)
+      NOTE: its hs2 premise is at the RETURNED record: R2 18#5 = pageAddr V1.upt.tfp (use SyscRows.tfp /
+      the callee's `upt` fact to move it).  Frame Hk Hpc Hframe Hte Hce Hbs Hip Hfd Hir Henv Hpriv Hfr Hch Hnext.
+   6. the four channel answers: syscExecOut_ne (n ≠ 7), syscSysOut_quiet f V M sts hE … n hnum (by decide)
+      at syscNumNofs numbers, else syscSysOut_at + your deposit law's out-wand; syscForkOut_ne (n ≠ 1);
+      syscWaitOut_ne (n ≠ 3).
+
+  THE EXIT ARM takes the RIGHT conjunct (`icases Hslot with ⟨-, Hcl⟩`), walks syscall's 4 frame cells into
+  it (stackOwn (k.sp-32) (trapRes k.sie + (k.avail-4)) ∗ frame4s2 … ⊢ stackOwn k.sp (trapRes k.sie + k.avail);
+  write the frame lemma in the arm file if MachCSL lacks one -- Rocq kstack_closer_frame), and pays
+  sys_exit with syscPayIn_exit (hnum) : syscPayIn f V ⊢ myPay V.gen (sexitPay f) ∗ sexitPay f (exitXs V.tf).
+
+  THE FALLBACK (W8-S4) proves syscFallbackBody (same rows; pc = syscallFallback; hrange : syscNum V < 1 ∨
+  22 < syscNum V instead of hnum/hra) and leaves through syscall_epilogue_tail after its own
+  `ld a5,88(s1); li a4,-1; sd a4,112(a5)` (store via syscall_tf_acc + PrepareReturnRules.prepare_return_tf_store,
+  as syscall_ret_tail does).  Rows: SyscRows at syscStore V (-1): mem/fd/pipe quiet (syscall_nofs_of_range:
+  every num-keyed row's guard is false); ret/fork/read/sbrk/pid by the range; syscSysOut_quiet via
+  syscall_nofs_of_range.  printk: fmt at syscall_fmt_addr (0x80007398 = Rocq sysc_fmt_a), the name via
+  ProcPrivAcc.procPrivFd_name, the pid cell via procPrivFd_cwdPid (quarter).
+
+----------------------------------------------------------------------------------------------------
+3. THE 4-WAY SPLIT (file = one agent; theorem names syscall_arm_<name>; all import Xv6.SyscallRet + callee Specs)
+----------------------------------------------------------------------------------------------------
+  W8-S1  Xv6/SyscallArmsProc.lean   fork(1) exit(2) wait(3) kill(6) getpid(11) sbrk(12) pause(13) uptime(14)
+                                    sync(22, D44)          [split into SyscallArmsProc2.lean if > few s/thm]
+  W8-S2  Xv6/SyscallArmsFd.lean     pipe(4) read(5) fstat(8) dup(10) write(16) close(21)
+  W8-S3  Xv6/SyscallArmsPath.lean   chdir(9) open(15) mknod(17) unlink(18) link(19) mkdir(20)
+  W8-S4  Xv6/SyscallArmsExec.lean   exec(7), syscall_fallback (syscFallbackBody), and
+         syscall_arms_all : (the 22 arm results at one fixed binder list) → ∀ n, 1 ≤ n → n ≤ 22 →
+         (hnum : syscNum V = n) → … syscArmBody n …   (case split; one theorem per arm stays separate, brief §9.6)
+  W8-E2 (8-3) ProofSyscall.lean: the head +0x00..+0x38 (wp_prologue4s2_gen; jal myproc (MYPROC); mv; ld s2,88(a0)
+         via procPrivFd_trapframe; ld a5,168(s2) via ArgLemmas.tfPage_word_acc (word 21 = tfArgIdx 7); sext.w;
+         addiw; li; bltu (syscall_bltu, syscall_bltu_tgt); slli (syscall_idx); auipc/addi (syscall_tbl_addr);
+         add; ld (SyscallDefs.syscall_tbl_word + kctx_kmapStatic/kctx_kernelData); beqz (syscTarget_ne_zero,
+         dead); jalr (wp_s_jalr, ra := syscallRet); then syscall_num_of_idx → hnum and syscall_arms_all, or the
+         fallback.  LinkSyscall instantiates PT := ParkCap.parkToken after W8-P2, hE / deposit laws from W8-K.
+
+----------------------------------------------------------------------------------------------------
+4. DEPOSIT LAWS (instance-agnostic; Rocq sysc_dep_<n> / sysc_out_<n> via UexecExecInst's sbundle_at_<n>_elim /
+   spost_at_<n>_intro).  The class instance is W8-K's (8-3), NOT landed.  An arm that opens its deposit
+   takes ONE hypothesis of this shape, defined as a Prop in ITS OWN arm file (name SyscDep<Name>), which
+   W8-K proves for uexecSGXv6 and W8-E2 passes at the seal:
+     def SyscDep<Name> {hlc GF …} [UexecSG GF] : Prop :=
+       ∀ (f : UexecSG.sfam GF) (W : Uvis),
+         UexecSG.sbundleAt (uslot (hlc := hlc)) <n> f W ⊢
+           ∃ <the Spec's family parameters>, <the Spec's deposit at W's fields (W.tf args, W.fd, W.cwd, W.M)> ∗
+             (∀ r M' fdv' cw' cs', <the Spec's receipt at those families and r> -∗
+                UexecSG.spostAt (uslot (hlc := hlc)) <n> f W r M' fdv' cw' cs')
+   (use syscSysIn_at to get `sbundleAt uslot n f (uvisOf V M sts gn cs pid)`, and syscSysOut_at to pay the
+   channel from the spostAt.)  Needed by: read(5: sysReadIn … F Rd Rin P ∗ P), kill(6: `□ uKillCred` only,
+   no out -- Rocq sysc_dep_kill), exec(7: myPay gn Q ∗ sysExecAuPre Fs … ; out = syscSysOut_exec's refund),
+   chdir(9: chdirAuPre), open(15: openIn), write(16: sysWriteIn), mknod(17: mknodAuAt), unlink(18:
+   unlinkAuPre), link(19: linkCommits), mkdir(20: mkdirAuPre), pipe(4)/close(21) only for their OUT rows
+   (Rocq spost_at_pipe_intro / close; Lean sys_pipe/sys_close take no deposit).  Numbers in syscNumNofs
+   (1,2,3,6,8,10,11,12,13,14,22) pay the out channel with syscSysOut_quiet (hE) -- except fork (syscSysOut_fork)
+   and exit (never returns).
+   D44 SYNC: Rocq's sync(22) row is quiet; the arm mints logEpochLb icfgLog 0 (LogDefs.logEpochLb_0, `imod`)
+   and DROPS the receipt.  Written against the CURRENT SpecSysSync (a0 = 0 only); MARK FOR UPDATE when C-2b
+   restores `flushedSync γ e` (the arm then discards it explicitly, as Rocq does).
+
+----------------------------------------------------------------------------------------------------
+5. PER-ARM NOTES (callee contract; adapters (D31); rows; blockers)
+----------------------------------------------------------------------------------------------------
+  shared: tf length 36 → `syscall_tf_len hct`; arg word v: V.tf[tfArgIdx i]? = some v from the length.
+    Image rows: a callee that returns `procPrivFd … {V with upt := P'} (viewFaulted V.upt P' M)` with
+    V.upt.extSz V.sz P' has syscImg = syscImg V M by SyscallTable.syscImg_faulted; a copyout
+    `umemWrite (viewFaulted …) a bs` is `usysWr` of the image by syscImg_write (+ syscImg_faulted),
+    needing umMapped P' a len and umPageLen (UMemL / procPtAt_pageLen).
+  S1 fork(1): SYSFORK.wp_sys_fork_eb (kforkPost).  !! BLOCKER-ish: SYSFORK takes `[ForkretIs]` (assumed class,
+     retired by W8-P2).  Do NOT add ForkretIs to SYSCALL; state the arm with `[ForkretIs]` as a theorem
+     instance argument and flag, or wait for W8-P2.  Env: wait_lock = the dispatch's γw; nextpid/procsAvail
+     via syscallEnv_pid; kmem via _kmem; isFtable via _ftable; isItable2/itableInv/iregInv via fsReady_icache/
+     fsReady_region; firstDone via _first.  Q := UexecSG.sforkPay f; the kill wand from syscForkIn (guard by
+     hnum) -- `□ (uKillCred -∗ sforkPay f (-1))`.  Out: syscForkOut ← kforkRet (childTok γc rv Q, γc ∉ csP)
+     with the LEND `sforkLend f` refunded on rv = -1 (uforkAns left arm), dropped on success.  PROCESS-LAYER
+     DEVIATION (flag): syscForkIn's child-slot wand is DROPPED (Lean kfork threads no uslot/Rc/park_token).
+     Rows: fork answer from kforkAns + r = signExtend rv; ch row free (num = 1); others as keep.
+  S1 exit(2): SYSEXIT.wp_sys_exit_eb, right conjunct.  !! BLOCKER: Lean SpecKexit/SpecSysExit carry
+     `hinit : procAddr j ≠ ip`, which the dispatch CANNOT discharge (init may call exit).  Rocq has no such
+     premise (SpecKexit.v header: "the panic arm is NOT ruled out ... closes at zero cost").  Needs a
+     Rocq-literal re-spec of SpecKexit/SpecSysExit dropping hinit (landed edit → worktree, like 8-P).  Until
+     then the arm can only be stated with an extra `(hinit : procAddr j ≠ ip)` premise (a SYSCALL change --
+     do not make it without the coordinator).  Env: isFtable (_ftable), panicEnv, kmem (on := none), fsReady,
+     initIdentAt = syscInitId ip.  Rocq's exit deposit (fileclose_cpays) has no Lean taker (Lean sys_exit
+     takes `∃ sts, fdFrags` only).
+  S1 wait(3): SYSWAIT.wp_sys_wait_eb (block = procPrivFd after 8-P).  initPidIs 1 ← syscInitId_pidIs.
+     Out: syscWaitOut via syscWaitOut_of (waitAns … (decide (v = 0)) pid) with syscUwaitWr from the post's
+     umemWrite (viewFaulted …) v.toNat ((xstateBytes xw).take d) + kwaitAns (syscImg_write/_faulted).
+     Rows: mem (wait row: bs := (xstateBytes xw).take d, d ≤ 4), upt extSz, cs' moved (ch row free, num = 3).
+  S1 kill(6): SYSKILL.wp_sys_kill (sie form).  D31: raw `wordPointsTo (pTrapframe k.proc) 8 dqt (pageAddr tfp)
+     ∗ tfPageAt tfp ws` ← ProcPrivAcc.procPrivFd_tf (quarter + page, wand back).  `□ killCred` ← SyscDepKill.
+     Rows: syscRows_keep.
+  S1 getpid(11): SYSGETPID.wp_sys_getpid (sie).  D31: procPrivNoctxAt ← ProcPrivAcc.procPrivFd_noctx hct.
+     Rows: syscRows_keep with hpid := syscRetPid_of _ _ _ (post's R' 10 = signExtend pid).
+  S1 sbrk(12): SYSSBRK.wp_sys_sbrk (sie).  D31: procPrivFd_noctx; kmem ← syscallEnv_kmem.  Rows: mem (sbrk row
+     from sysSbrkOk), sbrk answer (usysSbrkRet), sz/upt/lazy escape by number.
+  S1 pause(13): SYSPAUSE.wp_sys_pause_eb; isTickslock ← _ticks; raw tf cells as kill.  Rows: keep.
+  S1 uptime(14): SYSUPTIME.wp_sys_uptime; isTickslock ← _ticks.  Rows: keep.  (VALIDATED, §6.)
+  S1 sync(22): SYS_SYNC.wp_sys_sync_eb; logCtx at (icfgLog, fscBio, fscFs, V := fsView fscFs fscDisk icfgDev
+     fscCov, fscLogst, icfgDev) ← fsReady_log; logEpochLb 0 ← logEpochLb_0 (imod); pid cell ←
+     procPrivFd_cwdPid (quarter).  Rows: keep.  D44: mark for update.
+  S2 pipe(4): SYSPIPE.wp_sys_pipe_eb (sysPipeCont); fdSlot ∗ fdSlot out of fdSlots FDSPARE (fdSlots_split 2 2),
+     irefSlot out of irefSlots IREFSPARE (irefSlots_split 1 3 / irefSlots_combine); isFtable, panicEnv, kmem, procsInv.  Rows: pipe's
+     fd/pipe/mem rows (syscFdOk/syscPipeOk/syscMemOk at 4 = UsysMemOk rows).  Out: SyscDepPipe out-wand.
+  S2 read(5): SYSREAD.wp_sys_read_eb; filereadFsEnv ← syscallEnv_filereadFsEnv + bslot (bslots_uncons 2);
+     consoleReadyApp ← _console; deposit SyscDepRead.  Rows: mem (read row), read answer (syscReadRet).
+  S2 fstat(8): SYSFSTAT.wp_sys_fstat_eb; filestatFsEnv ← _filestatFsEnv + bslot.  Rows: mem (fstat row, ≤ 24).
+  S2 dup(10): SYSDUP.wp_sys_dup (sie); isFtable ← _ftable; "ftable" ∉ locks from wf.  Rows: fd (dup row).
+  S2 write(16): SYSWRITE.wp_sys_write_eb; filewriteFsEnv ← _filewriteFsEnv + the dispatch's bslots 3;
+     filewriteDevsw γl γu ← syscallEnv_devsw; deposit SyscDepWrite.
+  S2 close(21): SYSCLOSE.wp_sys_close_eb; fileclosePipeEnv ← _fileclosePipeEnv (on := none);
+     filecloseFsEnv ← _filecloseFsEnv j hj (+ bslots 3); irefSlot from IREFSPARE.  Rows: fd (close row).
+  S3 chdir(9): SYSCHDIR.wp_sys_chdir_eb; procsInv, panicEnv, fsReady, bslots 3, irefSlots 2 (irefSlots_split 2 2 of IREFSPARE,
+     2 2, join back), deposit SyscDepChdir.  Rows: cwi row (chdir success moves it).
+  S3 open(15): SYSOPEN.wp_sys_open_eb (wp_sys_open_frame); fdSlot + irefSlots sysOpenIrefs; SyscDepOpen.
+  S3 mknod(17)/unlink(18)/link(19)/mkdir(20): the Specs' eb bodies; irefSlots ns / sysUnlinkSlots /
+     sysLinkIrefs / ns out of IREFSPARE (ns ≤ 4); SyscDep<Name>.
+  S4 exec(7): SYSEXEC.wp_sys_exec_eb; fsFabric ← syscallEnv_fsFabric; bslots 3; irefSlots 2; myPay gn Q +
+     sysExecAuPre ← SyscDepExec (Q := sexitPay f, Fs := the uslot family).  Out: syscExecOut (failed facts ∨
+     uslot at the new key) and syscSysOut_exec (the refund on -1).  Needs W8-X's KexecNe/SysExecNe only for
+     W8-K's instance, not for the arm.
+
+----------------------------------------------------------------------------------------------------
+6. VALIDATED TEMPLATE (sys_uptime; compiled against these files in ~2 s, then removed -- copy into
+   SyscallArmsProc.lean as syscall_arm_uptime):
+----------------------------------------------------------------------------------------------------
+theorem syscall_arm_uptime (SU : SYSUPTIME) <the §2 binder list, n = 14> :
+    syscArmBody 14 PT Γ c0 cpu k spie spp R γw γ j pid V M sts gn cs ip f hE hj hproc hK hnoff htier hgn
+      hnum hpins hs1 hs2 hra := by
+  unfold syscArmBody
+  iintro ⟨Hk, Hpc, Hframe, #Hpi, Hte, Hce, #Hwl, Hbs, Hip, Hfd, Hir, #Henv, Hpriv, Hfr, Hch, -, -, -, Hslot⟩
+  icases Hslot with ⟨Hnext, -⟩
+  icases syscallEnv_ticks PT Γ γ $$ Henv with ⟨%γt, #Ht⟩
+  icases kctx_tier _ _ $$ Hk with ⟨%hti, Hk⟩
+  icases kctx_wf _ _ $$ Hk with ⟨%hwf, Hk⟩
+  have hct : curTier = KTier.kpt := by rw [← hti]; exact htier
+  icases syscall_tf_len hct γ (procAddr j) pid V M $$ Hpriv with ⟨%hl, Hpriv⟩
+  have hU := SU.wp_sys_uptime (hlc := hlc) (GF := GF) cpu (((k.withSpie spie spp).pushed 4).withRegs R) γt
+    ?hn ?hK ?hlk
+  case hn => simp only [KCtx.withRegs_noff, KCtx.pushed_noff, KCtx.withSpie_noff]; rw [hnoff]; decide
+  case hK => k_norm_g; have := syscallSlots_val; unfold sysUptimeSlots; omega
+  case hlk =>
+    k_norm_g
+    have hl0 : k.locks = [] := by
+      have h := hwf.2.2.2.1
+      k_norm_g at h
+      exact List.eq_nil_of_length_eq_zero (by omega)
+    rw [hl0]; simp
+  unfold wp_sys_uptime_body at hU
+  rw [syscTarget_uptime]
+  iapply hU
+  iframe Hk Ht Hpc
+  k_next_e
+  iintro %spie2 %spp2 %R2 %t %- Hk Hpc %⟨hcs, ha0⟩
+  have hww : ∀ (K : KCtx) (a b c d : Bool), (K.withSpie a b).withSpie c d = K.withSpie c d :=
+    fun _ _ _ _ _ => rfl
+  have hpsw : ∀ (K : KCtx) (m : Nat) (a b : Bool),
+      (K.pushed m).withSpie a b = (K.withSpie a b).pushed m := fun _ _ _ _ => rfl
+  k_norm_g [hra, syscallRet_jumpPc, hww, hpsw]
+  k_norm_g at hcs
+  have hpins2 := syscPins_calleeSaved k R R2 hpins hcs
+  have hs2' : R2 18#5 = pageAddr V.upt.tfp := hcs.2.2.2.1.trans hs2
+  have hn14 : syscNum V = (14 : Int) := hnum
+  have hrows := syscRows_keep V M sts cs pid (R2 10#5) 14 hn14 (by decide) (by decide) (by decide)
+    (by decide) (by decide) (by decide) (by decide) (by decide) (by decide) (by decide) (by decide)
+    (by rw [hl]; decide) (syscRetPid_ne _ _ _ 14 hn14 (by decide))
+  unfold syscallRet syscallAddr at *
+  iapply (syscall_ret_tail PT Γ c0 cpu k spie2 spp2 R2 γ j pid V M sts gn cs ip f V M sts cs hj hproc hK
+    htier hpins2 hs2' hrows)
+  iframe Hk Hpc Hframe Hte Hce Hbs Hip Hfd Hir Henv Hpriv Hfr Hch Hnext
+  isplitr
+  · iapply syscExecOut_ne; rw [hn14]; decide
+  isplitr
+  · iapply syscSysOut_quiet f V M sts hE gn cs pid _ _ sts _ cs 14 hn14 (by decide)
+  isplitr
+  · iapply syscForkOut_ne; rw [hn14]; decide
+  · iapply syscWaitOut_ne; rw [hn14]; decide
+  (file header: `attribute [local semireducible] LeanRV64D.Functions.hartSupports
+   LeanRV64D.Functions.currentlyEnabled`, `set_option maxHeartbeats 4000000 in` on the theorem.)
+
+----------------------------------------------------------------------------------------------------
+7. WHAT OTHERS OWE (report to coordinator)
+----------------------------------------------------------------------------------------------------
+  * W8-P2 / ParkCap: `parkToken : SchedNames → IProp GF` + `∀ Γ, Persistent (parkToken Γ)`; kfork's re-spec
+    consumes it from syscallEnv_token (and the child's uslot from syscForkIn, the lend Rc); SYSFORK drops
+    [ForkretIs].  LinkSyscall instantiates PT := parkToken.
+  * W8-K (UexecExecInst): the instance; `SyscSpostEmp` (Rocq spost_at_emp) and every SyscDep<Name> of §4.
+  * Exit blocker: SpecKexit/SpecSysExit `hinit` → Rocq-literal (no not-init premise) -- process-layer, worktree.
+  * Recommended moves (cleanup, later): syscReadRet → UsysMemOk (Rocq usys_read_ret); syscUwaitWr /
+    syscUwaitAnsAtM → UexecRet (Rocq uwait_wr / uwait_ans_at_m); syscForkChild → a KforkChild file.
