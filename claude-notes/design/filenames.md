@@ -1,4 +1,4 @@
-# Design: widening the file model to a class of user files (IN PROGRESS: W0, W1 landed)
+# Design: widening the file model to a class of user files (IN PROGRESS: W0-W2 landed)
 
 Owner ruling (2026-09-24): widen beyond the one name `f` to a class of
 user files (e.g. `*.txt`), not the image's binaries; ORDER: after the
@@ -37,7 +37,29 @@ product of wire subsequences over the named files (`prod_maps`,
 `FileDiscDec.disc_f_dec`/`scands`, FileOutPure §13's `file_phi_body`
 lemmas.  W4 CAVEAT: the parser takes the name generically but its proofs
 substitute `N = fname_f`; W4 redoes them from the class laws.
-NEXT: W2 (the claim's `dst` becomes a map).
+W2 LANDED (92036d0d0, VM w2final on the committed tree; audits
+13/13/14; TCB report runs; top statement unchanged): the claim over a
+map.  `dst := gmap fname (Z * bytes)`, `dst_content := snd <$> s` (W1's
+bridge retired); `f_ok av s` = every class name's row (`f_row`:
+`name_absent` if absent, `node_pin N i (AFile bs, 1)` if present), dom in
+the class, injective inums; `f_typed` = `s = ∅` or one `fl_lb` lower
+bound typing every entry AND each entry's name in the class (needed for
+the boot filing's `fstate_ok`).  Ledger lines are `(name, words)` pairs
+(type `fwline`; `efl_of` is `echof_lines_of`).  `name_absent`/`node_pin`
+moved to AppFile.  FileDeltas: pointwise lift (`f_ok_same`, `f_ok_move`),
+per-name `f_ok_create_at`/`_trunc_at`/`_write_at`/`_append_at`,
+`f_ok_fresh` (an armed inum is no file's).  Era 0 = `f_ok_empty` from L4
+(`FileName.era0_recovery_class_absent`).  FileOpen's create leg: no
+`decide (nm = fname_f)`; receipt `s !! N = None /\ d = ROOTINO /\ nm = N`
+with `fown r (<[N := (i, [])]> s)`; DEVIATION: the kernel's name
+predicate is `redir_at N := nm = N` (from `Hlast`), not
+`redir_name_ok`, because typing the new entry needs a ledger line at
+that exact name.  The append's cursor `file_wq c r N s i ws sel off`
+steps by `f_ok_write_at`.  UInitCons (g)'s side condition is now
+`~ uname nmn`.  The program tier stays at `f` but carries the map
+(`UkFileDev`'s `sf`, `UEchoFile`'s `N s`, redirect payloads indexed by
+the round's map; cat/union entries read `sf !! f`).
+NEXT: W3 (handler and programs at a general name N).
 
 ## Design: widening the file model from the one name `f` to a class of user files
 
