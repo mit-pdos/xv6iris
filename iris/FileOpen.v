@@ -797,9 +797,9 @@ Section FileOpen.
     intros Hrow0 Hpure0 Hok0 Hpure Hok.
     destruct (f_inum_not_pinned av0 i [] Hpure0 Hrow0
                 ltac:(rewrite /EchoDisc.line_max; cbn [length]; lia))
-      as (N1 & N2 & N3 & N4).
+      as (N1 & N2 & N3 & N4 & N5).
     split_and!.
-    - exact (file_fs_pure_trunc_ne i av N1 N2 N3 N4 Hpure).
+    - exact (file_fs_pure_trunc_ne i av N1 N2 N3 N4 N5 Hpure).
     - exact (cons_absent_trunc_any i av).
     - intros j. exact (cons_present_trunc_any j i av).
     - destruct s as [[i0 bs] |]; last first.
@@ -914,7 +914,7 @@ Section FileOpen.
     destruct Hfree as (Hpurex & Hrowf).
     destruct (Hrowf i Hstx) as (bsx & Hrowi & Hlenx).
     destruct (f_inum_not_pinned avx i bsx Hpurex Hrowi Hlenx)
-      as (N1 & N2 & N3 & N4).
+      as (N1 & N2 & N3 & N4 & N5).
     (* AND THE IDENTIFICATION: the deed's value at the lookup's own view
        names the row the truncate reached *)
     destruct s as [[j bs] |]; last first.
@@ -936,7 +936,7 @@ Section FileOpen.
     destruct Hf as (Hok & Hpure & Hcons).
     (* the three legs the truncate at a NON-PINNED row always carries *)
     assert (Hp1 : file_fs_pure (delta_trunc i (abs_view I)))
-      by exact (file_fs_pure_trunc_ne i (abs_view I) N1 N2 N3 N4 Hpure).
+      by exact (file_fs_pure_trunc_ne i (abs_view I) N1 N2 N3 N4 N5 Hpure).
     assert (Hp2 : cons_absent (abs_view I) ->
                   cons_absent (delta_trunc i (abs_view I)))
       by exact (cons_absent_trunc_any i (abs_view I)).

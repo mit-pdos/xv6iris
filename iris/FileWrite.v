@@ -111,6 +111,7 @@ Require Import FsInitPin.          (* [INIT_INO] *)
 Require Import FsShPin.            (* [SH_INO], [era0_sh_pins] *)
 Require Import FsEchoPin.          (* [ECHO_INO], [era0_echo_pins] *)
 Require Import FsCatPin.           (* [CAT_INO], [era0_cat_pins] *)
+Require Import FsGrepPin.          (* [GREP_INO], [era0_grep_pins] *)
 Require Import FsConsPin.          (* [file_pin] and its family, [cons_state] *)
 Require Import FileFsPure.         (* [file_fs_pure] *)
 Require Import EchoDisc.           (* [line_ok] *)
@@ -187,6 +188,11 @@ Lemma file_pin_cat (av : aview) :
   file_pin fname_cat CAT_INO cat_bytes av <-> era0_cat_pins av.
 Proof. rewrite /file_pin /era0_cat_pins /cat_path. reflexivity. Qed.
 
+(* ...and grep's its fifth (claude-notes/design/grep-pipes.md, cut G6) *)
+Lemma file_pin_grep (av : aview) :
+  file_pin fname_grep GREP_INO grep_bytes av <-> era0_grep_pins av.
+Proof. rewrite /file_pin /era0_grep_pins /grep_path. reflexivity. Qed.
+
 (* THE CONSOLE NEEDS NO PREMISE: its row is a DEVICE, and [delta_write]
    at a non-file row is the identity. *)
 Lemma cons_present_write (jc : Z) (i : Z) (off : nat)
@@ -206,10 +212,11 @@ Lemma cons_absent_write (i : Z) (off : nat) (new : list (bv 8)) (av : aview) :
 Proof. rewrite /cons_absent. by rewrite delta_write_astep. Qed.
 
 Lemma file_fs_pure_write (i : Z) (off : nat) (new : list (bv 8)) (av : aview) :
-  i <> INIT_INO -> i <> SH_INO -> i <> ECHO_INO -> i <> CAT_INO ->
+  i <> INIT_INO -> i <> SH_INO -> i <> ECHO_INO -> i <> CAT_INO -> i <> GREP_INO ->
   file_fs_pure av -> file_fs_pure (delta_write i off new av).
 Proof.
-  intros Hi Hs He Hc ((Hin & Hsh & Hec) & Hcat). split; [split_and! |].
+  intros Hi Hs He Hc Hg ((Hin & Hsh & Hec) & Hcat & Hgrep).
+  split; [split_and! | split].
   - apply file_pin_init, (file_pin_write _ _ _ i off new av Hi).
     by apply file_pin_init.
   - apply file_pin_sh, (file_pin_write _ _ _ i off new av Hs).
@@ -218,6 +225,8 @@ Proof.
     by apply file_pin_echo.
   - apply file_pin_cat, (file_pin_write _ _ _ i off new av Hc).
     by apply file_pin_cat.
+  - apply file_pin_grep, (file_pin_write _ _ _ i off new av Hg).
+    by apply file_pin_grep.
 Qed.
 
 (* ===================================================================== *)
@@ -370,7 +379,7 @@ Section FileWrite.
     (jx < length (echo_chunks ws))%nat ->
     Forall (fun k => (k < jx)%nat) sel ->
     (* PREMISE 4 -- [f] is not one of the four pinned binaries *)
-    i <> INIT_INO -> i <> SH_INO -> i <> ECHO_INO -> i <> CAT_INO ->
+    i <> INIT_INO -> i <> SH_INO -> i <> ECHO_INO -> i <> CAT_INO -> i <> GREP_INO ->
     app_inv γfs -∗ file_wq c r i ws sel off -∗
     ghost_map_auth (γtop (fs_gamma_L γfs)) (1/2) I ={appE}=∗
       ghost_map_auth (γtop (fs_gamma_L γfs)) (1/2) I ∗
@@ -381,7 +390,7 @@ Section FileWrite.
          ghost_map_auth (γtop (fs_gamma_L γfs)) (1/2) I' ∗
          file_wq c r i ws (sel ++ [jx]) (off + length bs)).
   Proof using .
-    intros Heq Hpre Hnode Hoffk Hbs Hjx Hlt Hi1 Hi2 Hi3 Hi4. subst offk.
+    intros Heq Hpre Hnode Hoffk Hbs Hjx Hlt Hi1 Hi2 Hi3 Hi4 Hi5. subst offk.
     iIntros "#Hinv Hq Hka".
     rewrite {1}/file_wq.
     iDestruct "Hq" as "[Hq | #HT]"; last first.
@@ -425,7 +434,7 @@ Section FileWrite.
     { iApply (file_app_step_park c r i I _
                 (Some (i, subseq (echo_chunks ws) sel))
                 (Some (i, subseq (echo_chunks ws) (sel ++ [jx]))) Heq
-                (file_fs_pure_write i off bs (abs_view I) Hi1 Hi2 Hi3 Hi4)
+                (file_fs_pure_write i off bs (abs_view I) Hi1 Hi2 Hi3 Hi4 Hi5)
                 (cons_absent_write i off bs (abs_view I))
                 (fun jc => cons_present_write jc i off bs (abs_view I))
                 Hstep with "Hd Hty'"). }
@@ -523,7 +532,7 @@ Section FileWrite.
     file_app = MkAppcfg file_names (file_pred c) r ->
     (jx < length (echo_chunks ws))%nat ->
     Forall (fun q => (q < jx)%nat) sel ->
-    i <> INIT_INO -> i <> SH_INO -> i <> ECHO_INO -> i <> CAT_INO ->
+    i <> INIT_INO -> i <> SH_INO -> i <> ECHO_INO -> i <> CAT_INO -> i <> GREP_INO ->
     ubytes_at M (add_vec_int ua (FW_MAX * Z.of_nat k))
       (echo_chunks ws !!! jx) ->
     Z.of_nat (length (echo_chunks ws !!! jx)) = wchunk_at nn k ->
@@ -532,7 +541,7 @@ Section FileWrite.
       (file_wq c r i ws (sel ++ [jx])
          (off + length (echo_chunks ws !!! jx))).
   Proof using .
-    intros Heq Hjx Hlt Hi1 Hi2 Hi3 Hi4 Hbsk Hlenk. iIntros "#Hinv Hq".
+    intros Heq Hjx Hlt Hi1 Hi2 Hi3 Hi4 Hi5 Hbsk Hlenk. iIntros "#Hinv Hq".
     rewrite /file_awrite_full_anchored.
     iIntros (I off1 bs bs0 nl) "%Hpre %Hby %Hlen %Hnode %Hoff Hka Hg".
     (* RELAY 3, CASHED: two runs of the caller's image at one base and of
@@ -541,7 +550,7 @@ Section FileWrite.
     { apply (ubytes_at_inj M (add_vec_int ua (FW_MAX * Z.of_nat k))
                bs (echo_chunks ws !!! jx) Hby Hbsk). lia. }
     iMod (file_awrite_phases γfs c r i ws sel jx off off1 I bs bs0 nl
-            Heq Hpre Hnode Hoff Hbs Hjx Hlt Hi1 Hi2 Hi3 Hi4
+            Heq Hpre Hnode Hoff Hbs Hjx Hlt Hi1 Hi2 Hi3 Hi4 Hi5
             with "Hinv Hq Hka") as "(Hka & Hstep & Hph2)".
     iModIntro. iFrame "Hka Hstep". iIntros (I') "%Hav Hka'".
     iMod ("Hph2" $! I' with "[//] Hka'") as "[Hka' Hq']".
@@ -614,7 +623,7 @@ Section FileWrite.
     file_app = MkAppcfg file_names (file_pred c) r ->
     (jx < length (echo_chunks ws))%nat ->
     Forall (fun q => (q < jx)%nat) sel ->
-    i <> INIT_INO -> i <> SH_INO -> i <> ECHO_INO -> i <> CAT_INO ->
+    i <> INIT_INO -> i <> SH_INO -> i <> ECHO_INO -> i <> CAT_INO -> i <> GREP_INO ->
     ubytes_at M (add_vec_int ua (FW_MAX * Z.of_nat k))
       (echo_chunks ws !!! jx) ->
     Z.of_nat (length (echo_chunks ws !!! jx)) = wchunk_at nn k ->
@@ -623,7 +632,7 @@ Section FileWrite.
     awrite_full_adv (fs_gamma_L γfs) appE i γo M ua nn k
       (file_cur c r i ws (sel ++ [jx]) γo).
   Proof using .
-    intros Heq Hjx Hlt Hi1 Hi2 Hi3 Hi4 Hbsk Hlenk.
+    intros Heq Hjx Hlt Hi1 Hi2 Hi3 Hi4 Hi5 Hbsk Hlenk.
     iIntros "#Hbr #Hinv Hcur". rewrite /awrite_full_adv.
     iIntros (I off bs bs0 nl) "%Hpre %Hby %Hlen Hka Hg".
     (* RELAY 3, CASHED *)
@@ -687,7 +696,7 @@ Section FileWrite.
       iPureIntro. split_and!; [ exact Hoff | exact Hline | exact Hsel
                               | exact Hin ]. }
     iMod (file_awrite_phases γfs c r i ws sel jx off off I bs bs0 nl
-            Heq Hpre Hnode eq_refl Hbs Hjx Hlt Hi1 Hi2 Hi3 Hi4
+            Heq Hpre Hnode eq_refl Hbs Hjx Hlt Hi1 Hi2 Hi3 Hi4 Hi5
             with "Hinv Hq Hka") as "(Hka & Hstep & Hph2)".
     iMod (uoff_advance γo off (length bs) with "Hu Hk") as "[Hk Hu]".
     iModIntro. iFrame "Hka Hstep". iIntros (I') "%Hav Hka'".

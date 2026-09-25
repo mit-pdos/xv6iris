@@ -58,6 +58,7 @@ Require Import FsImg.
 Require Import FsImgCheck.
 Require Import FsEchoPin.
 Require Import FsCatPin.
+Require Import FsGrepPin.
 Require Import FsInitPin FsShPin.
 Require Import AppCfg.
 Require Import AppInv.
@@ -930,7 +931,7 @@ Section UShURound.
     iDestruct "Hino" as "[Hino | #HT]"; last first.
     { iApply ("Hgen'" $! W' with "HT Hmp"). }
     iDestruct "Hino" as (i γo) "(%Hty & %Hi)".
-    destruct Hi as (Hi1 & Hi2 & Hi3 & Hi4).
+    destruct Hi as (Hi1 & Hi2 & Hi3 & Hi4 & Hi5).
     rewrite /UShFileRedir.redir_K /UkFileOpen.redir_K /FileOpen.file_open_fd_K.
     iDestruct "HK" as "[HK | #HT]"; last first.
     { iApply ("Hgen'" $! W' with "HT Hmp"). }
@@ -945,7 +946,7 @@ Section UShURound.
                   (fun _ : Z => UkShFork.ushf_wq Wcu I)
                   (fun _ _ => eq_refl) Heq Hokws Himg Hbytes Hflen
                   eq_refl
-                  ltac:(rewrite Hl -Hty; exact Hfd1) Hi1 Hi2 Hi3 Hi4
+                  ltac:(rewrite Hl -Hty; exact Hfd1) Hi1 Hi2 Hi3 Hi4 Hi5
                   with "[] [] [] [] Hinv Hnp0 Hdep") as "#He".
     { (* echo RAN: the exit pays the round's payload *)
       iIntros "!> [[_ Hc] Hex]". iDestruct "Hex" as (sel) "Hcur".

@@ -46,6 +46,7 @@ Require Import FsInitPin.                (* [INIT_INO] *)
 Require Import FsShPin.                  (* [SH_INO] *)
 Require Import FsEchoPin.                (* [ECHO_INO] *)
 Require Import FsCatPin.                 (* [CAT_INO] *)
+Require Import FsGrepPin.                (* [GREP_INO] *)
 Require Import AppFileCons.              (* the claim's readings *)
 Require Import AppCfg.
 Require Import AppInv.
@@ -212,7 +213,7 @@ Section UShFileRedir.
       ((∃ (i : Z) (γo : gname),
           ⌜ty = FdInode i γo OffHeld⌝
           ∗ ⌜i <> INIT_INO /\ i <> SH_INO /\ i <> ECHO_INO
-             /\ i <> CAT_INO⌝)
+             /\ i <> CAT_INO /\ i <> GREP_INO⌝)
        ∨ T).
   Proof using Heq.
     intros HE. iIntros "#Hinv HK".
@@ -440,7 +441,7 @@ Section UShFileRedir.
      ∗ ((∃ (i : Z) (γo : gname),
            ⌜ty = FdInode i γo OffHeld⌝
            ∗ ⌜i <> INIT_INO /\ i <> SH_INO /\ i <> ECHO_INO
-              /\ i <> CAT_INO⌝)
+              /\ i <> CAT_INO /\ i <> GREP_INO⌝)
         ∨ T))%I.
 End UShFileRedir.
 

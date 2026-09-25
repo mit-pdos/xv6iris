@@ -90,7 +90,7 @@ Require Import UkWriteFile.            (* [write_file_fam], [uwr_fd_st_std] *)
 Require Import FsBytesGamma FsCfg.
 Require Import FsAbsWriteFire.         (* [awrite_chain_adv] and its nodes *)
 Require Import AppCfg AppInv.
-Require Import FsInitPin FsShPin FsEchoPin FsCatPin.
+Require Import FsInitPin FsShPin FsEchoPin FsCatPin FsGrepPin.
 Require Import EchoDisc EchoOut LineWords.
 Require Import FileState.              (* [echo_chunks] *)
 Require Import AppFile AppFileCons FileOpen.
@@ -684,14 +684,14 @@ Section UkFileDev.
     (jx < length (echo_chunks ws))%nat -> (b <= jx)%nat ->
     echo_chunks ws !!! jx = bs ->
     (0 < length bs)%nat -> (length bs <= EchoDisc.line_max)%nat ->
-    i <> INIT_INO -> i <> SH_INO -> i <> ECHO_INO -> i <> CAT_INO ->
+    i <> INIT_INO -> i <> SH_INO -> i <> ECHO_INO -> i <> CAT_INO -> i <> GREP_INO ->
     □ (app_taint -∗ file_taint c) -∗ app_inv fsc_fs -∗
     UserFd.ustd γfd l -∗ file_out i γo ws b -∗
     ((UserFd.ustd γfd l -∗ file_out i γo ws (S jx) -∗ K (Z.of_nat (length bs)))
      ∧ (UserFd.ustd γfd l -∗ file_out i γo ws (S jx) -∗ K (-1))) -∗
     wr_obl N P (Z.of_nat fd) bs K.
   Proof using Heq Hsw.
-    intros Hfd Hl Hjx Hb Hch Hnb0 Hnbm Hi1 Hi2 Hi3 Hi4.
+    intros Hfd Hl Hjx Hb Hch Hnb0 Hnbm Hi1 Hi2 Hi3 Hi4 Hi5.
     iIntros "#Hbr #Hinv Hstd Hout HK".
     iIntros (h m avail ua tx dq f) "%Hf %Ha0 %Ha1 %Ha2 Hcode Hsrc Hrun Hcont".
     rewrite /file_out. iDestruct "Hout" as (sel) "[%Hlt0 Hq]".
@@ -811,7 +811,7 @@ Section UkFileDev.
               (length bs) f (Z.of_nat (length bs)) Hsrc Hwf Hpm (Hlf eq_refl)
               eq_refl Hnb0 ltac:(unfold FW_MAX; lia) Hnbm Hjx Hlt Hby
               ltac:(rewrite Hch; reflexivity)
-              Hi1 Hi2 Hi3 Hi4 with "Hbr Hinv Hq").
+              Hi1 Hi2 Hi3 Hi4 Hi5 with "Hbr Hinv Hq").
   Qed.
 
   (* A ZERO-LENGTH WRITE at the held row (cut 4(c)'s [ei_write_nil] at a

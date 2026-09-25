@@ -2,7 +2,7 @@
 (* FileFsPure.v -- THE FILE APPLICATION'S PURE FILE-SYSTEM CLAIM.          *)
 (*                                                                        *)
 (* [file_fs_pure] alone: the echo application's three era-0 pins, plus     *)
-(* /cat's.  It owns nothing -- that is the whole point of its being pure   *)
+(* /cat's and /grep's.  It owns nothing -- that is the whole point of its being pure   *)
 (* ([EchoFsPure.v]'s note, and [AppEcho.v]'s) -- so it needs only the pin  *)
 (* files that state its conjuncts.                                        *)
 (*                                                                        *)
@@ -26,6 +26,7 @@ Require Import FsInitPinBoot.      (* [era0_pins], [era0_recovery_pins]  *)
 Require Import FsShPin.            (* [era0_sh_pins]                     *)
 Require Import FsEchoPin.          (* [era0_echo_pins]                   *)
 Require Import FsCatPin.           (* [era0_cat_pins]                    *)
+Require Import FsGrepPin.          (* [era0_grep_pins]                   *)
 Require Import EchoFsPure.         (* [echo_fs_pure]                     *)
 Require Import FsAbsDefs.          (* [aview]                            *)
 Require Import FsState.            (* [fs_state_rec] / [fss_inodes]      *)
@@ -36,21 +37,26 @@ Require Import FsBootParams.       (* [fsimg_cov]                        *)
 Require Import FsImgCheck.         (* [fsimg_sb]                         *)
 Require Import FsImg.              (* [sb_logstart]                      *)
 
-(* /init, /sh, /echo and /cat are the image's, path and content, on the
+(* /init, /sh, /echo, /cat and /grep are the image's, path and content, on the
    abstract state's VIEW.  Per-inum rather than "the map is the image's"
    on purpose: the durable snapshot pins a state per inum and no whole-map
    equality exists (fs-syscall-specs.md lane D, gap (3)).  This half of
    the claim is PURE -- it owns nothing -- so it is a [Prop] and the
    predicate embeds it. *)
 Definition file_fs_pure (av : aview) : Prop :=
-  echo_fs_pure av /\ era0_cat_pins av.
+  echo_fs_pure av /\ era0_cat_pins av /\ era0_grep_pins av.
 
 (* THE PROJECTION every landed consumer of the echo claim reads. *)
 Lemma file_fs_pure_echo (av : aview) : file_fs_pure av -> echo_fs_pure av.
 Proof. intros [H _]. exact H. Qed.
 
 Lemma file_fs_pure_cat (av : aview) : file_fs_pure av -> era0_cat_pins av.
-Proof. intros [_ H]. exact H. Qed.
+Proof. intros [_ [H _]]. exact H. Qed.
+
+(* /grep's pins (claude-notes/design/grep-pipes.md, cut G6): a pipeline
+   stage `grep w` execs /grep out of them, as `cat` execs /cat *)
+Lemma file_fs_pure_grep (av : aview) : file_fs_pure av -> era0_grep_pins av.
+Proof. intros [_ [_ H]]. exact H. Qed.
 
 (* THE PINS AT THE MAP A BOOT FOUNDS ITS FILE SYSTEM AT, when the disk is
    mkfs's image -- the four pin files' transport theorems, read together.
@@ -70,5 +76,7 @@ Proof.
     split.
     + exact (era0_recovery_sh_pins dk D S Hdk Hrec HS).
     + exact (era0_recovery_echo_pins dk D S Hdk Hrec HS).
-  - exact (era0_recovery_cat_pins dk D S Hdk Hrec HS).
+  - split.
+    + exact (era0_recovery_cat_pins dk D S Hdk Hrec HS).
+    + exact (era0_recovery_grep_pins dk D S Hdk Hrec HS).
 Qed.

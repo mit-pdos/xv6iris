@@ -52,6 +52,7 @@ Require Import FsInitPin.          (* [INIT_INO], [init_bytes]            *)
 Require Import FsShPin.            (* [SH_INO], [sh_bytes]                *)
 Require Import FsEchoPin.          (* [ECHO_INO], [echo_bytes]            *)
 Require Import FsCatPin.           (* [CAT_INO], [cat_bytes]              *)
+Require Import FsGrepPin.          (* [GREP_INO], [grep_bytes]            *)
 Require Import ConsoleInv.         (* [CONSOLE]                           *)
 Require Import FsConsPin.          (* [file_pin], [cons_absent/_present]  *)
 Require Import FsFPin.             (* [f_absent], [fname_f_ne_*]          *)
@@ -713,7 +714,7 @@ Qed.
 (* ====================================================================== *)
 (*  4.  THE PINS AND THE CONSOLE UNDER `f`'s MOVES                         *)
 (*                                                                        *)
-(*  [FileFsPure.file_fs_pure] is four [FsConsPin.file_pin]s and            *)
+(*  [FileFsPure.file_fs_pure] is five [FsConsPin.file_pin]s and            *)
 (*  [AppEcho.cons_state]'s guards are [cons_absent] / [cons_present_at],   *)
 (*  so section 2's two shapes carry all of them.                           *)
 (* ====================================================================== *)
@@ -722,19 +723,25 @@ Lemma file_pin_cat (av : aview) :
   file_pin fname_cat CAT_INO cat_bytes av <-> era0_cat_pins av.
 Proof using . rewrite /file_pin /era0_cat_pins /cat_path. reflexivity. Qed.
 
-(* the four pins, as one list of [node_pin]s *)
+Lemma file_pin_grep (av : aview) :
+  file_pin fname_grep GREP_INO grep_bytes av <-> era0_grep_pins av.
+Proof using . rewrite /file_pin /era0_grep_pins /grep_path. reflexivity. Qed.
+
+(* the five pins, as one list of [node_pin]s *)
 Lemma file_fs_pure_pins (av : aview) :
   file_fs_pure av ->
   node_pin fname_init INIT_INO (MkAnode (AFile init_bytes) 1%nat) av
   /\ node_pin fname_sh SH_INO (MkAnode (AFile sh_bytes) 1%nat) av
   /\ node_pin fname_echo ECHO_INO (MkAnode (AFile echo_bytes) 1%nat) av
-  /\ node_pin fname_cat CAT_INO (MkAnode (AFile cat_bytes) 1%nat) av.
+  /\ node_pin fname_cat CAT_INO (MkAnode (AFile cat_bytes) 1%nat) av
+  /\ node_pin fname_grep GREP_INO (MkAnode (AFile grep_bytes) 1%nat) av.
 Proof using .
-  intros [[Hi [Hs He]] Hc]. split_and!; apply node_pin_of_file_pin.
+  intros [[Hi [Hs He]] [Hc Hg]]. split_and!; apply node_pin_of_file_pin.
   - by apply file_pin_init.
   - by apply file_pin_sh.
   - by apply file_pin_echo.
   - by apply file_pin_cat.
+  - by apply file_pin_grep.
 Qed.
 
 Lemma file_fs_pure_of_pins (av : aview) :
@@ -742,16 +749,18 @@ Lemma file_fs_pure_of_pins (av : aview) :
   node_pin fname_sh SH_INO (MkAnode (AFile sh_bytes) 1%nat) av ->
   node_pin fname_echo ECHO_INO (MkAnode (AFile echo_bytes) 1%nat) av ->
   node_pin fname_cat CAT_INO (MkAnode (AFile cat_bytes) 1%nat) av ->
+  node_pin fname_grep GREP_INO (MkAnode (AFile grep_bytes) 1%nat) av ->
   file_fs_pure av.
 Proof using .
-  intros Hi Hs He Hc. split; [split; [| split] |].
+  intros Hi Hs He Hc Hg. split; [split; [| split] | split].
   - apply file_pin_init. by apply file_pin_of_node_pin.
   - apply file_pin_sh. by apply file_pin_of_node_pin.
   - apply file_pin_echo. by apply file_pin_of_node_pin.
   - apply file_pin_cat. by apply file_pin_of_node_pin.
+  - apply file_pin_grep. by apply file_pin_of_node_pin.
 Qed.
 
-(* the four pinned rows are FILES, which is the side condition every
+(* the five pinned rows are FILES, which is the side condition every
    [node_pin] leg below asks of the pinned node *)
 Definition pinned_row_nondir (bs : list (bv 8))
   : forall e : gmap fname Z, an_node (MkAnode (AFile bs) 1%nat) <> ADir e
@@ -768,12 +777,14 @@ Proof using . rewrite /cons_dev. exact (dev_row_nonfile CONSOLE 0 1%nat). Qed.
 Lemma file_fs_pure_arm (i : Z) (c : absnode) (av : aview) :
   av !! i = None -> file_fs_pure av -> file_fs_pure (delta_arm i c av).
 Proof using .
-  intros Hfree Hp. destruct (file_fs_pure_pins av Hp) as (H1 & H2 & H3 & H4).
+  intros Hfree Hp.
+  destruct (file_fs_pure_pins av Hp) as (H1 & H2 & H3 & H4 & H5).
   apply file_fs_pure_of_pins.
   - exact (node_pin_arm _ _ _ i c av Hfree H1).
   - exact (node_pin_arm _ _ _ i c av Hfree H2).
   - exact (node_pin_arm _ _ _ i c av Hfree H3).
   - exact (node_pin_arm _ _ _ i c av Hfree H4).
+  - exact (node_pin_arm _ _ _ i c av Hfree H5).
 Qed.
 
 Lemma cons_absent_arm_nd (i : Z) (c : absnode) (av : aview) :
@@ -797,13 +808,14 @@ Lemma file_fs_pure_unarm_fresh (i : Z) (av0 av : aview) :
   file_fs_pure (delta_unarm i av).
 Proof using .
   intros Hfree Hp0 Hp.
-  destruct (file_fs_pure_pins av0 Hp0) as (K1 & K2 & K3 & K4).
-  destruct (file_fs_pure_pins av Hp) as (H1 & H2 & H3 & H4).
+  destruct (file_fs_pure_pins av0 Hp0) as (K1 & K2 & K3 & K4 & K5).
+  destruct (file_fs_pure_pins av Hp) as (H1 & H2 & H3 & H4 & H5).
   apply file_fs_pure_of_pins.
   - exact (node_pin_unarm_fresh _ _ _ i av0 av Hfree K1 H1).
   - exact (node_pin_unarm_fresh _ _ _ i av0 av Hfree K2 H2).
   - exact (node_pin_unarm_fresh _ _ _ i av0 av Hfree K3 H3).
   - exact (node_pin_unarm_fresh _ _ _ i av0 av Hfree K4 H4).
+  - exact (node_pin_unarm_fresh _ _ _ i av0 av Hfree K5 H5).
 Qed.
 
 Lemma cons_present_unarm_fresh_nd (j i : Z) (av0 av : aview) :
@@ -823,7 +835,8 @@ Lemma file_fs_pure_create (d : Z) (nmn : fname) (ents : gmap fname Z)
   (forall e : gmap fname Z, c <> ADir e) ->
   file_fs_pure av -> file_fs_pure (delta_create d nmn i c av).
 Proof using .
-  intros Hpre Hnd Hp. destruct (file_fs_pure_pins av Hp) as (H1 & H2 & H3 & H4).
+  intros Hpre Hnd Hp.
+  destruct (file_fs_pure_pins av Hp) as (H1 & H2 & H3 & H4 & H5).
   apply file_fs_pure_of_pins.
   - exact (node_pin_create _ _ _ d nmn ents nl i c av Hpre Hnd
              (pinned_row_nondir init_bytes) H1).
@@ -833,6 +846,8 @@ Proof using .
              (pinned_row_nondir echo_bytes) H3).
   - exact (node_pin_create _ _ _ d nmn ents nl i c av Hpre Hnd
              (pinned_row_nondir cat_bytes) H4).
+  - exact (node_pin_create _ _ _ d nmn ents nl i c av Hpre Hnd
+             (pinned_row_nondir grep_bytes) H5).
 Qed.
 
 Lemma cons_absent_create_nd (d : Z) (nmn : fname) (ents : gmap fname Z)
@@ -862,12 +877,14 @@ Lemma file_fs_pure_dots (i d : Z) (full : bool) (av : aview) :
   av !! i = Some (MkAnode (ADir ∅) 1%nat) ->
   file_fs_pure av -> file_fs_pure (dots_delta full i d av).
 Proof using .
-  intros Hi Hp. destruct (file_fs_pure_pins av Hp) as (H1 & H2 & H3 & H4).
+  intros Hi Hp.
+  destruct (file_fs_pure_pins av Hp) as (H1 & H2 & H3 & H4 & H5).
   apply file_fs_pure_of_pins.
   - exact (node_pin_dots _ _ _ i d full av Hi (pinned_row_nondir _) H1).
   - exact (node_pin_dots _ _ _ i d full av Hi (pinned_row_nondir _) H2).
   - exact (node_pin_dots _ _ _ i d full av Hi (pinned_row_nondir _) H3).
   - exact (node_pin_dots _ _ _ i d full av Hi (pinned_row_nondir _) H4).
+  - exact (node_pin_dots _ _ _ i d full av Hi (pinned_row_nondir _) H5).
 Qed.
 
 Lemma cons_absent_dots (i d : Z) (full : bool) (av : aview) :
@@ -917,40 +934,44 @@ Proof using .
            cons_dev_nonfile (node_pin_of_cons j av Hp)).
 Qed.
 
-(* ...and the four pinned rows ARE files, so they owe the inequality --
+(* ...and the five pinned rows ARE files, so they owe the inequality --
    which section 5 pays out of the length. *)
 Lemma file_fs_pure_trunc_ne (i : Z) (av : aview) :
   i <> INIT_INO -> i <> SH_INO -> i <> ECHO_INO -> i <> CAT_INO ->
+  i <> GREP_INO ->
   file_fs_pure av -> file_fs_pure (delta_trunc i av).
 Proof using .
-  intros N1 N2 N3 N4 Hp.
-  destruct (file_fs_pure_pins av Hp) as (H1 & H2 & H3 & H4).
+  intros N1 N2 N3 N4 N5 Hp.
+  destruct (file_fs_pure_pins av Hp) as (H1 & H2 & H3 & H4 & H5).
   apply file_fs_pure_of_pins.
   - exact (node_pin_trunc_ne _ _ _ i av N1 (pinned_row_nondir _) H1).
   - exact (node_pin_trunc_ne _ _ _ i av N2 (pinned_row_nondir _) H2).
   - exact (node_pin_trunc_ne _ _ _ i av N3 (pinned_row_nondir _) H3).
   - exact (node_pin_trunc_ne _ _ _ i av N4 (pinned_row_nondir _) H4).
+  - exact (node_pin_trunc_ne _ _ _ i av N5 (pinned_row_nondir _) H5).
 Qed.
 
 Lemma file_fs_pure_write_ne (i : Z) (off : nat) (new : list (bv 8))
     (av : aview) :
   i <> INIT_INO -> i <> SH_INO -> i <> ECHO_INO -> i <> CAT_INO ->
+  i <> GREP_INO ->
   file_fs_pure av -> file_fs_pure (delta_write i off new av).
 Proof using .
-  intros N1 N2 N3 N4 Hp.
-  destruct (file_fs_pure_pins av Hp) as (H1 & H2 & H3 & H4).
+  intros N1 N2 N3 N4 N5 Hp.
+  destruct (file_fs_pure_pins av Hp) as (H1 & H2 & H3 & H4 & H5).
   apply file_fs_pure_of_pins.
   - exact (node_pin_write_ne _ _ _ i off new av N1 (pinned_row_nondir _) H1).
   - exact (node_pin_write_ne _ _ _ i off new av N2 (pinned_row_nondir _) H2).
   - exact (node_pin_write_ne _ _ _ i off new av N3 (pinned_row_nondir _) H3).
   - exact (node_pin_write_ne _ _ _ i off new av N4 (pinned_row_nondir _) H4).
+  - exact (node_pin_write_ne _ _ _ i off new av N5 (pinned_row_nondir _) H5).
 Qed.
 
 (* ====================================================================== *)
 (*  5.  `f`'s INUM IS NONE OF THE PINNED ONES                              *)
 (*                                                                        *)
 (*  The truncate and the write at `f`'s own inum owe                       *)
-(*  [file_fs_pure_trunc_ne] / [_write_ne] four inequalities, and nothing   *)
+(*  [file_fs_pure_trunc_ne] / [_write_ne] five inequalities, and nothing   *)
 (*  in the view supplies them: what does is the LENGTH.  A typed content   *)
 (*  is a chunk subset of an ADMISSIBLE line, hence shorter than            *)
 (*  [line_max] = 100; every pinned binary is 35 KB and more; two rows with *)
@@ -1069,6 +1090,9 @@ Proof using . exact ElfUser.echo_elf_length. Qed.
 Lemma cat_bytes_length : Z.of_nat (length cat_bytes) = 36728.
 Proof using . exact ElfUser.cat_elf_length. Qed.
 
+Lemma grep_bytes_length : Z.of_nat (length grep_bytes) = 44440.
+Proof using . exact ElfUser.grep_elf_length. Qed.
+
 (* THE ROW'S CONTENT LENGTH, WITHOUT [injection].  Two rows at one inum
    are one row, and what section 5c needs of them is the LENGTH -- but
    [injection] on [Some (MkAnode (AFile bs) 1) = Some (MkAnode (AFile
@@ -1102,11 +1126,13 @@ Lemma f_inum_not_pinned (av : aview) (i : Z) (bs : list (bv 8)) :
   file_fs_pure av ->
   av !! i = Some (MkAnode (AFile bs) 1%nat) ->
   (length bs < EchoDisc.line_max)%nat ->
-  i <> INIT_INO /\ i <> SH_INO /\ i <> ECHO_INO /\ i <> CAT_INO.
+  i <> INIT_INO /\ i <> SH_INO /\ i <> ECHO_INO /\ i <> CAT_INO
+  /\ i <> GREP_INO.
 Proof using .
-  intros Hp Hrow Hlen. destruct (file_fs_pure_pins av Hp) as (H1 & H2 & H3 & H4).
+  intros Hp Hrow Hlen.
+  destruct (file_fs_pure_pins av Hp) as (H1 & H2 & H3 & H4 & H5).
   destruct H1 as (_ & R1). destruct H2 as (_ & R2).
-  destruct H3 as (_ & R3). destruct H4 as (_ & R4).
+  destruct H3 as (_ & R3). destruct H4 as (_ & R4). destruct H5 as (_ & R5).
   rewrite /EchoDisc.line_max in Hlen.
   assert (HlenZ : Z.of_nat (length bs) < 100) by lia.
   split_and!; intros Heq; rewrite Heq in Hrow.
@@ -1118,6 +1144,8 @@ Proof using .
     rewrite echo_bytes_length in Hl. lia.
   - pose proof (row_flen_eq av CAT_INO bs cat_bytes 1%nat 1%nat Hrow R4) as Hl.
     rewrite cat_bytes_length in Hl. lia.
+  - pose proof (row_flen_eq av GREP_INO bs grep_bytes 1%nat 1%nat Hrow R5) as Hl.
+    rewrite grep_bytes_length in Hl. lia.
 Qed.
 
 (* ...and `f`'s row is not the console's either: one is a file, the other
@@ -1169,9 +1197,9 @@ Lemma file_trunc_at_f (av : aview) (i : Z) (bs : list (bv 8))
 Proof using .
   intros Hpure Hok Hty. pose proof Hok as (Hst & Hrow).
   destruct (f_inum_not_pinned av i bs Hpure Hrow
-              (f_bytes_typed_short ls bs Hty)) as (N1 & N2 & N3 & N4).
+              (f_bytes_typed_short ls bs Hty)) as (N1 & N2 & N3 & N4 & N5).
   split_and!.
-  - exact (file_fs_pure_trunc_ne i av N1 N2 N3 N4 Hpure).
+  - exact (file_fs_pure_trunc_ne i av N1 N2 N3 N4 N5 Hpure).
   - exact (cons_absent_trunc_any i av).
   - intros j. exact (cons_present_trunc_any j i av).
   - exact (f_ok_trunc_f i bs av Hok).
@@ -1190,9 +1218,9 @@ Lemma file_write_at_f (av : aview) (i : Z) (off : nat)
 Proof using .
   intros Hpure Hok Hty. pose proof Hok as (Hst & Hrow).
   destruct (f_inum_not_pinned av i bs0 Hpure Hrow
-              (f_bytes_typed_short ls bs0 Hty)) as (N1 & N2 & N3 & N4).
+              (f_bytes_typed_short ls bs0 Hty)) as (N1 & N2 & N3 & N4 & N5).
   split_and!.
-  - exact (file_fs_pure_write_ne i off new av N1 N2 N3 N4 Hpure).
+  - exact (file_fs_pure_write_ne i off new av N1 N2 N3 N4 N5 Hpure).
   - exact (cons_absent_write_any i off new av).
   - intros j. exact (cons_present_write_any j i off new av).
   - exact (f_ok_write_f i off new bs0 av Hok).

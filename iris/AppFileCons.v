@@ -41,6 +41,7 @@ Require Import FsInitPin.         (* [INIT_INO] *)
 Require Import FsShPin.           (* [SH_INO] *)
 Require Import FsEchoPin.         (* [ECHO_INO] *)
 Require Import FsCatPin.          (* [CAT_INO] *)
+Require Import FsGrepPin.         (* [GREP_INO] *)
 Require Import ConsoleInv.        (* [CONSOLE] *)
 Local Open Scope Z_scope.
 
@@ -118,7 +119,7 @@ Section AppFileCons.
     (length bs < EchoDisc.line_max)%nat ->
     fdeed r (Some (i, bs)) -∗ file_pred c r av -∗
     file_pred c r av ∗ fdeed r (Some (i, bs)) ∗
-    (⌜i <> INIT_INO /\ i <> SH_INO /\ i <> ECHO_INO /\ i <> CAT_INO⌝
+    (⌜i <> INIT_INO /\ i <> SH_INO /\ i <> ECHO_INO /\ i <> CAT_INO /\ i <> GREP_INO⌝
      ∨ file_taint c).
   Proof using .
     intros Hlen. iIntros "Hd Hp".
@@ -321,7 +322,7 @@ Section AppFileCons.
     (* [i <> ROOTINO]: the root is the parent of every row the pure half
        pins, and [av0] does not have [i] at all. *)
     assert (Hroot : i <> FsImg.ROOTINO).
-    { destruct (FileDeltas.file_fs_pure_pins av0 Hp0) as (H1 & _ & _ & _).
+    { destruct (FileDeltas.file_fs_pure_pins av0 Hp0) as (H1 & _ & _ & _ & _).
       destruct (FileDeltas.node_pin_root _ _ _ av0 H1)
         as (ents & nl & Hrt & _).
       intros ->. by rewrite Hrt in Hfree. }
