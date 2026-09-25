@@ -855,3 +855,9 @@ import Xv6.UexecSlot
 import Xv6.KexecPtImage
 import Xv6.KexecImageAlg
 import Xv6.KexecImageOk
+import Xv6.IregLinkNz
+import Xv6.CreateDefs
+import Xv6.CreateParts
+import Xv6.CreateFreshTy
+import Xv6.CreateBudget
+import Xv6.SysOpenBudget
