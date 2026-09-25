@@ -99,8 +99,6 @@ Require Import UShEcho.
 Require Import UShPanic.          (* the panic and exec-failed laws at a record *)
 Require Import UShKernel.
 Require Import UInitSh.
-Require Import UCatOut.                  (* [cat_tie] -- the pure round tie *)
-Require Import UCatLend.          (* [catq_cat] / [cat_lend] *)
 Require UkFileIface.                     (* [fifRegG]: the binder below needs it in scope *)
 Require FileDeltas.                      (* [f_bytes_typed_short] *)
 Require Import CtxIdDefs.

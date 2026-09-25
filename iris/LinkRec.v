@@ -32,8 +32,7 @@
 (*     A file alternative whose output depends on the era's FILE STATE    *)
 (*     ([RCRan] at a present f) is NOT in [lk_ab]'s range -- the file     *)
 (*     instance sends it to [[]] -- because a program above the links     *)
-(*     names no state; cat's own round is stated at an explicit stage     *)
-(*     ([UCatOut] section 1) and does not go through this family.         *)
+(*     names no state; cat's own round does not go through this family.   *)
 (*   - THE ERA'S EXTRA STATE.  It never appears: it is hidden inside the  *)
 (*     credential families, which are fields.  echo's instance sets them  *)
 (*     to [EchoLinks]/[EchoLinksLine]'s own; the file's adds              *)
@@ -93,7 +92,7 @@ Section linkrec.
     (* THE SHELL'S OWN TWO ALTERNATIVES ARE PER-LINE (lane LINK-GEN-2).
        At the echo application there is one line shape and the fork panic
        is the constant 3; [FileDisc.ralt_ok] admits [RFFork] only at an
-       [LEchoF] line, [RCFork] only at an [LCat_f] one and [REcho 3] only at
+       [LEchoF] line, [RCFork] only at an [LCat] one and [REcho 3] only at
        an [LEcho] one.  The panic's BYTES are uniform ([alt_panic] at all
        three); the exec-failed child's are NOT -- sh prints
        "exec %s failed" with the command name -- hence [lk_exfb]. *)

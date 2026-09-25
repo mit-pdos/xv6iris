@@ -23,8 +23,7 @@
 (*  ON ONE -- every [ralt] but [RCRan] ([fstate_free]) -- and is [[]]        *)
 (*  elsewhere, which makes the block-byte step premise-free exactly as    *)
 (*  echo's is ([EchoDisc.line_alts_lt]).  cat's own round, the one        *)
-(*  [RCRan] round, is stated at an EXPLICIT stage ([UCatOut] section 1)   *)
-(*  and does not go through this family.                                  *)
+(*  [RCRan] round, does not go through this family.                       *)
 (* ===================================================================== *)
 From Stdlib Require Import ZArith Lia List.
 From stdpp Require Import gmap list bitvector.definitions.
@@ -183,21 +182,6 @@ Lemma wr_blk_started_f (ps cs : list nat) (s0 : fstate) (I : list (bv 8))
     (P : nat) : wr_blk_f ps cs s0 I P -> nstarted I = S (length cs).
 Proof using.
   rewrite wr_blk_f_lm. apply (lm_wr_blk_started file_lm).
-Qed.
-
-(* the stage [UCatOut.cat_stage] names, with the line abstract *)
-Lemma wr_blk_t_stage_f (ps cs : list nat) (s0 : fstate) (I : list (bv 8))
-    (P : nat) :
-  wr_blk_t_f ps cs s0 I P ->
-  rest_of I = []
-  /\ nlines I = S (length cs)
-  /\ P = length (proc_before_f ps cs (Some s0) I)
-  /\ pro_pin_f ps cs I
-  /\ wr_tail_f ps cs.
-Proof using.
-  rewrite wr_blk_t_f_lm proc_before_f_lm wr_tail_f_lm. intros Hw.
-  destruct (lm_wr_blk_t_stage file_lm ps cs s0 I P Hw) as (H1 & H2 & H3 & H4 & H5).
-  split_and!; [exact H1 | exact H2 | exact H3 | by apply pro_pin_f_lm | exact H5].
 Qed.
 
 (* ---- filing an alternative reads no round below the boundary ---- *)

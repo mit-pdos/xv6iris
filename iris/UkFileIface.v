@@ -30,11 +30,9 @@
 (* entry devices [D0] have the values [w0] throughout ([fif_ok]'s last    *)
 (* clause), so the wand finds the console at the round's [(v, I, C)] and *)
 (* the file at its [(i, γo, ws)].  The glue lemmas prove the wand from   *)
-(* the landed entries' payloads: [fif_exit_k_cat] from                    *)
-(* [UCatLend.catq_cat]'s wand (the drained console names a code of        *)
-(* [RCRan; RCNoOpen], and its body's length is [UCatOut.cat_out_len]),    *)
-(* [fif_exit_k_redir] from [UEchoFile.ef_exit]'s; echo at the console's   *)
-(* is [UkFileEntries.fif_exit_k_echo_cons_d].                             *)
+(* the landed entries' payloads: [fif_exit_k_cons_g] at the console --    *)
+(* echo's and cat's alike, at the code the drained console names -- and   *)
+(* [fif_exit_k_redir_g] from [UEchoFile.ef_exit]'s at a redirect.         *)
 (*                                                                        *)
 (* THE PROTECTED DEVICES.  A close of an entry device's last descriptor  *)
 (* would drop the very cursor the wand needs, so the record's [Dp] is     *)
@@ -126,7 +124,6 @@ Require Import FileLinks FileLinksLine FileLinkGen.   (* [file_links], [f0w], [f
 Require Import UkConsOut UkFileDev.
 Require Import UkHandler UkFreeHandler ProgTreeFile.
 Require Import GenLinksLine LineModelLinks FileHooks.   (* [gwc_post], [lm_body], [fline] *)
-Require Import UCatOut UCatLend.          (* [cch], [catq_cat]: the round's cat payload *)
 Require Import UCodeCat UkCatTree.
 Require Import UCodeEcho UkEchoTree.   (* echo's instance: [echo_prog] *)
 Local Open Scope Z_scope.

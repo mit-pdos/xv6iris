@@ -68,8 +68,8 @@ Section UkCatCat.
      at every call site ([UkRun.ukn_const]).  It used to be [ukn_triv] --
      "cat owes its parent nothing" -- which pinned the payload at [True]
      and so made cat's exit incapable of handing the shell the deed
-     fraction, the advanced console credential or the filed alternative
-     ([UCatOut.catq_filed] / [catq_unfiled]).  What cat actually needs of
+     fraction, the advanced console credential or the filed alternative.
+     What cat actually needs of
      its own payload is only that its two exits -- 0 on the content arm,
      1 on the diagnostic arm -- owe the SAME thing, which is exactly this
      class; echo's walk is stated at it for the same reason. *)
@@ -413,10 +413,10 @@ Section UkCatCat.
   (* one persistent obligation that funds a whole turn -- the read, and     *)
   (* then, at whatever the read returned, the branch the return selects --  *)
   (* and hands the invariant back for the next turn.  [I] is the payer's    *)
-  (* own cursor (at the file application, [UCatOut.cch] at the position     *)
-  (* the round's output has reached) and the walk reads none of it;         *)
-  (* [Cend] is what the loop's NORMAL exit -- read returned zero -- hands   *)
-  (* to cat's caller.                                                      *)
+  (* own cursor (at the file application, the output cursor at the          *)
+  (* position the round's output has reached) and the walk reads none of    *)
+  (* it; [Cend] is what the loop's NORMAL exit -- read returned zero --     *)
+  (* hands to cat's caller.                                                 *)
   (*                                                                       *)
   (* THE TWO DIAGNOSTIC TAILS ARE IN IT, because they are exits of the      *)
   (* loop and each ends in the program's own exit payload: cat's `write     *)
@@ -443,7 +443,7 @@ Section UkCatCat.
   (* The write output used to be [(I ∧ kcat_dg_cw) ∗ buffer]: an ADDITIVE  *)
   (* pair the payer owed on EVERY turn, because the walk takes whichever    *)
   (* arm of [beq a0,s1] the return value picks and the payment could not    *)
-  (* say which.  [UCatOut.cch_step] can only fund a byte the MODEL's        *)
+  (* say which.  A cursor's step can only fund a byte the MODEL's          *)
   (* continuation holds at the cursor, and "cat: write error" is not in it  *)
   (* at any position -- so a claim-bearing payer could never build a round. *)
   (*                                                                       *)
@@ -525,7 +525,7 @@ Section UkCatCat.
      vacuously true. *)
   (* ...AND THE PAYLOAD IS A PERSISTENT RESOURCE (lane CAT-GEOM-4; see
      [UkCat.kcat_pay_seq_of_law]'s note).  What this buys is the TAINT:
-     a payer whose payload is a claim-bearing [UCatOut.cch] holds it
+     a payer whose payload is a claim-bearing output cursor holds it
      persistently at a tainted era and could not hand it in as [(⊢ _)]. *)
   Lemma kcat_round_of_law (fdv : mword 64) :
     □ (ukn_pay N (-1)) -∗

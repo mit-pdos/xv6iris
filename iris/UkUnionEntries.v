@@ -15,8 +15,8 @@
 (* ([UnionDisc.ualt_code (UR a)]), and the console exit of BOTH console   *)
 (* entries hands the round's post at the parameters' own boot state --  *)
 (* [gwc_post] at [union_params_at s0] -- and the core's deed back: cat    *)
-(* no longer pays through [UCatLend.catq_cat] but through the same glue   *)
-(* as echo, at the code the drained console names.  cat's lend is the    *)
+(* no longer pays through a cat-specific payload but through the same     *)
+(* glue as echo, at the code the drained console names.  cat's lend is    *)
 (* round's cursor opened ([UkConsOut.cons_cur] at the block's first      *)
 (* byte), with the round's state tied to the deed's content.             *)
 (*                                                                        *)
@@ -73,7 +73,6 @@ Require Import FileLinks FileLinksLine FileLinkGen FileHooks.
 Require Import GenLinksLine.
 Require Import ConsoleInv.
 Require Import UkConsOut ProgTreeFile.
-Require Import UCatOut.
 Require Import FsInitPin FsShPin FsEchoPin FsCatPin FsGrepPin.
 Require Import UkFileDev FileWrite UEchoFile.
 Require Import UkFileIface.
@@ -93,6 +92,25 @@ Local Notation U := ulmG.
 
 (* cat's argument, positionally over the name's own length, is
    [UkTreeEntry.cat_name_tail] (cut W3) *)
+
+(* the shell's prompt is two bytes *)
+Lemma cat_prompt_len : length u_prompt = 2%nat.
+Proof using. vm_compute. reflexivity. Qed.
+
+(* cat's round at its line's own file, in its three arms: the content
+   then the prompt at a present file, the diagnostic at an absent one,
+   and the same diagnostic when the open returned -1 *)
+Lemma cat_cont_ran_some_at (s : fstate) (nm bs : list (bv 8)) :
+  s !! nm = Some bs -> cont s (LCat nm) RCRan = bs ++ u_prompt.
+Proof using. intros Hs. cbn [cont lname line_file default]. by rewrite Hs. Qed.
+
+Lemma cat_cont_ran_absent_at (s : fstate) (nm : list (bv 8)) :
+  s !! nm = None -> cont s (LCat nm) RCRan = alt_catopenN nm.
+Proof using. intros Hs. cbn [cont lname line_file default]. by rewrite Hs. Qed.
+
+Lemma cat_cont_noopen_at (s : fstate) (nm : list (bv 8)) :
+  cont s (LCat nm) RCNoOpen = alt_catopenN nm.
+Proof using. reflexivity. Qed.
 
 (* a file line's alternative at the union: the file's continuation at the
    round's state *)
@@ -128,7 +146,7 @@ Proof.
   rewrite ualt_dec_0 Hfl. cbn [ucont].
   replace (ralt_dec 0%nat) with (REcho 0%nat) by (vm_compute; reflexivity).
   cbn [cont uline_ws]. rewrite EchoDisc.line_alts_of_0.
-  rewrite length_app UCatOut.cat_prompt_len.
+  rewrite length_app cat_prompt_len.
   replace (length (wl_line (drop 1 ws)) + 2 - 2)%nat with (length (wl_line (drop 1 ws))) by lia.
   rewrite take_app_length. reflexivity.
 Qed.
@@ -153,8 +171,8 @@ Lemma ulm_cat_body_ran (s0 : fstate) (cs : list nat) (I : list (bv 8))
   lm_body U s0 cs I (ualt_code (UR RCRan)) = content.
 Proof.
   intros Hfl Hst. rewrite /lm_body ulm_abs_R Hfl.
-  rewrite (UCatOut.cat_cont_ran_some_at _ nm content Hst).
-  rewrite length_app UCatOut.cat_prompt_len.
+  rewrite (cat_cont_ran_some_at _ nm content Hst).
+  rewrite length_app cat_prompt_len.
   replace (length content + 2 - 2)%nat with (length content) by lia.
   rewrite take_app_length. reflexivity.
 Qed.
@@ -163,7 +181,7 @@ Qed.
 Lemma ucat_diag_take (nm : list (bv 8)) :
   take (length (alt_catopenN nm) - 2) (alt_catopenN nm) = cat_dg_open nm.
 Proof.
-  rewrite /alt_catopenN length_app UCatOut.cat_prompt_len.
+  rewrite /alt_catopenN length_app cat_prompt_len.
   replace (length (dg_catopenN nm) + 2 - 2)%nat with (length (dg_catopenN nm)) by lia.
   rewrite take_app_length fif_cat_dg_open. reflexivity.
 Qed.
@@ -174,7 +192,7 @@ Lemma ulm_cat_body_ran_none (s0 : fstate) (cs : list nat) (I : list (bv 8))
   (lm_upto U cs s0 (bodies_of I) (nlines I - 1) : fstate) !! nm = None ->
   lm_body U s0 cs I (ualt_code (UR RCRan)) = cat_dg_open nm.
 Proof.
-  intros Hfl Hst. rewrite /lm_body ulm_abs_R Hfl (UCatOut.cat_cont_ran_absent_at _ nm Hst).
+  intros Hfl Hst. rewrite /lm_body ulm_abs_R Hfl (cat_cont_ran_absent_at _ nm Hst).
   exact (ucat_diag_take nm).
 Qed.
 
@@ -183,7 +201,7 @@ Lemma ulm_cat_body_noopen (s0 : fstate) (cs : list nat) (I : list (bv 8))
   lm_line_at U I = LCat nm ->
   lm_body U s0 cs I (ualt_code (UR RCNoOpen)) = cat_dg_open nm.
 Proof.
-  intros Hfl. rewrite /lm_body ulm_abs_R Hfl UCatOut.cat_cont_noopen_at.
+  intros Hfl. rewrite /lm_body ulm_abs_R Hfl cat_cont_noopen_at.
   exact (ucat_diag_take nm).
 Qed.
 
