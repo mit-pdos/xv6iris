@@ -7,6 +7,12 @@
 (*  the union ledger's taint counter can sit at [decide (lm_disc ulmU h)] *)
 (*  with no excluded-middle axiom.  Nothing here is meant to run.         *)
 (*                                                                        *)
+(*  AT EVERY FILTER STAGE LIST (grep-pipes.md cut G4).  The decider is   *)
+(*  proved once for any admission [ud_disc_dec] (what it needs of one:    *)
+(*  [ud_adm]) and instantiated at the landed [adm_u_f] (cats only) and at *)
+(*  the widened [adm_u_g] (every stage [cat] or [grep w]), the one cut G8 *)
+(*  switches the application to: [lm_disc_ulmG_dec].                      *)
+(*                                                                        *)
 (*  WHY IT IS NOT [FileDiscDec] + [PipesDecE] (review S2).  The state     *)
 (*  feeds the range condition: at a [cat f | cat^n] line [uok] reads the  *)
 (*  round's content through [line_blocks], so                            *)
@@ -21,7 +27,9 @@
 (*     with the other stages' diagnostics.  So the boot-state witness is *)
 (*     canonicalised by TRUNCATION ([blocks_trunc], [terms_trunc]): a    *)
 (*     run at content [b0] stays a run, with the same console streams, *)
-(*     at any prefix of [b0] its printed content fits in -- and the      *)
+(*     at any prefix of [b0] its printed content fits in (at a grep too: *)
+(*     each pipe's new content is related to its old one, not a uniform *)
+(*     cut of it, section 4) -- and the                                  *)
 (*     longest such printed prefix is a SUBSEQUENCE of the segment's     *)
 (*     wire.  If [b0] itself is not one, no checked round printed [f]   *)
 (*     whole ([cat f] alone does, contiguously), and the era is the one *)
@@ -43,11 +51,11 @@ Require Import ProgTree PipesPair PipesDisc PipesDiscDec PipesDecE.
 Require PipeDisc.
 Require Import FileState FileDisc FileDiscDec.
 Require Import UnionDisc UnionDiscDec.
+Require GrepFilt.
 From stdpp Require Import ssreflect.
 Local Open Scope nat_scope.
 Local Open Scope list_scope.
 
-Local Notation U := ulmU.
 Local Notation fc0 := (files_of (Some [])).
 
 Ltac ud_elem :=
@@ -123,9 +131,17 @@ Qed.
 (*  A terminal run's console streams are diagnostics only, at every       *)
 (*  content: the producer's ([ud_prod]: echo's exec failure or nothing; *)
 (*  cat f's exec failure, nothing, its write error or its open failure), *)
-(*  the middle cats' ([pde_midok]) and the failing node's [fork] line.   *)
-(*  Each is realisable at [Some []], where the file is present and empty *)
-(*  -- so [umerge]'s [exists s] is [s = Some []].                         *)
+(*  the middle stages' ([umidok]: a cat's exec failure, nothing or its    *)
+(*  write error; a grep's exec failure or nothing -- a grep prints no     *)
+(*  diagnostic of its own) and the failing node's [fork] line.  Each is   *)
+(*  realisable at [Some []], where the file is present and empty -- so   *)
+(*  [umerge]'s [exists s] is [s = Some []].                               *)
+(*                                                                        *)
+(*  THE ADMISSION IS A PARAMETER ([ud_adm]): which producers it admits    *)
+(*  (echo, and cat at the model's file), whether it admits grep stages    *)
+(*  ([gp]), and that it admits every chain of cats -- and, at [gp], of    *)
+(*  cats and greps of one pattern [gpat] -- behind either producer, which *)
+(*  is what realises every checked shape.                                  *)
 (* ===================================================================== *)
 
 Definition ud_prod (p : producer) : list bytes :=
@@ -139,145 +155,247 @@ Proof using.
   intros H. destruct p as [ws | f]; inversion H; subst; cbn [so_cons st_dg_exec ud_prod]; ud_elem.
 Qed.
 
-Lemma ud_lterm_shape fc p n W s :
-  all_cats n = true -> line_term fc (LPipes p n) W s ->
-  (W = [dg_fork_b] /\ s ∈ ud_prod p)
-  \/ (exists pc mids, W = pc :: mids ++ [dg_fork_b] /\ pc ∈ ud_prod p
-                      /\ Forall pde_midok mids /\ pde_midok s).
-Proof using.
-  intros Hc H. remember (LPipes p n) as l eqn:Hl.
-  destruct H as [p' n' so Hn Hso | p' n' so W' s' Hso Ht]; injection Hl as -> ->.
-  - left. split; [reflexivity | exact (ud_prod_cons _ _ _ _ Hso)].
-  - right.
-    destruct (pde_sfx_shape _ _ _ _ _ _ (sfx_term_fc fc (fun _ => None) _ _ _ _ _ _ Ht) Hc)
-      as (mids & -> & HF & Hs).
-    exists (so_cons so), mids. split_and!; [reflexivity | exact (ud_prod_cons _ _ _ _ Hso)
-                                          | exact HF | exact Hs].
-Qed.
-
 (* the diagnostics of every producer the union admits *)
 Definition prodU : list bytes :=
   [[]; PipeDisc.dg_execL; PipeDisc.dg_execR; cat_dg_write; cat_dg_open fname_f].
 
-Lemma ud_prod_U p n x : adm_u_f (LPipes p n) = true -> x ∈ ud_prod p -> x ∈ prodU.
+(* the nonempty middle streams: a cat's two, and with grep stages ([gp])
+   a grep's exec failure *)
+Definition umo (gp : bool) : list bytes := pde_mo ++ (if gp then [dg_execG] else []).
+
+Definition umidok (gp : bool) (m : bytes) : Prop := m = [] \/ m ∈ umo gp.
+
+(* THE CHECKER: [PipesDecE.pde_mergeb] with the cat producer's streams and
+   the middle streams [umo gp] *)
+Definition umergeb (gp : bool) (u : bytes) : bool :=
+  existsb (fun pc => existsb (fun s => pde_chk (umo gp) [pc; dg_fork_b] true s u_prompt u)
+                      ([] :: umo gp)) prodU
+  || existsb (fun s => pde_chk (umo gp) [dg_fork_b] false s u_prompt u) prodU.
+
+Lemma umo_grep (gp : bool) m : m ∈ (if gp then [dg_execG] else []) -> gp = true /\ m = dg_execG.
 Proof using.
-  unfold prodU. destruct p as [ws | g]; cbn [ud_prod]; intros Ha Hx;
-    apply elem_of_list_In in Hx.
-  - destruct Hx as [<- | [<- | []]]; ud_elem.
-  - apply adm_u_f_catf in Ha as [-> _].
-    destruct Hx as [<- | [<- | [<- | [<- | []]]]]; ud_elem.
+  destruct gp; [intros Hm; split; [reflexivity | exact (proj1 (elem_of_list_singleton _ _) Hm)] |].
+  intros Hm. by apply elem_of_nil in Hm.
 Qed.
 
-(* each of them is a producer's stream at [Some []] *)
-Lemma ud_real pc :
-  pc ∈ prodU ->
-  exists p, (forall n, adm_u_f (LPipes p (cats n)) = true)
-            /\ exists so, stage_out fc0 (prod_content fc0 p) (SProd p) so /\ so_cons so = pc.
-Proof using.
-  unfold prodU. intros Hpc. apply elem_of_list_In in Hpc.
-  assert (HE : forall n, adm_u_f (LPipes (PrEcho []) (cats n)) = true)
-    by (intros n; exact (FileDisc.all_cats_cats n)).
-  assert (HC : forall n, adm_u_f (LPipes (PrCatF fname_f) (cats n)) = true)
-    by (intros n; apply adm_u_f_catf; split; [reflexivity | exact (FileDisc.all_cats_cats n)]).
-  destruct Hpc as [<- | [<- | [<- | [<- | [<- | []]]]]].
-  - exists (PrEcho []). split; [exact HE |]. eexists. split; [apply so_silent | reflexivity].
-  - exists (PrEcho []). split; [exact HE |]. eexists. split; [apply so_exec | reflexivity].
-  - exists (PrCatF fname_f). split; [exact HC |]. eexists. split; [apply so_exec | reflexivity].
-  - exists (PrCatF fname_f). split; [exact HC |]. exists (MkSO cat_dg_write None (Some (WrHalt []))).
-    split; [| reflexivity].
-    apply (so_catf_halt _ _ fname_f []); [| apply prefix_nil].
-    cbn [prod_content]. rewrite !files_of_f. reflexivity.
-  - exists (PrCatF fname_f). split; [exact HC |]. eexists. split; [apply so_catf_open | reflexivity].
-Qed.
+Lemma umergeb_prompt gp : umergeb gp u_prompt = false.
+Proof using. destruct gp; vm_compute; reflexivity. Qed.
 
-Lemma ud_merge_of_lt p n W s u :
-  (forall n, adm_u_f (LPipes p (cats n)) = true) ->
-  line_term fc0 (LPipes p (cats n)) W s -> pde_pmt W u_prompt s u -> pl_merge fc0 adm_u_f u.
-Proof using.
-  intros Ha Hlt Hp. destruct (pde_pmt_blk _ _ _ _ Hp) as (Wm & b & HW & Hb & Hu).
-  exists (LPipes p (cats n)), b. split; [exact (Ha n) |]. split; [| exact Hu].
-  split.
-  - intros ->. pose proof (pde_merge_len _ _ Hb) as Hl. unfold pde_total in Hl.
-    simpl in Hl. rewrite !length_app ll_prompt_len in Hl. simpl in Hl. lia.
-  - exists b. split; [| reflexivity]. exists W, s, Wm, s.
-    split; [exact Hlt |]. split; [exact HW |]. split; [reflexivity | exact Hb].
-Qed.
+(* WHAT THE DECIDER NEEDS OF AN ADMISSION *)
+Record ud_adm (adm : pline' -> bool) (gp : bool) (gpat : bytes) : Prop := {
+  uda_catf : forall g fs, adm (LPipes (PrCatF g) fs) = true -> g = fname_f;
+  uda_filt : forall p fs, adm (LPipes p fs) = true -> Forall (fun F => gp = true \/ F = FCat) fs;
+  uda_real : forall p fs,
+    p = PrEcho [] \/ p = PrCatF fname_f ->
+    Forall (fun F => F = FCat \/ (gp = true /\ F = FGrep gpat)) fs -> adm (LPipes p fs) = true
+}.
 
-(* THE CHECKER: [PipesDecE.pde_mergeb] with the cat producer's streams *)
-Definition umergeb (u : bytes) : bool :=
-  existsb (fun pc => existsb (fun s => pde_chk [pc; dg_fork_b] true s u_prompt u)
-                      [PipeDisc.dg_execR; []; cat_dg_write]) prodU
-  || existsb (fun s => pde_chk [dg_fork_b] false s u_prompt u) prodU.
+Section umerge.
+  Context (adm : pline' -> bool) (gp : bool) (gpat : bytes).
+  Hypothesis Hadm : ud_adm adm gp gpat.
 
-(* at EVERY content function: the shape reads no content *)
-Lemma umergeb_complete fc u : pl_merge fc adm_u_f u -> umergeb u = true.
-Proof using.
-  intros (l & b & Ha & [_ (b' & (W & s & Wm & sp & Hlt & HW & Hsp & Hb) & Hbb)] & Hu).
-  pose proof (pde_pmt_stray _ _ _ _ _
-                (pde_blk_pmt W Wm u_prompt sp b' u HW Hb
-                   ltac:(etrans; [exact Hu | exact Hbb])) Hsp) as Hp.
-  destruct l as [ws | p n]; [discriminate Ha |].
-  unfold umergeb. apply orb_true_iff.
-  destruct (ud_lterm_shape _ _ _ _ _ (adm_u_f_all _ _ Ha) Hlt)
-    as [[-> Hs] | (pc & mids & -> & Hpc & HF & Hs)].
-  - right. apply existsb_exists. exists s.
-    split; [apply elem_of_list_In; exact (ud_prod_U p n s Ha Hs) |].
-    apply (pde_chk_complete _ _ _ _ Hp [dg_fork_b] [] false); [by rewrite app_nil_r | constructor].
-  - left. apply existsb_exists. exists pc.
-    split; [apply elem_of_list_In; exact (ud_prod_U p n pc Ha Hpc) |].
-    apply existsb_exists. exists s. split.
-    { destruct Hs as [-> | [-> | ->]]; [left | right; left | right; right; left]; reflexivity. }
-    apply (pde_chk_complete _ _ _ _ Hp [pc; dg_fork_b] mids true); [| exact HF].
-    simpl. apply perm_skip. rewrite Permutation_app_comm. reflexivity.
-Qed.
+  Lemma ud_mid_cons fc L F so :
+    stage_out fc L (SMid F) so -> gp = true \/ F = FCat -> umidok gp (so_cons so).
+  Proof using.
+    intros H HF. remember (SMid F) as st eqn:Hst. unfold umidok, umo, pde_mo.
+    destruct H as [st0 | st0 | ws Hl | ws D Hl HD | f Hf | f D Hf HD | f | F' D HD | D HD
+                  | w D W HD HW | F' D HD]; try discriminate Hst; cbn [so_cons].
+    - subst st0. cbn [st_dg_exec]. right. apply elem_of_app. destruct F as [| w]; cbn [filt_dg_exec].
+      + left. ud_elem.
+      + destruct HF as [Hg | HF]; [| discriminate HF]. right. rewrite Hg. cbv iota. ud_elem.
+    - by left.
+    - by left.
+    - right. apply elem_of_app. left. ud_elem.
+    - by left.
+  Qed.
 
-Lemma umergeb_sound u : umergeb u = true -> pl_merge fc0 adm_u_f u.
-Proof using.
-  intros Hc. unfold umergeb in Hc. apply orb_true_iff in Hc as [Hc | Hc].
-  - apply existsb_exists in Hc as (pc & Hpin & Hc).
-    apply existsb_exists in Hc as (s & Hsin & Hc).
-    assert (Hs : pde_midok s).
-    { unfold pde_midok. destruct Hsin as [<- | [<- | [<- | []]]]; auto. }
-    destruct (pde_chk_sound u [pc; dg_fork_b] true s u_prompt Hc) as (Mu & HF & Hp).
-    destruct (ud_real pc (proj2 (elem_of_list_In _ _) Hpin)) as (p & Ha & so & Hso & Hc').
-    apply (ud_merge_of_lt p (S (S (length Mu))) (pc :: Mu ++ [dg_fork_b]) s u Ha).
-    + rewrite -Hc'. eapply lt_next; [exact Hso |].
-      apply (sfx_term_fc (fun _ => None)). apply pde_sfx_build; [| exact Hs].
-      eapply Forall_impl; [exact HF |]. intros m [_ [-> | ->]]; unfold pde_midok; auto.
-    + apply (pde_pmt_perm _ _ _ _ _ Hp). simpl. apply perm_skip.
-      rewrite Permutation_app_comm. reflexivity.
-  - apply existsb_exists in Hc as (s & Hsin & Hc).
-    destruct (pde_chk_sound u [dg_fork_b] false s u_prompt Hc) as (Mu & HF & Hp).
-    destruct Mu as [| m Mu]; [| apply Forall_cons in HF as [[Hf _] _]; discriminate Hf].
-    destruct (ud_real s (proj2 (elem_of_list_In _ _) Hsin)) as (p & Ha & so & Hso & Hc').
-    apply (ud_merge_of_lt p 1 [dg_fork_b] s u Ha); [| by rewrite app_nil_r in Hp].
-    rewrite -Hc'. apply lt_here; [discriminate | exact Hso].
-Qed.
+  (* a terminal suffix of an admitted line: diagnostics only *)
+  Lemma ud_sfx_shape fc L fs win wc W s :
+    sfx_term fc L fs win wc W s -> Forall (fun F => gp = true \/ F = FCat) fs ->
+    exists mids, W = mids ++ [dg_fork_b] /\ Forall (umidok gp) mids /\ umidok gp s.
+  Proof using.
+    induction 1 as [F F' fs win wc so Hso | F F' fs win wc so W s Hso Hp Hsfx IH]; intros Hc;
+      apply Forall_cons in Hc as [HF Hc].
+    - exists []. split_and!; [reflexivity | constructor | exact (ud_mid_cons _ _ _ _ Hso HF)].
+    - destruct (IH Hc) as (mids & -> & HFm & Hs). exists (so_cons so :: mids).
+      split_and!; [reflexivity | constructor; [exact (ud_mid_cons _ _ _ _ Hso HF) | exact HFm] | exact Hs].
+  Qed.
 
-(* [umerge]'s [exists s] IS [s = Some []] *)
-Lemma umerge_spec u : umerge adm_u_f u <-> umergeb u = true.
-Proof using.
-  split.
-  - intros (s & _ & Hm). exact (umergeb_complete _ u Hm).
-  - intros Hb. exists (Some []). split; [cbn [fstate_ok]; left; constructor |].
-    exact (umergeb_sound u Hb).
-Qed.
+  Lemma ud_lterm_shape fc p fs W s :
+    adm (LPipes p fs) = true -> line_term fc (LPipes p fs) W s ->
+    (W = [dg_fork_b] /\ s ∈ ud_prod p)
+    \/ (exists pc mids, W = pc :: mids ++ [dg_fork_b] /\ pc ∈ ud_prod p
+                        /\ Forall (umidok gp) mids /\ umidok gp s).
+  Proof using Hadm.
+    intros Ha H. remember (LPipes p fs) as l eqn:Hl.
+    destruct H as [p' fs' so Hn Hso | p' fs' so W' s' Hso Ht]; injection Hl as -> ->.
+    - left. split; [reflexivity | exact (ud_prod_cons _ _ _ _ Hso)].
+    - right.
+      destruct (ud_sfx_shape _ _ _ _ _ _ _ Ht (@uda_filt _ _ _ Hadm p fs Ha)) as (mids & -> & HF & Hs).
+      exists (so_cons so), mids.
+      split_and!; [reflexivity | exact (ud_prod_cons _ _ _ _ Hso) | exact HF | exact Hs].
+  Qed.
 
-Lemma umerge_some_nil u : umerge adm_u_f u <-> pl_merge fc0 adm_u_f u.
-Proof using.
-  split; [intros Hm; apply umergeb_sound, umerge_spec, Hm |].
-  intros Hm. exists (Some []). split; [cbn [fstate_ok]; left; constructor | exact Hm].
-Qed.
+  Lemma ud_prod_U p fs x : adm (LPipes p fs) = true -> x ∈ ud_prod p -> x ∈ prodU.
+  Proof using Hadm.
+    unfold prodU. destruct p as [ws | g]; cbn [ud_prod]; intros Ha Hx;
+      apply elem_of_list_In in Hx.
+    - destruct Hx as [<- | [<- | []]]; ud_elem.
+    - pose proof (@uda_catf _ _ _ Hadm g fs Ha) as ->.
+      destruct Hx as [<- | [<- | [<- | [<- | []]]]]; ud_elem.
+  Qed.
 
-Global Instance umerge_dec (u : bytes) : Decision (umerge adm_u_f u).
-Proof using.
-  destruct (umergeb u) eqn:H; [left; by apply umerge_spec |].
-  right. intros Hm. apply umerge_spec in Hm. congruence.
-Qed.
+  (* every middle stream is a stage's, at a cat or (at [gp]) a grep of [gpat] *)
+  Lemma ud_mid_so fc L m :
+    umidok gp m ->
+    exists F so, (F = FCat \/ (gp = true /\ F = FGrep gpat))
+                 /\ stage_out fc L (SMid F) so /\ so_cons so = m /\ rd_of so = RdGone.
+  Proof using.
+    unfold umidok, umo, pde_mo. intros [-> | Hm].
+    - exists FCat, (MkSO [] (Some RdGone) (Some WrNone)).
+      split_and!; [by left | apply (so_silent fc L (SMid FCat)) | reflexivity | reflexivity].
+    - apply elem_of_app in Hm as [Hm | Hm].
+      + apply elem_of_list_In in Hm. destruct Hm as [<- | [<- | []]].
+        * exists FCat, (MkSO PipeDisc.dg_execR (Some RdGone) (Some WrNone)).
+          split_and!; [by left | apply (so_exec fc L (SMid FCat)) | reflexivity | reflexivity].
+        * exists FCat, (MkSO cat_dg_write (Some RdGone) (Some (WrHalt []))).
+          split_and!; [by left | apply so_mid_halt, prefix_nil | reflexivity | reflexivity].
+      + destruct (umo_grep gp m Hm) as [Hg ->].
+        exists (FGrep gpat), (MkSO dg_execG (Some RdGone) (Some WrNone)).
+        split_and!; [right; split; [exact Hg | reflexivity] | apply (so_exec fc L (SMid (FGrep gpat)))
+                    | reflexivity | reflexivity].
+  Qed.
 
-(* the silent round's continuation ends no coverage *)
-Lemma umerge_prompt : ~ umerge adm_u_f u_prompt.
-Proof using. intros H. apply umerge_spec in H. vm_compute in H. discriminate H. Qed.
+  Lemma ud_sfx_build fc L (mids : list bytes) (s : bytes) :
+    Forall (umidok gp) mids -> umidok gp s ->
+    exists F1 fs, Forall (fun F => F = FCat \/ (gp = true /\ F = FGrep gpat)) (F1 :: fs)
+                  /\ forall win wc, sfx_term fc L (F1 :: fs) win wc (mids ++ [dg_fork_b]) s.
+  Proof using.
+    intros HF Hs. induction HF as [| m mids Hm HF IH].
+    - destruct (ud_mid_so fc L s Hs) as (F & so & HFo & Hso & Hc & _).
+      exists F, [FCat]. split; [constructor; [exact HFo | constructor; [by left | constructor]] |].
+      intros win wc. change ([] ++ [dg_fork_b]) with [dg_fork_b]. rewrite -Hc.
+      apply stt_here. exact Hso.
+    - destruct IH as (F1 & fs & Hfs & Ht).
+      destruct (ud_mid_so fc L m Hm) as (F & so & HFo & Hso & Hc & Hr).
+      exists F, (F1 :: fs). split; [constructor; [exact HFo | exact Hfs] |].
+      intros win wc. change ((m :: mids) ++ [dg_fork_b]) with (m :: (mids ++ [dg_fork_b])).
+      rewrite -Hc. eapply stt_next; [exact Hso | rewrite Hr; apply pde_pairB_gone | apply Ht].
+  Qed.
+
+  (* each producer stream is a producer's at [Some []] *)
+  Lemma ud_real pc :
+    pc ∈ prodU ->
+    exists p, (forall fs, Forall (fun F => F = FCat \/ (gp = true /\ F = FGrep gpat)) fs ->
+                          adm (LPipes p fs) = true)
+              /\ exists so, stage_out fc0 (prod_content fc0 p) (SProd p) so /\ so_cons so = pc.
+  Proof using Hadm.
+    unfold prodU. intros Hpc. apply elem_of_list_In in Hpc.
+    assert (HE : forall fs, Forall (fun F => F = FCat \/ (gp = true /\ F = FGrep gpat)) fs ->
+                            adm (LPipes (PrEcho []) fs) = true)
+      by (intros fs Hfs; apply (@uda_real _ _ _ Hadm); [by left | exact Hfs]).
+    assert (HC : forall fs, Forall (fun F => F = FCat \/ (gp = true /\ F = FGrep gpat)) fs ->
+                            adm (LPipes (PrCatF fname_f) fs) = true)
+      by (intros fs Hfs; apply (@uda_real _ _ _ Hadm); [by right | exact Hfs]).
+    destruct Hpc as [<- | [<- | [<- | [<- | [<- | []]]]]].
+    - exists (PrEcho []). split; [exact HE |]. eexists. split; [apply so_silent | reflexivity].
+    - exists (PrEcho []). split; [exact HE |]. eexists. split; [apply so_exec | reflexivity].
+    - exists (PrCatF fname_f). split; [exact HC |]. eexists. split; [apply so_exec | reflexivity].
+    - exists (PrCatF fname_f). split; [exact HC |].
+      exists (MkSO cat_dg_write None (Some (WrHalt []))).
+      split; [| reflexivity].
+      apply (so_catf_halt _ _ fname_f []); [| apply prefix_nil].
+      cbn [prod_content]. rewrite !files_of_f. reflexivity.
+    - exists (PrCatF fname_f). split; [exact HC |]. eexists. split; [apply so_catf_open | reflexivity].
+  Qed.
+
+  Lemma ud_merge_of_lt p fs W s u :
+    adm (LPipes p fs) = true ->
+    line_term fc0 (LPipes p fs) W s -> pde_pmt W u_prompt s u -> pl_merge fc0 adm u.
+  Proof using.
+    intros Ha Hlt Hp. destruct (pde_pmt_blk _ _ _ _ Hp) as (Wm & b & HW & Hb & Hu).
+    exists (LPipes p fs), b. split; [exact Ha |]. split; [| exact Hu].
+    split.
+    - intros ->. pose proof (pde_merge_len _ _ Hb) as Hl. unfold pde_total in Hl.
+      simpl in Hl. rewrite !length_app ll_prompt_len in Hl. simpl in Hl. lia.
+    - exists b. split; [| reflexivity]. exists W, s, Wm, s.
+      split; [exact Hlt |]. split; [exact HW |]. split; [reflexivity | exact Hb].
+  Qed.
+
+  (* at EVERY content function: the shape reads no content *)
+  Lemma umergeb_complete fc u : pl_merge fc adm u -> umergeb gp u = true.
+  Proof using Hadm.
+    intros (l & b & Ha & [_ (b' & (W & s & Wm & sp & Hlt & HW & Hsp & Hb) & Hbb)] & Hu).
+    pose proof (pde_pmt_stray _ _ _ _ _
+                  (pde_blk_pmt W Wm u_prompt sp b' u HW Hb
+                     ltac:(etrans; [exact Hu | exact Hbb])) Hsp) as Hp.
+    destruct l as [ws | p fs]; [inversion Hlt |].
+    unfold umergeb. apply orb_true_iff.
+    destruct (ud_lterm_shape _ _ _ _ _ Ha Hlt) as [[-> Hs] | (pc & mids & -> & Hpc & HF & Hs)].
+    - right. apply existsb_exists. exists s.
+      split; [apply elem_of_list_In; exact (ud_prod_U p fs s Ha Hs) |].
+      apply (pde_chk_complete _ _ _ _ _ Hp [dg_fork_b] [] false);
+        [by rewrite app_nil_r | constructor].
+    - left. apply existsb_exists. exists pc.
+      split; [apply elem_of_list_In; exact (ud_prod_U p fs pc Ha Hpc) |].
+      apply existsb_exists. exists s. split.
+      { apply elem_of_list_In. destruct Hs as [-> | Hs];
+          [apply elem_of_list_here | apply elem_of_list_further; exact Hs]. }
+      apply (pde_chk_complete _ _ _ _ _ Hp [pc; dg_fork_b] mids true); [| exact HF].
+      simpl. apply perm_skip. rewrite Permutation_app_comm. reflexivity.
+  Qed.
+
+  Lemma umergeb_sound u : umergeb gp u = true -> pl_merge fc0 adm u.
+  Proof using Hadm.
+    intros Hc. unfold umergeb in Hc. apply orb_true_iff in Hc as [Hc | Hc].
+    - apply existsb_exists in Hc as (pc & Hpin & Hc).
+      apply existsb_exists in Hc as (s & Hsin & Hc).
+      assert (Hs : umidok gp s).
+      { apply elem_of_list_In in Hsin. apply elem_of_cons in Hsin as [-> | Hs]; [by left | by right]. }
+      destruct (pde_chk_sound (umo gp) u [pc; dg_fork_b] true s u_prompt Hc) as (Mu & HF & Hp).
+      assert (HFm : Forall (umidok gp) Mu)
+        by (eapply Forall_impl; [exact HF |]; intros m [_ Hm]; by right).
+      destruct (ud_real pc (proj2 (elem_of_list_In _ _) Hpin)) as (p & Ha & so & Hso & Hc').
+      destruct (ud_sfx_build fc0 (prod_content fc0 p) Mu s HFm Hs) as (F1 & fs & Hfs & Ht).
+      apply (ud_merge_of_lt p (F1 :: fs) (pc :: Mu ++ [dg_fork_b]) s u (Ha _ Hfs)).
+      + rewrite -Hc'. eapply lt_next; [exact Hso |]. apply Ht.
+      + apply (pde_pmt_perm _ _ _ _ _ Hp). simpl. apply perm_skip.
+        rewrite Permutation_app_comm. reflexivity.
+    - apply existsb_exists in Hc as (s & Hsin & Hc).
+      destruct (pde_chk_sound (umo gp) u [dg_fork_b] false s u_prompt Hc) as (Mu & HF & Hp).
+      destruct Mu as [| m Mu]; [| apply Forall_cons in HF as [[Hf _] _]; discriminate Hf].
+      destruct (ud_real s (proj2 (elem_of_list_In _ _) Hsin)) as (p & Ha & so & Hso & Hc').
+      apply (ud_merge_of_lt p [FCat] [dg_fork_b] s u
+               (Ha [FCat] (proj2 (Forall_singleton _ _) (or_introl eq_refl))));
+        [| by rewrite app_nil_r in Hp].
+      rewrite -Hc'. apply lt_here; [discriminate | exact Hso].
+  Qed.
+
+  (* [umerge]'s [exists s] IS [s = Some []] *)
+  Lemma umerge_spec u : umerge adm u <-> umergeb gp u = true.
+  Proof using Hadm.
+    split.
+    - intros (s & _ & Hm). exact (umergeb_complete _ u Hm).
+    - intros Hb. exists (Some []). split; [cbn [fstate_ok]; left; constructor |].
+      exact (umergeb_sound u Hb).
+  Qed.
+
+  Lemma umerge_some_nil u : umerge adm u <-> pl_merge fc0 adm u.
+  Proof using Hadm.
+    split; [intros Hm; apply umergeb_sound, umerge_spec, Hm |].
+    intros Hm. exists (Some []). split; [cbn [fstate_ok]; left; constructor | exact Hm].
+  Qed.
+
+  Lemma umerge_dec (u : bytes) : Decision (umerge adm u).
+  Proof using Hadm.
+    destruct (umergeb gp u) eqn:H; [left; by apply umerge_spec |].
+    right. intros Hm. apply umerge_spec in Hm. congruence.
+  Qed.
+
+  (* the silent round's continuation ends no coverage *)
+  Lemma umerge_prompt : ~ umerge adm u_prompt.
+  Proof using Hadm. intros H. apply umerge_spec in H. rewrite umergeb_prompt in H. discriminate H. Qed.
+End umerge.
 
 (* ===================================================================== *)
 (*  2.  THE COVERAGE-ENDING GUARD, DECIDED                                *)
@@ -435,75 +553,190 @@ Qed.
 (*  4.  THE TRUNCATION LEMMA                                              *)
 (*                                                                        *)
 (*  Every pipe of a [cat f] pipeline carries a prefix of [f]'s content    *)
-(*  [L]; cutting every such prefix at [k] bytes keeps every pairing and   *)
-(*  (at the admission's ALL-CAT stages: a grep does not commute with a   *)
-(*  uniform cut, grep-pipes.md section 2, cut G4)                        *)
-(*  every stage's behaviour, at the content [take k L].  The console      *)
-(*  streams are unchanged provided the one stream that PRINTS content --  *)
-(*  the last cat's -- fits in [k] ([fits]).                               *)
+(*  [L], and [L] is ONE LINE (the file state's shape), so what a filter  *)
+(*  owes of a prefix is a prefix ([fapp_prefix]) and a grep passes the    *)
+(*  whole line or nothing (the gate, [GrepFilt.grep_out_line]).           *)
+(*                                                                        *)
+(*  Cutting the content to a prefix [P] re-runs the pipeline with each    *)
+(*  pipe's new content RELATED to its old one by [tr_rel P]: a prefix of  *)
+(*  it, inside [P], and the old one itself when that already fits in      *)
+(*  [P].  This is grep-pipes.md section 2's per-pipe truncation with the  *)
+(*  lengths left implicit: a grep does not commute with a uniform cut,    *)
+(*  but it keeps the relation -- by monotonicity and the gate, since its  *)
+(*  old output is [] or the whole line, and the whole line fits in [P]    *)
+(*  only when [P] is all of it; a halted writer's bytes reach no reader  *)
+(*  exactly, so the new run writes none; and a reader behind a halted cat *)
+(*  (the loose corner B) restarts at the first [|P|] bytes of what it     *)
+(*  saw.  The console streams are unchanged provided the one stream that  *)
+(*  PRINTS content -- the last stage's -- fits in [P] when it is a prefix *)
+(*  of [L] ([fits]).  No stage is assumed a cat.                          *)
 (* ===================================================================== *)
 
-Definition tr_wr (k : nat) (w : wr_out) : wr_out :=
-  match w with WrAll D => WrAll (take k D) | WrHalt D => WrHalt (take k D) | WrNone => WrNone end.
-Definition tr_rd (k : nat) (r : rd_out) : rd_out :=
-  match r with RdEof D => RdEof (take k D) | RdGone => RdGone end.
-Definition tr_so (k : nat) (so : st_out) : st_out :=
-  MkSO (so_cons so) (tr_rd k <$> so_rd so) (tr_wr k <$> so_wr so).
+Definition tr_rel (P D' D : bytes) : Prop :=
+  D' `prefix_of` D /\ D' `prefix_of` P /\ (D `prefix_of` P -> D' = D).
 
-Lemma tr_rd_of k so : rd_of (tr_so k so) = tr_rd k (rd_of so).
-Proof using. destruct so as [c [r |] w]; reflexivity. Qed.
-Lemma tr_wr_of k so : wr_of (tr_so k so) = tr_wr k (wr_of so).
-Proof using. destruct so as [c r [w |]]; reflexivity. Qed.
+Definition tr_wrel (P : bytes) (w' w : wr_out) : Prop :=
+  match w', w with
+  | WrAll D', WrAll D => tr_rel P D' D
+  | WrHalt _, WrHalt _ | WrNone, WrNone => True
+  | _, _ => False
+  end.
 
-Lemma pair_trunc L k wc w r :
-  pipe_pairB L wc w r -> pipe_pairB (take k L) wc (tr_wr k w) (tr_rd k r).
+Definition tr_rrel (P : bytes) (r' r : rd_out) : Prop :=
+  match r', r with
+  | RdEof D', RdEof D => tr_rel P D' D
+  | RdGone, RdGone => True
+  | _, _ => False
+  end.
+
+Lemma tr_rrel_gone P r' : tr_rrel P r' RdGone -> r' = RdGone.
+Proof using. destruct r'; cbn [tr_rrel]; [intros [] | reflexivity]. Qed.
+
+Lemma tr_rrel_eof P r' D : tr_rrel P r' (RdEof D) -> exists D', r' = RdEof D' /\ tr_rel P D' D.
+Proof using. destruct r' as [D' |]; cbn [tr_rrel]; [intros H; by exists D' | intros []]. Qed.
+
+Lemma take_len_prefix (P L D : bytes) :
+  P `prefix_of` L -> D `prefix_of` L -> take (length P) D `prefix_of` P.
 Proof using.
-  destruct w as [D | D |], r as [D' |]; cbn [tr_wr tr_rd pipe_pairB pipe_pair]; intros H;
-    try exact I.
-  - by subst.
-  - destruct H as [Hwc HD]. split; [exact Hwc | exact (ud_prefix_take k D' L HD)].
-  - subst. by rewrite take_nil.
+  intros HP HD.
+  assert (HPe : take (length P) L = P) by (destruct HP as [z ->]; by rewrite take_app_length).
+  etrans; [exact (ud_prefix_take (length P) D L HD) |]. rewrite HPe. reflexivity.
 Qed.
 
-(* a stage that is not a grep *)
-Definition st_cat (st : stage) : Prop :=
-  match st with SMid F | SLast F => F = FCat | SProd _ => True end.
-
-Lemma stage_trunc fc fc' L k st so :
-  stage_out fc L st so ->
-  (forall ws, st <> SProd (PrEcho ws)) -> st_cat st ->
-  (forall f, st = SProd (PrCatF f) -> fc f = Some L -> fc' f = Some (take k L)) ->
-  (forall F D, st = SLast F -> so_rd so = Some (RdEof D) -> length D <= k) ->
-  stage_out fc' (take k L) st (tr_so k so).
+Lemma tr_rel_top (P L : bytes) : P `prefix_of` L -> tr_rel P P L.
 Proof using.
-  destruct 1 as [st | st | ws Hl | ws D Hl HD | f Hf | f D Hf HD | f | F D HD | D HD
-                | w D W HD HW | F D HD];
-    intros Hne Hcat Hfc Hlast.
-  - replace (tr_so k (MkSO (st_dg_exec st) (st_rd_dead st) (st_wr_dead st)))
-      with (MkSO (st_dg_exec st) (st_rd_dead st) (st_wr_dead st)) by (destruct st; reflexivity).
-    apply so_exec.
-  - replace (tr_so k (MkSO [] (st_rd_dead st) (st_wr_dead st)))
-      with (MkSO [] (st_rd_dead st) (st_wr_dead st)) by (destruct st; reflexivity).
-    apply so_silent.
-  - exfalso. exact (Hne ws eq_refl).
-  - exfalso. exact (Hne ws eq_refl).
-  - rewrite /tr_so /=. apply so_catf. exact (Hfc f eq_refl Hf).
-  - rewrite /tr_so /=. apply so_catf_halt; [exact (Hfc f eq_refl Hf) | exact (ud_prefix_take k D L HD)].
-  - rewrite /tr_so /=. apply so_catf_open.
-  - cbn [st_cat] in Hcat. subst F.
-    rewrite /tr_so /=. apply so_mid_copy. exact (ud_prefix_take k D L HD).
-  - rewrite /tr_so /=. apply so_mid_halt. exact (ud_prefix_take k D L HD).
-  - cbn [st_cat] in Hcat. discriminate Hcat.
-  - cbn [st_cat] in Hcat. subst F.
-    pose proof (Hlast FCat D eq_refl eq_refl) as Hk.
-    rewrite /tr_so /= (take_ge D k Hk). apply so_last. exact (ud_prefix_take_ge k D L HD Hk).
+  intros HP. unfold tr_rel. split; [exact HP |]. split; [reflexivity |].
+  intros HL. exact (prefix_length_eq P L HP (prefix_length _ _ HL)).
 Qed.
 
-(* the last cat's printed content fits in [k] bytes, if it is content *)
-Definition fits (k : nat) (L : bytes) (ss : list bytes) : Prop :=
-  forall x, last ss = Some x -> x `prefix_of` L -> length x <= k.
+Lemma tr_rel_take (P L D : bytes) :
+  P `prefix_of` L -> D `prefix_of` L -> tr_rel P (take (length P) D) D.
+Proof using.
+  intros HP HD. unfold tr_rel. split; [apply prefix_take |]. split; [exact (take_len_prefix P L D HP HD) |].
+  intros HDP. apply take_ge. exact (prefix_length _ _ HDP).
+Qed.
 
-Lemma fits_cons k L x ss : ss <> [] -> fits k L (x :: ss) -> fits k L ss.
+(* A FILTER KEEPS THE RELATION (the gate) *)
+Lemma tr_rel_fapp (L P D' D : bytes) (F : filt) :
+  GrepFilt.oneline L -> D `prefix_of` L -> tr_rel P D' D -> tr_rel P (fapp F D') (fapp F D).
+Proof using.
+  intros HL HD (H1 & H2 & H3). unfold tr_rel.
+  destruct F as [| w]; cbn [fapp]; [exact (conj H1 (conj H2 H3)) |].
+  assert (HD' : D' `prefix_of` L) by (etrans; [exact H1 | exact HD]).
+  split; [exact (GrepFilt.grep_out_mono w D' D H1) |]. split.
+  - destruct (GrepFilt.grep_out_line w L D' HL HD') as [-> | [-> ->]]; [apply prefix_nil | exact H2].
+  - intros HP. destruct (GrepFilt.grep_out_line w L D HL HD) as [HE | [-> HE]].
+    + pose proof (GrepFilt.grep_out_mono w D' D H1) as Hm. rewrite HE in Hm |- *.
+      exact (prefix_nil_inv _ Hm).
+    + rewrite HE in HP. rewrite (H3 HP). reflexivity.
+Qed.
+
+(* A PIPE KEEPS IT: the new reader of a related writer *)
+Lemma pair_trunc (L P : bytes) wc w' w r :
+  P `prefix_of` L -> tr_wrel P w' w -> pipe_pairB L wc w r ->
+  exists r', tr_rrel P r' r /\ pipe_pairB P wc w' r'.
+Proof using.
+  intros HP Hw Hp. destruct r as [D |].
+  2: { exists RdGone. split; [exact I | destruct w'; exact I]. }
+  destruct w' as [D0' | D0' |], w as [D0 | D0 |]; cbn [tr_wrel] in Hw; try contradiction;
+    cbn [pipe_pairB pipe_pair] in Hp.
+  - subst D. exists (RdEof D0'). cbn [tr_rrel pipe_pairB pipe_pair]. split; [exact Hw | reflexivity].
+  - destruct Hp as [Hwc HD]. exists (RdEof (take (length P) D)).
+    split; [exact (tr_rel_take P L D HP HD) |]. cbn [pipe_pairB].
+    split; [exact Hwc | exact (take_len_prefix P L D HP HD)].
+  - subst D. exists (RdEof []). cbn [tr_rrel pipe_pairB pipe_pair]. unfold tr_rel.
+    split_and!; [reflexivity | apply prefix_nil | intros _; reflexivity | reflexivity].
+Qed.
+
+(* THE STAGES.  The cat producer at the cut content ... *)
+Lemma prod_trunc fc fc' L P f so :
+  P `prefix_of` L -> (fc f = Some L -> fc' f = Some P) ->
+  stage_out fc L (SProd (PrCatF f)) so ->
+  exists so', stage_out fc' P (SProd (PrCatF f)) so' /\ so_cons so' = so_cons so
+              /\ tr_wrel P (wr_of so') (wr_of so).
+Proof using.
+  intros HP Hfc H. remember (SProd (PrCatF f)) as st eqn:Hst.
+  destruct H as [st0 | st0 | ws Hl | ws D Hl HD | g Hg | g D Hg HD | g | F D HD | D HD
+                | w D W HD HW | F D HD]; try discriminate Hst.
+  - subst st0. eexists. split_and!; [apply so_exec | reflexivity | exact I].
+  - subst st0. eexists. split_and!; [apply so_silent | reflexivity | exact I].
+  - injection Hst as ->. exists (MkSO [] None (Some (WrAll P))).
+    split_and!; [apply so_catf; exact (Hfc Hg) | reflexivity | exact (tr_rel_top P L HP)].
+  - injection Hst as ->. exists (MkSO cat_dg_write None (Some (WrHalt []))).
+    split_and!; [apply so_catf_halt; [exact (Hfc Hg) | apply prefix_nil] | reflexivity | exact I].
+  - eexists. split_and!; [apply so_catf_open | reflexivity | exact I].
+Qed.
+
+(* ... a middle filter, reading a related pipe ... *)
+Lemma mid_trunc fc fc' L P F so r' :
+  GrepFilt.oneline L -> P `prefix_of` L ->
+  stage_out fc L (SMid F) so -> tr_rrel P r' (rd_of so) ->
+  exists so', stage_out fc' P (SMid F) so' /\ so_cons so' = so_cons so /\ rd_of so' = r'
+              /\ tr_wrel P (wr_of so') (wr_of so).
+Proof using.
+  intros HL HP H Hr. remember (SMid F) as st eqn:Hst.
+  destruct H as [st0 | st0 | ws Hl | ws D Hl HD | g Hg | g D Hg HD | g | F' D HD | D HD
+                | w D W HD HW | F' D HD]; try discriminate Hst.
+  - subst st0. cbn [rd_of so_rd st_rd_dead] in Hr. rewrite (tr_rrel_gone _ _ Hr).
+    eexists. split_and!; [apply so_exec | reflexivity | reflexivity | exact I].
+  - subst st0. cbn [rd_of so_rd st_rd_dead] in Hr. rewrite (tr_rrel_gone _ _ Hr).
+    eexists. split_and!; [apply so_silent | reflexivity | reflexivity | exact I].
+  - cbn [rd_of so_rd] in Hr. destruct (tr_rrel_eof _ _ _ Hr) as (D' & -> & Htr).
+    exists (MkSO [] (Some (RdEof D')) (Some (WrAll (fapp F' D')))).
+    split_and!; [apply so_mid_f; exact (proj1 (proj2 Htr)) | reflexivity | reflexivity |].
+    exact (tr_rel_fapp L P D' D F' HL HD Htr).
+  - cbn [rd_of so_rd] in Hr. rewrite (tr_rrel_gone _ _ Hr).
+    exists (MkSO cat_dg_write (Some RdGone) (Some (WrHalt []))).
+    split_and!; [apply so_mid_halt, prefix_nil | reflexivity | reflexivity | exact I].
+  - cbn [rd_of so_rd] in Hr. destruct (tr_rrel_eof _ _ _ Hr) as (D' & -> & Htr).
+    exists (MkSO [] (Some (RdEof D')) (Some (WrHalt []))).
+    split_and!; [apply so_grep_halt; [exact (proj1 (proj2 Htr)) | apply prefix_nil]
+                | reflexivity | reflexivity | exact I].
+Qed.
+
+(* ... a middle filter nobody reads after (a terminal run's stray) ... *)
+Lemma mid_trunc_any fc fc' L P F so :
+  stage_out fc L (SMid F) so -> exists so', stage_out fc' P (SMid F) so' /\ so_cons so' = so_cons so.
+Proof using.
+  intros H. remember (SMid F) as st eqn:Hst.
+  destruct H as [st0 | st0 | ws Hl | ws D Hl HD | g Hg | g D Hg HD | g | F' D HD | D HD
+                | w D W HD HW | F' D HD]; try discriminate Hst.
+  - eexists. split; [apply so_exec | reflexivity].
+  - eexists. split; [apply so_silent | reflexivity].
+  - exists (MkSO [] (Some (RdEof [])) (Some (WrAll (fapp F' [])))).
+    split; [apply so_mid_f, prefix_nil | reflexivity].
+  - exists (MkSO cat_dg_write (Some RdGone) (Some (WrHalt []))).
+    split; [apply so_mid_halt, prefix_nil | reflexivity].
+  - exists (MkSO [] (Some (RdEof [])) (Some (WrHalt []))).
+    split; [apply so_grep_halt; apply prefix_nil | reflexivity].
+Qed.
+
+(* ... and the last filter, whose printed content fits *)
+Lemma last_trunc fc fc' L P F so r' :
+  GrepFilt.oneline L -> P `prefix_of` L ->
+  stage_out fc L (SLast F) so -> tr_rrel P r' (rd_of so) ->
+  (so_cons so `prefix_of` L -> so_cons so `prefix_of` P) ->
+  exists so', stage_out fc' P (SLast F) so' /\ so_cons so' = so_cons so /\ rd_of so' = r'.
+Proof using.
+  intros HL HP H Hr Hfit. remember (SLast F) as st eqn:Hst.
+  destruct H as [st0 | st0 | ws Hl | ws D Hl HD | g Hg | g D Hg HD | g | F' D HD | D HD
+                | w D W HD HW | F' D HD]; try discriminate Hst.
+  - subst st0. cbn [rd_of so_rd st_rd_dead] in Hr. rewrite (tr_rrel_gone _ _ Hr).
+    eexists. split_and!; [apply so_exec | reflexivity | reflexivity].
+  - subst st0. cbn [rd_of so_rd st_rd_dead] in Hr. rewrite (tr_rrel_gone _ _ Hr).
+    eexists. split_and!; [apply so_silent | reflexivity | reflexivity].
+  - cbn [rd_of so_rd] in Hr. destruct (tr_rrel_eof _ _ _ Hr) as (D' & -> & Htr).
+    exists (MkSO (fapp F' D') (Some (RdEof D')) None).
+    split_and!; [apply so_last_f; exact (proj1 (proj2 Htr)) | | reflexivity].
+    cbn [so_cons] in Hfit |- *.
+    exact (proj2 (proj2 (tr_rel_fapp L P D' D F' HL HD Htr)) (Hfit (fapp_prefix F' L D HL HD))).
+Qed.
+
+(* the last stage's printed content fits in [P], if it is a prefix of [L] *)
+Definition fits (P L : bytes) (ss : list bytes) : Prop :=
+  forall x, last ss = Some x -> x `prefix_of` L -> x `prefix_of` P.
+
+Lemma fits_cons P L x ss : ss <> [] -> fits P L (x :: ss) -> fits P L ss.
 Proof using.
   intros Hne H y Hy. apply H. destruct ss as [| z ss]; [done |]. rewrite last_cons_cons. exact Hy.
 Qed.
@@ -511,138 +744,111 @@ Qed.
 Lemma sfx_run_ne fc L m w wc ss : sfx_run fc L m w wc ss -> ss <> [].
 Proof using. destruct 1; discriminate. Qed.
 
-Lemma ud_last_rd fc L so D :
-  stage_out fc L (SLast FCat) so -> so_rd so = Some (RdEof D) -> so_cons so = D /\ D `prefix_of` L.
+Lemma sfx_trunc fc fc' L P fs w wc ss w' :
+  GrepFilt.oneline L -> P `prefix_of` L ->
+  sfx_run fc L fs w wc ss -> tr_wrel P w' w -> fits P L ss -> sfx_run fc' P fs w' wc ss.
 Proof using.
-  intros H Hr. inversion H; subst; cbn in Hr; try discriminate Hr.
-  injection Hr as Hr. subst. split; [reflexivity | assumption].
-Qed.
-
-Lemma sfx_trunc fc fc' L k m w wc ss :
-  sfx_run fc L m w wc ss -> all_cats m = true -> fits k L ss ->
-  sfx_run fc' (take k L) m (tr_wr k w) wc ss.
-Proof using.
-  induction 1 as [F win wc so Hso Hp | F F' m win wc | F F' m win wc so ss Hso Hp Hr IH];
-    intros Hc Hf.
-  - apply FileDisc.all_cats_cons in Hc as [-> _].
-    assert (Hso' : stage_out fc' (take k L) (SLast FCat) (tr_so k so)).
-    { apply (stage_trunc fc); [exact Hso | intros ws; discriminate | reflexivity
-                              | intros f Hff; discriminate Hff |].
-      intros F D _ HD. destruct (ud_last_rd _ _ _ _ Hso HD) as [Hc HDL].
-      apply (Hf D); [cbn; rewrite Hc; reflexivity | exact HDL]. }
-    change [so_cons so] with [so_cons (tr_so k so)].
-    apply sr_last; [exact Hso' | rewrite tr_rd_of; exact (pair_trunc _ _ _ _ _ Hp)].
+  intros HL HP H. revert w'.
+  induction H as [F win wc so Hso Hp | F F' fs win wc | F F' fs win wc so ss Hso Hp Hr IH];
+    intros w' Hw Hf.
+  - destruct (pair_trunc L P wc w' win (rd_of so) HP Hw Hp) as (r' & Hrr & Hp').
+    destruct (last_trunc fc fc' L P F so r' HL HP Hso Hrr) as (so' & Hso' & Hc & Hrd).
+    { intros Hx. apply (Hf (so_cons so)); [reflexivity | exact Hx]. }
+    rewrite -Hc. apply sr_last; [exact Hso' | rewrite Hrd; exact Hp'].
   - apply sr_pipe_fail.
-  - apply FileDisc.all_cats_cons in Hc as [-> Hc].
-    assert (Hso' : stage_out fc' (take k L) (SMid FCat) (tr_so k so)).
-    { apply (stage_trunc fc); [exact Hso | intros ws; discriminate | reflexivity
-                              | intros f Hff; discriminate Hff |].
-      intros F D Hd; discriminate Hd. }
-    change (so_cons so :: ss) with (so_cons (tr_so k so) :: ss).
-    apply sr_node; [exact Hso' | rewrite tr_rd_of; exact (pair_trunc _ _ _ _ _ Hp) |].
-    rewrite tr_wr_of. apply IH; [exact Hc |]. exact (fits_cons _ _ _ _ (sfx_run_ne _ _ _ _ _ _ Hr) Hf).
+  - destruct (pair_trunc L P wc w' win (rd_of so) HP Hw Hp) as (r' & Hrr & Hp').
+    destruct (mid_trunc fc fc' L P F so r' HL HP Hso Hrr) as (so' & Hso' & Hc & Hrd & Hw').
+    rewrite -Hc. apply sr_node; [exact Hso' | rewrite Hrd; exact Hp' |].
+    apply IH; [exact Hw' |]. exact (fits_cons _ _ _ _ (sfx_run_ne _ _ _ _ _ _ Hr) Hf).
 Qed.
 
-Lemma sfx_term_trunc fc fc' L k m w wc W s :
-  sfx_term fc L m w wc W s -> all_cats m = true -> sfx_term fc' (take k L) m (tr_wr k w) wc W s.
+Lemma sfx_term_trunc fc fc' L P fs w wc W s w' :
+  GrepFilt.oneline L -> P `prefix_of` L ->
+  sfx_term fc L fs w wc W s -> tr_wrel P w' w -> sfx_term fc' P fs w' wc W s.
 Proof using.
-  induction 1 as [F F' m win wc so Hso | F F' m win wc so W s Hso Hp Ht IH]; intros Hc;
-    apply FileDisc.all_cats_cons in Hc as [-> Hc].
-  - change (so_cons so) with (so_cons (tr_so k so)). apply stt_here.
-    apply (stage_trunc fc); [exact Hso | intros ws; discriminate | reflexivity
-                            | intros f Hff; discriminate Hff |].
-    intros F D Hd; discriminate Hd.
-  - change (so_cons so :: W) with (so_cons (tr_so k so) :: W). apply stt_next.
-    + apply (stage_trunc fc); [exact Hso | intros ws; discriminate | reflexivity
-                              | intros f Hff; discriminate Hff |].
-      intros F D Hd; discriminate Hd.
-    + rewrite tr_rd_of. exact (pair_trunc _ _ _ _ _ Hp).
-    + rewrite tr_wr_of. exact (IH Hc).
+  intros HL HP H. revert w'.
+  induction H as [F F' fs win wc so Hso | F F' fs win wc so W s Hso Hp Ht IH]; intros w' Hw.
+  - destruct (mid_trunc_any fc fc' L P F so Hso) as (so' & Hso' & Hc).
+    rewrite -Hc. apply stt_here. exact Hso'.
+  - destruct (pair_trunc L P wc w' win (rd_of so) HP Hw Hp) as (r' & Hrr & Hp').
+    destruct (mid_trunc fc fc' L P F so r' HL HP Hso Hrr) as (so' & Hso' & Hc & Hrd & Hw').
+    rewrite -Hc. apply stt_next; [exact Hso' | rewrite Hrd; exact Hp' | exact (IH _ Hw')].
 Qed.
 
-(* the round's content function, cut at [k] *)
-Lemma files_trunc (b0 : bytes) k f :
-  (forall L, files_of (Some b0) f = Some L -> files_of (Some (take k b0)) f = Some (take k L))
-  /\ prod_content (files_of (Some (take k b0))) (PrCatF f)
-     = take k (prod_content (files_of (Some b0)) (PrCatF f)).
+(* the round's content function, cut to [P] *)
+Lemma files_trunc (b0 P : bytes) f :
+  fcont_ok b0 -> P `prefix_of` b0 ->
+  GrepFilt.oneline (prod_content (files_of (Some b0)) (PrCatF f))
+  /\ prod_content (files_of (Some P)) (PrCatF f) `prefix_of` prod_content (files_of (Some b0)) (PrCatF f)
+  /\ (files_of (Some b0) f = Some (prod_content (files_of (Some b0)) (PrCatF f)) ->
+      files_of (Some P) f = Some (prod_content (files_of (Some P)) (PrCatF f)))
+  /\ (forall x, (x `prefix_of` b0 -> x `prefix_of` P) ->
+                x `prefix_of` prod_content (files_of (Some b0)) (PrCatF f) ->
+                x `prefix_of` prod_content (files_of (Some P)) (PrCatF f)).
 Proof using.
-  cbn [prod_content]. destruct (decide (f = fname_f)) as [-> | Hf].
-  - rewrite !files_of_f. split; [intros L [= <-]; reflexivity | reflexivity].
-  - rewrite !files_of_ne; [| exact Hf | exact Hf].
-    split; [intros L HL; discriminate HL | cbn [default]; by rewrite take_nil].
+  intros Hb HP. cbn [prod_content]. destruct (decide (f = fname_f)) as [-> | Hf].
+  - rewrite !files_of_f. cbn [default].
+    split_and!; [exact (fcont_ok_nl b0 Hb) | exact HP | intros _; reflexivity | intros x Hx; exact Hx].
+  - rewrite !files_of_ne; [| exact Hf | exact Hf]. cbn [default].
+    split_and!; [unfold GrepFilt.oneline; left; apply not_elem_of_nil | reflexivity | intros H; discriminate H
+                | intros x _ Hx; exact Hx].
 Qed.
 
-Lemma line_run_trunc b0 k f n ss :
-  all_cats n = true ->
-  line_run (files_of (Some b0)) (LPipes (PrCatF f) n) ss ->
-  fits k (prod_content (files_of (Some b0)) (PrCatF f)) ss ->
-  line_run (files_of (Some (take k b0))) (LPipes (PrCatF f) n) ss.
+Lemma line_run_trunc b0 P f fs ss :
+  fcont_ok b0 -> P `prefix_of` b0 ->
+  line_run (files_of (Some b0)) (LPipes (PrCatF f) fs) ss ->
+  (forall x, last ss = Some x -> x `prefix_of` b0 -> x `prefix_of` P) ->
+  line_run (files_of (Some P)) (LPipes (PrCatF f) fs) ss.
 Proof using.
-  intros Hcat H Hf. destruct (files_trunc b0 k f) as [Hfc Hpc].
-  remember (LPipes (PrCatF f) n) as l eqn:Hl.
-  destruct H as [ws | ws | ws | p n' Hn | p n' so ss' Hso Hr]; try discriminate Hl;
+  intros Hb HP H Hx. destruct (files_trunc b0 P f Hb HP) as (HL & HLP & Hfc & Hfit).
+  remember (LPipes (PrCatF f) fs) as l eqn:Hl.
+  destruct H as [ws | ws | ws | p fs' Hn | p fs' so ss' Hso Hr]; try discriminate Hl;
     injection Hl as -> ->.
   - apply lr_pipe_fail. exact Hn.
-  - change (so_cons so :: ss') with (so_cons (tr_so k so) :: ss').
-    apply lr_node.
-    + rewrite Hpc. apply (stage_trunc (files_of (Some b0)));
-        [exact Hso | intros ws; discriminate | exact I | |].
-      * intros f' [= <-]. exact (Hfc _).
-      * intros F D Hd; discriminate Hd.
-    + rewrite Hpc tr_wr_of. apply (sfx_trunc (files_of (Some b0))); [exact Hr | exact Hcat |].
-      exact (fits_cons _ _ _ _ (sfx_run_ne _ _ _ _ _ _ Hr) Hf).
+  - destruct (prod_trunc _ (files_of (Some P)) _ _ f so HLP Hfc Hso) as (so' & Hso' & Hc & Hw).
+    rewrite -Hc. apply lr_node; [exact Hso' |].
+    apply (sfx_trunc (files_of (Some b0)) _ _ _ _ _ _ _ _ HL HLP Hr Hw).
+    apply (fits_cons _ _ (so_cons so) ss'); [exact (sfx_run_ne _ _ _ _ _ _ Hr) |].
+    intros x Hlx Hxl. apply (Hfit x); [exact (Hx x Hlx) | exact Hxl].
 Qed.
 
-Lemma line_term_trunc b0 k f n W s :
-  all_cats n = true ->
-  line_term (files_of (Some b0)) (LPipes (PrCatF f) n) W s ->
-  line_term (files_of (Some (take k b0))) (LPipes (PrCatF f) n) W s.
+Lemma line_term_trunc b0 P f fs W s :
+  fcont_ok b0 -> P `prefix_of` b0 ->
+  line_term (files_of (Some b0)) (LPipes (PrCatF f) fs) W s ->
+  line_term (files_of (Some P)) (LPipes (PrCatF f) fs) W s.
 Proof using.
-  intros Hcat H. destruct (files_trunc b0 k f) as [Hfc Hpc].
-  remember (LPipes (PrCatF f) n) as l eqn:Hl.
-  assert (Hst : forall so, stage_out (files_of (Some b0)) (prod_content (files_of (Some b0)) (PrCatF f))
-                             (SProd (PrCatF f)) so ->
-                stage_out (files_of (Some (take k b0))) (prod_content (files_of (Some (take k b0))) (PrCatF f))
-                             (SProd (PrCatF f)) (tr_so k so)).
-  { intros so Hso. rewrite Hpc.
-    apply (stage_trunc (files_of (Some b0))); [exact Hso | intros ws; discriminate | exact I | |].
-    - intros f' [= <-]. exact (Hfc _).
-    - intros F D Hd; discriminate Hd. }
-  destruct H as [p n' so Hn Hso | p n' so W' s' Hso Ht]; injection Hl as -> ->.
-  - change (so_cons so) with (so_cons (tr_so k so)). apply lt_here; [exact Hn | exact (Hst so Hso)].
-  - change (so_cons so :: W') with (so_cons (tr_so k so) :: W'). apply lt_next; [exact (Hst so Hso) |].
-    rewrite Hpc tr_wr_of. exact (sfx_term_trunc _ _ _ _ _ _ _ _ _ Ht Hcat).
+  intros Hb HP H. destruct (files_trunc b0 P f Hb HP) as (HL & HLP & Hfc & _).
+  remember (LPipes (PrCatF f) fs) as l eqn:Hl.
+  destruct H as [p fs' so Hn Hso | p fs' so W' s' Hso Ht]; injection Hl as -> ->.
+  - destruct (prod_trunc _ (files_of (Some P)) _ _ f so HLP Hfc Hso) as (so' & Hso' & Hc & _).
+    rewrite -Hc. apply lt_here; [exact Hn | exact Hso'].
+  - destruct (prod_trunc _ (files_of (Some P)) _ _ f so HLP Hfc Hso) as (so' & Hso' & Hc & Hw).
+    rewrite -Hc. apply lt_next; [exact Hso' |].
+    exact (sfx_term_trunc (files_of (Some b0)) _ _ _ _ _ _ _ _ _ HL HLP Ht Hw).
 Qed.
 
-(* THE TRUNCATION LEMMA (review S2): a run at content [b0] whose printed
-   content, if any, is a prefix of [P] stays a run -- with the SAME block
-   -- at [b0]'s prefix [P] *)
-Theorem blocks_trunc b0 P f n ss b :
-  all_cats n = true -> P `prefix_of` b0 ->
-  line_run (files_of (Some b0)) (LPipes (PrCatF f) n) ss -> merge_all ss b ->
+(* THE TRUNCATION LEMMA (review S2, at every filter stage list): a run at
+   content [b0] whose printed content, if a prefix of [b0], is a prefix of
+   [P] stays a run -- with the SAME block -- at [b0]'s prefix [P] *)
+Theorem blocks_trunc b0 P f fs ss b :
+  fcont_ok b0 -> P `prefix_of` b0 ->
+  line_run (files_of (Some b0)) (LPipes (PrCatF f) fs) ss -> merge_all ss b ->
   (forall x, last ss = Some x -> x `prefix_of` b0 -> x `prefix_of` P) ->
-  line_blocks (files_of (Some P)) (LPipes (PrCatF f) n) b.
+  line_blocks (files_of (Some P)) (LPipes (PrCatF f) fs) b.
 Proof using.
-  intros Hcat HP Hr Hm Hx.
-  assert (HPe : take (length P) b0 = P) by (destruct HP as [z ->]; by rewrite take_app_length).
-  rewrite -HPe. exists ss. split; [| exact Hm].
-  apply line_run_trunc; [exact Hcat | exact Hr |].
-  intros x Hl Hxp. cbn [prod_content] in Hxp. destruct (decide (f = fname_f)) as [-> | Hf].
-  - rewrite files_of_f in Hxp. exact (prefix_length _ _ (Hx x Hl Hxp)).
-  - rewrite files_of_ne in Hxp; [| exact Hf]. cbn [default] in Hxp.
-    apply prefix_nil_inv in Hxp as ->. cbn [length]. lia.
+  intros Hb HP Hr Hm Hx. exists ss.
+  split; [exact (line_run_trunc b0 P f fs ss Hb HP Hr Hx) | exact Hm].
 Qed.
 
 (* ...and a terminal block is one at every prefix *)
-Theorem terms_trunc b0 P f n b :
-  all_cats n = true -> P `prefix_of` b0 ->
-  plalt_ok (files_of (Some b0)) (LPipes (PrCatF f) n) (PLTerm b) ->
-  plalt_ok (files_of (Some P)) (LPipes (PrCatF f) n) (PLTerm b).
+Theorem terms_trunc b0 P f fs b :
+  fcont_ok b0 -> P `prefix_of` b0 ->
+  plalt_ok (files_of (Some b0)) (LPipes (PrCatF f) fs) (PLTerm b) ->
+  plalt_ok (files_of (Some P)) (LPipes (PrCatF f) fs) (PLTerm b).
 Proof using.
-  intros Hcat HP [Hne (b' & (W & t & Wm & sp & Hlt & HWm & Hsp & Hm) & Hp)].
-  assert (HPe : take (length P) b0 = P) by (destruct HP as [z ->]; by rewrite take_app_length).
+  intros Hb HP [Hne (b' & (W & t & Wm & sp & Hlt & HWm & Hsp & Hm) & Hp)].
   split; [exact Hne |]. exists b'. split; [| exact Hp]. exists W, t, Wm, sp.
-  rewrite -HPe. split_and!; [exact (line_term_trunc _ _ _ _ _ _ Hcat Hlt) | exact HWm | exact Hsp | exact Hm].
+  split_and!; [exact (line_term_trunc b0 P f fs W t Hb HP Hlt) | exact HWm | exact Hsp | exact Hm].
 Qed.
 
 (* ===================================================================== *)
@@ -720,9 +926,10 @@ Lemma um_upto_cons (M : lmodel) c cs s b bs i :
   lm_upto M (c :: cs) s (b :: bs) (S i) = lm_upto M cs (lm_step M s (lm_of M b) (lm_dec M c)) bs i.
 Proof using. symmetry. exact (lm_upto_drop M (c :: cs) s (b :: bs) 1 i). Qed.
 
-Lemma ualts_dep_intro s bs cs :
+Lemma ualts_dep_intro (adm : pline' -> bool) s bs cs :
   length cs = length bs ->
-  (forall i, i < length bs -> cs !!! i ∈ ucands (lm_upto U cs s bs i) (uline_of_u (bs !!! i))) ->
+  (forall i, i < length bs ->
+             cs !!! i ∈ ucands (lm_upto (ulm adm) cs s bs i) (uline_of_u (bs !!! i))) ->
   cs ∈ ualts_dep s bs.
 Proof using.
   revert s cs. induction bs as [| b bs IH]; intros s cs Hl H.
@@ -812,6 +1019,12 @@ End wire.
 Definition scandsU (seg : list mobs) : list fstate :=
   None :: (Some <$> ud_sublists (obs_wire Uart0 seg)).
 
+(* ...at an admission [ud_adm] describes, to the end of the file *)
+Section canon.
+  Context (adm : pline' -> bool) (gp : bool) (gpat : bytes).
+  Hypothesis Hadm : ud_adm adm gp gpat.
+  Local Notation U := (ulm adm).
+
 (* THE PRISTINE PAIR: until a round sets [f], the chains at two present
    boot contents are their own boot contents; from then on they agree.
    Read through the seam: a round off [f] moves nothing of it
@@ -844,7 +1057,7 @@ Qed.
    it is [f]'s, fits in [P] *)
 Definition ud_good (b0 P : bytes) (l : uline) (a : ualt) : Prop :=
   forall g n b, l = LPipe (PrCatF g) n -> a = UPC (PLRun b) ->
-    adm_u_f (LPipes (PrCatF g) n) = true ->
+    adm (LPipes (PrCatF g) n) = true ->
     plalt_ok (files_of (Some b0)) (LPipes (PrCatF g) n) (PLRun b) ->
     exists ss, line_run (files_of (Some b0)) (LPipes (PrCatF g) n) ss /\ merge_all ss b
                /\ (forall x, last ss = Some x -> x `prefix_of` b0 -> x `prefix_of` P).
@@ -870,7 +1083,7 @@ Proof using.
     try (apply Hkeep; intros g' n' b' Hl; discriminate Hl).
   destruct a as [r | x | [| b | b]];
     try (apply Hkeep; intros g' n' b' _ Ha; discriminate Ha).
-  destruct (decide (adm_u_f (LPipes (PrCatF g) n) = true
+  destruct (decide (adm (LPipes (PrCatF g) n) = true
                     /\ plalt_ok (files_of (Some b0)) (LPipes (PrCatF g) n) (PLRun b)))
     as [[Had (ss & Hr & Hm)] | Hno].
   2: { apply Hkeep. intros g' n' b' [= <- <-] [= <-] Had Hok. exfalso. apply Hno. by split. }
@@ -897,9 +1110,9 @@ Qed.
    boot content.  Off [f]: locality.  On [f]: a redirect and [cat f] read
    no state to admit; a [cat f] pipeline's blocks truncate. *)
 Lemma uok_trunc b0 P l a :
-  P `prefix_of` b0 -> ud_good b0 P l a -> uok adm_u_f (Some b0) l a -> uok adm_u_f (Some P) l a.
+  fcont_ok b0 -> P `prefix_of` b0 -> ud_good b0 P l a -> uok adm (Some b0) l a -> uok adm (Some P) l a.
 Proof using.
-  intros HP Hg Hok.
+  intros Hb0 HP Hg Hok.
   destruct (decide (line_file l = Some fname_f)) as [Hf | Hf].
   2: { apply (uok_local _ (Some b0)); [| exact Hok].
        intros g Hg'. rewrite !files_of_ne; [done | |]; intros ->; exact (Hf Hg'). }
@@ -911,8 +1124,8 @@ Proof using.
   destruct x as [| b | b].
   - exact I.
   - destruct (Hg fname_f n b eq_refl eq_refl Ha Hb) as (ss & Hr & Hm & Hx).
-    exact (blocks_trunc b0 P fname_f n ss b (adm_u_f_all _ _ Ha) HP Hr Hm Hx).
-  - exact (terms_trunc b0 P fname_f n b (adm_u_f_all _ _ Ha) HP Hb).
+    exact (blocks_trunc b0 P fname_f n ss b Hb0 HP Hr Hm Hx).
+  - exact (terms_trunc b0 P fname_f n b Hb0 HP Hb).
 Qed.
 
 (* THE CANONICALISATION: a disciplined era has a disciplined boot state
@@ -920,7 +1133,7 @@ Qed.
 Theorem u_canon_s seg s :
   fstate_ok s -> lm_disc_seg' U s seg ->
   exists s', s' ∈ scandsU seg /\ fstate_ok s' /\ lm_disc_seg' U s' seg.
-Proof using.
+Proof using Hadm.
   intros Hok Hd. rewrite /scandsU.
   destruct s as [b0 |]; [| exists None; split; [apply elem_of_list_here | by split]].
   destruct (decide (b0 ∈ ud_sublists (obs_wire Uart0 seg))) as [Hb | Hnb].
@@ -1022,15 +1235,15 @@ Proof using.
       pose proof (proj2 Halts i Hi) as Ho.
       destruct (upto_pristine cs b0 P (bodies_of (ins seg)) i) as [[H1 H2] | He].
       * rewrite H2. rewrite H1 in Ho.
-        exact (uok_trunc b0 P _ _ HPb (HPg i HiN H1) Ho).
+        exact (uok_trunc b0 P _ _ Hok HPb (HPg i HiN H1) Ho).
       * rewrite -He. exact Ho.
-    + rewrite (Hge i ltac:(lia) Hi). exact (unoc_ok adm_u_f _ _).
+    + rewrite (Hge i ltac:(lia) Hi). exact (unoc_ok adm _ _).
   - (* D4 *)
     intros i Hi Hex Hm. destruct (decide (i < nlines_max (in_pres seg))) as [HiN | HiN].
     + rewrite (Hup i ltac:(lia)) in Hex Hm. rewrite (Hat i HiN) (Hcont i HiN) in Hm.
       apply (Hd4 i Hi); [| exact Hm].
-      destruct Hex as (c & Hc & Ht). exact (lml_term_st ulmU_laws _ _ _ Hc Ht _).
-    + exfalso. rewrite (Hge i ltac:(lia) Hi) in Hm. apply umerge_prompt.
+      destruct Hex as (c & Hc & Ht). exact (lml_term_st (ulm_laws adm) _ _ _ Hc Ht _).
+    + exfalso. rewrite (Hge i ltac:(lia) Hi) in Hm. apply (umerge_prompt adm gp gpat Hadm).
       rewrite -(unoc_cont (lm_upto U cs' (Some P) (bodies_of (ins seg)) i)
                  (uline_of_u (bodies_of (ins seg) !!! i))).
       exact Hm.
@@ -1060,11 +1273,11 @@ Qed.
 (*  8.  THE PIECES, DECIDED                                               *)
 (* ===================================================================== *)
 
-Local Instance u_ok_dec s l a : Decision (lm_ok U s l a) := uok_dec adm_u_f s l a.
-Local Instance u_merge_dec u : Decision (lm_merge U u) := umerge_dec u.
+Local Instance u_ok_dec s l a : Decision (lm_ok U s l a) := uok_dec adm s l a.
+Local Instance u_merge_dec u : Decision (lm_merge U u) := umerge_dec adm gp gpat Hadm u.
 
 Local Instance u_input_dec (I : list (bv 8)) : Decision (lm_disc_input U I).
-Proof using. rewrite /lm_disc_input. cbn [ulmU ulm lm_body_ok lm_body_byte]. apply _. Qed.
+Proof using. rewrite /lm_disc_input. cbn [ulm lm_body_ok lm_body_byte]. apply _. Qed.
 
 Local Instance u_alts_dec s I cs : Decision (lm_alts_ok U s I cs).
 Proof using.
@@ -1080,13 +1293,13 @@ Qed.
 
 Local Instance u_termex_dec s l : Decision (exists c, lm_ok U s l c /\ lm_term U c = true).
 Proof using.
-  destruct (decide (uterm_line adm_u_f l)) as [H | H].
-  - left. exact (proj2 (utermex_iff adm_u_f s l) H).
-  - right. intros Hex. exact (H (proj1 (utermex_iff adm_u_f s l) Hex)).
+  destruct (decide (uterm_line adm l)) as [H | H].
+  - left. exact (proj2 (utermex_iff adm s l) H).
+  - right. intros Hex. exact (H (proj1 (utermex_iff adm s l) Hex)).
 Qed.
 
 Local Instance u_d4_dec cs s I : Decision (lm_d4 U cs s I).
-Proof using.
+Proof using Hadm.
   destruct (decide (Forall (fun i =>
       (exists c, lm_ok U (lm_upto U cs s (bodies_of I) i) (lm_of U (bodies_of I !!! i)) c
                  /\ lm_term U c = true) ->
@@ -1111,7 +1324,7 @@ Definition u_phi (seg : list mobs) (s : fstate) (ps cs : list nat) : Prop :=
        (in_pres seg).
 
 Local Instance u_phi_dec seg s ps cs : Decision (u_phi seg s ps cs).
-Proof using. rewrite /u_phi. apply _. Qed.
+Proof using Hadm. rewrite /u_phi. apply _. Qed.
 
 Definition u_found (seg : list mobs) (s : fstate) : Prop :=
   Exists (fun cs => Exists (fun ps => u_phi seg s ps cs)
@@ -1119,14 +1332,14 @@ Definition u_found (seg : list mobs) (s : fstate) : Prop :=
     (ualts_dep s (bodies_of (ins seg))).
 
 Local Instance u_found_dec seg s : Decision (u_found seg s).
-Proof using. rewrite /u_found. apply _. Qed.
+Proof using Hadm. rewrite /u_found. apply _. Qed.
 
 Definition u_rhs (seg : list mobs) : Prop :=
   lm_disc_input U (ins seg)
   /\ Exists (fun s => fstate_ok s /\ u_found seg s) (scandsU seg).
 
 Local Instance u_rhs_dec seg : Decision (u_rhs seg).
-Proof using. rewrite /u_rhs. apply _. Qed.
+Proof using Hadm. rewrite /u_rhs. apply _. Qed.
 
 (* ===================================================================== *)
 (*  9.  AT ONE BOOT STATE THE SEARCH IS COMPLETE                          *)
@@ -1150,7 +1363,7 @@ Proof using.
     intros i Hi. rewrite /cs0 list_lookup_total_fmap;
       [| rewrite (proj1 Halts); exact Hi].
     rewrite (pde_upto_ext U cs0 cs s _ Hext i).
-    exact (ucands_complete adm_u_f _ _ _ (proj2 Halts i Hi)). }
+    exact (ucands_complete adm _ _ _ (proj2 Halts i Hi)). }
   assert (Hd40 : lm_d4 U cs0 s (ins seg)) by exact (pde_d4_ext U cs0 cs s _ Hext Hd4).
   assert (Hall0 : forall p, p ∈ in_pres seg ->
             lm_pro_ok U ps cs0 (nlines (ins p)) /\ lm_disc_pt U ps cs0 s p).
@@ -1190,7 +1403,7 @@ Qed.
 
 Local Instance u_seg_dec (seg : list mobs) :
   Decision (exists s : lm_st U, lm_st_ok U s /\ lm_disc_seg' U s seg).
-Proof using.
+Proof using Hadm.
   destruct (decide (u_rhs seg)) as [H | H].
   - left. destruct H as [Hin HE]. apply Exists_exists in HE as (s & _ & Hok & HE).
     rewrite /u_found in HE. apply Exists_exists in HE as (cs & _ & HE).
@@ -1204,6 +1417,11 @@ Proof using.
     split; [exact Hs' |]. split; [exact Hok' | exact (u_seg_at seg s' Hd')].
 Qed.
 
+(* the decider at the admission, generic *)
+Lemma ud_disc_dec (h : list mobs) : Decision (lm_disc U h).
+Proof using Hadm. rewrite /lm_disc. apply _. Qed.
+End canon.
+
 (* ===================================================================== *)
 (*  THE DELIVERABLE                                                       *)
 (*                                                                        *)
@@ -1211,6 +1429,75 @@ Qed.
 (*  lm_disc_pipesE_dec] are: the ledger's counter is [if decide (lm_disc *)
 (*  ulmU h) then 0 else 1] and every proof that touches it rewrites with *)
 (*  a closure law.                                                        *)
+(*                                                                        *)
+(*  AT TWO ADMISSIONS: the landed one ([adm_u_f], cats only) and the     *)
+(*  widened one grep-pipes.md cut G8 switches to ([adm_u_g]: every echo  *)
+(*  pipeline and every [cat f | ..], each stage [cat] or [grep w] of an   *)
+(*  alphanumeric word).                                                   *)
 (* ===================================================================== *)
+Lemma adm_u_f_ok : ud_adm adm_u_f false [].
+Proof using.
+  split.
+  - intros g fs Ha. exact (proj1 (proj1 (adm_u_f_catf g fs) Ha)).
+  - intros p fs Ha. rewrite (adm_u_f_cats p fs Ha). unfold cats.
+    apply Forall_replicate. by right.
+  - intros p fs Hp Hfs.
+    assert (Hc : all_cats fs = true).
+    { unfold all_cats. apply forallb_forall. intros F HF. rewrite Forall_forall in Hfs.
+      destruct (Hfs F (proj2 (elem_of_list_In _ _) HF)) as [-> | [Hf _]];
+        [reflexivity | discriminate Hf]. }
+    destruct Hp as [-> | ->]; [exact Hc |]. apply adm_u_f_catf. split; [reflexivity | exact Hc].
+Qed.
+
 Global Instance lm_disc_ulmU_dec (h : list mobs) : Decision (lm_disc ulmU h).
-Proof using. rewrite /lm_disc. apply _. Qed.
+Proof using. exact (ud_disc_dec adm_u_f false [] adm_u_f_ok h). Qed.
+
+(* THE WIDENED ADMISSION: grep stages admitted *)
+Definition adm_u_g (l : pline') : bool :=
+  match l with
+  | LEcho' _ => false
+  | LPipes (PrEcho _) fs => forallb (fun F => bool_decide (filt_ok F)) fs
+  | LPipes (PrCatF g) fs => bool_decide (g = fname_f) && forallb (fun F => bool_decide (filt_ok F)) fs
+  end.
+
+Definition ulmG : lmodel := ulm adm_u_g.
+
+(* the pattern the realisations use: [a] *)
+Definition ud_gpat : bytes := [Z_to_bv 8 97].
+
+Lemma ud_gpat_word : wl_word ud_gpat.
+Proof using. apply (bool_decide_unpack _). vm_compute. exact I. Qed.
+
+Lemma adm_u_g_ok : ud_adm adm_u_g true ud_gpat.
+Proof using.
+  split.
+  - intros g fs Ha. cbn [adm_u_g] in Ha. apply andb_true_iff in Ha as [Ha _].
+    exact (bool_decide_eq_true_1 _ Ha).
+  - intros p fs _. apply Forall_forall. intros F _. by left.
+  - intros p fs Hp Hfs.
+    assert (Hc : forallb (fun F => bool_decide (filt_ok F)) fs = true).
+    { apply forallb_forall. intros F HF. apply bool_decide_eq_true_2.
+      rewrite Forall_forall in Hfs.
+      destruct (Hfs F (proj2 (elem_of_list_In _ _) HF)) as [-> | [_ ->]];
+        [exact I | exact ud_gpat_word]. }
+    destruct Hp as [-> | ->]; cbn [adm_u_g]; [exact Hc |].
+    rewrite bool_decide_true; [exact Hc | reflexivity].
+Qed.
+
+(* the grep admission is a superset of the landed one *)
+Lemma adm_u_g_f (l : pline') : adm_u_f l = true -> adm_u_g l = true.
+Proof using.
+  assert (Hcat : forall fs, all_cats fs = true -> forallb (fun F => bool_decide (filt_ok F)) fs = true).
+  { intros fs Hc. apply forallb_forall. intros F HF. apply bool_decide_eq_true_2.
+    unfold all_cats in Hc. rewrite forallb_forall in Hc. pose proof (Hc F HF) as HF'.
+    destruct F; [exact I | discriminate HF']. }
+  destruct l as [ws | [ws | g] fs]; cbn [adm_u_f adm_u_g]; [done | exact (Hcat fs) |].
+  rewrite !andb_true_iff. intros [Hg Hc]. split; [exact Hg | exact (Hcat fs Hc)].
+Qed.
+
+Global Instance lm_disc_ulmG_dec (h : list mobs) : Decision (lm_disc ulmG h).
+Proof using. exact (ud_disc_dec adm_u_g true ud_gpat adm_u_g_ok h). Qed.
+
+(* the widened admission is not empty of greps: [cat f | grep a | cat] *)
+Lemma adm_u_g_demo : adm_u_g (LPipes (PrCatF fname_f) [FGrep ud_gpat; FCat]) = true.
+Proof using. vm_compute. reflexivity. Qed.

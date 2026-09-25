@@ -39,7 +39,20 @@ stage list (a grep writer pairs exactly), exit bridges from
 after a filter).  SCOPED to cats, for later cuts: the vector runs
 (`PipeBothNPure.sfx_runV`/`line_runV` -> G5; `pipesV_alloc` gained
 `Hcat`), the decider's truncation (`blocks_trunc` etc. take `all_cats`
--> G4), the shell-side lemmas (`PipesCut`, `pipes_lp` -> G7).
+-> G4), the shell-side lemmas (`PipesCut`, `pipes_lp` -> G7).  G4 LANDED
+(4020dadfb, VM g4merge1, audits 13/13/14; the decider's frontier print
+'Closed under the global context'): the union decider at EVERY stage
+list, with no fallback -- instead of per-pipe lengths, each pipe's new
+content is RELATED to its old one (`tr_rel P D' D`: D' ⪯ D, D' ⪯ P, and
+D' = D when D ⪯ P); filters keep it by monotonicity + the gate, a
+halted writer's run writes `[]`, a corner-B reader restarts at `take |P|
+D`; `blocks_trunc`/`terms_trunc` take `fcont_ok b0` instead of
+`all_cats`; `u_canon_s` unchanged.  The decider is proved once
+(`ud_disc_dec` over a `ud_adm` record) and instantiated at `adm_u_f`
+(`lm_disc_ulmU_dec`, statement unchanged) and the widened `adm_u_g`
+(echo and `cat f` producers, any `filt_ok` stage list:
+`lm_disc_ulmG_dec`).  The loose corner (B) after a filter is kept
+(owner acknowledged, 2026-09-25).  G8 removes the frontier print.
 
 I've planned this from reading only; nothing was edited or built. Grep fits the landed machinery more cheaply than the question expects. Every content in the union is a single line, and on one line grep is just a gate. The real costs are elsewhere: grep has no exec image, pins, stubs or kexec facts yet (the biggest cut), the decider's truncation lemma needs rework (the riskiest cut), and there is one owner ruling on corner B.
 

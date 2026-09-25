@@ -51,3 +51,10 @@
 Require Import UInitUnion.
 
 Print Assumptions union_adequacy_closed.
+
+(* FRONTIER (grep-pipes.md cut G4, removed at G8): the union decider at the
+   widened admission [UnionDecU.adm_u_g], whose rounds admit grep stages.
+   It is pure and not yet in the anchor's cone (the anchor is still at
+   [adm_u_f]); it must print that it is closed under the global context. *)
+Require UnionDecU.
+Print Assumptions UnionDecU.lm_disc_ulmG_dec.

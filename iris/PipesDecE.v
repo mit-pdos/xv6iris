@@ -206,25 +206,42 @@ Qed.
 (* ===================================================================== *)
 Definition pde_midok (m : bytes) : Prop := m = dg_execR \/ m = [] \/ m = cat_dg_write.
 
-Fixpoint pde_chk (op : list bytes) (cm : bool) (sr pr u : bytes) {struct u} : bool :=
+(* the middle streams the checker may START on demand ([mo]): the
+   nonempty ones a middle stage can print.  At a cat stage [pde_mo]; at an
+   admission with grep stages also [dg_execG] ([UnionDecU.umo]). *)
+Definition pde_mo : list bytes := [dg_execR; cat_dg_write].
+
+Lemma pde_midok_mo (m : bytes) : pde_midok m -> m = [] \/ m ∈ pde_mo.
+Proof using.
+  intros [-> | [-> | ->]]; [right; apply elem_of_list_here | by left
+                           | right; apply elem_of_list_further, elem_of_list_here].
+Qed.
+
+Lemma pde_mo_midok (m : bytes) : m ∈ pde_mo -> pde_midok m.
+Proof using.
+  unfold pde_mo, pde_midok. intros Hm. apply elem_of_list_In in Hm.
+  destruct Hm as [<- | [<- | []]]; auto.
+Qed.
+
+Fixpoint pde_chk (mo : list bytes) (op : list bytes) (cm : bool) (sr pr u : bytes) {struct u} : bool :=
   match u with
   | [] => true
   | x :: u' =>
       existsb (fun j => match op !! j with
-                        | Some (y :: t) => bool_decide (y = x) && pde_chk (<[j:=t]> op) cm sr pr u'
+                        | Some (y :: t) => bool_decide (y = x) && pde_chk mo (<[j:=t]> op) cm sr pr u'
                         | _ => false
                         end) (seq 0 (length op))
       || (cm && existsb (fun m => match m with
-                                  | y :: t => bool_decide (y = x) && pde_chk (op ++ [t]) cm sr pr u'
+                                  | y :: t => bool_decide (y = x) && pde_chk mo (op ++ [t]) cm sr pr u'
                                   | [] => false
-                                  end) [dg_execR; cat_dg_write])
+                                  end) mo)
       || match sr with
-         | y :: sr' => bool_decide (y = x) && pde_chk op cm sr' pr u'
+         | y :: sr' => bool_decide (y = x) && pde_chk mo op cm sr' pr u'
          | [] => false
          end
       || (bool_decide (Forall (fun y => y = []) op)
           && match pr with
-             | y :: pr' => bool_decide (y = x) && pde_chk op false sr pr' u'
+             | y :: pr' => bool_decide (y = x) && pde_chk mo op false sr pr' u'
              | [] => false
              end)
   end.
@@ -232,9 +249,9 @@ Fixpoint pde_chk (op : list bytes) (cm : bool) (sr pr u : bytes) {struct u} : bo
 Lemma pde_insert_snoc (l : list bytes) (m t : bytes) : <[length l:=t]> (l ++ [m]) = l ++ [t].
 Proof using. induction l as [| a l IH]; [done |]. simpl. by rewrite IH. Qed.
 
-Lemma pde_chk_sound (u : bytes) : forall (op : list bytes) (cm : bool) (sr pr : bytes),
-  pde_chk op cm sr pr u = true ->
-  exists Mu, Forall (fun m => cm = true /\ (m = dg_execR \/ m = cat_dg_write)) Mu
+Lemma pde_chk_sound (mo : list bytes) (u : bytes) : forall (op : list bytes) (cm : bool) (sr pr : bytes),
+  pde_chk mo op cm sr pr u = true ->
+  exists Mu, Forall (fun m => cm = true /\ m ∈ mo) Mu
              /\ pde_pmt (op ++ Mu) pr sr u.
 Proof using.
   induction u as [| x u IH]; intros op cm sr pr Hc.
@@ -254,7 +271,7 @@ Proof using.
     destruct (IH _ _ _ _ Hr) as (Mu & HF & Hp).
     exists (Mu ++ [x :: t]). split.
     + apply Forall_app. split; [exact HF |]. apply Forall_singleton. split; [exact Hcm |].
-      destruct Hm as [<- | [<- | []]]; [by left | by right].
+      apply elem_of_list_In. exact Hm.
     + rewrite app_assoc.
       apply (pmt_w ((op ++ Mu) ++ [x :: t]) pr sr (length (op ++ Mu)) x t u).
       * by apply list_lookup_middle.
@@ -272,12 +289,12 @@ Proof using.
     exists []. split; [constructor |]. apply pmt_p; [by rewrite app_nil_r | exact Hp].
 Qed.
 
-Lemma pde_chk_complete (W : list bytes) (pr sr u : bytes) :
+Lemma pde_chk_complete (mo : list bytes) (W : list bytes) (pr sr u : bytes) :
   pde_pmt W pr sr u ->
   forall (op Mu : list bytes) (cm : bool),
     W ≡ₚ op ++ Mu ->
-    Forall (fun m => if cm then pde_midok m else m = []) Mu ->
-    pde_chk op cm sr pr u = true.
+    Forall (fun m => if cm then m = [] \/ m ∈ mo else m = []) Mu ->
+    pde_chk mo op cm sr pr u = true.
 Proof using.
   induction 1 as [W pr sr | W pr sr i x t u Hi H IH | W pr sr x u HF H IH | W pr sr x u H IH];
     intros op Mu cm HP HMu; [reflexivity | | |]; unfold bytes in *.
@@ -298,7 +315,7 @@ Proof using.
       destruct cm; cbv beta iota in Hmk; [| discriminate Hmk].
       apply andb_true_iff. split; [reflexivity |].
       apply existsb_exists. exists (x :: t). split.
-      { destruct Hmk as [-> | [Hq | ->]]; [by left | discriminate Hq | by right; left]. }
+      { destruct Hmk as [Hq | Hin']; [discriminate Hq | apply elem_of_list_In; exact Hin']. }
       cbv beta iota. rewrite bool_decide_true; [| reflexivity]. cbn [andb].
       apply (IH (op ++ [t]) (delete k Mu) true); [| by apply Forall_delete].
       assert (Hl : (op ++ Mu) !! (length op + k) = Some (x :: t)).
@@ -405,9 +422,9 @@ Qed.
 (*  5.  [pl_merge] AT [adm_echo], DECIDED                                 *)
 (* ===================================================================== *)
 Definition pde_mergeb (u : bytes) : bool :=
-  existsb (fun p => existsb (fun s => pde_chk [p; dg_fork_b] true s u_prompt u)
+  existsb (fun p => existsb (fun s => pde_chk pde_mo [p; dg_fork_b] true s u_prompt u)
                       [dg_execR; []; cat_dg_write]) [[]; dg_execL]
-  || existsb (fun s => pde_chk [dg_fork_b] false s u_prompt u) [dg_execL; []].
+  || existsb (fun s => pde_chk pde_mo [dg_fork_b] false s u_prompt u) [dg_execL; []].
 
 Lemma pl_merge_spec (u : bytes) : pl_merge fcE adm_echo u <-> pde_mergeb u = true.
 Proof using.
@@ -420,12 +437,13 @@ Proof using.
     destruct (pde_lterm_shape l W s Ha Hlt) as [[-> Hs] | (p & mids & -> & Hpp & HF & Hs)].
     + right. apply existsb_exists. exists s. split.
       { destruct Hs as [-> | ->]; [left | right; left]; reflexivity. }
-      apply (pde_chk_complete _ _ _ _ Hp [dg_fork_b] [] false); [by rewrite app_nil_r | constructor].
+      apply (pde_chk_complete _ _ _ _ _ Hp [dg_fork_b] [] false); [by rewrite app_nil_r | constructor].
     + left. apply existsb_exists. exists p. split.
       { destruct Hpp as [-> | ->]; [right; left | left]; reflexivity. }
       apply existsb_exists. exists s. split.
       { destruct Hs as [-> | [-> | ->]]; [left | right; left | right; right; left]; reflexivity. }
-      apply (pde_chk_complete _ _ _ _ Hp [p; dg_fork_b] mids true); [| exact HF].
+      apply (pde_chk_complete _ _ _ _ _ Hp [p; dg_fork_b] mids true);
+        [| exact (Forall_impl _ _ _ HF pde_midok_mo)].
       simpl. apply perm_skip. rewrite Permutation_app_comm. reflexivity.
   - intros Hc. unfold pde_mergeb in Hc. apply orb_true_iff in Hc as [Hc | Hc].
     + apply existsb_exists in Hc as (p & Hpin & Hc).
@@ -434,18 +452,18 @@ Proof using.
       { destruct Hpin as [<- | [<- | []]]; [right | left]; reflexivity. }
       assert (Hs : pde_midok s).
       { unfold pde_midok. destruct Hsin as [<- | [<- | [<- | []]]]; auto. }
-      destruct (pde_chk_sound u [p; dg_fork_b] true s u_prompt Hc) as (Mu & HF & Hp).
+      destruct (pde_chk_sound pde_mo u [p; dg_fork_b] true s u_prompt Hc) as (Mu & HF & Hp).
       apply (pde_merge_of_lt (S (S (length Mu))) (p :: Mu ++ [dg_fork_b]) s u).
       * destruct (pde_prod_so p Hpp) as (so & Hso & Hc'). rewrite -Hc'.
         eapply lt_next; [exact Hso |].
         apply pde_sfx_build; [| exact Hs].
-        eapply Forall_impl; [exact HF |]. intros m [_ [-> | ->]]; unfold pde_midok; auto.
+        eapply Forall_impl; [exact HF |]. intros m [_ Hm]. exact (pde_mo_midok m Hm).
       * apply (pde_pmt_perm _ _ _ _ _ Hp). simpl. apply perm_skip.
         rewrite Permutation_app_comm. reflexivity.
     + apply existsb_exists in Hc as (s & Hsin & Hc).
       assert (Hs : s = dg_execL \/ s = []).
       { destruct Hsin as [<- | [<- | []]]; [left | right]; reflexivity. }
-      destruct (pde_chk_sound u [dg_fork_b] false s u_prompt Hc) as (Mu & HF & Hp).
+      destruct (pde_chk_sound pde_mo u [dg_fork_b] false s u_prompt Hc) as (Mu & HF & Hp).
       destruct Mu as [| m Mu]; [| apply Forall_cons in HF as [[Hf _] _]; discriminate Hf].
       apply (pde_merge_of_lt 1 [dg_fork_b] s u); [| by rewrite app_nil_r in Hp].
       destruct (pde_prod_so s Hs) as (so & Hso & Hc'). rewrite -Hc'.
