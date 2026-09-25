@@ -43,10 +43,17 @@ faults gained lies below the break, so `umBelow` survives).  A caller that
 fetches in a LOOP (`exec`'s argv) re-enters at the block it got back.
 
 THE IMAGE.  Rocq's image does not move (lazy pages are already in its
-partial view, reading 0).  This port's per-page view does: the post image is
-`viewFaulted P P' M`, copyinstr's own, and the string is read out of it.
+partial view, reading 0).  This port's per-page view does: the block comes
+back at `viewFaulted P P' M`, copyinstr's own.  THE STRING, though, is read
+at ROCQ'S SINGLE IMAGE, fixed before the call: `viewLazy V.upt V.sz M`, the
+entry view with every lazy page zeroed (`Xv6/UMemLazy.lean`; Rocq's `us_M`,
+at which `fetchstr_got` is stated).  copyinstr says the string's pages are
+mapped in the table it returns (`umMapped`), and on those pages the faulted
+view is the lazy image (`UMemL.umemStr_viewLazy`).  For a block with no lazy
+page it is `M` itself (`UMemL.viewLazy_of_lazyFree`).
 -/
 import Xv6.SpecCopyinstr
+import Xv6.UMemLazy
 import Xv6.FdTable
 
 namespace Xv6
@@ -85,7 +92,7 @@ def wp_fetchstr_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G
     kctx cpu' ((k.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k.regs 1#5)) -∗
     (∃ (P' : UPtd) (bs : List (BitVec 8)),
       ⌜V.upt.extSz V.sz P' ∧
-        fetchstrRet (viewFaulted V.upt P' M) (k.regs 10#5).toNat old bs (R' 10#5)⌝ ∗
+        fetchstrRet (viewLazy V.upt V.sz M) (k.regs 10#5).toNat old bs (R' 10#5)⌝ ∗
       procPrivBareAt curCtx pa pid { V with upt := P' } (viewFaulted V.upt P' M) ∗
       byteBuf (k.regs 11#5) (DFrac.own 1) bs) -∗
     ⌜calleeSaved k.regs R'⌝ -∗ wpLoop cpu'))

@@ -429,7 +429,7 @@ theorem sys_chdir_fetched (NI : NAMEI_ERA) (IL : ILOCK) (IU : IUNLOCK) (IP : IPU
     (hnoff : k.noff = 0) (htier : k.tier = KTier.kpt) (hct : curTier = KTier.kpt)
     (hpins : sysChdirPins k R (k.regs 9#5) (procAddr A.j))
     (hal : (sysChdirBuf (k.regs 2#5)).toNat % 8 = 0) (hP2 : A.V.upt.extSz A.V.sz P2)
-    (hold : old.length = 128) (hret : fetchstrRet (sysChdirM1 A P2) v.toNat old bs (R 10#5)) :
+    (hold : old.length = 128) (hret : fetchstrRet (viewLazy A.V.upt A.V.sz A.M) v.toNat old bs (R 10#5)) :
     kctx cpu (((k.withSpie spie spp).pushed 20).withRegs R) ∗ pcIs cpu (KA.«sys_chdir» + 0x22#64) ∗
     sysChdirCells (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) w₃ (k.regs 18#5) ∗
     byteBuf (sysChdirBuf (k.regs 2#5)) (DFrac.own 1) bs ∗

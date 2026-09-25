@@ -127,7 +127,7 @@ def wp_argstr_w_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G
     ⌜k.sie = false → spie = k.spie ∧ spp = k.spp⌝ -∗
     kctx cpu' ((k.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k.regs 1#5)) -∗
     (∃ (P' : UPtd) (bs : List (BitVec 8)),
-      ⌜V.upt.extSz V.sz P' ∧ fetchstrRet (viewFaulted V.upt P' M) v.toNat old bs (R' 10#5) ∧
+      ⌜V.upt.extSz V.sz P' ∧ fetchstrRet (viewLazy V.upt V.sz M) v.toNat old bs (R' 10#5) ∧
         bs.length = old.length⌝ ∗
       procPrivBareAt curCtx pa pid { V with upt := P' } (viewFaulted V.upt P' M) ∗
       byteBuf (k.regs 11#5) (DFrac.own 1) bs) -∗
@@ -183,7 +183,7 @@ theorem sys_unlink_argstr (AS : ARGSTR_W) (Γ : SchedNames) (cpu : CPU) (k' : KC
     procPrivBareAt curCtx pa pid V M ∗ byteBuf ba (DFrac.own 1) old ∗
     (∀ (c : CPU) (spie spp : Bool) (R' : RegMap) (P' : UPtd) (bs : List (BitVec 8)),
       ⌜calleeSaved k'.regs R' ∧ V.upt.extSz V.sz P' ∧
-        fetchstrRet (viewFaulted V.upt P' M) v.toNat old bs (R' 10#5) ∧ bs.length = old.length⌝ -∗
+        fetchstrRet (viewLazy V.upt V.sz M) v.toNat old bs (R' 10#5) ∧ bs.length = old.length⌝ -∗
       kctx c ((k'.withSpie spie spp).withRegs R') -∗ pcIs c (jumpPc (k'.regs 1#5)) -∗
       trapCsrsExt c se -∗ cpuClaimExt c se pj -∗
       procPrivBareAt curCtx pa pid { V with upt := P' } (viewFaulted V.upt P' M) -∗

@@ -24,9 +24,10 @@ Rocq's `uptd_ext_sz`), and the trapframe word is read through `V.tf`, so the
 block supplies argraw's premises.
 
 The postcondition is fetchstr's verbatim, at the address `v` the caller
-already named: `fetchstrRet (viewFaulted V.upt P' M) v.toNat max new a0` -- the
-buffer holds the process's NUL-terminated string at `v` and `a0` is its
-length, or `a0 = -1`.  (`Xv6/ArgPath.lean`'s `argPathOf_umemStr` turns the
+already named: `fetchstrRet (viewLazy V.upt V.sz M) v.toNat max new a0` -- the
+buffer holds the process's NUL-terminated string at `v`, read at the ENTRY
+image with its lazy pages zeroed (Rocq's `us_M`, `SpecFetchstr`), and `a0`
+is its length, or `a0 = -1`.  (`Xv6/ArgPath.lean`'s `argPathOf_umemStr` turns the
 success arm into the syscall's `argPathOf`.)
 -/
 import Xv6.SpecFetchstr
@@ -59,7 +60,7 @@ def wp_argstr_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G G
     ⌜k.sie = false → spie = k.spie ∧ spp = k.spp⌝ -∗
     kctx cpu' ((k.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k.regs 1#5)) -∗
     (∃ (P' : UPtd) (bs : List (BitVec 8)),
-      ⌜V.upt.extSz V.sz P' ∧ fetchstrRet (viewFaulted V.upt P' M) v.toNat old bs (R' 10#5)⌝ ∗
+      ⌜V.upt.extSz V.sz P' ∧ fetchstrRet (viewLazy V.upt V.sz M) v.toNat old bs (R' 10#5)⌝ ∗
       procPrivBareAt curCtx pa pid { V with upt := P' } (viewFaulted V.upt P' M) ∗
       byteBuf (k.regs 11#5) (DFrac.own 1) bs) -∗
     ⌜calleeSaved k.regs R'⌝ -∗ wpLoop cpu'))

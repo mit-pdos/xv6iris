@@ -140,7 +140,7 @@ theorem argstr_fetchstr (FS : FETCHSTR) (c : CPU) (k' : KCtx) (γl : GName) (γk
       kctx cpu' ((k'.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k'.regs 1#5)) -∗
       (∃ (P' : UPtd) (bs : List (BitVec 8)),
         ⌜V.upt.extSz V.sz P' ∧
-          fetchstrRet (viewFaulted V.upt P' M) (k'.regs 10#5).toNat old bs (R' 10#5)⌝ ∗
+          fetchstrRet (viewLazy V.upt V.sz M) (k'.regs 10#5).toNat old bs (R' 10#5)⌝ ∗
         procPrivBareAt curCtx pa pid { V with upt := P' } (viewFaulted V.upt P' M) ∗
         byteBuf (k'.regs 11#5) (DFrac.own 1) bs) -∗
       ⌜calleeSaved k'.regs R'⌝ -∗ wpLoop cpu'))
@@ -282,7 +282,7 @@ theorem argstr_proof (AR : ARGRAW) (FS : FETCHSTR) : ARGSTR :=
   rw [argstr_withSpie_twice, argstr_pushed_withSpie]
   iapply (argstr_exit cpu c9 k
       (fun r => iprop(∃ (Q' : UPtd) (cs : List (BitVec 8)),
-        ⌜V.upt.extSz V.sz Q' ∧ fetchstrRet (viewFaulted V.upt Q' M) v.toNat old cs r⌝ ∗
+        ⌜V.upt.extSz V.sz Q' ∧ fetchstrRet (viewLazy V.upt V.sz M) v.toNat old cs r⌝ ∗
         procPrivBareAt curCtx pa pid { V with upt := Q' } (viewFaulted V.upt Q' M) ∗ byteBuf (k.regs 11#5) (DFrac.own 1) cs))
       hK4
       (fun h => (hp9 h).trans ((hp8 h).trans ((hp7 h).trans ((hp6 h).trans ((hp5 h).trans

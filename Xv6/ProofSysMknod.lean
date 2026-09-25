@@ -139,7 +139,7 @@ theorem sys_mknod_created (IUP : IUNLOCKPUT) (EO : END_OP) (Γ : SchedNames)
     (hpins : sysMknodPins k R)
     (hal : (sysMknodBuf (k.regs 2#5)).toNat % 8 = 0) (hP2 : A.V.upt.extSz A.V.sz P2)
     (hlen : pl.length + 1 + rest.length = 128)
-    (hpl : argPathOf (sysMknodM1 A P2) A.v0.toNat pl)
+    (hpl : argPathOf (viewLazy A.V.upt A.V.sz A.M) A.v0.toNat pl)
     (hns : if ok then ns' + 1 = A.ns else ns' = A.ns) (hu : ok = true → iputUnits ≤ u') :
     kctx cpu (((k.withSpie spie spp).pushed 20).withRegs R) ∗ pcIs cpu (KA.«sys_mknod» + 0x44#64) ∗
     sysMknodCells (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) ∗
@@ -175,8 +175,8 @@ theorem sys_mknod_created (IUP : IUNLOCKPUT) (EO : END_OP) (Γ : SchedNames)
     ihave Hop := logOpS_op icfgLog u' Sb' $$ Hop Htx
     ihave Hcf := creFailArms_dev (hlc := hlc) (fsGammaL fscFs) fscFs (devArg A.v1) (devArg A.v2)
       A.P A.Pmiss A.Farm (pfamTriv (fun _ _ _ _ => iprop(True))) A.Fun A.Fok A.Fex pl $$ Hcf
-    ihave Hfail : mknodPostFail (hlc := hlc) (fsGammaL fscFs) fscFs A.V.cwi A.V.upt A.V.sz A.M
-        A.v0.toNat (sysMknodM1 A P2) (devArg A.v1) (devArg A.v2) A.P A.Pmiss A.Farm A.Fun A.Fok
+    ihave Hfail : mknodPostFail (hlc := hlc) (fsGammaL fscFs) fscFs A.V.cwi (viewLazy A.V.upt A.V.sz A.M)
+        A.v0.toNat (devArg A.v1) (devArg A.v2) A.P A.Pmiss A.Farm A.Fun A.Fok
         A.Fex $$ [Hcf]
     · unfold mknodPostFail
       iright
@@ -200,7 +200,7 @@ theorem sys_mknod_created (IUP : IUNLOCKPUT) (EO : END_OP) (Γ : SchedNames)
     iintro Hk Hpc
     ihave Hcok := creOkArms_dev (hlc := hlc) (fsGammaL fscFs) (devArg A.v1) (devArg A.v2) A.P
       A.Farm (pfamTriv (fun _ _ _ _ => iprop(True))) A.Fun A.Fok A.Fex pl inum.toNat $$ Hcok
-    ihave Hok : mknodPostOk (hlc := hlc) (fsGammaL fscFs) (sysMknodM1 A P2) A.v0.toNat
+    ihave Hok : mknodPostOk (hlc := hlc) (fsGammaL fscFs) (viewLazy A.V.upt A.V.sz A.M) A.v0.toNat
         (devArg A.v1) (devArg A.v2) A.P A.Farm A.Fun A.Fok A.Fex $$ [Hcok]
     · unfold mknodPostOk
       iexists pl, inum.toNat
@@ -233,7 +233,7 @@ theorem sys_mknod_fetched (CR : CREATE) (IUP : IUNLOCKPUT) (EO : END_OP) (Γ : S
     (hal : (sysMknodBuf (k.regs 2#5)).toNat % 8 = 0)
     (hal8 : (sysMknodMin (k.regs 2#5)).toNat % 8 = 0) (hP2 : A.V.upt.extSz A.V.sz P2)
     (hold : old.length = 128)
-    (hret : fetchstrRet (sysMknodM1 A P2) A.v0.toNat old bs (R 10#5)) :
+    (hret : fetchstrRet (viewLazy A.V.upt A.V.sz A.M) A.v0.toNat old bs (R 10#5)) :
     kctx cpu (((k.withSpie spie spp).pushed 20).withRegs R) ∗ pcIs cpu (KA.«sys_mknod» + 0x2e#64) ∗
     sysMknodCells (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) ∗
     byteBuf (sysMknodBuf (k.regs 2#5)) (DFrac.own 1) bs ∗
@@ -307,9 +307,9 @@ theorem sys_mknod_fetched (CR : CREATE) (IUP : IUNLOCKPUT) (EO : END_OP) (Γ : S
     iintro Hk Hpc
     icases sys_mknod_buf_split _ pl _ $$ Hbuf with ⟨Hp, Hrest⟩
     -- THE ONE-SHOT, HANDED DOWN UNFIRED, AT THE PATH THE CALLER PASSED
-    ihave Hau := mknodAuAt_inst (hlc := hlc) (fsGammaL fscFs) fscFs A.V.cwi A.V.upt A.V.sz A.M
+    ihave Hau := mknodAuAt_inst (hlc := hlc) (fsGammaL fscFs) fscFs A.V.cwi (viewLazy A.V.upt A.V.sz A.M)
       A.v0.toNat pl (devArg A.v1) (devArg A.v2) A.P A.Pmiss A.Farm A.Fun A.Fok A.Fex
-      (mknodReads_intro _ _ _ _ _ P2 hP2 hpl) $$ Hau
+      hpl $$ Hau
     unfold mknodAuPre
     icases Hau with ⟨Hst, Hac, Hdl, Hch⟩
     -- THE BUNDLE AT THE DEVICE TYPE: no dots leg owed
@@ -380,8 +380,8 @@ theorem sys_mknod_fetched (CR : CREATE) (IUP : IUNLOCKPUT) (EO : END_OP) (Γ : S
     ihave Hbuf : sysMknodAny (sysMknodBuf (k.regs 2#5)) 128 $$ [Hbuf]
     · unfold sysMknodAny; iexists bs; iframe; ipureintro; omega
     ihave Hlow := sys_mknod_ints_close (k.regs 2#5) hal8 _ _ $$ Hints
-    ihave Hfail : mknodPostFail (hlc := hlc) (fsGammaL fscFs) fscFs A.V.cwi A.V.upt A.V.sz A.M
-        A.v0.toNat (sysMknodM1 A P2) (devArg A.v1) (devArg A.v2) A.P A.Pmiss A.Farm A.Fun A.Fok
+    ihave Hfail : mknodPostFail (hlc := hlc) (fsGammaL fscFs) fscFs A.V.cwi (viewLazy A.V.upt A.V.sz A.M)
+        A.v0.toNat (devArg A.v1) (devArg A.v2) A.P A.Pmiss A.Farm A.Fun A.Fok
         A.Fex $$ [Hau]
     · unfold mknodPostFail; ileft; iexact Hau
     iapply (sys_mknod_tail_58 EO Γ cpu k A P2 spie spp R MAXOPBLOCKS hj hproc hK hnoff htier hct hpins

@@ -182,7 +182,7 @@ theorem sys_mkdir_fetched (CR : CREATE) (IUP : IUNLOCKPUT) (EO : END_OP) (Γ : S
     (hns : createIrefSlots ≤ A.ns)
     (hpins : sysMkdirPins k R)
     (hal : (sysMkdirBuf (k.regs 2#5)).toNat % 8 = 0) (hP2 : A.V.upt.extSz A.V.sz P2)
-    (hold : old.length = 128) (hret : fetchstrRet (sysMkdirM1 A P2) v.toNat old bs (R 10#5)) :
+    (hold : old.length = 128) (hret : fetchstrRet (viewLazy A.V.upt A.V.sz A.M) v.toNat old bs (R 10#5)) :
     kctx cpu (((k.withSpie spie spp).pushed 18).withRegs R) ∗ pcIs cpu (KA.«sys_mkdir» + 0x1a#64) ∗
     sysMkdirCells (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) ∗
     byteBuf (sysMkdirBuf (k.regs 2#5)) (DFrac.own 1) bs ∗

@@ -83,8 +83,7 @@ fail fold the caller built. -/
 theorem sys_mknod_out_fail (A : SysMknodArgs GF) (P2 : UPtd) (hP2 : A.V.upt.extSz A.V.sz P2) :
     procPrivFd (GF := GF) A.γ (procAddr A.j) A.pid (sysMknodV1 A P2) (sysMknodM1 A P2) ∗
       bslots 3 ∗ irefSlots A.ns ∗
-      mknodPostFail (hlc := hlc) (fsGammaL fscFs) fscFs A.V.cwi A.V.upt A.V.sz A.M A.v0.toNat
-        (sysMknodM1 A P2) (devArg A.v1) (devArg A.v2) A.P A.Pmiss A.Farm A.Fun A.Fok A.Fex ⊢
+      mknodPostFail (hlc := hlc) (fsGammaL fscFs) fscFs A.V.cwi (viewLazy A.V.upt A.V.sz A.M) A.v0.toNat (devArg A.v1) (devArg A.v2) A.P A.Pmiss A.Farm A.Fun A.Fok A.Fex ⊢
     sysMknodOut A 0xFFFFFFFFFFFFFFFF#64 := by
   iintro ⟨Hblk, Hbs, Hir, Hf⟩
   unfold sysMknodOut
@@ -103,7 +102,7 @@ receipt the caller built. -/
 theorem sys_mknod_out_ok (A : SysMknodArgs GF) (P2 : UPtd) (hP2 : A.V.upt.extSz A.V.sz P2) :
     procPrivFd (GF := GF) A.γ (procAddr A.j) A.pid (sysMknodV1 A P2) (sysMknodM1 A P2) ∗
       bslots 3 ∗ irefSlots A.ns ∗
-      mknodPostOk (hlc := hlc) (fsGammaL fscFs) (sysMknodM1 A P2) A.v0.toNat (devArg A.v1)
+      mknodPostOk (hlc := hlc) (fsGammaL fscFs) (viewLazy A.V.upt A.V.sz A.M) A.v0.toNat (devArg A.v1)
         (devArg A.v2) A.P A.Farm A.Fun A.Fok A.Fex ⊢
     sysMknodOut A 0#64 := by
   iintro ⟨Hblk, Hbs, Hir, Hok⟩
@@ -135,8 +134,7 @@ theorem sys_mknod_tail_58 (EO : END_OP) (Γ : SchedNames) [ClaimIs (hlc := hlc) 
     trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie (procAddr A.j) ∗ sysMknodEnv (hlc := hlc) Γ ∗
     procPrivFd A.γ (procAddr A.j) A.pid (sysMknodV1 A P2) (sysMknodM1 A P2) ∗
     (∀ c : CPU, sysMknodPostA k A c) ∗ bslots 3 ∗ irefSlots A.ns ∗ logOp icfgLog u ∗
-    mknodPostFail (hlc := hlc) (fsGammaL fscFs) fscFs A.V.cwi A.V.upt A.V.sz A.M A.v0.toNat
-      (sysMknodM1 A P2) (devArg A.v1) (devArg A.v2) A.P A.Pmiss A.Farm A.Fun A.Fok A.Fex
+    mknodPostFail (hlc := hlc) (fsGammaL fscFs) fscFs A.V.cwi (viewLazy A.V.upt A.V.sz A.M) A.v0.toNat (devArg A.v1) (devArg A.v2) A.P A.Pmiss A.Farm A.Fun A.Fok A.Fex
     ⊢ wpLoop (GF := GF) cpu := by
   iintro ⟨Hk, Hpc, Hcells, Hbuf, Hlow, Hte, Hce, #Henv, Hblk, HΦ, Hbs, Hir, Hop, Hfail⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
@@ -202,7 +200,7 @@ theorem sys_mknod_tail_46 (IUP : IUNLOCKPUT) (EO : END_OP) (Γ : SchedNames)
     (∀ c : CPU, sysMknodPostA k A c) ∗
     createLocked A.pid kk qi s g inum dn bm ∗
     bslots 3 ∗ irefSlots ns1 ∗ logOpS icfgLog n Sb ∗
-    mknodPostOk (hlc := hlc) (fsGammaL fscFs) (sysMknodM1 A P2) A.v0.toNat (devArg A.v1)
+    mknodPostOk (hlc := hlc) (fsGammaL fscFs) (viewLazy A.V.upt A.V.sz A.M) A.v0.toNat (devArg A.v1)
       (devArg A.v2) A.P A.Farm A.Fun A.Fok A.Fex
     ⊢ wpLoop (GF := GF) cpu := by
   iintro ⟨Hk, Hpc, Hcells, Hbuf, Hlow, Hte, Hce, #Henv, Hblk, HΦ, Hlk, Hbs, Hir, Hop, Hok⟩

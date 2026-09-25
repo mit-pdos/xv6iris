@@ -86,7 +86,7 @@ theorem sys_link_argstr (AS : ARGSTR) (Γ : SchedNames) (cpu : CPU) (k' : KCtx) 
     procPrivBareAt curCtx pa pid V M ∗ byteBuf buf (DFrac.own 1) old ∗
     (∀ (c : CPU) (spie spp : Bool) (R' : RegMap) (P' : UPtd) (bs : List (BitVec 8)),
       ⌜calleeSaved k'.regs R' ∧ V.upt.extSz V.sz P' ∧
-        fetchstrRet (viewFaulted V.upt P' M) v.toNat old bs (R' 10#5)⌝ -∗
+        fetchstrRet (viewLazy V.upt V.sz M) v.toNat old bs (R' 10#5)⌝ -∗
       kctx c ((k'.withSpie spie spp).withRegs R') -∗ pcIs c (jumpPc (k'.regs 1#5)) -∗
       trapCsrsExt c se -∗ cpuClaimExt c se pj -∗
       procPrivBareAt curCtx pa pid { V with upt := P' } (viewFaulted V.upt P' M) -∗

@@ -207,7 +207,7 @@ theorem fetchstr_copyinstr (CI : COPYINSTR) (c : CPU) (k' : KCtx) (γl : GName) 
       (∃ (P' : UPtd) (bs' : List (BitVec 8)),
         ⌜P.extSz (k'.regs 11#5) P' ∧
           ((R' 10#5 = 0#64 ∧ ∃ s, umemStr (viewFaulted P P' M) (k'.regs 13#5).toNat old.length = some s ∧
-              bs' = s ++ old.drop s.length) ∨
+              bs' = s ++ old.drop s.length ∧ umMapped P' (k'.regs 13#5).toNat s.length) ∨
            (R' 10#5 = -1#64 ∧ ∃ d, d ≤ old.length ∧
               bs' = umemRead (viewFaulted P P' M) (k'.regs 13#5).toNat d ++ old.drop d))⌝ ∗
         procPtAt P' (viewFaulted P P' M) ∗ byteBuf (k'.regs 12#5) (DFrac.own 1) bs') -∗
@@ -498,13 +498,13 @@ theorem fetchstr_proof (MP : MYPROC) (CI : COPYINSTR) (SL : STRLEN) : FETCHSTR :
     f24.trans e24, f25.trans e25, f26.trans e26, f27.trans e27⟩
   have hR2 : R2 2#5 = k.regs 2#5 + 0xFFFFFFFFFFFFFFD0#64 := f2.trans e2
   obtain ⟨hext, hpost⟩ := hpost
-  rcases hpost with ⟨h0, s, hs, hbs⟩ | ⟨hm1, d, hd, hbs⟩
+  rcases hpost with ⟨h0, s, hs, hbs, hmap⟩ | ⟨hm1, d, hd, hbs⟩
   · -- success: strlen(buf)
     obtain ⟨pl, rfl, hnul, hlt⟩ := fetchstr_umemStr _ _ _ s hs
     subst hbs
     iapply (fetchstr_tail_ok SL cpu c13 k
       (fun r => iprop(∃ (Q' : UPtd) (cs : List (BitVec 8)),
-        ⌜P.extSz V.sz Q' ∧ fetchstrRet (viewFaulted P Q' M) (k.regs 10#5).toNat old cs r⌝ ∗
+        ⌜P.extSz V.sz Q' ∧ fetchstrRet (viewLazy P V.sz M) (k.regs 10#5).toNat old cs r⌝ ∗
         procPrivBareAt curCtx pa pid { V with upt := Q' } (viewFaulted P Q' M) ∗ byteBuf (k.regs 11#5) (DFrac.own 1) cs)) hK56 hpin13 spie2 spp2 hsp12 R2 hR2 hpins (f9.trans e9) h0
         pl (old.drop (pl ++ [0#8]).length) (by omega) hnul)
       $$ [- $Hk $Hpc $Hframe $Hbuf $HΦ]
@@ -513,11 +513,11 @@ theorem fetchstr_proof (MP : MYPROC) (CI : COPYINSTR) (SL : STRLEN) : FETCHSTR :
     iexists (pl ++ [0#8] ++ old.drop (pl ++ [0#8]).length)
     iframe Hblk Hbuf
     ipureintro
-    exact ⟨hext, fetchstr_ret_ok _ _ old pl hs⟩
+    exact ⟨hext, fetchstr_ret_ok _ _ old pl (UMemL.umemStr_viewLazy M hext hs hmap)⟩
   · -- failure: -1
     iapply (fetchstr_tail_fail cpu c13 k
       (fun r => iprop(∃ (Q' : UPtd) (cs : List (BitVec 8)),
-        ⌜P.extSz V.sz Q' ∧ fetchstrRet (viewFaulted P Q' M) (k.regs 10#5).toNat old cs r⌝ ∗
+        ⌜P.extSz V.sz Q' ∧ fetchstrRet (viewLazy P V.sz M) (k.regs 10#5).toNat old cs r⌝ ∗
         procPrivBareAt curCtx pa pid { V with upt := Q' } (viewFaulted P Q' M) ∗ byteBuf (k.regs 11#5) (DFrac.own 1) cs)) hK56 hpin13 spie2 spp2 hsp12 R2 hR2 hpins hm1)
       $$ [- $Hk $Hpc $Hframe $HΦ]
     iexists P'
