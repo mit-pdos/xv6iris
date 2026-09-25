@@ -242,23 +242,24 @@ set_option maxHeartbeats 1600000 in
 and a reservation that covers it. -/
 theorem iput_callR [Fscfg] [Icfg] [CurCtx] (IP : IPUT) (Γ : SchedNames)
     [ClaimIs (hlc := hlc) GF Γ] (c : CPU) (k' : KCtx) (j : Nat) (v : BitVec 64) (n : Nat)
-    (pidv : BitVec 32) (dqp : DFrac) (s : Bool) (hs : k'.sie = s)
+    (pidv : BitVec 32) (dqp : DFrac) (pj : BitVec 64) (hpj : k'.proc = pj) (s : Bool) (hs : k'.sie = s)
     (hj : j < NPROC) (hproc : k'.proc = procAddr j) (hK : iputSlots ≤ k'.avail)
     (hnoff : k'.noff = 0) (htier : k'.tier = KTier.kpt) (hn : iputUnits ≤ n)
     (ha0 : k'.regs 10#5 = v) :
     kctx c k' ∗ pcIs c KA.«iput» ∗ procsInv Γ ∗
-    trapCsrsExt c s ∗ cpuClaimExt c s k'.proc ∗ panicEnv ∗ fsReady (hlc := hlc) ∗
-    inodeHeld v ∗ wordPointsTo (pPid k'.proc) 4 dqp pidv ∗ bslots 3 ∗ logOp icfgLog n ∗
-    wpNext true k'.proc c (fun cpu' => iprop(∀ (spie spp : Bool) (R' : RegMap) (n' : Nat),
+    trapCsrsExt c s ∗ cpuClaimExt c s pj ∗ panicEnv ∗ fsReady (hlc := hlc) ∗
+    inodeHeld v ∗ wordPointsTo (pPid pj) 4 dqp pidv ∗ bslots 3 ∗ logOp icfgLog n ∗
+    wpNext true pj c (fun cpu' => iprop(∀ (spie spp : Bool) (R' : RegMap) (n' : Nat),
       ⌜calleeSaved k'.regs R'⌝ -∗
       kctx cpu' ((k'.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k'.regs 1#5)) -∗
-      trapCsrsExt cpu' s -∗ cpuClaimExt cpu' s k'.proc -∗
-      wordPointsTo (pPid k'.proc) 4 dqp pidv -∗
+      trapCsrsExt cpu' s -∗ cpuClaimExt cpu' s pj -∗
+      wordPointsTo (pPid pj) 4 dqp pidv -∗
       bslots 3 -∗
       ⌜n - iputUnits ≤ n' ∧ n' ≤ n⌝ -∗
       logOp icfgLog n' -∗
       irefSlot -∗ wpLoop cpu'))
     ⊢ wpLoop (GF := GF) c := by
+  subst hpj
   unfold inodeHeld
   iintro ⟨Hk, Hpc, #Hpi, Hte, Hce, #Hpe, #Hrdy, ⟨%kk, %q, %inum, %hv, %hkk, %hnib, %hpos, Hrefp⟩,
     Hpid, Hbs, Hop, Hnext⟩

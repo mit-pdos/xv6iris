@@ -44,7 +44,10 @@ theorem sysx_sp4 (x : BitVec 64) :
     x - 8#64 * BitVec.ofNat 64 4 = x + 0xFFFFFFFFFFFFFFE0#64 := by bv_decide
 
 section
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CurCtx]
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+  [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
+  [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF]
+  [Appcfg GF] [FileG GF] [Fscfg] [Icfg] [CurCtx]
 
 /-! ## The callees -/
 
@@ -70,8 +73,9 @@ theorem sysx_argint (AI : ARGINT) (c : CPU) (k' : KCtx) (tfp : BitVec 44) (ws : 
 
 /-- `kexit` at its eb contract, with its stack closer stated at an explicit
 `sp`/`avail` and the complement at a named index `s`. -/
-theorem sysx_kexit (KX : KEXIT) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ] [FsEnv]
-    (c : CPU) (k' : KCtx) (γw : GName) (j : Nat) (pid : BitVec 32) (V : ProcPriv)
+theorem sysx_kexit (KX : KEXIT) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+    (c : CPU) (k' : KCtx) (γw γl : GName) (γ : FileNames) (γkl : GName) (γk : KmemNames)
+    (on : Option Nat) (j : Nat) (pid : BitVec 32) (V : ProcPriv)
     (M : Nat → List (BitVec 8)) (ip : BitVec 64) (sp : BitVec 64) (n : Nat) (s : Bool)
     (hj : j < NPROC) (hproc : k'.proc = procAddr j) (hK : kexitSlots ≤ k'.avail)
     (hs : k'.sie = s) (hnoff : k'.noff = 0)
@@ -80,11 +84,15 @@ theorem sysx_kexit (KX : KEXIT) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ] [
     kctx c k' ∗ pcIs c KA.«kexit» ∗ procsInv Γ ∗
     trapCsrsExt c s ∗ cpuClaimExt c s (procAddr j) ∗
     isLock γw waitLockAddr "wait_lock" waitLockPay ∗ initprocIs ip ∗
-    procPrivNoctxAt curCtx (procAddr j) pid V M ∗ dormantAllow ∗
+    isFtable γl γ ∗ panicEnv ∗
+    isLock γkl kmemLockAddr "kmem" (kmemRes γk) ∗ kallocAvail γk on ∗
+    fsReady (hlc := hlc) ∗ bslots 3 ∗
+    fdSlots FDSPARE ∗ irefSlots IREFSPARE ∗
+    procPrivFd γ (procAddr j) pid V M ∗ (∃ sts, fdFrags V.fdg sts) ∗
     (stackOwn sp n -∗ stackOwn (V.kstack + 4096#64) 512)
     ⊢ wpLoop (GF := GF) c := by
   subst hs
-  have h := KX.wp_kexit_eb (hlc := hlc) (GF := GF) Γ c k' γw j pid V M ip
+  have h := KX.wp_kexit_eb (hlc := hlc) (GF := GF) Γ c k' γw γl γ γkl γk on j pid V M ip
     hj hproc hK hnoff htier hinit
   unfold wp_kexit_eb_body at h
   simp only [kexitAddr, KCtx.sp, hsp, hav, hproc] at h
@@ -149,19 +157,22 @@ theorem sys_exit_br_fffffffffffff71c : KA.«sys_exit» + 0xfffffffffffff71c#64 =
 set_option maxHeartbeats 64000000 in
 set_option maxRecDepth 20000 in
 theorem sys_exit_proof (AI : ARGINT) (KX : KEXIT) : SYSEXIT := ⟨
-  fun {hlc GF} _ _ _ _ _ X Γ _ _ cpu k γw j pid V M ip v hj hproc hv hK hnoff htier hinit => by
+  fun {hlc GF} _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ X Γ _ cpu k γw γl γ γkl γk on j pid V M ip v
+      hj hproc hv hK hnoff htier hinit => by
   obtain ⟨ξ0, t0⟩ := X
   letI : CurCtx := ⟨ξ0, t0⟩
   unfold wp_sys_exit_eb_body
   simp only [sysExitAddr]
-  iintro ⟨Hk, Hpc, #Hpi, Hte, Hce, #Hwl, #Hinit, Hblk, Hal, Hcloser⟩
+  iintro ⟨Hk, Hpc, #Hpi, Hte, Hce, #Hwl, #Hinit, #Hft, #Hpe, #Hkl, Hav, #Hrdy, Hbs, Hfsp, Hirs,
+    Hblk, Hfr, Hcloser⟩
   icases kctx_tier cpu k $$ Hk with ⟨%hct, Hk⟩
   have ht0 : t0 = KTier.kpt := hct.symm.trans htier
   subst ht0
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
   have hK4 : 4 ≤ k.avail := by unfold sysExitSlots at hK; omega
   -- the trapframe pointer and page, out of the block
-  icases (show procPrivNoctxAt (GF := GF) curCtx (procAddr j) pid V M ⊢
+  icases (procPrivFd_split γ (procAddr j) pid V M).1 $$ Hblk with ⟨Hcore, Hofs⟩
+  icases (show procPrivCoreNoctxAt (GF := GF) curCtx (procAddr j) pid V M ⊢
       ⌜V.sz.toNat ≤ uvmMaxsz ∧ umBelow V.sz V.upt ∧ V.pagetable = pageAddr V.upt.root ∧
         V.trapframe = pageAddr V.upt.tfp⌝ ∗
       wordPointsTo (pPid (procAddr j)) 4 pidPriv pid ∗
@@ -169,12 +180,12 @@ theorem sys_exit_proof (AI : ARGINT) (KX : KEXIT) : SYSEXIT := ⟨
        wordPointsTo (pSz (procAddr j)) 8 (DFrac.own 1) V.sz ∗
        wordPointsTo (pPagetable (procAddr j)) 8 (DFrac.own 1) V.pagetable ∗
        wordPointsTo (pTrapframe (procAddr j)) 8 (DFrac.own 1) V.trapframe ∗
-       ofileCells (procAddr j) (DFrac.own 1) V.ofile ∗
        wordPointsTo (pCwd (procAddr j)) 8 (DFrac.own 1) V.cwd ∗
        pnameCells (procAddr j) (DFrac.own 1) V.name) ∗
-      procPtAt V.upt M ∗ tfPageAt V.upt.tfp V.tf ∗ ⌜V.pvLazy = false → lazyFree V.upt.um V.sz⌝
-      from by unfold procPrivNoctxAt procFieldsNoctx; iintro H; iexact H) $$ Hblk
-    with ⟨%hVb, Hpid, ⟨Hks, Hsz, Hpg, Htf, Hof, Hcwd, Hnm⟩, HPt, HTf, %hlz⟩
+      procPtAt V.upt M ∗ tfPageAt V.upt.tfp V.tf ∗ ⌜V.pvLazy = false → lazyFree V.upt.um V.sz⌝ ∗
+      cwdRefAt V.cwd V.cwi
+      from by unfold procPrivCoreNoctxAt procPrivBareAt procFieldsNoOfile; iintro ⟨⟨H1, H2, H3, H4, H5, H6⟩, H7⟩; iframe) $$ Hcore
+    with ⟨%hVb, Hpid, ⟨Hks, Hsz, Hpg, Htf, Hcwd, Hnm⟩, HPt, HTf, %hlz, Hcwr⟩
   ihave Htf := (show wordPointsTo (GF := GF) (pTrapframe (procAddr j)) 8 (DFrac.own 1) V.trapframe ⊢
       wordPointsTo (pTrapframe k.proc) 8 (DFrac.own 1) (pageAddr V.upt.tfp) from by rw [hVb.2.2.2, hproc]) $$ Htf
   -- the prologue ; a1 = &n ; a0 = 0 ; jal argint
@@ -218,10 +229,10 @@ theorem sys_exit_proof (AI : ARGINT) (KX : KEXIT) : SYSEXIT := ⟨
     -- the block, closed again
     ihave Htf := (show wordPointsTo (GF := GF) (pTrapframe k.proc) 8 (DFrac.own 1) (pageAddr V.upt.tfp) ⊢
         wordPointsTo (pTrapframe (procAddr j)) 8 (DFrac.own 1) V.trapframe from by rw [hVb.2.2.2, hproc]) $$ Htf
-    ihave Hblk : procPrivNoctxAt (GF := GF) curCtx (procAddr j) pid V M $$ [Hpid Hks Hsz Hpg Htf Hof Hcwd Hnm HPt HTf]
+    ihave Hblk : procPrivFd (GF := GF) γ (procAddr j) pid V M $$ [Hpid Hks Hsz Hpg Htf Hcwd Hnm HPt HTf Hcwr Hofs]
     case' _ =>
-      unfold procPrivNoctxAt procFieldsNoctx
-      iframe Hpid Hks Hsz Hpg Htf Hof Hcwd Hnm HPt HTf
+      unfold procPrivFd procPrivCoreNoctxAt procPrivBareAt procFieldsNoOfile procOfiles
+      iframe Hpid Hks Hsz Hpg Htf Hcwd Hnm HPt HTf Hcwr Hofs
       ipureintro; exact ⟨hVb, hlz⟩
     ihave Hce := (show cpuClaimExt (GF := GF) cpu k.sie k.proc ⊢ cpuClaimExt cpu k.sie (procAddr j) from by
       rw [hproc]) $$ Hce
@@ -230,10 +241,11 @@ theorem sys_exit_proof (AI : ARGINT) (KX : KEXIT) : SYSEXIT := ⟨
       (by omega) hal
       (stackOwn (V.kstack + 4096#64) 512) $$ [F0 F1 Flo Fnn F3 Hcloser]
     case' _ => iframe
-    iapply (sysx_kexit KX Γ cpu _ γw j pid V M ip (k.regs 2#5 + 0xFFFFFFFFFFFFFFE0#64)
+    iapply (sysx_kexit KX Γ cpu _ γw γl γ γkl γk on j pid V M ip (k.regs 2#5 + 0xFFFFFFFFFFFFFFE0#64)
         (trapRes k.sie + k.avail - 4) k.sie
         hj ?hpr ?hKx ?hs ?hn2 ?ht hinit ?hsp ?hav)
-      $$ [- $Hk $Hpc $Hpi $Hte $Hce $Hwl $Hinit $Hblk $Hal $Hcloser]
+      $$ [- $Hk $Hpc $Hpi $Hte $Hce $Hwl $Hinit $Hft $Hpe $Hkl $Hav $Hrdy $Hbs $Hfsp $Hirs $Hblk $Hfr
+          $Hcloser]
     case hpr => k_norm_g; exact hproc
     case hKx => k_norm_g; unfold sysExitSlots at hK; omega
     case hs => k_norm_g
@@ -245,7 +257,7 @@ theorem sys_exit_proof (AI : ARGINT) (KX : KEXIT) : SYSEXIT := ⟨
   case hn => k_norm_g; rw [hnoff]; decide
   case hKa =>
     k_norm_g
-    unfold sysExitSlots kexitSlots fsSlots at hK
+    unfold sysExitSlots kexitSlots filecloseSlots endOpSlots at hK
     unfold argintSlots argrawSlots
     omega⟩
 
