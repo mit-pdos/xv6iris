@@ -288,8 +288,10 @@ jobs:
           #     [Hphi] hypothesis, an iProp entailment) and the FS durability
           #     record.
           #   xv6_fs_adequacy_xv6Sigma   -- [phi] chosen.
-          #   pipe_adequacy_pipeSigma_final -- the chain at [AppPipe.app_pipe],
-          #     closed (the echo theorem is its corollary).
+          #   union_adequacy_closed -- the chain at the UNION application
+          #     (UInitUnion; echo, echo > f, cat f, echo | cat^n, cat f | cat^n),
+          #     closed.  It replaced the file and pipeline applications'
+          #     theorems (union cut C9h deleted them).
           #
           # NEITHER OF THE MIDDLE TWO CONTAINS THE OTHER: a free [phi] puts
           # the ghost layer in that base, while only the fs one reaches the
@@ -302,12 +304,13 @@ jobs:
           # the application theorem: it has the most PROOF behind it and the
           # least STATEMENT in front of it.  What it says is a property of the
           # UART trace, so its base is the machine + device model, [ObsTrace]
-          # and [PipeDisc]/[EchoDisc], with no file system in it at all.
+          # and the union line model ([UnionDisc]/[PipesDisc]/[FileDisc] and
+          # the program trees they read), with no file-system proof in it.
           #
-          # WHAT TO WATCH IS [PipeDisc.v]'s CONTRIBUTION.  For the other three
+          # WHAT TO WATCH IS THE LINE MODEL'S CONTRIBUTION.  For the other three
           # the statement vocabulary is FS consistency, which this tree defines
           # either way; here THE PREDICATE IS THE SPECIFICATION, so a
-          # Print Assumptions of a theorem about the wrong [disc_p]/[good_out_p] is
+          # Print Assumptions of a theorem about the wrong [lm_disc]/[lm_good_out] is
           # worth nothing and this table is what rules that out.  The counts
           # are not quoted in this comment on purpose: they move with every
           # proof edit, and the tables below print the live ones.
@@ -319,7 +322,7 @@ jobs:
           for thm in RiscvAdequacy.riscv_power_adequacy \
                      SystemAdequacy.xv6_power_adequacy_xv6Σ \
                      SystemAdequacy.xv6_fs_adequacy_xv6Σ \
-                     UInitPipeAdequacy.pipe_adequacy_pipeΣ_final; do
+                     UInitUnion.union_adequacy_closed; do
             log="$RUNNER_TEMP/tcb-${thm##*.}.log"
             if ./tools/tcb/tcb-report.sh "xv6iris.$thm" > "$log" 2>&1; then
               python3 tools/tcb/tcb_report.py "$log" --md --target "$thm" \
