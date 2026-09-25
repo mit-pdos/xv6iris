@@ -1745,6 +1745,9 @@ UkShPipeForkTwin.v
 UShPipeAssembly.v
 UkPipesIface.v
 UkPipesEntries.v
+UkCatFIface.v
+UkCatFEntries.v
+UShCatFStage.v
 PipesFire.v
 PipesView.v
 UShPipesDefs.v
