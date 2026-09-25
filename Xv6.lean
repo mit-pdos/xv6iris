@@ -751,3 +751,16 @@ import Xv6.IreclaimOrphan
 import Xv6.IreclaimScan
 import Xv6.ProofIreclaim
 import Xv6.LinkIreclaim
+import Xv6.SpecDirlink
+import Xv6.FsCallSitesI
+import Xv6.DirlinkParts
+import Xv6.DirlinkDefs
+import Xv6.DirlinkTail
+import Xv6.DirlinkFound
+import Xv6.DirlinkWrite
+import Xv6.DirlinkRec
+import Xv6.DirlinkScan
+import Xv6.DirlinkLoop
+import Xv6.DirlinkSetup
+import Xv6.ProofDirlink
+import Xv6.LinkDirlink
