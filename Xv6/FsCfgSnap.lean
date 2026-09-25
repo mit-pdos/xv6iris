@@ -59,18 +59,13 @@ instances the mint chooses.
 7. Rocq's `Heplo` (the NINODE `icfg_ieplo` authorities `icfg_alloc` mints)
    is dropped here exactly as in Rocq (no kit carries it).
 8. **THE RECORD IS BUILT BY A PARAMETER `mk`** (`fsCfgAllocSnap_of mk hmk`,
-   `hmk : fsCfgMkOk mk`), not by `MkFscfg …` inline.  REASON (a bug in a
-   landed file, reported, not fixed here): `Xv6/FsCfgDefs.lean` opens
-   `Std MachCSL` but not `Iris`, so `GName` in its six fields `fscPrintk`,
-   `fscKalloc`, `fscKpages`, `fscDlock`, `fscIreg`, `fscItlock` is an
-   AUTO-BOUND IMPLICIT: `#check @Fscfg.mk` shows `({GName : Type} → GName)`
-   for each, i.e. `∀ α, α`, so `Fscfg` HAS NO INSTANCE AT ALL and no record
-   can be written.  Every consumer elaborates (`@fscItlock inst Nat`), which
-   is why nothing noticed.  After the one-line fix (`open Std MachCSL` →
-   `open Iris Std MachCSL` at FsCfgDefs.lean:102) the Rocq-shaped
-   `fsCfgAllocSnap` is `fsCfgAllocSnap_of fsCfgSnapRec fsCfgSnapRec_ok`
-   with `fsCfgSnapRec := { fscPrintk := gpr, … }` and `fsCfgSnapRec_ok`
-   seventeen `rfl`s.
+   `hmk : fsCfgMkOk mk`), which keeps the mint's proof independent of
+   `Fscfg`'s field spelling.  The Rocq-shaped `fsCfgAllocSnap` (end of
+   file) instantiates it at the concrete record `fsCfgSnapRec` (Rocq's
+   `MkFscfg …`), whose ties `fsCfgSnapRec_ok` are seventeen `rfl`s.
+   (History: this parameter was introduced while `Xv6/FsCfgDefs.lean`
+   lacked `open Iris`, which made `GName` in six `Fscfg` fields an
+   auto-bound implicit, so no record could be written; fixed.)
 -/
 import Xv6.FsCfgSnapVocab
 import Xv6.FsBootSupply
@@ -571,6 +566,38 @@ theorem fsCfgAllocSnap_wf (mk : GName → GName → KmemNames → UartNames → 
     (by rw [hnibeq]; have : (2 : Nat) ^ 16 ≤ 2 ^ 32 := Nat.pow_le_pow_right (by decide) (by decide)
         omega)
     hcovin (fun b h1 h2 => snapCovWindow S Pb cov b (skBytes hok) hlogsub h1 h2)
+
+
+/-- **Rocq `MkFscfg`**: the configuration record the mint returns, at the
+names it minted (deviation 8's concrete builder). -/
+@[reducible] def fsCfgSnapRec (gpr gkm : GName) (γk : KmemNames) (γd : UartNames)
+    (γv : DiskNames) (gdl : GName) (bn : BcacheNames) (γfs : FsNames)
+    (cov : ExtTreeSet Nat compare) (sb : FsSb) (γi : GName) (cn : IcNames) (gtl : GName)
+    (cnm : ConsNames) : Fscfg :=
+  ⟨gpr, gkm, (γk.cnt, γk.pend), γd, γv, gdl, bn, γfs, cov, sb.sbLogstart, sb.sbBmapstart,
+    sb.sbSize, sb.sbNinodes, γi, cn, gtl, cnm⟩
+
+/-- `fsCfgSnapRec`'s projections read its arguments back. -/
+theorem fsCfgSnapRec_ok : fsCfgMkOk fsCfgSnapRec := by
+  intro _ _ _ _ _ _ _ _ _ _ _ _ _ _
+  exact ⟨rfl, rfl, rfl, rfl, rfl, rfl, rfl, rfl, rfl, rfl, rfl, rfl, rfl, rfl, rfl, rfl, rfl⟩
+
+/-- **Rocq `fs_cfg_alloc_snap`** (as `BootShared` calls it, off the snapshot
+hypothesis): `fsCfgAllocSnap_wf` at the concrete record `fsCfgSnapRec`. -/
+theorem fsCfgAllocSnap [CurCtx]
+    (E : CoPset) (γd : UartNames) (γv : DiskNames) (cnm : ConsNames)
+    (dk : Nat → BitVec 8) (ndisk : Nat) (S : FsStateRec) (cov : ExtTreeSet Nat compare)
+    (nib : Nat) (gsn gln gtn : GName) (Pb : Nat → List (BitVec 8))
+    (hwf : fsBootSnapWf dk ndisk S Pb S.fssSb nib cov) :
+    ⊢@{IProp GF} ([∗list] b ∈ List.range (ndisk / BSIZE), diskBlock γv b (fsBlocks dk b)) -∗
+      ▷ appPred appRun (absView S.fssInodes) -∗
+      appXfer -∗
+      fsCrashSeamAt (hlc := hlc) appGuest cov S.fssSb.sbLogstart -∗
+      fsSnap (snapGamma gsn gln gtn) gsn (fsRestrict Pb (fsHomeList cov S.fssSb.sbLogstart)) S -∗
+      |={E}=> ∃ (I : Icfg) (F : Fscfg),
+        fsCfgSnapPost (hlc := hlc) I F dk S.fssSb nib cov γd γv cnm (snapSpent S nib) Pb
+          (hdrWset (fsBlocks dk) S.fssSb.sbLogstart) :=
+  fsCfgAllocSnap_wf fsCfgSnapRec fsCfgSnapRec_ok E γd γv cnm dk ndisk S cov nib gsn gln gtn Pb hwf
 
 end FsCfgSnap
 

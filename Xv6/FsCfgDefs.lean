@@ -99,7 +99,7 @@ import Xv6.ConsNames
 
 namespace Xv6
 
-open Std MachCSL
+open Iris Std MachCSL
 
 /-- Rocq `FsCfg.v`'s `Class fscfg`: the file system's canonical ghost
 names and its image geometry, AMBIENT rather than threaded. -/
