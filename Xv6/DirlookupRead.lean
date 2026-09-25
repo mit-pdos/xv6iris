@@ -45,7 +45,7 @@ theorem dirlookup_slots_panic (a : Nat) (h : dirlookupSlots ≤ a) : panicSlots 
 set_option maxHeartbeats 16000000 in
 /-- **`+0x6a` TAKEN, `+0x46 .. +0x4e`: THE SHORT READ** -- the literal, and
 `panic("dirlookup read")`, which never returns. -/
-theorem dirlookup_short (PA : PANIC) (c : CPU) (k : KCtx) (spie spp : Bool) (R : RegMap)
+theorem dirlookup_short (PA : PANIC) (cpu : CPU) (k : KCtx) (spie spp : Bool) (R : RegMap)
     (hK : dirlookupSlots ≤ k.avail) (hnoff : k.noff = 0)
     (hlocks : k.locks = []) :
     kctx cpu (((k.withSpie spie spp).pushed 12).withRegs R) ∗ pcIs cpu (KA.«dirlookup» + 0x46#64) ∗

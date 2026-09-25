@@ -488,8 +488,8 @@ REST of the byte ownership (`indOwned`, `inodeDat`, `inodePhi`) is
 RA-free as well (deviation 8). -/
 
 section RecOwned
-variable {GF : BundledGFunctors}
 open Iris Iris.BI Iris.ProofMode
+variable {GF : BundledGFunctors}
 
 /-- Inum `i`'s 64-byte slot of its inode block (Rocq's `rec_owned`).  The
 inum is `BitVec.ofNat 32 i`, Rocq's `fs_inum_bv i` (deviation 7). -/
@@ -682,8 +682,8 @@ end RecOwned
 /-! ### 3c.  ...and the rest of the inode's bytes (RA-free here, deviation 8) -/
 
 section InodeOwned
-variable {GF : BundledGFunctors}
 open Iris Iris.BI Iris.ProofMode
+variable {GF : BundledGFunctors}
 
 /-- THE INDIRECT BLOCK, at a share (durable-fs-plan.md §4/§6; Rocq's
 `ind_owned_q`).  `emp` when the node has none. -/
