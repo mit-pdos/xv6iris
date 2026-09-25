@@ -527,7 +527,6 @@ Section UkFileIface.
   Local Notation a1_idx := (mword_of_int 11 : mword 5).
   Local Notation a2_idx := (mword_of_int 12 : mword 5).
   Local Notation a7_idx := (mword_of_int 17 : mword 5).
-  Local Notation fcons_atc := (cons_dev_atc file_lm (file_params g) (file_links g)).
 
   (* ------------------------------------------------------------------- *)
   (*  the registry's tokens                                               *)
@@ -624,6 +623,28 @@ Section UkFileIface.
         UserFd.ufd γfd (Z.to_nat fd) (FdOpen true false (FdInode i γo OffHeld))
     | _ => emp
     end%I.
+
+  (* a protected device is never a tail input: its close is a standard
+     slot's *)
+  Context (Hw0 : forall d, d ∈ D0 -> forall i γo, w0 d <> FDIn false i γo).
+
+  (* =================================================================== *)
+  (*  THE CONSOLE'S CLAIM, ABSTRACT (union.md, review item S5).  Every    *)
+  (*  law from here to the record reads the claim only through the        *)
+  (*  console device, [UkConsOut.cons_dev_atc] at a line model [M], its   *)
+  (*  link parameters [Pm] and a persistent links bundle [LINKS] entailing *)
+  (*  the three console leaves ([UkConsOutGen]'s pattern): the file       *)
+  (*  application instantiates them at [file_links] (the glue below and   *)
+  (*  [UkFileEntries]), the union's claim C9e' at its own record.         *)
+  (* =================================================================== *)
+  Section UkFileIfaceGen.
+  Context (M : lmodel) (Pm : gen_params M).
+  Context (LINKS : iProp Σ) {LINKS_pers : Persistent LINKS}.
+  #[local] Existing Instance LINKS_pers.
+  Context (LINKS_w : LINKS -∗ gl_w M Pm).
+  Context (LINKS_blk : LINKS -∗ gl_blk M Pm).
+  Context (LINKS_taint : LINKS -∗ gl_taint M Pm).
+  Local Notation fcons_atc := (cons_dev_atc M Pm LINKS).
 
   (* the console at its round, remembering its codes *)
   Definition fif_out (d : nat) (alts : list (list (bv 8))) : iProp Σ :=
@@ -789,7 +810,7 @@ Section UkFileIface.
   Lemma fif_ans_ok (l : list fdstate) (ret : mword 64) :
     uk_open_taint_fd γfd l ret -∗ ⌜bv_signed ret = -1 \/ 0 <= bv_signed ret⌝.
   Proof using .
-    clear D0 w0 qf sf.
+    clear Hw0 D0 w0 qf sf.
     rewrite /uk_open_taint_fd. iIntros "[Hal | [%Hr _]]".
     - iDestruct "Hal" as (fd rd wr t) "[%Hb _]". destruct Hb as (Hr & Hfdlt & _).
       iPureIntro. right. rewrite Hr bvs_moi_small; [lia |].
@@ -926,7 +947,7 @@ Section UkFileIface.
     ((fif_fds fdm -∗ fif_out d [drop (length bs) a] -∗ K (Z.of_nat (length bs)))
      ∧ (∀ x, fif_taint (dom fdm) -∗ K x)) -∗
     wr_obl N P fd bs K.
-  Proof using Hcons Hsw HPc.
+  Proof using LINKS_blk LINKS_pers LINKS_taint LINKS_w Hsw HPc.
     intros _ Hfd Ha Hpre. iIntros "Hfds Hout HK".
     iDestruct "Hout" as (v I C) "[Htk Hout]".
     iDestruct "Hfds" as (l vs w) "[(Hstd & Hcwd & %Hok & Hpool & Htoks & Hhs & Hdq & #He) Hk]".
@@ -936,9 +957,8 @@ Section UkFileIface.
     pose proof Hok as (H1 & H2 & _). destruct (H1 fd d Hfd) as [H0 Hlt].
     pose proof (H2 fd d Hfd) as Hrow. rewrite Hv in Hrow. destruct Hrow as (Hs & rb & Hrow).
     destruct (Z_of_nat_complete fd H0) as [k ->]. rewrite Nat2Z.id in Hrow.
-    iApply (cons_write_gl_atc file_lm (file_params g) (file_links g)
-              (LINKS_pers := file_links_persistent g)
-              (file_links_gl_w g) (file_links_gl_blk g) (file_links_gl_taint g)
+    iApply (cons_write_gl_atc M Pm LINKS (LINKS_pers := LINKS_pers)
+              LINKS_w LINKS_blk LINKS_taint
               N P Hsw C v I l k rb alts a bs K
               ltac:(unfold NSTD in *; lia) Hrow Ha Hpre with "Hstd Hout").
     iIntros "Hstd Hout". iDestruct "HK" as "[HK _]".
@@ -956,7 +976,7 @@ Section UkFileIface.
     UserFd.ustd γfd l -∗ D -∗ (UserFd.ustd γfd l -∗ D -∗ K 0) -∗
     wr_obl N P (Z.of_nat fd) [] K.
   Proof using Hsw HPc.
-    clear D0 w0 qf sf. intros Hfd Hl. iIntros "Hstd Hd HK".
+    clear Hw0 D0 w0 qf sf. intros Hfd Hl. iIntros "Hstd Hd HK".
     iIntros (h m avail ua tx dq f) "%Hf %Ha0 %Ha1 %Ha2 #Hcode Hsrc Hrun Hcont".
     cbn [length] in *.
     iEval (rewrite (usrc_at_rebase N tx dq ua (uint (m !!! Regidx a1_idx)) 0 f
@@ -1547,10 +1567,6 @@ Section UkFileIface.
     - iApply (fif_close_in fdm fd d Sin files paths K Hfd Hns HD with "Hfds Hfiles Hdev HK").
   Qed.
 
-  (* a protected device is never a tail input: its close is a standard
-     slot's *)
-  Context (Hw0 : forall d, d ∈ D0 -> forall i γo, w0 d <> FDIn false i γo).
-
   (* [ei_close_shared]: a dup, or a PROTECTED device's descriptor -- the
      device stays registered and with the handler, only the ledger's slot
      closes *)
@@ -1603,7 +1619,8 @@ Section UkFileIface.
   (* ------------------------------------------------------------------- *)
 
   Definition file_iface : ep_ifaceP (Dp := D0) N P.
-  Proof using Hcons Heq HPc HNc Hsr Hsw Hso Hsc Hse D0 w0 Hw0 qf sf γreg fifRegG0.
+  Proof using LINKS_blk LINKS_pers LINKS_taint LINKS_w Heq HPc HNc Hsr Hsw Hso Hsc Hse D0 w0 Hw0
+              qf sf γreg fifRegG0.
     refine (MkEIP (Dp := D0) N P fif_fds fif_out (fun _ _ => False%I) (fun _ => False%I) fif_outm
               fif_in (fun _ _ => False%I) (fun _ => False%I)
               (fun _ _ _ _ => False%I) (fun _ _ _ => False%I) (fun _ => False%I)
@@ -1637,6 +1654,10 @@ Section UkFileIface.
   Proof. reflexivity. Qed.
   Lemma fif_dev_of (d : nat) (x : dspec) : dev_of N P file_iface d x = fif_dev d x.
   Proof. by destruct x. Qed.
+  End UkFileIfaceGen.
+
+  (* THE FILE APPLICATION'S INSTANCE: the console at [file_links] *)
+  Local Notation fcons_atc := (cons_dev_atc file_lm (file_params g) (file_links g)).
 
   (* =================================================================== *)
   (*  2.  THE EXIT WAND, PROVED FROM THE LANDED ENTRIES' PAYLOADS         *)
@@ -1919,8 +1940,9 @@ Section UkFileIface.
       (ds : gset nat) :
     D0 = [0%nat] ->
     (forall d, d ∈ ds -> drained (dv d)) -> dom_ok_p D0 fdm ds -> fif_ok D0 w0 fdm l vs ->
-    ([∗ set] d ∈ ds, fif_dev d (dv d)) -∗
-    ⌜drained (dv 0%nat)⌝ ∗ ⌜vs !! 0%nat = Some (w0 0%nat)⌝ ∗ fif_dev 0%nat (dv 0%nat).
+    ([∗ set] d ∈ ds, fif_dev file_lm (file_params g) (file_links g) d (dv d)) -∗
+    ⌜drained (dv 0%nat)⌝ ∗ ⌜vs !! 0%nat = Some (w0 0%nat)⌝
+    ∗ fif_dev file_lm (file_params g) (file_links g) 0%nat (dv 0%nat).
   Proof using .
     intros HD0 Hdr Hdom Hok. iIntros "Hdev".
     rewrite HD0 in Hdom, Hok. apply dom_ok_p_iff in Hdom as [Hdp _].
@@ -1941,7 +1963,7 @@ Section UkFileIface.
     file_era_pin g (S gen_id) vf -∗ f0_lb vf s0 -∗
     □ (∀ (ps cs : list nat) (pos : nat), ⌜lm_wr_blk_t file_lm ps cs s0 I0 pos⌝ -∗
          UCatLend.catq_cat g c r qf sf v vf ps cs s0 I0 pos (-1) -∗ F -∗ ukn_pay N (-1)) -∗
-    F -∗ fif_exit_k.
+    F -∗ fif_exit_k file_lm (file_params g) (file_links g).
   Proof using .
     intros HD0 Hw Hfl. iIntros "#Hvf #Hf0 #HQ HF".
     iIntros (fdm l vs w files paths dv ds) "%Hdr %Hdom Hcore _ Hdev".
@@ -1978,7 +2000,8 @@ Section UkFileIface.
      lent (framed, [Wq]) and the deed's cursor at whatever landed *)
   Lemma fif_exit_k_redir (i : Z) (γo : gname) (ws : wordline) (Wq : iProp Σ) :
     D0 = [0%nat] -> w0 0%nat = FDFile i γo ws ->
-    □ (UEchoFile.ef_exit c r Wq i γo ws -∗ ukn_pay N (-1)) -∗ Wq -∗ fif_exit_k.
+    □ (UEchoFile.ef_exit c r Wq i γo ws -∗ ukn_pay N (-1)) -∗ Wq
+    -∗ fif_exit_k file_lm (file_params g) (file_links g).
   Proof using .
     intros HD0 Hw. iIntros "#HQ HWq".
     iIntros (fdm l vs w files paths dv ds) "%Hdr %Hdom Hcore _ Hdev".
@@ -2036,11 +2059,17 @@ Section UkFileIface.
     (forall fd d, pe_fd E !! fd = Some d -> fif_hdl fd (Some (w0 0%nat)) = emp%I) ->
     (forall p, p ∈ pe_paths E -> p = fname_f /\ fif_wr D0 w0 = false) ->
     pe_files E fname_f = snd <$> sf ->
-    UserFd.ustd γfd l -∗ UserCwd.ucwd (ukn_cwd N) FsImg.ROOTINO -∗ fif_exit_k -∗
+    UserFd.ustd γfd l -∗ UserCwd.ucwd (ukn_cwd N) FsImg.ROOTINO
+    -∗ fif_exit_k file_lm (file_params g) (file_links g) -∗
     fif_env -∗ fif_dq -∗ own γreg (fif_pool ∅ w0) -∗
-    (fif_tok 0%nat (1/2) (w0 0%nat) -∗ fif_dev 0%nat (pe_dev E 0%nat)) -∗
-    env_res N P file_iface E {[0%nat]}.
-  Proof using .
+    (fif_tok 0%nat (1/2) (w0 0%nat)
+     -∗ fif_dev file_lm (file_params g) (file_links g) 0%nat (pe_dev E 0%nat)) -∗
+    env_res N P (file_iface file_lm (file_params g) (file_links g)
+                   (LINKS_pers := file_links_persistent g)
+                   (file_links_gl_w g) (file_links_gl_blk g) (file_links_gl_taint g))
+      E {[0%nat]}.
+  (* [Hcons] kept in the arguments: the landed callers pass it *)
+  Proof using Hcons.
     intros HD0 Hd0 Hrow Hbnd Hnin Hhdl Hpaths Hfiles.
     iIntros "Hstd Hcwd Hk #He Hd Hpool Hdev". rewrite /env_res.
     iDestruct (fif_pool_own_take ∅ w0 0%nat with "Hpool") as "[Hpool Htk]"; [set_solver |].
@@ -2123,19 +2152,27 @@ Section UkFileIfaceCat.
   Proof using . simpl. apply _. Qed.
 
   Definition fif_write_cat :=
-    fif_write g r Hcons N (cat_prog N) (cat_stub_write N) γreg D0 w0 qf sf.
+    fif_write g r N (cat_prog N) (cat_stub_write N) γreg D0 w0 qf sf file_lm (file_params g) (file_links g)
+      (LINKS_pers := file_links_persistent g)
+      (file_links_gl_w g) (file_links_gl_blk g) (file_links_gl_taint g).
   Definition fif_write_m_cat :=
-    fif_write_m g r Heq N (cat_prog N) (cat_stub_write N) γreg D0 w0 qf sf.
+    fif_write_m g r Heq N (cat_prog N) (cat_stub_write N) γreg D0 w0 qf sf
+      file_lm (file_params g) (file_links g).
   Definition fif_read_cat :=
-    fif_read g r Heq N (cat_prog N) (cat_stub_read N) γreg D0 w0 qf sf.
+    fif_read g r Heq N (cat_prog N) (cat_stub_read N) γreg D0 w0 qf sf
+      file_lm (file_params g) (file_links g).
   Definition fif_open_cat :=
-    fif_open g r Heq N (cat_prog N) (cat_stub_open N) γreg D0 w0 qf sf.
+    fif_open g r Heq N (cat_prog N) (cat_stub_open N) γreg D0 w0 qf sf
+      file_lm (file_params g) (file_links g).
   Definition fif_open_absent_nt_cat :=
-    fif_open_absent_nt g r Heq N (cat_prog N) (cat_stub_open N) γreg D0 w0 qf sf.
+    fif_open_absent_nt g r Heq N (cat_prog N) (cat_stub_open N) γreg D0 w0 qf sf
+      file_lm (file_params g) (file_links g).
   Definition fif_close_in_cat :=
-    fif_close_in g r N (cat_prog N) (cat_stub_close N) γreg D0 w0 qf sf.
+    fif_close_in g r N (cat_prog N) (cat_stub_close N) γreg D0 w0 qf sf
+      file_lm (file_params g) (file_links g).
   Definition fif_exit_cat :=
-    fif_exit g r N (cat_prog N) (cat_stub_exit N) γreg D0 w0 qf sf.
+    fif_exit g r N (cat_prog N) (cat_stub_exit N) γreg D0 w0 qf sf
+      file_lm (file_params g) (file_links g).
 End UkFileIfaceCat.
 
 (* ===================================================================== *)
@@ -2161,7 +2198,9 @@ Section UkFileIfaceEcho.
   Context (qf : Qp) (sf : dst).
 
   Definition file_iface_echo : ep_ifaceP (Dp := D0) N (echo_prog N) :=
-    file_iface g r Heq Hcons N (echo_prog N) (echo_stub_read N) (echo_stub_write N)
+    file_iface g r Heq N (echo_prog N) (echo_stub_read N) (echo_stub_write N)
       (echo_stub_open N) (echo_stub_close N) (echo_stub_exit N) γreg D0 w0 qf sf
-      Hw0.
+      Hw0 file_lm (file_params g) (file_links g)
+      (LINKS_pers := file_links_persistent g)
+      (file_links_gl_w g) (file_links_gl_blk g) (file_links_gl_taint g).
 End UkFileIfaceEcho.

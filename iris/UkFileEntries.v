@@ -253,7 +253,7 @@ Section UkFileEntriesCat.
   (* a tainted round's exit wand: the payload off the taint in the core *)
   Lemma fif_exit_k_taint (r : file_names) (N : uk_names Σ) (γreg : gname)
       (D0 : list nat) (w0 : nat -> fdev) (qf : Qp) (sf : dst) :
-    file_taint (fgn_cl g) -∗ fif_exit_k g r N γreg D0 w0 qf sf.
+    file_taint (fgn_cl g) -∗ fif_exit_k g r N γreg D0 w0 qf sf file_lm (file_params g) (file_links g).
   Proof using .
     iIntros "#HT". rewrite /fif_exit_k.
     iIntros (fdm l vs w files paths dv ds) "_ _ Hcore _ _".
@@ -315,9 +315,12 @@ Section UkFileEntriesCat.
     iApply uslot_bupd.
     iMod (fif_reg_alloc w0) as (γreg) "Hpool". iModIntro.
     set (I := fun (N' : uk_names Σ) (Hpq : ukn_pay N' = Q) =>
-                file_iface g r Heq Hcons N' (cat_prog N') (HNc := ukn_const_of_eq N' Q Hpq HQc)
+                file_iface g r Heq N' (cat_prog N') (HNc := ukn_const_of_eq N' Q Hpq HQc)
                   (cat_stub_read N') (cat_stub_write N') (cat_stub_open N')
-                  (cat_stub_close N') (cat_stub_exit N') γreg [0%nat] w0 q s Hw0).
+                  (cat_stub_close N') (cat_stub_exit N') γreg [0%nat] w0 q s Hw0
+                  file_lm (file_params g) (file_links g)
+                  (LINKS_pers := file_links_persistent g)
+                  (file_links_gl_w g) (file_links_gl_blk g) (file_links_gl_taint g)).
     iPoseProof (cat_image_entry_env_f_c ws Mn sv t gn sts cw cs pidv Q
                   (own γreg (fif_pool ∅ w0)
                    ∗ (UCatLend.cat_lend g r q s v vf ps0 cs0 s0 I0 P ∗ F))%I
@@ -329,7 +332,7 @@ Section UkFileEntriesCat.
       destruct (fif_cat_env_pure w0 (take NSTD sts) rb rb2 v I0 _ alts
                   (fif_files (snd <$> s)) eq_refl Hl1 Hl2) as (Hd0 & Hrow & Hbnd).
       (* the exit wand, off the lend's bounds or the taint *)
-      iAssert (fif_exit_k g r N' γreg [0%nat] w0 q s ∗ UCatOut.cch g v vf ps0 cs0 s0 I0
+      iAssert (fif_exit_k g r N' γreg [0%nat] w0 q s file_lm (file_params g) (file_links g) ∗ UCatOut.cch g v vf ps0 cs0 s0 I0
                  (ralt_enc RCRan) P 0%nat)%I with "[Hcch HF]" as "[Hk Hcch]".
       { rewrite {2}/UCatOut.cch.
         iDestruct "Hcch" as "[(Ht & #Hps0 & #Hcs0 & #HI & #Hf0) | #HT]"; last first.
@@ -483,7 +486,7 @@ Section UkFileEntriesEcho.
     □ (∀ a : nat, ⌜a ∈ C⌝ -∗ ⌜exists cs, cons_adm file_lm s0 cs I0 a⌝ -∗
          gwc_post file_lm (file_params_at g s0) (S gen_id) v I0 a -∗
          fdq r qf sf -∗ F -∗ ukn_pay N (-1)) -∗
-    F -∗ fif_exit_k g r N γreg D0 w0 qf sf.
+    F -∗ fif_exit_k g r N γreg D0 w0 qf sf file_lm (file_params g) (file_links g).
   Proof using .
     intros HD0 Hw. iIntros "#Hvf #Hf0 #HQ HF".
     iIntros (fdm l vs w files paths dv ds) "%Hdr %Hdom Hcore _ Hdev".
@@ -591,9 +594,12 @@ Section UkFileEntriesEcho.
     iApply uslot_bupd.
     iMod (fif_reg_alloc w0) as (γreg) "Hpool". iModIntro.
     set (I := fun (N' : uk_names Σ) (Hpq : ukn_pay N' = Q) =>
-                file_iface g r Heq Hcons N' (echo_prog N') (HNc := ukn_const_of_eq N' Q Hpq HQc)
+                file_iface g r Heq N' (echo_prog N') (HNc := ukn_const_of_eq N' Q Hpq HQc)
                   (echo_stub_read N') (echo_stub_write N') (echo_stub_open N')
-                  (echo_stub_close N') (echo_stub_exit N') γreg [0%nat] w0 q s Hw0).
+                  (echo_stub_close N') (echo_stub_exit N') γreg [0%nat] w0 q s Hw0
+                  file_lm (file_params g) (file_links g)
+                  (LINKS_pers := file_links_persistent g)
+                  (file_links_gl_w g) (file_links_gl_blk g) (file_links_gl_taint g)).
     iPoseProof (echo_image_entry_env_c ws M s0 t gb sts cw cs pidv Q
                   (own γreg (fif_pool ∅ w0)
                    ∗ (gwc_blk file_lm (file_params_at g sb) (S gen_id) v I0 0%nat 0%nat
@@ -606,7 +612,7 @@ Section UkFileEntriesEcho.
       iDestruct (gwc_blk_f0 with "Hb") as "#Hf0".
       iDestruct (gwc_blk_forget_at with "Hb") as "Hb".
       (* the exit wand, off the lend's boot-state witness or the taint *)
-      iAssert (fif_exit_k g r N' γreg [0%nat] w0 q s)%I with "[HF]" as "Hk".
+      iAssert (fif_exit_k g r N' γreg [0%nat] w0 q s file_lm (file_params g) (file_links g))%I with "[HF]" as "Hk".
       { iDestruct "Hf0" as "[#HT | (%vf & #Hvf & #Hf0)]".
         { iApply (fif_exit_k_taint with "HT"). }
         iApply (fif_exit_k_echo_cons_d r N' γreg [0%nat] w0 q s v vf I0 sb [0%nat] F
@@ -773,9 +779,12 @@ Section UkFileEntriesRedir.
     iApply uslot_bupd.
     iMod (fif_reg_alloc w0) as (γreg) "Hpool". iModIntro.
     set (I := fun (N' : uk_names Σ) (Hpq : ukn_pay N' = Q) =>
-                file_iface g r Heq Hcons N' (echo_prog N') (HNc := ukn_const_of_eq N' Q Hpq HQc)
+                file_iface g r Heq N' (echo_prog N') (HNc := ukn_const_of_eq N' Q Hpq HQc)
                   (echo_stub_read N') (echo_stub_write N') (echo_stub_open N')
-                  (echo_stub_close N') (echo_stub_exit N') γreg [0%nat] w0 1%Qp None Hw0).
+                  (echo_stub_close N') (echo_stub_exit N') γreg [0%nat] w0 1%Qp None Hw0
+                  file_lm (file_params g) (file_links g)
+                  (LINKS_pers := file_links_persistent g)
+                  (file_links_gl_w g) (file_links_gl_blk g) (file_links_gl_taint g)).
     iPoseProof (echo_image_entry_env_c ws M s0 t gb sts cw cs pidv Q
                   (own γreg (fif_pool ∅ w0) ∗ UEchoFile.ef_pay (fgn_cl g) r Wq i γo ws)%I
                   I E {[0%nat]}
@@ -784,7 +793,7 @@ Section UkFileEntriesRedir.
                   with "[] Hnpw Hdep") as "#He".
     { iIntros "!>" (N' Hpq) "Hstd Hcwd (Hpool & HWq & Hc)".
       (* the exit wand: [Wq] framed, the cursor read off the drained device *)
-      iAssert (fif_exit_k g r N' γreg [0%nat] w0 1%Qp None)%I with "[HWq]" as "Hk".
+      iAssert (fif_exit_k g r N' γreg [0%nat] w0 1%Qp None file_lm (file_params g) (file_links g))%I with "[HWq]" as "Hk".
       { iApply (fif_exit_k_redir g r N' γreg [0%nat] w0 1%Qp None i γo ws Wq eq_refl eq_refl
                   with "[] HWq").
         iIntros "!> Hx". rewrite Hpq. iApply ("HQ" with "Hx"). }
