@@ -67,9 +67,8 @@ and re-split, and the escrow (`exitTok_intro`) is keyed at the stored word.
 The ZOMBIE park gets `genHalvesAt`, the xstate half + escrow and the row at
 `∅` (`kx_dormant_build`).
 
-Deviations from Rocq ProofKexit.v: the pid cell lent to the fs callees is
-the whole `pidPriv` half (Rocq lends a quarter, `proc_priv_cwd_pid`; the
-Lean fs contracts are generic in the fraction); the ghost steps under
+Deviations from Rocq ProofKexit.v: (the pid cell lent to the fs callees is
+a quarter, as Rocq's `proc_priv_cwd_pid` lends -- batch 8-P); the ghost steps under
 `wait_lock` sit after the acquire's register bookkeeping rather than at the
 exact Rocq instruction (they are pure ghost updates, order-insensitive).
 -/
@@ -82,6 +81,7 @@ import Xv6.SpecSched
 import Xv6.SpecReparent
 import Xv6.SpecWakeup
 import Xv6.FsCallSitesOp
+import Xv6.ProcPrivAcc
 import Xv6.CodeTactics
 
 namespace Xv6
@@ -306,18 +306,21 @@ variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [Fdslot
   [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
   [Appcfg GF] [FileG GF] [Fscfg] [Icfg] [X : CurCtx]
 
-/-- THE PID CELL, LENT OUT OF THE CORE for a callee's call (Rocq's
-`proc_priv_pid_ofile` / `proc_priv_cwd_pid` lending; `ProofSysClose`'s
-`sc_core_pid`). -/
+/-- THE PID CELL, A QUARTER OF IT LENT OUT OF THE CORE for a callee's call
+(Rocq's `proc_priv_pid_ofile` / `proc_priv_cwd_pid` lending, `1/4`;
+`ProofSysClose`'s `sc_core_pid`). -/
 theorem kx_core_pid (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv) (M : Nat → List (BitVec 8)) :
     procPrivCoreNoctxAt (GF := GF) curCtx pa pid V M ⊢
-      @wordPointsTo hlc GF _ ⟨curCtx, KTier.kpt⟩ (pPid pa) 4 pidPriv pid ∗
-      (@wordPointsTo hlc GF _ ⟨curCtx, KTier.kpt⟩ (pPid pa) 4 pidPriv pid -∗
+      @wordPointsTo hlc GF _ ⟨curCtx, KTier.kpt⟩ (pPid pa) 4 (DFrac.own (1 : Qp).half.half) pid ∗
+      (@wordPointsTo hlc GF _ ⟨curCtx, KTier.kpt⟩ (pPid pa) 4 (DFrac.own (1 : Qp).half.half) pid -∗
         procPrivCoreNoctxAt curCtx pa pid V M) := by
-  unfold procPrivCoreNoctxAt procPrivBareAt
+  unfold procPrivCoreNoctxAt procPrivBareAt pidPriv
   iintro ⟨⟨%hf, Hpid, Hf, Hpt, Htfp, %hlz⟩, Hcw⟩
+  icases procPrivAcc_split curCtx _ 4 (1 : Qp).half _ $$ Hpid with ⟨Hpid, Hpid1⟩
   iframe Hpid
   iintro Hpid
+  ihave Hpid := procPrivAcc_join curCtx _ 4 (1 : Qp).half _ $$ [Hpid Hpid1]
+  · iframe
   iframe Hpid Hf Hpt Htfp Hcw
   isplitl []
   · ipureintro; exact hf
@@ -454,7 +457,7 @@ theorem kx_loop (FC : FILECLOSE) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
       icases filecloseEnv_frame Γ j (procAddr j) γkl γk on st $$ [Hpenv Hfenv] with ⟨Henv, Hback⟩
       · iframe
       iapply (fileclose_call FC Γ cpu ((k.setReg 10#5 (L[fd]'hfdlt2)).setReg 1#5 (KA.«kexit» + 0x46#64))
-          γl γ kk q st j γkl γk on pid pidPriv k.sie (by simp only [KCtx.setReg_sie]) (procAddr j)
+          γl γ kk q st j γkl γk on pid (DFrac.own (1 : Qp).half.half) k.sie (by simp only [KCtx.setReg_sie]) (procAddr j)
           (by simp only [KCtx.setReg_proc]; exact hp)
           (by simp only [KCtx.setReg_avail]; exact hK) (by simp only [KCtx.setReg_noff]; exact hn)
           (by simp only [KCtx.setReg_tier]; exact ht)
@@ -824,13 +827,16 @@ theorem kx_rest (AC : ACQUIRE) (RE : RELEASE) (RP : REPARENT) (WU : WAKEUP) (SC 
   -- park; the token-free core goes to the ZOMBIE block, the spent marker to
   -- the killed-route take.
   icases kx_procGen_open (procAddr j) pid V.gen rfl $$ Hgen with ⟨⟨%Q0, Hkq⟩, ⟨%xsb, Hxb⟩, Hgh, Htaken⟩
+  -- THE PID CELL: a quarter lent to the fs callees (Rocq `proc_priv_cwd_pid`)
+  icases procPrivAcc_split ξ0 (pPid (procAddr j)) 4 (1 : Qp).half pid $$ [Hpid] with ⟨Hpid, Hpidk⟩
+  · unfold pidPriv; iexact Hpid
   -- jal begin_op
   k_step_e (wp_s_jal cpu _ (KA.«kexit» + 0x4c#64) false 7198#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [kexit_br_1c6a, KCtx.setReg_sie, KCtx.setReg_proc]
   iintro Hk Hpc
   have hf1 : kxFrame (k.setReg 1#5 (KA.«kexit» + 0x50#64)) j k.sie status spval availval :=
     kx_setReg_frame k j status spval 1#5 _ hf (by decide) (by decide) (by decide) (by decide)
-  iapply (beginOp_callR BO Γ cpu (k.setReg 1#5 (KA.«kexit» + 0x50#64)) j pid pidPriv (procAddr j)
+  iapply (beginOp_callR BO Γ cpu (k.setReg 1#5 (KA.«kexit» + 0x50#64)) j pid (DFrac.own (1 : Qp).half.half) (procAddr j)
       hf1.2.2.2.2.1 k.sie hf1.1 hj hf1.2.2.2.2.1 (by have := hf1.2.2.2.2.2.1; omega) hf1.2.1 hf1.2.2.2.1)
     $$ [- $Hk $Hpc $Hpinv $Hte $Hce $Hrdy $Hpid]
   iapply wpNext_intro_pin
@@ -861,7 +867,7 @@ theorem kx_rest (AC : ACQUIRE) (RE : RELEASE) (RP : REPARENT) (WU : WAKEUP) (SC 
   -- iput(p->cwd): THE CWD REFERENCE, spent; its unit comes back
   ihave Hheld := (show cwdRefAt (GF := GF) V.cwd V.cwi ⊢ inodeHeld V.cwd from by
     unfold cwdRefAt; exact inodeHeldAt_held V.cwd V.cwi) $$ Hcwr
-  iapply (iput_callR IP Γ cpu _ j V.cwd MAXOPBLOCKS pid pidPriv (procAddr j) hf1b.2.2.2.2.1
+  iapply (iput_callR IP Γ cpu _ j V.cwd MAXOPBLOCKS pid (DFrac.own (1 : Qp).half.half) (procAddr j) hf1b.2.2.2.2.1
       k.sie hf1b.1 hj hf1b.2.2.2.2.1
       (by have := hf1b.2.2.2.2.2.1; omega) hf1b.2.1 hf1b.2.2.2.1 iputUnits_le_max
       (by simp only [KCtx.withRegs_regs, RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true]))
@@ -877,7 +883,7 @@ theorem kx_rest (AC : ACQUIRE) (RE : RELEASE) (RP : REPARENT) (WU : WAKEUP) (SC 
   iintro Hk Hpc
   have hf2a := kx_setReg_frame _ j status spval 1#5 (KA.«kexit» + 0x5c#64) hf2
     (by decide) (by decide) (by decide) (by decide)
-  iapply (endOp_callR EO Γ cpu _ j n' pid pidPriv (procAddr j) ?ep1 k.sie ?es hj
+  iapply (endOp_callR EO Γ cpu _ j n' pid (DFrac.own (1 : Qp).half.half) (procAddr j) ?ep1 k.sie ?es hj
       ?ep2 ?eK ?en ?et)
     $$ [- $Hk $Hpc $Hpinv $Hte $Hce $Hrdy $Hpe $Hpid $Hop]
   rotate_right 6
@@ -892,6 +898,10 @@ theorem kx_rest (AC : ACQUIRE) (RE : RELEASE) (RP : REPARENT) (WU : WAKEUP) (SC 
   iapply wpNext_intro_pin
   iintro %cpu %_
   iintro %spie3 %spp3 %R3 %hcs3 Hk Hpc Hte Hce Hpid
+  ihave Hpid := procPrivAcc_join ξ0 (pPid (procAddr j)) 4 (1 : Qp).half pid $$ [Hpid Hpidk]
+  · iframe
+  ihave Hpid : wordPointsTo (GF := GF) (pPid (procAddr j)) 4 pidPriv pid $$ [Hpid]
+  · unfold pidPriv; iexact Hpid
   ihave Hpc := (kx_pcIs_jump cpu _ R2 (KA.«kexit» + 0x5c#64) (by decide)) $$ Hpc
   have hf3 := kxFrame_cross hf2a spie3 spp3 R3 hcs3
   have h19R3 : R3 19#5 = procAddr j := hf3.2.2.2.2.2.2.2.1
