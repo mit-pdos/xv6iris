@@ -1009,3 +1009,12 @@ import Xv6.SysOpenStores
 import Xv6.SysOpenAlloc
 import Xv6.ProofSysOpen
 import Xv6.LinkSysOpen
+import Xv6.SpecFileread
+import Xv6.FilereadParts
+import Xv6.FilereadCalls
+import Xv6.FilereadInode
+import Xv6.FilereadArms
+import Xv6.FilereadDev
+import Xv6.FilereadInodeArm
+import Xv6.ProofFileread
+import Xv6.LinkFileread
