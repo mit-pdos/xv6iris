@@ -1,0 +1,241 @@
+/- Scratch: KexecBuilt §1–§3 (the stack algebra) against local Rocq-literal
+stand-ins for K-A's KexecDefs (`kxcRound16`, `kxcSp`, `kxcSpFinal`,
+`kxcStackOk`).  When KexecDefs lands, the stand-ins are deleted and this is
+appended to Xv6/KexecBuilt.lean. -/
+import Xv6.KexecBuilt
+
+namespace Xv6.KexecScratch
+
+open MachCSL
+open Xv6.KexecBuilt
+
+/-! stand-ins (Rocq KexecDefs.v:247–268, verbatim over Int) -/
+def kxcRound16 (x : Int) : Int := x - x % 16
+def kxcSp (top : Int) (len : Nat → Nat) : Nat → Int
+  | 0 => top
+  | i + 1 => kxcRound16 (kxcSp top len i - ((len i : Int) + 1))
+def kxcSpFinal (top : Int) (len : Nat → Nat) (argc : Nat) : Int :=
+  kxcRound16 (kxcSp top len argc - 8 * ((argc : Int) + 1))
+def kxcStackOk (top base : Int) (len : Nat → Nat) (argc : Nat) : Prop :=
+  (∀ i, 1 ≤ i → i ≤ argc → base ≤ kxcSp top len i) ∧ base ≤ kxcSpFinal top len argc
+
+/-! ## §1 The push geometry -/
+
+theorem kxc_round16_le (x : Int) : kxcRound16 x ≤ x := by
+  unfold kxcRound16; have := Int.emod_nonneg x (by decide : (16 : Int) ≠ 0); omega
+
+theorem kxc_sp_gap (top : Int) (alen : Nat → Nat) (i : Nat) :
+    kxcSp top alen (i + 1) + (alen i : Int) < kxcSp top alen i := by
+  have := kxc_round16_le (kxcSp top alen i - ((alen i : Int) + 1))
+  simp only [kxcSp]; omega
+
+theorem kxc_sp_mono (top : Int) (alen : Nat → Nat) {i k : Nat} (h : i ≤ k) :
+    kxcSp top alen k ≤ kxcSp top alen i := by
+  induction h with
+  | refl => exact Int.le_refl _
+  | @step m _ ih =>
+    show kxcSp top alen (m + 1) ≤ _
+    have := kxc_sp_gap top alen m; omega
+
+theorem kxc_sp_final_gap (top : Int) (alen : Nat → Nat) (na : Nat) :
+    kxcSpFinal top alen na + 8 * ((na : Int) + 1) ≤ kxcSp top alen na := by
+  have := kxc_round16_le (kxcSp top alen na - 8 * ((na : Int) + 1))
+  unfold kxcSpFinal; omega
+
+/-- String `i`'s bytes are strictly below every earlier string's (Rocq `kxc_sp_str_disj`). -/
+theorem kxc_sp_str_disj (top : Int) (alen : Nat → Nat) {i k : Nat} (hik : i < k) (j : Nat)
+    {m : Nat} (_hm : m < alen k + 1) :
+    kxcSp top alen (i + 1) + (j : Int) ≠ kxcSp top alen (k + 1) + (m : Int) := by
+  have := kxc_sp_gap top alen k
+  have := kxc_sp_mono top alen (show i + 1 ≤ k by omega)
+  omega
+
+/-- ...and the pointer vector below every string (Rocq `kxc_sp_vec_disj`). -/
+theorem kxc_sp_vec_disj (top : Int) (alen : Nat → Nat) {na i : Nat} (hi : i < na) (j : Nat)
+    {m : Nat} (hm : m < 8 * (na + 1)) :
+    kxcSp top alen (i + 1) + (j : Int) ≠ kxcSpFinal top alen na + (m : Int) := by
+  have := kxc_sp_final_gap top alen na
+  have := kxc_sp_mono top alen (show i + 1 ≤ na by omega)
+  omega
+
+/-! ## §2 The addresses the argument block occupies -/
+
+def kxbUstack (top : Int) (alen : Nat → Nat) (na i : Nat) : Int :=
+  if i < na then kxcSp top alen (i + 1) else 0
+
+def kxbArgAddr (top : Int) (alen : Nat → Nat) (na : Nat) (a : Int) : Prop :=
+  (∃ i, i < na ∧ kxcSp top alen (i + 1) ≤ a ∧ a ≤ kxcSp top alen (i + 1) + (alen i : Int)) ∨
+  (kxcSpFinal top alen na ≤ a ∧ a < kxcSpFinal top alen na + 8 * ((na : Int) + 1))
+
+/-- The argv loop's own zone: the first `k` strings (Rocq `kxb_str_zone`). -/
+def kxbStrZone (top : Int) (alen : Nat → Nat) (k : Nat) (a : Int) : Prop :=
+  ∃ i, i < k ∧ kxcSp top alen (i + 1) ≤ a ∧ a ≤ kxcSp top alen (i + 1) + (alen i : Int)
+
+theorem kxb_str_zone_mono (top : Int) (alen : Nat → Nat) {k k' : Nat} (hk : k ≤ k') {a : Int}
+    (h : kxbStrZone top alen k a) : kxbStrZone top alen k' a := by
+  obtain ⟨i, hi, ha⟩ := h; exact ⟨i, by omega, ha⟩
+
+theorem kxb_str_zone_arg (top : Int) (alen : Nat → Nat) (na : Nat) {a : Int}
+    (h : kxbStrZone top alen na a) : kxbArgAddr top alen na a := Or.inl h
+
+theorem kxb_str_zone_push (top : Int) (alen : Nat → Nat) (k : Nat) {j : Nat} (hj : j < alen k + 1) :
+    kxbStrZone top alen (k + 1) (kxcSp top alen (k + 1) + (j : Int)) :=
+  ⟨k, by omega, by omega, by omega⟩
+
+theorem kxb_arg_addr_str (top : Int) (alen : Nat → Nat) {na i j : Nat} (hi : i < na)
+    (hj : j < alen i + 1) : kxbArgAddr top alen na (kxcSp top alen (i + 1) + (j : Int)) :=
+  Or.inl ⟨i, hi, by omega, by omega⟩
+
+theorem kxb_arg_addr_vec (top : Int) (alen : Nat → Nat) {na j : Nat} (hj : j < 8 * (na + 1)) :
+    kxbArgAddr top alen na (kxcSpFinal top alen na + (j : Int)) :=
+  Or.inr ⟨by omega, by omega⟩
+
+/-! ## §3 The zero fill, and the bytes the copyouts put back -/
+
+/-- The stack page reads all zeros (Rocq `kx_page_zero`). -/
+def kxPageZero (top : Int) (Mv : Int → Option (BitVec 8)) : Prop :=
+  ∀ a, top - 4096 ≤ a → a < top → Mv a = some 0#8
+
+/-- **uvmalloc's stack page is zero** (Rocq `kx_page_zero_grow`, re-based):
+the guard/stack uvmalloc from the page-aligned `s` to `s + 8192` maps the
+stack page `[top - 4096, top)` at `top = s + 8192` inside its run. -/
+theorem kx_page_zero_uvmalloc {P P' : UPtd} {M M' : Nat → List (BitVec 8)} {s nw x : BitVec 64}
+    (hok : uvmallocOk P P' M M' s nw x) (hs : s.toNat % 4096 = 0)
+    (hnw : nw.toNat = s.toNat + 8192) :
+    kxPageZero ((nw.toNat : Nat) : Int) (umemView P' M') := by
+  intro a ha1 ha2
+  have ha0 : 0 ≤ a := by omega
+  rw [show a = ((a.toNat : Nat) : Int) by omega, umemView_ofNat]
+  refine umemGet_uvmalloc_zero hok ?_
+  have hpg : pgRoundUpN s.toNat = s.toNat := by unfold pgRoundUpN; omega
+  have hv0 : uvmaVpn0 s = s.toNat / 4096 := by unfold uvmaVpn0; rw [hpg]
+  have hnp : uvmaNp s nw = 2 := by unfold uvmaNp; rw [hpg, if_neg (by omega)]; omega
+  unfold uvmaInRun; rw [hv0, hnp]; omega
+
+/-- THE SURVIVING ZEROS (Rocq `kx_zero_except`). -/
+def kxZeroExcept (top : Int) (Pz : Int → Prop) (Mv : Int → Option (BitVec 8)) : Prop :=
+  ∀ a, top - 4096 ≤ a → a < top → ¬ Pz a → Mv a = some 0#8
+
+theorem kx_zero_except_of_page {top : Int} (Pz : Int → Prop) {Mv : Int → Option (BitVec 8)}
+    (h : kxPageZero top Mv) : kxZeroExcept top Pz Mv :=
+  fun a h1 h2 _ => h a h1 h2
+
+theorem kx_zero_except_mono {top : Int} {Pz Pz' : Int → Prop} {Mv : Int → Option (BitVec 8)}
+    (hsub : ∀ a, Pz a → Pz' a) (h : kxZeroExcept top Pz Mv) : kxZeroExcept top Pz' Mv :=
+  fun a h1 h2 hn => h a h1 h2 (fun hp => hn (hsub a hp))
+
+/-- A write inside the exception set keeps the zeros (Rocq `kx_zero_except_write`). -/
+theorem kx_zero_except_write {top : Int} {Pz : Int → Prop} (P : UPtd) {M : Nat → List (BitVec 8)}
+    (va : Nat) (bs : List (BitVec 8)) (h : kxZeroExcept top Pz (umemView P M))
+    (hin : ∀ j, j < bs.length → Pz ((va : Int) + j)) :
+    kxZeroExcept top Pz (umemView P (umemWrite M va bs)) := by
+  intro a h1 h2 hn
+  rw [umemView_write_out P M va bs ?_]
+  · exact h a h1 h2 hn
+  · rintro ⟨hlo, hhi⟩
+    exact hn (by have := hin (a - va).toNat (by omega); rwa [show (va : Int) + ((a - va).toNat : Nat) = a by omega] at this)
+
+/-- The first two conjuncts of the argument block, after `k` strings (Rocq `kx_str_at`). -/
+def kxStrAt (top : Int) (alen : Nat → Nat) (afun : Nat → Nat → BitVec 8) (k : Nat)
+    (Mv : Int → Option (BitVec 8)) : Prop :=
+  (∀ i j, i < k → j < alen i → Mv (kxcSp top alen (i + 1) + (j : Int)) = some (afun i j)) ∧
+  (∀ i, i < k → Mv (kxcSp top alen (i + 1) + (alen i : Int)) = some 0#8)
+
+theorem kx_str_at_0 (top : Int) (alen : Nat → Nat) (afun : Nat → Nat → BitVec 8)
+    (Mv : Int → Option (BitVec 8)) : kxStrAt top alen afun 0 Mv :=
+  ⟨fun _ _ h => absurd h (by omega), fun _ h => absurd h (by omega)⟩
+
+/-- **The argument block** (Rocq `kxb_args_at` = SpecKexec `kexec_args_at`). -/
+def kxbArgsAt (top : Int) (alen : Nat → Nat) (na : Nat) (afun : Nat → Nat → BitVec 8)
+    (Mv : Int → Option (BitVec 8)) : Prop :=
+  (∀ i j, i < na → j < alen i → Mv (kxcSp top alen (i + 1) + (j : Int)) = some (afun i j)) ∧
+  (∀ i, i < na → Mv (kxcSp top alen (i + 1) + (alen i : Int)) = some 0#8) ∧
+  (∀ (i k : Nat), i ≤ na → k < 8 →
+    Mv (kxcSpFinal top alen na + 8 * (i : Int) + (k : Int)) =
+      some (nthByte (n := 8) (BitVec.ofInt 64 (kxbUstack top alen na i)) k))
+
+/-- **The stack page** (Rocq `kxb_stack_at` = SpecKexec `kexec_stack_at`). -/
+def kxbStackAt (top : Int) (alen : Nat → Nat) (na : Nat) (Mv : Int → Option (BitVec 8)) : Prop :=
+  kxcStackOk top (top - 4096) alen na ∧
+  ∀ a, top - 4096 ≤ a → a < top → ¬ kxbArgAddr top alen na a → Mv a = some 0#8
+
+theorem kxb_stack_at_intro {top : Int} {alen : Nat → Nat} {na : Nat} {Mv : Int → Option (BitVec 8)}
+    (hok : kxcStackOk top (top - 4096) alen na) (hz : kxZeroExcept top (kxbArgAddr top alen na) Mv) :
+    kxbStackAt top alen na Mv := ⟨hok, hz⟩
+
+/-- ONE PUSH (Rocq `kx_argv_push`): the copyout of string `k` and its NUL at
+`kxcSp top alen (k+1)`, the destination bytes defined (the stack page is
+mapped); both halves of the argv loop's invariant step together.  Rocq's
+no-wrap premise is gone (Lean's write is Nat-keyed); the image is copyout's
+post collapsed by `kxCopyout_covered`. -/
+theorem kx_argv_push {top : Int} {alen : Nat → Nat} {afun : Nat → Nat → BitVec 8} {k : Nat}
+    (P : UPtd) {M : Nat → List (BitVec 8)} {dst : Nat} (bs : List (BitVec 8))
+    (hdst : (dst : Int) = kxcSp top alen (k + 1))
+    (hlen : bs.length = alen k + 1) (hbs : ∀ j, j < bs.length → bs[j]? = some (afun k j))
+    (hnul : afun k (alen k) = 0#8)
+    (hdef : ∀ j, j < bs.length → (umemView P M ((dst : Int) + j)).isSome)
+    (hstr : kxStrAt top alen afun k (umemView P M))
+    (hzero : kxZeroExcept top (kxbStrZone top alen k) (umemView P M)) :
+    kxStrAt top alen afun (k + 1) (umemView P (umemWrite M dst bs)) ∧
+    kxZeroExcept top (kxbStrZone top alen (k + 1)) (umemView P (umemWrite M dst bs)) := by
+  obtain ⟨hold, holdnul⟩ := hstr
+  have hin : ∀ j, j < bs.length →
+      umemView P (umemWrite M dst bs) (kxcSp top alen (k + 1) + (j : Int)) = some (afun k j) := by
+    intro j hj
+    rw [← hdst, umemView_write_in P M dst bs hj (hdef j hj), hbs j hj]
+  have hout : ∀ i j, i < k → j ≤ alen i →
+      umemView P (umemWrite M dst bs) (kxcSp top alen (i + 1) + (j : Int)) =
+        umemView P M (kxcSp top alen (i + 1) + (j : Int)) := by
+    intro i j hi _
+    refine umemView_write_out P M dst bs ?_
+    rintro ⟨hlo, hhi⟩
+    have := kxc_sp_str_disj top alen hi j (m := (kxcSp top alen (i + 1) + (j : Int) - dst).toNat)
+      (by omega)
+    omega
+  refine ⟨⟨fun i j hi hj => ?_, fun i hi => ?_⟩, ?_⟩
+  · by_cases hik : i = k
+    · subst hik; exact hin j (by omega)
+    · rw [hout i j (by omega) (by omega)]; exact hold i j (by omega) hj
+  · by_cases hik : i = k
+    · subst hik; rw [hin (alen i) (by omega), hnul]
+    · rw [hout i (alen i) (by omega) (Nat.le_refl _)]; exact holdnul i (by omega)
+  · refine kx_zero_except_write P dst bs
+      (kx_zero_except_mono (fun a ha => kxb_str_zone_mono top alen (Nat.le_succ k) ha) hzero)
+      fun j hj => ?_
+    rw [hdst]; exact kxb_str_zone_push top alen k (by omega)
+
+/-- THE CLOSING COPYOUT (Rocq `kx_argv_vec`): the `8 * (na + 1)`-byte pointer
+vector at `kxcSpFinal`, strictly below every string; its bytes are the
+`ustack` words, little-endian. -/
+theorem kx_argv_vec {top : Int} {alen : Nat → Nat} {afun : Nat → Nat → BitVec 8} {na : Nat}
+    (P : UPtd) {M : Nat → List (BitVec 8)} {dst : Nat} (bs : List (BitVec 8))
+    (hdst : (dst : Int) = kxcSpFinal top alen na)
+    (hlen : bs.length = 8 * (na + 1))
+    (hbs : ∀ i k, i ≤ na → k < 8 →
+      bs[8 * i + k]? = some (nthByte (n := 8) (BitVec.ofInt 64 (kxbUstack top alen na i)) k))
+    (hdef : ∀ j, j < bs.length → (umemView P M ((dst : Int) + j)).isSome)
+    (hstr : kxStrAt top alen afun na (umemView P M))
+    (hzero : kxZeroExcept top (kxbStrZone top alen na) (umemView P M)) :
+    kxbArgsAt top alen na afun (umemView P (umemWrite M dst bs)) ∧
+    kxZeroExcept top (kxbArgAddr top alen na) (umemView P (umemWrite M dst bs)) := by
+  obtain ⟨hold, holdnul⟩ := hstr
+  have hout : ∀ i j, i < na → j ≤ alen i →
+      umemView P (umemWrite M dst bs) (kxcSp top alen (i + 1) + (j : Int)) =
+        umemView P M (kxcSp top alen (i + 1) + (j : Int)) := by
+    intro i j hi _
+    refine umemView_write_out P M dst bs ?_
+    rintro ⟨hlo, hhi⟩
+    have := kxc_sp_vec_disj top alen hi j (m := (kxcSp top alen (i + 1) + (j : Int) - dst).toNat)
+      (by omega)
+    omega
+  refine ⟨⟨fun i j hi hj => ?_, fun i hi => ?_, fun i k hi hk => ?_⟩, ?_⟩
+  · rw [hout i j hi (by omega)]; exact hold i j hi hj
+  · rw [hout i (alen i) hi (Nat.le_refl _)]; exact holdnul i hi
+  · have hj : 8 * i + k < bs.length := by omega
+    rw [show kxcSpFinal top alen na + 8 * (i : Int) + (k : Int) = (dst : Int) + ((8 * i + k : Nat) : Int)
+        by omega, umemView_write_in P M dst bs hj (hdef _ hj), hbs i k hi hk]
+  · refine kx_zero_except_write P dst bs
+      (kx_zero_except_mono (fun a ha => kxb_str_zone_arg top alen na ha) hzero) fun j hj => ?_
+    rw [hdst]; exact kxb_arg_addr_vec top alen (by omega)
+
+end Xv6.KexecScratch
