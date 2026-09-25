@@ -941,3 +941,9 @@ import Xv6.CreateMkdir
 import Xv6.CreateCalls
 import Xv6.ProofCreate
 import Xv6.LinkCreate
+import Xv6.SpecSysMkdir
+import Xv6.SysMkdirFrame
+import Xv6.SysMkdirCalls
+import Xv6.SysMkdirTails
+import Xv6.ProofSysMkdir
+import Xv6.LinkSysMkdir
