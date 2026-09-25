@@ -1,6 +1,6 @@
 /-
-MachCSL: the supervisor-mode trap CSRs `kerneltrap` touches -- `sepc`,
-`scause` and the `sstatus` round trip.
+MachCSL: the supervisor-mode trap CSRs the trap handlers touch -- `sepc`,
+`scause`, `stval` and the `sstatus` round trip.
 
 `sepc` and `scause` are register cells, not part of the S-mode
 configuration bundle: a trap hands them to the handler (`trapCsrs`), which
@@ -8,7 +8,8 @@ reads them, and `kerneltrap` writes `sepc` back before `sret`.  So these
 rules take and return the cells explicitly.  The model reads `sepc`
 through `get_xepc`, which clears bit 0 (Zca), and writes it through
 `set_xepc`, which legalises the same way; on an even value both are the
-identity.
+identity (`wp_s_csrr_sepc`; `wp_s_csrr_sepc_any` reads a cell not known to
+be even, as a trap from U-mode's is to usertrap).
 
 `sstatus` gets a richer reading than `sstatusAt` here: `sstatusFull` also
 pins `SPIE`/`SPP` (available while interrupts are off) and the fields
@@ -32,11 +33,13 @@ variable {lent : Bool}
 
 @[sail_facts] theorem csr_name_map_forwards_sepc : csr_name_map_forwards 0x141#12 = pure "sepc" := rfl
 @[sail_facts] theorem csr_name_map_forwards_scause : csr_name_map_forwards 0x142#12 = pure "scause" := rfl
+@[sail_facts] theorem csr_name_map_forwards_stval : csr_name_map_forwards 0x143#12 = pure "stval" := rfl
 
 -- the `read_CSR` / `write_CSR` arms, so the executor never unfolds the
 -- model's whole match (the unfolded body costs the kernel ~5 s per proof)
 @[sail_facts] theorem read_CSR_sepc : read_CSR 0x141#12 = get_xepc Privilege.Supervisor := rfl
 @[sail_facts] theorem read_CSR_scause : read_CSR 0x142#12 = readReg Register.scause := rfl
+@[sail_facts] theorem read_CSR_stval : read_CSR 0x143#12 = readReg Register.stval := rfl
 @[sail_facts] theorem write_CSR_sepc (v : BitVec 64) : write_CSR 0x141#12 v =
     (do let r ← set_xepc Privilege.Supervisor v; pure (.Ok r)) := rfl
 
@@ -141,6 +144,31 @@ theorem execSpecF_csrr_scause (cpu : CPU) (c : MConf) (sie : Bool) (hok : SConfP
   iframe HF Hscause
 
 set_option maxHeartbeats 4000000 in
+/-- `csrr rd, stval`: the trap value into `rd`, the cell untouched. -/
+theorem execSpecF_csrr_stval (cpu : CPU) (c : MConf) (sie : Bool) (hok : SConfPhys (GF := GF) c sie)
+    (pc npc₀ : BitVec 64) (rd : BitVec 5) (hrd : rd ≠ 0#5) (R : RegMap) (e : BitVec 64) :
+    execSpecPP (GF := GF) cpu (DFrac.own 1) Privilege.Supervisor c Privilege.Supervisor c
+      (instruction.CSRReg (0x143#12, regidx.Regidx 0#5, regidx.Regidx rd, csrop.CSRRS)) pc npc₀ npc₀
+      iprop(gprFile cpu R ∗ Register.stval ↦ᵣ[cpu] e)
+      iprop(gprFile cpu (R.set rd e) ∗ Register.stval ↦ᵣ[cpu] e) := by
+  intro Φ
+  iintro ⟨HmConf, HPC, HnextPC, ⟨HF, Hstval⟩, HΦ⟩
+  conf_cases HmConf
+  obtain ⟨hpmp, hms, hpmm, hlpe⟩ := hok
+  obtain ⟨hSIE, hMPRV, hSXL, hMXR, hTSR, hTVM, hFS, hXS, hVS, hSD, hMPP⟩ := hms
+  unfold execute
+  swp_run 300
+  iapply swp_bind
+  iapply swp_wX_file (hrd := hrd)
+  iframe
+  inext
+  iintro HF
+  swp_run 20
+  conf_intro HmConf
+  iapply HΦ $$ HmConf HPC HnextPC [HF Hstval]
+  iframe HF Hstval
+
+set_option maxHeartbeats 4000000 in
 /-- `csrw sepc, rs1` with an even value: the cell takes it (the model's
 alignment is the identity), the file and the configuration are untouched. -/
 theorem execSpecF_csrw_sepc (cpu : CPU) (c : MConf) (sie : Bool) (hok : SConfPhys (GF := GF) c sie)
@@ -173,6 +201,22 @@ theorem execSpecF_csrw_sepc (cpu : CPU) (c : MConf) (sie : Bool) (hok : SConfPhy
 
 /-! ## The rules -/
 
+/-- `csrr rd, sepc` with interrupts off, at ANY cell value: `rd` gets the
+value with bit 0 cleared (`get_xepc`). -/
+theorem wp_s_csrr_sepc_any [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU) (k : KCtx)
+    (hsie : k.sie = false) (pc : BitVec 64) (is_rvc : Bool) (rd : BitVec 5) (hrd : rdOk rd) (e : BitVec 64) :
+    instr (GF := GF) pc is_rvc (instruction.CSRReg (0x141#12, regidx.Regidx 0#5, regidx.Regidx rd, csrop.CSRRS)) ∗
+    kctxL lent cpu k ∗ pcIs cpu pc ∗ Register.sepc ↦ᵣ[cpu] e ∗
+    ▷ wpNext k.sie k.proc cpu (fun cpu' =>
+        iprop(kctxL lent cpu' (k.setReg rd (e &&& 0xFFFFFFFFFFFFFFFE#64)) -∗ pcIs cpu' (pc + instrLen is_rvc) -∗
+          Register.sepc ↦ᵣ[cpu'] e -∗ wpLoop cpu'))
+    ⊢ wpLoop cpu :=
+  wpLoop_k_setReg' cpu k pc _ is_rvc _ rd hrd (fun _ => e &&& 0xFFFFFFFFFFFFFFFE#64) _ _
+    (fun cpu' c hpin hok _ => by
+      obtain rfl := hpin (Or.inl hsie)
+      exact execSpecF_csrr_sepc (GF := GF) cpu' c k.sie hok.phys pc (pc + instrLen is_rvc) rd hrd.1
+        (tpPin cpu' k.regs) e)
+
 /-- `csrr rd, sepc` with interrupts off: the client's `sepc` cell, whose
 (even) value goes into `rd`.  The model aligns what it returns, so the
 value is the cell's only when bit 0 is clear -- which it is for anything a
@@ -185,14 +229,10 @@ theorem wp_s_csrr_sepc [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU) (k : K
     ▷ wpNext k.sie k.proc cpu (fun cpu' =>
         iprop(kctxL lent cpu' (k.setReg rd e) -∗ pcIs cpu' (pc + instrLen is_rvc) -∗
           Register.sepc ↦ᵣ[cpu'] e -∗ wpLoop cpu'))
-    ⊢ wpLoop cpu :=
-  wpLoop_k_setReg' cpu k pc _ is_rvc _ rd hrd (fun _ => e) _ _
-    (fun cpu' c hpin hok _ => by
-      obtain rfl := hpin (Or.inl hsie)
-      have s := execSpecF_csrr_sepc (GF := GF) cpu' c k.sie hok.phys pc (pc + instrLen is_rvc) rd hrd.1
-        (tpPin cpu' k.regs) e
-      rw [and_lsb0_of_even e he] at s
-      exact s)
+    ⊢ wpLoop cpu := by
+  have h := wp_s_csrr_sepc_any (GF := GF) (lent := lent) cpu k hsie pc is_rvc rd hrd e
+  rw [and_lsb0_of_even e he] at h
+  exact h
 
 /-- `csrr rd, scause` with interrupts off: the client's `scause` cell. -/
 theorem wp_s_csrr_scause [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU) (k : KCtx) (hsie : k.sie = false)
@@ -207,6 +247,21 @@ theorem wp_s_csrr_scause [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU) (k :
     (fun cpu' c hpin hok _ => by
       obtain rfl := hpin (Or.inl hsie)
       exact execSpecF_csrr_scause (GF := GF) cpu' c k.sie hok.phys pc (pc + instrLen is_rvc) rd hrd.1
+        (tpPin cpu' k.regs) e)
+
+/-- `csrr rd, stval` with interrupts off: the client's `stval` cell. -/
+theorem wp_s_csrr_stval [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU) (k : KCtx) (hsie : k.sie = false)
+    (pc : BitVec 64) (is_rvc : Bool) (rd : BitVec 5) (hrd : rdOk rd) (e : BitVec 64) :
+    instr (GF := GF) pc is_rvc (instruction.CSRReg (0x143#12, regidx.Regidx 0#5, regidx.Regidx rd, csrop.CSRRS)) ∗
+    kctxL lent cpu k ∗ pcIs cpu pc ∗ Register.stval ↦ᵣ[cpu] e ∗
+    ▷ wpNext k.sie k.proc cpu (fun cpu' =>
+        iprop(kctxL lent cpu' (k.setReg rd e) -∗ pcIs cpu' (pc + instrLen is_rvc) -∗
+          Register.stval ↦ᵣ[cpu'] e -∗ wpLoop cpu'))
+    ⊢ wpLoop cpu :=
+  wpLoop_k_setReg' cpu k pc _ is_rvc _ rd hrd (fun _ => e) _ _
+    (fun cpu' c hpin hok _ => by
+      obtain rfl := hpin (Or.inl hsie)
+      exact execSpecF_csrr_stval (GF := GF) cpu' c k.sie hok.phys pc (pc + instrLen is_rvc) rd hrd.1
         (tpPin cpu' k.regs) e)
 
 /-- `csrw sepc, rs1` (an even value) with interrupts off: the client's

@@ -75,6 +75,11 @@ theorem utPins_set (A : UtArgs GF) (R : RegMap) (i : BitVec 5) (v : BitVec 64) (
       | (rw [if_neg (Ne.symm h9)]; assumption)
       | (rw [if_neg (hne _ (by decide) (by decide))]; assumption)
 
+/-- Peel caller-saved register writes off a pinned map (`utPins_set`), then
+close with the pins hypothesis in context. -/
+macro "ut_pins" : tactic =>
+  `(tactic| ((repeat (refine utPins_set _ _ _ _ ?_ (by decide) (by decide) (by decide))); try assumption))
+
 /-- **The base** (see the header): interrupts off with the sret-ready bits,
 it is the entry context. -/
 def utBase (k kb : KCtx) : Prop := kb.intrOff true false = k.intrOff true false
@@ -235,6 +240,43 @@ theorem ut_frame_closer (sp ra s0 s1 s2 : BitVec 64) (n : Nat) :
   iframe
 
 end Ctx
+
+/-! ## §4b The `killed` call site (the three kill checks share it) -/
+
+theorem ut_pushed_withSpie (K : KCtx) (m : Nat) (a b : Bool) :
+    (K.pushed m).withSpie a b = (K.withSpie a b).pushed m := rfl
+theorem ut_withSpie_withSpie (K : KCtx) (a b c d : Bool) : (K.withSpie a b).withSpie c d = K.withSpie c d := rfl
+
+section Killed
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+    [IrefslotG GF] [CtokG GF] [WchG GF] [CurCtx]
+
+/-- `killed`'s contract with a reading, at its entry (the strong form
+`KILLED.wp_killed_r`), at either `SIE`. -/
+theorem ut_killed (Γ : SchedNames) (KI : KILLED) (c : CPU) (k' : KCtx) (j : Nat)
+    (Rout : BitVec 32 → IProp GF)
+    (hj : j < NPROC) (hp : k'.regs 10#5 = procAddr j)
+    (hnoff' : k'.noff + 1 < 2 ^ 31) (hK' : 14 ≤ k'.avail) (hlk : "proc" ∉ k'.locks)
+    (htier : k'.tier = KTier.kpt) :
+    kctx c k' ∗ pcIs c KA.«killed» ∗ procsInv Γ ∗
+    (∀ (pidr klr : BitVec 32),
+      wordPointsTo (pPid (procAddr j)) 4 pidPub pidr -∗
+      killPaidAt (MachFixedGS.killCred (hlc := hlc) (GF := GF)) pidr klr -∗
+      wordPointsTo (pPid (procAddr j)) 4 pidPub pidr ∗
+      killPaidAt (MachFixedGS.killCred (hlc := hlc) (GF := GF)) pidr klr ∗ Rout klr) ∗
+    wpNext k'.sie k'.proc c (fun cpu' => iprop(∀ spie : Bool, ∀ spp : Bool, ∀ R' : RegMap,
+      ∀ kl : BitVec 32,
+      ⌜k'.sie = false → spie = k'.spie ∧ spp = k'.spp⌝ -∗
+      kctx cpu' ((k'.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k'.regs 1#5)) -∗
+      ⌜calleeSaved k'.regs R' ∧ R' 10#5 = BitVec.signExtend 64 kl⌝ -∗ Rout kl -∗
+      wpLoop cpu'))
+    ⊢ wpLoop (GF := GF) c := by
+  have h := KI.wp_killed_r (hlc := hlc) (GF := GF) Γ c k' j Rout hj hp hnoff' hK' hlk htier
+  unfold wp_killed_r_body at h
+  simp only [killedAddr] at h
+  exact h
+
+end Killed
 
 /-! ## §5 The block statements -/
 

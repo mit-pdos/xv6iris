@@ -14,7 +14,7 @@ killOwed gn`) and hands back the incarnation's kill shot, which is what the
 kill check at +0xa6 is lent (`utLiveRes`'s right disjunct).
 -/
 import Xv6.UsertrapAux
-import Xv6.UsertrapCsr
+import MachCSL.WpSmodeTrapCsr
 
 namespace Xv6
 
@@ -26,11 +26,6 @@ attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Funct
 set_option linter.unusedVariables false
 set_option linter.unusedSectionVars false
 set_option linter.unusedSimpArgs false
-
-/-- Peel register writes off a pinned map (each write to a caller-saved
-register). -/
-macro "ut_pins" h:term : tactic =>
-  `(tactic| ((repeat (refine utPins_set _ _ _ _ ?_ (by decide) (by decide) (by decide))); exact $h))
 
 theorem ut56_fmt1 : KA.«usertrap» + 19498#64 = KStr.«usertrap(): unexpected scause 0x%lx pid=%d\n» := by
   decide
@@ -109,13 +104,13 @@ theorem usertrap_56_proof (PK : PRINTK) (SK : SETKILLED) (HA : UT_A6 PT Γ) : UT
   k_norm_g [ut56_fmt1, ut56_printk, ut56_ret68]
   iframe #
   iintro %R1 Hk Hpc %hcs1
-  have hp1 : utPins A R1 := utPins_calleeSaved A _ R1 (by ut_pins hpins) hcs1
+  have hp1 : utPins A R1 := utPins_calleeSaved A _ R1 (by ut_pins) hcs1
   k_norm [ut56_ret68]
   -- +0x68  csrr a1,sepc ; +0x6c  csrr a2,stval
-  k_step (ut_wp_s_csrr_sepc_any cpu _ ?hs (KA.«usertrap» + 0x68#64) false 11#5 (by decide) e)
+  k_step (wp_s_csrr_sepc_any cpu _ ?hs (KA.«usertrap» + 0x68#64) false 11#5 (by decide) e)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc $Hsepc]
   iintro Hk Hpc Hsepc
-  k_step (ut_wp_s_csrr_stval cpu _ ?hs (KA.«usertrap» + 0x6c#64) false 12#5 (by decide) t)
+  k_step (wp_s_csrr_stval cpu _ ?hs (KA.«usertrap» + 0x6c#64) false 12#5 (by decide) t)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc $Hstval]
   iintro Hk Hpc Hstval
   -- +0x70  auipc a0,0x5 ; +0x74  addi a0,a0,-1046
@@ -141,7 +136,7 @@ theorem usertrap_56_proof (PK : PRINTK) (SK : SETKILLED) (HA : UT_A6 PT Γ) : UT
   k_norm_g [ut56_fmt2, ut56_printk, ut56_ret7c]
   iframe #
   iintro %R2 Hk Hpc %hcs2
-  have hp2 : utPins A R2 := utPins_calleeSaved A _ R2 (by ut_pins hp1) hcs2
+  have hp2 : utPins A R2 := utPins_calleeSaved A _ R2 (by ut_pins) hcs2
   k_norm [ut56_ret7c]
   -- +0x7c  mv a0,s1 ; +0x7e  jal setkilled
   k_step (wp_s_add cpu _ (KA.«usertrap» + 0x7c#64) true 10#5 0#5 9#5 (by decide))
@@ -169,7 +164,7 @@ theorem usertrap_56_proof (PK : PRINTK) (SK : SETKILLED) (HA : UT_A6 PT Γ) : UT
   case hsl => k_norm; rw [hok.hlocks]; simp
   case hst => k_norm; exact hok.htier
   iintro %R3 Hk Hpc %hcs3 Hq1 Hrg #Hshot
-  have hp3 : utPins A R3 := utPins_calleeSaved A _ R3 (by ut_pins hp2) hcs3
+  have hp3 : utPins A R3 := utPins_calleeSaved A _ R3 (by ut_pins) hcs3
   k_norm [ut56_ret82]
   -- +0x82  j +0xa6
   k_step (wp_s_j cpu _ (KA.«usertrap» + 0x82#64) true 36#21)

@@ -74,10 +74,6 @@ theorem ut_ihs {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [
   imodintro
   iapply (KV.handler (hlc := hlc) (GF := GF) Γ γ0 γ1 γc γl0 γl1 γd γdl γt cpu)
 
-/-- usertrap's pins through a chain of caller-saved writes. -/
-macro "utd_pins" : tactic =>
-  `(tactic| (repeat (refine utPins_set _ _ _ _ ?_ (by decide) (by decide) (by decide)); try assumption))
-
 section
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
     [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
@@ -265,7 +261,7 @@ theorem ut_disp_fault (HD0 : UT_D0 (hlc := hlc) PT Γ) (H56 : UT_56 (hlc := hlc)
     iapply (HD0 A cpu _ hok ?hp1 (Or.inr h15))
     rotate_left 1
     iframe Hk Hpc Hfr Hte Hce Hcaps Hown Hki Hpay Hkont
-    case hp1 => utd_pins
+    case hp1 => ut_pins
   · k_step (wp_s_branch cpu _ (KA.«usertrap» + 0x48#64) false 136#13 14#5 15#5 (by decide) bop.BEQ)
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [utd_beq_ne _ _ h15]
     iintro Hk Hpc
@@ -287,7 +283,7 @@ theorem ut_disp_fault (HD0 : UT_D0 (hlc := hlc) PT Γ) (H56 : UT_56 (hlc := hlc)
       iapply (HD0 A cpu _ hok ?hp2 (Or.inl h13))
       rotate_left 1
       iframe Hk Hpc Hfr Hte Hce Hcaps Hown Hki Hpay Hkont
-      case hp2 => utd_pins
+      case hp2 => ut_pins
     · k_step (wp_s_branch cpu _ (KA.«usertrap» + 0x52#64) false 126#13 14#5 15#5 (by decide) bop.BEQ)
         from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [utd_beq_ne _ _ h13]
       iintro Hk Hpc
@@ -300,7 +296,7 @@ theorem ut_disp_fault (HD0 : UT_D0 (hlc := hlc) PT Γ) (H56 : UT_56 (hlc := hlc)
       iapply (H56 A cpu _ hok ?hp3 (utd_ukill A.sc h8 hsc))
       rotate_left 1
       iframe Hk Hpc Hfr Hte Hce Hcaps Hown Hcred Hpay Hkont
-      case hp3 => utd_pins
+      case hp3 => ut_pins
 
 set_option maxHeartbeats 4000000 in
 /-- **The exception route** (+0x3a at a non-device cause): devintr answers
@@ -350,7 +346,7 @@ theorem ut_disp_exc (DI : DEVINTR) (HD0 : UT_D0 (hlc := hlc) PT Γ) (H56 : UT_56
   iapply (ut_disp_fault PT Γ HD0 H56 hI A cpu _ tv hok ?hp2 h8 hsc)
   rotate_left 1
   iframe Hk Hpc Hsc Hres
-  case hp2 => utd_pins
+  case hp2 => ut_pins
 
 set_option maxHeartbeats 4000000 in
 /-- **THE DISPATCH** (Rocq `ut_dispatch`), +0x30. -/
@@ -384,7 +380,7 @@ theorem usertrap_dispatch_proof (DI : DEVINTR) (KV : KERNELVEC)
     iapply (H90 A cpu _ hok ?hp1 ?h10' h8)
     rotate_left 2
     iframe Hk Hpc Hfr Hte Hce Hcaps Hown Hsi Hfi Hpi Hkont
-    case hp1 => utd_pins
+    case hp1 => ut_pins
     case h10' => simp only [RegMap.set_apply, BitVec.reduceEq, ite_false]; exact h10
   · k_step (wp_s_branch cpu _ (KA.«usertrap» + 0x36#64) false 90#13 14#5 15#5 (by decide) bop.BEQ)
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [utd_beq_ne _ _ h8]
@@ -393,11 +389,11 @@ theorem usertrap_dispatch_proof (DI : DEVINTR) (KV : KERNELVEC)
     · iapply (ut_disp_dev PT Γ DI HEA γ0 γ1 γc γl0 γl1 γd γdl γt hI A cpu _ tv hok ?hp2 hsc)
       rotate_left 1
       iframe Hk Hpc Hsc Hres
-      case hp2 => utd_pins
+      case hp2 => ut_pins
     · iapply (ut_disp_exc PT Γ DI HD0 H56 γ0 γ1 γc γl0 γl1 γd γdl γt hI A cpu _ tv hok ?hp3 h8 hsc)
       rotate_left 1
       iframe Hk Hpc Hsc Hres
-      case hp3 => utd_pins
+      case hp3 => ut_pins
 
 end
 

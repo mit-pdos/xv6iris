@@ -1,7 +1,7 @@
 /-
 `usertrap()`'s stage file: THE DEVICE ARM'S KILL CHECK (Rocq
 `ProofUsertrapArms.v` `ut_e8`), and the vocabulary the three cheap arms share
-(the prologue record's rows, the kill-row readings, the `killed` call site).
+(the prologue record's rows, the kill-row readings).
 
     +0xea  mv a0,s1 ; jal killed ; beqz a0,+0xfc ; j +0xf6
     +0xf6  li a0,-1 ; jal kexit
@@ -112,44 +112,7 @@ theorem utA_own_open (Rsys : UtNames → BitVec 32 → IProp GF) (N : UtNames) (
 
 end Own
 
-/-! ## §3 The `killed` call site -/
-
-section Calls
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
-    [IrefslotG GF] [CtokG GF] [WchG GF] [CurCtx]
-
-set_option maxHeartbeats 1000000 in
-/-- `killed`'s contract at its entry, with a reading `Rout` (the strong form
-`KILLED.wp_killed_r`), at interrupts off. -/
-theorem utA_killed (KI : KILLED) (Γ : SchedNames) (c : CPU) (k' : KCtx) (j : Nat)
-    (Rout : BitVec 32 → IProp GF)
-    (hj : j < NPROC) (hp : k'.regs 10#5 = procAddr j) (hsie : k'.sie = false)
-    (hnoff' : k'.noff + 1 < 2 ^ 31) (hK' : 14 ≤ k'.avail) (hlk : "proc" ∉ k'.locks)
-    (htier : k'.tier = KTier.kpt) :
-    kctx c k' ∗ pcIs c KA.«killed» ∗ procsInv Γ ∗
-    (∀ (pidr klr : BitVec 32),
-      wordPointsTo (pPid (procAddr j)) 4 pidPub pidr -∗
-      killPaidAt (MachFixedGS.killCred (hlc := hlc) (GF := GF)) pidr klr -∗
-      wordPointsTo (pPid (procAddr j)) 4 pidPub pidr ∗
-      killPaidAt (MachFixedGS.killCred (hlc := hlc) (GF := GF)) pidr klr ∗ Rout klr) ∗
-    (∀ (R' : RegMap) (kl : BitVec 32),
-      kctx c (k'.withRegs R') -∗ pcIs c (jumpPc (k'.regs 1#5)) -∗
-      ⌜calleeSaved k'.regs R' ∧ R' 10#5 = BitVec.signExtend 64 kl⌝ -∗ Rout kl -∗ wpLoop c)
-    ⊢ wpLoop (GF := GF) c := by
-  have h := KI.wp_killed_r (hlc := hlc) (GF := GF) Γ c k' j Rout hj hp hnoff' hK' hlk htier
-  unfold wp_killed_r_body at h
-  simp only [killedAddr] at h
-  iintro ⟨Hk, Hpc, Hpi, Hl, HK⟩
-  iapply h
-  iframe Hk Hpc Hpi Hl
-  rw [hsie]
-  iapply wpNext_off_intro
-  iintro %spie %spp %R' %kl %hs Hk Hpc %hc HR
-  obtain ⟨rfl, rfl⟩ := hs rfl
-  rw [KCtx.withSpie_self' k' _ _ rfl rfl]
-  iapply HK $$ %R' %kl Hk Hpc %hc HR
-
-end Calls
+/-! ## §3 The `killed` call site: `UsertrapBlocks.ut_killed` -/
 
 /-! ## §4 +0xea -/
 
@@ -192,12 +155,11 @@ theorem usertrap_ea_proof [ClaimIs (hlc := hlc) GF Γ] (KI : KILLED) (HF : UT_FA
   iintro Hk Hpc
   ihave Hrg := (show pidReg (GF := GF) A.pid (.own qeighth) (utV1 A).gen ⊢ pidReg A.pid (.own qeighth) A.gn
     from by rw [hok.hgn]) $$ Hrg
-  iapply (utA_killed KI Γ cpu _ A.j (fun kl => iprop(utKillRead A.gn emp kl ∗
+  iapply (ut_killed Γ KI cpu _ A.j (fun kl => iprop(utKillRead A.gn emp kl ∗
       wordPointsTo (pPid (procAddr A.j)) 4 pidPriv A.pid ∗ pidReg A.pid (.own qeighth) A.gn))
-      hok.hj ?hp ?hs ?hn ?hK ?hl ?ht) $$ [- $Hk $Hpc $Hpi]
+      hok.hj ?hp ?hn ?hK ?hl ?ht) $$ [- $Hk $Hpc $Hpi]
   rotate_right 1
   case hp => k_norm; rw [p9]
-  case hs => k_norm
   case hn => k_norm; rw [hok.hnoff]; decide
   case hK => k_norm; rw [hok.havail]; omega
   case hl => k_norm; rw [hok.hlocks]; simp
@@ -206,9 +168,14 @@ theorem usertrap_ea_proof [ClaimIs (hlc := hlc) GF Γ] (KI : KILLED) (HF : UT_FA
   · iapply ut_kill_lend A.j A.pid _ emp hnz
     iframe Hqp Hrg
     ileft; iempintro
-  iintro %R1 %kl Hk Hpc %⟨hcs1, h10⟩ ⟨Hread, Hqp, Hrg⟩
+  k_norm
+  iapply wpNext_off_intro
+  iintro %spie %spp %R1 %kl %hsp Hk Hpc %⟨hcs1, h10⟩ ⟨Hread, Hqp, Hrg⟩
+  have e := hsp (by k_norm)
+  k_norm at e
+  obtain ⟨rfl, rfl⟩ := e
   have hret : jumpPc (KA.«usertrap» + 0xf0#64) = KA.«usertrap» + 0xf0#64 := utA_ea_ret
-  k_norm [hret]
+  k_norm [ut_pushed_withSpie, KCtx.withSpie_self' A.k A.k.spie A.k.spp rfl rfl, hret]
   have hpins1 : utPins A R1 := utPins_calleeSaved A _ R1
     ⟨by simp [RegMap.set_apply, p2], by simp [RegMap.set_apply, p9], by simp [RegMap.set_apply, p19],
      by simp [RegMap.set_apply, p20], by simp [RegMap.set_apply, p21], by simp [RegMap.set_apply, p22],

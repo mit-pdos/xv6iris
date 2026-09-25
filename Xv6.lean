@@ -1163,7 +1163,6 @@ import Xv6.UsertrapArmsD0
 import Xv6.UsertrapAux
 import Xv6.UsertrapBlocks
 import Xv6.UsertrapClose
-import Xv6.UsertrapCsr
 import Xv6.UsertrapDispatch
 import Xv6.UsertrapEntry
 import Xv6.UsertrapKexit

@@ -155,7 +155,7 @@ theorem usertrap_d0_proof (VM : VMFAULT) (HA : UT_A6 PT Γ) (H56 : UT_56 PT Γ) 
   unfold trapCsrsAt
   icases Hcsrs with ⟨Hsepc, Hscause, Hstval⟩
   -- +0xd0  csrr a2,stval ; +0xd4  csrr a3,scause
-  k_step (ut_wp_s_csrr_stval cpu _ ?hs (KA.«usertrap» + 0xd0#64) false 12#5 (by decide) t)
+  k_step (wp_s_csrr_stval cpu _ ?hs (KA.«usertrap» + 0xd0#64) false 12#5 (by decide) t)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc $Hstval]
   iintro Hk Hpc Hstval
   k_step (wp_s_csrr_scause cpu _ ?hs (KA.«usertrap» + 0xd4#64) false 13#5 (by decide) s)
@@ -197,7 +197,7 @@ theorem usertrap_d0_proof (VM : VMFAULT) (HA : UT_A6 PT Γ) (H56 : UT_56 PT Γ) 
   case hz1 => k_norm; have := hfacts.1; unfold uvmMaxsz at this; exact Nat.le_trans this (by omega)
   iframe #
   iintro %R1 Hk Hpc Hres %hcs1
-  have hp1 : utPins A R1 := utPins_calleeSaved A _ R1 (by ut_pins hpins) hcs1
+  have hp1 : utPins A R1 := utPins_calleeSaved A _ R1 (by ut_pins) hcs1
   k_norm [utD0_ret]
   -- the block, re-assembled at whatever table vmfault left
   ihave Hsz := (show wordPointsTo (GF := GF) (procAddr A.j + 72#64) 8 (DFrac.own 1) (utV1 A).sz ⊢
