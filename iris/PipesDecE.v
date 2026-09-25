@@ -519,7 +519,8 @@ Section dec_ext.
     (forall j, lm_at M cs1 j = lm_at M cs2 j) ->
     lm_d4 M cs2 s I -> lm_d4 M cs1 s I.
   Proof using.
-    intros H Hd i Hi Hex Hm. apply (Hd i Hi Hex).
+    intros H Hd i Hi Hex Hm. rewrite (pde_upto_ext cs1 cs2 s _ H i) in Hex.
+    apply (Hd i Hi Hex).
     by rewrite -(pde_upto_ext cs1 cs2 s _ H i) -(H i).
   Qed.
 
@@ -585,7 +586,7 @@ Definition pde_cands (l : pline') : list nat :=
            pde_merges [Wm ++ u_prompt; sp] ≫= prefixes)).
 
 Lemma pde_cands_complete (l : pline') (a : plalt) :
-  lm_ok PME l a -> plalt_code a ∈ pde_cands l.
+  lm_ok PME tt l a -> plalt_code a ∈ pde_cands l.
 Proof using.
   intros H. cbn [lm_ok pipes_lmE pipes_lm] in H. rewrite /pde_cands.
   destruct H as [[-> | [-> | ->]] | [_ Hok]].
@@ -630,18 +631,30 @@ Local Instance pde_merge_dec (u : list (bv 8)) : Decision (lm_merge PME u) := pl
 Local Instance pde_input_dec (I : list (bv 8)) : Decision (lm_disc_input PME I).
 Proof using. rewrite /lm_disc_input. cbn [lm_body_ok lm_body_byte pipes_lmE pipes_lm]. apply _. Qed.
 
-Local Instance pde_ok_dec (l : pline') (a : plalt) : Decision (lm_ok PME l a) :=
-  pipes_lm_ok_dec fcE adm_echo l a.
+Local Instance pde_ok_dec (l : pline') (a : plalt) : Decision (lm_ok PME tt l a) :=
+  pipes_lm_ok_dec fcE adm_echo tt l a.
 
-Local Instance pde_alts_dec (I : list (bv 8)) (cs : list nat) : Decision (lm_alts_ok PME I cs).
-Proof using. rewrite /lm_alts_ok. apply _. Qed.
+(* the model's range condition ignores the state: it is decided entry by
+   entry ([LineModel.lm_alts_ok_nostate]) *)
+Lemma pde_alts_iff (I : list (bv 8)) (cs : list nat) :
+  lm_alts_ok PME tt I cs
+  <-> Forall2 (fun l c => lm_ok PME tt l (lm_dec PME c)) (lm_of PME <$> bodies_of I) cs.
+Proof using. exact (lm_alts_ok_nostate PME tt I cs (fun _ _ _ _ Hx => Hx)). Qed.
+
+Local Instance pde_alts_dec (I : list (bv 8)) (cs : list nat) : Decision (lm_alts_ok PME tt I cs).
+Proof using.
+  destruct (decide (Forall2 (fun l c => lm_ok PME tt l (lm_dec PME c))
+                      (lm_of PME <$> bodies_of I) cs)) as [H | H].
+  - left. by apply pde_alts_iff.
+  - right. intros H'. apply H. by apply pde_alts_iff.
+Qed.
 
 Definition pde_termex (l : pline') : Prop :=
-  exists c, lm_ok PME l c /\ lm_term PME c = true.
+  exists c, lm_ok PME tt l c /\ lm_term PME c = true.
 
 Local Instance pde_termex_dec (l : pline') : Decision (pde_termex l).
 Proof using.
-  destruct (decide (Exists (fun c => lm_ok PME l (plalt_of c) /\ plterm (plalt_of c) = true)
+  destruct (decide (Exists (fun c => lm_ok PME tt l (plalt_of c) /\ plterm (plalt_of c) = true)
                       (pde_cands l))) as [H | H].
   - left. apply Exists_exists in H as (c & _ & Hc). exists (plalt_of c). exact Hc.
   - right. intros (c & Hok & Ht). apply H. apply Exists_exists.
@@ -657,8 +670,10 @@ Lemma pde_d4_iff (cs : list nat) (I : list (bv 8)) :
                    nlines I = S i /\ rest_of I = []) (seq 0 (nlines I)).
 Proof using.
   rewrite Forall_forall. split.
-  - intros H i Hi. apply elem_of_seq in Hi. apply H. lia.
-  - intros H i Hi. apply H. apply elem_of_seq. lia.
+  - intros H i Hi (c & Hc) Hm. apply elem_of_seq in Hi.
+    apply (H i ltac:(lia)); [exists c; exact Hc | exact Hm].
+  - intros H i Hi (c & Hc) Hm.
+    apply (H i); [apply elem_of_seq; lia | exists c; exact Hc | exact Hm].
 Qed.
 
 Local Instance pde_d4_dec (cs : list nat) (I : list (bv 8)) : Decision (lm_d4 PME cs tt I).
@@ -678,7 +693,7 @@ Local Instance pde_pt_dec (ps cs : list nat) (p : list mobs) : Decision (lm_disc
 Proof using. rewrite /lm_disc_pt. apply _. Qed.
 
 Definition pde_phi (seg : list mobs) (ps cs : list nat) : Prop :=
-  lm_alts_ok PME (ins seg) cs /\ lm_d4 PME cs tt (ins seg)
+  lm_alts_ok PME tt (ins seg) cs /\ lm_d4 PME cs tt (ins seg)
   /\ Forall (fun p => lm_pro_ok PME ps cs (nlines (ins p)) /\ lm_disc_pt PME ps cs tt p)
        (in_pres seg).
 
@@ -706,13 +721,14 @@ Proof using.
     assert (Hext : forall j, lm_at PME cs0 j = lm_at PME cs j).
     { intros j. rewrite /lm_at /cs0 !list_lookup_total_alt list_lookup_fmap.
       destruct (cs !! j) as [c |]; [exact (plalt_of_code (plalt_of c)) | reflexivity]. }
-    assert (Halts0 : lm_alts_ok PME (ins seg) cs0).
-    { rewrite /lm_alts_ok /cs0. apply Forall2_fmap_r.
-      eapply Forall2_impl; [exact Halts |]. intros l c Hok.
-      change (lm_ok PME l (plalt_of (plalt_code (plalt_of c)))). rewrite plalt_of_code. exact Hok. }
+    pose proof (proj1 (pde_alts_iff _ _) Halts) as HaltsF.
+    assert (Halts0 : lm_alts_ok PME tt (ins seg) cs0).
+    { apply pde_alts_iff. rewrite /cs0. apply Forall2_fmap_r.
+      eapply Forall2_impl; [exact HaltsF |]. intros l c Hok.
+      change (lm_ok PME tt l (plalt_of (plalt_code (plalt_of c)))). rewrite plalt_of_code. exact Hok. }
     assert (Hprod : cs0 ∈ pde_prod (pde_cands <$> (lm_of PME <$> bodies_of (ins seg)))).
     { apply pde_prod_intro. rewrite /cs0. apply Forall2_fmap_l, Forall2_fmap_r, Forall2_flip.
-      eapply Forall2_impl; [exact Halts |]. intros l c Hok.
+      eapply Forall2_impl; [exact HaltsF |]. intros l c Hok.
       exact (pde_cands_complete l (plalt_of c) Hok). }
     assert (Hd40 : lm_d4 PME cs0 tt (ins seg)) by exact (pde_d4_ext PME cs0 cs tt _ Hext Hd4).
     assert (Hall0 : forall p, p ∈ in_pres seg ->

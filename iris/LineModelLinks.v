@@ -181,19 +181,23 @@ Record lm_hooks (M : lmodel) := MkLMH {
   lmh_exfb : lm_line M -> list (bv 8);
   lmh_noc : lm_line M -> nat;
   (* the range condition is decidable, which is what guards [lm_ab] *)
-  lmh_ok_dec : forall l a, Decision (lm_ok M l a);
+  lmh_ok_dec : forall s l a, Decision (lm_ok M s l a);
 
   lmh_free_cont : forall s s' l a,
     lmh_free a = true -> lm_cont M s l a = lm_cont M s' l a;
   lmh_free_term : forall a, lmh_free a = true -> lm_term M a = false;
-  lmh_pan_ok : forall l, lm_ok M l (lm_dec M (lmh_pan l));
+  (* ...and whose ADMISSIBILITY is a function of the line alone: a byte
+     lookup at [lm_ab] (read at [lmh_st0]) says it at the round's state *)
+  lmh_free_ok : forall s s' l a,
+    lmh_free a = true -> lm_ok M s l a -> lm_ok M s' l a;
+  lmh_pan_ok : forall s l, lm_ok M s l (lm_dec M (lmh_pan l));
   lmh_pan_free : forall l, lmh_free (lm_dec M (lmh_pan l)) = true;
   lmh_pan_panic : forall l, lm_panic M (lm_dec M (lmh_pan l)) = true;
-  lmh_exf_ok : forall l, lm_ok M l (lm_dec M (lmh_exf l));
+  lmh_exf_ok : forall s l, lm_ok M s l (lm_dec M (lmh_exf l));
   lmh_exf_free : forall l, lmh_free (lm_dec M (lmh_exf l)) = true;
   lmh_exf_nopanic : forall l, lm_panic M (lm_dec M (lmh_exf l)) = false;
   lmh_exf_cont : forall s l, lm_cont M s l (lm_dec M (lmh_exf l)) = lmh_exfb l;
-  lmh_noc_ok : forall l, lm_ok M l (lm_dec M (lmh_noc l));
+  lmh_noc_ok : forall s l, lm_ok M s l (lm_dec M (lmh_noc l));
   lmh_noc_free : forall l, lmh_free (lm_dec M (lmh_noc l)) = true;
   lmh_noc_nopanic : forall l, lm_panic M (lm_dec M (lmh_noc l)) = false;
   lmh_noc_cont : forall s l, lm_cont M s l (lm_dec M (lmh_noc l)) = u_prompt;
@@ -202,10 +206,10 @@ Record lm_hooks (M : lmodel) := MkLMH {
      (nor is the out-of-range decode's, which is what a cursor past the
      choice list reads) *)
   lmh_cont_prompt : forall s l a,
-    lm_ok M l a -> lm_panic M a = false -> lm_term M a = false ->
+    lm_ok M s l a -> lm_panic M a = false -> lm_term M a = false ->
     exists u, lm_cont M s l a = u ++ u_prompt;
   lmh_cont_nonnil : forall s l a,
-    lm_ok M l a \/ a = lm_dec M 0 -> lm_cont M s l a <> [];
+    lm_ok M s l a \/ a = lm_dec M 0 -> lm_cont M s l a <> [];
 }.
 Arguments lmh_free {M} _ _.
 Arguments lmh_st0 {M} _.
@@ -213,9 +217,10 @@ Arguments lmh_pan {M} _ _.
 Arguments lmh_exf {M} _ _.
 Arguments lmh_exfb {M} _ _.
 Arguments lmh_noc {M} _ _.
-Arguments lmh_ok_dec {M} _ _ _.
+Arguments lmh_ok_dec {M} _ _ _ _.
 Arguments lmh_free_cont {M} _.
 Arguments lmh_free_term {M} _.
+Arguments lmh_free_ok {M} _.
 Arguments lmh_pan_ok {M} _.
 Arguments lmh_pan_free {M} _.
 Arguments lmh_pan_panic {M} _.
@@ -610,7 +615,7 @@ Section line_model_links.
   (*  4.  THE LINE THAT WAS TYPED, AND ITS ALTERNATIVES' OUTPUT           *)
   (* ================================================================== *)
 
-  #[local] Instance lm_ok_dec_hook l a : Decision (lm_ok M l a) := lmh_ok_dec K l a.
+  #[local] Instance lm_ok_dec_hook s l a : Decision (lm_ok M s l a) := lmh_ok_dec K s l a.
 
   (* the line the last COMPLETE body of [I] parses to *)
   Definition lm_line_at (I : list (bv 8)) : lm_line M :=
@@ -619,15 +624,18 @@ Section line_model_links.
   (* THE RECORD'S [lk_ab]: the block alternative [a] owes at input [I],
      GUARDED so that a byte lookup alone says the alternative is
      admissible and state-free -- which is what makes the block-byte
-     step premise-free *)
+     step premise-free.  Both are read at the hook's state [lmh_st0]; a
+     state-free alternative is admissible at every state
+     ([lmh_free_ok]) *)
   Definition lm_ab (I : list (bv 8)) (a : nat) : list (bv 8) :=
-    if decide (lm_ok M (lm_line_at I) (lm_dec M a) /\ lmh_free K (lm_dec M a) = true)
+    if decide (lm_ok M (lmh_st0 K) (lm_line_at I) (lm_dec M a)
+               /\ lmh_free K (lm_dec M a) = true)
     then lm_cont M (lmh_st0 K) (lm_line_at I) (lm_dec M a) else [].
 
   (* THE RECORD'S [lk_apr]: the alternative ends with the shell's prompt,
      i.e. it is admissible, state-free and does NOT reopen the prologue *)
   Definition lm_apr (I : list (bv 8)) (a : nat) : Prop :=
-    lm_ok M (lm_line_at I) (lm_dec M a) /\ lmh_free K (lm_dec M a) = true
+    lm_ok M (lmh_st0 K) (lm_line_at I) (lm_dec M a) /\ lmh_free K (lm_dec M a) = true
     /\ lm_panic M (lm_dec M a) = false.
 
   (* ...with the state kept: the era's boot state and the choice list
@@ -637,32 +645,34 @@ Section line_model_links.
     lm_cont M (lm_upto M cs s0 (bodies_of I) (nlines I - 1)) (lm_line_at I)
       (lm_dec M a).
 
-  (* [lm_apr] without state-freedom: admissible, and not a panic *)
+  (* [lm_apr] without state-freedom: admissible (at every state, since the
+     round's is not in scope here), and not a panic *)
   Definition lm_aprs (I : list (bv 8)) (a : nat) : Prop :=
-    lm_ok M (lm_line_at I) (lm_dec M a) /\ lm_panic M (lm_dec M a) = false
+    (forall s, lm_ok M s (lm_line_at I) (lm_dec M a))
+    /\ lm_panic M (lm_dec M a) = false
     /\ lm_term M (lm_dec M a) = false.
 
   Lemma lm_apr_aprs (I : list (bv 8)) (a : nat) : lm_apr I a -> lm_aprs I a.
   Proof using K.
-    intros (H1 & H2 & H3). split; [exact H1 |]. split; [exact H3 |].
-    exact (lmh_free_term K _ H2).
+    intros (H1 & H2 & H3). split; [intros s; exact (lmh_free_ok K _ s _ _ H2 H1) |].
+    split; [exact H3 |]. exact (lmh_free_term K _ H2).
   Qed.
 
   Lemma lm_ab_ok (I : list (bv 8)) (a i : nat) (b : bv 8) :
     lm_ab I a !! i = Some b ->
-    lm_ok M (lm_line_at I) (lm_dec M a) /\ lmh_free K (lm_dec M a) = true.
+    lm_ok M (lmh_st0 K) (lm_line_at I) (lm_dec M a) /\ lmh_free K (lm_dec M a) = true.
   Proof using K.
     rewrite /lm_ab. case_decide as H; [intros _; exact H |].
     intros Hq. rewrite lookup_nil in Hq. discriminate.
   Qed.
 
   Lemma lm_ab_is (I : list (bv 8)) (a : nat) :
-    lm_ok M (lm_line_at I) (lm_dec M a) -> lmh_free K (lm_dec M a) = true ->
+    lm_ok M (lmh_st0 K) (lm_line_at I) (lm_dec M a) -> lmh_free K (lm_dec M a) = true ->
     lm_ab I a = lm_cont M (lmh_st0 K) (lm_line_at I) (lm_dec M a).
   Proof using K. intros Hok Hfr. rewrite /lm_ab decide_True; [reflexivity | done]. Qed.
 
   Lemma lm_ab_at (I : list (bv 8)) (a : nat) (s : lm_st M) :
-    lm_ok M (lm_line_at I) (lm_dec M a) -> lmh_free K (lm_dec M a) = true ->
+    lm_ok M (lmh_st0 K) (lm_line_at I) (lm_dec M a) -> lmh_free K (lm_dec M a) = true ->
     lm_ab I a = lm_cont M s (lm_line_at I) (lm_dec M a).
   Proof using K.
     intros Hok Hfr. rewrite (lm_ab_is I a Hok Hfr).
@@ -679,7 +689,7 @@ Section line_model_links.
     lm_aprs I a -> exists pre : list (bv 8), lm_abs s0 cs I a = pre ++ u_prompt.
   Proof using K.
     intros (Hok & Hp & Ht). rewrite /lm_abs.
-    exact (lmh_cont_prompt K _ _ _ Hok Hp Ht).
+    exact (lmh_cont_prompt K _ _ _ (Hok _) Hp Ht).
   Qed.
 
   Lemma ll_prompt_tail_facts (x u : list (bv 8)) :
@@ -787,13 +797,13 @@ Section line_model_links.
 
   Lemma lm_ab_pan (I : list (bv 8)) : lm_ab I (lmh_pan K (lm_line_at I)) = alt_panic.
   Proof using L K.
-    rewrite (lm_ab_is I _ (lmh_pan_ok K _) (lmh_pan_free K _)). apply lm_cont_pan.
+    rewrite (lm_ab_is I _ (lmh_pan_ok K _ _) (lmh_pan_free K _)). apply lm_cont_pan.
   Qed.
 
   Lemma lm_ab_exf (I : list (bv 8)) :
     lm_ab I (lmh_exf K (lm_line_at I)) = lmh_exfb K (lm_line_at I).
   Proof using K.
-    rewrite (lm_ab_is I _ (lmh_exf_ok K _) (lmh_exf_free K _)). apply lmh_exf_cont.
+    rewrite (lm_ab_is I _ (lmh_exf_ok K _ _) (lmh_exf_free K _)). apply lmh_exf_cont.
   Qed.
 
   Lemma lm_apr_exf (I : list (bv 8)) : lm_apr I (lmh_exf K (lm_line_at I)).
@@ -803,7 +813,7 @@ Section line_model_links.
 
   Lemma lm_ab_noc (I : list (bv 8)) : lm_ab I (lmh_noc K (lm_line_at I)) = u_prompt.
   Proof using K.
-    rewrite (lm_ab_is I _ (lmh_noc_ok K _) (lmh_noc_free K _)). apply lmh_noc_cont.
+    rewrite (lm_ab_is I _ (lmh_noc_ok K _ _) (lmh_noc_free K _)). apply lmh_noc_cont.
   Qed.
 
   Lemma lm_apr_noc (I : list (bv 8)) : lm_apr I (lmh_noc K (lm_line_at I)).
@@ -948,7 +958,7 @@ Section line_model_links.
   Lemma lm_wr_blk_pending_pre (ps cs : list nat) (s0 : lm_st M) (I : list (bv 8))
       (P a : nat) :
     lm_wr_blk M ps cs s0 I P ->
-    lm_ok M (lm_line_at I) (lm_dec M a) -> lmh_free K (lm_dec M a) = true ->
+    lm_ok M (lmh_st0 K) (lm_line_at I) (lm_dec M a) -> lmh_free K (lm_dec M a) = true ->
     lm_ab I a `prefix_of` lm_pending_at M ps (cs ++ [a]) s0 I.
   Proof using K.
     intros Hw Hok Hfr.
@@ -1344,64 +1354,71 @@ Section line_model_links.
   (* ================================================================== *)
 
   (* the reader's range condition: POINTWISE, since the list runs one
-     short at a block boundary *)
-  Definition lm_alts_pre (I : list (bv 8)) (cs : list nat) : Prop :=
+     short at a block boundary; each entry at its round's state from the
+     era's boot state [s0] *)
+  Definition lm_alts_pre (s0 : lm_st M) (I : list (bv 8)) (cs : list nat) : Prop :=
     forall (i : nat) (c : nat),
       cs !! i = Some c ->
-      i < nlines I /\ lm_ok M (lm_of M (bodies_of I !!! i)) (lm_dec M c).
+      i < nlines I
+      /\ lm_ok M (lm_upto M cs s0 (bodies_of I) i) (lm_of M (bodies_of I !!! i))
+           (lm_dec M c).
 
-  Lemma lm_alts_pre_nil I : lm_alts_pre I [].
+  Lemma lm_alts_pre_nil s0 I : lm_alts_pre s0 I [].
   Proof using. intros i c Hc. by rewrite lookup_nil in Hc. Qed.
 
-  Lemma lm_alts_pre_at I cs i :
-    lm_alts_pre I cs -> i < length cs ->
-    lm_ok M (lm_of M (bodies_of I !!! i)) (lm_at M cs i).
+  Lemma lm_alts_pre_at s0 I cs i :
+    lm_alts_pre s0 I cs -> i < length cs ->
+    lm_ok M (lm_upto M cs s0 (bodies_of I) i) (lm_of M (bodies_of I !!! i))
+      (lm_at M cs i).
   Proof using.
     intros H Hi. destruct (lookup_lt_is_Some_2 cs i Hi) as [c Hc].
     rewrite /lm_at (list_lookup_total_correct cs i c Hc).
     exact (proj2 (H i c Hc)).
   Qed.
 
-  Lemma lm_alts_pre_le I cs : lm_alts_pre I cs -> length cs <= nlines I.
+  Lemma lm_alts_pre_le s0 I cs : lm_alts_pre s0 I cs -> length cs <= nlines I.
   Proof using.
     intros H. destruct (decide (length cs = 0)) as [Hz | Hz]; [lia |].
     destruct (lookup_lt_is_Some_2 cs (length cs - 1) ltac:(lia)) as [c Hc].
     destruct (H _ c Hc) as [Hlt _]. lia.
   Qed.
 
-  Lemma lm_alts_pre_of_alts_ok I cs : lm_alts_ok M I cs -> lm_alts_pre I cs.
+  Lemma lm_alts_pre_of_alts_ok s0 I cs :
+    lm_alts_ok M s0 I cs -> lm_alts_pre s0 I cs.
   Proof using.
-    intros Ha i c Hc.
-    destruct (Forall2_lookup_r _ _ _ _ _ Ha Hc) as (l & Hl & Hok).
-    rewrite list_lookup_fmap in Hl.
-    destruct (bodies_of I !! i) as [b |] eqn:Hb; [| discriminate].
-    cbn in Hl. injection Hl as <-.
-    rewrite (list_lookup_total_correct _ _ _ Hb).
-    split; [| exact Hok]. rewrite /nlines. by eapply lookup_lt_Some.
+    intros [Hlen Ha] i c Hc.
+    assert (Hi : i < nlines I) by (rewrite -Hlen; by eapply lookup_lt_Some).
+    split; [exact Hi |].
+    pose proof (Ha i Hi) as Hok.
+    by rewrite /lm_at (list_lookup_total_correct _ _ _ Hc) in Hok.
   Qed.
 
   (* the input GROWS and the entries keep their meaning: a completed line's
      body is the same body in every longer input *)
-  Lemma lm_alts_pre_mono I I' cs :
-    I `prefix_of` I' -> lm_alts_pre I cs -> lm_alts_pre I' cs.
+  Lemma lm_alts_pre_mono s0 I I' cs :
+    I `prefix_of` I' -> lm_alts_pre s0 I cs -> lm_alts_pre s0 I' cs.
   Proof using.
     intros Hp H i c Hc. destruct (H i c Hc) as [Hi Hok].
     destruct (bodies_of_prefix I I' Hp) as [z Hz].
+    assert (Hbod : forall j, j < nlines I -> bodies_of I' !!! j = bodies_of I !!! j).
+    { intros j Hj. rewrite Hz !list_lookup_total_alt lookup_app_l;
+        [reflexivity | rewrite /nlines in Hj; lia]. }
     split; [rewrite /nlines Hz length_app; rewrite /nlines in Hi; lia |].
-    rewrite Hz list_lookup_total_alt lookup_app_l;
-      [| rewrite /nlines in Hi; lia].
-    by rewrite -list_lookup_total_alt.
+    rewrite (Hbod i Hi).
+    rewrite (lm_upto_ext cs cs s0 (bodies_of I') (bodies_of I) i
+               ltac:(intros j _; reflexivity) ltac:(intros j Hj; apply Hbod; lia)).
+    exact Hok.
   Qed.
 
   (* what the claim knows of the writer's stage at the input its log has
-     echoed *)
-  Definition lm_rd_stage (ps0 cs0 : list nat) (I : list (bv 8)) : Prop :=
+     echoed, from the era's boot state [s0] *)
+  Definition lm_rd_stage (ps0 cs0 : list nat) (s0 : lm_st M) (I : list (bv 8)) : Prop :=
     Forall (fun a => a < length pro_alts) ps0
-    /\ lm_alts_pre I cs0
+    /\ lm_alts_pre s0 I cs0
     /\ lm_pro_pin M ps0 cs0 I
     /\ nlines (removelast I) <= length cs0.
 
-  Lemma lm_rd_stage_0 : lm_rd_stage [] [] [].
+  Lemma lm_rd_stage_0 s0 : lm_rd_stage [] [] s0 [].
   Proof using.
     rewrite /lm_rd_stage. split_and!.
     - constructor.
@@ -1412,7 +1429,7 @@ Section line_model_links.
 
   Lemma lm_pending_at_nonnil_at (ps cs0 : list nat) (s0 : lm_st M)
       (I I0 : list (bv 8)) :
-    I `prefix_of` I0 -> lm_alts_pre I0 cs0 -> I <> [] -> rest_of I = [] ->
+    I `prefix_of` I0 -> lm_alts_pre s0 I0 cs0 -> I <> [] -> rest_of I = [] ->
     lm_pending_at M ps cs0 s0 I <> [].
   Proof using K.
     intros Hp Hao Hne Hr.
@@ -1423,17 +1440,21 @@ Section line_model_links.
     revert Hc. apply (lmh_cont_nonnil K).
     destruct (decide (nlines I - 1 < length cs0)) as [Hlt | Hge].
     - left.
-      pose proof (lm_alts_pre_at I0 cs0 (nlines I - 1) Hao Hlt) as Hok.
+      pose proof (lm_alts_pre_at s0 I0 cs0 (nlines I - 1) Hao Hlt) as Hok.
       destruct (bodies_of_prefix I I0 Hp) as [z Hz].
-      rewrite /nlines in Hq.
-      rewrite Hz list_lookup_total_alt lookup_app_l in Hok;
-        [| rewrite /nlines; lia].
-      by rewrite -list_lookup_total_alt in Hok.
+      assert (Hbod : forall j, j < nlines I -> bodies_of I0 !!! j = bodies_of I !!! j).
+      { intros j Hj. rewrite Hz !list_lookup_total_alt lookup_app_l;
+          [reflexivity | rewrite /nlines in Hj; lia]. }
+      rewrite (Hbod (nlines I - 1) ltac:(lia)) in Hok.
+      rewrite (lm_upto_ext cs0 cs0 s0 (bodies_of I0) (bodies_of I) (nlines I - 1)
+                 ltac:(intros j _; reflexivity)
+                 ltac:(intros j Hj; apply Hbod; lia)) in Hok.
+      exact Hok.
     - right. apply lm_at_ge. lia.
   Qed.
 
   Lemma lm_pending_at_nonnil (ps cs : list nat) (s0 : lm_st M) (I : list (bv 8)) :
-    lm_alts_pre I cs -> I <> [] -> rest_of I = [] ->
+    lm_alts_pre s0 I cs -> I <> [] -> rest_of I = [] ->
     lm_pending_at M ps cs s0 I <> [].
   Proof using K.
     intros Hao Hne Hr.
@@ -1443,7 +1464,7 @@ Section line_model_links.
   Lemma lm_wr_owed_read_refute (ps cs ps0 cs0 : list nat) (s0 : lm_st M)
       (I I0 : list (bv 8)) (P : nat) :
     lm_wr_owed M ps cs s0 I P ->
-    I `prefix_of` I0 -> I <> I0 -> lm_rd_stage ps0 cs0 I0 ->
+    I `prefix_of` I0 -> I <> I0 -> lm_rd_stage ps0 cs0 s0 I0 ->
     (ps `prefix_of` ps0 \/ ps0 `prefix_of` ps) ->
     (cs `prefix_of` cs0 \/ cs0 `prefix_of` cs) ->
     length (lm_proc_before M ps0 cs0 s0 I0) <= P -> False.

@@ -955,7 +955,7 @@ Qed.
 Lemma pein_pure_lm k pops dl cs0 : pein_pure k pops dl cs0 <-> gin_pure pipe_lm k pops dl cs0.
 Proof using. done. Qed.
 
-Lemma rd_stage_p_lm ps0 cs0 I : rd_stage_p ps0 cs0 I <-> lm_rd_stage pipe_lm ps0 cs0 I.
+Lemma rd_stage_p_lm ps0 cs0 s0 I : rd_stage_p ps0 cs0 I <-> lm_rd_stage pipe_lm ps0 cs0 s0 I.
 Proof using.
   rewrite /rd_stage_p /lm_rd_stage.
   split; intros (H1 & H2 & H3 & H4);
@@ -2690,7 +2690,7 @@ Section pipe_out.
       iRight. iExists cs0, ps0. iFrame "Hcs Hps".
       iSplitR; [by iPureIntro |].
       rewrite (proc_before_p_lm_s _ _ s0). iFrame "Htl".
-      iPureIntro. by apply rd_stage_p_lm.
+      iPureIntro. by apply (rd_stage_p_lm _ _ s0).
     - iMod (popen_step_read with "Hpin Hdl Hc") as "[Hc Hr]"; [exact Hread |].
       iModIntro. iFrame "Hr". by iRight.
   Qed.

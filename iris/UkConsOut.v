@@ -182,9 +182,12 @@ Definition cons_short (alts : list (list (bv 8))) : Prop :=
 Section cons_pure.
   Context (M : lmodel).
 
-  (* a code the line typed admits, and after which coverage goes on *)
-  Definition cons_adm (I : list (bv 8)) (c : nat) : Prop :=
-    lm_ok M (lm_line_at M I) (lm_dec M c) /\ lm_term M (lm_dec M c) = false.
+  (* a code the line typed admits at the round's state (from the era's
+     boot state [s0] under the filed list [cs]), and after which coverage
+     goes on *)
+  Definition cons_adm (s0 : lm_st M) (cs : list nat) (I : list (bv 8)) (c : nat) : Prop :=
+    lm_ok M (lm_upto M cs s0 (bodies_of I) (nlines I - 1)) (lm_line_at M I) (lm_dec M c)
+    /\ lm_term M (lm_dec M c) = false.
 
   (* THE STREAM BYTE a filed block's later byte is: the continuation at the
      round's state is a prefix of what the round then owes, at ANY
@@ -584,11 +587,11 @@ Section UkConsOutGen.
            ⌜lm_wr_blk_t M ps cs s0 I pos⌝ ∗ PIN ke v
            ∗ ((∃ codes : list nat,
                  ⌜alts = lm_body M s0 cs I <$> codes⌝
-                 ∗ ⌜Forall (cons_adm M I) codes⌝
+                 ∗ ⌜Forall (cons_adm M s0 cs I) codes⌝
                  ∗ cons_cur v ps cs s0 I pos 0 0)
               ∨ (∃ c i : nat,
                    ⌜(0 < i)%nat⌝ ∗ ⌜(i <= length (lm_body M s0 cs I c))%nat⌝
-                   ∗ ⌜cons_adm M I c⌝
+                   ∗ ⌜cons_adm M s0 cs I c⌝
                    ∗ ⌜alts = [drop i (lm_body M s0 cs I c)]⌝
                    ∗ cons_cur v ps cs s0 I pos c i)))
         ∨ T))%I.
@@ -611,11 +614,11 @@ Section UkConsOutGen.
            ∗ ((∃ codes : list nat,
                  ⌜codes ⊆ C⌝
                  ∗ ⌜alts = lm_body M s0 cs I <$> codes⌝
-                 ∗ ⌜Forall (cons_adm M I) codes⌝
+                 ∗ ⌜Forall (cons_adm M s0 cs I) codes⌝
                  ∗ cons_cur v ps cs s0 I pos 0 0)
               ∨ (∃ c i : nat,
                    ⌜c ∈ C⌝ ∗ ⌜(0 < i)%nat⌝ ∗ ⌜(i <= length (lm_body M s0 cs I c))%nat⌝
-                   ∗ ⌜cons_adm M I c⌝
+                   ∗ ⌜cons_adm M s0 cs I c⌝
                    ∗ ⌜alts = [drop i (lm_body M s0 cs I c)]⌝
                    ∗ cons_cur v ps cs s0 I pos c i)))
         ∨ T))%I.
@@ -878,7 +881,7 @@ Section UkConsOutGen.
   Lemma cons_dev_at_of_blk0 (v : era_pins) (I : list (bv 8)) (ps cs : list nat)
       (s0 : lm_st M) (pos : nat) (codes : list nat) :
     lm_wr_blk_t M ps cs s0 I pos ->
-    Forall (cons_adm M I) codes ->
+    Forall (cons_adm M s0 cs I) codes ->
     cons_short (lm_body M s0 cs I <$> codes) ->
     LINKS -∗ PIN ke v -∗ cons_cur v ps cs s0 I pos 0 0 -∗
     cons_dev_at v I (lm_body M s0 cs I <$> codes).
@@ -899,7 +902,7 @@ Section UkConsOutGen.
     cons_dev_at v I [[]] -∗
     LINKS
     ∗ (T ∨ ∃ (ps cs : list nat) (s0 : lm_st M) (pos c : nat),
-             ⌜lm_wr_blk_t M ps cs s0 I pos⌝ ∗ ⌜cons_adm M I c⌝ ∗ PIN ke v
+             ⌜lm_wr_blk_t M ps cs s0 I pos⌝ ∗ ⌜cons_adm M s0 cs I c⌝ ∗ PIN ke v
              ∗ cons_cur v ps cs s0 I pos c (length (lm_body M s0 cs I c))).
   Proof using .
     iIntros "(Hlk & _ & Hd)". iSplitL "Hlk"; [iExact "Hlk" |].
@@ -930,7 +933,7 @@ Section UkConsOutGen.
       (ps cs : list nat) (s0 : lm_st M) (pos : nat) (codes : list nat) :
     lm_wr_blk_t M ps cs s0 I pos ->
     codes ⊆ C ->
-    Forall (cons_adm M I) codes ->
+    Forall (cons_adm M s0 cs I) codes ->
     cons_short (lm_body M s0 cs I <$> codes) ->
     LINKS -∗ PIN ke v -∗ cons_cur v ps cs s0 I pos 0 0 -∗
     cons_dev_atc C v I (lm_body M s0 cs I <$> codes).
@@ -948,7 +951,7 @@ Section UkConsOutGen.
     cons_dev_atc C v I [[]] -∗
     LINKS
     ∗ (T ∨ ∃ (ps cs : list nat) (s0 : lm_st M) (pos c : nat),
-             ⌜lm_wr_blk_t M ps cs s0 I pos⌝ ∗ ⌜c ∈ C⌝ ∗ ⌜cons_adm M I c⌝ ∗ PIN ke v
+             ⌜lm_wr_blk_t M ps cs s0 I pos⌝ ∗ ⌜c ∈ C⌝ ∗ ⌜cons_adm M s0 cs I c⌝ ∗ PIN ke v
              ∗ cons_cur v ps cs s0 I pos c (length (lm_body M s0 cs I c))).
   Proof using .
     iIntros "(Hlk & _ & Hd)". iSplitL "Hlk"; [iExact "Hlk" |].

@@ -339,11 +339,11 @@ Proof using.
 Qed.
 
 Definition file_hooks : lm_hooks file_lm :=
-  MkLMH file_lm fstate_free None fpan_of fexf_of fexfb fnoc_of ralt_ok_dec
-    cont_state_free (fun _ _ => eq_refl)
-    fpan_of_ok fpan_of_free fpan_of_panic
-    fexf_of_ok fexf_of_free fexf_of_nopanic cont_fexf
-    fnoc_of_ok fnoc_of_free fnoc_of_nopanic cont_fnoc
+  MkLMH file_lm fstate_free None fpan_of fexf_of fexfb fnoc_of (fun _ => ralt_ok_dec)
+    cont_state_free (fun _ _ => eq_refl) (fun _ _ _ _ _ H => H)
+    (fun _ => fpan_of_ok) fpan_of_free fpan_of_panic
+    (fun _ => fexf_of_ok) fexf_of_free fexf_of_nopanic cont_fexf
+    (fun _ => fnoc_of_ok) fnoc_of_free fnoc_of_nopanic cont_fnoc
     (fun s l a Hok Hp _ => cont_prompt s l a Hok Hp)
     cont_nonnil_dec.
 
@@ -366,8 +366,8 @@ Proof using. rewrite /fabs /lm_abs fstate_upto_lm. reflexivity. Qed.
 Lemma faprs_lm (I : list (bv 8)) (a : nat) : faprs I a <-> lm_aprs file_lm I a.
 Proof using.
   split.
-  - intros [H1 H2]. exact (conj H1 (conj H2 eq_refl)).
-  - intros (H1 & H2 & _). exact (conj H1 H2).
+  - intros [H1 H2]. exact (conj (fun _ => H1) (conj H2 eq_refl)).
+  - intros (H1 & H2 & _). exact (conj (H1 None) H2).
 Qed.
 
 (* the stream, at a boot state that may be unfiled *)

@@ -88,7 +88,7 @@ Section open_pure.
     /\ lm_E_disc M (gs_E M so)
     /\ Forall (fun a => (a < length pro_alts)%nat) (gs_ps M so)
     /\ lm_pro_pin M (gs_ps M so) (gs_cs M so) (snd <$> gs_E M so)
-    /\ lm_alts_pre M (snd <$> gs_E M so) (gs_cs M so)
+    /\ lm_alts_pre M (st so) (snd <$> gs_E M so) (gs_cs M so)
     /\ Forall (fun x => lm_disc_input M (ins x.1)) (gs_E M so)
     /\ Forall (fun x => x.1 `prefix_of` open_seg ho) (gs_E M so)
     /\ (length (gs_E M so) <= length (ins (open_seg ho)))%nat
@@ -102,7 +102,8 @@ Section open_pure.
   Definition lm_blk_at (cs : list nat) (I : list (bv 8)) (s : lm_st M)
       (pre : list (bv 8)) (a : nat) : Prop :=
     I <> [] /\ rest_of I = [] /\ length cs = (nlines I - 1)%nat
-    /\ lm_ok M (lm_of M (bodies_of I !!! (nlines I - 1))) (lm_dec M a)
+    /\ lm_ok M (lm_upto M cs s (bodies_of I) (nlines I - 1))
+         (lm_of M (bodies_of I !!! (nlines I - 1))) (lm_dec M a)
     /\ lm_panic M (lm_dec M a) = false
     /\ pre `prefix_of` lm_cont M (lm_upto M cs s (bodies_of I) (nlines I - 1))
                          (lm_of M (bodies_of I !!! (nlines I - 1))) (lm_dec M a).
@@ -359,7 +360,7 @@ Section pipes_out_n.
     (nlines I0 <= S (length cs0))%nat ->
     lm_pro_pin PM ps0 cs0 I0 ->
     P = length (lm_proc_before PM ps0 cs0 tt I0) ->
-    lm_ok PM (lm_of PM (bodies_of I0 !!! (nlines I0 - 1)%nat)) (lm_dec PM a) ->
+    lm_ok PM tt (lm_of PM (bodies_of I0 !!! (nlines I0 - 1)%nat)) (lm_dec PM a) ->
     lm_panic PM (lm_dec PM a) = false ->
     lm_cont PM tt (lm_of PM (bodies_of I0 !!! (nlines I0 - 1)%nat)) (lm_dec PM a)
       !! 0%nat = Some b ->
@@ -536,7 +537,7 @@ Section pipes_out_n.
     length cs0 = r ->
     lm_pro_pin PM ps0 cs0 I0 ->
     P = length (lm_proc_before PM ps0 cs0 tt I0) ->
-    lm_ok PM (lm_of PM (bodies_of I0 !!! r)) (lm_dec PM a) ->
+    lm_ok PM tt (lm_of PM (bodies_of I0 !!! r)) (lm_dec PM a) ->
     lm_panic PM (lm_dec PM a) = false ->
     (pre0 ++ [b]) `prefix_of` lm_cont PM tt (lm_of PM (bodies_of I0 !!! r)) (lm_dec PM a) ->
     ((lm_term PM (lm_dec PM a) = false /\ Forall nodollar pre0 /\ nodollar b)
@@ -703,7 +704,7 @@ Section pipes_out_n.
     length cs0 = r ->
     lm_pro_pin PM ps0 cs0 I0 ->
     P = length (lm_proc_before PM ps0 cs0 tt I0) ->
-    lm_ok PM (lm_of PM (bodies_of I0 !!! r)) (lm_dec PM a) ->
+    lm_ok PM tt (lm_of PM (bodies_of I0 !!! r)) (lm_dec PM a) ->
     lm_panic PM (lm_dec PM a) = false ->
     lm_term PM (lm_dec PM a) = false ->
     lm_cont PM tt (lm_of PM (bodies_of I0 !!! r)) (lm_dec PM a) = pre0 ++ u_prompt ->
@@ -921,7 +922,7 @@ Section pipes_out_n.
      '$'-free unless the round is terminal *)
   Definition pwitN (I : list (bv 8)) (tm : bool) (pre : list (bv 8)) : Prop :=
     exists a : nat,
-      lm_ok PM (lineN I) (lm_dec PM a)
+      lm_ok PM tt (lineN I) (lm_dec PM a)
       /\ lm_panic PM (lm_dec PM a) = false
       /\ lm_term PM (lm_dec PM a) = tm
       /\ pre `prefix_of` lm_cont PM tt (lineN I) (lm_dec PM a)
@@ -1043,7 +1044,7 @@ Section pipes_out_n.
     assert (HneI : I <> []) by (intros ->; rewrite nlines_nil in Hn; lia).
     iDestruct "Hled" as "[%Hnil | Hled]"; [by destruct (Hne Hnil) |].
     iDestruct "Hled" as (w gb) "(#Hpera & Hcur & #Hrlb)".
-    assert (Hok : lm_ok PM (lm_of PM (bodies_of I !!! (nlines I - 1)%nat))
+    assert (Hok : lm_ok PM tt (lm_of PM (bodies_of I !!! (nlines I - 1)%nat))
                     (lm_dec PM (plalt_code (PLRun pre)))).
     { cbn [pipes_lm lm_ok lm_dec]. rewrite plalt_of_code. right. split; [exact Ha | exact Hbl]. }
     assert (Hpan : lm_panic PM (lm_dec PM (plalt_code (PLRun pre))) = false).
@@ -1574,7 +1575,7 @@ Proof using.
   destruct (pipesN_complete fc adm1 (LPipes (PrEcho ws) 1) (md2 dg_execR) (b2w <$> sel)
               eq_refl Hin Hfd (sel_wf2_N dg_execR sel Hwf) Hc)
     as (a & Hok & Hpan & Hterm & Hpref).
-  destruct (proj1 (pipes_one_iff fc adm1 ws a eq_refl) Hok) as (pa & Hpa & ->).
+  destruct (proj1 (pipes_one_iff fc adm1 tt ws a eq_refl) Hok) as (pa & Hpa & ->).
   exists (palt_code pa). rewrite palt_of_code Hl.
   split_and!; [exact Hpa | | |].
   - rewrite -(palt_to_panic (LPipe ws) pa Hpa). exact Hpan.

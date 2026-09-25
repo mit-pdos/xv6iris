@@ -433,13 +433,13 @@ Section gen_out_pure.
   (* ---- no alternative prints nothing ---- *)
   Lemma lm_pending_nonnil (ps cs : list nat) (s : lm_st M)
       (E : list (list mobs * bv 8)) :
-    lm_alts_pre M (snd <$> E) cs -> (snd <$> E) <> [] ->
+    lm_alts_pre M s (snd <$> E) cs -> (snd <$> E) <> [] ->
     rest_of (snd <$> E) = [] -> lm_pending ps cs s E <> [].
   Proof using K. rewrite /lm_pending. apply (lm_pending_at_nonnil M K). Qed.
 
   Lemma lm_pending_nil_inv (ps cs : list nat) (s : lm_st M)
       (E : list (list mobs * bv 8)) :
-    lm_alts_pre M (snd <$> E) cs -> rest_of (snd <$> E) = [] ->
+    lm_alts_pre M s (snd <$> E) cs -> rest_of (snd <$> E) = [] ->
     lm_pending ps cs s E = [] -> (snd <$> E) = [].
   Proof using K.
     intros Hao Hr Hnil.
@@ -488,26 +488,23 @@ Section gen_out_pure.
     by rewrite Hb.
   Qed.
 
-  Lemma lm_alts_pad_ok I cs :
-    lm_alts_pre M I cs -> lm_alts_ok M I (lm_alts_pad I cs).
+  Lemma lm_alts_pad_ok s I cs :
+    lm_alts_pre M s I cs -> lm_alts_ok M s I (lm_alts_pad I cs).
   Proof using.
-    intros H. pose proof (lm_alts_pre_le M I cs H) as Hle.
-    rewrite /lm_alts_ok.
-    apply Forall2_same_length_lookup_2.
-    { rewrite length_fmap (lm_alts_pad_length I cs Hle). reflexivity. }
-    intros i l c Hl Hc.
-    rewrite list_lookup_fmap in Hl.
-    destruct (bodies_of I !! i) as [b |] eqn:Hb; [| discriminate].
-    cbn in Hl. injection Hl as <-.
-    destruct (decide (i < length cs)%nat) as [Hi | Hi].
-    - rewrite /lm_alts_pad lookup_app_l in Hc; [| lia].
+    intros H. pose proof (lm_alts_pre_le M s I cs H) as Hle.
+    split; [exact (lm_alts_pad_length I cs Hle) |].
+    intros i Hi.
+    destruct (decide (i < length cs)%nat) as [Hlt | Hge].
+    - destruct (lookup_lt_is_Some_2 cs i Hlt) as [c Hc].
       destruct (H i c Hc) as [_ Hok].
-      by rewrite (list_lookup_total_correct _ _ _ Hb) in Hok.
-    - rewrite /lm_alts_pad lookup_app_r in Hc; [| lia].
-      rewrite list_lookup_fmap lookup_drop in Hc.
-      replace (length cs + (i - length cs))%nat with i in Hc by lia.
-      rewrite Hb in Hc. cbn in Hc. injection Hc as <-.
-      apply lmh_noc_ok.
+      assert (Hpad : forall j, (j < length cs)%nat -> lm_alts_pad I cs !!! j = cs !!! j).
+      { intros j Hj. rewrite /lm_alts_pad list_lookup_total_alt lookup_app_l; [| lia].
+        by rewrite -list_lookup_total_alt. }
+      rewrite (lm_upto_ext M (lm_alts_pad I cs) cs s (bodies_of I) (bodies_of I) i
+                 ltac:(intros j Hj; apply Hpad; lia) ltac:(intros j _; reflexivity)).
+      rewrite /lm_at (Hpad i Hlt) (list_lookup_total_correct _ _ _ Hc).
+      exact Hok.
+    - rewrite /lm_at (lm_alts_pad_at I cs i ltac:(lia) Hi). apply lmh_noc_ok.
   Qed.
 
   (* the pad changes no panic bit on the input's lines: below the stage's
@@ -576,13 +573,13 @@ Section gen_out_pure.
      padded session *)
   Lemma lm_stage_sess_pad (ps cs : list nat) (s : lm_st M)
       (E : list (list mobs * bv 8)) (w : list (bv 8)) :
-    lm_alts_pre M (snd <$> E) cs ->
+    lm_alts_pre M s (snd <$> E) cs ->
     (nlines (removelast (snd <$> E)) <= length cs)%nat ->
     ((nlines (snd <$> E) <= length cs)%nat \/ w = []) ->
     lm_E_disc E ->
     lm_pro_pin M ps cs (snd <$> E) ->
     w `prefix_of` lm_pending ps cs s E ->
-    lm_alts_ok M (snd <$> E) (lm_alts_pad (snd <$> E) cs)
+    lm_alts_ok M s (snd <$> E) (lm_alts_pad (snd <$> E) cs)
     /\ lm_pro_pin M ps (lm_alts_pad (snd <$> E) cs) (snd <$> E)
     /\ lm_D ps cs s E = lm_D ps (lm_alts_pad (snd <$> E) cs) s E
     /\ w `prefix_of` lm_pending ps (lm_alts_pad (snd <$> E) cs) s E
@@ -592,7 +589,7 @@ Section gen_out_pure.
     intros Hao Hrl Hlast HE Hpin Hw.
     set (cs' := lm_alts_pad (snd <$> E) cs).
     assert (Hcc : cs `prefix_of` cs') by apply lm_alts_pad_prefix.
-    assert (Hok : lm_alts_ok M (snd <$> E) cs') by exact (lm_alts_pad_ok _ cs Hao).
+    assert (Hok : lm_alts_ok M s (snd <$> E) cs') by exact (lm_alts_pad_ok s _ cs Hao).
     assert (Hpin' : lm_pro_pin M ps cs' (snd <$> E)).
     { intros q Hq.
       assert (Hqle : (q <= nlines (snd <$> E))%nat).
@@ -614,7 +611,7 @@ Section gen_out_pure.
   Lemma lm_good_out_of_stage (ps cs : list nat) (s : lm_st M)
       (E : list (list mobs * bv 8)) (w : list (bv 8)) (seg : list mobs) :
     Forall (fun a => (a < length pro_alts)%nat) ps ->
-    lm_alts_pre M (ins seg) cs ->
+    lm_alts_pre M s (ins seg) cs ->
     (nlines (removelast (snd <$> E)) <= length cs)%nat ->
     ((nlines (snd <$> E) <= length cs)%nat \/ w = []) ->
     lm_E_disc E ->
@@ -633,7 +630,7 @@ Section gen_out_pure.
       by exact (lm_pro_pin_mono M ps ps' cs _ Hpp Hpin).
     exists ps', cs'. split.
     { apply lm_pro_ok_pad; [exact Hps | lia]. }
-    split; [exact (lm_alts_pad_ok (ins seg) cs Hao) |].
+    split; [exact (lm_alts_pad_ok s (ins seg) cs Hao) |].
     etrans; [exact Hwire |].
     rewrite (lm_D_ps_ext ps ps' cs s E Hpp Hpin).
     rewrite (lm_D_cs_prefix ps' ps' cs cs' s E ltac:(reflexivity) Hcc Hpin' Hrl).
@@ -657,9 +654,7 @@ Section gen_out_pure.
     intros He (ps & cs & [Hpsb Hlt] & Hao & Hwire).
     set (I := ins seg). set (I' := ins (seg ++ [e])).
     assert (HII : I `prefix_of` I') by (rewrite /I /I' ins_app; by eexists).
-    assert (Hlen : length cs = nlines I).
-    { pose proof (Forall2_length _ _ _ Hao) as Hl.
-      rewrite length_fmap in Hl. rewrite /nlines /I. lia. }
+    assert (Hlen : length cs = nlines I) by exact (lm_alts_ok_len M s _ _ Hao).
     assert (Hnl : (nlines I <= nlines I')%nat) by (by apply nlines_prefix).
     set (cs' := lm_alts_pad I' cs).
     exists ps, cs'. split.
@@ -669,8 +664,8 @@ Section gen_out_pure.
       exact Hlt. }
     split.
     { rewrite /cs'. apply lm_alts_pad_ok.
-      apply (lm_alts_pre_mono M I I'); [exact HII |].
-      exact (lm_alts_pre_of_alts_ok M _ _ Hao). }
+      apply (lm_alts_pre_mono M s I I'); [exact HII |].
+      exact (lm_alts_pre_of_alts_ok M s _ _ Hao). }
     rewrite /I' obs_wire_app He app_nil_r.
     etrans; [exact Hwire |].
     assert (Hcut : lm_sess M ps cs s I = lm_sess M ps cs' s I).
@@ -729,7 +724,7 @@ Section gen_out_pure.
   Qed.
 
   Lemma lm_cs_len_ok_echo (so : gstage) (x : list mobs * bv 8) :
-    lm_alts_pre M (snd <$> gs_E so) (gs_cs so) ->
+    lm_alts_pre M (st so) (snd <$> gs_E so) (gs_cs so) ->
     gs_w so = lm_pending (gs_ps so) (gs_cs so) (st so) (gs_E so) ->
     lm_cs_len_ok so ->
     lm_cs_len_ok (MkGS (gs_ps so) (gs_cs so) (gs_E so ++ [x]) [] (gs_st so)).
@@ -970,7 +965,7 @@ Section gen_out_pure.
     /\ lm_E_disc (gs_E so)
     /\ Forall (fun a => (a < length pro_alts)%nat) (gs_ps so)
     /\ lm_pro_pin M (gs_ps so) (gs_cs so) (snd <$> gs_E so)
-    /\ lm_alts_pre M (snd <$> gs_E so) (gs_cs so)
+    /\ lm_alts_pre M (st so) (snd <$> gs_E so) (gs_cs so)
     /\ Forall (fun x => lm_disc_input M (ins x.1)) (gs_E so)
     /\ Forall (fun x => x.1 `prefix_of` open_seg ho) (gs_E so)
     /\ (length (gs_E so) <= length (ins (open_seg ho)))%nat

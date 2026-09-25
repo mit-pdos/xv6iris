@@ -124,7 +124,7 @@ Section pipes_links.
     (nlines I0 <= S (length cs0))%nat ->
     lm_pro_pin PME ps0 cs0 I0 ->
     P = length (lm_proc_before PME ps0 cs0 tt I0) ->
-    lm_ok PME (lm_line_at PME I0) (lm_dec PME a) ->
+    lm_ok PME tt (lm_line_at PME I0) (lm_dec PME a) ->
     lm_term PME (lm_dec PME a) = false ->
     lm_abs PME tt cs0 I0 a !! 0%nat = Some b ->
     era_pin γ k v -∗ turn v P -∗ ps_lb v ps0 -∗ cs_lb v cs0 -∗ inp_lb v I0 -∗
@@ -216,7 +216,7 @@ Section pipes_links.
                   ∗ ⌜(nlines (snd <$> (dl ++ ws)) <= S (length cs0))%nat⌝
                   ∗ turn_lb v (length (lm_proc_before PME ps0 cs0 tt
                                  (snd <$> (dl ++ ws))))
-                  ∗ ⌜lm_rd_stage PME ps0 cs0 (snd <$> (dl ++ ws))⌝))%I.
+                  ∗ ⌜lm_rd_stage PME ps0 cs0 tt (snd <$> (dl ++ ws))⌝))%I.
 
   Lemma pipes_read_link (k : nat) (v : era_pins) (n : nat)
       (ws : list (list mobs * bv 8)) (Φ : iProp Σ) :

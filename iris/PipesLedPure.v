@@ -64,7 +64,7 @@ Section lm_led.
   Proof using.
     split.
     { split; [constructor |]. split; [constructor |]. vm_compute. lia. }
-    exists [], []. split; [rewrite /lm_alts_ok; constructor |].
+    exists [], []. split; [apply lm_alts_ok_nil; by vm_compute |].
     split.
     - intros i Hi. rewrite /nlines in Hi. cbn in Hi. lia.
     - intros p Hp. by apply elem_of_nil in Hp.
@@ -105,7 +105,7 @@ Section lm_led.
     { apply (lm_upto_ext M); [intros j Hj; apply Htk; lia |].
       intros j Hj. symmetry. apply Hbod. lia. }
     rewrite Hup /lm_at (Htk i Hi) -(Hbod i Hi) in Hm.
-    rewrite -(Hbod i Hi) in Hex.
+    rewrite Hup -(Hbod i Hi) in Hex.
     assert (Hle : nlines I <= nlines (I ++ [b])) by (apply nlines_prefix; by eexists).
     destruct (Hd4 i ltac:(lia) Hex Hm) as [Hn Hr].
     destruct (decide (b = wl_nl)) as [-> | Hne].
@@ -114,15 +114,9 @@ Section lm_led.
       apply app_eq_nil in Hr as [_ Hr]. discriminate.
   Qed.
 
-  Lemma lm_alts_ok_take (I I' : list (bv 8)) (cs : list nat) :
-    I `prefix_of` I' -> lm_alts_ok M I' cs -> lm_alts_ok M I (take (nlines I) cs).
-  Proof using.
-    intros Hp Ha. destruct (bodies_of_prefix I I' Hp) as [z Hz].
-    rewrite /lm_alts_ok Hz fmap_app in Ha.
-    apply (Forall2_take _ _ _ (nlines I)) in Ha.
-    rewrite take_app_length' in Ha; [exact Ha |].
-    rewrite length_fmap. reflexivity.
-  Qed.
+  Lemma lm_alts_ok_take (s : lm_st M) (I I' : list (bv 8)) (cs : list nat) :
+    I `prefix_of` I' -> lm_alts_ok M s I' cs -> lm_alts_ok M s I (take (nlines I) cs).
+  Proof using. exact (lm_alts_ok_prefix M s I I' cs). Qed.
 
   Lemma lm_disc_seg'_in (s : lm_st M) (seg : list mobs) (b : bv 8) :
     lm_disc_seg' M s (seg ++ [ObsUartIn Uart0 b]) -> lm_disc_seg' M s seg.
@@ -135,7 +129,7 @@ Section lm_led.
     assert (Htk : forall j, j < n -> take n cs !!! j = cs !!! j).
     { intros j Hj. rewrite !list_lookup_total_alt lookup_take; [done | lia]. }
     exists ps, (take n cs).
-    split; [exact (lm_alts_ok_take _ _ cs Hpre Hl) |].
+    split; [exact (lm_alts_ok_take s _ _ cs Hpre Hl) |].
     split; [exact (lm_d4_take_snoc cs s (ins seg) b Hd4) |].
     intros p Hp.
     assert (Hpin : p ∈ in_pres (seg ++ [ObsUartIn Uart0 b])).
@@ -172,7 +166,7 @@ Section lm_led.
     { split.
       - apply Forall_singleton. rewrite pro_alts_length. lia.
       - vm_compute. lia. }
-    split; [rewrite /lm_alts_ok; constructor |].
+    split; [apply lm_alts_ok_nil; by vm_compute |].
     apply prefix_nil.
   Qed.
 

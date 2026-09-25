@@ -287,7 +287,7 @@ Section gen_out_hist.
   (* THE ECHO leaves the writer owing a whole block *)
   Lemma lm_dl_ok_echo (so : gstage M) (x : list mobs * bv 8)
       (dl : list (list mobs * bv 8)) :
-    lm_alts_pre M (snd <$> gs_E M so) (gs_cs M so) ->
+    lm_alts_pre M (gs_state M sd so) (snd <$> gs_E M so) (gs_cs M so) ->
     gs_w M so = lm_pending M (gs_ps M so) (gs_cs M so) (gs_state M sd so)
                   (gs_E M so) ->
     lm_dl_ok so dl ->
@@ -385,7 +385,7 @@ Section gen_out_hist.
 
   Lemma gcl_pure_rd_stage k ho so H :
     gcl_pure k ho so H ->
-    lm_rd_stage M (gs_ps M so) (gs_cs M so) (snd <$> gs_E M so).
+    lm_rd_stage M (gs_ps M so) (gs_cs M so) (gs_state M sd so) (snd <$> gs_E M so).
   Proof using.
     intros (Hout & Hcsl & _ & _ & _ & _).
     destruct Hout as (_ & _ & _ & _ & Hpsb & Hpin & Hcsb & _).

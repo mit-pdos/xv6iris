@@ -56,9 +56,9 @@ Record lmodel := MkLM {
      round starts in; and the state it leaves *)
   lm_cont : lm_st -> lm_line -> lm_alt -> list (bv 8);
   lm_step : lm_st -> lm_line -> lm_alt -> lm_st;
-  (* which alternatives a line admits (the range condition the stage's
-     choice list is checked against) *)
-  lm_ok : lm_line -> lm_alt -> Prop;
+  (* which alternatives a line admits at the state its round starts in
+     (the range condition the stage's choice list is checked against) *)
+  lm_ok : lm_st -> lm_line -> lm_alt -> Prop;
   (* THE INPUT DISCIPLINE's two readings of a body: a complete body parses
      to an admissible line; a partial one is body bytes *)
   lm_body_ok : list (bv 8) -> Prop;
@@ -107,20 +107,26 @@ Proof using. intros [[_ H] | [_ H]]; [left | right]; exact H. Qed.
 Record lm_laws (M : lmodel) : Prop := MkLML {
   lml_body_line : forall b, lm_body_ok M b -> lm_line_ok M (lm_of M b);
   lml_st_step : forall s l a,
-    lm_st_ok M s -> lm_line_ok M l -> lm_ok M l a -> lm_st_ok M (lm_step M s l a);
+    lm_st_ok M s -> lm_line_ok M l -> lm_ok M s l a -> lm_st_ok M (lm_step M s l a);
   lml_cont_panic : forall s l a, lm_panic M a = true -> lm_cont M s l a = alt_panic;
   lml_term_nopanic : forall a, lm_term M a = true -> lm_panic M a = false;
   lml_term_merge : forall s l a,
-    lm_ok M l a -> lm_term M a = true -> lm_merge M (lm_cont M s l a);
+    lm_st_ok M s -> lm_ok M s l a -> lm_term M a = true -> lm_merge M (lm_cont M s l a);
   lml_merge_prefix : forall u' u, u' `prefix_of` u -> lm_merge M u -> lm_merge M u';
   lml_cont_shape : forall s l a,
-    lm_st_ok M s -> lm_line_ok M l -> lm_ok M l a ->
+    lm_st_ok M s -> lm_line_ok M l -> lm_ok M s l a ->
     lm_panic M a = false -> lm_term M a = false ->
     exists u, lm_cont M s l a = u ++ u_prompt
               /\ Forall nodollar u
               /\ (forall Y ps W,
                     Forall (fun x => x < length pro_alts) ps ->
                     lm_below_panic u Y ps W -> u = alt_panic);
+  (* a line that admits a coverage-ending alternative at one state admits
+     one at every state: what moves the D4 guard's evidence between the
+     two witnesses' states in the determinacy argument *)
+  lml_term_st : forall s l c,
+    lm_ok M s l c -> lm_term M c = true ->
+    forall s', exists c', lm_ok M s' l c' /\ lm_term M c' = true;
 }.
 Arguments lml_body_line {M} _.
 Arguments lml_st_step {M} _.
@@ -129,6 +135,7 @@ Arguments lml_term_nopanic {M} _.
 Arguments lml_term_merge {M} _.
 Arguments lml_merge_prefix {M} _.
 Arguments lml_cont_shape {M} _.
+Arguments lml_term_st {M} _.
 
 (* THE BYTE LAWS: what the discipline says of a line's bytes, at the
    model.  Separate from [lm_laws] (the byte SHAPE of continuations) so
@@ -208,9 +215,14 @@ Section line_model.
   Definition lm_pro_pin (ps cs : list nat) (I : list (bv 8)) : Prop :=
     forall q, q < nstarted I -> lm_pro_idx cs q < pro_rounds ps.
 
-  (* ---- the stage's range condition and the input discipline ---- *)
-  Definition lm_alts_ok (I : list (bv 8)) (cs : list nat) : Prop :=
-    Forall2 (fun l c => lm_ok M l (lm_dec M c)) (lm_of M <$> bodies_of I) cs.
+  (* ---- the stage's range condition and the input discipline: one
+          entry per complete line, each checked at the state ITS round
+          starts in ---- *)
+  Definition lm_alts_ok (s : lm_st M) (I : list (bv 8)) (cs : list nat) : Prop :=
+    length cs = nlines I
+    /\ forall i, i < nlines I ->
+         lm_ok M (lm_upto cs s (bodies_of I) i) (lm_of M (bodies_of I !!! i))
+           (lm_at cs i).
 
   Definition lm_disc_input (I : list (bv 8)) : Prop :=
     Forall (lm_body_ok M) (bodies_of I)
@@ -441,18 +453,13 @@ Section line_model.
   Proof using. intro H. rewrite /lm_cont_all H. by rewrite app_nil_r. Qed.
 
   (* the range condition and the discipline, read at one round *)
-  Lemma lm_alts_ok_at I cs i :
-    lm_alts_ok I cs -> i < nlines I ->
-    lm_ok M (lm_of M (bodies_of I !!! i)) (lm_at cs i).
-  Proof using.
-    intros H Hi. rewrite /nlines in Hi.
-    destruct (lookup_lt_is_Some_2 (bodies_of I) i Hi) as [b Hb].
-    assert (Hl : (lm_of M <$> bodies_of I) !! i = Some (lm_of M b))
-      by (rewrite list_lookup_fmap Hb; reflexivity).
-    destruct (Forall2_lookup_l _ _ _ _ _ H Hl) as (c & Hc & Hok).
-    rewrite /lm_at (list_lookup_total_correct cs i c Hc).
-    by rewrite (list_lookup_total_correct _ _ _ Hb).
-  Qed.
+  Lemma lm_alts_ok_at s I cs i :
+    lm_alts_ok s I cs -> i < nlines I ->
+    lm_ok M (lm_upto cs s (bodies_of I) i) (lm_of M (bodies_of I !!! i)) (lm_at cs i).
+  Proof using. intros [_ H] Hi. exact (H i Hi). Qed.
+
+  Lemma lm_alts_ok_len s I cs : lm_alts_ok s I cs -> length cs = nlines I.
+  Proof using. by intros [H _]. Qed.
 
   Lemma lm_disc_input_at I i :
     lm_disc_input I -> i < nlines I -> lm_body_ok M (bodies_of I !!! i).
@@ -489,6 +496,20 @@ Section line_model.
       intro H. rewrite /lm_cont_all (lml_cont_panic L s l a H) H. reflexivity.
     Qed.
 
+    (* the state a round starts in is well-formed, round by round *)
+    Lemma lm_upto_st_ok (cs : list nat) (s : lm_st M) (bs : list (list (bv 8))) (q : nat) :
+      lm_st_ok M s ->
+      (forall i, i < q -> lm_line_ok M (lm_of M (bs !!! i))) ->
+      (forall i, i < q -> lm_ok M (lm_upto cs s bs i) (lm_of M (bs !!! i)) (lm_at cs i)) ->
+      lm_st_ok M (lm_upto cs s bs q).
+    Proof using L.
+      intros Hs. induction q as [| q IH]; intros Hl Hok; [exact Hs |].
+      cbn [lm_upto]. apply (lml_st_step L).
+      - apply IH; intros i Hi; [apply Hl | apply Hok]; lia.
+      - apply Hl. lia.
+      - apply Hok. lia.
+    Qed.
+
     (* THE BLOCK STEP.  Two continuations below one wire are the SAME
        BYTES, and the unprimed round is settled.  Four cases, by which
        side panicked; three of them are one lemma each and the fourth is
@@ -498,11 +519,11 @@ Section line_model.
       Forall (fun x => x < length pro_alts) ps ->
       Forall (fun x => x < length pro_alts) ps' ->
       lm_line_ok M l -> lm_st_ok M s -> lm_st_ok M s' ->
-      lm_ok M l a -> lm_ok M l a' ->
+      lm_ok M s l a -> lm_ok M s' l a' ->
       (lm_panic M a' = true -> 1 < pro_rounds ps') ->
       (lm_panic M a = true -> X <> [] -> 1 < pro_rounds ps) ->
       (lm_term M a = true -> X = []) ->
-      ((exists c, lm_ok M l c /\ lm_term M c = true) ->
+      ((exists c, lm_ok M s' l c /\ lm_term M c = true) ->
          ~ lm_merge M (lm_cont M s' l a')) ->
       (lm_cont_all ps' s' l a' ++ X') `prefix_of` (lm_cont_all ps s l a ++ X) ->
       (lm_panic M a = true -> 1 < pro_rounds ps)
@@ -517,16 +538,17 @@ Section line_model.
          INSIDE it -- and a prefix of a mergeable output is one. *)
       assert (Hfa' : lm_term M a' = false).
       { destruct (lm_term M a') eqn:Hf; [exfalso | reflexivity].
-        exact (Hnm (ex_intro _ a' (conj Ha' Hf)) (lml_term_merge L s' l a' Ha' Hf)). }
+        exact (Hnm (ex_intro _ a' (conj Ha' Hf))
+                   (lml_term_merge L s' l a' Hs' Ha' Hf)). }
       assert (Hfa : lm_term M a = false).
       { destruct (lm_term M a) eqn:Hf; [exfalso | reflexivity].
         rewrite (Hd4 eq_refl) app_nil_r in Hp.
-        apply (Hnm (ex_intro _ a (conj Ha Hf))).
+        apply (Hnm (lml_term_st L s l a Ha Hf s')).
         apply (lml_merge_prefix L _ (lm_cont_all ps s l a)).
         - etrans; [| etrans; [apply prefix_app_r; reflexivity | exact Hp]].
           rewrite /lm_cont_all. apply prefix_app_r. reflexivity.
         - rewrite /lm_cont_all (lml_term_nopanic L a Hf) app_nil_r.
-          exact (lml_term_merge L s l a Ha Hf). }
+          exact (lml_term_merge L s l a Hs Ha Hf). }
       destruct (lm_panic M a) eqn:Hpa; destruct (lm_panic M a') eqn:Hpa'.
       - (* BOTH PANICKED: two prologues below one wire *)
         rewrite (lm_cont_all_panic ps s l a Hpa) (lm_cont_all_panic ps' s' l a' Hpa')
@@ -636,11 +658,14 @@ Section line_model.
         q' <= length bs' -> q <= length bs ->
         lm_st_ok M s -> lm_st_ok M s' ->
         (forall i, i < q -> lm_line_ok M (lm_of M (bs !!! i))) ->
-        (forall i, i < q -> lm_ok M (lm_of M (bs !!! i)) (lm_at cs i)) ->
-        (forall i, i < q' -> lm_ok M (lm_of M (bs' !!! i)) (lm_at cs' i)) ->
+        (forall i, i < q ->
+           lm_ok M (lm_upto cs s bs i) (lm_of M (bs !!! i)) (lm_at cs i)) ->
+        (forall i, i < q' ->
+           lm_ok M (lm_upto cs' s' bs' i) (lm_of M (bs' !!! i)) (lm_at cs' i)) ->
         (forall i, i < q' -> lm_term M (lm_at cs i) = true -> S i = q /\ t = []) ->
         (forall i, i < q' ->
-           (exists c, lm_ok M (lm_of M (bs' !!! i)) c /\ lm_term M c = true) ->
+           (exists c, lm_ok M (lm_upto cs' s' bs' i) (lm_of M (bs' !!! i)) c
+                      /\ lm_term M c = true) ->
            ~ lm_merge M (lm_cont M (lm_upto cs' s' bs' i) (lm_of M (bs' !!! i))
                            (lm_at cs' i))) ->
         Forall (fun l => wl_nl ∉ l) bs -> Forall (fun l => wl_nl ∉ l) bs' ->
@@ -676,9 +701,10 @@ Section line_model.
       rewrite (lm_cont_at_bs0 ps' cs' s' bs' bs ltac:(by rewrite Hhd)) in Hrest.
       (* the head block: one line, two alternatives, one wire *)
       assert (Hl0 : lm_line_ok M (lm_of M (bs !!! 0))) by (apply Hline; lia).
-      assert (Ha0 : lm_ok M (lm_of M (bs !!! 0)) (lm_at cs 0)) by (apply Hokc; lia).
-      assert (Ha0' : lm_ok M (lm_of M (bs !!! 0)) (lm_at cs' 0)).
-      { rewrite -Hhd. apply Hokc'. lia. }
+      assert (Ha0 : lm_ok M s (lm_of M (bs !!! 0)) (lm_at cs 0))
+        by exact (Hokc 0 ltac:(lia)).
+      assert (Ha0' : lm_ok M s' (lm_of M (bs !!! 0)) (lm_at cs' 0)).
+      { rewrite -Hhd. exact (Hokc' 0 ltac:(lia)). }
       assert (Hset' : lm_panic M (lm_at cs' 0) = true -> 1 < pro_rounds ps').
       { intros H3. eapply Nat.le_lt_trans; [| exact Hlt'].
         rewrite -(lm_pro_idx_Sp cs' 0 H3). apply lm_pro_idx_mono. lia. }
@@ -702,7 +728,7 @@ Section line_model.
       { intros Hf. destruct (Hd4u 0 ltac:(lia) Hf) as [Hq Ht].
         assert (Hp0 : p = 0) by lia.
         by rewrite Hp0 lm_seq_0 Ht. }
-      assert (Hnmh : (exists c, lm_ok M (lm_of M (bs !!! 0)) c /\ lm_term M c = true) ->
+      assert (Hnmh : (exists c, lm_ok M s' (lm_of M (bs !!! 0)) c /\ lm_term M c = true) ->
                 ~ lm_merge M (lm_cont M s' (lm_of M (bs !!! 0)) (lm_at cs' 0))).
       { rewrite -Hhd. exact (Hnmp 0 ltac:(lia)). }
       rewrite !lm_cont_at_0 in Hrest.
@@ -742,8 +768,8 @@ Section line_model.
       { exact Hs1. }
       { exact Hs1'. }
       { intros i Hi. rewrite lb_lookup_total_drop. apply Hline. lia. }
-      { intros i Hi. rewrite /lm_at !lb_lookup_total_drop. apply Hokc. lia. }
-      { intros i Hi. rewrite /lm_at !lb_lookup_total_drop. apply Hokc'. lia. }
+      { intros i Hi. rewrite lm_upto_drop /lm_at !lb_lookup_total_drop. apply Hokc. lia. }
+      { intros i Hi. rewrite lm_upto_drop /lm_at !lb_lookup_total_drop. apply Hokc'. lia. }
       { intros i Hi Hf. rewrite /lm_at lb_lookup_total_drop in Hf.
         replace (1 + i) with (S i) in Hf by lia.
         destruct (Hd4u (S i) ltac:(lia) Hf) as [Hq Ht].
@@ -791,13 +817,14 @@ Section line_model.
         (I' I : list (bv 8)) :
       Forall (fun a => a < length pro_alts) ps ->
       lm_pro_ok ps' cs' (nlines I') ->
-      lm_alts_ok I cs -> lm_alts_ok I' cs' ->
+      lm_alts_ok s I cs -> lm_alts_ok s' I' cs' ->
       lm_pro_pin ps cs I -> lm_disc_input I -> lm_disc_input I' ->
       lm_st_ok M s -> lm_st_ok M s' ->
       (forall i, i < nlines I' -> lm_term M (lm_at cs i) = true ->
          S i = nlines I /\ rest_of I = []) ->
       (forall i, i < nlines I' ->
-         (exists c, lm_ok M (lm_of M (bodies_of I' !!! i)) c /\ lm_term M c = true) ->
+         (exists c, lm_ok M (lm_upto cs' s' (bodies_of I') i) (lm_of M (bodies_of I' !!! i)) c
+                    /\ lm_term M c = true) ->
          ~ lm_merge M (lm_cont M (lm_upto cs' s' (bodies_of I') i)
                          (lm_of M (bodies_of I' !!! i)) (lm_at cs' i))) ->
       lm_sess ps' cs' s' I' `prefix_of` lm_sess ps cs s I ->
@@ -837,11 +864,13 @@ Section line_model.
       assert (Hline : forall i, i < nlines I -> lm_line_ok M (lm_of M (bodies_of I !!! i)))
         by (intros i Hi; exact (lml_body_line L _ (lm_disc_input_at I i Hd Hi))).
       assert (Hokc : forall i, i < nlines I ->
-                lm_ok M (lm_of M (bodies_of I !!! i)) (lm_at cs i))
-        by (intros i Hi; exact (lm_alts_ok_at I cs i Hcs Hi)).
+                lm_ok M (lm_upto cs s (bodies_of I) i) (lm_of M (bodies_of I !!! i))
+                  (lm_at cs i))
+        by (intros i Hi; exact (lm_alts_ok_at s I cs i Hcs Hi)).
       assert (Hokc' : forall i, i < nlines I' ->
-                lm_ok M (lm_of M (bodies_of I' !!! i)) (lm_at cs' i))
-        by (intros i Hi; exact (lm_alts_ok_at I' cs' i Hcs' Hi)).
+                lm_ok M (lm_upto cs' s' (bodies_of I') i)
+                  (lm_of M (bodies_of I' !!! i)) (lm_at cs' i))
+        by (intros i Hi; exact (lm_alts_ok_at s' I' cs' i Hcs' Hi)).
       destruct (lm_seq_prefix_det (nlines I') ps ps' cs cs' s s'
                   (bodies_of I) (bodies_of I') (nlines I) (rest_of I') (rest_of I)
                   Hps Hps' Hlt' Hpos Hbelow Htlast Hlb' Hlb Hs Hs'
@@ -970,6 +999,64 @@ Section line_model.
     intros H. rewrite /lm_sess. by rewrite (lm_seq_cs_ext ps cs1 cs2 s _ _ H).
   Qed.
 
+  (* ---- THE RANGE CONDITION'S OWN LAWS ---- *)
+  Lemma lm_alts_ok_nil s I : nlines I = 0 -> lm_alts_ok s I [].
+  Proof using. intros Hn. split; [by rewrite Hn | intros i Hi; lia]. Qed.
+
+  (* a prefix of the input is checked by the prefix of the list *)
+  Lemma lm_alts_ok_prefix s I I' cs :
+    I `prefix_of` I' -> lm_alts_ok s I' cs -> lm_alts_ok s I (take (nlines I) cs).
+  Proof using.
+    intros Hp [Hlen H].
+    destruct (bodies_of_prefix I I' Hp) as [z Hz].
+    assert (Hle : nlines I <= nlines I') by (apply nlines_prefix; exact Hp).
+    assert (Hbod : forall j, j < nlines I -> bodies_of I' !!! j = bodies_of I !!! j).
+    { intros j Hj. rewrite Hz !list_lookup_total_alt lookup_app_l;
+        [reflexivity | rewrite /nlines in Hj; lia]. }
+    assert (Htk : forall j, j < nlines I -> take (nlines I) cs !!! j = cs !!! j).
+    { intros j Hj. rewrite !list_lookup_total_alt lookup_take; [done | lia]. }
+    split; [rewrite length_take; lia |].
+    intros i Hi.
+    rewrite /lm_at (Htk i Hi) -(Hbod i Hi).
+    rewrite (lm_upto_cs_ext (take (nlines I) cs) cs s (bodies_of I) i
+               ltac:(intros j Hj; apply Htk; lia)).
+    rewrite (lm_upto_bs_ext cs s (bodies_of I) (bodies_of I') i
+               ltac:(intros j Hj; symmetry; apply Hbod; lia)).
+    exact (H i ltac:(lia)).
+  Qed.
+
+  (* AT A STATE-FREE RANGE CONDITION the list is checked entry by entry,
+     at any one state ([Forall2], the landed instances' reading) *)
+  Lemma lm_alts_ok_nostate s I cs :
+    (forall s1 s2 l a, lm_ok M s1 l a -> lm_ok M s2 l a) ->
+    lm_alts_ok s I cs
+    <-> Forall2 (fun l c => lm_ok M s l (lm_dec M c)) (lm_of M <$> bodies_of I) cs.
+  Proof using.
+    intros Hst. split.
+    - intros [Hlen H]. apply Forall2_same_length_lookup_2.
+      { rewrite length_fmap Hlen. reflexivity. }
+      intros i l c Hl Hc.
+      rewrite list_lookup_fmap in Hl.
+      destruct (bodies_of I !! i) as [b |] eqn:Hb; [| discriminate].
+      cbn in Hl. injection Hl as <-.
+      assert (Hi : i < nlines I) by (rewrite /nlines; by eapply lookup_lt_Some).
+      pose proof (H i Hi) as Hok.
+      rewrite /lm_at (list_lookup_total_correct _ _ _ Hc)
+              (list_lookup_total_correct _ _ _ Hb) in Hok.
+      exact (Hst _ _ _ _ Hok).
+    - intros HF. pose proof (Forall2_length _ _ _ HF) as Hl.
+      rewrite length_fmap in Hl.
+      split; [rewrite /nlines; lia |].
+      intros i Hi. rewrite /nlines in Hi.
+      destruct (lookup_lt_is_Some_2 (bodies_of I) i Hi) as [b Hb].
+      assert (Hl' : (lm_of M <$> bodies_of I) !! i = Some (lm_of M b))
+        by (rewrite list_lookup_fmap Hb; reflexivity).
+      destruct (Forall2_lookup_l _ _ _ _ _ HF Hl') as (c & Hc & Hok).
+      rewrite /lm_at (list_lookup_total_correct cs i c Hc)
+              (list_lookup_total_correct _ _ _ Hb).
+      exact (Hst _ _ _ _ Hok).
+  Qed.
+
   (* ====================================================================== *)
   (*  THE DISCIPLINE AND THE CLAIM, ONCE                                     *)
   (*                                                                        *)
@@ -984,13 +1071,15 @@ Section line_model.
     lm_sess ps cs s (done_of (ins p)) `prefix_of` obs_wire Uart0 p.
 
   (* D4, [PipeDisc.d4_p] at the determinacy section's guard: a round whose
-     line admits a coverage-ending arm and whose continuation is a mergeable
+     line admits a coverage-ending arm at the round's state and whose
+     continuation is a mergeable
      output is the input's LAST line, and the input ends at its newline --
      the discipline reads nothing of the era past such an arm.  Vacuous
      where no arm ends coverage. *)
   Definition lm_d4 (cs : list nat) (s : lm_st M) (I : list (bv 8)) : Prop :=
     forall i, i < nlines I ->
-      (exists c, lm_ok M (lm_of M (bodies_of I !!! i)) c /\ lm_term M c = true) ->
+      (exists c, lm_ok M (lm_upto cs s (bodies_of I) i) (lm_of M (bodies_of I !!! i)) c
+                 /\ lm_term M c = true) ->
       lm_merge M (lm_cont M (lm_upto cs s (bodies_of I) i)
                     (lm_of M (bodies_of I !!! i)) (lm_at cs i)) ->
       nlines I = S i /\ rest_of I = [].
@@ -1007,7 +1096,7 @@ Section line_model.
   Definition lm_disc_seg' (s : lm_st M) (seg : list mobs) : Prop :=
     lm_disc_input (ins seg)
     /\ exists ps cs : list nat,
-         lm_alts_ok (ins seg) cs
+         lm_alts_ok s (ins seg) cs
          /\ lm_d4 cs s (ins seg)
          /\ forall p : list mobs, p ∈ in_pres seg ->
               lm_pro_ok ps cs (nlines (ins p)) /\ lm_disc_pt ps cs s p.
@@ -1023,7 +1112,7 @@ Section line_model.
   Definition lm_expected_rel (s : lm_st M) (I out : list (bv 8)) : Prop :=
     exists ps cs : list nat,
       lm_pro_ok ps cs (nlines I)
-      /\ lm_alts_ok I cs
+      /\ lm_alts_ok s I cs
       /\ out `prefix_of` lm_sess ps cs s I.
 
   Lemma lm_expected_rel_out_mono s I out out' :

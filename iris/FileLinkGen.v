@@ -158,7 +158,7 @@ Section file_link_gen.
     (0 < length ws)%nat ->
     fread_ret g k v n ws -∗
     FT ∨ (∃ (ps0 cs0 : list nat) (s0 : fstate) (J : list (bv 8)),
-            ⌜length J = (n + length ws)%nat⌝ ∗ ⌜lm_rd_stage file_lm ps0 cs0 J⌝
+            ⌜length J = (n + length ws)%nat⌝ ∗ ⌜lm_rd_stage file_lm ps0 cs0 s0 J⌝
             ∗ inp_lb v J ∗ turn_lb v (length (lm_proc_before file_lm ps0 cs0 s0 J))
             ∗ ps_lb v ps0 ∗ cs_lb v cs0 ∗ f0bwk k s0).
   Proof using .
@@ -173,7 +173,7 @@ Section file_link_gen.
     iRight. iExists ps0, cs0, s0, (snd <$> (dl ++ ws)).
     iFrame "Hinp Hps0 Hcs0".
     iSplitR; [iPureIntro; rewrite length_fmap length_app Hdl; reflexivity |].
-    iSplitR; [iPureIntro; exact (proj1 (rd_stage_f_lm _ _ _) Hrs) |].
+    iSplitR; [iPureIntro; exact (proj1 (rd_stage_f_lm _ _ _ _) Hrs) |].
     iSplitR; [rewrite -proc_before_f_lm; iExact "Htlb" |].
     iExists vf. iFrame "Hvf". iApply (f0_lb_bl with "Hf0").
   Qed.
@@ -199,7 +199,7 @@ Section file_link_gen.
     rewrite /fwc_rresw /fwc_rres /gwc_rres. iIntros "[Hr _]".
     iDestruct "Hr" as (ps0 cs0 s0) "(%Hrs & #Htlb & #Hps0 & #Hcs0 & #Hbw)".
     iExists ps0, cs0, s0. iFrame "Hps0 Hcs0".
-    iSplitR; [iPureIntro; exact (proj1 (rd_stage_f_lm _ _ _) Hrs) |].
+    iSplitR; [iPureIntro; exact (proj1 (rd_stage_f_lm _ _ _ _) Hrs) |].
     iSplitR; [rewrite -proc_before_f_lm; iExact "Htlb" |].
     iApply (f0bw_bwk with "Hbw").
   Qed.
@@ -319,7 +319,7 @@ Section file_link_gen.
     rewrite /fwc_rresw_at /fwc_rres_at /gwc_rres. iIntros "[Hr _]".
     iDestruct "Hr" as (ps0 cs0) "(%Hrs & #Htlb & #Hps0 & #Hcs0 & #Hbw)".
     iExists ps0, cs0, s0. iFrame "Hps0 Hcs0".
-    iSplitR; [iPureIntro; exact (proj1 (rd_stage_f_lm _ _ _) Hrs) |].
+    iSplitR; [iPureIntro; exact (proj1 (rd_stage_f_lm _ _ _ _) Hrs) |].
     iSplitR; [rewrite -proc_before_f_lm; iExact "Htlb" |].
     iApply (f0bw_bwk with "Hbw").
   Qed.

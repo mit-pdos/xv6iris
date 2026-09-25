@@ -175,7 +175,7 @@ Section file_links.
     iRight. iDestruct "Hw" as (vf) "[#Hfp #Hlb]".
     iExists cs0, ps0, vf, s0. rewrite proc_before_f_lm.
     iFrame "Hcs Hps Hfp Hlb Htl". iPureIntro.
-    split; [exact Hnl | by apply rd_stage_f_lm].
+    split; [exact Hnl | by apply (rd_stage_f_lm _ _ s0)].
   Qed.
 
   (* ---- the arm's close and its bytes, both free ---- *)

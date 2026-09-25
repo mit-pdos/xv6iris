@@ -68,7 +68,7 @@ Lemma pipes_code_apr (I : list (bv 8)) :
   /\ lm_ab pipes_lmE pipes_hooksE I (pipes_code I) = line_alts_of (last_ws I) !!! 0%nat.
 Proof using.
   intros Hl.
-  assert (Hok : lm_ok pipes_lmE (lm_line_at pipes_lmE I)
+  assert (Hok : lm_ok pipes_lmE tt (lm_line_at pipes_lmE I)
                   (lm_dec pipes_lmE (pipes_code I))).
   { rewrite /pipes_code. cbn [pipes_lmE pipes_lm lm_ok lm_dec].
     rewrite plalt_of_code. right.

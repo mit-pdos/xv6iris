@@ -78,7 +78,7 @@ Section open_events_pure.
 
   Lemma gcl_pure_o_rd_stage k ho so r pre H :
     gcl_pure_o M sd k ho so r pre H ->
-    lm_rd_stage M (gs_ps M so) (gs_cs M so) (snd <$> gs_E M so).
+    lm_rd_stage M (gs_ps M so) (gs_cs M so) (st so) (snd <$> gs_E M so).
   Proof using.
     intros (Hout & Hop & _).
     destruct Hout as (_ & _ & _ & Hpsb & Hpin & Hcsb & _).
@@ -272,7 +272,7 @@ Section open_events_pure.
       (ps cs : list nat) (s : lm_st M) (E : list (list mobs * bv 8))
       (w : list (bv 8)) (a : nat) (seg : list mobs) :
     Forall (fun x => (x < length pro_alts)%nat) ps ->
-    lm_alts_pre M (ins seg) cs ->
+    lm_alts_pre M s (ins seg) cs ->
     lm_E_disc M E ->
     lm_pro_pin M ps cs (snd <$> E) ->
     lm_blk_at M cs (snd <$> E) s w a ->
@@ -289,9 +289,18 @@ Section open_events_pure.
     { destruct (bodies_of_prefix (snd <$> E) (ins seg) Hinp) as [z Hz].
       rewrite Hz !list_lookup_total_alt lookup_app_l;
         [reflexivity | rewrite /nlines in Hpos |- *; lia]. }
-    assert (Hao' : lm_alts_pre M (ins seg) (cs ++ [a])).
-    { apply (lm_alts_pre_snoc M (ins seg) cs a Hao); [rewrite Hq; lia |].
-      rewrite Hq Hbod. exact Hok0. }
+    assert (Hbodj : forall j, (j < nlines (snd <$> E))%nat ->
+              bodies_of (ins seg) !!! j = bodies_of (snd <$> E) !!! j).
+    { destruct (bodies_of_prefix (snd <$> E) (ins seg) Hinp) as [z Hz].
+      intros j Hj. rewrite Hz !list_lookup_total_alt lookup_app_l;
+        [reflexivity | rewrite /nlines in Hj; lia]. }
+    assert (Hao' : lm_alts_pre M s (ins seg) (cs ++ [a])).
+    { apply (lm_alts_pre_snoc M s (ins seg) cs a Hao); [rewrite Hq; lia |].
+      rewrite Hq Hbod.
+      rewrite (lm_upto_ext M cs cs s (bodies_of (ins seg)) (bodies_of (snd <$> E))
+                 (nlines (snd <$> E) - 1) ltac:(intros j _; reflexivity)
+                 ltac:(intros j Hj; apply Hbodj; lia)).
+      exact Hok0. }
     assert (Hpin' : lm_pro_pin M ps (cs ++ [a]) (snd <$> E)).
     { intros q Hq'. rewrite (lm_pro_idx_app_le M); [by apply Hpin |].
       rewrite (ll_nstarted_rest_nil _ Hr) in Hq'. rewrite Hq. lia. }
@@ -386,8 +395,8 @@ Section open_events_pure.
     (* THE CLAIM'S RESOLUTION, COMPLETED WITH THE ROUND'S OWN CODE *)
     assert (HlenA : length (gs_cs M so ++ [ao]) = nlines (snd <$> gs_E M so))
       by (rewrite length_app /=; lia).
-    assert (HaoA : lm_alts_pre M (snd <$> gs_E M so) (gs_cs M so ++ [ao])).
-    { apply (lm_alts_pre_snoc M _ (gs_cs M so) ao Hcsb'); [lia |].
+    assert (HaoA : lm_alts_pre M (st so) (snd <$> gs_E M so) (gs_cs M so ++ [ao])).
+    { apply (lm_alts_pre_snoc M _ _ (gs_cs M so) ao Hcsb'); [lia |].
       rewrite Hqq. exact Hokao. }
     assert (HpinA : lm_pro_pin M (gs_ps M so) (gs_cs M so ++ [ao]) (snd <$> gs_E M so)).
     { intros q Hq. rewrite (lm_pro_idx_app_le M); [by apply Hpinf |].
@@ -470,8 +479,7 @@ Section open_events_pure.
                      < nlines (done_of (removelast (ins (open_seg h)))))%nat)
         by (rewrite HnI'; lia).
       apply (Hnm' _ Hi0).
-      + exists (lm_dec M ao). split; [| exact Hfk].
-        rewrite bodies_of_done HI. exact Hokao.
+      + rewrite bodies_of_done HI. exact (lml_term_st L _ _ _ Hokao Hfk _).
       + pose proof (Hconts _ Hi0) as Hc0.
         rewrite (lmN_cont_at_nopanic M (gs_ps M so) (gs_cs M so ++ [ao]) (st so)) in Hc0;
           last first.
@@ -486,7 +494,13 @@ Section open_events_pure.
                                 !!! (nlines (snd <$> gs_E M so) - 1)%nat))
                     (lm_dec M ao))).
         * rewrite -Hc0. by apply prefix_app_r.
-        * exact (lml_term_merge L _ _ _ Hokao Hfk).
+        * assert (Hstn : lm_st_ok M (lm_upto M (gs_cs M so) (st so)
+                                       (bodies_of (snd <$> gs_E M so))
+                                       (nlines (snd <$> gs_E M so) - 1))).
+          { apply (lm_upto_st_ok M L); [exact Hfok0 | |].
+            - intros i Hi. apply (lml_body_line L), (lm_disc_input_at M _ i Hbyte). lia.
+            - intros i Hi. apply (lm_alts_pre_at M _ _ _ i Hcsb'). lia. }
+          exact (lml_term_merge L _ _ _ Hstn Hokao Hfk).
   Qed.
 End open_events_pure.
 
@@ -621,7 +635,7 @@ Section pipes_events.
               ∗ ⌜(nlines (snd <$> (LogEntryDefs.ch_dl CH ++ ws)) <= S (length cs0))%nat⌝
               ∗ turn_lb v (length (lm_proc_before PM ps0 cs0 s0
                              (snd <$> (LogEntryDefs.ch_dl CH ++ ws))))
-              ∗ ⌜lm_rd_stage PM ps0 cs0 (snd <$> (LogEntryDefs.ch_dl CH ++ ws))⌝))%I.
+              ∗ ⌜lm_rd_stage PM ps0 cs0 s0 (snd <$> (LogEntryDefs.ch_dl CH ++ ws))⌝))%I.
 
   Lemma popenN_step_read (k : nat) (v : era_pins) (n : nat) (ho : list mobs)
       (CH : LogEntryDefs.cons_hist) (ws : list (list mobs * bv 8)) :
@@ -688,7 +702,7 @@ Section pipes_events.
       - rewrite /csq. apply prefix_take.
       - etrans; [| exact Hqle].
         apply nlines_prefix, (pop_prefix_of_removelast J Iw HJ Hne). }
-    assert (Hrdq : lm_rd_stage PM (gs_ps PM so) csq Iw).
+    assert (Hrdq : lm_rd_stage PM (gs_ps PM so) csq tt Iw).
     { rewrite /lm_rd_stage. split_and!; [exact Hpsb | | | exact Hqle].
       - intros i c Hc.
         assert (Hci : gs_cs PM so !! i = Some c)
@@ -700,7 +714,7 @@ Section pipes_events.
         destruct (bodies_of_prefix Iw (snd <$> gs_E PM so) HEpre) as [z Hz].
         rewrite Hz !list_lookup_total_alt lookup_app_l in Hok;
           [| rewrite /q /nlines in Hiq; lia].
-        by rewrite -!list_lookup_total_alt in Hok.
+        rewrite -!list_lookup_total_alt in Hok. exact Hok.
       - intros q' Hq'.
         assert (Hq'q : (q' <= q)%nat).
         { pose proof (nstarted_le_S Iw). rewrite /q. lia. }
@@ -865,7 +879,7 @@ Section pipes_events.
     rewrite -{1}Hst.
     apply (lm_good_out_of_stage_open PM K PB (gs_ps PM so) (gs_cs PM so)
              (gs_state PM tt so) (gs_E PM so) (gs_w PM so) ao seg Hpsb).
-    - apply (lm_alts_pre_mono PM (snd <$> gs_E PM so)); [exact Hbytes | exact Hcs'].
+    - apply (lm_alts_pre_mono PM _ (snd <$> gs_E PM so)); [exact Hbytes | exact Hcs'].
     - exact Hbyte.
     - exact Hpinf.
     - rewrite Hwp'. exact Hb2.
@@ -941,7 +955,7 @@ Section pipes_events.
       { rewrite Hwpre'. destruct pre; [by destruct (Hne' eq_refl) | cbn; lia]. }
       rewrite /lm_pcount in HP2. rewrite HP Hs2 in HP2.
       exfalso. lia. }
-    assert (Hok : lm_ok PM (lm_of PM (bodies_of I !!! (nlines I - 1)%nat))
+    assert (Hok : lm_ok PM tt (lm_of PM (bodies_of I !!! (nlines I - 1)%nat))
                     (lm_dec PM (plalt_code (PLRun [])))).
     { cbn [pipes_lm lm_ok lm_dec]. rewrite plalt_of_code. right.
       split; [exact Ha | exact Hbl]. }

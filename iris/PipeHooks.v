@@ -256,12 +256,12 @@ Qed.
 
 Definition pipe_hooks : lm_hooks pipe_lm :=
   MkLMH pipe_lm (fun a => negb (palt_isforkS a)) tt (fun _ => 3%nat) pexf_of pexfb
-    pnoc_of palt_ok_dec
-    (fun _ _ _ _ _ => eq_refl) pfree_term
-    ppan_ok (fun _ => pfree_of_nofork _ ppan_nofork) (fun _ => ppan_panic)
-    pexf_of_ok (fun l => pfree_of_nofork _ (pexf_of_nofork l)) pexf_of_nopanic
+    pnoc_of (fun _ => palt_ok_dec)
+    (fun _ _ _ _ _ => eq_refl) pfree_term (fun _ _ _ _ _ H => H)
+    (fun _ => ppan_ok) (fun _ => pfree_of_nofork _ ppan_nofork) (fun _ => ppan_panic)
+    (fun _ => pexf_of_ok) (fun l => pfree_of_nofork _ (pexf_of_nofork l)) pexf_of_nopanic
     (fun _ l => pcont_pexf l)
-    pnoc_of_ok (fun l => pfree_of_nofork _ (pnoc_of_nofork l)) pnoc_of_nopanic
+    (fun _ => pnoc_of_ok) (fun l => pfree_of_nofork _ (pnoc_of_nofork l)) pnoc_of_nopanic
     (fun _ l => pcont_pnoc l)
     (fun _ l a Hok Hp Ht => pcont_prompt l a Hok Hp Ht)
     (fun _ l a H => pcont_nonnil_dec l a H).

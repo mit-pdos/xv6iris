@@ -2153,11 +2153,15 @@ Section pipe_both.
   Proof using .
     rewrite /gwc_line. apply bi.equiv_entails; split.
     - iIntros "[H | [H | H]]"; [by iLeft | | by iRight; iRight].
-      iDestruct "H" as (a) "[%Ha H]". iRight. iLeft. iExists a.
+      iDestruct "H" as (a) "[%Ha H]". destruct Ha as (H1 & H2 & H3).
+      assert (Ha : papr I a) by exact (conj (H1 tt) (conj H2 H3)).
+      iRight. iLeft. iExists a.
       iSplitR; [by iPureIntro |]. rewrite (pwc_post_gen g k v I a Ha). iExact "H".
     - iIntros "[H | [H | H]]"; [by iLeft | | by iRight; iRight].
       iDestruct "H" as (a) "[%Ha H]". iRight. iLeft. iExists a.
-      iSplitR; [by iPureIntro |]. rewrite (pwc_post_gen g k v I a Ha). iExact "H".
+      iSplitR; [iPureIntro; destruct Ha as (H1 & H2 & H3);
+                exact (conj (fun _ => H1) (conj H2 H3)) |].
+      rewrite (pwc_post_gen g k v I a Ha). iExact "H".
   Qed.
 
   Lemma pwc_line2_timeless k v I : Timeless (pwc_line2 k v I).

@@ -127,7 +127,7 @@ Section pipes_writes.
     (nlines I0 <= S (length cs0))%nat ->
     lm_pro_pin PM ps0 cs0 I0 ->
     P = length (lm_proc_before PM ps0 cs0 tt I0) ->
-    lm_ok PM (lm_of PM (bodies_of I0 !!! (nlines I0 - 1)%nat)) (lm_dec PM a) ->
+    lm_ok PM tt (lm_of PM (bodies_of I0 !!! (nlines I0 - 1)%nat)) (lm_dec PM a) ->
     lm_term PM (lm_dec PM a) = false ->
     lm_cont PM (lm_upto PM cs0 tt (bodies_of I0) (nlines I0 - 1))
       (lm_of PM (bodies_of I0 !!! (nlines I0 - 1)%nat)) (lm_dec PM a) !! 0%nat = Some b ->

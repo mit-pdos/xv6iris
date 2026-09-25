@@ -745,7 +745,7 @@ Section PipeInitBoot.
         iExists [], [], tt. iEval (rewrite /EchoOut.turn) in "Htn".
         iDestruct (mono_nat_lb_own_get with "Htn") as "#Hlb0".
         rewrite (lm_proc_before_nil pipes_lmE). cbn [length].
-        iSplitR; [iPureIntro; exact (lm_rd_stage_0 pipes_lmE) |].
+        iSplitR; [iPureIntro; exact (lm_rd_stage_0 pipes_lmE tt) |].
         iFrame "Hlb0 Hps0 Hcs0". }
       iDestruct (UInitBanner.kinit_ban0_of_eturn_at (pipes_link_inst_at g)
                    with "[Hturn]")

@@ -2292,7 +2292,7 @@ Qed.
 (* ====================================================================== *)
 Definition pipe_lm : lmodel :=
   MkLM unit pline pline_of palt palt_of palt_panic (fun _ => pcont)
-       (fun _ _ _ => tt) palt_ok pbody_ok pbody_byte pline_ok (fun _ => True)
+       (fun _ _ _ => tt) (fun _ => palt_ok) pbody_ok pbody_byte pline_ok (fun _ => True)
        palt_isforkS pmergeable.
 
 Lemma pro_idx_p_lm cs i : pro_idx_p cs i = lm_pro_idx pipe_lm cs i.
@@ -2326,8 +2326,10 @@ Lemma pcont_all_out ps l a :
   palt_panic a = false -> pcont_all ps l a = pcont l a.
 Proof using. intro H. rewrite /pcont_all H. by rewrite app_nil_r. Qed.
 
-Lemma alts_ok_p_lm I cs : alts_ok_p I cs = lm_alts_ok pipe_lm I cs.
-Proof using. reflexivity. Qed.
+Lemma alts_ok_p_lm I cs : alts_ok_p I cs <-> lm_alts_ok pipe_lm tt I cs.
+Proof using.
+  rewrite (lm_alts_ok_nostate pipe_lm tt I cs (fun _ _ _ _ H => H)). reflexivity.
+Qed.
 
 Lemma disc_input_p_lm I : disc_input_p I = lm_disc_input pipe_lm I.
 Proof using. reflexivity. Qed.
@@ -2367,11 +2369,11 @@ Lemma disc_seg_p'_lm seg : disc_seg_p' seg <-> lm_disc_seg' pipe_lm tt seg.
 Proof using.
   rewrite /disc_seg_p' /lm_disc_seg' /disc_seg_p disc_input_p_lm. split.
   - intros [Hd (ps & cs & Hao & Hd4 & Hall)]. split; [exact Hd |]. exists ps, cs.
-    split; [by rewrite -alts_ok_p_lm |]. split; [by apply d4_p_lm |].
+    split; [by apply alts_ok_p_lm |]. split; [by apply d4_p_lm |].
     intros p Hp. destruct (Hall p Hp) as [Hok Hpt].
     split; [by apply pro_ok_p_lm | by apply disc_pt_p_lm].
   - intros [Hd (ps & cs & Hao & Hd4 & Hall)]. split; [exact Hd |]. exists ps, cs.
-    split; [by rewrite alts_ok_p_lm |]. split; [by apply d4_p_lm |].
+    split; [by apply alts_ok_p_lm |]. split; [by apply d4_p_lm |].
     intros p Hp. destruct (Hall p Hp) as [Hok Hpt].
     split; [by apply pro_ok_p_lm | by apply disc_pt_p_lm].
 Qed.
@@ -2388,10 +2390,10 @@ Lemma expected_rel_p_lm I out :
 Proof using.
   rewrite /expected_rel_p /lm_expected_rel. split.
   - intros (ps & cs & Hok & Hao & Hw). exists ps, cs.
-    split; [by apply pro_ok_p_lm |]. split; [by rewrite -alts_ok_p_lm |].
+    split; [by apply pro_ok_p_lm |]. split; [by apply alts_ok_p_lm |].
     by rewrite -sessp_lm.
   - intros (ps & cs & Hok & Hao & Hw). exists ps, cs.
-    split; [by apply pro_ok_p_lm |]. split; [by rewrite alts_ok_p_lm |].
+    split; [by apply pro_ok_p_lm |]. split; [by apply alts_ok_p_lm |].
     by rewrite sessp_lm.
 Qed.
 
@@ -2407,7 +2409,7 @@ Proof using.
   - intros s l a H. exact (pcont_panic l a H).
   - intros a H. destruct (palt_isforkS_inv a H) as [sel ->].
     exact (palt_panic_forkS sel).
-  - intros s l a Ha H. exact (pmergeable_isforkS l a Ha H).
+  - intros s l a _ Ha H. exact (pmergeable_isforkS l a Ha H).
   - intros u' u Hp Hm. exact (pmergeable_prefix u' u Hp Hm).
   - intros s l a _ Hl Ha Hp Hf.
     destruct (pcont_shape_nl l a Hl Ha Hp Hf) as (u & Hu & Hnd & Hnl).
@@ -2415,6 +2417,7 @@ Proof using.
     intros Y ps W _ Hcmp. apply lm_below_panic_any in Hcmp. destruct Hnl as [Hnl | Hhd].
     + exact (lb_out_eq_panic u Y _ Hnd Hnl Hcmp).
     + exfalso. exact (lb_head_ne_panic u Y _ Hhd Hcmp).
+  - intros s l c Hc Ht s'. exists c. split; [exact Hc | exact Ht].
 Qed.
 
 Lemma pipe_lm_byte_laws : lm_byte_laws pipe_lm.
@@ -2448,7 +2451,8 @@ Proof using.
   intros Hps Hok Hcs Hcs' Hpin Hd Hd' Hd4 Hnm Hpre.
   rewrite !sessp_lm in Hpre |- *.
   destruct (lm_sess_prefix_det pipe_lm pipe_lm_laws ps ps' cs cs' tt tt I' I Hps
-              (proj1 (pro_ok_p_lm _ _ _) Hok) Hcs Hcs'
+              (proj1 (pro_ok_p_lm _ _ _) Hok)
+              (proj1 (alts_ok_p_lm _ _) Hcs) (proj1 (alts_ok_p_lm _ _) Hcs')
               (proj1 (pro_pin_p_lm _ _ _) Hpin) Hd Hd' Logic.I Logic.I Hd4
               ltac:(intros i Hi (c & Hc & Hf) Hm;
                     destruct (palt_isforkS_inv c Hf) as [sel ->];

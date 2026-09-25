@@ -1867,7 +1867,7 @@ Definition file_phi (h : list mobs) : Prop :=
 (* ====================================================================== *)
 Definition file_lm : lmodel :=
   MkLM fstate uline uline_of ralt ralt_dec ralt_panic cont fsm
-       ralt_ok fbody_ok fbody_byte uline_ok fstate_ok
+       (fun _ => ralt_ok) fbody_ok fbody_byte uline_ok fstate_ok
        (fun _ => false) (fun _ => False).
 
 Lemma pro_idx_f_lm cs i : pro_idx_f cs i = lm_pro_idx file_lm cs i.
@@ -1890,8 +1890,10 @@ Proof using. reflexivity. Qed.
 Lemma sessf_lm ps cs s I : sessf ps cs s I = lm_sess file_lm ps cs s I.
 Proof using. rewrite /sessf /lm_sess. by rewrite alt_seq_f_lm. Qed.
 
-Lemma alts_ok_lm I cs : alts_ok I cs = lm_alts_ok file_lm I cs.
-Proof using. reflexivity. Qed.
+Lemma alts_ok_lm s I cs : alts_ok I cs <-> lm_alts_ok file_lm s I cs.
+Proof using.
+  rewrite (lm_alts_ok_nostate file_lm s I cs (fun _ _ _ _ H => H)). reflexivity.
+Qed.
 
 Lemma disc_input_f_lm I : disc_input_f I = lm_disc_input file_lm I.
 Proof using. reflexivity. Qed.
@@ -1910,12 +1912,12 @@ Lemma disc_seg_f'_lm s seg : disc_seg_f' s seg <-> lm_disc_seg' file_lm s seg.
 Proof using.
   rewrite /disc_seg_f' /lm_disc_seg' /disc_seg_f disc_input_f_lm. split.
   - intros [Hd (ps & cs & Hao & Hall)]. split; [exact Hd |]. exists ps, cs.
-    split; [by rewrite -alts_ok_lm |].
+    split; [by apply (alts_ok_lm s) |].
     split; [apply lm_d4_noterm; intro a; reflexivity |].
     intros p Hp. destruct (Hall p Hp) as [Hok Hpt].
     split; [by apply pro_ok_f_lm | by apply disc_pt_f_lm].
   - intros [Hd (ps & cs & Hao & _ & Hall)]. split; [exact Hd |]. exists ps, cs.
-    split; [by rewrite alts_ok_lm |].
+    split; [by apply (alts_ok_lm s) |].
     intros p Hp. destruct (Hall p Hp) as [Hok Hpt].
     split; [by apply pro_ok_f_lm | by apply disc_pt_f_lm].
 Qed.
@@ -1936,10 +1938,10 @@ Lemma expected_rel_f_lm s I out :
 Proof using.
   rewrite /lm_expected_rel. split.
   - intros (ps & cs & Hok & Hao & Hw). exists ps, cs.
-    split; [by apply pro_ok_f_lm |]. split; [by rewrite -alts_ok_lm |].
+    split; [by apply pro_ok_f_lm |]. split; [by apply (alts_ok_lm s) |].
     by rewrite -sessf_lm.
   - intros (ps & cs & Hok & Hao & Hw). exists ps, cs.
-    split; [by apply pro_ok_f_lm |]. split; [by rewrite alts_ok_lm |].
+    split; [by apply pro_ok_f_lm |]. split; [by apply (alts_ok_lm s) |].
     by rewrite sessf_lm.
 Qed.
 
@@ -1960,12 +1962,13 @@ Proof using.
   - intros s l a Hs Hl Ha. exact (fstate_ok_fsm s l a Hs Hl Ha).
   - intros s l a H. exact (cont_panic s l a H).
   - intros a H. cbn in H. discriminate H.
-  - intros s l a _ H. cbn in H. discriminate H.
+  - intros s l a _ _ H. cbn in H. discriminate H.
   - intros u' u _ H. exact H.
   - intros s l a Hs Hl Ha Hp _.
     destruct (cont_shape s l a Hl Hs Ha Hp) as (u & Hu & Hnd & Hnl).
     exists u. split; [exact Hu |]. split; [exact Hnd |].
     intros Y ps W _ Hcmp. exact (lb_out_eq_panic u Y _ Hnd Hnl (lm_below_panic_any u Y ps W Hcmp)).
+  - intros s l c _ H. cbn in H. discriminate H.
 Qed.
 
 Lemma file_lm_byte_laws : lm_byte_laws file_lm.
@@ -1995,7 +1998,8 @@ Proof using.
   intros Hps Hok Hcs Hcs' Hpin Hd Hd' Hs Hs' Hpre.
   rewrite !sessf_lm in Hpre |- *.
   destruct (lm_sess_prefix_det file_lm file_lm_laws ps ps' cs cs' s s' I' I Hps
-              (proj1 (pro_ok_f_lm _ _ _) Hok) Hcs Hcs'
+              (proj1 (pro_ok_f_lm _ _ _) Hok)
+              (proj1 (alts_ok_lm s _ _) Hcs) (proj1 (alts_ok_lm s' _ _) Hcs')
               (proj1 (pro_pin_f_lm _ _ _) Hpin) Hd Hd' Hs Hs'
               ltac:(intros i _ H; cbn in H; discriminate H)
               ltac:(intros i _ (c & _ & H); cbn in H; discriminate H) Hpre)

@@ -504,7 +504,7 @@ Lemma wr_owed_read_refute_p (ps cs ps0 cs0 : list nat) (I I0 : list (bv 8))
 Proof using.
   rewrite wr_owed_p_lm proc_before_p_lm. intros Hw HI Hne Hrs.
   exact (lm_wr_owed_read_refute pipe_lm pipe_lm_laws pipe_hooks ps cs ps0 cs0 tt I I0 P
-           Hw HI Hne (proj1 (rd_stage_p_lm _ _ _) Hrs)).
+           Hw HI Hne (proj1 (rd_stage_p_lm _ _ _ _) Hrs)).
 Qed.
 
 
@@ -1006,7 +1006,7 @@ Section pipe_links_line.
     (0 < length ws)%nat ->
     pread_ret g k v n ws -∗
     PT ∨ (∃ (ps0 cs0 : list nat) (s0 : unit) (J : list (bv 8)),
-            ⌜length J = (n + length ws)%nat⌝ ∗ ⌜lm_rd_stage pipe_lm ps0 cs0 J⌝
+            ⌜length J = (n + length ws)%nat⌝ ∗ ⌜lm_rd_stage pipe_lm ps0 cs0 s0 J⌝
             ∗ inp_lb v J ∗ turn_lb v (length (lm_proc_before pipe_lm ps0 cs0 s0 J))
             ∗ ps_lb v ps0 ∗ cs_lb v cs0 ∗ pipe_Wb k s0).
   Proof using .
@@ -1020,7 +1020,7 @@ Section pipe_links_line.
     iRight. iExists ps0, cs0, tt, (snd <$> (dl ++ ws)).
     iFrame "Hinp Hps0 Hcs0".
     iSplitR; [iPureIntro; rewrite length_fmap length_app Hdl; reflexivity |].
-    iSplitR; [iPureIntro; exact (proj1 (rd_stage_p_lm _ _ _) Hrs) |].
+    iSplitR; [iPureIntro; exact (proj1 (rd_stage_p_lm _ _ _ _) Hrs) |].
     rewrite -proc_before_p_lm /pipe_Wb. iFrame "Htlb".
   Qed.
 
@@ -1044,7 +1044,7 @@ Section pipe_links_line.
     rewrite /pwc_rres /gwc_rres. iIntros "Hr".
     iDestruct "Hr" as (ps0 cs0) "(%Hrs & #Htlb & #Hps0 & #Hcs0)".
     iExists ps0, cs0, tt. iFrame "Hps0 Hcs0".
-    iSplitR; [iPureIntro; exact (proj1 (rd_stage_p_lm _ _ _) Hrs) |].
+    iSplitR; [iPureIntro; exact (proj1 (rd_stage_p_lm _ _ _ _) Hrs) |].
     rewrite -proc_before_p_lm /pipe_Wb. iFrame "Htlb".
   Qed.
 
@@ -1122,7 +1122,8 @@ Section pipe_links_line.
   Proof using .
     rewrite /pwc_line /gwc_line. iIntros "[Hc | Hc]"; [by iLeft |].
     iDestruct "Hc" as (a) "[%Ha Hc]". iRight. iLeft. iExists a.
-    iSplitR; [by iPureIntro |]. by rewrite (pwc_post_gen k v I a Ha).
+    iSplitR; [iPureIntro; exact (lm_apr_aprs pipe_lm pipe_hooks I a (proj1 (papr_lm I a) Ha)) |].
+    by rewrite (pwc_post_gen k v I a Ha).
   Qed.
 
   Lemma pprompt_dollar_line (k : nat) (v : era_pins) (I : list (bv 8))

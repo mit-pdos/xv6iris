@@ -544,7 +544,7 @@ Lemma wr_owed_read_refute_f (ps cs ps0 cs0 : list nat) (s0 : fstate)
 Proof using.
   rewrite wr_owed_f_lm proc_before_f_lm. intros Hw HI Hne Hrs.
   exact (lm_wr_owed_read_refute file_lm file_lm_laws file_hooks ps cs ps0 cs0 s0 I I0 P
-           Hw HI Hne (proj1 (rd_stage_f_lm _ _ _) Hrs)).
+           Hw HI Hne (proj1 (rd_stage_f_lm _ _ _ _) Hrs)).
 Qed.
 
 

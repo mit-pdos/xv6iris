@@ -503,7 +503,7 @@ Defined.
 
 (* THE RANGE CONDITION OF [pipes_lm], DECIDED, at any content function
    and any admission *)
-Global Instance pipes_lm_ok_dec fc adm l a : Decision (lm_ok (pipes_lm fc adm) l a).
+Global Instance pipes_lm_ok_dec fc adm s l a : Decision (lm_ok (pipes_lm fc adm) s l a).
 Proof using. cbn [pipes_lm lm_ok]. apply _. Defined.
 
 (* ===================================================================== *)
@@ -522,15 +522,15 @@ Section pipes_hooks.
   Lemma phk_free_term (a : plalt) : negb (plterm a) = true -> plterm a = false.
   Proof using. destruct (plterm a); [discriminate | reflexivity]. Qed.
 
-  Lemma phk_pan_ok l : lm_ok PM l (lm_dec PM (plalt_code PLPanic)).
+  Lemma phk_pan_ok s l : lm_ok PM s l (lm_dec PM (plalt_code PLPanic)).
   Proof using. cbn [pipes_lm lm_ok lm_dec]. rewrite plalt_of_code. left. left. reflexivity. Qed.
 
-  Lemma phk_exf_ok l : lm_ok PM l (lm_dec PM (plalt_code (PLRun (pl_exfb l)))).
+  Lemma phk_exf_ok s l : lm_ok PM s l (lm_dec PM (plalt_code (PLRun (pl_exfb l)))).
   Proof using.
     cbn [pipes_lm lm_ok lm_dec]. rewrite plalt_of_code. left. right. right. reflexivity.
   Qed.
 
-  Lemma phk_noc_ok l : lm_ok PM l (lm_dec PM (plalt_code (PLRun []))).
+  Lemma phk_noc_ok s l : lm_ok PM s l (lm_dec PM (plalt_code (PLRun []))).
   Proof using. cbn [pipes_lm lm_ok lm_dec]. rewrite plalt_of_code. left. right. left. reflexivity. Qed.
 
   Lemma phk_code_free a : negb (plterm (lm_dec PM (plalt_code a))) = negb (plterm a).
@@ -543,7 +543,7 @@ Section pipes_hooks.
   Proof using. cbn [pipes_lm lm_cont lm_dec]. by rewrite plalt_of_code. Qed.
 
   Lemma phk_cont_prompt s l a :
-    lm_ok PM l a -> lm_panic PM a = false -> lm_term PM a = false ->
+    lm_ok PM s l a -> lm_panic PM a = false -> lm_term PM a = false ->
     exists u, lm_cont PM s l a = u ++ u_prompt.
   Proof using.
     intros _ Hp Ht. destruct a as [| b | b]; [discriminate Hp | | discriminate Ht].
@@ -551,14 +551,14 @@ Section pipes_hooks.
   Qed.
 
   Lemma phk_cont_nonnil s l a :
-    lm_ok PM l a \/ a = lm_dec PM 0 -> lm_cont PM s l a <> [].
+    lm_ok PM s l a \/ a = lm_dec PM 0 -> lm_cont PM s l a <> [].
   Proof using.
     intros Ha. cbn [pipes_lm lm_cont]. destruct a as [| b | b]; cbn [plcont].
     - intros Hq. apply (f_equal length) in Hq. rewrite lb_panic_len in Hq. discriminate Hq.
     - intros Hq. apply (f_equal length) in Hq. rewrite length_app, ll_prompt_len in Hq.
       cbn [length] in Hq. lia.
     - destruct Ha as [Hok | Hq].
-      + apply (pipes_lm_ok_term fc adm) in Hok as [_ [Hne _]]. exact Hne.
+      + apply (pipes_lm_ok_term fc adm s) in Hok as [_ [Hne _]]. exact Hne.
       + exfalso. cbn [pipes_lm lm_dec] in Hq. unfold plalt_of in Hq.
         rewrite decide_True in Hq; [discriminate Hq | reflexivity].
   Qed.
@@ -568,7 +568,7 @@ Section pipes_hooks.
       (fun _ => plalt_code PLPanic) (fun l => plalt_code (PLRun (pl_exfb l)))
       (fun l => pl_exfb l ++ u_prompt) (fun _ => plalt_code (PLRun []))
       (pipes_lm_ok_dec fc adm)
-      (fun _ _ _ _ _ => eq_refl) phk_free_term
+      (fun _ _ _ _ _ => eq_refl) phk_free_term (fun _ _ _ _ _ H => H)
       phk_pan_ok (fun _ => eq_trans (phk_code_free PLPanic) eq_refl)
       (fun _ => eq_trans (phk_code_panic PLPanic) eq_refl)
       phk_exf_ok (fun l => eq_trans (phk_code_free (PLRun (pl_exfb l))) eq_refl)
@@ -612,7 +612,7 @@ Example demo_foo3_run : line_blocks fc0 l_foo3 (sb "foo" ++ nlb').
 Proof using. apply line_blocksb_spec. vm_compute. reflexivity. Qed.
 
 Example demo_foo3_lm :
-  lm_ok (pipes_lm fc0 adm_echo) l_foo3 (PLRun (sb "foo" ++ nlb'))
+  lm_ok (pipes_lm fc0 adm_echo) tt l_foo3 (PLRun (sb "foo" ++ nlb'))
   /\ lm_cont (pipes_lm fc0 adm_echo) tt l_foo3 (PLRun (sb "foo" ++ nlb'))
      = sb "foo" ++ nlb' ++ sb "$ ".
 Proof using. split; [right; split; [vm_compute; reflexivity | exact demo_foo3_run] | reflexivity]. Qed.

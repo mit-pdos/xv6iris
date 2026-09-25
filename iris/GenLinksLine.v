@@ -219,7 +219,7 @@ Section gen_links_line.
      reader's witness of the boot state *)
   Definition gwc_rres (v : era_pins) (I : list (bv 8)) : iProp Σ :=
     (∃ (ps0 cs0 : list nat) (s0 : lm_st M),
-       ⌜lm_rd_stage M ps0 cs0 I⌝
+       ⌜lm_rd_stage M ps0 cs0 s0 I⌝
        ∗ turn_lb v (length (lm_proc_before M ps0 cs0 s0 I))
        ∗ ps_lb v ps0 ∗ cs_lb v cs0 ∗ Wb k0 s0)%I.
 
@@ -629,7 +629,8 @@ Section gen_links_line.
         ⌜nlines I0 <= S (length cs0)⌝ -∗
         ⌜lm_pro_pin M ps0 cs0 I0⌝ -∗
         ⌜P = length (lm_proc_before M ps0 cs0 s0 I0)⌝ -∗
-        ⌜lm_ok M (lm_line_at M I0) (lm_dec M a)⌝ -∗
+        ⌜lm_ok M (lm_upto M cs0 s0 (bodies_of I0) (nlines I0 - 1)) (lm_line_at M I0)
+           (lm_dec M a)⌝ -∗
         ⌜lm_term M (lm_dec M a) = false⌝ -∗
         ⌜lm_abs M s0 cs0 I0 a !! 0 = Some b⌝ -∗
         PIN k v -∗ W k s0 -∗ turn v P -∗
@@ -796,7 +797,7 @@ Section gen_links_line.
       { rewrite Hn. lia. }
       { exact Hpin0. }
       { exact HP. }
-      { exact Hok. }
+      { exact (lmh_free_ok K _ _ _ _ Hfr Hok). }
       { exact (lmh_free_term K _ Hfr). }
       { rewrite /lm_abs -(lm_ab_at M K I a _ Hok Hfr). exact Hb. }
       iIntros "Hres". iApply "HΦ". rewrite /gwc_blk.
@@ -879,7 +880,7 @@ Section gen_links_line.
                 with "[%] [%] [%] [%] [%] [%] [%] [%] Hpin Hf Htn Hps Hcs HE [HΦ]").
       { exact Hne. } { exact Hm. } { rewrite Hdv. lia. } { exact Hpin0. }
       { exact HP. }
-      { exact (lmh_noc_ok K (lm_line_at M I)). }
+      { exact (lmh_noc_ok K _ (lm_line_at M I)). }
       { exact (lmh_free_term K _ (lmh_noc_free K (lm_line_at M I))). }
       { rewrite /lm_abs (lmh_noc_cont K _ (lm_line_at M I)) Hb.
         exact EchoLinks.wr_prompt_head. }
@@ -994,7 +995,7 @@ Section gen_links_line.
       iApply ("Hblk" $! k v P a b ps cs s0 I Φ
                 with "[%] [%] [%] [%] [%] [%] [%] [%] Hpin Hf Htn Hps Hcs HE [HΦ]").
       { exact Hne. } { exact Hr. } { rewrite Hn. lia. } { exact Hpin0. }
-      { exact HP. } { exact Hok. } { exact Hnt. }
+      { exact HP. } { exact (Hok _). } { exact Hnt. }
       { exact Hby. }
       iIntros "Hres". iApply "HΦ". rewrite /gwc_sp_t.
       iDestruct "Hres" as "[(Htn' & Hps' & Hcs' & HE') | #HT]"; last by iRight.
@@ -1115,7 +1116,7 @@ Section gen_links_line.
     0 < length ws ->
     RR k v n ws -∗
     T ∨ (∃ (ps0 cs0 : list nat) (s0 : lm_st M) (J : list (bv 8)),
-           ⌜length J = (n + length ws)%nat⌝ ∗ ⌜lm_rd_stage M ps0 cs0 J⌝
+           ⌜length J = (n + length ws)%nat⌝ ∗ ⌜lm_rd_stage M ps0 cs0 s0 J⌝
            ∗ inp_lb v J ∗ turn_lb v (length (lm_proc_before M ps0 cs0 s0 J))
            ∗ ps_lb v ps0 ∗ cs_lb v cs0 ∗ Wb k s0)).
 

@@ -664,7 +664,7 @@ Proof using. intros (src & Hr & Hm). exact (line_runV_blocks fc l _ b Hr Hm). Qe
 Definition pipesN_wit (fc : bytes -> option bytes) (adm : pline' -> bool)
     (l : pline') (pre : bytes) : Prop :=
   exists a : plalt,
-    lm_ok (pipes_lm fc adm) l a
+    lm_ok (pipes_lm fc adm) tt l a
     /\ lm_panic (pipes_lm fc adm) a = false
     /\ lm_term (pipes_lm fc adm) a = false
     /\ pre `prefix_of` lm_cont (pipes_lm fc adm) tt l a.

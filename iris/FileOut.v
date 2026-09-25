@@ -88,7 +88,7 @@ Proof using.
   - cbn [removelast]. rewrite nlines_nil. cbn [length]. lia.
 Qed.
 
-Lemma rd_stage_f_lm ps0 cs0 I : rd_stage_f ps0 cs0 I <-> lm_rd_stage file_lm ps0 cs0 I.
+Lemma rd_stage_f_lm ps0 cs0 s0 I : rd_stage_f ps0 cs0 I <-> lm_rd_stage file_lm ps0 cs0 s0 I.
 Proof using.
   rewrite /rd_stage_f /lm_rd_stage.
   split; intros (H1 & H2 & H3 & H4).

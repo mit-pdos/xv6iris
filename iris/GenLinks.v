@@ -126,7 +126,8 @@ Section gen_links.
     nlines I0 <= S (length cs0) ->
     lm_pro_pin M ps0 cs0 I0 ->
     P = length (lm_proc_before M ps0 cs0 s0 I0) ->
-    lm_ok M (lm_of M (bodies_of I0 !!! (nlines I0 - 1))) (lm_dec M a) ->
+    lm_ok M (lm_upto M cs0 s0 (bodies_of I0) (nlines I0 - 1))
+      (lm_of M (bodies_of I0 !!! (nlines I0 - 1))) (lm_dec M a) ->
     lm_term M (lm_dec M a) = false ->
     lm_cont M (lm_upto M cs0 s0 (bodies_of I0) (nlines I0 - 1))
       (lm_of M (bodies_of I0 !!! (nlines I0 - 1))) (lm_dec M a) !! 0 = Some b ->
@@ -197,7 +198,7 @@ Section gen_links.
                   ∗ ⌜nlines (snd <$> (dl ++ ws)) <= S (length cs0)⌝
                   ∗ turn_lb v (length (lm_proc_before M ps0 cs0 s0
                                  (snd <$> (dl ++ ws))))
-                  ∗ ⌜lm_rd_stage M ps0 cs0 (snd <$> (dl ++ ws))⌝))%I.
+                  ∗ ⌜lm_rd_stage M ps0 cs0 s0 (snd <$> (dl ++ ws))⌝))%I.
 
   Lemma gread_link (k : nat) (v : era_pins) (n : nat)
       (ws : list (list mobs * bv 8)) (Φ : iProp Σ) :

@@ -480,7 +480,7 @@ Section UkFileEntriesEcho.
       (C : list nat) (F : iProp Σ) :
     D0 = [0%nat] -> w0 0%nat = FDCons v I0 C ->
     file_era_pin g (S gen_id) vf -∗ f0_lb vf s0 -∗
-    □ (∀ a : nat, ⌜a ∈ C⌝ -∗ ⌜cons_adm file_lm I0 a⌝ -∗
+    □ (∀ a : nat, ⌜a ∈ C⌝ -∗ ⌜exists cs, cons_adm file_lm s0 cs I0 a⌝ -∗
          gwc_post file_lm (file_params_at g s0) (S gen_id) v I0 a -∗
          fdq r qf sf -∗ F -∗ ukn_pay N (-1)) -∗
     F -∗ fif_exit_k g r N γreg D0 w0 qf sf.

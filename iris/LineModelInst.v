@@ -86,7 +86,7 @@ Definition echo_lm : lmodel :=
   MkLM unit (list (list (bv 8))) wl_words nat (fun k => k)
        (fun k => bool_decide (k = 3))
        (fun _ ws k => line_alts_of ws !!! k)
-       (fun _ _ _ => tt) (fun _ k => k < 4) body_ok wl_body_byte
+       (fun _ _ _ => tt) (fun _ _ k => k < 4) body_ok wl_body_byte
        line_ok (fun _ => True) (fun _ => false) (fun _ => False).
 
 Lemma echo_lm_byte_laws : lm_byte_laws echo_lm.
@@ -130,9 +130,9 @@ Proof using. rewrite /pro_ok /lm_pro_ok pro_idx_lm. reflexivity. Qed.
    [lm_alts_ok], whose per-line admissibility ignores the line. ---- *)
 Lemma alts_ok_lm I cs :
   length cs = nlines I /\ Forall (fun c => (c < 4)%nat) cs
-  <-> lm_alts_ok echo_lm I cs.
+  <-> lm_alts_ok echo_lm tt I cs.
 Proof using.
-  rewrite /lm_alts_ok. split.
+  rewrite (lm_alts_ok_nostate echo_lm tt I cs (fun _ _ _ _ Hx => Hx)). split.
   - intros [Hl HF].
     apply Forall2_same_length_lookup_2; [by rewrite length_fmap Hl |].
     intros i l c _ Hc. exact (Forall_lookup_1 _ _ _ _ HF Hc).

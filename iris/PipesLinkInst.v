@@ -137,7 +137,7 @@ Section pipes_link_inst.
     (0 < length ws)%nat ->
     preadE_ret g k v n ws -∗
     PT ∨ (∃ (ps0 cs0 : list nat) (s0 : lm_st pipes_lmE) (J : list (bv 8)),
-            ⌜length J = (n + length ws)%nat⌝ ∗ ⌜lm_rd_stage pipes_lmE ps0 cs0 J⌝
+            ⌜length J = (n + length ws)%nat⌝ ∗ ⌜lm_rd_stage pipes_lmE ps0 cs0 s0 J⌝
             ∗ inp_lb v J ∗ turn_lb v (length (lm_proc_before pipes_lmE ps0 cs0 s0 J))
             ∗ ps_lb v ps0 ∗ cs_lb v cs0 ∗ pipes_W k s0).
   Proof using .
@@ -197,7 +197,7 @@ Section pipes_link_inst.
     /\ lm_ab pipes_lmE pipes_hooksE I (plalt_code (PLRun pre)) = pre ++ u_prompt.
   Proof using .
     intros Ha Hbl.
-    assert (Hok : lm_ok pipes_lmE (lm_line_at pipes_lmE I)
+    assert (Hok : lm_ok pipes_lmE tt (lm_line_at pipes_lmE I)
                     (lm_dec pipes_lmE (plalt_code (PLRun pre)))).
     { cbn [pipes_lmE pipes_lm lm_ok lm_dec]. rewrite plalt_of_code. right.
       split; [exact Ha | exact Hbl]. }

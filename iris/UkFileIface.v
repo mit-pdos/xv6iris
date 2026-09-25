@@ -1705,8 +1705,8 @@ Section UkFileIface.
 
   (* the admissibility [UkConsOut.cons_adm] asks of a code, at the file
      model: the line admits it *)
-  Lemma fif_cons_adm (I : list (bv 8)) (a : nat) :
-    ralt_ok (fline I) (ralt_dec a) -> cons_adm file_lm I a.
+  Lemma fif_cons_adm (s0 : fstate) (cs : list nat) (I : list (bv 8)) (a : nat) :
+    ralt_ok (fline I) (ralt_dec a) -> cons_adm file_lm s0 cs I a.
   Proof using . intros Hok. split; [exact Hok | reflexivity]. Qed.
 
   (* the file parameters' projections, by name *)
@@ -1847,7 +1847,7 @@ Section UkFileIface.
     file_era_pin g (S gen_id) vf -∗ f0_lb vf s0 -∗ fcons_atc C v I alts -∗
     (file_taint c
      ∨ ∃ (ps cs : list nat) (pos c : nat),
-         ⌜lm_wr_blk_t file_lm ps cs s0 I pos⌝ ∗ ⌜c ∈ C⌝ ∗ ⌜cons_adm file_lm I c⌝
+         ⌜lm_wr_blk_t file_lm ps cs s0 I pos⌝ ∗ ⌜c ∈ C⌝ ∗ ⌜cons_adm file_lm s0 cs I c⌝
          ∗ era_pin (fgn_echo g) (S gen_id) v
          ∗ turn v (pos + length (lm_body file_lm s0 cs I c))
          ∗ ps_lb v ps ∗ cs_lb v (lm_blkcs cs c (length (lm_body file_lm s0 cs I c)))
@@ -1874,14 +1874,14 @@ Section UkFileIface.
     [] ∈ alts ->
     file_era_pin g (S gen_id) vf -∗ f0_lb vf s0 -∗ fcons_atc C v I alts -∗
     (file_taint c
-     ∨ ∃ c : nat, ⌜c ∈ C⌝ ∗ ⌜cons_adm file_lm I c⌝
+     ∨ ∃ c : nat, ⌜c ∈ C⌝ ∗ ⌜exists cs, cons_adm file_lm s0 cs I c⌝
          ∗ gwc_post file_lm (file_params g) (S gen_id) v I c).
   Proof using .
     intros Hin. iIntros "#Hvf #Hf0 Hd".
     iDestruct (fif_cons_drained C v vf I s0 alts Hin with "Hvf Hf0 Hd") as "[HT | Hd]";
       [by iLeft | iRight].
     iDestruct "Hd" as (ps cs pos c) "(%Hw & %HcC & %Hadm & _ & Ht & Hps & Hcs & HI)".
-    iExists c. iSplit; [done |]. iSplit; [done |].
+    iExists c. iSplit; [done |]. iSplit; [iPureIntro; by exists cs |].
     iApply (cons_cur_gwc_post file_lm (file_params g) v ps cs s0 I pos c Hw).
     rewrite /cons_cur. iFrame "Ht Hps Hcs HI". rewrite fif_gW /f0w.
     iSplit; [done |]. iExists vf. iFrame "Hvf Hf0".
