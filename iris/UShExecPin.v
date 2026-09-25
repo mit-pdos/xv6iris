@@ -355,8 +355,8 @@ Section UShExecPin.
     iIntros "#Hent #Hkt (#Hinv & #Hcl & #Hgen)".
     rewrite /UkShEcho.sh_exec_sup_echo_at.
     iIntros "!>" (N' m pc s0 t gn ld) "%Hpeq %Ha0 %Ha1 %Hbytes %Hrows Hstd #Hcmd Hcr".
-    iAssert (image_entry_taint T (fun _ : Z => Qv) uslot)%I as "#Hgen'".
-    { rewrite /image_entry_taint. iModIntro. iIntros (W') "#HT #Hmp".
+    iAssert (∀ sts, image_entry_taint T sts ProcDefs.secc_all (fun _ : Z => Qv) uslot)%I as "#Hgen'".
+    { iIntros (sts). iApply image_entry_taint_intro. iModIntro. iIntros (W') "#HT #Hmp".
       iApply ("Hgen" $! Qv W' with "HT Hmp Hkt"). }
     iApply (udepw_at_refR_of_sup N' m pc (mword_of_int s0) (mword_of_int (t + 8))
               FsImg.ROOTINO T pl elf 1%nat

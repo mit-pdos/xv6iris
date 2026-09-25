@@ -1150,7 +1150,7 @@ Section UShKernel.
     (□ (∀ N : uk_names Σ, UkSh.ush_open_console_leaf N T)
      ∨ (□ (∀ N : uk_names Σ, UkSh.ush_open_absent_leaf N T K) ∗ K)
      ∨ T) -∗
-    image_entry_taint T Q uslot -∗
+    (∀ sts secc, image_entry_taint T sts secc Q uslot) -∗
     image_entry_at sh_elf na alen afun sts FsImg.ROOTINO ProcDefs.secc_all cs pidv Q
       (upos γp n ∗ Ql (-1)
        ∗ ((∃ I : list (bv 8), ⌜length I = n⌝
@@ -1175,7 +1175,7 @@ Section UShKernel.
       iApply ("Hpay" $! W' γt γd γs with "[%] Hsz Hlo").
       exact (sh_pay_key_of_kexec na alen afun sts W' n0 Hok Hroom).
     - iExact "Hin".
-    - rewrite /image_entry_taint. iExact "Hgen".
+    - iApply (image_entry_taint_all_elim with "Hgen").
   Qed.
 
 End UShKernel.

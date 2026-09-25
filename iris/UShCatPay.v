@@ -354,8 +354,8 @@ Section UShCatPay.
     iIntros "!>" (N' m pc s0 t g ld)
       "%Hpeq %Ha0 %Ha1 %Hbytes %Hfd0 Hstd #Hcmd Hcr".
     (* ---- THE TAINT ARM: the generic slot at the chosen payload ---- *)
-    iAssert (image_entry_taint T (fun _ : Z => Qc) uslot)%I as "#Hgen'".
-    { rewrite /image_entry_taint. iModIntro. iIntros (W') "#HT #Hmp".
+    iAssert (∀ sts, image_entry_taint T sts ProcDefs.secc_all (fun _ : Z => Qc) uslot)%I as "#Hgen'".
+    { iIntros (sts). iApply image_entry_taint_intro. iModIntro. iIntros (W') "#HT #Hmp".
       iApply ("Hgen" $! Qc W' with "HT Hmp Hqt"). }
     (* ---- ...AND THE REST IS THE U-TIER RULE. ---- *)
     iApply (udepw_at_refR_of_sup N' m pc

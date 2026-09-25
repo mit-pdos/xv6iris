@@ -134,7 +134,7 @@ Section ExecBundle.
        says nothing at all about offsets. *)
     ex_node_id T Pfin Φo (MkAnode (AFile f) nl) -∗
     image_entry_at f na alen afun sts cw secc cs pidv Q Pay X -∗
-    image_entry_taint T Q X -∗
+    image_entry_taint T sts secc Q X -∗
     Pay -∗
     exec_slot_pre X Q Pfin Φo cw secc na alen afun sts cs pidv.
   Proof using .
@@ -151,7 +151,8 @@ Section ExecBundle.
       { (* THE TAINT ARM TAKES THE KEY AND NOTHING ELSE (lane OFF-HAND-6):
            the generic family needs no fact about the key's offsets, so
            what used to be spent here is not asked for. *)
-        iApply ("Hgen" $! W' with "HT Hp"). }
+        iApply ("Hgen" $! W' with "HT [%] [%] Hp");
+          [ exact (kexec_image_ok_fd _ _ _ _ _ _ Hok) | exact Hscw ]. }
       (* [subst f' nl'] and not a bare [subst]: the rows introduced just
          above are equations on [cw], on [uvis_lazy W'], on [cs] and on
          [pidv], and a bare [subst] would spend one of those instead. *)
@@ -162,7 +163,8 @@ Section ExecBundle.
       iIntros (av' i a W') "HP Hrecv %Hnload %Hkey %Hcwq %Hlzq %Hscw %Hchq %Hpiq #Hp".
       iPoseProof ("Hid" $! av' i a) as "Hid'".
       iDestruct ("Hid'" with "HP Hrecv") as "[%Hnode | HT]"; last first.
-      { iApply ("Hgen" $! W' with "HT Hp"). }
+      { iApply ("Hgen" $! W' with "HT [%] [%] Hp");
+          [ exact (exec_key_ok_fd _ _ _ _ Hkey) | exact Hscw ]. }
       subst a. exfalso. apply Hnload. exists f, nl.
       split; [ reflexivity | exact Hload ].
   Qed.
@@ -187,7 +189,7 @@ Section ExecBundle.
     exec_path_of M pv pl ->
     ex_node_id T (P (length (path_elems pl))) Φo (MkAnode (AFile f) nl) -∗
     image_entry f M av sts cw secc cs pidv Q Pay X -∗
-    image_entry_taint T Q X -∗
+    image_entry_taint T sts secc Q X -∗
     Pay -∗
     pf_at (fun S => sys_exec_slot_pre S Q P Φo cw secc M pv av sts cs pidv)
       (MkPfam X Pay).
@@ -229,7 +231,7 @@ Section ExecBundle.
       (MkAnode (AFile f) nl) -∗
     (* (E) *)
     image_entry f M av sts cw secc cs pidv Q Pay X -∗
-    image_entry_taint T Q X -∗
+    image_entry_taint T sts secc Q X -∗
     Pay -∗
     sys_exec_au_pre (MkPfam X Pay) (fs_gamma_L γfs) γfs cw secc Q P Pmiss Fo
       M pv av sts cs pidv.
@@ -261,7 +263,7 @@ Section ExecBundle.
     ex_node_id T (P (length (path_elems pl))) Fo.(pf_recv)
       (MkAnode (AFile f) nl) -∗
     image_entry_at f na alen afun sts cw secc cs pidv Q Pay X -∗
-    image_entry_taint T Q X -∗
+    image_entry_taint T sts secc Q X -∗
     Pay -∗
     exec_au_pre (MkPfam X Pay) (fs_gamma_L γfs) γfs cw secc Q P Pmiss Fo
       pl na alen afun sts cs pidv.

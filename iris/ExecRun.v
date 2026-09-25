@@ -241,7 +241,7 @@ Section ExecRun.
     my_pay gn (ukn_pay N) -∗
     exec_walk_of c T pl (MkAnode (AFile f) nl) -∗
     image_entry f M av fdv c secc_all cs pidv (ukn_pay N) Pay X -∗
-    image_entry_taint T (ukn_pay N) X -∗
+    image_entry_taint T fdv secc_all (ukn_pay N) X -∗
     Pay -∗
     sbundle_pay_refR X (ukn_pay N) R
       (uvis_of_run m pc M pm sz fdv c gn cs pidv false secc_all).
@@ -369,7 +369,7 @@ Section ExecRun.
     m !!! Regidx a0_idx = pv ->
     m !!! Regidx a1_idx = av ->
     □ (Pay -∗ R) -∗
-    image_entry_taint T (ukn_pay N) uslot -∗
+    (∀ sts, image_entry_taint T sts secc_all (ukn_pay N) uslot) -∗
     uexec_sup_run N pv av c T pl f nl Pay -∗
     udepw_at_refR N m pc c R.
   Proof using .
@@ -381,7 +381,8 @@ Section ExecRun.
     iFrame "Hh Hf".
     iApply (sbundle_pay_refR_of_exec uslot T N m pc M pm sz fdv c gn cs pidv
               pv av pl f nl Pay R Hload Ha0 Ha1 Hpath
-              with "Hrf Hmp Hw Hcon Hgen HPay").
+              with "Hrf Hmp Hw Hcon [] HPay").
+    iApply "Hgen".
   Qed.
 
   Lemma udepw_at_refR_ids_of_sup_ids (N : uk_names Σ) (m : regfile)
@@ -392,7 +393,7 @@ Section ExecRun.
     m !!! Regidx a0_idx = pv ->
     m !!! Regidx a1_idx = av ->
     □ (Pay -∗ R) -∗
-    image_entry_taint T (ukn_pay N) uslot -∗
+    (∀ sts, image_entry_taint T sts secc_all (ukn_pay N) uslot) -∗
     uexec_sup_run_ids N pv av c T pl f nl Pay -∗
     udepw_at_refR_ids N m pc c R.
   Proof using .
@@ -404,7 +405,8 @@ Section ExecRun.
     iFrame "Hh Hf Hids".
     iApply (sbundle_pay_refR_of_exec uslot T N m pc M pm sz fdv c gn cs pidv
               pv av pl f nl Pay R Hload Ha0 Ha1 Hpath
-              with "Hrf Hmp Hw Hcon Hgen HPay").
+              with "Hrf Hmp Hw Hcon [] HPay").
+    iApply "Hgen".
   Qed.
 
   (* ------------------------------------------------------------------ *)
@@ -439,7 +441,7 @@ Section ExecRun.
     □ (Pay -∗ R) -∗
     (* the taint arm: an application that is already tainted runs on the
        generic family, whatever the kernel loaded *)
-    image_entry_taint T (ukn_pay N) uslot -∗
+    (∀ sts, image_entry_taint T sts secc_all (ukn_pay N) uslot) -∗
     (* (W) + (E) + the linear resource the new image owns from birth, at
        every key this run may be at *)
     uexec_sup_run N pv av c T pl f nl Pay -∗
@@ -474,7 +476,7 @@ Section ExecRun.
     urun N h m pc avail -∗
     UserCwd.ucwd (ukn_cwd N) c -∗
     □ (Pay -∗ R) -∗
-    image_entry_taint T (ukn_pay N) uslot -∗
+    (∀ sts, image_entry_taint T sts secc_all (ukn_pay N) uslot) -∗
     uexec_sup_run_ids N pv av c T pl f nl Pay -∗
     (∀ h' : CpuId,
        UserCwd.ucwd (ukn_cwd N) c -∗
@@ -511,12 +513,13 @@ Section ExecRun.
        entries and lane OFF-HAND-5 put the TAINT arm's on the builder;
        fact 4 deletes it, so a tainted caller with a HELD descriptor
        execs exactly as one without. *)
-    □ T -∗ image_entry_taint T Q X -∗
+    □ T -∗ image_entry_taint T sts secc Q X -∗
     image_entry f M av sts cw secc cs pidv Q Pay X.
   Proof using .
     iIntros "#HT #Hgen". rewrite /image_entry /image_entry_taint.
-    iIntros "!>" (na alen afun W') "%Hok _ _ _ _ _ _ Hmp _".
-    iApply ("Hgen" $! W' with "HT Hmp").
+    iIntros "!>" (na alen afun W') "%Hok _ _ %Hscw _ _ _ Hmp _".
+    iApply ("Hgen" $! W' with "HT [%] [%] Hmp");
+      [ exact (kexec_image_ok_fd _ _ _ _ _ _ Hok) | exact Hscw ].
   Qed.
 
   (* THE PATH READING, as a program actually holds it: the string exec
@@ -613,7 +616,7 @@ Section ExecRun.
     □ (∀ (M : gmap Z (bv 8)) (fdv : list fdstate) (cs : gset gname)
          (pidv : mword 32),
          image_entry f M av fdv c secc_all cs pidv (ukn_pay N) Pay uslot) -∗
-    image_entry_taint T (ukn_pay N) uslot -∗
+    (∀ sts, image_entry_taint T sts secc_all (ukn_pay N) uslot) -∗
     □ (Pay -∗ R) -∗
     Pay -∗
     (∀ h' : CpuId,
@@ -658,7 +661,7 @@ Section ExecRun.
     urun N h m pc avail -∗
     UserCwd.ucwd (ukn_cwd N) c -∗
     □ T -∗
-    image_entry_taint T (ukn_pay N) uslot -∗
+    (∀ sts, image_entry_taint T sts secc_all (ukn_pay N) uslot) -∗
     uexec_path_reading N pv pl -∗
     (∀ h' : CpuId,
        UserCwd.ucwd (ukn_cwd N) c -∗
@@ -680,7 +683,7 @@ Section ExecRun.
       iFrame "Hheap Hufd". iSplitR; [ by iPureIntro | ].
       iSplitR; [ iApply (exec_walk_of_taint with "HT") | ].
       iSplitR; [ | done ].
-      iApply (image_entry_of_taint with "HT Hgen").
+      iApply (image_entry_of_taint with "HT []"). iApply "Hgen".
     - iIntros (h') "Hcwd _ Hrun". iApply ("Hcont" with "Hcwd Hrun").
   Qed.
 
@@ -796,7 +799,7 @@ Section ExecRun.
        bundle and the kernel holds it (design/app-file.md SS3 fact 4). *)
     ex_node_abs T Pfin Φo (AFile f) -∗
     image_entry_at f na alen afun sts cw secc cs pidv Q Pay X -∗
-    image_entry_taint T Q X -∗
+    image_entry_taint T sts secc Q X -∗
     Pay -∗
     exec_slot_pre X Q Pfin Φo cw secc na alen afun sts cs pidv.
   Proof using .
@@ -807,7 +810,8 @@ Section ExecRun.
       iIntros (av' i f' nl' W') "HP Hrecv %Hload' %Hok %Hcwq %Hlzq %Hscw %Hchq %Hpiq #Hp".
       iPoseProof ("Hid" $! av' i (MkAnode (AFile f') nl')) as "Hid'".
       iDestruct ("Hid'" with "HP Hrecv") as "[%Hnode | HT]"; last first.
-      { iApply ("Hgen" $! W' with "HT Hp"). }
+      { iApply ("Hgen" $! W' with "HT [%] [%] Hp");
+          [ exact (kexec_image_ok_fd _ _ _ _ _ _ Hok) | exact Hscw ]. }
       cbn [an_node] in Hnode. injection Hnode as Hf. subst f'.
       iApply ("Hcon" $! W' with "[%] [%] [%] [%] [%] [%] Hp HPay");
         [ exact Hok | exact Hcwq | exact Hlzq | exact Hscw | exact Hchq | exact Hpiq ].
@@ -815,7 +819,8 @@ Section ExecRun.
       iIntros (av' i a W') "HP Hrecv %Hnload %Hkey %Hcwq %Hlzq %Hscw %Hchq %Hpiq #Hp".
       iPoseProof ("Hid" $! av' i a) as "Hid'".
       iDestruct ("Hid'" with "HP Hrecv") as "[%Hnode | HT]"; last first.
-      { iApply ("Hgen" $! W' with "HT Hp"). }
+      { iApply ("Hgen" $! W' with "HT [%] [%] Hp");
+          [ exact (exec_key_ok_fd _ _ _ _ Hkey) | exact Hscw ]. }
       exfalso. apply Hnload. exists f, (an_nlink a).
       split; [ | exact Hload ].
       destruct a as [nd k]. cbn [an_node an_nlink] in Hnode |- *.
@@ -834,7 +839,7 @@ Section ExecRun.
        bundle and the kernel holds it (design/app-file.md SS3 fact 4). *)
     ex_node_abs T (P (length (path_elems pl))) Φo (AFile f) -∗
     image_entry f M av sts cw secc cs pidv Q Pay X -∗
-    image_entry_taint T Q X -∗
+    image_entry_taint T sts secc Q X -∗
     Pay -∗
     pf_at (fun S => sys_exec_slot_pre S Q P Φo cw secc M pv av sts cs pidv)
       (MkPfam X Pay).
@@ -866,7 +871,7 @@ Section ExecRun.
     pf_at (aopen_commit_at (fs_gamma_L fsc_fs) appE) Fo -∗
     ex_node_abs T (P (length (path_elems pl))) Fo.(pf_recv) (AFile f) -∗
     image_entry f M av sts cw secc cs pidv Q Pay X -∗
-    image_entry_taint T Q X -∗
+    image_entry_taint T sts secc Q X -∗
     Pay -∗
     sys_exec_au_pre (MkPfam X Pay) (fs_gamma_L fsc_fs) fsc_fs cw secc Q P Pmiss Fo
       M pv av sts cs pidv.
@@ -899,7 +904,7 @@ Section ExecRun.
     my_pay gn (ukn_pay N) -∗
     exec_walk_of_abs c T pl (AFile f) -∗
     image_entry f M av fdv c secc_all cs pidv (ukn_pay N) Pay X -∗
-    image_entry_taint T (ukn_pay N) X -∗
+    image_entry_taint T fdv secc_all (ukn_pay N) X -∗
     Pay -∗
     sbundle_pay_refR X (ukn_pay N) R
       (uvis_of_run m pc M pm sz fdv c gn cs pidv false secc_all).
@@ -952,7 +957,7 @@ Section ExecRun.
     m !!! Regidx a0_idx = pv ->
     m !!! Regidx a1_idx = av ->
     □ (Pay -∗ R) -∗
-    image_entry_taint T (ukn_pay N) uslot -∗
+    (∀ sts, image_entry_taint T sts secc_all (ukn_pay N) uslot) -∗
     uexec_sup_run_abs N pv av c T pl f Pay -∗
     udepw_at_refR N m pc c R.
   Proof using .
@@ -964,7 +969,8 @@ Section ExecRun.
     iFrame "Hh Hf".
     iApply (sbundle_pay_refR_of_exec_abs uslot T N m pc M pm sz fdv c gn cs pidv
               pv av pl f Pay R Hload Ha0 Ha1 Hpath
-              with "Hrf Hmp Hw Hcon Hgen HPay").
+              with "Hrf Hmp Hw Hcon [] HPay").
+    iApply "Hgen".
   Qed.
 
   (* THE RULE at a content-level walk.  [wp_uk_ecall_exec_run]'s statement
@@ -984,7 +990,7 @@ Section ExecRun.
     urun N h m pc avail -∗
     UserCwd.ucwd (ukn_cwd N) c -∗
     □ (Pay -∗ R) -∗
-    image_entry_taint T (ukn_pay N) uslot -∗
+    (∀ sts, image_entry_taint T sts secc_all (ukn_pay N) uslot) -∗
     uexec_sup_run_abs N pv av c T pl f Pay -∗
     (∀ h' : CpuId,
        UserCwd.ucwd (ukn_cwd N) c -∗

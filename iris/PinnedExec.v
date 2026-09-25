@@ -235,7 +235,7 @@ Section PinnedExec.
               with "[] [] [] HPay").
     - iApply (pobs_node_id Pin T cw pl hops ino (MkAnode (AFile f) nl) Hres).
     - rewrite /image_entry_at. iExact "Hcon".
-    - rewrite /image_entry_taint. iExact "Hgen".
+    - iApply (image_entry_taint_intro with "Hgen").
   Qed.
 
   Lemma pex_slot (γfs : fs_names) (X : uvis -d> iPropO Σ)
@@ -324,7 +324,7 @@ Section PinnedExec.
               with "[] [] [] HPay").
     - iApply (pobs_node_id Pin T cw pl hops ino (MkAnode (AFile f) nl) Hres).
     - rewrite /image_entry. iExact "Hcon".
-    - rewrite /image_entry_taint. iExact "Hgen".
+    - iApply (image_entry_taint_intro with "Hgen").
   Qed.
 
   (* ------------------------------------------------------------------ *)
@@ -395,7 +395,7 @@ Section PinnedExec.
     - rewrite /pobs_Fo /pfam_triv. cbn [pf_recv].
       iApply (pobs_node_id Pin T cw pl hops ino (MkAnode (AFile f) nl) Hres).
     - rewrite /image_entry. iExact "Hcon".
-    - rewrite /image_entry_taint. iExact "Hgen".
+    - iApply (image_entry_taint_intro with "Hgen").
   Qed.
 
   (* ...and the shape a deposit site takes it at: the families are the
@@ -526,7 +526,7 @@ Section PinnedExec.
       iIntros "!>" (W') "%Hok %Hcwq %Hlzq %Hscw _ _ Hp HPay".
       iApply ("Hcon" $! W' with "[%] [%] [%] [%] Hp HPay");
         [ exact Hok | exact Hcwq | exact Hlzq | exact Hscw ].
-    - rewrite /image_entry_taint. iExact "Hgen".
+    - iApply (image_entry_taint_intro with "Hgen").
   Qed.
 
   (* ...and the shape [InitBoot.init_boot_bundle] takes it at: the families

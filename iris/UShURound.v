@@ -462,9 +462,9 @@ Section UShURound.
     iIntros "!>" (N' m pc sa t gb ld)
       "%Hpeq %Ha0 %Ha1 %Hbytes %Hfd1 Hstd #Hcmd Hcr".
     iDestruct (uwc3 I with "Hcr") as (v) "(#Hpin & Hcr & HR)".
-    iAssert (image_entry_taint T
+    iAssert (∀ sts, image_entry_taint T sts ProcDefs.secc_all
                (fun _ : Z => UkShFork.ushf_wq Wcu I) uslot)%I as "#Hgen'".
-    { rewrite /image_entry_taint. iModIntro. iIntros (W') "#HT #Hmp".
+    { iIntros (sts). iApply image_entry_taint_intro. iModIntro. iIntros (W') "#HT #Hmp".
       iApply ("Hgen" $! (UkShFork.ushf_wq Wcu I) W' with "HT Hmp []").
       iIntros "!> #Hk". rewrite /UkShFork.ushf_wq. iRight.
       iApply (uWcu_taint' I 0%nat v with "Hpin"). iApply uHktaint'. iExact "Hk". }
@@ -503,7 +503,7 @@ Section UShURound.
     cbn [lk_pin lk_lpr union_link_inst_at gen_link_inst gwc_lpr].
     rewrite /ush_pre_at. iDestruct "HR" as "[Hdeed #Hwit]".
     rewrite {1}/ush_deed_at. iDestruct "Hdeed" as "[Hdeed | #HT]"; last first.
-    { iApply ("Hgen'" $! W' with "HT Hmp"). }
+    { iApply ("Hgen'" $! (UexecSlot.uvis_fd W') W' with "HT [//] [%] Hmp"); exact Hscw. }
     iDestruct "Hdeed" as (cs s v') "(Hown & %Htie & #Hty & #Hpin' & #Hcs)".
     rewrite /fown /fdeed. iDestruct "Hown" as "[Hdq Htk]".
     iPoseProof (uecho_cons_image_entry (PS := uprogSG_free)
@@ -591,9 +591,9 @@ Section UShURound.
     iAssert (□ (T -∗ UkShFork.ushf_wq Wcu I))%I as "#HQt".
     { iIntros "!> #HT". rewrite /UkShFork.ushf_wq. iRight.
       iApply (uWcu_taint' I 0%nat v' with "Hpin' HT"). }
-    iAssert (image_entry_taint T
+    iAssert (∀ sts, image_entry_taint T sts ProcDefs.secc_all
                (fun _ : Z => UkShFork.ushf_wq Wcu I) uslot)%I as "#Hgen'".
-    { rewrite /image_entry_taint. iModIntro. iIntros (W') "#HT #Hmp".
+    { iIntros (sts). iApply image_entry_taint_intro. iModIntro. iIntros (W') "#HT #Hmp".
       iApply ("Hgen" $! (UkShFork.ushf_wq Wcu I) W' with "HT Hmp []").
       iIntros "!> #Hk". iApply "HQt". iApply uHktaint'. iExact "Hk". }
     iApply (udepw_at_refR_of_sup (ghost_varG0 := offbox_offG) N' m pc
@@ -632,7 +632,7 @@ Section UShURound.
     cbn [lk_pin lk_lpr union_link_inst_at gen_link_inst gwc_lpr].
     rewrite /gwc_blk.
     iDestruct "Hc" as "[Hc | #HT]"; last first.
-    { iApply ("Hgen'" $! W' with "HT Hmp"). }
+    { iApply ("Hgen'" $! (UexecSlot.uvis_fd W') W' with "HT [//] [%] Hmp"); exact Hscw. }
     iDestruct "Hc" as (ps cs sw P) "(%Hw & Htn & #Hps & #Hcs & #HE & #HW)".
     iAssert (⌜sw = s0⌝)%I as %->.
     { cbn [gW union_params_at]. rewrite /f0w_at. iDestruct "HW" as "[_ %Hs]". done. }
@@ -921,9 +921,9 @@ Section UShURound.
     rewrite /UkShEcho.sh_exec_sup_echo_at.
     iIntros "!>" (N' m pc sa t gb ld)
       "%Hpeq %Ha0 %Ha1 %Hbytes %Hfd1 Hstd #Hcmd Hcr".
-    iAssert (image_entry_taint T
+    iAssert (∀ sts, image_entry_taint T sts ProcDefs.secc_all
                (fun _ : Z => UkShFork.ushf_wq Wcu I) uslot)%I as "#Hgen'".
-    { rewrite /image_entry_taint. iModIntro. iIntros (W') "#HT #Hmp".
+    { iIntros (sts). iApply image_entry_taint_intro. iModIntro. iIntros (W') "#HT #Hmp".
       iApply ("Hgen" $! (UkShFork.ushf_wq Wcu I) W' with "HT Hmp []").
       iIntros "!> #Hk". rewrite /UkShFork.ushf_wq. iRight.
       iApply (uWcu_taint' I 0%nat v' with "Hpin'"). iApply uHktaint'.
@@ -959,12 +959,12 @@ Section UShURound.
                                (Hstd & Hc & HK & Hino)".
     (* a tainted receipt buys the generic slot *)
     iDestruct "Hino" as "[Hino | #HT]"; last first.
-    { iApply ("Hgen'" $! W' with "HT Hmp"). }
+    { iApply ("Hgen'" $! (UexecSlot.uvis_fd W') W' with "HT [//] [%] Hmp"); exact Hscw. }
     iDestruct "Hino" as (i γo) "(%Hty & %Hi)".
     destruct Hi as (Hi1 & Hi2 & Hi3 & Hi4 & Hi5).
     rewrite /UShFileRedir.redir_K /UkFileOpen.redir_K /FileOpen.file_open_fd_K.
     iDestruct "HK" as "[HK | #HT]"; last first.
-    { iApply ("Hgen'" $! W' with "HT Hmp"). }
+    { iApply ("Hgen'" $! (UexecSlot.uvis_fd W') W' with "HT [//] [%] Hmp"); exact Hscw. }
     iDestruct "HK" as (i1 γo1) "(%Hty1 & Hd & Hpub)".
     rewrite Hty in Hty1. injection Hty1 as <- <-.
     iDestruct (UserOff.foff_pub_of_held with "Hpub") as "Hu".
