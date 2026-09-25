@@ -1061,3 +1061,14 @@ import Xv6.FsImgUsed
 import Xv6.FsImgDir
 import Xv6.FsImgWf
 import Xv6.FsImgBridge
+import Xv6.FsState
+import Xv6.FsDurBytes
+import Xv6.FsDurRead
+import Xv6.FsDurXferRuns
+import Xv6.FsDurXferPool
+import Xv6.FsDurXfer
+import Xv6.UexecRet
+import Xv6.UexecRound
+import Xv6.UexecApply
+import Xv6.UexecCond
+import Xv6.ProofUexecWp
