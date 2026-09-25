@@ -166,14 +166,14 @@ jobs:
             exit 1
           fi
 
-      # ---- 3b. Assumption audits (iris/SystemAssumptions.v, PipeAssumptions.v) ----
+      # ---- 3b. Assumption audits (iris/SystemAssumptions.v, UnionAssumptions.v) ----
       # `Print Assumptions`, the only check that sees through every functor and
       # seal.  TWO THEOREMS, because NEITHER CONE CONTAINS THE OTHER:
       # xv6_fs_adequacy_xv6Σ is the chain at the TRIVIAL application and names
       # no user program, so it never walks the Uk*/USh*/UInit*/UEcho* tier;
-      # pipe_adequacy_pipeΣ_final is the same chain at AppPipe.app_pipe (echo
-      # and pipeline lines; the echo theorem is its corollary), closed, and
-      # its cone does.  Nor can a grep for `Admitted`/`Axiom` stand in for the
+      # union_adequacy_closed is the same chain at AppUnionRec.app_union (the
+      # file lines and the pipelines, across power cycles), closed, and its
+      # cone does.  Nor can a grep for `Admitted`/`Axiom` stand in for the
       # second: a Spec*.v module Parameter that no Link*.v discharged sits in
       # the proof term unmentioned by any source line.
       #
@@ -191,7 +191,7 @@ jobs:
       # backgrounds the targets itself only because it needs each audit's
       # output in a log of its own for the summary.
       #
-      # `audit-only`/`audit-pipe-only`, not `audit`/`audit-pipe`: the latter
+      # `audit-only`/`audit-union-only`, not `audit`/`audit-union`: the latter
       # depend on `proofs`, whose kernel-rocq prerequisite pulls in the absent
       # kernel ELF (see the note atop this file).  `-s` keeps make's recipe echo
       # out of the captured stdout; coqc's warnings go to stderr and stay in the
@@ -208,7 +208,7 @@ jobs:
           make -s SWITCH="$GITHUB_WORKSPACE" audit-only \
             > "$RUNNER_TEMP/assumptions-system.log" &
           pid_sys=$!
-          make -s SWITCH="$GITHUB_WORKSPACE" audit-pipe-only \
+          make -s SWITCH="$GITHUB_WORKSPACE" audit-union-only \
             > "$RUNNER_TEMP/assumptions-app.log" &
           pid_app=$!
           wait $pid_sys || rc_sys=$?
@@ -227,7 +227,7 @@ jobs:
             cat "$RUNNER_TEMP/assumptions-system.log"
             echo '```'
             echo
-            echo "### \`UInitPipeAdequacy.pipe_adequacy_pipeΣ_final\`"
+            echo "### \`UInitUnion.union_adequacy_closed\`"
             echo
             if [ "$rc_app" -ne 0 ]; then
               echo "> :x: exit $rc_app — output below is partial."

@@ -22,9 +22,12 @@
 #                   era-0 obligation -- a cone neither of the other two walks
 #   make audit-file / audit-file-only  the same, for the FILE APPLICATION's
 #                   top-level theorem -- a fourth cone again
-#   make audit-pipe / audit-pipe-only  the same, for the APPLICATION theorem
-#                   (echo and pipeline lines) -- a cone the system audit never walks
-#   make audit-all / audit-all-only    system + application, run concurrently
+#   make audit-pipe / audit-pipe-only  the same, for the PIPELINE application's
+#                   theorem (echo and pipeline lines) -- a fifth cone
+#   make audit-union / audit-union-only  the same, for THE APPLICATION theorem:
+#                   the UNION of the file and pipeline lines, power-cycled --
+#                   a cone the system audit never walks
+#   make audit-all / audit-all-only    system + union application, concurrently
 #   make model      compile the Sail-generated Coq model (model-xv6iris/)
 #   make kernel     build the xv6 kernel ELF (xv6-riscv/kernel/kernel)
 #   make user       build the xv6 user-space programs (xv6-riscv/user/_*)
@@ -147,7 +150,7 @@ USER_DUMPS ?= sync:Sync echo:Echo sh:Sh init:Init cat:Cat grep:Grep
 .PHONY: all proofs model kernel user dump dump-force kernel-rocq user-rocq \
         xv6-rev-check sail-rev-check gen-code check-decode update-decode \
         gen-ucode check-ucode \
-        audit audit-only audit-tree audit-tree-only audit-file audit-file-only audit-pipe audit-pipe-only audit-all audit-all-only vtest vtest-check vtest-check-ci vtest-gen vtest-deps \
+        audit audit-only audit-tree audit-tree-only audit-file audit-file-only audit-pipe audit-pipe-only audit-union audit-union-only audit-all audit-all-only vtest vtest-check vtest-check-ci vtest-gen vtest-deps \
         hwtest hwtest-gen hwtest-gen-all hwtest-probe \
         vtest-runs vtest-passes vtest-table \
         clean clean-proofs distclean model-gen
@@ -402,8 +405,24 @@ audit-pipe: proofs
 audit-pipe-only:
 	cd $(IRIS) && $(RUN) coqc $(AUDIT_FLAGS) -noglob PipeAssumptions.v
 
-# BOTH audits, and the reason this target exists rather than a habit of typing
-# `make audit-only audit-pipe-only`: that line SERIALISES them.  Make runs the
+# The SAME audit for THE APPLICATION theorem (iris/UnionAssumptions.v): `Print
+# Assumptions` on UInitUnion.union_adequacy_closed, the whole-system theorem at
+# AppUnionRec.app_union -- the echo, echo > f and cat f lines and the pipelines
+# echo ... | cat^n and cat f | cat^n, across power cycles.  Its cone walks the
+# whole Uk*/USh*/UInit* program tier and the union stage (UnionDisc/UnionOut/
+# UnionLinks/AppUnionRec), which the system audit never does; the file and
+# pipeline audits above walk the two applications it replaces.  That file's
+# header says what it audits.  Same reasons for -noglob and for staying out of
+# iris/_CoqProject as SystemAssumptions.v.
+audit-union: proofs
+	$(MAKE) audit-union-only
+
+audit-union-only:
+	cd $(IRIS) && $(RUN) coqc $(AUDIT_FLAGS) -noglob UnionAssumptions.v
+
+# BOTH audits -- the system theorem and THE APPLICATION's (the union) -- and
+# the reason this target exists rather than a habit of typing
+# `make audit-only audit-union-only`: that line SERIALISES them.  Make runs the
 # goals on its command line one after another unless it is itself parallel, so
 # the two would cost the sum of their wall clocks for no reason -- they are
 # independent single-threaded coqc processes over an already-built tree,
@@ -421,7 +440,7 @@ audit-all: proofs
 	$(MAKE) audit-all-only
 
 audit-all-only:
-	$(MAKE) -j2 --output-sync=target audit-only audit-pipe-only
+	$(MAKE) -j2 --output-sync=target audit-only audit-union-only
 
 # ---- 5. vtest: the device semantics, differentially tested against QEMU ----
 #
