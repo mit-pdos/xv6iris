@@ -79,7 +79,7 @@ import Xv6.SpecPanic
 
 namespace Xv6
 
-open Iris Iris.ProgramLogic Iris.BI Std MachCSL
+open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
 open LeanRV64D
 
 /-- Address of `initlog`. -/
@@ -164,9 +164,104 @@ def wp_initlog_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G 
     logCtx (γ.withLk γlk) γb γfs V.cov logstart dev -∗ wpLoop cpu'))
   ⊢ wpLoop (GF := GF) cpu
 
+/-- The eb-generic form of `wp_initlog_body` (Rocq: `cpu_own 0 eb`, the
+complement `trap_csrs_ext` / `cpu_claim_ext` in and out; depth 0, so no
+spinlock held by `KCtx.wf`). -/
+def wp_initlog_eb_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
+    [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [CurCtx]
+    (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+    (cpu : CPU) (k : KCtx) (γ : LogNames) (γl : GName) (γb : BcacheNames) (V : BioView GF)
+    (γdl : GName) (γfs : FsNames) (pd pav pu : BitVec 64)
+    (j : Nat) (logstart : Nat) (dev : BitVec 32) (sb : BitVec 64)
+    (bsHdr : List (BitVec 8)) (L : BlockMap) (D : RegMapF Bool)
+    (vlock : BitVec 32) (vname vcpu : BitVec 64) (vStart vDev vNc vN : BitVec 32)
+    (pidv : BitVec 32) (dqp dqs : DFrac)
+    (hj : j < NPROC) (hproc : k.proc = procAddr j) (hK : initlogSlots ≤ k.avail)
+    (hnoff : k.noff = 0)
+    (htier : k.tier = KTier.kpt)
+    (hgeom : logGeomOk V.cov logstart) (hdev : dev = V.dev)
+    (hcl : V.clean = fsMclean γfs) (hdt : V.dirty = fsMdirty γfs)
+    (ha0 : k.regs 10#5 = BitVec.signExtend 64 dev) (ha1 : k.regs 11#5 = sb)
+    -- the on-disk header's well-formedness
+    (hhdrLen : (hdrDec bsHdr).1 ≤ LOGBLOCKS)
+    (hhdrNodup : (hdrDec bsHdr).2.Nodup)
+    (hhdrHome : ∀ b ∈ (hdrDec bsHdr).2, fsHome V.cov logstart b)
+    -- ...and, at boot, that it is CLEAN (Rocq `SpecFsinit.v`'s premise (g))
+    (hhdr0 : hdrN bsHdr = 0)
+    -- nothing is pinned in a fresh era
+    (hclean : ∀ b ∈ V.cov, PartialMap.get? D b = some false)
+    (hpd : descPageRw pd) : Prop :=
+  kctx cpu k ∗ pcIs cpu initlogAddr ∗ procsInv Γ ∗
+  trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗
+  bioCtx γl γb V ∗ diskCaps V.gd γdl pd pav pu ∗ panicEnv ∗
+  wordPointsTo (pPid k.proc) 4 dqp pidv ∗
+  -- THE BYTE VIEW'S ROW AND THE WAL'S EXCEPTION HANDLE (Rocq
+  -- `SpecInitlog.v:352`).  `initlog` is the function that SEALS the handle
+  -- and so builds `Xv6.logCtx`'s third conjunct: the invariant at the era's
+  -- home set, plus the certificate that its exception set is empty.  The
+  -- handle comes in at the ON-DISK HEADER'S WRITE SET -- the home blocks
+  -- whose byte view was minted at the committed view while the cache still
+  -- reads the crashed disk -- and the recovering `install_trans` shrinks it
+  -- entry by entry.
+  fsBytesAt γfs (fsHomeList V.cov logstart) ∗
+  excOwn γfs.exc (hdrDec bsHdr).2 ∗
+  -- the four ghost names, at their genesis values
+  logFreeTok γ ∗
+  -- the superblock field, read once
+  wordPointsTo (sb + 20#64) 4 dqs (BitVec.ofNat 32 logstart) ∗
+  -- the RAW spinlock cells of struct log (&log.lock = &log)
+  kmapId logAddr ∗ kmapId (logAddr + 16#64) ∗
+  wordPointsTo logAddr 4 (DFrac.own 1) vlock ∗
+  wordPointsTo (logAddr + 8#64) 8 (DFrac.own 1) vname ∗
+  wordPointsTo (logAddr + 16#64) 8 (DFrac.own 1) vcpu ∗
+  -- the rest of struct log
+  wordPointsTo lStart 4 (DFrac.own 1) vStart ∗
+  wordPointsTo lDev 4 (DFrac.own 1) vDev ∗
+  wordPointsTo lOut 4 (DFrac.own 1) 0#32 ∗
+  wordPointsTo lCmt 4 (DFrac.own 1) 0#32 ∗
+  wordPointsTo lNcommit 4 (DFrac.own 1) vNc ∗
+  wordPointsTo lhNAddr 4 (DFrac.own 1) vN ∗
+  ([∗list] i ∈ List.range LOGBLOCKS, ∃ w : BitVec 32,
+     wordPointsTo (lhBlock i) 4 (DFrac.own 1) w) ∗
+  -- the block view the batch is assembled from
+  fsCacheAuth γfs L ∗ fsDirtyAuth γfs D ∗
+  ([∗list] b ∈ V.cov.toList, fsDirtyHalf γfs b false) ∗
+  fsChalf γfs (logHdrBno logstart) bsHdr ∗
+  ([∗list] i ∈ List.range LOGBLOCKS, ∃ bs : List (BitVec 8),
+     fsChalf γfs (logSlotBno logstart i) bs) ∗
+  -- the slot pool, stocked: the batch's 32 plus initlog's own working pair
+  bslots γb ((LOGBLOCKS + 2) + 2) ∗
+  wpNext true k.proc cpu (fun cpu' => iprop(∀ (spie spp : Bool) (R' : RegMap) (γlk : GName),
+    ⌜calleeSaved k.regs R'⌝ -∗
+    kctx cpu' ((k.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k.regs 1#5)) -∗
+    trapCsrsExt cpu' k.sie -∗ cpuClaimExt cpu' k.sie k.proc -∗
+    wordPointsTo (pPid k.proc) 4 dqp pidv -∗
+    wordPointsTo (sb + 20#64) 4 dqs (BitVec.ofNat 32 logstart) -∗
+    bslots γb 2 -∗
+    logCtx (γ.withLk γlk) γb γfs V.cov logstart dev -∗ wpLoop cpu'))
+  ⊢ wpLoop (GF := GF) cpu
+
 /-- The interface of `initlog`. -/
 structure INITLOG : Prop where
-  wp_initlog : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
+  wp_initlog_eb : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
+    [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [CurCtx]
+    (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+    (cpu : CPU) (k : KCtx) (γ : LogNames) (γl : GName) (γb : BcacheNames) (V : BioView GF)
+    (γdl : GName) (γfs : FsNames) (pd pav pu : BitVec 64)
+    (j : Nat) (logstart : Nat) (dev : BitVec 32) (sb : BitVec 64)
+    (bsHdr : List (BitVec 8)) (L : BlockMap) (D : RegMapF Bool)
+    (vlock : BitVec 32) (vname vcpu : BitVec 64) (vStart vDev vNc vN : BitVec 32)
+    (pidv : BitVec 32) (dqp dqs : DFrac)
+    hj hproc hK hnoff htier hgeom hdev hcl hdt ha0 ha1
+    hhdrLen hhdrNodup hhdrHome hhdr0 hclean hpd,
+    wp_initlog_eb_body (hlc := hlc) (GF := GF) Γ cpu k γ γl γb V γdl γfs pd pav pu j
+      logstart dev sb bsHdr L D vlock vname vcpu vStart vDev vNc vN pidv dqp dqs
+      hj hproc hK hnoff htier hgeom hdev hcl hdt ha0 ha1
+      hhdrLen hhdrNodup hhdrHome hhdr0 hclean hpd
+
+/-- The interrupts-off instance of `wp_initlog_eb` (the complement is the whole
+bundle): the contract every not-yet-generalized caller states. -/
+theorem INITLOG.wp_initlog (A : INITLOG) {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
     [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [CurCtx]
     (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
     (cpu : CPU) (k : KCtx) (γ : LogNames) (γl : GName) (γb : BcacheNames) (V : BioView GF)
@@ -176,10 +271,21 @@ structure INITLOG : Prop where
     (vlock : BitVec 32) (vname vcpu : BitVec 64) (vStart vDev vNc vN : BitVec 32)
     (pidv : BitVec 32) (dqp dqs : DFrac)
     hj hproc hK hsie hnoff hlocks htier hgeom hdev hcl hdt ha0 ha1
-    hhdrLen hhdrNodup hhdrHome hhdr0 hclean hpd,
+    hhdrLen hhdrNodup hhdrHome hhdr0 hclean hpd :
     wp_initlog_body (hlc := hlc) (GF := GF) Γ cpu k γ γl γb V γdl γfs pd pav pu j
       logstart dev sb bsHdr L D vlock vname vcpu vStart vDev vNc vN pidv dqp dqs
       hj hproc hK hsie hnoff hlocks htier hgeom hdev hcl hdt ha0 ha1
-      hhdrLen hhdrNodup hhdrHome hhdr0 hclean hpd
+      hhdrLen hhdrNodup hhdrHome hhdr0 hclean hpd := by
+  have h := A.wp_initlog_eb (hlc := hlc) (GF := GF) (Γ := Γ) (cpu := cpu) (k := k) (γ := γ) (γl := γl) (γb := γb) (V := V) (γdl := γdl) (γfs := γfs) (pd := pd) (pav := pav) (pu := pu) (j := j) (logstart := logstart) (dev := dev) (sb := sb) (bsHdr := bsHdr) (L := L) (D := D) (vlock := vlock) (vname := vname) (vcpu := vcpu) (vStart := vStart) (vDev := vDev) (vNc := vNc) (vN := vN) (pidv := pidv) (dqp := dqp) (dqs := dqs) (hj := hj) (hproc := hproc) (hK := hK) (hnoff := hnoff) (htier := htier) (hgeom := hgeom) (hdev := hdev) (hcl := hcl) (hdt := hdt) (ha0 := ha0) (ha1 := ha1) (hhdrLen := hhdrLen) (hhdrNodup := hhdrNodup) (hhdrHome := hhdrHome) (hhdr0 := hhdr0) (hclean := hclean) (hpd := hpd)
+  unfold wp_initlog_eb_body at h
+  unfold wp_initlog_body
+  rw [hsie] at h
+  simp only [trapCsrsExt_false, cpuClaimExt_false] at h
+  iintro ⟨H0, H1, H2, Htc, Hcl, Hir, H6, H7, H8, H9, H10, H11, H12, H13, H14, H15, H16, H17, H18, H19, H20, H21, H22, H23, H24, H25, H26, H27, H28, H29, H30, H31, Hnext⟩
+  iapply h
+  iframe H0 H1 H2 Htc Hcl Hir H6 H7 H8 H9 H10 H11 H12 H13 H14 H15 H16 H17 H18 H19 H20 H21 H22 H23 H24 H25 H26 H27 H28 H29 H30 H31
+  iapply wpNext_mono $$ Hnext
+  iintro %cpu' HK %spie %spp %R' %γlk %p0 H1 H2 ⟨Htc, Hir⟩ Hcl H6 H7 H8 H9
+  iapply HK $$ %spie %spp %R' %γlk %p0 H1 H2 Htc Hcl Hir H6 H7 H8 H9
 
 end Xv6

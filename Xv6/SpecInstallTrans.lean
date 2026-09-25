@@ -95,7 +95,7 @@ import Xv6.SpecPrintk
 
 namespace Xv6
 
-open Iris Iris.ProgramLogic Iris.BI Std MachCSL
+open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
 open LeanRV64D
 
 /-- Address of `install_trans`. -/
@@ -272,9 +272,95 @@ def wp_install_trans_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] 
     bslots γb (2 + (if recovering then 0 else W.length)) -∗ wpLoop cpu'))
   ⊢ wpLoop (GF := GF) cpu
 
+/-- The eb-generic form of `wp_install_trans_body` (Rocq: `cpu_own 0 eb`, the
+complement `trap_csrs_ext` / `cpu_claim_ext` in and out; depth 0, so no
+spinlock held by `KCtx.wf`). -/
+def wp_install_trans_eb_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
+    [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [CurCtx]
+    (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+    (cpu : CPU) (k : KCtx) (γl : GName) (γb : BcacheNames) (V : BioView GF) (γdl : GName)
+    (γfs : FsNames) (pd pav pu : BitVec 64) (j : Nat) (logstart : Nat) (dev : BitVec 32)
+    (recovering : Bool) (n : Nat) (W : List (BitVec 32)) (Lw : Nat → List (BitVec 8))
+    (L : BlockMap) (D : RegMapF Bool) (pidv : BitVec 32) (dqp : DFrac)
+    (homeL : List Nat) (Xv : Nat → List (BitVec 8)) (Xexc : List Nat)
+    (hj : j < NPROC) (hproc : k.proc = procAddr j) (hK : installTransSlots ≤ k.avail)
+    (hnoff : k.noff = 0)
+    (htier : k.tier = KTier.kpt)
+    (hgeom : logGeomOk V.cov logstart) (hdev : dev = V.dev)
+    (hcl : V.clean = fsMclean γfs) (hdt : V.dirty = fsMdirty γfs)
+    (ha0 : k.regs 10#5 = (if recovering then 1#64 else 0#64))
+    (hn : n = W.length ∧ n ≤ LOGBLOCKS)
+    (hnodup : ∀ (i k' : Nat) (v v' : BitVec 32), W[i]? = some v → W[k']? = some v' →
+      v.toNat = v'.toNat → i = k')
+    (hhome : ∀ w ∈ W, fsHome V.cov logstart w.toNat)
+    (hlen : ∀ i, (Lw i).length = BSIZE)
+    (hcommit : recovering = false →
+      ∀ (i : Nat) (w : BitVec 32), W[i]? = some w → PartialMap.get? L w.toNat = some (Lw i))
+    (hpin : recovering = true → ∀ w ∈ W, PartialMap.get? D w.toNat = some false)
+    -- THE EXCEPTION SET NAMES EVERY ENTRY, AT THE SLOT'S LOGGED VALUE: it is
+    -- the on-disk header's write set -- the blocks whose byte view was minted
+    -- at the committed view while the cache still reads the crashed disk --
+    -- and `Xv` is what the byte view holds there, which is exactly what this
+    -- pass is about to write.
+    (hxexc : recovering = true → ∀ (i : Nat) (w : BitVec 32), W[i]? = some w →
+      w.toNat ∈ Xexc ∧ Xv w.toNat = Lw i)
+    (hpd : descPageRw pd) : Prop :=
+  kctx cpu k ∗ pcIs cpu installTransAddr ∗ procsInv Γ ∗
+  trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗
+  bioCtx γl γb V ∗ diskCaps V.gd γdl pd pav pu ∗ panicEnv ∗
+  logFrozen logstart dev ∗
+  wordPointsTo (pPid k.proc) 4 dqp pidv ∗
+  -- the in-memory header, READ ONLY (the write set it walks)
+  wordPointsTo lhNAddr 4 (DFrac.own 1) (BitVec.ofNat 32 n) ∗
+  ([∗list] i ↦ w ∈ W, wordPointsTo (lhBlock i) 4 (DFrac.own 1) w) ∗
+  -- THE BYTE VIEW'S ROW: only the recovering arm uses it, and it is
+  -- persistent, so both callers have one (end_op off `Xv6.logCtx`, initlog
+  -- off its own precondition)
+  fsBytesInv γfs.bytes γfs.cache γfs.exc homeL Xv ∗
+  -- ...and THE WAL'S EXCEPTION HANDLE, on the recovering arm only
+  (if recovering then excOwn γfs.exc Xexc else iprop(emp)) ∗
+  fsCacheAuth γfs L ∗ fsDirtyAuth γfs D ∗
+  ([∗list] i ↦ w ∈ W, fsChalf γfs (logSlotBno logstart i) (Lw i) ∗
+     (if recovering then iprop(emp) else fsDirtyHalf γfs w.toNat true)) ∗
+  bslots γb 2 ∗
+  wpNext true k.proc cpu (fun cpu' => iprop(∀ (spie spp : Bool) (R' : RegMap),
+    ⌜calleeSaved k.regs R'⌝ -∗
+    kctx cpu' ((k.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k.regs 1#5)) -∗
+    trapCsrsExt cpu' k.sie -∗ cpuClaimExt cpu' k.sie k.proc -∗
+    wordPointsTo (pPid k.proc) 4 dqp pidv -∗
+    wordPointsTo lhNAddr 4 (DFrac.own 1) (BitVec.ofNat 32 n) -∗
+    ([∗list] i ↦ w ∈ W, wordPointsTo (lhBlock i) 4 (DFrac.own 1) w) -∗
+    -- the exception set's RESIDUE: every entry has been landed, so the WAL's
+    -- handle comes back at `Xexc` minus the whole write set
+    (if recovering then excOwn γfs.exc (excDelMany Xexc (W.map (fun w => w.toNat)))
+     else iprop(emp)) -∗
+    fsCacheAuth γfs (if recovering then itRecL W Lw L else L) -∗
+    fsDirtyAuth γfs (if recovering then D else dirtyClear D (W.map (fun w => w.toNat))) -∗
+    ([∗list] i ↦ w ∈ W, fsChalf γfs (logSlotBno logstart i) (Lw i) ∗
+       (if recovering then iprop(emp) else fsDirtyHalf γfs w.toNat false)) -∗
+    bslots γb (2 + (if recovering then 0 else W.length)) -∗ wpLoop cpu'))
+  ⊢ wpLoop (GF := GF) cpu
+
 /-- The interface of `install_trans`. -/
 structure INSTALL_TRANS : Prop where
-  wp_install_trans : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
+  wp_install_trans_eb : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
+    [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [CurCtx]
+    (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+    (cpu : CPU) (k : KCtx) (γl : GName) (γb : BcacheNames) (V : BioView GF) (γdl : GName)
+    (γfs : FsNames) (pd pav pu : BitVec 64) (j : Nat) (logstart : Nat) (dev : BitVec 32)
+    (recovering : Bool) (n : Nat) (W : List (BitVec 32)) (Lw : Nat → List (BitVec 8))
+    (L : BlockMap) (D : RegMapF Bool) (pidv : BitVec 32) (dqp : DFrac)
+    (homeL : List Nat) (Xv : Nat → List (BitVec 8)) (Xexc : List Nat)
+    hj hproc hK hnoff htier hgeom hdev hcl hdt ha0 hn hnodup hhome hlen hcommit hpin
+    hxexc hpd,
+    wp_install_trans_eb_body (hlc := hlc) (GF := GF) Γ cpu k γl γb V γdl γfs pd pav pu j
+      logstart dev recovering n W Lw L D pidv dqp homeL Xv Xexc
+      hj hproc hK hnoff htier hgeom hdev hcl hdt ha0 hn hnodup hhome hlen hcommit hpin
+      hxexc hpd
+
+/-- The interrupts-off instance of `wp_install_trans_eb` (the complement is the whole
+bundle): the contract every not-yet-generalized caller states. -/
+theorem INSTALL_TRANS.wp_install_trans (A : INSTALL_TRANS) {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
     [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [CurCtx]
     (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
     (cpu : CPU) (k : KCtx) (γl : GName) (γb : BcacheNames) (V : BioView GF) (γdl : GName)
@@ -283,10 +369,21 @@ structure INSTALL_TRANS : Prop where
     (L : BlockMap) (D : RegMapF Bool) (pidv : BitVec 32) (dqp : DFrac)
     (homeL : List Nat) (Xv : Nat → List (BitVec 8)) (Xexc : List Nat)
     hj hproc hK hsie hnoff hlocks htier hgeom hdev hcl hdt ha0 hn hnodup hhome hlen hcommit hpin
-    hxexc hpd,
+    hxexc hpd :
     wp_install_trans_body (hlc := hlc) (GF := GF) Γ cpu k γl γb V γdl γfs pd pav pu j
       logstart dev recovering n W Lw L D pidv dqp homeL Xv Xexc
       hj hproc hK hsie hnoff hlocks htier hgeom hdev hcl hdt ha0 hn hnodup hhome hlen hcommit hpin
-      hxexc hpd
+      hxexc hpd := by
+  have h := A.wp_install_trans_eb (hlc := hlc) (GF := GF) (Γ := Γ) (cpu := cpu) (k := k) (γl := γl) (γb := γb) (V := V) (γdl := γdl) (γfs := γfs) (pd := pd) (pav := pav) (pu := pu) (j := j) (logstart := logstart) (dev := dev) (recovering := recovering) (n := n) (W := W) (Lw := Lw) (L := L) (D := D) (pidv := pidv) (dqp := dqp) (homeL := homeL) (Xv := Xv) (Xexc := Xexc) (hj := hj) (hproc := hproc) (hK := hK) (hnoff := hnoff) (htier := htier) (hgeom := hgeom) (hdev := hdev) (hcl := hcl) (hdt := hdt) (ha0 := ha0) (hn := hn) (hnodup := hnodup) (hhome := hhome) (hlen := hlen) (hcommit := hcommit) (hpin := hpin) (hxexc := hxexc) (hpd := hpd)
+  unfold wp_install_trans_eb_body at h
+  unfold wp_install_trans_body
+  rw [hsie] at h
+  simp only [trapCsrsExt_false, cpuClaimExt_false] at h
+  iintro ⟨H0, H1, H2, Htc, Hcl, Hir, H6, H7, H8, H9, H10, H11, H12, H13, H14, H15, H16, H17, H18, Hnext⟩
+  iapply h
+  iframe H0 H1 H2 Htc Hcl Hir H6 H7 H8 H9 H10 H11 H12 H13 H14 H15 H16 H17 H18
+  iapply wpNext_mono $$ Hnext
+  iintro %cpu' HK %spie %spp %R' %p0 H1 H2 ⟨Htc, Hir⟩ Hcl H6 H7 H8 H9 H10 H11 H12 H13
+  iapply HK $$ %spie %spp %R' %p0 H1 H2 Htc Hcl Hir H6 H7 H8 H9 H10 H11 H12 H13
 
 end Xv6

@@ -394,6 +394,40 @@ theorem eoK_popExit (k : KCtx) (hsie : k.sie = false) (hlk : "log" ∉ k.locks) 
   subst hsie
   simp [trapRes]
 
+/-- The locked context's budget at either entry `SIE`: the acquire's
+`trapRes k.sie` reserve on top of the frame. -/
+@[simp] theorem eoK_avail' (k : KCtx) : (eoK k).avail = trapRes k.sie + k.avail - 8 := rfl
+
+/-- The `acquire` inside the frame, at either entry `SIE`: the pushed bits
+are whatever the acquire's exit says (`k.withSpie a b` is the base). -/
+theorem eoK_fold_ws (k : KCtx) (a b : Bool) (hK : 8 ≤ k.avail) :
+    ((k.pushed 8).pushOffAt a b).withLocks ("log" :: k.locks) = eoK (k.withSpie a b) := by
+  unfold eoK
+  obtain ⟨regs, sie, spie, spp, avail, noff, intena, locks, tier, root, proc⟩ := k
+  simp only at hK ⊢
+  simp only [KCtx.pushed, KCtx.pushOffAt, KCtx.withLocks, KCtx.withSpie, KCtx.mk.injEq,
+    _root_.true_and, _root_.and_true]
+  omega
+
+/-- ...and the matching `release`, re-enabling interrupts exactly when the
+entry had them on (`reen = k.sie`, `KCtx.wf` at depth 0). -/
+theorem eoK_popExit_ws (k : KCtx) (a b : Bool) (hwf : k.wf) (hnoff : k.noff = 0)
+    (hlk : "log" ∉ k.locks) :
+    ((eoK (k.withSpie a b)).popExit k.sie).withLocks
+        (("log" :: k.locks).filter (fun x => x ≠ "log")) =
+      (k.withSpie a b).pushed 8 := by
+  rw [eo_filter k.locks hlk]
+  have hi := hwf.1 hnoff
+  unfold eoK KCtx.pushed KCtx.withLocks KCtx.popExit KCtx.popOff KCtx.pushOffAt KCtx.withSpie
+  obtain ⟨regs, sie, spie, spp, avail, noff, intena, locks, tier, root, proc⟩ := k
+  simp only at hi hnoff ⊢
+  subst hnoff
+  cases sie
+  · simp [trapRes]
+  · subst hi
+    simp [trapRes, KCtx.intrOn]
+    omega
+
 theorem eo_withSpie2 (k : KCtx) (a b a' b' : Bool) :
     (k.withSpie a b).withSpie a' b' = k.withSpie a' b' := rfl
 
@@ -924,14 +958,14 @@ def eoPost (k : KCtx) (pidv : BitVec 32) (dqp : DFrac) : CPU → IProp GF :=
   fun cpu' => iprop(∀ (spie spp : Bool) (R' : RegMap),
     ⌜calleeSaved k.regs R'⌝ -∗
     kctx cpu' ((k.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k.regs 1#5)) -∗
-    trapCsrs cpu' -∗ cpuClaim cpu' k.proc -∗ intrRes cpu' -∗
+    trapCsrsExt cpu' k.sie -∗ cpuClaimExt cpu' k.sie k.proc -∗
     wordPointsTo (pPid k.proc) 4 dqp pidv -∗ wpLoop cpu')
 
 theorem eoPost_elim (k : KCtx) (pidv : BitVec 32) (dqp : DFrac) (cpu' : CPU) :
     eoPost (GF := GF) k pidv dqp cpu' ⊢ ∀ (spie spp : Bool) (R' : RegMap),
       ⌜calleeSaved k.regs R'⌝ -∗
       kctx cpu' ((k.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k.regs 1#5)) -∗
-      trapCsrs cpu' -∗ cpuClaim cpu' k.proc -∗ intrRes cpu' -∗
+      trapCsrsExt cpu' k.sie -∗ cpuClaimExt cpu' k.sie k.proc -∗
       wordPointsTo (pPid k.proc) 4 dqp pidv -∗ wpLoop cpu' := by
   unfold eoPost; iintro H; iexact H
 

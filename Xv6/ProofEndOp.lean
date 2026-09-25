@@ -111,27 +111,25 @@ theorem eo_re (RE : RELEASE) (c : CPU) (k' : KCtx) (γ : LogNames) (γb : Bcache
     (γfs : FsNames) (cov : Std.ExtTreeSet Nat compare) (ls : Nat) (dev : BitVec 32)
     (ha0 : k'.regs 10#5 = logAddr)
     (hsie : k'.sie = false) (hnoff : 1 ≤ k'.noff) (hK : 10 ≤ k'.avail)
-    (hreen : false = (decide (k'.noff = 1) && k'.intena)) :
+    (reen : Bool) (hreen : reen = (decide (k'.noff = 1) && k'.intena))
+    (hon : reen = true → k'.tier = .kpt ∧ trapRes true + 6 ≤ k'.avail) :
     kctx c k' ∗ pcIs c KA.«release» ∗ logCtx γ γb γfs cov ls dev ∗
-    locked γ.lk c ∗ logResAt γ γb γfs cov ls curCtx ∗
-    wpNext (k'.popExit false).sie k'.proc c (fun cpu' => iprop(∀ R' : RegMap,
-      kctx cpu' (((k'.popExit false).withRegs R').withLocks
+    locked γ.lk c ∗ logResAt γ γb γfs cov ls curCtx ∗ popArm c k' reen ∗
+    wpNext (k'.popExit reen).sie k'.proc c (fun cpu' => iprop(∀ R' : RegMap,
+      kctx cpu' (((k'.popExit reen).withRegs R').withLocks
         (k'.locks.filter (fun x => x ≠ "log"))) -∗
       pcIs cpu' (jumpPc (k'.regs 1#5)) -∗ ⌜calleeSaved k'.regs R'⌝ -∗ wpLoop cpu'))
     ⊢ wpLoop (GF := GF) c := by
   have h := RE.wp_release (hlc := hlc) (GF := GF) c k' γ.lk "log"
-    (logResAt γ γb γfs cov ls) hsie hnoff hK false hreen (by simp)
+    (logResAt γ γb γfs cov ls) hsie hnoff hK reen hreen hon
   unfold wp_release_body at h
   simp only [releaseAddr] at h
   rw [ha0] at h
-  iintro ⟨Hk, Hpc, #Hctx, Hlocked, Hpay, HΦ⟩
+  iintro ⟨Hk, Hpc, #Hctx, Hlocked, Hpay, Harm, HΦ⟩
   ihave #Hlk := logCtx_lock γ γb γfs cov ls dev $$ Hctx
   iapply h
-  iframe Hk Hpc Hlocked Hpay HΦ
-  isplitl []
-  · iexact Hlk
-  · simp only [popArm_false]
-    iempintro
+  iframe Hk Hpc Hlocked Hpay Harm HΦ
+  iexact Hlk
 
 theorem eo_wk (WK : WAKEUP) (Γ : SchedNames) (c : CPU) (k' : KCtx)
     (hnoff : k'.noff + 1 < 2 ^ 31) (hK : wakeupSlots ≤ k'.avail)
@@ -151,28 +149,28 @@ theorem eo_bwrite (BW : BWRITE) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
     (c : CPU) (k' : KCtx) (γl : GName) (γb : BcacheNames) (V : BioView GF) (γdl : GName)
     (pd pav pu : BitVec 64) (j kk : Nat)
     (pidv dev bno : BitVec 32) (dqp : DFrac) (bs bsd : List (BitVec 8))
-    (pj : BitVec 64) (hpj : k'.proc = pj)
+    (pj : BitVec 64) (hpj : k'.proc = pj) (s : Bool) (hs : k'.sie = s)
     (hj : j < NPROC) (hproc : k'.proc = procAddr j) (hK : bwriteSlots ≤ k'.avail)
-    (hsie : k'.sie = false) (hnoff : k'.noff = 0) (hlocks : k'.locks = [])
+    (hnoff : k'.noff = 0)
     (htier : k'.tier = KTier.kpt)
     (hkk : kk < NBUF) (ha0 : k'.regs 10#5 = bnode kk)
     (hbno : bno.toNat < 2 ^ 31) (hbsd : bsd.length = BSIZE) (hpd : descPageRw pd) :
     kctx c k' ∗ pcIs c KA.«bwrite» ∗ procsInv Γ ∗
-    trapCsrs c ∗ cpuClaim c pj ∗ intrRes c ∗
+    trapCsrsExt c s ∗ cpuClaimExt c s pj ∗
     bioCtx γl γb V ∗ diskCaps V.gd γdl pd pav pu ∗
     wordPointsTo (pPid pj) 4 dqp pidv ∗
     bufHold0 γb V kk pidv dev bno bs bsd ∗
     wpNext true pj c (fun cpu' => iprop(∀ (spie spp : Bool) (R' : RegMap),
       ⌜calleeSaved k'.regs R'⌝ -∗
       kctx cpu' ((k'.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k'.regs 1#5)) -∗
-      trapCsrs cpu' -∗ cpuClaim cpu' pj -∗ intrRes cpu' -∗
+      trapCsrsExt cpu' s -∗ cpuClaimExt cpu' s pj -∗
       wordPointsTo (pPid pj) 4 dqp pidv -∗
       bufHold0 γb V kk pidv dev bno bs bs -∗ wpLoop cpu'))
     ⊢ wpLoop (GF := GF) c := by
-  subst hpj
-  have h := BW.wp_bwrite (hlc := hlc) (GF := GF) Γ c k' γl γb V γdl pd pav pu j kk
-    pidv dev bno dqp bs bsd hj hproc hK hsie hnoff hlocks htier hkk ha0 hbno hbsd hpd
-  unfold wp_bwrite_body at h
+  subst hpj hs
+  have h := BW.wp_bwrite_eb (hlc := hlc) (GF := GF) Γ c k' γl γb V γdl pd pav pu j kk
+    pidv dev bno dqp bs bsd hj hproc hK hnoff htier hkk ha0 hbno hbsd hpd
+  unfold wp_bwrite_eb_body at h
   simp only [bwriteAddr] at h
   exact h
 
@@ -198,15 +196,15 @@ theorem eo_wh (WH : WRITE_HEAD) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
     (c : CPU) (k' : KCtx) (γl : GName) (γb : BcacheNames) (V : BioView GF) (γdl : GName)
     (γfs : FsNames) (pd pav pu : BitVec 64) (j logstart : Nat) (dev : BitVec 32)
     (n : Nat) (W : List (BitVec 32)) (L : BlockMap) (pidv : BitVec 32) (dqp : DFrac)
-    (pj : BitVec 64) (hpj : k'.proc = pj)
+    (pj : BitVec 64) (hpj : k'.proc = pj) (s : Bool) (hs : k'.sie = s)
     (hj : j < NPROC) (hproc : k'.proc = procAddr j) (hK : writeHeadSlots ≤ k'.avail)
-    (hsie : k'.sie = false) (hnoff : k'.noff = 0) (hlocks : k'.locks = [])
+    (hnoff : k'.noff = 0)
     (htier : k'.tier = KTier.kpt)
     (hgeom : logGeomOk V.cov logstart) (hdev : dev = V.dev)
     (hcl : V.clean = fsMclean γfs) (hdt : V.dirty = fsMdirty γfs)
     (hn : n = W.length ∧ n ≤ LOGBLOCKS) (hpd : descPageRw pd) :
     kctx c k' ∗ pcIs c KA.«write_head» ∗ procsInv Γ ∗
-    trapCsrs c ∗ cpuClaim c pj ∗ intrRes c ∗
+    trapCsrsExt c s ∗ cpuClaimExt c s pj ∗
     bioCtx γl γb V ∗ diskCaps V.gd γdl pd pav pu ∗ panicEnv ∗
     logFrozen logstart dev ∗
     wordPointsTo (pPid pj) 4 dqp pidv ∗
@@ -219,7 +217,7 @@ theorem eo_wh (WH : WRITE_HEAD) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
         (bs' : List (BitVec 8)),
       ⌜calleeSaved k'.regs R'⌝ -∗
       kctx cpu' ((k'.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k'.regs 1#5)) -∗
-      trapCsrs cpu' -∗ cpuClaim cpu' pj -∗ intrRes cpu' -∗
+      trapCsrsExt cpu' s -∗ cpuClaimExt cpu' s pj -∗
       wordPointsTo (pPid pj) 4 dqp pidv -∗
       wordPointsTo lhNAddr 4 (DFrac.own 1) (BitVec.ofNat 32 n) -∗
       ([∗list] i ↦ w ∈ W, wordPointsTo (lhBlock i) 4 (DFrac.own 1) w) -∗
@@ -228,10 +226,10 @@ theorem eo_wh (WH : WRITE_HEAD) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
       ⌜bs'.length = BSIZE ∧ hdrN bs' = n ∧ hdrDec bs' = (n, W.map (fun w => w.toNat))⌝ -∗
       bslot γb -∗ wpLoop cpu'))
     ⊢ wpLoop (GF := GF) c := by
-  subst hpj
-  have h := WH.wp_write_head (hlc := hlc) (GF := GF) Γ c k' γl γb V γdl γfs pd pav pu j
-    logstart dev n W L pidv dqp hj hproc hK hsie hnoff hlocks htier hgeom hdev hcl hdt hn hpd
-  unfold wp_write_head_body at h
+  subst hpj hs
+  have h := WH.wp_write_head_eb (hlc := hlc) (GF := GF) Γ c k' γl γb V γdl γfs pd pav pu j
+    logstart dev n W L pidv dqp hj hproc hK hnoff htier hgeom hdev hcl hdt hn hpd
+  unfold wp_write_head_eb_body at h
   simp only [writeHeadAddr] at h
   exact h
 
@@ -241,9 +239,9 @@ theorem eo_it (IT : INSTALL_TRANS) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ
     (n : Nat) (W : List (BitVec 32)) (Lw : Nat → List (BitVec 8))
     (L : BlockMap) (D : RegMapF Bool) (pidv : BitVec 32) (dqp : DFrac)
     (homeL : List Nat) (Xv : Nat → List (BitVec 8)) (Xexc : List Nat)
-    (pj : BitVec 64) (hpj : k'.proc = pj)
+    (pj : BitVec 64) (hpj : k'.proc = pj) (s : Bool) (hs : k'.sie = s)
     (hj : j < NPROC) (hproc : k'.proc = procAddr j) (hK : installTransSlots ≤ k'.avail)
-    (hsie : k'.sie = false) (hnoff : k'.noff = 0) (hlocks : k'.locks = [])
+    (hnoff : k'.noff = 0)
     (htier : k'.tier = KTier.kpt)
     (hgeom : logGeomOk V.cov logstart) (hdev : dev = V.dev)
     (hcl : V.clean = fsMclean γfs) (hdt : V.dirty = fsMdirty γfs)
@@ -257,7 +255,7 @@ theorem eo_it (IT : INSTALL_TRANS) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ
       PartialMap.get? L w.toNat = some (Lw i))
     (hpd : descPageRw pd) :
     kctx c k' ∗ pcIs c KA.«install_trans» ∗ procsInv Γ ∗
-    trapCsrs c ∗ cpuClaim c pj ∗ intrRes c ∗
+    trapCsrsExt c s ∗ cpuClaimExt c s pj ∗
     bioCtx γl γb V ∗ diskCaps V.gd γdl pd pav pu ∗ panicEnv ∗
     logFrozen logstart dev ∗
     wordPointsTo (pPid pj) 4 dqp pidv ∗
@@ -272,7 +270,7 @@ theorem eo_it (IT : INSTALL_TRANS) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ
     wpNext true pj c (fun cpu' => iprop(∀ (spie spp : Bool) (R' : RegMap),
       ⌜calleeSaved k'.regs R'⌝ -∗
       kctx cpu' ((k'.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k'.regs 1#5)) -∗
-      trapCsrs cpu' -∗ cpuClaim cpu' pj -∗ intrRes cpu' -∗
+      trapCsrsExt cpu' s -∗ cpuClaimExt cpu' s pj -∗
       wordPointsTo (pPid pj) 4 dqp pidv -∗
       wordPointsTo lhNAddr 4 (DFrac.own 1) (BitVec.ofNat 32 n) -∗
       ([∗list] i ↦ w ∈ W, wordPointsTo (lhBlock i) 4 (DFrac.own 1) w) -∗
@@ -283,13 +281,13 @@ theorem eo_it (IT : INSTALL_TRANS) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ
          fsDirtyHalf γfs w.toNat false) -∗
       bslots γb (2 + W.length) -∗ wpLoop cpu'))
     ⊢ wpLoop (GF := GF) c := by
-  subst hpj
-  have h := IT.wp_install_trans (hlc := hlc) (GF := GF) Γ c k' γl γb V γdl γfs pd pav pu j
+  subst hpj hs
+  have h := IT.wp_install_trans_eb (hlc := hlc) (GF := GF) Γ c k' γl γb V γdl γfs pd pav pu j
     logstart dev false n W Lw L D pidv dqp homeL Xv Xexc
-    hj hproc hK hsie hnoff hlocks htier hgeom hdev
+    hj hproc hK hnoff htier hgeom hdev
     hcl hdt (by simp only [Bool.false_eq_true, if_false]; exact ha0) hn hnodup hhome hlen
     (fun _ => hcommit) (by simp) (by simp) hpd
-  unfold wp_install_trans_body at h
+  unfold wp_install_trans_eb_body at h
   simp only [installTransAddr, Bool.false_eq_true, if_false] at h
   exact h
 
@@ -327,36 +325,40 @@ set_option maxHeartbeats 8000000 in
 and return.  Entered from the tail's `c.j` at `+0x66` and by falling out of
 the non-committer's `release` at `+0x8e`; `s3`/`s4`/`s5` are back at the
 caller's values on both. -/
-theorem eo_exit (c : CPU) (k : KCtx) (pidv : BitVec 32) (dqp : DFrac) (R : RegMap)
-    (hK : endOpSlots ≤ k.avail) (hsie : k.sie = false)
+theorem eo_exit (cpu : CPU) (k : KCtx) (a b : Bool) (pidv : BitVec 32) (dqp : DFrac) (R : RegMap)
+    (hK : endOpSlots ≤ k.avail)
     (hR2 : R 2#5 = k.regs 2#5 + 0xFFFFFFFFFFFFFFC0#64)
     (h19 : R 19#5 = k.regs 19#5) (h20 : R 20#5 = k.regs 20#5) (h21 : R 21#5 = k.regs 21#5)
     (h22 : R 22#5 = k.regs 22#5) (h23 : R 23#5 = k.regs 23#5) (h24 : R 24#5 = k.regs 24#5)
     (h25 : R 25#5 = k.regs 25#5) (h26 : R 26#5 = k.regs 26#5) (h27 : R 27#5 = k.regs 27#5) :
-    kctx c ((k.pushed 8).withRegs R) ∗ pcIs c (KA.«end_op» + 0x92#64) ∗
-    trapCsrs c ∗ cpuClaim c k.proc ∗ intrRes c ∗
+    kctx cpu (((k.withSpie a b).pushed 8).withRegs R) ∗ pcIs cpu (KA.«end_op» + 0x92#64) ∗
+    trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗
     wordPointsTo (pPid k.proc) 4 dqp pidv ∗
     eoFrame4 (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) (k.regs 9#5) (k.regs 18#5) ∗
     eoFrameJ (k.regs 2#5) ∗
-    wpNext true k.proc c (eoPost k pidv dqp)
-    ⊢ wpLoop (GF := GF) c := by
+    (∀ c : CPU, eoPost k pidv dqp c)
+    ⊢ wpLoop (GF := GF) cpu := by
   have hK8 : 8 ≤ k.avail := by
     unfold endOpSlots installTransSlots breadSlots panicSlots at hK; omega
-  iintro ⟨Hk, Hpc, Htc, Hcc, Hir, Hpid, Hfr, Hjk, Hnext⟩
+  iintro ⟨Hk, Hpc, Hte, Hce, Hpid, Hfr, Hjk, HΦ⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
-  iapply (eo_epilogue c k hK8 R hR2 (k.regs 1#5) (k.regs 8#5) (k.regs 9#5) (k.regs 18#5))
-    $$ [- $Hk $Hpc $Hfr $Hjk]
+  ihave Hfr := (show eoFrame4 (GF := GF) (k.regs 2#5) (k.regs 1#5) (k.regs 8#5)
+      (k.regs 9#5) (k.regs 18#5) ⊢
+      eoFrame4 ((k.withSpie a b).regs 2#5) (k.regs 1#5) (k.regs 8#5)
+        (k.regs 9#5) (k.regs 18#5) from .rfl) $$ Hfr
+  ihave Hjk := (show eoFrameJ (GF := GF) (k.regs 2#5) ⊢
+      eoFrameJ ((k.withSpie a b).regs 2#5) from .rfl) $$ Hjk
+  iapply (eo_epilogue cpu (k.withSpie a b) hK8 R hR2 (k.regs 1#5) (k.regs 8#5) (k.regs 9#5)
+      (k.regs 18#5)) $$ [- $Hk $Hpc $Hfr $Hjk]
   k_code (text_instr _ _ _ _ rfl rfl) Htext
   k_norm_g
   iframe
   inext
-  k_norm [hsie]
-  iapply wpNext_off_intro
+  k_next_e
   iintro Hk Hpc
-  ihave Hpost := wpNext_self true k.proc c _ $$ Hnext
-  ihave Hpost := eoPost_elim k pidv dqp c $$ Hpost
-  ihave Hk := eo_kctx_ws c k _ $$ Hk
-  iapply Hpost $$ %(k.spie) %(k.spp) %_ [] Hk Hpc Htc Hcc Hir Hpid
+  ihave Hpost := eoPost_elim k pidv dqp cpu $$ [HΦ]
+  · iapply HΦ
+  iapply Hpost $$ %a %b %_ [] Hk Hpc Hte Hce Hpid
   · ipureintro
     exact eo_calleeSaved_epi k.regs R h19 h20 h21 h22 h23 h24 h25 h26 h27
 
@@ -376,51 +378,53 @@ theorem eoK_withSpie (k : KCtx) : (eoK k).withSpie k.spie k.spp = eoK k := rfl
 
 set_option maxHeartbeats 16000000 in
 theorem eo_fast (RE : RELEASE) (WK : WAKEUP) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
-    (c : CPU) (k : KCtx) (γ : LogNames) (γb : BcacheNames) (γfs : FsNames)
+    (cpu : CPU) (k : KCtx) (a b : Bool) (γ : LogNames) (γb : BcacheNames) (γfs : FsNames)
     (cov : Std.ExtTreeSet Nat compare) (ls : Nat) (dev : BitVec 32)
     (pidv : BitVec 32) (dqp : DFrac) (R : RegMap) (r9 r18 : BitVec 64)
-    (hK : endOpSlots ≤ k.avail) (hsie : k.sie = false) (hnoff : k.noff = 0)
-    (hlocks : k.locks = []) (htier : k.tier = KTier.kpt) (hintena : k.intena = false)
+    (hK : endOpSlots ≤ k.avail) (hwf : k.wf) (hnoff : k.noff = 0)
+    (hlocks : k.locks = []) (htier : k.tier = KTier.kpt) (hintena : k.intena = k.sie)
     (hR : eoPins k R r9 r18 (k.regs 19#5) (k.regs 20#5) (k.regs 21#5)) :
-    kctx c ((eoK k).withRegs R) ∗ pcIs c (KA.«end_op» + 0x7a#64) ∗
-    procsInv Γ ∗ trapCsrs c ∗ cpuClaim c k.proc ∗ intrRes c ∗
-    logCtx γ γb γfs cov ls dev ∗ locked γ.lk c ∗ logResAt γ γb γfs cov ls curCtx ∗
+    kctx cpu ((eoK (k.withSpie a b)).withRegs R) ∗ pcIs cpu (KA.«end_op» + 0x7a#64) ∗
+    procsInv Γ ∗ trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗
+    sieArm cpu k.sie k.proc ∗
+    logCtx γ γb γfs cov ls dev ∗ locked γ.lk cpu ∗ logResAt γ γb γfs cov ls curCtx ∗
     eoFrame4 (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) (k.regs 9#5) (k.regs 18#5) ∗
     eoFrameJ (k.regs 2#5) ∗
     wordPointsTo (pPid k.proc) 4 dqp pidv ∗
-    wpNext true k.proc c (eoPost k pidv dqp)
-    ⊢ wpLoop (GF := GF) c := by
+    (∀ c : CPU, eoPost k pidv dqp c)
+    ⊢ wpLoop (GF := GF) cpu := by
   have hK8 : 8 ≤ k.avail := by
     unfold endOpSlots installTransSlots breadSlots panicSlots at hK; omega
   have hKi : 72 ≤ k.avail - 8 := by
     unfold endOpSlots installTransSlots breadSlots panicSlots at hK; omega
   have hlkn : ("log" : String) ∉ k.locks := by rw [hlocks]; simp
-  iintro ⟨Hk, Hpc, #Hpi, Htc, Hcc, Hir, #Hctx, Hlocked, Hpay, Hfr, Hjk, Hpid, Hnext⟩
+  have hsie : (eoK (k.withSpie a b)).sie = false := rfl
+  iintro ⟨Hk, Hpc, #Hpi, Hte, Hce, Harm, #Hctx, Hlocked, Hpay, Hfr, Hjk, Hpid, Hnext⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
   -- +0x7a auipc a0,0x1e ; +0x7e addi a0,a0,1432 ; +0x82 jal wakeup
-  k_step (wp_s_auipc c _ (KA.«end_op» + 0x7a#64) false 0x1e#20 10#5 (by decide))
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [eoK_sie k]
+  k_step (wp_s_auipc cpu _ (KA.«end_op» + 0x7a#64) false 0x1e#20 10#5 (by decide))
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [eoK_sie]
   iintro Hk Hpc
-  k_step (wp_s_addi c _ (KA.«end_op» + 0x7e#64) false 1432#12 10#5 10#5 (by decide))
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [eoK_sie k, eo_log]
+  k_step (wp_s_addi cpu _ (KA.«end_op» + 0x7e#64) false 1432#12 10#5 10#5 (by decide))
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [eoK_sie, eo_log]
   iintro Hk Hpc
-  k_step (wp_s_jal c _ (KA.«end_op» + 0x82#64) false 2089426#21 1#5 (by decide))
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [eoK_sie k, eo_br_wk]
+  k_step (wp_s_jal cpu _ (KA.«end_op» + 0x82#64) false 2089426#21 1#5 (by decide))
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [eoK_sie, eo_br_wk]
   iintro Hk Hpc
-  iapply (eo_wk WK Γ c _ ?hnw ?hKw ?hlw ?htw) $$ [- $Hk $Hpc]
+  iapply (eo_wk WK Γ cpu _ ?hnw ?hKw ?hlw ?htw) $$ [- $Hk $Hpc]
   rotate_right 1
-  k_norm [eoK_sie k, eo_ret_86]
+  k_norm [eoK_sie, eo_ret_86]
   iframe #
-  case hnw => k_norm [eoK_noff k, hnoff]; omega
-  case hKw => k_norm [eoK_avail k hsie]; unfold wakeupSlots; omega
-  case hlw => k_norm [eoK_locks k, hlocks]; simp
-  case htw => k_norm [eoK_tier k, htier]
+  case hnw => k_norm [eoK_noff, hnoff]; omega
+  case hKw => k_norm_g [eoK_avail']; unfold wakeupSlots; omega
+  case hlw => k_norm [eoK_locks, hlocks]; simp
+  case htw => k_norm [eoK_tier, htier]
   iapply wpNext_off_intro
   iintro %sw %pw %R1 %hspw Hk Hpc %hcsw
-  k_norm [eoK_sie k] at hspw
+  k_norm at hspw
   obtain ⟨ew1, ew2⟩ := hspw trivial
-  subst ew1; subst ew2
-  k_norm [eo_ret_86, eoK_spie k, eoK_spp k, eoK_withSpie k]
+  subst sw pw
+  k_norm [eo_ret_86, eoK_spie, eoK_spp, eoK_ws, eo_withSpie2]
   have hR1 : eoPins k R1 r9 r18 (k.regs 19#5) (k.regs 20#5) (k.regs 21#5) := by
     k_norm at hcsw
     refine eoPins_cs k _ R1 _ _ _ _ _ ?_ hcsw
@@ -442,29 +446,36 @@ theorem eo_fast (RE : RELEASE) (WK : WAKEUP) (Γ : SchedNames) [ClaimIs (hlc := 
         | exact q26
         | exact q27
   -- +0x86 auipc a0,0x1e ; +0x8a addi a0,a0,1420 ; +0x8e jal release
-  k_step (wp_s_auipc c _ (KA.«end_op» + 0x86#64) false 0x1e#20 10#5 (by decide))
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [eoK_sie k]
+  k_step (wp_s_auipc cpu _ (KA.«end_op» + 0x86#64) false 0x1e#20 10#5 (by decide))
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [eoK_sie]
   iintro Hk Hpc
-  k_step (wp_s_addi c _ (KA.«end_op» + 0x8a#64) false 1420#12 10#5 10#5 (by decide))
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [eoK_sie k, eo_log]
+  k_step (wp_s_addi cpu _ (KA.«end_op» + 0x8a#64) false 1420#12 10#5 10#5 (by decide))
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [eoK_sie, eo_log]
   iintro Hk Hpc
-  k_step (wp_s_jal c _ (KA.«end_op» + 0x8e#64) false 2084452#21 1#5 (by decide))
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [eoK_sie k, eo_br_rel]
+  k_step (wp_s_jal cpu _ (KA.«end_op» + 0x8e#64) false 2084452#21 1#5 (by decide))
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [eoK_sie, eo_br_rel]
   iintro Hk Hpc
-  iapply (eo_re RE c _ γ γb γfs cov ls dev ?ha0r ?hsr ?hnr ?hKr ?hrr)
+  iapply (eo_re RE cpu _ γ γb γfs cov ls dev ?ha0r ?hsr ?hnr ?hKr k.sie ?hrr ?hor)
     $$ [- $Hk $Hpc $Hlocked $Hpay]
   rotate_right 1
-  k_norm [eoK_sie k, eo_ret_92, eoK_locks k, eoK_popExit k hsie hlkn]
+  k_norm_g [eo_ret_92, eoK_locks, eoK_popExit_ws k a b hwf hnoff hlkn]
   iframe #
-  case ha0r => k_norm
-  case hsr => k_norm [eoK_sie k]
-  case hnr => k_norm [eoK_noff k]; omega
-  case hKr => k_norm [eoK_avail k hsie]; omega
-  case hrr => k_norm [eoK_noff k, eoK_intena k]; simp [hnoff, hintena]
-  k_norm [eoK_sie k]
-  iapply wpNext_off_intro
+  isplitl [Harm]
+  · iapply (popArm_sie cpu k _ ?hpp) $$ Harm
+    case hpp => rfl
+  case ha0r => k_norm_g
+  case hsr => rfl
+  case hnr => k_norm_g [eoK_noff] <;> omega
+  case hKr => k_norm_g [eoK_avail']; omega
+  case hrr => k_norm_g [eoK_noff, eoK_intena]; simp [hnoff, hintena]
+  case hor =>
+    intro hon
+    refine ⟨by k_norm_g [eoK_tier, htier], ?_⟩
+    k_norm_g [eoK_avail', hon]; simp [trapRes, kvFrameSlots]
+    unfold endOpSlots installTransSlots breadSlots panicSlots at hK; omega
+  k_next_e
   iintro %R2 Hk Hpc %hcsr
-  k_norm [eoK_sie k, eo_ret_92, eoK_locks k, eoK_popExit k hsie hlkn]
+  k_norm_g [eo_ret_92, eoK_locks, eoK_popExit_ws k a b hwf hnoff hlkn]
   have hR2 : eoPins k R2 r9 r18 (k.regs 19#5) (k.regs 20#5) (k.regs 21#5) := by
     k_norm at hcsr
     refine eoPins_cs k _ R2 _ _ _ _ _ ?_ hcsr
@@ -486,8 +497,8 @@ theorem eo_fast (RE : RELEASE) (WK : WAKEUP) (Γ : SchedNames) [ClaimIs (hlc := 
         | exact q26
         | exact q27
   obtain ⟨p2, p8, p9, p18, p19, p20, p21, p22, p23, p24, p25, p26, p27⟩ := id hR2
-  iapply (eo_exit c k pidv dqp R2 hK hsie p2 p19 p20 p21 p22 p23 p24 p25 p26 p27)
-    $$ [- $Hk $Hpc $Htc $Hcc $Hir $Hpid $Hfr $Hjk $Hnext]
+  iapply (eo_exit cpu k a b pidv dqp R2 hK p2 p19 p20 p21 p22 p23 p24 p25 p26 p27)
+    $$ [- $Hk $Hpc $Hte $Hce $Hpid $Hfr $Hjk $Hnext]
 
 end
 
@@ -516,60 +527,60 @@ theorem eo_word_ex (a : BitVec 64) (v : BitVec 32) :
 set_option maxHeartbeats 40000000 in
 theorem eo_tail (AC : ACQUIRE) (RE : RELEASE) (WK : WAKEUP)
     (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
-    (c : CPU) (k : KCtx) (γ : LogNames) (γb : BcacheNames) (γfs : FsNames)
+    (cpu : CPU) (k : KCtx) (a b : Bool) (γ : LogNames) (γb : BcacheNames) (γfs : FsNames)
     (cov : Std.ExtTreeSet Nat compare) (ls : Nat) (dev : BitVec 32)
     (L : BlockMap) (D : RegMapF Bool) (Lw : Nat → List (BitVec 8)) (t : Nat)
     (pidv : BitVec 32) (dqp : DFrac) (R : RegMap) (r9 r18 : BitVec 64)
-    (hK : endOpSlots ≤ k.avail) (hsie : k.sie = false) (hnoff : k.noff = 0)
-    (hlocks : k.locks = []) (htier : k.tier = KTier.kpt) (hintena : k.intena = false)
+    (hK : endOpSlots ≤ k.avail) (hwf : k.wf) (hnoff : k.noff = 0)
+    (hlocks : k.locks = []) (htier : k.tier = KTier.kpt) (hintena : k.intena = k.sie)
     (ht : t ≤ LOGBLOCKS)
     (hR : eoPins k R r9 r18 (k.regs 19#5) (k.regs 20#5) (k.regs 21#5)) :
-    kctx c ((k.pushed 8).withRegs R) ∗ pcIs c (KA.«end_op» + 0x42#64) ∗
-    procsInv Γ ∗ trapCsrs c ∗ cpuClaim c k.proc ∗ intrRes c ∗
+    kctx cpu (((k.withSpie a b).pushed 8).withRegs R) ∗ pcIs cpu (KA.«end_op» + 0x42#64) ∗
+    procsInv Γ ∗ trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗
     logCtx γ γb γfs cov ls dev ∗
     eoOpen γb γfs cov ls 0 [] L D Lw t ∗
     eoFrame4 (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) (k.regs 9#5) (k.regs 18#5) ∗
     eoFrameJ (k.regs 2#5) ∗
     wordPointsTo (pPid k.proc) 4 dqp pidv ∗
-    wpNext true k.proc c (eoPost k pidv dqp)
-    ⊢ wpLoop (GF := GF) c := by
+    (∀ c : CPU, eoPost k pidv dqp c)
+    ⊢ wpLoop (GF := GF) cpu := by
   have hK8 : 8 ≤ k.avail := by
     unfold endOpSlots installTransSlots breadSlots panicSlots at hK; omega
   have hKi : 72 ≤ k.avail - 8 := by
     unfold endOpSlots installTransSlots breadSlots panicSlots at hK; omega
   have hlkn : ("log" : String) ∉ k.locks := by rw [hlocks]; simp
-  iintro ⟨Hk, Hpc, #Hpi, Htc, Hcc, Hir, #Hctx, Hopen, Hfr, Hjk, Hpid, Hnext⟩
+  iintro ⟨Hk, Hpc, #Hpi, Hte, Hce, #Hctx, Hopen, Hfr, Hjk, Hpid, Hnext⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
   obtain ⟨q2, q8, q9, q18, q19, q20, q21, q22, q23, q24, q25, q26, q27⟩ := id hR
   -- +0x42 auipc s1,0x1e ; +0x46 addi s1,s1,1488 ; +0x4a mv a0,s1 ; +0x4c jal acquire
-  k_step (wp_s_auipc c _ (KA.«end_op» + 0x42#64) false 0x1e#20 9#5 (by decide))
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hsie]
+  k_step_e (wp_s_auipc cpu _ (KA.«end_op» + 0x42#64) false 0x1e#20 9#5 (by decide))
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
-  k_step (wp_s_addi c _ (KA.«end_op» + 0x46#64) false 1488#12 9#5 9#5 (by decide))
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hsie, eo_log]
+  k_step_e (wp_s_addi cpu _ (KA.«end_op» + 0x46#64) false 1488#12 9#5 9#5 (by decide))
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [eo_log]
   iintro Hk Hpc
-  k_step (wp_s_add c _ (KA.«end_op» + 0x4a#64) true 10#5 0#5 9#5 (by decide))
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hsie, KCtx.rget_zero]
+  k_step_e (wp_s_add cpu _ (KA.«end_op» + 0x4a#64) true 10#5 0#5 9#5 (by decide))
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [KCtx.rget_zero]
   iintro Hk Hpc
-  k_step (wp_s_jal c _ (KA.«end_op» + 0x4c#64) false 2084382#21 1#5 (by decide))
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hsie, eo_br_acq]
+  k_step_e (wp_s_jal cpu _ (KA.«end_op» + 0x4c#64) false 2084382#21 1#5 (by decide))
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [eo_br_acq]
   iintro Hk Hpc
-  iapply (eo_ac AC c _ γ γb γfs cov ls dev ?ha0 ?hna ?hKa ?hla) $$ [- $Hk $Hpc]
+  iapply (eo_ac AC cpu _ γ γb γfs cov ls dev ?ha0 ?hna ?hKa ?hla) $$ [- $Hk $Hpc]
   rotate_right 1
-  k_norm [hsie, eo_ret_50]
+  k_norm_g [eo_ret_50]
   iframe #
-  case ha0 => k_norm
-  case hna => k_norm [hnoff]; omega
-  case hKa => k_norm; omega
-  case hla => k_norm [hlocks]; simp
-  iapply wpNext_off_intro
-  iintro %s0 %p0 %R1 %hsp0 Hk Hpc %hcs0 Hlocked Hpay - -
-  k_norm [hsie] at hsp0
-  obtain ⟨e1, e2⟩ := hsp0 trivial
-  subst e1; subst e2
-  k_norm [hsie, eo_ret_50, KCtx.pushOffAt_withRegs, eoK_fold k hK8]
+  case ha0 => k_norm_g
+  case hna => k_norm_g [hnoff] <;> omega
+  case hKa => k_norm_g; omega
+  case hla => k_norm_g [hlocks]; simp
+  k_next_e
+  iintro %s0 %p0 %R1 %hsp0 Hk Hpc %hcs0 Hlocked Hpay - Harm
+  ihave Hk := kctx_eq_mono cpu _ ((eoK (k.withSpie s0 p0)).withRegs R1)
+    (by kctx_ext [eoK, hlocks]) $$ Hk
+  have hsie : (eoK (k.withSpie s0 p0)).sie = false := rfl
+  k_norm [eo_ret_50]
   have hR1 : eoPins k R1 logAddr r18 (k.regs 19#5) (k.regs 20#5) (k.regs 21#5) := by
-    k_norm at hcs0
+    k_norm_g at hcs0
     refine eoPins_cs k _ R1 _ _ _ _ _ ?_ hcs0
     refine ⟨?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_⟩ <;>
       simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true] <;>
@@ -615,20 +626,20 @@ theorem eo_tail (AC : ACQUIRE) (RE : RELEASE) (WK : WAKEUP)
   have hempty : ∀ (i : Nat) (e : OpEntry), PartialMap.get? om i ≠ some e :=
     eo_map_empty om hlen
   -- +0x50 sw zero,32(s1)
-  k_step (wp_s_sw c _ (KA.«end_op» + 0x50#64) false 32#12 9#5 0#5 (by decide) (1#32 : BitVec 32))
+  k_step (wp_s_sw cpu _ (KA.«end_op» + 0x50#64) false 32#12 9#5 0#5 (by decide) (1#32 : BitVec 32))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
-    with [eoK_sie k, p9, eo_o_cmt, KCtx.rget_zero]
+    with [eoK_sie, p9, eo_o_cmt, KCtx.rget_zero]
   iintro Hk Hpc Hcmt
   -- +0x54 lw a5,40(s1) ; +0x56 addiw a5,a5,1 ; +0x58 sw a5,40(s1)
-  k_step (wp_s_lw c _ (KA.«end_op» + 0x54#64) true 40#12 15#5 9#5 (by decide) (by decide)
+  k_step (wp_s_lw cpu _ (KA.«end_op» + 0x54#64) true 40#12 15#5 9#5 (by decide) (by decide)
       (DFrac.own 1) nc)
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [eoK_sie k, p9, eo_o_nc]
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [eoK_sie, p9, eo_o_nc]
   iintro Hk Hpc Hnc
-  k_step (wp_s_addiw c _ (KA.«end_op» + 0x56#64) true 1#12 15#5 15#5 (by decide))
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [eoK_sie k]
+  k_step (wp_s_addiw cpu _ (KA.«end_op» + 0x56#64) true 1#12 15#5 15#5 (by decide))
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [eoK_sie]
   iintro Hk Hpc
-  k_step (wp_s_sw c _ (KA.«end_op» + 0x58#64) true 40#12 9#5 15#5 (by decide) nc)
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [eoK_sie k, p9, eo_o_nc]
+  k_step (wp_s_sw cpu _ (KA.«end_op» + 0x58#64) true 40#12 9#5 15#5 (by decide) nc)
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [eoK_sie, p9, eo_o_nc]
   iintro Hk Hpc Hnc
   icases eo_word_ex lNcommit _ $$ Hnc with ⟨%ncv, Hnc⟩
   -- THE EPOCH BUMPS
@@ -651,27 +662,27 @@ theorem eo_tail (AC : ACQUIRE) (RE : RELEASE) (WK : WAKEUP)
     $$ [Hout Hcmt Hnc Hops Hep Hreg Htx Hbatch]
   case' _ => iframe Hout Hcmt Hnc Hops Hep Hreg Htx Hbatch
   -- +0x5a mv a0,s1 ; +0x5c jal wakeup
-  k_step (wp_s_add c _ (KA.«end_op» + 0x5a#64) true 10#5 0#5 9#5 (by decide))
+  k_step (wp_s_add cpu _ (KA.«end_op» + 0x5a#64) true 10#5 0#5 9#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
-    with [eoK_sie k, KCtx.rget_zero, p9]
+    with [eoK_sie, KCtx.rget_zero, p9]
   iintro Hk Hpc
-  k_step (wp_s_jal c _ (KA.«end_op» + 0x5c#64) false 2089464#21 1#5 (by decide))
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [eoK_sie k, eo_br_wk]
+  k_step (wp_s_jal cpu _ (KA.«end_op» + 0x5c#64) false 2089464#21 1#5 (by decide))
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [eoK_sie, eo_br_wk]
   iintro Hk Hpc
-  iapply (eo_wk WK Γ c _ ?hnw ?hKw ?hlw ?htw) $$ [- $Hk $Hpc]
+  iapply (eo_wk WK Γ cpu _ ?hnw ?hKw ?hlw ?htw) $$ [- $Hk $Hpc]
   rotate_right 1
-  k_norm [eoK_sie k, eo_ret_60]
+  k_norm [eoK_sie, eo_ret_60]
   iframe #
-  case hnw => k_norm [eoK_noff k, hnoff]; omega
-  case hKw => k_norm [eoK_avail k hsie]; unfold wakeupSlots; omega
-  case hlw => k_norm [eoK_locks k, hlocks]; simp
-  case htw => k_norm [eoK_tier k, htier]
+  case hnw => k_norm [eoK_noff, hnoff]; omega
+  case hKw => k_norm_g [eoK_avail']; unfold wakeupSlots; omega
+  case hlw => k_norm [eoK_locks, hlocks]; simp
+  case htw => k_norm [eoK_tier, htier]
   iapply wpNext_off_intro
   iintro %sw %pw %R2 %hspw Hk Hpc %hcsw
-  k_norm [eoK_sie k] at hspw
+  k_norm at hspw
   obtain ⟨ew1, ew2⟩ := hspw trivial
-  subst ew1; subst ew2
-  k_norm [eo_ret_60, eoK_spie k, eoK_spp k, eoK_withSpie k]
+  subst sw pw
+  k_norm [eo_ret_60, eoK_spie, eoK_spp, eoK_ws, eo_withSpie2]
   have hR2 : eoPins k R2 logAddr r18 (k.regs 19#5) (k.regs 20#5) (k.regs 21#5) := by
     k_norm at hcsw
     refine eoPins_cs k _ R2 _ _ _ _ _ ?_ hcsw
@@ -693,27 +704,34 @@ theorem eo_tail (AC : ACQUIRE) (RE : RELEASE) (WK : WAKEUP)
         | exact p27
   obtain ⟨u2, u8, u9, u18, u19, u20, u21, u22, u23, u24, u25, u26, u27⟩ := id hR2
   -- +0x60 mv a0,s1 ; +0x62 jal release
-  k_step (wp_s_add c _ (KA.«end_op» + 0x60#64) true 10#5 0#5 9#5 (by decide))
+  k_step (wp_s_add cpu _ (KA.«end_op» + 0x60#64) true 10#5 0#5 9#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
-    with [eoK_sie k, KCtx.rget_zero, u9]
+    with [eoK_sie, KCtx.rget_zero, u9]
   iintro Hk Hpc
-  k_step (wp_s_jal c _ (KA.«end_op» + 0x62#64) false 2084496#21 1#5 (by decide))
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [eoK_sie k, eo_br_rel]
+  k_step (wp_s_jal cpu _ (KA.«end_op» + 0x62#64) false 2084496#21 1#5 (by decide))
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [eoK_sie, eo_br_rel]
   iintro Hk Hpc
-  iapply (eo_re RE c _ γ γb γfs cov ls dev ?ha0r ?hsr ?hnr ?hKr ?hrr)
+  iapply (eo_re RE cpu _ γ γb γfs cov ls dev ?ha0r ?hsr ?hnr ?hKr k.sie ?hrr ?hor)
     $$ [- $Hk $Hpc $Hlocked $Hpay]
   rotate_right 1
-  k_norm [eoK_sie k, eo_ret_66, eoK_locks k, eoK_popExit k hsie hlkn]
+  k_norm_g [eo_ret_66, eoK_locks, eoK_popExit_ws k s0 p0 hwf hnoff hlkn]
   iframe #
-  case ha0r => k_norm
-  case hsr => k_norm [eoK_sie k]
-  case hnr => k_norm [eoK_noff k]; omega
-  case hKr => k_norm [eoK_avail k hsie]; omega
-  case hrr => k_norm [eoK_noff k, eoK_intena k]; simp [hnoff, hintena]
-  k_norm [eoK_sie k]
-  iapply wpNext_off_intro
+  isplitl [Harm]
+  · iapply (popArm_sie cpu k _ ?hpp) $$ Harm
+    case hpp => rfl
+  case ha0r => k_norm_g
+  case hsr => rfl
+  case hnr => k_norm_g [eoK_noff] <;> omega
+  case hKr => k_norm_g [eoK_avail']; omega
+  case hrr => k_norm_g [eoK_noff, eoK_intena]; simp [hnoff, hintena]
+  case hor =>
+    intro hon
+    refine ⟨by k_norm_g [eoK_tier, htier], ?_⟩
+    k_norm_g [eoK_avail', hon]; simp [trapRes, kvFrameSlots]
+    unfold endOpSlots installTransSlots breadSlots panicSlots at hK; omega
+  k_next_e
   iintro %R3 Hk Hpc %hcsr
-  k_norm [eoK_sie k, eo_ret_66, eoK_locks k, eoK_popExit k hsie hlkn]
+  k_norm_g [eo_ret_66, eoK_locks, eoK_popExit_ws k s0 p0 hwf hnoff hlkn]
   have hR3 : eoPins k R3 logAddr r18 (k.regs 19#5) (k.regs 20#5) (k.regs 21#5) := by
     k_norm at hcsr
     refine eoPins_cs k _ R3 _ _ _ _ _ ?_ hcsr
@@ -735,11 +753,11 @@ theorem eo_tail (AC : ACQUIRE) (RE : RELEASE) (WK : WAKEUP)
         | exact u27
   obtain ⟨v2, v8, v9, v18, v19, v20, v21, v22, v23, v24, v25, v26, v27⟩ := id hR3
   -- +0x66 j +0x92
-  k_step (wp_s_j c _ (KA.«end_op» + 0x66#64) true 44#21)
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hsie]
+  k_step_e (wp_s_j cpu _ (KA.«end_op» + 0x66#64) true 44#21)
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
-  iapply (eo_exit c k pidv dqp R3 hK hsie v2 v19 v20 v21 v22 v23 v24 v25 v26 v27)
-    $$ [- $Hk $Hpc $Htc $Hcc $Hir $Hpid $Hfr $Hjk $Hnext]
+  iapply (eo_exit cpu k s0 p0 pidv dqp R3 hK v2 v19 v20 v21 v22 v23 v24 v25 v26 v27)
+    $$ [- $Hk $Hpc $Hte $Hce $Hpid $Hfr $Hjk $Hnext]
 
 end
 
@@ -769,12 +787,12 @@ def eoLoopInv (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
       (∀ i, (Lw i).length = BSIZE)⌝ -∗
     kctx c (((k.withSpie a b).pushed 8).withRegs R) -∗
     pcIs c (KA.«end_op» + 0xb4#64) -∗
-    trapCsrs c -∗ cpuClaim c k.proc -∗ intrRes c -∗
+    trapCsrsExt c k.sie -∗ cpuClaimExt c k.sie k.proc -∗
     wordPointsTo (pPid k.proc) 4 dqp pidv -∗
     eoOpen γb γfs cov ls n W L D Lw t -∗
     eoFrame4 (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) (k.regs 9#5) (k.regs 18#5) -∗
     eoFrameS (k.regs 2#5) (k.regs 19#5) (k.regs 20#5) (k.regs 21#5) -∗
-    wpNext true k.proc cpu (eoPost k pidv dqp) -∗
+    (∀ c' : CPU, eoPost k pidv dqp c') -∗
     wpLoop c
 
 theorem eoLoopInv_elim (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
@@ -790,12 +808,12 @@ theorem eoLoopInv_elim (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
           (∀ i, (Lw i).length = BSIZE)⌝ -∗
         kctx c (((k.withSpie a b).pushed 8).withRegs R) -∗
         pcIs c (KA.«end_op» + 0xb4#64) -∗
-        trapCsrs c -∗ cpuClaim c k.proc -∗ intrRes c -∗
+        trapCsrsExt c k.sie -∗ cpuClaimExt c k.sie k.proc -∗
         wordPointsTo (pPid k.proc) 4 dqp pidv -∗
         eoOpen γb γfs cov ls n W L D Lw t -∗
         eoFrame4 (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) (k.regs 9#5) (k.regs 18#5) -∗
         eoFrameS (k.regs 2#5) (k.regs 19#5) (k.regs 20#5) (k.regs 21#5) -∗
-        wpNext true k.proc cpu (eoPost k pidv dqp) -∗
+        (∀ c' : CPU, eoPost k pidv dqp c') -∗
         wpLoop c := by
   unfold eoLoopInv; iintro H; iexact H
 
@@ -811,12 +829,12 @@ theorem eoLoopInv_intro (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
           (∀ i, (Lw i).length = BSIZE)⌝ -∗
         kctx c (((k.withSpie a b).pushed 8).withRegs R) -∗
         pcIs c (KA.«end_op» + 0xb4#64) -∗
-        trapCsrs c -∗ cpuClaim c k.proc -∗ intrRes c -∗
+        trapCsrsExt c k.sie -∗ cpuClaimExt c k.sie k.proc -∗
         wordPointsTo (pPid k.proc) 4 dqp pidv -∗
         eoOpen γb γfs cov ls n W L D Lw t -∗
         eoFrame4 (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) (k.regs 9#5) (k.regs 18#5) -∗
         eoFrameS (k.regs 2#5) (k.regs 19#5) (k.regs 20#5) (k.regs 21#5) -∗
-        wpNext true k.proc cpu (eoPost k pidv dqp) -∗
+        (∀ c' : CPU, eoPost k pidv dqp c') -∗
         wpLoop c) ⊢
       eoLoopInv (GF := GF) Γ cpu k γb γfs cov ls n W pidv dqp := by
   unfold eoLoopInv; iintro H; iexact H
@@ -996,13 +1014,13 @@ set_option maxRecDepth 100000 in
 set_option maxHeartbeats 40000000 in
 theorem eo_commit (WH : WRITE_HEAD) (IT : INSTALL_TRANS) (AC : ACQUIRE) (RE : RELEASE)
     (WK : WAKEUP) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
-    (c : CPU) (k : KCtx) (γ : LogNames) (γl : GName) (γb : BcacheNames) (V : BioView GF)
+    (cpu : CPU) (k : KCtx) (γ : LogNames) (γl : GName) (γb : BcacheNames) (V : BioView GF)
     (γdl : GName) (γfs : FsNames) (pd pav pu : BitVec 64) (j ls n : Nat) (dev : BitVec 32)
     (W : List (BitVec 32)) (L : BlockMap) (D : RegMapF Bool) (Lw : Nat → List (BitVec 8))
     (pidv : BitVec 32) (dqp : DFrac) (R : RegMap) (a b : Bool) (s9 s19 : BitVec 64)
     (hj : j < NPROC) (hproc : k.proc = procAddr j) (hK : endOpSlots ≤ k.avail)
-    (hsie : k.sie = false) (hnoff : k.noff = 0) (hlocks : k.locks = [])
-    (htier : k.tier = KTier.kpt) (hintena : k.intena = false)
+    (hwf : k.wf) (hnoff : k.noff = 0) (hlocks : k.locks = [])
+    (htier : k.tier = KTier.kpt) (hintena : k.intena = k.sie)
     (hgeom : logGeomOk V.cov ls) (hdev : dev = V.dev)
     (hcl : V.clean = fsMclean γfs) (hdt : V.dirty = fsMdirty γfs)
     (hnW : n = W.length) (hnL : n ≤ LOGBLOCKS)
@@ -1013,16 +1031,16 @@ theorem eo_commit (WH : WRITE_HEAD) (IT : INSTALL_TRANS) (AC : ACQUIRE) (RE : RE
       PartialMap.get? L w.toNat = some (Lw i))
     (hLwlen : ∀ i, (Lw i).length = BSIZE)
     (hfix : eoPins k R s9 (BitVec.ofNat 64 n) s19 logAddr (lhBlock n)) :
-    kctx c (((k.withSpie a b).pushed 8).withRegs R) ∗ pcIs c (KA.«end_op» + 0x104#64) ∗
+    kctx cpu (((k.withSpie a b).pushed 8).withRegs R) ∗ pcIs cpu (KA.«end_op» + 0x104#64) ∗
     procsInv Γ ∗ bioCtx γl γb V ∗ diskCaps V.gd γdl pd pav pu ∗ panicEnv ∗
     logCtx γ γb γfs V.cov ls dev ∗
-    trapCsrs c ∗ cpuClaim c k.proc ∗ intrRes c ∗
+    trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗
     wordPointsTo (pPid k.proc) 4 dqp pidv ∗
     eoOpen γb γfs V.cov ls n W L D Lw n ∗
     eoFrame4 (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) (k.regs 9#5) (k.regs 18#5) ∗
     eoFrameS (k.regs 2#5) (k.regs 19#5) (k.regs 20#5) (k.regs 21#5) ∗
-    wpNext true k.proc c (eoPost k pidv dqp)
-    ⊢ wpLoop (GF := GF) c := by
+    (∀ c' : CPU, eoPost k pidv dqp c')
+    ⊢ wpLoop (GF := GF) cpu := by
   have hK' : 8 + (10 + breadSlots) ≤ k.avail := by
     unfold endOpSlots installTransSlots at hK; exact hK
   have hK8 : 8 ≤ k.avail := by omega
@@ -1035,7 +1053,7 @@ theorem eo_commit (WH : WRITE_HEAD) (IT : INSTALL_TRANS) (AC : ACQUIRE) (RE : RE
   have hhdrne : ∀ (i : Nat) (w : BitVec 32), W[i]? = some w → logHdrBno ls ≠ w.toNat := by
     intro i w hw
     exact eo_hdr_ne V.cov ls w (hhome w (List.mem_of_getElem? hw))
-  iintro ⟨Hk, Hpc, #Hpi, #Hbc, #Hdc, #Hpe, #Hctx, Htc, Hcl, Hir, Hpid, Hopen, Hfr, HfrS, Hnext⟩
+  iintro ⟨Hk, Hpc, #Hpi, #Hbc, #Hdc, #Hpe, #Hctx, Hte, Hce, Hpid, Hopen, Hfr, HfrS, Hnext⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
   ihave #Hfroz := logCtx_frozen γ γb γfs V.cov ls dev $$ Hctx
   -- the byte view's invariant, off the context every log function threads
@@ -1052,38 +1070,33 @@ theorem eo_commit (WH : WRITE_HEAD) (IT : INSTALL_TRANS) (AC : ACQUIRE) (RE : RE
   -- one slot unit for the first `write_head`
   icases bslots_uncons γb ((LOGBLOCKS - n) + 1) $$ Hpool with ⟨Hu1, Hpool⟩
   -- ===== +0x104  jal write_head =====
-  k_step (wp_s_jal c _ (KA.«end_op» + 0x104#64) false 2096324#21 1#5 (by decide))
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hsie, eo_br_wh]
+  k_step_e (wp_s_jal cpu _ (KA.«end_op» + 0x104#64) false 2096324#21 1#5 (by decide))
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [eo_br_wh]
   iintro Hk Hpc
-  iapply (eo_wh WH Γ c _ γl γb V γdl γfs pd pav pu j ls dev n W L pidv dqp
-      k.proc (by k_norm_g)
-      hj ?wproc ?wK ?wsie ?wnoff ?wlocks ?wtier hgeom hdev hcl hdt ⟨hnW, hnL⟩ hpd)
-    $$ [- $Hk $Hpc $Hpi $Htc $Hcl $Hir $Hbc $Hdc $Hpe $Hfroz $Hpid $HlhN $Hblk $Hauth $Hhdr $Hu1]
+  iapply (eo_wh WH Γ cpu _ γl γb V γdl γfs pd pav pu j ls dev n W L pidv dqp
+      k.proc (by k_norm_g) k.sie (by k_norm_g)
+      hj ?wproc ?wK ?wnoff ?wtier hgeom hdev hcl hdt ⟨hnW, hnL⟩ hpd)
+    $$ [- $Hk $Hpc $Hpi $Hte $Hce $Hbc $Hdc $Hpe $Hfroz $Hpid $HlhN $Hblk $Hauth $Hhdr $Hu1]
   rotate_right 1
   k_norm_g [eo_ret_108]
   iframe #
   case wproc => k_norm_g; exact hproc
   case wK => k_norm_g; omega
-  case wsie => k_norm_g; exact hsie
   case wnoff => k_norm_g; exact hnoff
-  case wlocks => k_norm_g; exact hlocks
   case wtier => k_norm_g; exact htier
   iapply wpNext_intro_pin
-  iintro %c1 %hq1 %sp1 %pp1 %R1 %bs1 %hcs1 Hk Hpc Htc Hcl Hir Hpid HlhN Hblk Hauth Hhdr %hbs1 Hu1
+  iintro %cpu %_ %sp1 %pp1 %R1 %bs1 %hcs1 Hk Hpc Hte Hce Hpid HlhN Hblk Hauth Hhdr %hbs1 Hu1
   k_norm_g [eo_ret_108, eo_ctx_collapse, eo_spie_pushed]
-  ihave Hnext := wpNext_shift true k.proc c c1 _
-    (fun h => h.elim (fun h => absurd h (by decide))
-      (fun h => absurd h (by rw [hproc]; exact procAddr_nonzero hj))) $$ Hnext
   have hfix1 : eoPins k R1 s9 (BitVec.ofNat 64 n) s19 logAddr (lhBlock n) := by
-    k_norm at hcs1
+    k_norm_g at hcs1
     refine eoPins_cs k _ R1 _ _ _ _ _ ?_ hcs1
     refine eoPins_set k R _ _ _ _ _ hfix 1#5 _ (by decide)
   -- ===== +0x108  li a0,0 ; +0x10a  jal install_trans =====
-  k_step (wp_s_addi c1 _ (KA.«end_op» + 0x108#64) true 0#12 10#5 0#5 (by decide))
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hsie, KCtx.rget_zero]
+  k_step_e (wp_s_addi cpu _ (KA.«end_op» + 0x108#64) true 0#12 10#5 0#5 (by decide))
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [KCtx.rget_zero]
   iintro Hk Hpc
-  k_step (wp_s_jal c1 _ (KA.«end_op» + 0x10a#64) false 2096412#21 1#5 (by decide))
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hsie, eo_br_it]
+  k_step_e (wp_s_jal cpu _ (KA.«end_op» + 0x10a#64) false 2096412#21 1#5 (by decide))
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [eo_br_it]
   iintro Hk Hpc
   -- the per-entry rows, assembled
   icases bslots_uncons γb (LOGBLOCKS - n) $$ Hpool with ⟨Hu2, Hpool⟩
@@ -1102,21 +1115,19 @@ theorem eo_commit (WH : WRITE_HEAD) (IT : INSTALL_TRANS) (AC : ACQUIRE) (RE : RE
       (fun i _ => fsChalf γfs (logSlotBno ls i) (Lw i)) (fun i x => .rfl)) $$ Hdone
   ihave Hrows := eo_rows_pack γfs ls W Lw true $$ [Hdone Hdirt]
   case' _ => iframe Hdone Hdirt
-  iapply (eo_it IT Γ c1 _ γl γb V γdl γfs pd pav pu j ls dev n W Lw
+  iapply (eo_it IT Γ cpu _ γl γb V γdl γfs pd pav pu j ls dev n W Lw
       (PartialMap.insert L (logHdrBno ls) bs1) D pidv dqp
-      (fsHomeList V.cov ls) Xv ([] : List Nat) k.proc (by k_norm_g)
-      hj ?iproc ?iK ?isie ?inoff ?ilocks ?itier hgeom hdev hcl hdt ?ia0 ⟨hnW, hnL⟩
+      (fsHomeList V.cov ls) Xv ([] : List Nat) k.proc (by k_norm_g) k.sie (by k_norm_g)
+      hj ?iproc ?iK ?inoff ?itier hgeom hdev hcl hdt ?ia0 ⟨hnW, hnL⟩
       (eo_nodup_inj W hnodup) hhome hLwlen ?icommit hpd)
-    $$ [- $Hk $Hpc $Hpi $Htc $Hcl $Hir $Hbc $Hdc $Hpe $Hfroz $Hbinv $Hpid $HlhN $Hblk $Hauth
+    $$ [- $Hk $Hpc $Hpi $Hte $Hce $Hbc $Hdc $Hpe $Hfroz $Hbinv $Hpid $HlhN $Hblk $Hauth
         $Hdirty $Hrows $Hu12]
   rotate_right 1
   k_norm_g [eo_ret_10e]
   iframe #
   case iproc => k_norm_g; exact hproc
   case iK => k_norm_g; omega
-  case isie => k_norm_g; exact hsie
   case inoff => k_norm_g; exact hnoff
-  case ilocks => k_norm_g; exact hlocks
   case itier => k_norm_g; exact htier
   case ia0 => k_norm_g
   case icommit =>
@@ -1124,11 +1135,11 @@ theorem eo_commit (WH : WRITE_HEAD) (IT : INSTALL_TRANS) (AC : ACQUIRE) (RE : RE
     rw [get?_insert_ne (hhdrne i w hw)]
     exact hLw i w hw
   iapply wpNext_intro_pin
-  iintro %c2 %hq2 %sp2 %pp2 %R2 %hcs2 Hk Hpc Htc Hcl Hir Hpid HlhN Hblk - Hauth Hdirty Hrows
+  iintro %cpu %_ %sp2 %pp2 %R2 %hcs2 Hk Hpc Hte Hce Hpid HlhN Hblk - Hauth Hdirty Hrows
     Hu12
   k_norm_g [eo_ret_10e, eo_ctx_collapse, eo_spie_pushed]
   have hfix2 : eoPins k R2 s9 (BitVec.ofNat 64 n) s19 logAddr (lhBlock n) := by
-    k_norm at hcs2
+    k_norm_g at hcs2
     refine eoPins_cs k _ R2 _ _ _ _ _ ?_ hcs2
     refine eoPins_set k _ _ _ _ _ _ (eoPins_set k R1 _ _ _ _ _ hfix1 10#5 _ (by decide))
       1#5 _ (by decide)
@@ -1143,12 +1154,12 @@ theorem eo_commit (WH : WRITE_HEAD) (IT : INSTALL_TRANS) (AC : ACQUIRE) (RE : RE
     exact eo_idx_range W (fun i _ => fsChalf γfs (logSlotBno ls i) (Lw i))
       (fun i => fsChalf γfs (logSlotBno ls i) (Lw i)) (fun i x => .rfl)) $$ Hdone
   -- ===== +0x10e  auipc a5,0x1e ; +0x112  sw zero,1328(a5) =====
-  k_step (wp_s_auipc c2 _ (KA.«end_op» + 0x10e#64) false 0x1e#20 15#5 (by decide))
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hsie]
+  k_step_e (wp_s_auipc cpu _ (KA.«end_op» + 0x10e#64) false 0x1e#20 15#5 (by decide))
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
-  k_step (wp_s_sw c2 _ (KA.«end_op» + 0x112#64) false 1328#12 15#5 0#5 (by decide)
+  k_step_e (wp_s_sw cpu _ (KA.«end_op» + 0x112#64) false 1328#12 15#5 0#5 (by decide)
       (BitVec.ofNat 32 n))
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hsie, eo_lhn, KCtx.rget_zero]
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [eo_lhn, KCtx.rget_zero]
   iintro Hk Hpc HlhN
   -- ===== +0x116  jal write_head, at the emptied header =====
   ihave Hpool := bslots_add γb (2 + W.length) (LOGBLOCKS - n) $$ [Hu12 Hpool]
@@ -1161,34 +1172,26 @@ theorem eo_commit (WH : WRITE_HEAD) (IT : INSTALL_TRANS) (AC : ACQUIRE) (RE : RE
   ihave Hblk0 : ([∗list] i ↦ w ∈ ([] : List (BitVec 32)),
       wordPointsTo (GF := GF) (lhBlock i) 4 (DFrac.own 1) w) $$ []
   case' _ => iapply BigSepL.bigSepL_nil.2; iempintro
-  k_step (wp_s_jal c2 _ (KA.«end_op» + 0x116#64) false 2096306#21 1#5 (by decide))
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hsie, eo_br_wh]
+  k_step_e (wp_s_jal cpu _ (KA.«end_op» + 0x116#64) false 2096306#21 1#5 (by decide))
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [eo_br_wh]
   iintro Hk Hpc
-  iapply (eo_wh WH Γ c2 _ γl γb V γdl γfs pd pav pu j ls dev 0 ([] : List (BitVec 32))
-      (PartialMap.insert L (logHdrBno ls) bs1) pidv dqp k.proc (by k_norm_g)
-      hj ?vproc ?vK ?vsie ?vnoff ?vlocks ?vtier hgeom hdev hcl hdt ⟨rfl, by omega⟩ hpd)
-    $$ [- $Hk $Hpc $Hpi $Htc $Hcl $Hir $Hbc $Hdc $Hpe $Hfroz $Hpid $HlhN $Hblk0 $Hauth $Hhdr
+  iapply (eo_wh WH Γ cpu _ γl γb V γdl γfs pd pav pu j ls dev 0 ([] : List (BitVec 32))
+      (PartialMap.insert L (logHdrBno ls) bs1) pidv dqp k.proc (by k_norm_g) k.sie (by k_norm_g)
+      hj ?vproc ?vK ?vnoff ?vtier hgeom hdev hcl hdt ⟨rfl, by omega⟩ hpd)
+    $$ [- $Hk $Hpc $Hpi $Hte $Hce $Hbc $Hdc $Hpe $Hfroz $Hpid $HlhN $Hblk0 $Hauth $Hhdr
         $Hu3]
   rotate_right 1
   k_norm_g [eo_ret_11a]
   iframe #
   case vproc => k_norm_g; exact hproc
   case vK => k_norm_g; omega
-  case vsie => k_norm_g; exact hsie
   case vnoff => k_norm_g; exact hnoff
-  case vlocks => k_norm_g; exact hlocks
   case vtier => k_norm_g; exact htier
   iapply wpNext_intro_pin
-  iintro %c3 %hq3 %sp3 %pp3 %R3 %bs2 %hcs3 Hk Hpc Htc Hcl Hir Hpid HlhN Hblk0 Hauth Hhdr %hbs2 Hu3
+  iintro %cpu %_ %sp3 %pp3 %R3 %bs2 %hcs3 Hk Hpc Hte Hce Hpid HlhN Hblk0 Hauth Hhdr %hbs2 Hu3
   k_norm_g [eo_ret_11a, eo_ctx_collapse, eo_spie_pushed]
-  ihave Hnext := wpNext_shift true k.proc c1 c2 _
-    (fun h => h.elim (fun h => absurd h (by decide))
-      (fun h => absurd h (by rw [hproc]; exact procAddr_nonzero hj))) $$ Hnext
-  ihave Hnext := wpNext_shift true k.proc c2 c3 _
-    (fun h => h.elim (fun h => absurd h (by decide))
-      (fun h => absurd h (by rw [hproc]; exact procAddr_nonzero hj))) $$ Hnext
   have hfix3 : eoPins k R3 s9 (BitVec.ofNat 64 n) s19 logAddr (lhBlock n) := by
-    k_norm at hcs3
+    k_norm_g at hcs3
     refine eoPins_cs k _ R3 _ _ _ _ _ ?_ hcs3
     refine eoPins_set k R2 _ _ _ _ _ hfix2 1#5 _ (by decide)
   obtain ⟨h32, h38, h39, h318, h319, h320, h321, h322, h323, h324, h325, h326, h327⟩ := id hfix3
@@ -1226,17 +1229,17 @@ theorem eo_commit (WH : WRITE_HEAD) (IT : INSTALL_TRANS) (AC : ACQUIRE) (RE : RE
       wordPointsTo ((k.regs 2#5) + 0xFFFFFFFFFFFFFFC8#64) 8 (DFrac.own 1) (k.regs 21#5) ∗
       (∃ w : BitVec 64, wordPointsTo ((k.regs 2#5) + 0xFFFFFFFFFFFFFFC0#64) 8 (DFrac.own 1) w)
       from by unfold eoFrameS; iintro H; iexact H) $$ HfrS with ⟨Hs3, Hs4, Hs5, Hs8⟩
-  k_step (wp_s_ld c3 _ (KA.«end_op» + 0x11a#64) true 24#12 19#5 2#5 (by decide) (by decide)
+  k_step_e (wp_s_ld cpu _ (KA.«end_op» + 0x11a#64) true 24#12 19#5 2#5 (by decide) (by decide)
       (DFrac.own 1) (k.regs 19#5))
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hsie, h32]
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h32]
   iintro Hk Hpc Hs3
-  k_step (wp_s_ld c3 _ (KA.«end_op» + 0x11c#64) true 16#12 20#5 2#5 (by decide) (by decide)
+  k_step_e (wp_s_ld cpu _ (KA.«end_op» + 0x11c#64) true 16#12 20#5 2#5 (by decide) (by decide)
       (DFrac.own 1) (k.regs 20#5))
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hsie, h32]
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h32]
   iintro Hk Hpc Hs4
-  k_step (wp_s_ld c3 _ (KA.«end_op» + 0x11e#64) true 8#12 21#5 2#5 (by decide) (by decide)
+  k_step_e (wp_s_ld cpu _ (KA.«end_op» + 0x11e#64) true 8#12 21#5 2#5 (by decide) (by decide)
       (DFrac.own 1) (k.regs 21#5))
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hsie, h32]
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h32]
   iintro Hk Hpc Hs5
   ihave HfrJ := (show
       wordPointsTo (GF := GF) ((k.regs 2#5) + 0xFFFFFFFFFFFFFFD8#64) 8 (DFrac.own 1) (k.regs 19#5) ∗
@@ -1255,28 +1258,14 @@ theorem eo_commit (WH : WRITE_HEAD) (IT : INSTALL_TRANS) (AC : ACQUIRE) (RE : RE
     iexact H4) $$ [Hs3 Hs4 Hs5 Hs8]
   case' _ => iframe Hs3 Hs4 Hs5 Hs8
   -- ===== +0x120  j +0x42 =====
-  k_step (wp_s_j c3 _ (KA.«end_op» + 0x120#64) true 2096930#21)
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hsie]
+  k_step_e (wp_s_j cpu _ (KA.«end_op» + 0x120#64) true 2096930#21)
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
-  ihave Hcl := (show cpuClaim (GF := GF) c3 k.proc ⊢
-      cpuClaim c3 (k.withSpie sp3 pp3).proc from .rfl) $$ Hcl
-  ihave Hpid := (show wordPointsTo (GF := GF) (pPid k.proc) 4 dqp pidv ⊢
-      wordPointsTo (pPid (k.withSpie sp3 pp3).proc) 4 dqp pidv from .rfl) $$ Hpid
-  ihave Hnext := (show wpNext (GF := GF) true k.proc c3 (eoPost k pidv dqp) ⊢
-      wpNext true (k.withSpie sp3 pp3).proc c3
-        (eoPost (k.withSpie sp3 pp3) pidv dqp) from .rfl) $$ Hnext
-  ihave Hfr := (show eoFrame4 (GF := GF) (k.regs 2#5) (k.regs 1#5) (k.regs 8#5)
-      (k.regs 9#5) (k.regs 18#5) ⊢
-      eoFrame4 ((k.withSpie sp3 pp3).regs 2#5) ((k.withSpie sp3 pp3).regs 1#5)
-        ((k.withSpie sp3 pp3).regs 8#5) ((k.withSpie sp3 pp3).regs 9#5)
-        ((k.withSpie sp3 pp3).regs 18#5) from .rfl) $$ Hfr
-  ihave HfrJ := (show eoFrameJ (GF := GF) (k.regs 2#5) ⊢
-      eoFrameJ ((k.withSpie sp3 pp3).regs 2#5) from .rfl) $$ HfrJ
-  iapply (eo_tail AC RE WK Γ c3 (k.withSpie sp3 pp3) γ γb γfs V.cov ls dev
+  iapply (eo_tail AC RE WK Γ cpu k sp3 pp3 γ γb γfs V.cov ls dev
       (PartialMap.insert (PartialMap.insert L (logHdrBno ls) bs1) (logHdrBno ls) bs2)
       (dirtyClear D (W.map (fun w => w.toNat))) Lw n pidv dqp _ s9 (BitVec.ofNat 64 n)
-      hK hsie hnoff hlocks htier hintena (by omega) ?htR)
-    $$ [- $Hk $Hpc $Hpi $Htc $Hcl $Hir $Hctx $Hopen $Hfr $HfrJ $Hpid $Hnext]
+      hK hwf hnoff hlocks htier hintena (by omega) ?htR)
+    $$ [- $Hk $Hpc $Hpi $Hte $Hce $Hctx $Hopen $Hfr $HfrJ $Hpid $Hnext]
   case htR =>
     refine ⟨?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_⟩ <;>
       simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true, KCtx.withSpie_regs] <;>
@@ -1411,12 +1400,12 @@ and the back-edge test. -/
 theorem eo_body (BR : BREAD) (BW : BWRITE) (BE : BRELSE) (MM : MEMMOVE)
     (WH : WRITE_HEAD) (IT : INSTALL_TRANS) (AC : ACQUIRE) (RE : RELEASE) (WK : WAKEUP)
     (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
-    (cpu c : CPU) (k : KCtx) (γ : LogNames) (γl : GName) (γb : BcacheNames) (V : BioView GF)
+    (c0 cpu : CPU) (k : KCtx) (γ : LogNames) (γl : GName) (γb : BcacheNames) (V : BioView GF)
     (γdl : GName) (γfs : FsNames) (pd pav pu : BitVec 64) (j ls n : Nat) (dev : BitVec 32)
     (W : List (BitVec 32)) (pidv : BitVec 32) (dqp : DFrac)
     (hj : j < NPROC) (hproc : k.proc = procAddr j) (hK : endOpSlots ≤ k.avail)
-    (hsie : k.sie = false) (hnoff : k.noff = 0) (hlocks : k.locks = [])
-    (htier : k.tier = KTier.kpt) (hintena : k.intena = false)
+    (hwf : k.wf) (hnoff : k.noff = 0) (hlocks : k.locks = [])
+    (htier : k.tier = KTier.kpt) (hintena : k.intena = k.sie)
     (hgeom : logGeomOk V.cov ls) (hdev : dev = V.dev)
     (hcl : V.clean = fsMclean γfs) (hdt : V.dirty = fsMdirty γfs)
     (hnW : n = W.length) (hnL : n ≤ LOGBLOCKS)
@@ -1428,17 +1417,17 @@ theorem eo_body (BR : BREAD) (BW : BWRITE) (BE : BRELSE) (MM : MEMMOVE)
     (hLw : ∀ (i : Nat) (w : BitVec 32), i < t → W[i]? = some w →
       PartialMap.get? L w.toNat = some (Lw i))
     (hLwlen : ∀ i, (Lw i).length = BSIZE) :
-    kctx c (((k.withSpie a b).pushed 8).withRegs R) ∗ pcIs c (KA.«end_op» + 0xb4#64) ∗
+    kctx cpu (((k.withSpie a b).pushed 8).withRegs R) ∗ pcIs cpu (KA.«end_op» + 0xb4#64) ∗
     procsInv Γ ∗ bioCtx γl γb V ∗ diskCaps V.gd γdl pd pav pu ∗ panicEnv ∗
     logCtx γ γb γfs V.cov ls dev ∗
-    trapCsrs c ∗ cpuClaim c k.proc ∗ intrRes c ∗
+    trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗
     wordPointsTo (pPid k.proc) 4 dqp pidv ∗
     eoOpen γb γfs V.cov ls n W L D Lw t ∗
     eoFrame4 (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) (k.regs 9#5) (k.regs 18#5) ∗
     eoFrameS (k.regs 2#5) (k.regs 19#5) (k.regs 20#5) (k.regs 21#5) ∗
-    wpNext true k.proc cpu (eoPost k pidv dqp) ∗
-    ▷ eoLoopInv Γ cpu k γb γfs V.cov ls n W pidv dqp
-    ⊢ wpLoop (GF := GF) c := by
+    (∀ c' : CPU, eoPost k pidv dqp c') ∗
+    ▷ eoLoopInv Γ c0 k γb γfs V.cov ls n W pidv dqp
+    ⊢ wpLoop (GF := GF) cpu := by
   have hK' : 8 + (10 + breadSlots) ≤ k.avail := by
     unfold endOpSlots installTransSlots at hK; exact hK
   have hK8 : 8 ≤ k.avail := by omega
@@ -1458,7 +1447,7 @@ theorem eo_body (BR : BREAD) (BW : BWRITE) (BE : BRELSE) (MM : MEMMOVE)
   have hbnoS : (BitVec.ofNat 32 (logSlotBno ls t)).toNat = logSlotBno ls t := by
     simp only [BitVec.toNat_ofNat]; omega
   have hslotne : logSlotBno ls t ≠ wt.toNat := eo_slot_ne V.cov ls t wt htL (hhome wt hwtmem)
-  iintro ⟨Hk, Hpc, #Hpi, #Hbc, #Hdc, #Hpe, #Hctx, Htc, Hcl, Hir, Hpid, Hopen, Hfr, HfrS,
+  iintro ⟨Hk, Hpc, #Hpi, #Hbc, #Hdc, #Hpe, #Hctx, Hte, Hce, Hpid, Hopen, Hfr, HfrS,
     Hnext, IH⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
   ihave #Hfroz := logCtx_frozen γ γb γfs V.cov ls dev $$ Hctx
@@ -1474,118 +1463,114 @@ theorem eo_body (BR : BREAD) (BW : BWRITE) (BE : BRELSE) (MM : MEMMOVE)
     wordPointsTo (GF := GF) (lhBlock i) 4 (DFrac.own 1) w) hwt $$ Hblk with ⟨Hcell, Hcellback⟩
   obtain ⟨p2, p8, p9, p18, p19, p20, p21, p22, p23, p24, p25, p26, p27⟩ := id hfix
   -- ===== +0xb4  lw a1,24(s4) ; addw a1,a1,s2 ; addiw a1,a1,1 ; lw a0,36(s4) ; jal bread
-  iapply (wp_s_lw c _ (KA.«end_op» + 0xb4#64) false 24#12 11#5 20#5 (by decide) (by decide)
+  iapply (wp_s_lw cpu _ (KA.«end_op» + 0xb4#64) false 24#12 11#5 20#5 (by decide) (by decide)
       DFrac.discard (BitVec.ofNat 32 ls)) $$ [- $Hk $Hpc]
   rotate_right 1
   k_code (text_instr _ _ _ _ rfl rfl) Htext
   iframe #
-  k_norm [hsie, p20, eo_o_start]
+  k_norm_g [p20, eo_o_start]
   iframe Hstartc
   inext
-  k_norm [hsie, p20, eo_o_start]
-  iapply wpNext_off_intro
+  k_norm_g [p20, eo_o_start]
+  k_next_e
   iintro Hk Hpc -
-  k_step (wp_s_addw c _ (KA.«end_op» + 0xb8#64) false 11#5 11#5 18#5 (by decide))
+  k_step_e (wp_s_addw cpu _ (KA.«end_op» + 0xb8#64) false 11#5 11#5 18#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
-    with [hsie, p18, eo_sext32 ls hls31]
+    with [p18, eo_sext32 ls hls31]
   iintro Hk Hpc
-  k_step (wp_s_addiw c _ (KA.«end_op» + 0xbc#64) true 1#12 11#5 11#5 (by decide))
+  k_step_e (wp_s_addiw cpu _ (KA.«end_op» + 0xbc#64) true 1#12 11#5 11#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
-    with [hsie, eo_slotaddr2 ls t hls31 ht31 hbs]
+    with [eo_slotaddr2 ls t hls31 ht31 hbs]
   iintro Hk Hpc
-  iapply (wp_s_lw c _ (KA.«end_op» + 0xbe#64) false 36#12 10#5 20#5 (by decide) (by decide)
+  iapply (wp_s_lw cpu _ (KA.«end_op» + 0xbe#64) false 36#12 10#5 20#5 (by decide) (by decide)
       DFrac.discard dev) $$ [- $Hk $Hpc]
   rotate_right 1
   k_code (text_instr _ _ _ _ rfl rfl) Htext
   iframe #
-  k_norm [hsie, p20, eo_o_dev]
+  k_norm_g [p20, eo_o_dev]
   iframe Hdevc
   inext
-  k_norm [hsie, p20, eo_o_dev]
-  iapply wpNext_off_intro
+  k_norm_g [p20, eo_o_dev]
+  k_next_e
   iintro Hk Hpc -
-  k_step (wp_s_jal c _ (KA.«end_op» + 0xc2#64) false 2092464#21 1#5 (by decide))
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hsie, eo_br_bread]
+  k_step_e (wp_s_jal cpu _ (KA.«end_op» + 0xc2#64) false 2092464#21 1#5 (by decide))
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [eo_br_bread]
   iintro Hk Hpc
-  iapply (bread_call BR Γ c _ γl γb V γdl pd pav pu j pidv dev
-      (BitVec.ofNat 32 (logSlotBno ls t)) dqp k.proc (by k_norm_g) hj ?qproc ?qK ?qsie ?qnoff
-      ?qlocks ?qtier ?qbno ?qcov hdev hpd ?qa0 ?qa1)
-    $$ [- $Hk $Hpc $Hpi $Htc $Hcl $Hir $Hbc $Hdc $Hpe $Hpid $Hu1]
+  iapply (bread_call_eb BR Γ cpu _ γl γb V γdl pd pav pu j pidv dev
+      (BitVec.ofNat 32 (logSlotBno ls t)) dqp k.proc (by k_norm_g) k.sie (by k_norm_g) hj ?qproc ?qK ?qnoff
+      ?qtier ?qbno ?qcov hdev hpd ?qa0 ?qa1)
+    $$ [- $Hk $Hpc $Hpi $Hte $Hce $Hbc $Hdc $Hpe $Hpid $Hu1]
   rotate_right 1
   k_norm_g [eo_ret_c6]
   iframe #
   case qproc => k_norm_g; exact hproc
   case qK => k_norm_g; omega
-  case qsie => k_norm_g; exact hsie
   case qnoff => k_norm_g; exact hnoff
-  case qlocks => k_norm_g; exact hlocks
   case qtier => k_norm_g; exact htier
   case qbno => rw [hbnoS]; exact hbs
   case qcov => rw [hbnoS]; exact hcovs
   case qa0 => k_norm_g
   case qa1 => k_norm_g
   iapply wpNext_intro_pin
-  iintro %c1 %hq1 %sp1 %pp1 %R1 %kkL %bsL %bsdL %dL %hcs1 Hk Hpc Htc Hcl Hir Hpid HlockL
+  iintro %cpu %_ %sp1 %pp1 %R1 %kkL %bsL %bsdL %dL %hcs1 Hk Hpc Hte Hce Hpid HlockL
   k_norm_g [eo_ret_c6, eo_ctx_collapse, eo_spie_pushed]
   obtain ⟨hcs1a, hcs1b⟩ := hcs1
   have hfix1 : eoPins k R1 s9 (BitVec.ofNat 64 t) s19 logAddr (lhBlock t) := by
-    k_norm at hcs1a
+    k_norm_g at hcs1a
     refine eoPins_cs k _ R1 _ _ _ _ _ ?_ hcs1a
     refine eoPins_set k _ _ _ _ _ _ (eoPins_set k _ _ _ _ _ _
       (eoPins_set k _ _ _ _ _ _ (eoPins_set k R _ _ _ _ _ hfix 11#5 _ (by decide))
         11#5 _ (by decide)) 10#5 _ (by decide)) 1#5 _ (by decide)
   -- ===== +0xc6  mv s1,a0 ; lw a1,0(s5) ; lw a0,36(s4) ; jal bread
-  k_step (wp_s_add c1 _ (KA.«end_op» + 0xc6#64) true 9#5 0#5 10#5 (by decide))
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hsie, KCtx.rget_zero, hcs1b]
+  k_step_e (wp_s_add cpu _ (KA.«end_op» + 0xc6#64) true 9#5 0#5 10#5 (by decide))
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [KCtx.rget_zero, hcs1b]
   iintro Hk Hpc
   have hfix2 : eoPins k (R1.set 9#5 (bnode kkL)) (bnode kkL) (BitVec.ofNat 64 t) s19 logAddr
       (lhBlock t) := eoPins_set9 k R1 _ _ _ _ _ _ hfix1
   obtain ⟨y2, y8, y9, y18, y19, y20, y21, y22, y23, y24, y25, y26, y27⟩ := id hfix1
   obtain ⟨q2, q8, q9, q18, q19, q20, q21, q22, q23, q24, q25, q26, q27⟩ := id hfix2
-  k_step (wp_s_lw c1 _ (KA.«end_op» + 0xc8#64) false 0#12 11#5 21#5 (by decide) (by decide)
+  k_step_e (wp_s_lw cpu _ (KA.«end_op» + 0xc8#64) false 0#12 11#5 21#5 (by decide) (by decide)
       (DFrac.own 1) wt)
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hsie, y21]
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [y21]
   iintro Hk Hpc Hcell
-  iapply (wp_s_lw c1 _ (KA.«end_op» + 0xcc#64) false 36#12 10#5 20#5 (by decide) (by decide)
+  iapply (wp_s_lw cpu _ (KA.«end_op» + 0xcc#64) false 36#12 10#5 20#5 (by decide) (by decide)
       DFrac.discard dev) $$ [- $Hk $Hpc]
   rotate_right 1
   k_code (text_instr _ _ _ _ rfl rfl) Htext
   iframe #
-  k_norm [hsie, y20, eo_o_dev]
+  k_norm_g [y20, eo_o_dev]
   iframe Hdevc
   inext
-  k_norm [hsie, y20, eo_o_dev]
-  iapply wpNext_off_intro
+  k_norm_g [y20, eo_o_dev]
+  k_next_e
   iintro Hk Hpc -
-  k_step (wp_s_jal c1 _ (KA.«end_op» + 0xd0#64) false 2092450#21 1#5 (by decide))
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hsie, eo_br_bread]
+  k_step_e (wp_s_jal cpu _ (KA.«end_op» + 0xd0#64) false 2092450#21 1#5 (by decide))
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [eo_br_bread]
   iintro Hk Hpc
-  iapply (bread_call BR Γ c1 _ γl γb V γdl pd pav pu j pidv dev wt dqp k.proc (by k_norm_g)
-      hj ?rproc ?rK ?rsie ?rnoff ?rlocks ?rtier hbw hcovw hdev hpd ?ra0 ?ra1)
-    $$ [- $Hk $Hpc $Hpi $Htc $Hcl $Hir $Hbc $Hdc $Hpe $Hpid $Hu2]
+  iapply (bread_call_eb BR Γ cpu _ γl γb V γdl pd pav pu j pidv dev wt dqp k.proc (by k_norm_g)
+      k.sie (by k_norm_g) hj ?rproc ?rK ?rnoff ?rtier hbw hcovw hdev hpd ?ra0 ?ra1)
+    $$ [- $Hk $Hpc $Hpi $Hte $Hce $Hbc $Hdc $Hpe $Hpid $Hu2]
   rotate_right 1
   k_norm_g [eo_ret_d4]
   iframe #
   case rproc => k_norm_g; exact hproc
   case rK => k_norm_g; omega
-  case rsie => k_norm_g; exact hsie
   case rnoff => k_norm_g; exact hnoff
-  case rlocks => k_norm_g; exact hlocks
   case rtier => k_norm_g; exact htier
   case ra0 => k_norm_g
   case ra1 => k_norm_g
   iapply wpNext_intro_pin
-  iintro %c2 %hq2 %sp2 %pp2 %R2 %kkD %bsD %bsdD %dD %hcs2 Hk Hpc Htc Hcl Hir Hpid HlockD
+  iintro %cpu %_ %sp2 %pp2 %R2 %kkD %bsD %bsdD %dD %hcs2 Hk Hpc Hte Hce Hpid HlockD
   k_norm_g [eo_ret_d4, eo_ctx_collapse, eo_spie_pushed]
   obtain ⟨hcs2a, hcs2b⟩ := hcs2
   have hfix3 : eoPins k R2 (bnode kkL) (BitVec.ofNat 64 t) s19 logAddr (lhBlock t) := by
-    k_norm at hcs2a
+    k_norm_g at hcs2a
     refine eoPins_cs k _ R2 _ _ _ _ _ ?_ hcs2a
     refine eoPins_set k _ _ _ _ _ _ (eoPins_set k _ _ _ _ _ _
       (eoPins_set k _ _ _ _ _ _ hfix2 11#5 _ (by decide)) 10#5 _ (by decide)) 1#5 _ (by decide)
   -- +0xd4  mv s3,a0
-  k_step (wp_s_add c2 _ (KA.«end_op» + 0xd4#64) true 19#5 0#5 10#5 (by decide))
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hsie, KCtx.rget_zero, hcs2b]
+  k_step_e (wp_s_add cpu _ (KA.«end_op» + 0xd4#64) true 19#5 0#5 10#5 (by decide))
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [KCtx.rget_zero, hcs2b]
   iintro Hk Hpc
   have hfix3' : eoPins k (R2.set 19#5 (bnode kkD)) (bnode kkL) (BitVec.ofNat 64 t)
       (bnode kkD) logAddr (lhBlock t) := eoPins_set19 k R2 _ _ _ _ _ _ hfix3
@@ -1606,36 +1591,36 @@ theorem eo_body (BR : BREAD) (BW : BWRITE) (BE : BRELSE) (MM : MEMMOVE)
     with ⟨-, Hauth, Hslot, HpcL⟩
   imodintro
   -- ===== +0xd6  li a2,1024 ; addi a1,a0,88 ; addi a0,s1,88 ; jal memmove
-  k_step (wp_s_addi c2 _ (KA.«end_op» + 0xd6#64) false 1024#12 12#5 0#5 (by decide))
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hsie, KCtx.rget_zero]
+  k_step_e (wp_s_addi cpu _ (KA.«end_op» + 0xd6#64) false 1024#12 12#5 0#5 (by decide))
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [KCtx.rget_zero]
   iintro Hk Hpc
-  k_step (wp_s_addi c2 _ (KA.«end_op» + 0xda#64) false 88#12 11#5 10#5 (by decide))
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hsie, hcs2b, eo_bufData]
+  k_step_e (wp_s_addi cpu _ (KA.«end_op» + 0xda#64) false 88#12 11#5 10#5 (by decide))
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hcs2b, eo_bufData]
   iintro Hk Hpc
-  k_step (wp_s_addi c2 _ (KA.«end_op» + 0xde#64) false 88#12 10#5 9#5 (by decide))
+  k_step_e (wp_s_addi cpu _ (KA.«end_op» + 0xde#64) false 88#12 10#5 9#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
-    with [hsie, (id hfix3).2.2.1, eo_bufData]
+    with [(id hfix3).2.2.1, eo_bufData]
   iintro Hk Hpc
-  k_step (wp_s_jal c2 _ (KA.«end_op» + 0xe2#64) false 2084520#21 1#5 (by decide))
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hsie, eo_br_memmove]
+  k_step_e (wp_s_jal cpu _ (KA.«end_op» + 0xe2#64) false 2084520#21 1#5 (by decide))
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [eo_br_memmove]
   iintro Hk Hpc
-  iapply (eo_memmove MM c2 _ bsD bsL BSIZE (DFrac.own 1) (aBufData (bnode kkD))
+  iapply (eo_memmove MM cpu _ bsD bsL BSIZE (DFrac.own 1) (aBufData (bnode kkD))
       (aBufData (bnode kkL)) (by k_norm_g) (by k_norm_g) ?mK ?mn ?mn32 ?mls ?mld)
     $$ [- $Hk $Hpc $HdatD $HdatL]
   rotate_right 1
-  k_norm [eo_ret_e6]
+  k_norm_g [eo_ret_e6]
   case mK => k_norm_g; omega
   case mn => k_norm_g; unfold BSIZE; rfl
   case mn32 => unfold BSIZE; omega
   case mls => exact hpD.2.2.2.1
   case mld => exact hpL.2.2.2.1
-  iapply wpNext_off_intro
+  k_next_e
   iintro %RM Hk Hpc HdatD HdatL %hcsM
   k_norm_g [eo_ret_e6]
   obtain ⟨hcsMa, hcsMb⟩ := hcsM
   have hfix4 : eoPins k RM (bnode kkL) (BitVec.ofNat 64 t) (bnode kkD) logAddr
       (lhBlock t) := by
-    k_norm at hcsMa
+    k_norm_g at hcsMa
     refine eoPins_cs k _ RM _ _ _ _ _ ?_ hcsMa
     refine eoPins_set k _ _ _ _ _ _ (eoPins_set k _ _ _ _ _ _
       (eoPins_set k _ _ _ _ _ _ (eoPins_set k _ _ _ _ _ _ hfix3' 12#5 _ (by decide))
@@ -1646,34 +1631,32 @@ theorem eo_body (BR : BREAD) (BW : BWRITE) (BE : BRELSE) (MM : MEMMOVE)
   ihave HbufD := HcloseD $$ %bsD [] HdatD
   case' _ => ipureintro; exact hpD.2.2.2.1
   -- ===== +0xe6  mv a0,s1 ; jal bwrite
-  k_step (wp_s_add c2 _ (KA.«end_op» + 0xe6#64) true 10#5 0#5 9#5 (by decide))
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hsie, KCtx.rget_zero, m9]
+  k_step_e (wp_s_add cpu _ (KA.«end_op» + 0xe6#64) true 10#5 0#5 9#5 (by decide))
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [KCtx.rget_zero, m9]
   iintro Hk Hpc
-  k_step (wp_s_jal c2 _ (KA.«end_op» + 0xe8#64) false 2092640#21 1#5 (by decide))
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hsie, eo_br_bwrite]
+  k_step_e (wp_s_jal cpu _ (KA.«end_op» + 0xe8#64) false 2092640#21 1#5 (by decide))
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [eo_br_bwrite]
   iintro Hk Hpc
-  iapply (eo_bwrite BW Γ c2 _ γl γb V γdl pd pav pu j kkL pidv dev
+  iapply (eo_bwrite BW Γ cpu _ γl γb V γdl pd pav pu j kkL pidv dev
       (BitVec.ofNat 32 (logSlotBno ls t)) dqp bsD bsdL k.proc (by k_norm_g)
-      hj ?wproc ?wK ?wsie ?wnoff ?wlocks ?wtier hpL.1 ?wa0 ?wbno hpL.2.2.2.2 hpd)
-    $$ [- $Hk $Hpc $Hpi $Htc $Hcl $Hir $Hbc $Hdc $Hpid $HbufL]
+      k.sie (by k_norm_g) hj ?wproc ?wK ?wnoff ?wtier hpL.1 ?wa0 ?wbno hpL.2.2.2.2 hpd)
+    $$ [- $Hk $Hpc $Hpi $Hte $Hce $Hbc $Hdc $Hpid $HbufL]
   rotate_right 1
   k_norm_g [eo_ret_ec]
   iframe #
   case wproc => k_norm_g; exact hproc
   case wK => k_norm_g; unfold endOpSlots installTransSlots breadSlots panicSlots bwriteSlots
                               virtioDiskRwSlots sleepSlots at *; omega
-  case wsie => k_norm_g; exact hsie
   case wnoff => k_norm_g; exact hnoff
-  case wlocks => k_norm_g; exact hlocks
   case wtier => k_norm_g; exact htier
   case wa0 => k_norm_g
   case wbno => rw [hbnoS]; exact hbs
   iapply wpNext_intro_pin
-  iintro %c3 %hq3 %sp3 %pp3 %R3 %hcs3 Hk Hpc Htc Hcl Hir Hpid HbufL
+  iintro %cpu %_ %sp3 %pp3 %R3 %hcs3 Hk Hpc Hte Hce Hpid HbufL
   k_norm_g [eo_ret_ec, eo_ctx_collapse, eo_spie_pushed]
   have hfix5 : eoPins k R3 (bnode kkL) (BitVec.ofNat 64 t) (bnode kkD) logAddr
       (lhBlock t) := by
-    k_norm at hcs3
+    k_norm_g at hcs3
     refine eoPins_cs k _ R3 _ _ _ _ _ ?_ hcs3
     refine eoPins_set k _ _ _ _ _ _ (eoPins_set k _ _ _ _ _ _ hfix4 10#5 _ (by decide))
       1#5 _ (by decide)
@@ -1688,17 +1671,17 @@ theorem eo_body (BR : BREAD) (BW : BWRITE) (BE : BRELSE) (MM : MEMMOVE)
   ihave HlockD := (bioLocked_split γb V kkD pidv dev wt bsD bsdD dD).2 $$ [HbufD HpayD]
   case' _ => iframe HbufD HpayD
   -- ===== +0xec  mv a0,s3 ; jal brelse (the home block)
-  k_step (wp_s_add c3 _ (KA.«end_op» + 0xec#64) true 10#5 0#5 19#5 (by decide))
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hsie, KCtx.rget_zero, n19]
+  k_step_e (wp_s_add cpu _ (KA.«end_op» + 0xec#64) true 10#5 0#5 19#5 (by decide))
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [KCtx.rget_zero, n19]
   iintro Hk Hpc
-  k_step (wp_s_jal c3 _ (KA.«end_op» + 0xee#64) false 2092684#21 1#5 (by decide))
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hsie, eo_br_brelse]
+  k_step_e (wp_s_jal cpu _ (KA.«end_op» + 0xee#64) false 2092684#21 1#5 (by decide))
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [eo_br_brelse]
   iintro Hk Hpc
-  iapply (brelse_call BE Γ c3 _ γl γb V kkD pidv dev wt dqp bsD bsdD dD k.proc (by k_norm_g)
+  iapply (brelse_call BE Γ cpu _ γl γb V kkD pidv dev wt dqp bsD bsdD dD k.proc (by k_norm_g)
       ?enoff ?eK ?elk ?esl ?ep ?etier hpD.1 ?ea0)
     $$ [- $Hk $Hpc $Hpi $Hbc $Hpid $HlockD]
   rotate_right 1
-  k_norm [eo_ret_f2]
+  k_norm_g [eo_ret_f2]
   iframe #
   case enoff => k_norm_g; rw [hnoff]; decide
   case eK => k_norm_g; unfold endOpSlots installTransSlots breadSlots panicSlots brelseSlots
@@ -1708,31 +1691,28 @@ theorem eo_body (BR : BREAD) (BW : BWRITE) (BE : BRELSE) (MM : MEMMOVE)
   case ep => k_norm_g; rw [hlocks]; simp
   case etier => k_norm_g; exact htier
   case ea0 => k_norm_g
-  iapply wpNext_off_intro
+  k_next_e
   iintro %sp4 %pp4 %R4 %hsp4 Hk Hpc %hcs4 Hpid Hu2
-  k_norm [eo_ret_f2] at hsp4
-  obtain ⟨e41, e42⟩ := hsp4 (by first | exact hsie | rfl | trivial | simp [hsie])
-  subst e41; subst e42
   k_norm_g [eo_ret_f2, eo_ctx_collapse, eo_spie_pushed]
   have hfix6 : eoPins k R4 (bnode kkL) (BitVec.ofNat 64 t) (bnode kkD) logAddr
       (lhBlock t) := by
-    k_norm at hcs4
+    k_norm_g at hcs4
     refine eoPins_cs k _ R4 _ _ _ _ _ ?_ hcs4
     refine eoPins_set k _ _ _ _ _ _ (eoPins_set k _ _ _ _ _ _ hfix5 10#5 _ (by decide))
       1#5 _ (by decide)
   obtain ⟨o2, o8, o9, o18, o19, o20, o21, o22, o23, o24, o25, o26, o27⟩ := id hfix6
   -- ===== +0xf2  mv a0,s1 ; jal brelse (the log slot)
-  k_step (wp_s_add c3 _ (KA.«end_op» + 0xf2#64) true 10#5 0#5 9#5 (by decide))
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hsie, KCtx.rget_zero, o9]
+  k_step_e (wp_s_add cpu _ (KA.«end_op» + 0xf2#64) true 10#5 0#5 9#5 (by decide))
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [KCtx.rget_zero, o9]
   iintro Hk Hpc
-  k_step (wp_s_jal c3 _ (KA.«end_op» + 0xf4#64) false 2092678#21 1#5 (by decide))
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hsie, eo_br_brelse]
+  k_step_e (wp_s_jal cpu _ (KA.«end_op» + 0xf4#64) false 2092678#21 1#5 (by decide))
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [eo_br_brelse]
   iintro Hk Hpc
-  iapply (brelse_call BE Γ c3 _ γl γb V kkL pidv dev (BitVec.ofNat 32 (logSlotBno ls t)) dqp
+  iapply (brelse_call BE Γ cpu _ γl γb V kkL pidv dev (BitVec.ofNat 32 (logSlotBno ls t)) dqp
       bsD bsD dL k.proc (by k_norm_g) ?fnoff ?fK ?flk ?fsl ?fp ?ftier hpL.1 ?fa0)
     $$ [- $Hk $Hpc $Hpi $Hbc $Hpid $HlockL]
   rotate_right 1
-  k_norm [eo_ret_f8]
+  k_norm_g [eo_ret_f8]
   iframe #
   case fnoff => k_norm_g; rw [hnoff]; decide
   case fK => k_norm_g; unfold endOpSlots installTransSlots breadSlots panicSlots brelseSlots
@@ -1742,15 +1722,12 @@ theorem eo_body (BR : BREAD) (BW : BWRITE) (BE : BRELSE) (MM : MEMMOVE)
   case fp => k_norm_g; rw [hlocks]; simp
   case ftier => k_norm_g; exact htier
   case fa0 => k_norm_g
-  iapply wpNext_off_intro
+  k_next_e
   iintro %sp5 %pp5 %R5 %hsp5 Hk Hpc %hcs5 Hpid Hu1
-  k_norm [eo_ret_f8] at hsp5
-  obtain ⟨e51, e52⟩ := hsp5 (by first | exact hsie | rfl | trivial | simp [hsie])
-  subst e51; subst e52
   k_norm_g [eo_ret_f8, eo_ctx_collapse, eo_spie_pushed]
   have hfix7 : eoPins k R5 (bnode kkL) (BitVec.ofNat 64 t) (bnode kkD) logAddr
       (lhBlock t) := by
-    k_norm at hcs5
+    k_norm_g at hcs5
     refine eoPins_cs k _ R5 _ _ _ _ _ ?_ hcs5
     refine eoPins_set k _ _ _ _ _ _ (eoPins_set k _ _ _ _ _ _ hfix6 10#5 _ (by decide))
       1#5 _ (by decide)
@@ -1785,18 +1762,18 @@ theorem eo_body (BR : BREAD) (BW : BWRITE) (BE : BRELSE) (MM : MEMMOVE)
   have hLwlen' : ∀ i, (eoExt Lw t bsD i).length = BSIZE :=
     eoExt_len Lw t bsD hLwlen hpD.2.2.2.1
   -- ===== +0xf8  addiw s2,s2,1 ; addi s5,s5,4 ; lw a5,44(s4) ; blt s2,a5
-  k_step (wp_s_addiw c3 _ (KA.«end_op» + 0xf8#64) true 1#12 18#5 18#5 (by decide))
+  k_step_e (wp_s_addiw cpu _ (KA.«end_op» + 0xf8#64) true 1#12 18#5 18#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
-    with [hsie, r18, eo_addiw1 t (by omega)]
+    with [r18, eo_addiw1 t (by omega)]
   iintro Hk Hpc
-  k_step (wp_s_addi c3 _ (KA.«end_op» + 0xfa#64) true 4#12 21#5 21#5 (by decide))
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hsie, r21, eo_lhBlock_succ t]
+  k_step_e (wp_s_addi cpu _ (KA.«end_op» + 0xfa#64) true 4#12 21#5 21#5 (by decide))
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [r21, eo_lhBlock_succ t]
   iintro Hk Hpc
   icases eoOpen_lhn γb γfs V.cov ls n W (PartialMap.insert L (logSlotBno ls t) bsD)
     D (eoExt Lw t bsD) (t + 1) $$ Hopen with ⟨HlhN, HlhNback⟩
-  k_step (wp_s_lw c3 _ (KA.«end_op» + 0xfc#64) false 44#12 15#5 20#5 (by decide) (by decide)
+  k_step_e (wp_s_lw cpu _ (KA.«end_op» + 0xfc#64) false 44#12 15#5 20#5 (by decide) (by decide)
       (DFrac.own 1) (BitVec.ofNat 32 n))
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hsie, r20, eo_o_lhn]
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [r20, eo_o_lhn]
   iintro Hk Hpc HlhN
   ihave Hopen := HlhNback $$ HlhN
   have hfix8 : eoPins k (((R5.set 18#5 (BitVec.ofNat 64 t + 1#64)).set 21#5
@@ -1820,34 +1797,31 @@ theorem eo_body (BR : BREAD) (BW : BWRITE) (BE : BRELSE) (MM : MEMMOVE)
         | exact r27
   by_cases hdone : t + 1 < n
   · -- more entries: back to the head
-    k_step (wp_s_branch c3 _ (KA.«end_op» + 0x100#64) false 8116#13 18#5 15#5 (by decide)
+    k_step_e (wp_s_branch cpu _ (KA.«end_op» + 0x100#64) false 8116#13 18#5 15#5 (by decide)
         bop.BLT)
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
-      with [hsie, r18, eo_sext32 n hn31, eo_blt_add t 1 n (by omega) (by omega),
+      with [r18, eo_sext32 n hn31, eo_blt_add t 1 n (by omega) (by omega),
         decide_eq_true hdone]
     iintro Hk Hpc
-    ihave IH' := eoLoopInv_elim Γ cpu k γb γfs V.cov ls n W pidv dqp $$ IH
-    iapply IH' $$ %c3 %sp5 %pp5 %_ %(t + 1) %(PartialMap.insert L (logSlotBno ls t) bsD)
-      %D %(eoExt Lw t bsD) %(bnode kkL) %(bnode kkD) [] Hk Hpc Htc Hcl Hir Hpid Hopen Hfr HfrS Hnext
+    ihave IH' := eoLoopInv_elim Γ c0 k γb γfs V.cov ls n W pidv dqp $$ IH
+    iapply IH' $$ %cpu %sp5 %pp5 %_ %(t + 1) %(PartialMap.insert L (logSlotBno ls t) bsD)
+      %D %(eoExt Lw t bsD) %(bnode kkL) %(bnode kkD) [] Hk Hpc Hte Hce Hpid Hopen Hfr HfrS Hnext
     ipureintro
     exact ⟨hfix8, hdone, fun i w hi hw => hLw' i w (by omega) hw, hLwlen'⟩
   · -- the last entry: on into the commit's tail
-    k_step (wp_s_branch c3 _ (KA.«end_op» + 0x100#64) false 8116#13 18#5 15#5 (by decide)
+    k_step_e (wp_s_branch cpu _ (KA.«end_op» + 0x100#64) false 8116#13 18#5 15#5 (by decide)
         bop.BLT)
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
-      with [hsie, r18, eo_sext32 n hn31, eo_blt_add t 1 n (by omega) (by omega),
+      with [r18, eo_sext32 n hn31, eo_blt_add t 1 n (by omega) (by omega),
         decide_eq_false hdone]
     iintro Hk Hpc
     have htn1 : t + 1 = n := by omega
     subst htn1
-    ihave Hnext := wpNext_shift true k.proc cpu c3 _
-      (fun h => h.elim (fun h => absurd h (by decide))
-        (fun h => absurd h (by rw [hproc]; exact procAddr_nonzero hj))) $$ Hnext
-    iapply (eo_commit WH IT AC RE WK Γ c3 k γ γl γb V γdl γfs pd pav pu j ls (t + 1) dev W
+    iapply (eo_commit WH IT AC RE WK Γ cpu k γ γl γb V γdl γfs pd pav pu j ls (t + 1) dev W
         (PartialMap.insert L (logSlotBno ls t) bsD) D (eoExt Lw t bsD) pidv dqp _ sp5 pp5
-        (bnode kkL) (bnode kkD) hj hproc hK hsie hnoff hlocks htier hintena hgeom hdev hcl hdt
+        (bnode kkL) (bnode kkD) hj hproc hK hwf hnoff hlocks htier hintena hgeom hdev hcl hdt
         hnW hnL hnodup hhome hpd ?hcm ?hln ?hfx)
-      $$ [- $Hk $Hpc $Hpi $Hbc $Hdc $Hpe $Hctx $Htc $Hcl $Hir $Hpid $Hopen $Hfr $HfrS $Hnext]
+      $$ [- $Hk $Hpc $Hpi $Hbc $Hdc $Hpe $Hctx $Hte $Hce $Hpid $Hopen $Hfr $HfrS $Hnext]
     case hcm =>
       exact fun i w hw => hLw' i w (by
         have hh := (List.getElem?_eq_some_iff.1 hw).1
@@ -1871,8 +1845,8 @@ theorem eo_loop (BR : BREAD) (BW : BWRITE) (BE : BRELSE) (MM : MEMMOVE)
     (γdl : GName) (γfs : FsNames) (pd pav pu : BitVec 64) (j ls n : Nat) (dev : BitVec 32)
     (W : List (BitVec 32)) (pidv : BitVec 32) (dqp : DFrac)
     (hj : j < NPROC) (hproc : k.proc = procAddr j) (hK : endOpSlots ≤ k.avail)
-    (hsie : k.sie = false) (hnoff : k.noff = 0) (hlocks : k.locks = [])
-    (htier : k.tier = KTier.kpt) (hintena : k.intena = false)
+    (hwf : k.wf) (hnoff : k.noff = 0) (hlocks : k.locks = [])
+    (htier : k.tier = KTier.kpt) (hintena : k.intena = k.sie)
     (hgeom : logGeomOk V.cov ls) (hdev : dev = V.dev)
     (hcl : V.clean = fsMclean γfs) (hdt : V.dirty = fsMdirty γfs)
     (hnW : n = W.length) (hnL : n ≤ LOGBLOCKS)
@@ -1884,12 +1858,12 @@ theorem eo_loop (BR : BREAD) (BW : BWRITE) (BE : BRELSE) (MM : MEMMOVE)
   iintro #Hpi #Hbc #Hdc #Hpe #Hctx
   iloeb as IH
   iapply eoLoopInv_intro
-  iintro %c %a %b %R %t %L %D %Lw %s9 %s19 %⟨hfix, htn, hLw, hLwlen⟩ Hk Hpc Htc Hcl Hir Hpid
+  iintro %c %a %b %R %t %L %D %Lw %s9 %s19 %⟨hfix, htn, hLw, hLwlen⟩ Hk Hpc Hte Hce Hpid
     Hopen Hfr HfrS HΦ
   iapply (eo_body BR BW BE MM WH IT AC RE WK Γ cpu c k γ γl γb V γdl γfs pd pav pu j ls n dev
-      W pidv dqp hj hproc hK hsie hnoff hlocks htier hintena hgeom hdev hcl hdt hnW hnL
+      W pidv dqp hj hproc hK hwf hnoff hlocks htier hintena hgeom hdev hcl hdt hnW hnL
       hnodup hhome hpd a b R t L D Lw s9 s19 hfix htn hLw hLwlen)
-    $$ [- $Hk $Hpc $Htc $Hcl $Hir $Hpid $Hopen $Hfr $HfrS $HΦ $IH]
+    $$ [- $Hk $Hpc $Hte $Hce $Hpid $Hopen $Hfr $HfrS $HΦ $IH]
   iframe #
 
 end
@@ -1946,23 +1920,23 @@ theorem eo_entry (BR : BREAD) (BW : BWRITE) (BE : BRELSE) (MM : MEMMOVE)
     (γdl : GName) (γfs : FsNames) (pd pav pu : BitVec 64) (j ls : Nat) (dev : BitVec 32)
     (u : Nat) (pidv : BitVec 32) (dqp : DFrac)
     (hj : j < NPROC) (hproc : k.proc = procAddr j) (hK : endOpSlots ≤ k.avail)
-    (hsie : k.sie = false) (hnoff : k.noff = 0) (hlocks : k.locks = [])
-    (htier : k.tier = KTier.kpt) (hintena : k.intena = false)
+    (hwf : k.wf) (hnoff : k.noff = 0) (hlocks : k.locks = [])
+    (htier : k.tier = KTier.kpt) (hintena : k.intena = k.sie)
     (hgeom : logGeomOk V.cov ls) (hdev : dev = V.dev)
     (hcl : V.clean = fsMclean γfs) (hdt : V.dirty = fsMdirty γfs) (hpd : descPageRw pd) :
     kctx cpu k ∗ pcIs cpu KA.«end_op» ∗ procsInv Γ ∗
-    trapCsrs cpu ∗ cpuClaim cpu k.proc ∗ intrRes cpu ∗
+    trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗
     bioCtx γl γb V ∗ diskCaps V.gd γdl pd pav pu ∗ panicEnv ∗
     logCtx γ γb γfs V.cov ls dev ∗
     wordPointsTo (pPid k.proc) 4 dqp pidv ∗
     logOp γ u ∗
-    wpNext true k.proc cpu (eoPost k pidv dqp)
+    (∀ c' : CPU, eoPost k pidv dqp c')
     ⊢ wpLoop (GF := GF) cpu := by
   have hK' : 8 + (10 + breadSlots) ≤ k.avail := by
     unfold endOpSlots installTransSlots at hK; exact hK
   have hK8 : 8 ≤ k.avail := by omega
   have hlkn : ("log" : String) ∉ k.locks := by rw [hlocks]; simp
-  iintro ⟨Hk, Hpc, #Hpi, Htc, Hcc, Hir, #Hbc, #Hdc, #Hpe, #Hctx, Hpid, Hop, Hnext⟩
+  iintro ⟨Hk, Hpc, #Hpi, Hte, Hce, #Hbc, #Hdc, #Hpe, #Hctx, Hpid, Hop, Hnext⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
   icases logOp_split γ u $$ Hop with ⟨Hopb, Htxf⟩
   -- ===== the prologue =====
@@ -1971,39 +1945,38 @@ theorem eo_entry (BR : BREAD) (BW : BWRITE) (BE : BRELSE) (MM : MEMMOVE)
   k_norm_g
   iframe
   inext
-  k_norm [hsie]
-  iapply wpNext_off_intro
+  k_next_e
   iintro Hk Hpc Hfr Hjk
   -- ===== +0x0c auipc s1 ; addi s1 ; mv a0,s1 ; jal acquire =====
-  k_step (wp_s_auipc cpu _ (KA.«end_op» + 0xc#64) false 0x1e#20 9#5 (by decide))
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hsie]
+  k_step_e (wp_s_auipc cpu _ (KA.«end_op» + 0xc#64) false 0x1e#20 9#5 (by decide))
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
-  k_step (wp_s_addi cpu _ (KA.«end_op» + 0x10#64) false 1542#12 9#5 9#5 (by decide))
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hsie, eo_log]
+  k_step_e (wp_s_addi cpu _ (KA.«end_op» + 0x10#64) false 1542#12 9#5 9#5 (by decide))
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [eo_log]
   iintro Hk Hpc
-  k_step (wp_s_add cpu _ (KA.«end_op» + 0x14#64) true 10#5 0#5 9#5 (by decide))
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hsie, KCtx.rget_zero]
+  k_step_e (wp_s_add cpu _ (KA.«end_op» + 0x14#64) true 10#5 0#5 9#5 (by decide))
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [KCtx.rget_zero]
   iintro Hk Hpc
-  k_step (wp_s_jal cpu _ (KA.«end_op» + 0x16#64) false 2084436#21 1#5 (by decide))
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hsie, eo_br_acq]
+  k_step_e (wp_s_jal cpu _ (KA.«end_op» + 0x16#64) false 2084436#21 1#5 (by decide))
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [eo_br_acq]
   iintro Hk Hpc
   iapply (eo_ac AC cpu _ γ γb γfs V.cov ls dev ?ha0 ?hna ?hKa ?hla) $$ [- $Hk $Hpc]
   rotate_right 1
-  k_norm [hsie, eo_ret_1a]
+  k_norm_g [eo_ret_1a]
   iframe #
-  case ha0 => k_norm
-  case hna => k_norm [hnoff]; omega
-  case hKa => k_norm; omega
-  case hla => k_norm [hlocks]; simp
-  iapply wpNext_off_intro
-  iintro %s0 %p0 %R1 %hsp0 Hk Hpc %hcs0 Hlocked Hpay - -
-  k_norm [hsie] at hsp0
-  obtain ⟨e1, e2⟩ := hsp0 trivial
-  subst e1; subst e2
+  case ha0 => k_norm_g
+  case hna => k_norm_g [hnoff] <;> omega
+  case hKa => k_norm_g; omega
+  case hla => k_norm_g [hlocks]; simp
+  k_next_e
+  iintro %s0 %p0 %R1 %hsp0 Hk Hpc %hcs0 Hlocked Hpay - Harm
+  ihave Hk := kctx_eq_mono cpu _ ((eoK (k.withSpie s0 p0)).withRegs R1)
+    (by kctx_ext [eoK, hlocks]) $$ Hk
+  have hsie : (eoK (k.withSpie s0 p0)).sie = false := rfl
   unfold calleeSaved at hcs0
-  k_norm at hcs0
+  k_norm_g at hcs0
   obtain ⟨c2, c8, c9, c18, c19, c20, c21, c22, c23, c24, c25, c26, c27⟩ := hcs0
-  k_norm [hsie, eo_ret_1a, KCtx.pushOffAt_withRegs, eoK_fold k hK8]
+  k_norm [eo_ret_1a]
   have hR1 : eoPins k R1 logAddr (k.regs 18#5) (k.regs 19#5) (k.regs 20#5) (k.regs 21#5) := by
     refine ⟨?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_⟩ <;>
       first
@@ -2048,19 +2021,19 @@ theorem eo_entry (BR : BREAD) (BW : BWRITE) (BE : BRELSE) (MM : MEMMOVE)
   k_step (wp_s_lw cpu _ (KA.«end_op» + 0x1a#64) true 28#12 15#5 9#5 (by decide) (by decide)
       (DFrac.own 1) (BitVec.ofNat 32 out))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
-    with [eoK_sie k, p9, eo_o_out]
+    with [eoK_sie, p9, eo_o_out]
   iintro Hk Hpc Hout
   k_step (wp_s_addiw cpu _ (KA.«end_op» + 0x1c#64) true 4095#12 15#5 15#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
-    with [eoK_sie k, eo_dec out hout1 hout3, eo_dec' out hout1 hout3]
+    with [eoK_sie, eo_dec out hout1 hout3, eo_dec' out hout1 hout3]
   iintro Hk Hpc
   k_step (wp_s_add cpu _ (KA.«end_op» + 0x1e#64) true 18#5 0#5 15#5 (by decide))
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [eoK_sie k, KCtx.rget_zero]
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [eoK_sie, KCtx.rget_zero]
   iintro Hk Hpc
   k_step (wp_s_sw cpu _ (KA.«end_op» + 0x20#64) true 28#12 9#5 15#5 (by decide)
       (BitVec.ofNat 32 out))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
-    with [eoK_sie k, p9, eo_o_out, eo_dec32 out hout1 hout3]
+    with [eoK_sie, p9, eo_o_out, eo_dec32 out hout1 hout3]
   iintro Hk Hpc Hout
   -- ===== THE LEDGER RETIRES =====
   iapply wpLoop_bupd
@@ -2098,33 +2071,33 @@ theorem eo_entry (BR : BREAD) (BW : BWRITE) (BE : BRELSE) (MM : MEMMOVE)
   k_step (wp_s_lw cpu _ (KA.«end_op» + 0x22#64) true 32#12 15#5 9#5 (by decide) (by decide)
       (DFrac.own 1) (0#32 : BitVec 32))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
-    with [eoK_sie k, p9, eo_o_cmt]
+    with [eoK_sie, p9, eo_o_cmt]
   iintro Hk Hpc Hcmt
   k_step (wp_s_branch cpu _ (KA.«end_op» + 0x24#64) true 68#13 15#5 0#5 (by decide) bop.BNE)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
-    with [eoK_sie k, KCtx.rget_zero, eo_bnez0]
+    with [eoK_sie, KCtx.rget_zero, eo_bnez0]
   iintro Hk Hpc
   by_cases hlast : out = 1
   · -- ================= THE LAST OUT: commit =================
     subst hlast
     k_step (wp_s_branch cpu _ (KA.«end_op» + 0x26#64) false 84#13 18#5 0#5 (by decide) bop.BNE)
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
-      with [eoK_sie k, KCtx.rget_zero, eo_bnez_zero, eo_bnez_zero']
+      with [eoK_sie, KCtx.rget_zero, eo_bnez_zero, eo_bnez_zero']
     iintro Hk Hpc
     -- +0x2a auipc s1 ; addi s1 ; li a5,1 ; sw a5,32(s1)
     k_step (wp_s_auipc cpu _ (KA.«end_op» + 0x2a#64) false 0x1e#20 9#5 (by decide))
-      from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [eoK_sie k]
+      from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [eoK_sie]
     iintro Hk Hpc
     k_step (wp_s_addi cpu _ (KA.«end_op» + 0x2e#64) false 1512#12 9#5 9#5 (by decide))
-      from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [eoK_sie k, eo_log]
+      from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [eoK_sie, eo_log]
     iintro Hk Hpc
     k_step (wp_s_addi cpu _ (KA.«end_op» + 0x32#64) true 1#12 15#5 0#5 (by decide))
-      from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [eoK_sie k, KCtx.rget_zero]
+      from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [eoK_sie, KCtx.rget_zero]
     iintro Hk Hpc
     k_step (wp_s_sw cpu _ (KA.«end_op» + 0x34#64) true 32#12 9#5 15#5 (by decide)
         (0#32 : BitVec 32))
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
-      with [eoK_sie k, eo_o_cmt, eo_one32]
+      with [eoK_sie, eo_o_cmt, eo_one32]
     iintro Hk Hpc Hcmt
     -- the batch is CHECKED OUT and the flag re-closed set
     icases eoOpen_of_batch γb γfs V.cov ls n LB (opPending om) $$ Hst
@@ -2141,28 +2114,35 @@ theorem eo_entry (BR : BREAD) (BW : BWRITE) (BE : BRELSE) (MM : MEMMOVE)
     -- +0x36 mv a0,s1 ; +0x38 jal release
     k_step (wp_s_add cpu _ (KA.«end_op» + 0x36#64) true 10#5 0#5 9#5 (by decide))
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
-      with [eoK_sie k, KCtx.rget_zero]
+      with [eoK_sie, KCtx.rget_zero]
     iintro Hk Hpc
     k_step (wp_s_jal cpu _ (KA.«end_op» + 0x38#64) false 2084538#21 1#5 (by decide))
-      from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [eoK_sie k, eo_br_rel]
+      from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [eoK_sie, eo_br_rel]
     iintro Hk Hpc
-    iapply (eo_re RE cpu _ γ γb γfs V.cov ls dev ?ha0r ?hsr ?hnr ?hKr ?hrr)
+    iapply (eo_re RE cpu _ γ γb γfs V.cov ls dev ?ha0r ?hsr ?hnr ?hKr k.sie ?hrr ?hor)
       $$ [- $Hk $Hpc $Hlocked $Hpay]
     rotate_right 1
-    k_norm [eoK_sie k, eo_ret_3c, eoK_locks k, eoK_popExit k hsie hlkn]
+    k_norm_g [eo_ret_3c, eoK_locks, eoK_popExit_ws k s0 p0 hwf hnoff hlkn]
     iframe #
-    case ha0r => k_norm
-    case hsr => k_norm [eoK_sie k]
-    case hnr => k_norm [eoK_noff k]; omega
-    case hKr => k_norm [eoK_avail k hsie]; omega
-    case hrr => k_norm [eoK_noff k, eoK_intena k]; simp [hnoff, hintena]
-    k_norm [eoK_sie k]
-    iapply wpNext_off_intro
+    isplitl [Harm]
+    · iapply (popArm_sie cpu k _ ?hpp) $$ Harm
+      case hpp => rfl
+    case ha0r => k_norm_g
+    case hsr => rfl
+    case hnr => k_norm_g [eoK_noff] <;> omega
+    case hKr => k_norm_g [eoK_avail']; omega
+    case hrr => k_norm_g [eoK_noff, eoK_intena]; simp [hnoff, hintena]
+    case hor =>
+      intro hon
+      refine ⟨by k_norm_g [eoK_tier, htier], ?_⟩
+      k_norm_g [eoK_avail', hon]; simp [trapRes, kvFrameSlots]
+      unfold endOpSlots installTransSlots breadSlots panicSlots at hK; omega
+    k_next_e
     iintro %R3 Hk Hpc %hcsr
-    k_norm [eoK_sie k, eo_ret_3c, eoK_locks k, eoK_popExit k hsie hlkn]
+    k_norm_g [eo_ret_3c, eoK_locks, eoK_popExit_ws k s0 p0 hwf hnoff hlkn]
     have hR3 : eoPins k R3 logAddr (BitVec.ofNat 64 0) (k.regs 19#5) (k.regs 20#5)
         (k.regs 21#5) := by
-      k_norm at hcsr
+      k_norm_g at hcsr
       refine eoPins_cs k _ R3 _ _ _ _ _ ?_ hcsr
       obtain ⟨a2, a8, a9, a18, a19, a20, a21, a22, a23, a24, a25, a26, a27⟩ := id hR1
       refine ⟨?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_⟩ <;>
@@ -2183,17 +2163,17 @@ theorem eo_entry (BR : BREAD) (BW : BWRITE) (BE : BRELSE) (MM : MEMMOVE)
     obtain ⟨d2, d8, d9, d18, d19, d20, d21, d22, d23, d24, d25, d26, d27⟩ := id hR3
     -- +0x3c lw a5,44(s1) ; +0x3e bgtz a5
     icases eoOpen_lhn γb γfs V.cov ls n W L D eoNullLw 0 $$ Hopen with ⟨HlhN, HlhNback⟩
-    k_step (wp_s_lw cpu _ (KA.«end_op» + 0x3c#64) true 44#12 15#5 9#5 (by decide) (by decide)
+    k_step_e (wp_s_lw cpu _ (KA.«end_op» + 0x3c#64) true 44#12 15#5 9#5 (by decide) (by decide)
         (DFrac.own 1) (BitVec.ofNat 32 n))
-      from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hsie, d9, eo_o_lhn]
+      from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [d9, eo_o_lhn]
     iintro Hk Hpc HlhN
     ihave Hopen := HlhNback $$ HlhN
     have hn31 : n < 2 ^ 31 := by unfold LOGBLOCKS at hnL; omega
     by_cases hn0 : 0 < n
     · -- ---- there is something to write out: the copy loop ----
-      k_step (wp_s_branch0 cpu _ (KA.«end_op» + 0x3e#64) false 96#13 15#5 (by decide) bop.BLT)
+      k_step_e (wp_s_branch0 cpu _ (KA.«end_op» + 0x3e#64) false 96#13 15#5 (by decide) bop.BLT)
         from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
-        with [hsie, KCtx.rget_zero, eo_sext32 n hn31, eo_bgtz n (by omega),
+        with [KCtx.rget_zero, eo_sext32 n hn31, eo_bgtz n (by omega),
           decide_eq_true hn0]
       iintro Hk Hpc
       -- +0x9e sd s3,24(sp) ; sd s4,16(sp) ; sd s5,8(sp)
@@ -2208,14 +2188,14 @@ theorem eo_entry (BR : BREAD) (BW : BWRITE) (BE : BRELSE) (MM : MEMMOVE)
             (DFrac.own 1) w) from by
         unfold eoFrameJ; iintro H; iexact H) $$ Hjk
         with ⟨⟨%j3, Hj3⟩, ⟨%j4, Hj4⟩, ⟨%j5, Hj5⟩, Hj8⟩
-      k_step (wp_s_sd cpu _ (KA.«end_op» + 0x9e#64) true 24#12 2#5 19#5 (by decide) j3)
-        from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hsie, d2]
+      k_step_e (wp_s_sd cpu _ (KA.«end_op» + 0x9e#64) true 24#12 2#5 19#5 (by decide) j3)
+        from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [d2]
       iintro Hk Hpc Hj3
-      k_step (wp_s_sd cpu _ (KA.«end_op» + 0xa0#64) true 16#12 2#5 20#5 (by decide) j4)
-        from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hsie, d2]
+      k_step_e (wp_s_sd cpu _ (KA.«end_op» + 0xa0#64) true 16#12 2#5 20#5 (by decide) j4)
+        from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [d2]
       iintro Hk Hpc Hj4
-      k_step (wp_s_sd cpu _ (KA.«end_op» + 0xa2#64) true 8#12 2#5 21#5 (by decide) j5)
-        from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hsie, d2]
+      k_step_e (wp_s_sd cpu _ (KA.«end_op» + 0xa2#64) true 8#12 2#5 21#5 (by decide) j5)
+        from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [d2]
       iintro Hk Hpc Hj5
       ihave HfrS := (show
           wordPointsTo (GF := GF) ((k.regs 2#5) + 0xFFFFFFFFFFFFFFD8#64) 8 (DFrac.own 1)
@@ -2229,27 +2209,25 @@ theorem eo_entry (BR : BREAD) (BW : BWRITE) (BE : BRELSE) (MM : MEMMOVE)
         unfold eoFrameS; iintro H; iexact H) $$ [Hj3 Hj4 Hj5 Hj8]
       case' _ => iframe Hj3 Hj4 Hj5 Hj8
       -- +0xa4 auipc s5 ; addi s5 ; +0xac auipc s4 ; addi s4
-      k_step (wp_s_auipc cpu _ (KA.«end_op» + 0xa4#64) false 0x1e#20 21#5 (by decide))
-        from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hsie]
+      k_step_e (wp_s_auipc cpu _ (KA.«end_op» + 0xa4#64) false 0x1e#20 21#5 (by decide))
+        from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
       iintro Hk Hpc
-      k_step (wp_s_addi cpu _ (KA.«end_op» + 0xa8#64) false 1438#12 21#5 21#5 (by decide))
-        from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hsie, eo_lhb0]
+      k_step_e (wp_s_addi cpu _ (KA.«end_op» + 0xa8#64) false 1438#12 21#5 21#5 (by decide))
+        from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [eo_lhb0]
       iintro Hk Hpc
-      k_step (wp_s_auipc cpu _ (KA.«end_op» + 0xac#64) false 0x1e#20 20#5 (by decide))
-        from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hsie]
+      k_step_e (wp_s_auipc cpu _ (KA.«end_op» + 0xac#64) false 0x1e#20 20#5 (by decide))
+        from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
       iintro Hk Hpc
-      k_step (wp_s_addi cpu _ (KA.«end_op» + 0xb0#64) false 1382#12 20#5 20#5 (by decide))
-        from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hsie, eo_log]
+      k_step_e (wp_s_addi cpu _ (KA.«end_op» + 0xb0#64) false 1382#12 20#5 20#5 (by decide))
+        from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [eo_log]
       iintro Hk Hpc
       -- into the loop, with the cursor at zero
       ihave Hloop := eo_loop BR BW BE MM WH IT AC RE WK Γ cpu k γ γl γb V γdl γfs pd pav pu
-        j ls n dev W pidv dqp hj hproc hK hsie hnoff hlocks htier hintena hgeom hdev hcl hdt
+        j ls n dev W pidv dqp hj hproc hK hwf hnoff hlocks htier hintena hgeom hdev hcl hdt
         hnW hnL hnodup hhome hpd $$ Hpi Hbc Hdc Hpe Hctx
       ihave Hloop := eoLoopInv_elim Γ cpu k γb γfs V.cov ls n W pidv dqp $$ Hloop
-      ihave Hk := (show kctx (GF := GF) cpu ((k.pushed 8).withRegs _) ⊢
-          kctx cpu (((k.withSpie k.spie k.spp).pushed 8).withRegs _) from .rfl) $$ Hk
-      iapply Hloop $$ %cpu %(k.spie) %(k.spp) %_ %0 %L %D %eoNullLw %logAddr %(R3 19#5) []
-        Hk Hpc Htc Hcc Hir Hpid Hopen Hfr HfrS Hnext
+      iapply Hloop $$ %cpu %s0 %p0 %_ %0 %L %D %eoNullLw %logAddr %(R3 19#5) []
+        Hk Hpc Hte Hce Hpid Hopen Hfr HfrS Hnext
       ipureintro
       refine ⟨?_, hn0, ?_, eoNullLw_len⟩
       · refine ⟨?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_⟩ <;>
@@ -2272,15 +2250,15 @@ theorem eo_entry (BR : BREAD) (BW : BWRITE) (BE : BRELSE) (MM : MEMMOVE)
       subst hn00
       have hWnil : W = [] := List.eq_nil_of_length_eq_zero hnW.symm
       subst hWnil
-      k_step (wp_s_branch0 cpu _ (KA.«end_op» + 0x3e#64) false 96#13 15#5 (by decide) bop.BLT)
+      k_step_e (wp_s_branch0 cpu _ (KA.«end_op» + 0x3e#64) false 96#13 15#5 (by decide) bop.BLT)
         from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
-        with [hsie, KCtx.rget_zero, eo_sext32 0 (by omega), eo_bgtz 0 (by omega),
+        with [KCtx.rget_zero, eo_sext32 0 (by omega), eo_bgtz 0 (by omega),
           decide_eq_false (by omega)]
       iintro Hk Hpc
-      iapply (eo_tail AC RE WK Γ cpu k γ γb γfs V.cov ls dev L D eoNullLw 0 pidv dqp _
-          logAddr (BitVec.ofNat 64 0) hK hsie hnoff hlocks htier hintena
+      iapply (eo_tail AC RE WK Γ cpu k s0 p0 γ γb γfs V.cov ls dev L D eoNullLw 0 pidv dqp _
+          logAddr (BitVec.ofNat 64 0) hK hwf hnoff hlocks htier hintena
           (by unfold LOGBLOCKS; omega) ?hRt)
-        $$ [- $Hk $Hpc $Hpi $Htc $Hcc $Hir $Hctx $Hopen $Hfr $Hjk $Hpid $Hnext]
+        $$ [- $Hk $Hpc $Hpi $Hte $Hce $Hctx $Hopen $Hfr $Hjk $Hpid $Hnext]
       case hRt =>
         refine ⟨?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_⟩ <;>
           simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true] <;>
@@ -2301,7 +2279,7 @@ theorem eo_entry (BR : BREAD) (BW : BWRITE) (BE : BRELSE) (MM : MEMMOVE)
   · -- ================= NOT THE LAST OUT: wake and go =================
     k_step (wp_s_branch cpu _ (KA.«end_op» + 0x26#64) false 84#13 18#5 0#5 (by decide) bop.BNE)
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
-      with [eoK_sie k, KCtx.rget_zero, eo_bnez_out (out - 1) (by omega) (by omega)]
+      with [eoK_sie, KCtx.rget_zero, eo_bnez_out (out - 1) (by omega) (by omega)]
     iintro Hk Hpc
     ihave Hbatch := eoBatch_intro γ γb γfs V.cov ls (PartialMap.delete om oi) E X curCtx n LB
       (opPending om) (by omega) (fun i e hi => hsets i e (hsub' i e hi)) hregLB $$ Hst
@@ -2313,10 +2291,10 @@ theorem eo_entry (BR : BREAD) (BW : BWRITE) (BE : BRELSE) (MM : MEMMOVE)
       (fun i e hi => hlive i e (hsub' i e hi)) hcap hfresht' hTlen'
       $$ [Hout Hcmt Hnc Hops Hep Hreg Htx Hbatch]
     case' _ => iframe Hout Hcmt Hnc Hops Hep Hreg Htx Hbatch
-    iapply (eo_fast RE WK Γ cpu k γ γb γfs V.cov ls dev pidv dqp _ logAddr
-        (BitVec.ofNat 64 (out - 1)) hK hsie hnoff hlocks htier hintena
+    iapply (eo_fast RE WK Γ cpu k s0 p0 γ γb γfs V.cov ls dev pidv dqp _ logAddr
+        (BitVec.ofNat 64 (out - 1)) hK hwf hnoff hlocks htier hintena
         (hpins R1 _ _ _ _ hR1))
-      $$ [- $Hk $Hpc $Hpi $Htc $Hcc $Hir $Hctx $Hlocked $Hpay $Hfr $Hjk $Hpid $Hnext]
+      $$ [- $Hk $Hpc $Hpi $Hte $Hce $Harm $Hctx $Hlocked $Hpay $Hfr $Hjk $Hpid $Hnext]
 
 end
 
@@ -2327,18 +2305,21 @@ theorem endOp_proof (BR : BREAD) (BW : BWRITE) (BE : BRELSE) (MM : MEMMOVE)
     (WH : WRITE_HEAD) (IT : INSTALL_TRANS) (AC : ACQUIRE) (RE : RELEASE) (WK : WAKEUP) :
     END_OP := ⟨
   fun {hlc GF} _ _ _ _ _ _ _ _ Γ _ cpu k γ γl γb V γdl γfs pd pav pu j logstart dev u pidv dqp
-    hj hproc hK hsie hnoff hlocks htier hgeom hdev hcl hdt hpd => by
-  unfold wp_end_op_body
+    hj hproc hK hnoff htier hgeom hdev hcl hdt hpd => by
+  unfold wp_end_op_eb_body
   simp only [endOpAddr]
-  iintro ⟨Hk, Hpc, #Hpi, Htc, Hcc, Hir, #Hbc, #Hdc, #Hpe, #Hctx, Hpid, Hop, Hnext⟩
+  iintro ⟨Hk, Hpc, #Hpi, Hte, Hce, #Hbc, #Hdc, #Hpe, #Hctx, Hpid, Hop, Hnext⟩
   icases kctx_wf _ _ $$ Hk with ⟨%hwf, Hk⟩
-  have hintena : k.intena = false := by
-    have h := hwf.1 hnoff
-    rw [hsie] at h
-    exact h.symm
+  have hintena : k.intena = k.sie := (hwf.1 hnoff).symm
+  have hlocks : k.locks = [] := List.eq_nil_of_length_eq_zero (by have := hwf.2.2.2.1; omega)
+  -- the caller's continuation is hart-free (a park's crossing, at a proc)
+  ihave HΦ : ∀ c' : CPU, eoPost k pidv dqp c' $$ [Hnext]
+  · iintro %c'
+    unfold eoPost
+    iapply wpNext_at true k.proc cpu c' _ (fun hc => Or.elim hc (fun hx => absurd hx (by decide))
+      (fun hx => absurd (hproc ▸ hx) (procAddr_nonzero hj))) $$ Hnext
   iapply (eo_entry BR BW BE MM WH IT AC RE WK Γ cpu k γ γl γb V γdl γfs pd pav pu j logstart
-    dev u pidv dqp hj hproc hK hsie hnoff hlocks htier hintena hgeom hdev hcl hdt hpd)
-  unfold eoPost
-  iframe Hk Hpc Hpi Htc Hcc Hir Hbc Hdc Hpe Hctx Hpid Hop Hnext⟩
+    dev u pidv dqp hj hproc hK hwf hnoff hlocks htier hintena hgeom hdev hcl hdt hpd)
+  iframe Hk Hpc Hpi Hte Hce Hbc Hdc Hpe Hctx Hpid Hop HΦ⟩
 
 end Xv6

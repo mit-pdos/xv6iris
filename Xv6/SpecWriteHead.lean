@@ -62,7 +62,7 @@ import Xv6.SpecBrelse
 
 namespace Xv6
 
-open Iris Iris.ProgramLogic Iris.BI Std MachCSL
+open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
 open LeanRV64D
 
 /-- Address of `write_head`. -/
@@ -110,16 +110,79 @@ def wp_write_head_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv
     bslot γb -∗ wpLoop cpu'))
   ⊢ wpLoop (GF := GF) cpu
 
-/-- The interface of `write_head`. -/
-structure WRITE_HEAD : Prop where
-  wp_write_head : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
+/-- The eb-generic form of `wp_write_head_body` (Rocq: `cpu_own 0 eb`, the
+complement `trap_csrs_ext` / `cpu_claim_ext` in and out; depth 0, so no
+spinlock held by `KCtx.wf`). -/
+def wp_write_head_eb_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
     [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [CurCtx]
     (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
     (cpu : CPU) (k : KCtx) (γl : GName) (γb : BcacheNames) (V : BioView GF) (γdl : GName)
     (γfs : FsNames) (pd pav pu : BitVec 64) (j : Nat) (logstart : Nat) (dev : BitVec 32)
     (n : Nat) (W : List (BitVec 32)) (L : BlockMap) (pidv : BitVec 32) (dqp : DFrac)
-    hj hproc hK hsie hnoff hlocks htier hgeom hdev hcl hdt hn hpd,
+    (hj : j < NPROC) (hproc : k.proc = procAddr j) (hK : writeHeadSlots ≤ k.avail)
+    (hnoff : k.noff = 0)
+    (htier : k.tier = KTier.kpt)
+    (hgeom : logGeomOk V.cov logstart) (hdev : dev = V.dev)
+    (hcl : V.clean = fsMclean γfs) (hdt : V.dirty = fsMdirty γfs)
+    (hn : n = W.length ∧ n ≤ LOGBLOCKS) (hpd : descPageRw pd) : Prop :=
+  kctx cpu k ∗ pcIs cpu writeHeadAddr ∗ procsInv Γ ∗
+  trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗
+  bioCtx γl γb V ∗ diskCaps V.gd γdl pd pav pu ∗ panicEnv ∗
+  logFrozen logstart dev ∗
+  wordPointsTo (pPid k.proc) 4 dqp pidv ∗
+  -- the checked-out batch's pieces write_head actually touches
+  wordPointsTo lhNAddr 4 (DFrac.own 1) (BitVec.ofNat 32 n) ∗
+  ([∗list] i ↦ w ∈ W, wordPointsTo (lhBlock i) 4 (DFrac.own 1) w) ∗
+  fsCacheAuth γfs L ∗
+  (∃ bsh : List (BitVec 8), fsChalf γfs (logHdrBno logstart) bsh) ∗
+  bslot γb ∗
+  wpNext true k.proc cpu (fun cpu' => iprop(∀ (spie spp : Bool) (R' : RegMap)
+      (bs' : List (BitVec 8)),
+    ⌜calleeSaved k.regs R'⌝ -∗
+    kctx cpu' ((k.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k.regs 1#5)) -∗
+    trapCsrsExt cpu' k.sie -∗ cpuClaimExt cpu' k.sie k.proc -∗
+    wordPointsTo (pPid k.proc) 4 dqp pidv -∗
+    wordPointsTo lhNAddr 4 (DFrac.own 1) (BitVec.ofNat 32 n) -∗
+    ([∗list] i ↦ w ∈ W, wordPointsTo (lhBlock i) 4 (DFrac.own 1) w) -∗
+    fsCacheAuth γfs (PartialMap.insert L (logHdrBno logstart) bs') -∗
+    fsChalf γfs (logHdrBno logstart) bs' -∗
+    ⌜bs'.length = BSIZE ∧ hdrN bs' = n ∧ hdrDec bs' = (n, W.map (fun w => w.toNat))⌝ -∗
+    bslot γb -∗ wpLoop cpu'))
+  ⊢ wpLoop (GF := GF) cpu
+
+/-- The interface of `write_head`. -/
+structure WRITE_HEAD : Prop where
+  wp_write_head_eb : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
+    [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [CurCtx]
+    (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+    (cpu : CPU) (k : KCtx) (γl : GName) (γb : BcacheNames) (V : BioView GF) (γdl : GName)
+    (γfs : FsNames) (pd pav pu : BitVec 64) (j : Nat) (logstart : Nat) (dev : BitVec 32)
+    (n : Nat) (W : List (BitVec 32)) (L : BlockMap) (pidv : BitVec 32) (dqp : DFrac)
+    hj hproc hK hnoff htier hgeom hdev hcl hdt hn hpd,
+    wp_write_head_eb_body (hlc := hlc) (GF := GF) Γ cpu k γl γb V γdl γfs pd pav pu j
+      logstart dev n W L pidv dqp hj hproc hK hnoff htier hgeom hdev hcl hdt hn hpd
+
+/-- The interrupts-off instance of `wp_write_head_eb` (the complement is the whole
+bundle): the contract every not-yet-generalized caller states. -/
+theorem WRITE_HEAD.wp_write_head (A : WRITE_HEAD) {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
+    [BcacheG GF] [SleepLockG GF] [DiskG GF] [FsBlocksG GF] [LogG GF] [CurCtx]
+    (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+    (cpu : CPU) (k : KCtx) (γl : GName) (γb : BcacheNames) (V : BioView GF) (γdl : GName)
+    (γfs : FsNames) (pd pav pu : BitVec 64) (j : Nat) (logstart : Nat) (dev : BitVec 32)
+    (n : Nat) (W : List (BitVec 32)) (L : BlockMap) (pidv : BitVec 32) (dqp : DFrac)
+    hj hproc hK hsie hnoff hlocks htier hgeom hdev hcl hdt hn hpd :
     wp_write_head_body (hlc := hlc) (GF := GF) Γ cpu k γl γb V γdl γfs pd pav pu j
-      logstart dev n W L pidv dqp hj hproc hK hsie hnoff hlocks htier hgeom hdev hcl hdt hn hpd
+      logstart dev n W L pidv dqp hj hproc hK hsie hnoff hlocks htier hgeom hdev hcl hdt hn hpd := by
+  have h := A.wp_write_head_eb (hlc := hlc) (GF := GF) (Γ := Γ) (cpu := cpu) (k := k) (γl := γl) (γb := γb) (V := V) (γdl := γdl) (γfs := γfs) (pd := pd) (pav := pav) (pu := pu) (j := j) (logstart := logstart) (dev := dev) (n := n) (W := W) (L := L) (pidv := pidv) (dqp := dqp) (hj := hj) (hproc := hproc) (hK := hK) (hnoff := hnoff) (htier := htier) (hgeom := hgeom) (hdev := hdev) (hcl := hcl) (hdt := hdt) (hn := hn) (hpd := hpd)
+  unfold wp_write_head_eb_body at h
+  unfold wp_write_head_body
+  rw [hsie] at h
+  simp only [trapCsrsExt_false, cpuClaimExt_false] at h
+  iintro ⟨H0, H1, H2, Htc, Hcl, Hir, H6, H7, H8, H9, H10, H11, H12, H13, H14, H15, Hnext⟩
+  iapply h
+  iframe H0 H1 H2 Htc Hcl Hir H6 H7 H8 H9 H10 H11 H12 H13 H14 H15
+  iapply wpNext_mono $$ Hnext
+  iintro %cpu' HK %spie %spp %R' %bs' %p0 H1 H2 ⟨Htc, Hir⟩ Hcl H6 H7 H8 H9 H10 %p11 H12
+  iapply HK $$ %spie %spp %R' %bs' %p0 H1 H2 Htc Hcl Hir H6 H7 H8 H9 H10 %p11 H12
 
 end Xv6

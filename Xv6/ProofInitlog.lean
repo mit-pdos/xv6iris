@@ -262,15 +262,15 @@ theorem il_install_trans (IT : INSTALL_TRANS) (Γ : SchedNames) [ClaimIs (hlc :=
     (γfs : FsNames) (pd pav pu : BitVec 64) (j : Nat) (logstart : Nat) (dev : BitVec 32)
     (L : BlockMap) (D : RegMapF Bool) (pidv : BitVec 32) (dqp : DFrac)
     (homeL : List Nat) (Xv : Nat → List (BitVec 8)) (Xexc : List Nat)
-    (pj : BitVec 64) (hpj : k'.proc = pj)
+    (pj : BitVec 64) (hpj : k'.proc = pj) (s : Bool) (hs : k'.sie = s)
     (hj : j < NPROC) (hproc : k'.proc = procAddr j) (hK : installTransSlots ≤ k'.avail)
-    (hsie : k'.sie = false) (hnoff : k'.noff = 0) (hlocks : k'.locks = [])
+    (hnoff : k'.noff = 0)
     (htier : k'.tier = KTier.kpt)
     (hgeom : logGeomOk V.cov logstart) (hdev : dev = V.dev)
     (hcl : V.clean = fsMclean γfs) (hdt : V.dirty = fsMdirty γfs)
     (ha0 : k'.regs 10#5 = 1#64) (hpd : descPageRw pd) :
     kctx c k' ∗ pcIs c KA.«install_trans» ∗ procsInv Γ ∗
-    trapCsrs c ∗ cpuClaim c pj ∗ intrRes c ∗
+    trapCsrsExt c s ∗ cpuClaimExt c s pj ∗
     bioCtx γl γb V ∗ diskCaps V.gd γdl pd pav pu ∗ panicEnv ∗
     logFrozen logstart dev ∗
     fsBytesInv γfs.bytes γfs.cache γfs.exc homeL Xv ∗
@@ -281,17 +281,17 @@ theorem il_install_trans (IT : INSTALL_TRANS) (Γ : SchedNames) [ClaimIs (hlc :=
     wpNext true pj c (fun cpu' => iprop(∀ (spie spp : Bool) (R' : RegMap),
       ⌜calleeSaved k'.regs R'⌝ -∗
       kctx cpu' ((k'.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k'.regs 1#5)) -∗
-      trapCsrs cpu' -∗ cpuClaim cpu' pj -∗ intrRes cpu' -∗
+      trapCsrsExt cpu' s -∗ cpuClaimExt cpu' s pj -∗
       wordPointsTo (pPid pj) 4 dqp pidv -∗
       wordPointsTo lhNAddr 4 (DFrac.own 1) 0#32 -∗
       excOwn γfs.exc Xexc -∗
       fsCacheAuth γfs L -∗ fsDirtyAuth γfs D -∗ bslots γb 2 -∗ wpLoop cpu'))
     ⊢ wpLoop (GF := GF) c := by
-  subst hpj
-  have h := IT.wp_install_trans (hlc := hlc) (GF := GF) Γ c k' γl γb V γdl γfs pd pav pu j
+  subst hpj hs
+  have h := IT.wp_install_trans_eb (hlc := hlc) (GF := GF) Γ c k' γl γb V γdl γfs pd pav pu j
     logstart dev true 0 ([] : List (BitVec 32)) (fun _ => List.replicate BSIZE 0#8) L D pidv dqp
     homeL Xv Xexc
-    hj hproc hK hsie hnoff hlocks htier hgeom hdev hcl hdt
+    hj hproc hK hnoff htier hgeom hdev hcl hdt
     (by simp only [if_true]; exact ha0)
     ⟨rfl, by unfold LOGBLOCKS; omega⟩
     (by intro i k'' v v' hv; simp at hv)
@@ -301,13 +301,13 @@ theorem il_install_trans (IT : INSTALL_TRANS) (Γ : SchedNames) [ClaimIs (hlc :=
     (by intro _ w hw; exact absurd hw List.not_mem_nil)
     (by intro _ i w hw; simp at hw)
     hpd
-  unfold wp_install_trans_body at h
+  unfold wp_install_trans_eb_body at h
   simp only [installTransAddr, if_true, itRecL_nil, Nat.add_zero, List.map_nil,
     excDelMany_nil] at h
-  iintro ⟨Hk, Hpc, #Hpi, Htc, Hcl, Hir, #Hbc, #Hdc, #Hpe, #Hfr, #Hbinv, Hpid, HlhN, Hexc,
+  iintro ⟨Hk, Hpc, #Hpi, Hte, Hce, #Hbc, #Hdc, #Hpe, #Hfr, #Hbinv, Hpid, HlhN, Hexc,
     HL, HD, Hsl, Hnext⟩
   iapply h
-  iframe Hk Hpc Hpi Htc Hcl Hir Hbc Hdc Hpe Hfr Hpid Hbinv
+  iframe Hk Hpc Hpi Hte Hce Hbc Hdc Hpe Hfr Hpid Hbinv
   isplitl [HlhN]
   · iexact HlhN
   isplitr [Hexc HL HD Hsl Hnext]
@@ -317,9 +317,9 @@ theorem il_install_trans (IT : INSTALL_TRANS) (Γ : SchedNames) [ClaimIs (hlc :=
   · iapply BigSepL.bigSepL_nil.2; iempintro
   iframe Hsl
   iapply wpNext_intro_pin
-  iintro %cpu2 %hp2 %spie %spp %R' %hcs Hk Hpc Htc Hcl Hir Hpid HlhN - Hexc HL HD - Hsl
+  iintro %cpu2 %hp2 %spie %spp %R' %hcs Hk Hpc Hte Hce Hpid HlhN - Hexc HL HD - Hsl
   ihave Hn := wpNext_at true k'.proc c cpu2 _ hp2 $$ Hnext
-  iapply Hn $$ %spie %spp %R' %hcs Hk Hpc Htc Hcl Hir Hpid HlhN Hexc HL HD Hsl
+  iapply Hn $$ %spie %spp %R' %hcs Hk Hpc Hte Hce Hpid HlhN Hexc HL HD Hsl
 
 set_option maxHeartbeats 2000000 in
 /-- `write_head()` AT THE EMPTY WRITE SET. -/
@@ -327,14 +327,14 @@ theorem il_write_head (WH : WRITE_HEAD) (Γ : SchedNames) [ClaimIs (hlc := hlc) 
     (c : CPU) (k' : KCtx) (γl : GName) (γb : BcacheNames) (V : BioView GF) (γdl : GName)
     (γfs : FsNames) (pd pav pu : BitVec 64) (j : Nat) (logstart : Nat) (dev : BitVec 32)
     (L : BlockMap) (pidv : BitVec 32) (dqp : DFrac)
-    (pj : BitVec 64) (hpj : k'.proc = pj)
+    (pj : BitVec 64) (hpj : k'.proc = pj) (s : Bool) (hs : k'.sie = s)
     (hj : j < NPROC) (hproc : k'.proc = procAddr j) (hK : writeHeadSlots ≤ k'.avail)
-    (hsie : k'.sie = false) (hnoff : k'.noff = 0) (hlocks : k'.locks = [])
+    (hnoff : k'.noff = 0)
     (htier : k'.tier = KTier.kpt)
     (hgeom : logGeomOk V.cov logstart) (hdev : dev = V.dev)
     (hcl : V.clean = fsMclean γfs) (hdt : V.dirty = fsMdirty γfs) (hpd : descPageRw pd) :
     kctx c k' ∗ pcIs c KA.«write_head» ∗ procsInv Γ ∗
-    trapCsrs c ∗ cpuClaim c pj ∗ intrRes c ∗
+    trapCsrsExt c s ∗ cpuClaimExt c s pj ∗
     bioCtx γl γb V ∗ diskCaps V.gd γdl pd pav pu ∗ panicEnv ∗
     logFrozen logstart dev ∗
     wordPointsTo (pPid pj) 4 dqp pidv ∗
@@ -345,32 +345,32 @@ theorem il_write_head (WH : WRITE_HEAD) (Γ : SchedNames) [ClaimIs (hlc := hlc) 
         (bs' : List (BitVec 8)),
       ⌜calleeSaved k'.regs R'⌝ -∗
       kctx cpu' ((k'.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k'.regs 1#5)) -∗
-      trapCsrs cpu' -∗ cpuClaim cpu' pj -∗ intrRes cpu' -∗
+      trapCsrsExt cpu' s -∗ cpuClaimExt cpu' s pj -∗
       wordPointsTo (pPid pj) 4 dqp pidv -∗
       wordPointsTo lhNAddr 4 (DFrac.own 1) 0#32 -∗
       fsCacheAuth γfs (PartialMap.insert L (logHdrBno logstart) bs') -∗
       fsChalf γfs (logHdrBno logstart) bs' -∗ bslot γb -∗ wpLoop cpu'))
     ⊢ wpLoop (GF := GF) c := by
-  subst hpj
-  have h := WH.wp_write_head (hlc := hlc) (GF := GF) Γ c k' γl γb V γdl γfs pd pav pu j
+  subst hpj hs
+  have h := WH.wp_write_head_eb (hlc := hlc) (GF := GF) Γ c k' γl γb V γdl γfs pd pav pu j
     logstart dev 0 ([] : List (BitVec 32)) L pidv dqp
-    hj hproc hK hsie hnoff hlocks htier hgeom hdev hcl hdt
+    hj hproc hK hnoff htier hgeom hdev hcl hdt
     ⟨rfl, by unfold LOGBLOCKS; omega⟩ hpd
-  unfold wp_write_head_body at h
+  unfold wp_write_head_eb_body at h
   simp only [writeHeadAddr] at h
-  iintro ⟨Hk, Hpc, #Hpi, Htc, Hcl, Hir, #Hbc, #Hdc, #Hpe, #Hfr, Hpid, HlhN, HL, Hch, Hsl,
+  iintro ⟨Hk, Hpc, #Hpi, Hte, Hce, #Hbc, #Hdc, #Hpe, #Hfr, Hpid, HlhN, HL, Hch, Hsl,
     Hnext⟩
   iapply h
-  iframe Hk Hpc Hpi Htc Hcl Hir Hbc Hdc Hpe Hfr Hpid
+  iframe Hk Hpc Hpi Hte Hce Hbc Hdc Hpe Hfr Hpid
   isplitl [HlhN]
   · iexact HlhN
   isplitr [HL Hch Hsl Hnext]
   · iapply BigSepL.bigSepL_nil.2; iempintro
   iframe HL Hch Hsl
   iapply wpNext_intro_pin
-  iintro %cpu2 %hp2 %spie %spp %R' %bs' %hcs Hk Hpc Htc Hcl Hir Hpid HlhN - HL Hch %hbs Hsl
+  iintro %cpu2 %hp2 %spie %spp %R' %bs' %hcs Hk Hpc Hte Hce Hpid HlhN - HL Hch %hbs Hsl
   ihave Hn := wpNext_at true k'.proc c cpu2 _ hp2 $$ Hnext
-  iapply Hn $$ %spie %spp %R' %bs' %hcs Hk Hpc Htc Hcl Hir Hpid HlhN HL Hch Hsl
+  iapply Hn $$ %spie %spp %R' %bs' %hcs Hk Hpc Hte Hce Hpid HlhN HL Hch Hsl
 
 end
 
@@ -412,19 +412,18 @@ the raw cells and the block-view material (`Xv6/LogBoot.lean`), SEAL the
 "log" spinlock over it (`MachCSL.kctx_newlock`), run the epilogue and hand
 the caller back `Xv6.logCtx`. -/
 theorem il_seal (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
-    (cpu c : CPU) (k : KCtx) (spie1 spp1 : Bool) (R : RegMap)
+    (cpu : CPU) (k : KCtx) (spie1 spp1 : Bool) (R : RegMap)
     (γ : LogNames) (γb : BcacheNames) (γfs : FsNames) (V : BioView GF)
     (logstart : Nat) (dev pidv vNc : BitVec 32) (sb : BitVec 64) (dqp dqs : DFrac)
     (L : BlockMap) (D : RegMapF Bool) (bsh : List (BitVec 8))
-    (hK : 6 ≤ k.avail) (hsie : k.sie = false)
+    (hK : 6 ≤ k.avail)
     (hR2 : R 2#5 = k.regs 2#5 + 0xFFFFFFFFFFFFFFD0#64)
     (p20 : R 20#5 = k.regs 20#5) (p21 : R 21#5 = k.regs 21#5) (p22 : R 22#5 = k.regs 22#5)
     (p23 : R 23#5 = k.regs 23#5) (p24 : R 24#5 = k.regs 24#5) (p25 : R 25#5 = k.regs 25#5)
-    (p26 : R 26#5 = k.regs 26#5) (p27 : R 27#5 = k.regs 27#5)
-    (hpin : true = false ∨ k.proc = 0#64 → c = cpu) :
-    kctx c (((k.withSpie spie1 spp1).pushed 6).withRegs R) ∗
-    pcIs c (KA.«initlog» + 0x74#64) ∗
-    trapCsrs c ∗ cpuClaim c k.proc ∗ intrRes c ∗
+    (p26 : R 26#5 = k.regs 26#5) (p27 : R 27#5 = k.regs 27#5) :
+    kctx cpu (((k.withSpie spie1 spp1).pushed 6).withRegs R) ∗
+    pcIs cpu (KA.«initlog» + 0x74#64) ∗
+    trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗
     frame6s3 (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) (k.regs 9#5) (k.regs 18#5) (k.regs 19#5) ∗
     wordPointsTo (pPid k.proc) 4 dqp pidv ∗
     wordPointsTo (sb + 20#64) 4 dqs (BitVec.ofNat 32 logstart) ∗
@@ -443,16 +442,16 @@ theorem il_seal (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
     ([∗list] i ∈ List.range LOGBLOCKS, ∃ bs : List (BitVec 8),
        fsChalf γfs (logSlotBno logstart i) bs) ∗
     bslots γb (LOGBLOCKS + 2) ∗ bslots γb 2 ∗
-    wpNext true k.proc cpu (fun cpu' => iprop(∀ (spie spp : Bool) (R' : RegMap) (γlk : GName),
+    (∀ (cpu' : CPU) (spie spp : Bool) (R' : RegMap) (γlk : GName),
       ⌜calleeSaved k.regs R'⌝ -∗
       kctx cpu' ((k.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k.regs 1#5)) -∗
-      trapCsrs cpu' -∗ cpuClaim cpu' k.proc -∗ intrRes cpu' -∗
+      trapCsrsExt cpu' k.sie -∗ cpuClaimExt cpu' k.sie k.proc -∗
       wordPointsTo (pPid k.proc) 4 dqp pidv -∗
       wordPointsTo (sb + 20#64) 4 dqs (BitVec.ofNat 32 logstart) -∗
       bslots γb 2 -∗
-      logCtx (γ.withLk γlk) γb γfs V.cov logstart dev -∗ wpLoop cpu'))
-    ⊢ wpLoop (GF := GF) c := by
-  iintro ⟨Hk, Hpc, Htc, Hcl, Hir, Hframe, Hpid, Hsb, #Hfroz, #Hrow, #Hm1, #Hm2, Hfresh, Htok,
+      logCtx (γ.withLk γlk) γb γfs V.cov logstart dev -∗ wpLoop cpu')
+    ⊢ wpLoop (GF := GF) cpu := by
+  iintro ⟨Hk, Hpc, Hte, Hce, Hframe, Hpid, Hsb, #Hfroz, #Hrow, #Hm1, #Hm2, Hfresh, Htok,
     Hout, Hcmt, Hnc, HlhN, Hjunk, HL, HD, Hd, Hhdr, Hslots, Hpool, Hwork, Hnext⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
   -- the boot pack
@@ -464,7 +463,7 @@ theorem il_seal (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
   case' _ => iframe
   -- the seal
   iapply wpLoop_fupd
-  imod (kctx_newlock c _ logAddr "log" (logResAt γ γb γfs V.cov logstart))
+  imod (kctx_newlock cpu _ logAddr "log" (logResAt γ γb γfs V.cov logstart))
     $$ [Hk Hres Hfresh Hm1 Hm2] with ⟨Hk, %γlk, #Hlk⟩
   · iframe Hm1 Hm2
     iframe
@@ -478,7 +477,7 @@ theorem il_seal (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
         ((k.withSpie spie1 spp1).regs 8#5) ((k.withSpie spie1 spp1).regs 9#5)
         ((k.withSpie spie1 spp1).regs 18#5) ((k.withSpie spie1 spp1).regs 19#5) from by
     simp only [KCtx.withSpie_regs]; iintro H; iexact H) $$ Hframe
-  iapply (wp_epilogue6s3_gen c (k.withSpie spie1 spp1) (KA.«initlog» + 0x74#64)
+  iapply (wp_epilogue6s3_gen cpu (k.withSpie spie1 spp1) (KA.«initlog» + 0x74#64)
       (by simp only [KCtx.withSpie_avail]; exact hK) R
       (by simp only [KCtx.withSpie_regs]; exact hR2)
       ((k.withSpie spie1 spp1).regs 1#5) ((k.withSpie spie1 spp1).regs 8#5)
@@ -489,18 +488,14 @@ theorem il_seal (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
   k_norm_g
   iframe
   inext
-  iapply wpNext_intro_pin
-  iintro %c2 %hp2 Hk Hpc
-  have hc2 : c2 = c := hp2 (Or.inl (by k_norm_g; exact hsie))
-  subst hc2
+  k_next_e
+  iintro Hk Hpc
   k_norm_g
-  ihave HΦ := wpNext_at true k.proc cpu c2 _ hpin $$ Hnext
-  iapply HΦ $$ %spie1 %spp1 %_ %γlk [] Hk Hpc [Htc] [Hcl] [Hir] [Hpid] [Hsb] [Hwork] [Hctx]
+  iapply Hnext $$ %cpu %spie1 %spp1 %_ %γlk [] Hk Hpc [Hte] [Hce] [Hpid] [Hsb] [Hwork] [Hctx]
   · ipureintro
     exact calleeSaved_epi6s3 k.regs R p20 p21 p22 p23 p24 p25 p26 p27
-  · iexact Htc
-  · iexact Hcl
-  · iexact Hir
+  · iexact Hte
+  · iexact Hce
   · iexact Hpid
   · iexact Hsb
   · iexact Hwork
@@ -519,7 +514,7 @@ theorem initlog_proof
     INITLOG := ⟨
   fun {hlc GF} _ _ _ _ _ _ _ _ Γ _ cpu k γ γl γb V γdl γfs pd pav pu j logstart dev sb
     bsHdr L D vlock vname vcpu vStart vDev vNc vN pidv dqp dqs
-    hj hproc hK hsie hnoff hlocks htier hgeom hdev hcl hdt ha0 ha1
+    hj hproc hK hnoff htier hgeom hdev hcl hdt ha0 ha1
     hhdrLen hhdrNodup hhdrHome hhdr0 hpinned hpd => by
   have hcovhdr : logstart ∈ V.cov := hgeom.2 logstart (logRegion_hdr logstart)
   have hls31 : logstart < 2 ^ 31 := (hgeom.1 logstart hcovhdr).2
@@ -531,9 +526,9 @@ theorem initlog_proof
     fun _ _ _ _ _ => rfl
   have hpsw : ∀ (K : KCtx) (m : Nat) (a b : Bool),
       (K.pushed m).withSpie a b = (K.withSpie a b).pushed m := fun _ _ _ _ => rfl
-  unfold wp_initlog_body
+  unfold wp_initlog_eb_body
   simp only [initlogAddr]
-  iintro ⟨Hk, Hpc, #Hpi, Htc, Hcl, Hir, #Hbc, #Hdc, #Hpe, Hpid, #Hat, Hexc, Htok, Hsb,
+  iintro ⟨Hk, Hpc, #Hpi, Hte, Hce, #Hbc, #Hdc, #Hpe, Hpid, #Hat, Hexc, Htok, Hsb,
     #Hm1, #Hm2, Hlock, Hname, Hcpu, HlStart, HlDev, Hout, Hcmt, Hnc, HlhN, Hjunk, HL, HD, Hd,
     Hhdr, Hslots, Hpool0, Hnext⟩
   icases (show fsBytesAt (GF := GF) γfs (fsHomeList V.cov logstart) ⊢
@@ -547,6 +542,20 @@ theorem initlog_proof
       excOwn γfs.exc ([] : List Nat) from by
     rw [show (hdrDec bsHdr).2 = ([] : List Nat) from by rw [hdrDec_zero bsHdr hhdr0]]) $$ Hexc
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
+  icases kctx_wf _ _ $$ Hk with ⟨%hwf, Hk⟩
+  have hlocks : k.locks = [] := List.eq_nil_of_length_eq_zero (by have := hwf.2.2.2.1; omega)
+  -- the caller's continuation is hart-free (a park's crossing, at a proc)
+  ihave Hnext : ∀ (c : CPU) (spie spp : Bool) (R' : RegMap) (γlk : GName),
+      ⌜calleeSaved k.regs R'⌝ -∗
+      kctx c ((k.withSpie spie spp).withRegs R') -∗ pcIs c (jumpPc (k.regs 1#5)) -∗
+      trapCsrsExt c k.sie -∗ cpuClaimExt c k.sie k.proc -∗
+      wordPointsTo (pPid k.proc) 4 dqp pidv -∗
+      wordPointsTo (sb + 20#64) 4 dqs (BitVec.ofNat 32 logstart) -∗
+      bslots γb 2 -∗
+      logCtx (γ.withLk γlk) γb γfs V.cov logstart dev -∗ wpLoop c $$ [Hnext]
+  · iintro %c
+    iapply wpNext_at true k.proc cpu c _ (fun hc => Or.elim hc (fun hx => absurd hx (by decide))
+      (fun hx => absurd (hproc ▸ hx) (procAddr_nonzero hj))) $$ Hnext
   icases il_slots_split γb $$ Hpool0 with ⟨Hu1, Hu2, Hpool⟩
   -- ===== the prologue =====
   iapply (wp_prologue6s3_gen cpu k KA.«initlog» hK6)
@@ -554,39 +563,37 @@ theorem initlog_proof
   k_norm_g
   iframe
   inext
-  iapply wpNext_intro_pin
-  iintro %c1 %hp1 Hk Hpc Hframe
-  have hc1 : c1 = cpu := hp1 (Or.inl hsie)
-  subst hc1
+  k_next_e
+  iintro Hk Hpc Hframe
   -- +0x0e  c.mv s1,a0 ; +0x10  c.mv s3,a1
-  k_step (wp_s_add c1 _ (KA.«initlog» + 0xe#64) true 9#5 0#5 10#5 (by decide))
+  k_step_e (wp_s_add cpu _ (KA.«initlog» + 0xe#64) true 9#5 0#5 10#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [ha0]
   iintro Hk Hpc
-  k_step (wp_s_add c1 _ (KA.«initlog» + 0x10#64) true 19#5 0#5 11#5 (by decide))
+  k_step_e (wp_s_add cpu _ (KA.«initlog» + 0x10#64) true 19#5 0#5 11#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [ha1]
   iintro Hk Hpc
   -- +0x12/+0x16  s2 = &log
-  k_step (wp_s_auipc c1 _ (KA.«initlog» + 0x12#64) false 0x1e#20 18#5 (by decide))
+  k_step_e (wp_s_auipc cpu _ (KA.«initlog» + 0x12#64) false 0x1e#20 18#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
-  k_step (wp_s_addi c1 _ (KA.«initlog» + 0x16#64) false 1806#12 18#5 18#5 (by decide))
+  k_step_e (wp_s_addi cpu _ (KA.«initlog» + 0x16#64) false 1806#12 18#5 18#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [il_log_addr]
   iintro Hk Hpc
   -- +0x1a/+0x1e  a1 = "log"
-  k_step (wp_s_auipc c1 _ (KA.«initlog» + 0x1a#64) false 4#20 11#5 (by decide))
+  k_step_e (wp_s_auipc cpu _ (KA.«initlog» + 0x1a#64) false 4#20 11#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
-  k_step (wp_s_addi c1 _ (KA.«initlog» + 0x1e#64) false 2086#12 11#5 11#5 (by decide))
+  k_step_e (wp_s_addi cpu _ (KA.«initlog» + 0x1e#64) false 2086#12 11#5 11#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
   -- +0x22  c.mv a0,s2 ; +0x24  jal ra,initlock
-  k_step (wp_s_add c1 _ (KA.«initlog» + 0x22#64) true 10#5 0#5 18#5 (by decide))
+  k_step_e (wp_s_add cpu _ (KA.«initlog» + 0x22#64) true 10#5 0#5 18#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
-  k_step (wp_s_jal c1 _ (KA.«initlog» + 0x24#64) false 2084564#21 1#5 (by decide))
+  k_step_e (wp_s_jal cpu _ (KA.«initlog» + 0x24#64) false 2084564#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [il_br_initlock]
   iintro Hk Hpc
-  iapply (il_initlock_call IL c1 _ vlock vname vcpu ?iK logAddr ?ia0)
+  iapply (il_initlock_call IL cpu _ vlock vname vcpu ?iK logAddr ?ia0)
     $$ [- $Hk $Hpc $Hm1 $Hm2 $Hlock $Hname $Hcpu]
   rotate_right 1
   k_norm_g [il_ret_28]
@@ -597,26 +604,24 @@ theorem initlog_proof
     omega
   case ia0 => k_norm_g
   -- ===== back from initlock =====
-  iapply wpNext_intro_pin
-  iintro %c2 %hp2 %R1 Hk Hpc Hname Hfresh %hcs1
-  have hc2 : c2 = c1 := hp2 (Or.inl (by k_norm_g; exact hsie))
-  subst hc2
+  k_next_e
+  iintro %R1 Hk Hpc Hname Hfresh %hcs1
   k_norm_g [il_ret_28]
   unfold calleeSaved at hcs1
   k_norm_g at hcs1
   obtain ⟨a2', a8', a9', a18', a19', a20', a21', a22', a23', a24', a25', a26', a27'⟩ := hcs1
   -- +0x28  lw a1,20(s3)
-  k_step (wp_s_lw c2 _ (KA.«initlog» + 0x28#64) false 20#12 11#5 19#5 (by decide) (by decide)
+  k_step_e (wp_s_lw cpu _ (KA.«initlog» + 0x28#64) false 20#12 11#5 19#5 (by decide) (by decide)
       dqs (BitVec.ofNat 32 logstart))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [a19']
   iintro Hk Hpc Hsb
   -- +0x2c  sw a1,24(s2)
-  k_step (wp_s_sw c2 _ (KA.«initlog» + 0x2c#64) false 24#12 18#5 11#5 (by decide) vStart)
+  k_step_e (wp_s_sw cpu _ (KA.«initlog» + 0x2c#64) false 24#12 18#5 11#5 (by decide) vStart)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
     with [a18', il_lStart, il_ext_sext (BitVec.ofNat 32 logstart)]
   iintro Hk Hpc HlStart
   -- +0x30  sw s1,36(s2)
-  k_step (wp_s_sw c2 _ (KA.«initlog» + 0x30#64) false 36#12 18#5 9#5 (by decide) vDev)
+  k_step_e (wp_s_sw cpu _ (KA.«initlog» + 0x30#64) false 36#12 18#5 9#5 (by decide) vDev)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
     with [a18', a9', il_lDev, il_ext_sext dev]
   iintro Hk Hpc HlDev
@@ -626,16 +631,16 @@ theorem initlog_proof
   · iframe HlDev HlStart
   imodintro
   -- +0x34  c.mv a0,s1 ; +0x36  jal ra,bread
-  k_step (wp_s_add c2 _ (KA.«initlog» + 0x34#64) true 10#5 0#5 9#5 (by decide))
+  k_step_e (wp_s_add cpu _ (KA.«initlog» + 0x34#64) true 10#5 0#5 9#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [a9']
   iintro Hk Hpc
-  k_step (wp_s_jal c2 _ (KA.«initlog» + 0x36#64) false 2092874#21 1#5 (by decide))
+  k_step_e (wp_s_jal cpu _ (KA.«initlog» + 0x36#64) false 2092874#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [il_br_bread]
   iintro Hk Hpc
-  iapply (bread_call BD Γ c2 _ γl γb V γdl pd pav pu j pidv dev (BitVec.ofNat 32 logstart) dqp
-      k.proc (by k_norm_g) hj ?dproc ?dK ?dsie ?dnoff ?dlocks ?dtier ?dbno ?dcov hdev hpd
+  iapply (bread_call_eb BD Γ cpu _ γl γb V γdl pd pav pu j pidv dev (BitVec.ofNat 32 logstart) dqp
+      k.proc (by k_norm_g) k.sie (by k_norm_g) hj ?dproc ?dK ?dnoff ?dtier ?dbno ?dcov hdev hpd
       ?da0 ?da1)
-    $$ [- $Hk $Hpc $Hpi $Htc $Hcl $Hir $Hbc $Hdc $Hpe $Hpid $Hu1]
+    $$ [- $Hk $Hpc $Hpi $Hte $Hce $Hbc $Hdc $Hpe $Hpid $Hu1]
   rotate_right 1
   k_norm_g [il_ret_3a]
   iframe #
@@ -644,9 +649,7 @@ theorem initlog_proof
     k_norm_g
     unfold initlogSlots installTransSlots at hK
     omega
-  case dsie => k_norm_g; exact hsie
   case dnoff => k_norm_g; exact hnoff
-  case dlocks => k_norm_g; exact hlocks
   case dtier => k_norm_g; exact htier
   case dbno => rw [hbnoNat]; omega
   case dcov => rw [hbnoNat]; exact hcovhdr
@@ -654,7 +657,7 @@ theorem initlog_proof
   case da1 => k_norm_g
   -- ===== back from bread: read_head =====
   iapply wpNext_intro_pin
-  iintro %c3 %hp3 %spie3 %spp3 %R2 %kk %bs %bsd %dd %hcs2 Hk Hpc Htc Hcl Hir Hpid Hlocked
+  iintro %cpu %_ %spie3 %spp3 %R2 %kk %bs %bsd %dd %hcs2 Hk Hpc Hte Hce Hpid Hlocked
   k_norm_g [il_ret_3a, hww, hpsw]
   obtain ⟨hcsb, ha0kk⟩ := hcs2
   unfold calleeSaved at hcsb
@@ -678,7 +681,7 @@ theorem initlog_proof
   ihave Hword := (show wordPointsTo (GF := GF) (bnode kk + 88#64) 4 (DFrac.own 1)
         (MachCSL.bytesToWord4 ((bs.drop (4 * 0)).take 4)) ⊢
       wordPointsTo (bnode kk + 88#64) 4 (DFrac.own 1) 0#32 from by rw [hw0]) $$ Hword
-  k_step (wp_s_lw c3 _ (KA.«initlog» + 0x3a#64) true 88#12 12#5 10#5 (by decide) (by decide)
+  k_step_e (wp_s_lw cpu _ (KA.«initlog» + 0x3a#64) true 88#12 12#5 10#5 (by decide) (by decide)
       (DFrac.own 1) 0#32)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [ha0kk, il_sext0]
   iintro Hk Hpc Hword
@@ -697,18 +700,18 @@ theorem initlog_proof
       bs bsd dd).2 $$ [Hhold Hpay]
   case' _ => iframe Hhold Hpay
   -- +0x3c  sw a2,44(s2)
-  k_step (wp_s_sw c3 _ (KA.«initlog» + 0x3c#64) false 44#12 18#5 12#5 (by decide) vN)
+  k_step_e (wp_s_sw cpu _ (KA.«initlog» + 0x3c#64) false 44#12 18#5 12#5 (by decide) vN)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [b18, a18', il_lhN, il_ext0]
   iintro Hk Hpc HlhN
   -- +0x40  blez a2 : TAKEN (the copy loop at +0x52 is dead at a clean header)
-  k_step (wp_s_branch0 c3 _ (KA.«initlog» + 0x40#64) false 30#13 12#5 (by decide) bop.BGE)
+  k_step_e (wp_s_branch0 cpu _ (KA.«initlog» + 0x40#64) false 30#13 12#5 (by decide) bop.BGE)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [il_blez_zero]
   iintro Hk Hpc
   -- +0x5e  jal ra,brelse
-  k_step (wp_s_jal c3 _ (KA.«initlog» + 0x5e#64) false 2093098#21 1#5 (by decide))
+  k_step_e (wp_s_jal cpu _ (KA.«initlog» + 0x5e#64) false 2093098#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [il_br_brelse]
   iintro Hk Hpc
-  iapply (brelse_call BE Γ c3 _ γl γb V kk pidv dev (BitVec.ofNat 32 logstart) dqp bs bsd dd
+  iapply (brelse_call BE Γ cpu _ γl γb V kk pidv dev (BitVec.ofNat 32 logstart) dqp bs bsd dd
       k.proc (by k_norm_g) ?rnoff ?rK ?rlk ?rsl ?rp ?rtier hkk ?ra0)
     $$ [- $Hk $Hpc $Hpi $Hbc $Hpid $Hlocked]
   rotate_right 1
@@ -726,10 +729,8 @@ theorem initlog_proof
   case rtier => k_norm_g; exact htier
   case ra0 => k_norm_g; exact ha0kk
   -- ===== back from brelse =====
-  iapply wpNext_intro_pin
-  iintro %c4 %hp4 %spie4 %spp4 %R3 %hsp4 Hk Hpc %hcs3 Hpid Hu1
-  have hc4 : c4 = c3 := hp4 (Or.inl (by k_norm_g; exact hsie))
-  subst hc4
+  k_next_e
+  iintro %spie4 %spp4 %R3 %hsp4 Hk Hpc %hcs3 Hpid Hu1
   k_norm_g [il_ret_62, hww, hpsw]
   unfold calleeSaved at hcs3
   k_norm_g at hcs3
@@ -737,40 +738,38 @@ theorem initlog_proof
   -- ===== install_trans(1) =====
   ihave Hs2 := il_slots_join2 γb $$ [Hu1 Hu2]
   case' _ => iframe
-  k_step (wp_s_addi c4 _ (KA.«initlog» + 0x62#64) true 1#12 10#5 0#5 (by decide))
+  k_step_e (wp_s_addi cpu _ (KA.«initlog» + 0x62#64) true 1#12 10#5 0#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
-  k_step (wp_s_jal c4 _ (KA.«initlog» + 0x64#64) false 2096848#21 1#5 (by decide))
+  k_step_e (wp_s_jal cpu _ (KA.«initlog» + 0x64#64) false 2096848#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [il_br_install]
   iintro Hk Hpc
-  iapply (il_install_trans IT Γ c4 _ γl γb V γdl γfs pd pav pu j logstart dev L D pidv dqp
+  iapply (il_install_trans IT Γ cpu _ γl γb V γdl γfs pd pav pu j logstart dev L D pidv dqp
       (fsHomeList V.cov logstart) Xv ([] : List Nat)
-      k.proc (by k_norm_g) hj ?tproc ?tK ?tsie ?tnoff ?tlocks ?ttier hgeom hdev hcl hdt
+      k.proc (by k_norm_g) k.sie (by k_norm_g) hj ?tproc ?tK ?tnoff ?ttier hgeom hdev hcl hdt
       ?ta0 hpd)
-    $$ [- $Hk $Hpc $Hpi $Htc $Hcl $Hir $Hbc $Hdc $Hpe $Hfroz $Hbinv $Hpid $HlhN $Hexc $HL $HD
+    $$ [- $Hk $Hpc $Hpi $Hte $Hce $Hbc $Hdc $Hpe $Hfroz $Hbinv $Hpid $HlhN $Hexc $HL $HD
          $Hs2]
   rotate_right 1
   k_norm_g [il_ret_68]
   iframe #
   case tproc => k_norm_g; exact hproc
   case tK => k_norm_g; unfold initlogSlots at hK; omega
-  case tsie => k_norm_g; exact hsie
   case tnoff => k_norm_g; exact hnoff
-  case tlocks => k_norm_g; exact hlocks
   case ttier => k_norm_g; exact htier
   case ta0 => k_norm_g
   -- ===== back from install_trans =====
   iapply wpNext_intro_pin
-  iintro %c5 %hp5 %spie5 %spp5 %R4 %hcs4 Hk Hpc Htc Hcl Hir Hpid HlhN Hexc HL HD Hs2
+  iintro %cpu %_ %spie5 %spp5 %R4 %hcs4 Hk Hpc Hte Hce Hpid HlhN Hexc HL HD Hs2
   k_norm_g [il_ret_68, hww, hpsw]
   unfold calleeSaved at hcs4
   k_norm_g at hcs4
   obtain ⟨f2, f8, f9, f18, f19, f20, f21, f22, f23, f24, f25, f26, f27⟩ := hcs4
   -- +0x68 auipc a5,0x1e ; +0x6c sw zero,1764(a5) : log.lh.n = 0
-  k_step (wp_s_auipc c5 _ (KA.«initlog» + 0x68#64) false 0x1e#20 15#5 (by decide))
+  k_step_e (wp_s_auipc cpu _ (KA.«initlog» + 0x68#64) false 0x1e#20 15#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
-  k_step (wp_s_sw c5 _ (KA.«initlog» + 0x6c#64) false 1764#12 15#5 0#5 (by decide) 0#32)
+  k_step_e (wp_s_sw cpu _ (KA.«initlog» + 0x6c#64) false 1764#12 15#5 0#5 (by decide) 0#32)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [il_lhn_reloc, il_ext0]
   iintro Hk Hpc HlhN
   -- +0x70 jal ra,write_head
@@ -778,12 +777,12 @@ theorem initlog_proof
   ihave Hch := (show fsChalf (GF := GF) γfs (logHdrBno logstart) bsHdr ⊢
       ∃ bsh : List (BitVec 8), fsChalf γfs (logHdrBno logstart) bsh from by
     iintro H; iexists bsHdr; iexact H) $$ Hhdr
-  k_step (wp_s_jal c5 _ (KA.«initlog» + 0x70#64) false 2096742#21 1#5 (by decide))
+  k_step_e (wp_s_jal cpu _ (KA.«initlog» + 0x70#64) false 2096742#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [il_br_writehead]
   iintro Hk Hpc
-  iapply (il_write_head WH Γ c5 _ γl γb V γdl γfs pd pav pu j logstart dev L pidv dqp
-      k.proc (by k_norm_g) hj ?wproc ?wK ?wsie ?wnoff ?wlocks ?wtier hgeom hdev hcl hdt hpd)
-    $$ [- $Hk $Hpc $Hpi $Htc $Hcl $Hir $Hbc $Hdc $Hpe $Hfroz $Hpid $HlhN $HL $Hch $Hu1]
+  iapply (il_write_head WH Γ cpu _ γl γb V γdl γfs pd pav pu j logstart dev L pidv dqp
+      k.proc (by k_norm_g) k.sie (by k_norm_g) hj ?wproc ?wK ?wnoff ?wtier hgeom hdev hcl hdt hpd)
+    $$ [- $Hk $Hpc $Hpi $Hte $Hce $Hbc $Hdc $Hpe $Hfroz $Hpid $HlhN $HL $Hch $Hu1]
   rotate_right 1
   k_norm_g [il_ret_74]
   iframe #
@@ -792,13 +791,11 @@ theorem initlog_proof
     k_norm_g
     unfold initlogSlots installTransSlots writeHeadSlots at *
     omega
-  case wsie => k_norm_g; exact hsie
   case wnoff => k_norm_g; exact hnoff
-  case wlocks => k_norm_g; exact hlocks
   case wtier => k_norm_g; exact htier
   -- ===== back from write_head: the seal =====
   iapply wpNext_intro_pin
-  iintro %c6 %hp6 %spie6 %spp6 %R5 %bs' %hcs5 Hk Hpc Htc Hcl Hir Hpid HlhN HL Hch Hu1
+  iintro %cpu %_ %spie6 %spp6 %R5 %bs' %hcs5 Hk Hpc Hte Hce Hpid HlhN HL Hch Hu1
   k_norm_g [il_ret_74, hww, hpsw]
   unfold calleeSaved at hcs5
   k_norm_g at hcs5
@@ -813,8 +810,8 @@ theorem initlog_proof
   imod Hsealed with #Hseal
   imodintro
   ihave #Hrow := fsBytesAnyAt_of γfs (fsHomeList V.cov logstart) $$ Hat Hseal
-  iapply (il_seal Γ c2 c6 k spie6 spp6 R5 γ γb γfs V logstart dev pidv vNc sb dqp dqs
-      (PartialMap.insert L (logHdrBno logstart) bs') D bs' hK6 hsie
+  iapply (il_seal Γ cpu k spie6 spp6 R5 γ γb γfs V logstart dev pidv vNc sb dqp dqs
+      (PartialMap.insert L (logHdrBno logstart) bs') D bs' hK6
       ((g2.trans f2).trans ((d2.trans b2).trans a2'))
       ((g20.trans f20).trans ((d20.trans b20).trans a20'))
       ((g21.trans f21).trans ((d21.trans b21).trans a21'))
@@ -823,9 +820,8 @@ theorem initlog_proof
       ((g24.trans f24).trans ((d24.trans b24).trans a24'))
       ((g25.trans f25).trans ((d25.trans b25).trans a25'))
       ((g26.trans f26).trans ((d26.trans b26).trans a26'))
-      ((g27.trans f27).trans ((d27.trans b27).trans a27'))
-      (fun hh => (hp6 hh).trans ((hp5 hh).trans (hp3 hh))))
-    $$ [- $Hk $Hpc $Htc $Hcl $Hir $Hframe $Hpid $Hsb $Hfroz $Hrow $Hm1 $Hm2 $Hfresh $Htok
+      ((g27.trans f27).trans ((d27.trans b27).trans a27')))
+    $$ [- $Hk $Hpc $Hte $Hce $Hframe $Hpid $Hsb $Hfroz $Hrow $Hm1 $Hm2 $Hfresh $Htok
          $Hout $Hcmt $Hnc $HlhN $Hjunk $HL $HD $Hd $Hch $Hslots $Hpool $Hs2 $Hnext]
   k_norm_g
   try (iframe #)⟩
