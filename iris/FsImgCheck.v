@@ -371,17 +371,17 @@ Qed.
 (* ---- WHICH inums are live, as ONE set ------------------------------- *)
 
 (* [FsImg.fs_live_set] is the [A] of the stocking split [R = A ⊎ (R ∖ A)].
-   Twenty-two allocated records, [1 .. 22]; inum 0 and everything from 23
+   Twenty-three allocated records, [1 .. 23]; inum 0 and everything from 24
    up is free.  ONE sweep of the thirteen inode blocks. *)
 Lemma fsimg_live_set :
-  fs_live_set fsimg_P fsimg_sb = list_to_set (Z.of_nat <$> seq 1 22).
+  fs_live_set fsimg_P fsimg_sb = list_to_set (Z.of_nat <$> seq 1 23).
 Proof. vm_eq. Qed.
 
 (* ...and the membership law the split actually uses, off the computed set
-   and [FsImg.fs_live_set_elem_of]: the live inums are exactly [1 .. 22],
+   and [FsImg.fs_live_set_elem_of]: the live inums are exactly [1 .. 23],
    and they are exactly the records with a nonzero type. *)
 Lemma fsimg_live_set_elem (z : Z) :
-  z ∈ fs_live_set fsimg_P fsimg_sb <-> 1 <= z <= 22.
+  z ∈ fs_live_set fsimg_P fsimg_sb <-> 1 <= z <= 23.
 Proof.
   rewrite fsimg_live_set, elem_of_list_to_set, elem_of_list_fmap.
   split.
@@ -392,7 +392,7 @@ Proof.
 Qed.
 
 Lemma fsimg_live_iff (z : Z) :
-  1 <= z <= 22
+  1 <= z <= 23
   <-> 0 <= z < sb_ninodes fsimg_sb
       /\ bv_unsigned (di_type (fs_dinode fsimg_P fsimg_sb z)) <> 0.
 Proof.
