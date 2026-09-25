@@ -38,7 +38,7 @@ Rocq's `ms_inithart_sched` also allocates the SIE live-bit invariant
 `intrRes_of_kernelvec` fold alone.
 -/
 import MachCSL.WpSmodeFrame
-import Xv6.MainSecondarySpin
+import MachCSL.WpSmodeFenceFloor
 import Xv6.SpecMainSecondary
 import Xv6.CodeTactics
 
@@ -190,7 +190,7 @@ theorem ms_spin [CurCtx] (cpu : CPU) (hcpu : cpu ≠ startedPrimary)
   ihave Hk := Hk $$ Hown
   ihave HAU := started_readAUr γi ξd P cpu hcpu K $$ Hinv
   -- +0x16  lw a5,0(a4)
-  k_step (mainSec_wp_s_lw_aur cpu _ ?hs (KA.«main» + 22#64) true 0#12 15#5 14#5 (by decide)
+  k_step (wp_s_lw_aur cpu _ ?hs (KA.«main» + 22#64) true 0#12 15#5 14#5 (by decide)
       startedAddr ?ha (by decide) (by decide) K [] _)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc $Hid $HK $HAU]
   iintro %w Hk Hpc Hseen
@@ -199,7 +199,7 @@ theorem ms_spin [CurCtx] (cpu : CPU) (hcpu : cpu ≠ startedPrimary)
   icases Hseen with (%hw | ⟨%t, %hw, #Hidx, #Hrv, #HP⟩)
   · -- read 0: the fence, and round again
     subst hw
-    k_step (mainSec_wp_s_fence_r_rw cpu _ (KA.«main» + 24#64) false 0#5 0#5)
+    k_step (wp_s_fence_r_rw cpu _ (KA.«main» + 24#64) false 0#5 0#5)
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [KCtx.setReg_sie, KCtx.setReg_proc]
     iintro Hk Hpc
     k_step (wp_s_addiw cpu _ (KA.«main» + 28#64) true 0#12 15#5 15#5 (by decide))
@@ -216,7 +216,7 @@ theorem ms_spin [CurCtx] (cpu : CPU) (hcpu : cpu ≠ startedPrimary)
     iapply HΦ $$ %v Hk Hpc HP
   · -- read 1: the store is visible; the fence makes it this hart's floor
     subst hw
-    k_step (mainSec_wp_s_fence_r_rw_floor cpu _ (by simp [hsie]) (KA.«main» + 24#64) false 0#5 0#5 t)
+    k_step (wp_s_fence_r_rw_floor cpu _ (by simp [hsie]) (KA.«main» + 24#64) false 0#5 0#5 t)
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc $Hrv] with [KCtx.setReg_sie, KCtx.setReg_proc]
     iintro Hk Hpc #Hv
     k_step (wp_s_addiw cpu _ (KA.«main» + 28#64) true 0#12 15#5 15#5 (by decide))
