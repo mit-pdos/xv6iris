@@ -68,6 +68,11 @@ a STAGE file (no `Proof` prefix).  Rocq's header, in short:
    moved to KexecTail (its deviation 5).
 9. **The +0x1a2 state's pc is `KA.«kexec» + 0x1f2`** (Rocq's own: the
    `c.li s2,0` the phnum = 0 branch lands on); the name keeps Rocq's.
+10. **ONE uvmalloc call site, `kxc_call_uvmalloc`** (KexecCore's dedupe):
+   phase C's stack call (formerly `KexecCParts.kxcC_call_uvmalloc`, moved
+   here verbatim) and phase B2's segment call
+   (`KexecB2.kxcB2_call_uvmalloc`, now its instance at the covered break)
+   share it.  Rocq transcribes the call inline at both sites.
 -/
 import Xv6.KexecTail
 import Xv6.LazyFree
@@ -574,5 +579,86 @@ def kxcAt2a6 (k : KCtx) (A : KexecArgs) (c : CPU) (spie spp : Bool) (R : RegMap)
   kxcDRes k A w5 w6 w7 w8 w9 w10 w11 w12 w13 w67 ef P Mi ci
 
 end Seams
+
+/-! ## THE uvmalloc CALL SITE (deviation 10) -/
+
+section CallUvmalloc
+attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Functions.currentlyEnabled
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+  [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
+  [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
+  [Appcfg GF] [FileG GF] [Fscfg] [Icfg] [CurCtx]
+
+set_option maxHeartbeats 8000000 in
+/-- **`jal uvmalloc` at `X`, THE ONE kexec CALL SITE** (+0x17c, a segment's
+pages; +0x1ce, the stack's two pages): uvmalloc's landed contract at kexec's
+context form, its premises (`hold`, Rocq's `newsz ≤ maxsz ∨ covered`
+disjunct `hnew`, the permission mask, the run's freshness `hfree`) passed
+through.  `KexecB2.kxcB2_call_uvmalloc` is its instance at the loop's
+covered break (deviation 10). -/
+theorem kxc_call_uvmalloc (UA : UVMALLOC) (Γ : SchedNames) (cpu : CPU) (k : KCtx) (A : KexecArgs)
+    (spie spp : Bool) (R : RegMap)
+    (X : BitVec 64) (imm : BitVec 21) (hX : X + BitVec.signExtend 64 imm = KA.«uvmalloc»)
+    (hret : jumpPc (X + 4#64) = X + 4#64) (P : UPtd) (M : Nat → List (BitVec 8))
+    (hK : kexecSlots ≤ k.avail) (hnoff : k.noff = 0)
+    (hroot : R 10#5 = pageAddr P.root) (hold : (R 11#5).toNat ≤ uvmMaxsz)
+    (hnew : (R 12#5).toNat ≤ uvmMaxsz ∨ lazyFree P.um (R 11#5))
+    (hperm : R 13#5 &&& ~~~0x3EE#64 = 0#64)
+    (hfree : ∀ i, i < uvmaNp (R 11#5) (R 12#5) →
+      pgRoundUpN (R 11#5).toNat + 4096 * i + 4096 ≤ uvmMaxsz → get? P.um (uvmaVpn0 (R 11#5) + i) = none) :
+    instr X false (instruction.JAL (imm, regidx.Regidx 1#5)) ∗
+    kctx cpu (((k.withSpie spie spp).pushed 68).withRegs R) ∗ pcIs cpu X ∗
+    trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗
+    fsFabric (hlc := hlc) Γ A.pd A.pav A.pu ∗ procPtAt P M ∗
+    (∀ (c : CPU) (spie' spp' : Bool) (R' : RegMap),
+      ⌜calleeSaved (R.set 1#5 (X + 4#64)) R'⌝ -∗
+      kctx c (((k.withSpie spie' spp').pushed 68).withRegs R') -∗ pcIs c (X + 4#64) -∗
+      trapCsrsExt c k.sie -∗ cpuClaimExt c k.sie k.proc -∗
+      ((⌜R' 10#5 = 0#64⌝ ∗ procPtAt P M) ∨
+       (∃ (P' : UPtd) (M' : Nat → List (BitVec 8)),
+          ⌜uvmallocOk P P' M M' (R 11#5) (R 12#5) (R 13#5) ∧
+            R' 10#5 = (if (R 12#5).toNat < (R 11#5).toNat then R 11#5 else R 12#5)⌝ ∗
+          procPtAt P' M')) -∗ wpLoop c)
+    ⊢ wpLoop (GF := GF) cpu := by
+  have hK' : uvmallocSlots ≤ k.avail - 68 := by
+    have : uvmallocSlots = 42 := rfl
+    rw [kxc_slots_val] at hK; omega
+  iintro ⟨#Hi, Hk, Hpc, Hte, Hce, #Hfab, Hpt, HK⟩
+  icases fsFabric_all Γ A.pd A.pav A.pu $$ Hfab with
+    ⟨⟨-, -, -, -, -, -, -, -, #Hkl, #Hav, -, -, -⟩, -, -, -, -⟩
+  icases kctx_wf _ _ $$ Hk with ⟨%hwf, Hk⟩
+  have hlocks : k.locks = [] := by
+    have := hwf.2.2.2.1
+    simp only [KCtx.withRegs, KCtx.pushed, KCtx.withSpie] at this
+    exact List.eq_nil_of_length_eq_zero (by omega)
+  k_step_e (wp_s_jal cpu _ X false imm 1#5 (by decide)) $$ [- $Hk $Hpc $Hi] with [hX]
+  iintro Hk Hpc
+  have h := UA.wp_uvmalloc (hlc := hlc) (GF := GF) cpu
+    ((((k.withSpie spie spp).pushed 68).withRegs R).setReg 1#5 (X + 4#64)) fscKalloc fsReadyKmem P M
+    (by k_norm_g; omega) (by k_norm_g; exact hK') (by k_norm_g; simp [hlocks])
+    (by k_norm_g; simp [RegMap.set_apply, hroot]) (by k_norm_g; simpa [RegMap.set_apply] using hold)
+    (by k_norm_g; simpa [RegMap.set_apply] using hnew) (by k_norm_g; simpa [RegMap.set_apply] using hperm)
+    (by k_norm_g; simpa [RegMap.set_apply] using hfree)
+  unfold wp_uvmalloc_body at h
+  simp only [uvmallocAddr] at h
+  iapply h
+  k_norm_g
+  iframe
+  iframe #
+  iapply wpNext_intro_pin
+  iintro %c %hpin %spie' %spp' %R' %_ Hk Hpc Hres %hcs
+  have hpin' : k.sie = false → c = cpu := fun h => hpin (Or.inl (by k_norm_g; exact h))
+  ihave Hte := trapCsrsExt_move _ _ _ hpin' $$ Hte
+  ihave Hce := cpuClaimExt_move _ _ _ _ hpin' $$ Hce
+  k_norm_g [hret]
+  ihave Hk := kctx_eq_mono c _ (((k.withSpie spie' spp').pushed 68).withRegs R')
+    (kxc_ctx_ret k spie spp spie' spp' R') $$ Hk
+  iapply HK $$ %c %spie' %spp' %R' [] Hk Hpc Hte Hce
+  · ipureintro
+    simpa using hcs
+  try simp only [RegMap.set_apply, BitVec.reduceEq, ite_false]
+  iexact Hres
+
+end CallUvmalloc
 
 end Xv6

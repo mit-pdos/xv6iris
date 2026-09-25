@@ -213,9 +213,10 @@ theorem kxcB2_call_f2p (F2P : FLAGS2PERM) (cpu : CPU) (k : KCtx) (spie spp : Boo
   simpa [RegMap.set_apply] using hret'
 
 set_option maxHeartbeats 8000000 in
-/-- **`jal uvmalloc` at `X`** (+0x17c; deviation 4): Rocq's COVERED premise
-(`hnew := Or.inr`, the old break bounding the loop's cursor), the old break's
-own bound by `UmCovered.lazyFree_maxsz`, the run's freshness off `umBelow`. -/
+/-- **`jal uvmalloc` at `X`** (+0x17c; deviation 4): KexecSeam's
+`kxc_call_uvmalloc` at Rocq's COVERED premise (`hnew := Or.inr`, the old
+break bounding the loop's cursor), the old break's own bound by
+`UmCovered.lazyFree_maxsz`, the run's freshness off `umBelow`. -/
 theorem kxcB2_call_uvmalloc (UV : UVMALLOC) (Γ : SchedNames) (cpu : CPU) (k : KCtx) (A : KexecArgs)
     (spie spp : Bool) (R : RegMap)
     (X : BitVec 64) (imm : BitVec 21) (hX : X + BitVec.signExtend 64 imm = KA.«uvmalloc»)
@@ -237,48 +238,12 @@ theorem kxcB2_call_uvmalloc (UV : UVMALLOC) (Γ : SchedNames) (cpu : CPU) (k : K
             R' 10#5 = (if (R 12#5).toNat < (R 11#5).toNat then R 11#5 else R 12#5)⌝ ∗
           procPtAt P' M')) -∗ wpLoop c)
     ⊢ wpLoop (GF := GF) cpu := by
-  have hK' : uvmallocSlots ≤ k.avail - 68 := by
-    have : uvmallocSlots = 42 := rfl
-    rw [kxc_slots_val] at hK; omega
   iintro ⟨#Hi, Hk, Hpc, Hte, Hce, #Hfab, Hpt, HK⟩
   icases UMemL.procPtAt_wf P Mi $$ Hpt with ⟨Hpt, %hwf⟩
-  have hold : (R 11#5).toNat ≤ uvmMaxsz := UmCovered.lazyFree_maxsz P _ hwf hcov
-  icases fsFabric_all Γ A.pd A.pav A.pu $$ Hfab with
-    ⟨⟨-, -, -, -, -, -, -, -, #Hkl, #Hav, -, -, -⟩, -, -, -, -⟩
-  icases kctx_wf _ _ $$ Hk with ⟨%hwfk, Hk⟩
-  have hlocks : k.locks = [] := by
-    have := hwfk.2.2.2.1
-    simp only [KCtx.withRegs, KCtx.pushed, KCtx.withSpie] at this
-    exact List.eq_nil_of_length_eq_zero (by omega)
-  k_step_e (wp_s_jal cpu _ X false imm 1#5 (by decide)) $$ [- $Hk $Hpc $Hi] with [hX]
-  iintro Hk Hpc
-  have h := UV.wp_uvmalloc (hlc := hlc) (GF := GF) cpu
-    ((((k.withSpie spie spp).pushed 68).withRegs R).setReg 1#5 (X + 4#64)) fscKalloc fsReadyKmem P Mi
-    (by k_norm_g; omega) (by k_norm_g; exact hK') (by k_norm_g; simp [hlocks])
-    (by k_norm_g; simp [RegMap.set_apply, hroot]) (by k_norm_g; simpa [RegMap.set_apply] using hold)
-    (by k_norm_g; exact Or.inr (by simpa [RegMap.set_apply] using hcov))
-    (by k_norm_g; simpa [RegMap.set_apply] using hperm)
-    (by
-      k_norm_g
-      intro i hi _
-      exact kxc_um_free_above _ _ P hbelow i hi)
-  unfold wp_uvmalloc_body at h
-  simp only [uvmallocAddr] at h
-  iapply h
-  k_norm_g
-  iframe
-  iframe #
-  iapply wpNext_intro_pin
-  iintro %c %hpin %spie' %spp' %R' %_ Hk Hpc Hres %hcs
-  have hpin' : k.sie = false → c = cpu := fun h => hpin (Or.inl (by k_norm_g; exact h))
-  ihave Hte := trapCsrsExt_move _ _ _ hpin' $$ Hte
-  ihave Hce := cpuClaimExt_move _ _ _ _ hpin' $$ Hce
-  k_norm_g [hret]
-  ihave Hk := kctx_eq_mono c _ (((k.withSpie spie' spp').pushed 68).withRegs R')
-    (kxc_ctx_ret k spie spp spie' spp' R') $$ Hk
-  iapply HK $$ %c %spie' %spp' %R' [] Hk Hpc Hte Hce Hres
-  ipureintro
-  simpa using hcs
+  iapply (kxc_call_uvmalloc UV Γ cpu k A spie spp R X imm hX hret P Mi hK hnoff hroot
+    (UmCovered.lazyFree_maxsz P _ hwf hcov) (Or.inr hcov) hperm
+    (fun i hi _ => kxc_um_free_above _ _ P hbelow i hi))
+    $$ [$Hi $Hk $Hpc $Hte $Hce $Hfab $Hpt $HK]
 
 set_option maxHeartbeats 8000000 in
 /-- **`jal readi` at `X`** (+0x0e6 / +0x13a; deviation 4): `KexecACode`'s

@@ -521,7 +521,7 @@ theorem kxc_c_setup (MP : MYPROC) (UA : UVMALLOC) (UC : UVMCLEAR) (PFP : PROC_FR
   have hc8 : lazyFree P.um (BitVec.ofNat 64 (pgRoundUpN szv.toNat)) := by
     intro j hj; rw [hs8n, hpgi] at hj; exact hcov j hj
   -- +0x1ce  jal uvmalloc
-  iapply (kxcC_call_uvmalloc Γ UA cpu k A spie1 spp1 _ (KA.«kexec» + 0x1ce#64) 2082986#21
+  iapply (kxc_call_uvmalloc UA Γ cpu k A spie1 spp1 _ (KA.«kexec» + 0x1ce#64) 2082986#21
       kxcC_br_uvmalloc kxcC_ret_1ce P Mi hK hnoff ?ur ?uo ?un ?up ?uf)
     $$ [- $Hk $Hpc $Hte $Hce $Hfab $Hpt]
   case ur => simp [RegMap.set_apply]
