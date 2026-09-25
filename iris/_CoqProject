@@ -321,6 +321,16 @@ UCodeEcho.v
 UCodeInit.v
 UInitArgv.v
 UCodeCat.v
+UCodeGrep.v
+UkGrepLib.v
+UkGrepMatch.v
+UkGrepPutc.v
+UkGrepVprintf.v
+UkGrepVprintfS.v
+UkGrepFprintf.v
+UkGrepLoop.v
+UkGrepMain.v
+UkGrepTree.v
 UkCat.v
 UkCatPutc.v
 UkCatLit.v
@@ -1505,6 +1515,7 @@ ProgTree.v
 FileState.v
 ProgTreeFile.v
 ProgTreePipes.v
+GrepTree.v
 EchoDisc.v
 LineBytes.v
 LineModel.v
