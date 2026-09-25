@@ -45,7 +45,7 @@ FsCfgKits / FsCfgSnap / ProofMain).
    `lkFresh itableLock` (the two word cells at their positions with their
    floors: `MachCSL.lkFresh`); iinit's post hands `lockInited itableLockAddr
    itableNameAddr` = the name word ∗ `lkFresh`, and the caller drops the name
-   word (`Xv6.bioInit_of_binit`'s pattern: `isLock` carries the name as a
+   word (`Xv6.bioInitAt_of_binit`'s pattern: `isLock` carries the name as a
    `String`, no memory conjunct).  Rocq's `sl_fresh (i_lock (ientry k))
    "inode"` is `sleepLockInited (iLock (ientry k)) sname` (iinit's post;
    `sname` is the `"inode"` literal's address, Lean `SpecIinit.inodeNameAddr`,
@@ -60,7 +60,7 @@ FsCfgKits / FsCfgSnap / ProofMain).
    `lk_cpu_ready` / `sl_fresh`.  Lean's claims are `kmapId`s
    (`IcacheInvRef` deviation 3), which a cell does not yield (a `wordAtN`
    names an arbitrary `ppn`), so `icacheBootAt` takes the persistent
-   `kmapStatic` (what `Xv6.bioInit` extracts from its `kctx`) and derives
+   `kmapStatic` (what `Xv6.bioInitAt` extracts from its `kctx`) and derives
    all of them here: `irefClaims_boot`, `itableLock_kmapIds`,
    `inodeSlk_kmapIds`, over the arithmetic `itable_kmapRw` /
    `ientry_off_toNat` (the whole `itable`, `0x1aa8` bytes, is kernel

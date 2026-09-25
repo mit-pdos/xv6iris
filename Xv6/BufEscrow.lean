@@ -762,7 +762,7 @@ all naming block `0` coexist.
 hands back only the three things `binit` writes: the initialised sleeplock
 (`sleepLockInited`), `b->prev` and `b->next`.  The rest of `struct buf` is
 `.bss` that `binit` never touches and its spec never mentions, so a full
-`bioInit` must take, per buffer, as EXTRA inputs beside `binit`'s post:
+`bioInitAt` must take, per buffer, as EXTRA inputs beside `binit`'s post:
 `b->valid` (`+0`), `b->disk` (`+4`), `b->dev` (`+8`), `b->blockno` (`+12`),
 `b->refcnt` (`+64`) and the 1024 data bytes (`+88`) -- all zero out of
 `.bss`. -/

@@ -282,6 +282,7 @@ import Xv6.SpecArgaddr
 import Xv6.SpecSysWait
 import Xv6.SpecSysPause
 import Xv6.SleepLockDefs
+import Xv6.SleepLockAt
 import Xv6.SpecAcquiresleep
 import Xv6.SpecReleasesleep
 import Xv6.SpecHoldingsleep

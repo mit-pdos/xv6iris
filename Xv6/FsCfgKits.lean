@@ -43,15 +43,15 @@ the arity-free `fsCrashSeam` ride `SpecMain`/`firstBootPersist`, not a kit.
    fscfg) (APP : appcfg Σ)` are Lean's per-declaration `[Icfg] [Fscfg]` and
    the section's `[Appcfg GF]` (FsCfgDefs deviation 4); every row is at the
    ambient fields, which is what Rocq's explicit passing achieves.
-2. **KIT 1 HAS NO `bio_free_tok fsc_bio` ROW.**  Rocq's `BioInitAt.bio_init_at`
-   builds the buffer cache AT the pre-minted `fsc_bio`; Lean has only
-   `Xv6.bioInit` / `bioInit_of_binit`, which MINT `∃ γl γ, bioCtx γl γ V`,
-   and Lean's `BcacheNames` has no lock gname and a different box layout, so
-   there is no `bioFreeTok` to state.  This is a GAP, not a simplification:
-   `fsReady` / `firstBootPersist` want `∃ γl, bioCtx γl fscBio …` at the
-   AMBIENT `fscBio`, which `bioInit`'s fresh names cannot meet.  Porting
-   Rocq's `BioInitAt.v` (`bio_free_tok`, `bio_init_at`) is the fix; the row
-   is then inserted after `icId`'s, at Rocq's position.
+2. **KIT 1'S BIO ROW BINDS THE LOCK'S NAME.**  Rocq's `bio_free_tok fsc_bio`
+   is `∃ γl, bioFreeTok γl fscBio` (`Xv6/BioInit.lean`, Rocq
+   `BioInitAt.v`), consumed by `Xv6.bioInitAt` /
+   `Xv6.bioInitAt_of_binit` at the AMBIENT `fscBio`, whose post
+   `bioCtx γl fscBio …` meets `fsReady` / `firstBootPersist`'s
+   `∃ γl, bioCtx γl fscBio …`.  The `∃ γl` is FsReady deviation 2 (Lean's
+   `bioCtx γl γ V` keeps the "bcache" spinlock's name outside
+   `BcacheNames`, Rocq's `bn_lk` is inside); `bioFreeTok`'s own deviations
+   (no `bslots` rows, no `bn_mid`) are in its docstring.
 3. **Kit 1's kinit rows are Rocq's** (`lockFreeTok fscKalloc`,
    `kallocAvail fsReadyKmem (some 0)`, `kmemAuth fsReadyKmem 0` = Rocq
    `kmem_avail_auth`, the same disjunction), but Lean's `wp_kinit` still
@@ -89,6 +89,7 @@ import Xv6.OffBox
 import Xv6.AppDur
 import Xv6.FsCrashSeam
 import MachCSL.LockBornHook
+import Xv6.BioInit
 
 namespace Xv6
 
@@ -108,7 +109,7 @@ variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [Fdslot
 order), the bio boot's pool rows, the four `newlockAt` ghosts (kmem /
 virtio_disk / itable / pr), kinit's genesis count, the lock-window pins, the
 pool's transit and corpse ledgers, and the fifty boxes' fresh ghosts.
-Deviations 2--4 for the row spellings and the missing bio row. -/
+Deviations 2--4 for the row spellings. -/
 def fsKitIcache [Fscfg] [Icfg] : IProp GF := iprop(
   -- `icacheBootAt`'s ghost premises
   iOwn (F := constOF IcacheUR) icfgIref (● (∅ : RegMapF (Qp × PosNat))) ∗
@@ -124,7 +125,8 @@ def fsKitIcache [Fscfg] [Icfg] : IProp GF := iprop(
   ([∗list] k ∈ List.range NINODE, icDepNeutral fscIc k) ∗
   -- the identification family at DUMMY values (`icacheBootAt` re-tags it)
   ([∗list] k ∈ List.range NINODE, ∃ (v : Bool) (d n : BitVec 32), icId fscIc k 1 v d n) ∗
-  -- the bio boot's pool (deviation 2: no `bio_free_tok fscBio` row)
+  -- `bioInitAt`'s ghost premises (deviation 2: the lock's name is bound)
+  (∃ γl : GName, bioFreeTok γl fscBio) ∗
   ([∗set] b ∈ fscCov, poolBlk (fsView fscFs fscDisk icfgDev fscCov) b) ∗
   -- the other three `newlockAt` ghosts
   lockFreeTok fscKalloc ∗
@@ -226,6 +228,7 @@ def fsKitIcacheRest [Fscfg] [Icfg] : IProp GF := iprop(
   ([∗list] k ∈ List.range NINODE, icTok fscIc k) ∗
   ([∗list] k ∈ List.range NINODE, icDepNeutral fscIc k) ∗
   ([∗list] k ∈ List.range NINODE, ∃ (v : Bool) (d n : BitVec 32), icId fscIc k 1 v d n) ∗
+  (∃ γl : GName, bioFreeTok γl fscBio) ∗
   ([∗set] b ∈ fscCov, poolBlk (fsView fscFs fscDisk icfgDev fscCov) b) ∗
   lockFreeTok fscDlock ∗
   ([∗list] k ∈ List.range NINODE, hpnFull k none) ∗
@@ -237,13 +240,13 @@ def fsKitIcacheRest [Fscfg] [Icfg] : IProp GF := iprop(
 theorem fsKitIcache_split [Fscfg] [Icfg] :
     fsKitIcache (GF := GF) ⊢ fsKitPrintk ∗ fsKitKalloc ∗ fsKitIcacheRest := by
   unfold fsKitIcache fsKitPrintk fsKitKalloc fsKitIcacheRest
-  iintro ⟨Hiref, Hlive, Hstmp, Hisl, Hipool, Hpkey, Hxkey, Hitlk, Htok, Hdep, Hgid, Hpool,
+  iintro ⟨Hiref, Hlive, Hstmp, Hisl, Hipool, Hpkey, Hxkey, Hitlk, Htok, Hdep, Hgid, Hbio, Hpool,
     Hkmlk, Hdllk, Hprlk, Hkav, Hkauth, Hhpn, Htkey, Hckey, Hbox⟩
   isplitl [Hprlk]
   · iexact Hprlk
   isplitl [Hkmlk Hkav Hkauth]
   · iframe Hkmlk Hkav Hkauth
-  iframe Hiref Hlive Hstmp Hisl Hipool Hpkey Hxkey Hitlk Htok Hdep Hgid Hpool Hdllk Hhpn
+  iframe Hiref Hlive Hstmp Hisl Hipool Hpkey Hxkey Hitlk Htok Hdep Hgid Hbio Hpool Hdllk Hhpn
     Htkey Hckey Hbox
 
 /-- **Rocq `fs_kit_kalloc_open`**. -/
@@ -268,6 +271,7 @@ theorem fsKitIcacheRest_open [Fscfg] [Icfg] :
       ([∗list] k ∈ List.range NINODE, icTok fscIc k) ∗
       ([∗list] k ∈ List.range NINODE, icDepNeutral fscIc k) ∗
       ([∗list] k ∈ List.range NINODE, ∃ (v : Bool) (d n : BitVec 32), icId fscIc k 1 v d n) ∗
+      (∃ γl : GName, bioFreeTok γl fscBio) ∗
       ([∗set] b ∈ fscCov, poolBlk (fsView fscFs fscDisk icfgDev fscCov) b) ∗
       lockFreeTok fscDlock ∗
       ([∗list] k ∈ List.range NINODE, hpnFull k none) ∗

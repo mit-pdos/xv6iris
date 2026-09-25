@@ -11,7 +11,7 @@ sleeplock (`Xv6.sleepLockInited`), `b->prev` and `b->next`.  The rest of
 therefore never mentions -- `b->valid` (+0), `b->disk` (+4), `b->dev` (+8),
 `b->blockno` (+12), `b->refcnt` (+64) and the 1024 data bytes (+88), all
 zero out of `.bss`.  Those are the boot chain's to hand over, not `binit`'s,
-so `Xv6.SpecBinit` does NOT grow: `Xv6.bioInit` takes them as a premise
+so `Xv6.SpecBinit` does NOT grow: `Xv6.bioInitAt` takes them as a premise
 beside `binit`'s post, exactly as Rocq's `bio_init` does.
 
 Beside them it takes the covered blocks' disk fragments (the initial POOL:
@@ -19,16 +19,18 @@ no buffer caches anything yet) and requires `0 ∉ V.cov`, because `binit`
 leaves every buffer's blockno cell at `0` and an uncovered blockno owes no
 fragment -- which is what lets thirty buffers all naming block `0` coexist.
 
-**GNAMES BEFORE THE RECORD** (Rocq's own dance).  `Xv6.bufSlpBox γ k` --
-the payload the sleeplocks are sealed over -- names buffer `k`'s checkout
-token and its escrow, so those ghosts are allocated FIRST as bare
-`Nat → _` functions, the locks are sealed over `Xv6.bufSlpRaw`, and only
-then is `Xv6.BcacheNames` assembled.
-
-**THE LOCK IS BORN THROUGH ITS HOOK.**  `Xv6.bcacheResAt`'s floor slot must
-cover the boot stamps of all thirty escrows, and a floor above the creator's
-own view can only be minted on a stamped record -- so `bcache.lock` is
-created with `MachCSL.kctx_newlock_hook` over `Xv6.bcacheRes_fold_in`.
+**AT PUBLISHED NAMES** (Rocq `BioInitAt.v`).  The fs configuration's
+`Fscfg.fscBio` is AMBIENT -- fixed before any fupd runs -- so the cache must
+be built AT a record the caller already holds, not return a fresh one.  So:
+`Xv6.bioFreeTok γl γ` is the free state of every gname (one row, a boot kit
+row: `Xv6.fsKitIcache`), `Xv6.bioNamesGhostAlloc` picks the record (a
+plain `bupd`), and `Xv6.bioInitAt` / `Xv6.bioInitAt_of_binit` build the
+cache at it: the thirty sleeplocks at `γ.slk k` (`Xv6.kctx_newSleeplockAt`)
+over `Xv6.bufSlpRaw`, the escrows at `γ.box k`, and `bcache.lock` at `γl`
+(`MachCSL.newlockAt_llb`, the floor folded at the lock's own stamped
+context, since `Xv6.bcacheResAt`'s floor slot covers the thirty escrows'
+boot stamps).  The fresh-name `bioInit` / `bioInit_of_binit` (Rocq
+`bio_init`) had no caller and are gone.
 
 **THE SLOT SUPPLY IS NOT MINTED HERE** (wave 7, P3 prerequisite): the
 `bslots` tokens live at the CANONICAL name `BioslotG.bioslotName`
@@ -38,6 +40,7 @@ no longer carries `bslots BSLOTS` (it was a fresh name's whole supply).
 -/
 import Xv6.BufEscrow
 import MachCSL.LockBornHook
+import Xv6.SleepLockAt
 import MachCSL.BigSepLib
 
 namespace Xv6
@@ -378,76 +381,110 @@ theorem bd_kmap_all (n : Nat) (hn : n ≤ NBUF) :
       iapply kmapStatic_rw _ (bnode_off_kmapRw n 40 (by omega) (by decide))
       iexact HS
 
-/-! ## The whole cache, born -/
+/-! ## The free state of a names record (Rocq `BioInitAt.v`) -/
+
+/-- **Rocq `BioInitAt.bio_free_tok`**: the free state of the buffer cache's
+gnames, ONE row -- the "bcache" spinlock unbuilt, the reference authority
+empty, every buffer's sleeplock pair unbuilt beside its idle checkout token,
+and every buffer's escrow ghosts fresh (the raw bundle beside the L2
+register's other half, which the sleeplock is sealed over).
+
+Deviations from Rocq's row: the lock's name `γl` is a separate argument
+(`Xv6.bioCtx γl γ V` keeps it outside `BcacheNames`; FsReady deviation 2);
+there is no `bslots_auth ∗ bslots BSLOTS_FS` (the slot supply lives at the
+CANONICAL `BioslotG.bioslotName`, minted by the boot chain's
+`Xv6.bslots_alloc`, and this construction neither takes nor returns it);
+no `bn_mid` token (Lean's `BcacheNames` has no such field); the four box
+ghosts are `Xv6.bufBoxRaw` (whose drop register is existential, Rocq's is
+at `SlotReg 0 false (0, 0) None`). -/
+def bioFreeTok (γl : GName) (γ : BcacheNames) : IProp GF := iprop(
+  lockFreeTok γl ∗
+  (γ.ref ↪●MAP (∅ : RegMapF Nat)) ∗
+  ([∗list] k ∈ List.range NBUF, slFreePair (γ.slk k) ∗ (γ.own k ↪VAR{DFrac.own (1 : Qp)} ())) ∗
+  ([∗list] k ∈ List.range NBUF,
+    bufBoxRaw (γ.box k) ∗ slotpHalf (γ.box k) (⟨0, none⟩ : L2Reg BufId)))
+
+/-- **Rocq `BioInitAt.bio_names_ghost_alloc`**: pick the record (and the
+lock's name).  A plain `bupd`: no mask, no physical premise, so the era
+fupd runs it before `binit` does. -/
+theorem bioNamesGhostAlloc :
+    ⊢@{IProp GF} |==> ∃ (γl : GName) (γ : BcacheNames), bioFreeTok γl γ := by
+  imod lockGhostAlloc (GF := GF) with ⟨%γl, Hlk⟩
+  imod (ghost_map_alloc_empty (GF := GF) (K := Nat) (V := Nat) (H := RegMapF))
+    with ⟨%γref, Ha⟩
+  imod bd_funAlloc (fun (_ : Nat) (pg : (GName × GName) × GName) =>
+      iprop(slFreePair (GF := GF) pg.1 ∗ (pg.2 ↪VAR{DFrac.own (1 : Qp)} ())))
+      (fun _ => by
+        imod slPairGhostAlloc (GF := GF) with ⟨%p, Hp⟩
+        imod ghost_var_alloc (GF := GF) (() : Unit) with ⟨%γo, Ho⟩
+        imodintro
+        iexists (p, γo)
+        iframe Hp Ho) NBUF with ⟨%f, Hbufs⟩
+  imod bd_funAlloc (fun (_ : Nat) (γbk : BoxNames) => iprop(bufBoxRaw (GF := GF) γbk ∗
+      slotpHalf (GF := GF) γbk (⟨0, none⟩ : L2Reg BufId)))
+      (fun _ => bufBoxRaw_alloc) NBUF with ⟨%bx, Hbx⟩
+  imodintro
+  iexists γl, (⟨γref, fun k => (f k).1, fun k => (f k).2, bx⟩ : BcacheNames)
+  unfold bioFreeTok
+  iframe Hlk Ha Hbufs Hbx
+
+/-! ## The whole cache, born at a published record -/
 
 set_option maxHeartbeats 16000000 in
-/-- **THE BUFFER CACHE, BORN** (Rocq's `bio_init`). -/
-theorem bioInit (cpu : CPU) (k : KCtx) (V : BioView GF) (hcov0 : (0 : Nat) ∉ V.cov) :
-    kctx cpu k ∗ lkFresh bcacheLockAddr ∗
+/-- **THE BUFFER CACHE, BORN** at the names the caller already published
+(Rocq `BioInitAt.bio_init_at`; it replaces the fresh-name `bio_init` form,
+which had no caller).  `Xv6.bioFreeTok γl γ` supplies every ghost;
+everything else is `bio_init`'s physical premises. -/
+theorem bioInitAt (cpu : CPU) (k : KCtx) (γl : GName) (γ : BcacheNames) (V : BioView GF)
+    (hcov0 : (0 : Nat) ∉ V.cov) :
+    kctx cpu k ∗ bioFreeTok γl γ ∗ lkFresh bcacheLockAddr ∗
     wordAtN curCtx (bNext bhead) 8 (DFrac.own 1) (bufAddr (NBUF - 1)) ∗
     wordAtN curCtx (bPrev bhead) 8 (DFrac.own 1) (bufAddr 0) ∗
     ([∗list] i ∈ List.range NBUF, sleepLockInited (aBufLock (bnode i)) bufferNameAddr) ∗
     ([∗list] i ∈ List.range NBUF, bdLinks curCtx i) ∗
     ([∗list] i ∈ List.range NBUF, bdBss curCtx i) ∗
     ([∗set] b ∈ V.cov, poolBlk V b)
-    ⊢ |={⊤}=> (kctx (GF := GF) cpu k ∗
-      ∃ (γl : GName) (γ : BcacheNames), bioCtx γl γ V) := by
-  iintro ⟨Hk, Hfresh, Hhn, Hhp, Hslki, Hlinks, Hbss, Hpool⟩
+    ⊢ |={⊤}=> (kctx (GF := GF) cpu k ∗ bioCtx γl γ V) := by
+  unfold bioFreeTok
+  iintro ⟨Hk, ⟨Hlkf, Ha, Hsl, Hbx⟩, Hfresh, Hhn, Hhp, Hslki, Hlinks, Hbss, Hpool⟩
   icases kctx_kmapStatic _ _ $$ Hk with ⟨#HS, Hk⟩
   ihave Hpool := bioPool_boot V hcov0 $$ Hpool
   ihave Hlru := bd_lru_boot curCtx $$ [Hhn Hhp Hlinks]
   case' _ => iframe Hhn Hhp Hlinks
   have hc0 : (0#32 : BitVec 32).toNat ∉ V.cov := by
     rw [show (0#32 : BitVec 32).toNat = 0 from by decide]; exact hcov0
-  -- **THE BOX GHOSTS, BEFORE THE NAMES RECORD** (Rocq's four `seq_fun_alloc`
-  -- families): the escrows' payload mentions `BcacheNames`, so the box names
-  -- must exist -- and the sleeplocks be sealed over them -- before it does.
-  imod bd_funAlloc (fun (_ : Nat) (γbk : BoxNames) => iprop(bufBoxRaw (GF := GF) γbk ∗
-      slotpHalf (GF := GF) γbk (⟨0, none⟩ : L2Reg BufId)))
-      (fun _ => bufBoxRaw_alloc) NBUF with ⟨%bx, Hbraw⟩
-  icases BigSepL.bigSepL_sep_eqv.1 $$ Hbraw with ⟨Hbraw, Hslotp⟩
-  -- the checkout tokens
-  imod bd_funAlloc (fun (_ : Nat) (γo : GName) => iprop(γo ↪VAR{DFrac.own (1 : Qp)} ()))
-      (fun _ => ghost_var_alloc (GF := GF) (() : Unit)) NBUF with ⟨%fown, Htoks⟩
-  -- **THE THIRTY SLEEPLOCKS**, sealed over the RAW row
+  icases BigSepL.bigSepL_sep_eqv.1 $$ Hbx with ⟨Hbraw, Hslotp⟩
+  -- **THE THIRTY SLEEPLOCKS**, at their published pairs, sealed over the RAW row
   ihave #Hkm := bd_kmap_all NBUF (Nat.le_refl _) $$ HS
-  ihave Hq := BigSepL.bigSepL_sep_eqv.2 $$ [Hslki Htoks]
-  case' _ => iframe Hslki Htoks
+  ihave Hq := BigSepL.bigSepL_sep_eqv.2 $$ [Hslki Hsl]
+  case' _ => iframe Hslki Hsl
   ihave Hq := BigSepL.bigSepL_sep_eqv.2 $$ [Hq Hslotp]
   case' _ => iframe Hq Hslotp
   ihave Hq := BigSepL.bigSepL_sep_eqv.2 $$ [Hq Hkm]
   case' _ => iframe Hq Hkm
   imod bd_funAllocK
       (fun j => iprop(((sleepLockInited (aBufLock (bnode j)) bufferNameAddr ∗
-          (fown j ↪VAR{DFrac.own (1 : Qp)} ())) ∗
-          slotpHalf (bx j) (⟨0, none⟩ : L2Reg BufId)) ∗
+          (slFreePair (γ.slk j) ∗ (γ.own j ↪VAR{DFrac.own (1 : Qp)} ()))) ∗
+          slotpHalf (γ.box j) (⟨0, none⟩ : L2Reg BufId)) ∗
         (kmapId (slLk (aBufLock (bnode j))) ∗ kmapId (slLk (aBufLock (bnode j)) + 16#64))))
-      (fun j (p : GName × GName) => isSleeplockGen p.1 p.2 (aBufLock (bnode j))
-        (bufSlpRaw (fown j) (bx j)) slUntracked)
+      (fun j (_ : Unit) => isSleeplockGen (γ.slk j).1 (γ.slk j).2 (aBufLock (bnode j))
+        (bufSlpRaw (γ.own j) (γ.box j)) slUntracked)
       cpu k
       (fun j => by
-        iintro ⟨Hk, ⟨⟨Hsli, Htok⟩, Hpp⟩, #Hm1, #Hm2⟩
-        imod kctx_newSleeplock cpu k (aBufLock (bnode j)) bufferNameAddr
-            (bufSlpRaw (fown j) (bx j)) slUntracked $$ [Hk Hsli Hm1 Hm2 Htok Hpp]
-          with ⟨Hk, ⟨%γa, %γb, #Hsl⟩⟩
-        · iframe Hk Hsli Hm1 Hm2
-          iapply bufSlpRaw_boot (fown j) (bx j) curCtx
+        iintro ⟨Hk, ⟨⟨Hsli, Hp, Htok⟩, Hpp⟩, #Hm1, #Hm2⟩
+        imod kctx_newSleeplockAt cpu k (γ.slk j) (aBufLock (bnode j)) bufferNameAddr
+            (bufSlpRaw (γ.own j) (γ.box j)) slUntracked $$ [Hk Hp Hsli Hm1 Hm2 Htok Hpp]
+          with ⟨Hk, #Hslk⟩
+        · iframe Hk Hp Hsli Hm1 Hm2
+          iapply bufSlpRaw_boot (γ.own j) (γ.box j) curCtx
           iframe Htok Hpp
         imodintro
         iframe Hk
-        iexists ((γa, γb) : GName × GName)
-        iexact Hsl)
-      NBUF $$ [Hk Hq] with ⟨Hk, ⟨%fslk, Hslks⟩⟩
+        iexists ()
+        iexact Hslk)
+      NBUF $$ [Hk Hq] with ⟨Hk, ⟨%_, Hslks⟩⟩
   · iframe Hk Hq
-  -- **THE NAMES RECORD**, now that every ghost exists
-  imod (ghost_map_alloc_empty (GF := GF) (K := Nat) (V := Nat) (H := RegMapF))
-    with ⟨%γref, Ha⟩
-  obtain ⟨γ, h1, h3, h4, h5⟩ : ∃ g : BcacheNames,
-      g.ref = γref ∧ g.slk = fslk ∧ g.own = fown ∧ g.box = bx :=
-    ⟨⟨γref, fslk, fown, bx⟩, rfl, rfl, rfl, rfl⟩
-  rw [← h1, ← h3, ← h4, ← h5]
-  -- the `.bss` cells, split the way the cache seats them (the travelling
-  -- payload names `γ`, so this waits for the record)
+  -- the `.bss` cells, split the way the cache seats them
   ihave Hbss := BigSepL.bigSepL_mono_of_forall
     (Φ := fun _ i => bdBss (GF := GF) curCtx i)
     (Ψ := fun _ i => iprop((∃ bs : List (BitVec 8),
@@ -466,7 +503,6 @@ theorem bioInit (cpu : CPU) (k : KCtx) (V : BioView GF) (hcov0 : (0 : Nat) ∉ V
   imod bufEscrow_allocAllAt γ V γ.box (1 : Qp).half (1 : Qp).half cpu (fun _ => 0#32)
       (fun _ => 0#32) (fun _ => 0#32) bsf ⊤ NBUF $$ [Hctx Hbraw Htrav] with ⟨Hctx, Hrows⟩
   · iframe Hctx Hbraw Htrav
-  ihave Hk := Hkback $$ Hctx
   icases bd_rows_split γ V γ.box NBUF $$ Hrows with ⟨%tl, #Htl, Hbox, Hrg, Hcnt⟩
   -- the key rows
   ihave Hkey := BigSepL.bigSepL_sep_eqv.2 $$ [Hdev Hbno]
@@ -512,18 +548,18 @@ theorem bioInit (cpu : CPU) (k : KCtx) (V : BioView GF) (hcov0 : (0 : Nat) ∉ V
     (fun k1 k2 _ _ hc _ => absurd hc hc0)
     (fun k0 _ hc => absurd hc hc0) $$ [Ha Hlru Hpool Hkey Hs]
   case' _ => iframe Ha Hlru Hpool Hkey Hs
-  ihave Hin := bcacheResIn_intro γ V curCtx tl $$ [Htl Hscan]
-  case' _ => iframe Htl Hscan
-  ihave #Hhook := lockHook_llb (bcacheResIn γ V tl) (bcacheResAt γ V) tl
-    (bcacheRes_fold_in γ V tl) $$ Htl
+  -- **THE LOCK, AT ITS PUBLISHED NAME**, minted with the fold at the boot
+  -- floor slot (Rocq's `newlock_at_llb` over `bcache_res2_fold_in`)
   ihave #Hm1 := kmapStatic_rw bcacheLockAddr (by decide) $$ HS
   ihave #Hm2 := kmapStatic_rw (bcacheLockAddr + 16#64) (by decide) $$ HS
-  imod kctx_newlock_hook cpu k bcacheLockAddr "bcache" (bcacheResAt γ V) (bcacheResIn γ V tl)
-    $$ [Hk Hin Hhook Hfresh Hm1 Hm2] with ⟨Hk, ⟨%γl, #Hlk⟩⟩
-  · iframe Hk Hin Hhook Hfresh Hm1 Hm2
+  ihave Hin := bcacheResIn_intro γ V curCtx tl $$ [Htl Hscan]
+  case' _ => iframe Htl Hscan
+  imod newlockAt_llb cpu ⊤ γl bcacheLockAddr "bcache" (bcacheResAt γ V) (bcacheResIn γ V tl)
+      tl (bcacheRes_fold_in γ V tl) $$ [Hlkf Hm1 Hm2 Hctx Hfresh Htl Hin] with ⟨Hctx, #Hlk⟩
+  · iframe Hlkf Hm1 Hm2 Hctx Hfresh Htl Hin
+  ihave Hk := Hkback $$ Hctx
   imodintro
   iframe Hk
-  iexists γl, γ
   unfold bioCtx isBcache
   isplitl []
   · iexact Hlk
@@ -567,17 +603,18 @@ Everything but `Xv6.bdBss` is `Xv6.wp_binit_body`'s postcondition verbatim.
 sleeplock, `prev` and `next`, so `b->valid`, `b->disk`, `b->dev`,
 `b->blockno`, `b->refcnt` and the 1024 data bytes are `.bss` cells it never
 touches -- the boot chain's to hand over, which is why `Xv6.SpecBinit` does
-not grow. -/
-theorem bioInit_of_binit (cpu : CPU) (k : KCtx) (V : BioView GF) (hcov0 : (0 : Nat) ∉ V.cov) :
-    kctx cpu k ∗ lockInited bcacheLockAddr bcacheNameAddr ∗
+not grow.  At the names the caller published (Rocq `bio_init_at`'s
+premises): `Xv6.bioFreeTok γl γ` beside `binit`'s post. -/
+theorem bioInitAt_of_binit (cpu : CPU) (k : KCtx) (γl : GName) (γ : BcacheNames) (V : BioView GF)
+    (hcov0 : (0 : Nat) ∉ V.cov) :
+    kctx cpu k ∗ bioFreeTok γl γ ∗ lockInited bcacheLockAddr bcacheNameAddr ∗
     wordPointsTo (bcacheHeadAddr + 72#64) 8 (DFrac.own 1) (bufAddr 0) ∗
     wordPointsTo (bcacheHeadAddr + 80#64) 8 (DFrac.own 1) (bufAddr 29) ∗
     ([∗list] i ∈ List.range 30, bufOut i) ∗
     ([∗list] i ∈ List.range NBUF, bdBss curCtx i) ∗
     ([∗set] b ∈ V.cov, poolBlk V b)
-    ⊢ |={⊤}=> (kctx (GF := GF) cpu k ∗
-      ∃ (γl : GName) (γ : BcacheNames), bioCtx γl γ V) := by
-  iintro ⟨Hk, Hli, Hhp, Hhn, Hout, Hbss, Hpool⟩
+    ⊢ |={⊤}=> (kctx (GF := GF) cpu k ∗ bioCtx γl γ V) := by
+  iintro ⟨Hk, Hfree, Hli, Hhp, Hhn, Hout, Hbss, Hpool⟩
   icases (show lockInited (GF := GF) bcacheLockAddr bcacheNameAddr ⊢
       wordPointsTo (bcacheLockAddr + 8#64) 8 (DFrac.own 1) bcacheNameAddr ∗
       lkFresh bcacheLockAddr from by
@@ -604,8 +641,8 @@ theorem bioInit_of_binit (cpu : CPU) (k : KCtx) (V : BioView GF) (hcov0 : (0 : N
         (bufAddr 0) ⊢
       wordAtN curCtx (bPrev bhead) 8 (DFrac.own 1) (bufAddr 0) from by
     rw [wordAtN_cur, show bPrev bhead = bcacheHeadAddr + 72#64 from rfl]) $$ Hhp
-  iapply bioInit cpu k V hcov0
-  iframe Hk Hfresh Hhn Hhp Hslki Hlinks Hbss Hpool
+  iapply bioInitAt cpu k γl γ V hcov0
+  iframe Hk Hfree Hfresh Hhn Hhp Hslki Hlinks Hbss Hpool
 
 end
 

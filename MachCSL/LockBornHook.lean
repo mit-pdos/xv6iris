@@ -8,7 +8,7 @@ stamps of thirty escrows -- cannot be presented there at all.  The release
 edge already has the answer (`MachCSL.lockHook_llb`): a floor over a stamp
 the presenter only holds a `MachCSL.topLb` for can be minted on the record
 ONCE IT IS STAMPED, because a stamped context has no hart.  This file runs
-the same fold at the lock's BIRTH, which is what `Xv6.bioInit` needs.
+the same fold at the lock's BIRTH, which is what `Xv6.bioInitAt` needs.
 
 Also here, from `Xv6/IcacheBootTable.lean` (Rocq `WpLockAt.v`), the birth at
 a PRE-ALLOCATED gname the itable boot needs: `lockFreeTok` (Rocq

@@ -76,7 +76,7 @@ PER-BLOCK PAYLOADS -- `clean b bs` ("`bs` is block `b`'s logical content and
 the disk home cell agrees") and `dirty b bs` ("`bs` is block `b`'s logical
 content and the block is pinned by a log reference").  `cov` must not contain
 `0` -- `binit` leaves every buffer's blockno cell at `0` -- which is what
-`Xv6.bioInit` takes as a premise.
+`Xv6.bioInitAt` takes as a premise.
 
 Bio only MOVES the payloads -- pool → escrow → handle and back -- and never
 converts clean ↔ dirty; holders do that with their own (log-layer) ghosts.

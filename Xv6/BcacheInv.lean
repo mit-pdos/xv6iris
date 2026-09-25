@@ -1203,7 +1203,7 @@ def bufSlpBox (γ : BcacheNames) (k : Nat) : CtxId → IProp GF := fun ξ => ipr
   bufTok γ k ∗ ∃ s : L2Reg BufId, slotpHalf (γ.box k) s ∗ ⌜s.hold = none⌝ ∗ ctxFloor ξ s.tp)
 
 /-- **THE SAME ROW, BEFORE THE NAMES RECORD EXISTS** (Rocq's `bslp_raw`).
-`Xv6.bioInit` must seal the thirty sleeplocks over this payload, but the
+`Xv6.bioInitAt` must seal the thirty sleeplocks over this payload, but the
 payload names buffer `k`'s checkout token and its escrow -- so those ghosts
 are allocated FIRST, as bare `Nat → _` functions, the locks are sealed over
 the raw form, and only then is `Xv6.BcacheNames` assembled.  The two forms

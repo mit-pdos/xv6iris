@@ -8,7 +8,7 @@ they are carved here out of the owned half's `.bss` and free RAM:
 * `bootCarve_buf` / `bootCarve_bcache` (Rocq `boot_buf_node` /
   `boot_bcache_nodes`, plus the bcache lock and head rows of
   `main_globals_raw`): `binit`'s precondition cells (`lockWords`, the head
-  links, `[∗list] bufIn`) and bioInit's `bdBss` rows -- this DISCHARGES
+  links, `[∗list] bufIn`) and bioInitAt's `bdBss` rows -- this DISCHARGES
   BioInit's `bdBss` premise (wave-8 deviation 17; the other half,
   `0 ∉ V.cov`, is `Xv6.fsCovIn_0` in FsCfgBoot);
 * `bootCarve_lockWords`: any static spinlock's input words;
@@ -101,7 +101,7 @@ theorem bootBss_wordAt [CurCtx] (image : Mem) (himg : BootImage image)
 
 /-- **One buffer's record, carved** (Rocq `boot_buf_node`): the 1112 `.bss`
 bytes of `bcache.buf[i]` are `binit`'s input fields (`bufIn`) and the
-fields `binit` never touches (`bdBss`, bioInit's premise). -/
+fields `binit` never touches (`bdBss`, bioInitAt's premise). -/
 theorem bootCarve_buf [CurCtx] (ξ : CtxId) (image : Mem) (himg : BootImage image) (i : Nat) (hi : i < NBUF) :
     kmapStatic (GF := GF) ⊢ bootRan (imgFlat image) (bcBuf i) (bcBuf i + 1112) -∗ bufIn i ∗ bdBss ξ i := by
   obtain ⟨hlo, hend, hal⟩ := bc_buf_bounds i hi
@@ -200,7 +200,7 @@ theorem bc_bcache_val : MachCSL.KernelSyms.«bcache» = 0x80018278 := rfl
 /-- **THE WHOLE BUFFER CACHE, CARVED** (Rocq `boot_bcache_nodes` with the
 lock and head rows of `main_globals_raw`): the `.bss` bytes of `bcache` are
 `binit`'s precondition cells (the lock, the head's links, every buffer's
-`bufIn`) and bioInit's `bdBss` rows, everything at its `.bss` zero. -/
+`bufIn`) and bioInitAt's `bdBss` rows, everything at its `.bss` zero. -/
 theorem bootCarve_bcache [CurCtx] (ξ : CtxId) (image : Mem) (himg : BootImage image) :
     kmapStatic (GF := GF) ⊢
       bootRan (imgFlat image) MachCSL.KernelSyms.«bcache» (MachCSL.KernelSyms.«bcache» + 0x86c0) -∗
