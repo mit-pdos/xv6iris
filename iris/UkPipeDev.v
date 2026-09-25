@@ -331,12 +331,11 @@ Section UkPipeDev.
               with "Hb Hmy").
     rewrite (uexec_ret_ecall _ _ eq_refl).
     assert (Hnum : uvis_num (uvis_of_run m pc M pm sz fdv cw gn cs pidv false secc_all) = 16).
-    { rewrite uvis_num_full0.
-      - cbn [uvis_tf uvis_of_run]. rewrite tf_of_num. exact Hn.
-      - reflexivity.
-      - cbn [uvis_tf uvis_of_run]. rewrite tf_of_num, Hn. usys_range. }
+    { assert (Hraw : usys_num (uvis_tf (uvis_of_run m pc M pm sz fdv cw gn cs pidv false secc_all)) = 16)
+        by (cbn [uvis_tf uvis_of_run]; rewrite tf_of_num; exact Hn).
+      rewrite uvis_num_full0; [ exact Hraw | reflexivity | rewrite Hraw; usys_range ]. }
     rewrite /uexec_pay_dep /upay_at.
-    rewrite Hnum. cbv zeta.
+    unfold uvis_num in Hnum. rewrite Hnum. cbv zeta.
     destruct (decide (uecall_scause = uecall_scause)) as [_ | Hpne];
       [ | exfalso; exact (Hpne eq_refl) ].
     destruct (decide (16 = USYS_exit)) as [He | _]; [ discriminate He | ].

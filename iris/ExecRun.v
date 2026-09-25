@@ -804,15 +804,15 @@ Section ExecRun.
     rewrite /exec_slot_pre /ex_node_abs /image_entry_at /image_entry_taint.
     iSplitL "HPay".
     - (* ---- ARM (a): the observed content IS the caller's file ---- *)
-      iIntros (av' i f' nl' W') "HP Hrecv %Hload' %Hok %Hcwq %Hlzq %Hchq %Hpiq #Hp".
+      iIntros (av' i f' nl' W') "HP Hrecv %Hload' %Hok %Hcwq %Hlzq %Hscw %Hchq %Hpiq #Hp".
       iPoseProof ("Hid" $! av' i (MkAnode (AFile f') nl')) as "Hid'".
       iDestruct ("Hid'" with "HP Hrecv") as "[%Hnode | HT]"; last first.
       { iApply ("Hgen" $! W' with "HT Hp"). }
       cbn [an_node] in Hnode. injection Hnode as Hf. subst f'.
-      iApply ("Hcon" $! W' with "[%] [%] [%] [%] [%] Hp HPay");
-        [ exact Hok | exact Hcwq | exact Hlzq | exact Hchq | exact Hpiq ].
+      iApply ("Hcon" $! W' with "[%] [%] [%] [%] [%] [%] Hp HPay");
+        [ exact Hok | exact Hcwq | exact Hlzq | exact Hscw | exact Hchq | exact Hpiq ].
     - (* ---- ARM (b): a loadable content IS loadable ---- *)
-      iIntros (av' i a W') "HP Hrecv %Hnload %Hkey %Hcwq %Hlzq %Hchq %Hpiq #Hp".
+      iIntros (av' i a W') "HP Hrecv %Hnload %Hkey %Hcwq %Hlzq %Hscw %Hchq %Hpiq #Hp".
       iPoseProof ("Hid" $! av' i a) as "Hid'".
       iDestruct ("Hid'" with "HP Hrecv") as "[%Hnode | HT]"; last first.
       { iApply ("Hgen" $! W' with "HT Hp"). }
@@ -876,7 +876,7 @@ Section ExecRun.
     { iIntros (pl') "%Hpath'".
       rewrite (exec_path_of_uniq M pv pl' pl Hpath' Hpath). iExact "Hwalk". }
     iSplitL "Hobs"; [ iExact "Hobs" | ].
-    iApply (sys_exec_slot_of_entry_abs X T P Fo.(pf_recv) f Pay Q cw pl M pv av
+    iApply (sys_exec_slot_of_entry_abs X T P Fo.(pf_recv) f Pay Q cw secc pl M pv av
               sts cs pidv Hload Hpath with "Hid Hcon Hgen HPay").
   Qed.
 

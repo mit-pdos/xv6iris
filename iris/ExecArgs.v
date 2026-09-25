@@ -749,13 +749,13 @@ Section ExecArgsLift.
   Proof using .
     intros Hargs. iIntros "#H". rewrite /image_entry.
     iIntros "!>" (na' alen' afun' W')
-      "%Hok %Hcw %Hlz %Hch %Hpid %Hargs' Hp HPay".
+      "%Hok %Hcw %Hlz %Hscw %Hch %Hpid %Hargs' Hp HPay".
     destruct (exec_args_of_agree M av na alen afun na' alen' afun'
                 Hargs Hargs') as (Hn & Hl & Hb).
     subst na'.
     rewrite /image_entry_at.
-    iApply ("H" $! W' with "[%] [%] [%] [%] [%] Hp HPay");
-      [ | exact Hcw | exact Hlz | exact Hch | exact Hpid ].
+    iApply ("H" $! W' with "[%] [%] [%] [%] [%] [%] Hp HPay");
+      [ | exact Hcw | exact Hlz | exact Hscw | exact Hch | exact Hpid ].
     refine (kexec_image_ok_ext f na alen' alen afun' afun sts W'
               _ _ Hok).
     - intros i Hi. exact (eq_sym (Hl i Hi)).

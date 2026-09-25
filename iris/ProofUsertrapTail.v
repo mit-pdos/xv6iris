@@ -1194,6 +1194,8 @@ Section UtRet.
                  (* the lazy bit across the re-arming: prepare_return writes
                     no block field (lane LAZY-FLAG) *)
                  ltac:(cbn [us_V]; rewrite /Vr; destruct (us_V U); reflexivity)
+                 (* ...and the mask, likewise *)
+                 ltac:(cbn [us_V]; rewrite /Vr; destruct (us_V U); reflexivity)
                  with "Hxo") as "Hxo".
     (* ...and the syscall channel's row across the same re-arming.  It reads
        the parked frame at a0 alone, which is what [tf_ueq] is blind to --

@@ -5505,7 +5505,9 @@ Section SyscallArms.
                 ([SpecKexec.exec_key]'s own note), and the trap route's
                 payment is keyed on it *)
              /\ pv_gen V' = pv_gen (us_V U)
-             /\ pv_cwi V' = pv_cwi (us_V U)⌝ ∗
+             /\ pv_cwi V' = pv_cwi (us_V U)
+             (* ...and the mask: exec keeps [p->seccomp] *)
+             /\ pv_secc V' = pv_secc (us_V U)⌝ ∗
              sysc_exec_out fdep U
                (us_tf (MkUstate V' Mk)
                   (<[tf_arg_idx 0 := mf !!! Regidx Ra0]>
@@ -5517,7 +5519,7 @@ Section SyscallArms.
                 guard out of [kexec_ok]'s own [r <> -1]. *)
              ∗ (⌜mf !!! Regidx Ra0 = (mword_of_int (-1) : mword 64)⌝ -∗
                   sexec_refund fdep))%I
-      with "[Harm]" as "[(%Htfp' & %Hfg' & %Hchg' & %Hgeng' & %Hcwi') [Hxo Hrf]]".
+      with "[Harm]" as "[(%Htfp' & %Hfg' & %Hchg' & %Hgeng' & %Hcwi' & %Hscv') [Hxo Hrf]]".
     { iDestruct "Harm" as "[[(%Hr & %HV & %HM) Hfail] | Hok]".
       - (* FAILED *)
         cbn [us_V us_M] in HV, HM.
@@ -5529,7 +5531,8 @@ Section SyscallArms.
           - exact (f_equal pv_fdg HV).
           - exact (f_equal pv_chg HV).
           - exact (f_equal pv_gen HV).
-          - exact (f_equal pv_cwi HV). }
+          - exact (f_equal pv_cwi HV).
+          - exact (f_equal pv_secc HV). }
         iSplitR "Hrf".
         { rewrite /sysc_exec_out. iIntros "_". iLeft. iPureIntro.
           rewrite /sysc_exec_failed.
@@ -5549,7 +5552,7 @@ Section SyscallArms.
           iDestruct "Ha" as (f nl) "(_ & _ & %Hkx & _ & Hslot)".
           destruct Hkx as (e & spv & szv' & _ & Hne & Hkok).
           cbn [us_V] in Hkok.
-          destruct Hkok as [(Hm1 & _) | (Hr & _ & _ & _ & _ & Htf' & _ & _ & Hfg & _ & Hcwi & Hgen & Hchg & _)];
+          destruct Hkok as [(Hm1 & _) | (Hr & _ & _ & _ & _ & Htf' & _ & _ & Hfg & _ & Hcwi & Hgen & Hchg & _ & _ & _ & _ & Hsec)];
             [exact (False_ind _ (Hne Hm1)) |].
           iSplitR.
           { iPureIntro. split_and!.
@@ -5557,7 +5560,8 @@ Section SyscallArms.
             - revert Hfg. cbn [pv_fdg upd_upt]. exact id.
             - revert Hchg. cbn [pv_chg upd_upt]. exact id.
             - revert Hgen. cbn [pv_gen upd_upt]. exact id.
-            - revert Hcwi. cbn [pv_cwi upd_upt pv_gen pv_chg]. exact id. }
+            - revert Hcwi. cbn [pv_cwi upd_upt pv_gen pv_chg]. exact id.
+            - revert Hsec. cbn [pv_secc upd_upt]. exact id. }
           iSplitL "Hslot".
           { rewrite /sysc_exec_out. iIntros "_". iRight.
             rewrite /exec_key. rewrite Hr. cbn [us_V]. iExact "Hslot". }
@@ -5567,7 +5571,7 @@ Section SyscallArms.
           iDestruct "Hb" as "(_ & %Hok & Hslot)".
           destruct Hok as (entry & spv & szv' & Hne & Hkok).
           cbn [us_V] in Hkok.
-          destruct Hkok as [(Hm1 & _) | (Hr & _ & _ & _ & _ & Htf' & _ & _ & Hfg & _ & Hcwi & Hgen & Hchg & _)];
+          destruct Hkok as [(Hm1 & _) | (Hr & _ & _ & _ & _ & Htf' & _ & _ & Hfg & _ & Hcwi & Hgen & Hchg & _ & _ & _ & _ & Hsec)];
             [exact (False_ind _ (Hne Hm1)) |].
           iSplitR.
           { iPureIntro. split_and!.
@@ -5575,7 +5579,8 @@ Section SyscallArms.
             - revert Hfg. cbn [pv_fdg upd_upt]. exact id.
             - revert Hchg. cbn [pv_chg upd_upt]. exact id.
             - revert Hgen. cbn [pv_gen upd_upt]. exact id.
-            - revert Hcwi. cbn [pv_cwi upd_upt pv_gen pv_chg]. exact id. }
+            - revert Hcwi. cbn [pv_cwi upd_upt pv_gen pv_chg]. exact id.
+            - revert Hsec. cbn [pv_secc upd_upt]. exact id. }
           iSplitL "Hslot".
           { rewrite /sysc_exec_out. iIntros "_". iRight.
             rewrite /exec_key. rewrite Hr. cbn [us_V]. iExact "Hslot". }

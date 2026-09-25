@@ -237,7 +237,7 @@ Section UkPipesEntries.
     iIntros "#Hnpw #Hdep".
     set (wv := fun _ : nat => PDWr pn gp).
     rewrite /image_entry.
-    iIntros "!>" (na alen afun W') "%Hokk %Hcw %Hlz %Hch %Hpid %Hargs Hmp HPay".
+    iIntros "!>" (na alen afun W') "%Hokk %Hcw %Hlz %Hscw %Hch %Hpid %Hargs Hmp HPay".
     iApply uslot_bupd.
     iMod (pns_reg_alloc wv) as (γreg) "Hpool". iModIntro.
     set (If := fun (N' : uk_names Σ) (Hpq : ukn_pay N' = Q) =>
@@ -260,8 +260,8 @@ Section UkPipesEntries.
                 (echo_stub_close N') (echo_stub_exit N') γreg _ (pse_nodup0 _)
                 pn gp (take NSTD sts) rb wv (fun _ => None) eq_refl eq_refl Hl1
                 with "Hstd Hpool Hlend"). }
-    iApply ("He" $! na alen afun W' with "[%] [%] [%] [%] [%] [%] Hmp [Hpool HPay]");
-      [ exact Hokk | exact Hcw | exact Hlz | exact Hch | exact Hpid | exact Hargs | ].
+    iApply ("He" $! na alen afun W' with "[%] [%] [%] [%] [%] [%] [%] Hmp [Hpool HPay]");
+      [ exact Hokk | exact Hcw | exact Hlz | exact Hscw | exact Hch | exact Hpid | exact Hargs | ].
     iFrame "Hpool HPay".
   Qed.
 
@@ -290,7 +290,7 @@ Section UkPipesEntries.
     iIntros "#Hnpw #Hdep".
     set (wv := fun d : nat => match d with O => PDCon w2 A2 | S _ => PDCopy (pin, gin) FCat sk end).
     rewrite /image_entry.
-    iIntros "!>" (na alen afun W') "%Hokk %Hcw %Hlz %Hch %Hpid %Hargs Hmp HPay".
+    iIntros "!>" (na alen afun W') "%Hokk %Hcw %Hlz %Hscw %Hch %Hpid %Hargs Hmp HPay".
     iApply uslot_bupd.
     iMod (pns_reg_alloc wv) as (γreg) "Hpool". iModIntro.
     set (If := fun (N' : uk_names Σ) (Hpq : ukn_pay N' = Q) =>
@@ -316,8 +316,8 @@ Section UkPipesEntries.
                 w2 A2 alts2 pin gin FCat sk (take NSTD sts) wb rb1 rb2 wv (fun _ => None)
                 eq_refl eq_refl eq_refl Hl0 Hl1 Hl2
                 with "Hstd Hpool Hlend"). }
-    iApply ("He" $! na alen afun W' with "[%] [%] [%] [%] [%] [%] Hmp [Hpool HPay]");
-      [ exact Hokk | exact Hcw | exact Hlz | exact Hch | exact Hpid | exact Hargs | ].
+    iApply ("He" $! na alen afun W' with "[%] [%] [%] [%] [%] [%] [%] Hmp [Hpool HPay]");
+      [ exact Hokk | exact Hcw | exact Hlz | exact Hscw | exact Hch | exact Hpid | exact Hargs | ].
     iFrame "Hpool HPay".
   Qed.
 
@@ -369,7 +369,7 @@ Section UkPipesEntries.
     iIntros "#Hnpw #Hdep".
     set (wv := fun d : nat => match d with O => PDMute | S _ => PDCopy (pin, gin) FCat (CSCon wL) end).
     rewrite /image_entry.
-    iIntros "!>" (na alen afun W') "%Hokk %Hcw %Hlz %Hch %Hpid %Hargs Hmp HPay".
+    iIntros "!>" (na alen afun W') "%Hokk %Hcw %Hlz %Hscw %Hch %Hpid %Hargs Hmp HPay".
     iApply uslot_bupd.
     iMod (pns_reg_alloc wv) as (γreg) "Hpool". iModIntro.
     set (If := fun (N' : uk_names Σ) (Hpq : ukn_pay N' = Q) =>
@@ -396,8 +396,8 @@ Section UkPipesEntries.
                 pin gin FCat (CSCon wL) (take NSTD sts) wb rb1 rb2 wv (fun _ => None)
                 eq_refl eq_refl eq_refl Hl0 Hl1 Hl2
                 with "Hstd Hpool Hlend"). }
-    iApply ("He" $! na alen afun W' with "[%] [%] [%] [%] [%] [%] Hmp [Hpool HPay]");
-      [ exact Hokk | exact Hcw | exact Hlz | exact Hch | exact Hpid | exact Hargs | ].
+    iApply ("He" $! na alen afun W' with "[%] [%] [%] [%] [%] [%] [%] Hmp [Hpool HPay]");
+      [ exact Hokk | exact Hcw | exact Hlz | exact Hscw | exact Hch | exact Hpid | exact Hargs | ].
     iFrame "Hpool HPay".
   Qed.
 
@@ -434,7 +434,7 @@ Section UkPipesEntries.
     iIntros "#Hnpw #Hdep".
     set (wv := fun d : nat => match d with O => PDCon w2 A2 | S _ => PDCopy (pin, gin) (FGrep wp) sk end).
     rewrite /image_entry.
-    iIntros "!>" (na alen afun W') "%Hokk %Hcw %Hlz %Hch %Hpid %Hargs Hmp HPay".
+    iIntros "!>" (na alen afun W') "%Hokk %Hcw %Hlz %Hscw %Hch %Hpid %Hargs Hmp HPay".
     iApply uslot_bupd.
     iMod (pns_reg_alloc wv) as (γreg) "Hpool". iModIntro.
     set (If := fun (N' : uk_names Σ) (Hpq : ukn_pay N' = Q) =>
@@ -461,8 +461,8 @@ Section UkPipesEntries.
                 w2 A2 alts2 pin gin (FGrep wp) sk (take NSTD sts) wb rb1 rb2 wv (fun _ => None)
                 eq_refl eq_refl eq_refl Hl0 Hl1 Hl2
                 with "Hstd Hpool Hlend"). }
-    iApply ("He" $! na alen afun W' with "[%] [%] [%] [%] [%] [%] Hmp [Hpool HPay]");
-      [ exact Hokk | exact Hcw | exact Hlz | exact Hch | exact Hpid | exact Hargs | ].
+    iApply ("He" $! na alen afun W' with "[%] [%] [%] [%] [%] [%] [%] Hmp [Hpool HPay]");
+      [ exact Hokk | exact Hcw | exact Hlz | exact Hscw | exact Hch | exact Hpid | exact Hargs | ].
     iFrame "Hpool HPay".
   Qed.
 
@@ -513,7 +513,7 @@ Section UkPipesEntries.
     iIntros "#Hnpw #Hdep".
     set (wv := fun d : nat => match d with O => PDMute | S _ => PDCopy (pin, gin) (FGrep wp) (CSCon wL) end).
     rewrite /image_entry.
-    iIntros "!>" (na alen afun W') "%Hokk %Hcw %Hlz %Hch %Hpid %Hargs Hmp HPay".
+    iIntros "!>" (na alen afun W') "%Hokk %Hcw %Hlz %Hscw %Hch %Hpid %Hargs Hmp HPay".
     iApply uslot_bupd.
     iMod (pns_reg_alloc wv) as (γreg) "Hpool". iModIntro.
     set (If := fun (N' : uk_names Σ) (Hpq : ukn_pay N' = Q) =>
@@ -541,8 +541,8 @@ Section UkPipesEntries.
                 pin gin (FGrep wp) (CSCon wL) (take NSTD sts) wb rb1 rb2 wv (fun _ => None)
                 eq_refl eq_refl eq_refl Hl0 Hl1 Hl2
                 with "Hstd Hpool Hlend"). }
-    iApply ("He" $! na alen afun W' with "[%] [%] [%] [%] [%] [%] Hmp [Hpool HPay]");
-      [ exact Hokk | exact Hcw | exact Hlz | exact Hch | exact Hpid | exact Hargs | ].
+    iApply ("He" $! na alen afun W' with "[%] [%] [%] [%] [%] [%] [%] Hmp [Hpool HPay]");
+      [ exact Hokk | exact Hcw | exact Hlz | exact Hscw | exact Hch | exact Hpid | exact Hargs | ].
     iFrame "Hpool HPay".
   Qed.
 End UkPipesEntries.

@@ -204,11 +204,11 @@ Section ExecEntry.
     image_entry f M av sts cw secc cs pidv Q Pay X.
   Proof using .
     iIntros "#H". rewrite /image_entry. iIntros "!>" (na alen afun W')
-      "%Hok %Hcw %Hlz %Hch %Hpid %Hargs Hp HPay".
+      "%Hok %Hcw %Hlz %Hscw %Hch %Hpid %Hargs Hp HPay".
     iDestruct ("H" $! na alen afun with "[%]") as "#He"; [ exact Hargs | ].
     rewrite /image_entry_at.
-    iApply ("He" $! W' with "[%] [%] [%] [%] [%] Hp HPay");
-      [ exact Hok | exact Hcw | exact Hlz | exact Hch | exact Hpid ].
+    iApply ("He" $! W' with "[%] [%] [%] [%] [%] [%] Hp HPay");
+      [ exact Hok | exact Hcw | exact Hlz | exact Hscw | exact Hch | exact Hpid ].
   Qed.
 
   (* ...and back, at any shape the reading admits *)
@@ -221,10 +221,10 @@ Section ExecEntry.
     image_entry_at f na alen afun sts cw secc cs pidv Q Pay X.
   Proof using .
     intros Hargs. iIntros "#H". rewrite /image_entry_at.
-    iIntros "!>" (W') "%Hok %Hcw %Hlz %Hch %Hpid Hp HPay".
+    iIntros "!>" (W') "%Hok %Hcw %Hlz %Hscw %Hch %Hpid Hp HPay".
     rewrite /image_entry.
-    iApply ("H" $! na alen afun W' with "[%] [%] [%] [%] [%] [%] Hp HPay");
-      [ exact Hok | exact Hcw | exact Hlz | exact Hch | exact Hpid
+    iApply ("H" $! na alen afun W' with "[%] [%] [%] [%] [%] [%] [%] Hp HPay");
+      [ exact Hok | exact Hcw | exact Hlz | exact Hscw | exact Hch | exact Hpid
       | exact Hargs ].
   Qed.
 

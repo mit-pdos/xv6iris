@@ -399,10 +399,10 @@ Section UShCatPay.
       (* the ledger fragment is SPENT at the entry; the lend is the pay *)
       rewrite /image_entry.
       iIntros "!>" (na alen afun W')
-        "%Hok %Hcw %Hlz %Hch %Hpid %Hargs Hmp [_ Hc]".
+        "%Hok %Hcw %Hlz %Hscw %Hch %Hpid %Hargs Hmp [_ Hc]".
       iApply ("He" $! na alen afun W'
-               with "[%] [%] [%] [%] [%] [%] Hmp Hc");
-        [ exact Hok | exact Hcw | exact Hlz | exact Hch | exact Hpid
+               with "[%] [%] [%] [%] [%] [%] [%] Hmp Hc");
+        [ exact Hok | exact Hcw | exact Hlz | exact Hscw | exact Hch | exact Hpid
         | exact Hargs ]. }
     iFrame "Hstd Hcr".
   Qed.

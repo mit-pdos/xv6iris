@@ -1665,7 +1665,7 @@ Section UservecAllPt.
                        term on both sides (lane CONS-SWALLOW, W4) -- and the
                        lazy bit beside them, which the walk does not touch
                        either (lane LAZY-FLAG) *)
-                    eq_refl eq_refl eq_refl
+                    eq_refl eq_refl eq_refl eq_refl
                     with "Hxin")
       end. }
     { (* FORK'S DEPOSIT ACROSS THE SAVE WALK.  The row reads the whole

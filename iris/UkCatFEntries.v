@@ -150,7 +150,7 @@ Section UkCatFEntries.
       - apply (cat_file_prod_absent_conforms_gen fname_f); [rewrite Hfs Hs; reflexivity
                                                            | by right; left | exact Hx]. }
     rewrite /image_entry.
-    iIntros "!>" (na alen afun W') "%Hokk %Hcwv %Hlz %Hch %Hpid %Hargs Hmp HPay".
+    iIntros "!>" (na alen afun W') "%Hokk %Hcwv %Hlz %Hscw %Hch %Hpid %Hargs Hmp HPay".
     iApply uslot_bupd.
     iMod (cif_reg_alloc wv) as (γreg) "Hpool". iModIntro.
     set (If := fun (N' : uk_names Σ) (Hpq : ukn_pay N' = Q) =>
@@ -172,8 +172,8 @@ Section UkCatFEntries.
                 (cfe_kdp0 pn gp w A X) qf sf pn gp w A X ds xs (take NSTD sts) rb1 rb2 wv files
                 eq_refl eq_refl Hl1 Hl2 Hfs
                 with "Hstd Hcwd Hpool Hlend"). }
-    iApply ("He" $! na alen afun W' with "[%] [%] [%] [%] [%] [%] Hmp [Hpool HPay]");
-      [ exact Hokk | exact Hcwv | exact Hlz | exact Hch | exact Hpid | exact Hargs | ].
+    iApply ("He" $! na alen afun W' with "[%] [%] [%] [%] [%] [%] [%] Hmp [Hpool HPay]");
+      [ exact Hokk | exact Hcwv | exact Hlz | exact Hscw | exact Hch | exact Hpid | exact Hargs | ].
     iFrame "Hpool HPay".
   Qed.
 

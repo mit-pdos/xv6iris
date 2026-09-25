@@ -373,7 +373,7 @@ Section UkUnionEntries.
     assert (Hrd : fif_wr [0%nat] w0 = false) by reflexivity.
     set (E := cons_env (wl_line (drop 1 ws)) (fif_files (snd <$> s))).
     rewrite /image_entry.
-    iIntros "!>" (na alen afun W') "%Hok' %Hcw' %Hlz %Hch %Hpid %Hargs Hmp HPay".
+    iIntros "!>" (na alen afun W') "%Hok' %Hcw' %Hlz %Hscw %Hch %Hpid %Hargs Hmp HPay".
     iApply uslot_bupd.
     iMod (fif_reg_alloc w0) as (γreg) "Hpool". iModIntro.
     set (I := fun (N' : uk_names Σ) (Hpq : ukn_pay N' = Q) =>
@@ -425,8 +425,8 @@ Section UkUnionEntries.
       - iIntros "Htk". cbn [E cons_env pe_dev]. case_decide as Hc0; [| done]. simpl.
         iExists v, I0, [0%nat]. iFrame "Htk".
         iApply (uecho_lend ug sb v I0 ws Hfl Hshort with "Hlk Hpin Hb"). }
-    iApply ("He" $! na alen afun W' with "[%] [%] [%] [%] [%] [%] Hmp [Hpool HPay]");
-      [ exact Hok' | exact Hcw' | exact Hlz | exact Hch | exact Hpid | exact Hargs | ].
+    iApply ("He" $! na alen afun W' with "[%] [%] [%] [%] [%] [%] [%] Hmp [Hpool HPay]");
+      [ exact Hok' | exact Hcw' | exact Hlz | exact Hscw | exact Hch | exact Hpid | exact Hargs | ].
     iFrame "Hpool HPay".
   Qed.
 
@@ -537,7 +537,7 @@ Section UkUnionEntries.
       by (intros; discriminate).
     assert (Hrd : fif_wr [0%nat] w0 = false) by reflexivity.
     rewrite /image_entry.
-    iIntros "!>" (na alen afun W') "%Hok' %Hcw' %Hlz %Hch %Hpid %Hargs Hmp HPay".
+    iIntros "!>" (na alen afun W') "%Hok' %Hcw' %Hlz %Hscw %Hch %Hpid %Hargs Hmp HPay".
     iApply uslot_bupd.
     iMod (fif_reg_alloc w0) as (γreg) "Hpool". iModIntro.
     set (I := fun (N' : uk_names Σ) (Hpq : ukn_pay N' = Q) =>
@@ -588,8 +588,8 @@ Section UkUnionEntries.
         iApply (ucat_lend ug sq v ps0 cs0 I0 P (snd <$> s) Hwb Hfl
                   (eq_trans (f_equal (fun t : fstate => t !! fname_f) Htie) (dst_content_f s)) Hs
                   with "Hlk Hpin Hc"). }
-    iApply ("He" $! na alen afun W' with "[%] [%] [%] [%] [%] [%] Hmp [Hpool HPay]");
-      [ exact Hok' | exact Hcw' | exact Hlz | exact Hch | exact Hpid | exact Hargs | ].
+    iApply ("He" $! na alen afun W' with "[%] [%] [%] [%] [%] [%] [%] Hmp [Hpool HPay]");
+      [ exact Hok' | exact Hcw' | exact Hlz | exact Hscw | exact Hch | exact Hpid | exact Hargs | ].
     iFrame "Hpool HPay".
   Qed.
 
@@ -634,7 +634,7 @@ Section UkUnionEntries.
     assert (Hwr : fif_wr [0%nat] w0 = true) by reflexivity.
     set (E := pipe_env (DOutM (echo_chunks ws)) (fif_files (snd <$> (None : dst)))).
     rewrite /image_entry.
-    iIntros "!>" (na alen afun W') "%Hok' %Hcw' %Hlz %Hch %Hpid %Hargs Hmp HPay".
+    iIntros "!>" (na alen afun W') "%Hok' %Hcw' %Hlz %Hscw %Hch %Hpid %Hargs Hmp HPay".
     iApply uslot_bupd.
     iMod (fif_reg_alloc w0) as (γreg) "Hpool". iModIntro.
     set (I := fun (N' : uk_names Σ) (Hpq : ukn_pay N' = Q) =>
@@ -684,8 +684,8 @@ Section UkUnionEntries.
         iSplit; [done |]. iSplit; [iPureIntro; exact Hwok |].
         rewrite /file_out.
         iApply (UEchoFile.efany_of c r i γo ws 0%nat [] ltac:(constructor) with "Hc"). }
-    iApply ("He" $! na alen afun W' with "[%] [%] [%] [%] [%] [%] Hmp [Hpool HPay]");
-      [ exact Hok' | exact Hcw' | exact Hlz | exact Hch | exact Hpid | exact Hargs | ].
+    iApply ("He" $! na alen afun W' with "[%] [%] [%] [%] [%] [%] [%] Hmp [Hpool HPay]");
+      [ exact Hok' | exact Hcw' | exact Hlz | exact Hscw | exact Hch | exact Hpid | exact Hargs | ].
     iFrame "Hpool HPay".
   Qed.
 End UkUnionEntries.

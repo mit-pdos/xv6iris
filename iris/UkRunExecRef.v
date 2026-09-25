@@ -155,15 +155,14 @@ Section UkRunExecRef.
               with "Hb Hmy").
     rewrite (uexec_ret_ecall _ _ eq_refl).
     assert (Hnum : uvis_num (uvis_of_run m pc M pm sz fdv c gn cs pidv false secc_all) = USYS_exec).
-    { rewrite uvis_num_full0.
-      - cbn [uvis_tf uvis_of_run]. rewrite tf_of_num. exact Hn.
-      - reflexivity.
-      - cbn [uvis_tf uvis_of_run]. rewrite tf_of_num, Hn. usys_range. }
+    { assert (Hraw : usys_num (uvis_tf (uvis_of_run m pc M pm sz fdv c gn cs pidv false secc_all)) = USYS_exec)
+        by (cbn [uvis_tf uvis_of_run]; rewrite tf_of_num; exact Hn).
+      rewrite uvis_num_full0; [ exact Hraw | reflexivity | rewrite Hraw; usys_range ]. }
     (* the PAYMENT's guard IS the deposit's own, so it is opened BEFORE the
        number is rewritten and the destructs below then reduce both copies
        at once *)
     rewrite /uexec_pay_dep /upay_at.
-    rewrite Hnum. cbv zeta.
+    unfold uvis_num in Hnum. rewrite Hnum. cbv zeta.
     destruct (decide (uecall_scause = uecall_scause)) as [_ | Hpne];
       [ | exfalso; exact (Hpne eq_refl) ].
     destruct (decide (USYS_exec = USYS_exit)) as [He | _];
@@ -183,7 +182,7 @@ Section UkRunExecRef.
        to be [emp] and is a wand from "the answer was -1" now
        ([UexecSG.spost_at_exec]), which is exactly the branch this leaf is
        on -- a successful exec never resumes here. *)
-    iIntros (r M' pm' sz' fdv' cw' gn' cs' lz' secc') \"%Hok %Hfdok %Hpiperow %Hcwrow %Hgnrow %Hpidrow %Hliverow %Hscrow %Hchrow Hsp".
+    iIntros (r M' pm' sz' fdv' cw' gn' cs' lz' secc') "%Hok %Hfdok %Hpiperow %Hcwrow %Hgnrow %Hpidrow %Hliverow %Hscrow %Hchrow Hsp".
     (* THE LAZY BIT CROSSED THE TRAP UNCHANGED (lane LAZY-FLAG, L6).  The
        trapping key is at [false] -- the U tier's run is
        ([UexecRet.ukcq]) -- and every row but sbrk's is the equation
@@ -315,15 +314,14 @@ Section UkRunExecRef.
               with "Hb Hmy").
     rewrite (uexec_ret_ecall _ _ eq_refl).
     assert (Hnum : uvis_num (uvis_of_run m pc M pm sz fdv c gn cs pidv false secc_all) = USYS_exec).
-    { rewrite uvis_num_full0.
-      - cbn [uvis_tf uvis_of_run]. rewrite tf_of_num. exact Hn.
-      - reflexivity.
-      - cbn [uvis_tf uvis_of_run]. rewrite tf_of_num, Hn. usys_range. }
+    { assert (Hraw : usys_num (uvis_tf (uvis_of_run m pc M pm sz fdv c gn cs pidv false secc_all)) = USYS_exec)
+        by (cbn [uvis_tf uvis_of_run]; rewrite tf_of_num; exact Hn).
+      rewrite uvis_num_full0; [ exact Hraw | reflexivity | rewrite Hraw; usys_range ]. }
     (* the PAYMENT's guard IS the deposit's own, so it is opened BEFORE the
        number is rewritten and the destructs below then reduce both copies
        at once *)
     rewrite /uexec_pay_dep /upay_at.
-    rewrite Hnum. cbv zeta.
+    unfold uvis_num in Hnum. rewrite Hnum. cbv zeta.
     destruct (decide (uecall_scause = uecall_scause)) as [_ | Hpne];
       [ | exfalso; exact (Hpne eq_refl) ].
     destruct (decide (USYS_exec = USYS_exit)) as [He | _];
@@ -343,7 +341,7 @@ Section UkRunExecRef.
        to be [emp] and is a wand from "the answer was -1" now
        ([UexecSG.spost_at_exec]), which is exactly the branch this leaf is
        on -- a successful exec never resumes here. *)
-    iIntros (r M' pm' sz' fdv' cw' gn' cs' lz' secc') \"%Hok %Hfdok %Hpiperow %Hcwrow %Hgnrow %Hpidrow %Hliverow %Hscrow %Hchrow Hsp".
+    iIntros (r M' pm' sz' fdv' cw' gn' cs' lz' secc') "%Hok %Hfdok %Hpiperow %Hcwrow %Hgnrow %Hpidrow %Hliverow %Hscrow %Hchrow Hsp".
     (* THE LAZY BIT CROSSED THE TRAP UNCHANGED (lane LAZY-FLAG, L6).  The
        trapping key is at [false] -- the U tier's run is
        ([UexecRet.ukcq]) -- and every row but sbrk's is the equation

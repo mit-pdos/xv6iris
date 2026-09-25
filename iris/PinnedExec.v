@@ -523,9 +523,9 @@ Section PinnedExec.
     - rewrite /pobs_Fo /pfam_triv. cbn [pf_recv].
       iApply (pobs_node_id Pin T cw pl hops ino (MkAnode (AFile f) nl) Hres).
     - rewrite /image_entry_at.
-      iIntros "!>" (W') "%Hok %Hcwq %Hlzq _ _ Hp HPay".
-      iApply ("Hcon" $! W' with "[%] [%] [%] Hp HPay");
-        [ exact Hok | exact Hcwq | exact Hlzq ].
+      iIntros "!>" (W') "%Hok %Hcwq %Hlzq %Hscw _ _ Hp HPay".
+      iApply ("Hcon" $! W' with "[%] [%] [%] [%] Hp HPay");
+        [ exact Hok | exact Hcwq | exact Hlzq | exact Hscw ].
     - rewrite /image_entry_taint. iExact "Hgen".
   Qed.
 

@@ -142,7 +142,7 @@ Section ExecBundle.
     rewrite /exec_slot_pre /ex_node_id /image_entry_at /image_entry_taint.
     iSplitL "HPay".
     - (* ---- ARM (a): the observed node IS the caller's file ---- *)
-      iIntros (av' i f' nl' W') "HP Hrecv %Hload' %Hok %Hcwq %Hlzq %Hchq %Hpiq #Hp".
+      iIntros (av' i f' nl' W') "HP Hrecv %Hload' %Hok %Hcwq %Hlzq %Hscw %Hchq %Hpiq #Hp".
       (* [iPoseProof] first: [Hid] is persistent and its two arguments are
          SPATIAL, so specializing it in place would ask for a persistent
          result.  The copy is spatial and takes them. *)
@@ -156,10 +156,10 @@ Section ExecBundle.
          above are equations on [cw], on [uvis_lazy W'], on [cs] and on
          [pidv], and a bare [subst] would spend one of those instead. *)
       injection Hnode; intros Hnl Hf. subst f' nl'.
-      iApply ("Hcon" $! W' with "[%] [%] [%] [%] [%] Hp HPay");
-        [ exact Hok | exact Hcwq | exact Hlzq | exact Hchq | exact Hpiq ].
+      iApply ("Hcon" $! W' with "[%] [%] [%] [%] [%] [%] Hp HPay");
+        [ exact Hok | exact Hcwq | exact Hlzq | exact Hscw | exact Hchq | exact Hpiq ].
     - (* ---- ARM (b): a loadable file IS loadable, so this arm is dead ---- *)
-      iIntros (av' i a W') "HP Hrecv %Hnload %Hkey %Hcwq %Hlzq %Hchq %Hpiq #Hp".
+      iIntros (av' i a W') "HP Hrecv %Hnload %Hkey %Hcwq %Hlzq %Hscw %Hchq %Hpiq #Hp".
       iPoseProof ("Hid" $! av' i a) as "Hid'".
       iDestruct ("Hid'" with "HP Hrecv") as "[%Hnode | HT]"; last first.
       { iApply ("Hgen" $! W' with "HT Hp"). }
@@ -239,7 +239,7 @@ Section ExecBundle.
     { iIntros (pl') "%Hpath'".
       rewrite (exec_path_of_uniq M pv pl' pl Hpath' Hpath). iExact "Hwalk". }
     iSplitL "Hobs"; [ iExact "Hobs" | ].
-    iApply (sys_exec_slot_of_entry X T P Fo.(pf_recv) f nl Pay Q cw pl M pv av
+    iApply (sys_exec_slot_of_entry X T P Fo.(pf_recv) f nl Pay Q cw secc pl M pv av
               sts cs pidv Hload Hpath with "Hid Hcon Hgen HPay").
   Qed.
 
@@ -271,7 +271,7 @@ Section ExecBundle.
     iSplitL "Hobs"; [ iExact "Hobs" | ].
     rewrite /pf_at. cbn [pf_recv pf_refund]. iSplit; [ | iExact "HPay" ].
     iApply (exec_slot_of_entry_at X T (P (length (path_elems pl)))
-              Fo.(pf_recv) f nl Pay Q cw na alen afun sts cs pidv Hload
+              Fo.(pf_recv) f nl Pay Q cw secc na alen afun sts cs pidv Hload
               with "Hid Hcon Hgen HPay").
   Qed.
 

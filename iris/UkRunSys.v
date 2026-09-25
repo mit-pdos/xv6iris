@@ -578,15 +578,14 @@ Section UkRunSys.
               with "Hb Hmy").
     rewrite (uexec_ret_ecall _ _ eq_refl).
     assert (Hnum : uvis_num (uvis_of_run m pc M pm sz fdv cw gn cs pidv false secc_all) = n).
-    { rewrite uvis_num_full0.
-      - cbn [uvis_tf uvis_of_run]. rewrite tf_of_num. exact Hn.
-      - reflexivity.
-      - cbn [uvis_tf uvis_of_run]. rewrite tf_of_num, Hn. usys_range. }
+    { assert (Hraw : usys_num (uvis_tf (uvis_of_run m pc M pm sz fdv cw gn cs pidv false secc_all)) = n)
+        by (cbn [uvis_tf uvis_of_run]; rewrite tf_of_num; exact Hn).
+      rewrite uvis_num_full0; [ exact Hraw | reflexivity | rewrite Hraw; usys_range ]. }
     (* the PAYMENT's guard IS the deposit's own, so it is opened BEFORE the
        number is rewritten and the destructs below then reduce both copies
        at once *)
     rewrite /uexec_pay_dep /upay_at.
-    rewrite Hnum. cbv zeta.
+    unfold uvis_num in Hnum. rewrite Hnum. cbv zeta.
     destruct (decide (uecall_scause = uecall_scause)) as [_ | Hpne];
       [ | exfalso; exact (Hpne eq_refl) ].
     destruct (decide (n = USYS_exit)) as [He | _]; [ exfalso; exact (Hexit He) | ].
@@ -613,7 +612,7 @@ Section UkRunSys.
     cbn [uvis_gen uvis_of_run].
     iSplitR; [ iFrame "Hmy" | ].
     iSplitL "Hdepn"; [ iExact "Hdepn" | ].
-    iIntros (r M' pm' sz' fdv' cw' gn' cs' lz' secc') \"%Hok %Hfdok %Hpiperow %Hcwrow %Hgnrow %Hpidrow %Hliverow %Hscrow %Hchrow _".
+    iIntros (r M' pm' sz' fdv' cw' gn' cs' lz' secc') "%Hok %Hfdok %Hpiperow %Hcwrow %Hgnrow %Hpidrow %Hliverow %Hscrow %Hchrow _".
     (* THE LAZY BIT CROSSED THE TRAP UNCHANGED (lane LAZY-FLAG, L6).  The
        trapping key is at [false] -- the U tier's run is
        ([UexecRet.ukcq]) -- and every row but sbrk's is the equation
@@ -726,15 +725,14 @@ Section UkRunSys.
     rewrite (uexec_ret_ecall _ _ eq_refl).
     assert (Hnum : uvis_num (uvis_of_run m pc M pm sz fdv c gn cs pidv false secc_all)
                    = USYS_chdir).
-    { rewrite uvis_num_full0.
-      - cbn [uvis_tf uvis_of_run]. rewrite tf_of_num. exact Hn.
-      - reflexivity.
-      - cbn [uvis_tf uvis_of_run]. rewrite tf_of_num, Hn. usys_range. }
+    { assert (Hraw : usys_num (uvis_tf (uvis_of_run m pc M pm sz fdv c gn cs pidv false secc_all)) = USYS_chdir)
+        by (cbn [uvis_tf uvis_of_run]; rewrite tf_of_num; exact Hn).
+      rewrite uvis_num_full0; [ exact Hraw | reflexivity | rewrite Hraw; usys_range ]. }
     (* the PAYMENT's guard IS the deposit's own, so it is opened BEFORE the
        number is rewritten and the destructs below then reduce both copies
        at once *)
     rewrite /uexec_pay_dep /upay_at.
-    rewrite Hnum. cbv zeta.
+    unfold uvis_num in Hnum. rewrite Hnum. cbv zeta.
     destruct (decide (uecall_scause = uecall_scause)) as [_ | Hpne];
       [ | exfalso; exact (Hpne eq_refl) ].
     destruct (decide (USYS_chdir = USYS_exit)) as [He | _];
@@ -750,7 +748,7 @@ Section UkRunSys.
     cbn [uvis_gen uvis_of_run].
     iSplitR; [ iFrame "Hmy" | ].
     iSplitL "Hdepn"; [ iExact "Hdepn" | ].
-    iIntros (r M' pm' sz' fdv' cw' gn' cs' lz' secc') \"%Hok %Hfdok %Hpiperow %Hcwrow %Hgnrow %Hpidrow %Hliverow %Hscrow %Hchrow _".
+    iIntros (r M' pm' sz' fdv' cw' gn' cs' lz' secc') "%Hok %Hfdok %Hpiperow %Hcwrow %Hgnrow %Hpidrow %Hliverow %Hscrow %Hchrow _".
     (* THE LAZY BIT CROSSED THE TRAP UNCHANGED (lane LAZY-FLAG, L6).  The
        trapping key is at [false] -- the U tier's run is
        ([UexecRet.ukcq]) -- and every row but sbrk's is the equation
@@ -896,15 +894,14 @@ Section UkRunSys.
               with "Hb Hmy").
     rewrite (uexec_ret_ecall _ _ eq_refl).
     assert (Hnum : uvis_num (uvis_of_run m pc M pm sz fdv cw gn cs pidv false secc_all) = USYS_open).
-    { rewrite uvis_num_full0.
-      - cbn [uvis_tf uvis_of_run]. rewrite tf_of_num. exact Hn.
-      - reflexivity.
-      - cbn [uvis_tf uvis_of_run]. rewrite tf_of_num, Hn. usys_range. }
+    { assert (Hraw : usys_num (uvis_tf (uvis_of_run m pc M pm sz fdv cw gn cs pidv false secc_all)) = USYS_open)
+        by (cbn [uvis_tf uvis_of_run]; rewrite tf_of_num; exact Hn).
+      rewrite uvis_num_full0; [ exact Hraw | reflexivity | rewrite Hraw; usys_range ]. }
     (* the PAYMENT's guard IS the deposit's own, so it is opened BEFORE the
        number is rewritten and the destructs below then reduce both copies
        at once *)
     rewrite /uexec_pay_dep /upay_at.
-    rewrite Hnum. cbv zeta.
+    unfold uvis_num in Hnum. rewrite Hnum. cbv zeta.
     destruct (decide (uecall_scause = uecall_scause)) as [_ | Hpne];
       [ | exfalso; exact (Hpne eq_refl) ].
     destruct (decide (USYS_open = USYS_exit)) as [He | _];
@@ -923,7 +920,7 @@ Section UkRunSys.
     cbn [uvis_gen uvis_of_run].
     iSplitR; [ iFrame "Hmy" | ].
     iSplitL "Hdepn"; [ iExact "Hdepn" | ].
-    iIntros (r M' pm' sz' fdv' cw' gn' cs' lz' secc') \"%Hok %Hfdok %Hpiperow %Hcwrow %Hgnrow %Hpidrow %Hliverow %Hscrow %Hchrow _".
+    iIntros (r M' pm' sz' fdv' cw' gn' cs' lz' secc') "%Hok %Hfdok %Hpiperow %Hcwrow %Hgnrow %Hpidrow %Hliverow %Hscrow %Hchrow _".
     (* THE LAZY BIT CROSSED THE TRAP UNCHANGED (lane LAZY-FLAG, L6).  The
        trapping key is at [false] -- the U tier's run is
        ([UexecRet.ukcq]) -- and every row but sbrk's is the equation
@@ -1086,15 +1083,14 @@ Section UkRunSys.
               with "Hb Hmy").
     rewrite (uexec_ret_ecall _ _ eq_refl).
     assert (Hnum : uvis_num (uvis_of_run m pc M pm sz fdv cw gn cs pidv false secc_all) = USYS_dup).
-    { rewrite uvis_num_full0.
-      - cbn [uvis_tf uvis_of_run]. rewrite tf_of_num. exact Hn.
-      - reflexivity.
-      - cbn [uvis_tf uvis_of_run]. rewrite tf_of_num, Hn. usys_range. }
+    { assert (Hraw : usys_num (uvis_tf (uvis_of_run m pc M pm sz fdv cw gn cs pidv false secc_all)) = USYS_dup)
+        by (cbn [uvis_tf uvis_of_run]; rewrite tf_of_num; exact Hn).
+      rewrite uvis_num_full0; [ exact Hraw | reflexivity | rewrite Hraw; usys_range ]. }
     (* the PAYMENT's guard IS the deposit's own, so it is opened BEFORE the
        number is rewritten and the destructs below then reduce both copies
        at once *)
     rewrite /uexec_pay_dep /upay_at.
-    rewrite Hnum. cbv zeta.
+    unfold uvis_num in Hnum. rewrite Hnum. cbv zeta.
     destruct (decide (uecall_scause = uecall_scause)) as [_ | Hpne];
       [ | exfalso; exact (Hpne eq_refl) ].
     destruct (decide (USYS_dup = USYS_exit)) as [He | _];
@@ -1113,7 +1109,7 @@ Section UkRunSys.
     cbn [uvis_gen uvis_of_run].
     iSplitR; [ iFrame "Hmy" | ].
     iSplitL "Hdepn"; [ iExact "Hdepn" | ].
-    iIntros (r M' pm' sz' fdv' cw' gn' cs' lz' secc') \"%Hok %Hfdok %Hpiperow %Hcwrow %Hgnrow %Hpidrow %Hliverow %Hscrow %Hchrow _".
+    iIntros (r M' pm' sz' fdv' cw' gn' cs' lz' secc') "%Hok %Hfdok %Hpiperow %Hcwrow %Hgnrow %Hpidrow %Hliverow %Hscrow %Hchrow _".
     (* THE LAZY BIT CROSSED THE TRAP UNCHANGED (lane LAZY-FLAG, L6).  The
        trapping key is at [false] -- the U tier's run is
        ([UexecRet.ukcq]) -- and every row but sbrk's is the equation
@@ -1252,15 +1248,14 @@ Section UkRunSys.
               with "Hb Hmy").
     rewrite (uexec_ret_ecall _ _ eq_refl).
     assert (Hnum : uvis_num (uvis_of_run m pc M pm sz fdv cw gn cs pidv false secc_all) = USYS_dup).
-    { rewrite uvis_num_full0.
-      - cbn [uvis_tf uvis_of_run]. rewrite tf_of_num. exact Hn.
-      - reflexivity.
-      - cbn [uvis_tf uvis_of_run]. rewrite tf_of_num, Hn. usys_range. }
+    { assert (Hraw : usys_num (uvis_tf (uvis_of_run m pc M pm sz fdv cw gn cs pidv false secc_all)) = USYS_dup)
+        by (cbn [uvis_tf uvis_of_run]; rewrite tf_of_num; exact Hn).
+      rewrite uvis_num_full0; [ exact Hraw | reflexivity | rewrite Hraw; usys_range ]. }
     (* the PAYMENT's guard IS the deposit's own, so it is opened BEFORE the
        number is rewritten and the destructs below then reduce both copies
        at once *)
     rewrite /uexec_pay_dep /upay_at.
-    rewrite Hnum. cbv zeta.
+    unfold uvis_num in Hnum. rewrite Hnum. cbv zeta.
     destruct (decide (uecall_scause = uecall_scause)) as [_ | Hpne];
       [ | exfalso; exact (Hpne eq_refl) ].
     destruct (decide (USYS_dup = USYS_exit)) as [He | _];
@@ -1279,7 +1274,7 @@ Section UkRunSys.
     cbn [uvis_gen uvis_of_run].
     iSplitR; [ iFrame "Hmy" | ].
     iSplitL "Hdepn"; [ iExact "Hdepn" | ].
-    iIntros (r M' pm' sz' fdv' cw' gn' cs' lz' secc') \"%Hok %Hfdok %Hpiperow %Hcwrow %Hgnrow %Hpidrow %Hliverow %Hscrow %Hchrow _".
+    iIntros (r M' pm' sz' fdv' cw' gn' cs' lz' secc') "%Hok %Hfdok %Hpiperow %Hcwrow %Hgnrow %Hpidrow %Hliverow %Hscrow %Hchrow _".
     (* THE LAZY BIT CROSSED THE TRAP UNCHANGED (lane LAZY-FLAG, L6).  The
        trapping key is at [false] -- the U tier's run is
        ([UexecRet.ukcq]) -- and every row but sbrk's is the equation
@@ -1433,12 +1428,11 @@ Section UkRunSys.
               with "Hb Hmy").
     rewrite (uexec_ret_ecall _ _ eq_refl).
     assert (Hnum : uvis_num (uvis_of_run m pc M pm sz fdv cw gn cs pidv false secc_all) = USYS_dup).
-    { rewrite uvis_num_full0.
-      - cbn [uvis_tf uvis_of_run]. rewrite tf_of_num. exact Hn.
-      - reflexivity.
-      - cbn [uvis_tf uvis_of_run]. rewrite tf_of_num, Hn. usys_range. }
+    { assert (Hraw : usys_num (uvis_tf (uvis_of_run m pc M pm sz fdv cw gn cs pidv false secc_all)) = USYS_dup)
+        by (cbn [uvis_tf uvis_of_run]; rewrite tf_of_num; exact Hn).
+      rewrite uvis_num_full0; [ exact Hraw | reflexivity | rewrite Hraw; usys_range ]. }
     rewrite /uexec_pay_dep /upay_at.
-    rewrite Hnum. cbv zeta.
+    unfold uvis_num in Hnum. rewrite Hnum. cbv zeta.
     destruct (decide (uecall_scause = uecall_scause)) as [_ | Hpne];
       [ | exfalso; exact (Hpne eq_refl) ].
     destruct (decide (USYS_dup = USYS_exit)) as [He | _];
@@ -1450,7 +1444,7 @@ Section UkRunSys.
     cbn [uvis_gen uvis_of_run].
     iSplitR; [ iFrame "Hmy" | ].
     iSplitL "Hdepn"; [ iExact "Hdepn" | ].
-    iIntros (r M' pm' sz' fdv' cw' gn' cs' lz' secc') \"%Hok %Hfdok %Hpiperow %Hcwrow %Hgnrow %Hpidrow %Hliverow %Hscrow %Hchrow _".
+    iIntros (r M' pm' sz' fdv' cw' gn' cs' lz' secc') "%Hok %Hfdok %Hpiperow %Hcwrow %Hgnrow %Hpidrow %Hliverow %Hscrow %Hchrow _".
     (* THE LAZY BIT CROSSED THE TRAP UNCHANGED (lane LAZY-FLAG, L6).  The
        trapping key is at [false] -- the U tier's run is
        ([UexecRet.ukcq]) -- and every row but sbrk's is the equation
@@ -1613,15 +1607,14 @@ Section UkRunSys.
               with "Hb Hmy").
     rewrite (uexec_ret_ecall _ _ eq_refl).
     assert (Hnum : uvis_num (uvis_of_run m pc M pm sz fdv cw gn cs pidv false secc_all) = USYS_close).
-    { rewrite uvis_num_full0.
-      - cbn [uvis_tf uvis_of_run]. rewrite tf_of_num. exact Hn.
-      - reflexivity.
-      - cbn [uvis_tf uvis_of_run]. rewrite tf_of_num, Hn. usys_range. }
+    { assert (Hraw : usys_num (uvis_tf (uvis_of_run m pc M pm sz fdv cw gn cs pidv false secc_all)) = USYS_close)
+        by (cbn [uvis_tf uvis_of_run]; rewrite tf_of_num; exact Hn).
+      rewrite uvis_num_full0; [ exact Hraw | reflexivity | rewrite Hraw; usys_range ]. }
     (* the PAYMENT's guard IS the deposit's own, so it is opened BEFORE the
        number is rewritten and the destructs below then reduce both copies
        at once *)
     rewrite /uexec_pay_dep /upay_at.
-    rewrite Hnum. cbv zeta.
+    unfold uvis_num in Hnum. rewrite Hnum. cbv zeta.
     destruct (decide (uecall_scause = uecall_scause)) as [_ | Hpne];
       [ | exfalso; exact (Hpne eq_refl) ].
     destruct (decide (USYS_close = USYS_exit)) as [He | _];
@@ -1640,7 +1633,7 @@ Section UkRunSys.
     cbn [uvis_gen uvis_of_run].
     iSplitR; [ iFrame "Hmy" | ].
     iSplitL "Hdepn"; [ iExact "Hdepn" | ].
-    iIntros (r M' pm' sz' fdv' cw' gn' cs' lz' secc') \"%Hok %Hfdok %Hpiperow %Hcwrow %Hgnrow %Hpidrow %Hliverow %Hscrow %Hchrow _".
+    iIntros (r M' pm' sz' fdv' cw' gn' cs' lz' secc') "%Hok %Hfdok %Hpiperow %Hcwrow %Hgnrow %Hpidrow %Hliverow %Hscrow %Hchrow _".
     (* THE LAZY BIT CROSSED THE TRAP UNCHANGED (lane LAZY-FLAG, L6).  The
        trapping key is at [false] -- the U tier's run is
        ([UexecRet.ukcq]) -- and every row but sbrk's is the equation
@@ -1736,15 +1729,14 @@ Section UkRunSys.
               with "Hb Hmy").
     rewrite (uexec_ret_ecall _ _ eq_refl).
     assert (Hnum : uvis_num (uvis_of_run m pc M pm sz fdv cw gn cs pidv false secc_all) = USYS_close).
-    { rewrite uvis_num_full0.
-      - cbn [uvis_tf uvis_of_run]. rewrite tf_of_num. exact Hn.
-      - reflexivity.
-      - cbn [uvis_tf uvis_of_run]. rewrite tf_of_num, Hn. usys_range. }
+    { assert (Hraw : usys_num (uvis_tf (uvis_of_run m pc M pm sz fdv cw gn cs pidv false secc_all)) = USYS_close)
+        by (cbn [uvis_tf uvis_of_run]; rewrite tf_of_num; exact Hn).
+      rewrite uvis_num_full0; [ exact Hraw | reflexivity | rewrite Hraw; usys_range ]. }
     (* the PAYMENT's guard IS the deposit's own, so it is opened BEFORE the
        number is rewritten and the destructs below then reduce both copies
        at once *)
     rewrite /uexec_pay_dep /upay_at.
-    rewrite Hnum. cbv zeta.
+    unfold uvis_num in Hnum. rewrite Hnum. cbv zeta.
     destruct (decide (uecall_scause = uecall_scause)) as [_ | Hpne];
       [ | exfalso; exact (Hpne eq_refl) ].
     destruct (decide (USYS_close = USYS_exit)) as [He | _];
@@ -1763,7 +1755,7 @@ Section UkRunSys.
     cbn [uvis_gen uvis_of_run].
     iSplitR; [ iFrame "Hmy" | ].
     iSplitL "Hdepn"; [ iExact "Hdepn" | ].
-    iIntros (r M' pm' sz' fdv' cw' gn' cs' lz' secc') \"%Hok %Hfdok %Hpiperow %Hcwrow %Hgnrow %Hpidrow %Hliverow %Hscrow %Hchrow _".
+    iIntros (r M' pm' sz' fdv' cw' gn' cs' lz' secc') "%Hok %Hfdok %Hpiperow %Hcwrow %Hgnrow %Hpidrow %Hliverow %Hscrow %Hchrow _".
     (* THE LAZY BIT CROSSED THE TRAP UNCHANGED (lane LAZY-FLAG, L6).  The
        trapping key is at [false] -- the U tier's run is
        ([UexecRet.ukcq]) -- and every row but sbrk's is the equation
@@ -1869,15 +1861,14 @@ Section UkRunSys.
               with "Hb Hmy").
     rewrite (uexec_ret_ecall _ _ eq_refl).
     assert (Hnum : uvis_num (uvis_of_run m pc M pm sz fdv cw gn cs pidv false secc_all) = USYS_exec).
-    { rewrite uvis_num_full0.
-      - cbn [uvis_tf uvis_of_run]. rewrite tf_of_num. exact Hn.
-      - reflexivity.
-      - cbn [uvis_tf uvis_of_run]. rewrite tf_of_num, Hn. usys_range. }
+    { assert (Hraw : usys_num (uvis_tf (uvis_of_run m pc M pm sz fdv cw gn cs pidv false secc_all)) = USYS_exec)
+        by (cbn [uvis_tf uvis_of_run]; rewrite tf_of_num; exact Hn).
+      rewrite uvis_num_full0; [ exact Hraw | reflexivity | rewrite Hraw; usys_range ]. }
     (* the PAYMENT's guard IS the deposit's own, so it is opened BEFORE the
        number is rewritten and the destructs below then reduce both copies
        at once *)
     rewrite /uexec_pay_dep /upay_at.
-    rewrite Hnum. cbv zeta.
+    unfold uvis_num in Hnum. rewrite Hnum. cbv zeta.
     destruct (decide (uecall_scause = uecall_scause)) as [_ | Hpne];
       [ | exfalso; exact (Hpne eq_refl) ].
     destruct (decide (USYS_exec = USYS_exit)) as [He | _];
@@ -1896,7 +1887,7 @@ Section UkRunSys.
     cbn [uvis_gen uvis_of_run].
     iSplitR; [ iFrame "Hmy" | ].
     iSplitL "Hdepn"; [ iExact "Hdepn" | ].
-    iIntros (r M' pm' sz' fdv' cw' gn' cs' lz' secc') \"%Hok %Hfdok %Hpiperow %Hcwrow %Hgnrow %Hpidrow %Hliverow %Hscrow %Hchrow _".
+    iIntros (r M' pm' sz' fdv' cw' gn' cs' lz' secc') "%Hok %Hfdok %Hpiperow %Hcwrow %Hgnrow %Hpidrow %Hliverow %Hscrow %Hchrow _".
     (* THE LAZY BIT CROSSED THE TRAP UNCHANGED (lane LAZY-FLAG, L6).  The
        trapping key is at [false] -- the U tier's run is
        ([UexecRet.ukcq]) -- and every row but sbrk's is the equation
@@ -2020,15 +2011,14 @@ Section UkRunSys.
               with "Hb Hmy").
     rewrite (uexec_ret_ecall _ _ eq_refl).
     assert (Hnum : uvis_num (uvis_of_run m pc M pm sz fdv c gn cs pidv false secc_all) = USYS_exec).
-    { rewrite uvis_num_full0.
-      - cbn [uvis_tf uvis_of_run]. rewrite tf_of_num. exact Hn.
-      - reflexivity.
-      - cbn [uvis_tf uvis_of_run]. rewrite tf_of_num, Hn. usys_range. }
+    { assert (Hraw : usys_num (uvis_tf (uvis_of_run m pc M pm sz fdv c gn cs pidv false secc_all)) = USYS_exec)
+        by (cbn [uvis_tf uvis_of_run]; rewrite tf_of_num; exact Hn).
+      rewrite uvis_num_full0; [ exact Hraw | reflexivity | rewrite Hraw; usys_range ]. }
     (* the PAYMENT's guard IS the deposit's own, so it is opened BEFORE the
        number is rewritten and the destructs below then reduce both copies
        at once *)
     rewrite /uexec_pay_dep /upay_at.
-    rewrite Hnum. cbv zeta.
+    unfold uvis_num in Hnum. rewrite Hnum. cbv zeta.
     destruct (decide (uecall_scause = uecall_scause)) as [_ | Hpne];
       [ | exfalso; exact (Hpne eq_refl) ].
     destruct (decide (USYS_exec = USYS_exit)) as [He | _];
@@ -2048,7 +2038,7 @@ Section UkRunSys.
        to be [emp] and is a wand from "the answer was -1" now
        ([UexecSG.spost_at_exec]), which is exactly the branch this leaf is
        on -- a successful exec never resumes here. *)
-    iIntros (r M' pm' sz' fdv' cw' gn' cs' lz' secc') \"%Hok %Hfdok %Hpiperow %Hcwrow %Hgnrow %Hpidrow %Hliverow %Hscrow %Hchrow Hsp".
+    iIntros (r M' pm' sz' fdv' cw' gn' cs' lz' secc') "%Hok %Hfdok %Hpiperow %Hcwrow %Hgnrow %Hpidrow %Hliverow %Hscrow %Hchrow Hsp".
     (* THE LAZY BIT CROSSED THE TRAP UNCHANGED (lane LAZY-FLAG, L6).  The
        trapping key is at [false] -- the U tier's run is
        ([UexecRet.ukcq]) -- and every row but sbrk's is the equation
@@ -2256,17 +2246,16 @@ Section UkRunSys.
               with "Hb Hmy").
     rewrite (uexec_ret_ecall _ _ eq_refl).
     assert (Hnum : uvis_num (uvis_of_run m pc M pm sz fdv cw gn cs pidv false secc_all) = USYS_wait).
-    { rewrite uvis_num_full0.
-      - cbn [uvis_tf uvis_of_run]. rewrite tf_of_num. exact Hn.
-      - reflexivity.
-      - cbn [uvis_tf uvis_of_run]. rewrite tf_of_num, Hn. usys_range. }
+    { assert (Hraw : usys_num (uvis_tf (uvis_of_run m pc M pm sz fdv cw gn cs pidv false secc_all)) = USYS_wait)
+        by (cbn [uvis_tf uvis_of_run]; rewrite tf_of_num; exact Hn).
+      rewrite uvis_num_full0; [ exact Hraw | reflexivity | rewrite Hraw; usys_range ]. }
     assert (Ha0 : uint (uvis_tf (uvis_of_run m pc M pm sz fdv cw gn cs pidv false secc_all) !!! tf_arg_idx 0) = 0).
     { cbn [uvis_tf uvis_of_run]. rewrite tf_of_arg0. exact Hz. }
     (* the PAYMENT's guard IS the deposit's own, so it is opened BEFORE the
        number is rewritten and the destructs below then reduce both copies
        at once *)
     rewrite /uexec_pay_dep /upay_at.
-    rewrite Hnum. cbv zeta.
+    unfold uvis_num in Hnum. rewrite Hnum. cbv zeta.
     destruct (decide (uecall_scause = uecall_scause)) as [_ | Hpne];
       [ | exfalso; exact (Hpne eq_refl) ].
     destruct (decide (USYS_wait = USYS_exit)) as [He | _];
@@ -2290,7 +2279,7 @@ Section UkRunSys.
     cbn [uvis_gen uvis_of_run].
     iSplitR; [ iFrame "Hmy" | ].
     iSplitL "Hdepn"; [ iExact "Hdepn" | ].
-    iIntros (r M' pm' sz' fdv' cw' gn' cs' lz' secc') \"%Hok %Hfdok %Hpiperow %Hcwrow %Hgnrow %Hpidrow %Hliverow %Hscrow Hans _".
+    iIntros (r M' pm' sz' fdv' cw' gn' cs' lz' secc') "%Hok %Hfdok %Hpiperow %Hcwrow %Hgnrow %Hpidrow %Hliverow %Hscrow Hans _".
     (* THE LAZY BIT CROSSED THE TRAP UNCHANGED (lane LAZY-FLAG, L6).  The
        trapping key is at [false] -- the U tier's run is
        ([UexecRet.ukcq]) -- and every row but sbrk's is the equation
@@ -2609,12 +2598,11 @@ Section UkRunSys.
               with "Hb Hmy").
     rewrite (uexec_ret_ecall _ _ eq_refl).
     assert (Hnum : uvis_num (uvis_of_run m pc M pm sz fdv cw gn cs pidv false secc_all) = USYS_wait).
-    { rewrite uvis_num_full0.
-      - cbn [uvis_tf uvis_of_run]. rewrite tf_of_num. exact Hn.
-      - reflexivity.
-      - cbn [uvis_tf uvis_of_run]. rewrite tf_of_num, Hn. usys_range. }
+    { assert (Hraw : usys_num (uvis_tf (uvis_of_run m pc M pm sz fdv cw gn cs pidv false secc_all)) = USYS_wait)
+        by (cbn [uvis_tf uvis_of_run]; rewrite tf_of_num; exact Hn).
+      rewrite uvis_num_full0; [ exact Hraw | reflexivity | rewrite Hraw; usys_range ]. }
     rewrite /uexec_pay_dep /upay_at.
-    rewrite Hnum. cbv zeta.
+    unfold uvis_num in Hnum. rewrite Hnum. cbv zeta.
     destruct (decide (uecall_scause = uecall_scause)) as [_ | Hpne];
       [ | exfalso; exact (Hpne eq_refl) ].
     destruct (decide (USYS_wait = USYS_exit)) as [He | _];
@@ -2628,7 +2616,7 @@ Section UkRunSys.
     cbn [uvis_gen uvis_of_run].
     iSplitR; [ iFrame "Hmy" | ].
     iSplitL "Hdepn"; [ iExact "Hdepn" | ].
-    iIntros (r M' pm' sz' fdv' cw' gn' cs' lz' secc') \"%Hok %Hfdok %Hpiperow %Hcwrow %Hgnrow %Hpidrow %Hliverow %Hscrow Hans _".
+    iIntros (r M' pm' sz' fdv' cw' gn' cs' lz' secc') "%Hok %Hfdok %Hpiperow %Hcwrow %Hgnrow %Hpidrow %Hliverow %Hscrow Hans _".
     assert (Hlzq : lz' = false)
       by (refine (usys_mem_ok_lazy _ _ _ _ _ _ _ _ _ _ _ _ Hok);
           first [ assumption | vm_compute; discriminate ]).
@@ -2827,10 +2815,9 @@ Section UkRunSys.
               with "Hb Hmy").
     rewrite (uexec_ret_ecall _ _ eq_refl).
     assert (Hnum : uvis_num (uvis_of_run m pc M pm sz fdv cw gn cs pidv false secc_all) = n).
-    { rewrite uvis_num_full0.
-      - cbn [uvis_tf uvis_of_run]. rewrite tf_of_num. exact Hn.
-      - reflexivity.
-      - cbn [uvis_tf uvis_of_run]. rewrite tf_of_num, Hn. usys_range. }
+    { assert (Hraw : usys_num (uvis_tf (uvis_of_run m pc M pm sz fdv cw gn cs pidv false secc_all)) = n)
+        by (cbn [uvis_tf uvis_of_run]; rewrite tf_of_num; exact Hn).
+      rewrite uvis_num_full0; [ exact Hraw | reflexivity | rewrite Hraw; usys_range ]. }
     assert (Hw : usys_win n (uvis_tf (uvis_of_run m pc M pm sz fdv cw gn cs pidv false secc_all))
                  = Some (dst, cap)).
     { cbn [uvis_tf uvis_of_run]. rewrite usyswin_tf_of. exact Hwin. }
@@ -2839,7 +2826,7 @@ Section UkRunSys.
        number is rewritten and the destructs below then reduce both copies
        at once *)
     rewrite /uexec_pay_dep /upay_at.
-    rewrite Hnum. cbv zeta.
+    unfold uvis_num in Hnum. rewrite Hnum. cbv zeta.
     destruct (decide (uecall_scause = uecall_scause)) as [_ | Hpne];
       [ | exfalso; exact (Hpne eq_refl) ].
     destruct (decide (n = USYS_exit)) as [He | _]; [ exfalso; exact (Hexit He) | ].
@@ -2857,7 +2844,7 @@ Section UkRunSys.
     cbn [uvis_gen uvis_of_run].
     iSplitR; [ iFrame "Hmy" | ].
     iSplitL "Hdepn"; [ iExact "Hdepn" | ].
-    iIntros (r M' pm' sz' fdv' cw' gn' cs' lz' secc') \"%Hok %Hfdok %Hpiperow %Hcwrow %Hgnrow %Hpidrow %Hliverow %Hscrow %Hchrow _".
+    iIntros (r M' pm' sz' fdv' cw' gn' cs' lz' secc') "%Hok %Hfdok %Hpiperow %Hcwrow %Hgnrow %Hpidrow %Hliverow %Hscrow %Hchrow _".
     (* THE LAZY BIT CROSSED THE TRAP UNCHANGED (lane LAZY-FLAG, L6).  The
        trapping key is at [false] -- the U tier's run is
        ([UexecRet.ukcq]) -- and every row but sbrk's is the equation
@@ -3158,10 +3145,9 @@ Section UkRunSys.
               with "Hb Hmy").
     rewrite (uexec_ret_ecall _ _ eq_refl).
     assert (Hnum : uvis_num (uvis_of_run m pc M pm sz fdv cw gn cs pidv false secc_all) = USYS_pipe).
-    { rewrite uvis_num_full0.
-      - cbn [uvis_tf uvis_of_run]. rewrite tf_of_num. exact Hn.
-      - reflexivity.
-      - cbn [uvis_tf uvis_of_run]. rewrite tf_of_num, Hn. usys_range. }
+    { assert (Hraw : usys_num (uvis_tf (uvis_of_run m pc M pm sz fdv cw gn cs pidv false secc_all)) = USYS_pipe)
+        by (cbn [uvis_tf uvis_of_run]; rewrite tf_of_num; exact Hn).
+      rewrite uvis_num_full0; [ exact Hraw | reflexivity | rewrite Hraw; usys_range ]. }
     assert (Hw : usys_win USYS_pipe (uvis_tf (uvis_of_run m pc M pm sz fdv cw gn cs pidv false secc_all))
                  = Some (dst, 8%nat)).
     { cbn [uvis_tf uvis_of_run]. rewrite usyswin_tf_of.
@@ -3178,7 +3164,7 @@ Section UkRunSys.
        number is rewritten and the destructs below then reduce both copies
        at once *)
     rewrite /uexec_pay_dep /upay_at.
-    rewrite Hnum. cbv zeta.
+    unfold uvis_num in Hnum. rewrite Hnum. cbv zeta.
     destruct (decide (uecall_scause = uecall_scause)) as [_ | Hpne];
       [ | exfalso; exact (Hpne eq_refl) ].
     destruct (decide (USYS_pipe = USYS_exit)) as [He | _];
@@ -3197,7 +3183,7 @@ Section UkRunSys.
     cbn [uvis_gen uvis_of_run].
     iSplitR; [ iFrame "Hmy" | ].
     iSplitL "Hdepn"; [ iExact "Hdepn" | ].
-    iIntros (r M' pm' sz' fdv' cw' gn' cs' lz' secc') \"%Hok %Hfdok %Hpiperow %Hcwrow %Hgnrow %Hpidrow %Hliverow %Hscrow %Hchrow Hsp".
+    iIntros (r M' pm' sz' fdv' cw' gn' cs' lz' secc') "%Hok %Hfdok %Hpiperow %Hcwrow %Hgnrow %Hpidrow %Hliverow %Hscrow %Hchrow Hsp".
     (* THE POST IS NOT DISCARDED ANY MORE (design/pipe.md, "The byte
        queue"): row 4 hands the process the new pipe's exact fragment, and
        this leaf passes it on unread -- only the instance can open it. *)
@@ -3798,15 +3784,14 @@ Section UkRunSys.
               with "Hb Hmy").
     rewrite (uexec_ret_ecall _ _ eq_refl).
     assert (Hnum : uvis_num (uvis_of_run m pc M pm sz fdv cw gn cs pidv false secc_all) = USYS_read).
-    { rewrite uvis_num_full0.
-      - cbn [uvis_tf uvis_of_run]. rewrite tf_of_num. exact Hn.
-      - reflexivity.
-      - cbn [uvis_tf uvis_of_run]. rewrite tf_of_num, Hn. usys_range. }
+    { assert (Hraw : usys_num (uvis_tf (uvis_of_run m pc M pm sz fdv cw gn cs pidv false secc_all)) = USYS_read)
+        by (cbn [uvis_tf uvis_of_run]; rewrite tf_of_num; exact Hn).
+      rewrite uvis_num_full0; [ exact Hraw | reflexivity | rewrite Hraw; usys_range ]. }
     assert (Hw : usys_win USYS_read (uvis_tf (uvis_of_run m pc M pm sz fdv cw gn cs pidv false secc_all))
                  = Some (dst, cap)).
     { cbn [uvis_tf uvis_of_run]. rewrite usyswin_tf_of. exact Hwin. }
     rewrite /uexec_pay_dep /upay_at.
-    rewrite Hnum. cbv zeta.
+    unfold uvis_num in Hnum. rewrite Hnum. cbv zeta.
     destruct (decide (uecall_scause = uecall_scause)) as [_ | Hpne];
       [ | exfalso; exact (Hpne eq_refl) ].
     destruct (decide (USYS_read = USYS_exit)) as [He | _];
@@ -4116,12 +4101,11 @@ Section UkRunSys.
               with "Hb Hmy").
     rewrite (uexec_ret_ecall _ _ eq_refl).
     assert (Hnum : uvis_num (uvis_of_run m pc M pm sz fdv c gn cs pidv false secc_all) = USYS_open).
-    { rewrite uvis_num_full0.
-      - cbn [uvis_tf uvis_of_run]. rewrite tf_of_num. exact Hn.
-      - reflexivity.
-      - cbn [uvis_tf uvis_of_run]. rewrite tf_of_num, Hn. usys_range. }
+    { assert (Hraw : usys_num (uvis_tf (uvis_of_run m pc M pm sz fdv c gn cs pidv false secc_all)) = USYS_open)
+        by (cbn [uvis_tf uvis_of_run]; rewrite tf_of_num; exact Hn).
+      rewrite uvis_num_full0; [ exact Hraw | reflexivity | rewrite Hraw; usys_range ]. }
     rewrite /uexec_pay_dep /upay_at.
-    rewrite Hnum. cbv zeta.
+    unfold uvis_num in Hnum. rewrite Hnum. cbv zeta.
     destruct (decide (uecall_scause = uecall_scause)) as [_ | Hpne];
       [ | exfalso; exact (Hpne eq_refl) ].
     destruct (decide (USYS_open = USYS_exit)) as [He | _];
@@ -4280,12 +4264,11 @@ Section UkRunSys.
               with "Hb Hmy").
     rewrite (uexec_ret_ecall _ _ eq_refl).
     assert (Hnum : uvis_num (uvis_of_run m pc M pm sz fdv c gn cs pidv false secc_all) = n).
-    { rewrite uvis_num_full0.
-      - cbn [uvis_tf uvis_of_run]. rewrite tf_of_num. exact Hn.
-      - reflexivity.
-      - cbn [uvis_tf uvis_of_run]. rewrite tf_of_num, Hn. usys_range. }
+    { assert (Hraw : usys_num (uvis_tf (uvis_of_run m pc M pm sz fdv c gn cs pidv false secc_all)) = n)
+        by (cbn [uvis_tf uvis_of_run]; rewrite tf_of_num; exact Hn).
+      rewrite uvis_num_full0; [ exact Hraw | reflexivity | rewrite Hraw; usys_range ]. }
     rewrite /uexec_pay_dep /upay_at.
-    rewrite Hnum. cbv zeta.
+    unfold uvis_num in Hnum. rewrite Hnum. cbv zeta.
     destruct (decide (uecall_scause = uecall_scause)) as [_ | Hpne];
       [ | exfalso; exact (Hpne eq_refl) ].
     destruct (decide (n = USYS_exit)) as [He | _]; [ exfalso; exact (Hexit He) | ].
@@ -4571,12 +4554,11 @@ Section UkRunSys.
               with "Hb Hmy").
     rewrite (uexec_ret_ecall _ _ eq_refl).
     assert (Hnum : uvis_num (uvis_of_run m pc M pm sz fdv cw gn cs pidv false secc_all) = 16).
-    { rewrite uvis_num_full0.
-      - cbn [uvis_tf uvis_of_run]. rewrite tf_of_num. exact Hn.
-      - reflexivity.
-      - cbn [uvis_tf uvis_of_run]. rewrite tf_of_num, Hn. usys_range. }
+    { assert (Hraw : usys_num (uvis_tf (uvis_of_run m pc M pm sz fdv cw gn cs pidv false secc_all)) = 16)
+        by (cbn [uvis_tf uvis_of_run]; rewrite tf_of_num; exact Hn).
+      rewrite uvis_num_full0; [ exact Hraw | reflexivity | rewrite Hraw; usys_range ]. }
     rewrite /uexec_pay_dep /upay_at.
-    rewrite Hnum. cbv zeta.
+    unfold uvis_num in Hnum. rewrite Hnum. cbv zeta.
     destruct (decide (uecall_scause = uecall_scause)) as [_ | Hpne];
       [ | exfalso; exact (Hpne eq_refl) ].
     destruct (decide (16 = USYS_exit)) as [He | _]; [ discriminate He | ].
@@ -5015,12 +4997,11 @@ Section UkRunSys.
               with "Hb Hmy").
     rewrite (uexec_ret_ecall _ _ eq_refl).
     assert (Hnum : uvis_num (uvis_of_run m pc M pm sz fdv c gn cs pidv false secc_all) = USYS_open).
-    { rewrite uvis_num_full0.
-      - cbn [uvis_tf uvis_of_run]. rewrite tf_of_num. exact Hn.
-      - reflexivity.
-      - cbn [uvis_tf uvis_of_run]. rewrite tf_of_num, Hn. usys_range. }
+    { assert (Hraw : usys_num (uvis_tf (uvis_of_run m pc M pm sz fdv c gn cs pidv false secc_all)) = USYS_open)
+        by (cbn [uvis_tf uvis_of_run]; rewrite tf_of_num; exact Hn).
+      rewrite uvis_num_full0; [ exact Hraw | reflexivity | rewrite Hraw; usys_range ]. }
     rewrite /uexec_pay_dep /upay_at.
-    rewrite Hnum. cbv zeta.
+    unfold uvis_num in Hnum. rewrite Hnum. cbv zeta.
     destruct (decide (uecall_scause = uecall_scause)) as [_ | Hpne];
       [ | exfalso; exact (Hpne eq_refl) ].
     destruct (decide (USYS_open = USYS_exit)) as [He | _];
@@ -5271,12 +5252,11 @@ Section UkRunSys.
               with "Hb Hmy").
     rewrite (uexec_ret_ecall _ _ eq_refl).
     assert (Hnum : uvis_num (uvis_of_run m pc M pm sz fdv c gn cs pidv false secc_all) = USYS_open).
-    { rewrite uvis_num_full0.
-      - cbn [uvis_tf uvis_of_run]. rewrite tf_of_num. exact Hn.
-      - reflexivity.
-      - cbn [uvis_tf uvis_of_run]. rewrite tf_of_num, Hn. usys_range. }
+    { assert (Hraw : usys_num (uvis_tf (uvis_of_run m pc M pm sz fdv c gn cs pidv false secc_all)) = USYS_open)
+        by (cbn [uvis_tf uvis_of_run]; rewrite tf_of_num; exact Hn).
+      rewrite uvis_num_full0; [ exact Hraw | reflexivity | rewrite Hraw; usys_range ]. }
     rewrite /uexec_pay_dep /upay_at.
-    rewrite Hnum. cbv zeta.
+    unfold uvis_num in Hnum. rewrite Hnum. cbv zeta.
     destruct (decide (uecall_scause = uecall_scause)) as [_ | Hpne];
       [ | exfalso; exact (Hpne eq_refl) ].
     destruct (decide (USYS_open = USYS_exit)) as [He | _];
@@ -5476,12 +5456,11 @@ Section UkRunSys.
               with "Hb Hmy").
     rewrite (uexec_ret_ecall _ _ eq_refl).
     assert (Hnum : uvis_num (uvis_of_run m pc M pm sz fdv c gn cs pidv false secc_all) = n).
-    { rewrite uvis_num_full0.
-      - cbn [uvis_tf uvis_of_run]. rewrite tf_of_num. exact Hn.
-      - reflexivity.
-      - cbn [uvis_tf uvis_of_run]. rewrite tf_of_num, Hn. usys_range. }
+    { assert (Hraw : usys_num (uvis_tf (uvis_of_run m pc M pm sz fdv c gn cs pidv false secc_all)) = n)
+        by (cbn [uvis_tf uvis_of_run]; rewrite tf_of_num; exact Hn).
+      rewrite uvis_num_full0; [ exact Hraw | reflexivity | rewrite Hraw; usys_range ]. }
     rewrite /uexec_pay_dep /upay_at.
-    rewrite Hnum. cbv zeta.
+    unfold uvis_num in Hnum. rewrite Hnum. cbv zeta.
     destruct (decide (uecall_scause = uecall_scause)) as [_ | Hpne];
       [ | exfalso; exact (Hpne eq_refl) ].
     destruct (decide (n = USYS_exit)) as [He | _]; [ exfalso; exact (Hexit He) | ].
@@ -5668,15 +5647,14 @@ Section UkRunSys.
     rewrite (uexec_ret_ecall _ _ eq_refl).
     assert (Hnum : uvis_num (uvis_of_run m pc M pm sz fdv cw gn cs pidv false secc_all)
                    = USYS_sbrk).
-    { rewrite uvis_num_full0.
-      - cbn [uvis_tf uvis_of_run]. rewrite tf_of_num. exact Hn.
-      - reflexivity.
-      - cbn [uvis_tf uvis_of_run]. rewrite tf_of_num, Hn. usys_range. }
+    { assert (Hraw : usys_num (uvis_tf (uvis_of_run m pc M pm sz fdv cw gn cs pidv false secc_all)) = USYS_sbrk)
+        by (cbn [uvis_tf uvis_of_run]; rewrite tf_of_num; exact Hn).
+      rewrite uvis_num_full0; [ exact Hraw | reflexivity | rewrite Hraw; usys_range ]. }
     (* the PAYMENT's guard IS the deposit's own, so it is opened BEFORE the
        number is rewritten and the destructs below then reduce both copies
        at once *)
     rewrite /uexec_pay_dep /upay_at.
-    rewrite Hnum. cbv zeta.
+    unfold uvis_num in Hnum. rewrite Hnum. cbv zeta.
     destruct (decide (uecall_scause = uecall_scause)) as [_ | Hpne];
       [ | exfalso; exact (Hpne eq_refl) ].
     destruct (decide (USYS_sbrk = USYS_exit)) as [He | _];
@@ -5695,7 +5673,7 @@ Section UkRunSys.
     cbn [uvis_gen uvis_of_run].
     iSplitR; [ iFrame "Hmy" | ].
     iSplitL "Hdepn"; [ iExact "Hdepn" | ].
-    iIntros (r M' pm' sz' fdv' cw' gn' cs' lz' secc') \"%Hok %Hfdok %Hpiperow %Hcwrow %Hgnrow %Hpidrow %Hliverow %Hscrow %Hchrow _".
+    iIntros (r M' pm' sz' fdv' cw' gn' cs' lz' secc') "%Hok %Hfdok %Hpiperow %Hcwrow %Hgnrow %Hpidrow %Hliverow %Hscrow %Hchrow _".
     (* THE CWD CROSSED THE TRAP UNCHANGED -- chdir is the one row that moves
        it, and this is not it -- so the engine's half is re-keyed onto the
        view the process resumes at and the program's half never moved. *)
@@ -5914,15 +5892,14 @@ Section UkRunSys.
               with "Hb Hmy").
     rewrite (uexec_ret_ecall _ _ eq_refl).
     assert (Hnum : uvis_num (uvis_of_run m pc M pm sz fdv cw gn cs pidv false secc_all) = USYS_exit).
-    { rewrite uvis_num_full0.
-      - cbn [uvis_tf uvis_of_run]. rewrite tf_of_num. exact Hn.
-      - reflexivity.
-      - cbn [uvis_tf uvis_of_run]. rewrite tf_of_num, Hn. usys_range. }
+    { assert (Hraw : usys_num (uvis_tf (uvis_of_run m pc M pm sz fdv cw gn cs pidv false secc_all)) = USYS_exit)
+        by (cbn [uvis_tf uvis_of_run]; rewrite tf_of_num; exact Hn).
+      rewrite uvis_num_full0; [ exact Hraw | reflexivity | rewrite Hraw; usys_range ]. }
     (* the PAYMENT's guard IS the deposit's own, so it is opened BEFORE the
        number is rewritten and the destructs below then reduce both copies
        at once *)
     rewrite /uexec_pay_dep /upay_at.
-    rewrite Hnum. cbv zeta.
+    unfold uvis_num in Hnum. rewrite Hnum. cbv zeta.
     destruct (decide (uecall_scause = uecall_scause)) as [_ | Hpne];
       [ | exfalso; exact (Hpne eq_refl) ].
     destruct (decide (USYS_exit = USYS_fork)) as [He | _];

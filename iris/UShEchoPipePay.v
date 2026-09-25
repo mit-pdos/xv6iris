@@ -124,9 +124,9 @@ Section UShEchoPipePay.
     image_entry f M av sts cw secc cs pidv Q P' X.
   Proof using .
     iIntros "#Hw #He". rewrite /image_entry.
-    iIntros "!>" (na alen afun W') "%Hok %Hcw %Hlz %Hch %Hpid %Hargs Hp HP".
-    iApply ("He" $! na alen afun W' with "[%] [%] [%] [%] [%] [%] Hp [HP]");
-      [ exact Hok | exact Hcw | exact Hlz | exact Hch | exact Hpid
+    iIntros "!>" (na alen afun W') "%Hok %Hcw %Hlz %Hscw %Hch %Hpid %Hargs Hp HP".
+    iApply ("He" $! na alen afun W' with "[%] [%] [%] [%] [%] [%] [%] Hp [HP]");
+      [ exact Hok | exact Hcw | exact Hlz | exact Hscw | exact Hch | exact Hpid
       | exact Hargs | ].
     iApply ("Hw" with "HP").
   Qed.
