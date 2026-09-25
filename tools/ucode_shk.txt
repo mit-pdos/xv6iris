@@ -89,13 +89,15 @@ func putc
 
 omit 0xc8c exit's [c.jr ra] -- the ecall at 0xc88 never returns
 
-# The ONE pc the tier cannot state: [UserHeap.uinstr_is] still carries its
-# temporary in-page clause ([Z.rem (uint pc) 4096 <= 4092]) and this [c.mv
-# a1,a5] sits two bytes below the page boundary.  It is the SECOND [putc] of
-# vprintf's unknown-'%' arm ([putc(fd,'%'); putc(fd,c0)]), which none of sh's
-# three formats reaches -- every one of them is a '%s' -- and cat's proof of
-# the same code never names the corresponding pc either.
-omit 0xffe vprintf's unknown-'%' arm, unreachable from a '%s' format; and it straddles a page, which [uinstr_is]'s temporary in-page clause still forbids
+# There WAS one pc the tier could not state: [UserHeap.uinstr_is] carries a
+# temporary in-page clause ([Z.rem (uint pc) 4096 <= 4092]), and before the
+# a083670 bump vprintf's [c.mv a1,a5] (the SECOND [putc] of the unknown-'%'
+# arm, unreachable from sh's '%s' formats) sat at 0xffe, two bytes below the
+# page boundary, so it was omitted.  The bump's 8-byte [seccomp] stub moved
+# it to 0x1006; the last instruction below the boundary is now the 4-byte
+# [addi s1,s1,936] at 0xffc (rem 4092, allowed), and no listed pc is above
+# 4092 in its page.  So the omit is gone and the arm is stated, as
+# ucode_cat.txt's rule keeps every unreachable branch of a listed function.
 
 skipfunc printf unreachable: every diagnostic in sh.c is an [fprintf(2, ...)]
 skipfunc printint unreachable: vprintf reaches it only from the %d/%u/%x
