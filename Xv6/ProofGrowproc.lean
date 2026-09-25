@@ -435,7 +435,7 @@ theorem growproc_proof (MP : MYPROC) (UA : UVMALLOC) (UD : UVMDEALLOC) : GROWPRO
       ⊢ wpLoop (GF := GF) cc := by
     intro cc k' P M' hnoff' hK' hlk' hroot' hold' hnew' hperm' hfree'
     have h := UA.wp_uvmalloc (hlc := hlc) (GF := GF) cc k' γl γk P M' hnoff' hK' hlk' hroot'
-      hold' hnew' hperm' hfree'
+      hold' (Or.inl hnew') hperm' (fun i hi _ => hfree' i hi)
     unfold wp_uvmalloc_body at h
     simp only [uvmallocAddr] at h
     exact h

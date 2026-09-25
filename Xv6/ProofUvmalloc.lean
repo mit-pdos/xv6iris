@@ -17,6 +17,7 @@ import Xv6.SpecKfree
 import Xv6.SpecMemset
 import Xv6.SpecMappages
 import Xv6.UPtAllocLemmas
+import Xv6.UmCovered
 import Xv6.UvmallocDefs
 import Xv6.CodeTactics
 
@@ -734,8 +735,9 @@ theorem uvma_iter (KAL : KALLOC) (KF : KFREE) (MS : MEMSET) (MA : MAPPAGES_ANY)
     (perm newsz : BitVec 64) (A np i : Nat)
     (hnoff : k.noff + 1 < 2 ^ 31) (hK : uvmallocSlots ≤ k.avail) (hlk : "kmem" ∉ k.locks)
     (hmask : perm &&& ~~~0x3FF#64 = 0#64) (hrwx : perm &&& 0xE#64 ≠ 0#64)
-    (hA4 : 4096 ∣ A) (hnewsz : newsz.toNat ≤ uvmMaxsz)
-    (hlo : ∀ j, j < np → A + 4096 * j < newsz.toNat)
+    (hA4 : 4096 ∣ A)
+    (hbnd : ∀ (Pj : UPtd) (Mj : Nat → List (BitVec 8)) (j : Nat), j < np → uptWf Pj →
+      UaInv P M perm (A / 4096) j Pj Mj → A + 4096 * j + 4096 ≤ uvmMaxsz)
     (hfree : ∀ j, j < np → Iris.Std.PartialMap.get? P.um (A / 4096 + j) = none)
     (hi : i < np)
     (Pi : UPtd) (Mi : Nat → List (BitVec 8)) (hinv : UaInv P M perm (A / 4096) i Pi Mi)
@@ -752,8 +754,6 @@ theorem uvma_iter (KAL : KALLOC) (KF : KFREE) (MS : MEMSET) (MA : MAPPAGES_ANY)
       uaOut k γk P M perm newsz A i R2 pcv -∗ wpLoop cpu'))
     ⊢ wpLoop (GF := GF) cur := by
   have hmax : uvmMaxsz < 2 ^ 38 := by unfold uvmMaxsz; omega
-  have hlt : A + 4096 * i < newsz.toNat := hlo i hi
-  have hbound : A + 4096 * i ≤ uvmMaxsz := by omega
   have hfr : ∀ j, j < i → Iris.Std.PartialMap.get? P.um (A / 4096 + j) = none :=
     fun j hj => hfree j (by omega)
   have hnone : Iris.Std.PartialMap.get? Pi.um (A / 4096 + i) = none :=
@@ -762,6 +762,12 @@ theorem uvma_iter (KAL : KALLOC) (KF : KFREE) (MS : MEMSET) (MA : MAPPAGES_ANY)
   have hregs : uaRegs k R newsz P.root perm A i :=
     ⟨g2, g18, g19, g20, g21, g22, g23, g24, g25, g26, g27⟩
   iintro ⟨Hk, Hpc, #Hlk, Hav, HP, Hsv, HΦ⟩
+  -- the address bound at this iteration (Rocq `ua_loop`'s per-iteration premise)
+  icases procPtAt_split Pi Mi $$ HP with ⟨%hwfi0, Htree0, Hpages0⟩
+  ihave HP := ua_mkProcPtAt Pi Mi hwfi0 $$ [Htree0 Hpages0]
+  case' _ => iframe
+  have hbound1 : A + 4096 * i + 4096 ≤ uvmMaxsz := hbnd Pi Mi i hi hwfi0 hinv
+  have hbound : A + 4096 * i ≤ uvmMaxsz := by omega
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
   -- kalloc()
   k_step_gen (wp_s_jal cur _ (KA.«uvmalloc» + 0x36#64) false 2095130#21 1#5 (by decide))
@@ -1113,7 +1119,9 @@ theorem uvma_loop (KAL : KALLOC) (KF : KFREE) (MS : MEMSET) (MA : MAPPAGES_ANY)
     (perm newsz : BitVec 64) (A np : Nat)
     (hnoff : k.noff + 1 < 2 ^ 31) (hK : uvmallocSlots ≤ k.avail) (hlk : "kmem" ∉ k.locks)
     (hmask : perm &&& ~~~0x3FF#64 = 0#64) (hrwx : perm &&& 0xE#64 ≠ 0#64)
-    (hA4 : 4096 ∣ A) (hnewsz : newsz.toNat ≤ uvmMaxsz)
+    (hA4 : 4096 ∣ A)
+    (hbnd : ∀ (Pj : UPtd) (Mj : Nat → List (BitVec 8)) (j : Nat), j < np → uptWf Pj →
+      UaInv P M perm (A / 4096) j Pj Mj → A + 4096 * j + 4096 ≤ uvmMaxsz)
     (hlo : ∀ j, j < np → A + 4096 * j < newsz.toNat)
     (hhi : newsz.toNat ≤ A + 4096 * np)
     (hfree : ∀ j, j < np → get? P.um (A / 4096 + j) = none) (fuel : Nat) :
@@ -1140,8 +1148,12 @@ theorem uvma_loop (KAL : KALLOC) (KF : KFREE) (MS : MEMSET) (MA : MAPPAGES_ANY)
     have hi : i < np := by omega
     have hlast : i + 1 = np := by omega
     iintro ⟨Hk, Hpc, #Hlk, Hav, HP, Hsv, HΦ⟩
+    icases procPtAt_split Pi Mi $$ HP with ⟨%hwfi0, Htree0, Hpages0⟩
+    ihave HP := ua_mkProcPtAt Pi Mi hwfi0 $$ [Htree0 Hpages0]
+    case' _ => iframe
+    have hbi : A + 4096 * i + 4096 ≤ uvmMaxsz := hbnd Pi Mi i hi hwfi0 hinv
     iapply (uvma_iter KAL KF MS MA UD k γl γk P M perm newsz A np i hnoff hK hlk hmask hrwx
-      hA4 hnewsz hlo hfree hi Pi Mi hinv spie spp R hregs cur cur (fun _ => rfl))
+      hA4 hbnd hfree hi Pi Mi hinv spie spp R hregs cur cur (fun _ => rfl))
       $$ [- $Hk $Hpc $Hav $HP $Hsv]
     rotate_right 1
     iframe #
@@ -1157,7 +1169,7 @@ theorem uvma_loop (KAL : KALLOC) (KF : KFREE) (MS : MEMSET) (MA : MAPPAGES_ANY)
       have g19 : R2 19#5 = 4096#64 := hregs'.2.2.1
       have g20 : R2 20#5 = newsz := hregs'.2.2.2.1
       have hb64 : A + 4096 * (i + 1) < 2 ^ 64 := by
-        have := hlo (np - 1) (by omega); omega
+        omega
       k_step_gen (wp_s_add c1 _ (KA.«uvmalloc» + 0x56#64) true 18#5 18#5 19#5 (by decide))
         from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c2 hp2
       iintro Hk Hpc
@@ -1188,7 +1200,7 @@ theorem uvma_loop (KAL : KALLOC) (KF : KFREE) (MS : MEMSET) (MA : MAPPAGES_ANY)
     have hnlast : i + 1 < np := by omega
     iintro ⟨Hk, Hpc, #Hlk, Hav, HP, Hsv, HΦ⟩
     iapply (uvma_iter KAL KF MS MA UD k γl γk P M perm newsz A np i hnoff hK hlk hmask hrwx
-      hA4 hnewsz hlo hfree hi Pi Mi hinv spie spp R hregs cur cur (fun _ => rfl))
+      hA4 hbnd hfree hi Pi Mi hinv spie spp R hregs cur cur (fun _ => rfl))
       $$ [- $Hk $Hpc $Hav $HP $Hsv]
     rotate_right 1
     iframe #
@@ -1243,10 +1255,28 @@ theorem uvma_loop (KAL : KALLOC) (KF : KFREE) (MS : MEMSET) (MA : MAPPAGES_ANY)
 set_option maxHeartbeats 4000000 in
 theorem uvmalloc_proof (KAL : KALLOC) (KF : KFREE) (MS : MEMSET) (MA : MAPPAGES_ANY)
     (UD : UVMDEALLOC) : UVMALLOC :=
-  ⟨fun {hlc GF} _ _ _ cpu k γl γk P M hnoff hK hlk hroot hold hnew hperm hfree => by
+  ⟨fun {hlc GF} _ _ _ cpu k γl γk P M hnoff hK hlk hroot hold hnew hperm hfree0 => by
   unfold wp_uvmalloc_body
   simp only [uvmallocAddr]
   iintro ⟨Hk, Hpc, #Hlk, Hav, HP, HΦ⟩
+  icases procPtAt_split P M $$ HP with ⟨%hwfP, Htree0, Hpages0⟩
+  ihave HP := ua_mkProcPtAt P M hwfP $$ [Htree0 Hpages0]
+  case' _ => iframe
+  -- freshness where the contract guards it, and past `TRAPFRAME` by `uptWf`
+  have hfree : ∀ i, i < uvmaNp (k.regs 11#5) (k.regs 12#5) →
+      get? P.um (uvmaVpn0 (k.regs 11#5) + i) = none := by
+    intro i hi
+    by_cases hb : pgRoundUpN (k.regs 11#5).toNat + 4096 * i + 4096 ≤ uvmMaxsz
+    · exact hfree0 i hi hb
+    · cases hg : get? P.um (uvmaVpn0 (k.regs 11#5) + i) with
+      | none => rfl
+      | some w =>
+        have h1 := (hwfP.1 _ w hg).1
+        rw [tfVpn_toNat] at h1
+        obtain ⟨q, hq⟩ := pgRoundUpN_dvd (k.regs 11#5).toNat
+        unfold uvmaVpn0 at h1
+        unfold uvmMaxsz at hb
+        omega
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
   have hK10 : 10 ≤ k.avail := by unfold uvmallocSlots at hK; omega
   have hmax : uvmMaxsz < 2 ^ 38 := by unfold uvmMaxsz; omega
@@ -1447,7 +1477,7 @@ theorem uvmalloc_proof (KAL : KALLOC) (KF : KFREE) (MS : MEMSET) (MA : MAPPAGES_
       rw [ua_pushed_spie_self k 10]
       iapply (uvma_loop KAL KF MS MA UD k γl γk P M (k.regs 13#5 ||| 18#64) (k.regs 12#5)
         (pgRoundUpN (k.regs 11#5).toNat) (uvmaNp (k.regs 11#5) (k.regs 12#5)) hnoff hK hlk hmask
-        hrwx hA4 hnew hlo hhi hfree (uvmaNp (k.regs 11#5) (k.regs 12#5) - 1) 0 (by omega) P M
+        hrwx hA4 ?hbnd hlo hhi hfree (uvmaNp (k.regs 11#5) (k.regs 12#5) - 1) 0 (by omega) P M
         (uaInv_zero P M (k.regs 13#5 ||| 18#64) (pgRoundUpN (k.regs 11#5).toNat / 4096))
         k.spie k.spp _ ?hr0 c23) $$ [- $Hk $Hpc $Hav $HP $Hsv]
       rotate_right 1
@@ -1529,6 +1559,14 @@ theorem uvmalloc_proof (KAL : KALLOC) (KF : KFREE) (MS : MEMSET) (MA : MAPPAGES_
               (if (k.regs 12#5).toNat < (k.regs 11#5).toNat then k.regs 11#5 else k.regs 12#5)
               (by rw [hpost'.2, h10]) $$ HPr
             iapply HΦ $$ %spie2 %spp2 %R' %hsp2 Hk Hpc Hres %hpost'.1
+      case hbnd =>
+        intro Pj Mj j hj hwfj hinvj
+        rcases hnew with hnew | hcov
+        · have := hlo j hj
+          obtain ⟨q, hq⟩ := hA4
+          unfold uvmMaxsz at hnew ⊢
+          omega
+        · exact UmCovered.uvma_addr_bound P Pj M Mj _ (k.regs 11#5) j hcov hwfj hinvj
       case hr0 =>
         refine ⟨?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_⟩
         · simp only [RegMap.set_apply, BitVec.reduceEq, ite_true, ite_false]
