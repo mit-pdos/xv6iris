@@ -20,6 +20,7 @@ the shared epilogue at `+0x32`.
 import Xv6.SpecSysFstat
 import Xv6.CodeTactics
 import MachCSL.WpSmodeFrame6
+import MachCSL.StackOwnBounds
 
 namespace Xv6
 
@@ -55,8 +56,9 @@ theorem sfs_f_addr (x : BitVec 64) : x + BitVec.signExtend 64 4072#12 = x + 0xFF
 theorem sfs_bltz_m1 : bcond bop.BLT 0xFFFFFFFFFFFFFFFF#64 0#64 = true := by decide
 theorem sfs_bltz_0 : bcond bop.BLT 0#64 0#64 = false := by decide
 
-/-- `&f` is not null (Rocq's `stack_own_sp_nonzero` reading; `hsp`). -/
-theorem sfs_f_nonnull (sp : BitVec 64) (h : 48 ≤ sp.toNat) : sp + 0xFFFFFFFFFFFFFFE8#64 ≠ 0#64 := by
+/-- `&f` is not null (Rocq's `stack_own_sp_nonzero` reading, off the
+frame's own bound `sfs_sp_bound`). -/
+theorem sfs_f_nonnull (sp : BitVec 64) (h : 32 ≤ sp.toNat) : sp + 0xFFFFFFFFFFFFFFE8#64 ≠ 0#64 := by
   intro he
   have h2 := congrArg BitVec.toNat he
   rw [BitVec.toNat_add] at h2
@@ -146,6 +148,18 @@ theorem sfs_frame_open (sp ra s0 : BitVec 64) :
       (∃ w : BitVec 64, wordPointsTo (sp + 0xFFFFFFFFFFFFFFE8#64) 8 (DFrac.own 1) w) ∗
       (∃ w : BitVec 64, wordPointsTo (sp + 0xFFFFFFFFFFFFFFE0#64) 8 (DFrac.own 1) w) := by
   unfold frame4s0 frame4s0rest; iintro H; iexact H
+
+/-- **THE FRAME'S OWN GEOMETRY** (Rocq's `stack_own_sp_nonzero`, read off
+`sie_cap_gpr`'s stack; the `SysUnlinkFrame.sys_unlink_sp_bound` pattern):
+the lowest frame cell, `&st = sp - 32`, is an owned word, whose address is
+below `2^38` (`MachCSL.wordPointsTo_lt38`), so it does not wrap:
+`32 ≤ sp`. -/
+theorem sfs_sp_bound (sp w : BitVec 64) :
+    wordPointsTo (GF := GF) (sp + 0xFFFFFFFFFFFFFFE0#64) 8 (DFrac.own 1) w ⊢ ⌜32 ≤ sp.toNat⌝ := by
+  iintro H
+  ihave %h := wordPointsTo_lt38 _ 8 _ _ $$ H
+  ipureintro
+  bv_omega
 
 theorem sfs_frame_close (sp ra s0 w1 w2 : BitVec 64) :
     wordPointsTo (GF := GF) (sp + 0xFFFFFFFFFFFFFFF8#64) 8 (DFrac.own 1) ra ∗

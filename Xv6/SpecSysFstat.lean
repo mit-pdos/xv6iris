@@ -20,7 +20,8 @@ in slots 1/2, `f` at `s0-24`, `st` at `s0-32`, both full words).
   epilogue is ONE lemma over the value the arm left there.
 * `pfd` IS NULL: sys_fstat passes 0 for argfd's `int *pfd`, exactly the
   case `ofdOut` exists for (a null out-parameter carries no resource).
-  `pf` is a real stack slot; its non-nullity is `hsp` (below).
+  `pf` is a real stack slot; its non-nullity is read off the frame's own
+  cells (deviation 5), so it is not a premise.
 * ARGADDR RUNS BEFORE ARGFD and its result is never checked: a bad user
   address is copyout's problem (its contract is total in the
   destination).  The word is still named (`v1`) because the post's window
@@ -64,9 +65,12 @@ in slots 1/2, `f` at `s0-24`, `st` at `s0-32`, both full words).
    `hproc`; `callee_saved m mf` is `⌜calleeSaved k.regs R'⌝`; the exit
    context is `(k.withSpie spie spp).withRegs R'`; the image is
    `umemWrote V.upt M v1 d P' M'` (Rocq `umem_wr (us_M U) v1 d bs`, bytes
-   existential).  `hsp` is the stack bound Rocq reads off `sie_cap_gpr`'s
-   stack ownership (`stack_own_sp_nonzero`): `&f` is passed to argfd by
-   address (sys_close's form).
+   existential).  Rocq reads `&f`'s non-nullity off `sie_cap_gpr`'s stack
+   ownership (`stack_own_sp_nonzero`); here the proof reads `32 ≤ sp0` off
+   the frame's lowest owned cell (`SysFstatParts.sfs_sp_bound`, via
+   `MachCSL.wordPointsTo_lt38`; the `SysUnlinkFrame.sys_unlink_sp_bound`
+   pattern), so the former `hsp : 48 ≤ sp0` premise is retired.  `&f` is
+   passed to argfd by address (sys_close's form).
 -/
 import Xv6.SpecArgfd
 import Xv6.SpecArgaddr
@@ -127,7 +131,7 @@ def wp_sys_fstat_eb_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [
     (M : Nat → List (BitVec 8)) (v v1 : BitVec 64) (γkl : GName) (γk : KmemNames)
     (hv : V.tf[tfArgIdx 0]? = some v) (hv1 : V.tf[tfArgIdx 1]? = some v1)
     (hK : sysFstatSlots ≤ k.avail) (hj : j < NPROC) (hproc : k.proc = procAddr j)
-    (hnoff : k.noff = 0) (htier : k.tier = KTier.kpt) (hsp : 48 ≤ (k.regs 2#5).toNat) : Prop :=
+    (hnoff : k.noff = 0) (htier : k.tier = KTier.kpt) : Prop :=
   kctx cpu k ∗ pcIs cpu sysFstatAddr ∗ procsInv Γ ∗
   trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗
   -- filestat itself never panics; ilock does, and this is its credential
@@ -150,8 +154,8 @@ structure SYSFSTAT : Prop where
     (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
     (cpu : CPU) (k : KCtx) (γ : FileNames) (j : Nat) (pid : BitVec 32) (V : ProcPriv)
     (M : Nat → List (BitVec 8)) (v v1 : BitVec 64) (γkl : GName) (γk : KmemNames)
-    hv hv1 hK hj hproc hnoff htier hsp,
+    hv hv1 hK hj hproc hnoff htier,
     wp_sys_fstat_eb_body (hlc := hlc) (GF := GF) Γ cpu k γ j pid V M v v1 γkl γk
-      hv hv1 hK hj hproc hnoff htier hsp
+      hv hv1 hK hj hproc hnoff htier
 
 end Xv6

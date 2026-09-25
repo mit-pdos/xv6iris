@@ -326,7 +326,7 @@ theorem sfs_argfd_call (AF : ARGFD) (FS : FILESTAT) (Γ : SchedNames) [ClaimIs (
     (spie spp : Bool) (R : RegMap) (wf : BitVec 64)
     (hv : V.tf[tfArgIdx 0]? = some v)
     (hK : sysFstatSlots ≤ k.avail) (hj : j < NPROC) (hproc : k.proc = procAddr j)
-    (hnoff : k.noff = 0) (htier : k.tier = KTier.kpt) (hsp : 48 ≤ (k.regs 2#5).toNat)
+    (hnoff : k.noff = 0) (htier : k.tier = KTier.kpt) (hsp : 32 ≤ (k.regs 2#5).toNat)
     (hr : sfsRegs k R) :
     kctx cpu (((k.withSpie spie spp).pushed 4).withRegs R) ∗
     pcIs cpu (KA.«sys_fstat» + 0x12#64) ∗
@@ -400,9 +400,9 @@ theorem sys_fstat_main (AA : ARGADDR) (AF : ARGFD) (FS : FILESTAT)
     (M : Nat → List (BitVec 8)) (v v1 : BitVec 64) (γkl : GName) (γk : KmemNames)
     (hv : V.tf[tfArgIdx 0]? = some v) (hv1 : V.tf[tfArgIdx 1]? = some v1)
     (hK : sysFstatSlots ≤ k.avail) (hj : j < NPROC) (hproc : k.proc = procAddr j)
-    (hnoff : k.noff = 0) (htier : k.tier = KTier.kpt) (hsp : 48 ≤ (k.regs 2#5).toNat) :
+    (hnoff : k.noff = 0) (htier : k.tier = KTier.kpt) :
     wp_sys_fstat_eb_body (hlc := hlc) (GF := GF) Γ cpu k γ j pid V M v v1 γkl γk
-      hv hv1 hK hj hproc hnoff htier hsp := by
+      hv hv1 hK hj hproc hnoff htier := by
   unfold wp_sys_fstat_eb_body
   have hK80 := hK
   rw [sysFstatSlots_eq] at hK80
@@ -428,6 +428,8 @@ theorem sys_fstat_main (AA : ARGADDR) (AF : ARGFD) (FS : FILESTAT)
   k_norm_g
   ihave Hk := sfs_ctx_entry _ _ _ $$ Hk
   icases sfs_frame_open _ _ _ $$ Hframe with ⟨Hra, Hs0, ⟨%wf, Hcf⟩, ⟨%ws, Hcs⟩⟩
+  -- the frame's own geometry: `&st` is owned, so `32 ≤ sp0` (Rocq's `hsp`)
+  ihave %hsp := sfs_sp_bound _ _ $$ Hcs
   have hr0 := sfsRegs_entry k
   -- +0x08  addi a1,s0,-32 ; +0x0c  c.li a0,1 ; +0x0e  jal argaddr
   k_step_e (wp_s_addi cpu _ (KA.«sys_fstat» + 0x8#64) false 4064#12 11#5 8#5 (by decide))
@@ -472,7 +474,7 @@ end
 /-- `sys_fstat`'s proof, from its callees' interfaces (Rocq's `SysFstatProof
 Argaddr Argfd Filestat`). -/
 theorem sys_fstat_proof (AA : ARGADDR) (AF : ARGFD) (FS : FILESTAT) : SYSFSTAT :=
-  ⟨fun Γ _ cpu k γ j pid V M v v1 γkl γk hv hv1 hK hj hproc hnoff htier hsp =>
-    sys_fstat_main AA AF FS Γ cpu k γ j pid V M v v1 γkl γk hv hv1 hK hj hproc hnoff htier hsp⟩
+  ⟨fun Γ _ cpu k γ j pid V M v v1 γkl γk hv hv1 hK hj hproc hnoff htier =>
+    sys_fstat_main AA AF FS Γ cpu k γ j pid V M v v1 γkl γk hv hv1 hK hj hproc hnoff htier⟩
 
 end Xv6

@@ -26,6 +26,7 @@ import MachCSL.WpStages
 import MachCSL.MConf
 import MachCSL.DecodeBridge
 import MachCSL.KCtx
+import MachCSL.StackOwnBounds
 import MachCSL.WpAluFile
 import MachCSL.WpSmode
 import MachCSL.WpSmodeMem

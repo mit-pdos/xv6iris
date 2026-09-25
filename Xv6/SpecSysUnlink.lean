@@ -120,8 +120,9 @@ three LIVE panics (+0xf4 "unlink: nlink < 1", +0x136 "isdirempty: readi",
    premise here: Rocq reads it off `stack_own`'s built-in range
    (`su_sp_bounds` + `stack_off_nonzero`, ProofSysUnlinkW2:1182); Lean's
    `stackOwn` carries the range cell by cell, and the frame's lowest owned
-   slot (`sp0 - 240`, a `wordPointsTo`, whose address is below `2^38`) gives
-   `240 ≤ sp0` (`SysUnlinkFrame.sys_unlink_sp_bound`).
+   slot (`sp0 - 240`, a one-slot region) gives `240 ≤ sp0`
+   (`SysUnlinkFrame.sys_unlink_sp_bound`, over the shared
+   `MachCSL.stackOwn_sp_bounds`, Rocq's `stack_own_sp_bounds`).
 
 ## Dropped/simplified vs Rocq
 

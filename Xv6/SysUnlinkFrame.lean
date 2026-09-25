@@ -53,6 +53,7 @@ import Xv6.DinodeSlot
 import MachCSL.WpSmodeFrame
 import MachCSL.ByteWord
 import MachCSL.ByteWord4
+import MachCSL.StackOwnBounds
 import Xv6.CodeTactics
 
 namespace Xv6
@@ -169,24 +170,15 @@ def sysUnlinkBufs [CurCtx] (sp0 : BitVec 64) : IProp GF := iprop%
   (∃ ov : BitVec 32, wordPointsTo (sysUnlinkOff sp0) 4 (DFrac.own 1) ov) ∗
   suAny (sysUnlinkDel sp0) 16
 
-/-- A word cell's address is below `2^38` (`wordPointsTo`'s own clause). -/
-theorem sys_unlink_wpt_lt38 [CurCtx] (a : BitVec 64) (n : Nat) (dq : DFrac) (w : BitVec (8 * n)) :
-    wordPointsTo (GF := GF) a n dq w ⊢ ⌜a.toNat < 2 ^ 38⌝ := by
-  unfold wordPointsTo
-  iintro ⟨%ppn, #Hcl, %⟨-, hlt, -, -⟩, -⟩
-  ipureintro; exact hlt
-
 /-- **THE FRAME'S OWN GEOMETRY** (Rocq's `su_sp_bounds` + `stack_off_nonzero`,
-ProofSysUnlinkW2:1181): the lowest frame slot, `sp0 - 240`, is an owned word,
-so its address does not wrap -- `240 ≤ sp0`.  Rocq reads the bound off
-`stack_own`'s built-in range; Lean's `stackOwn` carries it cell by cell. -/
+ProofSysUnlinkW2:1181): the dead slot below `sysUnlinkDel sp0` is an owned
+region, so `MachCSL.stackOwn_sp_bounds` (Rocq's `stack_own_sp_bounds`) pins
+its base in `[8, 2^38 + 8)` -- and `240 ≤ sp0`. -/
 theorem sys_unlink_sp_bound [CurCtx] (sp0 : BitVec 64) :
     sysUnlinkBufs (GF := GF) sp0 ⊢ ⌜240 ≤ sp0.toNat⌝ := by
-  unfold sysUnlinkBufs sysUnlinkJunk stackOwn
-  simp only [List.range_one]
+  unfold sysUnlinkBufs sysUnlinkJunk
   iintro ⟨⟨-, Hd, -⟩, -⟩
-  icases BigSepL.bigSepL_singleton.1 $$ Hd with ⟨%w, Hd⟩
-  ihave %h := sys_unlink_wpt_lt38 _ 8 _ _ $$ Hd
+  ihave %h := stackOwn_sp_bounds _ 1 (by omega) $$ Hd
   ipureintro
   simp only [sysUnlinkDel] at h
   bv_omega
