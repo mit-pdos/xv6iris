@@ -1021,3 +1021,11 @@ import Xv6.SpecSysRead
 import Xv6.SysReadParts
 import Xv6.ProofSysRead
 import Xv6.LinkSysRead
+import Xv6.SpecSysExec
+import Xv6.SysExecParts
+import Xv6.SysExecLoop
+import Xv6.SysExecSetup
+import Xv6.UsysMemOk
+import Xv6.SyscallDefs
+import Xv6.UsysMemOkSpec
+import Xv6.StartedInv
