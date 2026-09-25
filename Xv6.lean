@@ -716,3 +716,4 @@ import Xv6.PrepareReturnStores
 import Xv6.ProofPrepareReturn
 import Xv6.LinkPrepareReturn
 import Xv6.LinkReadi
+import Xv6.LinkIput
