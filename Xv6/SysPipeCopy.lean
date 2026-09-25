@@ -48,9 +48,11 @@ theorem sys_pipe_stage_f (FC : FILECLOSE) (Γ : SchedNames) (cpu c : CPU) (k : K
     (l : List Nat) (hfrees : fdFrees V.ofile = fd0 :: fd1 :: l)
     (P1 P2 : UPtd) (M1 M2 : Nat → List (BitVec 8)) (hext1 : V.upt.extSz V.sz P1) (hext2 : P1.extSz V.sz P2)
     (hM1 : M1 = umemWrite (viewFaulted V.upt P1 M) v.toNat (sysPipeFdBytes fd0))
-    (hr2 : (R 10#5 = 0#64 ∧ M2 = umemWrite (viewFaulted P1 P2 M1) (v + 4#64).toNat (sysPipeFdBytes fd1)) ∨
+    (hr2 : (R 10#5 = 0#64 ∧ M2 = umemWrite (viewFaulted P1 P2 M1) (v + 4#64).toNat (sysPipeFdBytes fd1) ∧
+        umMapped P2 (v + 4#64).toNat (sysPipeFdBytes fd1).length) ∨
       (R 10#5 = -1#64 ∧ ∃ d, d < (sysPipeFdBytes fd1).length ∧
-        M2 = umemWrite (viewFaulted P1 P2 M1) (v + 4#64).toNat ((sysPipeFdBytes fd1).take d)))
+        M2 = umemWrite (viewFaulted P1 P2 M1) (v + 4#64).toNat ((sysPipeFdBytes fd1).take d) ∧
+        umMapped P2 (v + 4#64).toNat d))
     (htier : k.tier = KTier.kpt) (hnoff : k.noff + 2 < 2 ^ 31) (hK : sysPipeSlots ≤ k.avail)
     (hlk : "ftable" ∉ k.locks) (hplk : "pipe" ∉ k.locks) (hprc : "proc" ∉ k.locks) (hkmem : "kmem" ∉ k.locks)
     (hpin : k.sie = false ∨ k.proc = 0#64 → c = cpu) (hsp : k.sie = false → spie = k.spie ∧ spp = k.spp)
@@ -74,7 +76,7 @@ theorem sys_pipe_stage_f (FC : FILECLOSE) (Γ : SchedNames) (cpu c : CPU) (k : K
   k_step_gen (wp_s_addi c _ (KA.«sys_pipe» + 0x7a#64) true 0#12 15#5 0#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [sys_pipe_li0] next c1 hp1
   iintro Hk Hpc
-  rcases hr2 with ⟨h10, hM2⟩ | ⟨h10, d, hd, hM2⟩
+  rcases hr2 with ⟨h10, hM2, -⟩ | ⟨h10, d, hd, hM2, -⟩
   · -- success: bgez taken to the exit
     k_step_gen (wp_s_branch c1 _ (KA.«sys_pipe» + 0x7c#64) false 94#13 10#5 0#5 (by decide) bop.BGE)
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h10, sys_pipe_bgez_0] next c2 hp2
@@ -161,9 +163,11 @@ theorem sys_pipe_stage_e {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [
     (l : List Nat) (hfrees : fdFrees V.ofile = fd0 :: fd1 :: l)
     (P1 : UPtd) (M1 : Nat → List (BitVec 8)) (hext1 : V.upt.extSz V.sz P1)
     (hf : V.sz.toNat ≤ uvmMaxsz ∧ umBelow V.sz V.upt ∧ V.pagetable = pageAddr V.upt.root ∧ V.trapframe = pageAddr V.upt.tfp)
-    (hr1 : (R 10#5 = 0#64 ∧ M1 = umemWrite (viewFaulted V.upt P1 M) v.toNat (sysPipeFdBytes fd0)) ∨
+    (hr1 : (R 10#5 = 0#64 ∧ M1 = umemWrite (viewFaulted V.upt P1 M) v.toNat (sysPipeFdBytes fd0) ∧
+        umMapped P1 v.toNat (sysPipeFdBytes fd0).length) ∨
       (R 10#5 = -1#64 ∧ ∃ d, d < (sysPipeFdBytes fd0).length ∧
-        M1 = umemWrite (viewFaulted V.upt P1 M) v.toNat ((sysPipeFdBytes fd0).take d)))
+        M1 = umemWrite (viewFaulted V.upt P1 M) v.toNat ((sysPipeFdBytes fd0).take d) ∧
+        umMapped P1 v.toNat d))
     (htier : k.tier = KTier.kpt) (hnoff : k.noff + 2 < 2 ^ 31) (hK : sysPipeSlots ≤ k.avail)
     (hlk : "ftable" ∉ k.locks) (hplk : "pipe" ∉ k.locks) (hprc : "proc" ∉ k.locks) (hkmem : "kmem" ∉ k.locks)
     (hpin : k.sie = false ∨ k.proc = 0#64 → c = cpu) (hsp : k.sie = false → spie = k.spie ∧ spp = k.spp)
@@ -189,7 +193,7 @@ theorem sys_pipe_stage_e {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [
     Hfrag, Hnext⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
   have p8 : R 8#5 = k.regs 2#5 := hpins.2.1
-  rcases hr1 with ⟨h10, hM1⟩ | ⟨h10, d, hd, hM1⟩
+  rcases hr1 with ⟨h10, hM1, -⟩ | ⟨h10, d, hd, hM1, -⟩
   · -- the first word is out: the second copyout
     k_step_gen (wp_s_branch c _ (KA.«sys_pipe» + 0x62#64) false 30#13 10#5 0#5 (by decide) bop.BLT)
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h10, sys_pipe_bltz_0] next c1 hp1

@@ -40,7 +40,7 @@ theorem rd_exit_ok (c cpu : CPU) (k : KCtx) (spie spp : Bool) (R : RegMap)
     (hproc : k.proc = procAddr j) (hK : 14 ≤ k.avail) (hsie : k.sie = false)
     (hR2 : R 2#5 = k.regs 2#5 + 0xFFFFFFFFFFFFFF90#64) (h19 : R 19#5 = BitVec.ofNat 64 tot)
     (htot : tot = rdClamp dn.diSize off n)
-    (hok : rdUserOk user Vp M P Mi (k.regs 12#5) tot)
+    (hok : rdUserOk user Vp M P Mi (k.regs 12#5) data off tot)
     (hpin : true = false ∨ k.proc = 0#64 → c = cpu) :
     kctx c (((k.withSpie spie spp).pushed 14).withRegs R) ∗ pcIs c (KA.«readi» + 0xbe#64) ∗
     rdFrame (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) (k.regs 9#5) (k.regs 18#5) (k.regs 19#5)
@@ -105,7 +105,7 @@ theorem rd_exit_fail (BE : BRELSE) (Γ : SchedNames) (c cpu : CPU) (k : KCtx) (s
     (hnoff : k.noff = 0) (hlocks : k.locks = []) (htier : k.tier = KTier.kpt)
     (hR2 : R 2#5 = k.regs 2#5 + 0xFFFFFFFFFFFFFF90#64) (h18 : R 18#5 = bnode kk) (hkk : kk < NBUF)
     (huser : user = true) (htot : tot ≤ rdClamp dn.diSize off n)
-    (hok : rdUserOk user Vp M P Mi (k.regs 12#5) tot)
+    (hok : rdUserOk user Vp M P Mi (k.regs 12#5) data off tot)
     (hpin : true = false ∨ k.proc = 0#64 → c = cpu) :
     kctx c (((k.withSpie spie spp).pushed 14).withRegs R) ∗ pcIs c (KA.«readi» + 0xaa#64) ∗
     rdFrame (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) (k.regs 9#5) (k.regs 18#5) (k.regs 19#5)

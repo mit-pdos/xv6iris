@@ -66,7 +66,7 @@ theorem rd_post_of_spec (cpu : CPU) (k : KCtx) (γb : BcacheNames) (γfs : FsNam
       inodeMapQ γfs dq ip bm -∗ inodeBlocksQ γfs dq bm data -∗
       (if user then
         (∃ (P' : UPtd) (M' : Nat → List (BitVec 8)),
-          ⌜Vp.upt.extSz Vp.sz P' ∧ rdOut (viewFaulted Vp.upt P' M) M' (k.regs 12#5) tot⌝ ∗
+          ⌜Vp.upt.extSz Vp.sz P' ∧ rdImg Vp.upt P' M M' (k.regs 12#5) data off tot⌝ ∗
           procPrivRun (procAddr j) pidv { Vp with upt := P' } M')
        else byteBuf (k.regs 12#5) (DFrac.own 1) (rdDelivered data olds off tot) ∗
          wordPointsTo (pPid k.proc) 4 dqp pidv) -∗
@@ -105,7 +105,7 @@ theorem rd_early (c cpu : CPU) (k : KCtx) (R : RegMap)
   ihave HΦ := wpNext_at true k.proc cpu c _ (rd_pin hj k hproc c cpu) $$ Hnext
   ihave HΦ := rdPost_elim _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ $$ HΦ
   ihave Hdst := rdDst_post k user j pidv Vp M Vp.upt M dqp data olds off 0 hproc
-    (rdUserOk_zero user Vp M (k.regs 12#5)) $$ Hdst
+    (rdUserOk_zero user Vp M (k.regs 12#5) data off) $$ Hdst
   have hk : k.withSpie k.spie k.spp = k := rfl
   iapply HΦ $$ %k.spie %k.spp %(R.set 10#5 0#64) %0 [] [] [] [Hk] Hpc Htc Hcl Hir Hdev Hmeta Hmap Hblk Hdst Hsl
   · ipureintro
@@ -171,7 +171,7 @@ theorem rd_body0 (BM : BMAP_NOALLOC) (BR : BREAD) (BE : BRELSE) (EC : EITHER_COP
     iapply (rd_join c cpu k spie spp _ (BitVec.ofNat 64 N) γb γfs dev j ip bm data dn user off n
         0 olds pidv Vp M dqp dq dqd Vp.upt M w2 w8 w9 w10 w11 w13 hs.hproc hK14 hsie ?e2 ?e19 ?e18
         ?e24 ?e25 ?e26 ?e27 (Nat.zero_le _) (Or.inr ⟨by rw [hN0], by rw [← hs.hclamp, hN0]⟩)
-        (rdUserOk_zero user Vp M (k.regs 12#5)) (rd_pin hs.hj k hs.hproc c cpu))
+        (rdUserOk_zero user Vp M (k.regs 12#5) data off) (rd_pin hs.hj k hs.hproc c cpu))
       $$ [$Hk $Hpc $Hframe $Htc $Hcl $Hir $Hdev $Hmeta $Hmap $Hblk $Hdst $Hsl $Hnext]
     all_goals (simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true] <;>
       first | assumption | rfl)
@@ -222,7 +222,7 @@ theorem rd_body0 (BM : BMAP_NOALLOC) (BR : BREAD) (BE : BRELSE) (EC : EITHER_COP
     Hmap Hblk Hdst Hsl Hnext
   ipureintro
   refine ⟨⟨?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_⟩, by omega, by omega, by omega,
-    rdUserOk_zero user Vp M (k.regs 12#5)⟩ <;>
+    rdUserOk_zero user Vp M (k.regs 12#5) data off⟩ <;>
     simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true] <;>
     first | assumption | rfl | (rw [h20]; simp)
 

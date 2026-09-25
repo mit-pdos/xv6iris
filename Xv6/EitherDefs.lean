@@ -114,6 +114,21 @@ theorem procPriv_to_ext (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv)
 theorem procFields_upt (pa : BitVec 64) (dq : DFrac) (V : ProcPriv) (P' : UPtd) :
     procFieldsNoctx (GF := GF) pa dq { V with upt := P' } = procFieldsNoctx pa dq V := rfl
 
+/-- The block's table facts, kept (what a chunked copy needs to chain its
+chunks without a 64-bit wrap: `UMemL.umMapped_bound`). -/
+theorem procPrivExt_wf (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv) (P' : UPtd)
+    (M' : Nat → List (BitVec 8)) :
+    procPrivExt (GF := GF) pa pid V P' M' ⊢ procPrivExt pa pid V P' M' ∗ ⌜uptWf P'⌝ := by
+  unfold procPrivExt
+  iintro ⟨%hf, Hpid, Hfl, Hpt, Htf, %hl⟩
+  icases UMemL.procPtAt_wf _ _ $$ Hpt with ⟨Hpt, %hwf⟩
+  isplitl [Hpid Hfl Hpt Htf]
+  · iframe
+    isplitr []
+    · ipureintro; exact hf
+    · ipureintro; exact hl
+  · ipureintro; exact hwf
+
 /-- ... and back. -/
 theorem procPrivExt_close (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv) (P' : UPtd)
     (M' : Nat → List (BitVec 8)) :

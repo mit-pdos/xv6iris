@@ -9,14 +9,14 @@ contract at its call site.
 
 1. `rdDst` is indexed by the delivered count `tot` and the user arm's
    current table/image `(P, Mi)` (Rocq indexes the user arm by the
-   accumulated `rd_img`, which SpecReadi deviation 5 replaces by the pure
-   `rdUserOk`).  Rocq's `rd_q` (the vestigial pid fraction) is `rdQ`, and
+   accumulated `rd_img`; here the image is the pure `rdUserOk`, SpecReadi
+   deviation 5's `rdImg` equation).  Rocq's `rd_q` (the vestigial pid fraction) is `rdQ`, and
    now names a real fraction: the user arm's pid share IS `pidPriv`, the
    one inside the running block.
 2. bread / brelse are called through the shared `Xv6.bread_call` /
    `Xv6.brelse_call` (FsCallSites).  `rd_copyout` is the whole
    either_copyout step on both arms (the kernel arm's window split and
-   spliced back, the user arm's `rdOut` advanced).
+   spliced back, the user arm's `rdImg` advanced by the chunk it wrote).
 -/
 import Xv6.ReadiParts
 import Xv6.ReadiFrame
@@ -51,22 +51,17 @@ def rdDst (user : Bool) (dst : BitVec 64) (j : Nat) (pidv : BitVec 32) (Vp : Pro
 /-- The pid share each arm lends bmap / bread / brelse (Rocq's `rd_q`). -/
 def rdQ (user : Bool) (dqp : DFrac) : DFrac := if user then pidPriv else dqp
 
-/-- The user arm's loop facts (SpecReadi deviation 5). -/
+/-- The user arm's loop facts (SpecReadi deviation 5): the table grown
+under the break, and the image equation after `tot` bytes. -/
 def rdUserOk (user : Bool) (Vp : ProcPriv) (M : Nat → List (BitVec 8)) (P : UPtd)
-    (Mi : Nat → List (BitVec 8)) (dst : BitVec 64) (tot : Nat) : Prop :=
-  user = true → Vp.upt.extSz Vp.sz P ∧ rdOut (viewFaulted Vp.upt P M) Mi dst tot
+    (Mi : Nat → List (BitVec 8)) (dst : BitVec 64) (data : Nat → List (BitVec 8))
+    (off tot : Nat) : Prop :=
+  user = true → Vp.upt.extSz Vp.sz P ∧ rdImg Vp.upt P M Mi dst data off tot
 
 theorem rdUserOk_zero (user : Bool) (Vp : ProcPriv) (M : Nat → List (BitVec 8))
-    (dst : BitVec 64) : rdUserOk user Vp M Vp.upt M dst 0 := by
-  intro _
-  refine ⟨UMemL.extSz_refl _ _, ?_⟩
-  rw [UMemL.viewFaulted_self]
-  exact rdOut_zero _ _
-
-theorem rdUserOk_mono (user : Bool) (Vp : ProcPriv) (M : Nat → List (BitVec 8)) (P : UPtd)
-    (Mi : Nat → List (BitVec 8)) (dst : BitVec 64) (t t' : Nat) (h : t ≤ t')
-    (ho : rdUserOk user Vp M P Mi dst t) : rdUserOk user Vp M P Mi dst t' :=
-  fun hu => ⟨(ho hu).1, rdOut_mono _ _ _ _ _ h (ho hu).2⟩
+    (dst : BitVec 64) (data : Nat → List (BitVec 8)) (off : Nat) :
+    rdUserOk user Vp M Vp.upt M dst data off 0 :=
+  fun _ => ⟨UMemL.extSz_refl _ _, rdImg_zero _ _ _ _ _⟩
 
 /-- THE BORROW (Rocq's `rd_dst_bare`): the pid cell, out of either arm, and
 back. -/
@@ -168,7 +163,8 @@ set_option maxHeartbeats 4000000 in
 /-- **THE COPY** (`jal either_copyout` at `+0x60`), on both arms: the
 kernel arm's window `[tot, tot + m)` of the caller's buffer split out,
 overwritten with the chunk and spliced back (`rdDelivered_step`); the user
-arm's block extended and its image advanced (`rdOut_step`). -/
+arm's block extended and its image advanced by what the chunk wrote
+(`rdImg_step`): all `m` bytes, or on a `-1` some prefix `d < m` of them. -/
 theorem rd_copyout (EC : EITHER_COPYOUT) (c : CPU) (k' : KCtx) (γkl : GName) (γk : KmemNames)
     (j : Nat) (pidv : BitVec 32) (Vp : ProcPriv) (M : Nat → List (BitVec 8)) (user : Bool)
     (dst : BitVec 64) (dqp : DFrac) (data : Nat → List (BitVec 8)) (olds : List (BitVec 8))
@@ -180,17 +176,18 @@ theorem rd_copyout (EC : EITHER_COPYOUT) (c : CPU) (k' : KCtx) (γkl : GName) (�
     (ha1 : k'.regs 11#5 = dst + BitVec.ofNat 64 tot)
     (ha3 : k'.regs 13#5 = BitVec.ofNat 64 m)
     (hbs : bs.length = m) (hm : m < 2 ^ 31)
-    (hchunk : user = false → bs = (List.range m).map (fun i => fileByte data (off + tot + i)))
+    (hchunk : bs = (List.range m).map (fun i => fileByte data (off + tot + i)))
     (hfit : user = false → tot + m ≤ olds.length)
-    (hok : rdUserOk user Vp M P Mi dst tot) :
+    (hok : rdUserOk user Vp M P Mi dst data off tot) :
     kctx c k' ∗ pcIs c KA.«either_copyout» ∗ isLock γkl kmemLockAddr "kmem" (kmemRes γk) ∗
     kallocAvail γk none ∗ byteBuf (k'.regs 12#5) (DFrac.own 1) bs ∗
     rdDst user dst j pidv Vp P Mi dqp data olds off tot ∗
     wpNext k'.sie k'.proc c (fun cpu' => iprop(∀ (spie spp : Bool) (R' : RegMap) (P' : UPtd)
         (Mi' : Nat → List (BitVec 8)),
       ⌜k'.sie = false → spie = k'.spie ∧ spp = k'.spp⌝ -∗ ⌜calleeSaved k'.regs R'⌝ -∗
-      ⌜(R' 10#5 = 0#64 ∨ (R' 10#5 = -1#64 ∧ user = true)) ∧
-        rdUserOk user Vp M P' Mi' dst (tot + m)⌝ -∗
+      ⌜(R' 10#5 = 0#64 ∧ rdUserOk user Vp M P' Mi' dst data off (tot + m)) ∨
+        (R' 10#5 = -1#64 ∧ user = true ∧
+          ∃ d, d < m ∧ rdUserOk user Vp M P' Mi' dst data off (tot + d))⌝ -∗
       kctx cpu' ((k'.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k'.regs 1#5)) -∗
       byteBuf (k'.regs 12#5) (DFrac.own 1) bs -∗
       rdDst user dst j pidv Vp P' Mi' dqp data olds off (tot + m) -∗ wpLoop cpu'))
@@ -198,7 +195,7 @@ theorem rd_copyout (EC : EITHER_COPYOUT) (c : CPU) (k' : KCtx) (γkl : GName) (�
   cases user
   · -- THE KERNEL ARM: memmove into the caller's buffer
     have hfit' := hfit rfl
-    have hch := hchunk rfl
+    have hch := hchunk
     have hlenL : (rdDelivered data olds off tot).length = olds.length :=
       rdDelivered_length data olds off tot (by omega)
     have h := EC.wp_either_copyout (hlc := hlc) (GF := GF) c k' γkl γk j pidv Vp P Mi false
@@ -226,7 +223,7 @@ theorem rd_copyout (EC : EITHER_COPYOUT) (c : CPU) (k' : KCtx) (γkl : GName) (�
     rw [hch, rdDelivered_step data olds off tot m (by omega)]
     iapply HK $$ %spie %spp %R' %P %Mi %hs %hcs [] Hk Hpc Hsrc
     · ipureintro
-      exact ⟨Or.inl hr, fun h => absurd h (by decide)⟩
+      exact Or.inl ⟨hr, fun h => absurd h (by decide)⟩
     · rw [rdDst_false]; iframe Hbuf Hpid
   · -- THE USER ARM: copyout into the running process
     obtain ⟨hext0, hout0⟩ := hok rfl
@@ -243,22 +240,23 @@ theorem rd_copyout (EC : EITHER_COPYOUT) (c : CPU) (k' : KCtx) (γkl : GName) (�
     ihave Hn := wpNext_mono _ _ _ _ _ $$ Hnext
     iapply Hn
     iintro %cpu' HK %spie %spp %R' %hs Hk Hpc Hsrc ⟨%P', %M', %⟨hext, harm⟩, Hpriv⟩ %hcs
+    icases procPrivExt_wf _ _ _ _ _ $$ Hpriv with ⟨Hpriv, %hwf⟩
     iapply HK $$ %spie %spp %R' %P' %M' %hs %hcs [] Hk Hpc Hsrc
     rotate_left 1
     · rw [rdDst_true]; iexact Hpriv
     · ipureintro
       rw [ha1] at harm
-      refine ⟨?_, fun _ => ⟨UMemL.extSz_trans hext0 hext, ?_⟩⟩
-      · rcases harm with ⟨hr, _⟩ | ⟨hr, _⟩
-        · exact Or.inl hr
-        · exact Or.inr ⟨hr, rfl⟩
-      · rcases harm with ⟨_, hM⟩ | ⟨_, d, hd, hM⟩
-        · rw [hM]
-          exact rdOut_step M Mi dst tot m bs (by omega) (UMemL.extSz_ext hext0)
-            (UMemL.extSz_ext hext) hout0
-        · rw [hM]
-          exact rdOut_step M Mi dst tot m (bs.take d) (by simp; omega) (UMemL.extSz_ext hext0)
-            (UMemL.extSz_ext hext) hout0
+      have hext' := UMemL.extSz_trans hext0 hext
+      rcases harm with ⟨hr, hM, hmap⟩ | ⟨hr, d, hd, hM, hmap⟩
+      · refine Or.inl ⟨hr, fun _ => ⟨hext', ?_⟩⟩
+        rw [hM, hchunk]
+        rw [hbs] at hmap
+        exact rdImg_step M Mi dst data off tot m hwf (UMemL.extSz_ext hext0)
+          (UMemL.extSz_ext hext) hout0 hmap
+      · refine Or.inr ⟨hr, rfl, d, by omega, fun _ => ⟨hext', ?_⟩⟩
+        rw [hM, hchunk, rd_chunk_take data (off + tot) m d (by omega)]
+        exact rdImg_step M Mi dst data off tot d hwf (UMemL.extSz_ext hext0)
+          (UMemL.extSz_ext hext) hout0 hmap
 
 end
 

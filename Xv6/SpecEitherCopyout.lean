@@ -13,7 +13,8 @@ The flag is a ghost `Bool` (`user`) reflected by `huser`; the arm it
 selects decides which end of the copy is a kernel buffer and which is a
 user virtual address, and therefore what the caller lends and what comes
 back.  The user arm mirrors `Xv6/SpecCopyout.lean`'s success / `-1` arms
-(`umemWrite` over `viewFaulted`); the kernel arm is `memmove`'s guarantee
+(`umemWrite` over `viewFaulted`, and `umMapped`: the written prefix's pages
+are mapped in `P'`, what a chunked caller chains on); the kernel arm is `memmove`'s guarantee
 with the return value `0` (the code returns the flag register itself).
 The frame is 48 bytes (six slots), so `either_copyout` needs 6 + 52 slots.
 
@@ -66,9 +67,11 @@ def wp_either_copyout_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF]
     (if user then
       (∃ (P' : UPtd) (M' : Nat → List (BitVec 8)),
         ⌜P.extSz V.sz P' ∧
-          ((R' 10#5 = 0#64 ∧ M' = umemWrite (viewFaulted P P' M) (k.regs 11#5).toNat bs) ∨
+          ((R' 10#5 = 0#64 ∧ M' = umemWrite (viewFaulted P P' M) (k.regs 11#5).toNat bs ∧
+            umMapped P' (k.regs 11#5).toNat bs.length) ∨
            (R' 10#5 = -1#64 ∧ ∃ d, d < bs.length ∧
-              M' = umemWrite (viewFaulted P P' M) (k.regs 11#5).toNat (bs.take d)))⌝ ∗
+              M' = umemWrite (viewFaulted P P' M) (k.regs 11#5).toNat (bs.take d) ∧
+              umMapped P' (k.regs 11#5).toNat d))⌝ ∗
         procPrivExt (procAddr j) pid V P' M')
      else ⌜R' 10#5 = 0#64⌝ ∗ byteBuf (k.regs 11#5) (DFrac.own 1) bs) -∗
     ⌜calleeSaved k.regs R'⌝ -∗ wpLoop cpu'))

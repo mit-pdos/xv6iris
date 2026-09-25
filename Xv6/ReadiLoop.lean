@@ -62,7 +62,7 @@ theorem rd_chunk (BE : BRELSE) (EC : EITHER_COPYOUT) (Γ : SchedNames)
     (tot pos fuel : Nat) (P : UPtd) (Mi : Nat → List (BitVec 8)) (kk : Nat)
     (bs bsd : List (BitVec 8)) (d : Bool) (v13 : BitVec 64)
     (hpos : pos = off + tot) (htot : tot < N) (hfuel : N - tot ≤ fuel)
-    (hok : rdUserOk user Vp M P Mi (k.regs 12#5) tot)
+    (hok : rdUserOk user Vp M P Mi (k.regs 12#5) data off tot)
     (hr : rdRegs k ip N R tot pos) (ha0kk : R 10#5 = bnode kk)
     (hfbn : pos / BSIZE < MAXFILE) (hnz : (blkmapGet bm (pos / BSIZE)).toNat ≠ 0) :
     kctx c (((k.withSpie spie spp).pushed 14).withRegs R) ∗ pcIs c (KA.«readi» + 0x92#64) ∗
@@ -184,7 +184,7 @@ theorem rd_head (BM : BMAP_NOALLOC) (BR : BREAD) (BE : BRELSE) (EC : EITHER_COPY
     (hcl : V.clean = fsMclean γfs) (hdt : V.dirty = fsMdirty γfs) (hpd : descPageRw pd)
     (tot pos fuel : Nat) (P : UPtd) (Mi : Nat → List (BitVec 8)) (v13 : BitVec 64)
     (hpos : pos = off + tot) (htot : tot < N) (hfuel : N - tot ≤ fuel)
-    (hok : rdUserOk user Vp M P Mi (k.regs 12#5) tot)
+    (hok : rdUserOk user Vp M P Mi (k.regs 12#5) data off tot)
     (hr : rdRegs k ip N R tot pos) :
     kctx c (((k.withSpie spie spp).pushed 14).withRegs R) ∗ pcIs c (KA.«readi» + 0x7c#64) ∗
     rdFrame (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) (k.regs 9#5) (k.regs 18#5) (k.regs 19#5)

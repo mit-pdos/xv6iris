@@ -50,7 +50,7 @@ def rdLoop (cpu : CPU) (k : KCtx) (γb : BcacheNames) (γfs : FsNames) (dev : Bi
   ∀ (cur : CPU) (spie spp : Bool) (R : RegMap) (tot pos : Nat) (P : UPtd)
     (Mi : Nat → List (BitVec 8)) (v13 : BitVec 64),
     ⌜rdRegs k ip N R tot pos ∧ pos = off + tot ∧ tot < N ∧ N - tot < fuel ∧
-      rdUserOk user Vp M P Mi (k.regs 12#5) tot⌝ -∗
+      rdUserOk user Vp M P Mi (k.regs 12#5) data off tot⌝ -∗
     kctx cur (((k.withSpie spie spp).pushed 14).withRegs R) -∗
     pcIs cur (KA.«readi» + 0x7c#64) -∗
     rdFrame (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) (k.regs 9#5) (k.regs 18#5) (k.regs 19#5)
@@ -72,7 +72,7 @@ theorem rdLoop_elim (cpu : CPU) (k : KCtx) (γb : BcacheNames) (γfs : FsNames) 
     ∀ (cur : CPU) (spie spp : Bool) (R : RegMap) (tot pos : Nat) (P : UPtd)
       (Mi : Nat → List (BitVec 8)) (v13 : BitVec 64),
       ⌜rdRegs k ip N R tot pos ∧ pos = off + tot ∧ tot < N ∧ N - tot < fuel ∧
-        rdUserOk user Vp M P Mi (k.regs 12#5) tot⌝ -∗
+        rdUserOk user Vp M P Mi (k.regs 12#5) data off tot⌝ -∗
       kctx cur (((k.withSpie spie spp).pushed 14).withRegs R) -∗
       pcIs cur (KA.«readi» + 0x7c#64) -∗
       rdFrame (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) (k.regs 9#5) (k.regs 18#5) (k.regs 19#5)
@@ -94,7 +94,7 @@ theorem rdLoop_intro (cpu : CPU) (k : KCtx) (γb : BcacheNames) (γfs : FsNames)
     (∀ (cur : CPU) (spie spp : Bool) (R : RegMap) (tot pos : Nat) (P : UPtd)
       (Mi : Nat → List (BitVec 8)) (v13 : BitVec 64),
       ⌜rdRegs k ip N R tot pos ∧ pos = off + tot ∧ tot < N ∧ N - tot < fuel ∧
-        rdUserOk user Vp M P Mi (k.regs 12#5) tot⌝ -∗
+        rdUserOk user Vp M P Mi (k.regs 12#5) data off tot⌝ -∗
       kctx cur (((k.withSpie spie spp).pushed 14).withRegs R) -∗
       pcIs cur (KA.«readi» + 0x7c#64) -∗
       rdFrame (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) (k.regs 9#5) (k.regs 18#5) (k.regs 19#5)
@@ -127,8 +127,9 @@ theorem rd_advance (BE : BRELSE) (Γ : SchedNames)
     (hm : m = min (N - tot) (BSIZE - pos % BSIZE)) (hkk : kk < NBUF)
     (hr : rdRegs k ip N R tot pos) (g18 : R 18#5 = bnode kk) (g26 : R 26#5 = BitVec.ofNat 64 m)
     (g27 : R 27#5 = BitVec.ofNat 64 m)
-    (harm : R 10#5 = 0#64 ∨ (R 10#5 = -1#64 ∧ user = true))
-    (hok' : rdUserOk user Vp M P' Mi' (k.regs 12#5) (tot + m)) :
+    (hres : (R 10#5 = 0#64 ∧ rdUserOk user Vp M P' Mi' (k.regs 12#5) data off (tot + m)) ∨
+      (R 10#5 = -1#64 ∧ user = true ∧
+        ∃ dd, dd < m ∧ rdUserOk user Vp M P' Mi' (k.regs 12#5) data off (tot + dd))) :
     kctx c (((k.withSpie spie spp).pushed 14).withRegs R) ∗ pcIs c (KA.«readi» + 0x64#64) ∗
     rdFrame (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) (k.regs 9#5) (k.regs 18#5) (k.regs 19#5)
       (k.regs 20#5) (k.regs 21#5) (k.regs 22#5) (k.regs 23#5) (k.regs 24#5) (k.regs 25#5)
@@ -159,16 +160,20 @@ theorem rd_advance (BE : BRELSE) (Γ : SchedNames)
   iintro ⟨Hk, Hpc, Hframe, #Hpi, #Hbc, Htc, Hcl, Hir, Hdev, Hmeta, Hmap, Hblk, Hlk, Hdst, Hnext, IH⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
   -- +0x64  beq a0,s8 : the copy faulted?
-  rcases harm with hr0 | ⟨hr1, huser⟩
+  rcases hres with ⟨hr0, hok'⟩ | ⟨hr1, huser, dd, hdd, hokd⟩
   case inr =>
     k_step (wp_s_branch c _ (KA.«readi» + 0x64#64) false 70#13 10#5 24#5 (by decide) bop.BEQ)
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
       with [hr1, q24, rd_beq_self]
     iintro Hk Hpc
-    iapply (rd_exit_fail BE Γ c cpu k spie spp R γl γb V γfs dev j ip bm data dn user off n
-        (tot + m) olds pidv Vp M dqp dq dqd P' Mi' v13 kk _ _ bsd d hs.hproc hs.hK hsie hs.hnoff
-        hs.hlocks hs.htier q2 g18 hkk huser
-        (by have := hs.hclamp; omega) hok' (rd_pin hs.hj k hs.hproc c cpu))
+    -- THE FAILING CHUNK MOVED `dd` BYTES: readi's `tot` is `tot + dd` (Rocq's +0xb0 exit)
+    subst huser
+    ihave Hdst := (show rdDst (GF := GF) true (k.regs 12#5) j pidv Vp P' Mi' dqp data olds off (tot + m) ⊢
+        rdDst true (k.regs 12#5) j pidv Vp P' Mi' dqp data olds off (tot + dd) from .rfl) $$ Hdst
+    iapply (rd_exit_fail BE Γ c cpu k spie spp R γl γb V γfs dev j ip bm data dn true off n
+        (tot + dd) olds pidv Vp M dqp dq dqd P' Mi' v13 kk _ _ bsd d hs.hproc hs.hK hsie hs.hnoff
+        hs.hlocks hs.htier q2 g18 hkk rfl
+        (by have := hs.hclamp; omega) hokd (rd_pin hs.hj k hs.hproc c cpu))
       $$ [$Hk $Hpc $Hframe $Hpi $Hbc $Htc $Hcl $Hir $Hdev $Hmeta $Hmap $Hblk $Hlk $Hdst $Hnext]
   -- the copy succeeded: brelse and advance
   k_step (wp_s_branch c _ (KA.«readi» + 0x64#64) false 70#13 10#5 24#5 (by decide) bop.BEQ)
@@ -235,7 +240,7 @@ theorem rd_advance (BE : BRELSE) (Γ : SchedNames)
   have hs4 : k.regs 12#5 + (BitVec.ofNat 64 tot + BitVec.ofNat 64 m) =
       k.regs 12#5 + BitVec.ofNat 64 tot' := by
     rw [← BitVec.add_assoc, rd_addr_step, htot', Nat.add_comm]
-  have hok'' : rdUserOk user Vp M P' Mi' (k.regs 12#5) tot' := by
+  have hok'' : rdUserOk user Vp M P' Mi' (k.regs 12#5) data off tot' := by
     rw [htot', Nat.add_comm]; exact hok'
   -- +0x78  bgeu s3,s5 : done?
   by_cases hdone : N ≤ tot'
@@ -290,7 +295,7 @@ theorem rd_copy (BE : BRELSE) (EC : EITHER_COPYOUT) (Γ : SchedNames)
     (hpos : pos = off + tot) (htot : tot < N) (hfuel : N - tot ≤ fuel)
     (hm : m = min (N - tot) (BSIZE - pos % BSIZE))
     (hlen : (data (pos / BSIZE)).length = BSIZE) (hkk : kk < NBUF)
-    (hok : rdUserOk user Vp M P Mi (k.regs 12#5) tot)
+    (hok : rdUserOk user Vp M P Mi (k.regs 12#5) data off tot)
     (hr : rdRegs k ip N R tot pos) (h18 : R 18#5 = bnode kk) (h26 : R 26#5 = BitVec.ofNat 64 m)
     (h15 : R 15#5 = BitVec.ofNat 64 (pos % BSIZE)) :
     kctx c (((k.withSpie spie spp).pushed 14).withRegs R) ∗ pcIs c (KA.«readi» + 0x4c#64) ∗
@@ -377,7 +382,6 @@ theorem rd_copy (BE : BRELSE) (EC : EITHER_COPYOUT) (Γ : SchedNames)
   case ca1 => k_norm_g
   case ca3 => k_norm_g
   case cchunk =>
-    intro _
     rw [rdBytes_chunk data pos m hlen hmo, hpos]
   case cfit =>
     intro hu
@@ -387,7 +391,7 @@ theorem rd_copy (BE : BRELSE) (EC : EITHER_COPYOUT) (Γ : SchedNames)
     omega
   -- ===== back from either_copyout =====
   iapply wpNext_off_intro
-  iintro %spieC %sppC %RC %P' %Mi' %hspC %hcsC %⟨harm, hok'⟩ Hk Hpc Hwin Hdst
+  iintro %spieC %sppC %RC %P' %Mi' %hspC %hcsC %hres Hk Hpc Hwin Hdst
   k_norm_g at hspC
   obtain ⟨e1, e2⟩ := hspC trivial
   subst spieC; subst sppC
@@ -413,7 +417,7 @@ theorem rd_copy (BE : BRELSE) (EC : EITHER_COPYOUT) (Γ : SchedNames)
   iapply (rd_advance BE Γ c cpu k spie spp RC γl γb V γfs logstart dev j ip bm data dn user off n
       N olds pidv Vp M dqp dq dqd hs tot pos m fuel P' Mi' kk bsd d v13 hpos htot hfuel hm hkk hrC
       (by rw [b18]; exact h18) (by rw [b26]; exact h26) (by first | exact b27 | rw [b27])
-      harm hok')
+      hres)
     $$ [$Hk $Hpc $Hframe $Hpi $Hbc $Htc $Hcl $Hir $Hdev $Hmeta $Hmap $Hblk $Hlk $Hdst $Hnext $IH]
 
 end

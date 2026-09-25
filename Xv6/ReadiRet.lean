@@ -50,7 +50,7 @@ def rdPost (k : KCtx) (γb : BcacheNames) (γfs : FsNames) (dev : BitVec 32) (j 
     inodeMapQ γfs dq ip bm -∗ inodeBlocksQ γfs dq bm data -∗
     (if user then
       (∃ (P' : UPtd) (M' : Nat → List (BitVec 8)),
-        ⌜Vp.upt.extSz Vp.sz P' ∧ rdOut (viewFaulted Vp.upt P' M) M' (k.regs 12#5) tot⌝ ∗
+        ⌜Vp.upt.extSz Vp.sz P' ∧ rdImg Vp.upt P' M M' (k.regs 12#5) data off tot⌝ ∗
         procPrivRun (procAddr j) pidv { Vp with upt := P' } M')
      else byteBuf (k.regs 12#5) (DFrac.own 1) (rdDelivered data olds off tot) ∗
        wordPointsTo (pPid k.proc) 4 dqp pidv) -∗
@@ -74,7 +74,7 @@ theorem rdPost_elim (k : KCtx) (γb : BcacheNames) (γfs : FsNames) (dev : BitVe
     inodeMapQ γfs dq ip bm -∗ inodeBlocksQ γfs dq bm data -∗
     (if user then
       (∃ (P' : UPtd) (M' : Nat → List (BitVec 8)),
-        ⌜Vp.upt.extSz Vp.sz P' ∧ rdOut (viewFaulted Vp.upt P' M) M' (k.regs 12#5) tot⌝ ∗
+        ⌜Vp.upt.extSz Vp.sz P' ∧ rdImg Vp.upt P' M M' (k.regs 12#5) data off tot⌝ ∗
         procPrivRun (procAddr j) pidv { Vp with upt := P' } M')
      else byteBuf (k.regs 12#5) (DFrac.own 1) (rdDelivered data olds off tot) ∗
        wordPointsTo (pPid k.proc) 4 dqp pidv) -∗
@@ -85,11 +85,11 @@ theorem rdPost_elim (k : KCtx) (γb : BcacheNames) (γfs : FsNames) (dev : BitVe
 theorem rdDst_post (k : KCtx) (user : Bool) (j : Nat) (pidv : BitVec 32) (Vp : ProcPriv)
     (M : Nat → List (BitVec 8)) (P : UPtd) (Mi : Nat → List (BitVec 8)) (dqp : DFrac)
     (data : Nat → List (BitVec 8)) (olds : List (BitVec 8)) (off tot : Nat)
-    (hproc : k.proc = procAddr j) (hok : rdUserOk user Vp M P Mi (k.regs 12#5) tot) :
+    (hproc : k.proc = procAddr j) (hok : rdUserOk user Vp M P Mi (k.regs 12#5) data off tot) :
     rdDst (GF := GF) user (k.regs 12#5) j pidv Vp P Mi dqp data olds off tot ⊢
       (if user then
         (∃ (P' : UPtd) (M' : Nat → List (BitVec 8)),
-          ⌜Vp.upt.extSz Vp.sz P' ∧ rdOut (viewFaulted Vp.upt P' M) M' (k.regs 12#5) tot⌝ ∗
+          ⌜Vp.upt.extSz Vp.sz P' ∧ rdImg Vp.upt P' M M' (k.regs 12#5) data off tot⌝ ∗
           procPrivRun (procAddr j) pidv { Vp with upt := P' } M')
        else byteBuf (k.regs 12#5) (DFrac.own 1) (rdDelivered data olds off tot) ∗
          wordPointsTo (pPid k.proc) 4 dqp pidv) := by
@@ -122,7 +122,7 @@ theorem rd_join (c cpu : CPU) (k : KCtx) (spie spp : Bool) (R : RegMap) (rv : Bi
     (h26 : R 26#5 = k.regs 26#5) (h27 : R 27#5 = k.regs 27#5)
     (htot : tot ≤ rdClamp dn.diSize off n)
     (hret : (rv = -1#64 ∧ user = true) ∨ (rv = BitVec.ofNat 64 tot ∧ tot = rdClamp dn.diSize off n))
-    (hok : rdUserOk user Vp M P Mi (k.regs 12#5) tot)
+    (hok : rdUserOk user Vp M P Mi (k.regs 12#5) data off tot)
     (hpin : true = false ∨ k.proc = 0#64 → c = cpu) :
     kctx c (((k.withSpie spie spp).pushed 14).withRegs R) ∗ pcIs c (KA.«readi» + 0xd8#64) ∗
     rdFrame (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) (k.regs 9#5) v2 (k.regs 19#5) (k.regs 20#5)

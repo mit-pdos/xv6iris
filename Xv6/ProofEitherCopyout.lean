@@ -48,9 +48,11 @@ theorem ec_copyout_call (CO : COPYOUT) [CurCtx] (c : CPU) (k' : KCtx) (γl : GNa
       byteBuf (k'.regs 13#5) dqs bs -∗
       (∃ (P' : UPtd) (M' : Nat → List (BitVec 8)),
         ⌜P.extSz (k'.regs 11#5) P' ∧
-          ((R' 10#5 = 0#64 ∧ M' = umemWrite (viewFaulted P P' M) (k'.regs 12#5).toNat bs) ∨
+          ((R' 10#5 = 0#64 ∧ M' = umemWrite (viewFaulted P P' M) (k'.regs 12#5).toNat bs ∧
+              umMapped P' (k'.regs 12#5).toNat bs.length) ∨
            (R' 10#5 = -1#64 ∧ ∃ d, d < bs.length ∧
-              M' = umemWrite (viewFaulted P P' M) (k'.regs 12#5).toNat (bs.take d)))⌝ ∗
+              M' = umemWrite (viewFaulted P P' M) (k'.regs 12#5).toNat (bs.take d) ∧
+              umMapped P' (k'.regs 12#5).toNat d))⌝ ∗
         procPtAt P' M') -∗
       ⌜calleeSaved k'.regs R'⌝ -∗ wpLoop cpu'))
     ⊢ wpLoop (GF := GF) c := by
@@ -216,9 +218,11 @@ theorem either_copyout_proof (MP : MYPROC) (CO : COPYOUT) (MM : MEMMOVE) : EITHE
     obtain ⟨x10, x1, x2, x8, x9, x18, x19, x20, xrest⟩ := hexit
     ihave Hout : (∃ (Q : UPtd) (N : Nat → List (BitVec 8)),
         ⌜P.extSz V.sz Q ∧
-          ((R3 10#5 = 0#64 ∧ N = umemWrite (viewFaulted P Q M) (k.regs 11#5).toNat bs) ∨
+          ((R3 10#5 = 0#64 ∧ N = umemWrite (viewFaulted P Q M) (k.regs 11#5).toNat bs ∧
+              umMapped Q (k.regs 11#5).toNat bs.length) ∨
            (R3 10#5 = 18446744073709551615#64 ∧ ∃ d, d < bs.length ∧
-              N = umemWrite (viewFaulted P Q M) (k.regs 11#5).toNat (List.take d bs)))⌝ ∗
+              N = umemWrite (viewFaulted P Q M) (k.regs 11#5).toNat (List.take d bs) ∧
+              umMapped Q (k.regs 11#5).toNat d))⌝ ∗
         procPrivExt (procAddr j) pid V Q N) $$ [Hsz Hpg Hspace Hrest]
     case' _ =>
       iexists P'

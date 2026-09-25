@@ -2,8 +2,8 @@
 `readi`'s pure vocabulary (Rocq `ProofReadiParts.v`, groups (0), (1), (3)
 and the fuel): the register arithmetic of the instruction chain, the call
 targets and return addresses, the delivered-bytes algebra of the kernel
-arm, and the untouched-outside-the-window algebra of the user arm
-(`Xv6.rdOut`, SpecReadi deviation 5).
+arm, and the image algebra of the user arm
+(`Xv6.rdImg`, SpecReadi deviation 5).
 
 **Deviations from Rocq.**
 
@@ -25,8 +25,9 @@ arm, and the untouched-outside-the-window algebra of the user arm
    uses checked: `grep -w rd_blocks` over `/shared/xv6rocq/iris/*.v`
    finds them only in ProofReadiParts.v/ProofReadi.v -- reason: a simpler
    measure serves the same induction.
-4. THE USER ARM'S ALGEBRA (`rdOut_zero`, `rdOut_step`, `rdOut_mono`) is new: it is the
-   loop invariant of SpecReadi deviation 5.
+4. THE USER ARM'S ALGEBRA (`rdImg_zero`, `rdImg_step`) is Rocq's
+   `umem_wr_app` chaining, in the Lean view (SpecReadi deviation 5):
+   `UMemL.umemWrite_step` over the `umMapped` conjunct COPYOUT carries.
 -/
 import Xv6.SpecReadi
 import Xv6.UMemWindow
@@ -297,51 +298,39 @@ theorem rdDelivered_step (data : Nat → List (BitVec 8)) (olds : List (BitVec 8
   congr 1
   omega
 
-/-! ## The user arm: untouched outside the window (SpecReadi deviation 5) -/
+/-! ## The user arm: the image equation (SpecReadi deviation 5) -/
 
-theorem rdOut_zero (M0 : Nat → List (BitVec 8)) (a : BitVec 64) : rdOut M0 M0 a 0 :=
-  fun _ _ _ _ _ => rfl
+/-- Before the first chunk the image is the entry one. -/
+theorem rdImg_zero (P : UPtd) (M : Nat → List (BitVec 8)) (dst : BitVec 64)
+    (data : Nat → List (BitVec 8)) (off : Nat) : rdImg P P M M dst data off 0 :=
+  ⟨by rw [rdBytes_zero, UMemL.umemWrite_nil, UMemL.viewFaulted_self], UMemL.umMapped_zero P _⟩
 
-/-- A position inside the next chunk is inside the grown window. -/
-theorem rd_pos_in (a : BitVec 64) (t p : Nat) (hp : p < 2 ^ 64)
-    (h1 : (a + BitVec.ofNat 64 t).toNat ≤ p) :
-    (a + BitVec.ofNat 64 (t + (p - (a + BitVec.ofNat 64 t).toNat))).toNat = p := by
-  have e : a + BitVec.ofNat 64 (t + (p - (a + BitVec.ofNat 64 t).toNat)) =
-      (a + BitVec.ofNat 64 t) + BitVec.ofNat 64 (p - (a + BitVec.ofNat 64 t).toNat) := by
-    rw [BitVec.add_assoc]; congr 1
-    apply BitVec.eq_of_toNat_eq; simp only [BitVec.toNat_add, BitVec.toNat_ofNat]; omega
-  rw [e, BitVec.toNat_add, BitVec.toNat_ofNat]
-  have := (a + BitVec.ofNat 64 t).isLt
-  omega
+/-- ONE ROUND OF THE USER ARM (Rocq's `umem_wr_app` step of `rd_chunk_body`):
+the table grows again, and `d` more of the file's bytes land at the
+window's end `dst + t`.  `hwf` is the grown table's (no 64-bit wrap). -/
+theorem rdImg_step {P0 P P' : UPtd} (M Mi : Nat → List (BitVec 8)) (dst : BitVec 64)
+    (data : Nat → List (BitVec 8)) (off t d : Nat) (hwf : uptWf P')
+    (hext0 : P0.ext P) (hext : P.ext P') (h : rdImg P0 P M Mi dst data off t)
+    (hm2 : umMapped P' (dst + BitVec.ofNat 64 t).toNat d) :
+    rdImg P0 P' M (umemWrite (viewFaulted P P' Mi) (dst + BitVec.ofNat 64 t).toNat
+        ((List.range d).map (fun i => fileByte data (off + t + i)))) dst data off (t + d) := by
+  obtain ⟨rfl, hm⟩ := h
+  have hl : (rdBytes data off t).length = t := rdBytes_length _ _ _
+  rw [← hl] at hm hm2 ⊢
+  have h := UMemL.umemWrite_step M dst (rdBytes data off t)
+    ((List.range d).map (fun i => fileByte data (off + t + i))) hwf hext0 hext hm
+    (by rw [List.length_map, List.length_range]; exact hm2)
+  rw [hl] at h ⊢
+  unfold rdImg
+  rw [rdBytes_add]
+  refine ⟨h.1, ?_⟩
+  have h2 := h.2
+  rwa [List.length_append, List.length_map, List.length_range, hl] at h2
 
-/-- ONE ROUND OF THE USER ARM: the table grows again (`viewFaulted`) and at
-most `m` bytes are written at the window's end. -/
-theorem rdOut_step {P0 P P' : UPtd} (M Mi : Nat → List (BitVec 8)) (a : BitVec 64) (t m : Nat)
-    (bs : List (BitVec 8)) (hbs : bs.length ≤ m) (hext0 : P0.ext P) (hext : P.ext P')
-    (h : rdOut (viewFaulted P0 P M) Mi a t) :
-    rdOut (viewFaulted P0 P' M) (umemWrite (viewFaulted P P' Mi) (a + BitVec.ofNat 64 t).toNat bs)
-      a (t + m) := by
-  intro k j hk hj hout
-  rw [UMemL.umemWrite_getElem?]
-  have hnot : ¬ ((a + BitVec.ofNat 64 t).toNat ≤ k * 4096 + j ∧
-      k * 4096 + j < (a + BitVec.ofNat 64 t).toNat + bs.length) := by
-    rintro ⟨h1, h2⟩
-    exact hout (t + (k * 4096 + j - (a + BitVec.ofNat 64 t).toNat)) (by omega)
-      (rd_pos_in a t (k * 4096 + j) (by omega) h1).symm
-  have hmap : ∀ o : Option (BitVec 8), o.map (fun b =>
-      if (a + BitVec.ofNat 64 t).toNat ≤ k * 4096 + j ∧
-        k * 4096 + j < (a + BitVec.ofNat 64 t).toNat + bs.length
-      then bs[k * 4096 + j - (a + BitVec.ofNat 64 t).toNat]?.getD b else b) = o := by
-    intro o; cases o <;> simp only [Option.map_none, Option.map_some, if_neg hnot]
-  rw [hmap]
-  have IH := h k j hk hj (fun i hi => hout i (by omega))
-  rcases UMemL.viewFaulted_step M Mi hext0 hext k with ⟨e1, e2⟩ | ⟨e1, e2⟩
-  · rw [e1, e2]; exact IH
-  · rw [e1, e2]
-
-/-- The window only grows. -/
-theorem rdOut_mono (M0 M' : Nat → List (BitVec 8)) (a : BitVec 64) (t t' : Nat) (h : t ≤ t')
-    (ho : rdOut M0 M' a t) : rdOut M0 M' a t' :=
-  fun k j hk hj hout => ho k j hk hj (fun i hi => hout i (by omega))
+/-- A failing chunk's prefix is the file's next bytes too. -/
+theorem rd_chunk_take (data : Nat → List (BitVec 8)) (base m d : Nat) (h : d ≤ m) :
+    ((List.range m).map (fun i => fileByte data (base + i))).take d =
+      (List.range d).map (fun i => fileByte data (base + i)) := by
+  rw [← List.map_take, List.take_range, Nat.min_eq_left h]
 
 end Xv6

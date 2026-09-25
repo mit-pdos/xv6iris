@@ -14,8 +14,10 @@ the callee-saved registers restored, the reference back, and the process
 block extended by copyout's lazy faults to `P'` with ONLY the run
 `[addr, addr + d)` written -- `d` bytes came out of the pipe, and `d` IS the
 return value (`-1` only when the very first one-byte `copyout` failed, so
-nothing was written).  The run's bytes stay existential
-(`umemUntouched`, `Xv6/UMemWindow.lean`).
+nothing was written).  That is Rocq's image `umem_wr (us_M U) addr d bs`
+with the bytes `bs` existential: `umemWrote V.upt M addr d P' M'`
+(`Xv6/UMem.lean`) -- the entry view faulted on to `P'`, some `d` bytes
+written at `addr`, every page they touch mapped in `P'`.
 -/
 import MachCSL.WpSmodeFrame
 import MachCSL.Lock
@@ -60,7 +62,7 @@ def wp_piperead_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G
   wpNext true k.proc cpu (fun cpu' => iprop(∀ (spie spp : Bool) (R' : RegMap) (P' : UPtd)
     (M' : Nat → List (BitVec 8)) (d : Nat),
     ⌜calleeSaved k.regs R' ∧ V.upt.extSz V.sz P' ∧ (d : Int) ≤ max 0 n ∧ pipeReadRet d (R' 10#5) ∧
-      UMemL.umemUntouched (viewFaulted V.upt P' M) M' (k.regs 11#5) d⌝ -∗
+      umemWrote V.upt M (k.regs 11#5) d P' M'⌝ -∗
     kctx cpu' ((k.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k.regs 1#5)) -∗
     trapCsrs cpu' -∗ cpuClaim cpu' k.proc -∗ intrRes cpu' -∗
     pipeRef γp w q -∗

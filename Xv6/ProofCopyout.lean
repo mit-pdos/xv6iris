@@ -325,8 +325,9 @@ theorem coKeep_of_calleeSaved {R R' : RegMap} (h : calleeSaved R R') : coKeep R 
 def coPost (psz : BitVec 64) (P : UPtd) (M : Nat → List (BitVec 8)) (A : Nat) (bs : List (BitVec 8))
     (P' : UPtd) (M' : Nat → List (BitVec 8)) (r : BitVec 64) : Prop :=
   P.extSz psz P' ∧
-    ((r = 0#64 ∧ M' = umemWrite (viewFaulted P P' M) A bs) ∨
-     (r = -1#64 ∧ ∃ e, e < bs.length ∧ M' = umemWrite (viewFaulted P P' M) A (bs.take e)))
+    ((r = 0#64 ∧ M' = umemWrite (viewFaulted P P' M) A bs ∧ umMapped P' A bs.length) ∨
+     (r = -1#64 ∧ ∃ e, e < bs.length ∧ M' = umemWrite (viewFaulted P P' M) A (bs.take e) ∧
+       umMapped P' A e))
 
 /-! ## The callees -/
 
@@ -367,7 +368,7 @@ theorem copyout_page (WA : WALKADDR) (VF : VMFAULT) [Xv6G GF] [CurCtx]
     (hsz : psz.toNat ≤ 2 ^ 38)
     (d : Nat) (hd : d ≤ bs.length) (hA64 : A + d < 2 ^ 64)
     (hcur : d = 0 ∨ (A + d) % 4096 = 0)
-    (P1 : UPtd) (hext1 : P.extSz psz P1)
+    (P1 : UPtd) (hext1 : P.extSz psz P1) (hmap1 : umMapped P1 A d)
     (spie spp : Bool) (R : RegMap)
     (h23 : R 23#5 = pageAddr P.root) (h27 : R 27#5 = psz)
     (h20 : R 20#5 = BitVec.ofNat 64 (A + d)) (h26 : R 26#5 = 0xFFFFFFFFFFFFF000#64)
@@ -381,7 +382,7 @@ theorem copyout_page (WA : WALKADDR) (VF : VMFAULT) [Xv6G GF] [CurCtx]
       ⌜k.sie = false → spie2 = spie ∧ spp2 = spp⌝ -∗
       kctx cpu' (((k.pushed 14).withSpie spie2 spp2).withRegs R2) -∗ pcIs cpu' pcv -∗
       procPtAt P2 (umemWrite (viewFaulted P P2 M) A (bs.take d)) -∗ Res -∗
-      ⌜coKeep R R2 ∧ P.extSz psz P2 ∧
+      ⌜coKeep R R2 ∧ P.extSz psz P2 ∧ umMapped P2 A d ∧
         ((pcv = (KA.«copyout» + 0xa0#64) ∧ R2 10#5 = -1#64) ∨
          (pcv = (KA.«copyout» + 0x78#64) ∧ get? P2.um ((A + d) / 4096) = some w ∧
           R2 19#5 = pte2pa w ∧ R2 9#5 = BitVec.ofNat 64 ((A + d) / 4096 * 4096) ∧
@@ -504,7 +505,7 @@ theorem copyout_page (WA : WALKADDR) (VF : VMFAULT) [Xv6G GF] [CurCtx]
           ((hp16 h).trans ((hp15 h).trans (hpinB h))))) $$ HΦ
         iapply HΦ' $$ %spie2 %spp2 %_ %P1 %0#64 %_ %hsp3' Hk Hpc HP HRes
         ipureintro
-        refine ⟨?_, hext1, Or.inl ⟨rfl, ?_⟩⟩
+        refine ⟨?_, hext1, hmap1, Or.inl ⟨rfl, ?_⟩⟩
         · unfold coKeep
           simp only [RegMap.set_apply, BitVec.reduceEq, ite_true, ite_false]
           exact ⟨f2.trans e2, f18.trans e18, f20.trans e20, f21.trans e21, f22.trans e22,
@@ -545,7 +546,8 @@ theorem copyout_page (WA : WALKADDR) (VF : VMFAULT) [Xv6G GF] [CurCtx]
         iapply HΦ' $$ %spie2 %spp2 %_ %(P1.insertLeaf ((A + d) / 4096) r (PTE_W ||| PTE_U ||| PTE_R))
           %(uLeaf (BitVec.extractLsb' 12 44 r) (PTE_W ||| PTE_U ||| PTE_R)) %_ %hsp3' Hk Hpc HP HRes
         ipureintro
-        refine ⟨?_, hext2, Or.inr ⟨rfl, UMemL.insertLeaf_get _ _ _ _, ?_, ?_, hmax⟩⟩
+        refine ⟨?_, hext2, UMemL.umMapped_ext (UMemL.ext_insertLeaf P1 _ r _ hnone) hmap1,
+          Or.inr ⟨rfl, UMemL.insertLeaf_get _ _ _ _, ?_, ?_, hmax⟩⟩
         · simp only [coKeep, RegMap.set_apply, BitVec.reduceEq, ite_true, ite_false]
           exact ⟨f2.trans e2, f18.trans e18, f20.trans e20, f21.trans e21, f22.trans e22,
             f23.trans e23, f24.trans e24, f25.trans e25, f26.trans e26, f27.trans e27⟩
@@ -565,7 +567,7 @@ theorem copyout_page (WA : WALKADDR) (VF : VMFAULT) [Xv6G GF] [CurCtx]
         (fun h => (hp8 h).trans ((hp7 h).trans (hpinA h))) $$ HΦ
       iapply HΦ' $$ %spie %spp %_ %P1 %w %_ %(fun _ => ⟨rfl, rfl⟩) Hk Hpc HP HRes
       ipureintro
-      refine ⟨?_, hext1, Or.inr ⟨rfl, hum, ?_, ?_, hmax⟩⟩
+      refine ⟨?_, hext1, hmap1, Or.inr ⟨rfl, hum, ?_, ?_, hmax⟩⟩
       · simp only [coKeep, RegMap.set_apply, BitVec.reduceEq, ite_true, ite_false]
         exact ⟨e2, e18, e20, e21, e22, e23, e24, e25, e26, e27⟩
       · simp only [RegMap.set_apply, BitVec.reduceEq, ite_true, ite_false]
@@ -584,7 +586,7 @@ theorem copyout_page (WA : WALKADDR) (VF : VMFAULT) [Xv6G GF] [CurCtx]
       (fun h => (hp3 h).trans ((hp2 h).trans (hp1 h))) $$ HΦ
     iapply HΦ' $$ %spie %spp %_ %P1 %0#64 %_ %(fun _ => ⟨rfl, rfl⟩) Hk Hpc HP HRes
     ipureintro
-    refine ⟨?_, hext1, Or.inl ⟨rfl, ?_⟩⟩
+    refine ⟨?_, hext1, hmap1, Or.inl ⟨rfl, ?_⟩⟩
     · simp [coKeep, RegMap.set_apply]
     · simp only [RegMap.set_apply, BitVec.reduceEq, ite_true, ite_false]
 
@@ -602,7 +604,7 @@ theorem copyout_move (MM : MEMMOVE) [Xv6G GF] [CurCtx]
     (hncase : n = 4096 - (A + d) % 4096 ∨ n = bs.length - d)
     (hA64 : A + d < 2 ^ 64) (hmax : (A + d) / 4096 * 4096 < 2 ^ 38)
     (P2 : UPtd) (w : BitVec 64) (hext2 : P.extSz psz P2)
-    (hum : get? P2.um ((A + d) / 4096) = some w)
+    (hum : get? P2.um ((A + d) / 4096) = some w) (hmap : umMapped P2 A d)
     (spie spp : Bool) (R : RegMap) (hsp : R 2#5 = sp)
     (h9 : R 9#5 = BitVec.ofNat 64 ((A + d) / 4096 * 4096))
     (h18 : R 18#5 = BitVec.ofNat 64 n)
@@ -624,7 +626,7 @@ theorem copyout_move (MM : MEMMOVE) [Xv6G GF] [CurCtx]
       ⌜R2 2#5 = sp ∧
         ((pcv = (KA.«copyout» + 0xa0#64) ∧ coPost psz P M A bs P3 M3 (R2 10#5)) ∨
          (pcv = (KA.«copyout» + 0x54#64) ∧ d < d2 ∧ d2 < bs.length ∧ P.extSz psz P3 ∧
-          M3 = umemWrite (viewFaulted P P3 M) A (bs.take d2) ∧
+          M3 = umemWrite (viewFaulted P P3 M) A (bs.take d2) ∧ umMapped P3 A d2 ∧
           A + d2 ≤ 2 ^ 38 ∧ (A + d2) % 4096 = 0 ∧
           R2 23#5 = pageAddr P.root ∧ R2 27#5 = psz ∧
           R2 20#5 = BitVec.ofNat 64 (A + d2) ∧ R2 22#5 = src0 + BitVec.ofNat 64 d2 ∧
@@ -656,6 +658,8 @@ theorem copyout_move (MM : MEMMOVE) [Xv6G GF] [CurCtx]
         ((bs.drop d).take n)
       = umemWrite (viewFaulted P P2 M) A (bs.take (d + n)) := by
     rw [List.take_add, UMemL.umemWrite_append, htkd]
+  have hmapn : umMapped P2 A (d + n) :=
+    UMemL.umMapped_append hmap (UMemL.umMapped_page hfit (by rw [hum]; rfl))
   iintro ⟨Hk, Hpc, HP, Hsrc, HΦ⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
   icases UMemL.procPtAt_elim _ _ $$ HP with ⟨%hwf2, ⟨%t2, %ht2, Htree⟩, Hum⟩
@@ -764,7 +768,7 @@ theorem copyout_move (MM : MEMMOVE) [Xv6G GF] [CurCtx]
       ((hp10 h).trans ((hp9 h).trans ((hp8 h).trans ((hp7 h).trans (hpinA h))))))) $$ HΦ
     iapply HΦ' $$ %spie %spp %_ %P2 %_ %(d + n) %_ %(fun _ => ⟨rfl, rfl⟩) Hk Hpc HP Hsrc
     ipureintro
-    refine ⟨?_, Or.inl ⟨rfl, hext2, Or.inl ⟨?_, ?_⟩⟩⟩
+    refine ⟨?_, Or.inl ⟨rfl, hext2, Or.inl ⟨?_, ?_, by rw [← hfull]; exact hmapn⟩⟩⟩
     · simp only [RegMap.set_apply, BitVec.reduceEq, ite_true, ite_false]
       exact (g2.trans hsp : _)
     · simp only [RegMap.set_apply, BitVec.reduceEq, ite_true, ite_false]
@@ -782,7 +786,7 @@ theorem copyout_move (MM : MEMMOVE) [Xv6G GF] [CurCtx]
       ((hp8 h).trans ((hp7 h).trans (hpinA h))))) $$ HΦ
     iapply HΦ' $$ %spie %spp %_ %P2 %_ %(d + n) %_ %(fun _ => ⟨rfl, rfl⟩) Hk Hpc HP Hsrc
     ipureintro
-    refine ⟨?_, Or.inr ⟨rfl, by omega, by omega, hext2, rfl, by omega, by omega, ?_, ?_, ?_, ?_,
+    refine ⟨?_, Or.inr ⟨rfl, by omega, by omega, hext2, rfl, hmapn, by omega, by omega, ?_, ?_, ?_, ?_,
       ?_, ?_, ?_, ?_⟩⟩
     · simp only [RegMap.set_apply, BitVec.reduceEq, ite_true, ite_false]
       exact (g2.trans hsp : _)
@@ -817,7 +821,7 @@ theorem copyout_check (W : WALK_NOALLOC) (MM : MEMMOVE) [Xv6G GF] [CurCtx]
     (d : Nat) (hd : d < bs.length) (hlen' : bs.length < 2 ^ 63)
     (hA64 : A + d < 2 ^ 64) (hmax : (A + d) / 4096 * 4096 < 2 ^ 38)
     (P2 : UPtd) (w : BitVec 64) (hext2 : P.extSz psz P2)
-    (hum : get? P2.um ((A + d) / 4096) = some w)
+    (hum : get? P2.um ((A + d) / 4096) = some w) (hmap : umMapped P2 A d)
     (spie spp : Bool) (R : RegMap) (hsp : R 2#5 = sp)
     (h9 : R 9#5 = BitVec.ofNat 64 ((A + d) / 4096 * 4096))
     (h19 : R 19#5 = pte2pa w)
@@ -838,7 +842,7 @@ theorem copyout_check (W : WALK_NOALLOC) (MM : MEMMOVE) [Xv6G GF] [CurCtx]
       ⌜R2 2#5 = sp ∧
         ((pcv = (KA.«copyout» + 0xa0#64) ∧ coPost psz P M A bs P3 M3 (R2 10#5)) ∨
          (pcv = (KA.«copyout» + 0x54#64) ∧ d < d2 ∧ d2 < bs.length ∧ P.extSz psz P3 ∧
-          M3 = umemWrite (viewFaulted P P3 M) A (bs.take d2) ∧
+          M3 = umemWrite (viewFaulted P P3 M) A (bs.take d2) ∧ umMapped P3 A d2 ∧
           A + d2 ≤ 2 ^ 38 ∧ (A + d2) % 4096 = 0 ∧
           R2 23#5 = pageAddr P.root ∧ R2 27#5 = psz ∧
           R2 20#5 = BitVec.ofNat 64 (A + d2) ∧ R2 22#5 = src0 + BitVec.ofNat 64 d2 ∧
@@ -924,7 +928,7 @@ theorem copyout_check (W : WALK_NOALLOC) (MM : MEMMOVE) [Xv6G GF] [CurCtx]
       ((hp8 h).trans ((hp7 h).trans ((hp6 h).trans (hpinA h)))))) $$ HΦ
     iapply HΦ' $$ %spie %spp %_ %P2 %_ %d %_ %(fun _ => ⟨rfl, rfl⟩) Hk Hpc HP Hsrc
     ipureintro
-    refine ⟨?_, Or.inl ⟨rfl, hext2, Or.inr ⟨?_, d, by omega, rfl⟩⟩⟩
+    refine ⟨?_, Or.inl ⟨rfl, hext2, Or.inr ⟨?_, d, by omega, rfl, hmap⟩⟩⟩
     · simp only [RegMap.set_apply, BitVec.reduceEq, ite_true, ite_false]
       exact (g2.trans hsp : _)
     · simp only [RegMap.set_apply, BitVec.reduceEq, ite_true, ite_false]
@@ -950,7 +954,7 @@ theorem copyout_check (W : WALK_NOALLOC) (MM : MEMMOVE) [Xv6G GF] [CurCtx]
       ihave HΦ := wpNext_shift _ _ _ _ _ (fun h => (hp11 h).trans ((hp10 h).trans
         ((hp9 h).trans ((hp8 h).trans ((hp7 h).trans ((hp6 h).trans (hpinA h))))))) $$ HΦ
       iapply (copyout_move MM k P M bs A src0 dqs psz sp hK d (4096 - (A + d) % 4096) hd hlen'
-        (by omega) hge (by omega) (Or.inl rfl) hA64 hmax P2 w hext2 hum spie spp _
+        (by omega) hge (by omega) (Or.inl rfl) hA64 hmax P2 w hext2 hum hmap spie spp _
         ?hsp' ?h9' ?h18' ?h19' ?h20' ?h21' ?h22' ?h23' ?h24' ?h25' ?h26' ?h27' _)
         $$ [- $Hk $Hpc $HP $Hsrc]
       rotate_right 1
@@ -995,7 +999,7 @@ theorem copyout_check (W : WALK_NOALLOC) (MM : MEMMOVE) [Xv6G GF] [CurCtx]
         ((hp11 h).trans ((hp10 h).trans ((hp9 h).trans ((hp8 h).trans ((hp7 h).trans
         ((hp6 h).trans (hpinA h))))))))) $$ HΦ
       iapply (copyout_move MM k P M bs A src0 dqs psz sp hK d (bs.length - d) hd hlen'
-        (by omega) (by omega) (by omega) (Or.inr rfl) hA64 hmax P2 w hext2 hum spie spp _
+        (by omega) (by omega) (by omega) (Or.inr rfl) hA64 hmax P2 w hext2 hum hmap spie spp _
         ?hsp2' ?h92' ?h182' ?h192' ?h202' ?h212' ?h222' ?h232' ?h242' ?h252' ?h262' ?h272' _)
         $$ [- $Hk $Hpc $HP $Hsrc]
       rotate_right 1
@@ -1036,7 +1040,7 @@ theorem copyout_iter (WA : WALKADDR) (VF : VMFAULT) (W : WALK_NOALLOC) (MM : MEM
     (hsz : psz.toNat ≤ 2 ^ 38) (hlen' : bs.length < 2 ^ 63)
     (d : Nat) (hd : d < bs.length) (hA64 : A + d < 2 ^ 64)
     (hcur : d = 0 ∨ (A + d) % 4096 = 0)
-    (P1 : UPtd) (hext1 : P.extSz psz P1)
+    (P1 : UPtd) (hext1 : P.extSz psz P1) (hmap1 : umMapped P1 A d)
     (spie spp : Bool) (R : RegMap) (hsp : R 2#5 = sp)
     (h20 : R 20#5 = BitVec.ofNat 64 (A + d)) (h21 : R 21#5 = BitVec.ofNat 64 (bs.length - d))
     (h22 : R 22#5 = src0 + BitVec.ofNat 64 d)
@@ -1055,7 +1059,7 @@ theorem copyout_iter (WA : WALKADDR) (VF : VMFAULT) (W : WALK_NOALLOC) (MM : MEM
       ⌜R2 2#5 = sp ∧
         ((pcv = (KA.«copyout» + 0xa0#64) ∧ coPost psz P M A bs P3 M3 (R2 10#5)) ∨
          (pcv = (KA.«copyout» + 0x54#64) ∧ d < d2 ∧ d2 < bs.length ∧ P.extSz psz P3 ∧
-          M3 = umemWrite (viewFaulted P P3 M) A (bs.take d2) ∧
+          M3 = umemWrite (viewFaulted P P3 M) A (bs.take d2) ∧ umMapped P3 A d2 ∧
           A + d2 ≤ 2 ^ 38 ∧ (A + d2) % 4096 = 0 ∧
           R2 23#5 = pageAddr P.root ∧ R2 27#5 = psz ∧
           R2 20#5 = BitVec.ofNat 64 (A + d2) ∧ R2 22#5 = src0 + BitVec.ofNat 64 d2 ∧
@@ -1065,24 +1069,24 @@ theorem copyout_iter (WA : WALKADDR) (VF : VMFAULT) (W : WALK_NOALLOC) (MM : MEM
     ⊢ wpLoop (GF := GF) cur := by
   iintro ⟨Hk, Hpc, #Hlk, #Hav, HP, Hsrc, HΦ⟩
   iapply (copyout_page WA VF k γl γk P M bs A psz hnoff hK hlk hsz d (by omega) hA64 hcur P1
-    hext1 spie spp R h23 h27 h20 h26 h25 cur (byteBuf src0 dqs bs)) $$ [- $Hk $Hpc]
+    hext1 hmap1 spie spp R h23 h27 h20 h26 h25 cur (byteBuf src0 dqs bs)) $$ [- $Hk $Hpc]
   rotate_right 1
   iframe #
   iframe HP Hsrc
   iapply wpNext_intro_pin
   iintro %c %hp %spie2 %spp2 %R2 %P2 %w %pcv %hsp2 Hk Hpc HP Hsrc %hpost
-  obtain ⟨hkeep, hext2, hcase⟩ := hpost
+  obtain ⟨hkeep, hext2, hmap2, hcase⟩ := hpost
   obtain ⟨j2, j18, j20, j21, j22, j23, j24, j25, j26, j27⟩ := hkeep
   rcases hcase with ⟨hpcv, hm1⟩ | ⟨hpcv, hum, h19', h9', hmax⟩
   · subst hpcv
     ihave HΦ' := wpNext_at _ _ _ c _ hp $$ HΦ
     iapply HΦ' $$ %spie2 %spp2 %R2 %P2 %_ %d %_ %hsp2 Hk Hpc HP Hsrc
     ipureintro
-    exact ⟨j2.trans hsp, Or.inl ⟨rfl, hext2, Or.inr ⟨hm1, d, by omega, rfl⟩⟩⟩
+    exact ⟨j2.trans hsp, Or.inl ⟨rfl, hext2, Or.inr ⟨hm1, d, by omega, rfl, hmap2⟩⟩⟩
   · subst hpcv
     ihave HΦ := wpNext_shift _ _ _ _ _ hp $$ HΦ
     iapply (copyout_check W MM k P M bs A src0 dqs psz sp hK d hd hlen' hA64 hmax P2 w hext2 hum
-      spie2 spp2 R2 (j2.trans hsp) h9' h19' (j20.trans h20) (j21.trans h21) (j22.trans h22)
+      hmap2 spie2 spp2 R2 (j2.trans hsp) h9' h19' (j20.trans h20) (j21.trans h21) (j22.trans h22)
       (j23.trans h23) (j24.trans h24) (j25.trans h25) (j26.trans h26) (j27.trans h27) c)
       $$ [- $Hk $Hpc $HP $Hsrc]
     rotate_right 1
@@ -1107,7 +1111,7 @@ theorem copyout_loop (WA : WALKADDR) (VF : VMFAULT) (W : WALK_NOALLOC) (MM : MEM
     (hsz : psz.toNat ≤ 2 ^ 38) (hlen' : bs.length < 2 ^ 63) (fuel : Nat) :
     ∀ (d : Nat) (_ : bs.length - d ≤ fuel) (_ : d < bs.length) (_ : A + d < 2 ^ 64)
       (_ : d = 0 ∨ (A + d) % 4096 = 0)
-      (P1 : UPtd) (_ : P.extSz psz P1)
+      (P1 : UPtd) (_ : P.extSz psz P1) (_ : umMapped P1 A d)
       (spie spp : Bool) (R : RegMap) (_ : R 2#5 = sp)
       (_ : R 20#5 = BitVec.ofNat 64 (A + d)) (_ : R 21#5 = BitVec.ofNat 64 (bs.length - d))
       (_ : R 22#5 = src0 + BitVec.ofNat 64 d)
@@ -1127,13 +1131,13 @@ theorem copyout_loop (WA : WALKADDR) (VF : VMFAULT) (W : WALK_NOALLOC) (MM : MEM
     ⊢ wpLoop (GF := GF) cur := by
   induction fuel with
   | zero =>
-    intro d hf hd _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+    intro d hf hd _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
     exact absurd hf (by omega)
   | succ fuel ih =>
-    intro d hf hd hA64 hcur P1 hext1 spie spp R hsp h20 h21 h22 h23 h24 h25 h26 h27 cur
+    intro d hf hd hA64 hcur P1 hext1 hmap1 spie spp R hsp h20 h21 h22 h23 h24 h25 h26 h27 cur
     iintro ⟨Hk, Hpc, #Hlk, #Hav, HP, Hsrc, HΦ⟩
     iapply (copyout_iter WA VF W MM k γl γk P M bs A src0 dqs psz sp hnoff hK hlk hsz hlen'
-      d hd hA64 hcur P1 hext1 spie spp R hsp h20 h21 h22 h23 h24 h25 h26 h27 cur)
+      d hd hA64 hcur P1 hext1 hmap1 spie spp R hsp h20 h21 h22 h23 h24 h25 h26 h27 cur)
       $$ [- $Hk $Hpc $HP $Hsrc]
     rotate_right 1
     iframe #
@@ -1141,7 +1145,7 @@ theorem copyout_loop (WA : WALKADDR) (VF : VMFAULT) (W : WALK_NOALLOC) (MM : MEM
     iapply wpNext_intro_pin
     iintro %c %hp %spie2 %spp2 %R2 %P2 %M2 %d2 %pcv %hsp2 Hk Hpc HP Hsrc %hpost
     obtain ⟨hs2, hcase⟩ := hpost
-    rcases hcase with ⟨hpcv, hres⟩ | ⟨hpcv, hlt2, hd2, hext2, hM2, hle2, hmod2, e23, e27, e20,
+    rcases hcase with ⟨hpcv, hres⟩ | ⟨hpcv, hlt2, hd2, hext2, hM2, hmap2, hle2, hmod2, e23, e27, e20,
       e22, e21, e26, e25, e24⟩
     · subst hpcv
       ihave HΦ' := wpNext_at _ _ _ c _ hp $$ HΦ
@@ -1151,7 +1155,7 @@ theorem copyout_loop (WA : WALKADDR) (VF : VMFAULT) (W : WALK_NOALLOC) (MM : MEM
     · subst hpcv
       subst hM2
       ihave HΦ := wpNext_shift _ _ _ _ _ hp $$ HΦ
-      iapply (ih d2 (by omega) hd2 (by omega) (Or.inr hmod2) P2 hext2 spie2 spp2 R2 hs2
+      iapply (ih d2 (by omega) hd2 (by omega) (Or.inr hmod2) P2 hext2 hmap2 spie2 spp2 R2 hs2
         e20 e21 e22 e23 e24 e25 e26 e27 c) $$ [- $Hk $Hpc $HP $Hsrc]
       rotate_right 1
       iframe #
@@ -1202,6 +1206,7 @@ theorem copyout_proof (WA : WALKADDR) (VF : VMFAULT) (W : WALK_NOALLOC) (MM : ME
         refine ⟨UMemL.extSz_refl _ P, Or.inl ⟨?_, ?_⟩⟩
         · simp only [RegMap.set_apply, KCtx.rget_zero, BitVec.reduceEq, ite_true, ite_false]
         · rw [UMemL.viewFaulted_self, hbs, UMemL.umemWrite_nil]
+          exact ⟨rfl, UMemL.umMapped_zero P _⟩
       · iexact HP
     · ipureintro
       unfold calleeSaved
@@ -1268,7 +1273,7 @@ theorem copyout_proof (WA : WALKADDR) (VF : VMFAULT) (W : WALK_NOALLOC) (MM : ME
     iapply (copyout_loop WA VF W MM k γl γk P M bs (k.regs 12#5).toNat (k.regs 13#5) dqs
       (k.regs 11#5) (k.regs 2#5 + 0xFFFFFFFFFFFFFF90#64) hnoff hK hlk hsz hlen' bs.length
       0 (by omega) (by omega) (by simpa using (k.regs 12#5).isLt)
-      (Or.inl rfl) P (UMemL.extSz_refl _ P) k.spie k.spp _
+      (Or.inl rfl) P (UMemL.extSz_refl _ P) (UMemL.umMapped_zero P _) k.spie k.spp _
       ?hsp0 ?h20' ?h21' ?h22' ?h23' ?h24' ?h25' ?h26' ?h27' c11) $$ [- $Hk $Hpc $Hsrc]
     rotate_right 1
     rw [UMemL.viewFaulted_self, List.take_zero, UMemL.umemWrite_nil]

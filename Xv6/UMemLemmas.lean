@@ -370,6 +370,17 @@ theorem procPtAt_elim (P : UPtd) (M : Nat → List (BitVec 8)) :
       umPages P M := by
   unfold procPtAt ptOwnRep; iintro H; iexact H
 
+/-- The table facts of an address space, kept. -/
+theorem procPtAt_wf (P : UPtd) (M : Nat → List (BitVec 8)) :
+    procPtAt (GF := GF) P M ⊢ procPtAt P M ∗ ⌜uptWf P⌝ := by
+  unfold procPtAt
+  iintro ⟨%hwf, Ht, Hu⟩
+  isplitl [Ht Hu]
+  · isplitr [Ht Hu]
+    · ipureintro; exact hwf
+    · iframe
+  · ipureintro; exact hwf
+
 theorem procPtAt_intro (P : UPtd) (M : Nat → List (BitVec 8)) :
     iprop(⌜uptWf P⌝ ∗ (∃ t : PTree, ⌜t.base = P.root ∧ ptRep t P.leaves⌝ ∗
         ptreeOwn 2 (DFrac.own 1) t) ∗ umPages P M) ⊢ procPtAt (GF := GF) P M := by
@@ -594,6 +605,88 @@ theorem umBelow_extSz {sz : BitVec 64} {P P' : UPtd} (hb : umBelow sz P) (h : P.
     have := h.2.1 k w h0 hk
     have hge : sz.toNat ≤ pgRoundUpN sz.toNat := by unfold pgRoundUpN; omega
     omega
+
+/-! ## The written prefix is mapped (`umMapped`): chaining chunked copies -/
+
+theorem umMapped_zero (P : UPtd) (va : Nat) : umMapped P va 0 := fun _ h => absurd h (by omega)
+
+theorem umMapped_le {P : UPtd} {va n m : Nat} (hle : m ≤ n) (h : umMapped P va n) :
+    umMapped P va m := fun i hi => h i (by omega)
+
+/-- A larger table maps what the smaller one did. -/
+theorem umMapped_ext {P P' : UPtd} {va n : Nat} (hext : P.ext P') (h : umMapped P va n) :
+    umMapped P' va n := by
+  intro i hi
+  have h1 := h i hi
+  cases h0 : get? P.um ((va + i) / 4096) with
+  | none => rw [h0] at h1; cases h1
+  | some w => rw [hext.2.2 _ w h0]; rfl
+
+/-- Adjacent mapped runs are one. -/
+theorem umMapped_append {P : UPtd} {va n m : Nat} (h1 : umMapped P va n)
+    (h2 : umMapped P (va + n) m) : umMapped P va (n + m) := by
+  intro i hi
+  by_cases h : i < n
+  · exact h1 i h
+  · have := h2 (i - n) (by omega)
+    rwa [show va + n + (i - n) = va + i from by omega] at this
+
+/-- A run inside one mapped page is mapped. -/
+theorem umMapped_page {P : UPtd} {va n : Nat} (hfit : va % 4096 + n ≤ 4096)
+    (hpg : (get? P.um (va / 4096)).isSome) : umMapped P va n := by
+  intro i hi
+  rwa [show (va + i) / 4096 = va / 4096 from by omega]
+
+/-- A mapped run lies below `TRAPFRAME` (every user leaf does, `uptWf`), so
+it does not wrap the 64-bit address space. -/
+theorem umMapped_bound {P : UPtd} {va n : Nat} (hwf : uptWf P) (h : umMapped P va n)
+    (hn : 0 < n) : va + n ≤ uvmMaxsz := by
+  have h1 := h (n - 1) (by omega)
+  cases h0 : get? P.um ((va + (n - 1)) / 4096) with
+  | none => rw [h0] at h1; cases h1
+  | some w =>
+    have := (hwf.1 _ w h0).1
+    rw [tfVpn_toNat] at this
+    unfold uvmMaxsz
+    omega
+
+/-- A later extension's zeroing commutes with a write whose pages were
+already mapped: it zeroes only pages new to it. -/
+theorem viewFaulted_umemWrite {P1 P2 : UPtd} (X : Nat → List (BitVec 8)) (va : Nat)
+    (bs : List (BitVec 8)) (hm : umMapped P1 va bs.length) :
+    viewFaulted P1 P2 (umemWrite X va bs) = umemWrite (viewFaulted P1 P2 X) va bs := by
+  funext k
+  by_cases hc : (get? P1.um k).isNone ∧ (get? P2.um k).isSome
+  · have e1 : viewFaulted P1 P2 (umemWrite X va bs) k = List.replicate 4096 0#8 := by
+      simp only [viewFaulted, if_pos hc]
+    have e2 : viewFaulted P1 P2 X k = List.replicate 4096 0#8 := by
+      simp only [viewFaulted, if_pos hc]
+    rw [e1, umemWrite_other _ _ _ _ ?_, e2]
+    intro j hj hin
+    rw [e2, List.length_replicate] at hj
+    have := hm (k * 4096 + j - va) (by omega)
+    rw [show (va + (k * 4096 + j - va)) / 4096 = k from by omega] at this
+    rw [Option.isNone_iff_eq_none] at hc
+    rw [hc.1] at this
+    cases this
+  · have e1 : viewFaulted P1 P2 (umemWrite X va bs) k = umemWrite X va bs k := by
+      simp only [viewFaulted, if_neg hc]
+    have e2 : viewFaulted P1 P2 X k = X k := by simp only [viewFaulted, if_neg hc]
+    rw [e1]
+    refine List.ext_getElem? fun j => ?_
+    rw [umemWrite_getElem?, umemWrite_getElem?, e2]
+
+/-- **Two chunked copies are one** (the Lean face of Rocq's `umem_wr_app`
+across a lazy fault): a first write over the view faulted to `P1`, whose
+pages are mapped in `P1`, then a second, adjacent write over the view
+faulted on to `P2`, is the concatenation written over the view faulted
+straight to `P2`. -/
+theorem umemWrite_chain {P P1 P2 : UPtd} (M : Nat → List (BitVec 8)) (va : Nat)
+    (bs1 bs2 : List (BitVec 8)) (h1 : P.ext P1) (h2 : P1.ext P2)
+    (hm : umMapped P1 va bs1.length) :
+    umemWrite (viewFaulted P1 P2 (umemWrite (viewFaulted P P1 M) va bs1)) (va + bs1.length) bs2
+      = umemWrite (viewFaulted P P2 M) va (bs1 ++ bs2) := by
+  rw [viewFaulted_umemWrite _ _ _ hm, viewFaulted_trans M h1 h2, umemWrite_append]
 
 theorem insertLeaf_get (P : UPtd) (vpn : Nat) (r perm : BitVec 64) :
     get? (P.insertLeaf vpn r perm).um vpn = some (uLeaf (BitVec.extractLsb' 12 44 r) perm) := by

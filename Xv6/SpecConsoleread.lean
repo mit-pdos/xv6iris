@@ -6,9 +6,12 @@ the process is killed while waiting.
 
 The running thread is proc `j` with a user destination (`user_dst != 0`,
 the only caller being `fileread`); its private view may fault pages in
-and is written at `dst` (`umemUntouched` bounds the damage to the `d`
-bytes delivered, as `piperead`'s contract does).  Stack: the 12-slot
-frame over `either_copyout`'s 58.
+and is written at `dst`: the block comes back at Rocq's image
+`umem_wr (us_M U) dst d bs` -- here `umemWrote V.upt M dst d P' M'`, the
+entry view faulted on to `P'` with some `d` bytes written at `dst` and
+their pages mapped in `P'` (the bytes stay existential, as in Rocq's
+`∀ bs`), `d` the count delivered, as `piperead`'s contract does.  Stack:
+the 12-slot frame over `either_copyout`'s 58.
 
 Imports only definitional files.
 -/
@@ -56,7 +59,7 @@ def wp_consoleread_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [X
   wpNext true k.proc cpu (fun cpu' => iprop(∀ (spie spp : Bool) (R' : RegMap) (P' : UPtd)
     (M' : Nat → List (BitVec 8)) (d : Nat),
     ⌜calleeSaved k.regs R' ∧ V.upt.extSz V.sz P' ∧ (d : Int) ≤ max 0 n ∧ consReadRet d (R' 10#5) ∧
-      UMemL.umemUntouched (viewFaulted V.upt P' M) M' (k.regs 11#5) d⌝ -∗
+      umemWrote V.upt M (k.regs 11#5) d P' M'⌝ -∗
     kctx cpu' ((k.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k.regs 1#5)) -∗
     trapCsrs cpu' -∗ cpuClaim cpu' k.proc -∗ intrRes cpu' -∗
     procPrivNoctxAt curCtx (procAddr j) pid { V with upt := P' } M' -∗ wpLoop cpu'))

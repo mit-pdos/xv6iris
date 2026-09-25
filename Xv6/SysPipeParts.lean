@@ -290,9 +290,11 @@ theorem sys_pipe_copyout (CO : COPYOUT) (c : CPU) (k' : KCtx) (γl : GName) (γk
       byteBuf (k'.regs 13#5) (DFrac.own 1) bs -∗
       (∃ (P' : UPtd) (M' : Nat → List (BitVec 8)),
         ⌜P.extSz (k'.regs 11#5) P' ∧
-          ((R' 10#5 = 0#64 ∧ M' = umemWrite (viewFaulted P P' M) (k'.regs 12#5).toNat bs) ∨
+          ((R' 10#5 = 0#64 ∧ M' = umemWrite (viewFaulted P P' M) (k'.regs 12#5).toNat bs ∧
+              umMapped P' (k'.regs 12#5).toNat bs.length) ∨
            (R' 10#5 = -1#64 ∧ ∃ d, d < bs.length ∧
-              M' = umemWrite (viewFaulted P P' M) (k'.regs 12#5).toNat (bs.take d)))⌝ ∗
+              M' = umemWrite (viewFaulted P P' M) (k'.regs 12#5).toNat (bs.take d) ∧
+              umMapped P' (k'.regs 12#5).toNat d))⌝ ∗
         procPtAt P' M') -∗
       ⌜calleeSaved k'.regs R'⌝ -∗ wpLoop cpu'))
     ⊢ wpLoop (GF := GF) c := by

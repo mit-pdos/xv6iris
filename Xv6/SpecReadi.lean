@@ -66,20 +66,17 @@ Specification of `readi` (kernel/fs.c): the public contract.  Mirrors Rocq
    off tot` (pointwise, `nat → bv 8`) is `Xv6.rdDelivered data olds off
    tot = rdBytes data off tot ++ olds.drop tot` over the caller's `olds`
    (of length `n`); `rd_bytes` is the list `Xv6.rdBytes`.
-5. **THE USER ARM'S IMAGE IS NOT AN EQUATION** (a WEAKENING, forced by the
-   Lean callee): Rocq returns the block at `umem_wr (us_M U) dst tot
-   (rd_bytes data off)`.  Lean's `EITHER_COPYOUT` says only
-   `M' = umemWrite (viewFaulted P P' M) dst bs`, with NO statement that the
-   pages written lie in `P'`: a later chunk's lazy fault could then (in the
-   contract's world) re-zero a page an earlier chunk wrote, so the
-   delivered bytes are not derivable across iterations.  The user arm
-   therefore returns `∃ P' M'`, `Vp.upt.extSz Vp.sz P'`, and `Xv6.rdOut
-   (viewFaulted Vp.upt P' M) M' dst tot`: every byte OUTSIDE the window
-   `[dst, dst + tot)` (on every page below `2^52`, which includes every
-   mapped one) is untouched -- the analogue of `SpecPiperead`'s
-   `umemUntouched`.  The fix is to add "the written prefix's pages are
-   mapped in `P'`" to `COPYOUT`/`EITHER_COPYOUT`'s arms; with it the loop
-   invariant can carry Rocq's equation.  (The KERNEL arm is exact.)
+5. **THE USER ARM'S IMAGE IS ROCQ'S EQUATION, IN THE LEAN VIEW**: Rocq
+   returns the block at `umem_wr (us_M U) dst tot (rd_bytes data off)`;
+   here it is `Xv6.rdImg Vp.upt P' M M' dst data off tot`, i.e.
+   `M' = umemWrite (viewFaulted Vp.upt P' M) dst (rdBytes data off tot)`
+   (the Lean view zeroes the pages the lazy faults added, where Rocq's
+   `us_M` already holds them as zeros) AND `umMapped P' dst tot`: every
+   page the delivered bytes touch is mapped in `P'` -- the conjunct
+   `COPYOUT`/`EITHER_COPYOUT` now carry, which is what lets the chunks'
+   equations chain (`UMemL.umemWrite_step`) and a caller chain readi's.
+   `tot` is Rocq's: on the `-1` arm it is the loop counter PLUS what the
+   failing chunk managed.
 6. Rocq's `j < NPROC ∧ γs !! j = Some γl` is `hj`/`hproc`, as bread;
    `a1`'s `eq_vec … = negb user` is `huser` in `EITHER_COPYOUT`'s form.
 
@@ -128,13 +125,14 @@ def rdDelivered (data : Nat → List (BitVec 8)) (olds : List (BitVec 8)) (off t
     List (BitVec 8) :=
   rdBytes data off tot ++ olds.drop tot
 
-/-- **The user arm's image** (deviation 5): on every page below `2^52` (so
-on every page a user table maps), every byte outside the window
-`[a, a + d)` -- positions taken modulo `2^64`, as the loop's `dst += m`
-does -- is what it was. -/
-def rdOut (M0 M' : Nat → List (BitVec 8)) (a : BitVec 64) (d : Nat) : Prop :=
-  ∀ k j, k < 2 ^ 52 → j < 4096 → (∀ i, i < d → k * 4096 + j ≠ (a + BitVec.ofNat 64 i).toNat) →
-    (M' k)[j]? = (M0 k)[j]?
+/-- **The user arm's image** (deviation 5; Rocq's `umem_wr (us_M U) dst tot
+(rd_bytes data off)`): the entry image `M` faulted on to `P'` with the
+file's bytes `[off, off + tot)` written at `dst`, every page they touch
+mapped in `P'`. -/
+def rdImg (P P' : UPtd) (M M' : Nat → List (BitVec 8)) (dst : BitVec 64)
+    (data : Nat → List (BitVec 8)) (off tot : Nat) : Prop :=
+  M' = umemWrite (viewFaulted P P' M) dst.toNat (rdBytes data off tot) ∧
+    umMapped P' dst.toNat tot
 
 /-- Rocq's `rd_arg32_small`: below `2^31` the ABI's sign-extended `uint` is
 the plain literal. -/
@@ -203,7 +201,7 @@ def wp_readi_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF
     inodeMapQ γfs dq ip bm -∗ inodeBlocksQ γfs dq bm data -∗
     (if user then
       (∃ (P' : UPtd) (M' : Nat → List (BitVec 8)),
-        ⌜Vp.upt.extSz Vp.sz P' ∧ rdOut (viewFaulted Vp.upt P' M) M' (k.regs 12#5) tot⌝ ∗
+        ⌜Vp.upt.extSz Vp.sz P' ∧ rdImg Vp.upt P' M M' (k.regs 12#5) data off tot⌝ ∗
         procPrivRun (procAddr j) pidv { Vp with upt := P' } M')
      else byteBuf (k.regs 12#5) (DFrac.own 1) (rdDelivered data olds off tot) ∗
        wordPointsTo (pPid k.proc) 4 dqp pidv) -∗
