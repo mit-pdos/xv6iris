@@ -425,3 +425,174 @@ plan is S0 -> S1 || S2 -> S3 -> S4 (worklist `projects/seccomp.md`).
   readings `(⊢ app_sup -∗ lk_T L)`, discharged where those are (the
   instance is `False` there).  S2 replaces that premise with the third
   outcome ("the era is wild") and the loop laws' handling of it.
+
+## 10. The claim's terminal arm, worked out against the tree (owner, 2026-09-25)
+
+Section 6 sketched cut S2; the survey of the union tier (UnionOut, PipeOutN,
+GenOut, EchoOut, UShURound*, UShLine, ConsoleInv, ProofConsoleread) fixes
+the shapes below.  They supersede §6 where they differ.  The knob stays OFF
+through S2: every shape and law lands, the transition is a lemma of the
+claim that fires only at an ADMITTED `LSecc` line, and no `LSecc` line is
+admitted until S4.
+
+### 10.1 The flag and the token
+
+`EchoOut.era_pins` gains `ep_secc : gname` (a `mono_nat`); `era_full`
+gains `mono_nat_auth_own (ep_secc v) 1 0`.  `secc_flag v n :=
+mono_nat_auth_own (ep_secc v) 1 n` -- the FULL authority, held by the
+claim and by nobody else, so no process ever carries a half; `secc_tok k
+:= ∃ v, UPIN k v ∗ mono_nat_lb_own (ep_secc v) 1` (persistent, timeless);
+`secc_tok k -∗ UPIN k v -∗ secc_flag v 0 -∗ False`.  The union's
+`ai_wild k := secc_tok k`; the trivial and echo instances stay at `False`.
+
+### 10.2 The licence is for the two process events only
+
+The interrupt's echo arm (`EvOpen`/`EvByte`/`EvClose`, `WpUart.cons_run`)
+is stepped by the application's own echo law with the trace's discipline
+in hand (`peclV_step_echo`'s premises come from the rx tag); a PROCESS
+steps the claim only at `EvOut` (`out_link`, the write chain) and
+`EvRead` (`cons_read_pay`).  So `ai_wild_lic` is stated for those two,
+with the validity facts `cons_link` supplies:
+
+    ai_wild_lic : forall k, ai_wild k ⊢ □ ∀ h H ev, ⌜wild_ev ev⌝ -∗
+        ⌜cons_hist_ok H⌝ -∗ ⌜cons_ev_ok H ev⌝ -∗ ai_cons k h H ==∗ ai_cons k h (cons_step H ev)
+    wild_ev (EvOut _) := True;  wild_ev (EvRead _) := True;  wild_ev _ := False
+
+and S0's `cons_licence_at k` is the same statement; `out_link_of_licence`
+and `cons_read_pay_triv` get their `_at k` twins, `cons_run_of_licence`
+does not (nobody needs it at era k).
+
+### 10.3 The claim: three arms, the old lemmas refute the third
+
+    ucl k ho H := UT
+                  ∨ (∃ v, UPIN k v ∗ secc_flag v 0 ∗ peclV pg U ucparams ∅ uwa k ho H)
+                  ∨ usecc k ho H
+
+The NAME `ucl` is kept (seven files carry `Hcons : riscv_cons_res = ucl
+ug` as a context), so every consumer sees the new shape through the old
+name.  `usecc k ho H` holds, for the era's pins `v`, the state at the
+moment of the transition (10.4) and nothing that moves afterwards:
+
+    ∃ v ps cs s0 I0 u,  UPIN k v ∗ secc_flag v 1 ∗ turn_auth v P ∗ ps_auth v ps
+      ∗ cs_frozen v cs ∗ Elist_auth v E ∗ dl_cnt v (1/2) (length (ch_dl H))
+      ∗ dl_list_auth v (ch_dl H) ∗ WA k (Some s0) ∗ f0cw gf k s0
+      ∗ ⌜ P = length (lm_proc_before U ps cs s0 I0)
+          ∧ nlines I0 = S (length cs) ∧ rest_of I0 = []
+          ∧ lm_of U (bodies_of I0 !!! (nlines I0 - 1)) = LSecc ws  (admitted)
+          ∧ lm_pro_ok ps cs (nlines I0) ∧ lm_alts_ok' s0 I0 cs (the first length cs lines)
+          ∧ ch_acc H = lm_sess_pre ps cs s0 I0 ++ u      (the session with the last
+                                                          line's continuation omitted)
+          ∧ ch_dl H = echoed (ch_log H) ∧ snd <$> ch_dl H = I0 ∧ gin_pure k (ch_log H) (ch_dl H) cs
+          ∧ ch_arm H = None ⌝
+
+`u` is the wire's tail after the echoed line, ARBITRARY.  What each arm
+of `usecc` is for:
+- `secc_flag v 1` refutes nothing and is what `secc_tok` was minted from;
+  `secc_flag v 0` in the MIDDLE arm is what refutes the middle arm under
+  the wild licence.
+- `turn_auth v P` (the claim's half; sh keeps its half) and the pure
+  `P = …` are what REFUTE every clean presenter: every `ucl_step_*` /
+  `pwc_blkU_file*` / `eclN` step takes `turn v P'` from its caller, the
+  halves agree, and a writer at the cursor of the seccomp line's read is
+  pinned to that line -- `lm_proc_before` grows by at least the prompt
+  per line, so an `inp_lb v I` presenter has `I = I0`; then a pipeline
+  block at `I0` contradicts `LSecc`, a `_pro` write's `cs_lb` is longer
+  than the frozen `cs`, a `_blk` write at `I0` would append to a frozen
+  `cs`, and a plain `ucl_step_write` at `P` reads past the end of
+  `lm_proc_stream ps cs s0 I0`.  So the old lemmas hold at the new `ucl`
+  with their statements UNCHANGED and the third arm closed by refutation.
+  FALLBACK, only if one of those refutations turns out underivable from
+  lane M's model: that lemma's outcome gains the escape `∨ (secc_tok k ∗
+  cs_frozen_at v (nlines I0 - 1) ∗ inp_lb v I0 ∗ ⌜I = I0⌝)` and its
+  consumers move to the wild shape (10.5) at their own `I`.
+- `dl_cnt` (the claim's half) and `dl_list_auth` keep serving sh's TOKEN
+  reads: under `read_ok` and `ch_dl = echoed ch_log` every read delivers
+  `ws = []`, so `rd_retV`'s right arm is returned with its `⌜ws = []⌝`
+  disjunct; the wild licence's `EvRead` is the same fact with no half
+  presented.  `EvOut b` under the licence extends `u`.
+- The log is FROZEN in this arm: an `EvOpen h c cs` carries the rx tag
+  `lm_disc U h ∨ UT`; `lm_disc U h` is refuted by D4 (`lm_d4`: a line
+  admitting a terminal alternative whose merge is `True` is the era's
+  last, and `h`'s input has a byte after it -- `cons_ev_ok`'s index
+  clause puts the new byte at `length (ch_log H) + 1 + f`), and `UT`
+  sends the claim to its first arm.  This is why the arm can say `ch_dl
+  = echoed ch_log`.
+- `WA k (Some s0) ∗ f0cw gf k s0` and the pure session fact are the
+  drain's: `ucl_drain` at this arm returns `udrain_ret`'s right arm with
+  `lm_good_out U s0 seg` at the choices `cs ++ [ualt_code (US u')]`, `u'
+  := u` if `u <> []` else `[wl_nl]` (`uok` needs a non-empty `u`; the wire
+  is a prefix either way).
+
+### 10.4 The transition is the claim's READ step at the seccomp line
+
+sh reaches the claim only through console events, and its halves (turn,
+dl) are not in the read link, so the arm change happens INSIDE the
+union's read wrapper of `peclV_step_read` (the law behind `rk_rd`): after
+the generic step, if the delivered input `I' := snd <$> (ch_dl ++ ws)`
+now ends in a complete, ADMITTED `LSecc` line that was not complete
+before the read, the wrapper (in the `gcl` arm -- `popenV` cannot be the
+arm at such a read: `gin_pure`'s `nlines ≤ S (length cs)` against the open
+round's frozen `cs`) bumps the flag to 1, freezes `cs` (`cs_freeze`, at
+`length cs = nlines I' - 1`, derived from `gcl_pure`), records the
+session fact off `lm_out_pure`, and re-closes at `usecc` with `u := []`.
+The reader gets `rd_retV` as before PLUS `secc_tok k ∗ cs_frozen_at v
+(nlines I' - 1)` in that case (the union's `lk_rr` carries it), which is
+what sh's read law turns into the wild shape.  Nothing else in sh's round
+is a transition: the fork panic, the exec failure and the silent round
+are all inside the arm's arbitrary `u` (so lane M's `RSExec`/`RCFork`/
+`RCSilent` codes at `LSecc` are never chosen by the claim; they stay for
+the hooks).
+
+For this the claim must KNOW, at the read, that no logged entry lies
+beyond the delivered newline: `GenOutHist.gin_pure` gains the conjunct
+`forall e, e ∈ pops -> lm_disc M (le_hist e)` (maintained at `EvClose`
+from `garm_era`'s `lm_disc M h`; every other step leaves `pops` alone).
+An entry beyond a seccomp newline then contradicts D4.  This is the one
+change in the generic tier.
+
+### 10.5 The wild shape of sh, and of init
+
+    useccomp_shape I := secc_tok (S gen_id) ∗ ∃ v, era_pin (fgn_echo gf) (S gen_id) v
+                        ∗ inp_lb v I ∗ ⌜0 < nlines I⌝ ∗ cs_frozen_at v (nlines I - 1)
+
+`uWcu I p` gains it as a fourth arm (`uWbf I` a wild arm of the same
+resources, for the fork-panic path where sh's exit payload restarts init);
+no deed (B3).  The laws:
+- `uWcu_read` at the wild arm is VACUOUS: the post-read `Pm (I ++ l ++
+  [wl_nl])` carries `lk_rres v (I ++ l ++ [wl_nl])`, i.e. a `cs_lb v cs0`
+  with `length cs0 >= nlines I`, absurd against the freeze
+  (`cs_frozen_at_lb_absurd`), exactly `uterm_read_law`'s argument.  This
+  matches the kernel: the console marks its escrow dirty only when a
+  tokenless reader CONSUMES bytes (`ProofConsoleread.cr_racc` at `None`:
+  `⌜d = 0⌝ ∨ cons_dirty_lb`), and in this arm nobody consumes, so sh's
+  token read never takes the dirty arm and gets the claim's `ws = []`.
+- the prompt law and the panic law at the wild arm write through
+  `out_link_of_licence_at` (from `secc_tok`); the kill law is from `UT`
+  as today.
+- `ush_read_pay_era_at`'s two premises become `(⊢ app_rdcred -∗ lk_T L)`
+  and `(⊢ lk_T L -∗ app_rdcred)`; both hold at the union with `lk_T :=
+  UT` (S0's `False` instance goes away: `riscv_wild -∗ UT` is not needed,
+  because a wild-era sh never reaches the dirty arm -- see above -- and
+  the premise form `app_rdcred -∗ lk_T` is discharged from `app_sup -∗ UT`
+  plus `riscv_wild (S gen_id) -∗ UT`... which is FALSE at the union.  So
+  the union keeps S0's third outcome for the dirty arm after all: `ush_rd_ret`
+  gains `(riscv_wild (S gen_id) ∗ ∃ n', upos γp n')`, refuted in the clean
+  laws by `secc_flag`... no: by nothing the clean shell holds.  RULING:
+  the dirty arm's third outcome is ABSORBED into the wild shape (it hands
+  sh `secc_tok`, and sh already holds `inp_lb`/the freeze it needs from
+  the transition, since a dirty outcome at a clean line is impossible in
+  fact but unrefutable in the proof); the clean read laws therefore end
+  in `Wcu … 3` at the wild arm in that outcome, which is a legal state.
+  (This is the one place the clean tier absorbs the token without a
+  refutation; it costs nothing because the wild arm is absorbing.)
+
+### 10.6 What S2 delivers and what it leaves to S4
+
+S2: 10.1-10.5 with every existing law re-proved at the new `ucl`/`uWcu`/
+`uWbf`, `union_cons_lic` (from `UT`) and the wild licence (from
+`secc_tok`), `ucl_drain` at the third arm, the read wrapper's transition,
+`union_era_split` at `secc_flag v 0`, and the U-tier premises threaded.
+Audits unchanged.  S4: `ush_line_union` at `LSecc`, sh's round law at the
+wild shape (fork; the child's exec of `/seccomp` with `secc_tok` in its
+`Pay`; wait; prompt through the licence), init's wild arm on the panic
+path, the knob, the top theorem's statement through the model.
