@@ -1083,3 +1083,4 @@ import Xv6.DiskBoot
 import Xv6.FsBoot
 import Xv6.FsDurSnapBytes
 import Xv6.FsDurSnap
+import Xv6.FsDurImg
