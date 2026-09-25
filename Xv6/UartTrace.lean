@@ -15,6 +15,7 @@ import Xv6.Geom
 import Iris.BI.Lib.MonoList
 import Iris.Algebra.Auth
 import Iris.Algebra.UFrac
+import Iris.Instances.Lib.CInvariants
 
 namespace Xv6
 
@@ -48,10 +49,16 @@ class Xv6G (GF : BundledGFunctors) where
   per-lock names) and the iref-slot supply (`Xv6.IrefslotRF`,
   `IrefslotG.irefslotName`) -/
   [authUfracG : ElemG GF (constOF (Auth (Option UFrac)))]
+  /-- THE ONE cancellable-invariant camera (Rocq's `cinvG`, which Rocq also
+  keeps in its one bundle `xv6G`): the file table's inode payload
+  (`FileDefs.inodePay`, a share of an inode reference parked in a `cinv`
+  whose fraction is the cancel token).  Pipes do NOT use it (their dead arm
+  is hand-rolled, `PipeInvDefs`). -/
+  [cinvG : CInvG GF]
 
 attribute [instance] Xv6G.monoListG Xv6G.gvListG
 attribute [reducible, instance] Xv6G.gvNatG Xv6G.gvUnitG Xv6G.gvCpuG Xv6G.gvW32G Xv6G.gvBoolG
-attribute [reducible, instance] Xv6G.gmUnitG Xv6G.gmBlkG Xv6G.authUfracG
+attribute [reducible, instance] Xv6G.gmUnitG Xv6G.gmBlkG Xv6G.authUfracG Xv6G.cinvG
 
 /-- The names of one port's ghosts (the Rocq `UartNames.uart_names`, the
 subset the Lean port carries): the accepted trace (`mono_list` over
