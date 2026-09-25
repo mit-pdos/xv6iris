@@ -1783,10 +1783,10 @@ Section UkCatFIface.
     refine (MkEIP (Dp := kds.*1) N P cif_fds
               (fun _ _ => False%I) (fun _ _ => False%I) (fun _ => False%I) (fun _ _ => False%I)
               cif_in (fun _ _ => False%I) (fun _ => False%I)
-              (fun _ _ _ _ => False%I) (fun _ _ _ => False%I) (fun _ => False%I)
+              (fun _ _ _ _ _ _ => False%I) (fun _ _ _ _ => False%I) (fun _ _ => False%I)
               cif_prod cif_prod_halt
               cif_filesr cif_taint cif_taint_pays
-              _ _ _ _ cif_write_nil cif_read _ _ _ _ _ _ _ _ _ cif_open cif_open_absent
+              _ _ _ _ cif_write_nil cif_read _ _ _ _ _ _ _ _ _ _ _ cif_open cif_open_absent
               cif_close cif_close_shared cif_exit
               cif_write_prod cif_write_prod_halt cif_write_prod_err cif_write_prod_fail
               cif_write_prod_halt_err).

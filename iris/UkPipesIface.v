@@ -46,10 +46,10 @@
 (* FINAL states ([pns_final], per kind) or the taint to [ukn_pay N (-1)]. *)
 (* [ei_exit] finds every protected device among the drained ones and     *)
 (* reads each off its kind ([pns_dev_final]):                             *)
-(*   [DCopyEnd h []] -> read EOF at [c], wrote [take c L] (the output     *)
+(*   [DCopyEnd F h []] -> read EOF at [c], wrote [take c L] (the output   *)
 (*                      pipe's permit and bound at [c], or the console    *)
 (*                      writer's cursor at [c] with its mode);           *)
-(*   [DCopyHalt]     -> the output pipe halted ([ro_shot]);               *)
+(*   [DCopyHalt oS]  -> the output pipe halted ([ro_shot]);               *)
 (*   a console writer -> its final stream ([pns_wfin]: unfired, or its    *)
 (*                      whole source, one of [A]);                        *)
 (*   the write end   -> the landed left exit [pns_lexit].                 *)
@@ -229,6 +229,13 @@ Proof.
   intros Hwc HcL Heq.
   rewrite -take_take_drop Heq take_app_length.
   rewrite drop_app_le; [reflexivity |]. rewrite length_take Nat.min_l; [lia | exact HcL].
+Qed.
+
+(* what was read, after a chunk joined it *)
+Lemma pns_read_grow (L : list (bv 8)) (c : nat) (cb S' : list (bv 8)) :
+  drop c L = cb ++ S' -> take c L ++ cb = take (c + length cb) L.
+Proof using.
+  intros Heq. rewrite -take_take_drop Heq take_app_length. reflexivity.
 Qed.
 
 (* a drained copy device has its two cursors equal *)
@@ -1233,30 +1240,36 @@ Section UkPipesIface.
     (⌜(wc <= c)%nat /\ (c <= length L)%nat⌝ ∗ rcur pin c
      ∗ (⌜c = 0%nat⌝ ∨ pws_lb pin (take 1 L)) ∗ pns_sink pin sk wc)%I.
 
-  Definition pns_copy (d : nat) (h : bool) (Sc pending : list (bv 8)) : iProp Σ :=
+  (* the filter device is cat's here ([F = flt_id]): what was read is the
+     input cursor's prefix of the line, and what is owed the part of it
+     not yet written *)
+  Definition pns_copy (d : nat) (F : pfilter) (h : bool) (Rr Sc pending : list (bv 8)) : iProp Σ :=
     (∃ (pin : pnames) (gin : pipe_names) (sk : csink),
        ⌜h = pns_sink_h sk⌝ ∗ pns_tok d (1/2) (PDCopy (pin, gin) sk)
-       ∗ ∃ c wc : nat, ⌜Sc = drop c L /\ pending = drop wc (take c L)⌝
+       ∗ ∃ c wc : nat, ⌜F = flt_id /\ Rr = take c L /\ Sc = drop c L
+                        /\ pending = drop wc (take c L)⌝
                        ∗ pns_copy_core pin sk c wc)%I.
 
-  Definition pns_copy_end (d : nat) (h : bool) (pending : list (bv 8)) : iProp Σ :=
+  Definition pns_copy_end (d : nat) (F : pfilter) (h : bool) (pending : list (bv 8)) : iProp Σ :=
     (∃ (pin : pnames) (gin : pipe_names) (sk : csink),
        ⌜h = pns_sink_h sk⌝ ∗ pns_tok d (1/2) (PDCopy (pin, gin) sk)
-       ∗ ∃ c wc : nat, ⌜pending = drop wc (take c L)⌝ ∗ pns_copy_core pin sk c wc
+       ∗ ∃ c wc : nat, ⌜F = flt_id /\ pending = drop wc (take c L)⌝ ∗ pns_copy_core pin sk c wc
                        ∗ eof_shot pin (take c L))%I.
 
-  Definition pns_copy_halt (d : nat) : iProp Σ :=
+  (* halted: the input cursor, and the input's rest at it or its end *)
+  Definition pns_copy_halt (d : nat) (oS : option (list (bv 8))) : iProp Σ :=
     (∃ (pin : pnames) (gin : pipe_names) (pn : pnames) (gp : pipe_names),
        pns_tok d (1/2) (PDCopy (pin, gin) (CSPipe pn gp))
-       ∗ ∃ c wc : nat, rcur pin c ∗ wcur pn wc ∗ ro_shot pn)%I.
+       ∗ ∃ c wc : nat, rcur pin c ∗ wcur pn wc ∗ ro_shot pn
+                       ∗ (⌜oS = Some (drop c L)⌝ ∨ (⌜oS = None⌝ ∗ eof_shot pin (take c L))))%I.
 
   Definition pns_dev (d : nat) (x : dspec) : iProp Σ :=
     match x with
     | DOut alts => pns_out d alts | DOutH alts => pns_outh d alts | DOutM _ => False
     | DHalt => pns_halt d | DIn _ => False | DInE Sin => pns_in d Sin
     | DInEnd => pns_in_end d
-    | DCopy h Sc p => pns_copy d h Sc p | DCopyEnd h p => pns_copy_end d h p
-    | DCopyHalt => pns_copy_halt d
+    | DCopy F h Rr Sc p => pns_copy d F h Rr Sc p | DCopyEnd F h p => pns_copy_end d F h p
+    | DCopyHalt oS => pns_copy_halt d oS
     | DProd _ _ _ => False | DProdHalt _ => False
     end%I.
 
@@ -1292,7 +1305,7 @@ Section UkPipesIface.
   Lemma pns_dev_tok (d : nat) (x : dspec) :
     pns_dev d x -∗ ∃ kd : pdev, pns_tok d (1/2) kd ∗ (pns_tok d (1/2) kd -∗ pns_dev d x).
   Proof using .
-    destruct x as [alts | alts | cs | | Sin | Sin | | h Sc p | h p | | outs xs dss | dss];
+    destruct x as [alts | alts | cs | | Sin | Sin | | F h Rr Sc p | F h p | oS | outs xs dss | dss];
       cbn [pns_dev]; [| | iIntros "[]" | | iIntros "[]" | | | | | | iIntros "[]" | iIntros "[]"].
     - iIntros "[(%w & %A & Htk & Hd) | [Htk %Hm]]".
       + iExists (PDCon w A). iFrame "Htk". iIntros "Htk". iLeft. iExists w, A. iFrame "Htk Hd".
@@ -1625,18 +1638,19 @@ Section UkPipesIface.
   (* [ei_read_copy], at either sink: the input's read at the core's
      cursor; a nonempty chunk joins the pending bytes, and the input's
      first byte is recorded ([PipeProto.flow_supply]) *)
-  Lemma pns_read_copy (fdm : fdmap) (fd : Z) (d : nat) (h : bool) (Sin p : list (bv 8))
-      (n : nat) (K : rd_ans -> iProp Σ) :
+  Lemma pns_read_copy (fdm : fdmap) (fd : Z) (d : nat) (F : pfilter) (h : bool)
+      (Rr Sin p : list (bv 8)) (n : nat) (K : rd_ans -> iProp Σ) :
     (0 < n)%nat -> fdm !! fd = Some d -> fd = copy_in ->
-    pns_fds fdm -∗ pns_copy d h Sin p -∗
+    pns_fds fdm -∗ pns_copy d F h Rr Sin p -∗
     ((∀ (cb S' : list (bv 8)), ⌜chunk_ok n Sin cb S'⌝ -∗ ⌜cb <> []⌝ -∗
-        pns_fds fdm -∗ pns_copy d h S' (p ++ cb) -∗ K (RdBytes cb))
-     ∧ (pns_fds fdm -∗ pns_copy_end d h p -∗ K (RdBytes []))
+        pns_fds fdm -∗ pns_copy d F h (Rr ++ cb) S' (p ++ flt_new F Rr cb) -∗ K (RdBytes cb))
+     ∧ (pns_fds fdm -∗ pns_copy_end d F h p -∗ K (RdBytes []))
      ∧ (∀ x, pns_taint (dom fdm) -∗ K x)) -∗
     rd_obl N P fd n K.
   Proof using Hkill Hsr.
     intros Hn Hfd Hfd0. iIntros "Hfds Hd HK".
-    iDestruct "Hd" as (pin gin sk) "(%Hh & Htk & %c & %wc & [%HS %Hp] & [%Hwc %HcL] & Hr & #H0 & Hsk)".
+    iDestruct "Hd" as (pin gin sk) "(%Hh & Htk & %c & %wc & (%HF & %HR & %HS & %Hp) & [%Hwc %HcL] & Hr & #H0 & Hsk)".
+    subst F.
     iDestruct "Hfds" as (l vs wv) "(Hstd & Hxk & %Hok & %Hkd & Hpool & Htoks & #He)".
     destruct (pns_ok_lookup _ _ _ _ _ Hok Hfd) as [kd Hv].
     iDestruct (pns_toks_agree vs d kd with "Htoks Htk") as "(%Hvv & Htoks & Htk)"; [exact Hv |].
@@ -1662,13 +1676,15 @@ Section UkPipesIface.
       iExists pin, gin, sk. iSplitR; [iPureIntro; exact Hh |]. iFrame "Htk".
       iExists (c + length cb)%nat, wc.
       iSplitR.
-      { iPureIntro. split; [reflexivity |]. rewrite Hp.
-        destruct Hchk as (Hdc & _ & _). exact (pns_pending_grow L c wc cb _ Hwc HcL Hdc). }
+      { iPureIntro. destruct Hchk as (Hdc & _ & _).
+        split; [reflexivity |]. split; [rewrite HR; exact (pns_read_grow L c cb _ Hdc) |].
+        split; [reflexivity |]. rewrite Hp.
+        exact (pns_pending_grow L c wc cb _ Hwc HcL Hdc). }
       iSplitR; [iPureIntro; split; lia |]. iFrame "Hr Hsk". iRight. iExact "Hlb1".
     - iIntros "Hstd Hr #Heof". iModIntro. iDestruct "HK" as "[_ [HK _]]".
       iApply ("HK" with "[-Htk Hr Hsk] [Htk Hr Hsk]"); [pns_repack |].
       iExists pin, gin, sk. iSplitR; [iPureIntro; exact Hh |]. iFrame "Htk".
-      iExists c, wc. iSplitR; [iPureIntro; exact Hp |].
+      iExists c, wc. iSplitR; [iPureIntro; split; [reflexivity | exact Hp] |].
       iSplitL "Hr Hsk"; [| iExact "Heof"].
       iSplitR; [iPureIntro; split; lia |]. iFrame "Hr Hsk H0".
     - iIntros "Hstd #Ht" (x). iDestruct "HK" as "[_ [_ HK]]". iApply "HK".
@@ -1676,16 +1692,16 @@ Section UkPipesIface.
   Qed.
 
   (* [ei_read_copy_end]: the read after the end answers 0 *)
-  Lemma pns_read_copy_end (fdm : fdmap) (fd : Z) (d : nat) (h : bool) (p : list (bv 8))
-      (n : nat) (K : rd_ans -> iProp Σ) :
+  Lemma pns_read_copy_end (fdm : fdmap) (fd : Z) (d : nat) (F : pfilter) (h : bool)
+      (p : list (bv 8)) (n : nat) (K : rd_ans -> iProp Σ) :
     (0 < n)%nat -> fdm !! fd = Some d -> fd = copy_in ->
-    pns_fds fdm -∗ pns_copy_end d h p -∗
-    ((pns_fds fdm -∗ pns_copy_end d h p -∗ K (RdBytes []))
+    pns_fds fdm -∗ pns_copy_end d F h p -∗
+    ((pns_fds fdm -∗ pns_copy_end d F h p -∗ K (RdBytes []))
      ∧ (∀ x, pns_taint (dom fdm) -∗ K x)) -∗
     rd_obl N P fd n K.
   Proof using Hkill Hsr.
     intros Hn Hfd Hfd0. iIntros "Hfds Hd HK".
-    iDestruct "Hd" as (pin gin sk) "(%Hh & Htk & %c & %wc & %Hp & ([%Hwc %HcL] & Hr & #H0 & Hsk) & #Heof)".
+    iDestruct "Hd" as (pin gin sk) "(%Hh & Htk & %c & %wc & [%HF %Hp] & ([%Hwc %HcL] & Hr & #H0 & Hsk) & #Heof)".
     iDestruct "Hfds" as (l vs wv) "(Hstd & Hxk & %Hok & %Hkd & Hpool & Htoks & #He)".
     destruct (pns_ok_lookup _ _ _ _ _ Hok Hfd) as [kd Hv].
     iDestruct (pns_toks_agree vs d kd with "Htoks Htk") as "(%Hvv & Htoks & Htk)"; [exact Hv |].
@@ -1701,9 +1717,83 @@ Section UkPipesIface.
     - iIntros "Hstd Hr". iDestruct "HK" as "[HK _]".
       iApply ("HK" with "[-Htk Hr Hsk] [Htk Hr Hsk]"); [pns_repack |].
       iExists pin, gin, sk. iSplitR; [iPureIntro; exact Hh |]. iFrame "Htk".
-      iExists c, wc. iSplitR; [iPureIntro; exact Hp |].
+      iExists c, wc. iSplitR; [iPureIntro; split; [exact HF | exact Hp] |].
       iSplitL "Hr Hsk"; [| iExact "Heof"].
       iSplitR; [iPureIntro; split; lia |]. iFrame "Hr Hsk H0".
+    - iIntros "Hstd #Ht" (x). iDestruct "HK" as "[_ HK]". iApply "HK".
+      iApply (pns_taint_of_fds fdm l vs Hok with "Ht Hstd Hxk He").
+  Qed.
+
+  (* [ei_read_copy_halt]: the output pipe's reader went, and the input is
+     read on at the cursor ([pns_read_atU]): a chunk moves the cursor,
+     the end of file is shot *)
+  Lemma pns_read_copy_halt (fdm : fdmap) (fd : Z) (d : nat) (Sin : list (bv 8))
+      (n : nat) (K : rd_ans -> iProp Σ) :
+    (0 < n)%nat -> fdm !! fd = Some d -> fd = copy_in ->
+    pns_fds fdm -∗ pns_copy_halt d (Some Sin) -∗
+    ((∀ (cb S' : list (bv 8)), ⌜chunk_ok n Sin cb S'⌝ -∗ ⌜cb <> []⌝ -∗
+        pns_fds fdm -∗ pns_copy_halt d (Some S') -∗ K (RdBytes cb))
+     ∧ (pns_fds fdm -∗ pns_copy_halt d None -∗ K (RdBytes []))
+     ∧ (∀ x, pns_taint (dom fdm) -∗ K x)) -∗
+    rd_obl N P fd n K.
+  Proof using Hkill Hsr TERM dep.
+    intros Hn Hfd Hfd0. iIntros "Hfds Hd HK".
+    iDestruct "Hd" as (pin gin pn gp) "(Htk & %c & %wc & Hr & Hw & #Hsh & [%HS | [%HS _]])";
+      [| discriminate HS].
+    injection HS as HS.
+    iDestruct "Hfds" as (l vs wv) "(Hstd & Hxk & %Hok & %Hkd & Hpool & Htoks & #He)".
+    destruct (pns_ok_lookup _ _ _ _ _ Hok Hfd) as [kd Hv].
+    iDestruct (pns_toks_agree vs d kd with "Htoks Htk") as "(%Hvv & Htoks & Htk)"; [exact Hv |].
+    subst kd.
+    destruct (pns_fds_row _ _ _ _ _ _ Hok Hfd Hv) as (k & Hk & Hlt & Hrow).
+    rewrite Hk in Hfd0. subst fd.
+    destruct (pns_copy_row_in l k pin gin (CSPipe pn gp) Hrow Hfd0) as [-> (wb & Hl0)].
+    iPoseProof (pns_env_lookup vs d _ Hv with "He") as "Hi". cbn [pns_pk_inv].
+    iDestruct "Hi" as "[(%prev & #Hinv) _]".
+    iApply (pns_read_atU N P Hsr pin gin L (flow_U L prev) c l 0 wb n K Hlt Hl0 Hn
+              with "Hinv Hstd Hr").
+    iSplit; [| iSplit].
+    - iIntros (cb) "[%Hne %Hchk] Hstd Hr". iModIntro. iDestruct "HK" as "[HK _]".
+      iApply ("HK" $! cb (drop (c + length cb) L) with "[%] [%] [-Htk Hr Hw] [Htk Hr Hw]");
+        [rewrite HS; exact Hchk | exact Hne | pns_repack |].
+      iExists pin, gin, pn, gp. iFrame "Htk". iExists (c + length cb)%nat, wc.
+      iFrame "Hr Hw Hsh". iLeft. by iPureIntro.
+    - iIntros "Hstd Hr #Heof". iModIntro. iDestruct "HK" as "[_ [HK _]]".
+      iApply ("HK" with "[-Htk Hr Hw] [Htk Hr Hw]"); [pns_repack |].
+      iExists pin, gin, pn, gp. iFrame "Htk". iExists c, wc.
+      iFrame "Hr Hw Hsh". iRight. iSplitR; [by iPureIntro | iExact "Heof"].
+    - iIntros "Hstd #Ht" (x). iDestruct "HK" as "[_ [_ HK]]". iApply "HK".
+      iApply (pns_taint_of_fds fdm l vs Hok with "Ht Hstd Hxk He").
+  Qed.
+
+  (* [ei_read_copy_halt_end]: ...and after its end, 0 *)
+  Lemma pns_read_copy_halt_end (fdm : fdmap) (fd : Z) (d : nat) (n : nat)
+      (K : rd_ans -> iProp Σ) :
+    (0 < n)%nat -> fdm !! fd = Some d -> fd = copy_in ->
+    pns_fds fdm -∗ pns_copy_halt d None -∗
+    ((pns_fds fdm -∗ pns_copy_halt d None -∗ K (RdBytes []))
+     ∧ (∀ x, pns_taint (dom fdm) -∗ K x)) -∗
+    rd_obl N P fd n K.
+  Proof using Hkill Hsr TERM dep.
+    intros Hn Hfd Hfd0. iIntros "Hfds Hd HK".
+    iDestruct "Hd" as (pin gin pn gp) "(Htk & %c & %wc & Hr & Hw & #Hsh & [%HS | [_ #Heof]])";
+      [discriminate HS |].
+    iDestruct "Hfds" as (l vs wv) "(Hstd & Hxk & %Hok & %Hkd & Hpool & Htoks & #He)".
+    destruct (pns_ok_lookup _ _ _ _ _ Hok Hfd) as [kd Hv].
+    iDestruct (pns_toks_agree vs d kd with "Htoks Htk") as "(%Hvv & Htoks & Htk)"; [exact Hv |].
+    subst kd.
+    destruct (pns_fds_row _ _ _ _ _ _ Hok Hfd Hv) as (k & Hk & Hlt & Hrow).
+    rewrite Hk in Hfd0. subst fd.
+    destruct (pns_copy_row_in l k pin gin (CSPipe pn gp) Hrow Hfd0) as [-> (wb & Hl0)].
+    iPoseProof (pns_env_lookup vs d _ Hv with "He") as "Hi". cbn [pns_pk_inv].
+    iDestruct "Hi" as "[(%prev & #Hinv) _]".
+    iApply (pns_read_eofU N P Hsr pin gin L (flow_U L prev) c l 0 wb n K Hlt Hl0 Hn
+              with "Hinv Hstd Hr Heof").
+    iSplit.
+    - iIntros "Hstd Hr". iDestruct "HK" as "[HK _]".
+      iApply ("HK" with "[-Htk Hr Hw] [Htk Hr Hw]"); [pns_repack |].
+      iExists pin, gin, pn, gp. iFrame "Htk". iExists c, wc.
+      iFrame "Hr Hw Hsh". iRight. iSplitR; [by iPureIntro | iExact "Heof"].
     - iIntros "Hstd #Ht" (x). iDestruct "HK" as "[_ HK]". iApply "HK".
       iApply (pns_taint_of_fds fdm l vs Hok with "Ht Hstd Hxk He").
   Qed.
@@ -1744,16 +1834,16 @@ Section UkPipesIface.
   Qed.
 
   (* [ei_write_copy]: the LAST cat (the sink is the console writer) *)
-  Lemma pns_write_copy (fdm : fdmap) (fd : Z) (d : nat) (Sin p bs : list (bv 8))
+  Lemma pns_write_copy (fdm : fdmap) (fd : Z) (d : nat) (F : pfilter) (Rr Sin p bs : list (bv 8))
       (K : Z -> iProp Σ) :
     bs <> [] -> fdm !! fd = Some d -> fd = copy_out -> bs `prefix_of` p ->
-    pns_fds fdm -∗ pns_copy d false Sin p -∗
-    ((pns_fds fdm -∗ pns_copy d false Sin (drop (length bs) p) -∗ K (Z.of_nat (length bs)))
+    pns_fds fdm -∗ pns_copy d F false Rr Sin p -∗
+    ((pns_fds fdm -∗ pns_copy d F false Rr Sin (drop (length bs) p) -∗ K (Z.of_nat (length bs)))
      ∧ (∀ x, pns_taint (dom fdm) -∗ K x)) -∗
     wr_obl N P fd bs K.
   Proof using HL31 HPc Hadmit Hext HlR Hcons Hfc Hplok Hsw dep_tl.
     intros Hne Hfd Hfd1 Hpre. iIntros "Hfds Hd HK". subst fd.
-    iDestruct "Hd" as (pin gin sk) "(%Hh & Htk & %c & %wc & [%HS %Hp] & [%Hwc %HcL] & Hr & #H0 & Hsk)".
+    iDestruct "Hd" as (pin gin sk) "(%Hh & Htk & %c & %wc & (%HF & %HR & %HS & %Hp) & [%Hwc %HcL] & Hr & #H0 & Hsk)".
     destruct sk as [w | pn gp]; [| discriminate Hh].
     iDestruct "Hfds" as (l vs wv) "(Hstd & Hxk & %Hok & %Hkd & Hpool & Htoks & #He)".
     destruct (pns_ok_lookup _ _ _ _ _ Hok Hfd) as [kd Hv].
@@ -1767,21 +1857,21 @@ Section UkPipesIface.
     iIntros (wc2) "[%Hw2 %Hw2c] Hstd Hsk".
     iApply ("HK" with "[-Htk Hr Hsk] [Htk Hr Hsk]"); [pns_repack |].
     iExists pin, gin, (CSCon w). iSplitR; [by iPureIntro |]. iFrame "Htk".
-    iExists c, wc2. iSplitR; [iPureIntro; split; [exact HS | exact Hw2] |].
+    iExists c, wc2. iSplitR; [iPureIntro; split_and!; [exact HF | exact HR | exact HS | exact Hw2] |].
     iSplitR; [iPureIntro; split; [exact Hw2c | exact HcL] |]. iFrame "Hr H0 Hsk".
   Qed.
 
   (* [ei_write_copy_end]: the same write, the end's shot kept *)
-  Lemma pns_write_copy_end (fdm : fdmap) (fd : Z) (d : nat) (p bs : list (bv 8))
+  Lemma pns_write_copy_end (fdm : fdmap) (fd : Z) (d : nat) (F : pfilter) (p bs : list (bv 8))
       (K : Z -> iProp Σ) :
     bs <> [] -> fdm !! fd = Some d -> fd = copy_out -> bs `prefix_of` p ->
-    pns_fds fdm -∗ pns_copy_end d false p -∗
-    ((pns_fds fdm -∗ pns_copy_end d false (drop (length bs) p) -∗ K (Z.of_nat (length bs)))
+    pns_fds fdm -∗ pns_copy_end d F false p -∗
+    ((pns_fds fdm -∗ pns_copy_end d F false (drop (length bs) p) -∗ K (Z.of_nat (length bs)))
      ∧ (∀ x, pns_taint (dom fdm) -∗ K x)) -∗
     wr_obl N P fd bs K.
   Proof using HL31 HPc Hadmit Hext HlR Hcons Hfc Hplok Hsw dep_tl.
     intros Hne Hfd Hfd1 Hpre. iIntros "Hfds Hd HK". subst fd.
-    iDestruct "Hd" as (pin gin sk) "(%Hh & Htk & %c & %wc & %Hp & ([%Hwc %HcL] & Hr & #H0 & Hsk) & #Heof)".
+    iDestruct "Hd" as (pin gin sk) "(%Hh & Htk & %c & %wc & [%HF %Hp] & ([%Hwc %HcL] & Hr & #H0 & Hsk) & #Heof)".
     destruct sk as [w | pn gp]; [| discriminate Hh].
     iDestruct "Hfds" as (l vs wv) "(Hstd & Hxk & %Hok & %Hkd & Hpool & Htoks & #He)".
     destruct (pns_ok_lookup _ _ _ _ _ Hok Hfd) as [kd Hv].
@@ -1795,7 +1885,7 @@ Section UkPipesIface.
     iIntros (wc2) "[%Hw2 %Hw2c] Hstd Hsk".
     iApply ("HK" with "[-Htk Hr Hsk] [Htk Hr Hsk]"); [pns_repack |].
     iExists pin, gin, (CSCon w). iSplitR; [by iPureIntro |]. iFrame "Htk".
-    iExists c, wc2. iSplitR; [iPureIntro; exact Hw2 |].
+    iExists c, wc2. iSplitR; [iPureIntro; split; [exact HF | exact Hw2] |].
     iSplitL "Hr Hsk"; [| iExact "Heof"].
     iSplitR; [iPureIntro; split; [exact Hw2c | exact HcL] |]. iFrame "Hr H0 Hsk".
   Qed.
@@ -1845,17 +1935,17 @@ Section UkPipesIface.
   Qed.
 
   (* [ei_write_copy_h]: the MIDDLE cat *)
-  Lemma pns_write_copy_h (fdm : fdmap) (fd : Z) (d : nat) (Sin p bs : list (bv 8))
+  Lemma pns_write_copy_h (fdm : fdmap) (fd : Z) (d : nat) (F : pfilter) (Rr Sin p bs : list (bv 8))
       (K : Z -> iProp Σ) :
     bs <> [] -> fdm !! fd = Some d -> fd = copy_out -> bs `prefix_of` p ->
-    pns_fds fdm -∗ pns_copy d true Sin p -∗
-    ((pns_fds fdm -∗ pns_copy d true Sin (drop (length bs) p) -∗ K (Z.of_nat (length bs)))
-     ∧ (pns_fds fdm -∗ pns_copy_halt d -∗ K (-1))
+    pns_fds fdm -∗ pns_copy d F true Rr Sin p -∗
+    ((pns_fds fdm -∗ pns_copy d F true Rr Sin (drop (length bs) p) -∗ K (Z.of_nat (length bs)))
+     ∧ (pns_fds fdm -∗ pns_copy_halt d (Some Sin) -∗ K (-1))
      ∧ (∀ x, pns_taint (dom fdm) -∗ K x)) -∗
     wr_obl N P fd bs K.
   Proof using HL31 Hkill Hsw.
     intros Hne Hfd Hfd1 Hpre. iIntros "Hfds Hd HK". subst fd.
-    iDestruct "Hd" as (pin gin sk) "(%Hh & Htk & %c & %wc & [%HS %Hp] & [%Hwc %HcL] & Hr & #H0 & Hsk)".
+    iDestruct "Hd" as (pin gin sk) "(%Hh & Htk & %c & %wc & (%HF & %HR & %HS & %Hp) & [%Hwc %HcL] & Hr & #H0 & Hsk)".
     destruct sk as [w | pn gp]; [discriminate Hh |].
     iDestruct "Hsk" as "[Hw #Hlb]".
     iDestruct "Hfds" as (l vs wv) "(Hstd & Hxk & %Hok & %Hkd & Hpool & Htoks & #He)".
@@ -1871,29 +1961,31 @@ Section UkPipesIface.
     - iIntros "Hstd Hw #Hlb' [%Hw2 %Hw2c]". iDestruct "HK" as "[HK _]".
       iApply ("HK" with "[-Htk Hr Hw] [Htk Hr Hw]"); [pns_repack |].
       iExists pin, gin, (CSPipe pn gp). iSplitR; [by iPureIntro |]. iFrame "Htk".
-      iExists c, (wc + length bs)%nat. iSplitR; [iPureIntro; split; [exact HS | exact Hw2] |].
+      iExists c, (wc + length bs)%nat.
+      iSplitR; [iPureIntro; split_and!; [exact HF | exact HR | exact HS | exact Hw2] |].
       iSplitR; [iPureIntro; split; [exact Hw2c | exact HcL] |]. iFrame "Hr H0".
       cbn [pns_sink]. iFrame "Hw Hlb'".
     - iIntros "Hstd Hw #Hsh". iDestruct "HK" as "[_ [HK _]]".
       iDestruct "Hw" as (c') "Hw".
       iApply ("HK" with "[-Htk Hr Hw] [Htk Hr Hw]"); [pns_repack |].
       iExists pin, gin, pn, gp. iFrame "Htk". iExists c, c'. iFrame "Hr Hw Hsh".
+      iLeft. iPureIntro. by rewrite HS.
     - iIntros "Hstd #Ht" (z). iDestruct "HK" as "[_ [_ HK]]". iApply "HK".
       iApply (pns_taint_of_fds fdm l vs Hok with "Ht Hstd Hxk He").
   Qed.
 
   (* [ei_write_copy_end_h] *)
-  Lemma pns_write_copy_end_h (fdm : fdmap) (fd : Z) (d : nat) (p bs : list (bv 8))
+  Lemma pns_write_copy_end_h (fdm : fdmap) (fd : Z) (d : nat) (F : pfilter) (p bs : list (bv 8))
       (K : Z -> iProp Σ) :
     bs <> [] -> fdm !! fd = Some d -> fd = copy_out -> bs `prefix_of` p ->
-    pns_fds fdm -∗ pns_copy_end d true p -∗
-    ((pns_fds fdm -∗ pns_copy_end d true (drop (length bs) p) -∗ K (Z.of_nat (length bs)))
-     ∧ (pns_fds fdm -∗ pns_copy_halt d -∗ K (-1))
+    pns_fds fdm -∗ pns_copy_end d F true p -∗
+    ((pns_fds fdm -∗ pns_copy_end d F true (drop (length bs) p) -∗ K (Z.of_nat (length bs)))
+     ∧ (pns_fds fdm -∗ pns_copy_halt d None -∗ K (-1))
      ∧ (∀ x, pns_taint (dom fdm) -∗ K x)) -∗
     wr_obl N P fd bs K.
   Proof using HL31 Hkill Hsw.
     intros Hne Hfd Hfd1 Hpre. iIntros "Hfds Hd HK". subst fd.
-    iDestruct "Hd" as (pin gin sk) "(%Hh & Htk & %c & %wc & %Hp & ([%Hwc %HcL] & Hr & #H0 & Hsk) & #Heof)".
+    iDestruct "Hd" as (pin gin sk) "(%Hh & Htk & %c & %wc & [%HF %Hp] & ([%Hwc %HcL] & Hr & #H0 & Hsk) & #Heof)".
     destruct sk as [w | pn gp]; [discriminate Hh |].
     iDestruct "Hsk" as "[Hw #Hlb]".
     iDestruct "Hfds" as (l vs wv) "(Hstd & Hxk & %Hok & %Hkd & Hpool & Htoks & #He)".
@@ -1909,7 +2001,7 @@ Section UkPipesIface.
     - iIntros "Hstd Hw #Hlb' [%Hw2 %Hw2c]". iDestruct "HK" as "[HK _]".
       iApply ("HK" with "[-Htk Hr Hw] [Htk Hr Hw]"); [pns_repack |].
       iExists pin, gin, (CSPipe pn gp). iSplitR; [by iPureIntro |]. iFrame "Htk".
-      iExists c, (wc + length bs)%nat. iSplitR; [iPureIntro; exact Hw2 |].
+      iExists c, (wc + length bs)%nat. iSplitR; [iPureIntro; split; [exact HF | exact Hw2] |].
       iSplitL "Hr Hw"; [| iExact "Heof"].
       iSplitR; [iPureIntro; split; [exact Hw2c | exact HcL] |]. iFrame "Hr H0".
       cbn [pns_sink]. iFrame "Hw Hlb'".
@@ -1917,20 +2009,21 @@ Section UkPipesIface.
       iDestruct "Hw" as (c') "Hw".
       iApply ("HK" with "[-Htk Hr Hw] [Htk Hr Hw]"); [pns_repack |].
       iExists pin, gin, pn, gp. iFrame "Htk". iExists c, c'. iFrame "Hr Hw Hsh".
+      iRight. iSplitR; [by iPureIntro | iExact "Heof"].
     - iIntros "Hstd #Ht" (z). iDestruct "HK" as "[_ [_ HK]]". iApply "HK".
       iApply (pns_taint_of_fds fdm l vs Hok with "Ht Hstd Hxk He").
   Qed.
 
   (* [ei_write_copy_halt]: -1 at the halted output pipe *)
-  Lemma pns_write_copy_halt (fdm : fdmap) (fd : Z) (d : nat) (bs : list (bv 8))
-      (K : Z -> iProp Σ) :
+  Lemma pns_write_copy_halt (fdm : fdmap) (fd : Z) (d : nat) (oS : option (list (bv 8)))
+      (bs : list (bv 8)) (K : Z -> iProp Σ) :
     bs <> [] -> Z.of_nat (length bs) < 2 ^ 31 -> fdm !! fd = Some d -> fd = copy_out ->
-    pns_fds fdm -∗ pns_copy_halt d -∗
-    ((pns_fds fdm -∗ pns_copy_halt d -∗ K (-1)) ∧ (∀ x, pns_taint (dom fdm) -∗ K x)) -∗
+    pns_fds fdm -∗ pns_copy_halt d oS -∗
+    ((pns_fds fdm -∗ pns_copy_halt d oS -∗ K (-1)) ∧ (∀ x, pns_taint (dom fdm) -∗ K x)) -∗
     wr_obl N P fd bs K.
   Proof using Hkill Hsw TERM dep.
     intros Hne Hbnd Hfd Hfd1. iIntros "Hfds Hd HK". subst fd.
-    iDestruct "Hd" as (pin gin pn gp) "(Htk & %c & %wc & Hr & Hw & #Hsh)".
+    iDestruct "Hd" as (pin gin pn gp) "(Htk & %c & %wc & Hr & Hw & #Hsh & HoS)".
     iDestruct "Hfds" as (l vs wv) "(Hstd & Hxk & %Hok & %Hkd & Hpool & Htoks & #He)".
     destruct (pns_ok_lookup _ _ _ _ _ Hok Hfd) as [kd Hv].
     iDestruct (pns_toks_agree vs d kd with "Htoks Htk") as "(%Hvv & Htoks & Htk)"; [exact Hv |].
@@ -1946,8 +2039,8 @@ Section UkPipesIface.
               with "Hinv Hsh Hstd [Hr Hw]"); [iFrame "Hr Hw" |].
     iSplit.
     - iIntros "Hstd [Hr Hw]". iDestruct "HK" as "[HK _]".
-      iApply ("HK" with "[-Htk Hr Hw] [Htk Hr Hw]"); [pns_repack |].
-      iExists pin, gin, pn, gp. iFrame "Htk". iExists c, wc. iFrame "Hr Hw Hsh".
+      iApply ("HK" with "[-Htk Hr Hw HoS] [Htk Hr Hw HoS]"); [pns_repack |].
+      iExists pin, gin, pn, gp. iFrame "Htk". iExists c, wc. iFrame "Hr Hw Hsh HoS".
     - iIntros "Hstd #Ht" (z). iDestruct "HK" as "[_ HK]". iApply "HK".
       iApply (pns_taint_of_fds fdm l vs Hok with "Ht Hstd Hxk He").
   Qed.
@@ -2092,7 +2185,7 @@ Section UkPipesIface.
   Proof using .
     intros Hv Hdr. iIntros "#He Htoks Hd".
     iPoseProof (pns_env_lookup vs d kd Hv with "He") as "#Hi".
-    destruct x as [alts | alts | cs | | Sin | Sin | | h Sc p | h p | | outs xs dss | dss];
+    destruct x as [alts | alts | cs | | Sin | Sin | | F h Rr Sc p | F h p | oS | outs xs dss | dss];
       cbn [pns_dev drained] in Hdr |- *; [.. | iDestruct "Hd" as "[]" | iDestruct "Hd" as "[]"].
     - iDestruct "Hd" as "[(%w & %A & Htk & Hd) | [Htk %Hm]]".
       + iDestruct (pns_toks_agree vs d kd with "Htoks Htk") as "(%Hkk & Htoks & _)"; [exact Hv |].
@@ -2124,7 +2217,7 @@ Section UkPipesIface.
       subst kd. cbn [pns_final]. iModIntro. iFrame "Htoks". iExists c. iExact "Hr".
     - destruct Hdr.
     - subst p.
-      iDestruct "Hd" as (pin gin sk) "(_ & Htk & %c & %wc & %Hp & ([%Hwc %HcL] & Hr & _ & Hsk) & #Heof)".
+      iDestruct "Hd" as (pin gin sk) "(_ & Htk & %c & %wc & [_ %Hp] & ([%Hwc %HcL] & Hr & _ & Hsk) & #Heof)".
       iDestruct (pns_toks_agree vs d kd with "Htoks Htk") as "(%Hkk & Htoks & _)"; [exact Hv |].
       subst kd. pose proof (pns_drained_eq L c wc Hwc HcL Hp) as ->.
       destruct sk as [w | pn gp]; cbn [pns_sink pns_final].
@@ -2132,7 +2225,7 @@ Section UkPipesIface.
         iExists c. iFrame "Heof Hr Hcw Hmw". by iPureIntro.
       + iDestruct "Hsk" as "[Hw #Hlb]". iModIntro. iFrame "Htoks".
         iLeft. iExists c. iFrame "Heof Hr Hw Hlb".
-    - iDestruct "Hd" as (pin gin pn gp) "(Htk & %c & %wc & Hr & Hw & #Hsh)".
+    - iDestruct "Hd" as (pin gin pn gp) "(Htk & %c & %wc & Hr & Hw & #Hsh & _)".
       iDestruct (pns_toks_agree vs d kd with "Htoks Htk") as "(%Hkk & Htoks & _)"; [exact Hv |].
       subst kd. cbn [pns_final]. iModIntro. iFrame "Htoks".
       iRight. iExists c, wc. iFrame "Hr Hw Hsh".
@@ -2196,6 +2289,7 @@ Section UkPipesIface.
               pns_filesr pns_taint pns_taint_pays
               pns_write pns_write_h _ pns_write_halt pns_write_nil
               _ pns_read_e pns_read_end pns_read_copy pns_read_copy_end
+              pns_read_copy_halt pns_read_copy_halt_end
               pns_write_copy pns_write_copy_h pns_write_copy_end pns_write_copy_end_h
               pns_write_copy_halt pns_open pns_open_absent
               pns_close pns_close_shared pns_exit _ _ _ _ _).
@@ -2254,7 +2348,7 @@ Section UkPipesIface.
     l !! 2%nat = Some (FdOpen rb2 true (FdDevice CONSOLE)) ->
     UserFd.ustd γfd l -∗ own γreg (pns_pool ∅ wv) -∗
     pns_copy_lend w2 A2 alts2 pin gin sk (ukn_pay N) -∗
-    env_res N P pipes_iface (copy_env (DCopy (pns_sink_h sk) L []) alts2 files [])
+    env_res N P pipes_iface (copy_env (DCopy flt_id (pns_sink_h sk) [] L []) alts2 files [])
       {[0%nat; 1%nat]}.
   Proof using Hsup.
     intros Hk Hw0 Hw1 Hl0 Hl1 Hl2.
@@ -2315,15 +2409,15 @@ Section UkPipesIface.
     iSplitR.
     { rewrite pns_ei_files /pns_filesr. cbn [copy_env pe_paths]. by iPureIntro. }
     rewrite /dev_res big_sepS_union; [| set_solver]. rewrite !big_sepS_singleton !pns_dev_of.
-    assert (E0 : pe_dev (copy_env (DCopy (pns_sink_h sk) L []) alts2 files []) 0%nat
+    assert (E0 : pe_dev (copy_env (DCopy flt_id (pns_sink_h sk) [] L []) alts2 files []) 0%nat
                  = DOut alts2) by reflexivity.
-    assert (E1 : pe_dev (copy_env (DCopy (pns_sink_h sk) L []) alts2 files []) 1%nat
-                 = DCopy (pns_sink_h sk) L []) by reflexivity.
+    assert (E1 : pe_dev (copy_env (DCopy flt_id (pns_sink_h sk) [] L []) alts2 files []) 1%nat
+                 = DCopy flt_id (pns_sink_h sk) [] L []) by reflexivity.
     rewrite E0 E1. cbn [pns_dev]. iSplitL "Htk0b Hc Hm Hks".
     - iLeft. iExists w2, A2. iFrame "Htk0b".
       iApply (pns_con_lend w2 A2 alts2 Hs2 Hw2 HA2 with "Hfam Hc Hm Hks").
     - iExists pin, gin, sk. iSplitR; [by iPureIntro |]. iFrame "Htk1b".
-      iExists 0%nat, 0%nat. iSplitR; [iPureIntro; split; reflexivity |].
+      iExists 0%nat, 0%nat. iSplitR; [iPureIntro; split_and!; reflexivity |].
       iSplitR; [iPureIntro; split; lia |]. iFrame "Hr Hsk". by iLeft.
   Qed.
 
@@ -2346,7 +2440,7 @@ Section UkPipesIface.
     l !! 2%nat = Some (FdOpen rb2 true (FdDevice CONSOLE)) ->
     UserFd.ustd γfd l -∗ own γreg (pns_pool ∅ wv) -∗
     pns_copy_lend_m pin gin sk (ukn_pay N) -∗
-    env_res N P pipes_iface (copy_env (DCopy (pns_sink_h sk) L []) [[]] files [])
+    env_res N P pipes_iface (copy_env (DCopy flt_id (pns_sink_h sk) [] L []) [[]] files [])
       {[0%nat; 1%nat]}.
   Proof using Hsup.
     intros Hk Hw0 Hw1 Hl0 Hl1 Hl2.
@@ -2406,14 +2500,14 @@ Section UkPipesIface.
     iSplitR.
     { rewrite pns_ei_files /pns_filesr. cbn [copy_env pe_paths]. by iPureIntro. }
     rewrite /dev_res big_sepS_union; [| set_solver]. rewrite !big_sepS_singleton !pns_dev_of.
-    assert (E0 : pe_dev (copy_env (DCopy (pns_sink_h sk) L []) [[]] files []) 0%nat
+    assert (E0 : pe_dev (copy_env (DCopy flt_id (pns_sink_h sk) [] L []) [[]] files []) 0%nat
                  = DOut [[]]) by reflexivity.
-    assert (E1 : pe_dev (copy_env (DCopy (pns_sink_h sk) L []) [[]] files []) 1%nat
-                 = DCopy (pns_sink_h sk) L []) by reflexivity.
+    assert (E1 : pe_dev (copy_env (DCopy flt_id (pns_sink_h sk) [] L []) [[]] files []) 1%nat
+                 = DCopy flt_id (pns_sink_h sk) [] L []) by reflexivity.
     rewrite E0 E1. cbn [pns_dev]. iSplitL "Htk0b".
     - iRight. iFrame "Htk0b". by iPureIntro.
     - iExists pin, gin, sk. iSplitR; [by iPureIntro |]. iFrame "Htk1b".
-      iExists 0%nat, 0%nat. iSplitR; [iPureIntro; split; reflexivity |].
+      iExists 0%nat, 0%nat. iSplitR; [iPureIntro; split_and!; reflexivity |].
       iSplitR; [iPureIntro; split; lia |]. iFrame "Hr Hsk". by iLeft.
   Qed.
 

@@ -14,8 +14,8 @@
 (*                the descriptors held are its domain), per device at     *)
 (*                what it owes or has left ([ei_out], [ei_outh],           *)
 (*                [ei_outm], [ei_halt], [ei_in], [ei_in_e], [ei_in_end],   *)
-(*                and the copy device [ei_copy], [ei_copy_end],            *)
-(*                [ei_copy_halt] -- design SS3.4f),                        *)
+(*                and the filter device [ei_copy], [ei_copy_end],          *)
+(*                [ei_copy_halt] -- design SS3.4f, grep-pipes.md SS1),     *)
 (*                for the files it describes ([ei_files files paths]),    *)
 (*                and the TAINT ([ei_taint held]: the application gave up  *)
 (*                describing, the process keeps its handles) -- and its   *)
@@ -167,12 +167,14 @@ Section UkHandler.
     ei_in : nat -> bytes -> iProp Σ;
     ei_in_e : nat -> bytes -> iProp Σ;         (* an input that may end early *)
     ei_in_end : nat -> iProp Σ;                (* ...and has *)
-    (* the copy device (design SS3.4f): one number on both of cat's
-       descriptors; the input still to come and the bytes read but not
-       yet written; [h] says the sink may halt *)
-    ei_copy : nat -> bool -> bytes -> bytes -> iProp Σ;
-    ei_copy_end : nat -> bool -> bytes -> iProp Σ;   (* the writer closed *)
-    ei_copy_halt : nat -> iProp Σ;                   (* the sink's reader went *)
+    (* the filter device (design SS3.4f, grep-pipes.md SS1): one number on
+       both of a filter's descriptors; the filter, whether the sink may
+       halt, the input read so far, the input still to come, and the
+       output owed and not yet written *)
+    ei_copy : nat -> pfilter -> bool -> bytes -> bytes -> bytes -> iProp Σ;
+    ei_copy_end : nat -> pfilter -> bool -> bytes -> iProp Σ;   (* the writer closed *)
+    (* the sink's reader went; the input still to come, or its end *)
+    ei_copy_halt : nat -> option bytes -> iProp Σ;
     (* the producer device ([ProgTree.DProd], union.md C9d'): one number on
        a producer's output and its diagnostics; the output owes one of
        [outs], the diagnostics one of [ds] or a failure report of [xs] *)
@@ -229,8 +231,8 @@ Section UkHandler.
          | DOut alts => ei_out d alts | DOutH alts => ei_outh d alts
          | DOutM cs => ei_outm d cs | DHalt => ei_halt d
          | DIn Sin => ei_in d Sin | DInE Sin => ei_in_e d Sin | DInEnd => ei_in_end d
-         | DCopy h Sin p => ei_copy d h Sin p | DCopyEnd h p => ei_copy_end d h p
-         | DCopyHalt => ei_copy_halt d
+         | DCopy F h Rr Sin p => ei_copy d F h Rr Sin p | DCopyEnd F h p => ei_copy_end d F h p
+         | DCopyHalt oS => ei_copy_halt d oS
          | DProd outs xs ds => ei_prod d outs xs ds | DProdHalt ds => ei_prod_halt d ds
          end) -∗
         ((ei_fds fdm -∗
@@ -238,8 +240,8 @@ Section UkHandler.
            | DOut alts => ei_out d alts | DOutH alts => ei_outh d alts
            | DOutM cs => ei_outm d cs | DHalt => ei_halt d
            | DIn Sin => ei_in d Sin | DInE Sin => ei_in_e d Sin | DInEnd => ei_in_end d
-           | DCopy h Sin p => ei_copy d h Sin p | DCopyEnd h p => ei_copy_end d h p
-           | DCopyHalt => ei_copy_halt d
+           | DCopy F h Rr Sin p => ei_copy d F h Rr Sin p | DCopyEnd F h p => ei_copy_end d F h p
+           | DCopyHalt oS => ei_copy_halt d oS
            | DProd outs xs ds => ei_prod d outs xs ds | DProdHalt ds => ei_prod_halt d ds
            end) -∗ K 0)
          ∧ (ei_fds fdm -∗
@@ -247,8 +249,8 @@ Section UkHandler.
              | DOut alts => ei_out d alts | DOutH alts => ei_outh d alts
              | DOutM cs => ei_outm d cs | DHalt => ei_halt d
              | DIn Sin => ei_in d Sin | DInE Sin => ei_in_e d Sin | DInEnd => ei_in_end d
-             | DCopy h Sin p => ei_copy d h Sin p | DCopyEnd h p => ei_copy_end d h p
-             | DCopyHalt => ei_copy_halt d
+             | DCopy F h Rr Sin p => ei_copy d F h Rr Sin p | DCopyEnd F h p => ei_copy_end d F h p
+             | DCopyHalt oS => ei_copy_halt d oS
              | DProd outs xs ds => ei_prod d outs xs ds | DProdHalt ds => ei_prod_halt d ds
              end) -∗ K (-1))
          ∧ (∀ y, ei_taint (dom fdm) -∗ K y)) -∗
@@ -278,58 +280,79 @@ Section UkHandler.
         ei_fds fdm -∗ ei_in_end d -∗
         ((ei_fds fdm -∗ ei_in_end d -∗ K (RdBytes [])) ∧ (∀ x, ei_taint (dom fdm) -∗ K x)) -∗
         rd_obl N P fd n K;
-    (* a read at the copy device, at the filter's input ([ProgTree.copy_in]):
-       a NONEMPTY chunk of the input joins what is pending, or the writer
-       closed (end of file) *)
-    ei_read_copy : forall (fdm : fdmap) (fd : Z) (d : nat) (h : bool) (Sin p : bytes) (n : nat)
-                     (K : rd_ans -> iProp Σ),
+    (* a read at the filter device, at the filter's input ([ProgTree.
+       copy_in]): a NONEMPTY chunk of the input adds what it owes to what is
+       pending, or the writer closed (end of file) *)
+    ei_read_copy : forall (fdm : fdmap) (fd : Z) (d : nat) (F : pfilter) (h : bool)
+                     (Rr Sin p : bytes) (n : nat) (K : rd_ans -> iProp Σ),
         (0 < n)%nat -> fdm !! fd = Some d -> fd = copy_in ->
-        ei_fds fdm -∗ ei_copy d h Sin p -∗
+        ei_fds fdm -∗ ei_copy d F h Rr Sin p -∗
         ((∀ (c S' : bytes), ⌜chunk_ok n Sin c S'⌝ -∗ ⌜c <> []⌝ -∗
-            ei_fds fdm -∗ ei_copy d h S' (p ++ c) -∗ K (RdBytes c))
-         ∧ (ei_fds fdm -∗ ei_copy_end d h p -∗ K (RdBytes []))
+            ei_fds fdm -∗ ei_copy d F h (Rr ++ c) S' (p ++ flt_new F Rr c) -∗ K (RdBytes c))
+         ∧ (ei_fds fdm -∗ ei_copy_end d F h p -∗ K (RdBytes []))
          ∧ (∀ x, ei_taint (dom fdm) -∗ K x)) -∗
         rd_obl N P fd n K;
-    ei_read_copy_end : forall (fdm : fdmap) (fd : Z) (d : nat) (h : bool) (p : bytes) (n : nat)
-                         (K : rd_ans -> iProp Σ),
+    ei_read_copy_end : forall (fdm : fdmap) (fd : Z) (d : nat) (F : pfilter) (h : bool) (p : bytes)
+                         (n : nat) (K : rd_ans -> iProp Σ),
         (0 < n)%nat -> fdm !! fd = Some d -> fd = copy_in ->
-        ei_fds fdm -∗ ei_copy_end d h p -∗
-        ((ei_fds fdm -∗ ei_copy_end d h p -∗ K (RdBytes [])) ∧ (∀ x, ei_taint (dom fdm) -∗ K x)) -∗
+        ei_fds fdm -∗ ei_copy_end d F h p -∗
+        ((ei_fds fdm -∗ ei_copy_end d F h p -∗ K (RdBytes [])) ∧ (∀ x, ei_taint (dom fdm) -∗ K x)) -∗
         rd_obl N P fd n K;
-    (* a write at the copy device, at the filter's output ([ProgTree.
+    (* ...at a HALTED one the input goes on ([ProgTree.cf_read_copy_halt]):
+       a nonempty chunk, or end of file, after which reads answer 0 *)
+    ei_read_copy_halt : forall (fdm : fdmap) (fd : Z) (d : nat) (Sin : bytes) (n : nat)
+                          (K : rd_ans -> iProp Σ),
+        (0 < n)%nat -> fdm !! fd = Some d -> fd = copy_in ->
+        ei_fds fdm -∗ ei_copy_halt d (Some Sin) -∗
+        ((∀ (c S' : bytes), ⌜chunk_ok n Sin c S'⌝ -∗ ⌜c <> []⌝ -∗
+            ei_fds fdm -∗ ei_copy_halt d (Some S') -∗ K (RdBytes c))
+         ∧ (ei_fds fdm -∗ ei_copy_halt d None -∗ K (RdBytes []))
+         ∧ (∀ x, ei_taint (dom fdm) -∗ K x)) -∗
+        rd_obl N P fd n K;
+    ei_read_copy_halt_end : forall (fdm : fdmap) (fd : Z) (d : nat) (n : nat) (K : rd_ans -> iProp Σ),
+        (0 < n)%nat -> fdm !! fd = Some d -> fd = copy_in ->
+        ei_fds fdm -∗ ei_copy_halt d None -∗
+        ((ei_fds fdm -∗ ei_copy_halt d None -∗ K (RdBytes [])) ∧ (∀ x, ei_taint (dom fdm) -∗ K x)) -∗
+        rd_obl N P fd n K;
+    (* a write at the filter device, at the filter's output ([ProgTree.
        copy_out]), drains a prefix of what is pending: the count comes back
        exactly; at a sink that may halt ([h = true]) the payer may instead
-       answer -1 and halt the device *)
-    ei_write_copy : forall (fdm : fdmap) (fd : Z) (d : nat) (Sin p bs : bytes) (K : Z -> iProp Σ),
+       answer -1 and halt the device, which keeps the input's rest *)
+    ei_write_copy : forall (fdm : fdmap) (fd : Z) (d : nat) (F : pfilter) (Rr Sin p bs : bytes)
+                      (K : Z -> iProp Σ),
         bs <> [] -> fdm !! fd = Some d -> fd = copy_out -> bs `prefix_of` p ->
-        ei_fds fdm -∗ ei_copy d false Sin p -∗
-        ((ei_fds fdm -∗ ei_copy d false Sin (drop (length bs) p) -∗ K (Z.of_nat (length bs)))
+        ei_fds fdm -∗ ei_copy d F false Rr Sin p -∗
+        ((ei_fds fdm -∗ ei_copy d F false Rr Sin (drop (length bs) p) -∗ K (Z.of_nat (length bs)))
          ∧ (∀ x, ei_taint (dom fdm) -∗ K x)) -∗
         wr_obl N P fd bs K;
-    ei_write_copy_h : forall (fdm : fdmap) (fd : Z) (d : nat) (Sin p bs : bytes) (K : Z -> iProp Σ),
+    ei_write_copy_h : forall (fdm : fdmap) (fd : Z) (d : nat) (F : pfilter) (Rr Sin p bs : bytes)
+                        (K : Z -> iProp Σ),
         bs <> [] -> fdm !! fd = Some d -> fd = copy_out -> bs `prefix_of` p ->
-        ei_fds fdm -∗ ei_copy d true Sin p -∗
-        ((ei_fds fdm -∗ ei_copy d true Sin (drop (length bs) p) -∗ K (Z.of_nat (length bs)))
-         ∧ (ei_fds fdm -∗ ei_copy_halt d -∗ K (-1))
+        ei_fds fdm -∗ ei_copy d F true Rr Sin p -∗
+        ((ei_fds fdm -∗ ei_copy d F true Rr Sin (drop (length bs) p) -∗ K (Z.of_nat (length bs)))
+         ∧ (ei_fds fdm -∗ ei_copy_halt d (Some Sin) -∗ K (-1))
          ∧ (∀ x, ei_taint (dom fdm) -∗ K x)) -∗
         wr_obl N P fd bs K;
-    ei_write_copy_end : forall (fdm : fdmap) (fd : Z) (d : nat) (p bs : bytes) (K : Z -> iProp Σ),
+    ei_write_copy_end : forall (fdm : fdmap) (fd : Z) (d : nat) (F : pfilter) (p bs : bytes)
+                          (K : Z -> iProp Σ),
         bs <> [] -> fdm !! fd = Some d -> fd = copy_out -> bs `prefix_of` p ->
-        ei_fds fdm -∗ ei_copy_end d false p -∗
-        ((ei_fds fdm -∗ ei_copy_end d false (drop (length bs) p) -∗ K (Z.of_nat (length bs)))
+        ei_fds fdm -∗ ei_copy_end d F false p -∗
+        ((ei_fds fdm -∗ ei_copy_end d F false (drop (length bs) p) -∗ K (Z.of_nat (length bs)))
          ∧ (∀ x, ei_taint (dom fdm) -∗ K x)) -∗
         wr_obl N P fd bs K;
-    ei_write_copy_end_h : forall (fdm : fdmap) (fd : Z) (d : nat) (p bs : bytes) (K : Z -> iProp Σ),
+    ei_write_copy_end_h : forall (fdm : fdmap) (fd : Z) (d : nat) (F : pfilter) (p bs : bytes)
+                            (K : Z -> iProp Σ),
         bs <> [] -> fdm !! fd = Some d -> fd = copy_out -> bs `prefix_of` p ->
-        ei_fds fdm -∗ ei_copy_end d true p -∗
-        ((ei_fds fdm -∗ ei_copy_end d true (drop (length bs) p) -∗ K (Z.of_nat (length bs)))
-         ∧ (ei_fds fdm -∗ ei_copy_halt d -∗ K (-1))
+        ei_fds fdm -∗ ei_copy_end d F true p -∗
+        ((ei_fds fdm -∗ ei_copy_end d F true (drop (length bs) p) -∗ K (Z.of_nat (length bs)))
+         ∧ (ei_fds fdm -∗ ei_copy_halt d None -∗ K (-1))
          ∧ (∀ x, ei_taint (dom fdm) -∗ K x)) -∗
         wr_obl N P fd bs K;
-    ei_write_copy_halt : forall (fdm : fdmap) (fd : Z) (d : nat) (bs : bytes) (K : Z -> iProp Σ),
+    ei_write_copy_halt : forall (fdm : fdmap) (fd : Z) (d : nat) (oS : option bytes) (bs : bytes)
+                           (K : Z -> iProp Σ),
         bs <> [] -> Z.of_nat (length bs) < 2 ^ 31 -> fdm !! fd = Some d -> fd = copy_out ->
-        ei_fds fdm -∗ ei_copy_halt d -∗
-        ((ei_fds fdm -∗ ei_copy_halt d -∗ K (-1)) ∧ (∀ x, ei_taint (dom fdm) -∗ K x)) -∗
+        ei_fds fdm -∗ ei_copy_halt d oS -∗
+        ((ei_fds fdm -∗ ei_copy_halt d oS -∗ K (-1)) ∧ (∀ x, ei_taint (dom fdm) -∗ K x)) -∗
         wr_obl N P fd bs K;
     (* an open of a described, present file: a descriptor the process did
        not hold, bound to a device of the glue's choosing at the content --
@@ -364,8 +387,8 @@ Section UkHandler.
          | DOut alts => ei_out d alts | DOutH alts => ei_outh d alts
          | DOutM cs => ei_outm d cs | DHalt => ei_halt d
          | DIn Sin => ei_in d Sin | DInE Sin => ei_in_e d Sin | DInEnd => ei_in_end d
-         | DCopy h Sin p => ei_copy d h Sin p | DCopyEnd h p => ei_copy_end d h p
-         | DCopyHalt => ei_copy_halt d
+         | DCopy F h Rr Sin p => ei_copy d F h Rr Sin p | DCopyEnd F h p => ei_copy_end d F h p
+         | DCopyHalt oS => ei_copy_halt d oS
          | DProd outs xs ds => ei_prod d outs xs ds | DProdHalt ds => ei_prod_halt d ds
          end) -∗
         ((ei_fds (delete fd fdm) -∗ ei_files files paths -∗ K 0)
@@ -390,8 +413,8 @@ Section UkHandler.
                          | DOut alts => ei_out d alts | DOutH alts => ei_outh d alts
                          | DOutM cs => ei_outm d cs | DHalt => ei_halt d
                          | DIn Sin => ei_in d Sin | DInE Sin => ei_in_e d Sin | DInEnd => ei_in_end d
-                         | DCopy h Sin p => ei_copy d h Sin p | DCopyEnd h p => ei_copy_end d h p
-                         | DCopyHalt => ei_copy_halt d
+                         | DCopy F h Rr Sin p => ei_copy d F h Rr Sin p | DCopyEnd F h p => ei_copy_end d F h p
+                         | DCopyHalt oS => ei_copy_halt d oS
                          | DProd outs xs ds => ei_prod d outs xs ds | DProdHalt ds => ei_prod_halt d ds
                          end) -∗
         ex_obl N P s;
@@ -447,8 +470,8 @@ Section UkHandler.
     | DOut alts => ei_out I d alts | DOutH alts => ei_outh I d alts
     | DOutM cs => ei_outm I d cs | DHalt => ei_halt I d
     | DIn Sin => ei_in I d Sin | DInE Sin => ei_in_e I d Sin | DInEnd => ei_in_end I d
-    | DCopy h Sin p => ei_copy I d h Sin p | DCopyEnd h p => ei_copy_end I d h p
-    | DCopyHalt => ei_copy_halt I d
+    | DCopy F h Rr Sin p => ei_copy I d F h Rr Sin p | DCopyEnd F h p => ei_copy_end I d F h p
+    | DCopyHalt oS => ei_copy_halt I d oS
     | DProd outs xs ds => ei_prod I d outs xs ds | DProdHalt ds => ei_prod_halt I d ds
     end.
 
@@ -645,7 +668,8 @@ Section UkHandler.
         assert (Hin : d ∈ ds) by (apply (Hdom fd); exact Hfd).
         iDestruct (dev_res_take I _ ds d Hin with "Hdev") as "[Hdr Hrest]".
         destruct Hc as [(Sin & Hd & Hk) | [(Sin & Hd & Hk & Hke) | [(Hd & Hk)
-                       | [(Hfd0 & h & Sin & p & Hd & Hk & Hke) | (Hfd0 & h & p & Hd & Hk)]]]]; rewrite Hd.
+                       | [(Hfd0 & F & h & Rr & Sin & p & Hd & Hk & Hke) | [(Hfd0 & F & h & p & Hd & Hk)
+                       | [(Hfd0 & Sin & Hd & Hk & Hke) | (Hfd0 & Hd & Hk)]]]]]]; rewrite Hd.
         * iApply (ei_read I (pe_fd E) fd d Sin n with "Hfds Hdr"); [exact Hn | exact Hfd |].
           iSplit; [| iIntros (x) "Ht"; iApply (cf_inv_taint I _ with "Ht"); apply Hs].
           iIntros (c S') "%Hchunk Hfds Hin'".
@@ -664,21 +688,38 @@ Section UkHandler.
           iIntros "Hfds Hend".
           iApply (cf_inv_move I E ds d DInEnd with "Hfds Hfiles Hend Hrest");
             [exact Hin | by rewrite (env_set_dev_id E d _ Hd) | apply Hs | exact Hdp | exact Hdom].
-        * (* the copy device: a chunk joins the pending bytes, or the writer closed *)
-          iApply (ei_read_copy I (pe_fd E) fd d h Sin p n with "Hfds Hdr");
+        * (* the filter device: a chunk adds what it owes, or the writer closed *)
+          iApply (ei_read_copy I (pe_fd E) fd d F h Rr Sin p n with "Hfds Hdr");
             [exact Hn | exact Hfd | exact Hfd0 |].
           iSplit; [| iSplit; [| iIntros (x) "Ht"; iApply (cf_inv_taint I _ with "Ht"); apply Hs]].
           { iIntros (c S') "%Hchunk %Hne Hfds Hc".
-            iApply (cf_inv_move I E ds d (DCopy h S' (p ++ c)) with "Hfds Hfiles Hc Hrest");
+            iApply (cf_inv_move I E ds d (DCopy F h (Rr ++ c) S' (p ++ flt_new F Rr c))
+                      with "Hfds Hfiles Hc Hrest");
               [exact Hin | by apply Hk | apply Hs | exact Hdp | exact Hdom]. }
           { iIntros "Hfds Hend".
-            iApply (cf_inv_move I E ds d (DCopyEnd h p) with "Hfds Hfiles Hend Hrest");
+            iApply (cf_inv_move I E ds d (DCopyEnd F h p) with "Hfds Hfiles Hend Hrest");
               [exact Hin | exact Hke | apply Hs | exact Hdp | exact Hdom]. }
-        * iApply (ei_read_copy_end I (pe_fd E) fd d h p n with "Hfds Hdr");
+        * iApply (ei_read_copy_end I (pe_fd E) fd d F h p n with "Hfds Hdr");
             [exact Hn | exact Hfd | exact Hfd0 |].
           iSplit; [| iIntros (x) "Ht"; iApply (cf_inv_taint I _ with "Ht"); apply Hs].
           iIntros "Hfds Hend".
-          iApply (cf_inv_move I E ds d (DCopyEnd h p) with "Hfds Hfiles Hend Hrest");
+          iApply (cf_inv_move I E ds d (DCopyEnd F h p) with "Hfds Hfiles Hend Hrest");
+            [exact Hin | by rewrite (env_set_dev_id E d _ Hd) | apply Hs | exact Hdp | exact Hdom].
+        * (* the halted filter device: the input goes on *)
+          iApply (ei_read_copy_halt I (pe_fd E) fd d Sin n with "Hfds Hdr");
+            [exact Hn | exact Hfd | exact Hfd0 |].
+          iSplit; [| iSplit; [| iIntros (x) "Ht"; iApply (cf_inv_taint I _ with "Ht"); apply Hs]].
+          { iIntros (c S') "%Hchunk %Hne Hfds Hc".
+            iApply (cf_inv_move I E ds d (DCopyHalt (Some S')) with "Hfds Hfiles Hc Hrest");
+              [exact Hin | by apply Hk | apply Hs | exact Hdp | exact Hdom]. }
+          { iIntros "Hfds Hend".
+            iApply (cf_inv_move I E ds d (DCopyHalt None) with "Hfds Hfiles Hend Hrest");
+              [exact Hin | exact Hke | apply Hs | exact Hdp | exact Hdom]. }
+        * iApply (ei_read_copy_halt_end I (pe_fd E) fd d n with "Hfds Hdr");
+            [exact Hn | exact Hfd | exact Hfd0 |].
+          iSplit; [| iIntros (x) "Ht"; iApply (cf_inv_taint I _ with "Ht"); apply Hs].
+          iIntros "Hfds Hend".
+          iApply (cf_inv_move I E ds d (DCopyHalt None) with "Hfds Hfiles Hend Hrest");
             [exact Hin | by rewrite (env_set_dev_id E d _ Hd) | apply Hs | exact Hdp | exact Hdom].
       + (* EWrite *)
         destruct Hc as (d & Hfd & Hc).
@@ -689,9 +730,9 @@ Section UkHandler.
                        | [(Hne & alts & a & Hd & Ha & Hpre & Hk & Hkh)
                        | [(Hne & rest & Hd & Hk & Hkm)
                        | [(Hne & Hbnd & Hd & Hk)
-                       | [(Hne & Hfd1 & h & Sin & p & Hd & Hpre & Hk & Hkh)
-                       | [(Hne & Hfd1 & h & p & Hd & Hpre & Hk & Hkh)
-                       | [(Hne & Hbnd & Hfd1 & Hd & Hk)
+                       | [(Hne & Hfd1 & F & h & Rr & Sin & p & Hd & Hpre & Hk & Hkh)
+                       | [(Hne & Hfd1 & F & h & p & Hd & Hpre & Hk & Hkh)
+                       | [(Hne & Hbnd & Hfd1 & oS & Hd & Hk)
                        | [(Hne & Hfd1 & outs & xs & dss & a & Hd & Ha & Hpre & Hk & Hkh)
                        | [(Hne & Hbnd & Hfd1 & dss & Hd & Hk)
                        | [(Hne & Hfd1 & outs & xs & dss & a & Hd & Ha & Hpre & Hk)
@@ -741,43 +782,43 @@ Section UkHandler.
             [exact Hin | by rewrite (env_set_dev_id E d _ Hd) | apply Hs | exact Hdp | exact Hdom].
         * (* the copy device: the count, and at a sink that may halt, -1 *)
           rewrite Hd. destruct h.
-          { iApply (ei_write_copy_h I (pe_fd E) fd d Sin p bs with "Hfds Hdr");
+          { iApply (ei_write_copy_h I (pe_fd E) fd d F Rr Sin p bs with "Hfds Hdr");
               [exact Hne | exact Hfd | exact Hfd1 | exact Hpre |].
             iSplit; [| iSplit; [| iIntros (x) "Ht"; iApply (cf_inv_taint I _ with "Ht"); apply Hs]].
             { iIntros "Hfds Hc".
-              iApply (cf_inv_move I E ds d (DCopy true Sin (drop (length bs) p)) with "Hfds Hfiles Hc Hrest");
+              iApply (cf_inv_move I E ds d (DCopy F true Rr Sin (drop (length bs) p)) with "Hfds Hfiles Hc Hrest");
                 [exact Hin | exact Hk | apply Hs | exact Hdp | exact Hdom]. }
             { iIntros "Hfds Hh".
-              iApply (cf_inv_move I E ds d DCopyHalt with "Hfds Hfiles Hh Hrest");
+              iApply (cf_inv_move I E ds d (DCopyHalt (Some Sin)) with "Hfds Hfiles Hh Hrest");
                 [exact Hin | exact (Hkh eq_refl) | apply Hs | exact Hdp | exact Hdom]. } }
-          { iApply (ei_write_copy I (pe_fd E) fd d Sin p bs with "Hfds Hdr");
+          { iApply (ei_write_copy I (pe_fd E) fd d F Rr Sin p bs with "Hfds Hdr");
               [exact Hne | exact Hfd | exact Hfd1 | exact Hpre |].
             iSplit; [| iIntros (x) "Ht"; iApply (cf_inv_taint I _ with "Ht"); apply Hs].
             iIntros "Hfds Hc".
-            iApply (cf_inv_move I E ds d (DCopy false Sin (drop (length bs) p)) with "Hfds Hfiles Hc Hrest");
+            iApply (cf_inv_move I E ds d (DCopy F false Rr Sin (drop (length bs) p)) with "Hfds Hfiles Hc Hrest");
               [exact Hin | exact Hk | apply Hs | exact Hdp | exact Hdom]. }
         * rewrite Hd. destruct h.
-          { iApply (ei_write_copy_end_h I (pe_fd E) fd d p bs with "Hfds Hdr");
+          { iApply (ei_write_copy_end_h I (pe_fd E) fd d F p bs with "Hfds Hdr");
               [exact Hne | exact Hfd | exact Hfd1 | exact Hpre |].
             iSplit; [| iSplit; [| iIntros (x) "Ht"; iApply (cf_inv_taint I _ with "Ht"); apply Hs]].
             { iIntros "Hfds Hc".
-              iApply (cf_inv_move I E ds d (DCopyEnd true (drop (length bs) p)) with "Hfds Hfiles Hc Hrest");
+              iApply (cf_inv_move I E ds d (DCopyEnd F true (drop (length bs) p)) with "Hfds Hfiles Hc Hrest");
                 [exact Hin | exact Hk | apply Hs | exact Hdp | exact Hdom]. }
             { iIntros "Hfds Hh".
-              iApply (cf_inv_move I E ds d DCopyHalt with "Hfds Hfiles Hh Hrest");
+              iApply (cf_inv_move I E ds d (DCopyHalt None) with "Hfds Hfiles Hh Hrest");
                 [exact Hin | exact (Hkh eq_refl) | apply Hs | exact Hdp | exact Hdom]. } }
-          { iApply (ei_write_copy_end I (pe_fd E) fd d p bs with "Hfds Hdr");
+          { iApply (ei_write_copy_end I (pe_fd E) fd d F p bs with "Hfds Hdr");
               [exact Hne | exact Hfd | exact Hfd1 | exact Hpre |].
             iSplit; [| iIntros (x) "Ht"; iApply (cf_inv_taint I _ with "Ht"); apply Hs].
             iIntros "Hfds Hc".
-            iApply (cf_inv_move I E ds d (DCopyEnd false (drop (length bs) p)) with "Hfds Hfiles Hc Hrest");
+            iApply (cf_inv_move I E ds d (DCopyEnd F false (drop (length bs) p)) with "Hfds Hfiles Hc Hrest");
               [exact Hin | exact Hk | apply Hs | exact Hdp | exact Hdom]. }
         * rewrite Hd.
-          iApply (ei_write_copy_halt I (pe_fd E) fd d bs with "Hfds Hdr");
+          iApply (ei_write_copy_halt I (pe_fd E) fd d oS bs with "Hfds Hdr");
             [exact Hne | exact Hbnd | exact Hfd | exact Hfd1 |].
           iSplit; [| iIntros (x) "Ht"; iApply (cf_inv_taint I _ with "Ht"); apply Hs].
           iIntros "Hfds Hh".
-          iApply (cf_inv_move I E ds d DCopyHalt with "Hfds Hfiles Hh Hrest");
+          iApply (cf_inv_move I E ds d (DCopyHalt oS) with "Hfds Hfiles Hh Hrest");
             [exact Hin | by rewrite (env_set_dev_id E d _ Hd) | apply Hs | exact Hdp | exact Hdom].
         * (* the producer device: an output write *)
           rewrite Hd.

@@ -1623,22 +1623,22 @@ Qed.
 (* a middle cat: copy device at a sink that may halt, the console owing
    nothing or the write diagnostic *)
 Theorem cat_mid_stage_of_exit fc (L S : bytes) files paths (E' : penv) :
-  reach_exit (copy_env (DCopy true S []) [[]; cat_dg_write] files paths) (cat_tree [sb "cat"]) E' ->
-  (E' = copy_env (DCopyEnd true []) [[]; cat_dg_write] files paths
+  reach_exit (copy_env (DCopy flt_id true [] S []) [[]; cat_dg_write] files paths) (cat_tree [sb "cat"]) E' ->
+  (E' = copy_env (DCopyEnd flt_id true []) [[]; cat_dg_write] files paths
    /\ forall D, D `prefix_of` L -> stage_out fc L SMid (MkSO [] (Some (RdEof D)) (Some (WrAll D))))
-  \/ (E' = copy_env DCopyHalt [[]] files paths
+  \/ ((exists S', E' = copy_env (DCopyHalt (Some S')) [[]] files paths)
       /\ forall D, D `prefix_of` L ->
            stage_out fc L SMid (MkSO cat_dg_write (Some RdGone) (Some (WrHalt D)))).
 Proof using.
-  intros Hr. destruct (cat_copy_exits true S _ files paths E' Hr) as [-> | (_ & _ & ->)].
+  intros Hr. destruct (cat_copy_exits true S _ files paths E' Hr) as [-> | (_ & _ & S' & ->)].
   - left. split; [reflexivity |]. intros D HD. apply so_mid_copy. exact HD.
-  - right. split; [reflexivity |]. intros D HD. apply so_mid_halt. exact HD.
+  - right. split; [by exists S' |]. intros D HD. apply so_mid_halt. exact HD.
 Qed.
 
 (* the last cat: copy device at the console, which never halts *)
 Theorem cat_last_stage_of_exit fc (L S : bytes) files paths (E' : penv) :
-  reach_exit (copy_env (DCopy false S []) [[]] files paths) (cat_tree [sb "cat"]) E' ->
-  E' = copy_env (DCopyEnd false []) [[]] files paths
+  reach_exit (copy_env (DCopy flt_id false [] S []) [[]] files paths) (cat_tree [sb "cat"]) E' ->
+  E' = copy_env (DCopyEnd flt_id false []) [[]] files paths
   /\ forall D, D `prefix_of` L -> stage_out fc L SLast (MkSO D (Some (RdEof D)) None).
 Proof using.
   intros Hr. destruct (cat_copy_exits false S _ files paths E' Hr) as [-> | (Hf & _)];

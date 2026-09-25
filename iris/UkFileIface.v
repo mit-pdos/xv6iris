@@ -692,7 +692,7 @@ Section UkFileIface.
     match x with
     | DOut alts => fif_out d alts | DOutH _ => False | DOutM cs => fif_outm d cs
     | DHalt => False | DIn Sin => fif_in d Sin | DInE _ => False | DInEnd => False
-    | DCopy _ _ _ => False | DCopyEnd _ _ => False | DCopyHalt => False
+    | DCopy _ _ _ _ _ => False | DCopyEnd _ _ _ => False | DCopyHalt _ => False
     | DProd _ _ _ => False | DProdHalt _ => False
     end%I.
 
@@ -1643,16 +1643,18 @@ Section UkFileIface.
               qf sf γreg fifRegG0.
     refine (MkEIP (Dp := D0) N P fif_fds fif_out (fun _ _ => False%I) (fun _ => False%I) fif_outm
               fif_in (fun _ _ => False%I) (fun _ => False%I)
-              (fun _ _ _ _ => False%I) (fun _ _ _ => False%I) (fun _ => False%I)
+              (fun _ _ _ _ _ _ => False%I) (fun _ _ _ _ => False%I) (fun _ _ => False%I)
               (fun _ _ _ _ => False%I) (fun _ _ => False%I)
               fif_filesr fif_taint fif_taint_pays
-              fif_write _ fif_write_m _ fif_write_nil fif_read _ _ _ _ _ _ _ _ _ fif_open fif_open_absent
+              fif_write _ fif_write_m _ fif_write_nil fif_read _ _ _ _ _ _ _ _ _ _ _ fif_open fif_open_absent
               fif_close fif_close_shared fif_exit _ _ _ _ _).
     - intros. iIntros "_ []".
     - intros. iIntros "_ []".
     - intros. iIntros "_ []".
     - intros. iIntros "_ []".
-    (* the copy device (design SS3.4f): no copy device in the file application *)
+    (* the filter device (design SS3.4f): no filter device in the file application *)
+    - intros. iIntros "_ []".
+    - intros. iIntros "_ []".
     - intros. iIntros "_ []".
     - intros. iIntros "_ []".
     - intros. iIntros "_ []".

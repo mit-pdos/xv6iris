@@ -12,14 +12,16 @@
 (*   [pse_echo_image_entry]  echo at the head: fd 1 the first pipe's write *)
 (*                           end ([pipe_env (DOutH [L])], device 0 the     *)
 (*                           write end, protected).                        *)
-(*   [pse_mid_image_entry]   a middle cat: [copy_env (DCopy true L [])]    *)
+(*   [pse_mid_image_entry]   a middle cat: [copy_env (DCopy flt_id true    *)
+(*                           [] L [])]                                     *)
 (*                           ([ProgTree.cat_copy_conforms true]): fd 0 the  *)
 (*                           input pipe's read end and fd 1 the output     *)
 (*                           pipe's write end on the copy device (device   *)
 (*                           1, sink [CSPipe]), fd 2 a live console writer *)
 (*                           [PDCon w2 A2] owing [alts2] ([[]] and         *)
 (*                           [cat_dg_write] among them).                   *)
-(*   [pse_last_image_entry]  the last cat: [copy_env (DCopy false L [])],   *)
+(*   [pse_last_image_entry]  the last cat: [copy_env (DCopy flt_id false   *)
+(*                           [] L [])],                                    *)
 (*                           the sink the console writer [CSCon wL] (the   *)
 (*                           content source [L]), fd 2 as above.           *)
 (*                                                                        *)
@@ -346,7 +348,7 @@ Section UkPipesEntries.
                   (fun j : nat => gn (a + j)%nat) sts cw cs pidv Q
                   (own γreg (pns_pool ∅ wv)
                    ∗ pns_copy_lend g LM PV CP v I sR lR L TERM TOK dep γc γm w2 A2 alts2 pin gin sk Q)%I
-                  If (copy_env (DCopy (pns_sink_h sk) L []) alts2 (fun _ => None) [])
+                  If (copy_env (DCopy flt_id (pns_sink_h sk) [] L []) alts2 (fun _ => None) [])
                   {[0%nat; 1%nat]}
                   Hok Hnode Hab Hfdl
                   (cat_copy_conforms (pns_sink_h sk) L alts2 (fun _ => None) [] Hnil Hdg)
@@ -429,7 +431,7 @@ Section UkPipesEntries.
                   (fun j : nat => gn (a + j)%nat) sts cw cs pidv Q
                   (own γreg (pns_pool ∅ wv)
                    ∗ pns_copy_lend_m g LM PV CP v I sR lR L TERM TOK dep γc γm pin gin (CSCon wL) Q)%I
-                  If (copy_env (DCopy false L []) [[]] (fun _ => None) [])
+                  If (copy_env (DCopy flt_id false [] L []) [[]] (fun _ => None) [])
                   {[0%nat; 1%nat]}
                   Hok Hnode Hab Hfdl
                   (cat_copy_conforms false L [[]] (fun _ => None) []

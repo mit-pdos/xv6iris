@@ -705,29 +705,29 @@ Inductive reach_exit : penv -> proc -> penv -> Prop :=
       bs <> [] -> Z.of_nat (length bs) < 2 ^ 31 ->
       pe_fd E !! fd = Some d -> pe_dev E d = DHalt ->
       reach_exit E (k (-1)) E' -> reach_exit E (Vis (EWrite fd bs) k) E'
-  | re_write_copy E fd d h S p bs k E' :
-      bs <> [] -> fd = copy_out -> pe_fd E !! fd = Some d -> pe_dev E d = DCopy h S p ->
+  | re_write_copy E fd d F h Rr S p bs k E' :
+      bs <> [] -> fd = copy_out -> pe_fd E !! fd = Some d -> pe_dev E d = DCopy F h Rr S p ->
       bs `prefix_of` p ->
-      reach_exit (env_set_dev E d (DCopy h S (drop (length bs) p))) (k (Z.of_nat (length bs))) E' ->
+      reach_exit (env_set_dev E d (DCopy F h Rr S (drop (length bs) p))) (k (Z.of_nat (length bs))) E' ->
       reach_exit E (Vis (EWrite fd bs) k) E'
-  | re_write_copy_h E fd d S p bs k E' :
-      bs <> [] -> fd = copy_out -> pe_fd E !! fd = Some d -> pe_dev E d = DCopy true S p ->
+  | re_write_copy_h E fd d F Rr S p bs k E' :
+      bs <> [] -> fd = copy_out -> pe_fd E !! fd = Some d -> pe_dev E d = DCopy F true Rr S p ->
       bs `prefix_of` p ->
-      reach_exit (env_set_dev E d DCopyHalt) (k (-1)) E' ->
+      reach_exit (env_set_dev E d (DCopyHalt (Some S))) (k (-1)) E' ->
       reach_exit E (Vis (EWrite fd bs) k) E'
-  | re_write_copy_end E fd d h p bs k E' :
-      bs <> [] -> fd = copy_out -> pe_fd E !! fd = Some d -> pe_dev E d = DCopyEnd h p ->
+  | re_write_copy_end E fd d F h p bs k E' :
+      bs <> [] -> fd = copy_out -> pe_fd E !! fd = Some d -> pe_dev E d = DCopyEnd F h p ->
       bs `prefix_of` p ->
-      reach_exit (env_set_dev E d (DCopyEnd h (drop (length bs) p))) (k (Z.of_nat (length bs))) E' ->
+      reach_exit (env_set_dev E d (DCopyEnd F h (drop (length bs) p))) (k (Z.of_nat (length bs))) E' ->
       reach_exit E (Vis (EWrite fd bs) k) E'
-  | re_write_copy_end_h E fd d p bs k E' :
-      bs <> [] -> fd = copy_out -> pe_fd E !! fd = Some d -> pe_dev E d = DCopyEnd true p ->
+  | re_write_copy_end_h E fd d F p bs k E' :
+      bs <> [] -> fd = copy_out -> pe_fd E !! fd = Some d -> pe_dev E d = DCopyEnd F true p ->
       bs `prefix_of` p ->
-      reach_exit (env_set_dev E d DCopyHalt) (k (-1)) E' ->
+      reach_exit (env_set_dev E d (DCopyHalt None)) (k (-1)) E' ->
       reach_exit E (Vis (EWrite fd bs) k) E'
-  | re_write_copy_halt E fd d bs k E' :
+  | re_write_copy_halt E fd d oS bs k E' :
       bs <> [] -> Z.of_nat (length bs) < 2 ^ 31 -> fd = copy_out ->
-      pe_fd E !! fd = Some d -> pe_dev E d = DCopyHalt ->
+      pe_fd E !! fd = Some d -> pe_dev E d = DCopyHalt oS ->
       reach_exit E (k (-1)) E' -> reach_exit E (Vis (EWrite fd bs) k) E'
   | re_read E fd d S n c S' k E' :
       (0 < n)%nat -> pe_fd E !! fd = Some d -> pe_dev E d = DIn S ->
@@ -747,17 +747,30 @@ Inductive reach_exit : penv -> proc -> penv -> Prop :=
       (0 < n)%nat -> pe_fd E !! fd = Some d -> pe_dev E d = DInEnd ->
       reach_exit E (k (RdBytes [])) E' ->
       reach_exit E (Vis (ERead fd n) k) E'
-  | re_read_copy E fd d h S p n c S' k E' :
-      (0 < n)%nat -> fd = copy_in -> pe_fd E !! fd = Some d -> pe_dev E d = DCopy h S p ->
+  | re_read_copy E fd d F h Rr S p n c S' k E' :
+      (0 < n)%nat -> fd = copy_in -> pe_fd E !! fd = Some d -> pe_dev E d = DCopy F h Rr S p ->
       chunk_ok n S c S' -> c <> [] ->
-      reach_exit (env_set_dev E d (DCopy h S' (p ++ c))) (k (RdBytes c)) E' ->
+      reach_exit (env_set_dev E d (DCopy F h (Rr ++ c) S' (p ++ flt_new F Rr c))) (k (RdBytes c)) E' ->
       reach_exit E (Vis (ERead fd n) k) E'
-  | re_read_copy_eof E fd d h S p n k E' :
-      (0 < n)%nat -> fd = copy_in -> pe_fd E !! fd = Some d -> pe_dev E d = DCopy h S p ->
-      reach_exit (env_set_dev E d (DCopyEnd h p)) (k (RdBytes [])) E' ->
+  | re_read_copy_eof E fd d F h Rr S p n k E' :
+      (0 < n)%nat -> fd = copy_in -> pe_fd E !! fd = Some d -> pe_dev E d = DCopy F h Rr S p ->
+      reach_exit (env_set_dev E d (DCopyEnd F h p)) (k (RdBytes [])) E' ->
       reach_exit E (Vis (ERead fd n) k) E'
-  | re_read_copy_end E fd d h p n k E' :
-      (0 < n)%nat -> fd = copy_in -> pe_fd E !! fd = Some d -> pe_dev E d = DCopyEnd h p ->
+  | re_read_copy_end E fd d F h p n k E' :
+      (0 < n)%nat -> fd = copy_in -> pe_fd E !! fd = Some d -> pe_dev E d = DCopyEnd F h p ->
+      reach_exit E (k (RdBytes [])) E' ->
+      reach_exit E (Vis (ERead fd n) k) E'
+  | re_read_copy_halt E fd d S n c S' k E' :
+      (0 < n)%nat -> fd = copy_in -> pe_fd E !! fd = Some d -> pe_dev E d = DCopyHalt (Some S) ->
+      chunk_ok n S c S' -> c <> [] ->
+      reach_exit (env_set_dev E d (DCopyHalt (Some S'))) (k (RdBytes c)) E' ->
+      reach_exit E (Vis (ERead fd n) k) E'
+  | re_read_copy_halt_eof E fd d S n k E' :
+      (0 < n)%nat -> fd = copy_in -> pe_fd E !! fd = Some d -> pe_dev E d = DCopyHalt (Some S) ->
+      reach_exit (env_set_dev E d (DCopyHalt None)) (k (RdBytes [])) E' ->
+      reach_exit E (Vis (ERead fd n) k) E'
+  | re_read_copy_halt_end E fd d n k E' :
+      (0 < n)%nat -> fd = copy_in -> pe_fd E !! fd = Some d -> pe_dev E d = DCopyHalt None ->
       reach_exit E (k (RdBytes [])) E' ->
       reach_exit E (Vis (ERead fd n) k) E'
   | re_open_present E p content fd d k E' :
@@ -807,13 +820,13 @@ Definition re_step (P : penv -> Prop) (R : penv -> proc -> Prop) (E : penv) (t :
                 R (env_set_dev E d (DOutM rest)) (k (Z.of_nat (length bs)))
                 /\ R (env_set_dev E d (DOutM rest)) (k (-1)))
           /\ (bs <> [] -> Z.of_nat (length bs) < 2 ^ 31 -> pe_dev E d = DHalt -> R E (k (-1)))
-          /\ (forall h S p, bs <> [] -> fd = copy_out -> pe_dev E d = DCopy h S p -> bs `prefix_of` p ->
-                R (env_set_dev E d (DCopy h S (drop (length bs) p))) (k (Z.of_nat (length bs)))
-                /\ (h = true -> R (env_set_dev E d DCopyHalt) (k (-1))))
-          /\ (forall h p, bs <> [] -> fd = copy_out -> pe_dev E d = DCopyEnd h p -> bs `prefix_of` p ->
-                R (env_set_dev E d (DCopyEnd h (drop (length bs) p))) (k (Z.of_nat (length bs)))
-                /\ (h = true -> R (env_set_dev E d DCopyHalt) (k (-1))))
-          /\ (bs <> [] -> Z.of_nat (length bs) < 2 ^ 31 -> fd = copy_out -> pe_dev E d = DCopyHalt ->
+          /\ (forall F h Rr S p, bs <> [] -> fd = copy_out -> pe_dev E d = DCopy F h Rr S p -> bs `prefix_of` p ->
+                R (env_set_dev E d (DCopy F h Rr S (drop (length bs) p))) (k (Z.of_nat (length bs)))
+                /\ (h = true -> R (env_set_dev E d (DCopyHalt (Some S))) (k (-1))))
+          /\ (forall F h p, bs <> [] -> fd = copy_out -> pe_dev E d = DCopyEnd F h p -> bs `prefix_of` p ->
+                R (env_set_dev E d (DCopyEnd F h (drop (length bs) p))) (k (Z.of_nat (length bs)))
+                /\ (h = true -> R (env_set_dev E d (DCopyHalt None)) (k (-1))))
+          /\ (forall oS, bs <> [] -> Z.of_nat (length bs) < 2 ^ 31 -> fd = copy_out -> pe_dev E d = DCopyHalt oS ->
                 R E (k (-1)))
       | ERead fd n => fun k =>
           forall d, pe_fd E !! fd = Some d -> (0 < n)%nat ->
@@ -823,11 +836,16 @@ Definition re_step (P : penv -> Prop) (R : penv -> proc -> Prop) (E : penv) (t :
                 (forall c S', chunk_ok n S c S' -> R (env_set_dev E d (DInE S')) (k (RdBytes c)))
                 /\ R (env_set_dev E d DInEnd) (k (RdBytes [])))
           /\ (pe_dev E d = DInEnd -> R E (k (RdBytes [])))
-          /\ (forall h S p, fd = copy_in -> pe_dev E d = DCopy h S p ->
+          /\ (forall F h Rr S p, fd = copy_in -> pe_dev E d = DCopy F h Rr S p ->
                 (forall c S', chunk_ok n S c S' -> c <> [] ->
-                   R (env_set_dev E d (DCopy h S' (p ++ c))) (k (RdBytes c)))
-                /\ R (env_set_dev E d (DCopyEnd h p)) (k (RdBytes [])))
-          /\ (forall h p, fd = copy_in -> pe_dev E d = DCopyEnd h p -> R E (k (RdBytes [])))
+                   R (env_set_dev E d (DCopy F h (Rr ++ c) S' (p ++ flt_new F Rr c))) (k (RdBytes c)))
+                /\ R (env_set_dev E d (DCopyEnd F h p)) (k (RdBytes [])))
+          /\ (forall F h p, fd = copy_in -> pe_dev E d = DCopyEnd F h p -> R E (k (RdBytes [])))
+          /\ (forall S, fd = copy_in -> pe_dev E d = DCopyHalt (Some S) ->
+                (forall c S', chunk_ok n S c S' -> c <> [] ->
+                   R (env_set_dev E d (DCopyHalt (Some S'))) (k (RdBytes c)))
+                /\ R (env_set_dev E d (DCopyHalt None)) (k (RdBytes [])))
+          /\ (fd = copy_in -> pe_dev E d = DCopyHalt None -> R E (k (RdBytes [])))
       | EOpen p m => fun k =>
           p ∈ pe_paths E ->
           (forall content, m = 0 -> pe_files E p = Some content ->
@@ -858,18 +876,21 @@ Proof using.
     | E fd d alts a bs k E' Hne Hfd Hd Ha Hp Hr IH
     | E fd d rest bs k x E' Hne Hfd Hd Hx Hr IH
     | E fd d bs k E' Hne Hlt Hfd Hd Hr IH
-    | E fd d h S p bs k E' Hne Hco Hfd Hd Hp Hr IH
-    | E fd d S p bs k E' Hne Hco Hfd Hd Hp Hr IH
-    | E fd d h p bs k E' Hne Hco Hfd Hd Hp Hr IH
-    | E fd d p bs k E' Hne Hco Hfd Hd Hp Hr IH
-    | E fd d bs k E' Hne Hlt Hco Hfd Hd Hr IH
+    | E fd d F h Rr S p bs k E' Hne Hco Hfd Hd Hp Hr IH
+    | E fd d F Rr S p bs k E' Hne Hco Hfd Hd Hp Hr IH
+    | E fd d F h p bs k E' Hne Hco Hfd Hd Hp Hr IH
+    | E fd d F p bs k E' Hne Hco Hfd Hd Hp Hr IH
+    | E fd d oS bs k E' Hne Hlt Hco Hfd Hd Hr IH
     | E fd d S n c S' k E' Hn Hfd Hd Hc Hr IH
     | E fd d S n c S' k E' Hn Hfd Hd Hc Hr IH
     | E fd d S n k E' Hn Hfd Hd Hr IH
     | E fd d n k E' Hn Hfd Hd Hr IH
-    | E fd d h S p n c S' k E' Hn Hci Hfd Hd Hc Hcne Hr IH
-    | E fd d h S p n k E' Hn Hci Hfd Hd Hr IH
-    | E fd d h p n k E' Hn Hci Hfd Hd Hr IH
+    | E fd d F h Rr S p n c S' k E' Hn Hci Hfd Hd Hc Hcne Hr IH
+    | E fd d F h Rr S p n k E' Hn Hci Hfd Hd Hr IH
+    | E fd d F h p n k E' Hn Hci Hfd Hd Hr IH
+    | E fd d S n c S' k E' Hn Hci Hfd Hd Hc Hcne Hr IH
+    | E fd d S n k E' Hn Hci Hfd Hd Hr IH
+    | E fd d n k E' Hn Hci Hfd Hd Hr IH
     | E p content fd d k E' Hp Hf Hfd0 Hfd Hfr Hr IH
     | E p content k E' Hp Hf Hr IH
     | E p m k E' Hp Hm Hf Hr IH
@@ -885,18 +906,21 @@ Proof using.
   - destruct (HI d Hfd) as (_ & _ & _ & H & _). destruct (H rest Hne Hd) as [H1 H2].
     destruct Hx as [-> | ->]; [exact (IH H1) | exact (IH H2)].
   - destruct (HI d Hfd) as (_ & _ & _ & _ & H & _). exact (IH (H Hne Hlt Hd)).
-  - destruct (HI d Hfd) as (_ & _ & _ & _ & _ & H & _). exact (IH (proj1 (H h S p Hne Hco Hd Hp))).
-  - destruct (HI d Hfd) as (_ & _ & _ & _ & _ & H & _). exact (IH (proj2 (H true S p Hne Hco Hd Hp) eq_refl)).
-  - destruct (HI d Hfd) as (_ & _ & _ & _ & _ & _ & H & _). exact (IH (proj1 (H h p Hne Hco Hd Hp))).
-  - destruct (HI d Hfd) as (_ & _ & _ & _ & _ & _ & H & _). exact (IH (proj2 (H true p Hne Hco Hd Hp) eq_refl)).
-  - destruct (HI d Hfd) as (_ & _ & _ & _ & _ & _ & _ & H). exact (IH (H Hne Hlt Hco Hd)).
+  - destruct (HI d Hfd) as (_ & _ & _ & _ & _ & H & _). exact (IH (proj1 (H F h Rr S p Hne Hco Hd Hp))).
+  - destruct (HI d Hfd) as (_ & _ & _ & _ & _ & H & _). exact (IH (proj2 (H F true Rr S p Hne Hco Hd Hp) eq_refl)).
+  - destruct (HI d Hfd) as (_ & _ & _ & _ & _ & _ & H & _). exact (IH (proj1 (H F h p Hne Hco Hd Hp))).
+  - destruct (HI d Hfd) as (_ & _ & _ & _ & _ & _ & H & _). exact (IH (proj2 (H F true p Hne Hco Hd Hp) eq_refl)).
+  - destruct (HI d Hfd) as (_ & _ & _ & _ & _ & _ & _ & H). exact (IH (H oS Hne Hlt Hco Hd)).
   - destruct (HI d Hfd Hn) as (H & _). exact (IH (H S c S' Hd Hc)).
   - destruct (HI d Hfd Hn) as (_ & H & _). exact (IH (proj1 (H S Hd) c S' Hc)).
   - destruct (HI d Hfd Hn) as (_ & H & _). exact (IH (proj2 (H S Hd))).
   - destruct (HI d Hfd Hn) as (_ & _ & H & _). exact (IH (H Hd)).
-  - destruct (HI d Hfd Hn) as (_ & _ & _ & H & _). exact (IH (proj1 (H h S p Hci Hd) c S' Hc Hcne)).
-  - destruct (HI d Hfd Hn) as (_ & _ & _ & H & _). exact (IH (proj2 (H h S p Hci Hd))).
-  - destruct (HI d Hfd Hn) as (_ & _ & _ & _ & H). exact (IH (H h p Hci Hd)).
+  - destruct (HI d Hfd Hn) as (_ & _ & _ & H & _). exact (IH (proj1 (H F h Rr S p Hci Hd) c S' Hc Hcne)).
+  - destruct (HI d Hfd Hn) as (_ & _ & _ & H & _). exact (IH (proj2 (H F h Rr S p Hci Hd))).
+  - destruct (HI d Hfd Hn) as (_ & _ & _ & _ & H & _). exact (IH (H F h p Hci Hd)).
+  - destruct (HI d Hfd Hn) as (_ & _ & _ & _ & _ & H & _). exact (IH (proj1 (H S Hci Hd) c S' Hc Hcne)).
+  - destruct (HI d Hfd Hn) as (_ & _ & _ & _ & _ & H & _). exact (IH (proj2 (H S Hci Hd))).
+  - destruct (HI d Hfd Hn) as (_ & _ & _ & _ & _ & _ & H). exact (IH (H Hci Hd)).
   - destruct (HI Hp) as [H _]. exact (IH (proj1 (H content eq_refl Hf) fd d Hfd0 Hfd Hfr)).
   - destruct (HI Hp) as [H _]. exact (IH (proj2 (H content eq_refl Hf))).
   - destruct (HI Hp) as [_ H]. exact (IH (H Hm Hf)).
@@ -1064,30 +1088,31 @@ Definition cc_wr_tree (bs : bytes) : proc :=
     else write_bytes 2 cat_dg_write (exit_ 1)).
 
 Inductive cc_st (h : bool) (alts : list bytes) files paths : penv -> proc -> Prop :=
-  | cc_loop S : cc_st h alts files paths (copy_env (DCopy h S []) alts files paths) (cat_loop 0 (exit_ 0))
-  | cc_tau S : cc_st h alts files paths (copy_env (DCopy h S []) alts files paths) (Tau (cat_loop 0 (exit_ 0)))
-  | cc_wr S bs : bs <> [] ->
-      cc_st h alts files paths (copy_env (DCopy h S bs) alts files paths) (cc_wr_tree bs)
-  | cc_end : cc_st h alts files paths (copy_env (DCopyEnd h []) alts files paths) (exit_ 0)
-  | cc_dg w r A : h = true -> w ++ r = cat_dg_write -> dev_after alts w A ->
-      cc_st h alts files paths (copy_env DCopyHalt A files paths) (write_bytes 2 r (exit_ 1)).
+  | cc_loop R S : cc_st h alts files paths (copy_env (DCopy flt_id h R S []) alts files paths) (cat_loop 0 (exit_ 0))
+  | cc_tau R S : cc_st h alts files paths (copy_env (DCopy flt_id h R S []) alts files paths) (Tau (cat_loop 0 (exit_ 0)))
+  | cc_wr R S bs : bs <> [] ->
+      cc_st h alts files paths (copy_env (DCopy flt_id h R S bs) alts files paths) (cc_wr_tree bs)
+  | cc_end : cc_st h alts files paths (copy_env (DCopyEnd flt_id h []) alts files paths) (exit_ 0)
+  | cc_dg S w r A : h = true -> w ++ r = cat_dg_write -> dev_after alts w A ->
+      cc_st h alts files paths (copy_env (DCopyHalt (Some S)) A files paths) (write_bytes 2 r (exit_ 1)).
 
 Definition copy_exit (h : bool) (alts : list bytes) files paths (E' : penv) : Prop :=
-  E' = copy_env (DCopyEnd h []) alts files paths
-  \/ (h = true /\ cat_dg_write ∈ alts /\ E' = copy_env DCopyHalt [[]] files paths).
+  E' = copy_env (DCopyEnd flt_id h []) alts files paths
+  \/ (h = true /\ cat_dg_write ∈ alts
+      /\ exists S, E' = copy_env (DCopyHalt (Some S)) [[]] files paths).
 
 Lemma cc_st_closed (h : bool) (alts : list bytes) files paths (E : penv) (t : proc) :
   cc_st h alts files paths E t -> re_step (copy_exit h alts files paths) (cc_st h alts files paths) E t.
 Proof using.
-  intros Hst. destruct Hst as [S | S | S bs Hbs | | w r A Hh Hwr Hw].
+  intros Hst. destruct Hst as [R S | R S | R S bs Hbs | | S w r A Hh Hwr Hw].
   - (* the read *)
     rewrite cat_loop_unfold. cbn [re_step]. intros d Hd _.
     rewrite copy_env_fd0 in Hd. injection Hd as <-. rewrite copy_env_dev1.
     split; [intros; discriminate |]. split; [intros; discriminate |].
-    split; [intros; discriminate |]. split; [| intros; discriminate].
-    intros h' S' p _ Heq. injection Heq as <- <- <-. split.
+    split; [intros; discriminate |]. split; [| repeat split; intros; discriminate].
+    intros F' h' R' S' p _ Heq. injection Heq as <- <- <- <- <-. split.
     + intros c S'' _ Hc. rewrite copy_env_set. destruct c as [| b c']; [done |].
-      apply (cc_wr h alts files paths S'' (b :: c')). discriminate.
+      apply (cc_wr h alts files paths (R ++ b :: c') S'' (b :: c')). discriminate.
     + rewrite copy_env_set. apply cc_end.
   - cbn [re_step]. apply cc_loop.
   - (* the write of what was read *)
@@ -1096,36 +1121,38 @@ Proof using.
     split; [intros Hn; exfalso; exact (Hbs Hn) |].
     do 4 (split; [intros; discriminate |]).
     split; [| repeat split; intros; discriminate].
-    intros h' S' p _ _ Heq _. injection Heq as <- <- <-. split.
+    intros F' h' R' S' p _ _ Heq _. injection Heq as <- <- <- <- <-. split.
     + rewrite drop_all, copy_env_set. rewrite decide_True; [| reflexivity]. apply cc_tau.
     + intros Hh. rewrite copy_env_set. rewrite decide_False; [| lia].
-      apply (cc_dg h alts files paths [] cat_dg_write alts Hh); [reflexivity | apply dev_after_nil].
+      apply (cc_dg h alts files paths S [] cat_dg_write alts Hh); [reflexivity | apply dev_after_nil].
   - cbn [exit_ re_step]. intros _. unfold copy_exit. by left.
-  - apply (diag_step _ _ (fun A => copy_env DCopyHalt A files paths) alts cat_dg_write w r A 1).
+  - apply (diag_step _ _ (fun A => copy_env (DCopyHalt (Some S)) A files paths) alts cat_dg_write w r A 1).
     + intros A'. apply copy_env_fd2.
     + intros A'. apply copy_env_dev0.
     + intros A' A''. apply copy_env_out.
-    + intros w' r' A' Hwr' Hw'. exact (cc_dg h alts files paths w' r' A' Hh Hwr' Hw').
+    + intros w' r' A' Hwr' Hw'. exact (cc_dg h alts files paths S w' r' A' Hh Hwr' Hw').
     + intros A' HA' Hdr. specialize (Hdr 0%nat). cbv beta in Hdr |- *.
       change (drained (DOut A')) in Hdr.
       destruct (dev_after_done _ _ _ HA' cat_dg_write_ne Hdr) as [Hin ->].
-      unfold copy_exit. right. split; [exact Hh |]. split; [exact Hin | reflexivity].
+      unfold copy_exit. right. split; [exact Hh |]. split; [exact Hin | by exists S].
     + exact Hwr.
     + exact Hw.
 Qed.
 
-(* cat at the copy device exits having read its input to the end and
-   written all of it, the console untouched; or (the sink may halt) with
-   the sink halted and exactly the write diagnostic on the console *)
+(* cat at the filter device ([flt_id]) exits having read its input to the
+   end and written all of it, the console untouched; or (the sink may
+   halt) with the sink halted -- the input not read on -- and exactly the
+   write diagnostic on the console *)
 Theorem cat_copy_exits (h : bool) (L : bytes) (alts : list bytes) files paths (E' : penv) :
-  reach_exit (copy_env (DCopy h L []) alts files paths) (cat_tree [sb "cat"]) E' ->
-  E' = copy_env (DCopyEnd h []) alts files paths
-  \/ (h = true /\ cat_dg_write ∈ alts /\ E' = copy_env DCopyHalt [[]] files paths).
+  reach_exit (copy_env (DCopy flt_id h [] L []) alts files paths) (cat_tree [sb "cat"]) E' ->
+  E' = copy_env (DCopyEnd flt_id h []) alts files paths
+  \/ (h = true /\ cat_dg_write ∈ alts
+      /\ exists S, E' = copy_env (DCopyHalt (Some S)) [[]] files paths).
 Proof using.
   intros Hr.
   apply (reach_exit_inv (copy_exit h alts files paths) (cc_st h alts files paths)
            (cc_st_closed h alts files paths) _ _ _ Hr).
-  exact (cc_loop h alts files paths L).
+  exact (cc_loop h alts files paths [] L).
 Qed.
 
 (* ---- cat f at a pipe's write end --------------------------------------- *)
@@ -1298,19 +1325,19 @@ Qed.
    about an empty relation *)
 Example reach_copy_good (b : bv 8) (alts : list bytes) files paths :
   [] ∈ alts ->
-  reach_exit (copy_env (DCopy false [b] []) alts files paths) (cat_tree [sb "cat"])
-             (copy_env (DCopyEnd false []) alts files paths).
+  reach_exit (copy_env (DCopy flt_id false [] [b] []) alts files paths) (cat_tree [sb "cat"])
+             (copy_env (DCopyEnd flt_id false []) alts files paths).
 Proof using.
   intros Hnil. cbn [cat_tree drop]. rewrite cat_loop_unfold.
-  eapply (re_read_copy _ 0 1%nat false [b] [] cat_bufsz [b] []);
+  eapply (re_read_copy _ 0 1%nat flt_id false [] [b] [] cat_bufsz [b] []);
     [unfold cat_bufsz; lia | reflexivity | apply copy_env_fd0 | reflexivity
     | split; [reflexivity | split; [unfold cat_bufsz; simpl; lia | intros Hn; exact Hn]] | discriminate |].
   rewrite copy_env_set. cbv beta iota.
-  eapply (re_write_copy _ 1 1%nat false [] [b] [b]);
+  eapply (re_write_copy _ 1 1%nat flt_id false [b] [] [b] [b]);
     [discriminate | reflexivity | apply copy_env_fd1 | reflexivity | exists []; reflexivity |].
   rewrite drop_all, copy_env_set. cbv beta. rewrite decide_True; [| reflexivity].
   apply re_tau. rewrite cat_loop_unfold.
-  eapply (re_read_copy_eof _ 0 1%nat false [] [] cat_bufsz);
+  eapply (re_read_copy_eof _ 0 1%nat flt_id false [b] [] [] cat_bufsz);
     [unfold cat_bufsz; lia | reflexivity | apply copy_env_fd0 | reflexivity |].
   rewrite copy_env_set. cbv beta iota.
   apply re_exit. intros d. cbn [pe_dev copy_env].
@@ -1319,21 +1346,21 @@ Proof using.
 Qed.
 
 Example reach_copy_halt (b : bv 8) files paths :
-  reach_exit (copy_env (DCopy true [b] []) [[]; cat_dg_write] files paths) (cat_tree [sb "cat"])
-             (copy_env DCopyHalt [[]] files paths).
+  reach_exit (copy_env (DCopy flt_id true [] [b] []) [[]; cat_dg_write] files paths) (cat_tree [sb "cat"])
+             (copy_env (DCopyHalt (Some [])) [[]] files paths).
 Proof using.
   cbn [cat_tree drop]. rewrite cat_loop_unfold.
-  eapply (re_read_copy _ 0 1%nat true [b] [] cat_bufsz [b] []);
+  eapply (re_read_copy _ 0 1%nat flt_id true [] [b] [] cat_bufsz [b] []);
     [unfold cat_bufsz; lia | reflexivity | apply copy_env_fd0 | reflexivity
     | split; [reflexivity | split; [unfold cat_bufsz; simpl; lia | intros Hn; exact Hn]] | discriminate |].
   rewrite copy_env_set. cbv beta iota.
-  eapply (re_write_copy_h _ 1 1%nat [] [b] [b]);
+  eapply (re_write_copy_h _ 1 1%nat flt_id [b] [] [b] [b]);
     [discriminate | reflexivity | apply copy_env_fd1 | reflexivity | exists []; reflexivity |].
   rewrite copy_env_set. cbv beta. rewrite decide_False; [| lia].
   (* the diagnostic, one byte at a time, each on the one alternative *)
   assert (forall w r, w ++ r = cat_dg_write -> w <> [] ->
-            reach_exit (copy_env DCopyHalt [r] files paths) (write_bytes 2 r (exit_ 1))
-                       (copy_env DCopyHalt [[]] files paths)) as Hrun.
+            reach_exit (copy_env (DCopyHalt (Some [])) [r] files paths) (write_bytes 2 r (exit_ 1))
+                       (copy_env (DCopyHalt (Some [])) [[]] files paths)) as Hrun.
   { intros w r. revert w. induction r as [| x r IH]; intros w Hwr Hw.
     - cbn [write_bytes exit_]. apply re_exit. intros d. cbn [pe_dev copy_env].
       destruct (decide (d = 0%nat)); [by left |].
