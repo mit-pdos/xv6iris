@@ -123,11 +123,12 @@ Lemma ustep_noc (s : fstate) (l : uline) :
 Proof using.
   change (lm_step ulmG) with ustep. change (lm_dec ulmG) with ualt_dec.
   change (lmh_noc ulmG_hooks) with unoc.
-  destruct l as [ws | ws Nf | Nf | p n]; cbn [unoc].
+  destruct l as [ws | ws Nf | Nf | p n | ws]; cbn [unoc].
   - rewrite ualt_dec_R. exact (UShFileRedir.fsm_fnoc s (LEcho ws)).
   - rewrite ualt_dec_R. exact (UShFileRedir.fsm_fnoc s (LEchoF ws Nf)).
   - rewrite ualt_dec_R. exact (UShFileRedir.fsm_fnoc s (LCat Nf)).
   - rewrite ualt_dec_code. by destruct p.
+  - rewrite ualt_dec_R. exact (UShFileRedir.fsm_fnoc s (LSecc ws)).
 Qed.
 
 (* a panic alternative moves no file, at every line *)
@@ -135,7 +136,8 @@ Lemma ustep_panic (s : fstate) (l : uline) (a : lm_alt U) :
   lm_panic U a = true -> lm_step U s l a = s.
 Proof using.
   change (lm_step ulmG) with ustep. change (lm_panic ulmG) with upanic.
-  destruct a as [r | x | x]; cbn [upanic ustep]; [| intros _; reflexivity | intros _; reflexivity].
+  destruct a as [r | x | x | u]; cbn [upanic ustep];
+    [| intros _; reflexivity | intros _; reflexivity | intros _; reflexivity].
   intros Hp. exact (UShFileRedir.fsm_panic s l r Hp).
 Qed.
 

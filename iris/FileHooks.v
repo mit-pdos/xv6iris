@@ -91,6 +91,8 @@ Definition fpan_of (l : uline) : nat :=
   (* the DEAD arm: [FileDisc.ralt_ok] gives [LPipe] exactly [LCat]'s five,
      so all four of this file's per-line choices are [LCat]'s verbatim *)
   | LPipe _ _ => ralt_enc RCFork
+  (* a [seccomp] line: the shell's own fork panic *)
+  | LSecc _ => ralt_enc RCFork
   end.
 
 Definition fexf_of (l : uline) : nat :=
@@ -99,6 +101,7 @@ Definition fexf_of (l : uline) : nat :=
   | LEchoF _ _ => ralt_enc RFExec
   | LCat _ => ralt_enc RCExec
   | LPipe _ _ => ralt_enc RCExec
+  | LSecc _ => ralt_enc RSExec
   end.
 
 (* ...and the bytes the exec-failed child prints, per line *)
@@ -108,6 +111,7 @@ Definition fexfb (l : uline) : list (bv 8) :=
   | LEchoF _ _ => alt_execfail
   | LCat _ => alt_execcat
   | LPipe _ _ => alt_execcat
+  | LSecc _ => alt_execsecc
   end.
 
 Definition fnoc : nat := ralt_enc RFSilent.
@@ -159,27 +163,30 @@ Definition faprs (I : list (bv 8)) (a : nat) : Prop :=
 (* ---- the two PER-LINE alternatives, and the "nobody chose" one ---- *)
 Lemma fpan_of_ok (l : uline) : ralt_ok l (ralt_dec (fpan_of l)).
 Proof using.
-  destruct l as [ws | ws N | N | ws npc]; cbn [fpan_of].
+  destruct l as [ws | ws N | N | ws npc | ws]; cbn [fpan_of].
   - rewrite (ralt_dec_lt4 3%nat ltac:(lia)) /ralt_ok. lia.
   - by rewrite (ralt_dec_enc RFFork).
+  - by rewrite (ralt_dec_enc RCFork).
   - by rewrite (ralt_dec_enc RCFork).
   - by rewrite (ralt_dec_enc RCFork).
 Qed.
 
 Lemma fpan_of_free (l : uline) : fstate_free (ralt_dec (fpan_of l)) = true.
 Proof using.
-  destruct l as [ws | ws N | N | ws npc]; cbn [fpan_of].
+  destruct l as [ws | ws N | N | ws npc | ws]; cbn [fpan_of].
   - by rewrite (ralt_dec_lt4 3%nat ltac:(lia)).
   - by rewrite (ralt_dec_enc RFFork).
+  - by rewrite (ralt_dec_enc RCFork).
   - by rewrite (ralt_dec_enc RCFork).
   - by rewrite (ralt_dec_enc RCFork).
 Qed.
 
 Lemma fpan_of_panic (l : uline) : ralt_panic (ralt_dec (fpan_of l)) = true.
 Proof using.
-  destruct l as [ws | ws N | N | ws npc]; cbn [fpan_of].
+  destruct l as [ws | ws N | N | ws npc | ws]; cbn [fpan_of].
   - rewrite (ralt_dec_lt4 3%nat ltac:(lia)). by vm_compute.
   - by rewrite (ralt_dec_enc RFFork).
+  - by rewrite (ralt_dec_enc RCFork).
   - by rewrite (ralt_dec_enc RCFork).
   - by rewrite (ralt_dec_enc RCFork).
 Qed.
@@ -187,10 +194,11 @@ Qed.
 Lemma cont_fpan (s : fstate) (l : uline) :
   cont s l (ralt_dec (fpan_of l)) = alt_panic.
 Proof using.
-  destruct l as [ws | ws N | N | ws npc]; cbn [fpan_of].
+  destruct l as [ws | ws N | N | ws npc | ws]; cbn [fpan_of].
   - rewrite (ralt_dec_lt4 3%nat ltac:(lia)). cbn [cont uline_ws].
     exact (line_alts_of_3 ws).
   - by rewrite (ralt_dec_enc RFFork).
+  - by rewrite (ralt_dec_enc RCFork).
   - by rewrite (ralt_dec_enc RCFork).
   - by rewrite (ralt_dec_enc RCFork).
 Qed.
@@ -198,40 +206,44 @@ Qed.
 
 Lemma fexf_of_ok (l : uline) : ralt_ok l (ralt_dec (fexf_of l)).
 Proof using.
-  destruct l as [ws | ws N | N | ws npc]; cbn [fexf_of].
+  destruct l as [ws | ws N | N | ws npc | ws]; cbn [fexf_of].
   - rewrite (ralt_dec_lt4 1%nat ltac:(lia)) /ralt_ok. lia.
   - by rewrite (ralt_dec_enc RFExec).
   - by rewrite (ralt_dec_enc RCExec).
   - by rewrite (ralt_dec_enc RCExec).
+  - by rewrite (ralt_dec_enc RSExec).
 Qed.
 
 Lemma fexf_of_free (l : uline) : fstate_free (ralt_dec (fexf_of l)) = true.
 Proof using.
-  destruct l as [ws | ws N | N | ws npc]; cbn [fexf_of].
+  destruct l as [ws | ws N | N | ws npc | ws]; cbn [fexf_of].
   - by rewrite (ralt_dec_lt4 1%nat ltac:(lia)).
   - by rewrite (ralt_dec_enc RFExec).
   - by rewrite (ralt_dec_enc RCExec).
   - by rewrite (ralt_dec_enc RCExec).
+  - by rewrite (ralt_dec_enc RSExec).
 Qed.
 
 Lemma fexf_of_nopanic (l : uline) : ralt_panic (ralt_dec (fexf_of l)) = false.
 Proof using.
-  destruct l as [ws | ws N | N | ws npc]; cbn [fexf_of].
+  destruct l as [ws | ws N | N | ws npc | ws]; cbn [fexf_of].
   - rewrite (ralt_dec_lt4 1%nat ltac:(lia)). by vm_compute.
   - by rewrite (ralt_dec_enc RFExec).
   - by rewrite (ralt_dec_enc RCExec).
   - by rewrite (ralt_dec_enc RCExec).
+  - by rewrite (ralt_dec_enc RSExec).
 Qed.
 
 Lemma cont_fexf (s : fstate) (l : uline) :
   cont s l (ralt_dec (fexf_of l)) = fexfb l.
 Proof using.
-  destruct l as [ws | ws N | N | ws npc]; cbn [fexf_of fexfb].
+  destruct l as [ws | ws N | N | ws npc | ws]; cbn [fexf_of fexfb].
   - rewrite (ralt_dec_lt4 1%nat ltac:(lia)). cbn [cont uline_ws].
     exact (line_alts_of_1 ws).
   - by rewrite (ralt_dec_enc RFExec).
   - by rewrite (ralt_dec_enc RCExec).
   - by rewrite (ralt_dec_enc RCExec).
+  - by rewrite (ralt_dec_enc RSExec).
 Qed.
 
 
@@ -246,31 +258,35 @@ Definition fnoc_of (l : uline) : nat :=
   | LEchoF _ _ => ralt_enc RFSilent
   | LCat _ => ralt_enc RCSilent
   | LPipe _ _ => ralt_enc RCSilent
+  | LSecc _ => ralt_enc RCSilent
   end.
 
 Lemma fnoc_of_ok (l : uline) : ralt_ok l (ralt_dec (fnoc_of l)).
 Proof using.
-  destruct l as [ws | ws N | N | ws npc]; cbn [fnoc_of].
+  destruct l as [ws | ws N | N | ws npc | ws]; cbn [fnoc_of].
   - rewrite (ralt_dec_lt4 2%nat ltac:(lia)) /ralt_ok. lia.
   - by rewrite (ralt_dec_enc RFSilent).
+  - by rewrite (ralt_dec_enc RCSilent).
   - by rewrite (ralt_dec_enc RCSilent).
   - by rewrite (ralt_dec_enc RCSilent).
 Qed.
 
 Lemma fnoc_of_free (l : uline) : fstate_free (ralt_dec (fnoc_of l)) = true.
 Proof using.
-  destruct l as [ws | ws N | N | ws npc]; cbn [fnoc_of].
+  destruct l as [ws | ws N | N | ws npc | ws]; cbn [fnoc_of].
   - by rewrite (ralt_dec_lt4 2%nat ltac:(lia)).
   - by rewrite (ralt_dec_enc RFSilent).
+  - by rewrite (ralt_dec_enc RCSilent).
   - by rewrite (ralt_dec_enc RCSilent).
   - by rewrite (ralt_dec_enc RCSilent).
 Qed.
 
 Lemma fnoc_of_nopanic (l : uline) : ralt_panic (ralt_dec (fnoc_of l)) = false.
 Proof using.
-  destruct l as [ws | ws N | N | ws npc]; cbn [fnoc_of].
+  destruct l as [ws | ws N | N | ws npc | ws]; cbn [fnoc_of].
   - rewrite (ralt_dec_lt4 2%nat ltac:(lia)). by vm_compute.
   - by rewrite (ralt_dec_enc RFSilent).
+  - by rewrite (ralt_dec_enc RCSilent).
   - by rewrite (ralt_dec_enc RCSilent).
   - by rewrite (ralt_dec_enc RCSilent).
 Qed.
@@ -278,10 +294,11 @@ Qed.
 Lemma cont_fnoc (s : fstate) (l : uline) :
   cont s l (ralt_dec (fnoc_of l)) = u_prompt.
 Proof using.
-  destruct l as [ws | ws N | N | ws npc]; cbn [fnoc_of].
+  destruct l as [ws | ws N | N | ws npc | ws]; cbn [fnoc_of].
   - rewrite (ralt_dec_lt4 2%nat ltac:(lia)). cbn [cont uline_ws].
     reflexivity.
   - by rewrite (ralt_dec_enc RFSilent).
+  - by rewrite (ralt_dec_enc RCSilent).
   - by rewrite (ralt_dec_enc RCSilent).
   - by rewrite (ralt_dec_enc RCSilent).
 Qed.
@@ -302,9 +319,9 @@ Lemma cont_prompt (s : fstate) (l : uline) (a : ralt) :
   exists u : list (bv 8), cont s l a = u ++ u_prompt.
 Proof using.
   intros Hok Hp. revert s.
-  destruct a as [k | sel | | | | | | | | | |]; intros st.
+  destruct a as [k | sel | | | | | | | | | | |]; intros st.
   { (* [REcho]: on its own, so no [vm_compute] meets the line *)
-    rewrite /ralt_ok in Hok. destruct l as [ws | ws N | N | ws npc];
+    rewrite /ralt_ok in Hok. destruct l as [ws | ws N | N | ws npc | ws];
       cbn in Hok; try done.
     cbn [ralt_panic] in Hp. apply bool_decide_eq_false in Hp.
     cbn [cont uline_ws].

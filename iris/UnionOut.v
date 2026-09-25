@@ -90,7 +90,7 @@ Definition ugn_pipe (ug : union_gn) : pipe_gn :=
   MkPipeGn (fgn_echo (ugn_file ug)) (ugn_pera ug).
 
 Local Notation U := ulmG.
-Local Notation UB := (ulm_byte_laws adm_u_g).
+Local Notation UB := (ulm_byte_laws adm_u_g adm_s_off).
 
 Section union_out.
   Context {Σ : gFunctors}.
@@ -325,7 +325,7 @@ Section union_out.
   Proof using .
     intros HlR Hok Ha Hl.
     exact (pipesV_HWIT U pview_unionU I sR lR HlR
-             (pview_union_fc_ok adm_u_g sR Hok) Ha Hl).
+             (pview_union_fc_ok adm_u_g adm_s_off sR Hok) Ha Hl).
   Qed.
 
   (* THE FILING at the credential: the prompt's first byte files the

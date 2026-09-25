@@ -144,9 +144,9 @@ Lemma ulm_ok_R (s : fstate) (l : uline) (a : ralt) :
 Proof using.
   intros Hnp. change (lm_ok ulmG) with (uok adm_u_g). change (lm_dec ulmG) with ualt_dec.
   rewrite ualt_dec_code.
-  destruct l as [ws | ws Nf | Nf | p n]; [cbn [uok]; reflexivity | cbn [uok]; reflexivity
-                                   | cbn [uok]; reflexivity |].
-  exfalso. exact (Hnp p n eq_refl).
+  destruct l as [ws | ws Nf | Nf | p n | ws]; [cbn [uok]; reflexivity | cbn [uok]; reflexivity
+                                   | cbn [uok]; reflexivity | | cbn [uok]; reflexivity].
+  exfalso. exact (proj1 Hnp p n eq_refl).
 Qed.
 
 Lemma ulm_cont_R (s : fstate) (l : uline) (a : ralt) :
@@ -289,8 +289,11 @@ Proof using. rewrite ucat_ws_head. exact ucat_execfail_bytes0. Qed.
 Definition ush_line_pipeU (p : producer) (n : list filt) : Prop :=
   adm_u_g (LPipes p n) = true /\ pl_ok (LPipes p n).
 
+(* a [seccomp] line is NOT among the loop's lines while the model's
+   seccomp knob is off ([UnionDisc.adm_s_off]; seccomp design section 3):
+   every round law cased on this predicate refutes the arm here *)
 Definition ush_line_union (l : uline) : Prop :=
-  match l with LPipe p n => ush_line_pipeU p n | _ => True end.
+  match l with LPipe p n => ush_line_pipeU p n | LSecc _ => False | _ => True end.
 
 Definition ush_line_upipe (l : uline) : Prop :=
   exists (p : producer) (n : list filt), l = LPipe p n /\ ush_line_pipeU p n.
@@ -1256,7 +1259,10 @@ Section UShURound.
     iIntros "!>" (lu h m f k len l n)
       "%Hd %Hlat %Hregs %Hs1 %Ha5 %Hnn %Hnul %Hkl2 %Hpm1 %Hpmwb %Hfd0
        #Hgen #Hcode #Hjt Hhead Hstd Hdat Hsz Hbuf Hrun".
-    destruct lu as [ws | ws Nf | Nf | p np].
+    destruct lu as [ws | ws Nf | Nf | p np | ws].
+    5: { (* [seccomp ..] -- not a line of the loop while the model's seccomp
+            knob is off ([ush_line_union]) *)
+         exfalso. exact Hd. }
     - (* [echo ws] -- the landed walk, at the fork twin *)
       iApply ("Hecho" $! (LEcho ws) h m f k len l n with
                 "[%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] Hgen Hcode Hjt

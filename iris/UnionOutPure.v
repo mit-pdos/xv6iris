@@ -89,7 +89,7 @@ End first_out.
 (*  2.  THE UNION'S CONCLUSION, AND ITS BODY                              *)
 (* ===================================================================== *)
 Local Notation U := ulmG.
-Local Notation UB := (ulm_byte_laws adm_u_g).
+Local Notation UB := (ulm_byte_laws adm_u_g adm_s_off).
 Local Notation UK := ulmG_hooks.
 
 (* THE CONCLUSION (design section 4): [FileDisc.file_phi] at the union *)

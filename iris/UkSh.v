@@ -562,8 +562,14 @@ Lemma ush_uline_head_nonblank (lu : FileDisc.uline) :
 Proof.
   intro Hok.
   assert (Hval : bv_unsigned (FileDisc.line_bytes lu !!! 0%nat) = 101%Z
-                 \/ bv_unsigned (FileDisc.line_bytes lu !!! 0%nat) = 99%Z).
-  { destruct lu as [ws | ws Nf | Nf | ws npc]; cbn [FileDisc.uline_ok] in Hok.
+                 \/ bv_unsigned (FileDisc.line_bytes lu !!! 0%nat) = 99%Z
+                 \/ bv_unsigned (FileDisc.line_bytes lu !!! 0%nat) = 115%Z).
+  { destruct lu as [ws | ws Nf | Nf | ws npc | ws]; cbn [FileDisc.uline_ok] in Hok.
+    5: { (* the seccomp line: its head is [seccomp]'s *)
+         right; right. rewrite FileDisc.line_bytes_body. cbn [FileDisc.line_body].
+         rewrite wl_body_cons. rewrite -!app_assoc.
+         rewrite (wl_lta_app_l FileDisc.cmd_seccomp _ 0%nat ltac:(vm_compute; lia)).
+         by vm_compute. }
     - left. rewrite FileDisc.line_bytes_echo.
       exact (line_ok_head_byte0 ws Hok).
     - left.
@@ -575,7 +581,7 @@ Proof.
       pose proof (line_ok_head_byte0 ws (proj1 Hok)) as Hh.
       rewrite /wl_line (wl_lta_app_l (wl_body ws) [wl_nl] 0%nat Hwb) in Hh.
       exact Hh.
-    - right.
+    - right; left.
       rewrite FileDisc.line_bytes_body. cbn [FileDisc.line_body].
       rewrite (wl_lta_app_l (FileDisc.cmd_cat Nf) [wl_nl] 0%nat
                  ltac:(rewrite FileDisc.cmd_cat_len; lia)).
@@ -595,7 +601,7 @@ Proof.
         pose proof (line_ok_head_byte0 ws (proj1 Hok)) as Hh.
         rewrite /wl_line (wl_lta_app_l (wl_body ws) [wl_nl] 0%nat Hwb) in Hh.
         exact Hh.
-      + right. rewrite FileDisc.line_bytes_body. cbn [FileDisc.line_body].
+      + right; left. rewrite FileDisc.line_bytes_body. cbn [FileDisc.line_body].
         rewrite (_ : FileDisc.prod_body (FileDisc.PrCatF fn)
                      = FileDisc.fd_w_cat ++ wl_tail [fn]); [| reflexivity].
         rewrite -!app_assoc.

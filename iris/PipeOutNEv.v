@@ -488,7 +488,7 @@ Section open_events_pure.
         rewrite (lm_blk_snoc_at M (gs_cs M so) (snd <$> gs_E M so) ao HnS)
           (lm_blk_snoc_upto M (gs_cs M so) (st so) (snd <$> gs_E M so) ao HnS) in Hc0.
         rewrite /lm_cont_at in Hc0.
-        apply (lml_merge_prefix L _
+        apply (lml_merge_prefix L _ _
                  (lm_cont M (lm_upto M (gs_cs M so) (st so) (bodies_of (snd <$> gs_E M so))
                                (nlines (snd <$> gs_E M so) - 1))
                     (lm_of M (bodies_of (snd <$> gs_E M so)

@@ -97,7 +97,7 @@ Proof using.
   intros Hd.
   assert (Hin : b ∈ (I ++ [b])%list).
   { apply elem_of_app. right. by apply elem_of_list_singleton. }
-  pose proof (lm_disc_input_byte_val U (ulm_byte_laws adm_u_g) (I ++ [b])%list b Hd Hin)
+  pose proof (lm_disc_input_byte_val U (ulm_byte_laws adm_u_g adm_s_off) (I ++ [b])%list b Hd Hin)
     as Hv.
   lia.
 Qed.
@@ -129,9 +129,13 @@ Proof using.
     - exists (uline_of J). destruct (fbody_ok_line J Hf) as [Hok HJ].
       split; [| split; [exact Hok | split; [exact HJ | exact (uline_ws_words J Hf)]]].
       pose proof (uline_of_nopipe J) as Hnp. rewrite /ush_line_union.
-      destruct (uline_of J) as [ws | ws Nf | Nf | p n] eqn:He; try exact Logic.I.
-      exfalso. exact (Hnp p n eq_refl).
-    - destruct Hlast as [Hf | Hp]; [contradiction |].
+      destruct (uline_of J) as [ws | ws Nf | Nf | p n | ws] eqn:He; try exact Logic.I.
+      + exfalso. exact (proj1 Hnp p n eq_refl).
+      + exfalso. exact (proj2 Hnp ws eq_refl).
+    - destruct Hlast as [Hf | [Hp | Hs]]; [contradiction | |].
+      2: { (* the seccomp knob is off: no seccomp body is admitted *)
+           exfalso. revert Hs. rewrite /usecc_ok.
+           destruct (secc_parse J); [intros Hq; discriminate Hq | intros []]. }
       revert Hp. rewrite /upipe_ok.
       destruct (pl_parse J) as [[ws | p n] |] eqn:Hq; intros Hp; try contradiction.
       destruct (pl_parse_some J _ Hq) as [Hok HJ].

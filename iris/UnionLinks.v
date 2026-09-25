@@ -56,7 +56,7 @@ From stdpp Require Import list.
 Local Open Scope list_scope.
 
 Local Notation U := ulmG.
-Local Notation UB := (ulm_byte_laws adm_u_g).
+Local Notation UB := (ulm_byte_laws adm_u_g adm_s_off).
 
 Section union_links.
   Context {Σ : gFunctors}.

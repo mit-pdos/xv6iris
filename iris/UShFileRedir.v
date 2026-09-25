@@ -111,8 +111,8 @@ Import Defs.
 Lemma fsm_panic (s : fstate) (l : uline) (a : ralt) :
   ralt_panic a = true -> fsm s l a = s.
 Proof using .
-  intro H. destruct l as [ws | ws Nf | Nf | ws];
-    [ reflexivity | | reflexivity | reflexivity ].
+  intro H. destruct l as [ws | ws Nf | Nf | ws | ws];
+    [ reflexivity | | reflexivity | reflexivity | reflexivity ].
   destruct a; try reflexivity; cbn [ralt_panic] in H; discriminate H.
 Qed.
 
@@ -120,9 +120,9 @@ Qed.
    IS the model fix of RULING HOLD-POS ([RFSilent]'s effect is identity) *)
 Lemma fsm_fnoc (s : fstate) (l : uline) : fsm s l (ralt_dec (fnoc_of l)) = s.
 Proof using .
-  destruct l as [ws | ws Nf | Nf | ws]; cbn [fnoc_of];
+  destruct l as [ws | ws Nf | Nf | ws | ws]; cbn [fnoc_of];
     [ reflexivity | by rewrite (ralt_dec_enc RFSilent)
-    | reflexivity | reflexivity ].
+    | reflexivity | reflexivity | reflexivity ].
 Qed.
 
 (* the words' line after the command fits a C int (the console write's

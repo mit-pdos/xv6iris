@@ -1361,8 +1361,9 @@ Section gen_out.
     forall i, i < nlines I ->
       (exists c, lm_ok M (lm_upto M cs s (bodies_of I) i) (lm_of M (bodies_of I !!! i)) c
                  /\ lm_term M c = true) ->
-      ~ lm_merge M (lm_cont M (lm_upto M cs s (bodies_of I) i)
-                     (lm_of M (bodies_of I !!! i)) (lm_at M cs i)).
+      ~ lm_merge M (lm_of M (bodies_of I !!! i))
+          (lm_cont M (lm_upto M cs s (bodies_of I) i)
+             (lm_of M (bodies_of I !!! i)) (lm_at M cs i)).
   Proof using.
     intros Hd4 i Hi Hex Hm.
     destruct (bodies_of_prefix I (I ++ [b]) ltac:(by eexists)) as [z Hz].
@@ -1397,7 +1398,8 @@ Section gen_out.
                           (lm_of M (bodies_of
                           (done_of (removelast (ins seg))) !!! i)) a
                        /\ lm_term M a = true) ->
-            ~ lm_merge M (lm_cont M
+            ~ lm_merge M (lm_of M (bodies_of (done_of (removelast (ins seg))) !!! i))
+                (lm_cont M
                  (lm_upto M cs' s (bodies_of (done_of (removelast (ins seg)))) i)
                  (lm_of M (bodies_of (done_of (removelast (ins seg))) !!! i))
                  (lm_at M cs' i)))

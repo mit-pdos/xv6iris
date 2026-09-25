@@ -532,12 +532,12 @@ Section UShUPipes.
     iDestruct (udeed_typed s with "Hty") as %[Hsok _].
     pose proof (upv_line_pipe I (PrEcho ws) (F :: fs') Hul) as HlR.
     assert (Hfc : fc_ok (pv_fc pview_unionU (dst_content s)))
-      by exact (pview_union_fc_ok adm_u_g (dst_content s) Hsok).
+      by exact (pview_union_fc_ok adm_u_g adm_s_off (dst_content s) Hsok).
     assert (Hadmit : pns_admV pview_unionU (LPipes (PrEcho ws) (F :: fs')))
       by exact (adm_u_g_echo ws (F :: fs') HF).
     assert (Hplok : pl_ok (LPipes (PrEcho ws) (F :: fs'))) by exact (pl_ok_of_uline _ _ Hok_u).
     (* THE GATE: echo's content is one NUL-free line *)
-    pose proof (pview_union_gate adm_u_g (dst_content s) (PrEcho ws) (F :: fs') Hsok Hok) as Hgate.
+    pose proof (pview_union_gate adm_u_g adm_s_off (dst_content s) (PrEcho ws) (F :: fs') Hsok Hok) as Hgate.
     (* ---- THE ROUND'S ALLOCATION, at the deed's state ---- *)
     iApply uup_fupd_mwp.
     iMod (pls_nodes_alloc (lcats (LPipes (PrEcho ws) (F :: fs')))) as (P gF gG) "Hnodes".
@@ -675,13 +675,13 @@ Section UShUPipes.
       iFrame "Hdq Htk Hty' Hpin' Hcs'". by iPureIntro. }
     pose proof (upv_line_pipe I (PrCatF nm) (F :: fs') Hul) as HlR.
     assert (Hfc : fc_ok (pv_fc pview_unionU (dst_content s)))
-      by exact (pview_union_fc_ok adm_u_g (dst_content s) Hsok).
+      by exact (pview_union_fc_ok adm_u_g adm_s_off (dst_content s) Hsok).
     assert (Hadmit : pns_admV pview_unionU (LPipes (PrCatF nm) (F :: fs')))
       by exact (proj2 (adm_u_g_catf nm (F :: fs')) (conj Hu HF)).
     assert (Hplok : pl_ok (LPipes (PrCatF nm) (F :: fs'))) by exact (pl_ok_of_uline _ _ Hok_u).
     pose proof (catf_short (dst_content s) nm (Hshort nm)) as HL31.
     (* THE GATE: [f]'s content is one NUL-free line, as the deed types it *)
-    pose proof (pview_union_gate adm_u_g (dst_content s) (PrCatF nm) (F :: fs') Hsok Hok)
+    pose proof (pview_union_gate adm_u_g adm_s_off (dst_content s) (PrCatF nm) (F :: fs') Hsok Hok)
       as Hgate.
     (* ---- THE ROUND'S ALLOCATION, at the deed's state ---- *)
     iApply uup_fupd_mwp.

@@ -63,7 +63,7 @@ Definition echo_lm : lmodel :=
        (fun k => bool_decide (k = 3))
        (fun _ ws k => line_alts_of ws !!! k)
        (fun _ _ _ => tt) (fun _ _ k => k < 4) body_ok wl_body_byte
-       line_ok (fun _ => True) (fun _ => false) (fun _ => False).
+       line_ok (fun _ => True) (fun _ => false) (fun _ _ => False).
 
 (* ---- the discipline and the claim, as the model's.  Echo's range
    condition ([length cs = nlines] and every code below 4) IS the model's

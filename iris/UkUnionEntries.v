@@ -112,9 +112,9 @@ Proof.
   change (lm_ok ulmG) with (uok adm_u_g). change (lm_dec ulmG) with ualt_dec.
   change (lm_term ulmG) with uterm. rewrite ualt_dec_code.
   split; [| reflexivity].
-  revert Hnp Hok. destruct (lm_line_at U I) as [ws | ws Nf | Nf | p n]; intros Hnp Hok;
-    cbn [uok]; [exact Hok | exact Hok | exact Hok |].
-  exfalso. exact (Hnp p n eq_refl).
+  revert Hnp Hok. destruct (lm_line_at U I) as [ws | ws Nf | Nf | p n | ws]; intros Hnp Hok;
+    cbn [uok]; [exact Hok | exact Hok | exact Hok | | exact Hok].
+  exfalso. exact (proj1 Hnp p n eq_refl).
 Qed.
 
 (* echo's body at the console, at code 0 *)
@@ -252,7 +252,7 @@ Section UkUnionLend.
       (ucat_alts nm content).
   Proof using .
     intros Hw Hfl Hst Hs. iIntros "#Hlk #Hpin Hc".
-    assert (Hnp : uline_nopipe (lm_line_at U I)) by (rewrite Hfl; intros ? ? ?; discriminate).
+    assert (Hnp : uline_nopipe (lm_line_at U I)) by (rewrite Hfl; split; intros; discriminate).
     destruct content as [bs |].
     - assert (Hbodies : lm_body U sb cs I <$> [ualt_code (UR RCRan); ualt_code (UR RCNoOpen)]
                         = [bs; cat_dg_open nm]).

@@ -188,7 +188,7 @@ Section union_link_inst.
   Lemma union_links_gl : union_links ug -∗ glinks U union_params.
   Proof using .
     iIntros "Hlk". iDestruct (union_links_eq with "Hlk") as %Hc.
-    iApply (peclV_glinks pg U (ucparams ug) (ulm_byte_laws adm_u_g) ∅ (uwa ug) Hc
+    iApply (peclV_glinks pg U (ucparams ug) (ulm_byte_laws adm_u_g adm_s_off) ∅ (uwa ug) Hc
               union_params eq_refl eq_refl uf0w_cw (or_introl I) ufhead_boot).
   Qed.
 

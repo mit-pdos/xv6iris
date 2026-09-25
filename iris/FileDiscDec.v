@@ -158,6 +158,7 @@ Definition ralt_fix_cands (l : uline) : list ralt :=
   | LCat _ => [RCRan; RCNoOpen; RCExec; RCSilent; RCFork]
   (* the DEAD arm: [FileDisc.ralt_ok] gives [LPipe] exactly [LCat]'s five *)
   | LPipe _ _ => [RCRan; RCNoOpen; RCExec; RCSilent; RCFork]
+  | LSecc _ => [RCFork; RSExec; RCSilent]
   end.
 
 Definition ralt_cands (l : uline) : list nat :=
@@ -171,8 +172,9 @@ Definition ralt_cands (l : uline) : list nat :=
 
 Lemma ralt_fix_cands_ok l : Forall (ralt_ok l) (ralt_fix_cands l).
 Proof using.
-  destruct l as [ws | ws N | N | ws npc]; cbn [ralt_fix_cands].
+  destruct l as [ws | ws N | N | ws npc | ws]; cbn [ralt_fix_cands].
   - repeat (constructor; [cbn [ralt_ok]; lia |]). constructor.
+  - repeat (constructor; [exact I |]). constructor.
   - repeat (constructor; [exact I |]). constructor.
   - repeat (constructor; [exact I |]). constructor.
   - repeat (constructor; [exact I |]). constructor.
@@ -187,7 +189,7 @@ Proof using.
   - apply elem_of_list_fmap in Hin as (a & -> & Ha).
     rewrite ralt_dec_enc.
     exact (proj1 (Forall_forall _ _) (ralt_fix_cands_ok l) a Ha).
-  - destruct l as [ws | ws N | N | ws npc]; try (by apply elem_of_nil in Hin).
+  - destruct l as [ws | ws N | N | ws npc | ws]; try (by apply elem_of_nil in Hin).
     apply elem_of_list_fmap in Hin as (sel & -> & Hsel).
     rewrite ralt_dec_enc. cbn [ralt_ok].
     by apply (sel_ok_cands (echo_chunks ws) sel).
@@ -197,8 +199,8 @@ Lemma ralt_cands_canon l c :
   ralt_ok l (ralt_dec c) -> ralt_enc (ralt_dec c) ∈ ralt_cands l.
 Proof using.
   intro H. rewrite /ralt_cands elem_of_app.
-  destruct l as [ws | ws N | N | ws npc];
-    destruct (ralt_dec c) as [k | sel | | | | | | | | | |];
+  destruct l as [ws | ws N | N | ws npc | ws];
+    destruct (ralt_dec c) as [k | sel | | | | | | | | | | |];
     cbn [ralt_ok] in H; try done.
   - left. apply elem_of_list_fmap. exists (REcho k). split; [reflexivity |].
     cbn [ralt_fix_cands].
@@ -222,6 +224,10 @@ Proof using.
   - left. apply elem_of_list_fmap. exists RCExec. split; [reflexivity |]. fdd_elem.
   - left. apply elem_of_list_fmap. exists RCSilent. split; [reflexivity |]. fdd_elem.
   - left. apply elem_of_list_fmap. exists RCFork. split; [reflexivity |]. fdd_elem.
+  (* ...and the [seccomp] line's three (the shell's own) *)
+  - left. apply elem_of_list_fmap. exists RCSilent. split; [reflexivity |]. fdd_elem.
+  - left. apply elem_of_list_fmap. exists RCFork. split; [reflexivity |]. fdd_elem.
+  - left. apply elem_of_list_fmap. exists RSExec. split; [reflexivity |]. fdd_elem.
 Qed.
 
 (* ---- the resolution lists, line by line ----------------------------- *)
