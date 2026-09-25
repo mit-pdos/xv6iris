@@ -800,3 +800,11 @@ import Xv6.SysWriteDefs
 import Xv6.FsAbsOpenFire
 import Xv6.FsAbsReadFire
 import Xv6.FsAbsWriteFire
+import Xv6.SpecNamei
+import Xv6.NameiFrame
+import Xv6.ProofNamei
+import Xv6.ProofNameiRoot
+import Xv6.LinkNamei
+import Xv6.SpecNameiparent
+import Xv6.ProofNameiparent
+import Xv6.LinkNameiparent
