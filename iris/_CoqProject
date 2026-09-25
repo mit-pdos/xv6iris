@@ -1745,6 +1745,8 @@ PipesLinkInst.v
 PipesStageInst.v
 UkShPipesFork.v
 PipesUline.v
+UnionDisc.v
+UnionDiscDec.v
 PipesCut.v
 UShPipesLaw.v
 UShPipesRound.v

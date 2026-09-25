@@ -185,7 +185,7 @@ Proof using . reflexivity. Qed.
 (* ...and the PIPELINE application's line, for the same reason as [LCat]'s:
    [FileDisc.fsm] moves the file at [LEchoF] and nowhere else (lane
    ULINE-LPIPE) *)
-Lemma fsm_pipe (s : fstate) (ws : list (list (bv 8))) (n : nat) (a : ralt) :
+Lemma fsm_pipe (s : fstate) (ws : producer) (n : nat) (a : ralt) :
   fsm s (LPipe ws n) a = s.
 Proof using . reflexivity. Qed.
 

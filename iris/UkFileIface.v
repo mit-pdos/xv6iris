@@ -200,12 +200,13 @@ Proof.
   apply option_update, cmra_update_exclusive, fif_dfa_valid.
 Qed.
 
-(* the files the application describes: `f` *)
+(* the files the application describes: `f` -- the pure [FileDisc.files_of]
+   (cut C9b); this name is kept for the file application's statements *)
 Definition fif_files (s : option (list (bv 8))) : list (bv 8) -> option (list (bv 8)) :=
-  fun p => if decide (p = fname_f) then s else None.
+  files_of s.
 
 Lemma fif_files_f (s : option (list (bv 8))) : fif_files s fname_f = s.
-Proof. unfold fif_files. case_decide; [reflexivity | done]. Qed.
+Proof. unfold fif_files. exact (files_of_f s). Qed.
 
 (* the row a descriptor's device demands of it *)
 Definition fif_row (ov : option fdev) (fd : Z) (l : list fdstate) : Prop :=

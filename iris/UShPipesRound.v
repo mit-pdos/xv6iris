@@ -468,7 +468,7 @@ Section UShPipesRound.
       iApply (UkShPipeForkTwin.wp_kshm_body_pipe (PS := uprogSG_free)
                 (SG := uexecSG_xv6) N γp T Wct Wbf Pm (fun k0 H => H)
                 pipes_lp (68 + UkSh.ush_Dpipe) h m f k len
-                (FileDisc.uline_ws (FileDisc.LPipe ws n')) sz l n
+                (FileDisc.uline_ws (FileDisc.LPipe (PrEcho ws) n')) sz l n
                 ltac:(lia) pipes_lp0
                 Hregs Hs1 Ha5 Hnn Hnul Hkl2
                 (pipes_lp_of_at ws n' f k len Hlat)

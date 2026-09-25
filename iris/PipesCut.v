@@ -2,7 +2,7 @@
 (*  PipesCut.v -- THE N-STAGE PIPELINE LINE, READ BY THE PARSER (cut C8). *)
 (*                                                                       *)
 (*  [echo ws | cat | ... | cat] with [n >= 1] cats, as the loop's typed   *)
-(*  line fact [UkSh.ush_line_at (FileDisc.LPipe ws n)] states it:         *)
+(*  line fact [UkSh.ush_line_at (FileDisc.LPipe (PrEcho ws) n)] says:    *)
 (*    - it is the pipeline lexer's line ([UkShPipesLex.ushq_lines_is] at  *)
 (*      [n] words [cat]), so [ushq_lines_bars] lexes it stage by stage;   *)
 (*    - the parser's cut ([UkShPipesCmd.ushq_nulfolds] over every stage's *)
@@ -56,18 +56,20 @@ Proof using.
 Qed.
 
 Lemma line_bytes_pipe_split (ws : list (list (bv 8))) (n : nat) :
-  FileDisc.line_bytes (FileDisc.LPipe ws (S n))
+  FileDisc.line_bytes (FileDisc.LPipe (FileDisc.PrEcho ws) (S n))
   = wl_body ws ++ [wl_sp; ushq_bar; wl_sp] ++ (ushq_cat ++ FileDisc.suf_barcats n ++ [wl_nl]).
 Proof using.
   rewrite FileDisc.line_bytes_body. cbn [FileDisc.line_body].
+  rewrite (_ : FileDisc.prod_body (FileDisc.PrEcho ws) = wl_body ws); [| reflexivity].
   rewrite FileDisc.suf_barcats_S suf_barcat_split -!app_assoc. reflexivity.
 Qed.
 
 Lemma line_bytes_pipe_length (ws : list (list (bv 8))) (n : nat) :
-  length (FileDisc.line_bytes (FileDisc.LPipe ws n))
+  length (FileDisc.line_bytes (FileDisc.LPipe (FileDisc.PrEcho ws) n))
   = length (wl_body ws) + 6 * n + 1.
 Proof using.
   rewrite FileDisc.line_bytes_body. cbn [FileDisc.line_body].
+  rewrite (_ : FileDisc.prod_body (FileDisc.PrEcho ws) = wl_body ws); [| reflexivity].
   rewrite !length_app suf_barcats_length. cbn [length]. lia.
 Qed.
 
@@ -101,8 +103,8 @@ Qed.
 (* ---- THE LINE IS THE LEXER'S ---- *)
 Lemma lines_of_pipe (ws : list (list (bv 8))) (n : nat) (f : nat -> bv 8) (len : nat) :
   line_ok ws -> 1 <= n ->
-  bat f 0 (FileDisc.line_bytes (FileDisc.LPipe ws n)) ->
-  len = length (FileDisc.line_bytes (FileDisc.LPipe ws n)) ->
+  bat f 0 (FileDisc.line_bytes (FileDisc.LPipe (FileDisc.PrEcho ws) n)) ->
+  len = length (FileDisc.line_bytes (FileDisc.LPipe (FileDisc.PrEcho ws) n)) ->
   ushq_lines_is ws (replicate n ushq_cat) f 0 len.
 Proof using.
   intros Hok Hn Hb Hlen.
@@ -141,12 +143,12 @@ Qed.
 (* ---- THE LOOP'S TYPED LINE, as the round's line predicate ---- *)
 Definition pipes_lp (wsf : list (list (bv 8))) (gf : nat -> bv 8) (k len : nat) : Prop :=
   exists (ws : list (list (bv 8))) (n : nat),
-    wsf = FileDisc.uline_ws (FileDisc.LPipe ws n)
-    /\ UkSh.ush_line_at (FileDisc.LPipe ws n) gf k len.
+    wsf = FileDisc.uline_ws (FileDisc.LPipe (FileDisc.PrEcho ws) n)
+    /\ UkSh.ush_line_at (FileDisc.LPipe (FileDisc.PrEcho ws) n) gf k len.
 
 Lemma pipes_lp_of_at (ws : list (list (bv 8))) (n : nat) (f : nat -> bv 8) (k len : nat) :
-  UkSh.ush_line_at (FileDisc.LPipe ws n) f k len ->
-  pipes_lp (FileDisc.uline_ws (FileDisc.LPipe ws n)) (fun j : nat => f (k + j)) 0 len.
+  UkSh.ush_line_at (FileDisc.LPipe (FileDisc.PrEcho ws) n) f k len ->
+  pipes_lp (FileDisc.uline_ws (FileDisc.LPipe (FileDisc.PrEcho ws) n)) (fun j : nat => f (k + j)) 0 len.
 Proof using.
   intros (Hok & Hlen & Hby). exists ws, n. split; [reflexivity |].
   split; [exact Hok |]. split; [exact Hlen |].
@@ -168,9 +170,10 @@ Qed.
 (* below the first bar the pipeline line's bytes ARE the echo line's *)
 Lemma pipe_bytes_lo (ws : list (list (bv 8))) (n j : nat) :
   j < length (wl_body ws) ->
-  FileDisc.line_bytes (FileDisc.LPipe ws n) !!! j = wl_line ws !!! j.
+  FileDisc.line_bytes (FileDisc.LPipe (FileDisc.PrEcho ws) n) !!! j = wl_line ws !!! j.
 Proof using.
   intros Hj. rewrite FileDisc.line_bytes_body. cbn [FileDisc.line_body].
+  rewrite (_ : FileDisc.prod_body (FileDisc.PrEcho ws) = wl_body ws); [| reflexivity].
   rewrite -app_assoc (wl_lta_app_l (wl_body ws) _ j Hj).
   rewrite /wl_line (wl_lta_app_l (wl_body ws) [wl_nl] j Hj). reflexivity.
 Qed.
@@ -278,7 +281,7 @@ Qed.
 
 (* ...AND ECHO'S ARGV IS THERE *)
 Lemma pcut_echo_bytes (ws : list (list (bv 8))) (n : nat) (f : nat -> bv 8) (len : nat) :
-  UkSh.ush_line_at (FileDisc.LPipe ws n) f 0 len ->
+  UkSh.ush_line_at (FileDisc.LPipe (FileDisc.PrEcho ws) n) f 0 len ->
   UkShEcho.echo_argv_bytes ws (pcut ws n len f).
 Proof using.
   intros (Hok & Hlen & Hby).
@@ -311,7 +314,7 @@ Qed.
 
 (* ...AND EVERY [cat]'s *)
 Lemma pcut_cat_bytes (ws : list (list (bv 8))) (n : nat) (f : nat -> bv 8) (len i : nat) :
-  UkSh.ush_line_at (FileDisc.LPipe ws n) f 0 len -> i < n ->
+  UkSh.ush_line_at (FileDisc.LPipe (FileDisc.PrEcho ws) n) f 0 len -> i < n ->
   UkShCat.cat_argv_bytes (length (wl_body ws) + 3 + 6 * i)
     (length (wl_body ws) + 3 + 6 * i + 3) (pcut ws n len f).
 Proof using.
@@ -319,7 +322,7 @@ Proof using.
   destruct n as [| n]; [lia |].
   assert (Hlen' : len = length (wl_body ws) + 6 * S n + 1)
     by (rewrite Hlen line_bytes_pipe_length; reflexivity).
-  assert (Hb : bat f 0 (FileDisc.line_bytes (FileDisc.LPipe ws (S n)))).
+  assert (Hb : bat f 0 (FileDisc.line_bytes (FileDisc.LPipe (FileDisc.PrEcho ws) (S n)))).
   { intros j Hj. apply Hby. rewrite Hlen. exact Hj. }
   rewrite line_bytes_pipe_split in Hb.
   apply bat_app in Hb as [_ Hr]. apply bat_app in Hr as [_ Hr].

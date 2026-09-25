@@ -35,6 +35,7 @@ From stdpp Require Import list countable bitvector.definitions.
 Require Import RiscvLang ObsTrace.
 Require Import LineWords EchoDisc LineBytes LineModel PipeDisc.
 Require Import StringBytes ProgTree ProgTreePipes PipesPair.
+Require FileDisc.                (* [producer], moved down (cut C9b) *)
 (* stdpp's list lemmas over the ones [ProgTree]'s Stdlib import re-exports *)
 From stdpp Require Import list.
 
@@ -44,27 +45,28 @@ Local Open Scope nat_scope.
 (*  1.  THE LINES                                                         *)
 (* ===================================================================== *)
 
-Definition cmd_cat : bytes := sb "cat"%string.
-
-(* the first command of a pipeline: [echo w1 .. wk] (the words [ws],
-   command name included) or [cat f] *)
-Inductive producer :=
-  | PrEcho (ws : list bytes)
-  | PrCatF (f : bytes).
+(* THE PRODUCER -- the first command of a pipeline, [echo w1 .. wk] (the
+   words [ws], command name included) or [cat f] -- lives in [FileDisc]
+   (cut C9b: the shell loop's line type names it); these are its names
+   here, so every reader of this file sees them unchanged *)
+Notation cmd_cat := FileDisc.fd_w_cat.
+Notation producer := FileDisc.producer.
+Notation PrEcho := FileDisc.PrEcho.
+Notation PrCatF := FileDisc.PrCatF.
+Notation prod_words := FileDisc.prod_words.
+Notation prod_body := FileDisc.prod_body.
+Notation prod_ok := FileDisc.prod_ok.
+Notation cmd_cat_word := FileDisc.fd_w_cat_word.
+Notation prod_wf := FileDisc.prod_wf.
+Notation prod_body_bytes := FileDisc.prod_body_bytes.
 
 (* a line: a plain echo line, or the producer followed by [n] bare cats *)
 Inductive pline' :=
   | LEcho' (ws : list bytes)
   | LPipes (p : producer) (n : nat).
 
-Global Instance producer_eq_dec : EqDecision producer.
-Proof using. solve_decision. Defined.
 Global Instance pline'_eq_dec : EqDecision pline'.
 Proof using. solve_decision. Defined.
-
-Definition prod_words (p : producer) : list bytes :=
-  match p with PrEcho ws => ws | PrCatF f => [cmd_cat; f] end.
-Definition prod_body (p : producer) : bytes := wl_body (prod_words p).
 
 (* [n] times the canonical pipe suffix [ | cat] *)
 Definition suf_n (n : nat) : bytes := concat (replicate n suf_pipecat).
@@ -75,9 +77,6 @@ Definition pl_body (l : pline') : bytes :=
   | LPipes p n => prod_body p ++ suf_n n
   end.
 
-Definition prod_ok (p : producer) : Prop :=
-  match p with PrEcho ws => line_ok ws | PrCatF f => wl_word f end.
-
 (* a well-formed line: an admissible echo line, or a producer with at
    least one cat, the whole line within sh's buffer *)
 Definition pl_ok (l : pline') : Prop :=
@@ -86,8 +85,6 @@ Definition pl_ok (l : pline') : Prop :=
   | LPipes p n => prod_ok p /\ 1 <= n /\ S (length (pl_body l)) < line_max
   end.
 
-Global Instance prod_ok_dec p : Decision (prod_ok p).
-Proof using. destruct p; unfold prod_ok; apply _. Defined.
 Global Instance pl_ok_dec l : Decision (pl_ok l).
 Proof using. destruct l; unfold pl_ok; apply _. Defined.
 
@@ -164,21 +161,8 @@ Proof using.
     rewrite strip_pipecat_app, (IH k Hc ltac:(lia)). reflexivity.
 Qed.
 
-Lemma cmd_cat_word : wl_word cmd_cat.
-Proof using. apply (bool_decide_unpack _). vm_compute. exact I. Qed.
-
 Lemma cmd_cat_ne_echo : cmd_cat <> cmd_echo.
 Proof using. intros H. apply (f_equal (@length _)) in H. vm_compute in H. discriminate H. Qed.
-
-Lemma prod_wf (p : producer) : prod_ok p -> wl_wf (prod_words p).
-Proof using.
-  destruct p as [ws | f]; cbn [prod_ok prod_words]; intros H.
-  - exact (line_ok_wf ws H).
-  - unfold wl_wf. constructor; [exact cmd_cat_word | constructor; [exact H | constructor]].
-Qed.
-
-Lemma prod_body_bytes p : prod_ok p -> Forall wl_body_byte (prod_body p).
-Proof using. intros Hp. exact (wl_body_bytes _ (prod_wf p Hp)). Qed.
 
 Lemma cat_not_echo_ok (f : bytes) : wl_word f -> ~ body_ok (wl_body [cmd_cat; f]).
 Proof using.

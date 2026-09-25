@@ -5,9 +5,10 @@
 (*  [UkSh.ush_line_at] -- the sh loop's line fact, which every era        *)
 (*  shares -- reads three projections of a [FileDisc.uline]: the words,  *)
 (*  the admissibility and the bytes.  The pipeline era's lines are        *)
-(*  [LEcho ws] and [LPipe ws n] ([echo ws] followed by [n] bare cats);    *)
-(*  [uline_of_pl] is the injection at the admitted lines, and the three  *)
-(*  projections agree with [PipesDisc]'s own readings.  PURE.            *)
+(*  [LEcho ws] and [LPipe p n] (the producer [p] then [n] bare cats);    *)
+(*  [uline_of_pl] is the injection (cut C9b: at every line, [cat f] as   *)
+(*  a producer included), and the three projections agree with          *)
+(*  [PipesDisc]'s own readings.  PURE.                                   *)
 (*                                                                       *)
 (*  AND THE CONVERSE the forked child needs: the loop's slot knows the    *)
 (*  input's last body only by its WORDS and by [FileDisc.fline_ok] (some  *)
@@ -33,8 +34,7 @@ Local Open Scope nat_scope.
 Definition uline_of_pl (l : pline') : FileDisc.uline :=
   match l with
   | LEcho' ws => FileDisc.LEcho ws
-  | LPipes (PrEcho ws) n => FileDisc.LPipe ws n
-  | LPipes (PrCatF _) _ => FileDisc.LCat
+  | LPipes p n => FileDisc.LPipe p n
   end.
 
 (* the era discipline [UkSh]'s [Dl] is instantiated at: the lines the
@@ -44,7 +44,7 @@ Definition ush_line_pipes (lu : FileDisc.uline) : Prop :=
 
 Lemma ush_line_pipes_cases (lu : FileDisc.uline) :
   ush_line_pipes lu ->
-  (exists ws, lu = FileDisc.LEcho ws) \/ (exists ws n, lu = FileDisc.LPipe ws n).
+  (exists ws, lu = FileDisc.LEcho ws) \/ (exists ws n, lu = FileDisc.LPipe (PrEcho ws) n).
 Proof using.
   intros (l & Ha & ->). destruct l as [ws | [ws | f] n]; cbn [uline_of_pl].
   - left. by exists ws.
@@ -60,44 +60,65 @@ Proof using.
   unfold suf_n, FileDisc.suf_barcats. rewrite suf_pipecat_barcat. reflexivity.
 Qed.
 
-(* (1) THE BODY and THE BYTES *)
+(* (1) THE BODY and THE BYTES, at every line (cut C9b: the producer is
+   the line's own, so [cat f | cat] is its own body) *)
+Lemma line_body_of_pl_all (l : pline') :
+  FileDisc.line_body (uline_of_pl l) = pl_body l.
+Proof using.
+  destruct l as [ws | p n]; [reflexivity |].
+  cbn [uline_of_pl FileDisc.line_body pl_body]. by rewrite suf_n_barcats.
+Qed.
+
 Lemma line_body_of_pl (l : pline') :
   adm_echo l = true -> FileDisc.line_body (uline_of_pl l) = pl_body l.
-Proof using.
-  intros Ha. destruct l as [ws | [ws | f] n]; [reflexivity | | discriminate Ha].
-  cbn [uline_of_pl FileDisc.line_body pl_body prod_body prod_words].
-  by rewrite suf_n_barcats.
-Qed.
+Proof using. intros _. exact (line_body_of_pl_all l). Qed.
 
 Lemma line_bytes_of_pl (l : pline') :
   adm_echo l = true -> FileDisc.line_bytes (uline_of_pl l) = pl_body l ++ [wl_nl].
 Proof using.
-  intros Ha. rewrite FileDisc.line_bytes_body (line_body_of_pl l Ha). reflexivity.
+  intros _. rewrite FileDisc.line_bytes_body (line_body_of_pl_all l). reflexivity.
 Qed.
 
-(* (2) ADMISSIBILITY *)
+(* (2) ADMISSIBILITY, both ways *)
+Lemma uline_ok_of_pl_all (l : pline') :
+  pl_ok l -> FileDisc.uline_ok (uline_of_pl l).
+Proof using.
+  intros Hok. destruct l as [ws | p n]; [exact Hok |].
+  destruct Hok as (Hp & Hn & Hlen).
+  cbn [uline_of_pl FileDisc.uline_ok]. split; [exact Hp |]. split; [exact Hn |].
+  rewrite FileDisc.line_bytes_body (line_body_of_pl_all (LPipes p n)) length_app.
+  cbn [length]. lia.
+Qed.
+
 Lemma uline_ok_of_pl (l : pline') :
   adm_echo l = true -> pl_ok l -> FileDisc.uline_ok (uline_of_pl l).
+Proof using. intros _ Hok. exact (uline_ok_of_pl_all l Hok). Qed.
+
+Lemma pl_ok_of_uline (p : producer) (n : nat) :
+  FileDisc.uline_ok (FileDisc.LPipe p n) -> pl_ok (LPipes p n).
 Proof using.
-  intros Ha Hok. destruct l as [ws | [ws | f] n]; [exact Hok | | discriminate Ha].
-  destruct Hok as (Hp & Hn & Hlen). cbn [prod_ok] in Hp.
-  cbn [uline_of_pl FileDisc.uline_ok]. split; [exact Hp |]. split; [exact Hn |].
-  rewrite (line_bytes_of_pl (LPipes (PrEcho ws) n) eq_refl) length_app. cbn [length].
-  lia.
+  intros (Hp & Hn & Hlen). split; [exact Hp |]. split; [exact Hn |].
+  rewrite -(line_body_of_pl_all (LPipes p n)).
+  cbn [uline_of_pl]. rewrite FileDisc.line_bytes_body length_app in Hlen.
+  cbn [length] in Hlen. lia.
 Qed.
 
 (* (3) THE WORDS: the whole body's parse *)
+Lemma uline_ws_of_pl_all (l : pline') :
+  pl_ok l -> FileDisc.uline_ws (uline_of_pl l) = wl_words (pl_body l).
+Proof using.
+  intros Hok. destruct l as [ws | p n].
+  - cbn [uline_of_pl FileDisc.uline_ws pl_body].
+    symmetry. exact (wl_words_body ws (line_ok_wf _ Hok)).
+  - destruct Hok as (Hp & _ & _).
+    rewrite -(line_body_of_pl_all (LPipes p n)).
+    symmetry. exact (FileDisc.uline_ws_pipe p n Hp).
+Qed.
+
 Lemma uline_ws_of_pl (l : pline') :
   adm_echo l = true -> pl_ok l ->
   FileDisc.uline_ws (uline_of_pl l) = wl_words (pl_body l).
-Proof using.
-  intros Ha Hok. destruct l as [ws | [ws | f] n]; [| | discriminate Ha].
-  - cbn [uline_of_pl FileDisc.uline_ws pl_body].
-    symmetry. exact (wl_words_body ws (line_ok_wf _ Hok)).
-  - destruct Hok as (Hp & _ & _). cbn [prod_ok] in Hp.
-    rewrite -(line_body_of_pl (LPipes (PrEcho ws) n) eq_refl).
-    symmetry. exact (FileDisc.uline_ws_pipe ws n Hp).
-Qed.
+Proof using. intros _ Hok. exact (uline_ws_of_pl_all l Hok). Qed.
 
 (* ===================================================================== *)
 (*  THE WORDS OF A PIPELINE DETERMINE IT                                  *)
@@ -115,6 +136,14 @@ Lemma line_ok_no_bar (ws : list (list (bv 8))) :
   line_ok ws -> Forall (fun w => w <> FileDisc.fd_w_bar) ws.
 Proof using.
   intros Hok. pose proof (wl_wf_alnum _ (line_ok_wf _ Hok)) as Ha.
+  eapply Forall_impl; [exact Ha |]. intros w Hw. exact (alnum_word_ne_bar w Hw).
+Qed.
+
+(* ...nor has a [cat f] producer: [cat] and a word *)
+Lemma prod_no_bar (p : producer) :
+  prod_ok p -> Forall (fun w => w <> FileDisc.fd_w_bar) (prod_words p).
+Proof using.
+  intros Hok. pose proof (wl_wf_alnum _ (prod_wf p Hok)) as Ha.
   eapply Forall_impl; [exact Ha |]. intros w Hw. exact (alnum_word_ne_bar w Hw).
 Qed.
 
@@ -156,12 +185,12 @@ Qed.
    IS that pipeline's body *)
 Lemma fline_ok_pipes_words (b : list (bv 8)) (ws : list (list (bv 8))) (n : nat) :
   FileDisc.fline_ok b -> line_ok ws -> 1 <= n ->
-  wl_words b = FileDisc.uline_ws (FileDisc.LPipe ws n) ->
-  b = FileDisc.line_body (FileDisc.LPipe ws n).
+  wl_words b = FileDisc.uline_ws (FileDisc.LPipe (PrEcho ws) n) ->
+  b = FileDisc.line_body (FileDisc.LPipe (PrEcho ws) n).
 Proof using.
   intros (l & Hok & ->) Hws Hn Hw.
   destruct n as [| m]; [lia |].
-  cbn [FileDisc.uline_ws] in Hw.
+  cbn [FileDisc.uline_ws FileDisc.prod_words] in Hw.
   destruct l as [ws' | ws' | | ws' n'].
   - (* LEcho: its words are alphanumeric, and the bar is not *)
     exfalso. cbn [FileDisc.line_body] in Hw.
@@ -187,31 +216,31 @@ Proof using.
     apply (f_equal length) in Hw. rewrite length_app FileDisc.w_barcats_length in Hw.
     pose proof (line_ok_ge2 ws Hws) as H2.
     revert Hw. vm_compute (length (wl_words FileDisc.cmd_cat_f)). lia.
-  - (* LPipe: the words determine the command and the cats *)
+  - (* LPipe: the words determine the producer and the cats; the
+       producer's words are an echo line's, so it is echo *)
     destruct Hok as (Hok' & Hn' & _).
     rewrite (FileDisc.uline_ws_pipe ws' n' Hok') in Hw. cbn [FileDisc.uline_ws] in Hw.
-    destruct (barcats_split ws' ws n' (S m) (line_ok_no_bar ws' Hok')
-                (line_ok_no_bar ws Hws) Hw) as [-> ->].
-    reflexivity.
+    destruct (barcats_split (prod_words ws') ws n' (S m) (prod_no_bar ws' Hok')
+                (line_ok_no_bar ws Hws) Hw) as [Hpw ->].
+    destruct ws' as [ws0 | f]; cbn [prod_words] in Hpw.
+    + subst ws0. reflexivity.
+    + exfalso. pose proof (line_ok_head ws Hws) as Hh. rewrite -Hpw in Hh.
+      change (Some cmd_cat = Some cmd_echo) in Hh.
+      exact (cmd_cat_ne_echo (inj Some _ _ Hh)).
 Qed.
 
 (* ...AND THE MODEL READS IT AS THAT LINE *)
 Lemma pl_of_pipe_body (ws : list (list (bv 8))) (n : nat) :
   pl_ok (LPipes (PrEcho ws) n) ->
-  pl_of (FileDisc.line_body (FileDisc.LPipe ws n)) = LPipes (PrEcho ws) n.
+  pl_of (FileDisc.line_body (FileDisc.LPipe (PrEcho ws) n)) = LPipes (PrEcho ws) n.
 Proof using.
   intros Hok.
-  rewrite (_ : FileDisc.LPipe ws n = uline_of_pl (LPipes (PrEcho ws) n)); [| reflexivity].
+  rewrite (_ : FileDisc.LPipe (PrEcho ws) n = uline_of_pl (LPipes (PrEcho ws) n)); [| reflexivity].
   rewrite (line_body_of_pl (LPipes (PrEcho ws) n) eq_refl).
   exact (pl_of_body _ Hok).
 Qed.
 
 (* the admissibility of a pipeline line, read back from the loop's *)
 Lemma pl_ok_of_uline_pipe (ws : list (list (bv 8))) (n : nat) :
-  FileDisc.uline_ok (FileDisc.LPipe ws n) -> pl_ok (LPipes (PrEcho ws) n).
-Proof using.
-  intros (Hp & Hn & Hlen). split; [exact Hp |]. split; [exact Hn |].
-  rewrite -(line_body_of_pl (LPipes (PrEcho ws) n) eq_refl).
-  cbn [uline_of_pl]. rewrite FileDisc.line_bytes_body length_app in Hlen.
-  cbn [length] in Hlen. lia.
-Qed.
+  FileDisc.uline_ok (FileDisc.LPipe (PrEcho ws) n) -> pl_ok (LPipes (PrEcho ws) n).
+Proof using. exact (pl_ok_of_uline (PrEcho ws) n). Qed.

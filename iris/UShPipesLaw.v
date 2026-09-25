@@ -92,13 +92,13 @@ Qed.
 Lemma pls_lineN (I : list (bv 8)) (wsf ws : list (list (bv 8))) (n : nat) :
   wsf = last_ws I ->
   FileDisc.fline_ok (UkSh.ush_lastbody I) ->
-  wsf = FileDisc.uline_ws (FileDisc.LPipe ws n) ->
-  FileDisc.uline_ok (FileDisc.LPipe ws n) ->
+  wsf = FileDisc.uline_ws (FileDisc.LPipe (PrEcho ws) n) ->
+  FileDisc.uline_ok (FileDisc.LPipe (PrEcho ws) n) ->
   lineN fcE adm_echo I = LPipes (PrEcho ws) n.
 Proof using.
   intros Hlws Hfb Hwsf Hok.
   destruct Hok as (Hws & Hn & Hlm).
-  assert (Hb : UkSh.ush_lastbody I = FileDisc.line_body (FileDisc.LPipe ws n)).
+  assert (Hb : UkSh.ush_lastbody I = FileDisc.line_body (FileDisc.LPipe (PrEcho ws) n)).
   { apply (fline_ok_pipes_words _ ws n Hfb Hws Hn).
     rewrite /UkSh.ush_lastbody -last_ws_lastbody -Hlws. exact Hwsf. }
   rewrite (_ : lineN fcE adm_echo I = pl_of (UkSh.ush_lastbody I)); [| reflexivity].
@@ -108,7 +108,7 @@ Qed.
 
 (* at most fifteen cats fit the line *)
 Lemma pls_cats_le (ws : list (list (bv 8))) (n : nat) :
-  FileDisc.uline_ok (FileDisc.LPipe ws n) -> (n <= 16)%nat.
+  FileDisc.uline_ok (FileDisc.LPipe (PrEcho ws) n) -> (n <= 16)%nat.
 Proof using.
   intros (_ & _ & Hlm). rewrite line_bytes_pipe_length in Hlm.
   unfold EchoDisc.line_max in Hlm. lia.
@@ -259,7 +259,7 @@ Section UShPipesLaw.
     pose proof (pls_cats_le ws n Hok_u) as Hn16.
     pose proof (pls_lineN I wsf ws n Hlws Hfbk Hwsf Hok_u) as HlN.
     assert (Hpos : (1 <= nlines I)%nat).
-    { apply nlines_pos_of_ws. rewrite -Hlws Hwsf. cbn [FileDisc.uline_ws].
+    { apply nlines_pos_of_ws. rewrite -Hlws Hwsf. cbn [FileDisc.uline_ws FileDisc.prod_words].
       pose proof (line_ok_pos ws Hok) as Hp. intros Hq.
       apply (f_equal length) in Hq. rewrite length_app in Hq. cbn [length] in Hq. lia. }
     pose proof (ukn_const_of_eq N' _ Hpeq (fun x y => eq_refl)) as Hcst.
@@ -269,7 +269,7 @@ Section UShPipesLaw.
     destruct Hfd0c as [wr0 Hl0]. destruct Hfd1p as [rb1 Hl1]. destruct Hfd2p as [rb2 Hl2].
     destruct n as [| n']; [lia |].
     (* ---- the line is the lexer's ---- *)
-    assert (Hbat : bat gf 0 (FileDisc.line_bytes (FileDisc.LPipe ws (S n')))).
+    assert (Hbat : bat gf 0 (FileDisc.line_bytes (FileDisc.LPipe (PrEcho ws) (S n')))).
     { intros j Hj. apply Hby. rewrite Hlen. exact Hj. }
     pose proof (ushq_lines_bars ws (replicate (S n') ushq_cat) gf 0%nat len
                   (lines_of_pipe ws (S n') gf len Hok Hn Hbat Hlen)) as Hbars.

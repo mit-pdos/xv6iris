@@ -568,16 +568,25 @@ Proof.
       rewrite (wl_lta_app_l FileDisc.cmd_cat_f [wl_nl] 0%nat
                  ltac:(rewrite FileDisc.cmd_cat_f_len; lia)).
       by vm_compute.
-    - (* the pipe line: its head is the echo line's, one suffix over *)
-      left.
-      pose proof (ush_wl_body_pos ws (proj1 Hok)) as Hwb.
-      rewrite FileDisc.line_bytes_body. cbn [FileDisc.line_body].
-      rewrite (wl_lta_app_l (wl_body ws ++ FileDisc.suf_barcats npc) [wl_nl] 0%nat
-                 ltac:(rewrite length_app; lia)).
-      rewrite (wl_lta_app_l (wl_body ws) (FileDisc.suf_barcats npc) 0%nat Hwb).
-      pose proof (line_ok_head_byte0 ws (proj1 Hok)) as Hh.
-      rewrite /wl_line (wl_lta_app_l (wl_body ws) [wl_nl] 0%nat Hwb) in Hh.
-      exact Hh. }
+    - (* the pipe line: its head is its producer's, one suffix over --
+         the echo line's, or [cat]'s *)
+      destruct ws as [ws | fn].
+      + left.
+        pose proof (ush_wl_body_pos ws (proj1 Hok)) as Hwb.
+        rewrite FileDisc.line_bytes_body.
+        cbn [FileDisc.line_body FileDisc.prod_body FileDisc.prod_words].
+        rewrite (wl_lta_app_l (wl_body ws ++ FileDisc.suf_barcats npc) [wl_nl] 0%nat
+                   ltac:(rewrite length_app; lia)).
+        rewrite (wl_lta_app_l (wl_body ws) (FileDisc.suf_barcats npc) 0%nat Hwb).
+        pose proof (line_ok_head_byte0 ws (proj1 Hok)) as Hh.
+        rewrite /wl_line (wl_lta_app_l (wl_body ws) [wl_nl] 0%nat Hwb) in Hh.
+        exact Hh.
+      + right. rewrite FileDisc.line_bytes_body. cbn [FileDisc.line_body].
+        rewrite (_ : FileDisc.prod_body (FileDisc.PrCatF fn)
+                     = FileDisc.fd_w_cat ++ wl_tail [fn]); [| reflexivity].
+        rewrite -!app_assoc.
+        rewrite (wl_lta_app_l FileDisc.fd_w_cat _ 0%nat ltac:(vm_compute; lia)).
+        by vm_compute. }
   lia.
 Qed.
 

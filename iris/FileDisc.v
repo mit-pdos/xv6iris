@@ -114,8 +114,50 @@ Definition fd_w_bar : list (bv 8) := sb "|"%string.
 Definition fd_w_cat : list (bv 8) := sb "cat"%string.
 Definition suf_barcat : list (bv 8) := sb " | cat"%string.
 
+(* ---- THE PRODUCER of a pipeline (cut C9b, moved down from [PipesDisc]):
+   the first command, [echo w1 .. wk] (the words [ws], command name
+   included) or [cat f].  It lives HERE because the shell loop's line type
+   [uline] names it ([LPipe p n]), so that [cat f | cat] lexes exactly as
+   sh reads it; [PipesDisc] re-exports these names. *)
+Inductive producer :=
+  | PrEcho (ws : list (list (bv 8)))
+  | PrCatF (f : list (bv 8)).
+
+Global Instance producer_eq_dec : EqDecision producer.
+Proof using. solve_decision. Defined.
+
+Definition prod_words (p : producer) : list (list (bv 8)) :=
+  match p with PrEcho ws => ws | PrCatF f => [fd_w_cat; f] end.
+Definition prod_body (p : producer) : list (bv 8) := wl_body (prod_words p).
+
+(* an admissible producer: an admissible echo line, or [cat] of a word *)
+Definition prod_ok (p : producer) : Prop :=
+  match p with PrEcho ws => line_ok ws | PrCatF f => wl_word f end.
+
+Global Instance prod_ok_dec p : Decision (prod_ok p).
+Proof using. destruct p; unfold prod_ok; apply _. Defined.
+
+Lemma fd_w_cat_word : wl_word fd_w_cat.
+Proof using. apply (bool_decide_unpack _). vm_compute. exact I. Qed.
+
+Lemma prod_wf (p : producer) : prod_ok p -> wl_wf (prod_words p).
+Proof using.
+  destruct p as [ws | f]; cbn [prod_ok prod_words]; intros H.
+  - exact (line_ok_wf ws H).
+  - unfold wl_wf. constructor; [exact fd_w_cat_word | constructor; [exact H | constructor]].
+Qed.
+
+Lemma prod_body_bytes p : prod_ok p -> Forall wl_body_byte (prod_body p).
+Proof using. intros Hp. exact (wl_body_bytes _ (prod_wf p Hp)). Qed.
+
+Lemma prod_words_ge2 p : prod_ok p -> (2 <= length (prod_words p))%nat.
+Proof using. destruct p as [ws | f]; cbn [prod_ok prod_words length]; [exact (line_ok_ge2 ws) | lia]. Qed.
+
+Lemma prod_words_ne p : prod_ok p -> prod_words p <> [].
+Proof using. intros Hp He. pose proof (prod_words_ge2 p Hp) as H. rewrite He in H. cbn in H. lia. Qed.
+
 (* [n] times the suffix, and its [n] times two words (cut C8: the pipeline
-   is [echo ws] followed by [n] bare cats) *)
+   is its producer followed by [n] bare cats) *)
 Definition suf_barcats (n : nat) : list (bv 8) := concat (replicate n suf_barcat).
 Definition w_barcats (n : nat) : list (list (bv 8)) :=
   concat (replicate n [fd_w_bar; fd_w_cat]).
@@ -124,7 +166,7 @@ Inductive uline :=
   | LEcho (ws : list (list (bv 8)))
   | LEchoF (ws : list (list (bv 8)))
   | LCat
-  | LPipe (ws : list (list (bv 8))) (n : nat).
+  | LPipe (p : producer) (n : nat).
 
 Global Instance uline_eq_dec : EqDecision uline.
 Proof using. solve_decision. Defined.
@@ -155,7 +197,7 @@ Definition uline_ws (l : uline) : list (list (bv 8)) :=
      ([uline_ws lu = wl_words (rest_of I)]); [PipeDisc.pline_ws] is the
      LEFT command's alone and cannot be reused here.  The two words are
      the bar and [cat]; [uline_ws_pipe] below is the equation. *)
-  | LPipe ws n => ws ++ w_barcats n
+  | LPipe p n => prod_words p ++ w_barcats n
   end.
 
 (* THE BODY the console cut keeps, and the LINE the user typed: the body
@@ -166,7 +208,7 @@ Definition line_body (l : uline) : list (bv 8) :=
   | LEcho ws => wl_body ws
   | LEchoF ws => wl_body ws ++ suf_gtf
   | LCat => cmd_cat_f
-  | LPipe ws n => wl_body ws ++ suf_barcats n
+  | LPipe p n => prod_body p ++ suf_barcats n
   end.
 
 Definition line_bytes (l : uline) : list (bv 8) := line_body l ++ [wl_nl].
@@ -182,8 +224,8 @@ Definition uline_ok (l : uline) : Prop :=
   | LEcho ws => line_ok ws
   | LEchoF ws => line_ok ws /\ (length (line_bytes (LEchoF ws)) < line_max)%nat
   | LCat => True
-  | LPipe ws n =>
-      line_ok ws /\ (1 <= n)%nat /\ (length (line_bytes (LPipe ws n)) < line_max)%nat
+  | LPipe p n =>
+      prod_ok p /\ (1 <= n)%nat /\ (length (line_bytes (LPipe p n)) < line_max)%nat
   end.
 
 Global Instance uline_ok_dec l : Decision (uline_ok l).
@@ -281,19 +323,16 @@ Proof using.
   rewrite w_barcats_S length_app IH. cbn [length]. lia.
 Qed.
 
-Lemma uline_ws_pipe (ws : list (list (bv 8))) (n : nat) :
-  line_ok ws -> wl_words (line_body (LPipe ws n)) = uline_ws (LPipe ws n).
+Lemma uline_ws_pipe (p : producer) (n : nat) :
+  prod_ok p -> wl_words (line_body (LPipe p n)) = uline_ws (LPipe p n).
 Proof using.
-  intro Hok.
-  assert (Hne : ws <> []).
-  { pose proof (line_ok_pos ws Hok) as Hp.
-    destruct ws as [| w r]; [cbn [length] in Hp; lia | discriminate]. }
+  intro Hok. pose proof (prod_words_ne p Hok) as Hne.
   destruct n as [| n].
   - cbn [line_body uline_ws]. unfold suf_barcats, w_barcats.
     cbn [replicate concat]. rewrite !app_nil_r.
-    exact (wl_words_body ws (line_ok_wf _ Hok)).
-  - exact (fd_wl_words_body_app ws (suf_barcats (S n)) (w_barcats (S n))
-             (line_ok_wf _ Hok) Hne (wl_words_barcats n)).
+    exact (wl_words_body _ (prod_wf p Hok)).
+  - exact (fd_wl_words_body_app (prod_words p) (suf_barcats (S n)) (w_barcats (S n))
+             (prod_wf p Hok) Hne (wl_words_barcats n)).
 Qed.
 
 (* ...and the redirect line's, the same way (RULING SLOT-WS, option B) *)
@@ -614,7 +653,7 @@ Proof using.
     rewrite (uline_ws_pipe ws' npc' Hok') in Hw.
     apply (f_equal length) in Hw. revert Hw.
     cbn [uline_ws]. rewrite length_app w_barcats_length.
-    pose proof (line_ok_ge2 ws' Hok') as H2.
+    pose proof (prod_words_ge2 ws' Hok') as H2.
     vm_compute (length (wl_words cmd_cat_f)). cbn [length]. lia.
 Qed.
 
@@ -664,8 +703,8 @@ Proof using.
     rewrite (uline_ws_pipe ws' npc' Hok') in Hw. cbn [uline_ws] in Hw.
     destruct npc' as [| m]; [lia |].
     rewrite w_barcats_S_r in Hw.
-    replace (ws' ++ w_barcats m ++ [fd_w_bar; fd_w_cat])
-      with (((ws' ++ w_barcats m) ++ [fd_w_bar]) ++ [fd_w_cat]) in Hw
+    replace (prod_words ws' ++ w_barcats m ++ [fd_w_bar; fd_w_cat])
+      with (((prod_words ws' ++ w_barcats m) ++ [fd_w_bar]) ++ [fd_w_cat]) in Hw
       by (rewrite -!app_assoc; reflexivity).
     replace (ws ++ [fd_w_gt; file])
       with ((ws ++ [fd_w_gt]) ++ [file]) in Hw
@@ -745,7 +784,7 @@ Proof using.
   - apply (bool_decide_unpack _). vm_compute. exact I.
   - apply Forall_app. split.
     + apply Forall_impl with (P := wl_body_byte);
-        [exact (wl_body_bytes ws (line_ok_wf _ (proj1 Hok))) |].
+        [exact (prod_body_bytes ws (proj1 Hok)) |].
       intros b Hb. left. exact (fbody_byte_of_body b Hb).
     + apply Forall_impl with (P := fun b => fbody_byte b \/ b = fd_bar);
         [exact (suf_barcats_bytes npc) |].
@@ -822,6 +861,23 @@ Definition fcont_ok (bs : list (bv 8)) : Prop :=
 
 Definition fstate_ok (s : fstate) : Prop :=
   match s with None => True | Some bs => fcont_ok bs end.
+
+(* THE FILES THE APPLICATION DESCRIBES at a state: [f], and nothing else
+   (cut C9b, moved down from [UkFileIface.fif_files], which is now this).
+   It is the content function a pipeline's [cat f] producer reads at the
+   round's state. *)
+Definition files_of (s : fstate) : list (bv 8) -> option (list (bv 8)) :=
+  fun p => if decide (p = fname_f) then s else None.
+
+Lemma files_of_f (s : fstate) : files_of s fname_f = s.
+Proof using. unfold files_of. case_decide; [reflexivity | done]. Qed.
+
+Lemma files_of_ne (s : fstate) (p : list (bv 8)) : p <> fname_f -> files_of s p = None.
+Proof using. intros Hp. unfold files_of. case_decide; [done | reflexivity]. Qed.
+
+Lemma files_of_some (s : fstate) (p c : list (bv 8)) :
+  files_of s p = Some c -> s = Some c.
+Proof using. unfold files_of. case_decide; [done | discriminate]. Qed.
 
 Lemma fcont_ok_nodollar bs : fcont_ok bs -> Forall nodollar bs.
 Proof using.
