@@ -307,6 +307,32 @@ naming `cons_res`/`is_conslock`/`console_inv` then needs an ambient era),
 maintained by consoleintr's store arm, vacuous at the boot allocation,
 carried by `cr_ghost`/`cr_racc` into `cons_placed`'s per-byte clause.
 
+S2k ERA (the owner's ruling on the follow-up above, `secc/s2k2`): DONE,
+kernel side, the era in the NAMES.  `UartNames.cons_names` gains `cn_era
+: nat`; `ConsoleInv.cons_era l k := ∀ p, p ∈ l -> obs_boots p.1 = k`
+(with `_nil`, `_prefix`, `_snoc`, `_lookup`), and `cons_res` /
+`cons_res_at` / `cr_ghost` / `ct_gh` carry `⌜cons_era (st ++ pd) (cn_era
+cn)⌝` after `cons_below`.  `cons_ghosts_alloc γu k` returns `⌜cn_era cn =
+k⌝`; BootShared calls it at `S gen_id` and exports `⌜cn_era cnm = S
+gen_id⌝` beside `cn_uart cnm = γd`, threaded through SystemAdequacy,
+`BootChain.boot_hart_primary`, `SpecMain`, `ProofMain` (and
+`mn_grp_printk`) as a premise `cn_era cn = S gen_id`.  The CAPS FACTS:
+`SpecConsoleintr.console_caps` gains `⌜cn_era cn = S gen_id⌝` (after
+`cn_uart cn = γu`), which consoleintr's store arm (`ct_cr`, `ct_store`,
+`ct_dflt`, `ct_gh_push`) spends against the byte's own `obs_boots hb = S
+gen_id`; on the reader side `SpecFileread.console_ready_app` and
+`fileread_dev_caps` gain `⌜cn_era fsc_cons = S gen_id⌝` (readers
+`console_ready_app_era`, `fileread_dev_caps_era`), and `SpecSysRead`
+takes it as a premise from `ProofSyscall`.  `cons_placed l lo k d hs`'s
+per-byte clause is now `(lo <= p) /\ hs !! j = Some h /\ obs_ends_in
+Uart0 h b /\ l !! p = Some (h, b) /\ obs_boots h = k`; consoleread's
+receipt states it at `k := cn_era cn`, fileread converts it to `S
+gen_id` (`cons_placed_era` off `fileread_dev_caps_era`), so
+`console_receipt` and `UkReadCons.uread_cons_ans` state it at `S gen_id`
+-- S5b reads the era straight off the receipt, no caps fact needed at
+the U tier.  `GenOutWild.lm_placed_wild_undisc` takes the extra era
+argument (its proof drops the new conjunct).
+
 STATUS (lane S5a, `secc/s5a` off main aa793e35c, design 10.12's UNION
 bullet, the claim/pure half): landed, tree green (VM log s5a-3: EXIT=0, no
 `Error`, second pass 0 compiles), audits system 13 / union 14 / tree 13

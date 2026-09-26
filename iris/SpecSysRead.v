@@ -455,6 +455,9 @@ Definition wp_sys_read_sconf_body
      at its final release, and this is what it opens.  It comes off
      [SpecFileread.console_ready_app] with the table. *)
   WpUart.uart_inv Uart0 (cn_uart fsc_cons) -∗
+  (* ...AND THE RING'S ERA IS THIS ONE (lane seccomp S2k, the follow-up),
+     off the same bundle ([SpecFileread.console_ready_app_era]) *)
+  ⌜cn_era fsc_cons = S gen_id⌝ -∗
   (* ---- THE CALLER'S INPUT, KEYED ON THE DESCRIPTOR ARGUMENT 0 NAMES
      ([sys_read_in], which is [SpecFileread.fileread_in] at [sys_fd_st]):
      the observation commit conjoined with the caller's refund on an open,

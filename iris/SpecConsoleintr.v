@@ -281,6 +281,10 @@ Section ConsoleCaps.
        is_txlock γtx γu ∗
        WpLock.is_lock γc a_cons "cons"%string (cons_res_at cn) ∗
        ⌜cn_uart cn = γu⌝ ∗
+       (* ...AND THE RING IS THIS ERA'S (lane seccomp S2k, the follow-up):
+          what lets the store arm keep [ConsoleInv.cons_res]'s era clause
+          with the byte's own stamp [obs_boots hb = S gen_id]. *)
+       ⌜cn_era cn = S gen_id⌝ ∗
        cons_echo_shift ∗ uart_inited γu ∗
        uarts_words)%I.
 

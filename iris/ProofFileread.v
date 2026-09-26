@@ -1616,6 +1616,9 @@ Section ProofFileread.
                 its final release. *)
              iPoseProof (fileread_dev_caps_lock with "Hconslk") as "#Hclk".
              iPoseProof (fileread_dev_caps_uart with "Hconslk") as "#Huinv".
+             (* ...and the ring's era, which reads consoleread's marked
+                receipt at [S gen_id] (lane seccomp S2k, the follow-up) *)
+             iDestruct (fileread_dev_caps_era with "Hconslk") as %Hconsera.
              iApply (wp_bltu_fall_s_sconf (mword_of_int (FR + 0x84))
                        (mword_of_int 54 : mword 13) Ra3 Ra4 D4 (K - 6)%nat b
                        ltac:(vm_compute; discriminate) ltac:(vm_compute; discriminate)
@@ -2094,7 +2097,8 @@ Section ProofFileread.
                   { iApply (console_receipt_of_dirty _ _ (us_M U) (m !!! Regidx Ra1)
                               n (mword_of_int r) dcr dccr curcr bscr Rd Rin
                               hscr slcr
-                              Hdb Hdcr Hb1cr (Hb4cr H0) Htagcr Hchdcr Hpldcr
+                              Hdb Hdcr Hb1cr (Hb4cr H0) Htagcr Hchdcr
+                              (cons_placed_era _ _ _ _ _ _ Hconsera Hpldcr)
                               with "Htagsc Hlbcr Hcred Hrd"). }
                   iApply (console_receipt_of_run _ _ (us_M U) (m !!! Regidx Ra1)
                             n (mword_of_int r) dcr dccr curcr bscr Rd Rin

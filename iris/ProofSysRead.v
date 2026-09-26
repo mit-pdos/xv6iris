@@ -350,12 +350,12 @@ Section ProofSysRead.
        -- so it must be introduced with [#], not threaded. *)
     (* [HP] is the caller's exit payload, relayed to fileread (R1): the
        keyed input is a wand from it and both arms give it back. *)
-    iIntros "Hcg Hcpu #Htext #Hdata Hpc #Hpenv Hpriv Hufrag #Hkenv #Hprocs Henv #Hci #Huinv Hin HP Hcont".
+    iIntros "Hcg Hcpu #Htext #Hdata Hpc #Hpenv Hpriv Hufrag #Hkenv #Hprocs Henv #Hci #Huinv %Hera Hin HP Hcont".
     (* THE DEVICE COLUMN, PROJECTED.  What the contract holds is the console
        invariant -- one persistent proposition out of [syscall_env]; what
        fileread asks for is the read column, and this is the projection.  It
        is persistent too, so nothing has to give it back. *)
-    iPoseProof (fileread_devsw_of_console fn Hrp Hdq with "Hci Huinv") as "#Hdev".
+    iPoseProof (fileread_devsw_of_console fn Hrp Hdq Hera with "Hci Huinv") as "#Hdev".
     (* depth 0 forces the held set empty, so this body needs no order
        premise of its own -- every [locks_below] its callees raise is
        [locks_below ∅ _], which [lkbelow] closes outright. *)

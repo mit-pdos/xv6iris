@@ -266,6 +266,7 @@ Section CrBodies.
        (hh : option (list mobs)) (L0 : list LogEntryDefs.log_entry) (gp : bool),
        ⌜cons_stored rr ww cur st bs ts⌝ ∗ ⌜cons_pend rr ww ee pd bs ts⌝ ∗
        ⌜cons_chain (st ++ pd)⌝ ∗ ⌜cons_below (st ++ pd) hh⌝ ∗
+       ⌜cons_era (st ++ pd) (cn_era cn)⌝ ∗
        cons_stored_auth cn st ∗ cons_cursor cn nrd ∗ cons_hi cn hh ∗
        (* THE INPUT LOG, EXACTLY, and what the ring knows about it (lane
           CONS-IO, milestone B): the copy loop never moves either, but the
@@ -290,7 +291,7 @@ Section CrBodies.
     iIntros "H". rewrite /cons_res.
     iDestruct "H" as (rr ww ee bs ts cur nrd ndl st pd hh L0 gp)
       "(Hrc & Hwc & Hec & %Hlb & %Hlt & %Hok & %Hrow & %Hst & %Hpd & %Hch &
-        %Hbl & Hdat & Hts & Ha & Hcu & Hhi & Hlm & %Hlog & Hdc & %Hnc &
+        %Hbl & %Her & Hdat & Hts & Ha & Hcu & Hhi & Hlm & %Hlog & Hdc & %Hnc &
         %Hdn & Hmk)".
     iExists rr, ww, ee, bs, ts.
     iFrame "Hrc Hwc Hec Hdat Hts".
@@ -298,7 +299,7 @@ Section CrBodies.
     iSplitR; [by iPureIntro |]. iSplitR; [by iPureIntro |].
     rewrite /cr_ghost. iExists cur, nrd, ndl, st, pd, hh, L0, gp.
     iFrame "Ha Hcu Hhi Hlm Hdc Hmk". iPureIntro. split_and!;
-      [exact Hst | exact Hpd | exact Hch | exact Hbl | exact Hlog
+      [exact Hst | exact Hpd | exact Hch | exact Hbl | exact Her | exact Hlog
       | exact Hnc | exact Hdn].
   Qed.
 
@@ -313,14 +314,14 @@ Section CrBodies.
     intros Hlb Hlt Hok Hrow.
     iIntros "Hrc Hwc Hec Hdat Hts Hgh". rewrite /cr_ghost.
     iDestruct "Hgh" as (cur nrd ndl st pd hh L0 gp)
-      "(%Hst & %Hpd & %Hch & %Hbl & Ha & Hcu & Hhi & Hlm & %Hlog & Hdc &
+      "(%Hst & %Hpd & %Hch & %Hbl & %Her & Ha & Hcu & Hhi & Hlm & %Hlog & Hdc &
         %Hnc & %Hdn & Hmk)".
     rewrite /cons_res.
     iExists rr, ww, ee, bs, ts, cur, nrd, ndl, st, pd, hh, L0, gp.
     iFrame "Hrc Hwc Hec Hdat Hts Ha Hcu Hhi Hlm Hdc Hmk".
     iPureIntro. split_and!;
       [exact Hlb | exact Hlt | exact Hok | exact Hrow
-       | exact Hst | exact Hpd | exact Hch | exact Hbl | exact Hlog
+       | exact Hst | exact Hpd | exact Hch | exact Hbl | exact Her | exact Hlog
        | exact Hnc | exact Hdn].
   Qed.
 
@@ -350,7 +351,7 @@ Section CrBodies.
     iIntros "H". rewrite /cons_res.
     iDestruct "H" as (rr ww ee bs ts cur nrd ndl st pd hh L0 gp)
       "(Hrc & Hwc & Hec & %Hlb & %Hlt & %Hok & %Hrow & %Hst & %Hpd & %Hch &
-        %Hbl & Hdat & Hts & Ha & Hcu & Hhi & Hlm & %Hlog & Hdc & %Hnc &
+        %Hbl & %Her & Hdat & Hts & Ha & Hcu & Hhi & Hlm & %Hlog & Hdc & %Hnc &
         %Hdn & Hmk)".
     iExists st, ((st ++ pd)%list), L0, gp, nrd, ndl.
     iFrame "Ha Hlm Hcu Hdc".
@@ -362,7 +363,7 @@ Section CrBodies.
     iFrame "Hrc Hwc Hec Hdat Hts Ha Hcu Hhi Hlm Hdc Hmk".
     iPureIntro. split_and!;
       [exact Hlb | exact Hlt | exact Hok | exact Hrow
-       | exact Hst | exact Hpd | exact Hch | exact Hbl | exact Hlog
+       | exact Hst | exact Hpd | exact Hch | exact Hbl | exact Her | exact Hlog
        | exact Hnc | exact Hdn'].
   Qed.
 
@@ -446,7 +447,7 @@ Section CrBodies.
       (hs : list (list mobs)) : iProp Σ :=
     match ord with
     | None => ((∃ sl : list (list mobs * bv 8), cons_stored_lb cn sl ∗
-                  ⌜cons_chain sl⌝ ∗ ⌜cons_placed sl 0 d hs⌝) ∗
+                  ⌜cons_chain sl⌝ ∗ ⌜cons_placed sl 0 (cn_era cn) d hs⌝) ∗
                (⌜d = 0%nat⌝ ∨ cons_dirty_lb cn))%I
     | Some n0 =>
         ((∃ sl : list (list mobs * bv 8),
@@ -454,7 +455,7 @@ Section CrBodies.
             cons_stored_lb cn sl ∗
             ⌜cons_window sl n0 d bs hs⌝ ∗ ⌜cons_chain sl⌝)
          ∨ (∃ sl : list (list mobs * bv 8), cons_stored_lb cn sl ∗
-              ⌜cons_chain sl⌝ ∗ ⌜cons_placed sl n0 d hs⌝) ∗
+              ⌜cons_chain sl⌝ ∗ ⌜cons_placed sl n0 (cn_era cn) d hs⌝) ∗
            cons_rdtok cn (n0 + d)%nat ∗ cons_dl cn n0 ∗ cons_dirty_lb cn)%I
     end.
 
@@ -472,7 +473,7 @@ Section CrBodies.
       (hs : list (list mobs)) : iProp Σ :=
     match ord with
     | None => ((∃ sl : list (list mobs * bv 8), cons_stored_lb cn sl ∗
-                  ⌜cons_chain sl⌝ ∗ ⌜cons_placed sl 0 d hs⌝) ∗
+                  ⌜cons_chain sl⌝ ∗ ⌜cons_placed sl 0 (cn_era cn) d hs⌝) ∗
                (⌜d = 0%nat⌝ ∨ cons_dirty_lb cn))%I
     | Some n0 =>
         ((∃ sl : list (list mobs * bv 8),
@@ -481,7 +482,7 @@ Section CrBodies.
             cons_stored_lb cn sl ∗
             ⌜cons_window sl n0 d bs hs⌝ ∗ ⌜cons_chain sl⌝)
          ∨ (∃ sl : list (list mobs * bv 8), cons_stored_lb cn sl ∗
-              ⌜cons_chain sl⌝ ∗ ⌜cons_placed sl n0 d hs⌝) ∗
+              ⌜cons_chain sl⌝ ∗ ⌜cons_placed sl n0 (cn_era cn) d hs⌝) ∗
            cons_rdtok cn (n0 + dc)%nat ∗ cons_dl cn n0 ∗ cons_dirty_lb cn)%I
     end.
 
@@ -524,7 +525,7 @@ Section CrBodies.
         (* ...and where it did not, the credential and where each byte
            came from: the stored position of every delivered byte, at or
            after the start [cur] this call reports (lane seccomp S2k) *)
-        ∨ cons_dirty_cred Wd ∗ ⌜cons_chain sl⌝ ∗ ⌜cons_placed sl cur d hs⌝) ∗
+        ∨ cons_dirty_cred Wd ∗ ⌜cons_chain sl⌝ ∗ ⌜cons_placed sl cur (cn_era cn) d hs⌝) ∗
        cons_out cn Wd ord cur dc)%I.
 
   (* ...AND THIS IS WHERE THE BOUNDARY'S LINK IS FIRED (lane CONS-IO,
@@ -666,7 +667,7 @@ Section CrBodies.
     iPoseProof (is_conslock_cred with "Hlk") as "#Hcinv".
     rewrite /cr_ghost.
     iDestruct "Hgh" as (cur nrd ndl st pd hh L0 gp)
-      "(%Hst & %Hpd & %Hch & %Hbl & Ha & Hcu & Hhi & Hlm & %Hlog & Hdc &
+      "(%Hst & %Hpd & %Hch & %Hbl & %Her & Ha & Hcu & Hhi & Hlm & %Hlog & Hdc &
         %Hnc & %Hdn & Hmk)".
     pose proof Hst as Hst0. destruct Hst0 as [Hlst Hstk].
     destruct (Hstk 0%Z ltac:(lia)) as (h' & b' & Hs0 & Ht0 & He0 & Hb0).
@@ -699,6 +700,7 @@ Section CrBodies.
             iFrame "Ha Hcu Hhi Hlm Hdc".
             iSplitR; [by iPureIntro |]. iSplitR; [by iPureIntro |].
             iSplitR; [by iPureIntro |]. iSplitR; [by iPureIntro |].
+            iSplitR; [by iPureIntro |].
             iSplitR; [iPureIntro; exact Hlog |].
             iSplitR; [iPureIntro; lia |]. iSplitR; [iPureIntro; lia |].
             iLeft. by iPureIntro. }
@@ -724,6 +726,7 @@ Section CrBodies.
             iFrame "Ha Hcu Hhi Hlm Hdc".
             iSplitR; [by iPureIntro |]. iSplitR; [by iPureIntro |].
             iSplitR; [by iPureIntro |]. iSplitR; [by iPureIntro |].
+            iSplitR; [by iPureIntro |].
             iSplitR; [iPureIntro; exact Hlog |].
             iSplitR; [iPureIntro; lia |]. iSplitR; [iPureIntro; lia |].
             iRight. iExact "Hdt". }
@@ -735,9 +738,10 @@ Section CrBodies.
              [n0 + d] never exceeds. *)
           iRight. iSplitR.
           { iExists st. iFrame "Hstlb". iPureIntro. split; [exact (cons_chain_prefix _ _ Hstpd Hch) |].
-            apply (cons_placed_snoc st n0 d cur hs h b); [| lia | exact Hs0 | exact Hends].
-            exact (cons_placed_prefix sl st n0 d hs Hpfx
-                     (cons_placed_of_window sl n0 d src hs Hwin)). }
+            apply (cons_placed_snoc st n0 (cn_era cn) d cur hs h b);
+              [| lia | exact Hs0 | exact Hends | exact (cons_era_lookup (st ++ pd) (cn_era cn) cur h b Her (lookup_app_l_Some st pd cur (h, b) Hs0))].
+            exact (cons_placed_prefix sl st n0 (cn_era cn) d hs Hpfx
+                     (cons_placed_of_window sl n0 (cn_era cn) d src hs (cons_era_prefix sl (st ++ pd) (cn_era cn) (transitivity Hpfx Hstpd) Her) Hwin)). }
           iFrame "Hrd".
           iSplitL "Hdl"; [iApply (cr_dlc_dl with "Hdl") |]. iExact "Hdt".
       + (* ...and the same on a run that was already marked: the token is
@@ -753,13 +757,15 @@ Section CrBodies.
             iFrame "Ha Hcu Hhi Hlm Hdc".
           iSplitR; [by iPureIntro |]. iSplitR; [by iPureIntro |].
           iSplitR; [by iPureIntro |]. iSplitR; [by iPureIntro |].
+          iSplitR; [by iPureIntro |].
           iSplitR; [iPureIntro; exact Hlog |].
           iSplitR; [iPureIntro; lia |]. iSplitR; [iPureIntro; lia |].
           iRight. iExact "Hdt". }
         iRight. iFrame "Hrd Hdl". iSplitR; [| iExact "Hdt"].
         iExists st. iFrame "Hstlb". iPureIntro. split; [exact (cons_chain_prefix _ _ Hstpd Hch) |].
-        apply (cons_placed_snoc st n0 d cur hs h b); [| lia | exact Hs0 | exact Hends].
-        exact (cons_placed_prefix sl st n0 d hs Hpfx Hplsl).
+        apply (cons_placed_snoc st n0 (cn_era cn) d cur hs h b);
+          [| lia | exact Hs0 | exact Hends | exact (cons_era_lookup (st ++ pd) (cn_era cn) cur h b Her (lookup_app_l_Some st pd cur (h, b) Hs0))].
+        exact (cons_placed_prefix sl st n0 (cn_era cn) d hs Hpfx Hplsl).
     - rewrite /cr_racc.
       iDestruct "Hacc" as "[Hsl _]".
       iDestruct "Hsl" as (sl) "(#Hsl & %Hchsl & %Hplsl)".
@@ -772,13 +778,15 @@ Section CrBodies.
         iFrame "Ha Hcu Hhi Hlm Hdc".
         iSplitR; [by iPureIntro |]. iSplitR; [by iPureIntro |].
         iSplitR; [by iPureIntro |]. iSplitR; [by iPureIntro |].
+        iSplitR; [by iPureIntro |].
         iSplitR; [iPureIntro; exact Hlog |].
         iSplitR; [iPureIntro; lia |]. iSplitR; [iPureIntro; lia |].
         iRight. iExact "Hdt". }
       iSplitR; [| iRight; iExact "Hdt"].
       iExists st. iFrame "Hstlb". iPureIntro. split; [exact (cons_chain_prefix _ _ Hstpd Hch) |].
-      apply (cons_placed_snoc st 0 d cur hs h b); [| lia | exact Hs0 | exact Hends].
-      exact (cons_placed_prefix sl st 0 d hs Hpfx Hplsl).
+      apply (cons_placed_snoc st 0 (cn_era cn) d cur hs h b);
+        [| lia | exact Hs0 | exact Hends | exact (cons_era_lookup (st ++ pd) (cn_era cn) cur h b Her (lookup_app_l_Some st pd cur (h, b) Hs0))].
+      exact (cons_placed_prefix sl st 0 (cn_era cn) d hs Hpfx Hplsl).
   Qed.
 
   (* THE READ'S FIRST LOOK AT THE RING.  Everything the run will earn
@@ -795,7 +803,7 @@ Section CrBodies.
   Proof using .
     iIntros "Hgh Hpay Hrp". rewrite /cr_ghost.
     iDestruct "Hgh" as (cur nrd ndl st pd hh L0 gp)
-      "(%Hst & %Hpd & %Hch & %Hbl & Ha & Hcu & Hhi & Hlm & %Hlog & Hdc &
+      "(%Hst & %Hpd & %Hch & %Hbl & %Her & Ha & Hcu & Hhi & Hlm & %Hlog & Hdc &
         %Hnc & %Hdn & Hmk)".
     iDestruct (cons_stored_lb_get with "Ha") as "[Ha #Hstlb]".
     assert (Hstpd : st `prefix_of` (st ++ pd)%list) by (by exists pd).
@@ -811,7 +819,7 @@ Section CrBodies.
       2:{ iSplitL "Ha Hcu Hhi Hlm Hdc Hmk".
           { iExists cur, nrd, ndl, st, pd, hh, L0, gp.
             iFrame "Ha Hcu Hhi Hlm Hdc Hmk". iPureIntro. split_and!;
-              [exact Hst | exact Hpd | exact Hch | exact Hbl | exact Hlog
+              [exact Hst | exact Hpd | exact Hch | exact Hbl | exact Her | exact Hlog
               | exact Hnc | exact Hdn]. }
           iRight. rewrite Nat.add_0_r. iFrame "Hpay".
           iSplitR; [iExists st; iFrame "Hstlb"; iPureIntro;
@@ -829,6 +837,7 @@ Section CrBodies.
         { iExists cur, nrd, ndl, st, pd, hh, L0, gp. iFrame "Ha Hcu Hhi Hlm Hdc".
           iSplitR; [by iPureIntro |]. iSplitR; [by iPureIntro |].
           iSplitR; [by iPureIntro |]. iSplitR; [by iPureIntro |].
+          iSplitR; [by iPureIntro |].
           iSplitR; [iPureIntro; exact Hlog |].
           iSplitR; [iPureIntro; lia |]. iSplitR; [iPureIntro; lia |].
           iLeft. by iPureIntro. }
@@ -846,6 +855,7 @@ Section CrBodies.
         { iExists cur, nrd, ndl, st, pd, hh, L0, gp. iFrame "Ha Hcu Hhi Hlm Hdc".
           iSplitR; [by iPureIntro |]. iSplitR; [by iPureIntro |].
           iSplitR; [by iPureIntro |]. iSplitR; [by iPureIntro |].
+          iSplitR; [by iPureIntro |].
           iSplitR; [iPureIntro; exact Hlog |].
           iSplitR; [iPureIntro; lia |]. iSplitR; [iPureIntro; lia |].
           iRight. iExact "Hdt". }
@@ -858,7 +868,7 @@ Section CrBodies.
       iSplitL "Ha Hcu Hhi Hlm Hdc Hmk".
       { iExists cur, nrd, ndl, st, pd, hh, L0, gp. iFrame "Ha Hcu Hhi Hlm Hdc Hmk".
         iPureIntro. split_and!;
-          [exact Hst | exact Hpd | exact Hch | exact Hbl | exact Hlog
+          [exact Hst | exact Hpd | exact Hch | exact Hbl | exact Her | exact Hlog
           | exact Hnc | exact Hdn]. }
       iSplitR; [iExists st; iFrame "Hstlb"; iPureIntro;
                    split; [exact (cons_chain_prefix _ _ Hstpd Hch) | apply cons_placed_0] |]. iLeft. by iPureIntro.
@@ -892,7 +902,7 @@ Section CrBodies.
     iPoseProof (is_conslock_cred with "Hlk") as "#Hcinv".
     rewrite /cr_ghost.
     iDestruct "Hgh" as (cur nrd ndl st pd hh L0 gp)
-      "(%Hst & %Hpd & %Hch & %Hbl & Ha & Hcu & Hhi & Hlm & %Hlog & Hdc &
+      "(%Hst & %Hpd & %Hch & %Hbl & %Her & Ha & Hcu & Hhi & Hlm & %Hlog & Hdc &
         %Hnc & %Hdn & Hmk)".
     pose proof (cons_stored_pop rr ww cur st bs ts Hge Hst) as Hst'.
     pose proof (cons_pend_shift rr ww ee pd bs ts Hge Hpd) as Hpd'.
@@ -929,6 +939,7 @@ Section CrBodies.
             iFrame "Ha Hcu Hhi Hlm Hdc".
             iSplitR; [by iPureIntro |]. iSplitR; [by iPureIntro |].
             iSplitR; [by iPureIntro |]. iSplitR; [by iPureIntro |].
+            iSplitR; [by iPureIntro |].
             iSplitR; [iPureIntro; exact Hlog |].
             iSplitR; [iPureIntro; lia |]. iSplitR; [iPureIntro; lia |].
             iLeft. by iPureIntro. }
@@ -953,6 +964,7 @@ Section CrBodies.
             iFrame "Ha Hcu Hhi Hlm Hdc".
             iSplitR; [by iPureIntro |]. iSplitR; [by iPureIntro |].
             iSplitR; [by iPureIntro |]. iSplitR; [by iPureIntro |].
+            iSplitR; [by iPureIntro |].
             iSplitR; [iPureIntro; exact Hlog |].
             iSplitR; [iPureIntro; lia |]. iSplitR; [iPureIntro; lia |].
             iRight. iExact "Hdt". }
@@ -960,8 +972,8 @@ Section CrBodies.
              [dl] freezes where it stood (lane CONS-IO, milestone B). *)
           iRight. iSplitR.
           { iExists st. iFrame "Hstlb". iPureIntro. split; [exact (cons_chain_prefix _ _ Hstpd Hch) |].
-            exact (cons_placed_prefix sl st n0 d hs Hpfx
-                     (cons_placed_of_window sl n0 d src hs Hwin)). }
+            exact (cons_placed_prefix sl st n0 (cn_era cn) d hs Hpfx
+                     (cons_placed_of_window sl n0 (cn_era cn) d src hs (cons_era_prefix sl (st ++ pd) (cn_era cn) (transitivity Hpfx Hstpd) Her) Hwin)). }
           iFrame "Hrd".
           iSplitL "Hdl"; [iApply (cr_dlc_dl with "Hdl") |]. iExact "Hdt".
       + iDestruct (cons_cursor_agree with "Hcu Hrd") as %Hnrd. subst nrd.
@@ -972,6 +984,7 @@ Section CrBodies.
             iFrame "Ha Hcu Hhi Hlm Hdc".
           iSplitR; [by iPureIntro |]. iSplitR; [by iPureIntro |].
           iSplitR; [by iPureIntro |]. iSplitR; [by iPureIntro |].
+          iSplitR; [by iPureIntro |].
           iSplitR; [iPureIntro; exact Hlog |].
           iSplitR; [iPureIntro; lia |]. iSplitR; [iPureIntro; lia |].
           iRight. iExact "Hdt". }
@@ -985,6 +998,7 @@ Section CrBodies.
         iFrame "Ha Hcu Hhi Hlm Hdc".
         iSplitR; [by iPureIntro |]. iSplitR; [by iPureIntro |].
         iSplitR; [by iPureIntro |]. iSplitR; [by iPureIntro |].
+        iSplitR; [by iPureIntro |].
         iSplitR; [iPureIntro; exact Hlog |].
         iSplitR; [iPureIntro; lia |]. iSplitR; [iPureIntro; lia |].
         iRight. iExact "Hdt". }

@@ -1084,7 +1084,7 @@ Section SyscallVocab.
   Proof using .
     iIntros "Henv".
     iDestruct (syscall_env_world with "Henv") as (γtl pd pav pu) "(_ & #Hcc & _)".
-    iDestruct "Hcc" as (γtx γc cn) "(_ & _ & _ & _ & _ & #Hwords)".
+    iDestruct "Hcc" as (γtx γc cn) "(_ & _ & _ & _ & _ & _ & #Hwords)".
     iApply (SpecUartPutc.uarts_words_base Uart0 with "Hwords").
   Qed.
 
@@ -6146,6 +6146,7 @@ Section SyscallArms.
        them. *)
     iDestruct (syscall_env_console with "Henvc") as "#Hcready".
     iPoseProof (SpecFileread.console_ready_app_uart with "Hcready") as "#Huinv".
+    iPoseProof (SpecFileread.console_ready_app_era with "Hcready") as "#Hera".
     iDestruct "Hcready" as "[Hcr0 _]". iDestruct "Hcr0" as (γcon) "#Hci".
     iDestruct (sysc_fileread_env γf γcon (proc_addr j) fn with "Hfsenv Hsl")
       as "[Hfse Hback]".
@@ -6173,7 +6174,7 @@ Section SyscallArms.
               (rf_F fdep) (rf_ret fdep) (rf_in fdep) (rf_pq fdep) (rf_pqe fdep) True%I
               ltac:(lia) Hj Hgamma Hlen Hv0 Hv1 Hv2
               eq_refl eq_refl eq_refl
-              with "Hcg Hcpu Htext Hdata Hpc Hpanic Hpriv Hufrag Hkalloc Hprocs Hfse Hci Huinv Hsrin Hnil").
+              with "Hcg Hcpu Htext Hdata Hpc Hpanic Hpriv Hufrag Hkalloc Hprocs Hfse Hci Huinv Hera Hsrin Hnil").
     iIntros (CIDy Hsy mf r P' dw bsw)
       "%Hcs %Hextz %Hdwle %Htie %Hmfa0 Hcg Hcpu Hpc Hpriv Hufrag _ Hout Harms".
     (* WHAT THE PROCESS GETS BACK: the arm's own payout, at the descriptor

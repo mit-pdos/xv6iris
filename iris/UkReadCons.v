@@ -206,8 +206,9 @@ Section UkReadCons.
      says WHERE THE BYTES CAME FROM (lane seccomp S2k, the kernel's
      [SpecFileread.console_receipt] relayed): a bound [sl] on the ring's
      stored sequence, its order, and for each delivered byte a stored
-     position at or after [cur] with that byte's history -- no window, and
-     no promise that the positions increase. *)
+     position at or after [cur] with that byte's history, which is THIS
+     era's ([S gen_id]) -- no window, and no promise that the positions
+     increase. *)
   Definition uread_cons_ans (cnm : cons_names)
       (Rd : nat -> nat -> iProp Σ)
       (Rin : list (list mobs * bv 8) -> iProp Σ)
@@ -223,7 +224,7 @@ Section UkReadCons.
         ∨ cons_dirty_cred app_rdcred
           ∗ ∃ sl : list (list mobs * bv 8),
               ucons_stored_lb cnm sl ∗ ⌜cons_chain sl⌝ ∗
-              ⌜cons_placed sl cur dd hs⌝))%I.
+              ⌜cons_placed sl cur (S gen_id) dd hs⌝))%I.
 
   (* =================================================================== *)
   (*  4.  THE LEAF                                                        *)

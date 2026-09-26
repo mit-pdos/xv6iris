@@ -542,6 +542,9 @@ Section SpecMain.
     (* the console ring's names carry the RECEIVE side's, which is where the
        high-water mark's two halves live (app-echo.md, CONS-CURSOR C2) *)
     cn_uart cn = γd ->
+    (* ...and the ring is THIS era's (lane seccomp S2k, the follow-up):
+       [ConsoleInv.cons_ghosts_alloc] records the era in the names *)
+    cn_era cn = Datatypes.S gen_id ->
     (* the inode region is nonempty.  It is [BootShared.fs_boot_image_wf]'s
        fifth conjunct, and it reaches here as a PURE premise rather than as
        one of [fs_boot_supply]'s ties because the era holds it about [nib]

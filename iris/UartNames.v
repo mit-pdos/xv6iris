@@ -141,10 +141,20 @@ Record uart_names := UartNames {
               because the credential is an arbitrary application [iProp] and
               a lock payload must be timeless; the credential lives in the
               escrow invariant beside the lock handle
-              ([ConsoleInv.cons_cred_inv]). *)
+              ([ConsoleInv.cons_cred_inv]).
+     cn_era   the BOOT ERA the ring belongs to, a plain number fixed when
+              the record is built (lane seccomp S2k, the follow-up ruling):
+              every entry the ring stores or holds pending arrived in this
+              era ([ConsoleInv.cons_era]).  A name and not a ghost because
+              the ring is re-founded empty at every boot, so the era is a
+              fact about the record, and [ConsoleInv] need not know which
+              era is current -- the caps that do know
+              ([SpecConsoleintr.console_caps], [SpecFileread.fileread_dev_caps])
+              say [cn_era cn = S gen_id]. *)
 Record cons_names := ConsNames {
   cn_uart  : uart_names;
   cn_log   : gname;
   cn_rd    : gname;
   cn_dirty : gname;
+  cn_era   : nat;
 }.

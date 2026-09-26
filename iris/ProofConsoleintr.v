@@ -597,6 +597,8 @@ Section CtBodies.
        ⌜ cons_pend rr ww ee pd bs ts ⌝ ∗
        ⌜ cons_chain (st ++ pd) ⌝ ∗
        ⌜ cons_below (st ++ pd) hh ⌝ ∗
+       (* THE ERA ([ConsoleInv.cons_res]'s, the S2k follow-up) *)
+       ⌜ cons_era (st ++ pd) (cn_era cn) ⌝ ∗
        cons_stored_auth cn st ∗ cons_cursor cn nrd ∗ cons_hi cn hh ∗
        cons_logm cn L0 ∗ ⌜ cons_owed L0 pe (st ++ pd) gp ⌝ ∗
        (* THE DELIVERED-COUNT BOUND (relax-d2, lane K2), exactly
@@ -618,14 +620,14 @@ Section CtBodies.
     intros Hlb Hlt Hok Hrow.
     iIntros "Hrc Hwc Hec Hdat Hts Hgh".
     iDestruct "Hgh" as (cur nrd ndl st pd hh L0 gp)
-      "(%Hst & %Hpd & %Hch & %Hbl & Ha & Hcur & Hhi & Hlm & %Hlog & Hdc &
+      "(%Hst & %Hpd & %Hch & %Hbl & %Hera & Ha & Hcur & Hhi & Hlm & %Hlog & Hdc &
         %Hnc & %Hdn & Hmk)".
     rewrite /cons_res.
     iExists rr, ww, ee, bs, ts, cur, nrd, ndl, st, pd, hh, L0, gp.
     iFrame "Hrc Hwc Hec Hdat Hts Ha Hcur Hhi Hlm Hdc Hmk".
     iPureIntro. split_and!;
       [ exact Hlb | exact Hlt | exact Hok | exact Hrow | exact Hst | exact Hpd
-      | exact Hch | exact Hbl | exact Hlog | exact Hnc | exact Hdn ].
+      | exact Hch | exact Hbl | exact Hera | exact Hlog | exact Hnc | exact Hdn ].
   Qed.
 
   Lemma ct_res_gh `{XI : CurCtx} (cn : cons_names) :
@@ -640,7 +642,7 @@ Section CtBodies.
     iIntros "H". rewrite /cons_res.
     iDestruct "H" as (rr ww ee bs ts cur nrd ndl st pd hh L0 gp)
       "(Hrc & Hwc & Hec & %Hlb & %Hlt & %Hok & %Hrow & %Hst & %Hpd & %Hch &
-        %Hbl & Hdat & Hts & Ha & Hcur & Hhi & Hlm & %Hlog & Hdc & %Hnc &
+        %Hbl & %Hera & Hdat & Hts & Ha & Hcur & Hhi & Hlm & %Hlog & Hdc & %Hnc &
         %Hdn & Hmk)".
     iExists rr, ww, ee, bs, ts.
     iSplitR; [by iPureIntro |]. iSplitR; [by iPureIntro |].
@@ -648,7 +650,7 @@ Section CtBodies.
     iFrame "Hrc Hwc Hec Hdat Hts".
     rewrite /ct_gh. iExists cur, nrd, ndl, st, pd, hh, L0, gp.
     iFrame "Ha Hcur Hhi Hlm Hdc Hmk". iPureIntro. split_and!;
-      [ exact Hst | exact Hpd | exact Hch | exact Hbl | exact Hlog
+      [ exact Hst | exact Hpd | exact Hch | exact Hbl | exact Hera | exact Hlog
       | exact Hnc | exact Hdn ].
   Qed.
 
@@ -679,7 +681,7 @@ Section CtBodies.
   Proof using .
     intros Hok Hfull. iIntros "Hgh".
     iDestruct "Hgh" as (cur nrd ndl st pd hh L0 gp)
-      "(%Hst & %Hpd & %Hch & %Hbl & Ha & Hcur & Hhi & Hlm & %Hlog & Hdc &
+      "(%Hst & %Hpd & %Hch & %Hbl & %Hera & Ha & Hcur & Hhi & Hlm & %Hlog & Hdc &
         %Hnc & %Hdn & Hmk)".
     iExists L0, ndl.
     iSplitR.
@@ -695,7 +697,7 @@ Section CtBodies.
     iFrame "Hlm Hdc". iIntros "Hlm Hdc".
     iExists cur, nrd, ndl, st, pd, hh, L0, gp.
     iFrame "Ha Hcur Hhi Hlm Hdc Hmk". iPureIntro. split_and!;
-      [ exact Hst | exact Hpd | exact Hch | exact Hbl | exact Hlog
+      [ exact Hst | exact Hpd | exact Hch | exact Hbl | exact Hera | exact Hlog
       | exact Hnc | exact Hdn ].
   Qed.
 
@@ -720,7 +722,7 @@ Section CtBodies.
   Proof using .
     intro Hne. iIntros "Hgh".
     iDestruct "Hgh" as (cur nrd ndl st pd hh L0 gp)
-      "(%Hst & %Hpd & %Hch & %Hbl & Ha & Hcur & Hhi & Hlm & %Hlog & Hdc &
+      "(%Hst & %Hpd & %Hch & %Hbl & %Hera & Ha & Hcur & Hhi & Hlm & %Hlog & Hdc &
         %Hnc & %Hdn & Hmk)".
     pose proof (cons_sub_ne ee ww Hne) as Hge.
     pose proof (proj1 Hpd) as Hlpd.
@@ -744,6 +746,8 @@ Section CtBodies.
         [ apply prefix_app; exact Hpfx | exact Hch ].
     - apply (cons_below_prefix (st ++ removelast pd) (st ++ pd) hh);
         [ apply prefix_app; exact Hpfx | exact Hbl ].
+    - apply (cons_era_prefix (st ++ removelast pd) (st ++ pd));
+        [ apply prefix_app; exact Hpfx | exact Hera ].
     - destruct Hlog as [-> Hall]. split; [reflexivity |].
       intro cs. apply (cons_log_ok_pop _ _ (last pd dflt));
         [ rewrite <- Hsnoc; exact Hch | rewrite <- Hsnoc; exact (Hall cs) ].
@@ -763,7 +767,7 @@ Section CtBodies.
   Proof using .
     intro Hok. iIntros "Hgh".
     iDestruct "Hgh" as (cur nrd ndl st pd hh L0 gp)
-      "(%Hst & %Hpd & %Hch & %Hbl & Ha & Hcur & Hhi & Hlm & %Hlog & Hdc &
+      "(%Hst & %Hpd & %Hch & %Hbl & %Hera & Ha & Hcur & Hhi & Hlm & %Hlog & Hdc &
         %Hnc & %Hdn & Hmk)".
     iMod (cons_stored_append cn st pd with "Ha") as "Ha".
     iModIntro. rewrite /ct_gh.
@@ -773,6 +777,7 @@ Section CtBodies.
     split_and!;
       [ exact (cons_stored_commit rr ww ee cur st pd bs ts Hok Hst Hpd)
       | exact (cons_pend_commit rr ee bs ts) | exact Hch | exact Hbl
+      | exact Hera
       (* THE SEQUENCE DOES NOT MOVE: a commit only re-labels which of its
          entries are committed, so every input-log clause is unchanged. *)
       | exact Hlog | exact Hnc | exact Hdn ].
@@ -834,6 +839,9 @@ Section CtBodies.
        own equation -- so it is a premise here rather than a rewrite at
        every call site. *)
     cn_uart cn = γu ->
+    (* ...and the ring is THIS era's ([console_caps]'s other equation), so
+       the byte's own era stamp is the ring's (the S2k follow-up) *)
+    cn_era cn = S gen_id ->
     length bs = INPUT_BUF_SIZE -> length ts = INPUT_BUF_SIZE ->
     cons_ok rr ww ee ->
     (bv_unsigned (sub_vec ee rr) < Z.of_nat INPUT_BUF_SIZE)%Z ->
@@ -863,10 +871,10 @@ Section CtBodies.
       ct_gh cn None rr ww (add_vec ee (mword_of_int 1 : mword 32))
         (<[i := cons_xlate c]> bs) (<[i := Some h]> ts).
   Proof using .
-    intros <- Hlb Hlt Hok Hroom Hi Hends Hx Hxg Hes Hk3 Hk1.
+    intros <- Hcne Hlb Hlt Hok Hroom Hi Hends Hx Hxg Hes Hk3 Hk1.
     iIntros "#Hinv Hhi0 Hlgh (%Hsh & %Hbh & Harm & Hap) Hgh".
     iDestruct "Hgh" as (cur nrd ndl st pd hh1 L0 gp)
-      "(%Hst & %Hpd & %Hch & %Hbl & Ha & Hcur & Hhi & Hlm & %Hlog & Hdc &
+      "(%Hst & %Hpd & %Hch & %Hbl & %Hera & Ha & Hcur & Hhi & Hlm & %Hlog & Hdc &
         %Hnc & %Hdn & Hmk)".
     (* the two halves of the mark agree, which is what makes the ambient
        [ohist_ext hh h] a statement about the RING's own picture *)
@@ -892,6 +900,8 @@ Section CtBodies.
                Hends Hpd).
     - exact (cons_chain_snoc ((st ++ pd)%list) hh h c Hch Hbl Hx).
     - exact (cons_below_snoc ((st ++ pd)%list) hh h c Hbl Hx).
+    - apply (cons_era_snoc ((st ++ pd)%list) (cn_era cn) h c Hera).
+      rewrite Hcne. exact Hbh.
     - exact (cons_log_ok_push L0 ((st ++ pd)%list) gp h c Hch Hbelow
                (cons_gtop_of_below _ hh h Hbl Hx) Hlog).
     - exact Hnc.
@@ -928,7 +938,7 @@ Section CtBodies.
     intros <- Hends Hxg Hes Hk3 Hk1.
     iIntros "#Hinv Hlgh (%Hsh & %Hbh & Harm & Hap) Hgh".
     iDestruct "Hgh" as (cur nrd ndl st pd hh L0 gp)
-      "(%Hst & %Hpd & %Hch & %Hbl & Ha & Hcur & Hhi & Hlm & %Hlog & Hdc &
+      "(%Hst & %Hpd & %Hch & %Hbl & %Hera & Ha & Hcur & Hhi & Hlm & %Hlog & Hdc &
         %Hnc & %Hdn & Hmk)".
     rewrite /cons_logm.
     iMod (uart_inv_cons_close (cn_uart cn) h c cs j hg L0 Φ
@@ -940,7 +950,7 @@ Section CtBodies.
     iExists cur, nrd, ndl, st, pd, hh, ((L0 ++ [(h, c, [])])%list), gp.
     iFrame "Ha Hcur Hhi". rewrite /cons_logm /uart_logm. iFrame "Hlm".
     iFrame "Hdc Hmk". iPureIntro. split_and!;
-      [ exact Hst | exact Hpd | exact Hch | exact Hbl
+      [ exact Hst | exact Hpd | exact Hch | exact Hbl | exact Hera
       | exact (cons_log_ok_snoc_nil L0 ((st ++ pd)%list) gp (h, c, [])
                  eq_refl Hlog)
       | exact Hnc | exact Hdn ].
@@ -1000,14 +1010,14 @@ Section CtBodies.
   Proof using .
     intros <- Her Hends Hx. iIntros "Hhi0 Hgh".
     iDestruct "Hgh" as (cur nrd ndl st pd hh1 L0 gp)
-      "(%Hst & %Hpd & %Hch & %Hbl & Ha & Hcur & Hhi & Hlm & %Hlog & Hdc &
+      "(%Hst & %Hpd & %Hch & %Hbl & %Hera & Ha & Hcur & Hhi & Hlm & %Hlog & Hdc &
         %Hnc & %Hdn & Hmk)".
     rewrite /cons_hi /uart_rx_hi.
     iDestruct (ghost_var_agree with "Hhi0 Hhi") as %<-.
     iFrame "Hhi0". rewrite /ct_gh.
     iExists cur, nrd, ndl, st, pd, hh, L0, true.
     iFrame "Ha Hcur Hhi Hlm Hdc Hmk". iPureIntro. split_and!;
-      [ exact Hst | exact Hpd | exact Hch | exact Hbl | | exact Hnc
+      [ exact Hst | exact Hpd | exact Hch | exact Hbl | exact Hera | | exact Hnc
       | exact Hdn ].
     split; [reflexivity |]. intro cs.
     exact (cons_log_ok_owe L0 ((st ++ pd)%list) gp h c cs Hch
@@ -1045,7 +1055,7 @@ Section CtBodies.
     intros <- Hends Hxg Hecho Hes Hk3 Hk1.
     iIntros "#Hinv Hlgh (%Hsh & %Hbh & Harm & Hap) Hgh".
     iDestruct "Hgh" as (cur nrd ndl st pd hh L0 gp)
-      "(%Hst & %Hpd & %Hch & %Hbl & Ha & Hcur & Hhi & Hlm & %Hlog & Hdc &
+      "(%Hst & %Hpd & %Hch & %Hbl & %Hera & Ha & Hcur & Hhi & Hlm & %Hlog & Hdc &
         %Hnc & %Hdn & Hmk)".
     rewrite /cons_logm.
     iMod (uart_inv_cons_close (cn_uart cn) h c cs j hg L0 Φ
@@ -1057,7 +1067,7 @@ Section CtBodies.
     iExists cur, nrd, ndl, st, pd, hh, ((L0 ++ [(h, c, es)])%list), true.
     iFrame "Ha Hcur Hhi". rewrite /cons_logm /uart_logm. iFrame "Hlm".
     iFrame "Hdc Hmk". iPureIntro. split_and!;
-      [ exact Hst | exact Hpd | exact Hch | exact Hbl
+      [ exact Hst | exact Hpd | exact Hch | exact Hbl | exact Hera
       | exact (proj2 Hlog es) | exact Hnc | exact Hdn ].
   Qed.
 
@@ -2551,6 +2561,7 @@ Section ProofConsoleintr.
       (rr ww ee : mword 32) (bs : list (bv 8))
       (ts : list (option (list mobs))) (h : list mobs) (c : bv 8) :
     cn_uart cn = γu ->
+    cn_era cn = S gen_id ->
     ohist_ext hh h ->
     M !!! Regidx csp_rs1 = pa_stk sp0 6%nat ->
     ct_cs_hi M m0 ->
@@ -2599,7 +2610,7 @@ Section ProofConsoleintr.
     ct_exit_prop (CID0 := CID) γu h c cn γc pme m0 K lvl eb b sp0 lks -∗
     mWP (Loop : expr riscv_lang).
   Proof using .
-    intros Hcnu Hx Hsp Hcs HK Hlvl Hchain Hbelow Hlenb Hlent Hok Hrow Hroom
+    intros Hcnu Hcne Hx Hsp Hcs HK Hlvl Hchain Hbelow Hlenb Hlent Hok Hrow Hroom
            Hends Hc13.
     iIntros "#Ht #Hdev #Hbw #Htxl #Hp1 #Htg Hcg Hpc Hcnt Hpay Hlocked
              Hrc Hwc Hec Hdat Hts Hgh Hhi Hmark Hrest WAKE EXIT".
@@ -2851,7 +2862,7 @@ Section ProofConsoleintr.
     iApply fupd_wp.
     iMod (ct_gh_push cn (cn_uart cn) rr ww ee bs ts idx h c hh hg
             [echo_of c] (length [echo_of c]) True%I
-            eq_refl Hlenb Hlent Hok Hroom Hidx Hends Hx Hxg eq_refl
+            eq_refl Hcne Hlenb Hlent Hok Hroom Hidx Hends Hx Hxg eq_refl
             (* K3: the store arm's plan IS its one glyph, so it closes at 1 *)
             ltac:(intros _; reflexivity) Hk1
             with "Huinv Hhi Hlgh Hap Hgh") as "(Hhi & Hlgh & Hwin & _ & Hgh)".
@@ -3494,6 +3505,7 @@ Section ProofConsoleintr.
       (rr ww ee : mword 32) (bs : list (bv 8))
       (ts : list (option (list mobs))) (h : list mobs) (c : bv 8) :
     cn_uart cn = γu ->
+    cn_era cn = S gen_id ->
     ohist_ext hh h ->
     M !!! Regidx csp_rs1 = pa_stk sp0 6%nat ->
     M !!! Regidx Rs1 = cv ->
@@ -3543,7 +3555,7 @@ Section ProofConsoleintr.
     ct_exit_prop (CID0 := CID) γu h c cn γc pme m0 K lvl eb b sp0 lks -∗
     mWP (Loop : expr riscv_lang).
   Proof using .
-    intros Hcnu Hx Hsp Hs1 Hcs HK Hlvl Hchain Hbelow Hlenb Hlent Hok Hrow Hroom
+    intros Hcnu Hcne Hx Hsp Hs1 Hcs HK Hlvl Hchain Hbelow Hlenb Hlent Hok Hrow Hroom
            Hends Hcv Hc13.
     iIntros "#Ht #Hdev #Hbw #Htxl #Hp1 #Htg Hcg Hpc Hcnt Hpay Hlocked
              Hrc Hwc Hec Hdat Hts Hgh Hhi Hmark Hrest WAKE EXIT".
@@ -3780,7 +3792,7 @@ Section ProofConsoleintr.
     iApply fupd_wp.
     iMod (ct_gh_push cn (cn_uart cn) rr ww ee bs ts idx h c hh hg
             [echo_of c] (length [echo_of c]) True%I
-            eq_refl Hlenb Hlent Hok Hroom Hidx Hends Hx Hxg eq_refl
+            eq_refl Hcne Hlenb Hlent Hok Hroom Hidx Hends Hx Hxg eq_refl
             (* K3: the store arm's plan IS its one glyph, so it closes at 1 *)
             ltac:(intros _; reflexivity) Hk1
             with "Huinv Hhi Hlgh Hap Hgh") as "(Hhi & Hlgh & Hwin & _ & Hgh)".
@@ -4059,6 +4071,7 @@ Section ProofConsoleintr.
       (b : bool) (sp0 : mword 64) (cv : mword 64) (lks : gset string)
       (h : list mobs) (c : bv 8) :
     cn_uart cn = γu ->
+    cn_era cn = S gen_id ->
     ohist_ext hh h ->
     M !!! Regidx csp_rs1 = pa_stk sp0 6%nat ->
     M !!! Regidx Rs1 = cv ->
@@ -4102,7 +4115,7 @@ Section ProofConsoleintr.
     ct_exit_prop (CID0 := CID) γu h c cn γc pme m0 K lvl eb b sp0 lks -∗
     mWP (Loop : expr riscv_lang).
   Proof using .
-    intros Hcnu Hx Hsp Hs1 Hcs HK Hlvl Hchain Hbelow Hends Hcv.
+    intros Hcnu Hcne Hx Hsp Hs1 Hcs HK Hlvl Hchain Hbelow Hends Hcv.
     iIntros "#Ht #Hdev #Hbw #Htxl #Hp1 #Htg Hcg Hpc Hcnt Hpay Hlocked
              Hres Hhi Hmark Hrest WAKE EXIT".
     (* the console port's own invariant, which the two drop arms' appends
@@ -4345,7 +4358,7 @@ Section ProofConsoleintr.
                       = mword_of_int (CT + 0x12e)) by pcw.
       iEval (rewrite Hj12e) in "Hpc".
       iApply (ct_cr (CIDq := CIDq) γtx γc γu γv cn hh pme m0 G7 K lvl eb b sp0
-                lks rr ww ee bs ts h c Hcnu Hx
+                lks rr ww ee bs ts h c Hcnu Hcne Hx
                 HG7sp (ct_cs_hi_thr G7 M m0 HthrG7 Hcs) HK Hlvl Hchain Hbelow
                 Hlenb Hlent Hok Hrow Hroom Hends
                 ltac:(exact (ct_arg_eq13 c ltac:(rewrite <- Hcv; exact Hcr)))
@@ -4360,7 +4373,7 @@ Section ProofConsoleintr.
                     = mword_of_int (CT + 0x4e)) by pcw.
     iEval (rewrite Hp04e) in "Hpc".
     iApply (ct_store (CIDq := CIDq) γtx γc γu γv cn hh pme m0 G7 K lvl eb b sp0
-              cv lks rr ww ee bs ts h c Hcnu Hx
+              cv lks rr ww ee bs ts h c Hcnu Hcne Hx
               HG7sp HG7s1 (ct_cs_hi_thr G7 M m0 HthrG7 Hcs) HK Hlvl Hchain Hbelow
               Hlenb Hlent Hok Hrow Hroom Hends Hcv
               ltac:(exact (ct_arg_ne13 c ltac:(rewrite <- Hcv; exact Hcr)))
@@ -4387,7 +4400,7 @@ Section ProofConsoleintr.
     iIntros "Hcg Hcnt #Ht Hpc #Hpinv #Hdev #Hcaps #Htg #Hlbh #Hwlb Hhi Hlgh
              Hwin Hcont".
     iDestruct "Hcaps" as (γtx γc cn)
-      "(#Htxl & #Hlk & %Hcnu & #Hsh & #Hinitd & #Hwords)".
+      "(#Htxl & #Hlk & %Hcnu & %Hcne & #Hsh & #Hinitd & #Hwords)".
     iPoseProof (dev_inv_uart with "Hdev") as "#Huinv".
     (* THE LOG'S MARK, as the arms carry it (lane CONS-IO) -- and the ECHO
        WINDOW TOKEN beside it (milestone F): the arms spend it at the shift
@@ -4774,7 +4787,7 @@ Section ProofConsoleintr.
                     = mword_of_int (CT + 0x2c)) by pcw.
     iEval (rewrite Hp02c) in "Hpc".
     iApply (ct_dflt (CIDq := CIDaq) γtx γc γu γv cn hh pme m S3 K lvl eb b sp0
-              cv lks hb cb Hcnu Hx
+              cv lks hb cb Hcnu Hcne Hx
               HS3sp HS3s1 HS3cs HK Hlvl Hchain Hbelow Hends Hcv
               with "Ht Hdev Hbw Htxl Hpy Htg Hcg Hpc Hcnt Hpay Hlocked Hres Hhi
                     Hmark Hrest WAKE EXIT").

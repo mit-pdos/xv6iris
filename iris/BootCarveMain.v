@@ -674,6 +674,8 @@ Section BootCarveMain.
     iSplitR.
     { iPureIntro. intros j h b Hj.
       rewrite lookup_nil in Hj. discriminate Hj. }
+    (* ...and the era clause says nothing either (lane seccomp S2k) *)
+    iSplitR; [iPureIntro; apply cons_era_nil |].
     iSplitL "Hb"; [iExact "Hb" |].
     iSplitR; [iApply cons_tags_none |].
     iSplitL "Hsa"; [iExact "Hsa" |].

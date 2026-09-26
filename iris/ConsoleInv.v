@@ -1435,56 +1435,99 @@ Qed.
    NOT say is that the positions increase with [j]: the cursor is monotone
    in fact, but the ring's invariant keeps no witness of that across a
    release, so two pops separated by a sleep cannot be compared. *)
-Definition cons_placed (l : list (list mobs * bv 8)) (lo d : nat)
+(* ...AND THE ERA IT ARRIVED IN (the S2k follow-up): the ring is
+   re-founded empty at every boot, so every entry it holds is from the
+   ring's own era ([cons_era] below), and a placed byte carries it. *)
+Definition cons_placed (l : list (list mobs * bv 8)) (lo k d : nat)
     (hs : list (list mobs)) : Prop :=
   length hs = d
   /\ forall j : nat, (j < d)%nat ->
        exists (p : nat) (h : list mobs) (b : bv 8),
          (lo <= p)%nat /\ hs !! j = Some h /\ obs_ends_in Uart0 h b
-         /\ l !! p = Some (h, b).
+         /\ l !! p = Some (h, b) /\ obs_boots h = k.
 
-Lemma cons_placed_0 (l : list (list mobs * bv 8)) (lo : nat) :
-  cons_placed l lo 0 [].
+(* THE RING'S ERA CLAUSE: every stored and pending entry arrived in era
+   [k] (the names record's [cn_era]).  Pure, over the ring's own
+   sequence, and preserved by every transition: a push files a byte of
+   the current era, and nothing else adds an entry. *)
+Definition cons_era (l : list (list mobs * bv 8)) (k : nat) : Prop :=
+  forall p, p ∈ l -> obs_boots p.1 = k.
+
+Lemma cons_era_nil (k : nat) : cons_era [] k.
+Proof. intros p Hp. exfalso. by apply elem_of_nil in Hp. Qed.
+
+Lemma cons_era_prefix (l1 l2 : list (list mobs * bv 8)) (k : nat) :
+  l1 `prefix_of` l2 -> cons_era l2 k -> cons_era l1 k.
+Proof.
+  intros [l3 ->] He p Hp. apply He. apply elem_of_app. by left.
+Qed.
+
+Lemma cons_era_snoc (l : list (list mobs * bv 8)) (k : nat)
+    (h : list mobs) (c : bv 8) :
+  cons_era l k -> obs_boots h = k -> cons_era (l ++ [(h, c)])%list k.
+Proof.
+  intros He Hh p Hp. apply elem_of_app in Hp as [Hp | Hp]; [by apply He |].
+  apply elem_of_list_singleton in Hp. subst p. exact Hh.
+Qed.
+
+Lemma cons_era_lookup (l : list (list mobs * bv 8)) (k p : nat)
+    (h : list mobs) (b : bv 8) :
+  cons_era l k -> l !! p = Some (h, b) -> obs_boots h = k.
+Proof.
+  intros He Hl. exact (He (h, b) (elem_of_list_lookup_2 l p (h, b) Hl)).
+Qed.
+
+Lemma cons_placed_0 (l : list (list mobs * bv 8)) (lo k : nat) :
+  cons_placed l lo k 0 [].
 Proof. split; [reflexivity | intros j Hj; exfalso; lia]. Qed.
 
-(* a clean window is placed, at its own start *)
-Lemma cons_placed_of_window (l : list (list mobs * bv 8)) (n d : nat)
+(* a clean window is placed, at its own start, in the era of its bound *)
+Lemma cons_placed_of_window (l : list (list mobs * bv 8)) (n k d : nat)
     (bs : nat -> bv 8) (hs : list (list mobs)) :
-  cons_window l n d bs hs -> cons_placed l n d hs.
+  cons_era l k -> cons_window l n d bs hs -> cons_placed l n k d hs.
 Proof.
-  intros (_ & Hhl & Hwin). split; [exact Hhl |].
+  intros Her (_ & Hhl & Hwin). split; [exact Hhl |].
   intros j Hj. destruct (Hwin j Hj) as (h & b & Hl & Hh & He & _).
-  exists (n + j)%nat, h, b. split_and!; [lia | exact Hh | exact He | exact Hl].
+  exists (n + j)%nat, h, b.
+  split_and!; [lia | exact Hh | exact He | exact Hl |].
+  exact (cons_era_lookup l k (n + j) h b Her Hl).
 Qed.
 
 (* the bound only grows *)
-Lemma cons_placed_prefix (l l' : list (list mobs * bv 8)) (lo d : nat)
+Lemma cons_placed_prefix (l l' : list (list mobs * bv 8)) (lo k d : nat)
     (hs : list (list mobs)) :
-  l `prefix_of` l' -> cons_placed l lo d hs -> cons_placed l' lo d hs.
+  l `prefix_of` l' -> cons_placed l lo k d hs -> cons_placed l' lo k d hs.
 Proof.
   intros Hp [Hhl Hpl]. split; [exact Hhl |].
-  intros j Hj. destruct (Hpl j Hj) as (p & h & b & Hlo & Hh & He & Hl).
-  exists p, h, b. split_and!; [exact Hlo | exact Hh | exact He |].
+  intros j Hj. destruct (Hpl j Hj) as (p & h & b & Hlo & Hh & He & Hl & Hk).
+  exists p, h, b. split_and!; [exact Hlo | exact Hh | exact He | | exact Hk].
   exact (prefix_lookup_Some l l' p (h, b) Hl Hp).
 Qed.
 
 (* ...and a pop at a position at or after [lo] places one more byte *)
-Lemma cons_placed_snoc (l : list (list mobs * bv 8)) (lo d p : nat)
+Lemma cons_placed_snoc (l : list (list mobs * bv 8)) (lo k d p : nat)
     (hs : list (list mobs)) (h : list mobs) (b : bv 8) :
-  cons_placed l lo d hs -> (lo <= p)%nat -> l !! p = Some (h, b) ->
-  obs_ends_in Uart0 h b ->
-  cons_placed l lo (S d) (hs ++ [h])%list.
+  cons_placed l lo k d hs -> (lo <= p)%nat -> l !! p = Some (h, b) ->
+  obs_ends_in Uart0 h b -> obs_boots h = k ->
+  cons_placed l lo k (S d) (hs ++ [h])%list.
 Proof.
-  intros [Hhl Hpl] Hlo Hl He. split.
+  intros [Hhl Hpl] Hlo Hl He Hk. split.
   { rewrite length_app Hhl. cbn [length]. lia. }
   intros j Hj. destruct (decide (j < d)%nat) as [Hjd | Hjd].
-  - destruct (Hpl j Hjd) as (p' & h' & b' & Hlo' & Hh' & He' & Hl').
-    exists p', h', b'. split_and!; [exact Hlo' | | exact He' | exact Hl'].
+  - destruct (Hpl j Hjd) as (p' & h' & b' & Hlo' & Hh' & He' & Hl' & Hk').
+    exists p', h', b'.
+    split_and!; [exact Hlo' | | exact He' | exact Hl' | exact Hk'].
     rewrite lookup_app_l; [exact Hh' | lia].
   - assert (j = d) as -> by lia.
-    exists p, h, b. split_and!; [exact Hlo | | exact He | exact Hl].
+    exists p, h, b. split_and!; [exact Hlo | | exact He | exact Hl | exact Hk].
     rewrite lookup_app_r; [| lia]. rewrite Hhl Nat.sub_diag. reflexivity.
 Qed.
+
+(* the era, restated where a caller knows which era the ring is *)
+Lemma cons_placed_era (l : list (list mobs * bv 8)) (lo k k' d : nat)
+    (hs : list (list mobs)) :
+  k = k' -> cons_placed l lo k d hs -> cons_placed l lo k' d hs.
+Proof. by intros <-. Qed.
 
 (* ===================================================================== *)
 (*  devsw[] -- THE DEVICE FUNCTION TABLE                                  *)
@@ -2124,6 +2167,9 @@ Section ConsoleInv.
        ⌜cons_pend r w e pd bs ts⌝ ∗
        ⌜cons_chain (st ++ pd)⌝ ∗
        ⌜cons_below (st ++ pd) hh⌝ ∗
+       (* THE ERA (the S2k follow-up): everything stored or pending arrived
+          in the ring's own boot era, the names record's [cn_era]. *)
+       ⌜cons_era (st ++ pd) (cn_era cn)⌝ ∗
        cons_data bs ∗ cons_tags ts ∗
        cons_stored_auth cn st ∗ cons_cursor cn nrd ∗ cons_hi cn hh ∗
        (* THE INPUT LOG, EXACTLY (app-echo.md, lane CONS-IO, milestone B).
@@ -2314,12 +2360,14 @@ Section ConsoleInv.
      into the READER TOKEN (ruling F1) and the log's mirror into the ring;
      BootShared hands both over where it already hands the mark, and no
      other boot file changes. *)
-  Lemma cons_ghosts_alloc (γu : uart_names) :
+  (* [k] is the era the ring is founded in, recorded in the names *)
+  Lemma cons_ghosts_alloc (γu : uart_names) (k : nat) :
     ghost_var (un_rxhi γu) (1/2) (None : option (list mobs)) -∗
     ghost_var (un_deliv γu) (1/2) (@nil (list mobs * bv 8)) -∗
     ghost_var (un_logm γu) (1/2) (@nil LogEntryDefs.log_entry) -∗
     ghost_var (un_dlcnt γu) (1/2) 0%nat ==∗
-      ∃ cn : cons_names, ⌜cn_uart cn = γu⌝ ∗ cons_ghosts_boot cn.
+      ∃ cn : cons_names, ⌜cn_uart cn = γu⌝ ∗ ⌜cn_era cn = k⌝ ∗
+        cons_ghosts_boot cn.
   Proof using .
     iIntros "Hhi Hdv Hlm Hdc".
     iMod (own_alloc (●ML ([] : list (leibnizO (list mobs * bv 8)))))
@@ -2330,8 +2378,8 @@ Section ConsoleInv.
     iEval (rewrite -Qp.half_half) in "Hr".
     iDestruct (ghost_var_split with "Hr") as "[Hr1 Hr2]".
     iMod (mono_nat_own_alloc 0%nat) as (γk) "[Hk _]".
-    iModIntro. iExists (ConsNames γu γl γr γk).
-    iSplitR; [by iPureIntro |].
+    iModIntro. iExists (ConsNames γu γl γr γk k).
+    iSplitR; [by iPureIntro |]. iSplitR; [by iPureIntro |].
     rewrite /cons_ghosts_boot /cons_stored_auth /cons_cursor /cons_reader
             /cons_rdtok /cons_dl /cons_deliv /cons_logm /cons_dlcnt
             /cons_stored_lb /cons_hi /cons_clean_tok /=.
@@ -2382,6 +2430,7 @@ Section ConsoleCtx.
        ⌜cons_pend r w e pd bs ts⌝ ∗
        ⌜cons_chain (st ++ pd)⌝ ∗
        ⌜cons_below (st ++ pd) hh⌝ ∗
+       ⌜cons_era (st ++ pd) (cn_era cn)⌝ ∗
        cons_data_at ξ bs ∗ cons_tags ts ∗
        cons_stored_auth cn st ∗ cons_cursor cn nrd ∗ cons_hi cn hh ∗
        cons_logm cn L0 ∗ ⌜cons_log_ok L0 (st ++ pd) gp⌝ ∗

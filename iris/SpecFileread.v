@@ -344,7 +344,11 @@ Section SpecFileread.
         ruling F6): consoleread fires the boundary's input link at its
         final release and opens [uartN Uart0] to do it.  Persistent, and it
         comes off [console_ready_app] with the table. *)
-     WpUart.uart_inv Uart0 (cn_uart fsc_cons))%I.
+     WpUart.uart_inv Uart0 (cn_uart fsc_cons) ∗
+     (* ...AND THE RING IS THIS ERA'S (lane seccomp S2k, the follow-up):
+        consoleread's marked receipt places each byte at the ring's own
+        era [cn_era fsc_cons], and this is what reads it as [S gen_id]. *)
+     ⌜cn_era fsc_cons = S gen_id⌝)%I.
 
   Global Instance fileread_dev_caps_persistent fn :
     Persistent (fileread_dev_caps fn).
@@ -352,10 +356,13 @@ Section SpecFileread.
 
   Lemma fileread_dev_caps_lock (fn : fread_names) :
     fileread_dev_caps fn -∗ is_conslock fsc_cons app_rdcred (frn_cons fn).
-  Proof using . by iIntros "[$ _]". Qed.
+  Proof using . by iIntros "($ & _ & _)". Qed.
   Lemma fileread_dev_caps_uart (fn : fread_names) :
     fileread_dev_caps fn -∗ WpUart.uart_inv Uart0 (cn_uart fsc_cons).
-  Proof using . by iIntros "[_ $]". Qed.
+  Proof using . by iIntros "(_ & $ & _)". Qed.
+  Lemma fileread_dev_caps_era (fn : fread_names) :
+    fileread_dev_caps fn -∗ ⌜cn_era fsc_cons = S gen_id⌝.
+  Proof using . by iIntros "(_ & _ & $)". Qed.
 
   (* ---- THE CONSOLE INVARIANT, PINNED, AND WHY THE PIN LIVES HERE ------
 
@@ -386,15 +393,23 @@ Section SpecFileread.
      no tie has to be threaded down the read path. *)
   Definition console_ready_app : iProp Σ :=
     ((∃ γ : gname, ConsoleInv.console_inv fsc_cons app_rdcred γ) ∗
-     WpUart.uart_inv Uart0 (cn_uart fsc_cons))%I.
+     WpUart.uart_inv Uart0 (cn_uart fsc_cons) ∗
+     (* ...AND THE RING IS THIS ERA'S (lane seccomp S2k, the follow-up):
+        main mints it with [cn_era := S gen_id] ([ConsoleInv.cons_ghosts_alloc]) *)
+     ⌜cn_era fsc_cons = S gen_id⌝)%I.
 
   Global Instance console_ready_app_persistent : Persistent console_ready_app.
   Proof using . rewrite /console_ready_app. apply _. Qed.
 
   Lemma console_ready_app_intro (γ : gname) :
+    cn_era fsc_cons = S gen_id ->
     ConsoleInv.console_inv fsc_cons app_rdcred γ -∗
     WpUart.uart_inv Uart0 (cn_uart fsc_cons) -∗ console_ready_app.
-  Proof using . iIntros "H #Hu". rewrite /console_ready_app. iFrame "Hu". iExists γ. iExact "H". Qed.
+  Proof using .
+    iIntros (He) "H #Hu". rewrite /console_ready_app.
+    iSplitL "H"; [iExists γ; iExact "H" |]. iSplitR; [iExact "Hu" |].
+    by iPureIntro.
+  Qed.
 
   (* ...and the devsw half alone, which is all most consumers want *)
   Lemma console_ready_app_devsw : console_ready_app -∗ ConsoleInv.devsw_table.
@@ -402,7 +417,12 @@ Section SpecFileread.
 
   Lemma console_ready_app_uart :
     console_ready_app -∗ WpUart.uart_inv Uart0 (cn_uart fsc_cons).
-  Proof using . by iIntros "[_ $]". Qed.
+  Proof using . by iIntros "(_ & $ & _)". Qed.
+
+  (* THE ERA OF THE RING (lane seccomp S2k, the follow-up) *)
+  Lemma console_ready_app_era :
+    console_ready_app -∗ ⌜cn_era fsc_cons = S gen_id⌝.
+  Proof using . by iIntros "(_ & _ & $)". Qed.
 
   (* ONE cell, and only when the major is in range.  The disjunction is the
      honest statement of what the kernel installs: [consoleinit] fills
@@ -483,15 +503,16 @@ Section SpecFileread.
   Lemma fileread_devsw_of_console (fn : fread_names) :
     frn_rp fn = ConsoleInv.devsw_read_val ->
     frn_dqv fn = (fun _ => DfracDiscarded) ->
+    cn_era fsc_cons = S gen_id ->
     ConsoleInv.console_inv fsc_cons app_rdcred (frn_cons fn) -∗
     WpUart.uart_inv Uart0 (cn_uart fsc_cons) -∗
     fileread_devsw fn.
   Proof using .
-    intros Hrp Hdq. iIntros "#Hci #Huinv".
+    intros Hrp Hdq Hera. iIntros "#Hci #Huinv".
     iDestruct (ConsoleInv.console_inv_conslock with "Hci") as "#Hlk".
     iDestruct (ConsoleInv.console_inv_devsw with "Hci") as "#Htbl".
     rewrite /fileread_devsw /fileread_dev_caps Hrp Hdq.
-    iSplitR; [iSplitR; [iExact "Hlk" | iExact "Huinv"] |].
+    iSplitR; [iSplitR; [iExact "Hlk" | iSplitR; [iExact "Huinv" | by iPureIntro]] |].
     rewrite /ConsoleInv.devsw_table.
     iApply (big_sepL_impl with "Htbl").
     iModIntro. iIntros (k i Hk) "[Hr _]".
@@ -1181,10 +1202,12 @@ Section SpecFileread.
              each delivered byte sits in [sl] at some position at or after
              [cur] -- a lease holder's own position, which its [Rd] learns
              from [ConsoleInv.cons_out] on this arm too -- along the stored
-             order.  No window: the positions need not be consecutive, and
-             are not promised to increase. *)
+             order, each byte's history in THIS era ([S gen_id]: the ring's
+             own era, read off [fileread_dev_caps]).  No window: the
+             positions need not be consecutive, and are not promised to
+             increase. *)
           ∨ cons_dirty_cred app_rdcred ∗ ⌜cons_chain sl⌝
-              ∗ ⌜cons_placed sl cur d hs⌝) ∗
+              ∗ ⌜cons_placed sl cur (S gen_id) d hs⌝) ∗
          Rd cur dc)%I.
 
   (* the -1 arm, at every caller: whatever the caller asked for comes back,
@@ -1307,7 +1330,7 @@ Section SpecFileread.
     cons_tagged bs hs d ->
     (* ...and where each byte came from (lane seccomp S2k) *)
     cons_chain sl ->
-    cons_placed sl cur d hs ->
+    cons_placed sl cur (S gen_id) d hs ->
     ([∗ list] h ∈ hs, riscv_rx_tag h) -∗
     cons_stored_lb fsc_cons sl -∗
     cons_dirty_cred app_rdcred -∗
@@ -1787,13 +1810,14 @@ Section FilereadConsoleMorph.
     CtxMorph (λ ξ0 : CtxIdDefs.CtxId, console_ready_app (XI := ξ0)).
   Proof using .
     iIntros (ξ ξ') "Hd H". rewrite /console_ready_app.
-    iDestruct "H" as "[H #Hu]".
+    iDestruct "H" as "(H & #Hu & %Hera)".
     iDestruct "H" as (γ) "H".
     iMod (ConsoleInv.console_inv_morph fsc_cons app_rdcred γ ξ ξ' with "Hd H")
       as "[Hd H]".
     (* the port invariant does not mention the context axis at all, so it
        crosses unchanged (lane CONS-IO, milestone B) *)
-    iModIntro. iFrame "Hd Hu". iExists γ. iExact "H".
+    iModIntro. iFrame "Hd". iSplitL "H"; [iExists γ; iExact "H" |].
+    iSplitR; [iExact "Hu" | by iPureIntro].
   Qed.
 
 End FilereadConsoleMorph.
