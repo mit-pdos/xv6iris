@@ -28,6 +28,7 @@ Require Import FsEchoPin.          (* [era0_echo_pins]                   *)
 Require Import FsCatPin.           (* [era0_cat_pins]                    *)
 Require Import FsGrepPin.          (* [era0_grep_pins]                   *)
 Require Import FsSeccPin.          (* [era0_secc_pins] (seccomp S4)      *)
+Require Import FsSyncPin.          (* [era0_sync_pins] (sync SY2)        *)
 Require Import EchoFsPure.         (* [echo_fs_pure]                     *)
 Require Import FsAbsDefs.          (* [aview]                            *)
 Require Import FsState.            (* [fs_state_rec] / [fss_inodes]      *)
@@ -45,7 +46,8 @@ Require Import FsImg.              (* [sb_logstart]                      *)
    the claim is PURE -- it owns nothing -- so it is a [Prop] and the
    predicate embeds it. *)
 Definition file_fs_pure (av : aview) : Prop :=
-  echo_fs_pure av /\ era0_cat_pins av /\ era0_grep_pins av /\ era0_secc_pins av.
+  echo_fs_pure av /\ era0_cat_pins av /\ era0_grep_pins av /\ era0_secc_pins av
+  /\ era0_sync_pins av.
 
 (* THE PROJECTION every landed consumer of the echo claim reads. *)
 Lemma file_fs_pure_echo (av : aview) : file_fs_pure av -> echo_fs_pure av.
@@ -62,7 +64,12 @@ Proof. intros [_ [_ [H _]]]. exact H. Qed.
 (* /seccomp's pins (seccomp S4): a `seccomp x' line execs /seccomp out of
    them *)
 Lemma file_fs_pure_secc (av : aview) : file_fs_pure av -> era0_secc_pins av.
-Proof. intros [_ [_ [_ H]]]. exact H. Qed.
+Proof. intros [_ [_ [_ [H _]]]]. exact H. Qed.
+
+(* /sync's pins (sync design section 3): the line `sync' execs /sync out
+   of them *)
+Lemma file_fs_pure_sync (av : aview) : file_fs_pure av -> era0_sync_pins av.
+Proof. intros [_ [_ [_ [_ H]]]]. exact H. Qed.
 
 (* THE PINS AT THE MAP A BOOT FOUNDS ITS FILE SYSTEM AT, when the disk is
    mkfs's image -- the four pin files' transport theorems, read together.
@@ -86,5 +93,7 @@ Proof.
     + exact (era0_recovery_cat_pins dk D S Hdk Hrec HS).
     + split.
       * exact (era0_recovery_grep_pins dk D S Hdk Hrec HS).
-      * exact (era0_recovery_secc_pins dk D S Hdk Hrec HS).
+      * split.
+        -- exact (era0_recovery_secc_pins dk D S Hdk Hrec HS).
+        -- exact (era0_recovery_sync_pins dk D S Hdk Hrec HS).
 Qed.

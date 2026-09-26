@@ -766,8 +766,9 @@ Section UkShRedirBody.
     iIntros "!>" (lu h m f k len l n)
       "%Hd %Hlat %Hregs %Hs1 %Ha5 %Hnn %Hnul %Hkl2 %Hpm1 %Hpmwb %Hfd0
        #Hgen #Hcode #Hjt Hhead Hstd Hdat Hsz Hbuf Hrun".
-    destruct lu as [ ws | ws Nf | Nf | ws npc | ws];
-      [| | | by destruct (proj1 Hd ws npc eq_refl) | by destruct (proj2 Hd ws eq_refl) ].
+    destruct lu as [ ws | ws Nf | Nf | ws npc | ws |];
+      [| | | by destruct (proj1 Hd ws npc eq_refl) | by destruct (proj1 (proj2 Hd) ws eq_refl)
+      | by destruct (proj2 (proj2 Hd) eq_refl) ].
     - (* [echo a b] -- the landed walk *)
       iApply ("Hecho" $! (LEcho ws) h m f k len l n with
                 "[%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] Hgen Hcode Hjt

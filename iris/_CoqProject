@@ -1488,6 +1488,7 @@ FsEchoPin.v
 FsCatPin.v
 FsGrepPin.v
 FsSeccPin.v
+FsSyncPin.v
 FsFPin.v
 FsConsPin.v
 SpecKexec.v
@@ -1709,6 +1710,8 @@ UShCat.v
 UShGrep.v
 UShSecc.v
 UkSeccEntry.v
+UShSync.v
+UkSyncEntry.v
 UkTreeEntry.v
 UInitTree.v
 UInitTreeCons.v

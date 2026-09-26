@@ -236,6 +236,11 @@ Section UnionInitBoot.
     { iApply UShExecPin.sh_secc_slot_of_fs_pure_holds.
       rewrite /UShCatPay.sh_cat_slot_of_fs_pure.
       iSplitR; [iExact "Hinv" |]. iSplitR; [iExact "Hfs" | iExact "Hmint"]. }
+    (* ---- /sync's, the same way (sync design section 3) ---- *)
+    iAssert (UShExecPin.sh_sync_slot (file_taint (fgn_cl (ugn_file ug)))) as "#Hsync".
+    { iApply UShExecPin.sh_sync_slot_of_fs_pure_holds.
+      rewrite /UShCatPay.sh_cat_slot_of_fs_pure.
+      iSplitR; [iExact "Hinv" |]. iSplitR; [iExact "Hfs" | iExact "Hmint"]. }
     (* ---- the shell's slot, UNDER THE CONSOLE'S FLAG: the state payload,
            the TAIL at the union's round, the tag ---- *)
     iAssert (□ (∀ jo : option Z,
@@ -255,7 +260,7 @@ Section UnionInitBoot.
         [iApply UInitSh.sh_pay_state_holds |].
       iIntros (γp N).
       iApply (sh_round_holds_union_closed ug r Heq s0 Hcons Hkill Hwild Hrdw γp N
-                with "Hlks [] Hslot Hcat Hgrep Hsecc Hpine []").
+                with "Hlks [] Hslot Hcat Hgrep Hsecc Hsync Hpine []").
       - iApply (udep_free).
       - iExists jo. iExact "Hcred". }
     (* ---- THE PROMPT'S LAW at every line boundary, at the widened

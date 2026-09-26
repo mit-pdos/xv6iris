@@ -30,6 +30,11 @@
 (*      [echo foo | grep o | cat] prints the line, [echo foo | grep z |   *)
 (*      cat] nothing (and never the line), [cat f | grep x | cat] prints  *)
 (*      [f]'s line when it holds an [x] and nothing when it does not;     *)
+(*    - THE SYNC LINE (sync design section 3): [sync] is a line; /sync's *)
+(*      run prints the bare prompt and moves nothing, its exec failure    *)
+(*      prints [exec sync failed]; [echo hi > a.txt], [sync], [cat a.txt] *)
+(*      prints [hi]; NEGATIVE: the line admits nothing but its four, and  *)
+(*      a sync round printing anything else is refuted;                   *)
 (*    - THE OUT-OF-MEMORY ROUND (sync design sections 1-2): sh's child    *)
 (*      dies of out-of-memory SAYING SO, at a redirect and at a pipeline; *)
 (*      NEGATIVE: with no silent alternative, [echo a > a.txt], [echo b > *)
@@ -57,7 +62,7 @@ Local Open Scope nat_scope.
 
 Global Instance uok_dec adm s l a : Decision (uok adm s l a).
 Proof using.
-  destruct l as [ws | ws N | N | [ws | f] n | ws], a as [r | x | x | u]; cbn [uok]; apply _.
+  destruct l as [ws | ws N | N | [ws | f] n | ws |], a as [r | x | x | u]; cbn [uok]; apply _.
 Defined.
 
 Global Instance ulm_ok_dec adm adm_s s l a : Decision (lm_ok (ulm adm adm_s) s l a) :=
@@ -103,6 +108,17 @@ Lemma ulm_hooks_secc adm adm_s ws :
   /\ lmh_noc (ulm_hooks adm adm_s) (LSecc ws) = None.
 Proof using.
   split_and!; [exact (ualt_dec_code (UR RCFork)) | exact (ualt_dec_code (UR RSExec))
+              | reflexivity].
+Qed.
+
+(* ...and at the sync line (sync design section 3): the fork panic, [exec
+   sync failed], and no silent round -- its bare prompt is /sync's run *)
+Lemma ulm_hooks_sync adm adm_s :
+  lm_dec (ulm adm adm_s) (lmh_pan (ulm_hooks adm adm_s) LSync) = UR RCFork
+  /\ lm_dec (ulm adm adm_s) (lmh_exf (ulm_hooks adm adm_s) LSync) = UR RSyncExec
+  /\ lmh_noc (ulm_hooks adm adm_s) LSync = None.
+Proof using.
+  split_and!; [exact (ualt_dec_code (UR RCFork)) | exact (ualt_dec_code (UR RSyncExec))
               | reflexivity].
 Qed.
 
@@ -1005,4 +1021,129 @@ Proof using.
   destruct (lm_at ulmG cs 2) as [r | x | x | u]; cbn [uok] in Hok2; try contradiction.
   cbn [ucont upanic] in Hh.
   exact (ab_cat_head _ r sel _ _ Hok2 Hsel Hst2 Hh ltac:(vm_compute; reflexivity)).
+Qed.
+
+(* ===================================================================== *)
+(*  6.  THE SYNC LINE (claude-notes/design/sync.md section 3)             *)
+(*                                                                        *)
+(*  POSITIVE: [sync] is a line the union admits; /sync's run prints the   *)
+(*  bare prompt (it prints nothing on success) and moves nothing; its     *)
+(*  exec failure prints [exec sync failed]; a sync round between a        *)
+(*  redirect and a [cat] leaves the file as the redirect left it.         *)
+(*  NEGATIVE: the line admits the four alternatives and no other, so a    *)
+(*  sync round printing anything but the prompt, the exec diagnostic,     *)
+(*  the fork panic or the out-of-memory diagnostic is refuted.            *)
+(* ===================================================================== *)
+Definition b_sync : list (bv 8) := sb "sync".
+
+Example demo_sync_parse : uline_of_u b_sync = LSync /\ ubody_ok adm_u_g adm_s_on b_sync.
+Proof using. split; [vm_compute; reflexivity | right; right; right; vm_compute; reflexivity]. Qed.
+
+(* /sync RAN: the bare prompt, the state as the round found it *)
+Example demo_sync_ran (s : fstate) :
+  lm_ok ulmG s LSync (UR RSyncRan)
+  /\ lm_cont ulmG s LSync (UR RSyncRan) = u_prompt
+  /\ lm_step ulmG s LSync (UR RSyncRan) = s
+  /\ lm_term ulmG (UR RSyncRan) = false.
+Proof using. split_and!; [exact I | reflexivity | reflexivity | reflexivity]. Qed.
+
+(* the exec FAILED: sh says so *)
+Example demo_sync_execfail (s : fstate) :
+  lm_ok ulmG s LSync (UR RSyncExec)
+  /\ lm_cont ulmG s LSync (UR RSyncExec) = sb "exec sync failed" ++ nl1 ++ u_prompt.
+Proof using. split; [exact I | vm_compute; reflexivity]. Qed.
+
+(* ---- echo hi > a.txt, sync, then cat a.txt prints hi ---- *)
+Definition I_sy : list (bv 8) := b_hi1 ++ nl1 ++ b_sync ++ nl1 ++ b_ca ++ nl1.
+Definition cs_sy : list nat := [ualt_code a_hi1; ualt_code (UR RSyncRan); ualt_code a_cat].
+
+Lemma sy_bodies : bodies_of I_sy = [b_hi1; b_sync; b_ca].
+Proof using. vm_compute. reflexivity. Qed.
+
+Lemma sy_nlines : nlines I_sy = 3.
+Proof using. rewrite /nlines sy_bodies. reflexivity. Qed.
+
+Lemma sy_at (i : nat) (a : ualt) :
+  [ualt_code a_hi1; ualt_code (UR RSyncRan); ualt_code a_cat] !! i = Some (ualt_code a) ->
+  lm_at ulmG cs_sy i = a.
+Proof using.
+  intros Hi. unfold lm_at. cbn [ulmG ulm lm_dec].
+  rewrite /cs_sy (list_lookup_total_correct _ _ _ Hi). apply ualt_dec_code.
+Qed.
+
+Lemma sy_upto1 : lm_upto ulmG cs_sy ∅ (bodies_of I_sy) 1 = {[txt_a := c_hi]}.
+Proof using.
+  cbn [lm_upto]. rewrite (sy_at 0 a_hi1 eq_refl) sy_bodies.
+  change ([b_hi1; b_sync; b_ca] !!! 0) with b_hi1.
+  cbn [ulmG ulm lm_of lm_step]. rewrite hi_line1. dec_yes.
+Qed.
+
+(* the sync round moves nothing *)
+Example demo_sync_upto2 : lm_upto ulmG cs_sy ∅ (bodies_of I_sy) 2 = {[txt_a := c_hi]}.
+Proof using.
+  rewrite lm_upto_S2 sy_upto1 (sy_at 1 (UR RSyncRan) eq_refl) sy_bodies.
+  change ([b_hi1; b_sync; b_ca] !!! 1) with b_sync.
+  cbn [ulmG ulm lm_of lm_step]. rewrite (proj1 demo_sync_parse). reflexivity.
+Qed.
+
+(* every round is in range, each at the state its round starts in *)
+Example demo_sync_ok : lm_alts_ok ulmG ∅ I_sy cs_sy.
+Proof using.
+  split; [rewrite sy_nlines; reflexivity |].
+  intros i Hi. rewrite sy_nlines in Hi.
+  destruct i as [| [| [| i]]]; [| | | lia].
+  - cbn [lm_upto]. rewrite (sy_at 0 a_hi1 eq_refl) sy_bodies.
+    change ([b_hi1; b_sync; b_ca] !!! 0) with b_hi1.
+    cbn [ulmG ulm lm_of lm_ok]. rewrite hi_line1. dec_yes.
+  - rewrite sy_upto1 (sy_at 1 (UR RSyncRan) eq_refl) sy_bodies.
+    change ([b_hi1; b_sync; b_ca] !!! 1) with b_sync.
+    cbn [ulmG ulm lm_of lm_ok]. rewrite (proj1 demo_sync_parse). exact I.
+  - rewrite demo_sync_upto2 (sy_at 2 a_cat eq_refl) sy_bodies.
+    change ([b_hi1; b_sync; b_ca] !!! 2) with b_ca.
+    cbn [ulmG ulm lm_of lm_ok]. rewrite ca_line. dec_yes.
+Qed.
+
+(* ...the sync round prints the bare prompt, and [cat a.txt] prints [hi] *)
+Example demo_sync_cat :
+  lm_cont ulmG (lm_upto ulmG cs_sy ∅ (bodies_of I_sy) 1)
+    (lm_of ulmG (bodies_of I_sy !!! 1)) (lm_at ulmG cs_sy 1) = u_prompt
+  /\ lm_cont ulmG (lm_upto ulmG cs_sy ∅ (bodies_of I_sy) 2)
+       (lm_of ulmG (bodies_of I_sy !!! 2)) (lm_at ulmG cs_sy 2) = c_hi ++ u_prompt.
+Proof using.
+  rewrite demo_sync_upto2 (sy_at 1 (UR RSyncRan) eq_refl) (sy_at 2 a_cat eq_refl) sy_bodies.
+  change ([b_hi1; b_sync; b_ca] !!! 1) with b_sync.
+  change ([b_hi1; b_sync; b_ca] !!! 2) with b_ca.
+  cbn [ulmG ulm lm_of lm_cont]. rewrite (proj1 demo_sync_parse) ca_line.
+  split; [reflexivity | dec_yes].
+Qed.
+
+(* ---- NEGATIVE: the sync line admits its four alternatives and nothing
+        else, at every state ---- *)
+Example demo_sync_only (s : fstate) (a : ualt) :
+  lm_ok ulmG s LSync a ->
+  a = UR RSyncRan \/ a = UR RSyncExec \/ a = UR RCFork \/ a = UR ROom.
+Proof using.
+  change (lm_ok ulmG s LSync a) with (uok adm_u_g s LSync a).
+  destruct a as [r | x | x | u]; cbn [uok]; try contradiction.
+  destruct r; cbn [ralt_ok]; try contradiction; intros _; auto.
+Qed.
+
+(* ...so a sync round printing anything else is refuted: its block is the
+   prompt, the exec diagnostic, sh's panic line or the out-of-memory
+   diagnostic *)
+Example demo_sync_neg (s : fstate) (a : ualt) :
+  lm_ok ulmG s LSync a ->
+  lm_cont ulmG s LSync a ∈ [u_prompt; alt_execsync; alt_panic; alt_oom].
+Proof using.
+  intros Ha. destruct (demo_sync_only s a Ha) as [-> | [-> | [-> | ->]]];
+    change (lm_cont ulmG) with ucont; cbn [ucont cont];
+    repeat first [apply elem_of_list_here | apply elem_of_list_further].
+Qed.
+
+(* e.g. a transcript showing [sync] answered by [x] and the prompt *)
+Example demo_sync_neg_x (s : fstate) (a : ualt) :
+  lm_ok ulmG s LSync a -> lm_cont ulmG s LSync a <> sb "x" ++ nl1 ++ u_prompt.
+Proof using.
+  intros Ha Hc. pose proof (demo_sync_neg s a Ha) as Hin. rewrite Hc in Hin.
+  revert Hin. apply (bool_decide_unpack _). vm_compute. exact I.
 Qed.

@@ -42,6 +42,7 @@ Require Import FsShPin.           (* [SH_INO] *)
 Require Import FsEchoPin.         (* [ECHO_INO] *)
 Require Import FsCatPin.          (* [CAT_INO] *)
 Require Import FsSeccPin.                (* [SECC_INO] *)
+Require Import FsSyncPin.                (* [SYNC_INO] (sync SY2) *)
 Require Import FsGrepPin.         (* [GREP_INO] *)
 Require Import ConsoleInv.        (* [CONSOLE] *)
 Local Open Scope Z_scope.
@@ -122,7 +123,7 @@ Section AppFileCons.
     (length bs < EchoDisc.line_max)%nat ->
     fdeed r s -∗ file_pred c r av -∗
     file_pred c r av ∗ fdeed r s ∗
-    (⌜i <> INIT_INO /\ i <> SH_INO /\ i <> ECHO_INO /\ i <> CAT_INO /\ i <> GREP_INO /\ i <> SECC_INO⌝
+    (⌜i <> INIT_INO /\ i <> SH_INO /\ i <> ECHO_INO /\ i <> CAT_INO /\ i <> GREP_INO /\ i <> SECC_INO /\ i <> SYNC_INO⌝
      ∨ file_taint c).
   Proof using .
     intros HsN Hlen. iIntros "Hd Hp".

@@ -197,11 +197,13 @@ Section USyncKernel.
        working directory are both dropped here *)
     iIntros (N h) "%Hpayeq %Hsz Hszf #Ht _ _ _ _ Hrun".
     pose proof (Hpayeq : UkRun.ukn_triv N) as Hti.
+    pose proof (UkRun.ukn_const_of_triv N Hti) as Hc.
     rewrite Hpc.
     iApply (wp_ksync_start N Hpsok_free h (tf_resume_gpr0 (uvis_tf W))
-              (tf_resume_gpr0 (uvis_tf W) !!! Regidx csp_rs1) 0
-              eq_refl with "[] Hrun").
-    iApply (sync_code_of_text (ukn_t N) (uvis_M W) (uvis_perm W) Hsub Hx with "Ht").
+              (tf_resume_gpr0 (uvis_tf W) !!! Regidx csp_rs1) 0 True%I
+              eq_refl with "[] [//] [] Hrun").
+    - iApply (sync_code_of_text (ukn_t N) (uvis_M W) (uvis_perm W) Hsub Hx with "Ht").
+    - rewrite Hti. iApply sync_pay_triv.
   Qed.
 
 End USyncKernel.

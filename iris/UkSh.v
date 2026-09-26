@@ -563,12 +563,14 @@ Lemma ush_uline_head_val (lu : FileDisc.uline) :
   \/ bv_unsigned (FileDisc.line_bytes lu !!! 0%nat) = 115%Z.
 Proof.
   intro Hok.
-  { destruct lu as [ws | ws Nf | Nf | ws npc | ws]; cbn [FileDisc.uline_ok] in Hok.
+  { destruct lu as [ws | ws Nf | Nf | ws npc | ws |]; cbn [FileDisc.uline_ok] in Hok.
     5: { (* the seccomp line: its head is [seccomp]'s *)
          right; right. rewrite FileDisc.line_bytes_body. cbn [FileDisc.line_body].
          rewrite wl_body_cons. rewrite -!app_assoc.
          rewrite (wl_lta_app_l FileDisc.cmd_seccomp _ 0%nat ltac:(vm_compute; lia)).
          by vm_compute. }
+    5: { (* the sync line: [sync] itself *)
+         right; right. by vm_compute. }
     - left. rewrite FileDisc.line_bytes_echo.
       exact (line_ok_head_byte0 ws Hok).
     - left.

@@ -48,7 +48,7 @@ Require Import FsCfg.
 Require Import FsImg FsImgCheck.
 Require Import FsAbsDefs FsAbsEra.
 Require Import AppCfg AppInv.
-Require Import FsCatPin FsGrepPin FsSeccPin.
+Require Import FsCatPin FsGrepPin FsSeccPin FsSyncPin.
 Require Import FileFsPure.
 Require Import PinnedExec.
 Require Import ExecEntry ExecArgs ExecRun ExecWords.
@@ -108,6 +108,27 @@ Proof using .
     rewrite secc_path_elems. split.
     + exact Hrun.
     + rewrite Hnode. rewrite FsSeccPin.secc_bytes_elf. reflexivity.
+Qed.
+
+(* /sync's path is its command word [sync] (sync design section 3) *)
+Definition sync_pl : list (bv 8) := FileDisc.cmd_sync.
+
+Lemma sync_path_elems : path_elems sync_pl = FsSyncPin.sync_path.
+Proof using . vm_compute. reflexivity. Qed.
+
+Lemma sh_sync_pin_resolves :
+  pin_resolves FsSyncPin.era0_sync_pins FsImg.ROOTINO sync_pl
+    [FsImg.ROOTINO; FsSyncPin.SYNC_INO] FsSyncPin.SYNC_INO
+    ElfUser.sync_elf 1%nat.
+Proof using .
+  split_and!.
+  - unfold FsAbsEra.um_start_of.
+    destruct (decide (sync_pl !! 0%nat = Some PathElems.SLASH)); reflexivity.
+  - rewrite sync_path_elems. reflexivity.
+  - intros v Hv. destruct Hv as (_ & Hnode & Hrun).
+    rewrite sync_path_elems. split.
+    + exact Hrun.
+    + rewrite Hnode. rewrite FsSyncPin.syncf_bytes_elf. reflexivity.
 Qed.
 
 (* the image, the path, the inode and the pin of a stage's program *)
@@ -334,6 +355,22 @@ Section UShExecPin.
     iFrame "Hinv Hgen". iIntros "!>" (v) "Hv".
     iDestruct ("Hcl" $! v with "Hv") as "[$ [%Hpure | HT]]".
     - iLeft. iPureIntro. exact (FileFsPure.file_fs_pure_secc v Hpure).
+    - iRight. iExact "HT".
+  Qed.
+
+  (* /sync's (sync design section 3): the claim's fixed part pins it too *)
+  Definition sh_sync_slot (T : iProp Σ) : iProp Σ := sh_pin_slot FsSyncPin.era0_sync_pins T.
+
+  Global Instance sh_sync_slot_persistent T : Persistent (sh_sync_slot T).
+  Proof using . rewrite /sh_sync_slot. apply _. Qed.
+
+  Lemma sh_sync_slot_of_fs_pure_holds (T : iProp Σ) :
+    UShCatPay.sh_cat_slot_of_fs_pure T -∗ sh_sync_slot T.
+  Proof using .
+    iIntros "(#Hinv & #Hcl & #Hgen)". rewrite /sh_sync_slot /sh_pin_slot.
+    iFrame "Hinv Hgen". iIntros "!>" (v) "Hv".
+    iDestruct ("Hcl" $! v with "Hv") as "[$ [%Hpure | HT]]".
+    - iLeft. iPureIntro. exact (FileFsPure.file_fs_pure_sync v Hpure).
     - iRight. iExact "HT".
   Qed.
 

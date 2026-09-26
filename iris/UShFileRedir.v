@@ -47,6 +47,7 @@ Require Import FsShPin.                  (* [SH_INO] *)
 Require Import FsEchoPin.                (* [ECHO_INO] *)
 Require Import FsCatPin.                 (* [CAT_INO] *)
 Require Import FsSeccPin.                (* [SECC_INO] *)
+Require Import FsSyncPin.                (* [SYNC_INO] (sync SY2) *)
 Require Import FsGrepPin.                (* [GREP_INO] *)
 Require Import AppFileCons.              (* the claim's readings *)
 Require Import AppCfg.
@@ -110,8 +111,8 @@ Import Defs.
 Lemma fsm_panic (s : fstate) (l : uline) (a : ralt) :
   ralt_panic a = true -> fsm s l a = s.
 Proof using .
-  intro H. destruct l as [ws | ws Nf | Nf | ws | ws];
-    [ reflexivity | | reflexivity | reflexivity | reflexivity ].
+  intro H. destruct l as [ws | ws Nf | Nf | ws | ws |];
+    [ reflexivity | | reflexivity | reflexivity | reflexivity | reflexivity ].
   destruct a; try reflexivity; cbn [ralt_panic] in H; discriminate H.
 Qed.
 
@@ -210,7 +211,7 @@ Section UShFileRedir.
       ((∃ (i : Z) (γo : gname),
           ⌜ty = FdInode i γo OffHeld⌝
           ∗ ⌜i <> INIT_INO /\ i <> SH_INO /\ i <> ECHO_INO
-             /\ i <> CAT_INO /\ i <> GREP_INO /\ i <> SECC_INO⌝)
+             /\ i <> CAT_INO /\ i <> GREP_INO /\ i <> SECC_INO /\ i <> SYNC_INO⌝)
        ∨ T).
   Proof using Heq.
     intros HE. iIntros "#Hinv HK".
@@ -443,7 +444,7 @@ Section UShFileRedir.
      ∗ ((∃ (i : Z) (γo : gname),
            ⌜ty = FdInode i γo OffHeld⌝
            ∗ ⌜i <> INIT_INO /\ i <> SH_INO /\ i <> ECHO_INO
-              /\ i <> CAT_INO /\ i <> GREP_INO /\ i <> SECC_INO⌝)
+              /\ i <> CAT_INO /\ i <> GREP_INO /\ i <> SECC_INO /\ i <> SYNC_INO⌝)
         ∨ T))%I.
 End UShFileRedir.
 

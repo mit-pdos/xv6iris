@@ -31,7 +31,7 @@ Definition uv_line (l : uline) : option pline' :=
 Lemma uv_line_some (l : uline) (pl : pline') :
   uv_line l = Some pl -> exists p fs, l = LPipe p fs /\ pl = LPipes p fs.
 Proof using.
-  destruct l as [ws | ws N | N | p fs | ws]; cbn [uv_line]; try discriminate.
+  destruct l as [ws | ws N | N | p fs | ws |]; cbn [uv_line]; try discriminate.
   intros Hq. injection Hq as <-. by exists p, fs.
 Qed.
 

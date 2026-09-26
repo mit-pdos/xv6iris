@@ -50,6 +50,19 @@ Require Import UserFd.   (* [ufd_auth] -- the PROGRAM's own view of
                             which rides inside [urun] *)
 Require Import UexecSG.   (* [uexecSG] / [uprogSG]: the ARM deposit class *)
 
+(* THE PAYMENT /sync MAKES, AND WHEN (claude-notes/design/sync.md section
+   3).  The process is handed [P] at its entry and owes its parent the
+   payload [R] at its exit; [sync_pay P R] is what turns the one into the
+   other, and it is spent in [main] AFTER [sync()] returned -- the one
+   point of the program at which the call's effect is complete.  At a
+   trivial payload it is free ([sync_pay_triv]); the union's round pays
+   PEND at RAN with it ([UkSyncEntry]).  SY3 adds the kernel's durability
+   receipt here, as a second premise. *)
+Definition sync_pay {PROP : bi} (P R : PROP) : PROP := (P -∗ R)%I.
+
+Lemma sync_pay_triv {PROP : bi} (P : PROP) : ⊢ sync_pay P True.
+Proof. rewrite /sync_pay. iIntros "_". done. Qed.
+
 Section UkSync.
   Context `{!riscvGS Σ}.
   Context `{!ufdG Σ}.
@@ -59,13 +72,16 @@ Section UkSync.
      carries beside the cwd's *)
   Context `{!ghost_varG Σ (gset gname)}.
   Context (N : uk_names Σ).
-  (* THE PROGRAM'S PAYLOAD, as a section hypothesis: this program's exit
-     owes its parent nothing at this lane, and the entry constructor is
-     what fixes it ([UkRun.uslot_of_urun*] mint the record at the payload
-     the kernel handed them).  A SECTION hypothesis rather than a premise
-     on the exit stub, so that every lemma between the entry and the ecall
-     is generalized over it automatically. *)
-  Context `{Hpay : !ukn_triv N}.
+  (* THE PROGRAM'S PAYLOAD, as a section hypothesis: it does not read the
+     exit status ([UkRun.ukn_const]), so the exit stub pays it out of the
+     one resource [ukn_pay N (-1)], which [main] makes out of what the
+     process was handed ([sync_pay]).  The entry constructor is what fixes
+     the payload ([UkRun.uslot_of_urun*] mint the record at the payload the
+     kernel handed them); at the generic entry it is trivial
+     ([USyncKernel]).  A SECTION hypothesis rather than a premise on the
+     exit stub, so that every lemma between the entry and the ecall is
+     generalized over it automatically. *)
+  Context `{Hpay : !ukn_const N}.
   (* the fields, under the names the engine has always used *)
   Local Notation γt := (ukn_t N).
   Local Notation γd := (ukn_d N).
@@ -107,10 +123,11 @@ Section UkSync.
   (* ------------------------------------------------------------------- *)
   Lemma wp_ksync_exit (h : CpuId) (m : regfile) (avail : nat) :
     sync_code γt -∗
+    ukn_pay N (-1) -∗
     urun N h m (mword_of_int SyncSyms.exit) avail -∗
     mWP (Loop : expr riscv_lang).
   Proof using Hpay.
-    iIntros "#Hcode Hrun".
+    iIntros "#Hcode Hpay Hrun".
     destruct sync_syms_pins as (Hsmain & Hsstart & Hsexit & Hssync).
     rewrite Hsexit.
     (* 0x2c8  c.li a7,2 *)
@@ -135,11 +152,11 @@ Section UkSync.
               ltac:(unfold m1, usysno;
                     rewrite (upd_eq m (Regidx a7_idx) (mword_of_int 2 : mword 64));
                     vm_compute; reflexivity)
-              with "[] [] Hrun").
+              with "[] [Hpay] Hrun").
     { iApply (uis_sync_2ca with "Hcode"). }
-    (* AT THE TRIVIAL PAYLOAD THE EXIT LEAF'S ONE PAYMENT IS FREE: this
-       program owes its parent nothing ([UkRun.ukn_triv]). *)
-    { rewrite (ukn_triv_eq (N := N)). done. }
+    (* THE ONE PAYMENT, at the status a0 carries -- the payload the caller
+       handed in, because the record is status-independent *)
+    { by rewrite (ukn_const_eq (N := N) (uexitst m1) (-1)). }
   Qed.
 
   (* ------------------------------------------------------------------- *)
@@ -236,13 +253,15 @@ Section UkSync.
   (* ------------------------------------------------------------------- *)
   (* main @0x00: prologue, jal sync, c.li a0,0, jal exit.  DIVERGES.       *)
   (* ------------------------------------------------------------------- *)
-  Lemma wp_ksync_main (h : CpuId) (m : regfile) (sp0 : mword 64) (n : nat) :
+  Lemma wp_ksync_main (h : CpuId) (m : regfile) (sp0 : mword 64) (n : nat)
+      (P : iProp Σ) :
     m !!! Regidx csp_rs1 = sp0 ->
     sync_code γt -∗
+    P -∗ sync_pay P (ukn_pay N (-1)) -∗
     urun N h m (mword_of_int SyncSyms.main) (2 + n) -∗
     mWP (Loop : expr riscv_lang).
   Proof using Hpay Hpsok_free.
-    intros Hsp. iIntros "#Hcode Hrun".
+    intros Hsp. iIntros "#Hcode HP Hsp Hrun".
     (* the free stack the run already owns says sp is aligned and has room *)
     iDestruct (urun_stack with "Hrun") as %[Hal8' Hroom'].
     rewrite Hsp in Hal8', Hroom'.
@@ -340,6 +359,8 @@ Section UkSync.
               with "[] Hrun").
     { iExact "Hcode". }
     iIntros (h6 ret) "Hrun".
+    (* sync() RETURNED: the payment is made here and nowhere earlier *)
+    iDestruct ("Hsp" with "HP") as "Hpay".
     rewrite Hra3.
     set (m4 := <[Regidx a0_idx := ret]>
                  (<[Regidx a7_idx := (mword_of_int 22 : mword 64)]> m3)).
@@ -368,7 +389,7 @@ Section UkSync.
               with "[] Hrun").
     { iApply (uis_sync_0e with "Hcode"). }
     iIntros (h8) "Hrun".
-    iApply (wp_ksync_exit h8 _ n with "[] Hrun").
+    iApply (wp_ksync_exit h8 _ n with "[] Hpay Hrun").
     iExact "Hcode".
   Qed.
 
@@ -382,13 +403,15 @@ Section UkSync.
   (* old proof did this with [uk_stack_split] plus a re-derivation of the   *)
   (* stack facts at each updated image.                                     *)
   (* ------------------------------------------------------------------- *)
-  Lemma wp_ksync_start (h : CpuId) (m : regfile) (sp0 : mword 64) (n : nat) :
+  Lemma wp_ksync_start (h : CpuId) (m : regfile) (sp0 : mword 64) (n : nat)
+      (P : iProp Σ) :
     m !!! Regidx csp_rs1 = sp0 ->
     sync_code γt -∗
+    P -∗ sync_pay P (ukn_pay N (-1)) -∗
     urun N h m (mword_of_int SyncSyms.start) (2 + (2 + n)) -∗
     mWP (Loop : expr riscv_lang).
   Proof using Hpay Hpsok_free.
-    intros Hsp. iIntros "#Hcode Hrun".
+    intros Hsp. iIntros "#Hcode HP Hsp Hrun".
     (* the free stack the run already owns says sp is aligned and has room *)
     iDestruct (urun_stack with "Hrun") as %[Hal8' Hroom'].
     rewrite Hsp in Hal8', Hroom'.
@@ -489,7 +512,7 @@ Section UkSync.
                      (regval_into_reg (add_vec_int (add_vec_int sp0 (-16)) 16))
                      ltac:(vm_compute; discriminate))
                   Hsp1)). }
-    iApply (wp_ksync_main h5 m3 (add_vec_int sp0 (-16)) n Hsp3 with "[] Hrun").
+    iApply (wp_ksync_main h5 m3 (add_vec_int sp0 (-16)) n P Hsp3 with "[] HP Hsp Hrun").
     iExact "Hcode".
   Qed.
 

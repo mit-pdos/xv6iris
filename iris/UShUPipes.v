@@ -918,13 +918,14 @@ Section UShUPipes.
       UShCatPay.sh_cat_slot T -∗
       sh_grep_slot T -∗
       sh_secc_slot T -∗
+      sh_sync_slot T -∗
       (∃ v : era_pins, era_pin (fgn_echo gf) (S gen_id) v) -∗
       (∃ jo : option Z, file_cons_cred (fgn_cl gf) r jo) -∗
       UkSh.ush_rest_l_at (PS := uprogSG_free) (ghost_varG0 := offbox_offG)
         N γp T Wcu Wbu Pm ush_line_union
         (UInitSh.sh_Rsh (ukn_t N) (ukn_d N) (ukn_s N)).
   Proof using Hcons Hkill Hwild Hrdw Heq HfifR cifRegG0 pipeProtoG0 pnsRegG0 uartGhostG0.
-    iIntros "#Hlk #Hdep #Hslot #Hcat #Hgrep #Hsecc #Hpin #Hmade".
+    iIntros "#Hlk #Hdep #Hslot #Hcat #Hgrep #Hsecc #Hsync #Hpin #Hmade".
     iDestruct "Hpin" as (v) "#Hp".
     iPoseProof (ush_kill_law_u ug r s0 PT PD Hkill v with "Hp") as "#Hkl".
     iPoseProof (ush_child_law_union ug r Heq s0 Hcons Hkill PT PD
@@ -932,6 +933,7 @@ Section UShUPipes.
     iPoseProof (uHchild_redir ug r Heq s0 Hkill PT PD with "Hlk Hdep Hslot Hmade") as "#Hred".
     iPoseProof (uHchild_cat ug r Heq s0 Hcons Hkill PT PD with "Hlk Hdep Hcat Hmade") as "#Hcatl".
     iPoseProof (uHchild_secc ug r s0 Hcons Hkill Hwild Hrdw PT PD with "Hdep Hsecc") as "#Hsecl".
+    iPoseProof (uHchild_sync ug r s0 Hkill PT PD with "Hlk Hdep Hsync") as "#Hsyncl".
     iPoseProof (uHpanic ug r s0 PT PD with "Hlk") as "#Hplaw".
     iPoseProof (upipes_child_law_echo with "Hlk Hslot Hcat Hgrep") as "#Hche".
     iPoseProof (upipes_child_law_catf with "Hlk Hslot Hcat Hgrep Hmade") as "#Hchc".
@@ -942,7 +944,7 @@ Section UShUPipes.
     iPoseProof (ushq_body_law_union ug r s0 PT PD γp N (Hp := Hc)
                   (SpecKexec.kexec_sz ElfUser.sh_elf)
                   UShKernel.sh_sz_lo UShKernel.sh_sz_al UShKernel.sh_sz_ok
-                  with "Hkl Hchl Hred Hcatl Hsecl Hplaw Hpipes") as "#Hbody".
+                  with "Hkl Hchl Hred Hcatl Hsecl Hsyncl Hplaw Hpipes") as "#Hbody".
     iPoseProof (UkShPipeForkTwin.ushf_rest_of_body_at_pipe
                   (PS := uprogSG_free) (SG := uexecSG_xv6) (ghost_varG0 := offbox_offG)
                   (Hpay := Hc) N γp T Wcu Wbu Pm (fun k H => H) ush_line_union

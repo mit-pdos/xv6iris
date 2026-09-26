@@ -102,7 +102,7 @@ Definition uwild (l : uline) : bool :=
 
 Lemma uwild_wild (l : uline) : uwild l = true -> lm_wild U l.
 Proof using.
-  destruct l as [ws | ws N | N | p fs | ws]; try discriminate. intros _. split.
+  destruct l as [ws | ws N | N | p fs | ws |]; try discriminate. intros _. split.
   - intros s u Hu. exists (ualt_code (US u)).
     cbn [ulmG ulm lm_ok lm_term lm_cont lm_dec]. rewrite ualt_dec_code.
     split_and!; [exact Hu | reflexivity | reflexivity].

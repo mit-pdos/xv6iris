@@ -130,9 +130,13 @@ Proof using.
     - exists (uline_of J). destruct (fbody_ok_line J Hf) as [Hok HJ].
       split; [| split; [exact Hok | split; [exact HJ | exact (uline_ws_words J Hf)]]].
       pose proof (uline_of_nopipe J) as Hnp. rewrite /ush_line_union.
-      destruct (uline_of J) as [ws | ws Nf | Nf | p n | ws] eqn:He; try exact Logic.I.
+      destruct (uline_of J) as [ws | ws Nf | Nf | p n | ws |] eqn:He; try exact Logic.I.
       exfalso. exact (proj1 Hnp p n eq_refl).
-    - destruct Hlast as [Hf | [Hp | Hs]]; [contradiction | |].
+    - destruct Hlast as [Hf | [Hp | [Hs | Hy]]]; [contradiction | | |].
+      3: { (* the [sync] body (sync design section 3) *)
+           exists LSync. rewrite (sync_parse_true J Hy).
+           split_and!; [exact Logic.I | exact Logic.I | reflexivity |].
+           apply (bool_decide_unpack _). vm_compute. exact Logic.I. }
       2: { (* a [seccomp x] body, the knob on (seccomp lane S4) *)
            revert Hs. rewrite /usecc_ok.
            destruct (secc_parse J) as [ws |] eqn:Hq; [intros _ | intros []].

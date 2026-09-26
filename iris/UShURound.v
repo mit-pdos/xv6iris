@@ -134,6 +134,10 @@ Require UexecSecc.
 Require UShSecc.
 Require UShExecPin.
 Require UkSeccEntry.
+Require FsSyncPin.
+Require UShSync.
+Require UkSyncEntry.
+Require UkSync.                   (* [sync_pay] *)
 Require LinkUserinit.            (* [UG.uexec_wp_gen]: the generic user WP *)
 Require Import CtxIdDefs.
 Local Open Scope Z_scope.
@@ -145,15 +149,21 @@ Local Notation K := ulmG_hooks.
 (* ===================================================================== *)
 (*  S0  THE UNION'S CODES AT A FILE LINE, READ BACK AS THE FILE'S         *)
 (* ===================================================================== *)
-Lemma ulm_ok_R (s : fstate) (l : uline) (a : ralt) :
-  uline_nopipe l -> lm_ok U s l (lm_dec U (ualt_code (UR a))) <-> ralt_ok l a.
+(* at every line but a pipeline, the file's range condition *)
+Lemma ulm_ok_R' (s : fstate) (l : uline) (a : ralt) :
+  (forall p n, l <> LPipe p n) -> lm_ok U s l (lm_dec U (ualt_code (UR a))) <-> ralt_ok l a.
 Proof using.
   intros Hnp. change (lm_ok ulmG) with (uok adm_u_g). change (lm_dec ulmG) with ualt_dec.
   rewrite ualt_dec_code.
-  destruct l as [ws | ws Nf | Nf | p n | ws]; [cbn [uok]; reflexivity | cbn [uok]; reflexivity
-                                   | cbn [uok]; reflexivity | | cbn [uok]; reflexivity].
-  exfalso. exact (proj1 Hnp p n eq_refl).
+  destruct l as [ws | ws Nf | Nf | p n | ws |]; [cbn [uok]; reflexivity | cbn [uok]; reflexivity
+                                   | cbn [uok]; reflexivity | | cbn [uok]; reflexivity
+                                   | cbn [uok]; reflexivity].
+  exfalso. exact (Hnp p n eq_refl).
 Qed.
+
+Lemma ulm_ok_R (s : fstate) (l : uline) (a : ralt) :
+  uline_nopipe l -> lm_ok U s l (lm_dec U (ualt_code (UR a))) <-> ralt_ok l a.
+Proof using. intros Hnp. exact (ulm_ok_R' s l a (proj1 Hnp)). Qed.
 
 Lemma ulm_cont_R (s : fstate) (l : uline) (a : ralt) :
   lm_cont U s l (lm_dec U (ualt_code (UR a))) = cont s l a.
@@ -187,7 +197,27 @@ Proof using.
   rewrite ualt_dec_code. reflexivity.
 Qed.
 
-(* a state-free file alternative of the round's line is the record's own *)
+(* a state-free file alternative of the round's line is the record's own
+   (at the sync line too, which is no pipeline) *)
+Lemma ulm_apr_R' (I : list (bv 8)) (a : ralt) :
+  (forall p n, ul I <> LPipe p n) -> ralt_ok (ul I) a -> fstate_free a = true ->
+  ralt_panic a = false -> lm_apr U K I (ualt_code (UR a)).
+Proof using.
+  intros Hnp Hok Hfr Hp. rewrite /lm_apr. split_and!.
+  - apply (ulm_ok_R' _ (ul I) a Hnp). exact Hok.
+  - rewrite ulm_free_R. exact Hfr.
+  - rewrite ulm_panic_R. exact Hp.
+Qed.
+
+Lemma ulm_ab_R' (I : list (bv 8)) (a : ralt) :
+  (forall p n, ul I <> LPipe p n) -> ralt_ok (ul I) a -> fstate_free a = true ->
+  lm_ab U K I (ualt_code (UR a)) = cont ∅ (ul I) a.
+Proof using.
+  intros Hnp Hok Hfr. rewrite /lm_ab decide_True.
+  - exact (ulm_cont_R ∅ (ul I) a).
+  - split; [apply (ulm_ok_R' ∅ (ul I) a Hnp); exact Hok | rewrite ulm_free_R; exact Hfr].
+Qed.
+
 Lemma ulm_apr_R (I : list (bv 8)) (a : ralt) :
   uline_nopipe (ul I) -> ralt_ok (ul I) a -> fstate_free a = true ->
   ralt_panic a = false -> lm_apr U K I (ualt_code (UR a)).
@@ -362,6 +392,71 @@ Lemma usecc_execfail_bytes (wsx : list (list (bv 8))) :
   UkShDiagAt.ush_execfail_bytes FileDisc.alt_execsecc
     (FileDisc.uline_ws (LSecc wsx) !!! 0%nat).
 Proof using. exact usecc_execfail_bytes0. Qed.
+
+(* ---- the [sync] line's words and bytes (sync design section 3) ---- *)
+Definition usync_lp (ws : list (list (bv 8))) (g : nat -> bv 8) (k len : nat) : Prop :=
+  ws = FileDisc.uline_ws LSync /\ UkSh.ush_line_at LSync g k len.
+
+Lemma usync_ws_exec_ok : exec_ok (FileDisc.uline_ws LSync).
+Proof using. apply (bool_decide_unpack _). vm_compute. exact I. Qed.
+
+Lemma usync_line : LineWords.wl_line (FileDisc.uline_ws LSync) = FileDisc.line_bytes LSync.
+Proof using. vm_compute. reflexivity. Qed.
+
+Lemma usync_xline (gb : nat -> bv 8) (len : nat) :
+  UkSh.ush_line_at LSync gb 0%nat len ->
+  UkShEcho.ush_xline_is (FileDisc.uline_ws LSync) gb 0%nat len.
+Proof using.
+  intros (Hu & Hlen & Hby). split; [exact usync_ws_exec_ok |].
+  rewrite usync_line. exact (conj Hlen Hby).
+Qed.
+
+(* its first byte is 's', not the 'c' of a [cd] *)
+Lemma usync_lp0 (ws : list (list (bv 8))) (g : nat -> bv 8) (k len : nat) :
+  usync_lp ws g k len -> bv_unsigned (g k) <> 99%Z.
+Proof using.
+  intros (_ & _ & Hlen & Hby).
+  assert (Hpos : (0 < len)%nat) by (rewrite Hlen; vm_compute; lia).
+  pose proof (Hby 0%nat Hpos) as H0. rewrite Nat.add_0_r in H0. rewrite H0.
+  vm_compute. discriminate.
+Qed.
+
+Lemma usync_lp_of_at (f : nat -> bv 8) (k len : nat) :
+  UkSh.ush_line_at LSync f k len ->
+  usync_lp (FileDisc.uline_ws LSync) (fun j : nat => f (k + j)%nat) 0%nat len.
+Proof using.
+  intros (Hu & Hlen & Hby). split; [reflexivity |].
+  split_and!; [exact Hu | exact Hlen |]. intros j Hj. exact (Hby j Hj).
+Qed.
+
+(* sh's [exec sync failed] *)
+Lemma usync_execfail_bytes0 :
+  UkShDiagAt.ush_execfail_bytes FileDisc.alt_execsync FileDisc.cmd_sync.
+Proof using.
+  rewrite /UkShDiagAt.ush_execfail_bytes. split_and!.
+  - vm_compute. lia.
+  - intros p Hp.
+    assert (Hl : (p < length FileDisc.alt_execsync)%nat)
+      by (vm_compute in Hp |- *; lia).
+    exact (list_lookup_lookup_total_lt FileDisc.alt_execsync p Hl).
+  - intros p Hp.
+    apply (UkShDiag.ush_bytes_of_forallb (UkShDiag.shd_lit 0x1298)
+             (fun q : nat => FileDisc.alt_execsync !!! q) 0%nat 5%nat);
+      [vm_compute; reflexivity | lia].
+  - intros j Hj.
+    assert (Hj4 : (j < 4)%nat) by (vm_compute in Hj; lia).
+    destruct j as [| [| [| [| j]]]]; try lia; vm_compute; reflexivity.
+  - intros p Hp.
+    apply (UkShDiag.ush_bytes_of_forallb (UkShDiag.shd_lit 0x1298)
+             (fun q : nat => FileDisc.alt_execsync !!! (q + 2)%nat)
+             7%nat 8%nat);
+      [vm_compute; reflexivity | lia].
+Qed.
+
+Lemma usync_execfail_bytes :
+  UkShDiagAt.ush_execfail_bytes FileDisc.alt_execsync
+    (FileDisc.uline_ws LSync !!! 0%nat).
+Proof using. exact usync_execfail_bytes0. Qed.
 
 (* the union's admitted line shapes: the file's three, and the pipelines
    the union's admission lets through *)
@@ -1092,6 +1187,182 @@ Section UShURound.
   Qed.
 
   (* =================================================================== *)
+  (*  S2y  THE sync CHILD (sync design section 3)                         *)
+  (*                                                                     *)
+  (*  An EXEC line with no redirect, whose every alternative moves no    *)
+  (*  file: the lend goes to /sync whole, and /sync's exit pays the      *)
+  (*  round's credential at RAN once [sync()] has returned -- nothing on *)
+  (*  the console (it prints nothing), the block still owed whole, the   *)
+  (*  deed PEND at [RSyncRan].  The prompt is then the block's first     *)
+  (*  byte, and sh files RAN from the deed at its [$], as the redirect   *)
+  (*  line's [RFRan sel] is filed.  The exec failure and the out-of-      *)
+  (*  memory death are the record's own blocks beside the deed as found. *)
+  (* =================================================================== *)
+
+  (* THE PAYMENT AT RAN: the lend is the round's credential at the block's
+     head, and the deed moves from PRE to PEND at [RSyncRan] -- its step
+     is the identity *)
+  Lemma usync_ran_pay (I : list (bv 8)) :
+    ul I = LSync -> (0 < nlines I)%nat ->
+    ⊢ UkSync.sync_pay (Wcu I 3%nat) (UkShFork.ushf_wq Wcu I).
+  Proof using .
+    intros Hul Hpos. rewrite /UkSync.sync_pay /UkShFork.ushf_wq. iIntros "Hc".
+    iDestruct (uWcu_3_nw ug r s0 PT PD I ltac:(rewrite Hul; reflexivity) with "Hc") as "Hc".
+    rewrite uWcf_S3. iDestruct "Hc" as "[Hc [Hd _]]".
+    iApply (uWcu_of ug r s0 PT PD I 0%nat). rewrite uWcf_0. iRight. iFrame "Hc".
+    rewrite /ush_pend_at /ush_deed_at.
+    iDestruct "Hd" as "[Hd | #HT]"; [| by iRight].
+    iLeft. iDestruct "Hd" as (cs s v) "(Hown & %Htie & #Hty & #Hpin & #Hcs & %Hnw)".
+    iExists cs, s, v. iFrame "Hown Hty Hpin Hcs". iPureIntro.
+    split; [| exact Hnw].
+    destruct Htie as [Hlen Hcon]. exists (ualt_code (UR RSyncRan)).
+    rewrite /upend_tie_at ulm_term_R ulm_cont_R ulm_step_R Hul.
+    split_and!; [exact Hlen | exact Hpos | | reflexivity | reflexivity | exact Hcon].
+    apply (ulm_ok_R' _ LSync RSyncRan ltac:(intros; discriminate)). exact Logic.I.
+  Qed.
+
+  (* THE EXEC SUPPLY: [exec sync] at the union's /sync entry, the lend
+     going whole to the program *)
+  Lemma usync_exec_sup (I : list (bv 8)) :
+    ul I = LSync -> (0 < nlines I)%nat ->
+    ⊢ udep (SG := uexecSG_xv6) (PS := uprogSG_free) -∗
+      UShExecPin.sh_sync_slot T -∗
+      □ (app_taint -∗ UkShFork.ushf_wq Wcu I) -∗
+      UkShEcho.sh_exec_sup_echo_at (SG := uexecSG_xv6)
+        (ghost_varG0 := offbox_offG)
+        ucat_rows (FileDisc.uline_ws LSync)
+        (fun _ : Z => UkShFork.ushf_wq Wcu I) (Wcu I 3%nat).
+  Proof using .
+    intros Hul Hpos. iIntros "#Hdep #Hslot #Hkt".
+    iPoseProof (usync_ran_pay I Hul Hpos) as "#Hpay".
+    iApply (UShExecPin.sh_exec_sup_x_of_entry (ghost_varG0 := offbox_offG)
+              ucat_rows (FileDisc.uline_ws LSync) UShExecPin.sync_pl
+              FsSyncPin.era0_sync_pins [FsImg.ROOTINO; FsSyncPin.SYNC_INO]
+              FsSyncPin.SYNC_INO ElfUser.sync_elf T
+              (UkShFork.ushf_wq Wcu I) (Wcu I 3%nat)
+              usync_ws_exec_ok eq_refl UShSync.sync_elf_loadable
+              UShExecPin.sh_sync_pin_resolves with "[] Hkt Hslot").
+    iIntros "!>" (M sa t gn sts cs pidv) "%Himg %Hbytes %Hlen %Hrows #Hnp".
+    iApply (UkSyncEntry.sync_image_entry (PS := uprogSG_free) (ghost_varG0 := offbox_offG)
+              (FileDisc.uline_ws LSync) M sa t gn sts FsImg.ROOTINO cs pidv
+              (fun _ : Z => UkShFork.ushf_wq Wcu I) (Wcu I 3%nat)
+              (fun k H => H) (fun _ _ => eq_refl) usync_ws_exec_ok Himg Hbytes Hlen
+              with "Hpay Hnp Hdep").
+  Qed.
+
+  (* THE EXEC FAILED: [exec sync failed], the record's block at
+     [RSyncExec] beside the deed as the round found it *)
+  Lemma usync_execfail_law (I : list (bv 8)) :
+    ul I = LSync -> (0 < nlines I)%nat ->
+    ⊢ union_links ug -∗
+      UkShDiag.ush_execfail_law_at (PS := uprogSG_free) (ghost_varG0 := offbox_offG)
+        FileDisc.alt_execsync (13 + length (FileDisc.uline_ws LSync !!! 0%nat))%nat
+        (Wcu I 3%nat) (Wcu I 0%nat).
+  Proof using .
+    intros Hul Hpos. iIntros "#Hlk".
+    assert (Hnw : uwild (ul I) = false) by (rewrite Hul; reflexivity).
+    assert (Hnp : forall p n, ul I <> LPipe p n) by (rewrite Hul; intros; discriminate).
+    iPoseProof (UShPanic.ush_diag_law_hold_at_alt (PS := uprogSG_free)
+                  (ghost_varG0 := offbox_offG) FI (PRE I) I (ualt_code (UR RSyncExec))
+                  with "[] []") as "#Hx".
+    { iLeft. iPureIntro. rewrite ufi_wild Hnw. discriminate. }
+    { cbn [lk_links union_link_inst_at gen_link_inst]. iExact "Hlk". }
+    assert (Hab : lk_ab FI I (ualt_code (UR RSyncExec)) = FileDisc.alt_execsync).
+    { change (lk_ab FI I (ualt_code (UR RSyncExec)))
+        with (lm_ab U K I (ualt_code (UR RSyncExec))).
+      rewrite (ulm_ab_R' I RSyncExec Hnp ltac:(rewrite Hul; exact Logic.I) eq_refl) Hul.
+      reflexivity. }
+    assert (Hn : (length FileDisc.alt_execsync - 2
+                  = 13 + length (FileDisc.uline_ws LSync !!! 0%nat))%nat)
+      by (vm_compute; reflexivity).
+    iEval (rewrite Hab Hn) in "Hx".
+    rewrite /UkShDiag.ush_execfail_law_at.
+    iIntros "!>" (N l) "%Hfd Hc".
+    iDestruct (uWcu_3_nw ug r s0 PT PD I Hnw with "Hc") as "Hc". rewrite uWcf_S3.
+    iDestruct ("Hx" $! N l with "[%] [Hc]") as (Pf) "(H0 & #Hs & #He)";
+      [exact Hfd | rewrite /uWcl; iExact "Hc" |].
+    iExists Pf. iFrame "H0 Hs". iIntros "!> Hp".
+    iDestruct ("He" with "Hp") as (v) "(#Hpin & Hblk & Hpre)".
+    iApply (uWcu_of ug r s0 PT PD I 0%nat).
+    iApply (uWcf0_of_post_pre_id ug r s0 I (ualt_code (UR RSyncExec)) v
+              (ulm_apr_R' I RSyncExec Hnp ltac:(rewrite Hul; exact Logic.I) eq_refl eq_refl)
+              Hnw Hpos
+              ltac:(intros s; rewrite ulm_step_R Hul; reflexivity)
+              with "Hpin Hblk Hpre").
+  Qed.
+
+  (* ---- THE sync CHILD'S LAW ---- *)
+  Lemma uHchild_sync :
+    ⊢ union_links ug -∗
+      udep (SG := uexecSG_xv6) (PS := uprogSG_free) -∗
+      UShExecPin.sh_sync_slot T -∗
+      UkShFork.ushf_child_law_at (PS := uprogSG_free) (SG := uexecSG_xv6)
+        (ghost_varG0 := offbox_offG) T Wcu usync_lp 68.
+  Proof using Hkill.
+    iIntros "#Hlk #Hdep #Hslot".
+    rewrite /UkShFork.ushf_child_law_at.
+    iIntros "!>" (N' h m dw dv sa len ws gb sz ld n I)
+      "%Hpeq %Hs1 %Hline %Hlws %Hfok %Hsa %Hs64 %Hs38 %Hszlo %Hszal %Hszok
+       %Hrows #Hcode #Hpcode #Hpro #Hjt Hstr Hwsp Hsy Hstd Hcwd Hch _ HM Hcr
+       Hrun".
+    iDestruct (UkSh.ush_std_ustd with "Hstd") as "Hstd".
+    iDestruct (UserChildren.uch_any_of with "Hch") as "Hch".
+    destruct Hline as (-> & Hlat).
+    (* ---- the line, off the fork's words ---- *)
+    assert (Hpos : (0 < nlines I)%nat).
+    { destruct (nlines I) as [| k] eqn:Hn; [| lia]. exfalso.
+      rewrite /last_ws in Hlws. rewrite /nlines in Hn.
+      apply nil_length_inv in Hn. rewrite Hn in Hlws. cbn in Hlws.
+      revert Hlws. vm_compute. discriminate. }
+    assert (Hul : ul I = LSync).
+    { rewrite ul_lastbody.
+      rewrite (FileDisc.fline_ok_sync_words (UkSh.ush_lastbody I) Hfok);
+        [exact uline_of_u_sync |].
+      rewrite -(last_ws_lastbody I). symmetry. exact Hlws. }
+    assert (Hnw : uwild (ul I) = false) by (rewrite Hul; reflexivity).
+    (* the era's pin, off the lend, for the taint's payload *)
+    iAssert (∃ v0 : era_pins, era_pin (fgn_echo gf) (S gen_id) v0)%I
+      as (v0) "#Hpin0".
+    { iDestruct (uWcu_3_nw ug r s0 PT PD I Hnw with "Hcr") as "Hc".
+      rewrite uWcf_S3 /uWcl /lk_lcred. iDestruct "Hc" as "[Hc _]".
+      iDestruct "Hc" as (v0) "[#Hp _]". iExists v0.
+      cbn [lk_pin union_link_inst_at gen_link_inst]. iExact "Hp". }
+    iAssert (□ (app_taint -∗ UkShFork.ushf_wq Wcu I))%I as "#Hkillq".
+    { iIntros "!> #Hk". rewrite /UkShFork.ushf_wq.
+      iApply (uWcu_taint' I 0%nat v0 with "Hpin0"). iApply uHktaint'.
+      iExact "Hk". }
+    (* ---- THE WALK, at 8 more steps of budget than it needs ---- *)
+    assert (Hbud : (68 + (8 + (UkShDiag.ush_Dg + n)))%nat
+                   = (60 + (8 + (UkShDiag.ush_Dg + (n + 8))))%nat) by lia.
+    rewrite Hbud.
+    iApply (UkShEcho.wp_kshm_child_x_holds (PS := uprogSG_free)
+              (SG := uexecSG_xv6) (ghost_varG0 := offbox_offG)
+              (fun k H => H) ucat_rows (FileDisc.uline_ws LSync) FileDisc.alt_execsync
+              (fun _ : Z => UkShFork.ushf_wq Wcu I)
+              (Wcu I 3%nat) (Wcu I 0%nat)
+              N' (ukn_const_of_eq N' _ Hpeq (fun _ _ => eq_refl))
+              h m dw dv sa len gb sz ld (n + 8)%nat
+              Hpeq Hs1 (usync_xline gb len Hlat) usync_execfail_bytes
+              Hsa Hs64 Hs38 Hszlo Hszal Hszok Hrows (proj2 (proj2 Hrows))
+              with "Hcode [] [] [] [] Hpcode Hpro Hjt Hstr Hwsp Hsy Hstd Hcwd
+                    Hch HM Hcr Hrun").
+    - (* exec /sync *)
+      iApply (usync_exec_sup I Hul Hpos with "Hdep Hslot Hkillq").
+    - (* the parse ran out of memory: "out of memory", the deed as found *)
+      pose proof (ukn_const_of_eq N' _ Hpeq (fun _ _ => eq_refl)) as Hcst.
+      iApply (UkShEcho.ushp_oom_of_diag (PS := uprogSG_free)
+                (ghost_varG0 := offbox_offG) N' (Wcu I 3%nat) (Wcu I 0%nat) ld
+                (18 + (8 + (UkShDiag.ush_Dg + (n + 8))))%nat ltac:(lia)
+                (proj2 (proj2 Hrows)) with "[] [] Hcode []").
+      + iApply (uHoom ug r s0 PT PD I Hnw Hpos with "Hlk").
+      + iIntros "!> H". rewrite Hpeq /UkShFork.ushf_wq. iExact "H".
+      + iApply (UkSh.ush_jtab_ro with "Hjt").
+    - (* exec failed: the diagnostic at [RSyncExec] *)
+      iApply (usync_execfail_law I Hul Hpos with "Hlk").
+    - iIntros "!> H". rewrite /UkShFork.ushf_wq. iExact "H".
+  Qed.
+
+  (* =================================================================== *)
   (*  S3  THE REDIRECT CHILD                                              *)
   (* =================================================================== *)
 
@@ -1264,7 +1535,7 @@ Section UShURound.
     iDestruct "Hino" as "[Hino | #HT]"; last first.
     { iApply ("Hgen'" $! (UexecSlot.uvis_fd W') W' with "HT [//] [%] Hmp"); exact Hscw. }
     iDestruct "Hino" as (i γo) "(%Hty & %Hi)".
-    destruct Hi as (Hi1 & Hi2 & Hi3 & Hi4 & Hi5 & Hi6).
+    destruct Hi as (Hi1 & Hi2 & Hi3 & Hi4 & Hi5 & Hi6 & Hi7).
     rewrite /UShFileRedir.redir_K /UkFileOpen.redir_K /FileOpen.file_open_fd_K.
     iDestruct "HK" as "[HK | #HT]"; last first.
     { iApply ("Hgen'" $! (UexecSlot.uvis_fd W') W' with "HT [//] [%] Hmp"); exact Hscw. }
@@ -1279,7 +1550,7 @@ Section UShURound.
                   (fun _ : Z => UkShFork.ushf_wq Wcu I)
                   (fun _ _ => eq_refl) Heq Hokws Himg Hbytes Hflen
                   eq_refl
-                  ltac:(rewrite Hl -Hty; exact Hfd1) Hi1 Hi2 Hi3 Hi4 Hi5 Hi6
+                  ltac:(rewrite Hl -Hty; exact Hfd1) Hi1 Hi2 Hi3 Hi4 Hi5 Hi6 Hi7
                   with "[] [] [] [] Hinv Hnp0 Hdep") as "#He".
     { (* echo RAN: the exit pays the round's payload *)
       iIntros "!> [[_ Hc] Hex]". iDestruct "Hex" as (sel) "Hcur".
@@ -1547,6 +1818,8 @@ Section UShURound.
       (ghost_varG0 := offbox_offG) T Wcu UkShRedirBody.ushs_lp_cat 68 -∗
     UkShFork.ushf_child_law_at (PS := uprogSG_free) (SG := uexecSG_xv6)
       (ghost_varG0 := offbox_offG) T Wcu usecc_lp 68 -∗
+    UkShFork.ushf_child_law_at (PS := uprogSG_free) (SG := uexecSG_xv6)
+      (ghost_varG0 := offbox_offG) T Wcu usync_lp 68 -∗
     UkShDiag.ush_panic_law (PS := uprogSG_free) Wcu Wbu -∗
     UkShFork.ushf_body_law (PS := uprogSG_free) (SG := uexecSG_xv6)
       N γp T Wcu Wbu Pm ush_line_upipe sz -∗
@@ -1554,7 +1827,7 @@ Section UShURound.
       N γp T Wcu Wbu Pm ush_line_union sz.
   Proof using .
     intros Hszlo Hszal Hszok.
-    iIntros "#Hkl #Hchl #Hred #Hcatl #Hsecl #Hplaw #Hpipes".
+    iIntros "#Hkl #Hchl #Hred #Hcatl #Hsecl #Hsyncl #Hplaw #Hpipes".
     iPoseProof (UkShPipeForkTwin.ushf_body_law_echo_pipe (PS := uprogSG_free)
                   (SG := uexecSG_xv6) N γp T Wcu Wbu Pm
                   (fun k H => H) sz Hszlo Hszal Hszok
@@ -1570,7 +1843,22 @@ Section UShURound.
     iIntros "!>" (lu h m f k len l n)
       "%Hd %Hlat %Hregs %Hs1 %Ha5 %Hnn %Hnul %Hkl2 %Hpm1 %Hpmwb %Hfd0
        #Hgen #Hcode #Hjt Hhead Hstd Hdat Hsz Hbuf Hrun".
-    destruct lu as [ws | ws Nf | Nf | p np | ws].
+    destruct lu as [ws | ws Nf | Nf | p np | ws |].
+    6: { (* [sync] -- the sync child, at the generic body twin (sync
+            design section 3) *)
+         iDestruct (UkSh.ush_jtab_ro (ukn_t N) with "Hjt") as "#Hro".
+         iApply (UkShPipeForkTwin.wp_kshm_body_pipe_nc (PS := uprogSG_free)
+                   (SG := uexecSG_xv6) N γp T Wcu Wbu Pm (fun k0 H => H)
+                   usync_lp 68 h m f k len
+                   (FileDisc.uline_ws LSync) sz l n
+                   ltac:(lia) usync_lp0
+                   Hregs Hs1 Ha5 Hnn Hnul Hkl2
+                   (usync_lp_of_at f k len Hlat)
+                   Hszlo Hszal Hszok Hpm1 Hpmwb
+                   with "Hgen Hhead Hcode Hro [] Hjt Hkl Hsyncl Hplaw [%] Hstd
+                         Hdat Hsz Hbuf Hrun").
+         + iApply (UkShFork.ushf_code_shp (ukn_t N) with "Hcode").
+         + exact Hfd0. }
     5: { (* [seccomp ws] -- the wild child, at the generic body twin *)
          iDestruct (UkSh.ush_jtab_ro (ukn_t N) with "Hjt") as "#Hro".
          iApply (UkShPipeForkTwin.wp_kshm_body_pipe_nc (PS := uprogSG_free)

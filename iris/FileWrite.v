@@ -113,6 +113,7 @@ Require Import FsEchoPin.          (* [ECHO_INO], [era0_echo_pins] *)
 Require Import FsCatPin.           (* [CAT_INO], [era0_cat_pins] *)
 Require Import FsGrepPin.          (* [GREP_INO], [era0_grep_pins] *)
 Require Import FsSeccPin.          (* [SECC_INO], [era0_secc_pins] (seccomp S4) *)
+Require Import FsSyncPin.                (* [SYNC_INO] (sync SY2) *)
 Require Import FsConsPin.          (* [file_pin] and its family, [cons_state] *)
 Require Import FileFsPure.         (* [file_fs_pure] *)
 Require Import EchoDisc.           (* [line_ok] *)
@@ -200,6 +201,11 @@ Lemma file_pin_secc (av : aview) :
   file_pin fname_seccomp SECC_INO secc_bytes av <-> era0_secc_pins av.
 Proof using . rewrite /file_pin /era0_secc_pins /secc_path. reflexivity. Qed.
 
+(* ...and /sync's its seventh (sync SY2) *)
+Lemma file_pin_sync (av : aview) :
+  file_pin fname_sync SYNC_INO syncf_bytes av <-> era0_sync_pins av.
+Proof using . rewrite /file_pin /era0_sync_pins /sync_path. reflexivity. Qed.
+
 (* THE CONSOLE NEEDS NO PREMISE: its row is a DEVICE, and [delta_write]
    at a non-file row is the identity. *)
 Lemma cons_present_write (jc : Z) (i : Z) (off : nat)
@@ -220,11 +226,11 @@ Proof. rewrite /cons_absent. by rewrite delta_write_astep. Qed.
 
 Lemma file_fs_pure_write (i : Z) (off : nat) (new : list (bv 8)) (av : aview) :
   i <> INIT_INO -> i <> SH_INO -> i <> ECHO_INO -> i <> CAT_INO -> i <> GREP_INO ->
-  i <> SECC_INO ->
+  i <> SECC_INO -> i <> SYNC_INO ->
   file_fs_pure av -> file_fs_pure (delta_write i off new av).
 Proof.
-  intros Hi Hs He Hc Hg Hsc ((Hin & Hsh & Hec) & Hcat & Hgrep & Hsecc).
-  split; [split_and! | split; [| split]].
+  intros Hi Hs He Hc Hg Hsc Hsy ((Hin & Hsh & Hec) & Hcat & Hgrep & Hsecc & Hsync).
+  split; [split_and! | split; [| split; [| split]]].
   - apply file_pin_init, (file_pin_write _ _ _ i off new av Hi).
     by apply file_pin_init.
   - apply file_pin_sh, (file_pin_write _ _ _ i off new av Hs).
@@ -237,6 +243,8 @@ Proof.
     by apply file_pin_grep.
   - apply file_pin_secc, (file_pin_write _ _ _ i off new av Hsc).
     by apply file_pin_secc.
+  - apply file_pin_sync, (file_pin_write _ _ _ i off new av Hsy).
+    by apply file_pin_sync.
 Qed.
 
 (* ===================================================================== *)
@@ -380,7 +388,7 @@ Section FileWrite.
     Forall (fun k => (k < jx)%nat) sel ->
     (* PREMISE 4 -- [f] is not one of the four pinned binaries *)
     i <> INIT_INO -> i <> SH_INO -> i <> ECHO_INO -> i <> CAT_INO -> i <> GREP_INO ->
-    i <> SECC_INO ->
+    i <> SECC_INO -> i <> SYNC_INO ->
     app_inv γfs -∗ file_wq c r N s i ws sel off -∗
     ghost_map_auth (γtop (fs_gamma_L γfs)) (1/2) I ={appE}=∗
       ghost_map_auth (γtop (fs_gamma_L γfs)) (1/2) I ∗
@@ -391,7 +399,7 @@ Section FileWrite.
          ghost_map_auth (γtop (fs_gamma_L γfs)) (1/2) I' ∗
          file_wq c r N s i ws (sel ++ [jx]) (off + length bs)).
   Proof using .
-    intros Heq Hpre Hnode Hoffk Hbs Hjx Hlt Hi1 Hi2 Hi3 Hi4 Hi5 Hi6. subst offk.
+    intros Heq Hpre Hnode Hoffk Hbs Hjx Hlt Hi1 Hi2 Hi3 Hi4 Hi5 Hi6 Hi7. subst offk.
     iIntros "#Hinv Hq Hka".
     rewrite {1}/file_wq.
     iDestruct "Hq" as "[Hq | #HT]"; last first.
@@ -440,7 +448,7 @@ Section FileWrite.
                 with "Hty Hlb"). }
     iModIntro. iFrame "Hka". iSplitL "Hd".
     { iApply (file_app_step_park c r i I _ s0 s1 Heq
-                (file_fs_pure_write i off bs (abs_view I) Hi1 Hi2 Hi3 Hi4 Hi5 Hi6)
+                (file_fs_pure_write i off bs (abs_view I) Hi1 Hi2 Hi3 Hi4 Hi5 Hi6 Hi7)
                 (cons_absent_write i off bs (abs_view I))
                 (fun jc => cons_present_write jc i off bs (abs_view I))
                 Hstep with "Hd Hty'"). }
@@ -536,7 +544,7 @@ Section FileWrite.
     (jx < length (echo_chunks ws))%nat ->
     Forall (fun q => (q < jx)%nat) sel ->
     i <> INIT_INO -> i <> SH_INO -> i <> ECHO_INO -> i <> CAT_INO -> i <> GREP_INO ->
-    i <> SECC_INO ->
+    i <> SECC_INO -> i <> SYNC_INO ->
     ubytes_at M (add_vec_int ua (FW_MAX * Z.of_nat k))
       (echo_chunks ws !!! jx) ->
     Z.of_nat (length (echo_chunks ws !!! jx)) = wchunk_at nn k ->
@@ -545,7 +553,7 @@ Section FileWrite.
       (file_wq c r N s i ws (sel ++ [jx])
          (off + length (echo_chunks ws !!! jx))).
   Proof using .
-    intros Heq Hjx Hlt Hi1 Hi2 Hi3 Hi4 Hi5 Hi6 Hbsk Hlenk. iIntros "#Hinv Hq".
+    intros Heq Hjx Hlt Hi1 Hi2 Hi3 Hi4 Hi5 Hi6 Hi7 Hbsk Hlenk. iIntros "#Hinv Hq".
     rewrite /file_awrite_full_anchored.
     iIntros (I off1 bs bs0 nl) "%Hpre %Hby %Hlen %Hnode %Hoff Hka Hg".
     (* RELAY 3, CASHED: two runs of the caller's image at one base and of
@@ -554,7 +562,7 @@ Section FileWrite.
     { apply (ubytes_at_inj M (add_vec_int ua (FW_MAX * Z.of_nat k))
                bs (echo_chunks ws !!! jx) Hby Hbsk). lia. }
     iMod (file_awrite_phases γfs c r N s i ws sel jx off off1 I bs bs0 nl
-            Heq Hpre Hnode Hoff Hbs Hjx Hlt Hi1 Hi2 Hi3 Hi4 Hi5 Hi6
+            Heq Hpre Hnode Hoff Hbs Hjx Hlt Hi1 Hi2 Hi3 Hi4 Hi5 Hi6 Hi7
             with "Hinv Hq Hka") as "(Hka & Hstep & Hph2)".
     iModIntro. iFrame "Hka Hstep". iIntros (I') "%Hav Hka'".
     iMod ("Hph2" $! I' with "[//] Hka'") as "[Hka' Hq']".
@@ -628,7 +636,7 @@ Section FileWrite.
     (jx < length (echo_chunks ws))%nat ->
     Forall (fun q => (q < jx)%nat) sel ->
     i <> INIT_INO -> i <> SH_INO -> i <> ECHO_INO -> i <> CAT_INO -> i <> GREP_INO ->
-    i <> SECC_INO ->
+    i <> SECC_INO -> i <> SYNC_INO ->
     ubytes_at M (add_vec_int ua (FW_MAX * Z.of_nat k))
       (echo_chunks ws !!! jx) ->
     Z.of_nat (length (echo_chunks ws !!! jx)) = wchunk_at nn k ->
@@ -637,7 +645,7 @@ Section FileWrite.
     awrite_full_adv (fs_gamma_L γfs) appE i γo M ua nn k
       (file_cur c r N s i ws (sel ++ [jx]) γo).
   Proof using .
-    intros Heq Hjx Hlt Hi1 Hi2 Hi3 Hi4 Hi5 Hi6 Hbsk Hlenk.
+    intros Heq Hjx Hlt Hi1 Hi2 Hi3 Hi4 Hi5 Hi6 Hi7 Hbsk Hlenk.
     iIntros "#Hbr #Hinv Hcur". rewrite /awrite_full_adv.
     iIntros (I off bs bs0 nl) "%Hpre %Hby %Hlen Hka Hg".
     (* RELAY 3, CASHED *)
@@ -701,7 +709,7 @@ Section FileWrite.
       iPureIntro. split_and!; [ exact Hoff | exact Hline | exact Hsel
                               | exact Hin ]. }
     iMod (file_awrite_phases γfs c r N s i ws sel jx off off I bs bs0 nl
-            Heq Hpre Hnode eq_refl Hbs Hjx Hlt Hi1 Hi2 Hi3 Hi4 Hi5 Hi6
+            Heq Hpre Hnode eq_refl Hbs Hjx Hlt Hi1 Hi2 Hi3 Hi4 Hi5 Hi6 Hi7
             with "Hinv Hq Hka") as "(Hka & Hstep & Hph2)".
     iMod (uoff_advance γo off (length bs) with "Hu Hk") as "[Hk Hu]".
     iModIntro. iFrame "Hka Hstep". iIntros (I') "%Hav Hka'".
