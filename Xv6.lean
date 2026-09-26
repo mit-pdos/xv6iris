@@ -1582,3 +1582,5 @@ import Xv6.UkTreeRead
 import Xv6.UkTreeEntry
 import Xv6.ExecArgs
 import Xv6.ExecRun
+import Xv6.ProofUser
+import Xv6.LinkSystemAdequacyClosed

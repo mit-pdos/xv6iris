@@ -56,3 +56,22 @@ No `sorryAx`, no `Xv6.*`/`MachCSL.*` plain `axiom`.
 lake env lean Xv6/SystemAdequacy.lean 2>&1 | tr ',' '\n' | grep -v '_native.bv_decide.ax_'
 lake env lean Xv6/SystemAdequacy.lean 2>&1 | tr ',' '\n' | grep -c '_native.bv_decide.ax_'
 ```
+
+## USER proved (Sept 26 2026, lane U4)
+
+`Xv6.userProof (hZkr : ∀ C P, UclCsrZkr C P) : USER` (Xv6/ProofUser.lean) and the USER-free corollary
+`Xv6.xv6FsAdequacy_closed` (Xv6/LinkSystemAdequacyClosed.lean; a Link file because it imports ProofUser):
+hypotheses `hZkr`, `g.gen = 0`, `g.pow = false`, `diskOf g.m.devs = fsImgDisk`.
+
+| theorem | besides propext / Classical.choice / Quot.sound |
+|---|---|
+| `Xv6.userProof` | 58 `_native.bv_decide.ax_*` |
+| `Xv6.xv6FsAdequacy_closed` | 470 `_native.bv_decide.ax_*` |
+| `Xv6.xv6FsAdequacy_xv6GF` | 426 `_native.bv_decide.ax_*` |
+
+`hZkr` covers only the user CSR rows for 0x747/0x757 (mseccfg/mseccfgh): today the model has NO step there
+(the Lean backend's eager `&&` reaches `currentlyEnabled Ext_Zkr`, whose clause is missing because the Zkr
+module isn't compiled). It disappears under either fix: Sail's one-line Zkr clause in regen_sail_model.sh,
+or the backend's short-circuit fix (upstream patch prepared in /shared/sail-upstream). User decision pending.
+Still trusted (BootReset phase 3 pending): `MachCSL.resetVal` register reset table (a definition, so not in
+the axiom list).
