@@ -500,12 +500,12 @@ Section UkHandler.
 
   Lemma env_set_dev_pe_dev (E : penv) (d : nat) (x : dspec) :
     pe_dev (env_set_dev E d x) = fun d' => if decide (d' = d) then x else pe_dev E d'.
-  Proof. reflexivity. Qed.
+  Proof using . reflexivity. Qed.
 
   (* setting a device to what it already is changes nothing *)
   Lemma env_set_dev_id (E : penv) (d : nat) (x : dspec) :
     pe_dev E d = x -> env_set_dev E d x = E.
-  Proof.
+  Proof using .
     intros Hd. destruct E as [f g files paths]. unfold env_set_dev. simpl in *. f_equal.
     apply functional_extensionality. intros d'.
     destruct (decide (d' = d)) as [-> |]; [by rewrite Hd | reflexivity].

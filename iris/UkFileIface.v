@@ -1666,11 +1666,11 @@ Section UkFileIface.
   Defined.
 
   Lemma fif_ei_fds : ei_fds N P file_iface = fif_fds.
-  Proof. reflexivity. Qed.
+  Proof using . reflexivity. Qed.
   Lemma fif_ei_files : ei_files N P file_iface = fif_filesr.
-  Proof. reflexivity. Qed.
+  Proof using . reflexivity. Qed.
   Lemma fif_dev_of (d : nat) (x : dspec) : dev_of N P file_iface d x = fif_dev d x.
-  Proof. by destruct x. Qed.
+  Proof using . by destruct x. Qed.
 
   (* ------------------------------------------------------------------- *)
   (*  THE GLUE AT ANY LINK PARAMETERS (cut C9f1, design union.md S5): the *)
