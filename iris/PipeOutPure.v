@@ -480,13 +480,19 @@ Qed.
 
 Definition pipe_hooks : lm_hooks pipe_lm :=
   MkLMH pipe_lm (fun a => negb (palt_isforkS a)) tt (fun _ => 3%nat) pexf_of pexfb
-    pnoc_of (fun _ => palt_ok_dec)
+    (fun l => Some (pnoc_of l)) (fun _ => palt_ok_dec)
     (fun _ _ _ _ _ => eq_refl) pfree_term (fun _ _ _ _ _ H => H)
     (fun _ => ppan_ok) (fun _ => pfree_of_nofork _ ppan_nofork) (fun _ => ppan_panic)
     (fun _ => pexf_of_ok) (fun l => pfree_of_nofork _ (pexf_of_nofork l)) pexf_of_nopanic
     (fun _ l => pcont_pexf l)
-    (fun _ => pnoc_of_ok) (fun l => pfree_of_nofork _ (pnoc_of_nofork l)) pnoc_of_nopanic
-    (fun _ l => pcont_pnoc l)
+    (fun s l c => lmh_noc_some (fun c => LineModel.lm_ok pipe_lm s l (LineModel.lm_dec pipe_lm c)) _ c
+                    (pnoc_of_ok l))
+    (fun l c => lmh_noc_some (fun c => negb (palt_isforkS (LineModel.lm_dec pipe_lm c)) = true) _ c
+                  (pfree_of_nofork _ (pnoc_of_nofork l)))
+    (fun l c => lmh_noc_some (fun c => LineModel.lm_panic pipe_lm (LineModel.lm_dec pipe_lm c) = false) _ c
+                  (pnoc_of_nopanic l))
+    (fun s l c => lmh_noc_some (fun c => LineModel.lm_cont pipe_lm s l (LineModel.lm_dec pipe_lm c) = u_prompt) _ c
+                    (pcont_pnoc l))
     (fun _ l a Hok Hp Ht => pcont_prompt l a Hok Hp Ht)
     (fun _ l a H => pcont_nonnil_dec l a H).
 

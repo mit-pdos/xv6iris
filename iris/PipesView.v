@@ -19,9 +19,10 @@
 (*   the laws    at a pipeline line the model's range condition IS the    *)
 (*               pipeline's at the content ([pv_ok]), its continuation    *)
 (*               [plcont] ([pv_cont]), its panic and coverage flags the   *)
-(*               pipeline's ([pv_panic] / [pv_term]), a pipeline round    *)
-(*               leaves the state alone ([pv_step]), and every admitted   *)
-(*               alternative there is a pipeline one ([pv_onto]).         *)
+(*               pipeline's ([pv_panic] / [pv_term]), and a pipeline      *)
+(*               round leaves the state alone ([pv_step]).  An admitted   *)
+(*               alternative there need not be a pipeline one: the union  *)
+(*               admits the shell's out-of-memory death at every line.    *)
 (*                                                                        *)
 (* The pipeline application's model is its own view: [pview_pipes] at     *)
 (* [PipesDisc.pipes_lm fc adm] (every field by conversion).  The union's   *)
@@ -50,8 +51,6 @@ Record pview (M : lmodel) := MkPV {
   pv_term : forall pl a, lm_term M (lm_dec M (pv_enc pl a)) = plterm a;
   pv_step : forall s l pl a, pv_line l = Some pl ->
     lm_step M s l (lm_dec M (pv_enc pl a)) = s;
-  pv_onto : forall s l pl x, pv_line l = Some pl -> lm_ok M s l x ->
-    exists a, x = lm_dec M (pv_enc pl a);
 }.
 Global Arguments MkPV {M}.
 Global Arguments pv_line {M} _ _.
@@ -63,7 +62,6 @@ Global Arguments pv_cont {M} _ _ _ _ _ _.
 Global Arguments pv_panic {M} _ _ _.
 Global Arguments pv_term {M} _ _ _.
 Global Arguments pv_step {M} _ _ _ _ _ _.
-Global Arguments pv_onto {M} _ _ _ _ _ _ _.
 
 Section view.
   Context {M : lmodel} (V : pview M).
@@ -122,14 +120,13 @@ Definition pview_pipes (fc : bytes -> option bytes) (adm : pline' -> bool)
     : pview (pipes_lm fc adm).
 Proof.
   refine (@MkPV (pipes_lm fc adm) (fun l : pline' => Some l) (fun _ => fc) adm
-            (fun _ a => plalt_code a) _ _ _ _ _ _).
+            (fun _ a => plalt_code a) _ _ _ _ _).
   - intros s l pl a Hl. injection Hl as <-. cbn [pipes_lm lm_ok lm_dec].
     rewrite plalt_of_code. reflexivity.
   - intros s l pl a Hl. cbn [pipes_lm lm_cont lm_dec]. by rewrite plalt_of_code.
   - intros pl a. cbn [pipes_lm lm_panic lm_dec]. by rewrite plalt_of_code.
   - intros pl a. cbn [pipes_lm lm_term lm_dec]. by rewrite plalt_of_code.
   - intros s l pl a Hl. by destruct s.
-  - intros s l pl x Hl _. exists x. cbn [pipes_lm lm_dec]. by rewrite plalt_of_code.
 Defined.
 
 (* the view's reading at the application, by conversion *)

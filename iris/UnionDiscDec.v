@@ -29,7 +29,12 @@
 (*    - GREP STAGES (cut G8, at the union application's [ulmG]):          *)
 (*      [echo foo | grep o | cat] prints the line, [echo foo | grep z |   *)
 (*      cat] nothing (and never the line), [cat f | grep x | cat] prints  *)
-(*      [f]'s line when it holds an [x] and nothing when it does not.     *)
+(*      [f]'s line when it holds an [x] and nothing when it does not;     *)
+(*    - THE OUT-OF-MEMORY ROUND (sync design sections 1-2): sh's child    *)
+(*      dies of out-of-memory SAYING SO, at a redirect and at a pipeline; *)
+(*      NEGATIVE: with no silent alternative, [echo a > a.txt], [echo b > *)
+(*      a.txt], [cat a.txt] printing [a] is refuted at every boot state   *)
+(*      ([demo_no_silent]).                                               *)
 (*                                                                        *)
 (*  THE HOOKS: [ulm_hooks adm : lm_hooks (ulm adm)] at every admission,   *)
 (*  and [ulmG_hooks] at the union application's.                          *)
@@ -62,9 +67,10 @@ Global Instance ulm_ok_dec adm adm_s s l a : Decision (lm_ok (ulm adm adm_s) s l
 (*  1b.  THE HOOKS ([LineModelLinks.lm_hooks]) at every admission          *)
 (*                                                                        *)
 (*  Free: the file's state-free alternatives, every non-terminal echo-    *)
-(*  pipeline alternative, and at a [cat f] pipeline the panic, the silent *)
-(*  round and [exec cat failed] ([UnionDisc.ufree]).  The boot state      *)
-(*  [lmh_st0] is the file's, the empty map.                                      *)
+(*  pipeline alternative, and at a [cat f] pipeline the panic, the empty  *)
+(*  run and [exec cat failed] ([UnionDisc.ufree]).  The silent round is   *)
+(*  optional: a pipeline's empty run and the blank line's [REcho 2].      *)
+(*  The boot state [lmh_st0] is the file's, the empty map.                *)
 (* ===================================================================== *)
 Definition ulm_hooks (adm : pline' -> bool) (adm_s : list (list (bv 8)) -> bool)
   : lm_hooks (ulm adm adm_s) :=
@@ -86,17 +92,18 @@ Lemma ulm_hooks_exf adm adm_s p n :
   = upl p (PLRun (pl_exfb (LPipes p n))).
 Proof using. exact (ualt_dec_code _). Qed.
 Lemma ulm_hooks_noc adm adm_s p n :
-  lm_dec (ulm adm adm_s) (lmh_noc (ulm_hooks adm adm_s) (LPipe p n)) = upl p (PLRun []).
-Proof using. exact (ualt_dec_code _). Qed.
+  lm_dec (ulm adm adm_s) <$> lmh_noc (ulm_hooks adm adm_s) (LPipe p n) = Some (upl p (PLRun [])).
+Proof using. exact (f_equal Some (ualt_dec_code _)). Qed.
 
-(* ...and at a seccomp line: the shell's own three, at the file's codes *)
+(* ...and at a seccomp line: the shell's own two, at the file's codes, and
+   no silent round (the child may die of out-of-memory, and says so) *)
 Lemma ulm_hooks_secc adm adm_s ws :
   lm_dec (ulm adm adm_s) (lmh_pan (ulm_hooks adm adm_s) (LSecc ws)) = UR RCFork
   /\ lm_dec (ulm adm adm_s) (lmh_exf (ulm_hooks adm adm_s) (LSecc ws)) = UR RSExec
-  /\ lm_dec (ulm adm adm_s) (lmh_noc (ulm_hooks adm adm_s) (LSecc ws)) = UR RCSilent.
+  /\ lmh_noc (ulm_hooks adm adm_s) (LSecc ws) = None.
 Proof using.
   split_and!; [exact (ualt_dec_code (UR RCFork)) | exact (ualt_dec_code (UR RSExec))
-              | exact (ualt_dec_code (UR RCSilent))].
+              | reflexivity].
 Qed.
 
 Local Ltac dec_yes := apply (bool_decide_unpack _); vm_compute; exact I.
@@ -211,9 +218,10 @@ Example demo_B2_deadarm :
   ralt_ok l_hi1 RCRan /\ cont {[fname_f := c_hi]} l_hi1 RCRan = c_hi ++ u_prompt.
 Proof using. split; [exact I | vm_compute; reflexivity]. Qed.
 
-(* ... which the union does NOT admit, at any state *)
+(* ... which the union does NOT admit, at any state (its one file
+   alternative at a pipeline is the out-of-memory death) *)
 Example demo_B2_neg : forall s, ~ lm_ok ulmG s l_hi1 (UR RCRan).
-Proof using. intros s H. exact H. Qed.
+Proof using. intros s H. discriminate H. Qed.
 
 (* ---- THE TWO-STAGE CORNER (S3) ---- *)
 Definition l_cf1 : uline := LPipe (PrCatF txt_a) (cats 1).
@@ -711,4 +719,290 @@ Corollary demo_secc_neg_seg (s : fstate) (seg : list mobs) :
   ins seg = I_sc_neg -> ~ lm_disc_seg' ulmS s seg.
 Proof using.
   intros Hi (_ & ps & cs & _ & Hd4 & _). rewrite Hi in Hd4. exact (demo_secc_neg s cs Hd4).
+Qed.
+
+(* ===================================================================== *)
+(*  5.  THE OUT-OF-MEMORY ROUND, AND NO SILENT ONE (claude-notes/design/  *)
+(*      sync.md sections 1-2)                                             *)
+(*                                                                        *)
+(*  Since upstream d66e41c sh's child dies of out-of-memory in            *)
+(*  [parsecmd] SAYING SO, and the model has no alternative that prints    *)
+(*  the bare prompt at a line sh forks for.  POSITIVE: the death is       *)
+(*  admitted at a redirect (which it leaves unopened) and at a pipeline. *)
+(*  NEGATIVE: [echo a > a.txt], [echo b > a.txt], [cat a.txt] printing    *)
+(*  [a] is refuted at every boot state -- the second redirect's bare     *)
+(*  prompt can only be its run, which rewrote the file.                   *)
+(* ===================================================================== *)
+
+(* ---- echo hi > a.txt dies of out-of-memory: it says so, and the file
+        is never created, so cat a.txt prints cat's own diagnostic ---- *)
+Definition cs_oom : list nat := [ualt_code (UR ROom); ualt_code a_cat].
+
+Lemma oom_at0 : lm_at ulmG cs_oom 0 = UR ROom.
+Proof using. exact (ualt_dec_code (UR ROom)). Qed.
+
+Lemma oom_at1 : lm_at ulmG cs_oom 1 = a_cat.
+Proof using. exact (ualt_dec_code a_cat). Qed.
+
+Example demo_oom_upto : lm_upto ulmG cs_oom ∅ (bodies_of I_hi) 1 = ∅.
+Proof using. cbn [lm_upto]. rewrite oom_at0. reflexivity. Qed.
+
+Example demo_oom_ok : lm_alts_ok ulmG ∅ I_hi cs_oom.
+Proof using.
+  split; [rewrite hi_nlines; reflexivity |].
+  intros i Hi. rewrite hi_nlines in Hi.
+  destruct i as [| [| i]]; [| | lia].
+  - cbn [lm_upto]. rewrite oom_at0 hi_bodies.
+    change ([b_hi1; b_ca] !!! 0) with b_hi1.
+    cbn [ulmG ulm lm_of lm_ok]. rewrite hi_line1. exact I.
+  - rewrite demo_oom_upto oom_at1 hi_bodies.
+    change ([b_hi1; b_ca] !!! 1) with b_ca.
+    cbn [ulmG ulm lm_of lm_ok]. rewrite ca_line. exact I.
+Qed.
+
+Example demo_oom_cont :
+  lm_cont ulmG ∅ (lm_of ulmG (bodies_of I_hi !!! 0)) (lm_at ulmG cs_oom 0)
+    = sb "out of memory" ++ nl1 ++ u_prompt
+  /\ lm_cont ulmG (lm_upto ulmG cs_oom ∅ (bodies_of I_hi) 1)
+       (lm_of ulmG (bodies_of I_hi !!! 1)) (lm_at ulmG cs_oom 1)
+     = sb "cat: cannot open a.txt" ++ nl1 ++ u_prompt.
+Proof using.
+  rewrite demo_oom_upto oom_at0 oom_at1 hi_bodies.
+  change ([b_hi1; b_ca] !!! 0) with b_hi1. change ([b_hi1; b_ca] !!! 1) with b_ca.
+  cbn [ulmG ulm lm_of lm_cont]. rewrite hi_line1 ca_line.
+  split; vm_compute; reflexivity.
+Qed.
+
+(* ...and at a pipeline, at every state: sh's node-0 child parses the line *)
+Example demo_oom_pipe :
+  forall s, lm_ok ulmG s l_hi1 (UR ROom)
+            /\ lm_cont ulmG s l_hi1 (UR ROom) = sb "out of memory" ++ nl1 ++ u_prompt.
+Proof using. intros s. split; [reflexivity | vm_compute; reflexivity]. Qed.
+
+(* ---- THE NEGATIVE DEMO: echo a > a.txt; echo b > a.txt; cat a.txt
+        prints a.  Refuted at every well-formed boot state: the claim
+        (the top theorem's [lm_good_out], through
+        [UnionOutPure.union_phi]) does not hold of this wire under ANY
+        resolution.  The engine: the determinacy theorem pins every
+        resolution to the honest one through the typed [cat a.txt], so
+        the second redirect printed the bare prompt -- and the only
+        alternative of a redirect that does is its run ([ab_run]), which
+        left [a.txt] holding a run of [echo b]. ---- *)
+Definition ws_a : list (list (bv 8)) := [cmd_echo; sb "a"].
+Definition ws_b : list (list (bv 8)) := [cmd_echo; sb "b"].
+Definition b_ea : list (bv 8) := sb "echo a > a.txt".
+Definition b_eb : list (bv 8) := sb "echo b > a.txt".
+Definition c_a : list (bv 8) := sb "a" ++ nl1.
+
+(* the input through the typed [cat a.txt], before its newline *)
+Definition J_ab : list (bv 8) := b_ea ++ nl1 ++ b_eb ++ nl1 ++ b_ca.
+Definition I_ab : list (bv 8) := J_ab ++ nl1.
+
+Definition seg_ab : list mobs :=
+  demo_out u_prologue
+  ++ demo_typed (b_ea ++ nl1) ++ demo_out u_prompt
+  ++ demo_typed (b_eb ++ nl1) ++ demo_out u_prompt
+  ++ demo_typed (b_ca ++ nl1) ++ demo_out (c_a ++ u_prompt).
+
+(* an HONEST resolution through [J_ab]: both redirects ran (at the empty
+   selection, whose code is small enough to compute; every run prints the
+   bare prompt) *)
+Definition cs_ab0 : list nat := [ualt_code (UR (RFRan [])); ualt_code (UR (RFRan []))].
+
+Lemma ab_ins : ins seg_ab = I_ab.
+Proof using. vm_compute. reflexivity. Qed.
+
+Lemma ab_bodies : bodies_of I_ab = [b_ea; b_eb; b_ca].
+Proof using. vm_compute. reflexivity. Qed.
+
+Lemma ab_bodiesJ : bodies_of J_ab = [b_ea; b_eb].
+Proof using. vm_compute. reflexivity. Qed.
+
+Lemma ab_b0 : bodies_of I_ab !!! 0 = b_ea.
+Proof using. rewrite ab_bodies. reflexivity. Qed.
+Lemma ab_b1 : bodies_of I_ab !!! 1 = b_eb.
+Proof using. rewrite ab_bodies. reflexivity. Qed.
+Lemma ab_b2 : bodies_of I_ab !!! 2 = b_ca.
+Proof using. rewrite ab_bodies. reflexivity. Qed.
+Lemma abJ_b0 : bodies_of J_ab !!! 0 = b_ea.
+Proof using. rewrite ab_bodiesJ. reflexivity. Qed.
+Lemma abJ_b1 : bodies_of J_ab !!! 1 = b_eb.
+Proof using. rewrite ab_bodiesJ. reflexivity. Qed.
+
+Lemma ab_nlines : nlines I_ab = 3.
+Proof using. rewrite /nlines ab_bodies. reflexivity. Qed.
+
+Lemma ab_nlinesJ : nlines J_ab = 2.
+Proof using. rewrite /nlines ab_bodiesJ. reflexivity. Qed.
+
+Lemma ab_line0 : uline_of_u b_ea = LEchoF ws_a txt_a.
+Proof using. vm_compute. reflexivity. Qed.
+
+Lemma ab_line1 : uline_of_u b_eb = LEchoF ws_b txt_a.
+Proof using. vm_compute. reflexivity. Qed.
+
+(* the wire IS the honest transcript through [J_ab], then the newline and
+   the [a] cat is said to have printed *)
+Lemma ab_wire :
+  obs_wire Uart0 seg_ab = lm_sess ulmG [3; 0] cs_ab0 ∅ J_ab ++ wl_nl :: (c_a ++ u_prompt).
+Proof using. apply (bool_decide_unpack _). vm_compute. exact I. Qed.
+
+Lemma ab_ok0 : lm_alts_ok ulmG ∅ J_ab cs_ab0.
+Proof using.
+  split; [rewrite ab_nlinesJ; reflexivity |].
+  intros i Hi. rewrite ab_nlinesJ in Hi.
+  apply (bool_decide_unpack _).
+  destruct i as [| [| i]]; [vm_compute; exact I | vm_compute; exact I | lia].
+Qed.
+
+Lemma ab_pro0 : lm_pro_ok ulmG [3; 0] cs_ab0 (nlines J_ab).
+Proof using. rewrite /lm_pro_ok. apply (bool_decide_unpack _). vm_compute. exact I. Qed.
+
+Lemma ab_disc_input (I : list (bv 8)) :
+  bool_decide (Forall (ubody_ok adm_u_g adm_s_on) (bodies_of I) /\ Forall ubyte (rest_of I)
+               /\ S (length (rest_of I)) < line_max) = true ->
+  lm_disc_input ulmG I.
+Proof using. intros H. exact (bool_decide_eq_true_1 _ H). Qed.
+
+(* a round of a redirect line is never coverage-ending *)
+Lemma ab_echof_noterm s ws N a : uok adm_u_g s (LEchoF ws N) a -> uterm a = false.
+Proof using. destruct a; cbn [uok]; first [contradiction | reflexivity]. Qed.
+
+(* THE REDIRECT'S BARE PROMPT IS ITS RUN: every other admitted round of
+   [echo ws > N] prints a line first -- the exec and open diagnostics,
+   the fork panic, the out-of-memory death -- and there is no silent one *)
+Lemma ab_run (s : fstate) (ws : list (list (bv 8))) (N X : list (bv 8)) (a : ualt) :
+  uok adm_u_g s (LEchoF ws N) a ->
+  ucont s (LEchoF ws N) a ++ (if upanic a then X else []) = u_prompt ->
+  exists sel, a = UR (RFRan sel) /\ sel_ok (echo_chunks ws) sel.
+Proof using.
+  intros Hok H. destruct a as [r | x | x | u]; cbn [uok] in Hok; try contradiction.
+  cbn [ucont upanic] in H.
+  destruct r; cbn [ralt_ok] in Hok; try contradiction; cbn [cont ralt_panic] in H;
+    [eexists; split; [reflexivity | exact Hok] | ..];
+    exfalso; apply (f_equal length) in H;
+    unfold alt_execfail, alt_openfailN, alt_oom in H;
+    rewrite ?app_nil_r ?length_app ?lb_panic_len ?wl_line_length ?ll_prompt_len in H; simpl in H; lia.
+Qed.
+
+(* WHAT [cat a.txt] CAN PRINT FIRST at a state where [a.txt] holds a run
+   of [echo b]: '$', 'c', 'e', 'f', 'o', or one of [b\n]'s bytes.
+   Never 'a'. *)
+Lemma ab_cat_head (s : fstate) (r : ralt) (sel : list nat) (Z : list (bv 8)) (b : bv 8) :
+  ralt_ok (LCat txt_a) r -> sel_ok (echo_chunks ws_b) sel ->
+  s !! txt_a = Some (subseq (echo_chunks ws_b) sel) ->
+  (cont s (LCat txt_a) r ++ Z) !! 0 = Some b -> bv_unsigned b <> 97%Z.
+Proof using.
+  intros Ha Hsel Hs Hb.
+  assert (Hco : alt_catopenN txt_a !! 0 = Some (Z_to_bv 8 99%Z)) by (vm_compute; reflexivity).
+  assert (Hce : alt_execcat !! 0 = Some (Z_to_bv 8 101%Z)) by (vm_compute; reflexivity).
+  assert (Hcf : alt_panic !! 0 = Some (Z_to_bv 8 102%Z)) by (vm_compute; reflexivity).
+  assert (Hcm : alt_oom !! 0 = Some (Z_to_bv 8 111%Z)) by (vm_compute; reflexivity).
+  destruct r; cbn [ralt_ok] in Ha; try contradiction; cbn [cont lname line_file default] in Hb.
+  - (* cat ran: the file's first byte, or the prompt's *)
+    rewrite Hs in Hb.
+    destruct (subseq (echo_chunks ws_b) sel) as [| x xs] eqn:Hsub.
+    + rewrite -(app_assoc [] u_prompt Z) app_nil_l in Hb.
+      rewrite (fd_head_app _ _ _ _ u_prompt_head Hb). by vm_compute.
+    + rewrite -(app_assoc (x :: xs) u_prompt Z) in Hb.
+      cbn in Hb. injection Hb as Hxb.
+      destruct (subseq_head (echo_chunks ws_b) sel x Hsel
+                  ltac:(rewrite Hsub; reflexivity)) as (i & Hi & Hx).
+      vm_compute in Hi.
+      destruct i as [| [| i]]; [| | exfalso; lia];
+        vm_compute in Hx; injection Hx as <-; rewrite -Hxb; by vm_compute.
+  - rewrite (fd_head_app _ _ _ _ Hco Hb). by vm_compute.
+  - rewrite (fd_head_app _ _ _ _ Hce Hb). by vm_compute.
+  - rewrite (fd_head_app _ _ _ _ Hcf Hb). by vm_compute.
+  - rewrite (fd_head_app _ _ _ _ Hcm Hb). by vm_compute.
+Qed.
+
+Theorem demo_no_silent :
+  forall s, fstate_ok s -> ~ lm_good_out ulmG s seg_ab.
+Proof using.
+  intros s Hs (ps & cs & Hok & Hcs & Hpre).
+  rewrite ab_ins in Hok Hcs Hpre.
+  (* the three rounds' ranges, at their lines *)
+  assert (Hok0 : uok adm_u_g (lm_upto ulmG cs s (bodies_of I_ab) 0) (LEchoF ws_a txt_a)
+                   (lm_at ulmG cs 0)).
+  { pose proof (proj2 Hcs 0 ltac:(rewrite ab_nlines; lia)) as H.
+    rewrite ab_b0 in H. cbn [ulmG ulm lm_of lm_ok] in H. rewrite ab_line0 in H. exact H. }
+  assert (Hok1 : uok adm_u_g (lm_upto ulmG cs s (bodies_of I_ab) 1) (LEchoF ws_b txt_a)
+                   (lm_at ulmG cs 1)).
+  { pose proof (proj2 Hcs 1 ltac:(rewrite ab_nlines; lia)) as H.
+    rewrite ab_b1 in H. cbn [ulmG ulm lm_of lm_ok] in H. rewrite ab_line1 in H. exact H. }
+  assert (Hok2 : uok adm_u_g (lm_upto ulmG cs s (bodies_of I_ab) 2) (LCat txt_a)
+                   (lm_at ulmG cs 2)).
+  { pose proof (proj2 Hcs 2 ltac:(rewrite ab_nlines; lia)) as H.
+    rewrite ab_b2 in H. cbn [ulmG ulm lm_of lm_ok] in H. rewrite ca_line in H. exact H. }
+  (* no round of the two redirects ends coverage *)
+  assert (Hd4 : forall i, i < nlines J_ab -> lm_term ulmG (lm_at ulmG cs i) = true ->
+                S i = nlines I_ab /\ rest_of I_ab = []).
+  { intros i Hi Ht. exfalso. rewrite ab_nlinesJ in Hi.
+    destruct i as [| [| i]]; [| | lia]; change (lm_term ulmG) with uterm in Ht.
+    - rewrite (ab_echof_noterm _ _ _ _ Hok0) in Ht. discriminate Ht.
+    - rewrite (ab_echof_noterm _ _ _ _ Hok1) in Ht. discriminate Ht. }
+  assert (Hnm : forall i, i < nlines J_ab ->
+            (exists c, lm_ok ulmG (lm_upto ulmG cs_ab0 ∅ (bodies_of J_ab) i)
+                         (lm_of ulmG (bodies_of J_ab !!! i)) c /\ lm_term ulmG c = true) ->
+            ~ lm_merge ulmG (lm_of ulmG (bodies_of J_ab !!! i))
+                (lm_cont ulmG (lm_upto ulmG cs_ab0 ∅ (bodies_of J_ab) i)
+                   (lm_of ulmG (bodies_of J_ab !!! i)) (lm_at ulmG cs_ab0 i))).
+  { intros i Hi (c & Hc & Ht). exfalso. rewrite ab_nlinesJ in Hi.
+    change (lm_term ulmG) with uterm in Ht.
+    destruct i as [| [| i]]; [| | lia].
+    - rewrite abJ_b0 in Hc. cbn [ulmG ulm lm_of lm_ok] in Hc. rewrite ab_line0 in Hc.
+      rewrite (ab_echof_noterm _ _ _ _ Hc) in Ht. discriminate Ht.
+    - rewrite abJ_b1 in Hc. cbn [ulmG ulm lm_of lm_ok] in Hc. rewrite ab_line1 in Hc.
+      rewrite (ab_echof_noterm _ _ _ _ Hc) in Ht. discriminate Ht. }
+  (* the honest transcript through [J_ab] is below the wire, so every
+     resolution agrees with it there, round by round *)
+  assert (HT : lm_sess ulmG [3; 0] cs_ab0 ∅ J_ab `prefix_of` lm_sess ulmG ps cs s I_ab).
+  { etrans; [| exact Hpre]. rewrite ab_wire. by eexists. }
+  destruct (lm_sess_prefix_det ulmG ulmG_laws ps [3; 0] cs cs_ab0 s ∅ J_ab I_ab
+              (proj1 Hok) ab_pro0 Hcs ab_ok0 (lm_pro_pin_of_ok ulmG ps cs I_ab Hok)
+              (ab_disc_input I_ab ltac:(vm_compute; reflexivity))
+              (ab_disc_input J_ab ltac:(vm_compute; reflexivity))
+              Hs fstate_ok_empty Hd4 Hnm HT)
+    as (_ & _ & Heq & Hcnt).
+  (* round 1, [echo b > a.txt], printed the bare prompt: it RAN *)
+  pose proof (Hcnt 1 ltac:(rewrite ab_nlinesJ; lia)) as H1.
+  rewrite (_ : lm_cont_at ulmG [3; 0] cs_ab0 ∅ (bodies_of J_ab) 1 = u_prompt) in H1;
+    [| vm_compute; reflexivity].
+  assert (Hc1 : lm_cont_at ulmG ps cs s (bodies_of I_ab) 1
+                = ucont (lm_upto ulmG cs s (bodies_of I_ab) 1) (LEchoF ws_b txt_a) (lm_at ulmG cs 1)
+                  ++ (if upanic (lm_at ulmG cs 1)
+                      then pro_of (pro_from (S (lm_pro_idx ulmG cs 1)) ps) else [])).
+  { rewrite /lm_cont_at ab_b1. cbn [ulmG ulm lm_of lm_cont lm_panic]. rewrite ab_line1.
+    reflexivity. }
+  rewrite Hc1 in H1.
+  destruct (ab_run _ _ _ _ _ Hok1 (eq_sym H1)) as (sel & Hr1 & Hsel).
+  (* so the round of [cat a.txt] starts with [a.txt] holding a run of
+     [echo b] *)
+  assert (Hst2 : (lm_upto ulmG cs s (bodies_of I_ab) 2 : fstate) !! txt_a
+                 = Some (subseq (echo_chunks ws_b) sel)).
+  { change (lm_upto ulmG cs s (bodies_of I_ab) 2)
+      with (lm_step ulmG (lm_upto ulmG cs s (bodies_of I_ab) 1)
+              (lm_of ulmG (bodies_of I_ab !!! 1)) (lm_at ulmG cs 1)).
+    rewrite Hr1 ab_b1. cbn [ulmG ulm lm_of lm_step ustep]. rewrite ab_line1. cbn [fsm].
+    apply lookup_insert. }
+  (* the wire past the honest prefix is the cat round's continuation *)
+  rewrite ab_wire Heq in Hpre.
+  rewrite /I_ab /nl1 (lm_sess_snoc_nl ulmG ps cs s J_ab) in Hpre.
+  apply wl_prefix_app_cancel in Hpre. apply prefix_cons_inv_2 in Hpre.
+  assert (Hbs : bodies_of J_ab ++ [rest_of J_ab] = bodies_of I_ab)
+    by (vm_compute; reflexivity).
+  rewrite Hbs ab_nlinesJ in Hpre.
+  assert (Hg : (c_a ++ u_prompt) !! 0 = Some (Z_to_bv 8 97%Z)) by (vm_compute; reflexivity).
+  pose proof (lb_prefix_lookup _ _ _ 0 Hpre Hg) as Hh.
+  assert (Hc2 : lm_cont_at ulmG ps cs s (bodies_of I_ab) 2
+                = ucont (lm_upto ulmG cs s (bodies_of I_ab) 2) (LCat txt_a) (lm_at ulmG cs 2)
+                  ++ (if upanic (lm_at ulmG cs 2)
+                      then pro_of (pro_from (S (lm_pro_idx ulmG cs 2)) ps) else [])).
+  { rewrite /lm_cont_at ab_b2. cbn [ulmG ulm lm_of lm_cont lm_panic]. rewrite ca_line.
+    reflexivity. }
+  rewrite Hc2 in Hh.
+  destruct (lm_at ulmG cs 2) as [r | x | x | u]; cbn [uok] in Hok2; try contradiction.
+  cbn [ucont upanic] in Hh.
+  exact (ab_cat_head _ r sel _ _ Hok2 Hsel Hst2 Hh ltac:(vm_compute; reflexivity)).
 Qed.

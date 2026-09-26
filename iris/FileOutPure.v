@@ -346,14 +346,14 @@ Definition ralt_def (l : uline) : nat :=
   | LCat _ => ralt_enc RCRan
   (* the DEAD arm: [LPipe] admits [LCat]'s five, so it defaults the same *)
   | LPipe _ _ => ralt_enc RCRan
-  (* a [seccomp] line admits the shell's three; the silent round *)
-  | LSecc _ => ralt_enc RCSilent
+  (* a [seccomp] line admits the shell's three; the exec failure *)
+  | LSecc _ => ralt_enc RSExec
   end.
 
 Lemma ralt_def_ok (l : uline) : ralt_ok l (ralt_dec (ralt_def l)).
 Proof using.
   destruct l as [ws | ws N | N | ws npc | ws]; cbn [ralt_def].
-  - rewrite (ralt_dec_lt4 0%nat ltac:(lia)). rewrite /ralt_ok. lia.
+  - rewrite (ralt_dec_lt4 0%nat ltac:(lia)). rewrite /ralt_ok. split; [lia | intros; lia].
   - by rewrite ralt_dec_enc.
   - by rewrite ralt_dec_enc.
   - by rewrite ralt_dec_enc.
@@ -470,24 +470,24 @@ Proof using.
   assert (Hca : alt_catopenN (lname l) <> []) by apply Hsuf.
   assert (Hec : alt_execcat <> []) by (by vm_compute).
   assert (Hes : alt_execsecc <> []) by (by vm_compute).
-  destruct a as [k | sel | | | | | | | | | | |]; rewrite /cont.
+  assert (Hoo : alt_oom <> []) by (by vm_compute).
+  destruct a as [k | sel | | | | | | | | | |]; rewrite /cont.
   - assert (Hk : (k < 4)%nat).
     { destruct Ha as [Ha | Heq]; [| injection Heq as <-; lia].
       destruct l as [ws | ws N | N | ws npc | ws];
-        [exact Ha | by destruct Ha | by destruct Ha | by destruct Ha | by destruct Ha]. }
+        [exact (proj1 Ha) | by destruct Ha | by destruct Ha | by destruct Ha | by destruct Ha]. }
     exact (line_alts_of_nonnil (uline_ws l) k Hk).
   - exact Hpr.
   - exact Hex.
   - exact Hop.
   - exact Hop.
-  - exact Hpr.
   - exact Hpa.
   - destruct (s !! lname l) as [bs |]; [| exact Hca]. apply Hsuf.
   - exact Hca.
   - exact Hec.
-  - exact Hpr.
   - exact Hpa.
   - exact Hes.
+  - exact Hoo.
 Qed.
 
 (* ---- THE PADDING MOVES NO PROLOGUE ROUND.  [pro_idx_f] reads the choice

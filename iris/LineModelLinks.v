@@ -6,8 +6,9 @@
 (*  [PipeLinksLine] S5, [EchoLinks]/[EchoLinksLine]) spend of the model  *)
 (*  is PURE: the block an alternative owes at the line that was typed    *)
 (*  ([lm_ab]), which alternatives end in the prompt ([lm_apr]), the      *)
-(*  three alternatives the shell's own code names (the fork panic, the   *)
-(*  exec failure, the silent one), and the facts about the stream        *)
+(*  alternatives the shell's own code names (the fork panic, the exec    *)
+(*  failure, and a silent one where the model has one), and the facts   *)
+(*  about the stream                                                     *)
 (*  ([LineModel.lm_proc_stream]) that the write links ask for: the       *)
 (*  stream byte at the cursor, the cursor after a choice byte, a prompt  *)
 (*  byte, a line's read.  Each application had proved that list over its *)
@@ -175,11 +176,15 @@ Record lm_hooks (M : lmodel) := MkLMH {
   (* the state [lm_ab] reads a state-free continuation at *)
   lmh_st0 : lm_st M;
   (* per line: the CODE of the shell's fork panic, of the exec failure
-     (with its bytes, which name the command), and of the silent round *)
+     (with its bytes, which name the command), and -- WHERE THE MODEL HAS
+     ONE -- of a silent round, the bare prompt and nothing moved.  It is
+     optional (sync design section 2): at a line sh forks for, the command
+     that did not run says so ([FileDisc.ROom]), and a model with a silent
+     alternative there would read "did not run" into any transcript *)
   lmh_pan : lm_line M -> nat;
   lmh_exf : lm_line M -> nat;
   lmh_exfb : lm_line M -> list (bv 8);
-  lmh_noc : lm_line M -> nat;
+  lmh_noc : lm_line M -> option nat;
   (* the range condition is decidable, which is what guards [lm_ab] *)
   lmh_ok_dec : forall s l a, Decision (lm_ok M s l a);
 
@@ -197,10 +202,10 @@ Record lm_hooks (M : lmodel) := MkLMH {
   lmh_exf_free : forall l, lmh_free (lm_dec M (lmh_exf l)) = true;
   lmh_exf_nopanic : forall l, lm_panic M (lm_dec M (lmh_exf l)) = false;
   lmh_exf_cont : forall s l, lm_cont M s l (lm_dec M (lmh_exf l)) = lmh_exfb l;
-  lmh_noc_ok : forall s l, lm_ok M s l (lm_dec M (lmh_noc l));
-  lmh_noc_free : forall l, lmh_free (lm_dec M (lmh_noc l)) = true;
-  lmh_noc_nopanic : forall l, lm_panic M (lm_dec M (lmh_noc l)) = false;
-  lmh_noc_cont : forall s l, lm_cont M s l (lm_dec M (lmh_noc l)) = u_prompt;
+  lmh_noc_ok : forall s l c, lmh_noc l = Some c -> lm_ok M s l (lm_dec M c);
+  lmh_noc_free : forall l c, lmh_noc l = Some c -> lmh_free (lm_dec M c) = true;
+  lmh_noc_nopanic : forall l c, lmh_noc l = Some c -> lm_panic M (lm_dec M c) = false;
+  lmh_noc_cont : forall s l c, lmh_noc l = Some c -> lm_cont M s l (lm_dec M c) = u_prompt;
   (* what a WRITER knows of a continuation, holding none of the
      discipline's premises: it ends in the prompt, and it is not empty
      (nor is the out-of-range decode's, which is what a cursor past the
@@ -234,6 +239,11 @@ Arguments lmh_noc_nopanic {M} _.
 Arguments lmh_noc_cont {M} _.
 Arguments lmh_cont_prompt {M} _.
 Arguments lmh_cont_nonnil {M} _.
+
+(* an instance whose silent round is TOTAL ([Some] at every line) proves
+   the [lmh_noc] laws from its landed per-line ones through this *)
+Lemma lmh_noc_some (P : nat -> Prop) (x c : nat) : P x -> Some x = Some c -> P c.
+Proof. intros HP Hc. injection Hc as <-. exact HP. Qed.
 
 Section line_model_links.
   Context (M : lmodel) (L : lm_laws M) (K : lm_hooks M).
@@ -811,19 +821,24 @@ Section line_model_links.
     split; [apply lmh_exf_ok |]. split; [apply lmh_exf_free | apply lmh_exf_nopanic].
   Qed.
 
-  Lemma lm_ab_noc (I : list (bv 8)) : lm_ab I (lmh_noc K (lm_line_at I)) = u_prompt.
+  (* ...and the silent round, at a line whose model has one *)
+  Lemma lm_ab_noc (I : list (bv 8)) (c : nat) :
+    lmh_noc K (lm_line_at I) = Some c -> lm_ab I c = u_prompt.
   Proof using K.
-    rewrite (lm_ab_is I _ (lmh_noc_ok K _ _) (lmh_noc_free K _)). apply lmh_noc_cont.
+    intros Hc. rewrite (lm_ab_is I _ (lmh_noc_ok K _ _ _ Hc) (lmh_noc_free K _ _ Hc)).
+    exact (lmh_noc_cont K _ _ _ Hc).
   Qed.
 
-  Lemma lm_apr_noc (I : list (bv 8)) : lm_apr I (lmh_noc K (lm_line_at I)).
+  Lemma lm_apr_noc (I : list (bv 8)) (c : nat) :
+    lmh_noc K (lm_line_at I) = Some c -> lm_apr I c.
   Proof using K.
-    split; [apply lmh_noc_ok |]. split; [apply lmh_noc_free | apply lmh_noc_nopanic].
+    intros Hc. split; [exact (lmh_noc_ok K _ _ _ Hc) |].
+    split; [exact (lmh_noc_free K _ _ Hc) | exact (lmh_noc_nopanic K _ _ Hc)].
   Qed.
 
-  Lemma lm_ab_noc_len (I : list (bv 8)) :
-    length (lm_ab I (lmh_noc K (lm_line_at I))) - 2 = 0.
-  Proof using K. rewrite lm_ab_noc ll_prompt_len. lia. Qed.
+  Lemma lm_ab_noc_len (I : list (bv 8)) (c : nat) :
+    lmh_noc K (lm_line_at I) = Some c -> length (lm_ab I c) - 2 = 0.
+  Proof using K. intros Hc. rewrite (lm_ab_noc I c Hc) ll_prompt_len. lia. Qed.
 
   (* ================================================================== *)
   (*  5.  THE PURE LEMMAS ([FileLinksLine] S2)                           *)
@@ -1106,28 +1121,27 @@ Section line_model_links.
   Qed.
 
   (* (2) the LINE's choice byte at a settled round: the shell's '$' is the
-         block's first byte and files the round's silent alternative *)
+         block's first byte and files an alternative whose block is the
+         bare prompt (the line's silent round, where its model has one) *)
   Lemma lm_wr_blk_dollar (ps cs : list nat) (s0 : lm_st M) (I : list (bv 8))
-      (P : nat) :
+      (P : nat) (c : nat) :
+    lm_apr I c -> lm_ab I c = u_prompt ->
     lm_wr_blk M ps cs s0 I P ->
-    lm_wr_sp M ps (cs ++ [lmh_noc K (lm_line_at I)]) s0 I (S P).
+    lm_wr_sp M ps (cs ++ [c]) s0 I (S P).
   Proof using K.
-    intros Hw. pose proof (lm_wr_blk_nonnil ps cs s0 I P Hw) as Hne.
+    intros Hc Hcb Hw. pose proof (lm_wr_blk_nonnil ps cs s0 I P Hw) as Hne.
     pose proof (lm_wr_blk_started ps cs s0 I P Hw) as Hst.
     pose proof Hw as (Hpin & Hm & Hdv & HP).
-    assert (Hnp : lm_panic M (lm_dec M (lmh_noc K (lm_line_at I))) = false)
-      by exact (lmh_noc_nopanic K (lm_line_at I)).
-    assert (Hpend : lm_pending_at M ps (cs ++ [lmh_noc K (lm_line_at I)]) s0 I
-                    = u_prompt).
-    { rewrite (lm_wr_blk_pending ps cs s0 I P _ Hw (lm_apr_noc I)).
-      exact (lm_ab_noc I). }
-    assert (Hlow : lm_proc_before M ps (cs ++ [lmh_noc K (lm_line_at I)]) s0 I
+    assert (Hnp : lm_panic M (lm_dec M c) = false) by exact (proj2 (proj2 Hc)).
+    assert (Hpend : lm_pending_at M ps (cs ++ [c]) s0 I = u_prompt).
+    { rewrite (lm_wr_blk_pending ps cs s0 I P _ Hw Hc). exact Hcb. }
+    assert (Hlow : lm_proc_before M ps (cs ++ [c]) s0 I
                    = lm_proc_before M ps cs s0 I)
       by exact (lm_wr_blk_low ps cs s0 I P _ Hw).
-    assert (Hup : lm_proc_stream M ps (cs ++ [lmh_noc K (lm_line_at I)]) s0 I
+    assert (Hup : lm_proc_stream M ps (cs ++ [c]) s0 I
                   = lm_proc_before M ps cs s0 I ++ u_prompt)
       by (rewrite /lm_proc_stream Hlow Hpend; reflexivity).
-    assert (Hlen : length (lm_proc_stream M ps (cs ++ [lmh_noc K (lm_line_at I)]) s0 I)
+    assert (Hlen : length (lm_proc_stream M ps (cs ++ [c]) s0 I)
                    = S (S P)).
     { rewrite Hup (length_app (lm_proc_before M ps cs s0 I) u_prompt) ll_prompt_len.
       lia. }

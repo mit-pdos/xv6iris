@@ -376,8 +376,7 @@ Section union_link_inst.
     gen_link_inst U union_params union_X union_X_timeless
       (union_links ug) (union_links_persistent ug) union_links_gl
       union_X_dollar (uread_ret ug) uread_ret_res (fturn_pre gf)
-      uturn0 urresw urresw_persistent urresw_timeless urresw_res
-      (ualt_code (UR RFSilent)).
+      uturn0 urresw urresw_persistent urresw_timeless urresw_res.
 
   Lemma union_inst_T : lk_T union_link_inst = UT.
   Proof using . reflexivity. Qed.

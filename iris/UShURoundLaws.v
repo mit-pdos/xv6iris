@@ -607,9 +607,10 @@ Section UShURoundLaws.
     (* a tainted deed: the record's law, DONE := T *)
     rewrite {1}/ush_pend_at /ush_deed_at.
     iDestruct "Hp" as "[Hp | #HT]"; last first.
-    { iDestruct (lk_lcred_blk_line FI (S gen_id) I with "Hc") as "Hc".
+    { iDestruct (lk_lcred_blk_lend FI (S gen_id) I with "Hc") as (v) "[#Hpin _]".
+      iDestruct (uHcltaint ug s0 I 0%nat v with "Hpin HT") as "Hc0".
       iApply (uksh_w_prompt_taint N I l vw rb Hl2
-                with "HT Hlk Hro [%] [%] [%] Hcode [$Hstd $Hc] Hrun Hcont");
+                with "HT Hlk Hro [%] [%] [%] Hcode [$Hstd $Hc0] Hrun Hcont");
         assumption. }
     iDestruct "Hp" as (cs' s v') "(Hd & %Htie & #Hty & #Hpin' & #Hcs' & %Hnw)".
     destruct Htie as (a & Htie).

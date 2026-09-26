@@ -417,16 +417,6 @@ Section gen_links_line.
     iFrame "Htn Hps Hcs HE Hf". by iPureIntro.
   Qed.
 
-  Lemma gwc_line_of_blk0 k v I a : gwc_blk k v I a 0 -∗ gwc_line k v I.
-  Proof using.
-    iIntros "Hc". rewrite /gwc_line. iRight. iLeft.
-    iExists (lmh_noc K (lm_line_at M I)).
-    iSplitR; [iPureIntro; exact (lm_apr_aprs M K _ _ (lm_apr_noc M K I)) |].
-    iApply (gwc_post_of_blk k v I _ (lm_apr_noc M K I)).
-    rewrite (lm_ab_noc M K I) ll_prompt_len.
-    cbn [Nat.sub]. iApply (gwc_blk_0 with "Hc").
-  Qed.
-
   Lemma gwc_line_of_post k v I a :
     lm_apr M K I a ->
     gwc_blk k v I a (length (lm_ab M K I a) - 2) -∗ gwc_line k v I.
@@ -866,55 +856,38 @@ Section gen_links_line.
     iLeft. iExists [0], [], s0, 1. rewrite /gcur.
     iFrame "Htn' Hps' Hcs' HE' Hf". iPureIntro. exact (lm_wr_sp_head M L s0).
   Qed.
-  (* ---- the shell's prompt at the loose shapes ---- *)
-  Lemma gprompt_dollar (k : nat) (v : era_pins) (I : list (bv 8))
+  (* ---- the shell's prompt at the loose shapes: at the PROLOGUE's
+          credential.  A settled round whose block is still owed is not
+          here -- its '$' would file a silent alternative, which a line
+          sh forks for does not have; the round's own block files it
+          ([gprompt_dollar_posts]) ---- *)
+  Lemma gprompt_dollar_pro (k : nat) (v : era_pins) (I : list (bv 8))
       (b : bv 8) (Φ : iProp Σ) :
     b = u_prompt !!! 0 ->
-    (⌜¬ WL I⌝ ∨ T) -∗
-    PIN k v -∗ LINKS -∗ gwc_owed k v I -∗
+    PIN k v -∗ LINKS -∗ gwc_pro k v I -∗
     (gwc_sp k v I -∗ Φ) -∗ out_link Uart0 k b Φ.
   Proof using LINKS_gl LINKS_pers.
-    intros Hb. iIntros "Hnw #Hpin #Hlk Hc HΦ".
-    iDestruct (LINKS_gl with "Hlk") as "#(_ & Hblk & Hpro & _ & Ht)".
-    iDestruct "Hnw" as "[%Hnw | #HT]".
-    2: { iApply ("Ht" $! k v b Φ with "Hpin HT [HΦ]").
-         iIntros "#HT'". iApply "HΦ". by iApply gwc_sp_taint. }
-    rewrite {1}/gwc_owed.
+    intros Hb. iIntros "#Hpin #Hlk Hc HΦ".
+    iDestruct (LINKS_gl with "Hlk") as "#(_ & _ & Hpro & _ & Ht)".
+    rewrite {1}/gwc_pro.
     iDestruct "Hc" as "[Hl | [Hh | #HT]]"; last first.
     { iApply ("Ht" $! k v b Φ with "Hpin HT [HΦ]").
       iIntros "#HT'". iApply "HΦ". by iApply gwc_sp_taint. }
     { iApply (ghead_dollar k v I b Φ Hb with "Hpin Hlk Hh HΦ"). }
     iDestruct "Hl" as (ps cs s0 P) "(%Hw & Htn & #Hps & #Hcs & #HE & #Hf)".
-    destruct Hw as [Hw | Hw].
-    - (* the round's prologue is open: the '$' files alternative 0 *)
-      pose proof (lm_wr_pro_dollar M L ps cs s0 I P Hw) as Hsp.
-      destruct Hw as (Hpin0 & Hm & Hdv & Hr & Hnd & HP).
-      iApply ("Hpro" $! k v P 0 b ps cs s0 I Φ
-                with "[%] [%] [%] [%] [%] [%] [%] [%] Hpin Hf Htn Hps Hcs HE [HΦ]").
-      { exact Hm. } { exact Hr. } { lia. } { exact Hpin0. }
-      { exact Hnd. } { exact HP. }
-      { rewrite pro_alts_length. lia. }
-      { rewrite ll_pro_alts_0 Hb. exact EchoLinks.wr_prompt_head. }
-      iIntros "Hres". iApply "HΦ". rewrite /gwc_sp.
-      iDestruct "Hres" as "[(Htn' & Hps' & Hcs' & HE') | #HT]"; last by iRight.
-      iLeft. iExists (ps ++ [0]), cs, s0, (S P). rewrite /gcur.
-      iFrame "Htn' Hps' Hcs' HE' Hf". by iPureIntro.
-    - (* the round is settled: the '$' is the line's block-first byte *)
-      pose proof (lm_wr_blk_dollar M K ps cs s0 I P Hw) as Hsp.
-      pose proof (lm_wr_blk_nonnil M ps cs s0 I P Hw) as Hne.
-      pose proof Hw as (Hpin0 & Hm & Hdv & HP).
-      iApply ("Hblk" $! k v P (lmh_noc K (lm_line_at M I)) b ps cs s0 I Φ
-                with "[%] [%] [%] [%] [%] [%] [%] [%] [%] Hpin Hf Htn Hps Hcs HE [HΦ]").
-      { exact Hnw. } { exact Hne. } { exact Hm. } { rewrite Hdv. lia. } { exact Hpin0. }
-      { exact HP. }
-      { exact (lmh_noc_ok K _ (lm_line_at M I)). }
-      { exact (lmh_free_term K _ (lmh_noc_free K (lm_line_at M I))). }
-      { rewrite /lm_abs (lmh_noc_cont K _ (lm_line_at M I)) Hb.
-        exact EchoLinks.wr_prompt_head. }
-      iIntros "Hres". iApply "HΦ". rewrite /gwc_sp.
-      iDestruct "Hres" as "[(Htn' & Hps' & Hcs' & HE') | #HT]"; last by iRight.
-      iLeft. iExists ps, (cs ++ [lmh_noc K (lm_line_at M I)]), s0, (S P).
-      rewrite /gcur. iFrame "Htn' Hps' Hcs' HE' Hf". by iPureIntro.
+    (* the round's prologue is open: the '$' files alternative 0 *)
+    pose proof (lm_wr_pro_dollar M L ps cs s0 I P Hw) as Hsp.
+    destruct Hw as (Hpin0 & Hm & Hdv & Hr & Hnd & HP).
+    iApply ("Hpro" $! k v P 0 b ps cs s0 I Φ
+              with "[%] [%] [%] [%] [%] [%] [%] [%] Hpin Hf Htn Hps Hcs HE [HΦ]").
+    { exact Hm. } { exact Hr. } { lia. } { exact Hpin0. }
+    { exact Hnd. } { exact HP. }
+    { rewrite pro_alts_length. lia. }
+    { rewrite ll_pro_alts_0 Hb. exact EchoLinks.wr_prompt_head. }
+    iIntros "Hres". iApply "HΦ". rewrite /gwc_sp.
+    iDestruct "Hres" as "[(Htn' & Hps' & Hcs' & HE') | #HT]"; last by iRight.
+    iLeft. iExists (ps ++ [0]), cs, s0, (S P). rewrite /gcur.
+    iFrame "Htn' Hps' Hcs' HE' Hf". by iPureIntro.
   Qed.
 
   Lemma gprompt_space (k : nat) (v : era_pins) (I : list (bv 8))
@@ -948,9 +921,9 @@ Section gen_links_line.
     PIN k v -∗ LINKS -∗ gwc_ban k v I 0 -∗
     (gwc_sp k v I -∗ Φ) -∗ out_link Uart0 k b Φ.
   Proof using LINKS_gl LINKS_pers.
-    intros Hb. iIntros "Hnw #Hpin #Hlk Hc HΦ".
-    iApply (gprompt_dollar k v I b Φ Hb with "Hnw Hpin Hlk [Hc] HΦ").
-    iApply (gwc_ban_owed with "Hc").
+    intros Hb. iIntros "_ #Hpin #Hlk Hc HΦ".
+    iApply (gprompt_dollar_pro k v I b Φ Hb with "Hpin Hlk [Hc] HΦ").
+    iApply (gwc_ban_pro with "Hc").
   Qed.
 
   (* ---- the prompt at the TIGHT shapes ---- *)
@@ -1243,10 +1216,6 @@ Section gen_links_line.
           (RRES_pers : forall v I, Persistent (RRES v I))
           (RRES_tl : forall v I, Timeless (RRES v I))
           (RRES_res : forall v I, RRES v I -∗ gwc_rres v I).
-  (* the silent alternative's code, which the record carries as a
-     constant and nothing reads *)
-  Context (NOC : nat).
-
   Lemma gpin_epin (k : nat) (v : era_pins) : PIN k v -∗ PIN k v.
   Proof using. by iIntros "$". Qed.
 
@@ -1268,7 +1237,6 @@ Section gen_links_line.
        lk_pan := fun I => lmh_pan K (lm_line_at M I);
        lk_exf := fun I => lmh_exf K (lm_line_at M I);
        lk_exfb := fun I => lmh_exfb K (lm_line_at M I);
-       lk_noc := NOC;
        lk_ban := gwc_ban;
        lk_owed := gwc_owed;
        lk_sp := gwc_sp;
@@ -1331,7 +1299,6 @@ Section gen_links_line.
        lk_sp_t_sp := gwc_sp_t_sp;
        lk_open_t_open := gwc_open_t_open;
        lk_blk_0 := gwc_blk_0;
-       lk_line_of_blk0 := gwc_line_of_blk0;
        lk_line_of_post := gwc_line_of_post;
        lk_line_of_pro := gwc_line_of_pro;
        lk_lend_of_blk0 := gwc_lend_of_blk0;
@@ -1341,7 +1308,6 @@ Section gen_links_line.
        lk_ban_done := gwc_ban_done;
        lk_ban_done_line := gwc_ban_done_line;
        lk_ban_inp := gwc_ban_inp;
-       lk_prompt_dollar := gprompt_dollar;
        lk_prompt_space := gprompt_space;
        lk_prompt_dollar_ban := gprompt_dollar_ban;
        lk_read := gwc_read;

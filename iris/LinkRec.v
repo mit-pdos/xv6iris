@@ -104,7 +104,6 @@ Section linkrec.
     lk_pan : list (bv 8) -> nat;
     lk_exf : list (bv 8) -> nat;
     lk_exfb : list (bv 8) -> list (bv 8);
-    lk_noc : nat;
 
     (* ---- the credential families ---- *)
     lk_ban : nat -> era_pins -> list (bv 8) -> nat -> iProp Σ;
@@ -192,8 +191,6 @@ Section linkrec.
     lk_open_t_open : forall k v I, ⊢ lk_open_t k v I -∗ lk_open k v I;
     lk_blk_0 : forall k v I a a',
       ⊢ lk_blk k v I a 0%nat -∗ lk_blk k v I a' 0%nat;
-    lk_line_of_blk0 : forall k v I a,
-      ⊢ lk_blk k v I a 0%nat -∗ lk_line k v I;
     lk_line_of_post : forall k v I a, lk_apr I a ->
       ⊢ lk_blk k v I a (length (lk_ab I a) - 2)%nat -∗ lk_line k v I;
     lk_line_of_pro : forall k v I, ⊢ lk_pro k v I -∗ lk_line k v I;
@@ -218,11 +215,10 @@ Section linkrec.
       ⊢ lk_ban k v I 0%nat -∗
       lk_ban k v I 0%nat ∗ ((inp_lb v I ∗ ⌜rest_of I = []⌝) ∨ lk_T);
 
-    (* ---- the shell's prompt, at the loose shapes ---- *)
-    lk_prompt_dollar : forall k v I b Φ,
-      b = u_prompt !!! 0%nat ->
-      ⊢ (⌜¬ lk_wild I⌝ ∨ lk_T) -∗ lk_pin k v -∗ lk_links -∗ lk_owed k v I -∗
-      (lk_sp k v I -∗ Φ) -∗ out_link Uart0 k b Φ;
+    (* ---- the shell's prompt, at the loose shapes.  (No law files a
+            '$' at a settled round's block-owed credential: that would be
+            a silent alternative, which a line sh forks for does not have;
+            the round's own block files it, [lk_prompt_dollar_post].) ---- *)
     lk_prompt_space : forall k v I b Φ,
       b = u_prompt !!! 1%nat ->
       ⊢ lk_pin k v -∗ lk_links -∗ lk_sp k v I -∗
@@ -479,19 +475,6 @@ Section linkgen.
     iApply (lk_line_of_pro L k v I). iApply (lk_ban_pro L k v I with "Hb").
   Qed.
 
-  (* ---- the block owed IS a boundary credential ---- *)
-  Lemma lk_lpr_blk_line k v I : lk_lpr L k v I 3%nat -∗ lk_lpr L k v I 0%nat.
-  Proof using .
-    rewrite (lk_lpr_S3 L k v I 0%nat) (lk_lpr_0 L).
-    iApply (lk_line_of_blk0 L k v I 0%nat).
-  Qed.
-
-  Lemma lk_lcred_blk_line k I : lk_lcred k I 3%nat -∗ lk_lcred k I 0%nat.
-  Proof using .
-    rewrite /lk_lcred. iIntros "Hc". iDestruct "Hc" as (v) "[#Hpin Hc]".
-    iExists v. iFrame "Hpin". iApply (lk_lpr_blk_line with "Hc").
-  Qed.
-
   (* ---- what a child's block hands back: at whatever alternative the
          child took ([EchoLinksLine.ewc_lcred_of_post_a]; echo's own is
          [a = 0], the exec-failed child's [a = lk_exf]) ---- *)
@@ -734,7 +717,6 @@ Section echo_inst.
        lk_pan := fun _ => 3%nat;
        lk_exf := fun _ => 1%nat;
        lk_exfb := fun _ => alt_execfail;
-       lk_noc := 2%nat;
        lk_ban := fun _ v I i => EchoLinks.ewc_ban T v I i;
        lk_owed := fun _ v I => EchoLinks.ewc_owed T v I;
        lk_sp := fun _ v I => EchoLinks.ewc_sp T v I;
@@ -800,7 +782,6 @@ Section echo_inst.
        lk_sp_t_sp := fun _ v I => EchoLinksLine.ewc_sp_t_sp T v I;
        lk_open_t_open := fun _ v I => EchoLinksLine.ewc_open_t_open T v I;
        lk_blk_0 := fun _ v I a a' => EchoLinksLine.ewc_blk_0 T v I a a';
-       lk_line_of_blk0 := fun _ v I a => EchoLinksLine.ewc_line_of_blk0 T v I a;
        lk_line_of_post := fun _ v I a Ha => EchoLinksLine.ewc_line_of_post T v I a Ha;
        lk_line_of_pro := fun _ v I => EchoLinksLine.ewc_line_of_pro T v I;
        lk_lend_of_blk0 := ei_lend_of_blk0;
@@ -812,8 +793,6 @@ Section echo_inst.
        lk_ban_done_line := fun _ v I => EchoLinksLine.ewc_ban_done_line T v I;
        lk_ban_inp := ei_ban_inp;
 
-       lk_prompt_dollar := fun k v I b Φ Hb =>
-         lk_wand_drop _ _ (EchoLinks.echo_prompt_dollar T γ k v I b Φ Hb);
        lk_prompt_space := fun k v I b Φ Hb => EchoLinks.echo_prompt_space T γ k v I b Φ Hb;
        lk_prompt_dollar_ban := fun k v I b Φ Hb =>
          lk_wand_drop _ _ (EchoLinks.echo_prompt_dollar_ban T γ k v I b Φ Hb);

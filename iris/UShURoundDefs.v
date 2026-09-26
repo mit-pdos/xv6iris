@@ -617,16 +617,27 @@ Section UShURoundDefs.
       subst sw.
       pose proof Hw as [(_ & _ & Hn & _) _].
       destruct (length (lm_abs U s0 cs I a) - 2)%nat as [| i] eqn:Hi.
-      + (* the prompt is the block's first byte: still owed, deed PEND *)
+      + (* the prompt is the block's first byte: still owed, deed PEND at
+           the block's own alternative [a] (its step the identity) *)
         cbn [lm_blkcs]. rewrite Nat.add_0_r.
         iDestruct (ucs_lb_agree_len v cs cs' ltac:(lia) with "Hcs Hcs'") as %<-.
+        assert (Hpr : lm_cont U (ust cs s0 I) (ul I) (lm_dec U a) = u_prompt).
+        { destruct (lm_abs_prompt U K s0 cs I a Hapr) as [pre Hpre].
+          pose proof (lm_abs_len_ge2 U K s0 cs I a Hapr) as Hge.
+          change (lm_cont U (ust cs s0 I) (ul I) (lm_dec U a)) with (lm_abs U s0 cs I a).
+          rewrite Hpre length_app in Hi Hge.
+          assert (Hp0 : length pre = 0%nat)
+            by (revert Hi Hge; vm_compute (length u_prompt); lia).
+          apply nil_length_inv in Hp0. rewrite Hpre Hp0. reflexivity. }
         iRight. iSplitL "Htn".
         * iApply (uWcl3_close I v ps cs P Hw with "Hpin [Htn]").
           rewrite /gcur. cbn [gW union_params_at]. rewrite /f0w_at.
           iFrame "Htn Hps Hcs HE Hf". by iPureIntro.
         * rewrite /ush_pend_at /ush_deed_at. iLeft. iExists cs, s, v.
-          iFrame "Hd Hty Hpin Hcs %". iPureIntro. exists (lmh_noc K (ul I)).
-          apply (upend_tie_of_pre cs s0 I _ ltac:(lia) Htie).
+          iFrame "Hd Hty Hpin Hcs %". iPureIntro. exists a.
+          destruct Htie as [Hl Hc]. destruct Hapr as (Hok & _ & Hterm).
+          split_and!; [exact Hl | lia | exact (Hok _) | exact Hterm | exact Hpr |].
+          rewrite Hid. exact Hc.
       + (* a byte before the prompt: the alternative is filed, deed DONE *)
         cbn [lm_blkcs].
         iDestruct (ucs_lb_prefix_len v (cs ++ [a]) cs'
@@ -742,9 +753,9 @@ Section UShURoundDefs.
     rewrite uWcf_S3 uWcf_0. iIntros "[Hc Hp]".
     rewrite {1}/ush_pre_at /ush_deed_at. iDestruct "Hp" as "[Hp _]".
     iDestruct "Hp" as "[Hp | #HT]"; last first.
-    { iLeft. iSplitL "Hc";
-        [iApply (lk_lcred_blk_line FI (S gen_id) I with "Hc")
-        | iApply (ush_deed_taint with "HT")]. }
+    { iDestruct (lk_lcred_blk_lend FI (S gen_id) I with "Hc") as (v) "[#Hpin _]".
+      iLeft. iSplitL "";
+        [iApply (uHcltaint I 0%nat v with "Hpin HT") | iApply (ush_deed_taint with "HT")]. }
     rewrite /uWcl.
     iDestruct (lk_lcred_blk_lend FI (S gen_id) I with "Hc") as (v) "[#Hpin Hl]".
     cbn [lk_pin lk_lend union_link_inst_at gen_link_inst]. rewrite /gwc_lend.

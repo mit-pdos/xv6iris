@@ -35,7 +35,8 @@
 (*     N] alone does, contiguously), and the era is the one at the       *)
 (*     longest printed prefix.  The one round the wire never checks (the *)
 (*     last line, typed as the last input byte) is re-resolved to the    *)
-(*     silent round, which ends no coverage.                              *)
+(*     shell's out-of-memory death ([UnionDisc.uoom]), admissible at     *)
+(*     every line and ending no coverage.                                 *)
 (*                                                                        *)
 (*  THE STATE IS A MAP OF FILES (filenames.md cut W1), and the            *)
 (*  canonicalisation works ONE NAME AT A TIME through seam (a): a round  *)
@@ -348,6 +349,12 @@ Qed.
 Lemma umergeb_prompt gp : umergeb gp u_prompt = false.
 Proof using. destruct gp; vm_compute; reflexivity. Qed.
 
+(* the shell's out-of-memory death is no pipeline's coverage-ending
+   output: already its first two bytes are not (the checker is exponential
+   in its argument's length, and the merge is prefix-closed) *)
+Lemma umergeb_oom gp : umergeb gp (take 2 alt_oom) = false.
+Proof using. destruct gp; vm_compute; reflexivity. Qed.
+
 (* the state the coverage-ending outputs are realised at *)
 Lemma fstate_ok_nil1 : fstate_ok {[txt_a := []]}.
 Proof using.
@@ -624,6 +631,15 @@ Section umerge.
     intros Hl H. destruct l as [ws | ws N | N | p n | ws]; [| | | | exact (Hl ws eq_refl)].
     all: cbn [umerge] in H; apply umerge_spec in H; rewrite umergeb_prompt in H; discriminate H.
   Qed.
+
+  (* ...nor does the out-of-memory death's, which is what an unchecked
+     round is re-resolved to ([u_canon_name]) *)
+  Lemma umerge_oom l : (forall ws, l <> LSecc ws) -> ~ umerge adm l alt_oom.
+  Proof using Hadm.
+    intros Hl H. apply (ulm_merge_prefix adm l (take 2 alt_oom)) in H; [| apply prefix_take].
+    destruct l as [ws | ws N | N | p n | ws]; [| | | | exact (Hl ws eq_refl)].
+    all: cbn [umerge] in H; apply umerge_spec in H; rewrite umergeb_oom in H; discriminate H.
+  Qed.
 End umerge.
 
 (* ===================================================================== *)
@@ -650,7 +666,7 @@ Proof using.
     1-3: destruct c as [r | x | x | u]; cbn [uok uterm] in Hok, Ht;
          first [discriminate Ht | contradiction].
     2: exact I.
-    destruct (uok_pipe _ _ _ _ _ Hok) as (x & -> & Hx).
+    destruct (uok_pipe _ _ _ _ _ Hok) as [-> | (x & -> & Hx)]; [discriminate Ht |].
     rewrite upl_term in Ht. destruct x as [| b | b]; try discriminate Ht.
     destruct Hx as [Hsafe | [Ha (_ & b' & (W & t & Wm & sp & Hlt & _) & _)]].
     { exfalso. destruct Hsafe as [H | [H | H]]; discriminate H. }
@@ -779,7 +795,7 @@ Proof using.
   intros Hf Hok. destruct l as [ws | ws N | N | [ws | g] n | ws];
     [exact Hok | exact Hok | exact Hok | | | exact Hok].
   - exact (uok_echo_st adm s s' ws n a Hok).
-  - destruct a as [r | x | x | u]; cbn [uok] in Hok |- *; try contradiction.
+  - destruct a as [r | x | x | u]; cbn [uok] in Hok |- *; try contradiction; [exact Hok |].
     destruct Hok as [Hs | [Ha Hb]]; [left; exact Hs | right; split; [exact Ha |]].
     exact (plalt_ok_at _ _ g n x (Hf g eq_refl) Hb).
 Qed.
@@ -792,7 +808,8 @@ Proof using.
   intros Hf Hok. destruct a as [r | x | x | u]; cbn [ucont]; [| reflexivity | reflexivity | reflexivity].
   destruct (decide (cont s l r = cont s' l r)) as [E | Hne]; [exact E |].
   pose proof (cont_state_ne _ _ _ _ Hne) as ->. exfalso.
-  destruct l as [ws | ws N | N | p n | ws]; cbn [uok ralt_ok] in Hok; try contradiction.
+  destruct l as [ws | ws N | N | p n | ws]; cbn [uok ralt_ok] in Hok; try contradiction;
+    try discriminate Hok.
   apply Hne. pose proof (Hf N eq_refl) as E. rewrite /files_of in E.
   cbn [cont lname line_file default]. by rewrite E.
 Qed.
@@ -1181,12 +1198,13 @@ Proof using.
 Qed.
 
 (* the codes a line admits at a state: the file's canonical codes at a
-   file line, the pipeline's candidates at the round's content at a
-   pipeline, the shell's three and the canonical terminal arm at a
-   seccomp line *)
+   file line, the pipeline's candidates at the round's content and the
+   out-of-memory death at a pipeline, the shell's three and the canonical
+   terminal arm at a seccomp line *)
 Definition ucands (s : fstate) (l : uline) : list nat :=
   match l with
-  | LPipe p n => (fun x => ualt_code (upl p x)) <$> pl_cands (files_of s) (LPipes p n)
+  | LPipe p n => ((fun x => ualt_code (upl p x)) <$> pl_cands (files_of s) (LPipes p n))
+                 ++ [uoom]
   | LSecc _ => ((fun c => 4 * c) <$> ralt_cands l) ++ [ualt_code (US us0)]
   | _ => (fun c => 4 * c) <$> ralt_cands l
   end.
@@ -1202,8 +1220,9 @@ Proof using.
        - left. apply elem_of_list_fmap. exists (ralt_enc r).
          split; [reflexivity | exact (ralt_cands_enc _ r H)].
        - right. apply elem_of_list_here. }
-  destruct (uok_pipe _ _ _ _ _ H) as (x & -> & Hx). cbn [ucands].
-  rewrite (_ : ucanon (upl p x) = upl p x); [| by destruct p].
+  destruct (uok_pipe _ _ _ _ _ H) as [-> | (x & -> & Hx)]; cbn [ucands]; apply elem_of_app.
+  { right. apply elem_of_list_here. }
+  left. rewrite (_ : ucanon (upl p x) = upl p x); [| by destruct p].
   apply elem_of_list_fmap. exists x. split; [reflexivity |].
   apply pl_cands_complete. destruct Hx as [Hs | [_ Hok]]; [left | right]; assumption.
 Qed.
@@ -1628,7 +1647,7 @@ Proof using.
   destruct l as [ws | ws M | M | [ws | g] n | ws]; cbn [line_file] in Hf; try discriminate Hf;
     [exact Hok | exact Hok |].
   injection Hf as ->.
-  destruct (uok_pipe _ _ _ _ _ Hok) as (x & -> & Hx). apply uok_upl.
+  destruct (uok_pipe _ _ _ _ _ Hok) as [-> | (x & -> & Hx)]; [exact Hok |]. apply uok_upl.
   destruct Hx as [Hs | [Ha Hb]]; [left; exact Hs | right; split; [exact Ha |]].
   destruct x as [| b | b].
   - exact I.
@@ -1705,9 +1724,9 @@ Proof using Hadm.
     eapply Forall_impl; [exact HF |]. intros j Hj HjN Hjs.
     exact (ud_good_mono _ b0 P P' _ _ HPP (Hj HjN Hjs)). }
   destruct HP as (P & HPb & HPw & HPg).
-  (* the unchecked rounds re-resolved to the silent round *)
+  (* the unchecked rounds re-resolved to the out-of-memory death *)
   pose (cs' := imap (fun j c => if decide (j < nlines_max (in_pres seg)) then c
-                               else unoc (uline_of_u (bodies_of (ins seg) !!! j))) cs).
+                               else uoom) cs).
   assert (Hlen : length cs' = length cs) by apply length_imap.
   assert (Hlt : forall j, j < nlines_max (in_pres seg) -> cs' !!! j = cs !!! j).
   { intros j Hj. destruct (decide (j < length cs)) as [Hjl | Hjl].
@@ -1719,7 +1738,7 @@ Proof using Hadm.
   assert (Hat : forall j, j < nlines_max (in_pres seg) -> lm_at U cs' j = lm_at U cs j)
     by (intros j Hj; rewrite /lm_at (Hlt j Hj); reflexivity).
   assert (Hge : forall j, nlines_max (in_pres seg) <= j -> j < nlines (ins seg) ->
-                lm_at U cs' j = ualt_dec (unoc (uline_of_u (bodies_of (ins seg) !!! j)))).
+                lm_at U cs' j = ualt_dec uoom).
   { intros j Hj Hjl. unfold lm_at, cs'. rewrite list_lookup_total_imap; [| rewrite (proj1 Halts); exact Hjl].
     cbv beta. rewrite decide_False; [reflexivity | lia]. }
   assert (Hup : forall i, i <= nlines_max (in_pres seg) ->
@@ -1757,7 +1776,7 @@ Proof using Hadm.
         exact (uok_trunc _ N b0 P _ _ (upto_fok seg s cs i Hok Hin Halts ltac:(lia))
                  H1 HPb (HPg i HiN H1) Ho).
       * rewrite -He. exact Ho.
-    + rewrite (Hge i ltac:(lia) Hi). exact (unoc_ok adm _ _).
+    + rewrite (Hge i ltac:(lia) Hi). exact (uoom_ok adm _ _).
   - (* D4 *)
     intros i Hi Hex Hm. destruct (decide (i < nlines_max (in_pres seg))) as [HiN | HiN].
     + rewrite (Hup i ltac:(lia)) in Hex Hm. rewrite (Hat i HiN) (Hcont i HiN) in Hm.
@@ -1772,9 +1791,9 @@ Proof using Hadm.
         -- exact (lml_term_st (ulm_laws adm adm_s) _ _ _ Hc Ht _).
         -- rewrite Hws. exact I.
       * exfalso. rewrite (Hge i ltac:(lia) Hi) in Hm.
-        apply (umerge_prompt adm gp gpat Hadm (uline_of_u (bodies_of (ins seg) !!! i)));
+        apply (umerge_oom adm gp gpat Hadm (uline_of_u (bodies_of (ins seg) !!! i)));
           [exact Hns |].
-        rewrite -(unoc_cont (lm_upto U cs' (<[N := P]> s) (bodies_of (ins seg)) i)
+        rewrite -(uoom_cont (lm_upto U cs' (<[N := P]> s) (bodies_of (ins seg)) i)
                    (uline_of_u (bodies_of (ins seg) !!! i))).
         exact Hm.
   - (* the checked points *)

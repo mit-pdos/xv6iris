@@ -115,13 +115,12 @@ Proof using .
   destruct a; try reflexivity; cbn [ralt_panic] in H; discriminate H.
 Qed.
 
-(* the line's silent alternative moves no file -- at a redirect line this
-   IS the model fix of RULING HOLD-POS ([RFSilent]'s effect is identity) *)
-Lemma fsm_fnoc (s : fstate) (l : uline) : fsm s l (ralt_dec (fnoc_of l)) = s.
+(* the line's silent alternative, where the model has one (the blank
+   line's [LEcho []]), moves no file *)
+Lemma fsm_fnoc (s : fstate) (l : uline) (c : nat) :
+  fnoc_of l = Some c -> fsm s l (ralt_dec c) = s.
 Proof using .
-  destruct l as [ws | ws Nf | Nf | ws | ws]; cbn [fnoc_of];
-    [ reflexivity | by rewrite (ralt_dec_enc RFSilent)
-    | reflexivity | reflexivity | reflexivity ].
+  intros Hc. destruct (fnoc_of_some l c Hc) as [-> _]. reflexivity.
 Qed.
 
 (* the words' line after the command fits a C int (the console write's
