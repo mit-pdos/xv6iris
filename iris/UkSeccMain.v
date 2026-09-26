@@ -209,12 +209,12 @@ Section UkSeccMain.
 
   (* exit(status) @0x34c: the payload is the program's own, and free *)
   Lemma wp_ksecc_exit (N : uk_names Σ) (h : CpuId) (m : regfile) (avail : nat) :
-    (forall s : Z, ⊢ ukn_pay N s) ->
+    □ (∀ s : Z, ukn_pay N s) -∗
     seccomp_code (ukn_t N) -∗
     urun N h m (mword_of_int SeccompSyms.exit) avail -∗
     mWP (Loop : expr riscv_lang).
   Proof using .
-    intros Hq. iIntros "#Hcode Hrun".
+    iIntros "#Hq #Hcode Hrun".
     destruct seccomp_syms_pins
       as (_ & _ & _ & _ & _ & _ & Hexit & _ & _ & _ & _).
     rewrite Hexit.
@@ -238,7 +238,7 @@ Section UkSeccMain.
               ltac:(unfold usysno, mr2; rg; vm_compute; reflexivity)
               with "[] [] Hrun").
     { iApply (uis_seccomp_34e with "Hcode"). }
-    { iApply Hq. }
+    { iApply "Hq". }
   Qed.
 
   (* wait(0) @0x354, at the null status pointer *)
@@ -356,7 +356,7 @@ Section UkSeccMain.
   (* the usage line @0x4e (after main's [sd s1]) *)
   Lemma wp_ksecc_usage (N : uk_names Σ) (h : CpuId) (m : regfile) (n : nat)
       (l v : list fdstate) :
-    (forall s : Z, ⊢ ukn_pay N s) ->
+    □ (∀ s : Z, ukn_pay N s) -∗
     seccomp_code (ukn_t N) -∗
     seccomp_rodata (ukn_t N) -∗
     secc_wdep N l -∗
@@ -364,7 +364,7 @@ Section UkSeccMain.
     urun N h m (mword_of_int 0x4e) (10 + (12 + (4 + n))) -∗
     mWP (Loop : expr riscv_lang).
   Proof using .
-    intros Hq. iIntros "#Hcode #Hro #Hwd Hstd Hrun".
+    iIntros "#Hq #Hcode #Hro #Hwd Hstd Hrun".
     destruct seccomp_syms_pins
       as (_ & _ & Hfprintf & _ & _ & _ & Hexit & _ & _ & _ & _).
     (* ---- 0x4e  auipc a1,0x1 ---- *)
@@ -465,13 +465,13 @@ Section UkSeccMain.
               with "[] Hrun").
     { iApply (uis_seccomp_5e with "Hcode"). }
     iIntros (h7) "Hrun".
-    iApply (wp_ksecc_exit N h7 _ _ Hq with "Hcode Hrun").
+    iApply (wp_ksecc_exit N h7 _ _ with "Hq Hcode Hrun").
   Qed.
 
   (* the fork diagnostic @0x62 *)
   Lemma wp_ksecc_forkfail (N : uk_names Σ) (h : CpuId) (m : regfile) (n : nat)
       (l v : list fdstate) :
-    (forall s : Z, ⊢ ukn_pay N s) ->
+    □ (∀ s : Z, ukn_pay N s) -∗
     seccomp_code (ukn_t N) -∗
     seccomp_rodata (ukn_t N) -∗
     secc_wdep N l -∗
@@ -479,7 +479,7 @@ Section UkSeccMain.
     urun N h m (mword_of_int 0x62) (10 + (12 + (4 + n))) -∗
     mWP (Loop : expr riscv_lang).
   Proof using .
-    intros Hq. iIntros "#Hcode #Hro #Hwd Hstd Hrun".
+    iIntros "#Hq #Hcode #Hro #Hwd Hstd Hrun".
     destruct seccomp_syms_pins
       as (_ & _ & Hfprintf & _ & _ & _ & Hexit & _ & _ & _ & _).
     (* ---- 0x62  auipc a1,0x1 ---- *)
@@ -580,7 +580,7 @@ Section UkSeccMain.
               with "[] Hrun").
     { iApply (uis_seccomp_72 with "Hcode"). }
     iIntros (h7) "Hrun".
-    iApply (wp_ksecc_exit N h7 _ _ Hq with "Hcode Hrun").
+    iApply (wp_ksecc_exit N h7 _ _ with "Hq Hcode Hrun").
   Qed.
 
   (* ===================================================================== *)
@@ -591,15 +591,15 @@ Section UkSeccMain.
      c.bnez taken to 0x8a; wait(0); exit(0) *)
   Lemma wp_ksecc_parent (N : uk_names Σ) (h : CpuId) (m : regfile) (avail : nat)
       (pidv : mword 32) (cs : gset gname) :
-    (forall s : Z, ⊢ ukn_pay N s) ->
     (1 <= bv_unsigned pidv <= PIDMAX)%Z ->
     m !!! Regidx a0_idx = (sign_extend' 64 pidv : mword 64) ->
+    □ (∀ s : Z, ukn_pay N s) -∗
     seccomp_code (ukn_t N) -∗
     uch (ukn_ch N) cs -∗
     urun N h m (mword_of_int 0x16) avail -∗
     mWP (Loop : expr riscv_lang).
   Proof using Hpsok_free.
-    intros Hq Hrng Ha0. iIntros "#Hcode Hch Hrun".
+    intros Hrng Ha0. iIntros "#Hq #Hcode Hch Hrun".
     destruct seccomp_syms_pins
       as (_ & _ & _ & _ & _ & _ & Hexit & Hwait & _ & _ & _).
     assert (Hpv : (sign_extend' 64 pidv : mword 64) = mword_of_int (bv_unsigned pidv))
@@ -697,14 +697,14 @@ Section UkSeccMain.
               with "[] Hrun").
     { iApply (uis_seccomp_92 with "Hcode"). }
     iIntros (h7) "Hrun".
-    iApply (wp_ksecc_exit N h7 _ _ Hq with "Hcode Hrun").
+    iApply (wp_ksecc_exit N h7 _ _ with "Hq Hcode Hrun").
   Qed.
 
   (* THE FAILED FORK: bltz taken to the diagnostic *)
   Lemma wp_ksecc_forkneg (N : uk_names Σ) (h : CpuId) (m : regfile) (n : nat)
       (l v : list fdstate) :
-    (forall s : Z, ⊢ ukn_pay N s) ->
     m !!! Regidx a0_idx = (mword_of_int (-1) : mword 64) ->
+    □ (∀ s : Z, ukn_pay N s) -∗
     seccomp_code (ukn_t N) -∗
     seccomp_rodata (ukn_t N) -∗
     secc_wdep N l -∗
@@ -712,7 +712,7 @@ Section UkSeccMain.
     urun N h m (mword_of_int 0x16) (10 + (12 + (4 + n))) -∗
     mWP (Loop : expr riscv_lang).
   Proof using .
-    intros Hq Ha0. iIntros "#Hcode #Hro #Hwd Hstd Hrun".
+    intros Ha0. iIntros "#Hq #Hcode #Hro #Hwd Hstd Hrun".
     assert (Hblt : true = uv_btaken BLT (m !!! Regidx a0_idx) zero_reg)
       by (rewrite Ha0 zero_reg_moi; vm_compute; reflexivity).
     assert (Etgt : (mword_of_int 0x62 : mword 64)
@@ -726,7 +726,7 @@ Section UkSeccMain.
               with "[] Hrun").
     { iApply (uis_seccomp_16 with "Hcode"). }
     iIntros (h1) "Hrun".
-    iApply (wp_ksecc_forkfail N h1 m n l v Hq with "Hcode Hro Hwd Hstd Hrun").
+    iApply (wp_ksecc_forkfail N h1 m n l v with "Hq Hcode Hro Hwd Hstd Hrun").
   Qed.
 
   (* THE CHILD: a0 = 0, so both branches fall through to the mask literal
@@ -837,9 +837,9 @@ Section UkSeccMain.
   (* main(argc, argv): the frame, argc's test, the fork and its three arms *)
   Lemma wp_ksecc_main (N : uk_names Σ) (h : CpuId) (m : regfile) (na n : nat)
       (l v : list fdstate) (szv c : Z) (cs : gset gname) :
-    (forall s : Z, ⊢ ukn_pay N s) ->
     m !!! Regidx a0_idx = mword_of_int (Z.of_nat na) ->
     (Z.of_nat na < 2 ^ 31)%Z ->
+    □ (∀ s : Z, ukn_pay N s) -∗
     seccomp_code (ukn_t N) -∗
     seccomp_rodata (ukn_t N) -∗
     secc_wdep N l -∗
@@ -851,8 +851,8 @@ Section UkSeccMain.
     urun N h m (mword_of_int SeccompSyms.main) (4 + (10 + (12 + (4 + n)))) -∗
     mWP (Loop : expr riscv_lang).
   Proof using Hpsok_free.
-    intros Hq Ha0 Hna.
-    iIntros "#Hcode #Hro #Hwd #Huniv Hstd Hsz Hcwd Hch Hrun".
+    intros Ha0 Hna.
+    iIntros "#Hq #Hcode #Hro #Hwd #Huniv Hstd Hsz Hcwd Hch Hrun".
     destruct seccomp_syms_pins
       as (_ & Hmain & _ & _ & _ & Hfork & _ & _ & _ & _ & _).
     rewrite Hmain.
@@ -989,7 +989,7 @@ Section UkSeccMain.
                    = mword_of_int 0x4e);
         [ | apply bv_eq; vm_compute; reflexivity ].
       iIntros (h6) "Hrun".
-      iApply (wp_ksecc_usage N h6 m3 n l v Hq with "Hcode Hro Hwd Hstd Hrun"). }
+      iApply (wp_ksecc_usage N h6 m3 n l v with "Hq Hcode Hro Hwd Hstd Hrun"). }
     (* ARGUMENTS: fall through to the fork *)
     assert (Hf : false = uv_btaken BGE (m3 !!! Regidx a5_idx) (m3 !!! Regidx a0_idx))
       by (rewrite Hge; symmetry; destruct (Z.geb_spec 1 (Z.of_nat na)); [ lia | reflexivity ]).
@@ -1087,13 +1087,13 @@ Section UkSeccMain.
       iIntros (h'') "Hrun".
       iDestruct "Harm" as "[(%Hm1 & _ & _) | (%γ & %pidv & %Hrpid & %Hrng & _ & _ & Hch)]".
       + name_m h'' mr12.
-        iApply (wp_ksecc_forkneg N h'' mr12 n l v Hq
+        iApply (wp_ksecc_forkneg N h'' mr12 n l v
                   ltac:(unfold mr12; rg; exact Hm1)
-                  with "Hcode Hro Hwd Hstd Hrun").
+                  with "Hq Hcode Hro Hwd Hstd Hrun").
       + name_m h'' mr13.
-        iApply (wp_ksecc_parent N h'' mr13 k pidv (cs ∪ {[γ]}) Hq Hrng
+        iApply (wp_ksecc_parent N h'' mr13 k pidv (cs ∪ {[γ]}) Hrng
                   ltac:(unfold mr13; rg; exact Hrpid)
-                  with "Hcode Hch Hrun").
+                  with "Hq Hcode Hch Hrun").
     - (* ---- THE CHILD ---- *)
       iIntros (N' h' γ') "%Hpq _ _ #Hcode' _ Hstd' _ _ _ _ Hrun".
       name_m h' mr14.
@@ -1114,10 +1114,10 @@ Section UkSeccMain.
   (* start(argc, argv) @0x96: main never returns *)
   Lemma wp_ksecc_start (N : uk_names Σ) (h : CpuId) (m : regfile) (na n : nat)
       (l v : list fdstate) (szv c : Z) (cs : gset gname) :
-    (forall s : Z, ⊢ ukn_pay N s) ->
     m !!! Regidx a0_idx = mword_of_int (Z.of_nat na) ->
     (Z.of_nat na < 2 ^ 31)%Z ->
     (32 <= n)%nat ->
+    □ (∀ s : Z, ukn_pay N s) -∗
     seccomp_code (ukn_t N) -∗
     seccomp_rodata (ukn_t N) -∗
     secc_wdep N l -∗
@@ -1129,10 +1129,10 @@ Section UkSeccMain.
     urun N h m (mword_of_int SeccompSyms.start) n -∗
     mWP (Loop : expr riscv_lang).
   Proof using Hpsok_free.
-    intros Hq Ha0 Hna Hn.
+    intros Ha0 Hna Hn.
     replace n with (2 + (4 + (10 + (12 + (4 + (n - 32))))))%nat by lia.
     set (n' := (4 + (10 + (12 + (4 + (n - 32)))))%nat).
-    iIntros "#Hcode #Hro #Hwd #Huniv Hstd Hsz Hcwd Hch Hrun".
+    iIntros "#Hq #Hcode #Hro #Hwd #Huniv Hstd Hsz Hcwd Hch Hrun".
     destruct seccomp_syms_pins
       as (Hstart & Hmain & _ & _ & _ & _ & _ & _ & _ & _ & _).
     rewrite Hstart.
@@ -1221,9 +1221,9 @@ Section UkSeccMain.
     { iApply (uis_seccomp_9e with "Hcode"). }
     iIntros (h4) "Hrun".
     name_m h4 mr16.
-    iApply (wp_ksecc_main N h4 mr16 na (n - 32) l v szv c cs Hq
+    iApply (wp_ksecc_main N h4 mr16 na (n - 32) l v szv c cs
               ltac:(unfold mr16, m1; rg; exact Ha0) Hna
-              with "Hcode Hro Hwd Huniv Hstd Hsz Hcwd Hch Hrun").
+              with "Hq Hcode Hro Hwd Huniv Hstd Hsz Hcwd Hch Hrun").
   Qed.
 
 End UkSeccMain.

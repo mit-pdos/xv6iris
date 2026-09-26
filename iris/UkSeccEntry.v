@@ -19,8 +19,8 @@
 (*   - the child after row 23, through [UexecSecc.useccomp_mint] at the    *)
 (*     masked key, whose table the child's ledger view bounds and whose    *)
 (*     rows are [sts]'s ([secc_univ_of_mint]).                             *)
-(* The exit payload [Q] is any payload that is free ([forall s, ⊢ Q s]):  *)
-(* seccomp's parent owes its own parent nothing it could produce.         *)
+(* The exit payload [Q] is paid out of a PERSISTENT premise [□ ∀ s, Q s]  *)
+(* (sh's child pays its [ushf_wq] out of the persistent era token).       *)
 (* ===================================================================== *)
 From Stdlib Require Import ZArith Bool Lia List.
 From stdpp Require Import gmap list bitvector.definitions.
@@ -145,7 +145,7 @@ Section UkSeccEntry.
     UkShEcho.echo_argv_bytes ws gn ->
     length sts = NOFILE ->
     take NSTD sts !! 2%nat = Some (FdOpen rb2 true (FdDevice CONSOLE)) ->
-    (forall s : Z, ⊢ Q s) ->
+    □ (∀ s : Z, Q s) -∗
     □ uexec_wp -∗
     UkRun.urun_nopipe sts -∗
     udep -∗
@@ -153,8 +153,8 @@ Section UkSeccEntry.
       cw ProcDefs.secc_all cs pidv Q
       (riscv_wild (S gen_id) ∗ secc_rows sts) uslot.
   Proof using GEN PS fileG0 ghost_varG0 ghost_varG1 riscvGS0 ufdG0 xv6G0 Σ.
-    intros Hps Hok Himg Hbytes Hfdl Hcons HQ.
-    iIntros "#Hwp #Hnpw #Hdep".
+    intros Hps Hok Himg Hbytes Hfdl Hcons.
+    iIntros "#HQ #Hwp #Hnpw #Hdep".
     iApply image_entry_of_at. iIntros "!>" (na alen afun) "%Hargs".
     destruct (UShEcho.echo_args_det_x_holds ws Hok Mn sv t gn na alen afun
                 Himg Hbytes Hargs) as (Hna & Halen & Hafun).
@@ -184,9 +184,9 @@ Section UkSeccEntry.
               (Z.to_nat (uvis_argc W')) 42
               (take NSTD (uvis_fd W')) (uvis_fd W') (uvis_sz W') (uvis_cwd W')
               (uvis_ch W')
-              ltac:(intros s; rewrite Hpayeq; exact (HQ s))
               Ha0 ltac:(rewrite Z2Nat.id; lia) ltac:(lia)
-              with "[] [] [] [] Hstd Hszf Hcwf Hchf Hrun").
+              with "[] [] [] [] [] Hstd Hszf Hcwf Hchf Hrun").
+    - rewrite Hpayeq. iExact "HQ".
     - iApply (seccomp_code_of_text (ukn_t N) (uvis_M W') (uvis_perm W') Hsub Hx
                 with "Ht").
     - iApply (seccomp_rodata_of_text (ukn_t N) (uvis_M W') (uvis_perm W')
