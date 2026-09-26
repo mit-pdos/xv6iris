@@ -95,40 +95,15 @@ theorem swp_pmpCheck_xv6 (cpu : CPU) (dq : DFrac) (addr : BitVec 64) (width : Na
     swp_run 60
     iapply HΦ $$ Hpmpcfg_n Hpmpaddr_n
 
-set_option maxHeartbeats 4000000 in
-set_option maxRecDepth 100000 in
 /-- The all-off table passes regardless of the address table (the addresses
-are read but never inspected). -/
+are read but never inspected): `swp_pmpCheck_allOff` at `bootPmpcfg`. -/
 theorem swp_pmpCheck_off_any (cpu : CPU) (dq : DFrac) (addr : BitVec 64) (width : Nat)
     (acc : MemoryAccessType mem_payload) (Φ : Option ExceptionType → IProp GF)
     (paddr : Vector (BitVec 64) 64) :
     Register.pmpcfg_n ↦ᵣ[cpu]{dq} bootPmpcfg ∗ Register.pmpaddr_n ↦ᵣ[cpu]{dq} paddr ∗
     ▷ (Register.pmpcfg_n ↦ᵣ[cpu]{dq} bootPmpcfg -∗ Register.pmpaddr_n ↦ᵣ[cpu]{dq} paddr -∗ Φ none)
-    ⊢ swp cpu (pmpCheck (physaddr.Physaddr addr) width acc Privilege.Machine) Φ := by
-  iintro ⟨Hpmpcfg_n, Hpmpaddr_n, HΦ⟩
-  unfold pmpCheck
-  swp_run 3
-  simp only [IntRange.instForIn'IntInferInstanceMembershipOfMonad, IntRange.forIn'_eq]
-  iapply swp_bind
-  iapply swp_intrange_loop_later cpu _ rfl _
-    iprop(Register.pmpcfg_n ↦ᵣ[cpu]{dq} bootPmpcfg ∗ Register.pmpaddr_n ↦ᵣ[cpu]{dq} paddr)
-    _ _ (by decide) _
-  iframe
-  isplitl []
-  · imodintro
-    iintro %i %h %Ψ ⟨⟨Hpmpcfg_n, Hpmpaddr_n⟩, HΨ⟩
-    try simp only []
-    split
-    · swp_run 40
-      iapply HΨ $$ [Hpmpcfg_n Hpmpaddr_n]
-      iframe
-    · swp_run 40
-      iapply HΨ $$ [Hpmpcfg_n Hpmpaddr_n]
-      iframe
-  · inext
-    iintro ⟨Hpmpcfg_n, Hpmpaddr_n⟩
-    swp_run 10
-    iapply HΦ $$ Hpmpcfg_n Hpmpaddr_n
+    ⊢ swp cpu (pmpCheck (physaddr.Physaddr addr) width acc Privilege.Machine) Φ :=
+  swp_pmpCheck_allOff cpu dq addr width acc Φ bootPmpcfg paddr pmpAllOff_bootPmpcfg
 
 /-! ### The configurations' PMP obligations -/
 
@@ -138,6 +113,13 @@ theorem pmpPassesM_xv6 (cpu : CPU) (dq : DFrac) (c : MConf) (hcfg : c.pmpcfg = x
   intro addr width acc Φ hacc hram
   rw [hcfg, haddr]
   exact swp_pmpCheck_xv6 cpu dq addr width acc Φ hacc (pmpOk_of_inRam hram)
+
+/-- A configuration whose PMP entries are all off passes, whatever its
+address table (Rocq `wp_entry_boot`'s `pmp_all_off` premise). -/
+theorem pmpPassesM_allOff (cpu : CPU) (dq : DFrac) (c : MConf) (hcfg : pmpAllOff c.pmpcfg) :
+    pmpPassesM (GF := GF) cpu dq c := by
+  intro addr width acc Φ _ _
+  exact swp_pmpCheck_allOff cpu dq addr width acc Φ c.pmpcfg c.pmpaddr hcfg
 
 /-- A configuration with all PMP entries off passes, whatever its address table. -/
 theorem pmpPassesM_off_any (cpu : CPU) (dq : DFrac) (c : MConf) (hcfg : c.pmpcfg = bootPmpcfg) :
@@ -149,6 +131,10 @@ theorem pmpPassesM_off_any (cpu : CPU) (dq : DFrac) (c : MConf) (hcfg : c.pmpcfg
 theorem MConf.ok_xv6 (c : MConf) (hm : c.mok) (hcfg : c.pmpcfg = xv6Pmpcfg)
     (haddr : c.pmpaddr = xv6Pmpaddr) : MConf.ok (GF := GF) c :=
   ⟨hm, fun cpu dq => pmpPassesM_xv6 cpu dq c hcfg haddr⟩
+
+theorem MConf.ok_allOff (c : MConf) (hm : c.mok) (hcfg : pmpAllOff c.pmpcfg) :
+    MConf.ok (GF := GF) c :=
+  ⟨hm, fun cpu dq => pmpPassesM_allOff cpu dq c hcfg⟩
 
 theorem MConf.ok_off_any (c : MConf) (hm : c.mok) (hcfg : c.pmpcfg = bootPmpcfg) :
     MConf.ok (GF := GF) c :=

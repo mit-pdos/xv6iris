@@ -32,6 +32,24 @@ restated over existential/garbage values in phase 2 (see the port report).
 `resetRegs_iff` splits the Lean table exactly into the derived part and this
 residue, and `bootProg_not_resetRegs` shows the residue is genuinely not
 derivable.
+
+PHASE 2 STATUS (consumers made generic in the residue, Rocq route):
+  * `medeleg`, `mepc`, `satp`, `stimecmp`: `MachCSL.mBoot` takes them at ANY
+    value (`MachCSL.BootGarb`; `start()` overwrites every one);
+  * `mcountinhibit`, `minstretcfg`, `mcyclecfg`: `MachCSL.hwConfig` holds them
+    at existential values (`MachCSL.HwCounters`, Rocq `counter_caps`), the
+    cycle rules are generic in them (`swp_readReg_hwAny_bind`);
+  * `sig_meip`, `sig_seip`: no consumer reads their reset value (the wire
+    invariant takes the file's values);
+  * pmpcfg: the M-mode PMP stage is stated at any `pmpAllOff` table and any
+    address table (`MachCSL.swp_pmpCheck_allOff`, Rocq `wp_entry_boot`).
+  STILL PINNED, because the S-mode configuration (`MachCSL.sConfOf`) and the
+  user frame (`Xv6.UfCfg`, `MachCSL.UxrCfg`) consume their exact values after
+  `start()` -- which does NOT overwrite them: `mcounteren` (start writes
+  `r_mcounteren() | 2`), `mtimecmp` (never written), `pmpcfg` entries 8..63 and
+  `pmpaddr` entries 1..63 (start writes only `pmpcfg0`/`pmpaddr0`), and
+  `scounteren` (the user CSR table's "every counter read is illegal" outcome).
+  `resetVal` can be retired only once those tiers are generic too.
 -/
 import MachCSL.BootInitModel
 

@@ -21,9 +21,10 @@ symbolic-run kit (Rocq `RiscvExec.exec` restricted to the register side, and
   walker that drives them lives in `MachCSL.BootPeel`.
 
 The register file here is the bare Pi type (`BootRegs`), with its own update
-`BootRegs.set`; `MachCSL.RegFile` (Lang.lean) is the same type, so every
-statement below applies to it verbatim.  (Phase 2 of the BootReset port moves
-`RegFile`/`RegFile.set` down onto these.)
+`BootRegs.set`; the language's `MachCSL.RegFile`/`RegFile.set` (Lang.lean)
+are ALIASES of these two (so Lang.lean can import this file and state the
+power-on arm as a run of the boot program), and every statement below
+applies to them verbatim.
 -/
 import LeanRV64D.Defs
 

@@ -161,26 +161,31 @@ set_option hygiene false in
 /-- The retire part of the cycle, shared by both cycle lemmas: from the point
 where the step value is `Step_Execute (Retire_Success (), _)`. -/
 macro "cycle_retire" : tactic =>
-  `(tactic| (swp_run 40
-             cases tick
-             · swp_run 10
-               conf_intro HmConf
-               ihave Hclock := clockCells_intro _ _ _ _ _ _ $$ [Hminstret_increment Hminstret Hmcycle Hmtime Hmip]
-               case' _ => iframe
-               ihave Hpc := pcIs_intro _ _ $$ [HPC HnextPC]
-               case' _ => iframe
-               iapply HΦ $$ HmConf Hclock Hpc HR HQ
-             · swp_run 5
-               conf_intro HmConf
-               iapply swp_tick_clock_cells (hp := hp')
-               iframe
-               inext
-               iintro %mcycle' %mtime' %mip' HmConf Hmcycle Hmtime Hmip
-               ihave Hclock := clockCells_intro _ _ _ _ _ _ $$ [Hminstret_increment Hminstret Hmcycle Hmtime Hmip]
-               case' _ => iframe
-               ihave Hpc := pcIs_intro _ _ $$ [HPC HnextPC]
-               case' _ => iframe
-               iapply HΦ $$ HmConf Hclock Hpc HR HQ))
+  `(tactic| (cases tick
+             · swp_run 40
+               (try split)
+               all_goals
+                 swp_run 10
+                 conf_intro HmConf
+                 ihave Hclock := clockCells_intro _ _ _ _ _ _ $$ [Hminstret_increment Hminstret Hmcycle Hmtime Hmip]
+                 case' _ => iframe
+                 ihave Hpc := pcIs_intro _ _ $$ [HPC HnextPC]
+                 case' _ => iframe
+                 iapply HΦ $$ HmConf Hclock Hpc HR HQ
+             · swp_run 40
+               (try split)
+               all_goals
+                 swp_run 5
+                 conf_intro HmConf
+                 iapply swp_tick_clock_cells (hp := hp')
+                 iframe
+                 inext
+                 iintro %mcycle' %mtime' %mip' HmConf Hmcycle Hmtime Hmip
+                 ihave Hclock := clockCells_intro _ _ _ _ _ _ $$ [Hminstret_increment Hminstret Hmcycle Hmtime Hmip]
+                 case' _ => iframe
+                 ihave Hpc := pcIs_intro _ _ $$ [HPC HnextPC]
+                 case' _ => iframe
+                 iapply HΦ $$ HmConf Hclock Hpc HR HQ))
 
 set_option maxHeartbeats 4000000 in
 /-- One machine-mode cycle executing a 32-bit instruction. -/

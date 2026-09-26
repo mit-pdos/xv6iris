@@ -400,7 +400,7 @@ variable (D : UFoot)
 theorem UWSt.file_setPin (s : UWSt) (r : Register) (v : RegisterType r) :
     ({ s with pin := s.pin.set r v } : UWSt).file = s.file.set r v := by
   funext r'
-  unfold UWSt.file RegPin.set RegFile.set
+  unfold UWSt.file RegPin.set RegFile.set BootRegs.set
   by_cases h : r' = r
   · subst h; simp
   · simp [h]

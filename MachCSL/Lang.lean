@@ -46,6 +46,8 @@ the footprint; the PLIC drives the harts' external-interrupt pins
 -/
 import MachCSL.Platform
 import MachCSL.BootImage
+import MachCSL.ArchReset
+import MachCSL.BootRun
 import MachCSL.Dev.Fabric
 import Iris.ProgramLogic.Language
 import LeanRV64D.Step
@@ -58,20 +60,23 @@ open LeanRV64D
 
 /-! ## Machine state -/
 
-/-- A hart's register file: every Sail register, at its own type. -/
-abbrev RegFile := (r : Register) → RegisterType r
+/-- A hart's register file: every Sail register, at its own type.  The type
+and its update live with the boot program's interpreter
+(`MachCSL.BootRegs`, MachCSL/BootRun.lean), below this file, so the power-on
+arm can name a RUN of the boot program (`MachCSL.bootProg`) over it. -/
+abbrev RegFile := BootRegs
 
-/-- Update one register of a register file. -/
-def RegFile.set (f : RegFile) (r : Register) (v : RegisterType r) : RegFile :=
-  fun r' => if h : r' = r then h ▸ v else f r'
+/-- Update one register of a register file (= `MachCSL.BootRegs.set`). -/
+abbrev RegFile.set (f : RegFile) (r : Register) (v : RegisterType r) : RegFile :=
+  BootRegs.set f r v
 
 @[simp] theorem RegFile.set_same (f : RegFile) (r : Register) (v : RegisterType r) :
-    f.set r v r = v := by
-  simp [RegFile.set]
+    f.set r v r = v :=
+  BootRegs.set_same f r v
 
 theorem RegFile.set_other (f : RegFile) (r r' : Register) (v : RegisterType r) (h : r' ≠ r) :
-    f.set r v r' = f r' := by
-  simp [RegFile.set, h]
+    f.set r v r' = f r' :=
+  BootRegs.set_other f r r' v h
 
 /-- The global machine state: one register file per hart, and the shared
 memory of `MachCSL.TsoMem`: the byte histories, the author log (its length is

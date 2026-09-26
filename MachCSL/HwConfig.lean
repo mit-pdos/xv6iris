@@ -11,10 +11,15 @@ fetch/decode/translation paths read (`misa`, `mseccfg`, `pma_regions`,
 `htif_tohost_base`), the landing-pad state `elp` (only ever re-written with
 its own value, by the trap's `reset_elp`), the environment/state-enable pins
 a U-mode CSR access reads (`senvcfg`, `mstateen0`, `sstateen0`), and the
-counter configuration the cycle reads (`scounteren`, `mcountinhibit`,
-`minstretcfg`, `mcyclecfg`, `mhpmcounter`).  The values are the reset
-values `MachCSL.resetVal` pins, except `mhpmcounter`, which reset leaves
-arbitrary (existential here, as in Rocq's `counter_caps`).
+counter configuration (`scounteren`, and the four cells the cycle reads:
+`mcountinhibit`, `minstretcfg`, `mcyclecfg`, `mhpmcounter`).  The pinned
+values (`hwVal`) are the reset values `MachCSL.resetVal` pins.  The four
+counter cells the cycle reads are EXISTENTIAL (`HwCounters`, Rocq
+`counter_caps` + `HartMCycle.mcycle_inc_flag`): the boot program never writes
+them (`MachCSL.bootProg_keeps`), so they hold power-on garbage, and the cycle
+rules are generic in them -- a read is answered at an arbitrary value
+(`swp_readReg_hwAny_bind`), so the minstret/mcycle increment flags are
+symbolic.
 
 It is minted once per hart, from the reset register file, by persisting
 those cells (`Xv6.BootConfig.mBoot_of_cells`), and every configuration
@@ -46,17 +51,29 @@ def hwVal : (r : Register) → Option (RegisterType r)
   | .elp => some 0#1
   | .senvcfg => some 0#64
   | .scounteren => some 0#32
-  | .mcountinhibit => some 0#32
-  | .minstretcfg => some 0#64
-  | .mcyclecfg => some 0#64
   | .mstateen0 => some 0#64
   | .sstateen0 => some 0#32
   | _ => none
 
-/-- The registers of `hwConfig`, in its order (the pinned ones, then `mhpmcounter`). -/
+/-- The frozen counter cells the cycle reads, at their power-on values (Rocq
+`counter_caps`' existential values). -/
+structure HwCounters where
+  mci : BitVec 32
+  mic : BitVec 64
+  mcc : BitVec 64
+  hpm : Vector (BitVec 64) 32
+
+/-- The frozen counter registers, read at an ARBITRARY value. -/
+def hwAny (r : Register) : Bool :=
+  match r with
+  | .mcountinhibit | .minstretcfg | .mcyclecfg => true
+  | _ => false
+
+/-- The registers of `hwConfig`, in its order (the pinned ones, then the
+existential counter cells). -/
 def hwRegs : List Register :=
-  [.misa, .mseccfg, .pma_regions, .htif_tohost_base, .elp, .senvcfg, .scounteren, .mcountinhibit,
-   .minstretcfg, .mcyclecfg, .mstateen0, .sstateen0, .mhpmcounter]
+  [.misa, .mseccfg, .pma_regions, .htif_tohost_base, .elp, .senvcfg, .scounteren, .mstateen0,
+   .sstateen0, .mcountinhibit, .minstretcfg, .mcyclecfg, .mhpmcounter]
 
 theorem hwRegs_nodup : hwRegs.Nodup := by decide
 
@@ -72,7 +89,8 @@ instance regPointsTo_discard_persistent (cpu : CPU) (r : Register) (v : Register
   unfold regPointsTo regPointsToAt; infer_instance
 
 /-- **Rocq `hw_config`**: the frozen configuration cells of hart `cpu`,
-persistent. -/
+persistent; the counter cells the cycle reads at SOME value (Rocq
+`counter_caps`). -/
 def hwConfig (cpu : CPU) : IProp GF := iprop%
   Register.misa ↦ᵣ[cpu]□ 0x800000000014112D#64 ∗
   Register.mseccfg ↦ᵣ[cpu]□ 0#64 ∗
@@ -81,12 +99,11 @@ def hwConfig (cpu : CPU) : IProp GF := iprop%
   Register.elp ↦ᵣ[cpu]□ 0#1 ∗
   Register.senvcfg ↦ᵣ[cpu]□ 0#64 ∗
   Register.scounteren ↦ᵣ[cpu]□ 0#32 ∗
-  Register.mcountinhibit ↦ᵣ[cpu]□ 0#32 ∗
-  Register.minstretcfg ↦ᵣ[cpu]□ 0#64 ∗
-  Register.mcyclecfg ↦ᵣ[cpu]□ 0#64 ∗
   Register.mstateen0 ↦ᵣ[cpu]□ 0#64 ∗
   Register.sstateen0 ↦ᵣ[cpu]□ 0#32 ∗
-  ∃ hpm : Vector (BitVec 64) 32, Register.mhpmcounter ↦ᵣ[cpu]□ hpm
+  ∃ ctr : HwCounters,
+    Register.mcountinhibit ↦ᵣ[cpu]□ ctr.mci ∗ Register.minstretcfg ↦ᵣ[cpu]□ ctr.mic ∗
+    Register.mcyclecfg ↦ᵣ[cpu]□ ctr.mcc ∗ Register.mhpmcounter ↦ᵣ[cpu]□ ctr.hpm
 
 instance hwConfig_persistent (cpu : CPU) : Persistent (hwConfig (GF := GF) cpu) := by
   unfold hwConfig; infer_instance
@@ -98,21 +115,40 @@ theorem hwConfig_reg (cpu : CPU) (r : Register) (v : RegisterType r) (h : hwVal 
   all_goals first | subst h | (have h := Option.some.inj h; subst h)
   all_goals
     unfold hwConfig
-    iintro ⟨#H1, #H2, #H3, #H4, #H5, #H6, #H7, #H8, #H9, #H10, #H11, #H12, -⟩
+    iintro ⟨#H1, #H2, #H3, #H4, #H5, #H6, #H7, #H8, #H9, -⟩
     first
     | iexact H1 | iexact H2 | iexact H3 | iexact H4 | iexact H5 | iexact H6 | iexact H7 | iexact H8
-    | iexact H9 | iexact H10 | iexact H11 | iexact H12
+    | iexact H9
+
+/-- The existential counter cells, off the bundle. -/
+theorem hwConfig_counters (cpu : CPU) :
+    hwConfig (GF := GF) cpu ⊢ ∃ ctr : HwCounters,
+      Register.mcountinhibit ↦ᵣ[cpu]□ ctr.mci ∗ Register.minstretcfg ↦ᵣ[cpu]□ ctr.mic ∗
+      Register.mcyclecfg ↦ᵣ[cpu]□ ctr.mcc ∗ Register.mhpmcounter ↦ᵣ[cpu]□ ctr.hpm := by
+  unfold hwConfig
+  iintro ⟨-, -, -, -, -, -, -, -, -, H⟩
+  iexact H
 
 /-- `mhpmcounter`, at some value, off the bundle. -/
 theorem hwConfig_mhpmcounter (cpu : CPU) :
     hwConfig (GF := GF) cpu ⊢ ∃ hpm : Vector (BitVec 64) 32, Register.mhpmcounter ↦ᵣ[cpu]□ hpm := by
-  unfold hwConfig
-  iintro ⟨-, -, -, -, -, -, -, -, -, -, -, -, H⟩
+  iintro #H
+  icases hwConfig_counters cpu $$ H with ⟨%ctr, -, -, -, #H⟩
+  iexists ctr.hpm
   iexact H
 
-/-- **Mint the bundle** (Rocq `hw_config_intro`): the cells at their reset
-values, persisted. -/
-theorem hwConfig_intro (cpu : CPU) (hpm : Vector (BitVec 64) 32) :
+/-- An existential counter cell (`hwAny`), at some value, off the bundle. -/
+theorem hwConfig_any (cpu : CPU) (r : Register) (h : hwAny r = true) :
+    hwConfig (GF := GF) cpu ⊢ ∃ v : RegisterType r, r ↦ᵣ[cpu]□ v := by
+  iintro #H
+  icases hwConfig_counters cpu $$ H with ⟨%ctr, #H1, #H2, #H3, -⟩
+  cases r <;> simp only [hwAny, reduceCtorEq] at h
+  all_goals first
+    | (iexists ctr.mci; iexact H1) | (iexists ctr.mic; iexact H2) | (iexists ctr.mcc; iexact H3)
+
+/-- **Mint the bundle** (Rocq `hw_config_intro`): the pinned cells at their
+reset values and the counter cells at ANY values, persisted. -/
+theorem hwConfig_intro (cpu : CPU) (ctr : HwCounters) :
     Register.misa ↦ᵣ[cpu] 0x800000000014112D#64 ∗
     Register.mseccfg ↦ᵣ[cpu] 0#64 ∗
     Register.pma_regions ↦ᵣ[cpu] bootPMA ∗
@@ -120,12 +156,12 @@ theorem hwConfig_intro (cpu : CPU) (hpm : Vector (BitVec 64) 32) :
     Register.elp ↦ᵣ[cpu] 0#1 ∗
     Register.senvcfg ↦ᵣ[cpu] 0#64 ∗
     Register.scounteren ↦ᵣ[cpu] 0#32 ∗
-    Register.mcountinhibit ↦ᵣ[cpu] 0#32 ∗
-    Register.minstretcfg ↦ᵣ[cpu] 0#64 ∗
-    Register.mcyclecfg ↦ᵣ[cpu] 0#64 ∗
     Register.mstateen0 ↦ᵣ[cpu] 0#64 ∗
     Register.sstateen0 ↦ᵣ[cpu] 0#32 ∗
-    Register.mhpmcounter ↦ᵣ[cpu] hpm ⊢@{IProp GF} |==> hwConfig cpu := by
+    Register.mcountinhibit ↦ᵣ[cpu] ctr.mci ∗
+    Register.minstretcfg ↦ᵣ[cpu] ctr.mic ∗
+    Register.mcyclecfg ↦ᵣ[cpu] ctr.mcc ∗
+    Register.mhpmcounter ↦ᵣ[cpu] ctr.hpm ⊢@{IProp GF} |==> hwConfig cpu := by
   unfold hwConfig regPointsTo regPointsToAt
   iintro ⟨H1, H2, H3, H4, H5, H6, H7, H8, H9, H10, H11, H12, H13⟩
   imod ghost_map_elem_persist _ _ _ _ $$ H1 with #H1
@@ -142,8 +178,9 @@ theorem hwConfig_intro (cpu : CPU) (hpm : Vector (BitVec 64) 32) :
   imod ghost_map_elem_persist _ _ _ _ $$ H12 with #H12
   imod ghost_map_elem_persist _ _ _ _ $$ H13 with #H13
   imodintro
-  iframe H1 H2 H3 H4 H5 H6 H7 H8 H9 H10 H11 H12
-  iexists hpm
+  iframe H1 H2 H3 H4 H5 H6 H7 H8 H9
+  iexists ctr
+  iframe H10 H11 H12
   iexact H13
 
 /-! ## The rules -/
@@ -197,6 +234,20 @@ theorem swp_readReg_hw_bind (cpu : CPU) {X : Type} (r : Register) (v : RegisterT
   inext
   iintro -
   iexact HΦ
+
+/-- Read an existential counter cell (`hwAny`) off the bundle: the answer is
+arbitrary (Rocq `HartMCycle`: the increment flags are generic in the
+counter configuration). -/
+theorem swp_readReg_hwAny_bind (cpu : CPU) {X : Type} (r : Register) (h : hwAny r = true)
+    (f : RegisterType r → SailM X) (Φ : X → IProp GF) :
+    hwConfig cpu ∗ ▷ (∀ v, swp cpu (f v) Φ) ⊢ swp cpu (readReg r >>= f) Φ := by
+  iintro ⟨#Hhw, HΦ⟩
+  icases hwConfig_any cpu r h $$ Hhw with ⟨%v, #Hr⟩
+  iapply swp_readReg_bind cpu r DFrac.discard v f Φ
+  iframe Hr
+  inext
+  iintro -
+  iapply HΦ
 
 /-- Write a frozen register its own value (the trap's `reset_elp`). -/
 theorem swp_writeReg_hw_bind (cpu : CPU) {X : Type} (r : Register) (v : RegisterType r)

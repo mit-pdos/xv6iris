@@ -255,9 +255,15 @@ def headAction (m : Lean.Expr) : Lean.Expr :=
 def isHwReg (r : Lean.Expr) : Bool :=
   [``LeanRV64D.Register.misa, ``LeanRV64D.Register.mseccfg, ``LeanRV64D.Register.pma_regions,
    ``LeanRV64D.Register.htif_tohost_base, ``LeanRV64D.Register.elp, ``LeanRV64D.Register.senvcfg,
-   ``LeanRV64D.Register.scounteren, ``LeanRV64D.Register.mcountinhibit,
-   ``LeanRV64D.Register.minstretcfg, ``LeanRV64D.Register.mcyclecfg,
+   ``LeanRV64D.Register.scounteren,
    ``LeanRV64D.Register.mstateen0, ``LeanRV64D.Register.sstateen0].any r.isConstOf
+
+/-- The frozen counter registers the cycle reads (`MachCSL.hwAny`): cells of
+the persistent `hwConfig` bundle at an EXISTENTIAL value, so a read is
+answered at an arbitrary value. -/
+def isHwAnyReg (r : Lean.Expr) : Bool :=
+  [``LeanRV64D.Register.mcountinhibit, ``LeanRV64D.Register.minstretcfg,
+   ``LeanRV64D.Register.mcyclecfg].any r.isConstOf
 
 /-- Name for the cell hypothesis of register `r`. -/
 def regHypName (r : Lean.Expr) : Name :=
@@ -630,6 +636,15 @@ def swpStepCore (x fn : Lean.Expr) (bind : Bool) : TacticM Unit := do
         evalTactic (← `(tactic| first
           | (iapply (swp_readReg_hw_bind (r := $rStx) (h := rfl)); iframe $hw:ident; try inext)
           | (iapply swp_readReg_bind; (first | iframe $h:ident | iframe); try (inext; iintro $h:ident))))
+      -- the existential counter cells: an owned cell if the context has one
+      -- (a walker frame), else off the bundle at an arbitrary value
+      else if isHwAnyReg rE then
+        let rStx ← Lean.Elab.Term.exprToSyntax rE
+        let hw := mkIdent `Hhw
+        evalTactic (← `(tactic| first
+          | (iapply swp_readReg_bind; iframe $h:ident; try (inext; iintro $h:ident))
+          | (iapply (swp_readReg_hwAny_bind (r := $rStx) (h := rfl)); iframe $hw:ident;
+             try (inext; iintro %$h:ident))))
       else
         evalTactic (← `(tactic| (iapply swp_readReg_bind; (first | iframe $h:ident | iframe); try (inext; iintro $h:ident))))
     else if n == ``LeanRV64D.writeReg then

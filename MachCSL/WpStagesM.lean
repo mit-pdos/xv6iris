@@ -56,9 +56,12 @@ theorem swp_tick_clock_cells (cpu : CPU) (dq : DFrac) (p : Privilege)
       swp_run 60
       (try split)
       all_goals
-        swp_run 40
-        conf_intro HmConf
-        iapply HΦ $$ %_ %_ %_ HmConf Hmcycle Hmtime Hmip
+        swp_run 60
+        (try split)
+        all_goals
+          swp_run 40
+          conf_intro HmConf
+          iapply HΦ $$ %_ %_ %_ HmConf Hmcycle Hmtime Hmip
 
 theorem swp_tick_clock_conf (cpu : CPU) (dq : DFrac) (c : MConf) (mcycle mtime mip : BitVec 64)
     (Φ : Unit → IProp GF) :

@@ -39,8 +39,9 @@ X4).
    at a symbolic index (facts are closed by the kernel at literal indices).
 2. The frozen cells come off `hwConfig` (D52): they sit in the frame at
    `DFrac.discard` with the file pinned to `hwVal` (Rocq `u_pins_hw`); the
-   one existential cell (`mhpmcounter`) is pinned to the file's value by the
-   caller (`uf_open` picks `v.hpm` from `hwConfig`).
+   existential counter cells (`mcountinhibit`, `minstretcfg`, `mcyclecfg`,
+   `mhpmcounter`: `MachCSL.HwCounters`, Rocq `counter_caps`) are pinned to the
+   file's values by the caller (`uf_open` picks `v.ctr` from `hwConfig`).
 3. The read-only list also holds `mtimecmp`/`stimecmp` (exclusive in
    `userHwCells`; the Lean clock tick reads them, `UTick`), which Rocq
    leaves outside (its tick is absorbed above the tier).  `mepc` is not
@@ -143,7 +144,7 @@ structure UfVals where
   ip : BitVec 64
   tlb : Tlb
   stc : BitVec 64
-  hpm : Vector (BitVec 64) 32
+  ctr : HwCounters
 
 /-- Some register file (the reference file's value off the footprint). -/
 noncomputable def ufBaseFile : RegFile := fun r => by cases r <;> exact default
@@ -168,8 +169,8 @@ noncomputable def ufFile (C : UCfg) (P : UPtd) (v : UfVals) : RegFile := fun r =
   | .satp => satpOf .kpt P.root | .pmpcfg_n => xv6Pmpcfg | .pmpaddr_n => xv6Pmpaddr
   | .misa => 0x800000000014112D#64 | .mseccfg => 0#64 | .pma_regions => bootPMA
   | .htif_tohost_base => none | .elp => 0#1 | .senvcfg => 0#64 | .scounteren => 0#32
-  | .mcountinhibit => 0#32 | .minstretcfg => 0#64 | .mcyclecfg => 0#64 | .mstateen0 => 0#64
-  | .sstateen0 => 0#32 | .mhpmcounter => v.hpm
+  | .mcountinhibit => v.ctr.mci | .minstretcfg => v.ctr.mic | .mcyclecfg => v.ctr.mcc | .mstateen0 => 0#64
+  | .sstateen0 => 0#32 | .mhpmcounter => v.ctr.hpm
   | r => ufBaseFile r
 
 /-- **Rocq `u_pins_cfg` + `u_pins_hw` + `u_pins_pt`**: the loop-constant
@@ -269,17 +270,19 @@ theorem uf_ownRo_cells (cpu : CPU) (dqc : DFrac) (f : RegFile) :
   simp only [Iris.Algebra.BigOpL.bigOpL_cons, Iris.Algebra.BigOpL.bigOpL_nil]
   exact .rfl
 
-/-- The frozen cells, off `hwConfig` (Rocq `u_pins_hw`). -/
+/-- The frozen cells, off `hwConfig` (Rocq `u_pins_hw`); the existential
+counter cells at the file's values. -/
 theorem uf_hw_cells (cpu : CPU) (dqc : DFrac) (f : RegFile) (hw : ∀ r v, hwVal r = some v → f r = v) :
-    hwConfig (GF := GF) cpu ∗ Register.mhpmcounter ↦ᵣ[cpu]□ (f .mhpmcounter) ⊢
+    hwConfig (GF := GF) cpu ∗ Register.mcountinhibit ↦ᵣ[cpu]□ (f .mcountinhibit) ∗
+      Register.minstretcfg ↦ᵣ[cpu]□ (f .minstretcfg) ∗ Register.mcyclecfg ↦ᵣ[cpu]□ (f .mcyclecfg) ∗
+      Register.mhpmcounter ↦ᵣ[cpu]□ (f .mhpmcounter) ⊢
       ufCellsD cpu (ufDf dqc) hwRegs f := by
   unfold ufCellsD hwRegs
   simp only [Iris.Algebra.BigOpL.bigOpL_cons, Iris.Algebra.BigOpL.bigOpL_nil]
   rw [hw .misa _ rfl, hw .mseccfg _ rfl, hw .pma_regions _ rfl, hw .htif_tohost_base _ rfl, hw .elp _ rfl,
-    hw .senvcfg _ rfl, hw .scounteren _ rfl, hw .mcountinhibit _ rfl, hw .minstretcfg _ rfl,
-    hw .mcyclecfg _ rfl, hw .mstateen0 _ rfl, hw .sstateen0 _ rfl]
+    hw .senvcfg _ rfl, hw .scounteren _ rfl, hw .mstateen0 _ rfl, hw .sstateen0 _ rfl]
   unfold hwConfig
-  iintro ⟨⟨#H1, #H2, #H3, #H4, #H5, #H6, #H7, #H8, #H9, #H10, #H11, #H12, -⟩, #H13⟩
+  iintro ⟨⟨#H1, #H2, #H3, #H4, #H5, #H6, #H7, #H8, #H9, -⟩, #H10, #H11, #H12, #H13⟩
   dsimp only [ufDf]
   iframe H1 H2 H3 H4 H5 H6 H7 H8 H9 H10 H11 H12 H13
 
@@ -339,8 +342,8 @@ theorem uf_open [CurCtx] (cpu : CPU) (C : UCfg) (pt : UPtd) (Rut : UPtd → IPro
   icases Hcfg with ⟨Hstvec, Hmie, Hmdl, Hmedl, Hmenv, Hmcen, Hmtc, %mepc, %stc, Hmepc, Hstc⟩
   unfold ubPtRegs
   icases Hr with ⟨Hsatp, Hpcfg, Hpaddr, Htlb⟩
-  icases hwConfig_mhpmcounter cpu $$ Hhw with ⟨%hpm, #Hhpm⟩
-  iexists (⟨hs, ms, sc, stv, sep, va, va', g, mi, mst, cy, ti, ip, tlb, stc, hpm⟩ : UfVals), t, mm
+  icases hwConfig_counters cpu $$ Hhw with ⟨%ctr, #Hmci, #Hmic, #Hmcc, #Hhpm⟩
+  iexists (⟨hs, ms, sc, stv, sep, va, va', g, mi, mst, cy, ti, ip, tlb, stc, ctr⟩ : UfVals), t, mm
   isplitr
   · ipureintro; exact ⟨hok, hms, hact⟩
   isplitr
@@ -372,6 +375,7 @@ theorem uf_open [CurCtx] (cpu : CPU) (C : UCfg) (pt : UPtd) (Rut : UPtd → IPro
     · iapply uf_hw_cells cpu C.dqc (ufFile C pt _) (ufCfg_file C pt _).hw
       iframe Hhw
       dsimp only [ufFile]
+      iframe Hmci Hmic Hmcc
       iexact Hhpm
   · unfold ufAside
     iexists mepc

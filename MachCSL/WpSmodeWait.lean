@@ -134,9 +134,12 @@ theorem swp_tick_clock_cellsHS (cpu : CPU) (dq : DFrac) (p : Privilege)
       swp_run 60
       (try split)
       all_goals
-        swp_run 40
-        confhs_intro HmConf
-        iapply HΦ $$ %_ %_ %_ HmConf Hmcycle Hmtime Hmip
+        swp_run 60
+        (try split)
+        all_goals
+          swp_run 40
+          confhs_intro HmConf
+          iapply HΦ $$ %_ %_ %_ HmConf Hmcycle Hmtime Hmip
 
 /-! ## The execute stage of `wfi` -/
 
@@ -197,31 +200,30 @@ theorem wpLoop_wait_wfi (cpu : CPU) (p : Privilege)
   confhs_cases HmConf
   unfold try_step
   swp_run 40
-  have hfilt : (counter_priv_filter_bit (0#64) p == 0#1) = true := by
-    rcases hp with rfl | rfl <;> rfl
-  simp only [hfilt]
   split
   · -- `mip &&& mie ≠ 0`: the hart wakes, the instruction retires, `PC := nextPC`
     swp_run 60
-    cases tick
-    · swp_run 10
-      conf_intro HmConf
-      ihave Hclock := clockCells_intro _ _ _ _ _ _ $$ [Hminstret_increment Hminstret Hmcycle Hmtime Hmip]
-      case' _ => iframe
-      ihave Hpc := pcIs_intro _ _ $$ [HPC HnextPC]
-      case' _ => iframe
-      iapply HΦ $$ HmConf Hclock Hpc HF
-    · swp_run 5
-      conf_intro HmConf
-      iapply swp_tick_clock_cells (hp := hp)
-      iframe
-      inext
-      iintro %mcycle' %mtime' %mip' HmConf Hmcycle Hmtime Hmip
-      ihave Hclock := clockCells_intro _ _ _ _ _ _ $$ [Hminstret_increment Hminstret Hmcycle Hmtime Hmip]
-      case' _ => iframe
-      ihave Hpc := pcIs_intro _ _ $$ [HPC HnextPC]
-      case' _ => iframe
-      iapply HΦ $$ HmConf Hclock Hpc HF
+    (try split)
+    all_goals
+      cases tick
+      · swp_run 10
+        conf_intro HmConf
+        ihave Hclock := clockCells_intro _ _ _ _ _ _ $$ [Hminstret_increment Hminstret Hmcycle Hmtime Hmip]
+        case' _ => iframe
+        ihave Hpc := pcIs_intro _ _ $$ [HPC HnextPC]
+        case' _ => iframe
+        iapply HΦ $$ HmConf Hclock Hpc HF
+      · swp_run 5
+        conf_intro HmConf
+        iapply swp_tick_clock_cells (hp := hp)
+        iframe
+        inext
+        iintro %mcycle' %mtime' %mip' HmConf Hmcycle Hmtime Hmip
+        ihave Hclock := clockCells_intro _ _ _ _ _ _ $$ [Hminstret_increment Hminstret Hmcycle Hmtime Hmip]
+        case' _ => iframe
+        ihave Hpc := pcIs_intro _ _ $$ [HPC HnextPC]
+        case' _ => iframe
+        iapply HΦ $$ HmConf Hclock Hpc HF
   · -- still parked: a no-op step, the pc does not move; Löb
     swp_run 60
     cases tick

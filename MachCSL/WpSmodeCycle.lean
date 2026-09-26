@@ -408,51 +408,61 @@ theorem trapCsrsAt_intro (cpu : CPU) (a b c : BitVec 64) :
 set_option hygiene false in
 /-- The retire stage of a supervisor-mode cycle, with the lent `T`. -/
 macro "cycle_retire_t" : tactic =>
-  `(tactic| (swp_run 40
-             cases tick
-             · swp_run 10
-               conf_intro HmConf
-               ihave Hclock := clockCells_intro _ _ _ _ _ _ $$ [Hminstret_increment Hminstret Hmcycle Hmtime Hmip]
-               case' _ => iframe
-               ihave Hpc := pcIs_intro _ _ $$ [HPC HnextPC]
-               case' _ => iframe
-               iapply HΦ $$ HmConf Hclock Hpc HT HR HQ
-             · swp_run 5
-               conf_intro HmConf
-               iapply swp_tick_clock_cells (hp := hp')
-               iframe
-               inext
-               iintro %mcycle' %mtime' %mip' HmConf Hmcycle Hmtime Hmip
-               ihave Hclock := clockCells_intro _ _ _ _ _ _ $$ [Hminstret_increment Hminstret Hmcycle Hmtime Hmip]
-               case' _ => iframe
-               ihave Hpc := pcIs_intro _ _ $$ [HPC HnextPC]
-               case' _ => iframe
-               iapply HΦ $$ HmConf Hclock Hpc HT HR HQ))
+  `(tactic| (cases tick
+             · swp_run 40
+               (try split)
+               all_goals
+                 swp_run 10
+                 conf_intro HmConf
+                 ihave Hclock := clockCells_intro _ _ _ _ _ _ $$ [Hminstret_increment Hminstret Hmcycle Hmtime Hmip]
+                 case' _ => iframe
+                 ihave Hpc := pcIs_intro _ _ $$ [HPC HnextPC]
+                 case' _ => iframe
+                 iapply HΦ $$ HmConf Hclock Hpc HT HR HQ
+             · swp_run 40
+               (try split)
+               all_goals
+                 swp_run 5
+                 conf_intro HmConf
+                 iapply swp_tick_clock_cells (hp := hp')
+                 iframe
+                 inext
+                 iintro %mcycle' %mtime' %mip' HmConf Hmcycle Hmtime Hmip
+                 ihave Hclock := clockCells_intro _ _ _ _ _ _ $$ [Hminstret_increment Hminstret Hmcycle Hmtime Hmip]
+                 case' _ => iframe
+                 ihave Hpc := pcIs_intro _ _ $$ [HPC HnextPC]
+                 case' _ => iframe
+                 iapply HΦ $$ HmConf Hclock Hpc HT HR HQ))
 
 set_option hygiene false in
 /-- The retire stage after a trap (nothing retired): the pc lands on the
 vector, the clock ticks, the trap continuation `HK` takes over. -/
 macro "cycle_retire_trap" : tactic =>
-  `(tactic| (swp_run 40
-             cases tick
-             · swp_run 10
-               conf_intro HmConf
-               ihave Hclock := clockCells_intro _ _ _ _ _ _ $$ [Hminstret_increment Hminstret Hmcycle Hmtime Hmip]
-               case' _ => iframe
-               ihave Hpc := pcIs_intro _ _ $$ [HPC HnextPC]
-               case' _ => iframe
-               iapply HK $$ %_ %hsc HmConf Hclock Hpc HT HP Hcsrs Hstv
-             · swp_run 5
-               conf_intro HmConf
-               iapply swp_tick_clock_cells (hp := hp')
-               iframe
-               inext
-               iintro %mcycle' %mtime' %mip' HmConf Hmcycle Hmtime Hmip
-               ihave Hclock := clockCells_intro _ _ _ _ _ _ $$ [Hminstret_increment Hminstret Hmcycle Hmtime Hmip]
-               case' _ => iframe
-               ihave Hpc := pcIs_intro _ _ $$ [HPC HnextPC]
-               case' _ => iframe
-               iapply HK $$ %_ %hsc HmConf Hclock Hpc HT HP Hcsrs Hstv))
+  `(tactic| (cases tick
+             · swp_run 40
+               (try split)
+               all_goals
+                 swp_run 10
+                 conf_intro HmConf
+                 ihave Hclock := clockCells_intro _ _ _ _ _ _ $$ [Hminstret_increment Hminstret Hmcycle Hmtime Hmip]
+                 case' _ => iframe
+                 ihave Hpc := pcIs_intro _ _ $$ [HPC HnextPC]
+                 case' _ => iframe
+                 iapply HK $$ %_ %hsc HmConf Hclock Hpc HT HP Hcsrs Hstv
+             · swp_run 40
+               (try split)
+               all_goals
+                 swp_run 5
+                 conf_intro HmConf
+                 iapply swp_tick_clock_cells (hp := hp')
+                 iframe
+                 inext
+                 iintro %mcycle' %mtime' %mip' HmConf Hmcycle Hmtime Hmip
+                 ihave Hclock := clockCells_intro _ _ _ _ _ _ $$ [Hminstret_increment Hminstret Hmcycle Hmtime Hmip]
+                 case' _ => iframe
+                 ihave Hpc := pcIs_intro _ _ $$ [HPC HnextPC]
+                 case' _ => iframe
+                 iapply HK $$ %_ %hsc HmConf Hclock Hpc HT HP Hcsrs Hstv))
 
 set_option hygiene false in
 /-- The trap arm of a cycle: dispatch found `some (i, p)`; take the trap

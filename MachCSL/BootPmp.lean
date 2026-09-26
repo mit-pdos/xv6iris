@@ -24,16 +24,10 @@ open Sail Sail.ConcurrencyInterfaceV1
 open Sail.ArchSem (FreeM)
 open LeanRV64D LeanRV64D.Functions
 
-/-! ## §3a The entry algebra -/
+/-! ## §3a The entry algebra
 
-/-- "this entry is disabled and unlocked" (Rocq `pmp_entry_off`). -/
-def pmpEntryOff (e : BitVec 8) : Prop :=
-  pmpAddrMatchType_encdec_backwards (_get_Pmpcfg_ent_A e) = PmpAddrMatchType.OFF ∧
-    pmpLocked e = false
-
-/-- Every entry of a `pmpcfg` vector is off (Rocq `pmp_all_off`), at every
-index, in range or not. -/
-def pmpAllOff (v : Vector (BitVec 8) 64) : Prop := ∀ j : Nat, pmpEntryOff v[j]!
+`pmpEntryOff` / `pmpAllOff` themselves live with the PMP stage lemma that
+consumes them (`MachCSL.WpPmp`). -/
 
 /-- The value `reset_pmp`'s body stores, at an ARBITRARY old entry (Rocq
 `pmp_entry_off_cleared`). -/
@@ -53,14 +47,6 @@ theorem pmpEntryOff_cleared (x : BitVec 8) :
   refine ⟨?_, ?_⟩
   · rw [hA]; rfl
   · unfold pmpLocked; rw [hL]; rfl
-
-/-- The entry an out-of-range read hands back (Rocq `pmp_entry_off_inhabitant`). -/
-theorem pmpEntryOff_zero : pmpEntryOff 0#8 := ⟨rfl, rfl⟩
-
-/-- The all-zero configuration is all off (`MachCSL.bootPmpcfg`, the value
-the current reset table pins, satisfies the derived predicate). -/
-theorem pmpAllOff_bootPmpcfg : pmpAllOff bootPmpcfg := by
-  intro j; rw [bootPmpcfg_get]; exact pmpEntryOff_zero
 
 /-! ### The vector layer -/
 
