@@ -149,7 +149,7 @@ theorem uservec_proof : USERVEC :=
   icases (show KernelImage.ro ⊢ iprop((kernelText ∗ kernelData ∗ kmapStatic : IProp GF)) from .rfl) $$ Hro with
     ⟨#Htext, _, #HS⟩
   unfold cpuOwn hartCsrs
-  icases Hcpu with ⟨Hcells, Hlocks, ⟨%s0, Hss⟩, Hme, Hse⟩
+  icases Hcpu with ⟨Hcells, Hlocks, %s0, Hss⟩
   unfold kptOnAt
   icases Hon with ⟨%tk, %Mk, #Hk, %htk⟩
   subst htk
@@ -185,7 +185,7 @@ theorem uservec_proof : USERVEC :=
         g ws) hkwf
   ihave Hstack := (show stackOwn (KCtx.sp ⟨regs, false, spie, spp, avail, noff, intena, locks, KTier.kpt, tk.base,
       proc⟩) (trapRes false + avail) ⊢ stackOwn (GF := GF) (regs 2#5) (trapRes false + avail) from .rfl) $$ Hstack
-  ihave Hkc := hK $$ [HmConf Hclock HF Hstack Hkpt Htok Hcells Hlocks Hss Hme Hse]
+  ihave Hkc := hK $$ [HmConf Hclock HF Hstack Hkpt Htok Hcells Hlocks Hss]
   · rw [htp, hsp]
     iframe HF Hstack Htok Hclock
     isplitl [HmConf]
@@ -198,9 +198,9 @@ theorem uservec_proof : USERVEC :=
       ipureintro; exact htc
     isplitl []
     · unfold sieArm sieArmP; simp only [Bool.false_eq_true, ite_false]; ipureintro; trivial
-    isplitl [Hcells Hlocks Hss Hme Hse]
+    isplitl [Hcells Hlocks Hss]
     · unfold cpuOwn hartCsrs
-      iframe Hcells Hlocks Hme Hse
+      iframe Hcells Hlocks
       iexists g 10#5
       iexact Hss
     · iexact Hro

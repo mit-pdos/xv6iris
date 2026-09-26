@@ -89,8 +89,7 @@ theorem userInv_of_sret [CurCtx] (cpu : CPU) (C : UCfg) (P : UPtd) (Rut : UPtd �
     iapply (userPtInv_uptSlot cpu P M).2
     iframe Hsatp Hpmpcfg_n Hpmpaddr_n Hslot Hum
     ipureintro; exact hwf
-  iframe Hstvec Hmie Hmideleg Hmedeleg Hmenvcfg Hmisa Hmseccfg Hpma_regions Hhtif_tohost_base Help Hsenvcfg
-    Hmcounteren Hscounteren Hmcountinhibit Hminstretcfg Hmcyclecfg Hmtimecmp
+  iframe Hstvec Hmie Hmideleg Hmedeleg Hmenvcfg Hhw Hmcounteren Hmtimecmp
   iexists mepc, stc
   iframe Hmepc Hstimecmp
 
@@ -109,8 +108,8 @@ theorem userTrapFrame_open [CurCtx] (cpu : CPU) (C : UCfg) (P : UPtd) (Rut : UPt
   unfold userTrapFrame userPtAny userCfg userHwCells
   rw [hdq, hmie, hmed]
   iintro ⟨%ms, %sc, %stv, %sep, %g, %hms, Hhs, Hcp, Hms, Hsc, Hstv, Hsep, Hpc, Hclock, HF, ⟨%M, HP⟩,
-    ⟨Hstvec, Hmie, Hmideleg, Hmedeleg, Hmenvcfg, Hmisa, Hmseccfg, Hpma, Hhtif, Help, Hsenvcfg, Hmcounteren,
-      Hscounteren, Hmcountinhibit, Hminstretcfg, Hmcyclecfg, Hmtimecmp, %mepc, %stc, Hmepc, Hstimecmp⟩, HR⟩
+    ⟨Hstvec, Hmie, Hmideleg, Hmedeleg, Hmenvcfg, #Hhw, Hmcounteren, Hmtimecmp, %mepc, %stc, Hmepc,
+      Hstimecmp⟩, HR⟩
   icases (userPtInv_uptSlot cpu P M).1 $$ HP with ⟨Hsatp, Hpmpcfg, Hpmpaddr, %hwf, Hslot, Hum⟩
   iexists ms, mepc, stc, sc, stv, sep, g, M
   iframe Hpc Hclock HF Hsep Hsc Hstv Hstvec Hslot Hum HR
@@ -120,6 +119,7 @@ theorem userTrapFrame_open [CurCtx] (cpu : CPU) (C : UCfg) (P : UPtd) (Rut : UPt
   · unfold confCells sConfOf
     simp only [MIE_S, MEDELEG_S, MENVCFG_S]
     iframe
+    iexact Hhw
   · ipureintro; exact hwf
 
 /-! ## The hand-off -/
@@ -165,6 +165,7 @@ theorem wpLoop_userret_sret [CurCtx] (U : USER) (cpu : CPU) (C : UCfg) (P : UPtd
     unfold paOf vpnOf
     bv_decide
   iintro ⟨#HI, HmConf, Hclock, Hpc, Hslot, #HS, Htok, HF, Hsepc, Hsc, Hstv, Hstvec, %hwf, Hum, HR, #Hwire, Hh⟩
+  icases confCells_hw cpu _ _ _ $$ HmConf with ⟨HmConf, #Hhw⟩
   iapply (wpLoop_sT_instr cpu (sConfOf KTier.kpt P.root ms C.mideleg mepc stc)
     { sConfOf KTier.kpt P.root ms C.mideleg mepc stc with mstatus := sretMs ms } hok.phys hmdl rfl
     Privilege.User (Or.inr rfl) pc (paOf trampPpn pc) (epc &&& 0xFFFFFFFFFFFFFFFE#64) false (instruction.SRET ())
@@ -186,7 +187,7 @@ theorem wpLoop_userret_sret [CurCtx] (U : USER) (cpu : CPU) (C : UCfg) (P : UPtd
     (userMstatusOk_sretMs ms hsm hspie) $$ [HmConf Hclock Hpc HF Hsepc Hsc Hstv Hstvec Hslot Hum HRut]
   · iframe HmConf Hclock Hpc HF Hsepc Hsc Hstv Hstvec Hslot Hum HRut
     ipureintro; exact hwf
-  iapply (U.wp_user_exec_closed cpu C P Rut hacc) $$ Hwire HU
+  iapply (U.wp_user_exec_closed cpu C P Rut hacc) $$ Hhw Hwire HU
   iexact Hh
 
 end

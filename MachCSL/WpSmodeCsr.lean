@@ -59,7 +59,7 @@ theorem execSpecF_csrr_sstatus (cpu : CPU) (dq : DFrac) (c : MConf) (sie : Bool)
   swp_run 300
   iapply swp_bind
   iapply swp_wX_file (hrd := hrd)
-  iframe
+  iframe; try iframe Hhw
   inext
   iintro HF
   swp_run 10
@@ -89,14 +89,14 @@ theorem execSpecF_csrrci_sstatus (cpu : CPU) (c : MConf) (hok : SConfPhys (GF :=
   subst hW
   iapply swp_bind
   iapply swp_write_CSR_sstatus (hmpp := hMPP)
-  iframe
+  iframe; try iframe Hhw
   inext
-  iintro Hmisa Hmstatus
+  iintro Hmstatus
   simp only [hid]
   swp_run 30
   iapply swp_bind
   iapply swp_wX_file (hrd := hrd)
-  iframe
+  iframe; try iframe Hhw
   inext
   iintro HF
   swp_run 20
@@ -127,22 +127,21 @@ theorem execSpecF_csrrci_sstatus_flip (cpu : CPU) (c : MConf) (sie : Bool) (hok 
   subst hW
   iapply swp_bind
   iapply swp_write_CSR_sstatus (hmpp := hMPP)
-  iframe
+  iframe; try iframe Hhw
   inext
-  iintro Hmisa Hmstatus
+  iintro Hmstatus
   simp only [hcl]
   swp_run 30
   iapply swp_bind
   iapply swp_wX_file (hrd := hrd)
-  iframe
+  iframe; try iframe Hhw
   inext
   iintro HF
   swp_run 20
-  ihave HmConf := confCells_intro _ _ _ { c with mstatus := c.mstatus &&& 0xFFFFFFFFFFFFFFFD#64 } $$ [Hcur_privilege Hhart_state Hmisa Hmstatus Hmie
-    Hmideleg Hmedeleg Hmepc Hsatp Hmenvcfg Hmcounteren Hscounteren Hmtimecmp Hstimecmp Hpmpcfg_n
-    Hpmpaddr_n Hmseccfg Help Hsenvcfg Hmcountinhibit Hminstretcfg
-    Hmcyclecfg Hpma_regions Hhtif_tohost_base]
-  case' _ => iframe
+  ihave HmConf := confCells_intro _ _ _ { c with mstatus := c.mstatus &&& 0xFFFFFFFFFFFFFFFD#64 } $$ [Hcur_privilege Hhart_state Hmstatus Hmie
+    Hmideleg Hmedeleg Hmepc Hsatp Hmenvcfg Hmcounteren Hmtimecmp Hstimecmp Hpmpcfg_n
+    Hpmpaddr_n]
+  case' _ => (iframe; try iexact Hhw)
   iapply HΦ $$ HmConf HPC HnextPC HF
 
 set_option maxHeartbeats 4000000 in
@@ -168,19 +167,18 @@ theorem execSpecF_csrci_sstatus_x0 (cpu : CPU) (c : MConf) (sie : Bool) (hok : S
   subst hW
   iapply swp_bind
   iapply swp_write_CSR_sstatus (hmpp := hMPP)
-  iframe
+  iframe; try iframe Hhw
   inext
-  iintro Hmisa Hmstatus
+  iintro Hmstatus
   simp only [hcl]
   swp_run 30
   unfold wX_bits wX
   simp only [Sail.BitVec.toNatInt, BitVec.toNat_ofNat, Nat.reduceMod, Int.ofNat_eq_natCast, Int.toNat_natCast]
   swp_run 80
-  ihave HmConf := confCells_intro _ _ _ { c with mstatus := c.mstatus &&& 0xFFFFFFFFFFFFFFFD#64 } $$ [Hcur_privilege Hhart_state Hmisa Hmstatus Hmie
-    Hmideleg Hmedeleg Hmepc Hsatp Hmenvcfg Hmcounteren Hscounteren Hmtimecmp Hstimecmp Hpmpcfg_n
-    Hpmpaddr_n Hmseccfg Help Hsenvcfg Hmcountinhibit Hminstretcfg
-    Hmcyclecfg Hpma_regions Hhtif_tohost_base]
-  case' _ => iframe
+  ihave HmConf := confCells_intro _ _ _ { c with mstatus := c.mstatus &&& 0xFFFFFFFFFFFFFFFD#64 } $$ [Hcur_privilege Hhart_state Hmstatus Hmie
+    Hmideleg Hmedeleg Hmepc Hsatp Hmenvcfg Hmcounteren Hmtimecmp Hstimecmp Hpmpcfg_n
+    Hpmpaddr_n]
+  case' _ => (iframe; try iexact Hhw)
   iapply HΦ $$ HmConf HPC HnextPC HF
 
 set_option maxHeartbeats 4000000 in
@@ -206,19 +204,18 @@ theorem execSpecF_csrsi_sstatus_x0 (cpu : CPU) (c : MConf) (sie : Bool) (hok : S
   subst hW
   iapply swp_bind
   iapply swp_write_CSR_sstatus (hmpp := hMPP)
-  iframe
+  iframe; try iframe Hhw
   inext
-  iintro Hmisa Hmstatus
+  iintro Hmstatus
   simp only [hst]
   swp_run 30
   unfold wX_bits wX
   simp only [Sail.BitVec.toNatInt, BitVec.toNat_ofNat, Nat.reduceMod, Int.ofNat_eq_natCast, Int.toNat_natCast]
   swp_run 80
-  ihave HmConf := confCells_intro _ _ _ { c with mstatus := c.mstatus ||| 2#64 } $$ [Hcur_privilege Hhart_state Hmisa Hmstatus Hmie
-    Hmideleg Hmedeleg Hmepc Hsatp Hmenvcfg Hmcounteren Hscounteren Hmtimecmp Hstimecmp Hpmpcfg_n
-    Hpmpaddr_n Hmseccfg Help Hsenvcfg Hmcountinhibit Hminstretcfg
-    Hmcyclecfg Hpma_regions Hhtif_tohost_base]
-  case' _ => iframe
+  ihave HmConf := confCells_intro _ _ _ { c with mstatus := c.mstatus ||| 2#64 } $$ [Hcur_privilege Hhart_state Hmstatus Hmie
+    Hmideleg Hmedeleg Hmepc Hsatp Hmenvcfg Hmcounteren Hmtimecmp Hstimecmp Hpmpcfg_n
+    Hpmpaddr_n]
+  case' _ => (iframe; try iexact Hhw)
   iapply HΦ $$ HmConf HPC HnextPC HF
 
 end MachCSL

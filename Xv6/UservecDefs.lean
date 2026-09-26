@@ -257,8 +257,8 @@ theorem uservec_frame_open [CurCtx] (cpu : CPU) (C : UCfg) (P : UPtd) (Rut : UPt
   unfold userTrapFrameAtm userPtmInv userCfg userHwCells
   rw [hdq, hmie, hmed]
   iintro ⟨%hms, Hhs, Hcp, Hms, Hsc, Hstv, Hsep, Hpc, Hclock, HF, ⟨%Mp, HP, %hM⟩,
-    ⟨Hstvec, Hmie, Hmideleg, Hmedeleg, Hmenvcfg, Hmisa, Hmseccfg, Hpma, Hhtif, Help, Hsenvcfg, Hmcounteren,
-      Hscounteren, Hmcountinhibit, Hminstretcfg, Hmcyclecfg, Hmtimecmp, %mepc, %stc, Hmepc, Hstimecmp⟩, HR⟩
+    ⟨Hstvec, Hmie, Hmideleg, Hmedeleg, Hmenvcfg, #Hhw, Hmcounteren, Hmtimecmp, %mepc, %stc, Hmepc,
+      Hstimecmp⟩, HR⟩
   icases (userPtInv_uptSlot cpu P Mp).1 $$ HP with ⟨Hsatp, Hpmpcfg, Hpmpaddr, %hwf, Hslot, Hum⟩
   iexists mepc, stc, Mp
   iframe Hpc Hclock HF Hsep Hsc Hstv Hstvec Hslot Hum HR
@@ -268,6 +268,7 @@ theorem uservec_frame_open [CurCtx] (cpu : CPU) (C : UCfg) (P : UPtd) (Rut : UPt
   · unfold confCells sConfOf
     simp only [MIE_S, MEDELEG_S, MENVCFG_S]
     iframe
+    iexact Hhw
   · ipureintro; exact hwf
 
 /-! ## §4 The trapframe page, one word updated -/

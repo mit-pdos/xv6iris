@@ -2,16 +2,19 @@
 MachCSL: the machine-mode configuration of a hart, parametric in the CSRs the
 kernel's boot code writes.
 
-`mConf cpu dq c` owns the configuration registers of `cpu`: the frozen ones
-(misa, mseccfg, PMA table, ...) at their reset values and the mutable ones
-(mstatus, mie, mideleg, medeleg, mepc, satp, menvcfg, mcounteren, mtimecmp,
-stimecmp, the PMP tables) at the values in `c`.  `mBoot cpu dq` is the
+`mConf cpu dq c` owns the configuration registers of `cpu` that the kernel
+writes (mstatus, mie, mideleg, medeleg, mepc, satp, menvcfg, mcounteren,
+mtimecmp, stimecmp, the PMP tables) at the values in `c`, at fraction `dq`,
+and carries the frozen ones (misa, mseccfg, PMA table, ...) as the
+persistent read-only bundle `hwConfig` (MachCSL/HwConfig.lean, Rocq
+`hw_config`).  `mBoot cpu dq` is the
 instance at the reset configuration `bootConf`.  `MConf.ok c` collects what
 the machine-mode stage lemmas need of `c`: interrupts globally disabled
 (`mstatus.MIE = 0`), no modified privilege for data accesses (`MPRV = 0`), and
 the PMP check passing for RAM accesses.
 -/
 import MachCSL.Boot
+import MachCSL.HwConfig
 import MachCSL.PlatformFacts
 import MachCSL.WpPmp
 
@@ -70,7 +73,6 @@ def bootConf : MConf where
 def confCells (cpu : CPU) (dq : DFrac) (p : Privilege) (c : MConf) : IProp GF := iprop%
   Register.cur_privilege ↦ᵣ[cpu]{dq} p ∗
   Register.hart_state ↦ᵣ[cpu]{dq} HartState.HART_ACTIVE () ∗
-  Register.misa ↦ᵣ[cpu]{dq} 0x800000000014112D#64 ∗
   Register.mstatus ↦ᵣ[cpu]{dq} c.mstatus ∗
   Register.mie ↦ᵣ[cpu]{dq} c.mie ∗
   Register.mideleg ↦ᵣ[cpu]{dq} c.mideleg ∗
@@ -79,19 +81,11 @@ def confCells (cpu : CPU) (dq : DFrac) (p : Privilege) (c : MConf) : IProp GF :=
   Register.satp ↦ᵣ[cpu]{dq} c.satp ∗
   Register.menvcfg ↦ᵣ[cpu]{dq} c.menvcfg ∗
   Register.mcounteren ↦ᵣ[cpu]{dq} c.mcounteren ∗
-  Register.scounteren ↦ᵣ[cpu]{dq} 0#32 ∗
   Register.mtimecmp ↦ᵣ[cpu]{dq} c.mtimecmp ∗
   Register.stimecmp ↦ᵣ[cpu]{dq} c.stimecmp ∗
   Register.pmpcfg_n ↦ᵣ[cpu]{dq} c.pmpcfg ∗
   Register.pmpaddr_n ↦ᵣ[cpu]{dq} c.pmpaddr ∗
-  Register.mseccfg ↦ᵣ[cpu]{dq} 0#64 ∗
-  Register.elp ↦ᵣ[cpu]{dq} 0#1 ∗
-  Register.senvcfg ↦ᵣ[cpu]{dq} 0#64 ∗
-  Register.mcountinhibit ↦ᵣ[cpu]{dq} 0#32 ∗
-  Register.minstretcfg ↦ᵣ[cpu]{dq} 0#64 ∗
-  Register.mcyclecfg ↦ᵣ[cpu]{dq} 0#64 ∗
-  Register.pma_regions ↦ᵣ[cpu]{dq} bootPMA ∗
-  Register.htif_tohost_base ↦ᵣ[cpu]{dq} none
+  hwConfig cpu
 
 /-- The machine-mode configuration. -/
 abbrev mConf (cpu : CPU) (dq : DFrac) (c : MConf) : IProp GF := confCells cpu dq Privilege.Machine c
@@ -99,11 +93,34 @@ abbrev mConf (cpu : CPU) (dq : DFrac) (c : MConf) : IProp GF := confCells cpu dq
 /-- The same cells in supervisor mode (what `mret` leaves). -/
 abbrev sConf (cpu : CPU) (dq : DFrac) (c : MConf) : IProp GF := confCells cpu dq Privilege.Supervisor c
 
+/-- The configuration cells carry the persistent hardware configuration
+(Rocq: `sconf`/`mmode_config` hold `hw_config`); a copy may be taken out at
+any point. -/
+theorem confCells_hw (cpu : CPU) (dq : DFrac) (p : Privilege) (c : MConf) :
+    confCells (GF := GF) cpu dq p c ⊢ confCells cpu dq p c ∗ hwConfig cpu := by
+  unfold confCells
+  iintro ⟨H1, H2, H3, H4, H5, H6, H7, H8, H9, H10, H11, H12, H13, H14, #Hhw⟩
+  iframe
+  isplit <;> iexact Hhw
+
+/-- A frozen register off the configuration cells, persistently (the
+accessor form the read-only walks take). -/
+theorem confCells_hw_acc (cpu : CPU) (dq : DFrac) (p : Privilege) (c : MConf) (r : Register)
+    (v : RegisterType r) (h : hwVal r = some v) :
+    confCells (GF := GF) cpu dq p c ⊢
+      ∃ dq' : DFrac, r ↦ᵣ[cpu]{dq'} v ∗ (r ↦ᵣ[cpu]{dq'} v -∗ confCells cpu dq p c) := by
+  iintro H
+  icases confCells_hw cpu dq p c $$ H with ⟨H, #Hhw⟩
+  iexists DFrac.discard
+  isplitr
+  · iapply hwConfig_reg cpu r v h $$ Hhw
+  iintro -
+  iexact H
+
 theorem mConf_cases (cpu : CPU) (dq : DFrac) (c : MConf) :
     mConf (GF := GF) cpu dq c ⊢
     Register.cur_privilege ↦ᵣ[cpu]{dq} Privilege.Machine ∗
     Register.hart_state ↦ᵣ[cpu]{dq} HartState.HART_ACTIVE () ∗
-    Register.misa ↦ᵣ[cpu]{dq} 0x800000000014112D#64 ∗
     Register.mstatus ↦ᵣ[cpu]{dq} c.mstatus ∗
     Register.mie ↦ᵣ[cpu]{dq} c.mie ∗
     Register.mideleg ↦ᵣ[cpu]{dq} c.mideleg ∗
@@ -112,25 +129,16 @@ theorem mConf_cases (cpu : CPU) (dq : DFrac) (c : MConf) :
     Register.satp ↦ᵣ[cpu]{dq} c.satp ∗
     Register.menvcfg ↦ᵣ[cpu]{dq} c.menvcfg ∗
     Register.mcounteren ↦ᵣ[cpu]{dq} c.mcounteren ∗
-    Register.scounteren ↦ᵣ[cpu]{dq} 0#32 ∗
     Register.mtimecmp ↦ᵣ[cpu]{dq} c.mtimecmp ∗
     Register.stimecmp ↦ᵣ[cpu]{dq} c.stimecmp ∗
     Register.pmpcfg_n ↦ᵣ[cpu]{dq} c.pmpcfg ∗
     Register.pmpaddr_n ↦ᵣ[cpu]{dq} c.pmpaddr ∗
-    Register.mseccfg ↦ᵣ[cpu]{dq} 0#64 ∗
-    Register.elp ↦ᵣ[cpu]{dq} 0#1 ∗
-    Register.senvcfg ↦ᵣ[cpu]{dq} 0#64 ∗
-    Register.mcountinhibit ↦ᵣ[cpu]{dq} 0#32 ∗
-    Register.minstretcfg ↦ᵣ[cpu]{dq} 0#64 ∗
-    Register.mcyclecfg ↦ᵣ[cpu]{dq} 0#64 ∗
-    Register.pma_regions ↦ᵣ[cpu]{dq} bootPMA ∗
-    Register.htif_tohost_base ↦ᵣ[cpu]{dq} none := by
+    hwConfig cpu := by
   unfold mConf confCells; exact .rfl
 
 theorem mConf_intro (cpu : CPU) (dq : DFrac) (c : MConf) :
     Register.cur_privilege ↦ᵣ[cpu]{dq} Privilege.Machine ∗
     Register.hart_state ↦ᵣ[cpu]{dq} HartState.HART_ACTIVE () ∗
-    Register.misa ↦ᵣ[cpu]{dq} 0x800000000014112D#64 ∗
     Register.mstatus ↦ᵣ[cpu]{dq} c.mstatus ∗
     Register.mie ↦ᵣ[cpu]{dq} c.mie ∗
     Register.mideleg ↦ᵣ[cpu]{dq} c.mideleg ∗
@@ -139,26 +147,17 @@ theorem mConf_intro (cpu : CPU) (dq : DFrac) (c : MConf) :
     Register.satp ↦ᵣ[cpu]{dq} c.satp ∗
     Register.menvcfg ↦ᵣ[cpu]{dq} c.menvcfg ∗
     Register.mcounteren ↦ᵣ[cpu]{dq} c.mcounteren ∗
-    Register.scounteren ↦ᵣ[cpu]{dq} 0#32 ∗
     Register.mtimecmp ↦ᵣ[cpu]{dq} c.mtimecmp ∗
     Register.stimecmp ↦ᵣ[cpu]{dq} c.stimecmp ∗
     Register.pmpcfg_n ↦ᵣ[cpu]{dq} c.pmpcfg ∗
     Register.pmpaddr_n ↦ᵣ[cpu]{dq} c.pmpaddr ∗
-    Register.mseccfg ↦ᵣ[cpu]{dq} 0#64 ∗
-    Register.elp ↦ᵣ[cpu]{dq} 0#1 ∗
-    Register.senvcfg ↦ᵣ[cpu]{dq} 0#64 ∗
-    Register.mcountinhibit ↦ᵣ[cpu]{dq} 0#32 ∗
-    Register.minstretcfg ↦ᵣ[cpu]{dq} 0#64 ∗
-    Register.mcyclecfg ↦ᵣ[cpu]{dq} 0#64 ∗
-    Register.pma_regions ↦ᵣ[cpu]{dq} bootPMA ∗
-    Register.htif_tohost_base ↦ᵣ[cpu]{dq} none ⊢ mConf (GF := GF) cpu dq c := by
+    hwConfig cpu ⊢ mConf (GF := GF) cpu dq c := by
   unfold mConf confCells; exact .rfl
 
 theorem confCells_cases (cpu : CPU) (dq : DFrac) (p : Privilege) (c : MConf) :
     confCells (GF := GF) cpu dq p c ⊢
     Register.cur_privilege ↦ᵣ[cpu]{dq} p ∗
     Register.hart_state ↦ᵣ[cpu]{dq} HartState.HART_ACTIVE () ∗
-    Register.misa ↦ᵣ[cpu]{dq} 0x800000000014112D#64 ∗
     Register.mstatus ↦ᵣ[cpu]{dq} c.mstatus ∗
     Register.mie ↦ᵣ[cpu]{dq} c.mie ∗
     Register.mideleg ↦ᵣ[cpu]{dq} c.mideleg ∗
@@ -167,25 +166,16 @@ theorem confCells_cases (cpu : CPU) (dq : DFrac) (p : Privilege) (c : MConf) :
     Register.satp ↦ᵣ[cpu]{dq} c.satp ∗
     Register.menvcfg ↦ᵣ[cpu]{dq} c.menvcfg ∗
     Register.mcounteren ↦ᵣ[cpu]{dq} c.mcounteren ∗
-    Register.scounteren ↦ᵣ[cpu]{dq} 0#32 ∗
     Register.mtimecmp ↦ᵣ[cpu]{dq} c.mtimecmp ∗
     Register.stimecmp ↦ᵣ[cpu]{dq} c.stimecmp ∗
     Register.pmpcfg_n ↦ᵣ[cpu]{dq} c.pmpcfg ∗
     Register.pmpaddr_n ↦ᵣ[cpu]{dq} c.pmpaddr ∗
-    Register.mseccfg ↦ᵣ[cpu]{dq} 0#64 ∗
-    Register.elp ↦ᵣ[cpu]{dq} 0#1 ∗
-    Register.senvcfg ↦ᵣ[cpu]{dq} 0#64 ∗
-    Register.mcountinhibit ↦ᵣ[cpu]{dq} 0#32 ∗
-    Register.minstretcfg ↦ᵣ[cpu]{dq} 0#64 ∗
-    Register.mcyclecfg ↦ᵣ[cpu]{dq} 0#64 ∗
-    Register.pma_regions ↦ᵣ[cpu]{dq} bootPMA ∗
-    Register.htif_tohost_base ↦ᵣ[cpu]{dq} none := by
+    hwConfig cpu := by
   unfold confCells; exact .rfl
 
 theorem confCells_intro (cpu : CPU) (dq : DFrac) (p : Privilege) (c : MConf) :
     Register.cur_privilege ↦ᵣ[cpu]{dq} p ∗
     Register.hart_state ↦ᵣ[cpu]{dq} HartState.HART_ACTIVE () ∗
-    Register.misa ↦ᵣ[cpu]{dq} 0x800000000014112D#64 ∗
     Register.mstatus ↦ᵣ[cpu]{dq} c.mstatus ∗
     Register.mie ↦ᵣ[cpu]{dq} c.mie ∗
     Register.mideleg ↦ᵣ[cpu]{dq} c.mideleg ∗
@@ -194,61 +184,45 @@ theorem confCells_intro (cpu : CPU) (dq : DFrac) (p : Privilege) (c : MConf) :
     Register.satp ↦ᵣ[cpu]{dq} c.satp ∗
     Register.menvcfg ↦ᵣ[cpu]{dq} c.menvcfg ∗
     Register.mcounteren ↦ᵣ[cpu]{dq} c.mcounteren ∗
-    Register.scounteren ↦ᵣ[cpu]{dq} 0#32 ∗
     Register.mtimecmp ↦ᵣ[cpu]{dq} c.mtimecmp ∗
     Register.stimecmp ↦ᵣ[cpu]{dq} c.stimecmp ∗
     Register.pmpcfg_n ↦ᵣ[cpu]{dq} c.pmpcfg ∗
     Register.pmpaddr_n ↦ᵣ[cpu]{dq} c.pmpaddr ∗
-    Register.mseccfg ↦ᵣ[cpu]{dq} 0#64 ∗
-    Register.elp ↦ᵣ[cpu]{dq} 0#1 ∗
-    Register.senvcfg ↦ᵣ[cpu]{dq} 0#64 ∗
-    Register.mcountinhibit ↦ᵣ[cpu]{dq} 0#32 ∗
-    Register.minstretcfg ↦ᵣ[cpu]{dq} 0#64 ∗
-    Register.mcyclecfg ↦ᵣ[cpu]{dq} 0#64 ∗
-    Register.pma_regions ↦ᵣ[cpu]{dq} bootPMA ∗
-    Register.htif_tohost_base ↦ᵣ[cpu]{dq} none ⊢ confCells (GF := GF) cpu dq p c := by
+    hwConfig cpu ⊢ confCells (GF := GF) cpu dq p c := by
   unfold confCells; exact .rfl
 
 open Iris.ProofMode in
 set_option hygiene false in
 /-- Split `H : confCells cpu dq p c` (any privilege) into its cells. -/
 macro "conf_cases " h:ident : tactic =>
-  `(tactic| ihave ⟨Hcur_privilege, Hhart_state, Hmisa, Hmstatus, Hmie, Hmideleg, Hmedeleg, Hmepc,
-                  Hsatp, Hmenvcfg, Hmcounteren, Hscounteren, Hmtimecmp, Hstimecmp, Hpmpcfg_n, Hpmpaddr_n,
-                  Hmseccfg, Help, Hsenvcfg, Hmcountinhibit, Hminstretcfg,
-                  Hmcyclecfg, Hpma_regions, Hhtif_tohost_base⟩ := confCells_cases _ _ _ _ $$ $h:ident)
+  `(tactic| ihave ⟨Hcur_privilege, Hhart_state, Hmstatus, Hmie, Hmideleg, Hmedeleg, Hmepc,
+                  Hsatp, Hmenvcfg, Hmcounteren, Hmtimecmp, Hstimecmp, Hpmpcfg_n, Hpmpaddr_n, #Hhw⟩ := confCells_cases _ _ _ _ $$ $h:ident)
 
 open Iris.ProofMode in
 set_option hygiene false in
 /-- Reassemble `H : confCells cpu dq p c` from the cells (`p` and `c` from the goal). -/
 macro "conf_intro " h:ident : tactic =>
-  `(tactic| (ihave $h:ident := confCells_intro _ _ _ _ $$ [Hcur_privilege Hhart_state Hmisa Hmstatus Hmie
-                  Hmideleg Hmedeleg Hmepc Hsatp Hmenvcfg Hmcounteren Hscounteren Hmtimecmp Hstimecmp Hpmpcfg_n
-                  Hpmpaddr_n Hmseccfg Help Hsenvcfg Hmcountinhibit Hminstretcfg
-                  Hmcyclecfg Hpma_regions Hhtif_tohost_base]
-             case' _ => iframe))
+  `(tactic| (ihave $h:ident := confCells_intro _ _ _ _ $$ [Hcur_privilege Hhart_state Hmstatus Hmie Hmideleg Hmedeleg Hmepc
+                  Hsatp Hmenvcfg Hmcounteren Hmtimecmp Hstimecmp Hpmpcfg_n Hpmpaddr_n]
+             case' _ => (iframe; try iexact Hhw)))
 
 open Iris.ProofMode in
 set_option hygiene false in
 /-- Split `H : mConf cpu dq c` into its cells, named `H<register>`. -/
 macro "mconf_cases " h:ident : tactic =>
-  `(tactic| ihave ⟨Hcur_privilege, Hhart_state, Hmisa, Hmstatus, Hmie, Hmideleg, Hmedeleg, Hmepc,
-                  Hsatp, Hmenvcfg, Hmcounteren, Hscounteren, Hmtimecmp, Hstimecmp, Hpmpcfg_n, Hpmpaddr_n,
-                  Hmseccfg, Help, Hsenvcfg, Hmcountinhibit, Hminstretcfg,
-                  Hmcyclecfg, Hpma_regions, Hhtif_tohost_base⟩ := mConf_cases _ _ _ $$ $h:ident)
+  `(tactic| ihave ⟨Hcur_privilege, Hhart_state, Hmstatus, Hmie, Hmideleg, Hmedeleg, Hmepc,
+                  Hsatp, Hmenvcfg, Hmcounteren, Hmtimecmp, Hstimecmp, Hpmpcfg_n, Hpmpaddr_n, #Hhw⟩ := mConf_cases _ _ _ $$ $h:ident)
 
 open Iris.ProofMode in
 set_option hygiene false in
 /-- Reassemble `H : mConf cpu dq c` from the cells `mconf_cases` produced. -/
 macro "mconf_intro " h:ident : tactic =>
-  `(tactic| (ihave $h:ident := mConf_intro _ _ _ $$ [Hcur_privilege Hhart_state Hmisa Hmstatus Hmie
-                  Hmideleg Hmedeleg Hmepc Hsatp Hmenvcfg Hmcounteren Hscounteren Hmtimecmp Hstimecmp Hpmpcfg_n
-                  Hpmpaddr_n Hmseccfg Help Hsenvcfg Hmcountinhibit Hminstretcfg
-                  Hmcyclecfg Hpma_regions Hhtif_tohost_base]
-             case' _ => iframe))
+  `(tactic| (ihave $h:ident := mConf_intro _ _ _ $$ [Hcur_privilege Hhart_state Hmstatus Hmie Hmideleg Hmedeleg Hmepc
+                  Hsatp Hmenvcfg Hmcounteren Hmtimecmp Hstimecmp Hpmpcfg_n Hpmpaddr_n]
+             case' _ => (iframe; try iexact Hhw)))
 
-/-- The machine-mode boot configuration of a hart (compare `hw_config` /
-`mmode_config` in the Rocq prototype). -/
+/-- The machine-mode boot configuration of a hart (Rocq `mmode_config`,
+which carries `hw_config` as `confCells` does). -/
 abbrev mBoot (cpu : CPU) (dq : DFrac) : IProp GF := mConf cpu dq bootConf
 
 /-! ### What the stage lemmas need of a configuration -/

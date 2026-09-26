@@ -13,6 +13,7 @@ is a call of a model function, unfolds that function.  `swp_run n` repeats
 this up to `n` times.
 -/
 import MachCSL.Wp
+import MachCSL.HwConfig
 import MachCSL.ModelFacts
 
 namespace MachCSL
@@ -250,6 +251,15 @@ def headAction (m : Lean.Expr) : Lean.Expr :=
   if m.isAppOfArity ``Bind.bind 6 then m.getAppArgs[4]!
   else if isBind m then m.getAppArgs[2]!
   else m
+
+/-- The frozen configuration registers (`MachCSL.hwVal`), read and
+(same-value) written off the persistent `hwConfig` bundle, not a cell. -/
+def isHwReg (r : Lean.Expr) : Bool :=
+  [``LeanRV64D.Register.misa, ``LeanRV64D.Register.mseccfg, ``LeanRV64D.Register.pma_regions,
+   ``LeanRV64D.Register.htif_tohost_base, ``LeanRV64D.Register.elp, ``LeanRV64D.Register.senvcfg,
+   ``LeanRV64D.Register.scounteren, ``LeanRV64D.Register.mcountinhibit,
+   ``LeanRV64D.Register.minstretcfg, ``LeanRV64D.Register.mcyclecfg,
+   ``LeanRV64D.Register.mstateen0, ``LeanRV64D.Register.sstateen0].any r.isConstOf
 
 /-- Name for the cell hypothesis of register `r`. -/
 def regHypName (r : Lean.Expr) : Name :=
@@ -614,6 +624,12 @@ def swpStepCore (x fn : Lean.Expr) (bind : Bool) : TacticM Unit := do
       -- quantifies over the answer instead of pinning it
       if rE.isAppOf ``LeanRV64D.Register.sig_seip || rE.isAppOf ``LeanRV64D.Register.sig_meip then
         evalTactic (← `(tactic| (iapply swp_readReg_any_bind; try (inext; iintro %$h:ident))))
+      -- the frozen configuration registers are read off the persistent
+      -- `hwConfig` bundle (`Hhw`), at their pinned value
+      else if isHwReg rE then
+        let rStx ← Lean.Elab.Term.exprToSyntax rE
+        let hw := mkIdent `Hhw
+        evalTactic (← `(tactic| (iapply (swp_readReg_hw_bind (r := $rStx) (h := rfl)); (first | iframe $hw:ident | iframe); try inext)))
       else
         evalTactic (← `(tactic| (iapply swp_readReg_bind; (first | iframe $h:ident | iframe); try (inext; iintro $h:ident))))
     else if n == ``LeanRV64D.writeReg then
@@ -621,7 +637,15 @@ def swpStepCore (x fn : Lean.Expr) (bind : Bool) : TacticM Unit := do
       if !bind then
         let stx ← Lean.Elab.Term.exprToSyntax x
         evalTactic (← `(tactic| rw [show ($stx) = (($stx) >>= pure) from (bind_pure _).symm]))
-      evalTactic (← `(tactic| (iapply swp_writeReg_bind; (first | iframe $h:ident | iframe); try (inext; iintro $h:ident))))
+      let rE := x.getAppArgs[0]!
+      if isHwReg rE then
+        -- a same-value write of a frozen register (the trap's `reset_elp`)
+        let rStx ← Lean.Elab.Term.exprToSyntax rE
+        let wStx ← Lean.Elab.Term.exprToSyntax x.getAppArgs[1]!
+        let hw := mkIdent `Hhw
+        evalTactic (← `(tactic| (iapply (swp_writeReg_hw_bind (r := $rStx) (v := $wStx) (h := by rfl)); (first | iframe $hw:ident | iframe); try inext)))
+      else
+        evalTactic (← `(tactic| (iapply swp_writeReg_bind; (first | iframe $h:ident | iframe); try (inext; iintro $h:ident))))
     else if n == ``LeanRV64D.ConcurrencyInterfaceV1.sail_mem_read then
       -- normalise the request's address arithmetic so the bytes frame, then
       -- read the access kind off the request: a fetch reads image bytes

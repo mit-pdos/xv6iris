@@ -208,8 +208,7 @@ theorem userret_user_state [CurCtx] (cpu : CPU) (P : UPtd) (M : Nat → List (Bi
   · iapply (userPtInv_uptSlot cpu P M).2
     iframe Hsatp Hpmpcfg_n Hpmpaddr_n Hslot Hum
     ipureintro; exact hwf
-  iframe Hstvec Hmie Hmideleg Hmedeleg Hmenvcfg Hmisa Hmseccfg Hpma_regions Hhtif_tohost_base Help Hsenvcfg
-    Hmcounteren Hscounteren Hmcountinhibit Hminstretcfg Hmcyclecfg Hmtimecmp
+  iframe Hstvec Hmie Hmideleg Hmedeleg Hmenvcfg Hhw Hmcounteren Hmtimecmp
   iexists mepc, stc
   iframe Hmepc Hstimecmp
 

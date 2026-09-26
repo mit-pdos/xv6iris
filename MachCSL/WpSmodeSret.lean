@@ -54,12 +54,12 @@ theorem execSpecF_sret (cpu : CPU) (c : MConf) (hok : SConfPhys (GF := GF) c fal
   swp_run 300
   simp only [update_bit0_eq]
   ihave HmConf := confCells_intro cpu (DFrac.own 1) Privilege.Supervisor { c with mstatus := sretMs c.mstatus }
-    $$ [Hcur_privilege Hhart_state Hmisa Hmstatus Hmie Hmideleg Hmedeleg Hmepc Hsatp Hmenvcfg Hmcounteren
-        Hscounteren Hmtimecmp Hstimecmp Hpmpcfg_n Hpmpaddr_n Hmseccfg Help Hsenvcfg
-        Hmcountinhibit Hminstretcfg Hmcyclecfg Hpma_regions Hhtif_tohost_base]
+    $$ [Hcur_privilege Hhart_state Hmstatus Hmie Hmideleg Hmedeleg Hmepc Hsatp Hmenvcfg Hmcounteren
+        Hmtimecmp Hstimecmp Hpmpcfg_n Hpmpaddr_n]
   case' _ =>
     simp only [sretMs]
-    iframe
+    iframe; try iframe Hhw
+    try iexact Hhw
   iapply HΦ $$ HmConf HPC HnextPC [HF Hsepc]
   iframe HF Hsepc
 

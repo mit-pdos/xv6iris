@@ -160,22 +160,23 @@ theorem bootEntry_rest_cells (cpu : CPU) (f : RegFile) (hres : resetRegs cpu f) 
 `resetRegs`, are `Xv6.wp_boot_body`'s configuration, hart id, clock, program
 counter and GPR inputs, plus the rest of the file. -/
 theorem bootEntryPre (cpu : CPU) (f : RegFile) (hres : resetRegs cpu f) :
-    regCellsNoPins (GF := GF) (regName (hlc := hlc) (GF := GF) cpu) f ⊢
-      mBoot cpu (DFrac.own 1) ∗
+    regCellsNoPins (GF := GF) (regName (hlc := hlc) (GF := GF) cpu) f ⊢ |==>
+      (mBoot cpu (DFrac.own 1) ∗
       Register.mhartid ↦ᵣ[cpu] hartId cpu ∗ clockCells cpu ∗ pcIs cpu KA.«_entry» ∗
       Register.x1 ↦ᵣ[cpu] f .x1 ∗ Register.x2 ↦ᵣ[cpu] f .x2 ∗ Register.x4 ↦ᵣ[cpu] f .x4 ∗
       Register.x8 ↦ᵣ[cpu] f .x8 ∗ Register.x10 ↦ᵣ[cpu] f .x10 ∗
       Register.x11 ↦ᵣ[cpu] f .x11 ∗ Register.x14 ↦ᵣ[cpu] f .x14 ∗
       Register.x15 ↦ᵣ[cpu] f .x15 ∗
-      regCellsEx (regName (hlc := hlc) (GF := GF) cpu) f bootEntryTaken := by
+      regCellsEx (regName (hlc := hlc) (GF := GF) cpu) f bootEntryTaken) := by
   rw [regCellsNoPins_ex]
   iintro H
   icases regCellsEx_takeListAt cpu f bootEntryRegs
     [Register.sig_meip, Register.sig_seip] (by decide) (by decide) $$ H with ⟨Hl, H⟩
   unfold bootEntryRegs
   icases BigSepL.bigSepL_append.1 $$ Hl with ⟨Hc, Hl⟩
-  ihave Hm := mBoot_of_cells cpu f hres $$ Hc
+  imod mBoot_of_cells cpu f hres $$ Hc with Hm
   icases bootEntry_rest_cells cpu f hres $$ Hl with ⟨Hh, Hck, Hpc, H1, H2, H4, H8, H10, H11, H14, H15⟩
+  imodintro
   unfold bootEntryTaken bootEntryRegs
   iframe Hm Hh Hck Hpc H1 H2 H4 H8 H10 H11 H14 H15 H
 
@@ -211,14 +212,14 @@ theorem bootEntryPre_ofEra (E : EraGS) (gen : Nat) (cP : CPU → BitVec 64 → I
     (cI : ∀ cpu : CPU, ⊢ cP cpu 0#64)
     (σ : MState) (hbf : bootFacts σ) (cpu : CPU) :
     letI : MachGS hlc GF := MachGS.ofEra E gen cP cI
-    regCellsNoPins (GF := GF) (E.regName cpu) (σ.regs cpu) ⊢
-      mBoot cpu (DFrac.own 1) ∗
+    regCellsNoPins (GF := GF) (E.regName cpu) (σ.regs cpu) ⊢ |==>
+      (mBoot cpu (DFrac.own 1) ∗
       Register.mhartid ↦ᵣ[cpu] hartId cpu ∗ clockCells cpu ∗ pcIs cpu KA.«_entry» ∗
       Register.x1 ↦ᵣ[cpu] σ.regs cpu .x1 ∗ Register.x2 ↦ᵣ[cpu] σ.regs cpu .x2 ∗
       Register.x4 ↦ᵣ[cpu] σ.regs cpu .x4 ∗ Register.x8 ↦ᵣ[cpu] σ.regs cpu .x8 ∗
       Register.x10 ↦ᵣ[cpu] σ.regs cpu .x10 ∗ Register.x11 ↦ᵣ[cpu] σ.regs cpu .x11 ∗
       Register.x14 ↦ᵣ[cpu] σ.regs cpu .x14 ∗ Register.x15 ↦ᵣ[cpu] σ.regs cpu .x15 ∗
-      regCellsEx (E.regName cpu) (σ.regs cpu) bootEntryTaken :=
+      regCellsEx (E.regName cpu) (σ.regs cpu) bootEntryTaken) :=
   letI : MachGS hlc GF := MachGS.ofEra E gen cP cI
   bootEntryPre cpu (σ.regs cpu) (hbf.2.2.2.1 cpu)
 

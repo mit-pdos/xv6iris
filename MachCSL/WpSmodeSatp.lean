@@ -29,12 +29,12 @@ set_option maxHeartbeats 4000000 in
 the value. -/
 theorem swp_write_CSR_satp_sv39 (cpu : CPU) (dq : DFrac) (ms s0 : BitVec 64) (root : BitVec 44)
     (hSXL : BitVec.extractLsb' 34 2 ms = 2#2) (Φ : Result (BitVec 64) Unit → IProp GF) :
-    Register.misa ↦ᵣ[cpu]{dq} 0x800000000014112D#64 ∗ Register.mstatus ↦ᵣ[cpu]{dq} ms ∗
+    hwConfig cpu ∗ Register.mstatus ↦ᵣ[cpu]{dq} ms ∗
     Register.satp ↦ᵣ[cpu] s0 ∗
-    ▷ (Register.misa ↦ᵣ[cpu]{dq} 0x800000000014112D#64 -∗ Register.mstatus ↦ᵣ[cpu]{dq} ms -∗
+    ▷ (Register.mstatus ↦ᵣ[cpu]{dq} ms -∗
         Register.satp ↦ᵣ[cpu] (satpOf KTier.kpt root) -∗ Φ (.Ok (satpOf KTier.kpt root)))
     ⊢ swp cpu (write_CSR 0x180#12 (satpOf KTier.kpt root)) Φ := by
-  iintro ⟨Hmisa, Hmstatus, Hsatp, HΦ⟩
+  iintro ⟨#Hhw, Hmstatus, Hsatp, HΦ⟩
   unfold satpOf
   swp_run 120
   rw [ppn_setW]
@@ -44,7 +44,7 @@ theorem swp_write_CSR_satp_sv39 (cpu : CPU) (dq : DFrac) (ms s0 : BitVec 64) (ro
   have hmode : BitVec.extractLsb' 60 4 (524288#20 +++ root) = 8#4 := by bv_decide
   rw [hid, hmode]
   swp_run 60
-  iapply HΦ $$ Hmisa Hmstatus Hsatp
+  iapply HΦ $$ Hmstatus Hsatp
 
 set_option maxHeartbeats 4000000 in
 /-- The execute stage of `csrw satp, rs1` with an Sv39 kernel root in `rs1`:
@@ -65,7 +65,7 @@ theorem execSpecF_csrw_satp_sv39 (cpu : CPU) (c : MConf) (sie : Bool) (hok : SCo
   swp_run 30
   iapply swp_bind
   iapply swp_rX_file
-  iframe
+  iframe; try iframe Hhw
   iintro HF
   rw [hv]
   try unfold doCSR
@@ -74,18 +74,17 @@ theorem execSpecF_csrw_satp_sv39 (cpu : CPU) (c : MConf) (sie : Bool) (hok : SCo
   subst hW
   iapply swp_bind
   iapply swp_write_CSR_satp_sv39 (hSXL := hSXL)
-  iframe
+  iframe; try iframe Hhw
   inext
-  iintro Hmisa Hmstatus Hsatp
+  iintro Hmstatus Hsatp
   swp_run 30
   unfold wX_bits wX
   simp only [Sail.BitVec.toNatInt, Int.ofNat_eq_natCast, Int.toNat_natCast]
   swp_run 80
   ihave HmConf := confCells_intro cpu (DFrac.own 1) Privilege.Supervisor { c with satp := satpOf KTier.kpt root }
-    $$ [Hcur_privilege Hhart_state Hmisa Hmstatus Hmie Hmideleg Hmedeleg Hmepc Hsatp Hmenvcfg Hmcounteren
-        Hscounteren Hmtimecmp Hstimecmp Hpmpcfg_n Hpmpaddr_n Hmseccfg Help Hsenvcfg
-        Hmcountinhibit Hminstretcfg Hmcyclecfg Hpma_regions Hhtif_tohost_base]
-  case' _ => iframe
+    $$ [Hcur_privilege Hhart_state Hmstatus Hmie Hmideleg Hmedeleg Hmepc Hsatp Hmenvcfg Hmcounteren
+        Hmtimecmp Hstimecmp Hpmpcfg_n Hpmpaddr_n]
+  case' _ => (iframe; try iexact Hhw)
   iapply HΦ $$ HmConf HPC HnextPC HF
 
 /-! ## Moving resources from the Bare tier to the kernel table

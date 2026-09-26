@@ -193,11 +193,10 @@ theorem swp_handle_interrupt_S (cpu : CPU) (c : MConf) (i : InterruptType)
   swp_run 200
   rw [show redirect_callback h = () from rfl]
   unfold trapConf
-  ihave HmConf := confCells_intro _ _ _ { c with mstatus := trapMs c.mstatus } $$ [Hcur_privilege Hhart_state Hmisa Hmstatus Hmie
-    Hmideleg Hmedeleg Hmepc Hsatp Hmenvcfg Hmcounteren Hscounteren Hmtimecmp Hstimecmp Hpmpcfg_n
-    Hpmpaddr_n Hmseccfg Help Hsenvcfg Hmcountinhibit Hminstretcfg
-    Hmcyclecfg Hpma_regions Hhtif_tohost_base]
-  case' _ => iframe
+  ihave HmConf := confCells_intro _ _ _ { c with mstatus := trapMs c.mstatus } $$ [Hcur_privilege Hhart_state Hmstatus Hmie
+    Hmideleg Hmedeleg Hmepc Hsatp Hmenvcfg Hmcounteren Hmtimecmp Hstimecmp Hpmpcfg_n
+    Hpmpaddr_n]
+  case' _ => (iframe; try iexact Hhw)
   iapply HΦ $$ HmConf HPC HnextPC Hstvec Hsepc Hscause Hstval
 
 end MachCSL

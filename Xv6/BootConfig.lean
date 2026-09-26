@@ -18,8 +18,9 @@ GPRs.  This file is that conversion, and it has three halves:
   the named cells apart off a decidable `NoDup`).  A taken register's
   freshness is a `decide` on a short list.
 * §2 `bootConfRegs` / `mBoot_of_cells`: the configuration cells at the
-  values `resetRegs` pins are exactly `mBoot cpu 1` (Rocq
-  `hw_config_intro`/`mmode_config_intro`).
+  values `resetRegs` pins are exactly `mBoot cpu 1`, the frozen ones
+  persisted into `MachCSL.hwConfig` (Rocq `hw_config_intro`/
+  `mmode_config_intro`).
 
 DEVIATIONS from Rocq (none process-layer):
 1. NO `boot_D`.  Rocq's adequacy allocates each era's register map at an
@@ -28,11 +29,12 @@ DEVIATIONS from Rocq (none process-layer):
    (`MachCSL.regs_alloc_one` over `MachCSL.allRegs`, all 180 registers) and
    hands all of it but the two wire pins to the client, so there is no
    domain to state and nothing a spec can ask for that is missing.
-2. NO `hw_config`/`mmode_config` bundles, hence no persisting of frozen
-   cells here: Lean's machine-mode configuration is `MachCSL.mBoot`
-   (= `mConf cpu dq bootConf`), owned (not persistent), and the PMA/PMP
-   facts Rocq's §1 proves (`pma_allows_all_pma_boot`) are
-   `MachCSL.bootConf_ok` (MConf.lean), stated once at the framework level.
+2. NO separate `mmode_config` bundle: Lean's machine-mode configuration is
+   `MachCSL.mBoot` (= `mConf cpu dq bootConf`), which carries the persistent
+   `MachCSL.hwConfig` (Rocq `hw_config`, minted here by persisting the
+   frozen reset cells, D52), and the PMA/PMP facts Rocq's §1 proves
+   (`pma_allows_all_pma_boot`) are `MachCSL.bootConf_ok` (MConf.lean),
+   stated once at the framework level.
 3. NO GPR-file builder (`boot_gpr_file`): `Xv6.wp_boot_body` takes its
    eight GPRs as individual cells, so the whole-file form is only needed at
    the M->S bridge (`Xv6.BootBridge`), which takes it as `gprFile`.
@@ -154,12 +156,11 @@ end
 
 /-! ## §2 The configuration cells at the reset values -/
 
-/-- The registers `MachCSL.confCells` is stated over, in its order. -/
+/-- The registers `MachCSL.confCells` is stated over, in its order: the
+kernel-written cells, then the frozen ones of `MachCSL.hwConfig`. -/
 def bootConfRegs : List Register :=
-  [.cur_privilege, .hart_state, .misa, .mstatus, .mie, .mideleg, .medeleg, .mepc, .satp,
-   .menvcfg, .mcounteren, .scounteren, .mtimecmp, .stimecmp, .pmpcfg_n, .pmpaddr_n,
-   .mseccfg, .elp, .senvcfg, .mcountinhibit, .minstretcfg, .mcyclecfg, .pma_regions,
-   .htif_tohost_base]
+  [.cur_privilege, .hart_state, .mstatus, .mie, .mideleg, .medeleg, .mepc, .satp,
+   .menvcfg, .mcounteren, .mtimecmp, .stimecmp, .pmpcfg_n, .pmpaddr_n] ++ hwRegs
 
 theorem bootConfRegs_nodup : bootConfRegs.Nodup := by decide
 
@@ -168,42 +169,52 @@ variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF]
 
 /-- **The reset configuration cells ARE `mBoot`** (Rocq `hw_config_intro` +
 `mmode_config_intro`): every register `MachCSL.confCells` names is pinned by
-`resetRegs` to `bootConf`'s value. -/
+`resetRegs` to `bootConf`'s value, and the frozen ones are persisted into
+`MachCSL.hwConfig` (at the reset file's `mhpmcounter`, which reset leaves
+arbitrary). -/
 theorem mBoot_of_cells (cpu : CPU) (f : RegFile) (hres : resetRegs cpu f) :
-    ([∗list] r ∈ bootConfRegs, regPointsTo (GF := GF) cpu r (DFrac.own 1) (f r)) ⊢ mBoot cpu (DFrac.own 1) := by
+    ([∗list] r ∈ bootConfRegs, regPointsTo (GF := GF) cpu r (DFrac.own 1) (f r)) ⊢
+      |==> mBoot cpu (DFrac.own 1) := by
   have e1 := hres .cur_privilege _ rfl
   have e2 := hres .hart_state _ rfl
-  have e3 := hres .misa _ rfl
-  have e4 := hres .mstatus _ rfl
-  have e5 := hres .mie _ rfl
-  have e6 := hres .mideleg _ rfl
-  have e7 := hres .medeleg _ rfl
-  have e8 := hres .mepc _ rfl
-  have e9 := hres .satp _ rfl
-  have e10 := hres .menvcfg _ rfl
-  have e11 := hres .mcounteren _ rfl
-  have e12 := hres .scounteren _ rfl
-  have e13 := hres .mtimecmp _ rfl
-  have e14 := hres .stimecmp _ rfl
-  have e15 := hres .pmpcfg_n _ rfl
-  have e16 := hres .pmpaddr_n _ rfl
-  have e17 := hres .mseccfg _ rfl
-  have e18 := hres .elp _ rfl
-  have e19 := hres .senvcfg _ rfl
-  have e20 := hres .mcountinhibit _ rfl
-  have e21 := hres .minstretcfg _ rfl
-  have e22 := hres .mcyclecfg _ rfl
-  have e23 := hres .pma_regions _ rfl
-  have e24 := hres .htif_tohost_base _ rfl
-  simp only [bootConfRegs, Iris.Algebra.BigOpL.bigOpL_cons, Iris.Algebra.BigOpL.bigOpL_nil, e1, e2, e3, e4, e5, e6, e7, e8,
-    e9, e10, e11, e12, e13, e14, e15, e16, e17, e18, e19, e20, e21, e22, e23, e24]
+  have e3 := hres .mstatus _ rfl
+  have e4 := hres .mie _ rfl
+  have e5 := hres .mideleg _ rfl
+  have e6 := hres .medeleg _ rfl
+  have e7 := hres .mepc _ rfl
+  have e8 := hres .satp _ rfl
+  have e9 := hres .menvcfg _ rfl
+  have e10 := hres .mcounteren _ rfl
+  have e11 := hres .mtimecmp _ rfl
+  have e12 := hres .stimecmp _ rfl
+  have e13 := hres .pmpcfg_n _ rfl
+  have e14 := hres .pmpaddr_n _ rfl
+  have h1 := hres .misa _ rfl
+  have h2 := hres .mseccfg _ rfl
+  have h3 := hres .pma_regions _ rfl
+  have h4 := hres .htif_tohost_base _ rfl
+  have h5 := hres .elp _ rfl
+  have h6 := hres .senvcfg _ rfl
+  have h7 := hres .scounteren _ rfl
+  have h8 := hres .mcountinhibit _ rfl
+  have h9 := hres .minstretcfg _ rfl
+  have h10 := hres .mcyclecfg _ rfl
+  have h11 := hres .mstateen0 _ rfl
+  have h12 := hres .sstateen0 _ rfl
+  simp only [bootConfRegs, hwRegs, List.cons_append, List.nil_append, Iris.Algebra.BigOpL.bigOpL_cons,
+    Iris.Algebra.BigOpL.bigOpL_nil, e1, e2, e3, e4, e5, e6, e7, e8, e9, e10, e11, e12, e13, e14,
+    h1, h2, h3, h4, h5, h6, h7, h8, h9, h10, h11, h12]
   unfold mBoot mConf confCells
   simp only [bootConf_mstatus, bootConf_mie, bootConf_mideleg, bootConf_medeleg, bootConf_mepc,
     bootConf_satp, bootConf_menvcfg, bootConf_mcounteren, bootConf_mtimecmp, bootConf_stimecmp,
     bootConf_pmpcfg, bootConf_pmpaddr]
-  iintro ⟨H1, H2, H3, H4, H5, H6, H7, H8, H9, H10, H11, H12, H13, H14, H15, H16, H17, H18, H19,
-    H20, H21, H22, H23, H24, -⟩
+  iintro ⟨H1, H2, H3, H4, H5, H6, H7, H8, H9, H10, H11, H12, H13, H14,
+    M1, M2, M3, M4, M5, M6, M7, M8, M9, M10, M11, M12, M13, -⟩
+  imod hwConfig_intro cpu (f .mhpmcounter) $$ [M1 M2 M3 M4 M5 M6 M7 M8 M9 M10 M11 M12 M13] with #Hhw
+  · iframe
+  imodintro
   iframe
+  iexact Hhw
 
 end
 

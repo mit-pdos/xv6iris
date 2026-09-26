@@ -29,9 +29,11 @@ anywhere a `UEXEC_GEN` is in scope.
 
 1. Rocq's functor `UexecGen (US : USER) : UEXEC_GEN` is the theorem
    `uexecWp_gen : USER → UEXEC_GEN` (SpecUser deviation 4).
-2. No `hw_config`/`minstret_inv` to pass through (SpecUser deviation 1); the
-   residue-token accessor `hRut` is the slot's pure premise, handed to
-   `USER` as its Lean-level hypothesis (UexecWp deviation 4).
+2. No `minstret_inv` to pass through (SpecUser deviation 1).  `USER`'s
+   `hw_config` premise is taken off the slot's `userCfg` (which carries the
+   persistent `hwConfig`, UserExec deviation 1) rather than off a threaded
+   `uv_amb`; the residue-token accessor `hRut` is the slot's pure premise,
+   handed to `USER` as its Lean-level hypothesis (UexecWp deviation 4).
 -/
 import Xv6.UexecWp
 
@@ -60,7 +62,8 @@ theorem uexecWp_gen (US : USER) : UEXEC_GEN where
       isplitl [Hframe]
       · iexact Hframe
       · iexact IH
-    iapply (@USER.wp_user_exec_closed US hlc GF _ xi h C pt Rut hRut) $$ Hwire [Hregs Hpt Hcfg Hrut] Hhandler
+    icases @userCfg_hw hlc GF _ h C $$ Hcfg with ⟨Hcfg, #Hhw⟩
+    iapply (@USER.wp_user_exec_closed US hlc GF _ xi h C pt Rut hRut) $$ Hhw Hwire [Hregs Hpt Hcfg Hrut] Hhandler
     -- the concrete state, packed into the loop invariant: ACTIVE (so
     -- `userHartOk` is `True` and PC/nextPC are `va` both), the mstatus pins
     -- from the slot's premise, and the pinned image `M` FORGOTTEN -- exactly

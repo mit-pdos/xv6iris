@@ -384,15 +384,16 @@ def drefMisa : (r : Register) → Option (RegisterType r)
   | .misa => some 0x800000000014112D#64
   | _ => none
 
-theorem misa_drefMisa_acc (cpu : CPU) (dq : DFrac) (r : Register) (v : RegisterType r)
+theorem misa_drefMisa_acc (cpu : CPU) (r : Register) (v : RegisterType r)
     (hv : drefMisa r = some v) :
-    Register.misa ↦ᵣ[cpu]{dq} 0x800000000014112D#64 ⊢@{IProp GF}
-      (r ↦ᵣ[cpu]{dq} v ∗ (r ↦ᵣ[cpu]{dq} v -∗ Register.misa ↦ᵣ[cpu]{dq} 0x800000000014112D#64)) := by
+    hwConfig cpu ⊢@{IProp GF} ∃ dq : DFrac, r ↦ᵣ[cpu]{dq} v ∗ (r ↦ᵣ[cpu]{dq} v -∗ hwConfig cpu) := by
   cases r <;> simp only [drefMisa, Option.some.injEq, reduceCtorEq] at hv
   subst hv
-  iintro H
-  iframe H
-  iintro H
+  iintro #H
+  iexists DFrac.discard
+  isplitr
+  · iapply hwConfig_reg cpu _ _ rfl $$ H
+  iintro -
   iexact H
 
 /-- The `MPP` field of the legalised value's input, as the model reads it. -/
@@ -427,10 +428,9 @@ theorem legalize_mstatus_walk3 (o L : BitVec 64) (hL : BitVec.extractLsb' 11 2 L
 
 /-- `legalize_mstatus o L` with a nominal `MPP`: it reads `misa` and returns
 `mstatusLegalize o L`. -/
-theorem swp_legalize_mstatus (cpu : CPU) (dq : DFrac) (o L : BitVec 64)
+theorem swp_legalize_mstatus (cpu : CPU) (o L : BitVec 64)
     (hmpp : BitVec.extractLsb' 11 2 L ≠ 2#2) (Φ : BitVec 64 → IProp GF) :
-    Register.misa ↦ᵣ[cpu]{dq} 0x800000000014112D#64 ∗
-    ▷ (Register.misa ↦ᵣ[cpu]{dq} 0x800000000014112D#64 -∗ Φ (mstatusLegalize o L))
+    hwConfig cpu ∗ ▷ Φ (mstatusLegalize o L)
     ⊢ swp cpu (legalize_mstatus o L) Φ := by
   have h3 : ∀ x : BitVec 2, x ≠ 2#2 → x = 0#2 ∨ x = 1#2 ∨ x = 3#2 := by decide
   have hw : runRead drefMisa (legalize_mstatus o L) = some (mstatusLegalize o L, true) := by
@@ -438,28 +438,32 @@ theorem swp_legalize_mstatus (cpu : CPU) (dq : DFrac) (o L : BitVec 64)
     · exact legalize_mstatus_walk0 o L hm
     · exact legalize_mstatus_walk1 o L hm
     · exact legalize_mstatus_walk3 o L hm
-  have := swp_runRead cpu dq drefMisa _ (misa_drefMisa_acc cpu dq) _ _ true hw Φ
-  simpa only [laterIf, ite_true] using this
+  have := swp_runRead cpu drefMisa _ (misa_drefMisa_acc cpu) _ _ true hw Φ
+  simp only [laterIf, ite_true] at this
+  iintro ⟨#Hhw, HΦ⟩
+  iapply this
+  iframe Hhw
+  inext
+  iintro -
+  iexact HΦ
 
 /-- `write_CSR sstatus v` with a nominal `MPP`: `mstatus` becomes
 `mstatusLegalize mstatus (lift_sstatus mstatus v)`. -/
-theorem swp_write_CSR_sstatus (cpu : CPU) (dq : DFrac) (o v : BitVec 64)
+theorem swp_write_CSR_sstatus (cpu : CPU) (o v : BitVec 64)
     (hmpp : BitVec.extractLsb' 11 2 o ≠ 2#2) (Φ : Result (BitVec 64) Unit → IProp GF) :
-    Register.misa ↦ᵣ[cpu]{dq} 0x800000000014112D#64 ∗ Register.mstatus ↦ᵣ[cpu] o ∗
-    ▷ (Register.misa ↦ᵣ[cpu]{dq} 0x800000000014112D#64 -∗
-        Register.mstatus ↦ᵣ[cpu] mstatusLegalize o (lift_sstatus o (Mk_Sstatus (zero_extend (m := 64) v))) -∗
+    hwConfig cpu ∗ Register.mstatus ↦ᵣ[cpu] o ∗
+    ▷ (Register.mstatus ↦ᵣ[cpu] mstatusLegalize o (lift_sstatus o (Mk_Sstatus (zero_extend (m := 64) v))) -∗
         Φ (.Ok (lower_mstatus (mstatusLegalize o (lift_sstatus o (Mk_Sstatus (zero_extend (m := 64) v)))))))
     ⊢ swp cpu (write_CSR 0x100#12 v) Φ := by
-  iintro ⟨Hmisa, Hmstatus, HΦ⟩
+  iintro ⟨#Hhw, Hmstatus, HΦ⟩
   rw [write_CSR_sstatus]
   swp_run 2
   iapply swp_bind
-  iapply (swp_legalize_mstatus cpu dq o _ (by rw [lift_sstatus_mpp]; exact hmpp))
-  iframe Hmisa
+  iapply (swp_legalize_mstatus cpu o _ (by rw [lift_sstatus_mpp]; exact hmpp))
+  iframe Hhw
   inext
-  iintro Hmisa
   swp_run 5
-  iapply HΦ $$ Hmisa Hmstatus
+  iapply HΦ $$ Hmstatus
 
 /-- The 2-bit extension status is `Dirty` iff it is `3`. -/
 theorem extStatus_dirty_iff (x : BitVec 2) : (extStatus_map_backwards x == ExtStatus.Dirty) = (x == 3#2) := by

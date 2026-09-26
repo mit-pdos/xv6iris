@@ -55,19 +55,19 @@ theorem swp_legalize_tvec_direct (cpu : CPU) (o v : BitVec 64) (hd : stvecDirect
 set_option maxHeartbeats 4000000 in
 /-- `write_CSR stvec v` with `v` a direct-mode vector: legalization keeps
 `v`. -/
-theorem swp_write_CSR_stvec (cpu : CPU) (dq : DFrac) (o v : BitVec 64) (hd : stvecDirect v)
+theorem swp_write_CSR_stvec (cpu : CPU) (o v : BitVec 64) (hd : stvecDirect v)
     (Φ : Result (BitVec 64) Unit → IProp GF) :
-    Register.misa ↦ᵣ[cpu]{dq} 0x800000000014112D#64 ∗ Register.stvec ↦ᵣ[cpu] o ∗
-    ▷ (Register.misa ↦ᵣ[cpu]{dq} 0x800000000014112D#64 -∗ Register.stvec ↦ᵣ[cpu] v -∗ Φ (.Ok v))
+    hwConfig cpu ∗ Register.stvec ↦ᵣ[cpu] o ∗
+    ▷ (Register.stvec ↦ᵣ[cpu] v -∗ Φ (.Ok v))
     ⊢ swp cpu (write_CSR 0x105#12 v) Φ := by
-  iintro ⟨Hmisa, Hstvec, HΦ⟩
+  iintro ⟨#Hhw, Hstvec, HΦ⟩
   rw [write_CSR_stvec]
   swp_run 2
   iapply swp_bind
   iapply swp_bind
   iapply (swp_legalize_tvec_direct cpu o v hd)
   swp_run 40
-  iapply HΦ $$ Hmisa Hstvec
+  iapply HΦ $$ Hstvec
 
 set_option maxHeartbeats 4000000 in
 /-- The execute stage of `csrw stvec, rs1` (its value a
@@ -96,9 +96,9 @@ theorem execSpecF_csrw_stvec (cpu : CPU) (c : MConf) (sie : Bool) (hok : SConfPh
   subst hW
   iapply swp_bind
   iapply swp_write_CSR_stvec (hd := hd)
-  iframe
+  iframe; iframe Hhw
   inext
-  iintro Hmisa Hstvec
+  iintro Hstvec
   swp_run 30
   unfold wX_bits wX
   simp only [Sail.BitVec.toNatInt, Int.ofNat_eq_natCast, Int.toNat_natCast]

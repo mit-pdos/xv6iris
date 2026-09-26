@@ -6,6 +6,9 @@ The machine may run WHATEVER user code the mapped pages hold, forever, and the
 only exit is a trap into the kernel handler at `stvec`.  In the order the
 wands take it:
 
+* `hwConfig cpu` -- the hart's read-only hardware configuration (Rocq
+  `hw_config`, MachCSL/HwConfig.lean): the platform constants and every
+  configuration register frozen at reset, persistent (D52).
 * `wireInv` -- the SHARED interrupt-wire invariant: the device loop writes the
   external-interrupt wires concurrently, so a user arm may only BORROW them
   across a step.  Interrupts are unmaskable at User.
@@ -31,9 +34,9 @@ hypotheses, as in Rocq.
 
 ## Deviations from Rocq
 
-1. **No `hw_config` / `minstret_inv` wands** (UserExec deviations 1–2):
-   MachCSL owns the frozen configuration cells exclusively, so they ride
-   `userCfg` inside `userInv`/`userTrapFrame`; `minstret_inv` is `emp`.
+1. **No `minstret_inv` wand** (UserExec deviation 2: Rocq defines it as
+   `emp`).  The `hw_config` wand IS here (D52); `userCfg` also carries a
+   persistent copy (UserExec deviation 1).
 2. The accessor lends MachCSL's running token `ctxToken cpu` (the ambient
    context's token WITH the hart's reservation fragment, UserExec deviation 3)
    -- Rocq's `own_context cur_ctx`.
@@ -54,7 +57,7 @@ open Iris Iris.BI Iris.ProofMode MachCSL
 def wpUserExecClosedBody {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CurCtx]
     (cpu : CPU) (C : UCfg) (pt : UPtd) (Rut : UPtd → IProp GF) : Prop :=
   (∀ pt' : UPtd, Rut pt' ⊢ ctxToken cpu ∗ (ctxToken cpu -∗ Rut pt')) →
-  ⊢ wireInv -∗ userInv cpu C pt Rut -∗ ▷ stvecHandlerWp cpu C pt Rut -∗ wpLoop cpu
+  ⊢ hwConfig cpu -∗ wireInv -∗ userInv cpu C pt Rut -∗ ▷ stvecHandlerWp cpu C pt Rut -∗ wpLoop cpu
 
 /-- **Rocq `Module Type USER`**: the one assumed interface D24 allows. -/
 structure USER : Prop where

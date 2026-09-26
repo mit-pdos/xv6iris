@@ -217,19 +217,20 @@ theorem bootShared_harts (σ : MState) (hbf : bootFacts σ) :
   iintro ⟨#Hk, #Hg⟩ Ht Hr Hl Hs Hc
   icases ctxTokAt_viewLb0_list (MachGS.era (hlc := hlc) (GF := GF)) cpus $$ Ht with ⟨Ht, Hv⟩
   imod bootCarve_harts (GF := GF) $$ Hk Hv Hs Hc with Hb
-  imodintro
   ihave H := BigSepL.bigSepL_sep_eqv.2 $$ [Hl Hb]
   · iframe Hl Hb
   ihave H := BigSepL.bigSepL_sep_eqv.2 $$ [Hr H]
   · iframe Hr H
   ihave H := BigSepL.bigSepL_sep_eqv.2 $$ [Ht H]
   · iframe Ht H
+  iapply BigSepL.bigSepL_bupd
   iapply BigSepL.bigSepL_impl $$ H
   imodintro
   iintro %k %c %_ ⟨Ht1, Hr1, Hl1, Hb1⟩
-  iframe Ht1
-  iapply bootHartRes_intro (GF := GF) (σ.regs c) c (hbf.2.2.2.1 c)
-  iframe Hr1 Hl1 Hg Hb1
+  imod bootHartRes_intro (GF := GF) (σ.regs c) c (hbf.2.2.2.1 c) $$ [Hr1 Hl1 Hb1] with HB
+  · iframe Hr1 Hl1 Hg Hb1
+  imodintro
+  iframe Ht1 HB
 
 /-- **The handover cell** (Rocq's `started` row of `boot_bss_carve`): the
 `.bss` word `started`, never written, as `started_alloc`'s window. -/

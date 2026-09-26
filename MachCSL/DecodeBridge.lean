@@ -117,13 +117,14 @@ theorem laterIf_of_later (b : Bool) (Q : IProp GF) : Q ⊢ laterIf b Q := by
     iexact H
 
 /-- The walk lemma: if `m` walks to `x` on `dref`, then owning the
-`dref`-registers (through any resource `P` that hands each of them out and
-takes it back) gives `swp cpu m Φ` from `Φ x`, under a later iff an event was
+`dref`-registers (through any resource `P` that hands each of them out, at
+some fraction -- the frozen ones persistently, off `hwConfig` -- and takes it
+back) gives `swp cpu m Φ` from `Φ x`, under a later iff an event was
 taken.  Proved once, by induction on the computation. -/
-theorem swp_runRead (cpu : CPU) (dq : DFrac) (dref : (r : Register) → Option (RegisterType r))
+theorem swp_runRead (cpu : CPU) (dref : (r : Register) → Option (RegisterType r))
     (P : IProp GF)
     (hacc : ∀ (r : Register) (v : RegisterType r), dref r = some v →
-      P ⊢ (r ↦ᵣ[cpu]{dq} v ∗ (r ↦ᵣ[cpu]{dq} v -∗ P)))
+      P ⊢ ∃ dq : DFrac, r ↦ᵣ[cpu]{dq} v ∗ (r ↦ᵣ[cpu]{dq} v -∗ P))
     {X : Type} (m : SailM X) (x : X) (b : Bool) (h : runRead dref m = some (x, b))
     (Φ : X → IProp GF) :
     P ∗ laterIf b iprop(P -∗ Φ x) ⊢ swp cpu m Φ := by
@@ -165,7 +166,7 @@ theorem swp_runRead (cpu : CPU) (dq : DFrac) (dref : (r : Register) → Option (
           subst hx
           show P ∗ iprop(▷ (P -∗ Φ _)) ⊢ _
           iintro ⟨HP, HΦ⟩
-          icases (hacc r v hd) $$ HP with ⟨Hr, Hclose⟩
+          icases (hacc r v hd) $$ HP with ⟨%dq, Hr, Hclose⟩
           iapply swp_regRead_k cpu r dq v k Φ
           iframe Hr
           inext
@@ -235,15 +236,14 @@ theorem swp_runRead (cpu : CPU) (dq : DFrac) (dref : (r : Register) → Option (
 value, and take it back. -/
 theorem mConf_drefM_acc (cpu : CPU) (dq : DFrac) (c : MConf) (r : Register) (v : RegisterType r)
     (hv : drefM r = some v) :
-    mConf (GF := GF) cpu dq c ⊢ (r ↦ᵣ[cpu]{dq} v ∗ (r ↦ᵣ[cpu]{dq} v -∗ mConf (GF := GF) cpu dq c)) := by
+    mConf (GF := GF) cpu dq c ⊢
+      ∃ dq' : DFrac, r ↦ᵣ[cpu]{dq'} v ∗ (r ↦ᵣ[cpu]{dq'} v -∗ mConf (GF := GF) cpu dq c) := by
   cases r <;> simp only [drefM, Option.some.injEq, reduceCtorEq] at hv
-  all_goals (subst hv; iintro H; mconf_cases H)
-  all_goals
-    first
-    | (iframe Hcur_privilege; iintro Hcur_privilege)
-    | (iframe Hmisa; iintro Hmisa)
-    | (iframe Hmseccfg; iintro Hmseccfg)
-  all_goals (mconf_intro H; iexact H)
+  all_goals subst hv
+  all_goals first
+    | exact confCells_hw_acc cpu dq _ c _ _ rfl
+    | (iintro H; mconf_cases H; iexists dq; iframe Hcur_privilege; iintro Hcur_privilege;
+       mconf_intro H; iexact H)
 
 /-- The supervisor-mode reference map: what the decoder may read in
 supervisor mode (the prototype's `D_s` at `dstateS`); `menvcfg` at the
@@ -260,23 +260,23 @@ hand out each `drefS` register at its reference value, and take it back. -/
 theorem sConf_drefS_acc (cpu : CPU) (dq : DFrac) (c : MConf) (hm : c.menvcfg = menvcfgS)
     (r : Register) (v : RegisterType r) (hv : drefS r = some v) :
     confCells (GF := GF) cpu dq Privilege.Supervisor c ⊢
-      (r ↦ᵣ[cpu]{dq} v ∗ (r ↦ᵣ[cpu]{dq} v -∗ confCells (GF := GF) cpu dq Privilege.Supervisor c)) := by
+      ∃ dq' : DFrac, r ↦ᵣ[cpu]{dq'} v ∗
+        (r ↦ᵣ[cpu]{dq'} v -∗ confCells (GF := GF) cpu dq Privilege.Supervisor c) := by
   cases r <;> simp only [drefS, Option.some.injEq, reduceCtorEq] at hv
-  all_goals (subst hv; iintro H; conf_cases H)
-  all_goals
-    first
-    | (iframe Hcur_privilege; iintro Hcur_privilege)
-    | (iframe Hmisa; iintro Hmisa)
-    | (iframe Hmseccfg; iintro Hmseccfg)
-    | (rw [← hm]; iframe Hmenvcfg; iintro Hmenvcfg)
-  all_goals (conf_intro H; iexact H)
+  all_goals subst hv
+  all_goals first
+    | exact confCells_hw_acc cpu dq _ c _ _ rfl
+    | (iintro H; conf_cases H; iexists dq; iframe Hcur_privilege; iintro Hcur_privilege;
+       conf_intro H; iexact H)
+    | (iintro H; conf_cases H; iexists dq; rw [← hm]; iframe Hmenvcfg; iintro Hmenvcfg;
+       conf_intro H; iexact H)
 
 /-- A 32-bit decode fact, from the kernel's evaluation of the walk. -/
 theorem decodes32_bridge (cpu : CPU) (dq : DFrac) (c : MConf) (w : BitVec 32) (ast : instruction)
     (h : runRead drefM (ext_decode w) = some (ast, true)) :
     decodes32 (GF := GF) cpu dq c w ast := by
   intro Φ
-  exact swp_runRead cpu dq drefM (mConf (GF := GF) cpu dq c) (mConf_drefM_acc cpu dq c) (ext_decode w) ast true h Φ
+  exact swp_runRead cpu drefM (mConf (GF := GF) cpu dq c) (mConf_drefM_acc cpu dq c) (ext_decode w) ast true h Φ
 
 /-- A 32-bit decode fact in supervisor mode. -/
 theorem decodes32S_bridge (cpu : CPU) (dq : DFrac) (c : MConf) (hm : c.menvcfg = menvcfgS)
@@ -284,7 +284,7 @@ theorem decodes32S_bridge (cpu : CPU) (dq : DFrac) (c : MConf) (hm : c.menvcfg =
     (h : runRead drefS (ext_decode w) = some (ast, true)) :
     decodes32P (GF := GF) cpu dq Privilege.Supervisor c w ast := by
   intro Φ
-  exact swp_runRead cpu dq drefS (confCells (GF := GF) cpu dq Privilege.Supervisor c)
+  exact swp_runRead cpu drefS (confCells (GF := GF) cpu dq Privilege.Supervisor c)
     (sConf_drefS_acc cpu dq c hm) (ext_decode w) ast true h Φ
 
 /-- A 16-bit decode fact in supervisor mode. -/
@@ -293,7 +293,7 @@ theorem decodes16S_bridge (cpu : CPU) (dq : DFrac) (c : MConf) (hm : c.menvcfg =
     (h : runRead drefS (ext_decode_compressed h₁₆) = some (ast, true)) :
     decodes16P (GF := GF) cpu dq Privilege.Supervisor c h₁₆ ast := by
   intro Φ
-  exact swp_runRead cpu dq drefS (confCells (GF := GF) cpu dq Privilege.Supervisor c)
+  exact swp_runRead cpu drefS (confCells (GF := GF) cpu dq Privilege.Supervisor c)
     (sConf_drefS_acc cpu dq c hm) (ext_decode_compressed h₁₆) ast true h Φ
 
 /-- A 16-bit decode fact, from the kernel's evaluation of the walk. -/
@@ -301,7 +301,7 @@ theorem decodes16_bridge (cpu : CPU) (dq : DFrac) (c : MConf) (h₁₆ : BitVec 
     (h : runRead drefM (ext_decode_compressed h₁₆) = some (ast, true)) :
     decodes16 (GF := GF) cpu dq c h₁₆ ast := by
   intro Φ
-  exact swp_runRead cpu dq drefM (mConf (GF := GF) cpu dq c) (mConf_drefM_acc cpu dq c)
+  exact swp_runRead cpu drefM (mConf (GF := GF) cpu dq c) (mConf_drefM_acc cpu dq c)
     (ext_decode_compressed h₁₆) ast true h Φ
 
 /-- A word decodes wherever the kernel runs (both reference maps). -/

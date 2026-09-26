@@ -60,12 +60,12 @@ theorem execSpecP_mret (cpu : CPU) (c : MConf) (pc npc₀ : BitVec 64)
   swp_run 200
   simp only [update_bit0_eq]
   ihave HS := confCells_intro cpu (DFrac.own 1) Privilege.Supervisor { c with mstatus := mretMstatus c.mstatus }
-    $$ [Hcur_privilege Hhart_state Hmisa Hmstatus Hmie Hmideleg Hmedeleg Hmepc Hsatp Hmenvcfg Hmcounteren
-        Hscounteren Hmtimecmp Hstimecmp Hpmpcfg_n Hpmpaddr_n Hmseccfg Help Hsenvcfg
-        Hmcountinhibit Hminstretcfg Hmcyclecfg Hpma_regions Hhtif_tohost_base]
+    $$ [Hcur_privilege Hhart_state Hmstatus Hmie Hmideleg Hmedeleg Hmepc Hsatp Hmenvcfg Hmcounteren
+        Hmtimecmp Hstimecmp Hpmpcfg_n Hpmpaddr_n]
   case' _ =>
     simp only [mretMstatus]
-    iframe
+    iframe; try iframe Hhw
+    try iexact Hhw
   iapply HΦ $$ HS HPC HnextPC []
   ipureintro
   trivial
@@ -83,7 +83,7 @@ theorem wp_m_mret (cpu : CPU) (c : MConf) (hok : MConf.ok (GF := GF) c) (pc : Bi
   iintro ⟨HI, HmConf, Hclock, Hpc, HΦ⟩
   iapply wpLoop_m_instrP cpu (DFrac.own 1) c Privilege.Supervisor (Or.inr rfl) _ hok pc _ is_rvc _ _ _
     (execSpecP_mret cpu c pc _ hMPP hLPE)
-  iframe
+  iframe; try iframe Hhw
   isplitl []
   · ipureintro; trivial
   inext

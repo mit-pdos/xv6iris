@@ -41,7 +41,6 @@ with the hart state as a parameter). -/
 def confCellsHS (cpu : CPU) (dq : DFrac) (p : Privilege) (c : MConf) (hs : HartState) : IProp GF := iprop%
   Register.cur_privilege ↦ᵣ[cpu]{dq} p ∗
   Register.hart_state ↦ᵣ[cpu]{dq} hs ∗
-  Register.misa ↦ᵣ[cpu]{dq} 0x800000000014112D#64 ∗
   Register.mstatus ↦ᵣ[cpu]{dq} c.mstatus ∗
   Register.mie ↦ᵣ[cpu]{dq} c.mie ∗
   Register.mideleg ↦ᵣ[cpu]{dq} c.mideleg ∗
@@ -50,19 +49,11 @@ def confCellsHS (cpu : CPU) (dq : DFrac) (p : Privilege) (c : MConf) (hs : HartS
   Register.satp ↦ᵣ[cpu]{dq} c.satp ∗
   Register.menvcfg ↦ᵣ[cpu]{dq} c.menvcfg ∗
   Register.mcounteren ↦ᵣ[cpu]{dq} c.mcounteren ∗
-  Register.scounteren ↦ᵣ[cpu]{dq} 0#32 ∗
   Register.mtimecmp ↦ᵣ[cpu]{dq} c.mtimecmp ∗
   Register.stimecmp ↦ᵣ[cpu]{dq} c.stimecmp ∗
   Register.pmpcfg_n ↦ᵣ[cpu]{dq} c.pmpcfg ∗
   Register.pmpaddr_n ↦ᵣ[cpu]{dq} c.pmpaddr ∗
-  Register.mseccfg ↦ᵣ[cpu]{dq} 0#64 ∗
-  Register.elp ↦ᵣ[cpu]{dq} 0#1 ∗
-  Register.senvcfg ↦ᵣ[cpu]{dq} 0#64 ∗
-  Register.mcountinhibit ↦ᵣ[cpu]{dq} 0#32 ∗
-  Register.minstretcfg ↦ᵣ[cpu]{dq} 0#64 ∗
-  Register.mcyclecfg ↦ᵣ[cpu]{dq} 0#64 ∗
-  Register.pma_regions ↦ᵣ[cpu]{dq} bootPMA ∗
-  Register.htif_tohost_base ↦ᵣ[cpu]{dq} none
+  hwConfig cpu
 
 /-- At `HART_ACTIVE` the family is `confCells` itself. -/
 theorem confCellsHS_active (cpu : CPU) (dq : DFrac) (p : Privilege) (c : MConf) :
@@ -72,7 +63,6 @@ theorem confCellsHS_cases (cpu : CPU) (dq : DFrac) (p : Privilege) (c : MConf) (
     confCellsHS (GF := GF) cpu dq p c hs ⊢
     Register.cur_privilege ↦ᵣ[cpu]{dq} p ∗
     Register.hart_state ↦ᵣ[cpu]{dq} hs ∗
-    Register.misa ↦ᵣ[cpu]{dq} 0x800000000014112D#64 ∗
     Register.mstatus ↦ᵣ[cpu]{dq} c.mstatus ∗
     Register.mie ↦ᵣ[cpu]{dq} c.mie ∗
     Register.mideleg ↦ᵣ[cpu]{dq} c.mideleg ∗
@@ -81,25 +71,16 @@ theorem confCellsHS_cases (cpu : CPU) (dq : DFrac) (p : Privilege) (c : MConf) (
     Register.satp ↦ᵣ[cpu]{dq} c.satp ∗
     Register.menvcfg ↦ᵣ[cpu]{dq} c.menvcfg ∗
     Register.mcounteren ↦ᵣ[cpu]{dq} c.mcounteren ∗
-    Register.scounteren ↦ᵣ[cpu]{dq} 0#32 ∗
     Register.mtimecmp ↦ᵣ[cpu]{dq} c.mtimecmp ∗
     Register.stimecmp ↦ᵣ[cpu]{dq} c.stimecmp ∗
     Register.pmpcfg_n ↦ᵣ[cpu]{dq} c.pmpcfg ∗
     Register.pmpaddr_n ↦ᵣ[cpu]{dq} c.pmpaddr ∗
-    Register.mseccfg ↦ᵣ[cpu]{dq} 0#64 ∗
-    Register.elp ↦ᵣ[cpu]{dq} 0#1 ∗
-    Register.senvcfg ↦ᵣ[cpu]{dq} 0#64 ∗
-    Register.mcountinhibit ↦ᵣ[cpu]{dq} 0#32 ∗
-    Register.minstretcfg ↦ᵣ[cpu]{dq} 0#64 ∗
-    Register.mcyclecfg ↦ᵣ[cpu]{dq} 0#64 ∗
-    Register.pma_regions ↦ᵣ[cpu]{dq} bootPMA ∗
-    Register.htif_tohost_base ↦ᵣ[cpu]{dq} none := by
+    hwConfig cpu := by
   unfold confCellsHS; exact .rfl
 
 theorem confCellsHS_intro (cpu : CPU) (dq : DFrac) (p : Privilege) (c : MConf) (hs : HartState) :
     Register.cur_privilege ↦ᵣ[cpu]{dq} p ∗
     Register.hart_state ↦ᵣ[cpu]{dq} hs ∗
-    Register.misa ↦ᵣ[cpu]{dq} 0x800000000014112D#64 ∗
     Register.mstatus ↦ᵣ[cpu]{dq} c.mstatus ∗
     Register.mie ↦ᵣ[cpu]{dq} c.mie ∗
     Register.mideleg ↦ᵣ[cpu]{dq} c.mideleg ∗
@@ -108,19 +89,11 @@ theorem confCellsHS_intro (cpu : CPU) (dq : DFrac) (p : Privilege) (c : MConf) (
     Register.satp ↦ᵣ[cpu]{dq} c.satp ∗
     Register.menvcfg ↦ᵣ[cpu]{dq} c.menvcfg ∗
     Register.mcounteren ↦ᵣ[cpu]{dq} c.mcounteren ∗
-    Register.scounteren ↦ᵣ[cpu]{dq} 0#32 ∗
     Register.mtimecmp ↦ᵣ[cpu]{dq} c.mtimecmp ∗
     Register.stimecmp ↦ᵣ[cpu]{dq} c.stimecmp ∗
     Register.pmpcfg_n ↦ᵣ[cpu]{dq} c.pmpcfg ∗
     Register.pmpaddr_n ↦ᵣ[cpu]{dq} c.pmpaddr ∗
-    Register.mseccfg ↦ᵣ[cpu]{dq} 0#64 ∗
-    Register.elp ↦ᵣ[cpu]{dq} 0#1 ∗
-    Register.senvcfg ↦ᵣ[cpu]{dq} 0#64 ∗
-    Register.mcountinhibit ↦ᵣ[cpu]{dq} 0#32 ∗
-    Register.minstretcfg ↦ᵣ[cpu]{dq} 0#64 ∗
-    Register.mcyclecfg ↦ᵣ[cpu]{dq} 0#64 ∗
-    Register.pma_regions ↦ᵣ[cpu]{dq} bootPMA ∗
-    Register.htif_tohost_base ↦ᵣ[cpu]{dq} none ⊢ confCellsHS (GF := GF) cpu dq p c hs := by
+    hwConfig cpu ⊢ confCellsHS (GF := GF) cpu dq p c hs := by
   unfold confCellsHS; exact .rfl
 
 open Iris.ProofMode in
@@ -128,20 +101,16 @@ set_option hygiene false in
 /-- Split `H : confCellsHS cpu dq p c hs` into its cells, named `H<register>`
 (the names `conf_intro` and `confhs_intro` reassemble). -/
 macro "confhs_cases " h:ident : tactic =>
-  `(tactic| ihave ⟨Hcur_privilege, Hhart_state, Hmisa, Hmstatus, Hmie, Hmideleg, Hmedeleg, Hmepc,
-                  Hsatp, Hmenvcfg, Hmcounteren, Hscounteren, Hmtimecmp, Hstimecmp, Hpmpcfg_n, Hpmpaddr_n,
-                  Hmseccfg, Help, Hsenvcfg, Hmcountinhibit, Hminstretcfg,
-                  Hmcyclecfg, Hpma_regions, Hhtif_tohost_base⟩ := confCellsHS_cases _ _ _ _ _ $$ $h:ident)
+  `(tactic| ihave ⟨Hcur_privilege, Hhart_state, Hmstatus, Hmie, Hmideleg, Hmedeleg, Hmepc,
+                  Hsatp, Hmenvcfg, Hmcounteren, Hmtimecmp, Hstimecmp, Hpmpcfg_n, Hpmpaddr_n, #Hhw⟩ := confCellsHS_cases _ _ _ _ _ $$ $h:ident)
 
 open Iris.ProofMode in
 set_option hygiene false in
 /-- Reassemble `H : confCellsHS cpu dq p c hs` from the cells. -/
 macro "confhs_intro " h:ident : tactic =>
-  `(tactic| (ihave $h:ident := confCellsHS_intro _ _ _ _ _ $$ [Hcur_privilege Hhart_state Hmisa Hmstatus Hmie
-                  Hmideleg Hmedeleg Hmepc Hsatp Hmenvcfg Hmcounteren Hscounteren Hmtimecmp Hstimecmp Hpmpcfg_n
-                  Hpmpaddr_n Hmseccfg Help Hsenvcfg Hmcountinhibit Hminstretcfg
-                  Hmcyclecfg Hpma_regions Hhtif_tohost_base]
-             case' _ => iframe))
+  `(tactic| (ihave $h:ident := confCellsHS_intro _ _ _ _ _ $$ [Hcur_privilege Hhart_state Hmstatus Hmie Hmideleg Hmedeleg Hmepc
+                  Hsatp Hmenvcfg Hmcounteren Hmtimecmp Hstimecmp Hpmpcfg_n Hpmpaddr_n]
+             case' _ => (iframe; try iexact Hhw)))
 
 set_option maxHeartbeats 4000000 in
 /-- The clock tick at an arbitrary hart state (`swp_tick_clock_cells` at
@@ -238,20 +207,20 @@ theorem wpLoop_wait_wfi (cpu : CPU) (p : Privilege)
     · swp_run 10
       conf_intro HmConf
       ihave Hclock := clockCells_intro _ _ _ _ _ _ $$ [Hminstret_increment Hminstret Hmcycle Hmtime Hmip]
-      case' _ => iframe
+      case' _ => (iframe; try iexact Hhw)
       ihave Hpc := pcIs_intro _ _ $$ [HPC HnextPC]
-      case' _ => iframe
+      case' _ => (iframe; try iexact Hhw)
       iapply HΦ $$ HmConf Hclock Hpc HF
     · swp_run 5
       conf_intro HmConf
       iapply swp_tick_clock_cells (hp := hp)
-      iframe
+      iframe; try iframe Hhw
       inext
       iintro %mcycle' %mtime' %mip' HmConf Hmcycle Hmtime Hmip
       ihave Hclock := clockCells_intro _ _ _ _ _ _ $$ [Hminstret_increment Hminstret Hmcycle Hmtime Hmip]
-      case' _ => iframe
+      case' _ => (iframe; try iexact Hhw)
       ihave Hpc := pcIs_intro _ _ $$ [HPC HnextPC]
-      case' _ => iframe
+      case' _ => (iframe; try iexact Hhw)
       iapply HΦ $$ HmConf Hclock Hpc HF
   · -- still parked: a no-op step, the pc does not move; Löb
     swp_run 60
@@ -259,16 +228,16 @@ theorem wpLoop_wait_wfi (cpu : CPU) (p : Privilege)
     · swp_run 10
       confhs_intro HmConf
       ihave Hclock := clockCells_intro _ _ _ _ _ _ $$ [Hminstret_increment Hminstret Hmcycle Hmtime Hmip]
-      case' _ => iframe
+      case' _ => (iframe; try iexact Hhw)
       iapply IH $$ HmConf Hclock HPC HnextPC HF HΦ
     · swp_run 5
       confhs_intro HmConf
       iapply swp_tick_clock_cellsHS (hp := hp)
-      iframe
+      iframe; try iframe Hhw
       inext
       iintro %mcycle' %mtime' %mip' HmConf Hmcycle Hmtime Hmip
       ihave Hclock := clockCells_intro _ _ _ _ _ _ $$ [Hminstret_increment Hminstret Hmcycle Hmtime Hmip]
-      case' _ => iframe
+      case' _ => (iframe; try iexact Hhw)
       iapply IH $$ HmConf Hclock HPC HnextPC HF HΦ
 
 /-! ## The `wfi` cycle -/
@@ -307,19 +276,19 @@ theorem wpLoop_s_wfi_cycle [CurCtx] (cpu : CPU) (c : MConf) (tier : KTier) (root
   conf_intro HmConf
   iapply swp_bind
   iapply swp_dispatchInterrupt_S_off (hsie := hsie) (hmie := hmie)
-  iframe
+  iframe; try iframe Hhw
   inext
   iintro HmConf Hmip
   swp_run 40
   iapply swp_bind
   iapply (hfetch _)
-  iframe
+  iframe; try iframe Hhw
   inext
   iintro HmConf HPC HT HR
   swp_run 40
   iapply swp_bind
   iapply (hdec _)
-  iframe
+  iframe; try iframe Hhw
   inext
   iintro HmConf
   conf_cases HmConf
@@ -327,7 +296,7 @@ theorem wpLoop_s_wfi_cycle [CurCtx] (cpu : CPU) (c : MConf) (tier : KTier) (root
   conf_intro HmConf
   iapply swp_bind
   iapply (swp_execute_wfi cpu (DFrac.own 1) Privilege.Supervisor hp' c)
-  iframe
+  iframe; try iframe Hhw
   inext
   iintro HmConf
   conf_cases HmConf
@@ -340,18 +309,18 @@ theorem wpLoop_s_wfi_cycle [CurCtx] (cpu : CPU) (c : MConf) (tier : KTier) (root
   · swp_run 10
     confhs_intro HmConf
     ihave Hclock := clockCells_intro _ _ _ _ _ _ $$ [Hminstret_increment Hminstret Hmcycle Hmtime Hmip]
-    case' _ => iframe
+    case' _ => (iframe; try iexact Hhw)
     iapply (wpLoop_wait_wfi cpu Privilege.Supervisor hp' c w pc (pc + 4#64)
       iprop(transTok cpu tier root ∗ R))
     iframe HmConf Hclock HPC HnextPC HT HR Hcont
   · swp_run 5
     confhs_intro HmConf
     iapply swp_tick_clock_cellsHS (hp := hp')
-    iframe
+    iframe; try iframe Hhw
     inext
     iintro %mcycle' %mtime' %mip' HmConf Hmcycle Hmtime Hmip
     ihave Hclock := clockCells_intro _ _ _ _ _ _ $$ [Hminstret_increment Hminstret Hmcycle Hmtime Hmip]
-    case' _ => iframe
+    case' _ => (iframe; try iexact Hhw)
     iapply (wpLoop_wait_wfi cpu Privilege.Supervisor hp' c w pc (pc + 4#64)
       iprop(transTok cpu tier root ∗ R))
     iframe HmConf Hclock HPC HnextPC HT HR Hcont
@@ -399,6 +368,7 @@ theorem wp_s_wfi [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU) (k : KCtx)
       isplit
       · ipureintro; exact hkt
       · iexact Hro
+      try iexact Hhw
     iapply HΦ $$ Hk Hpc
   | F_RVC h => exact absurd hr (by simp [fetchIsRvc])
   | F_Error e => exact (by simp [decodesTo] at hdec : False).elim

@@ -122,7 +122,7 @@ theorem execSpecF_csrr_time (cpu : CPU) (c : MConf) (sie : Bool) (hok : SConfPhy
   swp_run 300
   iapply swp_bind
   iapply swp_wX_file (hrd := hrd)
-  iframe
+  iframe; try iframe Hhw
   inext
   iintro HF
   swp_run 10
@@ -155,7 +155,7 @@ theorem execSpecF_csrw_stimecmp (cpu : CPU) (c : MConf) (sie : Bool) (hok : SCon
   swp_run 30
   iapply swp_bind
   iapply swp_rX_file
-  iframe
+  iframe; try iframe Hhw
   iintro HF
   try unfold doCSR
   generalize hW : write_CSR 0x14D#12 = W
@@ -163,17 +163,16 @@ theorem execSpecF_csrw_stimecmp (cpu : CPU) (c : MConf) (sie : Bool) (hok : SCon
   subst hW
   iapply swp_bind
   iapply (swp_write_CSR_stimecmp cpu (DFrac.own 1) _ _ mt _ ip menvcfgS (by decide))
-  iframe
+  iframe; try iframe Hhw
   inext
-  iintro %ip' Hmisa Hstimecmp Hmtime Hmtimecmp Hmip Hmenvcfg
+  iintro %ip' Hstimecmp Hmtime Hmtimecmp Hmip Hmenvcfg
   swp_run 60
   try (unfold wX_bits wX; swp_run 40)
   ihave HmConf := confCells_intro _ _ _
-    { c with stimecmp := RegMap.get R rs1, mcounteren := 2#32, menvcfg := menvcfgS } $$ [Hcur_privilege Hhart_state Hmisa Hmstatus Hmie
-    Hmideleg Hmedeleg Hmepc Hsatp Hmenvcfg Hmcounteren Hscounteren Hmtimecmp Hstimecmp Hpmpcfg_n
-    Hpmpaddr_n Hmseccfg Help Hsenvcfg Hmcountinhibit Hminstretcfg
-    Hmcyclecfg Hpma_regions Hhtif_tohost_base]
-  case' _ => iframe
+    { c with stimecmp := RegMap.get R rs1, mcounteren := 2#32, menvcfg := menvcfgS } $$ [Hcur_privilege Hhart_state Hmstatus Hmie
+    Hmideleg Hmedeleg Hmepc Hsatp Hmenvcfg Hmcounteren Hmtimecmp Hstimecmp Hpmpcfg_n
+    Hpmpaddr_n]
+  case' _ => (iframe; try iexact Hhw)
   iapply HΦ $$ HmConf HPC HnextPC [HF Hmtime Hmip]
   iframe HF Hmtime
   iexists ip'

@@ -28,26 +28,29 @@ userret).
 
 ## Deviations from Rocq (ALL FLAGGED FOR 8-M / WAVE-9 REVIEW)
 
-1. **`hw_config` is not a separate PERSISTENT premise.**  Rocq holds the
-   frozen configuration cells `↦ᵣ□`; MachCSL owns them EXCLUSIVELY inside
-   `confCells` (the kernel's `kConf`), with no persistent form.  So they are
-   `userHwCells` (exact values, the ones `confCells`/`sConfOf` pin), carried
-   INSIDE `userCfg` -- hence inside `userInv` and back out in
-   `userTrapFrame`, so the kernel can re-assemble `kConf` after the trap.
-   `SpecUser`'s body drops the `hw_config` wand accordingly.
+1. **`hw_config` is `MachCSL.hwConfig`** (D52, Rocq-literal): the
+   configuration cells nothing writes after reset, `↦ᵣ□`, persistent, carried
+   by every `confCells`.  `SpecUser.USER` takes it as its `hw_config -∗`
+   premise.  `userCfg` ALSO carries it (inside `userHwCells`), as Rocq's
+   `user_cfg` carries its `↦ᵣ□` copies of `senvcfg`/`mstateen0`/`sstateen0`/
+   the counter cells: a persistent copy costs nothing, and it is what lets
+   the kernel re-assemble `kConf` from `userTrapFrame` after the trap and
+   the slot (`UexecWp`) stay free of a `hw_config` thread (Rocq threads it
+   through `uexec_wp`/`uv_amb`).  The cells the kernel writes during boot and
+   never after (`mcounteren`, `mtimecmp`, `mepc`, `stimecmp`) stay exclusive
+   in `userHwCells`, lent through the trap loop and back.
 2. **`minstret_inv` is dropped** (Rocq defines it as `emp`); Lean's
    `clockCells` (inside `uRegs`) owns minstret/mcycle/mtime/mip outright,
    which is Rocq's post-port `minstret_res`/`clock_res` riders.
 3. **`resv_any` is not in `uRegs`**: MachCSL's reservation fragment rides the
    running token `ctxTok cpu ξ`, which the `Rut` accessor lends (SpecUser's
    premise, Rocq's `own_context cur_ctx` accessor).
-4. **Fractions**: Rocq splits `medeleg`/`senvcfg`/the counter permissions as
-   `↦ᵣ□`; Lean holds `medeleg`/`menvcfg` at `C.dqc` (the kernel's `confCells`
-   owns them at `1`, and `loopOk` pins `dqc = 1`), `mcounteren` at the
-   kernel's value `2`.  `mstateen0`/`sstateen0` stay in the kernel residue
-   (MachCSL's `hartCsrs`, inside `cpuOwn`); `mhpmcounter` has no owner in
-   MachCSL.  If the wave-9 CSR arm needs any of these, `userHwCells` gains
-   them (userret then supplies them from the kernel's residue).
+4. **Fractions**: `senvcfg`, `scounteren`, `mhpmcounter`, `mstateen0`,
+   `sstateen0` are `↦ᵣ□` in `hwConfig` (as Rocq); `medeleg`/`menvcfg` are
+   held at `C.dqc` (the kernel's `confCells` owns them at `1`, and `loopOk`
+   pins `dqc = 1`; Rocq has `medeleg ↦ᵣ□` because its `hart_csrs` also
+   claimed it, which Lean's does not), `mcounteren` exclusively at the
+   kernel's value `2` (Rocq's persistent `TimerCap.sstc_enabled`).
 5. **The TLB fact** is `utlbOk` (below), the user-leaf generalisation of
    MachCSL's kernel-leaf `tlbOk`: every resident slot caches, up to `A`/`D`,
    a leaf the user tree's walk reaches.  userret's `sfence.vma` leaves the
@@ -184,16 +187,14 @@ def uRegs (cpu : CPU) (hs : HartState) (ms sc stv sep va va' : BitVec 64) (g : R
   Register.sepc ↦ᵣ[cpu] sep ∗ Register.PC ↦ᵣ[cpu] va ∗ Register.nextPC ↦ᵣ[cpu] va' ∗
   clockCells cpu ∗ gprFile cpu g
 
-/-- **Rocq `hw_config`, Lean-owned** (deviation 1): the configuration cells
-nothing writes after boot, at the values MachCSL's `confCells`/`sConfOf` pin,
-plus the timer compare cells the clock tick reads. -/
+/-- **The configuration cells the user tier reads but never writes**
+(deviation 1): the persistent `hwConfig` (Rocq `hw_config`, and `user_cfg`'s
+`↦ᵣ□` copies), and, exclusively, the cells the kernel wrote during boot and
+never after -- `mcounteren` at the kernel's value, the timer compares the
+clock tick reads, and `mepc` (carried for the kernel's `kConf`). -/
 def userHwCells (cpu : CPU) : IProp GF := iprop%
-  Register.misa ↦ᵣ[cpu] 0x800000000014112D#64 ∗ Register.mseccfg ↦ᵣ[cpu] 0#64 ∗
-  Register.pma_regions ↦ᵣ[cpu] bootPMA ∗ Register.htif_tohost_base ↦ᵣ[cpu] none ∗
-  Register.elp ↦ᵣ[cpu] 0#1 ∗ Register.senvcfg ↦ᵣ[cpu] 0#64 ∗
-  Register.mcounteren ↦ᵣ[cpu] 2#32 ∗ Register.scounteren ↦ᵣ[cpu] 0#32 ∗
-  Register.mcountinhibit ↦ᵣ[cpu] 0#32 ∗ Register.minstretcfg ↦ᵣ[cpu] 0#64 ∗
-  Register.mcyclecfg ↦ᵣ[cpu] 0#64 ∗ Register.mtimecmp ↦ᵣ[cpu] 0xFFFFFFFFFFFFFFFF#64 ∗
+  hwConfig cpu ∗
+  Register.mcounteren ↦ᵣ[cpu] 2#32 ∗ Register.mtimecmp ↦ᵣ[cpu] 0xFFFFFFFFFFFFFFFF#64 ∗
   ∃ mepc stc : BitVec 64, Register.mepc ↦ᵣ[cpu] mepc ∗ Register.stimecmp ↦ᵣ[cpu] stc
 
 /-- **Rocq `user_cfg`**: the loop-constant config cells at the fraction
@@ -203,6 +204,13 @@ def userCfg (cpu : CPU) (C : UCfg) : IProp GF := iprop%
   Register.stvec ↦ᵣ[cpu]{C.dqc} C.stvec ∗ Register.mie ↦ᵣ[cpu]{C.dqc} C.mie ∗
   Register.mideleg ↦ᵣ[cpu]{C.dqc} C.mideleg ∗ Register.medeleg ↦ᵣ[cpu]{C.dqc} C.medeleg ∗
   Register.menvcfg ↦ᵣ[cpu]{C.dqc} MENVCFG_S ∗ userHwCells cpu
+
+/-- The loop's config cells carry the persistent `hwConfig` (deviation 1). -/
+theorem userCfg_hw (cpu : CPU) (C : UCfg) : userCfg (GF := GF) cpu C ⊢ userCfg cpu C ∗ hwConfig cpu := by
+  unfold userCfg userHwCells
+  iintro ⟨H1, H2, H3, H4, H5, #Hhw, H6⟩
+  iframe
+  isplit <;> iexact Hhw
 
 /-- **Rocq `UserPtTree.user_pt_inv`**: the translation state (satp at the
 user root, the PMP cells, the TLB sound for the tree) and the address space

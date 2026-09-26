@@ -467,11 +467,12 @@ theorem bootHartBss_open [CurCtx] (c : CPU) :
 `bootEntryPre` and the 23 GPRs: the Bare slot, `hartCsrs`, and
 `mainHartRaw`'s rows. -/
 def bootHartCsrRegs : List Register :=
-  [.stvec, .sscratch, .mstateen0, .sstateen0, .tlb, .sepc, .scause, .stval]
+  [.stvec, .sscratch, .tlb, .sepc, .scause, .stval]
 
 /-- **WHAT ONE HART'S BOOT CHAIN RUNS ON** (Rocq `boot_hart_res`), beside its
 running token: `bootEntryPre`'s output (without the wire pins), the other
-23 GPRs, `stvec`, `hartCsrs` (at the reset `mstateen0 = 0`/`sstateen0 = 0`),
+23 GPRs, `stvec`, `hartCsrs` (`sscratch`; the state-enable pins ride
+`mBoot`'s `hwConfig`),
 `mainHartRaw`'s rows at the reset `tlb`, the empty held-lock set, the GOT
 row and the hart's `.bss` share.  Context-free (deviations 1 and 5). -/
 def bootHartRes (f : RegFile) (c : CPU) : IProp GF := iprop%
@@ -491,25 +492,23 @@ def bootHartRes (f : RegFile) (c : CPU) : IProp GF := iprop%
 /-- **The bundle, out of the power thread's per-hart rows** (Rocq
 `boot_hart_pre`'s register half + `boot_hart_pre_combine`): a reset file's
 cells (less the wire pins), the empty held-lock set, the GOT row and the
-hart's carved `.bss` share.  `mstateen0`/`sstateen0` are the reset table's
-pins (`MachCSL.resetVal`). -/
+hart's carved `.bss` share.  The update persists the frozen
+configuration cells (`BootConfig.mBoot_of_cells`). -/
 theorem bootHartRes_intro (f : RegFile) (c : CPU) (hres : resetRegs c f) :
     regCellsNoPins (GF := GF) (regName (hlc := hlc) (GF := GF) c) f ∗ lockSet c [] ∗
-      bootGotRo ∗ bootHartBss c ⊢ bootHartRes f c := by
-  have hm : f .mstateen0 = 0#64 := hres .mstateen0 _ rfl
-  have hs : f .sstateen0 = 0#32 := hres .sstateen0 _ rfl
+      bootGotRo ∗ bootHartBss c ⊢ |==> bootHartRes f c := by
   iintro ⟨H, Hl, #Hg, Hb⟩
-  icases bootEntryPre c f hres $$ H with
+  imod bootEntryPre c f hres $$ H with
     ⟨Hm, Hh, Hck, Hpc, H1, H2, H4, H8, H10, H11, H14, H15, H⟩
+  imodintro
   icases bootGprRest c f $$ H with ⟨Hgpr, H⟩
   icases regCellsEx_takeListAt c f bootHartCsrRegs (bootGprRestRegs.reverse ++ bootEntryTaken)
     (by decide) (by decide) $$ H with ⟨Hc, -⟩
   unfold bootHartCsrRegs
   simp only [Iris.Algebra.BigOpL.bigOpL_cons, Iris.Algebra.BigOpL.bigOpL_nil]
-  icases Hc with ⟨Hstv, Hss, Hms, Hsse, Htlb, Hep, Hca, Htv, -⟩
+  icases Hc with ⟨Hstv, Hss, Htlb, Hep, Hca, Htv, -⟩
   unfold bootHartRes hartCsrs mainHartRaw trapCsrs
-  rw [hm, hs] at *
-  iframe Hm Hh Hck Hpc H1 H2 H4 H8 H10 H11 H14 H15 Hgpr Hl Hg Hb Htlb Hms Hsse
+  iframe Hm Hh Hck Hpc H1 H2 H4 H8 H10 H11 H14 H15 Hgpr Hl Hg Hb Htlb
   isplitl [Hstv]
   · iexists f .stvec; iexact Hstv
   isplitl [Hss]
@@ -563,7 +562,7 @@ theorem bootHartRes_ofEra (E : EraGS) (gen : Nat) (cP : CPU → BitVec 64 → IP
     (σ : MState) (hbf : bootFacts σ) (c : CPU) :
     letI : MachGS hlc GF := MachGS.ofEra E gen cP cI
     regCellsNoPins (GF := GF) (E.regName c) (σ.regs c) ∗ lockSetAt E c [] ∗
-      bootGotRo ∗ bootHartBss c ⊢ bootHartRes (σ.regs c) c :=
+      bootGotRo ∗ bootHartBss c ⊢ |==> bootHartRes (σ.regs c) c :=
   letI : MachGS hlc GF := MachGS.ofEra E gen cP cI
   bootHartRes_intro (σ.regs c) c (hbf.2.2.2.1 c)
 

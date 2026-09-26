@@ -58,14 +58,14 @@ theorem zca_supported : hartSupports extension.Ext_Zca = true := rfl
 set_option maxHeartbeats 4000000 in
 /-- `csrr sepc`: the model aligns the value it returns (`get_xepc`). -/
 theorem swp_read_CSR_sepc (cpu : CPU) (dq : DFrac) (e : BitVec 64) (Φ : BitVec 64 → IProp GF) :
-    Register.misa ↦ᵣ[cpu]{dq} 0x800000000014112D#64 ∗ Register.sepc ↦ᵣ[cpu] e ∗
-    ▷ (Register.misa ↦ᵣ[cpu]{dq} 0x800000000014112D#64 -∗ Register.sepc ↦ᵣ[cpu] e -∗
+    hwConfig cpu ∗ Register.sepc ↦ᵣ[cpu] e ∗
+    ▷ (Register.sepc ↦ᵣ[cpu] e -∗
         Φ (e &&& 0xFFFFFFFFFFFFFFFE#64))
     ⊢ swp cpu (read_CSR 0x141#12) Φ := by
-  iintro ⟨Hmisa, Hsepc, HΦ⟩
+  iintro ⟨#Hhw, Hsepc, HΦ⟩
   swp_run 40
   simp only [update_bit0_eq]
-  iapply HΦ $$ Hmisa Hsepc
+  iapply HΦ $$ Hsepc
 
 set_option maxHeartbeats 4000000 in
 /-- `csrr scause`: a plain register read. -/
@@ -78,17 +78,16 @@ theorem swp_read_CSR_scause (cpu : CPU) (c : BitVec 64) (Φ : BitVec 64 → IPro
 
 set_option maxHeartbeats 4000000 in
 /-- `csrw sepc, v`: the cell takes `legalize_xepc v` (bit 0 cleared). -/
-theorem swp_write_CSR_sepc (cpu : CPU) (dq : DFrac) (e v : BitVec 64)
+theorem swp_write_CSR_sepc (cpu : CPU) (e v : BitVec 64)
     (Φ : Result (BitVec 64) Unit → IProp GF) :
-    Register.misa ↦ᵣ[cpu]{dq} 0x800000000014112D#64 ∗ Register.sepc ↦ᵣ[cpu] e ∗
-    ▷ (Register.misa ↦ᵣ[cpu]{dq} 0x800000000014112D#64 -∗
-        Register.sepc ↦ᵣ[cpu] (v &&& 0xFFFFFFFFFFFFFFFE#64) -∗ Φ (.Ok (v &&& 0xFFFFFFFFFFFFFFFE#64)))
+    hwConfig cpu ∗ Register.sepc ↦ᵣ[cpu] e ∗
+    ▷ (Register.sepc ↦ᵣ[cpu] (v &&& 0xFFFFFFFFFFFFFFFE#64) -∗ Φ (.Ok (v &&& 0xFFFFFFFFFFFFFFFE#64)))
     ⊢ swp cpu (write_CSR 0x141#12 v) Φ := by
-  iintro ⟨Hmisa, Hsepc, HΦ⟩
+  iintro ⟨#Hhw, Hsepc, HΦ⟩
   have hz : hartSupports extension.Ext_Zca = true := zca_supported
   swp_run 40
   simp only [legalize_xepc, hz, ite_true, update_bit0_eq]
-  iapply HΦ $$ Hmisa Hsepc
+  iapply HΦ $$ Hsepc
 
 /-! ## The execute stages -/
 
@@ -110,7 +109,7 @@ theorem execSpecF_csrr_sepc (cpu : CPU) (c : MConf) (sie : Bool) (hok : SConfPhy
   simp only [update_bit0_eq]
   iapply swp_bind
   iapply swp_wX_file (hrd := hrd)
-  iframe
+  iframe; try iframe Hhw
   inext
   iintro HF
   swp_run 20
@@ -135,7 +134,7 @@ theorem execSpecF_csrr_scause (cpu : CPU) (c : MConf) (sie : Bool) (hok : SConfP
   swp_run 300
   iapply swp_bind
   iapply swp_wX_file (hrd := hrd)
-  iframe
+  iframe; try iframe Hhw
   inext
   iintro HF
   swp_run 20
@@ -160,7 +159,7 @@ theorem execSpecF_csrr_stval (cpu : CPU) (c : MConf) (sie : Bool) (hok : SConfPh
   swp_run 300
   iapply swp_bind
   iapply swp_wX_file (hrd := hrd)
-  iframe
+  iframe; try iframe Hhw
   inext
   iintro HF
   swp_run 20
@@ -187,7 +186,7 @@ theorem execSpecF_csrw_sepc (cpu : CPU) (c : MConf) (sie : Bool) (hok : SConfPhy
   swp_run 30
   iapply swp_bind
   iapply swp_rX_file
-  iframe
+  iframe; try iframe Hhw
   iintro HF
   swp_run 300
   simp only [legalize_xepc, zca_supported, ite_true, update_bit0_eq, hal]
@@ -483,7 +482,7 @@ theorem execSpecF_csrw_sstatus_off (cpu : CPU) (c : MConf) (sie : Bool) (hok : S
   swp_run 30
   iapply swp_bind
   iapply swp_rX_file
-  iframe
+  iframe; try iframe Hhw
   iintro HF
   try unfold doCSR
   generalize hW : write_CSR 0x100#12 = W
@@ -491,19 +490,18 @@ theorem execSpecF_csrw_sstatus_off (cpu : CPU) (c : MConf) (sie : Bool) (hok : S
   subst hW
   iapply swp_bind
   iapply swp_write_CSR_sstatus (hmpp := hMPP)
-  iframe
+  iframe; try iframe Hhw
   inext
-  iintro Hmisa Hmstatus
+  iintro Hmstatus
   simp only [sstatusWrite_eq]
   swp_run 30
   unfold wX_bits wX
   simp only [Sail.BitVec.toNatInt, Int.ofNat_eq_natCast, Int.toNat_natCast]
   swp_run 80
-  ihave HmConf := confCells_intro _ _ _ { c with mstatus := sstatusWrite c.mstatus (R.get rs1) } $$ [Hcur_privilege Hhart_state Hmisa Hmstatus Hmie
-    Hmideleg Hmedeleg Hmepc Hsatp Hmenvcfg Hmcounteren Hscounteren Hmtimecmp Hstimecmp Hpmpcfg_n
-    Hpmpaddr_n Hmseccfg Help Hsenvcfg Hmcountinhibit Hminstretcfg
-    Hmcyclecfg Hpma_regions Hhtif_tohost_base]
-  case' _ => iframe
+  ihave HmConf := confCells_intro _ _ _ { c with mstatus := sstatusWrite c.mstatus (R.get rs1) } $$ [Hcur_privilege Hhart_state Hmstatus Hmie
+    Hmideleg Hmedeleg Hmepc Hsatp Hmenvcfg Hmcounteren Hmtimecmp Hstimecmp Hpmpcfg_n
+    Hpmpaddr_n]
+  case' _ => (iframe; try iexact Hhw)
   iapply HΦ $$ HmConf HPC HnextPC HF
 
 /-- The pinned `SPIE`/`SPP` indices do not enter `KCtx.wf`. -/

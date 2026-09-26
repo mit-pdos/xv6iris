@@ -702,12 +702,10 @@ theorem aCpuIntena_ok [KernelGeom] (cpu : CPU) : inRam (aCpuIntena cpu) 4 ∧ (a
   omega
 
 /-- The CSRs the kernel owns but never reads while it runs: `sscratch`
-(scratch; the trampoline writes it) and the state-enable pins, which stay at
-their reset value. -/
+(scratch; the trampoline writes it).  (The state-enable pins `mstateen0`/
+`sstateen0` are frozen at reset: they are in `hwConfig`.) -/
 def hartCsrs (cpu : CPU) : IProp GF := iprop%
-  (∃ v : BitVec 64, Register.sscratch ↦ᵣ[cpu] v) ∗
-  Register.mstateen0 ↦ᵣ[cpu] 0#64 ∗
-  Register.sstateen0 ↦ᵣ[cpu] 0#32
+  ∃ v : BitVec 64, Register.sscratch ↦ᵣ[cpu] v
 
 /-- The per-cpu bookkeeping: the cells, the held-lock set (the authority
 each held lock's invariant keeps a fragment of), and the kernel-owned CSRs. -/
