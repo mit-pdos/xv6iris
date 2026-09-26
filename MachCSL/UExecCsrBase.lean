@@ -6,11 +6,14 @@ runs under and the read-only bridge (lane U1-X3, brief
 **What a CSR instruction at User reads.**  `doCSR` reads `cur_privilege`,
 then `check_CSR_result`.  The Lean backend evaluates every `(← …)` of a
 condition up front (Rocq's `and_boolM` short-circuits; Lean's `&&` over
-lifted actions does not), so at User the model runs, for EVERY csr number,
+lifted actions does not), so at User the MODEL runs, for every csr number,
 `check_CSR_priv`, `is_CSR_accessible`, `stateen_allows_CSR_access` at User,
 and then `is_CSR_exception_virtual`, i.e. the same three at Supervisor.  The
-registers those read (measured: dropping any one makes some csr's walk fail)
-are `uxrReads`:
+CSR facts walk the SHORT-CIRCUIT chain instead (`UExecCsrSc`: Sail's own
+evaluation order), related to the model's by the elimination theorem
+(`SailStut`, `MachCSL/SailAndElim.lean`: the discarded operands are
+read-only and total).  The registers the short-circuit chain reads
+(measured: dropping any one makes some csr's walk fail) are `uxrReads`:
 
 * `cur_privilege` (User, the user frame);
 * `misa`, `senvcfg`, `scounteren`, `mstateen0`, `sstateen0` (FROZEN: the
@@ -18,11 +21,12 @@ are `uxrReads`:
 * `menvcfg` (`menvcfgS`) and `mcounteren` (`2`, i.e. `TM` only), the kernel's
   user-time values;
 * `mstatus` (only through the F / vector gates of `fflags`/`frm`/`fcsr` and the
-  vector CSRs, where it is SYMBOLIC: the user frame's `mstatus`, with `FS = 0`);
-* `mstateen1..3`, `sstateen1..3`: read (as data, any value) by the stateen
-  check of `sstateen1..3`/`hstateen1..3`(`h`) at User and Supervisor, whose
-  outcome the privilege gate then discards.  These six are in NO owner's
-  frame today (not in `hwVal`, not in `resetVal`): a D52 footprint gap.
+  vector CSRs, where it is SYMBOLIC: the user frame's `mstatus`, with `FS = 0`).
+
+The eager chain also read `mstateen1..3`/`sstateen1..3` (the stateen check of
+`sstateen1..3`/`hstateen1..3`, whose outcome the privilege gate discards) --
+cells in no owner's frame (a D52 footprint gap).  The short-circuit chain
+never reads them, so they are not in the footprint.
 
 `uxrPin f` is that table (the data cells at the file `f`'s values);
 every CSR fact takes the two premises `UxrFoot D` (the footprint reads them)
@@ -50,22 +54,15 @@ open LeanRV64D LeanRV64D.Functions
 (besides the source GPR of `CSRReg`). -/
 def uxrReads : List Register :=
   [.cur_privilege, .misa, .mstatus, .menvcfg, .senvcfg, .mcounteren, .scounteren,
-   .mstateen0, .sstateen0, .mstateen1, .mstateen2, .mstateen3, .sstateen1, .sstateen2,
-   .sstateen3]
+   .mstateen0, .sstateen0]
 
 /-- The values the check chain runs at: User privilege, the frozen cells at
 their `hwVal` values, `menvcfg`/`mcounteren` at the kernel's user-time values;
-the DATA cells (`mstatus`, `mstateen1..3`, `sstateen1..3`: read, never
-branched on except `mstatus.FS`) at the file `f`'s values. -/
+the DATA cell `mstatus` (read, never branched on except `FS`) at the file
+`f`'s value. -/
 def uxrPin (f : RegFile) : RegPin
   | .cur_privilege => some Privilege.User
   | .mstatus => some (f .mstatus)
-  | .mstateen1 => some (f .mstateen1)
-  | .mstateen2 => some (f .mstateen2)
-  | .mstateen3 => some (f .mstateen3)
-  | .sstateen1 => some (f .sstateen1)
-  | .sstateen2 => some (f .sstateen2)
-  | .sstateen3 => some (f .sstateen3)
   | .menvcfg => some menvcfgS
   | .mcounteren => some 2#32
   | .misa => hwVal .misa

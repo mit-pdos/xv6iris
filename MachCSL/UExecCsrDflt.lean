@@ -19,7 +19,7 @@ refuted by evaluating `uxrDflt` at the literal, every range guard false by
 
 The 339 other numbers are closed values (`UExecCsrTab`).
 -/
-import MachCSL.UExecCsrBase
+import MachCSL.UExecCsrSc
 
 namespace MachCSL
 

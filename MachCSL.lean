@@ -159,6 +159,12 @@ import LeanRV64D
 import MachCSL.UByteFrame
 import MachCSL.UFrameDf
 import MachCSL.URunRWMono
+import MachCSL.SailRO
+import MachCSL.SailROModel
+import MachCSL.SailROCsr
+import MachCSL.SailStut
+import MachCSL.SailAndElim
+import MachCSL.UExecCsrSc
 import MachCSL.UExecCsr
 import MachCSL.UWalkRun
 import MachCSL.UWalk
