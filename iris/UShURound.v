@@ -898,7 +898,7 @@ Section UShURound.
 
   (* the diagnostic through the era's licence, at any bytes *)
   Lemma usecc_execfail_law (I : list (bv 8)) (dg : list (bv 8)) (n : nat) :
-    ⊢ UkShDiag.ush_execfail_law_at (PS := uprogSG_free) dg n
+    ⊢ UkShDiag.ush_execfail_law_at (PS := uprogSG_free) (ghost_varG0 := offbox_offG) dg n
         (useccomp_shape ug I) (useccomp_shape ug I).
   Proof using Hcons.
     rewrite /UkShDiag.ush_execfail_law_at.
@@ -906,7 +906,8 @@ Section UShURound.
     iExists (fun _ : nat => useccomp_shape ug I).
     iSplitR; [iExact "Hsh" |]. iSplit.
     - iIntros "!>" (p b) "%Hb %Hlt".
-      iApply (UShPanic.ksh_w1_of_step N _ _ l rb b Hl2).
+      iApply (UShPanic.ksh_w1_of_step (PS := uprogSG_free) (ghost_varG0 := offbox_offG)
+                N (useccomp_shape ug I) (useccomp_shape ug I) l rb b Hl2).
       iIntros "!>" (Φ) "_ HΦ".
       iPoseProof "Hsh" as "[Htok _]".
       iApply (union_write_link_wild ug Hcons (S gen_id) b Φ with "[Htok] [HΦ]").
@@ -942,16 +943,16 @@ Section UShURound.
     - iIntros "!>" (M sa t gn sts cs pidv) "%Himg %Hbytes %Hlen %Hrows %Htab #Hnp".
       destruct Hrows as (_ & _ & [rb2 Hr2]).
       iPoseProof (UexecSecc.ush_view_secc_rows vw sts Hvok Htab) as "#Hrows".
-      iPoseProof (UkSeccEntry.secc_image_entry (ghost_varG0 := offbox_offG)
+      iPoseProof (UkSeccEntry.secc_image_entry (PS := uprogSG_free) (ghost_varG0 := offbox_offG)
                     (FileDisc.uline_ws (LSecc wsx)) M sa t gn sts FsImg.ROOTINO cs pidv
                     (fun _ : Z => UkShFork.ushf_wq Wcu I) rb2
-                    (fun _ _ => Logic.I) (usecc_ws_exec_ok wsx Hok) Himg Hbytes Hlen Hr2
+                    (fun k H => H) (usecc_ws_exec_ok wsx Hok) Himg Hbytes Hlen Hr2
                     with "HQ Hwp Hnp Hdep") as "He".
       iApply (UShEchoPipePay.image_entry_pay_mono with "[] He").
       iIntros "!> _". rewrite Hwild.
       iSplitR; [iPoseProof "Hsh" as "[Htok _]"; iApply (usecc_tok_of_at with "Htok") |].
       iSplitR; [iApply (Hrdw I with "Hsh") | iExact "Hrows"].
-    - iIntros "!> _". iApply "HQ".
+    - iIntros "!> _". iApply ("HQ" $! 0%Z).
   Qed.
 
   (* ---- THE seccomp CHILD'S LAW ---- *)
@@ -979,11 +980,11 @@ Section UShURound.
       rewrite Hb. exact (uline_of_u_secc wsx Hsok). }
     assert (Hw : uwild (ul I) = true) by (rewrite Hul; reflexivity).
     (* the taint's continuation, at a payload the caller supplies *)
-    iAssert (□ (app_taint -∗ UkShFork.ushf_wq Wcu I) -∗
+    iAssert (□ (□ (app_taint -∗ UkShFork.ushf_wq Wcu I) -∗
                □ (∀ W : UexecSlot.uvis,
                     T -∗ ChildTok.my_pay (UexecSlot.uvis_gen W) (ukn_pay N') -∗
-                    UexecRet.uslot (SG := uexecSG_xv6) W))%I as "#Hgenw".
-    { iIntros "#Hkq !>". iIntros (W) "#HT' #Hmy". rewrite Hpeq.
+                    UexecRet.uslot (SG := uexecSG_xv6) W)))%I as "#Hgenw".
+    { iIntros "!> #Hkq !>". iIntros (W) "#HT' #Hmy". rewrite Hpeq.
       iApply ("Hgen" $! (UkShFork.ushf_wq Wcu I) W with "HT' Hmy Hkq"). }
     iDestruct (uWcu_3 ug r s0 PT PD I with "Hcr") as "[Hcr | #Hsh]".
     { (* the clean arm: its deed refutes the wild line, or is the taint *)
@@ -1031,9 +1032,9 @@ Section UShURound.
               with "Hcode [] [] [] [] Hpcode Hpro Hjt Hstr Hwsp Hsy Hstd Hcwd
                     Hch HM [] Hrun").
     - iApply (usecc_exec_sup I wsx vw Hsok Hvok with "Hdep Hslot Hsh").
-    - iIntros "!> _". iApply "HQ".
+    - iIntros "!> _". iApply ("HQ" $! 0%Z).
     - iApply usecc_execfail_law.
-    - iIntros "!> _". iApply "HQ".
+    - iIntros "!> _". iApply ("HQ" $! 0%Z).
     - iExact "Hsh".
   Qed.
 
