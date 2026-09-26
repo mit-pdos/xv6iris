@@ -1211,3 +1211,5 @@ import Xv6.ForkretClose
 import Xv6.ProofForkret
 import Xv6.LinkForkret
 import Xv6.LinkForkretParkPaid
+import Xv6.UartBoot
+import Xv6.ProcBoot
