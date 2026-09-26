@@ -1286,3 +1286,11 @@ import Xv6.UkAbi
 import Xv6.UserCwd
 import Xv6.UserHeap
 import Xv6.UkRun
+import Xv6.LineWords
+import Xv6.EchoDisc
+import Xv6.LineBytes
+import Xv6.LineModel
+import Xv6.LineModelLinks
+import Xv6.EchoOutPure
+import Xv6.GenOutPure
+import Xv6.ExecWords
