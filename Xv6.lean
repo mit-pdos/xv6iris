@@ -1303,3 +1303,17 @@ import Xv6.UNameBytes
 import Xv6.UNamePath
 import Xv6.FileOutPure
 import Xv6.FileHooks
+import Xv6.EchoOut
+import Xv6.EchoLinks
+import Xv6.LinkRec
+import Xv6.EchoOutLine
+import Xv6.GenOutHist
+import Xv6.GenOutWild
+import Xv6.ReadRec
+import Xv6.GenLinksLine
+import Xv6.GenOut
+import Xv6.GenOutWrite
+import Xv6.GenOutWriteBlk
+import Xv6.GenOutWritePro
+import Xv6.GenOutRead
+import Xv6.FileLineWit
