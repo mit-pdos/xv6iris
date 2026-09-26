@@ -18,12 +18,11 @@ update order), with the bit facts the `userTrapFrame` re-assembly needs
 (`trapMstatusOk_utrapMs`, Rocq `utrap_ms_ok`).
 
 **The frozen configuration (USER ruling D52).**  The two frozen cells the
-tower reads, `misa` and `elp`, are taken in Rocq's `hw_config` shape: as
-PERSISTENT points-tos `↦ᵣ[cpu]□`, with `hw_config`'s pins (`misa` at its
-reset value, `elp ≠ LP_EXPECTED`).  `elp` is also WRITTEN (`reset_elp`); as
-in Rocq (`swp_trap_handler_u`, split at `reset_elp`), that node is a write
-of the value already there, `URegNode.swp_writeReg_same`, which
-accepts a points-to at ANY fraction, `□` included.  The loop-constant cells (`stvec`, `medeleg`,
+tower reads, `misa` and `elp`, come off the persistent `hwConfig` (Rocq
+`hw_config`; `elp` is pinned at `NO_LP_EXPECTED = 0`).  `elp` is also
+WRITTEN (`reset_elp`); as in Rocq (`swp_trap_handler_u`, split at
+`reset_elp`), that node is a write of the value already there
+(`swp_writeReg_hw_bind`).  The loop-constant cells (`stvec`, `medeleg`,
 Rocq's `user_cfg`) are taken at any fraction and handed back.
 
 **No `goodmb` twins.**  Rocq pairs every stretch with an `exec` fact and a
@@ -31,7 +30,7 @@ Rocq's `user_cfg`) are taken at any fraction and handed back.
 direct `swp` symbolic run over the owned cells (as WpTrap), so there is
 nothing to pair.
 -/
-import MachCSL.URegNode
+import MachCSL.WpTrap
 
 namespace MachCSL
 
@@ -158,47 +157,37 @@ variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF]
 
 /-! ## §2 The tower at `cur_privilege = User`, generic in the cause -/
 
-/-- `hw_config`'s `elp` pin (`elp ≠ LP_EXPECTED`) on a one-bit cell: it
-holds exactly what `reset_elp` writes. -/
-theorem elp_noLp (e : BitVec 1) (h : e ≠ landing_pad_bits_backwards .LP_EXPECTED) :
-    e = landing_pad_bits_backwards .NO_LP_EXPECTED := by
-  simp only [landing_pad_bits_backwards] at h ⊢
-  bv_decide
-
 set_option maxHeartbeats 4000000 in
 /-- **Rocq `swp_trap_handler_u`**: the trap from User to Supervisor with
 cause `c` and `tval` payload `info`.  The frozen cells `misa`/`elp` are the
 `hw_config` ones (persistent); `stvec` (direct mode) at any fraction. -/
 theorem swp_trap_handler_U (cpu : CPU) (c : TrapCause) (pc0 : BitVec 64) (info : Option (BitVec 64))
-    (e : BitVec 1) (he : e ≠ landing_pad_bits_backwards .LP_EXPECTED)
     (ms sc stv sep h : BitVec 64) (hdir : stvecDirect h) (dqs : DFrac) (Φ : BitVec 64 → IProp GF) :
-    Register.misa ↦ᵣ[cpu]□ 0x800000000014112D#64 ∗ Register.elp ↦ᵣ[cpu]□ e ∗
+    hwConfig cpu ∗
     Register.cur_privilege ↦ᵣ[cpu] Privilege.User ∗ Register.mstatus ↦ᵣ[cpu] ms ∗
     Register.scause ↦ᵣ[cpu] sc ∗ Register.stval ↦ᵣ[cpu] stv ∗ Register.sepc ↦ᵣ[cpu] sep ∗
     Register.stvec ↦ᵣ[cpu]{dqs} h ∗
-    ▷ (Register.cur_privilege ↦ᵣ[cpu] Privilege.Supervisor -∗ Register.mstatus ↦ᵣ[cpu] utrapMs e ms -∗
+    ▷ (Register.cur_privilege ↦ᵣ[cpu] Privilege.Supervisor -∗ Register.mstatus ↦ᵣ[cpu] utrapMs 0#1 ms -∗
         Register.scause ↦ᵣ[cpu] utrapScause c sc -∗ Register.stval ↦ᵣ[cpu] tval info -∗
         Register.sepc ↦ᵣ[cpu] pc0 -∗ Register.stvec ↦ᵣ[cpu]{dqs} h -∗ Φ h)
     ⊢ swp cpu (trap_handler Privilege.Supervisor c pc0 info none) Φ := by
-  iintro ⟨#Hmisa, #Help, Hcur_privilege, Hmstatus, Hscause, Hstval, Hsepc, Hstvec, HΦ⟩
+  iintro ⟨#Hhw, Hcur_privilege, Hmstatus, Hscause, Hstval, Hsepc, Hstvec, HΦ⟩
   have hbase := stvecDirect_base h hdir
   have hmode : BitVec.extractLsb' 0 2 h = 0#2 := hdir
-  have hnolp := elp_noLp e he
   unfold trap_handler zicfilp_preserve_elp_on_trap
   generalize hR : reset_elp () = R
   swp_run 40
   -- the `reset_elp` node: a write of the value already there
-  subst hR hnolp
+  subst hR
   unfold reset_elp
-  iapply swp_bind
-  iapply URegNode.swp_writeReg_same
-  iframe Help
+  iapply (swp_writeReg_hw_bind (r := Register.elp) (v := landing_pad_bits_backwards .NO_LP_EXPECTED)
+    (h := by rfl))
+  iframe Hhw
   inext
-  iintro Help
   have hms : Sail.BitVec.updateSubrange (Sail.BitVec.updateSubrange (Sail.BitVec.updateSubrange
-      (Sail.BitVec.updateSubrange ms 23 23 (landing_pad_bits_backwards .NO_LP_EXPECTED)) 5 5
-      (_get_Mstatus_SIE (Sail.BitVec.updateSubrange ms 23 23 (landing_pad_bits_backwards .NO_LP_EXPECTED))))
-      1 1 0#1) 8 8 0#1 = utrapMs (landing_pad_bits_backwards .NO_LP_EXPECTED) ms := rfl
+      (Sail.BitVec.updateSubrange ms 23 23 0#1) 5 5
+      (_get_Mstatus_SIE (Sail.BitVec.updateSubrange ms 23 23 0#1)))
+      1 1 0#1) 8 8 0#1 = utrapMs 0#1 ms := rfl
   have hsc : Sail.BitVec.updateSubrange
       (Sail.BitVec.updateSubrange sc 63 63 (bool_to_bit (trapCause_is_interrupt c))) 62 0
       (BitVec.setWidth 63 (trapCause_bits_forwards c)) = utrapScause c sc := rfl
@@ -211,10 +200,10 @@ set (and S present), a synchronous exception from User delegates to
 Supervisor. -/
 theorem swp_exception_delegatee_U (cpu : CPU) (e : ExceptionType) (md : BitVec 64) (dqd : DFrac)
     (hdel : md.getLsbD (exceptionType_bits_forwards e).toNat = true) (Φ : Privilege → IProp GF) :
-    Register.misa ↦ᵣ[cpu]□ 0x800000000014112D#64 ∗ Register.medeleg ↦ᵣ[cpu]{dqd} md ∗
+    hwConfig cpu ∗ Register.medeleg ↦ᵣ[cpu]{dqd} md ∗
     ▷ (Register.medeleg ↦ᵣ[cpu]{dqd} md -∗ Φ Privilege.Supervisor)
     ⊢ swp cpu (exception_delegatee e Privilege.User) Φ := by
-  iintro ⟨#Hmisa, Hmedeleg, HΦ⟩
+  iintro ⟨#Hhw, Hmedeleg, HΦ⟩
   unfold exception_delegatee
   generalize exceptionType_bits_forwards e = x at hdel ⊢
   have hb : (if _h : BitVec.ofBool md[x.toNat]! = 1#1 then true else false) = true := by
@@ -228,31 +217,30 @@ set_option maxHeartbeats 4000000 in
 /-- **Rocq `swp_exception_handler_u`**: a synchronous exception from User,
 delegated (the cause's `medeleg` bit set) to Supervisor. -/
 theorem swp_exception_handler_U (cpu : CPU) (ex : ExceptionType) (xv pc0 : BitVec 64)
-    (e : BitVec 1) (he : e ≠ landing_pad_bits_backwards .LP_EXPECTED)
     (ms sc stv sep h md : BitVec 64) (hdir : stvecDirect h) (dqs dqd : DFrac)
     (hdel : md.getLsbD (exceptionType_bits_forwards ex).toNat = true) (Φ : BitVec 64 → IProp GF) :
-    Register.misa ↦ᵣ[cpu]□ 0x800000000014112D#64 ∗ Register.elp ↦ᵣ[cpu]□ e ∗
+    hwConfig cpu ∗
     Register.cur_privilege ↦ᵣ[cpu] Privilege.User ∗ Register.mstatus ↦ᵣ[cpu] ms ∗
     Register.scause ↦ᵣ[cpu] sc ∗ Register.stval ↦ᵣ[cpu] stv ∗ Register.sepc ↦ᵣ[cpu] sep ∗
     Register.stvec ↦ᵣ[cpu]{dqs} h ∗ Register.medeleg ↦ᵣ[cpu]{dqd} md ∗
-    ▷ (Register.cur_privilege ↦ᵣ[cpu] Privilege.Supervisor -∗ Register.mstatus ↦ᵣ[cpu] utrapMs e ms -∗
+    ▷ (Register.cur_privilege ↦ᵣ[cpu] Privilege.Supervisor -∗ Register.mstatus ↦ᵣ[cpu] utrapMs 0#1 ms -∗
         Register.scause ↦ᵣ[cpu] utrapScause (.Exception ex) sc -∗
         Register.stval ↦ᵣ[cpu] tval (xtval_exception_value ex xv) -∗
         Register.sepc ↦ᵣ[cpu] pc0 -∗ Register.stvec ↦ᵣ[cpu]{dqs} h -∗ Register.medeleg ↦ᵣ[cpu]{dqd} md -∗ Φ h)
     ⊢ swp cpu (exception_handler Privilege.User (make_sync_exception ex xv) pc0) Φ := by
-  iintro ⟨#Hmisa, #Help, Hcur_privilege, Hmstatus, Hscause, Hstval, Hsepc, Hstvec, Hmedeleg, HΦ⟩
+  iintro ⟨#Hhw, Hcur_privilege, Hmstatus, Hscause, Hstval, Hsepc, Hstvec, Hmedeleg, HΦ⟩
   unfold exception_handler
   dsimp only [make_sync_exception]
   iapply swp_bind
   iapply swp_exception_delegatee_U cpu ex md dqd hdel
-  iframe Hmisa Hmedeleg
+  iframe Hhw Hmedeleg
   inext
   iintro Hmedeleg
   generalize hT : trap_handler = T
   swp_run 10
   subst hT
-  iapply swp_trap_handler_U cpu (.Exception ex) pc0 (xtval_exception_value ex xv) e he ms sc stv sep h hdir dqs
-  iframe Hmisa Help Hcur_privilege Hmstatus Hscause Hstval Hsepc Hstvec
+  iapply swp_trap_handler_U cpu (.Exception ex) pc0 (xtval_exception_value ex xv) ms sc stv sep h hdir dqs
+  iframe Hhw Hcur_privilege Hmstatus Hscause Hstval Hsepc Hstvec
   inext
   iintro Hcur_privilege Hmstatus Hscause Hstval Hsepc Hstvec
   iapply HΦ $$ Hcur_privilege Hmstatus Hscause Hstval Hsepc Hstvec Hmedeleg
@@ -271,26 +259,25 @@ set_option maxHeartbeats 4000000 in
 User: the tower at `Interrupt i` (`scause = sCause i`, `stval = 0`,
 `sepc = PC`), then `nextPC := stvec`. -/
 theorem swp_handle_interrupt_U (cpu : CPU) (i : InterruptType)
-    (e : BitVec 1) (he : e ≠ landing_pad_bits_backwards .LP_EXPECTED)
     (pc npc ms sc stv sep h : BitVec 64) (hdir : stvecDirect h) (dqs dqp : DFrac) (Φ : Unit → IProp GF) :
-    Register.misa ↦ᵣ[cpu]□ 0x800000000014112D#64 ∗ Register.elp ↦ᵣ[cpu]□ e ∗
+    hwConfig cpu ∗
     Register.cur_privilege ↦ᵣ[cpu] Privilege.User ∗ Register.mstatus ↦ᵣ[cpu] ms ∗
     Register.scause ↦ᵣ[cpu] sc ∗ Register.stval ↦ᵣ[cpu] stv ∗ Register.sepc ↦ᵣ[cpu] sep ∗
     Register.stvec ↦ᵣ[cpu]{dqs} h ∗ Register.PC ↦ᵣ[cpu]{dqp} pc ∗ Register.nextPC ↦ᵣ[cpu] npc ∗
-    ▷ (Register.cur_privilege ↦ᵣ[cpu] Privilege.Supervisor -∗ Register.mstatus ↦ᵣ[cpu] utrapMs e ms -∗
+    ▷ (Register.cur_privilege ↦ᵣ[cpu] Privilege.Supervisor -∗ Register.mstatus ↦ᵣ[cpu] utrapMs 0#1 ms -∗
         Register.scause ↦ᵣ[cpu] sCause i -∗ Register.stval ↦ᵣ[cpu] 0#64 -∗
         Register.sepc ↦ᵣ[cpu] pc -∗ Register.stvec ↦ᵣ[cpu]{dqs} h -∗
         Register.PC ↦ᵣ[cpu]{dqp} pc -∗ Register.nextPC ↦ᵣ[cpu] h -∗ Φ ())
     ⊢ swp cpu (handle_interrupt i Privilege.Supervisor) Φ := by
-  iintro ⟨#Hmisa, #Help, Hcur_privilege, Hmstatus, Hscause, Hstval, Hsepc, Hstvec, HPC, HnextPC, HΦ⟩
+  iintro ⟨#Hhw, Hcur_privilege, Hmstatus, Hscause, Hstval, Hsepc, Hstvec, HPC, HnextPC, HΦ⟩
   unfold handle_interrupt
   iapply swp_readReg_bind
   iframe HPC
   inext
   iintro HPC
   iapply swp_bind
-  iapply swp_trap_handler_U cpu (.Interrupt i) pc none e he ms sc stv sep h hdir dqs
-  iframe Hmisa Help Hcur_privilege Hmstatus Hscause Hstval Hsepc Hstvec
+  iapply swp_trap_handler_U cpu (.Interrupt i) pc none ms sc stv sep h hdir dqs
+  iframe Hhw Hcur_privilege Hmstatus Hscause Hstval Hsepc Hstvec
   inext
   iintro Hcur_privilege Hmstatus Hscause Hstval Hsepc Hstvec
   iapply swp_set_next_pc_U cpu h npc
@@ -305,23 +292,22 @@ set_option maxHeartbeats 4000000 in
 hands the tower `exception_handler User exc pc >>= set_next_pc` directly
 (the step already read the privilege and `PC`). -/
 theorem swp_exec_trap_U (cpu : CPU) (ex : ExceptionType) (xv pc0 : BitVec 64)
-    (e : BitVec 1) (he : e ≠ landing_pad_bits_backwards .LP_EXPECTED)
     (npc ms sc stv sep h md : BitVec 64) (hdir : stvecDirect h) (dqs dqd : DFrac)
     (hdel : md.getLsbD (exceptionType_bits_forwards ex).toNat = true) (Φ : Unit → IProp GF) :
-    Register.misa ↦ᵣ[cpu]□ 0x800000000014112D#64 ∗ Register.elp ↦ᵣ[cpu]□ e ∗
+    hwConfig cpu ∗
     Register.cur_privilege ↦ᵣ[cpu] Privilege.User ∗ Register.mstatus ↦ᵣ[cpu] ms ∗
     Register.scause ↦ᵣ[cpu] sc ∗ Register.stval ↦ᵣ[cpu] stv ∗ Register.sepc ↦ᵣ[cpu] sep ∗
     Register.stvec ↦ᵣ[cpu]{dqs} h ∗ Register.medeleg ↦ᵣ[cpu]{dqd} md ∗ Register.nextPC ↦ᵣ[cpu] npc ∗
-    ▷ (Register.cur_privilege ↦ᵣ[cpu] Privilege.Supervisor -∗ Register.mstatus ↦ᵣ[cpu] utrapMs e ms -∗
+    ▷ (Register.cur_privilege ↦ᵣ[cpu] Privilege.Supervisor -∗ Register.mstatus ↦ᵣ[cpu] utrapMs 0#1 ms -∗
         Register.scause ↦ᵣ[cpu] utrapScause (.Exception ex) sc -∗
         Register.stval ↦ᵣ[cpu] tval (xtval_exception_value ex xv) -∗
         Register.sepc ↦ᵣ[cpu] pc0 -∗ Register.stvec ↦ᵣ[cpu]{dqs} h -∗ Register.medeleg ↦ᵣ[cpu]{dqd} md -∗
         Register.nextPC ↦ᵣ[cpu] h -∗ Φ ())
     ⊢ swp cpu (exception_handler Privilege.User (make_sync_exception ex xv) pc0 >>= set_next_pc) Φ := by
-  iintro ⟨#Hmisa, #Help, Hcur_privilege, Hmstatus, Hscause, Hstval, Hsepc, Hstvec, Hmedeleg, HnextPC, HΦ⟩
+  iintro ⟨#Hhw, Hcur_privilege, Hmstatus, Hscause, Hstval, Hsepc, Hstvec, Hmedeleg, HnextPC, HΦ⟩
   iapply swp_bind
-  iapply swp_exception_handler_U cpu ex xv pc0 e he ms sc stv sep h md hdir dqs dqd hdel
-  iframe Hmisa Help Hcur_privilege Hmstatus Hscause Hstval Hsepc Hstvec Hmedeleg
+  iapply swp_exception_handler_U cpu ex xv pc0 ms sc stv sep h md hdir dqs dqd hdel
+  iframe Hhw Hcur_privilege Hmstatus Hscause Hstval Hsepc Hstvec Hmedeleg
   inext
   iintro Hcur_privilege Hmstatus Hscause Hstval Hsepc Hstvec Hmedeleg
   iapply swp_set_next_pc_U cpu h npc
@@ -335,21 +321,20 @@ set_option maxHeartbeats 4000000 in
 fetch-failure / illegal-instruction arms): read the privilege and `PC`, the
 delegated exception tower, then `nextPC := stvec`. -/
 theorem swp_handle_exception_U (cpu : CPU) (ex : ExceptionType) (xv : BitVec 64)
-    (e : BitVec 1) (he : e ≠ landing_pad_bits_backwards .LP_EXPECTED)
     (pc npc ms sc stv sep h md : BitVec 64) (hdir : stvecDirect h) (dqs dqd dqp : DFrac)
     (hdel : md.getLsbD (exceptionType_bits_forwards ex).toNat = true) (Φ : Unit → IProp GF) :
-    Register.misa ↦ᵣ[cpu]□ 0x800000000014112D#64 ∗ Register.elp ↦ᵣ[cpu]□ e ∗
+    hwConfig cpu ∗
     Register.cur_privilege ↦ᵣ[cpu] Privilege.User ∗ Register.mstatus ↦ᵣ[cpu] ms ∗
     Register.scause ↦ᵣ[cpu] sc ∗ Register.stval ↦ᵣ[cpu] stv ∗ Register.sepc ↦ᵣ[cpu] sep ∗
     Register.stvec ↦ᵣ[cpu]{dqs} h ∗ Register.medeleg ↦ᵣ[cpu]{dqd} md ∗
     Register.PC ↦ᵣ[cpu]{dqp} pc ∗ Register.nextPC ↦ᵣ[cpu] npc ∗
-    ▷ (Register.cur_privilege ↦ᵣ[cpu] Privilege.Supervisor -∗ Register.mstatus ↦ᵣ[cpu] utrapMs e ms -∗
+    ▷ (Register.cur_privilege ↦ᵣ[cpu] Privilege.Supervisor -∗ Register.mstatus ↦ᵣ[cpu] utrapMs 0#1 ms -∗
         Register.scause ↦ᵣ[cpu] utrapScause (.Exception ex) sc -∗
         Register.stval ↦ᵣ[cpu] tval (xtval_exception_value ex xv) -∗
         Register.sepc ↦ᵣ[cpu] pc -∗ Register.stvec ↦ᵣ[cpu]{dqs} h -∗ Register.medeleg ↦ᵣ[cpu]{dqd} md -∗
         Register.PC ↦ᵣ[cpu]{dqp} pc -∗ Register.nextPC ↦ᵣ[cpu] h -∗ Φ ())
     ⊢ swp cpu (handle_exception xv ex) Φ := by
-  iintro ⟨#Hmisa, #Help, Hcur_privilege, Hmstatus, Hscause, Hstval, Hsepc, Hstvec, Hmedeleg, HPC, HnextPC, HΦ⟩
+  iintro ⟨#Hhw, Hcur_privilege, Hmstatus, Hscause, Hstval, Hsepc, Hstvec, Hmedeleg, HPC, HnextPC, HΦ⟩
   unfold handle_exception
   iapply swp_readReg_bind
   iframe Hcur_privilege
@@ -359,8 +344,8 @@ theorem swp_handle_exception_U (cpu : CPU) (ex : ExceptionType) (xv : BitVec 64)
   iframe HPC
   inext
   iintro HPC
-  iapply swp_exec_trap_U cpu ex xv pc e he npc ms sc stv sep h md hdir dqs dqd hdel
-  iframe Hmisa Help Hcur_privilege Hmstatus Hscause Hstval Hsepc Hstvec Hmedeleg HnextPC
+  iapply swp_exec_trap_U cpu ex xv pc npc ms sc stv sep h md hdir dqs dqd hdel
+  iframe Hhw Hcur_privilege Hmstatus Hscause Hstval Hsepc Hstvec Hmedeleg HnextPC
   inext
   iintro Hcur_privilege Hmstatus Hscause Hstval Hsepc Hstvec Hmedeleg HnextPC
   iapply HΦ $$ Hcur_privilege Hmstatus Hscause Hstval Hsepc Hstvec Hmedeleg HPC HnextPC

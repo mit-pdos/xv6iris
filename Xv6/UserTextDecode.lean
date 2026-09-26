@@ -178,9 +178,9 @@ theorem utext_step_base (dref : (r : Register) → Option (RegisterType r)) {t :
     {m : ElfMem} (hok : UTextOk t m) (T : Nat → BitVec 8 → IProp GF) (pc : Nat)
     (i i₀ : instruction) (n w : Nat)
     (h : utextDecodeWith dref t m pc = some (false, i, i₀, n, w))
-    (cpu : CPU) (dq : DFrac) (P : IProp GF)
+    (cpu : CPU) (P : IProp GF)
     (hacc : ∀ (r : Register) (v : RegisterType r), dref r = some v →
-      P ⊢ (r ↦ᵣ[cpu]{dq} v ∗ (r ↦ᵣ[cpu]{dq} v -∗ P)))
+      P ⊢ ∃ dq : DFrac, r ↦ᵣ[cpu]{dq} v ∗ (r ↦ᵣ[cpu]{dq} v -∗ P))
     (Φ : instruction → IProp GF) :
     utextImg T m ∗ P ∗ ▷ (P -∗ Φ i) ⊢ utextWin T pc 4 w ∗ swp cpu (ext_decode (BitVec.ofNat 32 w)) Φ := by
   have F := utextDecode_facts dref hok pc false i i₀ n w h
@@ -189,7 +189,7 @@ theorem utext_step_base (dref : (r : Register) → Option (RegisterType r)) {t :
   iintro ⟨#Ht, HP, HΦ⟩
   isplitl []
   · iapply (utextImg_win T m pc 4 w F.bytes); iexact Ht
-  · iapply (swp_runRead cpu dq dref P hacc (ext_decode (BitVec.ofNat 32 w)) i true hdec Φ)
+  · iapply (swp_runRead cpu dref P hacc (ext_decode (BitVec.ofNat 32 w)) i true hdec Φ)
     isplitl [HP]
     · iexact HP
     · simp only [laterIf, if_true]; iexact HΦ
@@ -200,9 +200,9 @@ theorem utext_step_rvc (dref : (r : Register) → Option (RegisterType r)) {t : 
     {m : ElfMem} (hok : UTextOk t m) (T : Nat → BitVec 8 → IProp GF) (pc : Nat)
     (i i₀ : instruction) (n w : Nat)
     (h : utextDecodeWith dref t m pc = some (true, i, i₀, n, w))
-    (cpu : CPU) (dq : DFrac) (P : IProp GF)
+    (cpu : CPU) (P : IProp GF)
     (hacc : ∀ (r : Register) (v : RegisterType r), dref r = some v →
-      P ⊢ (r ↦ᵣ[cpu]{dq} v ∗ (r ↦ᵣ[cpu]{dq} v -∗ P)))
+      P ⊢ ∃ dq : DFrac, r ↦ᵣ[cpu]{dq} v ∗ (r ↦ᵣ[cpu]{dq} v -∗ P))
     (Φ : instruction → IProp GF) :
     utextImg T m ∗ P ∗ ▷ (P -∗ Φ i₀) ⊢
       ⌜execute i₀ = pure (ExecutionResult.ExecuteAs i)⌝ ∗ utextWin T pc n w ∗
@@ -214,7 +214,7 @@ theorem utext_step_rvc (dref : (r : Register) → Option (RegisterType r)) {t : 
   · ipureintro; exact hex
   isplitl []
   · iapply (utextImg_win T m pc n w F.bytes); iexact Ht
-  · iapply (swp_runRead cpu dq dref P hacc (ext_decode_compressed (BitVec.ofNat 16 w)) i₀ true hdec Φ)
+  · iapply (swp_runRead cpu dref P hacc (ext_decode_compressed (BitVec.ofNat 16 w)) i₀ true hdec Φ)
     isplitl [HP]
     · iexact HP
     · simp only [laterIf, if_true]; iexact HΦ

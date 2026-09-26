@@ -629,7 +629,9 @@ def swpStepCore (x fn : Lean.Expr) (bind : Bool) : TacticM Unit := do
       else if isHwReg rE then
         let rStx ← Lean.Elab.Term.exprToSyntax rE
         let hw := mkIdent `Hhw
-        evalTactic (← `(tactic| (iapply (swp_readReg_hw_bind (r := $rStx) (h := rfl)); (first | iframe $hw:ident | iframe); try inext)))
+        evalTactic (← `(tactic| first
+          | (iapply (swp_readReg_hw_bind (r := $rStx) (h := rfl)); iframe $hw:ident; try inext)
+          | (iapply swp_readReg_bind; (first | iframe $h:ident | iframe); try (inext; iintro $h:ident))))
       else
         evalTactic (← `(tactic| (iapply swp_readReg_bind; (first | iframe $h:ident | iframe); try (inext; iintro $h:ident))))
     else if n == ``LeanRV64D.writeReg then
@@ -643,7 +645,9 @@ def swpStepCore (x fn : Lean.Expr) (bind : Bool) : TacticM Unit := do
         let rStx ← Lean.Elab.Term.exprToSyntax rE
         let wStx ← Lean.Elab.Term.exprToSyntax x.getAppArgs[1]!
         let hw := mkIdent `Hhw
-        evalTactic (← `(tactic| (iapply (swp_writeReg_hw_bind (r := $rStx) (v := $wStx) (h := by rfl)); (first | iframe $hw:ident | iframe); try inext)))
+        evalTactic (← `(tactic| first
+          | (iapply (swp_writeReg_hw_bind (r := $rStx) (v := $wStx) (h := by rfl)); iframe $hw:ident; try inext)
+          | (iapply swp_writeReg_bind; (first | iframe $h:ident | iframe); try (inext; iintro $h:ident))))
       else
         evalTactic (← `(tactic| (iapply swp_writeReg_bind; (first | iframe $h:ident | iframe); try (inext; iintro $h:ident))))
     else if n == ``LeanRV64D.ConcurrencyInterfaceV1.sail_mem_read then

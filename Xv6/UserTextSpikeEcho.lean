@@ -63,9 +63,9 @@ def spikeUCells (cpu : CPU) (dq : DFrac) : IProp GF := iprop%
 /-- They lend each `spikeDrefU` register at its reference value. -/
 theorem spikeUCells_acc (cpu : CPU) (dq : DFrac) (r : Register) (v : RegisterType r)
     (hv : spikeDrefU r = some v) :
-    spikeUCells (GF := GF) cpu dq ⊢ (r ↦ᵣ[cpu]{dq} v ∗ (r ↦ᵣ[cpu]{dq} v -∗ spikeUCells cpu dq)) := by
+    spikeUCells (GF := GF) cpu dq ⊢ ∃ dq' : DFrac, r ↦ᵣ[cpu]{dq'} v ∗ (r ↦ᵣ[cpu]{dq'} v -∗ spikeUCells cpu dq) := by
   cases r <;> simp only [spikeDrefU, Option.some.injEq, reduceCtorEq] at hv
-  all_goals (subst hv; unfold spikeUCells; iintro ⟨H1, H2, H3, H4, H5⟩)
+  all_goals (subst hv; unfold spikeUCells; iintro ⟨H1, H2, H3, H4, H5⟩; iexists dq)
   all_goals
     first
     | (iframe H1; iintro H1)
@@ -85,7 +85,7 @@ theorem echo_main_16 (T : Nat → BitVec 8 → IProp GF) (cpu : CPU) (dq : DFrac
     utextImg T Echo.code.byte ∗ spikeUCells cpu dq ∗
       ▷ (spikeUCells cpu dq -∗ Φ (.BTYPE (0x60#13, .Regidx 10#5, .Regidx 15#5, .BGE))) ⊢
     utextWin T 0x16 4 0x06a7d063 ∗ swp cpu (ext_decode (BitVec.ofNat 32 0x06a7d063)) Φ :=
-  utext_step_base spikeDrefU Echo.textOk T 0x16 _ _ _ _ rfl cpu dq _ (spikeUCells_acc cpu dq) Φ
+  utext_step_base spikeDrefU Echo.textOk T 0x16 _ _ _ _ rfl cpu _ (spikeUCells_acc cpu dq) Φ
 
 /-- `main+0x0: c.addi16sp sp,-64` -- compressed at a 4-ALIGNED pc: the window
 is the fetched word, whose high half is the next instruction's (`c.sdsp` at
@@ -98,7 +98,7 @@ theorem echo_main_0 (T : Nat → BitVec 8 → IProp GF) (cpu : CPU) (dq : DFrac)
     ⌜execute (.C_ADDI16SP 0x3c#6) =
         pure (ExecutionResult.ExecuteAs (.ITYPE (0xfc0#12, .Regidx 2#5, .Regidx 2#5, .ADDI)))⌝ ∗
     utextWin T 0x0 4 0xfc067139 ∗ swp cpu (ext_decode_compressed (BitVec.ofNat 16 0xfc067139)) Φ :=
-  utext_step_rvc spikeDrefU Echo.textOk T 0x0 _ _ _ _ rfl cpu dq _ (spikeUCells_acc cpu dq) Φ
+  utext_step_rvc spikeDrefU Echo.textOk T 0x0 _ _ _ _ rfl cpu _ (spikeUCells_acc cpu dq) Φ
 
 /-- `main+0x2: c.sdsp ra,56(sp)` -- compressed at a 2-MOD-4 pc: a 2-byte
 window. -/
@@ -109,7 +109,7 @@ theorem echo_main_2 (T : Nat → BitVec 8 → IProp GF) (cpu : CPU) (dq : DFrac)
     ⌜execute (.C_SDSP (0x7#6, .Regidx 1#5)) =
         pure (ExecutionResult.ExecuteAs (.STORE (0x38#12, .Regidx 1#5, .Regidx 2#5, 8)))⌝ ∗
     utextWin T 0x2 2 0xfc06 ∗ swp cpu (ext_decode_compressed (BitVec.ofNat 16 0xfc06)) Φ :=
-  utext_step_rvc spikeDrefU Echo.textOk T 0x2 _ _ _ _ rfl cpu dq _ (spikeUCells_acc cpu dq) Φ
+  utext_step_rvc spikeDrefU Echo.textOk T 0x2 _ _ _ _ rfl cpu _ (spikeUCells_acc cpu dq) Φ
 
 /-- `main+0x44: jal 352 <write>` -- the call to the `write` stub (the site
 DU4's load-offset relocation is about). -/
@@ -118,7 +118,7 @@ theorem echo_main_44 (T : Nat → BitVec 8 → IProp GF) (cpu : CPU) (dq : DFrac
     utextImg T Echo.code.byte ∗ spikeUCells cpu dq ∗
       ▷ (spikeUCells cpu dq -∗ Φ (.JAL (0x30e#21, .Regidx 1#5))) ⊢
     utextWin T 0x44 4 0x30e000ef ∗ swp cpu (ext_decode (BitVec.ofNat 32 0x30e000ef)) Φ :=
-  utext_step_base spikeDrefU Echo.textOk T 0x44 _ _ _ _ rfl cpu dq _ (spikeUCells_acc cpu dq) Φ
+  utext_step_base spikeDrefU Echo.textOk T 0x44 _ _ _ _ rfl cpu _ (spikeUCells_acc cpu dq) Φ
 
 /-! ## The walk is honest
 

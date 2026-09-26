@@ -29,11 +29,11 @@ by `do`-notation and read unconditionally (twice).  So the rule takes an
 `mstatus` cell (any fraction, any value; handed back unmoved).  The user
 frame owns `mstatus`, so this costs nothing.
 
-`misa` is read (`currentlyEnabled Ext_S`); it is taken in `hw_config` shape,
-persistent (USER ruling D52).  `mie`/`mideleg` (Rocq `user_cfg`) and `mip`
+`misa` is read (`currentlyEnabled Ext_S`), off the persistent `hwConfig`
+(Rocq `hw_config`, USER ruling D52).  `mie`/`mideleg` (Rocq `user_cfg`) and `mip`
 (the clock rider) are taken at any fraction and handed back.
 -/
-import MachCSL.URegNode
+import MachCSL.WpTrap
 
 namespace MachCSL
 
@@ -104,13 +104,13 @@ inlined): dispatch at User, at every effective pending word `ip'` (the wire
 pins are read off-frame). -/
 theorem swp_dispatchInterrupt_U (cpu : CPU) (mie mideleg ip ms : BitVec 64) (dqe dql dqp dqm : DFrac)
     (hmm : mie &&& ~~~mideleg = 0#64) (Φ : Option (InterruptType × Privilege) → IProp GF) :
-    Register.misa ↦ᵣ[cpu]□ 0x800000000014112D#64 ∗
+    hwConfig cpu ∗
     Register.mie ↦ᵣ[cpu]{dqe} mie ∗ Register.mideleg ↦ᵣ[cpu]{dql} mideleg ∗
     Register.mip ↦ᵣ[cpu]{dqp} ip ∗ Register.mstatus ↦ᵣ[cpu]{dqm} ms ∗
     ▷ (∀ ip', Register.mie ↦ᵣ[cpu]{dqe} mie -∗ Register.mideleg ↦ᵣ[cpu]{dql} mideleg -∗
         Register.mip ↦ᵣ[cpu]{dqp} ip -∗ Register.mstatus ↦ᵣ[cpu]{dqm} ms -∗ Φ (dispatchU mie mideleg ip'))
     ⊢ swp cpu (dispatchInterrupt Privilege.User) Φ := by
-  iintro ⟨#Hmisa, Hmie, Hmideleg, Hmip, Hmstatus, HΦ⟩
+  iintro ⟨#Hhw, Hmie, Hmideleg, Hmip, Hmstatus, HΦ⟩
   have hext : ∀ (m s : BitVec 1) (v : BitVec 64),
       Mk_Minterrupts (v ||| _update_Minterrupts_SEI (_update_Minterrupts_MEI (Mk_Minterrupts 0#64) m) s)
         = v ||| ((~~~(1#64 <<< 9) &&& (BitVec.zeroExtend 64 m <<< 11)) ||| (BitVec.zeroExtend 64 s <<< 9)) := by

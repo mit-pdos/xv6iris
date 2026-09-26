@@ -130,7 +130,6 @@ import MachCSL.WpPtWalkOwn
 import MachCSL.WpSmodeSatpU
 import MachCSL.AdequacyDisk
 import MachCSL.CtxBoot
-import MachCSL.URegNode
 import MachCSL.UDispatch
 import MachCSL.UTrap
 import MachCSL.UDecodeWalk
