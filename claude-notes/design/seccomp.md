@@ -668,3 +668,19 @@ path, the knob, the top theorem's statement through the model.
   invariant).  `UexecSecc.useccomp_image_entry_taint` answers the
   generalised taint entry at a table in the universe and a masked mask;
   S3 uses it.
+
+### 10.9 Two taints in the generic shell tier (owner, 2026-09-25)
+
+The generic sh/init tier (UkSh, UkInit, UInitSh, UShKernel, UShLine) used
+ONE `T` for two jobs, and the token shows they differ: a LINK taint
+licenses console events (the lease, the link families, the read laws,
+`ucons_pay`'s tainted arm), a DEPOSIT taint pays the file system's atomic
+updates (`sh_deps` = `udepw_law 16`, the supply readings, the kill).  A
+token-paid generic write deposit is false at an inode row, so `lk_T :=
+UT ∨ secc_tok` cannot carry the deposit job.  RULING: the tier takes two
+parameters, `T` (link) and `Tk` (deposit), with `□ (Tk -∗ T)`, `□ (Tk -∗
+sh_deps)` and `Tk -∗ app_sup` where `T` did that work before; echo and
+every existing caller instantiate `Tk := T`; the union `T := UT ∨ secc_tok
+(S gen_id)`, `Tk := UT`.  After a tainted read the loop continues through
+the credential's own taint law (`uWcu_taint` at `T`: the `UT` half as
+today, the token half the wild arm), never a generic tainted loop.
