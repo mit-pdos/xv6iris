@@ -842,7 +842,6 @@ Section UShUPipes.
       UShEcho.sh_echo_slot T -∗
       UShCatPay.sh_cat_slot T -∗
       sh_grep_slot T -∗
-      sh_secc_slot T -∗
       (∃ v : era_pins, era_pin (fgn_echo gf) (S gen_id) v) -∗
       (∃ jo : option Z, file_cons_cred (fgn_cl gf) r jo) -∗
       ush_pipes_branch ug r s0 PT PD γp N.
@@ -869,6 +868,7 @@ Section UShUPipes.
       UShEcho.sh_echo_slot T -∗
       UShCatPay.sh_cat_slot T -∗
       sh_grep_slot T -∗
+      sh_secc_slot T -∗
       (∃ v : era_pins, era_pin (fgn_echo gf) (S gen_id) v) -∗
       (∃ jo : option Z, file_cons_cred (fgn_cl gf) r jo) -∗
       UkSh.ush_rest_l_at (PS := uprogSG_free) (ghost_varG0 := offbox_offG)
