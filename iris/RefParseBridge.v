@@ -583,6 +583,13 @@ Proof using.
   unfold wl_alnum in Ha. lia.
 Qed.
 
+(* ...and a file-name byte, which since filenames W4 may be the dot *)
+Lemma ref_fn_nonnul (b : bv 8) : fn_byte b -> b <> ubyte0.
+Proof using.
+  intros Ha E. apply (f_equal bv_unsigned) in E. rewrite ubyte0_val in E.
+  apply fn_byte_val in Ha. lia.
+Qed.
+
 Lemma ref_body_byte_nonnul (b : bv 8) : wl_body_byte b -> b <> ubyte0.
 Proof using.
   intros [ Ha | -> ]; [ exact (ref_alnum_nonnul b Ha) | ].
@@ -631,7 +638,7 @@ Proof using.
   { replace (k + (p0 + 2)) with (k + p0 + 2) by lia. rewrite Hsp2. exact ref_sp_nonnul. }
   destruct (lt_dec j (p0 + 3 + length file)) as [ Hf | Hnf ].
   { replace (k + j) with (k + p0 + 3 + (j - (p0 + 3))) by lia.
-    rewrite (Hfb (j - (p0 + 3)) ltac:(lia)). apply ref_alnum_nonnul.
+    rewrite (Hfb (j - (p0 + 3)) ltac:(lia)). apply ref_fn_nonnul.
     destruct Hfile as [ _ Hfile ]. exact (ref_lookup_total_Forall file (j - (p0 + 3)) Hfile ltac:(lia)). }
   replace (k + j) with (k + p0 + 3 + length file) by lia. rewrite Hnl. exact ref_nl_nonnul.
 Qed.
@@ -667,7 +674,7 @@ Proof using.
   pose proof (ushs_line_is_nosym ws f k len Hl) as Hns.
   destruct Hl as (Hok & Hlen & Hbytes).
   apply ref_parsecmd_nosym; [ exact Hnn | exact Hns | | ].
-  - exact (wl_tokens ws (fun j => f (k + j)) len (EchoDisc.line_ok_wf ws Hok) Hlen Hbytes).
+  - exact (wl_tokens ws (fun j => f (k + j)) len (wl_wf_fn ws (EchoDisc.line_ok_wf ws Hok)) Hlen Hbytes).
   - rewrite wl_toks_length. exact (EchoDisc.line_ok_lt10 ws Hok).
 Qed.
 

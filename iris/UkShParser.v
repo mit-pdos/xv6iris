@@ -2260,15 +2260,15 @@ Section UkShParser.
      arm pc -- 0x13c0 plus the signed row IS the arm, checked by vm_compute
      where each is used *)
   Definition ushp_nul_row (ty row : Z) (rowv : mword 32) (arm : Z) : Prop :=
-    (ty = 1 /\ row = 0x13c4 /\ rowv = mword_of_int 4294964330 /\ arm = 0x81a)
-    \/ (ty = 2 /\ row = 0x13c8 /\ rowv = mword_of_int 4294964354 /\ arm = 0x832)
-    \/ (ty = 3 /\ row = 0x13cc /\ rowv = mword_of_int 4294964378 /\ arm = 0x84a).
+    (ty = 1 /\ row = 0x13c4 /\ rowv = mword_of_int 4294964314 /\ arm = 0x81a)
+    \/ (ty = 2 /\ row = 0x13c8 /\ rowv = mword_of_int 4294964338 /\ arm = 0x832)
+    \/ (ty = 3 /\ row = 0x13cc /\ rowv = mword_of_int 4294964362 /\ arm = 0x84a).
 
-  Lemma ushp_nul_row_exec : ushp_nul_row 1 0x13c4 (mword_of_int 4294964330) 0x81a.
+  Lemma ushp_nul_row_exec : ushp_nul_row 1 0x13c4 (mword_of_int 4294964314) 0x81a.
   Proof using . left. auto. Qed.
-  Lemma ushp_nul_row_redir : ushp_nul_row 2 0x13c8 (mword_of_int 4294964354) 0x832.
+  Lemma ushp_nul_row_redir : ushp_nul_row 2 0x13c8 (mword_of_int 4294964338) 0x832.
   Proof using . right. left. auto. Qed.
-  Lemma ushp_nul_row_pipe : ushp_nul_row 3 0x13cc (mword_of_int 4294964378) 0x84a.
+  Lemma ushp_nul_row_pipe : ushp_nul_row 3 0x13cc (mword_of_int 4294964362) 0x84a.
   Proof using . right. right. auto. Qed.
 
   (* the REDIR row's four bytes, read off the image (from UkShRedirNul) *)
@@ -2778,7 +2778,7 @@ Section UkShParser.
                      | 1%nat => m !!! Regidx s0_idx
                      | _ => m !!! Regidx s1_idx end).
       set (spl := (mword_of_int (uint sp0 - 24) : mword 64)).
-      iApply (wp_ref_nul_head h m p 1 0x13c4 (mword_of_int 4294964330) 0x81a nn
+      iApply (wp_ref_nul_head h m p 1 0x13c4 (mword_of_int 4294964314) 0x81a nn
                 ushp_nul_row_exec Ha0 Hnp Hna ltac:(unfold Z64 in *; lia)
                 with "Hcode [] Hty4 Hrun").
       { iApply (ushp_jrow_exec with "Hro"). }
@@ -3045,7 +3045,7 @@ Section UkShParser.
                      | 1%nat => m !!! Regidx s0_idx
                      | _ => m !!! Regidx s1_idx end).
       set (spl := (mword_of_int (uint sp0 - 24) : mword 64)).
-      iApply (wp_ref_nul_head h m p 2 0x13c8 (mword_of_int 4294964354) 0x832
+      iApply (wp_ref_nul_head h m p 2 0x13c8 (mword_of_int 4294964338) 0x832
                 (4 * ushp_ht c + nn) ushp_nul_row_redir Ha0 Hnp Hna ltac:(unfold Z64 in *; lia)
                 with "Hcode [] Hty4 Hrun").
       { iApply (ushp_jrow_redir with "Hro"). }
@@ -3230,7 +3230,7 @@ Section UkShParser.
                      | 1%nat => m !!! Regidx s0_idx
                      | _ => m !!! Regidx s1_idx end).
       set (spl := (mword_of_int (uint sp0 - 24) : mword 64)).
-      iApply (wp_ref_nul_head h m p 3 0x13cc (mword_of_int 4294964378) 0x84a
+      iApply (wp_ref_nul_head h m p 3 0x13cc (mword_of_int 4294964362) 0x84a
                 (4 * mx + nn) ushp_nul_row_pipe Ha0 Hnp Hna ltac:(unfold Z64 in *; lia)
                 with "Hcode [] Hty4 Hrun").
       { iApply (ushp_jrow_pipe with "Hro"). }
