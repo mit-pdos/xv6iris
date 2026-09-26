@@ -335,8 +335,17 @@ form (`UkShRedirGtk`, `UkShRedirEx`, `UkShPipeEx`, `UkShPipeTok`;
 (upstream's PIPES-C8); the A3a/A3b/C1 consumer edits to `UkShMain`,
 `UkShRedirSeam`, `UkShPipeSeam`, `UkShRedirBody`, `UkShRedirChild`,
 `UShEcho`, `UShCat` merged cleanly with upstream's mask/filenames edits.
-NOTHING OF THIS IS VERIFIED YET: the first gate is the fast-forward into
-`/shared/xv6iris-int` and `make -k` there.
+VERIFIED (2026-09-26, `user-once/int` at ce2399f39): the base build of
+`origin/main` on this host (1,735 files, 19 min at -j32, model `.vo`
+reused, `kernel-rocq`/`user-rocq` compiled from the tracked dumps through
+their own makefiles, NO dump rule); then the re-landed cone, 39 files, 0
+errors, nothing pending, with exactly two fixes beyond the map --
+`UkShParser`'s three jump-table words (the map's imm rule needed the
+`: mword 32` annotation the table lacks) and `RefParseBridge` at W4
+(`ref_fn_nonnul` for the dot-admitting file-name byte, `wl_tokens` at
+`fn_wf`).  Audits at upstream's baseline: system 13, tree 13, union 14.
+The C1 instances, `UkShSeam`, and the A3a consumer edits compiled
+unchanged against the mask and filenames edits (different regions).
 
 **The plan from there.**
 1. Green the re-landed files (expect: literal residue the map missed,
