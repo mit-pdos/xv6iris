@@ -1349,3 +1349,8 @@ import Xv6.PipesView
 import Xv6.PipesDiscDec
 import Xv6.PipeBothNPure
 import Xv6.PipesFire
+import Xv6.UnionDisc
+import Xv6.UnionDiscDec
+import Xv6.UnionView
+import Xv6.UnionOutPure
+import Xv6.UnionDemo

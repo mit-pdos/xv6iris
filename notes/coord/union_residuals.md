@@ -21,9 +21,11 @@ Collected from the U0 agent reports (Sept 26 2026). Each item names the lane tha
 - `EchoOutG` (new camera class, one field: era map `GhostMapG GF Nat EraPins RegMapF`) needs a
   slot in `xv6GF` / `unionGF`.
 
-## U0-5 (union model)
-- DU9: parser and `stripGt`/`parseLine`/`seccParse` are classical/noncomputable, so FileDisc's
-  §8 demos were not ported; the anti-vacuity demos belong to U0-5 (or need a computable parser).
+## U0-5 (union model) — CLOSED
+- Anti-vacuity demos done in `Xv6/UnionDemo.lean` (`demo_disc : lmDisc ulmG hist`, thread demo,
+  admission demos) via the round-trip `ulineOfU_body`. Those general lemmas (`ulineOfU_body`,
+  `parseLine_pipe_none`, `plParse_pipe_body`) live in UnionDemo; move to UnionDisc if a lane
+  needs them.
 
 ## K3 (seccomp)
 - `LinkRec.lkWildNone` is deliberately distinct from K3's `wildNone`; K3 changes no U0-C statement.
