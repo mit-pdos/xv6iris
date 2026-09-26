@@ -281,6 +281,32 @@ holder does get `p_j >= n0 + j` per pop, but only `>= n0` is stated.
 UShLine: pattern-only (`[#Hdirty _]` at the cons_out and receipt
 disjuncts).
 
+S2k FOLLOW-UP (the era of a placed byte, for S5b's
+`GenOutWild.lm_placed_wild_undisc`): STOPPED -- the ring keeps NO
+per-entry era.  `cons_res` (ConsoleInv.v) is not era-aware at all (its
+section has no `GenId`); its entries are `(h, b)` under `cons_stored` /
+`cons_pend` / `cons_chain` / `cons_below` / `cons_log_ok`, none naming
+`obs_boots`.  `cons_logged` ties each entry to an entry of the log `L0`,
+but the port invariant keeps the era of the log's TOP only
+(`WpUart.cons_log_ins`, `uart_col_ok`'s `ht` clause).  Where the era IS,
+closest to the receipt: (1) the uart's rx queue, per queued byte (the
+receive column's `⌜obs_boots h = S gen_id⌝` row in `WpUart.v`), relayed
+at the POP beside `riscv_rx_tag h`, in hand at consoleintr's push
+(`ProofConsoleintr.v` ~823/1294/1573) and dropped when the byte is
+filed into the ring; (2) the application's tag, minted at that same push
+under the premise `obs_boots h = S gen_id` (`AppUnionRec.union_al_rx`;
+the era survives `h ++ [ObsUartIn i b]` by `obs_boots_app` /
+`obs_boots_io`, as at `WpUart.v:4073`) and ALREADY relayed by every
+receipt arm, the dirty one included (`[∗ list] h ∈ hs, riscv_rx_tag h`).
+The cheap route is (2): `UnionOut.utag` carries an era-keyed persistent
+witness the reader compares with its own era (`ai_tag` is era-agnostic,
+so a bare `⌜obs_boots h = S gen_id⌝` cannot be written in it).  The
+kernel route is a new `cons_res` clause `⌜∀ p, p ∈ st ++ pd -> obs_boots
+p.1 = S gen_id⌝`: `GenId` into ConsoleInv's section (every statement
+naming `cons_res`/`is_conslock`/`console_inv` then needs an ambient era),
+maintained by consoleintr's store arm, vacuous at the boot allocation,
+carried by `cr_ghost`/`cr_racc` into `cons_placed`'s per-byte clause.
+
 STATUS (lane S5a, `secc/s5a` off main aa793e35c, design 10.12's UNION
 bullet, the claim/pure half): landed, tree green (VM log s5a-3: EXIT=0, no
 `Error`, second pass 0 compiles), audits system 13 / union 14 / tree 13
