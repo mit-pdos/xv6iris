@@ -21,4 +21,5 @@ BUILDING ON THE GCP VM (allowed, 2026-09-26; 96 cores, clean full build ~5.5 min
   run-on-gcp --no-sync bash -lc 'export PATH=$HOME/.elan/bin:$PATH; setsid nohup bash -c "lake build Xv6 MachCSL > /mnt/rocq/<you>.log 2>&1; echo EXIT=\$? >> /mnt/rocq/<you>.log" >/dev/null 2>&1 < /dev/null &'
   run-on-gcp --no-sync bash -lc 'tail -3 /mnt/rocq/<you>.log'      # re-sync with --sync-only after every edit
 - Pick a unique <you> log name. Never pkill -f on the VM (shared machine); kill by PID. Two agents must not build in the same remote tree at once. Main-tree agents all share /mnt/rocq/trees/_shared_lean-xv6, so they should prefer local module builds, or coordinate.
+- WORKTREE agents: do FULL builds on the VM by default (the local machine overloads with many agents; lake has no jobs flag). Local = single-module checks only.
 - The final pre-push verification still happens locally in the coordinator's verify worktree.
