@@ -413,31 +413,51 @@ init's wild arm on the panic path; `secc_ok` widened to file-name words;
 the knob `adm_s := fun ws => bool_decide (ws <> [])`; the top theorem's
 statement changes only through the model; audits; the completed note.
 
-STATUS (lane S4, `secc/s4` off `secc/s3`): items 1 and 3 landed and
-green (VM log s4-r1: the one `Error` is S3's `UkSeccLit`, whose two
-dependents `UkSeccMain`/`UkSeccEntry` are the only files left to
-compile), audits system 13 / tree 13 / union 14 textually the baseline.
-Item 1: `FileDisc.secc_ok` at `fn_wf` (`seccomp rm a.txt` is a line;
-demo `demo_secc_path` replaces `demo_secc_nodot`; the decider unchanged).
-Item 3: `UInitBanner.kinit_w1_of_step` / `kinit_banner_pay_of_lic`;
-`UInitUnionCC.union_Wwild` (sh's wild shape at a count), the record's
-`cc_wp` gains it as a second arm, `union_wbn_to` returns it at `uWbf`'s
-wild arm, law (10) lends it on as `uWcu`'s wild arm, `UInitUnionBoot`'s
-banner and both diagnostics go through the licence (`union_wild_pay`);
-`uwild_disc_off` is deleted.  STOPPED at item 2, so items 4-5 (the knob,
-the statement) are not done: the Pay's `secc_rows sts` needs sh's WHOLE
-TABLE, and sh's proof never names its table view -- `UkSh.ush_std l :=
-ustd γfd l` hides it, every sh-tier leaf that takes the ledger (the write
-chains, `wp_ksh_read`/`gets`/`getcmd`, the prompt/panic/exec-fail laws,
-the fork arm, sh's console open) states `ustd` in and out, and the
-ledger reaches sh from init's `ustd` (init's open/dup leaves) and sh's
-view-free entry.  What is missing: `ustd_at` at a named view threaded
-init entry -> open/dup -> `wp_uk_ecall_fork_at` -> sh's entry (a pure
-fact on the exec'ing table) -> sh's startup open/close (view = console
-at 0-3, closed above) -> every round of sh's loop, i.e. the ledger a
-section parameter (or `ush_std` at `ustd_at`) of the generic sh/init tier
-with view-preserving leaves.  A second, smaller misfit: `secc_image_entry`
-takes `forall s, ⊢ Q s`, but sh's child's payload is `ushf_wq Wcu I`,
-paid at the wild arm only by the (persistent) token -- the entry should
-take `□ (∀ s, Q s)` (UkSeccMain's `wp_ksecc_start` likewise).
+STATUS (lane S4, `secc/s4`): items 1-5 in; the tree is green except
+`UInitUnion.union_adequacy_closed`'s proof, which leaves exactly the one
+premise the owner ruled open (design 10.12).  Audits: system 13 / tree 13
+textually the baseline; union 14 on `union_adequacy_closed_rd` (the same
+conclusion under the premise, in a scratch copy of `UInitUnion` without
+the red corollary), textually the baseline.
+- Item 1: `FileDisc.secc_ok` at `fn_wf` (`demo_secc_path`).
+- Item 3: init's wild path (`UInitUnionCC.union_Wwild`, `cc_wp`'s second
+  arm, `union_wbn_to` at `uWbf`'s wild arm, `union_wild_pay` through the
+  licence); `uwild_disc_off` deleted.
+- THE SWEEP (the whole-table fact): `UkSh.ush_std l := ustd_ok T γfd l :=
+  ∃ v, (⌜ush_view_ok v⌝ ∨ T) ∗ ustd_at γfd l v` (the `∨ T` because init's
+  opens are unconstrained under the taint); `ush_view_ok` = every row
+  closed or a device.  Kernel-facing leaves have `_at` twins that keep the
+  view (the `ustd` forms are corollaries); ledger moves reset the view to
+  an ok table (`ush_view_ok_open`/`_dup`).  The chain: init's boot table
+  `fdt0` (`ush_view_ok_fdt0`) -> init's console open/dups -> init's fork
+  (`wp_uk_ecall_fork_at`) -> sh's entry reads it off the exec'ing table ->
+  sh's startup open -> the loop keeps it -> sh's fork hands the child
+  `ush_std N' T ld` -> at `exec seccomp`, `ustd_at_tab` + the view give
+  `secc_rows fdv` (`UexecSecc.ush_view_secc_rows`).
+- Item 2: `/seccomp` pinned in the file application's fixed part
+  (`file_fs_pure`'s sixth conjunct `era0_secc_pins`; every write/unarm
+  lemma threads `i <> SECC_INO`); `UShExecPin.sh_secc_pin_resolves`,
+  `sh_secc_slot`, `sh_exec_sup_x_of_entry_v` (the supply at the parent's
+  view, the entry asked at `tab_le sts v`); `UShURound.uHchild_secc` (the
+  clean arm's deed refutes the wild line or is the taint; the wild arm
+  execs /seccomp through `UkSeccEntry.secc_image_entry`, Pay = the era
+  token via `Hwild : riscv_wild = usecc_tok ug`, `riscv_rdwild` via the
+  open premise, `secc_rows` via the view; every payload out of
+  `□ ∀ s, ushf_wq` from the shape; `usecc_execfail_law` prints `exec
+  seccomp failed` through the licence), dispatched at `LSecc` by
+  `wp_kshm_body_pipe_nc`.  The parent's wait/prompt is the body twin's.
+- Item 4: `UnionDisc.adm_s_on`, `ulmG := ulm adm_u_g adm_s_on`;
+  `ush_line_union` true at `LSecc`; `union_disc_line`'s seccomp arm;
+  UnionOut/UnionLinks/UnionView/UnionDecU at `adm_s_on`; the demos.
+- Item 5: `union_adequacy_closed`'s statement is unchanged (only `ulmG`
+  moved); `union_Hinit_boot_rd : union_rdwild_premise -> union_prog_law`.
+  THE OPEN PREMISE: `UShURoundDefs.ush_rdwild_of_shape ug := forall I,
+  useccomp_shape I ⊢ riscv_rdwild (S gen_id)` at every instance
+  (`UInitUnion.union_rdwild_premise`).  At the union `ai_rdwild` is
+  `wild_none`, so it is equivalent to "no wild shape exists" and is not
+  discharged here.
+- GOTCHA (the S4 hang): `UShPanic.ksh_w1_of_step N _ _ ...` in a section
+  with no `ghost_varG Σ Z` binder elaborated at a TC-found instance with
+  evar families and never finished (flat 2.5 GB).  Pass `(ghost_varG0 :=
+  offbox_offG)` and the families explicitly, as the landed children do.
 
