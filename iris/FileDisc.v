@@ -1529,6 +1529,13 @@ Definition dg_exec_secc : list (list (bv 8)) :=
   [ sb "exec"%string; cmd_seccomp; sb "failed"%string ].
 Definition alt_execsecc : list (bv 8) := wl_line dg_exec_secc ++ u_prompt.
 Notation alt_catopen := (alt_catopenN fname_f).
+(* sh's child died of OUT OF MEMORY in [parsecmd] (upstream d66e41c,
+   "sh: panic when out of memory": [cmdalloc]'s [panic("out of memory")]
+   prints [out of memory] on fd 2 and exits the child; sh then prints
+   its prompt).  A word line, like the exec diagnostics. *)
+Definition dg_oom : list (list (bv 8)) :=
+  [ sb "out"%string; sb "of"%string; sb "memory"%string ].
+Definition alt_oom : list (bv 8) := wl_line dg_oom ++ u_prompt.
 
 Lemma alt_openfail_string :
   alt_openfail = sb "open f failed"%string ++ nlb ++ sb "$ "%string.
@@ -1542,28 +1549,35 @@ Lemma alt_catopen_string :
   alt_catopen = sb "cat: cannot open f"%string ++ nlb ++ sb "$ "%string.
 Proof using. apply (bool_decide_unpack _). vm_compute. exact I. Qed.
 
+Lemma alt_oom_string :
+  alt_oom = sb "out of memory"%string ++ nlb ++ sb "$ "%string.
+Proof using. apply (bool_decide_unpack _). vm_compute. exact I. Qed.
+
 (* ONE ALTERNATIVE DECIDES A ROUND: what the console shows and what becomes
-   of [f].  [REcho] is the echo application's four, unchanged and with no
-   f-effect; the [RF*] are the redirect line's and the [RC*] are cat's. *)
+   of [f].  [REcho] is the echo application's four, with no f-effect (its
+   silent [REcho 2] admitted only at the blank line [LEcho []], see
+   [ralt_ok]); the [RF*] are the redirect line's and the [RC*] are cat's.
+   THERE IS NO SILENT ALTERNATIVE at a line sh forks for (claude-notes/
+   design/sync.md section 2): the one way such a command does not run and
+   the console still shows only sh's output is the child's out-of-memory
+   death in [parsecmd], and since upstream d66e41c that death PRINTS --
+   [ROom], shared by every forked line shape. *)
 Inductive ralt :=
   | REcho (a : nat)          (* the echo application's four; f unchanged *)
   | RFRan (sel : list nat)   (* "$ ";  f := the chunks that landed         *)
   | RFExec                   (* "exec echo failed\n$ ";  f := []          *)
   | RFOpenU                  (* "open f failed\n$ ";     f unchanged      *)
   | RFOpenM                  (* "open f failed\n$ ";     f := [] (created)*)
-  | RFSilent                 (* "$ ";                    f unchanged (limit 3;
-                                RULING HOLD-POS: the line's silent alternative
-                                leaves `f` alone, like [REcho 2] / [RCSilent]) *)
   | RFFork                   (* "fork\n";                f unchanged      *)
   | RCRan                    (* f's content, or cat's diagnostic; then "$ "*)
   | RCNoOpen                 (* "cat: cannot open f\n$ " at a PRESENT f   *)
   | RCExec                   (* "exec cat failed\n$ "                     *)
-  | RCSilent                 (* "$ "                                      *)
   | RCFork                   (* "fork\n"                                  *)
-  | RSExec.                  (* "exec seccomp failed\n$ " -- the shell's exec
-                                failure at a [seccomp] line; its fork panic and
-                                its silent round are [RCFork] and [RCSilent],
-                                whose bytes name no command *)
+  | RSExec                   (* "exec seccomp failed\n$ " -- the shell's exec
+                                failure at a [seccomp] line; its fork panic is
+                                [RCFork], whose bytes name no command *)
+  | ROom.                    (* "out of memory\n$ ";     f unchanged -- the
+                                child died in [parsecmd], before any open *)
 
 Global Instance ralt_eq_dec : EqDecision ralt.
 Proof using. solve_decision. Defined.
@@ -1576,11 +1590,13 @@ Definition ralt_enc (a : ralt) : nat :=
   match a with
   | REcho k => if decide (k < 4)%nat then k else (4 + 12 * (k - 4))%nat
   | RFExec => 5%nat | RFOpenU => 6%nat | RFOpenM => 7%nat
-  | RFSilent => 8%nat | RFFork => 9%nat
+  | RFFork => 9%nat
   | RCRan => 10%nat | RCNoOpen => 11%nat | RCExec => 12%nat
-  | RCSilent => 13%nat | RCFork => 14%nat
+  | RCFork => 14%nat
   | RFRan sel => (15 + 12 * encode_nat sel)%nat
   | RSExec => 17%nat
+  (* 18 is 6 mod 12: clear of [RFRan]'s class (3) and [REcho]'s (4) *)
+  | ROom => 18%nat
   end.
 
 Definition ralt_dec (n : nat) : ralt :=
@@ -1588,16 +1604,15 @@ Definition ralt_dec (n : nat) : ralt :=
   else if decide (n = 5%nat) then RFExec
   else if decide (n = 6%nat) then RFOpenU
   else if decide (n = 7%nat) then RFOpenM
-  else if decide (n = 8%nat) then RFSilent
   else if decide (n = 9%nat) then RFFork
   else if decide (n = 10%nat) then RCRan
   else if decide (n = 11%nat) then RCNoOpen
   else if decide (n = 12%nat) then RCExec
-  else if decide (n = 13%nat) then RCSilent
   else if decide (n = 14%nat) then RCFork
   else if decide (Nat.modulo n 12 = 3%nat)
        then RFRan (default [] (decode_nat (Nat.div (n - 15) 12)))
   else if decide (n = 17%nat) then RSExec
+  else if decide (n = 18%nat) then ROom
        else REcho (4 + Nat.div (n - 4) 12)%nat.
 
 Lemma fd_mod12_add (a m : nat) : Nat.modulo (a + 12 * m) 12 = Nat.modulo a 12.
@@ -1614,7 +1629,7 @@ Qed.
 
 Lemma ralt_dec_enc a : ralt_dec (ralt_enc a) = a.
 Proof using.
-  destruct a as [k | sel | | | | | | | | | | |]; try (by vm_compute).
+  destruct a as [k | sel | | | | | | | | | |]; try (by vm_compute).
   - (* REcho: its own index below 4, and out of every other code's way
        above it *)
     rewrite /ralt_enc. case_decide as Hk.
@@ -1622,8 +1637,9 @@ Proof using.
     + assert (Hm : Nat.modulo (4 + 12 * (k - 4)) 12 = 4%nat)
         by (rewrite fd_mod12_add; by vm_compute).
       rewrite /ralt_dec.
-      do 11 (case_decide; [exfalso; lia |]).
+      do 9 (case_decide; [exfalso; lia |]).
       case_decide; [exfalso; congruence |].
+      case_decide; [exfalso; lia |].
       case_decide; [exfalso; lia |].
       replace (4 + 12 * (k - 4) - 4)%nat with (12 * (k - 4))%nat by lia.
       rewrite fd_div12_mul. f_equal. lia.
@@ -1631,7 +1647,7 @@ Proof using.
     assert (Hm : Nat.modulo (15 + 12 * encode_nat sel) 12 = 3%nat)
       by (rewrite fd_mod12_add; by vm_compute).
     rewrite /ralt_enc /ralt_dec.
-    do 11 (case_decide; [exfalso; lia |]).
+    do 9 (case_decide; [exfalso; lia |]).
     case_decide; [| exfalso; congruence].
     replace (15 + 12 * encode_nat sel - 15)%nat with (12 * encode_nat sel)%nat
       by lia.
@@ -1652,19 +1668,31 @@ Definition ralt_panic (a : ralt) : bool :=
   | _ => false
   end.
 
-(* WHICH ALTERNATIVES A LINE SHAPE ADMITS, and [sel]'s shape *)
+(* WHICH ALTERNATIVES A LINE SHAPE ADMITS, and [sel]'s shape.  Every
+   forked line admits [ROom].  [REcho 2] -- the bare prompt, nothing run --
+   is admitted at [LEcho []] ONLY: that is the parser's fallback line
+   ([uline_of]'s [inhabitant]), which the proofs file a BLANK input line
+   at (sh re-prompts in the parent with no fork, sh.c:164), and no
+   admissible input parses to it ([LEcho []] fails [line_ok]: an echo
+   line has at least two words, so [parse_line_ok] never yields it, and
+   [UnionDisc.uline_of_u] reaches it only through [inhabitant]). *)
 Definition ralt_ok (l : uline) (a : ralt) : Prop :=
   match l with
-  | LEcho _ => match a with REcho k => (k < 4)%nat | _ => False end
+  | LEcho ws =>
+      match a with
+      | REcho k => (k < 4)%nat /\ (k = 2%nat -> ws = [])
+      | ROom => True
+      | _ => False
+      end
   | LEchoF ws _ =>
       match a with
       | RFRan sel => sel_ok (echo_chunks ws) sel
-      | RFExec | RFOpenU | RFOpenM | RFSilent | RFFork => True
+      | RFExec | RFOpenU | RFOpenM | RFFork | ROom => True
       | _ => False
       end
   | LCat _ =>
       match a with
-      | RCRan | RCNoOpen | RCExec | RCSilent | RCFork => True
+      | RCRan | RCNoOpen | RCExec | RCFork | ROom => True
       | _ => False
       end
   (* THE DEAD ARM.  [lines_of] never yields [LPipe] ([uline_of_nopipe]),
@@ -1676,16 +1704,16 @@ Definition ralt_ok (l : uline) (a : ralt) : Prop :=
      application reads its own [PipeDisc.palt_ok]/[pcont], never these. *)
   | LPipe _ _ =>
       match a with
-      | RCRan | RCNoOpen | RCExec | RCSilent | RCFork => True
+      | RCRan | RCNoOpen | RCExec | RCFork | ROom => True
       | _ => False
       end
-  (* THE SHELL'S OWN THREE at a [seccomp] line (seccomp design section 3):
-     its fork panic, its exec failure, its silent round.  The union adds
-     the terminal arm [UnionDisc.US] beside them; the file application
-     never files the line ([parse_line_not_secc]). *)
+  (* THE SHELL'S OWN at a [seccomp] line (seccomp design section 3): its
+     fork panic, its exec failure, the child's out-of-memory death.  The
+     union adds the terminal arm [UnionDisc.US] beside them; the file
+     application never files the line ([parse_line_not_secc]). *)
   | LSecc _ =>
       match a with
-      | RCFork | RSExec | RCSilent => True
+      | RCFork | RSExec | ROom => True
       | _ => False
       end
   end.
@@ -1696,18 +1724,14 @@ Proof using. destruct l, a; rewrite /ralt_ok; apply _. Defined.
 (* THE F-EFFECT.  [RFOpenM] is guarded at an ABSENT f (design section 1):
    xv6's [sys_open] truncates only after [filealloc] has succeeded, so at a
    present f the failed open leaves the file alone and this alternative is
-   [RFOpenU].  [RFSilent]'s effect is IDENTITY (RULING HOLD-POS, 2026-09-18):
-   it is sh's [argv[0] == 0] exit, unreachable under the discipline, and
-   every line shape then has one silent alternative that leaves `f` alone
-   ([REcho 2] / [RFSilent] / [RCSilent]) -- which is what the round's
-   credential files at the fork's relayed failure row. *)
+   [RFOpenU].  [ROom]'s effect is IDENTITY: the child dies in [parsecmd],
+   before the redirect's open. *)
 Definition fsm (s : fstate) (l : uline) (a : ralt) : fstate :=
   match l with
   | LEchoF ws N =>
       match a with
       | RFRan sel => <[N := subseq (echo_chunks ws) sel]> s
       | RFExec => <[N := []]> s
-      | RFSilent => s
       | RFOpenM => match s !! N with None => <[N := []]> s | Some _ => s end
       | _ => s
       end
@@ -1740,7 +1764,6 @@ Definition cont (s : fstate) (l : uline) (a : ralt) : list (bv 8) :=
   | RFExec => alt_execfail
   | RFOpenU => alt_openfailN (lname l)
   | RFOpenM => alt_openfailN (lname l)
-  | RFSilent => u_prompt
   | RFFork => alt_panic
   | RCRan => match s !! lname l with
              | Some bs => bs ++ u_prompt
@@ -1748,9 +1771,9 @@ Definition cont (s : fstate) (l : uline) (a : ralt) : list (bv 8) :=
              end
   | RCNoOpen => alt_catopenN (lname l)
   | RCExec => alt_execcat
-  | RCSilent => u_prompt
   | RCFork => alt_panic
   | RSExec => alt_execsecc
+  | ROom => alt_oom
   end.
 
 Lemma fstate_ok_fsm s l a : fstate_ok s -> uline_ok l -> ralt_ok l a -> fstate_ok (fsm s l a).
@@ -1890,6 +1913,8 @@ Proof using.
     by (apply (bool_decide_unpack _); vm_compute; exact I).
   assert (Hes : wl_wf dg_exec_secc)
     by (apply (bool_decide_unpack _); vm_compute; exact I).
+  assert (Hoom : wl_wf dg_oom)
+    by (apply (bool_decide_unpack _); vm_compute; exact I).
   assert (Hpr : exists u : list (bv 8), u_prompt = u ++ u_prompt
                   /\ Forall nodollar u
                   /\ (wl_nl ∉ u \/ exists v, wl_nl ∉ v /\ u = v ++ [wl_nl])).
@@ -1899,6 +1924,7 @@ Proof using.
   - (* REcho: the echo application's four, minus the panic one *)
     rewrite /ralt_panic in Hp. apply bool_decide_eq_false in Hp.
     rewrite /ralt_ok in Ha. destruct l as [ws | ws N | N | ws npc | ws]; [| done | done | done | done].
+    destruct Ha as [Ha _].
     destruct a as [| [| [| [| a]]]]; [| | | done | exfalso; lia].
     + exists (wl_line (drop 1 ws)). rewrite line_alts_of_0.
       split; [reflexivity |].
@@ -1914,7 +1940,6 @@ Proof using.
     split; [reflexivity |]. exact (wl_line_shape_fn _ Hop).
   - exists (wl_line (dg_openN (lname l))). rewrite /alt_openfailN.
     split; [reflexivity |]. exact (wl_line_shape_fn _ Hop).
-  - exact Hpr.
   - discriminate.
   - (* cat ran: the content, or its own diagnostic *)
     destruct (s !! lname l) as [bs |] eqn:Hsl.
@@ -1927,10 +1952,11 @@ Proof using.
     exact (dg_catopenN_shape _ (lname_fn l Hl)).
   - exists (wl_line dg_exec_cat). rewrite /alt_execcat.
     split; [reflexivity |]. exact (wl_line_shape' dg_exec_cat Hec).
-  - exact Hpr.
   - discriminate.
   - exists (wl_line dg_exec_secc). rewrite /alt_execsecc.
     split; [reflexivity |]. exact (wl_line_shape' dg_exec_secc Hes).
+  - exists (wl_line dg_oom). rewrite /alt_oom.
+    split; [reflexivity |]. exact (wl_line_shape' dg_oom Hoom).
 Qed.
 
 (* ====================================================================== *)
@@ -2769,9 +2795,13 @@ Qed.
 (*  7.  THE ECHO APPLICATION IS THIS ONE AT ITS ECHO LINES                 *)
 (*                                                                        *)
 (*  Nothing in [EchoDisc] is re-stated or weakened: at a history whose     *)
-(*  every complete line is an echo line, [sessf] IS [sess] and [disc_f]    *)
-(*  IS [disc] -- the file's rounds are literally today's, which is why     *)
-(*  the [REcho] alternatives had to encode as their own index.            *)
+(*  every complete line is an echo line, and at a resolution in the echo   *)
+(*  application's four codes, [sessf] IS [sess] -- the file's rounds are   *)
+(*  literally today's, which is why the [REcho] alternatives had to encode *)
+(*  as their own index.  The two RANGE conditions no longer coincide (the  *)
+(*  whole-history [disc_f] -> [disc] went with them, sync design section   *)
+(*  2): an echo line here admits [ROom] and not the silent [REcho 2],      *)
+(*  which the echo application's model still has.                         *)
 (* ====================================================================== *)
 
 Definition echo_only (I : list (bv 8)) : Prop := Forall body_ok (bodies_of I).
@@ -2883,13 +2913,6 @@ Proof using.
     apply fd_some_eq in Hh. exact (cmd_seccomp_ne_echo Hh).
 Qed.
 
-Lemma ralt_ok_echo_lt4 ws c : ralt_ok (LEcho ws) (ralt_dec c) -> (c < 4)%nat.
-Proof using.
-  rewrite /ralt_dec. case_decide as H4; [by intros _ |].
-  do 10 (case_decide; [by intros [] |]).
-  case_decide; [by intros [] |]. case_decide; [by intros [] |]. rewrite /ralt_ok. lia.
-Qed.
-
 Lemma ralt_panic_echo c :
   (c < 4)%nat -> ralt_panic (ralt_dec c) = bool_decide (c = 3%nat).
 Proof using. intro H. by rewrite (ralt_dec_lt4 c H). Qed.
@@ -2944,34 +2967,6 @@ Proof using.
   intro Hc. rewrite /pro_ok_f /pro_ok (pro_idx_f_echo cs q Hc). done.
 Qed.
 
-Lemma alts_ok_lt4 I cs :
-  echo_only I -> alts_ok I cs -> Forall (fun c => (c < 4)%nat) cs.
-Proof using.
-  intros He Ha. apply Forall_lookup. intros i c Hc.
-  destruct (Forall2_lookup_r _ _ _ _ _ Ha Hc) as (l & Hl & Hok).
-  rewrite /lines_of list_lookup_fmap in Hl.
-  destruct (bodies_of I !! i) as [b |] eqn:Hb; [| discriminate].
-  cbn in Hl. injection Hl as <-.
-  rewrite (uline_of_echo b (Forall_lookup_1 _ _ _ _ He Hb)) in Hok.
-  exact (ralt_ok_echo_lt4 _ c Hok).
-Qed.
-
-Lemma alts_ok_of_lt4 I cs :
-  echo_only I -> length cs = nlines I ->
-  Forall (fun c => (c < 4)%nat) cs -> alts_ok I cs.
-Proof using.
-  intros He Hl HF. rewrite /alts_ok.
-  apply Forall2_same_length_lookup_2;
-    [rewrite /lines_of length_fmap; by rewrite Hl |].
-  intros i l c Hli Hci.
-  rewrite /lines_of list_lookup_fmap in Hli.
-  destruct (bodies_of I !! i) as [b |] eqn:Hb; [| discriminate].
-  cbn in Hli. injection Hli as <-.
-  rewrite (uline_of_echo b (Forall_lookup_1 _ _ _ _ He Hb)).
-  rewrite (ralt_dec_lt4 c (Forall_lookup_1 _ _ _ _ HF Hci)).
-  rewrite /ralt_ok. exact (Forall_lookup_1 _ _ _ _ HF Hci).
-Qed.
-
 Lemma disc_input_f_of_echo I : echo_only I -> disc_input I -> disc_input_f I.
 Proof using.
   intros He (Hb & Hr & Hs). split.
@@ -2981,53 +2976,11 @@ Proof using.
   apply Forall_impl with (P := wl_body_byte); [exact Hr | exact fbody_byte_of_body].
 Qed.
 
-(* THE COMPATIBILITY, at the whole history: a file session that is
-   echo-only is disciplined for the echo application too.  Both rules are
-   at the input's COMPLETE LINES, so the per-point step is [sessf_sess] at
-   [done_of] (which [echo_only] and the range condition both survive, being
-   prefix-closed and at [nlines_done]). *)
-Lemma disc_f_disc h :
-  Forall disc_seg (cycles_of h) -> disc_f h -> disc h.
-Proof using.
-  intros HD Hf.
-  - (* the file model's discipline is the echo model's *)
-    apply Forall_lookup. intros i seg Hi.
-    assert (Hds : disc_seg seg) by (exact (Forall_lookup_1 _ _ _ _ HD Hi)).
-    assert (He : echo_only (ins seg)) by (by destruct Hds as (? & _ & _)).
-    destruct (Forall_lookup_1 _ _ _ _ Hf Hi)
-      as (s & _ & _ & (ps & cs & Hao & Hall)).
-    assert (Hlt4 : Forall (fun c => (c < 4)%nat) cs)
-      by (exact (alts_ok_lt4 _ _ He Hao)).
-    pose proof (alts_ok_length _ _ Hao) as Hlen.
-    split; [exact Hds |]. exists ps, cs.
-    split; [exact Hlen |]. split; [exact Hlt4 |].
-    intros p Hp.
-    assert (Hple : ins p `prefix_of` ins seg)
-      by (apply ins_prefix;
-          exact (proj1 (Forall_forall _ _) (in_pres_prefix_all seg) p Hp)).
-    assert (Hep : echo_only (ins p)) by (exact (echo_only_prefix _ _ Hple He)).
-    assert (Hnl : (nlines (ins p) <= nlines (ins seg))%nat)
-      by (by apply nlines_prefix).
-    assert (Hc4 : forall j, (j < nlines (ins p))%nat -> (cs !!! j < 4)%nat).
-    { intros j Hj.
-      destruct (lookup_lt_is_Some_2 cs j ltac:(lia)) as [c Hc].
-      rewrite (list_lookup_total_correct _ _ _ Hc).
-      exact (Forall_lookup_1 _ _ _ _ Hlt4 Hc). }
-    destruct (Hall p Hp) as [Hok Hpt].
-    split.
-    + by apply (pro_ok_f_ok ps cs (nlines (ins p)) Hc4).
-    + rewrite /disc_pt.
-      rewrite -(sessf_sess ps cs s (done_of (ins p))
-                  (echo_only_prefix _ _ (done_of_prefix _) Hep)
-                  ltac:(rewrite nlines_done; exact Hc4)).
-      exact Hpt.
-Qed.
-
 (* ====================================================================== *)
-(*  8.  ANTI-VACUITY: SIX MACHINE TRANSCRIPTS, FIVE GOOD AND ONE BAD       *)
+(*  8.  ANTI-VACUITY: SEVEN MACHINE TRANSCRIPTS, SIX GOOD AND ONE BAD      *)
 (*                                                                        *)
 (*  Everything here is CLOSED, so [vm_compute] answers it through the      *)
-(*  parser, the chunk arithmetic and the encoding.  The five good ones     *)
+(*  parser, the chunk arithmetic and the encoding.  The six good ones      *)
 (*  say the model admits what the machine does; the bad one says it does   *)
 (*  not admit what the machine cannot do -- a [cat f] that prints bytes    *)
 (*  nobody echoed into [f].                                                *)
@@ -3157,6 +3110,22 @@ Proof using.
   apply (bool_decide_unpack _). vm_compute. exact I.
 Qed.
 
+(* (6) THE OUT-OF-MEMORY ROUND: sh's child died in [parsecmd], before the
+   open, and said so; [f] was never created, so [cat f] prints cat's
+   diagnostic *)
+Definition fd_seg6 : list mobs :=
+  demo_out u_prologue
+  ++ demo_typed (line_bytes (LEchoF fd_ws fd_nm))
+  ++ demo_out alt_oom
+  ++ demo_typed (line_bytes (LCat fd_nm))
+  ++ demo_out (alt_catopenN fd_nm).
+
+Lemma demo_f6 : good_out_f ∅ fd_seg6.
+Proof using.
+  exists [3%nat; 0%nat], [ralt_enc ROom; ralt_enc RCRan].
+  apply (bool_decide_unpack _). vm_compute. exact I.
+Qed.
+
 (* ---- THE NEGATIVE WITNESS -------------------------------------------- *)
 
 (* the head byte of a concatenation is the head byte of its first part *)
@@ -3185,7 +3154,7 @@ Proof using.
 Qed.
 
 (* WHAT A [cat f] ROUND CAN PUT ON THE WIRE FIRST, at a file that only
-   [echo hello world > f] ever wrote: '$', 'c', 'e', 'f', or one of
+   [echo hello world > f] ever wrote: '$', 'c', 'e', 'f', 'o', or one of
    [hello world\n]'s own bytes.  Never 'g'. *)
 Lemma fd_cat_head (s : fstate) (a : ralt) (Z : list (bv 8)) (b : bv 8) :
   ralt_ok (LCat fd_nm) a ->
@@ -3200,6 +3169,8 @@ Proof using.
   assert (Hce : alt_execcat !! 0%nat = Some (Z_to_bv 8 101%Z))
     by (apply (bool_decide_unpack _); vm_compute; exact I).
   assert (Hcf : alt_panic !! 0%nat = Some (Z_to_bv 8 102%Z))
+    by (apply (bool_decide_unpack _); vm_compute; exact I).
+  assert (Hco' : alt_oom !! 0%nat = Some (Z_to_bv 8 111%Z))
     by (apply (bool_decide_unpack _); vm_compute; exact I).
   destruct a; try (by destruct Ha); rewrite /cont in Hb;
     cbn [lname line_file default] in Hb.
@@ -3219,8 +3190,8 @@ Proof using.
           vm_compute in Hx; injection Hx as <-; rewrite -Hxb; by vm_compute.
   - rewrite (fd_head_app _ _ _ _ Hco Hb). by vm_compute.
   - rewrite (fd_head_app _ _ _ _ Hce Hb). by vm_compute.
-  - rewrite (fd_head_app _ _ _ _ u_prompt_head Hb). by vm_compute.
   - rewrite (fd_head_app _ _ _ _ Hcf Hb). by vm_compute.
+  - rewrite (fd_head_app _ _ _ _ Hco' Hb). by vm_compute.
 Qed.
 
 (* the file [echo hello world > f] leaves, whichever way its round went *)
@@ -3236,8 +3207,8 @@ Proof using.
   - right. exists []. split; [apply sel_ok_nil | apply lookup_insert].
   - left. apply lookup_empty.
   - right. exists []. split; [apply sel_ok_nil |]. rewrite lookup_empty. apply lookup_insert.
-  - (* RFSilent: identity (RULING HOLD-POS) *) left. apply lookup_empty.
   - left. apply lookup_empty.
+  - (* ROom: identity *) left. apply lookup_empty.
 Qed.
 
 (* the three appends the cancellation goes through *)

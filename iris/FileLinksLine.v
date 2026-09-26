@@ -384,16 +384,9 @@ Proof using.
   rewrite wr_pro_f_lm wr_sp_f_lm. apply (lm_wr_pro_dollar file_lm file_lm_laws).
 Qed.
 
-(* (2) the LINE's choice byte at a settled round: the shell's '$' is the
-       block's first byte and files the round's "nobody wrote" alternative,
-       whichever of the three line shapes it is *)
-Lemma wr_blk_dollar_f (ps cs : list nat) (s0 : fstate) (I : list (bv 8))
-    (P : nat) :
-  wr_blk_f ps cs s0 I P ->
-  wr_sp_f ps (cs ++ [fnoc_of (fline I)]) s0 I (S P).
-Proof using.
-  rewrite wr_blk_f_lm wr_sp_f_lm. apply (lm_wr_blk_dollar file_lm file_hooks).
-Qed.
+(* (2) the LINE's choice byte at a settled round is the block of the
+       alternative the round took ([LineModelLinks.lm_wr_blk_dollar] at
+       it); there is no "nobody wrote" alternative to file *)
 
 (* (3) the SPACE, and (4) the READ *)
 Lemma wr_sp_open_f (ps cs : list nat) (s0 : fstate) (I : list (bv 8)) (P : nat) :

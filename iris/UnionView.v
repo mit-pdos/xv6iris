@@ -7,9 +7,7 @@
 (* function at the round's state is [FileDisc.files_of], and a pipeline  *)
 (* alternative is coded as the union's [UPE] (an echo pipeline) or      *)
 (* [UPC] (a [cat f] one).  Every law holds at EVERY                       *)
-(* admission: the cross cases of [UnionDisc.uok] are [False]              *)
-(* (amendment B2), so an admitted alternative at a pipeline line is a    *)
-(* pipeline one ([pv_onto]).                                              *)
+(* admission.                                                             *)
 (*                                                                        *)
 (* THE ENCODING IS THE MODEL'S, per line ([pv_enc] takes the pipeline):   *)
 (* [uv_alt] cases on the line's producer (C9b2's split), and nothing       *)
@@ -50,7 +48,7 @@ Proof using. unfold uv_enc. by rewrite ualt_dec_code. Qed.
 Definition pview_union (adm : pline' -> bool) (adm_s : list (list (bv 8)) -> bool)
   : pview (ulm adm adm_s).
 Proof.
-  refine (@MkPV (ulm adm adm_s) uv_line files_of adm uv_enc _ _ _ _ _ _).
+  refine (@MkPV (ulm adm adm_s) uv_line files_of adm uv_enc _ _ _ _ _).
   - intros s l pl a Hl. destruct (uv_line_some l pl Hl) as (p & n & -> & ->).
     cbn [ulm lm_ok lm_dec]. rewrite uv_dec. destruct p; reflexivity.
   - intros s l pl a Hl. destruct (uv_line_some l pl Hl) as (p & n & -> & ->).
@@ -61,10 +59,6 @@ Proof.
     destruct pl as [ws | [ws | f] n]; reflexivity.
   - intros s l pl a Hl. destruct (uv_line_some l pl Hl) as (p & n & -> & ->).
     cbn [ulm lm_step lm_dec]. rewrite uv_dec. destruct p; reflexivity.
-  - intros s l pl x Hl Hok. destruct (uv_line_some l pl Hl) as (p & n & -> & ->).
-    cbn [ulm lm_ok] in Hok.
-    destruct x as [r | a | a | u], p as [ws | f]; cbn [uok] in Hok; try contradiction;
-      exists a; cbn [ulm lm_dec]; rewrite uv_dec; reflexivity.
 Defined.
 
 (* the round's content at a well-formed state is a word line's *)

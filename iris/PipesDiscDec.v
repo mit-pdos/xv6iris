@@ -588,7 +588,7 @@ Section pipes_hooks.
   Definition pipes_hooks : lm_hooks PM :=
     MkLMH PM (fun a => negb (plterm a)) tt
       (fun _ => plalt_code PLPanic) (fun l => plalt_code (PLRun (pl_exfb l)))
-      (fun l => pl_exfb l ++ u_prompt) (fun _ => plalt_code (PLRun []))
+      (fun l => pl_exfb l ++ u_prompt) (fun _ => Some (plalt_code (PLRun [])))
       (pipes_lm_ok_dec fc adm)
       (fun _ _ _ _ _ => eq_refl) phk_free_term (fun _ _ _ _ _ H => H)
       phk_pan_ok (fun _ => eq_trans (phk_code_free PLPanic) eq_refl)
@@ -596,9 +596,13 @@ Section pipes_hooks.
       phk_exf_ok (fun l => eq_trans (phk_code_free (PLRun (pl_exfb l))) eq_refl)
       (fun l => eq_trans (phk_code_panic (PLRun (pl_exfb l))) eq_refl)
       (fun s l => phk_code_cont s l (PLRun (pl_exfb l)))
-      phk_noc_ok (fun _ => eq_trans (phk_code_free (PLRun [])) eq_refl)
-      (fun _ => eq_trans (phk_code_panic (PLRun [])) eq_refl)
-      (fun s l => phk_code_cont s l (PLRun []))
+      (fun s l c => lmh_noc_some (fun c => lm_ok PM s l (lm_dec PM c)) _ c (phk_noc_ok s l))
+      (fun _ c => lmh_noc_some (fun c => negb (plterm (lm_dec PM c)) = true) _ c
+                    (eq_trans (phk_code_free (PLRun [])) eq_refl))
+      (fun _ c => lmh_noc_some (fun c => lm_panic PM (lm_dec PM c) = false) _ c
+                    (eq_trans (phk_code_panic (PLRun [])) eq_refl))
+      (fun s l c => lmh_noc_some (fun c => lm_cont PM s l (lm_dec PM c) = u_prompt) _ c
+                      (phk_code_cont s l (PLRun [])))
       phk_cont_prompt phk_cont_nonnil.
 End pipes_hooks.
 

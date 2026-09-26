@@ -4,7 +4,8 @@
 (*  [FileLinksLine]'s section S0, moved below [FileOut] unchanged: the    *)
 (*  line the input's last complete body parses to, the state-free         *)
 (*  alternatives, the named alternatives (the fork panic, the exec        *)
-(*  failure with its bytes, the silent round), the continuation's shape   *)
+(*  failure with its bytes, the silent round where the model has one --  *)
+(*  the blank line's), the continuation's shape                          *)
 (*  lemmas, and [file_hooks : lm_hooks file_lm] with its equations.  The  *)
 (*  generic claim ([GenOut.gcl]) needs the hooks, and the file's claim    *)
 (*  sits below the link families that used to carry them.                *)
@@ -113,8 +114,6 @@ Definition fexfb (l : uline) : list (bv 8) :=
   | LPipe _ _ => alt_execcat
   | LSecc _ => alt_execsecc
   end.
-
-Definition fnoc : nat := ralt_enc RFSilent.
 
 
 (* ---- the block's LAST TWO BYTES are the shell's prompt, at every
@@ -248,59 +247,47 @@ Qed.
 
 
 
-(* the alternative a round takes when NOBODY wrote: the shell's own
-   prompt IS the block's first byte, and which code that is depends on the
-   line ([REcho 2] at an echo line, [RFSilent] at a redirect one,
-   [RCSilent] at a cat one) -- all three print [u_prompt]. *)
-Definition fnoc_of (l : uline) : nat :=
+(* THE SILENT ROUND, where the model has one: the shell's own prompt IS
+   the block's first byte and nothing moved.  Only the blank line's
+   [LEcho []] ([REcho 2], [FileDisc.ralt_ok]): every line sh forks for
+   admits [ROom] instead, and no silent alternative. *)
+Definition fnoc_of (l : uline) : option nat :=
   match l with
-  | LEcho _ => 2%nat
-  | LEchoF _ _ => ralt_enc RFSilent
-  | LCat _ => ralt_enc RCSilent
-  | LPipe _ _ => ralt_enc RCSilent
-  | LSecc _ => ralt_enc RCSilent
+  | LEcho [] => Some 2%nat
+  | _ => None
   end.
 
-Lemma fnoc_of_ok (l : uline) : ralt_ok l (ralt_dec (fnoc_of l)).
+Lemma fnoc_of_some (l : uline) (c : nat) : fnoc_of l = Some c -> l = LEcho [] /\ c = 2%nat.
 Proof using.
-  destruct l as [ws | ws N | N | ws npc | ws]; cbn [fnoc_of].
-  - rewrite (ralt_dec_lt4 2%nat ltac:(lia)) /ralt_ok. lia.
-  - by rewrite (ralt_dec_enc RFSilent).
-  - by rewrite (ralt_dec_enc RCSilent).
-  - by rewrite (ralt_dec_enc RCSilent).
-  - by rewrite (ralt_dec_enc RCSilent).
+  destruct l as [[| w ws] | ws N | N | ws npc | ws]; cbn [fnoc_of]; intros Hc;
+    try discriminate Hc.
+  injection Hc as <-. by split.
 Qed.
 
-Lemma fnoc_of_free (l : uline) : fstate_free (ralt_dec (fnoc_of l)) = true.
+Lemma fnoc_of_ok (l : uline) (c : nat) : fnoc_of l = Some c -> ralt_ok l (ralt_dec c).
 Proof using.
-  destruct l as [ws | ws N | N | ws npc | ws]; cbn [fnoc_of].
-  - by rewrite (ralt_dec_lt4 2%nat ltac:(lia)).
-  - by rewrite (ralt_dec_enc RFSilent).
-  - by rewrite (ralt_dec_enc RCSilent).
-  - by rewrite (ralt_dec_enc RCSilent).
-  - by rewrite (ralt_dec_enc RCSilent).
+  intros Hc. destruct (fnoc_of_some l c Hc) as [-> ->].
+  rewrite (ralt_dec_lt4 2%nat ltac:(lia)) /ralt_ok. split; [lia | reflexivity].
 Qed.
 
-Lemma fnoc_of_nopanic (l : uline) : ralt_panic (ralt_dec (fnoc_of l)) = false.
+Lemma fnoc_of_free (l : uline) (c : nat) : fnoc_of l = Some c -> fstate_free (ralt_dec c) = true.
 Proof using.
-  destruct l as [ws | ws N | N | ws npc | ws]; cbn [fnoc_of].
-  - rewrite (ralt_dec_lt4 2%nat ltac:(lia)). by vm_compute.
-  - by rewrite (ralt_dec_enc RFSilent).
-  - by rewrite (ralt_dec_enc RCSilent).
-  - by rewrite (ralt_dec_enc RCSilent).
-  - by rewrite (ralt_dec_enc RCSilent).
+  intros Hc. destruct (fnoc_of_some l c Hc) as [-> ->].
+  by rewrite (ralt_dec_lt4 2%nat ltac:(lia)).
 Qed.
 
-Lemma cont_fnoc (s : fstate) (l : uline) :
-  cont s l (ralt_dec (fnoc_of l)) = u_prompt.
+Lemma fnoc_of_nopanic (l : uline) (c : nat) :
+  fnoc_of l = Some c -> ralt_panic (ralt_dec c) = false.
 Proof using.
-  destruct l as [ws | ws N | N | ws npc | ws]; cbn [fnoc_of].
-  - rewrite (ralt_dec_lt4 2%nat ltac:(lia)). cbn [cont uline_ws].
-    reflexivity.
-  - by rewrite (ralt_dec_enc RFSilent).
-  - by rewrite (ralt_dec_enc RCSilent).
-  - by rewrite (ralt_dec_enc RCSilent).
-  - by rewrite (ralt_dec_enc RCSilent).
+  intros Hc. destruct (fnoc_of_some l c Hc) as [-> ->].
+  rewrite (ralt_dec_lt4 2%nat ltac:(lia)). by vm_compute.
+Qed.
+
+Lemma cont_fnoc (s : fstate) (l : uline) (c : nat) :
+  fnoc_of l = Some c -> cont s l (ralt_dec c) = u_prompt.
+Proof using.
+  intros Hc. destruct (fnoc_of_some l c Hc) as [-> ->].
+  rewrite (ralt_dec_lt4 2%nat ltac:(lia)). cbn [cont uline_ws]. reflexivity.
 Qed.
 
 
@@ -319,10 +306,11 @@ Lemma cont_prompt (s : fstate) (l : uline) (a : ralt) :
   exists u : list (bv 8), cont s l a = u ++ u_prompt.
 Proof using.
   intros Hok Hp. revert s.
-  destruct a as [k | sel | | | | | | | | | | |]; intros st.
+  destruct a as [k | sel | | | | | | | | | |]; intros st.
   { (* [REcho]: on its own, so no [vm_compute] meets the line *)
     rewrite /ralt_ok in Hok. destruct l as [ws | ws N | N | ws npc | ws];
       cbn in Hok; try done.
+    destruct Hok as [Hok _].
     cbn [ralt_panic] in Hp. apply bool_decide_eq_false in Hp.
     cbn [cont uline_ws].
     pose proof (line_alts_len_ge2 ws k ltac:(lia)) as Hl.
@@ -515,14 +503,5 @@ Proof using.
   apply fapr_lm. apply (lm_apr_exf file_lm file_hooks).
 Qed.
 
-Lemma fab_noc (I : list (bv 8)) : fab I (fnoc_of (fline I)) = u_prompt.
-Proof using.
-  rewrite fab_lm fline_lm. apply (lm_ab_noc file_lm file_hooks).
-Qed.
-
-Lemma fapr_noc (I : list (bv 8)) : fapr I (fnoc_of (fline I)).
-Proof using.
-  apply fapr_lm. apply (lm_apr_noc file_lm file_hooks).
-Qed.
 
 

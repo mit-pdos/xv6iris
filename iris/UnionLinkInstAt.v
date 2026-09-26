@@ -230,7 +230,7 @@ Section union_link_inst_at.
       (union_links ug) (union_links_persistent ug) (union_links_gl_at s0)
       (union_X_dollar_at s0) (uread_ret ug) (uread_ret_res ug) (fturn_pre_at gf s0)
       (uturn0_at s0) (urresw ug) (urresw_persistent ug) (urresw_timeless ug)
-      (urresw_res_at s0) (ualt_code (UR RFSilent)).
+      (urresw_res_at s0).
 
   Lemma union_at_T (s0 : fstate) : lk_T (union_link_inst_at s0) = UT.
   Proof using . reflexivity. Qed.

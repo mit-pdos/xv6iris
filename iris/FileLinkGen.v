@@ -300,7 +300,7 @@ Section file_link_gen.
     gen_link_inst file_lm file_params file_X file_X_tl (file_links g)
       (file_links_persistent g) file_links_gl file_X_dollar (fread_ret g)
       fread_ret_res (fturn_pre g) fturn0_gen (fwc_rresw g)
-      (fwc_rresw_persistent g) (fwc_rresw_timeless g) fwc_rresw_res fnoc.
+      (fwc_rresw_persistent g) (fwc_rresw_timeless g) fwc_rresw_res.
   (* =================================================================== *)
   (*  5.  THE SAME SECTION AT A NAMED BOOT STATE (RULING H')              *)
   (*                                                                     *)

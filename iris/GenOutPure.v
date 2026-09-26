@@ -453,13 +453,15 @@ Section gen_out_pure.
   (*                                                                    *)
   (*  The discipline's and the claim's statements are at [lm_alts_ok] -- *)
   (*  one entry per completed line -- and the stage's list runs one short *)
-  (*  at a block boundary.  The pad entry is the line's SILENT round      *)
-  (*  ([lmh_noc]): admissible, never a panic, never coverage-ending,      *)
-  (*  which is all a pad entry needs ([FileOutPure.ralt_def]/[PipeOutPure *)
-  (*  .palt_def] were per-model choices of the same thing).               *)
+  (*  at a block boundary.  The pad entry is the line's EXEC FAILURE      *)
+  (*  ([lmh_exf]): admissible at every line and state, never a panic,     *)
+  (*  never coverage-ending, which is all a pad entry needs               *)
+  (*  ([FileOutPure.ralt_def]/[PipeOutPure.palt_def] were per-model       *)
+  (*  choices of the same thing).  It used to be the silent round, which  *)
+  (*  a model need not have ([lmh_noc] is optional).                      *)
   (* ================================================================== *)
   Definition lm_alts_pad (I : list (bv 8)) (cs : list nat) : list nat :=
-    cs ++ ((fun b => lmh_noc K (lm_of M b)) <$> drop (length cs) (bodies_of I)).
+    cs ++ ((fun b => lmh_exf K (lm_of M b)) <$> drop (length cs) (bodies_of I)).
 
   Lemma lm_alts_pad_prefix I cs : cs `prefix_of` lm_alts_pad I cs.
   Proof using. rewrite /lm_alts_pad. by eexists. Qed.
@@ -474,10 +476,10 @@ Section gen_out_pure.
     rewrite /nlines in Hle |- *. lia.
   Qed.
 
-  (* inside the pad, the entry is the line's silent round *)
+  (* inside the pad, the entry is the line's exec failure *)
   Lemma lm_alts_pad_at I cs j :
     (length cs <= j)%nat -> (j < nlines I)%nat ->
-    lm_alts_pad I cs !!! j = lmh_noc K (lm_of M (bodies_of I !!! j)).
+    lm_alts_pad I cs !!! j = lmh_exf K (lm_of M (bodies_of I !!! j)).
   Proof using.
     intros Hge Hlt. rewrite /nlines in Hlt.
     destruct (lookup_lt_is_Some_2 (bodies_of I) j Hlt) as [b Hb].
@@ -504,7 +506,7 @@ Section gen_out_pure.
                  ltac:(intros j Hj; apply Hpad; lia) ltac:(intros j _; reflexivity)).
       rewrite /lm_at (Hpad i Hlt) (list_lookup_total_correct _ _ _ Hc).
       exact Hok.
-    - rewrite /lm_at (lm_alts_pad_at I cs i ltac:(lia) Hi). apply lmh_noc_ok.
+    - rewrite /lm_at (lm_alts_pad_at I cs i ltac:(lia) Hi). apply lmh_exf_ok.
   Qed.
 
   (* the pad changes no panic bit on the input's lines: below the stage's
@@ -518,7 +520,7 @@ Section gen_out_pure.
       by rewrite -list_lookup_total_alt.
     - rewrite (lm_panic_ge M B cs j ltac:(lia)).
       rewrite /lm_at (lm_alts_pad_at I cs j ltac:(lia) Hj).
-      apply lmh_noc_nopanic.
+      apply lmh_exf_nopanic.
   Qed.
 
   (* ...and the pad never ends coverage ([PipeOutPure.alts_pad_p_isforkS]) *)
@@ -527,7 +529,7 @@ Section gen_out_pure.
     lm_term M (lm_at M (lm_alts_pad I cs) j) = false.
   Proof using.
     intros Hge Hj. rewrite /lm_at (lm_alts_pad_at I cs j Hge Hj).
-    apply (lmh_free_term K), (lmh_noc_free K).
+    apply (lmh_free_term K), (lmh_exf_free K).
   Qed.
 
   Lemma lm_alts_pad_pro_idx I cs q :
