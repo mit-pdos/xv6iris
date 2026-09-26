@@ -305,7 +305,7 @@ theorem kxcB2_call_readi (RD : READI) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF
     (by k_norm_g; simp [RegMap.set_apply, ha1]) (by k_norm_g; simp [RegMap.set_apply, ha3])
     (by k_norm_g; simp [RegMap.set_apply, ha4]) (fun _ => holds)
   unfold wp_readi_eb_body at h
-  simp only [readiAddr, Bool.false_eq_true, if_false, _root_.and_false, _root_.false_or, fsView_gd] at h
+  simp only [readiAddr, Bool.false_eq_true, if_false, _root_.and_false, _root_.false_and, _root_.false_or, fsView_gd] at h
   ihave Hmap : inodeMapQ fscFs (DFrac.own 1) (ientry kf) bmf $$ [Haddrs Hind]
   · iapply inodeMapQ_1_to fscFs (DFrac.own 1) (ientry kf) bmf rfl
     unfold inodeMap; iframe

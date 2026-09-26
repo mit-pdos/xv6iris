@@ -42,7 +42,7 @@ def rdPost (k : KCtx) (γb : BcacheNames) (γfs : FsNames) (dev : BitVec 32) (j 
   fun cpu' => iprop(∀ (spie spp : Bool) (R' : RegMap) (tot : Nat),
     ⌜calleeSaved k.regs R'⌝ -∗
     ⌜tot ≤ rdClamp dn.diSize off n⌝ -∗
-    ⌜(R' 10#5 = -1#64 ∧ user = true) ∨
+    ⌜(R' 10#5 = -1#64 ∧ user = true ∧ rdFailWhy Vp.upt (k.regs 12#5) n) ∨
       (R' 10#5 = BitVec.ofNat 64 tot ∧ tot = rdClamp dn.diSize off n)⌝ -∗
     kctx cpu' ((k.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k.regs 1#5)) -∗
     trapCsrsExt cpu' k.sie -∗ cpuClaimExt cpu' k.sie k.proc -∗
@@ -66,7 +66,7 @@ theorem rdPost_elim (k : KCtx) (γb : BcacheNames) (γfs : FsNames) (dev : BitVe
     ∀ (spie spp : Bool) (R' : RegMap) (tot : Nat),
     ⌜calleeSaved k.regs R'⌝ -∗
     ⌜tot ≤ rdClamp dn.diSize off n⌝ -∗
-    ⌜(R' 10#5 = -1#64 ∧ user = true) ∨
+    ⌜(R' 10#5 = -1#64 ∧ user = true ∧ rdFailWhy Vp.upt (k.regs 12#5) n) ∨
       (R' 10#5 = BitVec.ofNat 64 tot ∧ tot = rdClamp dn.diSize off n)⌝ -∗
     kctx cpu' ((k.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k.regs 1#5)) -∗
     trapCsrsExt cpu' k.sie -∗ cpuClaimExt cpu' k.sie k.proc -∗
@@ -122,7 +122,8 @@ theorem rd_join (cpu c0 : CPU) (k : KCtx) (spie spp : Bool) (R : RegMap) (rv : B
     (h18 : R 18#5 = k.regs 18#5) (h24 : R 24#5 = k.regs 24#5) (h25 : R 25#5 = k.regs 25#5)
     (h26 : R 26#5 = k.regs 26#5) (h27 : R 27#5 = k.regs 27#5)
     (htot : tot ≤ rdClamp dn.diSize off n)
-    (hret : (rv = -1#64 ∧ user = true) ∨ (rv = BitVec.ofNat 64 tot ∧ tot = rdClamp dn.diSize off n))
+    (hret : (rv = -1#64 ∧ user = true ∧ rdFailWhy Vp.upt (k.regs 12#5) n) ∨
+      (rv = BitVec.ofNat 64 tot ∧ tot = rdClamp dn.diSize off n))
     (hok : rdUserOk user Vp M P Mi (k.regs 12#5) data off tot) :
     kctx cpu (((k.withSpie spie spp).pushed 14).withRegs R) ∗ pcIs cpu (KA.«readi» + 0xd8#64) ∗
     rdFrame (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) (k.regs 9#5) v2 (k.regs 19#5) (k.regs 20#5)
@@ -176,8 +177,8 @@ theorem rd_join (cpu c0 : CPU) (k : KCtx) (spie spp : Bool) (R : RegMap) (rv : B
   · ipureintro; exact htot
   · ipureintro
     simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true]
-    rcases hret with ⟨h1, h2⟩ | ⟨h1, h2⟩
-    · exact Or.inl ⟨h1, h2⟩
+    rcases hret with ⟨h1, h2, h3⟩ | ⟨h1, h2⟩
+    · exact Or.inl ⟨h1, h2, h3⟩
     · exact Or.inr ⟨h1, h2⟩
 
 end

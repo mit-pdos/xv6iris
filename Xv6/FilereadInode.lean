@@ -354,7 +354,7 @@ theorem frd_seg_read (RD : READI) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
     (∀ (c' : CPU) (spie' spp' : Bool) (R' : RegMap) (tot dd : Nat) (P' : UPtd)
         (M' : Nat → List (BitVec 8)) (a0 : BitVec 64),
       ⌜frdRegs k (fnode fk) a0 (BitVec.ofInt 64 n) R' ∧ tot ≤ rdClamp dn.diSize v.toNat n.toNat ∧
-        ((a0 = -1#64 ∧ dd = 0) ∨
+        ((a0 = -1#64 ∧ dd = 0 ∧ rdFailWhy V.upt (k.regs 11#5) n.toNat) ∨
           (a0 = BitVec.ofNat 64 tot ∧ tot = rdClamp dn.diSize v.toNat n.toNat ∧ dd = tot)) ∧
         V.upt.extSz V.sz P' ∧ rdImg V.upt P' M M' (k.regs 11#5) data v.toNat tot⌝ -∗
       kctx c' (((k.withSpie spie' spp').pushed 6).withRegs R') -∗
@@ -418,6 +418,7 @@ theorem frd_seg_read (RD : READI) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
   iintro %cpu %spie1 %spp1 %R1 %tot %P' %M' %⟨hcs1, hle, hret, hext, himg⟩ Hk Hpc Hte Hce Hdev
     Hmeta Hmap Hblk Hpriv Hbs
   k_norm_g [frd_ret_48, frd_ww, frd_psw] at himg
+  k_norm_g [frd_ret_48, frd_ww, frd_psw] at hret
   k_norm_g [frd_ret_48, frd_ww, frd_psw]
   have hr1 : frdRegs k (fnode fk) (k.regs 11#5) (BitVec.ofInt 64 n) R1 := by
     refine frdRegs_cs _ _ _ _ _ _ ?_ hcs1
@@ -433,7 +434,7 @@ theorem frd_seg_read (RD : READI) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
   by_cases hz : R1 10#5 = -1#64 ∨ tot = 0
   · -- +0x4a  blez a0 : taken (nothing counted), straight to +0x54
     have hb : bcond bop.BGE 0#64 (R1 10#5) = true := by
-      rcases hret with h0 | ⟨h0, -⟩
+      rcases hret with ⟨h0, -⟩ | ⟨h0, -⟩
       · rw [h0]; exact filerw_bge0_m1
       · rcases hz with hm | h0'
         · rw [hm]; exact filerw_bge0_m1
@@ -441,12 +442,14 @@ theorem frd_seg_read (RD : READI) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
     k_step_e (wp_s_branch0 cpu _ (KA.«fileread» + 0x4a#64) false 10#13 10#5 (by decide) bop.BGE)
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hb]
     iintro Hk Hpc
-    have harm : (R1 10#5 = -1#64 ∧ (0 : Nat) = 0) ∨
+    -- ...AND THE -1 SKIP CARRIES readi's REASON (lane READ-RELAY), at
+    -- readi's own a2, which is fileread's `addr`
+    have harm : (R1 10#5 = -1#64 ∧ (0 : Nat) = 0 ∧ rdFailWhy V.upt (k.regs 11#5) n.toNat) ∨
         (R1 10#5 = BitVec.ofNat 64 tot ∧ tot = rdClamp dn.diSize v.toNat n.toNat ∧ (0 : Nat) = tot) := by
-      rcases hret with h0 | h1
-      · exact Or.inl ⟨h0, rfl⟩
+      rcases hret with ⟨h0, hw⟩ | h1
+      · exact Or.inl ⟨h0, rfl, hw⟩
       · rcases hz with hm | h0'
-        · exact Or.inl ⟨hm, rfl⟩
+        · exact absurd (h1.1.symm.trans hm) (srd_ofNat_ne_m1 tot (by omega))
         · exact Or.inr ⟨h1.1, h1.2, h0'.symm⟩
     iapply HK $$ %cpu %spie1 %spp1 %_ %tot %0 %P' %M' %(R1 10#5) [] Hk Hpc Hte Hce Hip [Hoff] Hdev
       Hmeta Hmap Hblk Hpriv Hbs
@@ -454,7 +457,7 @@ theorem frd_seg_read (RD : READI) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
     · rw [filerwOffW_zero]; iexact Hoff
   · -- +0x4a  blez a0 : falls (a positive count), `f->off += r`
     have hpos : R1 10#5 = BitVec.ofNat 64 tot ∧ tot = rdClamp dn.diSize v.toNat n.toNat := by
-      rcases hret with h0 | h
+      rcases hret with ⟨h0, -⟩ | h
       · exact absurd (Or.inl h0) hz
       · exact h
     have htz : tot ≠ 0 := fun h => hz (Or.inr h)

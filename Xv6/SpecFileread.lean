@@ -90,8 +90,8 @@ joins the shared epilogue (+0x5e) with the answer in `s2`.
    killed check); the swallowed byte's fault reason is `¬ uvaWmapped pt
    (addr + d)`.  `gn`/`pt` are Rocq's parameters of `console_receipt` /
    `fileread_extra(_core)` / the arms (`V.gen` / `V.upt` at the post).  The
-   inode arm does not read `pt` (Lean's `readArms` has no READ-RELAY fault
-   row).
+   inode arm reads `pt` too since READ-RELAY (Rocq 52b0eb67b): `readArms`'s
+   fired `-1` arm carries `rdFailWhy pt addr n`.
 5. **THE IMAGE**: Rocq's `umem_wr (us_M U) addr d bs` is `umemWrote V.upt M
    addr d P' M'` (the piperead/filestat spelling; the bytes existential) and
    the receipts read the resume image `M'` by `umemByte`
@@ -452,7 +452,10 @@ def filereadExtraCore (gn : GName) (pt : UPtd) (st : FdState) (n : Int) (F : Pfa
     (Rd : Nat → Nat → IProp GF) (Rin : List (List Obs × BitVec 8) → IProp GF) (r : BitVec 64)
     (M' : Nat → List (BitVec 8)) (addr : BitVec 64) : IProp GF :=
   match st with
-  | .open true _ (.inode i γo _) => readArms (hlc := hlc) (fsGammaL fscFs) i γo n F r M' addr
+  | .open true _ (.inode i γo _) =>
+    -- `pt` IS THE INODE ARM'S TABLE TOO (lane READ-RELAY): the fired `-1`
+    -- arm names an address of the buffer `addr` this table cannot write
+    readArms (hlc := hlc) (fsGammaL fscFs) i γo pt n F r M' addr
   | .open true _ (.device mj) =>
     if mj = CONSOLE then consoleReceipt (hlc := hlc) gn pt Rd Rin n r M' addr else iprop(emp)
   | .open true _ (.pipe _) => iprop(emp)
@@ -514,7 +517,7 @@ theorem filereadIn_inode_of (st : FdState) (wb : Bool) (i : Nat) (γo : GName)
 theorem filereadExtra_inode_of (st : FdState) (wb : Bool) (i : Nat) (γo : GName) (n : Int)
     (r : BitVec 64) (M' : Nat → List (BitVec 8)) (addr : BitVec 64)
     (h : st = .open true wb (.inode i γo .parked)) :
-    P ⊢ readArms (hlc := hlc) (fsGammaL fscFs) i γo n F r M' addr -∗
+    P ⊢ readArms (hlc := hlc) (fsGammaL fscFs) i γo pt n F r M' addr -∗
       filereadExtra (hlc := hlc) gn pt st n F Rd Rin P r M' addr := by
   subst h
   unfold filereadExtra filereadExtraCore
@@ -642,7 +645,7 @@ theorem filereadExtra_neg (st : FdState) (n : Int) (M' : Nat → List (BitVec 8)
       icases H $$ HP with ⟨HP, Hc⟩
       imodintro
       iframe HP
-      iapply readArms_neg _ i γo n F M' addr hn $$ Hc
+      iapply readArms_neg _ i γo pt n F M' addr hn $$ Hc
   · cases rb
     · simp only [filereadIn, filereadExtra, filereadExtraCore]
       iintro H HP; ihave H := H $$ HP; imodintro; iframe H

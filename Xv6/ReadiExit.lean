@@ -105,6 +105,7 @@ theorem rd_exit_fail (BE : BRELSE) (Γ : SchedNames) (cpu c0 : CPU) (k : KCtx) (
     (hnoff : k.noff = 0) (hlocks : k.locks = []) (htier : k.tier = KTier.kpt)
     (hR2 : R 2#5 = k.regs 2#5 + 0xFFFFFFFFFFFFFF90#64) (h18 : R 18#5 = bnode kk) (hkk : kk < NBUF)
     (huser : user = true) (htot : tot ≤ rdClamp dn.diSize off n)
+    (hwhy : rdFailWhy Vp.upt (k.regs 12#5) n)
     (hok : rdUserOk user Vp M P Mi (k.regs 12#5) data off tot) :
     kctx cpu (((k.withSpie spie spp).pushed 14).withRegs R) ∗ pcIs cpu (KA.«readi» + 0xaa#64) ∗
     rdFrame (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) (k.regs 9#5) (k.regs 18#5) (k.regs 19#5)
@@ -195,7 +196,7 @@ theorem rd_exit_fail (BE : BRELSE) (Γ : SchedNames) (cpu c0 : CPU) (k : KCtx) (
   iapply (rd_join cpu c0 k spie1 spp1 _ (-1#64) γb γfs dev j ip bm data dn user off n
       tot olds pidv Vp M dqp dq dqd P Mi (k.regs 18#5) (k.regs 24#5) (k.regs 25#5) (k.regs 26#5)
       (k.regs 27#5) v13 hj hproc hK14 ?e2 ?e19 ?e18 ?e24 ?e25 ?e26 ?e27 htot
-      (Or.inl ⟨rfl, huser⟩) hok)
+      (Or.inl ⟨rfl, huser, hwhy⟩) hok)
     $$ [$Hk $Hpc $Hframe $Hte $Hce $Hdev $Hmeta $Hmap $Hblk $Hdst $Hsl $Hnext]
   all_goals (simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true] <;>
     first | (rw [b2]; exact hR2) | rfl | decide)

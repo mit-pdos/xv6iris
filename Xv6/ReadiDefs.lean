@@ -189,7 +189,8 @@ theorem rd_copyout (EC : EITHER_COPYOUT) (c : CPU) (k' : KCtx) (γkl : GName) (�
       ⌜k'.sie = false → spie = k'.spie ∧ spp = k'.spp⌝ -∗ ⌜calleeSaved k'.regs R'⌝ -∗
       ⌜(R' 10#5 = 0#64 ∧ rdUserOk user Vp M P' Mi' dst data off (tot + m)) ∨
         (R' 10#5 = -1#64 ∧ user = true ∧
-          ∃ d, d < m ∧ rdUserOk user Vp M P' Mi' dst data off (tot + d))⌝ -∗
+          (∃ d, d < m ∧ rdUserOk user Vp M P' Mi' dst data off (tot + d)) ∧
+          rdFailWhy Vp.upt dst (tot + m))⌝ -∗
       kctx cpu' ((k'.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k'.regs 1#5)) -∗
       byteBuf (k'.regs 12#5) (DFrac.own 1) bs -∗
       rdDst user dst j pidv Vp P' Mi' dqp data olds off (tot + m) -∗ wpLoop cpu'))
@@ -249,16 +250,21 @@ theorem rd_copyout (EC : EITHER_COPYOUT) (c : CPU) (k' : KCtx) (γkl : GName) (�
     · ipureintro
       rw [ha1] at harm
       have hext' := UMemL.extSz_trans hext0 hext
-      rcases harm with ⟨hr, hM, hmap⟩ | ⟨hr, d, hd, hM, hmap, -⟩
+      rcases harm with ⟨hr, hM, hmap⟩ | ⟨hr, d, hd, hM, hmap, hnw⟩
       · refine Or.inl ⟨hr, fun _ => ⟨hext', ?_⟩⟩
         rw [hM, hchunk]
         rw [hbs] at hmap
         exact rdImg_step M Mi dst data off tot m hwf (UMemL.extSz_ext hext0)
           (UMemL.extSz_ext hext) hout0 hmap
-      · refine Or.inr ⟨hr, rfl, d, by omega, fun _ => ⟨hext', ?_⟩⟩
-        rw [hM, hchunk, rd_chunk_take data (off + tot) m d (by omega)]
-        exact rdImg_step M Mi dst data off tot d hwf (UMemL.extSz_ext hext0)
-          (UMemL.extSz_ext hext) hout0 hmap
+      · refine Or.inr ⟨hr, rfl, ⟨d, by omega, fun _ => ⟨hext', ?_⟩⟩, ?_⟩
+        · rw [hM, hchunk, rd_chunk_take data (off + tot) m d (by omega)]
+          exact rdImg_step M Mi dst data off tot d hwf (UMemL.extSz_ext hext0)
+            (UMemL.extSz_ext hext) hout0 hmap
+        · -- THE FAULT'S REASON, brought back to the ENTRY table (Rocq's
+          -- `rd_nwmapped_entry`): the byte is `tot + d` off `dst`
+          refine ⟨tot + d, by omega, ?_⟩
+          rw [BitVec.ofNat_add, ← BitVec.add_assoc]
+          exact rdNwmappedEntry hext0 hnw
 
 end
 

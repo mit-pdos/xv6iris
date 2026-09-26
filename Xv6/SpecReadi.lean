@@ -137,6 +137,48 @@ def rdImg (P P' : UPtd) (M M' : Nat → List (BitVec 8)) (dst : BitVec 64)
   M' = umemWrite (viewFaulted P P' M) dst.toNat (rdBytes data off tot) ∧
     umMapped P' dst.toNat tot
 
+/-! ## Why a read fails -- the copyout's reason (Rocq `SysReadDefs.rd_fail_why`, lane READ-RELAY)
+
+readi's one `-1` exit is `either_copyout` answering `-1` on the USER arm,
+and that answer names the byte it died on: a destination address the
+process's page table does not map for WRITING.  Stated at the ENTRY table
+(the round's table only GREW, `UPtd.extSz`, and `uvaWmapped` is monotone),
+with the failing index EXISTENTIAL and bounded by the request.  Keyed by
+the 64-bit VA.  (Rocq keeps these in `SysReadDefs.v`; the Lean
+`SysReadDefs` imports this file for `rdClamp`, so they live here, beside
+the other read vocabulary, SysReadDefs deviation 1.) -/
+
+/-- Rocq's `rd_fail_why P dst n`. -/
+def rdFailWhy (P : UPtd) (dst : BitVec 64) (n : Nat) : Prop :=
+  ∃ d : Nat, d < n ∧ ¬ uvaWmapped P (dst + BitVec.ofNat 64 d).toNat
+
+/-- Rocq's `rd_nwmapped_entry`: the round's verdict, brought back to the
+ENTRY table. -/
+theorem rdNwmappedEntry {szv : BitVec 64} {P Pc : UPtd} {va : Nat}
+    (hext : P.extSz szv Pc) (hn : ¬ uvaWmapped Pc va) : ¬ uvaWmapped P va :=
+  fun hc => hn (UMemL.uvaWmapped_mono (UMemL.extSz_ext hext) hc)
+
+/-- Rocq's `rd_fail_why_entry`. -/
+theorem rdFailWhy_entry {szv : BitVec 64} {P Pc : UPtd} {dst : BitVec 64} {n : Nat}
+    (hext : P.extSz szv Pc) (h : rdFailWhy Pc dst n) : rdFailWhy P dst n := by
+  obtain ⟨d, hd, hn⟩ := h
+  exact ⟨d, hd, rdNwmappedEntry hext hn⟩
+
+/-- Rocq's `rd_fail_why_refute`: THE REFUTATION -- a whole destination
+buffer writable-mapped in the table the reason is stated at has no copyout
+fault to answer for. -/
+theorem rdFailWhy_refute {P : UPtd} {dst : BitVec 64} {k n : Nat} (hnk : n ≤ k)
+    (hmap : ∀ j : Nat, j < k → uvaWmapped P (dst + BitVec.ofNat 64 j).toNat)
+    (h : rdFailWhy P dst n) : False := by
+  obtain ⟨d, hd, hn⟩ := h
+  exact hn (hmap d (by omega))
+
+/-- Rocq's `rd_fail_why_mono`: the reason survives a WIDER request. -/
+theorem rdFailWhy_mono {P : UPtd} {dst : BitVec 64} {n n' : Nat} (hle : n ≤ n')
+    (h : rdFailWhy P dst n) : rdFailWhy P dst n' := by
+  obtain ⟨d, hd, hn⟩ := h
+  exact ⟨d, by omega, hn⟩
+
 /-- Rocq's `rd_arg32_small`: below `2^31` the ABI's sign-extended `uint` is
 the plain literal. -/
 theorem rd_arg32_small (x : Nat) (h : x < 2 ^ 31) :
@@ -195,7 +237,7 @@ def wp_readi_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF
   wpNext true k.proc cpu (fun cpu' => iprop(∀ (spie spp : Bool) (R' : RegMap) (tot : Nat),
     ⌜calleeSaved k.regs R'⌝ -∗
     ⌜tot ≤ rdClamp dn.diSize off n⌝ -∗
-    ⌜(R' 10#5 = -1#64 ∧ user = true) ∨
+    ⌜(R' 10#5 = -1#64 ∧ user = true ∧ rdFailWhy Vp.upt (k.regs 12#5) n) ∨
       (R' 10#5 = BitVec.ofNat 64 tot ∧ tot = rdClamp dn.diSize off n)⌝ -∗
     kctx cpu' ((k.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k.regs 1#5)) -∗
     trapCsrs cpu' -∗ cpuClaim cpu' k.proc -∗ intrRes cpu' -∗
@@ -256,7 +298,7 @@ def wp_readi_eb_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G
   wpNext true k.proc cpu (fun cpu' => iprop(∀ (spie spp : Bool) (R' : RegMap) (tot : Nat),
     ⌜calleeSaved k.regs R'⌝ -∗
     ⌜tot ≤ rdClamp dn.diSize off n⌝ -∗
-    ⌜(R' 10#5 = -1#64 ∧ user = true) ∨
+    ⌜(R' 10#5 = -1#64 ∧ user = true ∧ rdFailWhy Vp.upt (k.regs 12#5) n) ∨
       (R' 10#5 = BitVec.ofNat 64 tot ∧ tot = rdClamp dn.diSize off n)⌝ -∗
     kctx cpu' ((k.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k.regs 1#5)) -∗
     trapCsrsExt cpu' k.sie -∗ cpuClaimExt cpu' k.sie k.proc -∗

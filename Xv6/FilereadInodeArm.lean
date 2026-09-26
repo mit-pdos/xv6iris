@@ -36,17 +36,17 @@ theorem frd_inode_arms (i : Nat) (γo : GName) (n : Int) (F : Pfam GF (Aview →
     (hn0 : 0 ≤ n) (hn1 : n < 2 ^ 31) (hok : inodeOk fscCov fscLogst dn bm data)
     (hoff : off ≤ MAXFILE * BSIZE) (hrow : arowAt av i (absRow (eraNode dn bm data)))
     (hle : tot ≤ rdClamp dn.diSize off n.toNat)
-    (harm : (a0 = -1#64 ∧ dd = 0) ∨
+    (pt : UPtd) (harm : (a0 = -1#64 ∧ dd = 0 ∧ rdFailWhy pt addr n.toNat) ∨
       (a0 = BitVec.ofNat 64 tot ∧ tot = rdClamp dn.diSize off n.toNat ∧ dd = tot))
     (hM : M' = umemWrite Vw addr.toNat (rdBytes data off tot)) (hmap : umMapped P' addr.toNat tot)
     (hpl : ∀ kp w, Iris.Std.PartialMap.get? P'.um kp = some w → (M' kp).length = 4096) :
     F.pfRecv av off (absRow (eraNode dn bm data)) dd ⊢
-      readArms (hlc := hlc) (fsGammaL fscFs) i γo n F a0 M' addr := by
+      readArms (hlc := hlc) (fsGammaL fscFs) i γo pt n F a0 M' addr := by
   have hsz := arfSize_ok_era dn bm data hok.2.2.2.2.1
   have hpre : ardPre av i off (absRow (eraNode dn bm data)) := ⟨hrow, hoff, hsz⟩
   unfold readArms
   iintro Hrecv
-  rcases harm with ⟨h0, hd⟩ | ⟨h0, htot, hd⟩
+  rcases harm with ⟨h0, hd, hwhy⟩ | ⟨h0, htot, hd⟩
   · subst hd
     iright
     isplitr
@@ -55,6 +55,8 @@ theorem frd_inode_arms (i : Nat) (γo : GName) (n : Int) (F : Pfam GF (Aview →
     iright
     isplitr
     · ipureintro; exact hn0
+    isplitr
+    · ipureintro; exact hwhy
     iexists av, off, absRow (eraNode dn bm data)
     iframe Hrecv
     ipureintro; exact hpre
@@ -145,7 +147,7 @@ theorem frd_arm_inode (IL : ILOCK) (RD : READI) (IU : IUNLOCK) (Γ : SchedNames)
     Hip Hcell Hdev Hmeta Hmap Hblk Hpriv Hbs
   have hcap : v.toNat + dd ≤ MAXFILE * BSIZE := by
     have := fileread_off_advance dn.diSize v.toNat n.toNat tot hle2 hok.2.2.2.2.1 hwf
-    rcases harm with ⟨-, h⟩ | ⟨-, -, h⟩ <;> omega
+    rcases harm with ⟨-, h, -⟩ | ⟨-, -, h⟩ <;> omega
   -- the lock-held ghost steps after readi: THE FIRE, the checkin, the re-close
   iapply wpLoop_fupd
   icases kctx_token_acc _ _ $$ Hk with ⟨Hrun, Hkb⟩
@@ -199,7 +201,7 @@ theorem frd_arm_inode (IL : ILOCK) (RD : READI) (IU : IUNLOCK) (Γ : SchedNames)
   iapply filereadExtra_inode_of V.gen V.upt F Rd Rin P _ wb inum.toNat γo n (R' 10#5) M' (k.regs 11#5) rfl $$ HP
   rw [h10']
   iapply (frd_inode_arms inum.toNat γo n F dn bm data v.toNat tot dd a0 P' (viewFaulted V.upt P' M) M'
-    (k.regs 11#5) av hn0 hn1 hok hwf hrow hle2 harm himg.1 himg.2 hpl) $$ Hrecv
+    (k.regs 11#5) av hn0 hn1 hok hwf hrow hle2 V.upt harm himg.1 himg.2 hpl) $$ Hrecv
 
 end
 

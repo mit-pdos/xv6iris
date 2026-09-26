@@ -57,7 +57,7 @@ theorem rd_post_of_spec (cpu : CPU) (k : KCtx) (γb : BcacheNames) (γfs : FsNam
     wpNext true k.proc cpu (fun cpu' => iprop(∀ (spie spp : Bool) (R' : RegMap) (tot : Nat),
       ⌜calleeSaved k.regs R'⌝ -∗
       ⌜tot ≤ rdClamp dn.diSize off n⌝ -∗
-      ⌜(R' 10#5 = -1#64 ∧ user = true) ∨
+      ⌜(R' 10#5 = -1#64 ∧ user = true ∧ rdFailWhy Vp.upt (k.regs 12#5) n) ∨
         (R' 10#5 = BitVec.ofNat 64 tot ∧ tot = rdClamp dn.diSize off n)⌝ -∗
       kctx cpu' ((k.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k.regs 1#5)) -∗
       trapCsrsExt cpu' k.sie -∗ cpuClaimExt cpu' k.sie k.proc -∗

@@ -225,26 +225,33 @@ def readPostOk (i : Nat) (n : Int) (F : Pfam GF (Aview → Nat → Anode → Nat
 
 /-- ret -1 (Rocq's `read_post_fail`): the guard arm (`n < 0`, pre-lock) hands
 the piece BACK UNFIRED; the copyout-fault arm delivers the FIRED receipt at
-advance 0, and says nothing of the buffer. -/
-def readPostFail (Γ : FsViewNames GF) (i : Nat) (γo : GName) (n : Int)
-    (F : Pfam GF (Aview → Nat → Anode → Nat → IProp GF)) : IProp GF :=
+advance 0, and says nothing of the buffer's contents.
+
+...AND THE FIRED ARM NAMES ITS REASON (lane READ-RELAY, the twin of the
+write chain's RELAY 4): readi's copyout faulted on a byte of the buffer the
+process's table `P` (the one the call RAN AT) does not map for writing
+(`rdFailWhy`, relayed from `SpecReadi`'s `-1` arm).  WHICH byte is
+existential, so a caller refutes the arm from its own permission map over
+the WHOLE buffer (`readArms_mapped`).  The guard arm says nothing. -/
+def readPostFail (Γ : FsViewNames GF) (i : Nat) (γo : GName) (P : UPtd) (n : Int)
+    (F : Pfam GF (Aview → Nat → Anode → Nat → IProp GF)) (addr : BitVec 64) : IProp GF :=
   iprop((⌜n < 0⌝ ∗ pfAt (areadCommitAt Γ appE i γo) F) ∨
-    (⌜0 ≤ n⌝ ∗ ∃ (av : Aview) (off : Nat) (a : Anode),
+    (⌜0 ≤ n⌝ ∗ ⌜rdFailWhy P addr n.toNat⌝ ∗ ∃ (av : Aview) (off : Nat) (a : Anode),
       ⌜ardPre av i off a⌝ ∗ F.pfRecv av off a 0))
 
 /-- the armed disjunction the continuation receives, keyed on a0 (Rocq's
 `read_arms`) -/
-def readArms (Γ : FsViewNames GF) (i : Nat) (γo : GName) (n : Int)
+def readArms (Γ : FsViewNames GF) (i : Nat) (γo : GName) (P : UPtd) (n : Int)
     (F : Pfam GF (Aview → Nat → Anode → Nat → IProp GF)) (r : BitVec 64)
     (M' : Nat → List (BitVec 8)) (addr : BitVec 64) : IProp GF :=
-  iprop(readPostOk i n F r M' addr ∨ (⌜r = -1#64⌝ ∗ readPostFail Γ i γo n F))
+  iprop(readPostOk i n F r M' addr ∨ (⌜r = -1#64⌝ ∗ readPostFail Γ i γo P n F addr))
 
 /-- the arms refine the unified contract's unconditional return clause
 (Rocq's `read_arms_ret`) -/
-theorem readArms_ret (Γ : FsViewNames GF) (i : Nat) (γo : GName) (n : Int)
+theorem readArms_ret (Γ : FsViewNames GF) (i : Nat) (γo : GName) (P : UPtd) (n : Int)
     (F : Pfam GF (Aview → Nat → Anode → Nat → IProp GF)) (r : BitVec 64)
     (M' : Nat → List (BitVec 8)) (addr : BitVec 64) :
-    readArms Γ i γo n F r M' addr ⊢ ⌜pipeRwRet n r⌝ := by
+    readArms Γ i γo P n F r M' addr ⊢ ⌜pipeRwRet n r⌝ := by
   unfold readArms readPostOk
   iintro H
   icases H with (⟨%av, %off, %a, %d, %_, %hn, %htie, _⟩ | ⟨%hm1, _⟩)
@@ -253,10 +260,10 @@ theorem readArms_ret (Γ : FsViewNames GF) (i : Nat) (γo : GName) (n : Int)
 
 /-- THE SIGN GUARD'S EXIT (Rocq's `read_arms_neg`): the piece goes back
 exactly as it came in. -/
-theorem readArms_neg (Γ : FsViewNames GF) (i : Nat) (γo : GName) (n : Int)
+theorem readArms_neg (Γ : FsViewNames GF) (i : Nat) (γo : GName) (P : UPtd) (n : Int)
     (F : Pfam GF (Aview → Nat → Anode → Nat → IProp GF))
     (M' : Nat → List (BitVec 8)) (addr : BitVec 64) (hn : n < 0) :
-    pfAt (areadCommitAt Γ appE i γo) F ⊢ readArms Γ i γo n F (-1#64) M' addr := by
+    pfAt (areadCommitAt Γ appE i γo) F ⊢ readArms Γ i γo P n F (-1#64) M' addr := by
   unfold readArms readPostFail
   iintro Hc
   iright
@@ -266,6 +273,23 @@ theorem readArms_neg (Γ : FsViewNames GF) (i : Nat) (γo : GName) (n : Int)
     isplitr
     · ipureintro; exact hn
     · iexact Hc
+
+/-- ...AND AT A MAPPED DESTINATION THE FIRED ARM IS REFUTED (Rocq's
+`read_arms_mapped`, lane READ-RELAY): a caller whose whole destination run
+is writable-mapped in `P` has no copyout fault to answer for, and with a
+non-negative count the sign guard is gone too, which leaves the ok arm. -/
+theorem readArms_mapped (Γ : FsViewNames GF) (i : Nat) (γo : GName) (P : UPtd) (n : Int)
+    (F : Pfam GF (Aview → Nat → Anode → Nat → IProp GF)) (r : BitVec 64)
+    (M' : Nat → List (BitVec 8)) (addr : BitVec 64) (k : Nat)
+    (hn : 0 ≤ n) (hnk : n.toNat ≤ k)
+    (hmap : ∀ j : Nat, j < k → uvaWmapped P (addr + BitVec.ofNat 64 j).toNat) :
+    readArms Γ i γo P n F r M' addr ⊢ readPostOk i n F r M' addr := by
+  unfold readArms readPostFail
+  iintro H
+  icases H with (Hok | ⟨_, (⟨%hlt, _⟩ | ⟨_, %hwhy, _⟩)⟩)
+  · iexact Hok
+  · exact absurd hlt (by omega)
+  · exact (rdFailWhy_refute hnk hmap hwhy).elim
 
 end ReadCommit
 

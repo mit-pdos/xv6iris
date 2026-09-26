@@ -273,7 +273,8 @@ theorem frd_readi (RD : READI) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
     procPrivExt (procAddr j) pid V V.upt M ∗ bslot ∗
     (∀ (c' : CPU) (spie spp : Bool) (R' : RegMap) (tot : Nat) (P' : UPtd) (M' : Nat → List (BitVec 8)),
       ⌜calleeSaved k'.regs R' ∧ tot ≤ rdClamp dn.diSize off n.toNat ∧
-        (R' 10#5 = -1#64 ∨ (R' 10#5 = BitVec.ofNat 64 tot ∧ tot = rdClamp dn.diSize off n.toNat)) ∧
+        ((R' 10#5 = -1#64 ∧ rdFailWhy V.upt (k'.regs 12#5) n.toNat) ∨
+          (R' 10#5 = BitVec.ofNat 64 tot ∧ tot = rdClamp dn.diSize off n.toNat)) ∧
         V.upt.extSz V.sz P' ∧ rdImg V.upt P' M M' (k'.regs 12#5) data off tot⌝ -∗
       kctx c' ((k'.withSpie spie spp).withRegs R') -∗ pcIs c' (jumpPc (k'.regs 1#5)) -∗
       trapCsrsExt c' k'.sie -∗ cpuClaimExt c' k'.sie k'.proc -∗
@@ -313,8 +314,8 @@ theorem frd_readi (RD : READI) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
   iapply HK $$ %c' %spie %spp %R' %tot %P' %M' [] Hk Hpc Hte Hce Hdev Hmeta Hmap Hblk Hpriv Hbs
   ipureintro
   refine ⟨hcs, hle, ?_, hext, himg⟩
-  rcases hret with ⟨h1, -⟩ | h2
-  · exact Or.inl h1
+  rcases hret with ⟨h1, -, hw⟩ | h2
+  · exact Or.inl ⟨h1, hw⟩
   · exact Or.inr h2
 
 end

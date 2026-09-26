@@ -129,7 +129,8 @@ theorem rd_advance (BE : BRELSE) (Γ : SchedNames)
     (g27 : R 27#5 = BitVec.ofNat 64 m)
     (hres : (R 10#5 = 0#64 ∧ rdUserOk user Vp M P' Mi' (k.regs 12#5) data off (tot + m)) ∨
       (R 10#5 = -1#64 ∧ user = true ∧
-        ∃ dd, dd < m ∧ rdUserOk user Vp M P' Mi' (k.regs 12#5) data off (tot + dd))) :
+        (∃ dd, dd < m ∧ rdUserOk user Vp M P' Mi' (k.regs 12#5) data off (tot + dd)) ∧
+        rdFailWhy Vp.upt (k.regs 12#5) (tot + m))) :
     kctx cpu (((k.withSpie spie spp).pushed 14).withRegs R) ∗ pcIs cpu (KA.«readi» + 0x64#64) ∗
     rdFrame (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) (k.regs 9#5) (k.regs 18#5) (k.regs 19#5)
       (k.regs 20#5) (k.regs 21#5) (k.regs 22#5) (k.regs 23#5) (k.regs 24#5) (k.regs 25#5)
@@ -159,7 +160,7 @@ theorem rd_advance (BE : BRELSE) (Γ : SchedNames)
   iintro ⟨Hk, Hpc, Hframe, #Hpi, #Hbc, Hte, Hce, Hdev, Hmeta, Hmap, Hblk, Hlk, Hdst, Hnext, IH⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
   -- +0x64  beq a0,s8 : the copy faulted?
-  rcases hres with ⟨hr0, hok'⟩ | ⟨hr1, huser, dd, hdd, hokd⟩
+  rcases hres with ⟨hr0, hok'⟩ | ⟨hr1, huser, ⟨dd, hdd, hokd⟩, hwhy⟩
   case inr =>
     k_step_e (wp_s_branch cpu _ (KA.«readi» + 0x64#64) false 70#13 10#5 24#5 (by decide) bop.BEQ)
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
@@ -172,7 +173,9 @@ theorem rd_advance (BE : BRELSE) (Γ : SchedNames)
     iapply (rd_exit_fail BE Γ cpu c0 k spie spp R γl γb V γfs dev j ip bm data dn true off n
         (tot + dd) olds pidv Vp M dqp dq dqd P' Mi' v13 kk _ _ bsd d hs.hj hs.hproc hs.hK hs.hnoff
         hs.hlocks hs.htier q2 g18 hkk rfl
-        (by have := hs.hclamp; omega) hokd)
+        (by have := hs.hclamp; omega)
+        (rdFailWhy_mono (by have := hs.hclamp; have := rdClamp_le dn.diSize off n; omega) hwhy)
+        hokd)
       $$ [$Hk $Hpc $Hframe $Hpi $Hbc $Hte $Hce $Hdev $Hmeta $Hmap $Hblk $Hlk $Hdst $Hnext]
   -- the copy succeeded: brelse and advance
   k_step_e (wp_s_branch cpu _ (KA.«readi» + 0x64#64) false 70#13 10#5 24#5 (by decide) bop.BEQ)
