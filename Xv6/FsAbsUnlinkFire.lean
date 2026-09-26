@@ -284,6 +284,7 @@ critical section.  The TARGET's fragment is only READ and comes back
 untouched.  `dec` is `unlDec` of the target's own node: 0 on the FILE arm,
 1 on the DIR arm. -/
 theorem ufUent_fire [Icfg] [Appcfg GF] (γfs : FsNames) (E : CoPset) (dqt : DFrac)
+    (Pd : Nat → IProp GF)
     (Fent : Pfam GF (Aview → Nat → Fname → Nat → IProp GF))
     (d t : Nat) (nm : Fname) (dec : Nat) (np np' nt : FsNode)
     (hE : (↑ftopN : CoPset) ∪ ↑appN ⊆ E) (hloc : InodeLocal d np')
@@ -294,13 +295,15 @@ theorem ufUent_fire [Icfg] [Appcfg GF] (γfs : FsNames) (E : CoPset) (dqt : DFra
     (habsp' : absOf np' = some ⟨.ADir ((dirEntries np).erase nm), fnNlink np - dec⟩)
     (hnzt : fnType nt ≠ 0) :
     ⊢@{IProp GF} ftopInv (hlc := hlc) γfs -∗ appInv (hlc := hlc) γfs -∗
-      pfAt (uentCommitAt (hlc := hlc) (fsGammaL γfs) appE) Fent -∗
+      pfAt (uentCommitAt (hlc := hlc) (fsGammaL γfs) appE Pd) Fent -∗
+      -- THE PARENT CURSOR (TL-3K): READ by the commit and handed straight back
+      Pd d -∗
       topFrag (fsGammaL γfs) d np -∗
       topFragQ (fsGammaL γfs) dqt t nt ={E}=∗
-        topFrag (fsGammaL γfs) d np' ∗ topFragQ (fsGammaL γfs) dqt t nt ∗
+        topFrag (fsGammaL γfs) d np' ∗ topFragQ (fsGammaL γfs) dqt t nt ∗ Pd d ∗
         ∃ av : Aview, ⌜unlPre av d nm (dirEntries np) (fnNlink np) t (absRow nt)⌝ ∗
           Fent.pfRecv av d nm t := by
-  iintro #Hi #Hai Hcm Hfp Hft
+  iintro #Hi #Hai Hcm HPd Hfp Hft
   ihave Hcm := pfAt_au _ _ $$ Hcm
   unfold ftopInv
   imod (inv_acc_timeless (E := E) (N := ftopN) (P := ftopBody (GF := GF) γfs)
@@ -324,8 +327,8 @@ theorem ufUent_fire [Icfg] [Appcfg GF] (γfs : FsNames) (E : CoPset) (dqt : DFra
     simp only [deltaUnlEnt, hrowp]
   have hsub : appE ⊆ E \ ↑ftopN := appN_sub_ftop E hE
   unfold uentCommitAt
-  ihave Hcm := Hcm $$ %I %d %t %nm %(dirEntries np) %(fnNlink np) %(absRow nt) %hpre Ha
-  imod (fupd_mask_mono hsub) $$ Hcm with ⟨Ha, Hstep, Hph2⟩
+  ihave Hcm := Hcm $$ %I %d %t %nm %(dirEntries np) %(fnNlink np) %(absRow nt) %hpre HPd Ha
+  imod (fupd_mask_mono hsub) $$ Hcm with ⟨Ha, HPd, Hstep, Hph2⟩
   -- THE MOVE, at the whole authority: the application's half comes out of
   -- `appN` beside its claim, which the caller's step re-establishes.
   imod (appTopUpdate (E \ ↑ftopN) γfs I d np np' hsub) $$ Hai [Hstep] Ha Hfp with ⟨Ha, Hfp⟩
@@ -338,7 +341,7 @@ theorem ufUent_fire [Icfg] [Appcfg GF] (γfs : FsNames) (E : CoPset) (dqt : DFra
     iframe Ha Hla Hpark
     ipureintro; exact ufFtopClean_insert I A d np' hloc hcl
   imodintro
-  iframe Hfp Hft
+  iframe Hfp Hft HPd
   iexists absView I
   iframe HΦ
   ipureintro; exact hpre

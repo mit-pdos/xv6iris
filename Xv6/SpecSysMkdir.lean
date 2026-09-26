@@ -147,7 +147,11 @@ def mkdirAuPre (Γ : FsViewNames GF) (γfs : FsNames) (cw : Nat) (P Pmiss : Nat 
     (Fok Fex : Pfam GF (Aview → Nat → Fname → Nat → IProp GF)) : IProp GF :=
   iprop(nparWalkPreEra (hlc := hlc) γfs cw P Pmiss ∗
     pfAt (dlookupCommitAt (hlc := hlc) Γ appE) Fex ∗
-    creCommits (hlc := hlc) Γ T_DIR.toNat 0 0 Farm Fdots Fun Fok)
+    -- THE CURSOR-FREE COMMIT (TL-3K): mkdir's bundle still carries the
+    -- `∀ pl` walk form, so there is no ONE path for a cursor to name; create's
+    -- own bundle takes it up to the walk's terminal cursor through
+    -- `CreateDefs.creCommits_cur`
+    creCommits (hlc := hlc) Γ T_DIR.toNat 0 0 (fun _ => iprop(True)) Farm Fdots Fun Fok)
 
 /-- SATISFIABILITY (Rocq's `mkdir_au_pre_unit`): the generic application
 asks nothing of mkdir's walk or its legs -- every hop says yes, every cursor
@@ -170,7 +174,7 @@ theorem mkdirAuPre_unit (γfs : FsNames) (cw : Nat) :
     · iapply (axHops_triv (hlc := hlc) (GF := GF) (elend (fsGammaL γfs)) (nparElems pl) 0)
   isplitr
   · iapply (creDlookup_unit (hlc := hlc) (fsGammaL γfs))
-  · iapply (creCommits_unit (hlc := hlc) γfs T_DIR.toNat 0 0) $$ Hsup
+  · iapply (creCommits_unit (hlc := hlc) γfs T_DIR.toNat 0 0 _) $$ Hsup
 
 /-- THE ARMED DISJUNCTION the continuation receives, keyed on a0 (Rocq's
 `mkdir_arms`).  ret 0: create MADE the directory -- its arm, its dots and

@@ -760,8 +760,8 @@ theorem createFound_armG (IUP : IUNLOCKPUT) (Γ : SchedNames) [ClaimIs (hlc := h
     irefSlots 1 ∗ logOpS icfgLog n1 Sb1 ∗
     F.P (nparElems (bview A.plen A.pfun)).length dind.toNat ∗
     pfAt (dlookupCommitAt (fsGammaL fscFs) appE) F.Fex ∗
-    creCommits (hlc := hlc) (fsGammaL fscFs) A.ty.toNat A.major.toNat A.minor.toNat F.Farm
-      F.Fdots F.Fun F.Fok ∗
+    creCommits (hlc := hlc) (fsGammaL fscFs) A.ty.toNat A.major.toNat A.minor.toNat
+      (F.P (nparElems (bview A.plen A.pfun)).length) F.Farm F.Fdots F.Fun F.Fok ∗
     createFoundK k A F
     ⊢ wpLoop (GF := GF) cpu := by
   obtain ⟨r2, r8, r9, r18, r20, r21, r22, r19, r23, r24, r25, r26, r27⟩ := hR
@@ -850,8 +850,8 @@ theorem createFound_armG2 (IUP : IUNLOCKPUT) (Γ : SchedNames) [ClaimIs (hlc := 
     irefSlots 1 ∗ logOpS icfgLog n1 Sb1 ∗
     F.P (nparElems (bview A.plen A.pfun)).length dind.toNat ∗
     pfAt (dlookupCommitAt (fsGammaL fscFs) appE) F.Fex ∗
-    creCommits (hlc := hlc) (fsGammaL fscFs) A.ty.toNat A.major.toNat A.minor.toNat F.Farm
-      F.Fdots F.Fun F.Fok ∗
+    creCommits (hlc := hlc) (fsGammaL fscFs) A.ty.toNat A.major.toNat A.minor.toNat
+      (F.P (nparElems (bview A.plen A.pfun)).length) F.Farm F.Fdots F.Fun F.Fok ∗
     createFoundK k A F
     ⊢ wpLoop (GF := GF) cpu := by
   obtain ⟨r2, r8, r9, r18, r20, r21, r22, r19, r23, r24, r25, r26, r27⟩ := hR
@@ -934,8 +934,8 @@ theorem createFound_armN (cpu : CPU) (k : KCtx) (A : CreateFoundArgs) (F : Creat
     irefSlots 2 ∗ logOpS icfgLog n1 Sb1 ∗ logTx icfgLog ∗
     npDead (hlc := hlc) fscFs F.P F.Pmiss (bview A.plen A.pfun) ∗
     pfAt (dlookupCommitAt (fsGammaL fscFs) appE) F.Fex ∗
-    creCommits (hlc := hlc) (fsGammaL fscFs) A.ty.toNat A.major.toNat A.minor.toNat F.Farm
-      F.Fdots F.Fun F.Fok ∗
+    creCommits (hlc := hlc) (fsGammaL fscFs) A.ty.toNat A.major.toNat A.minor.toNat
+      (F.P (nparElems (bview A.plen A.pfun)).length) F.Farm F.Fdots F.Fun F.Fok ∗
     createFoundK k A F
     ⊢ wpLoop (GF := GF) cpu := by
   have hr := hR
@@ -1086,8 +1086,8 @@ theorem createFound_tests (IUP : IUNLOCKPUT) (Γ : SchedNames) [ClaimIs (hlc := 
     irefSlots 1 ∗ logOpS icfgLog n2 Sb2 ∗
     F.P (nparElems (bview A.plen A.pfun)).length dind.toNat ∗
     creExFired F.Fex dind.toNat (bname 14 nf) cinum.toNat ∗
-    creCommits (hlc := hlc) (fsGammaL fscFs) A.ty.toNat A.major.toNat A.minor.toNat F.Farm
-      F.Fdots F.Fun F.Fok ∗
+    creCommits (hlc := hlc) (fsGammaL fscFs) A.ty.toNat A.major.toNat A.minor.toNat
+      (F.P (nparElems (bview A.plen A.pfun)).length) F.Farm F.Fdots F.Fun F.Fok ∗
     createFoundK k A F
     ⊢ wpLoop (GF := GF) cpu := by
   have hr := hR
@@ -1220,8 +1220,8 @@ theorem createFound_found (IL : ILOCK) (IUP : IUNLOCKPUT) (Γ : SchedNames)
     inodeRef kslot qq icfgDev cinum ∗ runitAny cinum.toNat ∗
     F.P (nparElems (bview A.plen A.pfun)).length dind.toNat ∗
     creExFired F.Fex dind.toNat (bname 14 nf) cinum.toNat ∗
-    creCommits (hlc := hlc) (fsGammaL fscFs) A.ty.toNat A.major.toNat A.minor.toNat F.Farm
-      F.Fdots F.Fun F.Fok ∗
+    creCommits (hlc := hlc) (fsGammaL fscFs) A.ty.toNat A.major.toNat A.minor.toNat
+      (F.P (nparElems (bview A.plen A.pfun)).length) F.Farm F.Fdots F.Fun F.Fok ∗
     createFoundK k A F
     ⊢ wpLoop (GF := GF) cpu := by
   have hr := hR
@@ -1344,8 +1344,8 @@ theorem createFound_join (IL : ILOCK) (IUP : IUNLOCKPUT) (DL : DIRLOOKUP) (Γ : 
     irefSlots 1 ∗ logOpS icfgLog n1 Sb1 ∗
     F.P (nparElems (bview A.plen A.pfun)).length dind.toNat ∗
     pfAt (dlookupCommitAt (fsGammaL fscFs) appE) F.Fex ∗
-    creCommits (hlc := hlc) (fsGammaL fscFs) A.ty.toNat A.major.toNat A.minor.toNat F.Farm
-      F.Fdots F.Fun F.Fok ∗
+    creCommits (hlc := hlc) (fsGammaL fscFs) A.ty.toNat A.major.toNat A.minor.toNat
+      (F.P (nparElems (bview A.plen A.pfun)).length) F.Farm F.Fdots F.Fun F.Fok ∗
     createFoundK k A F
     ⊢ wpLoop (GF := GF) cpu := by
   have hr := hR
@@ -1529,8 +1529,8 @@ theorem createFound_gate (IL : ILOCK) (IUP : IUNLOCKPUT) (DL : DIRLOOKUP) (Γ : 
     irefSlots 1 ∗ logOpS icfgLog n1 Sb1 ∗
     F.P (nparElems (bview A.plen A.pfun)).length dind.toNat ∗
     pfAt (dlookupCommitAt (fsGammaL fscFs) appE) F.Fex ∗
-    creCommits (hlc := hlc) (fsGammaL fscFs) A.ty.toNat A.major.toNat A.minor.toNat F.Farm
-      F.Fdots F.Fun F.Fok ∗
+    creCommits (hlc := hlc) (fsGammaL fscFs) A.ty.toNat A.major.toNat A.minor.toNat
+      (F.P (nparElems (bview A.plen A.pfun)).length) F.Farm F.Fdots F.Fun F.Fok ∗
     createFoundK k A F
     ⊢ wpLoop (GF := GF) cpu := by
   have hr := hR
@@ -1627,8 +1627,8 @@ theorem createFound_parent (IL : ILOCK) (IUP : IUNLOCKPUT) (DL : DIRLOOKUP) (Γ 
     irefSlots 1 ∗ logOpS icfgLog n1 Sb1 ∗ logTx icfgLog ∗
     F.P (nparElems (bview A.plen A.pfun)).length dind.toNat ∗
     pfAt (dlookupCommitAt (fsGammaL fscFs) appE) F.Fex ∗
-    creCommits (hlc := hlc) (fsGammaL fscFs) A.ty.toNat A.major.toNat A.minor.toNat F.Farm
-      F.Fdots F.Fun F.Fok ∗
+    creCommits (hlc := hlc) (fsGammaL fscFs) A.ty.toNat A.major.toNat A.minor.toNat
+      (F.P (nparElems (bview A.plen A.pfun)).length) F.Farm F.Fdots F.Fun F.Fok ∗
     createFoundK k A F
     ⊢ wpLoop (GF := GF) cpu := by
   have hr := hR
@@ -1734,8 +1734,8 @@ theorem createFound_entry (NP : NPAR_WRAP_ERA) (IL : ILOCK) (IUP : IUNLOCKPUT) (
     bslots 3 ∗ irefSlots A.ns ∗ logOpS icfgLog A.u A.Sb ∗ logTx icfgLog ∗
     epStart fscFs A.V.cwi F.P F.Pmiss (bview A.plen A.pfun) ∗
     pfAt (dlookupCommitAt (fsGammaL fscFs) appE) F.Fex ∗
-    creCommits (hlc := hlc) (fsGammaL fscFs) A.ty.toNat A.major.toNat A.minor.toNat F.Farm
-      F.Fdots F.Fun F.Fok ∗
+    creCommits (hlc := hlc) (fsGammaL fscFs) A.ty.toNat A.major.toNat A.minor.toNat
+      (F.P (nparElems (bview A.plen A.pfun)).length) F.Farm F.Fdots F.Fun F.Fok ∗
     createFoundK k A F
     ⊢ wpLoop (GF := GF) cpu := by
   have hK10 := create_slots_10 _ hS.hK

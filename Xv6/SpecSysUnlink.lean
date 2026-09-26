@@ -179,7 +179,7 @@ def unlinkAuPre (Γ : FsViewNames GF) (γfs : FsNames) (cw : Nat)
     (Fex : Pfam GF (Aview → Nat → Fname → Nat → IProp GF))
     (Fmiss : Pfam GF (Aview → Nat → Fname → IProp GF)) : IProp GF :=
   iprop(nparWalkPreEra (hlc := hlc) γfs cw P Pmiss ∗
-    pfAt (uentCommitAt (hlc := hlc) Γ appE) Fent ∗
+    pfAt (uentCommitAt (hlc := hlc) Γ appE (fun _ => iprop(True))) Fent ∗
     pfAt (utgtCommitAt (hlc := hlc) Γ appE) Ftgt ∗
     pfAt (dlookupCommitAt (hlc := hlc) Γ appE) Fex ∗
     pfAt (dmissCommitAt (hlc := hlc) Γ appE) Fmiss)
@@ -216,13 +216,13 @@ def unlinkPostFail (Γ : FsViewNames GF) (γfs : FsNames) (cw : Nat)
   iprop(unlinkAuPre (hlc := hlc) Γ γfs cw P Pmiss Fent Ftgt Fex Fmiss ∨
     (∃ pl : List (BitVec 8),
       (nparWalkDeadEra (hlc := hlc) γfs P Pmiss pl ∗
-          pfAt (uentCommitAt (hlc := hlc) Γ appE) Fent ∗
+          pfAt (uentCommitAt (hlc := hlc) Γ appE (fun _ => iprop(True))) Fent ∗
           pfAt (utgtCommitAt (hlc := hlc) Γ appE) Ftgt ∗
           pfAt (dlookupCommitAt (hlc := hlc) Γ appE) Fex ∗
           pfAt (dmissCommitAt (hlc := hlc) Γ appE) Fmiss) ∨
       (∃ d : Nat,
         P (nparElems pl).length d ∗
-        pfAt (uentCommitAt (hlc := hlc) Γ appE) Fent ∗
+        pfAt (uentCommitAt (hlc := hlc) Γ appE (fun _ => iprop(True))) Fent ∗
         pfAt (utgtCommitAt (hlc := hlc) Γ appE) Ftgt ∗
         (-- (iii-a) the name is a dot: refused BY NAME, before any lookup
           (∃ nm : Fname,

@@ -362,7 +362,7 @@ theorem create_fail_of_cursor (Γ : FsViewNames GF) (γfs : FsNames) (tyz ma mi 
     (Fok Fex : Pfam GF (Aview → Nat → Fname → Nat → IProp GF)) (pl : List (BitVec 8)) (d : Nat) :
     P (nparElems pl).length d ⊢
       pfAt (dlookupCommitAt Γ appE) Fex -∗
-      creCommits (hlc := hlc) Γ tyz ma mi Farm Fdots Fun Fok -∗
+      creCommits (hlc := hlc) Γ tyz ma mi (P (nparElems pl).length) Farm Fdots Fun Fok -∗
       creFailArms (hlc := hlc) Γ γfs tyz ma mi P Pmiss Farm Fdots Fun Fok Fex pl := by
   unfold creFailArms creCommits
   iintro HP Hdl ⟨Ha, Hd, Hu, Hac⟩
@@ -384,7 +384,7 @@ theorem create_fail_of_dead (Γ : FsViewNames GF) (γfs : FsNames) (tyz ma mi : 
     (Fok Fex : Pfam GF (Aview → Nat → Fname → Nat → IProp GF)) (pl : List (BitVec 8)) :
     npDead (hlc := hlc) γfs P Pmiss pl ⊢
       pfAt (dlookupCommitAt Γ appE) Fex -∗
-      creCommits (hlc := hlc) Γ tyz ma mi Farm Fdots Fun Fok -∗
+      creCommits (hlc := hlc) Γ tyz ma mi (P (nparElems pl).length) Farm Fdots Fun Fok -∗
       creFailArms (hlc := hlc) Γ γfs tyz ma mi P Pmiss Farm Fdots Fun Fok Fex pl := by
   iintro Hdead Hdl Hcre
   icases npDead_to_mknod (hlc := hlc) γfs P Pmiss pl $$ Hdead with (Hd | ⟨%dpar, HPd⟩)
@@ -405,7 +405,7 @@ theorem create_fail_of_seen (Γ : FsViewNames GF) (γfs : FsNames) (tyz ma mi : 
     (d : Nat) (nm : Fname) (i : Nat) (hlast : (pathElems pl).getLast? = some nm) :
     P (nparElems pl).length d ⊢
       creExFired Fex d nm i -∗
-      creCommits (hlc := hlc) Γ tyz ma mi Farm Fdots Fun Fok -∗
+      creCommits (hlc := hlc) Γ tyz ma mi (P (nparElems pl).length) Farm Fdots Fun Fok -∗
       creFailArms (hlc := hlc) Γ γfs tyz ma mi P Pmiss Farm Fdots Fun Fok Fex pl := by
   unfold creFailArms creCommits
   iintro HP Hex ⟨Ha, Hd, Hu, Hac⟩
@@ -431,7 +431,7 @@ theorem create_fail_of_pair (Γ : FsViewNames GF) (γfs : FsNames) (tyz ma mi : 
     (d i : Nat) :
     P (nparElems pl).length d ⊢
       pfAt (dlookupCommitAt Γ appE) Fex -∗
-      pfAt (acreCommitAtGen (hlc := hlc) Γ appE (creChild tyz ma mi) Farm) Fok -∗
+      pfAt (acreCommitAtGen (hlc := hlc) Γ appE (creChild tyz ma mi) (P (nparElems pl).length) Farm) Fok -∗
       ((∃ full : Bool, creDotsFired Fdots i d full) ∨ creDotsLeg (hlc := hlc) Γ tyz Fdots) -∗
       creUnarmFired Fun i -∗
       creFailArms (hlc := hlc) Γ γfs tyz ma mi P Pmiss Farm Fdots Fun Fok Fex pl := by
@@ -456,7 +456,7 @@ theorem create_ok_of_found (Γ : FsViewNames GF) (tyz ma mi : Nat) (P : Nat → 
     (d : Nat) (nm : Fname) (i : Nat) (hlast : (pathElems pl).getLast? = some nm) :
     P (nparElems pl).length d ⊢
       creExFired Fex d nm i -∗
-      creCommits (hlc := hlc) Γ tyz ma mi Farm Fdots Fun Fok -∗
+      creCommits (hlc := hlc) Γ tyz ma mi (P (nparElems pl).length) Farm Fdots Fun Fok -∗
       creOkArms (hlc := hlc) Γ tyz ma mi P Farm Fdots Fun Fok Fex pl false i := by
   unfold creOkArms
   iintro HP Hex Hcre
@@ -637,7 +637,8 @@ def createAllocBody (k : KCtx) (plen : Nat) (pfun : Nat → BitVec 8) (ty major 
     -- exists observation UNFIRED, the four commits, NONE fired ----
     P (nparElems (bview plen pfun)).length dind.toNat -∗
     pfAt (dlookupCommitAt (fsGammaL fscFs) appE) Fex -∗
-    creCommits (hlc := hlc) (fsGammaL fscFs) ty.toNat major.toNat minor.toNat Farm Fdots Fun Fok -∗
+    creCommits (hlc := hlc) (fsGammaL fscFs) ty.toNat major.toNat minor.toNat
+      (P (nparElems (bview plen pfun)).length) Farm Fdots Fun Fok -∗
     -- the contract's own continuation, hart-free
     (∀ c' : CPU, createPost (hlc := hlc) k plen pfun ty major minor γ pid V M u Sb ns
       dqb dqs dqbs dqn dqpv P Pmiss Farm Fdots Fun Fok Fex c') -∗
@@ -757,7 +758,8 @@ def createMkdirBody (k : KCtx) (plen : Nat) (pfun : Nat → BitVec 8) (ty major 
     pfAt (adotsCommitAt (hlc := hlc) (fsGammaL fscFs) appE) Fdots -∗
     pfAt (aunarmOfArm (hlc := hlc) (fsGammaL fscFs) appE Farm) Fun -∗
     pfAt (acreCommitAtGen (hlc := hlc) (fsGammaL fscFs) appE
-      (creChild ty.toNat major.toNat minor.toNat) Farm) Fok -∗
+      (creChild ty.toNat major.toNat minor.toNat)
+        (P (nparElems (bview plen pfun)).length) Farm) Fok -∗
     (∀ c' : CPU, createPost (hlc := hlc) k plen pfun ty major minor γ pid V M u Sb ns
       dqb dqs dqbs dqn dqpv P Pmiss Farm Fdots Fun Fok Fex c') -∗
     wpLoop c)
@@ -884,7 +886,8 @@ def createFailBody (k : KCtx) (plen : Nat) (pfun : Nat → BitVec 8) (ty major m
     creDotsLeg (hlc := hlc) (fsGammaL fscFs) ty.toNat Fdots -∗
     pfAt (aunarmOfArm (hlc := hlc) (fsGammaL fscFs) appE Farm) Fun -∗
     pfAt (acreCommitAtGen (hlc := hlc) (fsGammaL fscFs) appE
-      (creChild ty.toNat major.toNat minor.toNat) Farm) Fok -∗
+      (creChild ty.toNat major.toNat minor.toNat)
+        (P (nparElems (bview plen pfun)).length) Farm) Fok -∗
     (∀ c' : CPU, createPost (hlc := hlc) k plen pfun ty major minor γ pid V M u Sb ns
       dqb dqs dqbs dqn dqpv P Pmiss Farm Fdots Fun Fok Fex c') -∗
     wpLoop c)
@@ -1001,7 +1004,8 @@ def createFailMkdirBody (k : KCtx) (plen : Nat) (pfun : Nat → BitVec 8)
       creDotsLeg (hlc := hlc) (fsGammaL fscFs) ty.toNat Fdots) -∗
     pfAt (aunarmOfArm (hlc := hlc) (fsGammaL fscFs) appE Farm) Fun -∗
     pfAt (acreCommitAtGen (hlc := hlc) (fsGammaL fscFs) appE
-      (creChild ty.toNat major.toNat minor.toNat) Farm) Fok -∗
+      (creChild ty.toNat major.toNat minor.toNat)
+        (P (nparElems (bview plen pfun)).length) Farm) Fok -∗
     (∀ c' : CPU, createPost (hlc := hlc) k plen pfun ty major minor γ pid V M u Sb ns
       dqb dqs dqbs dqn dqpv P Pmiss Farm Fdots Fun Fok Fex c') -∗
     wpLoop c)

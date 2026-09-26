@@ -316,12 +316,14 @@ theorem sys_mknod_fetched (CR : CREATE) (IUP : IUNLOCKPUT) (EO : END_OP) (Γ : S
     icases Hau with ⟨Hst, Hac, Hdl, Hch⟩
     -- THE BUNDLE AT THE DEVICE TYPE: no dots leg owed
     ihave Hcre := creCommits_of_dev (hlc := hlc) (fsGammaL fscFs) (devArg A.v1) (devArg A.v2)
-      A.Farm A.Fun A.Fok $$ Hac Hch
+      (A.P (nparElems pl).length) A.Farm A.Fun A.Fok $$ Hac Hch
     ihave Hcre := (show creCommits (hlc := hlc) (GF := GF) (fsGammaL fscFs) T_DEVICE_w.toNat
-        (devArg A.v1) (devArg A.v2) A.Farm (pfamTriv (fun _ _ _ _ => iprop(True))) A.Fun A.Fok ⊢
+        (devArg A.v1) (devArg A.v2) (A.P (nparElems pl).length) A.Farm
+        (pfamTriv (fun _ _ _ _ => iprop(True))) A.Fun A.Fok ⊢
       creCommits (hlc := hlc) (fsGammaL fscFs) T_DEVICE_w.toNat (sysMknodHw A.v1).toNat
-        (sysMknodHw A.v2).toNat A.Farm (pfamTriv (fun _ _ _ _ => iprop(True))) A.Fun A.Fok
-      from by rw [sys_mknod_hw_dev, sys_mknod_hw_dev]) $$ Hcre
+        (sysMknodHw A.v2).toNat (A.P (nparElems (bview pl.length (sysfilePfun pl))).length) A.Farm
+        (pfamTriv (fun _ _ _ _ => iprop(True))) A.Fun A.Fok
+      from by rw [sys_mknod_hw_dev, sys_mknod_hw_dev, sys_mknod_bview_self]) $$ Hcre
     ihave Hst := (show epStart (hlc := hlc) (GF := GF) fscFs A.V.cwi A.P A.Pmiss pl ⊢
       epStart (hlc := hlc) fscFs A.V.cwi A.P A.Pmiss (bview pl.length (sysfilePfun pl))
       from by rw [sys_mknod_bview_self]) $$ Hst

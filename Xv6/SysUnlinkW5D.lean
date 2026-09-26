@@ -470,7 +470,7 @@ theorem sys_unlink_w5_dir (IU : IUPDATE) (IUP : IUNLOCKPUT) (EO : END_OP) (Γ : 
       (eraNode dni bmi dati) ⊢ topFragQ (fsGammaL fscFs) (DFrac.own 1)
         (BitVec.setWidth 32 (dirInum datd kk)).toNat (eraNode dni bmi dati) from .rfl) $$ Htopi
   iapply wpLoop_fupd
-  imod (ufUent_fire (hlc := hlc) fscFs ⊤ (DFrac.own 1) A.Fent dinum.toNat
+  imod (ufUent_fire (hlc := hlc) fscFs ⊤ (DFrac.own 1) (fun _ => iprop(True)) A.Fent dinum.toNat
       (BitVec.setWidth 32 (dirInum datd kk)).toNat (dirBname datd kk) 1 (eraNode dnd bmd datd)
       (eraNode (sysUnlinkDF2 dnW) bmW datW) (eraNode dni bmi dati) ufNd_top hloc
       (mkfEra_is_dir dnd bmd datd htyz)
@@ -480,7 +480,7 @@ theorem sys_unlink_w5_dir (IU : IUPDATE) (IUP : IUNLOCKPUT) (EO : END_OP) (Γ : 
       (sys_unlink_nl1 dnd bmd datd hlive) (sys_unlink_nl1 dni bmi dati hnli)
       (sys_unlink_dir_dots dni bmi dati hoki.2.2.2.2.2.1 hoki.2.2.2.2.1 htyi hdots)
       (sys_unlink_dir_dec _ hdiri) habsp hoki.2.2.2.1)
-    $$ Hftop Happ He Htop Htopi with ⟨Htop, Htopi, %av0, %hpre, Hrecv⟩
+    $$ Hftop Happ He %trivial Htop Htopi with ⟨Htop, Htopi, -, %av0, %hpre, Hrecv⟩
   imodintro
   ihave Htopi := (show topFragQ (GF := GF) (fsGammaL fscFs) (DFrac.own 1)
         (BitVec.setWidth 32 (dirInum datd kk)).toNat (eraNode dni bmi dati) ⊢

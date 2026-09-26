@@ -437,6 +437,7 @@ the written row (`cafAcre_fire`, which performs the retag). -/
 theorem create_alloc_repark (dind cinum : BitVec 32) (dn dn' : Dinode) (bm bm' : Blkmap)
     (data data' : Nat → List (BitVec 8)) (nf : Nat → BitVec 8) (ty major minor : BitVec 16)
     (dnc : Dinode) (bmc : Blkmap) (datc : Nat → List (BitVec 8))
+    (Pd : Nat → IProp GF)
     (Farm : Pfam GF (Aview → Nat → IProp GF))
     (Fok : Pfam GF (Aview → Nat → Fname → Nat → IProp GF))
     (hty : dn.diType = T_DIR) (hnl0 : dn.diNlink ≠ 0#16)
@@ -465,11 +466,14 @@ theorem create_alloc_repark (dind cinum : BitVec 32) (dn dn' : Dinode) (bm bm' :
       topFrag (fsGammaL fscFs) dind.toNat (eraNode dn bm data) -∗
       topFrag (fsGammaL fscFs) cinum.toNat (eraNode (createSetf dnc major minor 1#16) bmc datc) -∗
       pfAt (acreCommitAtGen (hlc := hlc) (fsGammaL fscFs) appE
-        (creChild ty.toNat major.toNat minor.toNat) Farm) Fok -∗
+        (creChild ty.toNat major.toNat minor.toNat) Pd Farm) Fok -∗
       creArmFired Farm cinum.toNat -∗
+      -- THE PARENT CURSOR (TL-3K): read by the leg and handed back
+      Pd dind.toNat -∗
       |={⊤}=> dlinks fscFs dind.toNat dn' bm' data' ∗
         topFrag (fsGammaL fscFs) dind.toNat (eraNode dn' bm' data') ∗
         topFrag (fsGammaL fscFs) cinum.toNat (eraNode (createSetf dnc major minor 1#16) bmc datc) ∗
+        Pd dind.toNat ∗
         creAcreFired Fok dind.toNat (bname 14 nf) cinum.toNat
           (creChild ty.toNat major.toNat minor.toNat dind.toNat cinum.toNat) := by
   obtain ⟨hty', hnl', hszmax, hcap', hiok', hrl', hdok', hddix', hduq'⟩ :=
@@ -518,7 +522,7 @@ theorem create_alloc_repark (dind cinum : BitVec 32) (dn dn' : Dinode) (bm bm' :
     exact entTok_ofLink (fsGammaL fscFs) dind.toNat _ _ false (bname 14 nf) cinum.toNat .tFile
       (entTyOk_name _ _ _ false _ (by rw [DOT_dot]; exact hnd.1) (by rw [DOTDOT_dotdot]; exact hnd.2)
         (by simp))
-  iintro #Hinv Hdl Htok Htop Hctop Hacre Harm
+  iintro #Hinv Hdl Htok Htop Hctop Hacre Harm HPd
   icases dlinks_open fscFs dind.toNat dn bm data $$ Hdl with ⟨%D, %hD, Hetk⟩
   obtain ⟨hdok0, hxact0⟩ := hD
   have hsD : bname 14 nf ∉ D := fun hin => by
@@ -538,15 +542,15 @@ theorem create_alloc_repark (dind cinum : BitVec 32) (dn dn' : Dinode) (bm bm' :
   ihave Hctop : topFragQ (fsGammaL fscFs) (DFrac.own 1) cinum.toNat
       (eraNode (createSetf dnc major minor 1#16) bmc datc) $$ [Hctop]
   · rw [← topFrag_1]; iexact Hctop
-  imod (cafAcre_fire (hlc := hlc) fscFs ⊤ (creChild ty.toNat major.toNat minor.toNat) Farm Fok
+  imod (cafAcre_fire (hlc := hlc) fscFs ⊤ (creChild ty.toNat major.toNat minor.toNat) Pd Farm Fok
     dind.toNat cinum.toNat (bname 14 nf) (DFrac.own 1) _ _ _ CoPset.subseteq_top hloc
     (mkfEra_is_dir dn bm data hdz) (mkfEra_live dn bm data hnl0z) hnoneE habsp' habsc)
-    $$ Hft Hap Hacre Harm Htop Hctop with ⟨Htop, Hctop, ⟨%av, %hpre, HFok⟩⟩
+    $$ Hft Hap Hacre Harm HPd Htop Hctop with ⟨Htop, Hctop, HPd, ⟨%av, %hpre, HFok⟩⟩
   ihave Hctop : topFrag (fsGammaL fscFs) cinum.toNat
       (eraNode (createSetf dnc major minor 1#16) bmc datc) $$ [Hctop]
   · rw [topFrag_1]; iexact Hctop
   imodintro
-  iframe Hdl Htop Hctop
+  iframe Hdl Htop Hctop HPd
   unfold creAcreFired
   iexists av, (dirEntries (eraNode dn bm data)), (fnNlink (eraNode dn bm data))
   iframe HFok
@@ -915,7 +919,8 @@ theorem create_alloc_file (IUP : IUNLOCKPUT) (DLK : DIRLINK) (Γ : SchedNames)
       creDotsLeg (hlc := hlc) (fsGammaL fscFs) ty.toNat Fdots -∗
       pfAt (aunarmOfArm (hlc := hlc) (fsGammaL fscFs) appE Farm) Fun -∗
       pfAt (acreCommitAtGen (hlc := hlc) (fsGammaL fscFs) appE
-        (creChild ty.toNat major.toNat minor.toNat) Farm) Fok -∗
+        (creChild ty.toNat major.toNat minor.toNat)
+        (P (nparElems (bview plen pfun)).length) Farm) Fok -∗
       (∀ c' : CPU, createPost (hlc := hlc) k plen pfun ty major minor γ pid V M u Sb ns
         dqb dqs dqbs dqn dqpv P Pmiss Farm Fdots Fun Fok Fex c') -∗
       wpLoop cpu := by
@@ -1039,9 +1044,10 @@ theorem create_alloc_file (IUP : IUNLOCKPUT) (DLK : DIRLINK) (Γ : SchedNames)
         hnone hc16 hcinb hwf' hholes' haddr' hcov' hdn' hcapp hsizedp hrng
     iapply wpLoop_fupd
     imod (create_alloc_repark (hlc := hlc) dind cinum dn dn' bm bm' data data' nf ty major minor dnc
-      bmc datc Farm Fok htyd hnl0 hiok hdok hddix hduq hrl hnone hc16 hcpos.1 hcinb htdir htyc
-      hfresh hty hwf' hholes' haddr' hcov' hdn' hcapp hsizedp hrng)
-      $$ Hinv Hdl Htok Htop Hctop Hacre Harm with ⟨Hdl, Htop, Hctop, HFok⟩
+      bmc datc (P (nparElems (bview plen pfun)).length) Farm Fok htyd hnl0 hiok hdok hddix hduq hrl
+      hnone hc16 hcpos.1 hcinb htdir htyc hfresh hty hwf' hholes' haddr' hcov' hdn' hcapp hsizedp
+      hrng)
+      $$ Hinv Hdl Htok Htop Hctop Hacre Harm HP with ⟨Hdl, Htop, Hctop, HP, HFok⟩
     imodintro
     icases create_alloc_map_open (ientry kd) bm' $$ Hmap with ⟨Ha, Hi⟩
     ihave Hload := icMkLoaded fscFs fscIreg fscCov fscLogst kd dind dn' bm' data' hiok' hrl' hdok'
@@ -1233,7 +1239,8 @@ theorem create_alloc_made (IUP : IUNLOCKPUT) (IU : IUPDATE) (DLK : DIRLINK) (Γ 
       txPin icfgLog t (1 : Qp).half -∗
       P (nparElems (bview plen pfun)).length dind.toNat -∗
       pfAt (dlookupCommitAt (fsGammaL fscFs) appE) Fex -∗
-      creCommits (hlc := hlc) (fsGammaL fscFs) ty.toNat major.toNat minor.toNat Farm Fdots Fun Fok -∗
+      creCommits (hlc := hlc) (fsGammaL fscFs) ty.toNat major.toNat minor.toNat
+      (P (nparElems (bview plen pfun)).length) Farm Fdots Fun Fok -∗
       (∀ c' : CPU, createPost (hlc := hlc) k plen pfun ty major minor γ pid V M u Sb ns
         dqb dqs dqbs dqn dqpv P Pmiss Farm Fdots Fun Fok Fex c') -∗
       wpLoop cpu := by

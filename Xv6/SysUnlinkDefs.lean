@@ -179,19 +179,53 @@ variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [FsTopG GF]
 /-- INSTANT 1 -- the parent-row commit, two-phase at the raw map (Rocq's
 `uent_commit_at`; `acre_commit_at`'s mold: phase 1 observes the pre-state
 under `unlPre`, phase 2 witnesses the parent half applied).  Phase 1 hands
-back THE CALLER'S STEP (`appStep`) at the RAW insert the mover performs. -/
-def uentCommitAt [Appcfg GF] (Γ : FsViewNames GF) (E : CoPset)
+back THE CALLER'S STEP (`appStep`) at the RAW insert the mover performs.
+
+THE PARENT CURSOR IS A PREMISE (Rocq lane TL-3K, `fec45648e`), for
+`FsAbsCreateFire.acreCommitAtGen`'s reason exactly: `d` is quantified
+INSIDE, so without `Pd` a supplier owes a step at EVERY directory of every
+view.  `Pd` is nameiparent's TERMINAL CURSOR (`P (nparElems pl).length` at
+the syscall altitude), which the prover holds when this leg fires.  READ,
+NOT SPENT: phase 1 hands it straight back. -/
+def uentCommitAt [Appcfg GF] (Γ : FsViewNames GF) (E : CoPset) (Pd : Nat → IProp GF)
     (Φ : Aview → Nat → Fname → Nat → IProp GF) : IProp GF :=
   iprop(∀ (I : RegMapF FsNode) (d t : Nat) (nm : Fname)
       (ents : Std.ExtTreeMap Fname Nat compare) (nl : Nat) (a : Anode),
     ⌜unlPre (absView I) d nm ents nl t a⌝ -∗
+    Pd d -∗
     (Γ.top ↪●MAP{DFrac.own (1 : Qp).half} I) ={E}=∗
-    (Γ.top ↪●MAP{DFrac.own (1 : Qp).half} I) ∗
+    (Γ.top ↪●MAP{DFrac.own (1 : Qp).half} I) ∗ Pd d ∗
       appStep d I (deltaUnlEnt d nm (unlDec a.anNode) (absView I)) ∗
       (∀ I' : RegMapF FsNode,
         ⌜absView I' = deltaUnlEnt d nm (unlDec a.anNode) (absView I)⌝ -∗
         (Γ.top ↪●MAP{DFrac.own (1 : Qp).half} I') ={E}=∗
         (Γ.top ↪●MAP{DFrac.own (1 : Qp).half} I') ∗ Φ (absView I) d nm t))
+
+/-- ...and the cursor's ISO (Rocq's `uent_commit_at_mono`,
+`FsAbsCreateFire.acreCommitAtGen_mono`'s twin). -/
+theorem uentCommitAt_mono [Appcfg GF] (Γ : FsViewNames GF) (E : CoPset) (Pd Pd' : Nat → IProp GF)
+    (Φ : Aview → Nat → Fname → Nat → IProp GF) :
+    ⊢ iprop(□ (∀ d : Nat, Pd' d -∗ Pd d)) -∗ iprop(□ (∀ d : Nat, Pd d -∗ Pd' d)) -∗
+      uentCommitAt (hlc := hlc) Γ E Pd Φ -∗ uentCommitAt (hlc := hlc) Γ E Pd' Φ := by
+  unfold uentCommitAt
+  iintro #Hin #Hout H %I %d %t %nm %ents %nl %a %hpre HPd Ha
+  ihave HPd := Hin $$ %d HPd
+  imod H $$ %I %d %t %nm %ents %nl %a %hpre HPd Ha with ⟨Ha, HPd, Hstep, Hph2⟩
+  ihave HPd := Hout $$ %d HPd
+  imodintro
+  iframe Ha HPd Hstep Hph2
+
+/-- the cursor is a WEAKENING, exactly as at create (Rocq's
+`uent_commit_at_cur`; `FsAbsCreateFire.acreCommitAtGen_cur`). -/
+theorem uentCommitAt_cur [Appcfg GF] (Γ : FsViewNames GF) (E : CoPset) (Pd : Nat → IProp GF)
+    (Φ : Aview → Nat → Fname → Nat → IProp GF) :
+    uentCommitAt (hlc := hlc) Γ E (fun _ => iprop(True)) Φ ⊢
+      uentCommitAt (hlc := hlc) Γ E Pd Φ := by
+  unfold uentCommitAt
+  iintro H %I %d %t %nm %ents %nl %a %hpre HPd Ha
+  imod H $$ %I %d %t %nm %ents %nl %a %hpre %trivial Ha with ⟨Ha, -, Hstep, Hph2⟩
+  imodintro
+  iframe Ha HPd Hstep Hph2
 
 /-- INSTANT 2 -- the target-row commit, same mold (Rocq's `utgt_commit_at`).
 No name, no parent: by this instant only the target's identity is in the
@@ -227,15 +261,16 @@ def dmissCommitAt (Γ : FsViewNames GF) (E : CoPset) (Φ : Aview → Nat → Fna
 verbatim -- fired at the isdirempty refusal (arm iii-c). -/
 
 /-- satisfiability off the SUPPLY (Rocq's `uent_commit_at_unit`) -/
-theorem uentCommitAt_unit [Appcfg GF] [FsBytesG GF] (γfs : FsNames) (E : CoPset) :
+theorem uentCommitAt_unit [Appcfg GF] [FsBytesG GF] (γfs : FsNames) (E : CoPset)
+    (Pd : Nat → IProp GF) :
     appSup (GF := GF) ⊢
-      uentCommitAt (hlc := hlc) (fsGammaL γfs) E (fun _ _ _ _ => iprop(True)) := by
+      uentCommitAt (hlc := hlc) (fsGammaL γfs) E Pd (fun _ _ _ _ => iprop(True)) := by
   iintro #Hsup
   unfold uentCommitAt
-  iintro %I %d %t %nm %ents %nl %a %_ Ha
+  iintro %I %d %t %nm %ents %nl %a %_ HPd Ha
   ihave Hstep := appStep_acc d I (deltaUnlEnt d nm (unlDec a.anNode) (absView I)) $$ Hsup
   imodintro
-  iframe Ha Hstep
+  iframe Ha HPd Hstep
   iintro %I' %_ Ha'
   imodintro
   iframe Ha'

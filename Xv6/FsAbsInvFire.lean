@@ -121,12 +121,15 @@ theorem fsabsTruncPiece (γfs : FsNames) (vom : BitVec 64) :
   · exact fsabsAtrunc γfs
   · iintro _; iempintro
 
-/-- Rocq `fsabs_acre`. -/
-theorem fsabsAcre (γfs : FsNames) (c : Absnode) (Farm : Pfam GF (Aview → Nat → IProp GF)) :
+/-- Rocq `fsabs_acre`.  `Pd` IS FREE HERE (TL-3K): the generic application
+ignores the parent cursor, so it discharges the commit at whatever cursor
+the bundle it is being handed to carries. -/
+theorem fsabsAcre (γfs : FsNames) (c : Absnode) (Pd : Nat → IProp GF)
+    (Farm : Pfam GF (Aview → Nat → IProp GF)) :
     appSup (GF := GF) ⊢
-      pfAt (acreCommitAt (hlc := hlc) (fsGammaL γfs) appE c Farm)
+      pfAt (acreCommitAt (hlc := hlc) (fsGammaL γfs) appE c Pd Farm)
         (pfamTriv (fun _ _ _ _ => iprop(True))) :=
-  (acreCommitAt_unit γfs appE c Farm).trans (pfAt_triv _ _)
+  (acreCommitAt_unit γfs appE c Pd Farm).trans (pfAt_triv _ _)
 
 /-- Rocq `fsabs_child`: create's two child legs, unfired, at the trivial
 families. -/
@@ -143,10 +146,11 @@ theorem fsabsChild (γfs : FsNames) (c : Absnode) :
     iapply (aunarmOfArm_unit (hlc := hlc) γfs appE _) $$ Hsup
 
 /-- Rocq `fsabs_uent`. -/
-theorem fsabsUent (γfs : FsNames) :
+theorem fsabsUent (γfs : FsNames) (Pd : Nat → IProp GF) :
     appSup (GF := GF) ⊢
-      pfAt (uentCommitAt (hlc := hlc) (fsGammaL γfs) appE) (pfamTriv (fun _ _ _ _ => iprop(True))) :=
-  (uentCommitAt_unit γfs appE).trans (pfAt_triv _ _)
+      pfAt (uentCommitAt (hlc := hlc) (fsGammaL γfs) appE Pd)
+        (pfamTriv (fun _ _ _ _ => iprop(True))) :=
+  (uentCommitAt_unit γfs appE Pd).trans (pfAt_triv _ _)
 
 /-- Rocq `fsabs_utgt`. -/
 theorem fsabsUtgt (γfs : FsNames) :

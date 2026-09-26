@@ -185,7 +185,7 @@ theorem sys_unlink_name_close (sp0 : BitVec 64) (nf : Nat → BitVec 8) (tl : Li
 /-- The four commits, as the bundle hands them in and the refusals hand
 them back. -/
 def sysUnlinkCommits (A : SysUnlinkArgs GF) : IProp GF := iprop%
-  pfAt (uentCommitAt (hlc := hlc) (fsGammaL fscFs) appE) A.Fent ∗
+  pfAt (uentCommitAt (hlc := hlc) (fsGammaL fscFs) appE (fun _ => iprop(True))) A.Fent ∗
   pfAt (utgtCommitAt (hlc := hlc) (fsGammaL fscFs) appE) A.Ftgt ∗
   pfAt (dlookupCommitAt (hlc := hlc) (fsGammaL fscFs) appE) A.Fex ∗
   pfAt (dmissCommitAt (hlc := hlc) (fsGammaL fscFs) appE) A.Fmiss

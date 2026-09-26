@@ -195,7 +195,9 @@ def mknodAuPre (Γ : FsViewNames GF) (γfs : FsNames) (cw : Nat) (pl : List (Bit
     (Farm Fun : Pfam GF (Aview → Nat → IProp GF))
     (Fok Fex : Pfam GF (Aview → Nat → Fname → Nat → IProp GF)) : IProp GF :=
   iprop(epStart (hlc := hlc) γfs cw P Pmiss pl ∗
-    pfAt (acreCommitAt (hlc := hlc) Γ appE (.ADev ma mi) Farm) Fok ∗
+    -- THE PARENT CURSOR rides the commit (TL-3K): at THIS path the walk's
+    -- terminal cursor is `P (nparElems pl).length`
+    pfAt (acreCommitAt (hlc := hlc) Γ appE (.ADev ma mi) (P (nparElems pl).length) Farm) Fok ∗
     pfAt (dlookupCommitAt (hlc := hlc) Γ appE) Fex ∗
     creChildUnfired (hlc := hlc) Γ (.ADev ma mi) Farm Fun)
 
@@ -209,9 +211,34 @@ def mknodAuAt (Γ : FsViewNames GF) (γfs : FsNames) (cw : Nat)
     (Farm Fun : Pfam GF (Aview → Nat → IProp GF))
     (Fok Fex : Pfam GF (Aview → Nat → Fname → Nat → IProp GF)) : IProp GF :=
   iprop((∀ pl : List (BitVec 8), ⌜argPathOf M pv pl⌝ -∗ epStart (hlc := hlc) γfs cw P Pmiss pl) ∗
-    pfAt (acreCommitAt (hlc := hlc) Γ appE (.ADev ma mi) Farm) Fok ∗
+    -- the cursor UNDER THE SAME GUARD the walk carries -- a bare resource,
+    -- so the failure fold still hands the commit back on the nose
+    -- (`SysMknodDefs.nparCur`, TL-3K)
+    pfAt (acreCommitAt (hlc := hlc) Γ appE (.ADev ma mi) (nparCur M pv P) Farm) Fok ∗
     pfAt (dlookupCommitAt (hlc := hlc) Γ appE) Fex ∗
     creChildUnfired (hlc := hlc) Γ (.ADev ma mi) Farm Fun)
+
+/-- THE CURSOR'S TWO READINGS, as one move (Rocq's `mknod_acre_inst`,
+TL-3K): the syscall-tier commit is at the guarded cursor, the create-tier
+one at THE path argstr read, and `argPathOf_uniq` makes them
+interchangeable in both directions -- which is what the commit's iso
+needs, since it READS the premise and hands it back. -/
+theorem mknodAcre_inst (Γ : FsViewNames GF) (M : Nat → List (BitVec 8)) (pv : Nat)
+    (pl : List (BitVec 8)) (ma mi : Nat) (P : Nat → Nat → IProp GF)
+    (Farm : Pfam GF (Aview → Nat → IProp GF))
+    (Fok : Pfam GF (Aview → Nat → Fname → Nat → IProp GF))
+    (hpl : argPathOf M pv pl) :
+    pfAt (acreCommitAt (hlc := hlc) Γ appE (.ADev ma mi) (nparCur M pv P) Farm) Fok ⊢
+      pfAt (acreCommitAt (hlc := hlc) Γ appE (.ADev ma mi) (P (nparElems pl).length) Farm) Fok := by
+  iintro Hok
+  iapply (pfAt_mono (acreCommitAt (hlc := hlc) Γ appE (.ADev ma mi) (nparCur M pv P) Farm)
+    (acreCommitAt (hlc := hlc) Γ appE (.ADev ma mi) (P (nparElems pl).length) Farm) Fok) $$ [] Hok
+  iintro H
+  unfold acreCommitAt
+  iapply (acreCommitAtGen_mono (hlc := hlc) Γ appE (fun _ _ => .ADev ma mi) (nparCur M pv P)
+    (P (nparElems pl).length) Farm Fok.pfRecv) $$ [] [] H
+  · iapply (nparCur_out M pv pl P hpl)
+  · iapply (nparCur_in M pv pl P hpl)
 
 /-- THE INSTANCE, the step the proof takes once argstr has answered: at the
 path it read, the walk wand fires (Rocq's `mknod_au_at_inst`). -/
@@ -225,6 +252,7 @@ theorem mknodAuAt_inst (Γ : FsViewNames GF) (γfs : FsNames) (cw : Nat)
       mknodAuPre Γ γfs cw pl ma mi P Pmiss Farm Fun Fok Fex := by
   unfold mknodAuAt mknodAuPre
   iintro ⟨Hw, Hok, Hex, Hch⟩
+  ihave Hok := mknodAcre_inst Γ M pv pl ma mi P Farm Fok hpl $$ Hok
   iframe Hok Hex Hch
   iapply Hw $$ %pl %hpl
 
@@ -237,7 +265,7 @@ theorem mknodAuAt_of_all (Γ : FsViewNames GF) (γfs : FsNames) (cw : Nat)
     (Farm Fun : Pfam GF (Aview → Nat → IProp GF))
     (Fok Fex : Pfam GF (Aview → Nat → Fname → Nat → IProp GF)) :
     nparWalkPreEra (hlc := hlc) γfs cw P Pmiss ⊢
-      pfAt (acreCommitAt (hlc := hlc) Γ appE (.ADev ma mi) Farm) Fok -∗
+      pfAt (acreCommitAt (hlc := hlc) Γ appE (.ADev ma mi) (nparCur M pv P) Farm) Fok -∗
       pfAt (dlookupCommitAt (hlc := hlc) Γ appE) Fex -∗
       creChildUnfired (hlc := hlc) Γ (.ADev ma mi) Farm Fun -∗
       mknodAuAt Γ γfs cw M pv ma mi P Pmiss Farm Fun Fok Fex := by
@@ -253,7 +281,7 @@ theorem mknodAuPre_of_all (Γ : FsViewNames GF) (γfs : FsNames) (cw : Nat) (pl 
     (Farm Fun : Pfam GF (Aview → Nat → IProp GF))
     (Fok Fex : Pfam GF (Aview → Nat → Fname → Nat → IProp GF)) :
     nparWalkPreEra (hlc := hlc) γfs cw P Pmiss ⊢
-      pfAt (acreCommitAt (hlc := hlc) Γ appE (.ADev ma mi) Farm) Fok -∗
+      pfAt (acreCommitAt (hlc := hlc) Γ appE (.ADev ma mi) (P (nparElems pl).length) Farm) Fok -∗
       pfAt (dlookupCommitAt (hlc := hlc) Γ appE) Fex -∗
       creChildUnfired (hlc := hlc) Γ (.ADev ma mi) Farm Fun -∗
       mknodAuPre Γ γfs cw pl ma mi P Pmiss Farm Fun Fok Fex := by
@@ -292,12 +320,12 @@ def mknodPostFail (Γ : FsViewNames GF) (γfs : FsNames) (cw : Nat)
     (∃ pl : List (BitVec 8),
       ⌜argPathOf M pv pl⌝ ∗
       ((nparWalkDeadEra (hlc := hlc) γfs P Pmiss pl ∗
-          pfAt (acreCommitAt (hlc := hlc) Γ appE (.ADev ma mi) Farm) Fok ∗
+          pfAt (acreCommitAt (hlc := hlc) Γ appE (.ADev ma mi) (P (nparElems pl).length) Farm) Fok ∗
           pfAt (dlookupCommitAt (hlc := hlc) Γ appE) Fex ∗
           creChildUnfired (hlc := hlc) Γ (.ADev ma mi) Farm Fun) ∨
         (∃ d : Nat,
           P (nparElems pl).length d ∗
-          pfAt (acreCommitAt (hlc := hlc) Γ appE (.ADev ma mi) Farm) Fok ∗
+          pfAt (acreCommitAt (hlc := hlc) Γ appE (.ADev ma mi) (P (nparElems pl).length) Farm) Fok ∗
           ((∃ (av : Aview) (i : Nat) (nm : Fname) (ents : Std.ExtTreeMap Fname Nat compare)
               (nl : Nat),
               ⌜(pathElems pl).getLast? = some nm⌝ ∗

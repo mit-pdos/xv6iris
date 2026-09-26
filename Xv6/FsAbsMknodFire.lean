@@ -446,6 +446,7 @@ phases fired on either side of the map update INSIDE the one `ftopN`
 critical section.  The child's fragment is only READ.  THE ARM'S PERMIT IS
 SPENT HERE (`FsAbsCreateFire.acreCommitAtGen`'s note). -/
 theorem cafAcre_fire [Icfg] (γfs : FsNames) (E : CoPset) (cf : Nat → Nat → Absnode)
+    (Pd : Nat → IProp GF)
     (Farm : Pfam GF (Aview → Nat → IProp GF))
     (Fok : Pfam GF (Aview → Nat → Fname → Nat → IProp GF))
     (d i : Nat) (nm : Fname) (dqc : DFrac) (np np' nc : FsNode)
@@ -455,14 +456,17 @@ theorem cafAcre_fire [Icfg] (γfs : FsNames) (E : CoPset) (cf : Nat → Nat → 
       some ⟨.ADir ((dirEntries np).insert nm i), fnNlink np + acreBump (cf d i)⟩)
     (habsc : absOf nc = some ⟨cf d i, 1⟩) :
     ⊢@{IProp GF} ftopInv (hlc := hlc) γfs -∗ appInv (hlc := hlc) γfs -∗
-      pfAt (acreCommitAtGen (hlc := hlc) (fsGammaL γfs) appE cf Farm) Fok -∗
+      pfAt (acreCommitAtGen (hlc := hlc) (fsGammaL γfs) appE cf Pd Farm) Fok -∗
       creArmFired Farm i -∗
+      -- THE PARENT CURSOR (TL-3K): READ by the commit and handed straight
+      -- back, so the prover keeps the cursor its own post owes
+      Pd d -∗
       topFrag (fsGammaL γfs) d np -∗
       topFragQ (fsGammaL γfs) dqc i nc ={E}=∗
-        topFrag (fsGammaL γfs) d np' ∗ topFragQ (fsGammaL γfs) dqc i nc ∗
+        topFrag (fsGammaL γfs) d np' ∗ topFragQ (fsGammaL γfs) dqc i nc ∗ Pd d ∗
         ∃ av : Aview, ⌜crePre av d nm (dirEntries np) (fnNlink np) i (cf d i)⌝ ∗
           Fok.pfRecv av d nm i := by
-  iintro #Hi #Hai Hcm Harm Hfp Hfc
+  iintro #Hi #Hai Hcm Harm HPd Hfp Hfc
   ihave Hcm := pfAt_au _ _ $$ Hcm
   unfold topFrag topFragQ
   -- PARENT AND CHILD ARE DISTINCT KEYS: the parent's fragment is whole
@@ -484,8 +488,8 @@ theorem cafAcre_fire [Icfg] (γfs : FsNames) (E : CoPset) (cf : Nat → Nat → 
       deltaCreate_armed (absView I) d nm (dirEntries np) (fnNlink np) i (cf d i) hpre hne]
   have hsub : appE ⊆ E \ ↑ftopN := appN_sub_ftop E hE
   unfold acreCommitAtGen
-  ihave Hcm := Hcm $$ %I %d %i %nm %(dirEntries np) %(fnNlink np) %hpre Harm Ha
-  imod (fupd_mask_mono hsub) $$ Hcm with ⟨Ha, Hstep, Hph2⟩
+  ihave Hcm := Hcm $$ %I %d %i %nm %(dirEntries np) %(fnNlink np) %hpre Harm HPd Ha
+  imod (fupd_mask_mono hsub) $$ Hcm with ⟨Ha, HPd, Hstep, Hph2⟩
   -- THE MOVE, at the whole authority (`AppInv.appTopUpdate`)
   imod (appTopUpdate (E \ ↑ftopN) γfs I d np np' hsub) $$ Hai [Hstep] Ha Hfp with ⟨Ha, Hfp⟩
   · iintro %_ Hp
@@ -503,7 +507,7 @@ theorem cafAcre_fire [Icfg] (γfs : FsNames) (E : CoPset) (cf : Nat → Nat → 
     · rw [get?_insert_ne hjd] at hj
       exact hcl j m hj hun
   imodintro
-  iframe Hfp Hfc
+  iframe Hfp Hfc HPd
   iexists absView I
   iframe HΦ
   ipureintro; exact hpre
@@ -511,6 +515,7 @@ theorem cafAcre_fire [Icfg] (γfs : FsNames) (E : CoPset) (cf : Nat → Nat → 
 /-- the `AFile []` instance, the one the T_FILE create-AU fires (Rocq's
 `caf_acre_fire_file`). -/
 theorem cafAcre_fire_file [Icfg] (γfs : FsNames) (E : CoPset)
+    (Pd : Nat → IProp GF)
     (Farm : Pfam GF (Aview → Nat → IProp GF))
     (Fok : Pfam GF (Aview → Nat → Fname → Nat → IProp GF))
     (d i : Nat) (nm : Fname) (dqc : DFrac) (np np' nc : FsNode)
@@ -519,14 +524,15 @@ theorem cafAcre_fire_file [Icfg] (γfs : FsNames) (E : CoPset)
     (habsp' : absOf np' = some ⟨.ADir ((dirEntries np).insert nm i), fnNlink np⟩)
     (habsc : absOf nc = some ⟨.AFile [], 1⟩) :
     ⊢@{IProp GF} ftopInv (hlc := hlc) γfs -∗ appInv (hlc := hlc) γfs -∗
-      pfAt (acreCommitAt (hlc := hlc) (fsGammaL γfs) appE (.AFile []) Farm) Fok -∗
+      pfAt (acreCommitAt (hlc := hlc) (fsGammaL γfs) appE (.AFile []) Pd Farm) Fok -∗
       creArmFired Farm i -∗
+      Pd d -∗
       topFrag (fsGammaL γfs) d np -∗
       topFragQ (fsGammaL γfs) dqc i nc ={E}=∗
-        topFrag (fsGammaL γfs) d np' ∗ topFragQ (fsGammaL γfs) dqc i nc ∗
+        topFrag (fsGammaL γfs) d np' ∗ topFragQ (fsGammaL γfs) dqc i nc ∗ Pd d ∗
         ∃ av : Aview, ⌜crePre av d nm (dirEntries np) (fnNlink np) i (.AFile [])⌝ ∗
           Fok.pfRecv av d nm i :=
-  cafAcre_fire γfs E (fun _ _ => .AFile []) Farm Fok d i nm dqc np np' nc hE hloc hdir hnl hnone
+  cafAcre_fire γfs E (fun _ _ => .AFile []) Pd Farm Fok d i nm dqc np np' nc hE hloc hdir hnl hnone
     habsp' habsc
 
 end CreateFire2

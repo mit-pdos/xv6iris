@@ -174,6 +174,10 @@ theorem sys_open_split_create (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ] (k 
   unfold openAuCreateAt
   icases Hx with ⟨Hw, Hac, Hdl, Ho, Ht, Hcl⟩
   ihave Hst := Hw $$ %(bview plen bp) %hpo
+  -- the bundle's commit is at the GUARDED cursor and the create tier wants
+  -- it at THE path argstr read (`SysOpenDefs.openAcre_inst`, TL-3K)
+  ihave Hac := openAcre_inst (hlc := hlc) (fsGammaL fscFs) (sysOpenIm A) A.v.toNat (bview plen bp)
+    A.P Farm Fok hpo $$ Hac
   iapply hEC $$ %cpu %spie %spp %R %(k.regs 9#5) %w4 %w5 %w6 %lo %w24 %P2 %plen %bp %Sb %hP2
     %⟨hnn, hterm, hplen, hpo⟩ %hpins %hal Hk Hpc Hte Hce Henv Hcells Hbuf Hblk HopS Htx Hbs Hir
     Hfd Hfr Hst Hac Hdl Ho Ht Hcl HΦ

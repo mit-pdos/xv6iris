@@ -1606,7 +1606,8 @@ def sysOpenEntryCBody (Γ : SchedNames) (k : KCtx) (A : SysOpenArgs GF)
     bslots 3 -∗ irefSlots A.ns -∗ fdSlot -∗ fdFrags A.V.fdg A.sts -∗
     -- THE AU BUNDLE (the contract's O_CREATE side), at the fetched string
     epStart (hlc := hlc) fscFs A.V.cwi A.P A.Pmiss (bview plen bp) -∗
-    pfAt (acreCommitAt (hlc := hlc) (fsGammaL fscFs) appE (.AFile []) Farm) Fok -∗
+    pfAt (acreCommitAt (hlc := hlc) (fsGammaL fscFs) appE (.AFile [])
+      (A.P (nparElems (bview plen bp)).length) Farm) Fok -∗
     pfAt (dlookupCommitAt (hlc := hlc) (fsGammaL fscFs) appE) Fex -∗
     pfAt (aopenCommitAt (hlc := hlc) (fsGammaL fscFs) appE) A.Fo -∗
     openTruncPiece (hlc := hlc) (fsGammaL fscFs) A.vom A.Ft -∗

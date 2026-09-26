@@ -94,8 +94,8 @@ theorem sys_mknod_create (CR : CREATE) (Γ : SchedNames) [ClaimIs (hlc := hlc) G
     bslots 3 ∗ irefSlots ns ∗ logOpS icfgLog u Sb ∗ logTx icfgLog ∗
     epStart fscFs V.cwi P Pmiss (bview plen pfun) ∗
     pfAt (dlookupCommitAt (fsGammaL fscFs) appE) Fex ∗
-    creCommits (hlc := hlc) (fsGammaL fscFs) T_DEVICE_w.toNat major.toNat minor.toNat Farm
-      (pfamTriv (fun _ _ _ _ => iprop(True))) Fun Fok ∗
+    creCommits (hlc := hlc) (fsGammaL fscFs) T_DEVICE_w.toNat major.toNat minor.toNat
+      (P (nparElems (bview plen pfun)).length) Farm (pfamTriv (fun _ _ _ _ => iprop(True))) Fun Fok ∗
     (∀ c : CPU, sysMknodCreateK k' plen pfun major minor γ pid V M u Sb ns P Pmiss Farm Fun Fok Fex c)
     ⊢ wpLoop (GF := GF) cpu := by
   iintro ⟨Hk, Hpc, Hte, Hce, #Henv, Hblk, Hpath, Hbs, Hir, Hop, Htx, Hst, Hdl, Hcre, HK⟩

@@ -432,7 +432,8 @@ theorem createFail_parent_tail (IUP : IUNLOCKPUT) (Γ : SchedNames) [ClaimIs (hl
     pfAt (dlookupCommitAt (fsGammaL fscFs) appE) Fex ∗
     creDotsLeg (hlc := hlc) (fsGammaL fscFs) ty.toNat Fdots ∗
     pfAt (acreCommitAtGen (hlc := hlc) (fsGammaL fscFs) appE
-      (creChild ty.toNat major.toNat minor.toNat) Farm) Fok ∗
+      (creChild ty.toNat major.toNat minor.toNat)
+        (P (nparElems (bview plen pfun)).length) Farm) Fok ∗
     creUnarmFired Fun cinum.toNat ∗
     (∀ c' : CPU, createPost (hlc := hlc) k plen pfun ty major minor γ pid V M u Sb ns
       dqb dqs dqbs dqn dqpv P Pmiss Farm Fdots Fun Fok Fex c')

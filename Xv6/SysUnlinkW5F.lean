@@ -165,7 +165,7 @@ theorem sys_unlink_w5f_ghost (Fent : Pfam GF (Aview → Nat → Fname → Nat �
       topFrag (fsGammaL fscFs) dinum.toNat (eraNode dnd bmd datd) -∗
       dinodeAt fscIreg (BitVec.setWidth 32 (dirInum datd kk)) dni -∗
       topFrag (fsGammaL fscFs) (BitVec.setWidth 32 (dirInum datd kk)).toNat (eraNode dni bmi dati) -∗
-      pfAt (uentCommitAt (hlc := hlc) (fsGammaL fscFs) appE) Fent -∗
+      pfAt (uentCommitAt (hlc := hlc) (fsGammaL fscFs) appE (fun _ => iprop(True))) Fent -∗
       |={⊤}=> (icLoaded fscFs fscIreg fscCov fscLogst kd dinum dnW bmW ∗
         dinodeAt fscIreg (BitVec.setWidth 32 (dirInum datd kk)) dni ∗
         topFrag (fsGammaL fscFs) (BitVec.setWidth 32 (dirInum datd kk)).toNat
@@ -224,13 +224,13 @@ theorem sys_unlink_w5f_ghost (Fent : Pfam GF (Aview → Nat → Fname → Nat �
   ihave Htopi := (show topFrag (GF := GF) (fsGammaL fscFs) (BitVec.setWidth 32 (dirInum datd kk)).toNat
       (eraNode dni bmi dati) ⊢ topFragQ (fsGammaL fscFs) (DFrac.own 1)
         (BitVec.setWidth 32 (dirInum datd kk)).toNat (eraNode dni bmi dati) from .rfl) $$ Htopi
-  imod (ufUent_fire (hlc := hlc) fscFs ⊤ (DFrac.own 1) Fent dinum.toNat
+  imod (ufUent_fire (hlc := hlc) fscFs ⊤ (DFrac.own 1) (fun _ => iprop(True)) Fent dinum.toNat
       (BitVec.setWidth 32 (dirInum datd kk)).toNat (dirBname datd kk) 0 (eraNode dnd bmd datd)
       (eraNode dnW bmW datW) (eraNode dni bmi dati) ufNd_top hloc (mkfEra_is_dir dnd bmd datd htyz)
       (sys_unlink_ent_at dinum.toNat dnd bmd datd kk nf hop hty hfn) hnD hnDD
       (sys_unlink_nl1 dnd bmd datd hlive) (sys_unlink_nl1 dni bmi dati hnli)
       (sys_unlink_nondir_node _ hipnd) (sys_unlink_nondir_dec _ hipnd) habsp hoki.2.2.2.1)
-    $$ Hftop Happ Hcm Htop Htopi with ⟨Htop, Htopi, %av0, %hpre, Hrecv⟩
+    $$ Hftop Happ Hcm %trivial Htop Htopi with ⟨Htop, Htopi, -, %av0, %hpre, Hrecv⟩
   ihave Htopi := (show topFragQ (GF := GF) (fsGammaL fscFs) (DFrac.own 1)
         (BitVec.setWidth 32 (dirInum datd kk)).toNat (eraNode dni bmi dati) ⊢
       topFrag (fsGammaL fscFs) (BitVec.setWidth 32 (dirInum datd kk)).toNat

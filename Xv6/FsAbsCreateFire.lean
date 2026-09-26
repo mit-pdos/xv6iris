@@ -252,16 +252,30 @@ note): the create and the unarm are the two ways one armed inode can end,
 EXCLUSIVE on every run; taking the arm's receipt here and in `aunarmOfArm`,
 and CONSUMING it in both, makes that exclusion structural.  The application
 parks its credential in `Farm`'s receipt and gets it back through the
-receipt of the leg that actually fired. -/
+receipt of the leg that actually fired.
+
+THE PARENT CURSOR IS A PREMISE (Rocq lane TL-3K, `fec45648e`; design
+user-tree.md section 7.5's WALL A, fix (i)).  `d` is quantified INSIDE this
+definition, so without `Pd` a supplier owes a step at EVERY directory of
+every view -- including one inside a STRANGER's subtree, where a
+constraining application has no step at all.  `Pd` is the walk's TERMINAL
+CURSOR, i.e. `P (nparElems pl).length` at the syscall altitude: nameiparent
+has already run when this leg fires, so the prover HOLDS it.  IT IS READ,
+NOT SPENT: phase 1 hands `Pd d` straight back, because the cursor is also
+the syscall's own post and the caller's `P` may be linear.  A supplier that
+does not care instantiates `Pd` at anything and returns it unread
+(`acreCommitAtGen_unit`). -/
 def acreCommitAtGen [Appcfg GF] (Γ : FsViewNames GF) (E : CoPset) (cf : Nat → Nat → Absnode)
+    (Pd : Nat → IProp GF)
     (Farm : Pfam GF (Aview → Nat → IProp GF))
     (Φ : Aview → Nat → Fname → Nat → IProp GF) : IProp GF :=
   iprop(∀ (I : RegMapF FsNode) (d i : Nat) (nm : Fname)
       (ents : Std.ExtTreeMap Fname Nat compare) (nl : Nat),
     ⌜crePre (absView I) d nm ents nl i (cf d i)⌝ -∗
     creArmFired Farm i -∗
+    Pd d -∗
     (Γ.top ↪●MAP{DFrac.own (1 : Qp).half} I) ={E}=∗
-    (Γ.top ↪●MAP{DFrac.own (1 : Qp).half} I) ∗
+    (Γ.top ↪●MAP{DFrac.own (1 : Qp).half} I) ∗ Pd d ∗
       appStep d I (deltaCreate d nm i (cf d i) (absView I)) ∗
       (∀ I' : RegMapF FsNode,
         ⌜absView I' = deltaCreate d nm i (cf d i) (absView I)⌝ -∗
@@ -272,19 +286,57 @@ def acreCommitAtGen [Appcfg GF] (Γ : FsViewNames GF) (E : CoPset) (cf : Nat →
 device at mknod, an empty file at open(O_CREATE)) (Rocq's
 `acre_commit_at`). -/
 def acreCommitAt [Appcfg GF] (Γ : FsViewNames GF) (E : CoPset) (c : Absnode)
+    (Pd : Nat → IProp GF)
     (Farm : Pfam GF (Aview → Nat → IProp GF))
     (Φ : Aview → Nat → Fname → Nat → IProp GF) : IProp GF :=
-  acreCommitAtGen (hlc := hlc) Γ E (fun _ _ => c) Farm Φ
+  acreCommitAtGen (hlc := hlc) Γ E (fun _ _ => c) Pd Farm Φ
 
 /-- the child-content index is used POINTWISE, so a pointwise equality moves
 the commit (Rocq's `acre_commit_at_gen_ext`; deviation 5). -/
 theorem acreCommitAtGen_ext [Appcfg GF] (Γ : FsViewNames GF) (E : CoPset)
-    (cf cf' : Nat → Nat → Absnode) (Farm : Pfam GF (Aview → Nat → IProp GF))
+    (cf cf' : Nat → Nat → Absnode) (Pd : Nat → IProp GF)
+    (Farm : Pfam GF (Aview → Nat → IProp GF))
     (Φ : Aview → Nat → Fname → Nat → IProp GF) (hext : ∀ d i, cf d i = cf' d i) :
-    acreCommitAtGen (hlc := hlc) Γ E cf Farm Φ ⊢ acreCommitAtGen (hlc := hlc) Γ E cf' Farm Φ := by
+    acreCommitAtGen (hlc := hlc) Γ E cf Pd Farm Φ ⊢
+      acreCommitAtGen (hlc := hlc) Γ E cf' Pd Farm Φ := by
   have : cf = cf' := funext fun d => funext fun i => hext d i
   subst this
   exact .rfl
+
+/-- ...and the cursor MOVES ALONG AN ISO (Rocq's `acre_commit_at_gen_mono`,
+TL-3K): two readings of the same cursor (the one-path form
+`P (nparElems pl).length` and the syscall tier's guarded form,
+`SysMknodDefs.nparCur`) carry the commit between them.  BOTH directions are
+needed because the commit READS the premise and HANDS IT BACK. -/
+theorem acreCommitAtGen_mono [Appcfg GF] (Γ : FsViewNames GF) (E : CoPset)
+    (cf : Nat → Nat → Absnode) (Pd Pd' : Nat → IProp GF)
+    (Farm : Pfam GF (Aview → Nat → IProp GF))
+    (Φ : Aview → Nat → Fname → Nat → IProp GF) :
+    ⊢ iprop(□ (∀ d : Nat, Pd' d -∗ Pd d)) -∗ iprop(□ (∀ d : Nat, Pd d -∗ Pd' d)) -∗
+      acreCommitAtGen (hlc := hlc) Γ E cf Pd Farm Φ -∗
+      acreCommitAtGen (hlc := hlc) Γ E cf Pd' Farm Φ := by
+  unfold acreCommitAtGen
+  iintro #Hin #Hout H %I %d %i %nm %ents %nl %hpre Harm HPd Ha
+  ihave HPd := Hin $$ %d HPd
+  imod H $$ %I %d %i %nm %ents %nl %hpre Harm HPd Ha with ⟨Ha, HPd, Hstep, Hph2⟩
+  ihave HPd := Hout $$ %d HPd
+  imodintro
+  iframe Ha HPd Hstep Hph2
+
+/-- THE CURSOR IS A WEAKENING (Rocq's `acre_commit_at_gen_cur`, TL-3K), and
+this is the one line every GENERIC supplier takes: a commit that holds at
+every `d` with no cursor at all holds a fortiori when one is handed in. -/
+theorem acreCommitAtGen_cur [Appcfg GF] (Γ : FsViewNames GF) (E : CoPset)
+    (cf : Nat → Nat → Absnode) (Pd : Nat → IProp GF)
+    (Farm : Pfam GF (Aview → Nat → IProp GF))
+    (Φ : Aview → Nat → Fname → Nat → IProp GF) :
+    acreCommitAtGen (hlc := hlc) Γ E cf (fun _ => iprop(True)) Farm Φ ⊢
+      acreCommitAtGen (hlc := hlc) Γ E cf Pd Farm Φ := by
+  unfold acreCommitAtGen
+  iintro H %I %d %i %nm %ents %nl %hpre Harm HPd Ha
+  imod H $$ %I %d %i %nm %ents %nl %hpre Harm %trivial Ha with ⟨Ha, -, Hstep, Hph2⟩
+  imodintro
+  iframe Ha HPd Hstep Hph2
 
 /-- THE ARM (Rocq's `aarm_commit_at`): the row APPEARS.  The view has no row
 at `i` (the claim box is at count 0) but the MAP has one.  The `isSome`
@@ -390,24 +442,24 @@ theorem dlookupCommitAt_unit (Γ : FsViewNames GF) (E : CoPset) :
 /-- the write-kind ones owe the caller's step, paid out of the SUPPLY
 (Rocq's `acre_commit_at_gen_unit`). -/
 theorem acreCommitAtGen_unit [Appcfg GF] [FsBytesG GF] (γfs : FsNames) (E : CoPset)
-    (cf : Nat → Nat → Absnode) (Farm : Pfam GF (Aview → Nat → IProp GF)) :
+    (cf : Nat → Nat → Absnode) (Pd : Nat → IProp GF) (Farm : Pfam GF (Aview → Nat → IProp GF)) :
     appSup (GF := GF) ⊢
-      acreCommitAtGen (hlc := hlc) (fsGammaL γfs) E cf Farm (fun _ _ _ _ => iprop(True)) := by
+      acreCommitAtGen (hlc := hlc) (fsGammaL γfs) E cf Pd Farm (fun _ _ _ _ => iprop(True)) := by
   unfold acreCommitAtGen
-  iintro #Hsup %I %d %i %nm %ents %nl %_ _ Ha
+  iintro #Hsup %I %d %i %nm %ents %nl %_ _ HPd Ha
   ihave Hstep := appStep_acc d I (deltaCreate d nm i (cf d i) (absView I)) $$ Hsup
   imodintro
-  iframe Ha Hstep
+  iframe Ha HPd Hstep
   iintro %I' %_ Ha'
   imodintro
   iframe Ha'
 
 /-- Rocq's `acre_commit_at_unit`. -/
 theorem acreCommitAt_unit [Appcfg GF] [FsBytesG GF] (γfs : FsNames) (E : CoPset) (c : Absnode)
-    (Farm : Pfam GF (Aview → Nat → IProp GF)) :
+    (Pd : Nat → IProp GF) (Farm : Pfam GF (Aview → Nat → IProp GF)) :
     appSup (GF := GF) ⊢
-      acreCommitAt (hlc := hlc) (fsGammaL γfs) E c Farm (fun _ _ _ _ => iprop(True)) :=
-  acreCommitAtGen_unit γfs E _ Farm
+      acreCommitAt (hlc := hlc) (fsGammaL γfs) E c Pd Farm (fun _ _ _ _ => iprop(True)) :=
+  acreCommitAtGen_unit γfs E _ Pd Farm
 
 /-- the arm's step is paid although the VIEW has no row: the supply holds of
 every view (Rocq's `aarm_commit_at_unit`). -/

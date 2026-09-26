@@ -114,7 +114,8 @@ theorem sys_mkdir_create (CR : CREATE) (Γ : SchedNames) [ClaimIs (hlc := hlc) G
     bslots 3 ∗ irefSlots ns ∗ logOpS icfgLog u Sb ∗ logTx icfgLog ∗
     epStart fscFs V.cwi P Pmiss (bview plen pfun) ∗
     pfAt (dlookupCommitAt (fsGammaL fscFs) appE) Fex ∗
-    creCommits (hlc := hlc) (fsGammaL fscFs) ty.toNat major.toNat minor.toNat Farm Fdots Fun Fok ∗
+    creCommits (hlc := hlc) (fsGammaL fscFs) ty.toNat major.toNat minor.toNat
+      (P (nparElems (bview plen pfun)).length) Farm Fdots Fun Fok ∗
     sysMkdirCreateK k' se pj plen pfun ty major minor γ pid V M u Sb ns P Pmiss Farm Fdots Fun Fok Fex
     ⊢ wpLoop (GF := GF) cpu := by
   subst hs hpj

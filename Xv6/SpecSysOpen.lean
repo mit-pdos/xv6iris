@@ -403,7 +403,7 @@ def openPostOkCreate (Γ : FsViewNames GF) (γ : FileNames) (pa : BitVec 64) (pi
      (∃ (avx : Aview) (entsx : Std.ExtTreeMap Fname Nat compare) (nlx : Nat),
         ⌜PartialMap.get? avx d = some ⟨.ADir entsx, nlx⟩⌝ ∗ ⌜entsx[nm]? = some i⌝ ∗
         Fex.pfRecv avx d nm i ∗
-        pfAt (acreCommitAt (hlc := hlc) Γ appE (.AFile []) Farm) Fok ∗
+        pfAt (acreCommitAt (hlc := hlc) Γ appE (.AFile []) (P (nparElems pl).length) Farm) Fok ∗
         -- the name was already there: create's child legs are whole
         creChildUnfired (hlc := hlc) Γ (.AFile []) Farm Fun ∗
         (∃ (av : Aview) (nl : Nat),
@@ -437,7 +437,7 @@ def openPostFailCreate (Γ : FsViewNames GF) (γfs : FsNames) (cw : Nat)
     (∃ pl : List (BitVec 8),
       ⌜argPathOf Mim pv pl⌝ ∗
       ((nparWalkDeadEra (hlc := hlc) γfs P Pmiss pl ∗
-          pfAt (acreCommitAt (hlc := hlc) Γ appE (.AFile []) Farm) Fok ∗
+          pfAt (acreCommitAt (hlc := hlc) Γ appE (.AFile []) (P (nparElems pl).length) Farm) Fok ∗
           pfAt (dlookupCommitAt (hlc := hlc) Γ appE) Fex ∗
           pfAt (aopenCommitAt (hlc := hlc) Γ appE) Fo ∗
           openTruncPiece (hlc := hlc) Γ vom Ft ∗
@@ -461,14 +461,14 @@ def openPostFailCreate (Γ : FsViewNames GF) (γfs : FsNames) (cw : Nat)
               ⌜(pathElems pl).getLast? = some nm⌝ ∗
               ⌜PartialMap.get? av d = some ⟨.ADir ents, nl⟩⌝ ∗ ⌜ents[nm]? = some i⌝ ∗
               Fex.pfRecv av d nm i ∗
-              pfAt (acreCommitAt (hlc := hlc) Γ appE (.AFile []) Farm) Fok ∗
+              pfAt (acreCommitAt (hlc := hlc) Γ appE (.AFile []) (P (nparElems pl).length) Farm) Fok ∗
               (creChildUnfired (hlc := hlc) Γ (.AFile []) Farm Fun ∨
                 ∃ ic : Nat, creChildPair Farm Fun ic) ∗
               (pfAt (aopenCommitAt (hlc := hlc) Γ appE) Fo ∨
                 ∃ (av' : Aview) (a : Anode), ⌜arowAt av' i a⌝ ∗ Fo.pfRecv av' i a)) ∨
            -- (c) nothing observed: the nlink guard, out of inodes, dirlink
            -- failure, "/"
-           (pfAt (acreCommitAt (hlc := hlc) Γ appE (.AFile []) Farm) Fok ∗
+           (pfAt (acreCommitAt (hlc := hlc) Γ appE (.AFile []) (P (nparElems pl).length) Farm) Fok ∗
              pfAt (dlookupCommitAt (hlc := hlc) Γ appE) Fex ∗
              pfAt (aopenCommitAt (hlc := hlc) Γ appE) Fo ∗
              (creChildUnfired (hlc := hlc) Γ (.AFile []) Farm Fun ∨
@@ -663,7 +663,7 @@ def openReceiptCreate (Γ : FsViewNames GF) (γfs : FsNames) (cw : Nat)
        (∃ (avx : Aview) (entsx : Std.ExtTreeMap Fname Nat compare) (nlx : Nat),
           ⌜PartialMap.get? avx d = some ⟨.ADir entsx, nlx⟩⌝ ∗ ⌜entsx[nm]? = some i⌝ ∗
           Fex.pfRecv avx d nm i ∗
-          pfAt (acreCommitAt (hlc := hlc) Γ appE (.AFile []) Farm) Fok ∗
+          pfAt (acreCommitAt (hlc := hlc) Γ appE (.AFile []) (P (nparElems pl).length) Farm) Fok ∗
           creChildUnfired (hlc := hlc) Γ (.AFile []) Farm Fun ∗
           (∃ (av : Aview) (nl : Nat),
             (∃ bs0 : List (BitVec 8),

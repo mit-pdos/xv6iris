@@ -223,10 +223,17 @@ theorem sys_mkdir_fetched (CR : CREATE) (IUP : IUNLOCKPUT) (EO : END_OP) (Γ : S
         (bview (pl'.length + 1) (sysfilePfun pl')) ⊢
       byteBuf (k.regs 2#5 + 0xFFFFFFFFFFFFFF70#64) (DFrac.own 1)
         (bview (pl'.length + 1) (sysfilePfun pl')) from .rfl) $$ Hp
+    -- mkdir's bundle carries NO parent cursor (its walk premise is the
+    -- `∀ pl` one-shot), and create's takes one: the weakening
+    -- (`CreateDefs.creCommits_cur`, TL-3K)
+    ihave Hcre := creCommits_cur (hlc := hlc) (fsGammaL fscFs) T_DIR.toNat 0 0
+      (A.P (nparElems (bview pl'.length (sysfilePfun pl'))).length) A.Farm A.Fdots A.Fun A.Fok
+      $$ Hcre
     ihave Hcre := (show creCommits (hlc := hlc) (GF := GF) (fsGammaL fscFs) T_DIR.toNat 0 0
-        A.Farm A.Fdots A.Fun A.Fok ⊢
+        (A.P (nparElems (bview pl'.length (sysfilePfun pl'))).length) A.Farm A.Fdots A.Fun A.Fok ⊢
       creCommits (hlc := hlc) (fsGammaL fscFs) T_DIR.toNat (0#16 : BitVec 16).toNat
-        (0#16 : BitVec 16).toNat A.Farm A.Fdots A.Fun A.Fok from .rfl) $$ Hcre
+        (0#16 : BitVec 16).toNat (A.P (nparElems (bview pl'.length (sysfilePfun pl'))).length)
+        A.Farm A.Fdots A.Fun A.Fok from .rfl) $$ Hcre
     iapply (sys_mkdir_create CR Γ cpu _ k.sie (by k_norm_g) (procAddr A.j)
         (by k_norm_g; exact hproc) A.j pl'.length (sysfilePfun pl') T_DIR (0#16) (0#16) A.γ A.pid
         (sysMkdirV1 A P2) (sysMkdirM1 A P2) MAXOPBLOCKS Sb A.ns A.P A.Pmiss A.Farm A.Fdots A.Fun

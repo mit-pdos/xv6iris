@@ -324,7 +324,7 @@ def openAuPreCreate (Γ : FsViewNames GF) (γfs : FsNames) (cw : Nat) (pl : List
     (Fo : Pfam GF (Aview → Nat → Anode → IProp GF))
     (Ft : Pfam GF (Aview → Nat → List (BitVec 8) → IProp GF)) : IProp GF :=
   iprop(epStart (hlc := hlc) γfs cw P Pmiss pl ∗
-    pfAt (acreCommitAt (hlc := hlc) Γ appE (.AFile []) Farm) Fok ∗
+    pfAt (acreCommitAt (hlc := hlc) Γ appE (.AFile []) (P (nparElems pl).length) Farm) Fok ∗
     pfAt (dlookupCommitAt (hlc := hlc) Γ appE) Fex ∗
     pfAt (aopenCommitAt (hlc := hlc) Γ appE) Fo ∗
     openTruncPiece (hlc := hlc) Γ vom Ft ∗
@@ -358,7 +358,7 @@ def openAuCreateAt (Γ : FsViewNames GF) (γfs : FsNames) (cw : Nat) (M : Nat �
     (Fo : Pfam GF (Aview → Nat → Anode → IProp GF))
     (Ft : Pfam GF (Aview → Nat → List (BitVec 8) → IProp GF)) : IProp GF :=
   iprop((∀ pl : List (BitVec 8), ⌜argPathOf M pv pl⌝ -∗ epStart (hlc := hlc) γfs cw P Pmiss pl) ∗
-    pfAt (acreCommitAt (hlc := hlc) Γ appE (.AFile []) Farm) Fok ∗
+    pfAt (acreCommitAt (hlc := hlc) Γ appE (.AFile []) (nparCur M pv P) Farm) Fok ∗
     pfAt (dlookupCommitAt (hlc := hlc) Γ appE) Fex ∗
     pfAt (aopenCommitAt (hlc := hlc) Γ appE) Fo ∗
     openTruncPiece (hlc := hlc) Γ vom Ft ∗
@@ -380,6 +380,25 @@ theorem openAuPlainAt_inst (Γ : FsViewNames GF) (γfs : FsNames) (cw : Nat)
     · iexact Ho
     · iexact Ht
 
+/-- THE CURSOR'S TWO READINGS, as one move (Rocq's `open_acre_inst`, TL-3K;
+`SpecSysMknod.mknodAcre_inst`'s twin at the file child). -/
+theorem openAcre_inst (Γ : FsViewNames GF) (M : Nat → List (BitVec 8)) (pv : Nat)
+    (pl : List (BitVec 8)) (P : Nat → Nat → IProp GF)
+    (Farm : Pfam GF (Aview → Nat → IProp GF))
+    (Fok : Pfam GF (Aview → Nat → Fname → Nat → IProp GF))
+    (hpl : argPathOf M pv pl) :
+    pfAt (acreCommitAt (hlc := hlc) Γ appE (.AFile []) (nparCur M pv P) Farm) Fok ⊢
+      pfAt (acreCommitAt (hlc := hlc) Γ appE (.AFile []) (P (nparElems pl).length) Farm) Fok := by
+  iintro Hok
+  iapply (pfAt_mono (acreCommitAt (hlc := hlc) Γ appE (.AFile []) (nparCur M pv P) Farm)
+    (acreCommitAt (hlc := hlc) Γ appE (.AFile []) (P (nparElems pl).length) Farm) Fok) $$ [] Hok
+  iintro H
+  unfold acreCommitAt
+  iapply (acreCommitAtGen_mono (hlc := hlc) Γ appE (fun _ _ => .AFile []) (nparCur M pv P)
+    (P (nparElems pl).length) Farm Fok.pfRecv) $$ [] [] H
+  · iapply (nparCur_out M pv pl P hpl)
+  · iapply (nparCur_in M pv pl P hpl)
+
 /-- Rocq's `open_au_create_at_inst`. -/
 theorem openAuCreateAt_inst (Γ : FsViewNames GF) (γfs : FsNames) (cw : Nat)
     (M : Nat → List (BitVec 8)) (pv : Nat) (vom : BitVec 64) (pl : List (BitVec 8))
@@ -390,10 +409,12 @@ theorem openAuCreateAt_inst (Γ : FsViewNames GF) (γfs : FsNames) (cw : Nat)
     openAuCreateAt (hlc := hlc) Γ γfs cw M pv vom P Pmiss Farm Fun Fok Fex Fo Ft ⊢
       openAuPreCreate (hlc := hlc) Γ γfs cw pl vom P Pmiss Farm Fun Fok Fex Fo Ft := by
   unfold openAuCreateAt openAuPreCreate
-  iintro ⟨Hw, Hrest⟩
+  iintro ⟨Hw, Hok, Hrest⟩
+  ihave Hok := openAcre_inst Γ M pv pl P Farm Fok hpl $$ Hok
   isplitl [Hw]
   · iapply Hw $$ %pl %hpl
-  · iexact Hrest
+  · iframe Hok
+    iexact Hrest
 
 omit [Appcfg GF] in
 /-- the `∀ pl` walk premise specialised at one path: `exStart` there
@@ -435,7 +456,7 @@ theorem openAuCreateAt_of_all (Γ : FsViewNames GF) (γfs : FsNames) (cw : Nat)
     (Fo : Pfam GF (Aview → Nat → Anode → IProp GF))
     (Ft : Pfam GF (Aview → Nat → List (BitVec 8) → IProp GF)) :
     ⊢@{IProp GF} nparWalkPreEra (hlc := hlc) γfs cw P Pmiss -∗
-      pfAt (acreCommitAt (hlc := hlc) Γ appE (.AFile []) Farm) Fok -∗
+      pfAt (acreCommitAt (hlc := hlc) Γ appE (.AFile []) (nparCur M pv P) Farm) Fok -∗
       pfAt (dlookupCommitAt (hlc := hlc) Γ appE) Fex -∗
       pfAt (aopenCommitAt (hlc := hlc) Γ appE) Fo -∗
       openTruncPiece (hlc := hlc) Γ vom Ft -∗
@@ -472,7 +493,7 @@ theorem openAuPreCreate_of_all (Γ : FsViewNames GF) (γfs : FsNames) (cw : Nat)
     (Fo : Pfam GF (Aview → Nat → Anode → IProp GF))
     (Ft : Pfam GF (Aview → Nat → List (BitVec 8) → IProp GF)) :
     ⊢@{IProp GF} nparWalkPreEra (hlc := hlc) γfs cw P Pmiss -∗
-      pfAt (acreCommitAt (hlc := hlc) Γ appE (.AFile []) Farm) Fok -∗
+      pfAt (acreCommitAt (hlc := hlc) Γ appE (.AFile []) (P (nparElems pl).length) Farm) Fok -∗
       pfAt (dlookupCommitAt (hlc := hlc) Γ appE) Fex -∗
       pfAt (aopenCommitAt (hlc := hlc) Γ appE) Fo -∗
       openTruncPiece (hlc := hlc) Γ vom Ft -∗

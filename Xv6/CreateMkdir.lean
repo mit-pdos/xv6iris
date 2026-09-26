@@ -543,6 +543,34 @@ def createMkdirKeep (k : KCtx) (plen : Nat) (pfun : Nat → BitVec 8) (ty major 
     inodeRefShortGenlo kslot (q.half + q.half) q.half icfgDev cinum g lo ∗
     runitAny cinum.toNat)
 
+/-- the parked bundle LENDS its parent cursor (TL-3K): the parent leg reads
+`P (nparElems pl).length dind` at its fire and hands it back, so the bundle
+closes around it again (Rocq holds `HPpar` in context across the fire). -/
+theorem createMkdirKeep_cursor (k : KCtx) (plen : Nat) (pfun : Nat → BitVec 8)
+    (ty major minor : BitVec 16)
+    (γ : FileNames) (pid : BitVec 32) (V : ProcPriv) (M : Nat → List (BitVec 8))
+    (u : Nat) (Sb : List Nat) (ns : Nat) (dqb dqs dqbs dqn dqpv : DFrac)
+    (P Pmiss : Nat → Nat → IProp GF)
+    (Farm : Pfam GF (Aview → Nat → IProp GF))
+    (Fdots : Pfam GF (Aview → Nat → Nat → Bool → IProp GF))
+    (Fun : Pfam GF (Aview → Nat → IProp GF))
+    (Fok Fex : Pfam GF (Aview → Nat → Fname → Nat → IProp GF))
+    (kd : Nat) (qd : Qp) (gd γil γisl : GName) (dind : BitVec 32) (tl : List (BitVec 8))
+    (kslot : Nat) (q : Qp) (g gil gisl : GName) (lo tl0 : Nat) (cinum : BitVec 32) :
+    createMkdirKeep (hlc := hlc) k plen pfun ty major minor γ pid V M u Sb ns dqb dqs dqbs dqn dqpv
+      P Pmiss Farm Fdots Fun Fok Fex kd qd gd γil γisl dind tl kslot q g gil gisl lo tl0 cinum ⊢
+    P (nparElems (bview plen pfun)).length dind.toNat ∗
+      (P (nparElems (bview plen pfun)).length dind.toNat -∗
+        createMkdirKeep (hlc := hlc) k plen pfun ty major minor γ pid V M u Sb ns dqb dqs dqbs dqn
+          dqpv P Pmiss Farm Fdots Fun Fok Fex kd qd gd γil γisl dind tl kslot q g gil gisl lo tl0
+          cinum) := by
+  unfold createMkdirKeep
+  iintro ⟨H1, H2, H3, H4, H5, H6, H7, HP, Hrest⟩
+  iframe HP
+  iintro HP
+  iframe H1 H2 H3 H4 H5 H6 H7 HP
+  iexact Hrest
+
 /-- THE CHILD'S `".."` RE-PARK, deferred (Rocq keeps `Hcnodot` open until the
 +0x140 flush mints the parent's unit): hand it the `"."` fragment back at
 the value the sibling pins, and the parent's fresh unit, and the child's
@@ -620,7 +648,8 @@ def createMkdirDotdotBody (k : KCtx) (plen : Nat) (pfun : Nat → BitVec 8) (ty 
     creArmFired Farm cinum.toNat -∗
     pfAt (adotsCommitAt (hlc := hlc) (fsGammaL fscFs) appE) Fdots -∗
     pfAt (acreCommitAtGen (hlc := hlc) (fsGammaL fscFs) appE
-      (creChild ty.toNat major.toNat minor.toNat) Farm) Fok -∗
+      (creChild ty.toNat major.toNat minor.toNat)
+        (P (nparElems (bview plen pfun)).length) Farm) Fok -∗
     createMkdirKeep (hlc := hlc) k plen pfun ty major minor γ pid V M u Sb ns dqb dqs dqbs dqn dqpv
       P Pmiss Farm Fdots Fun Fok Fex kd qd gd γil γisl dind tl kslot q g gil gisl lo tl0 cinum -∗
     wpLoop c)
@@ -685,7 +714,8 @@ def createMkdirNameBody (k : KCtx) (plen : Nat) (pfun : Nat → BitVec 8) (ty ma
     creArmFired Farm cinum.toNat -∗
     pfAt (adotsCommitAt (hlc := hlc) (fsGammaL fscFs) appE) Fdots -∗
     pfAt (acreCommitAtGen (hlc := hlc) (fsGammaL fscFs) appE
-      (creChild ty.toNat major.toNat minor.toNat) Farm) Fok -∗
+      (creChild ty.toNat major.toNat minor.toNat)
+        (P (nparElems (bview plen pfun)).length) Farm) Fok -∗
     createMkdirKeep (hlc := hlc) k plen pfun ty major minor γ pid V M u Sb ns dqb dqs dqbs dqn dqpv
       P Pmiss Farm Fdots Fun Fok Fex kd qd gd γil γisl dind tl kslot q g gil gisl lo tl0 cinum -∗
     wpLoop c)
@@ -752,7 +782,8 @@ def createMkdirBumpBody (k : KCtx) (plen : Nat) (pfun : Nat → BitVec 8) (ty ma
     creArmFired Farm cinum.toNat -∗
     pfAt (adotsCommitAt (hlc := hlc) (fsGammaL fscFs) appE) Fdots -∗
     pfAt (acreCommitAtGen (hlc := hlc) (fsGammaL fscFs) appE
-      (creChild ty.toNat major.toNat minor.toNat) Farm) Fok -∗
+      (creChild ty.toNat major.toNat minor.toNat)
+        (P (nparElems (bview plen pfun)).length) Farm) Fok -∗
     createMkdirKeep (hlc := hlc) k plen pfun ty major minor γ pid V M u Sb ns dqb dqs dqbs dqn dqpv
       P Pmiss Farm Fdots Fun Fok Fex kd qd gd γil γisl dind tl kslot q g gil gisl lo tl0 cinum -∗
     wpLoop c)
@@ -921,7 +952,8 @@ theorem createMkdir_exit (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
     ((∃ full : Bool, creDotsFired Fdots cinum.toNat dind.toNat full) ∨
       creDotsLeg (hlc := hlc) (fsGammaL fscFs) ty.toNat Fdots) ∗
     pfAt (acreCommitAtGen (hlc := hlc) (fsGammaL fscFs) appE
-      (creChild ty.toNat major.toNat minor.toNat) Farm) Fok ∗
+      (creChild ty.toNat major.toNat minor.toNat)
+        (P (nparElems (bview plen pfun)).length) Farm) Fok ∗
     createMkdirKeep (hlc := hlc) k plen pfun ty major minor γ pid V M u Sb ns dqb dqs dqbs dqn dqpv
       P Pmiss Farm Fdots Fun Fok Fex kd qd gd γil γisl dind tl kslot q g gil gisl lo tl0 cinum
     ⊢ wpLoop (GF := GF) c := by
@@ -2686,10 +2718,16 @@ theorem create_mkdir_bump (IU : IUPDATE) (Γ : SchedNames) [ClaimIs (hlc := hlc)
   -- THE PARENT LEG FIRES (Rocq's `caf_acre_fire`)
   ihave Hctop : topFragQ (fsGammaL fscFs) (DFrac.own 1) cinum.toNat (eraNode dc2 bm2 dat2) $$ [Hctop]
   · rw [topFrag_1]; iexact Hctop
-  imod (cafAcre_fire (hlc := hlc) fscFs ⊤ (creChild ty.toNat major.toNat minor.toNat) Farm Fok
+  -- the parked bundle lends the parent cursor to the leg (TL-3K)
+  icases createMkdirKeep_cursor (hlc := hlc) k plen pfun ty major minor γ pid V M u Sb ns dqb dqs
+    dqbs dqn dqpv P Pmiss Farm Fdots Fun Fok Fex kd qd gd γil γisl dind tl kslot q g gil gisl lo tl0
+    cinum $$ Hkeep with ⟨HPpar, Hkeep⟩
+  imod (cafAcre_fire (hlc := hlc) fscFs ⊤ (creChild ty.toNat major.toNat minor.toNat)
+      (P (nparElems (bview plen pfun)).length) Farm Fok
       dind.toNat cinum.toNat (bname 14 nf) (DFrac.own 1) (eraNode dn bm data) _ _
       CoPset.subseteq_top hlocp hdir hnl0' happ.hnonep habsp habsc)
-    $$ Hft Hap Hacre Harm Htop Hctop with ⟨Htop, Hctop, ⟨%av, %hpre, HFok⟩⟩
+    $$ Hft Hap Hacre Harm HPpar Htop Hctop with ⟨Htop, Hctop, HPpar, ⟨%av, %hpre, HFok⟩⟩
+  ihave Hkeep := Hkeep $$ HPpar
   ihave Hctop : topFrag (fsGammaL fscFs) cinum.toNat (eraNode dc2 bm2 dat2) $$ [Hctop]
   · rw [topFrag_1]; iexact Hctop
   -- both inodes LOADED again

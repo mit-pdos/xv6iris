@@ -238,7 +238,8 @@ theorem sys_open_ec_create (CR : CREATE) (Γ : SchedNames) [ClaimIs (hlc := hlc)
     bslots 3 ∗ irefSlots ns ∗ logOpS icfgLog u Sb ∗ logTx icfgLog ∗
     epStart fscFs V.cwi P Pmiss (bview plen pfun) ∗
     pfAt (dlookupCommitAt (fsGammaL fscFs) appE) Fex ∗
-    creCommits (hlc := hlc) (fsGammaL fscFs) ty.toNat major.toNat minor.toNat Farm Fdots Fun Fok ∗
+    creCommits (hlc := hlc) (fsGammaL fscFs) ty.toNat major.toNat minor.toNat
+      (P (nparElems (bview plen pfun)).length) Farm Fdots Fun Fok ∗
     sysOpenCreateK k' se pj plen pfun ty major minor γ pid V M u Sb ns P Pmiss Farm Fdots Fun Fok Fex
     ⊢ wpLoop (GF := GF) cpu := by
   subst hs hpj
@@ -642,11 +643,13 @@ theorem sys_open_entry_c (CR : CREATE) (Γ : SchedNames) [ClaimIs (hlc := hlc) G
     byteBuf (k.regs 2#5 + 18446744073709551440#64) (DFrac.own 1) (bview (plen + 1) bp) from .rfl)
     $$ Hp
   -- THE BUNDLE AT THE FILE TYPE
-  ihave Hcre := creCommits_of_file (hlc := hlc) (fsGammaL fscFs) 0 0 Farm Fun Fok $$ Hac Hcl
-  ihave Hcre := (show creCommits (hlc := hlc) (GF := GF) (fsGammaL fscFs) T_FILE_w.toNat 0 0 Farm
-      (pfamTriv (fun _ _ _ _ => iprop(True))) Fun Fok ⊢
+  ihave Hcre := creCommits_of_file (hlc := hlc) (fsGammaL fscFs) 0 0
+    (A.P (nparElems (bview plen bp)).length) Farm Fun Fok $$ Hac Hcl
+  ihave Hcre := (show creCommits (hlc := hlc) (GF := GF) (fsGammaL fscFs) T_FILE_w.toNat 0 0
+      (A.P (nparElems (bview plen bp)).length) Farm (pfamTriv (fun _ _ _ _ => iprop(True))) Fun Fok ⊢
     creCommits (hlc := hlc) (fsGammaL fscFs) T_FILE_w.toNat (0#16 : BitVec 16).toNat
-      (0#16 : BitVec 16).toNat Farm (pfamTriv (fun _ _ _ _ => iprop(True))) Fun Fok from .rfl) $$ Hcre
+      (0#16 : BitVec 16).toNat (A.P (nparElems (bview plen bp)).length) Farm
+      (pfamTriv (fun _ _ _ _ => iprop(True))) Fun Fok from .rfl) $$ Hcre
   ihave Hblk := (show procPrivFd (GF := GF) A.γ (procAddr A.j) A.pid (sysOpenV2 A P2)
       (sysOpenM2 A P2) ⊢ procPrivFd A.γ k.proc A.pid (sysOpenV2 A P2) (sysOpenM2 A P2)
     from by rw [hS.hproc]) $$ Hblk

@@ -122,7 +122,7 @@ def sysOpenCrExists (Γ : FsViewNames GF) (P : Nat → Nat → IProp GF)
     ⌜ents[nm]? = some i0⌝ ∗
     P (nparElems pl).length d ∗
     Fex.pfRecv av d nm i0 ∗
-    pfAt (acreCommitAt (hlc := hlc) Γ appE (.AFile []) Farm) Fok ∗
+    pfAt (acreCommitAt (hlc := hlc) Γ appE (.AFile []) (P (nparElems pl).length) Farm) Fok ∗
     creChildUnfired (hlc := hlc) Γ (.AFile []) Farm Fun)
 
 /-- The record the plain tail runs at: the contract's, with the shim's
