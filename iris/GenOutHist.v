@@ -220,7 +220,7 @@ Section gen_out_hist.
        filed at the close from the open arm's [garm_era]; what lets the
        claim know, at a read, that no logged entry lies beyond a line the
        discipline makes the era's last (D4) *)
-    /\ (forall e, e ∈ pops -> lm_disc M (le_hist e)).
+    /\ (forall e, e ∈ pops -> lm_disc M (le_hist e) /\ trace_shape (le_hist e) true).
 
   Lemma gin_pure_0 k : gin_pure k [] [] [].
   Proof using.
@@ -420,7 +420,7 @@ Section gen_out_hist.
     destruct Hecl as (Hout & Hcs & Hps & Hin & Hera & HE & Hdlok).
     destruct Hin as (_ & Hdsc & Hbts & Hdl & _ & _ & _ & Hall & Hdh).
     rewrite /garm_era Ha in Hera.
-    destruct Hera as (Hdseg & Hboots & Hdish & _ & _ & Hcsa & _).
+    destruct Hera as (Hdseg & Hboots & Hdish & Hshh & _ & Hcsa & _).
     (* (A1) AT THE CLOSE: the arm's echo IS the byte, and the kernel says a
        store arm sends its byte before it closes (K3) *)
     destruct Hev as (a & Ha2 & _ & HK3). rewrite Ha in Ha2.
@@ -467,7 +467,7 @@ Section gen_out_hist.
       + intros e He. apply elem_of_app in He as [He | He].
         * exact (Hdh e He).
         * apply elem_of_list_singleton in He as ->.
-          cbn [le_hist fst snd]. exact Hdish.
+          cbn [le_hist fst snd]. exact (conj Hdish Hshh).
     - exact I.
     - rewrite /ch_E. cbn [LogEntryDefs.ch_log LogEntryDefs.ch_arm ch_arm_E].
       rewrite app_nil_r. by rewrite Hseg.

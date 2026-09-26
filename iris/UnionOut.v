@@ -392,7 +392,7 @@ Section union_out.
     blk_auth w [] -∗ rblk_auth gb [] -∗ cur_half w 1 0%nat gb false -∗
       ucl k [] (LogEntryDefs.MkCH [] [] [] None) ∗ fturn gf k.
   Proof using .
-    iIntros "#Hpin #Hfp #Hpera (Ht & Hcs & Hps & HE & Hdl & Hdll) Hf0 Hfla Hblk Hrb Hcur1".
+    iIntros "#Hpin #Hfp #Hpera (Ht & Hcs & Hps & HE & Hdl & Hdll & _) Hf0 Hfla Hblk Hrb Hcur1".
     iEval (rewrite -Qp.half_half) in "Ht".
     iDestruct "Ht" as "[Ht1 Ht2]".
     iEval (rewrite -Qp.half_half) in "Hdl".

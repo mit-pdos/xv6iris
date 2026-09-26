@@ -105,7 +105,7 @@ Section open_events_pure.
     destruct Hecl as (Hout & Hop & Hps & Hin & Hera & HE & Hdlok).
     destruct Hin as (_ & Hdsc & Hbts & Hdl & _ & _ & _ & Hall & Hdh).
     rewrite /garm_era Ha in Hera.
-    destruct Hera as (Hdseg & Hboots & Hdish & _ & _ & Hcsa & _).
+    destruct Hera as (Hdseg & Hboots & Hdish & Hshh & _ & Hcsa & _).
     destruct Hev as (a & Ha2 & _ & HK3). rewrite Ha in Ha2.
     injection Ha2 as <-.
     cbn [LogEntryDefs.ca_echo LogEntryDefs.ca_byte LogEntryDefs.ca_sent
@@ -141,7 +141,7 @@ Section open_events_pure.
       + rewrite -(seg_of_snd (echoed _)) Hseg Hqq. lia.
       + apply Forall_app. split; [exact Hall | by rewrite Forall_singleton].
       + intros e He. apply elem_of_app in He as [He | He]; [exact (Hdh e He) |].
-        apply elem_of_list_singleton in He as ->. cbn [le_hist fst snd]. exact Hdish.
+        apply elem_of_list_singleton in He as ->. cbn [le_hist fst snd]. exact (conj Hdish Hshh).
     - exact I.
     - rewrite /ch_E. cbn [LogEntryDefs.ch_log LogEntryDefs.ch_arm ch_arm_E].
       rewrite app_nil_r. by rewrite Hseg.
