@@ -487,6 +487,22 @@ Section UserFd.
     iFrame "Hm". iPureIntro. by rewrite length_insert.
   Qed.
 
+  (* ...at a named view: a slot move leaves the view where it was *)
+  Lemma ustd_at_acc (γf : gname) (l v : list fdstate) (k : nat) (st : fdstate) :
+    l !! k = Some st ->
+    ustd_at γf l v -∗
+    Some k ↪[γf] UCSlot st ∗
+    (∀ st' : fdstate, Some k ↪[γf] UCSlot st' -∗ ustd_at γf (<[k := st']> l) v).
+  Proof using .
+    iIntros (Hk) "[[%Hlen Hm] Ht]". iFrame "Ht".
+    assert (Hm : (map_seq 0 l : gmap nat fdstate) !! k = Some st)
+      by (by rewrite lookup_map_seq_0).
+    iDestruct (big_sepM_insert_acc _ _ _ _ Hm with "Hm") as "[$ Hback]".
+    iIntros (st') "Hs". iDestruct ("Hback" with "Hs") as "Hm".
+    rewrite (insert_map_seq_0 l k st' (lookup_lt_Some _ _ _ Hk)).
+    iFrame "Hm". iPureIntro. by rewrite length_insert.
+  Qed.
+
   (* THE LEDGER READS THE VIEW, whole: this is what turns "my three states"
      into "the table's first three slots", and it is the fact every
      lowest-descriptor argument starts from. *)
@@ -666,6 +682,37 @@ Section UserFd.
     ualloc γf l fd st -∗ ustd γf (ustd_after l st).
   Proof using . iIntros "[$ _]". Qed.
 
+  (* ...AT A NAMED VIEW (seccomp S4): the ledger after the allocation at
+     the view [w] the allocation left it at *)
+  Definition ualloc_v (γf : gname) (l : list fdstate) (fd : nat) (st : fdstate)
+      (w : list fdstate) : iProp Σ :=
+    (ustd_at γf (ustd_after l st) w ∗ ualloc_at γf l fd st)%I.
+
+  Lemma ualloc_v_std (γf : gname) (l : list fdstate) (fd k : nat) (st : fdstate)
+      (w : list fdstate) :
+    fd_lowest_closed l = Some k ->
+    ualloc_v γf l fd st w -∗ ⌜fd = k⌝ ∗ ustd_at γf (<[k := st]> l) w.
+  Proof using .
+    intros Hk. rewrite /ualloc_v /ualloc_at /ustd_after Hk.
+    iIntros "[Hl %H]". iSplitR; [ by iPureIntro | iExact "Hl" ].
+  Qed.
+
+  Lemma ualloc_v_hi (γf : gname) (l : list fdstate) (fd : nat) (st : fdstate)
+      (w : list fdstate) :
+    fd_lowest_closed l = None ->
+    ualloc_v γf l fd st w -∗ ⌜(NSTD <= fd)%nat⌝ ∗ ustd_at γf l w ∗ ufd γf fd st.
+  Proof using .
+    intros Hk. rewrite /ualloc_v /ualloc_at /ustd_after Hk.
+    iIntros "[Hl [%H Hh]]". iSplitR; [ by iPureIntro | iFrame "Hl Hh" ].
+  Qed.
+
+  Lemma ualloc_v_ualloc (γf : gname) (l : list fdstate) (fd : nat) (st : fdstate)
+      (w : list fdstate) :
+    ualloc_v γf l fd st w -∗ ualloc γf l fd st.
+  Proof using .
+    rewrite /ualloc_v /ualloc. iIntros "[Hl $]". iApply (ustd_at_ustd with "Hl").
+  Qed.
+
   (* a claim on an OPEN descriptor is never a claim on the slot an
      allocation lands in, which is what lets dup hand its source back at the
      ledger the allocation left. *)
@@ -765,6 +812,64 @@ Section UserFd.
       iMod (ghost_map_insert (Some fd) (UCSlot st) Hnone with "Ha") as "[Ha Hs]".
       iEval (rewrite ufd_gm_insert -(ufd_map_insert fdv fd st Hlt ltac:(by right))) in "Ha".
       iModIntro. iSplitL "Ha Hta".
+      + iExists _. iFrame "Ha Hta". iPureIntro.
+        split; [ by rewrite length_insert | apply tab_le_refl ].
+      + iFrame "Hl". iSplitR; [ by iPureIntro |].
+        iFrame "Hs". iPureIntro. exact (conj Hne Hge).
+  Qed.
+
+  (* ...AT A NAMED VIEW (seccomp S4): the allocation reads the caller's
+     view against the table ([tab_le]) and re-sets it to the new table,
+     and says so -- what a program that must know its whole table (sh,
+     for the seccomp child) carries across its own opens. *)
+  Lemma ufd_alloc_least_at (γf : gname) (fdv l v : list fdstate) (fd : nat)
+      (st : fdstate) :
+    fd_least_closed fdv fd -> st <> FdClosed ->
+    ufd_auth γf fdv -∗ ustd_at γf l v ==∗
+    ⌜tab_le fdv v⌝ ∗ ufd_auth γf (<[fd := st]> fdv)
+    ∗ ustd_at γf (ustd_after l st) (<[fd := st]> fdv) ∗ ualloc_at γf l fd st.
+  Proof using .
+    intros Hle Hne. iIntros "Ha Hl".
+    iDestruct (ufd_auth_len with "Ha") as %Hlen.
+    iDestruct (ustd_at_agree with "Ha Hl") as %Hst.
+    iDestruct (ustd_at_tab with "Ha Hl") as %Htab.
+    assert (Hll : length l = NSTD)
+      by (rewrite -Hst length_take Hlen; pose proof NSTD_le_NOFILE; lia).
+    pose proof (fd_least_closed_free _ _ Hle) as Hfree.
+    pose proof (lookup_lt_Some _ _ _ Hfree) as Hlt.
+    (* THE VIEW MOVES WITH THE LEDGER: re-set to the new table *)
+    iDestruct "Ha" as (v0) "(Ha & _ & _ & Hta)".
+    iDestruct "Hl" as "[Hl Htl]".
+    iMod (ufd_retab γf _ v0 v (<[fd := st]> fdv) with "Ha Hta Htl")
+      as "(Ha & Hta & Htl)".
+    iAssert (ustd_at γf l (<[fd := st]> fdv)) with "[Hl Htl]" as "Hl";
+      [ iFrame "Hl Htl" | ].
+    rewrite /ualloc_at /ustd_after.
+    destruct (fd_lowest_closed l) as [k |] eqn:Hk.
+    - (* THE DESCRIPTOR IS THE LEDGER'S OWN ANSWER. *)
+      assert (Hfd : fd = k)
+        by (apply (fd_least_closed_prefix fdv NSTD fd k Hle); by rewrite Hst).
+      subst fd.
+      assert (Hkl : l !! k = Some FdClosed)
+        by (exact (fd_lowest_closed_is_closed l k Hk)).
+      assert (Hklt : (k < NSTD)%nat)
+        by (rewrite <- Hll; exact (fd_lowest_closed_bound l k Hk)).
+      iDestruct (ustd_at_acc γf l _ k FdClosed Hkl with "Hl") as "[Hs Hback]".
+      iMod (ghost_map_update (UCSlot st) with "Ha Hs") as "[Ha Hs]".
+      iEval (rewrite ufd_gm_insert -(ufd_map_insert fdv k st Hlt ltac:(by left))) in "Ha".
+      iModIntro. iSplitR; [ by iPureIntro |]. iSplitL "Ha Hta".
+      + iExists _. iFrame "Ha Hta". iPureIntro.
+        split; [ by rewrite length_insert | apply tab_le_refl ].
+      + iSplitL; [ iApply ("Hback" with "Hs") | by iPureIntro ].
+    - (* IT IS ABOVE THE STANDARD STREAMS, so the ledger does not move and a
+         fresh handle is minted. *)
+      assert (Hge : (NSTD <= fd)%nat)
+        by (apply (fd_least_closed_prefix_none fdv NSTD fd Hle); by rewrite Hst).
+      assert (Hnone : ufd_gm (ufd_map fdv) (<[fd := st]> fdv) !! Some fd = None)
+        by (rewrite ufd_gm_some (ufd_map_lookup_None fdv fd Hge Hfree); reflexivity).
+      iMod (ghost_map_insert (Some fd) (UCSlot st) Hnone with "Ha") as "[Ha Hs]".
+      iEval (rewrite ufd_gm_insert -(ufd_map_insert fdv fd st Hlt ltac:(by right))) in "Ha".
+      iModIntro. iSplitR; [ by iPureIntro |]. iSplitL "Ha Hta".
       + iExists _. iFrame "Ha Hta". iPureIntro.
         split; [ by rewrite length_insert | apply tab_le_refl ].
       + iFrame "Hl". iSplitR; [ by iPureIntro |].
