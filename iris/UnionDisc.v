@@ -525,8 +525,8 @@ Qed.
 Lemma secc_body_bytes b ws : secc_parse b = Some ws -> Forall fbody_byte b.
 Proof using.
   intros Hs. destruct (secc_parse_some b ws Hs) as [Hok ->]. cbn [line_body].
-  eapply Forall_impl; [exact (wl_body_bytes _ (secc_ok_wf ws Hok)) |].
-  exact fbody_byte_of_body.
+  eapply Forall_impl; [exact (wl_body_bytes_fn _ (secc_ok_wf ws Hok)) |].
+  exact fbody_byte_of_fn.
 Qed.
 
 Lemma secc_body_short b ws : secc_parse b = Some ws -> S (length b) < line_max.

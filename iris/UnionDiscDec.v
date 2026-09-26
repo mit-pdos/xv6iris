@@ -523,11 +523,12 @@ Proof using. split_and!; dec_no. Qed.
 Definition adm_s_on (ws : list (list (bv 8))) : bool := bool_decide (ws <> []).
 Definition ulmS : lmodel := ulm adm_u_g adm_s_on.
 
-Definition ws_rmf : list (list (bv 8)) := [sb "rm"; sb "a"].
-Definition b_secc : list (bv 8) := sb "seccomp rm a".
+Definition ws_rmf : list (list (bv 8)) := [sb "rm"; txt_a].
+Definition b_secc : list (bv 8) := sb "seccomp rm a.txt".
 
-(* [seccomp rm a] is the seccomp line, admitted with the knob on and not
-   with it off *)
+(* [seccomp rm a.txt] is the seccomp line -- its words are FILE-NAME words
+   ([FileDisc.secc_ok] at [fn_wf], as cat's argument is since W4) --
+   admitted with the knob on and not with it off *)
 Example demo_secc_parse :
   uline_of_u b_secc = LSecc ws_rmf
   /\ ubody_ok adm_u_g adm_s_on b_secc /\ ~ ubody_ok adm_u_g adm_s_off b_secc.
@@ -538,20 +539,19 @@ Example demo_secc_alone :
   secc_parse (sb "seccomp") = None /\ ~ ubody_ok adm_u_g adm_s_on (sb "seccomp").
 Proof using. split; [vm_compute; reflexivity | dec_no]. Qed.
 
-(* ...and the seccomp words are ALPHANUMERIC (design section 3's
-   [wl_alnum]): the dot the file class [stem.txt] is typed through (cut
-   W4) is not among them, so [seccomp rm a.txt] is not a line -- whether
-   the seccomp tail widens to name words is the owner's call *)
-Example demo_secc_nodot :
-  secc_parse (sb "seccomp rm a.txt") = None /\ ~ ubody_ok adm_u_g adm_s_on (sb "seccomp rm a.txt").
+(* ...and a seccomp word is a FILE-NAME word: the alphanumerics and the
+   dot, nothing else -- a path is not a word (design section 8) *)
+Example demo_secc_path :
+  secc_parse (sb "seccomp cat /sh") = None /\ ~ ubody_ok adm_u_g adm_s_on (sb "seccomp cat /sh").
 Proof using. split; [vm_compute; reflexivity | dec_no]. Qed.
 
-(* ---- echo hi > a.txt, seccomp rm a; a power cycle; cat a.txt prints hi ---- *)
+(* ---- echo hi > a.txt, seccomp rm a.txt; a power cycle; cat a.txt prints
+        hi: the masked [rm] cannot unlink the file ---- *)
 Definition b_hif : list (bv 8) := sb "echo hi > a.txt".
 Definition I_sc1 : list (bv 8) := b_hif ++ nl1 ++ b_secc ++ nl1.
 Definition a_sc1 : ualt := UR (RFRan (sel_all (echo_chunks ws_hi))).
 (* the seccomp round's bytes: ANY nonempty run the masked binary printed *)
-Definition a_sc2 : ualt := US (sb "rm: a failed to delete" ++ nl1).
+Definition a_sc2 : ualt := US (sb "rm: a.txt failed to delete" ++ nl1).
 Definition cs_sc1 : list nat := [ualt_code a_sc1; ualt_code a_sc2].
 
 Lemma sc1_bodies : bodies_of I_sc1 = [b_hif; b_secc].

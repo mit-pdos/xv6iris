@@ -282,8 +282,10 @@ Definition w_barcats (n : nat) : list (list (bv 8)) :=
   concat (replicate n [fd_w_bar; fd_w_cat]).
 
 (* ---- THE SECCOMP LINE (seccomp design section 3): [seccomp x ..] -- the
-   command word, then ONE OR MORE alphanumeric words, the binary [x] and
-   its arguments.  [LSecc ws] carries the words AFTER [seccomp]; the whole
+   command word, then ONE OR MORE words, the binary [x] and its arguments.
+   The words are FILE-NAME words ([LineWords.fn_wf]: alphanumeric or the
+   dot, as a pipeline's producer and cat's argument are since W4), so
+   [seccomp rm a.txt] is a line.  [LSecc ws] carries the words AFTER [seccomp]; the whole
    argument vector obeys [EchoDisc.line_ok]'s limits (sh's MAXARGS and the
    line buffer), which is what "the words are ok" means.  Like [LPipe] the
    constructor is ADDITIVE: [parse_line] never answers it (the union's own
@@ -291,7 +293,7 @@ Definition w_barcats (n : nat) : list (list (bv 8)) :=
 Definition cmd_seccomp : list (bv 8) := sb "seccomp"%string.
 
 Definition secc_ok (ws : list (list (bv 8))) : Prop :=
-  wl_wf ws /\ ws <> [] /\ (S (length ws) < 10)%nat
+  fn_wf ws /\ ws <> [] /\ (S (length ws) < 10)%nat
   /\ (length (wl_line (cmd_seccomp :: ws)) < line_max)%nat.
 
 Global Instance secc_ok_dec ws : Decision (secc_ok ws).
@@ -314,8 +316,18 @@ Proof using. by vm_compute. Qed.
 Lemma cmd_seccomp_ne_cat : cmd_seccomp <> fd_w_cat.
 Proof using. by vm_compute. Qed.
 
-Lemma secc_ok_wf ws : secc_ok ws -> wl_wf (cmd_seccomp :: ws).
-Proof using. intros [H _]. constructor; [exact cmd_seccomp_word | exact H]. Qed.
+Lemma secc_ok_wf ws : secc_ok ws -> fn_wf (cmd_seccomp :: ws).
+Proof using.
+  intros [H _]. constructor; [exact (wl_word_fn _ cmd_seccomp_word) | exact H].
+Qed.
+
+(* `>' is not a file-name word *)
+Lemma fd_w_gt_not_fn : ~ fn_word fd_w_gt.
+Proof using.
+  intros [_ H]. apply Forall_cons_1 in H as [H _]. apply fn_byte_val in H.
+  revert H. vm_compute. intros [H | [H | [H | H]]];
+    first [ discriminate H | destruct H as [H1 H2]; first [ by apply H1 | by apply H2 ] ].
+Qed.
 
 Inductive uline :=
   | LEcho (ws : list (list (bv 8)))
@@ -961,7 +973,7 @@ Proof using.
   - exact (uline_ws_gtf ws N (proj1 Hok) (proj1 (proj2 Hok))).
   - cbn [uline_ws line_body]. exact (cat_words_N N (uname_lex N Hok)).
   - exact (uline_ws_pipe ws npc (proj1 Hok) (proj1 (proj2 (proj2 Hok)))).
-  - cbn [uline_ws line_body]. exact (wl_words_body _ (secc_ok_wf ws Hok)).
+  - cbn [uline_ws line_body]. exact (wl_words_body_fn _ (secc_ok_wf ws Hok)).
 Qed.
 
 (* THE TYPED LINE'S WORDS ARE THE BODY'S PARSE, at every constructor
@@ -1009,7 +1021,7 @@ Qed.
 Lemma secc_parse_body ws : secc_ok ws -> secc_parse (line_body (LSecc ws)) = Some ws.
 Proof using.
   intros Hok. cbn [line_body]. rewrite /secc_parse.
-  pose proof (wl_words_body _ (secc_ok_wf ws Hok)) as Hw.
+  pose proof (wl_words_body_fn _ (secc_ok_wf ws Hok)) as Hw.
   rewrite decide_True; [by rewrite Hw |].
   rewrite /secc_body Hw. split_and!; [reflexivity | reflexivity | exact Hok].
 Qed.
@@ -1164,14 +1176,11 @@ Proof using.
         by (rewrite -!app_assoc; reflexivity).
       apply app_inj_tail in Hw as [Hw _].
       apply app_inj_tail in Hw as [_ Hg]. discriminate Hg.
-  - (* LSecc: its words are alphanumeric, and `>' is not *)
+  - (* LSecc: its words are file-name words, and `>' is not *)
     exfalso. rewrite (uline_ws_body _ Hok) in Hw. cbn [uline_ws] in Hw.
     pose proof (secc_ok_wf ws' Hok) as Hwf. rewrite Hw in Hwf.
     apply Forall_app in Hwf as [_ Hwf].
-    apply Forall_cons_1 in Hwf as [[_ Hgt] _].
-    apply Forall_cons_1 in Hgt as [Hgt _].
-    revert Hgt. rewrite /wl_alnum. vm_compute. intros [H | [H | H]];
-      destruct H as [H1 H2]; first [ by apply H1 | by apply H2 ].
+    apply Forall_cons_1 in Hwf as [Hgt _]. exact (fd_w_gt_not_fn Hgt).
 Qed.
 
 Lemma fline_ok_of_body b : fbody_ok b -> fline_ok b.
@@ -1250,9 +1259,9 @@ Proof using.
   rewrite line_bytes_body. apply Forall_app. split;
     [| apply Forall_singleton; by right; right].
   destruct l as [ws | ws N | N | ws npc | ws]; rewrite /line_body.
-  5: { apply Forall_impl with (P := wl_body_byte);
-         [exact (wl_body_bytes _ (secc_ok_wf ws Hok)) |].
-       intros b Hb. left. exact (fbody_byte_of_body b Hb). }
+  5: { apply Forall_impl with (P := fun b => fn_byte b \/ b = wl_sp);
+         [exact (wl_body_bytes_fn _ (secc_ok_wf ws Hok)) |].
+       intros b Hb. left. exact (fbody_byte_of_fn b Hb). }
   - apply Forall_impl with (P := wl_body_byte);
       [exact (wl_body_bytes ws (line_ok_wf _ Hok)) |].
     intros b Hb. left. exact (fbody_byte_of_body b Hb).

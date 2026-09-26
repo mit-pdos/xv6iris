@@ -248,9 +248,9 @@ Proof using.
   assert (Hin : FileDisc.fd_w_bar ∈ wl_words (FileDisc.line_body l)).
   { rewrite Hw. cbn [FileDisc.uline_ws]. apply elem_of_app. right. exact Hbar. }
   destruct l as [ws' | ws' N' | N' | ws' fs' | ws'].
-  5: { (* LSecc: its words are alphanumeric, and the bar is not *)
+  5: { (* LSecc: its words are file-name words, and the bar is not *)
        exfalso. rewrite (FileDisc.uline_ws_body _ Hok) in Hin. cbn [FileDisc.uline_ws] in Hin.
-       assert (Hnb : ~ wl_word FileDisc.fd_w_bar)
+       assert (Hnb : ~ fn_word FileDisc.fd_w_bar)
          by (apply (bool_decide_unpack _); vm_compute; exact I).
        exact (Hnb (proj1 (Forall_forall _ _) (FileDisc.secc_ok_wf ws' Hok) _ Hin)). }
   - (* LEcho: its words are alphanumeric, and the bar is not *)
