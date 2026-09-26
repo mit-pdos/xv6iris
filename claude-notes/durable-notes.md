@@ -1068,8 +1068,10 @@ audit-union-only` (`iris/UnionAssumptions.v`), which prints
 `echo ws > N`, `cat N`, and pipelines `echo ws | ..` / `cat N | ..` of
 any mix of `cat` and `grep pat` stages, N any `stem.txt` name
 (`FileClass.txt_name`, since W4), at the union model `ulmG` (concrete functor list `unionΣ`, disk at the mkfs
-image).  It must print exactly 14 distinct axioms: the 13 of
-`audit-only` plus `PrimString.length`.  `make audit-all-only` is `audit-only
+image).  Since the seccomp effort `ulmG` has the seccomp knob on, so the
+same audit also covers a last line `seccomp x` per cycle
+([`design/seccomp.md`](design/seccomp.md)).  It must print exactly 14
+distinct axioms: the 13 of `audit-only` plus `PrimString.length`.  `make audit-all-only` is `audit-only
 audit-union-only`, and CI runs `audit-union-only`.  The file and pipe
 targets below were DELETED by union cut C9h (2026-09-25): THE BASELINE IS
 THREE AUDITS -- `make audit-only` (system) 13, `make audit-tree-only` 13,
@@ -1828,6 +1830,29 @@ implicit-argument failure.  The sweep reads `.glob` files and cannot see
 a class that only a generalisation mentions.  After any import sweep,
 grep every `` `{! `` binder's class for an import, and put the import back
 with a comment naming the binder.  Lane UPSTREAM-MERGE-6.
+
+## A lemma elaborated at a bare `uartGhostG` does not unify with one at `xv6G`'s projection -- it hangs, then OOMs (2026-09-26)
+
+`UnionLinkInst.union_link_inst` came to need the console ring's cameras.
+A lemma stated in a section binding a bare `` `{!uartGhostG Σ} `` and its
+consumer at `xv6G`'s field instance print identically and are not
+convertible; the mismatch showed as a 30-minute hang in `iDestruct … as
+"[$ $]"`, then as an OOM from a section with no `fscfg`.
+Rule (the `xv6G` bundle rule above, seen again): wherever a U-tier lemma
+names the record, bind `xv6G` (and the `fscfg` the ring's names live in),
+never a member class.  Lane seccomp S5b.
+
+## An `_` argument to a lemma in a section without its class binder elaborates at a searched instance, and never finishes (2026-09-26)
+
+`UShURound.usecc_execfail_law` applied `UShPanic.ksh_w1_of_step N _ _ …`
+(sh's one-byte write stub) in a section with no `ghost_varG Σ Z` binder.
+Elaboration took a typeclass-found `ghost_varG` instance with the
+families as evars and sat at a flat 2.5 GB without returning; with the
+instance and the families written out it closes at once.  Rule: in such a
+section pass `(ghost_varG0 := offbox_offG)` (and `(PS := uprogSG_free)`)
+AND every family argument explicitly, as the landed children do -- the
+same instance rule as the `uprogSG` bullet above, but the symptom is a
+hang at the application, not a `cannot instantiate`.  Lane seccomp S4.
 
 ## The pipeline discipline KEEPS D2; the echo discipline dropped it (relax-d2, 2026-09-19)
 

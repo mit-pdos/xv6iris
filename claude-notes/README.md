@@ -312,14 +312,9 @@ in `durable-notes.md` for what belongs where and what gets deleted.
   deed over the map, no kernel-row purchase, cuts W0-W4, and four seams
   applied during the union cuts.
 
-- **[`seccomp.md`](design/seccomp.md)** -- `seccomp x` FOR ANY `x` (2026-09-25,
-  the bump to a083670 and the theorem): why the binary's mask must clear
-  the four namespace-writing numbers too, the round as a COVERAGE-ENDING
-  arm whose alternative carries the arbitrary output, `lm_merge`
-  line-indexed, the mask in the record and the key and the EFFECTIVE
-  syscall number (a blocked call is the unknown-number call), the
-  universe's slot without the taint, the claim's terminal arm and the
-  per-era licence, the dirty credential widened.
+- **[`seccomp.md`](design/seccomp.md)** -- `seccomp x` for any `x`, as built:
+  the mask, the terminal round, the universe's slot, the three-arm console
+  claim, the dirty-arm ring facts and the per-era read position.
 
 - **[`contexts.md`](design/contexts.md)** — CONTEXTS (`TsoCtx.v`): the three
   tokens (running, stamped, parked under a context), the one domination
