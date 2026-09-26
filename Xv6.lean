@@ -1294,3 +1294,12 @@ import Xv6.LineModelLinks
 import Xv6.EchoOutPure
 import Xv6.GenOutPure
 import Xv6.ExecWords
+import Xv6.FileState
+import Xv6.FileClass
+import Xv6.FileName
+import Xv6.FileDiscLine
+import Xv6.FileDisc
+import Xv6.UNameBytes
+import Xv6.UNamePath
+import Xv6.FileOutPure
+import Xv6.FileHooks
