@@ -27,8 +27,27 @@ Collected from the U0 agent reports (Sept 26 2026). Each item names the lane tha
   `parseLine_pipe_none`, `plParse_pipe_body`) live in UnionDemo; move to UnionDisc if a lane
   needs them.
 
-## K3 (seccomp)
+## K3 (seccomp) — DONE (branch k3-secc: S0, S2k–S2k3, exec mask pin, whole-table view)
 - `LinkRec.lkWildNone` is deliberately distinct from K3's `wildNone`; K3 changes no U0-C statement.
+- Landed: `MachFixedGS.wild`/`rdwild` slots + `wildNone` (MachCSL); `AppIface.wild`/`wild_lic`/`rdwild`,
+  `wildNone_lic`, `consLicenceAt_of_wild` (takes the wild/consRes slot equations: Rocq reads
+  riscvF_app_iface); `ConsLog.wildEv`; `UartLinks.consLicenceAt` (+`_of_licence`),
+  `outLink_of_licenceAt`, `consReadPay_trivAt`; `AppInv.appRdcred` (+`_of_sup`/`_of_rdwild`/`_elim`)
+  at the console escrow; `AppLaws.al_programs`/`al_echo` take `wild`/`rdwild` slot equations.
+- S2k: `ConsNames.era`, `consEra`, `consPlaced`, `consSwallowPlaced`, `consoleCaps`/`consoleReadyApp`
+  carry `era = genId + 1` (`consoleReadyApp_era`); consoleread/fileread marked arms relayed at
+  `genId + 1`. DEVIATION: `consResCur` got only relax-d2's `nrd ≤ cur` (Rocq's `cons_dlcnt`/`ndl ≤ nrd`
+  still unported, pre-existing).
+- S5b (`ep_rpos`): nothing kernel-side; EchoOut/LinkRec/GenLinksLine/ReadRec already at the pin (U0-C).
+- Exec mask pin: `execSlotPre`/`execAuPre … cw secc …`, `initBootBundle cw secc sts`,
+  `EraInitBoot` at `ROOTINO seccAll fdt0`, `parkMode`/`parkPkg` carry `secc`.
+- Whole-table view: UserFd camera is `GhostMapG GF (Option Nat) UfdCell UfdMapF` (FileG slot 64);
+  `ustdAt`, `tabLe`, `ushViewOk`, `ustdOk`, `uallocV`; `uslot_of_urun_all_at`/`_ro_at`,
+  `UkFork.wp_uk_ecall_fork_at`, `UConsOpen.ukOpenFdArmAt`/`initCons_fail_std_at`.
+- Left for U1-T: UConsOpen `init_cons_any_std(_at)`; UInitFd `ufd_alloc0_v`, `ufd_headL*`,
+  `ufd_head1*`, `ufd_head*`, `ufd_row`, `ufd_head_open_row`, `ufd_head_of_row` (no non-`_at` forms yet);
+  ExecEntry/ExecBundle's `image_entry_taint` two key pins (Rocq 3e7fee0d2, union-side).
+- Left for U1-R/K4: UkRun `udepwf_std*`. For U1-P: `UexecSecc.ush_view_secc_rows`.
 
 ## UkShPipes* / UShUPipes wave (after DU8 repoint)
 - `Xv6/PipesCut.lean` (U0-3) is partial: 15/37 reached decls. The other 22 are statements about
@@ -65,9 +84,10 @@ Collected from the U0 agent reports (Sept 26 2026). Each item names the lane tha
 - `pobs_elend_aents` proved directly; repoint at K5's `FsAbsEraState.elend_aents` when convenient.
 
 ## U1-R (post-K3/K4 remainder; pre-bump part: UkRunLeaf/Mem/Br, UkCode, UkStub, echo walk, UkFork, UkRunExecRef, UEchoKernel)
-- UkRunSys, UkRunSecc (need K3 secc key/rows, K4 close/exit deposits).
+- UkRunSys, UkRunSecc (K3's secc key/rows are in; still need K4 close/exit deposits).
 - Restore `wp_uk_sb_denied`'s self-minted exit deposit (Rocq `udep_exit_run`; now from `UprogSG.psok USYS_exit`).
-- UkFork / UkRunExecRef: ledger (`ustd_at`, K3), pipe rows (`urun_rows`/`urun_nopipe`, K4), seccomp mask (K3).
+- UkFork / UkRunExecRef: pipe rows (`urun_rows`/`urun_nopipe`, K4). (`ustd_at`: done in K3; the seccAll
+  pins are Rocq-faithful -- Rocq's run keys are at secc_all -- so no mask change is owed.)
 - Syscall-number premise is on the register file (`extractLsb' 0 32 (m 17#5)).toInt = USYS_…`); switch to
   UkRunSys's `usysno`.
 - UkFork kill price is `□ (uKillCred -∗ Q (-1))` vs Rocq `app_taint` (process-layer deviation; K4's KILL-TAINT).
