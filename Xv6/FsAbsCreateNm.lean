@@ -37,17 +37,13 @@ A FILE OF ITS OWN, and additive, as in Rocq.
    `aunarm_of_arm_nd_of` → `aunarmOfArmNd_of`, `cre_child_unfired_nd` →
    `creChildUnfiredNd`, …).
 
-## Deferred (not dropped): the four create-side bridges (lane K6)
+## The four create-side bridges (landed by lane K6-A)
 
 `acre_commit_at_gen_nm_of`, `acre_commit_at_nm_of`,
-`acre_commit_at_gen_of_nm`, `acre_commit_at_of_nm`.  They relate
-`acreCommitAtGenNm` (stated here Rocq-literally, WITH TL-3K's parent cursor
-`Pd` and the dot-name credential) to `FsAbsCreateFire.acreCommitAtGen`,
-whose landed Lean statement predates TL-3K (Rocq `fec45648e`: no `Pd`, no
-dot-name premise), so the two sides do not have the same shape yet.  They
-land with the TL-3K re-spec of `acreCommitAtGen` (lane K6), APPENDED here.
-Uses checked (Rocq): `SpecSysMknod`, `SpecCreate`, `FileOpen`,
-`UInitCons`.
+`acre_commit_at_gen_of_nm`, `acre_commit_at_of_nm` → `acreCommitAtGenNm_of`,
+`acreCommitAtNm_of`, `acreCommitAtGen_of_nm`, `acreCommitAt_of_nm`.  They
+landed once `acreCommitAtGen` carried TL-3K's parent cursor (`fec45648e`)
+and the dot-name credential (`84090c137`).
 
 ## Dropped/simplified vs Rocq
 
@@ -90,6 +86,47 @@ def acreCommitAtNm (Γ : FsViewNames GF) (E : CoPset) (c : Absnode) (Nm : Fname 
     (Pd : Nat → IProp GF) (Farm : Pfam GF (Aview → Nat → IProp GF))
     (Φ : Aview → Nat → Fname → Nat → IProp GF) : IProp GF :=
   acreCommitAtGenNm (hlc := hlc) Γ E (fun _ _ => c) Nm Pd Farm Φ
+
+/-- A provider that answers at EVERY name answers a fortiori at the ones
+`Nm` admits (Rocq `acre_commit_at_gen_nm_of`): the one line every generic
+discharger takes. -/
+theorem acreCommitAtGenNm_of (Γ : FsViewNames GF) (E : CoPset) (cf : Nat → Nat → Absnode)
+    (Nm : Fname → Prop) (Pd : Nat → IProp GF)
+    (Farm : Pfam GF (Aview → Nat → IProp GF))
+    (Φ : Aview → Nat → Fname → Nat → IProp GF) :
+    acreCommitAtGen (hlc := hlc) Γ E cf Pd Farm Φ ⊢
+      acreCommitAtGenNm (hlc := hlc) Γ E cf Nm Pd Farm Φ := by
+  unfold acreCommitAtGen acreCommitAtGenNm
+  iintro H %I %d %i %nm %ents %nl %hpre %hnm %_ Harm HPd Ha
+  iapply H $$ %I %d %i %nm %ents %nl %hpre %hnm Harm HPd Ha
+
+/-- Rocq `acre_commit_at_nm_of`. -/
+theorem acreCommitAtNm_of (Γ : FsViewNames GF) (E : CoPset) (c : Absnode)
+    (Nm : Fname → Prop) (Pd : Nat → IProp GF)
+    (Farm : Pfam GF (Aview → Nat → IProp GF))
+    (Φ : Aview → Nat → Fname → Nat → IProp GF) :
+    acreCommitAt (hlc := hlc) Γ E c Pd Farm Φ ⊢ acreCommitAtNm (hlc := hlc) Γ E c Nm Pd Farm Φ :=
+  acreCommitAtGenNm_of Γ E (fun _ _ => c) Nm Pd Farm Φ
+
+/-- ...and back, at the predicate every landed site is at (Rocq
+`acre_commit_at_gen_of_nm`). -/
+theorem acreCommitAtGen_of_nm (Γ : FsViewNames GF) (E : CoPset) (cf : Nat → Nat → Absnode)
+    (Nm : Fname → Prop) (Pd : Nat → IProp GF)
+    (Farm : Pfam GF (Aview → Nat → IProp GF))
+    (Φ : Aview → Nat → Fname → Nat → IProp GF) (hNm : ∀ nm : Fname, Nm nm) :
+    acreCommitAtGenNm (hlc := hlc) Γ E cf Nm Pd Farm Φ ⊢
+      acreCommitAtGen (hlc := hlc) Γ E cf Pd Farm Φ := by
+  unfold acreCommitAtGen acreCommitAtGenNm
+  iintro H %I %d %i %nm %ents %nl %hpre %hnm Harm HPd Ha
+  iapply H $$ %I %d %i %nm %ents %nl %hpre %hnm %(hNm nm) Harm HPd Ha
+
+/-- Rocq `acre_commit_at_of_nm`. -/
+theorem acreCommitAt_of_nm (Γ : FsViewNames GF) (E : CoPset) (c : Absnode)
+    (Nm : Fname → Prop) (Pd : Nat → IProp GF)
+    (Farm : Pfam GF (Aview → Nat → IProp GF))
+    (Φ : Aview → Nat → Fname → Nat → IProp GF) (hNm : ∀ nm : Fname, Nm nm) :
+    acreCommitAtNm (hlc := hlc) Γ E c Nm Pd Farm Φ ⊢ acreCommitAt (hlc := hlc) Γ E c Pd Farm Φ :=
+  acreCommitAtGen_of_nm Γ E (fun _ _ => c) Nm Pd Farm Φ hNm
 
 /-- Rocq `acre_commit_at_gen_nm_cur_mono`: the CURSOR moves under the
 commit exactly as it does without the name predicate (pure, rides through). -/

@@ -155,12 +155,12 @@ theorem sys_mknod_created (IUP : IUNLOCKPUT) (EO : END_OP) (Γ : SchedNames)
       iprop(⌜R 10#5 = ientry kk ∧ kk < NINODE ∧ 0 < inum.toNat ∧ inum.toNat < 16 * icfgNib ∧
           creOkPure T_DEVICE_w (sysMknodHw A.v1) (sysMknodHw A.v2) made dn⌝ ∗
         createLocked A.pid kk qi s g inum dn bm ∗
-        creOkArms (hlc := hlc) (fsGammaL fscFs) T_DEVICE_w.toNat (devArg A.v1) (devArg A.v2) A.P
+        creOkArms (hlc := hlc) (fsGammaL fscFs) T_DEVICE_w.toNat (devArg A.v1) (devArg A.v2) (nparNm (viewLazy A.V.upt A.V.sz A.M) A.v0.toNat) (fun c => c = .ADev (devArg A.v1) (devArg A.v2)) A.P
           A.Farm (pfamTriv (fun _ _ _ _ => iprop(True))) A.Fun A.Fok A.Fex pl made inum.toNat)
      else
       iprop(⌜R 10#5 = 0#64⌝ ∗ logTx icfgLog ∗
         creFailArms (hlc := hlc) (fsGammaL fscFs) fscFs T_DEVICE_w.toNat (devArg A.v1)
-          (devArg A.v2) A.P A.Pmiss A.Farm (pfamTriv (fun _ _ _ _ => iprop(True))) A.Fun A.Fok
+          (devArg A.v2) (nparNm (viewLazy A.V.upt A.V.sz A.M) A.v0.toNat) (fun c => c = .ADev (devArg A.v1) (devArg A.v2)) A.P A.Pmiss A.Farm (pfamTriv (fun _ _ _ _ => iprop(True))) A.Fun A.Fok
           A.Fex pl))
     ⊢ wpLoop (GF := GF) cpu := by
   iintro ⟨Hk, Hpc, Hcells, Hp, Hrest, Hlow, Hte, Hce, #Henv, Hblk, HΦ, Hbs, Hir, Hop, Harm⟩
@@ -176,7 +176,7 @@ theorem sys_mknod_created (IUP : IUNLOCKPUT) (EO : END_OP) (Γ : SchedNames)
     iintro Hk Hpc
     ihave Hop := logOpS_op icfgLog u' Sb' $$ Hop Htx
     ihave Hcf := creFailArms_dev (hlc := hlc) (fsGammaL fscFs) fscFs (devArg A.v1) (devArg A.v2)
-      A.P A.Pmiss A.Farm (pfamTriv (fun _ _ _ _ => iprop(True))) A.Fun A.Fok A.Fex pl $$ Hcf
+      (nparNm (viewLazy A.V.upt A.V.sz A.M) A.v0.toNat) (fun c => c = .ADev (devArg A.v1) (devArg A.v2)) A.P A.Pmiss A.Farm (pfamTriv (fun _ _ _ _ => iprop(True))) A.Fun A.Fok A.Fex pl $$ Hcf
     ihave Hfail : mknodPostFail (hlc := hlc) (fsGammaL fscFs) fscFs A.V.cwi (viewLazy A.V.upt A.V.sz A.M)
         A.v0.toNat (devArg A.v1) (devArg A.v2) A.P A.Pmiss A.Farm A.Fun A.Fok
         A.Fex $$ [Hcf]
@@ -185,7 +185,8 @@ theorem sys_mknod_created (IUP : IUNLOCKPUT) (EO : END_OP) (Γ : SchedNames)
       iexists pl
       isplitr
       · ipureintro; exact hpl
-      · iexact Hcf
+      · unfold creChildUnfiredNd creChildUnfiredNdp
+        iexact Hcf
     ihave Hir := (show irefSlots (GF := GF) ns' ⊢ irefSlots A.ns from by rw [hns]) $$ Hir
     iapply (sys_mknod_tail_58 EO Γ cpu k A P2 spie spp _ u' hj hproc hK hnoff htier hct hpins hal hP2)
       $$ [$Hk $Hpc $Hcells $Hbuf $Hlow $Hte $Hce $Henv $Hblk $HΦ $Hbs $Hir $Hop $Hfail]
@@ -200,7 +201,7 @@ theorem sys_mknod_created (IUP : IUNLOCKPUT) (EO : END_OP) (Γ : SchedNames)
     k_step_e (wp_s_branch cpu _ (KA.«sys_mknod» + 0x44#64) true 20#13 10#5 0#5 (by decide) bop.BEQ)
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h10, sysfile_beqz, hd]
     iintro Hk Hpc
-    ihave Hcok := creOkArms_dev (hlc := hlc) (fsGammaL fscFs) (devArg A.v1) (devArg A.v2) A.P
+    ihave Hcok := creOkArms_dev (hlc := hlc) (fsGammaL fscFs) (devArg A.v1) (devArg A.v2) (nparNm (viewLazy A.V.upt A.V.sz A.M) A.v0.toNat) (fun c => c = .ADev (devArg A.v1) (devArg A.v2)) A.P
       A.Farm (pfamTriv (fun _ _ _ _ => iprop(True))) A.Fun A.Fok A.Fex pl inum.toNat $$ Hcok
     ihave Hok : mknodPostOk (hlc := hlc) (fsGammaL fscFs) (viewLazy A.V.upt A.V.sz A.M) A.v0.toNat
         (devArg A.v1) (devArg A.v2) A.P A.Farm A.Fun A.Fok A.Fex $$ [Hcok]
@@ -314,14 +315,17 @@ theorem sys_mknod_fetched (CR : CREATE) (IUP : IUNLOCKPUT) (EO : END_OP) (Γ : S
       hpl $$ Hau
     unfold mknodAuPre
     icases Hau with ⟨Hst, Hac, Hdl, Hch⟩
+    -- the child's pair at the NODE PREDICATE this syscall PINS (INIT-FILE)
+    ihave Hch := creChildUnfiredNdp_pin (hlc := hlc) (fsGammaL fscFs) (.ADev (devArg A.v1) (devArg A.v2))
+      A.Farm A.Fun $$ Hch
     -- THE BUNDLE AT THE DEVICE TYPE: no dots leg owed
     ihave Hcre := creCommits_of_dev (hlc := hlc) (fsGammaL fscFs) (devArg A.v1) (devArg A.v2)
-      (A.P (nparElems pl).length) A.Farm A.Fun A.Fok $$ Hac Hch
+      (nparNm (viewLazy A.V.upt A.V.sz A.M) A.v0.toNat) (fun c => c = .ADev (devArg A.v1) (devArg A.v2)) (A.P (nparElems pl).length) A.Farm A.Fun A.Fok $$ Hac Hch
     ihave Hcre := (show creCommits (hlc := hlc) (GF := GF) (fsGammaL fscFs) T_DEVICE_w.toNat
-        (devArg A.v1) (devArg A.v2) (A.P (nparElems pl).length) A.Farm
+        (devArg A.v1) (devArg A.v2) (nparNm (viewLazy A.V.upt A.V.sz A.M) A.v0.toNat) (fun c => c = .ADev (devArg A.v1) (devArg A.v2)) (A.P (nparElems pl).length) A.Farm
         (pfamTriv (fun _ _ _ _ => iprop(True))) A.Fun A.Fok ⊢
       creCommits (hlc := hlc) (fsGammaL fscFs) T_DEVICE_w.toNat (sysMknodHw A.v1).toNat
-        (sysMknodHw A.v2).toNat (A.P (nparElems (bview pl.length (sysfilePfun pl))).length) A.Farm
+        (sysMknodHw A.v2).toNat (nparNm (viewLazy A.V.upt A.V.sz A.M) A.v0.toNat) (fun c => c = .ADev (devArg A.v1) (devArg A.v2)) (A.P (nparElems (bview pl.length (sysfilePfun pl))).length) A.Farm
         (pfamTriv (fun _ _ _ _ => iprop(True))) A.Fun A.Fok
       from by rw [sys_mknod_hw_dev, sys_mknod_hw_dev, sys_mknod_bview_self]) $$ Hcre
     ihave Hst := (show epStart (hlc := hlc) (GF := GF) fscFs A.V.cwi A.P A.Pmiss pl ⊢
@@ -338,10 +342,19 @@ theorem sys_mknod_fetched (CR : CREATE) (IUP : IUNLOCKPUT) (EO : END_OP) (Γ : S
     ihave Hce := (show cpuClaimExt (GF := GF) cpu k.sie (procAddr A.j) ⊢ cpuClaimExt cpu k.sie k.proc
       from by rw [hproc]) $$ Hce
     iapply (sys_mknod_create CR Γ cpu _ A.j pl.length (sysfilePfun pl) (sysMknodHw A.v1)
-        (sysMknodHw A.v2) A.γ A.pid (sysMknodV1 A P2) (sysMknodM1 A P2) MAXOPBLOCKS Sb A.ns A.P
+        (sysMknodHw A.v2) A.γ A.pid (sysMknodV1 A P2) (sysMknodM1 A P2) MAXOPBLOCKS Sb A.ns (nparNm (viewLazy A.V.upt A.V.sz A.M) A.v0.toNat) (fun c => c = .ADev (devArg A.v1) (devArg A.v2)) A.P
         A.Pmiss A.Farm A.Fun A.Fok A.Fex hj ?cp ?cK ?cn ?ct (sysfile_pfun_nn pl hnul)
         (sysfile_pfun_term pl) (by omega) (by unfold createUnits; exact Nat.le_refl _) hns
-        ?ca1 ?ca2 ?ca3)
+        ?ca1 ?ca2 ?ca3
+        -- create's name premise, paid from the reading (`FsAbsCreateNm.nparNm_intro`),
+        -- and its node premises: at `T_DEVICE` the node the arm places IS
+        -- `ADev ma mi`, and the directory premise is vacuous (INIT-FILE)
+        (fun nm h => nparNm_intro _ _ pl nm hpl (by
+          unfold nlastElem; rw [sys_mknod_bview_self] at h; exact h))
+        (fun _ => show creC0 T_DEVICE_w.toNat (sysMknodHw A.v1).toNat (sysMknodHw A.v2).toNat =
+            .ADev (devArg A.v1) (devArg A.v2) by
+          rw [sys_mknod_hw_dev, sys_mknod_hw_dev]; exact creC0_dev _ _)
+        (fun h => absurd h (by decide)))
       $$ [- $Hk $Hpc $Henv $Hbs $Hir $HopS $Htx $Hst $Hdl $Hcre]
     rotate_right 1
     k_norm_g [sys_mknod_ret_44]

@@ -63,6 +63,7 @@ cursor (`nparElems`, `nparWalkDeadEra`, `epStart`) or the slot supplies.
 -/
 import Xv6.SpecNameiparent
 import Xv6.FsAbsCreateFire
+import Xv6.FsAbsCreateNm
 
 namespace Xv6
 
@@ -218,12 +219,96 @@ theorem creDotsLeg_nodir (Γ : FsViewNames GF) (tyz : Nat)
   iintro %hc
   exact absurd hc h
 
+/-! ### The unarm at a node predicate, at the three places create needs it
+(Rocq `SpecCreate.v`, INIT-FILE's UNARM ruling, `1a1b4633d`)
+
+`FsAbsCreateNm` is the ruling's bottom layer, so the readings create's own
+proof takes -- `aunarmOfArm_open`'s twin and the child's two legs at a
+GENERAL node predicate -- are stated here.  `FsAbsCreateNm.creChildUnfiredNd`
+is the instance of the pair at `fun c' => c' = c`, the one sys_mknod pins;
+every other caller is at `fun _ => True` and takes the bridges below. -/
+
+/-- the tied piece opened at the inum the ARM's receipt names (Rocq's
+`aunarm_of_arm_nd_open`) -/
+theorem aunarmOfArmNd_open (Γ : FsViewNames GF) (E : CoPset) (Nd : Absnode → Prop)
+    (Farm Fun : Pfam GF (Aview → Nat → IProp GF)) (i : Nat) :
+    ⊢@{IProp GF} creArmFired Farm i -∗ pfAt (aunarmOfArmNd (hlc := hlc) Γ E Nd Farm) Fun -∗
+      aunarmCommitAtNd (hlc := hlc) Γ E i Nd Fun.pfRecv := by
+  iintro Ha Hp
+  ihave Hp := pfAt_au _ _ $$ Hp
+  unfold aunarmOfArmNd
+  iapply Hp $$ %i Ha
+
+/-- Rocq's `cre_child_unfired_ndp`: the child's two legs with the unarm at a
+GENERAL node predicate. -/
+def creChildUnfiredNdp (Γ : FsViewNames GF) (c : Absnode) (Nd : Absnode → Prop)
+    (Farm Fun : Pfam GF (Aview → Nat → IProp GF)) : IProp GF :=
+  iprop(pfAt (aarmCommitAt (hlc := hlc) Γ appE c) Farm ∗
+    pfAt (aunarmOfArmNd (hlc := hlc) Γ appE Nd Farm) Fun)
+
+/-- A PROVIDER always has the weaker obligation (Rocq's
+`cre_child_unfired_ndp_of`). -/
+theorem creChildUnfiredNdp_of (Γ : FsViewNames GF) (c : Absnode) (Nd : Absnode → Prop)
+    (Farm Fun : Pfam GF (Aview → Nat → IProp GF)) :
+    creChildUnfired (hlc := hlc) Γ c Farm Fun ⊢ creChildUnfiredNdp (hlc := hlc) Γ c Nd Farm Fun := by
+  unfold creChildUnfired creChildUnfiredNdp
+  iintro ⟨Ha, Hun⟩
+  iframe Ha
+  iapply (pfAt_mono (aunarmOfArm (hlc := hlc) Γ appE Farm)
+    (aunarmOfArmNd (hlc := hlc) Γ appE Nd Farm) Fun) $$ [] Hun
+  iintro H
+  iapply (aunarmOfArmNd_of (hlc := hlc) Γ appE Nd Farm) $$ H
+
+/-- ...and back, at the predicate every other caller is at (Rocq's
+`cre_child_unfired_of_ndp`). -/
+theorem creChildUnfired_of_ndp (Γ : FsViewNames GF) (c : Absnode) (Nd : Absnode → Prop)
+    (Farm Fun : Pfam GF (Aview → Nat → IProp GF)) (hNd : ∀ c' : Absnode, Nd c') :
+    creChildUnfiredNdp (hlc := hlc) Γ c Nd Farm Fun ⊢ creChildUnfired (hlc := hlc) Γ c Farm Fun := by
+  unfold creChildUnfired creChildUnfiredNdp
+  iintro ⟨Ha, Hun⟩
+  iframe Ha
+  iapply (pfAt_mono (aunarmOfArmNd (hlc := hlc) Γ appE Nd Farm)
+    (aunarmOfArm (hlc := hlc) Γ appE Farm) Fun) $$ [] Hun
+  iintro H
+  iapply (aunarmOfArm_of_nd (hlc := hlc) Γ appE Nd Farm _ hNd) $$ H
+
+/-- ...and the PIN sys_mknod takes (Rocq's `cre_child_unfired_ndp_pin`): the
+pair at `fun c' => c' = c` IS `FsAbsCreateNm`'s. -/
+theorem creChildUnfiredNdp_pin (Γ : FsViewNames GF) (c : Absnode)
+    (Farm Fun : Pfam GF (Aview → Nat → IProp GF)) :
+    creChildUnfiredNd (hlc := hlc) Γ c Farm Fun ⊢
+      creChildUnfiredNdp (hlc := hlc) Γ c (fun c' : Absnode => c' = c) Farm Fun := .rfl
+
+/-- Rocq's `cre_child_unfired_nd_of_ndp`. -/
+theorem creChildUnfiredNd_of_ndp (Γ : FsViewNames GF) (c : Absnode)
+    (Farm Fun : Pfam GF (Aview → Nat → IProp GF)) :
+    creChildUnfiredNdp (hlc := hlc) Γ c (fun c' : Absnode => c' = c) Farm Fun ⊢
+      creChildUnfiredNd (hlc := hlc) Γ c Farm Fun := .rfl
+
+/-- `FsAbsCreateFire.acreCommitAtGen_ext` at the NAME-PREDICATE commit
+(Rocq's `acre_commit_at_gen_nm_ext`, stated in its `SpecCreate`). -/
+theorem acreCommitAtGenNm_ext (Γ : FsViewNames GF) (E : CoPset)
+    (cf cf' : Nat → Nat → Absnode) (Nm : Fname → Prop) (Pd : Nat → IProp GF)
+    (Farm : Pfam GF (Aview → Nat → IProp GF))
+    (Φ : Aview → Nat → Fname → Nat → IProp GF) (hext : ∀ d i, cf d i = cf' d i) :
+    acreCommitAtGenNm (hlc := hlc) Γ E cf Nm Pd Farm Φ ⊢
+      acreCommitAtGenNm (hlc := hlc) Γ E cf' Nm Pd Farm Φ := by
+  have : cf = cf' := funext fun d => funext fun i => hext d i
+  subst this
+  exact .rfl
+
 /-- the four commits, at the child's type-indexed content (Rocq's
 `cre_commits`).  `Pd` IS THE PARENT CURSOR (Rocq lane TL-3K, `fec45648e`):
 the parent leg's `d` is quantified inside its commit, so the bundle carries
 the cursor the syscall's walk hands back, and every arm instantiates it at
-`P (nparElems pl).length`. -/
+`P (nparElems pl).length`.  THE NAME PREDICATE `Nm` (INIT-FILE, `96f841c7d`)
+and THE NODE PREDICATE `Nd` (`1a1b4633d`): the parent leg is
+`acreCommitAtGenNm` at `Nm` and the unarm `aunarmOfArmNd` at `Nd`, so a
+caller's claim is asked to absorb a create only at the names the syscall can
+reach, and an unarm only at the nodes it can place; every caller but
+sys_mknod is at `fun _ => True`. -/
 def creCommits (Γ : FsViewNames GF) (tyz ma mi : Nat)
+    (Nm : Fname → Prop) (Nd : Absnode → Prop)
     (Pd : Nat → IProp GF)
     (Farm : Pfam GF (Aview → Nat → IProp GF))
     (Fdots : Pfam GF (Aview → Nat → Nat → Bool → IProp GF))
@@ -231,16 +316,16 @@ def creCommits (Γ : FsViewNames GF) (tyz ma mi : Nat)
     (Fok : Pfam GF (Aview → Nat → Fname → Nat → IProp GF)) : IProp GF :=
   iprop(pfAt (aarmCommitAt (hlc := hlc) Γ appE (creC0 tyz ma mi)) Farm ∗
     creDotsLeg (hlc := hlc) Γ tyz Fdots ∗
-    pfAt (aunarmOfArm (hlc := hlc) Γ appE Farm) Fun ∗
-    pfAt (acreCommitAtGen (hlc := hlc) Γ appE (creChild tyz ma mi) Pd Farm) Fok)
+    pfAt (aunarmOfArmNd (hlc := hlc) Γ appE Nd Farm) Fun ∗
+    pfAt (acreCommitAtGenNm (hlc := hlc) Γ appE (creChild tyz ma mi) Nm Pd Farm) Fok)
 
 /-- SATISFIABILITY, and the discharger every caller of create hands down
 (Rocq's `cre_commits_unit`): the GENERIC application asks nothing of create's
 legs, so every commit is its own unit, paid off the SUPPLY. -/
 theorem creCommits_unit [FsBytesG GF] (γfs : FsNames) (tyz ma mi : Nat)
-    (Pd : Nat → IProp GF) :
+    (Nm : Fname → Prop) (Nd : Absnode → Prop) (Pd : Nat → IProp GF) :
     appSup (GF := GF) ⊢
-      creCommits (hlc := hlc) (fsGammaL γfs) tyz ma mi Pd (pfamTriv (fun _ _ => iprop(True)))
+      creCommits (hlc := hlc) (fsGammaL γfs) tyz ma mi Nm Nd Pd (pfamTriv (fun _ _ => iprop(True)))
         (pfamTriv (fun _ _ _ _ => iprop(True))) (pfamTriv (fun _ _ => iprop(True)))
         (pfamTriv (fun _ _ _ _ => iprop(True))) := by
   unfold creCommits
@@ -254,29 +339,33 @@ theorem creCommits_unit [FsBytesG GF] (γfs : FsNames) (tyz ma mi : Nat)
     iapply (adotsCommitAt_unit (hlc := hlc) γfs appE) $$ Hsup
   isplitr
   · iapply pfAt_triv
+    iapply (aunarmOfArmNd_of (hlc := hlc) (fsGammaL γfs) appE Nd _)
     iapply (aunarmOfArm_unit (hlc := hlc) γfs appE _) $$ Hsup
   · iapply pfAt_triv
+    iapply (acreCommitAtGenNm_of (hlc := hlc) (fsGammaL γfs) appE _ Nm Pd _ _)
     iapply (acreCommitAtGen_unit (hlc := hlc) γfs appE _ Pd _) $$ Hsup
 
 /-- THE CURSOR IS A WEAKENING AT THE BUNDLE (Rocq's `cre_commits_cur`,
-TL-3K): a caller whose own bundle carries NO cursor hands its parent leg up
-to create's cursor-threaded one for free
-(`FsAbsCreateFire.acreCommitAtGen_cur`). -/
-theorem creCommits_cur (Γ : FsViewNames GF) (tyz ma mi : Nat) (Pd : Nat → IProp GF)
+TL-3K). -/
+theorem creCommits_cur (Γ : FsViewNames GF) (tyz ma mi : Nat) (Nm : Fname → Prop)
+    (Nd : Absnode → Prop) (Pd : Nat → IProp GF)
     (Farm : Pfam GF (Aview → Nat → IProp GF))
     (Fdots : Pfam GF (Aview → Nat → Nat → Bool → IProp GF))
     (Fun : Pfam GF (Aview → Nat → IProp GF))
     (Fok : Pfam GF (Aview → Nat → Fname → Nat → IProp GF)) :
-    creCommits (hlc := hlc) Γ tyz ma mi (fun _ => iprop(True)) Farm Fdots Fun Fok ⊢
-      creCommits (hlc := hlc) Γ tyz ma mi Pd Farm Fdots Fun Fok := by
+    creCommits (hlc := hlc) Γ tyz ma mi Nm Nd (fun _ => iprop(True)) Farm Fdots Fun Fok ⊢
+      creCommits (hlc := hlc) Γ tyz ma mi Nm Nd Pd Farm Fdots Fun Fok := by
   unfold creCommits
   iintro ⟨Ha, Hd, Hu, Hac⟩
   iframe Ha Hd Hu
   iapply (pfAt_mono
-    (acreCommitAtGen (hlc := hlc) Γ appE (creChild tyz ma mi) (fun _ => iprop(True)) Farm)
-    (acreCommitAtGen (hlc := hlc) Γ appE (creChild tyz ma mi) Pd Farm) Fok) $$ [] Hac
-  iintro H
-  iapply (acreCommitAtGen_cur (hlc := hlc) Γ appE (creChild tyz ma mi) Pd Farm Fok.pfRecv) $$ H
+    (acreCommitAtGenNm (hlc := hlc) Γ appE (creChild tyz ma mi) Nm (fun _ => iprop(True)) Farm)
+    (acreCommitAtGenNm (hlc := hlc) Γ appE (creChild tyz ma mi) Nm Pd Farm) Fok) $$ [] Hac
+  unfold acreCommitAtGenNm
+  iintro H %I %d %i %nm %ents %nl %hpre %hnm %hNm Harm HPd Ha
+  imod H $$ %I %d %i %nm %ents %nl %hpre %hnm %hNm Harm %trivial Ha with ⟨Ha, -, Hstep, Hph2⟩
+  imodintro
+  iframe Ha HPd Hstep Hph2
 
 /-- ...AND THE CURSOR MOVES ALONG AN ISO AT THE BUNDLE (Rocq's
 `cre_commits_mono`, TL-3C): the path-fixed `P (nparElems pl).length` and the
@@ -284,23 +373,24 @@ syscall tier's guarded `SysMknodDefs.nparCur` carry the whole four-leg bundle
 between them, which is what a PATH-FIXED mkdir bundle needs
 (`SpecSysMkdir.mkdirCre_inst`).  BOTH directions, because the parent leg
 READS the premise and hands it back. -/
-theorem creCommits_mono (Γ : FsViewNames GF) (tyz ma mi : Nat) (Pd Pd' : Nat → IProp GF)
+theorem creCommits_mono (Γ : FsViewNames GF) (tyz ma mi : Nat) (Nm : Fname → Prop)
+    (Nd : Absnode → Prop) (Pd Pd' : Nat → IProp GF)
     (Farm : Pfam GF (Aview → Nat → IProp GF))
     (Fdots : Pfam GF (Aview → Nat → Nat → Bool → IProp GF))
     (Fun : Pfam GF (Aview → Nat → IProp GF))
     (Fok : Pfam GF (Aview → Nat → Fname → Nat → IProp GF)) :
     ⊢ iprop(□ (∀ d : Nat, Pd' d -∗ Pd d)) -∗ iprop(□ (∀ d : Nat, Pd d -∗ Pd' d)) -∗
-      creCommits (hlc := hlc) Γ tyz ma mi Pd Farm Fdots Fun Fok -∗
-      creCommits (hlc := hlc) Γ tyz ma mi Pd' Farm Fdots Fun Fok := by
+      creCommits (hlc := hlc) Γ tyz ma mi Nm Nd Pd Farm Fdots Fun Fok -∗
+      creCommits (hlc := hlc) Γ tyz ma mi Nm Nd Pd' Farm Fdots Fun Fok := by
   unfold creCommits
   iintro #Hin #Hout ⟨Ha, Hd, Hu, Hac⟩
   iframe Ha Hd Hu
   iapply (pfAt_mono
-    (acreCommitAtGen (hlc := hlc) Γ appE (creChild tyz ma mi) Pd Farm)
-    (acreCommitAtGen (hlc := hlc) Γ appE (creChild tyz ma mi) Pd' Farm) Fok) $$ [] Hac
+    (acreCommitAtGenNm (hlc := hlc) Γ appE (creChild tyz ma mi) Nm Pd Farm)
+    (acreCommitAtGenNm (hlc := hlc) Γ appE (creChild tyz ma mi) Nm Pd' Farm) Fok) $$ [Hin Hout] Hac
   iintro H
-  iapply (acreCommitAtGen_mono (hlc := hlc) Γ appE (creChild tyz ma mi) Pd Pd' Farm Fok.pfRecv)
-    $$ Hin Hout H
+  iapply (acreCommitAtGenNm_cur_mono (hlc := hlc) Γ appE (creChild tyz ma mi) Nm Pd Pd' Farm
+    Fok.pfRecv) $$ Hin Hout H
 
 /-- the exists observation at the trivial pair (Rocq's `cre_dlookup_unit`) -/
 theorem creDlookup_unit (Γ : FsViewNames GF) :
@@ -311,50 +401,52 @@ theorem creDlookup_unit (Γ : FsViewNames GF) :
 /-- THE BUNDLE AT A PINNED TYPE, the device (Rocq's `cre_commits_of_dev`): a
 type-pinned caller holds the child's content as a CONSTANT and owes NO DOTS
 LEG at all. -/
-theorem creCommits_of_dev (Γ : FsViewNames GF) (ma mi : Nat)
-    (Pd : Nat → IProp GF)
+theorem creCommits_of_dev (Γ : FsViewNames GF) (ma mi : Nat) (Nm : Fname → Prop)
+    (Nd : Absnode → Prop) (Pd : Nat → IProp GF)
     (Farm Fun : Pfam GF (Aview → Nat → IProp GF))
     (Fok : Pfam GF (Aview → Nat → Fname → Nat → IProp GF)) :
-    pfAt (acreCommitAt (hlc := hlc) Γ appE (.ADev ma mi) Pd Farm) Fok ⊢
-      creChildUnfired (hlc := hlc) Γ (.ADev ma mi) Farm Fun -∗
-      creCommits (hlc := hlc) Γ T_DEVICE_w.toNat ma mi Pd Farm
+    pfAt (acreCommitAtNm (hlc := hlc) Γ appE (.ADev ma mi) Nm Pd Farm) Fok ⊢
+      creChildUnfiredNdp (hlc := hlc) Γ (.ADev ma mi) Nd Farm Fun -∗
+      creCommits (hlc := hlc) Γ T_DEVICE_w.toNat ma mi Nm Nd Pd Farm
         (pfamTriv (fun _ _ _ _ => iprop(True))) Fun Fok := by
-  unfold creCommits creChildUnfired
+  unfold creCommits creChildUnfiredNdp
   rw [creC0_dev]
   iintro Hac ⟨Ha, Hu⟩
   ihave Hd := creDotsLeg_nodir (hlc := hlc) Γ T_DEVICE_w.toNat
     (pfamTriv (fun _ _ _ _ => iprop(True))) (by decide)
   iframe Ha Hd Hu
-  iapply (pfAt_mono (acreCommitAt (hlc := hlc) Γ appE (.ADev ma mi) Pd Farm)
-    (acreCommitAtGen (hlc := hlc) Γ appE (creChild T_DEVICE_w.toNat ma mi) Pd Farm) Fok) $$ [] Hac
+  iapply (pfAt_mono (acreCommitAtNm (hlc := hlc) Γ appE (.ADev ma mi) Nm Pd Farm)
+    (acreCommitAtGenNm (hlc := hlc) Γ appE (creChild T_DEVICE_w.toNat ma mi) Nm Pd Farm) Fok)
+    $$ [] Hac
   iintro H
-  unfold acreCommitAt
-  iapply (acreCommitAtGen_ext (hlc := hlc) Γ appE (fun _ _ => .ADev ma mi)
-    (creChild T_DEVICE_w.toNat ma mi) Pd Farm Fok.pfRecv (fun d i => (creChild_dev ma mi d i).symm))
-    $$ H
+  unfold acreCommitAtNm
+  iapply (acreCommitAtGenNm_ext (hlc := hlc) Γ appE (fun _ _ => .ADev ma mi)
+    (creChild T_DEVICE_w.toNat ma mi) Nm Pd Farm Fok.pfRecv
+    (fun d i => (creChild_dev ma mi d i).symm)) $$ H
 
 /-- ...and the empty file (Rocq's `cre_commits_of_file`). -/
-theorem creCommits_of_file (Γ : FsViewNames GF) (ma mi : Nat)
-    (Pd : Nat → IProp GF)
+theorem creCommits_of_file (Γ : FsViewNames GF) (ma mi : Nat) (Nm : Fname → Prop)
+    (Nd : Absnode → Prop) (Pd : Nat → IProp GF)
     (Farm Fun : Pfam GF (Aview → Nat → IProp GF))
     (Fok : Pfam GF (Aview → Nat → Fname → Nat → IProp GF)) :
-    pfAt (acreCommitAt (hlc := hlc) Γ appE (.AFile []) Pd Farm) Fok ⊢
-      creChildUnfired (hlc := hlc) Γ (.AFile []) Farm Fun -∗
-      creCommits (hlc := hlc) Γ T_FILE_w.toNat ma mi Pd Farm
+    pfAt (acreCommitAtNm (hlc := hlc) Γ appE (.AFile []) Nm Pd Farm) Fok ⊢
+      creChildUnfiredNdp (hlc := hlc) Γ (.AFile []) Nd Farm Fun -∗
+      creCommits (hlc := hlc) Γ T_FILE_w.toNat ma mi Nm Nd Pd Farm
         (pfamTriv (fun _ _ _ _ => iprop(True))) Fun Fok := by
-  unfold creCommits creChildUnfired
+  unfold creCommits creChildUnfiredNdp
   rw [creC0_file]
   iintro Hac ⟨Ha, Hu⟩
   ihave Hd := creDotsLeg_nodir (hlc := hlc) Γ T_FILE_w.toNat
     (pfamTriv (fun _ _ _ _ => iprop(True))) (by decide)
   iframe Ha Hd Hu
-  iapply (pfAt_mono (acreCommitAt (hlc := hlc) Γ appE (.AFile []) Pd Farm)
-    (acreCommitAtGen (hlc := hlc) Γ appE (creChild T_FILE_w.toNat ma mi) Pd Farm) Fok) $$ [] Hac
+  iapply (pfAt_mono (acreCommitAtNm (hlc := hlc) Γ appE (.AFile []) Nm Pd Farm)
+    (acreCommitAtGenNm (hlc := hlc) Γ appE (creChild T_FILE_w.toNat ma mi) Nm Pd Farm) Fok)
+    $$ [] Hac
   iintro H
-  unfold acreCommitAt
-  iapply (acreCommitAtGen_ext (hlc := hlc) Γ appE (fun _ _ => .AFile [])
-    (creChild T_FILE_w.toNat ma mi) Pd Farm Fok.pfRecv (fun d i => (creChild_file ma mi d i).symm))
-    $$ H
+  unfold acreCommitAtNm
+  iapply (acreCommitAtGenNm_ext (hlc := hlc) Γ appE (fun _ _ => .AFile [])
+    (creChild T_FILE_w.toNat ma mi) Nm Pd Farm Fok.pfRecv
+    (fun d i => (creChild_file ma mi d i).symm)) $$ H
 
 end Commits
 

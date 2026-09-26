@@ -105,11 +105,11 @@ theorem sys_mkdir_created (IUP : IUNLOCKPUT) (EO : END_OP) (Γ : SchedNames)
       iprop(⌜R 10#5 = ientry kk ∧ kk < NINODE ∧ 0 < inum.toNat ∧ inum.toNat < 16 * icfgNib ∧
           creOkPure T_DIR (0#16) (0#16) made dn⌝ ∗
         createLocked A.pid kk qi s g inum dn bm ∗
-        creOkArms (hlc := hlc) (fsGammaL fscFs) T_DIR.toNat 0 0 A.P A.Farm A.Fdots A.Fun A.Fok A.Fex
+        creOkArms (hlc := hlc) (fsGammaL fscFs) T_DIR.toNat 0 0 (fun _ => True) (fun _ => True) A.P A.Farm A.Fdots A.Fun A.Fok A.Fex
           (bview pl.length (sysfilePfun pl)) made inum.toNat)
      else
       iprop(⌜R 10#5 = 0#64⌝ ∗ logTx icfgLog ∗
-        creFailArms (hlc := hlc) (fsGammaL fscFs) fscFs T_DIR.toNat 0 0 A.P A.Pmiss
+        creFailArms (hlc := hlc) (fsGammaL fscFs) fscFs T_DIR.toNat 0 0 (fun _ => True) (fun _ => True) A.P A.Pmiss
           A.Farm A.Fdots A.Fun A.Fok A.Fex (bview pl.length (sysfilePfun pl))))
     ⊢ wpLoop (GF := GF) cpu := by
   iintro ⟨Hk, Hpc, Hcells, Hp, Hrest, Hte, Hce, #Henv, Hblk, HΦ, Hbs, Hir, Hop, Harm⟩
@@ -233,15 +233,16 @@ theorem sys_mkdir_fetched (CR : CREATE) (IUP : IUNLOCKPUT) (EO : END_OP) (Γ : S
     ihave Hcre := mkdirCre_inst (hlc := hlc) (fsGammaL fscFs) (viewLazy A.V.upt A.V.sz A.M)
       A.v.toNat (bview pl'.length (sysfilePfun pl')) A.P A.Farm A.Fdots A.Fun A.Fok hpof $$ Hcre
     ihave Hcre := (show creCommits (hlc := hlc) (GF := GF) (fsGammaL fscFs) T_DIR.toNat 0 0
-        (A.P (nparElems (bview pl'.length (sysfilePfun pl'))).length) A.Farm A.Fdots A.Fun A.Fok ⊢
+        (fun _ => True) (fun _ => True) (A.P (nparElems (bview pl'.length (sysfilePfun pl'))).length) A.Farm A.Fdots A.Fun A.Fok ⊢
       creCommits (hlc := hlc) (fsGammaL fscFs) T_DIR.toNat (0#16 : BitVec 16).toNat
-        (0#16 : BitVec 16).toNat (A.P (nparElems (bview pl'.length (sysfilePfun pl'))).length)
+        (0#16 : BitVec 16).toNat (fun _ => True) (fun _ => True) (A.P (nparElems (bview pl'.length (sysfilePfun pl'))).length)
         A.Farm A.Fdots A.Fun A.Fok from .rfl) $$ Hcre
     iapply (sys_mkdir_create CR Γ cpu _ k.sie (by k_norm_g) (procAddr A.j)
         (by k_norm_g; exact hproc) A.j pl'.length (sysfilePfun pl') T_DIR (0#16) (0#16) A.γ A.pid
-        (sysMkdirV1 A P2) (sysMkdirM1 A P2) MAXOPBLOCKS Sb A.ns A.P A.Pmiss A.Farm A.Fdots A.Fun
+        (sysMkdirV1 A P2) (sysMkdirM1 A P2) MAXOPBLOCKS Sb A.ns (fun _ => True) (fun _ => True) A.P A.Pmiss A.Farm A.Fdots A.Fun
         A.Fok A.Fex hj ?cp ?cK ?cn ?ct (sysfile_pfun_nn pl' hnul) (sysfile_pfun_term pl')
-        (by omega) sys_mkdir_tdir_nz T_DIR_tyOk (le_refl _) hns ?c1 ?c2 ?c3)
+        (by omega) sys_mkdir_tdir_nz T_DIR_tyOk (le_refl _) hns ?c1 ?c2 ?c3
+        (fun _ _ => trivial) (fun _ => trivial) (fun _ _ => trivial))
       $$ [- $Hk $Hpc $Hte $Hce $Henv $Hblk $Hbs $Hir $HopS $Htx $Hst $Hdlc $Hcre]
     rotate_right 1
     k_norm_g [sys_mkdir_ret_2c]

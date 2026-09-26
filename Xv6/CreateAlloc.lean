@@ -437,7 +437,7 @@ the written row (`cafAcre_fire`, which performs the retag). -/
 theorem create_alloc_repark (dind cinum : BitVec 32) (dn dn' : Dinode) (bm bm' : Blkmap)
     (data data' : Nat → List (BitVec 8)) (nf : Nat → BitVec 8) (ty major minor : BitVec 16)
     (dnc : Dinode) (bmc : Blkmap) (datc : Nat → List (BitVec 8))
-    (Pd : Nat → IProp GF)
+    (Nm : Fname → Prop) (Nd : Absnode → Prop) (Pd : Nat → IProp GF)
     (Farm : Pfam GF (Aview → Nat → IProp GF))
     (Fok : Pfam GF (Aview → Nat → Fname → Nat → IProp GF))
     (hty : dn.diType = T_DIR) (hnl0 : dn.diNlink ≠ 0#16)
@@ -458,15 +458,17 @@ theorem create_alloc_repark (dind cinum : BitVec 32) (dn dn' : Dinode) (bm bm' :
           x < 16 * dirSlot data (dirNrec dn.diSize.toNat) + 16
       then (direntBytes (deOfName (createLow16 cinum) (bname 14 nf)))[x - 16 *
         dirSlot data (dirNrec dn.diSize.toNat)]!
-      else fileByte data x) :
+      else fileByte data x)
+    -- THE NAME PREDICATE, at the name this leg files (INIT-FILE)
+    (hNm : Nm (bname 14 nf)) :
     iregInv (hlc := hlc) fscIreg fscFs icfgIst icfgNib ⊢
       dlinks fscFs dind.toNat dn bm data -∗
       FsStateLink.linkToks (fsGammaL fscFs) (cinum.toNat : Int)
         (FsStateLink.linkReps (createDelta ty) (createIty ty (dind.toNat : Int))) -∗
       topFrag (fsGammaL fscFs) dind.toNat (eraNode dn bm data) -∗
       topFrag (fsGammaL fscFs) cinum.toNat (eraNode (createSetf dnc major minor 1#16) bmc datc) -∗
-      pfAt (acreCommitAtGen (hlc := hlc) (fsGammaL fscFs) appE
-        (creChild ty.toNat major.toNat minor.toNat) Pd Farm) Fok -∗
+      pfAt (acreCommitAtGenNm (hlc := hlc) (fsGammaL fscFs) appE
+        (creChild ty.toNat major.toNat minor.toNat) Nm Pd Farm) Fok -∗
       creArmFired Farm cinum.toNat -∗
       -- THE PARENT CURSOR (TL-3K): read by the leg and handed back
       Pd dind.toNat -∗
@@ -542,8 +544,8 @@ theorem create_alloc_repark (dind cinum : BitVec 32) (dn dn' : Dinode) (bm bm' :
   ihave Hctop : topFragQ (fsGammaL fscFs) (DFrac.own 1) cinum.toNat
       (eraNode (createSetf dnc major minor 1#16) bmc datc) $$ [Hctop]
   · rw [← topFrag_1]; iexact Hctop
-  imod (cafAcre_fire (hlc := hlc) fscFs ⊤ (creChild ty.toNat major.toNat minor.toNat) Pd Farm Fok
-    dind.toNat cinum.toNat (bname 14 nf) (DFrac.own 1) _ _ _ CoPset.subseteq_top hloc
+  imod (cafAcre_fire_nm (hlc := hlc) fscFs ⊤ (creChild ty.toNat major.toNat minor.toNat) Nm Pd Farm
+    Fok dind.toNat cinum.toNat (bname 14 nf) (DFrac.own 1) _ _ _ CoPset.subseteq_top hNm hloc
     (mkfEra_is_dir dn bm data hdz) (mkfEra_live dn bm data hnl0z) hnoneE
     ⟨by rw [DOT_dot]; exact hnd.1, by rw [DOTDOT_dotdot]; exact hnd.2⟩ habsp' habsc)
     $$ Hft Hap Hacre Harm HPd Htop Hctop with ⟨Htop, Hctop, HPd, ⟨%av, %hpre, HFok⟩⟩
@@ -610,7 +612,7 @@ theorem create_alloc_cok (IUP : IUNLOCKPUT) (Γ : SchedNames) [ClaimIs (hlc := h
     (plen : Nat) (pfun : Nat → BitVec 8) (ty major minor : BitVec 16)
     (γ : FileNames) (pid : BitVec 32) (V : ProcPriv) (M : Nat → List (BitVec 8))
     (u : Nat) (Sb : List Nat) (ns : Nat) (dqb dqs dqbs dqn dqpv : DFrac)
-    (P Pmiss : Nat → Nat → IProp GF)
+    (Nm : Fname → Prop) (Nd : Absnode → Prop) (P Pmiss : Nat → Nat → IProp GF)
     (Farm : Pfam GF (Aview → Nat → IProp GF))
     (Fdots : Pfam GF (Aview → Nat → Nat → Bool → IProp GF))
     (Fun : Pfam GF (Aview → Nat → IProp GF))
@@ -679,11 +681,11 @@ theorem create_alloc_cok (IUP : IUNLOCKPUT) (Γ : SchedNames) [ClaimIs (hlc := h
       P (nparElems (bview plen pfun)).length dind.toNat -∗
       pfAt (dlookupCommitAt (fsGammaL fscFs) appE) Fex -∗
       creDotsLeg (hlc := hlc) (fsGammaL fscFs) ty.toNat Fdots -∗
-      pfAt (aunarmOfArm (hlc := hlc) (fsGammaL fscFs) appE Farm) Fun -∗
+      pfAt (aunarmOfArmNd (hlc := hlc) (fsGammaL fscFs) appE Nd Farm) Fun -∗
       creAcreFired Fok dind.toNat (bname 14 nf) cinum.toNat
         (creChild ty.toNat major.toNat minor.toNat dind.toNat cinum.toNat) -∗
       (∀ c' : CPU, createPost (hlc := hlc) k plen pfun ty major minor γ pid V M u Sb ns
-        dqb dqs dqbs dqn dqpv P Pmiss Farm Fdots Fun Fok Fex c') -∗
+        dqb dqs dqbs dqn dqpv Nm Nd P Pmiss Farm Fdots Fun Fok Fex c') -∗
       wpLoop cpu := by
   obtain ⟨hj, hproc, hK, hnoff, htier, hroot, hnib0, hgeom, hbg, hbel, hireg, hnn, hterm, hplen,
     hn1, hnnib, hn31, h16, hty, htyk, hu, hns, ha1, ha2, ha3, hpd⟩ := hS
@@ -791,7 +793,7 @@ theorem create_alloc_cok (IUP : IUNLOCKPUT) (Γ : SchedNames) [ClaimIs (hlc := h
     · iexists lo, tl0
       iframe Hcfl Hckeep
       ipureintro; exact hle0
-  · iapply (create_ok_of_made (fsGammaL fscFs) ty.toNat major.toNat minor.toNat P Farm Fdots Fun
+  · iapply (create_ok_of_made (fsGammaL fscFs) ty.toNat major.toNat minor.toNat Nm Nd P Farm Fdots Fun
       Fok Fex (bview plen pfun) dind.toNat (bname 14 nf) cinum.toNat
       (create_last_of_npar _ nf hnp)) $$ HP [Hdots] HFok Hun Hdlk
     iright; iexact Hdots
@@ -823,15 +825,16 @@ theorem create_alloc_file (IUP : IUNLOCKPUT) (DLK : DIRLINK) (Γ : SchedNames)
     (plen : Nat) (pfun : Nat → BitVec 8) (ty major minor : BitVec 16)
     (γ : FileNames) (pid : BitVec 32) (V : ProcPriv) (M : Nat → List (BitVec 8))
     (u : Nat) (Sb : List Nat) (ns : Nat) (dqb dqs dqbs dqn dqpv : DFrac)
-    (P Pmiss : Nat → Nat → IProp GF)
+    (Nm : Fname → Prop) (Nd : Absnode → Prop) (P Pmiss : Nat → Nat → IProp GF)
     (Farm : Pfam GF (Aview → Nat → IProp GF))
     (Fdots : Pfam GF (Aview → Nat → Nat → Bool → IProp GF))
     (Fun : Pfam GF (Aview → Nat → IProp GF))
     (Fok Fex : Pfam GF (Aview → Nat → Fname → Nat → IProp GF))
     (hS : CreateStatic k j pd plen pfun ty major minor u ns)
+    (hNmL : ∀ nm : Fname, (pathElems (bview plen pfun)).getLast? = some nm → Nm nm)
     (hF : createEnv (hlc := hlc) Γ γl pd pav pu γkl γk ⊢
       createFailBody (hlc := hlc) k plen pfun ty major minor γ pid V M u Sb ns dqb dqs dqbs dqn dqpv
-        P Pmiss Farm Fdots Fun Fok Fex)
+        Nm Nd P Pmiss Farm Fdots Fun Fok Fex)
     (cpu : CPU) (spie spp : Bool) (R : RegMap)
     (kd : Nat) (qd : Qp) (gd γil γisl : GName) (dind : BitVec 32) (dn : Dinode) (bm : Blkmap)
     (data : Nat → List (BitVec 8)) (nf : Nat → BitVec 8) (tl : List (BitVec 8)) (t : Nat)
@@ -918,12 +921,12 @@ theorem create_alloc_file (IUP : IUNLOCKPUT) (DLK : DIRLINK) (Γ : SchedNames)
       pfAt (dlookupCommitAt (fsGammaL fscFs) appE) Fex -∗
       creArmFired Farm cinum.toNat -∗
       creDotsLeg (hlc := hlc) (fsGammaL fscFs) ty.toNat Fdots -∗
-      pfAt (aunarmOfArm (hlc := hlc) (fsGammaL fscFs) appE Farm) Fun -∗
-      pfAt (acreCommitAtGen (hlc := hlc) (fsGammaL fscFs) appE
-        (creChild ty.toNat major.toNat minor.toNat)
+      pfAt (aunarmOfArmNd (hlc := hlc) (fsGammaL fscFs) appE Nd Farm) Fun -∗
+      pfAt (acreCommitAtGenNm (hlc := hlc) (fsGammaL fscFs) appE
+        (creChild ty.toNat major.toNat minor.toNat) Nm
         (P (nparElems (bview plen pfun)).length) Farm) Fok -∗
       (∀ c' : CPU, createPost (hlc := hlc) k plen pfun ty major minor γ pid V M u Sb ns
-        dqb dqs dqbs dqn dqpv P Pmiss Farm Fdots Fun Fok Fex c') -∗
+        dqb dqs dqbs dqn dqpv Nm Nd P Pmiss Farm Fdots Fun Fok Fex c') -∗
       wpLoop cpu := by
   have hS' := hS
   obtain ⟨hj, hproc, hK, hnoff, htier, hroot, hnib0, hgeom, hbg, hbel, hireg, hnn, hterm, hplen,
@@ -1045,9 +1048,9 @@ theorem create_alloc_file (IUP : IUNLOCKPUT) (DLK : DIRLINK) (Γ : SchedNames)
         hnone hc16 hcinb hwf' hholes' haddr' hcov' hdn' hcapp hsizedp hrng
     iapply wpLoop_fupd
     imod (create_alloc_repark (hlc := hlc) dind cinum dn dn' bm bm' data data' nf ty major minor dnc
-      bmc datc (P (nparElems (bview plen pfun)).length) Farm Fok htyd hnl0 hiok hdok hddix hduq hrl
+      bmc datc Nm Nd (P (nparElems (bview plen pfun)).length) Farm Fok htyd hnl0 hiok hdok hddix hduq hrl
       hnone hc16 hcpos.1 hcinb htdir htyc hfresh hty hwf' hholes' haddr' hcov' hdn' hcapp hsizedp
-      hrng)
+      hrng (hNmL _ (create_last_of_npar _ nf hnp)))
       $$ Hinv Hdl Htok Htop Hctop Hacre Harm HP with ⟨Hdl, Htop, Hctop, HP, HFok⟩
     imodintro
     icases create_alloc_map_open (ientry kd) bm' $$ Hmap with ⟨Ha, Hi⟩
@@ -1069,7 +1072,7 @@ theorem create_alloc_file (IUP : IUNLOCKPUT) (DLK : DIRLINK) (Γ : SchedNames)
       (dirUniq_not_dir _ datc hsetty) $$ Hcdl1 Hcdi Hcmeta Hca Hci Hcblk Hctop
     ihave Hbare := Hpw $$ Hpid
     iapply (create_alloc_cok IUP Γ k γl pd pav pu j γkl γk plen pfun ty major minor γ pid V M u Sb
-      ns dqb dqs dqbs dqn dqpv P Pmiss Farm Fdots Fun Fok Fex hS cpu spie2 spp2 R2 kd qd gd γil γisl
+      ns dqb dqs dqbs dqn dqpv Nm Nd P Pmiss Farm Fdots Fun Fok Fex hS cpu spie2 spp2 R2 kd qd gd γil γisl
       dind dn' bm' nf tl t kslot q g gil gisl lo tl0 cinum dnc bmc n' Sb' lodc tldc hR2 hkd hdib hnp
       hkslot hcpos.1 hcinb htyc hfresh (fun x hx => hsub' x (hsb3 x hx)) hcru hn'4 hn'u hal hledc
       hle0)
@@ -1156,18 +1159,19 @@ theorem create_alloc_made (IUP : IUNLOCKPUT) (IU : IUPDATE) (DLK : DIRLINK) (Γ 
     (plen : Nat) (pfun : Nat → BitVec 8) (ty major minor : BitVec 16)
     (γ : FileNames) (pid : BitVec 32) (V : ProcPriv) (M : Nat → List (BitVec 8))
     (u : Nat) (Sb : List Nat) (ns : Nat) (dqb dqs dqbs dqn dqpv : DFrac)
-    (P Pmiss : Nat → Nat → IProp GF)
+    (Nm : Fname → Prop) (Nd : Absnode → Prop) (P Pmiss : Nat → Nat → IProp GF)
     (Farm : Pfam GF (Aview → Nat → IProp GF))
     (Fdots : Pfam GF (Aview → Nat → Nat → Bool → IProp GF))
     (Fun : Pfam GF (Aview → Nat → IProp GF))
     (Fok Fex : Pfam GF (Aview → Nat → Fname → Nat → IProp GF))
     (hS : CreateStatic k j pd plen pfun ty major minor u ns)
+    (hNmL : ∀ nm : Fname, (pathElems (bview plen pfun)).getLast? = some nm → Nm nm)
     (hM : createEnv (hlc := hlc) Γ γl pd pav pu γkl γk ⊢
       createMkdirBody (hlc := hlc) k plen pfun ty major minor γ pid V M u Sb ns dqb dqs dqbs dqn
-        dqpv P Pmiss Farm Fdots Fun Fok Fex)
+        dqpv Nm Nd P Pmiss Farm Fdots Fun Fok Fex)
     (hF : createEnv (hlc := hlc) Γ γl pd pav pu γkl γk ⊢
       createFailBody (hlc := hlc) k plen pfun ty major minor γ pid V M u Sb ns dqb dqs dqbs dqn dqpv
-        P Pmiss Farm Fdots Fun Fok Fex)
+        Nm Nd P Pmiss Farm Fdots Fun Fok Fex)
     (cpu : CPU) (spie spp : Bool) (R : RegMap)
     (kd : Nat) (qd : Qp) (gd γil γisl : GName) (dind : BitVec 32) (dn : Dinode) (bm : Blkmap)
     (data : Nat → List (BitVec 8)) (nf : Nat → BitVec 8) (tl : List (BitVec 8)) (t : Nat)
@@ -1241,9 +1245,9 @@ theorem create_alloc_made (IUP : IUNLOCKPUT) (IU : IUPDATE) (DLK : DIRLINK) (Γ 
       P (nparElems (bview plen pfun)).length dind.toNat -∗
       pfAt (dlookupCommitAt (fsGammaL fscFs) appE) Fex -∗
       creCommits (hlc := hlc) (fsGammaL fscFs) ty.toNat major.toNat minor.toNat
-      (P (nparElems (bview plen pfun)).length) Farm Fdots Fun Fok -∗
+      Nm Nd (P (nparElems (bview plen pfun)).length) Farm Fdots Fun Fok -∗
       (∀ c' : CPU, createPost (hlc := hlc) k plen pfun ty major minor γ pid V M u Sb ns
-        dqb dqs dqbs dqn dqpv P Pmiss Farm Fdots Fun Fok Fex c') -∗
+        dqb dqs dqbs dqn dqpv Nm Nd P Pmiss Farm Fdots Fun Fok Fex c') -∗
       wpLoop cpu := by
   have hS' := hS
   obtain ⟨hj, hproc, hK, hnoff, htier, hroot, hnib0, hgeom, hbg, hbel, hireg, hnn, hterm, hplen,
@@ -1278,7 +1282,7 @@ theorem create_alloc_made (IUP : IUNLOCKPUT) (IU : IUPDATE) (DLK : DIRLINK) (Γ 
   ihave #Hft := iregInv_ftop fscIreg fscFs icfgIst icfgNib $$ Hinv
   ihave #Hap := iregInv_app fscIreg fscFs icfgIst icfgNib $$ Hinv
   iapply wpLoop_fupd
-  imod (create_dirty_arm (hlc := hlc) ⊤ t cinum.toNat (creC0 ty.toNat major.toNat minor.toNat) Farm
+  imod (create_dirty_arm (hlc := hlc) ⊤ t cinum.toNat (creC0 ty.toNat major.toNat minor.toNat) Nm Nd Farm
     _ _ CoPset.subseteq_top hrow0 hrowc) $$ Hft Hap Htx Harm Hctop with ⟨Hdirty, Hctop, Harmr⟩
   imodintro
   icases create_alloc_meta_open (ientry kslot) dnc $$ Hcmeta with ⟨Hcty, Hcmaj, Hcmin, Hcnl, Hcsz⟩
@@ -1407,7 +1411,7 @@ theorem create_alloc_made (IUP : IUNLOCKPUT) (IU : IUPDATE) (DLK : DIRLINK) (Γ 
     iintro Hk Hpc
     ihave Hbare := Hpw $$ Hpid
     iapply (create_alloc_file IUP DLK Γ k γl pd pav pu j γkl γk plen pfun ty major minor γ pid V M
-      u Sb ns dqb dqs dqbs dqn dqpv P Pmiss Farm Fdots Fun Fok Fex hS hF cpu spie1 spp1
+      u Sb ns dqb dqs dqbs dqn dqpv Nm Nd P Pmiss Farm Fdots Fun Fok Fex hS hNmL hF cpu spie1 spp1
       (R1.set 14#5 1#64) kd qd gd γil γisl dind dn bm data nf tl t kslot q g gil gisl lo tl0 cinum dnc
       bmc datc (q2 + 1) (IBLOCK cinum icfgIst :: IBLOCK cinum icfgIst :: Sb1) lodc tldc hR4 htd hkd
       hdib htyd hnl0 hiok hdok hddix hduq hrl hnp hnone hkslot hcpos hcinb hfresh hrlc htyc hciok
@@ -1443,21 +1447,22 @@ theorem create_alloc_half (IL : ILOCK) (IUP : IUNLOCKPUT) (IA : IALLOC) (IU : IU
     (plen : Nat) (pfun : Nat → BitVec 8) (ty major minor : BitVec 16)
     (γ : FileNames) (pid : BitVec 32) (V : ProcPriv) (M : Nat → List (BitVec 8))
     (u : Nat) (Sb : List Nat) (ns : Nat) (dqb dqs dqbs dqn dqpv : DFrac)
-    (P Pmiss : Nat → Nat → IProp GF)
+    (Nm : Fname → Prop) (Nd : Absnode → Prop) (P Pmiss : Nat → Nat → IProp GF)
     (Farm : Pfam GF (Aview → Nat → IProp GF))
     (Fdots : Pfam GF (Aview → Nat → Nat → Bool → IProp GF))
     (Fun : Pfam GF (Aview → Nat → IProp GF))
     (Fok Fex : Pfam GF (Aview → Nat → Fname → Nat → IProp GF))
     (hS : CreateStatic k j pd plen pfun ty major minor u ns)
+    (hNmL : ∀ nm : Fname, (pathElems (bview plen pfun)).getLast? = some nm → Nm nm)
     (hM : createEnv (hlc := hlc) Γ γl pd pav pu γkl γk ⊢
       createMkdirBody (hlc := hlc) k plen pfun ty major minor γ pid V M u Sb ns dqb dqs dqbs dqn
-        dqpv P Pmiss Farm Fdots Fun Fok Fex)
+        dqpv Nm Nd P Pmiss Farm Fdots Fun Fok Fex)
     (hF : createEnv (hlc := hlc) Γ γl pd pav pu γkl γk ⊢
       createFailBody (hlc := hlc) k plen pfun ty major minor γ pid V M u Sb ns dqb dqs dqbs dqn dqpv
-        P Pmiss Farm Fdots Fun Fok Fex) :
+        Nm Nd P Pmiss Farm Fdots Fun Fok Fex) :
     createEnv (hlc := hlc) Γ γl pd pav pu γkl γk ⊢
       createAllocBody (hlc := hlc) k plen pfun ty major minor γ pid V M u Sb ns dqb dqs dqbs dqn dqpv
-        P Pmiss Farm Fdots Fun Fok Fex := by
+        Nm Nd P Pmiss Farm Fdots Fun Fok Fex := by
   have hS' := hS
   obtain ⟨hj, hproc, hK, hnoff, htier, hroot, hnib0, hgeom, hbg, hbel, hireg, hnn, hterm, hplen,
     hn1, hnnib, hn31, h16, hty, htyk, hu, hns, ha1, ha2, ha3, hpd⟩ := hS'
@@ -1616,7 +1621,7 @@ theorem create_alloc_half (IL : ILOCK) (IUP : IUNLOCKPUT) (IA : IALLOC) (IU : IU
       rw [ha0f]; simp [RegMap.set_apply, f19, s19]
     iframe Hlt
     iapply (create_fail_of_cursor (hlc := hlc) (fsGammaL fscFs) fscFs ty.toNat major.toNat
-      minor.toNat P Pmiss Farm Fdots Fun Fok Fex (bview plen pfun) dind.toNat) $$ HP Hdlk Hcre
+      minor.toNat Nm Nd P Pmiss Farm Fdots Fun Fok Fex (bview plen pfun) dind.toNat) $$ HP Hdlk Hcre
   | true =>
     -- ===== THE INODE WAS CLAIMED, LOCKED AND FILLED -- control at +0xb4 =====
     simp only [if_true]
@@ -1631,7 +1636,7 @@ theorem create_alloc_half (IL : ILOCK) (IUP : IUNLOCKPUT) (IA : IALLOC) (IU : IU
       createRegs3_of_span k _ _ _ ty major minor R R1 hcs1 hs3 hR
     ihave Hbare := Hpw $$ Hpid
     iapply (create_alloc_made IUP IU DLK Γ k γl pd pav pu j γkl γk plen pfun ty major minor γ pid V
-      M u Sb ns dqb dqs dqbs dqn dqpv P Pmiss Farm Fdots Fun Fok Fex hS hM hF cpu spie1 spp1 R1 kd qd
+      M u Sb ns dqb dqs dqbs dqn dqpv Nm Nd P Pmiss Farm Fdots Fun Fok Fex hS hNmL hM hF cpu spie1 spp1 R1 kd qd
       gd γil γisl dind dn bm data nf tl t kslot q g gil gisl lo tl0 cinum dnc bmc q2 Sb1 w lodc tldc
       hR1 hkd hdib htyd hnl0 hnlmax hiok hdok hddix hduq hrl hnp hnone hsb1 hwmem
       ⟨hn1r.1, hn1r.2⟩ hal hkslot ⟨hcpos, hclt⟩ hcinb htyc hfresh hledc hle0)

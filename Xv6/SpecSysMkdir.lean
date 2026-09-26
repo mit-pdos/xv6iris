@@ -172,7 +172,7 @@ def mkdirAuPre (Γ : FsViewNames GF) (γfs : FsNames) (cw : Nat) (pl : List (Bit
     (Fok Fex : Pfam GF (Aview → Nat → Fname → Nat → IProp GF)) : IProp GF :=
   iprop(epStart (hlc := hlc) γfs cw P Pmiss pl ∗
     pfAt (dlookupCommitAt (hlc := hlc) Γ appE) Fex ∗
-    creCommits (hlc := hlc) Γ T_DIR.toNat 0 0 (P (nparElems pl).length) Farm Fdots Fun Fok)
+    creCommits (hlc := hlc) Γ T_DIR.toNat 0 0 (fun _ => True) (fun _ => True) (P (nparElems pl).length) Farm Fdots Fun Fok)
 
 /-- ...AND THE SYSCALL TIER (Rocq's `mkdir_au_at`; the contract reads it at
 the entry image, as sys_mknod's). -/
@@ -184,7 +184,7 @@ def mkdirAuAt (Γ : FsViewNames GF) (γfs : FsNames) (cw : Nat)
     (Fok Fex : Pfam GF (Aview → Nat → Fname → Nat → IProp GF)) : IProp GF :=
   iprop((∀ pl : List (BitVec 8), ⌜argPathOf M pv pl⌝ -∗ epStart (hlc := hlc) γfs cw P Pmiss pl) ∗
     pfAt (dlookupCommitAt (hlc := hlc) Γ appE) Fex ∗
-    creCommits (hlc := hlc) Γ T_DIR.toNat 0 0 (nparCur M pv P) Farm Fdots Fun Fok)
+    creCommits (hlc := hlc) Γ T_DIR.toNat 0 0 (fun _ => True) (fun _ => True) (nparCur M pv P) Farm Fdots Fun Fok)
 
 /-- THE CURSOR'S TWO READINGS, as one move (Rocq's `mkdir_cre_inst`,
 `SpecSysMknod.mknodAcre_inst`'s twin at the whole four-leg bundle). -/
@@ -194,10 +194,10 @@ theorem mkdirCre_inst (Γ : FsViewNames GF) (M : Nat → List (BitVec 8)) (pv : 
     (Fdots : Pfam GF (Aview → Nat → Nat → Bool → IProp GF))
     (Fun : Pfam GF (Aview → Nat → IProp GF))
     (Fok : Pfam GF (Aview → Nat → Fname → Nat → IProp GF)) (hpl : argPathOf M pv pl) :
-    creCommits (hlc := hlc) Γ T_DIR.toNat 0 0 (nparCur M pv P) Farm Fdots Fun Fok ⊢
-      creCommits (hlc := hlc) Γ T_DIR.toNat 0 0 (P (nparElems pl).length) Farm Fdots Fun Fok := by
+    creCommits (hlc := hlc) Γ T_DIR.toNat 0 0 (fun _ => True) (fun _ => True) (nparCur M pv P) Farm Fdots Fun Fok ⊢
+      creCommits (hlc := hlc) Γ T_DIR.toNat 0 0 (fun _ => True) (fun _ => True) (P (nparElems pl).length) Farm Fdots Fun Fok := by
   iintro Hcre
-  iapply (creCommits_mono (hlc := hlc) Γ T_DIR.toNat 0 0 (nparCur M pv P)
+  iapply (creCommits_mono (hlc := hlc) Γ T_DIR.toNat 0 0 (fun _ => True) (fun _ => True) (nparCur M pv P)
     (P (nparElems pl).length) Farm Fdots Fun Fok) $$ [] [] Hcre
   · iapply (nparCur_out M pv pl P hpl)
   · iapply (nparCur_in M pv pl P hpl)
@@ -228,7 +228,7 @@ theorem mkdirAuAt_of_all (Γ : FsViewNames GF) (γfs : FsNames) (cw : Nat)
     (Fok Fex : Pfam GF (Aview → Nat → Fname → Nat → IProp GF)) :
     nparWalkPreEra (hlc := hlc) γfs cw P Pmiss ⊢
       pfAt (dlookupCommitAt (hlc := hlc) Γ appE) Fex -∗
-      creCommits (hlc := hlc) Γ T_DIR.toNat 0 0 (nparCur M pv P) Farm Fdots Fun Fok -∗
+      creCommits (hlc := hlc) Γ T_DIR.toNat 0 0 (fun _ => True) (fun _ => True) (nparCur M pv P) Farm Fdots Fun Fok -∗
       mkdirAuAt (hlc := hlc) Γ γfs cw M pv P Pmiss Farm Fdots Fun Fok Fex := by
   unfold mkdirAuAt
   iintro Hw Hex Hcre
@@ -260,7 +260,7 @@ theorem mkdirAuAt_unit (γfs : FsNames) (cw : Nat) (M : Nat → List (BitVec 8))
     · iapply (axHops_triv (hlc := hlc) (GF := GF) (elend (fsGammaL γfs)) (nparElems pl') 0)
   isplitr
   · iapply (creDlookup_unit (hlc := hlc) (fsGammaL γfs))
-  · iapply (creCommits_unit (hlc := hlc) γfs T_DIR.toNat 0 0 _) $$ Hsup
+  · iapply (creCommits_unit (hlc := hlc) γfs T_DIR.toNat 0 0 (fun _ => True) (fun _ => True) _) $$ Hsup
 
 /-- THE ARMED DISJUNCTION the continuation receives, keyed on a0 (Rocq's
 `mkdir_arms`).  ret 0: create MADE the directory -- its arm, its dots and
@@ -274,11 +274,11 @@ def mkdirArms (Γ : FsViewNames GF) (γfs : FsNames) (cw : Nat)
     (Fun : Pfam GF (Aview → Nat → IProp GF))
     (Fok Fex : Pfam GF (Aview → Nat → Fname → Nat → IProp GF)) (r : BitVec 64) : IProp GF :=
   iprop((⌜r = 0#64⌝ ∗ ∃ (pl : List (BitVec 8)) (i : Nat),
-      creOkArms (hlc := hlc) Γ T_DIR.toNat 0 0 P Farm Fdots Fun Fok Fex pl true i) ∨
+      creOkArms (hlc := hlc) Γ T_DIR.toNat 0 0 (fun _ => True) (fun _ => True) P Farm Fdots Fun Fok Fex pl true i) ∨
     (⌜r = 0xFFFFFFFFFFFFFFFF#64⌝ ∗
       (mkdirAuAt (hlc := hlc) Γ γfs cw M pv P Pmiss Farm Fdots Fun Fok Fex ∨
         ∃ pl : List (BitVec 8),
-          creFailArms (hlc := hlc) Γ γfs T_DIR.toNat 0 0 P Pmiss Farm Fdots Fun Fok Fex pl)))
+          creFailArms (hlc := hlc) Γ γfs T_DIR.toNat 0 0 (fun _ => True) (fun _ => True) P Pmiss Farm Fdots Fun Fok Fex pl)))
 
 /-- The return blanket, read off the arms. -/
 theorem mkdirArms_ret (Γ : FsViewNames GF) (γfs : FsNames) (cw : Nat)

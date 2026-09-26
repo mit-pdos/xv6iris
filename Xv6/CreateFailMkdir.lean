@@ -196,10 +196,12 @@ suspended row (count 1 → no row) and the registry hands the transaction's
 half back. -/
 theorem createFailMkdir_child_park (kslot : Nat) (cinum : BitVec 32) (t : Nat)
     (major minor : BitVec 16) (dc : Dinode) (bmc : Blkmap) (datc : Nat → List (BitVec 8))
-    (Farm Fun : Pfam GF (Aview → Nat → IProp GF))
+    (Nm : Fname → Prop) (Nd : Absnode → Prop) (Farm Fun : Pfam GF (Aview → Nat → IProp GF))
     (hctynz : dc.diType.toNat ≠ 0) (hcnl : dc.diNlink = 1#16)
     (hiok : inodeOk fscCov fscLogst dc bmc datc) (hrl : inodeRecLocal dc)
-    (hdok : dirOk icfgNib dc datc) (hduq : dirUniq dc datc) (hdots : dirDotsOnly dc datc) :
+    (hdok : dirOk icfgNib dc datc) (hduq : dirUniq dc datc) (hdots : dirDotsOnly dc datc)
+    -- THE NODE PREDICATE, owed at every node (INIT-FILE, the UNARM ruling)
+    (hNd : ∀ c : Absnode, Nd c) :
     iregInv (hlc := hlc) fscIreg fscFs icfgIst icfgNib ⊢
       dinodeAt fscIreg cinum (createSetf dc major minor 0#16) -∗
       inodeMeta (ientry kslot) (createSetf dc major minor 0#16) -∗
@@ -207,7 +209,7 @@ theorem createFailMkdir_child_park (kslot : Nat) (cinum : BitVec 32) (t : Nat)
       topFrag (fsGammaL fscFs) cinum.toNat (eraNode dc bmc datc) -∗
       createDirty t cinum.toNat -∗
       creArmFired Farm cinum.toNat -∗
-      pfAt (aunarmOfArm (hlc := hlc) (fsGammaL fscFs) appE Farm) Fun -∗
+      pfAt (aunarmOfArmNd (hlc := hlc) (fsGammaL fscFs) appE Nd Farm) Fun -∗
       |={⊤}=> icLoaded fscFs fscIreg fscCov fscLogst kslot cinum
           (createSetf dc major minor 0#16) bmc ∗
         txPin icfgLog t (1 : Qp).half ∗ creUnarmFired Fun cinum.toNat := by
@@ -236,9 +238,9 @@ theorem createFailMkdir_child_park (kslot : Nat) (cinum : BitVec 32) (t : Nat)
   iintro #Hinv Hdi Hmeta Hmap Hblk Htop Hdirty Harm Hun
   ihave #Hft := iregInv_ftop $$ Hinv
   ihave #Hap := iregInv_app $$ Hinv
-  ihave Hun := aunarmOfArm_open (hlc := hlc) (fsGammaL fscFs) appE Farm Fun cinum.toNat $$ Harm Hun
-  imod (create_dirty_clear_unarm (hlc := hlc) ⊤ t cinum.toNat _ Fun _ _ CoPset.subseteq_top hloc
-    hrow hnone) $$ Hft Hap Hdirty Hun Htop with ⟨Htx, Htop, Hr⟩
+  ihave Hun := aunarmOfArmNd_open (hlc := hlc) (fsGammaL fscFs) appE Nd Farm Fun cinum.toNat $$ Harm Hun
+  imod (create_dirty_clear_unarm_nd (hlc := hlc) ⊤ t cinum.toNat _ Nd Fun _ _ CoPset.subseteq_top
+    hloc hrow hnone (hNd _)) $$ Hft Hap Hdirty Hun Htop with ⟨Htx, Htop, Hr⟩
   ihave Het := entToks_eraDotsOnly (GF := GF) (fsGammaL fscFs) cinum.toNat
     (createSetf dc major minor 0#16) bmc datc ∅ hz hok0.2.2.2.2.2.1 hok0.2.2.2.2.1 hdots0
   ihave Hdl := dlinks_intro fscFs cinum.toNat _ bmc datc ∅ hdset hexact $$ Het
@@ -276,15 +278,16 @@ theorem create_fail_mkdir_half (IUP : IUNLOCKPUT) (IU : IUPDATE) (Γ : SchedName
     (plen : Nat) (pfun : Nat → BitVec 8) (ty major minor : BitVec 16)
     (γ : FileNames) (pid : BitVec 32) (V : ProcPriv) (M : Nat → List (BitVec 8))
     (u : Nat) (Sb : List Nat) (ns : Nat) (dqb dqs dqbs dqn dqpv : DFrac)
-    (P Pmiss : Nat → Nat → IProp GF)
+    (Nm : Fname → Prop) (Nd : Absnode → Prop) (P Pmiss : Nat → Nat → IProp GF)
     (Farm : Pfam GF (Aview → Nat → IProp GF))
     (Fdots : Pfam GF (Aview → Nat → Nat → Bool → IProp GF))
     (Fun : Pfam GF (Aview → Nat → IProp GF))
     (Fok Fex : Pfam GF (Aview → Nat → Fname → Nat → IProp GF))
-    (hS : CreateStatic k j pd plen pfun ty major minor u ns) :
+    (hS : CreateStatic k j pd plen pfun ty major minor u ns)
+    (hNdD : ty = T_DIR → ∀ c : Absnode, Nd c) :
     createEnv (hlc := hlc) Γ γl pd pav pu γkl γk ⊢
       createFailMkdirBody (hlc := hlc) k plen pfun ty major minor γ pid V M u Sb ns
-        dqb dqs dqbs dqn dqpv P Pmiss Farm Fdots Fun Fok Fex := by
+        dqb dqs dqbs dqn dqpv Nm Nd P Pmiss Farm Fdots Fun Fok Fex := by
   unfold createFailMkdirBody
   iintro #Henv %cpu %spie %spp %R %kd %qd %gd %γil %γisl %dind %nf %tl %t %kslot %q %g %gil %gisl
     %lo %tl0 %cinum %dp %bmp %datap %dc %bmc %datc %n4 %Sb4
@@ -351,8 +354,8 @@ theorem create_fail_mkdir_half (IUP : IUNLOCKPUT) (IU : IUPDATE) (Γ : SchedName
   -- THE CHILD'S RE-PARK, AND THE UNARM (Rocq :486–572)
   ihave #Hinv := create_env_ireg Γ γl pd pav pu γkl γk $$ Henv
   iapply wpLoop_fupd
-  imod (createFailMkdir_child_park kslot cinum t major minor dc bmc datc Farm Fun hctynz hcnl hciok
-    hcrl hcdok hcduq hcdots) $$ Hinv Hcdiat Hcmeta Hcmap Hcblocks Hctop Hdirty Harmr Hun
+  imod (createFailMkdir_child_park kslot cinum t major minor dc bmc datc Nm Nd Farm Fun hctynz hcnl hciok
+    hcrl hcdok hcduq hcdots (hNdD htd)) $$ Hinv Hcdiat Hcmeta Hcmap Hcblocks Hctop Hdirty Harmr Hun
     with ⟨Hcload, Htx0, Hunr⟩
   imodintro
   -- ===== +0x150  c.mv a0,s3 =====
@@ -481,7 +484,7 @@ theorem create_fail_mkdir_half (IUP : IUNLOCKPUT) (IU : IUPDATE) (Γ : SchedName
   · iframe
   -- mkdir's `fail:` payout: the do-then-undo PAIR, the dots as the entry brought them
   ihave Hcf := create_fail_of_pair (hlc := hlc) (fsGammaL fscFs) fscFs ty.toNat major.toNat
-    minor.toNat P Pmiss Farm Fdots Fun Fok Fex (bview plen pfun) dind.toNat cinum.toNat
+    minor.toNat Nm Nd P Pmiss Farm Fdots Fun Fok Fex (bview plen pfun) dind.toNat cinum.toNat
     $$ HP Hdlk Hacre Hdots Hunr
   have hns' : (if false = true then 1 + 1 + (ns - 2) + 1 = ns else 1 + 1 + (ns - 2) = ns) := by
     have := hS.hns; unfold createIrefSlots at this; simp; omega

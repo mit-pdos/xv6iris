@@ -63,11 +63,11 @@ at `fsReady`'s `DFrac.discard`, the path buffer whole, the dots family the
 trivial one (`T_DEVICE` owes no dots leg). -/
 abbrev sysMknodCreateK (k' : KCtx) (plen : Nat) (pfun : Nat → BitVec 8) (major minor : BitVec 16)
     (γ : FileNames) (pid : BitVec 32) (V : ProcPriv) (M : Nat → List (BitVec 8))
-    (u : Nat) (Sb : List Nat) (ns : Nat) (P Pmiss : Nat → Nat → IProp GF)
+    (u : Nat) (Sb : List Nat) (ns : Nat) (Nm : Fname → Prop) (Nd : Absnode → Prop) (P Pmiss : Nat → Nat → IProp GF)
     (Farm Fun : Pfam GF (Aview → Nat → IProp GF))
     (Fok Fex : Pfam GF (Aview → Nat → Fname → Nat → IProp GF)) (c : CPU) : IProp GF :=
   createPost (hlc := hlc) k' plen pfun T_DEVICE_w major minor γ pid V M u Sb ns
-    DFrac.discard DFrac.discard DFrac.discard DFrac.discard (DFrac.own 1) P Pmiss Farm
+    DFrac.discard DFrac.discard DFrac.discard DFrac.discard (DFrac.own 1) Nm Nd P Pmiss Farm
     (pfamTriv (fun _ _ _ _ => iprop(True))) Fun Fok Fex c
 
 set_option maxHeartbeats 16000000 in
@@ -77,7 +77,7 @@ set_option maxHeartbeats 16000000 in
 theorem sys_mknod_create (CR : CREATE) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
     (cpu : CPU) (k' : KCtx) (j : Nat) (plen : Nat) (pfun : Nat → BitVec 8) (major minor : BitVec 16)
     (γ : FileNames) (pid : BitVec 32) (V : ProcPriv) (M : Nat → List (BitVec 8))
-    (u : Nat) (Sb : List Nat) (ns : Nat) (P Pmiss : Nat → Nat → IProp GF)
+    (u : Nat) (Sb : List Nat) (ns : Nat) (Nm : Fname → Prop) (Nd : Absnode → Prop) (P Pmiss : Nat → Nat → IProp GF)
     (Farm Fun : Pfam GF (Aview → Nat → IProp GF))
     (Fok Fex : Pfam GF (Aview → Nat → Fname → Nat → IProp GF))
     (hj : j < NPROC) (hproc : k'.proc = procAddr j) (hK : createSlots ≤ k'.avail)
@@ -86,7 +86,10 @@ theorem sys_mknod_create (CR : CREATE) (Γ : SchedNames) [ClaimIs (hlc := hlc) G
     (hu : createUnits ≤ u) (hns : createIrefSlots ≤ ns)
     (ha1 : k'.regs 11#5 = BitVec.signExtend 64 T_DEVICE_w)
     (ha2 : k'.regs 12#5 = BitVec.signExtend 64 major)
-    (ha3 : k'.regs 13#5 = BitVec.signExtend 64 minor) :
+    (ha3 : k'.regs 13#5 = BitVec.signExtend 64 minor)
+    (hNmL : ∀ nm : Fname, (pathElems (bview plen pfun)).getLast? = some nm → Nm nm)
+    (hNdF : T_DEVICE_w ≠ T_DIR → Nd (creC0 T_DEVICE_w.toNat major.toNat minor.toNat))
+    (hNdD : T_DEVICE_w = T_DIR → ∀ c : Absnode, Nd c) :
     kctx cpu k' ∗ pcIs cpu KA.«create» ∗
     trapCsrsExt cpu k'.sie ∗ cpuClaimExt cpu k'.sie k'.proc ∗ sysfileEnv (hlc := hlc) Γ ∗
     procPrivFd γ k'.proc pid V M ∗
@@ -95,8 +98,8 @@ theorem sys_mknod_create (CR : CREATE) (Γ : SchedNames) [ClaimIs (hlc := hlc) G
     epStart fscFs V.cwi P Pmiss (bview plen pfun) ∗
     pfAt (dlookupCommitAt (fsGammaL fscFs) appE) Fex ∗
     creCommits (hlc := hlc) (fsGammaL fscFs) T_DEVICE_w.toNat major.toNat minor.toNat
-      (P (nparElems (bview plen pfun)).length) Farm (pfamTriv (fun _ _ _ _ => iprop(True))) Fun Fok ∗
-    (∀ c : CPU, sysMknodCreateK k' plen pfun major minor γ pid V M u Sb ns P Pmiss Farm Fun Fok Fex c)
+      Nm Nd (P (nparElems (bview plen pfun)).length) Farm (pfamTriv (fun _ _ _ _ => iprop(True))) Fun Fok ∗
+    (∀ c : CPU, sysMknodCreateK k' plen pfun major minor γ pid V M u Sb ns Nm Nd P Pmiss Farm Fun Fok Fex c)
     ⊢ wpLoop (GF := GF) cpu := by
   iintro ⟨Hk, Hpc, Hte, Hce, #Henv, Hblk, Hpath, Hbs, Hir, Hop, Htx, Hst, Hdl, Hcre, HK⟩
   unfold sysfileEnv
@@ -112,10 +115,10 @@ theorem sys_mknod_create (CR : CREATE) (Γ : SchedNames) [ClaimIs (hlc := hlc) G
   ihave #Hbmi := fsReady_bitmap $$ Hrdy
   have h := CR.wp_create_sconf_eb (hlc := hlc) (GF := GF) Γ cpu k' γbl pd pav pu j fscKalloc
     fsReadyKmem plen pfun T_DEVICE_w major minor γ pid V M u Sb ns DFrac.discard DFrac.discard
-    DFrac.discard DFrac.discard (DFrac.own 1) P Pmiss Farm (pfamTriv (fun _ _ _ _ => iprop(True)))
+    DFrac.discard DFrac.discard (DFrac.own 1) Nm Nd P Pmiss Farm (pfamTriv (fun _ _ _ _ => iprop(True)))
     Fun Fok Fex hj hproc hK hnoff htier hg.fgoRootdev hg.fgoNibPos hg.fgoLog hg.fgoBitmap
     hg.fgoCovBelow hg.fgoIreg hnn hterm hplen hg.fgoNinLo hg.fgoNinHi hg.fgoNin31 hg.fgoUshort
-    sys_mknod_tdev_nz T_DEVICE_w_tyOk hu hns ha1 ha2 ha3 hpd
+    sys_mknod_tdev_nz T_DEVICE_w_tyOk hu hns ha1 ha2 ha3 hpd hNmL hNdF hNdD
   unfold wp_create_sconf_eb_body at h
   iapply h
   iframe Hk Hpc Hte Hce Hblk Hpath Hbs Hir Hop Htx Hst Hdl Hcre

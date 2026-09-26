@@ -210,10 +210,12 @@ re-closes as `icLoaded` at `createSetf dnc major minor 0` -- a NON-directory
 owns no links, and a record at `nlink = 0` owes no dots. -/
 theorem createFail_child_park (kslot : Nat) (cinum : BitVec 32) (ty major minor : BitVec 16)
     (dnc : Dinode) (bmc : Blkmap) (datc : Nat → List (BitVec 8))
-    (Farm Fun : Pfam GF (Aview → Nat → IProp GF))
+    (Nm : Fname → Prop) (Nd : Absnode → Prop) (Farm Fun : Pfam GF (Aview → Nat → IProp GF))
     (htd : ty ≠ T_DIR) (htyc : dnc.diType = ty) (hfresh : freshShape dnc)
     (hrl : inodeRecLocal dnc) (hok : inodeOk fscCov fscLogst dnc bmc datc)
-    (hdok : dirOk icfgNib dnc datc) :
+    (hdok : dirOk icfgNib dnc datc)
+    -- THE NODE PREDICATE at the row the arm placed (INIT-FILE, the UNARM ruling)
+    (hNd : Nd (creC0 ty.toNat major.toNat minor.toNat)) :
     iregInv (hlc := hlc) fscIreg fscFs icfgIst icfgNib ⊢
       dinodeAt fscIreg cinum (createSetf dnc major minor 0#16) -∗
       inodeMeta (ientry kslot) (createSetf dnc major minor 0#16) -∗
@@ -221,7 +223,7 @@ theorem createFail_child_park (kslot : Nat) (cinum : BitVec 32) (ty major minor 
       topFrag (fsGammaL (GF := GF) fscFs) cinum.toNat
         (eraNode (createSetf dnc major minor 1#16) bmc datc) -∗
       creArmFired Farm cinum.toNat -∗
-      pfAt (aunarmOfArm (hlc := hlc) (fsGammaL fscFs) appE Farm) Fun -∗
+      pfAt (aunarmOfArmNd (hlc := hlc) (fsGammaL fscFs) appE Nd Farm) Fun -∗
       |={⊤}=> icLoaded fscFs fscIreg fscCov fscLogst kslot cinum
           (createSetf dnc major minor 0#16) bmc ∗
         creUnarmFired Fun cinum.toNat := by
@@ -234,16 +236,21 @@ theorem createFail_child_park (kslot : Nat) (cinum : BitVec 32) (ty major minor 
   have hloc : InodeLocal cinum.toNat (eraNode (createSetf dnc major minor 0#16) bmc datc) :=
     inodeLocal_ofOkRec cinum.toNat fscCov fscLogst _ bmc datc hok0 hrl0
       (dirUniq_not_dir _ datc htz) (dirDotsIx_not_dir _ _ datc htz)
-  have hrow := cafEra_row_nl1 (createSetf dnc major minor 1#16) bmc datc
-    (by rw [createSetf_type]; exact hfresh.1) (by rw [createSetf_nlink]; rfl)
+  -- THE NODE THE ROW STILL HOLDS: the record at count 1 is the one the ARM
+  -- flushed, so its abstract value is create's own `creC0` (Rocq `Hrowc1`)
+  have htynz : ty.toNat ≠ 0 := by rw [← htyc]; exact hfresh.1
+  have hrow : absOf (eraNode (createSetf dnc major minor 1#16) bmc datc) =
+      some ⟨creC0 ty.toNat major.toNat minor.toNat, 1⟩ := by
+    rw [create_setf_fresh_made dnc ty major minor hfresh htyc]
+    exact cafMade_row ty major minor bmc datc htynz
   have hnone := cafEra_none_nl0 (createSetf dnc major minor 0#16) bmc datc
     (by rw [createSetf_nlink]; rfl)
   iintro #Hinv Hdi Hmeta Hmap Hblk Htop Harm Hun
   ihave #Hft := iregInv_ftop $$ Hinv
   ihave #Hap := iregInv_app $$ Hinv
-  ihave Hun := aunarmOfArm_open (hlc := hlc) (fsGammaL fscFs) appE Farm Fun cinum.toNat $$ Harm Hun
-  imod (cafUnarm_fire (hlc := hlc) fscFs ⊤ cinum.toNat _ Fun _ _ CoPset.subseteq_top hloc hrow
-    hnone) $$ Hft Hap Hun Htop with ⟨Htop, Hr⟩
+  ihave Hun := aunarmOfArmNd_open (hlc := hlc) (fsGammaL fscFs) appE Nd Farm Fun cinum.toNat $$ Harm Hun
+  imod (create_unarm_fire_nd (hlc := hlc) fscFs ⊤ cinum.toNat _ Nd Fun _ _ CoPset.subseteq_top hloc
+    hrow hnone hNd) $$ Hft Hap Hun Htop with ⟨Htop, Hr⟩
   ihave Hdl := dlinks_notDir (GF := GF) fscFs cinum.toNat _ bmc datc htz
   unfold inodeMap
   icases Hmap with ⟨Ha, Hi⟩
@@ -384,7 +391,7 @@ theorem createFail_parent_tail (IUP : IUNLOCKPUT) (Γ : SchedNames) [ClaimIs (hl
     (γk : KmemNames) (plen : Nat) (pfun : Nat → BitVec 8) (ty major minor : BitVec 16)
     (γ : FileNames) (pid : BitVec 32) (V : ProcPriv) (M : Nat → List (BitVec 8))
     (u : Nat) (Sb : List Nat) (ns : Nat) (dqb dqs dqbs dqn dqpv : DFrac)
-    (P Pmiss : Nat → Nat → IProp GF)
+    (Nm : Fname → Prop) (Nd : Absnode → Prop) (P Pmiss : Nat → Nat → IProp GF)
     (Farm : Pfam GF (Aview → Nat → IProp GF))
     (Fdots : Pfam GF (Aview → Nat → Nat → Bool → IProp GF))
     (Fun : Pfam GF (Aview → Nat → IProp GF))
@@ -431,12 +438,12 @@ theorem createFail_parent_tail (IUP : IUNLOCKPUT) (Γ : SchedNames) [ClaimIs (hl
     P (nparElems (bview plen pfun)).length dind.toNat ∗
     pfAt (dlookupCommitAt (fsGammaL fscFs) appE) Fex ∗
     creDotsLeg (hlc := hlc) (fsGammaL fscFs) ty.toNat Fdots ∗
-    pfAt (acreCommitAtGen (hlc := hlc) (fsGammaL fscFs) appE
-      (creChild ty.toNat major.toNat minor.toNat)
+    pfAt (acreCommitAtGenNm (hlc := hlc) (fsGammaL fscFs) appE
+      (creChild ty.toNat major.toNat minor.toNat) Nm
         (P (nparElems (bview plen pfun)).length) Farm) Fok ∗
     creUnarmFired Fun cinum.toNat ∗
     (∀ c' : CPU, createPost (hlc := hlc) k plen pfun ty major minor γ pid V M u Sb ns
-      dqb dqs dqbs dqn dqpv P Pmiss Farm Fdots Fun Fok Fex c')
+      dqb dqs dqbs dqn dqpv Nm Nd P Pmiss Farm Fdots Fun Fok Fex c')
     ⊢ wpLoop (GF := GF) cpu := by
   have hK10 := create_slots_10 _ hS.hK
   have ⟨hdcov, hdlog⟩ := hS.hireg dind hdib
@@ -513,7 +520,7 @@ theorem createFail_parent_tail (IUP : IUNLOCKPUT) (Γ : SchedNames) [ClaimIs (hl
   obtain ⟨hcsf, ha0f⟩ := hfin
   -- ARM FAIL: the do-then-undo PAIR, the cursor and the observation home
   ihave Hcf := create_fail_of_pair (hlc := hlc) (fsGammaL fscFs) fscFs ty.toNat major.toNat
-    minor.toNat P Pmiss Farm Fdots Fun Fok Fex (bview plen pfun) dind.toNat cinum.toNat
+    minor.toNat Nm Nd P Pmiss Farm Fdots Fun Fok Fex (bview plen pfun) dind.toNat cinum.toNat
     $$ HPpar Hdlkc Hacre [Hdots] Hunr
   · iright; iexact Hdots
   unfold irefSlot
@@ -545,15 +552,16 @@ theorem create_fail_half (IUP : IUNLOCKPUT) (IU : IUPDATE) (Γ : SchedNames)
     (plen : Nat) (pfun : Nat → BitVec 8) (ty major minor : BitVec 16)
     (γ : FileNames) (pid : BitVec 32) (V : ProcPriv) (M : Nat → List (BitVec 8))
     (u : Nat) (Sb : List Nat) (ns : Nat) (dqb dqs dqbs dqn dqpv : DFrac)
-    (P Pmiss : Nat → Nat → IProp GF)
+    (Nm : Fname → Prop) (Nd : Absnode → Prop) (P Pmiss : Nat → Nat → IProp GF)
     (Farm : Pfam GF (Aview → Nat → IProp GF))
     (Fdots : Pfam GF (Aview → Nat → Nat → Bool → IProp GF))
     (Fun : Pfam GF (Aview → Nat → IProp GF))
     (Fok Fex : Pfam GF (Aview → Nat → Fname → Nat → IProp GF))
-    (hS : CreateStatic k j pd plen pfun ty major minor u ns) :
+    (hS : CreateStatic k j pd plen pfun ty major minor u ns)
+    (hNdF : ty ≠ T_DIR → Nd (creC0 ty.toNat major.toNat minor.toNat)) :
     createEnv (hlc := hlc) Γ γl pd pav pu γkl γk ⊢
       createFailBody (hlc := hlc) k plen pfun ty major minor γ pid V M u Sb ns dqb dqs dqbs dqn
-        dqpv P Pmiss Farm Fdots Fun Fok Fex := by
+        dqpv Nm Nd P Pmiss Farm Fdots Fun Fok Fex := by
   have hK10 := create_slots_10 _ hS.hK
   iintro #Henv
   unfold createFailBody
@@ -642,8 +650,8 @@ theorem create_fail_half (IUP : IUNLOCKPUT) (IU : IUPDATE) (Γ : SchedNames)
   iintro Hk Hpc
   -- THE TWO RE-PARKS: the UNARM fires at the child, the parent retags
   iapply wpLoop_fupd
-  ihave Hpk := createFail_child_park (hlc := hlc) kslot cinum ty major minor dnc bmc datc Farm Fun
-    htd htyc hfresh hrlc hciok hcdok $$ Hinv Hcdiat Hcmeta Hcmap Hcblocks Hctop Harmr Hun
+  ihave Hpk := createFail_child_park (hlc := hlc) kslot cinum ty major minor dnc bmc datc Nm Nd Farm Fun
+    htd htyc hfresh hrlc hciok hcdok (hNdF htd) $$ Hinv Hcdiat Hcmeta Hcmap Hcblocks Hctop Harmr Hun
   imod Hpk with ⟨Hcload, Hunr⟩
   ihave Hpk := createFail_parent_park (hlc := hlc) kd dind cinum nf dn dnp bm bmp data datap
     htydir hnl0 hiok hdok hddix hduq hrl hcnib hS.h16 hwf' hholes' haddr' hcov' hszcap' hsized'
@@ -694,7 +702,7 @@ theorem create_fail_half (IUP : IUNLOCKPUT) (IU : IUPDATE) (Γ : SchedNames)
   ihave Hshotl : ityShot gd dnp.diType $$ [Hshotl]
   · rw [hty']; iexact Hshotl
   iapply (createFail_parent_tail IUP Γ cpu k γl pd pav pu j γkl γk plen pfun ty major minor γ pid
-      V M u Sb ns dqb dqs dqbs dqn dqpv P Pmiss Farm Fdots Fun Fok Fex hS spie2 spp2 R2 kd qd gd
+      V M u Sb ns dqb dqs dqbs dqn dqpv Nm Nd P Pmiss Farm Fdots Fun Fok Fex hS spie2 spp2 R2 kd qd gd
       γil γisl dind dnp bmp nf tl t kslot cinum n5 Sb5 hR2 hkd hdib hipn5
       (create_sub2 _ _ _ (create_sub2 _ _ _ hsb4 (create_sub_cons Sb4 _)) hsb5) (by omega) hal)
   iframe Hk Hpc Hte Hce Hframe Hnb14 Hnb2 Hslkd Hslkdd Hdep Hoffr Hidev Hiinum Hivalid Hload

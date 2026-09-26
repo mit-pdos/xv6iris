@@ -75,7 +75,7 @@ def sysMkdirFail (A : SysMkdirArgs GF) : IProp GF := iprop(
   mkdirAuAt (hlc := hlc) (fsGammaL fscFs) fscFs A.V.cwi (viewLazy A.V.upt A.V.sz A.M) A.v.toNat
     A.P A.Pmiss A.Farm A.Fdots A.Fun A.Fok A.Fex ∨
     ∃ pl : List (BitVec 8),
-      creFailArms (hlc := hlc) (fsGammaL fscFs) fscFs T_DIR.toNat 0 0 A.P A.Pmiss A.Farm A.Fdots
+      creFailArms (hlc := hlc) (fsGammaL fscFs) fscFs T_DIR.toNat 0 0 (fun _ => True) (fun _ => True) A.P A.Pmiss A.Farm A.Fdots
         A.Fun A.Fok A.Fex pl)
 
 /-- ret -1: the block closed at the grown page table. -/
@@ -100,7 +100,7 @@ theorem sys_mkdir_out_ok (A : SysMkdirArgs GF) (P2 : UPtd) (hP2 : A.V.upt.extSz 
     (pl : List (BitVec 8)) (i : Nat) :
     procPrivFd (GF := GF) A.γ (procAddr A.j) A.pid (sysMkdirV1 A P2) (sysMkdirM1 A P2) ∗
       bslots 3 ∗ irefSlots A.ns ∗
-      creOkArms (hlc := hlc) (fsGammaL fscFs) T_DIR.toNat 0 0 A.P A.Farm A.Fdots A.Fun A.Fok A.Fex
+      creOkArms (hlc := hlc) (fsGammaL fscFs) T_DIR.toNat 0 0 (fun _ => True) (fun _ => True) A.P A.Farm A.Fdots A.Fun A.Fok A.Fex
         pl true i ⊢
     sysMkdirOut A 0#64 := by
   iintro ⟨Hb, Hbs, Hir, Ha⟩
@@ -199,7 +199,7 @@ theorem sys_mkdir_tail_ok (IUP : IUNLOCKPUT) (EO : END_OP) (Γ : SchedNames)
     procPrivFd A.γ (procAddr A.j) A.pid (sysMkdirV1 A P2) (sysMkdirM1 A P2) ∗
     (∀ c : CPU, sysMkdirPostA k A c) ∗ bslots 3 ∗ irefSlots ns' ∗ logOpS icfgLog u' Sb' ∗
     createLocked A.pid kk qi s g inum dn bm ∗
-    creOkArms (hlc := hlc) (fsGammaL fscFs) T_DIR.toNat 0 0 A.P A.Farm A.Fdots A.Fun A.Fok A.Fex
+    creOkArms (hlc := hlc) (fsGammaL fscFs) T_DIR.toNat 0 0 (fun _ => True) (fun _ => True) A.P A.Farm A.Fdots A.Fun A.Fok A.Fex
       pl true i
     ⊢ wpLoop (GF := GF) cpu := by
   iintro ⟨Hk, Hpc, Hcells, Hbuf, Hte, Hce, #Henv, Hblk, HΦ, Hbs, Hir, Hop, Hlk, Harms⟩
