@@ -120,3 +120,11 @@ Collected from the U0 agent reports (Sept 26 2026). Each item names the lane tha
 - Seccomp's printing arms still on the plain ledger `ustd` (UkSeccDefs dev 4) until the write leaf is ported.
 - Stale headers to point at the new files: ExecRun "DEFERRED", UInitFd/UConsOpen "not ported yet",
   UkSeccLit "pending K3". The rest of `UexecSecc` must import UexecSeccMasked (seccB/seccMasked).
+
+## sh-exec (landed) — follow-ups
+- `UshExecEnv` (Xv6/UshExecDefs) is a parameter record to instantiate when sh-run (ushcmd/ush_cmd/jtab/
+  cmd_addr/cmd_exec/wp_kshr_entry) and sh-main (ush_Dg, fd1p/fd2p, execfail law/bytes/paid) land; the
+  seam field `ush_cmd_of_ref` from UkShSeam's Iris half.
+- `ushf_child_law_holds_at_D` owed once sh-run's UkShFork exists (glue over `shChildEcho_holds`).
+- PipesCut: 6 left (`pipes_lpg`, `pipes_lpcg`, `pipes_lpg0`, `pipes_lpcg_bytes`, `pipes_lpg_of_at`,
+  `pipes_lpcg_of_at`) — portable now (ushLineAt landed); PipesCutSh header's "STILL LEFT (13)" is stale.

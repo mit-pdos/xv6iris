@@ -1592,3 +1592,14 @@ import Xv6.ExecRunSup
 import Xv6.UInitFdHead
 import Xv6.UConsOpenAny
 import Xv6.UexecSeccMasked
+import Xv6.LinkShExec
+import Xv6.PipesCutEcho
+import Xv6.ProofShChildExec
+import Xv6.ProofShExecAtCwd
+import Xv6.ProofShRuncmdExec
+import Xv6.SpecShChildExec
+import Xv6.SpecShExecAtCwd
+import Xv6.SpecShRuncmdExec
+import Xv6.UshEchoPure
+import Xv6.UshExecCode
+import Xv6.UshExecDefs
