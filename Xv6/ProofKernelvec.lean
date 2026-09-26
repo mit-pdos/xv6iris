@@ -43,15 +43,15 @@ theorem kernelvec_br_ffffffffffffd116 : KA.«kernelvec» + 0xffffffffffffd116#64
 set_option maxHeartbeats 8000000 in
 /-- **`kernelvec` meets the handler contract**, given `kerneltrap`. -/
 theorem kernelvec_proof (KT : KERNELTRAP) : KERNELVEC :=
-  ⟨fun {hlc GF} _ _ _ _ _ _ _ _ Γ γ0 γ1 γc γl0 γl1 γd γdl γt _ _ cpu₀ => by
-  suffices h : ⊢@{IProp GF} ∀ cpu : CPU, ihs ⟨cpu, kernelvecAddr⟩ by
+  ⟨fun {hlc GF} _ _ _ _ _ _ _ _ Γ γ0 γ1 γc γl0 γl1 γd γdl γt _ cpu₀ => by
+  suffices h : ⊢@{IProp GF} ∀ cpu : CPU, ihs ⟨envFam Γ γ0 γ1 γc γl0 γl1 γd γdl γt, cpu, kernelvecAddr⟩ by
     exact h.trans (by iintro H; iapply H $$ %cpu₀)
   iintro
   -- Löb over every hart: the resumed context's arm names this contract
   iloeb as IH
   iintuitionistic IH
   iintro %cpu
-  iapply (ihs_fold ⟨cpu, kernelvecAddr⟩)
+  iapply (ihs_fold ⟨envFam Γ γ0 γ1 γc γl0 γl1 γd γdl γt, cpu, kernelvecAddr⟩)
   unfold ihsF
   iintro !> %X %k %pc %sc %⟨hwf, hs, hpc, hsc⟩ Hk Hpc Hcsrs Hstv #Henv Hclaim Hcont
   -- THE HANDLER'S ENVIRONMENT, at THIS trap's context: the proc table
@@ -161,7 +161,7 @@ theorem kernelvec_proof (KT : KERNELTRAP) : KERNELVEC :=
   ihave Hres : intrRes cpu $$ [Hstv]
   case' _ =>
     unfold intrRes intrResP
-    iexists (KA.«kernelvec»)
+    iexists envFam Γ γ0 γ1 γc γl0 γl1 γd γdl γt, (KA.«kernelvec»)
     iframe Hstv Henv
     isplit
     · ipureintro; exact kernelvecAddr_direct

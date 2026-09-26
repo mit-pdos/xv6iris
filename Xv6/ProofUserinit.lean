@@ -376,8 +376,6 @@ theorem userinit_br_fffffffffffff062 : KA.«userinit» + 0xfffffffffffff062#64 =
 
 theorem ui_finish [X : CurCtx] (RE : RELEASE) (FP : FORKRET_PARK_PAID)
     (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
-    (γ0 γ1 : UartNames) (γc γl0 γl1 : GName) (γd : DiskNames) (γdl γt : GName)
-    [EnvIs (hlc := hlc) GF Γ γ0 γ1 γc γl0 γl1 γd γdl γt]
     (γw γtk γp γft : GName) (cpu : CPU) (kf : KCtx) (j : Nat) (ch : BitVec 64) (γ : FileNames) (pid : BitVec 32)
     (V : ProcPriv) (M : Nat → List (BitVec 8))
     (hj : j < NPROC) (hct : curTier = KTier.kpt)
@@ -477,7 +475,7 @@ theorem ui_finish [X : CurCtx] (RE : RELEASE) (FP : FORKRET_PARK_PAID)
       rw [hctx]; rfl]
     iframe Hctxc Hbare Hofs Hcwr Hfb Hkq Hgh Hxs Hfsp Hirs
     iexact Hmp
-  ihave #Htok := FP.park_token_intro (hlc := hlc) (GF := GF) Γ γ0 γ1 γc γl0 γl1 γd γdl γt
+  ihave #Htok := FP.park_token_intro (hlc := hlc) (GF := GF) Γ
   icases kctx_token_acc cpu _ $$ Hk with ⟨Hown, Hback⟩
   have hup := parkToken_park (hlc := hlc) (GF := GF) (SG := uexecSGXv6) cpu ξ0 ⟨γft, γ, γw, Γ, j, procAddr j, pid⟩
     (List.replicate 12 0#64) { V with cwd := kf.regs 10#5, cwi := ROOTINO, fdg := V.fdg } M
@@ -559,8 +557,6 @@ set_option maxHeartbeats 2000000 in
 `namei`, then `ui_finish`. -/
 theorem ui_publish [X : CurCtx] (RE : RELEASE) (NR : NAMEI_ROOT) (FP : FORKRET_PARK_PAID)
     (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
-    (γ0 γ1 : UartNames) (γc γl0 γl1 : GName) (γd : DiskNames) (γdl γt : GName)
-    [EnvIs (hlc := hlc) GF Γ γ0 γ1 γc γl0 γl1 γd γdl γt]
     (γw γtk γp γft : GName) (cpu : CPU) (kb : KCtx) (j : Nat) (ch : BitVec 64) (γ : FileNames) (pid : BitVec 32)
     (V : ProcPriv) (M : Nat → List (BitVec 8))
     (hj : j < NPROC) (hct : curTier = KTier.kpt)
@@ -649,7 +645,7 @@ theorem ui_publish [X : CurCtx] (RE : RELEASE) (NR : NAMEI_ROOT) (FP : FORKRET_P
     simpa [RegMap.set_apply] using h9
   ihave Hcref := (show inodeHeldAt (GF := GF) ipv ROOTINO ⊢
       inodeHeldAt ((kb.withRegs R3).regs 10#5) ROOTINO from by rw [KCtx.withRegs_regs, hip]) $$ Hcref
-  iapply (ui_finish RE FP Γ γ0 γ1 γc γl0 γl1 γd γdl γt γw γtk γp γft cpu (kb.withRegs R3) j ch γ pid V M hj rfl hctx hof hs1
+  iapply (ui_finish RE FP Γ γw γtk γp γft cpu (kb.withRegs R3) j ch γ pid V M hj rfl hctx hof hs1
       ?hsie2 ?hnoff2 ?hintena2 ?hlocks2 ?htier2 ?hK2)
     $$ [- $Hk $Hpc $Hpinv $Hheld $Hhart $Hused $Hpriv $Hstack $Hal $Hch $Hcref $Hgen $Hfds $Hkeys $Hpk $Hpe
       $Hinitp]
@@ -718,7 +714,7 @@ set_option maxHeartbeats 4000000 in
 /-- **`userinit` meets its specification.** -/
 theorem userinit_proof (AP : ALLOCPROC) (RE : RELEASE) (NR : NAMEI_ROOT) (FP : FORKRET_PARK_PAID) :
     USERINIT :=
-  ⟨fun {hlc GF} _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ X Γ _ γ0 γ1 γc γl0 γl1 γd γdl γt _ cpu k γp γft γ γw γtk nb np
+  ⟨fun {hlc GF} _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ X Γ _ cpu k γp γft γ γw γtk nb np
       hnoff hnoff0 hK hlk hlp hlq hlocks htier hproc hsie hnb hroot hnib0 => by
   obtain ⟨ξ0, t0⟩ := X
   letI : CurCtx := ⟨ξ0, t0⟩
@@ -856,7 +852,7 @@ theorem userinit_proof (AP : ALLOCPROC) (RE : RELEASE) (NR : NAMEI_ROOT) (FP : F
   subst hspie
   subst hsppv
   k_norm [ui_ret_bee]
-  iapply (ui_publish RE NR FP Γ γ0 γ1 γc γl0 γl1 γd γdl γt γw γtk γp γft cpu _ j ch γ 1#32 V M hj rfl hVp.2.2.2.2 hVp.1
+  iapply (ui_publish RE NR FP Γ γw γtk γp γft cpu _ j ch γ 1#32 V M hj rfl hVp.2.2.2.2 hVp.1
       ?ha0 ?hsie2 ?hnoff2 ?hintena2 ?hlocks2 ?htier2 ?hK2 hroot hnib0)
     $$ [- $Hk $Hpc $Hpinv $Hinit $Hit $Hiti $Hireg $Hpe $Hir $Hal $Hch $Hheld $Hhart $Hused $Hpriv $Hstack
       $Hgen $Hfds $Hkeys $Hpk]

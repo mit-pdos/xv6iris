@@ -86,7 +86,6 @@ store, the handler, the join. -/
 theorem mn_phaseD (SCH : SCHEDULER) (KV : KERNELVEC) (ξ : CtxId)
     (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
     (γ0 γ1 : UartNames) (γc γl0 γl1 : GName) (γd : DiskNames) (γdl γt : GName)
-    [EnvIs (hlc := hlc) GF Γ γ0 γ1 γc γl0 γl1 γd γdl γt]
     (k : KCtx) (R0 : RegMap) (hsie : k.sie = false) (hK : schedulerSlots ≤ k.avail) (hnoff : k.noff = 0)
     (hlocks : k.locks = []) (hproc : k.proc = 0#64) (htier : k.tier = KTier.kpt)
     (γi : GName) (ξd : CtxId) (P : CtxId → IProp GF) [∀ ξ, Persistent (P ξ)] [CtxMorph P]
@@ -183,7 +182,6 @@ theorem mn_phaseC (BI : BINIT) (II : IINIT) (FI : FILEINIT) (VD : VIRTIO_DISK_IN
     (SCH : SCHEDULER) (KV : KERNELVEC) [Fscfg] [Icfg] (ξ : CtxId) [Y : CurCtx] (hY : Y = ⟨ξ, KTier.kpt⟩)
     (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
     (γ0 γ1 : UartNames) (γc γl0 γl1 : GName) (γd : DiskNames) (γdl γt : GName)
-    [EnvIs (hlc := hlc) GF Γ γ0 γ1 γc γl0 γl1 γd γdl γt]
     (k : KCtx) (R0 : RegMap) (hsie : k.sie = false) (hK : mainSlots ≤ k.avail + 2) (hnoff : k.noff = 0)
     (hlocks : k.locks = []) (hproc : k.proc = 0#64) (htier : k.tier = KTier.kpt)
     (c0 : VirtioCfg) (hdead : Virtio.live c0 = false)
@@ -337,7 +335,6 @@ theorem mn_phaseB (PR : PROCINIT) (TI : TRAPINIT) (TIH : TRAPINITHART) (PLI : PL
     [Fscfg] [Icfg] (ξ : CtxId) [Y : CurCtx] (hY : Y = ⟨ξ, KTier.kpt⟩)
     (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
     (γ0 γ1 : UartNames) (γc γl0 γl1 : GName) (γd : DiskNames) (γdl γt : GName)
-    [EnvIs (hlc := hlc) GF Γ γ0 γ1 γc γl0 γl1 γd γdl γt]
     (k : KCtx) (R0 : RegMap) (hsie : k.sie = false) (hK : mainSlots ≤ k.avail + 2) (hnoff : k.noff = 0)
     (hlocks : k.locks = []) (hproc : k.proc = 0#64) (htier : k.tier = KTier.kpt)
     (cn : ConsNames) (hcn : cn.uart = γ0) (hcons : fscCons = cn)
@@ -454,7 +451,7 @@ theorem main_proof (CI : CPUID) (CN : CONSOLEINIT) (PI : PRINTKINIT) (PK : PRINT
     (KV : KVMINIT) (KVH : KVMINITHART) (PR : PROCINIT) (TI : TRAPINIT) (TIH : TRAPINITHART)
     (PLI : PLICINIT) (PLIH : PLICINITHART) (BI : BINIT) (II : IINIT) (FI : FILEINIT)
     (VD : VIRTIO_DISK_INIT) (UI : USERINIT) (SCH : SCHEDULER) (KVE : KERNELVEC) : MAIN :=
-  ⟨fun {hlc GF} _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ X Γ _ γ0 γ1 γc γl0 γl1 γd γdl γt _ cpu k cn
+  ⟨fun {hlc GF} _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ X Γ _ γ0 γ1 γc γl0 γl1 γd γdl γt cpu k cn
       l0 l1 c0 dk sb nib cov ndisk S Pb Rspent tlb0 γi ξd P _ _ hcpu hX hK hsie hnoff hlocks hproc hl0 hl1
       hdead hcn hdl hsnap => by
   obtain ⟨ξ, τ⟩ := X

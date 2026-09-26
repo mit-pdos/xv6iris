@@ -135,7 +135,7 @@ theorem prepare_return_proof (MP : MYPROC) : PREPARE_RETURN :=
   icases Hres with ⟨Hcsrs, Hres, Hpay⟩
   unfold trapCsrs
   icases Hcsrs with ⟨⟨%e0, Hsepc⟩, Hscause, Hstval⟩
-  icases prepare_return_intrRes_open c4 $$ Hres with ⟨⟨%h0, Hstv⟩, #Henv⟩
+  icases prepare_return_intrRes_open c4 $$ Hres with ⟨%h0, Hstv⟩
   icases prepare_return_priv_acc htc γ pa pid V M $$ Hpriv with ⟨%htfv, Hks, Htfc, Hpage, Hclose⟩
   ihave Htfc := prepare_return_cell_eq _ _ _ htfv $$ Htfc
   rw [KCtx.intrOff_withRegs]
@@ -177,7 +177,7 @@ theorem prepare_return_proof (MP : MYPROC) : PREPARE_RETURN :=
   ihave Hnext := wpNext_at _ _ _ c5 _ hpin $$ Hnext
   ihave Htfc := prepare_return_cell_eq _ _ _ htfv.symm $$ Htfc
   ihave Hpriv := Hclose $$ %_ Hks Htfc Hpage
-  iapply Hnext $$ %_ Hk Hpc [] Hpay Hsepc Hscause Hstval Hstv Henv Hpriv
+  iapply Hnext $$ %_ Hk Hpc [] Hpay Hsepc Hscause Hstval Hstv Hpriv
   · ipureintro
     unfold calleeSaved
     simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true, KCtx.intrOff_regs]

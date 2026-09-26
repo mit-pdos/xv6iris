@@ -54,8 +54,9 @@ spelling).  The boot hart is handed:
   quantified INSIDE the recipe (`∀ pd pav pu`), not parameters of the
   contract.
 
-THE HANDLER ENVIRONMENT'S NAMES are parameters (`Xv6.EnvIs`, as in
-`SpecMainSecondary`), and every lock the environment names is born AT its
+THE HANDLER ENVIRONMENT'S NAMES are parameters (as in `SpecMainSecondary`:
+main installs kernelvec's handler at `HandlerEnv.envFam` at them), and every
+lock the environment names is born AT its
 name: main holds that name's `lockFreeTok` (`MachCSL.LockBornHook`), which
 `newlockAt_llb` spends -- the console lock `γc`, the two transmit locks
 `γl0 γl1`, the ticks lock `γt` and the 64 proc locks `Γ.lock j`; the vdisk
@@ -104,8 +105,8 @@ of its own for it).
    `FirstTok.firstFsinit`'s row (C) carries.  Rocq's `bio_init_at` returns
    them; Lean's `bioInitAt` returns only `bioCtx` (BioInit deviations), so
    they come down the boot chain as their own row.
-8. **The EnvIs handler environment is `∃`-paged** (HandlerEnv): main installs
-   the handler at the pages `virtio_disk_init` chose.
+8. **The handler environment is `∃`-paged** (`HandlerEnv.envFam`): main
+   installs the handler at the pages `virtio_disk_init` chose.
 9. **`diskCrashCaps γd`** (the era's crash-permit invariant, Rocq's
    `dev_inv` conjunct `perm_inv gen_id (dn_perm γd)`) is its own row: Lean's
    `diskInv` does not carry it, and `diskCaps` (the vdisk credentials the
@@ -327,7 +328,6 @@ def wp_main_boot_body [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF] [FsTopG G
     [Fscfg] [Icfg] (X : CurCtx)
     (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
     (γ0 γ1 : UartNames) (γc γl0 γl1 : GName) (γd : DiskNames) (γdl γt : GName)
-    [EnvIs (hlc := hlc) GF Γ γ0 γ1 γc γl0 γl1 γd γdl γt]
     (cpu : CPU) (k : KCtx) (cn : ConsNames) (l0 l1 : List (BitVec 8)) (c0 : VirtioCfg)
     (dk : Nat → BitVec 8) (sb : FsSb) (nib : Nat) (cov : ExtTreeSet Nat compare) (ndisk : Nat)
     (S : FsStateRec) (Pb : Nat → List (BitVec 8)) (Rspent : ExtTreeSet Nat compare)
@@ -400,7 +400,6 @@ structure MAIN : Prop where
     [Fscfg] [Icfg] (X : CurCtx)
     (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
     (γ0 γ1 : UartNames) (γc γl0 γl1 : GName) (γd : DiskNames) (γdl γt : GName)
-    [EnvIs (hlc := hlc) GF Γ γ0 γ1 γc γl0 γl1 γd γdl γt]
     (cpu : CPU) (k : KCtx) (cn : ConsNames) (l0 l1 : List (BitVec 8)) (c0 : VirtioCfg)
     (dk : Nat → BitVec 8) (sb : FsSb) (nib : Nat) (cov : ExtTreeSet Nat compare) (ndisk : Nat)
     (S : FsStateRec) (Pb : Nat → List (BitVec 8)) (Rspent : ExtTreeSet Nat compare)

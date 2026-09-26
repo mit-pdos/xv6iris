@@ -171,7 +171,6 @@ theorem ut_prep_call (PR : PREPARE_RETURN) (c : CPU) (k' : KCtx) (γ : FileNames
       (∃ v : BitVec 64, Register.scause ↦ᵣ[cpu'] v) -∗
       (∃ v : BitVec 64, Register.stval ↦ᵣ[cpu'] v) -∗
       Register.stvec ↦ᵣ[cpu'] uservecTvec -∗
-      envAt curCtx -∗
       procPrivFd γ pa pid
         { V with tf := prepareReturnTf V.tf (satpOf KTier.kpt k'.root) (V.kstack + 4096#64) (hartId cpu') } M -∗
       wpLoop cpu'))
@@ -224,7 +223,7 @@ theorem usertrap_ret_proof (PR : PREPARE_RETURN) : UT_RET (hlc := hlc) (GF := GF
   iintro %c %hpin
   have hpin' : kb.sie = false → c = c1 := fun h => hpin (Or.inl h)
   ihave Hce := cpuClaimExt_move c1 c _ _ hpin' $$ Hce
-  iintro %R' Hk Hpc %hcs Hpay Hsepc Hsc Htv Hstv - Hpv
+  iintro %R' Hk Hpc %hcs Hpay Hsepc Hsc Htv Hstv Hpv
   ihave Hpay := (show prepareReturnPay (GF := GF) c kb.sie kb.proc ⊢ prepareReturnPay c kb.sie A.k.proc from by
     rw [utBase_proc hb]) $$ Hpay
   ihave Hcl := ut_ret_claim c kb.sie A.k.proc $$ [Hce Hpay]

@@ -133,16 +133,19 @@ instance instCtxMorphTransSlot [KernelGeom] (tier : KTier) (cpu : CPU) (tr : KTi
 /-- The installed handler at a fixed tier: only the environment it carries
 depends on the context, and the environment carries its own re-homing
 witness (`MachCSL.CtxLaws.envAt`). -/
-instance instCtxMorphIntrResP (tier : KTier) (S : IhsIx → IProp GF) (cpu : CPU) :
+instance instCtxMorphIntrResP (tier : KTier) (S : IhsIx GF → IProp GF) (cpu : CPU) :
     CtxMorph (GF := GF) (fun ξ => @intrResP hlc GF _ ⟨ξ, tier⟩ S cpu) :=
   @instCtxMorphExists hlc GF _ _
-    (fun (h : BitVec 64) ξ => iprop(⌜stvecDirect h⌝ ∗ Register.stvec ↦ᵣ[cpu] h ∗ □ S ⟨cpu, h⟩ ∗ envAt ξ))
-    (fun _ => @instCtxMorphSep hlc GF _ _ _ (instCtxMorphConst _)
-      (@instCtxMorphSep hlc GF _ _ _ (instCtxMorphConst _)
-        (@instCtxMorphSep hlc GF _ _ _ (instCtxMorphConst _) instCtxMorphEnvAt)))
+    (fun (E : CtxId → IProp GF) ξ => iprop(∃ h : BitVec 64,
+      ⌜stvecDirect h⌝ ∗ Register.stvec ↦ᵣ[cpu] h ∗ □ S ⟨E, cpu, h⟩ ∗ envAt E ξ))
+    (fun E => @instCtxMorphExists hlc GF _ _
+      (fun (h : BitVec 64) ξ => iprop(⌜stvecDirect h⌝ ∗ Register.stvec ↦ᵣ[cpu] h ∗ □ S ⟨E, cpu, h⟩ ∗ envAt E ξ))
+      (fun _ => @instCtxMorphSep hlc GF _ _ _ (instCtxMorphConst _)
+        (@instCtxMorphSep hlc GF _ _ _ (instCtxMorphConst _)
+          (@instCtxMorphSep hlc GF _ _ _ (instCtxMorphConst _) (instCtxMorphEnvAt E)))))
 
 /-- The interrupt arm at a fixed tier. -/
-instance instCtxMorphSieArmP (tier : KTier) (S : IhsIx → IProp GF) (cpu : CPU) (sie : Bool)
+instance instCtxMorphSieArmP (tier : KTier) (S : IhsIx GF → IProp GF) (cpu : CPU) (sie : Bool)
     (p : BitVec 64) :
     CtxMorph (GF := GF) (fun ξ => @sieArmP hlc GF _ ⟨ξ, tier⟩ S cpu sie p) := by
   unfold sieArmP

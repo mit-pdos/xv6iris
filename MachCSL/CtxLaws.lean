@@ -259,61 +259,88 @@ instance instCtxMorphBytes (pa : PAddr) (n : Nat) (dq : DFrac) (w : BitVec (8 * 
 
 /-! ## The handler environment
 
-`MachGS.envP` is the client's handler environment, a family indexed by the
-context it is held at (the xv6 client: the proc table's `procsInv`, whose
-lock handles carry their creator's floor).  The installed handler
-(`MachCSL.KCtx.intrResP`) carries it together with the WITNESS that it
-re-homes along a domination -- the Rocq prototype's `IntrDefs.env_move`,
-carried inside `intr_res` rather than assumed globally, since the
-domination relation is stated over the very instance the environment is a
-field of. -/
+A handler ENVIRONMENT is a family `E : CtxId → IProp GF`, indexed by the
+context it is held at (the xv6 client: the proc table's `procsInv` beside
+devintr's credentials, whose lock handles carry their creator's floor).
+It is NOT a field of the machine instance: the installed handler
+(`MachCSL.KCtx.intrResP`) ∃-PACKS it beside the contract, which is indexed
+by it -- the Rocq prototype's `IntrDefs.intr_res` (`∃ E, intr_res_at kt E
+∗ □ E XI ∗ □ env_move E`).  An instance field would be read by the very
+family the client instantiates it with (the family names `kctx`, whose arm
+names the environment), a knot no instance literal satisfies.  The
+environment is carried with the WITNESS that re-homes it along a
+domination (Rocq `IntrDefs.env_move`), since the family is abstract. -/
 
 /-- The environment's re-homing witness (Rocq `IntrDefs.env_move`). -/
-def envMorph : IProp GF := iprop%
-  □ ∀ (ξ ξ' : CtxId), ctxDom ξ ξ' -∗ MachGS.envP ξ -∗ |==> (ctxDom ξ ξ' ∗ MachGS.envP ξ')
+def envMorph (E : CtxId → IProp GF) : IProp GF := iprop%
+  □ ∀ (ξ ξ' : CtxId), ctxDom ξ ξ' -∗ □ E ξ -∗ |==> (ctxDom ξ ξ' ∗ □ E ξ')
 
-instance envMorph_persistent : Persistent (envMorph (hlc := hlc) (GF := GF)) := by
+instance envMorph_persistent (E : CtxId → IProp GF) : Persistent (envMorph (hlc := hlc) (GF := GF) E) := by
   unfold envMorph; infer_instance
 
 /-- The witness, applied. -/
-theorem envMorph_use (ξ ξ' : CtxId) :
-    envMorph ∗ ctxDom (GF := GF) ξ ξ' ∗ MachGS.envP ξ ⊢ |==> (ctxDom ξ ξ' ∗ MachGS.envP ξ') := by
+theorem envMorph_use (E : CtxId → IProp GF) (ξ ξ' : CtxId) :
+    envMorph E ∗ ctxDom (GF := GF) ξ ξ' ∗ □ E ξ ⊢ |==> (ctxDom ξ ξ' ∗ □ E ξ') := by
   unfold envMorph
-  iintro ⟨#Hm, Hd, He⟩
+  iintro ⟨#Hm, Hd, #He⟩
   iapply Hm $$ %ξ %ξ' Hd He
 
-/-- The handler environment AT a context, with its witness: what the
-installed handler carries. -/
-def envAt (ξ : CtxId) : IProp GF := iprop(□ MachGS.envP ξ ∗ envMorph)
+/-- A persistent family that transports has its witness (Rocq's
+`kernelvec_env_move`, generically). -/
+theorem envMorph_of_ctxMorph (E : CtxId → IProp GF) [CtxMorph E] [∀ ξ, Persistent (E ξ)] :
+    ⊢ envMorph (hlc := hlc) (GF := GF) E := by
+  unfold envMorph
+  iintro !> %ξ %ξ' Hdom #He
+  imod CtxMorph.morph (R := E) ξ ξ' $$ [$Hdom $He] with ⟨Hdom, #He'⟩
+  imodintro
+  iframe Hdom
+  imodintro
+  iexact He'
 
-instance envAt_persistent (ξ : CtxId) : Persistent (envAt (hlc := hlc) (GF := GF) ξ) := by
+/-- The handler environment `E` AT a context, with its witness: what the
+installed handler carries. -/
+def envAt (E : CtxId → IProp GF) (ξ : CtxId) : IProp GF := iprop(□ E ξ ∗ envMorph E)
+
+instance envAt_persistent (E : CtxId → IProp GF) (ξ : CtxId) :
+    Persistent (envAt (hlc := hlc) (GF := GF) E ξ) := by
   unfold envAt; infer_instance
 
-theorem envAt_intro (ξ : CtxId) :
-    MachGS.envP ξ ∗ envMorph ⊢@{IProp GF} envAt ξ := by
+theorem envAt_intro (E : CtxId → IProp GF) (ξ : CtxId) :
+    □ E ξ ∗ envMorph E ⊢@{IProp GF} envAt E ξ := by
   unfold envAt
   iintro ⟨#He, #Hm⟩
   isplit
-  · imodintro; iexact He
+  · iexact He
   · iexact Hm
 
-theorem envAt_env (ξ : CtxId) : envAt (hlc := hlc) (GF := GF) ξ ⊢ MachGS.envP ξ := by
+/-- A persistent family that transports, at a context, is an environment
+there. -/
+theorem envAt_of_ctxMorph (E : CtxId → IProp GF) [CtxMorph E] [∀ ξ, Persistent (E ξ)] (ξ : CtxId) :
+    E ξ ⊢@{IProp GF} envAt E ξ := by
+  iintro #He
+  iapply envAt_intro E ξ
+  isplit
+  · iexact He
+  · iapply envMorph_of_ctxMorph E
+
+theorem envAt_env (E : CtxId → IProp GF) (ξ : CtxId) : envAt (hlc := hlc) (GF := GF) E ξ ⊢ E ξ := by
   unfold envAt
   iintro ⟨#He, _⟩
   iexact He
 
 /-- The environment transports: the witness moves it, and it is persistent
 at the destination. -/
-instance instCtxMorphEnvAt : CtxMorph (GF := GF) (envAt (hlc := hlc) (GF := GF)) where
+instance instCtxMorphEnvAt (E : CtxId → IProp GF) : CtxMorph (GF := GF) (envAt (hlc := hlc) (GF := GF) E) where
   morph ξ ξ' := by
     iintro ⟨Hdom, HE⟩
-    icases (show envAt ξ ⊢ iprop(□ MachGS.envP ξ ∗ envMorph) from .rfl) $$ HE with ⟨#He, #Hm⟩
-    imod envMorph_use ξ ξ' $$ [$Hm $Hdom $He] with ⟨Hdom, He⟩
+    icases (show envAt E ξ ⊢ iprop(□ E ξ ∗ envMorph E) from .rfl) $$ HE with ⟨#He, #Hm⟩
+    imod envMorph_use E ξ ξ' $$ [$Hm $Hdom $He] with ⟨Hdom, #He⟩
     imodintro
     iframe Hdom
-    iapply envAt_intro ξ'
-    iframe He
-    iexact Hm
+    iapply envAt_intro E ξ'
+    isplit
+    · iexact He
+    · iexact Hm
 
 /-! ## The token's receipts -/
 

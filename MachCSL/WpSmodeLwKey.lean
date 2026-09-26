@@ -97,7 +97,7 @@ theorem wpLoop_k_memX [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU) (k : KC
     · unfold trapBranch
       iintro %hs
       ihave Harm := (show sieArm (GF := GF) cpu' k.sie k.proc ⊢ sieArm cpu' true k.proc by rw [hs]) $$ Harm
-      icases sieArm_on _ _ $$ Harm with ⟨%h, %hdir, Hcsrs, Hclaim, Hstv, #HS, #Henv⟩
+      icases sieArm_on _ _ $$ Harm with ⟨%E, %h, %hdir, Hcsrs, Hclaim, Hstv, #HS, #Henv⟩
       iexists h
       iframe Hcsrs Hstv
       isplit
@@ -106,7 +106,7 @@ theorem wpLoop_k_memX [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU) (k : KC
       unfold trapCont
       simp only [hkt]
       iintro %sc %hsc HmConf Hclock Hpc HT ⟨HF, HP⟩ Hcsrs Hstv
-      iapply Htc $$ %sc %h %⟨hs, hsc, hdir⟩ HmConf Hclock Hpc HT HF Hstack Hcpu Hcsrs Hstv Henv Hclaim HS [HP HΦ]
+      iapply Htc $$ %sc %h %E %⟨hs, hsc, hdir⟩ HmConf Hclock Hpc HT HF Hstack Hcpu Hcsrs Hstv Henv Hclaim HS [HP HΦ]
       isplit
       · iexact HI
       iframe HP

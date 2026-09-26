@@ -48,10 +48,11 @@ WHY THE POST HANDS BACK THE RAW CELLS AND NOT `intrRes`.  After
 prepare_return this hart has NO KERNEL TRAP HANDLER INSTALLED: `stvec` is
 uservec, whose contract is not `ihs` (it never returns to the interrupted
 pc).  So claiming `intrRes` at `TRAMPOLINE` would be false; what comes out
-is the three trap-scratch cells (`sepc` pinned), the written `stvec` cell,
-and the handler's ENVIRONMENT (`envAt curCtx`, persistent: what the caller
-needs, beside `KERNELVEC`'s `ihs ⟨cpu, kernelvec⟩`, to fold `intrRes` again
-once it re-installs kernelvec).  Rocq additionally returns the SIE ghost
+is the three trap-scratch cells (`sepc` pinned) and the written `stvec`
+cell; the environment the installed handler ∃-packed is dropped with it, as
+in Rocq (a caller that re-installs kernelvec folds `intrRes` again from its
+own `handlerEnvAt` row and `KERNELVEC`, `UsertrapRes.utCsrs_fold`).  Rocq
+additionally returns the SIE ghost
 quarter dangling ("interrupts cannot come back on before the sret"); the
 Lean context has no SIE ghost -- the same fact is that the post's context
 is at `sie = false` and no `intrRes` exists to rebuild the enabled arm.
@@ -161,7 +162,6 @@ def wp_prepare_return_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF]
     (∃ v : BitVec 64, Register.scause ↦ᵣ[cpu'] v) -∗
     (∃ v : BitVec 64, Register.stval ↦ᵣ[cpu'] v) -∗
     Register.stvec ↦ᵣ[cpu'] uservecTvec -∗
-    envAt curCtx -∗
     procPrivFd γ pa pid
       { V with tf := prepareReturnTf V.tf (satpOf KTier.kpt k.root) (V.kstack + 4096#64) (hartId cpu') } M -∗
     wpLoop cpu'))

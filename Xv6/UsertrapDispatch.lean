@@ -12,12 +12,13 @@ THE ONE BLOCK THAT CARRIES THE RAW TRAP CELLS (Rocq's header): the three
 `beq`s branch on the scause VALUE, so the cells are pinned here; each
 outgoing route folds them into the trap-CSR bundle (`ut_fold`,
 `UsertrapRes.utCsrs_fold`) with the installed kernelvec handler
-(`KERNELVEC.handler` under the era's `EnvIs`) and the handler environment
-(`utCaps`' `envAt`).  Everything runs with interrupts off at the entry hart.
+(`KERNELVEC.handler`, cashed as `kvIhs`) and the handler environment row
+(`utCaps`' `handlerEnvAt`).  Everything runs with interrupts off at the
+entry hart.
 
 devintr is called at EVERY cause but the ecall, through its one contract
-`DEVINTR` (credentials out of the handler environment,
-`devintrCaps_of_envAt'`): a device cause answers 1 or 2, any other 0
+`DEVINTR` (credentials out of the handler environment row, at its names,
+`devintrCaps_of_handlerEnvAt`): a device cause answers 1 or 2, any other 0
 (`devintrRet_none`).
 -/
 import Xv6.UsertrapBlocks
@@ -64,16 +65,6 @@ theorem utd_ukill (sc : BitVec 64) (h8 : sc ≠ 8#64) (hs : ¬ sCauseOk sc) : uk
 theorem utd_13_ok : ¬ sCauseOk 13#64 := by unfold sCauseOk; decide
 theorem utd_15_ok : ¬ sCauseOk 15#64 := by unfold sCauseOk; decide
 
-/-- The installed kernelvec handler, persistently (`KERNELVEC.handler`). -/
-theorem ut_ihs {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
-    [IrefslotG GF] [CtokG GF] [WchG GF] [DiskG GF] (KV : KERNELVEC)
-    (Γ : SchedNames) (γ0 γ1 : UartNames) (γc γl0 γl1 : GName) (γd : DiskNames) (γdl γt : GName)
-    [ClaimIs (hlc := hlc) GF Γ] [EnvIs (hlc := hlc) GF Γ γ0 γ1 γc γl0 γl1 γd γdl γt] (cpu : CPU) :
-    ⊢ □ ihs (GF := GF) ⟨cpu, kernelvecAddr⟩ := by
-  iintro
-  imodintro
-  iapply (KV.handler (hlc := hlc) (GF := GF) Γ γ0 γ1 γc γl0 γl1 γd γdl γt cpu)
-
 section
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
     [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF]
@@ -106,27 +97,28 @@ def UT_DISPATCH : Prop :=
 cells, the vector, the environment and the installed handler are the
 trap-CSR bundle and `intrRes` -- `trapCsrsExt cpu false`. -/
 theorem ut_fold (A : UtArgs GF) (cpu : CPU) (ep sc tv : BitVec 64)
-    (hI : ⊢ □ ihs (GF := GF) ⟨cpu, kernelvecAddr⟩) :
+    (hI : ⊢ □ kvIhs (GF := GF) Γ cpu) (hΓ : A.N.Γ = Γ) :
     Register.sepc ↦ᵣ[cpu] ep ∗ Register.scause ↦ᵣ[cpu] sc ∗ Register.stval ↦ᵣ[cpu] tv ∗
       Register.stvec ↦ᵣ[cpu] kernelvecAddr ∗ utCaps A.N ⊢ trapCsrsExt (GF := GF) cpu false := by
   rw [trapCsrsExt_false]
   unfold utCaps
+  rw [hΓ]
   iintro ⟨Hep, Hsc, Htv, Hstv, ⟨-, #Henv, -⟩⟩
   ihave #Hih := hI
-  iapply utCsrs_fold cpu ep sc tv
+  iapply utCsrs_fold Γ cpu ep sc tv
   iframe Hep Hsc Htv Hstv Henv Hih
 
 /-- The dispatch's resources, opened for an outgoing route: the folded
 bundle and the rest. -/
 theorem ut_disp_open (A : UtArgs GF) (cpu : CPU) (tv : BitVec 64)
-    (hI : ⊢ □ ihs (GF := GF) ⟨cpu, kernelvecAddr⟩) :
+    (hI : ⊢ □ kvIhs (GF := GF) Γ cpu) (hΓ : A.N.Γ = Γ) :
     Register.scause ↦ᵣ[cpu] A.sc ∗ utDispRes PT Γ A cpu tv ⊢
       utFrame A ∗ trapCsrsExt cpu false ∗ cpuClaimExt cpu false A.k.proc ∗ utCaps A.N ∗
       utOwn (utRsys PT Γ A) A.N (utV1 A) A.M A.sts A.cs A.pid ∗
       utSysIn (hlc := hlc) A.f A.sc A.sep A.V A.M A.sts A.gn A.cs A.pid ∗
       utForkIn (hlc := hlc) A.f A.sc A.sep A.V A.M A.sts ∗ utPayIn A.f A.sc A.sep A.V ∗
       utKillIn (hlc := hlc) A.f A.sc A.Wk A.gn A.sts ∗ utKont PT Γ A := by
-  have hf := ut_fold A cpu A.sep A.sc tv hI
+  have hf := ut_fold Γ A cpu A.sep A.sc tv hI hΓ
   unfold utDispRes
   iintro ⟨Hsc, Hfr, Hep, Htv, Hstv, Hcl, #Hcaps, Hown, Hsi, Hfi, Hpi, Hki, Hk⟩
   ihave Hte := hf $$ [Hep Hsc Htv Hstv]
@@ -135,9 +127,11 @@ theorem ut_disp_open (A : UtArgs GF) (cpu : CPU) (tv : BitVec 64)
   iframe Hfr Hte Hcl Hcaps Hown Hsi Hfi Hpi Hki Hk
 
 /-- The handler environment, copied out of the dispatch's resources. -/
-theorem ut_disp_env (A : UtArgs GF) (cpu : CPU) (tv : BitVec 64) :
-    utDispRes PT Γ A cpu tv ⊢ envAt (hlc := hlc) (GF := GF) curCtx ∗ utDispRes PT Γ A cpu tv := by
+theorem ut_disp_env (A : UtArgs GF) (cpu : CPU) (tv : BitVec 64) (hΓ : A.N.Γ = Γ) :
+    utDispRes PT Γ A cpu tv ⊢ handlerEnvAt (hlc := hlc) (GF := GF) Γ curCtx ∗ utDispRes PT Γ A cpu tv := by
+  have e : handlerEnvAt (hlc := hlc) (GF := GF) A.N.Γ curCtx = handlerEnvAt Γ curCtx := by rw [hΓ]
   unfold utDispRes utCaps
+  rw [e]
   iintro ⟨Hfr, Hep, Htv, Hstv, Hcl, ⟨#Hp, #He, #Hpe, #Hw, #Hft, #Hr, #Hig, #Hic⟩, Hrest⟩
   iframe He Hfr Hep Htv Hstv Hcl Hp Hpe Hw Hft Hr Hig Hic Hrest
 
@@ -172,9 +166,7 @@ set_option maxHeartbeats 4000000 in
 /-- **The device route** (+0x3a at a device cause): `devintr` answers 1 or 2,
 `mv s2,a0`, `bnez a0` taken, the cells folded -> `UT_EA`. -/
 theorem ut_disp_dev (DI : DEVINTR) (HEA : UT_EA (hlc := hlc) PT Γ)
-    (γ0 γ1 : UartNames) (γc γl0 γl1 : GName) (γd : DiskNames) (γdl γt : GName)
-    [EnvIs (hlc := hlc) GF Γ γ0 γ1 γc γl0 γl1 γd γdl γt]
-    (hI : ∀ c : CPU, ⊢ □ ihs (GF := GF) ⟨c, kernelvecAddr⟩)
+    (hI : ∀ c : CPU, ⊢ □ kvIhs (GF := GF) Γ c)
     (A : UtArgs GF) (cpu : CPU) (R : RegMap) (tv : BitVec 64) (hok : UtOk Γ A) (hp : utPins A R)
     (hsc : sCauseOk A.sc) :
     kctx cpu ((A.k.pushed 4).withRegs R) ∗ pcIs cpu (utPc 0x3a#64) ∗ Register.scause ↦ᵣ[cpu] A.sc ∗
@@ -184,8 +176,9 @@ theorem ut_disp_dev (DI : DEVINTR) (HEA : UT_EA (hlc := hlc) PT Γ)
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
   icases kctx_tier _ _ $$ Hk with ⟨%hti, Hk⟩
   have hct : curTier = KTier.kpt := by rw [← hti]; exact hok.htier
-  icases ut_disp_env PT Γ A cpu tv $$ Hres with ⟨#Henv, Hres⟩
-  icases devintrCaps_of_envAt' Γ γ0 γ1 γc γl0 γl1 γd γdl γt hct $$ Henv with ⟨%pd, %pav, %pu, #Hcaps⟩
+  icases ut_disp_env PT Γ A cpu tv hok.hΓ $$ Hres with ⟨#Henv, Hres⟩
+  icases devintrCaps_of_handlerEnvAt Γ hct $$ Henv with
+    ⟨%γ0, %γ1, %γc, %γl0, %γl1, %γd, %γdl, %γt, %pd, %pav, %pu, #Hcaps⟩
   -- +0x3a  jal devintr
   k_step (wp_s_jal cpu _ (KA.«usertrap» + 0x3a#64) false 2096960#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [utd_br_devintr]
@@ -213,7 +206,7 @@ theorem ut_disp_dev (DI : DEVINTR) (HEA : UT_EA (hlc := hlc) PT Γ)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
     with [h10, utd_bne_ne _ (devintrRet_ne_zero A.sc hsc), utd_bea]
   iintro Hk Hpc
-  icases ut_disp_open PT Γ A cpu tv (hI cpu) $$ [Hsc Hres] with ⟨Hfr, Hte, Hce, #Hcaps, Hown, -, -, Hpi, Hki, Hkont⟩
+  icases ut_disp_open PT Γ A cpu tv (hI cpu) hok.hΓ $$ [Hsc Hres] with ⟨Hfr, Hte, Hce, #Hcaps, Hown, -, -, Hpi, Hki, Hkont⟩
   · iframe Hsc Hres
   ihave #Hpay := ut_pay_of A hok.hgn $$ Hpi
   iapply (HEA A cpu (R1.set 18#5 (devintrRet A.sc)) hok
@@ -234,7 +227,7 @@ set_option maxHeartbeats 4000000 in
 /-- **The fault demultiplexer** (+0x42, devintr answered 0): scause 15 or
 13 -> `UT_D0`, anything else -> `UT_56`. -/
 theorem ut_disp_fault (HD0 : UT_D0 (hlc := hlc) PT Γ) (H56 : UT_56 (hlc := hlc) PT Γ)
-    (hI : ∀ c : CPU, ⊢ □ ihs (GF := GF) ⟨c, kernelvecAddr⟩)
+    (hI : ∀ c : CPU, ⊢ □ kvIhs (GF := GF) Γ c)
     (A : UtArgs GF) (cpu : CPU) (R : RegMap) (tv : BitVec 64) (hok : UtOk Γ A) (hp : utPins A R)
     (h8 : A.sc ≠ 8#64) (hsc : ¬ sCauseOk A.sc) :
     kctx cpu ((A.k.pushed 4).withRegs R) ∗ pcIs cpu (utPc 0x42#64) ∗ Register.scause ↦ᵣ[cpu] A.sc ∗
@@ -254,7 +247,7 @@ theorem ut_disp_fault (HD0 : UT_D0 (hlc := hlc) PT Γ) (H56 : UT_56 (hlc := hlc)
     k_step (wp_s_branch cpu _ (KA.«usertrap» + 0x48#64) false 136#13 14#5 15#5 (by decide) bop.BEQ)
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h15, utd_beq_self, utd_bd0a]
     iintro Hk Hpc
-    icases ut_disp_open PT Γ A cpu tv (hI cpu) $$ [Hsc Hres] with
+    icases ut_disp_open PT Γ A cpu tv (hI cpu) hok.hΓ $$ [Hsc Hres] with
       ⟨Hfr, Hte, Hce, #Hcaps, Hown, -, -, Hpi, Hki, Hkont⟩
     · iframe Hsc Hres
     ihave #Hpay := ut_pay_of A hok.hgn $$ Hpi
@@ -276,7 +269,7 @@ theorem ut_disp_fault (HD0 : UT_D0 (hlc := hlc) PT Γ) (H56 : UT_56 (hlc := hlc)
     · k_step (wp_s_branch cpu _ (KA.«usertrap» + 0x52#64) false 126#13 14#5 15#5 (by decide) bop.BEQ)
         from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h13, utd_beq_self, utd_bd0b]
       iintro Hk Hpc
-      icases ut_disp_open PT Γ A cpu tv (hI cpu) $$ [Hsc Hres] with
+      icases ut_disp_open PT Γ A cpu tv (hI cpu) hok.hΓ $$ [Hsc Hres] with
         ⟨Hfr, Hte, Hce, #Hcaps, Hown, -, -, Hpi, Hki, Hkont⟩
       · iframe Hsc Hres
       ihave #Hpay := ut_pay_of A hok.hgn $$ Hpi
@@ -288,7 +281,7 @@ theorem ut_disp_fault (HD0 : UT_D0 (hlc := hlc) PT Γ) (H56 : UT_56 (hlc := hlc)
         from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [utd_beq_ne _ _ h13]
       iintro Hk Hpc
       have hne : A.sc ≠ uecallScause := h8
-      icases ut_disp_open PT Γ A cpu tv (hI cpu) $$ [Hsc Hres] with
+      icases ut_disp_open PT Γ A cpu tv (hI cpu) hok.hΓ $$ [Hsc Hres] with
         ⟨Hfr, Hte, Hce, #Hcaps, Hown, -, -, Hpi, Hki, Hkont⟩
       · iframe Hsc Hres
       ihave #Hpay := ut_pay_of A hok.hgn $$ Hpi
@@ -303,9 +296,7 @@ set_option maxHeartbeats 4000000 in
 0 (`devintrRet_none`), `mv s2,a0`, `bnez a0` falls through to the fault
 demultiplexer. -/
 theorem ut_disp_exc (DI : DEVINTR) (HD0 : UT_D0 (hlc := hlc) PT Γ) (H56 : UT_56 (hlc := hlc) PT Γ)
-    (γ0 γ1 : UartNames) (γc γl0 γl1 : GName) (γd : DiskNames) (γdl γt : GName)
-    [EnvIs (hlc := hlc) GF Γ γ0 γ1 γc γl0 γl1 γd γdl γt]
-    (hI : ∀ c : CPU, ⊢ □ ihs (GF := GF) ⟨c, kernelvecAddr⟩)
+    (hI : ∀ c : CPU, ⊢ □ kvIhs (GF := GF) Γ c)
     (A : UtArgs GF) (cpu : CPU) (R : RegMap) (tv : BitVec 64) (hok : UtOk Γ A) (hp : utPins A R)
     (h8 : A.sc ≠ 8#64) (hsc : ¬ sCauseOk A.sc) :
     kctx cpu ((A.k.pushed 4).withRegs R) ∗ pcIs cpu (utPc 0x3a#64) ∗ Register.scause ↦ᵣ[cpu] A.sc ∗
@@ -315,8 +306,9 @@ theorem ut_disp_exc (DI : DEVINTR) (HD0 : UT_D0 (hlc := hlc) PT Γ) (H56 : UT_56
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
   icases kctx_tier _ _ $$ Hk with ⟨%hti, Hk⟩
   have hct : curTier = KTier.kpt := by rw [← hti]; exact hok.htier
-  icases ut_disp_env PT Γ A cpu tv $$ Hres with ⟨#Henv, Hres⟩
-  icases devintrCaps_of_envAt' Γ γ0 γ1 γc γl0 γl1 γd γdl γt hct $$ Henv with ⟨%pd, %pav, %pu, #Hcaps⟩
+  icases ut_disp_env PT Γ A cpu tv hok.hΓ $$ Hres with ⟨#Henv, Hres⟩
+  icases devintrCaps_of_handlerEnvAt Γ hct $$ Henv with
+    ⟨%γ0, %γ1, %γc, %γl0, %γl1, %γd, %γdl, %γt, %pd, %pav, %pu, #Hcaps⟩
   -- +0x3a  jal devintr
   k_step (wp_s_jal cpu _ (KA.«usertrap» + 0x3a#64) false 2096960#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [utd_br_devintr]
@@ -352,13 +344,10 @@ set_option maxHeartbeats 4000000 in
 /-- **THE DISPATCH** (Rocq `ut_dispatch`), +0x30. -/
 theorem usertrap_dispatch_proof (DI : DEVINTR) (KV : KERNELVEC)
     (H90 : UT_90 (hlc := hlc) PT Γ) (HEA : UT_EA (hlc := hlc) PT Γ) (HD0 : UT_D0 (hlc := hlc) PT Γ)
-    (H56 : UT_56 (hlc := hlc) PT Γ) [ClaimIs (hlc := hlc) GF Γ]
-    (γ0 γ1 : UartNames) (γc γl0 γl1 : GName) (γd : DiskNames) (γdl γt : GName)
-    [EnvIs (hlc := hlc) GF Γ γ0 γ1 γc γl0 γl1 γd γdl γt] :
+    (H56 : UT_56 (hlc := hlc) PT Γ) [ClaimIs (hlc := hlc) GF Γ] :
     UT_DISPATCH (hlc := hlc) PT Γ := by
   intro A cpu R tv hok hp h10
-  have hI : ∀ c : CPU, ⊢ □ ihs (GF := GF) ⟨c, kernelvecAddr⟩ :=
-    fun c => ut_ihs KV Γ γ0 γ1 γc γl0 γl1 γd γdl γt c
+  have hI : ∀ c : CPU, ⊢ □ kvIhs (GF := GF) Γ c := fun c => kvIhs_of_kernelvec KV Γ c
   have hsie : A.k.sie = false := hok.hctx.1
   iintro ⟨Hk, Hpc, Hsc, Hres⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
@@ -374,7 +363,7 @@ theorem usertrap_dispatch_proof (DI : DEVINTR) (KV : KERNELVEC)
     k_step (wp_s_branch cpu _ (KA.«usertrap» + 0x36#64) false 90#13 14#5 15#5 (by decide) bop.BEQ)
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h8, utd_beq_self, utd_b90]
     iintro Hk Hpc
-    icases ut_disp_open PT Γ A cpu tv (hI cpu) $$ [Hsc Hres] with
+    icases ut_disp_open PT Γ A cpu tv (hI cpu) hok.hΓ $$ [Hsc Hres] with
       ⟨Hfr, Hte, Hce, #Hcaps, Hown, Hsi, Hfi, Hpi, -, Hkont⟩
     · iframe Hsc Hres
     iapply (H90 A cpu _ hok ?hp1 ?h10' h8)
@@ -386,11 +375,11 @@ theorem usertrap_dispatch_proof (DI : DEVINTR) (KV : KERNELVEC)
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [utd_beq_ne _ _ h8]
     iintro Hk Hpc
     by_cases hsc : sCauseOk A.sc
-    · iapply (ut_disp_dev PT Γ DI HEA γ0 γ1 γc γl0 γl1 γd γdl γt hI A cpu _ tv hok ?hp2 hsc)
+    · iapply (ut_disp_dev PT Γ DI HEA hI A cpu _ tv hok ?hp2 hsc)
       rotate_left 1
       iframe Hk Hpc Hsc Hres
       case hp2 => ut_pins
-    · iapply (ut_disp_exc PT Γ DI HD0 H56 γ0 γ1 γc γl0 γl1 γd γdl γt hI A cpu _ tv hok ?hp3 h8 hsc)
+    · iapply (ut_disp_exc PT Γ DI HD0 H56 hI A cpu _ tv hok ?hp3 h8 hsc)
       rotate_left 1
       iframe Hk Hpc Hsc Hres
       case hp3 => ut_pins

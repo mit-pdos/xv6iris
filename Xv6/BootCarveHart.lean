@@ -559,25 +559,25 @@ held-lock set, at the instance the client runs its harts at
 (`MachCSL.MachGS.ofEra`), with the carve's per-hart rows, are
 `bootHartRes` at the booted file. -/
 theorem bootHartRes_ofEra (E : EraGS) (gen : Nat) (cP : CPU → BitVec 64 → IProp GF)
-    (cI : ∀ cpu : CPU, ⊢ cP cpu 0#64) (eP : CtxId → IProp GF) (ePe : ∀ ξ : CtxId, Persistent (eP ξ))
+    (cI : ∀ cpu : CPU, ⊢ cP cpu 0#64)
     (σ : MState) (hbf : bootFacts σ) (c : CPU) :
-    letI : MachGS hlc GF := MachGS.ofEra E gen cP cI eP ePe
+    letI : MachGS hlc GF := MachGS.ofEra E gen cP cI
     regCellsNoPins (GF := GF) (E.regName c) (σ.regs c) ∗ lockSetAt E c [] ∗
       bootGotRo ∗ bootHartBss c ⊢ bootHartRes (σ.regs c) c :=
-  letI : MachGS hlc GF := MachGS.ofEra E gen cP cI eP ePe
+  letI : MachGS hlc GF := MachGS.ofEra E gen cP cI
   bootHartRes_intro (σ.regs c) c (hbf.2.2.2.1 c)
 
 /-- **All eight harts' `.bss` shares at `Hboot`'s era**: `bootCarve_harts`
 with the `viewLb … 0` receipts read off `powerBootRes`'s token row (which is
 handed back). -/
 theorem bootCarve_harts_ofEra (E : EraGS) (gen : Nat) (cP : CPU → BitVec 64 → IProp GF)
-    (cI : ∀ cpu : CPU, ⊢ cP cpu 0#64) (eP : CtxId → IProp GF) (ePe : ∀ ξ : CtxId, Persistent (eP ξ)) :
-    letI : MachGS hlc GF := MachGS.ofEra E gen cP cI eP ePe
+    (cI : ∀ cpu : CPU, ⊢ cP cpu 0#64) :
+    letI : MachGS hlc GF := MachGS.ofEra E gen cP cI
     kmapStatic (GF := GF) ⊢ ([∗list] c ∈ cpus, ∃ ξ : CtxId, ctxTokAt E c ξ) -∗
       bootRan (imgFlat bootImage) MachCSL.KernelSyms.«stack0» (MachCSL.KernelSyms.«stack0» + 4096 * NCPU) -∗
       bootRan (imgFlat bootImage) MachCSL.KernelSyms.«cpus» (MachCSL.KernelSyms.«cpus» + 128 * NCPU) -∗
       |==> (([∗list] c ∈ cpus, ∃ ξ : CtxId, ctxTokAt E c ξ) ∗ [∗list] c ∈ cpus, bootHartBss c) := by
-  letI : MachGS hlc GF := MachGS.ofEra E gen cP cI eP ePe
+  letI : MachGS hlc GF := MachGS.ofEra E gen cP cI
   iintro #Hk Ht Hs Hc
   icases ctxTokAt_viewLb0_list E cpus $$ Ht with ⟨Ht, Hv⟩
   imod (bootCarve_harts) $$ Hk Hv Hs Hc with Hb

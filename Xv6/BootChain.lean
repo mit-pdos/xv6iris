@@ -182,7 +182,7 @@ deposit, with nothing left over. -/
 theorem bootHartSecondaryAt [X : CurCtx] (hX : X.curTier = KTier.bare)
     (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
     (γ0 γ1 : UartNames) (γc γl0 γl1 : GName) (γd : DiskNames) (γdl γt : GName)
-    [EnvIs (hlc := hlc) GF Γ γ0 γ1 γc γl0 γl1 γd γdl γt] (f : RegFile) (cpu : CPU) (γi : GName) (ξd : CtxId)
+ (f : RegFile) (cpu : CPU) (γi : GName) (ξd : CtxId)
     (hcpu : cpu ≠ startedPrimary) :
     kernelText (GF := GF) ⊢ kernelData -∗ bootHartRes f cpu -∗ ctxTok cpu curCtx -∗
       startedInv γi ξd (mainDeposit Γ γ0 γ1 γc γl0 γl1 γd γdl γt) -∗
@@ -204,7 +204,7 @@ context-free. -/
 theorem bootHartSecondary
     (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
     (γ0 γ1 : UartNames) (γc γl0 γl1 : GName) (γd : DiskNames) (γdl γt : GName)
-    [EnvIs (hlc := hlc) GF Γ γ0 γ1 γc γl0 γl1 γd γdl γt] (f : RegFile) (cpu : CPU) (γi : GName) (ξd : CtxId)
+ (f : RegFile) (cpu : CPU) (γi : GName) (ξd : CtxId)
     (hcpu : cpu ≠ startedPrimary) :
     kernelText (GF := GF) ⊢ kernelData -∗ bootHartRes f cpu -∗ (∃ ξ : CtxId, ctxTok cpu ξ) -∗
       startedInv γi ξd (mainDeposit Γ γ0 γ1 γc γl0 γl1 γd γdl γt) -∗
@@ -285,7 +285,7 @@ theorem bootHartPrimary [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF] [FsTopG
     [Fscfg] [Icfg] [X : CurCtx] (hX : X.curTier = KTier.bare)
     (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
     (γ0 γ1 : UartNames) (γc γl0 γl1 : GName) (γd : DiskNames) (γdl γt : GName)
-    [EnvIs (hlc := hlc) GF Γ γ0 γ1 γc γl0 γl1 γd γdl γt] (f : RegFile) (cpu : CPU)
+ (f : RegFile) (cpu : CPU)
     (cn : ConsNames) (l0 l1 : List (BitVec 8)) (c0 : VirtioCfg)
     (dk : Nat → BitVec 8) (sb : FsSb) (nib : Nat) (cov : ExtTreeSet Nat compare) (ndisk : Nat)
     (S : FsStateRec) (Pb : Nat → List (BitVec 8)) (Rspent : ExtTreeSet Nat compare)

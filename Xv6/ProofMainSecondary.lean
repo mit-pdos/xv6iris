@@ -29,7 +29,7 @@ open LeanRV64D
 set_option maxHeartbeats 4000000 in
 theorem main_secondary_proof (CI : CPUID) (PK : PRINTK) (KVH : KVMINITHART) (TIH : TRAPINITHART)
     (PIH : PLICINITHART) (SCH : SCHEDULER) (KV : KERNELVEC) : MAIN_SECONDARY :=
-  ⟨fun {hlc GF} _ _ _ _ _ _ _ _ X Γ _ γ0 γ1 γc γl0 γl1 γd γdl γt _ cpu k γi ξd tlb0
+  ⟨fun {hlc GF} _ _ _ _ _ _ _ _ X Γ _ γ0 γ1 γc γl0 γl1 γd γdl γt cpu k γi ξd tlb0
       hX hcpu hK hsie hnoff hlocks hproc => by
   obtain ⟨ξ, τ⟩ := X
   obtain rfl : τ = KTier.bare := hX

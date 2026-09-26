@@ -20,7 +20,7 @@ DEVIATIONS from Rocq (Lean's name discipline, not process layer):
 1. **The names are chosen before, not here.**  Rocq's conclusion is `∃ γs,
    procs_inv γs` (pass 1, `delayed_locks_alloc`, picks them).  Lean's
    `SchedNames Γ` is fixed when the era's machine instance is built
-   (`ClaimIs Γ`, `EnvIs Γ …` pin `MachGS.cpuClaim` / `MachGS.envP` to it), so
+   (`ClaimIs Γ` pins `MachGS.cpuClaim` to it), so
    each slot brings its lock's free token `lockFreeTok (Γ.lock i)` (minted by
    boot with `lockGhostAlloc`, as SpecMain's header says) and the conclusion
    is `procsInv Γ`.

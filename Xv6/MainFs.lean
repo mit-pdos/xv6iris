@@ -490,7 +490,6 @@ ambient allocator; it seals the count and assembles `firstBoot`). -/
 theorem mn_userinit (UI : USERINIT) [Fscfg] [Icfg] [FileG GF] [CurCtx]
     (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
     (γ0 γ1 : UartNames) (γc γl0 γl1 : GName) (γd : DiskNames) (γdl γt : GName)
-    [EnvIs (hlc := hlc) GF Γ γ0 γ1 γc γl0 γl1 γd γdl γt]
     (cpu : CPU) (k : KCtx) (R0 : RegMap) (hsie : k.sie = false) (hnoff : k.noff = 0)
     (hlocks : k.locks = []) (htier : k.tier = KTier.kpt) (hproc : k.proc = 0#64)
     (hK : userinitSlots ≤ k.avail)
@@ -513,7 +512,7 @@ theorem mn_userinit (UI : USERINIT) [Fscfg] [Icfg] [FileG GF] [CurCtx]
   k_step (wp_s_jal cpu _ (KA.«main» + 158#64) false 3346#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [mn_br_9e]
   iintro Hk Hpc
-  have hui := UI.wp_userinit (hlc := hlc) (GF := GF) Γ γ0 γ1 γc γl0 γl1 γd γdl γt cpu
+  have hui := UI.wp_userinit (hlc := hlc) (GF := GF) Γ cpu
     (k.withRegs (R0.set 1#5 (KA.«main» + 162#64))) γp γft γ γw γtk nb np
     (by simp [hnoff]) (by simp [hnoff]) (by simp; omega) (by simp [hlocks]) (by simp [hlocks])
     (by simp [hlocks]) (by simp [hlocks]) (by simp [htier]) (by simp [hproc]) (by simp [hsie]) hnb

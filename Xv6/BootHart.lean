@@ -208,9 +208,9 @@ variable {hlc : HasLC} {GF : BundledGFunctors} [MachFixedGS hlc GF]
 /-- `Xv6.bootEntryPre` at the instance `Hboot`'s client runs at, off the
 power thread's per-hart register row and its `bootFacts`. -/
 theorem bootEntryPre_ofEra (E : EraGS) (gen : Nat) (cP : CPU → BitVec 64 → IProp GF)
-    (cI : ∀ cpu : CPU, ⊢ cP cpu 0#64) (eP : CtxId → IProp GF) (ePe : ∀ ξ : CtxId, Persistent (eP ξ))
+    (cI : ∀ cpu : CPU, ⊢ cP cpu 0#64)
     (σ : MState) (hbf : bootFacts σ) (cpu : CPU) :
-    letI : MachGS hlc GF := MachGS.ofEra E gen cP cI eP ePe
+    letI : MachGS hlc GF := MachGS.ofEra E gen cP cI
     regCellsNoPins (GF := GF) (E.regName cpu) (σ.regs cpu) ⊢
       mBoot cpu (DFrac.own 1) ∗
       Register.mhartid ↦ᵣ[cpu] hartId cpu ∗ clockCells cpu ∗ pcIs cpu KA.«_entry» ∗
@@ -219,7 +219,7 @@ theorem bootEntryPre_ofEra (E : EraGS) (gen : Nat) (cP : CPU → BitVec 64 → I
       Register.x10 ↦ᵣ[cpu] σ.regs cpu .x10 ∗ Register.x11 ↦ᵣ[cpu] σ.regs cpu .x11 ∗
       Register.x14 ↦ᵣ[cpu] σ.regs cpu .x14 ∗ Register.x15 ↦ᵣ[cpu] σ.regs cpu .x15 ∗
       regCellsEx (E.regName cpu) (σ.regs cpu) bootEntryTaken :=
-  letI : MachGS hlc GF := MachGS.ofEra E gen cP cI eP ePe
+  letI : MachGS hlc GF := MachGS.ofEra E gen cP cI
   bootEntryPre cpu (σ.regs cpu) (hbf.2.2.2.1 cpu)
 
 end

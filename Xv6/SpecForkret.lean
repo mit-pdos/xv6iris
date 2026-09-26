@@ -80,16 +80,16 @@ the CLOSED trap loop.
    lock, the ftable, the file names, `initproc`'s value and the pid (Rocq's
    `j γs γw γft γf γtl pid`); `ustate` is `(V, M)`.
 4. **No timer capability** (UsertrapRes deviation 6); the closer takes the
-   resumer's handler environment `envAt` (UsertrapRes deviation 8).
+   resumer's handler environment row `handlerEnvAt` (UsertrapRes deviation
+   8), which forkret assembles from its globals' `procsInv` and the park
+   world's devintr credentials (Rocq: `devintr_caps_any` in `park_globals`).
 5. `forkretCloser` is `ParkCap.parkResumeK` minus the two spare allowances
    (Rocq's `forkret_yield` / package split: the park captures them).
 6. **PROCESS LAYER (flagged)**: `FORKRET` is stated at the park token
    (`ParkCap.parkToken`) and the kernel's deposit instance (`uexecSGXv6`),
    not over an abstract residue: Rocq's forkret re-exports the closed loop's
    `usertrap_res` (`UC : USERRET_CLOSED`), and the closed loop -- like the
-   usertrap / syscall seals -- lives at that instance and token; with it,
-   the handler environment's names (`EnvIs`), as `USERTRAP` /
-   `USERRET_CLOSED` quantify them.
+   usertrap / syscall seals -- lives at that instance and token.
 
 Imports only definitional files.
 -/
@@ -126,7 +126,8 @@ def forkretResumeK (URB : ParkURB GF) (W : IProp GF) (N : UtNames) (g γch : GNa
   iprop(⌜V'.upt = P'⌝ -∗ ⌜V'.fdg = g⌝ -∗ ⌜V'.chg = γch⌝ -∗ ⌜V'.gen = gn⌝ -∗ ⌜V'.cwi = cw⌝ -∗
     ⌜parkRunKey Wk V' M'⌝ -∗
     parkGlobals N.Γ N.w N.ft N.f N.ip -∗ utSysParkRows N.Γ -∗ firstDone (hlc := hlc) -∗ W -∗
-    envAt curCtx -∗ utTfk h (V'.kstack + 4096#64) V' -∗ cpuClaim h N.pj -∗ utBlock N.f N.pj N.pid V' -∗
+    handlerEnvAt (hlc := hlc) N.Γ curCtx -∗ utTfk h (V'.kstack + 4096#64) V' -∗ cpuClaim h N.pj -∗
+    utBlock N.f N.pj N.pid V' -∗
     (URB N.j h Xc P' (V'.kstack + 4096#64) V' sts cs N.pid ∗
       parkSlotOut (hlc := hlc) (SG := SG) Wk V' M' sts gn cs N.pid))
 
@@ -173,8 +174,6 @@ structure FORKRET : Prop where
     [Appcfg GF] [FileG GF] [Fscfg] [Icfg] [CurCtx]
     (W : IProp GF)
     (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
-    (γ0 γ1 : UartNames) (γc γl0 γl1 : GName) (γd : DiskNames) (γdl γt : GName)
-    [EnvIs (hlc := hlc) GF Γ γ0 γ1 γc γl0 γl1 γd γdl γt]
     (cpu : CPU) (R : RegMap) (spie spp eb : Bool) (root : BitVec 44) (N : UtNames) (V : ProcPriv)
     (M : Nat → List (BitVec 8)) (sts : List FdState) (gn : GName) (cs : ExtTreeSet GName compare)
     (steady : Bool) hΓ hj hgn hsp,

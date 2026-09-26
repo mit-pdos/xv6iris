@@ -688,12 +688,12 @@ after the trap plus what the schema kept aside resumes the client's `I` at
 `pc` (through the handler's contract). -/
 def trapCont [X : CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU) (k : KCtx) (pc : BitVec 64)
     (ms mdl mepc stc : BitVec 64) (I : IProp GF) : IProp GF := iprop%
-  ∀ (sc h : BitVec 64), ⌜k.sie = true ∧ sCauseOk sc ∧ stvecDirect h⌝ -∗
+  ∀ (sc h : BitVec 64) (E : CtxId → IProp GF), ⌜k.sie = true ∧ sCauseOk sc ∧ stvecDirect h⌝ -∗
     confCells cpu (DFrac.own 1) Privilege.Supervisor (trapConf (sConfOf k.tier k.root ms mdl mepc stc)) -∗
     clockCells cpu -∗ pcIs cpu h -∗ transTok cpu k.tier k.root -∗ gprFile cpu (tpPin cpu k.regs) -∗
     stackOwn k.sp (trapRes k.sie + k.avail) -∗ cpuOwn cpu lent k.sie k.noff k.intena k.proc k.locks -∗
-    trapCsrsAt cpu pc sc 0#64 -∗ Register.stvec ↦ᵣ[cpu] h -∗ envAt curCtx -∗ cpuClaim cpu k.proc -∗
-    □ ihs ⟨cpu, h⟩ -∗ I -∗ wpLoop cpu
+    trapCsrsAt cpu pc sc 0#64 -∗ Register.stvec ↦ᵣ[cpu] h -∗ envAt E curCtx -∗ cpuClaim cpu k.proc -∗
+    □ ihs ⟨E, cpu, h⟩ -∗ I -∗ wpLoop cpu
 
 /-- The obligation of a schema's step at hart `cpu'`, at the configuration
 `sConfOf k.tier k.root ms mdl mepc stc`: from the client's `I` and the
@@ -725,7 +725,7 @@ theorem wpLoop_k_absorb_gen [X : CurCtx] [KernelGeom] [KernelImage GF] (cpu : CP
   iapply (hnormal cpu' ms mdl mepc stc hpin hwf hkt hsm hsr hmdl) $$ HI HmConf Hclock Hpc HF Hstack Htrans Harm Hcpu Htok Hro
   inext
   unfold trapCont
-  iintro %sc %h %⟨hs, hsc, hdir⟩ HmConf Hclock Hpc HT HF Hstack Hcpu Hcsrs Hstv #Henv Hclaim #HS HI
+  iintro %sc %h %E %⟨hs, hsc, hdir⟩ HmConf Hclock Hpc HT HF Hstack Hcpu Hcsrs Hstv #Henv Hclaim #HS HI
   unfold transTok
   icases HT with ⟨Htrans, Htok⟩
   ihave Htr : transSlot cpu' k.tier k.root $$ [Htrans]
@@ -741,7 +741,7 @@ theorem wpLoop_k_absorb_gen [X : CurCtx] [KernelGeom] [KernelImage GF] (cpu : CP
     exact absurd (hs.symm.trans hs') (by decide)
   ihave Hk := kctx_trapped_intro cpu' k hwf hs ms mdl mepc stc hsm hmdl $$ [HmConf HF Hstack Htr Hcpu Htok Hclock Hro]
   case' _ => (iframe HmConf HF Hstack Htr Hcpu Htok Hclock; iexact Hro)
-  iapply (kctx_trap_resume cpu' k pc sc h I hwf hs hpc hsc)
+  iapply (kctx_trap_resume cpu' k E pc sc h I hwf hs hpc hsc)
   iframe Hk Hpc Hcsrs Hstv Hclaim HI
   isplitl []
   · iexact Henv
@@ -778,7 +778,7 @@ macro "schema_trap_branch" : tactic =>
   `(tactic| (unfold trapBranch
              iintro %hs
              ihave Harm := (show sieArm (GF := GF) cpu' k.sie k.proc ⊢ sieArm cpu' true k.proc by rw [hs]) $$ Harm
-             icases sieArm_on _ _ $$ Harm with ⟨%h, %hdir, Hcsrs, Hclaim, Hstv, #HS, #Henv⟩
+             icases sieArm_on _ _ $$ Harm with ⟨%E, %h, %hdir, Hcsrs, Hclaim, Hstv, #HS, #Henv⟩
              iexists h
              iframe Hcsrs Hstv
              isplit
@@ -787,7 +787,7 @@ macro "schema_trap_branch" : tactic =>
              unfold trapCont
              simp only [hkt]
              iintro %sc %hsc HmConf Hclock Hpc HT HF Hcsrs Hstv
-             iapply Htc $$ %sc %h %⟨hs, hsc, hdir⟩ HmConf Hclock Hpc HT HF Hstack Hcpu Hcsrs Hstv Henv Hclaim HS [HΦ]
+             iapply Htc $$ %sc %h %E %⟨hs, hsc, hdir⟩ HmConf Hclock Hpc HT HF Hstack Hcpu Hcsrs Hstv Henv Hclaim HS [HΦ]
              isplit
              · iexact HI
              inext

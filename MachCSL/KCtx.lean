@@ -528,21 +528,28 @@ theorem trapCsrs_intro (cpu : CPU) (a b c : BitVec 64) : trapCsrsAt (GF := GF) c
   · iexists b; iexact Hb
   · iexists c; iexact Hc
 
-/-- The index of the trap handler's contract: a hart and its handler. -/
-structure IhsIx where
+/-- The index of the trap handler's contract: the ENVIRONMENT the handler
+closes over (Rocq `ihs kt E`: the contract is a family over environments),
+a hart and its handler. -/
+structure IhsIx (GF : BundledGFunctors) where
+  env : CtxId → IProp GF
   cpu : CPU
   h : BitVec 64
 
-instance : OFE IhsIx := OFE.ofDiscrete _
+instance : OFE (IhsIx GF) := OFE.ofDiscrete _
 
 /-- The installed handler (the prototype's `intr_res`), over an abstract
-contract `S`: `stvec` in direct mode at `h`, the contract at `h`, and the
-handler's ENVIRONMENT at the context the bundle runs -- what the handler
+contract `S`: `stvec` in direct mode at `h`, the contract at `h` FOR SOME
+ENVIRONMENT `E`, and `E` at the context the bundle runs -- what the handler
 closes over and cannot get from any frame (`MachCSL.CtxLaws.envAt`: the
 environment together with the witness that re-homes it across a
-domination, so the bundle re-homes with its arm). -/
-def intrResP [CurCtx] (S : IhsIx → IProp GF) (cpu : CPU) : IProp GF := iprop%
-  ∃ h : BitVec 64, ⌜stvecDirect h⌝ ∗ Register.stvec ↦ᵣ[cpu] h ∗ □ S ⟨cpu, h⟩ ∗ envAt curCtx
+domination, so the bundle re-homes with its arm).  The environment is
+∃-PACKED, as Rocq's `intr_res` packs it (`∃ E, intr_res_at kt E ∗ □ E XI ∗
+□ env_move E`): no instance field names it, so a client family that
+mentions `kctx` (the xv6 proc table) can be an environment. -/
+def intrResP [CurCtx] (S : IhsIx GF → IProp GF) (cpu : CPU) : IProp GF := iprop%
+  ∃ (E : CtxId → IProp GF) (h : BitVec 64),
+    ⌜stvecDirect h⌝ ∗ Register.stvec ↦ᵣ[cpu] h ∗ □ S ⟨E, cpu, h⟩ ∗ envAt E curCtx
 
 /-- The interrupt arm, over an abstract contract.  Enabled: the trap CSRs,
 the running proc claim and the installed handler (with the handler's
@@ -550,20 +557,20 @@ environment at this context) -- what a preempting trap needs and cannot
 get from any frame.  Disabled: nothing; the SIE bit itself
 is tied to the index in `kConf`, and the per-cpu bookkeeping is in `cpuOwn`
 at either index. -/
-def sieArmP [CurCtx] (S : IhsIx → IProp GF) (cpu : CPU) (sie : Bool) (p : BitVec 64) : IProp GF :=
+def sieArmP [CurCtx] (S : IhsIx GF → IProp GF) (cpu : CPU) (sie : Bool) (p : BitVec 64) : IProp GF :=
   if sie then iprop(trapCsrs cpu ∗ cpuClaim cpu p ∗ intrResP S cpu) else iprop(True)
 
-theorem intrResP_mono [CurCtx] (Φ Ψ : IhsIx → IProp GF) (cpu : CPU) :
+theorem intrResP_mono [CurCtx] (Φ Ψ : IhsIx GF → IProp GF) (cpu : CPU) :
     □ (∀ x, Φ x -∗ Ψ x) ⊢ intrResP Φ cpu -∗ intrResP Ψ cpu := by
   unfold intrResP
-  iintro #Hm ⟨%h, %hd, Hstv, #HS, #Henv⟩
-  iexists h
+  iintro #Hm ⟨%E, %h, %hd, Hstv, #HS, #Henv⟩
+  iexists E, h
   iframe Hstv Henv
   isplit
   · ipureintro; exact hd
   · iapply Hm $$ HS
 
-theorem sieArmP_mono [CurCtx] (Φ Ψ : IhsIx → IProp GF) (cpu : CPU) (sie : Bool) (p : BitVec 64) :
+theorem sieArmP_mono [CurCtx] (Φ Ψ : IhsIx GF → IProp GF) (cpu : CPU) (sie : Bool) (p : BitVec 64) :
     □ (∀ x, Φ x -∗ Ψ x) ⊢ sieArmP Φ cpu sie p -∗ sieArmP Ψ cpu sie p := by
   unfold sieArmP
   cases sie
@@ -940,7 +947,7 @@ theorem wpNext_mono (sie : Bool) (p : BitVec 64) (cpu : CPU) (K K' : CPU → IPr
 /-- The kernel execution context resource of hart `cpu`, over an abstract
 handler contract `S` and an explicit ambient context `X`: everything below
 shares the index `k.sie`; the kernel's read-only image rides along. -/
-def kctxP (X : CurCtx) [KernelGeom] [KernelImage GF] (S : IhsIx → IProp GF) (lent : Bool) (cpu : CPU) (k : KCtx) :
+def kctxP (X : CurCtx) [KernelGeom] [KernelImage GF] (S : IhsIx GF → IProp GF) (lent : Bool) (cpu : CPU) (k : KCtx) :
     IProp GF :=
   letI : CurCtx := X
   iprop(⌜k.wf⌝ ∗
@@ -954,7 +961,7 @@ def kctxP (X : CurCtx) [KernelGeom] [KernelImage GF] (S : IhsIx → IProp GF) (l
     clockCells cpu ∗
     KernelImage.ro)
 
-theorem kctxP_mono (X : CurCtx) [KernelGeom] [KernelImage GF] (Φ Ψ : IhsIx → IProp GF) (lent : Bool) (cpu : CPU)
+theorem kctxP_mono (X : CurCtx) [KernelGeom] [KernelImage GF] (Φ Ψ : IhsIx GF → IProp GF) (lent : Bool) (cpu : CPU)
     (k : KCtx) : □ (∀ x, Φ x -∗ Ψ x) ⊢ kctxP (GF := GF) X Φ lent cpu k -∗ kctxP X Ψ lent cpu k := by
   unfold kctxP
   iintro #Hm ⟨%hwf, HConf, HF, Hstack, Htrans, Harm, Hcpu, Htok, Hclock, #Hro⟩
@@ -966,7 +973,7 @@ theorem kctxP_mono (X : CurCtx) [KernelGeom] [KernelImage GF] (Φ Ψ : IhsIx →
   · iexact Hro
 
 /-- With interrupts off the arm is empty: the contract does not matter. -/
-theorem kctxP_off (X : CurCtx) [KernelGeom] [KernelImage GF] (Φ Ψ : IhsIx → IProp GF) (lent : Bool) (cpu : CPU)
+theorem kctxP_off (X : CurCtx) [KernelGeom] [KernelImage GF] (Φ Ψ : IhsIx GF → IProp GF) (lent : Bool) (cpu : CPU)
     (k : KCtx) (h : k.sie = false) : kctxP (GF := GF) X Φ lent cpu k ⊢ kctxP X Ψ lent cpu k := by
   unfold kctxP sieArmP
   rw [h]
@@ -985,11 +992,11 @@ the handler is safe.  The resumed context holds the arm again, contract
 included, so the contract is the greatest fixpoint of this functional. -/
 
 /-- The functional of the handler contract at `S`. -/
-def ihsF [KernelGeom] [KernelImage GF] (S : IhsIx → IProp GF) (x : IhsIx) : IProp GF := iprop%
+def ihsF [KernelGeom] [KernelImage GF] (S : IhsIx GF → IProp GF) (x : IhsIx GF) : IProp GF := iprop%
   □ ∀ (X : CurCtx) (k : KCtx) (pc sc : BitVec 64),
     ⌜k.wf ∧ k.sie = true ∧ pc.toNat % 2 = 0 ∧ sCauseOk sc⌝ -∗
     kctxP X S false x.cpu k.trapped -∗ pcIs x.cpu x.h -∗ trapCsrsAt x.cpu pc sc 0#64 -∗
-    Register.stvec ↦ᵣ[x.cpu] x.h -∗ envAt X.curCtx -∗ cpuClaim x.cpu k.proc -∗
+    Register.stvec ↦ᵣ[x.cpu] x.h -∗ envAt x.env X.curCtx -∗ cpuClaim x.cpu k.proc -∗
     ▷ wpNext true k.proc x.cpu (fun cpu' => iprop(kctxP X S false cpu' k -∗ pcIs cpu' pc -∗ wpLoop cpu')) -∗
     wpLoop x.cpu
 
@@ -1009,12 +1016,12 @@ instance ihsF_mono [KernelGeom] [KernelImage GF] : BIMonoPred (ihsF (GF := GF)) 
   mono_pred_ne {Φ} _ := ⟨fun {_ _ _} (h : _ = _) => h ▸ OFE.Dist.rfl⟩
 
 /-- The handler contract (the greatest fixpoint). -/
-def ihs [KernelGeom] [KernelImage GF] : IhsIx → IProp GF := bi_greatest_fixpoint (ihsF (GF := GF))
+def ihs [KernelGeom] [KernelImage GF] : IhsIx GF → IProp GF := bi_greatest_fixpoint (ihsF (GF := GF))
 
-theorem ihs_unfold [KernelGeom] [KernelImage GF] (x : IhsIx) : ihs (GF := GF) x ⊢ ihsF ihs x :=
+theorem ihs_unfold [KernelGeom] [KernelImage GF] (x : IhsIx GF) : ihs (GF := GF) x ⊢ ihsF ihs x :=
   greatest_fixpoint_unfold_mp _
 
-theorem ihs_fold [KernelGeom] [KernelImage GF] (x : IhsIx) : ihsF (GF := GF) ihs x ⊢ ihs x :=
+theorem ihs_fold [KernelGeom] [KernelImage GF] (x : IhsIx GF) : ihsF (GF := GF) ihs x ⊢ ihs x :=
   greatest_fixpoint_unfold_mpr _
 
 /-- The installed handler. -/
@@ -1026,7 +1033,7 @@ def sieArm [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU) (sie : Bool) (p : 
 
 /-- The arm and the installed handler mention the context only through the
 environment: the tier is irrelevant. -/
-theorem intrResP_toKpt (X : CurCtx) (S : IhsIx → IProp GF) (cpu : CPU) :
+theorem intrResP_toKpt (X : CurCtx) (S : IhsIx GF → IProp GF) (cpu : CPU) :
     @intrResP hlc GF _ X S cpu = @intrResP hlc GF _ ⟨X.curCtx, KTier.kpt⟩ S cpu := rfl
 
 theorem intrRes_toKpt (X : CurCtx) [KernelGeom] [KernelImage GF] (cpu : CPU) :
@@ -1136,26 +1143,26 @@ theorem KCtx.setReg_setReg_same (k : KCtx) (i : BitVec 5) (v w : BitVec 64) :
 contract. -/
 theorem sieArm_on [X : CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU) (p : BitVec 64) :
     sieArm (GF := GF) cpu true p ⊢
-      ∃ h : BitVec 64, ⌜stvecDirect h⌝ ∗ trapCsrs cpu ∗ cpuClaim cpu p ∗ Register.stvec ↦ᵣ[cpu] h ∗
-        □ ihs ⟨cpu, h⟩ ∗ envAt curCtx := by
+      ∃ (E : CtxId → IProp GF) (h : BitVec 64), ⌜stvecDirect h⌝ ∗ trapCsrs cpu ∗ cpuClaim cpu p ∗
+        Register.stvec ↦ᵣ[cpu] h ∗ □ ihs ⟨E, cpu, h⟩ ∗ envAt E curCtx := by
   unfold sieArm sieArmP intrResP
   simp only [ite_true]
-  iintro ⟨Hcsrs, Hclaim, %h, %hd, Hstv, #HS, #Henv⟩
-  iexists h
+  iintro ⟨Hcsrs, Hclaim, %E, %h, %hd, Hstv, #HS, #Henv⟩
+  iexists E, h
   iframe Hcsrs Hclaim Hstv Henv
   isplit
   · ipureintro; exact hd
   · iexact HS
 
-theorem sieArm_on_intro [X : CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU) (p h : BitVec 64)
-    (hd : stvecDirect h) :
-    trapCsrs cpu ∗ cpuClaim cpu p ∗ Register.stvec ↦ᵣ[cpu] h ∗ □ ihs ⟨cpu, h⟩ ∗ envAt curCtx ⊢
+theorem sieArm_on_intro [X : CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU) (E : CtxId → IProp GF)
+    (p h : BitVec 64) (hd : stvecDirect h) :
+    trapCsrs cpu ∗ cpuClaim cpu p ∗ Register.stvec ↦ᵣ[cpu] h ∗ □ ihs ⟨E, cpu, h⟩ ∗ envAt E curCtx ⊢
       sieArm (GF := GF) cpu true p := by
   unfold sieArm sieArmP intrResP
   simp only [ite_true]
   iintro ⟨Hcsrs, Hclaim, Hstv, #HS, #Henv⟩
   iframe Hcsrs Hclaim
-  iexists h
+  iexists E, h
   iframe Hstv Henv
   isplit
   · ipureintro; exact hd
@@ -1201,15 +1208,16 @@ theorem kctx_trapped_intro [X : CurCtx] [KernelGeom] [KernelImage GF] {lent : Bo
 /-- The trap's resumption: the handler's contract, applied to the trapped
 state, with the promise to resume `k` at `pc` from the client's continuation
 `I`, on any hart the pinning allows. -/
-theorem kctx_trap_resume [X : CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU) (k : KCtx) (pc sc h : BitVec 64)
+theorem kctx_trap_resume [X : CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU) (k : KCtx)
+    (E : CtxId → IProp GF) (pc sc h : BitVec 64)
     (I : IProp GF) (hwf : k.wf) (hs : k.sie = true) (hpc : pc.toNat % 2 = 0) (hsc : sCauseOk sc) :
-    kctx cpu k.trapped ∗ pcIs cpu h ∗ trapCsrsAt cpu pc sc 0#64 ∗ Register.stvec ↦ᵣ[cpu] h ∗ envAt curCtx ∗
+    kctx cpu k.trapped ∗ pcIs cpu h ∗ trapCsrsAt cpu pc sc 0#64 ∗ Register.stvec ↦ᵣ[cpu] h ∗ envAt E curCtx ∗
     cpuClaim cpu k.proc ∗
-    □ ihs ⟨cpu, h⟩ ∗ I ∗
+    □ ihs ⟨E, cpu, h⟩ ∗ I ∗
     ▷ (∀ cpu' : CPU, ⌜k.proc = 0#64 → cpu' = cpu⌝ → I -∗ kctx cpu' k -∗ pcIs cpu' pc -∗ wpLoop cpu')
     ⊢ wpLoop (GF := GF) cpu := by
   iintro ⟨Hk, Hpc, Hcsrs, Hstv, #Henv, Hclaim, #HS, HI, IH⟩
-  ihave #HF := ihs_unfold ⟨cpu, h⟩ $$ HS
+  ihave #HF := ihs_unfold ⟨E, cpu, h⟩ $$ HS
   unfold ihsF kctx kctxL
   dsimp only
   iapply HF $$ %X %k %pc %sc %⟨hwf, hs, hpc, hsc⟩ Hk Hpc Hcsrs Hstv Henv Hclaim

@@ -243,13 +243,12 @@ theorem prepare_return_flip_res (cpu c : CPU) (sie : Bool) (p : BitVec 64)
     unfold intrRes
     iexact Hr
 
-/-- The installed handler, dismantled: its `stvec` cell and its
-environment (persistent). -/
+/-- The installed handler, dismantled: its `stvec` cell (the contract and
+the environment it packed are dropped, Rocq `prepare_return`'s post). -/
 theorem prepare_return_intrRes_open (c : CPU) :
-    intrRes (GF := GF) c ⊢ (∃ h : BitVec 64, Register.stvec ↦ᵣ[c] h) ∗ envAt curCtx := by
+    intrRes (GF := GF) c ⊢ ∃ h : BitVec 64, Register.stvec ↦ᵣ[c] h := by
   unfold intrRes intrResP
-  iintro ⟨%h, %_, Hstv, _, #Henv⟩
-  iframe Henv
+  iintro ⟨%E, %h, %_, Hstv, _, _⟩
   iexists h
   iexact Hstv
 

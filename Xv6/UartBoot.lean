@@ -35,7 +35,7 @@ DEVIATIONS from Rocq:
    device (`uartInv i`, `plicInv`, `diskInv`), so BOTH ports go through
    `uartInvAlloc` here, as Rocq's `Uart1` does.
 3. The transport of these rows between two `MachGS.ofEra` instances that
-   differ only in the claim/environment payloads is by `rfl`
+   differ only in the claim payloads is by `rfl`
    (`uartBootAlloc_ofEra`): the boot mints the names BEFORE it fixes
    `claimP := procClaim Γ` (brief w8_5 §4.2 step 6).
 
@@ -224,7 +224,7 @@ end
 
 /-! ## Transport between era instances
 
-The boot mints the UART names before it fixes the claim and environment
+The boot mints the UART names before it fixes the claim
 payloads of `MachGS.ofEra`; the invariant mentions only the era
 and its generation, so it is the same proposition at every choice (the rows
 of `uartBootRes` do not mention `MachGS` at all). -/
@@ -234,11 +234,10 @@ variable {hlc : HasLC} {GF : BundledGFunctors} [MachFixedGS hlc GF] [Xv6G GF]
 
 theorem uartBootAlloc_ofEra (E : EraGS) (gen : Nat)
     (cP cP' : CPU → BitVec 64 → IProp GF) (cI : ∀ cpu : CPU, ⊢ cP cpu 0#64)
-    (cI' : ∀ cpu : CPU, ⊢ cP' cpu 0#64) (eP eP' : CtxId → IProp GF)
-    (ePe : ∀ ξ : CtxId, Persistent (eP ξ)) (ePe' : ∀ ξ : CtxId, Persistent (eP' ξ))
+    (cI' : ∀ cpu : CPU, ⊢ cP' cpu 0#64)
     (i : UartId) (γ : UartNames) :
-    @uartInv hlc GF (MachGS.ofEra E gen cP cI eP ePe) _ i γ ⊢
-      @uartInv hlc GF (MachGS.ofEra E gen cP' cI' eP' ePe') _ i γ := .rfl
+    @uartInv hlc GF (MachGS.ofEra E gen cP cI) _ i γ ⊢
+      @uartInv hlc GF (MachGS.ofEra E gen cP' cI') _ i γ := .rfl
 
 end ofEra
 

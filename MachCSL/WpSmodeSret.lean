@@ -161,10 +161,10 @@ theorem wp_s_sret [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU) (k : KCtx) 
   ihave Hcpu := cpuOwn_zero cpu false false true k.noff k.intena true k.proc k.locks hn0 (fun h => nomatch h) $$ Hcpu
   -- the arm, from the trap CSRs, the claim and the handler
   unfold intrRes intrResP
-  icases Hres with ⟨%h, %hd, Hstv, #HS, #Henv⟩
+  icases Hres with ⟨%E, %h, %hd, Hstv, #HS, #Henv⟩
   ihave Hcsrs := trapCsrs_intro cpu epc sc tv $$ [Hsepc Hscause Hstval]
   case' _ => unfold trapCsrsAt; iframe Hsepc Hscause Hstval
-  ihave HarmOn := sieArm_on_intro cpu k.proc h hd $$ [Hcsrs Hclaim Hstv HS Henv]
+  ihave HarmOn := sieArm_on_intro cpu E k.proc h hd $$ [Hcsrs Hclaim Hstv HS Henv]
   case' _ => iframe Hcsrs Hclaim Hstv HS Henv
   iapply HΦ $$ [HConf HF Hstack Htrans HarmOn Hcpu Htok Hclock] Hpc
   iapply (kctx_intro' cpu (k.sretTo spie spp) hwf')
@@ -181,7 +181,7 @@ theorem wp_s_sret [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU) (k : KCtx) 
 /-! ## The handler contract is persistent; the bundle up to `x0` and `tp` -/
 
 /-- The handler contract is persistent (its body is a `□`). -/
-instance ihs_persistent [KernelGeom] [KernelImage GF] (x : IhsIx) : Persistent (ihs (GF := GF) x) where
+instance ihs_persistent [KernelGeom] [KernelImage GF] (x : IhsIx GF) : Persistent (ihs (GF := GF) x) where
   persistent := by
     iintro H
     ihave HF := ihs_unfold x $$ H

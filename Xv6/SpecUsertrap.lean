@@ -61,7 +61,7 @@ Rocq's (`utPayIn`, `utKillIn`, `utKillOut`, `utResumeIn`).
 2. **The residue is pinned to the era's proc table and the running slot**
    (`usertrapResAt PT Γ j`, a `utResBare` whose syscall environment carries
    `⌜N.Γ = Γ ∧ N.j = j⌝`): the Lean callees are stated under `[ClaimIs GF
-   Γ]` / `[EnvIs GF Γ …]` and the running context names `k.proc =
+   Γ]` and the running context names `k.proc =
    procAddr j` OUTSIDE the residue (Rocq's `cpu_own` / `sie_cap` are inside
    `ut_trap`, so its residue needs no pin).  The pinned forms live in
    UtResFits (`utSysEnvAt` / `usertrapResAt` / `usertrapResAt_park`).
@@ -426,18 +426,16 @@ end Contract
 
 /-- **Rocq `Module Type USERTRAP`**: `wp_usertrap` at the pinned residue
 (deviation 2), at THE PARK TOKEN (`ParkCap.parkToken`, W8-P2: the syscall
-seal `SYSCALL_XV6` is at it, since fork spends it), the era's
-proc table (`ClaimIs`) and its handler environment's names (`EnvIs`, which
-devintr's credentials are read from), at the kernel's deposit instance
-(deviation 10). -/
+seal `SYSCALL_XV6` is at it, since fork spends it) and the era's
+proc table (`ClaimIs`), at the kernel's deposit instance (deviation 10).
+devintr's credentials are read from the residue's handler environment row
+(`utCaps`' `handlerEnvAt`, at its own names). -/
 structure USERTRAP : Prop where
   wp_usertrap : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF]
     [BioslotG GF] [BcacheG GF] [SleepLockG GF] [DiskG GF] [IcacheG GF] [LogG GF] [FsBlocksG GF]
     [IregG GF] [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF]
     [CtokG GF] [WchG GF] [Appcfg GF] [FileG GF] [Fscfg] [Icfg] [CurCtx]
     (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
-    (γ0 γ1 : UartNames) (γc γl0 γl1 : GName) (γd : DiskNames) (γdl γt : GName)
-    [EnvIs (hlc := hlc) GF Γ γ0 γ1 γc γl0 γl1 γd γdl γt]
     (cpu : CPU) (k : KCtx) (j : Nat) (P : UPtd) (ksp : BitVec 64) (V : ProcPriv)
     (M : Nat → List (BitVec 8)) (sts : List FdState) (gn : GName) (cs : ExtTreeSet GName compare)
     (pid : BitVec 32) (sep sc tv : BitVec 64) (f : UexecSG.sfam GF) (Wk : Uvis)

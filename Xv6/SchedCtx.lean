@@ -1513,12 +1513,10 @@ The trap handler closes over the proc table: `kernelvec` calls
 `kerneltrap`, whose timer path yields, and `yield` needs `procsInv`.  A
 trap arrives at whatever context the interrupted hart runs, and
 `procsInv` is context-relative (every lock handle carries its creator's
-floor), so the invariant travels with the installed handler
-(`MachCSL.KCtx.intrResP`) as `MachGS.envP`, the ambient instance's
-environment family.  The family itself -- the table beside devintr's
-credentials -- and the client's choice of it (`EnvIs`) live in
-`Xv6.HandlerEnv`, which can name `devintrCaps`; what belongs here is the
-table's own transport. -/
+floor), so the invariant travels with the installed handler, which
+∃-packs its environment (`MachCSL.KCtx.intrResP`).  The family itself --
+the table beside devintr's credentials -- lives in `Xv6.HandlerEnv`, which
+can name `devintrCaps`; what belongs here is the table's own transport. -/
 
 /-- `procsInv` mentions the context only through its lock handles, so it
 transports along a domination. -/

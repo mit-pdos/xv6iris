@@ -137,8 +137,6 @@ the loop hypothesis under the later. -/
 theorem urc_round (UT : USERTRAP) (UV : USERVEC) (UR : USERRET)
     (PT : SchedNames → IProp GF) [∀ Γ, Persistent (PT Γ)] (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
     (hPT0 : PT = parkToken (hlc := hlc) (GF := GF) (SG := uexecSGXv6))
-    (γ0 γ1 : UartNames) (γc γl0 γl1 : GName) (γd : DiskNames) (γdl γt : GName)
-    [EnvIs (hlc := hlc) GF Γ γ0 γ1 γc γl0 γl1 γd γdl γt]
     (j : Nat) (hj : j < NPROC) (h : CPU) (C : UCfg) (pt : UPtd) (sz : Nat) (γfd : GName) (cw : Nat)
     (gn : GName) (cs : ExtTreeSet GName compare) (pid : BitVec 32) (lz : Bool) (fdv : List FdState)
     (hlo : loopOk C pt) :
@@ -183,7 +181,7 @@ theorem urc_round (UT : USERTRAP) (UV : USERVEC) (UR : USERRET)
   have hstk : utStackTop (uservecCtx k (tfResumeGpr0 W.tf) V.tf) ksp :=
     ⟨by show uservecRegs (tfResumeGpr0 W.tf) V.tf 2#5 = ksp; rw [urc_uservecRegs_sp, hkw.2.1]; exact hksp, hkav⟩
   subst hPT0
-  have HUT := UT.wp_usertrap (hlc := hlc) (GF := GF) Γ γ0 γ1 γc γl0 γl1 γd γdl γt h
+  have HUT := UT.wp_usertrap (hlc := hlc) (GF := GF) Γ h
     (uservecCtx k (tfResumeGpr0 W.tf) V.tf) j pt ksp (urcV0 V W) Mp W.fd gn cs pid (tfW W.tf tfEpcIdx) sc stv
     f (uvisRun W) hj hproc (uservecCtx_ok k _ _ hsie) htier hnoff hstk hVgen.symm
   unfold wp_usertrap_body at HUT

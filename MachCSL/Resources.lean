@@ -380,20 +380,8 @@ class MachGS (hlc : outParam HasLC) (GF : BundledGFunctors) where
   claimP : CPU → BitVec 64 → IProp GF
   /-- the idle claim is free -/
   claim_idle : ∀ cpu : CPU, ⊢ claimP cpu 0#64
-  /-- the HANDLER ENVIRONMENT (the Rocq prototype's `IntrDefs.intr_res`
-  environment): what the installed trap handler closes over, as a family
-  indexed by the context it is held at (the xv6 client: the proc table's
-  `procsInv`, whose lock handles carry their creator's floor).  It rides
-  the installed handler (`MachCSL.KCtx.intrResP`), so it must be
-  persistent; that it re-homes along a domination is a witness carried
-  beside it (`MachCSL.CtxLaws.envAt`), not a field, since the domination
-  relation is stated over this very instance. -/
-  envP : CtxId → IProp GF
-  /-- the environment is persistent -/
-  env_persistent : ∀ ξ : CtxId, Persistent (envP ξ)
 
 attribute [reducible, instance] MachGS.fixed
-attribute [instance] MachGS.env_persistent
 
 variable {hlc : HasLC} {GF : BundledGFunctors}
 

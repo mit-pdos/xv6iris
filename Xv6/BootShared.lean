@@ -10,7 +10,7 @@ thread hands `Hboot` (`MachCSL.powerBootRes`).  Parts 1 and 2 are
 (the file system's era mint and its supply routing).
 
 * §1 `powerBootRes_unpack` (Rocq `power_boot_res_unpack`): at `Hboot`'s era
-  instance `MachGS.ofEra E gen cP cI eP ePe` (ANY claim/environment
+  instance `MachGS.ofEra E gen cP cI` (ANY claim
   payload), `powerBootRes` is `powerBootRows` (its rows at the AMBIENT
   forms) beside the client's lent resource `Rb gen dk`.  Pure conversion.
 * §2 the carve stages: `bootShared_image` (the read-only image, the GOT
@@ -32,15 +32,16 @@ thread hands `Hboot` (`MachCSL.powerBootRes`).  Parts 1 and 2 are
 
 ## How the era (SA-7, `xv6BootEra`) uses this file
 
-1. Fix a PROVISIONAL instance `M0 := MachGS.ofEra E gen cP0 cI0 eP0 ePe0`
+1. Fix a PROVISIONAL instance `M0 := MachGS.ofEra E gen cP0 cI0`
    (any payload: nothing here reads it), `powerBootRes_unpack` at it, and
    run `SystemSlot.xv6LendUnpack` on the lent `Rb` to get `S`, the claim,
    the snapshot and `fsBootSnapWf`.
 2. `bootSharedAlloc` at `M0` (under the era's `Appcfg`); destruct the
    names and the minted instances (`WchG`, `FdslotG`, `BioslotG`,
    `IrefslotG`, `Icfg`, `Fscfg`).
-3. Fix the FINAL instance `M1 := MachGS.ofEra E gen (procClaim Γ) … (envFam
-   Γ γ0 γ1 γc γl0 γl1 γd fscDlock γt) …` and move the output across with
+3. Fix the FINAL instance `M1 := MachGS.ofEra E gen (procClaim Γ) …` (the
+   handler environment is not an instance field: `MachCSL.KCtx.intrResP`
+   ∃-packs it) and move the output across with
    `bootSharedOut_ofEra`; `bootShared_started` at `M1` gives the channel.
 4. `initBootBundle` from `Hinit_boot` (its `appInv fscFs` row is in the
    output) and `consEchoShift` from `Happ_echo`; `bootPrimarySupply_intro`
@@ -138,14 +139,13 @@ theorem bs_pull {PROP : Type _} [BI PROP] (a1 a2 a3 a4 a5 a6 a7 a8 a9 a10 a11 a1
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachFixedGS hlc GF]
 
 /-- **Rocq `power_boot_res_unpack`**: at `Hboot`'s era instance
-(`MachGS.ofEra E gen …`, any claim/environment payload), `powerBootRes`
+(`MachGS.ofEra E gen …`, any claim payload), `powerBootRes`
 is the ambient rows plus the client's lent resource.  Pure conversion. -/
 theorem powerBootRes_unpack (Mof : (Nat → BitVec 8) → LogMirror)
     (Rb : Nat → (Nat → BitVec 8) → IProp GF) (E : EraGS) (gen : Nat)
-    (cP : CPU → BitVec 64 → IProp GF) (cI : ∀ cpu : CPU, ⊢ cP cpu 0#64) (eP : CtxId → IProp GF)
-    (ePe : ∀ ξ : CtxId, Persistent (eP ξ)) (σ : MState) :
+    (cP : CPU → BitVec 64 → IProp GF) (cI : ∀ cpu : CPU, ⊢ cP cpu 0#64) (σ : MState) :
     powerBootRes Mof Rb E gen σ ⊢
-      @powerBootRows hlc GF (MachGS.ofEra E gen cP cI eP ePe) Mof σ ∗ Rb gen (diskOf σ.devs) :=
+      @powerBootRows hlc GF (MachGS.ofEra E gen cP cI) Mof σ ∗ Rb gen (diskOf σ.devs) :=
   bs_pull _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
 
 end unpack
@@ -577,7 +577,7 @@ theorem bootSharedAlloc (σ : MState) (hbf : bootFacts σ) (ds0 : DevStates) (hd
 end alloc
 
 
-/-! ## §6 Transport to the final claim/environment payload -/
+/-! ## §6 Transport to the final claim payload -/
 
 section ofEra
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachFixedGS hlc GF] [Xv6G GF] [CtokG GF] [DiskG GF]
@@ -586,22 +586,21 @@ variable {hlc : HasLC} {GF : BundledGFunctors} [MachFixedGS hlc GF] [Xv6G GF] [C
   [WchG GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [Icfg] [Fscfg]
 
 set_option maxRecDepth 100000 in
-/-- **The output does not read the claim/environment payload** (UartBoot
-deviation 3, ProcBoot deviation 1, at the whole output): the shared
-allocation runs at a provisional `MachGS.ofEra E gen …` (the names the final
-payload `procClaim Γ` / `envFam Γ …` is stated over are minted INSIDE it),
+/-- **The output does not read the claim payload** (UartBoot deviation 3,
+ProcBoot deviation 1, at the whole output): the shared allocation runs at a
+provisional `MachGS.ofEra E gen …` (the names the final payload `procClaim
+Γ` is stated over are minted INSIDE it),
 and its output is the same proposition at every payload. -/
 theorem bootSharedOut_ofEra (E : EraGS) (gen : Nat)
     (cP cP' : CPU → BitVec 64 → IProp GF) (cI : ∀ cpu : CPU, ⊢ cP cpu 0#64)
-    (cI' : ∀ cpu : CPU, ⊢ cP' cpu 0#64) (eP eP' : CtxId → IProp GF)
-    (ePe : ∀ ξ : CtxId, Persistent (eP ξ)) (ePe' : ∀ ξ : CtxId, Persistent (eP' ξ))
+    (cI' : ∀ cpu : CPU, ⊢ cP' cpu 0#64)
     (σ : MState) (ξ0 : CtxId) (Γ : SchedNames) (γ0 γ1 : UartNames)
     (γc γl0 γl1 γt : GName) (cn : ConsNames) (γd : DiskNames) (ξd : CtxId)
     (dk : Nat → BitVec 8) (sb : FsSb) (nib : Nat) (cov : ExtTreeSet Nat compare)
     (Pb : Nat → List (BitVec 8)) (Rspent : ExtTreeSet Nat compare) :
-    (letI : MachGS hlc GF := MachGS.ofEra E gen cP cI eP ePe;
+    (letI : MachGS hlc GF := MachGS.ofEra E gen cP cI;
       bootSharedOut (hlc := hlc) (GF := GF) σ ξ0 Γ γ0 γ1 γc γl0 γl1 γt cn γd ξd dk sb nib cov Pb Rspent) ⊢
-      (letI : MachGS hlc GF := MachGS.ofEra E gen cP' cI' eP' ePe';
+      (letI : MachGS hlc GF := MachGS.ofEra E gen cP' cI';
         bootSharedOut (hlc := hlc) (GF := GF) σ ξ0 Γ γ0 γ1 γc γl0 γl1 γt cn γd ξd dk sb nib cov Pb
           Rspent) := .rfl
 

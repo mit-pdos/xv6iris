@@ -29,11 +29,11 @@ item SA-7 (brief `notes/briefs/w8_5_final.md` §3, §4.1).
 
 ## Premises of `xv6FsAdequacy`
 
-`US : USER` (D24), `Hgen0`/`Hpow` (as Rocq), `Himg` (D34: Rocq discharges it
-from `Hdisk` at the literal image), and -- the BLOCKER -- `Hknot :
-EnvKnotAll hlc GF` (`SystemBootEra` header: MachCSL's `MachGS.envP` makes
-`EnvIs` a fixpoint equation no instance literal satisfies; Rocq ∃-packs the
-environment in `intr_res`).  Nothing about the kernel image (D47: it is the
+`US : USER` (D24), `Hgen0`/`Hpow` (as Rocq) and `Himg` (D34: Rocq
+discharges it from `Hdisk` at the literal image).  (The former `Hknot`
+premise is gone: MachCSL's installed handler ∃-packs its environment, as
+Rocq's `intr_res` does, so no instance field has to equal a family that
+reads it.)  Nothing about the kernel image (D47: it is the
 language constant `MachCSL.bootImage`).  Trusted, not in the statement:
 MachCSL's reset table (`resetVal`/`bootFacts`/`bootShape`, the language's
 PowerOn) until BootReset (wave 9) -- Rocq's `SystemAssumptions` note.
@@ -74,12 +74,6 @@ open Iris.ProgramLogic Language.Notation PrimStep
 
 set_option linter.unusedSectionVars false
 set_option linter.unusedVariables false
-
-/-! ## §1 The environment knot, at every record -/
-
-/-- `EraEnvKnot` at every fixed record (the BLOCKER premise, see the header). -/
-def EnvKnotAll (hlc : HasLC) (GF : BundledGFunctors) [Xv6G GF] [CtokG GF] [DiskG GF] : Prop :=
-  ∀ [MachFixedGS hlc GF], EraEnvKnot (hlc := hlc) (GF := GF)
 
 /-! ## §2 THE SYSTEM THEOREM, at a generic application -/
 
@@ -126,7 +120,6 @@ theorem xv6PowerAdequacyGen (g : GState) (sb : FsSb) (nib : Nat) (cov : ExtTreeS
       letI : MachFixedGS hlc GF := (xv6FixedGS N appFs cov sb.sbLogstart (Ai c) Hinv γgen γstart
         γreg γd γsw γobs γhist c T (Pt γobs c))
       EraPerm (hlc := hlc) (GF := GF))
-    (Hknot : EnvKnotAll hlc GF)
     (phi : GState → List Obs → Prop)
     (Hphi : ∀ (Hinv : InvGS_gen hlc GF) (γgen γstart γreg γd γsw γobs γhist : GName) (c : CT)
         (T : List Obs) (g' : GState) (h : List Obs),
@@ -157,8 +150,7 @@ theorem xv6PowerAdequacyGen (g : GState) (sb : FsSb) (nib : Nat) (cov : ExtTreeS
   subst hF
   exact xv6BootEra N appFs appBoot sb cov (Ai c) Hinv γgen γstart γreg γd γsw γobs γhist c T
     (Pt γobs c) (appXferRaw_ofBoot _ _ (Happ_boot c (gen + 1)))
-    (@Hknot (xv6FixedGS N appFs cov sb.sbLogstart (Ai c) Hinv γgen γstart γreg γd γsw γobs γhist c T
-      (Pt γobs c))) (Hinit_boot Hinv γgen γstart γreg γd γsw γobs γhist c T)
+    (Hinit_boot Hinv γgen γstart γreg γd γsw γobs γhist c T)
     (Happ_echo Hinv γgen γstart γreg γd γsw γobs γhist c T)
     (Hperm Hinv γgen γstart γreg γd γsw γobs γhist c T)
     E gen σ hbf hdv hpp hcovin hlogsub hls2
@@ -182,10 +174,10 @@ theorem xv6Triv_initBoot (US : USER) (cov : ExtTreeSet Nat compare) (ls : Nat)
     letI : MachFixedGS hlc GF := (xv6FixedGS Unit (fun _ _ _ => iprop(True)) cov ls (appIfaceTriv GF)
       Hinv γgen γstart γreg γd γsw γobs γhist c T (obsPredAt γobs))
     EraInitBoot (hlc := hlc) (GF := GF) Unit (fun _ _ _ => iprop(True)) (fun _ _ _ => iprop(emp)) c := by
-  intro E gen cP cI eP ePe W HFd HBs HIr I Fc r
+  intro E gen cP cI W HFd HBs HIr I Fc r
   letI : MachFixedGS hlc GF := xv6FixedGS Unit (fun _ _ _ => iprop(True)) cov ls (appIfaceTriv GF)
       Hinv γgen γstart γreg γd γsw γobs γhist c T (obsPredAt γobs)
-  letI : MachGS hlc GF := MachGS.ofEra E gen cP cI eP ePe
+  letI : MachGS hlc GF := MachGS.ofEra E gen cP cI
   letI : Appcfg GF := ⟨Unit, fun _ _ => iprop(True), r⟩
   have hsup : ⊢@{IProp GF} appSup := appSup_of_triv (fun _ _ => .rfl)
   have hkc : ⊢@{IProp GF} uKillCred (hlc := hlc) := by
@@ -208,10 +200,10 @@ theorem xv6Triv_echo (cov : ExtTreeSet Nat compare) (ls : Nat)
     letI : MachFixedGS hlc GF := (xv6FixedGS Unit (fun _ _ _ => iprop(True)) cov ls (appIfaceTriv GF)
       Hinv γgen γstart γreg γd γsw γobs γhist c T (obsPredAt γobs))
     EraEcho (hlc := hlc) (GF := GF) := by
-  intro E gen cP cI eP ePe
+  intro E gen cP cI
   letI : MachFixedGS hlc GF := xv6FixedGS Unit (fun _ _ _ => iprop(True)) cov ls (appIfaceTriv GF)
       Hinv γgen γstart γreg γd γsw γobs γhist c T (obsPredAt γobs)
-  letI : MachGS hlc GF := MachGS.ofEra E gen cP cI eP ePe
+  letI : MachGS hlc GF := MachGS.ofEra E gen cP cI
   exact consEchoShift_triv rfl
 
 /-- The trivial trace slot's permits (Rocq `uart_obs_permit_triv`). -/
@@ -220,10 +212,10 @@ theorem xv6Triv_perm (cov : ExtTreeSet Nat compare) (ls : Nat)
     letI : MachFixedGS hlc GF := (xv6FixedGS Unit (fun _ _ _ => iprop(True)) cov ls (appIfaceTriv GF)
       Hinv γgen γstart γreg γd γsw γobs γhist c T (obsPredAt γobs))
     EraPerm (hlc := hlc) (GF := GF) := by
-  intro E gen cP cI eP ePe Fc i γ _
+  intro E gen cP cI Fc i γ _
   letI : MachFixedGS hlc GF := xv6FixedGS Unit (fun _ _ _ => iprop(True)) cov ls (appIfaceTriv GF)
       Hinv γgen γstart γreg γd γsw γobs γhist c T (obsPredAt γobs)
-  letI : MachGS hlc GF := MachGS.ofEra E gen cP cI eP ePe
+  letI : MachGS hlc GF := MachGS.ofEra E gen cP cI
   exact uartObsPermit_triv i γ rfl rfl
 
 end triv
@@ -247,7 +239,6 @@ theorem xv6PowerAdequacy (US : USER) (g : GState) (sb : FsSb) (nib : Nat)
           (appIfaceTriv GF) Hinv γgen γstart γreg γd γsw γobs γhist c T (obsPredAt γobs)) g' ∗
         ▷ xv6Slot Unit (fun _ _ _ => iprop(True)) cov sb.sbLogstart γd γsw γreg γstart c ⊢@{IProp GF}
         ◇ ⌜phi g'⌝)
-    (Hknot : EnvKnotAll hlc GF)
     (Hgen0 : g.gen = 0) (Hpow : g.pow = false)
     (Himg : fsBootImageWf (diskOf g.m.devs) XV6_DISK_BYTES sb nib cov)
     (n : Nat) (κs : List Obs) (t2 : List Expr) (g2 : GState)
@@ -268,13 +259,14 @@ theorem xv6PowerAdequacy (US : USER) (g : GState) (sb : FsSb) (nib : Nat)
       γd γobs h on dk hs)
     (fun Hinv γgen γstart γreg γd γsw γobs γhist c T =>
       xv6Triv_perm cov sb.sbLogstart Hinv γgen γstart γreg γd γsw γobs γhist c T)
-    Hknot (fun g' _ => phi g')
+    (fun g' _ => phi g')
     (fun Hinv γgen γstart γreg γd γsw γobs γhist c T g' h => by
       iintro ⟨Hsi, -, -, HP, -⟩
       iapply Hphi Hinv γgen γstart γreg γd γsw γobs γhist c T g'
       iframe Hsi HP)
     Hgen0 Hpow Himg n κs t2 g2 hsteps
 
+include hlc GF in
 /-- **THE FILE-SYSTEM DURABILITY THEOREM** (Rocq
 `SystemAdequacy.xv6_fs_adequacy_xv6Σ`, at the abstract functor list, D46(a)):
 from a powered-off, never-booted machine whose disk holds a well-formed file
@@ -285,7 +277,6 @@ well-formed log and snapshot -- and the memory model's invariant holds
 whenever the power is on.  `USER` (D24) is the only assumed interface. -/
 theorem xv6FsAdequacy (US : USER) (g : GState) (sb : FsSb) (nib : Nat)
     (cov : ExtTreeSet Nat compare)
-    (Hknot : EnvKnotAll hlc GF)
     (Hgen0 : g.gen = 0) (Hpow : g.pow = false)
     (Himg : fsBootImageWf (diskOf g.m.devs) XV6_DISK_BYTES sb nib cov)
     (n : Nat) (κs : List Obs) (t2 : List Expr) (g2 : GState)
@@ -295,19 +286,19 @@ theorem xv6FsAdequacy (US : USER) (g : GState) (sb : FsSb) (nib : Nat)
     (fun Hinv γgen γstart γreg γd γsw γobs γhist c T g' =>
       xv6TraceHook Unit (fun _ _ _ => iprop(True)) cov sb.sbLogstart (appIfaceTriv GF) Hinv γgen
         γstart γreg γd γsw γobs γhist c T (obsPredAt γobs) g')
-    Hknot Hgen0 Hpow Himg n κs t2 g2 hsteps
+    Hgen0 Hpow Himg n κs t2 g2 hsteps
 
+include hlc GF in
 /-- **AT THE LITERAL MKFS IMAGE** (Rocq: `xv6_fs_adequacy_xv6Σ`'s `Hdisk`):
 `xv6FsAdequacy` at `fsimgSb fsimgNib fsimgCov`, `Himg` discharged by
 `FsImgBoot.fsimgHimg`; the only disk premise is that the machine is switched
 on with `fs.img` on its disk. -/
 theorem xv6FsAdequacyImg (US : USER) (g : GState)
-    (Hknot : EnvKnotAll hlc GF)
     (Hgen0 : g.gen = 0) (Hpow : g.pow = false) (Hdisk : diskOf g.m.devs = fsImgDisk)
     (n : Nat) (κs : List Obs) (t2 : List Expr) (g2 : GState)
     (hsteps : ([Expr.power], g) -<κs>->ₜₚ^[n] (t2, g2)) :
     (∀ e2, e2 ∈ t2 → Reducible (e2, g2)) ∧ xv6TracePure fsimgCov fsimgSb.sbLogstart g2 :=
-  xv6FsAdequacy (hlc := hlc) (GF := GF) US g fsimgSb fsimgNib fsimgCov Hknot Hgen0 Hpow
+  xv6FsAdequacy (hlc := hlc) (GF := GF) US g fsimgSb fsimgNib fsimgCov Hgen0 Hpow
     (fsimgHimg g Hdisk) n κs t2 g2 hsteps
 
 end unit
@@ -317,16 +308,14 @@ end unit
 /-- **THE FINAL THEOREM** (Rocq `SystemAdequacy.xv6_fs_adequacy_xv6Σ`): at
 the concrete functor list `xv6GF` (so no ghost-state class is assumed) and
 the literal mkfs image.  Premises: `USER` (D24), the machine off and never
-booted, `fs.img` on its disk -- and the environment knot (BLOCKER,
-`SystemBootEra` header). -/
+booted, `fs.img` on its disk. -/
 theorem xv6FsAdequacy_xv6GF {hlc : HasLC} (US : USER) (g : GState)
-    (Hknot : @EnvKnotAll hlc xv6GF _ _ _)
     (Hgen0 : g.gen = 0) (Hpow : g.pow = false) (Hdisk : diskOf g.m.devs = fsImgDisk)
     (n : Nat) (κs : List Obs) (t2 : List Expr) (g2 : GState)
     (hsteps : ([Expr.power], g) -<κs>->ₜₚ^[n] (t2, g2)) :
     (∀ e2, e2 ∈ t2 → Reducible (e2, g2)) ∧ xv6TracePure fsimgCov fsimgSb.sbLogstart g2 :=
   letI : MachGpreS hlc xv6GF := xv6GF_machGpreS hlc 0
-  xv6FsAdequacyImg (hlc := hlc) (GF := xv6GF) US g Hknot Hgen0 Hpow Hdisk n κs t2 g2 hsteps
+  xv6FsAdequacyImg (hlc := hlc) (GF := xv6GF) US g Hgen0 Hpow Hdisk n κs t2 g2 hsteps
 
 
 end Xv6

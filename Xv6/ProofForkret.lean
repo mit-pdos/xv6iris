@@ -62,8 +62,6 @@ set_option maxHeartbeats 4000000 in
 `fkr_close`. -/
 theorem fkr_tail_close [X : CurCtx] (PR : PREPARE_RETURN) (UC : USERRET_CLOSED) (W : IProp GF)
     (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
-    (γ0 γ1 : UartNames) (γc γl0 γl1 : GName) (γd : DiskNames) (γdl γt : GName)
-    [EnvIs (hlc := hlc) GF Γ γ0 γ1 γc γl0 γl1 γd γdl γt]
     (c : CPU) (kb : KCtx) (eb : Bool) (root : BitVec 44) (ksp : BitVec 64) (N : UtNames)
     (Vx : ProcPriv) (Mx : Nat → List (BitVec 8)) (sts : List FdState) (gn : GName)
     (cs : ExtTreeSet GName compare) (Wk : Option Uvis)
@@ -84,17 +82,15 @@ theorem fkr_tail_close [X : CurCtx] (PR : PREPARE_RETURN) (UC : USERRET_CLOSED) 
   rw [hs]
   iframe Hk Hpc Hte Hce Hpv
   iapply wpNext_intro
-  iintro %c' %R' %hR Hk Hpc Hsepc Hsc Htv Hstv Hcl #Henv Hpv
-  iapply (fkr_close UC W Γ γ0 γ1 γc γl0 γl1 γd γdl γt c' kb R' eb root ksp N Vx Mx sts gn cs Wk hΓ hj h hksp hR hgn hlen hrk hct)
-  iframe Hk Hpc Hsepc Hsc Htv Hstv Hcl Henv Hpv Hfr Hglob HG Hdone HW Hsin Hclose
+  iintro %c' %R' %hR Hk Hpc Hsepc Hsc Htv Hstv Hcl Hpv
+  iapply (fkr_close UC W Γ c' kb R' eb root ksp N Vx Mx sts gn cs Wk hΓ hj h hksp hR hgn hlen hrk hct)
+  iframe Hk Hpc Hsepc Hsc Htv Hstv Hcl Hpv Hfr Hglob HG Hdone HW Hsin Hclose
 
 set_option maxHeartbeats 4000000 in
 /-- **The steady arm** (Rocq `wp_forkret`'s `steady = true` case): the block
 whole, `firstDone`; `first` reads 0, the tail. -/
 theorem fkr_steady [X : CurCtx] (PR : PREPARE_RETURN) (UC : USERRET_CLOSED) (W : IProp GF)
     (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
-    (γ0 γ1 : UartNames) (γc γl0 γl1 : GName) (γd : DiskNames) (γdl γt : GName)
-    [EnvIs (hlc := hlc) GF Γ γ0 γ1 γc γl0 γl1 γd γdl γt]
     (c1 : CPU) (kr : KCtx) (eb : Bool) (root : BitVec 44) (N : UtNames) (V : ProcPriv)
     (M : Nat → List (BitVec 8)) (sts : List FdState) (gn : GName) (cs : ExtTreeSet GName compare)
     (hΓ : N.Γ = Γ) (hj : N.j < NPROC) (hgn : V.gen = gn)
@@ -117,7 +113,7 @@ theorem fkr_steady [X : CurCtx] (PR : PREPARE_RETURN) (UC : USERRET_CLOSED) (W :
   have hpin : eb = false → c2 = c1 := fun e => hp2 (Or.inl e)
   ihave Hte := trapCsrsExt_move c1 c2 eb hpin $$ Hte
   ihave Hce := cpuClaimExt_move c1 c2 eb _ hpin $$ Hce
-  iapply (fkr_tail_close PR UC W Γ γ0 γ1 γc γl0 γl1 γd γdl γt c2 kr2 eb root _ N V M sts gn cs
+  iapply (fkr_tail_close PR UC W Γ c2 kr2 eb root _ N V M sts gn cs
     (some (uvisOf V M [] V.gen cs N.pid)) hΓ hj hkr2 rfl hgn (urunEq_of V M [] V.gen cs N.pid) hct)
   iframe Hk Hpc Hte Hce Hpv Hfr Hglob HG Hdone HW Hclose
   unfold fkrSlotIn
@@ -129,8 +125,6 @@ set_option maxHeartbeats 8000000 in
 record and kexec's receipt. -/
 theorem fkr_boot [X : CurCtx] (PR : PREPARE_RETURN) (FS : FSINIT) (KX : KEXEC) (PN : PANIC)
     (UC : USERRET_CLOSED) (W : IProp GF) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
-    (γ0 γ1 : UartNames) (γc γl0 γl1 : GName) (γd : DiskNames) (γdl γt : GName)
-    [EnvIs (hlc := hlc) GF Γ γ0 γ1 γc γl0 γl1 γd γdl γt]
     (c1 : CPU) (kr : KCtx) (eb : Bool) (root : BitVec 44) (N : UtNames) (V : ProcPriv)
     (M : Nat → List (BitVec 8)) (sts : List FdState) (gn : GName) (cs : ExtTreeSet GName compare)
     (hΓ : N.Γ = Γ) (hj : N.j < NPROC) (hgn : V.gen = gn)
@@ -194,7 +188,7 @@ theorem fkr_boot [X : CurCtx] (PR : PREPARE_RETURN) (FS : FSINIT) (KX : KEXEC) (
   isplitl [Hbun]; · iexact Hbun
   isplitl [Hrd]; · iexact Hrd
   iintro %c4 %kb %V' %M' %hkb %⟨hfdg, hchg, hcwi, hgen, hks⟩ Hk Hpc Hte Hce Hfr Hpv Hslot
-  iapply (fkr_tail_close PR UC W Γ γ0 γ1 γc γl0 γl1 γd γdl γt c4 kb eb root _ N V' M' sts gn cs none hΓ hj hkb (by rw [hks])
+  iapply (fkr_tail_close PR UC W Γ c4 kb eb root _ N V' M' sts gn cs none hΓ hj hkb (by rw [hks])
     (hgen.trans hgn) trivial rfl)
   rw [hfdg, hchg, hcwi]
   iframe Hk Hpc Hte Hce Hpv Hfr Hglob HG Hdone HW Hclose
@@ -209,7 +203,7 @@ set_option maxHeartbeats 8000000 in
 callees' interfaces and the closed loop. -/
 theorem forkret_proof (MP : MYPROC) (RE : RELEASE) (PR : PREPARE_RETURN) (FS : FSINIT) (KX : KEXEC)
     (PN : PANIC) (UC : USERRET_CLOSED) : FORKRET :=
-  ⟨fun {hlc GF} _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ X W Γ _ γ0 γ1 γc γl0 γl1 γd γdl γt _ cpu R spie spp eb root N V M sts gn
+  ⟨fun {hlc GF} _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ X W Γ _ cpu R spie spp eb root N V M sts gn
       cs steady hΓ hj hgn hsp => by
     unfold wp_forkret_gen_body
     iintro ⟨Hk, Hpc, #Hglob, #HG, Htc, Hir, Hcl, Hlocked, HR, Hblk, HW, Hmode, Hclose⟩
@@ -226,13 +220,13 @@ theorem forkret_proof (MP : MYPROC) (RE : RELEASE) (PR : PREPARE_RETURN) (FS : F
     | true =>
       unfold parkBlock parkKey parkMode UtNames.pj
       simp only [↓reduceIte]
-      iapply (fkr_steady PR UC W Γ γ0 γ1 γc γl0 γl1 γd γdl γt c1 kr eb root N V M sts gn cs hΓ hj hgn hkr hct)
+      iapply (fkr_steady PR UC W Γ c1 kr eb root N V M sts gn cs hΓ hj hgn hkr hct)
       iframe Hk Hpc Hfr Hte Hce Hglob HG Hblk HW Hmode Hclose
     | false =>
       unfold parkBlock parkKey parkMode UtNames.pj
       simp only [Bool.false_eq_true, ↓reduceIte]
       icases Hmode with ⟨Hbun, Hrd⟩
-      iapply (fkr_boot PR FS KX PN UC W Γ γ0 γ1 γc γl0 γl1 γd γdl γt c1 kr eb root N V M sts gn cs hΓ hj hgn hkr hct)
+      iapply (fkr_boot PR FS KX PN UC W Γ c1 kr eb root N V M sts gn cs hΓ hj hgn hkr hct)
       iframe Hk Hpc Hfr Hte Hce Hglob HG Hblk HW Hbun Hrd Hclose⟩
 
 end Xv6

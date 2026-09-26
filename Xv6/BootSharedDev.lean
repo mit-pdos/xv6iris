@@ -38,7 +38,7 @@ DEVIATIONS from Rocq (none process-layer beyond those already recorded):
    too: `bslots_auth` has no Lean counterpart, SlotSupply deviation 3).
 4. Every mint runs at the AMBIENT `MachGS`: the caller runs this file at a
    provisional `MachGS.ofEra` and transports the result to the final
-   claim/environment payload by `rfl` (BootShared §4), as UartBoot /
+   claim payload by `rfl` (BootShared §4), as UartBoot /
    ProcBoot do (their deviation 3 / 1).
 
 Imports only definitional files and Spec files.

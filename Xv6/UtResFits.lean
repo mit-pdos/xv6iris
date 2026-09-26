@@ -39,7 +39,7 @@ the fit check.
    the loop reads the file system's `firstDone` instead).
 5. **The residue is pinned** (`utSysEnvAt PT Γ j`: `⌜N.Γ = Γ ∧ N.j = j⌝`
    beside `syscallEnv`): the Lean callees are stated under `[ClaimIs GF Γ]`
-   / `[EnvIs GF Γ …]` and the running context names `k.proc = procAddr j`
+   and the running context names `k.proc = procAddr j`
    OUTSIDE the residue (Rocq's per-cpu cells are inside `ut_trap`), so the
    residue must name the era's table and the slot (SpecUsertrap
    deviation 2).  Hence `usertrapResAt` / `usertrapResRunAt` /
@@ -156,6 +156,17 @@ end Res
 ticks lock and the park world, at its context. -/
 def utSysParkRows [Xc : CurCtx] (Γ : SchedNames) : IProp GF :=
   iprop(∃ γtk : GName, syscParkExtra Γ γtk ∗ parkWorld Γ)
+
+/-- The resumer's handler environment row, out of its globals' table and
+its park world's devintr credentials, at the kernel tier (Rocq: the
+resumer's `park_globals` carry `devintr_caps_any`; forkret's closer). -/
+theorem handlerEnvAt_of_parkRows [Xc : CurCtx] (hT : curTier = KTier.kpt) (Γ : SchedNames) (w ft : GName)
+    (f : FileNames) (ip : BitVec 64) :
+    parkGlobals (GF := GF) Γ w ft f ip ∗ utSysParkRows Γ ⊢ handlerEnvAt (hlc := hlc) Γ curCtx := by
+  unfold parkGlobals utSysParkRows parkWorld
+  iintro ⟨⟨#Hp, -⟩, ⟨%γtk, -, ⟨%γ0, %γ1, %γc, %γl0, %γl1, %γt, %pd, %pav, %pu, #Hc⟩, -⟩⟩
+  iapply handlerEnvAt_of_caps' Γ γ0 γ1 γc γl0 γl1 fscDisk fscDlock γt pd pav pu hT
+  iframe Hp Hc
 
 /-- **Rocq `UtResFits.usertrap_res_bare_park`**: the park's producer entry at
 the pinned residue and the park token -- `utResBare_park` with the

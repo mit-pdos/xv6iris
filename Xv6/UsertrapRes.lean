@@ -39,8 +39,8 @@ explicit in the Lean uservec/userret contracts, which take `Rut` opaque.
     `cpu_own`, `kpt_on`, `strans_*`       |
   `ut_ghosts` (½ + ¼ SIE, sret mirror)    | KCtx indices (`utCtxOk`, D27)
   `cpu_claim pj`                          | `cpuClaim cpu N.pj` (in `utResBare`)
-  `timer_cap` / `devintr_caps_any`        | `envAt curCtx` (in `utCaps`; the handler env,
-                                          |   `HandlerEnv.envFam`: procsInv + devintrCaps)
+  `timer_cap` / `devintr_caps_any`        | `handlerEnvAt N.Γ curCtx` (in `utCaps`; the handler
+                                          |   env `HandlerEnv.envFam` at ∃ names: procsInv + devintrCaps)
   `ut_tfk ksp V`                          | `utTfk cpu ksp V` (`□ kptOnAt root` + pure)
   `ut_caps N`                             | `utCaps N`
   `ut_own Rsys N U sts cs pid`            | `utOwn Rsys N V M sts cs pid`
@@ -98,10 +98,11 @@ av⌝` inside the residue; here it is the context's `avail`, and
    `kalloc_avail` are `fsReady`'s projections (as SpecKexit states them);
    `fs_crash_seam` / `gen_cert` ride `fsReady` (`fsReady_seam` /
    `fsReady_gen`, crash batch C-4); `is_kstack` is gone (4); `devintr_caps_any` + the kernelvec
-   handler's environment are ONE row, `envAt curCtx` (`HandlerEnv`:
-   `procsInv` beside `∃ pd pav pu, devintrCaps`, read with
-   `devintrCaps_of_envAt'` under the era's `EnvIs`), which is also what the
-   `csrw stvec` fold needs (`utCsrs_fold`; Rocq's `ihs_env` premise).
+   handler's environment are ONE row, `handlerEnvAt N.Γ curCtx` (`HandlerEnv`:
+   `envFam`, i.e. `procsInv` beside `∃ pd pav pu, devintrCaps`, at SOME
+   device names -- Rocq's are `ut_names`', which the Lean `UtNames` does not
+   carry, (4) -- read with `devintrCaps_of_handlerEnvAt`), which is also what
+   the `csrw stvec` fold needs (`utCsrs_fold`; Rocq's `ihs_env` premise).
    **`park_world` (the child park's world, SyscParkEnv) is not a row**: it is
    syscall-side (sys_fork's), and under D30 it belongs to the concrete
    `SyscallEnv.syscallEnv` that instantiates `Rsys`.
@@ -113,7 +114,7 @@ av⌝` inside the residue; here it is the context's `avail`, and
    (un_fn N pid)` -- `fclose_names` has no Lean counterpart).
 8. **The park** (`utResBare_park`): every `utCaps` row is supplied by the
    RESUMER at its context (`parkGlobals` + `firstDone`'s `fsReady` + its own
-   `envAt`), except init's ghost identity `initGen ip 1`, which is
+   `handlerEnvAt`), except init's ghost identity `initGen ip 1`, which is
    context-free and is the parker's (`utParkCaps`).  `parkGlobals` names
    `ip` (Rocq: `∃ ip` plus a cross-context agreement of discarded words,
    which Lean does not have); it carries the rows `utCaps` needs and nothing
@@ -385,7 +386,7 @@ lock and the ftable (syscall / kexit), the file system (fileclose / kexit /
 vmfault's kalloc pair), and `<init>`: its ghost identity and the discarded
 `initproc` cell (kexit's reparent). -/
 def utCaps (N : UtNames) : IProp GF := iprop(
-  procsInv N.Γ ∗ envAt curCtx ∗ panicEnv ∗
+  procsInv N.Γ ∗ handlerEnvAt (hlc := hlc) N.Γ curCtx ∗ panicEnv ∗
   isLock N.w waitLockAddr "wait_lock" waitLockPay ∗ isFtable N.ft N.f ∗
   fsReady (hlc := hlc) ∗ initGen N.ip 1#32 ∗ initIdentCell curCtx N.ip)
 
@@ -706,7 +707,7 @@ end Env
 A process that has never trapped is PARKED (userinit, kfork) and RESUMED by
 forkret on whatever hart and context runs it.  Every `utCaps` row is a
 handle or a cell read AT A CONTEXT, so the resumer supplies them at its own
-(`parkGlobals`, `firstDone`'s `fsReady`, its `envAt`); the one row the
+(`parkGlobals`, `firstDone`'s `fsReady`, its `handlerEnvAt`); the one row the
 resumer cannot re-derive -- `<init>`'s ghost identity -- is context-free and
 the parker's (`utParkCaps`); the bcache slots are ghost (`parkOwn`).
 Deviation 8. -/
@@ -741,7 +742,8 @@ instance parkGlobals_persistent [CurCtx] (Γ : SchedNames) (w ft : GName) (f : F
 /-- **Rocq `ut_caps_of_park`**: the parker's row and the resumer's, at the
 resumer's context, are the environment. -/
 theorem utCaps_of_park [CurCtx] (N : UtNames) :
-    utParkCaps (GF := GF) N ∗ parkGlobals N.Γ N.w N.ft N.f N.ip ∗ firstDone (hlc := hlc) ∗ envAt curCtx ⊢
+    utParkCaps (GF := GF) N ∗ parkGlobals N.Γ N.w N.ft N.f N.ip ∗ firstDone (hlc := hlc) ∗
+      handlerEnvAt (hlc := hlc) N.Γ curCtx ⊢
       utCaps N := by
   unfold utParkCaps parkGlobals firstDone utCaps
   iintro ⟨#Hig, ⟨#Hp, #Hpe, #Hwl, #Hft, #Hc⟩, ⟨-, #Hrdy, -⟩, #Henv⟩
@@ -760,7 +762,7 @@ def utParkResume (URB : CPU → CurCtx → UPtd → BitVec 64 → ProcPriv → L
     (W : IProp GF) (G : CurCtx → IProp GF) (N : UtNames) [Xc : CurCtx] (h : CPU) (P' : UPtd)
     (V' : ProcPriv) (sts' : List FdState) (cs' : ExtTreeSet GName compare) : IProp GF := iprop(
   ⌜V'.upt = P'⌝ -∗ parkGlobals N.Γ N.w N.ft N.f N.ip -∗ G Xc -∗ firstDone (hlc := hlc) -∗ W -∗
-  envAt curCtx -∗ utTfk h (V'.kstack + 4096#64) V' -∗ cpuClaim h N.pj -∗
+  handlerEnvAt (hlc := hlc) N.Γ curCtx -∗ utTfk h (V'.kstack + 4096#64) V' -∗ cpuClaim h N.pj -∗
   utBlock N.f N.pj N.pid V' -∗ fdSlots FDSPARE -∗ irefSlots IREFSPARE -∗
   fdFrags V'.fdg sts' -∗ chFrag V'.chg N.pj cs' -∗
   URB h Xc P' (V'.kstack + 4096#64) V' sts' cs' N.pid)
@@ -811,28 +813,26 @@ end Park
 /-! ## §5 The `csrw stvec, kernelvec` fold (Rocq `ut_trap_csrs_fold`) -/
 
 section Fold
-variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CurCtx]
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
+  [IrefslotG GF] [CtokG GF] [WchG GF] [DiskG GF] [CurCtx]
 
 /-- **Rocq `ut_trap_csrs_fold` / `ut_csrs_raw_fold`**: the three trap-scratch
-cells, the vector cell at kernelvec, the handler environment and the handler
-contract (`KERNELVEC.handler`) are the trap-CSR bundle and the installed
-handler.  (Rocq also folds the dangling SIE quarter and the sret mirror
-here: D27, they are the context's indices.) -/
-theorem utCsrs_fold (cpu : CPU) (ep sc tv : BitVec 64) :
+cells, the vector cell at kernelvec, the handler environment row and the
+handler contract at every environment the row names (`kvIhs`, out of
+`KERNELVEC.handler`; Rocq's `ihs_env`) are the trap-CSR bundle and the
+installed handler.  (Rocq also folds the dangling SIE quarter and the sret
+mirror here: D27, they are the context's indices.) -/
+theorem utCsrs_fold (Γ : SchedNames) (cpu : CPU) (ep sc tv : BitVec 64) :
     Register.sepc ↦ᵣ[cpu] ep ∗ Register.scause ↦ᵣ[cpu] sc ∗ Register.stval ↦ᵣ[cpu] tv ∗
-      Register.stvec ↦ᵣ[cpu] kernelvecAddr ∗ envAt curCtx ∗ □ ihs (GF := GF) ⟨cpu, kernelvecAddr⟩ ⊢
+      Register.stvec ↦ᵣ[cpu] kernelvecAddr ∗ handlerEnvAt (hlc := hlc) Γ curCtx ∗ □ kvIhs (GF := GF) Γ cpu ⊢
       trapCsrs cpu ∗ intrRes cpu := by
   iintro ⟨Hep, Hsc, Htv, Hstv, #Henv, #Hihs⟩
   isplitl [Hep Hsc Htv]
   · iapply trapCsrs_intro cpu ep sc tv
     unfold trapCsrsAt
     iframe Hep Hsc Htv
-  · unfold intrRes intrResP
-    iexists kernelvecAddr
-    iframe Hstv Henv
-    isplit
-    · ipureintro; exact kernelvecAddr_direct
-    · iexact Hihs
+  · iapply intrRes_of_kvIhs Γ cpu
+    iframe Hstv Henv Hihs
 
 end Fold
 

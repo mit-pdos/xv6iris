@@ -109,7 +109,7 @@ pages `virtio_disk_init` chose (`intrRes_of_kernelvec`), then
 theorem mn_sched (SCH : SCHEDULER) (KV : KERNELVEC) [Y : CurCtx] (hY : curTier = KTier.kpt)
     (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
     (γ0 γ1 : UartNames) (γc γl0 γl1 : GName) (γd : DiskNames) (γdl γt : GName)
-    (pd pav pu : BitVec 64) [EnvIs (hlc := hlc) GF Γ γ0 γ1 γc γl0 γl1 γd γdl γt]
+    (pd pav pu : BitVec 64)
     (cpu : CPU) (k : KCtx) (R : RegMap) (hsie : k.sie = false) (hK : schedulerSlots ≤ k.avail)
     (hnoff : k.noff = 0) (hlocks : k.locks = []) (hproc : k.proc = 0#64) (htier : k.tier = KTier.kpt) :
     kctx cpu (k.withRegs R) ∗ pcIs cpu (KA.«main» + 62#64) ∗ Register.stvec ↦ᵣ[cpu] kernelvecAddr ∗

@@ -61,9 +61,8 @@ record's own key: `uslot (uvisOf V M sts gn cs pid)`.  The sret lands at
    list, as Rocq's module-type field instantiates it.
 4. **The residue is pinned** (`usertrapResAt PT Γ j`, SpecUsertrap
    deviation 2), at the park token `ParkCap.parkToken` (where `USERTRAP` is
-   sealed, W8-P2), so the structure quantifies `Γ` (`ClaimIs`) and the
-   handler environment's names (`EnvIs`) exactly as `USERTRAP` does, and the
-   running slot is tied to the context (`hproc`) outside the residue.
+   sealed, W8-P2), so the structure quantifies `Γ` (`ClaimIs`) exactly as
+   `USERTRAP` does, and the running slot is tied to the context (`hproc`) outside the residue.
 5. **The stack gap** (above): Lean's `kctx` stack is explicit, Rocq's
    `ut_stack` budget (`⌜K_usertrap ≤ av⌝`) is inside its residue.
 6. **The trapframe page is at the entry** (`tfPageAt P.tfp V.tf`): Lean's
@@ -130,8 +129,6 @@ structure USERRET_CLOSED : Prop where
     [IregG GF] [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF]
     [CtokG GF] [WchG GF] [Appcfg GF] [FileG GF] [Fscfg] [Icfg] [CurCtx]
     (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
-    (γ0 γ1 : UartNames) (γc γl0 γl1 : GName) (γd : DiskNames) (γdl γt : GName)
-    [EnvIs (hlc := hlc) GF Γ γ0 γ1 γc γl0 γl1 γd γdl γt]
     (j : Nat) (cpu : CPU) (k : KCtx) (m : Nat) (P : UPtd) (ksp : BitVec 64) (V : ProcPriv)
     (M : Nat → List (BitVec 8)) (sts : List FdState) (gn : GName) (cs : ExtTreeSet GName compare)
     (pid : BitVec 32) (sep sc tv : BitVec 64)

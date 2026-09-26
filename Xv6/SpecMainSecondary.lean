@@ -32,9 +32,9 @@ cannot make for itself --
   (`intrRes_of_kernelvec`) and hand the scheduler its `procsInv`.
 
 The ghost names the handler environment is stated at (`Γ γ0 γ1 γc γl0 γl1
-γd γdl γt`) are the client's choice of `MachGS.envP` (`Xv6.EnvIs`), fixed
-when the era's machine instance is built, so they are PARAMETERS here, not
-Rocq's existentials; what stays existential is what hart 0 alone
+γd γdl γt`, `HandlerEnv.envFam`) are minted by the era's boot before any
+hart runs and the deposit channel is stated at them, so they are
+PARAMETERS here, not Rocq's existentials; what stays existential is what hart 0 alone
 chooses: the `pr` lock's name, the table's root / tree, and the disk's
 pages `pd pav pu` (`virtio_disk_init` picks them by `kalloc`;
 `HandlerEnv.envFam` packs them the same way, and a secondary installs its
@@ -159,7 +159,6 @@ interrupts off, depth 0, no lock, no proc), holding its own
 `started` channel at the CONCRETE deposit. -/
 def wp_main_secondary_body (X : CurCtx) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
     (γ0 γ1 : UartNames) (γc γl0 γl1 : GName) (γd : DiskNames) (γdl γt : GName)
-    [EnvIs (hlc := hlc) GF Γ γ0 γ1 γc γl0 γl1 γd γdl γt]
     (cpu : CPU) (k : KCtx) (γi : GName) (ξd : CtxId) (tlb0 : Tlb)
     (hX : X.curTier = KTier.bare) (hcpu : cpu ≠ startedPrimary) (hK : mainSecondarySlots ≤ k.avail)
     (hsie : k.sie = false) (hnoff : k.noff = 0) (hlocks : k.locks = []) (hproc : k.proc = 0#64) :
@@ -177,7 +176,6 @@ structure MAIN_SECONDARY : Prop where
     [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [DiskG GF] (X : CurCtx)
     (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
     (γ0 γ1 : UartNames) (γc γl0 γl1 : GName) (γd : DiskNames) (γdl γt : GName)
-    [EnvIs (hlc := hlc) GF Γ γ0 γ1 γc γl0 γl1 γd γdl γt]
     (cpu : CPU) (k : KCtx) (γi : GName) (ξd : CtxId) (tlb0 : Tlb) hX hcpu hK hsie hnoff hlocks hproc,
     wp_main_secondary_body (hlc := hlc) (GF := GF) X Γ γ0 γ1 γc γl0 γl1 γd γdl γt
       cpu k γi ξd tlb0 hX hcpu hK hsie hnoff hlocks hproc

@@ -37,7 +37,7 @@ been self-referential.)  `MachGpreS` carries one name (`mono_pre`'s
 name-bearing classes below.
 
 The name-bearing classes (`FdslotG BioslotG IrefslotG WchG MonoNatG`, and
-`Icfg Fscfg Appcfg ClaimIs EnvIs`) are minted per era in the final theorem
+`Icfg Fscfg Appcfg ClaimIs`) are minted per era in the final theorem
 (brief §3), not binders; the gname-only ones are shown inhabited here at an
 arbitrary name, the rest are produced by their mints.  `UexecSG`
 (`uexecSGXv6`) and `KernelImage` are global instances over `MachGS`, not

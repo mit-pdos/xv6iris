@@ -21,35 +21,17 @@ predicate's lend), every hart's `hartWP` and every device's `devWP`.
 * §1 `xv6Era_lend` (Rocq :680-750 through `SystemSlot.xv6LendUnpack`),
   `xv6Era_seam` (Rocq `Hseamg`).
 * §4 the era's instances and obligations: `eraM0` (the provisional instance
-  the shared allocation runs at), `EraEnvKnot` (see BLOCKER), and the
-  application's three per-era obligations `EraInitBoot` (Rocq `Hinit_boot`),
+  the shared allocation runs at) and the application's three per-era
+  obligations `EraInitBoot` (Rocq `Hinit_boot`),
   `EraEcho` (Rocq `Hecho`), `EraPerm` (Rocq `Hperm`).
 * §5 `xv6FixedGS` (the record literal at the composite crash slot) and
   **`xv6BootEra`** (Rocq `xv6_boot_era`), which composes: unpack
   (`powerBootRes_unpack` at `eraM0`) → lend → shared allocation at `eraM0`
   under the era's record `⟨N, appFs c, r⟩` → the final instance
-  `MachGS.ofEra E gen (procClaim Γ) … eP …` (`ClaimIs` by `rfl`, `EnvIs` from
-  the knot) → `bootSharedOut_ofEra` → `xv6Era_run` → `wpLoop_ofEra`.
-
-## BLOCKER (not a deviation to accept): the environment knot `EraEnvKnot`
-
-`MAIN` (hence `bootHartPrimary`/`bootHartSecondary`) is stated at an ambient
-instance with `[EnvIs … Γ γ0 γ1 γc γl0 γl1 γd γdl γt]`, i.e.
-`MachGS.envP ξ = envFam … ξ` AT THAT SAME INSTANCE.  `envFam` itself reads
-`MachGS.envP`: `envFam` → `procsInv` → `procLockPay` → `procSlotsAt` →
-`procCtxAt` → `▷ validCtx` → `validCtxF` → `kctx` → `sieArm` → `intrResP` →
-`envAt` → `MachGS.envP`.  So the equation is a genuine fixpoint: no
-`MachGS.ofEra … eP …` literal satisfies it by conversion (the provisional
-`envFam` at `eraM0` differs from the one at the final instance, and the
-`rfl` attempt does not terminate), and a guarded fixpoint gives only `≡`
-(on valid elements), not the Lean `Eq` `EnvIs` asks for.  Rocq has no such
-knot: `IntrDefs.intr_res` (`IntrDefs.v:2460`) ∃-PACKS the environment
-(`∃ E, intr_res_at kt E ∗ □ E XI ∗ □ env_move E`), so no instance field names
-it.  The fix belongs to MachCSL's `KCtx.intrResP`/`CtxLaws.envAt` (∃-pack the
-environment as Rocq does) or to `HandlerEnv.EnvIs` (a `⊣⊢` over a guarded
-fixpoint, with a contractiveness proof); both are edits to landed files.
-Until then `xv6BootEra` takes the knot as the named hypothesis `Hknot`, and
-EVERYTHING ELSE of the era is proved.
+  `MachGS.ofEra E gen (procClaim Γ) …` (`ClaimIs` by `rfl`; the handler
+  environment is no instance field -- MachCSL's `KCtx.intrResP` ∃-packs it,
+  as Rocq's `IntrDefs.intr_res` does) → `bootSharedOut_ofEra` →
+  `xv6Era_run` → `wpLoop_ofEra`.
 
 ## DEVIATIONS from Rocq
 
@@ -63,7 +45,7 @@ EVERYTHING ELSE of the era is proved.
    Rocq does.  `xv6Era_seam` keeps Rocq's `Hcp` form and is discharged by
    `rfl` at the literal.
 2. **The application's obligations are quantified over the era's instance
-   data** (`E gen cP cI eP ePe` and the minted classes), where Rocq
+   data** (`E gen cP cI` and the minted classes), where Rocq
    quantifies over `riscvGS`/`GenId`/the class instances with equations:
    `EraInitBoot` sets the era's record `⟨N, appFs c, r⟩` directly (Rocq:
    `file_app = MkAppcfg N A r`); `EraPerm` has no record equation
@@ -149,7 +131,7 @@ theorem xv6Era_glue (Φ : CPU → IProp GF) :
 /-- The secondaries: each destructs its own token and runs its chain. -/
 theorem xv6Era_secondaries (σ : MState) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
     (γ0 γ1 : UartNames) (γc γl0 γl1 : GName) (γd : DiskNames) (γt : GName)
-    [EnvIs (hlc := hlc) GF Γ γ0 γ1 γc γl0 γl1 γd fscDlock γt] (γi : GName) (ξd : CtxId) :
+ (γi : GName) (ξd : CtxId) :
     kernelText (GF := GF) ⊢ kernelData -∗
       startedInv γi ξd (mainDeposit Γ γ0 γ1 γc γl0 γl1 γd fscDlock γt) -∗
       ([∗list] c ∈ cpus.tail, (∃ ξ : CtxId, ctxTok (hlc := hlc) (GF := GF) c ξ) ∗
@@ -168,7 +150,6 @@ theorem xv6Era_secondaries (σ : MState) (Γ : SchedNames) [ClaimIs (hlc := hlc)
 `bootHartSecondary`. -/
 theorem xv6Era_harts (σ : MState) (ξ0 : CtxId) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
     (γ0 γ1 : UartNames) (γc γl0 γl1 : GName) (γd : DiskNames) (γt : GName)
-    [EnvIs (hlc := hlc) GF Γ γ0 γ1 γc γl0 γl1 γd fscDlock γt]
     (cn : ConsNames) (dk : Nat → BitVec 8) (sb : FsSb) (nib : Nat) (cov : ExtTreeSet Nat compare)
     (ndisk : Nat) (S : FsStateRec) (Pb : Nat → List (BitVec 8)) (Rspent : ExtTreeSet Nat compare)
     (γi : GName) (ξd : CtxId) (hcn : cn.uart = γ0) (hsnap : fsBootSnapWf dk ndisk S Pb sb nib cov) :
@@ -219,7 +200,6 @@ four device loops (the ports' permits from the application, at the era's
 console names). -/
 theorem xv6Era_run (σ : MState) (ξ0 : CtxId) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
     (γ0 γ1 : UartNames) (γc γl0 γl1 γt : GName) (cn : ConsNames) (γd : DiskNames) (ξd : CtxId)
-    [EnvIs (hlc := hlc) GF Γ γ0 γ1 γc γl0 γl1 γd fscDlock γt]
     (dk : Nat → BitVec 8) (sb : FsSb) (nib : Nat) (cov : ExtTreeSet Nat compare) (ndisk : Nat)
     (S : FsStateRec) (Pb : Nat → List (BitVec 8)) (Rspent : ExtTreeSet Nat compare)
     (hsnap : fsBootSnapWf dk ndisk S Pb sb nib cov)
@@ -324,42 +304,27 @@ section inst
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachFixedGS hlc GF]
 
 /-- The PROVISIONAL instance the shared allocation runs at: nothing it
-produces reads the claim/environment payload (`bootSharedOut_ofEra`). -/
+produces reads the claim payload (`bootSharedOut_ofEra`). -/
 @[reducible] def eraM0 (E : EraGS) (gen : Nat) : MachGS hlc GF :=
   MachGS.ofEra E gen (fun _ _ => iprop(True)) (fun _ => BI.true_intro)
-    (fun _ => iprop(True)) (fun _ => inferInstance)
 
 variable [Xv6G GF] [CtokG GF] [DiskG GF]
-
-/-- **THE ENVIRONMENT KNOT** (BLOCKER, see the header): the handler
-environment of the era's final instance.  `MAIN` wants `EnvIs … Γ …` at the
-instance its harts run at, i.e. `MachGS.envP = envFam …` at that SAME
-instance; `envFam` reads `MachGS.envP` itself (`procsInv` → `procCtxAt` →
-`validCtx` → `kctx` → `sieArm` → `intrResP` → `envAt`), so no
-`MachGS.ofEra` literal satisfies it by conversion.  Rocq has no such knot:
-`IntrDefs.intr_res` ∃-packs the environment (`IntrDefs.v:2460`). -/
-def EraEnvKnot : Prop :=
-  ∀ (E : EraGS) (gen : Nat) [FdslotG GF] [BioslotG GF] [IrefslotG GF] [WchG GF]
-    (Γ : SchedNames) (γ0 γ1 : UartNames) (γc γl0 γl1 : GName) (γd : DiskNames) (γdl γt : GName),
-    ∃ (eP : CtxId → IProp GF) (ePe : ∀ ξ : CtxId, Persistent (eP ξ)),
-      @EnvIs hlc GF (MachGS.ofEra E gen (procClaim Γ) (fun cpu => procClaim_idle Γ cpu) eP ePe)
-        _ _ _ _ _ _ _ Γ γ0 γ1 γc γl0 γl1 γd γdl γt
 
 /-- THE ECHO'S JUSTIFICATION at every era (Rocq `xv6_boot_era`'s `Hecho`,
 `∀ GEN XI`; the Lean shift is context-free). -/
 def EraEcho : Prop :=
   ∀ (E : EraGS) (gen : Nat) (cP : CPU → BitVec 64 → IProp GF) (cI : ∀ cpu : CPU, ⊢ cP cpu 0#64)
-    (eP : CtxId → IProp GF) (ePe : ∀ ξ : CtxId, Persistent (eP ξ)),
-    letI : MachGS hlc GF := MachGS.ofEra E gen cP cI eP ePe
+   ,
+    letI : MachGS hlc GF := MachGS.ofEra E gen cP cI
     (⊢@{IProp GF} consEchoShift (hlc := hlc))
 
 /-- THE PORTS' TRACE PERMITS at the era's own console names (Rocq
 `xv6_boot_era`'s `Hperm`, lane APP-IFACE (c)). -/
 def EraPerm : Prop :=
   ∀ (E : EraGS) (gen : Nat) (cP : CPU → BitVec 64 → IProp GF) (cI : ∀ cpu : CPU, ⊢ cP cpu 0#64)
-    (eP : CtxId → IProp GF) (ePe : ∀ ξ : CtxId, Persistent (eP ξ)) [Fscfg]
+    [Fscfg]
     (i : UartId) (γ : UartNames), (i = .uart0 → fscUart = γ) →
-    letI : MachGS hlc GF := MachGS.ofEra E gen cP cI eP ePe
+    letI : MachGS hlc GF := MachGS.ofEra E gen cP cI
     obsInv ⊢@{IProp GF} uartObsPermit (hlc := hlc) i γ
 
 variable [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF] [FsTopG GF] [FsLinkG GF]
@@ -372,9 +337,9 @@ invariant and the era's boot resource. -/
 def EraInitBoot {CT : Type} (N : Type) (appFs : CT → N → Aview → IProp GF)
     (appBoot : CT → Nat → N → IProp GF) (c : CT) : Prop :=
   ∀ (E : EraGS) (gen : Nat) (cP : CPU → BitVec 64 → IProp GF) (cI : ∀ cpu : CPU, ⊢ cP cpu 0#64)
-    (eP : CtxId → IProp GF) (ePe : ∀ ξ : CtxId, Persistent (eP ξ))
+   
     [WchG GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [Icfg] [Fscfg] (r : N),
-    letI : MachGS hlc GF := MachGS.ofEra E gen cP cI eP ePe
+    letI : MachGS hlc GF := MachGS.ofEra E gen cP cI
     letI : Appcfg GF := ⟨N, appFs c, r⟩
     (⊢@{IProp GF} appInv (hlc := hlc) fscFs -∗ appBoot c (gen + 1) r ==∗
       initBootBundle (hlc := hlc) (SG := uexecSGXv6) ROOTINO (List.replicate NOFILE FdState.closed))
@@ -407,9 +372,6 @@ theorem xv6BootEra {CT : Type} (N : Type) (appFs : CT → N → Aview → IProp 
     (Ai : AppIface GF) (Hinv : InvGS_gen hlc GF) (γgen γstart γreg γd γsw γobs γhist : GName)
     (c : CT) (T : List Obs) (Ptp : IProp GF)
     (Happ_xfer : ⊢@{IProp GF} appXferRaw (appFs c))
-    (Hknot : letI : MachFixedGS hlc GF := (xv6FixedGS N appFs cov sb.sbLogstart Ai Hinv γgen γstart
-      γreg γd γsw γobs γhist c T Ptp)
-      EraEnvKnot (hlc := hlc) (GF := GF))
     (Hinit_boot : letI : MachFixedGS hlc GF := (xv6FixedGS N appFs cov sb.sbLogstart Ai Hinv γgen
       γstart γreg γd γsw γobs γhist c T Ptp)
       EraInitBoot (hlc := hlc) N appFs appBoot c)
@@ -437,7 +399,7 @@ theorem xv6BootEra {CT : Type} (N : Type) (appFs : CT → N → Aview → IProp 
   iintro ⟨#Hoinv, Hres⟩
   icases powerBootRes_unpack (fun dk => mirrorOf (fsBlocks dk))
     (xv6Lend N appFs appBoot cov sb.sbLogstart c) E gen (fun _ _ => iprop(True))
-    (fun _ => BI.true_intro) (fun _ => iprop(True)) (fun _ => inferInstance) σ $$ Hres
+    (fun _ => BI.true_intro) σ $$ Hres
     with ⟨Hrows, Hlend⟩
   imod xv6Era_lend N appFs appBoot c cov sb.sbLogstart gen (diskOf σ.devs) D hrec hhwf hcovin hlogsub
     hls2 $$ Hlend with ⟨%r, %gt, %gsn, %gln, %S, %⟨hlseq, hwf⟩, Hok, Hsnap, Hbres⟩
@@ -456,25 +418,23 @@ theorem xv6BootEra {CT : Type} (N : Type) (appFs : CT → N → Aview → IProp 
       iapply Happ_xfer
     · unfold appGuest
       iapply hseam
-  -- THE FINAL INSTANCE: the claim is the proc table's, the environment the knot's
+  -- THE FINAL INSTANCE: the claim is the proc table's
   letI : Appcfg GF := ⟨N, appFs c, r⟩
-  obtain ⟨eP, ePe, hEnv⟩ := Hknot E gen Γ γ0 γ1 γc γl0 γl1 γd fscDlock γt
-  let M1 : MachGS hlc GF := MachGS.ofEra E gen (procClaim Γ) (fun cpu => procClaim_idle Γ cpu) eP ePe
+  let M1 : MachGS hlc GF := MachGS.ofEra E gen (procClaim Γ) (fun cpu => procClaim_idle Γ cpu)
   have hClaim : @ClaimIs hlc GF M1 _ Γ := @ClaimIs.mk hlc GF M1 _ Γ (fun _ _ => rfl)
   ihave Hout := bootSharedOut_ofEra E gen (fun _ _ => iprop(True)) (procClaim Γ)
-    (fun _ => BI.true_intro) (fun cpu => procClaim_idle Γ cpu) (fun _ => iprop(True)) eP
-    (fun _ => inferInstance) ePe σ ξ0 Γ γ0 γ1 γc γl0 γl1 γt cn γd ξd (diskOf σ.devs) S.fssSb (fsNib S)
+    (fun _ => BI.true_intro) (fun cpu => procClaim_idle Γ cpu) σ ξ0 Γ γ0 γ1 γc γl0 γl1 γt cn γd ξd (diskOf σ.devs) S.fssSb (fsNib S)
     cov (fsRecView (fsBlocks (diskOf σ.devs)) D) (snapSpent S (fsNib S)) $$ Hout
   -- the first process's exec bundle, at the era's record, over the lent boot resource
-  have hI := Hinit_boot E gen (procClaim Γ) (fun cpu => procClaim_idle Γ cpu) eP ePe r
+  have hI := Hinit_boot E gen (procClaim Γ) (fun cpu => procClaim_idle Γ cpu) r
   have hR := (letI : MachGS hlc GF := M1; letI : Appcfg GF := ⟨N, appFs c, r⟩;
-    haveI := hClaim; haveI := hEnv;
+    haveI := hClaim;
     xv6Era_run (hlc := hlc) (GF := GF) σ ξ0 Γ γ0 γ1 γc γl0 γl1 γt cn γd ξd (diskOf σ.devs) S.fssSb
       (fsNib S) cov XV6_DISK_BYTES S (fsRecView (fsBlocks (diskOf σ.devs)) D) (snapSpent S (fsNib S))
-      hwf (fun i γ hu => Hperm E gen (procClaim Γ) (fun cpu => procClaim_idle Γ cpu) eP ePe i γ hu)
+      hwf (fun i γ hu => Hperm E gen (procClaim Γ) (fun cpu => procClaim_idle Γ cpu) i γ hu)
       (appBoot c (gen + 1) r) hI)
   imod hR $$ Hoinv [] Hbres Hout with ⟨Hharts, Hdevs, #Hcert⟩
-  · iapply (Hecho E gen (procClaim Γ) (fun cpu => procClaim_idle Γ cpu) eP ePe)
+  · iapply (Hecho E gen (procClaim Γ) (fun cpu => procClaim_idle Γ cpu))
   have hc : @genCert hlc GF M1 ⊢ genCertAt gen E := .rfl
   have hd : ([∗list] d ∈ DevId.all, devWP (@genId hlc GF M1) d rootTask (pure ())) ⊢@{IProp GF}
       [∗list] d ∈ DevId.all, devWP gen d rootTask (pure ()) := .rfl
@@ -484,7 +444,7 @@ theorem xv6BootEra {CT : Type} (N : Type) (appFs : CT → N → Aview → IProp 
   · iapply BigSepL.bigSepL_impl $$ Hharts
     imodintro
     iintro %k %cpu %_ Hw
-    iapply wpLoop_ofEra E gen (procClaim Γ) (fun cpu => procClaim_idle Γ cpu) eP ePe cpu
+    iapply wpLoop_ofEra E gen (procClaim Γ) (fun cpu => procClaim_idle Γ cpu) cpu
     iframe Hc Hw
   · iapply hd $$ Hdevs
 

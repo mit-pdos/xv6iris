@@ -15,8 +15,10 @@ No instruction stepping.
 * THE FRAME: forkret's six slots are never popped; they are the `m = 6`
   dead slots below the stack top the loop merges back into the whole-page
   stack (`stackOwn ksp 6`).
-* THE LOOP is `USERRET_CLOSED` (W8-L), at the park token, the table and the
-  handler environment's names (`EnvIs`).
+* THE LOOP is `USERRET_CLOSED` (W8-L), at the park token and the table.
+* THE HANDLER ENVIRONMENT ROW the closer wants is assembled from the
+  resumer's globals and park world (`UtResFits.handlerEnvAt_of_parkRows`),
+  not taken from prepare_return (which drops the installed handler's).
 
 A stage file: it imports Spec and definitional files only.
 -/
@@ -81,8 +83,6 @@ set_option maxHeartbeats 4000000 in
 then the closed loop. -/
 theorem fkr_close [X : CurCtx] (UC : USERRET_CLOSED) (W : IProp GF) (Γ : SchedNames)
     [ClaimIs (hlc := hlc) GF Γ]
-    (γ0 γ1 : UartNames) (γc γl0 γl1 : GName) (γd : DiskNames) (γdl γt : GName)
-    [EnvIs (hlc := hlc) GF Γ γ0 γ1 γc γl0 γl1 γd γdl γt]
     (c : CPU) (k : KCtx) (R' : RegMap) (eb : Bool) (root : BitVec 44) (ksp : BitVec 64) (N : UtNames)
     (Vx : ProcPriv) (Mx : Nat → List (BitVec 8)) (sts : List FdState) (gn : GName)
     (cs : ExtTreeSet GName compare) (Wk : Option Uvis)
@@ -93,7 +93,7 @@ theorem fkr_close [X : CurCtx] (UC : USERRET_CLOSED) (W : IProp GF) (Γ : SchedN
     kctx c ((k.intrOff true false).withRegs R') ∗ pcIs c userretVa ∗
     Register.sepc ↦ᵣ[c] tfResumePc Vx.tf ∗
     (∃ v : BitVec 64, Register.scause ↦ᵣ[c] v) ∗ (∃ v : BitVec 64, Register.stval ↦ᵣ[c] v) ∗
-    Register.stvec ↦ᵣ[c] uservecTvec ∗ cpuClaim c (procAddr N.j) ∗ envAt curCtx ∗
+    Register.stvec ↦ᵣ[c] uservecTvec ∗ cpuClaim c (procAddr N.j) ∗
     procPrivFd N.f (procAddr N.j) N.pid (fkrPrep Vx k.root c) Mx ∗ fkrFrame ksp ∗
     parkGlobals Γ N.w N.ft N.f N.ip ∗ utSysParkRows Γ ∗ firstDone (hlc := hlc) ∗ W ∗
     fkrSlotIn (hlc := hlc) Wk Vx Mx sts gn cs N.pid ∗
@@ -112,7 +112,7 @@ theorem fkr_close [X : CurCtx] (UC : USERRET_CLOSED) (W : IProp GF) (Γ : SchedN
     cases Wk with
     | none => trivial
     | some W0 => exact urunEq_resume hrk hu rfl rfl rfl rfl rfl
-  iintro ⟨Hk, Hpc, Hsepc, ⟨%sc, Hsc⟩, ⟨%tv, Htv⟩, Hstv, Hcl, #Henv, Hpv, Hfr, #Hglob, #HG, #Hdone, HW, Hsin, Hclose⟩
+  iintro ⟨Hk, Hpc, Hsepc, ⟨%sc, Hsc⟩, ⟨%tv, Htv⟩, Hstv, Hcl, Hpv, Hfr, #Hglob, #HG, #Hdone, HW, Hsin, Hclose⟩
   icases ut_kctx_kptOnAt c _ (by simp only [KCtx.withRegs_tier, KCtx.intrOff_tier]; exact h.tier)
     $$ Hk with ⟨#Hkp, Hk⟩
   ihave #Hkp' := (show kptOnAt (GF := GF) ((k.intrOff true false).withRegs R').root ⊢
@@ -127,6 +127,9 @@ theorem fkr_close [X : CurCtx] (UC : USERRET_CLOSED) (W : IProp GF) (Γ : SchedN
   ihave #Hglob' := (show parkGlobals (hlc := hlc) (GF := GF) Γ N.w N.ft N.f N.ip ⊢
       parkGlobals N.Γ N.w N.ft N.f N.ip from by rw [hΓ]) $$ Hglob
   ihave #HG' := (show utSysParkRows (hlc := hlc) (GF := GF) Γ ⊢ utSysParkRows N.Γ from by rw [hΓ]) $$ HG
+  -- the resumer's handler environment row, from its globals and park world
+  ihave #Henv := handlerEnvAt_of_parkRows (hlc := hlc) (GF := GF) rfl N.Γ N.w N.ft N.f N.ip $$ [Hglob' HG']
+  · iframe Hglob' HG'
   unfold forkretCloser forkretResumeK
   ihave Hcl := (show cpuClaim (GF := GF) c (procAddr N.j) ⊢ cpuClaim c N.pj from .rfl) $$ Hcl
   ihave Hblk := (show utBlock (GF := GF) N.f (procAddr N.j) N.pid (fkrPrep Vx k.root c) ⊢
@@ -149,7 +152,7 @@ theorem fkr_close [X : CurCtx] (UC : USERRET_CLOSED) (W : IProp GF) (Γ : SchedN
       iexact Hsin
   have hsp6 : ((k.intrOff true false).withRegs R').sp + 8#64 * BitVec.ofNat 64 6 = ksp := by
     simp only [KCtx.sp, KCtx.withRegs_regs, hR.2, h.sp]; bv_omega
-  have hl := UC.wp_userret_closed (hlc := hlc) (GF := GF) Γ γ0 γ1 γc γl0 γl1 γd γdl γt N.j c
+  have hl := UC.wp_userret_closed (hlc := hlc) (GF := GF) Γ N.j c
     ((k.intrOff true false).withRegs R') 6 (fkrPrep Vx k.root c).upt ksp (fkrPrep Vx k.root c) Mx sts gn cs
     N.pid (tfResumePc (fkrPrep Vx k.root c).tf) sc tv hj
     (by simp only [KCtx.withRegs_proc, KCtx.intrOff_proc]; exact h.proc) ⟨rfl, rfl, rfl⟩

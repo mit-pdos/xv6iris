@@ -730,25 +730,23 @@ is the ambient instance at those, and `wpLoop_ofEra` turns the client's
 
 /-- The ambient instance at era `E`, generation `gen`, with the client's
 running-proc claim `cP` (`MachCSL.KCtx.cpuClaim`; `cI`: the idle claim is
-free) and its handler environment `eP` (`MachCSL.KCtx.intrResP`; `ePe`: the
-environment is persistent). -/
+free).  The handler environment is NOT an instance field: the installed
+handler ∃-packs it (`MachCSL.KCtx.intrResP`, Rocq `IntrDefs.intr_res`). -/
 @[reducible] def MachGS.ofEra (E : EraGS) (gen : Nat) (cP : CPU → BitVec 64 → IProp GF)
-    (cI : ∀ cpu : CPU, ⊢ cP cpu 0#64) (eP : CtxId → IProp GF)
-    (ePe : ∀ ξ : CtxId, Persistent (eP ξ)) : MachGS hlc GF :=
+    (cI : ∀ cpu : CPU, ⊢ cP cpu 0#64) : MachGS hlc GF :=
   { regName := E.regName, heapName := E.heapName, metaName := E.metaName, viewName := E.viewName, iviewName := E.iviewName,
     rviewName := E.rviewName, topName := E.topName, authName := E.authName, resvName := E.resvName,
     lockSetName := E.lockSetName, kmapName := E.kmapName, kptRootName := E.kptRootName,
-    devName := E.devName, mirrorName := E.mirrorName, gen := gen, claimP := cP, claim_idle := cI, envP := eP, env_persistent := ePe }
+    devName := E.devName, mirrorName := E.mirrorName, gen := gen, claimP := cP, claim_idle := cI }
 
 theorem wpLoop_ofEra (E : EraGS) (gen : Nat) (cP : CPU → BitVec 64 → IProp GF)
-    (cI : ∀ cpu : CPU, ⊢ cP cpu 0#64) (eP : CtxId → IProp GF)
-    (ePe : ∀ ξ : CtxId, Persistent (eP ξ)) (cpu : CPU) :
-    genCertAt gen E ∗ @wpLoop hlc GF (MachGS.ofEra E gen cP cI eP ePe) cpu ⊢@{IProp GF}
+    (cI : ∀ cpu : CPU, ⊢ cP cpu 0#64) (cpu : CPU) :
+    genCertAt gen E ∗ @wpLoop hlc GF (MachGS.ofEra E gen cP cI) cpu ⊢@{IProp GF}
       hartWP gen cpu (pure ()) := by
   iintro ⟨Hcert, Hwp⟩
   unfold wpLoop wpHart
-  rw [show @genId hlc GF (MachGS.ofEra E gen cP cI eP ePe) = gen from rfl,
-    show @genCert hlc GF (MachGS.ofEra E gen cP cI eP ePe) = genCertAt gen E from rfl]
+  rw [show @genId hlc GF (MachGS.ofEra E gen cP cI) = gen from rfl,
+    show @genCert hlc GF (MachGS.ofEra E gen cP cI) = genCertAt gen E from rfl]
   iapply Hwp
   iexact Hcert
 

@@ -175,7 +175,8 @@ def parkResumeK (URB : ParkURB GF) (W : IProp GF) (N : UtNames) (g γch : GName)
   iprop(⌜V'.upt = P'⌝ -∗ ⌜V'.fdg = g⌝ -∗ ⌜V'.chg = γch⌝ -∗ ⌜V'.gen = gn⌝ -∗ ⌜V'.cwi = cw⌝ -∗
     ⌜parkRunKey Wk V' M'⌝ -∗
     parkGlobals N.Γ N.w N.ft N.f N.ip -∗ utSysParkRows N.Γ -∗ firstDone (hlc := hlc) -∗ W -∗
-    envAt curCtx -∗ utTfk h (V'.kstack + 4096#64) V' -∗ cpuClaim h N.pj -∗ utBlock N.f N.pj N.pid V' -∗
+    handlerEnvAt (hlc := hlc) N.Γ curCtx -∗ utTfk h (V'.kstack + 4096#64) V' -∗ cpuClaim h N.pj -∗
+    utBlock N.f N.pj N.pid V' -∗
     fdSlots FDSPARE -∗ irefSlots IREFSPARE -∗
     (URB N.j h Xc P' (V'.kstack + 4096#64) V' sts cs N.pid ∗
       parkSlotOut (hlc := hlc) (SG := SG) Wk V' M' sts gn cs N.pid))

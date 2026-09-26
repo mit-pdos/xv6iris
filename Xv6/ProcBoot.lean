@@ -28,7 +28,7 @@ DEVIATIONS from Rocq:
    minted by `power_boot_res` (the framework knows `nproc`); Lean's MachCSL
    has no `NPROC`, so the names live in the client's `SchedNames` and are
    minted here, before the boot fixes `claimP := procClaim Γ`.  The rows are
-   the same proposition at every `MachGS.ofEra` choice of claim/environment
+   the same proposition at every `MachGS.ofEra` choice of claim
    payload (`procBootRows_ofEra`, by `rfl`).
 2. Name TABLES, not lists: `SchedNames` fields are total functions (of the
    index, or of the slot address for `used`), so the mint builds functions
@@ -164,11 +164,10 @@ variable {hlc : HasLC} {GF : BundledGFunctors} [MachFixedGS hlc GF] [Xv6G GF]
 
 theorem procBootRows_ofEra (E : EraGS) (gen : Nat)
     (cP cP' : CPU → BitVec 64 → IProp GF) (cI : ∀ cpu : CPU, ⊢ cP cpu 0#64)
-    (cI' : ∀ cpu : CPU, ⊢ cP' cpu 0#64) (eP eP' : CtxId → IProp GF)
-    (ePe : ∀ ξ : CtxId, Persistent (eP ξ)) (ePe' : ∀ ξ : CtxId, Persistent (eP' ξ))
+    (cI' : ∀ cpu : CPU, ⊢ cP' cpu 0#64)
     (Γ : SchedNames) (c : CPU) :
-    @procBootRows hlc GF (MachGS.ofEra E gen cP cI eP ePe) _ Γ c ⊢
-      @procBootRows hlc GF (MachGS.ofEra E gen cP' cI' eP' ePe') _ Γ c := .rfl
+    @procBootRows hlc GF (MachGS.ofEra E gen cP cI) _ Γ c ⊢
+      @procBootRows hlc GF (MachGS.ofEra E gen cP' cI') _ Γ c := .rfl
 
 end ofEra
 
