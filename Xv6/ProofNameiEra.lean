@@ -24,6 +24,7 @@ live in `ProofNamei`, which a Proof file may not import).
 -/
 import Xv6.NameiFrame
 import Xv6.SpecNameiEra
+import Xv6.SpecNamexEra
 
 namespace Xv6
 

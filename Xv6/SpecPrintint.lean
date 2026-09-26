@@ -9,8 +9,7 @@ this file used to say was the pre-163d39b number, printint over consputc).
 Imports only definitional files (never a `Code*` or `Proof*` file).
 -/
 import Xv6.Image
-import Xv6.SpecConsputc
-import Xv6.KernelData
+import Xv6.UartInv
 
 namespace Xv6
 

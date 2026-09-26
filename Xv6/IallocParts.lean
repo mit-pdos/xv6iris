@@ -24,7 +24,10 @@ Lean's `MEMSET` post is already `List.replicate n (low byte of a1)`.
 -/
 import Xv6.SpecIalloc
 import Xv6.DinodeSlot
-import Xv6.FsCallSitesF
+import Xv6.SpecBrelse
+import Xv6.SpecLogWrite
+import Xv6.FsWords
+import Xv6.SpecIget
 
 namespace Xv6
 

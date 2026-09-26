@@ -13,7 +13,7 @@ computing form `fsImgBlock` (`Xv6/FsImgDisk.lean` deviation 2), and the files
 build in parallel.  Leaf rule: no proof file imports any of them.
 -/
 import Xv6.FsImgDisk
-import Xv6.FsImgWf
+import Xv6.FsImgInode
 
 namespace Xv6
 

@@ -15,10 +15,11 @@ panic arm.  The resources are the weakest that suffice: a fraction of
 `tfArgIdx i = 14 + i`, exactly the displacement `c.ld a0,<112+8i>(a5)`
 encodes.
 -/
-import Xv6.ProcDefs
 import Xv6.UPtDefs
 import Xv6.Image
 import MachCSL.WpSmodeIntr
+import Xv6.IrefSlots
+import Xv6.SlotGen
 
 namespace Xv6
 

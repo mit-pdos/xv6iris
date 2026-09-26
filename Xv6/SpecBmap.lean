@@ -121,14 +121,7 @@ their lemmas; ProofCreate*/WriteiBudget use them by name.
 
 Imports only definitional files and callee `Spec*` files.
 -/
-import MachCSL.WpSmodeFrame
-import Xv6.BitmapInv
 import Xv6.InodeInv
-import Xv6.IcacheRefDefs
-import Xv6.FsBytesMint
-import Xv6.SpecBread
-import Xv6.SpecBrelse
-import Xv6.SpecLogWrite
 import Xv6.SpecBalloc
 
 namespace Xv6

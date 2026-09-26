@@ -82,7 +82,7 @@ bodies stated here:
 * `cr_cont_body` IS `SpecCreate.createPost` (one name, not two).
 -/
 import Xv6.CreateSharedRegs
-import Xv6.CodeTactics
+import Xv6.SpecCreate
 
 namespace Xv6
 

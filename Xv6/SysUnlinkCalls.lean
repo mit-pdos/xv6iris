@@ -47,9 +47,13 @@ ones, so the callee hands them back into nothing.
    below only package the two call shapes; the shrink / grow are the
    walk's.
 -/
-import Xv6.SysUnlinkFrame
-import Xv6.FsCallSites
 import Xv6.FsCallSitesI
+import Xv6.SpecIupdate
+import Xv6.SysfileCalls
+import Xv6.SpecIlock
+import Xv6.SpecWritei
+import Xv6.SpecNamecmp
+import Xv6.SpecNparWrapEra
 
 namespace Xv6
 

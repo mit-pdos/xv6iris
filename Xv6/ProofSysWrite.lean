@@ -35,6 +35,8 @@ block joined back.
    epilogue).
 -/
 import Xv6.SysWriteParts
+import Xv6.SysfileCalls
+import Xv6.SpecSysWrite
 
 namespace Xv6
 

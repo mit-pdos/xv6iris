@@ -17,11 +17,11 @@ the only callee-saved registers balloc never saves); `sp` is carried as
 `ba_buf_all` are `MachCSL.byteBuf_upd` and `Xv6.dsHold_swap` here (the
 port's buffer is already a byte LIST).
 -/
-import Xv6.SpecBalloc
 import Xv6.DinodeSlot
-import Xv6.CodeTactics
-import Xv6.BallocParts
-import Xv6.FsCallSites
+import Xv6.SpecPrintk
+import Xv6.BitmapInv
+import Xv6.SpecLogWrite
+import Xv6.FsWords
 
 namespace Xv6
 

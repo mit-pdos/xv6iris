@@ -48,9 +48,8 @@ Rocq's header, kept because the reasons are the content:
 
 Nothing.
 -/
-import Xv6.FsAbsDelta
-import Xv6.UMem
 import Xv6.UMemLemmas
+import Xv6.FsAbsDefs
 
 namespace Xv6
 

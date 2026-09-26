@@ -3,7 +3,6 @@ Proof of `memmove`'s specification (`SpecMemmove.MEMMOVE`): the prologue
 and epilogue rules, the two copy loops by induction on the remaining
 count, the instruction rules chained -- no symbolic execution.
 -/
-import MachCSL.WpSmodeFrame
 import Xv6.SpecMemmove
 import Xv6.CodeTactics
 

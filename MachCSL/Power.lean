@@ -24,7 +24,6 @@ ambient `MachGS` with that era and generation and discharges each hart's
 `wpLoop` from the boot resources -- the same shape as the Rocq prototype's
 `RiscvAdequacy.wp_power_loop`.
 -/
-import MachCSL.Wp
 import MachCSL.WpDev
 import MachCSL.KMap
 import MachCSL.WireInv

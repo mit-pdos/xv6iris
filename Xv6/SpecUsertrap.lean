@@ -100,11 +100,7 @@ Rocq's (`utPayIn`, `utKillIn`, `utKillOut`, `utResumeIn`).
 Imports only definitional files and Spec files (`UexecExecInst` for the
 instance, deviation 10).
 -/
-import Xv6.UtResFits
-import Xv6.ParkCap
-import Xv6.SpecSyscall
 import Xv6.UexecRound
-import Xv6.HandlerEnv
 import Xv6.UexecExecInst
 
 namespace Xv6

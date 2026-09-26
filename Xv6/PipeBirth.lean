@@ -20,10 +20,6 @@ its cancellable lock, and the invariant `isPipe`.
 A definitional/lemma file: it never touches a `Code*` file.
 -/
 import Xv6.PipeInv
-import Xv6.PipeInvDefs
-import Xv6.KallocDefs
-import MachCSL.Lock
-import MachCSL.ByteWord
 
 namespace Xv6
 

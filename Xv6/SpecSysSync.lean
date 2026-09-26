@@ -30,11 +30,8 @@ honestly stated -- see Rocq `SpecSysSync.v`'s last header section).
 
 Imports only definitional files (never a `Code*` or `Proof*` file).
 -/
-import MachCSL.WpSmodeFrame
 import Xv6.LogInv
 import Xv6.SpecSleep
-import Xv6.SpecAcquire
-import Xv6.SpecRelease
 
 namespace Xv6
 

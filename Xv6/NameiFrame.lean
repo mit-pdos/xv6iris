@@ -20,12 +20,8 @@ ProofIunlockput shape, `wp_prologue4s1_gen` minus the `s1` store); the
 carve is over `byteBuf` / `wordToBytes` (dirlookup's `de` move,
 `Xv6/DirlookupParts.lean`) instead of `bytes_own` / `bb_any_named`.
 -/
-import Xv6.SpecNamei
-import MachCSL.WpSmodeFrame
 import MachCSL.WpSmodeFrame12b
-import MachCSL.ByteWord
 import Xv6.SpecNamecmp
-import Xv6.CodeTactics
 
 namespace Xv6
 

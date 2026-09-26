@@ -24,7 +24,7 @@ at its own `wpNext k.sie`.  The prologue / epilogue are namex's own frame
 rules (`Xv6/NamexFrame.lean`), shared with the walk, as in Rocq.
 -/
 import Xv6.NamexFrame
-import Xv6.CodeTactics
+import Xv6.NamexParts
 
 namespace Xv6
 

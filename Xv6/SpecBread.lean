@@ -47,12 +47,9 @@ threads the full running-process bundle and its crossing is the literal
 
 Imports only definitional files (never a `Code*` or `Proof*` file).
 -/
-import MachCSL.WpSmodeFrame
-import MachCSL.Lock
 import Xv6.BcacheInv
 import Xv6.SpecPanic
 import Xv6.SpecVirtioDiskRw
-import Xv6.SpecAcquiresleep
 
 namespace Xv6
 

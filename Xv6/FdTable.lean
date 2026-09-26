@@ -43,11 +43,11 @@ Rocq's `proc_priv_core` D8 conjuncts (`first_tok`, `∃ Q, gen_kq ∗ my_pay`,
 the `p->xstate` half, `gen_halves_priv`) ride the core as ONE named row,
 `procGenAt` (D8 wiring), the core's third conjunct.
 -/
-import Xv6.FileDefs
 import Xv6.FileInv
 import Xv6.ProcInv
 import Xv6.FirstTok
 import Xv6.ProcPrivBare
+import Xv6.DiskTier
 
 namespace Xv6
 

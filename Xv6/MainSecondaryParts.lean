@@ -37,10 +37,10 @@ Rocq's `ms_inithart_sched` also allocates the SIE live-bit invariant
 (`intr_inv_alloc_off`); Lean has no SIE ghost (D27), so that step is the
 `intrRes_of_kernelvec` fold alone.
 -/
-import MachCSL.WpSmodeFrame
-import MachCSL.WpSmodeFenceFloor
 import Xv6.SpecMainSecondary
-import Xv6.CodeTactics
+import Xv6.SpecCpuid
+import Xv6.SpecTrapinithart
+import Xv6.SpecPlicinithart
 
 namespace Xv6
 

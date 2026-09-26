@@ -5,9 +5,6 @@ calls `acquire`/`release`, `myproc`, `killed`, `sleep_prepare`/`sleep` and
 still takes the page-table walkers as parameters).
 -/
 import Xv6.ProofConsoleread
-import Xv6.LinkAcquire
-import Xv6.LinkRelease
-import Xv6.LinkMyproc
 import Xv6.LinkKilled
 import Xv6.LinkSleepPrepare
 import Xv6.LinkSleep

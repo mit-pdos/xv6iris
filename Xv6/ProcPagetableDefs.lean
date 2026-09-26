@@ -7,13 +7,12 @@ addresses, and the call rules of the four user-memory callees
 Imports only definitional and Spec files (never a `Code*`, `Proof*` or
 `Link*` file).
 -/
-import MachCSL.WpSmodeFrame
 import Xv6.SpecUvmcreate
 import Xv6.SpecMappages
 import Xv6.SpecUvmunmap
 import Xv6.SpecUvmfree
 import Xv6.UPtPptLemmas
-import Xv6.CodeTactics
+import Xv6.UPtLemmas
 
 namespace Xv6
 

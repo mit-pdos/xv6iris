@@ -8,10 +8,7 @@ parameters of `LinkCopyout`).
 -/
 import Xv6.ProofReadi
 import Xv6.LinkBmapNoalloc
-import Xv6.LinkBread
-import Xv6.LinkBrelse
 import Xv6.LinkEitherCopyout
-import Xv6.LinkMyproc
 import Xv6.LinkMemmove
 
 namespace Xv6

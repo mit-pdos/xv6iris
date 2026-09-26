@@ -36,6 +36,7 @@ projection family); the superblock cells are the persistent
    nothing.
 -/
 import Xv6.SysLinkFrame
+import Xv6.SpecNamecmp
 
 namespace Xv6
 

@@ -30,8 +30,7 @@ What this file provides:
   switch to a user root is that execute stage at the user root.
 -/
 import MachCSL.WpSmodeCycleT
-import MachCSL.WpSmodeSatp
-import MachCSL.WpSmodeMem
+import MachCSL.WpSmodeFrame
 
 namespace MachCSL
 

@@ -28,8 +28,6 @@ two.
 
 Imports only definitional files (never a `Code*` or `Proof*` file).
 -/
-import MachCSL.CallConv
-import Xv6.Image
 import Xv6.SpecPlicClaim
 
 namespace Xv6

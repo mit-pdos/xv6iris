@@ -147,17 +147,15 @@ leaves (`SysOpenBits`, `SysOpenBudget`).
 -/
 import Xv6.SpecSysOpen
 import Xv6.SysOpenBits
-import Xv6.SysOpenBudget
-import Xv6.FsAbsOpenFire
-import Xv6.ProcPrivAcc
 import Xv6.KstackMap
-import Xv6.FilePay
 import Xv6.FileFrac
-import Xv6.UserOff
-import MachCSL.WpSmodeFrame
-import MachCSL.WpSmodeFrame12b
-import MachCSL.ByteWord
-import Xv6.CodeTactics
+import Xv6.SpecArgstr
+import Xv6.SpecArgint
+import Xv6.SpecIunlock
+import Xv6.SpecIunlockput
+import Xv6.SpecFileclose
+import Xv6.SpecIlock
+import Xv6.SpecNamei
 
 namespace Xv6
 

@@ -36,7 +36,7 @@ package's `firstDone`.
 
 Imports only definitional files and Spec files.
 -/
-import Xv6.SpecForkret
+import Xv6.UexecExecInst
 
 namespace Xv6
 

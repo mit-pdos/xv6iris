@@ -12,9 +12,9 @@ cannot move, the id is the entry hart's -- so the contract is stated at
 
 Imports only definitional files (never a `Code*` or `Proof*` file).
 -/
-import MachCSL.CallConv
 import Xv6.Image
 import Xv6.Geom
+import MachCSL.WpSmodeCtl
 
 namespace Xv6
 

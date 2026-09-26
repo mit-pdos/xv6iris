@@ -13,9 +13,6 @@ refuted from the contract's `vMagic.toNat = FSMAGIC`, an IMAGE premise about
 the 32 bytes mkfs wrote into block 1.
 -/
 import Xv6.ProofFsinit
-import Xv6.LinkBread
-import Xv6.LinkMemmove
-import Xv6.LinkBrelse
 import Xv6.LinkInitlog
 import Xv6.LinkIreclaim
 

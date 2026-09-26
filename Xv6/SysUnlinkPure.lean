@@ -60,13 +60,10 @@ Rocq); the walk is `SysUnlinkW1..W5D` (not yet written).
 * `su_dummyV`: DEAD by Rocq's own comment ("kept only until the last
   reference goes"; grep: no reference outside ProofSysUnlinkPure.v).
 -/
-import Xv6.SysUnlinkParts
 import Xv6.SpecDirlookup
-import Xv6.SpecReadi
 import Xv6.SpecWritei
 import Xv6.SpecIput
-import Xv6.DirentEnc
-import Xv6.ProcDefs
+import Xv6.FsWords
 
 namespace Xv6
 

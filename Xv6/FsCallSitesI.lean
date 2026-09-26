@@ -17,7 +17,8 @@ ONE function, so a call-site form two functions need lives here once.
 import Xv6.SpecReadi
 import Xv6.FsWords
 import Xv6.FsCfgDefs
-import Xv6.InodeRegionInv
+import Xv6.InodeRegion
+import Xv6.AppCfg
 
 namespace Xv6
 

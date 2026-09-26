@@ -3,7 +3,6 @@ Proof of `strlen`'s specification (`SpecStrlen.STRLEN`): the prologue and
 epilogue rules, the loop by induction on the remaining length, the
 instruction rules chained -- no symbolic execution.
 -/
-import MachCSL.WpSmodeFrame
 import Xv6.SpecStrlen
 import Xv6.CodeTactics
 import Xv6.StepLemmas

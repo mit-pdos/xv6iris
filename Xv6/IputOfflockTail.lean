@@ -5,6 +5,7 @@ a0,s1 ; jal brelse`, the three restores `ld s2/s3/s4`, `j +0x30`, and the
 epilogue (`IputParts.iput_epi`).  A stage file of iput's proof.
 -/
 import Xv6.IputOfflockParts
+import Xv6.IputParts
 
 namespace Xv6
 

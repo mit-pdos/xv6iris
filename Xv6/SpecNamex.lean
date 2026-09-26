@@ -121,12 +121,9 @@ so the loop is namex's own and `Xv6/PathElems.lean` models it directly.
 Imports only definitional files and callee `Spec*` files.
 -/
 import Xv6.SpecDirlookup
-import Xv6.SpecIunlockput
-import Xv6.SpecIlock
-import Xv6.SpecIdup
-import Xv6.SpecMyproc
-import Xv6.SpecMemmove
 import Xv6.PathElems
+import Xv6.SpecIput
+import Xv6.SpecIget
 
 namespace Xv6
 

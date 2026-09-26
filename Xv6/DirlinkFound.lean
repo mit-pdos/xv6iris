@@ -18,6 +18,7 @@ the seam (Rocq's GR-2c finding 5), and the arm reports `a0 = -1`, the
 directory UNCHANGED, `tot = 0`.
 -/
 import Xv6.DirlinkTail
+import Xv6.DirlinkDefs
 
 namespace Xv6
 

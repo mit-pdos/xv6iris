@@ -29,9 +29,7 @@ caller's store obligation (`UartLinks.storeOb`); the RHR pop hands out the
 popped byte's history, rider and the token at its new anchor.
 -/
 import MachCSL.WpSmodeDev
-import Xv6.UartTrace
 import Xv6.UartModel
-import Xv6.UartGhosts
 import Xv6.UartLinks
 
 namespace Xv6

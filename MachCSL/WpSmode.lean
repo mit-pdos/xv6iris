@@ -10,13 +10,9 @@ interrupts disabled -- the regime of early boot (`main` before
 * the PMP check passes for kernel accesses under xv6's tables in S-mode;
 * fetch at `satp = 0` is physical.
 -/
-import MachCSL.KCtx
-import MachCSL.WpStagesM
-import MachCSL.WpCycle
-import MachCSL.WpMmodeAlu
-import MachCSL.WpMmode
-import MachCSL.WpAluFile
 import MachCSL.SConfPhysDefs
+import MachCSL.WpPmpXv6
+import MachCSL.WpStages
 
 
 namespace MachCSL

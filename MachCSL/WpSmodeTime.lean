@@ -32,7 +32,8 @@ The cycle schema `wpLoop_s_instr` hands the execute stage no clock cells
 re-states it over `execSpecClkPP` (`wpLoop_s_instr_clk`) -- the same proof,
 with the clock cells lent to the stage.
 -/
-import MachCSL.WpSmodeTrapCsr
+import MachCSL.WpCsr
+import MachCSL.WpSmodeCycle
 
 namespace MachCSL
 

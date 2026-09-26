@@ -3,7 +3,6 @@ Proof of `memcmp`'s specification (`SpecMemcmp.MEMCMP`): the prologue and
 epilogue rules, the loop by induction on the remaining length, the
 instruction rules chained -- no symbolic execution.
 -/
-import MachCSL.WpSmodeFrame
 import Xv6.SpecMemcmp
 import Xv6.CodeTactics
 import Xv6.StepLemmas

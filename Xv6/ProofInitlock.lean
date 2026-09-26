@@ -4,7 +4,6 @@ prologue and epilogue rules, the name store (an ordinary word store) and
 the two MINTING stores (`MachCSL.wp_s_sw_mint`, `MachCSL.wp_s_sd_mint`),
 whose own positions become the two word cells' floors.
 -/
-import MachCSL.WpSmodeFrame
 import MachCSL.WpSmodeMint
 import Xv6.SpecInitlock
 import Xv6.CodeTactics

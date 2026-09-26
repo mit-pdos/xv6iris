@@ -8,7 +8,6 @@ induction) reduces the stage to one symbolic execution of the loop body at an
 arbitrary entry index.
 -/
 import MachCSL.Tactics
-import MachCSL.Platform
 
 namespace MachCSL
 

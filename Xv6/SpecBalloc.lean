@@ -93,13 +93,8 @@ as `Xv6/SpecBread.lean` does, and its crossing is the literal `true`.
 
 Imports only definitional files (never a `Code*` or `Proof*` file).
 -/
-import MachCSL.WpSmodeFrame
 import Xv6.BitmapInv
 import Xv6.SpecBread
-import Xv6.SpecBrelse
-import Xv6.SpecLogWrite
-import Xv6.SpecMemset
-import Xv6.SpecPrintk
 
 namespace Xv6
 

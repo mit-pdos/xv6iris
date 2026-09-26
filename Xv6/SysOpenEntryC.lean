@@ -72,6 +72,7 @@ call-site file.
 -/
 import Xv6.SysOpenCreArm
 import Xv6.SysfileCalls
+import Xv6.FsAbsOpenFire
 
 namespace Xv6
 

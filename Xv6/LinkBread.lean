@@ -4,15 +4,9 @@
 `virtio_disk_rw` and `panic` (itself closed with the proved `printk`).
 -/
 import Xv6.ProofBread
-import Xv6.LinkAcquire
-import Xv6.LinkRelease
 import Xv6.LinkAcquiresleep
 import Xv6.LinkVirtioDiskRw
 import Xv6.LinkPanic
-import Xv6.LinkMyproc
-import Xv6.LinkSleep
-import Xv6.LinkSleepPrepare
-import Xv6.LinkSched
 
 namespace Xv6
 

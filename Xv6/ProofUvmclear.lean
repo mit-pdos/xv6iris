@@ -5,13 +5,7 @@ interface of the non-allocating `walk`.
 `uvmclear(pt, va)` walks to `va`'s leaf and clears `PTE_U` in place.  The
 arithmetic facts and the `walk` call rule are in `Xv6/VmfaultDefs.lean`.
 -/
-import MachCSL.WpSmodeFrame
-import MachCSL.Lock
-import Xv6.SpecUvmclear
-import Xv6.SpecWalk
-import Xv6.UPtFaultLemmas
 import Xv6.VmfaultDefs
-import Xv6.CodeTactics
 
 namespace Xv6
 

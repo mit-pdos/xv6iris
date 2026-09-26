@@ -82,7 +82,7 @@ import Xv6.SpecLogWrite
 import Xv6.LogLedger
 import Xv6.BcacheLock
 import Xv6.CodeTactics
-import MachCSL.WpSmodeFrame12b
+import Xv6.SpecBpin
 
 namespace Xv6
 

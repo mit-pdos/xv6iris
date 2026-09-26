@@ -13,9 +13,6 @@ the machine-mode stage lemmas need of `c`: interrupts globally disabled
 (`mstatus.MIE = 0`), no modified privilege for data accesses (`MPRV = 0`), and
 the PMP check passing for RAM accesses.
 -/
-import MachCSL.Boot
-import MachCSL.HwConfig
-import MachCSL.PlatformFacts
 import MachCSL.WpPmp
 
 namespace MachCSL

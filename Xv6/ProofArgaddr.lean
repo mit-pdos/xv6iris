@@ -8,8 +8,9 @@ in `s1` across the call (`c.mv s1,a1`), and the whole 64-bit result goes
 into the caller's `uint64` cell by `c.sd` (`(KernelSyms.«argaddr» + 0x10)`).
 -/
 import Xv6.SpecArgaddr
-import Xv6.ArgLemmas
 import Xv6.CodeTactics
+import MachCSL.WpSmodeFrame
+import Xv6.SpecMyproc
 
 namespace Xv6
 

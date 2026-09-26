@@ -12,7 +12,7 @@ carry the same facts under their own names.
 import Xv6.UPtDefs
 import Xv6.PtRunLemmas
 import Xv6.PtOwnLemmas
-import MachCSL.ByteWord
+import MachCSL.WpSmodeCtl
 
 namespace Xv6.UPtAlloc
 

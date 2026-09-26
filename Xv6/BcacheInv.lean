@@ -91,11 +91,7 @@ hook alone.
 import Xv6.SpecBinit
 import Xv6.BioPool
 import Xv6.BufDefs
-import Xv6.DiskInvDefs
-import Xv6.KallocDefs
 import Xv6.SleepLockDefs
-import Xv6.PrintkDefs
-import MachCSL.Lock
 import MachCSL.CtxBox
 import Xv6.StepLemmas
 

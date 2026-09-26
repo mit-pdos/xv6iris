@@ -25,9 +25,7 @@ Same body `wp_syscall_body`, same binders otherwise.
    live in `SpecSyscall` (import cycle through `UexecExecInst`).  Rocq has
    one `SYSCALL`, at its one instance.
 -/
-import Xv6.SpecSyscall
 import Xv6.UexecExecInst
-import Xv6.ParkCap
 
 namespace Xv6
 

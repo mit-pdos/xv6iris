@@ -54,14 +54,9 @@ registration a forking parent would hold are DISCARDED (there is none), and
 cell with those readings, and the ledger is sealed with `initReg`
 (`procsAvail_seal_spent`).
 -/
-import MachCSL.WpSmodeFrame
-import MachCSL.ByteWord
-import MachCSL.Lock
 import Xv6.SpecUserinit
-import Xv6.SpecAllocproc
 import Xv6.SpecRelease
 import Xv6.SpecForkretParkPaid
-import Xv6.CodeTactics
 
 namespace Xv6
 

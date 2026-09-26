@@ -36,12 +36,8 @@ many ticks passed: the post says only that the result is one of the two.
 
 Imports only definitional files (never a `Code*` or `Proof*` file).
 -/
-import Xv6.SchedCtx
 import Xv6.TicksDefs
-import Xv6.SpecArgint
 import Xv6.SpecSleep
-import MachCSL.Lock
-import MachCSL.WpSmodeIntr
 
 namespace Xv6
 

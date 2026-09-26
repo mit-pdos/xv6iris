@@ -158,15 +158,11 @@ is not derivable stays in Rocq.
 
 Imports only definitional files and callee `Spec*` files.
 -/
-import Xv6.SpecCreate
-import Xv6.SpecBeginOp
-import Xv6.SpecEndOp
-import Xv6.SpecArgint
-import Xv6.SpecArgstr
-import Xv6.SpecIunlockput
 import Xv6.ArgPath
-import Xv6.FsReady
 import Xv6.FdTable
+import Xv6.UMemLazy
+import Xv6.FsAbsMknodFire
+import Xv6.CreateDefs
 
 namespace Xv6
 

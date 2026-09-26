@@ -36,7 +36,6 @@ class, `Xv6.IcacheG` a capacity class, and `Xv6.FileG` extends neither.)
 
 Nothing.
 -/
-import Xv6.IrefSlots
 import Xv6.IcacheRefDefs
 
 namespace Xv6

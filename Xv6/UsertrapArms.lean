@@ -13,7 +13,6 @@ Deviation from Rocq: none of substance; the trap-CSR set rides folded
 (`trapCsrsExt cpu false`) as in Rocq's `ut_hold` at `false`.
 -/
 import Xv6.UsertrapBlocks
-import Xv6.CodeTactics
 
 namespace Xv6
 

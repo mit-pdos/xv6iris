@@ -75,16 +75,7 @@ a0` at main+0x14 fall through into this arm.
 
 Imports only Spec files and the definitional layer.
 -/
-import Xv6.StartedInv
 import Xv6.SpecMain
-import Xv6.SpecCpuid
-import Xv6.SpecPrintk
-import Xv6.SpecKvminithart
-import Xv6.SpecTrapinithart
-import Xv6.SpecPlicinithart
-import Xv6.SpecScheduler
-import Xv6.SpecKernelvec
-import Xv6.SpecStart
 
 namespace Xv6
 

@@ -15,7 +15,6 @@ and is not ported.
 -/
 import Xv6.UserExec
 import Xv6.UPtPptLemmas
-import Xv6.PtRunLemmas
 import Xv6.UPtAllocLemmas
 import MachCSL.WpPtWalkOwn
 

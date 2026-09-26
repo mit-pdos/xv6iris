@@ -5,12 +5,7 @@ proved interfaces and the CLOSED trap loop is `LinkUserretClosed`'s.  Nothing
 stays a parameter.
 -/
 import Xv6.ProofForkret
-import Xv6.LinkMyproc
-import Xv6.LinkRelease
-import Xv6.LinkPrepareReturn
 import Xv6.LinkFsinit
-import Xv6.LinkKexec
-import Xv6.LinkPanic
 import Xv6.LinkUserretClosed
 
 namespace Xv6

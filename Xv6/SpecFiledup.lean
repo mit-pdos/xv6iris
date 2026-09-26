@@ -17,11 +17,8 @@ descriptor to live in, which is the `fdSlot` premise -- THE reason
 The `panic` arm is dead: a reference in hand means `ref ≥ 1`.  4 frame slots
 plus `acquire`'s 10.
 -/
-import MachCSL.WpSmodeFrame
-import MachCSL.Lock
 import Xv6.FileDefs
 import Xv6.Image
-import Xv6.Geom
 
 namespace Xv6
 

@@ -29,7 +29,7 @@ The demos:
   this one meets every clause: the input discipline, the choice list's range,
   D4, the prologue pin and the transcript prefix at every input point.)
 -/
-import Xv6.UnionOutPure
+import Xv6.UnionDisc
 
 namespace Xv6
 

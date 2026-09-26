@@ -41,6 +41,7 @@ ARM C-OK, the directory really was MADE).
    end_op are lent the pid quarter (`sys_mkdir_pid`).
 -/
 import Xv6.SysMkdirTails
+import Xv6.SysMkdirCalls
 
 namespace Xv6
 

@@ -9,9 +9,7 @@ applied at level 2 and then at level 1; with `alloc` it calls
 zero node in (`PTree.fill`), and it bails out to the shared epilogue with
 `a0 = 0` when `alloc` is off or `kalloc` fails.
 -/
-import MachCSL.WpSmodeFrame
 import MachCSL.WpSmodeAlu2
-import MachCSL.ByteWord
 import Xv6.SpecWalk
 import Xv6.SpecKalloc
 import Xv6.SpecMemset

@@ -20,8 +20,6 @@ Rocq's `ba_sext_zero`, `ba_sext32` and this file's former `ba_w32`,
 -/
 import Xv6.BitmapEnc
 import Xv6.FsGeom
-import MachCSL.WpSmodeFrame
-import Xv6.DiskDefs
 import Xv6.FsWords
 
 namespace Xv6

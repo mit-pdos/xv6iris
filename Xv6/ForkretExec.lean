@@ -43,11 +43,8 @@ the panic stays live.
 A stage file: it imports Spec and definitional files only.
 -/
 import Xv6.ForkretBoot
-import Xv6.SpecKexec
-import Xv6.InitBoot
-import Xv6.SpecPanic
 import Xv6.PrepareReturnRules
-import Xv6.Image
+import Xv6.ProcPrivAcc
 
 namespace Xv6
 

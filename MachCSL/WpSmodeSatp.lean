@@ -3,8 +3,6 @@ MachCSL: `csrw satp, rs1` in supervisor mode -- installing the kernel page
 table (xv6's `w_satp(MAKE_SATP(kernel_pagetable))` in `kvminithart`), and the
 transport of points-to resources from the ambient Bare tier to the Kpt tier.
 -/
-import MachCSL.WpSmodeRules
-import MachCSL.WpSmodeCsr
 import MachCSL.WpSmodeFrame
 
 namespace MachCSL

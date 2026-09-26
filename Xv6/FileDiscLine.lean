@@ -48,7 +48,7 @@ Deviations from Rocq:
 -/
 import Xv6.FileClass
 import Xv6.FileState
-import Xv6.LineBytes
+import Xv6.EchoDisc
 
 namespace Xv6
 

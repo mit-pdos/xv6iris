@@ -80,7 +80,6 @@ handler's own fence -- `DiskInvDefs.diskPayFl`.)
 import MachCSL.CtxBox
 import MachCSL.WpSmodeFenceFloor
 import Xv6.UartTrace
-import Xv6.Image
 import MachCSL.WpStoreOrd
 
 namespace Xv6

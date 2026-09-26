@@ -19,10 +19,9 @@ contract at its call site.
    spliced back, the user arm's `rdImg` advanced by the chunk it wrote).
 -/
 import Xv6.ReadiParts
-import Xv6.ReadiFrame
 import Xv6.DinodeSlot
-import Xv6.FsCallSites
-import Xv6.CodeTactics
+import Xv6.SpecEitherCopyout
+import Xv6.BlkmapBuf
 
 namespace Xv6
 

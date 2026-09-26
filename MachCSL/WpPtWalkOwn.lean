@@ -26,7 +26,6 @@ This file provides, bottom-up:
   leaf at this entry's address).
 -/
 import MachCSL.WpPtWalk
-import MachCSL.Translate
 
 namespace MachCSL
 

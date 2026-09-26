@@ -160,8 +160,6 @@ Everything else in the file is ported with Rocq's statement.
    order.
 -/
 import Xv6.FsNode
-import Xv6.InodeDefs
-import Xv6.FsGeom
 import Xv6.FsTree
 import Xv6.FsImg
 import Xv6.FsStateDefs

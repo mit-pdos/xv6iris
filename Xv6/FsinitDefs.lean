@@ -17,10 +17,9 @@ inline `fs_bytes_agree_exc`), the boot dirty map read as a pure fact (Rocq's
    (`Xv6.byteBuf_word4`).
 -/
 import Xv6.SpecFsinit
-import Xv6.CodeTactics
-import Xv6.FsCallSitesF
 import Xv6.DinodeSlot
-import Xv6.FsCollectAll
+import Xv6.SpecBrelse
+import Xv6.SpecInitlog
 
 namespace Xv6
 

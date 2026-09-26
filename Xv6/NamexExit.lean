@@ -16,6 +16,8 @@ Rocq transcribes it four times.  The failure arms build the contract's
 `ok = false` bundle through one pure/ghost lemma (`namex_fail_out`).
 -/
 import Xv6.NamexCalls
+import Xv6.NamexParts
+import Xv6.NamexTail
 
 namespace Xv6
 

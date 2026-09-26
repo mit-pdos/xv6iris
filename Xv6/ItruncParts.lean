@@ -62,11 +62,8 @@ shared `MachCSL.calleeSaved_epi6s3`, `MachCSL/WpSmodeFrame6c.lean`; the
 `Xv6/FsBlocks.lean`, beside `fsView_clean` / `_dirty`.)
 -/
 import Xv6.SpecItrunc
-import Xv6.BlkmapBuf
-import Xv6.DinodeSlot
-import Xv6.CodeTactics
-import MachCSL.WpSmodeFrame6c
-import Xv6.FsCallSitesF
+import Xv6.SpecBrelse
+import Xv6.SpecIupdate
 
 namespace Xv6
 

@@ -4,7 +4,6 @@ MachCSL: machine-mode control-flow rules beyond `jal`: the return `jalr x0,
 -/
 import MachCSL.WpCycle
 import MachCSL.WpGpr
-import MachCSL.WpMmodeAlu
 
 namespace MachCSL
 

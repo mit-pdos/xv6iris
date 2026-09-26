@@ -10,6 +10,7 @@
   THREE paths join here (the size test's two arms and the `n = 0` arm).
 -/
 import Xv6.WriteiDefs
+import Xv6.DinodeSlot
 
 namespace Xv6
 

@@ -8,7 +8,6 @@ import Xv6.LinkAcquire
 import Xv6.LinkRelease
 import Xv6.LinkSleep
 import Xv6.LinkSleepPrepare
-import Xv6.LinkMyproc
 import Xv6.LinkSched
 
 namespace Xv6

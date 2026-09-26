@@ -25,10 +25,9 @@ The function needs 32 of the caller's stack slots (its frame of 10, then
 Imports only definitional files (never a `Code*` or `Proof*` file).
 -/
 import MachCSL.WpSmodeFrame
-import MachCSL.Lock
 import Xv6.PtOwn
 import Xv6.Image
-import Xv6.Geom
+import Xv6.KallocDefs
 
 namespace Xv6
 

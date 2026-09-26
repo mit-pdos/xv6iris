@@ -11,7 +11,7 @@ kernel context lends for it: nothing at Bare beyond the `stvec` cell, the
 installed table and the hart's TLB at the kernel page table.
 -/
 import MachCSL.WpPtWalk
-import MachCSL.KMap
+import MachCSL.WpSmode
 
 namespace MachCSL
 

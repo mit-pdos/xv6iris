@@ -41,10 +41,9 @@ import Xv6.SpecInitlock
 import Xv6.FileFrac
 import Xv6.PipeRw
 import Xv6.KstackMap
-import Xv6.Image
-import Xv6.CodeTactics
 import MachCSL.WpSmodeFrame6
 import Xv6.PipeBirth
+import Xv6.SpecKalloc
 
 namespace Xv6
 

@@ -39,6 +39,8 @@ The close splits on the count, which is what lets its entries share it:
    not import another function's): promotion candidate.
 -/
 import Xv6.IputStages
+import Xv6.IcacheInvStore
+import Xv6.IcacheBoxSites
 
 namespace Xv6
 

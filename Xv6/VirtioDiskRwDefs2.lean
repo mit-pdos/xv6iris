@@ -26,7 +26,6 @@ the first instruction of the chain formatting).
 -/
 import Xv6.VirtioDiskRwDefs
 import Xv6.PtOwnLemmas
-import Xv6.VirtioQueue
 
 namespace Xv6
 

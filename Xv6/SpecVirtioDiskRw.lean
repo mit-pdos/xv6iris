@@ -47,13 +47,7 @@ C-2b.)
 
 Imports only definitional files.
 -/
-import MachCSL.CallConv
-import MachCSL.Lock
-import Xv6.Image
-import Xv6.SchedCtx
 import Xv6.SpecSleep
-import Xv6.DiskInvDefs
-import Xv6.BufDefs
 import Xv6.VirtioDiskRwDefs
 
 namespace Xv6

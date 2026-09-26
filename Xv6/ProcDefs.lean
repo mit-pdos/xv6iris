@@ -24,15 +24,9 @@ Layout of `struct proc` (kernel/proc.h, spinlock = {locked; name; cpu} =
 
 Imports only definitional files.
 -/
-import MachCSL.KCtx
-import MachCSL.CallConv
-import Xv6.Geom
-import Xv6.KernelText
 import Xv6.UPtDefs
-import Xv6.IrefSlots
-import Xv6.ProcGeom
-import Xv6.WaitInvTies
 import Xv6.KillRow
+import Xv6.WaitInv
 
 set_option linter.unusedSectionVars false
 

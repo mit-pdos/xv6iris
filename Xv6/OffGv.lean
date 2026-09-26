@@ -60,8 +60,6 @@ authority) are `Xv6.OffboxBoxG` in `Xv6/OffBoxCam.lean`, over the generalised
 * `off_gv_timeless` is the `Timeless` instance below (no named lemma).
 -/
 import MachCSL.Resources
-import Iris.Instances.Lib.Invariants
-import Iris.Instances.Lib.GhostVar
 
 namespace Xv6
 

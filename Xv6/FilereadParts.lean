@@ -35,14 +35,8 @@ eager three and pops.
    `Xv6/FileRwShared.lean` (`filerw_*`).
 -/
 import Xv6.SpecFileread
-import Xv6.FileOffProto
-import Xv6.FileRwShared
-import Xv6.FsWords
-import Xv6.UMemLemmas
 import MachCSL.WpSmodeFrame6c
-import MachCSL.WpSmodeLh
-import MachCSL.WpSmodeJalr
-import MachCSL.WpSmodeFrame12b
+import Xv6.FilePay
 
 namespace Xv6
 

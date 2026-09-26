@@ -8,7 +8,8 @@ setkilled call sites at interrupts off.
 
 Both take two numeric varargs (`PkArgDesc.num`), which cost nothing.
 -/
-import Xv6.UsertrapArms
+import Xv6.SpecSetkilled
+import Xv6.ProcPrivAcc
 
 namespace Xv6
 

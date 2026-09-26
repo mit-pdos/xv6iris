@@ -26,14 +26,11 @@ The tail is the only client of the new S-mode timer rules
 `kConf`'s existential `stc`), so nothing about the reload is observable --
 which is exactly what the spec says.
 -/
-import MachCSL.WpSmodeFrame
 import MachCSL.WpSmodeTime
 import Xv6.SpecClockintr
 import Xv6.SpecCpuid
 import Xv6.SpecAcquire
 import Xv6.SpecRelease
-import Xv6.SpecWakeup
-import Xv6.TicksDefs
 import Xv6.CodeTactics
 
 namespace Xv6

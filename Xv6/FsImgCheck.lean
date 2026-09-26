@@ -43,7 +43,6 @@ import Xv6.FsImgCheckInoD
 import Xv6.FsImgCheckDirs
 import Xv6.FsImgCheckUsed
 import Xv6.FsImgCheckRegion
-import Xv6.FsCfgBoot
 import Xv6.FsBootParams
 import Xv6.FsDurImg
 

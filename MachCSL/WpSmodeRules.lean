@@ -12,6 +12,7 @@ pinned to it by `transSlot`.
 import MachCSL.WpSmodeMem
 import MachCSL.WpSmodeCtl
 import MachCSL.WpSmodeCsr
+import MachCSL.WpSmodeCycle
 
 
 namespace MachCSL

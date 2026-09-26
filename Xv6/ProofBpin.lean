@@ -13,6 +13,7 @@ shape is `filedup`'s, minus the `blez` panic arm and the `mv a0,s1` return.
 import Xv6.SpecBpin
 import Xv6.BufEscrow
 import Xv6.BcacheLock
+import Xv6.CodeTactics
 
 namespace Xv6
 

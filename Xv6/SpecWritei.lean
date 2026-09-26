@@ -139,22 +139,11 @@ running-process bundle; its crossing is the literal `true`.
 
 Imports only definitional files and callee `Spec*` files.
 -/
-import MachCSL.WpSmodeFrame
-import Xv6.LogInv
-import Xv6.BitmapInv
-import Xv6.InodeRegionLink
 import Xv6.FsCfgDefs
-import Xv6.KallocDefs
-import Xv6.SchedCtx
-import Xv6.UMem
-import Xv6.SpecBread
-import Xv6.SpecBrelse
-import Xv6.SpecLogWrite
 import Xv6.SpecBmap
-import Xv6.SpecIupdate
-import Xv6.SpecEitherCopyin
 import Xv6.SysWriteDefs
 import Xv6.ProcPrivBare
+import Xv6.InodeRegionInv
 
 namespace Xv6
 

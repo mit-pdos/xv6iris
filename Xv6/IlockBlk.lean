@@ -15,7 +15,9 @@ and the small readings the walk needs.
   memmove's destination, back at any list of the same length (Rocq's own
   `il_addrs_buf_upd`).
 -/
-import Xv6.IlockEpi
+import Xv6.FsCfgDefs
+import Xv6.DinodeSlot
+import Xv6.IlockFill
 
 namespace Xv6
 

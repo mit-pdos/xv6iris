@@ -9,13 +9,7 @@ out of the process's memory one page at a time: `walkaddr` of the page,
 frame, then the page loop by induction on the bytes left, each iteration one
 `cstr_iter`.  Stated at either interrupt index, as the callees are.
 -/
-import MachCSL.WpSmodeFrame
-import MachCSL.WpSmodeAlu2
-import MachCSL.ByteWord
 import Xv6.SpecCopyinstr
-import Xv6.SpecWalkaddr
-import Xv6.SpecVmfault
-import Xv6.UMemLemmas
 import Xv6.CodeTactics
 import Xv6.CopyLemmas
 

@@ -16,7 +16,6 @@ invariant is only the port's PLIC payload at some count and anchor
 are off throughout (`hsie`), so the hart never migrates.
 -/
 import MachCSL.WpSmodeFrame
-import MachCSL.WpSmodeDev
 import MachCSL.WpSmodeJalr
 import Xv6.SpecUartintr
 import Xv6.SpecWakeup

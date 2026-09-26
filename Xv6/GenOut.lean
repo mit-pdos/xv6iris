@@ -48,7 +48,6 @@ Rocq's header, abridged:
    `lm_stream` → `lmStream`).  `turn_auth` is `turnAuth`, `Elist_auth`
    `elistAuth`.  `default sd st` is `st.getD sd`.
 -/
-import Xv6.EchoOut
 import Xv6.GenOutHist
 
 namespace Xv6

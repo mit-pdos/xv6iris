@@ -14,7 +14,6 @@ saves over the twelve cells), so the two rules are proved here, by copy of
 `Xv6.wp_prologue_dirlookup` / `wp_epilogue_dirlookup` (DirlookupParts), whose
 frame is the same `frame12` with nine saves.
 -/
-import Xv6.NamexParts
 import MachCSL.WpSmodeFrame12
 
 namespace Xv6

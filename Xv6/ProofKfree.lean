@@ -8,10 +8,7 @@ The shape follows the Rocq `ProofKfree.v`: the four-slot prologue
 that thread the page onto the free list, `release(&kmem.lock)` and the
 epilogue.
 -/
-import MachCSL.WpSmodeFrame
 import MachCSL.WpSmodeSltu
-import MachCSL.ByteWord
-import MachCSL.WpLock
 import Xv6.SpecKfree
 import Xv6.SpecAcquire
 import Xv6.SpecRelease

@@ -32,7 +32,6 @@ the file system's law built.  Not timeless (the guest is arbitrary).
 ## NOT PORTED (D36): none of this section's declarations are dead.
 -/
 import Xv6.FsCrash
-import MachCSL.DiskPermit
 
 namespace Xv6
 

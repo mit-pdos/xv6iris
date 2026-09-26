@@ -5,6 +5,7 @@
 ~26 s, W7 ~1 s, W8 ~13 s, conjunct (15) ~8 s of kernel evaluation.
 -/
 import Xv6.FsImgCheckBase
+import Xv6.FsImgDir
 
 namespace Xv6
 

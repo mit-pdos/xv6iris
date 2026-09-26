@@ -17,7 +17,6 @@ tier the pin says the address is its own physical address.
 -/
 import MachCSL.Ctx
 import MachCSL.Pte
-import MachCSL.PlatformFacts
 
 namespace MachCSL
 

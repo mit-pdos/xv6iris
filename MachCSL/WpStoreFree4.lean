@@ -16,8 +16,8 @@ is the consumer: the fresh file's off cell arrives free (Rocq
   RAM fact, and its raw histories;
 * `wp_s_sw_free` -- the rule.
 -/
-import MachCSL.WpStoreFree
 import MachCSL.ByteWord4
+import MachCSL.WpSmodeMint
 
 namespace MachCSL
 

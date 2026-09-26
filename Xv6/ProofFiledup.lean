@@ -15,6 +15,7 @@ references while `ref` is incremented; the content fraction `q` splits
 import Xv6.SpecFiledup
 import Xv6.FileFrac
 import Xv6.FtableLock
+import Xv6.CodeTactics
 
 namespace Xv6
 

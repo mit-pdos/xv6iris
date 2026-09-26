@@ -87,7 +87,6 @@ Rocq's header, in short:
    `kxcB_loopregs` (+0x0b8..+0x0c2) → `kxcB_mask` (+0x0c6..+0x0cc).
 -/
 import Xv6.KexecSeam
-import Xv6.SpecProcPagetable
 import Xv6.ProcPrivAcc
 import Xv6.UPtPptLemmas
 

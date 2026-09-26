@@ -19,7 +19,6 @@ hart is, and its rules follow the hart's (`MachCSL.Wp`):
   re-establishing the state interpretation only.
 -/
 import MachCSL.Wp
-import Iris.Instances.Lib.Invariants
 
 namespace MachCSL
 

@@ -26,7 +26,6 @@ local `vdis_*fence*` lemmas of `Xv6/ProofVirtioDiskIntr.lean`, which now
 use these instead).
 -/
 import MachCSL.WpSmodeFenceFloor
-import MachCSL.WpLock
 
 namespace MachCSL
 

@@ -13,12 +13,9 @@ Both callers hold `p->lock`, so interrupts are off on this hart anyway
 
 Imports only definitional files (never a `Code*` or `Proof*` file).
 -/
-import MachCSL.WpSmodeFrame
-import MachCSL.Lock
 import Xv6.SchedCtx
 import Xv6.PidLock
-import Xv6.Image
-import Xv6.Geom
+import Xv6.SpecProcinit
 
 namespace Xv6
 

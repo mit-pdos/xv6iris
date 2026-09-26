@@ -40,7 +40,6 @@ arm is a fupd-producing wand.
    automatic.
 3. `<[k := st]> l` is `l.set k st`; `l !! k` is `l[k]?`.
 -/
-import Xv6.PipeQueue
 import Xv6.FileDefs
 
 namespace Xv6

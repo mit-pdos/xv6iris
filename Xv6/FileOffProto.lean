@@ -37,7 +37,7 @@ A SHARED definitional file (the FsCallSites pattern): its two consumers are
    `proto_read_park` takes it at that `T` (Rocq's `Tr`).
 4. Names: `proto_read_llb/_checkout/_park` → `protoReadLlb/Checkout/Park`.
 -/
-import Xv6.FilePay
+import Xv6.FileDefs
 
 namespace Xv6
 

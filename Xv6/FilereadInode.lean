@@ -28,6 +28,8 @@ FD_INODE block, `+0x2e .. +0x56` there), plus the shared tail.
 Deviations: none beyond SpecFileread's.
 -/
 import Xv6.FilereadCalls
+import Xv6.FileOffProto
+import Xv6.FileRwShared
 
 namespace Xv6
 

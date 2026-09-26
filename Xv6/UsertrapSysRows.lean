@@ -13,6 +13,7 @@ bump is `bumpTf` of the prologue's frame (`tfResumeGpr0_bump`,
 Pure.
 -/
 import Xv6.UsertrapParts
+import Xv6.UsysMemOkSpec
 
 namespace Xv6
 

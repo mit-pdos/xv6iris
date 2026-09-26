@@ -5,9 +5,7 @@ root read from `kernel_pagetable` and packed into the Sv39 satp word,
 `csrw satp` (the tier switch, `wp_s_csrw_satp_kpt`), `sfence.vma` at the
 Kpt tier (the TLB inside the slot), the epilogue at the new tier.
 -/
-import MachCSL.WpSmodeFrame
 import MachCSL.WpSmodeSfence
-import MachCSL.WpSmodeKpt
 import Xv6.SpecKvminithart
 import Xv6.CodeTactics
 

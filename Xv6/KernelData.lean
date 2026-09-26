@@ -5,10 +5,9 @@ the `.rodata` section as never-written image bytes (`imgBytes`, timestamp 0 of
 the store order, hence persistent and readable by every hart at every view).
 Format strings, the `(null)` string and `printint`'s digit table live here.
 -/
-import MachCSL.Wp
 import MachCSL.CallConv
 import Xv6.KernelText
-import Xv6.KernelMap
+import MachCSL.Instr
 
 namespace Xv6.Kernel
 

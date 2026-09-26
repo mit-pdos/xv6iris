@@ -19,7 +19,6 @@ Modelled on `Xv6/ProofSafestrcpy.lean`.
     80000e5c: subw a3,a5,a4 ; bgtz a3,+0x30
     80000e64: <epilogue2>                   a0 = os, untouched throughout
 -/
-import MachCSL.WpSmodeFrame
 import Xv6.SpecStrncpy
 import Xv6.CodeTactics
 

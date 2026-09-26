@@ -87,13 +87,9 @@ mint's ledger, the claim at its view, and `fsBootSnapWf`).
 SA-M), which has landed in the main tree; nothing is taken as a hypothesis.
 -/
 import Xv6.AppIface
-import Xv6.AppDur
-import Xv6.FsCrash
 import Xv6.FsBootParams
-import Xv6.FsCfgBoot
 import Xv6.FsDurImg
 import Xv6.FirstTok
-import Xv6.FsImgWf
 import MachCSL.AdequacyDisk
 
 namespace Xv6

@@ -52,10 +52,10 @@ mapped in the table it returns (`umMapped`), and on those pages the faulted
 view is the lazy image (`UMemL.umemStr_viewLazy`).  For a block with no lazy
 page it is `M` itself (`UMemL.viewLazy_of_lazyFree`).
 -/
-import Xv6.SpecCopyinstr
 import Xv6.UMemLazy
-import Xv6.FdTable
 import Xv6.ProcPrivBare
+import Xv6.Image
+import MachCSL.WpSmodeFrame
 
 namespace Xv6
 

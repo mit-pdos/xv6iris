@@ -89,11 +89,8 @@ this port are the Lean image's, `KA.«create»` = 0x80004ca0, 356 bytes.)
 Imports only definitional files and callee `Spec*` files.
 -/
 import Xv6.CreateDefs
-import Xv6.SpecNparWrapEra
 import Xv6.FsAbsMknodFire
-import Xv6.SpecIunlockput
-import Xv6.SpecIalloc
-import Xv6.BitmapInv
+import Xv6.FdTable
 
 namespace Xv6
 

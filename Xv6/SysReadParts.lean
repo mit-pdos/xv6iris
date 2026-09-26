@@ -17,11 +17,10 @@ epilogue at `+0x40`.
 * THE TAIL (`srd_tail`): ONE epilogue over the value the arm left in `a0`
   (the error return is hoisted).
 -/
-import Xv6.SpecSysRead
-import Xv6.SysfileCalls
 import Xv6.ArgLemmas
 import MachCSL.WpSmodeFrame6
 import MachCSL.StackOwnBounds
+import Xv6.SpecFileread
 
 namespace Xv6
 

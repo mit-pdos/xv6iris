@@ -65,14 +65,8 @@ The FIFTH, `ghost_mapG nat era_pins`, is new: it is the one field of
 6. Rocq's curried `A -∗ B -∗ C` lemmas are stated `A ∗ B ⊢ C` where that is
    the port's idiom; `A -∗ A ∗ B` getters keep the authority.
 -/
-import Xv6.UartTrace
 import Xv6.ConsLog
 import Xv6.DiskInvDefs
-import MachCSL.ObsTrace
-import Iris.BI.Lib.MonoNat
-import Iris.BI.Lib.MonoList
-import Iris.Instances.Lib.GhostMap
-import Iris.Instances.Lib.GhostVar
 
 namespace Xv6
 

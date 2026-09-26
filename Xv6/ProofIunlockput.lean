@@ -43,9 +43,9 @@ back into `icDepSide d` in the post (Rocq B''-tx5).
 
 Dropped/simplified vs Rocq: none.
 -/
-import MachCSL.WpSmodeFrame
 import Xv6.SpecIunlockput
 import Xv6.CodeTactics
+import Xv6.SpecIunlock
 
 namespace Xv6
 

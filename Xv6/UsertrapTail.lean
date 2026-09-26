@@ -18,7 +18,6 @@
   complement and prepare_return's payment (`ut_ret_claim`).
 -/
 import Xv6.UsertrapClose
-import Xv6.CodeTactics
 
 namespace Xv6
 

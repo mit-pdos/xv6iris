@@ -8,8 +8,6 @@ non-allocating `walk`).
 Imports only definitional and Spec files (never a `Code*`, `Proof*` or
 `Link*` file).
 -/
-import MachCSL.WpSmodeFrame
-import MachCSL.Lock
 import Xv6.SpecUvmclear
 import Xv6.SpecWalk
 import Xv6.SpecIsmapped

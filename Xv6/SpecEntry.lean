@@ -13,6 +13,7 @@ Imports only definitional files (never a `Code*` or `Proof*` file).
 import MachCSL.WordPointsTo
 import MachCSL.MConf
 import Xv6.KernelText
+import MachCSL.Boot
 
 namespace Xv6
 

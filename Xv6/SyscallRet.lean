@@ -42,8 +42,6 @@ import Xv6.SyscallTable
 import Xv6.ProcPrivAcc
 import Xv6.PrepareReturnRules
 import Xv6.BcacheLock
-import Xv6.CodeTactics
-import MachCSL.WpSmodeFrame
 
 namespace Xv6
 

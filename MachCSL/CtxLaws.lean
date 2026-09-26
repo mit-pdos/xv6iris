@@ -20,7 +20,7 @@ re-indexes along a domination.  The mints are `ctx_park`/`ctx_move` (same
 hart, both running: ξ's keys REGISTER at ξ'), and the moves `ctx_stamp`,
 `ctx_unstamp`, `ctx_resume`.
 -/
-import MachCSL.Wp
+import MachCSL.Ctx
 
 namespace MachCSL
 

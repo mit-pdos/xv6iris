@@ -20,9 +20,6 @@ The shape follows the C (kernel/proc.c) and the disassembly:
 * the two failure tails `(KernelSyms.«allocproc» + 0xe0)` / `(KernelSyms.«allocproc» + 0xf0)`: `freeproc`,
   `release`, return `0`.
 -/
-import MachCSL.WpSmodeFrame
-import MachCSL.ByteWord
-import MachCSL.Lock
 import Xv6.SpecAllocproc
 import Xv6.SpecAcquire
 import Xv6.SpecRelease
@@ -30,7 +27,6 @@ import Xv6.SpecKalloc
 import Xv6.SpecMemset
 import Xv6.SpecFreeproc
 import Xv6.UPtLemmas
-import Xv6.SpecProcPagetable
 import Xv6.CodeTactics
 
 namespace Xv6

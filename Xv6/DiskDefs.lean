@@ -35,7 +35,6 @@ descriptor words and its 16-byte header are `Chain.d0/d1/d2/hdr`, and
 `chain_parse` says the model's parser turns exactly those bytes into
 `Chain.req` -- the request record the device's `fetch` would build.
 -/
-import MachCSL.Dev.Fabric
 import MachCSL.Resources
 import Xv6.KernelImage
 

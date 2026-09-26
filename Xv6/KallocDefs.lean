@@ -14,9 +14,6 @@ payload is, so the chain is written over the context-parametric
 `wordAtN`/`pageRestAt` (`wordPointsTo`/`byteBuf` at the ambient context).
 -/
 import Xv6.UartTrace
-import MachCSL.CallConv
-import MachCSL.CtxLaws
-import MachCSL.WpStoreFree
 import MachCSL.BytesFree
 
 namespace Xv6

@@ -9,7 +9,6 @@ state the boot path leaves behind.
 
 Imports only definitional files (never a `Code*` or `Proof*` file).
 -/
-import Xv6.SpecEntry
 import Xv6.SpecStart
 
 namespace Xv6

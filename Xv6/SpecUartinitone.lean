@@ -26,8 +26,6 @@ and the lock as `lkFresh` (its name field at the pointer passed).  The Rocq
 
 Imports only definitional files.
 -/
-import MachCSL.CallConv
-import MachCSL.Lock
 import Xv6.Image
 import Xv6.UartInv
 

@@ -48,6 +48,8 @@ ONE ghost step (`sys_open_publish`) and the settle
 Imports only `SysOpenParts` (and through it the definitional layer).
 -/
 import Xv6.SysOpenParts
+import Xv6.UserOff
+import Xv6.ProcPrivAcc
 
 namespace Xv6
 

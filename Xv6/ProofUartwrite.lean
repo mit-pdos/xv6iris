@@ -34,11 +34,8 @@ import Xv6.SpecUartwrite
 import Xv6.SpecAcquire
 import Xv6.SpecRelease
 import Xv6.SpecSleepPrepare
-import Xv6.SpecSleep
 import Xv6.CodeTactics
 import MachCSL.WpSmodeFrame8b
-import MachCSL.WpSmodeDev
-import MachCSL.CtxLaws
 
 namespace Xv6
 

@@ -20,11 +20,8 @@ separately from the switch): `fence.i`, `sfence.vma`, `csrw satp,a0`,
 compressed), `a0` last; `sret` at `+0x120`.
 -/
 import Xv6.SpecUserret
-import Xv6.TransPt
-import Xv6.UserKernelBridge
 import Xv6.CodeTactics
-import MachCSL.WpSmodeSfence
-import MachCSL.WpAluFile
+import Xv6.UptWalkTramp
 
 namespace Xv6
 

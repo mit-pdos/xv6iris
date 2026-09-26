@@ -21,8 +21,6 @@ have no counterpart (`BitVec` needs none).  Rocq's `bm_cells_insert_dir` /
 `_join` are `Xv6.bslots_cons` / `_uncons`, `bm_held_swap` / `bm_held_k` are
 `Xv6.dsHold_swap` / `Xv6.dsHold_k` (reused, not restated).
 -/
-import Xv6.FsGeom
-import MachCSL.WpSmodeFrame
 import Xv6.DiskDefs
 import Xv6.FsWords
 

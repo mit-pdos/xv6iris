@@ -53,7 +53,6 @@ away:
                         →  execSpecF_fence_rw_rw_floor  →  wp_s_fence_rw_rw_floor
 -/
 import MachCSL.WpSmodeAuRules
-import MachCSL.WpSmodeAtomic
 
 namespace MachCSL
 

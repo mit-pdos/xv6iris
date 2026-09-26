@@ -54,7 +54,6 @@ Interrupts may be on (`wpNext`, as `growproc`); `kmem` must not be held
 Imports only definitional files (never a `Code*` or `Proof*` file).
 -/
 import Xv6.SpecGrowproc
-import Xv6.SpecArgint
 
 namespace Xv6
 

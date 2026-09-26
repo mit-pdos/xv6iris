@@ -71,9 +71,7 @@ Stack budget `statiSlots = 2` (Rocq `K_stati`).
 
 Imports only definitional files (never a `Code*` or `Proof*` file).
 -/
-import MachCSL.WpSmodeFrame
 import Xv6.Image
-import Xv6.Geom
 import Xv6.IcacheRefDefs
 import Xv6.InodeInv
 

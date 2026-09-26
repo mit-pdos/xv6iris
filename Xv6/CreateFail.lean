@@ -68,7 +68,6 @@ THE GHOST MOVES (Rocq's, kept):
   `isItable2_escrows` / `icEscrows_lookup`, `bslots_uncons`) replaces them --
   reason: no Sail register file / `cpu_own` in Lean.
 -/
-import Xv6.CreateSharedBody
 import Xv6.CreateCalls
 import Xv6.FsStateEraResB
 

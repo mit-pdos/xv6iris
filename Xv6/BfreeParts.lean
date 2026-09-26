@@ -29,10 +29,9 @@ a one-screen ghost move; the instruction walks are in
   (the `Xv6/ProofWriteHead.lean` convention).
 -/
 import Xv6.SpecBfree
-import Xv6.CodeTactics
 import Xv6.DinodeSlot
-import MachCSL.WpSmodeLh
-import Xv6.FsCallSites
+import Xv6.SpecBrelse
+import Xv6.SpecLogWrite
 
 namespace Xv6
 

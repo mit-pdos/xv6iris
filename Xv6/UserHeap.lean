@@ -57,11 +57,9 @@ Rocq's header, point for point:
    `uinstrIs_of_facts` (Rocq `uinstr_is_of_uinstr`: U0-7's `UDecodeFacts` at
    `udrefU` give `uinstrIs`).
 -/
-import Xv6.SpecUkLeaves
 import Xv6.UkAbi
 import Xv6.UserTextDecode
 import Xv6.UserFd
-import Iris.Instances.Lib.GhostVar
 
 namespace Xv6
 

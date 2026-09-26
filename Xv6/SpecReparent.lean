@@ -22,8 +22,7 @@ Imports only definitional files (never a `Code*` or `Proof*` file).
 -/
 import Xv6.SchedCtx
 import Xv6.WaitLock
-import Xv6.SpecWakeup
-import MachCSL.WpSmodeIntr
+import MachCSL.WpSmodeFrame
 
 namespace Xv6
 

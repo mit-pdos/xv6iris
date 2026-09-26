@@ -10,6 +10,7 @@ code files instantiate the fetch and decode parts.
 -/
 import MachCSL.WpStagesM
 import MachCSL.Instr
+import MachCSL.Boot
 
 namespace MachCSL
 

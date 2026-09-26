@@ -34,13 +34,10 @@ literal, and the lock/panic call wrappers.
    of the stored register is decided at the store; the pool's key is
    `inum.toNat` already, IcacheEscrowPool deviation 1).
 -/
-import Xv6.SpecIget
-import Xv6.SpecAcquire
-import Xv6.SpecRelease
-import Xv6.CodeTactics
-import Xv6.PrintkDefs
-import Xv6.InodeLock
 import MachCSL.WpSmodeFrame6
+import Xv6.IcacheInvRef
+import Xv6.IcacheEscrowPool
+import Xv6.SpecPanic
 
 namespace MachCSL
 

@@ -39,9 +39,6 @@ the merge is: add these four fields to `OffboxG` (Xv6/OffGv.lean, which then
 imports this file's camera abbreviations) and delete this class.
 -/
 import MachCSL.CtxBox
-import Iris.Algebra.LeibnizSet
-import Iris.Algebra.Auth
-import Iris.Std.GenSetsInstances
 
 namespace MachCSL
 

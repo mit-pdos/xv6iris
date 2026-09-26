@@ -10,14 +10,8 @@ transmitter, of which a caller holds a persistent sublist witness
 transmitter's half of the trace.
 -/
 import MachCSL.Lock
-import MachCSL.Dev.DevIds
-import MachCSL.LogEntryDefs
 import Xv6.Geom
-import Iris.BI.Lib.MonoList
-import Iris.Algebra.Auth
-import Iris.Algebra.UFrac
 import Iris.Instances.Lib.CInvariants
-import Iris.Algebra.Lib.ExclAuth
 import Xv6.PipeNames
 
 namespace Xv6

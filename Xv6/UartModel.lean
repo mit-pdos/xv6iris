@@ -6,7 +6,6 @@ proofs rest on: the shape of each register access the kernel performs
 on LSR.  Nothing here is about the program logic.
 -/
 import MachCSL.Dev.Uart
-import MachCSL.Dev.Fabric
 
 namespace Xv6
 

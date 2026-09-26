@@ -4,7 +4,6 @@ byte buffers, the RISC-V calling convention's callee-saved registers, and
 the reading of register chains.
 -/
 import MachCSL.KCtx
-import MachCSL.WpSmodeCtl
 
 
 namespace MachCSL

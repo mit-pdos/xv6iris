@@ -103,9 +103,7 @@ names.
    `baSize`, `baDqb`, `baDqs`, `baPr`) and the two superblock cells are
    `MachCSL.wordPointsTo … 4`, the port's spelling of Rocq's `↦₄`.
 -/
-import Xv6.FsStateBitmap
 import Xv6.FsBytesGamma
-import Xv6.FsGeom
 import Xv6.LogInv
 
 namespace Xv6

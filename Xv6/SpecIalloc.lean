@@ -113,16 +113,10 @@ comment (printk is a functor parameter).
 
 Imports only definitional files and callee `Spec*` files.
 -/
-import MachCSL.WpSmodeFrame
-import Xv6.LogInv
-import Xv6.IcacheRef
 import Xv6.FsCfgDefs
 import Xv6.SpecBread
-import Xv6.SpecBrelse
-import Xv6.SpecLogWrite
-import Xv6.SpecMemset
-import Xv6.SpecPrintk
-import Xv6.SpecIget
+import Xv6.IcacheTable
+import Xv6.InodeRegionInv
 
 namespace Xv6
 

@@ -39,9 +39,6 @@ import Xv6.SysfileCalls
 import Xv6.SpecSysMkdir
 import Xv6.ProcPrivAcc
 import Xv6.KstackMap
-import MachCSL.WpSmodeFrame
-import MachCSL.ByteWord
-import Xv6.CodeTactics
 
 namespace Xv6
 

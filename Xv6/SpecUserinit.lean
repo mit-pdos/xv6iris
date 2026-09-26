@@ -100,15 +100,6 @@ RUNNABLE for the first scheduler that looks.
 
 Imports only definitional files (never a `Code*` or `Proof*` file).
 -/
-import Xv6.SchedCtx
-import Xv6.WaitLock
-import Xv6.PidLock
-import Xv6.ParkCap
-import Xv6.SpecNamei
-import Xv6.SpecAllocproc
-import Xv6.ProcAvail
-import MachCSL.Lock
-import MachCSL.WpSmodeIntr
 import Xv6.UexecExecInst
 
 namespace Xv6

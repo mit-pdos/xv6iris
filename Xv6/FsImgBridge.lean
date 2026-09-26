@@ -37,8 +37,9 @@ Rocq's header points, kept:
 5. `Nat` throughout; `bv_unsigned` is `.toNat`, `Z_to_bv 32` is
    `BitVec.ofNat 32`.
 -/
-import Xv6.FsImgWf
 import Xv6.InodeLock
+import Xv6.FsImgUsed
+import Xv6.FsImgDir
 
 namespace Xv6
 

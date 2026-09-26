@@ -11,13 +11,7 @@ safe in supervisor mode at `main` under the resulting configuration
 
 Imports only definitional files (never a `Code*` or `Proof*` file).
 -/
-import MachCSL.WordPointsTo
-import MachCSL.MConf
 import MachCSL.WpGpr
-import MachCSL.WpCsr
-import MachCSL.WpMmodeMret
-import Xv6.KernelText
-import Xv6.SpecTimerinit
 import Xv6.SpecEntry
 import MachCSL.PmpXv6Defs
 

@@ -17,6 +17,7 @@ The caller's run then becomes the pool entry (`Xv6.freeBlk_intro`) that
 `bitmapFreeAu` deposits at `log_write`.
 -/
 import Xv6.BfreeTail
+import MachCSL.WpSmodeLh
 
 namespace Xv6
 

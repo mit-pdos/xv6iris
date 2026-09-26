@@ -19,9 +19,10 @@ under its own prefix -- `frd_*` / `fwr_*`, with identical statements).
 The direction-specific ones (`readable`/`writable`, the carve, the
 dispatch's state readings) stay with their function.
 -/
-import Xv6.FileOffProto
 import Xv6.EitherDefs
 import Xv6.FsWords
+import Xv6.FdTable
+import Xv6.FilePay
 
 
 namespace Xv6

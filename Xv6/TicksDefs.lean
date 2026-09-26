@@ -11,7 +11,6 @@ seals from trapinit's `lkFresh`.
 -/
 import Xv6.KallocDefs
 import Xv6.SpecTrapinit
-import MachCSL.Lock
 
 namespace Xv6
 

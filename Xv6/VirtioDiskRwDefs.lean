@@ -22,10 +22,7 @@ takes it as a premise (`virtio_disk_init` establishes it: its pages come
 from `kalloc`).
 -/
 import MachCSL.WpSmodeFrame12b
-import MachCSL.Lock
 import Xv6.DiskInvDefs
-import Xv6.DiskTier
-import Xv6.KernelData
 import Xv6.SchedCtx
 import Xv6.BufDefs
 

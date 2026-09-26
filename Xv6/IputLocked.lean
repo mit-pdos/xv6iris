@@ -31,6 +31,8 @@
    ProofIput.v only (proof-internal) -- reason: dead.
 -/
 import Xv6.IputLockedA
+import Xv6.SpecBrelse
+import Xv6.SpecLogWrite
 
 namespace Xv6
 

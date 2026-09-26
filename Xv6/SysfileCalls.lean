@@ -39,23 +39,11 @@ The fetched string's shape facts are `UMemL.umemStr_nul` /
 `UMemL.umemStr_length_le` (`Xv6/UMemLazy.lean`).
 -/
 import Xv6.SpecArgstr
-import Xv6.SpecArgint
 import Xv6.SpecArgaddr
 import Xv6.SpecArgfd
 import Xv6.SpecBeginOp
 import Xv6.SpecEndOp
 import Xv6.SpecIunlockput
-import Xv6.FsReady
-import Xv6.FdTable
-import Xv6.FsWords
-import Xv6.InodeLock
-import Xv6.DirView
-import Xv6.InodeRegionDefs
-import Xv6.KstackMap
-import MachCSL.WpSmodeFrame
-import MachCSL.WpSmodeCtl
-import MachCSL.ByteWord
-import Xv6.CodeTactics
 
 namespace Xv6
 

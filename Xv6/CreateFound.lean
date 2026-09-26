@@ -104,6 +104,8 @@ is needed to share the context.
 -/
 import Xv6.CreateSharedBody
 import MachCSL.WpSmodeLh
+import Xv6.SpecNamexEra
+import Xv6.SpecNparWrapEra
 
 namespace Xv6
 

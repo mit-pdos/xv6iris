@@ -11,7 +11,10 @@ returns them; the callee-saved registers are preserved.
 
 Imports only definitional files (never a `Code*` or `Proof*` file).
 -/
-import Xv6.SpecInitlock
+import Xv6.Image
+import Xv6.Geom
+import MachCSL.WpSmodeFrame
+import MachCSL.Lock
 
 namespace Xv6
 

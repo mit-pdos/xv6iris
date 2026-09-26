@@ -20,14 +20,11 @@ meet: the string copyinstr read (`umemStr ... = some s`) is `pl ++ [0]` with
 `pl` NUL-free (`UMemL.umemStr_nul`), which is strlen's `cstr` precondition on
 the front of the buffer (`byteBuf_append`), and strlen answers `|pl|`.
 -/
-import Xv6.LazyFree
 import Xv6.SpecFetchstr
 import Xv6.EitherDefs
-import Xv6.SpecMyproc
 import Xv6.SpecStrlen
-import Xv6.CodeTactics
 import MachCSL.WpSmodeFrame6c
-import Xv6.UMemLemmas
+import Xv6.SpecCopyinstr
 
 namespace Xv6
 

@@ -30,7 +30,6 @@ Imports only definitional files.
 -/
 import Xv6.SchedCtx
 import MachCSL.WpSmodeIntr
-import Iris.ProofMode
 
 namespace Xv6
 

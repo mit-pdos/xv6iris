@@ -22,8 +22,7 @@ two pins out of every hart's freshly allocated register cells and allocates
 The Rocq prototype: `WireInv.v` (`wire_inv_body`, `wire_inv_alloc`) and
 `WpIntrCore.v:115-175` (`swp_read_reg_any`).
 -/
-import MachCSL.Wp
-import Iris.Instances.Lib.Invariants
+import MachCSL.Resources
 
 namespace MachCSL
 

@@ -136,12 +136,10 @@ av⌝` inside the residue; here it is the context's `avail`, and
 
 Imports only definitional files.
 -/
-import Xv6.SpecKexit
 import Xv6.SpecUservec
 import Xv6.SpecKernelvec
-import Xv6.UserretDefs
 import Xv6.SysExecDefs
-import Xv6.FirstTok
+import Xv6.WaitLock
 
 namespace Xv6
 

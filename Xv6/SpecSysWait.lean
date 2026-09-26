@@ -29,9 +29,7 @@ init's saved pid (`initPidIs 1`) forwarded.
 
 Imports only definitional files (never a `Code*` or `Proof*` file).
 -/
-import Iris.ProofMode
 import Xv6.SpecKwait
-import Xv6.SpecArgaddr
 
 namespace Xv6
 

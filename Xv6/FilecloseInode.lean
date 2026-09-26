@@ -27,6 +27,7 @@
   three sleeping callees take and return it.
 -/
 import Xv6.FilecloseParts
+import Xv6.FsCallSitesOp
 
 namespace Xv6
 

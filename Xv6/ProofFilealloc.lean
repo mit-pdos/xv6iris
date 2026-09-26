@@ -16,12 +16,8 @@ The found arm runs the ALLOC ghost step (`file_alloc_step`) before
 `release`; both arms rejoin at the tail `fa_tail` (`(KernelSyms.«filealloc» + 0x52)`).
 -/
 import Xv6.SpecFilealloc
-import Xv6.FileInv
 import Xv6.FtableLock
-import Xv6.SpecAcquire
-import Xv6.SpecRelease
 import Xv6.CodeTactics
-import Xv6.PrintkDefs
 
 namespace Xv6
 

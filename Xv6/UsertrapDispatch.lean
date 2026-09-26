@@ -22,7 +22,6 @@ devintr is called at EVERY cause but the ecall, through its one contract
 (`devintrRet_none`).
 -/
 import Xv6.UsertrapBlocks
-import Xv6.CodeTactics
 import MachCSL.WpSmodeTrapCsr
 
 namespace Xv6

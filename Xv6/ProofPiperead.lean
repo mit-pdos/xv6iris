@@ -23,17 +23,15 @@ at its eb contract, and the re-acquire joins again.
 -/
 import Xv6.SpecPiperead
 import Xv6.PipeRw
-import Xv6.PipeInvDefs
 import Xv6.SpecAcquire
 import Xv6.SpecRelease
 import Xv6.SpecWakeup
 import Xv6.SpecSleepPrepare
 import Xv6.SpecSleep
 import Xv6.SpecKilled
-import Xv6.SpecMyproc
 import Xv6.SpecCopyout
-import Xv6.CodeTactics
-import Xv6.PrintkDefs
+import MachCSL.WpLock
+import Xv6.UMemWindow
 
 namespace Xv6
 

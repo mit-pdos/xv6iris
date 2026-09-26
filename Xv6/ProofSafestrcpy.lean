@@ -21,7 +21,6 @@ chained -- modelled on `Xv6/ProofMemset.lean`.
 `safestrcpy` writes a terminating NUL at position `≤ 15` no matter what it
 copies, so the destination comes back `pnameWf` (16 bytes, NUL within).
 -/
-import MachCSL.WpSmodeFrame
 import Xv6.SpecSafestrcpy
 import Xv6.CodeTactics
 

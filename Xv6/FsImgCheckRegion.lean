@@ -7,6 +7,7 @@ why the check is split).  Measured: ~17 s each for the three region sweeps
 and `fsLinksEq`, under a second for the parse.
 -/
 import Xv6.FsImgCheckBase
+import Xv6.FsImgDir
 
 namespace Xv6
 

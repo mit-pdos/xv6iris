@@ -24,9 +24,7 @@
                   (`intrRes_of_kernelvec`, at the disk pages
                   `virtio_disk_init` chose) and `scheduler()` is entered.
 -/
-import Xv6.MainTrap
-import Xv6.SpecKernelvec
-import MachCSL.WpStoreOrd
+import Xv6.MainSecondaryParts
 
 namespace Xv6
 

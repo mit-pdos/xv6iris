@@ -28,9 +28,6 @@ import Xv6.ProofVirtioDiskRwC
 import Xv6.ProofVirtioDiskRwD
 import Xv6.ProofVirtioDiskRwE
 import Xv6.ProofVirtioDiskRwF
-import Xv6.LinkAcquire
-import Xv6.LinkRelease
-import Xv6.LinkMyproc
 import Xv6.LinkSched
 import Xv6.LinkSleep
 import Xv6.LinkSleepPrepare

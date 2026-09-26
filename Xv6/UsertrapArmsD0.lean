@@ -17,8 +17,10 @@ image already read it as zeros).  Interrupts are off throughout.
 The kill deposit is the additive pair: the failure route to +0x56 takes its
 kill row (`ukillCredAt`), the success route to +0xa6 its resume slot.
 -/
-import Xv6.UsertrapArms56
-import Xv6.UMemLemmas
+import MachCSL.WpSmodeTrapCsr
+import Xv6.SpecVmfault
+import Xv6.UsysMemOkSpec
+import Xv6.UsertrapArms
 
 namespace Xv6
 

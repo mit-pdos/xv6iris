@@ -10,7 +10,6 @@ import Xv6.LinkBread
 import Xv6.LinkLogWrite
 import Xv6.LinkBrelse
 import Xv6.LinkMemset
-import Xv6.LinkPrintk
 
 namespace Xv6
 

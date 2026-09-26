@@ -71,8 +71,7 @@ Imports only the boot-chain/allocation files and the device invariants.
 -/
 import Xv6.BootShared
 import Xv6.SystemSlot
-import Xv6.PlicInv
-import Xv6.DiskInv
+import Xv6.BootChain
 
 namespace Xv6
 

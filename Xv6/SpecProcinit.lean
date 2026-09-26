@@ -41,9 +41,9 @@ claims (`kmapId`), which Lean's `newlock` takes beside `lkFresh`, ride
 
 Imports only definitional files (never a `Code*` or `Proof*` file).
 -/
-import Xv6.SpecInitlock
-import Xv6.KvmDefs
 import Xv6.ProcDefs
+import Xv6.Image
+import MachCSL.WpSmodeFrame
 
 namespace Xv6
 

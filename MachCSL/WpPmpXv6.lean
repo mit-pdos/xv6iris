@@ -12,10 +12,9 @@ fetch, data load, data store): `pmpCheckRWX` has `internal_error` arms for
 malformed access kinds, so the check cannot be shown to succeed for an
 arbitrary `MemoryAccessType`.
 -/
-import MachCSL.WpPmp
-import MachCSL.WpCsr
 import MachCSL.MConf
 import MachCSL.PmpXv6Defs
+import MachCSL.PlatformFacts
 
 namespace MachCSL
 

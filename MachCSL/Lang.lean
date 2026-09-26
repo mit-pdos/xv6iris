@@ -44,13 +44,11 @@ the disk agent (`MState.storeDma`), blocked while a hart reserves a byte of
 the footprint; the PLIC drives the harts' external-interrupt pins
 (`sig_seip`/`sig_meip`) through the wire primitive.
 -/
-import Sail
-import LeanRV64D
 import MachCSL.Platform
-import MachCSL.TsoMem
 import MachCSL.BootImage
 import MachCSL.Dev.Fabric
 import Iris.ProgramLogic.Language
+import LeanRV64D.Step
 
 namespace MachCSL
 

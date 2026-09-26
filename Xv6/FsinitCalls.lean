@@ -5,6 +5,7 @@ included) and `ireclaim` at `+0x54`, at the ambient configuration, taking
 the `logCtx icfgLog` initlog handed back.
 -/
 import Xv6.FsinitDefs
+import Xv6.SpecMemmove
 
 namespace Xv6
 

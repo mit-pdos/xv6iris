@@ -30,7 +30,7 @@ Imports only definitional files (never a `Code*` or `Proof*` file).
 -/
 import Xv6.Image
 import MachCSL.WpSmodeIntr
-import Xv6.SpecPrintint
+import Xv6.UartInv
 
 namespace Xv6
 

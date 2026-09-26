@@ -27,7 +27,6 @@ tainted at the taint's price.
 3. Image and return-word conventions as `PipeQueue` deviations 2-3.
 -/
 import Xv6.PipeInvDefs
-import Xv6.PipeQueue
 
 namespace Xv6
 

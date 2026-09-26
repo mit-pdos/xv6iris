@@ -35,16 +35,8 @@ generation ghosts this layer cannot see.
 Imports only definitional and Spec files (never a `Code*`, `Proof*` or
 `Link*` file).
 -/
-import MachCSL.WpSmodeFrame
-import MachCSL.Lock
-import Xv6.ProcDefs
-import Xv6.SchedCtx
-import Xv6.FdTable
-import Xv6.UMem
 import Xv6.UMemLemmas
 import Xv6.LazyFree
-import Xv6.Image
-import Xv6.Geom
 import Xv6.SpecMyproc
 import Xv6.SpecMemmove
 import Xv6.SpecCopyin

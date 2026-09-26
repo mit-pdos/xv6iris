@@ -16,37 +16,21 @@ is the open form (every callee a parameter) for a client that closes them
 itself.
 -/
 import Xv6.ProofKexec
-import Xv6.LinkMyproc
 import Xv6.LinkBeginOp
 import Xv6.LinkNameiEra
-import Xv6.LinkIlock
-import Xv6.LinkReadi
-import Xv6.LinkIunlockput
 import Xv6.LinkEndOp
 import Xv6.LinkProcPagetable
 import Xv6.LinkProcFreepagetable
-import Xv6.LinkWalkaddr
 import Xv6.LinkFlags2perm
 import Xv6.LinkUvmalloc
 import Xv6.LinkUvmclear
 import Xv6.LinkStrlen
 import Xv6.LinkCopyout
 import Xv6.LinkSafestrcpySrc
-import Xv6.LinkPanic
-import Xv6.LinkKalloc
-import Xv6.LinkKfree
-import Xv6.LinkMemset
-import Xv6.LinkMemmove
-import Xv6.LinkMappages
-import Xv6.LinkWalk
 import Xv6.LinkUvmunmap
 import Xv6.LinkUvmfree
 import Xv6.LinkUvmcreate
-import Xv6.LinkVmfault
-import Xv6.LinkIsmapped
 import Xv6.LinkFreewalk
-import Xv6.LinkAcquire
-import Xv6.LinkRelease
 
 namespace Xv6
 

@@ -22,7 +22,13 @@ wrappers -- candidates to hoist into DinodeSlot together with ialloc's).
 -/
 import Xv6.SpecIreclaim
 import Xv6.DinodeSlot
-import Xv6.FsCallSitesF
+import Xv6.SpecBeginOp
+import Xv6.SpecBrelse
+import Xv6.SpecIunlock
+import Xv6.SpecIput
+import Xv6.FsWords
+import Xv6.SpecIlock
+import Xv6.SpecIget
 
 namespace Xv6
 

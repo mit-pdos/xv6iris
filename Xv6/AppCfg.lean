@@ -74,7 +74,6 @@ pure lemmas too).
 Nothing.
 -/
 import Xv6.FsAbsDefs
-import Iris.Instances.IProp
 
 namespace Xv6
 

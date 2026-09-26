@@ -8,11 +8,8 @@ address pairs that put `"cons"`/`&cons.lock` in `a1`/`a0`, the call to
 `consoleread`/`consolewrite` in `devsw[CONSOLE]`, and the epilogue.  Boot
 only (`SIE` literally `false`), as `uartinit` is.
 -/
-import MachCSL.WpSmodeFrame
-import MachCSL.Lock
 import Xv6.SpecConsoleinit
 import Xv6.SpecInitlock
-import Xv6.SpecUartinit
 import Xv6.CodeTactics
 
 namespace Xv6

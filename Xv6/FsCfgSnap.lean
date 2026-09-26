@@ -69,7 +69,6 @@ instances the mint chooses.
 -/
 import Xv6.FsCfgSnapVocab
 import Xv6.FsBootSupply
-import Xv6.FsDurSnap
 import Xv6.KmemGhost
 
 namespace Xv6

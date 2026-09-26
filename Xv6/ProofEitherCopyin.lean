@@ -9,14 +9,7 @@ at either `SIE`: the proof is a `k_step_gen` chain with the pins composed
 at each exit.  The frame, the exit and the `myproc` / `memmove` call rules
 it shares with `either_copyout` live in `Xv6/EitherDefs.lean`.
 -/
-import MachCSL.WpSmodeFrame
-import MachCSL.Lock
 import Xv6.SpecEitherCopyin
-import Xv6.SpecMyproc
-import Xv6.SpecCopyin
-import Xv6.SpecMemmove
-import Xv6.EitherDefs
-import Xv6.CodeTactics
 
 namespace Xv6
 

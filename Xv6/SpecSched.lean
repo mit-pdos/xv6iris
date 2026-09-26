@@ -35,7 +35,6 @@ parking hart's own `k.root`.
 Imports only definitional files.
 -/
 import Xv6.SchedCtx
-import MachCSL.WpSmodeIntr
 
 namespace Xv6
 

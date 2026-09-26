@@ -9,14 +9,7 @@ memory INTO the kernel buffer `dst`, one page at a time: `walkaddr` of the page,
 shared arithmetic / branch / callee lemmas live in `Xv6.CopyLemmas`.
 -/
 
-import MachCSL.WpSmodeFrame
-import MachCSL.WpSmodeAlu2
-import MachCSL.ByteWord
 import Xv6.SpecCopyin
-import Xv6.SpecWalkaddr
-import Xv6.SpecVmfault
-import Xv6.SpecMemmove
-import Xv6.UMemLemmas
 import Xv6.CodeTactics
 import Xv6.CopyLemmas
 

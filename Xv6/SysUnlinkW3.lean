@@ -42,6 +42,8 @@ Rocq's header, kept because the reasons are the content:
 2. ip crosses OPEN at a named `dati` (`SysUnlinkW2.sysUnlinkOpen`).
 -/
 import Xv6.SysUnlinkW2
+import MachCSL.WpSmodeLh
+import Xv6.DirlookupParts
 
 namespace Xv6
 

@@ -24,7 +24,6 @@ carried as the persistent `kmapStatic`; Rocq's `ptree_own` is already
 physical.
 -/
 import Xv6.UptTree
-import Xv6.PtOwnLemmas
 import Xv6.KstackMap
 import MachCSL.WpSmodeSatpU
 

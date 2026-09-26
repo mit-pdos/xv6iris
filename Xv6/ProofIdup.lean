@@ -53,9 +53,8 @@ ProofIdup.v only -- reason: deviation 1.  (Rocq's header names
 import Xv6.SpecIdup
 import Xv6.IdupCore
 import Xv6.FtableLock
-import MachCSL.WpSmodeAuRules
-import MachCSL.KCtxMove
 import Xv6.CodeTactics
+import Xv6.IcachePinwObl
 
 namespace Xv6
 

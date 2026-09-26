@@ -33,6 +33,11 @@ Rows are grouped (`mnKptB`, `mnKptFs`) so the phases' statements stay
 readable; `mn_splitKpt` cuts SpecMain's kernel-tier rows into them.
 -/
 import Xv6.MainFs
+import Xv6.KmemTier
+import Xv6.MainKvm
+import Xv6.MainTrap
+import Xv6.MainStarted
+import Xv6.FsCfgSnapFirst
 
 namespace Xv6
 

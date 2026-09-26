@@ -51,11 +51,11 @@ import Xv6.SpecSysOpen
 import Xv6.SpecSysChdir
 import Xv6.SpecSysMknod
 import Xv6.SpecSysUnlink
-import Xv6.SpecSysLink
 import Xv6.SpecSysMkdir
 import Xv6.SpecFileread
 import Xv6.SpecFilewrite
 import Xv6.SpecSysExec
+import Xv6.SysLinkDefs
 
 namespace Xv6
 

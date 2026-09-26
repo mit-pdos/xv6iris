@@ -29,8 +29,8 @@ Deviations from Rocq: as `Xv6/IupdateTail.lean`; the four-stage cut
 (Rocq has one lemma for `+0x00 .. +0x62`) is for elaboration speed only.
 -/
 import Xv6.IupdateTail
-import MachCSL.WpSmodeFrame12b
 import MachCSL.WpSmodeLh
+import Xv6.FsWords
 
 namespace Xv6
 

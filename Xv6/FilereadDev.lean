@@ -26,6 +26,8 @@ receipt is built from its post (`frd_receipt_of_run` / `_of_dirty`, or the
 `-1` arm at `Rd`).
 -/
 import Xv6.FilereadArms
+import MachCSL.WpSmodeJalr
+import MachCSL.WpSmodeLh
 
 namespace Xv6
 

@@ -19,6 +19,7 @@
 * `fwr_loop`: the induction.
 -/
 import Xv6.FilewriteBody
+import Xv6.FilewriteFire
 
 namespace Xv6
 

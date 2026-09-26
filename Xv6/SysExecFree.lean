@@ -51,6 +51,7 @@ congruence proof over the whole context.
 Imports only the shared vocabulary and callee Specs.
 -/
 import Xv6.SysExecParts
+import Xv6.SpecKfree
 
 namespace Xv6
 

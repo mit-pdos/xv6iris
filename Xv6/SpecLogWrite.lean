@@ -140,11 +140,7 @@ LogWrite files names `wp_log_write_au` (called by `ProofBfree`,
 
 Imports only definitional files (never a `Code*` or `Proof*` file).
 -/
-import MachCSL.WpSmodeFrame
 import Xv6.LogInv
-import Xv6.SpecBpin
-import Xv6.SpecAcquire
-import Xv6.SpecRelease
 import Xv6.FsBytesGamma
 
 namespace Xv6

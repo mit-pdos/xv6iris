@@ -11,6 +11,7 @@ is written.  Kept in its own namespace (`Xv6.PtRun`) so that other files
 may prove the same facts under their own names.
 -/
 import Xv6.PtOwn
+import Xv6.KallocDefs
 
 namespace Xv6.PtRun
 

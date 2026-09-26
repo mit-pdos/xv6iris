@@ -9,14 +9,11 @@ over the linked `Myproc` / `Argraw`; `fileread` is `LinkFileread`'s, whose
 closed term).
 -/
 import Xv6.ProofSysRead
-import Xv6.LinkMyproc
 import Xv6.LinkArgraw
 import Xv6.LinkArgint
 import Xv6.LinkArgaddr
 import Xv6.LinkArgfd
 import Xv6.LinkFileread
-import Xv6.LinkPiperead
-import Xv6.LinkCopyout
 
 namespace Xv6
 

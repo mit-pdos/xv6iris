@@ -18,7 +18,7 @@ keeps the file independent of the literal's other fields.
 At the literal, `P := Pc γdisk γswap γreg γstart c` and
 `Hproj γdisk γswap γreg γstart c` instantiate it verbatim.
 -/
-import MachCSL.Adequacy
+import MachCSL.Resources
 
 namespace MachCSL
 

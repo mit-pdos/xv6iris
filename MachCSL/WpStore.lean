@@ -7,7 +7,6 @@ to RAM, and the execute-stage specifications of `sd rs2, imm(rs1)` and of
 epilogue use).
 -/
 import MachCSL.WpCycle
-import MachCSL.WpStagesM
 import MachCSL.WpGpr
 import MachCSL.WordPointsTo
 

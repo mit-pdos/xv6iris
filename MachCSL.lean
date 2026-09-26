@@ -153,3 +153,6 @@ import MachCSL.BootPmp
 import MachCSL.BootBoard
 import MachCSL.BootInitModel
 import MachCSL.BootReset
+-- The whole model (its umbrella, `Model`, `ValidateConfig`), which the exact
+-- per-file imports no longer reach, stays checked by `lake build MachCSL`.
+import LeanRV64D

@@ -43,8 +43,8 @@ literally `LOG_WRITE.wp_log_write_au_range`'s atomic-update premise at
 import Xv6.SpecIupdate
 import Xv6.InodeRegionMovers
 import Xv6.DinodeSlot
-import Xv6.CodeTactics
 import Xv6.FsCallSitesF
+import Xv6.SpecMemmove
 
 namespace Xv6
 

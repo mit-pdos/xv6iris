@@ -128,13 +128,9 @@ literal `true`.
 Imports only definitional files and callee `Spec*` files.
 -/
 import Xv6.SpecReadi
-import Xv6.SpecNamecmp
-import Xv6.SpecIget
-import Xv6.DirView
-import Xv6.IcacheEscrowTok
-import Xv6.IcacheRefLink
 import Xv6.InodeRegionInv
 import Xv6.FsCfgDefs
+import Xv6.IcacheTable
 
 namespace Xv6
 

@@ -3,11 +3,10 @@ Proof of `write_head`'s specification (`SpecWriteHead.WRITE_HEAD`), given the
 interfaces of `bread`, `bwrite` and `brelse`.
 -/
 import Xv6.SpecWriteHead
-import Xv6.BufEscrow
 import Xv6.BcacheLock
 import Xv6.CodeTactics
-import MachCSL.ByteWord4
 import Xv6.FsCallSites
+import Xv6.SpecBwrite
 
 namespace Xv6
 

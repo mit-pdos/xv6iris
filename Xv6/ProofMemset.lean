@@ -3,7 +3,6 @@ Proof of `memset`'s specification (`SpecMemset.MEMSET`): the prologue and
 epilogue rules, the store loop by induction on the remaining count, the
 instruction rules chained -- no symbolic execution.
 -/
-import MachCSL.WpSmodeFrame
 import Xv6.SpecMemset
 import Xv6.CodeTactics
 import MachCSL.WpStoreFree

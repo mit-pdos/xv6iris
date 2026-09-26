@@ -87,9 +87,6 @@ the dormant block (`ProcDefs.procDormant`, Rocq `proc_dormant`) parks
 `file_core` names `iref_frac`) -- neither may be a cycle.
 -/
 import Xv6.SlotSupply
-import Iris.Algebra.Auth
-import Iris.Algebra.UFrac
-import Iris.BI.Lib.Fractional
 
 namespace Xv6
 

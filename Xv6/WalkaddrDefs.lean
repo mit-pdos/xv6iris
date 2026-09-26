@@ -6,10 +6,7 @@ call rule of their single callee, the non-allocating `walk`.
 Imports only definitional and Spec files (never a `Code*`, `Proof*` or
 `Link*` file).
 -/
-import MachCSL.WpSmodeFrame
 import Xv6.SpecWalk
-import Xv6.UPtWalkaddrLemmas
-import Xv6.CodeTactics
 
 namespace Xv6
 

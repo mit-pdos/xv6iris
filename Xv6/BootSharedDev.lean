@@ -44,10 +44,7 @@ DEVIATIONS from Rocq (none process-layer beyond those already recorded):
 Imports only definitional files and Spec files.
 -/
 import Xv6.ProcBoot
-import Xv6.UartBoot
 import Xv6.DiskBoot
-import Xv6.PlicInv
-import Xv6.WaitInvTies
 import Xv6.BootCarveProc
 
 namespace Xv6

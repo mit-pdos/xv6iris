@@ -11,7 +11,6 @@ the cursor set-up (`s2 = p`, `s1 = &proc[0]`, `s4 = &initproc`, `s3 =
 hands `waitResAt` in and takes it back rewritten by `reparented`.  Balanced
 and generic in the interrupt index, as `wakeup` is.
 -/
-import MachCSL.WpSmodeFrame
 import Xv6.SpecReparent
 import Xv6.SpecWakeup
 import Xv6.CodeTactics

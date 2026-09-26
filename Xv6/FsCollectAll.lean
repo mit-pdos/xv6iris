@@ -58,9 +58,8 @@ view's `fsbN`.
   are `esc_ns_still` and `ic_escrows_open_list`.
 -/
 import Xv6.FsCollectAllBodies
-import Xv6.SbPark
-import Xv6.LogSnapLaw
 import Xv6.AppDur
+import Xv6.IcacheEscrowPoolMove
 
 namespace Xv6
 

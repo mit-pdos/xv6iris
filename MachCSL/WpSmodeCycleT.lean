@@ -18,7 +18,6 @@ Interrupts are off at every trampoline instruction (`SConfPhys c false`):
 the dispatch finds nothing, so there is no trap branch.
 -/
 import MachCSL.WpSmodeCycle
-import MachCSL.WpSmodeWait
 
 namespace MachCSL
 

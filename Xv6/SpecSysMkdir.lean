@@ -111,13 +111,7 @@ iunlockput's argument is already in place).
 
 Imports only definitional files and callee `Spec*` files.
 -/
-import Xv6.SpecArgstr
-import Xv6.SpecBeginOp
-import Xv6.SpecEndOp
-import Xv6.SpecIunlockput
 import Xv6.SpecCreate
-import Xv6.FsReady
-import Xv6.FdTable
 
 namespace Xv6
 

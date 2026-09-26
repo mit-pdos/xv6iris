@@ -29,8 +29,6 @@ Deviations from Rocq: the register threading and the packed receipt as
 lemma for `+0x88 .. +0xba`) is for elaboration speed only.
 -/
 import Xv6.IallocTail
-import MachCSL.WpSmodeFrame12b
-import MachCSL.WpSmodeLh
 
 namespace Xv6
 

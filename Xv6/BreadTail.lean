@@ -13,6 +13,9 @@ cell that came out with it.
 -/
 import Xv6.BreadDefs
 import MachCSL.WpSmodeFrame6c
+import Xv6.CodeTactics
+import Xv6.BufEscrow
+import Xv6.SpecBread
 
 namespace Xv6
 

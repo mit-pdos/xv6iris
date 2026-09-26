@@ -47,6 +47,7 @@ and wire primitives is given by the language step relation in
 `MachCSL.Lang`, exactly as the Sail model's memory events are.
 -/
 import MachCSL.Dev.DevIds
+import MachCSL.TsoMem
 
 namespace MachCSL
 

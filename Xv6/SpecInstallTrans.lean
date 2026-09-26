@@ -87,15 +87,8 @@ parameter and says the same thing with `hcl : V.clean = fsMclean γfs` and
 
 Imports only definitional files (never a `Code*` or `Proof*` file).
 -/
-import MachCSL.WpSmodeFrame
 import Xv6.LogInv
-import Xv6.FsBytesMint
 import Xv6.SpecBread
-import Xv6.SpecBwrite
-import Xv6.SpecBrelse
-import Xv6.SpecBunpin
-import Xv6.SpecMemmove
-import Xv6.SpecPrintk
 
 namespace Xv6
 

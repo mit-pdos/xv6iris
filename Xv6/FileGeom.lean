@@ -7,8 +7,7 @@ split out of `Xv6/FileDefs.lean` for the same reason: `IrefSlots` and
 `FileOffCell` need them, and `FileDefs` will import the off box
 (`OffBox` → `FileOffCell`), which would otherwise be a cycle.
 -/
-import Xv6.ProcDefs
-import Xv6.Image
+import Xv6.KernelImage
 
 namespace Xv6
 

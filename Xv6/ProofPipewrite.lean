@@ -25,17 +25,13 @@ critical section, the entry `SIE` after the release.
 -/
 import Xv6.SpecPipewrite
 import Xv6.PipeRw
-import Xv6.PipeInvDefs
 import Xv6.SpecAcquire
 import Xv6.SpecRelease
 import Xv6.SpecWakeup
 import Xv6.SpecSleepPrepare
 import Xv6.SpecSleep
 import Xv6.SpecKilled
-import Xv6.SpecMyproc
-import Xv6.SpecCopyin
-import Xv6.CodeTactics
-import Xv6.PrintkDefs
+import MachCSL.WpLock
 
 namespace Xv6
 

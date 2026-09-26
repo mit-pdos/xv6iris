@@ -17,8 +17,8 @@ this proof.
 -/
 import Xv6.SpecSysExit
 import Xv6.ArgLemmas
-import Xv6.CodeTactics
 import MachCSL.WpSmodeFrame6
+import Xv6.SpecArgint
 
 namespace Xv6
 

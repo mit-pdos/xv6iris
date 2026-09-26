@@ -8,9 +8,6 @@ file it may import).
 closed term).
 -/
 import Xv6.ProofPipewrite
-import Xv6.LinkMyproc
-import Xv6.LinkAcquire
-import Xv6.LinkRelease
 import Xv6.LinkWakeup
 import Xv6.LinkSleepPrepare
 import Xv6.LinkSleep

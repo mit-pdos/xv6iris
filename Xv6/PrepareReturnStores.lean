@@ -16,7 +16,6 @@ a4,tp` reads the hart id, legal because the flip already happened.
 import Xv6.PrepareReturnRules
 import Xv6.CodeTactics
 import MachCSL.WpSmodeStvec
-import MachCSL.WpSmodeFrame
 
 namespace Xv6
 

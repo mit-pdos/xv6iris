@@ -14,7 +14,6 @@ closed term).
 -/
 import Xv6.ProofCopyinstr
 import Xv6.LinkWalkaddr
-import Xv6.LinkWalk
 import Xv6.LinkVmfault
 
 namespace Xv6

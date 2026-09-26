@@ -32,10 +32,7 @@ which process this THREAD runs -- does not.
 
 Imports only definitional files (never a `Code*` or `Proof*` file).
 -/
-import Xv6.SchedCtx
 import Xv6.FdTable
-import Xv6.Image
-import MachCSL.WpSmodeIntr
 
 namespace Xv6
 

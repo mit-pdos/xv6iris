@@ -15,6 +15,7 @@ kill check at +0xa6 is lent (`utLiveRes`'s right disjunct).
 -/
 import Xv6.UsertrapAux
 import MachCSL.WpSmodeTrapCsr
+import Xv6.UsertrapArms
 
 namespace Xv6
 

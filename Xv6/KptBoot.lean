@@ -18,7 +18,6 @@ hart's `kvminithart`.
 Imports only definitional files.
 -/
 import Xv6.KstackMap
-import Xv6.UPtDefs
 import Xv6.SyscallEnv
 
 namespace Xv6

@@ -10,6 +10,7 @@ A/D write-back, `entries` the memory footprint the page-walk leaves own,
 and `tlbOk` what the model's TLB may hold about such a tree.
 -/
 import MachCSL.Pte
+import LeanRV64D.VmemTlb
 
 namespace MachCSL
 

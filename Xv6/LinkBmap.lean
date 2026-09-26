@@ -8,9 +8,6 @@ never calls printk (`Xv6/ProofBmap.lean` deviation 1).
 -/
 import Xv6.ProofBmap
 import Xv6.LinkBalloc
-import Xv6.LinkBread
-import Xv6.LinkBrelse
-import Xv6.LinkLogWrite
 
 namespace Xv6
 

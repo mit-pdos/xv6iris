@@ -41,19 +41,10 @@ THE STAGES (Rocq ProofIput.v's lemmas, right to left):
    its own `#H`).
 -/
 import Xv6.SpecIput
-import Xv6.IcacheInvStore
-import Xv6.IcachePinwObl
-import Xv6.IcachePinwLw
-import Xv6.IcacheBoxSites
-import Xv6.IcacheInvFrz
-import Xv6.EscrowDeposit
-import Xv6.EscrowInode
-import Xv6.IcacheEscrowPoolMove
-import Xv6.IcacheEscrowDep
 import MachCSL.WpSmodeFrame6
-import MachCSL.WpSmodeAuRules
-import MachCSL.KCtxMove
 import Xv6.CodeTactics
+import Xv6.SpecAcquire
+import Xv6.SpecRelease
 
 namespace Xv6
 

@@ -43,8 +43,8 @@ bundle `logFreeTok` with its allocation.
 The registry (`loggedAt`) is the one ghost construction that changes
 shape; see its own comment.
 -/
-import Xv6.BioPool
 import MachCSL.LockBornHook
+import Xv6.UartTrace
 
 namespace Xv6
 

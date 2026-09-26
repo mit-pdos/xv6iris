@@ -5,9 +5,6 @@
 import Xv6.ProofBwrite
 import Xv6.LinkHoldingsleep
 import Xv6.LinkVirtioDiskRw
-import Xv6.LinkAcquire
-import Xv6.LinkRelease
-import Xv6.LinkMyproc
 
 namespace Xv6
 

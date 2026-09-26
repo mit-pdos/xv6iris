@@ -35,7 +35,6 @@ The geometry is `Xv6/FsGeom.lean`'s (`IBLOCK`, `islot`, `NDIRECT`,
    `RiscvModelBytes.nth_byte_assemble_len`.
 -/
 import Xv6.FsImg
-import Xv6.InodeDefs
 
 namespace Xv6
 

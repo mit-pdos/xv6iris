@@ -15,9 +15,7 @@ import Xv6.LinkIlock
 import Xv6.LinkReadi
 import Xv6.LinkIunlock
 import Xv6.LinkConsoleread
-import Xv6.LinkPanic
 import Xv6.LinkPiperead
-import Xv6.LinkCopyout
 
 namespace Xv6
 

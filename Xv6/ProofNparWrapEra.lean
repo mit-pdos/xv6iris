@@ -19,8 +19,6 @@ code constants are restated under `nparWrapEra_` names (the plain ones live
 in `ProofNameiparent`, which a Proof file may not import).
 -/
 import Xv6.SpecNparWrapEra
-import MachCSL.WpSmodeFrame
-import Xv6.CodeTactics
 
 namespace Xv6
 

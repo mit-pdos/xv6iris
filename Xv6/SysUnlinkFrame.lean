@@ -47,15 +47,14 @@ slots 9..10 `name[DIRSIZ]` (`s0-80`, fourteen bytes and two spare), slots
    `proc_priv_bare` premise is.
 -/
 import Xv6.SpecSysUnlink
-import Xv6.SysUnlinkParts
-import Xv6.SysUnlinkPure
-import Xv6.DinodeSlot
-import MachCSL.WpSmodeFrame
-import MachCSL.ByteWord
-import MachCSL.ByteWord4
 import MachCSL.StackOwnBounds
-import Xv6.CodeTactics
 import Xv6.SysUnlinkArgs
+import Xv6.KstackMap
+import Xv6.SpecIupdate
+import Xv6.SysfileCalls
+import Xv6.SpecIlock
+import Xv6.SpecNamecmp
+import Xv6.SpecNamexEra
 
 namespace Xv6
 

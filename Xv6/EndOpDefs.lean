@@ -19,10 +19,7 @@ frame with `ra`/`s0`/`s1`/`s2` saved eagerly and three cells written
 lazily), exactly as `Xv6/ProofInstallTrans.lean` carries its own ten-slot
 pair.
 -/
-import Xv6.SpecEndOp
-import Xv6.SpecMemmove
 import Xv6.LogLedger
-import Xv6.CodeTactics
 
 namespace Xv6
 

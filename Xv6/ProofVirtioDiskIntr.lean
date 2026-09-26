@@ -37,19 +37,13 @@ passed the context's floor -- or the position is its own store, which the
 fence drains).  `Xv6.vdis_payWm_mk` puts one back at the new watermark when the
 handler releases.
 -/
-import MachCSL.WpSmodeFrame
-import MachCSL.WpSmodeFrame12b
 import MachCSL.WpSmodeDev4
-import MachCSL.WpSmodeAuRules
-import MachCSL.WpSmodeFenceFloor
 import MachCSL.WpSmodeFenceFloor2
 import MachCSL.WpSmodeFencePub
 import Xv6.SpecVirtioDiskIntr
 import Xv6.SpecAcquire
 import Xv6.SpecRelease
-import Xv6.SpecWakeup
 import Xv6.DiskAcc
-import Xv6.VirtioDiskRwDefs
 import Xv6.CodeTactics
 
 namespace Xv6

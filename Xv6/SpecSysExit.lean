@@ -50,8 +50,6 @@ result to kexit, whose ZOMBIE park is where the page reaches the slot.
 Imports only definitional files (never a `Code*` or `Proof*` file).
 -/
 import Xv6.SpecKexit
-import Xv6.SpecArgint
-import Iris.ProofMode
 
 namespace Xv6
 

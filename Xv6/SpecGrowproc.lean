@@ -17,14 +17,8 @@ became live and the shrink unmaps only above the new break, so the block's
 
 Imports only definitional files (never a `Code*` or `Proof*` file).
 -/
-import MachCSL.WpSmodeFrame
-import MachCSL.Lock
-import Xv6.SchedCtx
 import Xv6.FdTable
 import Xv6.SpecUvmalloc
-import Xv6.PidLock
-import Xv6.Image
-import Xv6.Geom
 
 namespace Xv6
 

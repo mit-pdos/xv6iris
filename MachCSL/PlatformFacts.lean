@@ -7,7 +7,10 @@ the closed forms the stage specifications rewrite with.
 -/
 import MachCSL.Platform
 import MachCSL.TsoMem
-import MachCSL.SimpAttr
+import LeanRV64D.Pma
+import LeanRV64D.ZicsrInsts
+import LeanRV64D.Arithmetic
+import LeanRV64D.BaseInsts
 
 namespace MachCSL
 

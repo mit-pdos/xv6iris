@@ -183,23 +183,10 @@ reaches this contract.
 
 Imports only definitional files and callee `Spec*` files.
 -/
-import Xv6.SpecArgint
-import Xv6.SpecArgstr
-import Xv6.SpecBeginOp
-import Xv6.SpecEndOp
-import Xv6.SpecNameiEra
-import Xv6.SpecIlock
-import Xv6.SpecIunlock
-import Xv6.SpecIunlockput
-import Xv6.SpecItrunc
 import Xv6.SpecCreate
-import Xv6.SpecFilealloc
-import Xv6.SpecFdalloc
-import Xv6.SpecFileclose
 import Xv6.SysOpenDefs
-import Xv6.FsReady
-import Xv6.FdTable
 import Xv6.ConsoleInvDefs
+import Xv6.UMemLazy
 
 namespace Xv6
 

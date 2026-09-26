@@ -64,10 +64,10 @@ and exactly the map `LogSnapLaw.snapLawOut` names.
   are the machine-checked RECORD of residues (E)/(F)/(G), which the landed
   `iregCpin_no_ops` / `iregFsh_no_ops` / `ipoolQuiesceAcc` now close).
 -/
-import Xv6.FsDurSnap
 import Xv6.FsStateEraRes
-import Xv6.FsBytesInv
 import Xv6.InodeRegionInv
+import Xv6.FsDurSnapBytes
+import Xv6.FsDurXferRuns
 
 namespace Xv6
 

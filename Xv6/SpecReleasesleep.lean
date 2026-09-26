@@ -23,7 +23,6 @@ Imports only definitional files (never a `Code*` or `Proof*` file).
 -/
 import Xv6.SleepLockDefs
 import Xv6.SpecWakeup
-import MachCSL.WpSmodeIntr
 
 namespace Xv6
 

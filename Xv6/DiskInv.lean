@@ -83,10 +83,7 @@ no permit out, which is `disk_publish`'s whole obligation.  The
 COMPLETION side is `Xv6/DiskAcc.lean`'s, and its section head sets out
 the mechanisms both sides rest on.
 -/
-import Xv6.DiskInvDefs
 import Xv6.DiskCrashRows
-import MachCSL.WpDevDmaStep
-import MachCSL.WpDevDmaStepV
 import MachCSL.WpDevDisk
 
 namespace Xv6

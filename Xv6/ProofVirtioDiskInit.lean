@@ -13,16 +13,14 @@ geometry and the lock's payload.
 Interrupts are off throughout (`hsie`), so the hart never migrates; the
 frame is the standard four slots with `s1` and `s2` saved.
 -/
-import MachCSL.WpSmodeFrame
 import MachCSL.WpSmodeDev4
 import MachCSL.WpSmodeAlu4
-import MachCSL.ByteWord
-import MachCSL.Lock
 import Xv6.SpecVirtioDiskInit
 import Xv6.SpecInitlock
 import Xv6.SpecKalloc
 import Xv6.SpecMemset
 import Xv6.CodeTactics
+import Xv6.DiskAcc
 
 namespace Xv6
 

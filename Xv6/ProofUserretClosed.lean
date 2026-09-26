@@ -25,6 +25,7 @@ save walk's key facts), `UserretClosedResume` (userret + the slot),
 (uservec, usertrap, the exit).
 -/
 import Xv6.UserretClosedRound
+import Xv6.SpecUserretClosed
 
 namespace Xv6
 

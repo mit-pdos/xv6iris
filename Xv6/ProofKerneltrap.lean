@@ -17,10 +17,8 @@ the last on whichever hart the thread resumes on.  The tail (`csrw sepc`,
 `csrw sstatus`, the epilogue) is proved once, at any hart pinned to the
 entry one when there is no process.
 -/
-import MachCSL.WpSmodeFrame
 import MachCSL.WpSmodeTrapCsr
 import Xv6.SpecKerneltrap
-import Xv6.SpecDevintr
 import Xv6.SpecMyproc
 import Xv6.SpecYield
 import Xv6.CodeTactics

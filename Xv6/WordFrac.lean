@@ -4,7 +4,6 @@ Fractional ownership of memory words: splitting, merging and agreement for
 hands references fractions of a `struct file`'s cells (`fileFieldsAt`), so
 `filedup` halves them and `fileclose` merges them back.
 -/
-import MachCSL.WordPointsTo
 import Xv6.KallocDefs
 
 namespace Xv6

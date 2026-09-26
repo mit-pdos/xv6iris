@@ -9,17 +9,8 @@ unmapped (`ismapped`), then `kalloc`s a page, `memset`s it to zero and
 freeing what it took.  The arithmetic facts, the frame and the call rules
 are in `Xv6/VmfaultDefs.lean`.
 -/
-import MachCSL.WpSmodeFrame
-import MachCSL.Lock
 import Xv6.SpecVmfault
-import Xv6.SpecIsmapped
-import Xv6.SpecKalloc
-import Xv6.SpecKfree
-import Xv6.SpecMemset
-import Xv6.SpecMappages
-import Xv6.UPtFaultLemmas
 import Xv6.VmfaultDefs
-import Xv6.CodeTactics
 
 namespace Xv6
 

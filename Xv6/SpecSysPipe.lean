@@ -72,11 +72,8 @@ DEVIATIONS FROM ROCQ:
     fileclose_pipe_env` / `fileclose_fs_env_nopid` rows are the caller's own
     persistent rows here).
 -/
-import Xv6.SpecArgaddr
 import Xv6.SpecPipealloc
 import Xv6.SpecFdalloc
-import Xv6.SpecCopyout
-import MachCSL.ByteWord4
 
 namespace Xv6
 

@@ -73,13 +73,6 @@ THE TRANSITIONS (Rocq's seven, with their hooked forms): (a)
   half itself.
 -/
 import MachCSL.Lock
-import Iris.Instances.Lib.Invariants
-import Iris.Instances.Lib.GhostVar
-import Iris.Instances.Lib.GhostMap
-import Iris.Algebra.UFrac
-import Iris.Algebra.Auth
-import Iris.Algebra.Heap
-import Iris.Std.HeapInstances
 
 namespace MachCSL
 

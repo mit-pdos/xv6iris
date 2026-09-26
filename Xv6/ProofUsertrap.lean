@@ -21,12 +21,11 @@ instance; exec's answer up to the kernel words, SpecUsertrap deviations 9-10).
 -/
 import Xv6.UsertrapOpen
 import Xv6.UsertrapTail
-import Xv6.UsertrapTailA6
-import Xv6.UsertrapArms
 import Xv6.UsertrapArms56
 import Xv6.UsertrapArmsD0
 import Xv6.UsertrapSys
 import Xv6.UtReadWhyXv6
+import Xv6.UsertrapKexit
 
 namespace Xv6
 

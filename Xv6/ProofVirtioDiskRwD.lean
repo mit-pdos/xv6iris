@@ -24,12 +24,8 @@ which pins its value: the device never writes the avail page.  What each
 `MachCSL.ctxBytes_of_pushed` turns back into the payload's context cell
 with the hart's `ownCtx` (out of `MachCSL.kctx_token_acc`).
 -/
-import MachCSL.WpSmodeAuRules
 import MachCSL.WpSmodeFenceFloor2
-import MachCSL.WpDmaCtx
-import MachCSL.KCtxMove
 import Xv6.VirtioDiskRwDefs3
-import Xv6.SpecVirtioDiskRw
 import Xv6.CodeTactics
 
 namespace Xv6

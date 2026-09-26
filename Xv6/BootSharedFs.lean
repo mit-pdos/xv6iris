@@ -36,8 +36,6 @@ DEVIATIONS from Rocq:
 Imports only definitional files.
 -/
 import Xv6.FsCfgSnap
-import Xv6.FsCrashSeam
-import Xv6.LogMirrorHalf
 import Xv6.SpecMain
 
 namespace Xv6

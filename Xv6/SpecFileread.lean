@@ -143,16 +143,9 @@ joins the shared epilogue (+0x5e) with the answer in `s2`.
 
 Imports only definitional files and callee `Spec*` files.
 -/
-import Xv6.SpecPiperead
-import Xv6.SpecIlock
-import Xv6.SpecIunlock
-import Xv6.SpecReadi
-import Xv6.SpecConsoleread
-import Xv6.SpecPanic
-import Xv6.FsReady
-import Xv6.FilePay
 import Xv6.FdTable
 import Xv6.FsAbsReadFire
+import Xv6.ConsoleInvDefs
 
 
 namespace Xv6

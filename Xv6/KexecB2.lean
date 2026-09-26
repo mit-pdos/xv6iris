@@ -72,9 +72,6 @@ Rocq's header, in short:
 import Xv6.KexecB2Spec
 import Xv6.KexecPtImage
 import Xv6.SpecWalkaddr
-import Xv6.SpecFlags2perm
-import Xv6.SpecUvmalloc
-import Xv6.SpecPanic
 import Xv6.FsCallSitesI
 
 namespace Xv6

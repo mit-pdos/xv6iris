@@ -4,6 +4,7 @@
 CLEAR, each through its value-chained sequential permit.
 -/
 import Xv6.EndOpTail
+import Xv6.EndOpCrash
 
 namespace Xv6
 

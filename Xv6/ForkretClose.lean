@@ -25,8 +25,8 @@ A stage file: it imports Spec and definitional files only.
 import Xv6.ForkretTail
 import Xv6.ForkretParts
 import Xv6.SpecUserretClosed
-import Xv6.UexecExecInst
 import Xv6.UsertrapBlocks
+import Xv6.SpecForkret
 
 namespace Xv6
 

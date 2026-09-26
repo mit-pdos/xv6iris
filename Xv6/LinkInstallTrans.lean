@@ -9,7 +9,6 @@ import Xv6.LinkBunpin
 import Xv6.LinkBwrite
 import Xv6.LinkBrelse
 import Xv6.LinkMemmove
-import Xv6.LinkPrintk
 
 namespace Xv6
 

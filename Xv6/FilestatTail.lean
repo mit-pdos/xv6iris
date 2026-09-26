@@ -15,6 +15,7 @@ batch whose 'wrong type' case is an ordinary error return").  The window is
 EMPTY and the image is the one it came in at (`umemWrote_refl`).
 -/
 import Xv6.FilestatParts
+import Xv6.UMemWindow
 
 namespace Xv6
 

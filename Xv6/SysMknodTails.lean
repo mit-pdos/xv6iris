@@ -34,7 +34,7 @@ Rocq's header points, kept:
    premises, and eb-generically; the pid cell is lent at the bare block's
    `pidPriv` share through `sys_mknod_pid` (SysMknodFrame deviation 3).
 -/
-import Xv6.SysMknodCalls
+import Xv6.SysMknodFrame
 
 namespace Xv6
 

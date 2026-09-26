@@ -130,19 +130,11 @@ honest source is the process's own block.
 Imports only definitional files (and `SpecPanic` for `panicEnv`, as
 `Xv6/FsReady.lean` imports `SpecVirtioDiskRw` for `diskCaps`).
 -/
-import Xv6.FsReady
 import Xv6.FsCfgKits
 import Xv6.FsCfgBoot
 import Xv6.FsCollect
-import Xv6.FsImgWf
-import Xv6.FsCrashPure
 import Xv6.SpecPanic
-import Xv6.IrefSlots
-import Xv6.FsBytesInv
-import Xv6.FsImg
 import Xv6.PtOwnLemmas
-import MachCSL.ByteWord4
-import MachCSL.CallConv
 
 namespace Xv6
 

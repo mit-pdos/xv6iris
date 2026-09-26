@@ -86,8 +86,6 @@ Rocq's header, abridged (the reasons are the content):
 
 `opf_era_live` (deviation 3: the `mkf_era_live` twin).  Nothing else.
 -/
-import Xv6.FsAbsDefs
-import Xv6.FsStateEraPure
 import Xv6.SpecItrunc
 import Xv6.SysOpenDefs
 

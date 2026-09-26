@@ -32,9 +32,6 @@ Stack: the 4-slot frame over `consoleintr`'s 26.
 
 Imports only definitional files.
 -/
-import MachCSL.CallConv
-import Xv6.Image
-import Xv6.ConsoleDefs
 import Xv6.SpecConsoleintr
 
 namespace Xv6

@@ -12,7 +12,6 @@ page of the caller's tree.
 -/
 import Xv6.PtRunLemmas
 import Xv6.KvmDefs
-import MachCSL.ByteWord
 
 namespace Xv6.PtStack
 

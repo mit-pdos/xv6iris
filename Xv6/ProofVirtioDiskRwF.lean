@@ -30,7 +30,6 @@ flags and the next index are read off the STILL-FORMATTED descriptor
 before `free_desc` zeroes it, so the loop walks `c.d0 -> c.md`,
 `c.d1 -> c.tl`, `c.d2` (no NEXT) and stops.
 -/
-import MachCSL.WpSmodeFrame12b
 import Xv6.VirtioDiskRwDefs4
 import Xv6.CodeTactics
 

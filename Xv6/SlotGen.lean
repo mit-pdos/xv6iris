@@ -95,10 +95,6 @@ Imports only definitional files.
 -/
 import Xv6.ChildTok
 import Xv6.ProcGeom
-import Iris.Instances.Lib.GhostMap
-import Iris.Instances.Lib.GhostVar
-import Iris.Algebra.Lib.DFracAgree
-import Iris.Algebra.Heap
 
 namespace Xv6
 

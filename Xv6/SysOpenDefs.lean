@@ -90,10 +90,6 @@ FsAbsOpenFire precedent):
 
 Nothing dropped; everything not listed as ported is DEFERRED above.
 -/
-import Xv6.SysWriteDefs
-import Xv6.AppInv
-import Xv6.PieceFam
-import Xv6.FileDefs
 import Xv6.FsAbsMknodFire
 import Xv6.ArgPath
 import Xv6.SpecFdalloc

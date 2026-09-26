@@ -34,10 +34,10 @@ Deviations from Rocq:
    has no Lean counterpart (union_cone.md §3: MISSING, row U1-T).  It is
    `rfl` once the name lands.
 -/
-import Xv6.UNameBytes
 import Xv6.ExecWords
 import Xv6.ArgPath
 import Xv6.FsAbsEra
+import Xv6.FileDisc
 
 namespace Xv6
 

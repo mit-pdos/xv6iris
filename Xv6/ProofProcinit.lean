@@ -11,7 +11,6 @@ computation per process.  Stated at either interrupt index, as `initlock`
 is; `initlock` never touches the interrupt state, so the exit context is
 the plain `k.withRegs R'`.
 -/
-import MachCSL.WpSmodeFrame
 import MachCSL.WpSmodeAlu4
 import Xv6.SpecProcinit
 import Xv6.SpecInitlock

@@ -10,7 +10,6 @@ enabled interrupt arm needs (`sieArm_on_intro`, with the handler contract
 enabled, so the contract is at `sie = false`.
 Imports only definitional files.
 -/
-import Xv6.Image
 import Xv6.SpecKernelvec
 
 namespace Xv6

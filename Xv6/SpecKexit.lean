@@ -103,15 +103,9 @@ The `sie = false` contract `KEXIT.wp_kexit` is the derived instance.
 
 Imports only definitional files (never a `Code*` or `Proof*` file).
 -/
-import Xv6.SchedCtx
 import Xv6.WaitLock
-import Xv6.SpecSched
-import Xv6.SpecReparent
 import Xv6.SpecFileclose
 import Xv6.FdTable
-import MachCSL.Lock
-import MachCSL.WpSmodeIntr
-import Iris.ProofMode
 
 namespace Xv6
 

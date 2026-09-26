@@ -134,24 +134,11 @@ three LIVE panics (+0xf4 "unlink: nlink < 1", +0x136 "isdirempty: readi",
 
 Imports only definitional files and callee `Spec*` files.
 -/
-import Xv6.SpecArgstr
-import Xv6.SpecBeginOp
-import Xv6.SpecEndOp
-import Xv6.SpecNparWrapEra
-import Xv6.SpecIlock
-import Xv6.SpecNamecmp
-import Xv6.SpecDirlookup
-import Xv6.SpecMemset
-import Xv6.SpecReadi
-import Xv6.SpecWritei
-import Xv6.SpecIupdate
-import Xv6.SpecIunlockput
-import Xv6.SpecPanic
 import Xv6.SysUnlinkDefs
 import Xv6.SysUnlinkBudget
 import Xv6.FsAbsMknodFire
-import Xv6.FsReady
 import Xv6.FdTable
+import Xv6.SpecNameiparent
 
 namespace Xv6
 

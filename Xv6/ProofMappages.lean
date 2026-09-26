@@ -8,7 +8,6 @@ induction on the pages left: one `walk(pagetable, a, 1)` per page, the
 level-0 entry read (zero, by `mappagesArgs`) and written with the leaf.
 Stated at either interrupt index, as `walk` is.
 -/
-import MachCSL.WpSmodeFrame
 import Xv6.SpecMappages
 import Xv6.SpecWalk
 import Xv6.PtRunLemmas

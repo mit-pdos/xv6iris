@@ -52,7 +52,6 @@ W8-S4; Rocq `ProofSyscall.v` §SyscallArms `sysc_exec_in_open` /
 -/
 import Xv6.SyscallRet
 import Xv6.UsysMemOkSpec
-import Xv6.CstringInv
 
 namespace Xv6
 

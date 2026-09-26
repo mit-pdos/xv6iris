@@ -19,14 +19,7 @@ whichever hart `sleep` returns on and with whatever `SPIE`/`SPP` it was
 resumed with, so the induction hypothesis is `Xv6.vdrwLoopHead` at
 `k.withSpie a b`, universally quantified over the hart.
 -/
-import MachCSL.WpSmodeFrame12b
 import Xv6.VirtioDiskRwDefs4
-import Xv6.SpecVirtioDiskRw
-import Xv6.SpecFreeDesc
-import Xv6.SpecAcquire
-import Xv6.SpecRelease
-import Xv6.SpecSleep
-import Xv6.SpecSleepPrepare
 import Xv6.CodeTactics
 
 namespace Xv6

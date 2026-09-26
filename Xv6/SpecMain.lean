@@ -117,51 +117,17 @@ of its own for it).
 
 Requires only Spec files and the definitional layer.
 -/
-import Xv6.SpecCpuid
-import Xv6.SpecPrintk
 import Xv6.SpecConsoleinit
-import Xv6.SpecUartinitone
-import Xv6.SpecPrintkinit
-import Xv6.SpecKinit
-import Xv6.SpecFreerange
-import Xv6.SpecKvminit
 import Xv6.SpecKvminithart
-import Xv6.SpecProcinit
-import Xv6.SpecTrapinit
-import Xv6.SpecTrapinithart
-import Xv6.SpecPlicinit
-import Xv6.SpecPlicinithart
-import Xv6.SpecBinit
 import Xv6.SpecIinit
-import Xv6.SpecFileinit
 import Xv6.SpecVirtioDiskInit
-import Xv6.SpecVirtioDiskRw
 import Xv6.SpecUserinit
 import Xv6.SpecScheduler
-import Xv6.SpecKernelvec
 import Xv6.SpecStart
 import Xv6.StartedInv
-import Xv6.BioInit
 import Xv6.IcacheBootTable
-import Xv6.ConsoleInvDefs
-import Xv6.ConsoleDefs
-import Xv6.WaitInvTies
-import Xv6.SlotSupply
-import Xv6.IrefSlots
-import Xv6.ProcAvail
-import Xv6.FirstTok
-import Xv6.PidLock
-import Xv6.TicksDefs
-import Xv6.LogInv
-import Xv6.LogMirrorHalf
-import Xv6.FsCrashSeam
-import Xv6.FsCfgBoot
 import Xv6.FsBootSupply
 import Xv6.FileBoot
-import Xv6.InitBoot
-import MachCSL.WireInv
-import MachCSL.LockBornHook
-import MachCSL.KCtx
 
 namespace Xv6
 

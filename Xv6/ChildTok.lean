@@ -78,10 +78,7 @@ duplicated, which is what makes "the payload is paid once" a THEOREM.
 Imports only definitional files.
 -/
 import Iris.Instances.Lib.SavedProp
-import Iris.Algebra.Csum
-import Iris.Algebra.Excl
-import Iris.Algebra.Agree
-import MachCSL.Resources
+import MachCSL.KernelElf
 
 namespace Xv6
 

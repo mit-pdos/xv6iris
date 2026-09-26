@@ -23,7 +23,6 @@ Deviation from Rocq (DU3): no per-pc lemma is generated; a proof evaluates the
 tree lookup by `rfl` where it applies an instruction rule, as the kernel's do
 (`Xv6.kernelText_find`).
 -/
-import Iris
 import Xv6.UserTextDefs
 
 namespace Xv6.User

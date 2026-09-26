@@ -14,7 +14,6 @@ Imports only definitional files (never a `Code*` or `Proof*` file).
 import Xv6.UPtDefs
 import Xv6.PtRunLemmas
 import Xv6.PtOwnLemmas
-import MachCSL.ByteWord
 
 namespace Xv6.UPtCopy
 

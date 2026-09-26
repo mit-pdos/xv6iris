@@ -30,9 +30,9 @@ The stages: `Xv6/IallocTail.lean` (epilogue, no-inodes arm),
 4. `ia_held_L` is `Xv6.dsHeld_L`; `ia_win_acc` is `Xv6.diblkSlot_acc`
    followed by `Xv6.dislot_bytes` (brief §3.2).
 -/
-import Xv6.IallocParts
-import Xv6.InodeRegionMovers
-import Xv6.CodeTactics
+import Xv6.SpecIget
+import Xv6.SpecIalloc
+import Xv6.FsCallSitesF
 
 namespace Xv6
 

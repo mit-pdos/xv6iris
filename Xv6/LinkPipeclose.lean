@@ -9,9 +9,7 @@ reclaimed memory).
 `LinkMemset.MemsetFree`), as `LinkSyscall` does.
 -/
 import Xv6.ProofPipeclose
-import Xv6.LinkAcquire
 import Xv6.LinkWakeup
-import Xv6.LinkRelease
 import Xv6.LinkKfree
 import Xv6.LinkMemset
 

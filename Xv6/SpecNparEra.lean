@@ -54,7 +54,9 @@ typeclass-search memory bomb) has no Lean analogue.
 
 Imports only definitional files and callee `Spec*` files.
 -/
-import Xv6.SpecNamexEra
+import Xv6.FdTable
+import Xv6.FsAbsEra
+import Xv6.SpecNamex
 
 namespace Xv6
 

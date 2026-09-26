@@ -58,7 +58,6 @@ builds its congruence proof over the whole context).
 Imports only the shared vocabulary and kexec's Spec.
 -/
 import Xv6.SysExecParts
-import Xv6.SpecKexec
 
 namespace Xv6
 

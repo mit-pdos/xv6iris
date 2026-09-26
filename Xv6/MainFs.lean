@@ -34,10 +34,7 @@ handler environment's device complement), `mn_firstFsinit` (Rocq's
 `first_fsinit` transport) and `mn_firstPersist` (Rocq's
 `first_boot_persist`, seventeen rows).
 -/
-import Xv6.MainStarted
-import Xv6.FsBootSupply
-import Xv6.FileBoot
-import Xv6.FsCfgSnapFirst
+import Xv6.MainPrintk
 
 namespace Xv6
 

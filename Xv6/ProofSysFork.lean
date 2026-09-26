@@ -17,9 +17,7 @@ re-anchored along each pinning fact (`wpNext_shift`).  The
 save/restore of ra/s0 spans the call, so `calleeSaved` is discharged
 componentwise (Rocq's `cs_through` shape).
 -/
-import MachCSL.WpSmodeFrame
 import Xv6.SpecSysFork
-import Xv6.CodeTactics
 
 namespace Xv6
 

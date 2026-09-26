@@ -49,6 +49,8 @@ is never taken at `T_DEVICE`), and the two arms read at the device type
 -/
 import Xv6.SysMknodTails
 import MachCSL.WpSmodeLh
+import Xv6.ArgLemmas
+import Xv6.SysMknodCalls
 
 namespace Xv6
 

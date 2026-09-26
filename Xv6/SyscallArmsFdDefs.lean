@@ -50,12 +50,6 @@ The arms themselves are `SyscallArmsFd` (dup, fstat, close) and
    when it is, these two laws gain Rocq's resource rows.
 -/
 import Xv6.SyscallRet
-import Xv6.SpecSysPipe
-import Xv6.SpecSysRead
-import Xv6.SpecSysWrite
-import Xv6.SpecSysDup
-import Xv6.SpecSysClose
-import Xv6.SpecSysFstat
 import MachCSL.StackOwnBounds
 
 namespace Xv6

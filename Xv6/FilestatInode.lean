@@ -25,6 +25,7 @@ iunlock (`filerw_priv_pid`, Rocq's `proc_priv_core_bare_acc` discipline).
 -/
 import Xv6.FilestatCalls
 import Xv6.FilestatTail
+import Xv6.FileRwShared
 
 namespace Xv6
 

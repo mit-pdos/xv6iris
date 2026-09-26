@@ -8,13 +8,8 @@ takes `walkaddr`/`vmfault`).
 -/
 import Xv6.ProofWritei
 import Xv6.LinkBmap
-import Xv6.LinkBread
-import Xv6.LinkBrelse
-import Xv6.LinkLogWrite
 import Xv6.LinkEitherCopyin
 import Xv6.LinkIupdate
-import Xv6.LinkMyproc
-import Xv6.LinkMemmove
 
 namespace Xv6
 

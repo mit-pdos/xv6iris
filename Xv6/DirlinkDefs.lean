@@ -29,7 +29,6 @@ block statements `dl_tail_body`, `dl_after_body`/`dl_after_exit`,
    (DirlookupDefs deviation 2).
 -/
 import Xv6.DirlinkParts
-import Xv6.CodeTactics
 
 namespace Xv6
 

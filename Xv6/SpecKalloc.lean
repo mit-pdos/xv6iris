@@ -14,10 +14,8 @@ registers are preserved.
 Imports only definitional files (never a `Code*` or `Proof*` file).
 -/
 import MachCSL.WpSmodeFrame
-import MachCSL.Lock
 import Xv6.KallocDefs
 import Xv6.Image
-import Xv6.Geom
 
 namespace Xv6
 

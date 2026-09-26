@@ -26,7 +26,6 @@ The Iris side is one application of `swp_runRW` per fact
 (`urwDemo_swp_add`, `urwDemo_swp_ecall`, `urwDemo_swp_ld`).
 -/
 import MachCSL.URunRW
-import MachCSL.WpCsr
 
 namespace MachCSL
 

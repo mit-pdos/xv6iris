@@ -9,9 +9,7 @@ Inside a function body every context is `(k.pushed 2).withRegs R` (`k` the
 caller's context, `R` the current map), which is what the tactics
 normalise to; reads become map applications, decided on literal indices.
 -/
-import MachCSL.WpSmodeRules
 import MachCSL.WpSmodeIntr
-import MachCSL.CallConv
 
 
 namespace MachCSL

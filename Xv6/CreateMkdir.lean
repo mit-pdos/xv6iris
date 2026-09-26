@@ -112,7 +112,6 @@ proved from the `fail:` twin `createFailMkdirBody` as a PREMISE.
   (`create_first_0`, `create_first_miss_dotdot`, the body's `dirFirst`
   miss); nothing is dropped there.
 -/
-import Xv6.CreateSharedBody
 import Xv6.CreateCalls
 import Xv6.IregLinkNz
 import Xv6.FsStateEraResB

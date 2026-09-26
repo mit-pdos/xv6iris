@@ -11,7 +11,6 @@ installed table (`kptOn`, persistent, the client's) and the hart's TLB,
 empty after the `sfence.vma` that precedes the write.  Everything else in
 the bundle moves tier for free (`WpSmodeSatp`).
 -/
-import MachCSL.WpSmodeIntr
 import MachCSL.WpSmodeSatp
 
 namespace MachCSL

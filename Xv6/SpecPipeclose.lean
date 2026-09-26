@@ -26,9 +26,7 @@ and the continuation is at whichever hart the thread landed on.  It runs at
 the kernel page table (`.kpt`), which `wakeup`/`procsInv` and `isPipe` need.
 -/
 import Xv6.PipeInvDefs
-import Xv6.KallocDefs
 import Xv6.SchedCtx
-import MachCSL.Lock
 import MachCSL.WpSmodeIntr
 
 namespace Xv6

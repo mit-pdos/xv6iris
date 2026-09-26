@@ -35,6 +35,7 @@ anywhere a `UEXEC_GEN` is in scope.
    deviation 4).
 -/
 import Xv6.UexecWp
+import Xv6.SpecUser
 
 namespace Xv6
 

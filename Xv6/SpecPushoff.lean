@@ -18,7 +18,6 @@ Rocq); push_off's own frame is 4 slots over mycpu's 2.
 
 Imports only definitional files (never a `Code*` or `Proof*` file).
 -/
-import MachCSL.CallConv
 import MachCSL.WpSmodeIntr
 import Xv6.Image
 import Xv6.Geom

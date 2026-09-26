@@ -22,6 +22,8 @@ the caller's continuation out of the scan's induction.
 -/
 import Xv6.IgetParts
 import Xv6.SpecRelease
+import Xv6.CodeTactics
+import Xv6.SpecIget
 
 namespace Xv6
 

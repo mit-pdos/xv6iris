@@ -90,7 +90,6 @@ fragment, `unit_mass 0 = 1`).
 -/
 import Xv6.BcacheInv
 import Xv6.WordFrac
-import MachCSL.CtxBox
 
 namespace Xv6
 

@@ -18,9 +18,7 @@ import Xv6.LinkIunlock
 import Xv6.LinkBeginOp
 import Xv6.LinkEndOp
 import Xv6.LinkConsolewrite
-import Xv6.LinkPanic
 import Xv6.LinkPipewrite
-import Xv6.LinkCopyin
 
 namespace Xv6
 

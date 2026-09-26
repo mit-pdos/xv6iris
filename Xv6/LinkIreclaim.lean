@@ -12,15 +12,12 @@ refutation in this cone a caller cannot see.  Rocq's `PrintkGen` is Lean's
 `PRINTK`.
 -/
 import Xv6.ProofIreclaim
-import Xv6.LinkBread
-import Xv6.LinkBrelse
 import Xv6.LinkIget
 import Xv6.LinkBeginOp
 import Xv6.LinkIlock
 import Xv6.LinkIunlock
 import Xv6.LinkIput
 import Xv6.LinkEndOp
-import Xv6.LinkPrintk
 
 namespace Xv6
 

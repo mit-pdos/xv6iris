@@ -8,12 +8,10 @@ with, the trampoline, the constants), then the body as a loop by induction
 on the stacks left: one `kalloc` and one `kvmmap` of one read-write page at
 `KSTACK(i)` per process.  Stated at either interrupt index, as `kalloc` is.
 -/
-import MachCSL.WpSmodeFrame
 import MachCSL.WpSmodeAlu4
 import Xv6.SpecProcMapstacks
 import Xv6.SpecKalloc
 import Xv6.SpecKvmmap
-import Xv6.PtRunLemmas
 import Xv6.PtStackLemmas
 import Xv6.CodeTactics
 

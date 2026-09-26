@@ -10,15 +10,8 @@ return (before the frame), then the page loop by induction on the bytes
 left, each iteration one `copyout_iter`.  Stated at either interrupt
 index, as the callees are.
 -/
-import MachCSL.WpSmodeFrame
-import MachCSL.WpSmodeAlu2
-import MachCSL.ByteWord
 import Xv6.SpecCopyout
-import Xv6.SpecWalkaddr
-import Xv6.SpecVmfault
 import Xv6.SpecWalk
-import Xv6.SpecMemmove
-import Xv6.UMemLemmas
 import Xv6.CodeTactics
 import Xv6.CopyLemmas
 

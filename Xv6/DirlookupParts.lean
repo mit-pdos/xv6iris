@@ -46,11 +46,6 @@ The cell at `16(sp)` is never written; `0(sp)..15(sp)` is the `de` record
 -/
 import Xv6.SpecDirlookup
 import Xv6.FsWords
-import Xv6.DinodeSlot
-import MachCSL.WpSmodeFrame12
-import MachCSL.WpSmodeFrame12b
-import MachCSL.WpSmodeLh
-import MachCSL.ByteWord
 
 namespace Xv6
 

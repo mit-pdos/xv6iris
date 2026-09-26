@@ -13,8 +13,6 @@ past it -- the `memset` call and the tail -- runs at whichever hart the
 thread lands on; the body between `acquire` and `release` runs with
 interrupts off, at one hart.
 -/
-import MachCSL.WpSmodeFrame
-import MachCSL.ByteWord
 import Xv6.SpecKalloc
 import Xv6.SpecAcquire
 import Xv6.SpecRelease

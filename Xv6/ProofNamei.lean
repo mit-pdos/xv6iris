@@ -29,6 +29,7 @@ conditional one vacuously.
 3. The counted seal `wp_namei_sconf` is not ported (SpecNamei "Dropped").
 -/
 import Xv6.NameiFrame
+import Xv6.SpecNamei
 
 namespace Xv6
 

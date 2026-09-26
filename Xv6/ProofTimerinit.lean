@@ -3,7 +3,6 @@ Proof of `timerinit`'s specification (`SpecTimerinit.TIMERINIT`): the 21
 instruction rules chained, no symbolic execution.
 -/
 import MachCSL.WpMmode
-import MachCSL.WpMmodeAlu
 import MachCSL.WpMmodeCsr
 import MachCSL.WpMmodeCtl
 import MachCSL.WpStore

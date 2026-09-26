@@ -22,6 +22,9 @@ hand-off to the off-lock free at `+0x98`.  A stage file of iput's proof
   then `HO`.
 -/
 import Xv6.IputStages
+import Xv6.IcacheInvStore
+import Xv6.IcachePinwLw
+import Xv6.IcacheBoxSites
 
 namespace Xv6
 

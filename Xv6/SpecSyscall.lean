@@ -103,19 +103,13 @@ fallback (+0x40..+0x56) and the shared epilogue (+0x58..+0x62).
 Imports only definitional files and the 22 entries' Spec files (the slot
 check).
 -/
-import Xv6.SyscallEnv
 import Xv6.SyscallDefs
-import Xv6.UexecRet
-import Xv6.SpecKwait
-import Xv6.SpecMyproc
-import Xv6.SpecPrintk
 import Xv6.SpecSysFork
 import Xv6.SpecSysExit
 import Xv6.SpecSysWait
 import Xv6.SpecSysPipe
 import Xv6.SpecSysRead
 import Xv6.SpecSysKill
-import Xv6.SpecSysExec
 import Xv6.SpecSysFstat
 import Xv6.SpecSysChdir
 import Xv6.SpecSysDup

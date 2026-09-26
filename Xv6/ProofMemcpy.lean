@@ -3,7 +3,6 @@ Proof of `memcpy`'s specification (`SpecMemcpy.MEMCPY`), given the
 interface of `memmove`: the prologue, the call (discharged by
 `MEMMOVE.wp_memmove` at the callee's context), the epilogue.
 -/
-import MachCSL.WpSmodeFrame
 import Xv6.SpecMemcpy
 import Xv6.SpecMemmove
 import Xv6.CodeTactics

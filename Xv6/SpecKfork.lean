@@ -105,22 +105,8 @@ PROCESS-LAYER DEVIATIONS (flagged):
 
 Imports only definitional files (never a `Code*` or `Proof*` file).
 -/
-import Xv6.SchedCtx
-import Xv6.WaitLock
-import Xv6.PidLock
 import Xv6.ParkCap
 import Xv6.KforkChild
-import Xv6.SpecFiledup
-import Xv6.SpecIdup
-import Xv6.FdTable
-import Xv6.SpecAllocproc
-import Xv6.ProcAvail
-import Xv6.SpecFreeproc
-import Xv6.SpecUvmcopy
-import Xv6.SpecSleep
-import MachCSL.Lock
-import MachCSL.WpSmodeIntr
-import Iris.ProofMode
 
 namespace Xv6
 

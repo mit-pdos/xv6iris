@@ -9,14 +9,11 @@ real proofs, closed over the linked `Myproc` / `Argraw`; `pipewrite` and
 closed term).
 -/
 import Xv6.ProofSysWrite
-import Xv6.LinkMyproc
 import Xv6.LinkArgraw
 import Xv6.LinkArgint
 import Xv6.LinkArgaddr
 import Xv6.LinkArgfd
 import Xv6.LinkFilewrite
-import Xv6.LinkPipewrite
-import Xv6.LinkCopyin
 
 namespace Xv6
 

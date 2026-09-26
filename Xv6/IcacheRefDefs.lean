@@ -166,22 +166,13 @@ its class `Xv6.OffboxBoxG`.  See deviation 6.
   flattened: `[Icfg]` is a per-declaration binder (the `Fscfg` rule,
   `Xv6/FsCfgDefs.lean` deviation 4).
 -/
-import Xv6.SleepLockDefs
 import Xv6.LogDefs
 import Xv6.FsGeom
 import Xv6.DinodeEnc
 import Xv6.BlkmapDefs
-import MachCSL.CtxBox
-import Iris.Algebra.Auth
-import Iris.Algebra.Agree
-import Iris.Algebra.Csum
-import Iris.Algebra.Excl
-import Iris.Algebra.Heap
-import Iris.Algebra.Numbers
-import Iris.Algebra.Lib.DFracAgree
-import Iris.BI.Lib.MonoNat
 import Xv6.OffBoxCam
 import Xv6.SleepLockGhost
+import MachCSL.WpSmodeFrame
 
 namespace Xv6
 

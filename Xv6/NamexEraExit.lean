@@ -19,6 +19,7 @@ one `namexEra_fail_out`.  The death arm is built BEFORE the exit (by the
 caller, from its indices) rather than at the continuation's application.
 -/
 import Xv6.NamexEraDefs
+import Xv6.NamexExit
 
 namespace Xv6
 

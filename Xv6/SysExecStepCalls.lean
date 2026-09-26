@@ -27,6 +27,7 @@ sys_exec's FILL-LOOP CALL SITES AND BOOKKEEPING (stage file of
 Imports only the shared vocabulary and callee Specs.
 -/
 import Xv6.SysExecParts
+import Xv6.SpecKalloc
 
 namespace Xv6
 

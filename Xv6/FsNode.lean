@@ -30,7 +30,6 @@ file is that rule applied to the one type the top map's camera is over.
    empty map is `∅` in both.
 -/
 import Xv6.DinodeEnc
-import MachCSL.Resources
 
 namespace Xv6
 

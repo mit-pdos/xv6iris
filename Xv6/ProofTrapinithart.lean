@@ -3,7 +3,6 @@ Proof of `trapinithart`'s specification (`SpecTrapinithart.TRAPINITHART`):
 the standard 16-byte frame, `a5 := kernelvec`, `csrw stvec, a5`, the
 epilogue.
 -/
-import MachCSL.WpSmodeFrame
 import MachCSL.WpSmodeStvec
 import Xv6.SpecTrapinithart
 import Xv6.CodeTactics

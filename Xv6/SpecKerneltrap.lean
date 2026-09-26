@@ -21,9 +21,7 @@ the registers, `sepc` written back to the trapped pc and `sstatus`
 restored, and the arm's cells of the resumed hart in hand.
 Imports only definitional files.
 -/
-import Xv6.SchedCtx
 import Xv6.SpecDevintr
-import MachCSL.WpSmodeIntr
 
 namespace Xv6
 

@@ -93,12 +93,10 @@ tree; they are the documented readings of `app_top_update` and the
 transport's instances for the generic/pure/persistent applications, a few
 lines each, so they are kept.)
 -/
-import Xv6.FsAbsDefs
 import Xv6.AppCfg
 import Xv6.FsStateTop
 import Xv6.FsBlocks
 import Xv6.IcacheRefDefs
-import Iris.Instances.Lib.Invariants
 
 namespace Xv6
 

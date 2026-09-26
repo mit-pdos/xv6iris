@@ -151,8 +151,8 @@ their own: `NINODE`/`ISLOTSZ`/`ientry` are `Xv6/FsGeom.lean` /
   1872), `iref_frag_lookup` (ProofIput).
 -/
 import Xv6.IcacheRefGhost
-import Xv6.IrefSlots
 import Xv6.InodeInv
+import Xv6.LogInv
 
 namespace Xv6
 

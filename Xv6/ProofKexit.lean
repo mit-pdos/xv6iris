@@ -73,7 +73,6 @@ a quarter, as Rocq's `proc_priv_cwd_pid` lends -- batch 8-P); the ghost steps un
 `wait_lock` sit after the acquire's register bookkeeping rather than at the
 exact Rocq instruction (they are pure ghost updates, order-insensitive).
 -/
-import MachCSL.WpSmodeFrame
 import Xv6.SpecKexit
 import Xv6.SpecMyproc
 import Xv6.SpecAcquire
@@ -81,7 +80,6 @@ import Xv6.SpecRelease
 import Xv6.SpecSched
 import Xv6.SpecReparent
 import Xv6.SpecWakeup
-import Xv6.SpecPanic
 import Xv6.FsCallSitesOp
 import Xv6.ProcPrivAcc
 import Xv6.CodeTactics

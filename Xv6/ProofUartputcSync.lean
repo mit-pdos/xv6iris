@@ -17,8 +17,6 @@ a Löb induction over the two-instruction loop) and the THR store, whose
 accessors come from `Xv6.UartInv`.
 -/
 import MachCSL.WpSmodeFrame8
-import MachCSL.WpSmodeDev
-import MachCSL.WpLock
 import Xv6.SpecUartputcSync
 import Xv6.SpecAcquire
 import Xv6.SpecRelease

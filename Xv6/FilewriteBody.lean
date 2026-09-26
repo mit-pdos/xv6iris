@@ -19,7 +19,8 @@ pattern), so the iteration (`FilewriteLoop`) composes them with one
 `iapply` each and does the ghost steps (`FilewriteFire`) in between.
 -/
 import Xv6.FilewriteTail
-import Xv6.FsWords
+import Xv6.FileRwShared
+import Xv6.FilewriteCalls
 
 namespace Xv6
 

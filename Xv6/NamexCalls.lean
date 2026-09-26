@@ -21,7 +21,10 @@ HART-FREE wand (the dirlookup `dirlookupPost` pattern) and discharge the
 callee's `wpNext` with `wpNext_intro_pin`; Rocq threads `wp_next` and its
 transports at every call.
 -/
-import Xv6.NamexScan
+import Xv6.SpecIunlock
+import Xv6.SpecIunlockput
+import Xv6.SpecIlock
+import Xv6.NamexDefs
 
 namespace Xv6
 

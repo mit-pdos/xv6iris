@@ -68,13 +68,9 @@ Groups, as in Rocq:
 Dropped vs Rocq: `bm_align_arith` (a `Z` helper; `omega` has no
 `bv_unsigned` problem here, `Xv6/DinodeSlot.lean` deviation 7).
 -/
-import MachCSL.ByteWord4
 import Xv6.BlockWords
-import Xv6.BufDefs
 import Xv6.BcacheInv
-import Xv6.FsBlocks
 import Xv6.FsBytesMint
-import Xv6.PrintkDefs
 
 namespace Xv6
 

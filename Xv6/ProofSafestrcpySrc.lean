@@ -21,7 +21,6 @@ may not import another).
     80000df8: sb zero,0(a5)         *s = 0    (the guaranteed terminator)
     80000dfc: <epilogue2>           return a0 = os = dst
 -/
-import MachCSL.WpSmodeFrame
 import Xv6.SpecSafestrcpySrc
 import Xv6.CodeTactics
 

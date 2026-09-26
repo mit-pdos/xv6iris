@@ -15,6 +15,7 @@ specification's `wpNext`, word for word.
 Rocq's `rd_img`, SpecReadi deviation 5).
 -/
 import Xv6.ReadiDefs
+import Xv6.ReadiFrame
 
 namespace Xv6
 

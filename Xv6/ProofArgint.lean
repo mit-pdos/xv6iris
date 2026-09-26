@@ -8,8 +8,9 @@ narrowed into the caller's `int` cell by `c.sw` -- C's `(int)` conversion,
 `BitVec.extractLsb' 0 32`.
 -/
 import Xv6.SpecArgint
-import Xv6.ArgLemmas
 import Xv6.CodeTactics
+import MachCSL.WpSmodeFrame
+import Xv6.SpecMyproc
 
 namespace Xv6
 

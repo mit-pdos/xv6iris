@@ -29,7 +29,6 @@ The `fence rw,rw` of the publication needs no new rule:
 `MachCSL.wp_s_fence_rw_rw` (MachCSL/WpLock.lean) is already the
 kctx-level one.
 -/
-import MachCSL.WpSmodeFrame
 import MachCSL.WpSmodeFrame12
 import MachCSL.WpSmodeAuRules
 import MachCSL.WpDmaCtx2

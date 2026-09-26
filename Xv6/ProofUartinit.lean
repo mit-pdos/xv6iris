@@ -7,7 +7,6 @@ that put `"uart0"`/`&uarts[0]` and `"uart1"`/`&uarts[1]` in `a1`/`a0`, and
 the epilogue.  Boot only (`SIE` literally `false`), as `uartinitone` is.
 -/
 import MachCSL.WpSmodeFrame
-import MachCSL.Lock
 import Xv6.SpecUartinit
 import Xv6.CodeTactics
 

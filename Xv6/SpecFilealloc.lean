@@ -20,11 +20,8 @@ entered the table).  4 frame slots plus `acquire`'s 10.
 
 Imports only definitional files.
 -/
-import MachCSL.WpSmodeFrame
-import MachCSL.Lock
 import Xv6.FileDefs
 import Xv6.Image
-import Xv6.Geom
 
 namespace Xv6
 

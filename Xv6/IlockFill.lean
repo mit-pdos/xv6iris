@@ -35,9 +35,9 @@ Dropped/simplified vs Rocq: none.  The three `bm_empty` helpers keep
 Rocq's names (`il_bmcells_empty`, `il_ind_res_empty` → `il_indRes_empty`,
 `il_blocks_empty`).
 -/
-import Xv6.SpecIlock
 import Xv6.InodeRegionMovers
-import Xv6.FsTree
+import Xv6.IcacheEscrowTok
+import Xv6.InodeRegionWithdraw
 
 namespace Xv6
 

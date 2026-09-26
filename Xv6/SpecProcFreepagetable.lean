@@ -6,12 +6,6 @@ and the trapframe) and frees the space (uncounted); needs 40 slots
 
 Imports only definitional files (never a `Code*` or `Proof*` file).
 -/
-import MachCSL.WpSmodeFrame
-import MachCSL.Lock
-import Xv6.SchedCtx
-import Xv6.PidLock
-import Xv6.Image
-import Xv6.Geom
 import Xv6.SpecProcPagetable
 
 namespace Xv6

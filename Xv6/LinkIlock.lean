@@ -4,17 +4,9 @@
 `LinkIlock.v`: all callees PROVEN).
 -/
 import Xv6.ProofIlock
-import Xv6.LinkAcquiresleep
 import Xv6.LinkBread
 import Xv6.LinkMemmove
 import Xv6.LinkBrelse
-import Xv6.LinkPanic
-import Xv6.LinkAcquire
-import Xv6.LinkRelease
-import Xv6.LinkMyproc
-import Xv6.LinkSleep
-import Xv6.LinkSleepPrepare
-import Xv6.LinkSched
 
 namespace Xv6
 

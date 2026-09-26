@@ -6,9 +6,7 @@ interfaces of `kalloc` and `memset`.
 the zeroed page is an empty root node (`PTree.zeroNode`), owned whole
 (`ptreeOwn 2`).  Stated at either interrupt index, as `kalloc` is.
 -/
-import MachCSL.WpSmodeFrame
 import Xv6.SpecUvmcreate
-import Xv6.SpecKalloc
 import Xv6.SpecMemset
 import Xv6.PtOwnLemmas
 import Xv6.CodeTactics

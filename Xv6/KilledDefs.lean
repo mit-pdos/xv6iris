@@ -9,14 +9,9 @@ Imports only definitional and Spec files (never a `Code*`, `Proof*` or
 `Link*` file).
 -/
 import MachCSL.WpSmodeFrame
-import MachCSL.Lock
 import Xv6.SchedCtx
-import Xv6.PidLock
-import Xv6.Image
-import Xv6.Geom
 import Xv6.SpecAcquire
 import Xv6.SpecRelease
-import Xv6.CodeTactics
 
 namespace Xv6
 

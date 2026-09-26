@@ -37,9 +37,7 @@ A port of the Rocq prototype's TSO machine (`RiscvLang.mnode_step`,
   its own `fence.i`).  Only `fence.i` raises `itv` (past the data floor and
   the hart's own last store); `itv ≤ tv` is not an invariant.
 -/
-import Sail
-import LeanRV64D
-import MachCSL.Platform
+import LeanRV64D.Defs
 
 namespace MachCSL
 

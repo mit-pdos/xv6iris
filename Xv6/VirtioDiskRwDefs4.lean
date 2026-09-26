@@ -57,12 +57,10 @@ wrappers live here because a `Proof` file may not import another one.
 -/
 import Xv6.VirtioDiskRwDefs3
 import Xv6.SpecVirtioDiskRw
-import Xv6.SpecSleep
 import Xv6.SpecSleepPrepare
 import Xv6.SpecAcquire
 import Xv6.SpecRelease
 import Xv6.SpecFreeDesc
-import MachCSL.WpSmodeFrame12b
 
 namespace Xv6
 

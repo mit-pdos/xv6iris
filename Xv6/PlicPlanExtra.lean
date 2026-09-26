@@ -20,7 +20,6 @@ What the four PLIC DRIVER proofs need beside `Xv6.PlicPlan`:
 Nothing here is PLIC-specific state: no Iris ghosts, no invariant.
 -/
 import Xv6.PlicPlan
-import Xv6.KernelData
 import Xv6.SpecCpuid
 import MachCSL.WpSmodeFrame
 

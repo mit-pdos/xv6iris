@@ -45,7 +45,7 @@ block.
    shape, exactly as Rocq; `fs_root_wf_tree` needs no `ROOTINO < ninodes`
    cast.
 -/
-import Xv6.FsImgUsed
+import Xv6.FsImgTree
 
 namespace Xv6
 

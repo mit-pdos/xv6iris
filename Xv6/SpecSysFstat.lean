@@ -73,7 +73,6 @@ in slots 1/2, `f` at `s0-24`, `st` at `s0-32`, both full words).
    passed to argfd by address (sys_close's form).
 -/
 import Xv6.SpecArgfd
-import Xv6.SpecArgaddr
 import Xv6.SpecFilestat
 
 namespace Xv6

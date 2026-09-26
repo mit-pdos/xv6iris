@@ -14,8 +14,6 @@ boot premise, now stated in `Xv6/SpecInitlog.lean` as `hdrN bsHdr = 0`.
 -/
 import Xv6.ProofInitlog
 import Xv6.LinkInitlock
-import Xv6.LinkBread
-import Xv6.LinkBrelse
 import Xv6.LinkInstallTrans
 import Xv6.LinkWriteHead
 

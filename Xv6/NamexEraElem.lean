@@ -15,6 +15,7 @@ left iff `*s1 != 0`, `namexEra_rest_ne`).  The plain helpers
     +0xae  .. +0xbc   the trailing skip, then the level at +0xc0
 -/
 import Xv6.NamexEraLevel
+import Xv6.NamexElem
 
 namespace Xv6
 

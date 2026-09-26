@@ -26,6 +26,7 @@ import Xv6.SpecRelease
 import Xv6.CodeTactics
 import MachCSL.WpSmodeFrame6
 import MachCSL.WpLock
+import Xv6.SpecMyproc
 
 namespace Xv6
 

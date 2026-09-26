@@ -32,6 +32,7 @@ superblock cells are the persistent `DFrac.discard` ones.
    bare block's own, `pidPriv`).  This file keeps create's call site.
 -/
 import Xv6.SysMknodFrame
+import Xv6.SpecCreate
 
 namespace Xv6
 

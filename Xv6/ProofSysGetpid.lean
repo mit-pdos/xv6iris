@@ -12,7 +12,6 @@ frame around a call, at either `SIE` (`myproc` runs its interior with
 interrupts off, so the thread may change harts across the call:
 `k_step_gen` / `wpNext_intro_pin` throughout).
 -/
-import MachCSL.WpSmodeFrame
 import Xv6.SpecSysGetpid
 import Xv6.SpecMyproc
 import Xv6.CodeTactics

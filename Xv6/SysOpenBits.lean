@@ -49,7 +49,6 @@ image (`KA.«sys_open»` = 0x80005202):
 5. Names: Rocq's `soau_` prefix is `sys_open_` (the `sys_pipe_` precedent).
 -/
 import Xv6.SysOpenDefs
-import MachCSL.WpSmodeCtl
 
 namespace Xv6
 

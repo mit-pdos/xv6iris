@@ -93,11 +93,6 @@ the CLOSED trap loop.
 
 Imports only definitional files.
 -/
-import Xv6.SchedCtx
-import Xv6.SpecAllocproc
-import Xv6.FdTable
-import MachCSL.WpSmodeIntr
-import Xv6.ParkCap
 import Xv6.UexecExecInst
 
 namespace Xv6

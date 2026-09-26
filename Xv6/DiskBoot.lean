@@ -50,7 +50,6 @@ DEVIATIONS from Rocq:
 
 Imports only definitional files.
 -/
-import Xv6.DiskInvDefs
 import Xv6.FsCrashSector
 import Xv6.SpecVirtioDiskInit
 

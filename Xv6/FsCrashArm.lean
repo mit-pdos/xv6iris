@@ -41,9 +41,7 @@ why a fresh era can always swap (`fsArm_swap`).
 * The `fs_boot_tok` family (`fs_boot_tok`, `_alloc`, `_excl`, `_timeless`) --
   no use outside FsCrash.v (the brief's named cut).
 -/
-import Xv6.FsCrashRec
-import Iris.BI.Lib.MonoList
-import Iris.BI.Lib.MonoNat
+import Xv6.FsCrashPure
 
 namespace Xv6
 

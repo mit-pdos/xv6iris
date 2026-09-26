@@ -76,8 +76,6 @@ key components the leaf threads unchanged (`fdv cw gn cs pidv`) are `UkKey`.
    `goodmb` premise) are dropped (deviation 2).
 -/
 import Xv6.UexecRet
-import MachCSL.DecodeBridge
-import MachCSL.Instr
 
 namespace Xv6
 

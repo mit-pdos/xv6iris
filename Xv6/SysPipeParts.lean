@@ -11,14 +11,11 @@ THE FRAME (`addi sp,sp,-64`, `ra`/`s0`/`s1` saved; `s0` = the entry `sp`):
 `sysPipeFrame` is `frame8s1` with those cells named (`rf`/`wf` kept apart:
 they are pipealloc's out-parameters).
 -/
-import Xv6.LazyFree
 import Xv6.SpecSysPipe
-import Xv6.SysfileCalls
-import Xv6.SpecMyproc
 import Xv6.ArgLemmas
 import Xv6.UMemWindow
-import Xv6.CodeTactics
 import MachCSL.WpSmodeFrame8
+import Xv6.SpecCopyout
 
 namespace Xv6
 

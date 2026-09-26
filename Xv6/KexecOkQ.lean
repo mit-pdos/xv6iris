@@ -83,7 +83,6 @@ Definitional: imports only definitional files.
 import Xv6.KexecDefs
 import Xv6.FdTable
 import Xv6.ElfEnc
-import MachCSL.WpSmodeIntr
 
 namespace Xv6
 

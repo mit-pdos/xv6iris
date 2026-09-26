@@ -28,6 +28,8 @@ bread reference) and are joined (`Xv6.dsSlots_join`).
 -/
 import Xv6.BfreeParts
 import Xv6.BcacheLock
+import Xv6.CodeTactics
+import Xv6.FsCallSites
 
 namespace Xv6
 

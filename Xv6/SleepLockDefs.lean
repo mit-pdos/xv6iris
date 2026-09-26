@@ -39,7 +39,6 @@ spinlock: word@8 name@16 cpu@24), name@32 (8B), pid@40 (4B).
 -/
 import Xv6.SchedCtx
 import Xv6.SpecInitsleeplock
-import MachCSL.Lock
 import Xv6.SleepLockGhost
 
 namespace Xv6

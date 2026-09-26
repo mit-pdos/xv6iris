@@ -124,20 +124,9 @@ Uses checked: `grep -w` over `/shared/xv6rocq/iris/ProofSysExec*.v`.
 Imports only definitional files, callee Specs and shared call-site files.
 -/
 import Xv6.SpecSysExec
-import Xv6.SpecArgaddr
-import Xv6.SpecArgstr
-import Xv6.SpecMemset
 import Xv6.SpecFetchaddr
-import Xv6.SpecKalloc
-import Xv6.SpecFetchstr
-import Xv6.SpecKfree
 import Xv6.SysfileCalls
 import Xv6.KstackMap
-import Xv6.PtOwnLemmas
-import MachCSL.WpSmodeFrame
-import MachCSL.WpSmodeFrame12b
-import MachCSL.ByteWord
-import Xv6.CodeTactics
 
 namespace Xv6
 

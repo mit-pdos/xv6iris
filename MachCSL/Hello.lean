@@ -1,5 +1,4 @@
-import Iris.ProofMode
-import Iris.Instances.IProp
+import Iris.ProofMode.Instances
 
 /-! A smoke test that iris-lean's proof mode is wired up. -/
 

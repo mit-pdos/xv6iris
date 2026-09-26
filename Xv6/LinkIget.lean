@@ -8,8 +8,6 @@ discharged against `Panic`.  This file imports `ProofIget` (the only Proof
 file it may import).
 -/
 import Xv6.ProofIget
-import Xv6.LinkAcquire
-import Xv6.LinkRelease
 import Xv6.LinkPanic
 
 namespace Xv6

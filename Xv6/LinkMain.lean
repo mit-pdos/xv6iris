@@ -10,20 +10,13 @@ kerneltrap over yield).  (Rocq's LinkMain header, which lists assumed
 callees, is stale; this file has none.)
 -/
 import Xv6.ProofMain
-import Xv6.LinkCpuid
 import Xv6.LinkConsoleinit
 import Xv6.LinkPrintkinit
-import Xv6.LinkPrintk
 import Xv6.LinkKinit
 import Xv6.LinkFreerange
-import Xv6.LinkKfree
-import Xv6.LinkKalloc
-import Xv6.LinkMemset
 import Xv6.LinkKvminit
 import Xv6.LinkKvmmake
 import Xv6.LinkKvmmap
-import Xv6.LinkMappages
-import Xv6.LinkWalk
 import Xv6.LinkProcMapstacks
 import Xv6.LinkKvminithart
 import Xv6.LinkProcinit
@@ -35,24 +28,10 @@ import Xv6.LinkBinit
 import Xv6.LinkIinit
 import Xv6.LinkInitsleeplock
 import Xv6.LinkFileinit
-import Xv6.LinkInitlock
 import Xv6.LinkVirtioDiskInit
 import Xv6.LinkUserinit
-import Xv6.LinkAllocproc
-import Xv6.LinkProcPagetable
-import Xv6.LinkProcFreepagetable
-import Xv6.LinkFreeproc
-import Xv6.LinkUvmcreate
-import Xv6.LinkUvmunmap
-import Xv6.LinkUvmfree
-import Xv6.LinkFreewalk
-import Xv6.LinkAcquire
-import Xv6.LinkRelease
 import Xv6.LinkForkretParkPaid
 import Xv6.LinkScheduler
-import Xv6.LinkKernelvec
-import Xv6.LinkKerneltrap
-import Xv6.LinkYield
 
 namespace Xv6
 

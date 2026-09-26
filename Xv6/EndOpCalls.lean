@@ -3,17 +3,15 @@
 the few-seconds rule): the nine call-site wrappers, the shared epilogue and
 the non-committer's arm (`eo_fast`).
 -/
-import Xv6.EndOpCrash
 import Xv6.SpecWriteHead
-import Xv6.SpecInstallTrans
 import Xv6.SpecWakeup
 import Xv6.SpecAcquire
 import Xv6.SpecRelease
-import Xv6.SpecBread
 import Xv6.SpecBwrite
-import Xv6.SpecBrelse
 import Xv6.SpecMemmove
-import Xv6.FsCallSites
+import Xv6.CodeTactics
+import Xv6.SpecEndOp
+import Xv6.EndOpDefs
 
 namespace Xv6
 

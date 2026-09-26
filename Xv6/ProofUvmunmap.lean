@@ -16,7 +16,6 @@ resources (`umMap`) and the allocator (`unFree`) are `emp` and the
 interrupt state is untouched, so the raw contract's exit context is the
 caller's.
 -/
-import MachCSL.WpSmodeFrame
 import Xv6.SpecUvmunmap
 import Xv6.SpecWalk
 import Xv6.SpecKfree

@@ -20,7 +20,7 @@ Imports only definitional files (never a `Code*` or `Proof*` file).
 -/
 import Xv6.Image
 import MachCSL.WpSmodeIntr
-import Xv6.SpecPushoff
+import Xv6.Geom
 
 namespace Xv6
 

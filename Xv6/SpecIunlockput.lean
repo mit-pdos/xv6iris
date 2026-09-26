@@ -80,7 +80,6 @@ pass-throughs (to iunlock's and iput's own dead `dq`) -- reason: dead.
 
 Imports only definitional files and callee `Spec*` files.
 -/
-import Xv6.SpecIunlock
 import Xv6.SpecIput
 
 namespace Xv6

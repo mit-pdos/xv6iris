@@ -42,7 +42,6 @@ carries (dev, inum).
 import Xv6.IgetTail
 import Xv6.IcacheBoxSites
 import Xv6.IcacheInvStore
-import Xv6.SpecRelease
 import MachCSL.WpSmodeAuRules
 
 namespace Xv6

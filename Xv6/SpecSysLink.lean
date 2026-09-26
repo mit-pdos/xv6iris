@@ -110,19 +110,8 @@ contract.
 
 Imports only definitional files and callee `Spec*` files.
 -/
-import Xv6.SpecArgstr
-import Xv6.SpecBeginOp
-import Xv6.SpecEndOp
 import Xv6.SpecNamei
-import Xv6.SpecNameiparent
-import Xv6.SpecIlock
-import Xv6.SpecIunlock
-import Xv6.SpecIupdate
-import Xv6.SpecDirlink
-import Xv6.SpecIput
-import Xv6.SpecIunlockput
 import Xv6.SysLinkDefs
-import Xv6.FsReady
 import Xv6.FdTable
 
 namespace Xv6

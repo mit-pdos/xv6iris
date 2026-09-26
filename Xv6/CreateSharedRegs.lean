@@ -74,10 +74,7 @@ SpecSys*.v, ProofSys*.v), ProofCreateShared.v excluded.
 * `cr_zext64_16_unsigned` .. `cr_nbump_unsigned` -- deviation 3.
 -/
 import Xv6.CreateFreshTy
-import Xv6.SpecCreate
-import MachCSL.WpSmodeFrame12
-import MachCSL.WpSmodeFrame12b
-import MachCSL.ByteWord
+import Xv6.SpecNamecmp
 
 namespace Xv6
 

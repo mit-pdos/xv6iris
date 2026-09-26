@@ -4,15 +4,14 @@ Proof of `start`'s specification (`SpecStart.START`), given the interface of
 `TIMERINIT.wp_timerinit`, no symbolic execution.
 -/
 import MachCSL.WpMmode
-import MachCSL.WpMmodeAlu
 import MachCSL.WpMmodeCsr
-import MachCSL.WpMmodeCtl
 import MachCSL.WpMmodeMret
 import MachCSL.WpStore
 import MachCSL.WpPmpXv6
 import MachCSL.GprLit
 import Xv6.SpecStart
 import Xv6.CodeTactics
+import Xv6.SpecTimerinit
 
 namespace Xv6
 

@@ -39,7 +39,7 @@ Rocq's file keeps that genuinely names the contract is here.
    needs no such row (one representation, `proc_ptm` on a covered space).
 -/
 import Xv6.KexecBuilt
-import Xv6.UexecSlot
+import Xv6.UserExec
 
 namespace Xv6.KexecImageAlg
 

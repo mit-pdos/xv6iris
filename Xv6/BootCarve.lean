@@ -69,10 +69,9 @@ DEVIATIONS from Rocq (none process-layer):
 
 Imports only definitional files.
 -/
-import MachCSL.Power
-import Xv6.Image
 import Xv6.KallocDefs
 import Xv6.SpecEntry
+import Xv6.KernelData
 
 namespace Xv6
 

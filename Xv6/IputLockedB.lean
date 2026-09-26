@@ -13,6 +13,7 @@
 * `iput_lk_b` -- the walk.
 -/
 import Xv6.IputLockedC
+import Xv6.SpecReleasesleep
 
 namespace Xv6
 

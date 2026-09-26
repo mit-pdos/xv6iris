@@ -30,9 +30,7 @@ header of `Xv6/VirtioDiskRwDefs3.lean` describes: they arrive as the
 explicit hypotheses `hinfoH`, `hinfoM`, `hinfoT`.
 -/
 import MachCSL.WpSmodeSltu
-import MachCSL.WpLock
 import Xv6.VirtioDiskRwDefs3
-import Xv6.SpecVirtioDiskRw
 import Xv6.CodeTactics
 
 namespace Xv6

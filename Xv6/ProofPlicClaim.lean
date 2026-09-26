@@ -19,8 +19,6 @@ word, so the postcondition is transported from `BitVec 32` to `BitVec 64`
 (`pc_ret_ok`); the four answers are small and positive, so nothing is
 lost.
 -/
-import MachCSL.WpSmodeFrame
-import MachCSL.WpSmodeDev4
 import Xv6.SpecPlicClaim
 import Xv6.PlicPlanExtra
 import Xv6.CodeTactics

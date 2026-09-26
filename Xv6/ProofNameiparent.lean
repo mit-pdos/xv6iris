@@ -18,8 +18,6 @@ steps are MachCSL's `wp_prologue2_gen` / `wp_epilogue2_gen`; the callee-saved
 facts are one `calleeSaved` conjunct chain.  The counted seal is not ported.
 -/
 import Xv6.SpecNameiparent
-import MachCSL.WpSmodeFrame
-import Xv6.CodeTactics
 
 namespace Xv6
 

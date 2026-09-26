@@ -7,8 +7,6 @@ and `sz` into `mappages`' argument order, the call, the `bnez a0` that the
 counted mode never takes (`mappages` returned `0`), and the epilogue.
 Stated at either interrupt index, as `mappages` is.
 -/
-import MachCSL.WpSmodeFrame
-import MachCSL.Lock
 import Xv6.SpecKvmmap
 import Xv6.CodeTactics
 

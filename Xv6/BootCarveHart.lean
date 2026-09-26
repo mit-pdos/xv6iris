@@ -64,7 +64,6 @@ DEVIATIONS from Rocq (none process-layer):
 Imports only definitional files.
 -/
 import Xv6.BootHart
-import Xv6.BootCarveMain
 import Xv6.SpecMain
 import MachCSL.CtxBoot
 

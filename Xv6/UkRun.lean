@@ -60,7 +60,6 @@ children and the pid.  Rocq's header, point for point:
 -/
 import Xv6.UserHeap
 import Xv6.UserCwd
-import Xv6.UserChildren
 
 namespace Xv6
 

@@ -16,9 +16,6 @@ MachCSL/WpSmodeTime.lean).  Stack: its 2-slot frame over `wakeup`'s.
 
 Imports only definitional files.
 -/
-import MachCSL.CallConv
-import Xv6.Image
-import Xv6.SchedCtx
 import Xv6.TicksDefs
 import Xv6.SpecWakeup
 

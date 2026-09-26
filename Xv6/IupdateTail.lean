@@ -16,6 +16,7 @@ takes (`Xv6/ProofWriteHead.lean`'s `wh_tail` convention).
 -/
 import Xv6.IupdateSteps
 import Xv6.BcacheLock
+import Xv6.CodeTactics
 
 namespace Xv6
 

@@ -12,6 +12,7 @@ sits (`rd_exit_ok`, `rd_exit_fail`), five loads and a jump, because the
 `k_step` code facts are read off the image at literal addresses.
 -/
 import Xv6.ReadiRet
+import Xv6.FsCallSites
 
 namespace Xv6
 

@@ -17,7 +17,8 @@ The loop's static arguments are bundled (`FwrA`, `FwrFacts`) and its
 persistent environment is `fwrEnv` (filestat's `fstatEnvP` shape plus the
 offset row's invariant).
 -/
-import Xv6.FilewriteFire
+import Xv6.FilewriteChain
+import Xv6.FilewriteParts
 
 namespace Xv6
 

@@ -48,6 +48,7 @@ where `diskImgG` is the tree's unique source of that instance.
 -/
 import Xv6.FsCrashArm
 import Xv6.FsDurSnap
+import Xv6.FsCrashRec
 
 namespace Xv6
 

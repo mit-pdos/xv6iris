@@ -26,11 +26,11 @@ inline at its exit), the kernel-data windows and the panic messages
 5. `su_au_era_not_dir` .. `su_au_dir_dots` keep Rocq's statements over the
    Lean vocabulary (`Nat` for `Z`, `dotsOnly`, `absRow`).
 -/
-import Xv6.SysUnlinkCalls
 import Xv6.FsAbsUnlinkFire
-import Xv6.DirlookupParts
-import Xv6.IcacheBox
 import Xv6.SysUnlinkArgs
+import Xv6.SpecSysUnlink
+import Xv6.DinodeSlot
+import Xv6.SysUnlinkPure
 
 namespace Xv6
 

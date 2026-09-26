@@ -51,7 +51,6 @@ allocates the queue (`PipeBirth.pipe_ends_alloc`, Rocq's) and drops both
 halves meanwhile.
 -/
 import Xv6.SpecFileclose
-import Xv6.SpecKalloc
 
 namespace Xv6
 

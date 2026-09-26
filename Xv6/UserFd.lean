@@ -48,7 +48,6 @@ Cleanups: Rocq's `ufd_own_hi_ge` (its ledger argument is unused) is kept for
 its callers' shape; nothing dropped.
 -/
 import Xv6.UsysMemOk
-import Xv6.SlotSupply
 
 namespace Xv6
 

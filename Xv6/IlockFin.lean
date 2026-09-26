@@ -11,7 +11,11 @@ really does TAKE the branch, and `panic("ilock: no type")` runs against
 `PANIC`'s own contract (`Xv6.il_panic`).  Nothing before this instruction
 case-splits on the fill.
 -/
-import Xv6.IlockBlk
+import Xv6.DinodeSlot
+import Xv6.FsCallSites
+import MachCSL.WpSmodeLh
+import Xv6.IlockFill
+import Xv6.IlockEpi
 
 namespace Xv6
 

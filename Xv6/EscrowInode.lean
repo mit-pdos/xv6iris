@@ -131,7 +131,6 @@ import Xv6.IcacheRefLink
 import Xv6.FsStateTop
 import Xv6.FsBytesGamma
 import Xv6.FsStateInode
-import Iris.Instances.Lib.Invariants
 
 namespace Xv6
 

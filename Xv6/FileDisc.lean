@@ -49,7 +49,6 @@ Deviations from Rocq:
 -/
 import Xv6.FileDiscLine
 import Xv6.LineModel
-import Batteries.Data.List.Basic
 
 namespace Xv6
 

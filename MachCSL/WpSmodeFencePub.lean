@@ -34,7 +34,7 @@ new ghost state.  The `topLb T ∗ fence ⊢ viewLb cpu T` rule remains
 unsound (see the header of `MachCSL/WpSmodeFenceFloor.lean`): what makes
 this one sound is that the position is the HART'S OWN.
 -/
-import MachCSL.WpSmodeFenceFloor2
+import MachCSL.WpSmodeFenceFloor
 
 namespace MachCSL
 

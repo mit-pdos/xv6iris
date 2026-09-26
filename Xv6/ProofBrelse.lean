@@ -4,8 +4,8 @@ Proof of `brelse`'s specification (`SpecBrelse.BRELSE`).
 import Xv6.SpecBrelse
 import Xv6.BufEscrow
 import Xv6.SpecHoldingsleep
-import Xv6.SpecReleasesleep
 import Xv6.BcacheLock
+import Xv6.CodeTactics
 
 namespace Xv6
 

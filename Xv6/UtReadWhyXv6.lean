@@ -14,7 +14,6 @@ persistent, so the post comes straight back.
 Definitional; one proof-mode lemma.
 -/
 import Xv6.UsertrapParts
-import Xv6.UexecExecInst
 
 namespace Xv6
 

@@ -31,7 +31,6 @@ never touch the medium -- come over unchanged; `Virtio.serve_keepsDisk` is
 that fact of the model.
 -/
 import MachCSL.WpDevDmaStepV
-import MachCSL.DiskPermit
 
 namespace MachCSL
 

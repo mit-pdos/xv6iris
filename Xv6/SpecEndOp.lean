@@ -46,13 +46,7 @@ parameter and says the same thing with the two premises `hcl`/`hdt`
 
 Imports only definitional files (never a `Code*` or `Proof*` file).
 -/
-import MachCSL.WpSmodeFrame
-import Xv6.LogInv
-import Xv6.SpecWriteHead
 import Xv6.SpecInstallTrans
-import Xv6.SpecWakeup
-import Xv6.SpecAcquire
-import Xv6.SpecRelease
 
 namespace Xv6
 

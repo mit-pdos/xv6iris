@@ -36,13 +36,11 @@ which the loop invariant keeps, and each release re-splits it
 import Xv6.SpecSysPause
 import Xv6.SpecAcquire
 import Xv6.SpecRelease
-import Xv6.SpecMyproc
 import Xv6.SpecKilled
 import Xv6.SpecSleepPrepare
-import Xv6.SpecSleep
 import Xv6.ArgLemmas
-import Xv6.CodeTactics
 import MachCSL.WpSmodeFrame8
+import Xv6.SpecArgint
 
 namespace Xv6
 

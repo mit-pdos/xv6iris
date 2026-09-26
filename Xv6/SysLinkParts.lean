@@ -76,12 +76,6 @@ are read only by ProofSysLink.v's `Z` side conditions, which the `Nat`
 statements above discharge directly).
 -/
 import Xv6.SysfileCalls
-import Xv6.FsWords
-import Xv6.InodeLock
-import Xv6.DirView
-import Xv6.InodeRegionDefs
-import Xv6.SpecArgraw
-import MachCSL.WpSmodeCtl
 
 namespace Xv6
 

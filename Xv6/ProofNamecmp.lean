@@ -28,7 +28,6 @@ Deviations from Rocq: Rocq's `nc_thr`/`nc_sp` register bookkeeping and the
 `regne`/`pcw` tactics are replaced by the shared `wp_prologue2_gen` /
 `wp_epilogue2_gen` frame lemmas (as in `ProofMemcpy`).
 -/
-import MachCSL.WpSmodeFrame
 import Xv6.SpecNamecmp
 import Xv6.SpecStrncmp
 import Xv6.CodeTactics

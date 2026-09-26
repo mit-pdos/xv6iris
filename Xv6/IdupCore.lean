@@ -45,11 +45,10 @@ may not import another -- `tools/check_layering.sh`; the
    at `⊤`, so every mover here is instantiated at `Eo := ⊤`
    (`IcachePinwObl` deviation 6).
 -/
-import Xv6.SpecIdup
 import Xv6.IcacheInvStore
-import Xv6.IcachePinwObl
 import Xv6.IcacheBoxSites
-import MachCSL.WpAtomic
+import Xv6.FsCfgDefs
+import Xv6.IcacheTable
 
 namespace Xv6
 

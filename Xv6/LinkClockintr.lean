@@ -3,8 +3,6 @@
 -/
 import Xv6.ProofClockintr
 import Xv6.LinkCpuid
-import Xv6.LinkAcquire
-import Xv6.LinkRelease
 import Xv6.LinkWakeup
 
 namespace Xv6

@@ -5,8 +5,8 @@ executed symbolically: it only reads `misa`, so its `swp` is the read-only
 walk of `DecodeBridge` (`runRead`), evaluated by `rfl` once per nominal
 `MPP` -- the goodb trick of the decode facts.
 -/
-import MachCSL.WpCsr
 import MachCSL.DecodeBridge
+import MachCSL.PlatformFacts
 
 namespace MachCSL
 

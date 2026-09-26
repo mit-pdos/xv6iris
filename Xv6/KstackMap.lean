@@ -23,8 +23,6 @@ the `kpt` tier needs the map to say so: `kmapAt (kstackVpn i) (kLeaf (pas i)
 Imports only definitional/lemma files.
 -/
 import Xv6.KvmSeal
-import Xv6.PtStackLemmas
-import Xv6.KernelData
 import Xv6.SpecProcinit
 
 namespace Xv6

@@ -34,6 +34,7 @@ Deviations from Rocq: the inum is a `Nat` `n` with `s1 = ofNat 64 n`
 the `Nat.sub` bound's contradiction.
 -/
 import Xv6.IreclaimOrphan
+import MachCSL.WpSmodeLh
 
 namespace Xv6
 

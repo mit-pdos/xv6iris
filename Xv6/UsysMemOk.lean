@@ -61,8 +61,6 @@ Cleanups: Rocq's `usys_fd_ok_parked_ne_open` was already gone; nothing else
 dropped.
 -/
 import Xv6.UexecSlot
-import Xv6.ProcGeom
-import MachCSL.ByteWord4
 
 namespace Xv6
 

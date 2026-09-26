@@ -121,9 +121,6 @@ Imports only definitional files and callee `Spec*` files.
 import Xv6.SpecDirlookup
 import Xv6.SpecWritei
 import Xv6.SpecIput
-import Xv6.SpecStrncpy
-import Xv6.SpecPanic
-import Xv6.SpecReadi
 
 namespace Xv6
 

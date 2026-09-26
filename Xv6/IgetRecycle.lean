@@ -56,8 +56,6 @@ at (dev, inum).
 import Xv6.IgetTail
 import Xv6.IcacheBoxSites
 import Xv6.IcacheInvStore
-import Xv6.SpecPanic
-import Xv6.SpecRelease
 
 namespace Xv6
 

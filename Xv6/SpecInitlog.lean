@@ -70,12 +70,7 @@ keeps the client view `V` a parameter and says the same thing with
 
 Imports only definitional files (never a `Code*` or `Proof*` file).
 -/
-import MachCSL.WpSmodeFrame
-import Xv6.LogInv
 import Xv6.SpecInstallTrans
-import Xv6.SpecWriteHead
-import Xv6.SpecInitlock
-import Xv6.SpecPanic
 
 namespace Xv6
 

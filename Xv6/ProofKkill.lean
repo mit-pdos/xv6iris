@@ -15,10 +15,7 @@ is paid on the killed row's LIVE arm (`killPaid_kill`, Rocq
 matched) or through the match arm's `release` with `0`.  The shared
 prelude is in `Xv6/KilledDefs.lean`.
 -/
-import MachCSL.WpSmodeFrame
 import Xv6.SpecKkill
-import Xv6.SpecAcquire
-import Xv6.SpecRelease
 import Xv6.KilledDefs
 import Xv6.CodeTactics
 

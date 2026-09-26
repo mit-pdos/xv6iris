@@ -11,12 +11,10 @@ The small record-arithmetic lemmas (`iput_ofl_bno` / `_slot_align` /
 the `iput_ofl_` prefix: a stage file may not import another function's
 (promotion candidates).
 -/
-import Xv6.IputStages
 import Xv6.DinodeSlot
-import Xv6.InodeRegionMovers
-import Xv6.BcacheLock
 import Xv6.FsCallSitesF
-import MachCSL.WpSmodeFrame12b
+import Xv6.SpecIput
+import Xv6.EscrowDeposit
 
 namespace Xv6
 

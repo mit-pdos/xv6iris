@@ -24,7 +24,6 @@ with the premise `R 10#5 = procAddr A.j`; proposed edit: add it to `UT_90`
 -/
 import Xv6.UsertrapSysTail
 import Xv6.UsertrapTailA6
-import Xv6.PrepareReturnRules
 import Xv6.SpecSyscallXv6
 
 namespace Xv6

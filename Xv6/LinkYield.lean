@@ -2,7 +2,6 @@
 Link `yield`: the sealed proof instance clients import.
 -/
 import Xv6.ProofYield
-import Xv6.LinkMyproc
 import Xv6.LinkAcquire
 import Xv6.LinkRelease
 import Xv6.LinkSched

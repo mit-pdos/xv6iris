@@ -8,8 +8,6 @@ computations that put `"pr"` in `a1` and `&pr.lock` in `a0`, the call to
 either interrupt index, as `initlock` is; `initlock` never touches the
 interrupt state, so the exit context is the plain `k.withRegs R'`.
 -/
-import MachCSL.WpSmodeFrame
-import MachCSL.Lock
 import Xv6.SpecPrintkinit
 import Xv6.SpecInitlock
 import Xv6.CodeTactics

@@ -37,6 +37,7 @@ the written block).
    (`FsCrash.lean`, agent CG).
 -/
 import Xv6.LogDefs
+import Xv6.DiskDefs
 
 namespace Xv6
 

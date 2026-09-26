@@ -34,7 +34,7 @@ register bundle `nx_regs`).
    `∀ c', namexPostA k A c'` and needs no `wp_next_shift`.
 -/
 import Xv6.NamexFrame
-import Xv6.CodeTactics
+import Xv6.SpecNamex
 
 namespace Xv6
 

@@ -15,9 +15,7 @@ case reads `p->trapframe` and then word `14 + i` of the trapframe page
 (`tfPage_word_acc`), and falls into the shared epilogue at `(KernelSyms.«argraw» + 0x2c)`.
 -/
 import Xv6.SpecArgraw
-import Xv6.SpecMyproc
 import Xv6.ArgLemmas
-import Xv6.CodeTactics
 
 namespace Xv6
 

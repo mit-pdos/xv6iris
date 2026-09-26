@@ -77,17 +77,8 @@ handler it gets back are that hart's, and `SPIE`/`SPP` are quantified.
 
 Imports only definitional files (never a `Code*` or `Proof*` file).
 -/
-import Xv6.SchedCtx
 import Xv6.WaitLock
-import Xv6.PidLock
-import Xv6.SpecEitherCopyout
-import Xv6.SpecCopyout
-import Xv6.SpecFreeproc
-import Xv6.SpecSleep
 import Xv6.FdTable
-import MachCSL.Lock
-import MachCSL.WpSmodeIntr
-import Iris.ProofMode
 
 namespace Xv6
 

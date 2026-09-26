@@ -152,10 +152,6 @@ itable.lock's payload.
 -/
 import Xv6.IcacheInvAlg
 import Xv6.IcacheRef
-import MachCSL.WordHist
-import MachCSL.WordPointsTo
-import MachCSL.CtxLaws
-import MachCSL.Lock
 
 set_option linter.unusedSectionVars false
 

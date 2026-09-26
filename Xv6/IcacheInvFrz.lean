@@ -123,7 +123,6 @@ Z.of_nat nib` is `(inum.toNat : Int) < 16 * (nib : Int)` (what
 -/
 import Xv6.IcacheInvRef
 import Xv6.IgetLic
-import Xv6.InodeRegionWithdraw
 
 namespace Xv6
 

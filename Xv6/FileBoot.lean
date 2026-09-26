@@ -49,7 +49,6 @@ right after `fileinit` returns the zeroed lock words: `NFILE` raw entries plus
    row of `main_locks_raw`).
 5. **The payload names start at `fileBootPn0`** (Rocq `inhabitant`).
 -/
-import Xv6.FileInv
 import Xv6.FilePay
 import Xv6.BootCarveMain
 import Xv6.SpecFileinit

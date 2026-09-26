@@ -16,7 +16,6 @@ fsimgNib fsimgCov` with `Himg := fsimgHimg g Hdisk`, so its conclusion reads
 Leaf rule: only the system theorem's file may import this one.
 -/
 import Xv6.FsImgCheck
-import MachCSL.DiskOf
 
 namespace Xv6
 

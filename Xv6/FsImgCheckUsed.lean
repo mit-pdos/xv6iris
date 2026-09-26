@@ -5,6 +5,8 @@
 ~33 s (the used set of ~950 blocks, then the bitmap), W9 ~11 s.
 -/
 import Xv6.FsImgCheckBase
+import Xv6.FsImgUsed
+import Xv6.FsImgDir
 
 namespace Xv6
 

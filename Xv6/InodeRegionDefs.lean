@@ -85,8 +85,6 @@ named above).
 import Xv6.FsStateInode
 import Xv6.IcacheRefLink
 import Xv6.FsBytes
-import Iris.Algebra.Excl
-import Iris.Algebra.Frac
 
 namespace Xv6
 

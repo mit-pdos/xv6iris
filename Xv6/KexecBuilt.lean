@@ -80,7 +80,6 @@ The view is the MAPPED one; Rocq's `us_M` is the lazy view.  They agree under
 
 A lemma file: it imports definitional and Spec files only.
 -/
-import Xv6.UMem
 import Xv6.UMemLemmas
 import Xv6.UPtAllocLemmas
 import Xv6.SpecUvmalloc
@@ -88,6 +87,7 @@ import Xv6.SpecUvmclear
 import Xv6.KexecLoad
 import Xv6.UserPerm
 import Xv6.SpecFlags2perm
+import Xv6.ElfBridge
 
 namespace Xv6
 

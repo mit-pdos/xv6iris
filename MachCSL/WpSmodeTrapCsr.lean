@@ -19,8 +19,6 @@ not in `SConfAt`, so the two `sstatus` rules are proved directly from
 `wpLoop_s_instr` rather than through a schema.
 -/
 import MachCSL.WpSmodeIntr
-import MachCSL.WpSmodeCsr
-import MachCSL.WpMmodeCtl
 
 namespace MachCSL
 

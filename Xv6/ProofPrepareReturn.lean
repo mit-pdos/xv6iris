@@ -17,11 +17,8 @@ The body is in the stage files: `PrepareReturnStores.prepare_return_stvec`
 `prepare_return_sret` (`+0x54 .. +0x68`); the CSR rules and the block
 accessor in `PrepareReturnRules`.
 -/
-import MachCSL.WpSmodeFrame
-import Xv6.SpecPrepareReturn
 import Xv6.SpecMyproc
 import Xv6.PrepareReturnStores
-import Xv6.CodeTactics
 
 namespace Xv6
 

@@ -2,9 +2,6 @@
 Proof of `freeproc`'s contract (`SpecFreeproc.FREEPROC`), given the
 interfaces of `kfree`, `proc_freepagetable`, `acquire` and `release`.
 -/
-import MachCSL.WpSmodeFrame
-import MachCSL.ByteWord
-import MachCSL.WpLock
 import Xv6.SpecFreeproc
 import Xv6.SpecKfree
 import Xv6.SpecProcFreepagetable

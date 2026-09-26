@@ -5,8 +5,6 @@
 import Xv6.ProofBrelse
 import Xv6.LinkHoldingsleep
 import Xv6.LinkReleasesleep
-import Xv6.LinkAcquire
-import Xv6.LinkRelease
 import Xv6.LinkMyproc
 import Xv6.LinkWakeup
 

@@ -14,8 +14,8 @@ Stated at either interrupt index; `procdump` takes no lock of its own, so
 -/
 import MachCSL.WpSmodeFrame
 import Xv6.SpecProcdump
-import Xv6.WaitLock
 import Xv6.CodeTactics
+import MachCSL.ByteWord
 
 namespace Xv6
 

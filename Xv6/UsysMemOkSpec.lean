@@ -28,6 +28,7 @@ only, so each bridge takes the permission fact it needs as a PREMISE:
    counterpart: the views are functions.
 -/
 import Xv6.SyscallDefs
+import Xv6.UPtLemmas
 
 namespace Xv6
 

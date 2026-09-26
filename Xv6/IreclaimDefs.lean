@@ -31,8 +31,6 @@ step block, the plain arm), `Xv6/IreclaimOrphanC.lean` (iput / end_op),
    dropped, SpecIreclaim's header).
 -/
 import Xv6.IreclaimParts
-import Xv6.InodeRegionMovers
-import Xv6.CodeTactics
 
 namespace Xv6
 

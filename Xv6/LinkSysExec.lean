@@ -12,25 +12,14 @@ parameters, as in `LinkSysOpen`.  Rocq's `MemsetArray` is Lean's `MEMSET`.
 closed term).
 -/
 import Xv6.ProofSysExec
-import Xv6.LinkMyproc
 import Xv6.LinkArgraw
 import Xv6.LinkArgaddr
 import Xv6.LinkFetchstr
 import Xv6.LinkCopyinstr
-import Xv6.LinkStrlen
 import Xv6.LinkArgstr
-import Xv6.LinkMemset
-import Xv6.LinkMemmove
 import Xv6.LinkCopyin
 import Xv6.LinkFetchaddr
-import Xv6.LinkAcquire
-import Xv6.LinkRelease
-import Xv6.LinkKalloc
-import Xv6.LinkKfree
 import Xv6.LinkKexec
-import Xv6.LinkWalkaddr
-import Xv6.LinkWalk
-import Xv6.LinkVmfault
 
 namespace Xv6
 

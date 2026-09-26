@@ -64,9 +64,6 @@ userret).
 8. The user tier's `CurCtx` is the ambient class instance (`[CurCtx]`,
    Rocq's `XI`), its hart the explicit `cpu : CPU` (Rocq's `CID`).
 -/
-import MachCSL.KCtx
-import MachCSL.WireInv
-import MachCSL.WpCsr
 import Xv6.UPtDefs
 import Xv6.ElfFile
 

@@ -77,8 +77,6 @@ slots 1/2, `f` at `s0-24`, the `int n` the UPPER word of the slot at
    `sysReadArms`.
 -/
 import Xv6.SpecArgfd
-import Xv6.SpecArgaddr
-import Xv6.SpecArgint
 import Xv6.SpecFileread
 
 namespace Xv6

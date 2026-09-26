@@ -7,7 +7,6 @@ closed term).
 import Xv6.ProofSysExit
 import Xv6.LinkArgraw
 import Xv6.LinkArgint
-import Xv6.LinkMyproc
 import Xv6.LinkKexit
 
 namespace Xv6

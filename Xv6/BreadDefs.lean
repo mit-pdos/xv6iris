@@ -12,12 +12,9 @@ tie would be lost the moment it was established, and the `refcnt++` that
 follows could not hand back a reference at the REQUESTED key.  So both scans
 carry `Xv6.bdScan` and only the release path closes it.
 -/
-import Xv6.SpecBread
-import Xv6.WordFrac
-import Xv6.BufEscrow
-import Xv6.BcacheLock
 import Xv6.SpecAcquiresleep
-import Xv6.CodeTactics
+import Xv6.BcacheInv
+import Xv6.SpecPanic
 
 namespace Xv6
 

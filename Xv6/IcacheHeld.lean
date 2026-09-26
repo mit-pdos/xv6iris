@@ -85,7 +85,6 @@ needs the transports -- needs the pointer-keyed forms too.
 -/
 import Xv6.IcacheRef
 import MachCSL.KCtxMove
-import MachCSL.Lock
 
 namespace Xv6
 

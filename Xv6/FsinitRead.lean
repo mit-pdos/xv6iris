@@ -9,6 +9,7 @@ and the buffer released; then `Xv6.fsinit_log`.
 Deviations from Rocq: `Xv6/FsinitDefs.lean`'s.
 -/
 import Xv6.FsinitLog
+import Xv6.FsCallSitesF
 
 namespace Xv6
 

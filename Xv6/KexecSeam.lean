@@ -76,6 +76,7 @@ a STAGE file (no `Proof` prefix).  Rocq's header, in short:
 -/
 import Xv6.KexecTail
 import Xv6.LazyFree
+import Xv6.KexecBuilt
 
 namespace Xv6
 

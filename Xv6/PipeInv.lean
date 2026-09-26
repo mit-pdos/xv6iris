@@ -27,8 +27,6 @@ already are.  `pi` is 8-byte aligned (`lockAddrOk`: `pi+16` is), so the two
 This file is definitional (Spec-importable): it never touches a proof.
 -/
 import Xv6.PipeInvDefs
-import Xv6.KallocDefs
-import MachCSL.ByteWord
 
 namespace Xv6
 

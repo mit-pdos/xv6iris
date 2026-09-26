@@ -7,11 +7,7 @@ with `do_free = 0`, so the two pages themselves are the caller's) and
 frees the address space with `uvmfree`.  The call rules it shares with
 `proc_pagetable` are in `Xv6/ProcPagetableDefs.lean`.
 -/
-import MachCSL.WpSmodeFrame
 import Xv6.SpecProcFreepagetable
-import Xv6.SpecUvmunmap
-import Xv6.SpecUvmfree
-import Xv6.UPtPptLemmas
 import Xv6.ProcPagetableDefs
 import Xv6.CodeTactics
 

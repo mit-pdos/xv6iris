@@ -42,9 +42,8 @@ the console bundles (`console_caps`, `console_ready_app`).  Their payload
 (SpecMain deviation 5), so the birth is a ghost step taken after the tier
 switch (`MainKvm`), out of the `lkFresh consAddr` consoleinit returns.
 -/
-import Xv6.SpecMain
 import Xv6.MainSecondaryParts
-import Xv6.CodeTactics
+import Xv6.SpecPrintkinit
 
 namespace Xv6
 

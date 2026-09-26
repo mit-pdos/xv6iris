@@ -6,14 +6,10 @@ the callee-call rules (`walkaddr`, `vmfault`, `memmove`) and the register /
 only Spec and definitional files, and is imported by the `Proof*` files.
 -/
 
-import MachCSL.WpSmodeFrame
-import MachCSL.WpSmodeAlu2
-import MachCSL.ByteWord
 import Xv6.SpecWalkaddr
 import Xv6.SpecVmfault
 import Xv6.SpecMemmove
 import Xv6.UMemLemmas
-import Xv6.CodeTactics
 
 namespace Xv6
 

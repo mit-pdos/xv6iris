@@ -57,11 +57,8 @@ which this toolchain has no lemmas; the definitions are here, the lemmas
 are not, and nothing below `begin_op`/`log_write`/`end_op` consumes them
 (neither `write_head` nor `install_trans` mentions the ledger).
 -/
-import Xv6.FsBlocks
 import Xv6.FsBytesMint
 import Xv6.BcacheInv
-import Xv6.Image
-import MachCSL.Lock
 import Xv6.LogMirrorHalf
 import Xv6.LogSnapLaw
 import Xv6.FsFlushedCore

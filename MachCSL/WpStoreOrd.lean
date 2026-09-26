@@ -18,7 +18,8 @@ Additive: a copy of the plain-store chain at width 4 (the leaf, the
 physical-write stage, the execute stage and the `wpLoop` rule), with the
 accessor strengthened.
 -/
-import MachCSL.WpSmodeAuRules
+import MachCSL.WpSmodeRules
+import MachCSL.WpSmodeAtomic
 
 namespace MachCSL
 

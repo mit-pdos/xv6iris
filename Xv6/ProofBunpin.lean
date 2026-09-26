@@ -14,6 +14,7 @@ goes down by one; the slot unit it was holding comes back out
 import Xv6.SpecBunpin
 import Xv6.BufEscrow
 import Xv6.BcacheLock
+import Xv6.CodeTactics
 
 namespace Xv6
 

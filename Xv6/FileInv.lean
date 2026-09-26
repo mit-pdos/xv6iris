@@ -5,7 +5,6 @@ slot's `ref` cell, the ALLOC ghost step (a fresh reference id, its two
 halves, the fd token parked), and the cursor arithmetic of the scan.
 -/
 import Xv6.FileDefs
-import Xv6.PrintkDefs
 import Xv6.StepLemmas
 
 namespace Xv6

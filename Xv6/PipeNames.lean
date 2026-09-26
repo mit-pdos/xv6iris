@@ -27,7 +27,6 @@ like writing a byte (`pstClose`), paid by the closer.
    `leibnizO pipe_st`.
 -/
 import Iris.Algebra.IProp
-import Iris.Algebra.OFE
 
 namespace Xv6
 

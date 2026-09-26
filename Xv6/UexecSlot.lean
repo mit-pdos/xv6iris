@@ -45,7 +45,6 @@ binder of Rocq's SpecKexec is not ported (D17).
 -/
 import Xv6.UserPerm
 import Xv6.FileDefs
-import Xv6.ElfFile
 import Xv6.KexecDefs
 import Xv6.UserExec
 import Std.Data.ExtTreeSet

@@ -35,6 +35,7 @@ Deviations from Rocq: the inum is a `Nat` `n` with `s2 = ofNat 64 n` and
 (`exfalso; lia`) is the `Nat.sub` bound's contradiction.
 -/
 import Xv6.IallocClaim
+import MachCSL.WpSmodeLh
 
 namespace Xv6
 

@@ -30,16 +30,8 @@ The range-test collapse (Rocq `fa_z_ge_bad` / `fa_z_range` /
 `fetchaddr_ok`: under the block's `p->sz ≤ uvmMaxsz`, `addr + 8` cannot
 wrap once `addr < p->sz`.
 -/
-import MachCSL.WpSmodeFrame
 import MachCSL.WpSmodeSltu
-import MachCSL.Lock
-import MachCSL.ByteWord
 import Xv6.SpecFetchaddr
-import Xv6.SpecMyproc
-import Xv6.SpecCopyin
-import Xv6.EitherDefs
-import Xv6.UMemLemmas
-import Xv6.CodeTactics
 
 namespace Xv6
 

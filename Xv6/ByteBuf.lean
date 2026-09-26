@@ -82,7 +82,6 @@ NOT PORTED, because this port already has them (do not duplicate):
    non-NUL"; here that is `MachCSL.nonul (bs.take d)`, the predicate the
    rest of the port already uses (`MachCSL.cstr`).
 -/
-import MachCSL.ByteWord4
 import Xv6.ByteCursor
 
 namespace Xv6

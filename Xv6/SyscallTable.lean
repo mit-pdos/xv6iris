@@ -45,7 +45,7 @@ Definitional + address facts; no `wp` stepping (the head is ProofSyscall's,
 the tail is `SyscallRet`'s).
 -/
 import Xv6.SpecSyscall
-import MachCSL.WpSmodeFrame
+import Xv6.SpecSysExec
 
 namespace Xv6
 

@@ -79,9 +79,6 @@ record's own key: `uslot (uvisOf V M sts gn cs pid)`.  The sret lands at
 
 Imports only definitional and Spec files.
 -/
-import Xv6.SpecUsertrap
-import Xv6.SpecUserret
-import Xv6.ParkCap
 import Xv6.UexecExecInst
 
 namespace Xv6

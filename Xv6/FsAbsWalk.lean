@@ -52,8 +52,7 @@ Rocq's comment on the hop, kept:
 Nothing from the two definitions.  The rest of FsAbs.v is DEFERRED (table
 above).
 -/
-import Xv6.FsAbsDefs
-import Xv6.FsStateTop
+import Xv6.FsTree
 
 namespace Xv6
 

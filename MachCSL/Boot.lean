@@ -5,8 +5,7 @@ These are the resources whole-instruction and boot specifications are stated
 over: the program counter at a cycle boundary and the per-cycle bookkeeping
 registers.  The configuration bundle is in `MConf.lean`.
 -/
-import MachCSL.Wp
-import MachCSL.Platform
+import MachCSL.Resources
 
 namespace MachCSL
 

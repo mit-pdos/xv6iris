@@ -42,6 +42,7 @@ Rocq's header points, kept:
    shed from the plain `inodeRef` namei returned.
 -/
 import Xv6.SysChdirCalls
+import Xv6.SysChdirFrame
 
 namespace Xv6
 

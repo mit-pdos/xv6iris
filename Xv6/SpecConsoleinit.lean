@@ -22,11 +22,8 @@ ring and its indices are untouched (bss).  Stack: 2 over `uartinit`'s 6.
 
 Imports only definitional files.
 -/
-import MachCSL.CallConv
-import MachCSL.Lock
-import Xv6.Image
-import Xv6.ConsoleDefs
 import Xv6.SpecUartinit
+import Xv6.ConsoleInvDefs
 
 namespace Xv6
 

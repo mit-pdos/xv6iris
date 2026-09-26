@@ -19,11 +19,10 @@ the shared epilogue at `+0x32`.
 * THE TAIL (`sfs_tail`, Rocq `sfs_tail`): ONE epilogue over the value the
   arm left in `a0` (the error return is hoisted).
 -/
-import Xv6.SpecSysFstat
-import Xv6.SysfileCalls
 import Xv6.CodeTactics
 import MachCSL.WpSmodeFrame6
 import MachCSL.StackOwnBounds
+import Xv6.SpecFilestat
 
 namespace Xv6
 

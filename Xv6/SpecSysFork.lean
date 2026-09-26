@@ -41,7 +41,6 @@ derived.
 Imports only definitional files (never a `Code*` or `Proof*` file).
 -/
 import Xv6.SpecKfork
-import Iris.ProofMode
 
 namespace Xv6
 

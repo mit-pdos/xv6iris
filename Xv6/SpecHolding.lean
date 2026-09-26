@@ -23,9 +23,9 @@ Stack: holding's own 4 slots over mycpu's 2.
 Imports only definitional files (never a `Code*` or `Proof*` file).
 -/
 import MachCSL.Lock
-import MachCSL.CallConv
 import Xv6.Image
 import Xv6.Geom
+import MachCSL.WpSmodeCtl
 
 namespace Xv6
 

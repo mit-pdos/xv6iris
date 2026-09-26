@@ -46,6 +46,7 @@ import Xv6.SpecForkretParkPaid
 import Xv6.ForkretRecord
 import Xv6.EnvMorph
 import Xv6.FtableMorph
+import Xv6.SpecForkret
 
 namespace Xv6
 

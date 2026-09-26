@@ -22,6 +22,9 @@ translation state each one runs in:
 `urSt` at `+0xac`.
 -/
 import Xv6.UserretDefs
+import MachCSL.WpSmodeSatp
+import MachCSL.WpSmodeSfence
+import Xv6.TransPt
 
 namespace Xv6
 

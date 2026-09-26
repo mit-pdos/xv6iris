@@ -121,15 +121,9 @@ Every one of those has its Lean counterpart below (deviations listed).
 
 Imports only definitional files and callee `Spec*` files.
 -/
-import Xv6.SpecBread
-import Xv6.SpecBrelse
-import Xv6.SpecMemmove
-import Xv6.SpecInitlog
 import Xv6.SpecIreclaim
-import Xv6.FsImg
 import Xv6.AppDur
 import Xv6.FsCollect
-import MachCSL.ByteWord4
 
 namespace Xv6
 

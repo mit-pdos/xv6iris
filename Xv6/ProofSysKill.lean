@@ -14,8 +14,8 @@ The result is kkill's `a0`, untouched: the epilogue restores only
 -/
 import Xv6.SpecSysKill
 import Xv6.ArgLemmas
-import Xv6.CodeTactics
 import MachCSL.WpSmodeFrame6
+import Xv6.SpecKkill
 
 namespace Xv6
 

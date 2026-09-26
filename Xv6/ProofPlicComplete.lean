@@ -20,8 +20,6 @@ names.  The register holds the 64-bit `a0` and the bus sees its low word,
 so the four answers are moved across the width by `pcm_vals` /
 `pcm_wide10` / `pcm_wide12`.
 -/
-import MachCSL.WpSmodeFrame
-import MachCSL.WpSmodeDev4
 import Xv6.SpecPlicComplete
 import Xv6.PlicPlanExtra
 import Xv6.CodeTactics

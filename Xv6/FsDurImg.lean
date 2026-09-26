@@ -39,6 +39,7 @@ directory-view agreement lemmas are replaced by landed ones
 -/
 import Xv6.FsDurImgSnap
 import Xv6.FsDurAlloc
+import Xv6.FsDurImgLink
 
 namespace Xv6
 

@@ -7,7 +7,6 @@ Stated over a map, one proof covers every register pattern: `rd = rs1`,
 variants.  Only `rd ≠ 0` is assumed (`x0` writes are dropped by the model;
 the kernel never targets it).  Privilege-generic (default: supervisor).
 -/
-import MachCSL.WpCycle
 import MachCSL.WpMmodeAlu
 import MachCSL.KCtx
 

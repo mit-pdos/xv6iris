@@ -11,7 +11,6 @@ the trapping one; kerneltrap may yield, so the restores and `sret` run at
 whichever hart the thread lands on, and the trap engine's promise
 (`wpNext true k.proc`) is met there.
 -/
-import MachCSL.WpSmodeFrame
 import MachCSL.WpSmodeSret
 import Xv6.SpecKernelvec
 import Xv6.SpecKerneltrap

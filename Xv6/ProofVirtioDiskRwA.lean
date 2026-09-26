@@ -19,7 +19,6 @@ The phase ends at `+0xbc`, the head of the outer retry loop: the state
 there is `Xv6.vdrwP1Exit`, which the sleep path of P2 re-establishes after
 its own `acquire`.
 -/
-import MachCSL.WpSmodeFrame12b
 import Xv6.SpecVirtioDiskRw
 import Xv6.SpecAcquire
 import Xv6.CodeTactics

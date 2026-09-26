@@ -12,9 +12,10 @@ explicitly.  Both are execute stages over the register file, independent of
 the translation tier: the trampoline's cycle rules (`WpSmodeSatpU`) and the
 kernel-context schemas both consume them.
 -/
-import MachCSL.WpSmodeCsr
-import MachCSL.WpSmodeTrapCsr
 import MachCSL.SConfPhysDefs
+import MachCSL.WpCsr
+import MachCSL.KCtx
+import MachCSL.WpMmodeAlu
 
 namespace MachCSL
 

@@ -21,7 +21,6 @@ read.
 3. `l !! i` is `l[i]?`, `l !!! i` is `l[i]!` (U0-1's convention,
    `Xv6/LineWords.lean` deviation 2).
 -/
-import Xv6.LineWords
 import Xv6.EchoDisc
 
 namespace Xv6

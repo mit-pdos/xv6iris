@@ -17,9 +17,7 @@ The `int` local rides in the top half of an 8-byte frame slot
 (`word8_split4` / `word8_join4`).
 -/
 import Xv6.SpecArgfd
-import Xv6.SpecMyproc
 import Xv6.ArgLemmas
-import Xv6.CodeTactics
 import MachCSL.WpSmodeFrame6
 
 namespace Xv6

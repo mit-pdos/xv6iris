@@ -20,8 +20,6 @@ import MachCSL.PtTree
 import MachCSL.WordHist
 import MachCSL.WordPointsTo
 import MachCSL.CtxLaws
-import MachCSL.KMap
-import Iris.Instances.Lib.Invariants
 
 set_option maxRecDepth 100000
 

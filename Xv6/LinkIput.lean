@@ -9,16 +9,7 @@ it (its off-lock free flushes `ip->type = 0` by hand), so the Lean proof
 does not take it (ProofIput deviation 3).
 -/
 import Xv6.ProofIput
-import Xv6.LinkAcquire
-import Xv6.LinkRelease
-import Xv6.LinkAcquiresleep
-import Xv6.LinkReleasesleep
 import Xv6.LinkItrunc
-import Xv6.LinkBread
-import Xv6.LinkLogWrite
-import Xv6.LinkBrelse
-import Xv6.LinkMyproc
-import Xv6.LinkWakeup
 
 namespace Xv6
 

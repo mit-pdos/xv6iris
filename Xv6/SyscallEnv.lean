@@ -91,7 +91,6 @@ hands kfork the token out of `syscallEnv_token` (`SpecKfork.kforkPark`).
 Imports only definitional files and callee Spec files (for their env
 bundles).
 -/
-import Xv6.FirstTok
 import Xv6.SpecFileread
 import Xv6.SpecFilewrite
 import Xv6.SpecFilestat
@@ -99,14 +98,7 @@ import Xv6.SpecFileclose
 import Xv6.SpecDevintr
 import Xv6.KexecDefs
 import Xv6.ProcAvail
-import Xv6.PidLock
 import Xv6.WaitLock
-import Xv6.SpecProcinit
-import Xv6.TicksDefs
-import Xv6.WaitInv
-import Xv6.SpecPanic
-import MachCSL.WireInv
-import MachCSL.KMap
 
 namespace Xv6
 

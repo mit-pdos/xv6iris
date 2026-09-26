@@ -16,11 +16,9 @@ proof meets its callees':
 -/
 import Xv6.ProofDirlink
 import Xv6.LinkDirlookup
-import Xv6.LinkReadi
 import Xv6.LinkIput
 import Xv6.LinkStrncpy
 import Xv6.LinkWritei
-import Xv6.LinkPanic
 
 namespace Xv6
 

@@ -5,7 +5,10 @@ Iunlockput Dirlookup Iput`): the same nine callees as `Xv6.Namex`, through
 the same links; closed up to `copyout`, as `Xv6.Namex`.
 -/
 import Xv6.ProofNparEra
-import Xv6.LinkNamex
+import Xv6.LinkIdup
+import Xv6.LinkIlock
+import Xv6.LinkIunlockput
+import Xv6.LinkDirlookup
 
 namespace Xv6
 

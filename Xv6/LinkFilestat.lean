@@ -8,7 +8,6 @@ inode path), so no console appears here, and it reaches no allocator.
 `LinkKwait` (its page-table walkers are parameters of `LinkCopyout`).
 -/
 import Xv6.ProofFilestat
-import Xv6.LinkMyproc
 import Xv6.LinkIlock
 import Xv6.LinkStati
 import Xv6.LinkIunlock

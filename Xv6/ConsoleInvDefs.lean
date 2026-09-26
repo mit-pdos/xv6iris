@@ -94,10 +94,8 @@ import MachCSL.CtxBox
 import Xv6.ConsNames
 import Xv6.ConsoleTags
 import MachCSL.CallConv
-import MachCSL.Lock
 import MachCSL.KCtxMove
-import Xv6.Image
-import Xv6.UartInv
+import Xv6.UartGhosts
 
 namespace Xv6
 

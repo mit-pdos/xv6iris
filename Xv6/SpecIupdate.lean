@@ -116,14 +116,9 @@ each directly from the core.)
 
 Imports only definitional files and callee `Spec*` files.
 -/
-import MachCSL.WpSmodeFrame
-import Xv6.LogInv
 import Xv6.InodeRegionLink
 import Xv6.FsCfgDefs
 import Xv6.SpecBread
-import Xv6.SpecBrelse
-import Xv6.SpecLogWrite
-import Xv6.SpecMemmove
 
 namespace Xv6
 

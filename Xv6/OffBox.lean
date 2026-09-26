@@ -112,11 +112,8 @@ statements are `A ∗ B ⊢ C`, the port's convention (CtxBox.lean).
   `off_rows_to_dep`), `off_cnt`/`off_regd`/`off_regp` (they spell the
   site statements that FileOffProtocol/FileInv consume).
 -/
-import Xv6.OffBoxCam
 import Xv6.FileOffCell
 import Xv6.IcacheRefDefs
-import MachCSL.ByteWord4
-import MachCSL.WpStoreFree
 
 namespace Xv6
 

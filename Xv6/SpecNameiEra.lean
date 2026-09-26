@@ -40,8 +40,9 @@ As `SpecNamexEra` (1-3, 5) and `SpecNamei` (2): `nameiSlots` is Rocq's
 
 Imports only definitional files and callee `Spec*` files.
 -/
-import Xv6.SpecNamexEra
 import Xv6.SpecNamei
+import Xv6.FdTable
+import Xv6.FsAbsEra
 
 
 namespace Xv6

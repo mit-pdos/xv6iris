@@ -34,7 +34,6 @@ residue, and `bootProg_not_resetRegs` shows the residue is genuinely not
 derivable.
 -/
 import MachCSL.BootInitModel
-import MachCSL.Lang
 
 namespace MachCSL
 

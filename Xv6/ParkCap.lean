@@ -85,7 +85,6 @@ Imports only definitional files.
 -/
 import Xv6.UtResFits
 import Xv6.InitBoot
-import Xv6.ProcInv
 import Xv6.SpecAllocproc
 
 namespace Xv6

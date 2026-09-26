@@ -27,7 +27,7 @@ THE LEVEL'S TRACE FACTS (Rocq ProofNparEra's header item (2)):
   which is what the peel and the RIGHT death's strict bound need.
 -/
 import Xv6.NamexEraLook
-import MachCSL.WpSmodeLh
+import Xv6.NamexLevel
 
 namespace Xv6
 

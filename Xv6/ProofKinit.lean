@@ -9,12 +9,8 @@ genesis count the caller hands in, under `wpLoop_fupd`), the second pair
 of address computations, the call to `freerange`, and the epilogue.  Stated
 at either interrupt index, as `freerange` is.
 -/
-import MachCSL.WpSmodeFrame
-import MachCSL.Lock
-import MachCSL.LockBornHook
 import Xv6.SpecKinit
 import Xv6.SpecInitlock
-import Xv6.SpecFreerange
 import Xv6.CodeTactics
 
 namespace Xv6

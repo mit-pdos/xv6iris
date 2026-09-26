@@ -3,10 +3,8 @@
 search-tree lookup of `pc` plus the read-only decode walk, both evaluated by
 `rfl` at the point a proof applies an instruction rule.
 -/
-import MachCSL.WpCycle
 import MachCSL.DecodeBridge
-import MachCSL.Instr
-import Xv6.Image
+import Xv6.KernelData
 
 namespace Xv6
 

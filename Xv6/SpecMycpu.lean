@@ -9,9 +9,9 @@ code's `auipc/addi/add` chain spelled as the address it denotes).
 
 Imports only definitional files (never a `Code*` or `Proof*` file).
 -/
-import MachCSL.CallConv
 import Xv6.Image
 import Xv6.Geom
+import MachCSL.WpSmodeCtl
 
 namespace Xv6
 

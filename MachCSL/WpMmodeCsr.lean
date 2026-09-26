@@ -9,8 +9,6 @@ the `swp_write_CSR_*` stage lemma of `MachCSL/WpCsr.lean` (keeping
 returns the configuration with the one field updated; reads run through
 directly.  `wp_m_csrw_*` / `wp_m_csrr_*` are the `wpLoop` rules over `instr`.
 -/
-import MachCSL.WpCycle
-import MachCSL.WpGpr
 import MachCSL.WpCsr
 import MachCSL.WpMmodeAlu
 

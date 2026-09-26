@@ -25,9 +25,6 @@ panic is refuted by the protocol (a completed request's status byte is
 
 Imports only definitional files.
 -/
-import MachCSL.CallConv
-import Xv6.Image
-import Xv6.SchedCtx
 import Xv6.SpecWakeup
 import Xv6.SpecVirtioDiskRw
 

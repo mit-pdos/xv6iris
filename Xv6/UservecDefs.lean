@@ -22,6 +22,8 @@ at `+0x9a`.
 -/
 import Xv6.SpecUservec
 import Xv6.UserretDefs
+import Xv6.UexecRet
+import Xv6.UserKernelBridge
 
 namespace Xv6
 

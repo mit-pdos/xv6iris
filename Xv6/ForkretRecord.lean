@@ -22,7 +22,7 @@ rest.  (W8-P2 retired this file's `forkret_resume` / `forkret_record` /
 
 A lemma file: it imports Spec files, never a Proof or Link file.
 -/
-import Xv6.SpecForkret
+import Xv6.SchedCtx
 
 namespace Xv6
 

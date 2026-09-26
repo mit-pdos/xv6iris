@@ -23,10 +23,7 @@ Deviation from Rocq: the pushed-byte COUNT `un_rxpush` (`mono_nat`) is the
 Lean mono-LIST of arrivals `rxin` (its refinement: the count is its length,
 and a pop can name its byte by index).
 -/
-import MachCSL.WpSmodeDev
-import MachCSL.ObsTrace
 import Xv6.UartTrace
-import Xv6.UartModel
 import Xv6.ConsLog
 
 namespace Xv6

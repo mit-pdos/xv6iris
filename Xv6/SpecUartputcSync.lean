@@ -25,7 +25,6 @@ obligations.  Stack: the 8-slot frame over acquire's 10.
 
 Imports only definitional files (never a `Code*` or `Proof*` file).
 -/
-import MachCSL.CallConv
 import Xv6.Image
 import Xv6.UartInv
 

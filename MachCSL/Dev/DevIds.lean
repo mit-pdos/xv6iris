@@ -10,7 +10,6 @@ this file holds is the vocabulary the devices and the language share
 without seeing each other: which UART, which device, interrupt sources,
 task identifiers and the observable device events.
 -/
-import MachCSL.TsoMem
 
 namespace MachCSL
 

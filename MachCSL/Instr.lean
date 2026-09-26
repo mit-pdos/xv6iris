@@ -10,7 +10,6 @@ persistent premise and are stated once for both encodings (the Rocq
 prototype's `InstrBytes.instr`).
 -/
 import MachCSL.MConf
-import MachCSL.PlatformFacts
 import MachCSL.KMap
 
 namespace MachCSL

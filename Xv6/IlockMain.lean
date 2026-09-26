@@ -16,6 +16,7 @@ in two stages:
 import Xv6.IlockCheckout
 import Xv6.IlockEpi
 import Xv6.IcachePinwLw
+import Xv6.SpecAcquiresleep
 
 namespace Xv6
 

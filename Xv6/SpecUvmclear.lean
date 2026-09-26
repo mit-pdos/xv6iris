@@ -5,10 +5,8 @@ Specification of `uvmclear` (kernel/vm.c), over an address space.
 Imports only definitional files (never a `Code*` or `Proof*` file).
 -/
 import MachCSL.WpSmodeFrame
-import MachCSL.Lock
 import Xv6.UPtDefs
 import Xv6.Image
-import Xv6.Geom
 
 namespace Xv6
 

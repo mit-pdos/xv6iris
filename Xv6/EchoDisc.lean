@@ -59,7 +59,7 @@ Deviations from Rocq:
    are its echo instance, which `LineModelInst` (not needed) was.
 -/
 import Xv6.LineWords
-import MachCSL.ObsTrace
+import MachCSL.Lang
 
 namespace Xv6
 

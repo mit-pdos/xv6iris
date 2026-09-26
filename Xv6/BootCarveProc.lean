@@ -65,7 +65,6 @@ Deviations (none process-layer):
 
 Imports only definitional and Spec files.
 -/
-import Xv6.BootCarveMain
 import Xv6.SpecMain
 import Xv6.UartBoot
 

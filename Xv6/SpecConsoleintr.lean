@@ -39,8 +39,6 @@ Rocq 32).
 
 Imports only definitional files.
 -/
-import MachCSL.CallConv
-import Xv6.Image
 import Xv6.ConsoleDefs
 import Xv6.SchedCtx
 import MachCSL.WpSmodeIntr

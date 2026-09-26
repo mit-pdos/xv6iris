@@ -13,6 +13,10 @@
   iteration, is refuted from `size ≤ BPB`).
 -/
 import Xv6.BallocDefs
+import Xv6.CodeTactics
+import Xv6.SpecBalloc
+import Xv6.FsCallSites
+import Xv6.BallocParts
 
 namespace Xv6
 

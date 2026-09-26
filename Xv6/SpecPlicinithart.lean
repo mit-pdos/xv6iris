@@ -22,10 +22,8 @@ Interrupts are off (`cpuid` says so, and `main` runs this before
 
 Imports only definitional files (never a `Code*` or `Proof*` file).
 -/
-import MachCSL.CallConv
 import Xv6.Image
 import Xv6.PlicInv
-import Xv6.SpecCpuid
 
 namespace Xv6
 

@@ -45,7 +45,7 @@ Imports only definitional files.
 -/
 import Xv6.BootConfig
 import Xv6.SpecBoot
-import Xv6.KernelData
+import MachCSL.KCtx
 
 namespace Xv6
 

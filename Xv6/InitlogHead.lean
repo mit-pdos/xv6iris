@@ -28,15 +28,10 @@ twins of `Xv6/ProofWriteHead.lean`'s (`whCur`, `whCur_step`,
 `Proof*` file and may not be imported here (`tools/check_layering.sh`).
 Rocq has them once per proof file too (`il_cur_*` vs `wh_cur_*`).
 -/
-import Xv6.SpecInitlog
-import Xv6.FsImg
 import Xv6.CodeTactics
-import MachCSL.ByteWord4
 import MachCSL.BigSepLib
-import MachCSL.WpDmaCtx2
 import Xv6.DiskTier
-import Xv6.FsCallSites
-import Xv6.EndOpDefs
+import Xv6.LogInv
 
 namespace Xv6
 

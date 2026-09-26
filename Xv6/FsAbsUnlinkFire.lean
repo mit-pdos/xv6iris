@@ -80,9 +80,6 @@ Nothing.
 -/
 import Xv6.SysUnlinkDefs
 import Xv6.FsAbsCreateFire
-import Xv6.PieceFam
-import Xv6.InodeRegionInv
-import Xv6.FsStateEraPure
 
 namespace Xv6
 

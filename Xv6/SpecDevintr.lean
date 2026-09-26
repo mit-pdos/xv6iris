@@ -41,13 +41,10 @@ Interrupts are off throughout (the hart does not move), depth and locks are
 as at trap entry, and the hart runs on the kernel page table (`htier`).
 Imports only definitional files.
 -/
-import MachCSL.CallConv
-import MachCSL.WpSmodeIntr
-import Xv6.Image
 import Xv6.PlicInv
-import Xv6.SpecUartintr
-import Xv6.SpecVirtioDiskIntr
-import Xv6.SpecClockintr
+import Xv6.ConsoleDefs
+import Xv6.SpecVirtioDiskRw
+import Xv6.TicksDefs
 
 namespace Xv6
 

@@ -93,8 +93,6 @@ image numbers -- are deferred whole (design note §5).
 -/
 import Xv6.BitmapInv
 import Xv6.InodeInv
-import Xv6.IcacheRefDefs
-import Xv6.UartTrace
 import Xv6.ConsNames
 
 namespace Xv6

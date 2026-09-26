@@ -5,10 +5,7 @@ without its lock.  The payload carries the `nextpid` word and a quarter
 of every `pid` word (the private block keeps a half, `p->lock` a quarter),
 with the invariant that live pids are distinct and in `[1, PIDMAX]`.
 -/
-import Xv6.UPtDefs
 import Xv6.ProcDefs
-import Xv6.SpecProcinit
-import MachCSL.Lock
 
 namespace Xv6
 

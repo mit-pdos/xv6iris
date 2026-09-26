@@ -39,7 +39,6 @@ boot stamps).  The fresh-name `bioInit` / `bioInit_of_binit` (Rocq
 no longer carries `bslots BSLOTS` (it was a fresh name's whole supply).
 -/
 import Xv6.BufEscrow
-import MachCSL.LockBornHook
 import Xv6.SleepLockAt
 import MachCSL.BigSepLib
 

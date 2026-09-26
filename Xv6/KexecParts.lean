@@ -76,12 +76,9 @@ The eb question: every rule here is at either `SIE` (`kctxL lent`,
 `wpNext k.sie`); a phase threads `trapCsrsExt`/`cpuClaimExt` across them by
 `k_next_e` / `k_ext_move`, as `Xv6/IlockEpi.lean` does.
 -/
-import Xv6.KexecDefs
 import Xv6.CodeTactics
 import Xv6.KstackMap
-import MachCSL.WpSmodeFrame
 import MachCSL.WpSmodeFrame12b
-import MachCSL.ByteWord
 
 namespace Xv6
 

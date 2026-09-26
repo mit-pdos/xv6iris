@@ -7,7 +7,10 @@ the same links; closed up to `copyout`, which stays a parameter as there
 readi's whole one).  No panic of namex's own.
 -/
 import Xv6.ProofNamexEra
-import Xv6.LinkNamex
+import Xv6.LinkIdup
+import Xv6.LinkIlock
+import Xv6.LinkIunlockput
+import Xv6.LinkDirlookup
 
 namespace Xv6
 

@@ -34,7 +34,6 @@ Deviations from Rocq:
    their deciders/laws, `f_name_one`) and the unreached `nl_ne_*`
    corollaries (all but `nl_ne_sys`/`nl_ne_console`) will not be ported.
 -/
-import Xv6.FileClass
 import Xv6.FsAbsDefs
 
 namespace Xv6

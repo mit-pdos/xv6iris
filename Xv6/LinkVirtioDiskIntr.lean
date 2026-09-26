@@ -6,8 +6,6 @@ interfaces, and NOTHING stays open: the disk's accessors are all proved
 lock's payload (`Xv6.diskPayWm`).
 -/
 import Xv6.ProofVirtioDiskIntr
-import Xv6.LinkAcquire
-import Xv6.LinkRelease
 import Xv6.LinkWakeup
 
 namespace Xv6

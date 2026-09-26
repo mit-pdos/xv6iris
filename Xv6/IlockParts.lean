@@ -31,12 +31,9 @@ checked: `grep -l il_payload /shared/xv6rocq/iris/*.v` finds ProofIlock.v
 only, where the lemma is never applied -- reason: dead (the checkout's
 `ic_bundle_*_elim_held` readings replaced it).
 -/
-import Xv6.IlockFill
-import Xv6.DinodeSlot
-import Xv6.CodeTactics
-import MachCSL.WpSmodeFrame12b
-import MachCSL.WpSmodeLh
-import Xv6.FsCallSites
+import Xv6.IcacheRefDefs
+import Xv6.InodeInv
+import Xv6.SpecPanic
 
 namespace Xv6
 

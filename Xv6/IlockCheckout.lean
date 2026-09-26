@@ -27,8 +27,9 @@ Deviation from Rocq: the checkout's `own_context` comes out of the running
 token by `MachCSL.kctx_token_acc` (Rocq's `SieCapCtx.sie_cap_gpr_own_ctx_acc`)
 at the call site, so these lemmas take `ownCtx cpu curCtx` directly.
 -/
-import Xv6.IlockParts
 import Xv6.IcacheBoxSites
+import Xv6.FsCfgDefs
+import Xv6.InodeRegionWithdraw
 
 namespace Xv6
 

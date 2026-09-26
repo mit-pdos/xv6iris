@@ -90,10 +90,7 @@ Imports only definitional files.
 -/
 import Xv6.KexecOkQ
 import Xv6.KexecImageOk
-import Xv6.KexecLoad
-import Xv6.ChildTok
 import Xv6.SysOpenDefs
-import Xv6.FsAbsEra
 
 namespace Xv6
 

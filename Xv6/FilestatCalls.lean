@@ -27,7 +27,12 @@ Rocq's per-call `cpu_own_transport` / `wp_next_chain` threading is gone:
 the wrappers take hart-free continuations and discharge each callee's
 `wpNext` with `wpNext_intro_pin` (NamexCalls' recorded deviation).
 -/
-import Xv6.FilestatParts
+import Xv6.SpecMyproc
+import Xv6.FsReady
+import Xv6.SpecCopyout
+import Xv6.SpecIunlock
+import Xv6.SpecIlock
+import Xv6.SpecStati
 
 namespace Xv6
 

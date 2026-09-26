@@ -60,7 +60,6 @@ imports `LinkEntry`/`LinkMain`/`LinkMainSecondary`).
 -/
 import Xv6.BootCarveHart
 import Xv6.BootBridge
-import Xv6.Image
 import Xv6.LinkBoot
 import Xv6.LinkMain
 import Xv6.LinkMainSecondary

@@ -5,7 +5,6 @@ on bit 1 (the `ori a0,a0,4` arm), and one shared epilogue at `+0x18`
 (`hexit`, as in Rocq's TAIL assertion / `ProofStrlen`), reached from both
 arms at whatever hart the thread is on.  sie-generic (`k_step_gen`).
 -/
-import MachCSL.WpSmodeFrame
 import MachCSL.WpSmodeFrame12b
 import Xv6.SpecFlags2perm
 import Xv6.CodeTactics

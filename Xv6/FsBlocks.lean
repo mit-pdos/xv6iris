@@ -33,6 +33,7 @@ and every client projects it.
 -/
 import Xv6.LogDefs
 import Xv6.FsBytes
+import Xv6.BioPool
 
 namespace Xv6
 

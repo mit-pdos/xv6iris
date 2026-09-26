@@ -37,7 +37,6 @@ the one shared `Xv6G.gmUnitG` (one capacity per camera type).
    split is left to it.
 -/
 import Xv6.UartTrace
-import Iris.Instances.Lib.GhostMap
 
 set_option linter.unusedSectionVars false
 

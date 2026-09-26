@@ -22,6 +22,7 @@ of the machine `sret` leaves into the slot's vocabulary is
 `userret_user_state` (Rocq `userret_to_user_state`, UserKernelBridge).
 -/
 import Xv6.UserretDefs
+import Xv6.UserKernelBridge
 
 namespace Xv6
 

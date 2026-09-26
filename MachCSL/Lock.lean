@@ -30,12 +30,8 @@ at acquire (`lock_pay_take`) and back at release (`lock_pay_intro`).  The
 holder's token `locked` carries the lock's context parked under its own
 (`lockCtxHeld`).
 -/
-import MachCSL.WordHist
-import MachCSL.CtxLaws
 import MachCSL.Power
 import MachCSL.KCtx
-import MachCSL.CallConv
-import Iris.Instances.Lib.Invariants
 
 namespace MachCSL
 

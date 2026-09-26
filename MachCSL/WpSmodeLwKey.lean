@@ -42,8 +42,8 @@ resources depending on a value the stage produces; `wpLoop_k_lock` is its
 `sie = false` cousin with the held set).
 -/
 import MachCSL.WpSmodeAtomic
-import MachCSL.WpSmodeRules
 import MachCSL.Lock
+import MachCSL.WpSmodeCycle
 
 namespace MachCSL
 

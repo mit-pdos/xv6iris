@@ -26,16 +26,8 @@ with the bytes `bs` existential: `umemWrote V.upt M addr d P' M'`
 written at `addr`, every page they touch mapped in `P'`.
 -/
 import MachCSL.WpSmodeFrame
-import MachCSL.Lock
-import Xv6.SpecSleep
 import Xv6.PipeInvDefs
-import Xv6.KallocDefs
 import Xv6.SchedCtx
-import Xv6.FdTable
-import Xv6.UMem
-import Xv6.UMemWindow
-import Xv6.Image
-import Xv6.Geom
 import Xv6.ProcPrivBare
 
 namespace Xv6

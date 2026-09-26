@@ -3,6 +3,7 @@
 `write_log` copy loop, each slot write through the LOG-FILL permit.
 -/
 import Xv6.EndOpCommit
+import Xv6.FsCallSites
 
 namespace Xv6
 

@@ -97,15 +97,10 @@ a STAGE file (no `Proof` prefix, brief rule 2; the one seal is
 -/
 import Xv6.KexecOkQ
 import Xv6.KexecParts
-import Xv6.KexecBuilt
 import Xv6.SpecIunlockput
 import Xv6.SpecEndOp
 import Xv6.SpecProcFreepagetable
-import Xv6.IcacheEscrowDep
-import Xv6.OffBox
-import Xv6.FsTree
 import Xv6.DinodeSlot
-import MachCSL.ByteWord4
 import Xv6.UmCovered
 
 namespace Xv6

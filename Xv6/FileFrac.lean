@@ -4,7 +4,6 @@ family): a reference's fraction of a slot's content splits and merges, the
 fd-slot supply grows, and `filedup`'s ghost step: an outstanding reference
 `id ↦ (k, q)` becomes two, `id ↦ (k, q/2)` and a fresh `nx ↦ (k, q/2)`.
 -/
-import Xv6.WordFrac
 import Xv6.FileInv
 import Xv6.FilePay
 

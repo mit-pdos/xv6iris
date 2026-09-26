@@ -5,7 +5,6 @@ proof is closed with their linked interfaces.
 -/
 import Xv6.ProofUartintr
 import Xv6.LinkConsoleintr
-import Xv6.LinkWakeup
 
 namespace Xv6
 

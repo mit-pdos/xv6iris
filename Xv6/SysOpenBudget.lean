@@ -50,9 +50,6 @@ is at `KA.«sys_open»` and its join is the `lh a4,68(s1)` at +0x4a.)
 
 Nothing.
 -/
-import Xv6.SpecNamex
-import Xv6.SpecIput
-import Xv6.SpecItrunc
 import Xv6.CreateDefs
 
 namespace Xv6

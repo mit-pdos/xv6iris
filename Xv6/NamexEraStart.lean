@@ -27,6 +27,7 @@ the call's return (the first `wpLoop` goal after iget / idup), where Rocq
 fires it at the join; nothing is open at either point.
 -/
 import Xv6.NamexEraLoop
+import Xv6.NamexStart
 
 namespace Xv6
 

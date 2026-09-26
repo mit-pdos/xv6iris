@@ -13,7 +13,6 @@ stay parameters, as in `LinkCopyinstr` / `LinkSysChdir`.
 closed term).
 -/
 import Xv6.ProofSysLink
-import Xv6.LinkMyproc
 import Xv6.LinkArgraw
 import Xv6.LinkFetchstr
 import Xv6.LinkCopyinstr
@@ -22,18 +21,10 @@ import Xv6.LinkArgstr
 import Xv6.LinkBeginOp
 import Xv6.LinkNamei
 import Xv6.LinkNameiparent
-import Xv6.LinkIlock
-import Xv6.LinkIunlock
-import Xv6.LinkIupdate
 import Xv6.LinkDirlink
-import Xv6.LinkIput
-import Xv6.LinkIunlockput
 import Xv6.LinkEndOp
 import Xv6.LinkCopyout
 import Xv6.LinkCopyin
-import Xv6.LinkWalkaddr
-import Xv6.LinkWalk
-import Xv6.LinkVmfault
 
 namespace Xv6
 

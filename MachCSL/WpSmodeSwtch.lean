@@ -10,8 +10,9 @@ target's parked stack; the rule therefore takes the NEW region and hands
 back the caller's OLD one.  It is stated at interrupts off -- the only
 index a switch can happen at (xv6 holds `p->lock` across it).
 -/
-import MachCSL.WpSmodeRules
 import MachCSL.KCtxMove
+import MachCSL.WpSmodeCycle
+import MachCSL.WpSmodeMem
 
 namespace MachCSL
 

@@ -18,7 +18,6 @@ branches on `Xv6.bmBit_test_64`.
 -/
 import Xv6.BallocAlloc
 import MachCSL.WpSmodeLh
-import MachCSL.WpSmodeFrame12b
 
 namespace Xv6
 

@@ -25,7 +25,7 @@ The register file here is the bare Pi type (`BootRegs`), with its own update
 statement below applies to it verbatim.  (Phase 2 of the BootReset port moves
 `RegFile`/`RegFile.set` down onto these.)
 -/
-import LeanRV64D
+import LeanRV64D.Defs
 
 namespace MachCSL
 

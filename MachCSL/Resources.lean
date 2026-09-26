@@ -35,7 +35,6 @@ exactly the machine's byte histories, the mirrors are at the machine's
 values, and the memory-model step invariant `mmOk` holds (the Rocq
 prototype's `mm_ok`/`itv_ok`/`hr_ok`/`resv_ok`).
 -/
-import MachCSL.Lang
 import MachCSL.ObsTrace
 import MachCSL.LogEntryDefs
 import MachCSL.DiskImg
@@ -44,7 +43,6 @@ import Iris.BI.Lib.GenHeap
 import Iris.BI.Lib.MonoList
 import Iris.Instances.Lib.Invariants
 import Iris.BI.Lib.MonoNat
-import Iris.Instances.Lib.GhostMap
 import Iris.Instances.Lib.GhostVar
 import Iris.ProgramLogic.WeakestPre
 

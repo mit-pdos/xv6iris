@@ -32,7 +32,6 @@ for every instruction of the ulib cone the two agree (no privileged or
 config-gated decode).
 -/
 import MachCSL.DecodeBridge
-import MachCSL.KCtx
 import Xv6.UserTextDefs
 
 namespace Xv6

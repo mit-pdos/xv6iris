@@ -56,11 +56,10 @@ Rocq's header, kept (the reasons are the content):
 Imports `SysOpenParts`, the parts layer `SysOpenShared` (as Rocq's Alloc
 imports `ProofSysOpenShared`), `MachCSL.WpStoreFree4`.
 -/
-import Xv6.SysOpenParts
 import Xv6.SysOpenShared
-import Xv6.SysfileCalls
 import MachCSL.WpStoreFree4
 import MachCSL.WpSmodeLh
+import Xv6.SpecFilealloc
 
 namespace Xv6
 

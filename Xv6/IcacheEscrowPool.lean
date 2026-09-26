@@ -132,7 +132,8 @@ three dead movers of 2692--3360 are recorded in
 (Xv6/FsGeom.lean); iris-lean's `ghost_var_*`, `ghost_map_*`, `BigSepS` /
 `BigSepM` / `BigSepL`, `LawfulSet.ofList`, `FiniteMap.dom_set`.
 -/
-import Xv6.IcacheEscrowDep
+import Xv6.IcacheEscrowTok
+import Xv6.TxPin
 
 namespace Xv6
 

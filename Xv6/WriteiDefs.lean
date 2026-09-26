@@ -35,16 +35,10 @@ instruction stream computes, and each callee's contract at its call site.
    `Xv6.itrunc_iupdate` at a general record, which a stage file may not
    import) are local; promotion candidates.
 -/
-import Xv6.SpecWritei
-import Xv6.WriteiBudgetW
 import Xv6.WriteiParts
-import Xv6.DinodeSlot
-import Xv6.BlkmapBuf
-import Xv6.CodeTactics
-import Xv6.EitherDefs
-import Xv6.UMemLemmas
 import Xv6.FsCallSites
-import Xv6.FsCallSitesF
+import Xv6.SpecEitherCopyin
+import Xv6.SpecIupdate
 
 namespace Xv6
 

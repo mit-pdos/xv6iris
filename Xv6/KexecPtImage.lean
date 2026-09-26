@@ -38,7 +38,6 @@ In Lean most of that dissolves (each drop recorded with its consumers):
     (uvmalloc, copyout, uvmclear) is stated at `procPtAt P M`, and copyout's
     view on a covered space is the PURE `KexecBuilt.kxCopyout_covered`.
 -/
-import Xv6.KexecBuilt
 import Xv6.UMemLemmas
 
 namespace Xv6.KexecPtImage

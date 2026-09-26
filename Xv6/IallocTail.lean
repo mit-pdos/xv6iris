@@ -15,6 +15,8 @@ deviation 1; Rocq's `ia_epilogue` also packs `inode_claimed` from its three
 rows, which `iallocArms` already carries packed (its deviation 2).
 -/
 import Xv6.IallocDefs
+import Xv6.CodeTactics
+import Xv6.IallocParts
 
 namespace Xv6
 

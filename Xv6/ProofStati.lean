@@ -14,8 +14,6 @@ Deviations from Rocq: Rocq's per-instruction register bookkeeping and frame
 tactics are replaced by the shared `wp_prologue2_gen` / `wp_epilogue2_gen`
 frame lemmas (as in `ProofInitlock`/`ProofNamecmp`).
 -/
-import MachCSL.WpSmodeFrame
-import MachCSL.WpSmodeFrame12b
 import MachCSL.WpSmodeMem2
 import MachCSL.WpSmodeLh
 import Xv6.SpecStati

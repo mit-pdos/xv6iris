@@ -50,9 +50,7 @@ Rocq's header, kept (the reasons are the content):
 
 Imports `SysOpenParts`, the parts layer `SysOpenShared` and `SysfileCalls` (`sysfile_ww` / `_psw`).
 -/
-import Xv6.SysOpenParts
 import Xv6.SysOpenShared
-import Xv6.SysfileCalls
 import MachCSL.WpSmodeSltu
 import MachCSL.WpSmodeLh
 

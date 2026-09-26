@@ -9,7 +9,6 @@ epilogue), and the body as a loop by induction on the pages left, one
 every step past the first call runs at whichever hart the thread resumed
 on, and the exit `spie`/`spp` are the last call's.
 -/
-import MachCSL.WpSmodeFrame
 import Xv6.SpecFreerange
 import Xv6.SpecKfree
 import Xv6.CodeTactics

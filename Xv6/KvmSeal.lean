@@ -18,9 +18,7 @@ invariant, the mapping published.  Three steps:
 
 Imports only definitional files.
 -/
-import MachCSL.KptInv
 import Xv6.PtOwnLemmas
-import Xv6.KernelMap
 import Xv6.SpecKvmmake
 
 namespace Xv6

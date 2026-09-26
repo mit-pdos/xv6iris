@@ -30,7 +30,6 @@ import Xv6.SpecFdalloc
 import Xv6.SpecMyproc
 import Xv6.FtableLock
 import Xv6.CodeTactics
-import MachCSL.WpSmodeFrame
 
 namespace Xv6
 

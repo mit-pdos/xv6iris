@@ -16,6 +16,7 @@ itrunc (the group credit cashed first), into Part B
 * `iput_lk_a` -- the walk.
 -/
 import Xv6.IputLockedB
+import Xv6.SpecAcquiresleep
 
 namespace Xv6
 

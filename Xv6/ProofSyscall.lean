@@ -39,14 +39,10 @@ Every arm's deposit law is discharged AT THE INSTANCE from
 import Xv6.SyscallHead
 import Xv6.SpecSyscallXv6
 import Xv6.UexecExecLaws
-import Xv6.SyscallArmsExec
 import Xv6.SyscallArmsExit
 import Xv6.SyscallArmsFd
 import Xv6.SyscallArmsFd2
 import Xv6.SyscallArmsFork
-import Xv6.SyscallArmsPath
-import Xv6.SyscallArmsProc
-import Xv6.SyscallArmsSbrk
 import Xv6.SyscallArmsWait
 
 namespace Xv6

@@ -18,8 +18,8 @@ Deviations from Rocq: the register threading as `Xv6/IreclaimDefs.lean`
 deviation 1.
 -/
 import Xv6.IreclaimDefs
-import MachCSL.WpSmodeFrame12b
-import MachCSL.WpSmodeLh
+import Xv6.CodeTactics
+import Xv6.FsCallSitesF
 
 namespace Xv6
 

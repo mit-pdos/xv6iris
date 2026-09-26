@@ -43,25 +43,12 @@ arbitrary name, the rest are produced by their mints.  `UexecSG`
 (`uexecSGXv6`) and `KernelImage` are global instances over `MachGS`, not
 capacity rows.
 -/
-import MachCSL.Resources
-import MachCSL.CrashPermInv
-import Xv6.UartTrace
-import Xv6.IcacheRefDefs
-import Xv6.LogDefs
 import Xv6.FileDefs
-import Xv6.ChildTok
-import Xv6.SleepLockDefs
 import Xv6.FsBlocks
 import Xv6.BcacheInv
-import Xv6.OffGv
-import Xv6.SlotGen
 import Xv6.FsStateLink
 import Xv6.FsStateTop
-import Xv6.DiskInvDefs
-import Xv6.IrefSlots
 import Xv6.InodeRegion
-import Xv6.OffBoxCam
-import Xv6.SlotSupply
 import Xv6.AppCfg
 
 namespace Xv6

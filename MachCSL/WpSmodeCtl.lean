@@ -5,9 +5,10 @@ branches (`beq`/`bne`/`blt`/`bge`/`bltu`/`bgeu`), and the word
 arithmetic `subw`/`addw`.  Execute stages only; the `kctx` rules are in
 `WpSmodeRules.lean`.
 -/
-import MachCSL.WpSmodeCycle
 import MachCSL.WpMmodeCtl
 import MachCSL.SConfPhysDefs
+import MachCSL.KCtx
+import MachCSL.WpMmodeAlu
 
 namespace MachCSL
 

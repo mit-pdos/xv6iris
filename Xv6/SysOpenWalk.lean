@@ -68,6 +68,7 @@ Rocq's header, kept (the reasons are the content):
 -/
 import Xv6.SysOpenWalkCalls
 import MachCSL.WpSmodeLh
+import Xv6.SysOpenShared
 
 namespace Xv6
 

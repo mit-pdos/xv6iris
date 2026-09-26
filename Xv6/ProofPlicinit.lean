@@ -18,8 +18,6 @@ a priority write touches neither a `claimed` bit nor an enable word, so
 the accessor's postcondition is `emp` and the invariant comes back
 unchanged.
 -/
-import MachCSL.WpSmodeFrame
-import MachCSL.WpSmodeDev4
 import Xv6.SpecPlicinit
 import Xv6.PlicPlanExtra
 import Xv6.CodeTactics

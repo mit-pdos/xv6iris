@@ -16,9 +16,6 @@ again (empty is sound for any table, `tlbOk_reset`).  Both need interrupts off:
 the TLB is per-hart, so the thread must not move.
 -/
 import MachCSL.WpSmodeRules
-import MachCSL.WpSmodeCsr
-import MachCSL.WpPmp
-import MachCSL.WpPtWalk
 
 namespace MachCSL
 

@@ -61,7 +61,6 @@ Imports only definitional files (never a `Code*` or `Proof*` file).
 -/
 import Xv6.EitherDefs
 import Xv6.UMemLazy
-import MachCSL.ByteWord
 
 namespace Xv6
 

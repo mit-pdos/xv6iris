@@ -3,10 +3,7 @@ The kernel's read-only image as `kctx` owns it: the text (`kernelText`)
 and the rodata (`kernelData`), one persistent proposition.  A function's
 contract states neither; a proof takes them out of the context once.
 -/
-import MachCSL.KCtx
-import Xv6.KernelText
 import Xv6.KernelData
-import Xv6.KernelMap
 
 namespace Xv6
 

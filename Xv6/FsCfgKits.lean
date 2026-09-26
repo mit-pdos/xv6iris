@@ -82,13 +82,7 @@ the arity-free `fsCrashSeam` ride `SpecMain`/`firstBootPersist`, not a kit.
    holds this kit.
 -/
 import Xv6.FsReady
-import Xv6.FsBytesInv
-import Xv6.IcacheEscrowTok
-import Xv6.IcacheRefLink
-import Xv6.OffBox
 import Xv6.AppDur
-import Xv6.FsCrashSeam
-import MachCSL.LockBornHook
 import Xv6.BioInit
 
 namespace Xv6

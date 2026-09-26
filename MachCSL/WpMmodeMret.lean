@@ -8,8 +8,6 @@ The rule leaves machine mode, so its postcondition is not `mConf` but the
 same cells with `cur_privilege = Supervisor` (`sConf`, the seed of the
 supervisor-mode configuration bundle).
 -/
-import MachCSL.WpCycle
-import MachCSL.WpGpr
 import MachCSL.WpMmodeCtl
 
 namespace MachCSL

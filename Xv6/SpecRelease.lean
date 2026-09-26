@@ -19,8 +19,9 @@ release's 4 slots over holding's 6 (and pop_off's 4).
 Imports only definitional files (never a `Code*` or `Proof*` file).
 -/
 import Xv6.Image
-import Xv6.SpecHolding
 import MachCSL.WpSmodeIntr
+import Xv6.Geom
+import MachCSL.Lock
 
 namespace Xv6
 

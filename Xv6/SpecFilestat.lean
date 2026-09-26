@@ -137,14 +137,7 @@ coordinator (report).  `filestat_env_split` is ProofSysFstat.v's local
 Imports only definitional files and callee `Spec*` files.
 -/
 import Xv6.SpecIlock
-import Xv6.SpecIunlock
-import Xv6.SpecStati
-import Xv6.SpecCopyout
-import Xv6.SpecMyproc
-import Xv6.SpecPanic
-import Xv6.FsReady
 import Xv6.FilePay
-import Xv6.UMemWindow
 import Xv6.FdTable
 
 namespace Xv6

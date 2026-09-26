@@ -74,10 +74,7 @@ Lean hypotheses; `lks` is `k.locks`, free.
 
 Imports only definitional files.
 -/
-import Xv6.SchedCtx
 import Xv6.FdTable
-import Xv6.UPtDefs
-import MachCSL.WpSmodeIntr
 
 namespace Xv6
 

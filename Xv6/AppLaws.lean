@@ -71,7 +71,6 @@ Rocq's header on the laws, kept because the reasons are the content:
    (D24), where Rocq's closed corollary has `USER` as a module parameter.
 -/
 import Xv6.SystemAdequacy
-import Xv6.AppIface
 
 namespace Xv6
 

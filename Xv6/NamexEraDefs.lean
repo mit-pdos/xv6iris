@@ -46,8 +46,9 @@ prefix `npElems pl` on the nameiparent side (`FsAbsEra.epHopsFrom`); both ARE
    (`namexEra_dead_level`, `_missed`, `_noelems`) over the level's
    decomposition `pathElems pl = (es0 ++ [el]) ++ R`.
 -/
-import Xv6.NamexStart
 import Xv6.SpecNparEra
+import Xv6.SpecNamexEra
+import Xv6.NamexDefs
 
 namespace Xv6
 

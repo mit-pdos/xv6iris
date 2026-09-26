@@ -54,7 +54,6 @@ DEVIATIONS from Rocq.
   the file that reuses `indBytes` as the `addrs` field encoder.
 -/
 import Xv6.BlockWords
-import Xv6.FsGeom
 
 namespace Xv6
 

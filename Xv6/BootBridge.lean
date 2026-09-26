@@ -51,7 +51,7 @@ DEVIATIONS from Rocq:
 Imports only definitional files.
 -/
 import Xv6.BootHart
-import MachCSL.KCtx
+import Xv6.KernelData
 
 namespace Xv6
 

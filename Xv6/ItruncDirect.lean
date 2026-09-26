@@ -27,6 +27,8 @@ trap-CSR complement `Hte`/`Hce` follows each step (`k_step_e`) and goes to
 bfree and back (`Xv6.itrunc_bfree_eb`).
 -/
 import Xv6.ItruncParts
+import Xv6.CodeTactics
+import Xv6.BlkmapBuf
 
 namespace Xv6
 

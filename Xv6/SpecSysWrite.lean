@@ -79,8 +79,6 @@ three `jal` targets changed.
    `V.upt`, passed to filewrite's T1 parameter.)
 -/
 import Xv6.SpecArgfd
-import Xv6.SpecArgaddr
-import Xv6.SpecArgint
 import Xv6.SpecFilewrite
 
 namespace Xv6

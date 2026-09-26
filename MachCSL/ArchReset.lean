@@ -34,7 +34,7 @@ three functions: `bootProg` calls the model's own `init_model`, and
 is the state no-op Rocq instantiates it at (`plat_hook`).  A regeneration
 that changes the hook breaks that lemma, not a silent copy.
 -/
-import LeanRV64D
+import LeanRV64D.Model
 
 namespace MachCSL
 

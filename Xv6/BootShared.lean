@@ -93,11 +93,10 @@ row).
 -/
 import Xv6.BootSharedDev
 import Xv6.BootSharedFs
-import Xv6.BootChain
 import Xv6.BootCarveFs
-import Xv6.StartedInv
-import MachCSL.CtxBoot
 import Xv6.BootPrimarySupply
+import Xv6.SpecMainSecondary
+import Xv6.BootCarveHart
 
 namespace Xv6
 

@@ -30,7 +30,6 @@ interface is the spike's stand-in `UlibRun` (see `UlibRun.lean`); Rocq's
 obligation's supplier's business, and it is persistent there).
 -/
 import Xv6.UlibPutcCode
-import MachCSL.Resources
 
 namespace Xv6
 

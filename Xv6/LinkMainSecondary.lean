@@ -5,7 +5,6 @@ kvminithart, trapinithart, plicinithart, scheduler, and kernelvec over
 kerneltrap over yield.
 -/
 import Xv6.ProofMainSecondary
-import Xv6.LinkCpuid
 import Xv6.LinkPrintk
 import Xv6.LinkKvminithart
 import Xv6.LinkTrapinithart

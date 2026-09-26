@@ -32,7 +32,8 @@ Deviation from Rocq: no `page_valid` premise -- the Lean `argint` takes none.
 Imports only definitional files (never a `Code*` or `Proof*` file).
 -/
 import Xv6.SpecArgint
-import Xv6.SpecKkill
+import MachCSL.WpSmodeFrame
+import Xv6.SchedCtx
 
 namespace Xv6
 

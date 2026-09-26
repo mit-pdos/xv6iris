@@ -14,8 +14,6 @@ exactly like the valued byte store `execSpecF_sb`, so a client may forget a
 valued byte into a visibility-free one at any tier and store it back.
 -/
 import MachCSL.WpSmodeMint
-import MachCSL.ByteWord
-import MachCSL.BytesFree
 
 namespace MachCSL
 

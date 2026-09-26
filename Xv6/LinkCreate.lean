@@ -17,11 +17,7 @@ across create's own `jal ialloc` / `ilock` is create's body, not a callee
 -/
 import Xv6.ProofCreate
 import Xv6.LinkNparWrapEra
-import Xv6.LinkIlock
-import Xv6.LinkIunlockput
-import Xv6.LinkDirlookup
 import Xv6.LinkIalloc
-import Xv6.LinkIupdate
 import Xv6.LinkDirlink
 
 namespace Xv6

@@ -22,7 +22,11 @@ disk's credentials, which exist only after `virtio_disk_init`, so main keeps
 `stvec ↦ kernelvec` and installs the handler (`intrRes_of_kernelvec`) at
 the scheduler's call (`MainStarted`).
 -/
-import Xv6.MainKvm
+import Xv6.CodeTactics
+import MachCSL.LockBornHook
+import Xv6.SpecTrapinithart
+import Xv6.SpecPlicinit
+import Xv6.SpecPlicinithart
 
 namespace Xv6
 

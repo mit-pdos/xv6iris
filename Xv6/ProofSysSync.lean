@@ -54,6 +54,8 @@ import Xv6.SpecSysSync
 import Xv6.SpecSleepPrepare
 import Xv6.CodeTactics
 import MachCSL.WpSmodeFrame6
+import Xv6.SpecAcquire
+import Xv6.SpecRelease
 
 namespace Xv6
 

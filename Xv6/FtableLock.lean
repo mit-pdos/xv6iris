@@ -3,11 +3,9 @@ The ftable lock's `acquire`/`release` interfaces instantiated at
 `ftableResAt`, and the callee-saved bookkeeping shared by the file-table
 functions (`filealloc`, `filedup`, `fileclose`).
 -/
-import Xv6.FileDefs
 import Xv6.FtableMorph
 import Xv6.SpecAcquire
 import Xv6.SpecRelease
-import Xv6.CodeTactics
 
 namespace Xv6
 

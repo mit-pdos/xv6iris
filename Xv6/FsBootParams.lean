@@ -18,7 +18,6 @@ image's BYTES.
    `snapOk` / `FsStateRec`, so this file imports `Xv6.FsDurSnapBytes`
    (crash batch C-1, item CE).
 -/
-import Xv6.FsCrashPure
 import Xv6.FsDurSnapBytes
 
 namespace Xv6

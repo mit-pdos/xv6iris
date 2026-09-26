@@ -8,7 +8,6 @@ import Xv6.ProofSysClose
 import Xv6.LinkArgraw
 import Xv6.LinkArgint
 import Xv6.LinkArgfd
-import Xv6.LinkMyproc
 import Xv6.LinkFileclose
 
 namespace Xv6

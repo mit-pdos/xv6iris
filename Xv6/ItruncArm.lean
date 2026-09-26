@@ -19,6 +19,9 @@ does not thread them, so they are moved across its crossing by its own pin
 (`k_next_e`).
 -/
 import Xv6.ItruncELoop
+import Xv6.DinodeSlot
+import Xv6.FsCallSitesF
+import MachCSL.WpSmodeFrame6c
 
 namespace Xv6
 

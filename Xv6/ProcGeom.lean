@@ -18,7 +18,6 @@ Layout of `struct proc` (kernel/proc.h, spinlock = {locked; name; cpu} =
 
 Imports only definitional files.
 -/
-import Xv6.Geom
 import Xv6.SlotSupply
 
 set_option linter.unusedSectionVars false

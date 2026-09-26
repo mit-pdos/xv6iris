@@ -27,8 +27,6 @@ No per-process state, and NO `tp` premise: the hart id is the ambient
 Imports only definitional files (never a `Code*` or `Proof*` file).
 -/
 import Xv6.TicksDefs
-import Xv6.Image
-import MachCSL.WpSmodeIntr
 
 namespace Xv6
 

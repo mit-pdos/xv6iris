@@ -11,13 +11,9 @@ tree, with its node count read off the dummy tree of `Xv6/KvmCounts.lean`),
 mapping already completed, so they cost no nodes), and the epilogue.
 Stated at either interrupt index, as its callees are.
 -/
-import MachCSL.WpSmodeFrame
-import MachCSL.Lock
-import Xv6.SpecKvmmake
 import Xv6.SpecKalloc
 import Xv6.SpecMemset
 import Xv6.SpecKvmmap
-import Xv6.SpecProcMapstacks
 import Xv6.KvmCounts
 import Xv6.CodeTactics
 

@@ -27,7 +27,8 @@ bundle `dlk_regs`), and the three callees at their call sites.
    the registers), with the fuel stated as `nrec + 1 - i < fuel`.
 -/
 import Xv6.DirlookupParts
-import Xv6.CodeTactics
+import Xv6.SpecNamecmp
+import Xv6.SpecIget
 
 namespace Xv6
 

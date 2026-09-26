@@ -23,6 +23,7 @@ rules of `Xv6/NameiFrame.lean`.
 -/
 import Xv6.NameiFrame
 import Xv6.NamexRoot
+import Xv6.SpecNamei
 
 namespace Xv6
 

@@ -138,9 +138,7 @@ Imports only definitional files and callee `Spec*` files.
 -/
 import Xv6.SpecKexec
 import Xv6.SysExecDefs
-import Xv6.ArgPath
 import Xv6.UMemLazy
-import MachCSL.ByteWord
 
 namespace Xv6
 

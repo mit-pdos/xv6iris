@@ -32,8 +32,9 @@ subtleties that matter to later users (tso-port M2/M3):
 Imports only definitional files (never a `Code*` or `Proof*` file).
 -/
 import Xv6.Image
-import Xv6.SpecHolding
 import MachCSL.WpSmodeIntr
+import Xv6.Geom
+import MachCSL.Lock
 
 namespace Xv6
 

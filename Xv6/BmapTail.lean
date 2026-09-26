@@ -13,6 +13,8 @@
   data-balloc success).
 -/
 import Xv6.BmapDefs
+import Xv6.CodeTactics
+import Xv6.FsCallSites
 
 namespace Xv6
 

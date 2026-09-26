@@ -86,11 +86,8 @@ header, in short (every clause that is about content is kept):
 
 Imports only definitional files and the `tfArgIdx` Spec.
 -/
-import Xv6.ProcDefs
-import Xv6.SpecArgraw
 import Xv6.FsReady
 import Xv6.SpecPanic
-import Xv6.SchedCtx
 
 namespace Xv6
 

@@ -46,7 +46,7 @@ gives back the row AND the region's slot.
 -/
 import Xv6.FsCollectSlot
 import Xv6.IcacheCover
-import Xv6.IcacheEscrowPoolMove
+import Xv6.IcacheEscrowPool
 
 namespace Xv6
 

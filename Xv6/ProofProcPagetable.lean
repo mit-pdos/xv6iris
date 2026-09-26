@@ -12,13 +12,7 @@ address space, which both fixed pages share.  A failure of either
 `uvmfree`) and returns `0`.  The call rules it shares with
 `proc_freepagetable` are in `Xv6/ProcPagetableDefs.lean`.
 -/
-import MachCSL.WpSmodeFrame
 import Xv6.SpecProcPagetable
-import Xv6.SpecUvmcreate
-import Xv6.SpecMappages
-import Xv6.SpecUvmunmap
-import Xv6.SpecUvmfree
-import Xv6.UPtPptLemmas
 import Xv6.ProcPagetableDefs
 import Xv6.CodeTactics
 

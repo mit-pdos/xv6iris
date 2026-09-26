@@ -13,6 +13,7 @@ the trapframe page is owned separately (`tfPage`).  The hardware sets
 bits (`pteAD`).
 -/
 import Xv6.PtOwn
+import Xv6.KallocDefs
 
 namespace Xv6
 

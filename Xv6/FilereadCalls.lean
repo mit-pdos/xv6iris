@@ -23,6 +23,10 @@ pattern).
 * `frd_panic`: `panic("fileread")` as an ordinary call.
 -/
 import Xv6.FilereadParts
+import Xv6.SpecConsoleread
+import Xv6.SpecIunlock
+import Xv6.SpecPiperead
+import Xv6.SpecIlock
 
 namespace Xv6
 

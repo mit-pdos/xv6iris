@@ -11,7 +11,7 @@ while the pc ends at `jumpPc (R.get rs1)`.  (It belongs beside
 does not invalidate every file below `WpSmodeCtl`.)
 -/
 import MachCSL.WpSmodeCtl
-import MachCSL.WpSmodeRules
+import MachCSL.WpSmodeCycle
 
 namespace MachCSL
 

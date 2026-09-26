@@ -37,7 +37,6 @@ A stage file: it imports Spec and definitional files only.
 -/
 import Xv6.ForkretParts
 import Xv6.SpecFsinit
-import Xv6.FirstTok
 import Xv6.LogBoot
 
 namespace Xv6

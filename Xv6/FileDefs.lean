@@ -77,21 +77,11 @@ invariants the Rocq algebra enforces:
 `FileInv.ftable_res_boot`) are ported in `Xv6/FileBoot.lean`
 (`fileBoot_offFree_of_word`, `fentryRaw`).
 -/
-import MachCSL.Lock
 import Xv6.PipeInvDefs
-import Xv6.ProcDefs
-import Xv6.SchedCtx
-import Xv6.Image
-import Xv6.Geom
-import Xv6.FileGeom
-import Xv6.IrefSlots
 import Xv6.IcacheHeld
 import Xv6.OffBox
 import Xv6.DirView
 import Xv6.FsImg
-import Iris.Instances.Lib.CInvariants
-import Iris.Algebra.Heap
-import Iris.Algebra.Lib.DFracAgree
 
 namespace Xv6
 

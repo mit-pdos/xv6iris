@@ -61,11 +61,8 @@ fabric; it enters and returns at `noff = 0`.
 
 Imports only definitional files (never a `Code*` or `Proof*` file).
 -/
-import MachCSL.WpSmodeFrame
 import Xv6.LogInv
 import Xv6.SpecBread
-import Xv6.SpecBwrite
-import Xv6.SpecBrelse
 
 namespace Xv6
 

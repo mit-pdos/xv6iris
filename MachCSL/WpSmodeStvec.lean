@@ -9,7 +9,6 @@ it rides client-side.  So the rule takes and returns the cell explicitly.
 With a direct-mode value the model's legalization is the identity.
 -/
 import MachCSL.WpSmodeRules
-import MachCSL.WpSmodeCsr
 
 namespace MachCSL
 

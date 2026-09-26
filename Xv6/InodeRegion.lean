@@ -123,7 +123,6 @@ brackets after each item:
 Nothing.  (`Global Instance`s for timelessness are `instance`s.)
 -/
 import Xv6.InodeRegionDefs
-import Xv6.FsBytes
 
 namespace Xv6
 

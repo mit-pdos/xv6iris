@@ -12,9 +12,7 @@ cell from the context and re-introducing it after the later; or, if the head
 is a call of a model function, unfolds that function.  `swp_run n` repeats
 this up to `n` times.
 -/
-import MachCSL.Wp
 import MachCSL.HwConfig
-import MachCSL.ModelFacts
 
 namespace MachCSL
 

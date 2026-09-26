@@ -126,7 +126,6 @@ InodeRegionLink / InodeRegionMovers, which each carried a copy.
 import Xv6.InodeRegionSlot
 import Xv6.AppInv
 import Xv6.FsBytesMint
-import Xv6.FsStateInode
 
 namespace Xv6
 

@@ -19,7 +19,6 @@ re-homes it across a domination -- the Rocq `IntrDefs.env_move`).
 Imports only definitional files.
 -/
 import Xv6.HandlerEnv
-import MachCSL.WpSmodeIntr
 
 namespace Xv6
 

@@ -9,11 +9,10 @@ where it is pure, an extracted term where it is monadic), the reads, and the
 `doCSR` paths `csrw`/`csrr` reduce to.  The concrete values xv6 writes are
 evaluated at the end.
 -/
-import MachCSL.Tactics
 import MachCSL.PlatformFacts
-import MachCSL.Boot
 import MachCSL.WpGpr
 import MachCSL.PmpXv6Defs
+import MachCSL.ModelFacts
 
 namespace MachCSL
 

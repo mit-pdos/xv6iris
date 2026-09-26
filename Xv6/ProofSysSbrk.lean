@@ -35,11 +35,9 @@ takes it whole.  All five exits join at
 -/
 import MachCSL.WpSmodeFrame6
 import Xv6.SpecSysSbrk
-import Xv6.SpecMyproc
 import Xv6.ArgLemmas
-import Xv6.UPtLemmas
-import Xv6.CodeTactics
 import Xv6.ProcPrivAcc
+import Xv6.SpecArgint
 
 namespace Xv6
 

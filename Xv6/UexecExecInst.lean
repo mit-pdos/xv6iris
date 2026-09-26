@@ -93,8 +93,6 @@ Rocq's header, point for point:
 import Xv6.FsAbsInvFire
 import Xv6.SysExecNe
 import Xv6.SpecSyscall
-import Xv6.UMemImg
-import Xv6.UMemLazy
 
 namespace Xv6
 

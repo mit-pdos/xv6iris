@@ -30,11 +30,7 @@ has it): pipeclose's flag store must then step the ghost, paid by the
 closer's `pipe_cpay`, which fileclose can only supply once it takes
 Rocq's `fileclose_cpay` (the PQ-b wave's close payment).
 -/
-import MachCSL.Lock
-import MachCSL.WpLock
-import Xv6.KallocDefs
 import MachCSL.KCtxMove
-import Xv6.PipeNames
 import Xv6.PipeQueue
 
 namespace Xv6

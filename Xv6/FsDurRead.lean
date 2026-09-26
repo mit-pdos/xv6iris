@@ -38,7 +38,7 @@ those facts are the GEOMETRY the snapshot still carries.
 Nothing beyond deviation 3 (the brief counts 0 dead declarations here).
 -/
 import Xv6.FsDurBytes
-import Xv6.FsState
+import Xv6.FsStateBitmap
 
 namespace Xv6
 

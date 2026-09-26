@@ -39,6 +39,7 @@ this file is the entry, the not-last arm and the seal.
    reference's list membership).
 -/
 import Xv6.FilecloseLast
+import Xv6.FileFrac
 
 namespace Xv6
 

@@ -26,7 +26,9 @@ Deviations: none beyond SpecFilewrite's.  Rocq's four-case tag `(tf, pf,
 xf)` is the disjunction `tot = c` (the full node) / `tot < c` (resume `x ≤
 1` past the prefix), which is all the exits read.
 -/
-import Xv6.FilewriteCalls
+import Xv6.FileOffProto
+import Xv6.FileRwShared
+import Xv6.FilewriteChain
 
 namespace Xv6
 

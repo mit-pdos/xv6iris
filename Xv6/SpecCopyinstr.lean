@@ -16,10 +16,8 @@ the view, the Lean one zeroes a page when it is faulted in).
 Imports only definitional files (never a `Code*` or `Proof*` file).
 -/
 import MachCSL.WpSmodeFrame
-import MachCSL.Lock
 import Xv6.UMem
 import Xv6.Image
-import Xv6.Geom
 
 namespace Xv6
 

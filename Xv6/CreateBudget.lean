@@ -51,8 +51,6 @@ Rocq's header, in short (the reasons are the content):
 
 Nothing.
 -/
-import Xv6.SpecIput
-import Xv6.SpecWritei
 import Xv6.SpecDirlink
 import Xv6.SpecNamex
 

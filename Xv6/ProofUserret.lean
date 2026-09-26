@@ -20,7 +20,6 @@ continuation as `userretLeft`: the stack, the per-cpu cells, the token (back
 from the user slot), the kernel table's invariant (copied out of the kernel
 slot before the switch consumed it) and the image.
 -/
-import Xv6.SpecUserret
 import Xv6.UserretEntryPt
 import Xv6.UserretPt
 

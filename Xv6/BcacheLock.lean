@@ -6,7 +6,6 @@
 import Xv6.BcacheInv
 import Xv6.SpecAcquire
 import Xv6.SpecRelease
-import Xv6.CodeTactics
 
 namespace Xv6
 

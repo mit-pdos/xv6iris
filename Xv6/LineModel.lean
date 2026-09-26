@@ -43,6 +43,7 @@ Deviations from Rocq:
    the transcript through the stage families of `LineModelLinks`.)
 -/
 import Xv6.LineBytes
+import MachCSL.ObsTrace
 
 namespace Xv6
 

@@ -7,7 +7,6 @@ the interface of `uvmunmap`.
 size; when `newsz >= oldsz` it returns `oldsz` without touching the space.
 Both exits go through the shared tail `uvmd_tail`.
 -/
-import MachCSL.WpSmodeFrame
 import Xv6.SpecUvmdealloc
 import Xv6.SpecUvmunmap
 import Xv6.UPtAllocLemmas

@@ -21,10 +21,8 @@ pending.
 Stated at either interrupt index, as both callees are; neither touches the
 interrupt state, so the exit context is the plain `k.withRegs R'`.
 -/
-import MachCSL.WpSmodeFrame
 import Xv6.SpecBinit
 import Xv6.SpecInitlock
-import Xv6.SpecInitsleeplock
 import Xv6.CodeTactics
 
 namespace Xv6

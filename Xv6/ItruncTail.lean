@@ -20,6 +20,9 @@ payout is `iregOut`, and `diTrunc` keeps the (nonzero) type, so it is the
 allocated branch (`Xv6.iregOut_alloc_inv`).
 -/
 import Xv6.ItruncParts
+import Xv6.CodeTactics
+import Xv6.DinodeSlot
+import MachCSL.WpSmodeFrame6c
 
 namespace Xv6
 

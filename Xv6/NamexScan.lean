@@ -26,7 +26,7 @@ a fuel induction whose continuation is a resource (the `wp_next`-wrapped
 `nx_*_exit` statements of Rocq), stated at an arbitrary context `K`, so it
 serves every turn of the walk.
 -/
-import Xv6.NamexTail
+import Xv6.NamexParts
 
 namespace Xv6
 

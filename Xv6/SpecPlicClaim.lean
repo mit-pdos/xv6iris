@@ -31,10 +31,8 @@ four stack slots: its own two-slot frame over `cpuid`'s two.
 
 Imports only definitional files (never a `Code*` or `Proof*` file).
 -/
-import MachCSL.CallConv
 import Xv6.Image
 import Xv6.PlicInv
-import Xv6.SpecCpuid
 
 namespace Xv6
 

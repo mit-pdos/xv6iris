@@ -17,6 +17,7 @@ exits through, which is what lets the exit facts be STATEMENTS ABOUT
 `devs`/`bnos` -- see `Xv6/BreadDefs.lean`'s header.
 -/
 import Xv6.BreadTail
+import Xv6.BcacheLock
 
 namespace Xv6
 

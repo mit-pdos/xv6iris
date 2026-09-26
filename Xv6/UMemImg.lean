@@ -15,7 +15,6 @@ deviation 4; its former private copy `filewriteImg` and `FilewriteParts`'
 duplicate lemmas are gone).
 -/
 import Xv6.UMem
-import Xv6.UPtDefs
 
 namespace Xv6
 

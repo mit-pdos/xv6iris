@@ -14,6 +14,7 @@ head `+0x82` to the `BODY` assertion) and the induction:
   count), continuation fixed before the induction.
 -/
 import Xv6.WriteiBody
+import Xv6.BlkmapBuf
 
 namespace Xv6
 

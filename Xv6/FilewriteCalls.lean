@@ -28,7 +28,14 @@ continuation that carries the trap-CSR complement (`trapCsrsExt` /
 Rocq's per-call `cpu_own_transport` / `wp_next_chain` threading and its
 `b = true` pin are gone (eb-generic).
 -/
-import Xv6.FilewriteParts
+import Xv6.FsReady
+import Xv6.SpecConsolewrite
+import Xv6.SpecBeginOp
+import Xv6.SpecEndOp
+import Xv6.SpecIunlock
+import Xv6.SpecIlock
+import Xv6.SpecPipewrite
+import Xv6.SpecWritei
 
 namespace Xv6
 

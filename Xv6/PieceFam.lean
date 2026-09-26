@@ -60,9 +60,7 @@ the Rocq tree's `claude-notes/design/fs-syscall-specs.md` sections 0-4, and
 
 Nothing.
 -/
-import Iris.BI
-import Iris.ProofMode
-import MachCSL.Resources
+import Iris.Instances.UPred.Instance
 
 namespace Xv6
 

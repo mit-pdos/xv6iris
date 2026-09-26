@@ -8,8 +8,9 @@ interrupts are off -- so at `sie = false` a hart may retarget its own
 `c->proc` freely.  (With interrupts ON the arm carries `cpuClaim cpu k.proc`
 and the change would have to be paid for; xv6 never does it there.)
 -/
-import MachCSL.WpSmodeRules
 import MachCSL.CallConv
+import MachCSL.WpSmodeCycle
+import MachCSL.WpSmodeMem
 
 namespace MachCSL
 

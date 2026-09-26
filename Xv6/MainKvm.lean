@@ -26,10 +26,10 @@
                     `nextpid_res`) and `wait_lock` (over `wait_res`,
                     `WaitInvTies.waitRes_alloc`).
 -/
-import Xv6.MainPrintk
-import Xv6.KmemTier
 import Xv6.KptBoot
 import Xv6.ProcsInvAlloc
+import Xv6.SpecKvminit
+import Xv6.MainSecondaryParts
 
 namespace Xv6
 

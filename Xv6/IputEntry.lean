@@ -31,6 +31,10 @@
 -/
 import Xv6.IputEntryGhost
 import MachCSL.WpSmodeLh
+import Xv6.SpecAcquiresleep
+import Xv6.SpecBrelse
+import Xv6.SpecLogWrite
+import Xv6.IputStages
 
 namespace Xv6
 

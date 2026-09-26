@@ -8,6 +8,8 @@ What the two arms carry to the join is bundled as `ilDone`: every row of the
 post other than the machine bundle (deviation 2 of `Xv6/IlockParts.lean`).
 -/
 import Xv6.IlockParts
+import Xv6.CodeTactics
+import Xv6.SpecIlock
 
 namespace Xv6
 

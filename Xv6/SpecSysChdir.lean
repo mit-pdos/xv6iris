@@ -130,18 +130,8 @@ frame: ra @ `sp0-8`, s0 @ `sp0-16` (the frame pointer, = the entry sp), s1
 
 Imports only definitional files and callee `Spec*` files.
 -/
-import Xv6.SpecMyproc
-import Xv6.SpecArgstr
-import Xv6.SpecBeginOp
-import Xv6.SpecEndOp
-import Xv6.SpecNameiEra
-import Xv6.SpecIlock
-import Xv6.SpecIunlock
-import Xv6.SpecIput
-import Xv6.SpecIunlockput
 import Xv6.SysOpenDefs
-import Xv6.FsReady
-import Xv6.FdTable
+import Xv6.SpecNamei
 
 namespace Xv6
 

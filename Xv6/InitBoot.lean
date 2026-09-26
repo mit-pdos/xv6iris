@@ -40,7 +40,6 @@ carrying it is built at the PARKER's context and spent at the RESUMER's).
 import Xv6.UexecRet
 import Xv6.SpecKexec
 import Xv6.ConsoleInvDefs
-import Xv6.DirentEnc
 
 namespace Xv6
 

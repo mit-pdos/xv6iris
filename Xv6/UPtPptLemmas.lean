@@ -10,9 +10,8 @@ freshly built space, and the allocator-count arithmetic (`availSub`).
 Kept in its own namespace (`Xv6.UPtPpt`), so other files may carry the
 same facts under their own names.
 -/
-import Xv6.UPtDefs
 import Xv6.UPtLemmas
-import Xv6.PtRunLemmas
+import MachCSL.WpSmodeCtl
 
 namespace Xv6.UPtPpt
 

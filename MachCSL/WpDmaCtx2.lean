@@ -23,8 +23,6 @@ Everything here is the same one fact, at three tiers:
 The byte-indexing lemma underneath is `nthByte_extractLsb'`: byte `j` of a
 sub-window of `w` is byte `o + j` of `w`.
 -/
-import MachCSL.WpDmaCtx
-import MachCSL.ByteWord
 import MachCSL.BytesFree
 
 namespace MachCSL

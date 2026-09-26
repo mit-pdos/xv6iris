@@ -135,8 +135,6 @@ are used inside this file.
 -/
 import Xv6.FsStateDefs
 import Xv6.IcacheRefDefs
-import Iris.Algebra.LeibnizMultiSet
-import Iris.Std.GenMultiSetsInstances
 
 namespace Xv6
 

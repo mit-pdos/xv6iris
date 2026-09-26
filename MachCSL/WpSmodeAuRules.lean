@@ -34,7 +34,6 @@ this file adds (`swp_checked_mem_read_load1_S_au`, `..._load2_S_au`,
 `MachCSL.WpStoreFree`'s -- and `execSpecF_lbu_au`, `execSpecF_lhu_au`,
 `execSpecF_sb_au`, `execSpecF_sh_au`).
 -/
-import MachCSL.WpSmodeAtomic
 import MachCSL.WpStoreFree
 import MachCSL.WpLock
 

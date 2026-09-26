@@ -158,9 +158,7 @@ FsCfgKits / FsCfgSnap / ProofMain).
 -/
 import Xv6.IcacheTable
 import Xv6.IcacheBoxSites
-import Xv6.KernelData
 import Xv6.ArrCursor
-import MachCSL.LockBornHook
 import MachCSL.BigSepLib
 
 namespace Xv6

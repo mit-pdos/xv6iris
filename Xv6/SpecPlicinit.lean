@@ -20,7 +20,6 @@ Interrupts are off -- this runs from `main` before `intr_on` -- so no
 
 Imports only definitional files (never a `Code*` or `Proof*` file).
 -/
-import MachCSL.CallConv
 import Xv6.Image
 import Xv6.PlicInv
 

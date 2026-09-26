@@ -16,6 +16,7 @@ this port's (Rocq threads the persistent premises one by one).
 -/
 import Xv6.FsinitCalls
 import Xv6.BcacheLock
+import Xv6.CodeTactics
 
 namespace Xv6
 

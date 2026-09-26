@@ -21,7 +21,6 @@ from the facts it already has:
 
 A lemma file: it imports definitional and Spec files only.
 -/
-import Xv6.UPtDefs
 import Xv6.UPtLemmas
 import Xv6.UPtAllocLemmas
 import Xv6.SpecUvmalloc

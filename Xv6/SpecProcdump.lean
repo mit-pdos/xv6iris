@@ -62,7 +62,8 @@ THE ONE SHAPE CONSTRAINT ON THE NAME: `cstr (pName pa) dq nm` owns
 Imports only definitional files (never a `Code*` or `Proof*` file).
 -/
 import Xv6.SpecPrintk
-import Xv6.ProcDefs
+import Xv6.IrefSlots
+import Xv6.SlotGen
 
 namespace Xv6
 

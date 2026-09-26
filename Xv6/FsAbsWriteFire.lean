@@ -109,7 +109,6 @@ Rocq's header, kept because the reasons are the content:
 Nothing.  (`Global Typeclasses Opaque awrite_chain` -- the chain's SEAL --
 has no Lean analogue to port: a Lean `def` is not unfolded by `iframe`.)
 -/
-import Xv6.SysWriteDefs
 import Xv6.FsAbsOpenFire
 import Xv6.FsAbsReadFire
 import Xv6.SpecWritei

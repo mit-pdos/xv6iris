@@ -11,7 +11,6 @@ Rocq `UkSh.v`: `ush_line_is` (line 385) and `ush_line_at` (line 450), pinned
    (sh-main, U2) import this one.
 2. `l !!! j` is `l[j]!`.
 -/
-import Xv6.EchoDisc
 import Xv6.FileDiscLine
 
 namespace Xv6

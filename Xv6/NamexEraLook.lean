@@ -31,6 +31,7 @@ return, before the `beqz` (Rocq fires inside each `found` arm; both are
 between the same two instructions).
 -/
 import Xv6.NamexEraExit
+import Xv6.NamexLook
 
 namespace Xv6
 

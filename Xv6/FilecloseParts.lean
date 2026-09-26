@@ -20,11 +20,10 @@ Rocq cancels after release, in the inode arm.  Ghost-only; the cinv's mask
 is `fileipN`, disjoint from everything the lock holds.
 -/
 import Xv6.SpecFileclose
-import Xv6.FsCallSitesOp
-import Xv6.FileFrac
 import Xv6.FilePay
 import Xv6.FtableLock
 import MachCSL.WpSmodeFrame8
+import Xv6.CodeTactics
 
 namespace Xv6
 

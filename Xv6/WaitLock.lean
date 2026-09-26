@@ -12,10 +12,8 @@ generation ghosts.
 forever after (`kexit`'s "init exiting" check, `reparent`'s target); it is
 published as a discarded fraction, `initprocIs`.
 -/
-import Xv6.ProcDefs
 import Xv6.PidLock
 import Xv6.WaitInvTies
-import MachCSL.Lock
 
 namespace Xv6
 

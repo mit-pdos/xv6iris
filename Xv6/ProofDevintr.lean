@@ -32,13 +32,14 @@ pair back with the token `uartintr` returned.
 
 Interrupts are off throughout, so the hart never migrates.
 -/
-import MachCSL.WpSmodeFrame
 import MachCSL.WpSmodeFrame6
 import MachCSL.WpSmodeTrapCsr
 import Xv6.SpecDevintr
-import Xv6.SpecPlicClaim
 import Xv6.SpecPlicComplete
 import Xv6.CodeTactics
+import Xv6.SpecUartintr
+import Xv6.SpecVirtioDiskIntr
+import Xv6.SpecClockintr
 
 namespace Xv6
 

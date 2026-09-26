@@ -43,9 +43,8 @@ licence payment (`cwPort`, the step-2 interim) is gone.
 import Xv6.SpecConsolewrite
 import Xv6.UartConsAcc
 import Xv6.PipeRw
-import Xv6.UMemLemmas
-import Xv6.CodeTactics
 import MachCSL.WpSmodeFrame16
+import Xv6.SpecUartwrite
 
 namespace Xv6
 

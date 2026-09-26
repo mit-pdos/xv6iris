@@ -7,11 +7,10 @@ tails free what was built and the count is then unknown).  Needs 40 slots.
 Imports only definitional files (never a `Code*` or `Proof*` file).
 -/
 import MachCSL.WpSmodeFrame
-import MachCSL.Lock
-import Xv6.SchedCtx
-import Xv6.PidLock
 import Xv6.Image
-import Xv6.Geom
+import Xv6.UPtDefs
+import Xv6.IrefSlots
+import Xv6.SlotGen
 
 namespace Xv6
 

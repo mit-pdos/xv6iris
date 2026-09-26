@@ -31,7 +31,10 @@ superblock cells are the persistent `DFrac.discard` ones.
    share (sys_chdir lends the seam's quarter, `sysfilePidQ`); namei (at its
    ERA contract), ilock, iunlock and iput stay here.
 -/
-import Xv6.SysChdirFrame
+import Xv6.SpecIunlock
+import Xv6.SysfileCalls
+import Xv6.SpecIlock
+import Xv6.SpecNameiEra
 
 namespace Xv6
 

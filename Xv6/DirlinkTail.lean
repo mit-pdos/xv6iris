@@ -10,7 +10,7 @@ As in Rocq, the tail holds an ABSTRACT continuation: whatever the arm
 wants to hand the caller at the returned registers `R'` (callee-saved
 against the entry, `a0` the arm's).
 -/
-import Xv6.DirlinkDefs
+import Xv6.DirlinkParts
 
 namespace Xv6
 

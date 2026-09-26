@@ -123,7 +123,6 @@ import Xv6.FsStateEraPure
 import Xv6.FsStateInodeOwned
 import Xv6.FsStateTop
 import Xv6.InodeRegion
-import Xv6.FsBytesGamma
 
 namespace Xv6
 

@@ -5,9 +5,6 @@ of `.rodata`.
 -/
 import Xv6.PipeBirth
 import Xv6.PipeRw
-import Xv6.KernelData
-import Xv6.ProcDefs
-import Xv6.UPtDefs
 import Xv6.KstackMap
 
 namespace Xv6

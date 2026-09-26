@@ -25,6 +25,7 @@ four-stage cut (Rocq has one lemma for `+0x00 .. +0x54`) is for elaboration
 speed only.
 -/
 import Xv6.FsinitRead
+import Xv6.FsCollectAll
 
 namespace Xv6
 

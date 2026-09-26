@@ -57,10 +57,10 @@ import Xv6.SpecInitlog
 import Xv6.InitlogCrash
 import Xv6.LogBoot
 import Xv6.InitlogHead
-import Xv6.CodeTactics
-import MachCSL.ByteWord4
 import MachCSL.WpSmodeFrame6c
 import Xv6.FsCallSites
+import Xv6.SpecInitlock
+import Xv6.SpecWriteHead
 
 namespace Xv6
 

@@ -6,9 +6,7 @@ interface of the non-allocating `walk`.
 The arithmetic facts and the `walk` call rule are in
 `Xv6/WalkaddrDefs.lean`.
 -/
-import MachCSL.WpSmodeFrame
 import Xv6.SpecIsmapped
-import Xv6.SpecWalk
 import Xv6.UPtWalkaddrLemmas
 import Xv6.WalkaddrDefs
 import Xv6.CodeTactics

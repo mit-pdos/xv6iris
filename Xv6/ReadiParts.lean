@@ -31,7 +31,6 @@ arm, and the image algebra of the user arm
 -/
 import Xv6.SpecReadi
 import Xv6.UMemWindow
-import Xv6.BlkmapBuf
 import Xv6.FsWords
 
 namespace Xv6

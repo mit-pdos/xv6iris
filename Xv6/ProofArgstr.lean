@@ -12,7 +12,6 @@ The block is borrowed for argraw only (`argstr_priv_tf`, Rocq
 again before fetchstr, which takes it
 whole; fetchstr's post is argstr's, at the address argraw returned.
 -/
-import Xv6.LazyFree
 import Xv6.SpecArgstr
 import Xv6.CodeTactics
 

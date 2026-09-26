@@ -16,18 +16,12 @@ proved at the instance (`UtReadWhyXv6.utReadWhy_xv6`, Rocq
 `spost_at_read_why`).
 -/
 import Xv6.ProofUsertrap
-import Xv6.LinkPrintk
-import Xv6.LinkMyproc
-import Xv6.LinkKilled
 import Xv6.LinkSetkilled
-import Xv6.LinkDevintr
 import Xv6.LinkYield
 import Xv6.LinkPrepareReturn
-import Xv6.LinkKexit
 import Xv6.LinkKernelvec
 import Xv6.LinkKerneltrap
 import Xv6.LinkSyscall
-import Xv6.LinkVmfault
 
 namespace Xv6
 

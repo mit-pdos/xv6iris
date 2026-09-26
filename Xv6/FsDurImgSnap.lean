@@ -30,7 +30,7 @@ directory clauses (11c') are W6/W7/W8 read through `FsImgBridge`.
    no length conjunct); this is Rocq's `pre`/`post` form, which
    `recInBlk` and FsCollect.v's port read.
 -/
-import Xv6.FsDurImgLink
+import Xv6.FsCfgBoot
 
 namespace Xv6
 

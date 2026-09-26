@@ -7,10 +7,7 @@ one `acquire`/`release` pair around a single store, at either interrupt
 index and at any lock depth that does not already hold `"proc"`.  The
 shared prelude is in `Xv6/KilledDefs.lean`.
 -/
-import MachCSL.WpSmodeFrame
 import Xv6.SpecSetkilled
-import Xv6.SpecAcquire
-import Xv6.SpecRelease
 import Xv6.KilledDefs
 import Xv6.WordFrac
 import Xv6.CodeTactics

@@ -35,7 +35,6 @@ the 12-slot frame the prologue pushes and never pops).
 Imports only definitional files.
 -/
 import Xv6.SchedCtx
-import MachCSL.WpSmodeIntr
 
 namespace Xv6
 

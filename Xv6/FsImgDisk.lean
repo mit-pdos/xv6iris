@@ -26,7 +26,6 @@ system theorem's file may import them, and no PROOF file imports any of them.
    `decide +kernel` (which ignores the attribute) is the only thing that does.
 -/
 import Xv6.FsImgRaw
-import Xv6.FsCrashSector
 import Xv6.FsCrashPure
 
 namespace Xv6

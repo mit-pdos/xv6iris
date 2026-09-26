@@ -37,6 +37,10 @@ and the walk's budget invariant steps.
 -/
 import Xv6.SpecNamex
 import Xv6.FsWords
+import Xv6.SpecIunlock
+import Xv6.SpecIunlockput
+import Xv6.SpecIlock
+import Xv6.SpecIdup
 
 namespace Xv6
 

@@ -73,11 +73,6 @@ by the W1..W5 walks' `Z` side conditions).
 -/
 import Xv6.SysfileCalls
 import Xv6.FsWords
-import Xv6.InodeLock
-import Xv6.DirView
-import Xv6.InodeRegionDefs
-import Xv6.SpecArgraw
-import MachCSL.WpSmodeCtl
 
 namespace Xv6
 

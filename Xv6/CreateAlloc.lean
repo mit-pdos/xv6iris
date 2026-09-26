@@ -91,7 +91,6 @@ contract's own continuation `createPost`.
 * `Hal9` / `Hal10` -- the name buffer's alignment rides the body's pure
   premise (CreateSharedBody deviation 5).
 -/
-import Xv6.CreateSharedBody
 import Xv6.CreateCalls
 import Xv6.FsStateEraResB
 

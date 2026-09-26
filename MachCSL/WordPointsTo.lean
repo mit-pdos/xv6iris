@@ -7,8 +7,6 @@ in RAM and `pa` is `n`-aligned.  The facts travel with the ownership (the
 Rocq prototype's `word_pointsto`), so an instruction rule takes the cell and
 nothing else: no client proves RAM membership or alignment at a memory access.
 -/
-import MachCSL.Ctx
-import MachCSL.PlatformFacts
 import MachCSL.KMap
 
 namespace MachCSL

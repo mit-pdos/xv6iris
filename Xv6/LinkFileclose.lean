@@ -7,8 +7,6 @@
 closed term).
 -/
 import Xv6.ProofFileclose
-import Xv6.LinkAcquire
-import Xv6.LinkRelease
 import Xv6.LinkPipeclose
 import Xv6.LinkBeginOp
 import Xv6.LinkIput

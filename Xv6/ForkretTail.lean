@@ -28,8 +28,6 @@ state at the `jalr`'s target: `a0` the user satp, the pc at userret.
 
 A stage file: it imports Spec and definitional files only.
 -/
-import Xv6.SpecForkret
-import Xv6.SpecPrepareReturn
 import Xv6.SpecUserret
 import Xv6.ProcPrivAcc
 import Xv6.CodeTactics

@@ -29,6 +29,7 @@ memset's.  So memset's bytes come back as 32 zero WORDS (the landed
 Imports only the shared vocabulary and callee Specs.
 -/
 import Xv6.SysExecParts
+import Xv6.SpecMemset
 
 namespace Xv6
 

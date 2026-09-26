@@ -25,12 +25,8 @@ the `PTE_W` re-walk.
 Imports only definitional files (never a `Code*` or `Proof*` file).
 -/
 import MachCSL.WpSmodeFrame
-import MachCSL.Lock
-import Xv6.UMem
 import Xv6.Image
-import Xv6.Geom
 import Xv6.UMemLemmas
-import Iris.ProofMode
 
 namespace Xv6
 

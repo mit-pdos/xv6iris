@@ -50,13 +50,8 @@ DEVIATIONS from Rocq:
 
 Imports only definitional files.
 -/
-import Xv6.DiskBoot
-import Xv6.FsBytesMint
-import Xv6.BioPool
-import Xv6.IcacheBootRegion
-import Xv6.FsCrashPure
 import Xv6.FsCfgBoot
-import Batteries.Data.List.Perm
+import Xv6.LogInv
 
 namespace Xv6
 

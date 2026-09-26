@@ -21,10 +21,8 @@ Definitional: it imports only `MachCSL.SwtchCtx`, the lock kit and the
 process geometry.
 -/
 import MachCSL.SwtchCtx
-import MachCSL.Lock
 import Xv6.ProcDefs
 import Xv6.Image
-import Xv6.UartTrace
 
 namespace Xv6
 

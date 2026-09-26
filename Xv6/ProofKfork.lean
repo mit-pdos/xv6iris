@@ -92,24 +92,14 @@ Study `ProofYield.lean` (lock acquire/release + held-half agreement),
 (the word loop `uvmcopy_loop`), `ParkCap.lean` (`parkToken_park_steady`).
 -/
 import Xv6.WaitFresh
-import Xv6.LazyFree
-import MachCSL.WpSmodeFrame
-import MachCSL.ByteWord
-import MachCSL.Lock
 import Xv6.SpecKfork
-import Xv6.SpecMyproc
-import Xv6.SpecAllocproc
-import Xv6.SpecUvmcopy
 import Xv6.SpecFreeproc
 import Xv6.SpecSafestrcpy
 import Xv6.SpecAcquire
 import Xv6.SpecRelease
-import Xv6.WaitLock
-import Xv6.KforkChild
 import Xv6.UexecApply
-import Xv6.UPtLemmas
-import Xv6.CodeTactics
-import Xv6.DiskTier
+import Xv6.SpecIdup
+import Xv6.SpecFiledup
 
 namespace Xv6
 

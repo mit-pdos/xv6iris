@@ -252,8 +252,6 @@ functions first and the record assembled at the end.
 -/
 import Xv6.IcacheBox
 import Xv6.IcacheEscrowPool
-import Xv6.IrefSlots
-import Xv6.SleepLockDefs
 
 namespace Xv6
 

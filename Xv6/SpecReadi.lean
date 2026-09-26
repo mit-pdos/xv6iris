@@ -87,8 +87,7 @@ Specification of `readi` (kernel/fs.c): the public contract.  Mirrors Rocq
 Imports only definitional files and callee `Spec*` files.
 -/
 import Xv6.SpecBmap
-import Xv6.SpecEitherCopyout
-import Xv6.InodeDefs
+import Xv6.EitherDefs
 
 namespace Xv6
 

@@ -110,8 +110,7 @@ import Xv6.InodeDefs
 import Xv6.BlkmapDefs
 import Xv6.DinodeEnc
 import Xv6.FsBytesGamma
-import Xv6.LogInv
-import Xv6.KallocDefs
+import MachCSL.WpSmodeFrame
 
 namespace Xv6
 

@@ -46,7 +46,6 @@ Rocq's header design points, all kept:
    precedent).  `free_lit` likewise (a `decide` closes `freeNum` at a literal).
 -/
 import Xv6.UsysMemOk
-import Xv6.ChildTok
 
 namespace Xv6
 

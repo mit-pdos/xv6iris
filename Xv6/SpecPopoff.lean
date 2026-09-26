@@ -21,7 +21,8 @@ coupling `locks.length ≤ noff` must survive the pop).  Both
 Imports only definitional files (never a `Code*` or `Proof*` file).
 -/
 import Xv6.Image
-import Xv6.SpecPushoff
+import Xv6.Geom
+import MachCSL.WpSmodeIntr
 
 namespace Xv6
 

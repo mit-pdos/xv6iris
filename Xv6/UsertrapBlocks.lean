@@ -26,6 +26,9 @@ kill check, `utLiveRes`: the kill row with the live row, or the shot).
 Definitional + small proof-mode lemmas; no instruction stepping.
 -/
 import Xv6.UsertrapParts
+import Xv6.SpecKilled
+import Xv6.UserretDefs
+import Xv6.ProcPrivAcc
 
 namespace Xv6
 

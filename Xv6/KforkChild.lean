@@ -12,8 +12,10 @@ stated separately (`kforkChild_umem`, `kforkChild_perm`).
 
 Imports only definitional files.
 -/
-import Xv6.UexecSlot
 import Xv6.SpecUvmcopy
+import Xv6.ProcDefs
+import Xv6.UserExec
+import Xv6.UserPerm
 
 namespace Xv6
 

@@ -7,10 +7,7 @@ registers (each through the device accessors of `Xv6.UartInv`), then
 `initlock(&u->tx_lock, name)`.  Boot only (`SIE` literally `false`), so
 the hart never migrates; the frame is the standard two slots.
 -/
-import MachCSL.WpSmodeFrame
-import MachCSL.WpSmodeDev
 import MachCSL.WpSmodeSltu
-import MachCSL.Lock
 import Xv6.SpecUartinitone
 import Xv6.SpecInitlock
 import Xv6.CodeTactics

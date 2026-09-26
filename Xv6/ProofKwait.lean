@@ -85,19 +85,12 @@ with the complement, and the park calls `sleep` at its eb contract and
 re-joins after the re-acquire.  The nested `pp->lock` pairs stay at
 `sie = false`.
 -/
-import Xv6.LazyFree
-import MachCSL.WpSmodeFrame
-import MachCSL.ByteWord
-import Xv6.UPtLemmas
-import Xv6.UMemLemmas
 import Xv6.KvmLemmas
 import Xv6.SpecKwait
 import Xv6.ProcPrivAcc
-import Xv6.WordFrac
 import Xv6.SpecCopyout
 import Xv6.SpecFreeproc
 import Xv6.SpecKilled
-import Xv6.SpecSleep
 import Xv6.SpecSleepPrepare
 import Xv6.SpecMyproc
 import Xv6.SpecAcquire

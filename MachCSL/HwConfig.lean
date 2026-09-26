@@ -29,7 +29,6 @@ bundle back (it is persistent).  `swp_run` dispatches to them for the
 registers of `hwVal` (MachCSL/Tactics.lean).
 -/
 import MachCSL.Wp
-import MachCSL.Platform
 
 namespace MachCSL
 

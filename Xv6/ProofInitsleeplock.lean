@@ -10,8 +10,6 @@ that puts `"sleep lock"` in `a1` and `&lk->lk` in `a0`, the call to
 Stated at either interrupt index, as `initlock` is; `initlock` never touches
 the interrupt state, so the exit context is the plain `k.withRegs R'`.
 -/
-import MachCSL.WpSmodeFrame
-import MachCSL.Lock
 import Xv6.SpecInitsleeplock
 import Xv6.SpecInitlock
 import Xv6.CodeTactics

@@ -7,12 +7,9 @@ dispatch, the clock tick, retirement.  Each is proved once by symbolic
 execution of that stage alone and is then applied by the whole-instruction
 leaf rules.
 -/
-import MachCSL.Tactics
-import MachCSL.Platform
 import MachCSL.WpPmp
 import MachCSL.PlatformFacts
-import MachCSL.HwConfig
-import MachCSL.FetchedDefs
+import MachCSL.ModelFacts
 
 namespace MachCSL
 

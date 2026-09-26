@@ -15,7 +15,6 @@ shifted there by the entry's pin facts) with the arm `acquire` paid out
 (`sieArm c k.sie k.proc`), which `release` takes back.
 -/
 import MachCSL.WpSmodeFrame6
-import MachCSL.ByteWord
 import Xv6.SpecConsoleintr
 import Xv6.SpecConsputc
 import Xv6.SpecAcquire
@@ -23,7 +22,6 @@ import Xv6.SpecRelease
 import Xv6.SpecWakeup
 import Xv6.CodeTactics
 import Xv6.ConsoleintrGhost
-import Xv6.UartConsAcc
 
 namespace Xv6
 

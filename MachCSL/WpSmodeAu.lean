@@ -3,9 +3,10 @@ MachCSL: the physical reads and writes of supervisor mode with ACCESSORS
 (`WpAtomic`), the twins of the `WpSmodeMem` leaves for bytes a client
 opens an invariant for at the access (lock words, page-table entries).
 -/
-import MachCSL.WpSmode
 import MachCSL.WpAtomic
 import MachCSL.SConfPhysDefs
+import MachCSL.WpPmpXv6
+import MachCSL.WpStages
 
 namespace MachCSL
 

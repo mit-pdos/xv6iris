@@ -8,16 +8,8 @@ arithmetic as the instructions compute it.
 A definitional file (neither Spec nor Proof nor Link), so both function
 proofs may import it.
 -/
-import MachCSL.ByteWord
-import MachCSL.WpSmodeFrame
 import Xv6.PipeInvDefs
-import Xv6.SchedCtx
-import Xv6.FdTable
 import Xv6.EitherDefs
-import Xv6.UMem
-import Xv6.UMemLemmas
-import Xv6.LazyFree
-import Xv6.PrintkDefs
 import Xv6.StepLemmas
 
 namespace Xv6

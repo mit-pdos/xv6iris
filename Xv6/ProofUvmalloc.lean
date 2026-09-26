@@ -8,15 +8,12 @@ contract) and `uvmdealloc` (for the rollback).
 of either frees what the turn allocated (`kfree`) and rolls the run back
 with `uvmdealloc`, returning `0`.
 -/
-import MachCSL.WpSmodeFrame
 import Xv6.SpecUvmalloc
 import Xv6.SpecUvmdealloc
-import Xv6.SpecUvmunmap
 import Xv6.SpecKalloc
 import Xv6.SpecKfree
 import Xv6.SpecMemset
 import Xv6.SpecMappages
-import Xv6.UPtAllocLemmas
 import Xv6.UmCovered
 import Xv6.UvmallocDefs
 import Xv6.CodeTactics

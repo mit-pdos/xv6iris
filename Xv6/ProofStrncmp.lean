@@ -16,7 +16,6 @@ rules chained -- no symbolic execution.  Modelled on `Xv6/ProofMemcmp.lean`.
     80000e14: lbu  a0,0(a0) ; lbu a5,0(a1) ; subw a0,a0,a5
     80000e1e: <epilogue2>
 -/
-import MachCSL.WpSmodeFrame
 import Xv6.SpecStrncmp
 import Xv6.CodeTactics
 

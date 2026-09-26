@@ -48,10 +48,8 @@ any").  Three things hang off it:
 import Xv6.SpecBmap
 import Xv6.DinodeSlot
 import Xv6.BlkmapBuf
-import Xv6.CodeTactics
 import Xv6.BmapParts
 import MachCSL.WpSmodeFrame6c
-import Xv6.FsCallSites
 
 namespace Xv6
 

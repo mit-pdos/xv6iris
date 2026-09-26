@@ -10,16 +10,7 @@ interfaces), as `LinkSysClose` takes it.
 closed term).
 -/
 import Xv6.ProofKexit
-import Xv6.LinkMyproc
-import Xv6.LinkAcquire
-import Xv6.LinkRelease
 import Xv6.LinkReparent
-import Xv6.LinkWakeup
-import Xv6.LinkSched
-import Xv6.LinkBeginOp
-import Xv6.LinkIput
-import Xv6.LinkEndOp
-import Xv6.LinkPanic
 import Xv6.LinkFileclose
 
 namespace Xv6

@@ -10,9 +10,6 @@ an instruction fact says its page is mapped executable.  Proofs look an
 instruction up by address in the search-tree form of the same list
 (`Kernel.textTree`, `kernelText_find`).
 -/
-import MachCSL.Wp
-import MachCSL.KMap
-import Xv6.KernelImage
 import Xv6.KernelTree
 import Xv6.KernelMap
 

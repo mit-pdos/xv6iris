@@ -42,11 +42,7 @@ record is the two bottom cells (`&de = s0-80 = sp`, `&de.name = s0-78`).
 import Xv6.SpecDirlink
 import Xv6.FsWords
 import Xv6.DinodeSlot
-import MachCSL.WpSmodeFrame12
-import MachCSL.WpSmodeFrame12b
-import MachCSL.WpSmodeLh
-import MachCSL.WpSmodeSltu
-import MachCSL.ByteWord
+import Xv6.SpecStrncpy
 
 namespace Xv6
 

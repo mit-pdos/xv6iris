@@ -102,7 +102,8 @@ included, so a zero is a hard zero):
 `entTokenless_dot` / `_dotdot` / `_ne`, `entDsetOk`, `fnDd`
 (Xv6/FsStateInode.lean).
 -/
-import Xv6.FsStateEraRes
+import Xv6.FsStateInodeOwned
+import Xv6.FsStateEraPure
 
 namespace Xv6
 

@@ -45,6 +45,7 @@ kernel, not `panic`.  The header's `+0x..` offsets are Rocq's image's; the
 bodies are byte-identical and the offsets above are the Lean image's.
 -/
 import Xv6.DirlookupRead
+import MachCSL.WpSmodeLh
 
 namespace Xv6
 

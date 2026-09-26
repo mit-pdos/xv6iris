@@ -74,6 +74,7 @@ the only one that loses a Rocq lemma.**
 -/
 import Xv6.LogDefs
 import Xv6.DinodeEnc
+import Xv6.FsGeom
 
 namespace Xv6
 

@@ -57,17 +57,10 @@ Deviations from Rocq:
 
 Imports only definitional files.
 -/
-import MachCSL.CallConv
-import Xv6.Image
 import Xv6.ConsoleInvDefs
-import Xv6.UartLinks
-import Xv6.KallocDefs
 import Xv6.SchedCtx
-import Xv6.UMem
-import Xv6.UMemWindow
 import Xv6.SpecEitherCopyout
-import Xv6.SpecSleep
-import Iris.ProofMode
+import Xv6.UartInv
 
 namespace Xv6
 

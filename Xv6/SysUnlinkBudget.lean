@@ -62,7 +62,6 @@ Rocq's header, kept because the reasons are the content:
 
 Nothing.
 -/
-import Xv6.SpecIput
 import Xv6.SpecWritei
 import Xv6.SpecNamex
 

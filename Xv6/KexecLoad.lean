@@ -66,9 +66,8 @@ contract.  Rocq's header on these definitions, in short:
 
 Imports only definitional files.
 -/
-import Xv6.ElfBridge
 import Xv6.KexecDefs
-import Xv6.FsAbsDefs
+import Xv6.ElfFile
 
 namespace Xv6
 

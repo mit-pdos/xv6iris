@@ -26,6 +26,7 @@ proof file evaluates it.
    !andb_true_iff; tauto` in each.
 -/
 import Xv6.FsImgDir
+import Xv6.FsImgUsed
 
 namespace Xv6
 

@@ -29,9 +29,8 @@ Reused from `SysfileCalls` (the shared sysfile call sites): `sysfile_ww`,
 `pl ++ 0 :: rest` list; the walk's buffer arrives as `bview 128 bp`, so the
 cut here is `sys_open_walk_buf_split` / `_join`.
 -/
-import Xv6.SysOpenShared
-import Xv6.SysfileCalls
 import Xv6.SpecNameiEra
+import Xv6.SysOpenParts
 
 namespace Xv6
 

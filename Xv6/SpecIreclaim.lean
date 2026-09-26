@@ -108,15 +108,10 @@ fsinit presents exactly Rocq's premises and receives exactly Rocq's post
 
 Imports only definitional files and callee `Spec*` files.
 -/
-import Xv6.SpecBread
-import Xv6.SpecBrelse
-import Xv6.SpecPrintk
-import Xv6.SpecIget
-import Xv6.SpecBeginOp
 import Xv6.SpecEndOp
-import Xv6.SpecIlock
-import Xv6.SpecIunlock
-import Xv6.SpecIput
+import Xv6.FsCfgDefs
+import Xv6.IcacheTable
+import Xv6.InodeRegionInv
 
 namespace Xv6
 

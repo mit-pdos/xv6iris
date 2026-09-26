@@ -45,6 +45,9 @@ built (Rocq: "it takes it already built and spends it against ARMS").
    before `bad:`, which takes `dp` at its whole-token `icTxDep` form.
 -/
 import Xv6.SysUnlinkShared
+import Xv6.SysUnlinkParts
+import Xv6.SysUnlinkFrame
+import Xv6.SysUnlinkCalls
 
 
 namespace Xv6

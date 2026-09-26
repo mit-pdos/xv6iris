@@ -23,8 +23,6 @@ the two stores: the hart id in `a0` really is this hart's
 (`Xv6.PlicPlanExtra.plic_shift8`/`plic_shift13` turn it into the byte
 offsets, eight closed cases).
 -/
-import MachCSL.WpSmodeFrame
-import MachCSL.WpSmodeDev4
 import Xv6.SpecPlicinithart
 import Xv6.PlicPlanExtra
 import Xv6.CodeTactics

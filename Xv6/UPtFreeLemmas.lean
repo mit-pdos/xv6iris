@@ -13,7 +13,7 @@ zero is a whole page, ready for `kfree`.
 -/
 import Xv6.PtOwnLemmas
 import Xv6.UPtDefs
-import Xv6.SpecUvmunmap
+import MachCSL.WpSmodeFrame
 
 namespace Xv6.UPtFree
 

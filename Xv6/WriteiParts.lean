@@ -20,9 +20,7 @@ single-block receipt `wi16Pre` / `wi16Fresh`.
 4. The user-arm content steps are over `Xv6.wiUsrGot` (SpecWritei
    deviation 5): the chunk's view composes by `Xv6.viewFaulted_trans`.
 -/
-import Xv6.SpecWritei
 import Xv6.WriteiBudgetW
-import Xv6.UMemLemmas
 
 namespace Xv6
 

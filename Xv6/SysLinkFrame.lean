@@ -30,12 +30,13 @@ THE CARVE (Rocq `sl_frame_carve`): the thirty-eight slots below the entry
    slot cells' contents: a slot not yet saved holds a junk word.
 -/
 import Xv6.SpecSysLink
-import Xv6.SysLinkParts
-import Xv6.SysLinkBudget
-import Xv6.FsAbsLinkFire
-import MachCSL.WpSmodeFrame
-import MachCSL.ByteWord
-import Xv6.CodeTactics
+import Xv6.KstackMap
+import Xv6.SpecIunlock
+import Xv6.SpecIupdate
+import Xv6.SysfileCalls
+import Xv6.SpecIlock
+import Xv6.SpecNameiparent
+import Xv6.SpecDirlink
 
 namespace Xv6
 

@@ -1,7 +1,6 @@
 /-
 MachCSL: more supervisor-mode memory stages: `lwu`.
 -/
-import MachCSL.WpSmodeMem
 import MachCSL.WpSmodeRules
 
 namespace MachCSL

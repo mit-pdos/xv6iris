@@ -96,10 +96,7 @@ dead parameter; a caller supplying it has nothing to supply.
 Imports only definitional files and callee `Spec*` files.
 -/
 import Xv6.IcacheBox
-import Xv6.IcacheInvRef
 import Xv6.FsCfgDefs
-import Xv6.SchedCtx
-import Xv6.SpecHoldingsleep
 import Xv6.SpecReleasesleep
 
 namespace Xv6

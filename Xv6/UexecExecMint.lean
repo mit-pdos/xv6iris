@@ -37,7 +37,6 @@ Rocq's header, point for point:
 -/
 import Xv6.UexecExecInst
 import Xv6.UexecCond
-import Xv6.InitBoot
 
 namespace Xv6
 

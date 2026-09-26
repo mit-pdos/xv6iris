@@ -9,13 +9,14 @@ string (fuel: the bytes left), one lemma per directive arm, the `%s` and
 `release(&pr.lock)` and the epilogue.
 -/
 import MachCSL.WpSmodeFrame
-import MachCSL.WpLock
 import MachCSL.WpSmodeMem2
 import Xv6.PrintkDefs
 import Xv6.SpecPrputc
 import Xv6.SpecAcquire
 import Xv6.SpecRelease
 import Xv6.CodeTactics
+import MachCSL.WpSmodeBits
+import Xv6.SpecPrintint
 
 namespace Xv6
 

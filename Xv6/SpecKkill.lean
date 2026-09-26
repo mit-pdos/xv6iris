@@ -13,11 +13,7 @@ which the row's published wand turns into the target's `Q (-1)`.
 Imports only definitional files (never a `Code*` or `Proof*` file).
 -/
 import MachCSL.WpSmodeFrame
-import MachCSL.Lock
 import Xv6.SchedCtx
-import Xv6.PidLock
-import Xv6.Image
-import Xv6.Geom
 
 namespace Xv6
 

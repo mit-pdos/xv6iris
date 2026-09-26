@@ -68,11 +68,9 @@ at +0x090; kc_interfaces.txt §3/§5):
    `KexecTail.kxc_win4` do that work.
 -/
 import Xv6.KexecSeam
-import Xv6.SpecMyproc
 import Xv6.SpecBeginOp
 import Xv6.SpecNamei
 import Xv6.SpecIlock
-import Xv6.SpecReadi
 import Xv6.FsCallSitesI
 
 namespace Xv6

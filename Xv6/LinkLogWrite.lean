@@ -3,8 +3,6 @@
 `release` and `bpin`.
 -/
 import Xv6.ProofLogWrite
-import Xv6.LinkAcquire
-import Xv6.LinkRelease
 import Xv6.LinkBpin
 
 namespace Xv6

@@ -15,7 +15,6 @@ so the cursor cannot reach `TRAPFRAME`.
 
 A lemma file: it imports definitional and lemma files only.
 -/
-import Xv6.UPtDefs
 import Xv6.UPtAllocLemmas
 
 namespace Xv6.UmCovered

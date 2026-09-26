@@ -7,9 +7,9 @@ translation slot and the memory token (`transTok`) through the fetch and
 the execute stage; `wpLoop_s_instr` is the schema the `kctx` rules
 instantiate, at the context's own tier.
 -/
-import MachCSL.WpSmode
 import MachCSL.Translate
 import MachCSL.WpTrap
+import MachCSL.WpAluFile
 
 namespace MachCSL
 

@@ -29,12 +29,8 @@ move (`SIE` false; `main` on hart 0, before the scheduler).  Stack: its
 
 Imports only definitional files.
 -/
-import MachCSL.CallConv
-import MachCSL.Lock
 import Xv6.Image
-import Xv6.KallocDefs
 import Xv6.DiskInvDefs
-import Xv6.DiskAcc
 
 namespace Xv6
 

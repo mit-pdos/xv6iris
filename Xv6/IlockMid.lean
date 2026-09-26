@@ -11,6 +11,9 @@ the slot's six pieces go back unchanged (Rocq 1907-1920), which is what
 the opened block's back wand (`Xv6.il_blk_open`) takes.
 -/
 import Xv6.IlockFin
+import Xv6.SpecMemmove
+import Xv6.FsWords
+import Xv6.IlockBlk
 
 namespace Xv6
 

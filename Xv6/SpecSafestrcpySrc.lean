@@ -43,7 +43,6 @@ Imports only definitional files (never a `Code*` or `Proof*` file).
 -/
 import MachCSL.WpSmodeFrame
 import Xv6.Image
-import Xv6.Geom
 import Xv6.ProcDefs
 
 namespace Xv6

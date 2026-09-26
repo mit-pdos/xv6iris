@@ -15,7 +15,6 @@ that level, so the induction hypothesis is the contract restated at the
 entry address (`fw_rec_call`).  Stated at either interrupt index, as
 `kfree` is.
 -/
-import MachCSL.WpSmodeFrame
 import Xv6.SpecFreewalk
 import Xv6.SpecKfree
 import Xv6.UPtFreeLemmas

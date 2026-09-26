@@ -26,7 +26,6 @@ updatable, and an update needs both halves.
    brief's K5 row lists `UserCwd` as a kernel gap -- this file closes it.
 -/
 import Iris.Instances.Lib.GhostVar
-import Iris.ProofMode
 
 namespace Xv6
 

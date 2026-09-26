@@ -11,7 +11,6 @@ does not need a `MachCSL.ctxFloor` takes.
 import Xv6.ProofAcquire
 import Xv6.LinkPushoff
 import Xv6.LinkHolding
-import Xv6.LinkMycpu
 
 namespace Xv6
 

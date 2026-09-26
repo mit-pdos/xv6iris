@@ -22,7 +22,6 @@
    rather than Rocq's domain law `proc_ptm_dom`.
 -/
 import Xv6.SyscallRet
-import Xv6.UPtLemmas
 
 namespace Xv6
 

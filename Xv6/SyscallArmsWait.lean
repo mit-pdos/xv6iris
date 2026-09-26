@@ -15,7 +15,6 @@ dispatch's rows, per the frozen recipe (notes/coord/syscall_arms_interfaces.txt)
 * The answer: `syscWaitOut` via `syscWaitOut_of` from kwait's `waitAns` and
   the window (`syscUwaitWr`, Rocq `uwait_wr`) from `kwaitAns`'s two guards.
 -/
-import Xv6.SyscallRet
 import Xv6.SyscallArmsSbrk
 
 namespace Xv6

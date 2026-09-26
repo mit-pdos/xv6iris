@@ -66,6 +66,7 @@ Imports `SysOpenParts` and the shared `SysfileCalls`.
 -/
 import Xv6.SysOpenParts
 import Xv6.SysfileCalls
+import Xv6.FsAbsOpenFire
 
 namespace Xv6
 

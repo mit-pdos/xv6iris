@@ -8,7 +8,7 @@ model's decoders (`PPN_of_PTE`, the flag getters, `pte_is_non_leaf`,
 `update_PTE_Bits`) compute on them.  The page-walk leaves are stated over
 these forms, so the tree spec never mentions raw bit positions.
 -/
-import MachCSL.ModelFacts
+import LeanRV64D.VmemPte
 
 namespace MachCSL
 

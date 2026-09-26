@@ -31,8 +31,6 @@ is a tail call into a function that PARKS.
 
 Imports only definitional files (never a `Code*` or `Proof*` file).
 -/
-import MachCSL.WpSmodeFrame
-import MachCSL.Lock
 import Xv6.BcacheInv
 import Xv6.SpecVirtioDiskRw
 

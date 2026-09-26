@@ -14,6 +14,8 @@ The blocks bundle is `inodeBlocks (itZ bm (NDIRECT + q))` (`Xv6/ItruncParts.lean
 deviation "one blocks state"), the budget `bmPaidS` at the SAME `e0`.
 -/
 import Xv6.ItruncParts
+import Xv6.CodeTactics
+import Xv6.BlkmapBuf
 
 namespace Xv6
 

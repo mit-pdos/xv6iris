@@ -11,33 +11,19 @@ an UNTYPED file, `filecloseEnv_none`) are parameters.  `SysOpenClosed`
 closes them all at their `Link*Closed` terms.
 -/
 import Xv6.ProofSysOpen
-import Xv6.LinkMyproc
 import Xv6.LinkArgraw
 import Xv6.LinkArgint
 import Xv6.LinkFetchstr
 import Xv6.LinkCopyinstr
 import Xv6.LinkStrlen
 import Xv6.LinkArgstr
-import Xv6.LinkBeginOp
 import Xv6.LinkNameiEra
-import Xv6.LinkIlock
-import Xv6.LinkIunlock
-import Xv6.LinkIunlockput
-import Xv6.LinkEndOp
-import Xv6.LinkAcquire
-import Xv6.LinkRelease
-import Xv6.LinkIput
 import Xv6.LinkFileclose
-import Xv6.LinkItrunc
 import Xv6.LinkFilealloc
 import Xv6.LinkFdalloc
 import Xv6.LinkCreate
 import Xv6.LinkCopyout
 import Xv6.LinkCopyin
-import Xv6.LinkWalkaddr
-import Xv6.LinkWalk
-import Xv6.LinkVmfault
-import Xv6.LinkPipeclose
 
 namespace Xv6
 

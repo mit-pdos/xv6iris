@@ -29,7 +29,6 @@ Merged here (old names, all deleted):
 import Xv6.FsCallSites
 import Xv6.FsCfgDefs
 import Xv6.InodeRegionInv
-import Xv6.DinodeSlot
 
 namespace Xv6
 

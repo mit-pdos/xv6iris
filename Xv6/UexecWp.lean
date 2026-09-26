@@ -42,7 +42,7 @@ statement needs it.
    `uexecWp_unfold`/`uexecWp_fold`.
 6. `Module Type UEXEC_GEN` is a `Prop` structure (SpecUser deviation 4).
 -/
-import Xv6.SpecUser
+import Xv6.UserExec
 
 namespace Xv6
 

@@ -15,7 +15,6 @@ call, then `freewalk` at level 2 -- legal because `umBelow` says every leaf
 lay in the run just unmapped, so the table maps nothing (`delRunL_eq_empty`,
 `noLeaves_of_ptRep_empty`), and the user pages are gone with it.
 -/
-import MachCSL.WpSmodeFrame
 import Xv6.SpecUvmfree
 import Xv6.SpecUvmunmap
 import Xv6.SpecFreewalk

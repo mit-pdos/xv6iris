@@ -33,6 +33,7 @@ the payload at the publication (`Xv6.diskResSeal`).
 -/
 import Xv6.VirtioDiskRwDefs2
 import Xv6.DiskAcc
+import MachCSL.WpSmodeDev4
 
 namespace Xv6
 

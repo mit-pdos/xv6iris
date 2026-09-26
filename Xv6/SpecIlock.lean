@@ -108,16 +108,10 @@ is re-proved.
 
 Imports only definitional files and callee `Spec*` files.
 -/
-import MachCSL.WpSmodeFrame
 import Xv6.SpecBread
-import Xv6.SpecBrelse
-import Xv6.SpecMemmove
-import Xv6.SpecPanic
-import Xv6.SpecAcquiresleep
 import Xv6.IcacheBox
 import Xv6.InodeRegionWithdraw
 import Xv6.FsCfgDefs
-import Xv6.TxPin
 
 namespace Xv6
 

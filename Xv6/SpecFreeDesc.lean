@@ -35,7 +35,6 @@ and the continuation is at `cpu` itself.
 
 Imports only definitional files.
 -/
-import Xv6.SchedCtx
 import Xv6.SpecWakeup
 import Xv6.VirtioDiskRwDefs
 

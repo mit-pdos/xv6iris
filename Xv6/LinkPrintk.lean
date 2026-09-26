@@ -4,9 +4,6 @@ Link `printk`: the proof instance clients import.  `printk` calls
 `PRINTK` closes here.
 -/
 import Xv6.ProofPrintk
-import Xv6.LinkAcquire
-import Xv6.LinkRelease
-import Xv6.LinkPrputc
 import Xv6.LinkPrintint
 
 namespace Xv6

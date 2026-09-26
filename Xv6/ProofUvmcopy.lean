@@ -15,10 +15,8 @@ returns `-1`.
 
 Every premise of the contract is discharged here.
 -/
-import MachCSL.WpSmodeFrame
 import Xv6.SpecUvmcopy
 import Xv6.SpecWalk
-import Xv6.SpecKalloc
 import Xv6.SpecKfree
 import Xv6.SpecMemmove
 import Xv6.SpecMappages

@@ -54,9 +54,6 @@ tier-generic):
 Imports only definitional files and Spec files.
 -/
 import Xv6.SpecMain
-import Xv6.FileBoot
-import Xv6.BootCarveMain
-import Xv6.IcacheBootTable
 
 namespace Xv6
 

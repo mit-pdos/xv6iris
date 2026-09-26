@@ -29,8 +29,6 @@ way); `+ 1` would not let `MYPROC`'s contract apply at `k.noff + 1`.
 Imports only definitional files (never a `Code*` or `Proof*` file).
 -/
 import Xv6.SleepLockDefs
-import Xv6.SpecMyproc
-import MachCSL.WpSmodeIntr
 
 namespace Xv6
 

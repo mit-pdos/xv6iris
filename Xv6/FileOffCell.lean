@@ -48,8 +48,8 @@ Rocq import → Lean counterpart: `ArrCursor` (`acur`, for `fnode`) and
 -/
 import Xv6.FileGeom
 import Xv6.FsGeom
-import Xv6.DiskDefs
 import Xv6.OffGv
+import Xv6.KallocDefs
 
 namespace Xv6
 

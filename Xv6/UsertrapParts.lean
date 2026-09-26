@@ -33,21 +33,6 @@ consoleread's kill shot) in the seal.
 Definitional + pure + small proof-mode lemmas; no instruction stepping.
 -/
 import Xv6.SpecUsertrap
-import Xv6.SpecMyproc
-import Xv6.SpecKilled
-import Xv6.SpecSetkilled
-import Xv6.SpecDevintr
-import Xv6.SpecVmfault
-import Xv6.SpecYield
-import Xv6.SpecKexit
-import Xv6.SpecPrepareReturn
-import Xv6.SpecPrintk
-import Xv6.SpecSyscall
-import Xv6.SpecKernelvec
-import Xv6.ProcPrivAcc
-import Xv6.UsysMemOkSpec
-import Xv6.KillRow
-import MachCSL.WpSmodeFrame
 
 namespace Xv6
 

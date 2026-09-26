@@ -10,7 +10,6 @@ as in `LinkFilestat` (its page-table walkers are parameters of
 closed term).
 -/
 import Xv6.ProofSysFstat
-import Xv6.LinkMyproc
 import Xv6.LinkArgraw
 import Xv6.LinkArgint
 import Xv6.LinkArgaddr

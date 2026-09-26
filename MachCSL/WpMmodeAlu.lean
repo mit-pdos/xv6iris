@@ -6,7 +6,6 @@ Same shape as `WpMmode.lean`.
 -/
 import MachCSL.WpCycle
 import MachCSL.WpGpr
-import MachCSL.Instr
 
 namespace MachCSL
 

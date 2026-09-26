@@ -58,9 +58,7 @@ sibling, one layer up.  Definitional: no `wp`.
 Imports only definitional files.
 -/
 import Xv6.FdTable
-import Xv6.UMemLemmas
 import Xv6.LazyFree
-import Xv6.WordFrac
 
 namespace Xv6
 

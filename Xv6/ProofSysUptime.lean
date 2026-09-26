@@ -20,13 +20,9 @@ at either `SIE` (`k_step_gen` / `wpNext_intro_pin`), exactly the shape of
 arm out, `release` pops it with `reen = k.sie` (`KCtx.reen_of_wf`), and
 the pair is balanced (`KCtx.pushOffAt_popExit`).
 -/
-import MachCSL.WpSmodeFrame
-import MachCSL.WpSmodeCycle
-import MachCSL.WpLock
 import Xv6.SpecSysUptime
 import Xv6.SpecAcquire
 import Xv6.SpecRelease
-import Xv6.TicksDefs
 import Xv6.CodeTactics
 
 namespace Xv6

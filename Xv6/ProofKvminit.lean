@@ -6,8 +6,6 @@ The shape: the two-slot frame, the call to `kvmmake`, the `auipc`/`sd`
 pair that publishes the new root in `kernel_pagetable`, and the epilogue.
 Stated at either interrupt index, as `kvmmake` is.
 -/
-import MachCSL.WpSmodeFrame
-import MachCSL.Lock
 import Xv6.SpecKvminit
 import Xv6.CodeTactics
 

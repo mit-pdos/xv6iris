@@ -19,8 +19,8 @@ is `kb.withSpie spie spp` (`utBase_withSpie`).
 `UT_FA` runs at interrupts off; the `bne` is split on `s2 = 2` (no fact
 about `s2` is needed: either arm ends at +0xae).
 -/
-import Xv6.UsertrapKexit
-import Xv6.CodeTactics
+import Xv6.SpecYield
+import Xv6.UsertrapBlocks
 
 namespace Xv6
 

@@ -16,7 +16,6 @@ W1-M1 and W1-M3):
   friendly.
 -/
 import MachCSL.WpSmodeFrame12b
-import MachCSL.WpSmodeRules
 
 namespace MachCSL
 

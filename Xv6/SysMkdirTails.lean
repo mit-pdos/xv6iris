@@ -32,7 +32,7 @@ Rocq's header points, kept:
 2. The pid share is lent through `sys_mkdir_pid` (SysMkdirFrame deviation 2)
    instead of Rocq's `proc_priv_bare_acc`.
 -/
-import Xv6.SysMkdirCalls
+import Xv6.SysMkdirFrame
 
 namespace Xv6
 

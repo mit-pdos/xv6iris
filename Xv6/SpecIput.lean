@@ -99,15 +99,7 @@ Dropped/simplified vs Rocq: none (the contract is clause-for-clause Rocq's).
 Imports only definitional files and callee `Spec*` files.
 -/
 import Xv6.SpecItrunc
-import Xv6.SpecAcquire
-import Xv6.SpecRelease
-import Xv6.SpecAcquiresleep
-import Xv6.SpecReleasesleep
-import Xv6.SpecLogWrite
 import Xv6.IcacheTable
-import Xv6.IcacheHeld
-import Xv6.TxPin
-import Xv6.SpecSleep
 
 namespace Xv6
 

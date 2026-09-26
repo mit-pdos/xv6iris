@@ -58,10 +58,6 @@ that names a descriptor state can name a queue.
    `pipeRstop(Noobs)`/`pipeRpost(Img)`; lemma suffixes kept
    (`pipeQueue_agree`, `pipeWlink_of_frag`, …).
 -/
-import Iris.Algebra.Lib.ExclAuth
-import MachCSL.Resources
-import Xv6.UartTrace
-import Xv6.UPtDefs
 import Xv6.UMemLemmas
 
 namespace Xv6

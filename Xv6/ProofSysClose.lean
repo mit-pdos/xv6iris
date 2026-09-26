@@ -25,9 +25,7 @@ fileclose everything is at its return hart.
 -/
 import Xv6.SpecSysClose
 import Xv6.SysfileCalls
-import Xv6.SpecMyproc
 import Xv6.ArgLemmas
-import Xv6.CodeTactics
 import MachCSL.WpSmodeFrame6
 
 namespace Xv6

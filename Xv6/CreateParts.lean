@@ -73,7 +73,7 @@ import Xv6.SpecIalloc
 import Xv6.SpecIupdate
 import Xv6.SpecIunlockput
 import Xv6.SpecDirlink
-import Xv6.KernelData
+import Xv6.SpecIlock
 
 namespace Xv6
 

@@ -42,7 +42,6 @@ dispatch's resources untouched.  Three stages, each one theorem:
    exactly as Rocq's `sysc_target_nz`.
 -/
 import Xv6.SyscallRet
-import Xv6.SpecMyproc
 import Xv6.ArgLemmas
 import MachCSL.WpSmodeJalr
 

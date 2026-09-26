@@ -31,12 +31,7 @@ predicate, the per-inum geometry off `FsGeomOk`, iput's reference as the
 package `inodeHeld v` (a0 = v).  This is the form a process-level caller
 holding `fsReady` (Rocq's `fileclose_fs_env`, kexit's pre) uses.
 -/
-import Xv6.SpecBeginOp
-import Xv6.SpecIput
-import Xv6.SpecEndOp
 import Xv6.SpecFileclose
-import Xv6.FsReady
-import Xv6.IcacheHeld
 
 namespace Xv6
 

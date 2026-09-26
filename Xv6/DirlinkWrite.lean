@@ -24,6 +24,8 @@ arithmetic.
 -/
 import Xv6.DirlinkTail
 import Xv6.FsCallSitesI
+import MachCSL.WpSmodeSltu
+import Xv6.DirlinkDefs
 
 namespace Xv6
 

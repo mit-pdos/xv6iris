@@ -55,18 +55,15 @@ complement is indexed by the base context's `kb.sie` (`CrBase.sie` ties it to
 `k.sie`), so the level-0 steps move it syntactically.
 -/
 import MachCSL.WpSmodeFrame12
-import MachCSL.ByteWord
 import Xv6.SpecConsoleread
 import Xv6.ConsolereadGhost
 import Xv6.SpecAcquire
 import Xv6.SpecRelease
-import Xv6.SpecMyproc
 import Xv6.SpecKilled
 import Xv6.SpecSleepPrepare
 import Xv6.SpecSleep
-import Xv6.SpecEitherCopyout
 import Xv6.PipeRw
-import Xv6.CodeTactics
+import Xv6.WordFrac
 
 namespace Xv6
 

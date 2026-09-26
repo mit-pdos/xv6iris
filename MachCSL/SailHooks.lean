@@ -16,7 +16,7 @@ reservation CONTENT: `match_reservation` / `valid_reservation` read the opaque
 handle both answers.
 -/
 import MachCSL.SimpAttr
-import LeanRV64D
+import LeanRV64D.Xv6Extras
 
 namespace LeanRV64D.Functions
 

@@ -26,6 +26,7 @@ comes back with them; the three shares rejoin into the caller's
    `ipo_thr` exit (IputParts deviation 1).
 -/
 import Xv6.IputOfflockTail
+import Xv6.IputStages
 
 namespace Xv6
 

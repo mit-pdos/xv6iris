@@ -12,7 +12,6 @@ unchanged, well-formedness, distinct pages) are what `mappages` builds on.
 -/
 import MachCSL.PtTree
 import MachCSL.WordPointsTo
-import Xv6.KallocDefs
 
 namespace Xv6
 

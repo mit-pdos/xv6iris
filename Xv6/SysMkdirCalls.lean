@@ -28,7 +28,8 @@ The fs rows each call needs come out of `fsReady` INSIDE the wrapper.
    environment are the shared `Xv6/SysfileCalls.lean` ones; this file keeps
    create's call site.
 -/
-import Xv6.SysMkdirFrame
+import Xv6.SysfileCalls
+import Xv6.SpecCreate
 
 namespace Xv6
 
