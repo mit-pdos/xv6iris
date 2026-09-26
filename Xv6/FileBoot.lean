@@ -223,9 +223,9 @@ variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF]
 /-- **One free entry, carved** (Rocq `boot_file_entry` plus the bridge
 `file_node_raw_fentry`): the 40 `.bss` bytes of `ftable.file[k]` are
 `fentryRaw ξ k`, every field at the loader's zero. -/
-theorem bootCarve_fileEntry [CurCtx] (ξ : CtxId) (image : Mem) (himg : BootImage image) (k : Nat)
+theorem bootCarve_fileEntry [CurCtx] (ξ : CtxId) (k : Nat)
     (hk : k < NFILE) :
-    kmapStatic (GF := GF) ⊢ bootRan (imgFlat image) (fileB k) (fileB k + 40) -∗ fentryRaw ξ k := by
+    kmapStatic (GF := GF) ⊢ bootRan (imgFlat bootImage) (fileB k) (fileB k + 40) -∗ fentryRaw ξ k := by
   have o : ∀ j, j < 40 → (fnode k + BitVec.ofNat 64 j).toNat = fileB k + j :=
     fun j hj => fileB_off k j hk hj
   have a0 : (aFtype k).toNat = fileB k := by
@@ -244,15 +244,15 @@ theorem bootCarve_fileEntry [CurCtx] (ξ : CtxId) (image : Mem) (himg : BootImag
     · rw [bc_bss_val]; omega
     · rw [bc_end_val]; omega
   iintro #Hk H
-  icases (bootRan_split (GF := GF) (imgFlat image) B (B + 4) (B + 40) (by omega) (by omega)).1 $$ H with ⟨Hty, H⟩
-  icases (bootRan_split (GF := GF) (imgFlat image) (B + 4) (B + 8) (B + 40) (by omega) (by omega)).1 $$ H with ⟨Href, H⟩
-  icases (bootRan_split (GF := GF) (imgFlat image) (B + 8) (B + 9) (B + 40) (by omega) (by omega)).1 $$ H with ⟨Hrd, H⟩
-  icases (bootRan_split (GF := GF) (imgFlat image) (B + 9) (B + 10) (B + 40) (by omega) (by omega)).1 $$ H with ⟨Hwr, H⟩
-  icases (bootRan_split (GF := GF) (imgFlat image) (B + 10) (B + 16) (B + 40) (by omega) (by omega)).1 $$ H with ⟨-, H⟩
-  icases (bootRan_split (GF := GF) (imgFlat image) (B + 16) (B + 24) (B + 40) (by omega) (by omega)).1 $$ H with ⟨Hpp, H⟩
-  icases (bootRan_split (GF := GF) (imgFlat image) (B + 24) (B + 32) (B + 40) (by omega) (by omega)).1 $$ H with ⟨Hip, H⟩
-  icases (bootRan_split (GF := GF) (imgFlat image) (B + 32) (B + 36) (B + 40) (by omega) (by omega)).1 $$ H with ⟨Hoff, H⟩
-  icases (bootRan_split (GF := GF) (imgFlat image) (B + 36) (B + 38) (B + 40) (by omega) (by omega)).1 $$ H with ⟨Hmj, -⟩
+  icases (bootRan_split (GF := GF) (imgFlat bootImage) B (B + 4) (B + 40) (by omega) (by omega)).1 $$ H with ⟨Hty, H⟩
+  icases (bootRan_split (GF := GF) (imgFlat bootImage) (B + 4) (B + 8) (B + 40) (by omega) (by omega)).1 $$ H with ⟨Href, H⟩
+  icases (bootRan_split (GF := GF) (imgFlat bootImage) (B + 8) (B + 9) (B + 40) (by omega) (by omega)).1 $$ H with ⟨Hrd, H⟩
+  icases (bootRan_split (GF := GF) (imgFlat bootImage) (B + 9) (B + 10) (B + 40) (by omega) (by omega)).1 $$ H with ⟨Hwr, H⟩
+  icases (bootRan_split (GF := GF) (imgFlat bootImage) (B + 10) (B + 16) (B + 40) (by omega) (by omega)).1 $$ H with ⟨-, H⟩
+  icases (bootRan_split (GF := GF) (imgFlat bootImage) (B + 16) (B + 24) (B + 40) (by omega) (by omega)).1 $$ H with ⟨Hpp, H⟩
+  icases (bootRan_split (GF := GF) (imgFlat bootImage) (B + 24) (B + 32) (B + 40) (by omega) (by omega)).1 $$ H with ⟨Hip, H⟩
+  icases (bootRan_split (GF := GF) (imgFlat bootImage) (B + 32) (B + 36) (B + 40) (by omega) (by omega)).1 $$ H with ⟨Hoff, H⟩
+  icases (bootRan_split (GF := GF) (imgFlat bootImage) (B + 36) (B + 38) (B + 40) (by omega) (by omega)).1 $$ H with ⟨Hmj, -⟩
   obtain ⟨l0, e0, m0⟩ := cl 4 B (by omega) (by omega) (by omega)
   obtain ⟨l1, e1, m1⟩ := cl 4 (B + 4) (by omega) (by omega) (by omega)
   obtain ⟨l2, e2, m2⟩ := cl 1 (B + 8) (by omega) (by omega) (by omega)
@@ -269,14 +269,14 @@ theorem bootCarve_fileEntry [CurCtx] (ξ : CtxId) (image : Mem) (himg : BootImag
   have a32 : (aFoff k).toNat = B + 32 := o 32 (by decide)
   have a36 : (aFmajor k).toNat = B + 36 := o 36 (by decide)
   clear o
-  ihave Hty := bootBss_cellAt (GF := GF) ξ image himg (aFtype k) 4 B (B + 4) a0 rfl l0 e0 m0 $$ Hk Hty
-  ihave Href := bootBss_cellAt (GF := GF) ξ image himg (aFref k) 4 (B + 4) (B + 8) a4 rfl l1 e1 m1 $$ Hk Href
-  ihave Hrd := bootBss_cellAt (GF := GF) ξ image himg (aFreadable k) 1 (B + 8) (B + 9) a8 rfl l2 e2 m2 $$ Hk Hrd
-  ihave Hwr := bootBss_cellAt (GF := GF) ξ image himg (aFwritable k) 1 (B + 9) (B + 10) a9 rfl l3 e3 m3 $$ Hk Hwr
-  ihave Hpp := bootBss_cellAt (GF := GF) ξ image himg (aFpipe k) 8 (B + 16) (B + 24) a16 rfl l4 e4 m4 $$ Hk Hpp
-  ihave Hip := bootBss_cellAt (GF := GF) ξ image himg (aFip k) 8 (B + 24) (B + 32) a24 rfl l5 e5 m5 $$ Hk Hip
-  ihave Hoff := bootBss_cellAt (GF := GF) ξ image himg (aFoff k) 4 (B + 32) (B + 36) a32 rfl l6 e6 m6 $$ Hk Hoff
-  ihave Hmj := bootBss_cellAt (GF := GF) ξ image himg (aFmajor k) 2 (B + 36) (B + 38) a36 rfl l7 e7 m7 $$ Hk Hmj
+  ihave Hty := bootBss_cellAt (GF := GF) ξ (aFtype k) 4 B (B + 4) a0 rfl l0 e0 m0 $$ Hk Hty
+  ihave Href := bootBss_cellAt (GF := GF) ξ (aFref k) 4 (B + 4) (B + 8) a4 rfl l1 e1 m1 $$ Hk Href
+  ihave Hrd := bootBss_cellAt (GF := GF) ξ (aFreadable k) 1 (B + 8) (B + 9) a8 rfl l2 e2 m2 $$ Hk Hrd
+  ihave Hwr := bootBss_cellAt (GF := GF) ξ (aFwritable k) 1 (B + 9) (B + 10) a9 rfl l3 e3 m3 $$ Hk Hwr
+  ihave Hpp := bootBss_cellAt (GF := GF) ξ (aFpipe k) 8 (B + 16) (B + 24) a16 rfl l4 e4 m4 $$ Hk Hpp
+  ihave Hip := bootBss_cellAt (GF := GF) ξ (aFip k) 8 (B + 24) (B + 32) a24 rfl l5 e5 m5 $$ Hk Hip
+  ihave Hoff := bootBss_cellAt (GF := GF) ξ (aFoff k) 4 (B + 32) (B + 36) a32 rfl l6 e6 m6 $$ Hk Hoff
+  ihave Hmj := bootBss_cellAt (GF := GF) ξ (aFmajor k) 2 (B + 36) (B + 38) a36 rfl l7 e7 m7 $$ Hk Hmj
   unfold fentryRaw FD_NONE
   iframe Hty Href Hoff
   isplitl [Hrd]
@@ -292,26 +292,26 @@ theorem bootCarve_fileEntry [CurCtx] (ξ : CtxId) (image : Mem) (himg : BootImag
 /-- **The `NFILE` entries, carved** (Rocq `boot_file_entries`): the array
 `[ftable + 24, <disk>)`, one `fentryRaw` per slot, which is what
 `fileBoot_ftableRes` takes. -/
-theorem bootCarve_fileEntries [CurCtx] (ξ : CtxId) (image : Mem) (himg : BootImage image) :
-    kmapStatic (GF := GF) ⊢ bootRan (imgFlat image) (fileB 0) (fileB 0 + 40 * NFILE) -∗
+theorem bootCarve_fileEntries [CurCtx] (ξ : CtxId) :
+    kmapStatic (GF := GF) ⊢ bootRan (imgFlat bootImage) (fileB 0) (fileB 0 + 40 * NFILE) -∗
       [∗list] k ∈ List.range NFILE, fentryRaw ξ k := by
   iintro #Hk H
-  ihave H := bootRan_stride (GF := GF) (imgFlat image) (fileB 0) 40 NFILE $$ H
+  ihave H := bootRan_stride (GF := GF) (imgFlat bootImage) (fileB 0) 40 NFILE $$ H
   iapply BigSepL.bigSepL_impl $$ H
   imodintro
   iintro %n %k %hk Hi
   have hk' : k < NFILE := List.mem_range.1 (List.mem_of_getElem? hk)
   have e : fileB 0 + 40 * k = fileB k := by unfold fileB; omega
   rw [e]
-  iapply bootCarve_fileEntry ξ image himg k hk' $$ Hk Hi
+  iapply bootCarve_fileEntry ξ k hk' $$ Hk Hi
 
 /-- **The whole `ftable` symbol, carved** (Rocq `main_locks_raw`'s ftable
 row plus `boot_file_entries`, deviation 4): `[ftable, ftable + 0xfb8)`,
 which ends exactly at `<disk>`, is `fileinit`'s lock words and the
 `NFILE` raw entries. -/
-theorem bootCarve_ftable [CurCtx] (ξ : CtxId) (image : Mem) (himg : BootImage image) :
+theorem bootCarve_ftable [CurCtx] (ξ : CtxId) :
     kmapStatic (GF := GF) ⊢
-      bootRan (imgFlat image) MachCSL.KernelSyms.«ftable» (MachCSL.KernelSyms.«ftable» + 0xfb8) -∗
+      bootRan (imgFlat bootImage) MachCSL.KernelSyms.«ftable» (MachCSL.KernelSyms.«ftable» + 0xfb8) -∗
       lockWords ftableLockAddr 0#32 0#64 0#64 ∗ [∗list] k ∈ List.range NFILE, fentryRaw ξ k := by
   have hF : MachCSL.KernelSyms.«ftable» = 0x80022548 := rfl
   have hlk : ftableLockAddr.toNat = 0x80022548 := rfl
@@ -319,11 +319,11 @@ theorem bootCarve_ftable [CurCtx] (ξ : CtxId) (image : Mem) (himg : BootImage i
   have hN : NFILE = 100 := rfl
   rw [hF]
   iintro #Hk H
-  icases (bootRan_split (GF := GF) (imgFlat image) 0x80022548 (0x80022548 + 24) (0x80022548 + 0xfb8)
+  icases (bootRan_split (GF := GF) (imgFlat bootImage) 0x80022548 (0x80022548 + 24) (0x80022548 + 0xfb8)
     (by omega) (by omega)).1 $$ H with ⟨Hl, H⟩
-  ihave Hl := bootCarve_lockWords (GF := GF) image himg ftableLockAddr _ hlk (by omega) (by omega) (by omega) $$ Hk Hl
+  ihave Hl := bootCarve_lockWords (GF := GF) ftableLockAddr _ hlk (by omega) (by omega) (by omega) $$ Hk Hl
   iframe Hl
-  iapply bootCarve_fileEntries ξ image himg $$ Hk
+  iapply bootCarve_fileEntries ξ $$ Hk
   rw [h0, hN]
   iexact H
 

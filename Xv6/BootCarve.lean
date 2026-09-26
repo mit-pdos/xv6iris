@@ -18,8 +18,10 @@ bundles at `main`'s altitude are `Xv6.BootCarveMain`.
   against the ELF's loaded image, by chunked `decide +kernel` (`bc_img_*`),
   as the text/rodata address bounds are (`bc_text*`, `bc_ro*`); each chunk
   is well under a second, and the literals are never unfolded in the proof
-  mode.  The carve's lemmas are stated over an image `image` with
-  `BootImage image`; `bootCarve_era` instantiates them at `bootImage`.
+  mode.  The carve's bundles are stated at `bootImage` (as Rocq's are at
+  `boot_byte`); only the byte-run helpers (`bootImg_run`,
+  `bootImg_ctxBytes`, `bootImg_wordAtN`, `bootRo_imgByte(s)`) stay generic
+  in the image.
 * §1 RANGES (Rocq §6 `ran_bytes`/`boot_raw_ran`): `Xv6.bootRan m lo hi`,
   the histories at `[lo, hi)` as a `PartialMap.filter`; `bootRaw_ran`,
   `bootRan_split` (Rocq `boot_ran_split`), `bootRan_one`, the run induction
@@ -51,8 +53,8 @@ them over as `kmapStaticAt E` in `powerBootRes`.
 DEVIATIONS from Rocq (none process-layer):
 1. (Retired, D47.)  As in Rocq, the boot memory is a language constant
    (`MachCSL.bootImage`, Rocq `RiscvLang.boot_image`), so `BootImage` is a
-   theorem (`bootImage_wf`), not a premise.  The carve lemmas stay generic
-   in the image (with `BootImage image`); only `bootCarve_era` fixes it.
+   theorem (`bootImage_wf`), not a premise, and no carve lemma takes an
+   image argument.
 2. `.data` (`first`, `nextpid`, `uarts`), `.got` and `.got.plt` are in
    `BootImage.data` (`Kernel.dataInit`, 136 bytes, emitted by
    tools/gen_kernel_data.py; `bc_dataInit_addrs`: exactly `[_data, _bss)`).
@@ -493,29 +495,29 @@ theorem bootImage_wf : BootImage bootImage where
       bootByte_zero _ (by unfold KernelElf.elfEnd; omega)]
 
 /-- **The kernel text** out of the persisted window (Rocq `kernel_text_intro`). -/
-theorem kernelText_intro (image : Mem) (himg : BootImage image) :
-    kmapStatic (GF := GF) ∗ bootRo (imgFlat image) bcRoLo bcRoHi ⊢ kernelText := by
+theorem kernelText_intro :
+    kmapStatic (GF := GF) ∗ bootRo (imgFlat bootImage) bcRoLo bcRoHi ⊢ kernelText := by
   unfold kernelText
   iintro ⟨#Hk, #Ho⟩
   iframe Hk
-  iapply (BigSepL.bigSepL_intro (P := iprop(□ bootRo (GF := GF) (imgFlat image) bcRoLo bcRoHi))
+  iapply (BigSepL.bigSepL_intro (P := iprop(□ bootRo (GF := GF) (imgFlat bootImage) bcRoLo bcRoHi))
     (fun _ k hk => by
       have hk' := List.mem_of_getElem? hk
-      exact intuitionistically_elim.trans (bootRo_imgBytes image _ _ _ _ _
-        (bc_text_bytes k hk') (himg.text k hk'))))
+      exact intuitionistically_elim.trans (bootRo_imgBytes bootImage _ _ _ _ _
+        (bc_text_bytes k hk') (bootImage_wf.text k hk'))))
   imodintro
   iexact Ho
 
 /-- **The rodata** out of the persisted window (Rocq `kernel_data_intro`). -/
-theorem kernelData_intro (image : Mem) (himg : BootImage image) :
-    bootRo (GF := GF) (imgFlat image) bcRoLo bcRoHi ⊢ kernelData := by
+theorem kernelData_intro :
+    bootRo (GF := GF) (imgFlat bootImage) bcRoLo bcRoHi ⊢ kernelData := by
   unfold kernelData dataByte
   iintro #Ho
-  iapply (BigSepL.bigSepL_intro (P := iprop(□ bootRo (GF := GF) (imgFlat image) bcRoLo bcRoHi))
+  iapply (BigSepL.bigSepL_intro (P := iprop(□ bootRo (GF := GF) (imgFlat bootImage) bcRoLo bcRoHi))
     (fun _ p hp => by
       have hp' := List.mem_of_getElem? hp
-      exact intuitionistically_elim.trans (bootRo_imgBytes image _ _ _ _ _
-        (bc_ro_bytes p hp') (himg.rodata p hp'))))
+      exact intuitionistically_elim.trans (bootRo_imgBytes bootImage _ _ _ _ _
+        (bc_ro_bytes p hp') (bootImage_wf.rodata p hp'))))
   imodintro
   iexact Ho
 
@@ -558,29 +560,29 @@ theorem bootImg_wordAtN [CurCtx] (ξ : CtxId) (image : Mem) (A n : Nat) (w : Bit
   iapply bc_wordAtN_intro ξ _ n _ w (bcInRam_inRam hA) (by rw [ht]; exact hal) $$ Hid Hb
 
 /-- ...at SOME value (the image's), when only its presence is known. -/
-theorem bootImg_wordAtN_ex [CurCtx] (ξ : CtxId) (image : Mem) (himg : BootImage image)
+theorem bootImg_wordAtN_ex [CurCtx] (ξ : CtxId)
     (A n : Nat) (hn : 0 < n) (hA : bcInRam A n) (hlo : 0x80007000 ≤ A) (hal : A % n = 0) :
-    kmapStatic (GF := GF) ⊢ bootRan (imgFlat image) A (A + n) -∗
+    kmapStatic (GF := GF) ⊢ bootRan (imgFlat bootImage) A (A + n) -∗
       ∃ w : BitVec (8 * n), wordAtN ξ (BitVec.ofNat 64 A) n (DFrac.own 1) w := by
-  obtain ⟨w, hw⟩ := bootImgHas_exists image A n hA himg.ram
+  obtain ⟨w, hw⟩ := bootImgHas_exists bootImage A n hA bootImage_wf.ram
   iintro #Hk H
   iexists w
-  iapply bootImg_wordAtN ξ image A n w hn hA hlo hal hw $$ Hk H
+  iapply bootImg_wordAtN ξ bootImage A n w hn hA hlo hal hw $$ Hk H
 
 /-- ...and at ZERO inside `.bss` (Rocq `boot_ran_cell*_bss`). -/
-theorem bootImg_wordAtN_bss [CurCtx] (ξ : CtxId) (image : Mem) (himg : BootImage image)
+theorem bootImg_wordAtN_bss [CurCtx] (ξ : CtxId)
     (A n : Nat) (hn : 0 < n) (hlo : MachCSL.KernelSyms.«_bss» ≤ A) (hhi : A + n ≤ MachCSL.KernelSyms.«end»)
     (hal : A % n = 0) :
-    kmapStatic (GF := GF) ⊢ bootRan (imgFlat image) A (A + n) -∗
+    kmapStatic (GF := GF) ⊢ bootRan (imgFlat bootImage) A (A + n) -∗
       wordAtN ξ (BitVec.ofNat 64 A) n (DFrac.own 1) 0#(8 * n) := by
   have hA : bcInRam A n := by
     unfold bcInRam ramBase ramEnd; simp only [MachCSL.KernelSyms.«_bss», MachCSL.KernelSyms.«end»] at *
     omega
-  refine bootImg_wordAtN ξ image A n _ hn hA (by simp only [MachCSL.KernelSyms.«_bss»] at hlo; omega) hal ?_
+  refine bootImg_wordAtN ξ bootImage A n _ hn hA (by simp only [MachCSL.KernelSyms.«_bss»] at hlo; omega) hal ?_
   intro j hj
   rw [show nthByte (0#(8 * n)) j = 0#8 by simp [nthByte]]
   have := bc_addr_toNat A j (by simp only [MachCSL.KernelSyms.«end»] at hhi; omega)
-  exact himg.bss _ (by omega) (by omega)
+  exact bootImage_wf.bss _ (by omega) (by omega)
 
 /-- One byte at a context is a one-byte `ctxBytes`. -/
 theorem bc_ctxBytes_one (ξ : CtxId) (a : PAddr) (dq : DFrac) (v : BitVec 8) :
@@ -593,18 +595,18 @@ theorem bc_ctxBytes_one (ξ : CtxId) (a : PAddr) (dq : DFrac) (v : BitVec 8) :
 /-- **A byte buffer of the owned half, at the image's contents** (Rocq
 `boot_ran_bytes_list`): the `n` bytes of `[A, A + n)` above `etext`, one
 kernel byte cell each, at context `ξ`. -/
-theorem bootImg_bytes_ex [CurCtx] (ξ : CtxId) (image : Mem) (himg : BootImage image)
+theorem bootImg_bytes_ex [CurCtx] (ξ : CtxId)
     (A n : Nat) (hA : bcInRam A n) (hlo : 0x80007000 ≤ A) :
-    kmapStatic (GF := GF) ⊢ bootRan (imgFlat image) A (A + n) -∗
+    kmapStatic (GF := GF) ⊢ bootRan (imgFlat bootImage) A (A + n) -∗
       ∃ bs : List (BitVec 8), ⌜bs.length = n⌝ ∗
         [∗list] j ↦ b ∈ bs, wordAtN ξ (BitVec.ofNat 64 A + BitVec.ofNat 64 j) 1 (DFrac.own 1) b := by
-  let vals : Nat → BitVec 8 := fun j => (image[BitVec.ofNat 64 A + BitVec.ofNat 64 j]?).getD 0#8
-  have hv : ∀ j, j < n → image[BitVec.ofNat 64 A + BitVec.ofNat 64 j]? = some (vals j) := by
+  let vals : Nat → BitVec 8 := fun j => (bootImage[BitVec.ofNat 64 A + BitVec.ofNat 64 j]?).getD 0#8
+  have hv : ∀ j, j < n → bootImage[BitVec.ofNat 64 A + BitVec.ofNat 64 j]? = some (vals j) := by
     intro j hj
-    obtain ⟨v, h⟩ := himg.ram _ (bcInRam_byte hA hj)
+    obtain ⟨v, h⟩ := bootImage_wf.ram _ (bcInRam_byte hA hj)
     simp only [vals, h, Option.getD_some]
   iintro #Hk Hr
-  ihave Hr := bootImg_run image A n vals hA hv $$ Hr
+  ihave Hr := bootImg_run bootImage A n vals hA hv $$ Hr
   iexists (List.range n).map vals
   isplitr
   · ipureintro; simp
@@ -659,23 +661,23 @@ theorem bootRan_stride (m : MemF Hist) (base stride : Nat) :
 byte histories of a fresh era, with the static claims, persist the
 read-only window into the kernel's read-only image (`KernelImage.ro`, the
 copy `kctx` owns) and hand back the owned half `[_data, PHYSTOP)`. -/
-theorem bootCarve_image (image : Mem) (himg : BootImage image) :
-    kmapStatic (GF := GF) ∗ bootRaw (imgFlat image) ⊢@{IProp GF}
-      |==> ((kernelText ∗ kernelData ∗ kmapStatic) ∗ bootRan (imgFlat image) bcRoHi ramEnd) := by
+theorem bootCarve_image :
+    kmapStatic (GF := GF) ∗ bootRaw (imgFlat bootImage) ⊢@{IProp GF}
+      |==> ((kernelText ∗ kernelData ∗ kmapStatic) ∗ bootRan (imgFlat bootImage) bcRoHi ramEnd) := by
   have h1 : bcRoLo ≤ bcRoHi := by decide
   have h2 : bcRoHi ≤ ramEnd := by decide
   have h3 : ramEnd ≤ 2 ^ 64 := by decide
   iintro ⟨#Hk, H⟩
-  ihave H := bootRaw_ran (GF := GF) (imgFlat image) $$ H
-  icases (bootRan_split (GF := GF) (imgFlat image) 0 bcRoLo (2 ^ 64) (by omega) (by unfold bcRoLo ramBase; omega)).1
+  ihave H := bootRaw_ran (GF := GF) (imgFlat bootImage) $$ H
+  icases (bootRan_split (GF := GF) (imgFlat bootImage) 0 bcRoLo (2 ^ 64) (by omega) (by unfold bcRoLo ramBase; omega)).1
     $$ H with ⟨-, H⟩
-  icases (bootRan_split (GF := GF) (imgFlat image) bcRoLo bcRoHi (2 ^ 64) h1 (by omega)).1 $$ H with ⟨Hro, H⟩
-  icases (bootRan_split (GF := GF) (imgFlat image) bcRoHi ramEnd (2 ^ 64) h2 h3).1 $$ H with ⟨Hown, -⟩
-  ihave Hro := bootRan_persist (GF := GF) (imgFlat image) bcRoLo bcRoHi $$ Hro
+  icases (bootRan_split (GF := GF) (imgFlat bootImage) bcRoLo bcRoHi (2 ^ 64) h1 (by omega)).1 $$ H with ⟨Hro, H⟩
+  icases (bootRan_split (GF := GF) (imgFlat bootImage) bcRoHi ramEnd (2 ^ 64) h2 h3).1 $$ H with ⟨Hown, -⟩
+  ihave Hro := bootRan_persist (GF := GF) (imgFlat bootImage) bcRoLo bcRoHi $$ Hro
   imod Hro with #Hro
-  ihave Ht := kernelText_intro (GF := GF) image himg $$ [Hk Hro]
+  ihave Ht := kernelText_intro (GF := GF) $$ [Hk Hro]
   · iframe Hk Hro
-  ihave Hd := kernelData_intro (GF := GF) image himg $$ Hro
+  ihave Hd := kernelData_intro (GF := GF) $$ Hro
   imodintro
   iframe Ht Hd Hk Hown
 
@@ -698,16 +700,16 @@ theorem bootCarve_owned (m : MemF Hist) :
 /-- **The GOT word** `_entry` loads `&stack0` from (BootHart deviation 1),
 out of `.data`/`.got`, as the M-mode physical cell `wp_boot_body` takes (at any
 fraction: the shared allocation discards it and gives each hart a copy). -/
-theorem bootCarve_got [CurCtx] (image : Mem) (himg : BootImage image) :
-    bootRan (GF := GF) (imgFlat image) MachCSL.KernelSyms.«_data» MachCSL.KernelSyms.«_bss» ⊢
+theorem bootCarve_got [CurCtx] :
+    bootRan (GF := GF) (imgFlat bootImage) MachCSL.KernelSyms.«_data» MachCSL.KernelSyms.«_bss» ⊢
       pwordPointsTo stack0Slot 8 (DFrac.own 1) KA.«stack0» := by
   have hs : stack0Slot = BitVec.ofNat 64 0x8000a318 := by decide
   have hA : bcInRam 0x8000a318 8 := by unfold bcInRam ramBase ramEnd; omega
   iintro H
-  icases (bootRan_split (GF := GF) (imgFlat image) _ 0x8000a318 _ (by decide) (by decide)).1 $$ H with ⟨-, H⟩
-  icases (bootRan_split (GF := GF) (imgFlat image) _ (0x8000a318 + 8) _ (by decide) (by decide)).1 $$ H with ⟨H, -⟩
+  icases (bootRan_split (GF := GF) (imgFlat bootImage) _ 0x8000a318 _ (by decide) (by decide)).1 $$ H with ⟨-, H⟩
+  icases (bootRan_split (GF := GF) (imgFlat bootImage) _ (0x8000a318 + 8) _ (by decide) (by decide)).1 $$ H with ⟨H, -⟩
   rw [hs]
-  ihave H := bootImg_ctxBytes (GF := GF) curCtx image 0x8000a318 8 _ hA (hs ▸ himg.got) $$ H
+  ihave H := bootImg_ctxBytes (GF := GF) curCtx bootImage 0x8000a318 8 _ hA (hs ▸ bootImage_wf.got) $$ H
   iapply pwordPointsTo_intro _ 8 _ _ (bcInRam_inRam hA) (by decide) $$ H
 
 end
@@ -729,7 +731,7 @@ theorem bootCarve_era (E : EraGS GF) (gen : Nat) (cP : CPU → BitVec 64 → IPr
       |==> ((kernelText ∗ kernelData ∗ kmapStatic) ∗ bootRan (imgFlat bootImage) bcRoHi ramEnd) := by
   letI : MachGS hlc GF := MachGS.ofEra E gen cP cI eP ePe
   rw [hbf.1]
-  exact bootCarve_image bootImage bootImage_wf
+  exact bootCarve_image
 
 end era
 
