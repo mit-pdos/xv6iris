@@ -176,7 +176,20 @@ arms, not parser), `UkShRedirAns`, and the new pure `UkShRedirCut`
 (the redirect cut in its landed spelling).  `UkShParse*` were not
 re-stated: the general walks sit beside them and the symbol-free
 statements are corollaries.  Kept as planned: the runcmd arms and child
-walks, at the general parser theorem.
+walks, at the general parser theorem.  The N-stage layer `UkShPipes{Parse,
+Cmd,Seam,Round}` is corollaries too (the reference's right spine
+`RefParseBridge.ushq_ptree`), and the sixteen shells are gone (2026-09-26).
+
+**The out-of-memory law's budget is a function of the tree** (since xv6
+d66e41c, `UkShCmdalloc.ushp_oom Pex K`: the caller's law at every panic run
+of budget at least `K`).  Each general walk takes it at its entry budget
+less the deepest panic under the tree -- `UkShArgs.ushp_pex_deep` (22, or
+42 under a REDIR on top), `UkShParser.ushp_pp_deep` / `ushp_pl_deep` /
+`ushp_deep` beside the rooms -- so the walk asks for the least it can and
+every consumer, the N-stage statements at `20 + nn` included, is a mono
+step away.  A budget stated as a constant below the caller's extra
+(`nn - 2`) is not a corollary's premise: it asks for more than a caller
+with a larger `K` can give.
 
 ## 3. Abstraction B — `fd_stream`: a descriptor row as a byte stream with an owned payment
 

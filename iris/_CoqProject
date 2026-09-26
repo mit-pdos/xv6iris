@@ -1621,21 +1621,12 @@ UkShParseRedir.v
 UkShParseExec.v
 UkShParseCmd.v
 UkShRedirCut.v
-UkShRedirLex.v
-UkShRedirGtk.v
 UkShRedirCmd.v
 UkShRedirs.v
-UkShRedirPr.v
-UkShRedirEx.v
 UkShArgs.v
-UkShRedirPex.v
 UkShPipeNode.v
 UkShPipeCmd.v
 UkShParser.v
-UkShPipeParse.v
-UkShRedirNul.v
-UkShRedirCm.v
-UkShRedirPc.v
 
 UCodeShM.v
 UkShMalloc.v
@@ -1653,15 +1644,8 @@ UkShEcho.v
 UShLexRedir.v
 UkShPipeLex.v
 UkShPipesLex.v
-UkShPipeTok.v
 RefParseBridge.v
 UkShPipeSeam.v
-UkShPipeEx.v
-UkShPipeRight.v
-UkShPipePr.v
-UkShPipeEx2.v
-UkShPipePex.v
-UkShPipeCm.v
 UkShPipesParse.v
 UkShPipesSeam.v
 UkShPipesCmd.v

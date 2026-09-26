@@ -312,37 +312,59 @@ console instance waits for its M3.
   `UShPipeCatRound` as instances.  Exit: one echo entry, one cat round,
   three instance files each.
 
-## RESUME HERE (2026-09-26, after upstream's d66e41c bump)
+## RESUME HERE (2026-09-26, lane A complete on d66e41c)
 
-**Where things are.**  `main` = `origin/main` (dee9cac0c: upstream's bump to
-xv6 d66e41c -- sh's `cmdalloc`, the out-of-memory law `UkShCmdalloc.ushp_oom`
-threaded through every parse walk, the images relaid) + ONE commit of this
-campaign: step 0, THE SCOPE FROM THE CURSOR (`RefParse.ref_sym_scope_from`
-and the five cursor-monotonicity lemmas; the four general walks at their
-own cursor; the cursor-0 theorems unchanged).  Gate on that base: 64 files,
-0 errors, nothing pending; audits system 13, tree 13, union 14.
+**Where things are.**  Lane A of user-once is COMPLETE on `main` =
+`origin/main` (dee9cac0c, upstream's bump to xv6 d66e41c) + four commits of
+this campaign, in order:
 
-**What did NOT re-land, and why (RULING NEEDED).**  Steps 2-3 (the N-stage
-layer `UkShPipes{Parse,Cmd,Seam,Round}` as corollaries of the parser
-theorem, then the sixteen one-bar shells deleted) landed on the previous
-base (branch `user-once/N`, 81cc1b905, gate green, audits at baseline) but
-do not re-land on d66e41c: upstream's re-walk states the general walks'
-out-of-memory law at budget `nn - 2` (`wp_ref_parsepipe` at room
-`ushp_pp_room t + nn` takes `ushp_oom Pex (nn - 2)`) while its N-stage
-statements take it at `20 + nn` -- a WEAKER premise, so the N-stage lemma
-is not a corollary of the general one as stated.  Two ways out: (a) the
-general walks take the law at the budget the N-stage proofs already
-justify (re-prove the oom accounting in `UkShParser`/`UkShArgs`/`UkShRedirs`
-tightly: the panic sits below parsepipe's and parseexec's frames, so the
-run at panic's entry has more than `nn - 2`; then steps 2-3 land as on
-`user-once/N`, whose commits d2bb85b8e/81cc1b905 are the text to port);
-(b) leave the N-stage layer on the shells.  (a) is the right end state and
-is bounded, but it edits the general files under a collaborator's active
-SY1 lanes -- one person's change.  Everything else of user-once (C2, B1;
-B2 behind app-both's M3) is unaffected by the choice.
+- step 0 (71383237c, pushed): THE SCOPE FROM THE CURSOR --
+  `RefParse.ref_sym_scope_from` and the five cursor-monotonicity lemmas; the
+  four general walks at their own cursor; the cursor-0 theorems unchanged.
+- step 1b (b24f07704): THE OUT-OF-MEMORY LAW AT THE TREE'S DEEPEST PANIC.
+  `UkShCmdalloc.ushp_oom Pex K` (upstream d66e41c) is the caller's law at
+  every panic run of budget AT LEAST `K`, so a walk asks for LESS the larger
+  its `K`.  Upstream's re-walk stated the general walks at `nn - 2` (loose:
+  a constant below the caller's extra) while its N-stage statements carry
+  `20 + nn` over `48 + 6b + nn` -- a weaker premise, so the corollaries
+  could not be derived.  The owner's ruling was (a): the general walks now
+  take the law at the run's room less the tree's deepest panic:
+  `UkShArgs.ushp_pex_deep t` (22, or 42 under a REDIR on top: parseredirs'
+  redircmd sits twenty words below execcmd's), `UkShParser.ushp_pp_deep` /
+  `ushp_pl_deep` / `ushp_deep` mirroring the rooms (parsepipe adds 6 per
+  node, parseline 6, parsecmd 8).  `wp_ref_parseexec` takes
+  `ushp_oom Pex (16 + (24 + nn) - ushp_pex_deep t)`, `wp_ref_parsepipe`
+  `(ushp_pp_room t + nn - ushp_pp_deep t)`, `wp_ref_parseline` the same
+  with `pl`, `wp_ref_parsecmd` / `wp_ref_parser` / `UkShSeam.wp_ref_child`
+  `(ushp_room t + nn - ushp_deep t)`.  Inside parseexec the redirect turns'
+  bundles are unlocked by a redirect's presence (`ushp_redirs_res_of_ne`,
+  `ushp_pex_res_of_ne`): the law at `nn - 2` exists only under a REDIR.
+  The three specialized children (`wp_ref_child_exec/_redir/_pipe`) and
+  every consumer keep their statements; the conversion is one
+  `ushp_oom_mono` with `change ... with 60/72/66` and `42/62/48`.  At a bar
+  chain of plain EXECs the depth is `28 + 6b` against the room `46 + 6b`
+  (`UkShPipesParse.ushq_ptree_pp_deep`), so the general law at the room
+  less the depth is EXACTLY the N-stage `20 + nn` -- no slack either way.
+- step 2 (this commit, from `user-once/N`'s d2bb85b8e): the N-stage layer
+  `UkShPipes{Parse,Cmd,Seam,Round}` as corollaries of the parser theorem
+  (`RefParseBridge` SS7: `ushq_bars` is the reference's right spine;
+  `ushq_ptree` lives there), statements byte-identical to upstream's.
+- step 3 (same commit, from 81cc1b905): the sixteen shells deleted --
+  `UkShRedir{Lex,Gtk,Pr,Ex,Pex,Nul,Cm,Pc}`, `UkShPipe{Tok,Pr,Ex,Ex2,Pex,Cm,
+  Parse,Right}` and their `_CoqProject` rows.  Nothing imported them but
+  each other and the N-stage files.
 
-Superseded local branches: `user-once/A3` (pre-integration), `user-once/int`
-and `user-once/int-wip` (the first re-landing), `user-once/N` (steps 0-3 on
-the previous base -- the reference text for (a)), `user-once/N2`/`N2-wip`
-(this), `int-wip-attempt1`, the old `user-once/A*`.
+Gate after steps 2-3: 36 files (the cone above `RefParseBridge`), 0 errors,
+nothing pending; audits at baseline (system 13, tree 13, union 14).
 
+**Rule for the law's budget (durable, for every future walk).**  State
+`ushp_oom Pex K` at `K` = the walk's entry budget less the deepest panic
+under the tree it parses, as a function of the tree beside the room; never
+at a constant below the caller's extra.  A caller with a smaller `K` monos
+up; a caller with a larger one cannot come down, and that is exactly what
+blocked steps 2-3 for a day.
+
+**Next.**  C2 (`cmd_spec` / `sh_exec_arm C`), B1 (`fd_stream`); B2 behind
+app-both's M3.  Local branches: `user-once/N` (steps 0-3 on the previous
+base, now fully superseded -- delete once this is pushed), `user-once/oom`
+(this cut).

@@ -37,6 +37,7 @@ Require Import UkShRedirLine.
 Require Import UkShWords.
 Require Import UShLexRedir.
 Require Import UkShPipeLex.
+Require Import UkShPipesLex.    (* [ushq_bars]: the pipeline of any length (PIPES-C3) *)
 Require Import RefParseSym.
 Require UkSh.
 Import UkShParse.
@@ -727,3 +728,304 @@ Lemma ref_nulcut_shapes (toks : list (nat * nat)) (q e : nat) (r : nat * nat) :
   /\ ref_nulcut (UshpRedir (UshpExec toks) q e rr_mode_gt 1) = map snd toks ++ [e]
   /\ ref_nulcut (UshpPipe (UshpExec toks) (UshpExec [r])) = map snd toks ++ [snd r].
 Proof using. cbn. auto. Qed.
+
+
+(* ===================================================================== *)
+(* §7 THE PIPELINE OF ANY LENGTH: [ushq_bars] IS THE REFERENCE'S RIGHT     *)
+(*    SPINE (user-once N)                                                 *)
+(*                                                                        *)
+(* [UkShPipesLex.ushq_bars len f c a rest] is the N-stage layer's token   *)
+(* model: from cursor [c], stage [a] up to a bar read locally, then the   *)
+(* rest from two bytes past the bar; the last stage symbol-free to the    *)
+(* end.  The reference parses it to [UkShPipesParse.ushq_ptree a rest],   *)
+(* the right spine of EXEC nodes, with the cursor at [len] -- by the       *)
+(* induction on the bars, each stage the one-bar bridge's [parseexec]     *)
+(* step at a LOCAL bar (§4's [ushq_one] was the whole-line fact: exactly   *)
+(* one symbol; here only the bytes from the stage's cursor to its bar are *)
+(* symbol-free, which is all [parseexec] reads).                          *)
+(* ===================================================================== *)
+
+(* the parse's answer on a pipeline: the right spine of EXEC nodes (from
+   UkShPipesParse, which keeps the name by notation) *)
+Fixpoint ushq_ptree (a : list (nat * nat)) (rest : list (list (nat * nat)))
+    : ushp_cmd :=
+  match rest with
+  | [] => UshpExec a
+  | b :: rest' => UshpPipe (UshpExec a) (ushq_ptree b rest')
+  end.
+
+(* a blank is not a symbol *)
+Lemma ref_ws_not_sym (b : bv 8) : ushp_is_ws b = true -> ushp_is_sym b = false.
+Proof using.
+  intro Hw. destruct (ushp_is_sym b) eqn:E; [ exfalso | reflexivity ].
+  apply ushs_ws_val in Hw. apply ushs_sym_val in E. lia.
+Qed.
+
+(* the blank scan runs over blanks only; the word scan over neither
+   blanks nor symbols (UkShSeam.ushp_toklen_body, which sits above) *)
+Lemma ref_skipws_ws (n i j : nat) (f : nat -> bv 8) :
+  j < ushp_skipws n i f -> ushp_is_ws (f (i + j)) = true.
+Proof using.
+  revert i j. induction n as [| n IH ]; intros i j Hj; cbn [ushp_skipws] in Hj; [ lia | ].
+  destruct (ushp_is_ws (f i)) eqn:E; [ | lia ].
+  destruct j as [| j ]; [ rewrite Nat.add_0_r; exact E | ].
+  replace (i + S j) with (S i + j) by lia. apply IH. lia.
+Qed.
+
+Lemma ref_toklen_body (n i x : nat) (f : nat -> bv 8) :
+  x < ushp_toklen n i f -> ushp_is_ws (f (i + x)) || ushp_is_sym (f (i + x)) = false.
+Proof using.
+  revert i x. induction n as [| n IH ]; intros i x Hx; cbn [ushp_toklen] in Hx; [ lia | ].
+  destruct (ushp_is_ws (f i) || ushp_is_sym (f i)) eqn:E; [ lia | ].
+  destruct x as [| x ]; [ rewrite Nat.add_0_r; exact E | ].
+  replace (i + S x) with (S i + x) by lia. apply IH. lia.
+Qed.
+
+(* the bytes a token list covers, from its cursor to its stop, hold no
+   symbol: blanks between, word bodies within *)
+Lemma ushs_toks_nosym (len : nat) (f : nat -> bv 8) (stop : nat) :
+  forall (toks : list (nat * nat)) (off : nat),
+    ushs_toks len f stop off toks ->
+    forall j : nat, off <= j < stop -> ushp_is_sym (f j) = false.
+Proof using.
+  induction toks as [| tk rest IH ]; intros off Htoks j Hj.
+  - pose proof (ushs_toks_nil_inv _ _ _ _ Htoks) as Hnil.
+    replace j with (off + (j - off)) by lia. apply ref_ws_not_sym.
+    apply (ref_skipws_ws (len - off)). lia.
+  - destruct (ushs_toks_cons_inv' len stop off (off + ushp_skipws (len - off) off f)
+                (ushp_toklen (len - (off + ushp_skipws (len - off) off f))
+                   (off + ushp_skipws (len - off) off f) f) f tk rest
+                eq_refl eq_refl Htoks) as (Hq & -> & Hrest).
+    pose proof (ushs_toks_le _ _ _ _ _ Hrest) as Hle.
+    destruct (lt_dec j (off + ushp_skipws (len - off) off f)) as [ Hlt | Hge ].
+    + replace j with (off + (j - off)) by lia. apply ref_ws_not_sym.
+      apply (ref_skipws_ws (len - off)). lia.
+    + destruct (lt_dec j (off + ushp_skipws (len - off) off f
+                          + ushp_toklen (len - (off + ushp_skipws (len - off) off f))
+                              (off + ushp_skipws (len - off) off f) f)) as [ Hlt2 | Hge2 ].
+      * replace j with (off + ushp_skipws (len - off) off f
+                        + (j - (off + ushp_skipws (len - off) off f))) by lia.
+        pose proof (ref_toklen_body (len - (off + ushp_skipws (len - off) off f))
+                      (off + ushp_skipws (len - off) off f)
+                      (j - (off + ushp_skipws (len - off) off f)) f ltac:(lia)) as Hb.
+        apply orb_false_iff in Hb as [ _ Hs ]. exact Hs.
+      * apply (IH _ Hrest j). split; lia.
+Qed.
+
+(* A BAR, LOCAL TO A STAGE: at [p], with no symbol from the stage's
+   cursor [c] up to it.  [ushq_one len f (Some p)] is this at [c = 0] on a
+   line with no other symbol. *)
+Definition ushq_barp (len : nat) (f : nat -> bv 8) (c p : nat) : Prop :=
+  p < len /\ f p = rb_bar /\ (forall j : nat, c <= j < p -> ushp_is_sym (f j) = false).
+
+Lemma ushq_barp_of_barw (len : nat) (f : nat -> bv 8) (c gp : nat) (toks : list (nat * nat)) :
+  ushq_barw len f gp -> ushs_toks len f gp c toks -> ushq_barp len f c gp.
+Proof using.
+  intros Hbw Htoks. split; [ exact (ushq_barw_lt _ _ _ Hbw) | ].
+  split; [ rewrite <- rb_bar_is_ushq; exact (ushq_barw_bar _ _ _ Hbw) | ].
+  exact (ushs_toks_nosym len f gp toks c Htoks).
+Qed.
+
+Lemma ref_at_notin_bar_loc (len : nat) (f : nat -> bv 8) (c p s : nat) (toks : list (bv 8)) :
+  ushq_barp len f c p -> c <= s -> s <= p -> ref_symtoks toks -> rb_bar ∉ toks ->
+  ref_at len f s ∉ toks.
+Proof using.
+  intros (Hp & Hfp & Hns) Hcs Hsp Hsym Hbar Hin.
+  rewrite (ref_at_lt len f s ltac:(lia)) in Hin.
+  apply elem_of_list_lookup_1 in Hin as [ k Hk ].
+  pose proof (Forall_lookup_1 _ _ _ _ Hsym Hk) as Hb. cbn beta in Hb.
+  destruct (lt_dec s p) as [ Hlt | Hge ].
+  - rewrite (Hns s (conj Hcs Hlt)) in Hb. discriminate Hb.
+  - assert (E : s = p) by lia. subst s. rewrite Hfp in Hk.
+    exact (Hbar (elem_of_list_lookup_2 _ _ _ Hk)).
+Qed.
+
+(* the argument loop at a local bar: [ref_args_of_toks_at] with the
+   whole-line fact replaced by the stage's *)
+Lemma ref_args_of_toks_loc (len : nat) (f : nat -> bv 8) (c p : nat)
+    (toks acc : list (nat * nat)) (rs : list rredir) (n off : nat) :
+  ref_nonnul len f ->
+  ushq_barp len f c p ->
+  c <= off -> off <= p ->
+  ushs_toks len f p off toks ->
+  length acc + length toks < 10 ->
+  length toks < n ->
+  ref_args len f n off acc rs = Some (acc ++ toks, rs, p).
+Proof using.
+  revert off acc n.
+  induction toks as [| tk rest IH ]; intros off acc n Hnn Hbp Hcoff Hoff Htoks Hlen Hn.
+  - destruct Hbp as (Hp & Hbar & _).
+    destruct n as [| n ]; [ lia | ]. cbn [ref_args].
+    pose proof (ushs_toks_nil_inv _ _ _ _ Htoks) as Hnil.
+    assert (Hs : ref_skip len f off = p) by (unfold ref_skip; exact Hnil).
+    rewrite (ref_peek_hit len f off [rb_bar; rb_rpar; rb_amp; rb_semi]);
+      [ | rewrite Hs, (ref_at_lt _ _ _ Hp); exact (Hnn p Hp)
+        | rewrite Hs, (ref_at_lt _ _ _ Hp), Hbar; exact rb_bar_in_stop ].
+    rewrite Hs, app_nil_r. reflexivity.
+  - destruct n as [| n ]; [ cbn in Hn; lia | ].
+    pose proof Hbp as (Hp & _ & Hbelow).
+    destruct (ushs_toks_cons_inv' len p off (ref_skip len f off)
+                (ushp_toklen (len - ref_skip len f off) (ref_skip len f off) f) f tk rest
+                eq_refl eq_refl Htoks) as (Hq & -> & Hrest).
+    set (s := ref_skip len f off) in *.
+    set (n0 := ushp_toklen (len - s) s f) in *.
+    assert (Hslt : s < len) by exact (ref_toklen_pos_lt len f s Hq).
+    assert (Hsn : s + n0 <= len) by (pose proof (ushp_toklen_le (len - s) s f); lia).
+    assert (Hsnp : s + n0 <= p) by exact (ushs_toks_le _ _ _ _ _ Hrest).
+    assert (Hcs : c <= s) by (pose proof (ref_skip_ge len f off); lia).
+    assert (Hsym : ushp_is_sym (f s) = false) by (apply Hbelow; lia).
+    cbn [length] in Hlen, Hn.
+    rewrite (ref_args_step len f n off s n0 acc rs Hnn ltac:(lia) eq_refl Hslt Hsym eq_refl ltac:(lia)).
+    set (s1 := ref_skip len f (s + n0)).
+    assert (Hs1 : s1 <= len) by exact (ref_skip_le len f (s + n0) Hsn).
+    assert (Hs1i : ref_skip len f s1 = s1) by exact (ref_skip_idem len f (s + n0) Hsn).
+    pose proof (ushs_toks_skip len p f (s + n0) rest Hsn Hrest) as Hrest1.
+    fold s1 in Hrest1.
+    assert (Hs1p : s1 <= p) by exact (ushs_toks_le _ _ _ _ _ Hrest1).
+    assert (Hcs1 : c <= s1) by (pose proof (ref_skip_ge len f (s + n0)); lia).
+    rewrite (ref_redirs_miss len f n s1 rs ltac:(lia)).
+    2:{ rewrite Hs1i. apply (ref_at_notin_bar_loc len f c p); [ exact Hbp | exact Hcs1 | exact Hs1p | exact ref_symtoks_redir | exact rb_bar_notin_redir ]. }
+    rewrite Hs1i. cbn beta iota.
+    rewrite (IH s1 (acc ++ [(s, s + n0)]) n Hnn Hbp Hcs1 Hs1p Hrest1
+               ltac:(rewrite ushp_len_app1; lia) ltac:(lia)).
+    rewrite <- app_assoc. reflexivity.
+Qed.
+
+(* a stage's parseexec, from its cursor to its bar: an EXEC node *)
+Lemma ref_parseexec_loc (len : nat) (f : nat -> bv 8) (n c off p : nat) (toks : list (nat * nat)) :
+  ref_nonnul len f -> ushq_barp len f c p -> c <= off -> off <= p ->
+  ushs_toks len f p off toks -> length toks < 10 -> length toks < n ->
+  ref_parseexec len f n off = Some (UshpExec toks, p).
+Proof using.
+  intros Hnn Hbp Hcoff Hoff Htoks Hlen Hn. unfold ref_parseexec.
+  pose proof Hbp as (Hp & _ & _).
+  assert (Hoffl : off <= len) by lia.
+  pose proof (ushs_toks_skip len p f off toks Hoffl Htoks) as Htoks0.
+  set (s0 := ref_skip len f off) in *.
+  assert (Hs0p : s0 <= p) by exact (ushs_toks_le _ _ _ _ _ Htoks0).
+  assert (Hcs0 : c <= s0) by (pose proof (ref_skip_ge len f off); lia).
+  assert (Hs0i : ref_skip len f s0 = s0) by exact (ref_skip_idem len f off Hoffl).
+  rewrite (ref_peek_miss len f off [rb_lpar]);
+    [ | apply (ref_at_notin_bar_loc len f c p); [ exact Hbp | exact Hcs0 | exact Hs0p | exact ref_symtoks_lpar | exact rb_bar_notin_lpar ] ].
+  fold s0. cbn beta iota.
+  rewrite (ref_redirs_miss len f n s0 [] ltac:(lia)).
+  2:{ rewrite Hs0i. apply (ref_at_notin_bar_loc len f c p); [ exact Hbp | exact Hcs0 | exact Hs0p | exact ref_symtoks_redir | exact rb_bar_notin_redir ]. }
+  rewrite Hs0i. cbn beta iota.
+  rewrite (ref_args_of_toks_loc len f c p toks [] [] n s0 Hnn Hbp Hcs0 Hs0p Htoks0 ltac:(cbn [length]; lia) Hn).
+  reflexivity.
+Qed.
+
+(* every stage needs three bytes (a word, the bar, the blank), so the
+   stages are bounded by the line -- the fuel's business *)
+Lemma ushq_bars_len (len : nat) (f : nat -> bv 8) (c : nat) (a : list (nat * nat))
+    (rest : list (list (nat * nat))) :
+  ushq_bars len f c a rest -> c + 3 * length rest <= len.
+Proof using.
+  induction 1 as [ c toks Hc Hns Htoks Hlen | c gp toks b rest Hc Hbw Htoks Hpos Hlen Hrest IH ];
+    cbn [length]; [ lia | ].
+  destruct Hbw as (Hlt3 & _).
+  destruct toks as [| tk toks' ]; [ cbn in Hpos; lia | ].
+  destruct (ushs_toks_cons_inv' len gp c (c + ushp_skipws (len - c) c f)
+              (ushp_toklen (len - (c + ushp_skipws (len - c) c f)) (c + ushp_skipws (len - c) c f) f)
+              f tk toks' eq_refl eq_refl Htoks) as (Hq & _ & Hrest').
+  pose proof (ushs_toks_le _ _ _ _ _ Hrest') as Hle'.
+  lia.
+Qed.
+
+(* THE SPINE: parsepipe from a stage's cursor answers the right spine of
+   the stages, at the end of the line, at any fuel over the line *)
+Lemma ushq_bars_parsepipe (len : nat) (f : nat -> bv 8) :
+  ref_nonnul len f ->
+  forall (c : nat) (a : list (nat * nat)) (rest : list (list (nat * nat))),
+    ushq_bars len f c a rest ->
+    forall n : nat, len + length rest < n ->
+      ref_parsepipe len f (S n) c = Some (ushq_ptree a rest, len).
+Proof using.
+  intros Hnn c a rest Hb.
+  induction Hb as [ c toks Hc Hns Htoks Hlen | c gp toks b rest Hc Hbw Htoks Hpos Hlen Hrest IH ];
+    intros n Hn.
+  - cbn [ushq_ptree]. apply ref_parsepipe_end.
+    pose proof (ushs_toks_len_le _ _ _ _ _ Htoks).
+    apply ref_parseexec_exec;
+      [ exact Hnn | exact Hns | exact Hc | exact (ushs_toks_tokens _ _ _ _ Htoks) | exact Hlen | lia ].
+  - cbn [ushq_ptree].
+    pose proof (ushq_barp_of_barw len f c gp toks Hbw Htoks) as Hbp.
+    pose proof (ushq_barw_lt _ _ _ Hbw) as Hgp.
+    pose proof (ushq_barw_bar _ _ _ Hbw) as Hbar. rewrite rb_bar_is_ushq in Hbar.
+    pose proof (ushs_toks_le _ _ _ _ _ Htoks) as Hcgp.
+    pose proof (ushs_toks_len_le _ _ _ _ _ Htoks) as Htl.
+    assert (Hpp : ref_skip len f gp = gp).
+    { unfold ref_skip. rewrite (ushq_skipws_at_barw len f gp _ Hbw). lia. }
+    cbn [length] in Hn.
+    rewrite ref_parsepipe_S.
+    rewrite (ref_parseexec_loc len f n c c gp toks Hnn Hbp (Nat.le_refl c) Hcgp Htoks Hlen ltac:(lia)).
+    rewrite (ref_peek_hit len f gp [rb_bar]);
+      [ | rewrite Hpp, (ref_at_lt _ _ _ Hgp); exact (Hnn gp Hgp)
+        | rewrite Hpp, (ref_at_lt _ _ _ Hgp), Hbar; exact rb_bar_in_bar ].
+    rewrite Hpp. cbn beta iota.
+    rewrite (ref_gettoken_sym len f gp gp Hnn Hpp Hgp);
+      [ | rewrite Hbar, <- rb_bar_is_ushq; exact ushq_bar_sym
+        | rewrite Hbar, <- rb_bar_is_ushq, <- rb_gt_is_ushs; exact ushq_bar_not_gt ].
+    cbn beta iota.
+    assert (Hskip : ref_skip len f (S gp) = S (S gp)).
+    { unfold ref_skip. rewrite (ushq_skipws_after_barw len f gp Hbw). lia. }
+    rewrite Hskip.
+    destruct n as [| n ]; [ lia | ].
+    rewrite (IH n ltac:(lia)). reflexivity.
+Qed.
+
+(* ...and the whole line, from the top: [parsecmd] on any pipeline *)
+Theorem ref_parsecmd_bars (len : nat) (f : nat -> bv 8) (a : list (nat * nat))
+    (rest : list (list (nat * nat))) :
+  ref_nonnul len f -> ushq_bars len f 0 a rest ->
+  ref_parsecmd len f = Some (ushq_ptree a rest).
+Proof using.
+  intros Hnn Hb. apply ref_parsecmd_of_line. rewrite ref_fuel_SS.
+  apply ref_parseline_end; [ lia | ].
+  pose proof (ushq_bars_len _ _ _ _ _ Hb).
+  apply ushq_bars_parsepipe; [ exact Hnn | exact Hb | lia ].
+Qed.
+
+(* the scope from the stage's cursor: a bar carries the whole line's
+   symbol scope; the last stage is symbol-free from its cursor *)
+Lemma ushq_bars_scope (len : nat) (f : nat -> bv 8) (c : nat) (a : list (nat * nat))
+    (rest : list (list (nat * nat))) :
+  ushq_bars len f c a rest -> ref_sym_scope_from len f c.
+Proof using.
+  intro Hb. destruct Hb as [ c toks Hc Hns Htoks Hlen | c gp toks b rest Hc Hbw Htoks Hpos Hlen Hrest ].
+  - intros j Hj Hs. rewrite (Hns j Hj) in Hs. discriminate Hs.
+  - exact (ref_sym_scope_from_of len f c (ushq_sym_ok_scope len f (ushq_barw_sym_ok len f gp Hbw))).
+Qed.
+
+(* the spine's shape, as the walks measure it *)
+Lemma ushq_bars_le (len : nat) (f : nat -> bv 8) (c : nat) (a : list (nat * nat))
+    (rest : list (list (nat * nat))) :
+  ushq_bars len f c a rest -> c <= len.
+Proof using. intro Hb. destruct Hb; assumption. Qed.
+
+Lemma ushq_ptree_nodes (a : list (nat * nat)) (rest : list (list (nat * nat))) :
+  ushp_nodes (ushq_ptree a rest) = 2 * length rest + 1.
+Proof using.
+  revert a. induction rest as [| b rest IH ]; intro a; cbn [ushq_ptree ushp_nodes length];
+    [ reflexivity | rewrite IH; lia ].
+Qed.
+
+Lemma ushq_ptree_cat (a : list (nat * nat)) (rest : list (list (nat * nat))) :
+  ushp_cat (ushq_ptree a rest).
+Proof using.
+  revert a. induction rest as [| b rest IH ]; intro a; cbn [ushq_ptree ushp_cat];
+    [ exact I | exact (conj I (IH b)) ].
+Qed.
+
+Lemma ushq_ptree_ht (a : list (nat * nat)) (rest : list (list (nat * nat))) :
+  ushp_ht (ushq_ptree a rest) = S (length rest).
+Proof using.
+  revert a. induction rest as [| b rest IH ]; intro a; cbn [ushq_ptree ushp_ht length];
+    [ reflexivity | rewrite IH; lia ].
+Qed.
+
+(* the one-bar line is the two-stage instance, both ways of reading it *)
+Lemma ushq_ptree_one (a b : list (nat * nat)) :
+  ushq_ptree a [b] = UshpPipe (UshpExec a) (UshpExec b).
+Proof using. reflexivity. Qed.
+

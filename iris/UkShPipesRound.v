@@ -73,9 +73,13 @@ Require Import UkShPipesLex.
 Require Import UkShPipesParse.
 Require Import UkShPipesSeam.
 Require Import UkShPipesCmd.
+Require UkShCmdalloc.
+Require Import RefParse RefParseSym RefParseBridge.  (* [ref_parsecmd_bars], [ushq_ptree]'s facts *)
+Require Import UkShRedirs.  (* [ushp_malloc_chain] *)
+Require Import UkShParser.  (* [ushp_room] *)
+Require Import UkShSeam.  (* [wp_ref_child]: THE CHILD, once *)
 Require Import CtxIdDefs.
 Require User.ShSyms User.ShInstrs.
-Require UkShCmdalloc.
 Require Import ChildTok.
 Require Import UexecSG.
 Require Import UexecRet.     (* [uwait_ans] *)
@@ -437,90 +441,37 @@ Section UkShPipesRound.
       intros Hbars HK Hs1 Hs0 Hs64 Hs38.
       iIntros "#Hcode #Hpcode #Hpro Hline Hws Hsy HM Hcp #Hpxw Hrun Hcont".
       iDestruct (ustr_nonul with "Hline") as %Hnn0.
-      iDestruct (ustr_len with "Hline") as %Hlen31.
-      (* ---- 0x99c  c.mv a0,s1 ---- *)
-      iApply (wp_uk_cmv N h m (mword_of_int 0x99c) a0_idx s1_idx
-                (add_vec zero_reg (m !!! Regidx s1_idx))
-                (68 + (length rest * 6 + k))
-                ltac:(unfold unot_sp; vm_compute; discriminate)
-                ltac:(vm_compute; discriminate) eq_refl with "[] Hrun").
-      { iApply (uis_shk_99c with "Hcode"). }
-      assert (E9c0 : add_vec_int (mword_of_int 0x99c : mword 64) 2
-                     = mword_of_int 0x99e)
-        by (apply bv_eq; vm_compute; reflexivity).
-      rewrite E9c0. iIntros (h1) "Hrun".
-      set (m1 := <[Regidx a0_idx
-                   := regval_into_reg (add_vec zero_reg (m !!! Regidx s1_idx))]> m).
-      assert (Ha0_1 : m1 !!! Regidx a0_idx = (mword_of_int s0 : mword 64)).
-      { rewrite /m1 (upd_eq m (Regidx a0_idx) _).
-        rewrite Hs1. apply bv_eq. rewrite add_vec_unsigned.
-        unfold bv_wrap. cbn [bv_unsigned]. rewrite Z.add_0_l.
-        rewrite Z.mod_small; [ reflexivity | ].
-        pose proof (bv_unsigned_in_range _ (mword_of_int s0 : mword 64)) as Hr.
-        assert (Hm : bv_modulus (MachineWord.Z_idx 64) = 18446744073709551616%Z)
-          by (vm_compute; reflexivity).
-        rewrite Hm in Hr. exact Hr. }
-      (* ---- 0x99e  jal ra,parsecmd ---- *)
-      iApply (wp_uk_jal N h1 m1 (mword_of_int 0x99e)
-                (mword_of_int 2096812 : mword 21) (mword_of_int 1 : mword 5)
-                (mword_of_int ShSyms.parsecmd) (mword_of_int 0x9a2)
-                (68 + (length rest * 6 + k))
-                ltac:(unfold unot_sp; vm_compute; discriminate)
-                ltac:(vm_compute; discriminate)
-                ltac:(apply bv_eq; vm_compute; reflexivity)
-                ltac:(apply bv_eq; vm_compute; reflexivity)
-                ltac:(vm_compute; reflexivity)
-                with "[] Hrun").
-      { iApply (uis_shk_99e with "Hcode"). }
-      iIntros (h2) "Hrun".
-      set (m2 := <[Regidx (mword_of_int 1 : mword 5)
-                   := regval_into_reg (mword_of_int 0x9a2 : mword 64)]> m1).
-      assert (Ha0_2 : m2 !!! Regidx a0_idx = (mword_of_int s0 : mword 64))
-        by (rewrite /m2 (upd_ne m1 (Regidx (mword_of_int 1 : mword 5))
-                           (Regidx a0_idx) _ ltac:(vm_compute; discriminate));
-            exact Ha0_1).
-      assert (Hra_2 : ret_pc (m2 !!! Regidx (mword_of_int 1 : mword 5))
-                      = (mword_of_int 0x9a2 : mword 64))
-        by (rewrite /m2 (upd_eq m1 (Regidx (mword_of_int 1 : mword 5)) _);
-            apply bv_eq; vm_compute; reflexivity).
-      (* ---- parsecmd, at any number of bars: the payer crosses it whole ---- *)
-      iApply (UkShPipesCmd.wp_kshp_parsecmd_pipes N UM K Hchain h2 m2 dw dv
-                s0 len f a rest i k Hbars HK Ha0_2 Hs0 Hs64
-                with "Hpcode Hpro Hline Hws Hsy HM Hpxw Hcp Hrun").
-      iIntros (p) "Htree Hbytes Hws Hsy".
-      iIntros (h3 m3) "%Hcs3 %Ha0_3 HM3 Hcp Hrun".
-      rewrite Hra_2.
-      (* ---- 0x9a2  jal ra,runcmd ---- *)
-      iApply (wp_uk_jal N h3 m3 (mword_of_int 0x9a2)
-                (mword_of_int 2094828 : mword 21) (mword_of_int 1 : mword 5)
-                (mword_of_int ShSyms.runcmd) (mword_of_int 0x9a6)
-                (68 + (length rest * 6 + k))
-                ltac:(unfold unot_sp; vm_compute; discriminate)
-                ltac:(vm_compute; discriminate)
-                ltac:(apply bv_eq; vm_compute; reflexivity)
-                ltac:(apply bv_eq; vm_compute; reflexivity)
-                ltac:(vm_compute; reflexivity)
-                with "[] Hrun").
-      { iApply (uis_shk_9a2 with "Hcode"). }
-      iIntros (h4) "Hrun".
-      set (m4 := <[Regidx (mword_of_int 1 : mword 5)
-                   := regval_into_reg (mword_of_int 0x9a6 : mword 64)]> m3).
-      assert (Ha0_4 : m4 !!! Regidx a0_idx = (mword_of_int p : mword 64))
-        by (rewrite /m4 (upd_ne m3 (Regidx (mword_of_int 1 : mword 5))
-                           (Regidx a0_idx) _ ltac:(vm_compute; discriminate));
-            exact Ha0_3).
-      (* ---- THE SEAM, at every node of the spine ---- *)
-      iMod (UkShMain.ubytes_persist γd s0 (S len)
-              (ushq_nulfolds a rest (UkShParseCmd.ushp_ext len f))
-              with "Hbytes") as "#Hbytesq".
-      iMod (UkShPipesSeam.ush_cmd_of_ushp_pipes N h4 m4
-              (mword_of_int ShSyms.runcmd) (68 + (length rest * 6 + k))
-              s0 len (ushq_nulfolds a rest (UkShParseCmd.ushp_ext len f))
-              Hlen31 Hs0 Hs38 rest a p
-              (ushq_cuts_ok_bars len f 0%nat a rest Hnn0 Hbars)
-              with "Hrun Htree Hbytesq") as "(Hrun & #Hcmd)".
-      iApply ("Hcont" $! h4 m4 p with "[] Hcmd Hws Hsy HM3 Hcp Hrun").
-      iPureIntro. exact Ha0_4.
+      (* the allocator chain, the room, and the tree: the spine's *)
+      assert (Hch : UkShRedirs.ushp_malloc_chain N (ushp_nodes (ushq_ptree a rest))
+                      (UM i) (UM (i + 2 * length rest + 1))).
+      { rewrite ushq_ptree_nodes.
+        replace (i + 2 * length rest + 1)%nat with (i + (2 * length rest + 1))%nat by lia.
+        exact (UkShPipesParse.ushq_UM_chain N UM K Hchain (2 * length rest + 1) i ltac:(lia)). }
+      replace (68 + (length rest * 6 + k))%nat
+        with (UkShParser.ushp_room (ushq_ptree a rest) + (8 + k))%nat
+        by (unfold UkShParser.ushp_room, UkShParser.ushp_pl_room;
+            rewrite UkShPipesParse.ushq_ptree_pp_room ushq_ptree_ht; lia).
+      (* the law at the general child's budget: the room less the spine's depth *)
+      iDestruct (UkShCmdalloc.ushp_oom_mono N Cp (20 + (6 + k))
+                   (UkShParser.ushp_room (ushq_ptree a rest) + (8 + k)
+                    - UkShParser.ushp_deep (ushq_ptree a rest))
+                   ltac:(unfold UkShParser.ushp_room, UkShParser.ushp_pl_room,
+                           UkShParser.ushp_deep, UkShParser.ushp_pl_deep;
+                         rewrite UkShPipesParse.ushq_ptree_pp_room UkShPipesParse.ushq_ptree_pp_deep
+                           ushq_ptree_ht; lia)
+                   with "Hpxw") as "#Hpxg".
+      (* THE GENERAL CHILD at the reference's answer on the bars *)
+      iApply (UkShSeam.wp_ref_child N (UM i) (UM (i + 2 * length rest + 1)) h m dw dv s0 len f
+                (ushq_ptree a rest) (8 + k) Cp
+                Hs1 (ref_sym_scope_of_from_0 len f (ushq_bars_scope len f 0%nat a rest Hbars))
+                (ref_parsecmd_bars len f a rest Hnn0 Hbars) (ushq_ptree_cat a rest)
+                Hch Hs0 Hs64 Hs38
+                with "Hcode Hpcode Hpro Hline Hws Hsy HM Hpxg Hcp Hrun").
+      iIntros (h' m' q) "%Ha0 %Hcs #Htree #Hlineq Hws Hsy HM' Hcp Hrun".
+      iApply ("Hcont" $! h' m' q with "[%//] [] Hws Hsy HM' Hcp Hrun").
+      (* the runner's pipeline IS the seam's tree at the spine, at the cut *)
+      rewrite /ushq_stages. rewrite <- UkShPipesSeam.ushq_ptree_ushcmd.
+      rewrite ushq_nulfolds_zero_at. iExact "Htree".
     Qed.
 
   End Child.

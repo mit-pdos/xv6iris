@@ -58,22 +58,20 @@ Require UkShCmdalloc.
 Require Import UkShParseSym.
 Require Import UkShParseCmd.
 Require Import UkShPipeLex.
-Require Import UkShPipeParse.
-Require Import UkShPipeRight.
-Require Import UkShPipePex.
-Require Import UkShPipeCm.
 Require Import UkShPipesLex.
+Require Import RefParseBridge.  (* [ushq_ptree], [ref_parsecmd_bars] *)
+Require Import RefParse RefParseSym.
+Require Import UkShRedirs.      (* [ushp_malloc_chain] *)
+Require Import UkShParser.      (* [wp_ref_parsepipe]: THE general parsepipe *)
 Require Import UexecSG.
+Require Import UkShPipeNode.
 Local Open Scope Z_scope.
 Import Defs.
 
-(* the parse's answer: the right spine of EXEC nodes *)
-Fixpoint ushq_ptree (a : list (nat * nat)) (rest : list (list (nat * nat)))
-    : ushp_cmd :=
-  match rest with
-  | [] => UshpExec a
-  | b :: rest' => UshpPipe (UshpExec a) (ushq_ptree b rest')
-  end.
+(* the parse's answer: the right spine of EXEC nodes -- the reference
+   parser's answer on the line ([RefParseBridge.ref_parsecmd_bars]), so it
+   lives there; the name is kept here for every consumer *)
+Notation ushq_ptree := RefParseBridge.ushq_ptree.
 
 Section UkShPipesParse.
   Context `{!riscvGS Σ}.
@@ -96,7 +94,7 @@ Section UkShPipesParse.
 
   Local Notation ushp_exec_at := (UkShParse.ushp_exec_at N).
   Local Notation ushp_tree := (UkShParse.ushp_tree N).
-  Local Notation ushp_pipe_node := (UkShPipeParse.ushp_pipe_node N).
+  Local Notation ushp_pipe_node := (UkShPipeNode.ushp_pipe_node N).
   Local Notation ushp_malloc_ty := (UkShParse.ushp_malloc_ty_le N 168).
 
   (* ===================================================================== *)
@@ -112,60 +110,10 @@ Section UkShPipesParse.
   (* [UkShPipeCm.ushq_pex_left_holds] at a bar read locally and at any       *)
   (* cursor: every stage of a pipeline but the last.                         *)
   (* ===================================================================== *)
-  Lemma ushq_pex_left_at_holds {Pex : iProp Σ} (UM0 UM1 : iProp Σ)
-      (dq dw dv : dfrac) (ps s0 : Z) (len c gp : nat) (f : nat -> bv 8)
-      (args : list (nat * nat)) (nn : nat) :
-    ushp_malloc_ty UM0 UM1 ->
-    (c <= len)%nat ->
-    ushq_barw len f gp ->
-    ushs_toks len f gp c args ->
-    (0 < length args)%nat ->
-    (length args < 10)%nat ->
-    0 <= s0 -> s0 + Z.of_nat len < Z64 ->
-    0 < ps -> ps mod 8 = 0 -> ps + 8 < Z64 ->
-    ⊢ UkShPipeCm.ushq_pex_left_at N UM0 UM1 dq dw dv ps s0
-        (mword_of_int (s0 + Z.of_nat c)) len gp f args Pex
-        (16 + (24 + (8 + nn))).
-  Proof using .
-    intros Hmal Hcle Hbw Htoks Hpos Hlen Hs0 Hs64 Hps0 Hps8 Hpssz.
-    iIntros (h m rpc)
-      "%Ha0 %Ha1 %Erpc #Hcode #Hro Hcur Hstr Hws Hsy HM0 #Hpx Hpay Hrun Hcont".
-    rewrite <- Erpc.
-    iApply (UkShPipePex.wp_kshp_parseexec_barw N UM0 UM1 Hmal h m dq dw dv
-              ps s0 len c f (mword_of_int (s0 + Z.of_nat c)) args gp nn
-              Ha0 Ha1 Hcle eq_refl Hbw Htoks Hpos Hlen Hs0 Hs64 Hps0 Hps8
-              Hpssz
-              with "Hcode Hro Hcur Hstr Hws Hsy HM0 Hpx Hpay Hrun").
-    iIntros (pl) "%Hplsz Hnodel Hcur Hstr Hws Hsy".
-    iIntros (h' m') "%Hcs %Ha0' HM1 Hpay Hrun".
-    iApply ("Hcont" $! pl with "[] Hnodel Hcur Hstr Hws Hsy [] [] HM1 Hpay Hrun").
-    - iPureIntro. exact Hplsz.
-    - iPureIntro. exact Hcs.
-    - iPureIntro. exact Ha0'.
-  Qed.
 
   (* ===================================================================== *)
   (* §3 A PIPE NODE AND ITS TWO CHILDREN ARE THE PARSER'S TREE               *)
   (* ===================================================================== *)
-  Lemma ushq_tree_pipe (s0 t pl pr : Z) (a : list (nat * nat))
-      (r : ushp_cmd) :
-    ushp_pipe_node t pl pr -∗
-    ushp_exec_at s0 pl a -∗
-    ushp_tree s0 pr r -∗
-    ushp_tree s0 t (UshpPipe (UshpExec a) r).
-  Proof using .
-    iIntros "Hn Hl Hr". rewrite /UkShPipeParse.ushp_pipe_node.
-    iDestruct "Hn" as "(%Ht0 & %Ht8 & %Htz & [Hty Hpad] & Hwl & Hwr)".
-    cbn [UkShParse.ushp_tree].
-    iSplitR; [ iPureIntro; exact Ht0 | ].
-    iSplitR; [ iPureIntro; exact Ht8 | ].
-    iSplitL "Hty Hpad".
-    { rewrite /UkShParse.ushp_type_at. cbn [UkShParse.ushp_ty].
-      iFrame "Hty Hpad". }
-    iSplitL "Hwl Hl".
-    - iExists pl. iFrame "Hwl". iExact "Hl".
-    - iExists pr. iFrame "Hwr Hr".
-  Qed.
 
   (* ===================================================================== *)
   (* §4 THE WALK, BY INDUCTION ON THE NUMBER OF BARS                         *)
@@ -175,6 +123,49 @@ Section UkShPipesParse.
   (* at link [i] and left at link [i + 2 * length rest + 1].  At one bar it  *)
   (* is [UkShPipeCm.wp_kshp_parsepipe_bar_closed]'s own walk.               *)
   (* ===================================================================== *)
+  (* ===================================================================== *)
+  (* THE SPINE AT THE GENERAL WALK (user-once N).  [wp_kshp_parsepipe_bars]  *)
+  (* below is [UkShParser.wp_ref_parsepipe] at the reference's answer on    *)
+  (* the bars ([RefParseBridge.ushq_bars_parsepipe]): its room is the        *)
+  (* spine's [ushp_pp_room] (46 + 6 per bar) plus two words, its allocator  *)
+  (* chain is the indexed chain's [2 * bars + 1] links, and its scope is    *)
+  (* the stage's own cursor's ([ushq_bars_scope]).                          *)
+  (* ===================================================================== *)
+  Lemma ushq_ptree_pp_room (a : list (nat * nat)) (rest : list (list (nat * nat))) :
+    UkShParser.ushp_pp_room (ushq_ptree a rest) = (46 + 6 * length rest)%nat.
+  Proof using .
+    revert a. induction rest as [| b rest IH ]; intro a;
+      cbn [ushq_ptree UkShParser.ushp_pp_room length].
+    - unfold UkShParser.ushp_pex_room, UkShParser.ushp_pex_extra. cbn [ref_has_redir]. lia.
+    - rewrite IH. unfold UkShParser.ushp_pex_room, UkShParser.ushp_pex_extra.
+      cbn [ref_has_redir]. lia.
+  Qed.
+
+  (* ...and its deepest out-of-memory panic ([UkShParser.ushp_pp_deep]):
+     eighteen fewer than the room at every bar, so the general walk's law
+     at the room less it is exactly this walk's [20 + nn] *)
+  Lemma ushq_ptree_pp_deep (a : list (nat * nat)) (rest : list (list (nat * nat))) :
+    UkShParser.ushp_pp_deep (ushq_ptree a rest) = (28 + 6 * length rest)%nat.
+  Proof using .
+    revert a. induction rest as [| b rest IH ]; intro a;
+      cbn [ushq_ptree UkShParser.ushp_pp_deep length].
+    - unfold UkShArgs.ushp_pex_deep. cbn [ref_has_redir]. lia.
+    - rewrite IH. unfold UkShArgs.ushp_pex_deep. cbn [ref_has_redir]. lia.
+  Qed.
+
+  (* the indexed chain, as the general walk's chain predicate *)
+  Lemma ushq_UM_chain (k i : nat) :
+    (i + k <= K)%nat -> UkShRedirs.ushp_malloc_chain N k (UM i) (UM (i + k)).
+  Proof using ushq_malloc_chain.
+    induction k as [| k IH ]; intro Hk.
+    - cbn [UkShRedirs.ushp_malloc_chain]. rewrite Nat.add_0_r. reflexivity.
+    - replace (S k) with (k + 1)%nat by lia.
+      apply (UkShRedirs.ushp_malloc_chain_app N k 1 _ (UM (i + k))); [ apply IH; lia | ].
+      apply UkShRedirs.ushp_malloc_chain_1.
+      replace (i + (k + 1))%nat with (S (i + k)) by lia.
+      apply ushq_malloc_chain. lia.
+  Qed.
+
   Lemma wp_kshp_parsepipe_bars {Pex : iProp Σ} (dq dw dv : dfrac)
       (ps s0 : Z) (len : nat) (f : nat -> bv 8) :
     0 <= s0 -> s0 + Z.of_nat len < Z64 ->
@@ -212,84 +203,33 @@ Section UkShPipesParse.
            mWP (Loop : expr riscv_lang)) -∗
     mWP (Loop : expr riscv_lang).
   Proof using ushq_malloc_chain.
-    intros Hs0 Hs64 Hps0 Hps8 Hpssz.
-    induction 1 as [ c toks Hcle Hns Htoks Htlen
-                   | c gp toks b rest Hcle Hbw Htoks Hpos Htlen Hbars IH ];
-      intros i nn h m HK Ha0 Ha1;
-      iIntros "#Hcode #Hro Hcur Hstr Hws Hsy HM #Hpx Hpay Hrun Hcont".
-    - (* ---- NO BAR LEFT: the symbol-free walk on the line's suffix ---- *)
-      destruct (ushs_toks_rel len c f c toks Htoks (le_n c))
-        as (rel & Hrel & ->).
-      rewrite Nat.sub_diag in Hrel.
-      rewrite ushq_rebase_length in Htlen.
-      assert (E1 : (i + 2 * length (@nil (list (nat * nat))) + 1)%nat = S i)
-        by (cbn [length]; lia).
-      assert (E2 : (6 + (16 + (24 + (2 + (length (@nil (list (nat * nat))) * 6
-                                           + nn)))))%nat
-                   = (6 + (16 + (24 + (2 + nn))))%nat)
-        by (cbn [length]; lia).
-      rewrite E1 E2.
-      iApply (UkShPipeRight.wp_kshp_parsepipe_tail N (UM i) (UM (S i))
-                (ushq_malloc_chain i ltac:(cbn [length] in HK; lia))
-                h m dq dw dv ps s0 len c f rel (2 + nn)
-                Ha0 Ha1 Hcle Hns (ushs_toks_tokens _ _ _ _ Hrel) Htlen
-                Hs0 Hs64 Hps0 Hps8 Hpssz
-                with "Hcode Hro Hcur Hstr Hws Hsy HM Hpx Hpay Hrun").
-      iIntros (q) "%Hqsz Hnode".
-      assert (Esh : UkShPipeRight.ushq_shift c rel = ushq_rebase c rel)
-        by reflexivity.
-      rewrite Esh.
-      iApply ("Hcont" $! q with "[Hnode]").
-      cbn [ushq_ptree UkShParse.ushp_tree]. iExact "Hnode".
-    - (* ---- A BAR: the turn, its recursion the induction hypothesis ---- *)
-      assert (HK' : (S i + 2 * length rest + 1 + 1 <= K)%nat)
-        by (cbn [length] in HK; lia).
-      assert (E2 : (6 + (16 + (24 + (2 + (length (b :: rest) * 6 + nn)))))%nat
-                   = (6 + (16 + (24 + (8 + (length rest * 6 + nn)))))%nat)
-        by (cbn [length]; lia).
-      assert (E3 : (i + 2 * length (b :: rest) + 1)%nat
-                   = S (S i + 2 * length rest + 1)) by (cbn [length]; lia).
-      rewrite E2 E3.
-      iDestruct (UkShCmdalloc.ushp_oom_mono N Pex (20 + nn)
-                   (20 + (length rest * 6 + nn)) ltac:(lia) with "Hpx") as "#Hpxb".
-      iApply (UkShPipeCm.wp_kshp_parsepipe_bar_g N (UM i) (UM (S i))
-                (UM (S i + 2 * length rest + 1))
-                (UM (S (S i + 2 * length rest + 1)))
-                h m dq dw dv ps s0 (mword_of_int (s0 + Z.of_nat c)) len gp f
-                toks (fun pr : Z => ushp_tree s0 pr (ushq_ptree b rest))
-                (length rest * 6 + nn)
-                Ha0 Ha1 Hbw Hs0 Hs64 Hps0 Hps8 Hpssz
-                with "Hcode Hro Hcur Hstr Hws Hsy HM Hpxb Hpay [] [] [] Hrun
-                      [Hcont]").
-      + (* (i) the stage's own parseexec, from its cursor *)
-        iApply (ushq_pex_left_at_holds (UM i) (UM (S i)) dq dw dv ps s0 len c
-                  gp f toks (length rest * 6 + nn)
-                  (ushq_malloc_chain i ltac:(lia))
-                  Hcle Hbw Htoks Hpos Htlen Hs0 Hs64 Hps0 Hps8 Hpssz).
-      + (* (iii) THE RECURSION IS THE INDUCTION HYPOTHESIS *)
-        iIntros (h1 m1) "%Ha0' %Ha1' Hcode' Hro' Hcur Hstr Hws Hsy HM1 Hpx'
-                         Hpay Hrun Hk".
-        assert (E4 : (16 + (24 + (8 + (length rest * 6 + nn))))%nat
-                     = (6 + (16 + (24 + (2 + (length rest * 6 + nn)))))%nat)
-          by lia.
-        rewrite E4.
-        (* the recursion's own law is the one this walk holds: the call
-           premise's is at the outer stage's (larger) budget *)
-        iApply (IH (S i) nn h1 m1 ltac:(lia) Ha0' Ha1'
-                  with "Hcode' Hro' Hcur Hstr Hws Hsy HM1 Hpx Hpay Hrun").
-        iIntros (t) "Ht". iApply ("Hk" $! t with "Ht").
-      + (* (ii) pipecmd, the stage's LAST allocation *)
-        iApply (UkShPipeCm.ushq_pipecmd_call_holds N
-                  (UM (S i + 2 * length rest + 1))
-                  (UM (S (S i + 2 * length rest + 1)))
-                  (length rest * 6 + nn)
-                  (ushq_malloc_chain (S i + 2 * length rest + 1)
-                     ltac:(lia))).
-      + iIntros (t pl pr) "%Hplsz Hpnode Hnodel Hnoder".
-        iApply ("Hcont" $! t with "[Hpnode Hnodel Hnoder]").
-        cbn [ushq_ptree].
-        iApply (ushq_tree_pipe s0 t pl pr toks (ushq_ptree b rest)
-                  with "Hpnode Hnodel Hnoder").
+    intros Hs0 Hs64 Hps0 Hps8 Hpssz c a rest Hbars i nn h m HK Ha0 Ha1.
+    iIntros "#Hcode #Hro Hcur Hstr Hws Hsy HM #Hpx Hpay Hrun Hcont".
+    iDestruct (ustr_nonul with "Hstr") as %Hnn.
+    pose proof (ushq_bars_le _ _ _ _ _ Hbars) as Hcle.
+    replace (6 + (16 + (24 + (2 + (length rest * 6 + nn)))))%nat
+      with (UkShParser.ushp_pp_room (ushq_ptree a rest) + (2 + nn))%nat
+      by (rewrite ushq_ptree_pp_room; lia).
+    (* the law at the general walk's budget: the room less the spine's depth *)
+    iDestruct (UkShCmdalloc.ushp_oom_mono N Pex (20 + nn)
+                 (UkShParser.ushp_pp_room (ushq_ptree a rest) + (2 + nn)
+                  - UkShParser.ushp_pp_deep (ushq_ptree a rest))
+                 ltac:(rewrite ushq_ptree_pp_room ushq_ptree_pp_deep; lia)
+                 with "Hpx") as "#Hpxg".
+    iApply (UkShParser.wp_ref_parsepipe N dq dw dv ps s0 len f (len + length rest + 1)
+              h m c len (mword_of_int (s0 + Z.of_nat c)) (ushq_ptree a rest)
+              (UM i) (UM (i + 2 * length rest + 1)) (2 + nn)
+              Ha0 Ha1 Hcle eq_refl (ushq_bars_scope len f c a rest Hbars)
+              (ushq_bars_parsepipe len f Hnn c a rest Hbars (len + length rest + 1) ltac:(lia))
+              ltac:(rewrite ushq_ptree_nodes;
+                    replace (i + 2 * length rest + 1)%nat with (i + (2 * length rest + 1))%nat by lia;
+                    exact (ushq_UM_chain (2 * length rest + 1) i ltac:(lia)))
+              Hs0 Hs64 Hps0 Hps8 Hpssz
+              with "Hcode Hro Hcur Hstr Hws Hsy HM Hpxg Hpay Hrun").
+    iIntros (root) "Hot Hcur Hstr Hws Hsy".
+    iIntros (h' m') "%Hcs %Ha0' HM' Hpay Hrun".
+    iApply ("Hcont" $! root with "[Hot] Hcur Hstr Hws Hsy [%//] [%//] HM' Hpay Hrun").
+    iApply (UkShParser.ushp_otree_close N with "Hot").
   Qed.
 
   (* ...and the one-bar line through it, as a check that the induction's
