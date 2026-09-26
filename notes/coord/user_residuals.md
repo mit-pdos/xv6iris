@@ -63,3 +63,16 @@ Collected from the USER lane reports (Sept 26 2026). Each item names the lane th
 - New walker `uftRun` (U2-F): runRW + fetch nodes via oracle; `swp_uftRun` proved once.
 - **bv_decide enum pitfall**: bv_decide over a Sail enum adds `<Enum>.enumToBitVec`; two modules doing it
   clash on import. Shared home pattern: MachCSL/BvEnumSatp.lean.
+
+## BootReset phase 3 (after U2-M4 and the K lanes land) — retire `resetVal`
+Phase 2 (landed) made RegFile = BootRegs, the M-mode PMP stage generic over `pmpAllOff`, mBoot generic in
+medeleg/mepc/satp/stimecmp, counter cells existential in hwConfig. Blocker: `start()` does NOT overwrite
+mcounteren (garbage | 2), mtimecmp, pmpcfg 8..63 / pmpaddr 1..63, scounteren — yet sConfOf/startConf/
+UfCfg/UxrCfg/UWalk/UTranslate/UserBytesAcc/wp_m_csrw_pmp* read their exact values. Rocq keeps them generic
+(`sconf` holds none; `st_pmpcfg1 cfg0` parametric). Plan: (1) a leftover-values record as a parameter of
+`sConfOf`, quantified in kConf/KCtx (26 files, 129 uses); (2) xv6 PMP check depends only on entry 0;
+(3) M-mode csrw pmpaddr0/pmpcfg0 rules at any all-off table; (4) UfCfg pins → the same record;
+(5) **user CSR arm generic in scounteren/mcounteren: a user rdcycle/rdtime CAN retire** (Rocq
+`u_csr_readable`) — U1-X3/UExecCsr's "every CSR is Illegal" becomes "Illegal or a retiring counter read".
+Then the Lang switch: bootFacts states the run, resetVal/resetRegs/resetWith → resetRegsRun.
+AMO check: Rocq's pma_boot also gives AMOCASQ (the UserMemClassifyAmo comment is stale) — nothing to change.
