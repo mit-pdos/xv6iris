@@ -48,3 +48,18 @@ Collected from the U0 agent reports (Sept 26 2026). Each item names the lane tha
 - Interim deviations to retire in K4: PipeInvDefs (queue not in payload), SpecPipealloc dev 4
   (no `pipe_qfrag … pst0` handed out), SpecSysPipe, PipeReg dev 1; PipeReg §4 (fileclose_cpay).
 - Name watch: K2 added `fdstNopipe` in FileDefs (Rocq FdSlots name) — U1-R / U0-6 must reuse it.
+
+## U1-T (post-bump remainder; pre-bump part landed: UImgWordDefs, UStrImg, UserConsole, UInitFd partial, PinnedObs, UConsOpen partial)
+- TreeView/TreeObs/AppTree: 0 reached decls — nothing to port. UConsLine's alias = `UkShLineDefs.ushLineIs`.
+- fs.img literal (after bump): TreeImg (`img_root_blk/ents/nrec_leb/blk_agree/ents_eq`), PinnedExec, PinnedOpen, all Fs*Pin.
+- Seccomp key (`uvis_secc`, bump ckpt 1 / K3): ExecEntry (`image_entry_at`, `image_entry`, `_taint`,
+  `_taint_intro`, `_taint_all_elim`, `_of_at`, `_at_of`); ExecBundle (`ex_node_id`,
+  `exec_slot_of_entry_at`, `sys_exec_slot_of_entry`, `exec_bundle_of(_at)`).
+- K3 UserFd whole-table view (edits `UserFd.ustd`): UInitFd `ufd_alloc0_v`, `ufd_headL*`, `ufd_head1*`,
+  `ufd_head*`, `ufd_row`, `ufd_head_open_row`, `ufd_head_of_row`; UConsOpen `uk_open_fd_arm_at`,
+  `init_cons_fail_std_at`, `init_cons_any_std_at`.
+- UConsOpen waiting on UInitCons (I-init) + FsConsPin: `init_cons_elems_len/_hd`, `cons_hop_dead`,
+  `cons_walk_dead`, `cons_open_bundle_dead`, `cons_open_dead_recv`, `init_cons_absent_fam`,
+  `cons_sup_absent`, `init_cons_console_fam`, `cons_sup_console`; on Xfam after K4 + `utext_img`:
+  `xfam_open`, `sbundle_at_open_intro_at`, `spost_at_open_elim_at`, `cons_ro_sub`; on `wp_triv`: `fupd_wp_triv`.
+- `pobs_elend_aents` proved directly; repoint at K5's `FsAbsEraState.elend_aents` when convenient.
