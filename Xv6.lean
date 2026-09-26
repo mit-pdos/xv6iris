@@ -1603,3 +1603,16 @@ import Xv6.SpecShRuncmdExec
 import Xv6.UshEchoPure
 import Xv6.UshExecCode
 import Xv6.UshExecDefs
+import Xv6.ProofGrepGrep
+import Xv6.ProofGrepMain
+import Xv6.ProofGrepStart
+import Xv6.SpecGrepGrep
+import Xv6.SpecGrepMain
+import Xv6.SpecGrepStart
+import Xv6.UkGrepLoopHead
+import Xv6.UkGrepLoopPost
+import Xv6.UkGrepLoopStep
+import Xv6.UkGrepMainArms
+import Xv6.UkGrepMainBody
+import Xv6.UkGrepMainDefs
+import Xv6.UkGrepTreeDefs
