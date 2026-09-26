@@ -1554,10 +1554,10 @@ Lemma alt_oom_string :
 Proof using. apply (bool_decide_unpack _). vm_compute. exact I. Qed.
 
 (* ONE ALTERNATIVE DECIDES A ROUND: what the console shows and what becomes
-   of [f].  [REcho] is the echo application's four, with no f-effect (its
-   silent [REcho 2] admitted only at the blank line [LEcho []], see
-   [ralt_ok]); the [RF*] are the redirect line's and the [RC*] are cat's.
-   THERE IS NO SILENT ALTERNATIVE at a line sh forks for (claude-notes/
+   of [f].  [REcho] is the echo application's four, with no f-effect (a
+   line admits three of them: never the silent index 2, see [ralt_ok]);
+   the [RF*] are the redirect line's and the [RC*] are cat's.
+   THERE IS NO SILENT ALTERNATIVE at any line (claude-notes/
    design/sync.md section 2): the one way such a command does not run and
    the console still shows only sh's output is the child's out-of-memory
    death in [parsecmd], and since upstream d66e41c that death PRINTS --
@@ -1669,18 +1669,16 @@ Definition ralt_panic (a : ralt) : bool :=
   end.
 
 (* WHICH ALTERNATIVES A LINE SHAPE ADMITS, and [sel]'s shape.  Every
-   forked line admits [ROom].  [REcho 2] -- the bare prompt, nothing run --
-   is admitted at [LEcho []] ONLY: that is the parser's fallback line
-   ([uline_of]'s [inhabitant]), which the proofs file a BLANK input line
-   at (sh re-prompts in the parent with no fork, sh.c:164), and no
-   admissible input parses to it ([LEcho []] fails [line_ok]: an echo
-   line has at least two words, so [parse_line_ok] never yields it, and
-   [UnionDisc.uline_of_u] reaches it only through [inhabitant]). *)
+   forked line admits [ROom], and no line admits [REcho 2] -- the bare
+   prompt, nothing run -- at any words, the parser's fallback [LEcho []]
+   included: a BLANK input line re-prompts in sh's parent with no fork
+   (sh.c:164), and under the discipline it is only the taint's arm
+   ([UkSh.ush_uline_head_nonnl]). *)
 Definition ralt_ok (l : uline) (a : ralt) : Prop :=
   match l with
-  | LEcho ws =>
+  | LEcho _ =>
       match a with
-      | REcho k => (k < 4)%nat /\ (k = 2%nat -> ws = [])
+      | REcho k => (k < 4)%nat /\ k <> 2%nat
       | ROom => True
       | _ => False
       end
@@ -1699,7 +1697,7 @@ Definition ralt_ok (l : uline) (a : ralt) : Prop :=
      so which alternatives this line admits is unobservable to every FILE
      statement; it is [LCat]'s five because that makes [fsm], [cont] and
      every per-line choice ([FileOutPure.ralt_def],
-     [FileHooks.fpan_of]/[fexf_of]/[fnoc_of]) agree with [LCat]'s arm
+     [FileHooks.fpan_of]/[fexf_of]) agree with [LCat]'s arm
      verbatim, and so costs each landed proof one copied line.  The PIPE
      application reads its own [PipeDisc.palt_ok]/[pcont], never these. *)
   | LPipe _ _ =>
@@ -1924,15 +1922,14 @@ Proof using.
   - (* REcho: the echo application's four, minus the panic one *)
     rewrite /ralt_panic in Hp. apply bool_decide_eq_false in Hp.
     rewrite /ralt_ok in Ha. destruct l as [ws | ws N | N | ws npc | ws]; [| done | done | done | done].
-    destruct Ha as [Ha _].
-    destruct a as [| [| [| [| a]]]]; [| | | done | exfalso; lia].
+    destruct Ha as [Ha H2].
+    destruct a as [| [| [| [| a]]]]; [| | done | done | exfalso; lia].
     + exists (wl_line (drop 1 ws)). rewrite line_alts_of_0.
       split; [reflexivity |].
       apply (wl_line_shape' (drop 1 ws)).
       apply lb_Forall_drop, (line_ok_wf _ Hl).
     + exists (wl_line dg_exec). rewrite line_alts_of_1 /alt_execfail.
       split; [reflexivity |]. exact (wl_line_shape' dg_exec Hex).
-    + rewrite line_alts_of_2 /alt_prompt. exact Hpr.
   - exact Hpr.
   - exists (wl_line dg_exec). rewrite /alt_execfail.
     split; [reflexivity |]. exact (wl_line_shape' dg_exec Hex).

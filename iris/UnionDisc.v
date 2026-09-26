@@ -752,13 +752,13 @@ Section hooks.
     end.
   Definition uexfb (l : uline) : list (bv 8) :=
     match l with LPipe p n => pl_exfb (LPipes p n) ++ u_prompt | _ => fexfb l end.
-  (* the silent round, where the model has one: a pipeline's [PLRun []]
-     (a pipeline that printed nothing, one of [plsafe]'s three), and the
-     file model's at the blank line's [LEcho []] *)
+  (* the silent round, at a pipeline only: its [PLRun []] (a pipeline
+     that printed nothing, one of [plsafe]'s three).  No file line has
+     one ([FileHooks]'s [None]). *)
   Definition unoc (l : uline) : option nat :=
     match l with
     | LPipe p _ => Some (ualt_code (upl p (PLRun [])))
-    | _ => (fun c => 4 * c) <$> fnoc_of l
+    | _ => None
     end.
   (* ...and the out-of-memory death, admitted at EVERY line: every line
      sh reads but the blank one is parsed in a child *)
@@ -818,53 +818,34 @@ Section hooks.
     rewrite ualt_dec_code, upl_cont. reflexivity.
   Qed.
 
-  (* a file line's silent round is the file model's, coded *)
-  Lemma unoc_file l c :
-    (forall p n, l <> LPipe p n) -> unoc l = Some c ->
-    exists k, fnoc_of l = Some k /\ c = 4 * k.
+  Lemma unoc_pipe l c : unoc l = Some c -> exists p n, l = LPipe p n /\ c = ualt_code (upl p (PLRun [])).
   Proof using.
-    intros Hl Hc. destruct l as [ws | ws N | N | p n | ws];
-      [| | | exfalso; exact (Hl p n eq_refl) |];
-      cbn [unoc] in Hc; destruct (fnoc_of _) as [k |] eqn:Hk; cbn in Hc;
-      first [discriminate Hc | injection Hc as <-; by exists k].
+    destruct l as [ws | ws N | N | p n | ws]; cbn [unoc]; intros Hc; try discriminate Hc.
+    injection Hc as <-. by exists p, n.
   Qed.
 
   Lemma unoc_ok s l c : unoc l = Some c -> uok adm s l (ualt_dec c).
   Proof using.
-    destruct l as [ws | ws N | N | p n | ws]; intros Hc.
-    4: { cbn [unoc] in Hc. injection Hc as <-.
-         rewrite ualt_dec_code. apply uok_upl. left. right. left. reflexivity. }
-    all: match type of Hc with unoc ?l = _ =>
-           destruct (unoc_file l c ltac:(intros ? ? ?; discriminate) Hc) as (k & Hk & ->) end;
-         rewrite ualt_dec_R; exact (fnoc_of_ok _ k Hk).
+    intros Hc. destruct (unoc_pipe l c Hc) as (p & n & -> & ->).
+    rewrite ualt_dec_code. apply uok_upl. left. right. left. reflexivity.
   Qed.
 
   Lemma unoc_free l c : unoc l = Some c -> ufree (ualt_dec c) = true.
   Proof using.
-    destruct l as [ws | ws N | N | p n | ws]; intros Hc.
-    4: { cbn [unoc] in Hc. injection Hc as <-. rewrite ualt_dec_code.
-         destruct p; cbn [upl ufree]; [reflexivity | apply bool_decide_eq_true; by left]. }
-    all: match type of Hc with unoc ?l = _ =>
-           destruct (unoc_file l c ltac:(intros ? ? ?; discriminate) Hc) as (k & Hk & ->) end;
-         rewrite ualt_dec_R; exact (fnoc_of_free _ k Hk).
+    intros Hc. destruct (unoc_pipe l c Hc) as (p & n & -> & ->). rewrite ualt_dec_code.
+    destruct p; cbn [upl ufree]; [reflexivity | apply bool_decide_eq_true; by left].
   Qed.
 
   Lemma unoc_nopanic l c : unoc l = Some c -> upanic (ualt_dec c) = false.
   Proof using.
-    destruct l as [ws | ws N | N | p n | ws]; intros Hc.
-    4: { cbn [unoc] in Hc. injection Hc as <-. rewrite ualt_dec_code, upl_panic. reflexivity. }
-    all: match type of Hc with unoc ?l = _ =>
-           destruct (unoc_file l c ltac:(intros ? ? ?; discriminate) Hc) as (k & Hk & ->) end;
-         rewrite ualt_dec_R; exact (fnoc_of_nopanic _ k Hk).
+    intros Hc. destruct (unoc_pipe l c Hc) as (p & n & -> & ->).
+    rewrite ualt_dec_code, upl_panic. reflexivity.
   Qed.
 
   Lemma unoc_cont s l c : unoc l = Some c -> ucont s l (ualt_dec c) = u_prompt.
   Proof using.
-    destruct l as [ws | ws N | N | p n | ws]; intros Hc.
-    4: { cbn [unoc] in Hc. injection Hc as <-. rewrite ualt_dec_code, upl_cont. reflexivity. }
-    all: match type of Hc with unoc ?l = _ =>
-           destruct (unoc_file l c ltac:(intros ? ? ?; discriminate) Hc) as (k & Hk & ->) end;
-         rewrite ualt_dec_R; exact (cont_fnoc _ _ k Hk).
+    intros Hc. destruct (unoc_pipe l c Hc) as (p & n & -> & ->).
+    rewrite ualt_dec_code, upl_cont. reflexivity.
   Qed.
 
   (* THE OUT-OF-MEMORY DEATH: admissible at every line and state, free,

@@ -115,14 +115,6 @@ Proof using .
   destruct a; try reflexivity; cbn [ralt_panic] in H; discriminate H.
 Qed.
 
-(* the line's silent alternative, where the model has one (the blank
-   line's [LEcho []]), moves no file *)
-Lemma fsm_fnoc (s : fstate) (l : uline) (c : nat) :
-  fnoc_of l = Some c -> fsm s l (ralt_dec c) = s.
-Proof using .
-  intros Hc. destruct (fnoc_of_some l c Hc) as [-> _]. reflexivity.
-Qed.
-
 (* the words' line after the command fits a C int (the console write's
    count) -- [UkPipeEntries.pe_line_len], restated here to keep the round
    off the pipeline's cone *)

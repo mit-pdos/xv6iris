@@ -153,8 +153,7 @@ Proof using. rewrite elem_of_sel_cands. by rewrite /sel_ok. Qed.
 
 Definition ralt_fix_cands (l : uline) : list ralt :=
   match l with
-  (* the silent [REcho 2] at the blank line's [LEcho []] only *)
-  | LEcho [] => [REcho 0%nat; REcho 1%nat; REcho 2%nat; REcho 3%nat; ROom]
+  (* the echo application's four but its silent index 2 *)
   | LEcho _ => [REcho 0%nat; REcho 1%nat; REcho 3%nat; ROom]
   | LEchoF _ _ => [RFExec; RFOpenU; RFOpenM; RFFork; ROom]
   | LCat _ => [RCRan; RCNoOpen; RCExec; RCFork; ROom]
@@ -174,10 +173,8 @@ Definition ralt_cands (l : uline) : list nat :=
 
 Lemma ralt_fix_cands_ok l : Forall (ralt_ok l) (ralt_fix_cands l).
 Proof using.
-  destruct l as [[| w ws] | ws N | N | ws npc | ws]; cbn [ralt_fix_cands].
-  - repeat (constructor; [cbn [ralt_ok]; first [exact I | split; [lia | intros; first [reflexivity | lia]]] |]).
-    constructor.
-  - repeat (constructor; [cbn [ralt_ok]; first [exact I | split; [lia | intros; first [reflexivity | lia]]] |]).
+  destruct l as [ws | ws N | N | ws npc | ws]; cbn [ralt_fix_cands].
+  - repeat (constructor; [cbn [ralt_ok]; first [exact I | split; lia] |]).
     constructor.
   - repeat (constructor; [exact I |]). constructor.
   - repeat (constructor; [exact I |]). constructor.
@@ -208,14 +205,9 @@ Proof using.
     destruct (ralt_dec c) as [k | sel | | | | | | | | | |];
     cbn [ralt_ok] in H; try done.
   - left. apply elem_of_list_fmap. exists (REcho k). split; [reflexivity |].
-    destruct H as [Hk4 H2].
-    assert (Hk : k = 0%nat \/ k = 1%nat \/ k = 2%nat \/ k = 3%nat) by lia.
-    destruct ws as [| w ws]; cbn [ralt_fix_cands].
-    + destruct Hk as [-> | [-> | [-> | ->]]]; fdd_elem.
-    + destruct Hk as [-> | [-> | [-> | ->]]];
-        [fdd_elem | fdd_elem | discriminate (H2 eq_refl) | fdd_elem].
-  - left. apply elem_of_list_fmap. exists ROom. split; [reflexivity |].
-    destruct ws; cbn [ralt_fix_cands]; fdd_elem.
+    assert (Hk : k = 0%nat \/ k = 1%nat \/ k = 3%nat) by lia.
+    cbn [ralt_fix_cands]. destruct Hk as [-> | [-> | ->]]; fdd_elem.
+  - left. apply elem_of_list_fmap. exists ROom. split; [reflexivity |]. fdd_elem.
   - right. apply elem_of_list_fmap. exists sel. split; [reflexivity |].
     by apply sel_ok_cands.
   - left. apply elem_of_list_fmap. exists RFExec. split; [reflexivity |]. fdd_elem.

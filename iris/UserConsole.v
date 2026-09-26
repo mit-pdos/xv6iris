@@ -66,7 +66,7 @@ Local Open Scope Z_scope.
 (*  The six predicates the console's supply is parametric in.  They used *)
 (*  to travel as six separate arguments through every lemma of the seam, *)
 (*  which is why [init_cons_sup_of_sh_slot] below once read as five      *)
-(*  predicates and ten law hypotheses: the application had to hand each  *)
+(*  predicates and nine law hypotheses: the application had to hand each *)
 (*  one over at the call.  Bundled here, the application builds the      *)
 (*  record ONCE ([AppEcho]'s side: [echo_cc]) and discharges the laws    *)
 (*  ONCE ([echo_cc_holds]), and the seam takes a pair.                   *)
@@ -81,7 +81,7 @@ Local Open Scope Z_scope.
 (*  branches of the U tier have to see it: /init's chain ([UkInit],      *)
 (*  [UkInitMain], [UInitKernel]) takes it where it took [Wp Wb Rdl] and  *)
 (*  two [Timeless] binders, and sh's ([UInitSh]) where it took five      *)
-(*  predicates and ten laws.  [UkInit] and [UkSh] are siblings; this     *)
+(*  predicates and nine laws.  [UkInit] and [UkSh] are siblings; this    *)
 (*  file is below both.                                                  *)
 Record cons_cred (Σ : gFunctors) := MkConsCred {
   (* the per-position credential on the lease (lane IO-LEAF, M5) *)

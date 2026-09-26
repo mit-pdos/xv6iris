@@ -69,7 +69,7 @@ Global Instance ulm_ok_dec adm adm_s s l a : Decision (lm_ok (ulm adm adm_s) s l
 (*  Free: the file's state-free alternatives, every non-terminal echo-    *)
 (*  pipeline alternative, and at a [cat f] pipeline the panic, the empty  *)
 (*  run and [exec cat failed] ([UnionDisc.ufree]).  The silent round is   *)
-(*  optional: a pipeline's empty run and the blank line's [REcho 2].      *)
+(*  a pipeline's empty run, and no file line has one.                     *)
 (*  The boot state [lmh_st0] is the file's, the empty map.                *)
 (* ===================================================================== *)
 Definition ulm_hooks (adm : pline' -> bool) (adm_s : list (list (bv 8)) -> bool)

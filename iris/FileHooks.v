@@ -4,8 +4,7 @@
 (*  [FileLinksLine]'s section S0, moved below [FileOut] unchanged: the    *)
 (*  line the input's last complete body parses to, the state-free         *)
 (*  alternatives, the named alternatives (the fork panic, the exec        *)
-(*  failure with its bytes, the silent round where the model has one --  *)
-(*  the blank line's), the continuation's shape                          *)
+(*  failure with its bytes; no silent round), the continuation's shape    *)
 (*  lemmas, and [file_hooks : lm_hooks file_lm] with its equations.  The  *)
 (*  generic claim ([GenOut.gcl]) needs the hooks, and the file's claim    *)
 (*  sits below the link families that used to carry them.                *)
@@ -245,55 +244,11 @@ Proof using.
   - by rewrite (ralt_dec_enc RSExec).
 Qed.
 
-
-
-(* THE SILENT ROUND, where the model has one: the shell's own prompt IS
-   the block's first byte and nothing moved.  Only the blank line's
-   [LEcho []] ([REcho 2], [FileDisc.ralt_ok]): every line sh forks for
-   admits [ROom] instead, and no silent alternative. *)
-Definition fnoc_of (l : uline) : option nat :=
-  match l with
-  | LEcho [] => Some 2%nat
-  | _ => None
-  end.
-
-Lemma fnoc_of_some (l : uline) (c : nat) : fnoc_of l = Some c -> l = LEcho [] /\ c = 2%nat.
-Proof using.
-  destruct l as [[| w ws] | ws N | N | ws npc | ws]; cbn [fnoc_of]; intros Hc;
-    try discriminate Hc.
-  injection Hc as <-. by split.
-Qed.
-
-Lemma fnoc_of_ok (l : uline) (c : nat) : fnoc_of l = Some c -> ralt_ok l (ralt_dec c).
-Proof using.
-  intros Hc. destruct (fnoc_of_some l c Hc) as [-> ->].
-  rewrite (ralt_dec_lt4 2%nat ltac:(lia)) /ralt_ok. split; [lia | reflexivity].
-Qed.
-
-Lemma fnoc_of_free (l : uline) (c : nat) : fnoc_of l = Some c -> fstate_free (ralt_dec c) = true.
-Proof using.
-  intros Hc. destruct (fnoc_of_some l c Hc) as [-> ->].
-  by rewrite (ralt_dec_lt4 2%nat ltac:(lia)).
-Qed.
-
-Lemma fnoc_of_nopanic (l : uline) (c : nat) :
-  fnoc_of l = Some c -> ralt_panic (ralt_dec c) = false.
-Proof using.
-  intros Hc. destruct (fnoc_of_some l c Hc) as [-> ->].
-  rewrite (ralt_dec_lt4 2%nat ltac:(lia)). by vm_compute.
-Qed.
-
-Lemma cont_fnoc (s : fstate) (l : uline) (c : nat) :
-  fnoc_of l = Some c -> cont s l (ralt_dec c) = u_prompt.
-Proof using.
-  intros Hc. destruct (fnoc_of_some l c Hc) as [-> ->].
-  rewrite (ralt_dec_lt4 2%nat ltac:(lia)). cbn [cont uline_ws]. reflexivity.
-Qed.
-
-
-
-
-
+(* NO SILENT ROUND: the model has none at any line ([FileDisc.ralt_ok]
+   never admits [REcho 2]; a line sh forks for admits [ROom] instead), so
+   the hook's [None] makes its four laws vacuous. *)
+Lemma fnoc_none {P : Prop} (c : nat) : @None nat = Some c -> P.
+Proof using. intros H. discriminate H. Qed.
 
 (* ---- THE MODEL'S HOOKS ([LineModelLinks.lm_hooks] at the file model):
         the per-line alternatives the shell's own code names, state-
@@ -346,11 +301,12 @@ Proof using.
 Qed.
 
 Definition file_hooks : lm_hooks file_lm :=
-  MkLMH file_lm fstate_free ∅ fpan_of fexf_of fexfb fnoc_of (fun _ => ralt_ok_dec)
+  MkLMH file_lm fstate_free ∅ fpan_of fexf_of fexfb (fun _ => None) (fun _ => ralt_ok_dec)
     cont_state_free (fun _ _ => eq_refl) (fun _ _ _ _ _ H => H)
     (fun _ => fpan_of_ok) fpan_of_free fpan_of_panic
     (fun _ => fexf_of_ok) fexf_of_free fexf_of_nopanic cont_fexf
-    (fun _ => fnoc_of_ok) fnoc_of_free fnoc_of_nopanic cont_fnoc
+    (fun _ _ c => fnoc_none c) (fun _ c => fnoc_none c) (fun _ c => fnoc_none c)
+    (fun _ _ c => fnoc_none c)
     (fun s l a Hok Hp _ => cont_prompt s l a Hok Hp)
     cont_nonnil_dec.
 
