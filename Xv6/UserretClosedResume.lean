@@ -80,6 +80,7 @@ theorem urc_resume (UR : USERRET) (PT : SchedNames → IProp GF) (Γ : SchedName
     ⊢ wpLoop (GF := GF) cpu := by
   obtain ⟨hsie, hspie, hspp⟩ := hctx
   iintro ⟨#Hwire, #Hcl, Hk, Hgap, Hpc, Hsep, Hsc, Hstv, Hstvec, Hppt, Htf, Hres, Hslot, #Hloop⟩
+  icases kctx_kmapStatic cpu k $$ Hk with ⟨#Hks, Hk⟩
   icases kctx_hw cpu k $$ Hk with ⟨Hk, #Hhw⟩
   icases urc_res_upt PT Γ j cpu P ksp V sts cs pid $$ Hres with ⟨Hres, %hVP⟩
   icases usertrapResAt_sz PT Γ j cpu P ksp V sts cs pid $$ Hres with ⟨Hres, %hszb⟩
@@ -114,7 +115,7 @@ theorem urc_resume (UR : USERRET) (PT : SchedNames → IProp GF) (Γ : SchedName
     (urcRut_acc PT Γ j cpu V.sz.toNat V.fdg V.cwi gn cs pid V.pvLazy)
     V.sz.toNat sts V.cwi gn cs pid V.pvLazy (uvisOf V M sts gn cs pid) (umemLazy V.upt V.sz.toNat M)
     (tfResumeGpr0 V.tf) ms sc tv sep (retPc sep) hlo (uszOk_of_maxsz hszb) hms rfl rfl rfl rfl rfl rfl rfl
-    rfl rfl hlf rfl hsep.symm) $$ Hslot Hhw Hwire HU Hptm Hfrag Hcfg Hrut Hk
+    rfl rfl hlf rfl hsep.symm) $$ Hslot Hhw Hks Hwire HU Hptm Hfrag Hcfg Hrut Hk
 
 end
 

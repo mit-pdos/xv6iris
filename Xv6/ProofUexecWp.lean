@@ -30,7 +30,8 @@ anywhere a `UEXEC_GEN` is in scope.
 1. Rocq's functor `UexecGen (US : USER) : UEXEC_GEN` is the theorem
    `uexecWp_gen : USER → UEXEC_GEN` (SpecUser deviation 4).
 2. No `minstret_inv` to pass through (SpecUser deviation 1); `hw_config` is
-   passed through as in Rocq; the residue-token accessor `hRut` is the slot's
+   passed through as in Rocq, and `kmapStatic` beside it (SpecUser
+   deviation 5); the residue-token accessor `hRut` is the slot's
    pure premise, handed to `USER` as its Lean-level hypothesis (UexecWp
    deviation 4).
 -/
@@ -51,7 +52,7 @@ theorem uexecWp_gen (US : USER) : UEXEC_GEN where
     imodintro
     iapply uexecWp_fold
     unfold uexecF
-    iintro %h %xi %C %pt %Rut %hRut %M %g %ms %sc %stv %sep %va %hlo %hms #Hhw #Hwire Hregs Hpt Hcfg Hrut Hh
+    iintro %h %xi %C %pt %Rut %hRut %M %g %ms %sc %stv %sep %va %hlo %hms #Hhw #Hks #Hwire Hregs Hpt Hcfg Hrut Hh
     -- THE OLD-SHAPE HANDLER, out of the PAIRED one: the missing half is `IH`,
     -- under the same later, so one `inext` strips both and the two compose.
     ihave Hhandler : iprop(▷ @stvecHandlerWp hlc GF _ xi h C pt Rut) $$ [Hh]
@@ -62,7 +63,7 @@ theorem uexecWp_gen (US : USER) : UEXEC_GEN where
       isplitl [Hframe]
       · iexact Hframe
       · iexact IH
-    iapply (@USER.wp_user_exec_closed US hlc GF _ xi h C pt Rut hRut) $$ Hhw Hwire [Hregs Hpt Hcfg Hrut] Hhandler
+    iapply (@USER.wp_user_exec_closed US hlc GF _ xi h C pt Rut hRut) $$ Hhw Hks Hwire [Hregs Hpt Hcfg Hrut] Hhandler
     -- the concrete state, packed into the loop invariant: ACTIVE (so
     -- `userHartOk` is `True` and PC/nextPC are `va` both), the mstatus pins
     -- from the slot's premise, and the pinned image `M` FORGOTTEN -- exactly

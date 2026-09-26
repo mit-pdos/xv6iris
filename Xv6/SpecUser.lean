@@ -9,6 +9,9 @@ wands take it:
 * `hwConfig cpu` -- the hart's read-only hardware configuration (Rocq
   `hw_config`, MachCSL/HwConfig.lean): the platform constants and every
   configuration register frozen at reset, persistent (D52).
+* `kmapStatic` -- the kernel's static identity map, persistent (NOT in Rocq,
+  deviation 5): the user table's words and pages are held as kernel-virtual
+  cells, and the user-mode walker reads them physically.
 * `wireInv` -- the SHARED interrupt-wire invariant: the device loop writes the
   external-interrupt wires concurrently, so a user arm may only BORROW them
   across a step.  Interrupts are unmaskable at User.
@@ -45,6 +48,13 @@ hypotheses, as in Rocq.
    instances (`hlc`, `GF`, `MachGS`, `CurCtx`), the form of the retired
    `DiskAcc.DISK_INIT_WM`; Rocq's `GenId` is MachCSL's `genId` (inside `MachGS`), its `CpuId`
    the explicit `cpu`.
+5. **`kmapStatic -∗`** after `hw_config -∗` (coordinator decision, U1-K;
+   UserExec deviation 9): Lean's `userPtInv` holds the user table's words
+   and the user pages' bytes as kernel-virtual `wordPointsTo` cells, so the
+   walker's physical reads of them need the persistent static map
+   (`UptWalkTramp.uptCell_phys`); Rocq's cells are physical.  It rides the
+   slot's ambient `uvAmb` with `hwConfig`, and every kernel-side producer
+   discharges it from its `KernelImage.ro`.
 -/
 import Xv6.UserExec
 
@@ -56,7 +66,7 @@ open Iris Iris.BI Iris.ProofMode MachCSL
 def wpUserExecClosedBody {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CurCtx]
     (cpu : CPU) (C : UCfg) (pt : UPtd) (Rut : UPtd → IProp GF) : Prop :=
   (∀ pt' : UPtd, Rut pt' ⊢ ctxToken cpu ∗ (ctxToken cpu -∗ Rut pt')) →
-  ⊢ hwConfig cpu -∗ wireInv -∗ userInv cpu C pt Rut -∗ ▷ stvecHandlerWp cpu C pt Rut -∗ wpLoop cpu
+  ⊢ hwConfig cpu -∗ kmapStatic (hlc := hlc) (GF := GF) -∗ wireInv -∗ userInv cpu C pt Rut -∗ ▷ stvecHandlerWp cpu C pt Rut -∗ wpLoop cpu
 
 /-- **Rocq `Module Type USER`**: the one assumed interface D24 allows. -/
 structure USER : Prop where

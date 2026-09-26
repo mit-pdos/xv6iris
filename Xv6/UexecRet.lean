@@ -53,7 +53,8 @@ Rocq's header, kept point for point:
    `userPtmInv`/`userPtmInvX` (the lazy-view twin of `userPtInv`: the page
    view `Mp` with `umemLazy P sz Mp = M`, UexecSlot's own lazy view),
    `userTrapFrameAt`/`userTrapFrameAtm`, `uvRegs`, `uvAmb`.  `uvAmb cpu` is
-   `hwConfig cpu ∗ wireInv` (Rocq `uv_amb`; `minstret_inv` is `emp`);
+   `hwConfig cpu ∗ kmapStatic ∗ wireInv` (Rocq `uv_amb`; `minstret_inv` is
+   `emp`; `kmapStatic` is not in Rocq, UserExec deviation 9);
    `uvRegs` carries `clockCells` (UserExec deviation 2).  Candidates to move
    into `UserExec.lean` when 8-M touches it.
 4. `ustate` is the pair `(V, M)` (UexecSlot deviation 1): `urunEq Wk V M`.
@@ -1314,7 +1315,7 @@ theorem uslot_of_creds (R : IProp GF) :
   unfold uslotF
   iintro %h %xi %C %pt %Rfd %Rut %hRut %hlo %hpm %hlz Hb
   unfold uvbF ukontF ukbF
-  icases Hb with ⟨⟨#Hhw, #Hwi⟩, Hur, %hsz, Hpt, Hfrag, Hcfg, Hg, Hpc, Hrut, Hk⟩
+  icases Hb with ⟨⟨#Hhw, #Hks, #Hwi⟩, Hur, %hsz, Hpt, Hfrag, Hcfg, Hg, Hpc, Hrut, Hk⟩
   ihave ⟨%Mp, Hpt⟩ := @userPtmInvX_pt hlc GF _ xi h pt W.sz W.M $$ Hpt
   ihave ⟨%ms, %sc, %stv, %sep, %hms, Hregs⟩ := uvRegs_uRegs h (tfResumePc W.tf) (tfResumeGpr0 W.tf) $$ [Hur Hg Hpc]
   · isplitl [Hur]
@@ -1325,7 +1326,7 @@ theorem uslot_of_creds (R : IProp GF) :
   ihave Hwp0 := uexecWp_unfold_mp $$ Hwp
   unfold uexecF
   iapply Hwp0 $$ %h %xi %C %pt %Rut %hRut %Mp %(tfResumeGpr0 W.tf) %ms %sc %stv %sep %(tfResumePc W.tf)
-    %hlo %hms Hhw Hwi Hregs Hpt Hcfg Hrut [Hk Hfrag]
+    %hlo %hms Hhw Hks Hwi Hregs Hpt Hcfg Hrut [Hk Hfrag]
   inext
   iintro ⟨Hframe, -⟩
   ihave ⟨%W', %sc', %stv', %hpins, Htm⟩ :=

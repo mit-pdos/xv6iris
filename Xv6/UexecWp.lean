@@ -30,7 +30,8 @@ statement needs it.
 ## Deviations from Rocq
 
 1. The body takes `hw_config` (`hwConfig h`, as Rocq) but not
-   `minstret_inv` (`emp`, SpecUser deviation 1).
+   `minstret_inv` (`emp`, SpecUser deviation 1); it also takes `kmapStatic`
+   right after it (NOT in Rocq: SpecUser deviation 5).
 2. `loopOk` drops `ud_data pt = ud_pas pt`: Lean's `UPtd` has no separate
    data-footprint field (the footprint IS `um`'s pages), so the conjunct is
    vacuous; `proc_pt_wf` is `UPtDefs.uptWf`.
@@ -67,7 +68,7 @@ def uexecF (X : IProp GF) : IProp GF := iprop%
     ⌜∀ pt' : UPtd, Rut pt' ⊢ @ctxToken hlc GF _ xi h ∗ (@ctxToken hlc GF _ xi h -∗ Rut pt')⌝ -∗
     ∀ (M : Nat → List (BitVec 8)) (g : RegMap) (ms sc stv sep va : BitVec 64),
       ⌜loopOk C pt⌝ -∗ ⌜userMstatusOk ms⌝ -∗
-      hwConfig h -∗ wireInv -∗
+      hwConfig h -∗ kmapStatic (hlc := hlc) (GF := GF) -∗ wireInv -∗
       uRegs h (HartState.HART_ACTIVE ()) ms sc stv sep va va g -∗
       @userPtInvX hlc GF _ xi h pt M -∗
       userCfg h C -∗
@@ -93,6 +94,7 @@ instance uexecF_contractive : OFE.Contractive (uexecF (GF := GF)) where
     refine BI.forall_ne (fun stv => ?_)
     refine BI.forall_ne (fun sep => ?_)
     refine BI.forall_ne (fun va => ?_)
+    refine BI.wand_ne.ne .rfl ?_
     refine BI.wand_ne.ne .rfl ?_
     refine BI.wand_ne.ne .rfl ?_
     refine BI.wand_ne.ne .rfl ?_

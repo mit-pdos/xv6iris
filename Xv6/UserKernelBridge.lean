@@ -187,7 +187,7 @@ theorem wpLoop_userret_sret [CurCtx] (U : USER) (cpu : CPU) (C : UCfg) (P : UPtd
     (userMstatusOk_sretMs ms hsm hspie) $$ [HmConf Hclock Hpc HF Hsepc Hsc Hstv Hstvec Hslot Hum HRut]
   · iframe HmConf Hclock Hpc HF Hsepc Hsc Hstv Hstvec Hslot Hum HRut
     ipureintro; exact hwf
-  iapply (U.wp_user_exec_closed cpu C P Rut hacc) $$ Hhw Hwire HU
+  iapply (U.wp_user_exec_closed cpu C P Rut hacc) $$ Hhw HS Hwire HU
   iexact Hh
 
 end

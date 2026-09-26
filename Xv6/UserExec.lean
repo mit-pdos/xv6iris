@@ -32,11 +32,21 @@ userret).
    configuration cells nothing writes after reset, `↦ᵣ□`, persistent, carried
    by every `confCells`.  As in Rocq it is NOT in `userInv`/`userCfg`: it is
    `SpecUser.USER`'s `hw_config -∗` premise, rides the slot's ambient
-   (`uvAmb cpu = hwConfig cpu ∗ wireInv`, Rocq `uv_amb`) and `uexecF`'s
-   premise, and uservec takes it to re-assemble `kConf`.  The cells the
-   kernel writes during boot and never after (`mcounteren`, `mtimecmp`,
-   `mepc`, `stimecmp`) stay exclusive in `userHwCells`, lent through the
-   trap loop and back.
+   (`uvAmb cpu = hwConfig cpu ∗ kmapStatic ∗ wireInv`, Rocq `uv_amb`) and
+   `uexecF`'s premise, and uservec takes it to re-assemble `kConf`.  The
+   cells the kernel writes during boot and never after (`mcounteren`,
+   `mtimecmp`, `mepc`, `stimecmp`) stay exclusive in `userHwCells`, lent
+   through the trap loop and back.
+9. **`kmapStatic` rides with `hwConfig`** (coordinator decision, U1-K; NOT
+   in Rocq): `userPtInv` holds the user table's words and the user pages'
+   bytes as KERNEL-VIRTUAL `wordPointsTo` cells, so reading them at their
+   physical addresses (what the user-mode walker does) needs the kernel's
+   persistent static map (`UptWalkTramp.uptCell_phys`).  Rocq's cells are
+   physical and it never needed this.  So `uvAmb cpu` is
+   `hwConfig cpu ∗ kmapStatic ∗ wireInv`, and `SpecUser.USER`, `uexecF`
+   and `ukc_apply`/`uslot_applyLoop` take `kmapStatic -∗` right after
+   `hwConfig -∗`.  The kernel holds it everywhere (`KernelImage.ro`), so
+   every producer discharges it from what it has.
 2. **`minstret_inv` is dropped** (Rocq defines it as `emp`); Lean's
    `clockCells` (inside `uRegs`) owns minstret/mcycle/mtime/mip outright,
    which is Rocq's post-port `minstret_res`/`clock_res` riders.
@@ -66,6 +76,7 @@ userret).
 -/
 import Xv6.UPtDefs
 import Xv6.ElfFile
+import Xv6.KernelMap
 
 namespace Xv6
 
@@ -359,9 +370,10 @@ def uvRegs (cpu : CPU) : IProp GF := iprop%
     Register.mstatus ↦ᵣ[cpu] ms ∗ Register.scause ↦ᵣ[cpu] sc ∗ Register.stval ↦ᵣ[cpu] stv ∗
     Register.sepc ↦ᵣ[cpu] sep ∗ clockCells cpu
 
-/-- **Rocq `UmodeRegs.uv_amb`**: the hart's `hw_config` and the wire
-invariant (`minstret_inv` is `emp`, deviation 2). -/
-abbrev uvAmb (cpu : CPU) : IProp GF := iprop(hwConfig cpu ∗ wireInv)
+/-- **Rocq `UmodeRegs.uv_amb`**: the hart's `hw_config`, the kernel's static
+map (deviation 9, not in Rocq) and the wire invariant (`minstret_inv` is
+`emp`, deviation 2). -/
+abbrev uvAmb (cpu : CPU) : IProp GF := iprop(hwConfig cpu ∗ kmapStatic (hlc := hlc) (GF := GF) ∗ wireInv)
 
 instance uvAmb_persistent (cpu : CPU) : Persistent (uvAmb (GF := GF) cpu) := by
   unfold uvAmb; infer_instance
