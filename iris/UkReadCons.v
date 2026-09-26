@@ -385,4 +385,171 @@ Section UkReadCons.
     rewrite ucons_swallow_eq. iExact "Hsw".
   Qed.
 
+  (* ...AT A NAMED TABLE VIEW (seccomp S4): read moves no descriptor *)
+  Lemma wp_uk_ecall_read_cons_at (N : uk_names Σ) (h : CpuId) (m : regfile)
+      (pc : mword 64) (a : Z) (k cap : nat) (f : nat -> bv 8) (avail : nat)
+      (l v : list fdstate) (fd : nat) (wr : bool)
+      (Rd : nat -> nat -> iProp Σ)
+      (Rin : list (list mobs * bv 8) -> iProp Σ) :
+    usysno m = USYS_read ->
+    (* THE DESCRIPTOR IS A STANDARD STREAM THE CALLER'S LEDGER NAMES, and
+       the ledger says it is the console *)
+    bv_signed (trunc32 (m !!! Regidx a0_idx)) = Z.of_nat fd ->
+    (fd < NSTD)%nat ->
+    l !! fd = Some (FdOpen true wr (FdDevice CONSOLE)) ->
+    uint (m !!! Regidx a1_idx) = a ->
+    uint (m !!! Regidx a2_idx) = Z.of_nat cap ->
+    (cap <= k)%nat ->
+    (* the kernel answers the SIGNED 32-bit count, so the request the caller
+       made is the request file.c read only below the sign boundary *)
+    (Z.of_nat cap < 2 ^ 31)%Z ->
+    is_aligned_vaddr (Virtaddr (add_vec_int pc 4)) 2 = true ->
+    uinstr_is (ukn_t N) pc false (ECALL tt) -∗
+    urun N h m pc avail -∗
+    ustd_at (ukn_fd N) l v -∗
+    ubytes (ukn_d N) a k f -∗
+    (* THE PAYMENT: the ring's, and ONE ATOMIC UPDATE ON THE CONSOLE
+       HISTORY'S INPUT QUEUE *)
+    cons_acc fsc_cons app_rdcred Rd -∗
+    cons_read_pay (S gen_id) Rin -∗
+    (∀ (h' : CpuId) (r : mword 64) (d : nat) (g : nat -> bv 8),
+       ⌜ (d <= cap)%nat ⌝ -∗
+       ⌜ forall j : nat, (d <= j < k)%nat -> g j = f j ⌝ -∗
+       ustd_at (ukn_fd N) l v -∗
+       uread_cons_ans fsc_cons Rd Rin r cap g -∗
+       ubytes (ukn_d N) a k g -∗
+       urun N h' (<[Regidx a0_idx := r]> m) (add_vec_int pc 4) avail -∗
+       mWP (Loop : expr riscv_lang)) -∗
+    mWP (Loop : expr riscv_lang).
+  Proof using .
+    intros Hn Ha0 Hfdlt Hl0 Ha1 Ha2 Hcapk Hcap31 Hal.
+    iIntros "#Hi Hrun Hstd Hbuf Hacc Hlink Hcont".
+    subst a.
+    pose proof (uread_count_le (m !!! Regidx a2_idx) cap Ha2) as Hbnd.
+    assert (Hcnt : sys_rw_count (m !!! Regidx a2_idx) = Z.of_nat cap)
+      by exact (uread_count_is_cap (m !!! Regidx a2_idx) cap Ha2 Hcap31).
+    change (2 ^ 31)%Z with 2147483648%Z in Hcap31.
+    iDestruct (udepwf_std_read_cons N m pc l fd wr Rd Rin Ha0 Hfdlt Hl0
+                 with "Hacc Hlink") as "Hsb".
+    iApply (wp_uk_ecall_read_recv_at N h m pc
+              (bv_signed (subrange_vec_dec (m !!! Regidx a2_idx) 31 0
+                          : mword 32))
+              k f avail (read_cons_fam (ukn_pay N) Rd Rin) l v
+              Hn eq_refl ltac:(lia) Hal
+              with "Hi Hrun Hsb Hstd Hbuf").
+    iIntros (h' r d g W M' fdv' cw' cs')
+      "%Hd %Hgf %Hlin %HM %Hnf %Harg0 %Harg1 %Harg2 %Htake %Hlz %Hlive
+       Hstd Hpost Hrun Hbuf".
+    iDestruct (spost_at_read_elim uslot (read_cons_fam (ukn_pay N) Rd Rin) W
+                 (m !!! Regidx a0_idx) (m !!! Regidx a1_idx)
+                 (m !!! Regidx a2_idx) (uvis_fd W) r M' fdv' cw' cs'
+                 Harg0 Harg1 Harg2 eq_refl with "Hpost")
+      as "[%Hfrret Hpost']".
+    iDestruct "Hpost'" as (P) "(%Hperm & %Hwf & %Hlazy & Hrec)".
+    rewrite Hcnt in Hfrret.
+    (* THE ANSWER IS NOT -1 AT AN OPEN READABLE CONSOLE DESCRIPTOR
+       (lane TRAP-ROWS, T2(iii)) *)
+    assert (Hfdw : uvis_fd W !! fd
+                   = Some (FdOpen true wr (FdDevice CONSOLE))).
+    { pose proof Hl0 as Hl0'. rewrite <- Htake in Hl0'.
+      rewrite lookup_take in Hl0'; [ exact Hl0' | lia ]. }
+    assert (Hcgz : (0 <= bv_signed
+                      (trunc32 (tf_w (uvis_tf W) (tf_arg_idx 2))))%Z).
+    { rewrite Harg2. rewrite /sys_rw_count in Hcnt. lia. }
+    assert (Hargfd : usys_argfd (uvis_tf W) = Z.of_nat fd).
+    { rewrite /usys_argfd.
+      replace (uvis_tf W !!! tf_arg_idx 0) with (m !!! Regidx a0_idx)
+        by (symmetry; exact Harg0).
+      exact Ha0. }
+    assert (Hne1 : r <> (mword_of_int (-1) : mword 64)).
+    { apply (proj1 Hlive eq_refl Hcgz wr).
+      - rewrite Hargfd. unfold NSTD, NOFILE in *. lia.
+      - rewrite Hargfd Nat2Z.id. exact Hfdw. }
+    iEval (rewrite (std_fd_st_of_key (m !!! Regidx a0_idx) (uvis_fd W) l fd
+                      (FdOpen true wr (FdDevice CONSOLE)) Ha0 Hfdlt Htake Hl0)
+                   /fileread_extra_core;
+           cbn [read_cons_fam xfam_rd rf_F rf_ret rf_in kf_xpay]) in "Hrec".
+    destruct (decide (CONSOLE = CONSOLE)) as [_ | Hc];
+      [ | exfalso; exact (Hc eq_refl) ].
+    pose proof (Hlazy Hlz) as Hlf.
+    iEval (rewrite /console_receipt) in "Hrec".
+    iDestruct "Hrec" as "[(%Hm1 & _ & _) | Hw]";
+      [ exfalso; exact (Hne1 Hm1) | ].
+    iDestruct "Hw" as (dd dc cur hs sl)
+      "(%Hdr & %Hdmax & %Hb1 & %Hb4 & %Hhl & %Hled & #Htags & #Hlb
+        & Hwin & Hrd)".
+    destruct Hfrret as [Hm1 | (i0 & Hri & Hi0)];
+      [ exfalso; exact (Hne1 Hm1) | ].
+    assert (Hi0u : bv_unsigned r = i0).
+    { rewrite Hri. rewrite <- uint_unsigned.
+      apply uint_moi. unfold Z64. lia. }
+    assert (Hddcap : (dd <= cap)%nat) by lia.
+    iDestruct "Hwin" as "[(%Hwj & %Hsl & %Hch & #Hsw & Hbnd) | #Hdirty]";
+      last first.
+    { (* a tokenless reader popped while the call slept: the ring's
+         credential is the answer, and nothing is claimed about the
+         window *)
+      iApply ("Hcont" $! h' r d g with "[%] [%] Hstd [Hrd] Hbuf Hrun");
+        [ lia | exact Hgf | ].
+      rewrite /uread_cons_ans. iExists dd, dc, cur, hs.
+      iSplitR; [ by iPureIntro | ]. iSplitR; [ by iPureIntro | ].
+      iSplitR; [ iPureIntro; intros Hdc; apply Hb1;
+                 rewrite Hcnt Hdc; lia | ].
+      iSplitR; [ iPureIntro; intros Hd0 Hc0; apply Hb4;
+                 [ exact Hd0 | rewrite Hcnt; lia ] | ].
+      iSplitR; [ iExact "Htags" | ]. iFrame "Hrd". by iRight. }
+    iDestruct "Hbnd" as (sl2 ws)
+      "(#Hlb2 & %Hpre2 & %Hlen2 & %Hlws & %Hwsj & Hrin)".
+    (* THE WINDOW, ASSEMBLED: the receipt's ORDER clause and its per-byte
+       LEDGER are about the same bytes, joined by [obs_ends_in_inj] (a
+       history names at most one byte) and by the leaf's resume-image
+       bridge. *)
+    assert (Hwinf : cons_window sl cur dd g hs).
+    { split_and!; [ lia | exact Hhl | ].
+      intros j Hj.
+      destruct (Hwj j Hj) as (hj & bj & Hhj & Hej & Hsj).
+      exists hj, bj. split_and!; [ exact Hsj | exact Hhj | exact Hej | ].
+      destruct (Hled ltac:(intros i Hi; apply Hlin; lia) j Hj)
+        as (hj' & bj' & Hhj' & Hej' & Hmj').
+      assert (Hhe : hj' = hj)
+        by (rewrite Hhj in Hhj'; by injection Hhj' as Hhj'').
+      subst hj'.
+      assert (Hbe : bj' = bj)
+        by exact (proj2 (obs_ends_in_inj _ _ hj bj' bj Hej' Hej)).
+      subst bj'.
+      rewrite (HM j ltac:(lia)) in Hmj'. by injection Hmj' as Hmj''. }
+    assert (Hddc : (dd <= dc)%nat).
+    { pose proof (prefix_length _ _ Hpre2) as Hle. lia. }
+    iApply ("Hcont" $! h' r d g with "[%] [%] Hstd [Hrd Hrin] Hbuf Hrun");
+      [ lia | exact Hgf | ].
+    rewrite /uread_cons_ans. iExists dd, dc, cur, hs.
+    iSplitR; [ by iPureIntro | ]. iSplitR; [ by iPureIntro | ].
+    iSplitR; [ iPureIntro; intros Hdc; apply Hb1; rewrite Hcnt Hdc; lia | ].
+    iSplitR; [ iPureIntro; intros Hd0 Hc0; apply Hb4;
+               [ exact Hd0 | rewrite Hcnt; lia ] | ].
+    iSplitR; [ iExact "Htags" | ]. iFrame "Hrd".
+    iLeft. rewrite /uread_cons_win. iExists sl.
+    iSplitR; [ by iPureIntro | ].
+    iSplitR; [ rewrite ucons_stored_lb_eq; iExact "Hlb" | ].
+    iSplitR; [ by iPureIntro | ].
+    iSplitR "Hrin"; last first.
+    { iSplitR; [ by iPureIntro | ]. iExists sl2, ws.
+      iSplitR; [ rewrite ucons_stored_lb_eq; iExact "Hlb2" | ].
+      iSplitR; [ by iPureIntro | ]. iSplitR; [ by iPureIntro | ].
+      iSplitR; [ by iPureIntro | ]. iSplitR; [ by iPureIntro | ].
+      iExact "Hrin". }
+    (* THE SWALLOW'S COPY-OUT REASON IS REFUTED HERE, off the leaf's
+       writable-mapped row: the caller owns the byte one past the run. *)
+    destruct (Nat.eq_dec dd cap) as [Hde | Hdne].
+    { assert (Hdcdd : dc = dd) by (apply Hb1; rewrite Hcnt Hde; lia).
+      rewrite Hdcdd. iApply ucons_swallow_refl. }
+    iApply (ucons_swallow_mono fsc_cons
+              (~ uva_wmapped P (uint (add_vec_int (m !!! Regidx a1_idx)
+                                        (Z.of_nat dd)))) False sl dd dc
+              ltac:(intro Hno;
+                    exact (Hno (Hnf P dd Hwf Hperm Hlf ltac:(lia))))
+              with "[]").
+    rewrite ucons_swallow_eq. iExact "Hsw".
+  Qed.
+
 End UkReadCons.

@@ -634,6 +634,30 @@ Section UConsOpen.
     exact (init_cons_moi_nat_m1 fd Hlt (eq_sym Hfd)).
   Qed.
 
+  (* ...AT A NAMED TABLE VIEW (seccomp S4): [UkRunSys.
+     wp_uk_ecall_open_recv_img_at]'s two arms *)
+  Definition uk_open_fd_arm_at (γfd : gname) (l v sts fdv' : list fdstate)
+      (r : mword 64) : iProp Σ :=
+    ((∃ (fd : nat) (rd wr : bool) (t : fdtype),
+        ⌜r = (mword_of_int (Z.of_nat fd) : mword 64)
+         /\ (fd < NOFILE)%nat
+         /\ fdv' = <[fd := FdOpen rd wr t]> sts
+         /\ fdst_nopipe (FdOpen rd wr t)⌝ ∗
+        (ualloc_v γfd l fd (FdOpen rd wr t) fdv' ∗ ⌜tab_le sts v⌝))
+     ∨ (⌜r = (mword_of_int (-1) : mword 64) /\ fdv' = sts⌝ ∗ ustd_at γfd l v))%I.
+
+  Lemma init_cons_fail_std_at (γfd : gname) (l v sts fdv' : list fdstate)
+      (r : mword 64) :
+    r = (mword_of_int (-1) : mword 64) ->
+    uk_open_fd_arm_at γfd l v sts fdv' r -∗ ustd_at γfd l v.
+  Proof using .
+    intros Hr. rewrite /uk_open_fd_arm_at. iIntros "[Hal | [_ $]]".
+    iDestruct "Hal" as (fd rd wr t) "[%Hb _]".
+    destruct Hb as (Hfd & Hlt & _). exfalso.
+    rewrite Hr in Hfd.
+    exact (init_cons_moi_nat_m1 fd Hlt (eq_sym Hfd)).
+  Qed.
+
   Lemma init_cons_any_std (γfd : gname) (l sts fdv' : list fdstate)
       (r : mword 64) :
     uk_open_fd_arm γfd l sts fdv' r -∗ ustd_any γfd.

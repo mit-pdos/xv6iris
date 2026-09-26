@@ -491,6 +491,7 @@ Section UShUPipes.
       "%Hpeq %Hs1 %Hlp %Hlws %Hfbk %Hs0 %Hs64 %Hs38 %Hszlo %Hszal %Hszok
        %Hrows #Hcode #Hpcode #Hpro #Hjt Hstr Hws Hsy Hstd Hcwd Hch Hpid HM
        Hcp Hrun".
+    iDestruct (UkSh.ush_std_ustd with "Hstd") as "Hstd".
     destruct Hlp as (ws & fs & Hwsf & Hlat).
     pose proof Hlat as (Hok_u & Hlen & Hby).
     pose proof Hok_u as (Hok & Hn & HF & _).
@@ -627,6 +628,7 @@ Section UShUPipes.
       "%Hpeq %Hs1 %Hlp %Hlws %Hfbk %Hs0 %Hs64 %Hs38 %Hszlo %Hszal %Hszok
        %Hrows #Hcode #Hpcode #Hpro #Hjt Hstr Hws Hsy Hstd Hcwd Hch Hpid HM
        Hcp Hrun".
+    iDestruct (UkSh.ush_std_ustd with "Hstd") as "Hstd".
     destruct Hlp as (nm & fs & Hu & Hwsf & Hlat).
     pose proof Hlat as (Hok_u & Hlen & Hby).
     pose proof Hok_u as (Hok & Hn & HF & _).

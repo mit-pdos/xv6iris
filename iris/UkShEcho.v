@@ -1532,6 +1532,7 @@ Section UkShEcho.
     iIntros "!>" (N' h m dw dv s0 len ws g sz ld n I)
       "%Hpeq %Hs1 %Hline %Hlws %Hfbk %Hs0 %Hs64 %Hs38 %Hszlo %Hszal %Hszok %Hrows
        #Hcode #Hpcode #Hpro #Hjt Hline Hws Hsy Hstd Hcwd Hch _ HM Hcr Hrun".
+    iDestruct (UkSh.ush_std_ustd with "Hstd") as "Hstd".
     (* the two rows design app-pipe SS4.3w bought (purchase 2) are FREE for
        this prover: the echo child's walk does not read its own pid, and
        the set it takes is [UserChildren.uch_any]. *)

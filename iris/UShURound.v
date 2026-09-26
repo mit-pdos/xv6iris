@@ -710,6 +710,7 @@ Section UShURound.
       "%Hpeq %Hs1 %Hline %Hlws %Hfok %Hsa %Hs64 %Hs38 %Hszlo %Hszal %Hszok
        %Hrows #Hcode #Hpcode #Hpro #Hjt Hstr Hwsp Hsy Hstd Hcwd Hch _ HM Hcr
        Hrun".
+    iDestruct (UkSh.ush_std_ustd with "Hstd") as "Hstd".
     iDestruct (UserChildren.uch_any_of with "Hch") as "Hch".
     destruct Hline as (nm & -> & Hlat).
     pose proof (proj1 Hlat) as Hu.
@@ -1063,6 +1064,7 @@ Section UShURound.
        %Hrows #Hcode #Hpcode #Hpro #Hjt Hstr Hwsp Hsy Hstd Hcwd Hch Hpid HM Hcr
        Hrun".
     iDestruct (UserChildren.uch_any_of with "Hch") as "Hch". iClear "Hpid".
+    iDestruct (UkSh.ush_std_ustd with "Hstd") as "Hstd".
     pose proof (proj1 Hline) as Hokws.
     (* ---- the line, off the fork's words ---- *)
     assert (Hpos : (0 < nlines I)%nat).

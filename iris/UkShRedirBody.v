@@ -289,7 +289,7 @@ Section UkShRedirBody.
           ustr (ukn_d N') (DfracOwn 1) s0 len fb -∗
           ustr (ukn_d N') dw ushp_whitespace 5 ushp_ws_f -∗
           ustr (ukn_d N') dv ushp_symbols 7 ushp_sym_f -∗
-          UserFd.ustd (ukn_fd N') ld -∗
+          UkSh.ush_std N' ld -∗
           UserCwd.ucwd (ukn_cwd N') FsImg.ROOTINO -∗
           (* THE TWO ROWS [UkShFork.ushf_child_law_at] BOUGHT (design
              app-pipe SS4.3w, purchase 2), MIRRORED HERE so that the two
