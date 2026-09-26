@@ -4,7 +4,7 @@
 
 The frame (push 4, spill ra/s0), argc's test (`bge a5,a0` at a5 = 1: the
 usage arm at 0x4c), the spill of s1 and `mv s1,a1`, the call to fork's stub
-(`c.li a7,1; ecall; c.jr ra`, the ecall `UkFork.wp_uk_ecall_fork_at` at the
+(`c.li a7,1; ecall; c.jr ra`, the ecall `UkFork.wp_uk_ecall_fork` at the
 payload `ukCode` -- the text crosses the fork, `secc_forkable_code`), and
 the three arms at 0x16 (`SeccMainArms`).
 
@@ -57,7 +57,7 @@ end
 
 section
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CtokG GF] [SG : UexecSG GF] [PS : UprogSG GF]
-  [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF Nat FdState RegMapF]
+  [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
   [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int]
 
 /-- **Rocq `wp_ksecc_main`**. -/
@@ -186,7 +186,7 @@ theorem wp_seccMain (UL : UK_LEAVES) (HS : UK_SYS_P) (HF : SECC_FPRINTF)
   ihave Hi := secc_uis N.t 0x346 false (.ECALL ()) ⟨_, _, _, rfl⟩ (by decide) (by decide) $$ Hc
   have hn : (BitVec.extractLsb' 0 32 ((ukWr mf 17#5 (BitVec.ofInt 64 1)) 17#5)).toInt = USYS_fork :=
     secc_usysno mf 1 (by decide)
-  iapply wp_uk_ecall_fork_at UL N h10 (ukWr mf 17#5 (BitVec.ofInt 64 1)) (BitVec.ofNat 64 (0x344 + 2))
+  iapply wp_uk_ecall_fork UL N h10 (ukWr mf 17#5 (BitVec.ofInt 64 1)) (BitVec.ofNat 64 (0x344 + 2))
     (10 + (12 + (4 + n))) szv l ∅ c cs (fun _ => iprop(True)) iprop(emp)
     (fun γt _ _ => ukCode γt User.Seccomp.code.byte) hn (by decide)
     $$ Hi [] Hc Hsz Hstd [] Hcwd Hch [] Hrun

@@ -91,7 +91,7 @@ theorem kinit_lit_str {GF : BundledGFunctors} [GhostMapG GF Nat (BitVec 8) RegMa
 
 section Steps
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CtokG GF] [UexecSG GF] [UprogSG GF]
-  [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF Nat FdState RegMapF]
+  [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
   [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int]
 
 /-! ## §4 `auipc rd,1 ; addi rd,rd,imm` -- a literal's address -/

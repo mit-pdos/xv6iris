@@ -25,7 +25,7 @@ open Std (ExtTreeSet)
 every pattern length. -/
 structure GREP_MATCHHERE : Prop where
   wp_grepMatchhere : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CtokG GF] [UexecSG GF] [UprogSG GF]
-    [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF Nat FdState RegMapF]
+    [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
     [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int],
     ∀ lr : Nat, grepMhSpec (hlc := hlc) (GF := GF) lr
 

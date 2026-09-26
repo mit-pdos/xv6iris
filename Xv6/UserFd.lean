@@ -28,7 +28,7 @@ Rocq `ufdG := ghost_mapG Σ (option nat) ufdcell` (seccomp S3 ruling G2: key
 `FileDefs.FileG.gmUfdG : GhostMapG GF (Option Nat) UfdCell UfdMapF` -- the
 same key and cell types, the map an `Option Nat`-keyed `Std.ExtTreeMap`
 (`UfdMapF`), whose `LawfulFiniteMap` instance is iris-lean's generic
-`ExtTreeMap` one.  It REPLACES the pre-view `GhostMapG GF Nat FdState RegMapF`
+`ExtTreeMap` one.  It REPLACES the pre-view `GhostMapG GF (Option Nat) UfdCell UfdMapF`
 (its only user was this file), in the same `Xv6GF` slot 64.  `UfdCell` lives
 in `FileDefs` beside the field (`FdState` is defined there).  The file binds
 the instance as a section variable, filled from `FileG` by instance

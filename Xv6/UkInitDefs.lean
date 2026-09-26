@@ -123,7 +123,7 @@ end Code
 /-! ## §1 THE HEADS (Rocq `UInitFd`, pre-K3: deviation 2) -/
 
 section Heads
-variable {GF : BundledGFunctors} [GhostMapG GF Nat FdState RegMapF]
+variable {GF : BundledGFunctors} [GhostMapG GF (Option Nat) UfdCell UfdMapF]
 
 /-- **Rocq `ufd_headL`**: the ledger is at `l`, or still the all-closed
 one, or the taint. -/
@@ -194,7 +194,7 @@ end Heads
 
 section Dance
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CtokG GF] [UexecSG GF] [UprogSG GF]
-  [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF Nat FdState RegMapF]
+  [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
   [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int]
 
 /-- The console open's argument words: a0 = "console" at 0x980, a1 = O_RDWR. -/
@@ -368,7 +368,7 @@ end Dance
 
 section Round
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CtokG GF] [UexecSG GF] [UprogSG GF]
-  [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF Nat FdState RegMapF]
+  [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
   [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int] [Xv6G GF]
 
 /-- **Rocq `init_rd_cred`**. -/
@@ -514,7 +514,7 @@ through the pending `UlibRunP.ofUkRun` bridge) -/
 
 section Printf
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CtokG GF] [UexecSG GF] [UprogSG GF]
-  [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF Nat FdState RegMapF]
+  [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
   [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int]
 
 /-- **Rocq `UkInitPrintf.wp_kinit_printf_chain`**: printf of a `%`-free
@@ -535,7 +535,7 @@ end Printf
 /-- The interface of init's `printf` (Rocq `UkInitPrintf`). -/
 structure INIT_PRINTF : Prop where
   wp_initPrintfChain : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CtokG GF] [UexecSG GF]
-    [UprogSG GF] [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF Nat FdState RegMapF]
+    [UprogSG GF] [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
     [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int], wpInitPrintfChainBody (hlc := hlc) (GF := GF)
 
 end Xv6

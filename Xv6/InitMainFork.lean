@@ -10,7 +10,7 @@ the fork is init's text and argv (`forkable_initImg`) and the lend (the
 position, the lease and the credential).
 
 Deviations: `UkInitDefs` deviations; the stub is walked inline
-(`UkStub.stub_li`, the fork leaf `UkFork.wp_uk_ecall_fork_at`, `wp_uk_ret`)
+(`UkStub.stub_li`, the fork leaf `UkFork.wp_uk_ecall_fork`, `wp_uk_ret`)
 because `stubLaw`'s return is one-armed; Lean's leaf also hands the pid
 arm's freshness `γc ∉ Sc`, which /init's round does not read and drops
 (Rocq's statement drops it the same way); the descriptor handles `D` are
@@ -30,7 +30,7 @@ attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Funct
 
 section
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CtokG GF] [UexecSG GF] [UprogSG GF]
-  [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF Nat FdState RegMapF]
+  [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
   [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int] [Xv6G GF]
 
 /-- **Rocq `wp_kinit_fork`**. -/
@@ -74,7 +74,7 @@ theorem wp_kinit_fork (UL : UK_LEAVES) (N : UkNames GF) (T : IProp GF) [Persiste
   iintro %h1 Hrun
   -- 0x36c  ecall: the leaf that returns twice
   ihave Hi := init_uis N.t (User.Init.Sym.«fork» + 2) false (.ECALL ()) ⟨_, _, _, rfl⟩ (by decide) (by decide) $$ Hc
-  iapply wp_uk_ecall_fork_at UL N h1 (ukWr m 17#5 (BitVec.ofInt 64 1)) (BitVec.ofNat 64 (User.Init.Sym.«fork» + 2))
+  iapply wp_uk_ecall_fork UL N h1 (ukWr m 17#5 (BitVec.ofInt 64 1)) (BitVec.ofNat 64 (User.Init.Sym.«fork» + 2))
     avail szv l ∅ ROOTINO Sc (uconsPay (hlc := hlc) cn γ T (initRd Cr.ccRd (ccWbn Cr)))
     iprop(upos (hlc := hlc) γ np ∗ uconsPay (hlc := hlc) cn γ T Cr.ccRd (-1) ∗
       initLendCred T stc Cr.ccWp (ccWbn Cr) l np)
