@@ -1137,6 +1137,8 @@ import Xv6.MainPrintk
 import Xv6.MainKvm
 import Xv6.MainTrap
 import Xv6.MainStarted
+import Xv6.MainFs
+import Xv6.ProofMain
 import Xv6.FsCfgKits
 import Xv6.FsBootSupply
 import Xv6.FileBoot

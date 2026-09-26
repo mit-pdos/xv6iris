@@ -106,7 +106,11 @@ of its own for it).
    they come down the boot chain as their own row.
 8. **The EnvIs handler environment is `∃`-paged** (HandlerEnv): main installs
    the handler at the pages `virtio_disk_init` chose.
-9. `fd_slots_auth` (Rocq `main_globals_raw`) has no Lean counterpart
+9. **`diskCrashCaps γd`** (the era's crash-permit invariant, Rocq's
+   `dev_inv` conjunct `perm_inv gen_id (dn_perm γd)`) is its own row: Lean's
+   `diskInv` does not carry it, and `diskCaps` (the vdisk credentials the
+   handler environment and the boot token hold) does.
+10. `fd_slots_auth` (Rocq `main_globals_raw`) has no Lean counterpart
    (SlotSupply's keyed tokens, FileBoot deviation 1); `flive_own` neither
    (FileDefs deviation 2).
 
@@ -130,6 +134,7 @@ import Xv6.SpecBinit
 import Xv6.SpecIinit
 import Xv6.SpecFileinit
 import Xv6.SpecVirtioDiskInit
+import Xv6.SpecVirtioDiskRw
 import Xv6.SpecUserinit
 import Xv6.SpecScheduler
 import Xv6.SpecKernelvec
@@ -371,7 +376,7 @@ def wp_main_boot_body [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF] [FsTopG G
   -- THE FIRST PROCESS'S EXEC BUNDLE (Rocq `init_boot_bundle`), carried to userinit
   initBootBundle (hlc := hlc) (SG := uexecSGXv6) ROOTINO (List.replicate NOFILE FdState.closed) ∗
   -- the device fabric, from time 0, and the boot hart's tokens over it
-  uartInv .uart0 γ0 ∗ uartInv .uart1 γ1 ∗ plicInv γ0 γ1 ∗ diskInv γd ∗
+  uartInv .uart0 γ0 ∗ uartInv .uart1 γ1 ∗ plicInv γ0 γ1 ∗ diskInv γd ∗ diskCrashCaps γd ∗
   wireInv ∗
   mainUartRaw X .uart0 γ0 l0 ∗ mainUartRaw X .uart1 γ1 l1 ∗
   diskCfgOwn γd c0 ∗ diskInitGhosts γd ∗
