@@ -140,6 +140,12 @@ import MachCSL.UTranslate
 import MachCSL.UFetchMem
 import MachCSL.UExecAlu
 import MachCSL.UExecCtl
+import MachCSL.UCycleDefs
+import MachCSL.UCycle
+import MachCSL.UWait
+import MachCSL.UTick
+import MachCSL.UCycleSwp
+import MachCSL.UCycleExec
 import MachCSL.ArchReset
 import MachCSL.BootRun
 import MachCSL.BootPeel
