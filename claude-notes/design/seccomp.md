@@ -717,3 +717,19 @@ Supersedes 10.7's escape and 10.5's `lk_T := T'`:
   trace nothing observable changes -- no input ever arrives after a
   seccomp line -- but the masked program can read nothing, pipes and
   inherited files included.  §1's "read the console" is withdrawn.
+
+### 10.11 Lane S2 landed (owner, 2026-09-25)
+
+Accepted as built: the claim is `pwclV pg U ucparams ∅ uwa uwild` (a
+generic three-arm claim in `PipeOutW.v`, with the wild-line predicate as
+a parameter); the token at its own line `secc_tok_at k I0` also carries
+`lm_disc_input I0`; `useccomp_shape I := usecc_tok_at (S gen_id) I ∗ ⌜uwild
+(ul I) = true⌝` is TIED to the shape's line (the tie is what makes the
+next read vacuous by `uterm_read_law`'s argument); the read receipt
+`rd_retW` gives `secc_tok_at k (delivered) ∨ T` and reaches sh through
+`urresw`'s third conjunct.  The refutation lemmas live in
+`GenOutWild.v`.  The narrow tainted-prompt law of 10.9 is NOT needed
+(with `lk_T = UT` the taint still pays `sh_deps`); 10.9 is withdrawn.
+S4 must replace the one knob-off discharge `UInitUnionCC.union_wbn_to`
+(`uwild_disc_off`) by init's licence path, and must never present a
+block-first byte at `LSecc` (the block step's not-wild premise).
