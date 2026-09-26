@@ -87,10 +87,10 @@ before it.
 - `uok s (LSecc ws) a` admits `US u` for any NON-EMPTY `u`
   (`LineModelLinks.lmh_cont_nonnil` quantifies over every admitted
   alternative) and the shell's own non-terminal alternatives every line
-  must admit (`lm_hooks`: the fork panic `RCFork`, the exec failure
-  `RSExec` -- `exec seccomp failed`, code 17 -- and the silent pad
-  `RCSilent`).  The claim never chooses those three at a seccomp line
-  (§6.4); they exist for the hooks.
+  must admit (`lm_hooks`: the fork panic `RCFork` and the exec failure
+  `RSExec` -- `exec seccomp failed`, code 17), plus sh's child's
+  out-of-memory death `ROom` (sync.md §2), which the seccomp child files
+  through the era's licence (`usecc_execfail_law`).
 - `LineModel.lm_merge` IS LINE-INDEXED (`lm_line -> list (bv 8) ->
   Prop`): a seccomp round's continuation is any byte string, so there
   `lm_merge` must be `True`, while at a pipeline line it stays

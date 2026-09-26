@@ -69,13 +69,11 @@ echo line (the round in flight at the cut).  `f` never contains junk.
    subsequence of ANY earlier `echo … > f` line, or absent.  Within an
    era the model is EXACT.  The commit receipt at `write` is priced in
    §6 and is milestone 2.
-3. **`echo`'s alternative 2** ("the child died before printing", `$ `)
-   is kept for the new round shapes — it is sh's `argv[0] == 0` exit and
-   unreachable under the discipline, as in the echo application.  Its
-   f-effect is IDENTITY (`RFSilent`: f unchanged), not "truncated":
-   every line shape then has one silent alternative that leaves `f`
-   alone (`REcho 2`, `RFSilent`, `RCSilent`), which is what the round's
-   credential needs at the fork's relayed failure row (RULING HOLD-POS).
+3. **No silent alternative** (superseded by [`sync.md`](sync.md) §1-§2):
+   since xv6 `d66e41c` sh's out-of-memory death prints, every forked line
+   admits `ROom` (`out of memory\n$ `, f unchanged), and no line admits a
+   bare-prompt alternative that moves nothing.  The `RFSilent`/`RCSilent`
+   rows below are historical.
 
 ## 1. The pure model (`iris/FileDisc.v`)
 

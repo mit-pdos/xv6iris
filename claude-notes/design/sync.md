@@ -1,6 +1,6 @@
 # Design: `sync` in the union -- a completed sync pins what the next boot sees
 
-PROPOSAL (owner's direction; the worklist is
+§1-§2 LANDED (xv6 `d66e41c`); §3-§5 PROPOSAL (the worklist is
 [`../projects/sync.md`](../projects/sync.md)).  Builds on
 [`union.md`](union.md) (the model `ulm`, the round, the top theorem),
 [`app-file.md`](app-file.md) (the deed, the durable copy, honest limit 2,
@@ -25,81 +25,67 @@ Two NEGATIVE demos carry the claim (the vacuity rule): that transcript with
 `cat f` printing `a` is refuted; and, within one era, `echo a > f; echo b >
 f; cat f` printing `a` is refuted (§1 -- the landed model admits it).
 
-## 1. The silent alternative is a hole at the TRACE level
+## 1. Why no line may have a silent alternative
 
 The top theorem is `∃ cs` (one alternative per line) with the transcript a
-prefix of the session.  A line whose admissible set contains an alternative
-printing the bare prompt and moving nothing lets the theorem read "the
-command did not run" into any transcript where the command prints nothing
-on success.  Today every file line has one (`REcho 2`, `RFSilent`,
-`RCSilent`), and `echo … > f` prints nothing on success (`RFRan sel`, cont
-`u_prompt`) -- so `echo a > f; echo b > f; cat f` printing `a` is ADMITTED
-(`echo b > f` read as `RFSilent`).  A silent `sync` would leave the floor of
-§5 unraised the same way.  So the silent alternative leaves the MODEL, not
-just the proofs.
+prefix of the session.  An admissible alternative that prints the bare
+prompt and moves nothing lets the theorem read "the command did not run"
+into any transcript where the command prints nothing on success -- `echo …
+> f` (`RFRan`, cont `u_prompt`) and `sync`.  So `echo a > f; echo b > f;
+cat f` printing `a` would be admitted, and a completed `sync` could not
+raise the floor of §5.
 
-**A real execution DOES reach it: the child's out-of-memory death in
-`parsecmd`.**  sh parses in the CHILD (`sh.c:172`, `runcmd(parsecmd(cmd))`);
-`parsecmd`'s constructors `malloc` and `memset` the result unchecked
-(`sh.c:206-207`, …); `malloc` returns NULL when `sbrk` fails
-(`umalloc.c:54-56`, `growproc`'s `kalloc` can fail), the store to NULL
-faults, and `usertrap` prints on the KERNEL UART (not the theorem's) and
-kills.  sh then prints `$ ` after `wait`, ignoring the status.  So "the
-command did not run and the console shows only the prompt" is an HONEST
-outcome at every forked line (`UkShMalloc.v`'s header: no caller can wish
-the NULL away), and the proofs' left payload arm (`Wc I 3`, "died at the
-null store") is exactly it.  Consequences: the within-era `echo a > f; echo
-b > f; cat f` -> `a` is admitted HONESTLY (the second child may die before
-its open), and a silent `/sync` cannot be told apart from a sync that never
-ran.  The other deaths are visible or unreachable: `argv[0] == 0`
-(`sh.c:77`) and `cmd == 0` (`:68`) at a non-empty line, exec and fork
-failure print, `kill` has no caller in the union (the taint covers it), and
-a verified program faults nowhere.  A BLANK line re-prompts in the parent
-(`sh.c:164`) with no fork; the proofs file it at the silent echo
-alternative of the parser's fallback line `LEcho []`.
+Until xv6 `d66e41c` such an alternative was HONEST: sh parses in the child
+(`sh.c`, `runcmd(parsecmd(cmd))`), the constructors used `malloc`'s result
+unchecked, `malloc` returns NULL when `sbrk`'s `kalloc` fails, the store to
+NULL faults, `usertrap` reports on the KERNEL UART (not the theorem's) and
+kills the child, and sh prints `$ ` after `wait`.  `d66e41c` (owner's
+change, "sh: panic when out of memory") adds `cmdalloc`: `malloc`,
+`panic("out of memory")` on NULL, `memset`.  The death now PRINTS `out of
+memory\n` on fd 2 (checked in QEMU with a memory hog).  Every other child
+death is visible or unreachable: exec and fork failure print, `argv[0] ==
+0` and `cmd == 0` cannot happen at a non-empty admissible line, `kill` has
+no caller in the union (the taint covers it), a verified program faults
+nowhere, and a BLANK line re-prompts in sh's parent with no fork -- under
+the discipline only as the taint's arm (an admissible line never starts
+with a newline, `UkSh.ush_uline_head_nonnl`).
 
-RULED (owner, 2026-09-26): option (b) -- sh checks `malloc`.  Upstream
-`d66e41c` ("sh: panic when out of memory") adds `cmdalloc(n)`: `malloc`,
-`panic("out of memory")` on NULL, `memset`; the five constructors call it.
-So the out-of-memory death PRINTS `out of memory\n` on fd 2 and exits the
-child, and sh prints `$ `.  Checked in QEMU with a memory hog: the pinned
-sh printed nothing (the kill message went to the kernel UART) and sync never
-ran; `d66e41c` prints the diagnostic.
+## 2. The model: an out-of-memory alternative, no silent one
 
-## 2. The model after `d66e41c`: an out-of-memory alternative, no silent one
-
-- **`ROom`**, one alternative shared by every forked line shape (echo,
-  redirect, cat, seccomp, sync, and the pipelines through `UR ROom`): cont
-  `out of memory\n$ `, step the identity (the parse precedes the redirect's
-  open), not a panic, state-free, hence free.  It is the only honest
-  "the command did not run" outcome that the console can show.
-- **The silent alternatives leave**: `REcho 2`, `RFSilent`, `RCSilent`
-  (echo, redirect, cat, and seccomp's), and `sync` never has one.  ONE
-  exception, a proof artefact with no trace meaning: a BLANK line is
-  handled in sh's parent with no fork (`sh.c:164`), and the proofs file it
-  at the parser's fallback line `LEcho []`, which no admissible input
-  parses to; `REcho 2` stays admissible THERE ONLY.  Pipelines keep `PLRun
-  []` (a pipeline that prints nothing is a real outcome, `cat f | cat` at an
-  empty `f`).
-- **The hook**: `lmh_noc` becomes optional (`Some` at pipelines and at
-  `LEcho []`); the PAD (`GenOutPure.lm_alts_pad`, the in-flight line's
-  entry) moves to `lmh_exf`, which already has the three properties it
-  needs (admissible, free, not a panic); `UnionDecU.u_canon_name` needs a
-  pad output that does not merge (to check).
-- **The proofs, and who knows the true alternative**:
-  - the constructors' NULL arm (formerly the fault at the null store,
-    `UkSh.wp_ksh_memset_null`) is now `cmdalloc` -> `panic`: the CHILD,
-    holding the lend (`Wc I 3`), prints `out of memory\n`, files `ROom` at
-    its first byte, and exits paying `Wc I 0` -- the exec-failed diagnostic's
-    shape (`ush_execfail_law`), at the panic walk (`UkShDiag`);
-  - so no child returns the lend untouched: `ushf_wq`'s left arm has no
-    producer and goes, and with it `uHwbl_f`'s payload use;
-  - the fork re-entry's whole-lend row is refuted inside
-    `wp_kshf_fork_core` (its `r <> -1` is discarded there today);
-  - `uWcf0_of_pre_line_id`'s prompt-first arm files PEND at the block's own
-    alternative (`lm_aprs I a`; `cat f` at an empty `f`, `RCRan`);
-  - `gprompt_dollar`'s settled arm is dead at the union; `gwc_line_of_blk0`
-    is reached only under the taint (`uHcltaint` instead).
+- **`FileDisc.ROom`** (code 18), shared by every forked line shape --
+  echo, redirect, cat, seccomp, sync, and the pipelines as `UR ROom`
+  (`UnionDisc.uok`'s one cross arm): cont `alt_oom = "out of memory\n$ "`,
+  step the identity (the parse precedes the redirect's open), not a panic,
+  free.  It is the one "the command did not run" outcome the console shows.
+- **No file line has a silent alternative.**  Pipelines keep `PLRun []` in
+  the shell's always-admitted three (`PipesDisc.plsafe`): an empty pipeline
+  output is real (`cat f | cat` at an empty `f`), and taking it out of
+  `plsafe` reaches the N-stage layer (`PipesView.pv_ok`,
+  `PipeOutNEv.pwc_blkV_file_empty`) -- an open cleanup, not a hole.
+- **The hook** `LineModelLinks.lmh_noc : lm_line M -> option nat`, its laws
+  under `Some`; the pad of an in-flight line (`GenOutPure.lm_alts_pad`)
+  uses `lmh_exf`; the decider's canonical re-resolution
+  (`UnionDecU.u_canon_name`) uses `uoom`.
+- **The proofs name the true alternative** wherever the silent one used to
+  be filed:
+  - the constructors' NULL arm is `cmdalloc` -> `panic`; the parse walks
+    take it as the continuation `UkShEcho.ushp_oom` (built from a
+    diagnostic law by `ushp_oom_of_diag`), and the child -- holding its
+    lend AND its fd ledger, since panic writes fd 2 -- prints, files `ROom`
+    at the block's first byte and exits paying `Wc I 0`
+    (`UkShDiag.wp_kshd_oom_paid`; `UShURoundDefs.uHoom` for echo and the
+    pipeline's node 0, `UShURound.uoom_law_deed` for cat and the redirect,
+    whose children open the deed before the parse);
+  - no child returns its lend untouched: `UkShFork.ushf_wq I := Wc I 0`,
+    and no law converts `Wc I 3` to `Wc I 0`;
+  - the fork's re-entry has no whole-lend row (`ushf_fans`: the parent
+    arm's `r ≠ -1` refutes it);
+  - a block whose first byte is the prompt files the block's OWN
+    alternative (`uWcf0_of_pre_line_id`: `cat f` at an empty `f`, `RCRan`).
+- **The negative demo**: `UnionDiscDec.demo_no_silent` -- for every
+  well-formed boot state, `echo a > a.txt; echo b > a.txt; cat a.txt`
+  printing `a` is not a good output of the union model (`lm_good_out
+  ulmG`, what `union_phi` promises per cycle).
 
 ## 3. The sync line
 
