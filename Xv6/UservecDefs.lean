@@ -247,7 +247,7 @@ page view `Mp` whose lazy view is `M`, and the residue. -/
 theorem uservec_frame_open [CurCtx] (cpu : CPU) (C : UCfg) (P : UPtd) (Rut : UPtd → IProp GF) (sz : Nat)
     (M : ElfMem) (ms sc tv sep : BitVec 64) (g : RegMap)
     (hdq : C.dqc = DFrac.own 1) (hmie : C.mie = MIE_S) (hmed : C.medeleg = MEDELEG_S) :
-    userTrapFrameAtm (GF := GF) cpu C P Rut sz M ms sc tv sep g ⊢
+    hwConfig cpu ∗ userTrapFrameAtm (GF := GF) cpu C P Rut sz M ms sc tv sep g ⊢
       ∃ (mepc stc : BitVec 64) (Mp : Nat → List (BitVec 8)),
         ⌜(smFacts ms false ∧ sretFacts ms false true false) ∧ umemLazy P sz Mp = M⌝ ∗
         confCells cpu (DFrac.own 1) Privilege.Supervisor (sConfOf KTier.kpt P.root ms C.mideleg mepc stc) ∗
@@ -256,8 +256,8 @@ theorem uservec_frame_open [CurCtx] (cpu : CPU) (C : UCfg) (P : UPtd) (Rut : UPt
         Register.stvec ↦ᵣ[cpu] C.stvec ∗ ⌜uptWf P⌝ ∗ uptSlot cpu P ∗ umPages P Mp ∗ Rut P := by
   unfold userTrapFrameAtm userPtmInv userCfg userHwCells
   rw [hdq, hmie, hmed]
-  iintro ⟨%hms, Hhs, Hcp, Hms, Hsc, Hstv, Hsep, Hpc, Hclock, HF, ⟨%Mp, HP, %hM⟩,
-    ⟨Hstvec, Hmie, Hmideleg, Hmedeleg, Hmenvcfg, #Hhw, Hmcounteren, Hmtimecmp, %mepc, %stc, Hmepc,
+  iintro ⟨#Hhw, %hms, Hhs, Hcp, Hms, Hsc, Hstv, Hsep, Hpc, Hclock, HF, ⟨%Mp, HP, %hM⟩,
+    ⟨Hstvec, Hmie, Hmideleg, Hmedeleg, Hmenvcfg, Hmcounteren, Hmtimecmp, %mepc, %stc, Hmepc,
       Hstimecmp⟩, HR⟩
   icases (userPtInv_uptSlot cpu P Mp).1 $$ HP with ⟨Hsatp, Hpmpcfg, Hpmpaddr, %hwf, Hslot, Hum⟩
   iexists mepc, stc, Mp

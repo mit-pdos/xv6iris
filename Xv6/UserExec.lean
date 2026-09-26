@@ -30,15 +30,13 @@ userret).
 
 1. **`hw_config` is `MachCSL.hwConfig`** (D52, Rocq-literal): the
    configuration cells nothing writes after reset, `↦ᵣ□`, persistent, carried
-   by every `confCells`.  `SpecUser.USER` takes it as its `hw_config -∗`
-   premise.  `userCfg` ALSO carries it (inside `userHwCells`), as Rocq's
-   `user_cfg` carries its `↦ᵣ□` copies of `senvcfg`/`mstateen0`/`sstateen0`/
-   the counter cells: a persistent copy costs nothing, and it is what lets
-   the kernel re-assemble `kConf` from `userTrapFrame` after the trap and
-   the slot (`UexecWp`) stay free of a `hw_config` thread (Rocq threads it
-   through `uexec_wp`/`uv_amb`).  The cells the kernel writes during boot and
-   never after (`mcounteren`, `mtimecmp`, `mepc`, `stimecmp`) stay exclusive
-   in `userHwCells`, lent through the trap loop and back.
+   by every `confCells`.  As in Rocq it is NOT in `userInv`/`userCfg`: it is
+   `SpecUser.USER`'s `hw_config -∗` premise, rides the slot's ambient
+   (`uvAmb cpu = hwConfig cpu ∗ wireInv`, Rocq `uv_amb`) and `uexecF`'s
+   premise, and uservec takes it to re-assemble `kConf`.  The cells the
+   kernel writes during boot and never after (`mcounteren`, `mtimecmp`,
+   `mepc`, `stimecmp`) stay exclusive in `userHwCells`, lent through the
+   trap loop and back.
 2. **`minstret_inv` is dropped** (Rocq defines it as `emp`); Lean's
    `clockCells` (inside `uRegs`) owns minstret/mcycle/mtime/mip outright,
    which is Rocq's post-port `minstret_res`/`clock_res` riders.
@@ -187,13 +185,12 @@ def uRegs (cpu : CPU) (hs : HartState) (ms sc stv sep va va' : BitVec 64) (g : R
   Register.sepc ↦ᵣ[cpu] sep ∗ Register.PC ↦ᵣ[cpu] va ∗ Register.nextPC ↦ᵣ[cpu] va' ∗
   clockCells cpu ∗ gprFile cpu g
 
-/-- **The configuration cells the user tier reads but never writes**
-(deviation 1): the persistent `hwConfig` (Rocq `hw_config`, and `user_cfg`'s
-`↦ᵣ□` copies), and, exclusively, the cells the kernel wrote during boot and
-never after -- `mcounteren` at the kernel's value, the timer compares the
-clock tick reads, and `mepc` (carried for the kernel's `kConf`). -/
+/-- **The configuration cells the user tier reads but never writes, held
+exclusively** (deviation 1; the frozen ones are `hwConfig`): the cells the
+kernel wrote during boot and never after -- `mcounteren` at the kernel's
+value, the timer compares the clock tick reads, and `mepc` (carried for the
+kernel's `kConf`). -/
 def userHwCells (cpu : CPU) : IProp GF := iprop%
-  hwConfig cpu ∗
   Register.mcounteren ↦ᵣ[cpu] 2#32 ∗ Register.mtimecmp ↦ᵣ[cpu] 0xFFFFFFFFFFFFFFFF#64 ∗
   ∃ mepc stc : BitVec 64, Register.mepc ↦ᵣ[cpu] mepc ∗ Register.stimecmp ↦ᵣ[cpu] stc
 
@@ -204,13 +201,6 @@ def userCfg (cpu : CPU) (C : UCfg) : IProp GF := iprop%
   Register.stvec ↦ᵣ[cpu]{C.dqc} C.stvec ∗ Register.mie ↦ᵣ[cpu]{C.dqc} C.mie ∗
   Register.mideleg ↦ᵣ[cpu]{C.dqc} C.mideleg ∗ Register.medeleg ↦ᵣ[cpu]{C.dqc} C.medeleg ∗
   Register.menvcfg ↦ᵣ[cpu]{C.dqc} MENVCFG_S ∗ userHwCells cpu
-
-/-- The loop's config cells carry the persistent `hwConfig` (deviation 1). -/
-theorem userCfg_hw (cpu : CPU) (C : UCfg) : userCfg (GF := GF) cpu C ⊢ userCfg cpu C ∗ hwConfig cpu := by
-  unfold userCfg userHwCells
-  iintro ⟨H1, H2, H3, H4, H5, #Hhw, H6⟩
-  iframe
-  isplit <;> iexact Hhw
 
 /-- **Rocq `UserPtTree.user_pt_inv`**: the translation state (satp at the
 user root, the PMP cells, the TLB sound for the tree) and the address space
@@ -372,10 +362,11 @@ def uvRegs (cpu : CPU) : IProp GF := iprop%
     Register.mstatus ↦ᵣ[cpu] ms ∗ Register.scause ↦ᵣ[cpu] sc ∗ Register.stval ↦ᵣ[cpu] stv ∗
     Register.sepc ↦ᵣ[cpu] sep ∗ clockCells cpu
 
-/-- **Rocq `UmodeRegs.uv_amb`** (deviation 3: `wireInv` alone). -/
-abbrev uvAmb : IProp GF := wireInv
+/-- **Rocq `UmodeRegs.uv_amb`**: the hart's `hw_config` and the wire
+invariant (`minstret_inv` is `emp`, deviation 2). -/
+abbrev uvAmb (cpu : CPU) : IProp GF := iprop(hwConfig cpu ∗ wireInv)
 
-instance uvAmb_persistent : Persistent (uvAmb (GF := GF)) := by
+instance uvAmb_persistent (cpu : CPU) : Persistent (uvAmb (GF := GF) cpu) := by
   unfold uvAmb; infer_instance
 
 /-- Rocq `u_regs_uv_regs`. -/

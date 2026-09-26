@@ -35,8 +35,7 @@ hypotheses, as in Rocq.
 ## Deviations from Rocq
 
 1. **No `minstret_inv` wand** (UserExec deviation 2: Rocq defines it as
-   `emp`).  The `hw_config` wand IS here (D52); `userCfg` also carries a
-   persistent copy (UserExec deviation 1).
+   `emp`).  The `hw_config` wand IS here (D52), as in Rocq.
 2. The accessor lends MachCSL's running token `ctxToken cpu` (the ambient
    context's token WITH the hart's reservation fragment, UserExec deviation 3)
    -- Rocq's `own_context cur_ctx`.

@@ -213,7 +213,7 @@ at the parked residue. -/
 def urcLoop (PT : SchedNames → IProp GF) (Γ : SchedNames) (j : Nat) : IProp GF :=
   iprop(□ ∀ (h : CPU) (C : UCfg) (pt : UPtd) (sz : Nat) (γfd : GName) (cw : Nat) (gn : GName)
       (cs : ExtTreeSet GName compare) (pid : BitVec 32) (lz : Bool) (fdv : List FdState),
-    ⌜loopOk C pt⌝ -∗
+    ⌜loopOk C pt⌝ -∗ hwConfig h -∗
     ukb (hlc := hlc) h C pt (fdFrags γfd) (urcRut PT Γ j h sz γfd cw gn cs pid lz) sz (permOf pt.um sz)
       fdv cw gn cs pid lz)
 

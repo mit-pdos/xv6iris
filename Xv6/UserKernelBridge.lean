@@ -89,7 +89,7 @@ theorem userInv_of_sret [CurCtx] (cpu : CPU) (C : UCfg) (P : UPtd) (Rut : UPtd �
     iapply (userPtInv_uptSlot cpu P M).2
     iframe Hsatp Hpmpcfg_n Hpmpaddr_n Hslot Hum
     ipureintro; exact hwf
-  iframe Hstvec Hmie Hmideleg Hmedeleg Hmenvcfg Hhw Hmcounteren Hmtimecmp
+  iframe Hstvec Hmie Hmideleg Hmedeleg Hmenvcfg Hmcounteren Hmtimecmp
   iexists mepc, stc
   iframe Hmepc Hstimecmp
 
@@ -98,7 +98,7 @@ configuration cells over the user root, interrupts off with `SPIE = 1`,
 `SPP = U`, the pc at the handler, and the rest of the frame. -/
 theorem userTrapFrame_open [CurCtx] (cpu : CPU) (C : UCfg) (P : UPtd) (Rut : UPtd → IProp GF)
     (hdq : C.dqc = DFrac.own 1) (hmie : C.mie = MIE_S) (hmed : C.medeleg = MEDELEG_S) :
-    userTrapFrame (GF := GF) cpu C P Rut ⊢
+    hwConfig cpu ∗ userTrapFrame (GF := GF) cpu C P Rut ⊢
       ∃ (ms mepc stc sc tv sep : BitVec 64) (g : RegMap) (M : Nat → List (BitVec 8)),
         ⌜smFacts ms false ∧ sretFacts ms false true false⌝ ∗
         confCells cpu (DFrac.own 1) Privilege.Supervisor (sConfOf KTier.kpt P.root ms C.mideleg mepc stc) ∗
@@ -107,8 +107,8 @@ theorem userTrapFrame_open [CurCtx] (cpu : CPU) (C : UCfg) (P : UPtd) (Rut : UPt
         Register.stvec ↦ᵣ[cpu] C.stvec ∗ ⌜uptWf P⌝ ∗ uptSlot cpu P ∗ umPages P M ∗ Rut P := by
   unfold userTrapFrame userPtAny userCfg userHwCells
   rw [hdq, hmie, hmed]
-  iintro ⟨%ms, %sc, %stv, %sep, %g, %hms, Hhs, Hcp, Hms, Hsc, Hstv, Hsep, Hpc, Hclock, HF, ⟨%M, HP⟩,
-    ⟨Hstvec, Hmie, Hmideleg, Hmedeleg, Hmenvcfg, #Hhw, Hmcounteren, Hmtimecmp, %mepc, %stc, Hmepc,
+  iintro ⟨#Hhw, %ms, %sc, %stv, %sep, %g, %hms, Hhs, Hcp, Hms, Hsc, Hstv, Hsep, Hpc, Hclock, HF, ⟨%M, HP⟩,
+    ⟨Hstvec, Hmie, Hmideleg, Hmedeleg, Hmenvcfg, Hmcounteren, Hmtimecmp, %mepc, %stc, Hmepc,
       Hstimecmp⟩, HR⟩
   icases (userPtInv_uptSlot cpu P M).1 $$ HP with ⟨Hsatp, Hpmpcfg, Hpmpaddr, %hwf, Hslot, Hum⟩
   iexists ms, mepc, stc, sc, stv, sep, g, M

@@ -67,7 +67,7 @@ def uexecF (X : IProp GF) : IProp GF := iprop%
     ⌜∀ pt' : UPtd, Rut pt' ⊢ @ctxToken hlc GF _ xi h ∗ (@ctxToken hlc GF _ xi h -∗ Rut pt')⌝ -∗
     ∀ (M : Nat → List (BitVec 8)) (g : RegMap) (ms sc stv sep va : BitVec 64),
       ⌜loopOk C pt⌝ -∗ ⌜userMstatusOk ms⌝ -∗
-      wireInv -∗
+      hwConfig h -∗ wireInv -∗
       uRegs h (HartState.HART_ACTIVE ()) ms sc stv sep va va g -∗
       @userPtInvX hlc GF _ xi h pt M -∗
       userCfg h C -∗
@@ -93,6 +93,7 @@ instance uexecF_contractive : OFE.Contractive (uexecF (GF := GF)) where
     refine BI.forall_ne (fun stv => ?_)
     refine BI.forall_ne (fun sep => ?_)
     refine BI.forall_ne (fun va => ?_)
+    refine BI.wand_ne.ne .rfl ?_
     refine BI.wand_ne.ne .rfl ?_
     refine BI.wand_ne.ne .rfl ?_
     refine BI.wand_ne.ne .rfl ?_

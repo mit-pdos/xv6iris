@@ -175,7 +175,7 @@ def wp_uservec_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CurCt
     (ws : List (BitVec 64)) (ms sc tv sep : BitVec 64) (g : RegMap)
     (hloop : loopOk C P) (hsie : k.sie = false) (htier : k.tier = KTier.kpt)
     (hkw : uservecKWords cpu k ws) : Prop :=
-  userTrapFrameAtm cpu C P Rut sz M ms sc tv sep g ∗ kmapAt trampVpn (kLeaf trampPpn .rx 0#1 0#1) ∗
+  hwConfig cpu ∗ userTrapFrameAtm cpu C P Rut sz M ms sc tv sep g ∗ kmapAt trampVpn (kLeaf trampPpn .rx 0#1 0#1) ∗
   tfPageAt P.tfp ws ∗ userretLeft cpu k ∗
   ▷ uservecPost cpu k P Rut sz M ws g sep sc tv
   ⊢ wpLoop (GF := GF) cpu

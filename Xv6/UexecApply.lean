@@ -34,7 +34,7 @@ round resumed.  Everything here is what that re-keying needs:
 4. `uexec_ret_round_slot_of` is stated at the record pair `(V, M)` (UexecSlot
    deviation 1): `us_M U'` is `umemLazy V.upt V.sz.toNat M`, the image the
    key projection `uvisOf` reads.
-5. `ukc_apply`/`uslot_apply_loop` take no `hw_config`/`minstret_inv`
+5. `ukc_apply`/`uslot_apply_loop` take `hw_config` (as Rocq) but no `minstret_inv`
    (SpecUser deviation 1); `wire_inv` is `wireInv`.
 -/
 import Xv6.UexecRound
@@ -484,17 +484,19 @@ theorem ukc_apply [xi : CurCtx] (cpu : CPU) (C : UCfg) (pt : UPtd) (Rfd : List F
     (pidv : BitVec 32) (lz : Bool) (M : ElfMem) (m : RegMap) (ms sc stv sep pc : BitVec 64)
     (hlo : loopOk C pt) (hsz : uszOk sz) (hms : userMstatusOk ms)
     (hlz : lz = false → lazyFree pt.um (BitVec.ofNat 64 sz)) :
-    ⊢ ukc (permOf pt.um sz) M sz fdv cw gn cs pidv lz m pc -∗ wireInv -∗
+    ⊢ ukc (permOf pt.um sz) M sz fdv cw gn cs pidv lz m pc -∗ hwConfig cpu -∗ wireInv -∗
       uRegs cpu (HartState.HART_ACTIVE ()) ms sc stv sep pc pc m -∗ userPtmInvX cpu pt sz M -∗ Rfd fdv -∗
       userCfg cpu C -∗ Rut pt -∗ ▷ ukb cpu C pt Rfd Rut sz (permOf pt.um sz) fdv cw gn cs pidv lz -∗
       wpLoop cpu := by
-  iintro Hkc #Hwi Hregs Hupt Hfrag Hcfg Hrut Hk
+  iintro Hkc #Hhw #Hwi Hregs Hupt Hfrag Hcfg Hrut Hk
   ihave ⟨Hur, Hg, Hpc⟩ := uRegs_uvRegs cpu ms sc stv sep pc m hms $$ Hregs
   unfold ukc
   iapply Hkc $$ %cpu %xi %C %pt %Rfd %Rut %hRut %hlo %rfl %hlz
   unfold uvb uvbF ukontF
   isplitl []
-  · iexact Hwi
+  · isplit
+    · iexact Hhw
+    · iexact Hwi
   isplitl [Hur]
   · iexact Hur
   isplitr
@@ -525,7 +527,7 @@ theorem uslot_applyLoop [xi : CurCtx] (cpu : CPU) (C : UCfg) (pt : UPtd) (Rfd : 
     (hch : W.ch = cs) (hpid : W.pid = pidv) (hlzw : W.lazy = lz)
     (hlf : lz = false → lazyFree pt.um (BitVec.ofNat 64 sz)) (hg : tfResumeGpr0 W.tf = m)
     (hpc : tfResumePc W.tf = pc) :
-    ⊢ uslot W -∗ wireInv -∗ uRegs cpu (HartState.HART_ACTIVE ()) ms sc stv sep pc pc m -∗
+    ⊢ uslot W -∗ hwConfig cpu -∗ wireInv -∗ uRegs cpu (HartState.HART_ACTIVE ()) ms sc stv sep pc pc m -∗
       userPtmInvX cpu pt sz M -∗ Rfd fdv -∗ userCfg cpu C -∗ Rut pt -∗
       ▷ ukb cpu C pt Rfd Rut sz (permOf pt.um sz) fdv cw gn cs pidv lz -∗ wpLoop cpu := by
   iintro Hs

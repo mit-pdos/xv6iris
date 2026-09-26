@@ -44,13 +44,13 @@ variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [Fdslot
 theorem urcLoop_ukb (PT : SchedNames → IProp GF) (Γ : SchedNames) (j : Nat) (h : CPU) (C : UCfg) (pt : UPtd)
     (sz : Nat) (γfd : GName) (cw : Nat) (gn : GName) (cs : ExtTreeSet GName compare) (pid : BitVec 32)
     (lz : Bool) (fdv : List FdState) (hlo : loopOk C pt) :
-    ▷ urcLoop (hlc := hlc) PT Γ j ⊢
+    ▷ urcLoop (hlc := hlc) PT Γ j ∗ hwConfig h ⊢
       ▷ ukb (hlc := hlc) h C pt (fdFrags γfd) (urcRut PT Γ j h sz γfd cw gn cs pid lz) sz (permOf pt.um sz)
         fdv cw gn cs pid lz := by
-  refine BI.later_mono ?_
+  iintro ⟨#H, #Hhw⟩
+  inext
   unfold urcLoop
-  iintro #H
-  iapply H $$ %h %C %pt %sz %γfd %cw %gn %cs %pid %lz %fdv %hlo
+  iapply H $$ %h %C %pt %sz %γfd %cw %gn %cs %pid %lz %fdv %hlo Hhw
 
 /-- The user machine's image, at the lazy view the key reads. -/
 theorem urc_ptm (cpu : CPU) (P : UPtd) (M : Nat → List (BitVec 8)) (sz : Nat) :
@@ -80,6 +80,7 @@ theorem urc_resume (UR : USERRET) (PT : SchedNames → IProp GF) (Γ : SchedName
     ⊢ wpLoop (GF := GF) cpu := by
   obtain ⟨hsie, hspie, hspp⟩ := hctx
   iintro ⟨#Hwire, #Hcl, Hk, Hgap, Hpc, Hsep, Hsc, Hstv, Hstvec, Hppt, Htf, Hres, Hslot, #Hloop⟩
+  icases kctx_hw cpu k $$ Hk with ⟨Hk, #Hhw⟩
   icases urc_res_upt PT Γ j cpu P ksp V sts cs pid $$ Hres with ⟨Hres, %hVP⟩
   icases usertrapResAt_sz PT Γ j cpu P ksp V sts cs pid $$ Hres with ⟨Hres, %hszb⟩
   icases usertrapResAt_lazy PT Γ j cpu P ksp V sts cs pid $$ Hres with ⟨Hres, %hlzf⟩
@@ -102,7 +103,8 @@ theorem urc_resume (UR : USERRET) (PT : SchedNames → IProp GF) (Γ : SchedName
     iframe Hleft Htf Hclose
     ipureintro; exact hpins
   ihave Hptm := urc_ptm cpu P M V.sz.toNat $$ Hpt
-  ihave Hk := urcLoop_ukb PT Γ j cpu C P V.sz.toNat V.fdg V.cwi gn cs pid V.pvLazy sts hlo $$ Hloop
+  ihave Hk := urcLoop_ukb PT Γ j cpu C P V.sz.toNat V.fdg V.cwi gn cs pid V.pvLazy sts hlo $$ [Hloop Hhw]
+  · iframe Hloop Hhw
   rw [urc_jump_retPc]
   have hlf : V.pvLazy = false → lazyFree P.um (BitVec.ofNat 64 V.sz.toNat) := by
     intro h; rw [BitVec.ofNat_toNat, BitVec.setWidth_eq]; exact hlzf h
@@ -112,7 +114,7 @@ theorem urc_resume (UR : USERRET) (PT : SchedNames → IProp GF) (Γ : SchedName
     (urcRut_acc PT Γ j cpu V.sz.toNat V.fdg V.cwi gn cs pid V.pvLazy)
     V.sz.toNat sts V.cwi gn cs pid V.pvLazy (uvisOf V M sts gn cs pid) (umemLazy V.upt V.sz.toNat M)
     (tfResumeGpr0 V.tf) ms sc tv sep (retPc sep) hlo (uszOk_of_maxsz hszb) hms rfl rfl rfl rfl rfl rfl rfl
-    rfl rfl hlf rfl hsep.symm) $$ Hslot Hwire HU Hptm Hfrag Hcfg Hrut Hk
+    rfl rfl hlf rfl hsep.symm) $$ Hslot Hhw Hwire HU Hptm Hfrag Hcfg Hrut Hk
 
 end
 

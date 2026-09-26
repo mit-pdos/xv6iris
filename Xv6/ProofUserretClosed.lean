@@ -45,15 +45,17 @@ theorem urcLoop_of (P : IProp GF) [Persistent P] (PT : SchedNames → IProp GF) 
     (H : ∀ (h : CPU) (C : UCfg) (pt : UPtd) (sz : Nat) (γfd : GName) (cw : Nat) (gn : GName)
       (cs : ExtTreeSet GName compare) (pid : BitVec 32) (lz : Bool) (fdv : List FdState),
       loopOk C pt →
-      P ⊢ ukb (hlc := hlc) h C pt (fdFrags γfd) (urcRut PT Γ j h sz γfd cw gn cs pid lz) sz (permOf pt.um sz)
-        fdv cw gn cs pid lz) :
+      P ∗ hwConfig h ⊢ ukb (hlc := hlc) h C pt (fdFrags γfd) (urcRut PT Γ j h sz γfd cw gn cs pid lz) sz
+        (permOf pt.um sz) fdv cw gn cs pid lz) :
     P ⊢ urcLoop (hlc := hlc) PT Γ j := by
   unfold urcLoop
   iintro #HP
   imodintro
-  iintro %h %C %pt %sz %γfd %cw %gn %cs %pid %lz %fdv %hlo
+  iintro %h %C %pt %sz %γfd %cw %gn %cs %pid %lz %fdv %hlo #Hhw
   iapply (H h C pt sz γfd cw gn cs pid lz fdv hlo)
-  iexact HP
+  isplit
+  · iexact HP
+  · iexact Hhw
 
 /-- **Rocq `stvec_handler_loop`**: the Löb.  The round's own contract, under
 the later, is the next round's. -/

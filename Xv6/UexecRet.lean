@@ -52,8 +52,8 @@ Rocq's header, kept point for point:
    that `UserExec.lean` (W8-C) did not port, is §0 below: `uszOk`,
    `userPtmInv`/`userPtmInvX` (the lazy-view twin of `userPtInv`: the page
    view `Mp` with `umemLazy P sz Mp = M`, UexecSlot's own lazy view),
-   `userTrapFrameAt`/`userTrapFrameAtm`, `uvRegs`, `uvAmb`.  `uvAmb` is
-   `wireInv` alone (SpecUser deviation 1: `hw_config`/`minstret_inv` dropped);
+   `userTrapFrameAt`/`userTrapFrameAtm`, `uvRegs`, `uvAmb`.  `uvAmb cpu` is
+   `hwConfig cpu ∗ wireInv` (Rocq `uv_amb`; `minstret_inv` is `emp`);
    `uvRegs` carries `clockCells` (UserExec deviation 2).  Candidates to move
    into `UserExec.lean` when 8-M touches it.
 4. `ustate` is the pair `(V, M)` (UexecSlot deviation 1): `urunEq Wk V M`.
@@ -747,7 +747,7 @@ def uvbF (X : Uvis → IProp GF) [xi : CurCtx] (cpu : CPU) (C : UCfg) (pt : UPtd
     (Rfd : List FdState → IProp GF) (Rut : UPtd → IProp GF) (sz : Nat) (π : Nat → Option UPerm)
     (fdv : List FdState) (cw : Nat) (g : GName) (cs : ExtTreeSet GName compare) (pidv : BitVec 32)
     (lz : Bool) (M : ElfMem) (m : RegMap) (pc : BitVec 64) : IProp GF :=
-  iprop(uvAmb ∗ uvRegs cpu ∗ ⌜uszOk sz⌝ ∗ userPtmInvX cpu pt sz M ∗ Rfd fdv ∗ userCfg cpu C ∗
+  iprop(uvAmb cpu ∗ uvRegs cpu ∗ ⌜uszOk sz⌝ ∗ userPtmInvX cpu pt sz M ∗ Rfd fdv ∗ userCfg cpu C ∗
     gprFile cpu m ∗ pcIs cpu pc ∗ Rut pt ∗ ukontF X cpu C pt Rfd Rut sz π fdv cw g cs pidv lz)
 
 /-- **Rocq `uslot_F`**: the slot's functional -- at every hart, context,
@@ -1315,7 +1315,7 @@ theorem uslot_of_creds (R : IProp GF) :
   unfold uslotF
   iintro %h %xi %C %pt %Rfd %Rut %hRut %hlo %hpm %hlz Hb
   unfold uvbF ukontF ukbF
-  icases Hb with ⟨#Hamb, Hur, %hsz, Hpt, Hfrag, Hcfg, Hg, Hpc, Hrut, Hk⟩
+  icases Hb with ⟨⟨#Hhw, #Hwi⟩, Hur, %hsz, Hpt, Hfrag, Hcfg, Hg, Hpc, Hrut, Hk⟩
   ihave ⟨%Mp, Hpt⟩ := @userPtmInvX_pt hlc GF _ xi h pt W.sz W.M $$ Hpt
   ihave ⟨%ms, %sc, %stv, %sep, %hms, Hregs⟩ := uvRegs_uRegs h (tfResumePc W.tf) (tfResumeGpr0 W.tf) $$ [Hur Hg Hpc]
   · isplitl [Hur]
@@ -1326,7 +1326,7 @@ theorem uslot_of_creds (R : IProp GF) :
   ihave Hwp0 := uexecWp_unfold_mp $$ Hwp
   unfold uexecF
   iapply Hwp0 $$ %h %xi %C %pt %Rut %hRut %Mp %(tfResumeGpr0 W.tf) %ms %sc %stv %sep %(tfResumePc W.tf)
-    %hlo %hms Hamb Hregs Hpt Hcfg Hrut [Hk Hfrag]
+    %hlo %hms Hhw Hwi Hregs Hpt Hcfg Hrut [Hk Hfrag]
   inext
   iintro ⟨Hframe, -⟩
   ihave ⟨%W', %sc', %stv', %hpins, Htm⟩ :=

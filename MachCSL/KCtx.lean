@@ -1069,6 +1069,22 @@ theorem kctx_intro [CurCtx] [KernelGeom] [KernelImage GF] {lent : Bool} (cpu : C
   iintro H
   iexact H
 
+/-- A kernel context carries the hart's persistent `hwConfig` (in its
+configuration cells); a copy may be taken out. -/
+theorem kctx_hw [CurCtx] [KernelGeom] [KernelImage GF] {lent : Bool} (cpu : CPU) (k : KCtx) :
+    kctxL (GF := GF) lent cpu k ⊢ kctxL lent cpu k ∗ hwConfig cpu := by
+  iintro H
+  icases kctx_cases cpu k $$ H with ⟨%hwf, Hc, H⟩
+  icases kConf_cases cpu _ _ _ _ _ $$ Hc with ⟨%ms, %mdl, %mepc, %stc, %hf, Hc⟩
+  icases confCells_hw cpu _ _ _ $$ Hc with ⟨Hc, #Hhw⟩
+  isplitl [Hc H]
+  · iapply kctx_intro cpu k
+    iframe H
+    isplitr
+    · ipureintro; exact hwf
+    iapply kConf_intro cpu _ _ _ _ _ ms mdl mepc stc hf $$ Hc
+  · iexact Hhw
+
 /-- `kctx_intro` with the well-formedness as a Lean hypothesis. -/
 theorem kctx_intro' [CurCtx] [KernelGeom] [KernelImage GF] {lent : Bool} (cpu : CPU) (k : KCtx) (hwf : k.wf) :
     kConf cpu k.tier k.root k.sie k.spie k.spp ∗ gprFile cpu (tpPin cpu k.regs) ∗

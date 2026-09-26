@@ -140,11 +140,11 @@ theorem urc_round (UT : USERTRAP) (UV : USERVEC) (UR : USERRET)
     (j : Nat) (hj : j < NPROC) (h : CPU) (C : UCfg) (pt : UPtd) (sz : Nat) (γfd : GName) (cw : Nat)
     (gn : GName) (cs : ExtTreeSet GName compare) (pid : BitVec 32) (lz : Bool) (fdv : List FdState)
     (hlo : loopOk C pt) :
-    wireInv ∗ kmapAt trampVpn (kLeaf trampPpn .rx 0#1 0#1) ∗ ▷ urcLoop (hlc := hlc) PT Γ j ⊢
+    (wireInv ∗ kmapAt trampVpn (kLeaf trampPpn .rx 0#1 0#1) ∗ ▷ urcLoop (hlc := hlc) PT Γ j) ∗ hwConfig h ⊢
       ukb (hlc := hlc) h C pt (fdFrags γfd) (urcRut PT Γ j h sz γfd cw gn cs pid lz) sz (permOf pt.um sz)
         fdv cw gn cs pid lz := by
   unfold ukb ukbF trappedMachine
-  iintro ⟨#Hwire, #Hcl, #Hloop⟩ %W %sc %stv %hpe %hsz %hfd %hcw %hgn %hch %hpid %hlz ⟨⟨%ms, %hlw, Htm⟩, Hfrag, Hret⟩
+  iintro ⟨⟨#Hwire, #Hcl, #Hloop⟩, #Hhw⟩ %W %sc %stv %hpe %hsz %hfd %hcw %hgn %hch %hpid %hlz ⟨⟨%ms, %hlw, Htm⟩, Hfrag, Hret⟩
   -- the frame, its residue out
   icases urc_frame_rut h C pt _ sz W.M ms sc stv (tfW W.tf tfEpcIdx) (tfResumeGpr0 W.tf) $$ Htm with ⟨Hfr, Hrut⟩
   icases urcRut_open PT Γ j h sz γfd cw gn cs pid lz pt $$ Hrut with ⟨%k, %ksp, %V, %hp, Hleft, Htf, Hclose⟩
@@ -167,7 +167,7 @@ theorem urc_round (UT : USERTRAP) (UV : USERVEC) (UR : USERRET)
     (tfW W.tf tfEpcIdx) (tfResumeGpr0 W.tf) hlo hsie htier hkw
   unfold wp_uservec_body uservecPost at HUV
   iapply HUV
-  iframe Hfr Hcl Htf Hleft
+  iframe Hhw Hfr Hcl Htf Hleft
   inext
   iintro %Mp %hM Hk Hpc Hsep Hsc Hstv Hstvec Hppt Htf -
   -- the residue at the saved frame, the deposit at usertrap's rows
