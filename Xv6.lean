@@ -1365,3 +1365,7 @@ import Xv6.UserConsole
 import Xv6.UInitFd
 import Xv6.PinnedObs
 import Xv6.UConsOpen
+import Xv6.UserBytes
+import Xv6.UserBytesAcc
+import Xv6.UserFrame
+import Xv6.UserFrameFoot
