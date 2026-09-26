@@ -196,7 +196,35 @@ console instance waits for its M3.
   five plus `UkShParseCmd.wp_kshp_parser` become one-line corollaries;
   DELETE `UkShPipeRight.v` (only `UkShPipeCm` imports it).  A statement of
   THIS campaign changes, no landed one.
-- [ ] **A3** the consumers.  READ OFF THE TREE (2026-09-23, importer map):
+- [ ] **A3** the consumers.  **A3a LANDED** (2026-09-26, branch `user-once/A3`;
+  `iris/UkShSeam.v`, 1,607 lines, after `UkShParser`/`UkShRedir`/`UkShPipe`
+  and BEFORE `UkShMain`): (P) the cut read back -- `ushp_toks_ok` (every
+  token of the reference's answer is a word-arm token: body neither blank
+  nor symbol, end where the scan stopped), by the `ushp_bounded` induction,
+  and `ushp_cut_ok_of_ref` (the line cut at `ref_nulcut t` is readable at
+  every node; the pipe's two sides are cut at ONE list, so no ordering of
+  tokens is needed -- no cut index can land in a body); (V) UkShMain
+  §1-§3 moved down verbatim and re-exported by `Notation`; (S) the seam
+  `ush_cmd_of_ushp_tree` by induction on `t` (all five constructors, no
+  scope premise) answering `ushcmd_of_tree s0 g t`, and `ush_cmd_of_ref`
+  at the parser's own cut; (C) the child `wp_ref_child` from 0x9c0
+  through `wp_ref_parser` and the seam to `runcmd`'s ENTRY with the arm as
+  its continuation, room `ushp_room t`, and the three arm dispatches
+  `wp_ref_child_exec/_redir/_pipe`; (A) `ushm_chain_of_fresh` (k calls out
+  of `ushm_fresh` chain for 1 <= k <= 341).  Corollaries in place, statements
+  byte-identical: `UkShMain.wp_kshm_child` (785 -> 377 lines),
+  `UkShRedirSeam.ush_cmd_of_ushs_redir` / `wp_kshm_child_redir_g` (954 ->
+  761), `UkShPipeSeam.ush_cmd_of_ushp_pipe` (240 -> 203),
+  `UkShPipeRound.wp_kshm_child_pipe` (741 -> 614).  NOT in A3a, deferred:
+  (ii)'s `ushf_child_law_at` `Lp` as the reference equation -- its three
+  instances (`UkSh.ush_line_is`, `UkShRedirBody.ushs_lp_cat`,
+  `UShPipeRound.ushq_lp`) are word-list predicates the app-both rounds
+  (`UShRound`, `UShPipeRound`, `UkShEcho`) prove their entry theorems at, so
+  the change is app-both's SLOT-WS (M4) and not this campaign's files;
+  and `UShPipeChild.wp_kshm_child_pipe_paid_at_sz`, the PAID pipe child,
+  which still walks 0x9c0 itself through `UkShPipeCm.wp_kshp_parsecmd_bar`
+  -- A3b must re-point it at `wp_ref_child` with the paid arm before
+  `UkShPipeCm` can go.  Gate: 39 files (the cone above `UkShMain`), 0 errors, nothing pending; audits unmoved (system 13, tree 13, file 14, pipe 14).  READ OFF THE TREE (2026-09-23, importer map):
   after A2a-d the parser-tier twins are corollary shells whose only
   importers are each other and three CONSUMER files -- `UkShRedirSeam`
   (imports `UkShRedirPc`, `UkShRedirCmd`, `UkShRedir`; holds the
@@ -255,4 +283,4 @@ RULED by the owner: A starts now.  Branch `user-once/A` off `main` at
 monotonicity, the symbol-free bridge both ways, the redirect and pipe
 bridges, the three line-shape facts on `ush_line_is`/`ushs_line_is`/
 `ushq_line_is`) is stated and elaborates; its proofs are with a subagent.
-A1 and A2a-e are on `main`.  NEXT: A3 (branch `user-once/A3`), in two cuts: A3a the seam + the child walks at the general theorem; A3b the deletions and re-homing.
+A1 and A2a-e are on `main`; A3a is on branch `user-once/A3`.  NEXT: A3b -- the deletions and re-homing (the shells `UkShRedir{Lex,Gtk,Pr,Ex,Pex,Nul,Cm,Pc}`, `UkShPipe{Tok,Pr,Ex,Ex2,Pex,Cm,Cmd,Parse}`), with `UShPipeChild`'s paid child re-pointed at `UkShSeam.wp_ref_child` first (it is the last direct consumer of `UkShPipeCm`).

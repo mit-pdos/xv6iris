@@ -1303,9 +1303,12 @@ defining one as the symbol directly compiles, but `unfold` then leaves something
 
 - **A tactic in an argument position whose expected type is still an evar can
   diverge, and it looks exactly like a slow file.** `vm_compute` normalises
-  forever; `lia` fails with "Cannot find witness", which reads like an arithmetic
-  gap and means the goal had an evar. Name the value and pass it, or `refine`
-  first. (`refine (f a b _ _ c); tac; [g1 | g2]` is malformed — the `;` already
+  forever; `lia` fails with "Cannot find witness" or a bare "No applicable
+  tactic" (Rocq 9.0), which reads like an arithmetic gap and means the goal had
+  an evar -- typically a `_` for the callee's own parameter (an allocator
+  budget `R`, a tree `t`) that unification would only fill AFTER the argument
+  elaborates. Name the value and pass it, or `refine` first, or prove the
+  bundle as a named `assert` (the next bullet). (`refine (f a b _ _ c); tac; [g1 | g2]` is malformed — the `;` already
   sent `tac` to both goals.)
 - **Build a callee's precondition bundle with a named `assert`, never an inline
   `ltac:`** — by the time it runs, elaboration has zeta-expanded the `set`-bound

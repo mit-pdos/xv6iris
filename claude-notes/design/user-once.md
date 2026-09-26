@@ -155,7 +155,9 @@ calls of `malloc`; the pipe walk "chains ONE where the redirect chains
 two").
 
 **The seam does not move.**  `UkShMain`'s conversion `ushp_tree → ush_cmd`
-is already stated over the tree; the child laws' line predicate `Lp`
+is already stated over the tree (since A3a it is `UkShSeam.ush_cmd_of_ushp_tree`,
+by induction on the tree, with `UkShSeam.wp_ref_child` the one child walk
+beside it and the per-shape seams and children its corollaries); the child laws' line predicate `Lp`
 (`ushf_child_law_at`) becomes `ref_parsecmd … = Some t` with `t` the
 shape — which is the SLOT-WS cleanup app-both owes ("the fork interface
 speaking the parsed line") paid here.

@@ -1641,6 +1641,7 @@ UkShRedirLine.v
 UkShLoop.v
 UkShCd.v
 UkShMain.v
+UkShSeam.v
 UkShRedirSeam.v
 UkShFork.v
 UConsLine.v

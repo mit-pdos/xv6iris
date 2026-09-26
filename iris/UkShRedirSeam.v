@@ -40,6 +40,11 @@ Require Import UkShRedirCmd.
 Require Import UkShRedirPc.
 Require Import UkShRedir.
 Require Import UkShMain.
+Require Import RefParse.
+Require Import RefParseSym.    (* [ref_parsecmd_redir]: the redirect line at the reference *)
+Require Import UkShRedirs.      (* [ushp_malloc_chain] *)
+Require Import UkShParser.      (* [ushp_zero_at]: the reference's cut *)
+Require Import UkShSeam.        (* THE SEAM AND THE CHILD, once *)
 Require Import UkShRun.
 Require Import UkShDiag.
 Require Import UkShMalloc.
@@ -342,60 +347,28 @@ Section UkShRedirSeam.
     assert (Hgl : (gp < len)%nat) by exact (ushs_redir_lt len f gp fe Hred).
     iIntros "Hrun Hn Hnode Hline".
     iMod (UkShMain.ubytes_persist γd s0 (S len) _ with "Hline") as "#Hline".
-    rewrite /UkShRedirCmd.ushp_redir_node.
-    iDestruct "Hn" as "(%Ht0 & %Ht8 & %Htz & [Hty Hpad] & Hcmd & Hfile
-                        & Hefile & Hmode & Hfd)".
-    iClear "Hpad". iClear "Hefile".
-    iDestruct (UkShMain.urun_ubytes_bnd N h m pc avail t 4 _ with "Hrun Hty")
-      as %Htb.
-    assert (Ht38 : 0 < t < 2 ^ 38)
-      by (split; [ exact Ht0
-                 | destruct (Htb 0%nat ltac:(lia)) as [ _ Hh ]; lia ]).
-    iMod (UkShMain.ush_cmd_of_ushp_gen N h m pc avail s0 pe len
-            (ushs_nulcut args len f fe) args
-            ltac:(intros i tk Hi;
-                  destruct (ushs_arg_below len f gp fe args Hred Htoks i tk Hi)
-                    as [ Hl Hh ]; split; lia)
-            ltac:(intros i tk Hi;
-                  exact (UkShRedirPc.ushs_nulcut_arg args len f fe i tk Hi))
-            ltac:(exact (ushs_nulcut_body len f gp fe args Hred Htoks Hnn))
-            Hlen31 Hs0 Hs0hi
-            with "Hrun Hnode Hline") as "(Hrun & #Hexec)".
-    iMod (UkShMain.ubytes_persist γd t 4 _ with "Hty") as "#Htyq".
-    iMod (UkShMain.uword_persist γd (t + 8) _ with "Hcmd") as "#Hcmdq".
-    iMod (UkShMain.uword_persist γd (t + 16) _ with "Hfile") as "#Hfileq".
-    iMod (UkShMain.ubytes_persist γd (t + 32) 4 _ with "Hmode") as "#Hmodeq".
-    iMod (UkShMain.ubytes_persist γd (t + 36) 4 _ with "Hfd") as "#Hfdq".
-    iAssert (ush_str γd (ushs_file s0 len f args gp fe))%I as "#Hfstr".
-    { rewrite /ush_str /ushs_file. cbn [ua_ptr ua_len ua_bytes].
-      iSplit; [ iPureIntro; lia | ].
-      rewrite /ustr.
-      iSplit;
-        [ iPureIntro;
-          exact (ushs_nulcut_filebody len f gp fe args Hred Htoks Hnn) | ].
-      iSplit; [ iPureIntro; lia | ].
-      iSplit.
-      - iApply (UkShMain.ubytesq_sub γd s0 (S len)
-                  (ushs_nulcut args len f fe) (S (S gp)) (fe - S (S gp))%nat
-                  ltac:(lia) with "Hline").
-      - iDestruct (UkShMain.ubytesq_at γd s0 (S len)
-                     (ushs_nulcut args len f fe) fe ltac:(lia) with "Hline")
-          as "Hb".
-        rewrite (UkShRedirPc.ushs_nulcut_file args len f fe).
-        assert (Ea : (s0 + Z.of_nat fe)%Z
-                     = (s0 + Z.of_nat (S (S gp))
-                        + Z.of_nat (fe - S (S gp)))%Z) by lia.
-        iEval (rewrite Ea) in "Hb". iExact "Hb". }
-    iModIntro. iFrame "Hrun".
-    iApply (ush_cmd_redir_intro γd t pe
-              (UExec (ush_args s0 (ushs_nulcut args len f fe) args))
-              (ushs_file s0 len f args gp fe) 1537 1 Ht38 Ht8
-              with "[] [] Hexec [] Hfstr [] []").
-    - rewrite /ush_w32. iExact "Htyq".
-    - rewrite /ush_ptr. iExact "Hcmdq".
-    - rewrite /ush_ptr /ushs_file. cbn [ua_ptr]. iExact "Hfileq".
-    - rewrite /ush_w32. iExact "Hmodeq".
-    - rewrite /ush_w32. iExact "Hfdq".
+    (* the two nodes are the tree, closed *)
+    iDestruct (UkShRedirCmd.ushp_redir_close N s0 t pe (S (S gp)) fe 1537 1
+                 (UshpExec args) with "Hn Hnode") as "Htree".
+    (* ...and the redirect line's cut is readable at both of them: the
+       three landed facts about the arguments, the two about the file *)
+    assert (Hcut : UkShSeam.ushp_cut_ok len (ushs_nulcut args len f fe)
+                     (UshpRedir (UshpExec args) (S (S gp)) fe 1537 1)).
+    { cbn [UkShSeam.ushp_cut_ok]. split_and!.
+      - intros i tk Hi.
+        destruct (ushs_arg_below len f gp fe args Hred Htoks i tk Hi) as [Hl Hh].
+        split; lia.
+      - intros i tk Hi. exact (UkShRedirPc.ushs_nulcut_arg args len f fe i tk Hi).
+      - exact (ushs_nulcut_body len f gp fe args Hred Htoks Hnn).
+      - lia.
+      - lia.
+      - exact (UkShRedirPc.ushs_nulcut_file args len f fe).
+      - exact (ushs_nulcut_filebody len f gp fe args Hred Htoks Hnn). }
+    iMod (UkShSeam.ush_cmd_of_ushp_tree N h m pc avail s0 len
+            (ushs_nulcut args len f fe)
+            (UshpRedir (UshpExec args) (S (S gp)) fe 1537 1) Hcut
+            Hlen31 Hs0 Hs0hi t with "Hrun Htree Hline") as "[Hrun #Hcmd]".
+    iModIntro. iFrame "Hrun". rewrite /ushs_file. iExact "Hcmd".
   Qed.
 
 
@@ -501,103 +474,23 @@ Section UkShRedirSeam.
     iIntros "#Hcode #Hjt #Hpcode #Hpro Hline Hws Hsy Hstd Hcwd HM Hopen
              #Hpxw Hsplit Hcr Hrun Hk".
     iDestruct (ustr_nonul with "Hline") as %Hnn0.
-    iDestruct (ustr_len with "Hline") as %Hlen31.
-    (* ---- 0x9c0  c.mv a0,s1 ---- *)
-    iApply (wp_uk_cmv N h m (mword_of_int 0x9c0) a0_idx s1_idx
-              (add_vec zero_reg (m !!! Regidx s1_idx))
-              (68 + (8 + (UkShDiag.ush_Dg + n)))
-              ltac:(unfold unot_sp; vm_compute; discriminate)
-              ltac:(vm_compute; discriminate) eq_refl with "[] Hrun").
-    { iApply (uis_shk_9c0 with "Hcode"). }
-    assert (E9c0 : add_vec_int (mword_of_int 0x9c0 : mword 64) 2
-                   = mword_of_int 0x9c2)
-      by (apply bv_eq; vm_compute; reflexivity).
-    rewrite E9c0. iIntros (h1) "Hrun".
-    set (m1 := <[Regidx a0_idx
-                 := regval_into_reg (add_vec zero_reg (m !!! Regidx s1_idx))]> m).
-    assert (Ha0_1 : m1 !!! Regidx a0_idx = (mword_of_int s0 : mword 64)).
-    { rewrite /m1 (upd_eq m (Regidx a0_idx) _).
-      rewrite Hs1. apply bv_eq. rewrite add_vec_unsigned.
-      unfold bv_wrap. cbn [bv_unsigned]. rewrite Z.add_0_l.
-      rewrite Z.mod_small; [ reflexivity | ].
-      pose proof (bv_unsigned_in_range _ (mword_of_int s0 : mword 64)) as Hr.
-      assert (Hm : bv_modulus (MachineWord.Z_idx 64) = 18446744073709551616%Z)
-        by (vm_compute; reflexivity).
-      rewrite Hm in Hr. exact Hr. }
-    (* ---- 0x9c2  jal ra,parsecmd ---- *)
-    iApply (wp_uk_jal N h1 m1 (mword_of_int 0x9c2)
-              (mword_of_int 2096812 : mword 21) (mword_of_int 1 : mword 5)
-              (mword_of_int ShSyms.parsecmd) (mword_of_int 0x9c6)
-              (68 + (8 + (UkShDiag.ush_Dg + n)))
-              ltac:(unfold unot_sp; vm_compute; discriminate)
-              ltac:(vm_compute; discriminate)
-              ltac:(apply bv_eq; vm_compute; reflexivity)
-              ltac:(apply bv_eq; vm_compute; reflexivity)
-              ltac:(vm_compute; reflexivity)
-              with "[] Hrun").
-    { iApply (uis_shk_9c2 with "Hcode"). }
-    iIntros (h2) "Hrun".
-    set (m2 := <[Regidx (mword_of_int 1 : mword 5)
-                 := regval_into_reg (mword_of_int 0x9c6 : mword 64)]> m1).
-    assert (Ha0_2 : m2 !!! Regidx a0_idx = (mword_of_int s0 : mword 64))
-      by (rewrite /m2 (upd_ne m1 (Regidx (mword_of_int 1 : mword 5))
-                         (Regidx a0_idx) _ ltac:(vm_compute; discriminate));
-          exact Ha0_1).
-    assert (Hra_2 : ret_pc (m2 !!! Regidx (mword_of_int 1 : mword 5))
-                    = (mword_of_int 0x9c6 : mword 64))
-      by (rewrite /m2 (upd_eq m1 (Regidx (mword_of_int 1 : mword 5)) _);
-          apply bv_eq; vm_compute; reflexivity).
-    (* ---- parsecmd, at the redirect shape ---- *)
-    iApply (UkShRedirPc.wp_kshp_parsecmd_gt N UM0 UM1 UM2 Hm0 Hm1
-              h2 m2 dw dv s0 len f args gp fe
-              (8 + (UkShDiag.ush_Dg + n))
-              Ha0_2 Hred Htoks Hpos Htlen Hs0 Hs64
-              with "Hpcode Hpro Hline Hws Hsy HM Hpxw Hcr Hrun").
-    iIntros (p pe) "Hrnode Hnode Hline Hws Hsy".
-    iIntros (h3 m3) "%Hcs3 %Ha0_3 HM2 Hcr Hrun".
-    rewrite Hra_2.
-    (* ---- 0x9c6  jal ra,runcmd ---- *)
-    iApply (wp_uk_jal N h3 m3 (mword_of_int 0x9c6)
-              (mword_of_int 2094792 : mword 21) (mword_of_int 1 : mword 5)
-              (mword_of_int ShSyms.runcmd) (mword_of_int 0x9ca)
-              (68 + (8 + (UkShDiag.ush_Dg + n)))
-              ltac:(unfold unot_sp; vm_compute; discriminate)
-              ltac:(vm_compute; discriminate)
-              ltac:(apply bv_eq; vm_compute; reflexivity)
-              ltac:(apply bv_eq; vm_compute; reflexivity)
-              ltac:(vm_compute; reflexivity)
-              with "[] Hrun").
-    { iApply (uis_shk_9c6 with "Hcode"). }
-    iIntros (h4) "Hrun".
-    set (m4 := <[Regidx (mword_of_int 1 : mword 5)
-                 := regval_into_reg (mword_of_int 0x9ca : mword 64)]> m3).
-    assert (Ha0_4 : m4 !!! Regidx a0_idx = (mword_of_int p : mword 64))
-      by (rewrite /m4 (upd_ne m3 (Regidx (mword_of_int 1 : mword 5))
-                         (Regidx a0_idx) _ ltac:(vm_compute; discriminate));
-          exact Ha0_3).
-    (* ---- THE SEAM, at the REDIR node ---- *)
-    iMod (ush_cmd_of_ushs_redir h4 m4 (mword_of_int ShSyms.runcmd)
-            (68 + (8 + (UkShDiag.ush_Dg + n))) s0 p pe len f args gp fe
-            Hred Htoks Hnn0 Hlen31 Hs0 Hs38
-            with "Hrun Hrnode Hnode Hline") as "(Hrun & #Htree)".
-    (* ---- runcmd's REDIR arm: close(1), open(file), then the sub-tree ---- *)
-    replace (68 + (8 + (UkShDiag.ush_Dg + n)))%nat
-      with (6 + (UkShDiag.ush_Dg + (70 + n)))%nat by lia.
-    iDestruct ("Hsplit" with "Hcr") as "[HH Hcr]".
-    iApply (UkShRedir.wp_kshr_redir_arm_g N
-              (UExec (ush_args s0 (ushs_nulcut args len f fe) args))
-              (ushs_file s0 len f args gp fe) 1537
-              h4 m4 p cwdv ld st1 (70 + n) H K Kf
-              ltac:(unfold Z31; lia) Ha0_4 Hst1 Hne Hnp
-              with "Hcode Hjt Htree Hstd Hcwd Hopen HH Hrun").
-    iSplit.
-    - iDestruct "Hk" as "[Hcont _]".
-      iIntros (hf mf q ty) "%Ha0f Hsub Hstd Hcwd HK Hrun".
-      iApply ("Hcont" $! hf mf q ty
-                with "[%//] Hsub Hstd Hcwd HK HM2 Hcr Hrun").
-    - iDestruct "Hk" as "[_ Hfail]".
-      iIntros (hf mf) "%Hat Hfp Hfs Hstd Hcwd HKf Hrun".
-      iApply ("Hfail" $! hf mf with "[%//] Hfp Hfs Hstd Hcwd HKf Hcr Hrun").
+    (* THE GENERAL CHILD at the redirect line's tree: the line parses to
+       ONE REDIR over ONE EXEC (RefParseSym.ref_parsecmd_redir), its symbol
+       bytes are in the catalogued scope, its cut is the reference's, and
+       the two allocations chain *)
+    iApply (UkShSeam.wp_ref_child_redir N UM0 UM2 h m dw dv s0 cwdv len f args
+              (S (S gp)) fe (ushs_nulcut args len f fe) ld st1 n H K Kf Cr Cr'
+              Hs1
+              (ushs_gt_ok_scope len f (ushs_gt_ok_redir len f gp fe Hred))
+              (ref_parsecmd_redir len f gp fe args Hnn0 Hred Htoks Htlen)
+              ltac:(cbn [ref_nulcut]; rewrite UkShParser.ushp_zero_at_snoc;
+                    rewrite <- UkShParser.ushp_nulfold_zero_at; reflexivity)
+              ltac:(cbn [UkShRedirs.ushp_malloc_chain];
+                    exists UM1; split; [ exact Hm0 | ];
+                    exists UM2; split; [ exact Hm1 | reflexivity ])
+              Hs0 Hs64 Hs38 Hst1 Hne Hnp
+              with "Hcode Hjt Hpcode Hpro Hline Hws Hsy Hstd Hcwd HM Hopen
+                    Hpxw Hsplit Hcr Hrun Hk").
   Qed.
 
   (* ...and the landed seam, VERBATIM, as its instance: the landed call,

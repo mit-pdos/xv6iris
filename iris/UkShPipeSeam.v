@@ -48,6 +48,7 @@ Require Import UkShMain.
 Require Import UkShMalloc.
 Require Import UkShPipeLex.
 Require Import UkShPipeParse.
+Require Import UkShSeam.        (* THE SEAM, once *)
 Require Import UexecSG.
 Local Open Scope Z_scope.
 Import Defs.
@@ -102,36 +103,15 @@ Section UkShPipeSeam.
     ush_cmd γd p (UPipe (UExec (ush_args s0 g toksl))
                         (UExec (ush_args s0 g toksr))).
   Proof using .
-    intros (Hinl & Hendl & Hbodl) (Hinr & Hendr & Hbodr) Hlen31 Hs0 Hs0hi.
+    intros Hl Hr Hlen31 Hs0 Hs0hi.
     iIntros "Hrun Hn Hl Hr #Hline".
-    rewrite /UkShPipeParse.ushp_pipe_node.
-    iDestruct "Hn" as "(%Hp0 & %Hp8 & %Hpz & [Hty _] & Hleft & Hright)".
-    iDestruct (urun_ubytes_bnd h m pc avail p 4
-                 (nth_byte (mword_of_int 3 : mword 32))
-                 with "Hrun Hty") as %Hpb.
-    assert (Hp : 0 < p < 2 ^ 38).
-    { split; [ exact Hp0 | ].
-      destruct (Hpb 0%nat ltac:(lia)) as [_ Hhi]. lia. }
-    iMod (ubytes_persist γd p 4 (nth_byte (mword_of_int 3 : mword 32))
-            with "Hty") as "#Hty".
-    iMod (uword_persist γd (p + 8) (mword_of_int pl) with "Hleft")
-      as "#Hleft".
-    iMod (uword_persist γd (p + 16) (mword_of_int pr) with "Hright")
-      as "#Hright".
-    iMod (ush_cmd_of_ushp_gen h m pc avail s0 pl len g toksl
-            Hinl Hendl Hbodl Hlen31 Hs0 Hs0hi with "Hrun Hl Hline")
-      as "[Hrun #Hcl]".
-    iMod (ush_cmd_of_ushp_gen h m pc avail s0 pr len g toksr
-            Hinr Hendr Hbodr Hlen31 Hs0 Hs0hi with "Hrun Hr Hline")
-      as "[Hrun #Hcr]".
-    iModIntro. iFrame "Hrun".
-    cbn [ush_cmd ush_ty].
-    iSplitR; [ iPureIntro; exact Hp | ].
-    iSplitR; [ iPureIntro; exact Hp8 | ].
-    iSplitR; [ rewrite /ush_w32; iExact "Hty" | ].
-    iSplitL.
-    - iExists pl. rewrite /ush_ptr. iFrame "Hleft Hcl".
-    - iExists pr. rewrite /ush_ptr. iFrame "Hright Hcr".
+    (* the three nodes are the tree, closed; [ushq_cut_ok] at each side IS
+       the general seam's EXEC case, conjunct for conjunct *)
+    iDestruct (UkShPipeParse.ushp_pipe_close N s0 p pl pr (UshpExec toksl) (UshpExec toksr)
+                 with "Hn Hl Hr") as "Htree".
+    iApply (UkShSeam.ush_cmd_of_ushp_tree N h m pc avail s0 len g
+              (UshpPipe (UshpExec toksl) (UshpExec toksr)) (conj Hl Hr)
+              Hlen31 Hs0 Hs0hi p with "Hrun Htree Hline").
   Qed.
 
   (* ===================================================================== *)

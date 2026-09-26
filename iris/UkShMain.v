@@ -66,6 +66,10 @@ Require Import UkShParseCmd.
 Require Import UkShRun.
 Require Import UkShDiag.
 Require Import UkShMalloc.
+Require Import RefParse.
+Require Import RefParseBridge.  (* [ref_parsecmd_nosym]: the symbol-free line at the reference *)
+Require Import UkShRedirs.      (* [ushp_malloc_chain] *)
+Require Import UkShSeam.        (* THE SEAM AND THE CHILD, once *)
 Require Import CtxIdDefs.
 Require User.ShSyms User.ShInstrs.
 Require Import ChildTok.  (* [genF] -- the capacity the slot's fork arms name *)
@@ -136,350 +140,16 @@ Section UkShMain.
   (* ---- the parser's files, at this file's own ghost names ---- *)
 (*ALIASES-END*)
 
-  (* ===================================================================== *)
-  (* §1 PERSISTING A RUN.                                                   *)
-  (*                                                                        *)
-  (* [UserHeap.uarea_persist] does this for a MAP; the seam below holds     *)
-  (* RUNS, so here are the two run-shaped twins.  They belong beside it     *)
-  (* and are local only because moving them rebuilds the tier.              *)
-  (* ===================================================================== *)
-  Lemma ubytes_persist (g : gname) (a : Z) (n : nat) (f : nat -> bv 8) :
-    ubytes g a n f ==∗ ubytesq g DfracDiscarded a n f.
-  Proof using .
-    iIntros "H". rewrite /ubytes /ubytesq.
-    iApply big_sepL_bupd. iApply (big_sepL_impl with "H").
-    iIntros "!>" (i j _) "Hb". rewrite /ubyteq /ubyte.
-    iApply (ghost_map_elem_persist with "Hb").
-  Qed.
-
-  Lemma uword_persist (g : gname) (a : Z) (w : mword 64) :
-    uword g a w ==∗ uwordq g DfracDiscarded a w.
-  Proof using .
-    iIntros "H". rewrite /uword /uwordq.
-    iApply (ubytes_persist g a 8 (nth_byte w) with "H").
-  Qed.
-
-  Lemma ustr_persist (g : gname) (a : Z) (n : nat) (f : nat -> bv 8) :
-    ustr g (DfracOwn 1) a n f ==∗ ustr g DfracDiscarded a n f.
-  Proof using .
-    iIntros "(%Hne & %Hlen & Hbs & Hnul)".
-    iMod (ubytes_persist g a n f with "Hbs") as "#Hbs".
-    iMod (ghost_map_elem_persist with "Hnul") as "#Hnul".
-    iModIntro. iSplitR; [ iPureIntro; exact Hne | ].
-    iSplitR; [ iPureIntro; exact Hlen | ].
-    iSplitR; [ iExact "Hbs" | iExact "Hnul" ].
-  Qed.
 
   (* ===================================================================== *)
-  (* §2 THE TOKEN MODEL, ONE STEP FURTHER: SEPARATION.                      *)
-  (*                                                                       *)
-  (* [nulterminate] writes a zero at every token's END index, so a token's  *)
-  (* BODY is only still readable as a string if no OTHER token's end lands  *)
-  (* inside it.  None does, and the reason is the tokenizer's own stopping  *)
-  (* rule: a token stops at the end of the line or on a WHITESPACE byte (on *)
-  (* a symbol-free line), so the next token starts strictly later.  These   *)
-  (* are the two facts that turn the parser's index pairs into strings.     *)
+  (* §1-§3 MOVED DOWN (lane user-once A3a).  Persisting a run, the           *)
+  (* separation fact, [ush_args] and the EXEC conversion                     *)
+  (* [ush_cmd_of_ushp_gen] live in [UkShSeam.v] now, where they are the      *)
+  (* EXEC case of the seam stated over the WHOLE tree                        *)
+  (* ([UkShSeam.ush_cmd_of_ushp_tree]); every name is re-exported below the  *)
+  (* section under its landed spelling, so [UkShMain.ush_args] and its       *)
+  (* siblings resolve unchanged.                                             *)
   (* ===================================================================== *)
-
-  (* the byte a token stops on, when it did not run out of line -- the twin
-     of [UkShParse.ushp_skipws_end] *)
-  Lemma ushp_toklen_end (n i : nat) (f : nat -> bv 8) :
-    (ushp_toklen n i f < n)%nat ->
-    ushp_is_ws (f (i + ushp_toklen n i f)%nat)
-    || ushp_is_sym (f (i + ushp_toklen n i f)%nat) = true.
-  Proof using .
-    revert i. induction n as [| n IH ]; intros i H.
-    - cbn [ushp_toklen] in H. lia.
-    - cbn [ushp_toklen] in H |- *.
-      destruct (ushp_is_ws (f i) || ushp_is_sym (f i)) eqn:Hw.
-      + rewrite Nat.add_0_r. exact Hw.
-      + assert (E : (i + S (ushp_toklen n (S i) f))%nat
-                    = (S i + ushp_toklen n (S i) f)%nat) by lia.
-        rewrite E. apply IH. lia.
-  Qed.
-
-  (* the fold leaves a byte alone unless some token ends there *)
-  Lemma ushp_nulfold_miss (toks : list (nat * nat)) (g : nat -> bv 8) (j : nat) :
-    (forall (i : nat) (tk : nat * nat), toks !! i = Some tk -> j <> snd tk) ->
-    ushp_nulfold toks g j = g j.
-  Proof using .
-    revert g. induction toks as [| tk r IH ]; intros g Hmiss;
-      cbn [ushp_nulfold]; [ reflexivity | ].
-    rewrite (IH (ushp_setb g (snd tk) ubyte0)).
-    - rewrite /ushp_setb.
-      destruct (Nat.eqb j (snd tk)) eqn:E; [ | reflexivity ].
-      exfalso. apply Nat.eqb_eq in E.
-      exact (Hmiss 0%nat tk eq_refl E).
-    - intros i t Hi. exact (Hmiss (S i) t Hi).
-  Qed.
-
-  (* THE SEPARATION FACT.  On a symbol-free line, a token's end is either
-     the end of the line or a whitespace byte, so the NEXT token starts
-     strictly after it -- and therefore no token end falls inside another
-     token's body. *)
-  Lemma ushp_tokens_gap (len : nat) (f : nat -> bv 8) (off : nat)
-      (toks : list (nat * nat)) :
-    ushp_no_symbols len f ->
-    ushp_tokens len f off toks -> (off <= len)%nat ->
-    forall (i : nat) (tk : nat * nat), toks !! i = Some tk ->
-    forall (j : nat) (tk' : nat * nat), toks !! j = Some tk' ->
-    forall x : nat, (fst tk <= x < snd tk)%nat -> x <> snd tk'.
-  Proof using .
-    intros Hns Htoks. revert Hns.
-    induction Htoks as [ off Hnil | off toks k n Hn Htoks IH ];
-      intros Hns Hoff i tk Hi j tk' Hj x Hx.
-    - destruct i; cbn in Hi; discriminate Hi.
-    - (* the head's own bounds, and where the rest starts *)
-      assert (Hk : (k <= len - off)%nat) by exact (ushp_skipws_le (len - off) off f).
-      assert (Hnle : (n <= len - (off + k))%nat)
-        by exact (ushp_toklen_le (len - (off + k)) (off + k) f).
-      assert (Hrest : forall (q : nat) (t : nat * nat), toks !! q = Some t ->
-                (off + k + n <= fst t < snd t /\ snd t <= len)%nat)
-        by (intros q t Hq;
-            exact (ushp_tokens_in len f (off + k + n)%nat toks Htoks
-                     ltac:(lia) q t Hq)).
-      destruct i as [| i ]; cbn [lookup] in Hi.
-      + (* x is in the HEAD token's body: [off+k, off+k+n) *)
-        injection Hi as <-. cbn [fst snd] in Hx.
-        destruct j as [| j ]; cbn [lookup] in Hj.
-        * injection Hj as <-. cbn [snd]. lia.
-        * destruct (Hrest j tk' Hj) as [Hlo _]. lia.
-      + (* x is in a LATER token's body, hence at or above [off+k+n] *)
-        destruct (Hrest i tk Hi) as [Hlo _].
-        destruct j as [| j ]; cbn [lookup] in Hj.
-        * (* the head's end is [off+k+n], and every later token starts
-             STRICTLY above it: the head stopped on a whitespace byte (the
-             line has no symbol), which the next scan skips *)
-          injection Hj as <-. cbn [snd].
-          assert (Hgap : forall (q : nat) (t : nat * nat),
-                    toks !! q = Some t -> (off + k + n < fst t)%nat).
-          { intros q t Hq.
-            assert (Hlt : (n < len - (off + k))%nat).
-            { destruct (Nat.lt_ge_cases n (len - (off + k))) as [Hc | Hc];
-                [ exact Hc | exfalso ].
-              destruct (Hrest q t Hq) as [Hlo' Hhi']. lia. }
-            pose proof (ushp_toklen_end (len - (off + k)) (off + k) f Hlt) as Hstop.
-            assert (Hwsb : ushp_is_ws (f (off + k + n)%nat) = true).
-            { apply orb_true_iff in Hstop as [Hw | Hsy]; [ exact Hw | exfalso ].
-              assert (Hin : (off + k + n < len)%nat) by lia.
-              rewrite (Hns (off + k + n)%nat Hin) in Hsy. discriminate Hsy. }
-            destruct toks as [| t0 rest ];
-              [ destruct q; cbn in Hq; discriminate Hq | ].
-            destruct (ushp_tokens_cons_inv len (off + k + n)%nat f t0 rest Htoks)
-              as (Hpos & Ht0 & Hrest').
-            assert (Hk0 : (0 < ushp_skipws (len - (off + k + n))
-                                 (off + k + n) f)%nat).
-            { destruct (len - (off + k + n))%nat as [| mm ] eqn:Em.
-              - exfalso. destruct (Hrest q t Hq) as [Hlo2 Hhi2]. lia.
-              - cbn [ushp_skipws]. rewrite Hwsb. lia. }
-            destruct (Hrest 0%nat t0 eq_refl) as [Hlo0 Hhi0].
-            rewrite Ht0 in Hlo0, Hhi0. cbn [fst snd] in Hlo0, Hhi0.
-            destruct q as [| q' ]; cbn [lookup] in Hq.
-            - injection Hq as <-. rewrite Ht0. cbn [fst]. lia.
-            - destruct (ushp_tokens_in len f _ rest Hrest' Hhi0 q' t Hq)
-                as [Hlo3 _].
-              lia. }
-          pose proof (Hgap i tk Hi). lia.
-        * (* both tokens are in the tail: the induction hypothesis *)
-          exact (IH Hns ltac:(lia) i tk Hi j tk' Hj x Hx).
-  Qed.
-
-  (* ===================================================================== *)
-  (* §3 THE SEAM: the parser's NODE is the runner's TREE.                   *)
-  (* ===================================================================== *)
-
-  (* a sub-run of a PERSISTED run -- the discarded twin of                  *)
-  (* [UkRunSys.ubytes_split], and easier: a persistent run can be read      *)
-  (* wherever it is needed and never has to be given back. *)
-  Lemma ubytesq_sub (g : gname) (a : Z) (n : nat) (f : nat -> bv 8)
-      (i m : nat) :
-    (i + m <= n)%nat ->
-    ubytesq g DfracDiscarded a n f -∗
-    ubytesq g DfracDiscarded (a + Z.of_nat i) m (fun j => f (i + j)%nat).
-  Proof using .
-    intros Hle. iIntros "#H". rewrite {2}/ubytesq.
-    iApply big_sepL_intro. iIntros "!>" (k j Hkj).
-    apply lookup_seq in Hkj as [-> Hlt].
-    iDestruct (big_sepL_lookup _ (seq 0 n) (i + k)%nat (i + k)%nat with "H")
-      as "Hb"; [ apply lookup_seq; lia | ].
-    assert (E : (a + Z.of_nat (i + k))%Z = (a + Z.of_nat i + Z.of_nat k)%Z)
-      by lia.
-    iEval (rewrite E) in "Hb". iExact "Hb".
-  Qed.
-
-  (* one byte of a persisted run *)
-  Lemma ubytesq_at (g : gname) (a : Z) (n : nat) (f : nat -> bv 8) (i : nat) :
-    (i < n)%nat ->
-    ubytesq g DfracDiscarded a n f -∗
-    ubyteq g DfracDiscarded (a + Z.of_nat i) (f i).
-  Proof using .
-    intros Hi. iIntros "#H".
-    iDestruct (big_sepL_lookup _ (seq 0 n) i i with "H") as "Hb";
-      [ apply lookup_seq; lia | ]. iExact "Hb".
-  Qed.
-
-  (* THE ARGUMENT VECTOR the runner reads, out of the token boundaries the
-     parser recorded: a token (i,j) is the string at [s0+i] of length [j-i],
-     whose bytes are the line's and whose terminator is the zero
-     [nulterminate] wrote at [j]. *)
-  Definition ush_args (s0 : Z) (g : nat -> bv 8) (toks : list (nat * nat))
-      : list uarg :=
-    map (fun tk : nat * nat =>
-           UArg (s0 + Z.of_nat (fst tk)) (snd tk - fst tk)%nat
-                (fun j : nat => g (fst tk + j)%nat)) toks.
-
-  Lemma ush_args_length (s0 : Z) (g : nat -> bv 8) (toks : list (nat * nat)) :
-    length (ush_args s0 g toks) = length toks.
-  Proof using . unfold ush_args. rewrite length_map. reflexivity. Qed.
-
-  Lemma ush_args_lookup (s0 : Z) (g : nat -> bv 8) (toks : list (nat * nat))
-      (i : nat) (tk : nat * nat) :
-    toks !! i = Some tk ->
-    ush_args s0 g toks !! i
-    = Some (UArg (s0 + Z.of_nat (fst tk)) (snd tk - fst tk)%nat
-                 (fun j : nat => g (fst tk + j)%nat)).
-  Proof using . intro Hi. unfold ush_args. rewrite list_lookup_fmap Hi. reflexivity. Qed.
-
-  (* every byte a program owns is inside the user region -- read off the
-     run's own heap, and the run survives because the conclusion is pure *)
-  Lemma urun_ubytes_bnd (h : CpuId) (m : regfile) (pc : mword 64)
-      (avail : nat) (a : Z) (nb : nat) (fb : nat -> bv 8) :
-    urun N h m pc avail -∗ ubytes γd a nb fb -∗
-    ⌜ forall j : nat, (j < nb)%nat -> 0 <= a + Z.of_nat j < 2 ^ 38 ⌝.
-  Proof using .
-    iIntros "Hrun Hbs".
-    iDestruct "Hrun" as (xi C pt Rfd Rut sz M pm fdv cw gn cs pidv)
-      "(_ & _ & _ & _ & Hheap & _)".
-    iDestruct (uheap_ubytes_img γt γd γs M pm sz a nb fb with "Hheap Hbs")
-      as %Hall.
-    iPureIntro. intros j Hj. exact (proj2 (Hall j Hj)).
-  Qed.
-
-  (* THE CONVERSION.  Everything the runner's tree names is built here out
-     of the parser's node and the NUL-cut line, and every byte of it is
-     DISCARDED on the way -- which is what makes the tree persistent, hence
-     what lets it cross the fork as a payload. *)
-  (* THE CONVERSION, at what it actually needs.  The NUL cut enters the     *)
-  (* argument only through three facts about the line's bytes -- each       *)
-  (* token is inside the line, its END byte is zero, and no byte of its     *)
-  (* BODY is -- so those are the premises, and the cut that produced them   *)
-  (* is the caller's business.  [ush_cmd_of_ushp] below is this lemma at    *)
-  (* stage 4's cut; the redirect line's cut is one byte longer and is the   *)
-  (* other instance.                                                        *)
-  Lemma ush_cmd_of_ushp_gen (h : CpuId) (m : regfile) (pc : mword 64)
-      (avail : nat) (s0 p : Z) (len : nat) (g : nat -> bv 8)
-      (toks : list (nat * nat)) :
-    (forall (i : nat) (tk : nat * nat), toks !! i = Some tk ->
-       (fst tk < snd tk)%nat /\ (snd tk <= len)%nat) ->
-    (forall (i : nat) (tk : nat * nat), toks !! i = Some tk ->
-       g (snd tk) = ubyte0) ->
-    (forall (i : nat) (tk : nat * nat), toks !! i = Some tk ->
-       forall j : nat, (j < snd tk - fst tk)%nat ->
-         g (fst tk + j)%nat <> ubyte0) ->
-    Z.of_nat len < 2 ^ 31 ->
-    0 < s0 -> s0 + Z.of_nat len < 2 ^ 38 ->
-    (* the run is here only to read the node's address bound off the heap *)
-    urun N h m pc avail -∗
-    ushp_tree N s0 p (UshpExec toks) -∗
-    (* the line ALREADY PERSISTED: a caller with a second string to cut out
-       of it (the redirect's file name) needs it afterwards, and the cut is
-       done by then either way *)
-    ubytesq γd DfracDiscarded s0 (S len) g ==∗
-    urun N h m pc avail ∗
-    ush_cmd γd p (UExec (ush_args s0 g toks)).
-  Proof using .
-    intros Hin Hend Hbod Hlen31 Hs0 Hs0hi.
-    iIntros "Hrun Hnode #Hline".
-    iDestruct "Hnode" as "(%Hlt10 & %Hp0 & %Hp8 & [Hty _] & Hargv & _)".
-    iDestruct (urun_ubytes_bnd h m pc avail p 4 _ with "Hrun Hty") as %Hpb.
-    assert (Hp : 0 < p < 2 ^ 38).
-    { split; [ exact Hp0 | ].
-      destruct (Hpb 0%nat ltac:(lia)) as [_ Hhi]. lia. }
-    iMod (ubytes_persist γd p 4 _ with "Hty") as "#Hty".
-    (* ---- the ten argv slots, persisted down to the ones that matter ---- *)
-    assert (E10 : (10 = S (length toks) + (10 - S (length toks)))%nat) by lia.
-    rewrite E10 seq_app big_sepL_app.
-    iDestruct "Hargv" as "[Hargv _]".
-    iAssert (|==> [∗ list] i ∈ seq 0 (S (length toks)),
-               uwordq γd DfracDiscarded (p + 8 + 8 * Z.of_nat i)
-                 (mword_of_int (match toks !! i with
-                                | Some tk => s0 + Z.of_nat (fst tk)
-                                | None => 0
-                                end)))%I with "[Hargv]" as ">#Hargv".
-    { iApply big_sepL_bupd. iApply (big_sepL_impl with "Hargv").
-      iIntros "!>" (i j Hij) "Hs".
-      apply lookup_seq in Hij as [Hje Hlt].
-      rewrite Nat.add_0_l in Hje. subst j.
-      rewrite /ushp_slot.
-      destruct (toks !! i) as [tk |] eqn:Etk.
-      - iApply (uword_persist with "Hs").
-      - rewrite (bool_decide_eq_true_2 (i = length toks)).
-        + iApply (uword_persist with "Hs").
-        + apply lookup_ge_None_1 in Etk. lia. }
-    (* ---- every token, as a string ---- *)
-    iAssert ([∗ list] x ∈ ush_args s0 g toks, ush_str γd x)%I as "#Hstrs".
-    { rewrite /ush_args big_sepL_fmap.
-      iApply big_sepL_intro. iIntros "!>" (i tk Hi).
-      rewrite /ush_str. cbn [ua_ptr ua_len ua_bytes fst snd].
-      destruct (Hin i tk Hi) as [Hlo Hhi].
-      iSplitR; [ iPureIntro; lia | ].
-      iSplitR; [ iPureIntro; exact (Hbod i tk Hi) | ].
-      iSplitR; [ iPureIntro; lia | ].
-      iSplitL.
-      - (* the bytes *)
-        iDestruct (ubytesq_sub γd s0 (S len) g (fst tk) (snd tk - fst tk)%nat
-                     ltac:(lia) with "Hline") as "Hb". iExact "Hb".
-      - (* the terminator, which is the zero [nulterminate] wrote *)
-        iDestruct (ubytesq_at γd s0 (S len) g (snd tk) ltac:(lia) with "Hline")
-          as "Hb".
-        rewrite (Hend i tk Hi).
-        assert (Ea : (s0 + Z.of_nat (snd tk))%Z
-                     = (s0 + Z.of_nat (fst tk) + Z.of_nat (snd tk - fst tk))%Z)
-          by lia.
-        iEval (rewrite Ea) in "Hb". iExact "Hb". }
-    (* ---- assemble ---- *)
-    iModIntro. iFrame "Hrun". rewrite /ush_cmd.
-    iSplitR; [ iPureIntro; lia | ].
-    iSplitR; [ iPureIntro; exact Hp8 | ].
-    iSplitR.
-    { (* the type word: EXEC is 1 *)
-      rewrite /ush_w32. iExact "Hty". }
-    iSplit.
-    { (* the vector *)
-      rewrite /uargv.
-      iSplit; [ iPureIntro; rewrite Zplus_mod Hp8; reflexivity | ].
-      iSplit; [ iPureIntro; rewrite ush_args_length; lia | ].
-      iApply big_sepL_intro. iIntros "!>" (i x Hi).
-      (* the element is the token's image, so its fields are the token's *)
-      assert (Htk : exists tk : nat * nat,
-                toks !! i = Some tk /\
-                x = UArg (s0 + Z.of_nat (fst tk)) (snd tk - fst tk)%nat
-                         (fun j : nat => g (fst tk + j)%nat)).
-      { unfold ush_args in Hi. rewrite list_lookup_fmap in Hi.
-        destruct (toks !! i) as [tk |] eqn:Etk; [ | discriminate Hi ].
-        injection Hi as <-. exists tk. split; [ reflexivity | reflexivity ]. }
-      destruct Htk as (tk & Hi' & ->).
-      cbn [ua_ptr ua_len ua_bytes].
-      iSplit.
-      - iDestruct (big_sepL_lookup _ (seq 0 (S (length toks))) i i with "Hargv")
-          as "Hw"; [ apply lookup_seq;
-                     pose proof (lookup_lt_Some toks i tk Hi'); lia | ].
-        rewrite Hi'. iExact "Hw".
-      - iDestruct (big_sepL_lookup _ (ush_args s0 g toks) i
-                     (UArg (s0 + Z.of_nat (fst tk)) (snd tk - fst tk)%nat
-                           (fun j : nat => g (fst tk + j)%nat)) with "Hstrs")
-          as "Hs"; [ exact (ush_args_lookup s0 g toks i tk Hi') | ].
-        rewrite /ush_str. iDestruct "Hs" as "[_ Hs]".
-        cbn [ua_ptr ua_len ua_bytes]. iExact "Hs". }
-    iSplit; [ | iExact "Hstrs" ].
-    (* the NULL cap, at the slot just past the last token *)
-    rewrite /ush_ptr ush_args_length.
-    iDestruct (big_sepL_lookup _ (seq 0 (S (length toks)))
-                 (length toks) (length toks) with "Hargv") as "Hw";
-      [ apply lookup_seq; lia | ].
-    rewrite (lookup_ge_None_2 toks (length toks) ltac:(lia)).
-    iExact "Hw".
-  Qed.
 
   (* ---- the landed statement, which is that conversion at STAGE 4's cut -- *)
   Lemma ush_cmd_of_ushp (h : CpuId) (m : regfile) (pc : mword 64) (avail : nat)
@@ -498,8 +168,8 @@ Section UkShMain.
   Proof using .
     intros Htoks Hns Hnn Hlen31 Hs0 Hs0hi.
     iIntros "Hrun Hnode Hline".
-    iMod (ubytes_persist γd s0 (S len) _ with "Hline") as "#Hline".
-    iApply (ush_cmd_of_ushp_gen h m pc avail s0 p len
+    iMod (UkShSeam.ubytes_persist γd s0 (S len) _ with "Hline") as "#Hline".
+    iApply (UkShSeam.ush_cmd_of_ushp_gen N h m pc avail s0 p len
               (ushp_nulfold toks (ushp_ext len f)) toks
               ltac:(intros i tk Hi;
                     destruct (ushp_tokens_in len f 0%nat toks Htoks
@@ -511,10 +181,10 @@ Section UkShMain.
               ltac:(intros i tk Hi j Hj;
                     destruct (ushp_tokens_in len f 0%nat toks Htoks
                                 ltac:(lia) i tk Hi) as [Hlo Hhi];
-                    rewrite (ushp_nulfold_miss toks (ushp_ext len f)
+                    rewrite (UkShSeam.ushp_nulfold_miss toks (ushp_ext len f)
                                (fst tk + j)%nat
                                ltac:(intros q t Hq;
-                                     exact (ushp_tokens_gap len f 0%nat toks
+                                     exact (UkShSeam.ushp_tokens_gap len f 0%nat toks
                                               Hns Htoks ltac:(lia)
                                               i tk Hi q t Hq
                                               (fst tk + j)%nat ltac:(lia))));
@@ -525,6 +195,7 @@ Section UkShMain.
               Hlen31 Hs0 Hs0hi
               with "Hrun Hnode Hline").
   Qed.
+
 
 
   (* ===================================================================== *)
@@ -592,129 +263,28 @@ Section UkShMain.
     intros Hs1 Hns Htoks Htlen Hs0 Hs64 Hs38 Hpx.
     iIntros "#Hdp #Hcode #Hxs #Hkw #Hpcode #Hpro #Hjt Hline Hws Hsy Hstd Hcwd
              Hch HM Hrun".
-    (* the line's own bytes are non-NUL, which is what makes each token a
-       string once the cut lands *)
+    (* the line's own bytes are non-NUL, which is what makes the line the
+       reference parses: [ref_parsecmd] at the symbol-free line is ONE EXEC
+       node over exactly these tokens (RefParseBridge.ref_parsecmd_nosym) *)
     iDestruct (ustr_nonul with "Hline") as %Hnn0.
-    iDestruct (ustr_len with "Hline") as %Hlen31.
-    (* ---- 0x9c0  c.mv a0,s1 ---- *)
-    iApply (wp_uk_cmv N h m (mword_of_int 0x9c0) a0_idx s1_idx
-              (add_vec zero_reg (m !!! Regidx s1_idx))
-              (60 + (8 + (UkShDiag.ush_Dg + n)))
-              ltac:(unfold unot_sp; vm_compute; discriminate)
-              ltac:(vm_compute; discriminate) eq_refl with "[] Hrun").
-    { iApply (uis_shk_9c0 with "Hcode"). }
-    assert (E9c0 : add_vec_int (mword_of_int 0x9c0 : mword 64) 2
-                   = mword_of_int 0x9c2)
-      by (apply bv_eq; vm_compute; reflexivity).
-    rewrite E9c0. iIntros (h1) "Hrun".
-    set (m1 := <[Regidx a0_idx
-                 := regval_into_reg (add_vec zero_reg (m !!! Regidx s1_idx))]> m).
-    assert (Ha0_1 : m1 !!! Regidx a0_idx = (mword_of_int s0 : mword 64)).
-    { rewrite /m1 (upd_eq m (Regidx a0_idx) _).
-      rewrite Hs1. apply bv_eq. rewrite add_vec_unsigned.
-      unfold bv_wrap. cbn [bv_unsigned]. rewrite Z.add_0_l.
-      rewrite Z.mod_small; [ reflexivity | ].
-      pose proof (bv_unsigned_in_range _ (mword_of_int s0 : mword 64)) as Hr.
-      assert (Hm : bv_modulus (MachineWord.Z_idx 64) = 18446744073709551616%Z)
-        by (vm_compute; reflexivity).
-      rewrite Hm in Hr. exact Hr. }
-    assert (Hs1_1 : m1 !!! Regidx s1_idx = (mword_of_int s0 : mword 64))
-      by (rewrite /m1 (upd_ne m (Regidx a0_idx) (Regidx s1_idx) _
-                         ltac:(vm_compute; discriminate)); exact Hs1).
-    (* ---- 0x9c2  jal ra,parsecmd ---- *)
-    iApply (wp_uk_jal N h1 m1 (mword_of_int 0x9c2)
-              (mword_of_int 2096812 : mword 21) (mword_of_int 1 : mword 5)
-              (mword_of_int ShSyms.parsecmd) (mword_of_int 0x9c6)
-              (60 + (8 + (UkShDiag.ush_Dg + n)))
-              ltac:(unfold unot_sp; vm_compute; discriminate)
-              ltac:(vm_compute; discriminate)
-              ltac:(apply bv_eq; vm_compute; reflexivity)
-              ltac:(apply bv_eq; vm_compute; reflexivity)
-              ltac:(vm_compute; reflexivity)
-              with "[] Hrun").
-    { iApply (uis_shk_9c2 with "Hcode"). }
-    iIntros (h2) "Hrun".
-    set (m2 := <[Regidx (mword_of_int 1 : mword 5)
-                 := regval_into_reg (mword_of_int 0x9c6 : mword 64)]> m1).
-    assert (Ha0_2 : m2 !!! Regidx a0_idx = (mword_of_int s0 : mword 64))
-      by (rewrite /m2 (upd_ne m1 (Regidx (mword_of_int 1 : mword 5))
-                         (Regidx a0_idx) _ ltac:(vm_compute; discriminate));
-          exact Ha0_1).
-    assert (Hra_2 : ret_pc (m2 !!! Regidx (mword_of_int 1 : mword 5))
-                    = (mword_of_int 0x9c6 : mword 64))
-      by (rewrite /m2 (upd_eq m1 (Regidx (mword_of_int 1 : mword 5)) _);
-          apply bv_eq; vm_compute; reflexivity).
-    (* ---- parsecmd ---- *)
-    (* THE EXIT PAYLOAD GOES DOWN THE PARSER'S WALK (lane IO-LEAF, M3c):
-       [malloc] can return NULL and the store through it KILLS this
-       process, so the payload its exit owes has to be in hand there.  It
-       was a section Hypothesis of the three parser files -- "the payload
-       is free at this record" -- which is false the moment sh's children
-       are forked at a payload of their own.  This walk still has it for
-       free, so it is one [iPoseProof] away. *)
-    iPoseProof Hpx as "Hpay".
-    (* the exit resource IS the payload here, and the law the identity *)
-    iAssert (□ (ukn_pay N (-1) -∗ ukn_pay N (-1)))%I as "#Hpxw";
-      [ iIntros "!> $" | ].
     (* THE CAPABILITY IS WEAKENED HERE, AND NOWHERE ELSE (lane SH-MALLOC-3).
        This lemma's [Hmalloc] is the UNBOUNDED contract, unchanged -- it is
        what [UkShMalloc]'s adapter proves and what every caller supplies --
-       while the parser now asks for [UkShParse.ushp_malloc_ty_le N 168].
-       A capability good for every request up to 65504 is good for every
-       request up to 168, which is the one line below. *)
-    iApply (UkShParseCmd.wp_kshp_parser N UMalloc (usz γs szv)
-              (UkShParse.ushp_malloc_ty_le_mono N 65504 168 UMalloc
-                 (usz γs szv) ltac:(lia)
-                 (UkShParse.ushp_malloc_ty_le_top N UMalloc (usz γs szv)
-                    Hmalloc))
-              h2 m2 dw dv s0 len f toks
-              (8 + (UkShDiag.ush_Dg + n))
-              Ha0_2 Hns Htoks Htlen Hs0 Hs64
-              with "Hpcode Hpro Hline Hws Hsy HM Hpxw Hpay Hrun").
-    iIntros (p) "%Hparses Hnode Hline %Hcut Hws Hsy".
-    (* the payload comes back unspent on the arm where the allocation
-       succeeded; this walk still has it for free, so it is dropped *)
-    iIntros (h3 m3) "%Hcs3 %Ha0_3 Hsz _ Hrun".
-    rewrite Hra_2.
-    (* ---- 0x9c6  jal ra,runcmd ---- *)
-    iApply (wp_uk_jal N h3 m3 (mword_of_int 0x9c6)
-              (mword_of_int 2094792 : mword 21) (mword_of_int 1 : mword 5)
-              (mword_of_int ShSyms.runcmd) (mword_of_int 0x9ca)
-              (60 + (8 + (UkShDiag.ush_Dg + n)))
-              ltac:(unfold unot_sp; vm_compute; discriminate)
-              ltac:(vm_compute; discriminate)
-              ltac:(apply bv_eq; vm_compute; reflexivity)
-              ltac:(apply bv_eq; vm_compute; reflexivity)
-              ltac:(vm_compute; reflexivity)
-              with "[] Hrun").
-    { iApply (uis_shk_9c6 with "Hcode"). }
-    iIntros (h4) "Hrun".
-    set (m4 := <[Regidx (mword_of_int 1 : mword 5)
-                 := regval_into_reg (mword_of_int 0x9ca : mword 64)]> m3).
-    assert (Ha0_4 : m4 !!! Regidx a0_idx = (mword_of_int p : mword 64))
-      by (rewrite /m4 (upd_ne m3 (Regidx (mword_of_int 1 : mword 5))
-                         (Regidx a0_idx) _ ltac:(vm_compute; discriminate));
-          exact Ha0_3).
-    (* ---- THE SEAM: the node the parser built is the tree runcmd walks ---- *)
-    iMod (ush_cmd_of_ushp h4 m4 (mword_of_int ShSyms.runcmd)
-            (60 + (8 + (UkShDiag.ush_Dg + n))) s0 p len f toks
-            Htoks Hns Hnn0 Hlen31 Hs0 Hs38
-            with "Hrun Hnode Hline") as "(Hrun & #Htree)".
-    (* ---- runcmd, which reaches [exec] and never returns ---- *)
-    replace (60 + (8 + (UkShDiag.ush_Dg + n)))%nat
-      with (6 * ush_ht (UExec (ush_args s0
-                                (ushp_nulfold toks (ushp_ext len f)) toks))
-            + (2 + (UkShDiag.ush_Dg + (60 + n))))%nat
-      by (cbn [ush_ht]; lia).
-    (* runcmd is stated at the record's OWN exec payload, and since lane
-       IO-LEAF's M3b its forks are at that payload too -- so the one
-       supply this walk carries is the one it hands on. *)
-    iApply (UkShDiag.wp_kshr_runcmd_final Hpsok_free
-              (UExec (ush_args s0 (ushp_nulfold toks (ushp_ext len f)) toks))
-              ltac:(cbn [ush_simple]; exact I)
-              N h4 m4 p szv ld (60 + n)
-              Hpx Ha0_4
-              with "Hdp Hcode Hxs Hkw Hjt Htree Hsz Hstd Hcwd Hch Hrun").
+       while the parser asks for [UkShParse.ushp_malloc_ty_le N 168], ONE
+       link of the chain [UkShRedirs.ushp_malloc_chain]. *)
+    iApply (UkShSeam.wp_ref_child_exec N Hpsok_free UMalloc (usz γs szv)
+              h m dw dv s0 len f toks szv ld n
+              Hs1 (RefParse.ref_sym_scope_nosym len f Hns)
+              (RefParseBridge.ref_parsecmd_nosym len f toks Hnn0 Hns Htoks Htlen)
+              (UkShRedirs.ushp_malloc_chain_1 N UMalloc (usz γs szv)
+                 (UkShParse.ushp_malloc_ty_le_mono N 65504 168 UMalloc
+                    (usz γs szv) ltac:(lia)
+                    (UkShParse.ushp_malloc_ty_le_top N UMalloc (usz γs szv)
+                       Hmalloc)))
+              Hs0 Hs64 Hs38 Hpx
+              with "Hdp Hcode Hxs Hkw Hpcode Hpro Hjt Hline Hws Hsy Hstd Hcwd
+                    Hch HM [] Hrun").
+    iIntros "$".
   Qed.
 
   (* ===================================================================== *)
@@ -785,3 +355,23 @@ Section UkShMain.
   Qed.
 
 End UkShMain.
+
+(* ===================================================================== *)
+(* THE MOVED VOCABULARY, RE-EXPORTED (lane user-once A3a).  These lived    *)
+(* in SS1-SS3 of this file and are [UkShSeam.v]'s now; every consumer      *)
+(* names them [UkShMain.X], so each keeps that name as an abbreviation of  *)
+(* the one constant -- the same device [UkShPipeParse.ushp_pipe_node] uses. *)
+(* ===================================================================== *)
+Notation ubytes_persist := UkShSeam.ubytes_persist.
+Notation uword_persist := UkShSeam.uword_persist.
+Notation ustr_persist := UkShSeam.ustr_persist.
+Notation ushp_toklen_end := UkShSeam.ushp_toklen_end.
+Notation ushp_nulfold_miss := UkShSeam.ushp_nulfold_miss.
+Notation ushp_tokens_gap := UkShSeam.ushp_tokens_gap.
+Notation ubytesq_sub := UkShSeam.ubytesq_sub.
+Notation ubytesq_at := UkShSeam.ubytesq_at.
+Notation ush_args := UkShSeam.ush_args.
+Notation ush_args_length := UkShSeam.ush_args_length.
+Notation ush_args_lookup := UkShSeam.ush_args_lookup.
+Notation urun_ubytes_bnd := UkShSeam.urun_ubytes_bnd.
+Notation ush_cmd_of_ushp_gen := UkShSeam.ush_cmd_of_ushp_gen.
