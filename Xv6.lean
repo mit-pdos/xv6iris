@@ -1215,3 +1215,5 @@ import Xv6.UartBoot
 import Xv6.ProcBoot
 import Xv6.Xv6GF
 import Xv6.BootCarveHart
+import Xv6.AppIface
+import Xv6.SystemSlot
