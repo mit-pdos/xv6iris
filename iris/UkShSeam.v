@@ -1152,8 +1152,9 @@ Section UkShSeam.
     ustr γd dv ushp_symbols 7 ushp_sym_f -∗
     UM -∗
     (* the lend, and the out-of-memory law it goes to where the parser's
-       [cmdalloc] panics ([UkShCmdalloc.ushp_oom]; upstream d66e41c) *)
-    UkShCmdalloc.ushp_oom N Cr (nn - 2) -∗
+       [cmdalloc] panics ([UkShCmdalloc.ushp_oom]; upstream d66e41c), at
+       the run's budget less the tree's deepest panic ([ushp_deep]) *)
+    UkShCmdalloc.ushp_oom N Cr (ushp_room t + nn - ushp_deep t) -∗
     Cr -∗
     urun N h m (mword_of_int 0x99c) (ushp_room t + nn) -∗
     (∀ (h' : CpuId) (m' : regfile) (p : Z),
@@ -1312,9 +1313,15 @@ Section UkShSeam.
     replace (60 + (8 + (UkShDiag.ush_Dg + n)))%nat
       with (ushp_room (UshpExec toks) + (8 + (UkShDiag.ush_Dg + n)))%nat
       by reflexivity.
+    iDestruct (UkShCmdalloc.ushp_oom_mono N (ukn_pay N (-1))
+                 (8 + (UkShDiag.ush_Dg + n) - 2)
+                 (ushp_room (UshpExec toks) + (8 + (UkShDiag.ush_Dg + n)) - ushp_deep (UshpExec toks))
+                 ltac:(change (ushp_room (UshpExec toks)) with 60%nat;
+                       change (ushp_deep (UshpExec toks)) with 42%nat; lia)
+                 with "Hpxw") as "#Hpxw'".
     iApply (wp_ref_child UM UM' h m dw dv s0 len f (UshpExec toks)
               (8 + (UkShDiag.ush_Dg + n)) (ukn_pay N (-1)) Hs1 Hscope Href I Hchain Hs0 Hs64 Hs38
-              with "Hcode Hpcode Hpro Hline Hws Hsy HM Hpxw Hpay Hrun").
+              with "Hcode Hpcode Hpro Hline Hws Hsy HM Hpxw' Hpay Hrun").
     iIntros (h' m' p) "%Ha0 %Hcs #Htree #Hlineq Hws Hsy HM' _ Hrun".
     iDestruct ("Husz" with "HM'") as "Hsz".
     replace (ushp_room (UshpExec toks) + (8 + (UkShDiag.ush_Dg + n)))%nat
@@ -1408,11 +1415,18 @@ Section UkShSeam.
     replace (68 + (8 + (UkShDiag.ush_Dg + n)))%nat
       with (ushp_room (UshpRedir (UshpExec toks) q e 1537 1) + (4 + (UkShDiag.ush_Dg + n)))%nat
       by reflexivity.
+    iDestruct (UkShCmdalloc.ushp_oom_mono N (Cr ∗ UserFd.ustd γfd ld)
+                 (4 + (UkShDiag.ush_Dg + n) - 2)
+                 (ushp_room (UshpRedir (UshpExec toks) q e 1537 1) + (4 + (UkShDiag.ush_Dg + n))
+                  - ushp_deep (UshpRedir (UshpExec toks) q e 1537 1))
+                 ltac:(change (ushp_room (UshpRedir (UshpExec toks) q e 1537 1)) with 72%nat;
+                       change (ushp_deep (UshpRedir (UshpExec toks) q e 1537 1)) with 62%nat; lia)
+                 with "Hpxw") as "#Hpxw'".
     iApply (wp_ref_child UM UM' h m dw dv s0 len f
               (UshpRedir (UshpExec toks) q e 1537 1) (4 + (UkShDiag.ush_Dg + n))
               (Cr ∗ UserFd.ustd γfd ld)
               Hs1 Hscope Href (conj I (conj eq_refl eq_refl)) Hchain Hs0 Hs64 Hs38
-              with "Hcode Hpcode Hpro Hline Hws Hsy HM Hpxw [$Hcr $Hstd] Hrun").
+              with "Hcode Hpcode Hpro Hline Hws Hsy HM Hpxw' [$Hcr $Hstd] Hrun").
     iIntros (h' m' p) "%Ha0 %Hcs #Htree #Hlineq Hws Hsy HM' [Hcr Hstd] Hrun".
     replace (ushp_room (UshpRedir (UshpExec toks) q e 1537 1) + (4 + (UkShDiag.ush_Dg + n)))%nat
       with (6 + (UkShDiag.ush_Dg + (70 + n)))%nat by reflexivity.
@@ -1547,11 +1561,19 @@ Section UkShSeam.
       with (ushp_room (UshpPipe (UshpExec toksl) (UshpExec toksr))
             + (8 + (UkShDiag.ush_Dg + (2 + n))))%nat
       by (change (ushp_room (UshpPipe (UshpExec toksl) (UshpExec toksr))) with 66%nat; lia).
+    iDestruct (UkShCmdalloc.ushp_oom_mono N Cr
+                 (8 + (UkShDiag.ush_Dg + (2 + n)) - 2)
+                 (ushp_room (UshpPipe (UshpExec toksl) (UshpExec toksr))
+                  + (8 + (UkShDiag.ush_Dg + (2 + n)))
+                  - ushp_deep (UshpPipe (UshpExec toksl) (UshpExec toksr)))
+                 ltac:(change (ushp_room (UshpPipe (UshpExec toksl) (UshpExec toksr))) with 66%nat;
+                       change (ushp_deep (UshpPipe (UshpExec toksl) (UshpExec toksr))) with 48%nat; lia)
+                 with "Hpxw") as "#Hpxw'".
     iApply (wp_ref_child UM UM' h m dw dv s0 len f
               (UshpPipe (UshpExec toksl) (UshpExec toksr))
               (8 + (UkShDiag.ush_Dg + (2 + n))) Cr
               Hs1 Hscope Href (conj I I) Hchain Hs0 Hs64 Hs38
-              with "Hcode Hpcode Hpro Hline Hws Hsy HM Hpxw Hcr Hrun").
+              with "Hcode Hpcode Hpro Hline Hws Hsy HM Hpxw' Hcr Hrun").
     iIntros (h' m' p) "%Ha0 %Hcs #Htree #Hlineq Hws Hsy HM' Hcr Hrun".
     replace (ushp_room (UshpPipe (UshpExec toksl) (UshpExec toksr))
              + (8 + (UkShDiag.ush_Dg + (2 + n))))%nat

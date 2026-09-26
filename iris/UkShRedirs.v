@@ -236,6 +236,22 @@ Section UkShRedirs.
                  ∗ ushp_oom Pex K)%I
     end.
 
+  (* ...and one whose law is unlocked by a redirect's presence lends them
+     too: at [[]] nothing is asked (parseexec, user-once N) *)
+  Lemma ushp_redirs_res_of_ne (rs : list rredir) (dv : dfrac) (Pex : iProp Σ)
+      {K : nat} :
+    (⌜ rs <> [] ⌝ -∗ ushp_oom Pex K) -∗
+    ustr γd dv ushp_symbols 7 ushp_sym_f -∗ Pex -∗
+    ushp_redirs_res rs dv Pex K
+    ∗ (ushp_redirs_res rs dv Pex K -∗ ustr γd dv ushp_symbols 7 ushp_sym_f ∗ Pex).
+  Proof using .
+    iIntros "Hpx Hsy Hpay". destruct rs as [| r rs ]; cbn [ushp_redirs_res].
+    - iSplitR; [ done | ]. iIntros "_". iFrame "Hsy Hpay".
+    - iDestruct ("Hpx" with "[]") as "#Hpx'"; [ iPureIntro; discriminate | ].
+      iSplitL "Hsy Hpay"; [ iFrame "Hsy Hpay Hpx'" | ].
+      iIntros "(Hsy & Hpay & _)". iFrame "Hsy Hpay".
+  Qed.
+
   (* a caller holding the table and the payment lends them at any [rs] *)
   Lemma ushp_redirs_res_of (rs : list rredir) (dv : dfrac) (Pex : iProp Σ)
       {K : nat} :

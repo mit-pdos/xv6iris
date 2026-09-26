@@ -180,6 +180,77 @@ Definition ushp_room (t : ushp_cmd) : nat :=
   (8 + Nat.max (ushp_pl_room t) (4 * ushp_ht t))%nat.
 
 (* ===================================================================== *)
+(* (4b) THE DEEPEST OUT-OF-MEMORY PANIC UNDER EACH WALK (user-once N).   *)
+(*                                                                       *)
+(* Each walk hands its run to [UkShCmdalloc.ushp_oom Pex K] where a       *)
+(* cmdalloc under it panics, and the law is the caller's at every budget  *)
+(* AT LEAST [K]; so the walk asks for least when [K] is the entry's       *)
+(* budget less the depth of the deepest such panic under the tree.  The   *)
+(* depths mirror the rooms: parseexec's is [UkShArgs.ushp_pex_deep]       *)
+(* (twenty-two, or forty-two under a REDIR on top), and each frame above  *)
+(* it adds its own words -- parsepipe's six at every node (its pipecmd    *)
+(* panics eight below the frame, shallower than either subtree's), and   *)
+(* parseline's six, parsecmd's eight.  At a bar chain of plain EXECs the *)
+(* depth is [28 + 6 * bars] against parsepipe's room of [46 + 6 * bars]:  *)
+(* the law eighteen above the caller's extra, which is what the N-stage  *)
+(* statements ([UkShPipesParse.wp_kshp_parsepipe_bars] at [20 + nn] over  *)
+(* [48 + 6 * bars + nn]) carry.                                           *)
+(* ===================================================================== *)
+
+Fixpoint ushp_pp_deep (t : ushp_cmd) : nat :=
+  match t with
+  | UshpPipe l r => (6 + Nat.max (UkShArgs.ushp_pex_deep l) (ushp_pp_deep r))%nat
+  | _ => (6 + UkShArgs.ushp_pex_deep t)%nat
+  end.
+
+Lemma ushp_pp_deep_ge (t : ushp_cmd) : (28 <= ushp_pp_deep t)%nat.
+Proof using.
+  destruct t; cbn [ushp_pp_deep];
+    match goal with
+    | |- context [ UkShArgs.ushp_pex_deep ?x ] => pose proof (UkShArgs.ushp_pex_deep_ge x)
+    end; lia.
+Qed.
+
+(* every depth is within its room *)
+Lemma ushp_pex_deep_le_room (t : ushp_cmd) :
+  (UkShArgs.ushp_pex_deep t <= ushp_pex_room t)%nat.
+Proof using.
+  unfold UkShArgs.ushp_pex_deep, ushp_pex_room, ushp_pex_extra.
+  destruct (ref_has_redir t); lia.
+Qed.
+
+Lemma ushp_pp_deep_le_room (t : ushp_cmd) : (ushp_pp_deep t <= ushp_pp_room t)%nat.
+Proof using.
+  induction t; cbn [ushp_pp_deep ushp_pp_room];
+    repeat match goal with
+    | |- context [ UkShArgs.ushp_pex_deep ?x ] =>
+        lazymatch goal with
+        | H : (UkShArgs.ushp_pex_deep x <= _)%nat |- _ => fail
+        | _ => pose proof (ushp_pex_deep_le_room x)
+        end
+    end; lia.
+Qed.
+
+(* parseexec's answer is never a pipe *)
+Lemma ushp_pp_deep_wrap (toks : list (nat * nat)) (rs : list rredir) :
+  ushp_pp_deep (ref_wrap (UshpExec toks) rs)
+  = (6 + UkShArgs.ushp_pex_deep (ref_wrap (UshpExec toks) rs))%nat.
+Proof using.
+  destruct (ref_wrap_redir_or (UshpExec toks) rs) as [ E | (c' & q & e & mode & fd & E) ];
+    rewrite E; reflexivity.
+Qed.
+
+Definition ushp_pl_deep (t : ushp_cmd) : nat := (6 + ushp_pp_deep t)%nat.
+
+Definition ushp_deep (t : ushp_cmd) : nat := (8 + ushp_pl_deep t)%nat.
+
+Lemma ushp_deep_le_room (t : ushp_cmd) : (ushp_deep t <= ushp_room t)%nat.
+Proof using.
+  unfold ushp_deep, ushp_pl_deep, ushp_room, ushp_pl_room.
+  pose proof (ushp_pp_deep_le_room t). lia.
+Qed.
+
+(* ===================================================================== *)
 (* (5a) THE CUT, pure: the fold that zeroes every index nulterminate      *)
 (* visits.  [UkShParseCmd.ushp_nulfold] is its instance at an exec node.  *)
 (* ===================================================================== *)
@@ -441,7 +512,7 @@ Section UkShParser.
     ustr γd dw ushp_whitespace 5 ushp_ws_f -∗
     ustr γd dv ushp_symbols 7 ushp_sym_f -∗
     UM -∗
-    ushp_oom Pex (nn - 2) -∗
+    ushp_oom Pex (16 + (24 + nn) - UkShArgs.ushp_pex_deep t1) -∗
     Pex -∗
     urun N h m (mword_of_int ShSyms.parsepipe) (6 + (16 + (24 + nn))) -∗
     (∀ (h' : CpuId) (m' : regfile) (p : Z),
@@ -1053,7 +1124,7 @@ Section UkShParser.
     ustr γd dw ushp_whitespace 5 ushp_ws_f -∗
     ustr γd dv ushp_symbols 7 ushp_sym_f -∗
     UM -∗
-    ushp_oom Pex (nn - 2) -∗
+    ushp_oom Pex (ushp_pp_room t + nn - ushp_pp_deep t) -∗
     Pex -∗
     urun N h m (mword_of_int ShSyms.parsepipe) (ushp_pp_room t + nn) -∗
     (∀ root : Z,
@@ -1111,12 +1182,22 @@ Section UkShParser.
       assert (Ebud2 : (16 + (24 + nn'))%nat = (ushp_pp_room r + nnr)%nat)
         by (unfold nn', nnr; lia).
       (* the out-of-memory law at each call's (deeper) budget *)
-      iDestruct (UkShCmdalloc.ushp_oom_mono N Pex (nn - 2) (nn' - 2)
-                   ltac:(unfold nn'; lia) with "Hpx") as "#Hpxh".
-      iDestruct (UkShCmdalloc.ushp_oom_mono N Pex (nn - 2) (nnr - 2)
-                   ltac:(unfold nnr; lia) with "Hpx") as "#Hpxr".
-      iDestruct (UkShCmdalloc.ushp_oom_mono N Pex (nn - 2) (10 + (22 + nn'))
-                   ltac:(unfold nn'; lia) with "Hpx") as "#Hpxp".
+      pose proof (UkShArgs.ushp_pex_deep_ge t1) as Hldg.
+      pose proof (ushp_pex_deep_le_room t1) as Hldl.
+      pose proof (ushp_pp_deep_ge r) as Hrdg.
+      pose proof (ushp_pp_deep_le_room r) as Hrdl.
+      iDestruct (UkShCmdalloc.ushp_oom_mono N Pex
+                   (ushp_pp_room (UshpPipe t1 r) + nn - ushp_pp_deep (UshpPipe t1 r))
+                   (16 + (24 + nn') - UkShArgs.ushp_pex_deep t1)
+                   ltac:(cbn [ushp_pp_room ushp_pp_deep]; unfold nn'; lia) with "Hpx") as "#Hpxh".
+      iDestruct (UkShCmdalloc.ushp_oom_mono N Pex
+                   (ushp_pp_room (UshpPipe t1 r) + nn - ushp_pp_deep (UshpPipe t1 r))
+                   (ushp_pp_room r + nnr - ushp_pp_deep r)
+                   ltac:(cbn [ushp_pp_room ushp_pp_deep]; unfold nnr; lia) with "Hpx") as "#Hpxr".
+      iDestruct (UkShCmdalloc.ushp_oom_mono N Pex
+                   (ushp_pp_room (UshpPipe t1 r) + nn - ushp_pp_deep (UshpPipe t1 r))
+                   (10 + (22 + nn'))
+                   ltac:(cbn [ushp_pp_room ushp_pp_deep]; unfold nn'; lia) with "Hpx") as "#Hpxp".
       (* the left command's guard: a REDIR on top means its room is 48 *)
       assert (Hguard : ref_has_redir t1 = true -> (12 <= nn')%nat)
         by (intro H; pose proof (ushp_pex_room_has t1 H) as E; unfold nn'; lia).
@@ -1535,9 +1616,12 @@ Section UkShParser.
       set (nn' := (ushp_pex_extra t1 + nn)%nat) in *.
       assert (Ebud : (ushp_pp_room t1 + nn)%nat = (6 + (16 + (24 + nn')))%nat)
         by (unfold nn'; rewrite Ht1 (ushp_pp_room_wrap toks rs); unfold ushp_pex_room; lia).
+      iDestruct (UkShCmdalloc.ushp_oom_mono N Pex
+                   (ushp_pp_room t1 + nn - ushp_pp_deep t1)
+                   (16 + (24 + nn') - UkShArgs.ushp_pex_deep t1)
+                   ltac:(unfold nn'; rewrite Ht1 (ushp_pp_deep_wrap toks rs) (ushp_pp_room_wrap toks rs);
+                         unfold ushp_pex_room; lia) with "Hpx") as "#Hpxh".
       rewrite Ebud.
-      iDestruct (UkShCmdalloc.ushp_oom_mono N Pex (nn - 2) (nn' - 2)
-                   ltac:(unfold nn'; lia) with "Hpx") as "#Hpxh".
       iApply (wp_ref_pp_head h m dq dw dv ps s0 len off (S n) s s1 f w0 t1 false UM UM' nn'
                 Ha0 Ha1 Hoffle Hw0 Hscope Hex Hpk Hchain (ushp_pex_extra_guard t1 nn)
                 Hs0 Hs64 Hps0 Hps8 Hpssz
@@ -1593,7 +1677,7 @@ Section UkShParser.
     ustr γd dw ushp_whitespace 5 ushp_ws_f -∗
     ustr γd dv ushp_symbols 7 ushp_sym_f -∗
     UM -∗
-    ushp_oom Pex (nn - 2) -∗
+    ushp_oom Pex (ushp_pl_room t + nn - ushp_pl_deep t) -∗
     Pex -∗
     urun N h m (mword_of_int ShSyms.parseline) (ushp_pl_room t + nn) -∗
     (∀ root : Z,
@@ -1639,6 +1723,11 @@ Section UkShParser.
       by (unfold ushp_pl_room, nn'; lia).
     assert (Ebud2 : (6 + (16 + (24 + nn')))%nat = (ushp_pp_room t + nn)%nat)
       by (unfold nn'; lia).
+    (* the law in parsepipe's spelling, before the room is respelled *)
+    iDestruct (UkShCmdalloc.ushp_oom_mono N Pex
+                 (ushp_pl_room t + nn - ushp_pl_deep t)
+                 (ushp_pp_room t + nn - ushp_pp_deep t)
+                 ltac:(unfold ushp_pl_room, ushp_pl_deep; lia) with "Hpx") as "#Hpxp".
     rewrite Ebud.
     rewrite shpp_parseline.
     set (vals := fun i : nat =>
@@ -1774,7 +1863,7 @@ Section UkShParser.
     iEval (rewrite Ebud2) in "Hrun".
     iApply (wp_ref_parsepipe dq dw dv ps s0 len f n h4 m4 off s w0 t UM UM' nn
               Ha0_4 Ha1_4 Hoffle Hw0 Hscope Hpp Hchain Hs0 Hs64 Hps0 Hps8 Hpssz
-              with "Hcode Hro Hcur Hstr Hws Hsy HM Hpx Hpay Hrun").
+              with "Hcode Hro Hcur Hstr Hws Hsy HM Hpxp Hpay Hrun").
     iIntros (p) "Hot Hcur Hstr Hws Hsy".
     iIntros (h5 m5) "%Hcs45 %Ha0_5 HM' Hpay Hrun".
     iEval (rewrite <- Ebud2) in "Hrun".
@@ -3483,7 +3572,7 @@ Section UkShParser.
     ustr γd dw ushp_whitespace 5 ushp_ws_f -∗
     ustr γd dv ushp_symbols 7 ushp_sym_f -∗
     UM -∗
-    ushp_oom Pex (nn - 2) -∗
+    ushp_oom Pex (ushp_room t + nn - ushp_deep t) -∗
     Pex -∗
     urun N h m (mword_of_int ShSyms.parsecmd) (ushp_room t + nn) -∗
     (∀ p : Z,
@@ -3529,6 +3618,11 @@ Section UkShParser.
       by (unfold nn'; lia).
     assert (Ebud3 : (52 + nn')%nat = (4 * ushp_ht t + (B - 4 * ushp_ht t + nn))%nat)
       by (unfold nn'; lia).
+    (* the law in parseline's spelling, before the room is respelled *)
+    iDestruct (UkShCmdalloc.ushp_oom_mono N Pex
+                 (ushp_room t + nn - ushp_deep t)
+                 (ushp_pl_room t + (B - ushp_pl_room t + nn) - ushp_pl_deep t)
+                 ltac:(unfold ushp_room, ushp_deep; fold B; lia) with "Hpx") as "#Hpxl".
     rewrite Ebud.
     rewrite shpp_parsecmd.
     iDestruct (ustr_len with "Hstr") as %Hlen31.
@@ -3893,8 +3987,6 @@ Section UkShParser.
     rewrite <- shpp_parseline.
     (* THE LINE: the general parseline at the reference's answer *)
     iEval (rewrite Ebud2) in "Hrun".
-    iDestruct (UkShCmdalloc.ushp_oom_mono N Pex (nn - 2)
-                 ((B - ushp_pl_room t + nn)%nat - 2) ltac:(lia) with "Hpx") as "#Hpxl".
     iApply (wp_ref_parseline h14 m12 (DfracOwn 1) dw dv
               (uint sp0 - 56) s0 len 0%nat n s f (mword_of_int s0) t UM UM'
               (B - ushp_pl_room t + nn)%nat
@@ -4367,7 +4459,7 @@ Section UkShParser.
     ustr γd dw ushp_whitespace 5 ushp_ws_f -∗
     ustr γd dv ushp_symbols 7 ushp_sym_f -∗
     UM -∗
-    ushp_oom Pex (nn - 2) -∗
+    ushp_oom Pex (ushp_room t + nn - ushp_deep t) -∗
     Pex -∗
     urun N h m (mword_of_int ShSyms.parsecmd) (ushp_room t + nn) -∗
     (∀ p : Z,

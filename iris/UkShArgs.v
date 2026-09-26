@@ -101,6 +101,31 @@ Require Import UkShRedirs.
 
 Require Import UexecSG.
 
+(* ===================================================================== *)
+(* THE DEEPEST OUT-OF-MEMORY PANIC UNDER parseexec (user-once N).        *)
+(*                                                                       *)
+(* [UkShCmdalloc.ushp_oom Pex K] is the caller's law at every panic run  *)
+(* of budget AT LEAST [K], so a walk that takes it at a LARGER [K] asks   *)
+(* for less.  parseexec's run at [16 + (24 + nn)] panics in execcmd's     *)
+(* cmdalloc at [18 + nn] (its frame of sixteen, execcmd's of six) and,   *)
+(* only under a REDIR on top, in parseredirs' redircmd at [nn - 2]       *)
+(* (parseredirs' twenty-six below the frame).  This is that depth below  *)
+(* the entry, and the walk takes the law at the entry's budget less it:  *)
+(* [16 + (24 + nn) - ushp_pex_deep t].                                    *)
+(* ===================================================================== *)
+Definition ushp_pex_deep (t : ushp_cmd) : nat :=
+  if ref_has_redir t then 42%nat else 22%nat.
+
+Lemma ushp_pex_deep_ge (t : ushp_cmd) : (22 <= ushp_pex_deep t)%nat.
+Proof using. unfold ushp_pex_deep. destruct (ref_has_redir t); lia. Qed.
+
+Lemma ushp_pex_deep_le (t : ushp_cmd) : (ushp_pex_deep t <= 42)%nat.
+Proof using. unfold ushp_pex_deep. destruct (ref_has_redir t); lia. Qed.
+
+Lemma ushp_pex_deep_has (t : ushp_cmd) :
+  ref_has_redir t = true -> ushp_pex_deep t = 42%nat.
+Proof using. intro H. unfold ushp_pex_deep. rewrite H. reflexivity. Qed.
+
 Section UkShArgs.
   Context `{!riscvGS Σ}.
   Context `{!ufdG Σ}.
@@ -161,6 +186,7 @@ Section UkShArgs.
   Local Notation ushp_redirs_at := (UkShRedirs.ushp_redirs_at N).
   Local Notation ushp_redirs_res := (UkShRedirs.ushp_redirs_res N).
   Local Notation ushp_redirs_res_of := (UkShRedirs.ushp_redirs_res_of N).
+  Local Notation ushp_redirs_res_of_ne := (UkShRedirs.ushp_redirs_res_of_ne N).
   Local Notation ushp_redirs_close := (UkShRedirs.ushp_redirs_close N).
   Local Notation wp_ref_parseredirs := (UkShRedirs.wp_ref_parseredirs N).
 (*ALIASES-END*)
@@ -191,6 +217,19 @@ Section UkShArgs.
   (* a turn that consumed a redirect lends parseredirs the table and the
      payment [UkShRedirs.ushp_redirs_res] asks for; one that consumed none
      lends nothing *)
+  (* ...and lends them at any [rs] whose non-emptiness is what unlocks the
+     law: a walk whose law sits deeper than the turns' need has it only
+     once a redirect is known to be there (parseexec, user-once N) *)
+  Lemma ushp_pex_res_of_ne (rs : list rredir) (Pex : iProp Σ) {K : nat} :
+    (⌜ rs <> [] ⌝ -∗ ushp_oom Pex K) -∗ Pex -∗
+    ushp_pex_res rs Pex K ∗ (ushp_pex_res rs Pex K -∗ Pex).
+  Proof using .
+    iIntros "Hpx Hpay". destruct rs as [| r rs ]; cbn [ushp_pex_res].
+    - iSplitR; [ done | ]. iIntros "_". iExact "Hpay".
+    - iDestruct ("Hpx" with "[]") as "#Hpx'"; [ iPureIntro; discriminate | ].
+      iSplitL "Hpay"; [ iFrame "Hpay Hpx'" | ]. iIntros "(Hpay & _)". iExact "Hpay".
+  Qed.
+
   Lemma ushp_pex_res_lend (rs : list rredir) (dv : dfrac) (Pex : iProp Σ)
       {K : nat} :
     ushp_pex_res rs Pex K -∗ ustr γd dv ushp_symbols 7 ushp_sym_f -∗
@@ -1614,7 +1653,7 @@ Section UkShArgs.
     ustr γd dw ushp_whitespace 5 ushp_ws_f -∗
     ustr γd dv ushp_symbols 7 ushp_sym_f -∗
     UM -∗
-    ushp_oom Pex (nn - 2) -∗
+    ushp_oom Pex (16 + (24 + nn) - ushp_pex_deep t) -∗
     Pex -∗
     urun N h m (mword_of_int ShSyms.parseexec) (16 + (24 + nn)) -∗
     (∀ (root p : Z) (toks : list (nat * nat)) (rs : list rredir),
@@ -1650,6 +1689,12 @@ Section UkShArgs.
     injection Href as Ht Hfin. subst t fin.
     destruct (ref_args_prefix len f n s1 [] toks rs_l rs_tot s2 Eargs) as [ rs' Hrs' ].
     subst rs_tot.
+    (* the law at the redirect turns' budget, unlocked by a redirect: a
+       REDIR on top puts the deepest panic twenty words below execcmd's *)
+    iAssert (□ ∀ _ : rs_l ++ rs' <> [], ushp_oom Pex (nn - 2))%I as "#Hpx2".
+    { iIntros "!>" (Hne).
+      iApply (UkShCmdalloc.ushp_oom_mono N Pex with "Hpx").
+      rewrite (ushp_pex_deep_has _ (ref_has_redir_wrap _ _ Hne)). lia. }
     assert (Hs : (s <= len)%nat)
       by (rewrite (ref_peek_miss_inv _ _ _ _ _ Epk); exact (ref_skip_le len f off Hoffle)).
     assert (Hs1 : (s1 <= len)%nat) by exact (ref_redirs_fin_le len f n s [] rs_l s1 Hs Erd).
@@ -2078,8 +2123,11 @@ Section UkShArgs.
       apply bv_eq; vm_compute; reflexivity. }
     rewrite <- shpp_execcmd.
     (* the out-of-memory law, at execcmd's (deeper) budget *)
-    iDestruct (UkShCmdalloc.ushp_oom_mono N Pex (nn - 2) (10 + (8 + nn))
-                 ltac:(lia) with "Hpx") as "#Hpx8".
+    iDestruct (UkShCmdalloc.ushp_oom_mono N Pex
+                 (16 + (24 + nn) - ushp_pex_deep (ref_wrap (UshpExec toks) (rs_l ++ rs')))
+                 (10 + (8 + nn))
+                 ltac:(pose proof (ushp_pex_deep_ge (ref_wrap (UshpExec toks) (rs_l ++ rs')));
+                       lia) with "Hpx") as "#Hpx8".
     iApply (UkShParseLex.wp_kshp_execcmd N UM UM1 Hok0 h13 m10 s0 (8 + nn)
               with "Hcode HM Hpx8 Hpay Hrun").
     iIntros (h14 m11 p) "%Hcs1011 %Ha0_11 %Hpb Hnode HM' Hpay Hrun".
@@ -2243,7 +2291,8 @@ Section UkShArgs.
       by (rewrite (ref_peek_miss_inv _ _ _ _ _ Epk); exact (ref_skip_ge len f off)).
     assert (Hoffs1 : (off <= s1)%nat)
       by (pose proof (ref_redirs_fin_ge len f n s [] rs_l s1 Erd); lia).
-    iDestruct (ushp_redirs_res_of rs_l dv Pex with "Hpx Hsy Hpay") as "[Hrres Hback]".
+    iDestruct (ushp_redirs_res_of_ne rs_l dv Pex with "[] Hsy Hpay") as "[Hrres Hback]".
+    { iIntros "%Hne". iApply ("Hpx2" $! (app_ne_l rs_l rs' Hne)). }
     iApply (wp_ref_parseredirs h19 m16 dq dw dv p ps s0 len s n s1 f rs_l
               UM1 UM2 (mword_of_int (s0 + Z.of_nat s)) nn
               Ha0_16 Ha1_16 Ha2_16 Hs eq_refl Erd Hch1
@@ -2506,7 +2555,8 @@ Section UkShArgs.
     assert (Hsp8al : (uint sp0 - 128) mod 8 = 0).
     { rewrite Zminus_mod Hal8. reflexivity. }
     (* ---- 0x5fe..0x63e  THE ARGUMENT LOOP ---- *)
-    iDestruct (ushp_pex_res_of rs' Pex with "Hpx Hpay") as "[Hres Hback']".
+    iDestruct (ushp_pex_res_of_ne rs' Pex with "[] Hpay") as "[Hres Hback']".
+    { iIntros "%Hne". iApply ("Hpx2" $! (app_ne_r rs_l rs' Hne)). }
     iApply (wp_ref_pex_loop dq dw dv s0 ps p (uint sp0) len f nn
               n (@nil (nat * nat)) toks rs_l rs' t0 s1 s2 UM2 UM' h29 m25 wq weq
               (ref_sym_scope_from_mono len f off s1 Hscope Hoffs1) Eargs Hch2
@@ -3043,7 +3093,7 @@ Section UkShArgs.
     ustr γd dw ushp_whitespace 5 ushp_ws_f -∗
     ustr γd dv ushp_symbols 7 ushp_sym_f -∗
     UM -∗
-    ushp_oom Pex (nn - 2) -∗
+    ushp_oom Pex (16 + (24 + nn) - ushp_pex_deep t) -∗
     Pex -∗
     urun N h m (mword_of_int ShSyms.parseexec) (16 + (24 + nn)) -∗
     (∀ root : Z,
