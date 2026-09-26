@@ -256,7 +256,7 @@ theorem sys_open_alloc_fail_ret_f (k : KCtx) (A : SysOpenArgs GF) (P2 : UPtd) (n
   ispecialize Hpost $$ %c'
   unfold sysOpenPostP sysOpenK
   iapply Hpost $$ %spie' %spp' %R' %P2 %hcs %hP2 Hk Hpc Hte Hce Hbs Hisl
-  iapply (sys_open_arm_fail (hlc := hlc) (fsGammaL fscFs) fscFs A.V.cwi A.γ (procAddr A.j) A.pid
+  iapply (sys_open_arm_fail (hlc := hlc) A.omo (fsGammaL fscFs) fscFs A.V.cwi A.γ (procAddr A.j) A.pid
       (sysOpenIm A) A.v.toNat A.vom A.P A.Pmiss A.Fo A.Ft A.sts (sysOpenV2 A P2) (sysOpenM2 A P2)
       (R' 10#5) pl inum.toNat (eraNode dn bm data) hpl hr)
     $$ Hpriv Hfrags Hfds HP Hobs Htc
@@ -406,7 +406,8 @@ theorem sys_open_alloc_types (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ] (k :
       iexists 0#32
       rw [wordAtN_cur]
       iframe Hw Hgv
-      ipureintro; exact offWf_zero
+      -- the word is ZERO (Rocq L4's `bv_unsigned voff = 0`, by computation)
+      ipureintro; exact ⟨offWf_zero, rfl⟩
     ihave Hfty := (show wordPointsTo (GF := GF) (fnode kf) 4 (DFrac.own 1) FD_INODE ⊢
       wordPointsTo (aFtype kf) 4 (DFrac.own 1) FD_INODE from .rfl) $$ Hfty
     ihave Hflds : fileFieldsAt (GF := GF) curCtx kf 1 (sysOpenAllocInode Cf) $$
@@ -416,7 +417,7 @@ theorem sys_open_alloc_types (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ] (k :
       iframe
     iapply hSt $$ %cpu %spie %spp %_ %w6 %lo %w24 %γil %γisl %loc %tlc %kk %s %g %inum %dn %bm
       %data %kf %fd %l %(sysOpenAllocInode Cf) %pn %γo %P2 %u %nsj
-      %(FdType.inode inum.toNat γo .parked) %pl %⟨hkk, hinb, hipos, hle, h2u⟩ %hB %⟨Or.inl rfl, hD.1⟩
+      %(FdType.inode inum.toNat γo A.omo) %pl %⟨hkk, hinb, hipos, hle, h2u⟩ %hB %⟨Or.inl rfl, hD.1⟩
       %⟨fun h => absurd h hdv, fun _ => ⟨rfl, rfl⟩⟩ %hE %?hpinsI %hal Hk Hpc Hte Hce Henv Hcells
       Hbuf Hlk Hflat Hkeep Href Hflds Hnames Hoff Hiru Hcore Howe Hop Hbs Hisl Hfds Hfrags Hauth Hres
       Hpost

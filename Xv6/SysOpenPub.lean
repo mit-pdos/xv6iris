@@ -25,10 +25,12 @@ Rocq's header, kept (the reasons are the content):
 > the arm arrives as a wand from `open_fd_ok` to `open_post_ok_plain` and
 > this block only earns its antecedent.
 
-THE ORDER (Rocq's): the fd's off box is BORN UNDER THE LOCK (the publish's
-mode is PARK, `UserOff.off_pub_park`: the shadow's user half becomes the
-row invariant the descriptor bundle carries, the kernel half is deposited
-into the fresh box by `SysOpenParts.sys_open_deposit`); then ARM S runs
+THE ORDER (Rocq's): the fd's off box is BORN UNDER THE LOCK (at the
+publish's mode, the CALLER'S `A.omo` (Rocq L4): at PARK
+`UserOff.off_pub_park` makes the shadow's user half the row invariant the
+descriptor bundle carries, at HAND `UserOff.off_pub_hand` hands it to the
+caller on the success arm; the kernel half is deposited into the fresh box
+by `SysOpenParts.sys_open_deposit`); then ARM S runs
 (iunlock, end_op, the reloads, the epilogue); then, in its continuation, the
 ONE ghost step (`sys_open_publish`) and the settle
 (`ProcPrivAcc.procPrivFd_settle`).
@@ -67,42 +69,87 @@ variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [Fdslot
   [Appcfg GF] [FileG GF] [Fscfg] [Icfg] [CurCtx]
 
 /-- THE BIRTH OF THE FD'S OFF BOX, UNDER THE LOCK (Rocq's first block of
-`so_tail_pub_au`): on the FD_INODE arm the shadow is split by the publish's
-PARK mode (`off_pub_park`: the kernel half stays with the cell, the user
-half becomes the row invariant) and the stored word is deposited into a
-fresh box registered in the inode's rows (`sys_open_deposit`); on the
-FD_DEVICE arm the free word simply stays.  What comes out is exactly the
-publication's off conjunct and the row the descriptor bundle will carry. -/
-theorem sys_open_pub_off (cpu : CPU) (kk kf : Nat) (γo : GName) (C : FContent)
-    (hkk : kk < NINODE) (hip : C.ip = ientry kk) :
+`so_tail_pub_au`), AT THE CALLER'S MODE `omo` -- THE ONE PLACE THE KERNEL
+CHOOSES (Rocq L4).  On the FD_INODE arm the whole shadow (at ZERO, the word
+sys_open stored) splits into the kernel's half, which the deposit puts in
+the fresh box registered in the inode's rows (`sys_open_deposit`), and the
+user's: at mode PARK it becomes the row invariant the descriptor bundle
+carries (`off_pub_park`), at mode HAND it goes to the CALLER
+(`off_pub_hand`) and the row (`foffRow` at `.held`) claims nothing.  On the
+FD_DEVICE arm the free word simply stays and nothing is handed
+(`foffPubT_dev`).  What comes out is the publication's off conjunct, the
+row the descriptor bundle will carry, and the half the success arm carries
+out (`foffPubT omo t`). -/
+theorem sys_open_pub_off (cpu : CPU) (kk kf : Nat) (γo : GName) (C : FContent) (omo : OffMode)
+    (inum : BitVec 32) (t : FdType) (hkk : kk < NINODE) (hip : C.ip = ientry kk)
+    (ht : (C.type = FD_INODE ∧ t = .inode inum.toNat γo omo) ∨
+      (C.type = FD_DEVICE ∧ t = .device C.major.toNat)) :
     ownCtx (GF := GF) cpu curCtx ∗ offRows offCfg kk curCtx ∗ sysOpenOffCell kf C γo ⊢
       |={⊤}=> ownCtx cpu curCtx ∗ offRows offCfg kk curCtx ∗
         ∃ γb : BoxNames, (if C.type = FD_INODE then offFd kf 1 γb γo C else offFree kf 1) ∗
-          (if C.type = FD_INODE then offUserInv γo else iprop(True)) := by
+          (if C.type = FD_INODE then foffRow (GF := GF) (.open true true (.inode 0 γo omo))
+            else iprop(True)) ∗
+          foffPubT omo t := by
   unfold sysOpenOffCell
   by_cases h : C.type = FD_INODE
-  · simp only [if_pos h]
+  · have ht' : t = .inode inum.toNat γo omo := by
+      rcases ht with ⟨-, e⟩ | ⟨hc, -⟩
+      · exact e
+      · rw [h] at hc; exact absurd hc (by decide)
+    subst ht'
+    simp only [if_pos h]
     iintro ⟨Hctx, Hrows, ⟨%vo, Hcell, %hwf, Hgv⟩⟩
-    imod off_pub_park ⊤ γo (vo.toNat : Int) $$ Hgv with ⟨Hgk, #Huinv⟩
-    imod sys_open_deposit cpu ⊤ kk kf γo C CoPset.subseteq_top hkk hip $$ [Hctx Hrows Hcell Hgk]
-      with ⟨Hctx, Hrows, %γb, Hfd⟩
-    · iframe Hctx Hrows
-      unfold offResident
-      iexists vo
-      iframe Hcell
+    obtain ⟨hwf, rfl⟩ := hwf
+    cases omo with
+    | parked =>
+      imod off_pub_park ⊤ γo ((0#32 : BitVec 32).toNat : Int) $$ Hgv with ⟨Hgk, #Huinv⟩
+      imod sys_open_deposit cpu ⊤ kk kf γo C CoPset.subseteq_top hkk hip $$ [Hctx Hrows Hcell Hgk]
+        with ⟨Hctx, Hrows, %γb, Hfd⟩
+      · iframe Hctx Hrows
+        unfold offResident
+        iexists 0#32
+        iframe Hcell
+        isplitr
+        · ipureintro; exact hwf
+        · iapply offLink_of $$ Hgk
+      imodintro
+      iframe Hctx Hrows
+      iexists γb
+      iframe Hfd
       isplitr
-      · ipureintro; exact hwf
-      · iapply offLink_of $$ Hgk
-    imodintro
-    iframe Hctx Hrows
-    iexists γb
-    iframe Hfd Huinv
-  · simp only [if_neg h]
+      · unfold foffRow; iexact Huinv
+      · unfold foffPubT foffPub; iempintro
+    | held =>
+      icases off_pub_hand γo (0#32 : BitVec 32).toNat $$ Hgv with ⟨Hgk, Hu⟩
+      imod sys_open_deposit cpu ⊤ kk kf γo C CoPset.subseteq_top hkk hip $$ [Hctx Hrows Hcell Hgk]
+        with ⟨Hctx, Hrows, %γb, Hfd⟩
+      · iframe Hctx Hrows
+        unfold offResident
+        iexists 0#32
+        iframe Hcell
+        isplitr
+        · ipureintro; exact hwf
+        · iapply offLink_of $$ Hgk
+      imodintro
+      iframe Hctx Hrows
+      iexists γb
+      iframe Hfd
+      isplitr
+      · unfold foffRow; iempintro
+      · iapply (show uoff (GF := GF) γo (0#32 : BitVec 32).toNat ⊢
+          foffPubT .held (.inode inum.toNat γo .held) from .rfl) $$ Hu
+  · have ht' : t = .device C.major.toNat := by
+      rcases ht with ⟨hc, -⟩ | ⟨-, e⟩
+      · exact absurd hc h
+      · exact e
+    subst ht'
+    simp only [if_neg h]
     iintro ⟨Hctx, Hrows, Hoff⟩
     imodintro
     iframe Hctx Hrows
     iexists (⟨0, 0, 0, 0⟩ : BoxNames)
-    iframe Hoff
+    ihave Hpub := foffPubT_dev (GF := GF) omo C.major.toNat
+    iframe Hoff Hpub
 
 /-- The descriptor state the contract names IS the one the publication
 minted: the two mode cells hold the caller's own omode bits
@@ -156,7 +203,8 @@ theorem sys_open_pub (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ] (k : KCtx) (
   icases Hlk with ⟨#Hslk, Hsl, #Hfl, Hdep, Hrows, Hdev, Hinum, Hval, #Hshot, Hfrz⟩
   iapply wpLoop_fupd
   icases kctx_token_acc _ _ $$ Hk with ⟨Hctx, Hkback⟩
-  imod sys_open_pub_off c kk kf γo C hkk hip $$ [Hctx Hrows Hoff] with ⟨Hctx, Hrows, %γb, Hcoff, Huinv⟩
+  imod sys_open_pub_off c kk kf γo C A.omo inum t hkk hip hty2 $$ [Hctx Hrows Hoff]
+    with ⟨Hctx, Hrows, %γb, Hcoff, Huinv, Hpub⟩
   · iframe
   ihave Hk := Hkback $$ Hctx
   imodintro
@@ -178,13 +226,13 @@ theorem sys_open_pub (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ] (k : KCtx) (
   have hrdb : C.readable = if omReadable A.vom then 1#8 else 0#8 := hrd.trans (sys_open_rd_byte A.vom)
   have hwdb : C.writable = if omWritable A.vom then 1#8 else 0#8 := hwr.trans (sys_open_wr_byte A.vom)
   iapply wpLoop_fupd
-  imod sys_open_publish ⊤ A.γ kf kk s g lo2 inum dn.diType C pn γb γo (sysOpenOm A)
+  imod sys_open_publish A.omo ⊤ A.γ kf kk s g lo2 inum dn.diType C pn γb γo (sysOpenOm A)
     (omReadable A.vom) (omWritable A.vom) CoPset.subseteq_top hkk hinb hipos hip hty hwr hrdb hwdb
     hdir hdvw $$ [Hpar Hru Hs Href Hflds Hnames Hcoff] with ⟨%st, %hok, Hfref⟩
   · iframe
     iexact Hshot
-  have hst := sys_open_pub_state inum γo .parked pn.pipe C A.vom t st hrd hwr hty2 hok
-  have hne := sys_open_pub_ne inum γo .parked pn.pipe C st hty hok
+  have hst := sys_open_pub_state inum γo A.omo pn.pipe C A.vom t st hrd hwr hty2 hok
+  have hne := sys_open_pub_ne inum γo A.omo pn.pipe C st hty hok
   -- ---- THE ONE GHOST STEP ON THE DESCRIPTOR: the settle ----
   icases fdFrags_len A.V.fdg A.sts $$ Hfrags with ⟨%hlens, Hfrags⟩
   have hfdlt : fd < A.sts.length := by rw [hlens]; exact hfd
@@ -193,12 +241,7 @@ theorem sys_open_pub (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ] (k : KCtx) (
   icases fdSt_agree' A.V.fdg fd .closed stq $$ [$Hauth $Hfr] with ⟨%hcl, Hauth, Hfr⟩
   imod procPrivFd_settle A.γ (procAddr A.j) A.pid (sysOpenV2 A P2) (sysOpenM2 A P2) fd kf 1 st
     .closed stq hfd hlen hkf hne $$ Hcore Howe Hfref Hauth Hfr with ⟨Hpriv, Hfr⟩
-  ihave Huinv : (if C.type = FD_INODE then foffRow (GF := GF) (.open true true (.inode 0 γo .parked))
-      else iprop(True)) $$ [Huinv]
-  · by_cases hti : C.type = FD_INODE
-    · rw [if_pos hti, if_pos hti]; unfold foffRow; iexact Huinv
-    · rw [if_neg hti, if_neg hti]; iexact Huinv
-  ihave Hrow := foffRow_of_ok inum γo .parked pn.pipe C st hok $$ Huinv
+  ihave Hrow := foffRow_of_ok inum γo A.omo pn.pipe C st hok $$ Huinv
   ihave Hfrags := Hfw $$ %st Hfr Hrow
   imodintro
   -- ---- THE CONTRACT'S CONTINUATION, at the success arm ----
@@ -210,7 +253,7 @@ theorem sys_open_pub (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ] (k : KCtx) (
   unfold openArmsPlain
   iframe Hfds
   iright
-  iapply Harm
+  iapply Harm $$ [Hpriv Hfrags] Hpub
   unfold openFdOk
   iexists fd, l, kf
   rw [← hst]

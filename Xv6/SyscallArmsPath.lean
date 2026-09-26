@@ -251,15 +251,19 @@ def SyscDepMknod : Prop :=
               Fex r -∗
             spostAt (uslot (hlc := hlc)) 17 f W r M' fdv' cw' cs')
 
+variable [OffboxG GF] in
 /-- **Rocq `sysc_dep_open` + `sysc_out_open`** (deviation 2: the image
 guard): branch 15 is open's one input at the O_CREATE bit of argument 1, the
 path at argument 0, at every page view agreeing with the key's image; open's
 RECEIPT at the view it fired at and the resume descriptor view pays the
-post. -/
+post.  THE OFFSET MODE the caller's opens install is the family's too (Rocq
+L4's `of_om`, which Rocq's `ProofSyscall` hands to `wp_sys_open`): the
+bundle names it, and the kernel publishes at it.  (The receipt carries the
+handed half `foffPub`, hence the offset-box camera here.) -/
 def SyscDepOpen : Prop :=
   ∀ (f : sfam GF) (W : Uvis),
     sbundleAt (uslot (hlc := hlc)) 15 f W ⊢
-      ∃ (P Pmiss : Nat → Nat → IProp GF) (Farm Fun : Pfam GF (Aview → Nat → IProp GF))
+      ∃ (omo : OffMode) (P Pmiss : Nat → Nat → IProp GF) (Farm Fun : Pfam GF (Aview → Nat → IProp GF))
         (Fok Fex : Pfam GF (Aview → Nat → Fname → Nat → IProp GF))
         (Fo : Pfam GF (Aview → Nat → Anode → IProp GF))
         (Ft : Pfam GF (Aview → Nat → List (BitVec 8) → IProp GF)),
@@ -269,7 +273,7 @@ def SyscDepOpen : Prop :=
         (∀ (Mv : Nat → List (BitVec 8)) (r : BitVec 64) (M' : ElfMem) (fdv' : List FdState)
             (cw' : Nat) (cs' : ExtTreeSet GName compare),
           ⌜∀ (a : Nat) (b : BitVec 8), W.M a = some b → umemByte Mv a = b⌝ -∗
-          openReceipt (hlc := hlc) (fsGammaL fscFs) fscFs W.cwd Mv (tfW W.tf (tfArgIdx 0)).toNat
+          openReceipt (hlc := hlc) omo (fsGammaL fscFs) fscFs W.cwd Mv (tfW W.tf (tfArgIdx 0)).toNat
               (tfW W.tf (tfArgIdx 1)) P Pmiss Farm Fun Fok Fex Fo Ft W.fd r fdv' -∗
             spostAt (uslot (hlc := hlc)) 15 f W r M' fdv' cw' cs')
 
@@ -751,9 +755,9 @@ theorem syscPath_openFdOk (V V' : ProcPriv) (P' : UPtd) (sts sts' : List FdState
   rw [hn]
   unfold usysFdOk
   rw [if_neg (by decide), if_neg (by decide), if_pos (by decide)]
-  rcases hrow with ⟨hr, -, rfl⟩ | ⟨fd, l, kk, rb, wb, t, hr, hfree, rfl, hcl, rfl, hpk⟩
+  rcases hrow with ⟨hr, -, rfl⟩ | ⟨fd, l, kk, rb, wb, t, hr, hfree, rfl, hcl, rfl⟩
   · exact Or.inr ⟨hr.trans (by decide), rfl⟩
-  · refine Or.inl ⟨fd, rb, wb, t, hr, ?_, rfl, hpk⟩
+  · refine Or.inl ⟨fd, rb, wb, t, hr, ?_, rfl⟩
     apply fdLeastClosed_intro hcl
     intro i hi hic
     have hlt : fd < V.ofile.length := fdFrees_head_lt V.ofile fd l hfree
@@ -792,7 +796,7 @@ theorem syscall_arm_open (SO : SYSOPEN) (hdep : SyscDepOpen (hlc := hlc) (GF := 
   have hn : syscNum V = (15 : Int) := hnum
   ihave Hdep := syscSysIn_at f V M sts gn cs pid 15 hn (by decide) $$ Hsin
   icases hdep f (uvisOf V M sts gn cs pid) $$ Hdep with
-    ⟨%P, %Pmiss, %Farm, %Fun, %Fok, %Fex, %Fo, %Ft, Hau, Hout⟩
+    ⟨%omo, %P, %Pmiss, %Farm, %Fun, %Fok, %Fex, %Fo, %Ft, Hau, Hout⟩
   rw [show (uvisOf V M sts gn cs pid).cwd = V.cwi from rfl,
     show (uvisOf V M sts gn cs pid).tf = V.tf from rfl,
     show (uvisOf V M sts gn cs pid).fd = sts from rfl,
@@ -803,7 +807,7 @@ theorem syscall_arm_open (SO : SYSOPEN) (hdep : SyscDepOpen (hlc := hlc) (GF := 
   icases syscallEnv_ftable PT Γ γ $$ Henv with ⟨%γl, #Hft⟩
   icases (show fdSlots (GF := GF) FDSPARE ⊢ fdSlot ∗ fdSlots 3 from fdSlots_uncons 3) $$ Hfd with
     ⟨Hfd1, Hfdk⟩
-  have hC := SO.wp_sys_open_eb (hlc := hlc) (GF := GF) Γ cpu
+  have hC := SO.wp_sys_open_eb (hlc := hlc) (GF := GF) omo Γ cpu
     (((k.withSpie spie spp).pushed 4).withRegs R) γl γ j IREFSPARE (tfW V.tf (tfArgIdx 0))
     (tfW V.tf (tfArgIdx 1)) pid V M sts P Pmiss Farm Fun Fok Fex Fo Ft hj ?hp ?ht ?hn ?hK
     (by decide) (syscPath_arg V 0 hl (by decide)) (syscPath_arg V 1 hl (by decide))
@@ -820,7 +824,7 @@ theorem syscall_arm_open (SO : SYSOPEN) (hdep : SyscDepOpen (hlc := hlc) (GF := 
   iintro %c %_
   unfold sysOpenK
   iintro %spie2 %spp2 %R2 %P' %hcs %hext Hk Hpc Hte Hce Hbs Hir Harms
-  icases openArms_split (hlc := hlc) (fsGammaL fscFs) fscFs V.cwi γ (procAddr j) pid
+  icases openArms_split (hlc := hlc) omo (fsGammaL fscFs) fscFs V.cwi γ (procAddr j) pid
     (viewLazy V.upt V.sz M) (tfW V.tf (tfArgIdx 0)).toNat (tfW V.tf (tfArgIdx 1)) P Pmiss Farm Fun
     Fok Fex Fo Ft sts { V with upt := P' } (viewFaulted V.upt P' M) (R2 10#5) $$ Harms with
     ⟨%V1, %sts', %hrow, Hpriv, Hfr, Hfd1, Hrc⟩

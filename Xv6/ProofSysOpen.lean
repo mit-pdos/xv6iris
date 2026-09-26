@@ -85,11 +85,11 @@ end
 theorem sys_open_proof (AI : ARGINT) (AS : ARGSTR) (BO : BEGIN_OP) (NI : NAMEI_ERA) (IL : ILOCK)
     (IU : IUNLOCK) (IUP : IUNLOCKPUT) (EO : END_OP) (FC : FILECLOSE) (IT : ITRUNC)
     (FA : FILEALLOC) (FD : FDALLOC) (CR : CREATE) : SYSOPEN := ⟨
-  fun Γ _ cpu k γl γ j ns v vom pid V M sts P Pmiss Farm Fun Fok Fex Fo Ft hj hproc htier hnoff hK
-      hns hv0 hv1 => by
-  let A : SysOpenArgs _ := ⟨γl, γ, j, pid, V, M, v, vom, sts, ns, P, Pmiss, Fo, Ft⟩
+  fun omo Γ _ cpu k γl γ j ns v vom pid V M sts P Pmiss Farm Fun Fok Fex Fo Ft hj hproc htier hnoff
+      hK hns hv0 hv1 => by
+  let A : SysOpenArgs _ := ⟨γl, γ, j, pid, V, M, v, vom, sts, ns, P, Pmiss, Fo, Ft, omo⟩
   have hS : SysOpenStatic k A := ⟨hj, hproc, htier, hnoff, hK, hns, hv0, hv1⟩
-  exact wp_sys_open_eb_of_arms Γ cpu k γl γ j ns v vom pid V M sts P Pmiss Farm Fun Fok Fex Fo Ft
+  exact wp_sys_open_eb_of_arms omo Γ cpu k γl γ j ns v vom pid V M sts P Pmiss Farm Fun Fok Fex Fo Ft
     hj hproc htier hnoff hK hns hv0 hv1
     (fun hc => sys_open_plain AI AS BO Γ cpu k A hS
       (sys_open_entry_n NI IL Γ k A hS (sys_open_join_all IU IUP EO FC IT FA FD Γ k A hS)

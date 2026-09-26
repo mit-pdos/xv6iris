@@ -69,8 +69,7 @@ Rocq's header, point for point:
    has no queue ghost and sys_pipe/sys_close/sys_exit take no deposit, so
    those bundles and posts are `emp` (and so are the `Xfam` fields
    `rf_pq`/`rf_pqe`/`wf_Qe`/`cl_P`, and `srow_reg` -- not a field of the
-   landed class).  `of_om` is dropped: Lean's `openReceipt` takes no
-   offset mode.
+   landed class).
 5. (retired: row 16 was the interim `filewriteChainIn` while
    `filewriteIn` carried a no-wrap conjunct; SpecFilewrite deviation 5 is
    retired, so row 16 is Rocq's `filewrite_in`, `SpecFilewrite.filewriteIn`,
@@ -187,7 +186,7 @@ theorem imgAgrees_writerImg (P : UPtd) (sz : Nat) (M : Nat → List (BitVec 8)) 
 /-! ## §1 THE DEPOSIT'S FAMILIES, as one record -/
 
 /-- **Rocq `xfam`**: one field per syscall whose contract takes
-caller-chosen families (deviation 4 for the dropped pipe/omode fields), and
+caller-chosen families (deviation 4 for the dropped pipe fields), and
 the three payload fields fork/exit read. -/
 structure Xfam (GF : BundledGFunctors) where
   /-- exec (7) -/
@@ -212,6 +211,11 @@ structure Xfam (GF : BundledGFunctors) where
   oFex : Pfam GF (Aview → Nat → Fname → Nat → IProp GF)
   oFo : Pfam GF (Aview → Nat → Anode → IProp GF)
   oFt : Pfam GF (Aview → Nat → List (BitVec 8) → IProp GF)
+  /-- ...AND THE OFFSET MODE THE CALLER'S OPEN INSTALLS (Rocq L4's `of_om`): a
+  field of the FAMILY, not of the syscall's arguments -- which mode a
+  program's opens run at is a property of the PROGRAM, and the kernel reads
+  it here and publishes at it.  Every landed family sets it to `.parked`. -/
+  oOm : OffMode
   /-- write (16): the chain's prefix cursor -/
   wQ : Nat → IProp GF
   /-- mknod (17) -/
@@ -271,6 +275,7 @@ def xfamPt : Xfam GF where
   oFex := pfamTriv (fun _ _ _ _ => iprop(True))
   oFo := pfamTriv (fun _ _ _ => iprop(True))
   oFt := pfamTriv (fun _ _ _ => iprop(True))
+  oOm := .parked
   wQ := fun _ => iprop(True)
   nP := fun _ _ => iprop(True)
   nPmiss := fun _ _ => iprop(True)
@@ -403,13 +408,13 @@ def xpostChdir (P Pmiss : Nat → Nat → IProp GF) (Fo : Pfam GF (Aview → Nat
   chdirReceipt (hlc := hlc) (fsGammaL fscFs) fscFs W.cwd P Pmiss Fo r cw'
 
 /-- post 15: open's RECEIPT at the descriptor view the call resumes at. -/
-def xpostOpen (P Pmiss : Nat → Nat → IProp GF) (Farm Fun : Pfam GF (Aview → Nat → IProp GF))
+def xpostOpen (omo : OffMode) (P Pmiss : Nat → Nat → IProp GF) (Farm Fun : Pfam GF (Aview → Nat → IProp GF))
     (Fok Fex : Pfam GF (Aview → Nat → Fname → Nat → IProp GF))
     (Fo : Pfam GF (Aview → Nat → Anode → IProp GF))
     (Ft : Pfam GF (Aview → Nat → List (BitVec 8) → IProp GF)) (W : Uvis) (r : BitVec 64)
     (fdv' : List FdState) : IProp GF :=
   iprop(∃ Mv : Nat → List (BitVec 8), ⌜imgAgrees W.M Mv⌝ ∗
-    openReceipt (hlc := hlc) (fsGammaL fscFs) fscFs W.cwd Mv (xkA W 0).toNat (xkA W 1)
+    openReceipt (hlc := hlc) omo (fsGammaL fscFs) fscFs W.cwd Mv (xkA W 0).toNat (xkA W 1)
       P Pmiss Farm Fun Fok Fex Fo Ft W.fd r fdv')
 
 /-- post 16 (deviation 2): write's answer in range, and filewrite's extra at
@@ -478,7 +483,7 @@ def xv6Spost (_X : Uvis → IProp GF) (n : Int) (f : Xfam GF) (W : Uvis) (r : Bi
   if n = USYS_exec then iprop(⌜r = BitVec.ofInt 64 (-1)⌝ -∗ f.xRs)
   else if n = 5 then xpostRead (hlc := hlc) f.rF f.rRd f.rRin W r M'
   else if n = 9 then xpostChdir (hlc := hlc) f.cP f.cPmiss f.cFo W r cw'
-  else if n = 15 then xpostOpen (hlc := hlc) f.oP f.oPmiss f.oFarm f.oFun f.oFok f.oFex f.oFo f.oFt W r fdv'
+  else if n = 15 then xpostOpen (hlc := hlc) f.oOm f.oP f.oPmiss f.oFarm f.oFun f.oFok f.oFex f.oFo f.oFt W r fdv'
   else if n = 16 then xpostWrite (hlc := hlc) f.wQ W r
   else if n = 17 then xpostMknod (hlc := hlc) f.nP f.nPmiss f.nFarm f.nFun f.nFok f.nFex W r
   else if n = 18 then xpostUnlink (hlc := hlc) f.uP f.uPmiss f.uFent f.uFtgt f.uFex f.uFmiss W r
@@ -920,7 +925,7 @@ theorem sbundleAt_xv6_open (X : Uvis → IProp GF) (f : Xfam GF) (W : Uvis) :
 
 theorem spostAt_xv6_open (X : Uvis → IProp GF) (f : Xfam GF) (W : Uvis) (r : BitVec 64) (M' : ElfMem)
     (fdv' : List FdState) (cw' : Nat) (cs' : ExtTreeSet GName compare) :
-    @UexecSG.spostAt GF _ uexecSGXv6 X 15 f W r M' fdv' cw' cs' = xpostOpen (hlc := hlc) f.oP f.oPmiss f.oFarm f.oFun f.oFok f.oFex f.oFo f.oFt W r fdv' := rfl
+    @UexecSG.spostAt GF _ uexecSGXv6 X 15 f W r M' fdv' cw' cs' = xpostOpen (hlc := hlc) f.oOm f.oP f.oPmiss f.oFarm f.oFun f.oFok f.oFex f.oFo f.oFt W r fdv' := rfl
 
 theorem sbundleAt_xv6_write (X : Uvis → IProp GF) (f : Xfam GF) (W : Uvis) :
     @UexecSG.sbundleAt GF _ uexecSGXv6 X 16 f W = xrowWrite (hlc := hlc) f.wQ W := rfl
@@ -1000,7 +1005,7 @@ theorem syscDepOpen_xv6 (f : Xfam GF) (W : Uvis) :
       (∀ (Mv : Nat → List (BitVec 8)) (r : BitVec 64) (M' : ElfMem) (fdv' : List FdState) (cw' : Nat)
           (cs' : ExtTreeSet GName compare),
         ⌜imgAgrees W.M Mv⌝ -∗
-        openReceipt (hlc := hlc) (fsGammaL fscFs) fscFs W.cwd Mv (xkA W 0).toNat (xkA W 1)
+        openReceipt (hlc := hlc) f.oOm (fsGammaL fscFs) fscFs W.cwd Mv (xkA W 0).toNat (xkA W 1)
           f.oP f.oPmiss f.oFarm f.oFun f.oFok f.oFex f.oFo f.oFt W.fd r fdv' -∗
           @UexecSG.spostAt GF _ uexecSGXv6 (uslot (hlc := hlc)) 15 f W r M' fdv' cw' cs') := by
   rw [sbundleAt_xv6_open]

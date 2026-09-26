@@ -75,7 +75,7 @@ theorem sys_open_arm0_plain (A : SysOpenArgs GF) :
     sysOpenArm0 A
       (openAuPlainAt (hlc := hlc) (fsGammaL fscFs) fscFs A.V.cwi (sysOpenIm A) A.v.toNat A.vom A.P A.Pmiss
         A.Fo A.Ft)
-      (openArmsPlain (hlc := hlc) (fsGammaL fscFs) fscFs A.V.cwi A.γ (procAddr A.j) A.pid (sysOpenIm A)
+      (openArmsPlain (hlc := hlc) A.omo (fsGammaL fscFs) fscFs A.V.cwi A.γ (procAddr A.j) A.pid (sysOpenIm A)
         A.v.toNat A.vom A.P A.Pmiss A.Fo A.Ft A.sts) := by
   intro VW MW hfdg
   unfold openArmsPlain openPostFailPlain
@@ -95,7 +95,7 @@ theorem sys_open_arm0_create (A : SysOpenArgs GF)
     sysOpenArm0 A
       (openAuCreateAt (hlc := hlc) (fsGammaL fscFs) fscFs A.V.cwi (sysOpenIm A) A.v.toNat A.vom A.P A.Pmiss
         Farm Fun Fok Fex A.Fo A.Ft)
-      (openArmsCreate (hlc := hlc) (fsGammaL fscFs) fscFs A.V.cwi A.γ (procAddr A.j) A.pid (sysOpenIm A)
+      (openArmsCreate (hlc := hlc) A.omo (fsGammaL fscFs) fscFs A.V.cwi A.γ (procAddr A.j) A.pid (sysOpenIm A)
         A.v.toNat A.vom A.P A.Pmiss Farm Fun Fok Fex A.Fo A.Ft A.sts) := by
   intro VW MW hfdg
   unfold openArmsCreate openPostFailCreate
@@ -120,7 +120,7 @@ theorem sys_open_split_plain (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ] (k :
     ⊢ sysOpenAt36 (hlc := hlc) Γ k A
       (openAuPlainAt (hlc := hlc) (fsGammaL fscFs) fscFs A.V.cwi (sysOpenIm A) A.v.toNat A.vom A.P A.Pmiss
         A.Fo A.Ft)
-      (openArmsPlain (hlc := hlc) (fsGammaL fscFs) fscFs A.V.cwi A.γ (procAddr A.j) A.pid (sysOpenIm A)
+      (openArmsPlain (hlc := hlc) A.omo (fsGammaL fscFs) fscFs A.V.cwi A.γ (procAddr A.j) A.pid (sysOpenIm A)
         A.v.toNat A.vom A.P A.Pmiss A.Fo A.Ft A.sts) := by
   unfold sysOpenEntryNBody at hEN
   unfold sysOpenAt36
@@ -155,7 +155,7 @@ theorem sys_open_split_create (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ] (k 
     ⊢ sysOpenAt36 (hlc := hlc) Γ k A
       (openAuCreateAt (hlc := hlc) (fsGammaL fscFs) fscFs A.V.cwi (sysOpenIm A) A.v.toNat A.vom A.P A.Pmiss
         Farm Fun Fok Fex A.Fo A.Ft)
-      (openArmsCreate (hlc := hlc) (fsGammaL fscFs) fscFs A.V.cwi A.γ (procAddr A.j) A.pid (sysOpenIm A)
+      (openArmsCreate (hlc := hlc) A.omo (fsGammaL fscFs) fscFs A.V.cwi A.γ (procAddr A.j) A.pid (sysOpenIm A)
         A.v.toNat A.vom A.P A.Pmiss Farm Fun Fok Fex A.Fo A.Ft A.sts) := by
   unfold sysOpenEntryCBody at hEC
   unfold sysOpenAt36
@@ -191,7 +191,7 @@ theorem sys_open_plain (AI : ARGINT) (AS : ARGSTR) (BO : BEGIN_OP) (Γ : SchedNa
     [ClaimIs (hlc := hlc) GF Γ] (cpu : CPU) (k : KCtx) (A : SysOpenArgs GF)
     (hS : SysOpenStatic k A)
     (hEN : ⊢ sysOpenEntryNBody (hlc := hlc) Γ k A) (hc : omCreate A.vom = false) :
-    wp_sys_open_plain_eb_body (hlc := hlc) Γ cpu k A.γl A.γ A.j A.ns A.v A.vom A.pid A.V A.M
+    wp_sys_open_plain_eb_body (hlc := hlc) A.omo Γ cpu k A.γl A.γ A.j A.ns A.v A.vom A.pid A.V A.M
       A.sts A.P A.Pmiss A.Fo A.Ft hS.hj hS.hproc hS.htier hS.hnoff hS.hK hS.hns hS.hv0 hS.hv1
       hc := by
   unfold wp_sys_open_plain_eb_body wp_sys_open_frame
@@ -208,7 +208,7 @@ theorem sys_open_create (AI : ARGINT) (AS : ARGSTR) (BO : BEGIN_OP) (Γ : SchedN
     (hS : SysOpenStatic k A)
     (hEC : ⊢ sysOpenEntryCBody (hlc := hlc) Γ k A Farm Fun Fok Fex)
     (hc : omCreate A.vom = true) :
-    wp_sys_open_create_eb_body (hlc := hlc) Γ cpu k A.γl A.γ A.j A.ns A.v A.vom A.pid A.V A.M
+    wp_sys_open_create_eb_body (hlc := hlc) A.omo Γ cpu k A.γl A.γ A.j A.ns A.v A.vom A.pid A.V A.M
       A.sts A.P A.Pmiss Farm Fun Fok Fex A.Fo A.Ft hS.hj hS.hproc hS.htier hS.hnoff hS.hK hS.hns
       hS.hv0 hS.hv1 hc := by
   unfold wp_sys_open_create_eb_body wp_sys_open_frame

@@ -212,19 +212,19 @@ theorem sys_open_cr_ite (b : Bool) (X Y : IProp GF) (h : X ⊢ Y) :
 /-- THE FRESH READING (Rocq's `socr_ok_fresh_arm`): the tail's DEVICE and
 DIRECTORY arms are refuted by the pure receipt (create ran at T_FILE), and
 the trunc component comes out at the caller's own `Ft`. -/
-theorem sys_open_cr_ok_fresh (Γ : FsViewNames GF) (R : IProp GF) (i0 : Nat) (bs : List (BitVec 8))
+theorem sys_open_cr_ok_fresh (omo : OffMode) (Γ : FsViewNames GF) (R : IProp GF) (i0 : Nat) (bs : List (BitVec 8))
     (nl0 : Nat) (Ft : Pfam GF (Aview → Nat → List (BitVec 8) → IProp GF))
     (γ : FileNames) (pa : BitVec 64) (pid : BitVec 32) (Mim : Nat → List (BitVec 8)) (pv : Nat)
     (vom : BitVec 64) (sts : List FdState) (VW : ProcPriv) (MW : Nat → List (BitVec 8))
     (r : BitVec 64) :
-    openPostOkPlain (hlc := hlc) Γ γ pa pid Mim pv vom (sysOpenCrP R i0)
+    openPostOkPlain (hlc := hlc) omo Γ γ pa pid Mim pv vom (sysOpenCrP R i0)
       (sysOpenCrFoPure i0 ⟨.AFile bs, nl0⟩) Ft sts VW MW r ⊢
       R ∗
       (if omTrunc vom then
         iprop(∃ (av' : Aview) (nl' : Nat), ⌜arowAt av' i0 ⟨.AFile bs, nl'⟩⌝ ∗ Ft.pfRecv av' i0 bs)
        else iprop(emp)) ∗
       ∃ γo : GName, openFdOk γ pa pid VW MW (omReadable vom) (omWritable vom)
-        (.inode i0 γo .parked) sts r := by
+        (.inode i0 γo omo) sts r ∗ foffPub omo γo := by
   unfold openPostOkPlain sysOpenCrFoPure pfamTriv
   simp only [sysOpenCrP]
   iintro ⟨%pl, %av, %i, -, ⟨%hi, HR⟩, Harm⟩
@@ -247,14 +247,14 @@ theorem sys_open_cr_ok_fresh (Γ : FsViewNames GF) (R : IProp GF) (i0 : Nat) (bs
 /-- THE EXISTS READING (Rocq's `socr_ok_exists_arm`): the DIRECTORY arm is
 refuted by the staple (ARM F-OK admits only T_FILE and T_DEVICE); the other
 two ARE `openPostOkCreate`'s EXISTS sub-arms. -/
-theorem sys_open_cr_ok_exists (Γ : FsViewNames GF) (R : IProp GF) (i0 : Nat) (a0 : Anode)
+theorem sys_open_cr_ok_exists (omo : OffMode) (Γ : FsViewNames GF) (R : IProp GF) (i0 : Nat) (a0 : Anode)
     (Fo : Pfam GF (Aview → Nat → Anode → IProp GF))
     (Ft : Pfam GF (Aview → Nat → List (BitVec 8) → IProp GF))
     (γ : FileNames) (pa : BitVec 64) (pid : BitVec 32) (Mim : Nat → List (BitVec 8)) (pv : Nat)
     (vom : BitVec 64) (sts : List FdState) (VW : ProcPriv) (MW : Nat → List (BitVec 8))
     (r : BitVec 64) (hnd : ∀ (ents : Std.ExtTreeMap Fname Nat compare) (nl : Nat),
       a0 ≠ ⟨.ADir ents, nl⟩) :
-    openPostOkPlain (hlc := hlc) Γ γ pa pid Mim pv vom (sysOpenCrP R i0)
+    openPostOkPlain (hlc := hlc) omo Γ γ pa pid Mim pv vom (sysOpenCrP R i0)
       (sysOpenCrFoTag i0 a0 Fo) Ft sts VW MW r ⊢
       R ∗ ∃ (av : Aview) (nl : Nat),
         (∃ bs0 : List (BitVec 8),
@@ -264,7 +264,8 @@ theorem sys_open_cr_ok_exists (Γ : FsViewNames GF) (R : IProp GF) (i0 : Nat) (a
             iprop(∃ av' : Aview, ⌜arowAt av' i0 ⟨.AFile bs0, nl⟩⌝ ∗ Ft.pfRecv av' i0 bs0)
            else iprop(emp)) ∗
           ∃ γo : GName,
-            openFdOk γ pa pid VW MW (omReadable vom) (omWritable vom) (.inode i0 γo .parked) sts r) ∨
+            openFdOk γ pa pid VW MW (omReadable vom) (omWritable vom) (.inode i0 γo omo) sts r ∗
+            foffPub omo γo) ∨
         (∃ (ma mi : Nat),
           ⌜arowAt av i0 ⟨.ADev ma mi, nl⟩⌝ ∗ ⌜ma ≤ NDEV_max⌝ ∗
           Fo.pfRecv av i0 ⟨.ADev ma mi, nl⟩ ∗
@@ -294,7 +295,7 @@ theorem sys_open_cr_ok_exists (Γ : FsViewNames GF) (R : IProp GF) (i0 : Nat) (a
 /-! ## 6.  THE TWO ARM CONVERSIONS -/
 
 /-- Rocq's `socr_arms_fresh`. -/
-theorem sys_open_cr_arms_fresh (Γ : FsViewNames GF) (γfs : FsNames) (cw : Nat) (γ : FileNames)
+theorem sys_open_cr_arms_fresh (omo : OffMode) (Γ : FsViewNames GF) (γfs : FsNames) (cw : Nat) (γ : FileNames)
     (pa : BitVec 64) (pid : BitVec 32) (Mim : Nat → List (BitVec 8)) (pv : Nat) (vom : BitVec 64)
     (P Pmiss : Nat → Nat → IProp GF)
     (Farm Fun : Pfam GF (Aview → Nat → IProp GF))
@@ -303,11 +304,11 @@ theorem sys_open_cr_arms_fresh (Γ : FsViewNames GF) (γfs : FsNames) (cw : Nat)
     (Ft : Pfam GF (Aview → Nat → List (BitVec 8) → IProp GF))
     (sts : List FdState) (VW : ProcPriv) (MW : Nat → List (BitVec 8)) (r : BitVec 64)
     (pl : List (BitVec 8)) (i0 nl0 : Nat) (hpl : argPathOf Mim pv pl) :
-    openArmsPlain (hlc := hlc) Γ γfs cw γ pa pid Mim pv vom
+    openArmsPlain (hlc := hlc) omo Γ γfs cw γ pa pid Mim pv vom
       (sysOpenCrP (sysOpenCrFresh (hlc := hlc) Γ P Farm Fun Fok Fex Fo pl i0) i0)
       (sysOpenCrPm (sysOpenCrFresh (hlc := hlc) Γ P Farm Fun Fok Fex Fo pl i0))
       (sysOpenCrFoPure i0 ⟨.AFile [], nl0⟩) Ft sts VW MW r ⊢
-      |={⊤}=> openArmsCreate (hlc := hlc) Γ γfs cw γ pa pid Mim pv vom P Pmiss Farm Fun Fok Fex Fo Ft
+      |={⊤}=> openArmsCreate (hlc := hlc) omo Γ γfs cw γ pa pid Mim pv vom P Pmiss Farm Fun Fok Fex Fo Ft
         sts VW MW r := by
   unfold openArmsPlain openArmsCreate
   iintro ⟨(⟨%hr, Hpriv, Hfrag, Hf⟩ | Hok), Hslot⟩
@@ -331,7 +332,7 @@ theorem sys_open_cr_arms_fresh (Γ : FsViewNames GF) (γfs : FsNames) (cw : Nat)
     iexists av, i0, nm, ents, nl
     iframe HΦ Hdl Hoc Hun
     ipureintro; exact ⟨hl, hpre, hib⟩
-  · ihave ⟨HR, Htr, Hfd⟩ := sys_open_cr_ok_fresh Γ _ i0 [] nl0 Ft γ pa pid Mim pv vom sts VW MW r
+  · ihave ⟨HR, Htr, Hfd⟩ := sys_open_cr_ok_fresh omo Γ _ i0 [] nl0 Ft γ pa pid Mim pv vom sts VW MW r
       $$ Hok
     unfold sysOpenCrFresh
     icases HR with ⟨%d, %nm, %av, %ents, %nl, %hl, %hpre, %hib, HP, HΦ, Hdl, Hoc, Hun⟩
@@ -351,7 +352,7 @@ theorem sys_open_cr_arms_fresh (Γ : FsViewNames GF) (γfs : FsNames) (cw : Nat)
     ipureintro; exact ⟨hpre, hib⟩
 
 /-- Rocq's `socr_arms_exists`. -/
-theorem sys_open_cr_arms_exists (Γ : FsViewNames GF) (γfs : FsNames) (cw : Nat) (γ : FileNames)
+theorem sys_open_cr_arms_exists (omo : OffMode) (Γ : FsViewNames GF) (γfs : FsNames) (cw : Nat) (γ : FileNames)
     (pa : BitVec 64) (pid : BitVec 32) (Mim : Nat → List (BitVec 8)) (pv : Nat) (vom : BitVec 64)
     (P Pmiss : Nat → Nat → IProp GF)
     (Farm Fun : Pfam GF (Aview → Nat → IProp GF))
@@ -361,11 +362,11 @@ theorem sys_open_cr_arms_exists (Γ : FsViewNames GF) (γfs : FsNames) (cw : Nat
     (sts : List FdState) (VW : ProcPriv) (MW : Nat → List (BitVec 8)) (r : BitVec 64)
     (pl : List (BitVec 8)) (i0 : Nat) (a0 : Anode) (hpl : argPathOf Mim pv pl)
     (hnd : ∀ (ents : Std.ExtTreeMap Fname Nat compare) (nl : Nat), a0 ≠ ⟨.ADir ents, nl⟩) :
-    openArmsPlain (hlc := hlc) Γ γfs cw γ pa pid Mim pv vom
+    openArmsPlain (hlc := hlc) omo Γ γfs cw γ pa pid Mim pv vom
       (sysOpenCrP (sysOpenCrExists (hlc := hlc) Γ (nparNm Mim pv) P Farm Fun Fok Fex pl i0) i0)
       (sysOpenCrPm (sysOpenCrExists (hlc := hlc) Γ (nparNm Mim pv) P Farm Fun Fok Fex pl i0))
       (sysOpenCrFoTag i0 a0 Fo) Ft sts VW MW r ⊢
-      |={⊤}=> openArmsCreate (hlc := hlc) Γ γfs cw γ pa pid Mim pv vom P Pmiss Farm Fun Fok Fex Fo Ft
+      |={⊤}=> openArmsCreate (hlc := hlc) omo Γ γfs cw γ pa pid Mim pv vom P Pmiss Farm Fun Fok Fex Fo Ft
         sts VW MW r := by
   unfold openArmsPlain openArmsCreate
   iintro ⟨(⟨%hr, Hpriv, Hfrag, Hf⟩ | Hok), Hslot⟩
@@ -416,7 +417,7 @@ theorem sys_open_cr_arms_exists (Γ : FsViewNames GF) (γfs : FsNames) (cw : Nat
       iexists avx, ax
       iframe HP2
       ipureintro; exact hax
-  · ihave ⟨HR, Hrest⟩ := sys_open_cr_ok_exists Γ _ i0 a0 Fo Ft γ pa pid Mim pv vom sts VW MW r hnd
+  · ihave ⟨HR, Hrest⟩ := sys_open_cr_ok_exists omo Γ _ i0 a0 Fo Ft γ pa pid Mim pv vom sts VW MW r hnd
       $$ Hok
     unfold sysOpenCrExists
     icases HR with ⟨%d, %nm, %av, %ents, %nl, %hl, %hrow, %hent, HP, HΦ, Hac, Hcl⟩
@@ -468,7 +469,7 @@ theorem sys_open_cr_post_fresh (k : KCtx) (A : SysOpenArgs GF)
   ispecialize HΦ $$ %c
   iapply (sysOpenK_mono_fupd k A.ns A.V A.M _ _ c) $$ HΦ
   iintro %VW %MW %r H
-  iapply (sys_open_cr_arms_fresh (fsGammaL fscFs) fscFs A.V.cwi A.γ (procAddr A.j) A.pid
+  iapply (sys_open_cr_arms_fresh A.omo (fsGammaL fscFs) fscFs A.V.cwi A.γ (procAddr A.j) A.pid
     (sysOpenIm A) A.v.toNat A.vom A.P A.Pmiss Farm Fun Fok Fex A.Fo A.Ft A.sts VW MW r pl i0 nl0 hpl) $$ H
 
 /-- The EXISTS continuation shim (Rocq's second inline `iAssert`). -/
@@ -489,7 +490,7 @@ theorem sys_open_cr_post_exists (k : KCtx) (A : SysOpenArgs GF)
   ispecialize HΦ $$ %c
   iapply (sysOpenK_mono_fupd k A.ns A.V A.M _ _ c) $$ HΦ
   iintro %VW %MW %r H
-  iapply (sys_open_cr_arms_exists (fsGammaL fscFs) fscFs A.V.cwi A.γ (procAddr A.j) A.pid
+  iapply (sys_open_cr_arms_exists A.omo (fsGammaL fscFs) fscFs A.V.cwi A.γ (procAddr A.j) A.pid
     (sysOpenIm A) A.v.toNat A.vom A.P A.Pmiss Farm Fun Fok Fex A.Fo A.Ft A.sts VW MW r pl i0 a0 hpl hnd) $$ H
 
 end

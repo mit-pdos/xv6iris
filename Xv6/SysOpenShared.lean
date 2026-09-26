@@ -227,7 +227,7 @@ theorem sys_open_flat_major (kk : Nat) (inum : BitVec 32) (dn : Dinode) (bm : Bl
 /-- Rocq `so_arm_fail`: the post-walk FAILURE arm (ARMs C / D / E / F): the
 observation HAS fired and its receipt is delivered, the trunc commit comes
 back (`openPostFailPlain`'s third disjunct). -/
-theorem sys_open_arm_fail (Γ : FsViewNames GF) (γfs : FsNames) (cw : Nat) (γ : FileNames)
+theorem sys_open_arm_fail (omo : OffMode) (Γ : FsViewNames GF) (γfs : FsNames) (cw : Nat) (γ : FileNames)
     (pa : BitVec 64) (pid : BitVec 32) (Mim : Nat → List (BitVec 8)) (pv : Nat) (vom : BitVec 64)
     (P Pmiss : Nat → Nat → IProp GF) (Fo : Pfam GF (Aview → Nat → Anode → IProp GF))
     (Ft : Pfam GF (Aview → Nat → List (BitVec 8) → IProp GF)) (sts : List FdState)
@@ -235,7 +235,7 @@ theorem sys_open_arm_fail (Γ : FsViewNames GF) (γfs : FsNames) (cw : Nat) (γ 
     (i : Nat) (n : FsNode) (hpl : argPathOf Mim pv pl) (hr : r = 0xFFFFFFFFFFFFFFFF#64) :
     procPrivFd (GF := GF) γ pa pid VW MW ⊢ fdFrags VW.fdg sts -∗ fdSlot -∗
       P (pathElems pl).length i -∗ sysOpenObs Fo i n -∗ openTruncPiece (hlc := hlc) Γ vom Ft -∗
-      openArmsPlain (hlc := hlc) Γ γfs cw γ pa pid Mim pv vom P Pmiss Fo Ft sts VW MW r := by
+      openArmsPlain (hlc := hlc) omo Γ γfs cw γ pa pid Mim pv vom P Pmiss Fo Ft sts VW MW r := by
   iintro Hpriv Hfrag Hfds HP Hobs Htc
   unfold openArmsPlain openPostFailPlain sysOpenObs
   icases Hobs with ⟨%av, %hav, HΦ⟩
@@ -257,7 +257,7 @@ theorem sys_open_arm_fail (Γ : FsViewNames GF) (γfs : FsNames) (cw : Nat) (γ 
 
 /-- Rocq `so_arm_dead`: the WALK-DEAD arm (ARM B): nothing was observed, the
 era refund comes back with both commits. -/
-theorem sys_open_arm_dead (Γ : FsViewNames GF) (γfs : FsNames) (cw : Nat) (γ : FileNames)
+theorem sys_open_arm_dead (omo : OffMode) (Γ : FsViewNames GF) (γfs : FsNames) (cw : Nat) (γ : FileNames)
     (pa : BitVec 64) (pid : BitVec 32) (Mim : Nat → List (BitVec 8)) (pv : Nat) (vom : BitVec 64)
     (P Pmiss : Nat → Nat → IProp GF) (Fo : Pfam GF (Aview → Nat → Anode → IProp GF))
     (Ft : Pfam GF (Aview → Nat → List (BitVec 8) → IProp GF)) (sts : List FdState)
@@ -266,7 +266,7 @@ theorem sys_open_arm_dead (Γ : FsViewNames GF) (γfs : FsNames) (cw : Nat) (γ 
     procPrivFd (GF := GF) γ pa pid VW MW ⊢ fdFrags VW.fdg sts -∗ fdSlot -∗
       nameiWalkDeadEra (hlc := hlc) γfs P Pmiss pl -∗
       pfAt (aopenCommitAt (hlc := hlc) Γ appE) Fo -∗ openTruncPiece (hlc := hlc) Γ vom Ft -∗
-      openArmsPlain (hlc := hlc) Γ γfs cw γ pa pid Mim pv vom P Pmiss Fo Ft sts VW MW r := by
+      openArmsPlain (hlc := hlc) omo Γ γfs cw γ pa pid Mim pv vom P Pmiss Fo Ft sts VW MW r := by
   iintro Hpriv Hfrag Hfds Hdead Hoc Htc
   unfold openArmsPlain openPostFailPlain
   iframe Hfds
@@ -283,7 +283,7 @@ theorem sys_open_arm_dead (Γ : FsViewNames GF) (γfs : FsNames) (cw : Nat) (γ 
 
 /-- Rocq `so_arm_unspent`: the ARGSTR arm (ARM 0): nothing fs-visible
 happened at all. -/
-theorem sys_open_arm_unspent (Γ : FsViewNames GF) (γfs : FsNames) (cw : Nat) (γ : FileNames)
+theorem sys_open_arm_unspent (omo : OffMode) (Γ : FsViewNames GF) (γfs : FsNames) (cw : Nat) (γ : FileNames)
     (pa : BitVec 64) (pid : BitVec 32) (Mim : Nat → List (BitVec 8)) (pv : Nat) (vom : BitVec 64)
     (P Pmiss : Nat → Nat → IProp GF) (Fo : Pfam GF (Aview → Nat → Anode → IProp GF))
     (Ft : Pfam GF (Aview → Nat → List (BitVec 8) → IProp GF)) (sts : List FdState)
@@ -291,7 +291,7 @@ theorem sys_open_arm_unspent (Γ : FsViewNames GF) (γfs : FsNames) (cw : Nat) (
     (hr : r = 0xFFFFFFFFFFFFFFFF#64) :
     procPrivFd (GF := GF) γ pa pid VW MW ⊢ fdFrags VW.fdg sts -∗ fdSlot -∗
       openAuPlainAt (hlc := hlc) Γ γfs cw Mim pv vom P Pmiss Fo Ft -∗
-      openArmsPlain (hlc := hlc) Γ γfs cw γ pa pid Mim pv vom P Pmiss Fo Ft sts VW MW r := by
+      openArmsPlain (hlc := hlc) omo Γ γfs cw γ pa pid Mim pv vom P Pmiss Fo Ft sts VW MW r := by
   iintro Hpriv Hfrag Hfds Hpre
   unfold openArmsPlain openPostFailPlain
   iframe Hfds
@@ -309,7 +309,7 @@ publication block does not -- so the arm travels down as a wand and the
 publication only earns its antecedent. -/
 
 /-- Rocq `so_arm_dev`. -/
-theorem sys_open_arm_dev (Γ : FsViewNames GF) (γ : FileNames) (pa : BitVec 64) (pid : BitVec 32)
+theorem sys_open_arm_dev (omo : OffMode) (Γ : FsViewNames GF) (γ : FileNames) (pa : BitVec 64) (pid : BitVec 32)
     (Mim : Nat → List (BitVec 8)) (pv : Nat) (vom : BitVec 64) (P : Nat → Nat → IProp GF)
     (Fo : Pfam GF (Aview → Nat → Anode → IProp GF))
     (Ft : Pfam GF (Aview → Nat → List (BitVec 8) → IProp GF)) (sts : List FdState)
@@ -320,8 +320,9 @@ theorem sys_open_arm_dev (Γ : FsViewNames GF) (γ : FileNames) (pa : BitVec 64)
       openTruncPiece (hlc := hlc) Γ vom Ft -∗
       ∀ r : BitVec 64,
         openFdOk γ pa pid VW MW (omReadable vom) (omWritable vom) (.device ma) sts r -∗
-        openPostOkPlain (hlc := hlc) Γ γ pa pid Mim pv vom P Fo Ft sts VW MW r := by
-  iintro HP ⟨%av, %hav, HΦ⟩ Htc %r Hfd
+        foffPubT omo (.device ma) -∗
+        openPostOkPlain (hlc := hlc) omo Γ γ pa pid Mim pv vom P Fo Ft sts VW MW r := by
+  iintro HP ⟨%av, %hav, HΦ⟩ Htc %r Hfd -
   unfold openPostOkPlain
   iexists pl, av, i
   isplitr
@@ -334,7 +335,7 @@ theorem sys_open_arm_dev (Γ : FsViewNames GF) (γ : FileNames) (pa : BitVec 64)
 
 /-- Rocq `so_arm_file`: NO TRUNC PIECE -- at `omTrunc vom = false` the
 caller owed none and the arm returns none. -/
-theorem sys_open_arm_file (Γ : FsViewNames GF) (γ : FileNames) (pa : BitVec 64) (pid : BitVec 32)
+theorem sys_open_arm_file (omo : OffMode) (Γ : FsViewNames GF) (γ : FileNames) (pa : BitVec 64) (pid : BitVec 32)
     (Mim : Nat → List (BitVec 8)) (pv : Nat) (vom : BitVec 64) (P : Nat → Nat → IProp GF)
     (Fo : Pfam GF (Aview → Nat → Anode → IProp GF))
     (Ft : Pfam GF (Aview → Nat → List (BitVec 8) → IProp GF)) (sts : List FdState)
@@ -344,9 +345,10 @@ theorem sys_open_arm_file (Γ : FsViewNames GF) (γ : FileNames) (pa : BitVec 64
     P (pathElems pl).length i ⊢
       (∃ av : Aview, ⌜arowAt av i ⟨.AFile bs0, nl⟩⌝ ∗ Fo.pfRecv av i ⟨.AFile bs0, nl⟩) -∗
       ∀ r : BitVec 64,
-        openFdOk γ pa pid VW MW (omReadable vom) (omWritable vom) (.inode i γo .parked) sts r -∗
-        openPostOkPlain (hlc := hlc) Γ γ pa pid Mim pv vom P Fo Ft sts VW MW r := by
-  iintro HP ⟨%av, %hav, HΦ⟩ %r Hfd
+        openFdOk γ pa pid VW MW (omReadable vom) (omWritable vom) (.inode i γo omo) sts r -∗
+        foffPubT omo (.inode i γo omo) -∗
+        openPostOkPlain (hlc := hlc) omo Γ γ pa pid Mim pv vom P Fo Ft sts VW MW r := by
+  iintro HP ⟨%av, %hav, HΦ⟩ %r Hfd Hpub
   unfold openPostOkPlain
   iexists pl, av, i
   isplitr
@@ -363,10 +365,11 @@ theorem sys_open_arm_file (Γ : FsViewNames GF) (γ : FileNames) (pa : BitVec 64
   isplitr
   · iempintro
   iexists γo
-  iexact Hfd
+  iframe Hfd
+  iapply foffPubT_inode_elim $$ Hpub
 
 /-- Rocq `so_arm_file_tr`: the ONE arm that spends the trunc commit. -/
-theorem sys_open_arm_file_tr (Γ : FsViewNames GF) (γ : FileNames) (pa : BitVec 64)
+theorem sys_open_arm_file_tr (omo : OffMode) (Γ : FsViewNames GF) (γ : FileNames) (pa : BitVec 64)
     (pid : BitVec 32) (Mim : Nat → List (BitVec 8)) (pv : Nat) (vom : BitVec 64)
     (P : Nat → Nat → IProp GF) (Fo : Pfam GF (Aview → Nat → Anode → IProp GF))
     (Ft : Pfam GF (Aview → Nat → List (BitVec 8) → IProp GF)) (sts : List FdState)
@@ -377,9 +380,10 @@ theorem sys_open_arm_file_tr (Γ : FsViewNames GF) (γ : FileNames) (pa : BitVec
       (∃ av : Aview, ⌜arowAt av i ⟨.AFile bs0, nl⟩⌝ ∗ Fo.pfRecv av i ⟨.AFile bs0, nl⟩) -∗
       (∃ av' : Aview, ⌜arowAt av' i ⟨.AFile bs0, nl⟩⌝ ∗ Ft.pfRecv av' i bs0) -∗
       ∀ r : BitVec 64,
-        openFdOk γ pa pid VW MW (omReadable vom) (omWritable vom) (.inode i γo .parked) sts r -∗
-        openPostOkPlain (hlc := hlc) Γ γ pa pid Mim pv vom P Fo Ft sts VW MW r := by
-  iintro HP ⟨%av, %hav, HΦ⟩ Htr %r Hfd
+        openFdOk γ pa pid VW MW (omReadable vom) (omWritable vom) (.inode i γo omo) sts r -∗
+        foffPubT omo (.inode i γo omo) -∗
+        openPostOkPlain (hlc := hlc) omo Γ γ pa pid Mim pv vom P Fo Ft sts VW MW r := by
+  iintro HP ⟨%av, %hav, HΦ⟩ Htr %r Hfd Hpub
   unfold openPostOkPlain
   iexists pl, av, i
   isplitr
@@ -395,11 +399,12 @@ theorem sys_open_arm_file_tr (Γ : FsViewNames GF) (γ : FileNames) (pa : BitVec
   simp only [ite_true]
   iframe Htr
   iexists γo
-  iexact Hfd
+  iframe Hfd
+  iapply foffPubT_inode_elim $$ Hpub
 
 /-- Rocq `so_arm_dir`: the DIRECTORY arm, at O_RDONLY exactly -- its own key
 pays the writable-fd-is-not-a-directory theorem (`omRdonly_modes`). -/
-theorem sys_open_arm_dir (Γ : FsViewNames GF) (γ : FileNames) (pa : BitVec 64) (pid : BitVec 32)
+theorem sys_open_arm_dir (omo : OffMode) (Γ : FsViewNames GF) (γ : FileNames) (pa : BitVec 64) (pid : BitVec 32)
     (Mim : Nat → List (BitVec 8)) (pv : Nat) (vom : BitVec 64) (P : Nat → Nat → IProp GF)
     (Fo : Pfam GF (Aview → Nat → Anode → IProp GF))
     (Ft : Pfam GF (Aview → Nat → List (BitVec 8) → IProp GF)) (sts : List FdState)
@@ -410,11 +415,12 @@ theorem sys_open_arm_dir (Γ : FsViewNames GF) (γ : FileNames) (pa : BitVec 64)
       (∃ av : Aview, ⌜arowAt av i ⟨.ADir ents, nl⟩⌝ ∗ Fo.pfRecv av i ⟨.ADir ents, nl⟩) -∗
       openTruncPiece (hlc := hlc) Γ vom Ft -∗
       ∀ r : BitVec 64,
-        openFdOk γ pa pid VW MW (omReadable vom) (omWritable vom) (.inode i γo .parked) sts r -∗
-        openPostOkPlain (hlc := hlc) Γ γ pa pid Mim pv vom P Fo Ft sts VW MW r := by
+        openFdOk γ pa pid VW MW (omReadable vom) (omWritable vom) (.inode i γo omo) sts r -∗
+        foffPubT omo (.inode i γo omo) -∗
+        openPostOkPlain (hlc := hlc) omo Γ γ pa pid Mim pv vom P Fo Ft sts VW MW r := by
   obtain ⟨hrd, hwr⟩ := omRdonly_modes vom h0
   rw [hrd, hwr]
-  iintro HP ⟨%av, %hav, HΦ⟩ Htc %r Hfd
+  iintro HP ⟨%av, %hav, HΦ⟩ Htc %r Hfd Hpub
   unfold openPostOkPlain
   iexists pl, av, i
   isplitr
@@ -429,13 +435,14 @@ theorem sys_open_arm_dir (Γ : FsViewNames GF) (γ : FileNames) (pa : BitVec 64)
   isplitr
   · ipureintro; exact h0
   iexists γo
-  iexact Hfd
+  iframe Hfd
+  iapply foffPubT_inode_elim $$ Hpub
 
 /-- Rocq `so_arm_notr`: the arm read straight off `dn.diType`'s enumeration,
 the trunc commit handed back -- the one the two non-trunc exits use.  The
 FILE case's `omTrunc = false` is forced by the exit's own key (either the
 mask was empty or the type test failed). -/
-theorem sys_open_arm_notr (Γ : FsViewNames GF) (γ : FileNames) (pa : BitVec 64)
+theorem sys_open_arm_notr (omo : OffMode) (Γ : FsViewNames GF) (γ : FileNames) (pa : BitVec 64)
     (pid : BitVec 32) (Mim : Nat → List (BitVec 8)) (pv : Nat) (vom : BitVec 64)
     (P : Nat → Nat → IProp GF) (Fo : Pfam GF (Aview → Nat → Anode → IProp GF))
     (Ft : Pfam GF (Aview → Nat → List (BitVec 8) → IProp GF)) (sts : List FdState)
@@ -446,30 +453,31 @@ theorem sys_open_arm_notr (Γ : FsViewNames GF) (γ : FileNames) (pa : BitVec 64
     (hdirk : dn.diType.toNat = T_DIR_z → omArg vom = 0)
     (hdev : dn.diType.toNat = T_DEVICE →
       dn.diMajor.toNat ≤ NDEV_max ∧ t = .device dn.diMajor.toNat)
-    (hino : dn.diType.toNat ≠ T_DEVICE → t = .inode i γo .parked)
+    (hino : dn.diType.toNat ≠ T_DEVICE → t = .inode i γo omo)
     (hen : dn.diType.toNat = T_DIR_z ∨ dn.diType.toNat = T_FILE ∨ dn.diType.toNat = T_DEVICE) :
     P (pathElems pl).length i ⊢
       sysOpenObs Fo i (eraNode dn bm data) -∗ openTruncPiece (hlc := hlc) Γ vom Ft -∗
       ∀ r : BitVec 64,
         openFdOk γ pa pid VW MW (omReadable vom) (omWritable vom) t sts r -∗
-        openPostOkPlain (hlc := hlc) Γ γ pa pid Mim pv vom P Fo Ft sts VW MW r := by
+        foffPubT omo t -∗
+        openPostOkPlain (hlc := hlc) omo Γ γ pa pid Mim pv vom P Fo Ft sts VW MW r := by
   unfold sysOpenObs
   rcases hen with hd | hf | hv
   · have ht := hino (by rw [hd]; decide)
     subst ht
     rw [opfEra_dir_row dn bm data hd]
-    exact sys_open_arm_dir Γ γ pa pid Mim pv vom P Fo Ft sts VW MW pl i _ _ γo hpl (hdirk hd)
+    exact sys_open_arm_dir omo Γ γ pa pid Mim pv vom P Fo Ft sts VW MW pl i _ _ γo hpl (hdirk hd)
   · have ht := hino (by rw [hf]; decide)
     subst ht
     have hntf : omTrunc vom = false := hnt.elim id (fun h => absurd hf h)
     rw [opfEra_file_row dn bm data hf]
     iintro HP Hobs -
-    iapply sys_open_arm_file Γ γ pa pid Mim pv vom P Fo Ft sts VW MW pl i _ _ γo hpl hntf
+    iapply sys_open_arm_file omo Γ γ pa pid Mim pv vom P Fo Ft sts VW MW pl i _ _ γo hpl hntf
       $$ HP Hobs
   · obtain ⟨hmb, ht⟩ := hdev hv
     subst ht
     rw [opfEra_dev_row dn bm data (by rw [hv]; decide) (by rw [hv]; decide)]
-    exact sys_open_arm_dev Γ γ pa pid Mim pv vom P Fo Ft sts VW MW pl i _ _ _ hpl hmb
+    exact sys_open_arm_dev omo Γ γ pa pid Mim pv vom P Fo Ft sts VW MW pl i _ _ _ hpl hmb
 
 /-! ## §5.  The failure tails' common continuation -/
 
@@ -502,7 +510,7 @@ theorem sys_open_fail_ret (k : KCtx) (A : SysOpenArgs GF) (P2 : UPtd) (nsj : Nat
   ispecialize Hpost $$ %c'
   unfold sysOpenPostP sysOpenK
   iapply Hpost $$ %spie' %spp' %R' %P2 %hcs %hP2 Hk Hpc Hte Hce Hbs Hisl
-  iapply (sys_open_arm_fail (hlc := hlc) (fsGammaL fscFs) fscFs A.V.cwi A.γ (procAddr A.j) A.pid
+  iapply (sys_open_arm_fail (hlc := hlc) A.omo (fsGammaL fscFs) fscFs A.V.cwi A.γ (procAddr A.j) A.pid
       (sysOpenIm A) A.v.toNat A.vom A.P A.Pmiss A.Fo A.Ft A.sts (sysOpenV2 A P2) (sysOpenM2 A P2) (R' 10#5)
       pl inum.toNat (eraNode dn bm data) hpl hr)
     $$ Hpriv Hfrags Hfds HP Hobs Htc

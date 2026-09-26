@@ -287,7 +287,7 @@ theorem sys_open_walk_dead (Γ : SchedNames) (k : KCtx) (A : SysOpenArgs GF)
   ispecialize Hpost $$ %c'
   unfold sysOpenPostP sysOpenK
   iapply Hpost $$ %spie' %spp' %R' %P2 %hcs %hP2 Hk Hpc Hte Hce Hbs Hisl
-  iapply (sys_open_arm_dead (hlc := hlc) (fsGammaL fscFs) fscFs A.V.cwi A.γ (procAddr A.j) A.pid
+  iapply (sys_open_arm_dead (hlc := hlc) A.omo (fsGammaL fscFs) fscFs A.V.cwi A.γ (procAddr A.j) A.pid
       (sysOpenIm A) A.v.toNat A.vom A.P A.Pmiss A.Fo A.Ft A.sts (sysOpenV2 A P2) (sysOpenM2 A P2) (R' 10#5)
       pl hpl hr)
     $$ Hpriv Hfrags Hfds Hdead Hoc Htc

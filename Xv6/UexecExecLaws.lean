@@ -96,7 +96,7 @@ theorem syscDepOpen_holds : SyscDepOpen (hlc := hlc) (GF := GF) := by
   refine (syscDepOpen_xv6 (hlc := hlc) f W).trans ?_
   dsimp only [imgAgrees, xkA]
   iintro H
-  iexists (Xfam.oP f), (Xfam.oPmiss f), (Xfam.oFarm f), (Xfam.oFun f), (Xfam.oFok f), (Xfam.oFex f), (Xfam.oFo f), (Xfam.oFt f)
+  iexists (Xfam.oOm f), (Xfam.oP f), (Xfam.oPmiss f), (Xfam.oFarm f), (Xfam.oFun f), (Xfam.oFok f), (Xfam.oFex f), (Xfam.oFo f), (Xfam.oFt f)
   iexact H
 
 /-- **`SyscDepExec`** at the instance: the key's guard instantiated at the

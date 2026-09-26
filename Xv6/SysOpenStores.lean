@@ -145,13 +145,13 @@ variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [Fdslot
 reports, read off the store block's two conditional facts (Rocq `Hdvw`,
 `Hfdty`). -/
 theorem sys_open_stores_types (C0 : FContent) (dn : Dinode) (inum : BitVec 32) (γo : GName)
-    (t : FdType)
+    (om : OffMode) (t : FdType)
     (htd : dn.diType.toNat = T_DEVICE →
       C0.type = FD_DEVICE ∧ C0.major = dn.diMajor ∧ dn.diMajor.toNat ≤ NDEV_max ∧
       t = .device dn.diMajor.toNat)
-    (hti : dn.diType.toNat ≠ T_DEVICE → C0.type = FD_INODE ∧ t = .inode inum.toNat γo .parked) :
+    (hti : dn.diType.toNat ≠ T_DEVICE → C0.type = FD_INODE ∧ t = .inode inum.toNat γo om) :
     (C0.type = FD_INODE → dn.diType.toNat ≠ T_DEVICE) ∧
-      ((C0.type = FD_INODE ∧ t = .inode inum.toNat γo .parked) ∨
+      ((C0.type = FD_INODE ∧ t = .inode inum.toNat γo om) ∨
         (C0.type = FD_DEVICE ∧ t = .device C0.major.toNat)) := by
   by_cases hd : dn.diType.toNat = T_DEVICE
   · obtain ⟨h1, h2, -, h4⟩ := htd hd
@@ -177,7 +177,7 @@ theorem sys_open_stores_pub (Γ : SchedNames) (k : KCtx) (A : SysOpenArgs GF)
     (htd : dn.diType.toNat = T_DEVICE →
       C0.type = FD_DEVICE ∧ C0.major = dn.diMajor ∧ dn.diMajor.toNat ≤ NDEV_max ∧
       t = .device dn.diMajor.toNat)
-    (hti : dn.diType.toNat ≠ T_DEVICE → C0.type = FD_INODE ∧ t = .inode inum.toNat γo .parked)
+    (hti : dn.diType.toNat ≠ T_DEVICE → C0.type = FD_INODE ∧ t = .inode inum.toNat γo A.omo)
     (hE : nsj + 1 = A.ns ∧ A.V.upt.extSz A.V.sz P2)
     (hpins : sysOpenPins k R (ientry kk) (fnode kf) (BitVec.ofNat 64 fd))
     (hal : (sysOpenPath (k.regs 2#5)).toNat % 8 = 0) :
@@ -197,13 +197,14 @@ theorem sys_open_stores_pub (Γ : SchedNames) (k : KCtx) (A : SysOpenArgs GF)
     (∀ r : BitVec 64,
       openFdOk A.γ (procAddr A.j) A.pid (sysOpenV2 A P2) (sysOpenM2 A P2)
         (omReadable A.vom) (omWritable A.vom) t A.sts r -∗
-      openPostOkPlain (hlc := hlc) (fsGammaL fscFs) A.γ (procAddr A.j) A.pid (sysOpenIm A) A.v.toNat
+      foffPubT A.omo t -∗
+      openPostOkPlain (hlc := hlc) A.omo (fsGammaL fscFs) A.γ (procAddr A.j) A.pid (sysOpenIm A) A.v.toNat
         A.vom A.P A.Fo A.Ft A.sts (sysOpenV2 A P2) (sysOpenM2 A P2) r) -∗
     (∀ c' : CPU, sysOpenPostP (hlc := hlc) k A c') -∗
     wpLoop (GF := GF) cpu := by
   unfold sysOpenPubBody at hPub
   simp only [sysOpenAddr] at hPub
-  obtain ⟨hdvw, hty2⟩ := sys_open_stores_types C0 dn inum γo t htd hti
+  obtain ⟨hdvw, hty2⟩ := sys_open_stores_types C0 dn inum γo A.omo t htd hti
   iintro Hk Hpc Hte Hce #Henv Hcells Hbuf Hlk Hload Hkeep Href Hflds Hnames Hoff
     Hiru Hcore Howe Hop Hbs Hisl Hfds Hfrags Hauth Harm Hpost
   ihave Hoff := (show sysOpenOffCell (GF := GF) kf C0 γo ⊢
@@ -315,7 +316,7 @@ theorem sys_open_stores_trunc (IT : ITRUNC) (Γ : SchedNames) [ClaimIs (hlc := h
     (htd : dn.diType.toNat = T_DEVICE →
       C0.type = FD_DEVICE ∧ C0.major = dn.diMajor ∧ dn.diMajor.toNat ≤ NDEV_max ∧
       t = .device dn.diMajor.toNat)
-    (hti : dn.diType.toNat ≠ T_DEVICE → C0.type = FD_INODE ∧ t = .inode inum.toNat γo .parked)
+    (hti : dn.diType.toNat ≠ T_DEVICE → C0.type = FD_INODE ∧ t = .inode inum.toNat γo A.omo)
     (hE : nsj + 1 = A.ns ∧ A.V.upt.extSz A.V.sz P2)
     (hpins : sysOpenPins k R (ientry kk) (fnode kf) (BitVec.ofNat 64 fd))
     (hal : (sysOpenPath (k.regs 2#5)).toNat % 8 = 0)
@@ -414,10 +415,10 @@ theorem sys_open_stores_trunc (IT : ITRUNC) (Γ : SchedNames) [ClaimIs (hlc := h
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
   -- the O_TRUNC file arm: the ONE arm that spends the trunc commit
-  have htis : t = .inode inum.toNat γo .parked := (hti (by rw [hfile]; decide)).2
+  have htis : t = .inode inum.toNat γo A.omo := (hti (by rw [hfile]; decide)).2
   subst htis
   ihave Hobs := sys_open_stores_obs_file A.Fo inum.toNat dn bm data hfile $$ Hobs
-  ihave Harm := sys_open_arm_file_tr (hlc := hlc) (fsGammaL fscFs) A.γ (procAddr A.j) A.pid
+  ihave Harm := sys_open_arm_file_tr (hlc := hlc) A.omo (fsGammaL fscFs) A.γ (procAddr A.j) A.pid
     (sysOpenIm A) A.v.toNat A.vom A.P A.Fo A.Ft A.sts (sysOpenV2 A P2) (sysOpenM2 A P2) pl
     inum.toNat _ _ γo hpl htr $$ HP Hobs Htr2
   ihave Hlk : sysOpenLk (GF := GF) γil γisl loc tlc A.pid kk s g inum dn $$
@@ -502,7 +503,7 @@ theorem sys_open_stores (IT : ITRUNC) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF
   have hdev : dn.diType.toNat = T_DEVICE →
       dn.diMajor.toNat ≤ NDEV_max ∧ t = .device dn.diMajor.toNat := fun h =>
     ⟨(htd h).2.2.1, (htd h).2.2.2⟩
-  have hino : dn.diType.toNat ≠ T_DEVICE → t = .inode inum.toNat γo .parked := fun h => (hti h).2
+  have hino : dn.diType.toNat ≠ T_DEVICE → t = .inode inum.toNat γo A.omo := fun h => (hti h).2
   unfold sysOpenResidue
   icases Hres with ⟨%hpl, HP, Hobs, Htc⟩
   -- ===== +0xac c.beqz a5 -> +0xb8 =====
@@ -515,7 +516,7 @@ theorem sys_open_stores (IT : ITRUNC) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF
     k_step_e (wp_s_branch cpu _ (KA.«sys_open» + 0xac#64) true 12#13 15#5 0#5 (by decide) bop.BEQ)
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hb]
     iintro Hk Hpc
-    ihave Harm := sys_open_arm_notr (hlc := hlc) (fsGammaL fscFs) A.γ (procAddr A.j) A.pid
+    ihave Harm := sys_open_arm_notr (hlc := hlc) A.omo (fsGammaL fscFs) A.γ (procAddr A.j) A.pid
       (sysOpenIm A) A.v.toNat A.vom A.P A.Fo A.Ft A.sts (sysOpenV2 A P2) (sysOpenM2 A P2) pl
       inum.toNat dn bm data t γo hpl (Or.inl htr) hdirk hdev hino hen $$ HP Hobs Htc
     ihave Hload := sys_open_flat_close kk inum dn bm data $$ Hflat
@@ -565,7 +566,7 @@ theorem sys_open_stores (IT : ITRUNC) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF
           bop.BEQ)
         from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hbt, hd]
       iintro Hk Hpc
-      ihave Harm := sys_open_arm_notr (hlc := hlc) (fsGammaL fscFs) A.γ (procAddr A.j) A.pid
+      ihave Harm := sys_open_arm_notr (hlc := hlc) A.omo (fsGammaL fscFs) A.γ (procAddr A.j) A.pid
         (sysOpenIm A) A.v.toNat A.vom A.P A.Fo A.Ft A.sts (sysOpenV2 A P2) (sysOpenM2 A P2) pl
         inum.toNat dn bm data t γo hpl (Or.inr hf) hdirk hdev hino hen $$ HP Hobs Htc
       ihave Hload := sys_open_flat_close kk inum dn bm data $$ Hflat

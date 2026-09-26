@@ -419,7 +419,7 @@ def usysFdOk (n : Int) (tf : List (BitVec 64)) (r : BitVec 64) (sts sts' : List 
         fdLowestClosed sts = none))
   else if n = USYS_open then
     (∃ (fd : Nat) (rd wr : Bool) (t : FdType), usysRetIs r fd ∧ fdLeastClosed sts fd ∧
-      sts' = sts.set fd (.open rd wr t) ∧ fdstParked (.open rd wr t)) ∨
+      sts' = sts.set fd (.open rd wr t)) ∨
     (r = -1#64 ∧ sts' = sts)
   else if n = USYS_pipe then
     (if r.toNat = 0 then
@@ -482,7 +482,7 @@ theorem usysFdOk_length {n : Int} {tf : List (BitVec 64)} {r : BitVec 64} {sts s
   rw [if_neg hd] at H
   by_cases ho : n = USYS_open
   · rw [if_pos ho] at H
-    rcases H with ⟨_, _, _, _, -, -, rfl, -⟩ | ⟨-, rfl⟩ <;> simp
+    rcases H with ⟨_, _, _, _, -, -, rfl⟩ | ⟨-, rfl⟩ <;> simp
   rw [if_neg ho] at H
   by_cases hp : n = USYS_pipe
   · rw [if_pos hp] at H
@@ -497,8 +497,9 @@ theorem usysFdOk_length {n : Int} {tf : List (BitVec 64)} {r : BitVec 64} {sts s
 DISCIPLINE -- "no descriptor in this table has had its offset half handed
 out" -- across a round, the precondition design/app-file.md SS3.5's
 principle retires; the generic tier pays the TAINT and is told nothing about
-offsets.  `fdstParked` itself stays: the OPEN row above still carries it (L4
-relaxes it to the caller's mode). -/
+offsets.  The OPEN row above no longer pins `fdstParked` either (Rocq L4,
+abe94870d): an open installs the descriptor at the mode its caller's family
+asked for, and nothing in the tier reads all-parkedness off it any more. -/
 
 /-! ## §2c Pipe's two rows, joined -/
 

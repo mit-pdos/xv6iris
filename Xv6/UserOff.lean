@@ -67,6 +67,7 @@ sys_open's publish (wave 7b) and the U tier -- but they are a few lines
 each and are the file's stated API, so they are kept.)
 -/
 import Xv6.OffGv
+import Xv6.FileDefs
 
 namespace Xv6
 
@@ -120,6 +121,45 @@ theorem off_pub_hand (γo : GName) (off : Nat) :
 theorem off_pub_hand_0 (γo : GName) :
     offGv (GF := GF) γo 1 0 ⊢ offGv γo (1 : Qp).half 0 ∗ uoff γo 0 :=
   off_pub_hand γo 0
+
+/-- ...AND WHAT THE PUBLISH HANDS THE CALLER, KEYED ON THE MODE IT CHOSE
+(Rocq's `foff_pub`, lane OFF-LINK-6's L4): at mode PARK nothing (the half
+went into the row's invariant), at mode HAND the program's own half at zero.
+The ONE conjunct sys_open's success arm grows. -/
+def foffPub (om : OffMode) (γo : GName) : IProp GF :=
+  match om with
+  | .parked => iprop(emp)
+  | .held => uoff γo 0
+
+/-- Rocq's `foff_pub_parked`. -/
+theorem foffPub_parked (γo : GName) : ⊢@{IProp GF} foffPub .parked γo := by
+  unfold foffPub; iempintro
+
+/-- Rocq's `foff_pub_held`. -/
+theorem foffPub_held (γo : GName) : uoff (GF := GF) γo 0 ⊢ foffPub .held γo := .rfl
+
+/-- Rocq's `foff_pub_of_held`. -/
+theorem foffPub_of_held (γo : GName) : foffPub (GF := GF) .held γo ⊢ uoff γo 0 := .rfl
+
+/-- ...and the same keyed on the DESCRIPTOR TYPE the publish installed
+(Rocq's `foff_pub_t`): a device row has no offset shadow, so there is
+nothing to hand. -/
+def foffPubT (om : OffMode) (t : FdType) : IProp GF :=
+  match t with
+  | .inode _ γo _ => foffPub om γo
+  | _ => iprop(emp)
+
+/-- Rocq's `foff_pub_t_dev`. -/
+theorem foffPubT_dev (om : OffMode) (mj : Nat) : ⊢@{IProp GF} foffPubT om (.device mj) := by
+  unfold foffPubT; iempintro
+
+/-- Rocq's `foff_pub_t_inode`. -/
+theorem foffPubT_inode (om : OffMode) (i : Nat) (γo : GName) (m : OffMode) :
+    foffPub (GF := GF) om γo ⊢ foffPubT om (.inode i γo m) := .rfl
+
+/-- ...and back (the arms read the type-keyed half at the inode they built). -/
+theorem foffPubT_inode_elim (om : OffMode) (i : Nat) (γo : GName) (m : OffMode) :
+    foffPubT (GF := GF) om (.inode i γo m) ⊢ foffPub om γo := .rfl
 
 end UserOffHeld
 

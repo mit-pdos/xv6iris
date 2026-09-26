@@ -415,7 +415,7 @@ PUBLISHED FILE GIVES ITS DESCRIPTOR -- the output sys_open installs in the
 fd's ghost (`st` is determined by `C`, `inum` and `γo`, `fdstateOk_inj`).
 THE THEOREM OF THE WALK is premise `hwrb`/`hdir` (`sys_open_pay_witness`);
 the owner's ruling (FD_INODE ⇒ not a device) is `hdvw`. -/
-theorem sys_open_publish [Icfg] [CurCtx] (E : CoPset) (γ : FileNames) (kf kk : Nat) (s : Qp)
+theorem sys_open_publish [Icfg] [CurCtx] (omo : OffMode) (E : CoPset) (γ : FileNames) (kf kk : Nat) (s : Qp)
     (g : GName) (lo : Nat) (inum : BitVec 32) (ty : BitVec 16) (C : FContent) (pn : FPNames)
     (γb : BoxNames) (γo : GName) (om : BitVec 32) (rb wb : Bool)
     (hE : ↑fileipN ⊆ E) (hkk : kk < NINODE) (hinb : inum.toNat < 16 * icfgNib)
@@ -428,24 +428,25 @@ theorem sys_open_publish [Icfg] [CurCtx] (E : CoPset) (γ : FileNames) (kf kk : 
       inodeShrHeldGen (ientry kk) s g inum ∗ ityShot g ty ∗
       frefTok γ kf 1 ∗ fileFieldsAt curCtx kf 1 C ∗ fpayTok γ kf 1 pn ∗
       (if C.type = FD_INODE then offFd kf 1 γb γo C else offFree kf 1) ⊢
-      |={E}=> ∃ st : FdState, ⌜fdstateOk inum γo .parked pn.pipe C st⌝ ∗ fileRef γ kf 1 st := by
+      |={E}=> ∃ st : FdState, ⌜fdstateOk inum γo omo pn.pipe C st⌝ ∗ fileRef γ kf 1 st := by
   iintro ⟨Hkeep, Hru, Hs, #Hshot, Href, Hflds, Hnames, Hcoff⟩
   imod inodePay_alloc E kk s g lo inum C.type (fcWbool C) ty hkk hinb hipos
     (sys_open_pay_witness om ty C hwrb hdir) hdvw $$ [Hkeep Hru Hs Hshot] with ⟨%gx, Hpay⟩
   · iframe Hkeep Hru Hs Hshot
-  -- THE PUBLISH MINTS THE FILE'S OFFSET MODE (Rocq L2's `so_publish`): mode
-  -- park, today; relaxing it to the caller's mode is L4
+  -- THE PUBLISH MINTS THE FILE'S OFFSET MODE (Rocq L2's `so_publish`), and
+  -- the choice between PARK and HAND is made here only: `omo` is the mode
+  -- the CALLER'S FAMILY asked for (Rocq L4), and the row records it
   let pn' : FPNames :=
-    { pn with icv := gx, iq := s, ig := g, inum := inum, obox := γb, ooff := γo, om := .parked }
+    { pn with icv := gx, iq := s, ig := g, inum := inum, obox := γb, ooff := γo, om := omo }
   imod fpayTok_update γ kf pn pn' $$ Hnames with Hnames
   have hnp : C.type ≠ FD_PIPE := by
     rcases hty with h | h <;> rw [h] <;> decide
   let stpub : FdState :=
-    if C.type = FD_INODE then .open rb wb (.inode inum.toNat γo .parked)
+    if C.type = FD_INODE then .open rb wb (.inode inum.toNat γo omo)
     else .open rb wb (.device C.major.toNat)
-  have hok : fdstateOk inum γo .parked pn.pipe C stpub := by
+  have hok : fdstateOk inum γo omo pn.pipe C stpub := by
     rcases hty with h | h
-    · have e : stpub = .open rb wb (.inode inum.toNat γo .parked) := if_pos h
+    · have e : stpub = .open rb wb (.inode inum.toNat γo omo) := if_pos h
       rw [e]
       exact ⟨hrdb, hwdb, h, rfl, rfl, rfl⟩
     · have hne : C.type ≠ FD_INODE := by rw [h]; decide
@@ -947,6 +948,9 @@ structure SysOpenArgs (GF : BundledGFunctors) where
   Pmiss : Nat → Nat → IProp GF
   Fo : Pfam GF (Aview → Nat → Anode → IProp GF)
   Ft : Pfam GF (Aview → Nat → List (BitVec 8) → IProp GF)
+  /-- THE OFFSET MODE THE CALLER'S OPEN INSTALLS (Rocq L4's `omo`, threaded
+  through every `so_*_au`): the caller's family's, and the publish mints it. -/
+  omo : OffMode
 
 /-- THE STATIC PREMISES (Rocq's `K_sys_open <= K -> … -> eb = true ->`
 block, minus `eb`): the contract's own, fixed for the whole call.  `k` is
@@ -997,7 +1001,7 @@ instance sysOpenEnv_persistent (Γ : SchedNames) (A : SysOpenArgs GF) :
 `openArmsPlain`; deviation 3). -/
 abbrev sysOpenPostP (k : KCtx) (A : SysOpenArgs GF) (c : CPU) : IProp GF :=
   sysOpenK (hlc := hlc) k A.ns A.V A.M
-    (openArmsPlain (hlc := hlc) (fsGammaL fscFs) fscFs A.V.cwi A.γ (procAddr A.j) A.pid
+    (openArmsPlain (hlc := hlc) A.omo (fsGammaL fscFs) fscFs A.V.cwi A.γ (procAddr A.j) A.pid
       (sysOpenIm A) A.v.toNat A.vom A.P A.Pmiss A.Fo A.Ft A.sts) c
 
 /-- ...and at the CREATE arms (Rocq's `so_cont0_au_create`). -/
@@ -1005,7 +1009,7 @@ abbrev sysOpenPostC (k : KCtx) (A : SysOpenArgs GF)
     (Farm Fun : Pfam GF (Aview → Nat → IProp GF))
     (Fok Fex : Pfam GF (Aview → Nat → Fname → Nat → IProp GF)) (c : CPU) : IProp GF :=
   sysOpenK (hlc := hlc) k A.ns A.V A.M
-    (openArmsCreate (hlc := hlc) (fsGammaL fscFs) fscFs A.V.cwi A.γ (procAddr A.j) A.pid
+    (openArmsCreate (hlc := hlc) A.omo (fsGammaL fscFs) fscFs A.V.cwi A.γ (procAddr A.j) A.pid
       (sysOpenIm A) A.v.toNat A.vom A.P A.Pmiss Farm Fun Fok Fex A.Fo A.Ft A.sts) c
 
 /-- The contract's `wpNext` continuation, HART-FREE (a `true` crossing at a
@@ -1144,10 +1148,14 @@ theorem sysOpen_of_createLocked (pid : BitVec 32) (kk : Nat) (qi s : Qp) (g : GN
 (fc_type C = FD_INODE) then a_foff kf ↦₄ voff ∗ off_gv g 1 (bv_unsigned
 voff) else off_free kf 1`): the inode arm stored zero into the free cell
 and holds the word, WELL-FORMED, beside the WHOLE offset shadow at `γo`
-(minted beside the store); the device arm never touches `f->off`. -/
+(minted beside the store); the device arm never touches `f->off`.  THE WORD
+IS ZERO (Rocq L4's `bv_unsigned voff = 0`, a premise Rocq threads through
+`so_stores_au` / `so_tail_pub_au` and discharges at the alloc block; here a
+conjunct of the cell, paid where the cell is built): mode HAND hands the
+half at zero. -/
 def sysOpenOffCell (kf : Nat) (C : FContent) (γo : GName) : IProp GF :=
   if C.type = FD_INODE then
-    iprop(∃ vo : BitVec 32, wordAtN curCtx (aFoff kf) 4 (DFrac.own 1) vo ∗ ⌜offWf vo⌝ ∗
+    iprop(∃ vo : BitVec 32, wordAtN curCtx (aFoff kf) 4 (DFrac.own 1) vo ∗ ⌜offWf vo ∧ vo = 0#32⌝ ∗
       offGv γo 1 (vo.toNat : Int))
   else offFree kf 1
 
@@ -1407,7 +1415,8 @@ def sysOpenTailSBody (Γ : SchedNames) (k : KCtx) (A : SysOpenArgs GF) : IProp G
 
 /-- **ARM S AND THE PUBLICATION, +0xb8** (Rocq `so_tail_pub_au`): the tail
 at the ARMED post.  The off box is born under the lock (`sys_open_deposit`,
-mode PARK: `UserOff.off_pub_park`), ARM S runs (`sysOpenTailSBody`, a
+at the caller's mode `A.omo`: PARK `UserOff.off_pub_park`, HAND
+`off_pub_hand_0`), ARM S runs (`sysOpenTailSBody`, a
 premise of its proof), and in its continuation the ONE ghost step
 (`sys_open_publish`) and the settle (`ProcPrivAcc.procPrivFd_settle`) move
 the descriptor to its typed state.  THE ARM IS THE CALLER'S: which of the
@@ -1426,7 +1435,7 @@ def sysOpenPubBody (Γ : SchedNames) (k : KCtx) (A : SysOpenArgs GF) : IProp GF 
       C.readable = BitVec.extractLsb' 0 8 (soRdWord (sysOpenOm A))⌝ -∗
     ⌜(dn.diType.toNat = T_DIR_z → sysOpenOm A = 0#32) ∧
       (C.type = FD_INODE → dn.diType.toNat ≠ T_DEVICE)⌝ -∗
-    ⌜(C.type = FD_INODE ∧ t = .inode inum.toNat γo .parked) ∨
+    ⌜(C.type = FD_INODE ∧ t = .inode inum.toNat γo A.omo) ∨
       (C.type = FD_DEVICE ∧ t = .device C.major.toNat)⌝ -∗
     ⌜nsj + 1 = A.ns ∧ A.V.upt.extSz A.V.sz P2⌝ -∗
     ⌜sysOpenPins k R (ientry kk) s2v (BitVec.ofNat 64 fd)⌝ -∗
@@ -1452,7 +1461,10 @@ def sysOpenPubBody (Γ : SchedNames) (k : KCtx) (A : SysOpenArgs GF) : IProp GF 
     (∀ r : BitVec 64,
       openFdOk A.γ (procAddr A.j) A.pid (sysOpenV2 A P2) (sysOpenM2 A P2)
         (omReadable A.vom) (omWritable A.vom) t A.sts r -∗
-      openPostOkPlain (hlc := hlc) (fsGammaL fscFs) A.γ (procAddr A.j) A.pid (sysOpenIm A) A.v.toNat A.vom
+      -- ...AND THE HALF THIS BLOCK'S PUBLISH HANDED OUT (Rocq L4), guarded by
+      -- the type exactly as the deposit is: a device row has none
+      foffPubT A.omo t -∗
+      openPostOkPlain (hlc := hlc) A.omo (fsGammaL fscFs) A.γ (procAddr A.j) A.pid (sysOpenIm A) A.v.toNat A.vom
         A.P A.Fo A.Ft A.sts (sysOpenV2 A P2) (sysOpenM2 A P2) r) -∗
     (∀ c' : CPU, sysOpenPostP (hlc := hlc) k A c') -∗
     wpLoop c)
@@ -1479,7 +1491,7 @@ def sysOpenStoresBody (Γ : SchedNames) (k : KCtx) (A : SysOpenArgs GF) : IProp 
     ⌜(dn.diType.toNat = T_DEVICE →
         C0.type = FD_DEVICE ∧ C0.major = dn.diMajor ∧ dn.diMajor.toNat ≤ NDEV_max ∧
         t = .device dn.diMajor.toNat) ∧
-      (dn.diType.toNat ≠ T_DEVICE → C0.type = FD_INODE ∧ t = .inode inum.toNat γo .parked)⌝ -∗
+      (dn.diType.toNat ≠ T_DEVICE → C0.type = FD_INODE ∧ t = .inode inum.toNat γo A.omo)⌝ -∗
     ⌜nsj + 1 = A.ns ∧ A.V.upt.extSz A.V.sz P2⌝ -∗
     ⌜sysOpenPins k R (ientry kk) (fnode kf) (BitVec.ofNat 64 fd)⌝ -∗
     ⌜(sysOpenPath (k.regs 2#5)).toNat % 8 = 0⌝ -∗
