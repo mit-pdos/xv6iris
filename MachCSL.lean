@@ -124,3 +124,5 @@ import MachCSL.WpSmodeCycleT
 import MachCSL.WpSmodeSretU
 import MachCSL.WpPtWalkOwn
 import MachCSL.WpSmodeSatpU
+import MachCSL.AdequacyDisk
+import MachCSL.CtxBoot
