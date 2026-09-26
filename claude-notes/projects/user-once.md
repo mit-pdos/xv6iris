@@ -312,36 +312,53 @@ console instance waits for its M3.
   `UShPipeCatRound` as instances.  Exit: one echo entry, one cat round,
   three instance files each.
 
-## RESUME HERE (2026-09-23)
+## RESUME HERE (2026-09-26, INTEGRATION with origin/main)
 
-RULED by the owner: A starts now.  Branch `user-once/A` off `main` at
-`08033db62`.  A1's `RefParse.v` landed there (`eee474d4c`, seven
-`vm_compute` demos); `RefParseBridge.v` (18 statements: the fuel
-monotonicity, the symbol-free bridge both ways, the redirect and pipe
-bridges, the three line-shape facts on `ush_line_is`/`ushs_line_is`/
-`ushq_line_is`) is stated and elaborates; its proofs are with a subagent.
-A1 and A2a-e are on `main`; A3a and A3b are on branch `user-once/A3` -- LANE A IS COMPLETE there, awaiting the owner's merge to `main`.  C1 is on the same branch.
+**Where this branch is.**  `user-once/int-wip` (staged in the worktree
+`/shared/xv6iris-wip`; the built tree is `/shared/xv6iris-int` on
+`user-once/int` at `origin/main` = eb2c7bb25, fast-forwarded to this branch
+once the base build is green).  It is `origin/main` plus the user-once
+commits RE-LANDED by cherry-pick under ONE POLICY: upstream's files win
+wherever both sides edited (the shells stay FULL, because upstream's
+N-stage layer `UkShPipes{Lex,Parse,Cmd,Seam,Round}` (PIPES-C3/C3b) is an
+induction stacked on the one-bar shells' `_g`/`_at` variants and imports
+`UkShPipeRight`/`UkShPipeCm`/`UkShPipePex`/`UkShPipeParse`); our GENERAL
+files are added beside them (`RefParse`, `RefParseSym`, `RefParseBridge`,
+`UkShGettoken`, `UkShRedirs`, `UkShArgs`, `UkShParser`, `UkShPipeNode`,
+`UkShSeam`, `UkShRedirCut`, `UShGeom`) with their sh literals REMAPPED for
+the 7b2c1b1 bump (`scratchpad/relit.py` over a map read off upstream's own
+diff of the same walks: sh's text is unchanged below 0xd2e, so no parser pc
+moved; .rodata +0x10, ulib/printf/malloc text +8, the jump-table words
+-0x10).  Shells whose reduction merged without conflict are in REDUCED
+form (`UkShRedirGtk`, `UkShRedirEx`, `UkShPipeEx`, `UkShPipeTok`;
+`UkShRedirTok` deleted); `UkShPipeRound`/`UShPipeChild` stay deleted
+(upstream's PIPES-C8); the A3a/A3b/C1 consumer edits to `UkShMain`,
+`UkShRedirSeam`, `UkShPipeSeam`, `UkShRedirBody`, `UkShRedirChild`,
+`UShEcho`, `UShCat` merged cleanly with upstream's mask/filenames edits.
+NOTHING OF THIS IS VERIFIED YET: the first gate is the fast-forward into
+`/shared/xv6iris-int` and `make -k` there.
 
-**THE DIVERGENCE (read off `git fetch`, 2026-09-26) -- RULE ON THIS BEFORE
-ANY FURTHER LANE.**  Nothing of this campaign has reached `origin/main`:
-local `main` is 9 commits (A1-A2e) ahead of it and `origin/main` is 386
-commits / 774 files ahead of local `main`, 24 of them files this branch
-touched (twelve of them files A3b deleted).  Upstream's changes to this tier
-are structural: PIPES-C3/C8 rebuilt sh's pipe walk for pipelines of any
-length (new `UkShPipes*`, `UShPipes*`, `UShURound*`; `UShPipeChild`,
-`UShPipeRound`, `UShRound`, `UShEchoPay`, `UShRedirPay` DELETED there --
-the files A3b re-pointed and C3 targets); the seccomp bump changed the
-U-tier entry constructors and `exec_slot_pre`/`image_entry` to take the
-caller's mask (the shape C1/C2 sit on); an `XV6_REV` bump regenerated the
-images; upstream still has `UkShRedirTok` and `UkShPipeRight` (A2a/A2e
-deleted them) and never had `RefParse*`, `UkShGettoken`, `UkShRedirs`,
-`UkShArgs`, `UkShParser`, `UkShPipeNode`, `UkShSeam`, `UkShRedirCut`,
-`UShGeom`.  So merging or rebasing `user-once/A3` onto `origin/main` is a
-RE-LANDING, not a conflict resolution: A1 (the pure reference parser and
-its bridges) carries over; A2c-A3b and C1 were proved against a pipe tier
-and an entry interface that no longer exist upstream.  Options: (a) re-land
-user-once on `origin/main` from A1 and the design note, with the
-pipeline-of-any-length walk as the thing the reference parser generalizes
-(`ref_parsepipe` is already cursor-indexed and N-ary); (b) hold the branch
-until the seccomp and pipes work settles.  Do NOT start C2 or B1 on this
-base.  Still owed elsewhere: the fork law's `Lp` at the reference equation is app-both's SLOT-WS (M4).
+**The plan from there.**
+1. Green the re-landed files (expect: literal residue the map missed,
+   `RefParseBridge`'s redirect-line bridge at W4's `fn_word` in place of
+   `wl_word`, `UShGeom` at the +0x10 ELF sizes, the mask rows of
+   `image_entry`/`kexec_image_ok` in the C1 instances).
+2. THE N-STAGE LAYER AS COROLLARIES: `ushq_bars len f c a rest  ->
+   ref_parsepipe len f n c = Some (ushq_ptree a rest, fin)` (a bridge in
+   `RefParseBridge`, by induction on the bars), `ushq_nulfolds a rest g =
+   ushp_zero_at (ref_nulcut (ushq_ptree a rest)) g`, the `2 * length rest +
+   1` links are `ushp_nodes (ushq_ptree a rest)`, and upstream's room `48 +
+   6 * length rest` is `ushp_pp_room` plus the two-word slack A2e found;
+   then `UkShPipesParse.wp_kshp_parsepipe_bars`,
+   `UkShPipesCmd.wp_kshp_nulterminate/parseline/parsecmd_pipes` and
+   `UkShPipesSeam.ush_cmd_of_ushp_pipes` (from `UkShSeam.
+   ush_cmd_of_ushp_tree`) are corollaries, and `UkShPipesRound.
+   wp_kshm_child_pipes_g` of `UkShSeam.wp_ref_child`.
+3. Only then A3b's deletions, widened: every one-bar shell the N-stage
+   files no longer import.
+4. The audits are THREE now (system 13, tree 13, union 14 --
+   `make audit-union-only`); the file and pipe audits are gone (C9h).
+
+Branch `user-once/A3` (local, unpushed) is the pre-integration record and
+is superseded by this branch once it is green.
+
