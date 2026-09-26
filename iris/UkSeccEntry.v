@@ -9,8 +9,10 @@
 (* constructor at the WHOLE TABLE'S VIEW ([UkRun.uslot_of_urun_ro_at]) ->  *)
 (* the program ([UkSeccMain.wp_ksecc_start]).                              *)
 (*                                                                        *)
-(* WHAT THE ENTRY IS HANDED.  [Pay] is the ERA CREDENTIAL and the table's  *)
-(* universe rows, [riscv_wild (S gen_id) ∗ secc_rows sts]; the persistent  *)
+(* WHAT THE ENTRY IS HANDED.  [Pay] is the ERA CREDENTIALS and the table's *)
+(* universe rows, [riscv_wild (S gen_id) ∗ riscv_rdwild (S gen_id) ∗       *)
+(* secc_rows sts] (the reader-side one pays read's console row, seccomp    *)
+(* design 10.12); the persistent                                           *)
 (* context is the generic user WP [uexec_wp] (what [useccomp_mint] needs   *)
 (* beside the credential) and the two rows every entry takes ([udep],      *)
 (* [urun_nopipe]).  The credential pays both halves of the program:       *)
@@ -122,10 +124,11 @@ Section UkSeccEntry.
 
   (* THE UNIVERSE AT THE KEY'S TABLE, out of the minter *)
   Lemma secc_univ_of_mint (sts : list fdstate) :
-    riscv_wild (S gen_id) -∗ □ uexec_wp -∗ secc_rows sts -∗ secc_univ sts.
+    riscv_wild (S gen_id) -∗ riscv_rdwild (S gen_id) -∗ □ uexec_wp -∗
+    secc_rows sts -∗ secc_univ sts.
   Proof using .
-    iIntros "#Hw #Hwp #Hr".
-    iDestruct (useccomp_mint with "Hw Hwp") as "#Hmint".
+    iIntros "#Hw #Hrw #Hwp #Hr".
+    iDestruct (useccomp_mint with "Hw Hrw Hwp") as "#Hmint".
     rewrite /secc_univ. iIntros "!>" (W) "%Hm %Hle Hp".
     iApply ("Hmint" with "[] Hp"). iModIntro.
     rewrite /secc_key. iSplit; [ by iPureIntro | ].
@@ -151,7 +154,7 @@ Section UkSeccEntry.
     udep -∗
     image_entry ElfUser.seccomp_elf Mn (mword_of_int (t + 8) : mword 64) sts
       cw ProcDefs.secc_all cs pidv Q
-      (riscv_wild (S gen_id) ∗ secc_rows sts) uslot.
+      (riscv_wild (S gen_id) ∗ riscv_rdwild (S gen_id) ∗ secc_rows sts) uslot.
   Proof using GEN PS fileG0 ghost_varG0 ghost_varG1 riscvGS0 ufdG0 xv6G0 Σ.
     intros Hps Hok Himg Hbytes Hfdl Hcons.
     iIntros "#HQ #Hwp #Hnpw #Hdep".
@@ -160,7 +163,7 @@ Section UkSeccEntry.
                 Himg Hbytes Hargs) as (Hna & Halen & Hafun).
     pose proof (UShSecc.secc_room_of_det_x ws na alen Hok Hna Halen) as Hroom.
     rewrite /image_entry_at.
-    iIntros "!>" (W') "%Hokk %Hcwv %Hlzf %Hscf _ _ Hmp [#Hwild #Hrows]".
+    iIntros "!>" (W') "%Hokk %Hcwv %Hlzf %Hscf _ _ Hmp (#Hwild & #Hrdw & #Hrows)".
     destruct (UShSecc.secc_kexec_pages na alen afun sts W' Hokk)
       as (Hpc & Hsub & Hsub2 & Hx & Hdw & Hwr & Hrp).
     destruct (UShSecc.secc_kexec_entry_rows na alen afun sts W' Hokk Hroom
@@ -193,8 +196,8 @@ Section UkSeccEntry.
                 Hsub2 Hx with "Ht").
     - iApply (secc_wdep_of_pay N (take NSTD (uvis_fd W')) rb2
                 ltac:(rewrite Hfd; exact Hcons)).
-      iApply (secc_cons_pay_of_wild with "Hwild").
-    - rewrite Hfd. iApply (secc_univ_of_mint with "Hwild Hwp Hrows").
+      iApply (secc_cons_pay_of_wild with "Hwild Hrdw").
+    - rewrite Hfd. iApply (secc_univ_of_mint with "Hwild Hrdw Hwp Hrows").
   Qed.
 
 End UkSeccEntry.

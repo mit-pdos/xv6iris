@@ -3,8 +3,8 @@
 (* ARBITRARY binary running under a syscall mask, built WITHOUT the      *)
 (* application's taint (design/seccomp.md SS5 as amended by SS9).        *)
 (*                                                                       *)
-(* A key is IN THE UNIVERSE when its mask clears the blocked numbers     *)
-(* [secc_B] (read and the namespace writers) and every row of its table is one the        *)
+(* A key is IN THE UNIVERSE when its mask clears the six namespace-      *)
+(* writing numbers [secc_B] and every row of its table is one the        *)
 (* universe can pay for without the taint: no inode row (without open   *)
 (* none can arrive), a pipe row only at a pipe whose queue fragment is   *)
 (* parked with NO protocol ([wild_pipe]), and console / closed rows for  *)
@@ -71,18 +71,17 @@ Require Import UexecSG.
 (*  1.  PURE: the blocked set and the mask condition                      *)
 (* ===================================================================== *)
 
-(* read, kill, open, mknod, unlink, link, mkdir: the numbers a masked
-   process must not reach (design SS1; read (5) added by 10.10, pending
-   the owner's mask decision) *)
-Definition secc_B : list Z := [5; 6; 15; 17; 18; 19; 20].
+(* kill, open, mknod, unlink, link, mkdir: the numbers a masked process
+   must not reach (design SS1) *)
+Definition secc_B : list Z := [6; 15; 17; 18; 19; 20].
 
 Definition secc_masked (m : mword 64) : Prop :=
   forall n, n ∈ secc_B -> Z.testbit (bv_unsigned m) n = false.
 
-(* the seven numbers, spelled out: what a [decide] chain wants *)
+(* the six numbers, spelled out: what a [decide] chain wants *)
 Lemma secc_notin_cases (n : Z) :
   n ∉ secc_B ->
-  n <> 5 /\ n <> 6 /\ n <> 15 /\ n <> 17 /\ n <> 18 /\ n <> 19 /\ n <> 20.
+  n <> 6 /\ n <> 15 /\ n <> 17 /\ n <> 18 /\ n <> 19 /\ n <> 20.
 Proof.
   intros H.
   split_and!; intros ->; apply H; rewrite elem_of_list_In; cbn; tauto.
@@ -95,7 +94,7 @@ Proof.
   intros Hm Hin. apply usys_eff_blocked. exact (Hm _ Hin).
 Qed.
 
-(* ...so the EFFECTIVE number of a masked frame is never a blocked one *)
+(* ...so the EFFECTIVE number of a masked frame is never one of the six *)
 Lemma usys_eff_masked_notin (m : mword 64) (tf : list (mword 64)) :
   secc_masked m -> usys_eff m tf ∉ secc_B.
 Proof.
@@ -455,17 +454,35 @@ Section UexecSecc.
   (*  what pays for that is the era credential (SS5 below).  Named, so    *)
   (*  the minter is stated over the payer and the credential enters once. *)
   (* =================================================================== *)
-  (* the WRITE row only: read (5) is blocked (seccomp design 10.10) *)
   Definition secc_cons_pay : iProp Σ :=
-    (□ (∀ (rb : bool) (mj n : Z) (pmv : gmap (mword 27) uperm) (sz : Z)
-          (lz : bool) (M : gmap Z (bv 8)) (ua : mword 64),
-          filewrite_in pmv sz lz (FdOpen rb true (FdDevice mj)) n M ua
-            (fun _ => True%I) (fun _ _ => True%I)))%I.
+    (□ ((∀ (wb : bool) (mj n : Z) (P : iProp Σ),
+           fileread_in (FdOpen true wb (FdDevice mj)) n
+             (pfam_triv (fun _ _ _ _ => True%I)) (fun _ _ => True%I)
+             (fun _ => True%I) (fun _ => True%I) (fun _ _ => True%I) P)
+        ∧ (∀ (rb : bool) (mj n : Z) (pmv : gmap (mword 27) uperm) (sz : Z)
+             (lz : bool) (M : gmap Z (bv 8)) (ua : mword 64),
+             filewrite_in pmv sz lz (FdOpen rb true (FdDevice mj)) n M ua
+               (fun _ => True%I) (fun _ _ => True%I))))%I.
 
   Global Instance secc_cons_pay_persistent : Persistent secc_cons_pay.
   Proof using . rewrite /secc_cons_pay. apply _. Qed.
 
-  (* WRITE'S ROW at any row of the universe *)
+  (* READ'S ROW at any row of the universe *)
+  Lemma secc_fileread_in (st : fdstate) (n : Z) (P : iProp Σ) :
+    secc_cons_pay -∗ secc_row st -∗
+    fileread_in st n (pfam_triv (fun _ _ _ _ => True%I)) (fun _ _ => True%I)
+      (fun _ => True%I) (fun _ => True%I) (fun _ _ => True%I) P.
+  Proof using .
+    iIntros "#Hc #Hs".
+    destruct st as [| rb wb [i γo om | γp | mj]].
+    - rewrite /fileread_in. iIntros "HP". iExact "HP".
+    - rewrite /secc_row. iDestruct "Hs" as "[]".
+    - iApply (wild_fileread_in with "Hs").
+    - destruct rb; [ | rewrite /fileread_in; iIntros "HP"; iExact "HP" ].
+      iDestruct "Hc" as "[Hr _]". iApply "Hr".
+  Qed.
+
+  (* WRITE'S ROW, likewise *)
   Lemma secc_filewrite_in (st : fdstate) (n : Z)
       (pmv : gmap (mword 27) uperm) (sz : Z) (lz : bool)
       (M : gmap Z (bv 8)) (ua : mword 64) :
@@ -478,7 +495,7 @@ Section UexecSecc.
     - rewrite /secc_row. iDestruct "Hs" as "[]".
     - iApply (wild_filewrite_in with "Hs").
     - destruct wb; [ | rewrite /filewrite_in; done ].
-      iApply "Hc".
+      iDestruct "Hc" as "[_ Hw]". iApply "Hw".
   Qed.
 
   (* =================================================================== *)
@@ -542,12 +559,14 @@ Section UexecSecc.
     |==> sbundle_at uslot n secc_fam W.
   Proof using .
     intros Hnb.
-    destruct (secc_notin_cases n Hnb) as (H5 & H6 & H15 & H17 & H18 & H19 & H20).
+    destruct (secc_notin_cases n Hnb) as (H6 & H15 & H17 & H18 & H19 & H20).
     rewrite /secc_slots. iIntros "#Hc #Hk #Hpay #IH". rewrite /sbundle_at /= /xv6_sbundle.
     destruct (decide (n = USYS_exec)) as [_ | _];
       [ iModIntro; iApply (secc_sbundle_exec with "Hk Hpay IH") | ].
     rewrite /secc_fam /xfam_at /xfam_pt /xfam_exec /xfam_exec_at /=.
-    destruct (decide (n = 5)) as [He | _]; [ exfalso; exact (H5 He) | ].
+    destruct (decide (n = 5)) as [_ | _].
+    { iModIntro. iApply (secc_fileread_in with "Hc").
+      iApply (secc_key_at_arg with "Hk"). }
     destruct (decide (n = 9)) as [_ | _];
       [ iModIntro; iApply fsabs_chdir_pre | ].
     destruct (decide (n = 15)) as [He | _]; [ exfalso; exact (H15 He) | ].
@@ -590,7 +609,7 @@ Section UexecSecc.
     secc_key W -∗ my_pay (uvis_gen W) (fun _ => True%I) -∗ secc_slots -∗
     uexec_ret_cont_F uslot n secc_fam W.
   Proof using .
-    intros Hn Hnb. destruct (secc_notin_cases n Hnb) as (_ & _ & H15 & _).
+    intros Hn Hnb. destruct (secc_notin_cases n Hnb) as (_ & H15 & _).
     rewrite /secc_slots. iIntros "#Hk #Hpay #IH". iDestruct "Hk" as "[%Hm #Hr]".
     rewrite /uexec_ret_cont_F /uexec_ret_cont_gen.
     iIntros (r M' π' szv' fdv' cw' g' cs' lz' secc' _ Hfd _ _ Hg _ _ Hsc) "_ Hpost".
@@ -771,6 +790,30 @@ Section UexecSecc.
   (*  8.  THE ERA CREDENTIAL PAYS THE CONSOLE ROWS                       *)
   (* =================================================================== *)
 
+  (* READ at a console row: the ring's DIRTY arm at [AppInv.app_rdcred]'s
+     right disjunct -- the READER-side wild credential ([riscv_rdwild],
+     seccomp design 10.7, 10.12) -- and the boundary's input link off the
+     era licence *)
+  Lemma secc_cons_rd_of_wild :
+    riscv_wild (S gen_id) -∗ riscv_rdwild (S gen_id) -∗
+    □ (∀ (wb : bool) (mj n : Z) (P : iProp Σ),
+         fileread_in (FdOpen true wb (FdDevice mj)) n
+           (pfam_triv (fun _ _ _ _ => True%I)) (fun _ _ => True%I)
+           (fun _ => True%I) (fun _ => True%I) (fun _ _ => True%I) P).
+  Proof using .
+    iIntros "#Hw #Hrw".
+    iDestruct (cons_licence_at_of_wild with "Hw") as "#Hlic".
+    iIntros "!>" (wb mj n P). rewrite /fileread_in. iIntros "HP".
+    case_decide; [ | iExact "HP" ].
+    iSplitL "HP".
+    - iApply (ConsoleInv.cons_acc_cred fsc_cons app_rdcred
+                (fun (_ _ : nat) => (P ∗ True)%I)).
+      + rewrite /ConsoleInv.cons_dirty_cred. iModIntro.
+        iApply (app_rdcred_of_rdwild with "Hrw").
+      + iIntros (cur dc). iModIntro. by iFrame "HP".
+    - iApply (cons_read_pay_triv_at with "Hlic").
+  Qed.
+
   (* WRITE at a console row: the output chain at the trivial cursor, one
      [out_link] per byte off the era licence
      ([SpecConsolewrite.cons_out_chain_of_licence]'s induction at era k) *)
@@ -797,10 +840,13 @@ Section UexecSecc.
     iApply (secc_cons_out_chain with "Hlic").
   Qed.
 
-  Lemma secc_cons_pay_of_wild : riscv_wild (S gen_id) -∗ secc_cons_pay.
+  Lemma secc_cons_pay_of_wild :
+    riscv_wild (S gen_id) -∗ riscv_rdwild (S gen_id) -∗ secc_cons_pay.
   Proof using .
-    iIntros "#Hw". rewrite /secc_cons_pay.
-    iApply (secc_cons_wr_of_wild with "Hw").
+    iIntros "#Hw #Hrw". rewrite /secc_cons_pay.
+    iDestruct (secc_cons_rd_of_wild with "Hw Hrw") as "#Hr".
+    iDestruct (secc_cons_wr_of_wild with "Hw") as "#Hwr".
+    iModIntro. iSplit; [ iExact "Hr" | iExact "Hwr" ].
   Qed.
 
   (* =================================================================== *)
@@ -811,12 +857,12 @@ Section UexecSecc.
   (*  [app_taint] (design SS5, SS9).                                     *)
   (* =================================================================== *)
   Lemma useccomp_mint :
-    riscv_wild (S gen_id) -∗ □ uexec_wp -∗
+    riscv_wild (S gen_id) -∗ riscv_rdwild (S gen_id) -∗ □ uexec_wp -∗
     □ (∀ W : uvis, □ secc_key W -∗ my_pay (uvis_gen W) (fun _ => True%I) -∗ uslot W).
   Proof using .
-    iIntros "#Hw #Hwp".
+    iIntros "#Hw #Hrw #Hwp".
     iApply (useccomp_mint_of_cons with "[] Hwp").
-    iApply (secc_cons_pay_of_wild with "Hw").
+    iApply (secc_cons_pay_of_wild with "Hw Hrw").
   Qed.
 
 End UexecSecc.
