@@ -334,11 +334,12 @@ theorem pte2pa_uLeaf (r : BitVec 64) (perm : BitVec 64) (h : pageValid r)
 theorem uptWf_insertLeaf (P : UPtd) (vpn : Nat) (r : BitVec 64) (perm : BitVec 64)
     (hwf : uptWf P) (hlt : vpn < tfVpn.toNat) (hr : pageValid r)
     (hm : perm &&& ~~~0x3FF#64 = 0#64) (hrwx : perm &&& 0xE#64 ≠ 0#64) (hg : perm &&& 0x20#64 = 0#64)
+    (hrw : perm &&& 6#64 ≠ 4#64)
     (hfresh : ∀ k w, get? P.um k = some w → pte2pa w ≠ r) :
     uptWf (P.insertLeaf vpn r perm) := by
   refine uptWf_insert P vpn (uLeaf (BitVec.extractLsb' 12 44 r) perm) hwf hlt
     (uLeaf_isLeafPte _ _ hrwx) (by rw [pte2pa_uLeaf r perm hr hm]; exact hr)
-    (uLeafPins_uLeaf _ _ (by revert hm hg; bv_decide)) ?_
+    (uLeafPins_uLeaf _ _ (by revert hm hg; bv_decide)) (uwkInv_uLeaf _ _ hm hrwx hrw) ?_
   intro k w hw _hk hq
   rw [ptePpn_uLeaf _ _ hm] at hq
   refine hfresh k w hw ?_

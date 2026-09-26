@@ -14,6 +14,7 @@ bits (`pteAD`).
 -/
 import Xv6.PtOwn
 import Xv6.KallocDefs
+import MachCSL.UWalk
 
 namespace Xv6
 
@@ -101,7 +102,11 @@ def ptRep (t : PTree) (L : RegMapF (BitVec 64)) : Prop :=
 /-- The pure facts of a live table (Rocq `proc_pt_wf` + `upt_map_wf`): user
 leaves below `TRAPFRAME`, real leaves (`U` may be clear: `uvmclear`'s guard
 page), on valid pages, distinct pages; the trapframe page valid; every user
-leaf pinned (`uLeafPins`: `G = 0`, no NAPOT, `PBMT = 0`, D53).  (Disjointness of the user pages from the trapframe
+leaf pinned (`uLeafPins`: `G = 0`, no NAPOT, `PBMT = 0`, D53); every user
+leaf VALID in the walker's sense (`uwkInv w = false`: Rocq `upt_map_wf`'s
+`pte_valid` -- no `W` without `R`, reserved bits clear -- so no TLB entry
+can cache a leaf whose permission check would hit the model's assert).
+(Disjointness of the user pages from the trapframe
 page is enforced by separation-logic ownership, not a pure fact.) -/
 def uptWf (P : UPtd) : Prop :=
   (∀ k w, Iris.Std.PartialMap.get? P.um k = some w →
@@ -109,7 +114,8 @@ def uptWf (P : UPtd) : Prop :=
   (∀ k1 w1 k2 w2, Iris.Std.PartialMap.get? P.um k1 = some w1 → Iris.Std.PartialMap.get? P.um k2 = some w2 →
     ptePpn w1 = ptePpn w2 → k1 = k2) ∧
   pageValid (pageAddr P.tfp) ∧
-  (∀ k w, Iris.Std.PartialMap.get? P.um k = some w → uLeafPins w)
+  (∀ k w, Iris.Std.PartialMap.get? P.um k = some w → uLeafPins w) ∧
+  (∀ k w, Iris.Std.PartialMap.get? P.um k = some w → uwkInv w = false)
 
 /-- The pins survive the hardware's `A`/`D` write-back. -/
 theorem uLeafPins_setAD (w : BitVec 64) (a d : BitVec 1) (h : uLeafPins w) : uLeafPins (pteSetAD w a d) := by
@@ -132,13 +138,49 @@ theorem uLeafPins_andNotU (w : BitVec 64) (h : uLeafPins w) : uLeafPins (w &&& ~
 theorem pteFlags_pinMask (w : BitVec 64) (h : uLeafPins w) : pteFlags w &&& ~~~0x3DF#64 = 0#64 := by
   unfold uLeafPins pteFlags at *; revert h; bv_decide
 
+section
+open LeanRV64D LeanRV64D.Functions
+
+/-- `mappages`' leaf is valid (Rocq `pte_valid`) when its permission word is
+a leaf's (`R`/`W`/`X`) and not `W` without `R`. -/
+theorem uwkInv_uLeaf (ppn : BitVec 44) (perm : BitVec 64) (hm : perm &&& ~~~0x3FF#64 = 0#64)
+    (hrwx : perm &&& 0xE#64 ≠ 0#64) (hrw : perm &&& 6#64 ≠ 4#64) : uwkInv (uLeaf ppn perm) = false := by
+  revert hm hrwx hrw
+  simp only [uwkInv, uLeaf, pte_is_non_leaf, _get_PTE_Flags_V, _get_PTE_Flags_R, _get_PTE_Flags_W,
+    _get_PTE_Flags_X, _get_PTE_Flags_A, _get_PTE_Flags_D, _get_PTE_Flags_U, _get_PTE_Ext_PBMT,
+    _get_PTE_Ext_reserved, ext_bits_of_PTE, Mk_PTE_Ext, Sail.BitVec.length, Mk_PTE_Flags,
+    Sail.BitVec.extractLsb, BitVec.extractLsb]
+  bv_decide
+
+/-- Clearing `U` keeps a word valid. -/
+theorem uwkInv_andNotU (w : BitVec 64) (h : uwkInv w = false) : uwkInv (w &&& ~~~PTE_U) = false := by
+  revert h
+  simp only [uwkInv, PTE_U, pte_is_non_leaf, _get_PTE_Flags_V, _get_PTE_Flags_R, _get_PTE_Flags_W,
+    _get_PTE_Flags_X, _get_PTE_Flags_A, _get_PTE_Flags_D, _get_PTE_Flags_U, _get_PTE_Ext_PBMT,
+    _get_PTE_Ext_reserved, ext_bits_of_PTE, Mk_PTE_Ext, Sail.BitVec.length, Mk_PTE_Flags,
+    Sail.BitVec.extractLsb, BitVec.extractLsb]
+  bv_decide
+
+/-- A copy of a valid leaf's flags on another page (`uvmcopy`) is valid. -/
+theorem uwkInv_uLeaf_pteFlags (ppn : BitVec 44) (w : BitVec 64) (h : uwkInv w = false) :
+    uwkInv (uLeaf ppn (pteFlags w)) = false := by
+  revert h
+  simp only [uwkInv, uLeaf, pteFlags, pte_is_non_leaf, _get_PTE_Flags_V, _get_PTE_Flags_R,
+    _get_PTE_Flags_W, _get_PTE_Flags_X, _get_PTE_Flags_A, _get_PTE_Flags_D, _get_PTE_Flags_U,
+    _get_PTE_Ext_PBMT, _get_PTE_Ext_reserved, ext_bits_of_PTE, Mk_PTE_Ext, Sail.BitVec.length,
+    Mk_PTE_Flags, Sail.BitVec.extractLsb, BitVec.extractLsb]
+  bv_decide
+
+end
+
 /-- Adding (or replacing) one user leaf keeps the table's facts, given the
 new leaf's own facts and that its page is not one of the others'. -/
 theorem uptWf_insert (P : UPtd) (vpn : Nat) (u : BitVec 64) (hwf : uptWf P)
     (hlt : vpn < tfVpn.toNat) (hleaf : isLeafPte u) (hpg : pageValid (pte2pa u)) (hpin : uLeafPins u)
+    (hval : uwkInv u = false)
     (hinj : ∀ k w, Iris.Std.PartialMap.get? P.um k = some w → k ≠ vpn → ptePpn w ≠ ptePpn u) :
     uptWf { P with um := Iris.Std.PartialMap.insert P.um vpn u } := by
-  obtain ⟨w1, w2, w3, w4⟩ := hwf
+  obtain ⟨w1, w2, w3, w4, w5⟩ := hwf
   have hget : ∀ k w, Iris.Std.PartialMap.get? (Iris.Std.PartialMap.insert P.um vpn u) k = some w →
       (k = vpn ∧ w = u) ∨ (k ≠ vpn ∧ Iris.Std.PartialMap.get? P.um k = some w) := by
     intro k w hw
@@ -148,7 +190,7 @@ theorem uptWf_insert (P : UPtd) (vpn : Nat) (u : BitVec 64) (hwf : uptWf P)
       exact Or.inl ⟨rfl, (Option.some.inj hw).symm⟩
     · rw [Iris.Std.get?_insert_ne (fun hh => hk hh.symm)] at hw
       exact Or.inr ⟨hk, hw⟩
-  refine ⟨?_, ?_, w3, ?_⟩
+  refine ⟨?_, ?_, w3, ?_, ?_⟩
   · intro k w hw
     rcases hget k w hw with ⟨rfl, rfl⟩ | ⟨-, hw'⟩
     · exact ⟨hlt, hleaf, hpg⟩
@@ -164,6 +206,10 @@ theorem uptWf_insert (P : UPtd) (vpn : Nat) (u : BitVec 64) (hwf : uptWf P)
     rcases hget k w hw with ⟨rfl, rfl⟩ | ⟨-, hw'⟩
     · exact hpin
     · exact w4 k w hw'
+  · intro k w hw
+    rcases hget k w hw with ⟨rfl, rfl⟩ | ⟨-, hw'⟩
+    · exact hval
+    · exact w5 k w hw'
 
 /-- Every user leaf lies below `PGROUNDUP(sz)` (Rocq `um_below`). -/
 def umBelow (sz : BitVec 64) (P : UPtd) : Prop :=
