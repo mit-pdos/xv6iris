@@ -90,7 +90,8 @@ Section union_link_inst_at.
       UPIN _ _ (era_pin_agree (fgn_echo gf))
       (f0w_at gf s0) _ _
       (uf0bwk ug) _ _ (S gen_id) (uf0w_at_bwk s0) (uf0w_at_bwk0 s0) (uf0bwk_agree ug)
-      (fhead_at gf s0) _ (fhead_at_cur gf s0) (fhead_at_inp gf s0).
+      (fhead_at gf s0) _ (fhead_at_cur gf s0) (fhead_at_inp gf s0)
+      (fun I => uwild (lm_line_at U I) = true).
 
   Lemma union_params_at_T (s0 : fstate) : gT (union_params_at s0) = UT.
   Proof using . reflexivity. Qed.
@@ -99,13 +100,44 @@ Section union_link_inst_at.
   Lemma union_params_at_W (s0 : fstate) : gW (union_params_at s0) = f0w_at gf s0.
   Proof using . reflexivity. Qed.
 
-  (* the links entail the interface at [s0] *)
+  (* the links entail the interface at [s0] ([UnionLinkInst.union_links_gl]'s
+     proof, at the witness pinned to [s0]) *)
   Lemma union_links_gl_at (s0 : fstate) : union_links ug -∗ glinks U (union_params_at s0).
   Proof using .
     iIntros "Hlk". iDestruct (union_links_eq with "Hlk") as %Hc.
-    iApply (peclV_glinks (ugn_pipe ug) U (ucparams ug) (ulm_byte_laws adm_u_g) ∅
-              (uwa ug) Hc (union_params_at s0) eq_refl eq_refl (f0w_at_cw gf s0)
-              (or_introl I) (fhead_at_boot gf s0)).
+    rewrite /glinks /gl_w /gl_blk /gl_pro /gl_head /gl_taint.
+    cbn [gT gPIN gW gH gwild union_params_at].
+    iSplitR; [| iSplitR; [| iSplitR; [| iSplitR]]].
+    - iIntros "!>" (k v P0 b ps0 cs0 s0' I0 Φ)
+        "%H1 %H2 %H3 #Hpin #Hw Ht #Hps #Hcs #HE HΦ".
+      iApply (union_write_link ug Hc k v P0 b ps0 cs0 s0' I0 Φ H1 H2 H3
+                with "Hpin Ht Hps Hcs HE [Hw] [HΦ]"); [by iApply f0w_at_cw |].
+      iIntros "[(Ht & Hps' & Hcs' & HE' & _) | #HT]"; iApply "HΦ";
+        [iLeft; by iFrame "Ht Hps' Hcs' HE'" | by iRight].
+    - iIntros "!>" (k v P0 a b ps0 cs0 s0' I0 Φ)
+        "%H0 %H1 %H2 %H3 %H4 %H5 %H6 %H7 %H8 #Hpin #Hw Ht #Hps #Hcs #HE HΦ".
+      rewrite /lm_abs /lm_line_at in H0 H6 H8.
+      iApply (union_write_link_blk ug Hc k v P0 a b ps0 cs0 s0' I0 Φ
+                (not_true_is_false _ H0) H1 H2 H3 H4 H5 H6 H7 H8
+                with "Hpin Ht Hps Hcs HE [Hw] [HΦ]"); [by iApply f0w_at_cw |].
+      iIntros "[(Ht & Hps' & Hcs' & HE' & _) | #HT]"; iApply "HΦ";
+        [iLeft; by iFrame "Ht Hps' Hcs' HE'" | by iRight].
+    - iIntros "!>" (k v P0 a b ps0 cs0 s0' I0 Φ)
+        "%H1 %H2 %H3 %H4 %H5 %H6 %H7 %H8 #Hpin #Hw Ht #Hps #Hcs #HE HΦ".
+      iApply (union_write_link_pro ug Hc k v P0 a b ps0 cs0 s0' I0 Φ
+                H1 H2 H3 H4 H5 H6 H7 H8
+                with "Hpin Ht Hps Hcs HE [Hw] [HΦ]"); [by iApply f0w_at_cw |].
+      iIntros "[(Ht & Hps' & Hcs' & HE' & _) | #HT]"; iApply "HΦ";
+        [iLeft; by iFrame "Ht Hps' Hcs' HE'" | by iRight].
+    - iIntros "!>" (k v I a b Φ) "%H1 %H2 #Hpin Hh HΦ".
+      iDestruct (fhead_at_boot gf s0 with "Hh")
+        as "(Ht & #Hps & #Hcs & #HE & %s1 & %Hok & Hbt & Hwb)".
+      iApply (union_write_link_first ug Hc k v a b s1 Φ Hok H1 H2
+                with "Hpin Ht Hps Hcs HE Hbt [HΦ Hwb]").
+      iIntros "[(Ht & Hps' & Hcs' & HE' & Hw) | #HT]"; iApply "HΦ"; [| by iRight].
+      iLeft. iExists s1. iFrame "Ht Hps' Hcs' HE'". by iApply "Hwb".
+    - iIntros "!>" (k v b Φ) "_ #HT HΦ".
+      iApply (union_write_link_taint ug Hc with "HT HΦ").
   Qed.
 
   Lemma union_links_gl_w_at (s0 : fstate) : union_links ug -∗ gl_w U (union_params_at s0).
@@ -116,11 +148,14 @@ Section union_link_inst_at.
   Proof using .
     iIntros "Hlk". iDestruct (union_links_gl_at s0 with "Hlk") as "(_ & H & _)". iExact "H".
   Qed.
+  (* the taint's byte at the era's own number, for a device at it *)
   Lemma union_links_gl_taint_at (s0 : fstate) :
-    union_links ug -∗ gl_taint U (union_params_at s0).
+    union_links ug -∗ gl_taint_at U (union_params_at s0) (S gen_id).
   Proof using .
-    iIntros "Hlk". iDestruct (union_links_gl_at s0 with "Hlk") as "(_ & _ & _ & _ & H)".
-    iExact "H".
+    iIntros "Hlk". iDestruct (union_links_eq with "Hlk") as %Hc.
+    rewrite /gl_taint_at. cbn [gT union_params_at].
+    iIntros "!>" (b Φ) "#HT HΦ".
+    iApply (union_write_link_taint ug Hc with "HT HΦ").
   Qed.
 
   (* =================================================================== *)

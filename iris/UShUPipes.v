@@ -218,6 +218,15 @@ Section UShUPipes.
   Context (Hcons : @riscv_cons_res Σ (@riscv_fixedGS Σ _) = ucl ug).
   Context (Hkill : @app_taint Σ (@riscv_fixedGS Σ _) = file_taint (fgn_cl gf)).
 
+  (* THE CLAIM A PIPELINE ROUND WRITES THROUGH: the union's, which pays the
+     N-writer family's obligation at every pipeline line (a pipeline line
+     is not the wild one) *)
+  Lemma ucons_claim : cons_claimV (ugn_pipe ug) ulmG pview_unionU (ucparams ug) ∅ (uwa ug).
+  Proof using Hcons.
+    exists (ucl ug). split; [exact Hcons |].
+    intros v I sR lR HlR. exact (pblkU_ecl_holds ug v I sR (uwild_pv _ _ HlR)).
+  Qed.
+
   (* THE NODES' NAMES: a pipe and two one-shot names per node *)
   Lemma pls_nodes_alloc (n : nat) :
     ⊢ |==> ∃ (P : nat -> pnames) (gF gG : nat -> gname),
@@ -292,7 +301,7 @@ Section UShUPipes.
     rewrite /Qtop. iDestruct "Hq" as "[#HT | [[Hall HRd] | Hter]]".
     - iApply (uWcu_taint ug r s0 PT PD I 0%nat v with "Hpin HT").
     - (* COMMITTED: every writer at its whole source, the loan back *)
-      rewrite /uWcu. iRight. iRight. iSplitR; [done |].
+      rewrite /uWcu. iRight. iRight. iLeft. iSplitR; [done |].
       iSplitR "Hk HRd"; last first.
       { iSplitL; [iApply Hdeed; iFrame "Hk HRd" | iExact "Hcw"]. }
       rewrite /updone_shape.
@@ -365,7 +374,7 @@ Section UShUPipes.
   Proof using .
     iIntros "Hc [Hpre _]".
     rewrite {1}/ush_deed_at. iDestruct "Hpre" as "[Hpre | #HT]"; last by iLeft.
-    iDestruct "Hpre" as (cs' s v') "(Hd & %Htie & #Hty & #Hpin' & #Hcs')".
+    iDestruct "Hpre" as (cs' s v') "(Hd & %Htie & #Hty & #Hpin' & #Hcs' & %Hnw)".
     rewrite /uWcl /lk_lcred. iDestruct "Hc" as (v) "[#Hpin Hc]".
     cbn [lk_pin lk_lpr union_link_inst_at gen_link_inst gwc_lpr]. rewrite /gwc_blk.
     iDestruct "Hc" as "[Hc | #HT]"; last by iLeft.
@@ -520,7 +529,9 @@ Section UShUPipes.
     iIntros (h' m' q) "%Ha0' #Hcmd _ _ HM3 Hcp Hrun".
     iPoseProof (uup_um_usz N' sz _ with "HM3") as "Hsz".
     (* ---- THE LEND AND THE DEED, opened (or the taint) ---- *)
-    iDestruct (uWcu_3 ug r s0 PT PD I with "Hcp") as "Hcp".
+    iDestruct (uWcu_3_nw ug r s0 PT PD I ltac:(rewrite Hul; reflexivity) with "Hcp")
+      as "Hcp".
+    assert (Hnw : uwild (ul I) = false) by (rewrite Hul; reflexivity).
     rewrite uWcf_S3. iDestruct "Hcp" as "[Hc Hpre]".
     iDestruct (uup_pin0 I with "Hc") as "[Hc Hpin0]". iDestruct "Hpin0" as (v0) "#Hpin0".
     iPoseProof (uup_genw N' I v0 Hpeq with "Hcs Hpin0") as "#Hgenw".
@@ -532,12 +543,12 @@ Section UShUPipes.
     iDestruct (udeed_typed s with "Hty") as %[Hsok _].
     pose proof (upv_line_pipe I (PrEcho ws) (F :: fs') Hul) as HlR.
     assert (Hfc : fc_ok (pv_fc pview_unionU (dst_content s)))
-      by exact (pview_union_fc_ok adm_u_g (dst_content s) Hsok).
+      by exact (pview_union_fc_ok adm_u_g adm_s_off (dst_content s) Hsok).
     assert (Hadmit : pns_admV pview_unionU (LPipes (PrEcho ws) (F :: fs')))
       by exact (adm_u_g_echo ws (F :: fs') HF).
     assert (Hplok : pl_ok (LPipes (PrEcho ws) (F :: fs'))) by exact (pl_ok_of_uline _ _ Hok_u).
     (* THE GATE: echo's content is one NUL-free line *)
-    pose proof (pview_union_gate adm_u_g (dst_content s) (PrEcho ws) (F :: fs') Hsok Hok) as Hgate.
+    pose proof (pview_union_gate adm_u_g adm_s_off (dst_content s) (PrEcho ws) (F :: fs') Hsok Hok) as Hgate.
     (* ---- THE ROUND'S ALLOCATION, at the deed's state ---- *)
     iApply uup_fupd_mwp.
     iMod (pls_nodes_alloc (lcats (LPipes (PrEcho ws) (F :: fs')))) as (P gF gG) "Hnodes".
@@ -565,13 +576,13 @@ Section UShUPipes.
     iEval (rewrite E2) in "Hrun".
     (* THE PRODUCER'S LAW: echo's, the loan [True] *)
     iPoseProof (plaw_echo (ghost_varG0 := offbox_offG) pg U pview_unionU CPU ∅ WAU
-                  (uwa_ext ug) Hcons Hkill usup v I (dst_content s) (LPipes (PrEcho ws) (F :: fs'))
+                  (uwa_ext ug) ucons_claim Hkill usup v I (dst_content s) (LPipes (PrEcho ws) (F :: fs'))
                   HlR Hfc Hadmit Hplok (wl_line (drop 1 ws))
                   (UkPipesEntries.pe_line_len ws Hok) (PrEcho ws) True%I γc γm P gF gG
                   (F :: fs') eq_refl eq_refl sa (GS ws (F :: fs') len gb) ws eq_refl Hok Hbytes
                   with "Hfam Hes") as "#Hpl".
     iApply (wp_pipes_round_alloc (ghost_varG0 := offbox_offG) pg U pview_unionU CPU ∅ WAU
-              (uwa_ext ug) Hcons Hkill usup v I (dst_content s) (LPipes (PrEcho ws) (F :: fs'))
+              (uwa_ext ug) ucons_claim Hkill usup v I (dst_content s) (LPipes (PrEcho ws) (F :: fs'))
               HlR Hfc Hadmit Hplok (wl_line (drop 1 ws))
               (UkPipesEntries.pe_line_len ws Hok) (PrEcho ws) True%I γc γm P gF gG
               (UkShFork.ushf_wq Wcu I)
@@ -655,7 +666,9 @@ Section UShUPipes.
     iIntros (h' m' q) "%Ha0' #Hcmd _ _ HM3 Hcp Hrun".
     iPoseProof (uup_um_usz N' sz _ with "HM3") as "Hsz".
     (* ---- THE LEND AND THE DEED, opened (or the taint) ---- *)
-    iDestruct (uWcu_3 ug r s0 PT PD I with "Hcp") as "Hcp".
+    iDestruct (uWcu_3_nw ug r s0 PT PD I ltac:(rewrite Hul; reflexivity) with "Hcp")
+      as "Hcp".
+    assert (Hnw : uwild (ul I) = false) by (rewrite Hul; reflexivity).
     rewrite uWcf_S3. iDestruct "Hcp" as "[Hc Hpre]".
     iDestruct (uup_pin0 I with "Hc") as "[Hc Hpin0]". iDestruct "Hpin0" as (v0) "#Hpin0".
     iPoseProof (uup_genw N' I v0 Hpeq with "Hcs Hpin0") as "#Hgenw".
@@ -675,13 +688,13 @@ Section UShUPipes.
       iFrame "Hdq Htk Hty' Hpin' Hcs'". by iPureIntro. }
     pose proof (upv_line_pipe I (PrCatF nm) (F :: fs') Hul) as HlR.
     assert (Hfc : fc_ok (pv_fc pview_unionU (dst_content s)))
-      by exact (pview_union_fc_ok adm_u_g (dst_content s) Hsok).
+      by exact (pview_union_fc_ok adm_u_g adm_s_off (dst_content s) Hsok).
     assert (Hadmit : pns_admV pview_unionU (LPipes (PrCatF nm) (F :: fs')))
       by exact (proj2 (adm_u_g_catf nm (F :: fs')) (conj Hu HF)).
     assert (Hplok : pl_ok (LPipes (PrCatF nm) (F :: fs'))) by exact (pl_ok_of_uline _ _ Hok_u).
     pose proof (catf_short (dst_content s) nm (Hshort nm)) as HL31.
     (* THE GATE: [f]'s content is one NUL-free line, as the deed types it *)
-    pose proof (pview_union_gate adm_u_g (dst_content s) (PrCatF nm) (F :: fs') Hsok Hok)
+    pose proof (pview_union_gate adm_u_g adm_s_off (dst_content s) (PrCatF nm) (F :: fs') Hsok Hok)
       as Hgate.
     (* ---- THE ROUND'S ALLOCATION, at the deed's state ---- *)
     iApply uup_fupd_mwp.
@@ -711,7 +724,7 @@ Section UShUPipes.
     iEval (rewrite E2) in "Hrun".
     (* THE PRODUCER'S LAW: [cat f]'s, at the deed *)
     iPoseProof (stage_catf_law_holds (ghost_varG0 := offbox_offG) (fgn_cl gf) r Heq pg U
-                  pview_unionU CPU ∅ WAU (uwa_ext ug) Hcons Hkill usup v I (dst_content s)
+                  pview_unionU CPU ∅ WAU (uwa_ext ug) ucons_claim Hkill usup v I (dst_content s)
                   (LPipes (PrCatF nm) (F :: fs')) HlR Hfc Hadmit Hplok
                   (prod_content (pv_fc pview_unionU (dst_content s)) (PrCatF nm)) HL31
                   (PrCatF nm) γc γm P gF gG
@@ -726,7 +739,7 @@ Section UShUPipes.
     { iIntros "!> H". rewrite Hkill. iExact "H". }
     { iIntros "!> H". rewrite Hkill. iExact "H". }
     iApply (wp_pipes_round_alloc (ghost_varG0 := offbox_offG) pg U pview_unionU CPU ∅ WAU
-              (uwa_ext ug) Hcons Hkill usup v I (dst_content s) (LPipes (PrCatF nm) (F :: fs'))
+              (uwa_ext ug) ucons_claim Hkill usup v I (dst_content s) (LPipes (PrCatF nm) (F :: fs'))
               HlR Hfc Hadmit Hplok
               (prod_content (pv_fc pview_unionU (dst_content s)) (PrCatF nm)) HL31
               (PrCatF nm) (fdq r (1/2)%Qp s) γc γm P gF gG

@@ -1829,7 +1829,8 @@ Proof.
                  ltac:(iIntros "_"; iApply Hout_lic)
                  (* no masked program: the wild credential is absent *)
                  wild_none (@wild_none_persistent _) (@wild_none_timeless _)
-                 (wild_none_lic Cres))
+                 (wild_none_lic Cres)
+                 wild_none (@wild_none_persistent _) (@wild_none_timeless _))
             (fun (_ : unit) (_ : nat) => emp%I)
             (* THE TRANSPORT IS THE CLIENT'S at this theorem: it is what
                founds the client's own output claim per era. *)

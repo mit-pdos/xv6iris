@@ -1003,13 +1003,17 @@ Section UShLine.
      beside it, the taint arm pays the ring with
      [ConsoleInv.cons_dirty_cred] and the history with
      [EchoLinks.echo_link_rd_taint]. *)
+  (* the echo instances' reading of the supply, at the dirty credential *)
+  Lemma ush_rdcred_w (T : iProp Σ) : (⊢ T -∗ app_sup) -> ⊢ T -∗ app_rdcred.
+  Proof using . intros H. iIntros "HT". iApply app_rdcred_of_sup. by iApply H. Qed.
+
   Lemma ush_read_pay_era_at {L : LinkRec Σ} (R : ReadRec L) (γ : echo_gn)
       (N : uk_names Σ) (γp : gname) (I : list (bv 8)) :
     (* E2's two readings of the supply *)
     (⊢ app_sup -∗ lk_T L) ->
-    (⊢ lk_T L -∗ app_sup) ->
+    (⊢ lk_T L -∗ app_rdcred) ->
     (* ...and the era's WILD credential's (lane S0) *)
-    (⊢ riscv_wild (S gen_id) -∗ lk_T L) ->
+    (⊢ riscv_rdwild (S gen_id) -∗ lk_T L) ->
     (* the pieces' own pin IS the record's ([lk_pin file_link_inst :=
        era_pin (fgn_echo g)]; at echo it is the identity) *)
     (forall v : era_pins, ⊢ era_pin γ (S gen_id) v -∗ lk_pin L (S gen_id) v) ->
@@ -1062,13 +1066,12 @@ Section UShLine.
       iDestruct "Hp" as (n') "[Hpos _]".
       iSplitL "Hpos".
       + iApply (cons_acc_cred fsc_cons app_rdcred with "[] [Hpos]").
-        * rewrite /cons_dirty_cred. iModIntro. iApply app_rdcred_of_sup.
-          iApply Hts. iExact "HT".
+        * rewrite /cons_dirty_cred. iModIntro. iApply Hts. iExact "HT".
         * iIntros (cur dc). iModIntro.
           rewrite /ush_rd_ret. iRight. iFrame "HT". iExists n'.
           iExact "Hpos".
       + iIntros (ws).
-        iApply (rk_rd_taint L R (S gen_id) ws _ with "Hlk HT").
+        iApply (rk_rd_taint L R ws _ with "Hlk HT").
         iIntros "#HT'". rewrite /ush_rd_in_at. iRight. iExact "HT'".
   Qed.
 
@@ -1084,13 +1087,13 @@ Section UShLine.
       (N : uk_names Σ) (γp : gname) (I : list (bv 8)) :
     (⊢ app_sup -∗ T) ->
     (⊢ T -∗ app_sup) ->
-    (⊢ riscv_wild (S gen_id) -∗ T) ->
+    (⊢ riscv_rdwild (S gen_id) -∗ T) ->
     echo_links T γ -∗
     UkSh.ush_lease N γp T (ush_mid γ γp) I -∗
     cons_acc fsc_cons app_rdcred (ush_rd_ret γp T (length I))
     ∗ cons_read_pay (S gen_id) (ush_rd_in T γ I)
     := fun Hst Hts Hwd =>
-         ush_read_pay_era_at (echo_read_inst T γ) γ N γp I Hst Hts Hwd
+         ush_read_pay_era_at (echo_read_inst T γ) γ N γp I Hst (ush_rdcred_w _ Hts) Hwd
            (rr_ep_refl γ T).
 
   (* ...AND THE DEPOSIT, at its exact former statement: the neutral
@@ -1107,9 +1110,9 @@ Section UShLine.
     l !! 0%nat = Some (FdOpen true wr (FdDevice CONSOLE)) ->
     (* E2's two readings of the supply *)
     (⊢ app_sup -∗ lk_T L) ->
-    (⊢ lk_T L -∗ app_sup) ->
+    (⊢ lk_T L -∗ app_rdcred) ->
     (* ...and the era's WILD credential's (lane S0) *)
-    (⊢ riscv_wild (S gen_id) -∗ lk_T L) ->
+    (⊢ riscv_rdwild (S gen_id) -∗ lk_T L) ->
     (forall v : era_pins, ⊢ era_pin γ (S gen_id) v -∗ lk_pin L (S gen_id) v) ->
     lk_links L -∗
     UkSh.ush_lease N γp (lk_T L) (ush_mid_at (lk_rres L) γ γp) I -∗
@@ -1133,13 +1136,13 @@ Section UShLine.
     l !! 0%nat = Some (FdOpen true wr (FdDevice CONSOLE)) ->
     (⊢ app_sup -∗ T) ->
     (⊢ T -∗ app_sup) ->
-    (⊢ riscv_wild (S gen_id) -∗ T) ->
+    (⊢ riscv_rdwild (S gen_id) -∗ T) ->
     echo_links T γ -∗
     UkSh.ush_lease N γp T (ush_mid γ γp) I -∗
     udepwf_std N m pc USYS_read (ush_read_fam_era T γ γp I (ukn_pay N)) l
     := fun Ha0 Hl0 Hst Hts Hwd =>
          ush_read_sup_era_at (echo_read_inst T γ) γ N γp m pc l I wr
-           Ha0 Hl0 Hst Hts Hwd (rr_ep_refl γ T).
+           Ha0 Hl0 Hst (ush_rdcred_w _ Hts) Hwd (rr_ep_refl γ T).
 
   (* =================================================================== *)
   (*  THE BYTE THE READ DELIVERED IS THE INPUT'S, AT SH'S OWN COUNT       *)
@@ -1189,9 +1192,9 @@ Section UShLine.
     ukn_pay N
       = ucons_pay fsc_cons γp (lk_T L) (ush_rd_x_at (lk_rres L) γ Wb) ->
     (⊢ app_sup -∗ lk_T L) ->
-    (⊢ lk_T L -∗ app_sup) ->
+    (⊢ lk_T L -∗ app_rdcred) ->
     (* ...and the era's WILD credential's (lane S0) *)
-    (⊢ riscv_wild (S gen_id) -∗ lk_T L) ->
+    (⊢ riscv_rdwild (S gen_id) -∗ lk_T L) ->
     (forall v : era_pins, ⊢ era_pin γ (S gen_id) v -∗ lk_pin L (S gen_id) v) ->
     usysno m = USYS_read ->
     bv_signed (trunc32 (m !!! Regidx a0_idx)) = 0 ->
@@ -1394,9 +1397,9 @@ Section UShLine.
     ukn_pay N
       = ucons_pay fsc_cons γp (lk_T L) (ush_rd_x_at (lk_rres L) γ Wb) ->
     (⊢ app_sup -∗ lk_T L) ->
-    (⊢ lk_T L -∗ app_sup) ->
+    (⊢ lk_T L -∗ app_rdcred) ->
     (* ...and the era's WILD credential's (lane S0) *)
-    (⊢ riscv_wild (S gen_id) -∗ lk_T L) ->
+    (⊢ riscv_rdwild (S gen_id) -∗ lk_T L) ->
     (forall v : era_pins, ⊢ era_pin γ (S gen_id) v -∗ lk_pin L (S gen_id) v) ->
     (⊢ lk_links L) ->
     (* AT THE FREE INSTANCE, NAMED (durable-notes, the two-instances
@@ -1427,7 +1430,7 @@ Section UShLine.
     ukn_pay N = ucons_pay fsc_cons γp T (ush_rd_x γ Wb) ->
     (⊢ app_sup -∗ T) ->
     (⊢ T -∗ app_sup) ->
-    (⊢ riscv_wild (S gen_id) -∗ T) ->
+    (⊢ riscv_rdwild (S gen_id) -∗ T) ->
     usysno m = USYS_read ->
     bv_signed (trunc32 (m !!! Regidx a0_idx)) = 0 ->
     uint (m !!! Regidx a1_idx) = a ->
@@ -1454,7 +1457,7 @@ Section UShLine.
     mWP (Loop : expr riscv_lang)
     := fun Hpay Hst Hts Hwd =>
          ush_read_recv_era_at (echo_read_inst T γ) γ Wb N γp l h m pc a k cap
-           I f avail Hpay Hst Hts Hwd (rr_ep_refl γ T).
+           I f avail Hpay Hst (ush_rdcred_w _ Hts) Hwd (rr_ep_refl γ T).
 
   Definition ush_read_recv_leaf_holds (γ : echo_gn) (T : iProp Σ)
       `{!Persistent T} `{!Timeless T} (Wb : list (bv 8) -> iProp Σ)
@@ -1462,12 +1465,12 @@ Section UShLine.
     ukn_pay N = ucons_pay fsc_cons γp T (ush_rd_x γ Wb) ->
     (⊢ app_sup -∗ T) ->
     (⊢ T -∗ app_sup) ->
-    (⊢ riscv_wild (S gen_id) -∗ T) ->
+    (⊢ riscv_rdwild (S gen_id) -∗ T) ->
     (⊢ echo_links T γ) ->
     ⊢ UkSh.ush_read_recv_leaf (PS := uprogSG_free) N γp T
         (ush_mid γ γp) fsc_cons l
     := fun Hpay Hst Hts Hwd =>
          ush_read_recv_leaf_holds_at (echo_read_inst T γ) γ Wb N γp l
-           Hpay Hst Hts Hwd (rr_ep_refl γ T).
+           Hpay Hst (ush_rdcred_w _ Hts) Hwd (rr_ep_refl γ T).
 
 End UShLine.

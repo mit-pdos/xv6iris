@@ -151,13 +151,19 @@ Section union_link_inst.
     - iSplitR; [by iPureIntro |]. subst I. iExact "HE".
   Qed.
 
+  (* THE UNION'S WILD LINES: the input's last line is a [seccomp x] one
+     (seccomp design 10.7) *)
+  Definition uwild_at (I : list (bv 8)) : Prop :=
+    I <> [] /\ rest_of I = [] /\ uwild (lm_line_at U I) = true.
+
   Definition union_params : gen_params U :=
     MkGP U ulmG_laws ulmG_hooks
       UT _ _
       UPIN _ _ (era_pin_agree (fgn_echo gf))
       (f0w gf) _ _
       uf0bwk _ _ (S gen_id) uf0w_bwk uf0w_bwk0 uf0bwk_agree
-      (fhead gf) _ ufhead_cur ufhead_inp.
+      (fhead gf) _ ufhead_cur ufhead_inp
+      (fun I => uwild (lm_line_at U I) = true).
 
   (* =================================================================== *)
   (*  2.  THE LINKS ENTAIL THE INTERFACE                                  *)
@@ -184,12 +190,53 @@ Section union_link_inst.
     iIntros "Hw". rewrite /f0w. iSplitR; [by iPureIntro | iExact "Hw"].
   Qed.
 
-  (* the links are the claim's: the bundle is the record equation *)
+  (* the links are the claim's: the bundle is the record equation (the
+     block-first byte refuses the wild line, seccomp design 10.7) *)
   Lemma union_links_gl : union_links ug -∗ glinks U union_params.
   Proof using .
     iIntros "Hlk". iDestruct (union_links_eq with "Hlk") as %Hc.
-    iApply (peclV_glinks pg U (ucparams ug) (ulm_byte_laws adm_u_g) ∅ (uwa ug) Hc
-              union_params eq_refl eq_refl uf0w_cw (or_introl I) ufhead_boot).
+    rewrite /glinks /gl_w /gl_blk /gl_pro /gl_head /gl_taint.
+    cbn [gT gPIN gW gH gwild union_params].
+    iSplitR; [| iSplitR; [| iSplitR; [| iSplitR]]].
+    - iIntros "!>" (k v P0 b ps0 cs0 s0 I0 Φ)
+        "%H1 %H2 %H3 #Hpin #Hw Ht #Hps #Hcs #HE HΦ".
+      iApply (union_write_link ug Hc k v P0 b ps0 cs0 s0 I0 Φ H1 H2 H3
+                with "Hpin Ht Hps Hcs HE [Hw] [HΦ]"); [by iApply uf0w_cw |].
+      iIntros "[(Ht & Hps' & Hcs' & HE' & _) | #HT]"; iApply "HΦ";
+        [iLeft; by iFrame "Ht Hps' Hcs' HE'" | by iRight].
+    - iIntros "!>" (k v P0 a b ps0 cs0 s0 I0 Φ)
+        "%H0 %H1 %H2 %H3 %H4 %H5 %H6 %H7 %H8 #Hpin #Hw Ht #Hps #Hcs #HE HΦ".
+      rewrite /lm_abs /lm_line_at in H0 H6 H8.
+      iApply (union_write_link_blk ug Hc k v P0 a b ps0 cs0 s0 I0 Φ
+                (not_true_is_false _ H0) H1 H2 H3 H4 H5 H6 H7 H8
+                with "Hpin Ht Hps Hcs HE [Hw] [HΦ]"); [by iApply uf0w_cw |].
+      iIntros "[(Ht & Hps' & Hcs' & HE' & _) | #HT]"; iApply "HΦ";
+        [iLeft; by iFrame "Ht Hps' Hcs' HE'" | by iRight].
+    - iIntros "!>" (k v P0 a b ps0 cs0 s0 I0 Φ)
+        "%H1 %H2 %H3 %H4 %H5 %H6 %H7 %H8 #Hpin #Hw Ht #Hps #Hcs #HE HΦ".
+      iApply (union_write_link_pro ug Hc k v P0 a b ps0 cs0 s0 I0 Φ
+                H1 H2 H3 H4 H5 H6 H7 H8
+                with "Hpin Ht Hps Hcs HE [Hw] [HΦ]"); [by iApply uf0w_cw |].
+      iIntros "[(Ht & Hps' & Hcs' & HE' & _) | #HT]"; iApply "HΦ";
+        [iLeft; by iFrame "Ht Hps' Hcs' HE'" | by iRight].
+    - iIntros "!>" (k v I a b Φ) "%H1 %H2 #Hpin Hh HΦ".
+      iDestruct (ufhead_boot with "Hh") as "(Ht & #Hps & #Hcs & #HE & %s0 & %Hok & Hbt & Hwb)".
+      iApply (union_write_link_first ug Hc k v a b s0 Φ Hok H1 H2
+                with "Hpin Ht Hps Hcs HE Hbt [HΦ Hwb]").
+      iIntros "[(Ht & Hps' & Hcs' & HE' & Hw) | #HT]"; iApply "HΦ"; [| by iRight].
+      iLeft. iExists s0. iFrame "Ht Hps' Hcs' HE'". by iApply "Hwb".
+    - iIntros "!>" (k v b Φ) "_ #HT HΦ".
+      iApply (union_write_link_taint ug Hc with "HT HΦ").
+  Qed.
+
+  (* the taint's byte at the era's own number, for a device at it *)
+  Lemma union_links_gl_taint_now :
+    union_links ug -∗ gl_taint_at U union_params (S gen_id).
+  Proof using .
+    iIntros "Hlk". iDestruct (union_links_eq with "Hlk") as %Hc.
+    rewrite /gl_taint_at. cbn [gT union_params].
+    iIntros "!>" (b Φ) "#HT HΦ".
+    iApply (union_write_link_taint ug Hc with "HT HΦ").
   Qed.
 
   (* =================================================================== *)
@@ -204,10 +251,10 @@ Section union_link_inst.
             ∗ inp_lb v J ∗ turn_lb v (length (lm_proc_before U ps0 cs0 s0 J))
             ∗ ps_lb v ps0 ∗ cs_lb v cs0 ∗ uf0bwk k s0).
   Proof using .
-    intros Hws. iIntros "Hr". rewrite /uread_ret /vread_ret.
+    intros Hws. iIntros "Hr". rewrite /uread_ret.
     iDestruct "Hr" as "[[#HT _] | [_ Hfacts]]"; [by iLeft |].
     iDestruct "Hfacts" as (pops dl)
-      "(%Hrok & %Hdl & %Hpref & %Hidx & %Hdsc & %Hboots & #Hinp & %Hdi & Hrest)".
+      "(%Hrok & %Hdl & %Hpref & %Hidx & %Hdsc & %Hboots & #Hinp & %Hdi & Hrest & _)".
     iDestruct "Hrest" as "[%Hws0 | Hbb]".
     { exfalso. rewrite Hws0 in Hws. cbn in Hws. lia. }
     iDestruct "Hbb" as (cs0 ps0 s0) "(#Hcs0 & #Hps0 & #Hw & %Hbd & #Htlb & %Hrs)".
@@ -236,8 +283,12 @@ Section union_link_inst.
 
   (* THE RECORD'S RESIDUE: the generic cursor bounds, with the typed
      lines' witness beside them ([FileLinksLine.fwc_rresw]'s shape) *)
+  (* ...AND, at an input whose last line is a [seccomp x] one, THE ERA'S
+     WILD TOKEN (or the taint): the read that completed that line minted it
+     (seccomp design 10.4), and the reader's pieces carry it from there *)
   Definition urresw (v : era_pins) (I : list (bv 8)) : iProp Σ :=
-    (gwc_rres U union_params v I ∗ flw gf I)%I.
+    (gwc_rres U union_params v I ∗ flw gf I
+     ∗ (⌜uwild_at I⌝ → usecc_tok_at ug (S gen_id) I ∨ UT))%I.
 
   Global Instance urresw_persistent v I : Persistent (urresw v I).
   Proof using . rewrite /urresw. apply _. Qed.

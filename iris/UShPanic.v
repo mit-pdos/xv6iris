@@ -289,19 +289,19 @@ Section UShPanicGen.
      writer files with its first byte ([EchoLinksLine.echo_blk_step]) --
      sh's own "fork\n" is [a = 3], the exec-failed child's
      "exec echo failed\n" is [a = 1]. *)
-  Lemma ksh_w1_of_link_blk_at (N : uk_names Σ) (v : era_pins)
-      (I : list (bv 8))
-      (l : list fdstate) (rb : bool) (a i : nat) (b : bv 8) :
+  (* ONE BYTE AT fd 2 FROM ANY STEP OF THE CONSOLE LINK: the byte's
+     chain is paid by the step [F0 ~> F1] (the record's block step below;
+     the era's wild licence at the seccomp arm, [UShURoundDefs.uHpanic]) *)
+  Lemma ksh_w1_of_step (N : uk_names Σ) (F0 F1 : iProp Σ)
+      (l : list fdstate) (rb : bool) (b : bv 8) :
     l !! 2%nat = Some (FdOpen rb true (FdDevice CONSOLE)) ->
-    lk_ab L I a !! i = Some b ->
-    lk_pin L (S gen_id) v -∗
-    lk_links L -∗
+    □ (∀ Φ : iProp Σ, F0 -∗ (F1 -∗ Φ) -∗ out_link Uart0 (S gen_id) b Φ) -∗
     UkShDiag.ksh_w1 N (mword_of_int 2 : mword 64) b
-      (UserFd.ustd (ukn_fd N) l ∗ lk_blk L (S gen_id) v I a i)
-      (UserFd.ustd (ukn_fd N) l ∗ lk_blk L (S gen_id) v I a (S i)).
+      (UserFd.ustd (ukn_fd N) l ∗ F0)
+      (UserFd.ustd (ukn_fd N) l ∗ F1).
   Proof using .
-    intros Hl2 Hb.
-    iIntros "#Hpin #Hlk" (ua h m avail) "%Ha0 %Ha1 %Ha2 #Hcode [Hbuf [Hl Hc]] Hrun Hcont".
+    intros Hl2.
+    iIntros "#Hst" (ua h m avail) "%Ha0 %Ha1 %Ha2 #Hcode [Hbuf [Hl Hc]] Hrun Hcont".
     subst ua.
     (* the two halves *)
     iDestruct (ubyte_split with "Hbuf") as "[Hb1 Hb2]".
@@ -311,8 +311,8 @@ Section UShPanicGen.
     set (Q := (fun k : nat =>
                  ubyteq (ukn_d N) (DfracOwn (1/2)) (uint ua) b
                  ∗ match k with
-                   | O => lk_blk L (S gen_id) v I a i
-                   | _ => lk_blk L (S gen_id) v I a (S i)
+                   | O => F0
+                   | _ => F1
                    end)%I).
     assert (Ham1 : (<[Regidx a7_idx := (mword_of_int 16 : mword 64)]> m)
                      !!! Regidx a1_idx = ua)
@@ -360,8 +360,7 @@ Section UShPanicGen.
         { pose proof (HM 0%nat ltac:(lia)) as HM0.
           cbn in HM0. rewrite HM0 in Hb'. by injection Hb'. }
         subst b'.
-        iApply (lk_blk_step L (S gen_id) v I a i b (Q 1%nat)
-                  Hb with "Hpin Hlk Hc [Hb1]").
+        iApply ("Hst" $! (Q 1%nat) with "Hc [Hb1]").
         iIntros "Hres". rewrite /Q. iFrame "Hb1". iExact "Hres". }
     { iApply (ubytesq_of_one with "Hb2"). }
     iIntros (h' ret W cw' cs') "%Hka0 %Hka1 %Hka2 %Htk %Hlz %Hnf Hl Hb2 Hpost Hrun".
@@ -381,12 +380,30 @@ Section UShPanicGen.
     iFrame "Hbuf Hl". iExact "Hc".
   Qed.
 
+  Lemma ksh_w1_of_link_blk_at (N : uk_names Σ) (v : era_pins)
+      (I : list (bv 8))
+      (l : list fdstate) (rb : bool) (a i : nat) (b : bv 8) :
+    l !! 2%nat = Some (FdOpen rb true (FdDevice CONSOLE)) ->
+    lk_ab L I a !! i = Some b ->
+    (⌜¬ lk_wild L I⌝ ∨ lk_T L) -∗
+    lk_pin L (S gen_id) v -∗
+    lk_links L -∗
+    UkShDiag.ksh_w1 N (mword_of_int 2 : mword 64) b
+      (UserFd.ustd (ukn_fd N) l ∗ lk_blk L (S gen_id) v I a i)
+      (UserFd.ustd (ukn_fd N) l ∗ lk_blk L (S gen_id) v I a (S i)).
+  Proof using .
+    intros Hl2 Hb. iIntros "#Hnw #Hpin #Hlk".
+    iApply (ksh_w1_of_step N _ _ l rb b Hl2). iIntros "!>" (Φ) "Hc HΦ".
+    iApply (lk_blk_step L (S gen_id) v I a i b Φ Hb with "Hnw Hpin Hlk Hc HΦ").
+  Qed.
+
   (* ...and the panic's byte is the instance at [a = 3] *)
   Lemma ksh_w1_of_link_panic_at (N : uk_names Σ) (v : era_pins)
       (I : list (bv 8))
       (l : list fdstate) (rb : bool) (i : nat) (b : bv 8) :
     l !! 2%nat = Some (FdOpen rb true (FdDevice CONSOLE)) ->
     alt_panic !! i = Some b ->
+    (⌜¬ lk_wild L I⌝ ∨ lk_T L) -∗
     lk_pin L (S gen_id) v -∗
     lk_links L -∗
     UkShDiag.ksh_w1 N (mword_of_int 2 : mword 64) b
@@ -567,13 +584,14 @@ Section UShPanicGen.
 
   (* ---- the step at the widened boundary, [EchoLinksLine.ewc_lpr] ---- *)
   Lemma prompt_step_lpr_at (v : era_pins) (I : list (bv 8)) :
+    (⌜¬ lk_wild L I⌝ ∨ lk_T L) -∗
     lk_pin L (S gen_id) v -∗ lk_links L -∗
     prompt_step (fun p : nat => lk_lpr L (S gen_id) v I p).
   Proof using .
-    iIntros "#Hpin #Hlk". rewrite /prompt_step.
+    iIntros "#Hnw #Hpin #Hlk". rewrite /prompt_step.
     iIntros "!>" (p b Φ) "%Hb %Hp Hc HΦ".
     iApply (lk_lpr_step L (S gen_id) v I p b Φ Hb Hp
-              with "Hpin Hlk Hc HΦ").
+              with "Hnw Hpin Hlk Hc HΦ").
   Qed.
 
   (* =================================================================== *)
@@ -585,6 +603,7 @@ Section UShPanicGen.
       (l : list fdstate) (rb : bool) :
     lk_apr L I a ->
     l !! 2%nat = Some (FdOpen rb true (FdDevice CONSOLE)) ->
+    (⌜¬ lk_wild L I⌝ ∨ lk_T L) -∗
     lk_pin L (S gen_id) v -∗
     lk_links L -∗
     shk_rodata (ukn_t N) -∗
@@ -594,9 +613,9 @@ Section UShPanicGen.
       (UserFd.ustd (ukn_fd N) l ∗ lk_open_t L (S gen_id) v I).
   Proof using .
     intros Ha Hl2. rewrite <- (lk_lpr_2 L (S gen_id) v I).
-    iIntros "#Hpin #Hlk #Hro" (h m avail)
+    iIntros "#Hnw #Hpin #Hlk #Hro" (h m avail)
       "%Ha0 %Ha1 %Ha2 #Hcode [Hstd Hc] Hrun Hcont".
-    iDestruct (prompt_step_lpr_at v I with "Hpin Hlk") as "#Hst".
+    iDestruct (prompt_step_lpr_at v I with "Hnw Hpin Hlk") as "#Hst".
     iApply (ksh_w_of_link_prompt_fam N
               (fun p : nat => lk_lpr L (S gen_id) v I p) l rb Hl2
               with "Hst Hro [%] [%] [%] Hcode [$Hstd Hc] Hrun Hcont");
@@ -614,6 +633,7 @@ Section UShPanicGen.
   Lemma ksh_w_of_link_lcred_at (N : uk_names Σ) (I : list (bv 8))
       (l : list fdstate) (rb : bool) :
     l !! 2%nat = Some (FdOpen rb true (FdDevice CONSOLE)) ->
+    (⌜¬ lk_wild L I⌝ ∨ lk_T L) -∗
     lk_links L -∗
     shk_rodata (ukn_t N) -∗
     UkSh.ksh_w N (mword_of_int 2 : mword 64)
@@ -621,10 +641,10 @@ Section UShPanicGen.
       (UserFd.ustd (ukn_fd N) l ∗ lk_lcred L (S gen_id) I 0%nat)
       (UserFd.ustd (ukn_fd N) l ∗ lk_lcred L (S gen_id) I 2%nat).
   Proof using .
-    intros Hl2. iIntros "#Hlk #Hro" (h m avail)
+    intros Hl2. iIntros "#Hnw #Hlk #Hro" (h m avail)
       "%Ha0 %Ha1 %Ha2 #Hcode [Hstd Hc] Hrun Hcont".
     rewrite /lk_lcred. iDestruct "Hc" as (v) "[#Hpin Hc]".
-    iDestruct (prompt_step_lpr_at v I with "Hpin Hlk") as "#Hst".
+    iDestruct (prompt_step_lpr_at v I with "Hnw Hpin Hlk") as "#Hst".
     iApply (ksh_w_of_link_prompt_fam N
               (fun p : nat => lk_lpr L (S gen_id) v I p) l rb Hl2
               with "Hst Hro [%] [%] [%] Hcode [$Hstd $Hc] Hrun [Hcont]");
@@ -634,7 +654,8 @@ Section UShPanicGen.
     iExists v. iFrame "Hpin Hc".
   Qed.
 
-  Lemma sh_prompt_law_holds_line_at :
+  (* at a record with no wild line ([lk_wild] empty: echo, the file) *)
+  Lemma sh_prompt_law_holds_line_at (Hnw : forall I, ¬ lk_wild L I) :
     lk_links L -∗
     UShKernel.sh_prompt_law (lk_lcred L (S gen_id)).
   Proof using .
@@ -642,9 +663,33 @@ Section UShPanicGen.
     iIntros "!>" (N) "#Hro". rewrite /UkSh.ush_prompt_law.
     iModIntro. iSplitL "".
     - iIntros (I l) "%Hfd2". destruct Hfd2 as [rb Hl2].
-      iApply (ksh_w_of_link_lcred_at N I l rb Hl2 with "Hlk Hro").
+      iApply (ksh_w_of_link_lcred_at N I l rb Hl2 with "[] Hlk Hro").
+      iLeft. iPureIntro. exact (Hnw I).
     - (* the closed arm (step 3): see [UShOut.sh_prompt_law_holds] *)
       iIntros (l) "%Hcl".
+      iApply (UkWriteClosed.ksh_w_of_closed N (mword_of_int 2)
+                (mword_of_int sh_prompt_pv) 2%nat l 2%nat
+                UShOut.sh_fd2_signed ltac:(unfold NSTD; lia) Hcl).
+  Qed.
+
+  (* ...AT A FAMILY WHOSE HOLDER CARRIES THE LINE'S NOT-WILD FACT (seccomp
+     design 10.10): the union's deed *)
+  Lemma sh_prompt_law_hold_line_at (Hold : list (bv 8) -> iProp Σ)
+      (Hnw : forall I, Hold I ⊢ (⌜¬ lk_wild L I⌝ ∨ lk_T L) ∗ Hold I) :
+    lk_links L -∗
+    UShKernel.sh_prompt_law (fun I p => lk_lcred L (S gen_id) I p ∗ Hold I)%I.
+  Proof using .
+    iIntros "#Hlk". rewrite /UShKernel.sh_prompt_law.
+    iIntros "!>" (N) "#Hro". rewrite /UkSh.ush_prompt_law.
+    iModIntro. iSplitL "".
+    - iIntros (I l) "%Hfd2". destruct Hfd2 as [rb Hl2].
+      iIntros (h m avail) "%Ha0 %Ha1 %Ha2 #Hcode [Hstd [Hc Hh]] Hrun Hcont".
+      iDestruct (Hnw I with "Hh") as "[#Hnw Hh]".
+      iApply (ksh_w_of_link_lcred_at N I l rb Hl2 with "Hnw Hlk Hro [%] [%] [%] Hcode
+                [$Hstd $Hc] Hrun [Hcont Hh]"); [exact Ha0 | exact Ha1 | exact Ha2 |].
+      iIntros (h' ret) "[Hstd Hc] Hrun".
+      iApply ("Hcont" $! h' ret with "[$Hstd $Hc $Hh] Hrun").
+    - iIntros (l) "%Hcl".
       iApply (UkWriteClosed.ksh_w_of_closed N (mword_of_int 2)
                 (mword_of_int sh_prompt_pv) 2%nat l 2%nat
                 UShOut.sh_fd2_signed ltac:(unfold NSTD; lia) Hcl).
@@ -659,7 +704,7 @@ Section UShPanicGen.
   (*      banner-owed credential ([EchoLinksLine.ewc_panic_done]) -- which  *)
   (*      is [UInitBanner.kinit_ban T γ], spelled out.                     *)
   (* =================================================================== *)
-  Lemma ush_panic_law_holds_at :
+  Lemma ush_panic_law_holds_at (Hnw : forall I, ¬ lk_wild L I) :
     lk_links L -∗
     UkShDiag.ush_panic_law (lk_lcred L (S gen_id))
       (fun I : list (bv 8) => ∃ v : era_pins,
@@ -673,7 +718,8 @@ Section UShPanicGen.
     iSplitL "Hc"; [ iExact "Hc" | ].
     iSplit.
     - iIntros "!>" (p b) "%Hb".
-      iApply (ksh_w1_of_link_panic_at N v I l rb p b Hl2 Hb with "Hpin Hlk").
+      iApply (ksh_w1_of_link_panic_at N v I l rb p b Hl2 Hb with "[] Hpin Hlk").
+      iLeft. iPureIntro. exact (Hnw I).
     - iIntros "!> Hp". iExists v. iFrame "Hpin".
       iPoseProof (lk_panic_done L (S gen_id) v I) as "Hd".
       iEval (rewrite (lk_ab_pan L I) alt_panic_len) in "Hd".
@@ -737,7 +783,9 @@ Section UShPanicGen.
   Qed.
 
   (* sh's fork panic, at a family with a linear conjunct *)
-  Lemma ush_panic_law_hold_at (Hold : list (bv 8) -> iProp Σ) :
+  (* the holder carries the line's not-wild fact (seccomp design 10.10) *)
+  Lemma ush_panic_law_hold_at (Hold : list (bv 8) -> iProp Σ)
+      (Hnw : forall I, Hold I ⊢ (⌜¬ lk_wild L I⌝ ∨ lk_T L) ∗ Hold I) :
     lk_links L -∗
     UkShDiag.ush_panic_law
       (fun I p => lk_lcred L (S gen_id) I p ∗ Hold I)%I
@@ -746,6 +794,7 @@ Section UShPanicGen.
   Proof using .
     iIntros "#Hlk". rewrite /UkShDiag.ush_panic_law.
     iIntros "!>" (N I l) "%Hfd2 [Hc Hh]". destruct Hfd2 as [rb Hl2].
+    iDestruct (Hnw I with "Hh") as "[#Hnw Hh]".
     iDestruct (lk_lcred_blk_panic L (S gen_id) I with "Hc") as (v) "[#Hpin Hc]".
     iExists (fun p : nat => lk_panic L (S gen_id) v I p ∗ Hold I)%I.
     iSplitL; [ iFrame "Hc Hh" | ].
@@ -755,7 +804,7 @@ Section UShPanicGen.
                 (UserFd.ustd (ukn_fd N) l)
                 (lk_panic L (S gen_id) v I p)
                 (lk_panic L (S gen_id) v I (S p)) (Hold I)).
-      iApply (ksh_w1_of_link_panic_at N v I l rb p b Hl2 Hb with "Hpin Hlk").
+      iApply (ksh_w1_of_link_panic_at N v I l rb p b Hl2 Hb with "Hnw Hpin Hlk").
     - iIntros "!> [Hp Hh]". iFrame "Hh". iExists v. iFrame "Hpin".
       iPoseProof (lk_panic_done L (S gen_id) v I) as "Hd".
       iEval (rewrite (lk_ab_pan L I) alt_panic_len) in "Hd".
@@ -773,7 +822,7 @@ Section UShPanicGen.
   (*      child's exit hands back and the parent's next prompt is paid     *)
   (*      from.                                                            *)
   (* =================================================================== *)
-  Lemma ush_execfail_law_holds_at (I : list (bv 8)) :
+  Lemma ush_execfail_law_holds_at (I : list (bv 8)) (Hnw : ¬ lk_wild L I) :
     lk_links L -∗
     UkShDiag.ush_execfail_law_at (lk_exfb L I)
       (length (lk_exfb L I) - 2)%nat
@@ -792,7 +841,8 @@ Section UShPanicGen.
       iIntros "!>" (p b) "%Hb %Hlt".
       iApply (ksh_w1_of_link_blk_at N v I l rb (lk_exf L I) p b Hl2
                 ltac:(rewrite (lk_ab_exf L I); exact Hb)
-                with "Hpin Hlk").
+                with "[] Hpin Hlk").
+      { iLeft. by iPureIntro. }
     - iIntros "!> Hp".
       iApply (lk_lcred_of_post_a L (S gen_id) I (lk_exf L I) v
                 (lk_apr_exf L I) with "Hpin").
@@ -801,7 +851,8 @@ Section UShPanicGen.
 
   (* the exec-failed diagnostic, at a family with a linear conjunct *)
   Lemma ush_execfail_law_hold_at (Hold : list (bv 8) -> iProp Σ)
-      (I : list (bv 8)) :
+      (I : list (bv 8))
+      (Hnw : Hold I ⊢ (⌜¬ lk_wild L I⌝ ∨ lk_T L) ∗ Hold I) :
     lk_links L -∗
     UkShDiag.ush_execfail_law_at (lk_exfb L I)
       (length (lk_exfb L I) - 2)%nat
@@ -810,6 +861,7 @@ Section UShPanicGen.
   Proof using .
     iIntros "#Hlk". rewrite /UkShDiag.ush_execfail_law_at.
     iIntros "!>" (N l) "%Hfd2 [Hc Hh]". destruct Hfd2 as [rb Hl2].
+    iDestruct (Hnw with "Hh") as "[#Hnw Hh]".
     iDestruct (lk_lcred_blk_open L (S gen_id) I (lk_exf L I) with "Hc")
       as (v) "[#Hpin Hc]".
     iExists (fun p : nat =>
@@ -824,7 +876,7 @@ Section UShPanicGen.
                 (lk_blk L (S gen_id) v I (lk_exf L I) (S p)) (Hold I)).
       iApply (ksh_w1_of_link_blk_at N v I l rb (lk_exf L I) p b Hl2
                 ltac:(rewrite (lk_ab_exf L I); exact Hb)
-                with "Hpin Hlk").
+                with "Hnw Hpin Hlk").
     - iIntros "!> [Hp Hh]". iFrame "Hh".
       iApply (lk_lcred_of_post_a L (S gen_id) I (lk_exf L I) v
                 (lk_apr_exf L I) with "Hpin").
@@ -844,6 +896,7 @@ Section UShPanicGen.
      open-failed walks. *)
   Lemma ush_diag_law_hold_at_alt (Hold : iProp Σ) (I : list (bv 8))
       (a : nat) :
+    (⌜¬ lk_wild L I⌝ ∨ lk_T L) -∗
     lk_links L -∗
     UkShDiag.ush_execfail_law_at (lk_ab L I a)
       (length (lk_ab L I a) - 2)%nat
@@ -851,7 +904,7 @@ Section UShPanicGen.
       (∃ v : era_pins,
          lk_pin L (S gen_id) v ∗ lk_post L (S gen_id) v I a ∗ Hold).
   Proof using .
-    iIntros "#Hlk". rewrite /UkShDiag.ush_execfail_law_at.
+    iIntros "#Hnw #Hlk". rewrite /UkShDiag.ush_execfail_law_at.
     iIntros "!>" (N l) "%Hfd2 [Hc Hh]". destruct Hfd2 as [rb Hl2].
     iDestruct (lk_lcred_blk_open L (S gen_id) I a with "Hc")
       as (v) "[#Hpin Hc]".
@@ -864,7 +917,7 @@ Section UShPanicGen.
                 (lk_blk L (S gen_id) v I a p)
                 (lk_blk L (S gen_id) v I a (S p)) Hold).
       iApply (ksh_w1_of_link_blk_at N v I l rb a p b Hl2 Hb
-                with "Hpin Hlk").
+                with "Hnw Hpin Hlk").
     - iIntros "!> [Hp Hh]". iExists v. iFrame "Hpin Hh".
       rewrite /lk_post. iExact "Hp".
   Qed.
@@ -892,20 +945,20 @@ Section UShPanicEcho.
   Definition sh_prompt_law_holds_line :
     echo_links T γ -∗
     UShKernel.sh_prompt_law (EchoLinksLine.ewc_lcred T γ (S gen_id))
-    := sh_prompt_law_holds_line_at (echo_link_inst T γ).
+    := sh_prompt_law_holds_line_at (echo_link_inst T γ) (fun _ H => H).
 
   Definition ush_panic_law_holds :
     echo_links T γ -∗
     UkShDiag.ush_panic_law (EchoLinksLine.ewc_lcred T γ (S gen_id))
       (fun I : list (bv 8) => ∃ v : era_pins,
          era_pin γ (S gen_id) v ∗ EchoLinks.ewc_ban T v I 0%nat)%I
-    := ush_panic_law_holds_at (echo_link_inst T γ).
+    := ush_panic_law_holds_at (echo_link_inst T γ) (fun _ H => H).
 
   Definition ush_execfail_law_holds (I : list (bv 8)) :
     echo_links T γ -∗
     UkShDiag.ush_execfail_law
       (EchoLinksLine.ewc_lcred T γ (S gen_id) I 3%nat)
       (EchoLinksLine.ewc_lcred T γ (S gen_id) I 0%nat)
-    := ush_execfail_law_holds_at (echo_link_inst T γ) I.
+    := ush_execfail_law_holds_at (echo_link_inst T γ) I (fun H => H).
 
 End UShPanicEcho.

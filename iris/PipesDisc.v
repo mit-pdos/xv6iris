@@ -874,7 +874,7 @@ Proof using. intros H. left. exact (pbody_byte_of_body b H). Qed.
 Definition pipes_lm (fc : bytes -> option bytes) (adm : pline' -> bool) : lmodel :=
   MkLM unit pline' pl_of plalt plalt_of plpanic (fun _ _ a => plcont a)
        (fun _ _ _ => tt) (fun _ l a => plsafe l a \/ (adm l = true /\ plalt_ok fc l a))
-       (pl_body_ok adm) psbyte pl_ok (fun _ => True) plterm (pl_merge fc adm).
+       (pl_body_ok adm) psbyte pl_ok (fun _ => True) plterm (fun _ => pl_merge fc adm).
 
 Lemma pipes_lm_cont_run fc adm s l b : lm_cont (pipes_lm fc adm) s l (PLRun b) = b ++ u_prompt.
 Proof using. reflexivity. Qed.
@@ -892,8 +892,8 @@ Proof using.
 Qed.
 Lemma pipes_lm_term fc adm a : lm_term (pipes_lm fc adm) a = true <-> exists b, a = PLTerm b.
 Proof using. destruct a; cbn; split; try discriminate; try (intros [? ?]; discriminate); eauto. Qed.
-Lemma pipes_lm_merge fc adm u :
-  lm_merge (pipes_lm fc adm) u <->
+Lemma pipes_lm_merge fc adm l u :
+  lm_merge (pipes_lm fc adm) l u <->
   exists l b, adm l = true /\ plalt_ok fc l (PLTerm b) /\ u `prefix_of` b.
 Proof using. reflexivity. Qed.
 
@@ -1810,7 +1810,7 @@ Proof using.
   - intros s l a _ Hok Ht. destruct a as [| b | b]; [cbn in Ht; discriminate Ht | cbn in Ht; discriminate Ht |].
     apply (pipes_lm_ok_term fc adm s) in Hok as [Ha Hok].
     exists l, b. split; [exact Ha | split; [exact Hok | reflexivity]].
-  - intros u' u Hp (l & b & Ha & Hok & Hu). exists l, b.
+  - intros l0 u' u Hp (l & b & Ha & Hok & Hu). exists l, b.
     split; [exact Ha | split; [exact Hok | etrans; [exact Hp | exact Hu]]].
   - intros s l a _ Hl Hok Hp Ht. destruct a as [| b | b];
       [cbn in Hp; discriminate Hp | | cbn in Ht; discriminate Ht].

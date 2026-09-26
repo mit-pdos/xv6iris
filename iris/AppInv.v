@@ -227,8 +227,10 @@ Section AppInv.
      dirty escrow ([ConsoleInv.cons_dirty_cred]) holds.  A tokenless
      console read is paid by EITHER the supply -- the generic reader, which
      pays [app_sup] ([app_rdcred_of_sup]) -- OR the era's WILD credential
-     ([RiscvPtsto.riscv_wild], [app_rdcred_of_wild]), which a program under
-     a syscall mask holds in place of the supply.  Only the ESCROWED
+     ([RiscvPtsto.riscv_rdwild], [app_rdcred_of_rdwild]) -- the READER-side
+     one, split off the write licence [riscv_wild] (seccomp design 10.7):
+     the dirty outcome hands this credential to whichever reader finds
+     the marker moved, the shell included.  Only the ESCROWED
      proposition widens: the generic tier's supply law still pays
      [app_sup].  The era is the one the escrow is allocated in
      ([ProofMain]), and the reader's console era is [S gen_id] -- the
@@ -236,7 +238,7 @@ Section AppInv.
   Context {GEN : RiscvLang.GenId}.
 
   Definition app_rdcred : iProp Σ :=
-    (app_sup ∨ riscv_wild (S RiscvLang.gen_id))%I.
+    (app_sup ∨ riscv_rdwild (S RiscvLang.gen_id))%I.
 
   Global Instance app_rdcred_persistent : Persistent app_rdcred.
   Proof using . rewrite /app_rdcred. apply _. Qed.
@@ -244,13 +246,13 @@ Section AppInv.
   Lemma app_rdcred_of_sup : app_sup -∗ app_rdcred.
   Proof using . rewrite /app_rdcred. iIntros "H". by iLeft. Qed.
 
-  Lemma app_rdcred_of_wild : riscv_wild (S RiscvLang.gen_id) -∗ app_rdcred.
+  Lemma app_rdcred_of_rdwild : riscv_rdwild (S RiscvLang.gen_id) -∗ app_rdcred.
   Proof using . rewrite /app_rdcred. iIntros "H". by iRight. Qed.
 
   (* ...and its elimination at a Coq-level reading of each arm, which is
      the shape the shell tier's dirty arm spends it at *)
   Lemma app_rdcred_elim (T : iProp Σ) :
-    (⊢ app_sup -∗ T) -> (⊢ riscv_wild (S RiscvLang.gen_id) -∗ T) ->
+    (⊢ app_sup -∗ T) -> (⊢ riscv_rdwild (S RiscvLang.gen_id) -∗ T) ->
     ⊢ app_rdcred -∗ T.
   Proof using .
     intros Hs Hw. rewrite /app_rdcred.

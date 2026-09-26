@@ -20,6 +20,12 @@
 (*      free set satisfying [lmh_free_ok] contains [UPC] of it            *)
 (*      ([no_free_execL]); at an echo pipeline it is [UPE] of it,         *)
 (*      admissible at every state, and free ([demo_execL_echo]);          *)
+(*    - THE SECCOMP LINE (seccomp design section 3), at the knob-on       *)
+(*      model [ulmS]: [echo hi > f] then [seccomp rm f]; the seccomp      *)
+(*      round's arbitrary bytes are in range, it ends the era (D4), and   *)
+(*      after a power cycle [cat f] prints [hi] at an admissible boot     *)
+(*      state; NEGATIVE: a byte typed after the seccomp line is not       *)
+(*      disciplined, and [seccomp] alone is not a line;                   *)
 (*    - GREP STAGES (cut G8, at the union application's [ulmG]):          *)
 (*      [echo foo | grep o | cat] prints the line, [echo foo | grep z |   *)
 (*      cat] nothing (and never the line), [cat f | grep x | cat] prints  *)
@@ -45,9 +51,12 @@ Local Open Scope nat_scope.
 (* ===================================================================== *)
 
 Global Instance uok_dec adm s l a : Decision (uok adm s l a).
-Proof using. destruct l as [ws | ws N | N | [ws | f] n], a as [r | x | x]; cbn [uok]; apply _. Defined.
+Proof using.
+  destruct l as [ws | ws N | N | [ws | f] n | ws], a as [r | x | x | u]; cbn [uok]; apply _.
+Defined.
 
-Global Instance ulm_ok_dec adm s l a : Decision (lm_ok (ulm adm) s l a) := uok_dec adm s l a.
+Global Instance ulm_ok_dec adm adm_s s l a : Decision (lm_ok (ulm adm adm_s) s l a) :=
+  uok_dec adm s l a.
 
 (* ===================================================================== *)
 (*  1b.  THE HOOKS ([LineModelLinks.lm_hooks]) at every admission          *)
@@ -57,24 +66,38 @@ Global Instance ulm_ok_dec adm s l a : Decision (lm_ok (ulm adm) s l a) := uok_d
 (*  round and [exec cat failed] ([UnionDisc.ufree]).  The boot state      *)
 (*  [lmh_st0] is the file's, the empty map.                                      *)
 (* ===================================================================== *)
-Definition ulm_hooks (adm : pline' -> bool) : lm_hooks (ulm adm) :=
-  MkLMH (ulm adm) ufree ∅ upan uexf uexfb unoc (ulm_ok_dec adm)
+Definition ulm_hooks (adm : pline' -> bool) (adm_s : list (list (bv 8)) -> bool)
+  : lm_hooks (ulm adm adm_s) :=
+  MkLMH (ulm adm adm_s) ufree ∅ upan uexf uexfb unoc (ulm_ok_dec adm adm_s)
     ufree_cont ufree_term (ufree_ok adm)
     (upan_ok adm) upan_free upan_panic
     (uexf_ok adm) uexf_free uexf_nopanic uexf_cont
     (unoc_ok adm) unoc_free unoc_nopanic unoc_cont
     (ucont_prompt adm) (ucont_nonnil adm).
 
-Definition ulmG_hooks : lm_hooks ulmG := ulm_hooks adm_u_g.
+Definition ulmG_hooks : lm_hooks ulmG := ulm_hooks adm_u_g adm_s_off.
 
 (* the hooks' three codes at a pipeline, read back *)
-Lemma ulm_hooks_pan adm p n : lm_dec (ulm adm) (lmh_pan (ulm_hooks adm) (LPipe p n)) = upl p PLPanic.
+Lemma ulm_hooks_pan adm adm_s p n :
+  lm_dec (ulm adm adm_s) (lmh_pan (ulm_hooks adm adm_s) (LPipe p n)) = upl p PLPanic.
 Proof using. exact (ualt_dec_code _). Qed.
-Lemma ulm_hooks_exf adm p n :
-  lm_dec (ulm adm) (lmh_exf (ulm_hooks adm) (LPipe p n)) = upl p (PLRun (pl_exfb (LPipes p n))).
+Lemma ulm_hooks_exf adm adm_s p n :
+  lm_dec (ulm adm adm_s) (lmh_exf (ulm_hooks adm adm_s) (LPipe p n))
+  = upl p (PLRun (pl_exfb (LPipes p n))).
 Proof using. exact (ualt_dec_code _). Qed.
-Lemma ulm_hooks_noc adm p n : lm_dec (ulm adm) (lmh_noc (ulm_hooks adm) (LPipe p n)) = upl p (PLRun []).
+Lemma ulm_hooks_noc adm adm_s p n :
+  lm_dec (ulm adm adm_s) (lmh_noc (ulm_hooks adm adm_s) (LPipe p n)) = upl p (PLRun []).
 Proof using. exact (ualt_dec_code _). Qed.
+
+(* ...and at a seccomp line: the shell's own three, at the file's codes *)
+Lemma ulm_hooks_secc adm adm_s ws :
+  lm_dec (ulm adm adm_s) (lmh_pan (ulm_hooks adm adm_s) (LSecc ws)) = UR RCFork
+  /\ lm_dec (ulm adm adm_s) (lmh_exf (ulm_hooks adm adm_s) (LSecc ws)) = UR RSExec
+  /\ lm_dec (ulm adm adm_s) (lmh_noc (ulm_hooks adm adm_s) (LSecc ws)) = UR RCSilent.
+Proof using.
+  split_and!; [exact (ualt_dec_code (UR RCFork)) | exact (ualt_dec_code (UR RSExec))
+              | exact (ualt_dec_code (UR RCSilent))].
+Qed.
 
 Local Ltac dec_yes := apply (bool_decide_unpack _); vm_compute; exact I.
 Local Ltac dec_no := apply (bool_decide_unpack _); vm_compute; exact I.
@@ -90,7 +113,7 @@ Definition c_hi : list (bv 8) := sb "hi" ++ nl1.
 Definition l_cf2 : uline := LPipe (PrCatF txt_a) (cats 2).
 
 Example demo_parse_cf2 :
-  uline_of_u (sb "cat a.txt | cat | cat") = l_cf2 /\ ubody_ok adm_u_g (sb "cat a.txt | cat | cat").
+  uline_of_u (sb "cat a.txt | cat | cat") = l_cf2 /\ ubody_ok adm_u_g adm_s_off (sb "cat a.txt | cat | cat").
 Proof using. split; [vm_compute; reflexivity | dec_yes]. Qed.
 
 (* at a state holding [c]: the content, then the prompt *)
@@ -210,7 +233,7 @@ Example demo_S3_echo_neg : ~ uok adm_u_g {[txt_a := c_hi]} l_hi1 (UPE (PLRun cor
 Proof using. dec_no. Qed.
 
 (* ---- THE ADMISSION: [cat g] at another name is not admitted ---- *)
-Example demo_adm_other : ~ ubody_ok adm_u_g (sb "cat g | cat").
+Example demo_adm_other : ~ ubody_ok adm_u_g adm_s_off (sb "cat g | cat").
 Proof using. dec_no. Qed.
 
 (* ---- GREP STAGES (cut G8): the lines parse and are admitted ---- *)
@@ -220,12 +243,12 @@ Example demo_grep_parse :
 Proof using. vm_compute. reflexivity. Qed.
 
 Example demo_adm_grep :
-  ubody_ok adm_u_g (sb "echo hi | grep h | cat") /\ ubody_ok adm_u_g (sb "cat a.txt | grep h").
+  ubody_ok adm_u_g adm_s_off (sb "echo hi | grep h | cat") /\ ubody_ok adm_u_g adm_s_off (sb "cat a.txt | grep h").
 Proof using. split; dec_yes. Qed.
 
 (* ...but no pattern-less grep, and no grep of two words *)
 Example demo_adm_grep_neg :
-  ~ ubody_ok adm_u_g (sb "echo hi | grep") /\ ~ ubody_ok adm_u_g (sb "echo hi | grep a b").
+  ~ ubody_ok adm_u_g adm_s_off (sb "echo hi | grep") /\ ~ ubody_ok adm_u_g adm_s_off (sb "echo hi | grep a b").
 Proof using. split; dec_no. Qed.
 
 (* echo foo | grep o | cat: the line passes the gate, so it is printed *)
@@ -308,7 +331,7 @@ Example demo_execL_echo :
   /\ (forall s, lm_ok ulmG s l_hi1 (UPE (PLRun PipeDisc.dg_execL)))
   /\ lmh_free ulmG_hooks (UPE (PLRun PipeDisc.dg_execL)) = true.
 Proof using.
-  split_and!; [exact (ulm_hooks_exf adm_u_g (PrEcho [cmd_echo; sb "hi"]) (cats 1)) | | reflexivity].
+  split_and!; [exact (ulm_hooks_exf adm_u_g adm_s_off (PrEcho [cmd_echo; sb "hi"]) (cats 1)) | | reflexivity].
   intros s. left. right. right. reflexivity.
 Qed.
 
@@ -474,7 +497,7 @@ Definition l_cg_h : uline := LPipe (PrCatF txt_a) [FGrep (sb "h"); FCat].
 
 Example demo_txt_grep :
   uline_of_u (sb "cat a.txt | grep h | cat") = l_cg_h
-  /\ ubody_ok adm_u_g (sb "cat a.txt | grep h | cat")
+  /\ ubody_ok adm_u_g adm_s_off (sb "cat a.txt | grep h | cat")
   /\ lm_ok ulmG {[txt_a := c_hi]} l_cg_h (UPC (PLRun c_hi))
   /\ lm_cont ulmG {[txt_a := c_hi]} l_cg_h (UPC (PLRun c_hi)) = c_hi ++ u_prompt.
 Proof using.
@@ -485,9 +508,204 @@ Qed.
    old one-name class's [f], a binary's name), and the dot anywhere but
    a file name ---- *)
 Example demo_txt_neg :
-  ~ ubody_ok adm_u_g (sb "cat README") /\ ~ ubody_ok adm_u_g (sb "cat f")
-  /\ ~ ubody_ok adm_u_g (sb "echo x > sh") /\ ~ ubody_ok adm_u_g (sb "cat /sh")
-  /\ ~ ubody_ok adm_u_g (sb "cat README | cat")
-  /\ ~ ubody_ok adm_u_g (sb "echo a.txt")
-  /\ ~ ubody_ok adm_u_g (sb "echo hi | grep a.txt").
+  ~ ubody_ok adm_u_g adm_s_off (sb "cat README") /\ ~ ubody_ok adm_u_g adm_s_off (sb "cat f")
+  /\ ~ ubody_ok adm_u_g adm_s_off (sb "echo x > sh") /\ ~ ubody_ok adm_u_g adm_s_off (sb "cat /sh")
+  /\ ~ ubody_ok adm_u_g adm_s_off (sb "cat README | cat")
+  /\ ~ ubody_ok adm_u_g adm_s_off (sb "echo a.txt")
+  /\ ~ ubody_ok adm_u_g adm_s_off (sb "echo hi | grep a.txt").
 Proof using. split_and!; dec_no. Qed.
+(*  4.  THE SECCOMP LINE (seccomp design section 3), at the knob ON        *)
+(*                                                                        *)
+(*  The union application's [ulmG] keeps the seccomp knob OFF until sh's  *)
+(*  seccomp round is proved; these demos run at the model with the knob   *)
+(*  on, [ulmS]: every nonempty word list after [seccomp] admitted.        *)
+(* ===================================================================== *)
+Definition adm_s_on (ws : list (list (bv 8))) : bool := bool_decide (ws <> []).
+Definition ulmS : lmodel := ulm adm_u_g adm_s_on.
+
+Definition ws_rmf : list (list (bv 8)) := [sb "rm"; sb "a"].
+Definition b_secc : list (bv 8) := sb "seccomp rm a".
+
+(* [seccomp rm a] is the seccomp line, admitted with the knob on and not
+   with it off *)
+Example demo_secc_parse :
+  uline_of_u b_secc = LSecc ws_rmf
+  /\ ubody_ok adm_u_g adm_s_on b_secc /\ ~ ubody_ok adm_u_g adm_s_off b_secc.
+Proof using. split_and!; [vm_compute; reflexivity | dec_yes | dec_no]. Qed.
+
+(* ...and [seccomp] alone is not a line: the tail is one or more words *)
+Example demo_secc_alone :
+  secc_parse (sb "seccomp") = None /\ ~ ubody_ok adm_u_g adm_s_on (sb "seccomp").
+Proof using. split; [vm_compute; reflexivity | dec_no]. Qed.
+
+(* ...and the seccomp words are ALPHANUMERIC (design section 3's
+   [wl_alnum]): the dot the file class [stem.txt] is typed through (cut
+   W4) is not among them, so [seccomp rm a.txt] is not a line -- whether
+   the seccomp tail widens to name words is the owner's call *)
+Example demo_secc_nodot :
+  secc_parse (sb "seccomp rm a.txt") = None /\ ~ ubody_ok adm_u_g adm_s_on (sb "seccomp rm a.txt").
+Proof using. split; [vm_compute; reflexivity | dec_no]. Qed.
+
+(* ---- echo hi > a.txt, seccomp rm a; a power cycle; cat a.txt prints hi ---- *)
+Definition b_hif : list (bv 8) := sb "echo hi > a.txt".
+Definition I_sc1 : list (bv 8) := b_hif ++ nl1 ++ b_secc ++ nl1.
+Definition a_sc1 : ualt := UR (RFRan (sel_all (echo_chunks ws_hi))).
+(* the seccomp round's bytes: ANY nonempty run the masked binary printed *)
+Definition a_sc2 : ualt := US (sb "rm: a failed to delete" ++ nl1).
+Definition cs_sc1 : list nat := [ualt_code a_sc1; ualt_code a_sc2].
+
+Lemma sc1_bodies : bodies_of I_sc1 = [b_hif; b_secc].
+Proof using. vm_compute. reflexivity. Qed.
+
+Lemma sc1_line1 : uline_of_u b_hif = LEchoF ws_hi txt_a.
+Proof using. vm_compute. reflexivity. Qed.
+
+Lemma sc1_line2 : uline_of_u b_secc = LSecc ws_rmf.
+Proof using. vm_compute. reflexivity. Qed.
+
+Lemma sc1_at0 : lm_at ulmS cs_sc1 0 = a_sc1.
+Proof using.
+  unfold lm_at. cbn [ulmS ulm lm_dec].
+  rewrite (_ : cs_sc1 !!! 0 = ualt_code a_sc1); [apply ualt_dec_code | reflexivity].
+Qed.
+
+Lemma sc1_at1 : lm_at ulmS cs_sc1 1 = a_sc2.
+Proof using.
+  unfold lm_at. cbn [ulmS ulm lm_dec].
+  rewrite (_ : cs_sc1 !!! 1 = ualt_code a_sc2); [apply ualt_dec_code | reflexivity].
+Qed.
+
+(* the redirect round leaves [a.txt] holding [hi], and the seccomp round
+   leaves it alone *)
+(* (the codes are BUILT: [ualt_code a_sc2] is [4 * encode_nat u + 3], a
+   unary number far too large to compute, so nothing below reduces a
+   code -- it is read back with [ualt_dec_code]) *)
+Lemma sc1_step1 :
+  lm_step ulmS ∅ (lm_of ulmS (bodies_of I_sc1 !!! 0)) a_sc1 = {[txt_a := c_hi]}.
+Proof using.
+  rewrite sc1_bodies. change ([b_hif; b_secc] !!! 0) with b_hif.
+  cbn [ulmS ulm lm_of lm_step]. rewrite sc1_line1. vm_compute. reflexivity.
+Qed.
+
+Lemma sc1_upto1 : lm_upto ulmS cs_sc1 ∅ (bodies_of I_sc1) 1 = {[txt_a := c_hi]}.
+Proof using. cbn [lm_upto]. rewrite sc1_at0. exact sc1_step1. Qed.
+
+Example demo_secc_after : lm_after ulmS cs_sc1 ∅ I_sc1 = {[txt_a := c_hi]}.
+Proof using.
+  rewrite /lm_after (_ : nlines I_sc1 = 2); [| by rewrite /nlines sc1_bodies].
+  cbn [lm_upto]. rewrite sc1_at0 sc1_at1 sc1_step1.
+  cbn [ulmS ulm lm_step ustep a_sc2]. reflexivity.
+Qed.
+
+(* both rounds are in range at the knob on, the seccomp one at its
+   arbitrary bytes *)
+Lemma sc1_ok0 : lm_ok ulmS ∅ (lm_of ulmS (bodies_of I_sc1 !!! 0)) a_sc1.
+Proof using.
+  rewrite sc1_bodies. change ([b_hif; b_secc] !!! 0) with b_hif.
+  change (lm_of ulmS b_hif) with (uline_of_u b_hif). rewrite sc1_line1.
+  change (uok adm_u_g ∅ (LEchoF ws_hi txt_a) a_sc1). dec_yes.
+Qed.
+
+Lemma sc1_ok1 : lm_ok ulmS {[txt_a := c_hi]} (lm_of ulmS (bodies_of I_sc1 !!! 1)) a_sc2.
+Proof using.
+  rewrite sc1_bodies. change ([b_hif; b_secc] !!! 1) with b_secc.
+  change (lm_of ulmS b_secc) with (uline_of_u b_secc). rewrite sc1_line2.
+  change (uok adm_u_g {[txt_a := c_hi]} (LSecc ws_rmf) a_sc2). cbn [uok a_sc2]. discriminate.
+Qed.
+
+Lemma sc1_len : length cs_sc1 = nlines I_sc1.
+Proof using. rewrite /nlines sc1_bodies. reflexivity. Qed.
+
+Lemma sc1_alt0 :
+  lm_ok ulmS (lm_upto ulmS cs_sc1 ∅ (bodies_of I_sc1) 0) (lm_of ulmS (bodies_of I_sc1 !!! 0))
+    (lm_at ulmS cs_sc1 0).
+Proof using. cbn [lm_upto]. rewrite sc1_at0. exact sc1_ok0. Qed.
+
+Lemma sc1_alt1 :
+  lm_ok ulmS (lm_upto ulmS cs_sc1 ∅ (bodies_of I_sc1) 1) (lm_of ulmS (bodies_of I_sc1 !!! 1))
+    (lm_at ulmS cs_sc1 1).
+Proof using. rewrite sc1_upto1 sc1_at1. exact sc1_ok1. Qed.
+
+Lemma sc1_alts_at i : i < nlines I_sc1 ->
+  lm_ok ulmS (lm_upto ulmS cs_sc1 ∅ (bodies_of I_sc1) i) (lm_of ulmS (bodies_of I_sc1 !!! i))
+    (lm_at ulmS cs_sc1 i).
+Proof using.
+  intros Hi. destruct i as [| [| i]]; [exact sc1_alt0 | exact sc1_alt1 |].
+  exfalso. assert (H2 : nlines I_sc1 = 2) by (rewrite /nlines sc1_bodies; reflexivity).
+  rewrite H2 in Hi. lia.
+Qed.
+
+Example demo_secc_alts : lm_alts_ok ulmS ∅ I_sc1 cs_sc1.
+Proof using. exact (conj sc1_len sc1_alts_at). Qed.
+
+(* D4: the seccomp line is the input's last, typed as its last byte *)
+Example demo_secc_d4 : lm_d4 ulmS cs_sc1 ∅ I_sc1.
+Proof using.
+  assert (H2 : nlines I_sc1 = 2) by (rewrite /nlines sc1_bodies; reflexivity).
+  intros i Hi Hex _. destruct i as [| [| i]]; [| | rewrite H2 in Hi; lia].
+  - (* the redirect line ends no coverage *)
+    exfalso. destruct Hex as (c & Hc & Ht). cbn [lm_upto] in Hc. rewrite sc1_bodies in Hc.
+    change ([b_hif; b_secc] !!! 0) with b_hif in Hc.
+    cbn [ulmS ulm lm_of lm_ok lm_term] in Hc, Ht. rewrite sc1_line1 in Hc.
+    destruct c as [r | x | x | u]; cbn [uok uterm] in Hc, Ht; first [discriminate Ht | contradiction].
+  - split; [exact H2 | vm_compute; reflexivity].
+Qed.
+
+(* THE STATE SURVIVED: the next cycle's boot state [a.txt := hi] is admissible
+   against the lines typed before it (the top theorem's boot-state
+   condition, [FileDisc.fadm_boot]), and there [cat a.txt] prints [hi] *)
+Definition I_sc2 : list (bv 8) := cmd_cat txt_a ++ nl1.
+Definition cs_sc2 : list nat := [ualt_code (UR RCRan)].
+
+Example demo_secc_cycle :
+  lm_alts_ok ulmS ∅ I_sc1 cs_sc1 /\ lm_d4 ulmS cs_sc1 ∅ I_sc1
+  /\ fadm_boot (echof_lines_in I_sc1) (lm_after ulmS cs_sc1 ∅ I_sc1)
+  /\ lm_alts_ok ulmS (lm_after ulmS cs_sc1 ∅ I_sc1) I_sc2 cs_sc2
+  /\ lm_cont ulmS (lm_after ulmS cs_sc1 ∅ I_sc1) (lm_of ulmS (bodies_of I_sc2 !!! 0))
+       (lm_at ulmS cs_sc2 0) = c_hi ++ u_prompt.
+Proof using.
+  assert (Hb2 : bodies_of I_sc2 = [cmd_cat txt_a]) by (vm_compute; reflexivity).
+  assert (Hl2 : uline_of_u (cmd_cat txt_a) = LCat txt_a) by (vm_compute; reflexivity).
+  assert (Ha2 : lm_at ulmS cs_sc2 0 = UR RCRan) by exact (ualt_dec_code (UR RCRan)).
+  rewrite demo_secc_after. split_and!.
+  - exact demo_secc_alts.
+  - exact demo_secc_d4.
+  - rewrite /fadm_boot map_Forall_singleton.
+    exists ws_hi, (sel_all (echo_chunks ws_hi)). split_and!.
+    + dec_yes.
+    + apply sel_all_ok.
+    + vm_compute. reflexivity.
+  - assert (H1 : nlines I_sc2 = 1) by (rewrite /nlines Hb2; reflexivity).
+    split; [by rewrite H1 |]. intros i Hi.
+    destruct i as [| i]; [| rewrite H1 in Hi; lia]. cbn [lm_upto]. rewrite Ha2 Hb2.
+    change ([cmd_cat txt_a] !!! 0) with (cmd_cat txt_a).
+    cbn [ulmS ulm lm_of lm_ok]. rewrite Hl2. exact I.
+  - rewrite Ha2 Hb2. change ([cmd_cat txt_a] !!! 0) with (cmd_cat txt_a).
+    cbn [ulmS ulm lm_of lm_cont]. rewrite Hl2. vm_compute. reflexivity.
+Qed.
+
+(* ---- NEGATIVE: a byte typed after the seccomp line's newline is not
+        disciplined -- D4 ends the era's coverage at that line ---- *)
+Definition I_sc_neg : list (bv 8) := b_secc ++ nl1 ++ sb "x".
+
+Example demo_secc_neg : forall s cs, ~ lm_d4 ulmS cs s I_sc_neg.
+Proof using.
+  intros s cs Hd.
+  assert (Hb : bodies_of I_sc_neg = [b_secc]) by (vm_compute; reflexivity).
+  assert (Hr : rest_of I_sc_neg = sb "x") by (vm_compute; reflexivity).
+  enough (Hc : nlines I_sc_neg = 1 /\ rest_of I_sc_neg = [])
+    by (destruct Hc as [_ Hr0]; rewrite Hr in Hr0; discriminate Hr0).
+  apply (Hd 0).
+  - rewrite /nlines Hb. cbn [length]. lia.
+  - exists (US [wl_nl]). split; [| reflexivity].
+    rewrite Hb. change ([b_secc] !!! 0) with b_secc.
+    cbn [ulmS ulm lm_of lm_ok]. rewrite sc1_line2. cbn [uok]. discriminate.
+  - rewrite Hb. change ([b_secc] !!! 0) with b_secc.
+    cbn [ulmS ulm lm_of lm_merge]. rewrite sc1_line2. exact I.
+Qed.
+
+Corollary demo_secc_neg_seg (s : fstate) (seg : list mobs) :
+  ins seg = I_sc_neg -> ~ lm_disc_seg' ulmS s seg.
+Proof using.
+  intros Hi (_ & ps & cs & _ & Hd4 & _). rewrite Hi in Hd4. exact (demo_secc_neg s cs Hd4).
+Qed.

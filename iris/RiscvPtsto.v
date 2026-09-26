@@ -488,8 +488,18 @@ Record app_iface (Σ : gFunctors) := MkAppIface {
          (ev : ConsLog.cons_ev),
          ⌜ConsLog.wild_ev ev⌝ -∗ ⌜ConsLog.cons_ev_ok H ev⌝ -∗
          ai_cons k h H ==∗ ai_cons k h (ConsLog.cons_step H ev));
+  (* THE READER-SIDE WILD CREDENTIAL (seccomp design 10.7): what a
+     tokenless reader under a mask may pay the console escrow's DIRTY arm
+     with ([AppInv.app_rdcred]).  SPLIT OFF [ai_wild]: the dirty outcome
+     hands the escrow's credential to whichever reader finds the marker
+     moved, so a credential here reaches the SHELL -- which a write
+     licence must not.  Every landed application sets it to
+     [fun _ => False] ([wild_none]); no law. *)
+  ai_rdwild : nat -> iProp Σ;
+  ai_rdwild_persistent : forall k, Persistent (ai_rdwild k);
+  ai_rdwild_timeless : forall k, Timeless (ai_rdwild k);
 }.
-Arguments MkAppIface {Σ} _ _ _ _ _ _ _ _ _ _ _ _ _.
+Arguments MkAppIface {Σ} _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _.
 Arguments ai_tag {Σ} _ _. Arguments ai_kill {Σ} _.
 Arguments ai_cons {Σ} _ _ _ _.
 Arguments ai_tag_persistent {Σ} _ _. Arguments ai_tag_timeless {Σ} _ _.
@@ -499,6 +509,8 @@ Arguments ai_lic {Σ} _.
 Arguments ai_wild {Σ} _ _.
 Arguments ai_wild_persistent {Σ} _ _. Arguments ai_wild_timeless {Σ} _ _.
 Arguments ai_wild_lic {Σ} _ _.
+Arguments ai_rdwild {Σ} _ _.
+Arguments ai_rdwild_persistent {Σ} _ _. Arguments ai_rdwild_timeless {Σ} _ _.
 
 (* THE ABSENT WILD CREDENTIAL: what an application with no masked program
    sets [ai_wild] to.  Its law is proved from [False], at ANY claim. *)
@@ -713,6 +725,9 @@ Definition riscv_cons_res `{!riscvFixedGS Σ} :
    interface.  Persistent like the taint, so it too is written bare. *)
 Definition riscv_wild `{!riscvFixedGS Σ} : nat -> iProp Σ :=
   ai_wild riscvF_app_iface.
+(* ...and the reader-side one (seccomp design 10.7) *)
+Definition riscv_rdwild `{!riscvFixedGS Σ} : nat -> iProp Σ :=
+  ai_rdwild riscvF_app_iface.
 
 (* ...and their instances, off the interface's own fields.  They are
    [Global Instance] and not [Existing Instance] because the projections
@@ -739,6 +754,12 @@ Proof using . rewrite /riscv_wild. apply ai_wild_persistent. Qed.
 Global Instance riscv_wild_timeless `{!riscvFixedGS Σ} k :
   Timeless (riscv_wild k).
 Proof using . rewrite /riscv_wild. apply ai_wild_timeless. Qed.
+Global Instance riscv_rdwild_persistent `{!riscvFixedGS Σ} k :
+  Persistent (riscv_rdwild k).
+Proof using . rewrite /riscv_rdwild. apply ai_rdwild_persistent. Qed.
+Global Instance riscv_rdwild_timeless `{!riscvFixedGS Σ} k :
+  Timeless (riscv_rdwild k).
+Proof using . rewrite /riscv_rdwild. apply ai_rdwild_timeless. Qed.
 
 Class riscvGS (Σ : gFunctors) := RiscvGS {
   riscv_fixedGS :: riscvFixedGS Σ;
@@ -1058,7 +1079,8 @@ Definition app_iface_triv (Σ : gFunctors) : app_iface Σ :=
              cons_res_triv (@cons_res_triv_timeless Σ)
              (@cons_res_triv_lic Σ)
              wild_none (@wild_none_persistent Σ) (@wild_none_timeless Σ)
-             (wild_none_lic cons_res_triv).
+             (wild_none_lic cons_res_triv)
+             wild_none (@wild_none_persistent Σ) (@wild_none_timeless Σ).
 
 (* [win_res_triv] lived here. *)
 

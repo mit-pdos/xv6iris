@@ -110,7 +110,7 @@ Section UShPipesDefs.
   Context (WA : gen_wa LM CP sd).
   Hypothesis Hext : forall k l, gext WA k l = pext g k l.
   Local Notation T := (gcT CP).
-  Context (Hcons : @riscv_cons_res Σ (@riscv_fixedGS Σ HRg) = peclV g LM CP sd WA).
+  Context (Hcons : cons_claimV g LM PV CP sd WA).
   Context (v : era_pins) (I : list (bv 8)) (sR : lm_st LM) (lR : pline').
   Hypothesis HlR : pv_line PV (lineV LM I) = Some lR.
   Hypothesis Hfc : fc_ok (pv_fc PV sR).

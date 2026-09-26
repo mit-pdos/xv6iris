@@ -668,3 +668,68 @@ path, the knob, the top theorem's statement through the model.
   invariant).  `UexecSecc.useccomp_image_entry_taint` answers the
   generalised taint entry at a table in the universe and a masked mask;
   S3 uses it.
+
+### 10.9 Two taints in the generic shell tier (owner, 2026-09-25)
+
+The generic sh/init tier (UkSh, UkInit, UInitSh, UShKernel, UShLine) used
+ONE `T` for two jobs, and the token shows they differ: a LINK taint
+licenses console events (the lease, the link families, the read laws,
+`ucons_pay`'s tainted arm), a DEPOSIT taint pays the file system's atomic
+updates (`sh_deps` = `udepw_law 16`, the supply readings, the kill).  A
+token-paid generic write deposit is false at an inode row, so `lk_T :=
+UT ∨ secc_tok` cannot carry the deposit job.  RULING: the tier takes two
+parameters, `T` (link) and `Tk` (deposit), with `□ (Tk -∗ T)`, `□ (Tk -∗
+sh_deps)` and `Tk -∗ app_sup` where `T` did that work before; echo and
+every existing caller instantiate `Tk := T`; the union `T := UT ∨ secc_tok
+(S gen_id)`, `Tk := UT`.  After a tainted read the loop continues through
+the credential's own taint law (`uWcu_taint` at `T`: the `UT` half as
+today, the token half the wild arm), never a generic tainted loop.
+
+### 10.10 No escape; the reader-side credential split off; `read` blocked (owner, 2026-09-25)
+
+Supersedes 10.7's escape and 10.5's `lk_T := T'`:
+- THE BLOCK STEP REFUSES THE WILD LINE.  `ucl_step_write_blk` /
+  `union_write_link_blk` (and `GenLinksLine.gl_blk` through a section
+  parameter `gwild : list (bv 8) -> Prop`, `fun _ => False` at echo/pipe,
+  `is LSecc` at the union) take the premise that the line whose block
+  starts is not the wild line; every caller is a round start at a known
+  line kind.  With it the third arm refutes every presenter and there is
+  no escape, so `lk_T` STAYS `UT`, the link families and the lease never
+  see the token, and the era-pinned taint laws of 10.7 are unnecessary
+  (kept only if already green).  The token reaches the shell tier in
+  ONE way: the read wrapper's transition, landing in `uWcu`'s wild arm.
+- THE READER-SIDE WILD CREDENTIAL IS ITS OWN FIELD.  `app_iface` gets
+  `ai_rdwild : nat -> iProp Σ` (persistent, timeless, no law),
+  `riscv_rdwild`, and `AppInv.app_rdcred := app_sup ∨ riscv_rdwild (S
+  gen_id)`; EVERY instance, the union included, sets it to `fun _ =>
+  False`, so `app_rdcred ⊢ app_sup` and a dirty-ring outcome is the
+  ordinary taint.  Why: the console claim is a single-reader design (a
+  second consuming reader marks the ring dirty and the token holder must
+  absorb by tainting); a shell absorbing a dirty outcome with only the
+  era token has lost its position and cannot be shown never to read a
+  line, and a round on unknown input is unpayable at the token.  No
+  kernel-side fix exists: the dirty path cannot fire the reader's
+  payment (a second consumer breaks the delivered-list chain).
+- HENCE THE MASK ALSO BLOCKS `read` (5): `secc_B := [5;6;15;17;18;19;20]`,
+  `UexecSecc`'s console-read payer is deleted, and `user/seccomp.c`
+  upstream clears bit 5 (owner's decision pending at the time of
+  writing; the proof is built at the widened set).  Under a disciplined
+  trace nothing observable changes -- no input ever arrives after a
+  seccomp line -- but the masked program can read nothing, pipes and
+  inherited files included.  §1's "read the console" is withdrawn.
+
+### 10.11 Lane S2 landed (owner, 2026-09-25)
+
+Accepted as built: the claim is `pwclV pg U ucparams ∅ uwa uwild` (a
+generic three-arm claim in `PipeOutW.v`, with the wild-line predicate as
+a parameter); the token at its own line `secc_tok_at k I0` also carries
+`lm_disc_input I0`; `useccomp_shape I := usecc_tok_at (S gen_id) I ∗ ⌜uwild
+(ul I) = true⌝` is TIED to the shape's line (the tie is what makes the
+next read vacuous by `uterm_read_law`'s argument); the read receipt
+`rd_retW` gives `secc_tok_at k (delivered) ∨ T` and reaches sh through
+`urresw`'s third conjunct.  The refutation lemmas live in
+`GenOutWild.v`.  The narrow tainted-prompt law of 10.9 is NOT needed
+(with `lk_T = UT` the taint still pays `sh_deps`); 10.9 is withdrawn.
+S4 must replace the one knob-off discharge `UInitUnionCC.union_wbn_to`
+(`uwild_disc_off`) by init's licence path, and must never present a
+block-first byte at `LSecc` (the block step's not-wild premise).

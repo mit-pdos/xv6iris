@@ -26,14 +26,14 @@ From stdpp Require Import list.
 
 Local Open Scope nat_scope.
 
-(* which lines are pipelines *)
+(* which lines are pipelines (a [seccomp] line is not one) *)
 Definition uv_line (l : uline) : option pline' :=
   match l with LPipe p fs => Some (LPipes p fs) | _ => None end.
 
 Lemma uv_line_some (l : uline) (pl : pline') :
   uv_line l = Some pl -> exists p fs, l = LPipe p fs /\ pl = LPipes p fs.
 Proof using.
-  destruct l as [ws | ws N | N | p fs]; cbn [uv_line]; try discriminate.
+  destruct l as [ws | ws N | N | p fs | ws]; cbn [uv_line]; try discriminate.
   intros Hq. injection Hq as <-. by exists p, fs.
 Qed.
 
@@ -47,9 +47,10 @@ Definition uv_enc (pl : pline') (a : plalt) : nat := ualt_code (uv_alt pl a).
 Lemma uv_dec (pl : pline') (a : plalt) : ualt_dec (uv_enc pl a) = uv_alt pl a.
 Proof using. unfold uv_enc. by rewrite ualt_dec_code. Qed.
 
-Definition pview_union (adm : pline' -> bool) : pview (ulm adm).
+Definition pview_union (adm : pline' -> bool) (adm_s : list (list (bv 8)) -> bool)
+  : pview (ulm adm adm_s).
 Proof.
-  refine (@MkPV (ulm adm) uv_line files_of adm uv_enc _ _ _ _ _ _).
+  refine (@MkPV (ulm adm adm_s) uv_line files_of adm uv_enc _ _ _ _ _ _).
   - intros s l pl a Hl. destruct (uv_line_some l pl Hl) as (p & n & -> & ->).
     cbn [ulm lm_ok lm_dec]. rewrite uv_dec. destruct p; reflexivity.
   - intros s l pl a Hl. destruct (uv_line_some l pl Hl) as (p & n & -> & ->).
@@ -62,13 +63,14 @@ Proof.
     cbn [ulm lm_step lm_dec]. rewrite uv_dec. destruct p; reflexivity.
   - intros s l pl x Hl Hok. destruct (uv_line_some l pl Hl) as (p & n & -> & ->).
     cbn [ulm lm_ok] in Hok.
-    destruct x as [r | a | a], p as [ws | f]; cbn [uok] in Hok; try contradiction;
+    destruct x as [r | a | a | u], p as [ws | f]; cbn [uok] in Hok; try contradiction;
       exists a; cbn [ulm lm_dec]; rewrite uv_dec; reflexivity.
 Defined.
 
 (* the round's content at a well-formed state is a word line's *)
-Lemma pview_union_fc_ok (adm : pline' -> bool) (s : fstate) :
-  fstate_ok s -> fc_ok (pv_fc (pview_union adm) s).
+Lemma pview_union_fc_ok (adm : pline' -> bool) (adm_s : list (list (bv 8)) -> bool)
+    (s : fstate) :
+  fstate_ok s -> fc_ok (pv_fc (pview_union adm adm_s) s).
 Proof using. exact (files_of_fc_ok s). Qed.
 
 (* THE GATE AT THE UNION's ROUNDS (grep-pipes.md cut G8): the content a
@@ -101,9 +103,10 @@ Proof using.
       apply (f_equal bv_unsigned) in Hq. rewrite H0 in Hq. vm_compute in Hq. discriminate Hq.
 Qed.
 
-Lemma pview_union_gate (adm : pline' -> bool) (s : fstate) (p : producer) (fs : list filt) :
+Lemma pview_union_gate (adm : pline' -> bool) (adm_s : list (list (bv 8)) -> bool)
+    (s : fstate) (p : producer) (fs : list filt) :
   fstate_ok s -> prod_ok p ->
-  Forall (fun F => fok F (prod_content (pv_fc (pview_union adm) s) p)) fs.
+  Forall (fun F => fok F (prod_content (pv_fc (pview_union adm adm_s) s) p)) fs.
 Proof using.
   intros Hs Hp. apply Forall_forall. intros F _. destruct F as [| w]; [exact I |].
   split.
@@ -113,4 +116,4 @@ Qed.
 
 (* the union's view at the union application's admission ([adm_u_g]:
    grep stages admitted, cut G8) *)
-Definition pview_unionU : pview ulmG := pview_union adm_u_g.
+Definition pview_unionU : pview ulmG := pview_union adm_u_g adm_s_off.

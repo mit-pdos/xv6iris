@@ -376,7 +376,7 @@ Section peclV_links.
         iIntros "[(Ht & Hps' & Hcs' & HE' & _) | #HT]"; iApply "HΦ";
           [iLeft; by iFrame "Ht Hps' Hcs' HE'" | by iRight].
       - iIntros "!>" (k v P0 a b ps0 cs0 s0 I0 Φ)
-          "%H1 %H2 %H3 %H4 %H5 %H6 %H7 %H8 #Hpin #Hw Ht #Hps #Hcs #HE HΦ".
+          "_ %H1 %H2 %H3 %H4 %H5 %H6 %H7 %H8 #Hpin #Hw Ht #Hps #Hcs #HE HΦ".
         rewrite /lm_abs /lm_line_at in H6 H8.
         iApply (vwrite_link_blk k v P0 a b ps0 cs0 s0 I0 Φ H1 H2 H3 H4 H5 H6 H7 H8
                   with "Hpin Ht Hps Hcs HE [Hw] [HΦ]"); [by iApply HW |].
@@ -395,7 +395,7 @@ Section peclV_links.
                   with "Hpin Ht Hps Hcs HE Hbt [HΦ Hwb]").
         iIntros "[(Ht & Hps' & Hcs' & HE' & Hw) | #HT]"; iApply "HΦ"; [| by iRight].
         iLeft. iExists s0. iFrame "Ht Hps' Hcs' HE'". by iApply "Hwb".
-      - iIntros "!>" (k b Φ) "#HT HΦ".
+      - iIntros "!>" (k v b Φ) "_ #HT HΦ".
         iApply (vwrite_link_taint with "HT HΦ").
     Qed.
   End glinks_of_peclV.

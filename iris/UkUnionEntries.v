@@ -130,9 +130,9 @@ Proof.
   change (lm_ok ulmG) with (uok adm_u_g). change (lm_dec ulmG) with ualt_dec.
   change (lm_term ulmG) with uterm. rewrite ualt_dec_code.
   split; [| reflexivity].
-  revert Hnp Hok. destruct (lm_line_at U I) as [ws | ws Nf | Nf | p n]; intros Hnp Hok;
-    cbn [uok]; [exact Hok | exact Hok | exact Hok |].
-  exfalso. exact (Hnp p n eq_refl).
+  revert Hnp Hok. destruct (lm_line_at U I) as [ws | ws Nf | Nf | p n | ws]; intros Hnp Hok;
+    cbn [uok]; [exact Hok | exact Hok | exact Hok | | exact Hok].
+  exfalso. exact (proj1 Hnp p n eq_refl).
 Qed.
 
 (* echo's body at the console, at code 0 *)
@@ -241,7 +241,8 @@ Section UkUnionLend.
     assert (Hbodies : lm_body U s1 cs I <$> [0%nat] = [wl_line (drop 1 ws)]).
     { cbn [fmap list_fmap]. rewrite (ulm_echo_body s1 cs I ws Hfl). reflexivity. }
     rewrite -Hbodies.
-    iApply (cons_dev_atc_of_blk0 U (PA sb) LK [0%nat] v I ps cs s1 pos [0%nat] Hw
+    iApply (cons_dev_atc_of_blk0 U (PA sb) LK [0%nat] v I ps cs s1 pos [0%nat]
+              ltac:(cbn [gwild union_params_at]; rewrite Hfl; intros ?; discriminate) Hw
               ltac:(intros x Hx; exact Hx)
               ltac:(constructor; [exact (ulm_echo_adm s1 cs I ws Hfl) | constructor])
               ltac:(rewrite Hbodies; exact Hs)
@@ -270,7 +271,7 @@ Section UkUnionLend.
       (ucat_alts nm content).
   Proof using .
     intros Hw Hfl Hst Hs. iIntros "#Hlk #Hpin Hc".
-    assert (Hnp : uline_nopipe (lm_line_at U I)) by (rewrite Hfl; intros ? ? ?; discriminate).
+    assert (Hnp : uline_nopipe (lm_line_at U I)) by (rewrite Hfl; split; intros; discriminate).
     destruct content as [bs |].
     - assert (Hbodies : lm_body U sb cs I <$> [ualt_code (UR RCRan); ualt_code (UR RCNoOpen)]
                         = [bs; cat_dg_open nm]).
@@ -280,7 +281,8 @@ Section UkUnionLend.
       cbn [ucat_alts]. rewrite -Hbodies.
       iApply (cons_dev_atc_of_blk0 U (PA sb) LK
                 [ualt_code (UR RCRan); ualt_code (UR RCNoOpen)] v I ps cs sb pos
-                [ualt_code (UR RCRan); ualt_code (UR RCNoOpen)] Hw
+                [ualt_code (UR RCRan); ualt_code (UR RCNoOpen)]
+                ltac:(cbn [gwild union_params_at]; rewrite Hfl; intros ?; discriminate) Hw
                 ltac:(intros x Hx; exact Hx)
                 ltac:(constructor;
                       [ apply (ulm_cons_adm_R sb cs I RCRan Hnp); rewrite Hfl; exact Logic.I |];
@@ -295,7 +297,8 @@ Section UkUnionLend.
       cbn [ucat_alts]. rewrite -Hbodies.
       iApply (cons_dev_atc_of_blk0 U (PA sb) LK
                 [ualt_code (UR RCRan); ualt_code (UR RCNoOpen)] v I ps cs sb pos
-                [ualt_code (UR RCRan)] Hw
+                [ualt_code (UR RCRan)]
+                ltac:(cbn [gwild union_params_at]; rewrite Hfl; intros ?; discriminate) Hw
                 ltac:(intros x Hx; apply elem_of_list_singleton in Hx as ->; constructor)
                 ltac:(constructor;
                       [ apply (ulm_cons_adm_R sb cs I RCRan Hnp); rewrite Hfl; exact Logic.I

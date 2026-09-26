@@ -592,8 +592,8 @@ Section umerge.
       rewrite -Hc'. apply lt_here; [discriminate | exact Hso].
   Qed.
 
-  (* [umerge]'s [exists s] IS the state holding one empty class file *)
-  Lemma umerge_spec u : umerge adm u <-> umergeb gp u = true.
+  (* [umerge_p]'s [exists s] IS the state holding one empty class file *)
+  Lemma umerge_spec u : umerge_p adm u <-> umergeb gp u = true.
   Proof using Hadm.
     split.
     - intros (s & _ & Hm). exact (umergeb_complete _ u Hm).
@@ -601,21 +601,29 @@ Section umerge.
       exact (umergeb_sound u Hb).
   Qed.
 
-  Lemma umerge_some_nil u : umerge adm u <-> pl_merge fc0 adm u.
+  Lemma umerge_some_nil u : umerge_p adm u <-> pl_merge fc0 adm u.
   Proof using Hadm.
     split; [intros Hm; apply umergeb_sound, umerge_spec, Hm |].
     intros Hm. exists {[txt_a := []]}. split; [exact fstate_ok_nil1 | exact Hm].
   Qed.
 
-  Lemma umerge_dec (u : bytes) : Decision (umerge adm u).
+  Lemma umerge_p_dec (u : bytes) : Decision (umerge_p adm u).
   Proof using Hadm.
     destruct (umergeb gp u) eqn:H; [left; by apply umerge_spec |].
     right. intros Hm. apply umerge_spec in Hm. congruence.
   Qed.
 
-  (* the silent round's continuation ends no coverage *)
-  Lemma umerge_prompt : ~ umerge adm u_prompt.
-  Proof using Hadm. intros H. apply umerge_spec in H. rewrite umergeb_prompt in H. discriminate H. Qed.
+  (* at a line: [True] at a seccomp line, the pipeline's check elsewhere *)
+  Lemma umerge_dec (l : uline) (u : bytes) : Decision (umerge adm l u).
+  Proof using Hadm. destruct l; cbn [umerge]; [apply umerge_p_dec .. | left; exact I]. Qed.
+
+  (* the silent round's continuation ends no coverage, at a line that is
+     not a seccomp line *)
+  Lemma umerge_prompt l : (forall ws, l <> LSecc ws) -> ~ umerge adm l u_prompt.
+  Proof using Hadm.
+    intros Hl H. destruct l as [ws | ws N | N | p n | ws]; [| | | | exact (Hl ws eq_refl)].
+    all: cbn [umerge] in H; apply umerge_spec in H; rewrite umergeb_prompt in H; discriminate H.
+  Qed.
 End umerge.
 
 (* ===================================================================== *)
@@ -623,26 +631,32 @@ End umerge.
 (* ===================================================================== *)
 
 Definition uterm_line (adm : pline' -> bool) (l : uline) : Prop :=
-  match l with LPipe p n => adm (LPipes p n) = true /\ n <> [] | _ => False end.
+  match l with
+  | LPipe p n => adm (LPipes p n) = true /\ n <> []
+  | LSecc _ => True
+  | _ => False
+  end.
 
 Global Instance uterm_line_dec adm l : Decision (uterm_line adm l).
 Proof using. destruct l; cbn [uterm_line]; apply _. Defined.
 
 (* a line admits a coverage-ending alternative -- at any state -- iff it
-   is an admitted pipeline with a cat *)
+   is an admitted pipeline with a cat, or a seccomp line *)
 Lemma utermex_iff adm s l :
   (exists c, uok adm s l c /\ uterm c = true) <-> uterm_line adm l.
 Proof using.
   split.
-  - intros (c & Hok & Ht). destruct l as [ws | ws N | N | p n].
-    1-3: destruct c as [r | x | x]; cbn [uok uterm] in Hok, Ht;
+  - intros (c & Hok & Ht). destruct l as [ws | ws N | N | p n | ws].
+    1-3: destruct c as [r | x | x | u]; cbn [uok uterm] in Hok, Ht;
          first [discriminate Ht | contradiction].
+    2: exact I.
     destruct (uok_pipe _ _ _ _ _ Hok) as (x & -> & Hx).
     rewrite upl_term in Ht. destruct x as [| b | b]; try discriminate Ht.
     destruct Hx as [Hsafe | [Ha (_ & b' & (W & t & Wm & sp & Hlt & _) & _)]].
     { exfalso. destruct Hsafe as [H | [H | H]]; discriminate H. }
     split; [exact Ha | exact (line_term_pos _ _ _ _ _ Hlt)].
-  - destruct l as [ws | ws N | N | p n]; cbn [uterm_line]; [intros [] | intros [] | intros [] |].
+  - destruct l as [ws | ws N | N | p n | ws]; cbn [uterm_line]; [intros [] | intros [] | intros [] | |].
+    2: { intros _. exists (US [wl_nl]). split; [cbn [uok]; discriminate | reflexivity]. }
     intros [Ha Hn]. exists (upl p (PLTerm dg_fork_b)). split; [| rewrite upl_term; reflexivity].
     apply uok_upl. right. split; [exact Ha | exact (plterm_fork_ok _ p n Hn)].
 Qed.
@@ -664,8 +678,10 @@ Qed.
 Lemma ustep_local s l a g :
   line_file l <> Some g -> files_of (ustep s l a) g = files_of s g.
 Proof using.
-  intros Hl. rewrite /files_of. destruct a as [r | x | x]; cbn [ustep]; [| reflexivity | reflexivity].
-  destruct l as [ws | ws N | N | p n]; cbn [fsm]; [reflexivity | | reflexivity | reflexivity].
+  intros Hl. rewrite /files_of. destruct a as [r | x | x | u]; cbn [ustep];
+    [| reflexivity | reflexivity | reflexivity].
+  destruct l as [ws | ws N | N | p n | ws]; cbn [fsm];
+    [reflexivity | | reflexivity | reflexivity | reflexivity].
   assert (HgN : N <> g) by (intros ->; exact (Hl eq_refl)).
   destruct r; try reflexivity; try (by rewrite lookup_insert_ne).
   destruct (s !! N); [reflexivity | by rewrite lookup_insert_ne].
@@ -678,9 +694,11 @@ Lemma ustep_ins_cases l a N :
   (forall x t, ustep (<[N := x]> t) l a = <[N := x]> (ustep t l a))
   \/ (forall x x' t, ustep (<[N := x]> t) l a = ustep (<[N := x']> t) l a).
 Proof using.
-  destruct a as [r | y | y]; cbn [ustep]; [| left; intros x t; reflexivity | left; intros x t; reflexivity].
-  destruct l as [ws | ws M | M | p n]; cbn [fsm];
-    [left; intros x t; reflexivity | | left; intros x t; reflexivity | left; intros x t; reflexivity].
+  destruct a as [r | y | y | u]; cbn [ustep];
+    [| left; intros x t; reflexivity | left; intros x t; reflexivity | left; intros x t; reflexivity].
+  destruct l as [ws | ws M | M | p n | ws]; cbn [fsm];
+    [left; intros x t; reflexivity | | left; intros x t; reflexivity | left; intros x t; reflexivity
+    | left; intros x t; reflexivity].
   destruct (decide (M = N)) as [-> | HMN].
   - destruct r; try (left; intros x t; reflexivity).
     + right. intros x x' t. by rewrite !insert_insert.
@@ -758,9 +776,10 @@ Lemma uok_local adm s s' l a :
   (forall g, line_file l = Some g -> files_of s g = files_of s' g) ->
   uok adm s l a -> uok adm s' l a.
 Proof using.
-  intros Hf Hok. destruct l as [ws | ws N | N | [ws | g] n]; [exact Hok | exact Hok | exact Hok | |].
+  intros Hf Hok. destruct l as [ws | ws N | N | [ws | g] n | ws];
+    [exact Hok | exact Hok | exact Hok | | | exact Hok].
   - exact (uok_echo_st adm s s' ws n a Hok).
-  - destruct a as [r | x | x]; cbn [uok] in Hok |- *; try contradiction.
+  - destruct a as [r | x | x | u]; cbn [uok] in Hok |- *; try contradiction.
     destruct Hok as [Hs | [Ha Hb]]; [left; exact Hs | right; split; [exact Ha |]].
     exact (plalt_ok_at _ _ g n x (Hf g eq_refl) Hb).
 Qed.
@@ -770,10 +789,10 @@ Lemma ucont_local adm s s' l a :
   (forall g, line_file l = Some g -> files_of s g = files_of s' g) ->
   uok adm s l a -> ucont s l a = ucont s' l a.
 Proof using.
-  intros Hf Hok. destruct a as [r | x | x]; cbn [ucont]; [| reflexivity | reflexivity].
+  intros Hf Hok. destruct a as [r | x | x | u]; cbn [ucont]; [| reflexivity | reflexivity | reflexivity].
   destruct (decide (cont s l r = cont s' l r)) as [E | Hne]; [exact E |].
   pose proof (cont_state_ne _ _ _ _ Hne) as ->. exfalso.
-  destruct l as [ws | ws N | N | p n]; cbn [uok ralt_ok] in Hok; try contradiction.
+  destruct l as [ws | ws N | N | p n | ws]; cbn [uok ralt_ok] in Hok; try contradiction.
   apply Hne. pose proof (Hf N eq_refl) as E. rewrite /files_of in E.
   cbn [cont lname line_file default]. by rewrite E.
 Qed.
@@ -785,8 +804,9 @@ Lemma ustep_agree (Ns : list (list (bv 8))) s s' l a :
   (forall g, line_file l = Some g -> g ∈ Ns) ->
   forall N, N ∈ Ns -> ustep s l a !! N = ustep s' l a !! N.
 Proof using.
-  intros Hag Hl N HN. destruct a as [r | x | x]; cbn [ustep]; [| exact (Hag N HN) | exact (Hag N HN)].
-  destruct l as [ws | ws M | M | p n]; cbn [fsm]; try exact (Hag N HN).
+  intros Hag Hl N HN. destruct a as [r | x | x | u]; cbn [ustep];
+    [| exact (Hag N HN) | exact (Hag N HN) | exact (Hag N HN)].
+  destruct l as [ws | ws M | M | p n | ws]; cbn [fsm]; try exact (Hag N HN).
   pose proof (Hl M eq_refl) as HM.
   destruct r; try exact (Hag N HN);
     try (destruct (decide (M = N)) as [-> | HMN];
@@ -1146,22 +1166,44 @@ Proof using.
   exact (Hc H).
 Qed.
 
+(* THE SECCOMP ROUND'S CANONICAL BYTES (seccomp design section 3): D4
+   makes a seccomp line the input's last complete one with nothing typed
+   after it, so no input point's [done_of] holds it and its continuation
+   is read by no checked point -- one nonempty representative stands for
+   every [US u] ([ucanon]).  [u_seg_at] re-resolves to it. *)
+Definition us0 : list (bv 8) := [wl_nl].
+Definition ucanon (a : ualt) : ualt := match a with US _ => US us0 | _ => a end.
+
+Lemma uok_ucanon adm s l a : uok adm s l a -> uok adm s l (ucanon a).
+Proof using.
+  destruct a as [r | x | x | u]; cbn [ucanon]; try (intros H; exact H).
+  intros H. destruct l as [| | | [|] |]; cbn [uok] in H |- *; first [contradiction | discriminate].
+Qed.
+
 (* the codes a line admits at a state: the file's canonical codes at a
    file line, the pipeline's candidates at the round's content at a
-   pipeline *)
+   pipeline, the shell's three and the canonical terminal arm at a
+   seccomp line *)
 Definition ucands (s : fstate) (l : uline) : list nat :=
   match l with
   | LPipe p n => (fun x => ualt_code (upl p x)) <$> pl_cands (files_of s) (LPipes p n)
-  | _ => (fun c => 3 * c) <$> ralt_cands l
+  | LSecc _ => ((fun c => 4 * c) <$> ralt_cands l) ++ [ualt_code (US us0)]
+  | _ => (fun c => 4 * c) <$> ralt_cands l
   end.
 
-Lemma ucands_complete adm s l a : uok adm s l a -> ualt_code a ∈ ucands s l.
+Lemma ucands_complete adm s l a : uok adm s l a -> ualt_code (ucanon a) ∈ ucands s l.
 Proof using.
-  intros H. destruct l as [ws | ws N | N | p n].
-  1-3: destruct a as [r | x | x]; cbn [uok] in H; try contradiction;
-       cbn [ucands ualt_code]; apply elem_of_list_fmap; exists (ralt_enc r);
+  intros H. destruct l as [ws | ws N | N | p n | ws].
+  1-3: destruct a as [r | x | x | u]; cbn [uok] in H; try contradiction;
+       cbn [ucands ucanon ualt_code]; apply elem_of_list_fmap; exists (ralt_enc r);
        split; [reflexivity | exact (ralt_cands_enc _ r H)].
+  2: { destruct a as [r | x | x | u]; cbn [uok] in H; try contradiction;
+       cbn [ucands ucanon ualt_code]; apply elem_of_app.
+       - left. apply elem_of_list_fmap. exists (ralt_enc r).
+         split; [reflexivity | exact (ralt_cands_enc _ r H)].
+       - right. apply elem_of_list_here. }
   destruct (uok_pipe _ _ _ _ _ H) as (x & -> & Hx). cbn [ucands].
+  rewrite (_ : ucanon (upl p x) = upl p x); [| by destruct p].
   apply elem_of_list_fmap. exists x. split; [reflexivity |].
   apply pl_cands_complete. destruct Hx as [Hs | [_ Hok]]; [left | right]; assumption.
 Qed.
@@ -1180,10 +1222,10 @@ Lemma um_upto_cons (M : lmodel) c cs s b bs i :
   lm_upto M (c :: cs) s (b :: bs) (S i) = lm_upto M cs (lm_step M s (lm_of M b) (lm_dec M c)) bs i.
 Proof using. symmetry. exact (lm_upto_drop M (c :: cs) s (b :: bs) 1 i). Qed.
 
-Lemma ualts_dep_intro (adm : pline' -> bool) s bs cs :
+Lemma ualts_dep_intro (adm : pline' -> bool) (adm_s : list (list (bv 8)) -> bool) s bs cs :
   length cs = length bs ->
   (forall i, i < length bs ->
-             cs !!! i ∈ ucands (lm_upto (ulm adm) cs s bs i) (uline_of_u (bs !!! i))) ->
+             cs !!! i ∈ ucands (lm_upto (ulm adm adm_s) cs s bs i) (uline_of_u (bs !!! i))) ->
   cs ∈ ualts_dep s bs.
 Proof using.
   revert s cs. induction bs as [| b bs IH]; intros s cs Hl H.
@@ -1212,6 +1254,42 @@ Section wire.
     - destruct (IH ltac:(lia)) as (A & B & HE).
       exists A, (B ++ lm_blk M ps cs s bs q). rewrite HE. by rewrite -!app_assoc.
   Qed.
+
+  (* the transcript read at two choice lists that agree below a bound *)
+  Lemma um_pro_idx_at_ext cs1 cs2 q :
+    (forall j, j < q -> lm_panic M (lm_at M cs1 j) = lm_panic M (lm_at M cs2 j)) ->
+    lm_pro_idx M cs1 q = lm_pro_idx M cs2 q.
+  Proof using.
+    induction q as [| q IH]; intros H; [reflexivity |].
+    rewrite !lm_pro_idx_S IH; [| intros j Hj; apply H; lia]. by rewrite (H q ltac:(lia)).
+  Qed.
+
+  Lemma um_upto_at_ext cs1 cs2 s bs q :
+    (forall j, j < q -> forall st l,
+        lm_step M st l (lm_at M cs1 j) = lm_step M st l (lm_at M cs2 j)) ->
+    lm_upto M cs1 s bs q = lm_upto M cs2 s bs q.
+  Proof using.
+    induction q as [| q IH]; intros H; [reflexivity |].
+    cbn [lm_upto]. rewrite IH; [| intros j Hj; apply H; lia]. apply H. lia.
+  Qed.
+
+  Lemma um_seq_at_ext ps cs1 cs2 s bs q :
+    (forall j, j < q -> lm_at M cs1 j = lm_at M cs2 j) ->
+    lm_seq M ps cs1 s bs q = lm_seq M ps cs2 s bs q.
+  Proof using.
+    intros H. induction q as [| q IH]; [reflexivity |].
+    rewrite !lm_seq_S IH; [| intros j Hj; apply H; lia]. f_equal.
+    rewrite /lm_blk /lm_cont_at (H q ltac:(lia)).
+    rewrite (um_upto_at_ext cs1 cs2 s bs q);
+      [| intros j Hj st l; rewrite (H j ltac:(lia)); reflexivity].
+    rewrite (um_pro_idx_at_ext cs1 cs2 q); [reflexivity |].
+    intros j Hj. by rewrite (H j ltac:(lia)).
+  Qed.
+
+  Lemma um_sess_at_ext ps cs1 cs2 s I :
+    (forall j, j < nlines I -> lm_at M cs1 j = lm_at M cs2 j) ->
+    lm_sess M ps cs1 s I = lm_sess M ps cs2 s I.
+  Proof using. intros H. by rewrite /lm_sess (um_seq_at_ext ps cs1 cs2 s _ _ H). Qed.
 
   Lemma um_seq_cont_ext ps cs s1 s2 bs q :
     (forall i, i < q -> lm_cont_at M ps cs s1 bs i = lm_cont_at M ps cs s2 bs i) ->
@@ -1264,6 +1342,35 @@ Section wire.
     eapply infixed_prefix; [exact Hin | exact (Hpt p Hp)].
   Qed.
 End wire.
+
+(* an input point holds strictly fewer inputs than the segment *)
+Lemma um_pres_ins_lt seg p : p ∈ in_pres seg -> length (ins p) < length (ins seg).
+Proof using.
+  revert p. induction seg as [| e seg IH]; intros p Hp; [by apply elem_of_nil in Hp |].
+  change (e :: seg) with ([e] ++ seg). rewrite ins_app length_app.
+  destruct e as [[] c | [] c | |]; cbn [in_pres] in Hp.
+  1: { rewrite ins_in. apply elem_of_cons in Hp as [-> | Hp]; [cbn; lia |].
+       apply elem_of_list_fmap in Hp as (p' & -> & Hp').
+       change (ObsUartIn Uart0 c :: p') with ([ObsUartIn Uart0 c] ++ p').
+       rewrite ins_app ins_in length_app. pose proof (IH p' Hp'). cbn [length]. lia. }
+  all: rewrite ins_snoc_other; [| exact I].
+  all: apply elem_of_list_fmap in Hp as (p' & -> & Hp').
+  all: match goal with |- length (ins (?e :: ?q)) < _ => change (e :: q) with ([e] ++ q) end.
+  all: rewrite ins_app ins_snoc_other; [| exact I].
+  all: cbn [length app]; exact (IH p' Hp').
+Qed.
+
+(* ...so at a segment whose input ends at a newline, no input point holds
+   its last line complete *)
+Lemma um_pres_nlines seg p :
+  p ∈ in_pres seg -> rest_of (ins seg) = [] -> nlines (ins p) <= nlines (ins seg) - 1.
+Proof using.
+  intros Hp Hr. pose proof (um_pres_ins_lt seg p Hp) as Hlt.
+  destruct (ins_prefix _ _ (proj1 (Forall_forall _ _) (in_pres_prefix_all seg) p Hp)) as [z Hz].
+  assert (Hz0 : z <> []) by (intros ->; rewrite app_nil_r in Hz; rewrite Hz in Hlt; lia).
+  rewrite -(ll_nlines_removelast (ins seg) Hr). apply nlines_prefix.
+  rewrite Hz removelast_app; [| exact Hz0]. by eexists.
+Qed.
 
 (* ===================================================================== *)
 (*  7.  THE BOOT-STATE CANONICALISATION, ONE NAME AT A TIME               *)
@@ -1329,17 +1436,25 @@ Definition scandsU (seg : list mobs) : list fstate :=
 
 (* ...at an admission [ud_adm] describes, to the end of the file *)
 Section canon.
-  Context (adm : pline' -> bool) (gp : bool) (gpat : bytes).
+  Context (adm : pline' -> bool) (adm_s : list (list (bv 8)) -> bool) (gp : bool) (gpat : bytes).
   Hypothesis Hadm : ud_adm adm gp gpat.
-  Local Notation U := (ulm adm).
+  Local Notation U := (ulm adm adm_s).
+
+(* the terminal arm of a seccomp round is admitted only at a seccomp line,
+   where every output is mergeable *)
+Lemma um_secc_merge st l u c : uok adm st l (US u) -> umerge adm l c.
+Proof using.
+  intros H. destruct l as [ws | ws N | N | [ws | f] n | ws]; cbn [uok umerge] in H |- *;
+    first [contradiction | exact I].
+Qed.
 
 (* the state a checked round starts in is a state *)
 Lemma upto_fok seg (s : fstate) cs i :
   fstate_ok s -> lm_disc_input U (ins seg) -> lm_alts_ok U s (ins seg) cs ->
   i <= nlines (ins seg) -> fstate_ok (lm_upto U cs s (bodies_of (ins seg)) i).
 Proof using.
-  intros Hs Hin Halts Hi. apply (lm_upto_st_ok U (ulm_laws adm)); [exact Hs | |].
-  - intros j Hj. apply (uline_of_u_ok adm).
+  intros Hs Hin Halts Hi. apply (lm_upto_st_ok U (ulm_laws adm adm_s)); [exact Hs | |].
+  - intros j Hj. apply (uline_of_u_ok adm adm_s).
     destruct (lookup_lt_is_Some_2 (bodies_of (ins seg)) j ltac:(rewrite /nlines in Hi; lia))
       as [b Hb].
     rewrite (list_lookup_total_correct _ _ _ Hb). exact (Forall_lookup_1 _ _ _ _ (proj1 Hin) Hb).
@@ -1436,8 +1551,9 @@ Qed.
 Lemma ucont_pristine t N P l a :
   ucont t l a <> ucont (<[N := P]> t) l a -> a = UR RCRan /\ lname l = N.
 Proof using.
-  destruct a as [r | x | x]; cbn [ucont];
-    [| intros H; exfalso; exact (H eq_refl) | intros H; exfalso; exact (H eq_refl)].
+  destruct a as [r | x | x | u]; cbn [ucont];
+    [| intros H; exfalso; exact (H eq_refl) | intros H; exfalso; exact (H eq_refl)
+     | intros H; exfalso; exact (H eq_refl)].
   intros H. pose proof (cont_state_ne _ _ l r H) as ->. split; [reflexivity |].
   destruct (decide (lname l = N)) as [E | E]; [exact E |]. exfalso. apply H.
   cbn [cont]. rewrite lookup_insert_ne; [reflexivity | congruence].
@@ -1470,9 +1586,9 @@ Proof using.
   assert (Hkeep : ud_good c b0 P l a -> exists P', P `prefix_of` P' /\ P' `prefix_of` b0
                                            /\ P' `sublist_of` Wr /\ ud_good c b0 P' l a)
     by (intros Hg; exists P; split_and!; [reflexivity | exact HPb | exact HPw | exact Hg]).
-  destruct l as [ws | ws N | N | [ws | g] n];
+  destruct l as [ws | ws N | N | [ws | g] n | ws];
     try (apply Hkeep; intros g' n' b' Hl; discriminate Hl).
-  destruct a as [r | x | [| b | b]];
+  destruct a as [r | x | [| b | b] | u];
     try (apply Hkeep; intros g' n' b' _ Ha; discriminate Ha).
   destruct (decide (adm (LPipes (PrCatF g) n) = true
                     /\ plalt_ok (files_of c) (LPipes (PrCatF g) n) (PLRun b)))
@@ -1509,7 +1625,7 @@ Proof using.
   2: { apply (uok_local _ c); [| exact Hok].
        intros g Hg'. rewrite /files_of lookup_insert_ne; [reflexivity |].
        intros ->. exact (Hf Hg'). }
-  destruct l as [ws | ws M | M | [ws | g] n]; cbn [line_file] in Hf; try discriminate Hf;
+  destruct l as [ws | ws M | M | [ws | g] n | ws]; cbn [line_file] in Hf; try discriminate Hf;
     [exact Hok | exact Hok |].
   injection Hf as ->.
   destruct (uok_pipe _ _ _ _ _ Hok) as (x & -> & Hx). apply uok_upl.
@@ -1646,11 +1762,21 @@ Proof using Hadm.
     intros i Hi Hex Hm. destruct (decide (i < nlines_max (in_pres seg))) as [HiN | HiN].
     + rewrite (Hup i ltac:(lia)) in Hex Hm. rewrite (Hat i HiN) (Hcont i HiN) in Hm.
       apply (Hd4 i Hi); [| exact Hm].
-      destruct Hex as (c & Hc & Ht). exact (lml_term_st (ulm_laws adm) _ _ _ Hc Ht _).
-    + exfalso. rewrite (Hge i ltac:(lia) Hi) in Hm. apply (umerge_prompt adm gp gpat Hadm).
-      rewrite -(unoc_cont (lm_upto U cs' (<[N := P]> s) (bodies_of (ins seg)) i)
-                 (uline_of_u (bodies_of (ins seg) !!! i))).
-      exact Hm.
+      destruct Hex as (c & Hc & Ht). exact (lml_term_st (ulm_laws adm adm_s) _ _ _ Hc Ht _).
+    + assert (Hsd : forall l : uline, (exists ws, l = LSecc ws) \/ (forall ws, l <> LSecc ws))
+        by (intros [| | | | ws']; [right; intros; discriminate .. | left; by exists ws']).
+      destruct (Hsd (lm_of U (bodies_of (ins seg) !!! i))) as [[ws Hws] | Hns].
+      * (* an unchecked seccomp line: D4 at the original resolution, where
+           the line's every output is mergeable *)
+        destruct Hex as (c & Hc & Ht). apply (Hd4 i Hi).
+        -- exact (lml_term_st (ulm_laws adm adm_s) _ _ _ Hc Ht _).
+        -- rewrite Hws. exact I.
+      * exfalso. rewrite (Hge i ltac:(lia) Hi) in Hm.
+        apply (umerge_prompt adm gp gpat Hadm (uline_of_u (bodies_of (ins seg) !!! i)));
+          [exact Hns |].
+        rewrite -(unoc_cont (lm_upto U cs' (<[N := P]> s) (bodies_of (ins seg)) i)
+                   (uline_of_u (bodies_of (ins seg) !!! i))).
+        exact Hm.
   - (* the checked points *)
     intros p Hp. destruct (Hall p Hp) as [Hpo Hpt'].
     assert (Hq : nlines (ins p) <= nlines_max (in_pres seg)) by exact (nlines_max_ge _ _ Hp).
@@ -1738,7 +1864,7 @@ Qed.
 (* ===================================================================== *)
 
 Local Instance u_ok_dec s l a : Decision (lm_ok U s l a) := uok_dec adm s l a.
-Local Instance u_merge_dec u : Decision (lm_merge U u) := umerge_dec adm gp gpat Hadm u.
+Local Instance u_merge_dec l u : Decision (lm_merge U l u) := umerge_dec adm gp gpat Hadm l u.
 
 Local Instance u_input_dec (I : list (bv 8)) : Decision (lm_disc_input U I).
 Proof using. rewrite /lm_disc_input. cbn [ulm lm_body_ok lm_body_byte]. apply _. Qed.
@@ -1767,7 +1893,7 @@ Proof using Hadm.
   destruct (decide (Forall (fun i =>
       (exists c, lm_ok U (lm_upto U cs s (bodies_of I) i) (lm_of U (bodies_of I !!! i)) c
                  /\ lm_term U c = true) ->
-      lm_merge U (lm_cont U (lm_upto U cs s (bodies_of I) i)
+      lm_merge U (lm_of U (bodies_of I !!! i)) (lm_cont U (lm_upto U cs s (bodies_of I) i)
                     (lm_of U (bodies_of I !!! i)) (lm_at U cs i)) ->
       nlines I = S i /\ rest_of I = []) (seq 0 (nlines I)))) as [H | H].
   - left. intros i Hi Hex Hm. rewrite Forall_forall in H.
@@ -1815,26 +1941,57 @@ Proof using Hadm. rewrite /u_rhs. apply _. Qed.
 Lemma u_seg_at seg s : lm_disc_seg' U s seg -> u_found seg s.
 Proof using.
   intros [Hin (ps & cs & Halts & Hd4 & Hall)]. rewrite /u_found.
-  pose (cs0 := (fun c => ualt_code (ualt_dec c)) <$> cs).
-  assert (Hext : forall j, lm_at U cs0 j = lm_at U cs j).
+  (* the choice list canonicalised: every code through [ualt_code o
+     ualt_dec], and the seccomp round's bytes to [us0] ([ucanon]) *)
+  pose (cs0 := (fun c => ualt_code (ucanon (ualt_dec c))) <$> cs).
+  assert (Hext : forall j, lm_at U cs0 j = ucanon (lm_at U cs j)).
   { intros j. rewrite /lm_at /cs0 !list_lookup_total_alt list_lookup_fmap.
-    destruct (cs !! j) as [c |]; [exact (ualt_dec_code (ualt_dec c)) | reflexivity]. }
+    destruct (cs !! j) as [c |]; [exact (ualt_dec_code _) | reflexivity]. }
+  assert (Hpan : forall j, lm_panic U (lm_at U cs0 j) = lm_panic U (lm_at U cs j))
+    by (intros j; rewrite Hext; by destruct (lm_at U cs j)).
+  assert (Hpi : forall q, lm_pro_idx U cs0 q = lm_pro_idx U cs q)
+    by (intros q; apply um_pro_idx_at_ext; intros j _; exact (Hpan j)).
+  assert (Hup : forall bs q, lm_upto U cs0 s bs q = lm_upto U cs s bs q).
+  { intros bs q. apply um_upto_at_ext. intros j _ st l. rewrite Hext. by destruct (lm_at U cs j). }
   assert (Halts0 : lm_alts_ok U s (ins seg) cs0).
   { split; [rewrite /cs0 length_fmap; exact (proj1 Halts) |]. intros i Hi.
-    rewrite (pde_upto_ext U cs0 cs s _ Hext i) (Hext i). exact (proj2 Halts i Hi). }
+    rewrite Hup Hext. apply uok_ucanon. exact (proj2 Halts i Hi). }
   assert (Hprod : cs0 ∈ ualts_dep s (bodies_of (ins seg))).
-  { apply ualts_dep_intro; [rewrite /cs0 length_fmap; exact (proj1 Halts) |].
+  { apply (ualts_dep_intro adm adm_s); [rewrite /cs0 length_fmap; exact (proj1 Halts) |].
     intros i Hi. rewrite /cs0 list_lookup_total_fmap;
       [| rewrite (proj1 Halts); exact Hi].
-    rewrite (pde_upto_ext U cs0 cs s _ Hext i).
+    rewrite Hup.
     exact (ucands_complete adm _ _ _ (proj2 Halts i Hi)). }
-  assert (Hd40 : lm_d4 U cs0 s (ins seg)) by exact (pde_d4_ext U cs0 cs s _ Hext Hd4).
+  (* A SECCOMP ROUND IS NEVER CHECKED: D4 makes its line the input's last,
+     typed as its last byte, so no input point holds it complete *)
+  assert (Hnus : forall j u, lm_at U cs j = US u ->
+                 forall p, p ∈ in_pres seg -> nlines (ins p) <= j).
+  { intros j u Hu p Hp.
+    assert (Hjl : j < length cs).
+    { destruct (decide (j < length cs)) as [Hl | Hl]; [exact Hl | exfalso].
+      rewrite /lm_at list_lookup_total_alt (lookup_ge_None_2 cs j ltac:(lia)) in Hu.
+      change (lm_dec U (default inhabitant None)) with (ualt_dec 0) in Hu.
+      rewrite ualt_dec_0 in Hu. discriminate Hu. }
+    rewrite (proj1 Halts) in Hjl.
+    pose proof (proj2 Halts j Hjl) as Hok. rewrite Hu in Hok.
+    destruct (Hd4 j Hjl (ex_intro _ (US u) (conj Hok eq_refl))
+                (um_secc_merge _ _ u _ Hok)) as [Hn Hr].
+    pose proof (um_pres_nlines seg p Hp Hr) as Hle. lia. }
+  assert (Hd40 : lm_d4 U cs0 s (ins seg)).
+  { intros i Hi Hex Hm. rewrite Hup in Hex, Hm. apply (Hd4 i Hi Hex).
+    revert Hm. rewrite Hext. destruct (lm_at U cs i) as [r | x | x | u] eqn:Ei;
+      intros Hm; try exact Hm.
+    pose proof (proj2 Halts i Hi) as Hok. rewrite Ei in Hok.
+    exact (um_secc_merge _ _ u _ Hok). }
   assert (Hall0 : forall p, p ∈ in_pres seg ->
             lm_pro_ok U ps cs0 (nlines (ins p)) /\ lm_disc_pt U ps cs0 s p).
   { intros p Hp. destruct (Hall p Hp) as [[HF Hlt] Hpt].
-    rewrite /lm_pro_ok /lm_disc_pt (pde_pro_idx_ext U cs0 cs Hext)
-      (pde_sess_ext U ps cs0 cs s _ Hext).
-    split; [split; [exact HF | exact Hlt] | exact Hpt]. }
+    rewrite /lm_pro_ok /lm_disc_pt Hpi.
+    rewrite (um_sess_at_ext U ps cs0 cs s (done_of (ins p))).
+    - split; [split; [exact HF | exact Hlt] | exact Hpt].
+    - intros j Hj. rewrite nlines_done in Hj. rewrite Hext.
+      destruct (lm_at U cs j) as [r | x | x | u] eqn:Ej; try reflexivity.
+      exfalso. pose proof (Hnus j u Ej p Hp). lia. }
   apply Exists_exists. exists cs0. split; [exact Hprod |]. apply Exists_exists.
   destruct (decide (in_pres seg = [])) as [Hz | Hz].
   { destruct (pro_cands_nonempty (S (lm_pro_idx U cs0 (nlines_max (in_pres seg))))
@@ -1920,7 +2077,15 @@ Proof using.
 Qed.
 
 Global Instance lm_disc_ulmG_dec (h : list mobs) : Decision (lm_disc ulmG h).
-Proof using. exact (ud_disc_dec adm_u_g true ud_gpat adm_u_g_ok h). Qed.
+Proof using. exact (ud_disc_dec adm_u_g adm_s_off true ud_gpat adm_u_g_ok h). Qed.
+
+(* ...AND AT THE SECCOMP KNOB ON ([UnionDiscDec.ulmS], seccomp design
+   section 3): the decider is generic in the knob -- a seccomp round is
+   canonicalised to [US us0] ([u_seg_at]), and an unchecked seccomp line
+   keeps D4 at its original resolution ([u_canon_name]) -- so turning the
+   knob on at the application is this instance at its [adm_s] *)
+Global Instance lm_disc_ulmS_dec (h : list mobs) : Decision (lm_disc ulmS h).
+Proof using. exact (ud_disc_dec adm_u_g adm_s_on true ud_gpat adm_u_g_ok h). Qed.
 
 (* the widened admission is not empty of greps: [cat a.txt | grep a | cat] *)
 Lemma adm_u_g_demo : adm_u_g (LPipes (PrCatF txt_a) [FGrep ud_gpat; FCat]) = true.

@@ -607,7 +607,7 @@ Section UkPipesIface.
   Context (WA : gen_wa M G sd).
   Hypothesis Hext : forall k l, gext WA k l = pext g k l.
   Local Notation T := (gcT G).
-  Context (Hcons : @riscv_cons_res Σ (@riscv_fixedGS Σ HRg) = peclV g M G sd WA).
+  Context (Hcons : cons_claimV g M V G sd WA).
   Context (Hkill : @app_taint Σ (@riscv_fixedGS Σ HRg) = T).
   Hypothesis Hsup : ⊢ □ (T -∗ app_sup).
 
@@ -657,12 +657,13 @@ Section UkPipesIface.
     out_link Uart0 (S gen_id) b Φ.
   Proof using Hadmit Hext HlR Hcons Hfc Hplok dep_tl.
     intros Hw Hc Hb Hok. iIntros "#Hinv HcW HmW HΦ".
-    iApply (blkN_cstep wsN (wids_NoDup _) (peclV g M G sd WA) Hcons RUNN PWN
+    destruct Hcons as (CL & HcCL & Hecl).
+    iApply (blkN_cstep wsN (wids_NoDup _) CL HcCL RUNN PWN
               (PWN_tl g M G v I sR) TKN (TKN_pers M G v I) WITN
               (HWITV M V I sR lR HlR Hfc Hadmit Hplok) TERM TOK dep dep_tl
               pnsN (S gen_id) γc γm w s c b Φ pnsN_uart Hw Hc Hb Hok
               with "[] Hinv HcW HmW [HΦ]").
-    - iApply (pblkV_ecl_holds g M G sd WA Hext v I sR).
+    - iApply (Hecl v I sR lR HlR).
     - iIntros "HcW HmW _". iApply ("HΦ" with "HcW HmW").
   Qed.
 
@@ -686,12 +687,13 @@ Section UkPipesIface.
     out_link Uart0 (S gen_id) b Φ.
   Proof using Hadmit Hext HlR Hcons Hfc Hplok dep_tl.
     intros Hw Hb. iIntros "[(%EXCL & %Hok & #Hex) _] #Hinv HcW HmW Hdep HΦ".
-    iApply (blkN_fire wsN (wids_NoDup _) (peclV g M G sd WA) Hcons RUNN PWN
+    destruct Hcons as (CL & HcCL & Hecl).
+    iApply (blkN_fire wsN (wids_NoDup _) CL HcCL RUNN PWN
               (PWN_tl g M G v I sR) TKN (TKN_pers M G v I) WITN
               (HWITV M V I sR lR HlR Hfc Hadmit Hplok) TERM TOK dep dep_tl
               pnsN (↑pipeN) (S gen_id) γc γm w s b EXCL Φ pnsN_uart pnsN_pipeN Hw Hb Hok
               with "Hex [] Hinv HcW HmW Hdep [HΦ]").
-    - iApply (pblkV_ecl_holds g M G sd WA Hext v I sR).
+    - iApply (Hecl v I sR lR HlR).
     - iIntros "HcW HmW _". iApply ("HΦ" with "HcW HmW").
   Qed.
 

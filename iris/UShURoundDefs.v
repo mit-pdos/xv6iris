@@ -94,6 +94,25 @@ Local Notation K := ulmG_hooks.
 
 (* the round's line and the state before it *)
 Definition ul (I : list (bv 8)) : uline := lm_line_at U I.
+
+(* WITH THE KNOB OFF a disciplined input's last line is not a [seccomp x]
+   line ([UnionDisc.uline_of_u_off]).  Used ONCE, at init's banner reading
+   of sh's wild exit payload ([UInitUnionCC.union_wbn_to]), which S4
+   replaces with the licence path (seccomp design 10.5) *)
+Lemma uwild_disc_off (I : list (bv 8)) :
+  I <> [] -> rest_of I = [] -> lm_disc_input U I -> uwild (ul I) = false.
+Proof using.
+  intros Hne Hr (Hb & _ & _).
+  pose proof (nlines_pos_of_rest_nil I Hne Hr) as Hpos.
+  rewrite /ul /lm_line_at.
+  destruct (lookup_lt_is_Some_2 (bodies_of I) (nlines I - 1)%nat) as [b Hbl];
+    [unfold nlines in Hpos |- *; lia |].
+  rewrite (list_lookup_total_correct _ _ _ Hbl).
+  pose proof (proj1 (Forall_lookup _ _) Hb _ _ Hbl) as Hok.
+  cbn [ulmG ulm lm_body_ok lm_of] in Hok |- *.
+  destruct (uline_of_u b) eqn:He; try reflexivity.
+  exfalso. exact (uline_of_u_off adm_u_g b Hok _ He).
+Qed.
 Definition ust (cs : list nat) (sb : fstate) (I : list (bv 8)) : fstate :=
   lm_upto U cs sb (bodies_of I) (nlines I - 1).
 
@@ -123,11 +142,12 @@ Lemma ustep_noc (s : fstate) (l : uline) :
 Proof using.
   change (lm_step ulmG) with ustep. change (lm_dec ulmG) with ualt_dec.
   change (lmh_noc ulmG_hooks) with unoc.
-  destruct l as [ws | ws Nf | Nf | p n]; cbn [unoc].
+  destruct l as [ws | ws Nf | Nf | p n | ws]; cbn [unoc].
   - rewrite ualt_dec_R. exact (UShFileRedir.fsm_fnoc s (LEcho ws)).
   - rewrite ualt_dec_R. exact (UShFileRedir.fsm_fnoc s (LEchoF ws Nf)).
   - rewrite ualt_dec_R. exact (UShFileRedir.fsm_fnoc s (LCat Nf)).
   - rewrite ualt_dec_code. by destruct p.
+  - rewrite ualt_dec_R. exact (UShFileRedir.fsm_fnoc s (LSecc ws)).
 Qed.
 
 (* a panic alternative moves no file, at every line *)
@@ -135,7 +155,8 @@ Lemma ustep_panic (s : fstate) (l : uline) (a : lm_alt U) :
   lm_panic U a = true -> lm_step U s l a = s.
 Proof using.
   change (lm_step ulmG) with ustep. change (lm_panic ulmG) with upanic.
-  destruct a as [r | x | x]; cbn [upanic ustep]; [| intros _; reflexivity | intros _; reflexivity].
+  destruct a as [r | x | x | u]; cbn [upanic ustep];
+    [| intros _; reflexivity | intros _; reflexivity | intros _; reflexivity].
   intros Hp. exact (UShFileRedir.fsm_panic s l r Hp).
 Qed.
 
@@ -338,7 +359,10 @@ Section UShURoundDefs.
         fown r s
         ∗ ⌜tie cs sb I (dst_content s)⌝
         ∗ f_typed (fgn_cl gf) s
-        ∗ era_pin (fgn_echo gf) (S gen_id) v ∗ cs_lb v cs)
+        ∗ era_pin (fgn_echo gf) (S gen_id) v ∗ cs_lb v cs
+        (* the deed's line is not a [seccomp x] line (seccomp design
+           10.10): a round the claim still disciplines *)
+        ∗ ⌜uwild (ul I) = false⌝)
      ∨ T)%I.
 
   (* the line's witness rides with the deed from the read to the lend *)
@@ -364,8 +388,31 @@ Section UShURoundDefs.
   Global Instance ush_pre_at_timeless sb I : Timeless (ush_pre_at sb I).
   Proof using . rewrite /ush_pre_at. apply _. Qed.
 
+  (* the record's wild lines are the union's [seccomp x] lines *)
+  Lemma ufi_wild (I : list (bv 8)) : lk_wild FI I = (uwild (ul I) = true).
+  Proof using . reflexivity. Qed.
+
+  (* THE DEED SAYS ITS LINE IS NOT WILD (or the taint): what the record's
+     block-first laws take ([LinkRec.lk_blk_step] &c) *)
+  Lemma ush_deed_nw tie sb I :
+    ush_deed_at tie sb I ⊢ (⌜¬ lk_wild FI I⌝ ∨ lk_T FI) ∗ ush_deed_at tie sb I.
+  Proof using .
+    iIntros "Hd". iAssert (⌜¬ lk_wild FI I⌝ ∨ lk_T FI)%I as "#Hnw".
+    { rewrite /ush_deed_at. iDestruct "Hd" as "[Hd | #HT]"; [| by iRight].
+      iDestruct "Hd" as (cs s v) "(_ & _ & _ & _ & _ & %Hnw)". iLeft. iPureIntro.
+      rewrite ufi_wild Hnw. discriminate. }
+    iFrame "Hnw Hd".
+  Qed.
+
   Lemma ush_deed_taint tie sb I : T -∗ ush_deed_at tie sb I.
   Proof using . iIntros "#HT". rewrite /ush_deed_at. by iRight. Qed.
+
+  Lemma ush_pre_nw sb I :
+    ush_pre_at sb I ⊢ (⌜¬ lk_wild FI I⌝ ∨ lk_T FI) ∗ ush_pre_at sb I.
+  Proof using .
+    rewrite /ush_pre_at. iIntros "[Hd Hw]".
+    iDestruct (ush_deed_nw with "Hd") as "[$ Hd]". iFrame "Hd Hw".
+  Qed.
 
   Lemma ush_pre_taint sb I : T -∗ ush_pre_at sb I.
   Proof using .
@@ -381,7 +428,20 @@ Section UShURoundDefs.
     | S (S O) => (uWcl I 2%nat ∗ DONE I)%I
     | _ => (uWcl I 3%nat ∗ PRE I)%I
     end.
-  Definition uWbf (I : list (bv 8)) : iProp Σ := (uWbl I ∗ DONE I)%I.
+  (* THE WILD SHAPE (seccomp design 10.5, 10.10): the era's wild token AT
+     the [seccomp x] line the read completed.  No deed (B3). *)
+  Definition useccomp_shape (I : list (bv 8)) : iProp Σ :=
+    (usecc_tok_at ug (S gen_id) I ∗ ⌜uwild (ul I) = true⌝)%I.
+
+  Global Instance useccomp_shape_persistent I : Persistent (useccomp_shape I).
+  Proof using . rewrite /useccomp_shape. apply _. Qed.
+  Global Instance useccomp_shape_timeless I : Timeless (useccomp_shape I).
+  Proof using . rewrite /useccomp_shape. apply _. Qed.
+
+  (* sh's fork panic at the wild line hands init the shape (S4 proves
+     init's path through the licence) *)
+  Definition uWbf (I : list (bv 8)) : iProp Σ :=
+    ((uWbl I ∗ DONE I) ∨ useccomp_shape I)%I.
 
   Lemma uWcf_0 I :
     uWcf I 0%nat = ((uWcl I 0%nat ∗ DONE I) ∨ (uWcl I 3%nat ∗ PEND I))%I.
@@ -402,6 +462,7 @@ Section UShURoundDefs.
     | |- Timeless (ush_pre_at _ _) => apply ush_pre_at_timeless
     | |- Timeless (ush_done_at _ _) => apply ush_deed_at_timeless
     | |- Timeless (ush_pend_at _ _) => apply ush_deed_at_timeless
+    | |- Timeless (useccomp_shape _) => apply useccomp_shape_timeless
     | |- _ => apply _
     end.
 
@@ -420,7 +481,8 @@ Section UShURoundDefs.
     ush_done_at (dst_content s) [].
   Proof using .
     iIntros "#Hpin #Hcs Hd #Hty". rewrite /ush_done_at /ush_deed_at. iLeft.
-    iExists [], s, v. iFrame "Hd Hpin Hcs Hty". iPureIntro.
+    assert (Hnw : uwild (ul []) = false) by (vm_compute; reflexivity).
+    iExists [], s, v. iFrame "Hd Hpin Hcs Hty %". iPureIntro.
     split; [by rewrite nlines_nil | ].
     rewrite /lm_after nlines_nil. reflexivity.
   Qed.
@@ -478,7 +540,7 @@ Section UShURoundDefs.
     iIntros "[[_ Hx] _]". iDestruct "Hx" as (sR lR pre) "([%HlR _] & _)".
     iPureIntro. change (pv_line pview_unionU (lineV U I)) with (uv_line (ul I)) in HlR.
     destruct (uv_line_some (ul I) lR HlR) as (p & n & Hl & _).
-    exact (Hnp p n Hl).
+    exact (proj1 Hnp p n Hl).
   Qed.
 
   (* the record's block-owed credential, closed at the round's stage *)
@@ -508,7 +570,7 @@ Section UShURoundDefs.
     rewrite {1}/ush_pre_at /ush_deed_at. iDestruct "Hp" as "[Hp _]".
     iDestruct "Hp" as "[Hp | #HT]"; last first.
     { iLeft. iFrame "Hc". iApply (ush_deed_taint with "HT"). }
-    iDestruct "Hp" as (cs' s v') "(Hd & %Htie & #Hty & #Hpin' & #Hcs')".
+    iDestruct "Hp" as (cs' s v') "(Hd & %Htie & #Hty & #Hpin' & #Hcs' & %Hnw)".
     pose proof Htie as [Hlen _].
     rewrite /uWcl /lk_lcred.
     iDestruct "Hc" as (v) "[#Hpin Hc]".
@@ -517,7 +579,7 @@ Section UShURoundDefs.
     iAssert (∀ cs : list nat, ⌜length cs = nlines I⌝ -∗ ⌜cs' `prefix_of` cs⌝ -∗
                cs_lb v cs -∗ fown r s -∗ DONE I)%I as "Hdone".
     { iIntros (cs) "%Hl %Hpre #Hcs Hd". rewrite /ush_done_at /ush_deed_at. iLeft.
-      iExists cs, s, v. iFrame "Hd Hty Hpin Hcs". iPureIntro.
+      iExists cs, s, v. iFrame "Hd Hty Hpin Hcs %". iPureIntro.
       apply (udone_tie_of_pre_prefix cs cs' s0 I _ Htie Hl Hpre).
       intros _. apply Hid. }
     rewrite /gwc_line /gwc_pro /gwc_post /gcur.
@@ -561,7 +623,7 @@ Section UShURoundDefs.
           rewrite /gcur. cbn [gW union_params_at]. rewrite /f0w_at.
           iFrame "Htn Hps Hcs HE Hf". by iPureIntro.
         * rewrite /ush_pend_at /ush_deed_at. iLeft. iExists cs, s, v.
-          iFrame "Hd Hty Hpin Hcs". iPureIntro. exists (lmh_noc K (ul I)).
+          iFrame "Hd Hty Hpin Hcs %". iPureIntro. exists (lmh_noc K (ul I)).
           apply (upend_tie_of_pre cs s0 I _ ltac:(lia) Htie).
       + (* a byte before the prompt: the alternative is filed, deed DONE *)
         cbn [lm_blkcs].
@@ -583,7 +645,7 @@ Section UShURoundDefs.
      [a]'s own step from the round's entry state *)
   Lemma uWcf0_of_posts_alt (I : list (bv 8)) (a : nat) (v v' : era_pins)
       (cs' : list nat) (s : dst) :
-    lm_aprs U I a ->
+    lm_aprs U I a -> uwild (ul I) = false ->
     length cs' = (nlines I - 1)%nat -> (0 < nlines I)%nat ->
     dst_content s = lm_step U (ust cs' s0 I) (ul I) (lm_dec U a) ->
     lk_pin FI (S gen_id) v -∗
@@ -592,7 +654,7 @@ Section UShURoundDefs.
     era_pin (fgn_echo gf) (S gen_id) v' -∗ cs_lb v' cs' -∗
     uWcf I 0%nat.
   Proof using .
-    intros Hapr Hlen Hpos Hc.
+    intros Hapr Hnw Hlen Hpos Hc.
     iIntros "#Hpin Hblk Hd #Hty #Hpin' #Hcs'". rewrite uWcf_0.
     cbn [lk_pin union_link_inst_at gen_link_inst].
     iDestruct (era_pin_agree (fgn_echo gf) (S gen_id) v v' with "Hpin Hpin'") as %<-.
@@ -620,7 +682,7 @@ Section UShURoundDefs.
         rewrite /gcur. cbn [gW union_params_at]. rewrite /f0w_at.
         iFrame "Htn Hps Hcs HE Hf". by iPureIntro.
       + rewrite /ush_pend_at /ush_deed_at. iLeft. iExists cs, s, v.
-        iFrame "Hd Hty Hpin Hcs". iPureIntro. exists a.
+        iFrame "Hd Hty Hpin Hcs %". iPureIntro. exists a.
         destruct Hapr as (Hok & _ & Hterm).
         split_and!; [exact Hlen | exact Hpos | exact (Hok _) | exact Hterm
                     | exact Hpr | exact Hc].
@@ -647,14 +709,14 @@ Section UShURoundDefs.
         iFrame "Htn Hps Hcs HE Hf".
         iSplit; iPureIntro; [exact Hw | reflexivity].
       + rewrite /ush_done_at /ush_deed_at. iLeft. iExists (cs ++ [a]), s, v.
-        iFrame "Hd Hty Hpin Hcs". iPureIntro.
+        iFrame "Hd Hty Hpin Hcs %". iPureIntro.
         exact (udone_tie_snoc cs a s0 I _ Hlen Hpos Hc).
   Qed.
 
   (* ...and at the record's own block ([lk_post]): the instance *)
   Lemma uWcf0_of_post_alt (I : list (bv 8)) (a : nat) (v v' : era_pins)
       (cs' : list nat) (s : dst) :
-    lm_apr U K I a ->
+    lm_apr U K I a -> uwild (ul I) = false ->
     length cs' = (nlines I - 1)%nat -> (0 < nlines I)%nat ->
     dst_content s = lm_step U (ust cs' s0 I) (ul I) (lm_dec U a) ->
     lk_pin FI (S gen_id) v -∗ lk_post FI (S gen_id) v I a -∗
@@ -662,8 +724,8 @@ Section UShURoundDefs.
     era_pin (fgn_echo gf) (S gen_id) v' -∗ cs_lb v' cs' -∗
     uWcf I 0%nat.
   Proof using .
-    intros Hapr Hlen Hpos Hc. iIntros "#Hpin Hblk Hd #Hty #Hpin' #Hcs'".
-    iApply (uWcf0_of_posts_alt I a v v' cs' s (lm_apr_aprs U K I a Hapr) Hlen Hpos Hc
+    intros Hapr Hnw Hlen Hpos Hc. iIntros "#Hpin Hblk Hd #Hty #Hpin' #Hcs'".
+    iApply (uWcf0_of_posts_alt I a v v' cs' s (lm_apr_aprs U K I a Hapr) Hnw Hlen Hpos Hc
               with "Hpin [Hblk] Hd Hty Hpin' Hcs'").
     rewrite /lk_post. cbn [lk_blk lk_ab union_link_inst_at gen_link_inst].
     iApply (gwc_post_of_blk U PA (S gen_id) v I a Hapr with "Hblk").
@@ -696,8 +758,8 @@ Section UShURoundDefs.
       rewrite /gcur. cbn [gW union_params_at]. rewrite /f0w_at.
       iFrame "Htn Hps Hcs HE Hf". by iPureIntro. }
     rewrite /ush_pend_at /ush_deed_at. iLeft.
-    iDestruct "Hp" as (cs' s v') "(Hd & %Htie & #Hty & #Hpin' & #Hcs')".
-    iExists cs', s, v'. iFrame "Hd Hty Hpin' Hcs'". iPureIntro.
+    iDestruct "Hp" as (cs' s v') "(Hd & %Htie & #Hty & #Hpin' & #Hcs' & %Hnw)".
+    iExists cs', s, v'. iFrame "Hd Hty Hpin' Hcs' %". iPureIntro.
     destruct Hw as [(_ & _ & Hn & _) _].
     exists (lmh_noc K (ul I)).
     exact (upend_tie_of_pre cs' s0 I _ ltac:(lia) Htie).
@@ -705,9 +767,9 @@ Section UShURoundDefs.
 
 
   (* the banner-owed credential is a boundary one, at the DONE arm *)
-  Lemma uHwbwc_f (I : list (bv 8)) : ⊢ uWbf I -∗ uWcf I 0%nat.
+  Lemma uHwbwc_f (I : list (bv 8)) : ⊢ uWbl I ∗ DONE I -∗ uWcf I 0%nat.
   Proof using .
-    rewrite /uWbf uWcf_0. iIntros "[Hb Hd]". iLeft. iFrame "Hd".
+    rewrite uWcf_0. iIntros "[Hb Hd]". iLeft. iFrame "Hd".
     rewrite /uWcl /uWbl. iApply (lk_lcred_of_ban FI (S gen_id) I with "Hb").
   Qed.
 
@@ -719,7 +781,7 @@ Section UShURoundDefs.
     iIntros "Hb Hp". rewrite /ush_pre_at /ush_done_at /ush_deed_at.
     iDestruct "Hp" as "[Hp _]".
     iDestruct "Hp" as "[Hp | #HT]"; last (iFrame "Hb"; by iRight).
-    iDestruct "Hp" as (cs' s v') "(Hd & %Htie & #Hty & #Hpin' & #Hcs')".
+    iDestruct "Hp" as (cs' s v') "(Hd & %Htie & #Hty & #Hpin' & #Hcs' & %Hnw)".
     pose proof Htie as [Hlen _].
     rewrite /uWbl. iDestruct "Hb" as (v) "[#Hpin Hb]".
     cbn [lk_pin lk_ban union_link_inst_at gen_link_inst].
@@ -733,14 +795,14 @@ Section UShURoundDefs.
       iSplitL "Htn".
       + iExists v. iFrame "Hpin". iLeft. iExists ps, cs, s0, P.
         iFrame "Htn Hps Hcs HE Hf". iSplit; by iPureIntro.
-      + iLeft. iExists cs, s, v. iFrame "Hd Hty Hpin Hcs". iPureIntro.
+      + iLeft. iExists cs, s, v. iFrame "Hd Hty Hpin Hcs %". iPureIntro.
         exact (udone_tie_of_pre_ban cs cs' s0 I _ Htie ltac:(lia) Hpre Hpan).
     - iDestruct "Hb" as "[%Hi Hhd]". rewrite /fhead_at.
       iDestruct "Hhd" as "(%HI & %Hk & Htn & #Hps & #Hcs & #HE & #Hvf & Hpre)".
       iSplitL "Htn Hpre".
       + iExists v. iFrame "Hpin". iRight. iLeft. iSplitR; [by iPureIntro |].
         iFrame "Htn Hps Hcs HE Hvf Hpre". by iSplit; iPureIntro.
-      + iLeft. iExists [], s, v. iFrame "Hd Hty Hpin Hcs". iPureIntro.
+      + iLeft. iExists [], s, v. iFrame "Hd Hty Hpin Hcs %". iPureIntro.
         apply (udone_tie_of_pre_ban [] cs' s0 I _ Htie).
         * subst I. by rewrite nlines_nil.
         * subst I. rewrite nlines_nil in Hlen. cbn in Hlen.
@@ -768,14 +830,29 @@ Section UShURoundDefs.
      state, and the record's space credential is at [s0] *)
   Definition uWcu (I : list (bv 8)) (p : nat) : iProp Σ :=
     (uWcf I p ∨ (⌜(p < 3)%nat⌝ ∗ PT I (5 + p)%nat)
-     ∨ (⌜p = 0%nat⌝ ∗ PD I ∗ ush_deed_at upre_tie s0 I ∗ f0cw gf (S gen_id) s0))%I.
+     ∨ (⌜p = 0%nat⌝ ∗ PD I ∗ ush_deed_at upre_tie s0 I ∗ f0cw gf (S gen_id) s0)
+     (* THE WILD ARM (seccomp design 10.5): the read that completed a
+        [seccomp x] line, at every position of the round *)
+     ∨ useccomp_shape I)%I.
 
   Lemma uWcu_of (I : list (bv 8)) (p : nat) : uWcf I p -∗ uWcu I p.
   Proof using . iIntros "H". rewrite /uWcu. by iLeft. Qed.
 
-  Lemma uWcu_3 (I : list (bv 8)) : uWcu I 3%nat -∗ uWcf I 3%nat.
+  Lemma uWcu_wild (I : list (bv 8)) (p : nat) : useccomp_shape I -∗ uWcu I p.
+  Proof using . iIntros "H". rewrite /uWcu. iRight. iRight. by iRight. Qed.
+
+  Lemma uWcu_3 (I : list (bv 8)) : uWcu I 3%nat -∗ uWcf I 3%nat ∨ useccomp_shape I.
   Proof using .
-    rewrite /uWcu. iIntros "[H | [[%Hlt _] | [%Hz _]]]"; [iExact "H" | lia | lia].
+    rewrite /uWcu. iIntros "[H | [[%Hlt _] | [[%Hz _] | H]]]";
+      [by iLeft | lia | lia | by iRight].
+  Qed.
+
+  (* ...at a line of a known kind, the wild arm refuted *)
+  Lemma uWcu_3_nw (I : list (bv 8)) :
+    uwild (ul I) = false -> uWcu I 3%nat -∗ uWcf I 3%nat.
+  Proof using .
+    intros Hnw. iIntros "H". iDestruct (uWcu_3 with "H") as "[H | [_ %Hw]]"; [done |].
+    by rewrite Hnw in Hw.
   Qed.
 
   Lemma uWcu_taint (I : list (bv 8)) (p : nat) (v : era_pins) :
@@ -785,7 +862,17 @@ Section UShURoundDefs.
 
   Lemma uHwbl_u (I : list (bv 8)) : ⊢ uWcu I 3%nat -∗ uWcu I 0%nat.
   Proof using .
-    iIntros "H". iApply uWcu_of. iApply uHwbl_f. iApply (uWcu_3 with "H").
+    iIntros "H". iDestruct (uWcu_3 with "H") as "[H | #Hw]";
+      [| by iApply uWcu_wild].
+    iApply uWcu_of. iApply (uHwbl_f with "H").
+  Qed.
+
+  (* the banner-owed credential is a boundary one, its wild arm the wild
+     arm *)
+  Lemma uHwbwc_u (I : list (bv 8)) : ⊢ uWbf I -∗ uWcu I 0%nat.
+  Proof using .
+    rewrite /uWbf. iIntros "[H | #Hw]"; [| by iApply uWcu_wild].
+    iApply uWcu_of. iApply (uHwbwc_f with "H").
   Qed.
 
   Lemma uHpanic :
@@ -793,15 +880,28 @@ Section UShURoundDefs.
   Proof using .
     iIntros "#Hlk".
     iPoseProof (UShPanic.ush_panic_law_hold_at (PS := uprogSG_free) FI PRE
-                  with "[]") as "#Hp".
+                  (ush_pre_nw s0) with "[]") as "#Hp".
     { cbn [lk_links union_link_inst_at gen_link_inst]. iExact "Hlk". }
     rewrite /UkShDiag.ush_panic_law. iIntros "!>" (N I l) "%Hfd Hc".
-    iDestruct (uWcu_3 with "Hc") as "Hc". rewrite uWcf_S3.
+    iDestruct (uWcu_3 with "Hc") as "[Hc | #Hw]"; last first.
+    { (* THE WILD ARM: "fork\n" through the era's licence, the shape
+         unmoved (seccomp design 10.5) *)
+      iDestruct (union_links_eq with "Hlk") as %Hc.
+      destruct Hfd as [rb Hl2].
+      iExists (fun _ => useccomp_shape I). iSplitR; [iExact "Hw" |].
+      iSplit; [| iIntros "!> _"; rewrite /uWbf; by iRight].
+      iIntros "!>" (p b) "%Hb".
+      iApply (UShPanic.ksh_w1_of_step (PS := uprogSG_free) N _ _ l rb b Hl2).
+      iIntros "!>" (Φ) "#Hs HΦ".
+      iDestruct "Hs" as "[Htok _]".
+      iApply (union_write_link_wild ug Hc (S gen_id) b Φ with "[Htok] [HΦ]");
+        [by iApply (usecc_tok_of_at ug) | by iApply "HΦ"]. }
+    rewrite uWcf_S3.
     iDestruct ("Hp" $! N I l with "[%] [Hc]") as (Pf) "(H0 & #Hstep & #Hend)";
       [exact Hfd | rewrite /uWcl; iExact "Hc" |].
     iExists Pf. iFrame "H0 Hstep". iIntros "!> Hp5".
     iDestruct ("Hend" with "Hp5") as "[Hb Hpre]".
-    rewrite /uWbf. iApply (ush_done_of_pre_ban I with "[Hb] Hpre").
+    rewrite /uWbf. iLeft. iApply (ush_done_of_pre_ban I with "[Hb] Hpre").
     rewrite /uWbl. iExact "Hb".
   Qed.
 

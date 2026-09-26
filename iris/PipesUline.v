@@ -247,7 +247,12 @@ Proof using.
   pose proof (w_filts_bar fs Hn) as Hbar.
   assert (Hin : FileDisc.fd_w_bar ∈ wl_words (FileDisc.line_body l)).
   { rewrite Hw. cbn [FileDisc.uline_ws]. apply elem_of_app. right. exact Hbar. }
-  destruct l as [ws' | ws' N' | N' | ws' fs'].
+  destruct l as [ws' | ws' N' | N' | ws' fs' | ws'].
+  5: { (* LSecc: its words are alphanumeric, and the bar is not *)
+       exfalso. rewrite (FileDisc.uline_ws_body _ Hok) in Hin. cbn [FileDisc.uline_ws] in Hin.
+       assert (Hnb : ~ wl_word FileDisc.fd_w_bar)
+         by (apply (bool_decide_unpack _); vm_compute; exact I).
+       exact (Hnb (proj1 (Forall_forall _ _) (FileDisc.secc_ok_wf ws' Hok) _ Hin)). }
   - (* LEcho: its words are alphanumeric, and the bar is not *)
     exfalso. cbn [FileDisc.line_body] in Hin.
     rewrite (wl_words_body ws' (line_ok_wf _ Hok)) in Hin.

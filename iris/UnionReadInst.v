@@ -62,7 +62,7 @@ Proof using.
   intros Hd Hj.
   assert (Hin : I !!! j ∈ I).
   { apply elem_of_list_lookup_2 with j. apply list_lookup_lookup_total_lt. exact Hj. }
-  pose proof (lm_disc_input_byte_val U (ulm_byte_laws adm_u_g) I (I !!! j) Hd Hin) as Hv.
+  pose proof (lm_disc_input_byte_val U (ulm_byte_laws adm_u_g adm_s_off) I (I !!! j) Hd Hin) as Hv.
   rewrite /cons_xlate. rewrite decide_False; [reflexivity |].
   intro Hq. apply (f_equal bv_unsigned) in Hq.
   rewrite (_ : bv_unsigned (mword_of_int 13 : mword 8) = 13%Z) in Hq;
@@ -96,13 +96,13 @@ Section union_read_inst.
     iApply ("Hrdl" $! k v n ws with "Hpin Hdl HΦ").
   Qed.
 
-  Local Lemma uri_rd_taint (k : nat) (ws : list (list mobs * bv 8)) (Φ : iProp Σ) :
+  Local Lemma uri_rd_taint (ws : list (list mobs * bv 8)) (Φ : iProp Σ) :
     ⊢ union_links ug -∗ UT -∗ (UT -∗ Φ) -∗
-      cons_link Uart0 k (ConsLog.EvRead ws) Φ.
+      cons_link Uart0 (S gen_id) (ConsLog.EvRead ws) Φ.
   Proof using .
-    iIntros "#Hlk HT HΦ".
+    iIntros "#Hlk #HT HΦ".
     iDestruct (union_links_rd_taint with "Hlk") as "#Hrdt".
-    iApply ("Hrdt" $! k ws with "HT HΦ").
+    iApply ("Hrdt" $! (S gen_id) ws with "HT HΦ").
   Qed.
 
   (* THE LAST CONSUMED ENTRY'S TAG ([FileReadInst]'s, verbatim): the
@@ -176,11 +176,11 @@ Section union_read_inst.
       ∨ UT.
   Proof using Htag.
     intros Hddc Hlws Hwinf Hpre2 Hwsj.
-    iIntros "#Hpin #HE0 [#Hres0 #Hw0] Hret #Htags #Hsw #Hlb2".
-    rewrite /uread_ret /vread_ret.
+    iIntros "#Hpin #HE0 (#Hres0 & #Hw0 & #Hwt0) Hret #Htags #Hsw #Hlb2".
+    rewrite /uread_ret.
     iDestruct "Hret" as "[[#HT _] | [Hdlr Hfacts]]"; [ by iRight | ].
     iDestruct "Hfacts" as (pops dl)
-      "(%Hrok & %Hdl & %Hpref & %Hidx & %Hdsce & %Hboots & #HEin & %Hdinp & Hrest)".
+      "(%Hrok & %Hdl & %Hpref & %Hidx & %Hdsce & %Hboots & #HEin & %Hdinp & Hrest & Htok)".
     iEval (rewrite Hlws) in "Hdlr".
     iDestruct (inp_lb_cmp v I (snd <$> (dl ++ ws)) with "HE0 HEin") as %Hcmp.
     assert (Hlen' : length (snd <$> (dl ++ ws)) = (length I + dc)%nat).
@@ -199,6 +199,17 @@ Section union_read_inst.
     assert (HJlen : length J = dc)
       by (rewrite HJ length_app in Hlen'; lia).
     assert (HJdisc : lm_disc_input U (I ++ J)) by (rewrite <- HJ; exact Hdinp).
+    (* A READ THAT COMPLETES THE [seccomp x] LINE: the era is wild, and the
+       residue carries the token (seccomp design 10.4/10.10) -- off the
+       receipt where bytes were consumed, off the old residue where none *)
+    iAssert (⌜uwild_at (I ++ J)⌝ → usecc_tok_at ug (S gen_id) (I ++ J) ∨ UT)%I
+      with "[Htok]" as "#Hwtn".
+    { destruct (decide (ws = [])) as [Hws0 | Hws0].
+      - assert (HJnil : J = []).
+        { subst ws. cbn in Hlws. apply nil_length_inv. lia. }
+        rewrite HJnil app_nil_r. iExact "Hwt0".
+      - iIntros "%Hwa". rewrite -HJ. iApply "Htok". iPureIntro.
+        rewrite -HJ in Hwa. destruct Hwa as (? & ? & ?). by repeat split. }
     iDestruct "Hrest" as "#Hrest".
     iAssert (gwc_rres U (union_params ug) v (I ++ J)) as "#Hresn".
     { iDestruct "Hrest" as "[%Hws0 | Hbb]".
@@ -244,7 +255,7 @@ Section union_read_inst.
     iDestruct "Hwn" as "[#Hwn | #HT]"; [ | by iRight ].
     iLeft. iFrame "Hdlr". iExists J.
     iSplitR; [ by iPureIntro | ]. iSplitR; [ by iPureIntro | ].
-    iSplitR; [ | iFrame "HEn"; rewrite /urresw; iFrame "Hresn Hwn" ].
+    iSplitR; [ | iFrame "HEn"; rewrite /urresw; iFrame "Hresn Hwn Hwtn" ].
     iPureIntro. intro Hdd0.
     exact (rr_byte_of_rows (lm_disc_input U) sl sl' ws dl hs pops I J dd dc g0
              lm_disc_input_U_no_cr

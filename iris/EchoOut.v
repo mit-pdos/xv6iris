@@ -1326,6 +1326,12 @@ Record era_pins := MkPins {
                        a process that has already CONSUMED the line it
                        answers, so the ring holds at most the line in
                        progress. *)
+  ep_secc : gname;  (* mono_nat: THE ERA'S WILD FLAG (seccomp design 10.1):
+                       0 while the era's console is disciplined, 1 once a
+                       wild line's read made the era wild.  The union's
+                       claim holds the whole authority; the era's wild
+                       token is a lower bound at 1.  No other application
+                       reads it. *)
 }.
 
 (* THE ERA MAP'S BOUND.  Every era the ledger has ever founded is at most
@@ -2602,7 +2608,7 @@ Section echo_out.
   Definition era_full (v : era_pins) : iProp Σ :=
     (mono_nat_auth_own (ep_go v) 1 0%nat ∗ cs_auth v [] ∗ ps_auth v []
      ∗ Elist_auth v [] ∗ ghost_var (ep_gdl v) 1 0%nat
-     ∗ dl_list_auth v [])%I.
+     ∗ dl_list_auth v [] ∗ mono_nat_auth_own (ep_secc v) 1 0%nat)%I.
 
   Global Instance era_full_timeless v : Timeless (era_full v).
   Proof using . rewrite /era_full. apply _. Qed.
@@ -2619,9 +2625,10 @@ Section echo_out.
     iMod (ghost_var_alloc 0%nat) as (gdl) "Hdl".
     iMod (own_alloc (●ML ([] : list (leibnizO (list mobs * bv 8)))))
       as (gdll) "Hdll"; [apply mono_list_auth_valid |].
-    iModIntro. iExists (MkPins go gcs gps gE gdl gdll).
+    iMod (mono_nat_own_alloc 0%nat) as (gsc) "[Hsc _]".
+    iModIntro. iExists (MkPins go gcs gps gE gdl gdll gsc).
     rewrite /era_full /cs_auth /ps_auth /Elist_auth /dl_list_auth /=.
-    iFrame "Ht Hcs Hps HE Hdl Hdll".
+    iFrame "Ht Hcs Hps HE Hdl Hdll Hsc".
   Qed.
 
   Lemma pcount_nil (ps cs : list nat) : pcount ps cs [] [] = 0%nat.
@@ -2636,7 +2643,7 @@ Section echo_out.
     era_pin k v -∗ era_full v -∗
       ecl k [] (LogEntryDefs.MkCH [] [] [] None) ∗ eturn k.
   Proof using .
-    iIntros "#Hpin (Ht & Hcs & Hps & HE & Hdl & Hdll)".
+    iIntros "#Hpin (Ht & Hcs & Hps & HE & Hdl & Hdll & _)".
     iAssert (turn_lb v 0%nat) as "#Htlb0".
     { rewrite /turn_lb. iApply (mono_nat_lb_own_get with "Ht"). }
     iEval (rewrite -Qp.half_half) in "Ht".

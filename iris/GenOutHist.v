@@ -215,7 +215,12 @@ Section gen_out_hist.
     (* (A1) EVERY LOG ENTRY IS ECHOED: the drop arm is refuted at the open
        ([gcl_pure_open]) and the store arm sends its byte before it files
        ([ConsLog.cons_ev_ok]'s [EvClose] clause) *)
-    /\ Forall log_echoed pops.
+    /\ Forall log_echoed pops
+    (* EVERY LOGGED ENTRY'S HISTORY IS DISCIPLINED (seccomp design 10.4):
+       filed at the close from the open arm's [garm_era]; what lets the
+       claim know, at a read, that no logged entry lies beyond a line the
+       discipline makes the era's last (D4) *)
+    /\ (forall e, e ∈ pops -> lm_disc M (le_hist e) /\ trace_shape (le_hist e) true).
 
   Lemma gin_pure_0 k : gin_pure k [] [] [].
   Proof using.
@@ -231,6 +236,7 @@ Section gen_out_hist.
       rewrite rest_of_nil. cbn [length]. rewrite /line_max. lia.
     - rewrite echoed_nil fmap_nil nlines_nil. cbn [length]. lia.
     - constructor.
+    - intros e He. by apply elem_of_nil in He.
   Qed.
 
   (* (A2) THE DELIVERED LIST REACHES THE LINES BELOW THE WRITER'S: at a
@@ -412,9 +418,9 @@ Section gen_out_hist.
     destruct (LogEntryDefs.ch_arm H) as [[[[h c] cs] j] |] eqn:Ha; cycle 1.
     { rewrite /ConsLog.cons_step Ha. exact Hecl. }
     destruct Hecl as (Hout & Hcs & Hps & Hin & Hera & HE & Hdlok).
-    destruct Hin as (_ & Hdsc & Hbts & Hdl & _ & _ & _ & Hall).
+    destruct Hin as (_ & Hdsc & Hbts & Hdl & _ & _ & _ & Hall & Hdh).
     rewrite /garm_era Ha in Hera.
-    destruct Hera as (Hdseg & Hboots & _ & _ & _ & Hcsa & _).
+    destruct Hera as (Hdseg & Hboots & Hdish & Hshh & _ & Hcsa & _).
     (* (A1) AT THE CLOSE: the arm's echo IS the byte, and the kernel says a
        store arm sends its byte before it closes (K3) *)
     destruct Hev as (a & Ha2 & _ & HK3). rewrite Ha in Ha2.
@@ -458,6 +464,10 @@ Section gen_out_hist.
         destruct (decide (gs_w M so = [] /\ rest_of (snd <$> gs_E M so) = []));
           lia.
       + apply Forall_app. split; [exact Hall | by rewrite Forall_singleton].
+      + intros e He. apply elem_of_app in He as [He | He].
+        * exact (Hdh e He).
+        * apply elem_of_list_singleton in He as ->.
+          cbn [le_hist fst snd]. exact (conj Hdish Hshh).
     - exact I.
     - rewrite /ch_E. cbn [LogEntryDefs.ch_log LogEntryDefs.ch_arm ch_arm_E].
       rewrite app_nil_r. by rewrite Hseg.
@@ -473,13 +483,13 @@ Section gen_out_hist.
     gcl_pure k ho so' (ConsLog.cons_step H (ConsLog.EvOut b)).
   Proof using.
     intros Hcs' HE' Hout Hc Hp Hdlok' (_ & _ & _ & Hin & Hera & HE & _).
-    destruct Hin as (Hlog & Hdsc & Hbts & Hdl & HEi & HEb & Hcnt & Hall).
+    destruct Hin as (Hlog & Hdsc & Hbts & Hdl & HEi & HEb & Hcnt & Hall & Hdh).
     rewrite /gcl_pure /ConsLog.cons_step.
     cbn [LogEntryDefs.ch_acc LogEntryDefs.ch_log LogEntryDefs.ch_dl
          LogEntryDefs.ch_arm].
     split_and!; [exact Hout | exact Hc | exact Hp | | exact Hera | | exact Hdlok'].
     - split_and!; [exact Hlog | exact Hdsc | exact Hbts | exact Hdl
-                  | exact HEi | exact HEb | lia | exact Hall].
+                  | exact HEi | exact HEb | lia | exact Hall | exact Hdh].
     - by rewrite HE' HE /ch_E.
   Qed.
 
@@ -489,7 +499,7 @@ Section gen_out_hist.
     gcl_pure k ho so (ConsLog.cons_step H (ConsLog.EvRead ws)).
   Proof using.
     intros Hpre (Hout & Hc & Hp & Hin & Hera & HE & Hdlok).
-    destruct Hin as (Hlog & Hdsc & Hbts & _ & HEi & HEb & Hcnt & Hall).
+    destruct Hin as (Hlog & Hdsc & Hbts & _ & HEi & HEb & Hcnt & Hall & Hdh).
     rewrite /gcl_pure /ConsLog.cons_step.
     cbn [LogEntryDefs.ch_acc LogEntryDefs.ch_log LogEntryDefs.ch_dl
          LogEntryDefs.ch_arm].
@@ -554,7 +564,7 @@ Section gen_out_hist.
     assert (Hseg : seg_of (echoed (LogEntryDefs.ch_log H)) = gs_E M so).
     { rewrite HE /ch_E Hn. cbn [ch_arm_E]. by rewrite app_nil_r. }
     assert (Hall : Forall log_echoed (LogEntryDefs.ch_log H))
-      by (by destruct Hin as (_ & _ & _ & _ & _ & _ & _ & Hq)).
+      by (by destruct Hin as (_ & _ & _ & _ & _ & _ & _ & Hq & _)).
     assert (Hcnt : length (gs_E M so) = length (ins (open_seg h)) - 1).
     { rewrite -Hseg seg_of_length (echoed_all_len _ Hall). lia. }
     assert (Hle : length (gs_E M so) <= length (ins (open_seg h))) by lia.
@@ -607,14 +617,14 @@ Section gen_out_hist.
     gcl_pure k ho' so' (ConsLog.cons_step H (ConsLog.EvByte b)).
   Proof using.
     intros Ha Hw Hcs' HE' Hout Hc Hp Hdlok' (_ & _ & _ & Hin & Hera & HE & _).
-    destruct Hin as (Hlog & Hdsc & Hbts & Hdl & HEi & HEb & Hcnt & Hall).
+    destruct Hin as (Hlog & Hdsc & Hbts & Hdl & HEi & HEb & Hcnt & Hall & Hdh).
     pose proof (ch_E_byte_echo H b h c Ha) as Hgrow.
     rewrite /gcl_pure /ConsLog.cons_step Ha.
     cbn [LogEntryDefs.ch_acc LogEntryDefs.ch_log LogEntryDefs.ch_dl
          LogEntryDefs.ch_arm].
     split_and!; [exact Hout | exact Hc | exact Hp
                 | split_and!; [exact Hlog | exact Hdsc | exact Hbts | exact Hdl
-                              | exact HEi | exact HEb | lia | exact Hall]
+                              | exact HEi | exact HEb | lia | exact Hall | exact Hdh]
                 | | | exact Hdlok'].
     - rewrite /garm_era Ha in Hera. rewrite /garm_era.
       cbn [LogEntryDefs.ch_arm LogEntryDefs.ch_log].

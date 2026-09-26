@@ -61,48 +61,66 @@ Local Open Scope nat_scope.
 (*  1.  THE ALTERNATIVES                                                  *)
 (* ===================================================================== *)
 
-(* a file line's alternative, an echo pipeline's, or a [cat f] pipeline's *)
+(* a file line's alternative, an echo pipeline's, a [cat f] pipeline's,
+   or the TERMINAL arm of a [seccomp x] line (seccomp design section 3):
+   [US u], with [u] the bytes the round put on the wire after the echo --
+   ARBITRARY, since the masked binary keeps the console *)
 Inductive ualt :=
   | UR (a : ralt)
   | UPE (a : plalt)
-  | UPC (a : plalt).
+  | UPC (a : plalt)
+  | US (u : list (bv 8)).
 
 Global Instance ualt_eq_dec : EqDecision ualt.
 Proof using. solve_decision. Defined.
 
-(* THE CODE: the three injective codes interleaved.  Like [plalt_code] it
-   is built, never computed. *)
+(* THE CODE: the four injective codes interleaved mod 4.  Like
+   [plalt_code] it is built, never computed. *)
 Definition ualt_code (a : ualt) : nat :=
   match a with
-  | UR r => 3 * ralt_enc r
-  | UPE x => 3 * plalt_code x + 1
-  | UPC x => 3 * plalt_code x + 2
+  | UR r => 4 * ralt_enc r
+  | UPE x => 4 * plalt_code x + 1
+  | UPC x => 4 * plalt_code x + 2
+  | US u => 4 * encode_nat u + 3
   end.
 
 Definition ualt_dec (n : nat) : ualt :=
-  if decide (n mod 3 = 0) then UR (ralt_dec (n / 3))
-  else if decide (n mod 3 = 1) then UPE (plalt_of (n / 3))
-  else UPC (plalt_of (n / 3)).
+  if decide (n mod 4 = 0) then UR (ralt_dec (n / 4))
+  else if decide (n mod 4 = 1) then UPE (plalt_of (n / 4))
+  else if decide (n mod 4 = 2) then UPC (plalt_of (n / 4))
+  else US (default [] (decode_nat (n / 4))).
 
-Lemma ualt_dec_R (k : nat) : ualt_dec (3 * k) = UR (ralt_dec k).
+Lemma div4 (n : nat) : n = 4 * (n / 4) + n mod 4 /\ n mod 4 < 4.
+Proof using. split; [apply Nat.div_mod; lia | apply Nat.mod_upper_bound; lia]. Qed.
+
+Lemma ualt_dec_R (k : nat) : ualt_dec (4 * k) = UR (ralt_dec k).
 Proof using.
-  unfold ualt_dec. destruct (div3 (3 * k)) as [H1 H2].
-  assert (Hq : 3 * k / 3 = k) by lia.
+  unfold ualt_dec. destruct (div4 (4 * k)) as [H1 H2].
+  assert (Hq : 4 * k / 4 = k) by lia.
   rewrite decide_True; [| lia]. rewrite Hq. reflexivity.
 Qed.
 
-Lemma ualt_dec_E (k : nat) : ualt_dec (3 * k + 1) = UPE (plalt_of k).
+Lemma ualt_dec_E (k : nat) : ualt_dec (4 * k + 1) = UPE (plalt_of k).
 Proof using.
-  unfold ualt_dec. destruct (div3 (3 * k + 1)) as [H1 H2].
-  assert (Hq : (3 * k + 1) / 3 = k) by lia.
+  unfold ualt_dec. destruct (div4 (4 * k + 1)) as [H1 H2].
+  assert (Hq : (4 * k + 1) / 4 = k) by lia.
   rewrite decide_False; [| lia]. rewrite decide_True; [| lia]. rewrite Hq. reflexivity.
 Qed.
 
-Lemma ualt_dec_C (k : nat) : ualt_dec (3 * k + 2) = UPC (plalt_of k).
+Lemma ualt_dec_C (k : nat) : ualt_dec (4 * k + 2) = UPC (plalt_of k).
 Proof using.
-  unfold ualt_dec. destruct (div3 (3 * k + 2)) as [H1 H2].
-  assert (Hq : (3 * k + 2) / 3 = k) by lia.
-  rewrite decide_False; [| lia]. rewrite decide_False; [| lia]. rewrite Hq. reflexivity.
+  unfold ualt_dec. destruct (div4 (4 * k + 2)) as [H1 H2].
+  assert (Hq : (4 * k + 2) / 4 = k) by lia.
+  rewrite decide_False; [| lia]. rewrite decide_False; [| lia].
+  rewrite decide_True; [| lia]. rewrite Hq. reflexivity.
+Qed.
+
+Lemma ualt_dec_S (k : nat) : ualt_dec (4 * k + 3) = US (default [] (decode_nat k)).
+Proof using.
+  unfold ualt_dec. destruct (div4 (4 * k + 3)) as [H1 H2].
+  assert (Hq : (4 * k + 3) / 4 = k) by lia.
+  rewrite decide_False; [| lia]. rewrite decide_False; [| lia].
+  rewrite decide_False; [| lia]. rewrite Hq. reflexivity.
 Qed.
 
 Lemma ualt_dec_0 : ualt_dec 0 = UR (ralt_dec 0).
@@ -110,34 +128,45 @@ Proof using. exact (ualt_dec_R 0). Qed.
 
 Lemma ualt_dec_code (a : ualt) : ualt_dec (ualt_code a) = a.
 Proof using.
-  destruct a as [r | x | x]; cbn [ualt_code].
+  destruct a as [r | x | x | u]; cbn [ualt_code].
   - by rewrite ualt_dec_R, ralt_dec_enc.
   - by rewrite ualt_dec_E, plalt_of_code.
   - by rewrite ualt_dec_C, plalt_of_code.
+  - by rewrite ualt_dec_S, decode_encode_nat.
 Qed.
 
 Lemma ualt_code_inj (a b : ualt) : ualt_code a = ualt_code b -> a = b.
 Proof using. intros H. by rewrite <- (ualt_dec_code a), <- (ualt_dec_code b), H. Qed.
 
 Definition upanic (a : ualt) : bool :=
-  match a with UR r => ralt_panic r | UPE x | UPC x => plpanic x end.
+  match a with UR r => ralt_panic r | UPE x | UPC x => plpanic x | US _ => false end.
+(* the seccomp round ends the era's coverage (seccomp design section 2) *)
 Definition uterm (a : ualt) : bool :=
-  match a with UR _ => false | UPE x | UPC x => plterm x end.
+  match a with UR _ => false | UPE x | UPC x => plterm x | US _ => true end.
 
 (* the console continuation: the file's, at the round's state, or the
-   pipeline's (which names its whole block) *)
+   pipeline's (which names its whole block), or the seccomp round's bytes *)
 Definition ucont (s : fstate) (l : uline) (a : ualt) : list (bv 8) :=
-  match a with UR r => cont s l r | UPE x | UPC x => plcont x end.
+  match a with UR r => cont s l r | UPE x | UPC x => plcont x | US u => u end.
 
-(* the step: the file's; a pipeline leaves [f] alone *)
+(* the step: the file's; a pipeline leaves the files alone, and so does
+   the seccomp round -- THE STATE DOES NOT MOVE, which is the design's
+   section 1 claim, stated *)
 Definition ustep (s : fstate) (l : uline) (a : ualt) : fstate :=
-  match a with UR r => fsm s l r | UPE _ | UPC _ => s end.
+  match a with UR r => fsm s l r | UPE _ | UPC _ | US _ => s end.
 
 (* THE RANGE CONDITION at the round's state.  At a pipeline whose
    producer matches the alternative's: the shell's own three ([plsafe])
    at every state, or an admitted line's run at the content [s] gives
    [f] (which an echo producer never reads, [uok_echo_st]).  Every cross
-   case is [False] (amendment B2, and the producer split). *)
+   case is [False] (amendment B2, and the producer split).  At a [seccomp]
+   line: the shell's own three ([FileDisc.ralt_ok]'s arm) and the terminal
+   arm at any NONEMPTY [u] -- nonempty because the hooks' writer law
+   [lmh_cont_nonnil] reads every admitted continuation as nonempty (the
+   pipeline's terminal blocks are nonempty for the same reason), and a
+   claim is a prefix of the transcript, so a wire that shows nothing after
+   the echo is still one of [US u]'s prefixes.  [US] anywhere else is
+   [False]. *)
 Definition uok (adm : pline' -> bool) (s : fstate) (l : uline) (a : ualt) : Prop :=
   match l with
   | LPipe p n =>
@@ -147,6 +176,7 @@ Definition uok (adm : pline' -> bool) (s : fstate) (l : uline) (a : ualt) : Prop
           \/ (adm (LPipes p n) = true /\ plalt_ok (files_of s) (LPipes p n) x)
       | _, _ => False
       end
+  | LSecc _ => match a with UR r => ralt_ok l r | US u => u <> [] | _ => False end
   | _ => match a with UR r => ralt_ok l r | _ => False end
   end.
 
@@ -174,7 +204,7 @@ Lemma uok_pipe adm s p n a :
             /\ (plsafe (LPipes p n) x
                 \/ (adm (LPipes p n) = true /\ plalt_ok (files_of s) (LPipes p n) x)).
 Proof using.
-  intros H. destruct a as [r | x | x], p as [ws | f]; cbn [uok] in H; try contradiction;
+  intros H. destruct a as [r | x | x | u], p as [ws | f]; cbn [uok] in H; try contradiction;
     exists x; (split; [reflexivity | exact H]).
 Qed.
 
@@ -258,19 +288,24 @@ Qed.
 Lemma uok_echo_st adm s s' ws n a :
   uok adm s (LPipe (PrEcho ws) n) a -> uok adm s' (LPipe (PrEcho ws) n) a.
 Proof using.
-  intros H. destruct a as [r | x | x]; cbn [uok] in H |- *; try contradiction.
+  intros H. destruct a as [r | x | x | u]; cbn [uok] in H |- *; try contradiction.
   destruct H as [Hsafe | [Ha Hb]]; [left; exact Hsafe |].
   right. split; [exact Ha | exact (plalt_ok_echo_fc _ _ ws n x Hb)].
 Qed.
 
 (* ===================================================================== *)
-(*  2.  THE LINES: the file's parser, then the pipeline's                 *)
+(*  2.  THE LINES: the file's parser, then the pipeline's, then the       *)
+(*      seccomp line's                                                    *)
 (* ===================================================================== *)
 
 Definition uline_of_u (b : list (bv 8)) : uline :=
   match parse_line b with
   | Some l => l
-  | None => match pl_parse b with Some (LPipes p n) => LPipe p n | _ => inhabitant end
+  | None =>
+      match pl_parse b with
+      | Some (LPipes p n) => LPipe p n
+      | _ => match secc_parse b with Some ws => LSecc ws | None => inhabitant end
+      end
   end.
 
 (* a body the admission lets through as a pipeline *)
@@ -280,11 +315,38 @@ Definition upipe_ok (adm : pline' -> bool) (b : list (bv 8)) : Prop :=
 Global Instance upipe_ok_dec adm b : Decision (upipe_ok adm b).
 Proof using. unfold upipe_ok. destruct (pl_parse b) as [[ws | p n] |]; apply _. Defined.
 
-Definition ubody_ok (adm : pline' -> bool) (b : list (bv 8)) : Prop :=
-  fbody_ok b \/ upipe_ok adm b.
+(* THE SECCOMP ADMISSION KNOB (seccomp design section 3): [adm_s] says
+   which [seccomp x ..] lines the application admits, as [adm] does for
+   pipelines.  A seccomp body is admitted exactly when its words are, so
+   while the knob is off ([fun _ => false], [ulmG]) no disciplined input
+   holds one -- which is what refutes the [LSecc] arm of every law cased
+   on an admitted line. *)
+Definition usecc_ok (adm_s : list (list (bv 8)) -> bool) (b : list (bv 8)) : Prop :=
+  match secc_parse b with Some ws => adm_s ws = true | None => False end.
 
-Global Instance ubody_ok_dec adm b : Decision (ubody_ok adm b).
+Global Instance usecc_ok_dec adm_s b : Decision (usecc_ok adm_s b).
+Proof using. unfold usecc_ok. destruct (secc_parse b); apply _. Defined.
+
+Definition ubody_ok (adm : pline' -> bool) (adm_s : list (list (bv 8)) -> bool)
+    (b : list (bv 8)) : Prop :=
+  fbody_ok b \/ upipe_ok adm b \/ usecc_ok adm_s b.
+
+Global Instance ubody_ok_dec adm adm_s b : Decision (ubody_ok adm adm_s b).
 Proof using. unfold ubody_ok. apply _. Defined.
+
+(* the knob at a line: a seccomp line is well formed at the model only
+   when admitted ([lml_body_line] ties the two admissions together) *)
+Definition usecc_adm (adm_s : list (list (bv 8)) -> bool) (l : uline) : Prop :=
+  match l with LSecc ws => adm_s ws = true | _ => True end.
+
+Definition uline_okU (adm_s : list (list (bv 8)) -> bool) (l : uline) : Prop :=
+  uline_ok l /\ usecc_adm adm_s l.
+
+Global Instance usecc_adm_dec adm_s l : Decision (usecc_adm adm_s l).
+Proof using. destruct l; unfold usecc_adm; apply _. Defined.
+
+Global Instance uline_okU_dec adm_s l : Decision (uline_okU adm_s l).
+Proof using. unfold uline_okU. apply _. Defined.
 
 (* the partial line's alphabet: the file lines' ([fbody_byte], which has
    the dot a file name is typed through, cut W4) and the bar *)
@@ -293,19 +355,23 @@ Definition ubyte (b : bv 8) : Prop := fbody_byte b \/ b = fd_bar.
 Global Instance ubyte_dec b : Decision (ubyte b).
 Proof using. unfold ubyte. apply _. Defined.
 
-(* the coverage-ending outputs: a prefix of an admitted pipeline's
-   terminal block at SOME admissible state (terminal runs carry no
-   content, so the state is immaterial) *)
-Definition umerge (adm : pline' -> bool) (u : list (bv 8)) : Prop :=
+(* the coverage-ending outputs AT A LINE: at a [seccomp] line EVERY byte
+   string (the masked binary prints anything); elsewhere a prefix of an
+   admitted pipeline's terminal block at SOME admissible state (terminal
+   runs carry no content, so the state is immaterial) *)
+Definition umerge_p (adm : pline' -> bool) (u : list (bv 8)) : Prop :=
   exists s, fstate_ok s /\ pl_merge (files_of s) adm u.
+
+Definition umerge (adm : pline' -> bool) (l : uline) (u : list (bv 8)) : Prop :=
+  match l with LSecc _ => True | _ => umerge_p adm u end.
 
 (* ===================================================================== *)
 (*  3.  THE MODEL AND ITS LAWS                                            *)
 (* ===================================================================== *)
 
-Definition ulm (adm : pline' -> bool) : lmodel :=
+Definition ulm (adm : pline' -> bool) (adm_s : list (list (bv 8)) -> bool) : lmodel :=
   MkLM fstate uline uline_of_u ualt ualt_dec upanic ucont ustep (uok adm)
-       (ubody_ok adm) ubyte uline_ok fstate_ok uterm (umerge adm).
+       (ubody_ok adm adm_s) ubyte (uline_okU adm_s) fstate_ok uterm (umerge adm).
 
 (* THE ADMISSION THE UNION APPLICATION INSTANTIATES (grep-pipes.md cut
    G8): every echo pipeline and every [cat f | ..] at the model's file
@@ -328,7 +394,11 @@ Definition adm_u_g (l : pline') : bool :=
   | LPipes (PrCatF g) fs => bool_decide (uname g) && filts_okb fs
   end.
 
-Definition ulmG : lmodel := ulm adm_u_g.
+(* THE SECCOMP KNOB IS OFF at the union application until sh's seccomp
+   round is proved (seccomp design section 3, cut S4) *)
+Definition adm_s_off : list (list (bv 8)) -> bool := fun _ => false.
+
+Definition ulmG : lmodel := ulm adm_u_g adm_s_off.
 
 Lemma adm_u_g_echo (ws : list (list (bv 8))) (fs : list filt) :
   Forall filt_ok fs -> adm_u_g (LPipes (PrEcho ws) fs) = true.
@@ -358,16 +428,57 @@ Proof using.
   split; [exact (fcont_ok_nodollar c Hc) | exact (fcont_ok_nl c Hc)].
 Qed.
 
-Lemma uline_of_u_ok (adm : pline' -> bool) (b : list (bv 8)) :
-  ubody_ok adm b -> uline_ok (uline_of_u b).
+(* a pipeline's body is not a seccomp body: its first word is [echo] or
+   [cat] ([uline_ws_head_secc]) *)
+Lemma pl_parse_not_secc b l : pl_parse b = Some l -> secc_parse b = None.
 Proof using.
-  unfold uline_of_u. destruct (parse_line b) as [l |] eqn:Hp.
-  { intros _. exact (parse_line_ok b l Hp). }
-  intros [[l Hl] | Hpipe]; [rewrite Hp in Hl; discriminate Hl |].
-  revert Hpipe. unfold upipe_ok.
-  destruct (pl_parse b) as [[ws | p n] |] eqn:Hq; intros Hpipe; try contradiction.
-  destruct (pl_parse_some b _ Hq) as [Hok _].
-  exact (uline_ok_of_pl_all (LPipes p n) Hok).
+  intros Hq. destruct (pl_parse_some b l Hq) as [Hok Hb].
+  unfold secc_parse. rewrite decide_False; [reflexivity |].
+  intros (_ & Hh & _).
+  rewrite Hb, <- (uline_ws_of_pl_all l Hok) in Hh.
+  destruct (uline_ws_head_secc (uline_of_pl l) (uline_ok_of_pl_all l Hok) Hh) as [ws Hws].
+  destruct l; discriminate Hws.
+Qed.
+
+(* a seccomp body is read as its line *)
+Lemma uline_of_u_secc_parse b ws : secc_parse b = Some ws -> uline_of_u b = LSecc ws.
+Proof using.
+  intros Hs. unfold uline_of_u.
+  destruct (parse_line b) as [l |] eqn:Hp.
+  { exfalso. rewrite (secc_parse_fbody b (ex_intro _ l Hp)) in Hs. discriminate Hs. }
+  destruct (pl_parse b) as [[ws' | p n] |] eqn:Hq;
+    [rewrite Hs; reflexivity | | rewrite Hs; reflexivity].
+  exfalso. rewrite (pl_parse_not_secc b _ Hq) in Hs. discriminate Hs.
+Qed.
+
+Lemma uline_of_u_secc ws : secc_ok ws -> uline_of_u (line_body (LSecc ws)) = LSecc ws.
+Proof using. intros Hok. exact (uline_of_u_secc_parse _ ws (secc_parse_body ws Hok)). Qed.
+
+Lemma uline_of_u_ok (adm : pline' -> bool) (adm_s : list (list (bv 8)) -> bool)
+    (b : list (bv 8)) :
+  ubody_ok adm adm_s b -> uline_okU adm_s (uline_of_u b).
+Proof using.
+  intros Hb. unfold uline_of_u. destruct (parse_line b) as [l |] eqn:Hp.
+  { split; [exact (parse_line_ok b l Hp) |].
+    destruct l as [| | | | ws]; try exact I. exfalso. exact (parse_line_not_secc b ws Hp). }
+  destruct Hb as [[l Hl] | [Hpipe | Hsecc]]; [rewrite Hp in Hl; discriminate Hl | |].
+  - revert Hpipe. unfold upipe_ok.
+    destruct (pl_parse b) as [[ws | p n] |] eqn:Hq; intros Hpipe; try contradiction.
+    destruct (pl_parse_some b _ Hq) as [Hok _].
+    split; [exact (uline_ok_of_pl_all (LPipes p n) Hok) | exact I].
+  - revert Hsecc. unfold usecc_ok. destruct (secc_parse b) as [ws |] eqn:Hs; [| intros []].
+    intros Ha. destruct (pl_parse b) as [[ws' | p n] |] eqn:Hq.
+    + split; [exact (proj1 (secc_parse_some b ws Hs)) | exact Ha].
+    + exfalso. rewrite (pl_parse_not_secc b _ Hq) in Hs. discriminate Hs.
+    + split; [exact (proj1 (secc_parse_some b ws Hs)) | exact Ha].
+Qed.
+
+(* WITH THE KNOB OFF no admitted body is a seccomp line *)
+Lemma uline_of_u_off (adm : pline' -> bool) (b : list (bv 8)) :
+  ubody_ok adm adm_s_off b -> forall ws, uline_of_u b <> LSecc ws.
+Proof using.
+  intros Hb ws Hws. pose proof (uline_of_u_ok adm adm_s_off b Hb) as [_ Ha].
+  rewrite Hws in Ha. discriminate Ha.
 Qed.
 
 (* a run proves its line has a stage *)
@@ -410,63 +521,84 @@ Proof using.
 Qed.
 
 
+(* the seccomp body's bytes and length, as a line's *)
+Lemma secc_body_bytes b ws : secc_parse b = Some ws -> Forall fbody_byte b.
+Proof using.
+  intros Hs. destruct (secc_parse_some b ws Hs) as [Hok ->]. cbn [line_body].
+  eapply Forall_impl; [exact (wl_body_bytes _ (secc_ok_wf ws Hok)) |].
+  exact fbody_byte_of_body.
+Qed.
+
+Lemma secc_body_short b ws : secc_parse b = Some ws -> S (length b) < line_max.
+Proof using.
+  intros Hs. destruct (secc_parse_some b ws Hs) as [(_ & _ & _ & Hl) ->]. cbn [line_body].
+  rewrite wl_line_length in Hl. lia.
+Qed.
+
 Section laws.
-  Context (adm : pline' -> bool).
+  Context (adm : pline' -> bool) (adm_s : list (list (bv 8)) -> bool).
 
   Lemma ulm_st_step s l a :
     fstate_ok s -> uline_ok l -> uok adm s l a -> fstate_ok (ustep s l a).
   Proof using.
-    intros Hs Hl Ha. destruct a as [r | x | x]; cbn [ustep]; [| exact Hs | exact Hs].
-    destruct l as [ws | ws N | N | p n]; cbn [uok] in Ha;
+    intros Hs Hl Ha. destruct a as [r | x | x | u]; cbn [ustep]; [| exact Hs | exact Hs | exact Hs].
+    destruct l as [ws | ws N | N | p n | ws]; cbn [uok] in Ha;
       [exact (fstate_ok_fsm s _ r Hs Hl Ha) | exact (fstate_ok_fsm s _ r Hs Hl Ha)
-      | exact (fstate_ok_fsm s _ r Hs Hl Ha) | contradiction].
+      | exact (fstate_ok_fsm s _ r Hs Hl Ha) | contradiction
+      | exact (fstate_ok_fsm s _ r Hs Hl Ha)].
   Qed.
 
   Lemma ulm_cont_panic s l a : upanic a = true -> ucont s l a = alt_panic.
   Proof using.
-    destruct a as [r | [| b | b] | [| b | b]]; cbn [upanic ucont]; intros H;
+    destruct a as [r | [| b | b] | [| b | b] | u]; cbn [upanic ucont]; intros H;
       [exact (cont_panic s l r H) | reflexivity | discriminate H | discriminate H
-      | reflexivity | discriminate H | discriminate H].
+      | reflexivity | discriminate H | discriminate H | discriminate H].
   Qed.
 
   Lemma ulm_term_nopanic a : uterm a = true -> upanic a = false.
   Proof using.
-    destruct a as [r | [| b | b] | [| b | b]]; cbn; intros H; first [discriminate H | reflexivity].
+    destruct a as [r | [| b | b] | [| b | b] | u]; cbn; intros H; first [discriminate H | reflexivity].
   Qed.
 
   Lemma ulm_term_merge s l a :
-    fstate_ok s -> uok adm s l a -> uterm a = true -> umerge adm (ucont s l a).
+    fstate_ok s -> uok adm s l a -> uterm a = true -> umerge adm l (ucont s l a).
   Proof using.
-    intros Hs Hok Ht. destruct l as [ws | ws N | N | p n].
-    1-3: destruct a as [r | x | x]; cbn [uok uterm] in Hok, Ht;
+    intros Hs Hok Ht. destruct l as [ws | ws N | N | p n | ws].
+    1-3: destruct a as [r | x | x | u]; cbn [uok uterm] in Hok, Ht;
          first [discriminate Ht | contradiction].
+    2: exact I.
     destruct (uok_pipe _ _ _ _ _ Hok) as (x & -> & Hx).
     rewrite upl_term in Ht. rewrite upl_cont.
     destruct x as [| b | b]; try discriminate Ht.
     destruct Hx as [Hsafe | [Ha Hb]].
     { exfalso. destruct Hsafe as [H | [H | H]]; discriminate H. }
-    exists s. split; [exact Hs |]. exists (LPipes p n), b. split_and!; [exact Ha | exact Hb |].
-    reflexivity.
+    cbn [umerge]. exists s. split; [exact Hs |]. exists (LPipes p n), b.
+    split_and!; [exact Ha | exact Hb |]. reflexivity.
   Qed.
 
-  Lemma ulm_merge_prefix u' u : u' `prefix_of` u -> umerge adm u -> umerge adm u'.
+  Lemma ulm_merge_prefix l u' u : u' `prefix_of` u -> umerge adm l u -> umerge adm l u'.
   Proof using.
-    intros Hp (s & Hs & l & b & Ha & Hok & Hu). exists s. split; [exact Hs |].
-    exists l, b. split_and!; [exact Ha | exact Hok | etrans; [exact Hp | exact Hu]].
+    intros Hp Hm. destruct l as [ws | ws N | N | p n | ws]; [| | | | exact I].
+    all: cbn [umerge] in Hm |- *; unfold umerge_p in Hm |- *.
+    all: destruct Hm as (s & Hs & l & b & Ha & Hok & Hu); exists s; split; [exact Hs |].
+    all: exists l, b; split_and!; [exact Ha | exact Hok | etrans; [exact Hp | exact Hu]].
   Qed.
 
   Lemma ulm_cont_shape s l a :
-    fstate_ok s -> uline_ok l -> uok adm s l a -> upanic a = false -> uterm a = false ->
+    fstate_ok s -> uline_okU adm_s l -> uok adm s l a -> upanic a = false -> uterm a = false ->
     exists u, ucont s l a = u ++ u_prompt
               /\ Forall nodollar u
               /\ (forall Y ps W,
                     Forall (fun x => x < length pro_alts) ps ->
                     lm_below_panic u Y ps W -> u = alt_panic).
   Proof using.
-    intros Hs Hl Hok Hp Ht. destruct l as [ws | ws N | N | p n].
-    (* a file alternative at a file line: the file model's law *)
-    1-3: destruct a as [r | x | x]; cbn [uok] in Hok; try contradiction;
+    intros Hs [Hl _] Hok Hp Ht. destruct l as [ws | ws N | N | p n | ws].
+    (* a file alternative at a file line (or the shell's own three at a
+       seccomp line): the file model's law *)
+    1-3: destruct a as [r | x | x | u]; cbn [uok] in Hok; try contradiction;
          exact (lml_cont_shape file_lm_laws s _ r Hs Hl Hok Hp eq_refl).
+    2: { destruct a as [r | x | x | u]; cbn [uok] in Hok; try contradiction;
+           [exact (lml_cont_shape file_lm_laws s _ r Hs Hl Hok Hp eq_refl) | discriminate Ht]. }
     (* a pipeline alternative at a pipeline: the pipeline model's law at
        the round's content function *)
     destruct (uok_pipe _ _ _ _ _ Hok) as (x & -> & Hx).
@@ -476,14 +608,16 @@ Section laws.
   Qed.
 
   (* a terminal alternative at one state has one at every state: the
-     producer's exec failure below a failed fork ([plterm_fork_ok]) *)
+     producer's exec failure below a failed fork ([plterm_fork_ok]); at a
+     seccomp line the terminal arm at one byte, whatever the state *)
   Lemma ulm_term_st s l c :
     uok adm s l c -> uterm c = true ->
     forall s', exists c', uok adm s' l c' /\ uterm c' = true.
   Proof using.
-    intros Hok Ht s'. destruct l as [ws | ws N | N | p n].
-    1-3: destruct c as [r | x | x]; cbn [uok uterm] in Hok, Ht;
+    intros Hok Ht s'. destruct l as [ws | ws N | N | p n | ws].
+    1-3: destruct c as [r | x | x | u]; cbn [uok uterm] in Hok, Ht;
          first [discriminate Ht | contradiction].
+    2: { exists (US [wl_nl]). split; [cbn [uok]; discriminate | reflexivity]. }
     destruct (uok_pipe _ _ _ _ _ Hok) as (x & -> & Hx).
     rewrite upl_term in Ht. destruct x as [| b | b]; try discriminate Ht.
     destruct Hx as [Hsafe | [Ha (_ & b' & (W & t & Wm & sp & Hlt & _) & _)]].
@@ -493,12 +627,12 @@ Section laws.
     exact (plterm_fork_ok _ p n (line_term_pos _ _ _ _ _ Hlt)).
   Qed.
 
-  Theorem ulm_laws : lm_laws (ulm adm).
+  Theorem ulm_laws : lm_laws (ulm adm adm_s).
   Proof using.
     constructor; cbn [ulm lm_ok lm_cont lm_merge lm_panic lm_term lm_line_ok lm_body_ok
                       lm_of lm_st_ok lm_step].
-    - exact (uline_of_u_ok adm).
-    - exact ulm_st_step.
+    - exact (uline_of_u_ok adm adm_s).
+    - intros s l a Hs Hl Ha. exact (ulm_st_step s l a Hs (proj1 Hl) Ha).
     - exact ulm_cont_panic.
     - exact ulm_term_nopanic.
     - exact ulm_term_merge.
@@ -507,20 +641,24 @@ Section laws.
     - exact ulm_term_st.
   Qed.
 
-  Theorem ulm_byte_laws : lm_byte_laws (ulm adm).
+  Theorem ulm_byte_laws : lm_byte_laws (ulm adm adm_s).
   Proof using.
     constructor; cbn [ulm lm_body_ok lm_body_byte lm_panic lm_dec].
-    - intros b [Hb | Hb].
+    - intros b [Hb | [Hb | Hb]].
       + eapply Forall_impl; [exact (fbody_ok_bytes b Hb) |]. intros x Hx. by left.
       + revert Hb. unfold upipe_ok.
         destruct (pl_parse b) as [[ws | p n] |] eqn:Hq; intros Hb; try contradiction.
         destruct (pl_parse_some b _ Hq) as [Hok ->].
         eapply Forall_impl; [exact (pl_body_bytes _ Hok) |].
         intros x [[Hx | Hx] | Hx]; [left; left; exact Hx | right; exact Hx | left; right; right; exact Hx].
-    - intros b [Hb | Hb]; [exact (fbody_ok_short b Hb) |].
-      revert Hb. unfold upipe_ok.
-      destruct (pl_parse b) as [[ws | p n] |] eqn:Hq; intros Hb; try contradiction.
-      destruct (pl_parse_some b _ Hq) as [Hok ->]. exact (pl_body_short _ Hok).
+      + revert Hb. unfold usecc_ok. destruct (secc_parse b) as [ws |] eqn:Hs; [| intros []].
+        intros _. eapply Forall_impl; [exact (secc_body_bytes b ws Hs) |]. intros x Hx. by left.
+    - intros b [Hb | [Hb | Hb]]; [exact (fbody_ok_short b Hb) | |].
+      + revert Hb. unfold upipe_ok.
+        destruct (pl_parse b) as [[ws | p n] |] eqn:Hq; intros Hb; try contradiction.
+        destruct (pl_parse_some b _ Hq) as [Hok ->]. exact (pl_body_short _ Hok).
+      + revert Hb. unfold usecc_ok. destruct (secc_parse b) as [ws |] eqn:Hs; [| intros []].
+        intros _. exact (secc_body_short b ws Hs).
     - intros b [Hb | ->].
       + exact (lmb_byte_printable file_lm_byte_laws b Hb).
       + assert (Hbar : bv_unsigned fd_bar = 124%Z) by (vm_compute; reflexivity).
@@ -530,7 +668,7 @@ Section laws.
 End laws.
 
 Corollary ulmG_laws : lm_laws ulmG.
-Proof using. exact (ulm_laws adm_u_g). Qed.
+Proof using. exact (ulm_laws adm_u_g adm_s_off). Qed.
 
 (* ===================================================================== *)
 (*  4.  THE HOOKS                                                         *)
@@ -554,6 +692,8 @@ Definition ufree (a : ualt) : bool :=
   | UPC PLPanic => true
   | UPC (PLRun b) => bool_decide (b = [] \/ b = PipeDisc.dg_execR)
   | UPC (PLTerm _) => false
+  (* the seccomp round is terminal, and a terminal arm is never free *)
+  | US _ => false
   end.
 
 Section hooks.
@@ -561,22 +701,24 @@ Section hooks.
 
   Lemma ufree_cont s s' l a : ufree a = true -> ucont s l a = ucont s' l a.
   Proof using.
-    destruct a as [r | x | x]; cbn [ufree ucont]; [exact (cont_state_free s s' l r) | |];
+    destruct a as [r | x | x | u]; cbn [ufree ucont]; [exact (cont_state_free s s' l r) | | | discriminate];
       intros _; reflexivity.
   Qed.
 
   Lemma ufree_term a : ufree a = true -> uterm a = false.
-  Proof using. destruct a as [r | [| b | b] | [| b | b]]; cbn; done. Qed.
+  Proof using. destruct a as [r | [| b | b] | [| b | b] | u]; cbn; done. Qed.
 
   (* THE STATE-INDEPENDENCE of the free alternatives *)
   Lemma ufree_ok s s' l a : ufree a = true -> uok adm s l a -> uok adm s' l a.
   Proof using.
-    intros Hfr Hok. destruct l as [ws | ws N | N | [ws | f] n].
-    1-3: destruct a as [r | x | x]; cbn [uok] in Hok |- *; first [exact Hok | contradiction].
+    intros Hfr Hok. destruct l as [ws | ws N | N | [ws | f] n | ws].
+    1-3: destruct a as [r | x | x | u]; cbn [uok] in Hok |- *; first [exact Hok | contradiction].
+    3: destruct a as [r | x | x | u]; cbn [uok] in Hok |- *;
+         first [exact Hok | contradiction | discriminate Hfr].
     - (* an echo pipeline: its admission reads no state *)
       exact (uok_echo_st adm s s' ws n a Hok).
     - (* a [cat f] pipeline: only the state-free three *)
-      destruct a as [r | x | x]; cbn [uok] in Hok |- *; try contradiction.
+      destruct a as [r | x | x | u]; cbn [uok] in Hok |- *; try contradiction.
       destruct Hok as [Hsafe | [Ha Hb]]; [left; exact Hsafe |].
       destruct x as [| b | b]; cbn [ufree] in Hfr; [left; left; reflexivity | | discriminate Hfr].
       (* [exec cat failed] is the [cat f] producer's own exec diagnostic,
@@ -585,110 +727,101 @@ Section hooks.
       left. right. right. reflexivity.
   Qed.
 
-  (* the shell's own three, per line: the file's at a file line, the
-     pipeline's ([plsafe]) at a pipeline, at its producer's constructor *)
+  (* the shell's own three, per line: the file's at a file line (and at a
+     seccomp line, [FileHooks]'s arm), the pipeline's ([plsafe]) at a
+     pipeline, at its producer's constructor *)
   Definition upan (l : uline) : nat :=
-    match l with LPipe p _ => ualt_code (upl p PLPanic) | _ => 3 * fpan_of l end.
+    match l with LPipe p _ => ualt_code (upl p PLPanic) | _ => 4 * fpan_of l end.
   Definition uexf (l : uline) : nat :=
     match l with
     | LPipe p n => ualt_code (upl p (PLRun (pl_exfb (LPipes p n))))
-    | _ => 3 * fexf_of l
+    | _ => 4 * fexf_of l
     end.
   Definition uexfb (l : uline) : list (bv 8) :=
     match l with LPipe p n => pl_exfb (LPipes p n) ++ u_prompt | _ => fexfb l end.
   Definition unoc (l : uline) : nat :=
-    match l with LPipe p _ => ualt_code (upl p (PLRun [])) | _ => 3 * fnoc_of l end.
+    match l with LPipe p _ => ualt_code (upl p (PLRun [])) | _ => 4 * fnoc_of l end.
 
   Lemma upan_ok s l : uok adm s l (ualt_dec (upan l)).
   Proof using.
-    destruct l as [ws | ws N | N | p n]; cbn [upan];
-      [rewrite ualt_dec_R; exact (fpan_of_ok _) | rewrite ualt_dec_R; exact (fpan_of_ok _)
-      | rewrite ualt_dec_R; exact (fpan_of_ok _) |].
+    destruct l as [ws | ws N | N | p n | ws]; cbn [upan];
+      try (rewrite ualt_dec_R; exact (fpan_of_ok _)).
     rewrite ualt_dec_code. apply uok_upl. left. left. reflexivity.
   Qed.
 
   Lemma upan_free l : ufree (ualt_dec (upan l)) = true.
   Proof using.
-    destruct l as [ws | ws N | N | p n]; cbn [upan];
-      [rewrite ualt_dec_R; exact (fpan_of_free _) | rewrite ualt_dec_R; exact (fpan_of_free _)
-      | rewrite ualt_dec_R; exact (fpan_of_free _) |].
+    destruct l as [ws | ws N | N | p n | ws]; cbn [upan];
+      try (rewrite ualt_dec_R; exact (fpan_of_free _)).
     rewrite ualt_dec_code. by destruct p.
   Qed.
 
   Lemma upan_panic l : upanic (ualt_dec (upan l)) = true.
   Proof using.
-    destruct l as [ws | ws N | N | p n]; cbn [upan];
-      [rewrite ualt_dec_R; exact (fpan_of_panic _) | rewrite ualt_dec_R; exact (fpan_of_panic _)
-      | rewrite ualt_dec_R; exact (fpan_of_panic _) |].
+    destruct l as [ws | ws N | N | p n | ws]; cbn [upan];
+      try (rewrite ualt_dec_R; exact (fpan_of_panic _)).
     rewrite ualt_dec_code, upl_panic. reflexivity.
   Qed.
 
   Lemma uexf_ok s l : uok adm s l (ualt_dec (uexf l)).
   Proof using.
-    destruct l as [ws | ws N | N | p n]; cbn [uexf];
-      [rewrite ualt_dec_R; exact (fexf_of_ok _) | rewrite ualt_dec_R; exact (fexf_of_ok _)
-      | rewrite ualt_dec_R; exact (fexf_of_ok _) |].
+    destruct l as [ws | ws N | N | p n | ws]; cbn [uexf];
+      try (rewrite ualt_dec_R; exact (fexf_of_ok _)).
     rewrite ualt_dec_code. apply uok_upl. left. right. right. reflexivity.
   Qed.
 
   (* THE EXEC ALTERNATIVE IS FREE AT EVERY LINE: the file's at a file
      line, [exec echo failed] at an echo pipeline (whose admission reads
-     no state), [exec cat failed] at a [cat f] pipeline *)
+     no state), [exec cat failed] at a [cat f] pipeline, [exec seccomp
+     failed] at a seccomp line *)
   Lemma uexf_free l : ufree (ualt_dec (uexf l)) = true.
   Proof using.
-    destruct l as [ws | ws N | N | [ws | f] n]; cbn [uexf];
-      [rewrite ualt_dec_R; exact (fexf_of_free _) | rewrite ualt_dec_R; exact (fexf_of_free _)
-      | rewrite ualt_dec_R; exact (fexf_of_free _) | |];
+    destruct l as [ws | ws N | N | [ws | f] n | ws]; cbn [uexf];
+      try (rewrite ualt_dec_R; exact (fexf_of_free _));
       rewrite ualt_dec_code; cbn [upl ufree pl_exfb st_dg_exec]; [reflexivity |].
     apply bool_decide_eq_true. by right.
   Qed.
 
   Lemma uexf_nopanic l : upanic (ualt_dec (uexf l)) = false.
   Proof using.
-    destruct l as [ws | ws N | N | p n]; cbn [uexf];
-      [rewrite ualt_dec_R; exact (fexf_of_nopanic _) | rewrite ualt_dec_R; exact (fexf_of_nopanic _)
-      | rewrite ualt_dec_R; exact (fexf_of_nopanic _) |].
+    destruct l as [ws | ws N | N | p n | ws]; cbn [uexf];
+      try (rewrite ualt_dec_R; exact (fexf_of_nopanic _)).
     rewrite ualt_dec_code, upl_panic. reflexivity.
   Qed.
 
   Lemma uexf_cont s l : ucont s l (ualt_dec (uexf l)) = uexfb l.
   Proof using.
-    destruct l as [ws | ws N | N | p n]; cbn [uexf uexfb];
-      [rewrite ualt_dec_R; exact (cont_fexf _ _) | rewrite ualt_dec_R; exact (cont_fexf _ _)
-      | rewrite ualt_dec_R; exact (cont_fexf _ _) |].
+    destruct l as [ws | ws N | N | p n | ws]; cbn [uexf uexfb];
+      try (rewrite ualt_dec_R; exact (cont_fexf _ _)).
     rewrite ualt_dec_code, upl_cont. reflexivity.
   Qed.
 
   Lemma unoc_ok s l : uok adm s l (ualt_dec (unoc l)).
   Proof using.
-    destruct l as [ws | ws N | N | p n]; cbn [unoc];
-      [rewrite ualt_dec_R; exact (fnoc_of_ok _) | rewrite ualt_dec_R; exact (fnoc_of_ok _)
-      | rewrite ualt_dec_R; exact (fnoc_of_ok _) |].
+    destruct l as [ws | ws N | N | p n | ws]; cbn [unoc];
+      try (rewrite ualt_dec_R; exact (fnoc_of_ok _)).
     rewrite ualt_dec_code. apply uok_upl. left. right. left. reflexivity.
   Qed.
 
   Lemma unoc_free l : ufree (ualt_dec (unoc l)) = true.
   Proof using.
-    destruct l as [ws | ws N | N | [ws | f] n]; cbn [unoc];
-      [rewrite ualt_dec_R; exact (fnoc_of_free _) | rewrite ualt_dec_R; exact (fnoc_of_free _)
-      | rewrite ualt_dec_R; exact (fnoc_of_free _) | |];
+    destruct l as [ws | ws N | N | [ws | f] n | ws]; cbn [unoc];
+      try (rewrite ualt_dec_R; exact (fnoc_of_free _));
       rewrite ualt_dec_code; cbn [upl ufree]; [reflexivity |].
     apply bool_decide_eq_true. by left.
   Qed.
 
   Lemma unoc_nopanic l : upanic (ualt_dec (unoc l)) = false.
   Proof using.
-    destruct l as [ws | ws N | N | p n]; cbn [unoc];
-      [rewrite ualt_dec_R; exact (fnoc_of_nopanic _) | rewrite ualt_dec_R; exact (fnoc_of_nopanic _)
-      | rewrite ualt_dec_R; exact (fnoc_of_nopanic _) |].
+    destruct l as [ws | ws N | N | p n | ws]; cbn [unoc];
+      try (rewrite ualt_dec_R; exact (fnoc_of_nopanic _)).
     rewrite ualt_dec_code, upl_panic. reflexivity.
   Qed.
 
   Lemma unoc_cont s l : ucont s l (ualt_dec (unoc l)) = u_prompt.
   Proof using.
-    destruct l as [ws | ws N | N | p n]; cbn [unoc];
-      [rewrite ualt_dec_R; exact (cont_fnoc _ _) | rewrite ualt_dec_R; exact (cont_fnoc _ _)
-      | rewrite ualt_dec_R; exact (cont_fnoc _ _) |].
+    destruct l as [ws | ws N | N | p n | ws]; cbn [unoc];
+      try (rewrite ualt_dec_R; exact (cont_fnoc _ _)).
     rewrite ualt_dec_code, upl_cont. reflexivity.
   Qed.
 
@@ -696,9 +829,11 @@ Section hooks.
     uok adm s l a -> upanic a = false -> uterm a = false ->
     exists u, ucont s l a = u ++ u_prompt.
   Proof using.
-    intros Hok Hp Ht. destruct l as [ws | ws N | N | p n].
-    1-3: destruct a as [r | x | x]; cbn [uok] in Hok; try contradiction;
+    intros Hok Hp Ht. destruct l as [ws | ws N | N | p n | ws].
+    1-3: destruct a as [r | x | x | u]; cbn [uok] in Hok; try contradiction;
          exact (cont_prompt s _ r Hok Hp).
+    2: { destruct a as [r | x | x | u]; cbn [uok] in Hok; try contradiction;
+           [exact (cont_prompt s _ r Hok Hp) | discriminate Ht]. }
     destruct (uok_pipe _ _ _ _ _ Hok) as (x & -> & _).
     rewrite upl_panic in Hp. rewrite upl_term in Ht. rewrite upl_cont.
     destruct x as [| b | b]; try discriminate Hp; try discriminate Ht.
@@ -707,16 +842,20 @@ Section hooks.
 
   Lemma ucont_nonnil s l a : uok adm s l a \/ a = ualt_dec 0 -> ucont s l a <> [].
   Proof using.
-    intros Ha. destruct a as [r | x | x].
+    intros Ha. destruct a as [r | x | x | u].
     { apply (cont_nonnil_dec s l r). destruct Ha as [Hok | Hq].
-      - left. destruct l as [ws | ws N | N | p n]; cbn [uok] in Hok;
-          [exact Hok | exact Hok | exact Hok | contradiction].
+      - left. destruct l as [ws | ws N | N | p n | ws]; cbn [uok] in Hok;
+          [exact Hok | exact Hok | exact Hok | contradiction | exact Hok].
       - right. rewrite ualt_dec_0 in Hq. injection Hq as ->. reflexivity. }
+    (* the seccomp round: its bytes are nonempty by the range condition *)
+    3: { destruct Ha as [Hok | Hq]; [| rewrite ualt_dec_0 in Hq; discriminate Hq].
+         destruct l as [ws | ws N | N | p n | ws]; cbn [uok] in Hok; try contradiction.
+         exact Hok. }
     (* a pipeline alternative: the panic line and a block before the
        prompt are never empty, and a terminal one is nonempty by the
        range condition (it is not the out-of-range decode) *)
     all: destruct Ha as [Hok | Hq]; [| rewrite ualt_dec_0 in Hq; discriminate Hq].
-    all: destruct l as [ws | ws N | N | p n]; try (cbn [uok] in Hok; contradiction).
+    all: destruct l as [ws | ws N | N | p n | ws]; try (cbn [uok] in Hok; contradiction).
     all: destruct (uok_pipe _ _ _ _ _ Hok) as (x' & Hx' & Hx).
     all: destruct p; cbn [upl] in Hx'; try discriminate Hx'; injection Hx' as <-.
     all: cbn [ucont]; destruct x as [| b | b]; cbn [plcont].

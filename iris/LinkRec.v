@@ -89,6 +89,11 @@ Section linkrec.
     (* ---- the LINE MODEL ---- *)
     lk_ab : list (bv 8) -> nat -> list (bv 8);
     lk_apr : list (bv 8) -> nat -> Prop;
+    (* THE WILD LINES (seccomp design 10.7): an input whose last line may
+       have made the era's claim wild.  A block-first byte there is refused,
+       so the five laws that can write one take [⌜¬ lk_wild I⌝ ∨ lk_T].
+       [fun _ => False] at every era but the union's. *)
+    lk_wild : list (bv 8) -> Prop;
     (* THE SHELL'S OWN TWO ALTERNATIVES ARE PER-LINE (lane LINK-GEN-2).
        At the echo application there is one line shape and the fork panic
        is the constant 3; [FileDisc.ralt_ok] admits [RFFork] only at an
@@ -216,7 +221,7 @@ Section linkrec.
     (* ---- the shell's prompt, at the loose shapes ---- *)
     lk_prompt_dollar : forall k v I b Φ,
       b = u_prompt !!! 0%nat ->
-      ⊢ lk_pin k v -∗ lk_links -∗ lk_owed k v I -∗
+      ⊢ (⌜¬ lk_wild I⌝ ∨ lk_T) -∗ lk_pin k v -∗ lk_links -∗ lk_owed k v I -∗
       (lk_sp k v I -∗ Φ) -∗ out_link Uart0 k b Φ;
     lk_prompt_space : forall k v I b Φ,
       b = u_prompt !!! 1%nat ->
@@ -224,7 +229,7 @@ Section linkrec.
       (lk_open k v I -∗ Φ) -∗ out_link Uart0 k b Φ;
     lk_prompt_dollar_ban : forall k v I b Φ,
       b = u_prompt !!! 0%nat ->
-      ⊢ lk_pin k v -∗ lk_links -∗ lk_ban k v I 0%nat -∗
+      ⊢ (⌜¬ lk_wild I⌝ ∨ lk_T) -∗ lk_pin k v -∗ lk_links -∗ lk_ban k v I 0%nat -∗
       (lk_sp k v I -∗ Φ) -∗ out_link Uart0 k b Φ;
     lk_read : forall k v I l,
       wl_nl ∉ l ->
@@ -237,7 +242,7 @@ Section linkrec.
     (* ---- one byte of a block, and the block's end ---- *)
     lk_blk_step : forall k v I a i b Φ,
       lk_ab I a !! i = Some b ->
-      ⊢ lk_pin k v -∗ lk_links -∗ lk_blk k v I a i -∗
+      ⊢ (⌜¬ lk_wild I⌝ ∨ lk_T) -∗ lk_pin k v -∗ lk_links -∗ lk_blk k v I a i -∗
       (lk_blk k v I a (S i) -∗ Φ) -∗ out_link Uart0 k b Φ;
     lk_blk_sp : forall k v I a, lk_apr I a ->
       ⊢ lk_blk k v I a (length (lk_ab I a) - 1)%nat -∗ lk_sp_t k v I;
@@ -245,7 +250,7 @@ Section linkrec.
     (* ---- the shell's prompt, at the tight shapes ---- *)
     lk_prompt_dollar_post : forall k v I a b Φ,
       lk_apr I a -> b = u_prompt !!! 0%nat ->
-      ⊢ lk_pin k v -∗ lk_links -∗
+      ⊢ (⌜¬ lk_wild I⌝ ∨ lk_T) -∗ lk_pin k v -∗ lk_links -∗
       lk_blk k v I a (length (lk_ab I a) - 2)%nat -∗
       (lk_sp_t k v I -∗ Φ) -∗ out_link Uart0 k b Φ;
     lk_prompt_space_t : forall k v I b Φ,
@@ -254,7 +259,7 @@ Section linkrec.
       (lk_open_t k v I -∗ Φ) -∗ out_link Uart0 k b Φ;
     lk_prompt_dollar_line : forall k v I b Φ,
       b = u_prompt !!! 0%nat ->
-      ⊢ lk_pin k v -∗ lk_links -∗ lk_line k v I -∗
+      ⊢ (⌜¬ lk_wild I⌝ ∨ lk_T) -∗ lk_pin k v -∗ lk_links -∗ lk_line k v I -∗
       (lk_sp_t k v I -∗ Φ) -∗ out_link Uart0 k b Φ;
     lk_read_t : forall k v I a l,
       wl_nl ∉ l ->
@@ -420,18 +425,19 @@ Section linkgen.
   (* ---- the prompt's two bytes, as ONE step family ---- *)
   Lemma lk_lpr_step k v I p b Φ :
     u_prompt !! p = Some b -> (p < 2)%nat ->
+    (⌜¬ lk_wild L I⌝ ∨ lk_T L) -∗
     lk_pin L k v -∗ lk_links L -∗ lk_lpr L k v I p -∗
     (lk_lpr L k v I (S p) -∗ Φ) -∗ out_link Uart0 k b Φ.
   Proof using .
     intros Hb Hp. destruct p as [| [| p]]; [| | exfalso; lia].
     - assert (Hb0 : b = u_prompt !!! 0%nat).
       { rewrite wr_prompt_head in Hb. by injection Hb. }
-      iIntros "#Hpin #Hlk Hc HΦ".
+      iIntros "Hnw #Hpin #Hlk Hc HΦ".
       rewrite (lk_lpr_0 L) (lk_lpr_1 L).
-      iApply (lk_prompt_dollar_line L k v I b Φ Hb0 with "Hpin Hlk Hc HΦ").
+      iApply (lk_prompt_dollar_line L k v I b Φ Hb0 with "Hnw Hpin Hlk Hc HΦ").
     - assert (Hb1 : b = u_prompt !!! 1%nat).
       { rewrite wr_prompt_tail in Hb. by injection Hb. }
-      iIntros "#Hpin #Hlk Hc HΦ".
+      iIntros "_ #Hpin #Hlk Hc HΦ".
       rewrite (lk_lpr_1 L) (lk_lpr_2 L).
       iApply (lk_prompt_space_t L k v I b Φ Hb1 with "Hpin Hlk Hc HΦ").
   Qed.
@@ -526,6 +532,7 @@ Section linkgen.
   (* ---- one byte of the panic line ---- *)
   Lemma lk_panic_step k v I i b Φ :
     alt_panic !! i = Some b ->
+    (⌜¬ lk_wild L I⌝ ∨ lk_T L) -∗
     lk_pin L k v -∗ lk_links L -∗ lk_panic k v I i -∗
     (lk_panic k v I (S i) -∗ Φ) -∗ out_link Uart0 k b Φ.
   Proof using .
@@ -555,6 +562,10 @@ End linkgen.
 (*  the credential families ARE echo's, and there is nothing under the    *)
 (*  existentials but the three bounds.                                   *)
 (* ===================================================================== *)
+(* a law that needs no premise answers one it is given *)
+Lemma lk_wand_drop {Σ : gFunctors} (P X : iProp Σ) : (⊢ X) -> ⊢ P -∗ X.
+Proof using . intros HX. iIntros "_". iApply HX. Qed.
+
 Section echo_inst.
   Context {Σ : gFunctors} `{!echoOutG Σ}.
   Context (T : iProp Σ) (γ : echo_gn).
@@ -718,6 +729,7 @@ Section echo_inst.
        lk_epin := era_pin γ;
        lk_links := EchoLinks.echo_links T γ;
        lk_ab := fun I a => line_alts_of (last_ws I) !!! a;
+       lk_wild := fun _ => False;
        lk_apr := fun _ a => (a < 3)%nat;
        lk_pan := fun _ => 3%nat;
        lk_exf := fun _ => 1%nat;
@@ -800,21 +812,24 @@ Section echo_inst.
        lk_ban_done_line := fun _ v I => EchoLinksLine.ewc_ban_done_line T v I;
        lk_ban_inp := ei_ban_inp;
 
-       lk_prompt_dollar := fun k v I b Φ Hb => EchoLinks.echo_prompt_dollar T γ k v I b Φ Hb;
+       lk_prompt_dollar := fun k v I b Φ Hb =>
+         lk_wand_drop _ _ (EchoLinks.echo_prompt_dollar T γ k v I b Φ Hb);
        lk_prompt_space := fun k v I b Φ Hb => EchoLinks.echo_prompt_space T γ k v I b Φ Hb;
-       lk_prompt_dollar_ban := fun k v I b Φ Hb => EchoLinks.echo_prompt_dollar_ban T γ k v I b Φ Hb;
+       lk_prompt_dollar_ban := fun k v I b Φ Hb =>
+         lk_wand_drop _ _ (EchoLinks.echo_prompt_dollar_ban T γ k v I b Φ Hb);
        lk_read := fun _ v I l Hl => EchoLinks.ewc_read T v I l Hl;
        lk_owed_read_taint := fun k v n I ws H1 H2 => EchoLinks.ewc_owed_read_taint T k v n I ws H1 H2;
 
-       lk_blk_step := fun k v I a i b Φ Hb => EchoLinksLine.echo_blk_step T γ k v I a i b Φ Hb;
+       lk_blk_step := fun k v I a i b Φ Hb =>
+         lk_wand_drop _ _ (EchoLinksLine.echo_blk_step T γ k v I a i b Φ Hb);
        lk_blk_sp := fun _ v I a Ha => EchoLinksLine.ewc_blk_sp T v I a Ha;
 
        lk_prompt_dollar_post := fun k v I a b Φ Ha Hb =>
-         EchoLinksLine.echo_prompt_dollar_post T γ k v I a b Φ Ha Hb;
+         lk_wand_drop _ _ (EchoLinksLine.echo_prompt_dollar_post T γ k v I a b Φ Ha Hb);
        lk_prompt_space_t := fun k v I b Φ Hb =>
          EchoLinksLine.echo_prompt_space_t T γ k v I b Φ Hb;
        lk_prompt_dollar_line := fun k v I b Φ Hb =>
-         EchoLinksLine.echo_prompt_dollar_line T γ k v I b Φ Hb;
+         lk_wand_drop _ _ (EchoLinksLine.echo_prompt_dollar_line T γ k v I b Φ Hb);
        lk_read_t := fun _ v I a l Hl => EchoLinksLine.ewc_read_t T v I a l Hl;
 
        lk_ab_pan := fun I => line_alts_of_3 (last_ws I);

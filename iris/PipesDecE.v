@@ -631,7 +631,8 @@ Qed.
 (* ===================================================================== *)
 (*  8.  THE PIECES, DECIDED                                               *)
 (* ===================================================================== *)
-Local Instance pde_merge_dec (u : list (bv 8)) : Decision (lm_merge PME u) := pl_mergeE_dec u.
+Local Instance pde_merge_dec (l : pline') (u : list (bv 8)) : Decision (lm_merge PME l u) :=
+  pl_mergeE_dec u.
 
 Local Instance pde_input_dec (I : list (bv 8)) : Decision (lm_disc_input PME I).
 Proof using. rewrite /lm_disc_input. cbn [lm_body_ok lm_body_byte pipes_lmE pipes_lm]. apply _. Qed.
@@ -670,7 +671,7 @@ Qed.
 Lemma pde_d4_iff (cs : list nat) (I : list (bv 8)) :
   lm_d4 PME cs tt I <->
   Forall (fun i => pde_termex (lm_of PME (bodies_of I !!! i)) ->
-                   lm_merge PME (lm_cont PME (lm_upto PME cs tt (bodies_of I) i)
+                   lm_merge PME (lm_of PME (bodies_of I !!! i)) (lm_cont PME (lm_upto PME cs tt (bodies_of I) i)
                                    (lm_of PME (bodies_of I !!! i)) (lm_at PME cs i)) ->
                    nlines I = S i /\ rest_of I = []) (seq 0 (nlines I)).
 Proof using.
@@ -684,7 +685,7 @@ Qed.
 Local Instance pde_d4_dec (cs : list nat) (I : list (bv 8)) : Decision (lm_d4 PME cs tt I).
 Proof using.
   destruct (decide (Forall (fun i => pde_termex (lm_of PME (bodies_of I !!! i)) ->
-                   lm_merge PME (lm_cont PME (lm_upto PME cs tt (bodies_of I) i)
+                   lm_merge PME (lm_of PME (bodies_of I !!! i)) (lm_cont PME (lm_upto PME cs tt (bodies_of I) i)
                                    (lm_of PME (bodies_of I !!! i)) (lm_at PME cs i)) ->
                    nlines I = S i /\ rest_of I = []) (seq 0 (nlines I)))) as [H | H].
   - left. by apply pde_d4_iff.

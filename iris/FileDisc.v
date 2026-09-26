@@ -281,11 +281,48 @@ Definition suf_barcats (n : nat) : list (bv 8) := concat (replicate n suf_barcat
 Definition w_barcats (n : nat) : list (list (bv 8)) :=
   concat (replicate n [fd_w_bar; fd_w_cat]).
 
+(* ---- THE SECCOMP LINE (seccomp design section 3): [seccomp x ..] -- the
+   command word, then ONE OR MORE alphanumeric words, the binary [x] and
+   its arguments.  [LSecc ws] carries the words AFTER [seccomp]; the whole
+   argument vector obeys [EchoDisc.line_ok]'s limits (sh's MAXARGS and the
+   line buffer), which is what "the words are ok" means.  Like [LPipe] the
+   constructor is ADDITIVE: [parse_line] never answers it (the union's own
+   parser [UnionDisc.uline_of_u] reads it through [secc_parse]). ---- *)
+Definition cmd_seccomp : list (bv 8) := sb "seccomp"%string.
+
+Definition secc_ok (ws : list (list (bv 8))) : Prop :=
+  wl_wf ws /\ ws <> [] /\ (S (length ws) < 10)%nat
+  /\ (length (wl_line (cmd_seccomp :: ws)) < line_max)%nat.
+
+Global Instance secc_ok_dec ws : Decision (secc_ok ws).
+Proof using. rewrite /secc_ok. apply _. Defined.
+
+Lemma cmd_seccomp_word : wl_word cmd_seccomp.
+Proof using. apply (bool_decide_unpack _). vm_compute. exact I. Qed.
+
+(* equalities read at one constructor level, which [injection] would
+   push down into the bytes of two literal words *)
+Lemma fd_some_eq {A} (x y : A) : Some x = Some y -> x = y.
+Proof using. intros H. injection H as H. exact H. Qed.
+
+Lemma fd_cons_eq {A} (x y : A) (l l' : list A) : x :: l = y :: l' -> x = y /\ l = l'.
+Proof using. intros H. injection H as H1 H2. by split. Qed.
+
+Lemma cmd_seccomp_ne_echo : cmd_seccomp <> cmd_echo.
+Proof using. by vm_compute. Qed.
+
+Lemma cmd_seccomp_ne_cat : cmd_seccomp <> fd_w_cat.
+Proof using. by vm_compute. Qed.
+
+Lemma secc_ok_wf ws : secc_ok ws -> wl_wf (cmd_seccomp :: ws).
+Proof using. intros [H _]. constructor; [exact cmd_seccomp_word | exact H]. Qed.
+
 Inductive uline :=
   | LEcho (ws : list (list (bv 8)))
   | LEchoF (ws : list (list (bv 8))) (N : list (bv 8))
   | LCat (N : list (bv 8))
-  | LPipe (p : producer) (fs : list filt).
+  | LPipe (p : producer) (fs : list filt)
+  | LSecc (ws : list (list (bv 8))).
 
 Global Instance uline_eq_dec : EqDecision uline.
 Proof using. solve_decision. Defined.
@@ -317,6 +354,8 @@ Definition uline_ws (l : uline) : list (list (bv 8)) :=
      LEFT command's alone and cannot be reused here.  The two words are
      the bar and [cat]; [uline_ws_pipe] below is the equation. *)
   | LPipe p fs => prod_words p ++ w_filts fs
+  (* the whole body's words, command name included *)
+  | LSecc ws => cmd_seccomp :: ws
   end.
 
 (* THE BODY the console cut keeps, and the LINE the user typed: the body
@@ -328,6 +367,7 @@ Definition line_body (l : uline) : list (bv 8) :=
   | LEchoF ws N => wl_body ws ++ suf_gt N
   | LCat N => cmd_cat N
   | LPipe p fs => prod_body p ++ suf_filts fs
+  | LSecc ws => wl_body (cmd_seccomp :: ws)
   end.
 
 Definition line_bytes (l : uline) : list (bv 8) := line_body l ++ [wl_nl].
@@ -347,6 +387,7 @@ Definition uline_ok (l : uline) : Prop :=
   | LPipe p fs =>
       prod_ok p /\ fs <> [] /\ Forall filt_ok fs
       /\ (length (line_bytes (LPipe p fs)) < line_max)%nat
+  | LSecc ws => secc_ok ws
   end.
 
 Global Instance uline_ok_dec l : Decision (uline_ok l).
@@ -677,15 +718,17 @@ Definition lines_of (I : list (bv 8)) : list uline := uline_of <$> bodies_of I.
    and [alts_ok], the determinacy theorem and [AppFile]'s conclusion mean
    what they meant.  This is the fact that makes every [LPipe] arm added
    below a DEAD arm, and it is the guard the three round-trip lemmas
-   carry. *)
-Definition uline_nopipe (l : uline) : Prop := forall ws n, l <> LPipe ws n.
+   carry.  [LSecc] is out of the range the same way (seccomp design
+   section 3), so the guard names both: a line of the PARSER's range. *)
+Definition uline_nopipe (l : uline) : Prop :=
+  (forall ws n, l <> LPipe ws n) /\ (forall ws, l <> LSecc ws).
 
 Lemma uline_nopipe_echo ws : uline_nopipe (LEcho ws).
-Proof using. intros ws' n H. discriminate H. Qed.
+Proof using. split; intros; discriminate. Qed.
 Lemma uline_nopipe_echof ws N : uline_nopipe (LEchoF ws N).
-Proof using. intros ws' n H. discriminate H. Qed.
+Proof using. split; intros; discriminate. Qed.
 Lemma uline_nopipe_cat N : uline_nopipe (LCat N).
-Proof using. intros ws' n H. discriminate H. Qed.
+Proof using. split; intros; discriminate. Qed.
 
 Lemma parse_line_not_pipe b ws n : parse_line b <> Some (LPipe ws n).
 Proof using.
@@ -695,12 +738,25 @@ Proof using.
   - case_decide; discriminate.
 Qed.
 
+Lemma parse_line_not_secc b ws : parse_line b <> Some (LSecc ws).
+Proof using.
+  rewrite /parse_line. case_decide as Hu.
+  - case_decide as Hc; [discriminate |].
+    destruct (strip_gt (lastw b) b) as [c |]; case_decide; discriminate.
+  - case_decide; discriminate.
+Qed.
+
 Lemma uline_of_nopipe b : uline_nopipe (uline_of b).
 Proof using.
-  intros ws n Heq.
-  destruct (parse_line b) as [l |] eqn:Hp; rewrite /uline_of Hp in Heq;
-    cbn in Heq; [| discriminate Heq].
-  rewrite Heq in Hp. exact (parse_line_not_pipe b ws n Hp).
+  split.
+  - intros ws n Heq.
+    destruct (parse_line b) as [l |] eqn:Hp; rewrite /uline_of Hp in Heq;
+      cbn in Heq; [| discriminate Heq].
+    rewrite Heq in Hp. exact (parse_line_not_pipe b ws n Hp).
+  - intros ws Heq.
+    destruct (parse_line b) as [l |] eqn:Hp; rewrite /uline_of Hp in Heq;
+      cbn in Heq; [| discriminate Heq].
+    rewrite Heq in Hp. exact (parse_line_not_secc b ws Hp).
 Qed.
 
 Lemma lines_of_nopipe I l : l ∈ lines_of I -> uline_nopipe l.
@@ -836,7 +892,8 @@ Qed.
 Lemma parse_line_body l :
   uline_nopipe l -> uline_ok l -> parse_line (line_body l) = Some l.
 Proof using.
-  intro Hnp. destruct l as [ws | ws N | N | ws npc]; [| | | by destruct (Hnp ws npc eq_refl)].
+  intro Hnp. destruct l as [ws | ws N | N | ws npc | ws];
+    [| | | by destruct (proj1 Hnp ws npc eq_refl) | by destruct (proj2 Hnp ws eq_refl)].
   - (* LEcho *)
     intro Hok. rewrite /line_body /parse_line.
     assert (Hbo : body_ok (wl_body ws)).
@@ -896,6 +953,17 @@ Proof using.
   split; [exact (parse_line_ok b l Hl) | exact (line_body_parse b l Hl)].
 Qed.
 
+(* an admissible line's words are its body's, at every constructor *)
+Lemma uline_ws_body (l : uline) : uline_ok l -> wl_words (line_body l) = uline_ws l.
+Proof using.
+  destruct l as [ws | ws N | N | ws npc | ws]; intros Hok.
+  - cbn [uline_ws line_body]. exact (wl_words_body ws (line_ok_wf _ Hok)).
+  - exact (uline_ws_gtf ws N (proj1 Hok) (proj1 (proj2 Hok))).
+  - cbn [uline_ws line_body]. exact (cat_words_N N (uname_lex N Hok)).
+  - exact (uline_ws_pipe ws npc (proj1 Hok) (proj1 (proj2 (proj2 Hok)))).
+  - cbn [uline_ws line_body]. exact (wl_words_body _ (secc_ok_wf ws Hok)).
+Qed.
+
 (* THE TYPED LINE'S WORDS ARE THE BODY'S PARSE, at every constructor
    (RULING SLOT-WS, option B).  This is the equation [UkSh]'s [Hdsc_line]
    asks of an era's line read; it was a PREMISE of
@@ -907,16 +975,81 @@ Proof using.
   intro Hfb. destruct (fbody_ok_line b Hfb) as [Hok Hb].
   transitivity (wl_words (line_body (uline_of b)));
     [ | exact (f_equal wl_words (eq_sym Hb)) ].
-  revert Hok. generalize (uline_of b). intros [ws | ws N | N | ws npc] Hok.
-  - cbn [uline_ws line_body]. symmetry.
-    exact (wl_words_body ws (line_ok_wf _ Hok)).
-  - symmetry. exact (uline_ws_gtf ws N (proj1 Hok) (proj1 (proj2 Hok))).
-  - cbn [uline_ws line_body]. symmetry. exact (cat_words_N N (uname_lex N Hok)).
-  - symmetry. exact (uline_ws_pipe ws npc (proj1 Hok) (proj1 (proj2 (proj2 Hok)))).
+  revert Hok. generalize (uline_of b). intros l Hok. symmetry. exact (uline_ws_body l Hok).
 Qed.
 
 Lemma fbody_ok_of l : uline_nopipe l -> uline_ok l -> fbody_ok (line_body l).
 Proof using. intros Hnp H. exists l. exact (parse_line_body l Hnp H). Qed.
+
+(* ---- THE SECCOMP LINE'S PARSE (seccomp design section 3) ------------- *)
+(* [parse_line] never answers [LSecc] ([parse_line_not_secc]); the union
+   reads a seccomp body through [secc_parse], beside the pipeline's own
+   parser.  A body is a seccomp line when it is the canonical body of its
+   words, the first word is [seccomp] and the rest are [secc_ok]. *)
+Definition secc_body (b : list (bv 8)) : Prop :=
+  wl_body (wl_words b) = b /\ wl_words b !! 0%nat = Some cmd_seccomp
+  /\ secc_ok (drop 1 (wl_words b)).
+
+Global Instance secc_body_dec b : Decision (secc_body b).
+Proof using. rewrite /secc_body. apply _. Defined.
+
+Definition secc_parse (b : list (bv 8)) : option (list (list (bv 8))) :=
+  if decide (secc_body b) then Some (drop 1 (wl_words b)) else None.
+
+Lemma secc_parse_some b ws :
+  secc_parse b = Some ws -> secc_ok ws /\ b = line_body (LSecc ws).
+Proof using.
+  rewrite /secc_parse. case_decide as Hb; [| discriminate]. intros [= <-].
+  destruct Hb as (Hbody & Hh & Hok). split; [exact Hok |].
+  cbn [line_body]. rewrite -{1}Hbody. revert Hh.
+  destruct (wl_words b) as [| w r]; intros Hh; [discriminate Hh |].
+  injection Hh as ->. reflexivity.
+Qed.
+
+Lemma secc_parse_body ws : secc_ok ws -> secc_parse (line_body (LSecc ws)) = Some ws.
+Proof using.
+  intros Hok. cbn [line_body]. rewrite /secc_parse.
+  pose proof (wl_words_body _ (secc_ok_wf ws Hok)) as Hw.
+  rewrite decide_True; [by rewrite Hw |].
+  rewrite /secc_body Hw. split_and!; [reflexivity | reflexivity | exact Hok].
+Qed.
+
+(* ONLY A SECCOMP LINE HAS [seccomp] FOR ITS FIRST WORD: an echo line's
+   (and a redirect's, and an echo pipeline's) is [echo], a cat line's (and
+   a [cat f] pipeline's) is [cat] *)
+Lemma uline_ws_head_secc (l : uline) :
+  uline_ok l -> uline_ws l !! 0%nat = Some cmd_seccomp -> exists ws, l = LSecc ws.
+Proof using.
+  assert (Hech : forall ws r, line_ok ws -> (ws ++ r) !! 0%nat <> Some cmd_seccomp).
+  { intros ws r Hok Hh. pose proof (line_ok_head ws Hok) as He.
+    destruct ws as [| w ws']; [discriminate He |].
+    change ((w :: ws') !! 0%nat) with (Some w) in He.
+    change (((w :: ws') ++ r) !! 0%nat) with (Some w) in Hh.
+    apply fd_some_eq in He, Hh. rewrite He in Hh. exact (cmd_seccomp_ne_echo (eq_sym Hh)). }
+  destruct l as [ws | ws N | N | [ws | g] fs | ws]; cbn [uline_ws uline_ok prod_words]; intros Hok Hh.
+  - exfalso. apply (Hech ws [] Hok). by rewrite app_nil_r.
+  - exfalso. exact (Hech ws _ (proj1 Hok) Hh).
+  - exfalso. change ([fd_w_cat; N] !! 0%nat) with (Some fd_w_cat) in Hh.
+    apply fd_some_eq in Hh. exact (cmd_seccomp_ne_cat (eq_sym Hh)).
+  - exfalso. exact (Hech ws _ (proj1 Hok) Hh).
+  - exfalso. change (([fd_w_cat; g] ++ w_filts fs) !! 0%nat) with (Some fd_w_cat) in Hh.
+    apply fd_some_eq in Hh. exact (cmd_seccomp_ne_cat (eq_sym Hh)).
+  - by exists ws.
+Qed.
+
+(* a body in [parse_line]'s range is not a seccomp body *)
+Lemma fbody_ok_not_secc b : fbody_ok b -> ~ secc_body b.
+Proof using.
+  intros Hf (_ & Hh & _). destruct (fbody_ok_line b Hf) as [Hok _].
+  rewrite -(uline_ws_words b Hf) in Hh.
+  destruct (uline_ws_head_secc _ Hok Hh) as [ws Hws].
+  exact (proj2 (uline_of_nopipe b) ws Hws).
+Qed.
+
+Lemma secc_parse_fbody b : fbody_ok b -> secc_parse b = None.
+Proof using.
+  intros Hf. rewrite /secc_parse decide_False; [reflexivity | exact (fbody_ok_not_secc b Hf)].
+Qed.
 
 (* ---- ...AND THE READING THAT SURVIVES THE FOURTH CONSTRUCTOR ---------- *)
 (* [fbody_ok b] is "[b] is in [parse_line]'s range".  Its ONE consumer
@@ -942,7 +1075,7 @@ Lemma fline_ok_cat_words (b : list (bv 8)) (N : list (bv 8)) :
   fline_ok b -> wl_words b = uline_ws (LCat N) -> uline_of b = LCat N.
 Proof using.
   intros (l & Hok & ->) Hw.
-  destruct l as [ws' | ws' N' | N' | ws' npc'].
+  destruct l as [ws' | ws' N' | N' | ws' npc' | ws'].
   - exfalso. cbn [line_body] in Hw.
     rewrite (wl_words_body ws' (line_ok_wf _ Hok)) in Hw.
     pose proof (line_ok_head ws' Hok) as Hh. rewrite Hw in Hh.
@@ -955,7 +1088,7 @@ Proof using.
   - pose proof (cat_words_N N' (uname_lex N' Hok)) as Hc.
     cbn [line_body uline_ws] in Hw. rewrite Hc in Hw.
     assert (HN : N = N') by congruence. subst N.
-    apply uline_of_body; [ intros w ? Hp; discriminate Hp | exact Hok ].
+    apply uline_of_body; [ exact (uline_nopipe_cat _) | exact Hok ].
   - exfalso. destruct Hok as (Hok' & Hn1 & Hf1 & _).
     rewrite (uline_ws_pipe ws' npc' Hok' Hf1) in Hw.
     apply (f_equal length) in Hw. revert Hw.
@@ -963,6 +1096,9 @@ Proof using.
     pose proof (prod_words_ge2 ws' Hok') as H2.
     pose proof (w_filts_length_ge npc' Hn1) as H3.
     cbn [length]. lia.
+  - (* LSecc: its head word is [seccomp] *)
+    exfalso. rewrite (uline_ws_body _ Hok) in Hw. cbn [uline_ws] in Hw.
+    apply fd_cons_eq in Hw as [Hc _]. exact (cmd_seccomp_ne_cat Hc).
 Qed.
 
 (* WHICH LINE A REDIRECT WORD LIST IS (RULING SLOT-WS, option B): an
@@ -978,7 +1114,7 @@ Lemma fline_ok_redir_words (b : list (bv 8)) (ws : list (list (bv 8)))
   uline_of b = LEchoF ws file /\ uname file.
 Proof using.
   intros (l & Hok & ->) Hws Hw.
-  destruct l as [ws' | ws' N' | N' | ws' npc'].
+  destruct l as [ws' | ws' N' | N' | ws' npc' | ws'].
   - (* LEcho: its words are alphanumeric, and `>' is not *)
     exfalso. cbn [line_body] in Hw.
     rewrite (wl_words_body ws' (line_ok_wf _ Hok)) in Hw.
@@ -1000,7 +1136,7 @@ Proof using.
     apply app_inj_tail in Hw as [Hw HN]. subst file.
     apply app_inj_tail in Hw as [-> _].
     split; [ | exact Hu' ].
-    apply uline_of_body; [ intros w ? Hp; discriminate Hp | ].
+    apply uline_of_body; [ exact (uline_nopipe_echof _ _) | ].
     split_and!; assumption.
   - (* LCat: two words, so the command would have none *)
     exfalso. change (line_body (LCat N')) with (cmd_cat N') in Hw.
@@ -1028,6 +1164,14 @@ Proof using.
         by (rewrite -!app_assoc; reflexivity).
       apply app_inj_tail in Hw as [Hw _].
       apply app_inj_tail in Hw as [_ Hg]. discriminate Hg.
+  - (* LSecc: its words are alphanumeric, and `>' is not *)
+    exfalso. rewrite (uline_ws_body _ Hok) in Hw. cbn [uline_ws] in Hw.
+    pose proof (secc_ok_wf ws' Hok) as Hwf. rewrite Hw in Hwf.
+    apply Forall_app in Hwf as [_ Hwf].
+    apply Forall_cons_1 in Hwf as [[_ Hgt] _].
+    apply Forall_cons_1 in Hgt as [Hgt _].
+    revert Hgt. rewrite /wl_alnum. vm_compute. intros [H | [H | H]];
+      destruct H as [H1 H2]; first [ by apply H1 | by apply H2 ].
 Qed.
 
 Lemma fline_ok_of_body b : fbody_ok b -> fline_ok b.
@@ -1041,8 +1185,8 @@ Lemma fbody_ok_bytes b : fbody_ok b -> Forall fbody_byte b.
 Proof using.
   intro Hb. destruct (fbody_ok_line b Hb) as [Hok Heq].
   pose proof (uline_of_nopipe b) as Hnp. rewrite Heq.
-  destruct (uline_of b) as [ws | ws N | N | ws npc]; rewrite /line_body;
-    [| | | by destruct (Hnp ws npc eq_refl)].
+  destruct (uline_of b) as [ws | ws N | N | ws npc | ws]; rewrite /line_body;
+    [| | | by destruct (proj1 Hnp ws npc eq_refl) | by destruct (proj2 Hnp ws eq_refl)].
   - apply Forall_impl with (P := wl_body_byte);
       [exact (wl_body_bytes ws (line_ok_wf _ Hok)) | exact fbody_byte_of_body].
   - destruct Hok as (Hok & Hu & _).
@@ -1056,7 +1200,8 @@ Lemma fbody_ok_short b : fbody_ok b -> (S (length b) < line_max)%nat.
 Proof using.
   intro Hb. destruct (fbody_ok_line b Hb) as [Hok Heq].
   pose proof (uline_of_nopipe b) as Hnp. rewrite Heq.
-  destruct (uline_of b) as [ws | ws N | N | ws npc]; [| | | by destruct (Hnp ws npc eq_refl)].
+  destruct (uline_of b) as [ws | ws N | N | ws npc | ws];
+    [| | | by destruct (proj1 Hnp ws npc eq_refl) | by destruct (proj2 Hnp ws eq_refl)].
   - pose proof (line_ok_len ws Hok) as Hl.
     rewrite wl_line_length in Hl. rewrite /line_body. lia.
   - destruct Hok as (_ & _ & Hl).
@@ -1104,7 +1249,10 @@ Proof using.
   intro Hok.
   rewrite line_bytes_body. apply Forall_app. split;
     [| apply Forall_singleton; by right; right].
-  destruct l as [ws | ws N | N | ws npc]; rewrite /line_body.
+  destruct l as [ws | ws N | N | ws npc | ws]; rewrite /line_body.
+  5: { apply Forall_impl with (P := wl_body_byte);
+         [exact (wl_body_bytes _ (secc_ok_wf ws Hok)) |].
+       intros b Hb. left. exact (fbody_byte_of_body b Hb). }
   - apply Forall_impl with (P := wl_body_byte);
       [exact (wl_body_bytes ws (line_ok_wf _ Hok)) |].
     intros b Hb. left. exact (fbody_byte_of_body b Hb).
@@ -1357,6 +1505,10 @@ Definition alt_openfailN (N : list (bv 8)) : list (bv 8) := wl_line (dg_openN N)
 Definition alt_catopenN (N : list (bv 8)) : list (bv 8) := dg_catopenN N ++ u_prompt.
 Notation alt_openfail := (alt_openfailN fname_f).
 Definition alt_execcat  : list (bv 8) := wl_line dg_exec_cat ++ u_prompt.
+(* sh's [exec %s failed] at a [seccomp] line *)
+Definition dg_exec_secc : list (list (bv 8)) :=
+  [ sb "exec"%string; cmd_seccomp; sb "failed"%string ].
+Definition alt_execsecc : list (bv 8) := wl_line dg_exec_secc ++ u_prompt.
 Notation alt_catopen := (alt_catopenN fname_f).
 
 Lemma alt_openfail_string :
@@ -1388,7 +1540,11 @@ Inductive ralt :=
   | RCNoOpen                 (* "cat: cannot open f\n$ " at a PRESENT f   *)
   | RCExec                   (* "exec cat failed\n$ "                     *)
   | RCSilent                 (* "$ "                                      *)
-  | RCFork.                  (* "fork\n"                                  *)
+  | RCFork                   (* "fork\n"                                  *)
+  | RSExec.                  (* "exec seccomp failed\n$ " -- the shell's exec
+                                failure at a [seccomp] line; its fork panic and
+                                its silent round are [RCFork] and [RCSilent],
+                                whose bytes name no command *)
 
 Global Instance ralt_eq_dec : EqDecision ralt.
 Proof using. solve_decision. Defined.
@@ -1405,6 +1561,7 @@ Definition ralt_enc (a : ralt) : nat :=
   | RCRan => 10%nat | RCNoOpen => 11%nat | RCExec => 12%nat
   | RCSilent => 13%nat | RCFork => 14%nat
   | RFRan sel => (15 + 12 * encode_nat sel)%nat
+  | RSExec => 17%nat
   end.
 
 Definition ralt_dec (n : nat) : ralt :=
@@ -1421,6 +1578,7 @@ Definition ralt_dec (n : nat) : ralt :=
   else if decide (n = 14%nat) then RCFork
   else if decide (Nat.modulo n 12 = 3%nat)
        then RFRan (default [] (decode_nat (Nat.div (n - 15) 12)))
+  else if decide (n = 17%nat) then RSExec
        else REcho (4 + Nat.div (n - 4) 12)%nat.
 
 Lemma fd_mod12_add (a m : nat) : Nat.modulo (a + 12 * m) 12 = Nat.modulo a 12.
@@ -1437,7 +1595,7 @@ Qed.
 
 Lemma ralt_dec_enc a : ralt_dec (ralt_enc a) = a.
 Proof using.
-  destruct a as [k | sel | | | | | | | | | |]; try (by vm_compute).
+  destruct a as [k | sel | | | | | | | | | | |]; try (by vm_compute).
   - (* REcho: its own index below 4, and out of every other code's way
        above it *)
     rewrite /ralt_enc. case_decide as Hk.
@@ -1447,6 +1605,7 @@ Proof using.
       rewrite /ralt_dec.
       do 11 (case_decide; [exfalso; lia |]).
       case_decide; [exfalso; congruence |].
+      case_decide; [exfalso; lia |].
       replace (4 + 12 * (k - 4) - 4)%nat with (12 * (k - 4))%nat by lia.
       rewrite fd_div12_mul. f_equal. lia.
   - (* RFRan: the chunk subset through the countable encoding *)
@@ -1501,6 +1660,15 @@ Definition ralt_ok (l : uline) (a : ralt) : Prop :=
       | RCRan | RCNoOpen | RCExec | RCSilent | RCFork => True
       | _ => False
       end
+  (* THE SHELL'S OWN THREE at a [seccomp] line (seccomp design section 3):
+     its fork panic, its exec failure, its silent round.  The union adds
+     the terminal arm [UnionDisc.US] beside them; the file application
+     never files the line ([parse_line_not_secc]). *)
+  | LSecc _ =>
+      match a with
+      | RCFork | RSExec | RCSilent => True
+      | _ => False
+      end
   end.
 
 Global Instance ralt_ok_dec l a : Decision (ralt_ok l a).
@@ -1536,6 +1704,7 @@ Definition line_file (l : uline) : option (list (bv 8)) :=
   | LEchoF _ N | LCat N => Some N
   | LPipe (PrEcho _) _ => None
   | LPipe (PrCatF g) _ => Some g
+  | LSecc _ => None
   end.
 
 (* the name a round's own diagnostics print ([f] where the line names
@@ -1562,11 +1731,12 @@ Definition cont (s : fstate) (l : uline) (a : ralt) : list (bv 8) :=
   | RCExec => alt_execcat
   | RCSilent => u_prompt
   | RCFork => alt_panic
+  | RSExec => alt_execsecc
   end.
 
 Lemma fstate_ok_fsm s l a : fstate_ok s -> uline_ok l -> ralt_ok l a -> fstate_ok (fsm s l a).
 Proof using.
-  intros Hs Hl Ha. destruct l as [ws | ws N | N | ws npc]; [exact Hs | | exact Hs | exact Hs].
+  intros Hs Hl Ha. destruct l as [ws | ws N | N | ws npc | ws]; [exact Hs | | exact Hs | exact Hs | exact Hs].
   destruct Hl as (Hok & Hu & _).
   destruct a; cbn [fsm]; try exact Hs;
     try (apply fstate_ok_insert; [exact Hs | exact Hu | by left; constructor]).
@@ -1618,12 +1788,13 @@ Qed.
 Lemma lname_fn l : uline_ok l -> fn_word (lname l).
 Proof using.
   assert (Hf : fn_word fname_f) by (apply (bool_decide_unpack _); vm_compute; exact I).
-  destruct l as [ws | ws N | N | [ws | g] fs]; cbn [lname line_file default]; intros Hl.
+  destruct l as [ws | ws N | N | [ws | g] fs | ws]; cbn [lname line_file default]; intros Hl.
   - exact Hf.
   - destruct Hl as (_ & Hu & _). exact (uname_lex N Hu).
   - exact (uname_lex N Hl).
   - exact Hf.
   - exact (proj1 Hl).
+  - exact Hf.
 Qed.
 
 (* a word line of name words: '$'-free, one newline, at its end *)
@@ -1698,6 +1869,8 @@ Proof using.
     constructor; [apply (bool_decide_unpack _); vm_compute; exact I | constructor]. }
   assert (Hec : wl_wf dg_exec_cat)
     by (apply (bool_decide_unpack _); vm_compute; exact I).
+  assert (Hes : wl_wf dg_exec_secc)
+    by (apply (bool_decide_unpack _); vm_compute; exact I).
   assert (Hpr : exists u : list (bv 8), u_prompt = u ++ u_prompt
                   /\ Forall nodollar u
                   /\ (wl_nl ∉ u \/ exists v, wl_nl ∉ v /\ u = v ++ [wl_nl])).
@@ -1706,7 +1879,7 @@ Proof using.
   destruct a; rewrite /cont.
   - (* REcho: the echo application's four, minus the panic one *)
     rewrite /ralt_panic in Hp. apply bool_decide_eq_false in Hp.
-    rewrite /ralt_ok in Ha. destruct l as [ws | ws N | N | ws npc]; [| done | done | done].
+    rewrite /ralt_ok in Ha. destruct l as [ws | ws N | N | ws npc | ws]; [| done | done | done | done].
     destruct a as [| [| [| [| a]]]]; [| | | done | exfalso; lia].
     + exists (wl_line (drop 1 ws)). rewrite line_alts_of_0.
       split; [reflexivity |].
@@ -1737,6 +1910,8 @@ Proof using.
     split; [reflexivity |]. exact (wl_line_shape' dg_exec_cat Hec).
   - exact Hpr.
   - discriminate.
+  - exists (wl_line dg_exec_secc). rewrite /alt_execsecc.
+    split; [reflexivity |]. exact (wl_line_shape' dg_exec_secc Hes).
 Qed.
 
 (* ====================================================================== *)
@@ -2312,7 +2487,7 @@ Proof using.
   apply elem_of_list_fmap in Hl as (b & -> & _).
   destruct (parse_line b) as [l |] eqn:Hp; rewrite /uline_of Hp in Hws;
     [cbn in Hws | cbv in Hws; discriminate Hws].
-  destruct l as [ws' | ws' N' | N' | p fs]; try discriminate Hws.
+  destruct l as [ws' | ws' N' | N' | p fs | ws']; try discriminate Hws.
   injection Hws as <- <-. exact (proj1 (proj2 (parse_line_ok b _ Hp))).
 Qed.
 
@@ -2343,7 +2518,7 @@ Proof using.
   destruct (bodies_of I !! i) as [b |] eqn:Hb; [| discriminate].
   cbn in Hi. injection Hi as <-.
   destruct (fbody_ok_line b (disc_input_f_body I i b Hd Hb)) as [Hok _].
-  destruct (uline_of b) as [ws' | ws' N' | N' | ws' npc']; try discriminate.
+  destruct (uline_of b) as [ws' | ws' N' | N' | ws' npc' | ws']; try discriminate.
   injection Hws as <- <-. destruct Hok as (Hok & Hu & _). by split.
 Qed.
 
@@ -2416,7 +2591,7 @@ Definition file_phi (h : list mobs) : Prop :=
 Definition file_lm : lmodel :=
   MkLM fstate uline uline_of ralt ralt_dec ralt_panic cont fsm
        (fun _ => ralt_ok) fbody_ok fbody_byte uline_ok fstate_ok
-       (fun _ => false) (fun _ => False).
+       (fun _ => false) (fun _ _ => False).
 
 Lemma pro_idx_f_lm cs i : pro_idx_f cs i = lm_pro_idx file_lm cs i.
 Proof using. induction i as [| i IH]; [reflexivity |]. cbn. by rewrite IH. Qed.
@@ -2511,7 +2686,7 @@ Proof using.
   - intros s l a H. exact (cont_panic s l a H).
   - intros a H. cbn in H. discriminate H.
   - intros s l a _ _ H. cbn in H. discriminate H.
-  - intros u' u _ H. exact H.
+  - intros l u' u _ H. exact H.
   - intros s l a Hs Hl Ha Hp _.
     destruct (cont_shape s l a Hl Hs Ha Hp) as (u & Hu & Hnd & Hnl).
     exists u. split; [exact Hu |]. split; [exact Hnd |].
@@ -2635,8 +2810,9 @@ Lemma fbody_ok_echo (b : list (bv 8)) :
 Proof using.
   intros Hfb Hok.
   pose proof (fbody_ok_line b Hfb) as [Hlok Hbody].
-  destruct (uline_of b) as [ws | ws N | N | ws npc] eqn:Hu;
-    [| | | by destruct (uline_of_nopipe b ws npc Hu)].
+  destruct (uline_of b) as [ws | ws N | N | ws npc | ws] eqn:Hu;
+    [| | | by destruct (proj1 (uline_of_nopipe b) ws npc Hu)
+     | by destruct (proj2 (uline_of_nopipe b) ws Hu)].
   - (* LEcho: the body IS [wl_body ws], so the words are [ws] *)
     rewrite /uline_ok in Hlok. rewrite /line_body in Hbody.
     rewrite Hbody (wl_words_body ws (line_ok_wf _ Hlok)). reflexivity.
@@ -2662,7 +2838,7 @@ Lemma fline_ok_echo (b : list (bv 8)) :
   fline_ok b -> line_ok (wl_words b) -> uline_of b = LEcho (wl_words b).
 Proof using.
   intros [l [Hlok ->]] Hok.
-  destruct l as [ws | ws N | N | ws npc].
+  destruct l as [ws | ws N | N | ws npc | ws].
   - rewrite /line_body in Hok |- *.
     rewrite (wl_words_body ws (line_ok_wf _ Hlok)).
     exact (uline_of_body (LEcho ws) (uline_nopipe_echo ws) Hlok).
@@ -2682,13 +2858,17 @@ Proof using.
     rewrite suf_filts_cons in Hsuf. apply Forall_app in Hsuf as [Hsuf _].
     exact (fd_bar_not_body
              (proj1 (Forall_forall _ _) Hsuf fd_bar (suf_filt_bar F))).
+  - exfalso. rewrite (uline_ws_body _ Hlok) in Hok. cbn [uline_ws] in Hok.
+    pose proof (line_ok_head _ Hok) as Hh.
+    change ((cmd_seccomp :: ws) !! 0%nat) with (Some cmd_seccomp) in Hh.
+    apply fd_some_eq in Hh. exact (cmd_seccomp_ne_echo Hh).
 Qed.
 
 Lemma ralt_ok_echo_lt4 ws c : ralt_ok (LEcho ws) (ralt_dec c) -> (c < 4)%nat.
 Proof using.
   rewrite /ralt_dec. case_decide as H4; [by intros _ |].
   do 10 (case_decide; [by intros [] |]).
-  case_decide; [by intros [] |]. rewrite /ralt_ok. lia.
+  case_decide; [by intros [] |]. case_decide; [by intros [] |]. rewrite /ralt_ok. lia.
 Qed.
 
 Lemma ralt_panic_echo c :

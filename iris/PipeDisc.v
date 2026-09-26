@@ -1405,7 +1405,7 @@ Qed.
 Definition pipe_lm : lmodel :=
   MkLM unit pline pline_of palt palt_of palt_panic (fun _ => pcont)
        (fun _ _ _ => tt) (fun _ => palt_ok) pbody_ok pbody_byte pline_ok (fun _ => True)
-       palt_isforkS pmergeable.
+       palt_isforkS (fun _ => pmergeable).
 
 Lemma pro_idx_p_lm cs i : pro_idx_p cs i = lm_pro_idx pipe_lm cs i.
 Proof using. induction i as [| i IH]; [reflexivity |]. cbn. by rewrite IH. Qed.
@@ -1427,7 +1427,7 @@ Proof using.
   - intros a H. destruct (palt_isforkS_inv a H) as [sel ->].
     exact (palt_panic_forkS sel).
   - intros s l a _ Ha H. exact (pmergeable_isforkS l a Ha H).
-  - intros u' u Hp Hm. exact (pmergeable_prefix u' u Hp Hm).
+  - intros l u' u Hp Hm. exact (pmergeable_prefix u' u Hp Hm).
   - intros s l a _ Hl Ha Hp Hf.
     destruct (pcont_shape_nl l a Hl Ha Hp Hf) as (u & Hu & Hnd & Hnl).
     exists u. split; [exact Hu |]. split; [exact Hnd |].

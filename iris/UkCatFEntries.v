@@ -84,7 +84,7 @@ Section UkCatFEntries.
   Context (WA : gen_wa M G sd).
   Hypothesis Hext : forall k l, gext WA k l = pext g k l.
   Local Notation T := (gcT G).
-  Context (Hcons : @riscv_cons_res Σ (@riscv_fixedGS Σ HRg) = peclV g M G sd WA).
+  Context (Hcons : cons_claimV g M V G sd WA).
   Context (Hkill : @app_taint Σ (@riscv_fixedGS Σ HRg) = T).
   Hypothesis Hsup : ⊢ □ (T -∗ app_sup).
   Context (v : era_pins) (I : list (bv 8)) (sR : lm_st M) (lR : pline').

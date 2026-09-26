@@ -68,6 +68,7 @@ Require Import FileOut.
 Require Import FileLinksLine.
 Require Import FileLinkGen.
 Require Import PipeOut.
+Require Import PipeOutW.       (* [secc_tok_at]: the wild shape's token *)
 Require Import ProgTree.
 Require Import PipesDisc.
 Require Import PipesUline.
@@ -97,7 +98,7 @@ Proof using.
   intros Hd.
   assert (Hin : b ∈ (I ++ [b])%list).
   { apply elem_of_app. right. by apply elem_of_list_singleton. }
-  pose proof (lm_disc_input_byte_val U (ulm_byte_laws adm_u_g) (I ++ [b])%list b Hd Hin)
+  pose proof (lm_disc_input_byte_val U (ulm_byte_laws adm_u_g adm_s_off) (I ++ [b])%list b Hd Hin)
     as Hv.
   lia.
 Qed.
@@ -129,9 +130,13 @@ Proof using.
     - exists (uline_of J). destruct (fbody_ok_line J Hf) as [Hok HJ].
       split; [| split; [exact Hok | split; [exact HJ | exact (uline_ws_words J Hf)]]].
       pose proof (uline_of_nopipe J) as Hnp. rewrite /ush_line_union.
-      destruct (uline_of J) as [ws | ws Nf | Nf | p n] eqn:He; try exact Logic.I.
-      exfalso. exact (Hnp p n eq_refl).
-    - destruct Hlast as [Hf | Hp]; [contradiction |].
+      destruct (uline_of J) as [ws | ws Nf | Nf | p n | ws] eqn:He; try exact Logic.I.
+      + exfalso. exact (proj1 Hnp p n eq_refl).
+      + exfalso. exact (proj2 Hnp ws eq_refl).
+    - destruct Hlast as [Hf | [Hp | Hs]]; [contradiction | |].
+      2: { (* the seccomp knob is off: no seccomp body is admitted *)
+           exfalso. revert Hs. rewrite /usecc_ok.
+           destruct (secc_parse J); [intros Hq; discriminate Hq | intros []]. }
       revert Hp. rewrite /upipe_ok.
       destruct (pl_parse J) as [[ws | p n] |] eqn:Hq; intros Hp; try contradiction.
       destruct (pl_parse_some J _ Hq) as [Hok HJ].
@@ -262,7 +267,16 @@ Section UnionInitCC.
     iDestruct "H" as (I) "[%Hlen Hb]".
     iDestruct (uWbf_inp ug r s0 I with "Hb") as "[Hb #Hinp]".
     rewrite /uWbf /uWbl.
-    iDestruct "Hb" as "[Hb Hd]". iDestruct "Hb" as (v) "[#Hpin Hb]".
+    iDestruct "Hb" as "[[Hb Hd] | #Hw]"; last first.
+    { (* THE WILD ARM: with the knob off no disciplined input ends in a
+         [seccomp x] line ([UShURoundDefs.uwild_disc_off]).  S4 replaces
+         this with init's banner through the licence (seccomp design
+         10.5). *)
+      iExFalso. iDestruct "Hw" as "[Htok %Hwl]". rewrite /usecc_tok_at /secc_tok_at.
+      iDestruct "Htok" as (v) "(_ & _ & _ & %Hn & _)". destruct Hn as (Hpos & Hr & Hdi).
+      assert (Hne : I <> []) by (intros ->; rewrite nlines_nil in Hpos; lia).
+      rewrite (uwild_disc_off I Hne Hr Hdi) in Hwl. discriminate Hwl. }
+    iDestruct "Hb" as (v) "[#Hpin Hb]".
     iSplitL "Hb".
     { rewrite /UInitBanner.kinit_ban_at. iExists v, I.
       iSplitR; [by iPureIntro |]. iFrame "Hpin Hb". }
@@ -285,7 +299,7 @@ Section UnionInitCC.
     iAssert (uWbl ug s0 I) with "[Hb]" as "Hb".
     { rewrite /uWbl. iExists v. iFrame "Hpin Hb". }
     iDestruct (uWbl_inp ug s0 I with "Hb") as "[Hb #Hinp]".
-    iExists I. iSplitR; [by iPureIntro |]. rewrite /uWbf. iFrame "Hb".
+    iExists I. iSplitR; [by iPureIntro |]. rewrite /uWbf. iLeft. iFrame "Hb".
     iDestruct "Hinp" as "[[Hinp _] | #HT]"; last first.
     { iApply (ush_deed_taint ug r with "HT"). }
     iDestruct "Hinp'" as "[Hinp' | #HT]"; last first.
@@ -308,7 +322,7 @@ Section UnionInitCC.
       (Heq : @file_app Σ HF = MkAppcfg file_names (file_pred (fgn_cl (ugn_file ug))) r)
       (Hcons : @riscv_cons_res Σ (@riscv_fixedGS Σ HR) = ucl ug)
       (Htag : @riscv_rx_tag Σ (@riscv_fixedGS Σ HR) = utag ug)
-      (Hwild : @riscv_wild Σ (@riscv_fixedGS Σ HR) = wild_none) :
+      (Hrdwild : @riscv_rdwild Σ (@riscv_fixedGS Σ HR) = wild_none) :
     (⊢ union_links ug) ->
     UInitSh.cons_cred_holds_at fsc_cons (file_taint (fgn_cl (ugn_file ug)))
       (lm_disc_input U) union_disc_snoc_ncr union_disc_rest_short
@@ -323,14 +337,15 @@ Section UnionInitCC.
     { iIntros "#Hs".
       iApply (UInitFileLeaves.file_taint_of_sup_at (ugn_file ug) r Heq with "Hs"). }
     (* the wild credential's reading (lane S0): the union has none yet *)
-    assert (Hwdw : ⊢ riscv_wild (S gen_id) -∗ file_taint (fgn_cl (ugn_file ug))).
-    { rewrite Hwild /wild_none. by iIntros "[]". }
+    assert (Hwdw : ⊢ riscv_rdwild (S gen_id) -∗ file_taint (fgn_cl (ugn_file ug))).
+    { rewrite Hrdwild /wild_none. by iIntros "[]". }
     pose proof (uWbf_inp ug r s0) as Hwbi.
     rewrite /UInitSh.cons_cred_holds_at /union_cc /=.
     split_and!.
     - (* (1) the read leaf at the index *)
       intros γp N l Hpeq.
-      exact (union_read_leaf_holds_at ug Htag s0 (uWbf ug r s0) N γp l Hpeq Hstw Htsw Hwdw
+      exact (union_read_leaf_holds_at ug Htag s0 (uWbf ug r s0) N γp l Hpeq Hstw
+               (UShLine.ush_rdcred_w _ Htsw) Hwdw
                Hlkp).
     - intros γp N i Hpeq.
       exact (UShLine.ush_lease_of_at (lk_rres (union_link_inst_at ug s0))
@@ -347,12 +362,14 @@ Section UnionInitCC.
     - (* (5) the read that completes a line, at the widened credential *)
       intros γp I l Hnl. exact (uWcu_read ug r s0 γp I l Hnl).
     - (* (6) the banner-owed credential is a boundary credential *)
-      intros I. iIntros "H". iApply (uWcu_of ug r s0 (upterm_shape ug) (updone_shape ug) I 0%nat).
-      iApply (uHwbwc_f ug r s0 I with "H").
+      intros I. iIntros "H".
+      iApply (uHwbwc_u ug r s0 (upterm_shape ug) (updone_shape ug) I with "H").
     - (* (7) a block owed is one too *)
       intros I. exact (uHwbl_u ug r s0 (upterm_shape ug) (updone_shape ug) I).
     - (* (8) a line read at an unwritten prompt is the taint *)
-      intros γp I l Hnl. iIntros "Hm [Hb _]".
+      intros γp I l Hnl. iIntros "Hm [[Hb _] | #Hw]"; last first.
+      { (* the wild shape: the read is vacuous (seccomp design 10.5) *)
+        iExFalso. iApply (uwild_read_absurd ug s0 γp I l with "Hm Hw"). }
       iApply (UShLine.ush_wb_read_holds_at (union_link_inst_at ug s0) (fgn_echo (ugn_file ug))
                 γp (S gen_id) I l Hnl (union_ep_refl_at ug s0) with "Hm Hb").
     - (* (9) the cursor's boundary, at the widened credential *)
@@ -399,7 +416,7 @@ Section UnionInitCC.
       (Heq : @file_app Σ HF = MkAppcfg file_names (file_pred (fgn_cl (ugn_file ug))) r)
       (Hcons : @riscv_cons_res Σ (@riscv_fixedGS Σ HR) = ucl ug)
       (Htag : @riscv_rx_tag Σ (@riscv_fixedGS Σ HR) = utag ug)
-      (Hwild : @riscv_wild Σ (@riscv_fixedGS Σ HR) = wild_none)
+      (Hrdwild : @riscv_rdwild Σ (@riscv_fixedGS Σ HR) = wild_none)
       (st : fdstate) (n0 : nat) :
     (forall k : Z, free_num k -> @psok Σ uprogSG_free k) ->
     8 * Z.of_nat (2 + (8 + (16 + (UkSh.ush_Dbody + n0)))) <= 0xFE0 ->
@@ -429,7 +446,7 @@ Section UnionInitCC.
                 (file_taint (fgn_cl (ugn_file ug))) fsc_cons st (cons_never (fn_cons r))
                 (union_cc HR GEN ug r s0) UInitSh.sh_Rsh n0
                 Hpsok_free Hn0 Hst
-                (union_cc_holds HR GEN ug r s0 Heq Hcons Htag Hwild Hlkp)
+                (union_cc_holds HR GEN ug r s0 Heq Hcons Htag Hrdwild Hlkp)
                 with "Hdep Hdp Hplaw [] Hcore'").
       iApply (file_cons_in_of_Cns HR GEN (ugn_file ug) r Heq with "[] Hcns").
       iDestruct "Hcore'" as "(#Hinv & _)". iExact "Hinv".
@@ -473,7 +490,9 @@ Section UnionInitHead.
       iFrame "Hlb0 Hps Hcs". iSplitR; [iPureIntro; apply lm_rd_stage_0 |].
       cbn [gWb gk0 union_params]. rewrite /uf0bwk.
       rewrite /FileLinksLine.f0bw. iDestruct "Hbw" as "[_ $]".
-    - rewrite /FileLinksLine.flw. iLeft. iPureIntro. reflexivity.
+    - iSplit; [rewrite /FileLinksLine.flw; iLeft; iPureIntro; reflexivity |].
+      (* the empty input completed no line *)
+      iIntros "%Hw". by destruct Hw.
   Qed.
 
   (* /init's FIRST CREDENTIAL: the round's banner-owed family at the deed's
@@ -494,7 +513,7 @@ Section UnionInitHead.
       iExists v, vf. iFrame "Hpin Hvf Htn Hdl Hcs Hps HE". }
     iDestruct (lk_turn0 (union_link_inst_at ug s0) (S gen_id) with "Hturn")
       as "[Hrd Hwb]".
-    iFrame "Hrd". rewrite /uWbf. iSplitL "Hwb"; [rewrite /uWbl; iExact "Hwb" |].
+    iFrame "Hrd". rewrite /uWbf. iLeft. iSplitL "Hwb"; [rewrite /uWbl; iExact "Hwb" |].
     iDestruct "Hb" as "[[-> #Hty] | [-> #HT]]".
     - iApply (ush_done_head ug r s v with "Hpin Hcs Hd Hty").
     - iApply (ush_deed_taint ug r with "HT").

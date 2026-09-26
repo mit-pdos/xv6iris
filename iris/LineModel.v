@@ -71,9 +71,15 @@ Record lmodel := MkLM {
      reads nothing more of the era (the pipeline's fork failure at the
      second child, [PipeDisc.PForkS]); [false] everywhere else *)
   lm_term : lm_alt -> bool;
-  (* the outputs such an arm can have put on the wire, closed under
-     prefix ([PipeDisc.pmergeable]); [False] where no arm ends coverage *)
-  lm_merge : list (bv 8) -> Prop;
+  (* the outputs such an arm can have put on the wire AT A LINE, closed
+     under prefix ([PipeDisc.pmergeable]); [False] where no arm ends
+     coverage.  LINE-INDEXED (seccomp design section 3): at a line whose
+     terminal arm's continuation is ANY byte string (the union's
+     [seccomp x]) it is [True] there, while at a pipeline it stays the
+     pipeline's own set -- a line-free reading would make every pipeline
+     round mergeable.  The determinacy argument compares two witnesses at
+     ONE line, so nothing else changes. *)
+  lm_merge : lm_line -> list (bv 8) -> Prop;
 }.
 
 (* WHAT FOLLOWS SH'S PANIC LINE ON THE WIRE: init's next prologue round,
@@ -111,8 +117,8 @@ Record lm_laws (M : lmodel) : Prop := MkLML {
   lml_cont_panic : forall s l a, lm_panic M a = true -> lm_cont M s l a = alt_panic;
   lml_term_nopanic : forall a, lm_term M a = true -> lm_panic M a = false;
   lml_term_merge : forall s l a,
-    lm_st_ok M s -> lm_ok M s l a -> lm_term M a = true -> lm_merge M (lm_cont M s l a);
-  lml_merge_prefix : forall u' u, u' `prefix_of` u -> lm_merge M u -> lm_merge M u';
+    lm_st_ok M s -> lm_ok M s l a -> lm_term M a = true -> lm_merge M l (lm_cont M s l a);
+  lml_merge_prefix : forall l u' u, u' `prefix_of` u -> lm_merge M l u -> lm_merge M l u';
   lml_cont_shape : forall s l a,
     lm_st_ok M s -> lm_line_ok M l -> lm_ok M s l a ->
     lm_panic M a = false -> lm_term M a = false ->
@@ -524,7 +530,7 @@ Section line_model.
       (lm_panic M a = true -> X <> [] -> 1 < pro_rounds ps) ->
       (lm_term M a = true -> X = []) ->
       ((exists c, lm_ok M s' l c /\ lm_term M c = true) ->
-         ~ lm_merge M (lm_cont M s' l a')) ->
+         ~ lm_merge M l (lm_cont M s' l a')) ->
       (lm_cont_all ps' s' l a' ++ X') `prefix_of` (lm_cont_all ps s l a ++ X) ->
       (lm_panic M a = true -> 1 < pro_rounds ps)
       /\ lm_cont_all ps' s' l a' = lm_cont_all ps s l a
@@ -544,7 +550,7 @@ Section line_model.
       { destruct (lm_term M a) eqn:Hf; [exfalso | reflexivity].
         rewrite (Hd4 eq_refl) app_nil_r in Hp.
         apply (Hnm (lml_term_st L s l a Ha Hf s')).
-        apply (lml_merge_prefix L _ (lm_cont_all ps s l a)).
+        apply (lml_merge_prefix L l _ (lm_cont_all ps s l a)).
         - etrans; [| etrans; [apply prefix_app_r; reflexivity | exact Hp]].
           rewrite /lm_cont_all. apply prefix_app_r. reflexivity.
         - rewrite /lm_cont_all (lml_term_nopanic L a Hf) app_nil_r.
@@ -666,8 +672,8 @@ Section line_model.
         (forall i, i < q' ->
            (exists c, lm_ok M (lm_upto cs' s' bs' i) (lm_of M (bs' !!! i)) c
                       /\ lm_term M c = true) ->
-           ~ lm_merge M (lm_cont M (lm_upto cs' s' bs' i) (lm_of M (bs' !!! i))
-                           (lm_at cs' i))) ->
+           ~ lm_merge M (lm_of M (bs' !!! i))
+               (lm_cont M (lm_upto cs' s' bs' i) (lm_of M (bs' !!! i)) (lm_at cs' i))) ->
         Forall (fun l => wl_nl ∉ l) bs -> Forall (fun l => wl_nl ∉ l) bs' ->
         wl_nl ∉ t' -> wl_nl ∉ t ->
         (lm_seq ps' cs' s' bs' q' ++ t') `prefix_of` (lm_seq ps cs s bs q ++ t) ->
@@ -729,7 +735,8 @@ Section line_model.
         assert (Hp0 : p = 0) by lia.
         by rewrite Hp0 lm_seq_0 Ht. }
       assert (Hnmh : (exists c, lm_ok M s' (lm_of M (bs !!! 0)) c /\ lm_term M c = true) ->
-                ~ lm_merge M (lm_cont M s' (lm_of M (bs !!! 0)) (lm_at cs' 0))).
+                ~ lm_merge M (lm_of M (bs !!! 0))
+                    (lm_cont M s' (lm_of M (bs !!! 0)) (lm_at cs' 0))).
       { rewrite -Hhd. exact (Hnmp 0 ltac:(lia)). }
       rewrite !lm_cont_at_0 in Hrest.
       destruct (lm_cont_pair_det ps ps' s s' (lm_of M (bs !!! 0))
@@ -825,8 +832,9 @@ Section line_model.
       (forall i, i < nlines I' ->
          (exists c, lm_ok M (lm_upto cs' s' (bodies_of I') i) (lm_of M (bodies_of I' !!! i)) c
                     /\ lm_term M c = true) ->
-         ~ lm_merge M (lm_cont M (lm_upto cs' s' (bodies_of I') i)
-                         (lm_of M (bodies_of I' !!! i)) (lm_at cs' i))) ->
+         ~ lm_merge M (lm_of M (bodies_of I' !!! i))
+             (lm_cont M (lm_upto cs' s' (bodies_of I') i)
+                (lm_of M (bodies_of I' !!! i)) (lm_at cs' i))) ->
       lm_sess ps' cs' s' I' `prefix_of` lm_sess ps cs s I ->
       I' `prefix_of` I /\ lm_pro_ok ps cs (nlines I')
       /\ lm_sess ps' cs' s' I' = lm_sess ps cs s I'
@@ -1080,8 +1088,8 @@ Section line_model.
     forall i, i < nlines I ->
       (exists c, lm_ok M (lm_upto cs s (bodies_of I) i) (lm_of M (bodies_of I !!! i)) c
                  /\ lm_term M c = true) ->
-      lm_merge M (lm_cont M (lm_upto cs s (bodies_of I) i)
-                    (lm_of M (bodies_of I !!! i)) (lm_at cs i)) ->
+      lm_merge M (lm_of M (bodies_of I !!! i))
+        (lm_cont M (lm_upto cs s (bodies_of I) i) (lm_of M (bodies_of I !!! i)) (lm_at cs i)) ->
       nlines I = S i /\ rest_of I = [].
 
   Lemma lm_d4_noterm cs s I :

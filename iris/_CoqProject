@@ -1552,6 +1552,7 @@ PipeOutPure.v
 LineModelInst.v
 EchoOut.v
 GenOutHist.v
+GenOutWild.v
 EchoLinks.v
 EchoLinksPro.v
 EchoLinksLine.v
@@ -1723,6 +1724,7 @@ UShEchoPipePay.v
 PipeBothN.v
 PipeOutN.v
 PipeOutNEv.v
+PipeOutW.v
 UkShCat.v
 UShCatPay.v
 UkShPipeWait.v
