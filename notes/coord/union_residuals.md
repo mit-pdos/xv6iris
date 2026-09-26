@@ -34,3 +34,15 @@ Collected from the U0 agent reports (Sept 26 2026). Each item names the lane tha
   `UkShMain`/`UkShEcho`, `UmodeAbi.ubyte0`); only consumer is UShUPipes.
 - U0-2 owner note: FileDiscLine's trim dropped `all_cats`, but it is reached via `adm_echo`;
   U0-3 defines `allCats` in PipesDisc.
+
+## K4 (PQ-b, after the bump) — absorbs the rest of PQ-a
+- K2 landed only PQ-a steps 1–2 (PipeNames/PipeQueue/PipeReg defs, `Xv6G.pipeqG` slot 94,
+  `FdType.pipe γp`, `fdstateOk … γp`, `Xv6/PipeQstep.lean` ghost steps). The re-proofs of
+  pipealloc/pipewrite/piperead/pipeclose/sys_pipe and the fileread/filewrite pipe arms are
+  BLOCKED on PQ-b: `pipeQres` must enter `pipeResAt`, and then pipeclose's flag store needs
+  `pipe_cpay`, which only fileclose_cpay → sys_close/kexit deposits → syscall close arm /
+  usertrap exit+kill / UexecExecInst rows 2, 21 can pay. The kill path needs Rocq's KILL-TAINT
+  kill row (Lean `killRow` has no taint). So K4 = rest of PQ-a + PQ-b in one worktree lane.
+- Interim deviations to retire in K4: PipeInvDefs (queue not in payload), SpecPipealloc dev 4
+  (no `pipe_qfrag … pst0` handed out), SpecSysPipe, PipeReg dev 1; PipeReg §4 (fileclose_cpay).
+- Name watch: K2 added `fdstNopipe` in FileDefs (Rocq FdSlots name) — U1-R / U0-6 must reuse it.
