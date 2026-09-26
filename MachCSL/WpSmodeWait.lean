@@ -110,7 +110,7 @@ set_option hygiene false in
 macro "confhs_intro " h:ident : tactic =>
   `(tactic| (ihave $h:ident := confCellsHS_intro _ _ _ _ _ $$ [Hcur_privilege Hhart_state Hmstatus Hmie Hmideleg Hmedeleg Hmepc
                   Hsatp Hmenvcfg Hmcounteren Hmtimecmp Hstimecmp Hpmpcfg_n Hpmpaddr_n]
-             case' _ => (iframe; try iexact Hhw)))
+             case' _ => (iframe; iexact Hhw)))
 
 set_option maxHeartbeats 4000000 in
 /-- The clock tick at an arbitrary hart state (`swp_tick_clock_cells` at
@@ -207,20 +207,20 @@ theorem wpLoop_wait_wfi (cpu : CPU) (p : Privilege)
     · swp_run 10
       conf_intro HmConf
       ihave Hclock := clockCells_intro _ _ _ _ _ _ $$ [Hminstret_increment Hminstret Hmcycle Hmtime Hmip]
-      case' _ => (iframe; try iexact Hhw)
+      case' _ => iframe
       ihave Hpc := pcIs_intro _ _ $$ [HPC HnextPC]
-      case' _ => (iframe; try iexact Hhw)
+      case' _ => iframe
       iapply HΦ $$ HmConf Hclock Hpc HF
     · swp_run 5
       conf_intro HmConf
       iapply swp_tick_clock_cells (hp := hp)
-      iframe; try iframe Hhw
+      iframe
       inext
       iintro %mcycle' %mtime' %mip' HmConf Hmcycle Hmtime Hmip
       ihave Hclock := clockCells_intro _ _ _ _ _ _ $$ [Hminstret_increment Hminstret Hmcycle Hmtime Hmip]
-      case' _ => (iframe; try iexact Hhw)
+      case' _ => iframe
       ihave Hpc := pcIs_intro _ _ $$ [HPC HnextPC]
-      case' _ => (iframe; try iexact Hhw)
+      case' _ => iframe
       iapply HΦ $$ HmConf Hclock Hpc HF
   · -- still parked: a no-op step, the pc does not move; Löb
     swp_run 60
@@ -228,16 +228,16 @@ theorem wpLoop_wait_wfi (cpu : CPU) (p : Privilege)
     · swp_run 10
       confhs_intro HmConf
       ihave Hclock := clockCells_intro _ _ _ _ _ _ $$ [Hminstret_increment Hminstret Hmcycle Hmtime Hmip]
-      case' _ => (iframe; try iexact Hhw)
+      case' _ => iframe
       iapply IH $$ HmConf Hclock HPC HnextPC HF HΦ
     · swp_run 5
       confhs_intro HmConf
       iapply swp_tick_clock_cellsHS (hp := hp)
-      iframe; try iframe Hhw
+      iframe
       inext
       iintro %mcycle' %mtime' %mip' HmConf Hmcycle Hmtime Hmip
       ihave Hclock := clockCells_intro _ _ _ _ _ _ $$ [Hminstret_increment Hminstret Hmcycle Hmtime Hmip]
-      case' _ => (iframe; try iexact Hhw)
+      case' _ => iframe
       iapply IH $$ HmConf Hclock HPC HnextPC HF HΦ
 
 /-! ## The `wfi` cycle -/
@@ -276,19 +276,19 @@ theorem wpLoop_s_wfi_cycle [CurCtx] (cpu : CPU) (c : MConf) (tier : KTier) (root
   conf_intro HmConf
   iapply swp_bind
   iapply swp_dispatchInterrupt_S_off (hsie := hsie) (hmie := hmie)
-  iframe; try iframe Hhw
+  iframe
   inext
   iintro HmConf Hmip
   swp_run 40
   iapply swp_bind
   iapply (hfetch _)
-  iframe; try iframe Hhw
+  iframe
   inext
   iintro HmConf HPC HT HR
   swp_run 40
   iapply swp_bind
   iapply (hdec _)
-  iframe; try iframe Hhw
+  iframe
   inext
   iintro HmConf
   conf_cases HmConf
@@ -296,7 +296,7 @@ theorem wpLoop_s_wfi_cycle [CurCtx] (cpu : CPU) (c : MConf) (tier : KTier) (root
   conf_intro HmConf
   iapply swp_bind
   iapply (swp_execute_wfi cpu (DFrac.own 1) Privilege.Supervisor hp' c)
-  iframe; try iframe Hhw
+  iframe
   inext
   iintro HmConf
   conf_cases HmConf
@@ -309,18 +309,18 @@ theorem wpLoop_s_wfi_cycle [CurCtx] (cpu : CPU) (c : MConf) (tier : KTier) (root
   · swp_run 10
     confhs_intro HmConf
     ihave Hclock := clockCells_intro _ _ _ _ _ _ $$ [Hminstret_increment Hminstret Hmcycle Hmtime Hmip]
-    case' _ => (iframe; try iexact Hhw)
+    case' _ => iframe
     iapply (wpLoop_wait_wfi cpu Privilege.Supervisor hp' c w pc (pc + 4#64)
       iprop(transTok cpu tier root ∗ R))
     iframe HmConf Hclock HPC HnextPC HT HR Hcont
   · swp_run 5
     confhs_intro HmConf
     iapply swp_tick_clock_cellsHS (hp := hp')
-    iframe; try iframe Hhw
+    iframe
     inext
     iintro %mcycle' %mtime' %mip' HmConf Hmcycle Hmtime Hmip
     ihave Hclock := clockCells_intro _ _ _ _ _ _ $$ [Hminstret_increment Hminstret Hmcycle Hmtime Hmip]
-    case' _ => (iframe; try iexact Hhw)
+    case' _ => iframe
     iapply (wpLoop_wait_wfi cpu Privilege.Supervisor hp' c w pc (pc + 4#64)
       iprop(transTok cpu tier root ∗ R))
     iframe HmConf Hclock HPC HnextPC HT HR Hcont
@@ -368,7 +368,6 @@ theorem wp_s_wfi [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU) (k : KCtx)
       isplit
       · ipureintro; exact hkt
       · iexact Hro
-      try iexact Hhw
     iapply HΦ $$ Hk Hpc
   | F_RVC h => exact absurd hr (by simp [fetchIsRvc])
   | F_Error e => exact (by simp [decodesTo] at hdec : False).elim

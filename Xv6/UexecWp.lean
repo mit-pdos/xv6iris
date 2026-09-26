@@ -29,8 +29,8 @@ statement needs it.
 
 ## Deviations from Rocq
 
-1. The body drops `hw_config`/`minstret_inv` (SpecUser deviation 1: the
-   frozen cells ride `userCfg`).
+1. The body takes `hw_config` (`hwConfig h`, as Rocq) but not
+   `minstret_inv` (`emp`, SpecUser deviation 1).
 2. `loopOk` drops `ud_data pt = ud_pas pt`: Lean's `UPtd` has no separate
    data-footprint field (the footprint IS `um`'s pages), so the conjunct is
    vacuous; `proc_pt_wf` is `UPtDefs.uptWf`.

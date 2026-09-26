@@ -59,8 +59,8 @@ theorem execSpecF_sretU (cpu : CPU) (c : MConf) (sie : Bool) (hok : SConfPhys (G
         Hmtimecmp Hstimecmp Hpmpcfg_n Hpmpaddr_n]
   case' _ =>
     simp only [sretMs]
-    iframe; try iframe Hhw
-    try iexact Hhw
+    iframe
+    iexact Hhw
   iapply HΦ $$ HmConf HPC HnextPC [HF Hsepc]
   iframe HF Hsepc
 

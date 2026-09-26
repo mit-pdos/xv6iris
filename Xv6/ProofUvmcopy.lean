@@ -1141,11 +1141,11 @@ theorem uvmcopy_iter (W : WALK_NOALLOC) (KAL : KALLOC) (KF : KFREE) (MM : MEMMOV
               (UPtCopy.leafOf_isLeafPte _ _ hflagsrwx)
           rw [hvpni] at hrep2
           have hwf2 : uptWf { P with um := insert P.um i (uLeaf (BitVec.extractLsb' 12 44 (R3 10#5)) (pteFlags w)) } := by
-            refine UPtCopy.uptWf_insert P i _ hwfc (by rw [uc_tfVpn]; omega)
+            refine uptWf_insert P i _ hwfc (by rw [uc_tfVpn]; omega)
               (UPtCopy.leafOf_isLeafPte _ _ (uc_pteFlags_rwx_self hleafw)) ?_ ?_ ?_
             · rw [hleafpa]; exact hpv
             · exact uLeafPins_uLeaf _ _ (pteFlags_pinMask w (hwfo.2.2.2 i w hw))
-            · intro j w' hj hq
+            · intro j w' hj _ hq
               refine hfresh j w' hj ?_
               rw [← hleafpa]
               exact UPtCopy.pte2pa_eq_of_ppn w' _ (hwfc.1 j w' hj).2.2

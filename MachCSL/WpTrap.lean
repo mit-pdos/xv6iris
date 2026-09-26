@@ -196,7 +196,7 @@ theorem swp_handle_interrupt_S (cpu : CPU) (c : MConf) (i : InterruptType)
   ihave HmConf := confCells_intro _ _ _ { c with mstatus := trapMs c.mstatus } $$ [Hcur_privilege Hhart_state Hmstatus Hmie
     Hmideleg Hmedeleg Hmepc Hsatp Hmenvcfg Hmcounteren Hmtimecmp Hstimecmp Hpmpcfg_n
     Hpmpaddr_n]
-  case' _ => (iframe; try iexact Hhw)
+  case' _ => (iframe; iexact Hhw)
   iapply HΦ $$ HmConf HPC HnextPC Hstvec Hsepc Hscause Hstval
 
 end MachCSL

@@ -204,7 +204,7 @@ set_option hygiene false in
 macro "conf_intro " h:ident : tactic =>
   `(tactic| (ihave $h:ident := confCells_intro _ _ _ _ $$ [Hcur_privilege Hhart_state Hmstatus Hmie Hmideleg Hmedeleg Hmepc
                   Hsatp Hmenvcfg Hmcounteren Hmtimecmp Hstimecmp Hpmpcfg_n Hpmpaddr_n]
-             case' _ => (iframe; try iexact Hhw)))
+             case' _ => (iframe; iexact Hhw)))
 
 open Iris.ProofMode in
 set_option hygiene false in
@@ -219,7 +219,7 @@ set_option hygiene false in
 macro "mconf_intro " h:ident : tactic =>
   `(tactic| (ihave $h:ident := mConf_intro _ _ _ $$ [Hcur_privilege Hhart_state Hmstatus Hmie Hmideleg Hmedeleg Hmepc
                   Hsatp Hmenvcfg Hmcounteren Hmtimecmp Hstimecmp Hpmpcfg_n Hpmpaddr_n]
-             case' _ => (iframe; try iexact Hhw)))
+             case' _ => (iframe; iexact Hhw)))
 
 /-- The machine-mode boot configuration of a hart (Rocq `mmode_config`,
 which carries `hw_config` as `confCells` does). -/

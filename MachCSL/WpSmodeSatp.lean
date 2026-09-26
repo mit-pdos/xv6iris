@@ -65,7 +65,7 @@ theorem execSpecF_csrw_satp_sv39 (cpu : CPU) (c : MConf) (sie : Bool) (hok : SCo
   swp_run 30
   iapply swp_bind
   iapply swp_rX_file
-  iframe; try iframe Hhw
+  iframe
   iintro HF
   rw [hv]
   try unfold doCSR
@@ -74,7 +74,7 @@ theorem execSpecF_csrw_satp_sv39 (cpu : CPU) (c : MConf) (sie : Bool) (hok : SCo
   subst hW
   iapply swp_bind
   iapply swp_write_CSR_satp_sv39 (hSXL := hSXL)
-  iframe; try iframe Hhw
+  iframe; iframe Hhw
   inext
   iintro Hmstatus Hsatp
   swp_run 30
@@ -84,7 +84,7 @@ theorem execSpecF_csrw_satp_sv39 (cpu : CPU) (c : MConf) (sie : Bool) (hok : SCo
   ihave HmConf := confCells_intro cpu (DFrac.own 1) Privilege.Supervisor { c with satp := satpOf KTier.kpt root }
     $$ [Hcur_privilege Hhart_state Hmstatus Hmie Hmideleg Hmedeleg Hmepc Hsatp Hmenvcfg Hmcounteren
         Hmtimecmp Hstimecmp Hpmpcfg_n Hpmpaddr_n]
-  case' _ => (iframe; try iexact Hhw)
+  case' _ => (iframe; iexact Hhw)
   iapply HΦ $$ HmConf HPC HnextPC HF
 
 /-! ## Moving resources from the Bare tier to the kernel table

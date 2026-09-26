@@ -264,39 +264,6 @@ theorem pte2pa_uLeaf (r : BitVec 64) (h : pageValid r) :
 
 /-! ## `uptWf` under one more leaf -/
 
-/-- Adding (or replacing) one user leaf keeps the table's facts, given the
-new leaf's own facts and that its page is not one of the others'. -/
-theorem uptWf_insert (P : UPtd) (vpn : Nat) (u : BitVec 64) (hwf : uptWf P)
-    (hlt : vpn < tfVpn.toNat) (hleaf : isLeafPte u) (hpg : pageValid (pte2pa u)) (hpin : uLeafPins u)
-    (hinj : ∀ k w, Iris.Std.PartialMap.get? P.um k = some w → k ≠ vpn → ptePpn w ≠ ptePpn u) :
-    uptWf { P with um := Iris.Std.PartialMap.insert P.um vpn u } := by
-  obtain ⟨w1, w2, w3, w4⟩ := hwf
-  have hget : ∀ k w, Iris.Std.PartialMap.get? (Iris.Std.PartialMap.insert P.um vpn u) k = some w →
-      (k = vpn ∧ w = u) ∨ (k ≠ vpn ∧ Iris.Std.PartialMap.get? P.um k = some w) := by
-    intro k w hw
-    by_cases hk : k = vpn
-    · subst hk
-      rw [Iris.Std.get?_insert_eq rfl] at hw
-      exact Or.inl ⟨rfl, (Option.some.inj hw).symm⟩
-    · rw [Iris.Std.get?_insert_ne (fun hh => hk hh.symm)] at hw
-      exact Or.inr ⟨hk, hw⟩
-  refine ⟨?_, ?_, w3, ?_⟩
-  · intro k w hw
-    rcases hget k w hw with ⟨rfl, rfl⟩ | ⟨-, hw'⟩
-    · exact ⟨hlt, hleaf, hpg⟩
-    · exact w1 k w hw'
-  · intro k1 u1 k2 u2 h1 h2 hq
-    rcases hget k1 u1 h1 with ⟨rfl, rfl⟩ | ⟨hk1, h1'⟩ <;>
-      rcases hget k2 u2 h2 with ⟨rfl, rfl⟩ | ⟨hk2, h2'⟩
-    · rfl
-    · exact absurd hq.symm (hinj k2 u2 h2' hk2)
-    · exact absurd hq (hinj k1 u1 h1' hk1)
-    · exact w2 k1 u1 k2 u2 h1' h2' hq
-  · intro k w hw
-    rcases hget k w hw with ⟨rfl, rfl⟩ | ⟨-, hw'⟩
-    · exact hpin
-    · exact w4 k w hw'
-
 /-- `uvmclear`'s write (`SpecVmfault.UPtd.clearU` unfolded). -/
 theorem uptWf_clearU (P : UPtd) (vpn : Nat) (w : BitVec 64) (hwf : uptWf P)
     (hmap : Iris.Std.PartialMap.get? P.um vpn = some w) :

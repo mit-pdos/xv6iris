@@ -40,7 +40,7 @@ theorem execSpec_csrw_mstatus (cpu : CPU) (c : MConf) (pc npc₀ : BitVec 64) (r
   swp_run 30
   iapply swp_bind
   iapply swp_rX_bits (hrs := hrs1)
-  iframe; try iframe Hhw
+  iframe
   inext
   iintro Hrs1
   unfold doCSR
@@ -49,7 +49,7 @@ theorem execSpec_csrw_mstatus (cpu : CPU) (c : MConf) (pc npc₀ : BitVec 64) (r
   subst hW
   iapply swp_bind
   iapply swp_write_CSR_mstatus (hMPP := hMPP)
-  iframe; try iframe Hhw
+  iframe; iframe Hhw
   inext
   iintro Hmstatus
   swp_run 60
@@ -58,8 +58,8 @@ theorem execSpec_csrw_mstatus (cpu : CPU) (c : MConf) (pc npc₀ : BitVec 64) (r
     $$ [Hcur_privilege Hhart_state Hmstatus Hmie Hmideleg Hmedeleg Hmepc Hsatp Hmenvcfg Hmcounteren Hmtimecmp Hstimecmp Hpmpcfg_n Hpmpaddr_n]
   case' _ =>
     simp only []
-    iframe; try iframe Hhw
-    try iexact Hhw
+    iframe
+    iexact Hhw
   iapply HΦ $$ HmConf HPC HnextPC Hrs1
 
 set_option maxHeartbeats 4000000 in
@@ -77,7 +77,7 @@ theorem execSpec_csrw_mepc (cpu : CPU) (c : MConf) (pc npc₀ : BitVec 64) (rs1 
   swp_run 30
   iapply swp_bind
   iapply swp_rX_bits (hrs := hrs1)
-  iframe; try iframe Hhw
+  iframe
   inext
   iintro Hrs1
   unfold doCSR
@@ -86,7 +86,7 @@ theorem execSpec_csrw_mepc (cpu : CPU) (c : MConf) (pc npc₀ : BitVec 64) (rs1 
   subst hW
   iapply swp_bind
   iapply swp_write_CSR_mepc
-  iframe; try iframe Hhw
+  iframe; iframe Hhw
   inext
   iintro Hmepc
   swp_run 60
@@ -95,8 +95,8 @@ theorem execSpec_csrw_mepc (cpu : CPU) (c : MConf) (pc npc₀ : BitVec 64) (rs1 
     $$ [Hcur_privilege Hhart_state Hmstatus Hmie Hmideleg Hmedeleg Hmepc Hsatp Hmenvcfg Hmcounteren Hmtimecmp Hstimecmp Hpmpcfg_n Hpmpaddr_n]
   case' _ =>
     simp only []
-    iframe; try iframe Hhw
-    try iexact Hhw
+    iframe
+    iexact Hhw
   iapply HΦ $$ HmConf HPC HnextPC Hrs1
 
 set_option maxHeartbeats 4000000 in
@@ -115,7 +115,7 @@ theorem execSpec_csrw_satp0 (cpu : CPU) (c : MConf) (pc npc₀ : BitVec 64) (rs1
   swp_run 30
   iapply swp_bind
   iapply swp_rX_bits (hrs := hrs1)
-  iframe; try iframe Hhw
+  iframe
   inext
   iintro Hrs1
   unfold doCSR
@@ -124,7 +124,7 @@ theorem execSpec_csrw_satp0 (cpu : CPU) (c : MConf) (pc npc₀ : BitVec 64) (rs1
   subst hW
   iapply swp_bind
   iapply swp_write_CSR_satp0 (hSXL := hSXL)
-  iframe; try iframe Hhw
+  iframe; iframe Hhw
   inext
   iintro %x Hmstatus Hsatp %hx
   subst hx
@@ -134,8 +134,8 @@ theorem execSpec_csrw_satp0 (cpu : CPU) (c : MConf) (pc npc₀ : BitVec 64) (rs1
     $$ [Hcur_privilege Hhart_state Hmstatus Hmie Hmideleg Hmedeleg Hmepc Hsatp Hmenvcfg Hmcounteren Hmtimecmp Hstimecmp Hpmpcfg_n Hpmpaddr_n]
   case' _ =>
     simp only []
-    iframe; try iframe Hhw
-    try iexact Hhw
+    iframe
+    iexact Hhw
   iapply HΦ $$ HmConf HPC HnextPC Hrs1
 
 set_option maxHeartbeats 4000000 in
@@ -153,7 +153,7 @@ theorem execSpec_csrw_medeleg (cpu : CPU) (c : MConf) (pc npc₀ : BitVec 64) (r
   swp_run 30
   iapply swp_bind
   iapply swp_rX_bits (hrs := hrs1)
-  iframe; try iframe Hhw
+  iframe
   inext
   iintro Hrs1
   unfold doCSR
@@ -162,7 +162,7 @@ theorem execSpec_csrw_medeleg (cpu : CPU) (c : MConf) (pc npc₀ : BitVec 64) (r
   subst hW
   iapply swp_bind
   iapply swp_write_CSR_medeleg
-  iframe; try iframe Hhw
+  iframe; iframe Hhw
   inext
   iintro Hmedeleg
   swp_run 60
@@ -171,8 +171,8 @@ theorem execSpec_csrw_medeleg (cpu : CPU) (c : MConf) (pc npc₀ : BitVec 64) (r
     $$ [Hcur_privilege Hhart_state Hmstatus Hmie Hmideleg Hmedeleg Hmepc Hsatp Hmenvcfg Hmcounteren Hmtimecmp Hstimecmp Hpmpcfg_n Hpmpaddr_n]
   case' _ =>
     simp only []
-    iframe; try iframe Hhw
-    try iexact Hhw
+    iframe
+    iexact Hhw
   iapply HΦ $$ HmConf HPC HnextPC Hrs1
 
 set_option maxHeartbeats 4000000 in
@@ -190,7 +190,7 @@ theorem execSpec_csrw_mideleg (cpu : CPU) (c : MConf) (pc npc₀ : BitVec 64) (r
   swp_run 30
   iapply swp_bind
   iapply swp_rX_bits (hrs := hrs1)
-  iframe; try iframe Hhw
+  iframe
   inext
   iintro Hrs1
   unfold doCSR
@@ -199,7 +199,7 @@ theorem execSpec_csrw_mideleg (cpu : CPU) (c : MConf) (pc npc₀ : BitVec 64) (r
   subst hW
   iapply swp_bind
   iapply swp_write_CSR_mideleg
-  iframe; try iframe Hhw
+  iframe; iframe Hhw
   inext
   iintro Hmideleg
   swp_run 60
@@ -208,8 +208,8 @@ theorem execSpec_csrw_mideleg (cpu : CPU) (c : MConf) (pc npc₀ : BitVec 64) (r
     $$ [Hcur_privilege Hhart_state Hmstatus Hmie Hmideleg Hmedeleg Hmepc Hsatp Hmenvcfg Hmcounteren Hmtimecmp Hstimecmp Hpmpcfg_n Hpmpaddr_n]
   case' _ =>
     simp only []
-    iframe; try iframe Hhw
-    try iexact Hhw
+    iframe
+    iexact Hhw
   iapply HΦ $$ HmConf HPC HnextPC Hrs1
 
 set_option maxHeartbeats 4000000 in
@@ -227,7 +227,7 @@ theorem execSpec_csrw_sie (cpu : CPU) (c : MConf) (pc npc₀ : BitVec 64) (rs1 :
   swp_run 30
   iapply swp_bind
   iapply swp_rX_bits (hrs := hrs1)
-  iframe; try iframe Hhw
+  iframe
   inext
   iintro Hrs1
   unfold doCSR
@@ -236,7 +236,7 @@ theorem execSpec_csrw_sie (cpu : CPU) (c : MConf) (pc npc₀ : BitVec 64) (rs1 :
   subst hW
   iapply swp_bind
   iapply swp_write_CSR_sie
-  iframe; try iframe Hhw
+  iframe; iframe Hhw
   inext
   iintro Hmie Hmideleg
   swp_run 60
@@ -245,8 +245,8 @@ theorem execSpec_csrw_sie (cpu : CPU) (c : MConf) (pc npc₀ : BitVec 64) (rs1 :
     $$ [Hcur_privilege Hhart_state Hmstatus Hmie Hmideleg Hmedeleg Hmepc Hsatp Hmenvcfg Hmcounteren Hmtimecmp Hstimecmp Hpmpcfg_n Hpmpaddr_n]
   case' _ =>
     simp only []
-    iframe; try iframe Hhw
-    try iexact Hhw
+    iframe
+    iexact Hhw
   iapply HΦ $$ HmConf HPC HnextPC Hrs1
 
 set_option maxHeartbeats 4000000 in
@@ -265,7 +265,7 @@ theorem execSpec_csrw_menvcfg (cpu : CPU) (c : MConf) (pc npc₀ : BitVec 64) (r
   swp_run 30
   iapply swp_bind
   iapply swp_rX_bits (hrs := hrs1)
-  iframe; try iframe Hhw
+  iframe
   inext
   iintro Hrs1
   unfold doCSR
@@ -274,7 +274,7 @@ theorem execSpec_csrw_menvcfg (cpu : CPU) (c : MConf) (pc npc₀ : BitVec 64) (r
   subst hW
   iapply swp_bind
   iapply swp_write_CSR_menvcfg (hcbie := hcbie) (hpmm := hpmm)
-  iframe; try iframe Hhw
+  iframe; iframe Hhw
   inext
   iintro Hmenvcfg
   swp_run 60
@@ -283,8 +283,8 @@ theorem execSpec_csrw_menvcfg (cpu : CPU) (c : MConf) (pc npc₀ : BitVec 64) (r
     $$ [Hcur_privilege Hhart_state Hmstatus Hmie Hmideleg Hmedeleg Hmepc Hsatp Hmenvcfg Hmcounteren Hmtimecmp Hstimecmp Hpmpcfg_n Hpmpaddr_n]
   case' _ =>
     simp only []
-    iframe; try iframe Hhw
-    try iexact Hhw
+    iframe
+    iexact Hhw
   iapply HΦ $$ HmConf HPC HnextPC Hrs1
 
 set_option maxHeartbeats 4000000 in
@@ -302,7 +302,7 @@ theorem execSpec_csrw_mcounteren (cpu : CPU) (c : MConf) (pc npc₀ : BitVec 64)
   swp_run 30
   iapply swp_bind
   iapply swp_rX_bits (hrs := hrs1)
-  iframe; try iframe Hhw
+  iframe
   inext
   iintro Hrs1
   unfold doCSR
@@ -311,7 +311,7 @@ theorem execSpec_csrw_mcounteren (cpu : CPU) (c : MConf) (pc npc₀ : BitVec 64)
   subst hW
   iapply swp_bind
   iapply swp_write_CSR_mcounteren
-  iframe; try iframe Hhw
+  iframe; iframe Hhw
   inext
   iintro Hmcounteren
   swp_run 60
@@ -320,8 +320,8 @@ theorem execSpec_csrw_mcounteren (cpu : CPU) (c : MConf) (pc npc₀ : BitVec 64)
     $$ [Hcur_privilege Hhart_state Hmstatus Hmie Hmideleg Hmedeleg Hmepc Hsatp Hmenvcfg Hmcounteren Hmtimecmp Hstimecmp Hpmpcfg_n Hpmpaddr_n]
   case' _ =>
     simp only []
-    iframe; try iframe Hhw
-    try iexact Hhw
+    iframe
+    iexact Hhw
   iapply HΦ $$ HmConf HPC HnextPC Hrs1
 
 set_option maxHeartbeats 4000000 in
@@ -341,7 +341,7 @@ theorem execSpec_csrw_stimecmp (cpu : CPU) (c : MConf) (pc npc₀ : BitVec 64) (
   swp_run 30
   iapply swp_bind
   iapply swp_rX_bits (hrs := hrs1)
-  iframe; try iframe Hhw
+  iframe
   inext
   iintro Hrs1
   unfold doCSR
@@ -350,7 +350,7 @@ theorem execSpec_csrw_stimecmp (cpu : CPU) (c : MConf) (pc npc₀ : BitVec 64) (
   subst hW
   iapply swp_bind
   iapply swp_write_CSR_stimecmp (hstce := hstce)
-  iframe; try iframe Hhw
+  iframe; iframe Hhw
   inext
   iintro %mip' Hstimecmp Hmtime Hmtimecmp Hmip Hmenvcfg
   swp_run 60
@@ -359,8 +359,8 @@ theorem execSpec_csrw_stimecmp (cpu : CPU) (c : MConf) (pc npc₀ : BitVec 64) (
     $$ [Hcur_privilege Hhart_state Hmstatus Hmie Hmideleg Hmedeleg Hmepc Hsatp Hmenvcfg Hmcounteren Hmtimecmp Hstimecmp Hpmpcfg_n Hpmpaddr_n]
   case' _ =>
     simp only []
-    iframe; try iframe Hhw
-    try iexact Hhw
+    iframe
+    iexact Hhw
   iapply HΦ $$ HmConf HPC HnextPC [Hrs1 Hmip Hmtime]
   isplitl [Hrs1]
   · iexact Hrs1
@@ -386,7 +386,7 @@ theorem execSpec_csrw_pmpaddr0 (cpu : CPU) (c : MConf) (pc npc₀ : BitVec 64) (
   swp_run 30
   iapply swp_bind
   iapply swp_rX_bits (hrs := hrs1)
-  iframe; try iframe Hhw
+  iframe
   inext
   iintro Hrs1
   unfold doCSR
@@ -395,7 +395,7 @@ theorem execSpec_csrw_pmpaddr0 (cpu : CPU) (c : MConf) (pc npc₀ : BitVec 64) (
   subst hW
   iapply swp_bind
   iapply swp_write_CSR_pmpaddr0
-  iframe; try iframe Hhw
+  iframe
   inext
   iintro %x Hpmpcfg_n Hpmpaddr_n %hx
   subst hx
@@ -406,8 +406,8 @@ theorem execSpec_csrw_pmpaddr0 (cpu : CPU) (c : MConf) (pc npc₀ : BitVec 64) (
     $$ [Hcur_privilege Hhart_state Hmstatus Hmie Hmideleg Hmedeleg Hmepc Hsatp Hmenvcfg Hmcounteren Hmtimecmp Hstimecmp Hpmpcfg_n Hpmpaddr_n]
   case' _ =>
     simp only []
-    iframe; try iframe Hhw
-    try iexact Hhw
+    iframe
+    iexact Hhw
   iapply HΦ $$ HmConf HPC HnextPC Hrs1
 
 set_option maxHeartbeats 4000000 in
@@ -427,7 +427,7 @@ theorem execSpec_csrw_pmpcfg0 (cpu : CPU) (c : MConf) (pc npc₀ : BitVec 64) (r
   swp_run 30
   iapply swp_bind
   iapply swp_rX_bits (hrs := hrs1)
-  iframe; try iframe Hhw
+  iframe
   inext
   iintro Hrs1
   unfold doCSR
@@ -436,7 +436,7 @@ theorem execSpec_csrw_pmpcfg0 (cpu : CPU) (c : MConf) (pc npc₀ : BitVec 64) (r
   subst hW
   iapply swp_bind
   iapply swp_write_CSR_pmpcfg0
-  iframe; try iframe Hhw
+  iframe
   inext
   iintro %x %r Hpmpcfg_n %hxr
   obtain ⟨hx, hr⟩ := hxr
@@ -448,8 +448,8 @@ theorem execSpec_csrw_pmpcfg0 (cpu : CPU) (c : MConf) (pc npc₀ : BitVec 64) (r
     $$ [Hcur_privilege Hhart_state Hmstatus Hmie Hmideleg Hmedeleg Hmepc Hsatp Hmenvcfg Hmcounteren Hmtimecmp Hstimecmp Hpmpcfg_n Hpmpaddr_n]
   case' _ =>
     simp only []
-    iframe; try iframe Hhw
-    try iexact Hhw
+    iframe
+    iexact Hhw
   iapply HΦ $$ HmConf HPC HnextPC Hrs1
 
 /-! ### `csrr`: execute stages -/
@@ -461,7 +461,7 @@ macro "csrr_exec" hrd:term : tactic =>
              swp_run 300
              iapply swp_bind
              iapply swp_wX_bits (hrd := $hrd)
-             iframe; try iframe Hhw
+             iframe
              inext
              iintro Hrd
              swp_run 10))
@@ -536,7 +536,7 @@ theorem execSpec_csrr_time (cpu : CPU) (dq : DFrac) (c : MConf) (pc npc₀ : Bit
   csrr_exec hrd
   mconf_intro HmConf
   iapply HΦ $$ HmConf HPC HnextPC [Hrd Hmtime]
-  iframe; try iframe Hhw
+  iframe
 
 /-! ### The `wpLoop` rules -/
 
@@ -641,15 +641,15 @@ theorem wp_m_csrw_stimecmp (cpu : CPU) (c : MConf) (hok : MConf.ok (GF := GF) c)
     have h := execSpec_csrw_stimecmp cpu c pc (pc + instrLen is_rvc) rs1 hrs1 v ip mt hstce Φ
     iintro ⟨HmConf, HPC, HnextPC, ⟨Hrs1, Hmip, Hmtime⟩, HΦ⟩
     iapply h
-    iframe; try iframe Hhw
+    iframe
     inext
     iintro HmConf HPC HnextPC ⟨Hrs1, ⟨%ip', Hmip⟩, Hmtime⟩
     iapply HΦ $$ HmConf HPC HnextPC [Hrs1 Hmip Hmtime]
-    iframe; try iframe Hhw
+    iframe
     try (iexists ip', mt; iframe)
   iintro ⟨HI, HmConf, Hclock, Hpc, Hrs1, HΦ⟩
   iapply wpLoop_m_instrClk cpu (DFrac.own 1) c Privilege.Machine (Or.inl rfl) _ hok pc _ is_rvc _ _ _ hexec
-  iframe; try iframe Hhw
+  iframe
   try (inext; iintro HmConf Hclock Hpc Hrs1; iapply HΦ $$ HmConf Hclock Hpc Hrs1)
 
 /-- `csrw pmpaddr0, rs1` with `rs1 = 0x3fffffffffffff` from the reset PMP tables. -/
@@ -731,7 +731,7 @@ theorem wp_m_csrr_time (cpu : CPU) (dq : DFrac) (c : MConf) (hok : MConf.ok (GF 
     have h := execSpec_csrr_time cpu dq c pc (pc + instrLen is_rvc) rd hrd v mt Φ
     iintro ⟨HmConf, HPC, HnextPC, ⟨Hrd, Hmip, Hmtime⟩, HΦ⟩
     iapply h
-    iframe; try iframe Hhw
+    iframe
     inext
     iintro HmConf HPC HnextPC ⟨Hrd, Hmtime⟩
     iapply HΦ $$ HmConf HPC HnextPC [Hrd Hmip Hmtime]
@@ -740,7 +740,7 @@ theorem wp_m_csrr_time (cpu : CPU) (dq : DFrac) (c : MConf) (hok : MConf.ok (GF 
     · iexists ip, mt; iframe
   iintro ⟨HI, HmConf, Hclock, Hpc, Hrd, HΦ⟩
   iapply wpLoop_m_instrClk cpu dq c Privilege.Machine (Or.inl rfl) c hok pc _ is_rvc _ _ _ hexec
-  iframe; try iframe Hhw
+  iframe
   try (inext; iintro HmConf Hclock Hpc ⟨%t, Hrd⟩; iapply HΦ $$ %_ HmConf Hclock Hpc Hrd)
 
 end MachCSL

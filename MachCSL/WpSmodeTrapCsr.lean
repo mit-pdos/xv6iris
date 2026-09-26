@@ -109,7 +109,7 @@ theorem execSpecF_csrr_sepc (cpu : CPU) (c : MConf) (sie : Bool) (hok : SConfPhy
   simp only [update_bit0_eq]
   iapply swp_bind
   iapply swp_wX_file (hrd := hrd)
-  iframe; try iframe Hhw
+  iframe
   inext
   iintro HF
   swp_run 20
@@ -134,7 +134,7 @@ theorem execSpecF_csrr_scause (cpu : CPU) (c : MConf) (sie : Bool) (hok : SConfP
   swp_run 300
   iapply swp_bind
   iapply swp_wX_file (hrd := hrd)
-  iframe; try iframe Hhw
+  iframe
   inext
   iintro HF
   swp_run 20
@@ -159,7 +159,7 @@ theorem execSpecF_csrr_stval (cpu : CPU) (c : MConf) (sie : Bool) (hok : SConfPh
   swp_run 300
   iapply swp_bind
   iapply swp_wX_file (hrd := hrd)
-  iframe; try iframe Hhw
+  iframe
   inext
   iintro HF
   swp_run 20
@@ -186,7 +186,7 @@ theorem execSpecF_csrw_sepc (cpu : CPU) (c : MConf) (sie : Bool) (hok : SConfPhy
   swp_run 30
   iapply swp_bind
   iapply swp_rX_file
-  iframe; try iframe Hhw
+  iframe
   iintro HF
   swp_run 300
   simp only [legalize_xepc, zca_supported, ite_true, update_bit0_eq, hal]
@@ -482,7 +482,7 @@ theorem execSpecF_csrw_sstatus_off (cpu : CPU) (c : MConf) (sie : Bool) (hok : S
   swp_run 30
   iapply swp_bind
   iapply swp_rX_file
-  iframe; try iframe Hhw
+  iframe
   iintro HF
   try unfold doCSR
   generalize hW : write_CSR 0x100#12 = W
@@ -490,7 +490,7 @@ theorem execSpecF_csrw_sstatus_off (cpu : CPU) (c : MConf) (sie : Bool) (hok : S
   subst hW
   iapply swp_bind
   iapply swp_write_CSR_sstatus (hmpp := hMPP)
-  iframe; try iframe Hhw
+  iframe; iframe Hhw
   inext
   iintro Hmstatus
   simp only [sstatusWrite_eq]
@@ -501,7 +501,7 @@ theorem execSpecF_csrw_sstatus_off (cpu : CPU) (c : MConf) (sie : Bool) (hok : S
   ihave HmConf := confCells_intro _ _ _ { c with mstatus := sstatusWrite c.mstatus (R.get rs1) } $$ [Hcur_privilege Hhart_state Hmstatus Hmie
     Hmideleg Hmedeleg Hmepc Hsatp Hmenvcfg Hmcounteren Hmtimecmp Hstimecmp Hpmpcfg_n
     Hpmpaddr_n]
-  case' _ => (iframe; try iexact Hhw)
+  case' _ => (iframe; iexact Hhw)
   iapply HΦ $$ HmConf HPC HnextPC HF
 
 /-- The pinned `SPIE`/`SPP` indices do not enter `KCtx.wf`. -/

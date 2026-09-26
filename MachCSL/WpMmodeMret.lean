@@ -64,8 +64,8 @@ theorem execSpecP_mret (cpu : CPU) (c : MConf) (pc npc₀ : BitVec 64)
         Hmtimecmp Hstimecmp Hpmpcfg_n Hpmpaddr_n]
   case' _ =>
     simp only [mretMstatus]
-    iframe; try iframe Hhw
-    try iexact Hhw
+    iframe
+    iexact Hhw
   iapply HΦ $$ HS HPC HnextPC []
   ipureintro
   trivial
@@ -83,7 +83,7 @@ theorem wp_m_mret (cpu : CPU) (c : MConf) (hok : MConf.ok (GF := GF) c) (pc : Bi
   iintro ⟨HI, HmConf, Hclock, Hpc, HΦ⟩
   iapply wpLoop_m_instrP cpu (DFrac.own 1) c Privilege.Supervisor (Or.inr rfl) _ hok pc _ is_rvc _ _ _
     (execSpecP_mret cpu c pc _ hMPP hLPE)
-  iframe; try iframe Hhw
+  iframe
   isplitl []
   · ipureintro; trivial
   inext

@@ -234,67 +234,6 @@ theorem delRun_get_not_mem (P : UPtd) (v0 n k : Nat) (h : k < v0 ∨ v0 + n ≤ 
 
 /-! ## `uptWf`, `umBelow`, `mappedIn` -/
 
-/-- Deleting leaves keeps the table well formed. -/
-theorem uptWf_delRun (P : UPtd) (v0 n : Nat) (h : uptWf P) : uptWf (P.delRun v0 n) := by
-  refine ⟨?_, ?_, h.2.2.1, ?_⟩
-  · intro k w hk
-    by_cases hr : v0 ≤ k ∧ k < v0 + n
-    · rw [delRun_get_mem P v0 n k hr.1 hr.2] at hk; exact absurd hk (by simp)
-    · exact h.1 k w (by rw [← delRun_get_not_mem P v0 n k (by omega)]; exact hk)
-  · intro k1 w1 k2 w2 hk1 hk2 hp
-    by_cases hr1 : v0 ≤ k1 ∧ k1 < v0 + n
-    · rw [delRun_get_mem P v0 n k1 hr1.1 hr1.2] at hk1; exact absurd hk1 (by simp)
-    by_cases hr2 : v0 ≤ k2 ∧ k2 < v0 + n
-    · rw [delRun_get_mem P v0 n k2 hr2.1 hr2.2] at hk2; exact absurd hk2 (by simp)
-    exact h.2.1 k1 w1 k2 w2
-      (by rw [← delRun_get_not_mem P v0 n k1 (by omega)]; exact hk1)
-      (by rw [← delRun_get_not_mem P v0 n k2 (by omega)]; exact hk2) hp
-  · intro k w hk
-    by_cases hr : v0 ≤ k ∧ k < v0 + n
-    · rw [delRun_get_mem P v0 n k hr.1 hr.2] at hk; exact absurd hk (by simp)
-    · exact h.2.2.2 k w (by rw [← delRun_get_not_mem P v0 n k (by omega)]; exact hk)
-
-/-- Clearing `PTE_U` on a leaf keeps the table well formed (the guard page
-of `uvmclear`: `V` and `R`/`W`/`X` survive). -/
-theorem uptWf_clearU (P : UPtd) (k : Nat) (w : BitVec 64) (h : uptWf P)
-    (hk : get? P.um k = some w) :
-    uptWf { P with um := insert P.um k (w &&& ~~~PTE_U) } := by
-  have hpa : pte2pa (w &&& ~~~PTE_U) = pte2pa w := by unfold pte2pa PTE_U; bv_decide
-  have hpp : ptePpn (w &&& ~~~PTE_U) = ptePpn w := by unfold ptePpn PTE_U; bv_decide
-  have hkey : ∀ j w', get? (insert P.um k (w &&& ~~~PTE_U)) j = some w' →
-      ∃ v, get? P.um j = some v ∧ ptePpn w' = ptePpn v ∧ pte2pa w' = pte2pa v ∧
-        (isLeafPte v → isLeafPte w') := by
-    intro j w' hj
-    by_cases hjk : k = j
-    · rw [get?_insert_eq hjk] at hj
-      refine ⟨w, by rw [← hjk]; exact hk, ?_, ?_, ?_⟩ <;> cases hj
-      · exact hpp
-      · exact hpa
-      · intro hl
-        refine ⟨?_, ?_⟩
-        · have : (w &&& ~~~PTE_U) &&& PTE_V = w &&& PTE_V := by unfold PTE_U PTE_V; bv_decide
-          rw [this]; exact hl.1
-        · have : (w &&& ~~~PTE_U) &&& 0xE#64 = w &&& 0xE#64 := by unfold PTE_U; bv_decide
-          rw [this]; exact hl.2
-    · rw [get?_insert_ne hjk] at hj
-      exact ⟨w', hj, rfl, rfl, id⟩
-  refine ⟨?_, ?_, h.2.2.1, ?_⟩
-  · intro j w' hj
-    obtain ⟨v, hv, _, hpa', hl⟩ := hkey j w' hj
-    obtain ⟨h1, h2, h3⟩ := h.1 j v hv
-    exact ⟨h1, hl h2, by rw [hpa']; exact h3⟩
-  · intro j1 w1 j2 w2 h1 h2 hp
-    obtain ⟨v1, hv1, hpp1, _, _⟩ := hkey j1 w1 h1
-    obtain ⟨v2, hv2, hpp2, _, _⟩ := hkey j2 w2 h2
-    exact h.2.1 j1 v1 j2 v2 hv1 hv2 (by rw [← hpp1, ← hpp2]; exact hp)
-  · intro j w' hj
-    by_cases hjk : k = j
-    · rw [get?_insert_eq hjk] at hj
-      cases hj
-      exact uLeafPins_andNotU w (h.2.2.2 k w hk)
-    · rw [get?_insert_ne hjk] at hj
-      exact h.2.2.2 j w' hj
-
 /-- Deleting leaves keeps every leaf below the size. -/
 theorem umBelow_delRun (sz : BitVec 64) (P : UPtd) (v0 n : Nat) (h : umBelow sz P) :
     umBelow sz (P.delRun v0 n) := by

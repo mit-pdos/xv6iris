@@ -59,7 +59,7 @@ theorem execSpecF_csrr_sstatus (cpu : CPU) (dq : DFrac) (c : MConf) (sie : Bool)
   swp_run 300
   iapply swp_bind
   iapply swp_wX_file (hrd := hrd)
-  iframe; try iframe Hhw
+  iframe
   inext
   iintro HF
   swp_run 10
@@ -89,14 +89,14 @@ theorem execSpecF_csrrci_sstatus (cpu : CPU) (c : MConf) (hok : SConfPhys (GF :=
   subst hW
   iapply swp_bind
   iapply swp_write_CSR_sstatus (hmpp := hMPP)
-  iframe; try iframe Hhw
+  iframe; iframe Hhw
   inext
   iintro Hmstatus
   simp only [hid]
   swp_run 30
   iapply swp_bind
   iapply swp_wX_file (hrd := hrd)
-  iframe; try iframe Hhw
+  iframe
   inext
   iintro HF
   swp_run 20
@@ -127,21 +127,21 @@ theorem execSpecF_csrrci_sstatus_flip (cpu : CPU) (c : MConf) (sie : Bool) (hok 
   subst hW
   iapply swp_bind
   iapply swp_write_CSR_sstatus (hmpp := hMPP)
-  iframe; try iframe Hhw
+  iframe; iframe Hhw
   inext
   iintro Hmstatus
   simp only [hcl]
   swp_run 30
   iapply swp_bind
   iapply swp_wX_file (hrd := hrd)
-  iframe; try iframe Hhw
+  iframe
   inext
   iintro HF
   swp_run 20
   ihave HmConf := confCells_intro _ _ _ { c with mstatus := c.mstatus &&& 0xFFFFFFFFFFFFFFFD#64 } $$ [Hcur_privilege Hhart_state Hmstatus Hmie
     Hmideleg Hmedeleg Hmepc Hsatp Hmenvcfg Hmcounteren Hmtimecmp Hstimecmp Hpmpcfg_n
     Hpmpaddr_n]
-  case' _ => (iframe; try iexact Hhw)
+  case' _ => (iframe; iexact Hhw)
   iapply HΦ $$ HmConf HPC HnextPC HF
 
 set_option maxHeartbeats 4000000 in
@@ -167,7 +167,7 @@ theorem execSpecF_csrci_sstatus_x0 (cpu : CPU) (c : MConf) (sie : Bool) (hok : S
   subst hW
   iapply swp_bind
   iapply swp_write_CSR_sstatus (hmpp := hMPP)
-  iframe; try iframe Hhw
+  iframe; iframe Hhw
   inext
   iintro Hmstatus
   simp only [hcl]
@@ -178,7 +178,7 @@ theorem execSpecF_csrci_sstatus_x0 (cpu : CPU) (c : MConf) (sie : Bool) (hok : S
   ihave HmConf := confCells_intro _ _ _ { c with mstatus := c.mstatus &&& 0xFFFFFFFFFFFFFFFD#64 } $$ [Hcur_privilege Hhart_state Hmstatus Hmie
     Hmideleg Hmedeleg Hmepc Hsatp Hmenvcfg Hmcounteren Hmtimecmp Hstimecmp Hpmpcfg_n
     Hpmpaddr_n]
-  case' _ => (iframe; try iexact Hhw)
+  case' _ => (iframe; iexact Hhw)
   iapply HΦ $$ HmConf HPC HnextPC HF
 
 set_option maxHeartbeats 4000000 in
@@ -204,7 +204,7 @@ theorem execSpecF_csrsi_sstatus_x0 (cpu : CPU) (c : MConf) (sie : Bool) (hok : S
   subst hW
   iapply swp_bind
   iapply swp_write_CSR_sstatus (hmpp := hMPP)
-  iframe; try iframe Hhw
+  iframe; iframe Hhw
   inext
   iintro Hmstatus
   simp only [hst]
@@ -215,7 +215,7 @@ theorem execSpecF_csrsi_sstatus_x0 (cpu : CPU) (c : MConf) (sie : Bool) (hok : S
   ihave HmConf := confCells_intro _ _ _ { c with mstatus := c.mstatus ||| 2#64 } $$ [Hcur_privilege Hhart_state Hmstatus Hmie
     Hmideleg Hmedeleg Hmepc Hsatp Hmenvcfg Hmcounteren Hmtimecmp Hstimecmp Hpmpcfg_n
     Hpmpaddr_n]
-  case' _ => (iframe; try iexact Hhw)
+  case' _ => (iframe; iexact Hhw)
   iapply HΦ $$ HmConf HPC HnextPC HF
 
 end MachCSL
