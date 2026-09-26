@@ -355,7 +355,7 @@ Section UShURoundLaws.
     rewrite /UShLine.ush_mid_at. iDestruct "Hpm" as "(_ & _ & _ & Hv)".
     iDestruct "Hv" as (v') "(#Hpin' & _ & _ & #Hres)".
     rewrite /usecc_tok_at /secc_tok_at.
-    iDestruct "Htok" as (v) "(#Hpin & _ & _ & %Hn & #Hfz)".
+    iDestruct "Htok" as (v) "(#Hpin & _ & _ & %Hn & #Hfz & _)".
     destruct Hn as (Hpos & _).
     iDestruct (era_pin_agree with "Hpin' Hpin") as %->.
     iEval (cbn [lk_rres union_link_inst_at gen_link_inst]; rewrite /urresw /gwc_rres) in "Hres".

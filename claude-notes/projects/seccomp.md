@@ -281,6 +281,31 @@ holder does get `p_j >= n0 + j` per pop, but only `>= n0` is stated.
 UShLine: pattern-only (`[#Hdirty _]` at the cons_out and receipt
 disjuncts).
 
+STATUS (lane S5a, `secc/s5a` off main aa793e35c, design 10.12's UNION
+bullet, the claim/pure half): landed, tree green (VM log s5a-3: EXIT=0, no
+`Error`, second pass 0 compiles), audits system 13 / union 14 / tree 13
+textually the baseline.  `PipeOutW.secc_tok_at k I0` gains a LAST conjunct
+`∃ D h0, dl_list_lb v D ∗ ⌜snd <$> D = I0 /\ last D = Some (h0, wl_nl) /\
+ins (open_seg h0) = I0 /\ obs_boots h0 = k /\ trace_shape h0 true⌝` -- the
+STRONG form (equality, no flush-lost slack), proved at the transition in
+`pwclV_step_read` from the new pure `GenOutWild.lm_rd_last_hist` (read_ok's
+`hist_chain`, `E_index`, the pops' boots and shapes from `gin_pure`); it
+travels unchanged through `rd_retW` / `uread_ret` / `uri_arms` / `urresw`
+(they carry `secc_tok_at` whole).  The chain lemma
+`GenOutWild.lm_placed_wild_undisc`: `cons_chain sl -> sl !! n0 = Some (h0,
+c0) -> n0 < lo -> cons_placed sl lo d hs -> j < d -> I0 `prefix_of` ins
+(open_seg h0) -> I0 <> [] -> rest_of I0 = [] -> lm_wild M (lm_line_at M I0)
+-> trace_shape (hs !!! j) true -> obs_boots (hs !!! j) = obs_boots h0 -> ¬
+lm_disc M (hs !!! j)`.  ITS BOOTS PREMISE IS NOT GIVEN BY THE RING: a push
+trace past a power cycle need not extend the old era's input, and
+`cons_placed` says nothing about eras; the tag (`utag`) gives the shape
+only, so the read leaf (S5b) needs `obs_boots (hs !!! j) = S gen_id` from
+the kernel side (the UART layer knows it: `WpUart`'s `obs_boots h = S
+gen_id` clauses) or from a widened `cons_placed`.  Also for S5b: tying the
+token's `dl_list_lb v D` to the kernel's `sl` (index `n0 = length I0 - 1`)
+is the read leaf's job.  One shell-tier touch: `UShURoundLaws.
+uwild_read_absurd`'s destruct pattern gains `& _` for the new conjunct.
+
 ## S3 -- the seccomp program (design §7, §9) -- brief written when S1 and S2 land
 
 `UCodeSeccomp.v` is generated.  sh-style proof (fork, wait): the child's
