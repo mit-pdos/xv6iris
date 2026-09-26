@@ -1,6 +1,6 @@
 # Design: `sync` in the union -- a completed sync pins what the next boot sees
 
-§1-§2 LANDED (xv6 `d66e41c`); §3-§5 PROPOSAL (the worklist is
+§1-§3 LANDED (§1-§2 at xv6 `d66e41c`, §3 lane SY2); §4-§5 PROPOSAL (the worklist is
 [`../projects/sync.md`](../projects/sync.md)).  Builds on
 [`union.md`](union.md) (the model `ulm`, the round, the top theorem),
 [`app-file.md`](app-file.md) (the deed, the durable copy, honest limit 2,
@@ -89,18 +89,39 @@ with a newline, `UkSh.ush_uline_head_nonnl`).
 
 ## 3. The sync line
 
-- **Model** (`FileDisc`/`UnionDisc`): `LSync`, bytes `sync\n`; alternatives
-  RAN (`$ `, f unchanged), EXEC-FAILED (`exec sync failed\n$ `), and the
-  fork panic `RCFork`.  All state-free, so all free.  `line_file LSync =
-  None`.
-- **The round**: an EXEC line with no redirect -- `uHchild_*`'s echo/cat
-  shape at `argv = ["sync"]`; the child execs `/sync` on the image
-  (pinned like `/cat`: `FsImg` already tracks the raw), whose entry at the
-  union registry is `UkSync`'s program at a payload that pays PEND at RAN
-  once `sys_sync` has returned.  The deed is not lent (sync touches no
-  file); the payload is where §5's durability evidence will ride.
-- **Admission**: `adm_u` admits `LSync`; the decider (`UnionDecU`) gains
-  the line's three candidates.
+- **Model.**  `FileDisc.LSync` (bytes `sync\n`, words `[cmd_sync]`,
+  `line_file LSync = None`) is ADDITIVE like `LSecc`: `parse_line` never
+  answers it, `UnionDisc.uline_of_u` reads it through `FileDisc.sync_parse`
+  after the seccomp parser, `uline_nopipe` excludes it, and the union
+  admits it outright (`UnionDisc.usync_ok`, `ubody_ok`'s fourth disjunct).
+  `ralt_ok LSync` admits four: `RSyncRan` (code 19; `u_prompt`, the
+  identity -- /sync ran, it prints nothing), `RSyncExec` (20;
+  `alt_execsync`, `exec sync failed\n$ `), `RCFork` and `ROom`.  All free,
+  none terminal.  Hooks (`UnionDiscDec.ulm_hooks_sync`): pan `RCFork`, exf
+  `RSyncExec`, noc `None`.  The decider's candidates are
+  `FileDiscDec.ralt_fix_cands LSync`.  Demos (`UnionDiscDec` §6):
+  `demo_sync_parse`, `demo_sync_ran`, `demo_sync_execfail`,
+  `demo_sync_ok`/`demo_sync_cat` (`echo hi > a.txt; sync; cat a.txt` prints
+  `hi`); NEGATIVE `demo_sync_only` (the four and nothing else, at every
+  state), `demo_sync_neg`, `demo_sync_neg_x`.
+- **The program.**  `UkSync.wp_ksync_start` runs at a status-independent
+  payload, handed `P` and `sync_pay P (ukn_pay N (-1))`, which `main`
+  spends AFTER `sync()` returned -- SY3's durability receipt is a second
+  premise of `sync_pay`.  `UShSync` is `UShSecc`'s geometry at /sync;
+  `UkSyncEntry.sync_image_entry` takes any lend `P`, any status-independent
+  payload `Q` and `□ sync_pay P (Q (-1))`.  /sync is the seventh pin of the
+  fixed part (`FsSyncPin`, inum 22, in `FileFsPure.file_fs_pure`; every
+  write/unarm lemma threads `i <> SYNC_INO`), resolved by
+  `UShExecPin.sh_sync_pin_resolves`/`sh_sync_slot`.
+- **The round** (`UShURound.uHchild_sync`): an EXEC line with no redirect,
+  every alternative the identity, so the lend `Wcu I 3` goes to /sync
+  whole and `usync_ran_pay` pays PEND at `RSyncRan` (the deed PRE -> PEND,
+  the block owed whole; sh files RAN at its `$`, as for `RFRan sel`).  The
+  exec failure (`usync_execfail_law`) and the out-of-memory death
+  (`uHoom`) are the record's blocks beside the deed as found.  Dispatched
+  at `LSync` by `UkShPipeForkTwin.wp_kshm_body_pipe_nc` in
+  `ushq_body_law_union`; `UShUPipes.sh_round_holds_union_closed` takes
+  `sh_sync_slot`, which `UInitUnionBoot` builds from the fixed part.
 
 ## 4. What the kernel gives, and what it does not (the durability link)
 

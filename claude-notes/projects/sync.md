@@ -26,11 +26,7 @@ Open cleanups it left, none blocking:
 - `UInitTreeBoot.v`'s header cites a lemma `tree_cc_wb_conj8_is_turn_to_taint`
   that does not exist.
 
-## SY2 -- the `sync` line
-
-- [ ] model (`LSync`, three alternatives, admission, decider, demos)
-- [ ] the sync entry at the union registry, paying PEND at RAN
-- [ ] sh's round at `LSync`
+## SY2 -- DONE: the `sync` line (design §3)
 
 ## SY3 -- the durability link (design §4-§5)
 
