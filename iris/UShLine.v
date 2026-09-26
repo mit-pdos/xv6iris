@@ -1610,13 +1610,13 @@ Section UShLine.
     iIntros (h m pc a k cap I f avail)
       "%Hn %Ha0 %Ha1 %Ha2 %Hcapk %Hcap31 %Hfd0 %Hal #Hi Hbuf Hstd Hpos Hrun
        Hcont".
-    iDestruct "Hstd" as (vw) "[%Hvok Hstd]".
+    iDestruct "Hstd" as (vw) "[#Hvok Hstd]".
     iApply (ush_read_recv_era_at_vw R γ Wb N γp l vw h m pc a k cap I f avail
               Hpay Hst Hts Hwd Hep Hn Ha0 Ha1 Ha2 Hcapk Hcap31 Hfd0 Hal
               with "Hlk Hi Hbuf Hstd Hpos Hrun").
     iIntros (h' r d g) "%Hd %Hgf Hstd Hans Hbuf Hrun".
     iApply ("Hcont" $! h' r d g with "[%] [%] [Hstd] Hans Hbuf Hrun");
-      [ exact Hd | exact Hgf | rewrite /UkSh.ush_std; iExists vw; by iFrame "Hstd" ].
+      [ exact Hd | exact Hgf | rewrite /UkSh.ush_std /ustd_ok; iExists vw; by iFrame "Hvok Hstd" ].
   Qed.
 
   (* ...AND THE ECHO INSTANCES, by [Definition] with no proof text. *)

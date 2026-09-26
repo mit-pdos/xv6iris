@@ -592,6 +592,7 @@ Section UShKernel.
        generation came out of sh's OWN set. *)
     uvis_ch W = ∅ ->
     bv_unsigned (uvis_pid W) <> 1 ->
+
     (* NO ALL-PARKED PREMISE (lane OFF-HAND-6, H3): a record's held set is
        dead data now ([UkRun.urun_parked_row]), so this entry may be taken
        at a key with a HELD descriptor (design/app-file.md SS3 fact 4). *)
@@ -662,6 +663,10 @@ Section UShKernel.
        ([UkSh.ush_fd0]).  Persistent, and the walk reads none of the three
        -- which is what makes the CLOSED arm this same application. *)
     UkSh.ush_fd0 T (take NSTD (uvis_fd W)) -∗
+    (* ...AND ITS TABLE'S ROWS ARE CLOSED OR THE CONSOLE, or the taint
+       (seccomp S4): the view sh's ledger is minted at, which its loop
+       keeps *)
+    (⌜ush_view_ok (uvis_fd W)⌝ ∨ T) -∗
     (* ...AND THE STATE OF THE CONSOLE NODE (lane SH-OPEN, H3).  Which of
        the two PINNED opens sh's preamble makes is decided here: the node
        is there (and the leaf is a consequence of the persistent flag
@@ -705,9 +710,9 @@ Section UShKernel.
     uslot W.
   Proof using .
     intros Hbd HQc Hpc Hsub Hx Hal8 Hroom Hstk Hfdlen Hstop Hcwd0 Hlzf Hscf Hch0 Hpid1.
-    iIntros "#Hpay #Hnpw #Hdep #Hdp #Htag #Hplaw #Hrest #Hfd0 Hin #Hgen #Hmp Hpos
+    iIntros "#Hpay #Hnpw #Hdep #Hdp #Htag #Hplaw #Hrest #Hfd0 #Hvok Hin #Hgen #Hmp Hpos
              Hlease Hwcp".
-    iApply (uslot_of_urun_all W (2 + (8 + (16 + (ush_Dbody + n0)))) Q
+    iApply (uslot_of_urun_all_at W (2 + (8 + (16 + (ush_Dbody + n0)))) Q
               Hal8 Hroom Hstk Hfdlen Hstop Hlzf Hscf with "Hdep Hnpw Hmp").
     (* sh's own half of its children set travels in [UkSh.ush_pstate]
        beside the ledger and the cwd: fork1 MOVES the set, so the fragment
@@ -757,7 +762,7 @@ Section UShKernel.
     - (* runcmd's JUMP TABLE, off the same image (lane SH-LINE 2b, (b)):
          [UkSh.ush_rest] takes it now, so the entry is where it is paid. *)
       iApply (UkSh.ush_jtab_of_rodata (ukn_t N) with "Hro").
-    - rewrite /UkSh.ush_std. iExact "Hstd".
+    - rewrite /UkSh.ush_std /ustd_ok. iExists (uvis_fd W). by iFrame "Hvok Hstd".
     - rewrite <- Hcwd0. iExact "Hcwf".
     - (* the children set, at the EMPTY set the key carries (lane EXEC-SEAM) *)
       rewrite <- Hch0. iExact "Hchf".
@@ -855,6 +860,7 @@ Section UShKernel.
     kexec_sz sh_elf - PGSIZE + 8 * Z.of_nat (2 + (8 + (16 + (ush_Dbody + n0))))
       <= kxc_sp_final (kexec_sz sh_elf) alen na ->
     length sts = NOFILE ->
+
     (* ...and the lazy bit, passed straight through: see [sh_uexec_slot].
        [KexecBuilt]'s coverage row is what will make this a READING of
        [kexec_image_ok] instead of a premise (lane LAZY-FLAG, K4). *)
@@ -906,6 +912,9 @@ Section UShKernel.
     (* the entry row, the pay fact, the lend, the position and the
        credential slot, all passed straight through: see [sh_uexec_slot] *)
     UkSh.ush_fd0 T (take NSTD sts) -∗
+    (* ...AND THE TABLE'S ROWS ARE CLOSED OR THE CONSOLE, or the taint
+       (seccomp S4): exec keeps the table ([SpecKexec.kexec_image_ok_fd]) *)
+    (⌜ush_view_ok sts⌝ ∨ T) -∗
     (* the console node's state and the taint's continuation, both passed
        straight through: see [sh_uexec_slot] *)
     (□ (∀ N : uk_names Σ, UkSh.ush_open_console_leaf N T)
@@ -1147,6 +1156,9 @@ Section UShKernel.
     (∀ N : uk_names Σ,
        ush_rest_l_at N γp T Wc Wb Pm Dl (R (ukn_t N) (ukn_d N) (ukn_s N))) -∗
     UkSh.ush_fd0 T (take NSTD sts) -∗
+    (* ...AND THE TABLE'S ROWS ARE CLOSED OR THE CONSOLE, or the taint
+       (seccomp S4): exec keeps the table ([SpecKexec.kexec_image_ok_fd]) *)
+    (⌜ush_view_ok sts⌝ ∨ T) -∗
     (□ (∀ N : uk_names Σ, UkSh.ush_open_console_leaf N T)
      ∨ (□ (∀ N : uk_names Σ, UkSh.ush_open_absent_leaf N T K) ∗ K)
      ∨ T) -∗
@@ -1158,7 +1170,7 @@ Section UShKernel.
       uslot.
   Proof using .
     intros Hbd HQc Hroom Hlen -> Hpid1.
-    iIntros "#Hpay #Hnpw #Hdep #Hdp #Htag #Hplaw #Hrest #Hfd0 #Hin #Hgen".
+    iIntros "#Hpay #Hnpw #Hdep #Hdp #Htag #Hplaw #Hrest #Hfd0 #Hvok #Hin #Hgen".
     rewrite /image_entry_at. iIntros "!>" (W')
       "%Hok %Hcwd0 %Hlzf %Hscf %Hchq %Hpiq Hmp (Hpos & Hlease & Hwcp)".
     assert (Hch0 : uvis_ch W' = ∅) by exact Hchq.
@@ -1168,7 +1180,7 @@ Section UShKernel.
               Dl Hdline Hrl Hpm1 Hpm3 Hpmwb
               Hwc Hwbwc Hwbl Hwbr na alen afun sts W' n0 n Hbd HQc Hok Hcwd0
               Hroom Hlen Hlzf Hscf Hch0 Hpid1'
-              with "[] Hnpw Hdep Hdp Htag Hplaw Hrest Hfd0 [] [] Hmp Hpos Hlease
+              with "[] Hnpw Hdep Hdp Htag Hplaw Hrest Hfd0 Hvok [] [] Hmp Hpos Hlease
                     Hwcp").
     - (* the payload at THIS key, off the [∀]-over-keys wand *)
       iModIntro. iIntros (γt γd γs) "Hsz Hlo".

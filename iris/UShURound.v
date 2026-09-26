@@ -556,14 +556,14 @@ Section UShURound.
     ⊢ union_links ug -∗ udep (SG := uexecSG_xv6) (PS := uprogSG_free) -∗
       UShEcho.sh_echo_slot T -∗
       (∃ jo : option Z, file_cons_cred (fgn_cl gf) r jo) -∗
-      UkShFork.ushf_child_law (PS := uprogSG_free) (SG := uexecSG_xv6) Wcu.
+      UkShFork.ushf_child_law (PS := uprogSG_free) (SG := uexecSG_xv6) T Wcu.
   Proof using Heq Hkill Hcons HfifR.
     iIntros "#Hlk #Hdep #Hslot #Hmade".
     iPoseProof (uHexecfail_D with "Hlk") as "#Hxl".
     iPoseProof (uHchild_echo with "Hdep Hslot Hmade") as "#Hsup".
     iApply (UkShEcho.ushf_child_law_holds_at_D (PS := uprogSG_free)
               (SG := uexecSG_xv6) (fun k H => H) union_D (lk_exfb FI)
-              (fun I : list (bv 8) => (length (lk_exfb FI I) - 2)%nat) Wcu
+              (fun I : list (bv 8) => (length (lk_exfb FI I) - 2)%nat) T Wcu
               union_D_of_line union_D_exfb with "Hxl Hsup").
   Qed.
 
@@ -701,7 +701,7 @@ Section UShURound.
       UShCatPay.sh_cat_slot T -∗
       (∃ jo : option Z, file_cons_cred (fgn_cl gf) r jo) -∗
       UkShFork.ushf_child_law_at (PS := uprogSG_free) (SG := uexecSG_xv6)
-        (ghost_varG0 := offbox_offG) Wcu UkShRedirBody.ushs_lp_cat 68.
+        (ghost_varG0 := offbox_offG) T Wcu UkShRedirBody.ushs_lp_cat 68.
   Proof using Heq Hkill Hcons HfifR.
     iIntros "#Hlk #Hdep #Hslot #Hmade". iDestruct "Hmade" as (jo) "#Hmade".
     iPoseProof "Hslot" as "(#Hinv & _ & #Hgen)".
@@ -1054,7 +1054,7 @@ Section UShURound.
       UShEcho.sh_echo_slot T -∗
       (∃ jo : option Z, file_cons_cred (fgn_cl gf) r jo) -∗
       UkShRedirBody.sh_redir_child_law (PS := uprogSG_free)
-        (SG := uexecSG_xv6) (ghost_varG0 := offbox_offG) Wcu.
+        (SG := uexecSG_xv6) (ghost_varG0 := offbox_offG) T Wcu.
   Proof using Heq Hkill HfifR.
     iIntros "#Hlk #Hdep #Hslot #Hmade". iDestruct "Hmade" as (jo) "#Hmade".
     iPoseProof "Hslot" as "(#Hinv & _ & #Hgen)".
@@ -1246,11 +1246,11 @@ Section UShURound.
     UserPtTree.pgroundup sz = sz ->
     usz_ok (sz + 65536) ->
     UkShFork.ushf_kill_law Wcu -∗
-    UkShFork.ushf_child_law (PS := uprogSG_free) (SG := uexecSG_xv6) Wcu -∗
+    UkShFork.ushf_child_law (PS := uprogSG_free) (SG := uexecSG_xv6) T Wcu -∗
     UkShRedirBody.sh_redir_child_law (PS := uprogSG_free) (SG := uexecSG_xv6)
-      (ghost_varG0 := offbox_offG) Wcu -∗
+      (ghost_varG0 := offbox_offG) T Wcu -∗
     UkShFork.ushf_child_law_at (PS := uprogSG_free) (SG := uexecSG_xv6)
-      (ghost_varG0 := offbox_offG) Wcu UkShRedirBody.ushs_lp_cat 68 -∗
+      (ghost_varG0 := offbox_offG) T Wcu UkShRedirBody.ushs_lp_cat 68 -∗
     UkShDiag.ush_panic_law (PS := uprogSG_free) Wcu Wbu -∗
     UkShFork.ushf_body_law (PS := uprogSG_free) (SG := uexecSG_xv6)
       N γp T Wcu Wbu Pm ush_line_upipe sz -∗

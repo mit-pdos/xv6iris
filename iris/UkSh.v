@@ -739,36 +739,6 @@ Proof.
 Qed.
 
 
-(* ===================================================================== *)
-(* THE SHELL'S TABLE VIEW (seccomp S4).  sh's own table never moves in the  *)
-(* parent past its console preamble -- a redirect or a pipe moves a CHILD's *)
-(* table -- and every row it ever holds is closed or the console device.   *)
-(* That is the fact the seccomp child needs of its WHOLE table             *)
-(* ([UexecSecc.secc_rows]), and the ledger carries it at a view            *)
-(* ([UserFd.ustd_at]) that satisfies this.                                 *)
-(* ===================================================================== *)
-Definition ush_view_ok (v : list fdstate) : Prop :=
-  Forall (fun st => st = FdClosed \/ exists r w : bool, st = FdOpen r w (FdDevice CONSOLE)) v.
-
-(* a table under an ok view is ok: a slot the view shows may have closed *)
-Lemma ush_view_ok_tab (sts v : list fdstate) :
-  ush_view_ok v -> tab_le sts v -> ush_view_ok sts.
-Proof.
-  intros Hv [_ Hle]. apply Forall_lookup. intros k st Hk.
-  destruct (Hle k st Hk) as [Hv' | [-> _]]; [| by left].
-  exact (proj1 (Forall_lookup _ _) Hv k st Hv').
-Qed.
-
-(* ...and the console preamble's open keeps it: the new view is the old
-   table with the console installed *)
-Lemma ush_view_ok_open (fdv v : list fdstate) (fd : nat) (r w : bool) :
-  ush_view_ok v -> tab_le fdv v ->
-  ush_view_ok (<[fd := FdOpen r w (FdDevice CONSOLE)]> fdv).
-Proof.
-  intros Hv Hle. pose proof (ush_view_ok_tab fdv v Hv Hle) as Hf.
-  apply Forall_insert; [exact Hf | right; by exists r, w].
-Qed.
-
 Section UkSh.
   Context `{!riscvGS Σ}.
   Context `{!ufdG Σ}.
@@ -810,17 +780,14 @@ Section UkSh.
   Local Notation γpid := (ukn_pid N).
 
   (* THE LEDGER sh CARRIES (seccomp S4): the standard streams at a table
-     view whose rows are closed or the console ([ush_view_ok]).  Every step
-     of the loop keeps the view; the console preamble's open re-sets it to
-     the new table, which is still ok ([ush_view_ok_open]). *)
-  Definition ush_std (l : list fdstate) : iProp Σ :=
-    (∃ v : list fdstate, ⌜ush_view_ok v⌝ ∗ ustd_at γfd l v)%I.
-
-  Global Instance ush_std_timeless l : Timeless (ush_std l).
-  Proof using . rewrite /ush_std. apply _. Qed.
+     view whose rows are closed or the console ([ush_view_ok]), or the
+     taint (under which /init's opens installed whatever they did).  Every
+     step of the loop keeps the view; the console preamble's open re-sets
+     it to the new table, which is still ok ([ush_view_ok_open]). *)
+  Definition ush_std (l : list fdstate) : iProp Σ := ustd_ok T γfd l.
 
   Lemma ush_std_ustd (l : list fdstate) : ush_std l -∗ ustd γfd l.
-  Proof using . iIntros "[%v [_ H]]". iApply (ustd_at_ustd with "H"). Qed.
+  Proof using . iApply ustd_ok_ustd. Qed.
 
   Lemma ush_std_len (l : list fdstate) : ush_std l -∗ ⌜length l = NSTD⌝.
   Proof using .
@@ -7319,24 +7286,24 @@ Section UkSh.
      the pin buys; the NUMBER is the caller's own ledger's answer. *)
   (* the allocation's ledger at an ok view (seccomp S4) *)
   Definition ush_ualloc (l : list fdstate) (fd : nat) (st : fdstate) : iProp Σ :=
-    (∃ w : list fdstate, ⌜ush_view_ok w⌝ ∗ ualloc_v γfd l fd st w)%I.
+    (∃ w : list fdstate, (⌜ush_view_ok w⌝ ∨ T) ∗ ualloc_v γfd l fd st w)%I.
 
   Lemma ush_ualloc_std (l : list fdstate) (fd k : nat) (st : fdstate) :
     fd_lowest_closed l = Some k ->
     ush_ualloc l fd st -∗ ⌜fd = k⌝ ∗ ush_std (<[k := st]> l).
   Proof using .
-    intros Hk. iIntros "[%w [%Hok Hl]]".
+    intros Hk. iIntros "[%w [Hok Hl]]".
     iDestruct (ualloc_v_std with "Hl") as "[$ Hl]"; [exact Hk |].
-    iExists w. by iFrame "Hl".
+    rewrite /ush_std /ustd_ok. iExists w. by iFrame "Hok Hl".
   Qed.
 
   Lemma ush_ualloc_hi (l : list fdstate) (fd : nat) (st : fdstate) :
     fd_lowest_closed l = None ->
     ush_ualloc l fd st -∗ ⌜(NSTD <= fd)%nat⌝ ∗ ush_std l ∗ ufd γfd fd st.
   Proof using .
-    intros Hk. iIntros "[%w [%Hok Hl]]".
+    intros Hk. iIntros "[%w [Hok Hl]]".
     iDestruct (ualloc_v_hi with "Hl") as "($ & Hl & $)"; [exact Hk |].
-    iExists w. by iFrame "Hl".
+    rewrite /ush_std /ustd_ok. iExists w. by iFrame "Hok Hl".
   Qed.
 
   Definition ush_open_console_leaf : iProp Σ :=
@@ -7454,7 +7421,7 @@ Section UkSh.
   Proof using HT.
     intros Ha0 Ha1 Hal.
     iIntros "#Hcode #Hro #Hgen Hrun Hcwd Hstd Hin Hcont".
-    iDestruct "Hstd" as (v) "[%Hok Hstd]".
+    iDestruct "Hstd" as (v) "[#Hok Hstd]".
     iDestruct "Hin" as "[#Hlf | [[#Hlf HK] | #HT]]".
     - (* THE NODE IS THERE: the pinned open resolves *)
       iApply ("Hlf" $! h m l v avail with "Hcode Hro [%] Hrun Hcwd Hstd").
@@ -7464,17 +7431,19 @@ Section UkSh.
           [ iLeft | iLeft; iExact "Hlf" ].
         iDestruct "Hal" as (fd) "[%Hr Hal]". iDestruct "Hal" as (fdv) "[%Hle Hal]".
         iExists fd. iSplitR; [ by iPureIntro |]. rewrite /ush_ualloc.
-        iExists _. iFrame "Hal". iPureIntro. exact (ush_view_ok_open fdv v fd true true Hok Hle).
+        iExists _. iFrame "Hal".
+        iDestruct "Hok" as "[%Hok | HT]"; [| by iRight].
+        iLeft. iPureIntro. exact (ush_view_ok_open fdv v fd true true CONSOLE Hok Hle).
       + iApply ("Hcont" $! h' ret with "[Hm1] [] Hcwd Hrun");
           [ iRight | iLeft; iExact "Hlf" ].
-        iDestruct "Hm1" as "[$ Hstd]". iExists v. by iFrame "Hstd".
+        iDestruct "Hm1" as "[$ Hstd]". rewrite /ush_std /ustd_ok. iExists v. by iFrame "Hok Hstd".
       + iApply (ush_gen_run h' _ _ avail Hal with "Hgen HT Hrun").
     - (* THE NODE IS NOT THERE: the pinned open MISSES, provably *)
       iApply ("Hlf" $! h m l v avail with "Hcode Hro [%] Hrun Hcwd Hstd HK").
       { split; [ exact Ha0 | exact Ha1 ]. }
       iIntros (h' ret) "[(%Hrm & Hstd & HK) | #HT] Hcwd Hrun".
       + iApply ("Hcont" $! h' ret with "[Hstd] [HK] Hcwd Hrun").
-        * iRight. iSplitR; [ by iPureIntro |]. iExists v. by iFrame "Hstd".
+        * iRight. iSplitR; [ by iPureIntro |]. rewrite /ush_std /ustd_ok. iExists v. by iFrame "Hok Hstd".
         * iRight. iLeft. iFrame "Hlf HK".
       + iApply (ush_gen_run h' _ _ avail Hal with "Hgen HT Hrun").
     - (* THE TAINT: sh's walk stops being sh's before the call *)

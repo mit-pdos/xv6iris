@@ -483,7 +483,7 @@ Section UShUPipes.
   Lemma upipes_child_law_echo :
     ⊢ UShEcho.sh_echo_slot T -∗ UShCatPay.sh_cat_slot T -∗ sh_grep_slot T -∗
       UkShFork.ushf_child_law_at (PS := uprogSG_free) (SG := uexecSG_xv6)
-        (ghost_varG0 := offbox_offG) Wcu pipes_lpg (68 + UkSh.ush_Dpipe).
+        (ghost_varG0 := offbox_offG) T Wcu pipes_lpg (68 + UkSh.ush_Dpipe).
   Proof using Hcons Hkill Heq pipeProtoG0 pnsRegG0 uartGhostG0.
     iIntros "#Hes #Hcs #Hgs".
     rewrite /UkShFork.ushf_child_law_at.
@@ -619,7 +619,7 @@ Section UShUPipes.
     ⊢ UShEcho.sh_echo_slot T -∗ UShCatPay.sh_cat_slot T -∗ sh_grep_slot T -∗
       (∃ jo : option Z, file_cons_cred (fgn_cl gf) r jo) -∗
       UkShFork.ushf_child_law_at (PS := uprogSG_free) (SG := uexecSG_xv6)
-        (ghost_varG0 := offbox_offG) Wcu pipes_lpcg (68 + UkSh.ush_Dpipe).
+        (ghost_varG0 := offbox_offG) T Wcu pipes_lpcg (68 + UkSh.ush_Dpipe).
   Proof using Hcons Hkill Heq cifRegG0 pipeProtoG0 pnsRegG0 uartGhostG0.
     iIntros "#Hes #Hcs #Hgs #Hmade".
     iPoseProof "Hcs" as "(#Hinv & _ & _)".
@@ -785,9 +785,9 @@ Section UShUPipes.
     usz_ok (sz + 65536) ->
     UkShFork.ushf_kill_law Wcu -∗
     UkShFork.ushf_child_law_at (PS := uprogSG_free) (SG := uexecSG_xv6)
-      (ghost_varG0 := offbox_offG) Wcu pipes_lpg (68 + UkSh.ush_Dpipe) -∗
+      (ghost_varG0 := offbox_offG) T Wcu pipes_lpg (68 + UkSh.ush_Dpipe) -∗
     UkShFork.ushf_child_law_at (PS := uprogSG_free) (SG := uexecSG_xv6)
-      (ghost_varG0 := offbox_offG) Wcu pipes_lpcg (68 + UkSh.ush_Dpipe) -∗
+      (ghost_varG0 := offbox_offG) T Wcu pipes_lpcg (68 + UkSh.ush_Dpipe) -∗
     UkShDiag.ush_panic_law (PS := uprogSG_free) Wcu Wbu -∗
     UkShFork.ushf_body_law (PS := uprogSG_free) (SG := uexecSG_xv6)
       (ghost_varG0 := offbox_offG) N γp T Wcu Wbu Pm ush_line_upipe sz.

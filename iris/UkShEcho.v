@@ -1518,14 +1518,14 @@ Section UkShEcho.
      from which both the stage and [FileHooks.fexfb]'s value follow. *)
   Lemma ushf_child_law_holds_at_D (D : list (bv 8) -> Prop)
       (dg : list (bv 8) -> list (bv 8)) (nn : list (bv 8) -> nat)
-      (Wc : list (bv 8) -> nat -> iProp Σ) :
+      (T : iProp Σ) (Wc : list (bv 8) -> nat -> iProp Σ) :
     (forall (I : list (bv 8)) (ws : list (list (bv 8))),
        line_ok ws -> ws = last_ws I ->
        FileDisc.fline_ok (UkSh.ush_lastbody I) -> D I) ->
     (forall I : list (bv 8),
        D I -> dg I = alt_execfail /\ nn I = 17%nat) ->
     ush_execfail_law_wq_at_D D dg nn Wc -∗
-    sh_exec_sup_echo_wq_at D Wc -∗ UkShFork.ushf_child_law Wc.
+    sh_exec_sup_echo_wq_at D Wc -∗ UkShFork.ushf_child_law T Wc.
   Proof using Hpsok_free.
     intros HD Hdg. iIntros "#Hxl #Hsup".
     rewrite /UkShFork.ushf_child_law /UkShFork.ushf_child_law_at.
@@ -1573,29 +1573,29 @@ Section UkShEcho.
      [FileDisc.fline_ok_echo]. *)
   Lemma ushf_child_law_holds_at (D : list (bv 8) -> Prop)
       (dg : list (bv 8) -> list (bv 8)) (nn : list (bv 8) -> nat)
-      (Wc : list (bv 8) -> nat -> iProp Σ) :
+      (T : iProp Σ) (Wc : list (bv 8) -> nat -> iProp Σ) :
     (forall (I : list (bv 8)) (ws : list (list (bv 8))),
        line_ok ws -> ws = last_ws I ->
        FileDisc.fline_ok (UkSh.ush_lastbody I) -> D I) ->
     (forall I : list (bv 8),
        D I -> dg I = alt_execfail /\ nn I = 17%nat) ->
     ush_execfail_law_wq_at dg nn Wc -∗
-    sh_exec_sup_echo_wq_at D Wc -∗ UkShFork.ushf_child_law Wc.
+    sh_exec_sup_echo_wq_at D Wc -∗ UkShFork.ushf_child_law T Wc.
   Proof using Hpsok_free.
     intros HD Hdg. iIntros "#Hxl #Hsup".
-    iApply (ushf_child_law_holds_at_D D dg nn Wc HD Hdg with "[] Hsup").
+    iApply (ushf_child_law_holds_at_D D dg nn T Wc HD Hdg with "[] Hsup").
     iApply (ush_execfail_law_wq_at_D_of D dg nn Wc with "Hxl").
   Qed.
 
   (* the landed name: the echo era's guard is [line_ok] and its diagnostic
      is the constant one *)
-  Lemma ushf_child_law_holds (Wc : list (bv 8) -> nat -> iProp Σ) :
+  Lemma ushf_child_law_holds (T : iProp Σ) (Wc : list (bv 8) -> nat -> iProp Σ) :
     ush_execfail_law_wq Wc -∗
-    sh_exec_sup_echo_wq Wc -∗ UkShFork.ushf_child_law Wc.
+    sh_exec_sup_echo_wq Wc -∗ UkShFork.ushf_child_law T Wc.
   Proof.
     iIntros "#Hxl #Hsup".
     iApply (ushf_child_law_holds_at (fun I => line_ok (last_ws I))
-              (fun _ => alt_execfail) (fun _ => 17%nat) Wc
+              (fun _ => alt_execfail) (fun _ => 17%nat) T Wc
               ltac:(intros I ws Hok Heq _; subst ws; exact Hok)
               ltac:(intros I _; split; reflexivity)
               with "Hxl Hsup").
@@ -1625,7 +1625,7 @@ Section UkShEcho.
       (Wc : list (bv 8) -> nat -> iProp Σ) (Wb : list (bv 8) -> iProp Σ)
       (Pm : list (bv 8) -> iProp Σ)
       (l : list fdstate) (c : Z) : iProp Σ :=
-    (UkSh.ush_std N l ∗ UserCwd.ucwd (ukn_cwd N) c
+    (UkSh.ush_std N T l ∗ UserCwd.ucwd (ukn_cwd N) c
      (* the two identity conjuncts are PINNED now (lane EXEC-SEAM), as
         [UkSh.ush_pstate]'s are: no children at the head, not <init> *)
      ∗ UserChildren.uch (ukn_ch N) ∅

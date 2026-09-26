@@ -244,6 +244,44 @@ Proof.
   - rewrite list_lookup_insert_ne in Hk; [| lia]. exact (H k st Hk).
 Qed.
 
+(* A VIEW WHOSE ROWS ARE CLOSED OR A DEVICE (seccomp S4): what sh's ledger
+   carries of its whole table -- no inode and no pipe row, which is what the
+   seccomp child needs of the table it execs with ([UexecSecc.secc_rows]).
+   sh's parent only ever holds the console, and every step of its loop
+   keeps the view; the console preamble's opens re-set it to a table that
+   still satisfies it ([ush_view_ok_open]). *)
+Definition ush_view_ok (v : list fdstate) : Prop :=
+  Forall (fun st => st = FdClosed \/ exists (r w : bool) (mj : Z),
+                      st = FdOpen r w (FdDevice mj)) v.
+
+(* a table under an ok view is ok: a slot the view shows may have closed *)
+Lemma ush_view_ok_tab (sts v : list fdstate) :
+  ush_view_ok v -> tab_le sts v -> ush_view_ok sts.
+Proof.
+  intros Hv [_ Hle]. apply Forall_lookup. intros k st Hk.
+  destruct (Hle k st Hk) as [Hv' | [-> _]]; [| by left].
+  exact (proj1 (Forall_lookup _ _) Hv k st Hv').
+Qed.
+
+(* ...an allocation of a device keeps it *)
+Lemma ush_view_ok_open (fdv v : list fdstate) (fd : nat) (r w : bool) (mj : Z) :
+  ush_view_ok v -> tab_le fdv v ->
+  ush_view_ok (<[fd := FdOpen r w (FdDevice mj)]> fdv).
+Proof.
+  intros Hv Hle. pose proof (ush_view_ok_tab fdv v Hv Hle) as Hf.
+  apply Forall_insert; [exact Hf | right; by exists r, w, mj].
+Qed.
+
+(* ...and so does a copy of a row the table already has (dup) *)
+Lemma ush_view_ok_dup (fdv v : list fdstate) (fd i : nat) (st : fdstate) :
+  ush_view_ok v -> tab_le fdv v -> fdv !! i = Some st ->
+  ush_view_ok (<[fd := st]> fdv).
+Proof.
+  intros Hv Hle Hi. pose proof (ush_view_ok_tab fdv v Hv Hle) as Hf.
+  apply Forall_insert; [exact Hf |].
+  exact (proj1 (Forall_lookup _ _) Hf i st Hi).
+Qed.
+
 (* the standard streams are never closed behind the view's back *)
 Lemma tab_le_take (fdv v : list fdstate) :
   tab_le fdv v -> take NSTD fdv = take NSTD v.
@@ -411,6 +449,25 @@ Section UserFd.
   Proof using . apply _. Qed.
   Global Instance ustd_at_timeless γf l v : Timeless (ustd_at γf l v).
   Proof using . apply _. Qed.
+  (* THE LEDGER AT AN OK VIEW, or the application's taint [T] (seccomp S4):
+     what sh and /init carry ([UkSh.ush_std] is this at sh's record). *)
+  Definition ustd_ok (T : iProp Σ) (γf : gname) (l : list fdstate) : iProp Σ :=
+    (∃ v : list fdstate, (⌜ush_view_ok v⌝ ∨ T) ∗ ustd_at γf l v)%I.
+
+  Global Instance ustd_ok_timeless T γf l `{!Timeless T} : Timeless (ustd_ok T γf l).
+  Proof using . rewrite /ustd_ok. apply _. Qed.
+
+  Lemma ustd_ok_ustd (T : iProp Σ) (γf : gname) (l : list fdstate) :
+    ustd_ok T γf l -∗ ustd γf l.
+  Proof using . iIntros "[%v [_ H]]". iApply (ustd_at_ustd with "H"). Qed.
+
+  Lemma ustd_ok_taint (T : iProp Σ) (γf : gname) (l : list fdstate) :
+    T -∗ ustd γf l -∗ ustd_ok T γf l.
+  Proof using .
+    iIntros "HT H". iDestruct (ustd_ustd_at with "H") as (v) "H".
+    iExists v. iFrame "H". by iRight.
+  Qed.
+
 
   Lemma ustd_len (γf : gname) (l : list fdstate) :
     ustd γf l -∗ ⌜length l = NSTD⌝.

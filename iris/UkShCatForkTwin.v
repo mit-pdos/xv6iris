@@ -99,7 +99,7 @@ Section UkShCatForkTwin.
     UCodeShK.shk_code γt -∗
     UCodeShK.shk_rodata γt -∗ UCodeShP.shp_code γt -∗ UkSh.ush_jtab γt -∗
     UkShFork.ushf_kill_law Wc -∗
-    UkShFork.ushf_child_law_at Wc UkShRedirBody.ushs_lp_cat Dc -∗
+    UkShFork.ushf_child_law_at T Wc UkShRedirBody.ushs_lp_cat Dc -∗
     UkShDiag.ush_panic_law Wc Wb -∗
     ⌜ UkSh.ush_fd0p l ⌝ -∗
     UkSh.ush_bstate N γp T Wc Wb Pm l (FileDisc.uline_ws (FileDisc.LCat nm)) -∗
@@ -119,7 +119,7 @@ Section UkShCatForkTwin.
     usz_ok (sz + 65536) ->
     (forall I : list (bv 8), ⊢ Wc I 3%nat -∗ Wc I 0%nat) ->
     UkShFork.ushf_kill_law Wc -∗
-    UkShFork.ushf_child_law_at Wc UkShRedirBody.ushs_lp_cat 68 -∗
+    UkShFork.ushf_child_law_at T Wc UkShRedirBody.ushs_lp_cat 68 -∗
     UkShDiag.ush_panic_law Wc Wb -∗
     UkShFork.ushf_body_law N γp T Wc Wb Pm
       (fun l : uline => exists nm : list (bv 8), l = LCat nm) sz.

@@ -206,7 +206,7 @@ Section UkShCd.
 (*ALIASES-BEGIN*)
   (* ---- what the other files of the lane define, at this file's own
          ghost names ---- *)
-  Local Notation ush_std := (UkSh.ush_std N).
+  Local Notation ush_std := (UkSh.ush_std N T).
   Local Notation ush_pstate := (UkSh.ush_pstate N γp T Wc Wb Pm).
   Local Notation ush_loop_head := (UkSh.ush_loop_head N γp).
   Local Notation urun_x0 := (UkShParse.urun_x0 N).

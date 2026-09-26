@@ -2092,6 +2092,202 @@ Section UkRun.
   (* needs it: sh reads and writes its line buffer, which the lossy entry  *)
   (* would drop.                                                          *)
   (* ------------------------------------------------------------------- *)
+  Lemma uslot_of_urun_all_at (W : uvis) (avail : nat) (Q : Z -> iProp Σ) :
+    uint (tf_resume_gpr0 (uvis_tf W) !!! Regidx csp_rs1) mod 8 = 0 ->
+    8 * Z.of_nat avail
+      <= uint (tf_resume_gpr0 (uvis_tf W) !!! Regidx csp_rs1) ->
+    (forall j : nat, (j < 8 * avail)%nat ->
+       is_Some (udata_lo (uvis_M W) (uvis_perm W) (uvis_sz W)
+                 !! (uint (tf_resume_gpr0 (uvis_tf W) !!! Regidx csp_rs1)
+                     - 8 * Z.of_nat avail + Z.of_nat j)%Z)) ->
+    length (uvis_fd W) = NOFILE ->
+    (* the map stops at the break -- [uslot_of_urun]'s own premise *)
+    (forall (p : mword 27) (q : uperm), uvis_perm W !! p = Some q ->
+       bv_unsigned p * 4096 < UserPtTree.pgroundup (uvis_sz W)) ->
+    (* ...AND THE KEY'S LAZY BIT IS [false] (lane LAZY-FLAG, L6).  The
+       verified-program tier runs at an EMPTY FILL: [UexecRet.ukcq], and
+       with it [urun], is hardwired at [false], so a constructor can only
+       build a slot for a key that says so.  A process that called
+       [sbrklazy] simply has no [urun] to run on -- a restriction of that
+       tier, not of the model.  WHO SUPPLIES IT: exec, whose fresh image is
+       eager ([SpecKexec.exec_slot_pre]'s success wands; lane LAZY-FLAG's
+       K4 is what puts the fact on them). *)
+    uvis_lazy W = false ->
+    (* ...AND ITS MASK IS FULL (upstream a083670): [urun] is keyed at
+       [ProcDefs.secc_all], as it is at [false] above.  WHO SUPPLIES IT:
+       userinit's first record, fork's copy, exec's keep
+       ([SpecKexec.exec_slot_pre]'s mask row). *)
+    uvis_secc W = ProcDefs.secc_all ->
+    (* ...AND NO HONESTY ROW ON THE HELD SET (lane OFF-HAND-6's H3 emptied
+       it, lane OFF-LINK-2's L6 deleted the field): a constructor says
+       nothing about offsets and an entry may be taken at a key with a HELD
+       descriptor, which is what makes a redirect child's exec provable
+       (design/app-file.md SS3). *)
+    (* ...and the deposit supplier, exactly as [uslot_of_urun] takes it *)
+    udep -∗
+    (* ...AND THE PROCESS'S OWN KNOWLEDGE OF ITS EXIT PAYLOAD.  A [urun]
+       carries it ([ChildTok.my_pay] at the key's generation) because the
+       exit leaf pays the trap loop's deposit row out of it
+       ([UkRunSys.wp_uk_ecall_exit]), and a constructor is the only place
+       it can enter: the record it mints is what fixes [ukn_pay].  The
+       kernel is what hands it over -- fork through the child slot's
+       premise, exec through [SpecKexec.exec_slot_pre]'s wands, and
+       userinit at the trivial payload. *)
+    (* ...AND WHETHER THE PROCESS'S TABLE HOLDS A PIPE ROW (design/pipe.md,
+       "The exit path").  The run carries this between traps
+       ([urun_nopipe]) and exit's bundle row is minted off it, so an ENTRY
+       is where it comes in.  It is a fact about the key the kernel handed
+       over and it travels the way every other such fact does:
+       [SpecKexec.kexec_image_ok_fd] says an exec'd image's table IS the
+       exec'ing process's, so a chain of pipe-free programs stays pipe-free
+       and the boot process's table is [FdSlots.fdt0], all closed.  A
+       program that means to call pipe(2) comes in on the right arm
+       instead ([urun_nopipe_taint]). *)
+    (* ...AND WHETHER IT ANSWERS FOR ITS OFFSETS (lane OFF-HAND-3, R1).
+       [hs] is the set the minted record carries and this is the premise
+       that makes it honest: a constructor may claim a set only if every
+       unparked row of the key's table is in it.  Every landed entry
+       passes [empty] at a table the kernel has just handed over
+       ([SpecKexec.exec_slot_pre]'s all-parked row,
+       [FdSlots.fdv_all_parked_fdt0] at the boot), and a constructor for a
+       program that means to HOLD an offset half passes the slots it means
+       to hold. *)
+    urun_nopipe (uvis_fd W) -∗
+    my_pay (uvis_gen W) Q -∗
+    (∀ (N : uk_names Σ) (h : CpuId),
+       (* the record's payload IS the one that came in, which is what lets
+          the program's proof read its own [ukn_pay] *)
+       ⌜ ukn_pay N = Q ⌝ -∗
+       ⌜ usz_ok (uvis_sz W) ⌝ -∗
+       usz (ukn_s N) (uvis_sz W) -∗
+       utext_all (ukn_t N) (uvis_M W) (uvis_perm W) -∗
+       (* ...AT THE KEY'S OWN TABLE AS ITS VIEW (seccomp S4) *)
+       ustd_at (ukn_fd N) (take NSTD (uvis_fd W)) (uvis_fd W) -∗
+       (* ...AND THE PROGRAM'S OWN HALF OF ITS WORKING DIRECTORY, at the
+          inum the resumed key carries.  Same reason the ledger comes out
+          here: this is where the process's [urun] is created, so it is
+          where the tie between the program's half and the key's [cw]
+          begins.  A program that never looks at its cwd drops it. *)
+       ucwd (ukn_cwd N) (uvis_cwd W) -∗
+       (* ...AND ITS OWN HALF OF ITS CHILDREN SET, at the very set the
+          resumed key carries -- [∅] at every entry that exists today,
+          because an entry constructor builds the FIRST run of a program
+          and a program that has not forked has no children. *)
+       uch (ukn_ch N) (uvis_ch W) -∗
+       (* ...AND ITS OWN HALF OF ITS PID (lane TRAP-ROWS-4, B): the number
+          the resumed key carries, at the record's own ghost name.  It is
+          what a caller reads wait's reaping arm against
+          ([UkRunSys.wp_uk_ecall_wait_null_live]) and what makes getpid(2)'s
+          answer sayable.  A program that never asks drops it. *)
+       upid (ukn_pid N) (bv_unsigned (uvis_pid W)) -∗
+       ([∗ map] k ↦ b ∈ base.filter
+             (fun kv : Z * bv 8 =>
+                kv.1 < uint (tf_resume_gpr0 (uvis_tf W) !!! Regidx csp_rs1)
+                       - 8 * Z.of_nat avail)
+             (udata_lo (uvis_M W) (uvis_perm W) (uvis_sz W)),
+          ubyte (ukn_d N) k b) -∗
+       ([∗ map] k ↦ b ∈ base.filter
+             (fun kv : Z * bv 8 =>
+                ~ (kv.1 < uint (tf_resume_gpr0 (uvis_tf W) !!! Regidx csp_rs1)))
+             (udata_lo (uvis_M W) (uvis_perm W) (uvis_sz W)),
+          ubyte (ukn_d N) k b) -∗
+       urun N h (tf_resume_gpr0 (uvis_tf W))
+         (tf_resume_pc (uvis_tf W)) avail -∗
+       mWP (Loop : expr riscv_lang))
+    -∗ uslot W.
+  Proof using .
+    intros Hal8 Hroom Hstk Hfdlen Hstop Hlzf Hscf.
+    iIntros "#Hdep #Hnpx #Hpay Hprog".
+    rewrite uslot_ukc /ukc Hlzf Hscf.
+    iIntros (h xi C pt Rfd Rut HRut) "%Hlo %Hpm %Hlzr Hb".
+    set (sz := uvis_sz W).
+    assert (Hwf : proc_pt_wf pt)
+      by (destruct Hlo as (_ & _ & _ & _ & _ & H); exact H).
+    rewrite /uvb /uvb_F /user_ptm_inv_x.
+    iDestruct "Hb" as
+      "(Hamb & Hregs & %Hsz & (Htlb & Hlazy & %Hinj & %Hacc) &
+        Hfrag & Hcfg & Hgpr & Hpc & Hrut & Hkont)".
+    iDestruct (umem_lazy_bound pt sz (uvis_M W) Hwf Hsz with "Hlazy") as %Hcan.
+    iMod (uheap_alloc (uvis_M W) (uvis_perm W) sz Hcan Hstop)
+      as (γt γd γs) "(Hheap & Hszf & #Ht & Hd)".
+    iMod (ufd_alloc_std_at (uvis_fd W) (uvis_fd W) ∅ Hfdlen (map_empty_subseteq _)
+            (tab_le_refl _))
+      as (γfd) "(Hufd & Hstd & _)".
+    (* ...AND THE WORKING DIRECTORY'S PAIR, at the inum the resumed key
+       carries: the authority stays in the [urun] being built, the
+       fragment goes to the program. *)
+    iMod (ucwd_alloc (uvis_cwd W)) as (γc) "[Hcwa Hcwf]".
+    (* ...AND THE CHILDREN SET'S PAIR, at the set the resumed key carries:
+       the authority stays in the [urun] being built, the fragment goes to
+       the program. *)
+    iMod (uch_alloc (uvis_ch W)) as (γch) "[Hcha Hchf]".
+    (* ...AND THE PID'S PAIR, at the pid the resumed key carries: the
+       authority stays in the [urun] being built (bundled with the
+       children's -- [urun_ids]), the fragment goes to the program.  It is
+       what lets the program NAME its own pid (lane TRAP-ROWS-4, B). *)
+    iMod (upid_alloc (bv_unsigned (uvis_pid W))) as (γpid) "[Hpida Hpidf]".
+    rewrite -/(utext_all γt (uvis_M W) (uvis_perm W)).
+    (* ---- the two cuts: at the frame's base, then at sp ---- *)
+    set (sp := tf_resume_gpr0 (uvis_tf W) !!! Regidx csp_rs1).
+    set (D := udata_lo (uvis_M W) (uvis_perm W) sz).
+    set (base := (uint sp - 8 * Z.of_nat avail)%Z).
+    iDestruct (umap_split_at γd D base with "Hd") as "[Dlo Dhi]".
+    iDestruct (umap_split_pred γd _ (fun a : Z => a < uint sp) with "Dhi")
+      as "[Dmid Dtop]".
+    (* the upper half is [~ (k < sp)] on [D] itself: a key at or above sp
+       is not below [base] *)
+    iAssert ([∗ map] k ↦ b ∈ base.filter
+                 (fun kv : Z * bv 8 => ~ (kv.1 < uint sp)) D, ubyte γd k b)%I
+      with "[Dtop]" as "Dtop".
+    { assert (E : base.filter (fun kv : Z * bv 8 => ~ (kv.1 < uint sp))
+                    (base.filter (fun kv : Z * bv 8 => ~ (kv.1 < base)) D)
+                  = base.filter (fun kv : Z * bv 8 => ~ (kv.1 < uint sp)) D).
+      { rewrite map_filter_filter. apply map_filter_ext.
+        intros k b _. cbn.
+        split; [ intros [H _]; exact H
+               | intro H; split; [ exact H | unfold base; lia ] ]. }
+      rewrite E. iExact "Dtop". }
+    (* ---- the frame, out of the middle ---- *)
+    set (f := fun j : nat =>
+                default (bv_0 8)
+                  (base.filter (fun kv : Z * bv 8 => kv.1 < uint sp)
+                     (base.filter (fun kv : Z * bv 8 => ~ (kv.1 < base)) D)
+                     !! (base + Z.of_nat j)%Z)).
+    assert (Hf : forall j : nat, (j < 8 * avail)%nat ->
+                   base.filter (fun kv : Z * bv 8 => kv.1 < uint sp)
+                     (base.filter (fun kv : Z * bv 8 => ~ (kv.1 < base)) D)
+                     !! (base + Z.of_nat j)%Z = Some (f j)).
+    { intros j Hj. destruct (Hstk j Hj) as [b Hb].
+      assert (Hb' : base.filter (fun kv : Z * bv 8 => kv.1 < uint sp)
+                      (base.filter (fun kv : Z * bv 8 => ~ (kv.1 < base)) D)
+                      !! (base + Z.of_nat j)%Z = Some b).
+      { apply umap_filter_lookup_lt; [ unfold base; lia | ].
+        apply umap_filter_lookup_ge; [ lia | exact Hb ]. }
+      unfold f. rewrite Hb'. reflexivity. }
+    iDestruct (ubytes_of_map γd _ base (8 * avail) f Hf with "Dmid") as "Hbs".
+    iDestruct (ustack_of_ubytes γd sp avail f Hal8 Hroom with "Hbs") as "Hstk".
+    iSpecialize ("Hprog" $! (MkUkNames γt γd γs γfd γc γch Q γpid) h
+                   with "[%] [%] Hszf Ht Hstd Hcwf Hchf Hpidf Dlo Dtop");
+      [ reflexivity | exact Hsz | ].
+    iApply "Hprog".
+    iExists xi, C, pt, Rfd, Rut, sz, (uvis_M W), (uvis_perm W), (uvis_fd W),
+      (uvis_cwd W), (uvis_gen W), (uvis_ch W), (uvis_pid W).
+    iSplitR; [ iPureIntro; exact Hlo | ].
+    iSplitR; [ iPureIntro; exact Hpm | ].
+    iSplitR; [ iPureIntro; exact (Hlzr eq_refl) | ].
+    iSplitR; [ iPureIntro; exact HRut | ].
+    (* the record is minted at [Q], so the payload the constructor was
+       handed IS the run's [ukn_pay N (-1)] *)
+    (* the two identity authorities go in as ONE conjunct ([urun_ids]) *)
+    iDestruct (urun_ids_intro (MkUkNames γt γd γs γfd γc γch Q γpid)
+                 (uvis_ch W) (uvis_pid W) with "Hcha Hpida") as "Hcha".
+    iFrame "Hheap Hstk Hufd Hcwa Hcha Hpay Hdep".
+    iSplitR; [ rewrite /urun_rows; iExact "Hnpx" | ].
+    rewrite /uvb /uvb_F /user_ptm_inv_x.
+    iFrame "Hamb Hregs Hfrag Hcfg Hgpr Hpc Hrut Hkont Htlb Hlazy".
+    iPureIntro. split_and!; [ exact Hsz | exact Hinj | exact Hacc ].
+  Qed.
+
   Lemma uslot_of_urun_all (W : uvis) (avail : nat) (Q : Z -> iProp Σ) :
     uint (tf_resume_gpr0 (uvis_tf W) !!! Regidx csp_rs1) mod 8 = 0 ->
     8 * Z.of_nat avail
@@ -2197,93 +2393,11 @@ Section UkRun.
   Proof using .
     intros Hal8 Hroom Hstk Hfdlen Hstop Hlzf Hscf.
     iIntros "#Hdep #Hnpx #Hpay Hprog".
-    rewrite uslot_ukc /ukc Hlzf Hscf.
-    iIntros (h xi C pt Rfd Rut HRut) "%Hlo %Hpm %Hlzr Hb".
-    set (sz := uvis_sz W).
-    assert (Hwf : proc_pt_wf pt)
-      by (destruct Hlo as (_ & _ & _ & _ & _ & H); exact H).
-    rewrite /uvb /uvb_F /user_ptm_inv_x.
-    iDestruct "Hb" as
-      "(Hamb & Hregs & %Hsz & (Htlb & Hlazy & %Hinj & %Hacc) &
-        Hfrag & Hcfg & Hgpr & Hpc & Hrut & Hkont)".
-    iDestruct (umem_lazy_bound pt sz (uvis_M W) Hwf Hsz with "Hlazy") as %Hcan.
-    iMod (uheap_alloc (uvis_M W) (uvis_perm W) sz Hcan Hstop)
-      as (γt γd γs) "(Hheap & Hszf & #Ht & Hd)".
-    iMod (ufd_alloc_std (uvis_fd W) ∅ Hfdlen (map_empty_subseteq _))
-      as (γfd) "(Hufd & Hstd & _)".
-    (* ...AND THE WORKING DIRECTORY'S PAIR, at the inum the resumed key
-       carries: the authority stays in the [urun] being built, the
-       fragment goes to the program. *)
-    iMod (ucwd_alloc (uvis_cwd W)) as (γc) "[Hcwa Hcwf]".
-    (* ...AND THE CHILDREN SET'S PAIR, at the set the resumed key carries:
-       the authority stays in the [urun] being built, the fragment goes to
-       the program. *)
-    iMod (uch_alloc (uvis_ch W)) as (γch) "[Hcha Hchf]".
-    (* ...AND THE PID'S PAIR, at the pid the resumed key carries: the
-       authority stays in the [urun] being built (bundled with the
-       children's -- [urun_ids]), the fragment goes to the program.  It is
-       what lets the program NAME its own pid (lane TRAP-ROWS-4, B). *)
-    iMod (upid_alloc (bv_unsigned (uvis_pid W))) as (γpid) "[Hpida Hpidf]".
-    rewrite -/(utext_all γt (uvis_M W) (uvis_perm W)).
-    (* ---- the two cuts: at the frame's base, then at sp ---- *)
-    set (sp := tf_resume_gpr0 (uvis_tf W) !!! Regidx csp_rs1).
-    set (D := udata_lo (uvis_M W) (uvis_perm W) sz).
-    set (base := (uint sp - 8 * Z.of_nat avail)%Z).
-    iDestruct (umap_split_at γd D base with "Hd") as "[Dlo Dhi]".
-    iDestruct (umap_split_pred γd _ (fun a : Z => a < uint sp) with "Dhi")
-      as "[Dmid Dtop]".
-    (* the upper half is [~ (k < sp)] on [D] itself: a key at or above sp
-       is not below [base] *)
-    iAssert ([∗ map] k ↦ b ∈ base.filter
-                 (fun kv : Z * bv 8 => ~ (kv.1 < uint sp)) D, ubyte γd k b)%I
-      with "[Dtop]" as "Dtop".
-    { assert (E : base.filter (fun kv : Z * bv 8 => ~ (kv.1 < uint sp))
-                    (base.filter (fun kv : Z * bv 8 => ~ (kv.1 < base)) D)
-                  = base.filter (fun kv : Z * bv 8 => ~ (kv.1 < uint sp)) D).
-      { rewrite map_filter_filter. apply map_filter_ext.
-        intros k b _. cbn.
-        split; [ intros [H _]; exact H
-               | intro H; split; [ exact H | unfold base; lia ] ]. }
-      rewrite E. iExact "Dtop". }
-    (* ---- the frame, out of the middle ---- *)
-    set (f := fun j : nat =>
-                default (bv_0 8)
-                  (base.filter (fun kv : Z * bv 8 => kv.1 < uint sp)
-                     (base.filter (fun kv : Z * bv 8 => ~ (kv.1 < base)) D)
-                     !! (base + Z.of_nat j)%Z)).
-    assert (Hf : forall j : nat, (j < 8 * avail)%nat ->
-                   base.filter (fun kv : Z * bv 8 => kv.1 < uint sp)
-                     (base.filter (fun kv : Z * bv 8 => ~ (kv.1 < base)) D)
-                     !! (base + Z.of_nat j)%Z = Some (f j)).
-    { intros j Hj. destruct (Hstk j Hj) as [b Hb].
-      assert (Hb' : base.filter (fun kv : Z * bv 8 => kv.1 < uint sp)
-                      (base.filter (fun kv : Z * bv 8 => ~ (kv.1 < base)) D)
-                      !! (base + Z.of_nat j)%Z = Some b).
-      { apply umap_filter_lookup_lt; [ unfold base; lia | ].
-        apply umap_filter_lookup_ge; [ lia | exact Hb ]. }
-      unfold f. rewrite Hb'. reflexivity. }
-    iDestruct (ubytes_of_map γd _ base (8 * avail) f Hf with "Dmid") as "Hbs".
-    iDestruct (ustack_of_ubytes γd sp avail f Hal8 Hroom with "Hbs") as "Hstk".
-    iSpecialize ("Hprog" $! (MkUkNames γt γd γs γfd γc γch Q γpid) h
-                   with "[%] [%] Hszf Ht Hstd Hcwf Hchf Hpidf Dlo Dtop");
-      [ reflexivity | exact Hsz | ].
-    iApply "Hprog".
-    iExists xi, C, pt, Rfd, Rut, sz, (uvis_M W), (uvis_perm W), (uvis_fd W),
-      (uvis_cwd W), (uvis_gen W), (uvis_ch W), (uvis_pid W).
-    iSplitR; [ iPureIntro; exact Hlo | ].
-    iSplitR; [ iPureIntro; exact Hpm | ].
-    iSplitR; [ iPureIntro; exact (Hlzr eq_refl) | ].
-    iSplitR; [ iPureIntro; exact HRut | ].
-    (* the record is minted at [Q], so the payload the constructor was
-       handed IS the run's [ukn_pay N (-1)] *)
-    (* the two identity authorities go in as ONE conjunct ([urun_ids]) *)
-    iDestruct (urun_ids_intro (MkUkNames γt γd γs γfd γc γch Q γpid)
-                 (uvis_ch W) (uvis_pid W) with "Hcha Hpida") as "Hcha".
-    iFrame "Hheap Hstk Hufd Hcwa Hcha Hpay Hdep".
-    iSplitR; [ rewrite /urun_rows; iExact "Hnpx" | ].
-    rewrite /uvb /uvb_F /user_ptm_inv_x.
-    iFrame "Hamb Hregs Hfrag Hcfg Hgpr Hpc Hrut Hkont Htlb Hlazy".
-    iPureIntro. split_and!; [ exact Hsz | exact Hinj | exact Hacc ].
+    iApply (uslot_of_urun_all_at W avail Q Hal8 Hroom Hstk Hfdlen Hstop Hlzf Hscf
+              with "Hdep Hnpx Hpay").
+    iIntros (N h) "%H1 %H2 Hszf Ht Hstd Hcwf Hchf Hpidf Dlo Dtop Hrun".
+    iApply ("Hprog" $! N h with "[%] [%] Hszf Ht [Hstd] Hcwf Hchf Hpidf Dlo Dtop Hrun");
+      [ exact H1 | exact H2 | by iApply ustd_at_ustd ].
   Qed.
 
   Lemma uslot_of_urun (W : uvis) (avail : nat) (Q : Z -> iProp Σ) :

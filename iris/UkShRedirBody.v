@@ -176,7 +176,7 @@ Section UkShRedirBody.
     UCodeShK.shk_rodata γt -∗ UCodeShP.shp_code γt -∗ UkSh.ush_jtab γt -∗
     UkShFork.ushf_kill_law Wc -∗
     (* THE REDIRECT CHILD'S LAW, which is [sh_redir_child_law] below *)
-    UkShFork.ushf_child_law_at Wc ushs_lp 68 -∗
+    UkShFork.ushf_child_law_at T Wc ushs_lp 68 -∗
     UkShDiag.ush_panic_law Wc Wb -∗
     ⌜ UkSh.ush_fd0p l ⌝ -∗
     UkSh.ush_bstate N γp T Wc Wb Pm l (ws ++ [FileDisc.fd_w_gt; file]) -∗
@@ -289,7 +289,7 @@ Section UkShRedirBody.
           ustr (ukn_d N') (DfracOwn 1) s0 len fb -∗
           ustr (ukn_d N') dw ushp_whitespace 5 ushp_ws_f -∗
           ustr (ukn_d N') dv ushp_symbols 7 ushp_sym_f -∗
-          UkSh.ush_std N' ld -∗
+          UkSh.ush_std N' T ld -∗
           UserCwd.ucwd (ukn_cwd N') FsImg.ROOTINO -∗
           (* THE TWO ROWS [UkShFork.ushf_child_law_at] BOUGHT (design
              app-pipe SS4.3w, purchase 2), MIRRORED HERE so that the two
@@ -322,7 +322,7 @@ Section UkShRedirBody.
   (* the two shapes, one step apart: the walk takes the file name out of
      the line fact, the law binds it. *)
   Lemma ushf_child_law_at_of_redir :
-    sh_redir_child_law -∗ UkShFork.ushf_child_law_at Wc ushs_lp 68.
+    sh_redir_child_law -∗ UkShFork.ushf_child_law_at T Wc ushs_lp 68.
   Proof using .
     iIntros "#Hl". rewrite /UkShFork.ushf_child_law_at.
     iIntros "!>" (N' h m dw dv s0 len wsf g sz ld n I)
@@ -342,7 +342,7 @@ Section UkShRedirBody.
   (* ...and the other way, so the two shapes are interderivable and a
      supplier may prove whichever is convenient. *)
   Lemma sh_redir_child_law_of_at :
-    UkShFork.ushf_child_law_at Wc ushs_lp 68 -∗ sh_redir_child_law.
+    UkShFork.ushf_child_law_at T Wc ushs_lp 68 -∗ sh_redir_child_law.
   Proof using .
     iIntros "#Hl". rewrite /sh_redir_child_law.
     iIntros "!>" (N' h m dw dv s0 len ws file g sz ld n I)
@@ -466,7 +466,7 @@ Section UkShRedirBody.
       UCodeShK.shk_code γt -∗
       UCodeShK.shk_rodata γt -∗ UkSh.ush_jtab γt -∗
       UkShFork.ushf_kill_law Wc -∗
-      UkShFork.ushf_child_law_at Wc Lp Dc -∗
+      UkShFork.ushf_child_law_at T Wc Lp Dc -∗
       UkShDiag.ush_panic_law Wc Wb -∗
       ⌜ UkSh.ush_fd0p l ⌝ -∗
       UkSh.ush_bstate N γp T Wc Wb Pm l ws -∗
@@ -503,7 +503,7 @@ Section UkShRedirBody.
     UCodeShK.shk_code γt -∗
     UCodeShK.shk_rodata γt -∗ UCodeShP.shp_code γt -∗ UkSh.ush_jtab γt -∗
     UkShFork.ushf_kill_law Wc -∗
-    UkShFork.ushf_child_law_at Wc Lp Dc -∗
+    UkShFork.ushf_child_law_at T Wc Lp Dc -∗
     UkShDiag.ush_panic_law Wc Wb -∗
     ⌜ UkSh.ush_fd0p l ⌝ -∗
     UkSh.ush_bstate N γp T Wc Wb Pm l ws -∗
@@ -636,7 +636,7 @@ Section UkShRedirBody.
     UCodeShK.shk_code γt -∗
     UCodeShK.shk_rodata γt -∗ UCodeShP.shp_code γt -∗ UkSh.ush_jtab γt -∗
     UkShFork.ushf_kill_law Wc -∗
-    UkShFork.ushf_child_law_at Wc ushs_lp_cat Dc -∗
+    UkShFork.ushf_child_law_at T Wc ushs_lp_cat Dc -∗
     UkShDiag.ush_panic_law Wc Wb -∗
     ⌜ UkSh.ush_fd0p l ⌝ -∗
     UkSh.ush_bstate N γp T Wc Wb Pm l (FileDisc.uline_ws (FileDisc.LCat nm)) -∗
@@ -685,7 +685,7 @@ Section UkShRedirBody.
     UCodeShK.shk_code γt -∗
     UCodeShK.shk_rodata γt -∗ UCodeShP.shp_code γt -∗ UkSh.ush_jtab γt -∗
     UkShFork.ushf_kill_law Wc -∗
-    UkShFork.ushf_child_law_at Wc ushs_lp_cat Dc -∗
+    UkShFork.ushf_child_law_at T Wc ushs_lp_cat Dc -∗
     UkShDiag.ush_panic_law Wc Wb -∗
     ⌜ UkSh.ush_fd0p l ⌝ -∗
     UkSh.ush_bstate N γp T Wc Wb Pm l (FileDisc.uline_ws (FileDisc.LCat nm)) -∗
@@ -729,7 +729,7 @@ Section UkShRedirBody.
     usz_ok (sz + 65536) ->
     (forall I : list (bv 8), ⊢ Wc I 3%nat -∗ Wc I 0%nat) ->
     UkShFork.ushf_kill_law Wc -∗
-    UkShFork.ushf_child_law_at Wc ushs_lp_cat 68 -∗
+    UkShFork.ushf_child_law_at T Wc ushs_lp_cat 68 -∗
     UkShDiag.ush_panic_law Wc Wb -∗
     UkShFork.ushf_body_law N γp T Wc Wb Pm
       (fun l : uline => exists nm : list (bv 8), l = LCat nm) sz.
@@ -757,9 +757,9 @@ Section UkShRedirBody.
     usz_ok (sz + 65536) ->
     (forall I : list (bv 8), ⊢ Wc I 3%nat -∗ Wc I 0%nat) ->
     UkShFork.ushf_kill_law Wc -∗
-    UkShFork.ushf_child_law Wc -∗
+    UkShFork.ushf_child_law T Wc -∗
     sh_redir_child_law -∗
-    UkShFork.ushf_child_law_at Wc ushs_lp_cat 68 -∗
+    UkShFork.ushf_child_law_at T Wc ushs_lp_cat 68 -∗
     UkShDiag.ush_panic_law Wc Wb -∗
     UkShFork.ushf_body_law N γp T Wc Wb Pm ush_line_file sz.
   Proof using HT HWct Hpay Hpsok_free.
@@ -813,9 +813,9 @@ Section UkShRedirBody.
     usz_ok (sz + 65536) ->
     (forall I : list (bv 8), ⊢ Wc I 3%nat -∗ Wc I 0%nat) ->
     UkShFork.ushf_kill_law Wc -∗
-    UkShFork.ushf_child_law Wc -∗
+    UkShFork.ushf_child_law T Wc -∗
     sh_redir_child_law -∗
-    UkShFork.ushf_child_law_at Wc ushs_lp_cat 68 -∗
+    UkShFork.ushf_child_law_at T Wc ushs_lp_cat 68 -∗
     UkShDiag.ush_panic_law Wc Wb -∗
     UkSh.ush_rest_l_at N γp T Wc Wb Pm ush_line_file
       (UkShLoop.ushl_R N sz).

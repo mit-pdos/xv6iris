@@ -106,7 +106,7 @@ Section UkShPipeForkTwin.
   Local Notation s5_idx := (mword_of_int 21 : mword 5).
   Local Notation s6_idx := (mword_of_int 22 : mword 5).
 
-  Local Notation ush_std := (UkSh.ush_std N).
+  Local Notation ush_std := (UkSh.ush_std N T).
   Local Notation ush_pstate := (UkSh.ush_pstate N γp T Wc Wb Pm).
   Local Notation ushl_dat := (UkShLoop.ushl_dat γd).
   Local Notation ushl_head := (UkShLoop.ushl_head N γp T Wc Wb Pm).
@@ -117,8 +117,8 @@ Section UkShPipeForkTwin.
   Local Notation ushf_wq := (UkShFork.ushf_wq Wc).
   Local Notation ushf_fans := (UkShFork.ushf_fans).
   Local Notation ushf_kill_law := (UkShFork.ushf_kill_law Wc).
-  Local Notation ushf_child_law_at := (UkShFork.ushf_child_law_at Wc).
-  Local Notation ushf_child_law := (UkShFork.ushf_child_law Wc).
+  Local Notation ushf_child_law_at := (UkShFork.ushf_child_law_at T Wc).
+  Local Notation ushf_child_law := (UkShFork.ushf_child_law T Wc).
   Local Notation ushf_body_law := (UkShFork.ushf_body_law N γp T Wc Wb Pm).
   Local Notation ushf_code_shp := (UkShFork.ushf_code_shp).
   Local Notation ushf_rodata_shp := (UkShFork.ushf_rodata_shp).
@@ -187,7 +187,7 @@ Section UkShPipeForkTwin.
        ustr (ukn_d N') DfracDiscarded ushp_whitespace 5 ushp_ws_f -∗
        ustr (ukn_d N') DfracDiscarded ushp_symbols 7 ushp_sym_f -∗
        (* ...AT THE PARENT'S OK VIEW (seccomp S4) *)
-       UkSh.ush_std N' l -∗
+       UkSh.ush_std N' T l -∗
        UserCwd.ucwd (ukn_cwd N') FsImg.ROOTINO -∗
        UserChildren.uch (ukn_ch N') ∅ -∗
        (* ...and its own pid, not <init>'s (design app-pipe SS4.3w,
@@ -214,7 +214,7 @@ Section UkShPipeForkTwin.
     ubytes γd sh_buf sh_nbuf f -∗
     urun N h m (mword_of_int 0x92c) (16 + (UkSh.ush_Dbody + n)) -∗
     mWP (Loop : expr riscv_lang).
-  Proof using Hpay Hpsok_free.
+  Proof using HT Hpay Hpsok_free.
     intros HQc Hregs Hs1 Hnn Hnul Hkl.
     iIntros "Hhead #Hcode #Hro #Hjt %Hfd0 Hustd Hcwd Hch Hpid HRc #Hkw
              Hlease Hpanic Hchild Hre Hdat Hsz Hbuf Hrun".
@@ -249,7 +249,7 @@ Section UkShPipeForkTwin.
        M3a) and closed again at the loop head: the fork MINTS the token at
        the generation that joined it, and the wait REPORTS what the reap
        left.  THE PAYLOAD AND THE LEND ARE THE CALLER'S (step 4). *)
-    iDestruct "Hustd" as (vw) "[%Hvok Hustd]".
+    iDestruct "Hustd" as (vw) "[#Hvok Hustd]".
     iApply (UkShDiag.wp_kshr_fork1_final_at N (ushf_pay f)
               sz l vw ∅ h1 m1 (74 + (UkSh.ush_Dpipe + n)) FsImg.ROOTINO ∅ Q Rc Pex HQc
               with "Hcode Hro [Hdat Hbuf] Hsz Hustd Hcwd Hch [] HRc Hkw
@@ -425,8 +425,8 @@ Section UkShPipeForkTwin.
                 with "[%] [%] [Hustd Hcwd Hch Hpid Hpos] Hdat Hsz Hbuf Hrun").
       + exact HregsD.
       + exact Hfd0.
-      + rewrite /UkSh.ush_pstate /UkSh.ush_std. iFrame "Hcwd Hch Hpid Hpos".
-        iExists vw. by iFrame "Hustd".
+      + rewrite /UkSh.ush_pstate /UkSh.ush_std /ustd_ok. iFrame "Hcwd Hch Hpid Hpos".
+        iExists vw. by iFrame "Hvok Hustd".
     - (* ================= THE CHILD: parse, run, exec =================== *)
       iIntros (N' hA mA γ') "%Hpeq' %HcsA %Ha0A Hmy HRc #Hcode' Hpay Hsz Hustd Hcwd
                              Hch Hpid' _ Hrun".
@@ -462,7 +462,7 @@ Section UkShPipeForkTwin.
         by (unfold UkShDiag.ush_Dg, UkSh.ush_Dbody, UkSh.ush_Dpipe; lia).
       iApply ("Hchild" $! N' hB mA γ' with "[%] [%] Hmy HRc Hcode' Hro' Hjt'
                 Hline Hws Hsy [Hustd] Hcwd Hch Hpid' Hfresh Hrun");
-        [ exact Hpeq' | exact Hs1_A | rewrite /UkSh.ush_std; iExists vw; by iFrame "Hustd" ].
+        [ exact Hpeq' | exact Hs1_A | rewrite /UkSh.ush_std /ustd_ok; iExists vw; by iFrame "Hvok Hustd" ].
   Qed.
 
   Lemma wp_kshf_fork_pipe

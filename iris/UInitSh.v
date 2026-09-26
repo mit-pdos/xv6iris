@@ -1164,6 +1164,9 @@ Section UInitSh.
              UkSh.ush_open_absent_leaf (PS := uprogSG_free) N T K) ∗ K)
      ∨ T) -∗
     UkSh.ush_fd0 T (take NSTD fdv) -∗
+    (* the exec'ing table's rows are closed or the console, or the taint
+       (seccomp S4) *)
+    (⌜ush_view_ok fdv⌝ ∨ T) -∗
     (∀ sts secc, image_entry_taint T sts secc
        (ucons_pay cn γp T (UkInit.init_rd (cc_rd Cr) (cc_wbn Cr))) uslot) -∗
     image_entry ElfUser.sh_elf M (mword_of_int 0x1000 : mword 64) fdv
@@ -1185,7 +1188,7 @@ Section UInitSh.
     specialize (Hrl γp). specialize (Hpm1 γp). specialize (Hpm3 γp).
     specialize (Hpmwb γp). specialize (Hwc γp).
     specialize (Hwbr γp). specialize (Hbd γp).
-    iIntros "#Hnpw #Hdep #Hdp #Hplaw #Hcons #Hfd0 #Hgen'".
+    iIntros "#Hnpw #Hdep #Hdp #Hplaw #Hcons #Hfd0 #Hvok #Hgen'".
     rewrite /image_entry. iModIntro.
     iIntros (na alen afun W')
       "%Hok %Hcwd0 %Hlzf %Hscf %Hchq %Hpiq %Hargs #Hmp
@@ -1254,7 +1257,7 @@ Section UInitSh.
                   (init_sh_room alen n0 Halen Hn0) Hlen Hlzf Hscf Hch0 Hpid1)
       as Hsk.
     iDestruct (image_entry_taint_all_elim with "Hgen'") as "#Hgen0".
-    iApply (Hsk with "[] Hnpw Hdep Hdp Htag Hplaw [] [] Hcons Hgen0 Hmp Hps
+    iApply (Hsk with "[] Hnpw Hdep Hdp Htag Hplaw [] [] Hvok Hcons Hgen0 Hmp Hps
                       Hls Hwcp").
     - (* THE KEY'S OWN READING (lane SH-STATE): [sh_pay_state]'s wand
          takes [UShKernel.sh_pay_key], and the two facts it is derived
@@ -1304,6 +1307,9 @@ Section UInitSh.
              UkSh.ush_open_absent_leaf (PS := uprogSG_free) N T K) ∗ K)
      ∨ T) -∗
     UkSh.ush_fd0 T (take NSTD fdv) -∗
+    (* the exec'ing table's rows are closed or the console, or the taint
+       (seccomp S4) *)
+    (⌜ush_view_ok fdv⌝ ∨ T) -∗
     (∀ sts secc, image_entry_taint T sts secc
        (ucons_pay cn γp T (UkInit.init_rd (cc_rd Cr) (cc_wbn Cr))) uslot) -∗
     image_entry ElfUser.sh_elf M (mword_of_int 0x1000 : mword 64) fdv
