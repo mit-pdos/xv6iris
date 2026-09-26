@@ -151,12 +151,31 @@ theorem ui_priv_cwd_acc [CurCtx] (pa : BitVec 64) (pid : BitVec 32) (V : ProcPri
       (∀ w : BitVec 64, wordPointsTo (pCwd pa) 8 (DFrac.own 1) w -∗
         procPriv pa pid { V with cwd := w } M) := by
   unfold procPriv procFields
-  iintro ⟨%hV, Hpid, ⟨Hks, Hsz, Hpg, Htf, Hctx, Hof, Hcwd, Hnm⟩, Hpt, Htfp⟩
+  iintro ⟨%hV, Hpid, ⟨Hks, Hsz, Hpg, Htf, Hctx, Hof, Hcwd, Hnm, Hsc⟩, Hpt, Htfp⟩
   iframe Hcwd
   iintro %w Hcwd
   isplitl []
   · ipureintro; exact hV
-  iframe Hpid Hks Hsz Hpg Htf Hctx Hof Hcwd Hnm Hpt Htfp
+  iframe Hpid Hks Hsz Hpg Htf Hctx Hof Hcwd Hnm Hsc Hpt Htfp
+
+/-- `p->seccomp` comes out of the private block and goes back with a new value
+(xv6 7b2c1b1b: userinit's `p->seccomp = ~0ULL`). -/
+theorem ui_priv_secc_acc [CurCtx] (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv)
+    (M : Nat → List (BitVec 8)) :
+    procPriv (GF := GF) pa pid V M ⊢
+      wordPointsTo (pSecc pa) 8 (DFrac.own 1) V.pvSecc ∗
+      (∀ w : BitVec 64, wordPointsTo (pSecc pa) 8 (DFrac.own 1) w -∗
+        procPriv pa pid { V with pvSecc := w } M) := by
+  unfold procPriv procFields
+  iintro ⟨%hV, Hpid, ⟨Hks, Hsz, Hpg, Htf, Hctx, Hof, Hcwd, Hnm, Hsc⟩, Hpt, Htfp⟩
+  iframe Hsc
+  iintro %w Hsc
+  isplitl []
+  · ipureintro; exact hV
+  iframe Hpid Hks Hsz Hpg Htf Hctx Hof Hcwd Hnm Hsc Hpt Htfp
+
+/-- The mask userinit stores: `c.li a5,-1` is `seccAll`. -/
+theorem ui_seccAll : (0xFFFFFFFFFFFFFFFF#64 : BitVec 64) = seccAll := by decide
 
 /-! ## The first process's descriptor table and block (D8 wiring)
 
@@ -187,7 +206,7 @@ theorem ui_block [X : CurCtx] (hct : curTier = KTier.kpt) (γ : FileNames) (γd 
   subst hct
   letI : CurCtx := ⟨ξ0, KTier.kpt⟩
   unfold procPriv procFields ofileCells
-  iintro ⟨⟨%hV, Hpid, ⟨Hks, Hsz, Hpg, Htf, Hctx, ⟨%hlen, Hof⟩, Hcwd, Hnm⟩, Hpt, Htfp, %hlz⟩,
+  iintro ⟨⟨%hV, Hpid, ⟨Hks, Hsz, Hpg, Htf, Hctx, ⟨%hlen, Hof⟩, Hcwd, Hnm, Hsc⟩, Hpt, Htfp, %hlz⟩,
     Hcref, Hfds, Hkeys⟩
   rw [hof]
   icases procOfiles_null_close γ γd pa $$ [Hof Hfds Hkeys] with ⟨Hofs, Hfr⟩
@@ -195,7 +214,7 @@ theorem ui_block [X : CurCtx] (hct : curTier = KTier.kpt) (γ : FileNames) (γd 
   iframe Hctx Hfr
   unfold procPrivBareAt procFieldsNoOfile cwdRefAt
   dsimp only
-  iframe Hofs Hpid Hks Hsz Hpg Htf Hcwd Hnm Hpt Htfp Hcref
+  iframe Hofs Hpid Hks Hsz Hpg Htf Hcwd Hnm Hsc Hpt Htfp Hcref
   isplitl []
   · ipureintro; exact hV
   · ipureintro; exact hlz
@@ -428,12 +447,27 @@ theorem ui_finish [X : CurCtx] (RE : RELEASE) (FP : FORKRET_PARK_PAID)
   ihave HstateW := (show wordPointsTo (GF := GF) (procAddr j + 24#64) 4 (DFrac.own 1) (3#32) ⊢
       wordPointsTo (pState (procAddr j)) 4 (DFrac.own 1) RUNNABLE
       from by unfold pState RUNNABLE; iintro H; iexact H) $$ HstateW
+  -- c.li a5,-1 ; sd a5,360(s1) : p->seccomp = ~0ULL (xv6 7b2c1b1b)
+  icases ui_priv_secc_acc (procAddr j) pid { V with cwd := kf.regs 10#5 } M $$ Hpriv with ⟨Hsc, Hback⟩
+  ihave Hsc := (show wordPointsTo (GF := GF) (pSecc (procAddr j)) 8 (DFrac.own 1) V.pvSecc ⊢
+      wordPointsTo (procAddr j + 360#64) 8 (DFrac.own 1) V.pvSecc
+      from by unfold pSecc; iintro H; iexact H) $$ Hsc
+  k_step (wp_s_addi cpu _ (KA.«userinit» + 0x2c#64) true 0xfff#12 15#5 0#5 (by decide))
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [KCtx.rget_eq, KCtx.setReg_eq_withRegs, hs1]
+  iintro Hk Hpc
+  k_step (wp_s_sd cpu _ (KA.«userinit» + 0x2e#64) false 360#12 9#5 15#5 (by decide) V.pvSecc)
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [KCtx.rget_eq, KCtx.setReg_eq_withRegs, hs1]
+  iintro Hk Hpc Hsc
+  ihave Hsc := (show wordPointsTo (GF := GF) (procAddr j + 360#64) 8 (DFrac.own 1) 0xFFFFFFFFFFFFFFFF#64 ⊢
+      wordPointsTo (pSecc (procAddr j)) 8 (DFrac.own 1) seccAll
+      from by unfold pSecc; rw [ui_seccAll]) $$ Hsc
+  ihave Hpriv := Hback $$ %seccAll Hsc
   -- ===== the ghost publish =====
   iapply wpLoop_bupd
   -- THE FIRST PROCESS'S BLOCK, AT THE BOOT MODE (ParkCap.parkBootBlock):
   -- allocproc's descriptor ghost for its null table (`V.fdg`), the root's
   -- reference as its cwd (at `ROOTINO`), and the generation rows SPLIT
-  icases ui_block rfl γ V.fdg (procAddr j) pid { V with cwd := kf.regs 10#5 } M hof
+  icases ui_block rfl γ V.fdg (procAddr j) pid { V with cwd := kf.regs 10#5, pvSecc := seccAll } M hof
     $$ [$Hpriv $Hcref $Hfds $Hkeys] with ⟨Hctxc, ⟨Hbare, Hofs, Hcwr⟩, Hfr⟩
   unfold uiParkRows userinitPark
   icases Hpk with ⟨⟨#Hwl, #Htk, #Hcons, #Hdev, #Hwire, #Htramp, Hbun, Hrd⟩, #Hpl, #Hpav, #Hft, #Hig⟩
@@ -462,7 +496,7 @@ theorem ui_finish [X : CurCtx] (RE : RELEASE) (FP : FORKRET_PARK_PAID)
   icases Hal with ⟨Hfsp, Hirs, Hbs⟩
   icases Hgen with ⟨Hfb, Hkq, #Hmp, Hgh, Hxs⟩
   ihave Hchildr : parkChild (hlc := hlc) ξ0 ⟨γft, γ, γw, Γ, j, procAddr j, pid⟩ (List.replicate 12 0#64)
-      { V with cwd := kf.regs 10#5, cwi := ROOTINO, fdg := V.fdg } M false
+      { V with cwd := kf.regs 10#5, pvSecc := seccAll, cwi := ROOTINO, fdg := V.fdg } M false
       $$ [Hctxc Hbare Hofs Hcwr Hfb Hkq Hgh Hxs Hfsp Hirs]
   · unfold parkChild parkBlock parkBootBlock UtNames.pj
     simp only [Bool.false_eq_true, ↓reduceIte]
@@ -473,7 +507,7 @@ theorem ui_finish [X : CurCtx] (RE : RELEASE) (FP : FORKRET_PARK_PAID)
   ihave #Htok := FP.park_token_intro (hlc := hlc) (GF := GF) Γ
   icases kctx_token_acc cpu _ $$ Hk with ⟨Hown, Hback⟩
   have hup := parkToken_park (hlc := hlc) (GF := GF) (SG := uexecSGXv6) cpu ξ0 ⟨γft, γ, γw, Γ, j, procAddr j, pid⟩
-    (List.replicate 12 0#64) { V with cwd := kf.regs 10#5, cwi := ROOTINO, fdg := V.fdg } M
+    (List.replicate 12 0#64) { V with cwd := kf.regs 10#5, pvSecc := seccAll, cwi := ROOTINO, fdg := V.fdg } M
     (List.replicate NOFILE FdState.closed) ∅ hj (by simp)
   dsimp only [UtNames.pj, parkOwn, utParkCaps] at hup
   ihave Hup := hup $$ Hown Htok Hrows Hused Hbs Hig Hfr Hch Hbun Hrd Hchildr

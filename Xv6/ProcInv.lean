@@ -176,10 +176,10 @@ theorem procPrivNoctx_cwd (ξ : CtxId) (pa : BitVec 64) (pid : BitVec 32) (V : P
       (∀ v' : BitVec 64, @wordPointsTo hlc GF _ ⟨ξ, KTier.kpt⟩ (pCwd pa) 8 (DFrac.own 1) v' -∗
         procPrivNoctxAt ξ pa pid { V with cwd := v' } M) := by
   unfold procPrivNoctxAt procFieldsNoctx
-  iintro ⟨%h, Hpid, ⟨Hk, Hs, Hpg, Htf, Hof, Hcwd, Hnm⟩, Hpt, Htfp, %hlz⟩
+  iintro ⟨%h, Hpid, ⟨Hk, Hs, Hpg, Htf, Hof, Hcwd, Hnm, Hsc⟩, Hpt, Htfp, %hlz⟩
   iframe Hcwd
   iintro %v' Hcwd
-  iframe Hpid Hk Hs Hpg Htf Hof Hcwd Hnm Hpt Htfp
+  iframe Hpid Hk Hs Hpg Htf Hof Hcwd Hnm Hsc Hpt Htfp
   isplitl []
   · ipureintro; exact h
   · ipureintro; exact hlz

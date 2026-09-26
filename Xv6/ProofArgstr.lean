@@ -71,7 +71,7 @@ theorem argstr_priv_tf [X : CurCtx] (ξ : CtxId) (hX : X = ⟨ξ, KTier.kpt⟩) 
   subst hX
   letI : CurCtx := ⟨ξ, KTier.kpt⟩
   unfold procPrivBareAt procFieldsNoOfile
-  iintro ⟨%hf, Hpid, ⟨Hks, Hsz, Hpg, Htf, Hcwd, Hnm⟩, Hpt, Htfp, %hlz⟩
+  iintro ⟨%hf, Hpid, ⟨Hks, Hsz, Hpg, Htf, Hcwd, Hnm, Hsc⟩, Hpt, Htfp, %hlz⟩
   have h3 : V.trapframe = pageAddr V.upt.tfp := hf.2.2.2
   ihave Htf := (show wordPointsTo (GF := GF) (pTrapframe pa) 8 (DFrac.own 1) V.trapframe ⊢
       wordPointsTo (pTrapframe pa) 8 (DFrac.own 1) (pageAddr V.upt.tfp) from by rw [h3]) $$ Htf
@@ -79,7 +79,7 @@ theorem argstr_priv_tf [X : CurCtx] (ξ : CtxId) (hX : X = ⟨ξ, KTier.kpt⟩) 
   iintro Htf Htfp
   ihave Htf := (show wordPointsTo (GF := GF) (pTrapframe pa) 8 (DFrac.own 1) (pageAddr V.upt.tfp) ⊢
       wordPointsTo (pTrapframe pa) 8 (DFrac.own 1) V.trapframe from by rw [h3]) $$ Htf
-  iframe Hpid Hks Hsz Hpg Htf Hcwd Hnm Hpt Htfp
+  iframe Hpid Hks Hsz Hpg Htf Hcwd Hnm Hsc Hpt Htfp
   isplitl []
   · ipureintro; exact hf
   · ipureintro; exact hlz

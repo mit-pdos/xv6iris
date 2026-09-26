@@ -553,12 +553,12 @@ theorem sys_pipe_core_tf (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv) (M : 
       (@wordPointsTo hlc GF _ ⟨curCtx, KTier.kpt⟩ (pTrapframe pa) 8 (DFrac.own 1) V.trapframe -∗
         @tfPageAt hlc GF _ ⟨curCtx, KTier.kpt⟩ V.upt.tfp V.tf -∗ procPrivCoreNoctxAt curCtx pa pid V M) := by
   unfold procPrivCoreNoctxAt procPrivBareAt procFieldsNoOfile
-  iintro ⟨⟨%hf, Hpid, ⟨Hks, Hsz, Hpg, Htf, Hcwd, Hnm⟩, Hpt, Htfp, %hlz⟩, Hcw⟩
+  iintro ⟨⟨%hf, Hpid, ⟨Hks, Hsz, Hpg, Htf, Hcwd, Hnm, Hsc⟩, Hpt, Htfp, %hlz⟩, Hcw⟩
   iframe Htf Htfp
   isplitl []
   · ipureintro; exact hf.2.2.2
   iintro Htf Htfp
-  iframe Hpid Hks Hsz Hpg Htf Hcwd Hnm Hpt Htfp Hcw
+  iframe Hpid Hks Hsz Hpg Htf Hcwd Hnm Hsc Hpt Htfp Hcw
   isplitl []
   · ipureintro; exact hf
   · ipureintro; exact hlz
@@ -571,8 +571,8 @@ theorem sys_pipe_core_split (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv) (M
       @wordPointsTo hlc GF _ ⟨curCtx, KTier.kpt⟩ (pPagetable pa) 8 (DFrac.own 1) V.pagetable ∗
       @procPtAt hlc GF _ ⟨curCtx, KTier.kpt⟩ V.upt M ∗ sysPipeCoreRest pa pid V := by
   unfold procPrivCoreNoctxAt procPrivBareAt procFieldsNoOfile sysPipeCoreRest ecRest
-  iintro ⟨⟨%hf, Hpid, ⟨Hks, Hsz, Hpg, Htf, Hcwd, Hnm⟩, Hpt, Htfp, %hlz⟩, Hcw⟩
-  iframe Hpid Hks Hsz Hpg Htf Hcwd Hnm Hpt Htfp Hcw
+  iintro ⟨⟨%hf, Hpid, ⟨Hks, Hsz, Hpg, Htf, Hcwd, Hnm, Hsc⟩, Hpt, Htfp, %hlz⟩, Hcw⟩
+  iframe Hpid Hks Hsz Hpg Htf Hcwd Hnm Hsc Hpt Htfp Hcw
   isplitl []
   · ipureintro; exact hf
   · ipureintro; exact hlz
@@ -588,8 +588,8 @@ theorem sys_pipe_core_ext (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv) (P' 
       procPrivCoreNoctxAt curCtx pa pid { V with upt := P' } M' := by
   unfold procPrivCoreNoctxAt procPrivBareAt sysPipeCoreRest ecRest procFieldsNoOfile
   rw [hext.1.1, hext.1.2.1]
-  iintro ⟨Hsz, Hpg, Hpt, ⟨Hpid, Hks, Htf, Hcwd, Hnm, Htfp, %hlz⟩, Hcw⟩
-  iframe Hsz Hpg Hpt Hpid Hks Htf Hcwd Hnm Htfp Hcw
+  iintro ⟨Hsz, Hpg, Hpt, ⟨Hpid, Hks, Htf, Hcwd, Hnm, Hsc, Htfp, %hlz⟩, Hcw⟩
+  iframe Hsz Hpg Hpt Hpid Hks Htf Hcwd Hnm Hsc Htfp Hcw
   isplitl []
   · ipureintro; exact ⟨hf.1, UMemL.umBelow_extSz hf.2.1 hext, hf.2.2.1, hf.2.2.2⟩
   · ipureintro; exact fun h => LazyFree.lazyFree_extSz hext (hlz h)
@@ -603,8 +603,8 @@ theorem sys_pipe_core_join (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv) (M 
     @procPtAt hlc GF _ ⟨curCtx, KTier.kpt⟩ V.upt M ∗ sysPipeCoreRest pa pid V ⊢
       procPrivCoreNoctxAt curCtx pa pid V M := by
   unfold procPrivCoreNoctxAt procPrivBareAt sysPipeCoreRest ecRest procFieldsNoOfile
-  iintro ⟨Hsz, Hpg, Hpt, ⟨Hpid, Hks, Htf, Hcwd, Hnm, Htfp, %hlz⟩, Hcw⟩
-  iframe Hsz Hpg Hpt Hpid Hks Htf Hcwd Hnm Htfp Hcw
+  iintro ⟨Hsz, Hpg, Hpt, ⟨Hpid, Hks, Htf, Hcwd, Hnm, Hsc, Htfp, %hlz⟩, Hcw⟩
+  iframe Hsz Hpg Hpt Hpid Hks Htf Hcwd Hnm Hsc Htfp Hcw
   isplitl []
   · ipureintro; exact hf
   · ipureintro; exact hlz

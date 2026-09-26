@@ -42,7 +42,7 @@ set_option linter.unusedVariables false
 def dirlookupVp : ProcPriv :=
   { kstack := 0, sz := 0, pagetable := 0, trapframe := 0, upt := { root := 0, tfp := 0, um := ∅ },
     tf := [], context := [], ofile := [], fdg := 0, cwd := 0, name := [], cwi := 0, gen := 0,
-    chg := 0, pvLazy := false }
+    chg := 0, pvLazy := false, pvSecc := 0#64 }
 
 /-- The facts fixed for the whole call (the contract's premises, and the
 record's alignment, which the prologue reads off the frame). -/

@@ -205,12 +205,12 @@ theorem prepare_return_priv_acc (htc : curTier = KTier.kpt) (γ : FileNames) (pa
   simp only at htc
   subst htc
   simp only [procPrivFd, procPrivCoreNoctxAt, procPrivBareAt, procFieldsNoOfile, pKstack, pTrapframe]
-  iintro ⟨⟨⟨%hf, Hpid, ⟨Hks, Hsz, Hpt, Htf, Hcwd, Hname⟩, Hppt, Hpage, %hlz⟩, Hc⟩, Ho⟩
+  iintro ⟨⟨⟨%hf, Hpid, ⟨Hks, Hsz, Hpt, Htf, Hcwd, Hname, Hsc⟩, Hppt, Hpage, %hlz⟩, Hc⟩, Ho⟩
   isplitl []
   · ipureintro; exact hf.2.2.2
   iframe Hks Htf Hpage
   iintro %ws' Hks Htf Hpage
-  iframe Hpid Hks Hsz Hpt Htf Hcwd Hname Hppt Hpage Hc Ho
+  iframe Hpid Hks Hsz Hpt Htf Hcwd Hname Hsc Hppt Hpage Hc Ho
   isplit
   · ipureintro; exact hf
   · ipureintro; exact hlz

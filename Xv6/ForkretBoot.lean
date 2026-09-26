@@ -151,7 +151,7 @@ theorem fkr_fsinit_call [CurCtx] (FS : FSINIT) (Γ : SchedNames) [ClaimIs (hlc :
 
 theorem fkr_fsinit_slots : fsinitSlots ≤ 416 := by decide
 
-theorem fkr_first_addr2 : KA.«forkret» + 36900#64 + 18446744073709549778#64 = firstAddr := by decide
+theorem fkr_first_addr2 : KA.«forkret» + 36900#64 + 18446744073709549826#64 = firstAddr := by decide
 theorem fkr_first_addr2' : KA.«forkret» + 35110#64 = firstAddr := by decide
 
 set_option maxHeartbeats 8000000 in

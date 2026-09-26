@@ -5,7 +5,7 @@
 
 ```
  +0xa2  00009797   auipc a5,0x9
- +0xa6  3c078793   addi  a5,a5,960         a5 = &started
+ +0xa6  3c078793   addi  a5,a5,1008        a5 = &started
  +0xaa  4705       li    a4,1
  +0xac  0310000f   fence rw,w              __sync_synchronize()
  +0xb0  c398       sw    a4,0(a5)          started = 1
@@ -35,7 +35,7 @@ set_option linter.unusedSectionVars false
 
 attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Functions.currentlyEnabled
 
-theorem mn_started_addr' : KA.«main» + 162#64 + 36864#64 + 960#64 = KA.«started» := by decide
+theorem mn_started_addr' : KA.«main» + 162#64 + 36864#64 + 1008#64 = KA.«started» := by decide
 theorem mn_j_3e : KA.«main» + 178#64 + BitVec.signExtend 64 2097036#21 = KA.«main» + 62#64 := by decide
 
 section
@@ -66,7 +66,7 @@ theorem mn_started [CurCtx] (cpu : CPU) (k : KCtx) (R0 : RegMap) (hsie : k.sie =
   ihave HAU := started_writeAUT γi ξd P $$ [$Hinv $Hprim $HPd]
   ihave HAU := (show writeAUT (GF := GF) startedPrimary startedAddr 4 startedSet iprop(emp) ⊢
     writeAUT startedPrimary startedAddr 4 1#32 iprop(emp) from .rfl) $$ HAU
-  -- +0xa2  auipc a5,0x9 ; +0xa6  addi a5,a5,960
+  -- +0xa2  auipc a5,0x9 ; +0xa6  addi a5,a5,1008
   k_step (wp_s_auipc startedPrimary _ (KA.«main» + 162#64) false 9#20 15#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc

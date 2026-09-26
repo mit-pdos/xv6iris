@@ -644,13 +644,13 @@ theorem procPrivNoctxAt_split (ξ : CtxId) (pa : BitVec 64) (pid : BitVec 32) (V
       procPrivBareAt ξ pa pid V M ∗ @ofileCells hlc GF _ ⟨ξ, KTier.kpt⟩ pa (DFrac.own 1) V.ofile := by
   unfold procPrivNoctxAt procPrivBareAt procFieldsNoctx procFieldsNoOfile
   constructor
-  · iintro ⟨%h, Hpid, ⟨Hk, Hs, Hpg, Htf, Hof, Hcwd, Hnm⟩, Hpt, Htfp, %hlz⟩
-    iframe Hpid Hk Hs Hpg Htf Hof Hcwd Hnm Hpt Htfp
+  · iintro ⟨%h, Hpid, ⟨Hk, Hs, Hpg, Htf, Hof, Hcwd, Hnm, Hsc⟩, Hpt, Htfp, %hlz⟩
+    iframe Hpid Hk Hs Hpg Htf Hof Hcwd Hnm Hsc Hpt Htfp
     isplitl []
     · ipureintro; exact h
     · ipureintro; exact hlz
-  · iintro ⟨⟨%h, Hpid, ⟨Hk, Hs, Hpg, Htf, Hcwd, Hnm⟩, Hpt, Htfp, %hlz⟩, Hof⟩
-    iframe Hpid Hk Hs Hpg Htf Hof Hcwd Hnm Hpt Htfp
+  · iintro ⟨⟨%h, Hpid, ⟨Hk, Hs, Hpg, Htf, Hcwd, Hnm, Hsc⟩, Hpt, Htfp, %hlz⟩, Hof⟩
+    iframe Hpid Hk Hs Hpg Htf Hof Hcwd Hnm Hsc Hpt Htfp
     isplitl []
     · ipureintro; exact h
     · ipureintro; exact hlz
@@ -943,14 +943,14 @@ theorem procPriv_bare_split [X : CurCtx] (h : curTier = KTier.kpt) (pa : BitVec 
   subst h
   unfold procPriv procPrivBareAt procFields procFieldsNoOfile
   constructor
-  · iintro ⟨%hf, Hpid, ⟨Hk, Hs, Hpg, Htf, Hctx, Hof, Hcwd, Hnm⟩, Hpt, Htfp, %hlz⟩
+  · iintro ⟨%hf, Hpid, ⟨Hk, Hs, Hpg, Htf, Hctx, Hof, Hcwd, Hnm, Hsc⟩, Hpt, Htfp, %hlz⟩
     iframe Hctx Hof
-    iframe Hpid Hk Hs Hpg Htf Hcwd Hnm Hpt Htfp
+    iframe Hpid Hk Hs Hpg Htf Hcwd Hnm Hsc Hpt Htfp
     isplitl []
     · ipureintro; exact hf
     · ipureintro; exact hlz
-  · iintro ⟨⟨%hf, Hpid, ⟨Hk, Hs, Hpg, Htf, Hcwd, Hnm⟩, Hpt, Htfp, %hlz⟩, Hctx, Hof⟩
-    iframe Hpid Hk Hs Hpg Htf Hctx Hof Hcwd Hnm Hpt Htfp
+  · iintro ⟨⟨%hf, Hpid, ⟨Hk, Hs, Hpg, Htf, Hcwd, Hnm, Hsc⟩, Hpt, Htfp, %hlz⟩, Hctx, Hof⟩
+    iframe Hpid Hk Hs Hpg Htf Hctx Hof Hcwd Hnm Hsc Hpt Htfp
     isplitl []
     · ipureintro; exact hf
     · ipureintro; exact hlz

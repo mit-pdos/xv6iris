@@ -390,12 +390,12 @@ theorem sys_link_block_open (hct : curTier = KTier.kpt) (A : SysLinkArgs GF) (P2
       sysLinkRows (procAddr A.j) A.pid A.V ∗ sysLinkHole A (procAddr A.j) P2 := by
   unfold sysLinkHole sysLinkRows procPrivFd procPrivCoreNoctxAt procPrivBareAt procFieldsNoOfile cwdRefAt
   rw [sysfile_cur_kpt hct]
-  iintro ⟨⟨⟨%h, Hpid, ⟨Hk, Hs, Hpg, Htf, Hcwd, Hnm⟩, Hpt, Htfp, %hlz⟩, Hc, Hg⟩, Hof⟩
+  iintro ⟨⟨⟨%h, Hpid, ⟨Hk, Hs, Hpg, Htf, Hcwd, Hnm, Hsc⟩, Hpt, Htfp, %hlz⟩, Hc, Hg⟩, Hof⟩
   iframe Hpid Hcwd Hc
   isplitr
   · ipureintro; exact hP2
   iintro ⟨Hpid, Hcwd, Hc⟩
-  iframe Hpid Hk Hs Hpg Htf Hcwd Hnm Hpt Htfp Hc Hg Hof
+  iframe Hpid Hk Hs Hpg Htf Hcwd Hnm Hsc Hpt Htfp Hc Hg Hof
   isplitl []
   · ipureintro; exact h
   · ipureintro; exact hlz

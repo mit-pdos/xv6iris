@@ -117,7 +117,7 @@ theorem gp_priv_elim (htc : curTier = KTier.kpt) (γ : FileNames) (pa : BitVec 6
   simp only at htc
   subst htc
   unfold procPrivFd procPrivCoreNoctxAt procPrivBareAt procFieldsNoOfile
-  iintro ⟨⟨⟨%h, Hpid, ⟨Hk, Hs, Hpg, Htf, Hcwd, Hnm⟩, Hpt, Htfp, %hlz⟩, Hc⟩, Ho⟩
+  iintro ⟨⟨⟨%h, Hpid, ⟨Hk, Hs, Hpg, Htf, Hcwd, Hnm, Hsc⟩, Hpt, Htfp, %hlz⟩, Hc⟩, Ho⟩
   isplitl []
   · ipureintro; exact h
   isplitl []
@@ -127,7 +127,7 @@ theorem gp_priv_elim (htc : curTier = KTier.kpt) (γ : FileNames) (pa : BitVec 6
   obtain ⟨hsz, hb, hr, ht, hl⟩ := hv
   ihave Htfp := (show @tfPageAt hlc GF _ ⟨ξ, KTier.kpt⟩ V.upt.tfp V.tf ⊢
       @tfPageAt hlc GF _ ⟨ξ, KTier.kpt⟩ P'.tfp V.tf from by rw [ht]) $$ Htfp
-  iframe Hpid Hk Hs Hpg Htf Hcwd Hnm Hpt Htfp Hc Ho
+  iframe Hpid Hk Hs Hpg Htf Hcwd Hnm Hsc Hpt Htfp Hc Ho
   isplitl []
   · ipureintro; exact ⟨hsz, hb, by rw [hr]; exact h.2.2.1, by rw [ht]; exact h.2.2.2⟩
   · ipureintro; exact hl

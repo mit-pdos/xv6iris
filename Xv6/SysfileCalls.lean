@@ -535,12 +535,12 @@ theorem sysfile_core_tf (h : curTier = KTier.kpt) (pa : BitVec 64) (pid : BitVec
   simp only at h
   subst h
   unfold procPrivCoreNoctxAt procPrivBareAt procFieldsNoOfile
-  iintro ⟨⟨%hf, Hpid, ⟨Hks, Hsz, Hpg, Htf, Hcwd, Hnm⟩, Hpt, Htfp, %hlz⟩, Hcw⟩
+  iintro ⟨⟨%hf, Hpid, ⟨Hks, Hsz, Hpg, Htf, Hcwd, Hnm, Hsc⟩, Hpt, Htfp, %hlz⟩, Hcw⟩
   iframe Htf Htfp
   isplitl []
   · ipureintro; exact hf.2.2.2
   iintro Htf Htfp
-  iframe Hpid Hks Hsz Hpg Htf Hcwd Hnm Hpt Htfp Hcw
+  iframe Hpid Hks Hsz Hpg Htf Hcwd Hnm Hsc Hpt Htfp Hcw
   isplitl []
   · ipureintro; exact hf
   · ipureintro; exact hlz

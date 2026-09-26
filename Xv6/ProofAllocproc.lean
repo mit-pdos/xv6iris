@@ -2104,9 +2104,10 @@ theorem ap_found (AC : ACQUIRE) (RE : RELEASE) (KAL : KALLOC) (MS : MEMSET)
       contextCells (procAddr n) (DFrac.own 1) V0.context ∗
       ofileCells (procAddr n) (DFrac.own 1) V0.ofile ∗
       wordPointsTo (pCwd (procAddr n)) 8 (DFrac.own 1) V0.cwd ∗
-      pnameCells (procAddr n) (DFrac.own 1) V0.name
+      pnameCells (procAddr n) (DFrac.own 1) V0.name ∗
+      wordPointsTo (pSecc (procAddr n)) 8 (DFrac.own 1) V0.pvSecc
       from by unfold procFields; iintro H; iexact H) $$ Hfields with
-    ⟨Hkstack, Hsz, Hpagetable, Htrapframe, Hcontext, Hofile, Hcwd, Hname⟩
+    ⟨Hkstack, Hsz, Hpagetable, Htrapframe, Hcontext, Hofile, Hcwd, Hname, Hsecc⟩
   -- 0x80001c1e c.mv s2,a0
   k_step (wp_s_add c _ (KA.«allocproc» + 0xa0#64) true 18#5 0#5 10#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
@@ -2140,8 +2141,8 @@ theorem ap_found (AC : ACQUIRE) (RE : RELEASE) (KAL : KALLOC) (MS : MEMSET)
         (Rk 10#5) ⊢ wordPointsTo (GF := GF) (pTrapframe (procAddr n)) 8 (DFrac.own 1) V0.trapframe
         from by rw [hr0, hV0tf]) $$ Htrapframe
     ihave Hfields : procFields (GF := GF) (procAddr n) (DFrac.own 1) V0
-      $$ [Hkstack Hsz Hpagetable Htrapframe Hcontext Hofile Hcwd Hname]
-    case _ => unfold procFields; iframe Hkstack Hsz Hpagetable Htrapframe Hcontext Hofile Hcwd Hname
+      $$ [Hkstack Hsz Hpagetable Htrapframe Hcontext Hofile Hcwd Hname Hsecc]
+    case _ => unfold procFields; iframe Hkstack Hsz Hpagetable Htrapframe Hcontext Hofile Hcwd Hname Hsecc
     -- procHeld at USED
     ihave Hheld : procHeld Γ c n USED ch $$ [Hlocked Hpstw Hstate Hchan Hkilled Hxstate HpidPub Hkp]
     case _ =>
@@ -2610,6 +2611,7 @@ theorem ap_found (AC : ACQUIRE) (RE : RELEASE) (KAL : KALLOC) (MS : MEMSET)
         have hVofl : V.ofile = V0.ofile := by rw [hVdef]
         have hVcw : V.cwd = V0.cwd := by rw [hVdef]
         have hVnm : V.name = V0.name := by rw [hVdef]
+        have hVsc : V.pvSecc = V0.pvSecc := by rw [hVdef]
         have hVroot : V.upt.root = root := by rw [hVdef]
         have hVtfp : V.upt.tfp = BitVec.extractLsb' 12 44 (Rk 10#5) := by rw [hVdef]
         have hVum : V.upt.um = ∅ := by rw [hVdef]
@@ -2618,11 +2620,11 @@ theorem ap_found (AC : ACQUIRE) (RE : RELEASE) (KAL : KALLOC) (MS : MEMSET)
         have hVlz : V.pvLazy = true := by rw [hVdef]; exact hV0lz
         -- procFields V
         ihave Hfields : procFields (GF := GF) (procAddr n) (DFrac.own 1) V
-          $$ [Hkstack Hsz Hpagetable Htrapframe Hctx Hofile Hcwd Hname]
+          $$ [Hkstack Hsz Hpagetable Htrapframe Hctx Hofile Hcwd Hname Hsecc]
         case _ =>
           unfold procFields
-          rw [hVks, hVsz, hVpt, hVtf, hVctx, hVofl, hVcw, hVnm]
-          iframe Hkstack Hsz Hpagetable Htrapframe Hctx Hofile Hcwd Hname
+          rw [hVks, hVsz, hVpt, hVtf, hVctx, hVofl, hVcw, hVnm, hVsc]
+          iframe Hkstack Hsz Hpagetable Htrapframe Hctx Hofile Hcwd Hname Hsecc
         -- procHeld at USED
         ihave Hheld : procHeld Γ c n USED ch $$ [Hlocked Hpstw Hstate Hchan Hkilled Hxstate HpidPub Hkp]
         case _ =>
@@ -2834,14 +2836,15 @@ theorem ap_found (AC : ACQUIRE) (RE : RELEASE) (KAL : KALLOC) (MS : MEMSET)
       have hV1ofl : V1.ofile = V0.ofile := by rw [hV1def]
       have hV1cw : V1.cwd = V0.cwd := by rw [hV1def]
       have hV1nm : V1.name = V0.name := by rw [hV1def]
+      have hV1sc : V1.pvSecc = V0.pvSecc := by rw [hV1def]
       have hV1tfw : V1.tf = ws := by rw [hV1def]
       -- private fields at V1
       ihave Hfields : procFields (GF := GF) (procAddr n) (DFrac.own 1) V1
-        $$ [Hkstack Hsz Hpagetable Htrapframe Hcontext Hofile Hcwd Hname]
+        $$ [Hkstack Hsz Hpagetable Htrapframe Hcontext Hofile Hcwd Hname Hsecc]
       case _ =>
         unfold procFields
-        rw [hV1ks, hV1sz, hV1pt, hV1tf, hV1ctx, hV1ofl, hV1cw, hV1nm]
-        iframe Hkstack Hsz Hpagetable Htrapframe Hcontext Hofile Hcwd Hname
+        rw [hV1ks, hV1sz, hV1pt, hV1tf, hV1ctx, hV1ofl, hV1cw, hV1nm, hV1sc]
+        iframe Hkstack Hsz Hpagetable Htrapframe Hcontext Hofile Hcwd Hname Hsecc
       -- procHeld at USED
       ihave Hheld : procHeld Γ c n USED ch $$ [Hlocked Hpstw Hstate Hchan Hkilled Hxstate HpidPub Hkp]
       case _ =>

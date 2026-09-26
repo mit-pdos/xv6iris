@@ -87,17 +87,17 @@ theorem procPriv_split (ξ : CtxId) (pa : BitVec 64) (pid : BitVec 32) (V : Proc
   letI : CurCtx := ⟨ξ, KTier.kpt⟩
   constructor
   · unfold procPriv procPrivNoctxAt procFields procFieldsNoctx
-    iintro ⟨%hV, Hpid, ⟨Hks, Hsz, Hpt, Htf, Hctx, Hof, Hcwd, Hnm⟩, Hspace, Htfp⟩
-    isplitl [Hpid Hks Hsz Hpt Htf Hof Hcwd Hnm Hspace Htfp]
+    iintro ⟨%hV, Hpid, ⟨Hks, Hsz, Hpt, Htf, Hctx, Hof, Hcwd, Hnm, Hsc⟩, Hspace, Htfp⟩
+    isplitl [Hpid Hks Hsz Hpt Htf Hof Hcwd Hnm Hsc Hspace Htfp]
     · isplitl []
       · ipureintro; exact hV
       iframe
     · iapply contextCells_to_ctxCells pa V.context $$ Hctx
   · unfold procPriv procPrivNoctxAt procFields procFieldsNoctx
-    iintro ⟨⟨%hV, Hpid, ⟨Hks, Hsz, Hpt, Htf, Hof, Hcwd, Hnm⟩, Hspace, Htfp⟩, Hcells⟩
+    iintro ⟨⟨%hV, Hpid, ⟨Hks, Hsz, Hpt, Htf, Hof, Hcwd, Hnm, Hsc⟩, Hspace, Htfp⟩, Hcells⟩
     isplitl []
     · ipureintro; exact hV
-    iframe Hpid Hks Hsz Hpt Htf Hof Hcwd Hnm Hspace Htfp
+    iframe Hpid Hks Hsz Hpt Htf Hof Hcwd Hnm Hsc Hspace Htfp
     iapply ctxCells_to_contextCells pa V.context $$ Hcells
 
 end

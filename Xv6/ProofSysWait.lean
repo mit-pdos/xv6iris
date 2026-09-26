@@ -243,10 +243,11 @@ theorem sys_wait_proof (AA : ARGADDR) (KW : KWAIT) : SYSWAIT := ⟨
        wordPointsTo (pTrapframe (procAddr j)) 8 (DFrac.own 1) V.trapframe ∗
        ofileCells (procAddr j) (DFrac.own 1) V.ofile ∗
        wordPointsTo (pCwd (procAddr j)) 8 (DFrac.own 1) V.cwd ∗
-       pnameCells (procAddr j) (DFrac.own 1) V.name) ∗
+       pnameCells (procAddr j) (DFrac.own 1) V.name ∗
+       wordPointsTo (pSecc (procAddr j)) 8 (DFrac.own 1) V.pvSecc) ∗
       procPtAt V.upt M ∗ tfPageAt V.upt.tfp V.tf ∗ ⌜V.pvLazy = false → lazyFree V.upt.um V.sz⌝
       from by unfold procPrivNoctxAt procFieldsNoctx; iintro H; iexact H) $$ Hblk
-    with ⟨%hVb, Hpid, ⟨Hks, Hsz, Hpg, Htf, Hof, Hcwd, Hnm⟩, HPt, HTf, %hlz⟩
+    with ⟨%hVb, Hpid, ⟨Hks, Hsz, Hpg, Htf, Hof, Hcwd, Hnm, Hsc⟩, HPt, HTf, %hlz⟩
   ihave Htf := (show wordPointsTo (GF := GF) (pTrapframe (procAddr j)) 8 (DFrac.own 1) V.trapframe ⊢
       wordPointsTo (pTrapframe k.proc) 8 (DFrac.own 1) (pageAddr V.upt.tfp) from by rw [hVb.2.2.2, hproc]) $$ Htf
   -- the prologue ; a1 = &p ; a0 = 0 ; jal argaddr
@@ -300,10 +301,10 @@ theorem sys_wait_proof (AA : ARGADDR) (KW : KWAIT) : SYSWAIT := ⟨
   -- the block, closed again
   ihave Htf := (show wordPointsTo (GF := GF) (pTrapframe k.proc) 8 (DFrac.own 1) (pageAddr V.upt.tfp) ⊢
       wordPointsTo (pTrapframe (procAddr j)) 8 (DFrac.own 1) V.trapframe from by rw [hVb.2.2.2, hproc]) $$ Htf
-  ihave Hblk : procPrivNoctxAt (GF := GF) curCtx (procAddr j) pid V M $$ [Hpid Hks Hsz Hpg Htf Hof Hcwd Hnm HPt HTf]
+  ihave Hblk : procPrivNoctxAt (GF := GF) curCtx (procAddr j) pid V M $$ [Hpid Hks Hsz Hpg Htf Hof Hcwd Hnm Hsc HPt HTf]
   case' _ =>
     unfold procPrivNoctxAt procFieldsNoctx
-    iframe Hpid Hks Hsz Hpg Htf Hof Hcwd Hnm HPt HTf
+    iframe Hpid Hks Hsz Hpg Htf Hof Hcwd Hnm Hsc HPt HTf
     ipureintro; exact ⟨hVb, hlz⟩
   ihave Hblk := Hback $$ %V %M [] Hblk
   · ipureintro; exact ⟨rfl, rfl, rfl, rfl, rfl⟩

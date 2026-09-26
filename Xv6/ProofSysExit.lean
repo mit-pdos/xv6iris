@@ -199,11 +199,12 @@ theorem sys_exit_proof (AI : ARGINT) (KX : KEXIT) : SYSEXIT := ⟨
        wordPointsTo (pPagetable (procAddr j)) 8 (DFrac.own 1) V.pagetable ∗
        wordPointsTo (pTrapframe (procAddr j)) 8 (DFrac.own 1) V.trapframe ∗
        wordPointsTo (pCwd (procAddr j)) 8 (DFrac.own 1) V.cwd ∗
-       pnameCells (procAddr j) (DFrac.own 1) V.name) ∗
+       pnameCells (procAddr j) (DFrac.own 1) V.name ∗
+       wordPointsTo (pSecc (procAddr j)) 8 (DFrac.own 1) V.pvSecc) ∗
       procPtAt V.upt M ∗ tfPageAt V.upt.tfp V.tf ∗ ⌜V.pvLazy = false → lazyFree V.upt.um V.sz⌝ ∗
       (cwdRefAt V.cwd V.cwi ∗ procGenAt curCtx (procAddr j) pid V.gen)
       from by unfold procPrivCoreNoctxAt procPrivBareAt procFieldsNoOfile; iintro ⟨⟨H1, H2, H3, H4, H5, H6⟩, H7⟩; iframe) $$ Hcore
-    with ⟨%hVb, Hpid, ⟨Hks, Hsz, Hpg, Htf, Hcwd, Hnm⟩, HPt, HTf, %hlz, Hcwr⟩
+    with ⟨%hVb, Hpid, ⟨Hks, Hsz, Hpg, Htf, Hcwd, Hnm, Hsc⟩, HPt, HTf, %hlz, Hcwr⟩
   ihave Htf := (show wordPointsTo (GF := GF) (pTrapframe (procAddr j)) 8 (DFrac.own 1) V.trapframe ⊢
       wordPointsTo (pTrapframe k.proc) 8 (DFrac.own 1) (pageAddr V.upt.tfp) from by rw [hVb.2.2.2, hproc]) $$ Htf
   -- the prologue ; a1 = &n ; a0 = 0 ; jal argint
@@ -247,10 +248,10 @@ theorem sys_exit_proof (AI : ARGINT) (KX : KEXIT) : SYSEXIT := ⟨
     -- the block, closed again
     ihave Htf := (show wordPointsTo (GF := GF) (pTrapframe k.proc) 8 (DFrac.own 1) (pageAddr V.upt.tfp) ⊢
         wordPointsTo (pTrapframe (procAddr j)) 8 (DFrac.own 1) V.trapframe from by rw [hVb.2.2.2, hproc]) $$ Htf
-    ihave Hblk : procPrivFd (GF := GF) γ (procAddr j) pid V M $$ [Hpid Hks Hsz Hpg Htf Hcwd Hnm HPt HTf Hcwr Hofs]
+    ihave Hblk : procPrivFd (GF := GF) γ (procAddr j) pid V M $$ [Hpid Hks Hsz Hpg Htf Hcwd Hnm Hsc HPt HTf Hcwr Hofs]
     case' _ =>
       unfold procPrivFd procPrivCoreNoctxAt procPrivBareAt procFieldsNoOfile procOfiles
-      iframe Hpid Hks Hsz Hpg Htf Hcwd Hnm HPt HTf Hcwr Hofs
+      iframe Hpid Hks Hsz Hpg Htf Hcwd Hnm Hsc HPt HTf Hcwr Hofs
       ipureintro; exact ⟨hVb, hlz⟩
     ihave Hce := (show cpuClaimExt (GF := GF) cpu k.sie k.proc ⊢ cpuClaimExt cpu k.sie (procAddr j) from by
       rw [hproc]) $$ Hce

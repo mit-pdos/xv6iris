@@ -105,6 +105,19 @@ structure ProcPriv where
   `true`.  Not a cell: nothing in `struct proc` stores it and `procFields`
   does not mention it.  LAST in the record, as in Rocq. -/
   pvLazy : Bool
+  /-- **The syscall mask** (Rocq `ProcDefs.pv_secc`, `p->seccomp`, xv6
+  7b2c1b1b): bit `n` set means syscall `n` is allowed.  A CELL, unlike
+  `cwi`/`pvLazy` (the uint64 at +360, `ProcGeom.pSecc`, owned by
+  `procFields`), and process-visible: the dispatcher's blocked arm makes a
+  call's effect depend on it, so the key carries it (`Uvis.secc`).
+  userinit stores `seccAll`, kfork copies the parent's, sys_seccomp ANDs it
+  with its argument, and nothing else writes it (exec keeps it).  LAST, as
+  in Rocq. -/
+  pvSecc : BitVec 64
+
+/-- The mask that allows everything: userinit's `p->seccomp = ~0ULL` (Rocq
+`secc_all`). -/
+def seccAll : BitVec 64 := -1#64
 
 /-- `p->name` is a C string: a NUL somewhere in its 16 bytes (Rocq `pname_wf`). -/
 def pnameWf (bs : List (BitVec 8)) : Prop := bs.length = PNAMELEN ∧ ∃ j, j < PNAMELEN ∧ bs[j]? = some 0#8
@@ -132,7 +145,8 @@ def procFields (pa : BitVec 64) (dq : DFrac) (V : ProcPriv) : IProp GF := iprop%
   contextCells pa dq V.context ∗
   ofileCells pa dq V.ofile ∗
   wordPointsTo (pCwd pa) 8 dq V.cwd ∗
-  pnameCells pa dq V.name
+  pnameCells pa dq V.name ∗
+  wordPointsTo (pSecc pa) 8 dq V.pvSecc
 
 /-- The pid cell's three fractions (Rocq): a HALF rides in the private
 block, a QUARTER is lock-protected (`procPub`), a QUARTER sits in the
@@ -283,7 +297,8 @@ def procFieldsNoKstack (pa : BitVec 64) (dq : DFrac) (V : ProcPriv) : IProp GF :
   contextCells pa dq V.context ∗
   ofileCells pa dq V.ofile ∗
   wordPointsTo (pCwd pa) 8 dq V.cwd ∗
-  pnameCells pa dq V.name
+  pnameCells pa dq V.name ∗
+  wordPointsTo (pSecc pa) 8 dq V.pvSecc
 
 /-- **The UNUSED block without its supply units** (Rocq
 `ProcInv.proc_dormant_nofd`): what `procinit` is handed for each process

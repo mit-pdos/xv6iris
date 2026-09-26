@@ -800,7 +800,7 @@ theorem kw_priv_copy (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv)
           @procPtAt hlc GF _ ⟨curCtx, KTier.kpt⟩ P' M') -∗
         procPrivNoctxAt curCtx pa pid { V with upt := P' } M') := by
   unfold procPrivNoctxAt procFieldsNoctx
-  iintro ⟨%hf, Hpid, ⟨Hks, Hszc, Hpgc, Htfc, Hof, Hcwd, Hnm⟩, Hspace, Htfp, %hlz⟩
+  iintro ⟨%hf, Hpid, ⟨Hks, Hszc, Hpgc, Htfc, Hof, Hcwd, Hnm, Hsc⟩, Hspace, Htfp, %hlz⟩
   isplitl []
   · ipureintro; exact hf
   iframe Hszc Hpgc Hspace
@@ -808,7 +808,7 @@ theorem kw_priv_copy (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv)
   have htfp : P'.tfp = V.upt.tfp := hext.1.2.1
   ihave Htfp := (show @tfPageAt hlc GF _ ⟨curCtx, KTier.kpt⟩ V.upt.tfp V.tf ⊢
       @tfPageAt hlc GF _ ⟨curCtx, KTier.kpt⟩ P'.tfp V.tf from by rw [htfp]) $$ Htfp
-  iframe Hpid Hks Hszc Hpgc Htfc Hof Hcwd Hnm Hspace Htfp
+  iframe Hpid Hks Hszc Hpgc Htfc Hof Hcwd Hnm Hsc Hspace Htfp
   isplitl []
   · ipureintro
     exact ⟨hf.1, UMemL.umBelow_extSz hf.2.1 hext, by rw [hext.1.1]; exact hf.2.2.1,

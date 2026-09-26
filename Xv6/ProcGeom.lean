@@ -68,6 +68,8 @@ def pOfile (pa : BitVec 64) (j : Nat) : BitVec 64 := pa + 208#64 + BitVec.ofNat 
 def pCwd (pa : BitVec 64) : BitVec 64 := pa + 336#64
 /-- `&p->name` (16 bytes). -/
 def pName (pa : BitVec 64) : BitVec 64 := pa + 344#64
+/-- `&p->seccomp` (the syscall mask, xv6 7b2c1b1b; Rocq `p_secc`). -/
+def pSecc (pa : BitVec 64) : BitVec 64 := pa + 360#64
 
 /-- `enum procstate`. -/
 def UNUSED : BitVec 32 := 0#32

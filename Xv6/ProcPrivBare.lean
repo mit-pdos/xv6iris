@@ -19,7 +19,8 @@ def procFieldsNoOfile (pa : BitVec 64) (dq : DFrac) (V : ProcPriv) : IProp GF :=
   wordPointsTo (pPagetable pa) 8 dq V.pagetable ∗
   wordPointsTo (pTrapframe pa) 8 dq V.trapframe ∗
   wordPointsTo (pCwd pa) 8 dq V.cwd ∗
-  pnameCells pa dq V.name
+  pnameCells pa dq V.name ∗
+  wordPointsTo (pSecc pa) 8 dq V.pvSecc
 
 /-- `procPrivNoctxAt` minus the descriptor array: Rocq `proc_priv_bare` plus
 the lazy claim -- the block's cwd-free, fd-free part.  It is what the
