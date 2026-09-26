@@ -1575,3 +1575,10 @@ import Xv6.CatPrintfLink
 import Xv6.InitPrintfLink
 import Xv6.SeccPrintfLink
 import Xv6.GrepPrintfLink
+import Xv6.UkTree
+import Xv6.UkHandler
+import Xv6.UkFreeHandler
+import Xv6.UkTreeRead
+import Xv6.UkTreeEntry
+import Xv6.ExecArgs
+import Xv6.ExecRun
