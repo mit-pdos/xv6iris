@@ -3083,6 +3083,10 @@ Section UkSh.
        ⌜ bv_signed (trunc32 (m !!! Regidx a0_idx)) = 0 ⌝ -∗
        ⌜ uint (m !!! Regidx a1_idx) = a ⌝ -∗
        ⌜ uint (m !!! Regidx a2_idx) = Z.of_nat cap ⌝ -∗
+       (* a request for at least one byte (seccomp S5b): a zero-byte read
+          on a marked ring hands back nothing to place, which is the one
+          receipt the era's refutation of the marked arm cannot read *)
+       ⌜ (0 < cap)%nat ⌝ -∗
        ⌜ (cap <= k)%nat ⌝ -∗
        (* the kernel answers the SIGNED 32-bit count, so the request the
           caller made is the request file.c read only below the sign
@@ -3170,6 +3174,7 @@ Section UkSh.
     bv_signed (trunc32 (m !!! Regidx a0_idx)) = 0 ->
     uint (m !!! Regidx a1_idx) = a ->
     uint (m !!! Regidx a2_idx) = Z.of_nat cap ->
+    (0 < cap)%nat ->
     (cap <= k)%nat ->
     (Z.of_nat cap < 2 ^ 31)%Z ->
     ush_fd0p l ->
@@ -3191,7 +3196,7 @@ Section UkSh.
        mWP (Loop : expr riscv_lang)) -∗
     mWP (Loop : expr riscv_lang).
   Proof using Hdsc_ncr Hdsc_line Hdsc_short ush_read_leaf.
-    intros Ha0 Ha1 Ha2 Hck Hc31 Hfd0.
+    intros Ha0 Ha1 Ha2 Hcp Hck Hc31 Hfd0.
     iIntros "#Hcode Hbs Hstd Hpos Hrun Hcont".
     rewrite shp_read.
     (* ---- 0xc9e  c.li a7,5 ---- *)
@@ -3227,13 +3232,14 @@ Section UkSh.
     iPoseProof (ush_read_leaf l) as "Hrl".
     rewrite /ush_read_recv_leaf.
     iApply ("Hrl" $! h1 m1 (mword_of_int 0xca0) a k cap I f avail
-              with "[%] [%] [%] [%] [%] [%] [%] [%] [] Hbs Hstd Hpos Hrun").
+              with "[%] [%] [%] [%] [%] [%] [%] [%] [%] [] Hbs Hstd Hpos Hrun").
     { unfold m1, usysno.
       rewrite (upd_eq m (Regidx a7_idx) (mword_of_int 5 : mword 64)).
       vm_compute; reflexivity. }
     { exact Ha0_1. }
     { exact Ha1_1. }
     { exact Ha2_1. }
+    { exact Hcp. }
     { exact Hck. }
     { exact Hc31. }
     { exact Hfd0. }
@@ -4472,7 +4478,7 @@ Section UkSh.
     iDestruct (ush_gets_line_split_at Dsc l I0 J f with "Hpos") as "[Hlease #Hrows]".
     iApply (wp_ksh_read h8 m7 (spz - 81) 1%nat 1%nat (I0 ++ J)
               (fun _ => bc) l nn
-              Ha0_7 Ha1_7 Ha2_7 ltac:(lia) ltac:(vm_compute; reflexivity)
+              Ha0_7 Ha1_7 Ha2_7 ltac:(lia) ltac:(lia) ltac:(vm_compute; reflexivity)
               Hfd0
               with "Hcode Hbw Hstd Hlease Hrun").
     iIntros (h9 ret d g1) "%Hd %Hg1 Hstd Hans Hbw Hrun".

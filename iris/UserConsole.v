@@ -140,13 +140,33 @@ Section UserConsole.
   (* the PROGRAM's half: a separable resource sh carries round [gets],
      frames across unrelated calls, and hands to the read that moves it *)
   Definition upos (γ : gname) (n : nat) : iProp Σ :=
-    ghost_var γ (1/2) n.
+    mono_nat_auth_own γ (1/2) n.
 
   (* ...and the half that RIDES IN THE PAYLOAD, beside the token.  It is
      what makes the payload's existential position the program's own: the
      program agrees the two and neither can move without the other. *)
   Definition upos_a (γ : gname) (n : nat) : iProp Σ :=
-    ghost_var γ (1/2) n.
+    mono_nat_auth_own γ (1/2) n.
+
+  (* THE POSITION ONLY GROWS (seccomp design 10.12, lane S5b): a persistent
+     lower bound on it.  What lets the seccomp transition read record the
+     shell's position at the wild line, so that a later read's receipt --
+     at the holder's own position -- is known to start at or past it. *)
+  Definition upos_lb (γ : gname) (n : nat) : iProp Σ :=
+    mono_nat_lb_own γ n.
+
+  Global Instance upos_lb_persistent γ n : Persistent (upos_lb γ n).
+  Proof using . rewrite /upos_lb. apply _. Qed.
+  Global Instance upos_lb_timeless γ n : Timeless (upos_lb γ n).
+  Proof using . rewrite /upos_lb. apply _. Qed.
+
+  Lemma upos_lb_get (γ : gname) (n : nat) : upos γ n -∗ upos_lb γ n.
+  Proof using . iIntros "H". iApply (mono_nat_lb_own_get with "H"). Qed.
+
+  Lemma upos_lb_le (γ : gname) (n m : nat) : upos γ n -∗ upos_lb γ m -∗ ⌜(m <= n)%nat⌝.
+  Proof using .
+    iIntros "H Hl". by iDestruct (mono_nat_lb_own_valid with "H Hl") as %[_ ?].
+  Qed.
 
   Global Instance upos_timeless γ n : Timeless (upos γ n).
   Proof using . rewrite /upos. apply _. Qed.
@@ -160,9 +180,8 @@ Section UserConsole.
   Lemma upos_alloc (n : nat) :
     ⊢ |==> ∃ γ : gname, upos γ n ∗ upos_a γ n.
   Proof using .
-    iMod (ghost_var_alloc n) as (γ) "Hg".
-    iEval (rewrite -Qp.half_half) in "Hg".
-    iDestruct (ghost_var_split with "Hg") as "[H1 H2]".
+    iMod (mono_nat_own_alloc n) as (γ) "[Hg _]".
+    iEval (rewrite -Qp.half_half) in "Hg". iDestruct "Hg" as "[H1 H2]".
     iModIntro. iExists γ. iFrame "H1 H2".
   Qed.
 
@@ -172,13 +191,20 @@ Section UserConsole.
   Lemma upos_agree (γ : gname) (n n' : nat) :
     upos γ n -∗ upos_a γ n' -∗ ⌜n = n'⌝.
   Proof using .
-    iIntros "H1 H2". by iDestruct (ghost_var_agree with "H1 H2") as %->.
+    iIntros "H1 H2". by iDestruct (mono_nat_auth_own_agree with "H1 H2") as %[_ ->].
   Qed.
 
   (* ...and BOTH halves move it, which is what a read spends *)
   Lemma upos_update (γ : gname) (n n' : nat) :
+    (n <= n')%nat ->
     upos γ n -∗ upos_a γ n ==∗ upos γ n' ∗ upos_a γ n'.
-  Proof using . iIntros "H1 H2". iApply (ghost_var_update_halves with "H1 H2"). Qed.
+  Proof using .
+    intros Hle. iIntros "H1 H2". rewrite /upos /upos_a.
+    iAssert (mono_nat_auth_own γ 1 n) with "[H1 H2]" as "H".
+    { iEval (rewrite -Qp.half_half). iSplitL "H1"; [iExact "H1" | iExact "H2"]. }
+    iMod (mono_nat_own_update n' Hle with "H") as "[H _]".
+    iEval (rewrite -Qp.half_half) in "H". iDestruct "H" as "[$ $]". done.
+  Qed.
 
   (* ---- the ring's two resources, at the narrow class ---- *)
   (* THE BOUND ON THE STORED SEQUENCE a receipt hands out

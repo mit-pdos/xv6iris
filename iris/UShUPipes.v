@@ -845,7 +845,7 @@ Section UShUPipes.
       (∃ v : era_pins, era_pin (fgn_echo gf) (S gen_id) v) -∗
       (∃ jo : option Z, file_cons_cred (fgn_cl gf) r jo) -∗
       ush_pipes_branch ug r s0 PT PD γp N.
-  Proof using Hcons Hkill Heq cifRegG0 pipeProtoG0 pnsRegG0.
+  Proof using Hcons Hkill Heq cifRegG0 pipeProtoG0 pnsRegG0 uartGhostG0.
     iIntros "#Hlk #Hslot #Hcat #Hgrep #Hpin #Hmade".
     iDestruct "Hpin" as (v) "#Hp".
     iPoseProof (ush_kill_law_u ug r s0 PT PD Hkill v with "Hp") as "#Hkl".
@@ -874,7 +874,7 @@ Section UShUPipes.
       UkSh.ush_rest_l_at (PS := uprogSG_free) (ghost_varG0 := offbox_offG)
         N γp T Wcu Wbu Pm ush_line_union
         (UInitSh.sh_Rsh (ukn_t N) (ukn_d N) (ukn_s N)).
-  Proof using Hcons Hkill Hwild Hrdw Heq HfifR cifRegG0 pipeProtoG0 pnsRegG0.
+  Proof using Hcons Hkill Hwild Hrdw Heq HfifR cifRegG0 pipeProtoG0 pnsRegG0 uartGhostG0.
     iIntros "#Hlk #Hdep #Hslot #Hcat #Hgrep #Hsecc #Hpin #Hmade".
     iDestruct "Hpin" as (v) "#Hp".
     iPoseProof (ush_kill_law_u ug r s0 PT PD Hkill v with "Hp") as "#Hkl".

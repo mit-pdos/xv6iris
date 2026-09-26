@@ -1049,7 +1049,7 @@ Section UShLine.
       + (* nobody read behind its back: the window is at its own position,
            and BOTH halves move ([upos_update]) *)
         subst cur.
-        iMod (upos_update γp n (n + dc)%nat with "Hpos Hpa") as "[Hpos Hpa]".
+        iMod (upos_update γp n (n + dc)%nat ltac:(lia) with "Hpos Hpa") as "[Hpos Hpa]".
         iModIntro. rewrite /ush_rd_ret. iLeft.
         iSplitR; [ done | ]. iFrame "Hpos Hpa".
         rewrite ucons_reader_eq. iExact "Hrd'".
@@ -1464,7 +1464,7 @@ Section UShLine.
     iAssert (lk_links L) as "#Hlk"; [ iApply Hlk | ].
     rewrite /UkSh.ush_read_recv_leaf_at.
     iIntros (h m pc a k cap I f avail)
-      "%Hn %Ha0 %Ha1 %Ha2 %Hcapk %Hcap31 %Hfd0 %Hal #Hi Hbuf Hstd Hpos Hrun
+      "%Hn %Ha0 %Ha1 %Ha2 %Hcap0 %Hcapk %Hcap31 %Hfd0 %Hal #Hi Hbuf Hstd Hpos Hrun
        Hcont".
     iDestruct "Hstd" as (vw) "[#Hvok Hstd]".
     iApply (ush_read_recv_era_at_vw R γ Wb N γp l vw h m pc a k cap I f avail
