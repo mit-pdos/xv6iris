@@ -118,8 +118,11 @@ a.txt` prints `hi`), `demo_2f_*` (two independent files),
 `cat /sh`, `cat README | cat`, `echo a.txt`, `echo hi | grep a.txt` not
 admitted).  GOTCHA: `rewrite /nlines .. in H` in a demo makes Qed
 evaluate the input cut lazily for minutes; use the `*_nlines` lemmas
-and `dec_yes`.  THE WIDENING IS COMPLETE.  Open cleanup: the dead
-UCatOut.v/UCatLend.v file-application code.
+and `dec_yes`.  THE WIDENING IS COMPLETE.  CLEANUP DONE (b23da6bd9,
+VM dc2; audits 13/13/14): UCatOut.v and UCatLend.v deleted, their four
+live lemmas (`cat_prompt_len`, `cat_cont_*_at`) moved into
+UkUnionEntries.v, notations `LEchoF_f`/`LCat_f` and the lemmas they
+alone used removed.
 
 ## Design: widening the file model from the one name `f` to a class of user files
 
