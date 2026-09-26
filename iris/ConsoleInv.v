@@ -1424,6 +1424,68 @@ Proof.
       * exact Hhi.
 Qed.
 
+(* WHAT A READ WHOSE RING WENT DIRTY STILL KNOWS (lane seccomp S2k,
+   seccomp.md 10.12).  A marked ring takes the WINDOW away -- a tokenless
+   reader popped in one of this call's sleeps, so the bytes are no longer
+   consecutive -- but not where each byte came from: every pop is at the
+   ring's cursor, the byte it takes is the stored sequence's element there,
+   and the cursor is never below the reader's own position (the ring's
+   [nrd <= cur]).  So the [j]th delivered byte sits at SOME position [p] of
+   the bound [l], at or after [lo], with its own history.  What this does
+   NOT say is that the positions increase with [j]: the cursor is monotone
+   in fact, but the ring's invariant keeps no witness of that across a
+   release, so two pops separated by a sleep cannot be compared. *)
+Definition cons_placed (l : list (list mobs * bv 8)) (lo d : nat)
+    (hs : list (list mobs)) : Prop :=
+  length hs = d
+  /\ forall j : nat, (j < d)%nat ->
+       exists (p : nat) (h : list mobs) (b : bv 8),
+         (lo <= p)%nat /\ hs !! j = Some h /\ obs_ends_in Uart0 h b
+         /\ l !! p = Some (h, b).
+
+Lemma cons_placed_0 (l : list (list mobs * bv 8)) (lo : nat) :
+  cons_placed l lo 0 [].
+Proof. split; [reflexivity | intros j Hj; exfalso; lia]. Qed.
+
+(* a clean window is placed, at its own start *)
+Lemma cons_placed_of_window (l : list (list mobs * bv 8)) (n d : nat)
+    (bs : nat -> bv 8) (hs : list (list mobs)) :
+  cons_window l n d bs hs -> cons_placed l n d hs.
+Proof.
+  intros (_ & Hhl & Hwin). split; [exact Hhl |].
+  intros j Hj. destruct (Hwin j Hj) as (h & b & Hl & Hh & He & _).
+  exists (n + j)%nat, h, b. split_and!; [lia | exact Hh | exact He | exact Hl].
+Qed.
+
+(* the bound only grows *)
+Lemma cons_placed_prefix (l l' : list (list mobs * bv 8)) (lo d : nat)
+    (hs : list (list mobs)) :
+  l `prefix_of` l' -> cons_placed l lo d hs -> cons_placed l' lo d hs.
+Proof.
+  intros Hp [Hhl Hpl]. split; [exact Hhl |].
+  intros j Hj. destruct (Hpl j Hj) as (p & h & b & Hlo & Hh & He & Hl).
+  exists p, h, b. split_and!; [exact Hlo | exact Hh | exact He |].
+  exact (prefix_lookup_Some l l' p (h, b) Hl Hp).
+Qed.
+
+(* ...and a pop at a position at or after [lo] places one more byte *)
+Lemma cons_placed_snoc (l : list (list mobs * bv 8)) (lo d p : nat)
+    (hs : list (list mobs)) (h : list mobs) (b : bv 8) :
+  cons_placed l lo d hs -> (lo <= p)%nat -> l !! p = Some (h, b) ->
+  obs_ends_in Uart0 h b ->
+  cons_placed l lo (S d) (hs ++ [h])%list.
+Proof.
+  intros [Hhl Hpl] Hlo Hl He. split.
+  { rewrite length_app Hhl. cbn [length]. lia. }
+  intros j Hj. destruct (decide (j < d)%nat) as [Hjd | Hjd].
+  - destruct (Hpl j Hjd) as (p' & h' & b' & Hlo' & Hh' & He' & Hl').
+    exists p', h', b'. split_and!; [exact Hlo' | | exact He' | exact Hl'].
+    rewrite lookup_app_l; [exact Hh' | lia].
+  - assert (j = d) as -> by lia.
+    exists p, h, b. split_and!; [exact Hlo | | exact He | exact Hl].
+    rewrite lookup_app_r; [| lia]. rewrite Hhl Nat.sub_diag. reflexivity.
+Qed.
+
 (* ===================================================================== *)
 (*  devsw[] -- THE DEVICE FUNCTION TABLE                                  *)
 (*                                                                        *)
@@ -2101,12 +2163,20 @@ Section ConsoleInv.
      either the window it was just handed begins at ITS OWN position, or
      somebody read behind its back -- and then the CREDENTIAL, read out of
      the escrow against the ring's marker, which is what sends the holder's
-     continuation generic. *)
+     continuation generic.
+     THE MARKED ARM KEEPS THE POSITION (lane seccomp S2k, seccomp.md
+     10.12).  A marked ring takes the WINDOW away, not the start the call
+     reports: consoleread answers a token holder at its own [nrd] on both
+     arms, and the receipt's marked arm says every delivered byte sits in
+     the stored sequence at or after [cur] ([cons_placed]) -- which is
+     worth something to the holder only if it can tell that [cur] is its
+     own position.  So the credential comes with [cur = nrd]. *)
   Definition cons_out (cn : cons_names) (Wd : iProp Σ) (ord : option nat)
       (cur dc : nat) : iProp Σ :=
     match ord with
     | Some nrd =>
-        cons_reader cn (cur + dc)%nat ∗ (⌜cur = nrd⌝ ∨ cons_dirty_cred Wd)
+        cons_reader cn (cur + dc)%nat
+        ∗ (⌜cur = nrd⌝ ∨ cons_dirty_cred Wd ∗ ⌜cur = nrd⌝)
     | None => emp
     end%I.
 

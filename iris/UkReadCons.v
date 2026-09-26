@@ -202,7 +202,12 @@ Section UkReadCons.
      tracks nothing returns [True] and the window is just a window
      ([SpecFileread.console_receipt]'s own note).  The RIGHT disjunct is
      the ring's credential -- a tokenless reader popped while the call
-     slept -- which is the kernel's arm and not a weakening. *)
+     slept -- which is the kernel's arm and not a weakening.  It still
+     says WHERE THE BYTES CAME FROM (lane seccomp S2k, the kernel's
+     [SpecFileread.console_receipt] relayed): a bound [sl] on the ring's
+     stored sequence, its order, and for each delivered byte a stored
+     position at or after [cur] with that byte's history -- no window, and
+     no promise that the positions increase. *)
   Definition uread_cons_ans (cnm : cons_names)
       (Rd : nat -> nat -> iProp Σ)
       (Rin : list (list mobs * bv 8) -> iProp Σ)
@@ -214,7 +219,11 @@ Section UkReadCons.
        ⌜dd = 0%nat -> (0 < cap)%nat -> dc = (dd + 1)%nat⌝ ∗
        ([∗ list] hh ∈ hs, riscv_rx_tag hh) ∗
        Rd cur dc ∗
-       (uread_cons_win cnm Rin cur dd dc g hs ∨ cons_dirty_cred app_rdcred))%I.
+       (uread_cons_win cnm Rin cur dd dc g hs
+        ∨ cons_dirty_cred app_rdcred
+          ∗ ∃ sl : list (list mobs * bv 8),
+              ucons_stored_lb cnm sl ∗ ⌜cons_chain sl⌝ ∗
+              ⌜cons_placed sl cur dd hs⌝))%I.
 
   (* =================================================================== *)
   (*  4.  THE LEAF                                                        *)
@@ -317,7 +326,8 @@ Section UkReadCons.
     { rewrite Hri. rewrite <- uint_unsigned.
       apply uint_moi. unfold Z64. lia. }
     assert (Hddcap : (dd <= cap)%nat) by lia.
-    iDestruct "Hwin" as "[(%Hwj & %Hsl & %Hch & #Hsw & Hbnd) | #Hdirty]";
+    iDestruct "Hwin"
+      as "[(%Hwj & %Hsl & %Hch & #Hsw & Hbnd) | (#Hdirty & %Hchd & %Hpld)]";
       last first.
     { (* a tokenless reader popped while the call slept: the ring's
          credential is the answer, and nothing is claimed about the
@@ -330,7 +340,10 @@ Section UkReadCons.
                  rewrite Hcnt Hdc; lia | ].
       iSplitR; [ iPureIntro; intros Hd0 Hc0; apply Hb4;
                  [ exact Hd0 | rewrite Hcnt; lia ] | ].
-      iSplitR; [ iExact "Htags" | ]. iFrame "Hrd". by iRight. }
+      iSplitR; [ iExact "Htags" | ]. iFrame "Hrd".
+      iRight. iSplitR; [ iExact "Hdirty" | ]. iExists sl.
+      iSplitR; [ rewrite ucons_stored_lb_eq; iExact "Hlb" | ].
+      iSplitR; [ by iPureIntro | by iPureIntro ]. }
     iDestruct "Hbnd" as (sl2 ws)
       "(#Hlb2 & %Hpre2 & %Hlen2 & %Hlws & %Hwsj & Hrin)".
     (* THE WINDOW, ASSEMBLED: the receipt's ORDER clause and its per-byte

@@ -2088,12 +2088,13 @@ Section ProofFileread.
                      the credential when somebody did (SpecConsoleread.v's
                      post says why the kernel cannot exclude them). *)
                   iDestruct "Hwin"
-                    as "[(%Hwincr & %Hchcr & #Hswcr & Hincr) | Hcred]";
+                    as "[(%Hwincr & %Hchcr & #Hswcr & Hincr)
+                        | (Hcred & %Hchdcr & %Hpldcr)]";
                     last first.
                   { iApply (console_receipt_of_dirty _ _ (us_M U) (m !!! Regidx Ra1)
                               n (mword_of_int r) dcr dccr curcr bscr Rd Rin
                               hscr slcr
-                              Hdb Hdcr Hb1cr (Hb4cr H0) Htagcr
+                              Hdb Hdcr Hb1cr (Hb4cr H0) Htagcr Hchdcr Hpldcr
                               with "Htagsc Hlbcr Hcred Hrd"). }
                   iApply (console_receipt_of_run _ _ (us_M U) (m !!! Regidx Ra1)
                             n (mword_of_int r) dcr dccr curcr bscr Rd Rin
