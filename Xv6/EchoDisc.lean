@@ -30,11 +30,9 @@ Deviations from Rocq:
    `u_execfail`, `u_forkfail`, `dg_exec`, `dg_fork`) are written as explicit
    `BitVec 8` lists, each with its string in the doc comment; the lengths and
    lookups Rocq gets by `vm_compute` are `rfl`/`decide`.
-2. `ins h := obs_ins Uart0 h` is `consIns`, defined directly by recursion
-   (MachCSL's `ObsTrace` has no `obsIns` yet: union_cone.md §3 lists
-   `obs_ins`/`obs_ins_app`/`obs_ins_in` as MISSING).  When it lands,
-   `consIns = obsIns .uart0` is a one-line induction; `consIns_app`/
-   `consIns_in` are Rocq's `ins_app`/`ins_in`.
+2. Rocq's `ins h := obs_ins Uart0 h` is `consIns h := obsIns .uart0 h`
+   (the name `ins` is too short to stand unprefixed); `consIns_obsIns`/
+   `consIns_app`/`consIns_in` are Rocq's `ins_obs_ins`/`ins_app`/`ins_in`.
 3. Bytes are `BitVec 8` (`bv_unsigned` is `toNat`); `l !! i` is `l[i]?`,
    `l !!! i` is `l[i]!`, `prefix_of` is `<+:`, `Forall P l` is `∀ x ∈ l,
    P x`, `Exists P l` is `∃ x ∈ l, P x`, `concat` is `flatten`.
@@ -146,21 +144,13 @@ theorem nlines_pos_of_rest_nil (I : List (BitVec 8)) (hne : I ≠ []) (hr : rest
 
 /-- The console's INPUT bytes of an observation list, in order (Rocq
 `ins h := obs_ins Uart0 h`; deviation 2). -/
-def consIns : List Obs → List (BitVec 8)
-  | [] => []
-  | .dev (.uartIn .uart0 b) :: κ => b :: consIns κ
-  | _ :: κ => consIns κ
+def consIns (h : List Obs) : List (BitVec 8) := obsIns .uart0 h
 
-theorem consIns_app (h k : List Obs) : consIns (h ++ k) = consIns h ++ consIns k := by
-  induction h with
-  | nil => rfl
-  | cons e h ih =>
-    match e with
-    | .dev (.uartIn .uart0 b) => simp [consIns, ih]
-    | .dev (.uartIn .uart1 b) => simp [consIns, ih]
-    | .dev (.uartOut _ _) => simp [consIns, ih]
-    | .powerOn => simp [consIns, ih]
-    | .powerOff => simp [consIns, ih]
+/-- Rocq `ins_obs_ins`. -/
+theorem consIns_obsIns (h : List Obs) : consIns h = obsIns .uart0 h := rfl
+
+theorem consIns_app (h k : List Obs) : consIns (h ++ k) = consIns h ++ consIns k :=
+  obsIns_app .uart0 h k
 
 theorem consIns_in (b : BitVec 8) : consIns [.dev (.uartIn .uart0 b)] = [b] := rfl
 

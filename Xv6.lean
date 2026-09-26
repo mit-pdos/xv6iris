@@ -826,6 +826,7 @@ import Xv6.FsReady
 import Xv6.PieceFam
 import Xv6.UserOff
 import Xv6.FsAbsDelta
+import Xv6.FsAbsState
 import Xv6.SysReadDefs
 import Xv6.SysWriteDefs
 import Xv6.FsAbsOpenFire
@@ -856,7 +857,9 @@ import Xv6.ProofFilestat
 import Xv6.LinkFilestat
 import Xv6.FsAbsWalk
 import Xv6.FsAbsEra
+import Xv6.FsAbsEraState
 import Xv6.FsAbsCreateFire
+import Xv6.FsAbsCreateNm
 import Xv6.SysMknodDefs
 import Xv6.FsAbsMknodFire
 import Xv6.SysUnlinkDefs
@@ -866,6 +869,8 @@ import Xv6.FsAbsLinkFire
 import Xv6.SysUnlinkBudget
 import Xv6.SysLinkBudget
 import Xv6.SysOpenDefs
+import Xv6.SysOpenPermit
+import Xv6.SysOpenKept
 import Xv6.SysOpenBits
 import Xv6.SysLinkParts
 import Xv6.SysUnlinkParts

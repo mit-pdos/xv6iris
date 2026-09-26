@@ -1,7 +1,8 @@
 /-
 THE OFFSET SHADOW: a ghost variable over `Int` whose value is a file's
 `f->off`, its two halves, and the shape the USER half takes.  A literal port
-of Rocq `OffGv.v` (139 lines).
+of Rocq `OffGv.v` (236 lines at `1900b8a43`; the OFF-LINK section
+`off_link`/`off_ret` appended by lane K5).
 
 THE GHOST.  `FdSlots.FdInode inum γo` names, beside its inum, a ghost variable
 over `Int` that tracks the file's offset.  The kernel owns ONE HALF of it,
@@ -36,7 +37,11 @@ OffboxG.offG`), so the shadow never goes through instance search for
 `GhostVarG GF Int`, whatever other `Int` ghost variables a client has.
 
 Lean mapping: Rocq `Z` → `Int`; `1/2` → `(1 : Qp).half`; `off_gv` →
-`offGv`; `off_user_inv` → `offUserInv`; `foffN` → `foffN`.
+`offGv`; `off_user_inv` → `offUserInv`; `foffN` → `foffN`; `off_link` →
+`offLink`, `off_ret` → `offRet` (lemmas camel head, snake tail).  Rocq's
+`app_taint` (`ai_kill riscvF_app_iface`, RiscvPtsto) is the machine's
+`MachFixedGS.killCred` (the `SpecKkill` reading); Rocq's `Z.of_nat off` is
+the `Nat → Int` cast.
 
 ## Class ownership (`OffboxG`)
 
@@ -164,6 +169,100 @@ theorem offUserInv_move (E : CoPset) (γo : GName) (z z' : Int) (hE : (↑foffN 
   imod Hcl
   imodintro
   iexact Hk
+
+/-! ### The coupling, or the taint (Rocq lane OFF-LINK's L3)
+
+What the file's off box holds, what the commit nodes are LENT and what they
+hand back (`offRet`): the kernel's half at the value the cell holds, or --
+once a fire has run at a HELD row with no link -- the application's taint
+and NO GHOST AT ALL, permanently (a ghost-variable half cannot be re-minted
+at an existing name).  It lives here, below `UserOff`, because `offRet` is
+stated at it.  Rocq's `app_taint` is the machine's kill credential
+`MachFixedGS.killCred` (header, Lean mapping). -/
+
+/-- Rocq `off_link`: the kernel's half at `z`, or the taint. -/
+def offLink (γo : GName) (z : Int) : IProp GF :=
+  iprop(offGv γo (1 : Qp).half z ∨ MachFixedGS.killCred (hlc := hlc) (GF := GF))
+
+instance offLink_timeless (γo : GName) (z : Int) : Timeless (offLink (hlc := hlc) (GF := GF) γo z) := by
+  unfold offLink; infer_instance
+
+/-- Rocq `off_link_of`: the coupled arm, what a fire that MOVED the ghost
+hands back. -/
+theorem offLink_of (γo : GName) (z : Int) :
+    offGv (GF := GF) γo (1 : Qp).half z ⊢ offLink (hlc := hlc) γo z := by
+  unfold offLink
+  iintro H
+  ileft
+  iexact H
+
+/-- Rocq `off_link_taint`: the disconnect, paid with the taint. -/
+theorem offLink_taint (γo : GName) (z : Int) :
+    MachFixedGS.killCred (hlc := hlc) (GF := GF) ⊢ offLink (hlc := hlc) γo z := by
+  unfold offLink
+  iintro H
+  iright
+  iexact H
+
+/-- WHAT THE COMMIT HANDS BACK (Rocq `off_ret`, lane WRITE-RELAY): the half
+comes back UNMOVED or ADVANCED BY THE COUNT `d`, either arm possibly the
+taint. -/
+def offRet (γo : GName) (off d : Nat) : IProp GF :=
+  iprop(∃ v : Int, offLink (hlc := hlc) γo v ∗ ⌜v = (off : Int) ∨ v = ((off + d : Nat) : Int)⌝)
+
+/-- Rocq `off_ret_keep`: the generic node's answer, the borrow unmoved. -/
+theorem offRet_keep (γo : GName) (off d : Nat) :
+    offGv (GF := GF) γo (1 : Qp).half (off : Int) ⊢ offRet (hlc := hlc) γo off d := by
+  unfold offRet
+  iintro H
+  iexists (off : Int)
+  isplitl [H]
+  · iapply offLink_of $$ H
+  · ipureintro; exact Or.inl rfl
+
+/-- Rocq `off_ret_of_link`: the generic node's answer at the lend itself. -/
+theorem offRet_of_link (γo : GName) (off d : Nat) :
+    offLink (hlc := hlc) (GF := GF) γo (off : Int) ⊢ offRet (hlc := hlc) γo off d := by
+  unfold offRet
+  iintro H
+  iexists (off : Int)
+  isplitl [H]
+  · iexact H
+  · ipureintro; exact Or.inl rfl
+
+/-- Rocq `off_ret_taint`: the disconnected node's answer. -/
+theorem offRet_taint (γo : GName) (off d : Nat) :
+    MachFixedGS.killCred (hlc := hlc) (GF := GF) ⊢ offRet (hlc := hlc) γo off d := by
+  unfold offRet
+  iintro H
+  iexists (off : Int)
+  isplitl [H]
+  · iapply offLink_taint $$ H
+  · ipureintro; exact Or.inl rfl
+
+/-- Rocq `off_ret_adv`: the linked node's answer, advanced by the count. -/
+theorem offRet_adv (γo : GName) (off d : Nat) :
+    offGv (GF := GF) γo (1 : Qp).half ((off + d : Nat) : Int) ⊢ offRet (hlc := hlc) γo off d := by
+  unfold offRet
+  iintro H
+  iexists ((off + d : Nat) : Int)
+  isplitl [H]
+  · iapply offLink_of $$ H
+  · ipureintro; exact Or.inr rfl
+
+/-- Rocq `off_ret_case`: THE FIRE'S CASE SPLIT -- the half back unmoved, or
+the box's arm at the advanced value. -/
+theorem offRet_case (γo : GName) (off d : Nat) :
+    offRet (hlc := hlc) (GF := GF) γo off d ⊢
+      iprop(offGv γo (1 : Qp).half (off : Int) ∨ offLink (hlc := hlc) γo ((off + d : Nat) : Int)) := by
+  unfold offRet
+  iintro ⟨%v, Hk, %hv⟩
+  rcases hv with rfl | rfl
+  · unfold offLink
+    icases Hk with (Hk | #Ht)
+    · ileft; iexact Hk
+    · iright; iright; iexact Ht
+  · iright; iexact Hk
 
 end OffUser
 

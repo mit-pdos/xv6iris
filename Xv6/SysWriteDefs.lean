@@ -44,6 +44,13 @@ Rocq's header, kept because the reasons are the content:
    `uint (add_vec_int src d)`, wrapping modulo 2^64 the same way), and the
    entry lemma takes `P.ext Pc` (the part of Rocq's `uptd_ext_sz` it reads).
 
+5. Section 1c (`wchunk_at` and its lemmas, Rocq lane WRITE-RELAY RELAY 3,
+   and SKELETON's `wchunks_one`) is Rocq main's, appended by lane K5 as
+   pure definitions; the write chain's contract that READS `wchunk_at`
+   (RELAY 3's full-node chunk length) is lane K6's.  Names `wchunkAt`,
+   `wchunkAt_pick`, `wchunkAt_pos`, `wchunkAt_le`, `wchunkAt_0`,
+   `wchunks_one`.
+
 ## Dropped/simplified vs Rocq
 
 Nothing.
@@ -90,6 +97,49 @@ theorem wchunks_covers (n : Int) (hn : 0 ≤ n) : n ≤ FW_MAX * (wchunks n : In
 theorem wchunks_nonpos (n : Int) (hn : n ≤ 0) : wchunks n = 0 := by
   unfold wchunks FW_MAX
   have : (n + 3072 - 1) / 3072 ≤ 0 := by omega
+  omega
+
+/-! ## 1c.  The chunk at one node -- RELAY 3 (Rocq lane WRITE-RELAY; appended by K5)
+
+`wchunks n` says HOW MANY instants can fire; `wchunkAt n k` says how BIG
+the one at node `k` is.  Every chunk that reaches node `k` was FULL (a short
+one breaks the loop), so the loop's running offset at node `k` is
+`FW_MAX * k` and the count it passes writei is `min (n - FW_MAX*k) FW_MAX`.
+The node needs it because `ubytesAt` is prefix-closed: the LENGTH is what
+identifies the fire's `bs` with the bytes the client asked to write. -/
+
+/-- Rocq `wchunk_at`. -/
+def wchunkAt (n : Int) (k : Nat) : Int := min (n - FW_MAX * (k : Int)) FW_MAX
+
+/-- Rocq `wchunk_at_pick`: THE LOOP'S OWN CHUNK IS THIS ONE. -/
+theorem wchunkAt_pick (n c t : Int) (k : Nat) (_ht : 0 ≤ t) (_htn : t < n)
+    (htie : t = FW_MAX * (k : Int)) (_hc0 : 0 < c) (hcm : c ≤ FW_MAX) (hcr : c ≤ n - t)
+    (hpick : c = n - t ∨ c = FW_MAX) : c = wchunkAt n k := by
+  unfold wchunkAt
+  rw [← htie]
+  rcases hpick with rfl | rfl <;> omega
+
+/-- Rocq `wchunk_at_pos`. -/
+theorem wchunkAt_pos (n : Int) (k : Nat) (h : FW_MAX * (k : Int) < n) : 0 < wchunkAt n k := by
+  unfold wchunkAt FW_MAX at *
+  omega
+
+/-- Rocq `wchunk_at_le`. -/
+theorem wchunkAt_le (n : Int) (k : Nat) : wchunkAt n k ≤ FW_MAX := by
+  unfold wchunkAt
+  omega
+
+/-- Rocq `wchunks_one`: ONE WRITE OF AT MOST `FW_MAX` BYTES IS ONE NODE. -/
+theorem wchunks_one (n : Int) (h1 : 0 < n) (h2 : n ≤ FW_MAX) : wchunks n = 1 := by
+  unfold wchunks
+  unfold FW_MAX at h2 ⊢
+  have hd : (n + 3072 - 1) / 3072 = 1 := by omega
+  rw [hd]
+  rfl
+
+/-- Rocq `wchunk_at_0`. -/
+theorem wchunkAt_0 (n : Int) (h : n ≤ FW_MAX) : wchunkAt n 0 = n := by
+  unfold wchunkAt
   omega
 
 /-! ## 1d.  Why a write leaves bytes nobody named -- the copyin's reason

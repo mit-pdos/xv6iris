@@ -14,7 +14,9 @@ PORTED:
   `om_rdwr_plain`, and the mint justification `delta_write_no_shrink`
   (`delta_trunc` itself was hoisted to `FsAbsDelta`, as in Rocq);
 * 2a `aopen_commit_at` + `aopen_commit_at_unit`;
-* 2b `atrunc_commit_at` + `atrunc_commit_at_unit`;
+* 2b `atrunc_commit_at` + `atrunc_commit_at_unit` (+ `_unit_pers`,
+  appended by lane K5; the rest of Rocq's 2b'/2b'' keyed family that does
+  not change `open_trunc_piece` is `Xv6/SysOpenPermit.lean`);
 * 2b' `open_trunc_piece` + `_true` / `_false` / `_none`;
 * 2c `namei_walk_pre_era` / `namei_walk_dead_era` (APPENDED by worktree
   W-A of wave 7b, after `FsAbsEra` and `FsAbsMknodFire` §5-6 landed);
@@ -211,6 +213,22 @@ theorem atruncCommitAt_unit [Appcfg GF] (Γ : FsViewNames GF) (E : CoPset) :
   iintro %I' %_ Ha'
   imodintro
   iframe Ha'
+
+/-- ...and at a PERSISTENT post the supplier already holds: what an
+application pays out of its taint, whose receipt is the taint again (Rocq's
+`atrunc_commit_at_unit_pers`; at any `Γ`, deviation 3). -/
+theorem atruncCommitAt_unit_pers [Appcfg GF] (Γ : FsViewNames GF) (E : CoPset) (T : IProp GF)
+    [Persistent T] :
+    ⊢ appSup (GF := GF) -∗ T -∗ atruncCommitAt Γ E (fun _ _ _ => T) := by
+  unfold atruncCommitAt
+  iintro #Hsup #HT %I %i %bs0 %nl %_ Ha
+  ihave Hstep := appStep_acc i I (deltaTrunc i (absView I)) $$ Hsup
+  imodintro
+  iframe Ha Hstep
+  iintro %I' %_ Ha'
+  imodintro
+  iframe Ha'
+  iexact HT
 
 /-! ### 2b'.  The trunc piece is owed only when the code truncates -/
 

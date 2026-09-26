@@ -13,7 +13,7 @@ FsAbsSeam/FsAbsNpar/FsAbsStart leaves).
 | §1 pure (:169-213): `dir_entries_era_ok`, `era_nlink_nz`, `abs_of_era_dir` | ported | |
 | §0 `Section FsAbsSeam` (:215-292): `inode_rd_era_nview`, `ic_loaded_nview_excl`, `ipool_alloc_nview_excl`, `apn_pin_loaded_excl` | DEFERRED | over FsAbs's `nview`/`apn_pin` (FsAbs.v §3-4, deferred in `Xv6/FsAbsWalk.lean`); grep: named only by FsAbs.v itself, no kernel consumer |
 | §1 lend (:305-325): `elend`, `elend_timeless`, `elend_frag`, `elend_intro` | ported | |
-| §2 the three laws (:327-390): `elend_agrees`, `elend_reads`, `elend_astate_q`, `elend_astate`, `elend_aents` | DEFERRED | over `lend_agrees`/`nview`/`astate` (FsAbs §3-4); grep: kernel files (SpecNamexEra, SpecNameiEra, SysOpenDefs, FsAbsMknodFire) name `elend_astate` in COMMENTS only; `elend_astate_q`/`elend_aents` are used by PinnedObs.v (user lane) |
+| §2 the three laws (:327-390): `elend_agrees`, `elend_reads` DEFERRED; `elend_astate_q`, `elend_astate`, `elend_aents` ported in `Xv6/FsAbsEraState.lean` (K5, over `Xv6/FsAbsState.lean`'s `astate`) | DEFERRED (first two) | over `lend_agrees`/`nview`/`astate` (FsAbs §3-4); grep: kernel files (SpecNamexEra, SpecNameiEra, SysOpenDefs, FsAbsMknodFire) name `elend_astate` in COMMENTS only; `elend_astate_q`/`elend_aents` are used by PinnedObs.v (user lane) |
 | §3 hops (:396-437) | ported | |
 | §4 fire (:440-525) | ported | |
 | §5 (:534-583): `apn_walk_era`, `apr_walk_era`, `apr_hops_era_pl` | DEFERRED | over FsAbs §4/§4b; grep: no users anywhere |

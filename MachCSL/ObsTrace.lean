@@ -86,6 +86,35 @@ theorem obsWire_map_dev (i : UartId) (os : List DevObs) :
     | uartOut j b => by_cases h : j = i <;> simp [obsWire, devObsOut, h, ih]
     | uartIn j b => simp [obsWire, devObsOut, ih]
 
+/-- The INPUT bytes of an observation list on port `i` (Rocq `obs_ins`), the
+wire projection's dual: the cumulative `obsIns i` over an era IS what port
+`i`'s receiver accepted. -/
+def obsIns (i : UartId) : List Obs → List (BitVec 8)
+  | [] => []
+  | .dev (.uartIn j b) :: κ => if j = i then b :: obsIns i κ else obsIns i κ
+  | .dev (.uartOut _ _) :: κ => obsIns i κ
+  | .powerOn :: κ => obsIns i κ
+  | .powerOff :: κ => obsIns i κ
+
+/-- Rocq `obs_ins_app`. -/
+theorem obsIns_app (i : UartId) (κ₁ κ₂ : List Obs) :
+    obsIns i (κ₁ ++ κ₂) = obsIns i κ₁ ++ obsIns i κ₂ := by
+  induction κ₁ with
+  | nil => rfl
+  | cons e κ ih =>
+    match e with
+    | .dev (.uartIn j b) => by_cases h : j = i <;> simp [obsIns, h, ih]
+    | .dev (.uartOut _ _) => simp [obsIns, ih]
+    | .powerOn => simp [obsIns, ih]
+    | .powerOff => simp [obsIns, ih]
+
+/-- Rocq `obs_ins_in`. -/
+theorem obsIns_in (i : UartId) (b : BitVec 8) : obsIns i [.dev (.uartIn i b)] = [b] := by
+  simp [obsIns]
+
+/-- Rocq `obs_ins_out`. -/
+theorem obsIns_out (i j : UartId) (b : BitVec 8) : obsIns i [.dev (.uartOut j b)] = [] := rfl
+
 namespace Uart
 
 /-- The receiver never touches `SOUT`. -/
@@ -531,6 +560,62 @@ theorem openSeg_io (h κ : List Obs) (hκ : ∀ e ∈ κ, isIo e = true) :
 theorem openSeg_power (h : List Obs) (e : Obs) (he : isIo e = false) : openSeg (h ++ [e]) = [] := by
   rw [openSeg_app]
   cases e <;> simp_all [isIo, segStep]
+
+/-- A history that has died stays dead (Rocq `obs_foldl_step_none`). -/
+theorem obsFoldlStep_none (h : List Obs) : h.foldl obsStep none = none := by
+  induction h with
+  | nil => rfl
+  | cons e h ih => simpa [obsStep] using ih
+
+/-- A boot-free suffix ending powered was powered all along and is all I/O
+(Rocq `obs_no_power_of_boots`). -/
+theorem obsNoPower_of_boots (h : List Obs) (st : Bool) (hb : obsBoots h = 0)
+    (hf : h.foldl obsStep (some st) = some true) : st = true ∧ ∀ e ∈ h, isIo e = true := by
+  induction h generalizing st with
+  | nil => simp at hf; exact ⟨hf, by simp⟩
+  | cons e h ih =>
+    cases e with
+    | dev o =>
+      simp only [obsBoots] at hb
+      cases st with
+      | true =>
+        simp only [List.foldl_cons, obsStep] at hf
+        obtain ⟨_, hF⟩ := ih true hb hf
+        refine ⟨rfl, ?_⟩
+        intro x hx
+        simp only [List.mem_cons] at hx
+        rcases hx with rfl | hx
+        · rfl
+        · exact hF x hx
+      | false =>
+        simp only [List.foldl_cons, obsStep, obsFoldlStep_none] at hf
+        simp at hf
+    | powerOn => simp [obsBoots] at hb
+    | powerOff =>
+      simp only [obsBoots] at hb
+      cases st with
+      | true =>
+        simp only [List.foldl_cons, obsStep] at hf
+        exact Bool.noConfusion (ih false hb hf).1
+      | false =>
+        simp only [List.foldl_cons, obsStep, obsFoldlStep_none] at hf
+        simp at hf
+
+/-- Two histories in ONE power cycle (no boot between them) have nested open
+segments (Rocq `open_seg_prefix_of_boots`). -/
+theorem openSeg_prefix_of_boots (h1 h2 : List Obs) (hp : h1 <+: h2)
+    (hb : obsBoots h1 = obsBoots h2) (hsh : traceShape h2 true) : openSeg h1 <+: openSeg h2 := by
+  obtain ⟨k, rfl⟩ := hp
+  have hk : obsBoots k = 0 := by rw [obsBoots_app] at hb; omega
+  unfold traceShape at hsh
+  rw [List.foldl_append] at hsh
+  cases hst : h1.foldl obsStep (some false) with
+  | none => rw [hst, obsFoldlStep_none] at hsh; simp at hsh
+  | some st =>
+    rw [hst] at hsh
+    obtain ⟨_, hF⟩ := obsNoPower_of_boots k st hk hsh
+    rw [openSeg_io h1 k hF]
+    exact List.prefix_append _ _
 
 /-! ## 3. THE STEP INVARIANT -/
 

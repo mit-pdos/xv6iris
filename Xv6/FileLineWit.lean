@@ -56,7 +56,7 @@ theorem consumed_ins_last (k : Nat) (E : List (List Obs × BitVec 8)) (h : List 
     simp only [segOf, List.getElem?_map] at hx
     obtain ⟨y, hy, rfl⟩ := Option.map_eq_some_iff.1 hx
     have hjlt : j < E.length := (List.getElem?_eq_some_iff.1 hy).1
-    refine openSeg_prefix_boots y.1 h ?_ ?_ hsh
+    refine openSeg_prefix_of_boots y.1 h ?_ ?_ hsh
     · exact histChain_prefix E j (E.length - 1) y (h, b) hch (by omega) hy hlast
     · rw [hb y (List.mem_of_getElem? hy)]
       exact (hb (h, b) (List.mem_of_getElem? hlast)).symm

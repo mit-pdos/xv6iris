@@ -15,7 +15,7 @@ decision D15), not dropped:
 
 | Rocq FsAbs.v | what | why deferred |
 |---|---|---|
-| §3 :175-383 | the carrier `nview_dq`/`nview`/`astate_q`/`astate` and their laws | consumed only by `*_pinned` lemmas, sys_mknod's "stable" add-on, FsAbsEra §0/§2's `elend_agrees`/`elend_astate*` and §5 -- none has a kernel consumer in 7b (grep: `elend_astate*` is named in Rocq kernel files only in comments) |
+| §3 :175-383 | the carrier `nview_dq`/`nview`/`astate_q`/`astate` and their laws (§3a `astate_q`/`astate` + intro/elim: ported in `Xv6/FsAbsState.lean`, K5) | consumed only by `*_pinned` lemmas, sys_mknod's "stable" add-on, FsAbsEra §0/§2's `elend_agrees`/`elend_astate*` and §5 -- none has a kernel consumer in 7b (grep: `elend_astate*` is named in Rocq kernel files only in comments) |
 | §4 rest :417-720 | `lend_agrees`, `lend_reads`, `alend`, the pinned package `apn_*` | same; `lend_agrees` is named in `ProofNamexEra.v` only in a comment (:53) |
 | §4b :721-909 | the pin-returning package `apr_*` (was FsAbsPins) | same |
 | §5 :929-1000 | `ftop_*` (the ftopN readings of `astate`) | same; the user lane (wave 8) |

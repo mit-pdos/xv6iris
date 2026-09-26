@@ -16,7 +16,8 @@ the union cone is the vocabulary the console claim reads:
   order (`echoed_order`, via `filterStrictOrder`) and F3(a),
   `readWindow_prefix`: the consumed inputs are an initial segment of the
   echoed ones;
-* the open-segment facts `openSeg_ends_in` and `openSeg_prefix_boots`.
+* the open-segment fact `openSeg_ends_in` (Rocq's `open_seg_prefix_boots` is
+  MachCSL's `openSeg_prefix_of_boots`, deviation 4).
 
 Name map (Rocq → Lean): `lines_bytes` → `linesBytes`, `lines_bytes_nlines`
 → `linesBytes_nlines`, `lines_bytes_rest` → `linesBytes_rest`, `E_index` →
@@ -26,11 +27,10 @@ Name map (Rocq → Lean): `lines_bytes` → `linesBytes`, `lines_bytes_nlines`
 `filter_strict_order` → `filterStrictOrder`, `hist_ext_nil_of_ends` →
 `histExt_nil_of_ends`, `no_echoed_between` → `noEchoed_between`,
 `read_window_prefix` → `readWindow_prefix`, `open_seg_ends_in` →
-`openSeg_ends_in`, `open_seg_prefix_boots` → `openSeg_prefix_boots`,
+`openSeg_ends_in`,
 `ins_prefix_of` → `consIns_prefix_of`; the `epu_` helpers keep the prefix
 (`epuElem_of_rev_head`, `epuApp_snoc`, `epuApp_cons_ne`, `epuFmap_prefix`,
-`epuFilter_cons_T/F`, `epuRemovelast_snoc`, `epuFoldl_obsStep_none`,
-`epuNo_power_of_boots`).
+`epuFilter_cons_T/F`, `epuRemovelast_snoc`).
 
 Deviations from Rocq:
 1. Spelling: `bv 8` is `BitVec 8`; `!!` is `[·]?`; `prefix_of` is `<+:`;
@@ -42,11 +42,13 @@ Deviations from Rocq:
    `Bool` predicate; `echoed` filters by `decide (logEchoed e)`
    (ConsLog's `logEchoed_dec`), and `filterStrictOrder`/`epuFilter_cons_*`
    take `p : A → Bool`.
-3. `epu_foldl_obs_step_none` / `epu_no_power_of_boots` are Rocq's own local
-   helpers here (MachCSL's `ObsTrace` has neither), ported as such.
+3. `epu_foldl_obs_step_none` / `epu_no_power_of_boots` are Rocq's local
+   copies of ObsTrace's `obs_foldl_step_none` / `obs_no_power_of_boots`;
+   they are not ported here -- MachCSL's `obsFoldlStep_none` /
+   `obsNoPower_of_boots` are used instead (Rocq gunk: duplicate lemmas).
 4. `open_seg_prefix_boots` duplicates Rocq ObsTrace's
-   `open_seg_prefix_of_boots` (union_cone.md §3 lists that one MISSING in
-   Lean); Rocq keeps both, so does this port -- this file's copy only.
+   `open_seg_prefix_of_boots` (same statement); this port keeps ONE copy,
+   MachCSL's `openSeg_prefix_of_boots`, and every user reads that one.
 5. The pure `EchoOut.v` definitions `seg_of` (+`_snd/_app/_length`),
    `ch_arm_E`, `ch_E` and `lines_bytes_nil` are NOT here: the U0-C lane
    already landed them in `Xv6/EchoOut.lean` (`segOf*`, `chArmE`) and
@@ -314,57 +316,6 @@ theorem readWindow_prefix (pops : List LogEntry) (dl ws : List (List Obs × BitV
 
 theorem epuRemovelast_snoc {A : Type} (l : List A) (a : A) : (l ++ [a]).dropLast = l := by
   simp
-
-theorem epuFoldl_obsStep_none (h : List Obs) : h.foldl obsStep none = none := by
-  induction h with
-  | nil => rfl
-  | cons e h ih => simpa [obsStep] using ih
-
-theorem epuNo_power_of_boots (h : List Obs) (st : Bool) (hb : obsBoots h = 0)
-    (hf : h.foldl obsStep (some st) = some true) : st = true ∧ ∀ e ∈ h, isIo e = true := by
-  induction h generalizing st with
-  | nil => simp at hf; exact ⟨hf, by simp⟩
-  | cons e h ih =>
-    cases e with
-    | dev o =>
-      simp only [obsBoots] at hb
-      cases st with
-      | true =>
-        simp only [List.foldl_cons, obsStep] at hf
-        obtain ⟨_, hF⟩ := ih true hb hf
-        refine ⟨rfl, ?_⟩
-        intro x hx
-        simp only [List.mem_cons] at hx
-        rcases hx with rfl | hx
-        · rfl
-        · exact hF x hx
-      | false =>
-        simp only [List.foldl_cons, obsStep, epuFoldl_obsStep_none] at hf
-        simp at hf
-    | powerOn => simp [obsBoots] at hb
-    | powerOff =>
-      simp only [obsBoots] at hb
-      cases st with
-      | true =>
-        simp only [List.foldl_cons, obsStep] at hf
-        exact Bool.noConfusion (ih false hb hf).1
-      | false =>
-        simp only [List.foldl_cons, obsStep, epuFoldl_obsStep_none] at hf
-        simp at hf
-
-theorem openSeg_prefix_boots (h1 h2 : List Obs) (hp : h1 <+: h2) (hb : obsBoots h1 = obsBoots h2)
-    (hsh : traceShape h2 true) : openSeg h1 <+: openSeg h2 := by
-  obtain ⟨k, rfl⟩ := hp
-  have hk : obsBoots k = 0 := by rw [obsBoots_app] at hb; omega
-  unfold traceShape at hsh
-  rw [List.foldl_append] at hsh
-  cases hst : h1.foldl obsStep (some false) with
-  | none => rw [hst, epuFoldl_obsStep_none] at hsh; simp at hsh
-  | some st =>
-    rw [hst] at hsh
-    obtain ⟨_, hF⟩ := epuNo_power_of_boots k st hk hsh
-    rw [openSeg_io h1 k hF]
-    exact List.prefix_append _ _
 
 theorem consIns_prefix_of (s1 s2 : List Obs) (h : s1 <+: s2) : consIns s1 <+: consIns s2 :=
   consIns_prefix s1 s2 h

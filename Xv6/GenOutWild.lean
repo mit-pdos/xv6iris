@@ -18,9 +18,8 @@ section's `(M)` and later `(sd : lm_st M)` are Lean section variables;
 Rocq.
 
 Deviations from Rocq:
-1. Rocq's ObsTrace `open_seg_prefix_of_boots` is not in Lean's
-   `MachCSL/ObsTrace.lean` yet (union_cone.md §3 lists it MISSING); the same
-   statement is `EchoOutPure.openSeg_prefix_boots`, used here.
+1. Rocq's ObsTrace `open_seg_prefix_of_boots` is MachCSL's
+   `openSeg_prefix_of_boots`, used here as in Rocq.
 2. `cons_chain` is `consChain` (`Xv6/ConsoleTags.lean`); `ch_E`/`seg_of`
    as in `GenOutHist.lean`; `list_basics.last` is `getLast?`;
    `obs_ends_in Uart0` is `obsEndsIn .uart0`; spelling as in
@@ -299,7 +298,7 @@ theorem lmRd_last_hist (k : Nat) (pops : List LogEntry) (D : List (List Obs × B
         exact List.prefix_refl _
       · have hp := (histChain_lt D j (D.length - 1) hj' cj h0 c0 hch (by omega) hj hlk).1
         have hbj := (hof (hj', cj) (List.mem_of_getElem? hj)).1
-        exact openSeg_prefix_boots hj' h0 hp (by rw [hbj, hb0]) hs0
+        exact openSeg_prefix_of_boots hj' h0 hp (by rw [hbj, hb0]) hs0
   have hlen : (consIns (openSeg h0)).length = D.length := by
     have hx : (segOf D)[D.length - 1]? = some (openSeg h0, c0) := by
       rw [segOf, List.getElem?_map, hlk]; rfl
@@ -341,7 +340,7 @@ theorem lmStored_wild_undisc (sl : List (List Obs × BitVec 8)) (n0 p : Nat) (h0
       | false => simp [obsStep] at hsh
   have hbg : obsBoots g = obsBoots h0 := by
     rw [obsBoots_app] at hbt; simp [obsBoots] at hbt; omega
-  have hseg := openSeg_prefix_boots h0 g hg0 hbg.symm hshg
+  have hseg := openSeg_prefix_of_boots h0 g hg0 hbg.symm hshg
   have hins : consIns (openSeg (g ++ [.dev (.uartIn .uart0 b)])) = consIns (openSeg g) ++ [b] := by
     rw [openSeg_io g _ (by simp [isIo]), consIns_app]; rfl
   have hIg : I0 <+: consIns (openSeg g) := hI0.trans (consIns_prefix _ _ hseg)
