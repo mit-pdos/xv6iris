@@ -8,18 +8,21 @@ Rocq `UserCsr.v` (`exec_doCSR_U`/`goodmb_doCSR_U`,
 `exec_execute_CSRReg_total_U`/`goodmb_…`, `exec_execute_CSRImm_total_U`/
 `goodmb_…`).
 
-**The outcome at xv6's configuration.**  With `scounteren = 0` every
-counter (`cycle`/`time`/`instret`/`hpmcounter3..31`, the only CSRs whose
-privilege bits admit User and whose extension is live) is refused by
-`counter_enabled` (`feature_enabled_for_priv User` needs the `scounteren` bit
-once `S` is enabled); `fflags`/`frm`/`fcsr` are refused by `FS = Off`, the
-vector CSRs by `Zve32x` being off, `ssp` by `menvcfg.SSE = 0`, `seed` is not a
-defined CSR, and every other number fails the privilege or the read-only gate.
-So EVERY CSR instruction at User is `Illegal_Instruction`, the state and the
-oracle unchanged (`uxr_execute_CSRReg`, `uxr_execute_CSRImm`) -- Rocq's
-`u_csr_readable` retiring branch is empty at these pins (Rocq keeps the
-counter enables symbolic, so it proves the disjunction; the Lean facts are
-the exact outcome).
+**The outcome at xv6's configuration: Illegal, or a retiring counter read**
+(Rocq `exec_doCSR_U`'s disjunction).  The counter enables `mcounteren`/
+`scounteren` are GENERIC (as in Rocq: `start()` leaves `mcounteren` at
+`garbage | TM`, nothing writes `scounteren`).  A READ of a counter
+(`cycle`/`time`/`instret`/`hpmcounter3..31`, Rocq `u_csr_readable`, the only
+CSRs whose privilege bits admit User and whose extension is live) whose two
+enable bits are set RETIRES, writing the counter into `rd`
+(`UExecCsrCnt.uxr_doCSR_ok`); every other access is refused --
+`fflags`/`frm`/`fcsr` by `FS = Off`, the vector CSRs by `Zve32x` being off,
+`ssp` by `menvcfg.SSE = 0`, `seed` is not a defined CSR, a counter write by
+the read-only gate, a disabled counter by `counter_enabled`, and every other
+number by the privilege or the read-only gate -- `Illegal_Instruction`, the
+state and the oracle unchanged.  The facts (`uxr_execute_CSRReg`,
+`uxr_execute_CSRImm`) are `UxrDone`: one of the two, exactly (the verdict of
+the check is `uxrRes`).
 
 **Stated up to discarded reads.**  The model's check chain runs every
 operand of Sail's short-circuit `&` (the Lean backend hoists `(← …)`); the
@@ -37,9 +40,11 @@ model patch (the missing `currentlyEnabled Ext_Zkr` clause).
 
 **How.**  The short-circuit check chain (`uxrResultSc c User acc`) is
 read-only: it is walked by `DecodeBridge.runRead` at the table `uxrPin` and
-lifted by `uxr_runRW_of_pin`.  The csr number is split into three classes:
+lifted by `uxr_runRW_of_pin`.  The csr number is split into four classes:
 the default class (`UExecCsrDflt`, one symbolic split of each dispatcher),
-the 341 named numbers (`UExecCsrTab`, closed kernel walks), and the three
+the 64 counter-class numbers (`UExecCsrCnt`, composed: the enables are
+symbolic data, their bits split), the named numbers (`UExecCsrTab`, closed
+kernel walks at a table that does not pin the enables), and the three
 `FS`-gated numbers (composition, `FS = 0` rewriting the symbolic gate).
 -/
 import MachCSL.UExecCsrTab
@@ -102,9 +107,15 @@ theorem uxr_ccr_fs (hD : UxrFoot D) (hc : UxrCfg s) (orc : UOrc) (c : BitVec 12)
   rcases h with rfl | rfl | rfl <;> kernel_rfl
 
 /-- **The short-circuit check at User** (Rocq `exec_check_CSR_result_U`):
-every number walks to `CSR_Illegal`, state and oracle unchanged. -/
+every number walks to its verdict `uxrRes` (`CSR_Check_OK` exactly for an
+enabled counter read, `CSR_Illegal` otherwise), state and oracle unchanged. -/
 theorem uxr_ccrSc (hD : UxrFoot D) (hc : UxrCfg s) (orc : UOrc) (c : BitVec 12) (acc : CSRAccessType) :
-    runRW D orc s (uxrResultSc c Privilege.User acc) = some (CSRCheckResult.CSR_Illegal (), s, orc) := by
+    runRW D orc s (uxrResultSc c Privilege.User acc) = some (uxrRes s.file c acc, s, orc) := by
+  by_cases hl : uxrCntB c = true
+  · rw [uxrCntLo_of c hl]; exact uxr_resultSc_lo hD hc orc _ acc
+  by_cases hh : uxrCntHB c = true
+  · rw [uxrCntHi_of c hh]; exact uxr_resultSc_hi hD hc orc _ acc
+  rw [uxrRes_other s.file c acc (by simpa using hl)]
   by_cases hd : uxrDflt c = true
   · exact uxr_runRW_of_pin hD hc orc _ _ _ (uxr_ccr_dflt s.file c acc hd)
   by_cases he : uxrExc c.toNat = true
@@ -114,30 +125,32 @@ theorem uxr_ccrSc (hD : UxrFoot D) (hc : UxrCfg s) (orc : UOrc) (c : BitVec 12) 
     · exact Or.inl (BitVec.eq_of_toNat_eq (by simpa using h))
     · exact Or.inr (Or.inl (BitVec.eq_of_toNat_eq (by simpa using h)))
     · exact Or.inr (Or.inr (BitVec.eq_of_toNat_eq (by simpa using h)))
-  · obtain ⟨b, hb⟩ := uxr_ccr_spec s.file c acc (by simpa using hd) (by simpa using he)
+  · obtain ⟨b, hb⟩ := uxr_ccr_spec s.file c acc (by simpa using hd) (by simpa using he) (by simpa using hl)
+      (by simpa using hh)
     exact uxr_runRW_of_pin hD hc orc _ _ _ hb
 
 /-- **The model's check at User, up to discarded reads**: every number but
-`0x747`/`0x757` walks to `CSR_Illegal`, state and oracle unchanged. -/
+`0x747`/`0x757` walks to its verdict `uxrRes`, state and oracle unchanged. -/
 theorem uxr_ccr (hD : UxrFoot D) (hc : UxrCfg s) (c : BitVec 12)
     (hz : c ≠ 0x747#12 ∧ c ≠ 0x757#12) (acc : CSRAccessType) :
     URunSc D s (check_CSR_result c Privilege.User acc)
-      (fun orc => some (CSRCheckResult.CSR_Illegal (), s, orc)) :=
+      (fun orc => some (uxrRes s.file c acc, s, orc)) :=
   URunSc.of_stut (uxr_resultSc_stut c _ acc hz.1 hz.2) fun orc => uxr_ccrSc hD hc orc c acc
 
 /-! ## `doCSR` and the two families -/
 
-/-- A register read, as a walk. -/
-theorem uxr_readReg (orc : UOrc) (r : Register) (h : D.Dr r = true) :
-    runRW D orc s (readReg r) = some (s.file r, s, orc) :=
-  runRW_regRead_dr D orc s r _ h
+/-- **The outcome of a CSR instruction at User** (Rocq `exec_doCSR_U`'s
+disjunction): `Illegal_Instruction` with nothing changed, or `Retire_Success`
+with `rd` written (a counter read). -/
+def UxrDone (s : UWSt) (rd : regidx) (res : UOrc → Option (ExecutionResult × UWSt × UOrc)) : Prop :=
+  (∀ orc, res orc = some (ExecutionResult.Illegal_Instruction (), s, orc)) ∨
+    ∃ w : BitVec 64, ∀ orc, res orc = some (RETIRE_SUCCESS, uxaWr s (uxaIdx rd) w, orc)
 
-/-- **`doCSR` at User** (Rocq `exec_doCSR_U`): `Illegal_Instruction`, nothing
-written, whatever the operand, destination, operation and access type (up to
-discarded reads). -/
-theorem uxr_doCSR (hD : UxrFoot D) (hc : UxrCfg s) (c : BitVec 12)
-    (hz : c ≠ 0x747#12 ∧ c ≠ 0x757#12) (v : BitVec 64) (rd : regidx) (op : csrop)
-    (acc : CSRAccessType) :
+/-- A refused check: `doCSR` is `Illegal_Instruction`, nothing written. -/
+theorem uxr_doCSR_ill (hD : UxrFoot D) (hc : UxrCfg s) (c : BitVec 12) (v : BitVec 64) (rd : regidx)
+    (op : csrop) (acc : CSRAccessType)
+    (h : URunSc D s (check_CSR_result c Privilege.User acc)
+      (fun orc => some (CSRCheckResult.CSR_Illegal (), s, orc))) :
     URunSc D s (doCSR c v rd op acc) (fun orc => some (ExecutionResult.Illegal_Instruction (), s, orc)) := by
   unfold doCSR
   refine URunSc.bind (x := Privilege.User) (s' := s) (g := fun o => o)
@@ -146,30 +159,62 @@ theorem uxr_doCSR (hD : UxrFoot D) (hc : UxrCfg s) (c : BitVec 12)
   · rw [uxr_readReg orc .cur_privilege (hD _ (by decide)), hc.priv]
   · exact URunSc.bind (x := CSRCheckResult.CSR_Illegal ()) (s' := s) (g := fun o => o)
       (res := fun orc => some (ExecutionResult.Illegal_Instruction (), s, orc))
-      (uxr_ccr hD hc c hz acc) (URunSc.of_runRW fun _ => rfl)
+      h (URunSc.of_runRW fun _ => rfl)
+
+/-- **`doCSR` at User** (Rocq `exec_doCSR_U`): `Illegal_Instruction` with
+nothing written, or -- an enabled counter read -- `Retire_Success` with the
+counter in `rd`, whatever the operand, destination, operation and access
+type (up to discarded reads). -/
+theorem uxr_doCSR (hA : UxaFoot D) (hD : UxrFoot D) (hc : UxrCfg s) (c : BitVec 12)
+    (hz : c ≠ 0x747#12 ∧ c ≠ 0x757#12) (v : BitVec 64) (rd : regidx) (op : csrop)
+    (acc : CSRAccessType) :
+    ∃ res, URunSc D s (doCSR c v rd op acc) res ∧ UxrDone s rd res := by
+  have hccr := uxr_ccr hD hc c hz acc
+  by_cases hl : uxrCntB c = true
+  · obtain ⟨i, rfl⟩ : ∃ i, c = uxrCntLo i := ⟨_, uxrCntLo_of c hl⟩
+    rw [uxrRes_lo] at hccr
+    have hW : (CSRAccessType.CSRWrite == CSRAccessType.CSRRead) = false := rfl
+    have hRW : (CSRAccessType.CSRReadWrite == CSRAccessType.CSRRead) = false := rfl
+    have hR : (CSRAccessType.CSRRead == CSRAccessType.CSRRead) = true := rfl
+    cases acc with
+    | CSRWrite =>
+      simp only [hW, Bool.false_and, Bool.false_eq_true, ↓reduceIte] at hccr
+      exact ⟨_, uxr_doCSR_ill hD hc _ v rd op _ hccr, Or.inl fun _ => rfl⟩
+    | CSRReadWrite =>
+      simp only [hRW, Bool.false_and, Bool.false_eq_true, ↓reduceIte] at hccr
+      exact ⟨_, uxr_doCSR_ill hD hc _ v rd op _ hccr, Or.inl fun _ => rfl⟩
+    | CSRRead =>
+      simp only [hR, Bool.true_and] at hccr
+      cases hce : uxrCen s.file i.toNat
+      · simp only [hce, Bool.false_eq_true, ↓reduceIte] at hccr
+        exact ⟨_, uxr_doCSR_ill hD hc _ v rd op _ hccr, Or.inl fun _ => rfl⟩
+      · simp only [hce, ↓reduceIte] at hccr
+        cases rd with
+        | Regidx j => exact ⟨_, uxr_doCSR_ok hD hA hc i j v op hccr, Or.inr ⟨_, fun _ => rfl⟩⟩
+  · rw [uxrRes_other s.file c acc (by simpa using hl)] at hccr
+    exact ⟨_, uxr_doCSR_ill hD hc c v rd op acc hccr, Or.inl fun _ => rfl⟩
 
 /-- **`CSRImm` at User** (Rocq `exec_execute_CSRImm_total_U` +
 `goodmb_execute_CSRImm_total_U`), up to discarded reads. -/
-theorem uxr_execute_CSRImm (hD : UxrFoot D) (hc : UxrCfg s) (csr : BitVec 12)
+theorem uxr_execute_CSRImm (hA : UxaFoot D) (hD : UxrFoot D) (hc : UxrCfg s) (csr : BitVec 12)
     (hz : csr ≠ 0x747#12 ∧ csr ≠ 0x757#12) (imm : BitVec 5) (rd : regidx) (op : csrop) :
-    URunSc D s (execute (.CSRImm (csr, imm, rd, op)))
-      (fun orc => some (ExecutionResult.Illegal_Instruction (), s, orc)) :=
-  uxr_doCSR hD hc csr hz _ rd op _
+    ∃ res, URunSc D s (execute (.CSRImm (csr, imm, rd, op))) res ∧ UxrDone s rd res :=
+  uxr_doCSR hA hD hc csr hz _ rd op _
 
 /-- **`CSRReg` at User** (Rocq `exec_execute_CSRReg_total_U` +
 `goodmb_execute_CSRReg_total_U`), up to discarded reads: the source GPR is
 read (lane U1-X1's `uxa_rX`), then `doCSR`. -/
 theorem uxr_execute_CSRReg (hA : UxaFoot D) (hD : UxrFoot D) (hc : UxrCfg s)
     (csr : BitVec 12) (hz : csr ≠ 0x747#12 ∧ csr ≠ 0x757#12) (rs1 rd : regidx) (op : csrop) :
-    URunSc D s (execute (.CSRReg (csr, rs1, rd, op)))
-      (fun orc => some (ExecutionResult.Illegal_Instruction (), s, orc)) := by
+    ∃ res, URunSc D s (execute (.CSRReg (csr, rs1, rd, op))) res ∧ UxrDone s rd res := by
   cases rs1 with
   | Regidx i =>
-    show URunSc D s (execute_CSRReg csr (regidx.Regidx i) rd op) _
+    show ∃ res, URunSc D s (execute_CSRReg csr (regidx.Regidx i) rd op) res ∧ _
     unfold execute_CSRReg
-    exact URunSc.bind (x := uxaXget s.file i) (s' := s) (g := fun o => o)
-      (res := fun orc => some (ExecutionResult.Illegal_Instruction (), s, orc))
-      (URunSc.of_runRW fun orc => uxa_rX hA orc s i) (uxr_doCSR hD hc csr hz _ rd op _)
+    obtain ⟨res, h, hd⟩ := uxr_doCSR hA hD hc csr hz (uxaXget s.file i) rd op
+      (csr_access_type op (rd == zreg) (regidx.Regidx i == zreg))
+    exact ⟨_, URunSc.bind (x := uxaXget s.file i) (s' := s) (g := fun o => o) (res := res)
+      (URunSc.of_runRW fun orc => uxa_rX hA orc s i) h, hd⟩
 
 end
 

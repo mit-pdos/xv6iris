@@ -16,12 +16,16 @@ read-only and total).  The registers the short-circuit chain reads
 (measured: dropping any one makes some csr's walk fail) are `uxrReads`:
 
 * `cur_privilege` (User, the user frame);
-* `misa`, `senvcfg`, `scounteren`, `mstateen0`, `sstateen0` (FROZEN: the
-  `hwConfig` cells, at their `hwVal` values);
-* `menvcfg` (`menvcfgS`) and `mcounteren` (`2`, i.e. `TM` only), the kernel's
-  user-time values;
+* `misa`, `senvcfg`, `mstateen0`, `sstateen0` (FROZEN: the `hwConfig` cells,
+  at their `hwVal` values);
+* `menvcfg` (`menvcfgS`), the kernel's user-time value;
 * `mstatus` (only through the F / vector gates of `fflags`/`frm`/`fcsr` and the
-  vector CSRs, where it is SYMBOLIC: the user frame's `mstatus`, with `FS = 0`).
+  vector CSRs, where it is SYMBOLIC: the user frame's `mstatus`, with `FS = 0`);
+* `mcounteren`, `scounteren` (the counter enables, SYMBOLIC: Rocq keeps them
+  generic, `counter_caps`; `start()` leaves `mcounteren` at `garbage | TM` and
+  nothing writes `scounteren`), read only by the counter class
+  (`UExecCsrCnt`), and the counters a retiring read returns (`mcycle`,
+  `mtime`, `minstret`, `mhpmcounter`).
 
 The eager chain also read `mstateen1..3`/`sstateen1..3` (the stateen check of
 `sstateen1..3`/`hstateen1..3`, whose outcome the privilege gate discards) --
@@ -54,20 +58,19 @@ open LeanRV64D LeanRV64D.Functions
 (besides the source GPR of `CSRReg`). -/
 def uxrReads : List Register :=
   [.cur_privilege, .misa, .mstatus, .menvcfg, .senvcfg, .mcounteren, .scounteren,
-   .mstateen0, .sstateen0]
+   .mstateen0, .sstateen0, .mcycle, .mtime, .minstret, .mhpmcounter]
 
 /-- The values the check chain runs at: User privilege, the frozen cells at
-their `hwVal` values, `menvcfg`/`mcounteren` at the kernel's user-time values;
-the DATA cell `mstatus` (read, never branched on except `FS`) at the file
-`f`'s value. -/
+their `hwVal` values, `menvcfg` at the kernel's user-time value; the DATA
+cell `mstatus` (read, never branched on except `FS`) at the file `f`'s value.
+The counter enables are NOT in the table: a walk that succeeds at it never
+reads them (the counter class, which does, is `UExecCsrCnt`'s). -/
 def uxrPin (f : RegFile) : RegPin
   | .cur_privilege => some Privilege.User
   | .mstatus => some (f .mstatus)
   | .menvcfg => some menvcfgS
-  | .mcounteren => some 2#32
   | .misa => hwVal .misa
   | .senvcfg => hwVal .senvcfg
-  | .scounteren => hwVal .scounteren
   | .mstateen0 => hwVal .mstateen0
   | .sstateen0 => hwVal .sstateen0
   | _ => none
@@ -81,16 +84,14 @@ theorem uxrPin_dom (f : RegFile) (r : Register) (v : RegisterType r) (h : uxrPin
 def UxrFoot (D : UFoot) : Prop := ∀ r ∈ uxrReads, D.Dr r = true
 
 /-- **The configuration premise of every CSR fact**: the file holds the
-table's closed values (User, `misa`/`senvcfg`/`scounteren`/`mstateen0`/
-`sstateen0` at `hwVal`, `menvcfg = menvcfgS`, `mcounteren = 2`), and `mstatus`
-has `FS = 0` (Off). -/
+table's closed values (User, `misa`/`senvcfg`/`mstateen0`/`sstateen0` at
+`hwVal`, `menvcfg = menvcfgS`), and `mstatus` has `FS = 0` (Off).  Nothing
+about `mcounteren`/`scounteren` (Rocq `exec_check_CSR_U`'s premises). -/
 structure UxrCfg (s : UWSt) : Prop where
   priv : s.file .cur_privilege = Privilege.User
   misa : s.file .misa = 0x800000000014112D#64
   menvcfg : s.file .menvcfg = menvcfgS
   senvcfg : s.file .senvcfg = 0#64
-  mcounteren : s.file .mcounteren = 2#32
-  scounteren : s.file .scounteren = 0#32
   mstateen0 : s.file .mstateen0 = 0#64
   sstateen0 : s.file .sstateen0 = 0#32
   fs : _get_Mstatus_FS (s.file .mstatus) = 0#2
@@ -99,8 +100,7 @@ structure UxrCfg (s : UWSt) : Prop where
 theorem UxrCfg.val {s : UWSt} (hc : UxrCfg s) (r : Register) (v : RegisterType r)
     (h : uxrPin s.file r = some v) : s.file r = v := by
   cases r <;> simp only [uxrPin, hwVal, reduceCtorEq, Option.some.injEq] at h <;> subst h
-  all_goals simp only [hc.priv, hc.misa, hc.menvcfg, hc.senvcfg, hc.mcounteren, hc.scounteren,
-    hc.mstateen0, hc.sstateen0]
+  all_goals simp only [hc.priv, hc.misa, hc.menvcfg, hc.senvcfg, hc.mstateen0, hc.sstateen0]
 
 /-! ## The read-only bridge -/
 

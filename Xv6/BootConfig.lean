@@ -173,7 +173,7 @@ variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF]
 their power-on garbage (`medeleg`, `mepc`, `satp`, `stimecmp`), which `mBoot`
 takes at the file's own values (`MachCSL.BootGarb`) -- and the frozen ones are
 persisted into `MachCSL.hwConfig` (the counter cells `mcountinhibit`,
-`minstretcfg`, `mcyclecfg`, `mhpmcounter` at the file's own values, which the
+`minstretcfg`, `mcyclecfg`, `mhpmcounter`, `scounteren` at the file's own values, which the
 boot program leaves arbitrary: `MachCSL.HwCounters`). -/
 theorem mBoot_of_cells (cpu : CPU) (f : RegFile) (hres : resetRegs cpu f) :
     ([∗list] r ∈ bootConfRegs, regPointsTo (GF := GF) cpu r (DFrac.own 1) (f r)) ⊢
@@ -194,15 +194,14 @@ theorem mBoot_of_cells (cpu : CPU) (f : RegFile) (hres : resetRegs cpu f) :
   have h4 := hres .htif_tohost_base _ rfl
   have h5 := hres .elp _ rfl
   have h6 := hres .senvcfg _ rfl
-  have h7 := hres .scounteren _ rfl
   have h11 := hres .mstateen0 _ rfl
   have h12 := hres .sstateen0 _ rfl
   simp only [bootConfRegs, hwRegs, List.cons_append, List.nil_append, Iris.Algebra.BigOpL.bigOpL_cons,
     Iris.Algebra.BigOpL.bigOpL_nil, e1, e2, e3, e4, e5, e9, e10, e11, e13, e14,
-    h1, h2, h3, h4, h5, h6, h7, h11, h12]
+    h1, h2, h3, h4, h5, h6, h11, h12]
   iintro ⟨H1, H2, H3, H4, H5, H6, H7, H8, H9, H10, H11, H12, H13, H14,
     M1, M2, M3, M4, M5, M6, M7, M8, M9, M10, M11, M12, M13, -⟩
-  imod hwConfig_intro cpu ⟨f .mcountinhibit, f .minstretcfg, f .mcyclecfg, f .mhpmcounter⟩
+  imod hwConfig_intro cpu ⟨f .mcountinhibit, f .minstretcfg, f .mcyclecfg, f .mhpmcounter, f .scounteren⟩
     $$ [M1 M2 M3 M4 M5 M6 M7 M8 M9 M10 M11 M12 M13] with #Hhw
   · iframe
   imodintro

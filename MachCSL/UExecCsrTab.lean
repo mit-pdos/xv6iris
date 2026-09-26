@@ -1,12 +1,14 @@
 /-
-MachCSL: the CSR family at User privilege, part 3 -- the 339 numbers OUTSIDE
-the default class, and the check at User for every number (lane U1-X3; Rocq
-`UserCsr.v` §3b–§3f).
+MachCSL: the CSR family at User privilege, part 4 -- the numbers OUTSIDE the
+default class and the counter class, and the check at User for every number
+(lane U1-X3; Rocq `UserCsr.v` §3b–§3f).
 
 * `uxr_tab_*` (one kernel evaluation per access type over the 4096 numbers,
-  the default ones skipped, at a SYMBOLIC file `f`): the SHORT-CIRCUIT check
-  chain at User (`uxrResultSc`) answers `CSR_Illegal` for every non-default
-  number except the three of `uxrExc`.
+  the default ones and the 64 counter-class ones (`UExecCsrCnt`) skipped, at a
+  SYMBOLIC file `f`): the SHORT-CIRCUIT check chain at User (`uxrResultSc`)
+  answers `CSR_Illegal` for every other number except the three of `uxrExc`.
+  The table does not pin the counter enables, so these walks provably never
+  read them.
 * `0x001`–`0x003` (`fflags`/`frm`/`fcsr`): the F gate reads `mstatus.FS`,
   symbolic; `uxr_ccr_fs` composes the check (`false` under `FS = 0`, Rocq
   `exec_currentlyEnabled_F_off`) with the closed rest.
@@ -25,7 +27,7 @@ the default class, and the check at User for every number (lane U1-X3; Rocq
 `uxr_ccr_spec`: for every non-default number outside `uxrExc` (`0x747`/`0x757`
 included), `uxrResultSc c User acc` walks, at the table, to `CSR_Illegal`.
 -/
-import MachCSL.UExecCsrDflt
+import MachCSL.UExecCsrCnt
 
 namespace MachCSL
 
@@ -47,7 +49,8 @@ def uxrIll (f : RegFile) (acc : CSRAccessType) (n : Nat) : Bool :=
 
 /-- The table's check of one number. -/
 def uxrChk (f : RegFile) (acc : CSRAccessType) (n : Nat) : Bool :=
-  uxrDflt (BitVec.ofNat 12 n) || uxrExc n || uxrIll f acc n
+  uxrDflt (BitVec.ofNat 12 n) || uxrExc n || uxrCntB (BitVec.ofNat 12 n) || uxrCntHB (BitVec.ofNat 12 n) ||
+    uxrIll f acc n
 
 /-- The table over a quarter of the numbers (`[1024 q, 1024 q + 1024)`). -/
 def uxrQuarter (f : RegFile) (acc : CSRAccessType) (q : Nat) : Bool :=
@@ -92,15 +95,16 @@ theorem uxr_tab (f : RegFile) (acc : CSRAccessType) (n : Nat) (hn : n < 4096) :
   have := hq (n / 1024) (h4 _ (by omega)) (n % 1024) (Nat.mod_lt _ (by decide))
   rwa [Nat.mod_add_div] at this
 
-/-- A non-default number outside `uxrExc`: the short-circuit check at the
-table is `CSR_Illegal`. -/
+/-- A non-default, non-counter number outside `uxrExc`: the short-circuit
+check at the table is `CSR_Illegal`. -/
 theorem uxr_ccr_spec (f : RegFile) (c : BitVec 12) (acc : CSRAccessType)
-    (hd : uxrDflt c = false) (he : uxrExc c.toNat = false) :
+    (hd : uxrDflt c = false) (he : uxrExc c.toNat = false) (hl : uxrCntB c = false)
+    (hh : uxrCntHB c = false) :
     ∃ b, runRead (uxrPin f) (uxrResultSc c Privilege.User acc) =
       some (CSRCheckResult.CSR_Illegal (), b) := by
   have ht : uxrIll f acc c.toNat = true := by
     have := uxr_tab f acc c.toNat c.isLt
-    simpa [uxrChk, he, hd] using this
+    simpa [uxrChk, he, hd, hl, hh] using this
   unfold uxrIll at ht
   rw [BitVec.ofNat_toNat, BitVec.setWidth_eq] at ht
   split at ht

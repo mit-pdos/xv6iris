@@ -114,14 +114,13 @@ theorem ucl_land_uxc {s s' : UWSt} {res : ExecutionResult} (h : UstLand C P t0 m
 theorem ucl_uxcCfg {s : UWSt} (h : UstLand C P t0 mm0 s) : UxcCfg s :=
   uf_drefU C P s.file h.cfg h.priv
 
-/-- U1-X3's configuration premise (User, the frozen cells, `FS = Off`). -/
+/-- U1-X3's configuration premise (User, the frozen cells, `FS = Off`; nothing
+about the counter enables, which the CSR facts take at any value). -/
 theorem ucl_uxrCfg {s : UWSt} (h : UstLand C P t0 mm0 s) : UxrCfg s where
   priv := h.priv
   misa := h.cfg.hw .misa _ rfl
   menvcfg := h.cfg.menvcfg
   senvcfg := h.cfg.hw .senvcfg _ rfl
-  mcounteren := h.cfg.mcounteren
-  scounteren := h.cfg.hw .scounteren _ rfl
   mstateen0 := h.cfg.hw .mstateen0 _ rfl
   sstateen0 := h.cfg.hw .sstateen0 _ rfl
   fs := by

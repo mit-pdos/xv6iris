@@ -14,7 +14,10 @@ facts state `execute` up to discarded reads (`URunSc`), for every number but
 * `ustExecOkSc_of`: every `UstExecOk` fact is a `UstExecOkSc` fact (a plain
   walk is a walk up to discards), so every non-CSR row carries over;
 * `ucl_rowSc_csrReg`/`ucl_rowSc_csrImm`: the CSR rows from U1-X3's
-  `uxr_execute_CSRReg/Imm` (`URunSc.bind` through the redirect);
+  `uxr_execute_CSRReg/Imm` (`URunSc.bind` through the redirect): each is
+  `Illegal_Instruction` with nothing changed, or -- an enabled counter read
+  (Rocq `u_csr_readable`: the counter enables are generic) -- `Retire_Success`
+  with `rd` written, which lands by `ucl_land_wr` (`ucl_rowSc_done`);
 * `ucl_execTotalSc (hZkr : UclCsrZkr C P) (hM : UclMemArms C P) :
   UstExecTotalSc C P`.
 -/
@@ -56,19 +59,45 @@ theorem ucl_rowSc_illegal {s : UWSt} (hL : UstLand C P t0 mm0 s) (len : Int) (i 
      h (URunSc.of_runRW fun _ => rfl),
    fun _ => ⟨_, _, _, rfl, ucl_resOk_illegal (ucl_land_npc hL len)⟩⟩
 
+/-- A retiring `execute`, up to discards, that writes one GPR is an
+admissible row. -/
+theorem ucl_rowSc_retire {s : UWSt} (hL : UstLand C P t0 mm0 s) (len : Int) (i : instruction)
+    (j : BitVec 5) (w : BitVec 64)
+    (h : URunSc ufFoot (ucNpcS s len) (execute i)
+      (fun orc => some (RETIRE_SUCCESS, uxaWr (ucNpcS s len) j w, orc))) :
+    UstExecOkSc C P t0 mm0 s i len :=
+  ⟨fun orc => some (RETIRE_SUCCESS, uxaWr (ucNpcS s len) j w, orc),
+   URunSc.bind (g := fun o => o) (res := fun orc => some (RETIRE_SUCCESS, uxaWr (ucNpcS s len) j w, orc))
+     h (URunSc.of_runRW fun _ => rfl),
+   fun _ => ⟨_, _, _, rfl, ucl_resOk_retire (ucl_land_wr (ucl_land_npc hL len) j w)⟩⟩
+
+/-- **A CSR outcome is an admissible row** (U1-X3's `UxrDone`: illegal, or a
+retiring counter read into `rd`). -/
+theorem ucl_rowSc_done {s : UWSt} (hL : UstLand C P t0 mm0 s) (len : Int) (i : instruction) (rd : regidx)
+    (h : ∃ res, URunSc ufFoot (ucNpcS s len) (execute i) res ∧ UxrDone (ucNpcS s len) rd res) :
+    UstExecOkSc C P t0 mm0 s i len := by
+  obtain ⟨res, hr, hd⟩ := h
+  rcases hd with hd | ⟨w, hd⟩
+  · have e : res = fun orc => some (ExecutionResult.Illegal_Instruction (), ucNpcS s len, orc) := funext hd
+    subst e
+    exact ucl_rowSc_illegal hL len i hr
+  · have e : res = fun orc => some (RETIRE_SUCCESS, uxaWr (ucNpcS s len) (uxaIdx rd) w, orc) := funext hd
+    subst e
+    exact ucl_rowSc_retire hL len i _ w hr
+
 /-- **The CSRReg row, up to discards** (U1-X3's `uxr_execute_CSRReg`). -/
 theorem ucl_rowSc_csrReg {s : UWSt} (hL : UstLand C P t0 mm0 s) (len : Int) (csr : BitVec 12)
     (hz : csr ≠ 0x747#12 ∧ csr ≠ 0x757#12) (rs1 rd : regidx) (op : csrop) :
     UstExecOkSc C P t0 mm0 s (.CSRReg (csr, rs1, rd, op)) len :=
-  ucl_rowSc_illegal hL len _
+  ucl_rowSc_done hL len _ rd
     (uxr_execute_CSRReg ufFoot_uxa ufFoot_uxr (ucl_uxrCfg (ucl_land_npc hL len)) csr hz rs1 rd op)
 
 /-- **The CSRImm row, up to discards** (U1-X3's `uxr_execute_CSRImm`). -/
 theorem ucl_rowSc_csrImm {s : UWSt} (hL : UstLand C P t0 mm0 s) (len : Int) (csr : BitVec 12)
     (hz : csr ≠ 0x747#12 ∧ csr ≠ 0x757#12) (imm : BitVec 5) (rd : regidx) (op : csrop) :
     UstExecOkSc C P t0 mm0 s (.CSRImm (csr, imm, rd, op)) len :=
-  ucl_rowSc_illegal hL len _
-    (uxr_execute_CSRImm ufFoot_uxr (ucl_uxrCfg (ucl_land_npc hL len)) csr hz imm rd op)
+  ucl_rowSc_done hL len _ rd
+    (uxr_execute_CSRImm ufFoot_uxa ufFoot_uxr (ucl_uxrCfg (ucl_land_npc hL len)) csr hz imm rd op)
 
 /-- **The CSR row, up to discards** (every number; `mseccfg`/`mseccfgh` from
 `hZkr`). -/
