@@ -466,9 +466,11 @@ steps the claim only at `EvOut` (`out_link`, the write chain) and
 with the validity facts `cons_link` supplies:
 
     ai_wild_lic : forall k, ai_wild k ⊢ □ ∀ h H ev, ⌜wild_ev ev⌝ -∗
-        ⌜cons_hist_ok H⌝ -∗ ⌜cons_ev_ok H ev⌝ -∗ ai_cons k h H ==∗ ai_cons k h (cons_step H ev)
+        ⌜cons_ev_ok H ev⌝ -∗ ai_cons k h H ==∗ ai_cons k h (cons_step H ev)
     wild_ev (EvOut _) := True;  wild_ev (EvRead _) := True;  wild_ev _ := False
 
+(no `cons_hist_ok H`: the write link `out_link` does not carry it, and
+the third arm needs only `read_ok` at `EvRead` and nothing at `EvOut`),
 and S0's `cons_licence_at k` is the same statement; `out_link_of_licence`
 and `cons_read_pay_triv` get their `_at k` twins, `cons_run_of_licence`
 does not (nobody needs it at era k).
