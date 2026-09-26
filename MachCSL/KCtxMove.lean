@@ -93,8 +93,8 @@ instance instCtxMorphCpuOwn [KernelGeom] (tier : KTier) (cpu : CPU) (lent sie : 
 instance instCtxMorphKptKeys (tier : KTier) (t : PTree) (fl : Nat → Nat → Nat) :
     CtxMorph (GF := GF) (fun ξ => @kptKeys hlc GF _ ⟨ξ, tier⟩ t fl) :=
   ctxMorph_bigSepL (t.entries 2)
-    (fun i (_ : BitVec 64 × BitVec 64) ξ => iprop([∗list] j ∈ List.range 8, keyAt era ξ (fl i j)))
-    (fun i _ => ctxMorph_bigSepL (List.range 8) (fun _ j ξ => keyAt era ξ (fl i j))
+    (fun i (_ : BitVec 64 × BitVec 64) ξ => iprop([∗list] j ∈ List.range 8, keyAt (GF := GF) era ξ (fl i j)))
+    (fun i _ => ctxMorph_bigSepL (List.range 8) (fun _ j ξ => keyAt (GF := GF) era ξ (fl i j))
       (fun _ _ => instCtxMorphKeyAt _))
 
 /-- The installed kernel table (persistent, but its keys are the context's). -/

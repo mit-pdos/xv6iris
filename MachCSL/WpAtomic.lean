@@ -37,10 +37,10 @@ variable {hlc : HasLC} {GF : BundledGFunctors}
 /-! ## Histories of a byte window -/
 
 section fixed
-variable [MachFixedGS hlc GF] (E : EraGS GF)
+variable [MachFixedGS hlc GF] (E : EraGS)
 
 theorem hartViews_dropResv (σ : MState) (cpu c : CPU) :
-    hartViewsAt E (σ.dropResv cpu) c = hartViewsAt E σ c := by
+    hartViewsAt (GF := GF) E (σ.dropResv cpu) c = hartViewsAt E σ c := by
   unfold hartViewsAt
   rfl
 
@@ -157,7 +157,7 @@ theorem memModel_read_excl (σ : MState) (cpu : CPU) (pa : PAddr) (n : Nat) (w :
         exact h3 c r hr
 
 theorem hartViews_store_excl (σ : MState) (cpu : CPU) (pa : PAddr) (n : Nat) (w : BitVec (8 * n))
-    (c : CPU) (hc : c ≠ cpu) : hartViewsAt E (σ.store cpu pa n w true) c = hartViewsAt E σ c := by
+    (c : CPU) (hc : c ≠ cpu) : hartViewsAt (GF := GF) E (σ.store cpu pa n w true) c = hartViewsAt E σ c := by
   unfold hartViewsAt
   have e1 : (σ.store cpu pa n w true).tv c = σ.tv c := by simp [updCpu, hc]
   have e2 : (σ.store cpu pa n w true).itv c = σ.itv c := rfl

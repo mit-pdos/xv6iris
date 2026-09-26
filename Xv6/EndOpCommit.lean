@@ -178,7 +178,7 @@ theorem eo_commit (WH : WRITE_HEAD) (IT : INSTALL_TRANS) (AC : ACQUIRE) (RE : RE
     -- `bwrite`s into REAL durability fupds
     fsCrashSeam (hlc := hlc) (GF := GF) V.cov ls ∗
     eraRegistered (hlc := hlc) (GF := GF) (genId (hlc := hlc) (GF := GF))
-      (MachGS.era (hlc := hlc)) ∗
+      (MachGS.era (hlc := hlc) (GF := GF)) ∗
     trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗
     wordPointsTo (pPid k.proc) 4 dqp pidv ∗
     eoOpen γb γfs V.cov ls n W L D Lw n ∗

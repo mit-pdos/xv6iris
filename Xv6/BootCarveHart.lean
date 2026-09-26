@@ -530,7 +530,7 @@ variable {hlc : HasLC} {GF : BundledGFunctors} [MachFixedGS hlc GF]
 /-- **A running token carries a `viewLb … 0` receipt** (what `cpuCtxFree`
 needs at boot: Lean's `viewLb c 0` is not free, so it is read off
 `powerBootRes`'s per-hart `ctxTokAt`). -/
-theorem ctxTokAt_viewLb0 (E : EraGS GF) (cpu : CPU) (ξ : CtxId) :
+theorem ctxTokAt_viewLb0 (E : EraGS) (cpu : CPU) (ξ : CtxId) :
     ctxTokAt E cpu ξ ⊢@{IProp GF} ctxTokAt E cpu ξ ∗ viewLbAt E cpu 0 := by
   unfold ctxTokAt ownCtxAt
   iintro ⟨⟨%B, %K, %W, %D, Hat, #Hv, Hrest⟩, Hr⟩
@@ -541,7 +541,7 @@ theorem ctxTokAt_viewLb0 (E : EraGS GF) (cpu : CPU) (ξ : CtxId) :
   · iapply viewLbAt_le E cpu K 0 (Nat.zero_le K) $$ Hv
 
 /-- ...for all eight harts at once, off `powerBootRes`'s token row. -/
-theorem ctxTokAt_viewLb0_list (E : EraGS GF) (l : List CPU) :
+theorem ctxTokAt_viewLb0_list (E : EraGS) (l : List CPU) :
     ([∗list] c ∈ l, ∃ ξ : CtxId, ctxTokAt E c ξ) ⊢@{IProp GF}
       ([∗list] c ∈ l, ∃ ξ : CtxId, ctxTokAt E c ξ) ∗ [∗list] c ∈ l, viewLbAt E c 0 := by
   refine .trans ?_ BigSepL.bigSepL_sep_eqv.1
@@ -558,7 +558,7 @@ theorem ctxTokAt_viewLb0_list (E : EraGS GF) (l : List CPU) :
 held-lock set, at the instance the client runs its harts at
 (`MachCSL.MachGS.ofEra`), with the carve's per-hart rows, are
 `bootHartRes` at the booted file. -/
-theorem bootHartRes_ofEra (E : EraGS GF) (gen : Nat) (cP : CPU → BitVec 64 → IProp GF)
+theorem bootHartRes_ofEra (E : EraGS) (gen : Nat) (cP : CPU → BitVec 64 → IProp GF)
     (cI : ∀ cpu : CPU, ⊢ cP cpu 0#64) (eP : CtxId → IProp GF) (ePe : ∀ ξ : CtxId, Persistent (eP ξ))
     (σ : MState) (hbf : bootFacts σ) (c : CPU) :
     letI : MachGS hlc GF := MachGS.ofEra E gen cP cI eP ePe
@@ -570,7 +570,7 @@ theorem bootHartRes_ofEra (E : EraGS GF) (gen : Nat) (cP : CPU → BitVec 64 →
 /-- **All eight harts' `.bss` shares at `Hboot`'s era**: `bootCarve_harts`
 with the `viewLb … 0` receipts read off `powerBootRes`'s token row (which is
 handed back). -/
-theorem bootCarve_harts_ofEra (E : EraGS GF) (gen : Nat) (cP : CPU → BitVec 64 → IProp GF)
+theorem bootCarve_harts_ofEra (E : EraGS) (gen : Nat) (cP : CPU → BitVec 64 → IProp GF)
     (cI : ∀ cpu : CPU, ⊢ cP cpu 0#64) (eP : CtxId → IProp GF) (ePe : ∀ ξ : CtxId, Persistent (eP ξ)) :
     letI : MachGS hlc GF := MachGS.ofEra E gen cP cI eP ePe
     kmapStatic (GF := GF) ⊢ ([∗list] c ∈ cpus, ∃ ξ : CtxId, ctxTokAt E c ξ) -∗

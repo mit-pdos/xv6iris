@@ -49,11 +49,11 @@ variable {hlc : HasLC} {GF : BundledGFunctors}
 /-! ## The mirrors under a DMA write -/
 
 section memmodel
-variable [MachFixedGS hlc GF] (E : EraGS GF)
+variable [MachFixedGS hlc GF] (E : EraGS)
 
 /-- No hart's views move at a DMA write. -/
 theorem hartViews_storeDma (σ : MState) (pa : PAddr) (n : Nat) (w : BitVec (8 * n)) (c : CPU) :
-    hartViewsAt E (σ.storeDma pa n w) c = hartViewsAt E σ c := rfl
+    hartViewsAt (GF := GF) E (σ.storeDma pa n w) c = hartViewsAt E σ c := rfl
 
 /-- A DMA write by the disk: the store order grows by the disk's message,
 whose authorship and position become persistent facts.  No reservation

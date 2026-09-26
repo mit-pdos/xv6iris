@@ -49,7 +49,7 @@ variable {lent : Bool}
 /-! ## The model level -/
 
 section memmodel
-variable [MachFixedGS hlc GF] (E : EraGS GF)
+variable [MachFixedGS hlc GF] (E : EraGS)
 
 /-- **A hart's own store is at or below its `pub`.**  The authorship
 receipt is the `pubLb` the drain edge needs. -/

@@ -80,7 +80,7 @@ theorem fsLogfillV_seqPermit (cov : ExtTreeSet Nat compare) (ls i : Nat) (M0 : L
     (hM0 : lmHdr M0 ls = (0, [])) :
     fsCrashSeam (hlc := hlc) (GF := GF) cov ls ⊢
       eraRegistered (hlc := hlc) (GF := GF) (genId (hlc := hlc) (GF := GF))
-        (MachGS.era (hlc := hlc)) -∗
+        (MachGS.era (hlc := hlc) (GF := GF)) -∗
       swapLb (hlc := hlc) (GF := GF) (genId (hlc := hlc) (GF := GF) + 1) -∗
       logMirrorHalf (hlc := hlc) M0 -∗
       diskSeqPermit (hlc := hlc) (genId (hlc := hlc) (GF := GF))
@@ -152,7 +152,7 @@ theorem fsInstallV_seqPermit (cov : ExtTreeSet Nat compare) (ls nn : Nat) (Ws : 
     (hb : logRegion ls b = false) (hM0 : lmHdr M0 ls = (nn, Ws)) :
     fsCrashSeam (hlc := hlc) (GF := GF) cov ls ⊢
       eraRegistered (hlc := hlc) (GF := GF) (genId (hlc := hlc) (GF := GF))
-        (MachGS.era (hlc := hlc)) -∗
+        (MachGS.era (hlc := hlc) (GF := GF)) -∗
       swapLb (hlc := hlc) (GF := GF) (genId (hlc := hlc) (GF := GF) + 1) -∗
       ▷ logMirrorHalf (hlc := hlc) M0 -∗
       diskSeqPermit (hlc := hlc) (genId (hlc := hlc) (GF := GF)) (some (1024 * b, bs))

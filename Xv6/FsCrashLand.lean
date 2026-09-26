@@ -162,7 +162,7 @@ theorem fsLand_arm (γs : FsCrashNames) (cov : ExtTreeSet Nat compare) (ls : Nat
     (hstn : γs.start = MachFixedGS.startName (hlc := hlc) (GF := GF))
     (hn : n = genId (hlc := hlc) (GF := GF) + 1) :
     eraRegistered (hlc := hlc) (GF := GF) (genId (hlc := hlc) (GF := GF))
-      (MachGS.era (hlc := hlc)) ⊢
+      (MachGS.era (hlc := hlc) (GF := GF)) ⊢
       swapLb (hlc := hlc) (GF := GF) (genId (hlc := hlc) (GF := GF) + 1) -∗
       startAuth (hlc := hlc) (GF := GF) n -∗ logMirrorHalf (hlc := hlc) M0 -∗
       fsArm γs cov ls dk -∗
@@ -171,7 +171,7 @@ theorem fsLand_arm (γs : FsCrashNames) (cov : ExtTreeSet Nat compare) (ls : Nat
           ⌜logMirrorOk M' (fsBlocks dk') cov ls⌝ ==∗
             fsArm γs cov ls dk' ∗ logMirrorHalf (hlc := hlc) M') := by
   have h := fsArm_acc (GF := GF) γs cov ls dk (genId (hlc := hlc) (GF := GF))
-    (MachGS.era (hlc := hlc)) n M0 hn
+    (MachGS.era (hlc := hlc) (GF := GF)) n M0 hn
   unfold fsEraReg at h
   rw [hsw, hrg, hstn] at h
   unfold eraRegistered swapLb startAuth logMirrorHalf
@@ -188,7 +188,7 @@ theorem fsV_sector0_rec (G : GName → IProp GF) (cov : ExtTreeSet Nat compare) 
       fsRecWf r (fsBlocks (Virtio.diskWrite dk (blk * BSIZE + 0) (bs.take Virtio.sectorSize)))
         cov ls) :
     eraRegistered (hlc := hlc) (GF := GF) (genId (hlc := hlc) (GF := GF))
-      (MachGS.era (hlc := hlc)) ⊢
+      (MachGS.era (hlc := hlc) (GF := GF)) ⊢
       swapLb (hlc := hlc) (GF := GF) (genId (hlc := hlc) (GF := GF) + 1) -∗
       ▷ logMirrorHalf (hlc := hlc) M0 -∗
       fsRecPermit (hlc := hlc) G cov ls (genId (hlc := hlc) (GF := GF))
@@ -240,7 +240,7 @@ theorem fsV_sector1_rec (G : GName → IProp GF) (cov : ExtTreeSet Nat compare) 
       fsRecWf r (fsBlocks (Virtio.diskWrite dk (blk * BSIZE + Virtio.sectorSize)
         ((bs.drop Virtio.sectorSize).take Virtio.sectorSize))) cov ls) :
     eraRegistered (hlc := hlc) (GF := GF) (genId (hlc := hlc) (GF := GF))
-      (MachGS.era (hlc := hlc)) ⊢
+      (MachGS.era (hlc := hlc) (GF := GF)) ⊢
       swapLb (hlc := hlc) (GF := GF) (genId (hlc := hlc) (GF := GF) + 1) -∗
       ▷ logMirrorHalf (hlc := hlc) M0 -∗
       fsRecPermit (hlc := hlc) G cov ls (genId (hlc := hlc) (GF := GF))
@@ -302,7 +302,7 @@ theorem fsCommitL_sector0_rec (G : GName → IProp GF) (cov : ExtTreeSet Nat com
     (htie : ∀ b, fsHome cov ls b → b ∉ Ws → PartialMap.get? L b = some (V b))
     (hslot : ∀ i b, Ws[i]? = some b → PartialMap.get? L b = some (V (logSlotBno ls i))) :
     eraRegistered (hlc := hlc) (GF := GF) (genId (hlc := hlc) (GF := GF))
-      (MachGS.era (hlc := hlc)) ⊢
+      (MachGS.era (hlc := hlc) (GF := GF)) ⊢
       swapLb (hlc := hlc) (GF := GF) (genId (hlc := hlc) (GF := GF) + 1) -∗
       ▷ logMirrorHalf (hlc := hlc) M0 -∗
       durPair G (fsRestrict (dvOfD L) (fsHomeList cov ls)) -∗
@@ -379,7 +379,7 @@ theorem fsClearV_sector0_rec (G : GName → IProp GF) (cov : ExtTreeSet Nat comp
     (hM0 : lmHdr M0 ls = (nn, Ws)) (hoff : ∀ b, b ≠ logHdrBno ls → M0.view b = V b)
     (hcaught : ∀ j b, Ws[j]? = some b → V b = V (logSlotBno ls j)) :
     eraRegistered (hlc := hlc) (GF := GF) (genId (hlc := hlc) (GF := GF))
-      (MachGS.era (hlc := hlc)) ⊢
+      (MachGS.era (hlc := hlc) (GF := GF)) ⊢
       swapLb (hlc := hlc) (GF := GF) (genId (hlc := hlc) (GF := GF) + 1) -∗
       ▷ logMirrorHalf (hlc := hlc) M0 -∗
       fsRecPermit (hlc := hlc) G cov ls (genId (hlc := hlc) (GF := GF))

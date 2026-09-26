@@ -56,7 +56,7 @@ open Iris Iris.BI Iris.ProofMode Std MachCSL
 set_option linter.unusedSectionVars false
 
 section
-variable {GF : BundledGFunctors} [Xv6G GF] [GhostMapG GF Nat (EraGS GF) RegMapF]
+variable {GF : BundledGFunctors} [Xv6G GF] [GhostMapG GF Nat EraGS RegMapF]
   [MonoNatG GF] [GhostVarG GF LogMirror] [GhostMapG GF Nat (BitVec 8) RegMapF]
   [FsLinkG GF] [FsTopG GF]
 
@@ -281,7 +281,7 @@ mirror variable, born at the machine's own image, goes half into the custody
 arm; the epoch is LENT as a clone with its guest half at the caller's map. -/
 theorem pFs_swap (gt γd : GName) (N : Nat) (γsw γreg γst : GName)
     (cov : ExtTreeSet Nat compare) (ls : Nat) (dk : Nat → BitVec 8)
-    (E : EraGS GF) (gen : Nat) (I : RegMapF FsNode) :
+    (E : EraGS) (gen : Nat) (I : RegMapF FsNode) :
     (γreg ↪◯MAP[gen]{DFrac.discard} E) ⊢
       MonoNat.lb_own γst (.ofNat (gen + 1)) -∗
       MonoNat.auth_own γst (DFrac.own 1) (.ofNat (gen + 1)) -∗

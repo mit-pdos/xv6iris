@@ -207,7 +207,7 @@ variable {hlc : HasLC} {GF : BundledGFunctors} [MachFixedGS hlc GF]
 
 /-- `Xv6.bootEntryPre` at the instance `Hboot`'s client runs at, off the
 power thread's per-hart register row and its `bootFacts`. -/
-theorem bootEntryPre_ofEra (E : EraGS GF) (gen : Nat) (cP : CPU → BitVec 64 → IProp GF)
+theorem bootEntryPre_ofEra (E : EraGS) (gen : Nat) (cP : CPU → BitVec 64 → IProp GF)
     (cI : ∀ cpu : CPU, ⊢ cP cpu 0#64) (eP : CtxId → IProp GF) (ePe : ∀ ξ : CtxId, Persistent (eP ξ))
     (σ : MState) (hbf : bootFacts σ) (cpu : CPU) :
     letI : MachGS hlc GF := MachGS.ofEra E gen cP cI eP ePe

@@ -457,7 +457,7 @@ theorem lock_pay_intro_hook [CurCtx] (cpu : CPU) (R Rin : CtxId → IProp GF) [C
   iexists ξL, T'
   iframe Hst HR
 
-theorem viewLbAt_lb (E : EraGS GF) (cpu : CPU) (K : Nat) :
+theorem viewLbAt_lb (E : EraGS) (cpu : CPU) (K : Nat) :
     viewLbAt E cpu K ⊢@{IProp GF} MonoNat.lb_own (E.viewName cpu) (.ofNat K) := by
   unfold viewLbAt
   iintro ⟨H, _⟩
@@ -829,9 +829,9 @@ end geom
 
 /-! ## Accessors -/
 
-instance lkInAt_timeless (E : EraGS GF) (cpu : CPU) (s : String) : Timeless (lkInAt E cpu s) := by
+instance lkInAt_timeless (E : EraGS) (cpu : CPU) (s : String) : Timeless (lkInAt (GF := GF) E cpu s) := by
   unfold lkInAt; infer_instance
-instance lockSetAt_timeless (E : EraGS GF) (cpu : CPU) (l : List String) : Timeless (lockSetAt E cpu l) := by
+instance lockSetAt_timeless (E : EraGS) (cpu : CPU) (l : List String) : Timeless (lockSetAt (GF := GF) E cpu l) := by
   unfold lockSetAt; infer_instance
 
 theorem lkCpuFrag_some (c : CPU) (b : Bool) (s : String) : lkCpuFrag (GF := GF) (some (c, b)) s = lkIn c s := rfl

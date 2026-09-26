@@ -127,19 +127,19 @@ end
 /-! ## §3 The generation arm -/
 
 section
-variable {GF : BundledGFunctors} [GhostMapG GF Nat (EraGS GF) RegMapF] [MonoNatG GF]
+variable {GF : BundledGFunctors} [GhostMapG GF Nat EraGS RegMapF] [MonoNatG GF]
   [GhostVarG GF LogMirror]
 
 /-- The registry element at the PARAMETER gname (Rocq `fs_era_reg`). -/
-def fsEraReg (γs : FsCrashNames) (g : Nat) (E : EraGS GF) : IProp GF :=
+def fsEraReg (γs : FsCrashNames) (g : Nat) (E : EraGS) : IProp GF :=
   γs.reg ↪◯MAP[g]{DFrac.discard} E
 
 /-- The started certificate at the PARAMETER gname (Rocq `fs_started`). -/
 def fsStarted (γs : FsCrashNames) (g : Nat) : IProp GF :=
   MonoNat.lb_own γs.start (.ofNat (g + 1))
 
-instance fsEraReg_persistent (γs : FsCrashNames) (g : Nat) (E : EraGS GF) :
-    Persistent (fsEraReg γs g E) := by unfold fsEraReg; infer_instance
+instance fsEraReg_persistent (γs : FsCrashNames) (g : Nat) (E : EraGS) :
+    Persistent (fsEraReg (GF := GF) γs g E) := by unfold fsEraReg; infer_instance
 instance fsStarted_persistent (γs : FsCrashNames) (g : Nat) :
     Persistent (fsStarted (GF := GF) γs g) := by unfold fsStarted; infer_instance
 
@@ -147,7 +147,7 @@ instance fsStarted_persistent (γs : FsCrashNames) (g : Nat) :
 started certificate, and HALF of its mirror, true of the image. -/
 def fsCustody (γs : FsCrashNames) (cov : ExtTreeSet Nat compare) (ls : Nat)
     (dk : Nat → BitVec 8) (g'' : Nat) : IProp GF :=
-  iprop(∃ (E'' : EraGS GF) (M : LogMirror),
+  iprop(∃ (E'' : EraGS) (M : LogMirror),
     fsEraReg γs g'' E'' ∗ fsStarted γs g'' ∗
     (E''.mirrorName ↪VAR{.own (1 : Qp).half} M) ∗ ⌜logMirrorOk M (fsBlocks dk) cov ls⌝)
 
@@ -230,9 +230,9 @@ theorem fsArm_le (γs : FsCrashNames) (cov : ExtTreeSet Nat compare) (ls : Nat)
 THIS era's custody, the arm going in at the pre-write image and out at the
 post-write one. -/
 theorem fsArm_swap (γs : FsCrashNames) (cov : ExtTreeSet Nat compare) (ls : Nat)
-    (dk dk' : Nat → BitVec 8) (g : Nat) (E : EraGS GF) (n : Nat) (M : LogMirror)
+    (dk dk' : Nat → BitVec 8) (g : Nat) (E : EraGS) (n : Nat) (M : LogMirror)
     (hn : n = g + 1) (hok : logMirrorOk M (fsBlocks dk') cov ls) :
-    fsEraReg γs g E ⊢ fsStarted γs g -∗
+    fsEraReg (GF := GF) γs g E ⊢ fsStarted γs g -∗
       MonoNat.auth_own γs.start (DFrac.own 1) (.ofNat n) -∗
       (E.mirrorName ↪VAR{.own (1 : Qp).half} M) -∗
       fsArm γs cov ls dk ==∗
@@ -265,9 +265,9 @@ theorem fsArm_swap (γs : FsCrashNames) (cov : ExtTreeSet Nat compare) (ls : Nat
 squeeze, then the mirror's two halves meet, then the arm re-closes at the
 post-write image with the updated picture. -/
 theorem fsArm_acc (γs : FsCrashNames) (cov : ExtTreeSet Nat compare) (ls : Nat)
-    (dk : Nat → BitVec 8) (g : Nat) (E : EraGS GF) (n : Nat) (M0 : LogMirror)
+    (dk : Nat → BitVec 8) (g : Nat) (E : EraGS) (n : Nat) (M0 : LogMirror)
     (hn : n = g + 1) :
-    fsEraReg γs g E ⊢ MonoNat.lb_own γs.swap (.ofNat (g + 1)) -∗
+    fsEraReg (GF := GF) γs g E ⊢ MonoNat.lb_own γs.swap (.ofNat (g + 1)) -∗
       MonoNat.auth_own γs.start (DFrac.own 1) (.ofNat n) -∗
       (E.mirrorName ↪VAR{.own (1 : Qp).half} M0) -∗
       fsArm γs cov ls dk -∗

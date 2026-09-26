@@ -67,7 +67,7 @@ variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF]
 /-! ## The model level -/
 
 section memmodel
-variable [MachFixedGS hlc GF] (E : EraGS GF)
+variable [MachFixedGS hlc GF] (E : EraGS)
 
 /-- The read watermark's mirror, read off. -/
 theorem memModel_rviewLb (σ : MState) (cpu : CPU) (K : Nat) :

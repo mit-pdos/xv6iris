@@ -226,7 +226,7 @@ theorem ctxDeposit (R : CtxId → IProp GF) [CtxMorph R] (cpu : CPU) (ξ ξc : C
 
 /-- `dirtyElems` is timeless (so a stamped context can be pulled out from
 under an invariant's later). -/
-instance dirtyElems_timeless (E : EraGS GF) (ξ : CtxId) (D : RegMapF CPU) :
+instance dirtyElems_timeless (E : EraGS) (ξ : CtxId) (D : RegMapF CPU) :
     Timeless (PROP := IProp GF) (dirtyElems E ξ D) := by unfold dirtyElems; infer_instance
 
 instance ctxStamped_timeless (ξ : CtxId) (T : Nat) :

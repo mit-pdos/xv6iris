@@ -270,7 +270,7 @@ theorem eo_commit_fam (G : GName → IProp GF) (cov : Std.ExtTreeSet Nat compare
       PartialMap.get? L w.toNat = some (Lw i)) :
     fsCrashSeamAt (hlc := hlc) G cov ls ⊢
       eraRegistered (hlc := hlc) (GF := GF) (genId (hlc := hlc) (GF := GF))
-        (MachGS.era (hlc := hlc)) -∗
+        (MachGS.era (hlc := hlc) (GF := GF)) -∗
       swapLb (hlc := hlc) (GF := GF) (genId (hlc := hlc) (GF := GF) + 1) -∗
       logMirrorHalf (hlc := hlc) Mc -∗
       durPair G (fsRestrict (dvOfD L) (fsHomeList cov ls)) -∗
@@ -311,7 +311,7 @@ theorem eo_install_gen (cov : Std.ExtTreeSet Nat compare) (ls n : Nat)
       lmHdr (lmInstall M1 (W.map (fun w => w.toNat)) Lw t) ls = (n, W.map (fun w => w.toNat))) :
     fsCrashSeam (hlc := hlc) (GF := GF) cov ls ⊢
       eraRegistered (hlc := hlc) (GF := GF) (genId (hlc := hlc) (GF := GF))
-        (MachGS.era (hlc := hlc)) -∗
+        (MachGS.era (hlc := hlc) (GF := GF)) -∗
       swapLb (hlc := hlc) (GF := GF) (genId (hlc := hlc) (GF := GF) + 1) -∗
       □ (∀ (i : Nat) (w : BitVec 32), ⌜W[i]? = some w⌝ -∗ ⌜(Lw i).length = BSIZE⌝ -∗
         ▷ logMirrorHalf (hlc := hlc) (lmInstall M1 (W.map (fun w => w.toNat)) Lw i) -∗
@@ -336,7 +336,7 @@ theorem eo_clear_fam (cov : Std.ExtTreeSet Nat compare) (ls n : Nat) (Ws : List 
     (hcaught : ∀ j b, Ws[j]? = some b → M2.view b = M2.view (logSlotBno ls j)) :
     fsCrashSeam (hlc := hlc) (GF := GF) cov ls ⊢
       eraRegistered (hlc := hlc) (GF := GF) (genId (hlc := hlc) (GF := GF))
-        (MachGS.era (hlc := hlc)) -∗
+        (MachGS.era (hlc := hlc) (GF := GF)) -∗
       swapLb (hlc := hlc) (GF := GF) (genId (hlc := hlc) (GF := GF) + 1) -∗
       logMirrorHalf (hlc := hlc) M2 -∗
       ∀ bs' : List (BitVec 8), ⌜bs'.length = BSIZE⌝ -∗ ⌜hdrN bs' = 0⌝ -∗

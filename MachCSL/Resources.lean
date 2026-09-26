@@ -98,10 +98,17 @@ structure LogMirror where
   view : Nat → List (BitVec 8)
 
 /-- One era's ghost names: a register map per hart, the memory heap, and the
-memory-model mirrors. -/
-structure EraGS (GF : BundledGFunctors) where
+memory-model mirrors.  NAMES ONLY (Rocq `riscvEraGS`, `RiscvPtsto.v:182`):
+the record mentions no functor list, so the era registry
+`GhostMapG GF Nat EraGS RegMapF` is an ordinary camera a concrete functor
+list can contain.  The heap's `genHeapGS` is rebuilt from the fixed layer's
+`MachFixedGS.memPre` and the two heap names (`EraGS.mem`). -/
+structure EraGS where
   regName : CPU → GName
-  mem : genHeapGS PAddr Hist GF MemF
+  /-- the memory heap's value map (Rocq `era_heap_name`) -/
+  heapName : GName
+  /-- the memory heap's meta map (Rocq `era_meta_name`) -/
+  metaName : GName
   /-- each hart's data view (floor), a monotone counter -/
   viewName : CPU → GName
   /-- each hart's instruction view, a monotone counter -/
@@ -147,7 +154,7 @@ class MachGpreS (hlc : outParam HasLC) (GF : BundledGFunctors) extends InvGpreS 
   reg_pre : GhostMapG GF Nat RegVal RegMapF
   mem_pre : genHeapPreS PAddr Hist GF MemF
   mono_pre : MonoNatG GF
-  registry_pre : GhostMapG GF Nat (EraGS GF) RegMapF
+  registry_pre : GhostMapG GF Nat EraGS RegMapF
   auth_pre : GhostMapG GF Nat Agent RegMapF
   resv_pre : GhostMapG GF Nat ResvVal RegMapF
   dirty_pre : GhostMapG GF Nat CPU RegMapF
@@ -192,7 +199,7 @@ class MachFixedGS (hlc : outParam HasLC) (GF : BundledGFunctors) where
   reg : GhostMapG GF Nat RegVal RegMapF
   memPre : genHeapPreS PAddr Hist GF MemF
   mono : MonoNatG GF
-  registry : GhostMapG GF Nat (EraGS GF) RegMapF
+  registry : GhostMapG GF Nat EraGS RegMapF
   /-- the author log's functor -/
   authG : GhostMapG GF Nat Agent RegMapF
   /-- the reservation map's functor -/
@@ -346,8 +353,10 @@ class MachGS (hlc : outParam HasLC) (GF : BundledGFunctors) where
   [fixed : MachFixedGS hlc GF]
   /-- the register-map ghost name of each hart -/
   regName : CPU → GName
-  /-- the memory heap -/
-  mem : genHeapGS PAddr Hist GF MemF
+  /-- the memory heap's value map (see `EraGS.heapName`) -/
+  heapName : GName
+  /-- the memory heap's meta map (see `EraGS.metaName`) -/
+  metaName : GName
   viewName : CPU → GName
   iviewName : CPU → GName
   rviewName : CPU → GName
@@ -385,13 +394,26 @@ class MachGS (hlc : outParam HasLC) (GF : BundledGFunctors) where
 
 attribute [reducible, instance] MachGS.fixed
 attribute [instance] MachGS.env_persistent
-attribute [reducible, instance] MachGS.mem
 
 variable {hlc : HasLC} {GF : BundledGFunctors}
 
+/-- Era `E`'s memory heap: the fixed layer's heap functors at the era's two
+heap names. -/
+@[reducible] def EraGS.mem [MachFixedGS hlc GF] (E : EraGS) : genHeapGS PAddr Hist GF MemF :=
+  ⟨E.heapName, E.metaName⟩
+
+set_option synthInstance.checkSynthOrder false in
+/-- The ambient memory heap: the fixed layer's heap functors at the ambient
+era's heap names.  (`hlc` is an out-parameter of `MachGS`, found from the
+ambient instance; the order check does not know that, as for the former
+field projection.) -/
+@[reducible] instance MachGS.mem [MachGS hlc GF] : genHeapGS PAddr Hist GF MemF :=
+  ⟨MachGS.heapName (hlc := hlc) (GF := GF), MachGS.metaName (hlc := hlc) (GF := GF)⟩
+
 /-- The ambient era. -/
-@[reducible] def MachGS.era [MachGS hlc GF] : EraGS GF :=
-  ⟨MachGS.regName (hlc := hlc) (GF := GF), MachGS.mem (hlc := hlc) (GF := GF),
+@[reducible] def MachGS.era [MachGS hlc GF] : EraGS :=
+  ⟨MachGS.regName (hlc := hlc) (GF := GF), MachGS.heapName (hlc := hlc) (GF := GF),
+   MachGS.metaName (hlc := hlc) (GF := GF),
    MachGS.viewName (hlc := hlc) (GF := GF), MachGS.iviewName (hlc := hlc) (GF := GF),
    MachGS.rviewName (hlc := hlc) (GF := GF), MachGS.topName (hlc := hlc) (GF := GF),
    MachGS.authName (hlc := hlc) (GF := GF), MachGS.resvName (hlc := hlc) (GF := GF),
@@ -853,19 +875,19 @@ theorem mmOk_boot (σ : MState) (h : bootFacts σ) : mmOk σ := by
 
 /-- Hart `cpu`'s view mirrors at the machine `σ`: data view, instruction
 view, read watermark. -/
-def hartViewsAt [MachFixedGS hlc GF] (E : EraGS GF) (σ : MState) (cpu : CPU) : IProp GF := iprop%
+def hartViewsAt [MachFixedGS hlc GF] (E : EraGS) (σ : MState) (cpu : CPU) : IProp GF := iprop%
   MonoNat.auth_own (E.viewName cpu) (DFrac.own 1) (.ofNat (σ.tv cpu)) ∗
   MonoNat.auth_own (E.iviewName cpu) (DFrac.own 1) (.ofNat (σ.itv cpu)) ∗
   MonoNat.auth_own (E.rviewName cpu) (DFrac.own 1) (.ofNat (σ.hr cpu).rv)
 
-theorem hartViewsAt_cases [MachFixedGS hlc GF] (E : EraGS GF) (σ : MState) (cpu : CPU) :
+theorem hartViewsAt_cases [MachFixedGS hlc GF] (E : EraGS) (σ : MState) (cpu : CPU) :
     hartViewsAt E σ cpu ⊢@{IProp GF}
       MonoNat.auth_own (E.viewName cpu) (DFrac.own 1) (.ofNat (σ.tv cpu)) ∗
       MonoNat.auth_own (E.iviewName cpu) (DFrac.own 1) (.ofNat (σ.itv cpu)) ∗
       MonoNat.auth_own (E.rviewName cpu) (DFrac.own 1) (.ofNat (σ.hr cpu).rv) := by
   unfold hartViewsAt; iintro H; iexact H
 
-theorem hartViewsAt_intro [MachFixedGS hlc GF] (E : EraGS GF) (σ : MState) (cpu : CPU) :
+theorem hartViewsAt_intro [MachFixedGS hlc GF] (E : EraGS) (σ : MState) (cpu : CPU) :
     MonoNat.auth_own (E.viewName cpu) (DFrac.own 1) (.ofNat (σ.tv cpu)) ∗
       MonoNat.auth_own (E.iviewName cpu) (DFrac.own 1) (.ofNat (σ.itv cpu)) ∗
       MonoNat.auth_own (E.rviewName cpu) (DFrac.own 1) (.ofNat (σ.hr cpu).rv) ⊢@{IProp GF}
@@ -873,7 +895,7 @@ theorem hartViewsAt_intro [MachFixedGS hlc GF] (E : EraGS GF) (σ : MState) (cpu
   unfold hartViewsAt; iintro H; iexact H
 
 /-- Era `E`'s memory-model mirrors at the machine `σ`. -/
-def memModelAt [MachFixedGS hlc GF] (E : EraGS GF) (σ : MState) : IProp GF := iprop%
+def memModelAt [MachFixedGS hlc GF] (E : EraGS) (σ : MState) : IProp GF := iprop%
   MonoNat.auth_own E.topName (DFrac.own 1) (.ofNat σ.top) ∗
   (E.authName ↪●MAP authMap σ.log) ∗
   ([∗list] cpu ∈ cpus, hartViewsAt E σ cpu) ∗
@@ -898,26 +920,26 @@ theorem cpus_get?_ne {k : Nat} {y : CPU} (hk : cpus[k]? = some y) (cpu : CPU) (h
 /-! ## The device mirrors -/
 
 /-- The authoritative half of device `d`'s mirror at era `E`. -/
-def devAuthAt [MachFixedGS hlc GF] (E : EraGS GF) (d : DevId) (s : DevSt d) : IProp GF :=
+def devAuthAt [MachFixedGS hlc GF] (E : EraGS) (d : DevId) (s : DevSt d) : IProp GF :=
   (E.devName d) ↪VAR{.own (1 : Qp).half} (⟨d, s⟩ : DevVal)
 
 /-- The other half: what a device's invariant holds (the Rocq prototype's
 `uart_frag`/`plic_frag`/`virtio_frag`). -/
-def devFragAt [MachFixedGS hlc GF] (E : EraGS GF) (d : DevId) (s : DevSt d) : IProp GF :=
+def devFragAt [MachFixedGS hlc GF] (E : EraGS) (d : DevId) (s : DevSt d) : IProp GF :=
   (E.devName d) ↪VAR{.own (1 : Qp).half} (⟨d, s⟩ : DevVal)
 
 /-- Every device's authoritative half, at the machine's states. -/
-def devInterpAt [MachFixedGS hlc GF] (E : EraGS GF) (ds : DevStates) : IProp GF := iprop%
+def devInterpAt [MachFixedGS hlc GF] (E : EraGS) (ds : DevStates) : IProp GF := iprop%
   [∗list] d ∈ DevId.all, devAuthAt E d (ds.st d)
 
-instance [MachFixedGS hlc GF] (E : EraGS GF) (d : DevId) (s : DevSt d) :
+instance [MachFixedGS hlc GF] (E : EraGS) (d : DevId) (s : DevSt d) :
     Timeless (PROP := IProp GF) (devAuthAt E d s) := by
   unfold devAuthAt; infer_instance
-instance [MachFixedGS hlc GF] (E : EraGS GF) (d : DevId) (s : DevSt d) :
+instance [MachFixedGS hlc GF] (E : EraGS) (d : DevId) (s : DevSt d) :
     Timeless (PROP := IProp GF) (devFragAt E d s) := by
   unfold devFragAt; infer_instance
 
-theorem devAgreeAt [MachFixedGS hlc GF] (E : EraGS GF) (d : DevId) (s s' : DevSt d) :
+theorem devAgreeAt [MachFixedGS hlc GF] (E : EraGS) (d : DevId) (s s' : DevSt d) :
     devAuthAt E d s ∗ devFragAt E d s' ⊢@{IProp GF} ⌜s' = s⌝ := by
   unfold devAuthAt devFragAt
   iintro ⟨Ha, Hf⟩
@@ -927,14 +949,14 @@ theorem devAgreeAt [MachFixedGS hlc GF] (E : EraGS GF) (d : DevId) (s s' : DevSt
   simp only [Sigma.mk.injEq, heq_eq_eq, true_and] at h'
   exact h'.symm
 
-theorem devUpdateAt [MachFixedGS hlc GF] (E : EraGS GF) (d : DevId) (s s' s'' : DevSt d) :
+theorem devUpdateAt [MachFixedGS hlc GF] (E : EraGS) (d : DevId) (s s' s'' : DevSt d) :
     devAuthAt E d s ∗ devFragAt E d s' ⊢@{IProp GF} |==> (devAuthAt E d s'' ∗ devFragAt E d s'') := by
   unfold devAuthAt devFragAt
   iintro ⟨Ha, Hf⟩
   iapply ghost_var_update_halves (⟨d, s''⟩ : DevVal) (E.devName d) _ _ $$ Ha Hf
 
 /-- Era `E`'s interpretation of the machine `σ`. -/
-def eraInterp [MachFixedGS hlc GF] (E : EraGS GF) (σ : MState) : IProp GF := iprop%
+def eraInterp [MachFixedGS hlc GF] (E : EraGS) (σ : MState) : IProp GF := iprop%
   ([∗list] cpu ∈ cpus, regInterpAt (E.regName cpu) (σ.regs cpu)) ∗
   genHeapInterp (G := E.mem) σ.mem ∗
   memModelAt E σ ∗
@@ -971,12 +993,12 @@ def genStarted (gen : Nat) : IProp GF :=
   MonoNat.lb_own (MachFixedGS.startName (hlc := hlc) (GF := GF)) (.ofNat (gen + 1))
 
 /-- Generation `gen` runs era `E` (persistent registry element). -/
-def eraRegistered (gen : Nat) (E : EraGS GF) : IProp GF :=
+def eraRegistered (gen : Nat) (E : EraGS) : IProp GF :=
   ghost_map_elem (MachFixedGS.registryName (hlc := hlc) (GF := GF)) DFrac.discard gen E
 
 /-- The certificate a generation-`gen` thread of era `E` carries: born,
 started, and registered.  Persistent. -/
-def genCertAt (gen : Nat) (E : EraGS GF) : IProp GF := iprop%
+def genCertAt (gen : Nat) (E : EraGS) : IProp GF := iprop%
   genBorn gen ∗ genStarted gen ∗ eraRegistered gen E
 
 instance (gen : Nat) : Persistent (PROP := IProp GF) (genBorn gen) := by
@@ -985,17 +1007,17 @@ instance (gen : Nat) : Persistent (PROP := IProp GF) (genDead gen) := by
   unfold genDead; infer_instance
 instance (gen : Nat) : Persistent (PROP := IProp GF) (genStarted gen) := by
   unfold genStarted; infer_instance
-instance (gen : Nat) (E : EraGS GF) : Persistent (PROP := IProp GF) (eraRegistered gen E) := by
+instance (gen : Nat) (E : EraGS) : Persistent (PROP := IProp GF) (eraRegistered gen E) := by
   unfold eraRegistered; infer_instance
-instance (gen : Nat) (E : EraGS GF) : Persistent (PROP := IProp GF) (genCertAt gen E) := by
+instance (gen : Nat) (E : EraGS) : Persistent (PROP := IProp GF) (genCertAt gen E) := by
   unfold genCertAt; infer_instance
 
 /-- The registry holds exactly the started generations. -/
-def registryOk (R : RegMapF (EraGS GF)) (n : Nat) : Prop :=
+def registryOk (R : RegMapF EraGS) (n : Nat) : Prop :=
   ∀ k, (get? R k).isSome ↔ k < n
 
 /-- The current era's interpretation, present exactly while the power is on. -/
-def eraCur (R : RegMapF (EraGS GF)) (g : GState) : IProp GF :=
+def eraCur (R : RegMapF EraGS) (g : GState) : IProp GF :=
   match g.pow with
   | true => iprop(∃ E, ⌜get? R g.gen = some E⌝ ∗ eraInterp E g.m)
   | false => iprop(True)
@@ -1027,7 +1049,7 @@ positional patterns of the lifting rules keep their shape).  No image pin:
 the boot memory is the language constant `bootImage`, as in Rocq. -/
 def powerInterp (g : GState) : IProp GF := iprop%
   genAuth g.gen ∗ startAuth (startCount g) ∗
-  (∃ R : RegMapF (EraGS GF),
+  (∃ R : RegMapF EraGS,
     (MachFixedGS.registryName (hlc := hlc) (GF := GF) ↪●MAP R) ∗ ⌜registryOk R (startCount g)⌝ ∗
     eraCur R g) ∗
   diskFixedInterp g
@@ -1287,7 +1309,7 @@ theorem startAuth_started (n gen : Nat) :
   omega
 
 /-- The registry pins the era a generation runs. -/
-theorem eraRegistered_lookup (R : RegMapF (EraGS GF)) (gen : Nat) (E : EraGS GF) :
+theorem eraRegistered_lookup (R : RegMapF EraGS) (gen : Nat) (E : EraGS) :
     ⊢@{IProp GF} (MachFixedGS.registryName (hlc := hlc) (GF := GF) ↪●MAP R) -∗
       eraRegistered gen E -∗ ⌜get? R gen = some E⌝ := by
   unfold eraRegistered
@@ -1323,7 +1345,7 @@ theorem startAuth_bump (n : Nat) :
   iframe Ha Hlb
 
 /-- `PowerOn` registers the new era. -/
-theorem registry_insert (R : RegMapF (EraGS GF)) (gen : Nat) (E : EraGS GF)
+theorem registry_insert (R : RegMapF EraGS) (gen : Nat) (E : EraGS)
     (h : get? R gen = none) :
     (MachFixedGS.registryName (hlc := hlc) (GF := GF) ↪●MAP R) ⊢@{IProp GF}
       |==> ((MachFixedGS.registryName (hlc := hlc) (GF := GF) ↪●MAP insert R gen E) ∗

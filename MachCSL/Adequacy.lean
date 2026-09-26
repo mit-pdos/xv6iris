@@ -243,7 +243,7 @@ theorem riscvPowerAdequacy [MachGpreS hlc GF] [KernelMap] (ndisk : Nat) (g : GSt
         ◇ (diskImgAuthSized γdisk ndisk dk ∗ ▷ Pc γdisk γsw γreg γst c ∗ ⌜Ppure dk⌝))
     (Mof : (Nat → BitVec 8) → LogMirror)
     (Rb : CT → Nat → (Nat → BitVec 8) → IProp GF)
-    (Hswap : ∀ (γdisk γsw γreg γst : GName) (c : CT) (E : EraGS GF) (gen : Nat)
+    (Hswap : ∀ (γdisk γsw γreg γst : GName) (c : CT) (E : EraGS) (gen : Nat)
         (dk : Nat → BitVec 8),
       (γreg ↪◯MAP[gen]{.discard} E) ∗ MonoNat.lb_own γst (.ofNat (gen + 1)) ∗
         MonoNat.auth_own γst (DFrac.own 1) (.ofNat (gen + 1)) ∗ diskImgAuthSized γdisk ndisk dk ∗
@@ -280,7 +280,7 @@ theorem riscvPowerAdequacy [MachGpreS hlc GF] [KernelMap] (ndisk : Nat) (g : GSt
       F = bootFixedGS Hinv γgen γstart γreg γdisk ndisk γswap (Pc γdisk γswap γreg γstart c)
           γobs T (Pt γobs c) γhist
           (Tg c) (HTg c) (HTgt c) (Kc c) (HKc c) (HKct c) (Cres c) (HCrest c) →
-      ∀ (E : EraGS GF) (gen : Nat) (σ : MState), bootFacts σ →
+      ∀ (E : EraGS) (gen : Nat) (σ : MState), bootFacts σ →
         (∃ ds0 : DevStates, σ.devs = ds0.reset) →
         Ppure (diskOf σ.devs) →
         obsInv ∗ powerBootRes Mof (Rb c) E gen σ ⊢@{IProp GF} |={⊤}=>
@@ -295,7 +295,7 @@ theorem riscvPowerAdequacy [MachGpreS hlc GF] [KernelMap] (ndisk : Nat) (g : GSt
   imod (diskImgSized_alloc (GF := GF) (diskOf g.m.devs) ndisk) with ⟨%γdisk, Hdauth, Hdfr⟩
   imod (MonoNat.own_alloc (GF := GF) (.ofNat g.gen)) with ⟨%γgen, Hgauth, _⟩
   imod (MonoNat.own_alloc (GF := GF) (.ofNat (startCount g))) with ⟨%γstart, Hsauth, _⟩
-  imod (ghost_map_alloc_empty (GF := GF) (K := Nat) (V := EraGS GF) (H := RegMapF)) with ⟨%γreg, HRauth⟩
+  imod (ghost_map_alloc_empty (GF := GF) (K := Nat) (V := EraGS) (H := RegMapF)) with ⟨%γreg, HRauth⟩
   imod (MonoNat.own_alloc (GF := GF) (.ofNat 0)) with ⟨%γswap, Hswap0, _⟩
   imod Hbirth with ⟨%c, Hcl⟩
   imod (HPc γdisk γswap γreg γstart c) $$ [Hdfr Hswap0] with HPc0
@@ -369,7 +369,7 @@ section helpers
 variable [MachFixedGS hlc GF]
 
 /-- The era conjunct at the client's own era (Rocq `power_interp_era`). -/
-theorem powerInterp_era (g : GState) (E : EraGS GF) (hpw : g.pow = true) :
+theorem powerInterp_era (g : GState) (E : EraGS) (hpw : g.pow = true) :
     powerInterp g ∗ eraRegistered g.gen E ⊢@{IProp GF} eraInterp E g.m := by
   unfold powerInterp eraCur
   simp only [hpw]
@@ -531,7 +531,7 @@ theorem riscvTraceAdequacy [KernelMap] (ndisk : Nat) (g : GState)
         ◇ (diskImgAuthSized γdisk ndisk dk ∗ ▷ Pc γdisk γsw γreg γst ∗ ⌜Ppure dk⌝))
     (Mof : (Nat → BitVec 8) → LogMirror)
     (Rb : (Nat → BitVec 8) → IProp GF)
-    (Hswap : ∀ (γdisk γsw γreg γst : GName) (E : EraGS GF) (gen : Nat) (dk : Nat → BitVec 8),
+    (Hswap : ∀ (γdisk γsw γreg γst : GName) (E : EraGS) (gen : Nat) (dk : Nat → BitVec 8),
       (γreg ↪◯MAP[gen]{.discard} E) ∗ MonoNat.lb_own γst (.ofNat (gen + 1)) ∗
         MonoNat.auth_own γst (DFrac.own 1) (.ofNat (gen + 1)) ∗ diskImgAuthSized γdisk ndisk dk ∗
         (E.mirrorName ↪VAR (Mof dk)) ∗ ▷ Pc γdisk γsw γreg γst ⊢@{IProp GF}
@@ -552,7 +552,7 @@ theorem riscvTraceAdequacy [KernelMap] (ndisk : Nat) (g : GState)
           rxTagTriv (fun _ => inferInstance) (fun _ => inferInstance)
           killCredTriv inferInstance inferInstance
           consResTriv (fun _ _ _ => inferInstance) →
-      ∀ (E : EraGS GF) (gen : Nat) (σ : MState), bootFacts σ →
+      ∀ (E : EraGS) (gen : Nat) (σ : MState), bootFacts σ →
         (∃ ds0 : DevStates, σ.devs = ds0.reset) →
         Ppure (diskOf σ.devs) →
         obsInv ∗ powerBootRes Mof (fun _ => Rb) E gen σ ⊢@{IProp GF} |={⊤}=>

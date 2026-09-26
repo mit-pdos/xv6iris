@@ -353,7 +353,7 @@ back.  Every conjunct is placed by name (Rocq's note on the disk big-op). -/
 theorem xv6Slot_swap {CT : Type} (N : Type) (appFs : CT → N → Aview → IProp GF)
     (appBoot : CT → Nat → N → IProp GF) (cov : ExtTreeSet Nat compare) (ls : Nat)
     (Happ_boot : ∀ (c : CT) (k : Nat), ⊢@{IProp GF} appXferBootRaw (appFs c) (appBoot c k))
-    (γd γsw γreg γst : GName) (c : CT) (E : EraGS GF) (gen : Nat) (dk : Nat → BitVec 8) :
+    (γd γsw γreg γst : GName) (c : CT) (E : EraGS) (gen : Nat) (dk : Nat → BitVec 8) :
     (γreg ↪◯MAP[gen]{.discard} E) ∗ MonoNat.lb_own γst (.ofNat (gen + 1)) ∗
         MonoNat.auth_own γst (DFrac.own 1) (.ofNat (gen + 1)) ∗
         diskImgAuthSized γd XV6_DISK_BYTES dk ∗

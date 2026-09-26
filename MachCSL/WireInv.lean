@@ -41,19 +41,19 @@ def wireN : Namespace := ndot nroot "machcslwire"
 
 /-- `wireBody` at an explicit era, for the power thread (which allocates the
 invariant before any `MachGS` instance exists). -/
-def wireBodyAt (E : EraGS GF) : IProp GF := iprop%
+def wireBodyAt (E : EraGS) : IProp GF := iprop%
   ∃ seip meip : CPU → BitVec 1, [∗list] cpu ∈ cpus,
     (regPointsToAt (E.regName cpu) Register.sig_seip (DFrac.own 1) (seip cpu) ∗
      regPointsToAt (E.regName cpu) Register.sig_meip (DFrac.own 1) (meip cpu))
 
 /-- `wireInv` at an explicit era. -/
-def wireInvAt (E : EraGS GF) : IProp GF := inv wireN (wireBodyAt E)
+def wireInvAt (E : EraGS) : IProp GF := inv wireN (wireBodyAt E)
 
-instance wireInvAt_persistent (E : EraGS GF) : Persistent (wireInvAt (GF := GF) E) := by
+instance wireInvAt_persistent (E : EraGS) : Persistent (wireInvAt (GF := GF) E) := by
   unfold wireInvAt; infer_instance
 
 /-- Allocate the invariant from the owned pin cells of an era, at any levels. -/
-theorem wireInvAt_alloc (E : EraGS GF) (M : CoPset) (seip meip : CPU → BitVec 1) :
+theorem wireInvAt_alloc (E : EraGS) (M : CoPset) (seip meip : CPU → BitVec 1) :
     ([∗list] cpu ∈ cpus,
         (regPointsToAt (E.regName cpu) Register.sig_seip (DFrac.own 1) (seip cpu) ∗
          regPointsToAt (E.regName cpu) Register.sig_meip (DFrac.own 1) (meip cpu)))
@@ -84,9 +84,9 @@ def wireBody : IProp GF := iprop%
 def wireInv : IProp GF := inv wireN (wireBody (GF := GF))
 
 /-- In the ambient era the two forms agree. -/
-theorem wireBody_eq : wireBody (GF := GF) = wireBodyAt MachGS.era := rfl
+theorem wireBody_eq : wireBody (GF := GF) = wireBodyAt (MachGS.era (hlc := hlc) (GF := GF)) := rfl
 
-theorem wireInv_eq : wireInv (GF := GF) = wireInvAt MachGS.era := rfl
+theorem wireInv_eq : wireInv (GF := GF) = wireInvAt (MachGS.era (hlc := hlc) (GF := GF)) := rfl
 
 instance wireBody_timeless : Timeless (wireBody (GF := GF)) := by
   unfold wireBody regPointsTo regPointsToAt; infer_instance

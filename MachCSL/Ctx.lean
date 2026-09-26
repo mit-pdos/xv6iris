@@ -45,7 +45,7 @@ variable {hlc : HasLC} {GF : BundledGFunctors}
 /-! ## Receipts, at an explicit era -/
 
 section era
-variable [MachFixedGS hlc GF] (E : EraGS GF)
+variable [MachFixedGS hlc GF] (E : EraGS)
 
 /-- The store order has reached `K` (persistent; free at 0). -/
 def topLbAt (K : Nat) : IProp GF := iprop(⌜K = 0⌝ ∨ MonoNat.lb_own E.topName (.ofNat K))
@@ -177,7 +177,7 @@ def dirtyIn (ξ : CtxId) (t : Nat) (h : CPU) : IProp GF := ξ.dirty ↪◯MAP[t]
 
 /-- The justification of timestamp `t` at ξ: clean, or dirty with the
 machine's authorship receipt. -/
-def keyAt [MachFixedGS hlc GF] (E : EraGS GF) (ξ : CtxId) (t : Nat) : IProp GF := iprop%
+def keyAt [MachFixedGS hlc GF] (E : EraGS) (ξ : CtxId) (t : Nat) : IProp GF := iprop%
   ctxFloor ξ t ∨ ∃ h : CPU, dirtyIn ξ t h ∗ authoredByAt E t (hartAgent h)
 
 /-- ξ's authorities at fraction `q`: bound `B`, dirty set `D`. -/
@@ -192,14 +192,14 @@ instance (ξ : CtxId) (t : Nat) (h : CPU) : Persistent (PROP := IProp GF) (dirty
   unfold dirtyIn; infer_instance
 instance (ξ : CtxId) (t : Nat) (h : CPU) : Timeless (PROP := IProp GF) (dirtyIn ξ t h) := by
   unfold dirtyIn; infer_instance
-instance (E : EraGS GF) (ξ : CtxId) (t : Nat) : Persistent (PROP := IProp GF) (keyAt E ξ t) := by
+instance (E : EraGS) (ξ : CtxId) (t : Nat) : Persistent (PROP := IProp GF) (keyAt E ξ t) := by
   unfold keyAt; infer_instance
-instance (E : EraGS GF) (ξ : CtxId) (t : Nat) : Timeless (PROP := IProp GF) (keyAt E ξ t) := by
+instance (E : EraGS) (ξ : CtxId) (t : Nat) : Timeless (PROP := IProp GF) (keyAt E ξ t) := by
   unfold keyAt; infer_instance
 instance (ξ : CtxId) (q : Qp) (B : Nat) (D : RegMapF CPU) : Timeless (PROP := IProp GF) (ctxAt ξ q B D) := by
   unfold ctxAt; infer_instance
 
-theorem keyAt_cases (E : EraGS GF) (ξ : CtxId) (t : Nat) :
+theorem keyAt_cases (E : EraGS) (ξ : CtxId) (t : Nat) :
     keyAt E ξ t ⊢@{IProp GF} ctxFloor ξ t ∨ ∃ h : CPU, dirtyIn ξ t h ∗ authoredByAt E t (hartAgent h) := by
   unfold keyAt; iintro H; iexact H
 
@@ -210,7 +210,7 @@ theorem ctxFloor_0 (ξ : CtxId) : ⊢@{IProp GF} ctxFloor ξ 0 := by
   ipureintro
   rfl
 
-theorem keyAt_0 (E : EraGS GF) (ξ : CtxId) : ⊢@{IProp GF} keyAt E ξ 0 := by
+theorem keyAt_0 (E : EraGS) (ξ : CtxId) : ⊢@{IProp GF} keyAt E ξ 0 := by
   unfold keyAt
   iintro
   ileft
@@ -255,18 +255,18 @@ def dirtyOk (cpu : CPU) (B W : Nat) (D : RegMapF CPU) : Prop :=
 /-- The persistent facts of every dirty key -- its membership and the
 machine's authorship receipt -- kept beside the authority so a domination
 can hand them out. -/
-def dirtyElems (E : EraGS GF) (ξ : CtxId) (D : RegMapF CPU) : IProp GF := iprop%
+def dirtyElems (E : EraGS) (ξ : CtxId) (D : RegMapF CPU) : IProp GF := iprop%
   □ ∀ (k : Nat) (h : CPU), ⌜get? D k = some h⌝ -∗ dirtyIn ξ k h ∗ authoredByAt E k (hartAgent h)
 
-instance (E : EraGS GF) (ξ : CtxId) (D : RegMapF CPU) : Persistent (PROP := IProp GF) (dirtyElems E ξ D) := by
+instance (E : EraGS) (ξ : CtxId) (D : RegMapF CPU) : Persistent (PROP := IProp GF) (dirtyElems E ξ D) := by
   unfold dirtyElems; infer_instance
 
-theorem dirtyElems_intro (E : EraGS GF) (ξ : CtxId) (D : RegMapF CPU) :
+theorem dirtyElems_intro (E : EraGS) (ξ : CtxId) (D : RegMapF CPU) :
     (□ ∀ (k : Nat) (h : CPU), ⌜get? D k = some h⌝ -∗ dirtyIn ξ k h ∗ authoredByAt E k (hartAgent h))
       ⊢@{IProp GF} dirtyElems E ξ D := by
   unfold dirtyElems; iintro H; iexact H
 
-theorem dirtyElems_get (E : EraGS GF) (ξ : CtxId) (D : RegMapF CPU) (k : Nat) (h : CPU)
+theorem dirtyElems_get (E : EraGS) (ξ : CtxId) (D : RegMapF CPU) (k : Nat) (h : CPU)
     (hk : get? D k = some h) :
     dirtyElems E ξ D ⊢@{IProp GF} dirtyIn ξ k h ∗ authoredByAt E k (hartAgent h) := by
   unfold dirtyElems
@@ -278,7 +278,7 @@ theorem dirtyElems_get (E : EraGS GF) (ξ : CtxId) (D : RegMapF CPU) (k : Nat) (
 dominating the bound; a watermark bounding the dirty keys (a legal position,
 so the token can be stamped); every dirty key under the bound or `cpu`'s own
 store; the membership facts. -/
-def ownCtxAt (E : EraGS GF) (cpu : CPU) (ξ : CtxId) : IProp GF := iprop%
+def ownCtxAt (E : EraGS) (cpu : CPU) (ξ : CtxId) : IProp GF := iprop%
   ∃ (B K W : Nat) (D : RegMapF CPU),
     ctxAt ξ 1 B D ∗ viewLbAt E cpu K ∗ ⌜B ≤ K⌝ ∗
     topLbAt E W ∗ ⌜dirtyOk cpu B W D⌝ ∗ dirtyElems E ξ D
@@ -287,7 +287,7 @@ def ownCtxAt (E : EraGS GF) (cpu : CPU) (ξ : CtxId) : IProp GF := iprop%
 reservation fragment (some reservation or none -- a page walk's exclusive
 re-read may leave one standing, and every store clears it -- and no pending
 acquire, outside an AMO). -/
-def ctxTokAt (E : EraGS GF) (cpu : CPU) (ξ : CtxId) : IProp GF := iprop%
+def ctxTokAt (E : EraGS) (cpu : CPU) (ξ : CtxId) : IProp GF := iprop%
   ownCtxAt E cpu ξ ∗ ∃ r : Option Resv, resvFragAt E cpu r false
 
 

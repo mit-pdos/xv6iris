@@ -41,12 +41,12 @@ open LeanRV64D
 section dead
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachFixedGS hlc GF]
 
-theorem eraCur_true {R : RegMapF (EraGS GF)} {g : GState} (h : g.pow = true) :
-    eraCur R g = iprop(∃ E, ⌜get? R g.gen = some E⌝ ∗ eraInterp E g.m) := by
+theorem eraCur_true {R : RegMapF EraGS} {g : GState} (h : g.pow = true) :
+    eraCur (GF := GF) R g = iprop(∃ E, ⌜get? R g.gen = some E⌝ ∗ eraInterp E g.m) := by
   unfold eraCur; rw [h]
 
-theorem eraCur_false {R : RegMapF (EraGS GF)} {g : GState} (h : g.pow = false) :
-    eraCur R g = iprop(True) := by
+theorem eraCur_false {R : RegMapF EraGS} {g : GState} (h : g.pow = false) :
+    eraCur (GF := GF) R g = iprop(True) := by
   unfold eraCur; rw [h]
 
 /-- The bare WP of a hart expression. -/
@@ -114,7 +114,7 @@ abbrev machInterp (σ : MState) : IProp GF := iprop%
   devInterp σ.devs
 
 theorem eraInterp_ambient (σ : MState) :
-    eraInterp (MachGS.era (hlc := hlc) (GF := GF)) σ = machInterp σ := rfl
+    eraInterp (GF := GF) (MachGS.era (hlc := hlc) (GF := GF)) σ = machInterp σ := rfl
 
 /-- The mirrors do not mention the registers. -/
 theorem memModel_regs (σ : MState) (f : CPU → RegFile) :
@@ -716,7 +716,7 @@ arm re-establishes them.  Stated at an explicit era, so the power thread can
 use them too. -/
 
 section memmodel
-variable [MachFixedGS hlc GF] (E : EraGS GF)
+variable [MachFixedGS hlc GF] (E : EraGS)
 
 theorem memModel_mmOk (σ : MState) : memModelAt E σ ⊢@{IProp GF} ⌜mmOk σ⌝ := by
   unfold memModelAt
@@ -732,7 +732,7 @@ theorem memModel_setRt (σ : MState) (d : DevId) (rt : DevRt)
   have e : memModelAt E (σ.setRt d rt) = iprop(
       MonoNat.auth_own E.topName (DFrac.own 1) (.ofNat σ.top) ∗
       (E.authName ↪●MAP authMap σ.log) ∗
-      ([∗list] cpu ∈ cpus, hartViewsAt E σ cpu) ∗
+      ([∗list] cpu ∈ cpus, hartViewsAt (GF := GF) E σ cpu) ∗
       (E.resvName ↪●MAP resvMap σ) ∗
       ⌜mmOk (σ.setRt d rt)⌝) := rfl
   rw [e]
@@ -885,7 +885,7 @@ theorem memModel_fence (σ : MState) (cpu : CPU) (b : barrier_kind) :
     iexact Htoplb
 
 theorem hartViews_store_plain (σ : MState) (cpu : CPU) (pa : PAddr) (n : Nat) (w : BitVec (8 * n))
-    (c : CPU) : hartViewsAt E (σ.store cpu pa n w false) c = hartViewsAt E σ c := by
+    (c : CPU) : hartViewsAt (GF := GF) E (σ.store cpu pa n w false) c = hartViewsAt E σ c := by
   unfold hartViewsAt
   have e1 : (σ.store cpu pa n w false).tv c = σ.tv c := by
     simp only [MState.store, updCpu, Bool.false_and, if_false]; split <;> simp_all

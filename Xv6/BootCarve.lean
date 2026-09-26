@@ -723,7 +723,7 @@ variable {hlc : HasLC} {GF : BundledGFunctors} [MachFixedGS hlc GF]
 §1-§5): `powerBootRes`'s static claims and byte histories, at the instance
 the client runs its harts at (`MachCSL.MachGS.ofEra`), at the language's
 boot image, are the kernel's read-only image and the owned half. -/
-theorem bootCarve_era (E : EraGS GF) (gen : Nat) (cP : CPU → BitVec 64 → IProp GF)
+theorem bootCarve_era (E : EraGS) (gen : Nat) (cP : CPU → BitVec 64 → IProp GF)
     (cI : ∀ cpu : CPU, ⊢ cP cpu 0#64) (eP : CtxId → IProp GF) (ePe : ∀ ξ : CtxId, Persistent (eP ξ))
     (σ : MState) (hbf : bootFacts σ) :
     letI : MachGS hlc GF := MachGS.ofEra E gen cP cI eP ePe

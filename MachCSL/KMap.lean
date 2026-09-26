@@ -129,11 +129,11 @@ variable [MachFixedGS hlc GF]
 /-- The static claims of era `E`: the persistent element of every static
 entry.  Stated as a quantifier, not as a big-op over the map: the proof
 mode cannot afford to look inside a 33k-entry map literal. -/
-def kmapStaticAt (E : EraGS GF) [KernelMap] : IProp GF := iprop%
+def kmapStaticAt (E : EraGS) [KernelMap] : IProp GF := iprop%
   ∀ (k : Nat) (v : BitVec 64), ⌜Iris.Std.PartialMap.get? (M := RegMapF) KernelMap.static k = some v⌝ →
     E.kmapName ↪◯MAP[k]{.discard} v
 
-instance kmapStaticAt_persistent (E : EraGS GF) [KernelMap] : Persistent (kmapStaticAt (GF := GF) E) := by
+instance kmapStaticAt_persistent (E : EraGS) [KernelMap] : Persistent (kmapStaticAt (GF := GF) E) := by
   unfold kmapStaticAt; infer_instance
 
 /-- Every freshly minted element can be published. -/
@@ -143,7 +143,7 @@ theorem kmap_elem_persist (γ : GName) (k : Nat) (v : BitVec 64) :
   iapply ghost_map_elem_persist γ k (DFrac.own 1) v $$ H
 
 /-- Publishing the static entries, as the claims. -/
-theorem kmapStatic_persist (E : EraGS GF) [KernelMap] :
+theorem kmapStatic_persist (E : EraGS) [KernelMap] :
     ([∗map] k ↦ v ∈ KernelMap.static, E.kmapName ↪◯MAP[k] v) ⊢@{IProp GF} |==> kmapStaticAt E := by
   iintro H
   ihave Hl := (BigSepM.bigSepM_toList (Φ := fun k v => iprop(E.kmapName ↪◯MAP[k] v))

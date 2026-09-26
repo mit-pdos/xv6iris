@@ -289,7 +289,7 @@ theorem eo_body (BR : BREAD) (BW : BWRITE) (BE : BRELSE) (MM : MEMMOVE)
     logCtx γ γb γfs V.cov ls dev ∗
     fsCrashSeam (hlc := hlc) (GF := GF) V.cov ls ∗
     eraRegistered (hlc := hlc) (GF := GF) (genId (hlc := hlc) (GF := GF))
-      (MachGS.era (hlc := hlc)) ∗
+      (MachGS.era (hlc := hlc) (GF := GF)) ∗
     fsCrashSeamAt (hlc := hlc) G V.cov ls ∗
     trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗
     wordPointsTo (pPid k.proc) 4 dqp pidv ∗
@@ -752,7 +752,7 @@ theorem eo_loop (BR : BREAD) (BW : BWRITE) (BE : BRELSE) (MM : MEMMOVE)
     logCtx γ γb γfs V.cov ls dev -∗
     fsCrashSeam (hlc := hlc) (GF := GF) V.cov ls -∗
     eraRegistered (hlc := hlc) (GF := GF) (genId (hlc := hlc) (GF := GF))
-      (MachGS.era (hlc := hlc)) -∗
+      (MachGS.era (hlc := hlc) (GF := GF)) -∗
     fsCrashSeamAt (hlc := hlc) G V.cov ls -∗
     eoLoopInv Γ cpu k γb γfs V.cov ls n W pidv dqp G := by
   iintro #Hpi #Hbc #Hdc #Hpe #Hctx #Hseam #Hreg #HseamG

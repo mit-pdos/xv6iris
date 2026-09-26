@@ -47,7 +47,7 @@ theorem fsCommitL_seqPermit (G : GName → IProp GF) (cov : ExtTreeSet Nat compa
     (hslot : ∀ i b, Ws[i]? = some b → PartialMap.get? L b = some (V (logSlotBno ls i))) :
     fsCrashSeamAt (hlc := hlc) G cov ls ⊢
       eraRegistered (hlc := hlc) (GF := GF) (genId (hlc := hlc) (GF := GF))
-        (MachGS.era (hlc := hlc)) -∗
+        (MachGS.era (hlc := hlc) (GF := GF)) -∗
       swapLb (hlc := hlc) (GF := GF) (genId (hlc := hlc) (GF := GF) + 1) -∗
       logMirrorHalf (hlc := hlc) M0 -∗
       durPair G (fsRestrict (dvOfD L) (fsHomeList cov ls)) -∗
@@ -121,7 +121,7 @@ theorem fsClearKeep_seqPermit (cov : ExtTreeSet Nat compare) (ls : Nat) (M0 : Lo
     (hcaught : ∀ j b, Ws[j]? = some b → V b = V (logSlotBno ls j)) :
     fsCrashSeam (hlc := hlc) (GF := GF) cov ls ⊢
       eraRegistered (hlc := hlc) (GF := GF) (genId (hlc := hlc) (GF := GF))
-        (MachGS.era (hlc := hlc)) -∗
+        (MachGS.era (hlc := hlc) (GF := GF)) -∗
       swapLb (hlc := hlc) (GF := GF) (genId (hlc := hlc) (GF := GF) + 1) -∗
       logMirrorHalf (hlc := hlc) M0 -∗
       diskSeqPermit (hlc := hlc) (genId (hlc := hlc) (GF := GF))
