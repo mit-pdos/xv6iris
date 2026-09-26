@@ -289,7 +289,7 @@ Section UInitFileLeavesCC.
     UkInit.kinit_banner_pay (PS := uprogSG_free) N stc len f Rt -∗ H -∗
     UkInit.kinit_banner_pay (PS := uprogSG_free) N stc len f (Rt ∗ H).
   Proof using .
-    iIntros "Hp HH Hstd". iDestruct ("Hp" with "Hstd") as (Ch) "(#Hst & H0 & Hend)".
+    iIntros "Hp HH" (vw) "Hstd". iDestruct ("Hp" $! vw with "Hstd") as (Ch) "(#Hst & H0 & Hend)".
     iExists (fun j : nat => (Ch j ∗ H)%I). iSplitR.
     { iIntros "!>" (j) "%Hj".
       iApply (UkInit.kinit_w1_frame with "[]"). iApply ("Hst" $! j with "[%]").

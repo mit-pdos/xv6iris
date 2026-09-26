@@ -658,6 +658,17 @@ Section UConsOpen.
     exact (init_cons_moi_nat_m1 fd Hlt (eq_sym Hfd)).
   Qed.
 
+  Lemma init_cons_any_std_at (γfd : gname) (l v sts fdv' : list fdstate)
+      (r : mword 64) :
+    uk_open_fd_arm_at γfd l v sts fdv' r -∗ ustd_any γfd.
+  Proof using .
+    rewrite /uk_open_fd_arm_at. iIntros "[Hal | [_ Hstd]]".
+    - iDestruct "Hal" as (fd rd wr t) "[_ [Hal _]]".
+      rewrite /ualloc_v. iDestruct "Hal" as "[Hstd _]".
+      iExists _. iApply (ustd_at_ustd with "Hstd").
+    - iExists l. iApply (ustd_at_ustd with "Hstd").
+  Qed.
+
   Lemma init_cons_any_std (γfd : gname) (l sts fdv' : list fdstate)
       (r : mword 64) :
     uk_open_fd_arm γfd l sts fdv' r -∗ ustd_any γfd.

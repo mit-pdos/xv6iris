@@ -254,6 +254,10 @@ Definition ush_view_ok (v : list fdstate) : Prop :=
   Forall (fun st => st = FdClosed \/ exists (r w : bool) (mj : Z),
                       st = FdOpen r w (FdDevice mj)) v.
 
+(* the boot table, every slot closed *)
+Lemma ush_view_ok_fdt0 : ush_view_ok fdt0.
+Proof. apply Forall_replicate. by left. Qed.
+
 (* a table under an ok view is ok: a slot the view shows may have closed *)
 Lemma ush_view_ok_tab (sts v : list fdstate) :
   ush_view_ok v -> tab_le sts v -> ush_view_ok sts.

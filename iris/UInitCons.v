@@ -958,11 +958,11 @@ Section UInitCons.
      first two ([UConsLine.ush_std_cons] is the CONSOLE one), and the fork
      hands the child the same list at a fresh name. *)
   Lemma init_cons_head_console (γcl : echo_fixed) (γfd : gname) :
-    ustd γfd init_cons_l3 -∗ init_cons_head γcl γfd.
+    ustd_ok (echo_taint γcl) γfd init_cons_l3 -∗ init_cons_head γcl γfd.
   Proof using . iIntros "H". iApply (ufd_head_l3 with "H"). Qed.
 
   Lemma init_cons_head_closed (γcl : echo_fixed) (γfd : gname) :
-    ustd γfd init_cons_l0 -∗ init_cons_head γcl γfd.
+    ustd_ok (echo_taint γcl) γfd init_cons_l0 -∗ init_cons_head γcl γfd.
   Proof using . iIntros "H". iApply (ufd_head_closed with "H"). Qed.
 
   Lemma init_cons_head_taint (γcl : echo_fixed) (γfd : gname)
@@ -987,8 +987,11 @@ Section UInitCons.
     ∨ ustd γfd init_cons_l0 ∨ (ustd_any γfd ∗ echo_taint γcl).
   Proof using .
     rewrite /init_cons_head /ufd_head /ufd_headL.
-    iIntros "[H | H]"; [| by iRight ].
-    iLeft. iExists init_cons_l3. iApply (init_std_cons_l3 with "H").
+    iIntros "[H | [H | H]]".
+    - iLeft. iExists init_cons_l3. iApply (init_std_cons_l3 with "[H]").
+      iApply (ustd_ok_ustd with "H").
+    - iRight. iLeft. iApply (ustd_ok_ustd with "H").
+    - iRight. iRight. iExact "H".
   Qed.
 
   (* =================================================================== *)

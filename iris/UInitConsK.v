@@ -444,6 +444,7 @@ Section UInitConsK.
   Proof using .
     intros HPT HTT HTK. iIntros "#Hlaws #Hinv !>".
     iIntros (h m l avail) "#Hcode #Hro %Hargs Hrun Hcwd Hstd HK Hcont".
+    iDestruct "Hstd" as (vw) "[#Hvw Hstd]".
     destruct Hargs as [Ha0 Ha1].
     destruct init_syms_pins
       as (_ & _ & _ & _ & _ & Hopen & _ & _ & _ & _ & _ & _ & _).
@@ -478,7 +479,7 @@ Section UInitConsK.
                  ltac:(vm_compute; discriminate)).
       exact Ha1. }
     (* ---- 0x3b4  ecall -- the RECEIPT-KEEPING open leaf ---- *)
-    iApply (wp_uk_ecall_open_recv_img (PS := uprogSG_free) N h1 m1 (mword_of_int 0x3b4) l avail
+    iApply (wp_uk_ecall_open_recv_img_at (PS := uprogSG_free) N h1 m1 (mword_of_int 0x3b4) l vw avail
               (init_cons_absent_fam T K (ukn_pay N)) FsImg.ROOTINO
               UCodeInit.init_ro
               ltac:(unfold m1, usysno;
@@ -540,15 +541,16 @@ Section UInitConsK.
     iApply ("Hcont" $! h3 ret with "[Hfd Hans] Hcwd Hrun").
     iDestruct "Hans" as "[(%Hr & _ & [HK | #HT]) | #HT]".
     - iLeft. iSplitR; [ by iPureIntro | ]. iFrame "HK".
-      iApply (init_cons_fail_std (ukn_fd N) l (uvis_fd W) fdv' ret Hr
+      rewrite /ustd_ok. iExists vw. iFrame "Hvw".
+      iApply (init_cons_fail_std_at (ukn_fd N) l vw (uvis_fd W) fdv' ret Hr
                 with "[Hfd]").
-      rewrite /uk_open_fd_arm. iExact "Hfd".
+      rewrite /uk_open_fd_arm_at. iExact "Hfd".
     - iRight. iFrame "HT".
-      iApply (init_cons_any_std (ukn_fd N) l (uvis_fd W) fdv' ret with "[Hfd]").
-      rewrite /uk_open_fd_arm. iExact "Hfd".
+      iApply (init_cons_any_std_at (ukn_fd N) l vw (uvis_fd W) fdv' ret with "[Hfd]").
+      rewrite /uk_open_fd_arm_at. iExact "Hfd".
     - iRight. iFrame "HT".
-      iApply (init_cons_any_std (ukn_fd N) l (uvis_fd W) fdv' ret with "[Hfd]").
-      rewrite /uk_open_fd_arm. iExact "Hfd".
+      iApply (init_cons_any_std_at (ukn_fd N) l vw (uvis_fd W) fdv' ret with "[Hfd]").
+      rewrite /uk_open_fd_arm_at. iExact "Hfd".
   Qed.
 
   (* ------------------------------------------------------------------- *)
@@ -563,6 +565,7 @@ Section UInitConsK.
   Proof using .
     intros HPT HTT. iIntros "#Hlaws #Hmade #Hinv !>".
     iIntros (h m avail) "#Hcode #Hro %Hargs Hrun Hcwd Hstd Hcont".
+    iDestruct "Hstd" as (vw) "[#Hvw Hstd]".
     destruct Hargs as [Ha0 Ha1].
     destruct init_syms_pins
       as (_ & _ & _ & _ & _ & Hopen & _ & _ & _ & _ & _ & _ & _).
@@ -597,7 +600,7 @@ Section UInitConsK.
                  ltac:(vm_compute; discriminate)).
       exact Ha1. }
     (* ---- 0x3b4  ecall ---- *)
-    iApply (wp_uk_ecall_open_recv_img (PS := uprogSG_free) N h1 m1 (mword_of_int 0x3b4) ufd_l0 avail
+    iApply (wp_uk_ecall_open_recv_img_at (PS := uprogSG_free) N h1 m1 (mword_of_int 0x3b4) ufd_l0 vw avail
               (init_cons_console_fam T i (ukn_pay N)) FsImg.ROOTINO
               UCodeInit.init_ro
               ltac:(unfold m1, usysno;
@@ -653,9 +656,10 @@ Section UInitConsK.
     iDestruct "Hans" as "[[%Hr _] | [[%Hrcpt _] | #HT]]".
     - (* the call failed after the walk: nothing moved *)
       iRight. iLeft. iSplitR; [ by iPureIntro | ].
-      iApply (init_cons_fail_std (ukn_fd N) ufd_l0 (uvis_fd W) fdv' ret Hr
+      rewrite /ustd_ok. iExists vw. iFrame "Hvw".
+      iApply (init_cons_fail_std_at (ukn_fd N) ufd_l0 vw (uvis_fd W) fdv' ret Hr
                 with "[Hfd]").
-      rewrite /uk_open_fd_arm. iExact "Hfd".
+      rewrite /uk_open_fd_arm_at. iExact "Hfd".
     - (* THE CONSOLE: the receipt names the TYPE, the ledger the NUMBER *)
       destruct (init_cons_open_fd (mword_of_int 2) (uvis_fd W) ret fdv'
                   init_cons_om2_arg Hrcpt) as (fd0 & Hr0 & Hcl0 & Hfdv0).
@@ -664,7 +668,7 @@ Section UInitConsK.
       iDestruct "Hfd" as "[Hal | [%Hb _]]"; last first.
       { exfalso. destruct Hb as [Hrm _].
         exact (init_cons_moi_nat_m1 fd0 Hlt0 (eq_trans (eq_sym Hr0) Hrm)). }
-      iDestruct "Hal" as (fd rd wr t) "[%Hb Hal]".
+      iDestruct "Hal" as (fd rd wr t) "[%Hb [Hal %Htab]]".
       destruct Hb as (Hr1 & Hlt1 & Hfdv1 & _).
       assert (Hfdeq : fd = fd0)
         by exact (init_cons_moi_nat_inj fd fd0 Hlt1 Hlt0
@@ -685,15 +689,18 @@ Section UInitConsK.
         rewrite Hins in Hl1. rewrite Hl2 in Hl1.
         injection Hl1 as Hrd Hwr Ht.
         rewrite <- Hrd. rewrite <- Hwr. rewrite <- Ht. reflexivity. }
-      rewrite Hst.
-      iDestruct (ufd_alloc0 (ukn_fd N) init_cons_fd fd with "Hal")
+      rewrite Hfdv1 Hst.
+      iDestruct (ufd_alloc0_v (ukn_fd N) init_cons_fd fd with "Hal")
         as "[%Hfd0 Hstd]".
       subst fd.
-      iLeft. iFrame "Hstd". iPureIntro. rewrite Hr1. reflexivity.
+      iLeft. iSplitR; [ iPureIntro; rewrite Hr1; reflexivity |].
+      rewrite /ustd_ok. iExists _. iFrame "Hstd".
+      iDestruct "Hvw" as "[%Hok | $]". iLeft. iPureIntro.
+      exact (ush_view_ok_open (uvis_fd W) vw 0%nat true true CONSOLE Hok Htab).
     - iRight. iRight. iFrame "HT".
-      iApply (init_cons_any_std (ukn_fd N) ufd_l0 (uvis_fd W) fdv' ret
+      iApply (init_cons_any_std_at (ukn_fd N) ufd_l0 vw (uvis_fd W) fdv' ret
                 with "[Hfd]").
-      rewrite /uk_open_fd_arm. iExact "Hfd".
+      rewrite /uk_open_fd_arm_at. iExact "Hfd".
   Qed.
 
   (* ------------------------------------------------------------------- *)

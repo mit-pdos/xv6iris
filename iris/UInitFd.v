@@ -145,6 +145,11 @@ Section UInitFd.
     ualloc γfd ufd_l0 fd st -∗ ⌜fd = 0%nat⌝ ∗ ustd γfd (ufd_l1 st).
   Proof using . iApply (ualloc_std γfd ufd_l0 fd 0%nat st ufd_scan0). Qed.
 
+  (* ...at a named view (seccomp S4) *)
+  Lemma ufd_alloc0_v (γfd : gname) (st : fdstate) (fd : nat) (w : list fdstate) :
+    ualloc_v γfd ufd_l0 fd st w -∗ ⌜fd = 0%nat⌝ ∗ ustd_at γfd (ufd_l1 st) w.
+  Proof using . iApply (ualloc_v_std γfd ufd_l0 fd 0%nat st w ufd_scan0). Qed.
+
   Lemma ufd_alloc1 (γfd : gname) (st : fdstate) (fd : nat) :
     st <> FdClosed ->
     ualloc γfd (ufd_l1 st) fd st -∗ ⌜fd = 1%nat⌝ ∗ ustd γfd (ufd_l2 st).

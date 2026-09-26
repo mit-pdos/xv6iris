@@ -1049,10 +1049,12 @@ Section UInitSh.
   Proof using .
     rewrite /ufd_head /ufd_headL.
     iIntros "Ha [H | [H | [_ HT]]]".
-    - iDestruct (ustd_agree with "Ha H") as %->.
+    - iDestruct (ustd_ok_ustd with "H") as "H".
+      iDestruct (ustd_agree with "Ha H") as %->.
       iFrame "Ha". iLeft. iSplit; iPureIntro;
         [ exact (ufd_l3_row0 st) | exact (ufd_l3_row2 st) ].
-    - iDestruct (ustd_agree with "Ha H") as %->.
+    - iDestruct (ustd_ok_ustd with "H") as "H".
+      iDestruct (ustd_agree with "Ha H") as %->.
       iFrame "Ha". iRight. iLeft. iPureIntro. exact ufd_l0_row0.
     - iFrame "Ha". iRight. iRight. iExact "HT".
   Qed.

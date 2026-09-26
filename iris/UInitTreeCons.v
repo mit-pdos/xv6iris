@@ -315,7 +315,7 @@ Section UInitTreeCons.
      descriptor is on that device's major".  [UkTreeRead.
      wp_uk_ecall_open_own] one node kind over. ---- *)
   Lemma wp_uk_ecall_open_dev_own (N : uk_names Σ) (h : CpuId) (m : regfile)
-      (pc : mword 64) (l : list fdstate) (avail : nat)
+      (pc : mword 64) (l v : list fdstate) (avail : nat)
       (c : tree_fixed) (r : tree_names) (g : gname)
       (root d i cw : Z) (t : ttree) (ma mi : Z)
       (Img : gmap Z (bv 8)) (pv : mword 64) (pl : list (bv 8)) :
@@ -334,18 +334,22 @@ Section UInitTreeCons.
     utext_img (ukn_t N) Img -∗
     urun (PS := uprogSG_free) N h m pc avail -∗
     UserCwd.ucwd (ukn_cwd N) cw -∗
-    ustd (ukn_fd N) l -∗
+    ustd_at (ukn_fd N) l v -∗
     tree_pin r g root t -∗
     app_inv fsc_fs -∗
     (∀ (h' : CpuId) (rv : mword 64),
-       ((⌜rv = (mword_of_int (-1) : mword 64)⌝ ∗ ustd (ukn_fd N) l)
+       ((⌜rv = (mword_of_int (-1) : mword 64)⌝ ∗ ustd_at (ukn_fd N) l v)
         ∨ (∃ fd : nat,
              ⌜rv = (mword_of_int (Z.of_nat fd) : mword 64)
               /\ (fd < NOFILE)%nat⌝ ∗
-             ualloc (ukn_fd N) l fd
+             ∃ fdv : list fdstate, ⌜tab_le fdv v⌝ ∗
+             ualloc_v (ukn_fd N) l fd
                (FdOpen (om_readable (m !!! Regidx a1_idx))
                        (om_writable (m !!! Regidx a1_idx))
-                       (FdDevice ma)))
+                       (FdDevice ma))
+               (<[fd := FdOpen (om_readable (m !!! Regidx a1_idx))
+                          (om_writable (m !!! Regidx a1_idx))
+                          (FdDevice ma)]> fdv))
         ∨ (ustd_any (ukn_fd N) ∗ tree_taint c)) -∗
        UserCwd.ucwd (ukn_cwd N) cw -∗
        urun (PS := uprogSG_free) N h' (<[Regidx a0_idx := rv]> m)
@@ -358,7 +362,7 @@ Section UInitTreeCons.
     iDestruct (tree_open_sup_dev N c r g root d i t ma mi Img pv m pc pl cw
                  Heq Hpath Ha0 Hcr Htr Hp Hstart Hd Hres
                  with "Hpin Hinv Hro") as "Hsb".
-    iApply (wp_uk_ecall_open_recv_img (PS := uprogSG_free) N h m pc l avail
+    iApply (wp_uk_ecall_open_recv_img_at (PS := uprogSG_free) N h m pc l v avail
               (tree_open_fam (tree_taint c) (fun v => subtree v root = Some t)
                  (resolve_hops t d pl) (ukn_pay N))
               cw Img Hn Hal4 with "Hi Hro Hrun Hcwd Hsb Hstd").
@@ -383,8 +387,8 @@ Section UInitTreeCons.
     iApply ("Hcont" $! h' rv with "[Hfd Hans] Hcwd Hrun").
     iDestruct "Hans" as "[[%Hr %Hfdv] | [%Hrcpt | #HT]]"; last first.
     { iRight. iRight. iFrame "HT".
-      iApply (init_cons_any_std (ukn_fd N) l (uvis_fd W) fdv' rv with "[Hfd]").
-      rewrite /uk_open_fd_arm. iExact "Hfd". }
+      iApply (init_cons_any_std_at (ukn_fd N) l v (uvis_fd W) fdv' rv with "[Hfd]").
+      rewrite /uk_open_fd_arm_at. iExact "Hfd". }
     - (* THE DEVICE: the receipt's type meets the ledger's number *)
       iDestruct "Hfd" as "[Hal | [%Hb _]]"; last first.
       { exfalso. destruct Hb as [Hrm _].
@@ -392,7 +396,7 @@ Section UInitTreeCons.
         assert (Hlt0 : (fd0 < NOFILE)%nat).
         { rewrite <- Hlen. exact (lookup_lt_Some _ _ _ Hcl0). }
         exact (init_cons_moi_nat_m1 fd0 Hlt0 (eq_trans (eq_sym Hr0) Hrm)). }
-      iDestruct "Hal" as (fd rd wr ty) "[%Hb Hal]".
+      iDestruct "Hal" as (fd rd wr ty) "[%Hb [Hal %Htab]]".
       destruct Hb as (Hr1 & Hlt1 & Hfdv1 & _).
       (* the two spellings of the resume view agree at the slot the call
          wrote, so the receipt's TYPE is the ledger's ([UkTreeRead.
@@ -422,14 +426,14 @@ Section UInitTreeCons.
                          (om_writable (m !!! Regidx a1_idx))
                          (FdDevice ma)) Hfdlt) as Hl2.
         rewrite Hins in Hl1. rewrite Hl2 in Hl1. congruence. }
-      rewrite Hst.
-      iRight. iLeft. iExists fd. iFrame "Hal". iPureIntro.
-      exact (conj Hr1 Hlt1).
+      rewrite Hfdv1 Hst.
+      iRight. iLeft. iExists fd. iSplitR; [ iPureIntro; exact (conj Hr1 Hlt1) |].
+      iExists (uvis_fd W). iFrame "Hal". by iPureIntro.
     - (* the call failed: the ledger comes back untouched *)
       iLeft. iSplitR; [ by iPureIntro | ].
-      iApply (init_cons_fail_std (ukn_fd N) l (uvis_fd W) fdv' rv Hr
+      iApply (init_cons_fail_std_at (ukn_fd N) l v (uvis_fd W) fdv' rv Hr
                 with "[Hfd]").
-      rewrite /uk_open_fd_arm. iExact "Hfd".
+      rewrite /uk_open_fd_arm_at. iExact "Hfd".
   Qed.
 
   (* =================================================================== *)
@@ -452,6 +456,7 @@ Section UInitTreeCons.
   Proof using .
     intros Heq Hdd Hres. iIntros "#Hpin #Hinv !>".
     iIntros (h m avail) "#Hcode #Hro %Hargs Hrun Hcwd Hstd Hcont".
+    iDestruct "Hstd" as (vw) "[#Hvw Hstd]".
     destruct Hargs as [Ha0 Ha1].
     destruct init_syms_pins
       as (_ & _ & _ & _ & _ & Hopen & _ & _ & _ & _ & _ & _ & _).
@@ -486,7 +491,7 @@ Section UInitTreeCons.
                  ltac:(vm_compute; discriminate)).
       exact Ha1. }
     (* ---- 0x3b4  ecall, at the DEVICE the owner's tree records ---- *)
-    iApply (wp_uk_ecall_open_dev_own N h1 m1 (mword_of_int 0x3b4) ufd_l0 avail
+    iApply (wp_uk_ecall_open_dev_own N h1 m1 (mword_of_int 0x3b4) ufd_l0 vw avail
               c r g FsImg.ROOTINO FsImg.ROOTINO i FsImg.ROOTINO t CONSOLE 0
               UCodeInit.init_ro (mword_of_int 0x980) init_cons_pl
               Heq
@@ -530,18 +535,23 @@ Section UInitTreeCons.
     iApply ("Hcont" $! h3 ret with "[Hans] Hcwd Hrun").
     iDestruct "Hans" as "[[%Hr Hstd] | [Hal | [Hany #HT]]]".
     - (* the call failed: the ledger is back untouched *)
-      iRight. iLeft. iSplitR; [ by iPureIntro | ]. iExact "Hstd".
+      iRight. iLeft. iSplitR; [ by iPureIntro | ].
+      rewrite /ustd_ok. iExists vw. iFrame "Hvw Hstd".
     - (* THE CONSOLE: the receipt's type is the ledger's, and the LEDGER
          decides the number -- which at an all-closed table is 0 *)
       iDestruct "Hal" as (fd) "[%Hb Hal]". destruct Hb as [Hr1 Hlt1].
+      iDestruct "Hal" as (fdv) "[%Htab Hal]".
       assert (Hmodes : om_readable (m1 !!! Regidx a1_idx) = true
                        /\ om_writable (m1 !!! Regidx a1_idx) = true).
       { rewrite Ha1'. exact (om_rdwr_modes _ init_cons_om2_arg). }
       destruct Hmodes as [Hrd Hwr].
       iEval (rewrite Hrd Hwr) in "Hal".
-      iDestruct (ufd_alloc0 (ukn_fd N) init_cons_fd fd with "Hal")
+      iDestruct (ufd_alloc0_v (ukn_fd N) init_cons_fd fd with "Hal")
         as "[%Hfd0 Hstd]".
-      subst fd. iLeft. iFrame "Hstd". iPureIntro. rewrite Hr1. reflexivity.
+      subst fd. iLeft. iSplitR; [ iPureIntro; rewrite Hr1; reflexivity |].
+      rewrite /ustd_ok. iExists _. iFrame "Hstd".
+      iDestruct "Hvw" as "[%Hok | $]". iLeft. iPureIntro.
+      exact (ush_view_ok_open fdv vw 0%nat true true CONSOLE Hok Htab).
     - iRight. iRight. iFrame "HT". iExact "Hany".
   Qed.
 

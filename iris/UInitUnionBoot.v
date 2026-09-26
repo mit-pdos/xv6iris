@@ -307,7 +307,7 @@ Section UnionInitBoot.
                 (UkInit.init_kill_law_of_taint _ _ _ _ Hktaint)
                 (init_boot_room 0%nat
                                    ltac:(vm_compute; discriminate))
-                fdt0_length eq_refl (fdv_nopipe_closed _)
+                fdt0_length eq_refl (fdv_nopipe_closed _) ush_view_ok_fdt0
                 (fun k H => H)
                 with "[] [] Hxs").
       - iModIntro. iExact "Hdp".
@@ -410,7 +410,7 @@ Section UnionInitBoot.
       iPoseProof ("Hxlaw" $! n N' with "Hp") as "H".
       iDestruct (kinit_banner_pay_frame HR GEN N' _ _ _ _ _ with "H Hh") as "H".
       rewrite /UkInit.kinit_banner_pay.
-      iIntros "Hl". iDestruct ("H" with "Hl") as (Ch) "(#Hst & H0 & Hfin)".
+      iIntros (vw) "Hl". iDestruct ("H" $! vw with "Hl") as (Ch) "(#Hst & H0 & Hfin)".
       iExists Ch. iFrame "Hst H0".
       iIntros "HC". iDestruct ("Hfin" with "HC") as "[$ Hrt]".
       iDestruct "Hrt" as "[Hb Hh]".

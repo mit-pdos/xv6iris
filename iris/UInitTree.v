@@ -361,9 +361,9 @@ Section TreeInitWrite.
       iDestruct "Hdp" as "[[#Hwr _] _]". iExact "Hwr". }
     rewrite /UkInitMain.kinit_ban_law. iIntros "!>" (n) "Hwb".
     rewrite /UkInitMain.kinit_banner0 /UkInit.kinit_banner_pay.
-    iIntros "Hstd".
+    iIntros (vw) "Hstd".
     iExists (fun j : nat =>
-               (UserFd.ustd (ukn_fd N) (ufd_l3 stc)
+               (UserFd.ustd_at (ukn_fd N) (ufd_l3 stc) vw
                 ∗ match j with
                   | O => cc_wbn (tree_cc c) n
                   | S _ => tree_taint c
@@ -372,15 +372,15 @@ Section TreeInitWrite.
     - iIntros "!>" (j _). destruct j as [| j ].
       + (* THE FIRST BYTE: the licence is spent here *)
         iApply (kinit_w1_of_upd N _ _
-                  (UserFd.ustd (ukn_fd N) (ufd_l3 stc) ∗ cc_wbn (tree_cc c) n)
-                  (UserFd.ustd (ukn_fd N) (ufd_l3 stc) ∗ tree_taint c)).
+                  (UserFd.ustd_at (ukn_fd N) (ufd_l3 stc) vw ∗ cc_wbn (tree_cc c) n)
+                  (UserFd.ustd_at (ukn_fd N) (ufd_l3 stc) vw ∗ tree_taint c)).
         iIntros "!> [Hstd Hwb]".
         iMod (tree_cc_wbn_mint c n with "Hwb") as "#Ht". iModIntro.
         iFrame "Hstd Ht". iApply ("Hwr" with "Ht").
       + (* ...and every byte after it, off the same persistent fact *)
         iApply (kinit_w1_of_upd N _ _
-                  (UserFd.ustd (ukn_fd N) (ufd_l3 stc) ∗ tree_taint c)
-                  (UserFd.ustd (ukn_fd N) (ufd_l3 stc) ∗ tree_taint c)).
+                  (UserFd.ustd_at (ukn_fd N) (ufd_l3 stc) vw ∗ tree_taint c)
+                  (UserFd.ustd_at (ukn_fd N) (ufd_l3 stc) vw ∗ tree_taint c)).
         iIntros "!> [Hstd #Ht]". iModIntro. iFrame "Hstd Ht".
         iApply ("Hwr" with "Ht").
     - iSplitL "Hstd Hwb"; [ iFrame "Hstd Hwb" | ].
@@ -411,13 +411,13 @@ Section TreeInitWrite.
                   UkInit.kinit_banner_pay (PS := uprogSG_free) N' stc len f Rt))%I
       as "#Hchain".
     { iIntros "!>" (N' len f Rt) "#Hrt #Ht".
-      rewrite /UkInit.kinit_banner_pay. iIntros "Hstd".
-      iExists (fun _ : nat => UserFd.ustd (ukn_fd N') (ufd_l3 stc)).
+      rewrite /UkInit.kinit_banner_pay. iIntros (vw) "Hstd".
+      iExists (fun _ : nat => UserFd.ustd_at (ukn_fd N') (ufd_l3 stc) vw).
       iSplitR.
       - iIntros "!>" (j _).
         iApply (kinit_w1_of_upd N' _ _
-                  (UserFd.ustd (ukn_fd N') (ufd_l3 stc))
-                  (UserFd.ustd (ukn_fd N') (ufd_l3 stc))).
+                  (UserFd.ustd_at (ukn_fd N') (ufd_l3 stc) vw)
+                  (UserFd.ustd_at (ukn_fd N') (ufd_l3 stc) vw)).
         iIntros "!> Hstd". iModIntro. iFrame "Hstd".
         iApply ("Hwr" with "Ht").
       - iSplitL "Hstd"; [ iExact "Hstd" | ].

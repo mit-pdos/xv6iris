@@ -209,6 +209,7 @@ Section UInitTreeExec.
     rewrite /UkInit.init_exec_sup_pos.
     iIntros (N m pc l)
       "%Hpeq %Ha0 %Ha1 #Hro #Hargv Hstd Hrow Hcred Hpos Hlease Hchf Hpidf".
+    iDestruct (ustd_ok_ustd with "Hstd") as "Hstd".
     (* THE DOOR IS FREE HERE: the taint is a premise of this lemma, so
        nothing is spent to open the update. *)
     iModIntro.
@@ -369,7 +370,7 @@ Section UInitTreeExec.
               init_cons_fd_ne
               (tree_init_kill_law c init_cons_fd)
               (init_boot_room 0%nat ltac:(vm_compute; discriminate))
-              fdt0_length eq_refl (fdv_nopipe_closed _)
+              fdt0_length eq_refl (fdv_nopipe_closed _) ush_view_ok_fdt0
               (fun k H => H)
               with "[] [] []").
     - iApply (tree_init_deps c r Heq Hcons Hkill).
