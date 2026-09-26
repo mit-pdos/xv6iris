@@ -106,6 +106,7 @@ import Xv6.PipeNames
 import Xv6.PipeQueue
 import Xv6.PipeInvDefs
 import Xv6.PipeReg
+import Xv6.PipeQstep
 import Xv6.PipeInv
 import Xv6.PipeRw
 import Xv6.FileDefs
