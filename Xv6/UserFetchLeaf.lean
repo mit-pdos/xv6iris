@@ -152,7 +152,7 @@ theorem uft_leaves_ok (P : UPtd) (hwf : uptWf P) (hv : UftLeavesValid P) (k : Na
       cases h
       exact ⟨(uftLeafOk_tf P.tfp).1, fun hu => absurd hu (by rw [(uftLeafOk_tf P.tfp).2]; decide)⟩
     · rw [Iris.Std.get?_insert_ne (fun e => h2 e.symm)] at h
-      exact ⟨uftLeafOk_user lw (hwf.1 k lw h).2.1 (hwf.2.2.2 k lw h) (hv k lw h), fun _ => h⟩
+      exact ⟨uftLeafOk_user lw (hwf.1 k lw h).2.1 (hwf.2.2.2.1 k lw h) (hv k lw h), fun _ => h⟩
 
 /-! ## §2 The walk reaches a leaf of the table -/
 

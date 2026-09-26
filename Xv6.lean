@@ -1421,3 +1421,4 @@ import Xv6.UserFetchLeaf
 import Xv6.UserFetchTr
 import Xv6.UserFetchHit
 import Xv6.UserFetchXlate
+import Xv6.UserFetchWf
