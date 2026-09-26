@@ -1366,6 +1366,7 @@ import Xv6.UStrImg
 import Xv6.UserConsole
 import Xv6.UInitFd
 import Xv6.PinnedObs
+import Xv6.PinnedOpen
 import Xv6.UConsOpen
 import Xv6.UserBytes
 import Xv6.UserBytesAcc
