@@ -44,9 +44,15 @@ names `γ` (Rocq's `is_ftable γft γf` premise), its cwd reference
 trivial payload beside `firstBoot`'s rows.
 
 THE BOOT-TOKEN DEPOSIT (Rocq's `first_addr ↦₄ 1 ∗ first_boot_persist ∗
-first_fsinit`, here the one row `FirstTok.firstBoot`): userinit is the
-COURIER -- it reads none of it; it rides the park as the boot mode's own row
-(`ParkCap.parkBootBlock`), which forkret's boot arm consumes.
+first_fsinit`, three premises): userinit is the COURIER -- it reads none of
+it, and it SEALS the allocator count (`kallocAvail_seal`) once allocproc's
+last counted draw is done, which completes `FirstTok.firstBoot` (whose
+allocator row is the sealed count at `fsReadyKmem`); the token rides the
+park as the boot mode's own row (`ParkCap.parkBootBlock`), which forkret's
+boot arm consumes.  The allocator is therefore at the AMBIENT names
+(`fscKalloc` / `fsReadyKmem`, Rocq's "AT THE AMBIENT fsc_kalloc"): a count
+the caller named could not be the token's row, and holding the sealed row
+beside the counted one would be contradictory.
 
 THE PARK (W8-P2, Rocq's six park rows, the exec bundle and the reader
 token): userinit parks `<init>` with the park token at THE BOOT MODE
@@ -78,8 +84,10 @@ target), so `userinit` takes it owned and gives it back DISCARDED, inside
 the persistent `WaitInv.initIdentAt` every later reader takes as a premise.
 
 COUNTED: `allocproc` needs a trapframe page and up to
-`procPagetableNodes` table nodes, so the caller lends `kallocAvail γk
-(some nb)` with `nb` over that bound and gets back what is left; and it
+`procPagetableNodes` table nodes, so the caller lends `kallocAvail
+fsReadyKmem (some nb)` with `nb` over that bound and gets back the SEALED
+count (see above: nothing in the boot chain allocates a page after
+userinit on this hart); and it
 needs a FREE SLOT, which it does not check for, so the caller lends the
 proc table's counted regime `procsAvail Γ (some (np + 1))`
 (`Xv6/ProcAvail.lean`) -- the only thing that can refute `allocproc`'s
@@ -138,17 +146,21 @@ def wp_userinit_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G
     [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF] [FsTopG GF] [FsLinkG GF] [IcboxG GF]
     [SleepLockG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [Appcfg GF] [BcacheG GF] [DiskG GF] [OffboxG GF] [OffboxBoxG GF] [FileG GF] [SG : UexecSG GF] [Fscfg] [Icfg] [CurCtx]
     (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
-    (cpu : CPU) (k : KCtx) (γp γl : GName) (γk : KmemNames) (γft : GName) (γ : FileNames) (γw γtk : GName) (nb np : Nat)
+    (cpu : CPU) (k : KCtx) (γp : GName) (γft : GName) (γ : FileNames) (γw γtk : GName) (nb np : Nat)
     (hnoff : k.noff + 2 < 2 ^ 31) (hnoff0 : k.noff = 0) (hK : userinitSlots ≤ k.avail)
     (hlk : "kmem" ∉ k.locks) (hlp : "nextpid" ∉ k.locks) (hlq : "proc" ∉ k.locks)
     (hlocks : k.locks = []) (htier : k.tier = KTier.kpt) (hproc : k.proc = 0#64)
     (hsie : k.sie = false) (hnb : procPagetableNodes + 1 < nb)
     (hroot : icfgDev = BitVec.ofNat 32 ROOTDEV) (hnib0 : 0 < icfgNib) : Prop :=
   kctx cpu k ∗ pcIs cpu userinitAddr ∗ procsInv Γ ∗
-  isLock γl kmemLockAddr "kmem" (kmemRes γk) ∗ isLock γp pidLockAddr "nextpid" pidLockPay ∗
-  kallocAvail γk (some nb) ∗ procsAvailAt Γ (some (np + 1)) true ∗
+  isLock fscKalloc kmemLockAddr "kmem" (kmemRes fsReadyKmem) ∗ isLock γp pidLockAddr "nextpid" pidLockPay ∗
+  kallocAvail fsReadyKmem (some nb) ∗ procsAvailAt Γ (some (np + 1)) true ∗
   (∃ w : BitVec 64, wordPointsTo initprocAddr 8 (DFrac.own 1) w) ∗
-  firstBoot (hlc := hlc) ∗ initPidTok 0#32 ∗
+  -- THE BOOT TOKEN'S ROWS, unassembled (Rocq's three premises): userinit
+  -- seals the allocator count after allocproc's last draw and assembles
+  -- `firstBoot` itself
+  wordPointsTo firstAddr 4 (DFrac.own 1) 1#32 ∗ firstBootPersist (hlc := hlc) ∗ firstFsinit (hlc := hlc) ∗
+  initPidTok 0#32 ∗
   -- namei("/")'s four inode-cache rows and iget's live panic
   isItable2 fscItlock fscIc fscFs fscIreg fscCov fscLogst icfgNib icfgDev ∗
   itableInv (hlc := hlc) ∗ iregReg (hlc := hlc) fscIreg fscFs icfgIst icfgNib ∗ panicEnv ∗
@@ -159,7 +171,7 @@ def wp_userinit_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G
     ⌜(k.sie = false → spie = k.spie ∧ spp = k.spp) ∧ calleeSaved k.regs R' ∧
       g ≤ procPagetableNodes + 1 ∧ ∃ i : Nat, i < NPROC ∧ ip = procAddr i⌝ -∗
     kctx cpu' ((k.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k.regs 1#5)) -∗
-    initIdentAt curCtx ip -∗ kallocAvail γk (availSub (some nb) g) -∗ procsAvailAt Γ none false -∗ wpLoop cpu'))
+    initIdentAt curCtx ip -∗ kallocAvail fsReadyKmem none -∗ procsAvailAt Γ none false -∗ wpLoop cpu'))
   ⊢ wpLoop (GF := GF) cpu
 
 /-- The interface of `userinit`. -/
@@ -170,9 +182,9 @@ structure USERINIT : Prop where
     (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
     (γ0 γ1 : UartNames) (γc γl0 γl1 : GName) (γd : DiskNames) (γdl γt : GName)
     [EnvIs (hlc := hlc) GF Γ γ0 γ1 γc γl0 γl1 γd γdl γt]
-    (cpu : CPU) (k : KCtx) (γp γl : GName) (γk : KmemNames) (γft : GName) (γ : FileNames) (γw γtk : GName) (nb np : Nat)
+    (cpu : CPU) (k : KCtx) (γp : GName) (γft : GName) (γ : FileNames) (γw γtk : GName) (nb np : Nat)
     hnoff hnoff0 hK hlk hlp hlq hlocks htier hproc hsie hnb hroot hnib0,
-    wp_userinit_body (hlc := hlc) (GF := GF) (SG := uexecSGXv6) Γ cpu k γp γl γk γft γ γw γtk nb np
+    wp_userinit_body (hlc := hlc) (GF := GF) (SG := uexecSGXv6) Γ cpu k γp γft γ γw γtk nb np
       hnoff hnoff0 hK hlk hlp hlq hlocks htier hproc hsie hnb hroot hnib0
 
 end Xv6

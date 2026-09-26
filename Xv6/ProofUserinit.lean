@@ -40,7 +40,8 @@ THE PARK IS THE BOOT MODE'S (`ParkCap.parkBootBlock`, Rocq `park_child`'s
 descriptor ghost allocproc minted (`V.fdg`, each slot owning its `fdSlot`
 unit and the `.closed` authority), the root reference `namei` returned as
 the cwd (at `ROOTINO`), and -- SPLIT, as their own rows -- the boot deposit
-`firstBoot`, the kernel's quarter and `myPay` at the trivial payload, the
+`firstBoot` (assembled here: the allocator count is SEALED after allocproc,
+`kallocAvail_seal`, and joined to the three premises), the kernel's quarter and `myPay` at the trivial payload, the
 two quarters `genHalvesPriv` and the xstate half (`uiBootRows`); beside the
 all-closed `fdFrags`.  The package carries the exec bundle and the reader
 token (`SpecUserinit.userinitPark`).
@@ -717,14 +718,14 @@ set_option maxHeartbeats 4000000 in
 /-- **`userinit` meets its specification.** -/
 theorem userinit_proof (AP : ALLOCPROC) (RE : RELEASE) (NR : NAMEI_ROOT) (FP : FORKRET_PARK_PAID) :
     USERINIT :=
-  ⟨fun {hlc GF} _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ X Γ _ γ0 γ1 γc γl0 γl1 γd γdl γt _ cpu k γp γl γk γft γ γw γtk nb np
+  ⟨fun {hlc GF} _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ X Γ _ γ0 γ1 γc γl0 γl1 γd γdl γt _ cpu k γp γft γ γw γtk nb np
       hnoff hnoff0 hK hlk hlp hlq hlocks htier hproc hsie hnb hroot hnib0 => by
   obtain ⟨ξ0, t0⟩ := X
   letI : CurCtx := ⟨ξ0, t0⟩
   unfold wp_userinit_body
   simp only [userinitAddr]
-  iintro ⟨Hk, Hpc, #Hpinv, #Hkml, #Hpml, Hkav, Hpav, Hinit, Hfb, Hipt, #Hit, #Hiti, #Hireg, #Hpe, #Hft, Hupk,
-    HPhi⟩
+  iintro ⟨Hk, Hpc, #Hpinv, #Hkml, #Hpml, Hkav, Hpav, Hinit, Hfw, #Hfbp, Hffs, Hipt, #Hit, #Hiti, #Hireg, #Hpe,
+    #Hft, Hupk, HPhi⟩
   icases kctx_tier cpu k $$ Hk with ⟨%hct, Hk⟩
   have ht0 : t0 = KTier.kpt := hct.symm.trans htier
   subst ht0
@@ -750,7 +751,7 @@ theorem userinit_proof (AP : ALLOCPROC) (RE : RELEASE) (NR : NAMEI_ROOT) (FP : F
   -- <init>'S PAYLOAD IS THE TRIVIAL ONE, and so is the wand that says how a
   -- killer pays for it (Rocq: `Q := fun _ => True`, the wand by `done`)
   ihave #HKw := ui_killw (hlc := hlc) (GF := GF)
-  iapply (ui_allocproc AP Γ γ cpu _ γl γp γk (some nb) (some (np + 1)) true (fun _ => iprop(True))
+  iapply (ui_allocproc AP Γ γ cpu _ fscKalloc γp fsReadyKmem (some nb) (some (np + 1)) true (fun _ => iprop(True))
       ?hna ?hKa ?hlka ?hlpa ?hlqa ?hta) $$ [- $Hk $Hpc]
   rotate_right 1
   k_norm
@@ -816,6 +817,13 @@ theorem userinit_proof (AP : ALLOCPROC) (RE : RELEASE) (NR : NAMEI_ROOT) (FP : F
   ihave Hpav := (show pavSpent (GF := GF) Γ (pavDec (some (np + 1))) ⊢ pavSpent Γ (some np)
     from by rw [show pavDec (some (np + 1)) = some np from by simp [pavDec]]) $$ Hpav
   imod procsAvail_seal_spent Γ np $$ [$Hir $Hpav] with #Hpav
+  -- THE ALLOCATOR COUNT, SEALED: allocproc's was the boot chain's last
+  -- counted draw on this hart, and the sealed count is the token's row
+  ihave Hkav := (show kallocAvail (GF := GF) fsReadyKmem (availSub (some nb) g) ⊢
+      kallocAvail fsReadyKmem (some (nb - g)) from .rfl) $$ Hkav
+  imod kallocAvail_seal fsReadyKmem (nb - g) $$ Hkav with #Hkav
+  -- ...WHICH COMPLETES THE BOOT TOKEN (Rocq `first_boot`)
+  ihave Hfb := firstBoot_intro (hlc := hlc) (GF := GF) $$ Hfw Hfbp Hkav Hffs
   -- THE BOOT MODE'S GENERATION ROWS: the boot deposit rides the park as its
   -- own row (userinit is its courier), beside the pair at the trivial payload
   ihave Hgen : uiBootRows (GF := GF) (procAddr j) 1#32 V.gen $$ [Hfb Hkq Hxs Hgh]
