@@ -58,6 +58,7 @@ Deviations from Rocq:
 -/
 import Xv6.LineWords
 import MachCSL.Lang
+import MachCSL.ObsTrace
 
 namespace Xv6
 
