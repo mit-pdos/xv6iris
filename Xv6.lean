@@ -1416,3 +1416,8 @@ import Xv6.UkForkHeap
 import Xv6.UkFork
 import Xv6.UkRunExecRef
 import Xv6.UEchoKernel
+import Xv6.UserFetch
+import Xv6.UserFetchLeaf
+import Xv6.UserFetchTr
+import Xv6.UserFetchHit
+import Xv6.UserFetchXlate
