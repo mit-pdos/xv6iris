@@ -733,3 +733,34 @@ next read vacuous by `uterm_read_law`'s argument); the read receipt
 S4 must replace the one knob-off discharge `UInitUnionCC.union_wbn_to`
 (`uwild_disc_off`) by init's licence path, and must never present a
 block-first byte at `LSecc` (the block step's not-wild premise).
+
+### 10.12 `read` STAYS OPEN; the console's dirty arm learns positions (owner, 2026-09-25)
+
+The owner's ruling: the discipline is exactly D4 -- once `seccomp x` has
+run, the user types nothing more until the system restarts (input typed
+after it could reach `x` or, if `x` has exited, the shell; the model
+already refuses it: `lm_d4` at `LSecc`, `demo_secc_d4`).  So the mask does
+NOT block `read`: 10.10's third bullet is withdrawn, `secc_B` is the six
+numbers of §1 again, `UexecSecc`'s console-read payer returns, and the
+union's `ai_rdwild := usecc_tok` (the universe pays its tokenless console
+reads with the era token).  The universe's reads consume nothing in fact
+(no input exists), and the shell's later token read must be able to SEE
+that when the kernel reports its ring dirty:
+
+- KERNEL (lane S2k): the console read's receipt, on the token holder's
+  DIRTY arm and on the tokenless arm, carries per-byte facts the ring can
+  always give: every delivered byte was stored at a ring position at or
+  after the ring's delivered count when this call began (the cursor is
+  monotone and every pop is at the cursor), with `cons_stored_lb sl`,
+  `cons_chain sl` and the token's own position at most that count.  No
+  window at the token's position (impossible when dirty), no link fired
+  (a second consumer breaks the delivered-list chain); pure facts only.
+- UNION: `usecc_tok_at k I0` also carries the transition read's window
+  facts (the stored list up to the seccomp newline, its bytes `I0`, the
+  index tie of the last entry's trace to `I0`).  The wild shape's read
+  law at the dirty arm: each delivered byte's ring position is past the
+  seccomp newline, so its push trace extends the newline's (`cons_chain`)
+  and its input has a byte after a complete admitted `LSecc` line; D4
+  refutes the tag's `lm_disc`, the tag's other half is `UT`, and the
+  outcome is the ordinary taint.  The refutation lives at the U-tier read
+  leaf (where the tags are), not in `cons_acc`.
