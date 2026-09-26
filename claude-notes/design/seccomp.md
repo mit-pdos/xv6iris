@@ -787,3 +787,14 @@ The union's `ai_rdwild` is the token in the form that carries what the
 discharge needs.  With both, the leaf's dirty case at the token half has
 three sub-cases (a delivered byte, the swallowed byte, nothing), the first
 two refuted through `lm_placed_wild_undisc`, the third by `0 < cap`.
+- GAP A, REFINED (lane S5b): the shell's position ghost `upos` is minted
+  fresh per shell (init restarts shells after a wild-era panic), so a
+  per-shell bound cannot reach a later shell.  The bound is therefore
+  PER ERA: `era_pins` gains `ep_rpos` (a `mono_nat`, the `ep_secc`
+  pattern), its full authority in the lease's era part beside `dl_cnt` in
+  `ush_mid_at`, handed shell to shell through `Pm` via init; the read leaf
+  advances it on the clean arm and holds it on the dirty arm (unlike
+  `dl_cnt`, whose half is spent into the read link and never returns on
+  the dirty arm); the transition's landing snapshots `rpos_lb v (length
+  I0)` into the wild shape, and the union's `ai_rdwild` is the token at
+  its line with that bound and the ring facts.
