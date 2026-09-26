@@ -48,8 +48,8 @@ Section UkGrepVprintf.
      at every call site ([UkRun.ukn_const]).  It used to be [ukn_triv] --
      "cat owes its parent nothing" -- which pinned the payload at [True]
      and so made cat's exit incapable of handing the shell the deed
-     fraction, the advanced console credential or the filed alternative
-     ([UCatOut.catq_filed] / [catq_unfiled]).  What cat actually needs of
+     fraction, the advanced console credential or the filed alternative.
+     What cat actually needs of
      its own payload is only that its two exits -- 0 on the content arm,
      1 on the diagnostic arm -- owe the SAME thing, which is exactly this
      class; echo's walk is stated at it for the same reason. *)

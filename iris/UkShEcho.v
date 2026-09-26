@@ -1437,7 +1437,7 @@ Section UkShEcho.
      THE DIAGNOSTIC IS A PARAMETER (lane LINK-GEN-4), as it already is one
      level down ([UkShDiag.ush_execfail_law_at dg n]).  An era whose
      exec-failed alternative depends on the LINE -- the file's
-     [FileHooks.fexfb], which is [alt_execcat] at an [LCat_f] line --
+     [FileHooks.fexfb], which is [alt_execcat] at an [LCat] line --
      cannot answer the constant form at every input, and the producer
      ([UShPanic.ush_execfail_law_hold_at]) delivers it at [lk_exfb L I]
      anyway.  So the carrier takes the bytes and their index as functions
