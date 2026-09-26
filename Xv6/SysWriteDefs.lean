@@ -200,6 +200,22 @@ theorem ubytesAt_nil (M : Nat → List (BitVec 8)) (ua : BitVec 64) : ubytesAt M
   intro d c hd
   simp at hd
 
+/-- TWO RUNS OF THE SAME LENGTH AT THE SAME BASE ARE THE SAME RUN (Rocq's
+`SpecCopyin.ubytes_at_inj`, lane WRITE-RELAY RELAY 3): `ubytesAt` is
+prefix-closed, so it identifies a run ONLY once the length is known beside
+it -- which is what the chain node's `wchunkAt` conjunct buys a client. -/
+theorem ubytesAt_inj (M : Nat → List (BitVec 8)) (ua : BitVec 64) (bs bs' : List (BitVec 8))
+    (h1 : ubytesAt M ua bs) (h2 : ubytesAt M ua bs') (hlen : bs.length = bs'.length) :
+    bs = bs' := by
+  apply List.ext_getElem?
+  intro d
+  by_cases hd : d < bs.length
+  · rw [List.getElem?_eq_getElem hd, List.getElem?_eq_getElem (by omega)]
+    have e1 := h1 d bs[d] (List.getElem?_eq_getElem hd)
+    have e2 := h2 d bs'[d] (List.getElem?_eq_getElem (by omega))
+    rw [← e1, ← e2]
+  · rw [List.getElem?_eq_none (by omega), List.getElem?_eq_none (by omega)]
+
 /-- ADJACENT RUNS APPEND, at the bumped base (Rocq's `ubytes_at_app`) -- the
 chunked writer's step.  No no-wrap side condition: the addition composes
 modulo 2^64. -/

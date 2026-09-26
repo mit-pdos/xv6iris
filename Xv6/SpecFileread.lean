@@ -438,7 +438,10 @@ def filereadIn (st : FdState) (F : Pfam GF (Aview → Nat → Anode → Nat → 
     IProp GF :=
   iprop(P -∗
     match st with
-    | .open true _ (.inode i γo _) => iprop(P ∗ pfAt (areadCommitAt (fsGammaL fscFs) appE i γo) F)
+    -- KEYED ON THE ROW'S OFFSET MODE (Rocq lanes OFF-LINK-4/5): a PARKED row
+    -- pays what it always paid, a HELD one `link ∨ taint`
+    -- (`FsAbsReadFire.areadInOm`)
+    | .open true _ (.inode i γo om) => iprop(P ∗ areadInOm (hlc := hlc) om (fsGammaL fscFs) appE i γo F)
     | .open true _ (.device mj) =>
       if mj = CONSOLE then
         iprop(consAcc fscCons (appRdcred (hlc := hlc) (GF := GF)) (fun cur dc => iprop(P ∗ Rd cur dc)) ∗
@@ -504,19 +507,19 @@ theorem filereadExtraCore_m1_why (rb : Bool) (n : Int) (r : BitVec 64) (M' : Nat
   exact consoleReceipt_m1_why gn pt Rd Rin n r M' addr hnb hr
 
 /-- Rocq `fileread_in_inode_of`. -/
-theorem filereadIn_inode_of (st : FdState) (wb : Bool) (i : Nat) (γo : GName)
-    (h : st = .open true wb (.inode i γo .parked)) :
+theorem filereadIn_inode_of (st : FdState) (om : OffMode) (wb : Bool) (i : Nat) (γo : GName)
+    (h : st = .open true wb (.inode i γo om)) :
     filereadIn (hlc := hlc) st F Rd Rin P ⊢ P -∗
-      P ∗ pfAt (areadCommitAt (fsGammaL fscFs) appE i γo) F := by
+      P ∗ areadInOm (hlc := hlc) om (fsGammaL fscFs) appE i γo F := by
   subst h
   unfold filereadIn
   iintro H HP
   iapply H $$ HP
 
 /-- Rocq `fileread_extra_inode_of`. -/
-theorem filereadExtra_inode_of (st : FdState) (wb : Bool) (i : Nat) (γo : GName) (n : Int)
-    (r : BitVec 64) (M' : Nat → List (BitVec 8)) (addr : BitVec 64)
-    (h : st = .open true wb (.inode i γo .parked)) :
+theorem filereadExtra_inode_of (st : FdState) (om : OffMode) (wb : Bool) (i : Nat) (γo : GName)
+    (n : Int) (r : BitVec 64) (M' : Nat → List (BitVec 8)) (addr : BitVec 64)
+    (h : st = .open true wb (.inode i γo om)) :
     P ⊢ readArms (hlc := hlc) (fsGammaL fscFs) i γo pt n F r M' addr -∗
       filereadExtra (hlc := hlc) gn pt st n F Rd Rin P r M' addr := by
   subst h
@@ -645,7 +648,19 @@ theorem filereadExtra_neg (st : FdState) (n : Int) (M' : Nat → List (BitVec 8)
       icases H $$ HP with ⟨HP, Hc⟩
       imodintro
       iframe HP
-      iapply readArms_neg _ i γo pt n F M' addr hn $$ Hc
+      -- the HELD row's two arms (Rocq lanes OFF-LINK-4/5): the sign guard
+      -- fires before anything is read, so the piece comes back whole, the
+      -- client-advanced one converting down
+      cases om with
+      | parked =>
+        unfold areadInOm
+        iapply readArms_neg _ i γo pt n F M' addr hn $$ Hc
+      | held =>
+        unfold areadInOm
+        icases Hc with (Hc | ⟨Hc, -⟩)
+        · ihave Hc := pfAt_areadCommitAt_of_adv _ _ i γo F $$ Hc
+          iapply readArms_neg _ i γo pt n F M' addr hn $$ Hc
+        · iapply readArms_neg _ i γo pt n F M' addr hn $$ Hc
   · cases rb
     · simp only [filereadIn, filereadExtra, filereadExtraCore]
       iintro H HP; ihave H := H $$ HP; imodintro; iframe H

@@ -225,19 +225,9 @@ def fdstParked : FdState → Prop
   | .open _ _ (.inode _ _ .held) => False
   | _ => True
 
-/-- A state a live `struct file` admits is PARKED (`fdstate_ok_parked`): the
-`FD_INODE` arm's pin, read as the fact it is. -/
-theorem fdstateOk_parked (inum : BitVec 32) (γo : GName) (γp : PipeNames) (C : FContent) (st : FdState)
-    (h : fdstateOk inum γo γp C st) : fdstParked st := by
-  cases st with
-  | closed => trivial
-  | «open» r w t =>
-    cases t with
-    | pipe _ => trivial
-    | device mj => trivial
-    | inode n g om =>
-      obtain ⟨-, -, -, -, -, hom⟩ := h
-      subst hom; trivial
+/- Rocq's `fdstate_ok_parked` is DELETED (Rocq lane OFF-LINK, bb7d140b3): it
+read `fdstateOk`'s pin as "every live row is parked" for a generic tier that
+is no longer told anything about offsets; it had no consumer. -/
 
 /-- "This row is not a pipe end" (Rocq FdSlots.v `fdst_nopipe`): the pure
 reading of `PipeReg.pipeRowReg`, one resource down. -/

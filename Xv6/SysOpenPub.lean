@@ -89,8 +89,10 @@ theorem sys_open_pub_off (cpu : CPU) (kk kf : Nat) (γo : GName) (C : FContent)
     · iframe Hctx Hrows
       unfold offResident
       iexists vo
-      iframe Hcell Hgk
-      ipureintro; exact hwf
+      iframe Hcell
+      isplitr
+      · ipureintro; exact hwf
+      · iapply offLink_of $$ Hgk
     imodintro
     iframe Hctx Hrows
     iexists γb

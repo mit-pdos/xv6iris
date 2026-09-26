@@ -442,6 +442,32 @@ theorem writeArmsAt_neg (Γ : FsViewNames GF) (i : Nat) (γo : GName) (P : UPtd)
   · ipureintro; exact ubytesAt_nil M ua
   iexact Hc
 
+/-- ...and the HELD row's (Rocq `write_arms_at_neg_held`, lanes
+OFF-LINK-4/5): `wchunks n` is 0 at a negative count, so the client-advanced
+chain IS the cursor -- a negative request moves no offset. -/
+theorem writeArmsAt_neg_held (Γ : FsViewNames GF) (i : Nat) (γo : GName) (P : UPtd) (n : Int)
+    (M : Nat → List (BitVec 8)) (ua : BitVec 64) (Q : Nat → IProp GF) (hn : n < 0) :
+    awriteChainAdv (hlc := hlc) Γ appE i γo M ua P n Q 0 (wchunks n) ⊢
+      writeArmsAt Γ i γo P n M ua Q (-1#64) := by
+  unfold writeArmsAt writePostFailAt
+  iintro Hc
+  ihave Hc := awriteChainAdv_cursor Γ appE i γo M ua P n Q 0 (wchunks n) $$ Hc
+  iright
+  isplitr
+  · ipureintro; rfl
+  iexists [], 0
+  rw [wchunks_nonpos n (by omega)]
+  isplitr
+  · ipureintro; exact Or.inr ⟨hn, rfl⟩
+  isplitr
+  · ipureintro; simp
+  isplitr
+  · ipureintro; omega
+  isplitr
+  · ipureintro; exact ubytesAt_nil M ua
+  simp only [List.length_nil, Nat.add_zero, Nat.zero_sub, awriteChainAt_0]
+  iexact Hc
+
 end Arms
 
 /-! ## The one input and the one output, keyed on the state -/
@@ -506,6 +532,21 @@ theorem writeConsArms_of_cursor (P : UPtd) (ua : BitVec 64) (Q : Nat → IProp G
 
 /-! ### The one input and the one output -/
 
+/-- WHAT A HELD DESCRIPTOR'S WRITE PAYS (Rocq `filewrite_in_held`, lanes
+OFF-LINK-4/5): the LINK arm is the CLIENT-ADVANCED chain
+(`FsAbsWriteFire.awriteChainAdv`), whose nodes hand the box's arm back
+ADVANCED BY THE CHUNK -- the half lives in the node's own closure, so the
+kernel carries no `uoff` and its fire answers no supplier; the TAINT arm is
+the plain chain beside the taint, which is what the generic tier pays and
+what a disconnected object leaves.  THERE IS NO SECOND POST: what the
+caller gets back rides in its own cursor `Q`, so `filewriteExtra` is the
+landed `writeArmsAt` at both modes.  The match is outside the `∀ P`. -/
+def filewriteInHeld (i : Nat) (γo : GName) (n : Int) (M : Nat → List (BitVec 8)) (ua : BitVec 64)
+    (Q : Nat → IProp GF) : IProp GF :=
+  iprop((∀ P : UPtd, awriteChainAdv (hlc := hlc) (fsGammaL fscFs) appE i γo M ua P n Q 0 (wchunks n)) ∨
+    (awriteChain (hlc := hlc) (fsGammaL fscFs) appE i γo M ua n Q 0 (wchunks n) ∗
+      MachFixedGS.killCred (hlc := hlc) (GF := GF)))
+
 /-- WHAT THE CALLER HANDS IN, by `st` (Rocq `filewrite_in`): on an open,
 writable INODE the commit CHAIN at the cursor `Q`, one node per possible
 chunk; on an open, writable DEVICE (at EVERY major: the walk calls whatever
@@ -514,8 +555,11 @@ nothing elsewhere. -/
 def filewriteIn (st : FdState) (n : Int) (M : Nat → List (BitVec 8)) (ua : BitVec 64)
     (Q : Nat → IProp GF) : IProp GF :=
   match st with
-  | .open _ true (.inode i γo _) =>
+  -- KEYED ON THE ROW'S OFFSET MODE (Rocq lane OFF-LINK-4): a PARKED row pays
+  -- what it always paid, a HELD one `link ∨ taint` (`filewriteInHeld`)
+  | .open _ true (.inode i γo .parked) =>
     awriteChain (hlc := hlc) (fsGammaL fscFs) appE i γo M ua n Q 0 (wchunks n)
+  | .open _ true (.inode i γo .held) => filewriteInHeld (hlc := hlc) i γo n M ua Q
   | .open _ true (.device _) =>
     consOutChain (genId (hlc := hlc) (GF := GF) + 1) M ua Q 0 n.toNat
   | _ => emp
@@ -553,6 +597,27 @@ theorem filewriteIn_inode (rb : Bool) (i : Nat) (γo : GName) (n : Int) (M : Nat
     (ua : BitVec 64) (Q : Nat → IProp GF) :
     filewriteIn (hlc := hlc) (.open rb true (.inode i γo .parked)) n M ua Q ⊣⊢
       awriteChain (hlc := hlc) (fsGammaL fscFs) appE i γo M ua n Q 0 (wchunks n) := .rfl
+
+/-- The inode arm at either mode (Rocq `filewrite_in_inode_om`): what the
+walk's carrier is initialised from. -/
+def filewriteInInodeOm (om : OffMode) (i : Nat) (γo : GName) (n : Int) (M : Nat → List (BitVec 8))
+    (ua : BitVec 64) (Q : Nat → IProp GF) : IProp GF :=
+  match om with
+  | .parked => awriteChain (hlc := hlc) (fsGammaL fscFs) appE i γo M ua n Q 0 (wchunks n)
+  | .held => filewriteInHeld (hlc := hlc) i γo n M ua Q
+
+/-- Rocq `filewrite_in_inode_any`. -/
+theorem filewriteIn_inode_any (rb : Bool) (om : OffMode) (i : Nat) (γo : GName) (n : Int)
+    (M : Nat → List (BitVec 8)) (ua : BitVec 64) (Q : Nat → IProp GF) :
+    filewriteIn (hlc := hlc) (.open rb true (.inode i γo om)) n M ua Q ⊢
+      filewriteInInodeOm (hlc := hlc) om i γo n M ua Q := by
+  cases om <;> exact .rfl
+
+/-- Rocq `filewrite_in_inode_held`: the HELD row's reading. -/
+theorem filewriteIn_inode_held (rb : Bool) (i : Nat) (γo : GName) (n : Int)
+    (M : Nat → List (BitVec 8)) (ua : BitVec 64) (Q : Nat → IProp GF) :
+    filewriteIn (hlc := hlc) (.open rb true (.inode i γo .held)) n M ua Q ⊣⊢
+      filewriteInHeld (hlc := hlc) i γo n M ua Q := .rfl
 
 /-- Rocq `filewrite_in_cons`. -/
 theorem filewriteIn_cons (rb : Bool) (mj : Nat) (n : Int) (M : Nat → List (BitVec 8))
@@ -642,9 +707,19 @@ theorem filewriteExtra_neg (P : UPtd) (st : FdState) (n : Int) (M : Nat → List
         iintro -
         iapply filewriteExtra_pipe P rb true γp n M ua Q (-1#64) (fun _ => by
           rw [show n.toNat = 0 by omega]; exact pipeWpostR_neg P ua)
-      · unfold filewriteIn filewriteExtra
-        iintro Hc
-        iapply writeArmsAt_neg _ i g P n M ua Q hn $$ Hc
+      · -- the HELD row's two arms (Rocq lanes OFF-LINK-4/5): the link's
+        -- own cursor, or the plain chain beside the taint
+        cases om with
+        | parked =>
+          unfold filewriteIn filewriteExtra
+          iintro Hc
+          iapply writeArmsAt_neg _ i g P n M ua Q hn $$ Hc
+        | held =>
+          unfold filewriteIn filewriteExtra filewriteInHeld
+          iintro (Hc | ⟨Hc, -⟩)
+          · ispecialize Hc $$ %P
+            iapply writeArmsAt_neg_held _ i g P n M ua Q hn $$ Hc
+          · iapply writeArmsAt_neg _ i g P n M ua Q hn $$ Hc
       · iintro -
         by_cases hc : mj = CONSOLE
         · subst hc

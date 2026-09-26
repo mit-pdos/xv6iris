@@ -268,7 +268,6 @@ theorem fwr_dispatch (PW : PIPEWRITE) (IL : ILOCK) (WI : WRITEI) (IU : IUNLOCK) 
   unfold filewriteIn
   unfold filewriteEnv filewriteFsEnv
   icases Henv with ⟨#Hfs, Hbs⟩
-  unfold foffRow
   have hpos : 0 < n ∧ n < 2 ^ 31 := ⟨by omega, hn.2⟩
   let A : FwrA := ⟨γ, fk, q, rb, i, γoC, j, pid, V, M, γkl, γk, γl, γu, n⟩
   have hA : FwrFacts k A := ⟨hK, hfk, hj, hproc, hnoff, hlocks, htier, ht0, hpos⟩

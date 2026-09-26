@@ -94,8 +94,6 @@ theorem frd_env_dev (r w : Bool) (mj : Nat) :
 theorem frd_env_inode (r w : Bool) (i : Nat) (γo : GName) (om : OffMode) :
     filereadEnv (hlc := hlc) (GF := GF) (.open r w (.inode i γo om)) ⊢ fsReady (hlc := hlc) ∗ bslot :=
   .rfl
-theorem frd_foff_inode (r w : Bool) (i : Nat) (γo : GName) :
-    foffRow (GF := GF) (.open r w (.inode i γo .parked)) ⊢ offUserInv (hlc := hlc) γo := .rfl
 
 set_option maxHeartbeats 32000000 in
 /-- **`+0x20 .. +0x34`: THE DISPATCH** (Rocq's `+0x1e .. +0x2a`): the type
@@ -220,8 +218,7 @@ theorem frd_dispatch (PR : PIPEREAD) (IL : ILOCK) (RD : READI) (IU : IUNLOCK) (C
   ihave Href := filerw_ref_close γ fk q _ C $$ [Htok Hfields Hpay]
   · iframe
   icases frd_env_inode true wb i γoC .parked $$ Henv with ⟨#Hfs, Hbs⟩
-  ihave #Hoinv := frd_foff_inode true wb i γoC $$ Hfoff
-  icases filereadIn_inode_of F Rd Rin P _ wb i γoC rfl $$ Hin HP with ⟨HP, Hcm⟩
+  icases filereadIn_inode_of F Rd Rin P _ .parked wb i γoC rfl $$ Hin HP with ⟨HP, Hcm⟩
   iapply (frd_arm_inode IL RD IU Γ cpu k k.spie k.spp _ γ fk q wb i γoC j pid V M γkl γk n F Rd Rin P
     hK hj hproc hnoff hlocks htier ht0 hn0 hn.2 ?hri ?h10i) $$ [- $Hk $Hpc]
   rotate_right 1

@@ -169,7 +169,7 @@ theorem frd_pre_ghost (cpu : CPU) (ik fk : Nat) (q : Qp) (γb : BoxNames) (γo :
           inodeBlocksQ fscFs (DFrac.own Qp.quarter) bm data ∗
           topFragQ (fsGammaL fscFs) (DFrac.own Qp.quarter) inum.toNat (eraNode dn bm data) ∗
           wordPointsTo (fnode fk + 32#64) 4 (DFrac.own 1) v ∗
-          offGv γo (1 : Qp).half (v.toNat : Int) ∗ frdOut ik fk q γb γo m T0 Tr) := by
+          offLink (hlc := hlc) γo (v.toNat : Int) ∗ frdOut ik fk q γb γo m T0 Tr) := by
   iintro ⟨Hrun, #Hflr, Hat, Hrows, Hheld⟩
   unfold icDepHeld
   simp only [icDepRd, ↓reduceIte]
@@ -204,14 +204,15 @@ re-closed. -/
 theorem frd_post_ghost (cpu : CPU) (ik fk : Nat) (q : Qp) (γb : BoxNames) (γo : GName)
     (C : FContent) (m : StampMap Nat) (T0 Tr : Nat) (s : Qp) (g : GName) (lo : Nat)
     (inum : BitVec 32) (dn : Dinode) (bm : Blkmap) (data : Nat → List (BitVec 8)) (v : BitVec 32)
-    (dd : Nat) (F : Pfam GF (Aview → Nat → Anode → Nat → IProp GF))
+    (dd : Nat) (F : Pfam GF (Aview → Nat → Anode → Nat → IProp GF)) (wb : Bool) (om : OffMode)
     (hip : C.ip = ientry ik) (hik : ik < NINODE) (hq : MachCSL.qsum m = q.val)
     (hok : inodeOk fscCov fscLogst dn bm data) (hloc : InodeLocal inum.toNat (eraNode dn bm data))
     (hwf : offWf v) (hcap : v.toNat + dd ≤ MAXFILE * BSIZE) :
-    ownCtx cpu curCtx ∗ fsReady (hlc := hlc) ∗ offUserInv (hlc := hlc) γo ∗
-      pfAt (areadCommitAt (fsGammaL fscFs) appE inum.toNat γo) F ∗
+    ownCtx cpu curCtx ∗ fsReady (hlc := hlc) ∗
+      foffRow (GF := GF) (.open true wb (.inode inum.toNat γo om)) ∗
+      areadInOm (hlc := hlc) om (fsGammaL fscFs) appE inum.toNat γo F ∗
       topFragQ (fsGammaL fscFs) (DFrac.own Qp.quarter) inum.toNat (eraNode dn bm data) ∗
-      offGv γo (1 : Qp).half (v.toNat : Int) ∗
+      offLink (hlc := hlc) γo (v.toNat : Int) ∗
       wordPointsTo (fnode fk + 32#64) 4 (DFrac.own 1) (filerwOffW v dd) ∗
       frdOut (GF := GF) ik fk q γb γo m T0 Tr ∗
       inodeMeta (ientry ik) dn ∗ inodeMapQ fscFs (DFrac.own Qp.quarter) (ientry ik) bm ∗
@@ -227,11 +228,13 @@ theorem frd_post_ghost (cpu : CPU) (ik fk : Nat) (q : Qp) (γb : BoxNames) (γo 
   have hsz := arfSize_ok_era dn bm data hok.2.2.2.2.1
   have hnz := arfEra_typed dn bm data hok.2.2.2.1
   have hs := nodeShapeOk_ofInodeOk fscCov fscLogst dn bm data hok
-  iintro ⟨Hrun, #Hfs, #Hoinv, Hcm, Htop, Hgv, Hcell, Hout, Hmeta, Hmap, Hblk⟩
+  iintro ⟨Hrun, #Hfs, #Hrow, Hcm, Htop, Hgv, Hcell, Hout, Hmeta, Hmap, Hblk⟩
   icases fsReady_region $$ Hfs with ⟨#Hireg, -⟩
   ihave #Hft := iregInv_ftop fscIreg fscFs icfgIst icfgNib $$ Hireg
-  imod (arfRead_fire fscFs ⊤ (DFrac.own Qp.quarter) F inum.toNat γo v.toNat dd
-    (eraNode dn bm data) hE hwf hsz hnz) $$ Hft Hoinv Hcm Htop Hgv with ⟨Htop, Hgv, Hav⟩
+  -- THE ONE FIRE, AT THE ROW'S MODE (Rocq lane OFF-LINK-5's
+  -- `arf_read_fire_om`): the row itself goes in, and the mode is read there
+  imod (arfRead_fire_om om fscFs ⊤ (DFrac.own Qp.quarter) F inum.toNat γo v.toNat dd true wb
+    (eraNode dn bm data) hE hwf hsz hnz) $$ Hft Hrow Hcm Htop Hgv with ⟨Htop, Hgv, Hav⟩
   -- CHECK IN the cell: the half came back at exactly its word
   ihave Hres := offResident_of curCtx γo fk (filerwOffW v dd) hwf' $$ [Hcell] [Hgv]
   · rw [wordAtN_cur]; unfold aFoff; iexact Hcell

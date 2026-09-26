@@ -33,9 +33,13 @@ Rocq's header, point for point:
    `pipe_rpay_taint`/`pipe_wpay_taint` have nothing to pay), and the
    console's output/input links are paid out of `UartLinks.consLicence`,
    taken as an explicit persistent premise (Rocq's pre-SUP-ONE form).
-2. **NO OFFSET-MODE SPLIT.**  Lean's `filereadIn`/`filewriteIn` inode arms
-   do not branch on the row's `held`/`parked` mode (no `filewrite_in_held`
-   right arm), so the dischargers take the one arm.
+2. **THE OFFSET-MODE SPLIT IS ROCQ'S (lane K6-C; Rocq OFF-LINK-4/5,
+   8e4ffb667 / 237b50d21 / 4f9be67fd).**  `filereadIn`/`filewriteIn`'s inode
+   arms branch on the row's mode, and at a HELD row the generic tier takes
+   the RIGHT arm (the landed commit/chain beside the taint).  The taint is
+   the machine's kill credential `MachFixedGS.killCred` (Rocq's
+   `app_taint`), taken here as a persistent premise beside the licence --
+   the pre-SUP-ONE shape of deviation 1, where Rocq had `pipe_taint_cred`.
 3. (retired: the write input's no-wrap conjunct is gone from
    `filewriteIn` -- SpecFilewrite deviation 5 retired, the callees report
    the bound -- so the discharger is for `filewriteIn` itself, at every
@@ -179,9 +183,10 @@ beside the read link the licence pays (deviation 1); every other arm hands
 `P` back. -/
 theorem fsabsFilereadIn [Xv6G GF] [OffboxG GF] [Fscfg] (st : FdState) (P : IProp GF) :
     ⊢ appSup (GF := GF) -∗ consLicence (hlc := hlc) (GF := GF) -∗
+      MachFixedGS.killCred (hlc := hlc) (GF := GF) -∗
       filereadIn (hlc := hlc) st (pfamTriv (fun _ _ _ _ => iprop(True))) (fun _ _ => iprop(True))
         (fun _ => iprop(True)) P := by
-  iintro #Hsup #Hlic
+  iintro #Hsup #Hlic #Htaint
   unfold filereadIn
   iintro HP
   rcases st with _ | ⟨rb, wb, ty⟩
@@ -190,9 +195,20 @@ theorem fsabsFilereadIn [Xv6G GF] [OffboxG GF] [Fscfg] (st : FdState) (P : IProp
   · iexact HP
   rcases ty with _ | ⟨i, γo, om⟩ | mj
   · iexact HP
-  · dsimp only
+  · -- the inode arm at the row's mode (Rocq lane OFF-LINK-4): at a HELD row
+    -- the generic tier has no `uoff` to lend and takes the RIGHT arm -- the
+    -- same commit beside the taint it already holds
+    dsimp only
     iframe HP
-    iapply (fsabsAread (hlc := hlc) (fsGammaL fscFs) i γo)
+    cases om with
+    | parked =>
+      unfold areadInOm
+      iapply (fsabsAread (hlc := hlc) (fsGammaL fscFs) i γo)
+    | held =>
+      unfold areadInOm
+      iright
+      iframe Htaint
+      iapply (fsabsAread (hlc := hlc) (fsGammaL fscFs) i γo)
   · dsimp only
     split
     · isplitl [HP]
@@ -210,8 +226,9 @@ licence. -/
 theorem fsabsFilewriteIn [Xv6G GF] [OffboxG GF] [Fscfg] (st : FdState) (n : Int)
     (M : Nat → List (BitVec 8)) (ua : BitVec 64) :
     ⊢ appSup (GF := GF) -∗ consLicence (hlc := hlc) (GF := GF) -∗
+      MachFixedGS.killCred (hlc := hlc) (GF := GF) -∗
       filewriteIn (hlc := hlc) st n M ua (fun _ => iprop(True)) := by
-  iintro #Hsup #Hlic
+  iintro #Hsup #Hlic #Htaint
   unfold filewriteIn
   rcases st with _ | ⟨rb, wb, ty⟩
   · iempintro
@@ -219,7 +236,16 @@ theorem fsabsFilewriteIn [Xv6G GF] [OffboxG GF] [Fscfg] (st : FdState) (n : Int)
   · iempintro
   rcases ty with _ | ⟨i, γo, om⟩ | mj
   · iempintro
-  · iapply (fsabsAwriteChain (hlc := hlc) fscFs i γo M ua n 0 (wchunks n)) $$ Hsup
+  · -- THE INODE ARM, keyed on the row's offset mode (Rocq lane OFF-LINK-4):
+    -- at a HELD row the generic tier takes the RIGHT arm, the same chain
+    -- beside the taint it already holds
+    cases om with
+    | parked => iapply (fsabsAwriteChain (hlc := hlc) fscFs i γo M ua n 0 (wchunks n)) $$ Hsup
+    | held =>
+      unfold filewriteInHeld
+      iright
+      iframe Htaint
+      iapply (fsabsAwriteChain (hlc := hlc) fscFs i γo M ua n 0 (wchunks n)) $$ Hsup
   · iapply (consOutChain_of_licence (hlc := hlc) (GF := GF) _ M ua 0 n.toNat) $$ Hlic
 
 /-! ## 4.  The bundles the sealed contracts take, at the live Γ -/

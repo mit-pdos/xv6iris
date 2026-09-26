@@ -90,8 +90,7 @@ variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [Fdslot
 /-- The persistent environment the FD_INODE arm runs in. -/
 def fwrEnv (Γ : SchedNames) (A : FwrA) : IProp GF := iprop%
   procsInv Γ ∗ panicEnv ∗ fsReady (hlc := hlc) ∗
-  isLock A.γkl kmemLockAddr "kmem" (kmemRes A.γk) ∗ kallocAvail A.γk none ∗
-  offUserInv (hlc := hlc) A.γo
+  isLock A.γkl kmemLockAddr "kmem" (kmemRes A.γk) ∗ kallocAvail A.γk none
 
 instance fwrEnv_persistent (Γ : SchedNames) (A : FwrA) :
     Persistent (fwrEnv (hlc := hlc) (GF := GF) Γ A) := by
@@ -174,7 +173,7 @@ theorem fwr_exit_ok (cpu : CPU) (k : KCtx) (A : FwrA) (hA : FwrFacts k A) (Q : N
       (k.regs 20#5) (k.regs 21#5) (k.regs 22#5) (k.regs 23#5) (k.regs 24#5) (k.regs 25#5) v11 ∗
     trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗
     fileRef A.γ A.fk A.q A.st ∗ procPrivExt (procAddr A.j) A.pid A.V P A.img ∗ bslots 3 ∗
-    fwrRaw (hlc := hlc) (fsGammaL fscFs) A.i A.γo A.V.upt A.n A.img (k.regs 11#5) Q t p 0 ∗
+    fwrSt (hlc := hlc) .parked (fsGammaL fscFs) A.i A.γo A.V.upt A.n A.img (k.regs 11#5) Q t p 0 ∗
     fwrK (hlc := hlc) k A.γul A.γuu A.γ A.fk A.q A.st A.j A.pid A.V A.M A.n Q
     ⊢ wpLoop (GF := GF) cpu := by
   have hK12 : 12 ≤ k.avail := by have := hA.hK; rw [filewriteSlots_eq] at this; omega
@@ -229,7 +228,7 @@ theorem fwr_exit_ok (cpu : CPU) (k : KCtx) (A : FwrA) (hA : FwrFacts k A) (Q : N
     ileft
     isplitr
     · ipureintro; exact ⟨rfl, by have := hA.hn.1; omega⟩
-    iapply fwrRaw_ok (fsGammaL fscFs) A.i A.γo A.V.upt A.n A.img (k.regs 11#5) Q t p htn $$ Hst
+    iapply fwrSt_ok .parked (fsGammaL fscFs) A.i A.γo A.V.upt A.n A.img (k.regs 11#5) Q t p htn $$ Hst
 
 set_option maxHeartbeats 16000000 in
 /-- **THE FAIL EXIT** (`+0xe2` taken, `+0x12a .. +0x138`, the tail): a
@@ -244,7 +243,7 @@ theorem fwr_exit_fail (cpu : CPU) (k : KCtx) (A : FwrA) (hA : FwrFacts k A) (Q :
       (k.regs 20#5) (k.regs 21#5) (k.regs 22#5) (k.regs 23#5) (k.regs 24#5) (k.regs 25#5) v11 ∗
     trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗
     fileRef A.γ A.fk A.q A.st ∗ procPrivExt (procAddr A.j) A.pid A.V P A.img ∗ bslots 3 ∗
-    fwrRaw (hlc := hlc) (fsGammaL fscFs) A.i A.γo A.V.upt A.n A.img (k.regs 11#5) Q t p x ∗
+    fwrSt (hlc := hlc) .parked (fsGammaL fscFs) A.i A.γo A.V.upt A.n A.img (k.regs 11#5) Q t p x ∗
     fwrK (hlc := hlc) k A.γul A.γuu A.γ A.fk A.q A.st A.j A.pid A.V A.M A.n Q
     ⊢ wpLoop (GF := GF) cpu := by
   have hK12 : 12 ≤ k.avail := by have := hA.hK; rw [filewriteSlots_eq] at this; omega
@@ -304,7 +303,7 @@ theorem fwr_exit_fail (cpu : CPU) (k : KCtx) (A : FwrA) (hA : FwrFacts k A) (Q :
     iright
     isplitr
     · ipureintro; rfl
-    iapply fwrRaw_fail (fsGammaL fscFs) A.i A.γo A.V.upt A.n A.img (k.regs 11#5) Q t p x (Or.inl htn) $$ Hst
+    iapply fwrSt_fail .parked (fsGammaL fscFs) A.i A.γo A.V.upt A.n A.img (k.regs 11#5) Q t p x (Or.inl htn) $$ Hst
 
 end
 

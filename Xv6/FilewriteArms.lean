@@ -584,11 +584,14 @@ theorem fwr_arm_inode (BO : BEGIN_OP) (IL : ILOCK) (WI : WRITEI) (IU : IUNLOCK) 
     trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗
     fwrEnv (hlc := hlc) Γ A ∗ fileRef A.γ A.fk A.q A.st ∗
     procPrivExt (procAddr A.j) A.pid A.V A.V.upt A.M ∗ bslots 3 ∗
+    -- THE DESCRIPTOR'S OFFSET ROW (Rocq lane OFF-LINK-5): the carrier's
+    -- supplier at mode park, read once at the entry
+    foffRow (GF := GF) A.st ∗
     awriteChain (hlc := hlc) (fsGammaL fscFs) appE A.i A.γo A.img (k.regs 11#5) A.n Q 0 (wchunks A.n) ∗
     fwrK (hlc := hlc) k A.γul A.γuu A.γ A.fk A.q A.st A.j A.pid A.V A.M A.n Q
     ⊢ wpLoop (GF := GF) cpu := by
   obtain ⟨r2, r8, r9, r18, r19, r20, r21, r22, r23, r24, r25, r26, r27⟩ := id hr
-  iintro ⟨Hk, Hpc, Hframe, Hte, Hce, #Henv, Href, Hpriv, Hbs, Hc, HΦ⟩
+  iintro ⟨Hk, Hpc, Hframe, Hte, Hce, #Henv, Href, Hpriv, Hbs, #Hrow, Hc, HΦ⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
   -- +0x3c .. +0x46  the six lazy spills
   iapply (fwr_spill6 cpu (k.withSpie spie spp) R (KA.«filewrite» + 0x3c#64) r2 (k.regs 1#5)
@@ -636,7 +639,10 @@ theorem fwr_arm_inode (BO : BEGIN_OP) (IL : ILOCK) (WI : WRITEI) (IU : IUNLOCK) 
     refine ⟨?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_⟩ <;>
       simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true] <;> first | assumption | rfl
   ihave Hpriv := fwr_priv_img (procAddr A.j) A.pid A.V A.M $$ Hpriv
-  ihave Hst := fwrRaw_init (fsGammaL fscFs) A.i A.γo A.V.upt A.n A.img (k.regs 11#5) Q $$ Hc
+  -- THE CARRIER AT THE ROW'S MODE (Rocq lane OFF-LINK-5's `fw_au_st_init`;
+  -- the one caller is at mode park, which `fdstateOk` still pins)
+  ihave Hinv := foffRow_inode_of (hlc := hlc) _ A.rb true A.i A.γo rfl $$ Hrow
+  ihave Hst := fwrSt_init_parked (fsGammaL fscFs) A.i A.γo A.V.upt A.n A.img (k.regs 11#5) Q $$ Hinv Hc
   iapply (fwr_loop BO IL WI IU EO Γ k A hA Q A.n.toNat cpu spie spp _ 0 0 A.V.upt (k.regs 9#5)
     (k.regs 19#5) w11 (by omega) (by have := hA.hn.1; omega) (by unfold FW_MAX; omega)
     (UMemL.extSz_refl _ _) hr')

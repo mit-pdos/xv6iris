@@ -57,9 +57,8 @@ projections of the post-exec block (definitional; KexecBridge's
 4. **`TFWORDS` is the literal 36** (the port has no `TFWORDS`; ProcDefs'
    `tf` doc and ProofKfork write 36).  Rocq's `<[i := v]>` on the list is
    `List.set`.
-5. **`fdv_all_parked sts` is `∀ st ∈ sts, fdstParked st`** (Rocq
-   `Forall fdst_parked`; FdSlots' `fdv_all_parked` is not ported and has no
-   other Lean consumer).
+5. (retired with Rocq 378b23778: `fdv_all_parked` and the two `_parked`
+   readers are gone.)
 6. `kexec_image_ok_below` is stated at `kxbPermBelow` directly (Rocq
    unfolds it at `mword 27`; the permission view is `Nat`-keyed, UserPerm
    deviation 1).  `kexec_image_ok_argv`'s pointer-vector bytes are
@@ -205,16 +204,10 @@ theorem kexecImageOk_fd (h : kexecImageOk f na alen afun sts W') : W'.fd = sts :
 /-- Rocq `exec_key_ok_fd`: the same row off the non-loadable arm. -/
 theorem execKeyOk_fd (h : execKeyOk na alen sts W') : W'.fd = sts := h.2.2.2.2.2.2.2.1
 
-/-- Rocq `kexec_image_ok_parked` (THE BOUNDARY PARK'S CROSSING AT EXEC: the
-table survives exec, so a parked table stays parked; deviation 5). -/
-theorem kexecImageOk_parked (h : kexecImageOk f na alen afun sts W')
-    (hpk : ∀ st ∈ sts, fdstParked st) : ∀ st ∈ W'.fd, fdstParked st := by
-  rw [kexecImageOk_fd h]; exact hpk
-
-/-- Rocq `exec_key_ok_parked`. -/
-theorem execKeyOk_parked (h : execKeyOk na alen sts W')
-    (hpk : ∀ st ∈ sts, fdstParked st) : ∀ st ∈ W'.fd, fdstParked st := by
-  rw [execKeyOk_fd h]; exact hpk
+/- Rocq's `kexec_image_ok_parked` / `exec_key_ok_parked` are DELETED (Rocq
+lane OFF-LINK-2, L6, 378b23778): they carried the parked discipline across
+exec for a generic tier that is no longer told anything about offsets.
+`kexecImageOk_fd` / `execKeyOk_fd` stand. -/
 
 /-- Rocq `kexec_image_ok_below`: THE MAP-STOP READER (deviation 6). -/
 theorem kexecImageOk_below (h : kexecImageOk f na alen afun sts W') :

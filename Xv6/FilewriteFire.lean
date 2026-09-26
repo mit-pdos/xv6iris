@@ -110,11 +110,13 @@ set_option maxHeartbeats 8000000 in
 fragment retagged at writei's record and, beside it, the chunk's commit
 fired (full or partial arm) or nothing spent; the offset's half advanced by
 the count `tot`. -/
-theorem fwr_fire (inum : BitVec 32) (γo : GName) (P : UPtd) (n : Int) (Mimg : Nat → List (BitVec 8))
+theorem fwr_fire (om : OffMode) (inum : BitVec 32) (γo : GName) (P : UPtd) (n : Int)
+    (Mimg : Nat → List (BitVec 8))
     (ua : BitVec 64) (Q : Nat → IProp GF) (t p c : Nat)
     (dn dn' : Dinode) (bm bm' : Blkmap) (data data' : Nat → List (BitVec 8))
     (off tot dist : Nat) (wrote dstb : Nat → BitVec 8) (a0 : BitVec 64)
     (htn : (t : Int) < n) (htie : (t : Int) = FW_MAX * p) (hcpos : 0 < c)
+    (hcw : (c : Int) = wchunkAt n p) (hw16 : wiBlocks off c = 1 → tot = 0 ∨ tot = c)
     (hty : dn.diType.toNat = T_FILE) (hty' : dn'.diType = dn.diType)
     (hnl' : dn'.diNlink = dn.diNlink)
     (hh : blkHolesZero bm data) (hh' : blkHolesZero bm' data')
@@ -130,15 +132,15 @@ theorem fwr_fire (inum : BitVec 32) (γo : GName) (P : UPtd) (n : Int) (Mimg : N
       (a0 = BitVec.ofNat 64 tot ∧ off ≤ dn.diSize.toNat ∧
         dn'.diSize.toNat = max (off + tot) dn.diSize.toNat))
     (hchunk : ubytesAt Mimg (ua + BitVec.ofNat 64 t) (wrfRun wrote tot)) :
-    ⊢@{IProp GF} ftopInv (hlc := hlc) fscFs -∗ appInv (hlc := hlc) fscFs -∗ offUserInv (hlc := hlc) γo -∗
+    ⊢@{IProp GF} ftopInv (hlc := hlc) fscFs -∗ appInv (hlc := hlc) fscFs -∗
       topFrag (fsGammaL fscFs) inum.toNat (eraNode dn bm data) -∗
-      offGv γo (1 : Qp).half (off : Int) -∗
-      fwrRaw (hlc := hlc) (fsGammaL fscFs) inum.toNat γo P n Mimg ua Q t p 0 ={⊤}=∗
+      offLink (hlc := hlc) γo (off : Int) -∗
+      fwrSt (hlc := hlc) om (fsGammaL fscFs) inum.toNat γo P n Mimg ua Q t p 0 ={⊤}=∗
         topFrag (fsGammaL fscFs) inum.toNat (eraNode dn' bm' data') ∗
-        offGv γo (1 : Qp).half ((off + tot : Nat) : Int) ∗
-        ((⌜tot = c⌝ ∗ fwrRaw (hlc := hlc) (fsGammaL fscFs) inum.toNat γo P n Mimg ua Q (t + c) (p + 1) 0) ∨
+        offLink (hlc := hlc) γo ((off + tot : Nat) : Int) ∗
+        ((⌜tot = c⌝ ∗ fwrSt (hlc := hlc) om (fsGammaL fscFs) inum.toNat γo P n Mimg ua Q (t + c) (p + 1) 0) ∨
          (⌜tot < c⌝ ∗ ∃ x : Nat, ⌜x ≤ 1⌝ ∗
-           fwrRaw (hlc := hlc) (fsGammaL fscFs) inum.toNat γo P n Mimg ua Q t p x)) := by
+           fwrSt (hlc := hlc) om (fsGammaL fscFs) inum.toNat γo P n Mimg ua Q t p x)) := by
   have hE : (↑ftopN : CoPset) ∪ ↑appN ⊆ ⊤ := CoPset.subseteq_top
   have hnz : fnType (eraNode dn bm data) ≠ 0 := opfEra_file_typed dn bm data hty
   have hrow := opfEra_file_row dn bm data hty
@@ -148,7 +150,7 @@ theorem fwr_fire (inum : BitVec 32) (γo : GName) (P : UPtd) (n : Int) (Mimg : N
     rw [wrfEra_bytes]; exact wrfFb_length _ _
   have hptie : ua + BitVec.ofNat 64 t = ua + BitVec.ofInt 64 (FW_MAX * (p : Int)) := by
     rw [← htie, BitVec.ofInt_natCast]
-  iintro #Hft #Hai #Hoinv Htop Hgv Hst
+  iintro #Hft #Hai Htop Hgv Hst
   rcases harms with ⟨h0, htot0, hbm, hdata, hdn⟩ | ⟨h0, hle, hsz'⟩
   · -- WRITEI'S -1: the up-front guards failed, nothing ran
     subst bm' data' dn' htot0
@@ -176,13 +178,16 @@ theorem fwr_fire (inum : BitVec 32) (γo : GName) (P : UPtd) (n : Int) (Mimg : N
       have hd0 : dist = 0 := hdistf hfull
       subst hd0
       rw [wrfLanded_0] at hrow'
-      icases fwrRaw_take (fsGammaL fscFs) inum.toNat γo P n Mimg ua Q t p htn htie $$ Hst
-        with ⟨Hcm, Hback⟩
-      imod (wrfAwrite_fire fscFs ⊤ inum.toNat γo Mimg ua p _ off (wrfRun wrote tot)
+      -- THE PEEL, THE FIRE AND THE CLOSER IN ONE STEP, at the row's mode
+      -- (Rocq lane OFF-LINK-5's `fw_st_fire_full`); RELAY 3: THE CHUNK'S
+      -- LENGTH, RELAYED -- what landed is exactly what writei was asked for
+      -- (`tot = c`), and `hcw` says which node's count that is
+      imod (fwrSt_fire_full om fscFs ⊤ inum.toNat γo Mimg ua P n Q t p off (wrfRun wrote tot)
         (fnFileBytes (eraNode dn bm data)) (fnNlink (eraNode dn bm data)) (eraNode dn bm data)
         (eraNode dn' bm' data') hE hloc (by rw [wrfRun_length]; omega)
         (by rw [hbs0]; exact hle) (by rw [wrfRun_length]; exact hcap) hnz hrow hnz' hrow'
-        (by rw [← hptie]; exact hchunk)) $$ Hft Hai Hoinv Hcm Htop Hgv with ⟨Htop, Hgv, Hrest⟩
+        hchunk (by rw [wrfRun_length, hfull]; exact hcw) htn htie)
+        $$ Hft Hai Hst Htop Hgv with ⟨Htop, Hgv, Hst⟩
       imodintro
       iframe Htop
       rw [wrfRun_length] at *
@@ -190,26 +195,31 @@ theorem fwr_fire (inum : BitVec 32) (γo : GName) (P : UPtd) (n : Int) (Mimg : N
       ileft
       isplitr
       · ipureintro; exact hfull
-      ihave Hst := Hback $$ %(wrfRun wrote tot) %hchunk Hrest
-      rw [wrfRun_length, hfull]
+      rw [← hfull]
       iexact Hst
     · have htotlt : tot < c := by omega
       by_cases hland : 0 < (wrfLanded wrote dstb dn.diSize.toNat off tot dist).length
       · -- THE PARTIAL NODE FIRES, at the run that landed
         have hbslen := wrfLanded_length wrote dstb dn.diSize.toNat off tot dist
-        icases fwrRaw_spendPart (fsGammaL fscFs) inum.toNat γo P n Mimg ua Q t p htn htie $$ Hst
-          with ⟨Hpart, Hback⟩
         have htake : (wrfLanded wrote dstb dn.diSize.toNat off tot dist).take tot = wrfRun wrote tot := by
           unfold wrfLanded
           exact List.take_left' (wrfRun_length wrote tot)
-        imod (wrfApart_fire fscFs ⊤ inum.toNat γo Mimg ua P n p _ off tot
+        imod (fwrSt_fire_part om fscFs ⊤ inum.toNat γo Mimg ua P n Q t p off tot
           (wrfLanded wrote dstb dn.diSize.toNat off tot dist)
           (fnFileBytes (eraNode dn bm data)) (fnNlink (eraNode dn bm data)) (eraNode dn bm data)
           (eraNode dn' bm' data') hE hloc hland (by rw [hbs0]; exact hle)
           (by rw [hbslen]; omega) (by rw [hbslen]; omega) (by rw [hbslen]; have := hdistle; omega)
+          hnz hrow hnz' hrow' (by rw [htake, ← hptie]; exact hchunk)
+          -- RELAY 3's partial half: the count returned is SHORT of the node's chunk
+          (by rw [← hcw]; omega)
           (fun hlt => hwhy (by rw [hbslen] at hlt; omega))
-          hnz hrow hnz' hrow' (by rw [htake, ← hptie]; exact hchunk))
-          $$ Hft Hai Hoinv Hpart Htop Hgv with ⟨Htop, Hgv, Hrest⟩
+          -- RELAY 4's single-block half: `wi16Atomic` read at this arm
+          (fun hb => by
+            have hct : (wchunkAt n p).toNat = c := by rw [← hcw]; omega
+            rw [hct] at hb
+            rcases hw16 hb with h | h <;> omega)
+          htn htie)
+          $$ Hft Hai Hst Htop Hgv with ⟨Htop, Hgv, Hst⟩
         imodintro
         iframe Htop Hgv
         iright
@@ -218,7 +228,7 @@ theorem fwr_fire (inum : BitVec 32) (γo : GName) (P : UPtd) (n : Int) (Mimg : N
         iexists 1
         isplitr
         · ipureintro; omega
-        iapply Hback $$ Hrest
+        iexact Hst
       · -- NOTHING LANDED: the view does not move
         have hlen0 : (wrfLanded wrote dstb dn.diSize.toNat off tot dist).length = 0 := by omega
         have hbslen := wrfLanded_length wrote dstb dn.diSize.toNat off tot dist
@@ -279,7 +289,7 @@ theorem fwr_pre_ghost (cpu : CPU) (ik fk : Nat) (q : Qp) (γb : BoxNames) (γo :
           dinodeAt fscIreg inum dn ∗ inodeMeta (ientry ik) dn ∗ inodeMap fscFs (ientry ik) bm ∗
           inodeBlocks fscFs bm data ∗ topFrag (fsGammaL fscFs) inum.toNat (eraNode dn bm data) ∗
           wordPointsTo (fnode fk + 32#64) 4 (DFrac.own 1) v ∗
-          offGv γo (1 : Qp).half (v.toNat : Int) ∗ fwrOut ik fk q γb γo m T0 Tr) := by
+          offLink (hlc := hlc) γo (v.toNat : Int) ∗ fwrOut ik fk q γb γo m T0 Tr) := by
   iintro ⟨Hrun, #Hflr, Hat, Hrows, Hload, #Hshot', #Hshot⟩
   ihave %htyeq := ityShot_agree g dn.diType ty $$ [Hshot' Hshot]
   · iframe #
@@ -320,13 +330,14 @@ set_option maxHeartbeats 16000000 in
 the fire (`fwr_fire`), the cell re-formed at the word the `sw` left
 (`offResident_of`) and parked (`protoReadPark`), and the checked-out bundle
 rebuilt at writei's record (`icMkLoaded`). -/
-theorem fwr_post_ghost (cpu : CPU) (ik fk : Nat) (q : Qp) (γb : BoxNames) (C : FContent)
+theorem fwr_post_ghost (om : OffMode) (cpu : CPU) (ik fk : Nat) (q : Qp) (γb : BoxNames) (C : FContent)
     (m : StampMap Nat) (T0 Tr : Nat) (inum : BitVec 32) (γo : GName) (P : UPtd) (n : Int)
     (Mimg : Nat → List (BitVec 8)) (ua : BitVec 64) (Q : Nat → IProp GF) (t p c : Nat)
     (dn dn' dn0' : Dinode) (bm bm' : Blkmap) (data data' : Nat → List (BitVec 8)) (v : BitVec 32)
     (tot dist : Nat) (wrote dstb : Nat → BitVec 8) (a0 : BitVec 64)
     (hip : C.ip = ientry ik) (hik : ik < NINODE) (hq : MachCSL.qsum m = q.val)
     (htn : (t : Int) < n) (htie : (t : Int) = FW_MAX * p) (hcpos : 0 < c)
+    (hcw : (c : Int) = wchunkAt n p) (hw16 : wiBlocks v.toNat c = 1 → tot = 0 ∨ tot = c)
     (hty : dn.diType.toNat = T_FILE) (hty' : dn'.diType = dn.diType)
     (hnl' : dn'.diNlink = dn.diNlink)
     (hh : blkHolesZero bm data) (hh' : blkHolesZero bm' data')
@@ -343,32 +354,33 @@ theorem fwr_post_ghost (cpu : CPU) (ik fk : Nat) (q : Qp) (γb : BoxNames) (C : 
     (hchunk : ubytesAt Mimg (ua + BitVec.ofNat 64 t) (wrfRun wrote tot))
     (hok' : inodeOk fscCov fscLogst dn' bm' data') (hrl' : inodeRecLocal dn')
     (hnd' : dn'.diType.toNat ≠ T_DIR_z) (hdn0 : dn0' = dn') :
-    ownCtx cpu curCtx ∗ fsReady (hlc := hlc) ∗ offUserInv (hlc := hlc) γo ∗
+    ownCtx cpu curCtx ∗ fsReady (hlc := hlc) ∗
       topFrag (fsGammaL fscFs) inum.toNat (eraNode dn bm data) ∗
-      offGv γo (1 : Qp).half (v.toNat : Int) ∗
-      fwrRaw (hlc := hlc) (fsGammaL fscFs) inum.toNat γo P n Mimg ua Q t p 0 ∗
+      offLink (hlc := hlc) γo (v.toNat : Int) ∗
+      fwrSt (hlc := hlc) om (fsGammaL fscFs) inum.toNat γo P n Mimg ua Q t p 0 ∗
       wordPointsTo (fnode fk + 32#64) 4 (DFrac.own 1) (filerwOffW v tot) ∗
       fwrOut (GF := GF) ik fk q γb γo m T0 Tr ∗
       dinodeAt fscIreg inum dn0' ∗ inodeMeta (ientry ik) dn' ∗ inodeMap fscFs (ientry ik) bm' ∗
       inodeBlocks fscFs bm' data' ⊢
       |={⊤}=> ownCtx cpu curCtx ∗ offFd fk q γb γo C ∗ (∃ T : Nat, offRowsDep offCfg ik T) ∗
         icLoaded fscFs fscIreg fscCov fscLogst ik inum dn' bm' ∗
-        ((⌜tot = c⌝ ∗ fwrRaw (hlc := hlc) (fsGammaL fscFs) inum.toNat γo P n Mimg ua Q (t + c) (p + 1) 0) ∨
+        ((⌜tot = c⌝ ∗ fwrSt (hlc := hlc) om (fsGammaL fscFs) inum.toNat γo P n Mimg ua Q (t + c) (p + 1) 0) ∨
          (⌜tot < c⌝ ∗ ∃ x : Nat, ⌜x ≤ 1⌝ ∗
-           fwrRaw (hlc := hlc) (fsGammaL fscFs) inum.toNat γo P n Mimg ua Q t p x)) := by
+           fwrSt (hlc := hlc) om (fsGammaL fscFs) inum.toNat γo P n Mimg ua Q t p x)) := by
   have hloc : InodeLocal inum.toNat (eraNode dn' bm' data') :=
     inodeLocal_ofOkRec inum.toNat fscCov fscLogst dn' bm' data' hok' hrl'
       (dirUniq_not_dir dn' data' hnd') (dirDotsIx_not_dir inum.toNat dn' data' hnd')
   have hw : (filerwOffW v tot).toNat = v.toNat + tot :=
     filerwOffW_toNat v tot (by have : MAXFILE * BSIZE = 274432 := rfl; omega)
   have hwf : offWf (filerwOffW v tot) := by unfold offWf; rw [hw]; exact hcap
-  iintro ⟨Hrun, #Hfs, #Hoinv, Htop, Hgv, Hst, Hcell, Hout, Hdi, Hmeta, Hmap, Hblk⟩
+  iintro ⟨Hrun, #Hfs, Htop, Hgv, Hst, Hcell, Hout, Hdi, Hmeta, Hmap, Hblk⟩
   icases fsReady_region $$ Hfs with ⟨#Hireg, -⟩
   ihave #Hft := iregInv_ftop fscIreg fscFs icfgIst icfgNib $$ Hireg
   ihave #Hai := iregInv_app fscIreg fscFs icfgIst icfgNib $$ Hireg
-  imod (fwr_fire inum γo P n Mimg ua Q t p c dn dn' bm bm' data data' v.toNat tot dist wrote dstb a0
-    htn htie hcpos hty hty' hnl' hh hh' hcap0 hcap htotc hdistle hdistf hwhy hloc hrange harms hchunk)
-    $$ Hft Hai Hoinv Htop Hgv Hst with ⟨Htop, Hgv, Hst⟩
+  imod (fwr_fire om inum γo P n Mimg ua Q t p c dn dn' bm bm' data data' v.toNat tot dist wrote dstb a0
+    htn htie hcpos hcw hw16 hty hty' hnl' hh hh' hcap0 hcap htotc hdistle hdistf hwhy hloc hrange harms
+    hchunk)
+    $$ Hft Hai Htop Hgv Hst with ⟨Htop, Hgv, Hst⟩
   -- CHECK IN the cell: the half came back at exactly its word
   ihave Hres := offResident_of curCtx γo fk (filerwOffW v tot) hwf $$ [Hcell] [Hgv]
   · rw [wordAtN_cur]; unfold aFoff; iexact Hcell

@@ -47,8 +47,8 @@ PURE; it does not import the kernel's contracts.
    `4096 * uvmd_np szv szv'` on a shrink (`UsysMemOkSpec.uvmdNp_bytes`).
 4. `live_pages sz` is "`k * 4096 < pgRoundUpN sz`" (UserPerm deviation 2).
 5. Rocq's `list fdstate` rows: `<[k := st]> l` is `l.set k st`, `l !! k` is
-   `l[k]?`, `l !!! k` is `l.getD k .closed`; `fdv_all_parked l` is
-   `∀ st ∈ l, fdstParked st` (as `KexecImageOk` already reads it).
+   `l[k]?`, `l !!! k` is `l.getD k .closed`.  (`fdv_all_parked` and
+   `usys_fd_ok_parked` are gone, Rocq 378b23778.)
 6. `FdSlots.fd_lowest_closed`/`fd_least_closed` had no Lean counterpart; they
    are ported here (`fdLowestClosed`/`fdLeastClosed`) with the four readers
    the rows use.
@@ -492,54 +492,13 @@ theorem usysFdOk_length {n : Int} {tf : List (BitVec 64)} {r : BitVec 64} {sts s
   rw [if_neg hp] at H
   subst H; rfl
 
-/-- A parked row set into a parked table. -/
-theorem fdvParked_set {l : List FdState} (hl : ∀ st ∈ l, fdstParked st) (k : Nat) {x : FdState}
-    (hx : fdstParked x) : ∀ st ∈ l.set k x, fdstParked st := by
-  intro st hst
-  rcases List.mem_or_eq_of_mem_set hst with h | rfl
-  · exact hl st h
-  · exact hx
-
-/-- ...and the total lookup of a parked table is parked. -/
-theorem fdvParked_getD {l : List FdState} (hl : ∀ st ∈ l, fdstParked st) (k : Nat) :
-    fdstParked (l.getD k .closed) := by
-  rw [List.getD_eq_getElem?_getD]
-  cases h : l[k]? with
-  | none => trivial
-  | some st => exact hl st (List.mem_of_getElem? h)
-
-/-- **EVERY ROW KEEPS THE PARKED DISCIPLINE** (Rocq `usys_fd_ok_parked`). -/
-theorem usysFdOk_parked {n : Int} {tf : List (BitVec 64)} {r : BitVec 64} {sts sts' : List FdState}
-    (H : usysFdOk n tf r sts sts') (hpk : ∀ st ∈ sts, fdstParked st) : ∀ st ∈ sts', fdstParked st := by
-  unfold usysFdOk at H
-  by_cases hc : n = USYS_close
-  · rw [if_pos hc] at H
-    obtain ⟨H, -⟩ := H
-    split at H <;> subst H
-    · exact fdvParked_set hpk _ (x := .closed) trivial
-    · exact hpk
-  rw [if_neg hc] at H
-  by_cases hd : n = USYS_dup
-  · rw [if_pos hd] at H
-    rcases H with ⟨_, -, -, -, rfl⟩ | ⟨-, rfl, -⟩
-    · exact fdvParked_set hpk _ (fdvParked_getD hpk _)
-    · exact hpk
-  rw [if_neg hd] at H
-  by_cases ho : n = USYS_open
-  · rw [if_pos ho] at H
-    rcases H with ⟨_, _, _, _, -, -, rfl, hop⟩ | ⟨-, rfl⟩
-    · exact fdvParked_set hpk _ hop
-    · exact hpk
-  rw [if_neg ho] at H
-  by_cases hp : n = USYS_pipe
-  · rw [if_pos hp] at H
-    split at H
-    · obtain ⟨_, _, γp, -, -, -, rfl⟩ := H
-      exact fdvParked_set (fdvParked_set hpk _ (x := .open true false (.pipe γp)) trivial) _
-        (x := .open false true (.pipe γp)) trivial
-    · subst H; exact hpk
-  rw [if_neg hp] at H
-  subst H; exact hpk
+/- Rocq's `usys_fd_ok_parked` (and here its two list helpers) is DELETED
+(Rocq lane OFF-LINK-2, L6, 378b23778): it carried the generic tier's PARKED
+DISCIPLINE -- "no descriptor in this table has had its offset half handed
+out" -- across a round, the precondition design/app-file.md SS3.5's
+principle retires; the generic tier pays the TAINT and is told nothing about
+offsets.  `fdstParked` itself stays: the OPEN row above still carries it (L4
+relaxes it to the caller's mode). -/
 
 /-! ## §2c Pipe's two rows, joined -/
 

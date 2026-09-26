@@ -70,6 +70,16 @@ theorem fwrChunk_le (n i : Nat) : fwrChunk n i ≤ 3072 := by
 theorem fwrChunk_le_rem (n i : Nat) : fwrChunk n i ≤ n - i := by
   unfold fwrChunk; omega
 
+/-- THE LOOP'S OWN CHUNK IS THE NODE'S (Rocq's `Hcw`, lane WRITE-RELAY
+RELAY 3, off `SysWriteDefs.wchunk_at_pick`): every chunk that reached node
+`p` was full, so the running offset is `FW_MAX * p` and the chunk is
+`wchunkAt n p`. -/
+theorem fwrChunk_wchunkAt (n : Int) (t p : Nat) (htn : (t : Int) < n)
+    (htie : (t : Int) = FW_MAX * p) : (fwrChunk n.toNat t : Int) = wchunkAt n p := by
+  unfold fwrChunk wchunkAt
+  unfold FW_MAX at htie ⊢
+  omega
+
 /-- A chunk that did not exhaust the count IS the cap (Rocq's `Hcpick`). -/
 theorem fwrChunk_cap (n i : Nat) (h : i + fwrChunk n i < n) : fwrChunk n i = 3072 := by
   unfold fwrChunk at *; omega

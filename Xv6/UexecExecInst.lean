@@ -603,8 +603,8 @@ def xv6Ssupply : IProp GF :=
 theorem xrowRead_supply (W : Uvis) :
     □ xv6Ssupply (hlc := hlc) (GF := GF) ⊢ xrowRead (hlc := hlc) (xfamPt (GF := GF)).rF xfamPt.rRd xfamPt.rRin W := by
   dsimp only [xrowRead, xfamPt, xv6Ssupply]
-  iintro #⟨Hsup, -, Hlic⟩
-  iapply (fsabsFilereadIn (hlc := hlc) _ iprop(True)) $$ Hsup Hlic
+  iintro #⟨Hsup, Hkc, Hlic⟩
+  iapply (fsabsFilereadIn (hlc := hlc) _ iprop(True)) $$ Hsup Hlic Hkc
 
 theorem xrowChdir_supply (W : Uvis) :
     □ xv6Ssupply (hlc := hlc) (GF := GF) ⊢ xrowChdir (hlc := hlc) (xfamPt (GF := GF)).cP xfamPt.cPmiss xfamPt.cFo W := by
@@ -623,8 +623,8 @@ theorem xrowOpen_supply (W : Uvis) :
 theorem xrowWrite_supply (W : Uvis) :
     □ xv6Ssupply (hlc := hlc) (GF := GF) ⊢ xrowWrite (hlc := hlc) (xfamPt (GF := GF)).wQ W := by
   dsimp only [xrowWrite, xfamPt, xv6Ssupply]
-  iintro #⟨Hsup, -, Hlic⟩ %Mv %_
-  iapply (fsabsFilewriteIn (hlc := hlc)) $$ Hsup Hlic
+  iintro #⟨Hsup, Hkc, Hlic⟩ %Mv %_
+  iapply (fsabsFilewriteIn (hlc := hlc)) $$ Hsup Hlic Hkc
 
 theorem xrowMknod_supply (W : Uvis) :
     □ xv6Ssupply (hlc := hlc) (GF := GF) ⊢

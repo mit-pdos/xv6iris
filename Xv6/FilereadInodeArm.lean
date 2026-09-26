@@ -93,14 +93,16 @@ theorem frd_arm_inode (IL : ILOCK) (RD : READI) (IU : IUNLOCK) (Γ : SchedNames)
     frame6s3 (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) (k.regs 9#5) (k.regs 18#5) (k.regs 19#5) ∗
     trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗
     procsInv Γ ∗ panicEnv ∗ fsReady (hlc := hlc) ∗
-    isLock γkl kmemLockAddr "kmem" (kmemRes γk) ∗ kallocAvail γk none ∗ offUserInv (hlc := hlc) γo ∗
+    isLock γkl kmemLockAddr "kmem" (kmemRes γk) ∗ kallocAvail γk none ∗
+    foffRow (GF := GF) (.open true wb (.inode i γo .parked)) ∗
     fileRef γ fk q (.open true wb (.inode i γo .parked)) ∗ procPrivExt (procAddr j) pid V V.upt M ∗
-    genHalvesPriv (procAddr j) pid V.gen ∗ bslot ∗ P ∗ pfAt (areadCommitAt (fsGammaL fscFs) appE i γo) F ∗
+    genHalvesPriv (procAddr j) pid V.gen ∗ bslot ∗ P ∗
+    areadInOm (hlc := hlc) .parked (fsGammaL fscFs) appE i γo F ∗
     frdK (hlc := hlc) k γ fk q (.open true wb (.inode i γo .parked)) j pid V M n F Rd Rin P
     ⊢ wpLoop (GF := GF) cpu := by
   have hK' : 6 + readiSlots ≤ k.avail := hK
   have hK6 : 6 ≤ k.avail := by unfold readiSlots bmapSlots ballocSlots breadSlots panicSlots at hK'; omega
-  iintro ⟨Hk, Hpc, Hframe, Hte, Hce, #Hpi, #Hpe, #Hfs, #Hkl, #Hav, #Hoinv, Href, Hpriv, Hgen, Hbs, HP, Hcm,
+  iintro ⟨Hk, Hpc, Hframe, Hte, Hce, #Hpi, #Hpe, #Hfs, #Hkl, #Hav, #Hrow, Href, Hpriv, Hgen, Hbs, HP, Hcm,
     HΦ⟩
   -- THE REFERENCE, OPENED, AND THE CARVE
   icases filerw_ref_open γ fk q _ $$ Href with ⟨%C, %-, Htok, Hfields, Hpay⟩
@@ -151,7 +153,7 @@ theorem frd_arm_inode (IL : ILOCK) (RD : READI) (IU : IUNLOCK) (Γ : SchedNames)
   -- the lock-held ghost steps after readi: THE FIRE, the checkin, the re-close
   iapply wpLoop_fupd
   icases kctx_token_acc _ _ $$ Hk with ⟨Hrun, Hkb⟩
-  imod frd_post_ghost cpu ik fk q γb γo C m T0 Tr s g lo inum dn bm data v dd F hip hik hq hok hloc
+  imod frd_post_ghost cpu ik fk q γb γo C m T0 Tr s g lo inum dn bm data v dd F wb .parked hip hik hq hok hloc
     hwf hcap $$ [Hrun Hcm Htop Hgv Hcell Hout Hmeta Hmap Hblk]
     with ⟨Hrun, Hoffd, Hrows, Hheld, ⟨%av, %hrow, Hrecv⟩⟩
   · iframe Hrun Hcm Htop Hgv Hcell Hout Hmeta Hmap Hblk
@@ -198,7 +200,7 @@ theorem frd_arm_inode (IL : ILOCK) (RD : READI) (IU : IUNLOCK) (Γ : SchedNames)
     rcases hr10 with h | h
     · rw [h]; exact frd_ret_nat n tot (by omega)
     · rw [h]; exact filereadRet_m1 n
-  iapply filereadExtra_inode_of V.gen V.upt F Rd Rin P _ wb inum.toNat γo n (R' 10#5) M' (k.regs 11#5) rfl $$ HP
+  iapply filereadExtra_inode_of V.gen V.upt F Rd Rin P _ .parked wb inum.toNat γo n (R' 10#5) M' (k.regs 11#5) rfl $$ HP
   rw [h10']
   iapply (frd_inode_arms inum.toNat γo n F dn bm data v.toNat tot dd a0 P' (viewFaulted V.upt P' M) M'
     (k.regs 11#5) av hn0 hn1 hok hwf hrow hle2 V.upt harm himg.1 himg.2 hpl) $$ Hrecv

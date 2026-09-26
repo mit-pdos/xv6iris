@@ -90,10 +90,16 @@ off box holds while a file's `f->off` is not checked out (Rocq
 ghost records cannot drift, and neither side can move the ghost alone.  A
 checkout takes cell and half out together; a checkin puts them back at the
 new word, the fs commit having moved the ghost (`offResident_of`).  Rocq
-`off_resident`, at an explicit context (deviation 3). -/
+`off_resident`, at an explicit context (deviation 3).
+
+...AND ITS GHOST IS THE COUPLING OR THE TAINT (Rocq lane OFF-LINK-2's L3,
+4919630d6): the kernel's half at the value the cell holds, or -- once a fire
+has run at a HELD row with no link -- the application's taint and NO GHOST
+AT ALL, permanently (`offLink`).  The CELL is kept in both arms (the store
+`f->off += r` needs it); only the tie to the shadow is dropped. -/
 def offResident [CurCtx] (ξ : CtxId) (γo : GName) (k : Nat) : IProp GF := iprop%
   ∃ v : BitVec 32, wordAtN ξ (aFoff k) 4 (DFrac.own 1) v ∗ ⌜offWf v⌝ ∗
-    offGv γo (1 : Qp).half (v.toNat : Int)
+    offLink (hlc := hlc) γo (v.toNat : Int)
 
 /-- Rocq's `off_hdr` CtxMorph (`ctx_morph_solve`). -/
 instance instCtxMorphOffResident [CurCtx] (γo : GName) (k : Nat) :
@@ -108,7 +114,7 @@ exactly that word re-form the resident cell, no ghost step.  Rocq
 theorem offResident_of [CurCtx] (ξ : CtxId) (γo : GName) (k : Nat) (v : BitVec 32)
     (hwf : offWf v) :
     ⊢@{IProp GF} wordAtN ξ (aFoff k) 4 (DFrac.own 1) v -∗
-      offGv γo (1 : Qp).half (v.toNat : Int) -∗ offResident ξ γo k := by
+      offLink (hlc := hlc) γo (v.toNat : Int) -∗ offResident ξ γo k := by
   iintro Hc Hg
   unfold offResident
   iexists v
