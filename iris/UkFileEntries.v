@@ -76,7 +76,6 @@ Require Import FileLinks FileLinksLine FileLinkGen FileHooks.
 Require Import GenLinksLine.          (* [gwc_blk] / [gwc_post] *)
 Require Import ConsoleInv.             (* [CONSOLE] *)
 Require Import UkConsOut ProgTreeFile.
-Require Import UCatOut UCatLend.      (* [cch], [catq_cat], [cat_lend] *)
 Require Import FsInitPin FsShPin FsEchoPin FsCatPin.   (* the four image inodes *)
 Require Import UkFileDev FileWrite UEchoFile.         (* [file_out], [ef_pay], [ef_exit] *)
 Require Import UkFileIface.

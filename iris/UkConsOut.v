@@ -604,7 +604,7 @@ Section UkConsOutGen.
      lane D): [cons_dev_at] with the unfiled codes drawn from [C] and the
      filed one in [C].  A drained device then names a code of [C] -- which
      is what an exit payload stated at the round's two or three codes
-     ([UCatKernel.catq_cat]) needs and the code-free reader cannot give.
+     needs and the code-free reader cannot give.
      [cons_dev_at] is this at some [C], and its step law is proved here. *)
   Definition cons_dev_atc (C : list nat) (v : era_pins) (I : list (bv 8))
       (alts : list (list (bv 8))) : iProp Σ :=

@@ -466,9 +466,11 @@ steps the claim only at `EvOut` (`out_link`, the write chain) and
 with the validity facts `cons_link` supplies:
 
     ai_wild_lic : forall k, ai_wild k ⊢ □ ∀ h H ev, ⌜wild_ev ev⌝ -∗
-        ⌜cons_hist_ok H⌝ -∗ ⌜cons_ev_ok H ev⌝ -∗ ai_cons k h H ==∗ ai_cons k h (cons_step H ev)
+        ⌜cons_ev_ok H ev⌝ -∗ ai_cons k h H ==∗ ai_cons k h (cons_step H ev)
     wild_ev (EvOut _) := True;  wild_ev (EvRead _) := True;  wild_ev _ := False
 
+(no `cons_hist_ok H`: the write link `out_link` does not carry it, and
+the third arm needs only `read_ok` at `EvRead` and nothing at `EvOut`),
 and S0's `cons_licence_at k` is the same statement; `out_link_of_licence`
 and `cons_read_pay_triv` get their `_at k` twins, `cons_run_of_licence`
 does not (nobody needs it at era k).
@@ -617,3 +619,35 @@ Audits unchanged.  S4: `ush_line_union` at `LSecc`, sh's round law at the
 wild shape (fork; the child's exec of `/seccomp` with `secc_tok` in its
 `Pay`; wait; prompt through the licence), init's wild arm on the panic
 path, the knob, the top theorem's statement through the model.
+
+### 10.7 Rulings from lane S2 (owner, 2026-09-25)
+
+- THE MODEL STAYS: `LineModelLinks.lm_hooks` requires an admitted
+  NON-terminal alternative at every line (`lmh_pan_ok`/`lmh_pan_panic`:
+  a panic is non-terminal by `lml_term_nopanic`; `lmh_noc_ok`/`lmh_noc_free`
+  and `lmh_exf_ok`/`lmh_exf_free` with `lmh_free_term`: the silent pad and
+  the exec failure are admitted and non-terminal everywhere, and
+  `lm_alts_pad` pads the drain's lines with the silent pad).  So `uok`
+  at `LSecc` keeps `RCFork`/`RSExec`/`RCSilent` beside `US u`, and the
+  presenter "block-first byte at the seccomp line with a non-terminal
+  admitted alternative" is unrefutable in the third arm.  It is the ONE
+  escape: `ucl_step_write_blk` / `union_write_link_blk` may return
+  `secc_tok k ∗ cs_frozen_at v (nlines I0 - 1) ∗ inp_lb v I0` (with `I =
+  I0`, the presenter's own line) instead of progress; inside
+  `GenLinksLine.gl_blk` it is absorbed into the family taint, so
+  `glinks`' statement is unchanged.  Every other presenter is refuted
+  (`write_first`: `turn 0 < P`; `write`: the stage byte pins the echoed
+  list against the frozen `cs`; `_pro`: the prologue pin likewise; the
+  `pre <> []` family bytes and `pwc_blkU_file`: `pext`'s full `cur_half`;
+  `pwc_blkU_file_empty`: a pipeline line is not the wild line).
+  `pblkU_ecl_holds` takes the premise that the line is not the wild
+  line, discharged at its pipeline-line callers.  CONSEQUENCE FOR S4:
+  sh's round at `LSecc` never presents a block-first byte; its
+  diagnostics go through the licence.
+- `lk_T := UT ∨ secc_tok (S gen_id)` IS SOUND BY PINNING THE ERA: the
+  union's link record's pin is `gPIN k v := UPIN k v ∗ ⌜k = S gen_id⌝`,
+  `GenLinksLine.gl_taint` and `ReadRec.rk_rd_taint` (and every taint law
+  the records state at an arbitrary era) take the family's `PIN k v`; a
+  token of era `k` licenses only era `k`'s claim.  Rejected: an
+  era-indexed `lk_T` (a sweep of the generic sh tier) and a third read
+  outcome with era-indexed wild arms in the families.

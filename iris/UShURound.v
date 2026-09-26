@@ -15,7 +15,7 @@
 (*      the diagnostics at the union's codes;                             *)
 (*    - [cat f]: [UShRound.cat_exec_sup]'s body at                        *)
 (*      [UkUnionEntries.ucat_image_entry] -- the exit folds at the post   *)
-(*      the drained console names, no [UCatOut.cch] detour.               *)
+(*      the drained console names, with no cat-specific payload.          *)
 (*  The DISPATCH goes through [UkShPipeForkTwin] (the widened credential  *)
 (*  is not timeless): [echo] by [ushf_body_law_echo_pipe], [echo > f] by  *)
 (*  [wp_kshm_body_pipe] at [UkShRedirBody.ushs_lp], [cat f] by the cat    *)

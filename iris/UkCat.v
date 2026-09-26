@@ -73,8 +73,7 @@ Section UkCat.
      [Q = fun _ => True] and cat's exit can hand the shell NOTHING.  What
      the walk actually needs is only that cat's two exits -- 0 on the
      content arm, 1 on the diagnostic arm -- owe the same thing, which is
-     [UkRun.ukn_const]; [UCatOut.catq_filed_const] / [catq_unfiled_const]
-     are the witnesses at the file application. *)
+     [UkRun.ukn_const]. *)
   Context `{Hpay : !ukn_const N}.
   (* the fields, under the names the engine has always used *)
   Local Notation γt := (ukn_t N).
@@ -886,7 +885,7 @@ Section UkCat.
      (lane CAT-GEOM-4).  It used to be [(⊢ Cend)], which is satisfiable
      only at the TRIVIAL payload -- and that is what made this chain
      unusable to a payer whose payload is a CLAIM: at a tainted era cat's
-     own [UCatOut.cch] is persistent (its right disjunct IS
+     own output cursor is persistent (its right disjunct IS
      [AppFile.file_taint]) but it is a HYPOTHESIS, not derivable from
      nothing.  [□ Cend] is strictly weaker as a premise -- [⊢ P] gives
      [⊢ □ P] in an affine BI, because [□ emp ⊣⊢ emp] -- so every caller
