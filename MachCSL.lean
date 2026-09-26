@@ -193,3 +193,8 @@ import MachCSL.UFetchRun
 import MachCSL.UFetchWalk
 import MachCSL.UFetch
 import MachCSL.UFetchTotal
+import MachCSL.UclCsrPin
+import MachCSL.UclCsrTab
+import MachCSL.UclCsr
+import MachCSL.UclCbo
+import MachCSL.UclCtl

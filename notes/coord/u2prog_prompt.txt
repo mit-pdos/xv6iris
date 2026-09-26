@@ -24,3 +24,11 @@ Main-tree lane: new files only under Xv6/, no Xv6.lean edits, no git in /shared/
 on the VM; tools/check_layering.sh (plain grep, fine locally); no sorry; grep new names for clashes
 (other program lanes run in parallel — use your program's prefix). Report: files + import order, Rocq
 decls ported/dropped, deviations, parameters taken (syscall leaves etc.), slowest theorems.
+
+PITFALL (bv_decide + enums): bv_decide over a goal/hypothesis mentioning an enum type (SATPMode,
+mem_payload, page_based_mem_type, Privilege, InterruptType, ExtStatus, …) adds an auxiliary
+`<Enum>.enumToBitVec` declaration; two modules that each do it for the same enum CLASH when imported
+together (the root build fails with "environment already contains …enumToBitVec"). Before using
+bv_decide on an enum, import the module that already defines its encoding (MachCSL/BvEnumSatp for
+SATPMode; UTlb for mem_payload/page_based_mem_type; WpTrap for Privilege/InterruptType; WpCsrS for
+ExtStatus) — or keep the bv_decide context to plain BitVec/Bool by extracting a standalone lemma.

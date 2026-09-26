@@ -60,3 +60,11 @@ state it as a hypothesis/parameter and say so in the report.
 REPORT (final message): files + imports to add, headline statements, Rocq lemmas mirrored,
 per-theorem timings (largest ones), deviations, names reused, what's left, and anything
 the coordinator must decide.
+
+PITFALL (bv_decide + enums): bv_decide over a goal/hypothesis mentioning an enum type (SATPMode,
+mem_payload, page_based_mem_type, Privilege, InterruptType, ExtStatus, …) adds an auxiliary
+`<Enum>.enumToBitVec` declaration; two modules that each do it for the same enum CLASH when imported
+together (the root build fails with "environment already contains …enumToBitVec"). Before using
+bv_decide on an enum, import the module that already defines its encoding (MachCSL/BvEnumSatp for
+SATPMode; UTlb for mem_payload/page_based_mem_type; WpTrap for Privilege/InterruptType; WpCsrS for
+ExtStatus) — or keep the bv_decide context to plain BitVec/Bool by extracting a standalone lemma.
