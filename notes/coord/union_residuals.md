@@ -81,3 +81,9 @@ Collected from the U0 agent reports (Sept 26 2026). Each item names the lane tha
   own `kcatPaySeq`. Fix: make UlibRunP carry the hart (or build it from `urun`/UK_LEAVES), then discharge
   `CAT_FPRINTF` from `ulibFprintf_link`; same for grep/init/seccomp.
 - UkCatTree's Iris half (23 decls, `cat_prog` … `wp_kcat_start_env`) waits for H-tree (UkTree/UkHandler).
+
+## U1-T post-bump — remaining
+- PinnedOpen (7 reached): waits for K6-B's re-spec of SpecSysOpen (truncation key); port after K6-B.
+- ExecEntry, ExecBundle, PinnedExec's `pobs_node_id` / `pinned_exec_bundle_boot(_at)`: need K3's seccomp key.
+- FileName.lean / UNamePath.lean still say PENDING for items now in FileNamePins / UNamePathCat — update their
+  headers when convenient.

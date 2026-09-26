@@ -353,7 +353,7 @@ FsCfgKits' open items are closed: binit/kinit are at the configured names (`a59c
 
 Rules: wave7b prompt conventions; stage files without the `Proof` prefix; one function per file does
 not apply (these are adequacy files, not kernel functions); no theorem over a few seconds; carve files
-under `ulimit -v 40000000; timeout 300` (memory: lean-runaway-memory, and Rocq's "no bare iFrame past
+under `timeout 300` (NOT `ulimit -v`: it makes Lean abort with "failed to create thread") (memory: lean-runaway-memory, and Rocq's "no bare iFrame past
 the 2 MB disk big-op").
 
 **Wave A (start now, parallel; main tree, new files only):**

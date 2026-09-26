@@ -376,7 +376,7 @@ USER-L → LinkUkLeaves (anytime before U4's final corollary; not on the critica
 - **The bulk runs in parallel with it.** The program walks (about 60% of the lines) only need U1-R
   and the images, and U1-R's non-syscall leaves only need U0-6.
 - **Build discipline (memory rules).** Big-literal and generated files build under
-  `ulimit -v 40000000; timeout 300`. No theorem may take more than a few seconds; the Rocq incidents
+  `timeout 300` (NOT `ulimit -v`: it makes Lean abort with "failed to create thread"). No theorem may take more than a few seconds; the Rocq incidents
   in §0.6 are the ones to watch. Main-tree agents build only their own modules and share the GCP
   tree `_shared_lean-xv6`.
 

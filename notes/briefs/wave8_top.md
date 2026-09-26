@@ -414,7 +414,7 @@ but the park rows are Rocq's from here on.
 4. **MachCSL U-tier (8-M) is invasive.** It may touch `KTier` and `SConfPhys`. Isolate it in a
    worktree and merge before the uservec/userret stages start.
 5. **Boot carve memory.** BootCarve/BootCarveMain enumerate kernel-sized data (memory:
-   lean-runaway-memory). Run them under `ulimit -v 40000000; timeout 300`.
+   lean-runaway-memory). Run them under `timeout 300` (NOT `ulimit -v`: it makes Lean abort with "failed to create thread").
 6. **The dispatch's 22-way arm.** Rocq ends in `exfalso; lia` after a `decide`. In Lean, keep
    each arm a separate theorem so no single `decide` over the table blows the few-seconds budget.
 7. **Stale Rocq headers.** ProofSyscall :1–301 says read/write are unwired. LinkUsertrap says
