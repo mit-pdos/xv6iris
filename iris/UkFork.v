@@ -782,6 +782,382 @@ Section UkFork.
      licenses re-minting them at the child's name, so a caller says only
      what it actually holds; one holding nothing passes the empty map and
      the two extra premises are [emp]. *)
+  Lemma wp_uk_ecall_fork_at (N : uk_names Σ) (h : CpuId) (m : regfile)
+      (pc : mword 64) (avail : nat) (szv : Z) (l : list fdstate)
+      (D : gmap nat fdstate) (c : Z)
+      (* THE LEDGER'S TABLE VIEW (design/seccomp.md, S3 ruling G2): the
+         child's is the parent's, so a parent that knows its whole table
+         hands its child the same knowledge *)
+      (v : list fdstate)
+      (* THE CALLER'S LIVE CHILDREN, and THE PAYLOAD ITS CHILD'S EXIT WILL
+         OWE IT.  Both are the program's choice: [S] because the key's
+         children reading grows by the child's generation and [urun] hides
+         the set existentially (the parent's half is what pins it, exactly
+         as its [ucwd] pins the working directory), and [Q] because the
+         parent is the party that decides what it wants back -- a program
+         that wants nothing passes [fun _ => True]. *)
+      (Sc : gset gname) (Q : Z -> iProp Σ)
+      (* ...AND WHATEVER ELSE THE PARENT LENDS THE CHILD.  The payload [Q]
+         is what the child's EXIT owes back; [Rc] is what the child is
+         handed to run WITH, and it cannot ride in [P]: [Forkable] is by
+         construction a family of ADDRESS-SPACE views re-minted at the
+         child's fresh ghost names (its header: "a constant family that
+         smuggles a non-heap resource has no instance"), while what a
+         parent lends here is a protocol token at a FIXED name -- init
+         lends the shell its half of the console position pair
+         ([UserConsole.upos], app-echo.md "SH-LINE RULING").  A caller
+         that lends nothing passes [emp]. *)
+      (Rc : iProp Σ)
+      (* ...AND THE SET THE CHILD'S RECORD IS MINTED AT (lane OFF-HAND-4,
+         S1).  The PARENT chooses it: the child's table IS the parent's, so
+         any superset of the parent's own held set is honest, and a parent
+         that means its child to hold an offset half -- sh's REDIR child
+         opens [f] on slot 1 at a held offset (design/app-file.md SS3) --
+         has no other place to say so.  A parent that means nothing by it
+         passes [ukn_held N]. *)
+      (P : gname -> gname -> gname -> iProp Σ) `{FP : !Forkable P} :
+    usysno m = USYS_fork ->
+    is_aligned_vaddr (Virtaddr (add_vec_int pc 4)) 2 = true ->
+    uinstr_is (ukn_t N) pc false (ECALL tt) -∗
+    (* ...AND THE CHILD'S PAYLOAD ITSELF, at the kill status.  The parent
+       chose [Q]; the child's RUN carries [Q (-1)] from its first
+       instruction, because the kernel may tear the child down at any trap
+       and nothing its program does could pay then
+       ([UexecRet.uexec_pay_dep]).  So the resource crosses HERE: a parent
+       that lends its child a resource lends it at the fork.  At
+       [fun _ => True] it costs nothing. *)
+    (* ...and the lend itself, which crosses on the same terms *)
+    Rc -∗
+    P (ukn_t N) (ukn_d N) (ukn_s N) -∗
+    usz (ukn_s N) szv -∗
+    UserFd.ustd_at (ukn_fd N) l v -∗
+    ([∗ map] fd ↦ st ∈ D, UserFd.ufd (ukn_fd N) fd st) -∗
+    (* THE CALLER'S OWN HALF OF ITS WORKING DIRECTORY.  fork keeps the cwd
+       ([UexecRet]'s child arm resumes the child at the parent's
+       [uvis_cwd]), and the child's half has to be minted at a value this
+       statement can NAME -- [urun]'s [cw] is existentially bound and
+       cannot be.  So the parent hands its half in, agreement pins the
+       key's [cw] to it, and both processes come out holding [c]: exactly
+       what fork does to the descriptor ledger one line up. *)
+    UserCwd.ucwd (ukn_cwd N) c -∗
+    (* ...AND ITS OWN HALF OF ITS CHILDREN SET, for the cwd's reason: the
+       set MOVES here, and an update needs both halves. *)
+    UserChildren.uch (ukn_ch N) Sc -∗
+    (* ...AND HOW A KILLER PAYS FOR THE CHILD (lane SELF-KILL, §4b'): the
+       child's killed row publishes a wand from the application's TAINT
+       ([RiscvPtsto.app_taint]) to the child's exit payload at -1 and
+       allocproc founds it, so the FORKING PROGRAM supplies it here.  At
+       [Q := fun _ => True] -- what a program that wants nothing back
+       passes -- it is free. *)
+    □ (app_taint -∗ Q (-1)) -∗
+    urun N h m pc avail -∗
+    ((∀ (h' : CpuId) (r : mword 64),
+        ⌜r <> (mword_of_int 0 : mword 64)⌝ -∗
+        (* FORK'S TWO ARMS, as the program sees them: it FAILED, returning
+           -1, and the caller's children set is the one it had AND WHAT IT
+           LENT ITS CHILD COMES BACK (lane FORK-REFUND: the kernel created
+           no process, so nothing consumed [Rc] -- and a parent that could
+           not get it back could not report the failure, since init's
+           "init: fork failed" and sh's "fork" are printed on exactly the
+           console credential the parent lends); or it returned the child's
+           pid, and the parent gets [ChildTok.child_tok] -- the quarter a
+           later wait() redeems -- beside the set grown by that child's
+           generation, the lend having gone to the child. *)
+        ((⌜r = (mword_of_int (-1) : mword 64)⌝ ∗
+            UserChildren.uch (ukn_ch N) Sc ∗ Rc)
+         ∨ ∃ (γ : gname) (pidv : mword 32),
+             ⌜r = (sign_extend' 64 pidv : mword 64)⌝ ∗
+             ⌜(1 <= bv_unsigned pidv <= PIDMAX)%Z⌝ ∗
+             (* ...AND THE GENERATION IS FRESH (design app-pipe SS4.3y,
+                lane SH-PIPE-ROUND-11): [UexecRet.ufork_ans]'s own row,
+                which this arm was RE-SPELLING and dropping.  The child's
+                generation was in no row of the <wait_lock> children map
+                when kfork put it in the caller's, so the union beside it
+                is a GROWTH BY ONE and not a no-op -- which is what lets a
+                parent that forks twice tell its two children apart.  A
+                consumer that does not want it introduces and drops it. *)
+             ⌜γ ∉ Sc⌝ ∗
+             child_tok γ pidv Q ∗
+             UserChildren.uch (ukn_ch N) (Sc ∪ {[γ]})) -∗
+        P (ukn_t N) (ukn_d N) (ukn_s N) -∗ usz (ukn_s N) szv -∗
+        (* the parent keeps what it had: fork writes nothing into its table *)
+        UserFd.ustd_at (ukn_fd N) l v -∗
+        ([∗ map] fd ↦ st ∈ D, UserFd.ufd (ukn_fd N) fd st) -∗
+        (* ...and its working directory, which fork did not move *)
+        UserCwd.ucwd (ukn_cwd N) c -∗
+        urun N h' (<[Regidx (mword_of_int 10) := r]> m)
+          (add_vec_int pc 4) avail -∗
+        mWP (Loop : expr riscv_lang)) ∗
+     (* THE CHILD GETS A FRESH DESCRIPTOR NAME TOO.  It already got a fresh
+        heap triple -- its ghost state is not the parent's -- and the fd
+        authority is no different: parent and child each own a full map, and
+        one name could not carry both.  (This is why the descriptor name is a
+        FIELD of the record rather than an ambient: an ambient name would
+        make this arm unprovable.)  Its WORKING DIRECTORY is a fresh name
+        for the same reason and at the same value: fork keeps the cwd.
+        ...AND IT GETS THE HANDLES FOR EVERYTHING IT INHERITED, at that
+        fresh name.  [fdv] is the PARENT's table -- fork copies it, which is
+        what [UexecRet]'s child arm now says -- so the map is exactly what
+        the parent had open, and each entry is a handle the child can spend
+        on a close.  Without this the child could not close fd 0, the pipe
+        ends its parent had just made, or anything else it did not itself
+        open, which is what parked sh's runner.  The parent's own handles
+        are NOT consumed: it keeps its table and its authority, and the
+        child's are freshly minted at γfd'. *)
+     (∀ (N' : uk_names Σ) (h' : CpuId) (γ' : gname),
+        (* THE CHILD'S HELD SET IS THE ONE THE PARENT CHOSE (lane
+           OFF-HAND-4, S1), exactly as its payload is. *)
+        (* THE CHILD LEARNS ITS OWN PAYLOAD: what its exit owes its parent,
+           persistent, out of the generation the kernel minted for it
+           ([ChildTok.my_pay]).  A child that pays nothing ignores it.
+           ...AND ITS RECORD IS KEYED AT IT: the arm MINTS the child's
+           record, so it is the party that says what its [UkRun.ukn_pay]
+           is, exactly as an entry constructor does. *)
+        ⌜ ukn_pay N' = Q ⌝ -∗
+        my_pay γ' Q -∗
+        (* ...AND WHAT THE PARENT LENT IT, verbatim *)
+        Rc -∗
+        P (ukn_t N') (ukn_d N') (ukn_s N') -∗ usz (ukn_s N') szv -∗
+        (* ...and the child gets the same descriptors at its OWN name --
+           INCLUDING THE LEDGER, at the parent's own states: fork copies the
+           table, so the child's standard streams are the parent's, and that
+           is what lets a forked child redirect one ([close(1); dup(x)] in
+           sh's PIPE runs in the child). *)
+        UserFd.ustd_at (ukn_fd N') l v -∗
+        ([∗ map] fd ↦ st ∈ D, UserFd.ufd (ukn_fd N') fd st) -∗
+        UserCwd.ucwd (ukn_cwd N') c -∗
+        (* ...AND ITS OWN HALF OF ITS CHILDREN SET, at [∅] on the nose: a
+           process that has just been created has created nothing
+           ([UexecRet.uexec_fork_child_F]'s row).  No binder, because there
+           is only one value it can be -- which is why this arm can name
+           it where it cannot name the parent's. *)
+        UserChildren.uch (ukn_ch N') ∅ -∗
+        (* ...AND ITS OWN PID, AS A HANDLE, WITH THE ONE FACT THAT MAKES IT
+           WORTH HAVING (lane TRAP-ROWS-4, B1b).  The number <allocpid>
+           gave it, at the child record's own ghost name, AND that the
+           number is not <init>'s -- which is the literal 1, registered
+           forever, so the pid scan that found this one refutes it
+           ([SlotGen.init_reg_ne], via
+           [SpecAllocproc.allocproc_post]'s uncounted arm).  A forked child
+           is the one process that can PROVE it is not <init>, and that is
+           exactly what it spends on wait's reaping arm
+           ([UkRunSys.wp_uk_ecall_wait_null_pid]). *)
+        (∃ p : Z, ⌜p <> 1⌝ ∗ UserChildren.upid (ukn_pid N') p) -∗
+        urun N' h'
+          (<[Regidx (mword_of_int 10) := (mword_of_int 0 : mword 64)]> m)
+          (add_vec_int pc 4) avail -∗
+        mWP (Loop : expr riscv_lang))) -∗
+    mWP (Loop : expr riscv_lang).
+  Proof using .
+    intros Hn Hal4. iIntros "#Hi HRc HP Hsz Hstd HD Hcwd Hchf #Hkw Hrun [Hpar Hchild]".
+    iDestruct "Hrun" as (xi C pt Rfd Rut sz M pm fdv cw gn cs pidv) "(%Hlo & %Hpm & %Hlzf & %HRut & Hheap & Hstk & Hufd & Hcwda & Hcha & #Hmy & #Hdep & #Hnpx & Hb)".
+    (* THE CHILD'S ROW, AT THE PARENT'S TABLE: the pipe half is the
+       parent's verbatim, and there is no offset half any more (lane
+       OFF-HAND-6, H3). *)
+    iAssert (urun_rows (MkUkNames (ukn_t N) (ukn_d N) (ukn_s N) (ukn_fd N)
+                          (ukn_cwd N) (ukn_ch N) (ukn_pay N) (ukn_pid N)) fdv)
+      as "#Hnpc";
+      [ rewrite /urun_rows; iApply (urun_rows_nopipe N fdv with "Hnpx") | ].
+    (* the caller's half pins the key's working directory *)
+    iDestruct (ucwd_agree with "Hcwda Hcwd") as %->.
+    (* ...and its other half pins the key's children set, which is why the
+       set has to come IN: [urun] binds it existentially, and the arm has
+       to name it to say what it grew to *)
+    iDestruct (urun_ids_ch with "Hcha") as "[Hchauth Hidsb0]".
+    iDestruct (uch_agree with "Hchauth Hchf") as %->.
+    iDestruct ("Hidsb0" $! Sc with "Hchauth") as "Hcha".
+    iDestruct (uinstr_is_uk_instr with "Hheap Hi") as %Hui.
+    iDestruct (uvb_x0 with "Hb") as "[%Hx0 Hb]".
+    (* the caller's handles ARE the parent's table, at the slots they name --
+       which is what licenses re-minting them at the child's fresh name *)
+    (* the program's break IS the key's, now that the heap carries it *)
+    iDestruct (uheap_usz with "Hheap Hsz") as %<-.
+    iDestruct (ufd_auth_len with "Hufd") as %Hfdlen.
+    iDestruct (ufd_sub_hi (ukn_fd N) fdv D with "Hufd HD") as %Hsub.
+    (* ...and the ledger says the child's standard streams are these *)
+    iDestruct (ustd_at_agree with "Hufd Hstd") as %Hstl.
+    iDestruct (ustd_at_tab with "Hufd Hstd") as %Hle.
+    (* ---- fork the payload TOGETHER WITH THE FREE STACK: [ustack] is a
+       payload like any other, so the two cross through one reveal ---- *)
+    pose proof (forkable_sep P
+                  (fun _ γd0 _ => ustack γd0 (m !!! Regidx csp_rs1) avail)
+                  FP (forkable_ustack (m !!! Regidx csp_rs1) avail)) as FPS.
+    iDestruct (FPS (ukn_t N) (ukn_d N) (ukn_s N) with "[HP Hstk]")
+      as (Ft Fp F) "(#Htf & #Hpf & Hdf & Hrestore & #Hrebuild)";
+      [ iSplitL "HP"; [ iExact "HP" | iExact "Hstk" ] | ].
+    iMod (uheap_fork (ukn_t N) (ukn_d N) (ukn_s N) M pm sz Ft Fp F with "Hheap Htf Hpf Hdf")
+      as "(Hheap & Hdf & Hchildres)".
+    iDestruct ("Hrestore" with "Hdf") as "[HP Hstk]".
+    iDestruct "Hchildres" as (γt' γd' γs')
+      "(Hheap' & Hsz' & #Htf' & #Hpf' & Hdf')".
+    iMod ("Hrebuild" $! γt' γd' γs' with "Htf' Hpf' Hdf'") as "[HP' Hstk']".
+    (* ---- the trap ---- *)
+    iApply (UkStep.wp_uk_ecall C pt Rfd Rut pm sz Hlo Hpm HRut Hlzf M m pc fdv c gn Sc pidv Hui
+              (fun (s : mstate)
+                   (Hp : register_lookup cur_privilege s.(sregs) = User)
+                   (Hc : register_lookup (R_bitvector_64 PC) s.(sregs) = pc) =>
+                 UserExecFacts.goodmb_execute_ECALL_U UserFrame.Du_r UserFrame.Du_w
+                   s pc ltac:(vm_compute; reflexivity)
+                   ltac:(vm_compute; reflexivity) Hp Hc)
+              with "Hb Hmy").
+    rewrite (uexec_ret_ecall _ _ eq_refl).
+    assert (Hnum : uvis_num (uvis_of_run m pc M pm sz fdv c gn Sc pidv false secc_all)
+                   = USYS_fork).
+    { assert (Hraw : usys_num (uvis_tf (uvis_of_run m pc M pm sz fdv c gn Sc pidv false secc_all)) = USYS_fork)
+        by (cbn [uvis_tf uvis_of_run]; rewrite tf_of_num; exact Hn).
+      rewrite uvis_num_full0; [ exact Hraw | reflexivity | rewrite Hraw; usys_range ]. }
+    pose proof Hnum as Hnume. unfold uvis_num in Hnume. rewrite ?Hnum ?Hnume. cbv zeta.
+    destruct (decide (USYS_fork = USYS_exit)) as [He | _];
+      [ exfalso; unfold USYS_fork, USYS_exit in He; lia | ].
+    destruct (decide (USYS_fork = USYS_fork)) as [_ | Hne];
+      [ | exfalso; exact (Hne eq_refl) ].
+    cbn [uvis_M uvis_perm uvis_sz uvis_gen uvis_ch uvis_of_run].
+    (* THE FAMILIES THE PROCESS CHOOSES AT THIS TRAP, and at a fork trap
+       the only field either leg reads is the child's exit payload -- so
+       the point family at [Q] is exactly what the two legs need
+       ([UexecSG.sfam_pay] / [sfork_pay_pay]). *)
+    iExists (sfam_at (ukn_pay N) (sfam_pay Q Rc)).
+    rewrite (sfork_pay_at (ukn_pay N) (sfam_pay Q Rc)) sfork_pay_pay.
+    (* ...AND THE LEND IS A FIELD OF THE SAME VALUE (lane FORK-REFUND):
+       what the deposit hands down and what the failing arm hands back are
+       the same resource because [f] carries both. *)
+    rewrite (sfork_lend_at (ukn_pay N) (sfam_pay Q Rc)) sfork_lend_pay.
+    (* THE PAY FACT, at the PARENT's own payload -- the child's is [Q], and
+       the two live in one value ([UexecSG.sfam_at]).  Nothing travels
+       beside it (lane SELF-KILL, P6b). *)
+    iSplitR;
+      [ iApply (uexec_pay_dep_ret USYS_fork m pc M pm sz fdv c gn Sc pidv
+                  false secc_all _ (sfam_at (ukn_pay N) (sfam_pay Q Rc))
+                  ltac:(assert (Hraw' : usys_num (tf_of m pc) = USYS_fork)
+                          by (rewrite tf_of_num; exact Hn);
+                        rewrite usys_eff_secc_all; [ exact Hraw' | rewrite Hraw'; usys_range ])
+                  ltac:(unfold USYS_fork, USYS_exit; lia)
+                  (sexit_pay_at (ukn_pay N) (sfam_pay Q Rc)) with "Hmy") | ].
+    (* the PARENT keeps the descriptor authority it had -- fork does not
+       touch the parent's table -- and the CHILD mints its own below. *)
+    iSplitL "Hpar HP Hsz Hstd HD Hcwd Hheap Hstk Hufd Hcwda Hcha Hchf";
+      [ | iSplitR; [ iModIntro; iExact "Hkw" | iSplitL "HRc"; [ iExact "HRc" | ] ] ].
+    (* ---- the parent: same heap, r <> 0, and the children set grown by
+       the child's generation ---- *)
+    - iIntros (r fdv' cw' cs') "%Hr %Hfv %Hcv Hans". subst fdv' cw'.
+      (* FORK'S TWO ARMS, and the mirror moves on the second: both halves
+         of the program's children variable are in hand -- the engine's
+         inside the [urun] just destructed, the program's as a premise --
+         which is why the set has to come IN.  What the mirror tracks is
+         the kernel's own map ([WaitInv.children_own_at]), whose per-slot
+         row the kernel moves at the same fork. *)
+      iApply uslot_bupd.
+      (* the run's identity conjunct is the PAIR now ([UkRun.urun_ids]): the
+         children half is what this arm moves, the pid half rides through
+         untouched (lane TRAP-ROWS-4, B). *)
+      iDestruct (urun_ids_ch with "Hcha") as "[Hcha Hidsback]".
+      iAssert (|==> ∃ cs2 : gset gname,
+                 ⌜cs' = cs2⌝ ∗ uch_auth (ukn_ch N) cs2 ∗
+                 ((⌜r = (mword_of_int (-1) : mword 64)⌝ ∗
+                     UserChildren.uch (ukn_ch N) Sc ∗ Rc)
+                  ∨ ∃ (γ : gname) (pidv : mword 32),
+                      ⌜r = (sign_extend' 64 pidv : mword 64)⌝ ∗
+                      ⌜(1 <= bv_unsigned pidv <= PIDMAX)%Z⌝ ∗
+                      ⌜γ ∉ Sc⌝ ∗
+                      child_tok γ pidv Q ∗
+                      UserChildren.uch (ukn_ch N) (Sc ∪ {[γ]})))%I
+        with "[Hcha Hchf Hans]" as ">Hmv".
+      { rewrite /ufork_ans. iDestruct "Hans" as "[[%Hm1 HRc] | Hpid]".
+        - destruct Hm1 as [Hm1 Hcs]. iModIntro. iExists Sc.
+          iSplitR; [iPureIntro; exact Hcs |]. iFrame "Hcha".
+          iLeft. iSplitR; [iPureIntro; exact Hm1 |]. iFrame "Hchf HRc".
+        (* [%Hnin] is the kernel's freshness row (design app-pipe SS4.3x),
+           and it is RELAYED now (SS4.3y): this arm re-spells fork's answer
+           at the run's own children handle and carries the conjunct with
+           it, so the sh tier ([UkShRun.wp_kshr_fork]) can relay it on to
+           a round that has to tell two children apart. *)
+        - iDestruct "Hpid" as (γ pidk) "(%Hpv & %Hrng & %Hnin & %Hcs & Htok)".
+          iMod (uch_update (ukn_ch N) Sc Sc (Sc ∪ {[γ]}) with "Hcha Hchf")
+            as "[Hcha Hchf]".
+          iModIntro. iExists (Sc ∪ {[γ]}).
+          iSplitR; [iPureIntro; exact Hcs |]. iFrame "Hcha".
+          iRight. iExists γ, pidk. iSplitR; [iPureIntro; exact Hpv |].
+          iSplitR; [iPureIntro; exact Hrng |].
+          iSplitR; [iPureIntro; exact Hnin |].
+          iFrame "Htok Hchf". }
+      iDestruct "Hmv" as (cs2) "(%Hcs2 & Hcha & Harm)". subst cs'.
+      iDestruct ("Hidsback" $! cs2 with "Hcha") as "Hcha".
+      iModIntro.
+      rewrite (uslot_bump_run m pc M M pm pm sz sz fdv fdv c c gn gn Sc
+                 cs2 pidv false false secc_all secc_all r Hx0 Hal4).
+      iApply ukcq_ukc.
+      iApply (urun_close_upd N M pm m (mword_of_int 10) r sz fdv c gn
+                cs2 pidv (add_vec_int pc 4) avail
+                ltac:(unfold unot_sp; vm_compute; discriminate)
+                with "Hheap Hstk Hufd Hcwda Hcha Hmy Hdep Hnpx").
+      iIntros (h') "Hrun".
+      iApply ("Hpar" $! h' r with "[%] Harm HP Hsz Hstd HD Hcwd Hrun").
+      exact Hr.
+    (* ---- the child: fresh heap, r = 0, payload rebuilt at the new names *)
+    - iIntros (fdv' cw' g' pidc) "%Hpidc #Hmp %Hfdv' %Hcv' HRc". subst fdv' cw'.
+      (* THE CHILD'S OWN DESCRIPTOR AUTHORITY, minted at the view the kernel
+         handed it -- BEFORE the key is rewritten to [ukc], since the update
+         is absorbed by the [uslot] and not by what it unfolds to.  The
+         parent's cannot be shared (both are full maps at the full
+         fraction), which is exactly why [urun] takes the fd name as a
+         PARAMETER: the child needs its own, as it needs its own heap
+         triple.
+         [ufd_alloc_open] rather than [ufd_alloc]: the child's table is the
+         parent's, so the map is non-empty and its fragments are the
+         inherited handles.  [ufd_alloc] would mint the same authority and
+         drop them. *)
+      iApply uslot_bupd.
+      iMod (ufd_alloc_std_at fdv v D Hfdlen Hsub Hle)
+        as (γfd') "(Hufd' & Hstd' & Hfrag')".
+      iEval (rewrite Hstl) in "Hstd'".
+      (* ...AND ITS OWN WORKING-DIRECTORY PAIR, at the inum the kernel
+         resumed it at, which is the parent's: fork keeps the cwd. *)
+      iMod (ucwd_alloc c) as (γc') "[Hcwa' Hcwf']".
+      (* ...AND ITS OWN CHILDREN PAIR, at [∅]: the child has no children.
+         A fresh name for the parent's reason -- both halves of a variable
+         are full, and one name cannot carry two processes' sets. *)
+      iMod (uch_alloc (∅ : gset gname)) as (γch') "[Hcha' Hchf']".
+      (* ...AND ITS OWN PID PAIR, at the number <allocpid> gave it (lane
+         TRAP-ROWS-4, B).  A fresh name for the children pair's reason, and
+         at the CHILD's pid rather than the parent's: this is a different
+         process.  <init>'s number is nothing the record has to carry any
+         more -- it is the literal 1 (B1b) -- and the kernel's fork answer
+         is what says this pid is not it. *)
+      iMod (upid_alloc (bv_unsigned pidc)) as (γpid') "[Hpida' Hpidf']".
+      iModIntro.
+      rewrite (uslot_bump_at_run m pc M M pm pm sz sz fdv fdv c c gn g' Sc ∅
+                 pidv pidc false false secc_all secc_all (mword_of_int 0) Hx0 Hal4).
+      (* THE CHILD'S RECORD IS MINTED AT THE PARENT'S CHOSEN PAYLOAD, and
+         the fact that BACKS it is the [ChildTok.my_pay] the kernel handed
+         in on this very arm ([SpecSyscall.sysc_fork_in]): the parent chose
+         [Q] at the ecall, kfork set it on the child's generation, and the
+         child's run is keyed by it -- which is what makes the child's own
+         exit leaf able to pay what its parent will redeem. *)
+      iApply ukcq_ukc.
+      iDestruct (urun_ids_intro
+                   (MkUkNames γt' γd' γs' γfd' γc' γch' Q γpid')
+                   ∅ pidc with "Hcha' Hpida'") as "Hcha'".
+      iApply (urun_close_upd
+                (MkUkNames γt' γd' γs' γfd' γc' γch' Q γpid')
+                M pm m
+                (mword_of_int 10)
+                (mword_of_int 0) sz fdv c g' ∅ pidc (add_vec_int pc 4) avail
+                ltac:(unfold unot_sp; vm_compute; discriminate)
+                with "Hheap' Hstk' Hufd' Hcwa' Hcha' Hmp Hdep Hnpc").
+      iIntros (h') "Hrun".
+      iApply ("Hchild" $!
+                (MkUkNames γt' γd' γs' γfd' γc' γch' Q γpid') h' g'
+                with "[%] Hmp HRc HP' Hsz' Hstd' Hfrag' Hcwf' Hchf' [Hpidf'] Hrun").
+      { reflexivity. }
+      iExists (bv_unsigned pidc). iSplitR; [| iExact "Hpidf'"].
+      (* THE CHILD IS NOT <INIT>, unsigned: the kernel's fork answer says
+         the pid is not the word 1 and [bv_unsigned] is injective. *)
+      iPureIntro. intro He. apply Hpidc. apply bv_eq.
+      rewrite He. vm_compute. reflexivity.
+  Qed.
+
+  (* ...AND AT A LEDGER WHOSE VIEW NOBODY READS: every caller but the
+     seccomp program's ([UkSeccMain]) *)
   Lemma wp_uk_ecall_fork (N : uk_names Σ) (h : CpuId) (m : regfile)
       (pc : mword 64) (avail : nat) (szv : Z) (l : list fdstate)
       (D : gmap nat fdstate) (c : Z)
@@ -945,210 +1321,19 @@ Section UkFork.
         mWP (Loop : expr riscv_lang))) -∗
     mWP (Loop : expr riscv_lang).
   Proof using .
-    intros Hn Hal4. iIntros "#Hi HRc HP Hsz Hstd HD Hcwd Hchf #Hkw Hrun [Hpar Hchild]".
-    iDestruct "Hrun" as (xi C pt Rfd Rut sz M pm fdv cw gn cs pidv) "(%Hlo & %Hpm & %Hlzf & %HRut & Hheap & Hstk & Hufd & Hcwda & Hcha & #Hmy & #Hdep & #Hnpx & Hb)".
-    (* THE CHILD'S ROW, AT THE PARENT'S TABLE: the pipe half is the
-       parent's verbatim, and there is no offset half any more (lane
-       OFF-HAND-6, H3). *)
-    iAssert (urun_rows (MkUkNames (ukn_t N) (ukn_d N) (ukn_s N) (ukn_fd N)
-                          (ukn_cwd N) (ukn_ch N) (ukn_pay N) (ukn_pid N)) fdv)
-      as "#Hnpc";
-      [ rewrite /urun_rows; iApply (urun_rows_nopipe N fdv with "Hnpx") | ].
-    (* the caller's half pins the key's working directory *)
-    iDestruct (ucwd_agree with "Hcwda Hcwd") as %->.
-    (* ...and its other half pins the key's children set, which is why the
-       set has to come IN: [urun] binds it existentially, and the arm has
-       to name it to say what it grew to *)
-    iDestruct (urun_ids_ch with "Hcha") as "[Hchauth Hidsb0]".
-    iDestruct (uch_agree with "Hchauth Hchf") as %->.
-    iDestruct ("Hidsb0" $! Sc with "Hchauth") as "Hcha".
-    iDestruct (uinstr_is_uk_instr with "Hheap Hi") as %Hui.
-    iDestruct (uvb_x0 with "Hb") as "[%Hx0 Hb]".
-    (* the caller's handles ARE the parent's table, at the slots they name --
-       which is what licenses re-minting them at the child's fresh name *)
-    (* the program's break IS the key's, now that the heap carries it *)
-    iDestruct (uheap_usz with "Hheap Hsz") as %<-.
-    iDestruct (ufd_auth_len with "Hufd") as %Hfdlen.
-    iDestruct (ufd_sub_hi (ukn_fd N) fdv D with "Hufd HD") as %Hsub.
-    (* ...and the ledger says the child's standard streams are these *)
-    iDestruct (ustd_agree with "Hufd Hstd") as %Hstl.
-    (* ---- fork the payload TOGETHER WITH THE FREE STACK: [ustack] is a
-       payload like any other, so the two cross through one reveal ---- *)
-    pose proof (forkable_sep P
-                  (fun _ γd0 _ => ustack γd0 (m !!! Regidx csp_rs1) avail)
-                  FP (forkable_ustack (m !!! Regidx csp_rs1) avail)) as FPS.
-    iDestruct (FPS (ukn_t N) (ukn_d N) (ukn_s N) with "[HP Hstk]")
-      as (Ft Fp F) "(#Htf & #Hpf & Hdf & Hrestore & #Hrebuild)";
-      [ iSplitL "HP"; [ iExact "HP" | iExact "Hstk" ] | ].
-    iMod (uheap_fork (ukn_t N) (ukn_d N) (ukn_s N) M pm sz Ft Fp F with "Hheap Htf Hpf Hdf")
-      as "(Hheap & Hdf & Hchildres)".
-    iDestruct ("Hrestore" with "Hdf") as "[HP Hstk]".
-    iDestruct "Hchildres" as (γt' γd' γs')
-      "(Hheap' & Hsz' & #Htf' & #Hpf' & Hdf')".
-    iMod ("Hrebuild" $! γt' γd' γs' with "Htf' Hpf' Hdf'") as "[HP' Hstk']".
-    (* ---- the trap ---- *)
-    iApply (UkStep.wp_uk_ecall C pt Rfd Rut pm sz Hlo Hpm HRut Hlzf M m pc fdv c gn Sc pidv Hui
-              (fun (s : mstate)
-                   (Hp : register_lookup cur_privilege s.(sregs) = User)
-                   (Hc : register_lookup (R_bitvector_64 PC) s.(sregs) = pc) =>
-                 UserExecFacts.goodmb_execute_ECALL_U UserFrame.Du_r UserFrame.Du_w
-                   s pc ltac:(vm_compute; reflexivity)
-                   ltac:(vm_compute; reflexivity) Hp Hc)
-              with "Hb Hmy").
-    rewrite (uexec_ret_ecall _ _ eq_refl).
-    assert (Hnum : uvis_num (uvis_of_run m pc M pm sz fdv c gn Sc pidv false secc_all)
-                   = USYS_fork).
-    { assert (Hraw : usys_num (uvis_tf (uvis_of_run m pc M pm sz fdv c gn Sc pidv false secc_all)) = USYS_fork)
-        by (cbn [uvis_tf uvis_of_run]; rewrite tf_of_num; exact Hn).
-      rewrite uvis_num_full0; [ exact Hraw | reflexivity | rewrite Hraw; usys_range ]. }
-    pose proof Hnum as Hnume. unfold uvis_num in Hnume. rewrite ?Hnum ?Hnume. cbv zeta.
-    destruct (decide (USYS_fork = USYS_exit)) as [He | _];
-      [ exfalso; unfold USYS_fork, USYS_exit in He; lia | ].
-    destruct (decide (USYS_fork = USYS_fork)) as [_ | Hne];
-      [ | exfalso; exact (Hne eq_refl) ].
-    cbn [uvis_M uvis_perm uvis_sz uvis_gen uvis_ch uvis_of_run].
-    (* THE FAMILIES THE PROCESS CHOOSES AT THIS TRAP, and at a fork trap
-       the only field either leg reads is the child's exit payload -- so
-       the point family at [Q] is exactly what the two legs need
-       ([UexecSG.sfam_pay] / [sfork_pay_pay]). *)
-    iExists (sfam_at (ukn_pay N) (sfam_pay Q Rc)).
-    rewrite (sfork_pay_at (ukn_pay N) (sfam_pay Q Rc)) sfork_pay_pay.
-    (* ...AND THE LEND IS A FIELD OF THE SAME VALUE (lane FORK-REFUND):
-       what the deposit hands down and what the failing arm hands back are
-       the same resource because [f] carries both. *)
-    rewrite (sfork_lend_at (ukn_pay N) (sfam_pay Q Rc)) sfork_lend_pay.
-    (* THE PAY FACT, at the PARENT's own payload -- the child's is [Q], and
-       the two live in one value ([UexecSG.sfam_at]).  Nothing travels
-       beside it (lane SELF-KILL, P6b). *)
-    iSplitR;
-      [ iApply (uexec_pay_dep_ret USYS_fork m pc M pm sz fdv c gn Sc pidv
-                  false secc_all _ (sfam_at (ukn_pay N) (sfam_pay Q Rc))
-                  ltac:(assert (Hraw' : usys_num (tf_of m pc) = USYS_fork)
-                          by (rewrite tf_of_num; exact Hn);
-                        rewrite usys_eff_secc_all; [ exact Hraw' | rewrite Hraw'; usys_range ])
-                  ltac:(unfold USYS_fork, USYS_exit; lia)
-                  (sexit_pay_at (ukn_pay N) (sfam_pay Q Rc)) with "Hmy") | ].
-    (* the PARENT keeps the descriptor authority it had -- fork does not
-       touch the parent's table -- and the CHILD mints its own below. *)
-    iSplitL "Hpar HP Hsz Hstd HD Hcwd Hheap Hstk Hufd Hcwda Hcha Hchf";
-      [ | iSplitR; [ iModIntro; iExact "Hkw" | iSplitL "HRc"; [ iExact "HRc" | ] ] ].
-    (* ---- the parent: same heap, r <> 0, and the children set grown by
-       the child's generation ---- *)
-    - iIntros (r fdv' cw' cs') "%Hr %Hfv %Hcv Hans". subst fdv' cw'.
-      (* FORK'S TWO ARMS, and the mirror moves on the second: both halves
-         of the program's children variable are in hand -- the engine's
-         inside the [urun] just destructed, the program's as a premise --
-         which is why the set has to come IN.  What the mirror tracks is
-         the kernel's own map ([WaitInv.children_own_at]), whose per-slot
-         row the kernel moves at the same fork. *)
-      iApply uslot_bupd.
-      (* the run's identity conjunct is the PAIR now ([UkRun.urun_ids]): the
-         children half is what this arm moves, the pid half rides through
-         untouched (lane TRAP-ROWS-4, B). *)
-      iDestruct (urun_ids_ch with "Hcha") as "[Hcha Hidsback]".
-      iAssert (|==> ∃ cs2 : gset gname,
-                 ⌜cs' = cs2⌝ ∗ uch_auth (ukn_ch N) cs2 ∗
-                 ((⌜r = (mword_of_int (-1) : mword 64)⌝ ∗
-                     UserChildren.uch (ukn_ch N) Sc ∗ Rc)
-                  ∨ ∃ (γ : gname) (pidv : mword 32),
-                      ⌜r = (sign_extend' 64 pidv : mword 64)⌝ ∗
-                      ⌜(1 <= bv_unsigned pidv <= PIDMAX)%Z⌝ ∗
-                      ⌜γ ∉ Sc⌝ ∗
-                      child_tok γ pidv Q ∗
-                      UserChildren.uch (ukn_ch N) (Sc ∪ {[γ]})))%I
-        with "[Hcha Hchf Hans]" as ">Hmv".
-      { rewrite /ufork_ans. iDestruct "Hans" as "[[%Hm1 HRc] | Hpid]".
-        - destruct Hm1 as [Hm1 Hcs]. iModIntro. iExists Sc.
-          iSplitR; [iPureIntro; exact Hcs |]. iFrame "Hcha".
-          iLeft. iSplitR; [iPureIntro; exact Hm1 |]. iFrame "Hchf HRc".
-        (* [%Hnin] is the kernel's freshness row (design app-pipe SS4.3x),
-           and it is RELAYED now (SS4.3y): this arm re-spells fork's answer
-           at the run's own children handle and carries the conjunct with
-           it, so the sh tier ([UkShRun.wp_kshr_fork]) can relay it on to
-           a round that has to tell two children apart. *)
-        - iDestruct "Hpid" as (γ pidk) "(%Hpv & %Hrng & %Hnin & %Hcs & Htok)".
-          iMod (uch_update (ukn_ch N) Sc Sc (Sc ∪ {[γ]}) with "Hcha Hchf")
-            as "[Hcha Hchf]".
-          iModIntro. iExists (Sc ∪ {[γ]}).
-          iSplitR; [iPureIntro; exact Hcs |]. iFrame "Hcha".
-          iRight. iExists γ, pidk. iSplitR; [iPureIntro; exact Hpv |].
-          iSplitR; [iPureIntro; exact Hrng |].
-          iSplitR; [iPureIntro; exact Hnin |].
-          iFrame "Htok Hchf". }
-      iDestruct "Hmv" as (cs2) "(%Hcs2 & Hcha & Harm)". subst cs'.
-      iDestruct ("Hidsback" $! cs2 with "Hcha") as "Hcha".
-      iModIntro.
-      rewrite (uslot_bump_run m pc M M pm pm sz sz fdv fdv c c gn gn Sc
-                 cs2 pidv false false secc_all secc_all r Hx0 Hal4).
-      iApply ukcq_ukc.
-      iApply (urun_close_upd N M pm m (mword_of_int 10) r sz fdv c gn
-                cs2 pidv (add_vec_int pc 4) avail
-                ltac:(unfold unot_sp; vm_compute; discriminate)
-                with "Hheap Hstk Hufd Hcwda Hcha Hmy Hdep Hnpx").
-      iIntros (h') "Hrun".
-      iApply ("Hpar" $! h' r with "[%] Harm HP Hsz Hstd HD Hcwd Hrun").
-      exact Hr.
-    (* ---- the child: fresh heap, r = 0, payload rebuilt at the new names *)
-    - iIntros (fdv' cw' g' pidc) "%Hpidc #Hmp %Hfdv' %Hcv' HRc". subst fdv' cw'.
-      (* THE CHILD'S OWN DESCRIPTOR AUTHORITY, minted at the view the kernel
-         handed it -- BEFORE the key is rewritten to [ukc], since the update
-         is absorbed by the [uslot] and not by what it unfolds to.  The
-         parent's cannot be shared (both are full maps at the full
-         fraction), which is exactly why [urun] takes the fd name as a
-         PARAMETER: the child needs its own, as it needs its own heap
-         triple.
-         [ufd_alloc_open] rather than [ufd_alloc]: the child's table is the
-         parent's, so the map is non-empty and its fragments are the
-         inherited handles.  [ufd_alloc] would mint the same authority and
-         drop them. *)
-      iApply uslot_bupd.
-      iMod (ufd_alloc_std fdv D Hfdlen Hsub)
-        as (γfd') "(Hufd' & Hstd' & Hfrag')".
-      iEval (rewrite Hstl) in "Hstd'".
-      (* ...AND ITS OWN WORKING-DIRECTORY PAIR, at the inum the kernel
-         resumed it at, which is the parent's: fork keeps the cwd. *)
-      iMod (ucwd_alloc c) as (γc') "[Hcwa' Hcwf']".
-      (* ...AND ITS OWN CHILDREN PAIR, at [∅]: the child has no children.
-         A fresh name for the parent's reason -- both halves of a variable
-         are full, and one name cannot carry two processes' sets. *)
-      iMod (uch_alloc (∅ : gset gname)) as (γch') "[Hcha' Hchf']".
-      (* ...AND ITS OWN PID PAIR, at the number <allocpid> gave it (lane
-         TRAP-ROWS-4, B).  A fresh name for the children pair's reason, and
-         at the CHILD's pid rather than the parent's: this is a different
-         process.  <init>'s number is nothing the record has to carry any
-         more -- it is the literal 1 (B1b) -- and the kernel's fork answer
-         is what says this pid is not it. *)
-      iMod (upid_alloc (bv_unsigned pidc)) as (γpid') "[Hpida' Hpidf']".
-      iModIntro.
-      rewrite (uslot_bump_at_run m pc M M pm pm sz sz fdv fdv c c gn g' Sc ∅
-                 pidv pidc false false secc_all secc_all (mword_of_int 0) Hx0 Hal4).
-      (* THE CHILD'S RECORD IS MINTED AT THE PARENT'S CHOSEN PAYLOAD, and
-         the fact that BACKS it is the [ChildTok.my_pay] the kernel handed
-         in on this very arm ([SpecSyscall.sysc_fork_in]): the parent chose
-         [Q] at the ecall, kfork set it on the child's generation, and the
-         child's run is keyed by it -- which is what makes the child's own
-         exit leaf able to pay what its parent will redeem. *)
-      iApply ukcq_ukc.
-      iDestruct (urun_ids_intro
-                   (MkUkNames γt' γd' γs' γfd' γc' γch' Q γpid')
-                   ∅ pidc with "Hcha' Hpida'") as "Hcha'".
-      iApply (urun_close_upd
-                (MkUkNames γt' γd' γs' γfd' γc' γch' Q γpid')
-                M pm m
-                (mword_of_int 10)
-                (mword_of_int 0) sz fdv c g' ∅ pidc (add_vec_int pc 4) avail
-                ltac:(unfold unot_sp; vm_compute; discriminate)
-                with "Hheap' Hstk' Hufd' Hcwa' Hcha' Hmp Hdep Hnpc").
-      iIntros (h') "Hrun".
-      iApply ("Hchild" $!
-                (MkUkNames γt' γd' γs' γfd' γc' γch' Q γpid') h' g'
-                with "[%] Hmp HRc HP' Hsz' Hstd' Hfrag' Hcwf' Hchf' [Hpidf'] Hrun").
-      { reflexivity. }
-      iExists (bv_unsigned pidc). iSplitR; [| iExact "Hpidf'"].
-      (* THE CHILD IS NOT <INIT>, unsigned: the kernel's fork answer says
-         the pid is not the word 1 and [bv_unsigned] is injective. *)
-      iPureIntro. intro He. apply Hpidc. apply bv_eq.
-      rewrite He. vm_compute. reflexivity.
+    intros Hn Hal4.
+    iIntros "#Hi HRc HP Hsz Hstd HD Hcwd Hchf #Hkw Hrun [Hpar Hchild]".
+    iDestruct (ustd_ustd_at with "Hstd") as (v) "Hstd".
+    iApply (wp_uk_ecall_fork_at N h m pc avail szv l D c v Sc Q Rc P
+              Hn Hal4 with "Hi HRc HP Hsz Hstd HD Hcwd Hchf Hkw Hrun [Hpar Hchild]").
+    iSplitL "Hpar".
+    - iIntros (h' r) "%Hr Harm HP Hsz Hstd HD Hcwd Hrun".
+      iApply ("Hpar" $! h' r with "[%] Harm HP Hsz [Hstd] HD Hcwd Hrun");
+        [ exact Hr | iApply (ustd_at_ustd with "Hstd") ].
+    - iIntros (N' h' γ') "%Hpeq Hmp HRc' HP' Hsz' Hstd' Hfrag' Hcwd' Hch' Hpid' Hrun".
+      iApply ("Hchild" $! N' h' γ'
+                with "[%] Hmp HRc' HP' Hsz' [Hstd'] Hfrag' Hcwd' Hch' Hpid' Hrun");
+        [ exact Hpeq | iApply (ustd_at_ustd with "Hstd'") ].
   Qed.
 
   (* ===================================================================== *)

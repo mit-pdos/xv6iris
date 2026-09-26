@@ -269,8 +269,7 @@ Section UkFreeHandler.
     iDestruct "Ht" as "(#HT & #Hkc & #Hsc & Hpay & %l & %hm & Hstd & %Hok & Hhm)".
     iPoseProof ("Hsc" with "HT") as "#Hsup".
     iPoseProof (udepw_law_of_sup 15 ltac:(by left) with "Hsup") as "#Hlaw".
-    iAssert (⌜length l = NSTD⌝ ∗ UserFd.ustd γfd l)%I with "[Hstd]" as "[%Hlen Hstd]".
-    { rewrite /UserFd.ustd. iDestruct "Hstd" as "[%H $]". done. }
+    iDestruct (UserFd.ustd_len with "Hstd") as %Hlen.
     set (m1 := <[Regidx a7_idx := (mword_of_int 15 : mword 64)]> m).
     assert (Hnum : usysno m1 = USYS_open).
     { unfold m1, usysno. rewrite (upd_eq m (Regidx a7_idx) (mword_of_int 15 : mword 64)).

@@ -197,6 +197,32 @@ ledger states, the exit payload `Q` chosen by the parent, and `my_pay`), and
 `UkInitMain.wp_kinit_fork` instantiates it for init's child
 (`completed/app-echo.md`, "WX-WAIT LANDED" and "SH-LINE RULING").
 
+## 5½  The table view: knowing the WHOLE table
+
+A closed slot above `NSTD` is absent from the map, so the ledger and the
+handles can never say "this slot is closed" -- and a program that must know
+its whole table (the seccomp child, whose masked key is in the universe only
+if no row is an inode, `UexecSecc.secc_key`) had no way to know it.  The
+map has one more cell for that: key `None` (slots are `Some k`, the cell
+type `ufdcell` is `UCSlot st | UCTab v`) holds a TABLE VIEW `v`, half in
+`ufd_auth`, half in the LEDGER (`ustd` hides the view, `ustd_at γ l v`
+names it; `utab γ v` is the half alone).  `ufd_auth γ fdv` carries
+`tab_le fdv v`: the table is the view except at slots above `NSTD` it may
+have CLOSED since.
+
+- every move that takes the ledger resets the view to the new table
+  (`ufd_alloc_least`, `ufd_close_std`); a tail close spends only its handle
+  and leaves the view (`tab_le_close_hi`) -- so no statement over `ustd`
+  and no leaf moved, and a program that never reads its view carries
+  exactly what it did;
+- the entry constructor `uslot_of_urun_ro_at` hands the ledger at the key's
+  table, and `UkFork.wp_uk_ecall_fork_at` hands the child the PARENT's view
+  (the child's table is the parent's, so the view bounds it too); the
+  view-free `uslot_of_urun_ro` / `wp_uk_ecall_fork` are corollaries;
+- `ustd_at_tab` / `utab_agree` read it: `tab_le fdv v` at the run's own
+  table, which is what `UkRunSecc.wp_uk_ecall_seccomp` hands its
+  continuation about the resumed key.
+
 ## 6  What this does NOT yet do
 
 `UkSh.ush_std l` is the ledger plus `⌜fd_lowest_closed l = None⌝` — sh's

@@ -2478,6 +2478,197 @@ Section UkRun.
   (* disjoint from any other, so no caller and no entry gate ever has to   *)
   (* decide whether two argv slots point at the same string.               *)
   (* ------------------------------------------------------------------- *)
+  Lemma uslot_of_urun_ro_at (W : uvis) (avail : nat) (Q : Z -> iProp Σ) :
+    uint (tf_resume_gpr0 (uvis_tf W) !!! Regidx csp_rs1) mod 8 = 0 ->
+    8 * Z.of_nat avail
+      <= uint (tf_resume_gpr0 (uvis_tf W) !!! Regidx csp_rs1) ->
+    (forall j : nat, (j < 8 * avail)%nat ->
+       is_Some (udata_lo (uvis_M W) (uvis_perm W) (uvis_sz W)
+                 !! (uint (tf_resume_gpr0 (uvis_tf W) !!! Regidx csp_rs1)
+                     - 8 * Z.of_nat avail + Z.of_nat j)%Z)) ->
+    (* the descriptor table is [NOFILE] slots -- what the process's own
+       authority is minted with ([UserFd.ufd_auth] carries it) *)
+    length (uvis_fd W) = NOFILE ->
+    (* THE MAP STOPS AT THE BREAK: above the page the break sits in, the
+       key's permission view has no entry.  It is the U tier's reading of
+       [ProcPtOwn.um_below] -- which the bundle does not carry, so it is
+       stated here, where the program's own layout decides it -- and it is
+       what makes [sbrk]'s new run FRESH ([UserHeap]'s own clause). *)
+    (forall (p : mword 27) (q : uperm), uvis_perm W !! p = Some q ->
+       bv_unsigned p * 4096 < UserPtTree.pgroundup (uvis_sz W)) ->
+    (* ...AND THE KEY'S LAZY BIT IS [false] -- see [uslot_of_urun_all]. *)
+    uvis_lazy W = false ->
+    (* ...AND ITS MASK IS FULL (upstream a083670): [urun] is keyed at
+       [ProcDefs.secc_all], as it is at [false] above.  WHO SUPPLIES IT:
+       userinit's first record, fork's copy, exec's keep
+       ([SpecKexec.exec_slot_pre]'s mask row). *)
+    uvis_secc W = ProcDefs.secc_all ->
+    (* ...AND NO HONESTY ROW ON THE HELD SET (lane OFF-HAND-6's H3 emptied
+       it, lane OFF-LINK-2's L6 deleted the field): a constructor says
+       nothing about offsets and an entry may be taken at a key with a HELD
+       descriptor, which is what makes a redirect child's exec provable
+       (design/app-file.md SS3). *)
+    (* THE DEPOSIT SUPPLIER, at the key the slot is being built for.  This
+       is the one obligation the ARM adds to an entry constructor: whoever
+       hands a program a [urun] says which syscall bundles it can pay and
+       out of what.  [UexecCond.cond_entry_slot] passes the generic one
+       ([Dsup := ssupply], every number admitted); a verified program's
+       constructor passes its own. *)
+    udep -∗
+    (* ...AND THE PROCESS'S OWN KNOWLEDGE OF ITS EXIT PAYLOAD.  A [urun]
+       carries it ([ChildTok.my_pay] at the key's generation) because the
+       exit leaf pays the trap loop's deposit row out of it
+       ([UkRunSys.wp_uk_ecall_exit]), and a constructor is the only place
+       it can enter: the record it mints is what fixes [ukn_pay].  The
+       kernel is what hands it over -- fork through the child slot's
+       premise, exec through [SpecKexec.exec_slot_pre]'s wands, and
+       userinit at the trivial payload. *)
+    (* ...AND WHETHER THE PROCESS'S TABLE HOLDS A PIPE ROW (design/pipe.md,
+       "The exit path").  The run carries this between traps
+       ([urun_nopipe]) and exit's bundle row is minted off it, so an ENTRY
+       is where it comes in.  It is a fact about the key the kernel handed
+       over and it travels the way every other such fact does:
+       [SpecKexec.kexec_image_ok_fd] says an exec'd image's table IS the
+       exec'ing process's, so a chain of pipe-free programs stays pipe-free
+       and the boot process's table is [FdSlots.fdt0], all closed.  A
+       program that means to call pipe(2) comes in on the right arm
+       instead ([urun_nopipe_taint]). *)
+    (* ...AND WHETHER IT ANSWERS FOR ITS OFFSETS (lane OFF-HAND-3, R1).
+       [hs] is the set the minted record carries and this is the premise
+       that makes it honest: a constructor may claim a set only if every
+       unparked row of the key's table is in it.  Every landed entry
+       passes [empty] at a table the kernel has just handed over
+       ([SpecKexec.exec_slot_pre]'s all-parked row,
+       [FdSlots.fdv_all_parked_fdt0] at the boot), and a constructor for a
+       program that means to HOLD an offset half passes the slots it means
+       to hold. *)
+    urun_nopipe (uvis_fd W) -∗
+    my_pay (uvis_gen W) Q -∗
+    (∀ (N : uk_names Σ) (h : CpuId),
+       (* the record's payload IS the one that came in, which is what lets
+          the program's proof read its own [ukn_pay] *)
+       ⌜ ukn_pay N = Q ⌝ -∗
+       ⌜ usz_ok (uvis_sz W) ⌝ -∗
+       usz (ukn_s N) (uvis_sz W) -∗
+       utext_all (ukn_t N) (uvis_M W) (uvis_perm W) -∗
+       (* THE LEDGER OF THE STANDARD STREAMS, at the states the resumed key
+          carries.  It comes out here because it has to: the low [NSTD] keys
+          are in [UserFd.ufd_map] by construction, so their fragments exist
+          from the moment the authority does, and an exclusive fragment for
+          a key already in the map can never be minted later.  A program
+          that does not care about its standard streams drops it -- and then
+          calls no allocating syscall, which is the honest reading of "it is
+          not tracking its descriptors". *)
+       (* ...AT THE WHOLE TABLE'S VIEW (design/seccomp.md, S3 ruling G2):
+          the key's table is the view, so the program knows it outright *)
+       ustd_at (ukn_fd N) (take NSTD (uvis_fd W)) (uvis_fd W) -∗
+       (* ...AND THE PROGRAM'S OWN HALF OF ITS WORKING DIRECTORY, at the
+          inum the resumed key carries.  Same reason the ledger comes out
+          here: this is where the process's [urun] is created, so it is
+          where the tie between the program's half and the key's [cw]
+          begins.  A program that never looks at its cwd drops it. *)
+       ucwd (ukn_cwd N) (uvis_cwd W) -∗
+       (* ...AND ITS OWN HALF OF ITS CHILDREN SET, at the very set the
+          resumed key carries -- [∅] at every entry that exists today,
+          because an entry constructor builds the FIRST run of a program
+          and a program that has not forked has no children. *)
+       uch (ukn_ch N) (uvis_ch W) -∗
+       (* ...AND ITS OWN HALF OF ITS PID (lane TRAP-ROWS-4, B): the number
+          the resumed key carries, at the record's own ghost name.  It is
+          what a caller reads wait's reaping arm against
+          ([UkRunSys.wp_uk_ecall_wait_null_live]) and what makes getpid(2)'s
+          answer sayable.  A program that never asks drops it. *)
+       upid (ukn_pid N) (bv_unsigned (uvis_pid W)) -∗
+       ([∗ map] k ↦ b ∈ base.filter
+             (fun kv : Z * bv 8 =>
+                ~ (kv.1 < uint (tf_resume_gpr0 (uvis_tf W) !!! Regidx csp_rs1)))
+             (udata_lo (uvis_M W) (uvis_perm W) (uvis_sz W)),
+          ubyteq (ukn_d N) DfracDiscarded k b) -∗
+       urun N h (tf_resume_gpr0 (uvis_tf W)) (tf_resume_pc (uvis_tf W))
+         avail -∗
+       mWP (Loop : expr riscv_lang))
+    -∗ uslot W.
+  Proof using .
+    intros Hal8 Hroom Hstk Hfdlen Hstop Hlzf Hscf.
+    iIntros "#Hdep #Hnpx #Hpay Hprog". rewrite uslot_ukc /ukc Hlzf Hscf.
+    iIntros (h xi C pt Rfd Rut HRut) "%Hlo %Hpm %Hlzr Hb".
+    set (sz := uvis_sz W).
+    assert (Hwf : proc_pt_wf pt)
+      by (destruct Hlo as (_ & _ & _ & _ & _ & H); exact H).
+    rewrite /uvb /uvb_F /user_ptm_inv_x.
+    iDestruct "Hb" as
+      "(Hamb & Hregs & %Hsz & (Htlb & Hlazy & %Hinj & %Hacc) &
+        Hfrag & Hcfg & Hgpr & Hpc & Hrut & Hkont)".
+    iDestruct (umem_lazy_bound pt sz (uvis_M W) Hwf Hsz with "Hlazy") as %Hcan.
+    iMod (uheap_alloc (uvis_M W) (uvis_perm W) sz Hcan Hstop)
+      as (γt γd γs) "(Hheap & Hszf & #Ht & Hd)".
+    (* ...AND THE PROGRAM'S DESCRIPTOR AUTHORITY, minted here beside the
+       heap's three names.  This is where a process's [urun] is created, so
+       it is where its own view of its table begins -- at the view the
+       resumed KEY carries, which is the view the kernel is handing it. *)
+    iMod (ufd_alloc_std_at (uvis_fd W) (uvis_fd W) ∅ Hfdlen (map_empty_subseteq _)
+            (tab_le_refl _))
+      as (γfd) "(Hufd & Hstd & _)".
+    (* ...AND THE WORKING DIRECTORY'S PAIR, at the inum the resumed key
+       carries: the authority stays in the [urun] being built, the
+       fragment goes to the program. *)
+    iMod (ucwd_alloc (uvis_cwd W)) as (γc) "[Hcwa Hcwf]".
+    (* ...AND THE CHILDREN SET'S PAIR, at the set the resumed key carries:
+       the authority stays in the [urun] being built, the fragment goes to
+       the program. *)
+    iMod (uch_alloc (uvis_ch W)) as (γch) "[Hcha Hchf]".
+    (* ...AND THE PID'S PAIR, at the pid the resumed key carries: the
+       authority stays in the [urun] being built (bundled with the
+       children's -- [urun_ids]), the fragment goes to the program.  It is
+       what lets the program NAME its own pid (lane TRAP-ROWS-4, B). *)
+    iMod (upid_alloc (bv_unsigned (uvis_pid W))) as (γpid) "[Hpida Hpidf]".
+    rewrite -/(utext_all γt (uvis_M W) (uvis_perm W)).
+    (* ---- the cut at the entry sp ---- *)
+    set (sp := tf_resume_gpr0 (uvis_tf W) !!! Regidx csp_rs1).
+    set (D := udata_lo (uvis_M W) (uvis_perm W) sz).
+    iDestruct (umap_split_at γd D (uint sp) with "Hd") as "[Dlo Dhi]".
+    iMod (uarea_persist γd _ with "Dhi") as "#Dhi".
+    (* ---- the frame, out of what is below sp ---- *)
+    set (base := (uint sp - 8 * Z.of_nat avail)%Z).
+    set (f := fun j : nat =>
+                default (bv_0 8)
+                  (base.filter (fun kv : Z * bv 8 => kv.1 < uint sp) D
+                     !! (base + Z.of_nat j)%Z)).
+    assert (Hf : forall j : nat, (j < 8 * avail)%nat ->
+                   base.filter (fun kv : Z * bv 8 => kv.1 < uint sp) D
+                     !! (base + Z.of_nat j)%Z = Some (f j)).
+    { intros j Hj. destruct (Hstk j Hj) as [b Hb].
+      assert (Hb' : base.filter (fun kv : Z * bv 8 => kv.1 < uint sp) D
+                      !! (base + Z.of_nat j)%Z = Some b)
+        by (apply umap_filter_lookup_lt; [ unfold base; lia | exact Hb ]).
+      unfold f. rewrite Hb'. reflexivity. }
+    iDestruct (ubytes_of_map γd
+                 (base.filter (fun kv : Z * bv 8 => kv.1 < uint sp) D)
+                 base (8 * avail) f Hf with "Dlo") as "Hbs".
+    iDestruct (ustack_of_ubytes γd sp avail f Hal8 Hroom with "Hbs") as "Hstk".
+    iSpecialize ("Hprog" $! (MkUkNames γt γd γs γfd γc γch Q γpid) h
+                   with "[%] [%] Hszf Ht Hstd Hcwf Hchf Hpidf Dhi");
+      [ reflexivity | exact Hsz | ].
+    iApply "Hprog".
+    iExists xi, C, pt, Rfd, Rut, sz, (uvis_M W), (uvis_perm W), (uvis_fd W),
+      (uvis_cwd W), (uvis_gen W), (uvis_ch W), (uvis_pid W).
+    iSplitR; [ iPureIntro; exact Hlo | ].
+    iSplitR; [ iPureIntro; exact Hpm | ].
+    iSplitR; [ iPureIntro; exact (Hlzr eq_refl) | ].
+    iSplitR; [ iPureIntro; exact HRut | ].
+    (* the record is minted at [Q], so the payload the constructor was
+       handed IS the run's [ukn_pay N (-1)] *)
+    (* the two identity authorities go in as ONE conjunct ([urun_ids]) *)
+    iDestruct (urun_ids_intro (MkUkNames γt γd γs γfd γc γch Q γpid)
+                 (uvis_ch W) (uvis_pid W) with "Hcha Hpida") as "Hcha".
+    iFrame "Hheap Hstk Hufd Hcwa Hcha Hpay Hdep".
+    iSplitR; [ rewrite /urun_rows; iExact "Hnpx" | ].
+    rewrite /uvb /uvb_F /user_ptm_inv_x.
+    iFrame "Hamb Hregs Hfrag Hcfg Hgpr Hpc Hrut Hkont Htlb Hlazy".
+    iPureIntro. split_and!; [ exact Hsz | exact Hinj | exact Hacc ].
+  Qed.
+
+  (* ...and at a ledger whose view nobody reads: every entry but seccomp's *)
   Lemma uslot_of_urun_ro (W : uvis) (avail : nat) (Q : Z -> iProp Σ) :
     uint (tf_resume_gpr0 (uvis_tf W) !!! Regidx csp_rs1) mod 8 = 0 ->
     8 * Z.of_nat avail
@@ -2588,81 +2779,12 @@ Section UkRun.
     -∗ uslot W.
   Proof using .
     intros Hal8 Hroom Hstk Hfdlen Hstop Hlzf Hscf.
-    iIntros "#Hdep #Hnpx #Hpay Hprog". rewrite uslot_ukc /ukc Hlzf Hscf.
-    iIntros (h xi C pt Rfd Rut HRut) "%Hlo %Hpm %Hlzr Hb".
-    set (sz := uvis_sz W).
-    assert (Hwf : proc_pt_wf pt)
-      by (destruct Hlo as (_ & _ & _ & _ & _ & H); exact H).
-    rewrite /uvb /uvb_F /user_ptm_inv_x.
-    iDestruct "Hb" as
-      "(Hamb & Hregs & %Hsz & (Htlb & Hlazy & %Hinj & %Hacc) &
-        Hfrag & Hcfg & Hgpr & Hpc & Hrut & Hkont)".
-    iDestruct (umem_lazy_bound pt sz (uvis_M W) Hwf Hsz with "Hlazy") as %Hcan.
-    iMod (uheap_alloc (uvis_M W) (uvis_perm W) sz Hcan Hstop)
-      as (γt γd γs) "(Hheap & Hszf & #Ht & Hd)".
-    (* ...AND THE PROGRAM'S DESCRIPTOR AUTHORITY, minted here beside the
-       heap's three names.  This is where a process's [urun] is created, so
-       it is where its own view of its table begins -- at the view the
-       resumed KEY carries, which is the view the kernel is handing it. *)
-    iMod (ufd_alloc_std (uvis_fd W) ∅ Hfdlen (map_empty_subseteq _))
-      as (γfd) "(Hufd & Hstd & _)".
-    (* ...AND THE WORKING DIRECTORY'S PAIR, at the inum the resumed key
-       carries: the authority stays in the [urun] being built, the
-       fragment goes to the program. *)
-    iMod (ucwd_alloc (uvis_cwd W)) as (γc) "[Hcwa Hcwf]".
-    (* ...AND THE CHILDREN SET'S PAIR, at the set the resumed key carries:
-       the authority stays in the [urun] being built, the fragment goes to
-       the program. *)
-    iMod (uch_alloc (uvis_ch W)) as (γch) "[Hcha Hchf]".
-    (* ...AND THE PID'S PAIR, at the pid the resumed key carries: the
-       authority stays in the [urun] being built (bundled with the
-       children's -- [urun_ids]), the fragment goes to the program.  It is
-       what lets the program NAME its own pid (lane TRAP-ROWS-4, B). *)
-    iMod (upid_alloc (bv_unsigned (uvis_pid W))) as (γpid) "[Hpida Hpidf]".
-    rewrite -/(utext_all γt (uvis_M W) (uvis_perm W)).
-    (* ---- the cut at the entry sp ---- *)
-    set (sp := tf_resume_gpr0 (uvis_tf W) !!! Regidx csp_rs1).
-    set (D := udata_lo (uvis_M W) (uvis_perm W) sz).
-    iDestruct (umap_split_at γd D (uint sp) with "Hd") as "[Dlo Dhi]".
-    iMod (uarea_persist γd _ with "Dhi") as "#Dhi".
-    (* ---- the frame, out of what is below sp ---- *)
-    set (base := (uint sp - 8 * Z.of_nat avail)%Z).
-    set (f := fun j : nat =>
-                default (bv_0 8)
-                  (base.filter (fun kv : Z * bv 8 => kv.1 < uint sp) D
-                     !! (base + Z.of_nat j)%Z)).
-    assert (Hf : forall j : nat, (j < 8 * avail)%nat ->
-                   base.filter (fun kv : Z * bv 8 => kv.1 < uint sp) D
-                     !! (base + Z.of_nat j)%Z = Some (f j)).
-    { intros j Hj. destruct (Hstk j Hj) as [b Hb].
-      assert (Hb' : base.filter (fun kv : Z * bv 8 => kv.1 < uint sp) D
-                      !! (base + Z.of_nat j)%Z = Some b)
-        by (apply umap_filter_lookup_lt; [ unfold base; lia | exact Hb ]).
-      unfold f. rewrite Hb'. reflexivity. }
-    iDestruct (ubytes_of_map γd
-                 (base.filter (fun kv : Z * bv 8 => kv.1 < uint sp) D)
-                 base (8 * avail) f Hf with "Dlo") as "Hbs".
-    iDestruct (ustack_of_ubytes γd sp avail f Hal8 Hroom with "Hbs") as "Hstk".
-    iSpecialize ("Hprog" $! (MkUkNames γt γd γs γfd γc γch Q γpid) h
-                   with "[%] [%] Hszf Ht Hstd Hcwf Hchf Hpidf Dhi");
-      [ reflexivity | exact Hsz | ].
-    iApply "Hprog".
-    iExists xi, C, pt, Rfd, Rut, sz, (uvis_M W), (uvis_perm W), (uvis_fd W),
-      (uvis_cwd W), (uvis_gen W), (uvis_ch W), (uvis_pid W).
-    iSplitR; [ iPureIntro; exact Hlo | ].
-    iSplitR; [ iPureIntro; exact Hpm | ].
-    iSplitR; [ iPureIntro; exact (Hlzr eq_refl) | ].
-    iSplitR; [ iPureIntro; exact HRut | ].
-    (* the record is minted at [Q], so the payload the constructor was
-       handed IS the run's [ukn_pay N (-1)] *)
-    (* the two identity authorities go in as ONE conjunct ([urun_ids]) *)
-    iDestruct (urun_ids_intro (MkUkNames γt γd γs γfd γc γch Q γpid)
-                 (uvis_ch W) (uvis_pid W) with "Hcha Hpida") as "Hcha".
-    iFrame "Hheap Hstk Hufd Hcwa Hcha Hpay Hdep".
-    iSplitR; [ rewrite /urun_rows; iExact "Hnpx" | ].
-    rewrite /uvb /uvb_F /user_ptm_inv_x.
-    iFrame "Hamb Hregs Hfrag Hcfg Hgpr Hpc Hrut Hkont Htlb Hlazy".
-    iPureIntro. split_and!; [ exact Hsz | exact Hinj | exact Hacc ].
+    iIntros "#Hdep #Hnpx #Hpay Hprog".
+    iApply (uslot_of_urun_ro_at W avail Q Hal8 Hroom Hstk Hfdlen Hstop Hlzf Hscf
+              with "Hdep Hnpx Hpay").
+    iIntros (N h) "%Hq %Hsz Hszf Ht Hstd Hcwf Hchf Hpidf Hro Hrun".
+    iApply ("Hprog" $! N h with "[%] [%] Hszf Ht [Hstd] Hcwf Hchf Hpidf Hro Hrun");
+      [ exact Hq | exact Hsz | iApply (ustd_at_ustd with "Hstd") ].
   Qed.
 
 End UkRun.
