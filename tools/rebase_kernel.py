@@ -23,6 +23,13 @@ Everything it cannot map is reported (functions whose instruction stream
 changed, symbols that disappeared, ambiguous strings).
 
 Usage: tools/rebase_kernel.py OLD_ELF NEW_ELF [--objdump OBJDUMP] [--dry-run] [FILES...]
+
+The full pipeline for a new kernel build (the generated files first):
+  1. tools/dump_kernel.py --kernel NEW_ELF --rev REV   (Xv6/KernelImage.lean, KernelTree)
+  2. tools/gen_kernel_data.py --kernel NEW_ELF         (Xv6/KernelData.lean byte lists)
+  3. tools/dump_elf_image.py --kernel NEW_ELF --rev REV (MachCSL/KernelElf.lean: the
+     language's boot image, MachCSL.bootImage; Xv6.bootImage_wf checks 1-2 against it)
+  4. this tool (literal pass, then --fixup once), then the manual residue.
 """
 import argparse, os, re, subprocess, sys, glob
 
