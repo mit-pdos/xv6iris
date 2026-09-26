@@ -278,6 +278,30 @@ theorem creCommits_cur (Γ : FsViewNames GF) (tyz ma mi : Nat) (Pd : Nat → IPr
   iintro H
   iapply (acreCommitAtGen_cur (hlc := hlc) Γ appE (creChild tyz ma mi) Pd Farm Fok.pfRecv) $$ H
 
+/-- ...AND THE CURSOR MOVES ALONG AN ISO AT THE BUNDLE (Rocq's
+`cre_commits_mono`, TL-3C): the path-fixed `P (nparElems pl).length` and the
+syscall tier's guarded `SysMknodDefs.nparCur` carry the whole four-leg bundle
+between them, which is what a PATH-FIXED mkdir bundle needs
+(`SpecSysMkdir.mkdirCre_inst`).  BOTH directions, because the parent leg
+READS the premise and hands it back. -/
+theorem creCommits_mono (Γ : FsViewNames GF) (tyz ma mi : Nat) (Pd Pd' : Nat → IProp GF)
+    (Farm : Pfam GF (Aview → Nat → IProp GF))
+    (Fdots : Pfam GF (Aview → Nat → Nat → Bool → IProp GF))
+    (Fun : Pfam GF (Aview → Nat → IProp GF))
+    (Fok : Pfam GF (Aview → Nat → Fname → Nat → IProp GF)) :
+    ⊢ iprop(□ (∀ d : Nat, Pd' d -∗ Pd d)) -∗ iprop(□ (∀ d : Nat, Pd d -∗ Pd' d)) -∗
+      creCommits (hlc := hlc) Γ tyz ma mi Pd Farm Fdots Fun Fok -∗
+      creCommits (hlc := hlc) Γ tyz ma mi Pd' Farm Fdots Fun Fok := by
+  unfold creCommits
+  iintro #Hin #Hout ⟨Ha, Hd, Hu, Hac⟩
+  iframe Ha Hd Hu
+  iapply (pfAt_mono
+    (acreCommitAtGen (hlc := hlc) Γ appE (creChild tyz ma mi) Pd Farm)
+    (acreCommitAtGen (hlc := hlc) Γ appE (creChild tyz ma mi) Pd' Farm) Fok) $$ [] Hac
+  iintro H
+  iapply (acreCommitAtGen_mono (hlc := hlc) Γ appE (creChild tyz ma mi) Pd Pd' Farm Fok.pfRecv)
+    $$ Hin Hout H
+
 /-- the exists observation at the trivial pair (Rocq's `cre_dlookup_unit`) -/
 theorem creDlookup_unit (Γ : FsViewNames GF) :
     ⊢ pfAt (dlookupCommitAt (hlc := hlc) Γ appE) (pfamTriv (fun _ _ _ _ => iprop(True))) := by

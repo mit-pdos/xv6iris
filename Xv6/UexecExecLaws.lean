@@ -75,6 +75,7 @@ theorem syscDepLink_holds : SyscDepLink (hlc := hlc) (GF := GF) := by
 theorem syscDepMkdir_holds : SyscDepMkdir (hlc := hlc) (GF := GF) := by
   intro f W
   refine (syscDepMkdir_xv6 (hlc := hlc) f W).trans ?_
+  dsimp only [imgAgrees, xkA]
   iintro H
   iexists (Xfam.dP f), (Xfam.dPmiss f), (Xfam.dFarm f), (Xfam.dFdots f), (Xfam.dFun f), (Xfam.dFok f), (Xfam.dFex f)
   iexact H

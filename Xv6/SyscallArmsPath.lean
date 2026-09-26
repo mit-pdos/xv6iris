@@ -33,8 +33,10 @@ channel: the law's out-wand at the entry's receipt).
    `none`).  So the input is owed at EVERY page view `Mv` agreeing with
    `W.M` on its defined bytes, and the out-wand takes the receipt at the
    view it fired at; the arm instantiates at its own view
-   (`syscPath_imgLazy`, = W8-K's `imgAgrees_viewLazy`).  chdir/unlink/
-   link/mkdir read no image (their Lean bundles are path-generic).
+   (`syscPath_imgLazy`, = W8-K's `imgAgrees_viewLazy`).  mkdir's law has
+   the same guard since its bundle became path-fixed (Rocq TL-3C
+   `3e3a157ae`); chdir/unlink/link read no image (their Lean bundles are
+   path-generic).
 3. The ledgers: chdir borrows `irefSlots 2` and link `irefSlots
    sysLinkIrefs` (3) and unlink `irefSlots sysUnlinkSlots` (2) out of
    `IREFSPARE` and join them back (Rocq `sysc_iref_split/join`); open,
@@ -201,8 +203,10 @@ def SyscDepLink : Prop :=
           linkArms (hlc := hlc) (fsGammaL fscFs) Ftgt Fent Funt r -∗
             spostAt (uslot (hlc := hlc)) 19 f W r M' fdv' cw' cs')
 
-/-- **Rocq `sysc_dep_mkdir` + `sysc_out_mkdir`**: branch 20 is mkdir's caller
-bundle at the key's cwd; mkdir's arms pay the post. -/
+/-- **Rocq `sysc_dep_mkdir` + `sysc_out_mkdir`** (deviation 2: the image
+guard; TL-3C made mkdir's bundle path-fixed): branch 20 is mkdir's caller
+bundle at the key's cwd and the path at argument 0; mkdir's arms at the view
+it fired at pay the post. -/
 def SyscDepMkdir : Prop :=
   ∀ (f : sfam GF) (W : Uvis),
     sbundleAt (uslot (hlc := hlc)) 20 f W ⊢
@@ -210,10 +214,14 @@ def SyscDepMkdir : Prop :=
         (Fdots : Pfam GF (Aview → Nat → Nat → Bool → IProp GF))
         (Fun : Pfam GF (Aview → Nat → IProp GF))
         (Fok Fex : Pfam GF (Aview → Nat → Fname → Nat → IProp GF)),
-        mkdirAuPre (hlc := hlc) (fsGammaL fscFs) fscFs W.cwd P Pmiss Farm Fdots Fun Fok Fex ∗
-        (∀ (r : BitVec 64) (M' : ElfMem) (fdv' : List FdState) (cw' : Nat)
-            (cs' : ExtTreeSet GName compare),
-          mkdirArms (hlc := hlc) (fsGammaL fscFs) fscFs W.cwd P Pmiss Farm Fdots Fun Fok Fex r -∗
+        (∀ Mv : Nat → List (BitVec 8), ⌜∀ (a : Nat) (b : BitVec 8), W.M a = some b → umemByte Mv a = b⌝ -∗
+          mkdirAuAt (hlc := hlc) (fsGammaL fscFs) fscFs W.cwd Mv (tfW W.tf (tfArgIdx 0)).toNat
+            P Pmiss Farm Fdots Fun Fok Fex) ∗
+        (∀ (Mv : Nat → List (BitVec 8)) (r : BitVec 64) (M' : ElfMem) (fdv' : List FdState)
+            (cw' : Nat) (cs' : ExtTreeSet GName compare),
+          ⌜∀ (a : Nat) (b : BitVec 8), W.M a = some b → umemByte Mv a = b⌝ -∗
+          mkdirArms (hlc := hlc) (fsGammaL fscFs) fscFs W.cwd Mv (tfW W.tf (tfArgIdx 0)).toNat
+              P Pmiss Farm Fdots Fun Fok Fex r -∗
             spostAt (uslot (hlc := hlc)) 20 f W r M' fdv' cw' cs')
 
 /-- **Rocq `sysc_dep_mknod` + `sysc_out_mknod`** (deviation 2: the image
@@ -545,7 +553,10 @@ theorem syscall_arm_mkdir (SM : SYSMKDIR) (hdep : SyscDepMkdir (hlc := hlc) (GF 
   ihave Hdep := syscSysIn_at f V M sts gn cs pid 20 hn (by decide) $$ Hsin
   icases hdep f (uvisOf V M sts gn cs pid) $$ Hdep with
     ⟨%P, %Pmiss, %Farm, %Fdots, %Fun, %Fok, %Fex, Hau, Hout⟩
-  rw [show (uvisOf V M sts gn cs pid).cwd = V.cwi from rfl]
+  rw [show (uvisOf V M sts gn cs pid).cwd = V.cwi from rfl,
+    show (uvisOf V M sts gn cs pid).tf = V.tf from rfl,
+    show (uvisOf V M sts gn cs pid).M = umemLazy V.upt V.sz.toNat M from rfl]
+  ihave Hau := Hau $$ %(viewLazy V.upt V.sz M) %(syscPath_imgLazy V.upt V.sz M)
   ihave #Hpe := syscallEnv_panic PT Γ γ $$ Henv
   ihave #Hrdy := syscallEnv_fsReady PT Γ γ $$ Henv
   have hC := SM.wp_sys_mkdir_eb (hlc := hlc) (GF := GF) Γ cpu
@@ -587,7 +598,7 @@ theorem syscall_arm_mkdir (SM : SYSMKDIR) (hdep : SyscDepMkdir (hlc := hlc) (GF 
   isplitl [Hout Harms]
   · iapply (syscSysOut_at f V M sts gn cs pid _ _ _ _ _ 20 hn (by decide) (by decide))
     rw [ha0]
-    iapply Hout
+    iapply Hout $$ %(viewLazy V.upt V.sz M) %_ %_ %_ %_ %_ %(syscPath_imgLazy V.upt V.sz M)
     iexact Harms
   isplitr
   · iapply syscForkOut_ne; rw [hn]; decide

@@ -75,9 +75,10 @@ Rocq's header, point for point:
    `filewriteIn` carried a no-wrap conjunct; SpecFilewrite deviation 5 is
    retired, so row 16 is Rocq's `filewrite_in`, `SpecFilewrite.filewriteIn`,
    paid from the supply at every key.)
-6. **UNLINK/MKDIR ARE NOT PATH-FIXED** (Lean's `unlinkAuPre`/`mkdirAuPre`
-   quantify the walk at every path; Rocq's `unlink_au_at`/`mkdir_au_at`
-   read argument 0): the rows are the landed Lean bundles.
+6. **UNLINK IS NOT PATH-FIXED YET** (Lean's `unlinkAuPre` quantifies the
+   walk at every path; Rocq's `unlink_au_at` reads argument 0).  MKDIR IS
+   (Rocq TL-3C `3e3a157ae`): row/post 20 are `mkdirAuAt`/`mkdirArms` at
+   argument 0 under deviation 1's image guard, as mknod's.
 7. **`uprogSG_gen` / `uprogSG_free` are `def`s, not instances** (no Lean
    consumer yet -- the `UkRun` program tier is wave 9 -- and a global
    `UprogSG` instance would be ambiguous against a verified program's).
@@ -371,11 +372,14 @@ def xrowLink (Ftgt : Pfam GF (Aview → Nat → Anode → IProp GF))
     IProp GF :=
   linkCommits (hlc := hlc) (fsGammaL fscFs) Ftgt Fent Funt
 
-/-- row 20 (deviation 6). -/
+/-- row 20: mkdir's bundle AT ITS PATH ARGUMENT (Rocq TL-3C item (M)),
+at every page view agreeing with the key's image (deviation 1). -/
 def xrowMkdir (P Pmiss : Nat → Nat → IProp GF) (Farm : Pfam GF (Aview → Nat → IProp GF))
     (Fdots : Pfam GF (Aview → Nat → Nat → Bool → IProp GF)) (Fun : Pfam GF (Aview → Nat → IProp GF))
     (Fok Fex : Pfam GF (Aview → Nat → Fname → Nat → IProp GF)) (W : Uvis) : IProp GF :=
-  mkdirAuPre (hlc := hlc) (fsGammaL fscFs) fscFs W.cwd P Pmiss Farm Fdots Fun Fok Fex
+  iprop(∀ Mv : Nat → List (BitVec 8), ⌜imgAgrees W.M Mv⌝ -∗
+    mkdirAuAt (hlc := hlc) (fsGammaL fscFs) fscFs W.cwd Mv (xkA W 0).toNat
+      P Pmiss Farm Fdots Fun Fok Fex)
 
 /-! ### The posts -/
 
@@ -433,12 +437,14 @@ def xpostLink (Ftgt : Pfam GF (Aview → Nat → Anode → IProp GF))
     (r : BitVec 64) : IProp GF :=
   linkArms (hlc := hlc) (fsGammaL fscFs) Ftgt Fent Funt r
 
-/-- post 20. -/
+/-- post 20: mkdir's arms, at the view they fired at. -/
 def xpostMkdir (P Pmiss : Nat → Nat → IProp GF) (Farm : Pfam GF (Aview → Nat → IProp GF))
     (Fdots : Pfam GF (Aview → Nat → Nat → Bool → IProp GF)) (Fun : Pfam GF (Aview → Nat → IProp GF))
     (Fok Fex : Pfam GF (Aview → Nat → Fname → Nat → IProp GF)) (W : Uvis) (r : BitVec 64) :
     IProp GF :=
-  mkdirArms (hlc := hlc) (fsGammaL fscFs) fscFs W.cwd P Pmiss Farm Fdots Fun Fok Fex r
+  iprop(∃ Mv : Nat → List (BitVec 8), ⌜imgAgrees W.M Mv⌝ ∗
+    mkdirArms (hlc := hlc) (fsGammaL fscFs) fscFs W.cwd Mv (xkA W 0).toNat
+      P Pmiss Farm Fdots Fun Fok Fex r)
 
 /-! ## §3 THE TWO FAMILIES OF THE CLASS -/
 
@@ -643,7 +649,7 @@ theorem xrowMkdir_supply (W : Uvis) :
       xrowMkdir (hlc := hlc) (xfamPt (GF := GF)).dP xfamPt.dPmiss xfamPt.dFarm xfamPt.dFdots xfamPt.dFun
         xfamPt.dFok xfamPt.dFex W := by
   dsimp only [xrowMkdir, xfamPt, xv6Ssupply]
-  iintro #⟨Hsup, -, -⟩
+  iintro #⟨Hsup, -, -⟩ %Mv %_
   iapply (fsabsMkdirPre (hlc := hlc) fscFs) $$ Hsup
 
 /-- every number but exec, at the point (Rocq's branch-by-branch discharge). -/
@@ -1083,21 +1089,26 @@ theorem syscDepLink_xv6 (f : Xfam GF) (W : Uvis) :
 /-- **`SyscDepMkdir`** (Rocq `sbundle_at_mkdir_elim` + `spost_at_mkdir_intro`). -/
 theorem syscDepMkdir_xv6 (f : Xfam GF) (W : Uvis) :
     @UexecSG.sbundleAt GF _ uexecSGXv6 (uslot (hlc := hlc)) 20 f W ⊢
-      mkdirAuPre (hlc := hlc) (fsGammaL fscFs) fscFs W.cwd f.dP f.dPmiss f.dFarm f.dFdots f.dFun f.dFok
-        f.dFex ∗
-      (∀ (r : BitVec 64) (M' : ElfMem) (fdv' : List FdState) (cw' : Nat) (cs' : ExtTreeSet GName compare),
-        mkdirArms (hlc := hlc) (fsGammaL fscFs) fscFs W.cwd f.dP f.dPmiss f.dFarm f.dFdots f.dFun f.dFok
-          f.dFex r -∗
+      (∀ Mv : Nat → List (BitVec 8), ⌜imgAgrees W.M Mv⌝ -∗
+        mkdirAuAt (hlc := hlc) (fsGammaL fscFs) fscFs W.cwd Mv (xkA W 0).toNat f.dP f.dPmiss f.dFarm
+          f.dFdots f.dFun f.dFok f.dFex) ∗
+      (∀ (Mv : Nat → List (BitVec 8)) (r : BitVec 64) (M' : ElfMem) (fdv' : List FdState) (cw' : Nat)
+          (cs' : ExtTreeSet GName compare),
+        ⌜imgAgrees W.M Mv⌝ -∗
+        mkdirArms (hlc := hlc) (fsGammaL fscFs) fscFs W.cwd Mv (xkA W 0).toNat f.dP f.dPmiss f.dFarm
+          f.dFdots f.dFun f.dFok f.dFex r -∗
           @UexecSG.spostAt GF _ uexecSGXv6 (uslot (hlc := hlc)) 20 f W r M' fdv' cw' cs') := by
   rw [sbundleAt_xv6_mkdir]
   unfold xrowMkdir
   iintro H
   isplitl [H]
   · iexact H
-  · iintro %r %M' %fdv' %cw' %cs' Hp
+  · iintro %Mv %r %M' %fdv' %cw' %cs' %hag Hp
     rw [spostAt_xv6_mkdir]
     unfold xpostMkdir
-    iexact Hp
+    iexists Mv
+    iframe Hp
+    ipureintro; exact hag
 
 end Inst
 

@@ -304,15 +304,16 @@ theorem fsabsUnlinkPre (γfs : FsNames) (cw : Nat) :
   · iapply fsabsDlookup
   · iapply fsabsDmiss
 
-/-- mkdir's (the landed `mkdirAuPre_unit`, under this file's name). -/
-theorem fsabsMkdirPre (γfs : FsNames) (cw : Nat) :
+/-- mkdir's (the landed `mkdirAuAt_unit`, under this file's name; the
+syscall-tier bundle is path-fixed since TL-3C). -/
+theorem fsabsMkdirPre (γfs : FsNames) (cw : Nat) (M : Nat → List (BitVec 8)) (pv : Nat) :
     appSup (GF := GF) ⊢
-      mkdirAuPre (hlc := hlc) (fsGammaL γfs) γfs cw (fun _ _ => iprop(True))
+      mkdirAuAt (hlc := hlc) (fsGammaL γfs) γfs cw M pv (fun _ _ => iprop(True))
         (fun _ _ => iprop(True))
         (pfamTriv (fun _ _ => iprop(True))) (pfamTriv (fun _ _ _ _ => iprop(True)))
         (pfamTriv (fun _ _ => iprop(True))) (pfamTriv (fun _ _ _ _ => iprop(True)))
         (pfamTriv (fun _ _ _ _ => iprop(True))) :=
-  mkdirAuPre_unit γfs cw
+  mkdirAuAt_unit γfs cw M pv
 
 /-- **exec's bundle at a caller that tracks nothing** (Rocq's
 `xv6_sbundle_of_supply` exec branch, stated once here at `SpecSysExec`'s

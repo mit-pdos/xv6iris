@@ -274,6 +274,24 @@ theorem sysMkdirPins_exit (k : KCtx) (R : RegMap) (h : sysMkdirPins k R) :
 
 /-! ## The arguments, the pid seam, the out bundle, the join point -/
 
+/-- argstr's success arm, read (TL-3C; `SysMknodFrame.sys_mknod_path_of`'s
+twin): THE READING OF ARGUMENT 0 at the buffer create is handed. -/
+theorem sys_mkdir_path_of (M : Nat → List (BitVec 8)) (va : Nat) (pl : List (BitVec 8))
+    (hs : umemStr M va 128 = some (pl ++ [0#8])) :
+    argPathOf M va (bview pl.length (sysfilePfun pl)) := by
+  have hself : bview pl.length (sysfilePfun pl) = pl := by
+    apply List.ext_getElem
+    · simp [bview_length]
+    · intro i h1 h2
+      rw [bview_length] at h1
+      unfold bview sysfilePfun
+      simp only [List.getElem_map, List.getElem_range]
+      simp [List.getD_eq_getElem?_getD, List.getElem?_eq_getElem h1]
+  rw [hself]
+  obtain ⟨pl', hpl', hof⟩ := argPathOf_umemStr M va 128 _ (by decide) hs
+  rw [List.append_cancel_right hpl']
+  exact hof
+
 /-- The contract's parameters, as one record (the `NamexArgs` pattern). -/
 structure SysMkdirArgs (GF : BundledGFunctors) where
   γ : FileNames
@@ -281,6 +299,8 @@ structure SysMkdirArgs (GF : BundledGFunctors) where
   pid : BitVec 32
   V : ProcPriv
   M : Nat → List (BitVec 8)
+  /-- the path argument (trapframe argument 0; TL-3C's path-fixed bundle) -/
+  v : BitVec 64
   ns : Nat
   P : Nat → Nat → IProp GF
   Pmiss : Nat → Nat → IProp GF
@@ -299,8 +319,8 @@ variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [Fdslot
 /-- The contract's continuation at the record (hart-free: a `true` crossing
 at a process pins nothing). -/
 abbrev sysMkdirPostA (k : KCtx) (A : SysMkdirArgs GF) (c : CPU) : IProp GF :=
-  sysMkdirK (hlc := hlc) k A.γ (procAddr A.j) A.pid A.V A.M A.ns A.P A.Pmiss A.Farm A.Fdots A.Fun
-    A.Fok A.Fex c
+  sysMkdirK (hlc := hlc) k A.γ (procAddr A.j) A.pid A.V A.M A.ns A.v.toNat A.P A.Pmiss A.Farm
+    A.Fdots A.Fun A.Fok A.Fex c
 
 /-- The block after argstr: the page table grown to `P2` and the view
 faulted (argstr's post). -/
@@ -330,7 +350,8 @@ def sysMkdirOut (A : SysMkdirArgs GF) (r : BitVec 64) : IProp GF := iprop%
   bslots 3 ∗ irefSlots A.ns ∗
   (∃ P' : UPtd, ⌜A.V.upt.extSz A.V.sz P'⌝ ∗
     procPrivFd A.γ (procAddr A.j) A.pid { A.V with upt := P' } (viewFaulted A.V.upt P' A.M)) ∗
-  mkdirArms (hlc := hlc) (fsGammaL fscFs) fscFs A.V.cwi A.P A.Pmiss A.Farm A.Fdots A.Fun A.Fok A.Fex r
+  mkdirArms (hlc := hlc) (fsGammaL fscFs) fscFs A.V.cwi (viewLazy A.V.upt A.V.sz A.M) A.v.toNat
+    A.P A.Pmiss A.Farm A.Fdots A.Fun A.Fok A.Fex r
 
 set_option maxHeartbeats 8000000 in
 /-- **THE JOIN POINT `+0x38`** (Rocq `md_epilogue` + the caller's
@@ -369,7 +390,7 @@ theorem sys_mkdir_exit (cpu : CPU) (k : KCtx) (A : SysMkdirArgs GF)
   ihave Hce := cpuClaimExt_move _ _ _ _ hpin' $$ Hce
   unfold sysMkdirOut
   icases Hout with ⟨Hbs, Hir, ⟨%P', %hP', Hblk⟩, Harms⟩
-  ihave %hret := mkdirArms_ret (hlc := hlc) _ _ _ _ _ _ _ _ _ _ _ $$ Harms
+  ihave %hret := mkdirArms_ret (hlc := hlc) _ _ _ _ _ _ _ _ _ _ _ _ _ $$ Harms
   ispecialize HΦ $$ %c
   unfold sysMkdirPostA sysMkdirK
   iapply HΦ $$ %spie %spp %_ %P' %hcs %hP' Hk Hpc Hte Hce Hbs Hir Hblk [] [Harms]

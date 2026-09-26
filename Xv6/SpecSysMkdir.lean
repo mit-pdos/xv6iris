@@ -96,9 +96,18 @@ iunlockput's argument is already in place).
    `bv_unsigned T_DIR` / `bv_unsigned (mword_of_int 0)` is `T_DIR.toNat` /
    `0`; `-1` is `0xFFFFFFFFFFFFFFFF#64`, `zero_reg` is `0#64`.
 7. Names: `K_sys_mkdir` → `sysMkdirSlots`, `sys_mkdir_ret` → `sysMkdirRet`,
-   `mkdir_au_pre(_unit)` → `mkdirAuPre(_unit)`, `mkdir_arms` → `mkdirArms`,
+   `mkdir_au_pre` → `mkdirAuPre`, `mkdir_au_at(_inst, _of_all, _unit)` →
+   `mkdirAuAt(_inst, _of_all, _unit)`, `mkdir_cre_inst` → `mkdirCre_inst`,
+   `mkdir_arms` → `mkdirArms`,
    `wp_sys_mkdir_sconf_body` → `wp_sys_mkdir_eb_body` (continuation named
    `sysMkdirK`), `SYSMKDIR` kept.
+
+8. **THE PATH READING IS AT THE LAZY IMAGE** (TL-3C, `3e3a157ae`), as
+   `SpecSysMknod` deviation 5: Rocq's `mkdir_au_at (us_M U) v` is
+   `mkdirAuAt … (viewLazy V.upt V.sz M) v.toNat`, and the arms take the same
+   image and pointer.  Argument order: `M pv` follow `cw` in `mkdirAuAt` and
+   `mkdirArms` (sys_mknod's Lean order; Rocq's `mkdir_arms` takes them
+   before `r`).
 
 ## Dropped/simplified vs Rocq
 
@@ -106,12 +115,13 @@ iunlockput's argument is already in place).
   is at `γ : FileNames`), `gs`/`gl`, `b`, `lks`, `m`, `K`, `eb`,
   `pd pav pu` (bound inside `fsReady`), `dqb dqs dqbs dqn` (deviation 2) --
   statement packaging only.
-* `Global Typeclasses Opaque mkdir_au_pre mkdir_arms`: a Lean `def` is not
+* `Global Typeclasses Opaque mkdir_au_pre mkdir_au_at mkdir_arms`: a Lean `def` is not
   unfolded by instance search.
 
 Imports only definitional files and callee `Spec*` files.
 -/
 import Xv6.SpecCreate
+import Xv6.UMemLazy
 
 namespace Xv6
 
@@ -137,41 +147,117 @@ section Arms
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [FsTopG GF] [FsBytesG GF]
   [Appcfg GF]
 
-/-- EVERYTHING THE CALLER HANDS IN, at the commit mask `appE` (Rocq's
-`mkdir_au_pre`): the parent-prefix walk premise, the exists observation and
-create's four commits at `T_DIR` with both device halfwords zero. -/
-def mkdirAuPre (Γ : FsViewNames GF) (γfs : FsNames) (cw : Nat) (P Pmiss : Nat → Nat → IProp GF)
+/-! ### THE PATH-FIXED BUNDLE (Rocq TL-3C item (M), `3e3a157ae`) --
+`SpecSysMknod.mknodAuPre` / `mknodAuAt`'s TWIN.
+
+TL-3K threaded the walk's terminal cursor into the parent leg's commit and
+found that mkdir COULD NOT CARRY ONE: its bundle took the `∀ pl` one-shot
+(`nparWalkPreEra`), so there was no ONE path for a cursor to name.  So mkdir
+now takes the bundle AT THE PATH ARGUMENT 0 NAMES, exactly as sys_mknod and
+open(O_CREATE) do: `mkdirAuPre` at ONE fetched path (the walk one-shot there
+and the four legs at `P (nparElems pl).length`), and `mkdirAuAt` at the
+SYSCALL tier (under the reading of trapframe argument 0, the cursor under the
+SAME guard, `nparCur`).  THE COMMITS STAY OUTSIDE THE WALK'S WAND: argstr can
+fail, and then no `pl` satisfies the reading. -/
+
+/-- EVERYTHING THE CALLER HANDS IN, AT ONE PATH, at the commit mask `appE`
+(Rocq's `mkdir_au_pre`): the walk one-shot at the path, the exists
+observation and create's four commits at `T_DIR` with both device halfwords
+zero, at the walk's terminal cursor. -/
+def mkdirAuPre (Γ : FsViewNames GF) (γfs : FsNames) (cw : Nat) (pl : List (BitVec 8))
+    (P Pmiss : Nat → Nat → IProp GF)
     (Farm : Pfam GF (Aview → Nat → IProp GF))
     (Fdots : Pfam GF (Aview → Nat → Nat → Bool → IProp GF))
     (Fun : Pfam GF (Aview → Nat → IProp GF))
     (Fok Fex : Pfam GF (Aview → Nat → Fname → Nat → IProp GF)) : IProp GF :=
-  iprop(nparWalkPreEra (hlc := hlc) γfs cw P Pmiss ∗
+  iprop(epStart (hlc := hlc) γfs cw P Pmiss pl ∗
     pfAt (dlookupCommitAt (hlc := hlc) Γ appE) Fex ∗
-    -- THE CURSOR-FREE COMMIT (TL-3K): mkdir's bundle still carries the
-    -- `∀ pl` walk form, so there is no ONE path for a cursor to name; create's
-    -- own bundle takes it up to the walk's terminal cursor through
-    -- `CreateDefs.creCommits_cur`
-    creCommits (hlc := hlc) Γ T_DIR.toNat 0 0 (fun _ => iprop(True)) Farm Fdots Fun Fok)
+    creCommits (hlc := hlc) Γ T_DIR.toNat 0 0 (P (nparElems pl).length) Farm Fdots Fun Fok)
 
-/-- SATISFIABILITY (Rocq's `mkdir_au_pre_unit`): the generic application
-asks nothing of mkdir's walk or its legs -- every hop says yes, every cursor
-is `True`, every commit is its own unit, paid off the SUPPLY. -/
-theorem mkdirAuPre_unit (γfs : FsNames) (cw : Nat) :
+/-- ...AND THE SYSCALL TIER (Rocq's `mkdir_au_at`; the contract reads it at
+the entry image, as sys_mknod's). -/
+def mkdirAuAt (Γ : FsViewNames GF) (γfs : FsNames) (cw : Nat)
+    (M : Nat → List (BitVec 8)) (pv : Nat) (P Pmiss : Nat → Nat → IProp GF)
+    (Farm : Pfam GF (Aview → Nat → IProp GF))
+    (Fdots : Pfam GF (Aview → Nat → Nat → Bool → IProp GF))
+    (Fun : Pfam GF (Aview → Nat → IProp GF))
+    (Fok Fex : Pfam GF (Aview → Nat → Fname → Nat → IProp GF)) : IProp GF :=
+  iprop((∀ pl : List (BitVec 8), ⌜argPathOf M pv pl⌝ -∗ epStart (hlc := hlc) γfs cw P Pmiss pl) ∗
+    pfAt (dlookupCommitAt (hlc := hlc) Γ appE) Fex ∗
+    creCommits (hlc := hlc) Γ T_DIR.toNat 0 0 (nparCur M pv P) Farm Fdots Fun Fok)
+
+/-- THE CURSOR'S TWO READINGS, as one move (Rocq's `mkdir_cre_inst`,
+`SpecSysMknod.mknodAcre_inst`'s twin at the whole four-leg bundle). -/
+theorem mkdirCre_inst (Γ : FsViewNames GF) (M : Nat → List (BitVec 8)) (pv : Nat)
+    (pl : List (BitVec 8)) (P : Nat → Nat → IProp GF)
+    (Farm : Pfam GF (Aview → Nat → IProp GF))
+    (Fdots : Pfam GF (Aview → Nat → Nat → Bool → IProp GF))
+    (Fun : Pfam GF (Aview → Nat → IProp GF))
+    (Fok : Pfam GF (Aview → Nat → Fname → Nat → IProp GF)) (hpl : argPathOf M pv pl) :
+    creCommits (hlc := hlc) Γ T_DIR.toNat 0 0 (nparCur M pv P) Farm Fdots Fun Fok ⊢
+      creCommits (hlc := hlc) Γ T_DIR.toNat 0 0 (P (nparElems pl).length) Farm Fdots Fun Fok := by
+  iintro Hcre
+  iapply (creCommits_mono (hlc := hlc) Γ T_DIR.toNat 0 0 (nparCur M pv P)
+    (P (nparElems pl).length) Farm Fdots Fun Fok) $$ [] [] Hcre
+  · iapply (nparCur_out M pv pl P hpl)
+  · iapply (nparCur_in M pv pl P hpl)
+
+/-- Rocq's `mkdir_au_at_inst`: at the path argstr read, the walk wand fires
+and the cursor moves. -/
+theorem mkdirAuAt_inst (Γ : FsViewNames GF) (γfs : FsNames) (cw : Nat)
+    (M : Nat → List (BitVec 8)) (pv : Nat) (pl : List (BitVec 8))
+    (P Pmiss : Nat → Nat → IProp GF)
+    (Farm : Pfam GF (Aview → Nat → IProp GF))
+    (Fdots : Pfam GF (Aview → Nat → Nat → Bool → IProp GF))
+    (Fun : Pfam GF (Aview → Nat → IProp GF))
+    (Fok Fex : Pfam GF (Aview → Nat → Fname → Nat → IProp GF)) (hpl : argPathOf M pv pl) :
+    mkdirAuAt (hlc := hlc) Γ γfs cw M pv P Pmiss Farm Fdots Fun Fok Fex ⊢
+      mkdirAuPre (hlc := hlc) Γ γfs cw pl P Pmiss Farm Fdots Fun Fok Fex := by
+  unfold mkdirAuAt mkdirAuPre
+  iintro ⟨Hw, Hex, Hcre⟩
+  ihave Hcre := mkdirCre_inst Γ M pv pl P Farm Fdots Fun Fok hpl $$ Hcre
+  iframe Hex Hcre
+  iapply Hw $$ %pl %hpl
+
+/-- THE GENERIC SUPPLIER'S ONE LINE (Rocq's `mkdir_au_at_of_all`). -/
+theorem mkdirAuAt_of_all (Γ : FsViewNames GF) (γfs : FsNames) (cw : Nat)
+    (M : Nat → List (BitVec 8)) (pv : Nat) (P Pmiss : Nat → Nat → IProp GF)
+    (Farm : Pfam GF (Aview → Nat → IProp GF))
+    (Fdots : Pfam GF (Aview → Nat → Nat → Bool → IProp GF))
+    (Fun : Pfam GF (Aview → Nat → IProp GF))
+    (Fok Fex : Pfam GF (Aview → Nat → Fname → Nat → IProp GF)) :
+    nparWalkPreEra (hlc := hlc) γfs cw P Pmiss ⊢
+      pfAt (dlookupCommitAt (hlc := hlc) Γ appE) Fex -∗
+      creCommits (hlc := hlc) Γ T_DIR.toNat 0 0 (nparCur M pv P) Farm Fdots Fun Fok -∗
+      mkdirAuAt (hlc := hlc) Γ γfs cw M pv P Pmiss Farm Fdots Fun Fok Fex := by
+  unfold mkdirAuAt
+  iintro Hw Hex Hcre
+  iframe Hex Hcre
+  iintro %pl %_
+  iapply (npStart_of_mknod (hlc := hlc) γfs cw P Pmiss pl) $$ Hw
+
+/-- SATISFIABILITY (Rocq's `mkdir_au_at_unit`): the generic application asks
+nothing of mkdir's walk or its legs -- every hop says yes, every cursor is
+`True`, every commit is its own unit, paid off the SUPPLY. -/
+theorem mkdirAuAt_unit (γfs : FsNames) (cw : Nat) (M : Nat → List (BitVec 8)) (pv : Nat) :
     appSup (GF := GF) ⊢
-      mkdirAuPre (hlc := hlc) (fsGammaL γfs) γfs cw (fun _ _ => iprop(True))
+      mkdirAuAt (hlc := hlc) (fsGammaL γfs) γfs cw M pv (fun _ _ => iprop(True))
         (fun _ _ => iprop(True))
         (pfamTriv (fun _ _ => iprop(True))) (pfamTriv (fun _ _ _ _ => iprop(True)))
         (pfamTriv (fun _ _ => iprop(True))) (pfamTriv (fun _ _ _ _ => iprop(True)))
         (pfamTriv (fun _ _ _ _ => iprop(True))) := by
-  unfold mkdirAuPre
+  unfold mkdirAuAt
   iintro #Hsup
   isplitr
-  · unfold nparWalkPreEra
-    iintro %pl %r _
+  · iintro %pl %_
+    iapply (npStart_of_mknod (hlc := hlc) γfs cw (fun _ _ => iprop(True))
+      (fun _ _ => iprop(True)) pl)
+    unfold nparWalkPreEra
+    iintro %pl' %r _
     imodintro
     isplitr
     · ipureintro; trivial
-    · iapply (axHops_triv (hlc := hlc) (GF := GF) (elend (fsGammaL γfs)) (nparElems pl) 0)
+    · iapply (axHops_triv (hlc := hlc) (GF := GF) (elend (fsGammaL γfs)) (nparElems pl') 0)
   isplitr
   · iapply (creDlookup_unit (hlc := hlc) (fsGammaL γfs))
   · iapply (creCommits_unit (hlc := hlc) γfs T_DIR.toNat 0 0 _) $$ Hsup
@@ -181,7 +267,8 @@ theorem mkdirAuPre_unit (γfs : FsNames) (cw : Nat) :
 its parent leg fired.  ret -1: argstr failed and the WHOLE bundle comes
 back, or create refused and its own failure fold is the payout.  The
 fetched string stays existential: argstr picks it, not the caller. -/
-def mkdirArms (Γ : FsViewNames GF) (γfs : FsNames) (cw : Nat) (P Pmiss : Nat → Nat → IProp GF)
+def mkdirArms (Γ : FsViewNames GF) (γfs : FsNames) (cw : Nat)
+    (M : Nat → List (BitVec 8)) (pv : Nat) (P Pmiss : Nat → Nat → IProp GF)
     (Farm : Pfam GF (Aview → Nat → IProp GF))
     (Fdots : Pfam GF (Aview → Nat → Nat → Bool → IProp GF))
     (Fun : Pfam GF (Aview → Nat → IProp GF))
@@ -189,18 +276,18 @@ def mkdirArms (Γ : FsViewNames GF) (γfs : FsNames) (cw : Nat) (P Pmiss : Nat �
   iprop((⌜r = 0#64⌝ ∗ ∃ (pl : List (BitVec 8)) (i : Nat),
       creOkArms (hlc := hlc) Γ T_DIR.toNat 0 0 P Farm Fdots Fun Fok Fex pl true i) ∨
     (⌜r = 0xFFFFFFFFFFFFFFFF#64⌝ ∗
-      (mkdirAuPre (hlc := hlc) Γ γfs cw P Pmiss Farm Fdots Fun Fok Fex ∨
+      (mkdirAuAt (hlc := hlc) Γ γfs cw M pv P Pmiss Farm Fdots Fun Fok Fex ∨
         ∃ pl : List (BitVec 8),
           creFailArms (hlc := hlc) Γ γfs T_DIR.toNat 0 0 P Pmiss Farm Fdots Fun Fok Fex pl)))
 
 /-- The return blanket, read off the arms. -/
 theorem mkdirArms_ret (Γ : FsViewNames GF) (γfs : FsNames) (cw : Nat)
-    (P Pmiss : Nat → Nat → IProp GF)
+    (M : Nat → List (BitVec 8)) (pv : Nat) (P Pmiss : Nat → Nat → IProp GF)
     (Farm : Pfam GF (Aview → Nat → IProp GF))
     (Fdots : Pfam GF (Aview → Nat → Nat → Bool → IProp GF))
     (Fun : Pfam GF (Aview → Nat → IProp GF))
     (Fok Fex : Pfam GF (Aview → Nat → Fname → Nat → IProp GF)) (r : BitVec 64) :
-    mkdirArms (hlc := hlc) Γ γfs cw P Pmiss Farm Fdots Fun Fok Fex r ⊢ ⌜sysMkdirRet r⌝ := by
+    mkdirArms (hlc := hlc) Γ γfs cw M pv P Pmiss Farm Fdots Fun Fok Fex r ⊢ ⌜sysMkdirRet r⌝ := by
   unfold mkdirArms sysMkdirRet
   iintro (⟨%hr, -⟩ | ⟨%hr, -⟩)
   · ipureintro; exact Or.inl hr
@@ -221,7 +308,7 @@ same everything but the page table and the faulted view (THE IMAGE DOES NOT
 MOVE: argstr only grows the descriptor), the answer, and the legs' receipts
 keyed on it. -/
 def sysMkdirK (k : KCtx) (γ : FileNames) (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv)
-    (M : Nat → List (BitVec 8)) (ns : Nat) (P Pmiss : Nat → Nat → IProp GF)
+    (M : Nat → List (BitVec 8)) (ns : Nat) (pv : Nat) (P Pmiss : Nat → Nat → IProp GF)
     (Farm : Pfam GF (Aview → Nat → IProp GF))
     (Fdots : Pfam GF (Aview → Nat → Nat → Bool → IProp GF))
     (Fun : Pfam GF (Aview → Nat → IProp GF))
@@ -238,7 +325,8 @@ def sysMkdirK (k : KCtx) (γ : FileNames) (pa : BitVec 64) (pid : BitVec 32) (V 
     procPrivFd γ pa pid { V with upt := P' } (viewFaulted V.upt P' M) -∗
     ⌜sysMkdirRet (R' 10#5)⌝ -∗
     -- ...and the legs' receipts, keyed on that answer
-    mkdirArms (hlc := hlc) (fsGammaL fscFs) fscFs V.cwi P Pmiss Farm Fdots Fun Fok Fex (R' 10#5) -∗
+    mkdirArms (hlc := hlc) (fsGammaL fscFs) fscFs V.cwi (viewLazy V.upt V.sz M) pv
+      P Pmiss Farm Fdots Fun Fok Fex (R' 10#5) -∗
     wpLoop cpu')
 
 end
@@ -272,9 +360,12 @@ def wp_sys_mkdir_eb_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [
   procPrivFd γ (procAddr j) pid V M ∗
   -- THE APPLICATION'S SIDE: the walk's cursor pair, the exists observation
   -- and the four commits create's legs fire, at mkdir's own type index
-  mkdirAuPre (hlc := hlc) (fsGammaL fscFs) fscFs V.cwi P Pmiss Farm Fdots Fun Fok Fex ∗
+  -- (at the PATH ARGUMENT 0 NAMES, read at the entry image: TL-3C)
+  mkdirAuAt (hlc := hlc) (fsGammaL fscFs) fscFs V.cwi (viewLazy V.upt V.sz M) v.toNat
+    P Pmiss Farm Fdots Fun Fok Fex ∗
   -- THE CROSSING IS THE LITERAL `true`: sys_mkdir parks in all four callees
-  wpNext true k.proc cpu (sysMkdirK k γ (procAddr j) pid V M ns P Pmiss Farm Fdots Fun Fok Fex)
+  wpNext true k.proc cpu (sysMkdirK k γ (procAddr j) pid V M ns v.toNat P Pmiss Farm Fdots Fun
+    Fok Fex)
   ⊢ wpLoop (GF := GF) cpu
 
 /-- The interface of `sys_mkdir` (Rocq's `Module Type SYSMKDIR`). -/

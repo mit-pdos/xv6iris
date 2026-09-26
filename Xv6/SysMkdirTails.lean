@@ -72,7 +72,8 @@ variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [Fdslot
 /-- ret -1's receipt (the `-1` arm of `mkdirArms`): the whole bundle back
 (argstr failed), or create's own failure fold. -/
 def sysMkdirFail (A : SysMkdirArgs GF) : IProp GF := iprop(
-  mkdirAuPre (hlc := hlc) (fsGammaL fscFs) fscFs A.V.cwi A.P A.Pmiss A.Farm A.Fdots A.Fun A.Fok A.Fex ∨
+  mkdirAuAt (hlc := hlc) (fsGammaL fscFs) fscFs A.V.cwi (viewLazy A.V.upt A.V.sz A.M) A.v.toNat
+    A.P A.Pmiss A.Farm A.Fdots A.Fun A.Fok A.Fex ∨
     ∃ pl : List (BitVec 8),
       creFailArms (hlc := hlc) (fsGammaL fscFs) fscFs T_DIR.toNat 0 0 A.P A.Pmiss A.Farm A.Fdots
         A.Fun A.Fok A.Fex pl)
