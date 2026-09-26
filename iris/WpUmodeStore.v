@@ -330,8 +330,7 @@ Proof.
   apply Hl. intros j Hj. apply in_seq in Hj. apply H. lia.
 Qed.
 
-(* the in-page bound at the STORE width (UmodeFetch's [uinpage_nc] is the
-   4-byte fetch-window version) *)
+(* the in-page bound at the STORE width *)
 Lemma uinpage_nc_k (va : mword 64) (k d : Z) :
   Z.rem (uint va) 4096 <= 4096 - k -> 0 <= d < k ->
   bv_unsigned va mod 4096 + d < 4096.

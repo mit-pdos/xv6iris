@@ -373,10 +373,9 @@ def verify(dump, pcs):
         rvc = (enc & 3) != 3
         if rvc != (width == 16):
             fail(a, 'width %d disagrees with the RVC bits of 0x%x' % (width, enc))
-        # the fetch window: 2 bytes for a compressed instruction at a 2-mod-4
-        # pc, 4 otherwise (UmodeMem.ui_inpage's two bounds)
-        if a % PAGE > PAGE - (2 if rvc else 4):
-            fail(a, 'fetch window crosses a page (ui_inpage would be false)')
+        # (a fetch window MAY cross a page: every read of the fetch is
+        # naturally aligned, and the split fetch's second read is translated
+        # on its own -- page crossings are the paging layer's, UmodeMem §4)
         if width == 16 and a % 4 == 0:
             for j in (2, 3):
                 if dump.bytes.get(a + j) is None:
@@ -1215,7 +1214,7 @@ def emit(dump, prog, pcs, groups, dropped, skipfuncs, skipdefault, notes, asts,
             'from the [uinstr] facts this section used to emit.\n\n'
             'Each proof pulls its window out of the program\'s text with '
             '[utext_run_of] and closes with one of [uinstr_is_base] / [_rvc4] / '
-            '[_rvc2].  The alignment and in-page conditions are [vm_compute]s on '
+            '[_rvc2].  The alignment conditions are [vm_compute]s on '
             'the concrete pc; each byte of the window is a concrete [%s_bytes] '
             'lookup transported by [%s_text_sub]; and the X-and-not-W verdict for '
             'the window\'s addresses -- what puts them in the TEXT heap rather '
@@ -1306,7 +1305,6 @@ def emit(dump, prog, pcs, groups, dropped, skipfuncs, skipdefault, notes, asts,
     a('    iApply (uinstr_is_rvc2 g (mword_of_int off) h _')
     a('              ltac:(vm_compute; reflexivity)')
     a('              ltac:(vm_compute; reflexivity)')
-    a('              ltac:(apply Z.leb_le; vm_compute; reflexivity)')
     a('              ltac:(vm_compute; reflexivity) dec);')
     a('    uis_run g off 2%nat h.')
     a('')
@@ -1314,7 +1312,6 @@ def emit(dump, prog, pcs, groups, dropped, skipfuncs, skipdefault, notes, asts,
     a('  Ltac uis_rvc4 g off h dec w :=')
     a('    iApply (uinstr_is_rvc4 g (mword_of_int off) h w _')
     a('              ltac:(vm_compute; reflexivity)')
-    a('              ltac:(apply Z.leb_le; vm_compute; reflexivity)')
     a('              ltac:(vm_compute; reflexivity) dec')
     a('              ltac:(apply bv_eq; vm_compute; reflexivity));')
     a('    uis_run g off 4%nat w.')
@@ -1323,7 +1320,6 @@ def emit(dump, prog, pcs, groups, dropped, skipfuncs, skipdefault, notes, asts,
     a('  Ltac uis_base g off w dec :=')
     a('    iApply (uinstr_is_base g (mword_of_int off) w _')
     a('              ltac:(vm_compute; reflexivity)')
-    a('              ltac:(apply Z.leb_le; vm_compute; reflexivity)')
     a('              ltac:(vm_compute; reflexivity) dec);')
     a('    uis_run g off 4%nat w.')
     a('')

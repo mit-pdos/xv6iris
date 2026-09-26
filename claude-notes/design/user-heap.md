@@ -172,11 +172,11 @@ turns it plus the heap into the Prop-level `uk_instr` the old engine
 consumes: the leaf and canonicity come from the byte AT the pc
 (`uheap_text_pc`), the code bytes from `uheap_text_run`.
 
-`uinstr_is` carries ONE temporary clause, `Z.rem (uint pc) 4096 <= 4092`.
-It has exactly one consumer left (`UkStep.uk_instr_mapped`) and lives here
-rather than in leaf statements because the decode lemmas discharge it free,
-one `vm_compute` per pc.  Delete it when that consumer takes the second
-halfword's leaf as a premise instead.
+There is no in-page clause: an instruction may straddle a page.  The split
+fetch's second read (pc+2) is translated on its own, and its facts
+(`uinstr`'s `ui_hi`) come off the fragment at `uint pc + 2`
+(`UkRun.uheap_text_read2`), which also bounds that address so
+`uint (add_vec_int pc 2) = uint pc + 2`.
 
 ## The entry
 

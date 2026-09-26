@@ -162,8 +162,8 @@ What bit, and what a script must special-case:
   sign-extended immediate outside the instruction (`sign_extend' 64 (518 :
   mword 12) = mword_of_int 518`); the width-less literal is not a catalog
   token and a token-keyed rewrite misses it.  (4) A relayout can put a
-  REACHABLE compressed instruction at page offset 0xffe; `ui_inpage` bounds
-  a compressed instruction by 4094 since then, a base one by 4092.  (5) A
+  REACHABLE compressed instruction at page offset 0xffe -- legal: the
+  instruction fact has no in-page clause (a crossing is the paging layer's).  (5) A
   reshaped callee whose FRAME grew raises every walk budget above it (§4d):
   the constructors' shared `cmdalloc` put four words on every redirect
   parse (the redirect room 68 -> 72).

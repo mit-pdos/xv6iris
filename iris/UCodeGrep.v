@@ -2496,11 +2496,11 @@ Local Open Scope Z_scope.
 
    Each proof pulls its window out of the program's text with
    [utext_run_of] and closes with one of [uinstr_is_base] / [_rvc4] /
-   [_rvc2]. The alignment and in-page conditions are [vm_compute]s on the
-   concrete pc; each byte of the window is a concrete [grep_bytes] lookup
-   transported by [grep_text_sub]; and the X-and-not-W verdict for the
-   window's addresses -- what puts them in the TEXT heap rather than the
-   data one -- comes from [Hx].
+   [_rvc2]. The alignment conditions are [vm_compute]s on the concrete pc;
+   each byte of the window is a concrete [grep_bytes] lookup transported by
+   [grep_text_sub]; and the X-and-not-W verdict for the window's addresses
+   -- what puts them in the TEXT heap rather than the data one -- comes
+   from [Hx].
 
    NOTE the RVC-at-4-ALIGNED case. A compressed instruction at a 4-aligned
    pc is fetched as ONE 4-byte read, so the resource carries the whole
@@ -2580,7 +2580,6 @@ Section UCodeGrep.
     iApply (uinstr_is_rvc2 g (mword_of_int off) h _
               ltac:(vm_compute; reflexivity)
               ltac:(vm_compute; reflexivity)
-              ltac:(apply Z.leb_le; vm_compute; reflexivity)
               ltac:(vm_compute; reflexivity) dec);
     uis_run g off 2%nat h.
 
@@ -2588,7 +2587,6 @@ Section UCodeGrep.
   Ltac uis_rvc4 g off h dec w :=
     iApply (uinstr_is_rvc4 g (mword_of_int off) h w _
               ltac:(vm_compute; reflexivity)
-              ltac:(apply Z.leb_le; vm_compute; reflexivity)
               ltac:(vm_compute; reflexivity) dec
               ltac:(apply bv_eq; vm_compute; reflexivity));
     uis_run g off 4%nat w.
@@ -2597,7 +2595,6 @@ Section UCodeGrep.
   Ltac uis_base g off w dec :=
     iApply (uinstr_is_base g (mword_of_int off) w _
               ltac:(vm_compute; reflexivity)
-              ltac:(apply Z.leb_le; vm_compute; reflexivity)
               ltac:(vm_compute; reflexivity) dec);
     uis_run g off 4%nat w.
 

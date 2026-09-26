@@ -360,9 +360,8 @@ Qed.
 Lemma uload_width_1 : uload_width 1.
 Proof. split; [ left; reflexivity | exact exec_read_ram_plain_1 ]. Qed.
 
-(* the in-page bound at the ACCESS width (UmodeFetch's [uinpage_nc] is the
-   4-byte fetch-window version, WpUmodeStore's [uinpage_nc8] the width-8
-   one) *)
+(* the in-page bound at the ACCESS width (WpUmodeStore's [uinpage_nc_k]
+   is the store twin) *)
 Lemma uinpage_nck (va : mword 64) (k : Z) (j : nat) :
   Z.rem (uint va) 4096 <= 4096 - k -> Z.of_nat j < k ->
   bv_unsigned va mod 4096 + Z.of_nat j < 4096.

@@ -1765,11 +1765,9 @@ Section UkRun.
   (*                                                                       *)
   (* [uinstr_is] plus the heap gives the Prop-level decode fact the         *)
   (* existing engine consumes.  Every clause of [UmodeMem.uinstr] comes off *)
-  (* a text fragment except [ui_inpage], which is TEMPORARY: it is here     *)
-  (* only until WpUmodeStep's [uv_fetch_base_2] takes the second halfword's *)
-  (* leaf as a premise instead of deriving it from the window being on one  *)
-  (* page.  The source for that premise is the fragment at [uint pc + 2],   *)
-  (* which this lemma already has in hand.                                  *)
+  (* a text fragment: each READ's translation facts off the fragment at the *)
+  (* read's address -- the pc's, and for the split fetch pc+2's, which may  *)
+  (* sit on the next page.                                                  *)
   (* ===================================================================== *)
   Lemma uheap_text_byte (γt γd γs : gname) (M : gmap Z (bv 8)) (pm : gmap (mword 27) uperm)
       (szh : Z) (a : Z) (b : bv 8) :
@@ -1828,18 +1826,46 @@ Section UkRun.
     - exact (uva_text_of_perm pt sz (uint pc) q Hq Hqx Hqw).
   Qed.
 
+  (* the SECOND read of a split fetch, off the fragment at [uint pc + 2]:
+     [uheap] bounds that address, so it is [add_vec_int pc 2]'s [uint]
+     (no wrap), and the fragment carries its own page's translation facts
+     -- the next page's, when the instruction straddles a boundary *)
+  Lemma uheap_text_read2 (γt γd γs : gname) (M : gmap Z (bv 8)) (pm : gmap (mword 27) uperm)
+      (szh : Z) (pc : mword 64) (b : bv 8) :
+    uheap γt γd γs M pm szh -∗ utext γt (uint pc + Z.of_nat 2) b -∗
+    ⌜ (uint (add_vec_int pc 2) = uint pc + 2)%Z /\
+      forall pt sz, proc_pt_wf pt -> perm_of (ud_um pt) sz = pm ->
+                    uva_fetch_ok pt (add_vec_int pc 2) ⌝.
+  Proof using .
+    iIntros "Hheap #Hb".
+    iDestruct (uheap_text with "Hheap Hb") as %(_ & _ & Hbnd).
+    assert (Hu2 : (uint (add_vec_int pc 2) = uint pc + 2)%Z).
+    { change (Z.of_nat 2) with 2%Z in Hbnd. change (2 ^ 38)%Z with 274877906944%Z in Hbnd.
+      rewrite !uint_unsigned in Hbnd |- *.
+      apply UserBits.uint_add_vec_int_small; lia. }
+    assert (Ek : (uint pc + Z.of_nat 2 = uint (add_vec_int pc 2) + Z.of_nat 0)%Z)
+      by (rewrite Hu2; lia).
+    iDestruct (uheap_text_pc _ _ _ _ _ _ (add_vec_int pc 2) with "Hheap [Hb]") as %[Hcanon Hlf];
+      [ rewrite -Ek; iExact "Hb" | ].
+    iDestruct (uheap_text_pc_text _ _ _ _ _ _ (add_vec_int pc 2) with "Hheap [Hb]") as %Htx;
+      [ rewrite -Ek; iExact "Hb" | ].
+    iPureIntro. split; [ exact Hu2 | ].
+    intros pt sz Hwf Hpmeq.
+    split_and!; [ exact Hcanon | exact (Hlf pt sz Hwf Hpmeq) | exact (Htx pt sz Hwf Hpmeq) ].
+  Qed.
+
   (* THE BRIDGE: [uinstr_is] plus the heap gives the Prop-level decode fact
      the existing engine consumes.  Every clause of [UmodeMem.uinstr] comes
-     off a text fragment -- the leaf and canonicity from the byte at the pc,
-     the code bytes from the run -- except [ui_inpage], which [uinstr_is]
-     still carries for its one remaining consumer. *)
+     off a text fragment -- the leaf and canonicity from the byte at the pc
+     (and, for the split fetch, from the byte at pc+2), the code bytes from
+     the run. *)
   Lemma uinstr_is_uk_instr (γt γd γs : gname) (M : gmap Z (bv 8)) (pm : gmap (mword 27) uperm)
       (szh : Z) (pc : mword 64) (is_rvc : bool) (i : instruction) :
     uheap γt γd γs M pm szh -∗ uinstr_is γt pc is_rvc i -∗
     ⌜ uk_instr pm M pc is_rvc i ⌝.
   Proof using .
     iIntros "Hheap #Hi". rewrite /uinstr_is.
-    iDestruct "Hi" as "(%Hal2 & %Hpg & Hcode)".
+    iDestruct "Hi" as "(%Hal2 & Hcode)".
     destruct is_rvc.
     - iDestruct "Hcode" as (h) "(%HisRVC & %Hdec & Hbs)".
       destruct (is_aligned_vaddr (Virtaddr pc) 4) eqn:Hal4.
@@ -1852,7 +1878,8 @@ Section UkRun.
         iDestruct (uheap_text_pc with "Hheap H0") as %[Hcanon Hlf].
         iDestruct (uheap_text_pc_text with "Hheap H0") as %Htx.
         iPureIntro. intros pt sz Hwf Hpmeq.
-        refine (UInstr pt M pc true i Hal2 Hcanon (Hlf pt sz Hwf Hpmeq) Hpg _
+        refine (UInstr pt M pc true i Hal2 Hcanon (Hlf pt sz Hwf Hpmeq)
+                  (fun (Hc : true = false) _ => False_ind _ (diff_true_false Hc)) _
                   (Htx pt sz Hwf Hpmeq)).
         exists h. split_and!; [ exact HisRVC | | exact Hdec | ].
         * intros j Hj. rewrite <- Hlow.
@@ -1871,7 +1898,8 @@ Section UkRun.
         iDestruct (uheap_text_pc with "Hheap H0") as %[Hcanon Hlf].
         iDestruct (uheap_text_pc_text with "Hheap H0") as %Htx.
         iPureIntro. intros pt sz Hwf Hpmeq.
-        refine (UInstr pt M pc true i Hal2 Hcanon (Hlf pt sz Hwf Hpmeq) Hpg _
+        refine (UInstr pt M pc true i Hal2 Hcanon (Hlf pt sz Hwf Hpmeq)
+                  (fun (Hc : true = false) _ => False_ind _ (diff_true_false Hc)) _
                   (Htx pt sz Hwf Hpmeq)).
         exists h. split_and!; [ exact HisRVC | exact Hb2 | exact Hdec | ].
         intros Hc. rewrite Hc in Hal4. discriminate Hal4.
@@ -1881,8 +1909,13 @@ Section UkRun.
         [ reflexivity | ].
       iDestruct (uheap_text_pc with "Hheap H0") as %[Hcanon Hlf].
       iDestruct (uheap_text_pc_text with "Hheap H0") as %Htx.
+      (* the split fetch's second read: the fragment at pc+2 *)
+      iDestruct (big_sepL_lookup _ _ 2%nat 2%nat with "Hbs") as "#H2";
+        [ reflexivity | ].
+      iDestruct (uheap_text_read2 with "Hheap H2") as %[Hu2 Hfo2].
       iPureIntro. intros pt sz Hwf Hpmeq.
-      refine (UInstr pt M pc false i Hal2 Hcanon (Hlf pt sz Hwf Hpmeq) Hpg _
+      refine (UInstr pt M pc false i Hal2 Hcanon (Hlf pt sz Hwf Hpmeq)
+                (fun _ _ => conj Hu2 (Hfo2 pt sz Hwf Hpmeq)) _
                 (Htx pt sz Hwf Hpmeq)).
       exists w. split_and!; [ exact HnRVC | exact Hb4 | exact Hdec ].
   Qed.

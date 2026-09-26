@@ -300,25 +300,13 @@ Proof.
   lia.
 Qed.
 
-(* a 4-aligned pc inside the 2-byte in-page bound is inside the 4-byte one *)
-Lemma ukp_al4_inpage (a : mword 64) :
-  is_aligned_vaddr (Virtaddr a) 4 = true ->
-  (Z.rem (uint a) 4096 <= 4094)%Z -> (Z.rem (uint a) 4096 <= 4092)%Z.
-Proof.
-  unfold is_aligned_vaddr. intros H%Z.eqb_eq Hpg.
-  pose proof (proj1 (bv_unsigned_in_range _ a)) as Hlo.
-  rewrite uint_unsigned in H, Hpg |- *.
-  rewrite Z.rem_mod_nonneg in H; [ | exact Hlo | lia ].
-  rewrite Z.rem_mod_nonneg in Hpg; [ | exact Hlo | lia ].
-  rewrite Z.rem_mod_nonneg; [ | exact Hlo | lia ].
-  Z.div_mod_to_equations. lia.
-Qed.
-
 (* THE INSTRUCTION FACT, TRANSPORTED.  A program states its decode fact at
-   the KEY's image; the machine fetches out of the MAPPED sub-image.  The
-   pc's page is mapped ([ui_leaf]) and the whole fetch window stays on it
-   ([ui_inpage]: 4 bytes, or 2 for a compressed instruction at a 2-mod-4
-   pc), so every byte of the window transports. *)
+   the KEY's image; the machine fetches out of the MAPPED sub-image.  Every
+   READ of the fetch is on a mapped page -- the pc's ([ui_leaf]) and, for
+   the split fetch, pc+2's ([ui_hi]) -- and stays on it because it is
+   naturally aligned, so every byte of the window transports through the
+   leaf of the read that fetches it.  The translation facts themselves do
+   not mention the image and pass through unchanged. *)
 Lemma uk_instr_mapped (π : gmap (mword 27) uperm) (M Mp : gmap Z (bv 8))
     (pc : mword 64) (is_rvc : bool) (i : instruction) (pt : uptd) (sz : Z) :
   proc_pt_wf pt -> perm_of (ud_um pt) sz = π -> uk_pt_pure pt sz M Mp ->
@@ -329,38 +317,49 @@ Proof.
   pose proof (ui_al2 _ _ _ _ _ Hu) as Hal2.
   pose proof (ui_canon _ _ _ _ _ Hu) as Hcanon.
   pose proof (ui_leaf _ _ _ _ _ Hu) as Hleaf.
-  pose proof (ui_inpage _ _ _ _ _ Hu) as Hinpage.
+  pose proof (ui_hi _ _ _ _ _ Hu) as Hhi.
   pose proof (ui_code _ _ _ _ _ Hu) as Hcode.
   destruct Hleaf as (w_leaf & Hl & Hlok).
   refine (UInstr pt Mp pc is_rvc i Hal2 Hcanon
-            (ex_intro _ w_leaf (conj Hl Hlok)) Hinpage _
+            (ex_intro _ w_leaf (conj Hl Hlok)) Hhi _
             (ui_text _ _ _ _ _ Hu)).
+  (* the pc's read: 2-aligned, so its first two bytes are on its page *)
+  assert (Hoff2 : forall j : nat, (j < 2)%nat ->
+            (bv_unsigned pc mod 4096 + Z.of_nat j < 4096)%Z)
+    by (intros j Hj; exact (UmodeFetch.ualign2_nc pc (Z.of_nat j) Hal2 ltac:(lia))).
   destruct is_rvc.
-  - cbn iota in Hinpage.
-    assert (Hoff : forall d : Z, (0 <= d < 2)%Z ->
-              (bv_unsigned pc mod 4096 + d < 4096)%Z)
-      by (intros d Hd; exact (ukp_off pc 2 d ltac:(lia) Hd)).
-    destruct Hcode as (h & HisRVC & Hbytes & Hdec & Hnext2).
+  - destruct Hcode as (h & HisRVC & Hbytes & Hdec & Hnext2).
     exists h. split_and!; [ exact HisRVC | | exact Hdec | ].
     + intros j Hj.
       exact (ukp_win pt sz M Mp pc w_leaf j _ (proj1 Hwf) Hp Hl
-               (Hoff (Z.of_nat j) ltac:(lia)) (Hbytes j Hj)).
-    + intros Hal4. destruct (Hnext2 Hal4) as (b2 & b3 & Hb2 & Hb3).
-      pose proof (ukp_al4_inpage pc Hal4 Hinpage) as Hpg4.
+               (Hoff2 j Hj) (Hbytes j Hj)).
+    + (* a 4-aligned pc: one 4-byte read, on the pc's page *)
+      intros Hal4. destruct (Hnext2 Hal4) as (b2 & b3 & Hb2 & Hb3).
       exists b2, b3. split.
       * exact (ukp_win pt sz M Mp pc w_leaf 2%nat b2 (proj1 Hwf) Hp Hl
-                 (ukp_off pc 4 2 ltac:(lia) ltac:(lia)) Hb2).
+                 (UmodeFetch.ualign4_nc pc 2 Hal4 ltac:(lia)) Hb2).
       * exact (ukp_win pt sz M Mp pc w_leaf 3%nat b3 (proj1 Hwf) Hp Hl
-                 (ukp_off pc 4 3 ltac:(lia) ltac:(lia)) Hb3).
-  - cbn iota in Hinpage.
-    assert (Hoff : forall d : Z, (0 <= d < 4)%Z ->
-              (bv_unsigned pc mod 4096 + d < 4096)%Z)
-      by (intros d Hd; exact (ukp_off pc 4 d ltac:(lia) Hd)).
-    destruct Hcode as (w & HnRVC & Hbytes & Hdec).
+                 (UmodeFetch.ualign4_nc pc 3 Hal4 ltac:(lia)) Hb3).
+  - destruct Hcode as (w & HnRVC & Hbytes & Hdec).
     exists w. split_and!; [ exact HnRVC | | exact Hdec ].
     intros j Hj.
-    exact (ukp_win pt sz M Mp pc w_leaf j _ (proj1 Hwf) Hp Hl
-             (Hoff (Z.of_nat j) ltac:(lia)) (Hbytes j Hj)).
+    destruct (is_aligned_vaddr (Virtaddr pc) 4) eqn:Hal4.
+    + (* one 4-byte read at a 4-aligned pc *)
+      exact (ukp_win pt sz M Mp pc w_leaf j _ (proj1 Hwf) Hp Hl
+               (UmodeFetch.ualign4_nc pc (Z.of_nat j) Hal4 ltac:(lia)) (Hbytes j Hj)).
+    + (* the split fetch: bytes 0,1 through the pc's leaf, 2,3 through pc+2's *)
+      destruct (decide (j < 2)%nat) as [Hlo | Hhi2].
+      * exact (ukp_win pt sz M Mp pc w_leaf j _ (proj1 Hwf) Hp Hl
+                 (Hoff2 j Hlo) (Hbytes j Hj)).
+      * destruct (Hhi eq_refl eq_refl) as (Hu2 & _ & (w2 & Hl2 & _) & _).
+        pose proof (UmodeFetch.ualign2_plus2 pc Hal2) as Hal2h.
+        assert (Ej : (uint pc + Z.of_nat j = uint (add_vec_int pc 2) + Z.of_nat (j - 2))%Z)
+          by (rewrite Hu2; lia).
+        rewrite Ej.
+        pose proof (Hbytes j Hj) as Hbj. rewrite Ej in Hbj.
+        exact (ukp_win pt sz M Mp (add_vec_int pc 2) w2 (j - 2) _ (proj1 Hwf) Hp Hl2
+                 (UmodeFetch.ualign2_nc (add_vec_int pc 2) (Z.of_nat (j - 2)) Hal2h
+                    ltac:(lia)) Hbj).
 Qed.
 
 (* ===================================================================== *)
@@ -2086,7 +2085,7 @@ Section UkEcall.
       iDestruct "Hkc" as "[Hkc _]". iFrame "Hbak Hfdr Hkb". iExact "Hkc". }
     destruct (uk_instr_mapped π M Mp' pc false (ECALL tt) pt' sz
                 (loop_ok_wf C' pt' Hlo') Hpm' Hpure Hui)
-      as [Hal2' Hcanon Hleaf Hinpage Hcode Htext].
+      as [Hal2' Hcanon Hleaf Hhi Hcode Htext].
     destruct Hleaf as (w_leaf & Hum & Hlok).
     destruct Hcode as (w & HnRVC & Hbytes & Hdecbase).
     iPoseProof "Hamb" as "(#Hhw & _ & _)".
@@ -2104,7 +2103,7 @@ Section UkEcall.
                         with "Hcert Hany Hrw Hro Hctx Hmm") as "H".
           iEval (rewrite HnRVC) in "H". iExact "H".
         - iApply (uv_swp_fetch_base2 (CID := CIDo) (XI := XIo) pt' Mp' t (uc_dqc C')
-                    rsA w_leaf pc w Hinj Hum Hlok Hcanon Hinpage Hal2' Hal4 Hbytes
+                    rsA w_leaf pc w Hinj Hum Hlok Hcanon (Hhi eq_refl eq_refl) Hal2' Hal4 Hbytes
                     HnRVC Htext LpcA LcpA (proj1 HmsokA) LmenvA HpinsA Htok
                     with "Hcert Hany Hrw Hro Hctx Hmm"). }
     iIntros (r) "(-> & Hpost)".

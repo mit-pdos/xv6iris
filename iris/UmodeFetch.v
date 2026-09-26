@@ -20,11 +20,14 @@
      [umode_fetch_base_2]  2-mod-4 pc, non-compressed    -> [F_Base w]
                            (the split 2+2 fetch)
 
-   All four take the pure translation facts in [uinstr] shape (the pc's
-   vpn mapped with a fetch-permitting leaf, [uva_canon], and the
-   whole-window-on-one-page bound [Z.rem (uint pc) 4096 <= 4092]) and the
-   standard U-mode state pins, and hand back the moved state with
-   [utlb_inv_pt] and [umem] intact -- exactly as UserFetchPt does.
+   All four take the pure translation facts in [uinstr] shape -- PER READ:
+   the read address's vpn mapped with a fetch-permitting leaf and
+   [uva_canon] (the split fetch translates pc and pc+2 each through its own
+   leaf, so a base instruction may straddle a page) -- and the standard
+   U-mode state pins, and hand back the moved state with [utlb_inv_pt] and
+   [umem] intact -- exactly as UserFetchPt does.  No read leaves its page
+   because every read is naturally aligned ([ualign4_nc]/[ualign2_nc]); no
+   in-page premise.
 
    Layout: §1 pure va/window arithmetic (the [uinstr]-premise bridges);
    §2 the concrete byte window out of [umem]; §3 the four composers.     *)
@@ -53,9 +56,9 @@ Import Defs.
 (* ===================================================================== *)
 (* §1 Pure window arithmetic.                                            *)
 (*                                                                        *)
-(* Everything here is about ONE 4-byte fetch window that does not cross a *)
-(* page boundary.  [uinstr] states that as [Z.rem (uint pc) 4096 <= 4092];*)
-(* the working form throughout is the no-carry bound                      *)
+(* Everything here is about ONE fetch READ, which does not cross a page    *)
+(* boundary because it is naturally aligned ([ualign4_nc]/[ualign2_nc]    *)
+(* below); the working form throughout is the no-carry bound              *)
 (* [bv_unsigned pc mod 4096 + d < 4096].  All the real arithmetic is done *)
 (* in [mword]-FREE lemmas over plain [Z] (the bitvector zify hook makes   *)
 (* [lia] unreliable on goals mentioning [bv_unsigned] -- durable-notes).  *)
@@ -105,18 +108,6 @@ Proof.
   replace (R + d) with ((R / 4096) * 4096 + (R mod 4096 + d)) by lia.
   rewrite (Z.div_add_l (R / 4096) 4096 (R mod 4096 + d) ltac:(lia)).
   rewrite (Z.div_small (R mod 4096 + d) 4096 ltac:(lia)). lia.
-Qed.
-
-(* the [uinstr] in-page premise, in the working no-carry form *)
-Lemma uinpage_nc (pc : mword 64) (d : Z) :
-  Z.rem (uint pc) 4096 <= 4092 -> 0 <= d <= 3 ->
-  bv_unsigned pc mod 4096 + d < 4096.
-Proof.
-  intros Hpg Hd.
-  rewrite uint_unsigned in Hpg.
-  rewrite Z.rem_mod_nonneg in Hpg;
-    [ | exact (proj1 (bv_unsigned_in_range _ pc)) | lia ].
-  lia.
 Qed.
 
 (* [mword_of_int] of the image key IS the model's address arithmetic *)
@@ -297,25 +288,44 @@ Proof.
   rewrite fetch_pa_id in H. exact H.
 Qed.
 
-(* the window shifted to pc+d (the split fetch's second halfword reads at
-   pc+2, and every fact it needs is the same fact at the shifted base) *)
-Lemma uwin_shift (pc : mword 64) (d : Z) :
-  Z.rem (uint pc) 4096 <= 4092 -> 0 <= d <= 3 ->
-  uint (add_vec_int pc d) = uint pc + d /\
-  bv_unsigned (add_vec_int pc d) mod 4096 = bv_unsigned pc mod 4096 + d.
+(* ALIGNMENT ALONE BOUNDS A READ: a k-aligned va has a page offset that is
+   a multiple of k, hence at most 4096 - k, so a k-byte read starting there
+   cannot leave the page.  Every read of the fetch is naturally aligned (4
+   bytes at a 4-aligned pc, 2 at a 2-aligned one), so this is where "the
+   read stays on its page" comes from; a page crossing can only fall
+   BETWEEN the two reads of the split fetch, each translated on its own. *)
+Lemma ualign_page_off (pc : mword 64) (k : Z) :
+  0 < k -> (k | 4096) -> is_aligned_vaddr (Virtaddr pc) k = true ->
+  (bv_unsigned pc mod 4096) mod k = 0.
 Proof.
-  intros Hpg Hd.
-  pose proof (uinpage_nc pc d Hpg Hd) as Hnc.
-  pose proof (bv_unsigned_in_range _ pc) as Hr.
-  assert (E64 : bv_modulus 64 = 18446744073709551616) by (vm_compute; reflexivity).
-  rewrite E64 in Hr.
-  pose proof (z_win_nowrap (bv_unsigned pc) d Hr ltac:(lia) Hnc) as Hnw.
-  pose proof (uint_add_vec_int_small pc d ltac:(lia) Hnw) as Hav.
-  split.
-  - rewrite !uint_unsigned. exact Hav.
-  - rewrite Hav.
-    exact (z_mod_add_nocarry (bv_unsigned pc) d 4096 ltac:(lia) ltac:(lia)
-             ltac:(lia) ltac:(exists 1; reflexivity) Hnc).
+  intros Hk Hdvd Hal.
+  unfold is_aligned_vaddr in Hal. apply Z.eqb_eq in Hal.
+  rewrite uint_unsigned in Hal.
+  rewrite Z.rem_mod_nonneg in Hal;
+    [ | exact (proj1 (bv_unsigned_in_range _ pc)) | lia ].
+  rewrite <- (Znumtheory.Zmod_div_mod k 4096 (bv_unsigned pc) Hk ltac:(lia) Hdvd).
+  exact Hal.
+Qed.
+
+Lemma ualign2_nc (pc : mword 64) (d : Z) :
+  is_aligned_vaddr (Virtaddr pc) 2 = true -> 0 <= d <= 1 ->
+  bv_unsigned pc mod 4096 + d < 4096.
+Proof.
+  intros Hal Hd.
+  pose proof (ualign_page_off pc 2 ltac:(lia) ltac:(exists 2048; reflexivity) Hal) as Hm.
+  pose proof (Z.mod_pos_bound (bv_unsigned pc) 4096 ltac:(lia)) as Hb.
+  apply Z.mod_divide in Hm; [ | lia ]. destruct Hm as [q Hq]. lia.
+Qed.
+
+Lemma ualign4_nc (pc : mword 64) (d : Z) :
+  is_aligned_vaddr (Virtaddr pc) 4 = true -> 0 <= d <= 3 ->
+  bv_unsigned pc mod 4096 + d < 4096.
+Proof.
+  intros Hal Hd.
+  pose proof (ualign_page_off pc 4 ltac:(lia) ltac:(exists 1024; reflexivity) Hal) as Hm.
+  pose proof (Z.mod_pos_bound (bv_unsigned pc) 4096 ltac:(lia)) as Hb.
+  (* [lia] cannot see through the NESTED mod, so hand it the multiple *)
+  apply Z.mod_divide in Hm; [ | lia ]. destruct Hm as [q Hq]. lia.
 Qed.
 
 (* ===================================================================== *)
@@ -529,7 +539,6 @@ Section UmodeFetchOk.
     ud_um pt !! svpn_of pc = Some w_leaf ->
     uleaf_ok (InstructionFetch tt) w_leaf ->
     uva_canon pc ->
-    Z.rem (uint pc) 4096 <= 4092 ->
     is_aligned_vaddr (Virtaddr pc) 4 = true ->
     uM_bytes M (uint pc) 4 iw ->
     isRVC (subrange_vec_dec iw 15 0) = false ->
@@ -561,7 +570,7 @@ Section UmodeFetchOk.
       reg_interp σ'.(sregs) ∗ gen_heap_interp σ'.(mem) ∗
       utlb_inv_pt (ud_root pt) (ud_tfp pt) (ud_um pt) ∗ umem pt M.
   Proof using .
-    intros Hl Hchk Hcanon Hpg Hal Hbytes HnRVC Lpc Hmisa Hmenv Hhtif Hcp HSXL Hall.
+    intros Hl Hchk Hcanon Hal Hbytes HnRVC Lpc Hmisa Hmenv Hhtif Hcp HSXL Hall.
     iIntros "#Hpay HS Hri Hgh Hinv HM".
     iDestruct (utlb_inv_pt_pmp_facts (ud_root pt) (ud_tfp pt) (ud_um pt) σ with "Hri Hinv")
       as %(HA & Hord & HX & HR & HW & Hcovp).
@@ -577,10 +586,9 @@ Section UmodeFetchOk.
     { intros r Hne.
       destruct Hsregs as [Heq | (tv & Heq)]; rewrite Heq;
         [ reflexivity | apply irrelevant_register_set; exact Hne ]. }
-    pose proof (uinpage_nc pc 3 Hpg ltac:(lia)) as Hnc3.
     assert (Hnc : forall j : nat, (j < 4)%nat ->
               bv_unsigned pc mod 4096 + Z.of_nat j < 4096).
-    { intros j Hj. lia. }
+    { intros j Hj. exact (ualign4_nc pc (Z.of_nat j) Hal ltac:(lia)). }
     iDestruct (umem_fetch_byte pt M w_leaf pc 0 (nth_byte iw 0) σ' Hl
                  (Hnc 0%nat ltac:(lia)) (Hbytes 0%nat ltac:(lia)) with "Hgh HM")
       as %[Hm0 Hr0].
@@ -658,7 +666,6 @@ Section UmodeFetchRvc4.
     ud_um pt !! svpn_of pc = Some w_leaf ->
     uleaf_ok (InstructionFetch tt) w_leaf ->
     uva_canon pc ->
-    Z.rem (uint pc) 4096 <= 4092 ->
     is_aligned_vaddr (Virtaddr pc) 4 = true ->
     uM_bytes M (uint pc) 2 h ->
     M !! (uint pc + 2) = Some b2 ->
@@ -692,7 +699,7 @@ Section UmodeFetchRvc4.
       reg_interp σ'.(sregs) ∗ gen_heap_interp σ'.(mem) ∗
       utlb_inv_pt (ud_root pt) (ud_tfp pt) (ud_um pt) ∗ umem pt M.
   Proof using .
-    intros Hl Hchk Hcanon Hpg Hal Hbytes Hb2 Hb3 HisRVC
+    intros Hl Hchk Hcanon Hal Hbytes Hb2 Hb3 HisRVC
            Lpc Hmisa Hmenv Hhtif Hcp HSXL Hall.
     iIntros "#Hpay HS Hri Hgh Hinv HM".
     iDestruct (utlb_inv_pt_pmp_facts (ud_root pt) (ud_tfp pt) (ud_um pt) σ with "Hri Hinv")
@@ -709,10 +716,9 @@ Section UmodeFetchRvc4.
     { intros r Hne.
       destruct Hsregs as [Heq | (tv & Heq)]; rewrite Heq;
         [ reflexivity | apply irrelevant_register_set; exact Hne ]. }
-    pose proof (uinpage_nc pc 3 Hpg ltac:(lia)) as Hnc3.
     assert (Hnc : forall j : nat, (j < 4)%nat ->
               bv_unsigned pc mod 4096 + Z.of_nat j < 4096).
-    { intros j Hj. lia. }
+    { intros j Hj. exact (ualign4_nc pc (Z.of_nat j) Hal ltac:(lia)). }
     iDestruct (umem_fetch_byte pt M w_leaf pc 0 (nth_byte h 0) σ' Hl
                  (Hnc 0%nat ltac:(lia)) (Hbytes 0%nat ltac:(lia)) with "Hgh HM")
       as %[Hm0 Hr0].
@@ -759,9 +765,9 @@ End UmodeFetchRvc4.
 (* ===================================================================== *)
 (* §3c The 2-mod-4 geometries.  The low halfword comes off the pc's page; *)
 (*     a NON-compressed instruction then needs the high halfword, which   *)
-(*     translates INDEPENDENTLY at pc+2 -- and, since [uinstr] keeps the  *)
-(*     whole 4-byte window on ONE page, through the SAME leaf.  So the    *)
-(*     mapped/canonical facts at pc+2 are DERIVED here, not assumed.      *)
+(*     translates INDEPENDENTLY at pc+2, through ITS OWN leaf -- the next *)
+(*     page's when the instruction straddles a page boundary.  Each 2-byte *)
+(*     read is 2-aligned, so neither leaves its page.                     *)
 (* ===================================================================== *)
 
 Section UmodeFetchSplit.
@@ -775,7 +781,6 @@ Section UmodeFetchSplit.
     ud_um pt !! svpn_of pc = Some w_leaf ->
     uleaf_ok (InstructionFetch tt) w_leaf ->
     uva_canon pc ->
-    Z.rem (uint pc) 4096 <= 4092 ->
     is_aligned_vaddr (Virtaddr pc) 2 = true ->
     is_aligned_vaddr (Virtaddr pc) 4 = false ->
     uM_bytes M (uint pc) 2 h ->
@@ -808,7 +813,7 @@ Section UmodeFetchSplit.
       reg_interp σ'.(sregs) ∗ gen_heap_interp σ'.(mem) ∗
       utlb_inv_pt (ud_root pt) (ud_tfp pt) (ud_um pt) ∗ umem pt M.
   Proof using .
-    intros Hl Hchk Hcanon Hpg Hal2 Hnal4 Hbytes HisRVC
+    intros Hl Hchk Hcanon Hal2 Hnal4 Hbytes HisRVC
            Lpc Hmisa Hmenv Hhtif Hcp HSXL Hall.
     assert (HmisaC : eq_vec (_get_Misa_C (register_lookup misa σ.(sregs))) ('b"1") = true)
       by (rewrite Hmisa; vm_compute; reflexivity).
@@ -828,10 +833,9 @@ Section UmodeFetchSplit.
     { intros r Hne.
       destruct Hsregs as [Heq | (tv & Heq)]; rewrite Heq;
         [ reflexivity | apply irrelevant_register_set; exact Hne ]. }
-    pose proof (uinpage_nc pc 3 Hpg ltac:(lia)) as Hnc3.
     assert (Hnc : forall j : nat, (j < 2)%nat ->
               bv_unsigned pc mod 4096 + Z.of_nat j < 4096).
-    { intros j Hj. lia. }
+    { intros j Hj. exact (ualign2_nc pc (Z.of_nat j) Hal2 ltac:(lia)). }
     iDestruct (umem_fetch_byte pt M w_leaf pc 0 (nth_byte h 0) σ' Hl
                  (Hnc 0%nat ltac:(lia)) (Hbytes 0%nat ltac:(lia)) with "Hgh HM")
       as %[Hm0 Hr0].
@@ -875,11 +879,15 @@ Section UmodeFetchSplitBase.
      state shape is reported as the lookup-transport property (every
      non-[tlb] register unchanged), exactly as [user_pt_fetch_instr_2]. *)
   Lemma umode_fetch_base_2 (pt : uptd) (M : gmap Z (bv 8))
-      (w_leaf pc : mword 64) (iw : mword 32) (σ : mstate) (S : TsoMemPa.bytemap -> iProp Σ) :
+      (w_leaf w_leaf2 pc : mword 64) (iw : mword 32) (σ : mstate) (S : TsoMemPa.bytemap -> iProp Σ) :
     ud_um pt !! svpn_of pc = Some w_leaf ->
     uleaf_ok (InstructionFetch tt) w_leaf ->
     uva_canon pc ->
-    Z.rem (uint pc) 4096 <= 4092 ->
+    (* the second read's own translation, at pc+2 *)
+    ud_um pt !! svpn_of (add_vec_int pc 2) = Some w_leaf2 ->
+    uleaf_ok (InstructionFetch tt) w_leaf2 ->
+    uva_canon (add_vec_int pc 2) ->
+    uint (add_vec_int pc 2) = uint pc + 2 ->
     is_aligned_vaddr (Virtaddr pc) 2 = true ->
     is_aligned_vaddr (Virtaddr pc) 4 = false ->
     uM_bytes M (uint pc) 4 iw ->
@@ -910,21 +918,16 @@ Section UmodeFetchSplitBase.
       reg_interp σ'.(sregs) ∗ gen_heap_interp σ'.(mem) ∗
       utlb_inv_pt (ud_root pt) (ud_tfp pt) (ud_um pt) ∗ umem pt M.
   Proof using .
-    intros Hl Hchk Hcanon Hpg Hal2 Hnal4 Hbytes HnRVC
+    intros Hl Hchk Hcanon Hl2 Hchk2 Hcanon2 Hu2 Hal2 Hnal4 Hbytes HnRVC
            Lpc Hmisa Hmenv Hhtif Hcp HSXL Hall.
     assert (HmisaC : eq_vec (_get_Misa_C (register_lookup misa σ.(sregs))) ('b"1") = true)
       by (rewrite Hmisa; vm_compute; reflexivity).
     destruct (align2_not4_facts pc Hal2 Hnal4) as (_ & Hbit0 & Hbit1).
-    pose proof (uinpage_nc pc 3 Hpg ltac:(lia)) as Hnc3.
-    pose proof (uinpage_nc pc 2 Hpg ltac:(lia)) as Hnc2.
-    (* the SECOND halfword's va lives on the SAME page, hence the same leaf *)
-    assert (Hl2 : ud_um pt !! svpn_of (add_vec_int pc 2) = Some w_leaf).
-    { rewrite (usvpn_window pc 2 ltac:(lia) Hnc2). exact Hl. }
-    pose proof (uva_canon_add pc 2 Hcanon ltac:(lia) Hnc2) as Hcanon2.
-    destruct (uwin_shift pc 2 Hpg ltac:(lia)) as [Hu2 Hmod2].
     assert (Hncs : forall j : nat, (j < 2)%nat ->
               bv_unsigned (add_vec_int pc 2) mod 4096 + Z.of_nat j < 4096).
-    { intros j Hj. rewrite Hmod2. lia. }
+    { intros j Hj.
+      exact (ualign2_nc (add_vec_int pc 2) (Z.of_nat j) (ualign2_plus2 pc Hal2)
+               ltac:(lia)). }
     assert (Hbytes2 : forall j : nat, (j < 2)%nat ->
               M !! (uint (add_vec_int pc 2) + Z.of_nat j)
               = Some (nth_byte iw (2 + j))).
@@ -950,7 +953,7 @@ Section UmodeFetchSplitBase.
         [ reflexivity | apply irrelevant_register_set; exact Hne ]. }
     assert (Hnc : forall j : nat, (j < 2)%nat ->
               bv_unsigned pc mod 4096 + Z.of_nat j < 4096).
-    { intros j Hj. lia. }
+    { intros j Hj. exact (ualign2_nc pc (Z.of_nat j) Hal2 ltac:(lia)). }
     iDestruct (umem_fetch_byte pt M w_leaf pc 0 (nth_byte iw 0) σ1 Hl
                  (Hnc 0%nat ltac:(lia)) (Hbytes 0%nat ltac:(lia)) with "Hgh HM")
       as %[Hm0 Hr0].
@@ -975,11 +978,11 @@ Section UmodeFetchSplitBase.
       - rewrite (Tr1 cur_privilege ltac:(vm_compute; reflexivity)); exact Hcp.
       - rewrite (Tr1 htif_tohost_base ltac:(vm_compute; reflexivity)); exact Hhtif.
       - rewrite (Tr1 pma_regions ltac:(vm_compute; reflexivity)); exact Hall. }
-    (* --- the high halfword: translate at pc+2 (same leaf), read 2 bytes --- *)
+    (* --- the high halfword: translate at pc+2 (its own leaf), read 2 bytes --- *)
     iMod (utlb_inv_pt_translateAddr_u (InstructionFetch tt)
-            (ud_root pt) (ud_tfp pt) (ud_um pt) w_leaf (add_vec_int pc 2)
-            (u_walk_pa w_leaf (add_vec_int pc 2)) σ1 S
-            Hl2 Hchk Hcanon2 eq_refl
+            (ud_root pt) (ud_tfp pt) (ud_um pt) w_leaf2 (add_vec_int pc 2)
+            (u_walk_pa w_leaf2 (add_vec_int pc 2)) σ1 S
+            Hl2 Hchk2 Hcanon2 eq_refl
             (ltac:(rewrite (Tr1 misa ltac:(vm_compute; reflexivity)); exact Hmisa))
             (ltac:(rewrite (Tr1 menvcfg ltac:(vm_compute; reflexivity)); exact Hmenv))
             (ltac:(rewrite (Tr1 htif_tohost_base ltac:(vm_compute; reflexivity)); exact Hhtif))
@@ -995,23 +998,23 @@ Section UmodeFetchSplitBase.
     { intros r Hne.
       destruct Hsregs2 as [Heq | (tv & Heq)]; rewrite Heq;
         [ reflexivity | apply irrelevant_register_set; exact Hne ]. }
-    iDestruct (umem_fetch_byte pt M w_leaf (add_vec_int pc 2) 0
+    iDestruct (umem_fetch_byte pt M w_leaf2 (add_vec_int pc 2) 0
                  (nth_byte iw (2 + 0)) σ2 Hl2
                  (Hncs 0%nat ltac:(lia)) (Hbytes2 0%nat ltac:(lia)) with "Hgh HM")
       as %[Hn0 Hs0].
-    iDestruct (umem_fetch_byte pt M w_leaf (add_vec_int pc 2) 1
+    iDestruct (umem_fetch_byte pt M w_leaf2 (add_vec_int pc 2) 1
                  (nth_byte iw (2 + 1)) σ2 Hl2
                  (Hncs 1%nat ltac:(lia)) (Hbytes2 1%nat ltac:(lia)) with "Hgh HM")
       as %[Hn1 Hs1].
     assert (Hmr2 : exec (mem_read (InstructionFetch tt) PBMT_PMA
-                     (Physaddr (u_walk_pa w_leaf (add_vec_int pc 2))) 2 false false false) σ2
+                     (Physaddr (u_walk_pa w_leaf2 (add_vec_int pc 2))) 2 false false false) σ2
                    = Some (Ok (subrange_vec_dec iw 31 16 : mword 16), σ2)).
-    { apply (umode_mem_read_fetch_2 (u_walk_pa w_leaf (add_vec_int pc 2))
+    { apply (umode_mem_read_fetch_2 (u_walk_pa w_leaf2 (add_vec_int pc 2))
                (subrange_vec_dec iw 31 16 : mword 16) σ2).
       - intros j HjN. rewrite (nth_byte_subrange_hi iw j HjN).
         assert (Hj : (j < 2)%nat) by lia.
         destruct j as [ | [ | ] ]; try lia; [ exact Hn0 | exact Hn1 ].
-      - rewrite <- (pa_add_0 (u_walk_pa w_leaf (add_vec_int pc 2))). exact Hs0.
+      - rewrite <- (pa_add_0 (u_walk_pa w_leaf2 (add_vec_int pc 2))). exact Hs0.
       - exact Hs1.
       - exact (pa_aligned_div _ (add_vec_int pc 2) 2 ltac:(lia)
                  ltac:(exists 2048; reflexivity) (ualign2_plus2 pc Hal2)).
@@ -1034,7 +1037,7 @@ Section UmodeFetchSplitBase.
     { pose proof (exec_fetch_base_2 σ σ1 pc (u_walk_pa w_leaf pc)
                     Lpc HmisaC Hbit0 Hbit1 Hnal4
                     (subrange_vec_dec iw 15 0 : mword 16) Htr1 Hmr1
-                    σ2 (u_walk_pa w_leaf (add_vec_int pc 2))
+                    σ2 (u_walk_pa w_leaf2 (add_vec_int pc 2))
                     (eq_trans (Tr1 PC ltac:(vm_compute; reflexivity)) Lpc)
                     HnRVC (subrange_vec_dec iw 31 16 : mword 16) Htr2 Hmr2) as Hf.
       rewrite concat_subranges_id in Hf. exact Hf. }
@@ -1045,52 +1048,3 @@ Section UmodeFetchSplitBase.
   Qed.
 
 End UmodeFetchSplitBase.
-
-(* ==== MAIN-COMPAT appendix (tso-cutover): main-side additions kept
-   beside flip's file; delete each when its last consumer migrates. ==== *)
-Lemma ualign_page_off (pc : mword 64) (k : Z) :
-  0 < k -> (k | 4096) -> is_aligned_vaddr (Virtaddr pc) k = true ->
-  (bv_unsigned pc mod 4096) mod k = 0.
-Proof.
-  intros Hk Hdvd Hal.
-  unfold is_aligned_vaddr in Hal. apply Z.eqb_eq in Hal.
-  rewrite uint_unsigned in Hal.
-  rewrite Z.rem_mod_nonneg in Hal;
-    [ | exact (proj1 (bv_unsigned_in_range _ pc)) | lia ].
-  rewrite <- (Znumtheory.Zmod_div_mod k 4096 (bv_unsigned pc) Hk ltac:(lia) Hdvd).
-  exact Hal.
-Qed.
-
-Lemma ualign2_nc (pc : mword 64) (d : Z) :
-  is_aligned_vaddr (Virtaddr pc) 2 = true -> 0 <= d <= 1 ->
-  bv_unsigned pc mod 4096 + d < 4096.
-Proof.
-  intros Hal Hd.
-  pose proof (ualign_page_off pc 2 ltac:(lia) ltac:(exists 2048; reflexivity) Hal) as Hm.
-  pose proof (Z.mod_pos_bound (bv_unsigned pc) 4096 ltac:(lia)) as Hb.
-  apply Z.mod_divide in Hm; [ | lia ]. destruct Hm as [q Hq]. lia.
-Qed.
-
-Lemma ualign4_nc (pc : mword 64) (d : Z) :
-  is_aligned_vaddr (Virtaddr pc) 4 = true -> 0 <= d <= 3 ->
-  bv_unsigned pc mod 4096 + d < 4096.
-Proof.
-  intros Hal Hd.
-  pose proof (ualign_page_off pc 4 ltac:(lia) ltac:(exists 1024; reflexivity) Hal) as Hm.
-  pose proof (Z.mod_pos_bound (bv_unsigned pc) 4096 ltac:(lia)) as Hb.
-  (* [lia] cannot see through the NESTED mod, so hand it the multiple *)
-  apply Z.mod_divide in Hm; [ | lia ]. destruct Hm as [q Hq]. lia.
-Qed.
-
-(* ALIGNMENT ALONE BOUNDS THE WINDOW, which is why three of the four fetch
-   geometries need no in-page premise at all: a k-aligned pc has a page
-   offset that is a multiple of k, hence at most 4096 - k, so a k-byte
-   window starting there cannot leave the page.  At k = 4 that covers the
-   two 4-ALIGNED reads and at k = 2 the compressed 2-mod-4 one.
-
-   The remaining geometry -- a NON-compressed instruction at a 2-mod-4 pc,
-   read as 2 + 2 -- is the one that genuinely CAN straddle a page boundary
-   (its low half sits at page offset 4094), and the way to support it is to
-   give the second halfword its own leaf rather than to forbid the case with
-   an in-page premise. *)
-

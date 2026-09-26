@@ -2372,7 +2372,7 @@ Section UvEcall.
     mWP (Loop : expr riscv_lang).
   Proof using .
     intros Hui Hg.
-    destruct Hui as [Hal2 Hcanon Hleaf Hinpage Hcode Htext].
+    destruct Hui as [Hal2 Hcanon Hleaf Hhi Hcode Htext].
     destruct Hleaf as (w_leaf & Hum & Hlok).
     destruct Hcode as (w & HnRVC & Hbytes & Hdecbase).
     iIntros "Hcg Hpc HPsi".
@@ -2396,7 +2396,7 @@ Section UvEcall.
                         with "Hcert Hany Hrw Hro Hctx Hmm") as "H".
           rewrite HnRVC. iExact "H".
         - iApply (uv_swp_fetch_base2 (CID := CIDo) (XI := XIo) pt M t (uc_dqc C)
-                    rsA w_leaf pc w Hinj Hum Hlok Hcanon Hinpage Hal2 Hal4 Hbytes
+                    rsA w_leaf pc w Hinj Hum Hlok Hcanon (Hhi eq_refl eq_refl) Hal2 Hal4 Hbytes
                     HnRVC Htext LpcA LcpA (proj1 HmsokA) LmenvA HpinsA Htok
                     with "Hcert Hany Hrw Hro Hctx Hmm"). }
     iIntros (r) "(-> & Hpost)".

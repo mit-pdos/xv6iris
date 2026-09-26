@@ -167,20 +167,33 @@ Definition udecode_rvc (h : mword 16) (i : instruction) : Prop :=
 (* ONE 4-byte read even when the instruction is compressed (the read grabs *)
 (* the next instruction's 2 bytes too), so the RVC-at-4-aligned case needs *)
 (* the following two bytes present in [M] as well.  A 2-mod-4 pc reads 2   *)
-(* bytes, then (base case) 2 more at pc+2.  [ui_inpage] keeps the whole    *)
-(* fetch window on one page, so one leaf fact serves every byte.  The      *)
-(* window is 4 bytes for a base instruction and 2 for a compressed one     *)
-(* at a 2-mod-4 pc, hence the two bounds; a compressed one at a 4-aligned  *)
-(* pc is at most 4092 anyway.  (The d66e41c bump put a REACHABLE [c.ldsp]  *)
-(* of sh's vprintf at 0xffe, which the old uniform 4092 could not state.)  *)
+(* bytes, then (base case) 2 more at pc+2.                                 *)
+(*                                                                         *)
+(* PAGE CROSSINGS ARE THE PAGING LAYER'S.  Every single read is NATURALLY  *)
+(* ALIGNED (4 bytes at a 4-aligned va, 2 at a 2-aligned one), so no read   *)
+(* can leave its page; a crossing can only fall BETWEEN the two reads of   *)
+(* the split fetch, which the machine translates separately.  So the fact  *)
+(* names the translation of every address the fetch READS -- the pc        *)
+(* ([ui_canon]/[ui_leaf]/[ui_text]) and, for the split fetch, pc+2         *)
+(* ([ui_hi]) -- and has no in-page clause: the fetch composers derive     *)
+(* that a read stays on its page from the read's alignment.               *)
 (* ===================================================================== *)
+
+(* ONE READ of the fetch at user va [va]: canonical, its page mapped with a
+   fetch-permitting leaf, and TEXT (X and not W) *)
+Definition uva_fetch_ok (pt : uptd) (va : mword 64) : Prop :=
+  uva_canon va /\ uva_fetch_leaf pt va /\ uva_text pt (uint va).
 
 Record uinstr (pt : uptd) (M : gmap Z (bv 8)) (pc : mword 64)
     (is_rvc : bool) (i : instruction) : Prop := UInstr {
   ui_al2    : is_aligned_vaddr (Virtaddr pc) 2 = true;
   ui_canon  : uva_canon pc;
   ui_leaf   : uva_fetch_leaf pt pc;
-  ui_inpage : Z.rem (uint pc) 4096 <= (if is_rvc then 4094 else 4092);
+  (* the split fetch's SECOND read, at pc+2 (possibly the next page): its
+     own translation, and the image key [uint pc + 2] is its va *)
+  ui_hi     : is_rvc = false -> is_aligned_vaddr (Virtaddr pc) 4 = false ->
+              uint (add_vec_int pc 2) = uint pc + 2 /\
+              uva_fetch_ok pt (add_vec_int pc 2);
   ui_code   :
     if is_rvc
     then exists h : mword 16,

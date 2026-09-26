@@ -1254,9 +1254,8 @@ Section UserHeap.
   (*                covers it, and covers data addresses at the same time   *)
   (*   ui_leaf    GONE -- [uheap_text] yields [ux_addr] PER FRAGMENT, so     *)
   (*                every byte brings its own fetchability                  *)
-  (*   ui_inpage  GONE -- with per-byte evidence a fetch window that        *)
-  (*                STRADDLES A PAGE needs nothing extra; that clause       *)
-  (*                existed only so ONE table leaf could cover four bytes   *)
+  (*   ui_hi      GONE -- the split fetch's second read (pc+2, possibly on  *)
+  (*                the next page) gets its leaf off the fragment there     *)
   (*   ui_code    the [uM_bytes] clauses become the fragments themselves    *)
   (*                                                                       *)
   (* This is the kernel's [InstrBytes.instr] shape with [utext] where it    *)
@@ -1280,16 +1279,6 @@ Section UserHeap.
   Definition uinstr_is (γt : gname) (pc : mword 64) (is_rvc : bool)
       (i : instruction) : iProp Σ :=
     (⌜ is_aligned_vaddr (Virtaddr pc) 2 = true ⌝ ∗
-     (* TEMPORARY, and it is the LAST one.  Nothing in the fetch path needs
-        this any more; its single remaining consumer is
-        [UkStep.uk_instr_mapped], which transports the fetch bytes from the
-        key's image to the MAPPED sub-image using the pc's one leaf.  Under
-        the heap that transport has nothing to do -- each fragment carries
-        its own page's evidence -- so the clause goes when the leaves stop
-        routing through the Prop-level [uinstr].  It lives HERE rather than
-        in a leaf statement because the decode lemmas discharge it for free,
-        one [vm_compute] per pc. *)
-     ⌜ Z.rem (uint pc) 4096 <= (if is_rvc then 4094 else 4092) ⌝ ∗
      if is_rvc
      then ∃ h : mword 16,
             ⌜ isRVC h = true ⌝ ∗ ⌜ udecode_rvc h i ⌝ ∗
@@ -1472,14 +1461,13 @@ Section UserHeap.
   Lemma uinstr_is_base (γt : gname) (pc : mword 64) (w : mword 32)
       (i : instruction) :
     is_aligned_vaddr (Virtaddr pc) 2 = true ->
-    Z.rem (uint pc) 4096 <= 4092 ->
     isRVC (subrange_vec_dec w 15 0) = false ->
     udecode_base w i ->
     ([∗ list] j ∈ seq 0 4, utext γt (uint pc + Z.of_nat j) (nth_byte w j)) -∗
     uinstr_is γt pc false i.
   Proof using .
-    intros Hal Hpg Hn Hdec. iIntros "#Hbs".
-    rewrite /uinstr_is. iSplit; [ done | ]. iSplit; [ done | ].
+    intros Hal Hn Hdec. iIntros "#Hbs".
+    rewrite /uinstr_is. iSplit; [ done | ].
     iExists w. iSplit; [ done | ]. iSplit; [ done | ]. iExact "Hbs".
   Qed.
 
@@ -1488,15 +1476,13 @@ Section UserHeap.
   Lemma uinstr_is_rvc4 (γt : gname) (pc : mword 64) (h : mword 16)
       (w : mword 32) (i : instruction) :
     is_aligned_vaddr (Virtaddr pc) 4 = true ->
-    Z.rem (uint pc) 4096 <= 4094 ->
     isRVC h = true -> udecode_rvc h i -> subrange_vec_dec w 15 0 = h ->
     ([∗ list] j ∈ seq 0 4, utext γt (uint pc + Z.of_nat j) (nth_byte w j)) -∗
     uinstr_is γt pc true i.
   Proof using .
-    intros Hal4 Hpg Hrvc Hdec Hlow. iIntros "#Hbs".
+    intros Hal4 Hrvc Hdec Hlow. iIntros "#Hbs".
     rewrite /uinstr_is.
     iSplit; [ iPureIntro; exact (ualign4_al2 pc Hal4) | ].
-    iSplit; [ done | ].
     iExists h. iSplit; [ done | ]. iSplit; [ done | ].
     rewrite Hal4. iExists w. iSplit; [ done | ]. iExact "Hbs".
   Qed.
@@ -1506,13 +1492,12 @@ Section UserHeap.
       (i : instruction) :
     is_aligned_vaddr (Virtaddr pc) 2 = true ->
     is_aligned_vaddr (Virtaddr pc) 4 = false ->
-    Z.rem (uint pc) 4096 <= 4094 ->
     isRVC h = true -> udecode_rvc h i ->
     ([∗ list] j ∈ seq 0 2, utext γt (uint pc + Z.of_nat j) (nth_byte h j)) -∗
     uinstr_is γt pc true i.
   Proof using .
-    intros Hal2 Hne Hpg Hrvc Hdec. iIntros "#Hbs".
-    rewrite /uinstr_is. iSplit; [ done | ]. iSplit; [ done | ].
+    intros Hal2 Hne Hrvc Hdec. iIntros "#Hbs".
+    rewrite /uinstr_is. iSplit; [ done | ].
     iExists h. iSplit; [ done | ]. iSplit; [ done | ].
     rewrite Hne. iExact "Hbs".
   Qed.
@@ -1538,12 +1523,12 @@ Section UserHeap.
     ([∗ map] a ↦ b ∈ utext_part M pm, utext γt a b) -∗ uinstr_is γt pc rvc i.
   Proof using .
     intros Hui Hperm. iIntros "#Ht".
-    destruct Hui as [Hal2 Hcan Hleaf Hpg Hcode _].
+    destruct Hui as [Hal2 Hcan Hleaf _ Hcode _].
     destruct rvc.
     - destruct Hcode as (h & Hrvc & Hbytes & Hdec & Htrail).
       destruct (is_aligned_vaddr (Virtaddr pc) 4) eqn:Hal4.
       + destruct (Htrail eq_refl) as (b2 & b3 & Hb2 & Hb3).
-        iApply (uinstr_is_rvc4 γt pc h (urvc4_word h b2 b3) i Hal4 Hpg Hrvc Hdec
+        iApply (uinstr_is_rvc4 γt pc h (urvc4_word h b2 b3) i Hal4 Hrvc Hdec
                   (urvc4_low h b2 b3)).
         iApply (utext_run_of γt M pm (uint pc) 4 (urvc4_word h b2 b3)
                   ltac:(intros j Hj; rewrite (urvc4_byte h b2 b3 j Hj);
@@ -1552,11 +1537,11 @@ Section UserHeap.
                         | exact (Hbytes 1%nat ltac:(lia))
                         | exact Hb2 | exact Hb3 | exfalso; lia ])
                   Hperm with "Ht").
-      + iApply (uinstr_is_rvc2 γt pc h i Hal2 Hal4 Hpg Hrvc Hdec).
+      + iApply (uinstr_is_rvc2 γt pc h i Hal2 Hal4 Hrvc Hdec).
         iApply (utext_run_of γt M pm (uint pc) 2 h Hbytes
                   ltac:(intros j Hj; apply Hperm; lia) with "Ht").
     - destruct Hcode as (w & Hn & Hbytes & Hdec).
-      iApply (uinstr_is_base γt pc w i Hal2 Hpg Hn Hdec).
+      iApply (uinstr_is_base γt pc w i Hal2 Hn Hdec).
       iApply (utext_run_of γt M pm (uint pc) 4 w Hbytes Hperm with "Ht").
   Qed.
 

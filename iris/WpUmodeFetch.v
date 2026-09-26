@@ -1003,15 +1003,17 @@ Section UvOpen.
   (* ---- (c) a 2-mod-4 pc holding a BASE instruction: TWO walks, TWO 2-byte
      reads.  The second walk starts from the FIRST half's Iris landing file
      [rs1], which agrees with the pure landing [rsf1] on the footprint --
-     exactly what [uv_swp_walk] takes -- and the second halfword's leaf is
-     the pc's own ([ui_inpage] keeps the window on one page). *)
+     exactly what [uv_swp_walk] takes -- and the second halfword is
+     translated through ITS OWN leaf ([uinstr]'s [ui_hi]), the next page's
+     when the instruction straddles a page boundary. *)
   Lemma uv_swp_fetch_base2 (pt : uptd) (M : gmap Z (bv 8)) (t : ptree)
       (dq : dfrac) (rsA : regstate) (w_leaf pc : mword 64) (iw : mword 32) :
     uva_inj pt M ->
     ud_um pt !! svpn_of pc = Some w_leaf ->
     uleaf_ok (InstructionFetch tt) w_leaf ->
     uva_canon pc ->
-    Z.rem (uint pc) 4096 <= 4092 ->
+    (* the second read, at pc+2: its own translation ([ui_hi]) *)
+    uint (add_vec_int pc 2) = uint pc + 2 /\ uva_fetch_ok pt (add_vec_int pc 2) ->
     is_aligned_vaddr (Virtaddr pc) 2 = true ->
     is_aligned_vaddr (Virtaddr pc) 4 = false ->
     uM_bytes M (uint pc) 4 iw ->
@@ -1028,19 +1030,15 @@ Section UvOpen.
     TsoCtx.own_context XI -∗ uv_bytes pt M t -∗
     swp (fetch tt) (uv_fetch_post dq pt M rsA t (F_Base iw)).
   Proof using .
-    intros Hinj Hl Hlok Hcanon Hpg Hal2 Hnal4 Hb HnRVC Htx Lpc Lcp Lsxl Lmenv
+    intros Hinj Hl Hlok Hcanon Hhi Hal2 Hnal4 Hb HnRVC Htx Lpc Lcp Lsxl Lmenv
       Hpins Htok.
     pose proof Hpins as ((Hmisa & _ & _ & _ & _ & _) & _).
     assert (HmisaC : eq_vec (_get_Misa_C (register_lookup misa rsA))
                        (MachineWord.MachineWord.N_to_word 1 1%N) = true)
       by (rewrite Hmisa; vm_compute; reflexivity).
     destruct (align2_not4_facts pc Hal2 Hnal4) as (_ & Hbit0 & Hbit1).
-    (* the second halfword's own facts, off the in-page bound *)
-    pose proof (uinpage_nc pc 2 Hpg ltac:(lia)) as Hnc2.
-    assert (Hl2 : ud_um pt !! svpn_of (add_vec_int pc 2) = Some w_leaf)
-      by (rewrite (usvpn_window pc 2 ltac:(lia) Hnc2); exact Hl).
-    pose proof (uva_canon_add pc 2 Hcanon ltac:(lia) Hnc2) as Hcanon2.
-    destruct (uwin_shift pc 2 Hpg ltac:(lia)) as [Hu2 Hmod2].
+    (* the second halfword's own facts: its own leaf, off [ui_hi] *)
+    destruct Hhi as (Hu2 & Hcanon2 & (w_leaf2 & Hl2 & Hlok2) & Htx2).
     assert (Hal2h : is_aligned_vaddr (Virtaddr (add_vec_int pc 2)) 2 = true)
       by exact (ualign2_plus2 pc Hal2).
     assert (Hncl : forall j : nat, (j < 2)%nat ->
@@ -1050,9 +1048,6 @@ Section UvOpen.
               bv_unsigned (add_vec_int pc 2) mod 4096 + Z.of_nat j < 4096)
       by (intros j Hj; exact (ualign2_nc (add_vec_int pc 2) (Z.of_nat j) Hal2h
                                 ltac:(lia))).
-    assert (Hnc4 : forall j : nat, (j < 4)%nat ->
-              bv_unsigned pc mod 4096 + Z.of_nat j < 4096)
-      by (intros j Hj; exact (uinpage_nc pc (Z.of_nat j) Hpg ltac:(lia))).
     assert (Hb1 : uM_bytes M (uint pc) 2 (subrange_vec_dec iw 15 0 : mword 16)).
     { intros j Hj. rewrite (nth_byte_subrange_lo iw j ltac:(lia)).
       exact (Hb j ltac:(lia)). }
@@ -1063,8 +1058,6 @@ Section UvOpen.
       pose proof (Hb (2 + j)%nat ltac:(lia)) as Hbj.
       rewrite Nat2Z.inj_add in Hbj. change (Z.of_nat 2) with 2 in Hbj.
       rewrite Hu2. rewrite <- Z.add_assoc. exact Hbj. }
-    assert (Htx2 : uva_text pt (uint (add_vec_int pc 2))).
-    { rewrite Hu2. exact (uva_text_window pt pc 2 Hnc2 Htx). }
     (* ---- the low halfword's walk ---- *)
     pose proof (uv_tree_ok_data pt M t Hinj Htok) as Htokd.
     destruct (uv_walk_fetch pt t (upa_map pt (uM_data pt M)) rsA w_leaf pc
@@ -1082,8 +1075,8 @@ Section UvOpen.
       by (rewrite (Tr1 menvcfg ltac:(vm_compute; reflexivity)); exact Lmenv).
     assert (Lpc1 : register_lookup PC rsf1 = pc)
       by (rewrite (Tr1 PC ltac:(vm_compute; reflexivity)); exact Lpc).
-    destruct (uv_walk_fetch pt t1 (upa_map pt (uM_data pt M)) rsf1 w_leaf
-                (add_vec_int pc 2) Hl2 Hlok Hcanon2 Lcp1 Lsxl1 Lmenv1 Hpins1 Htokd1)
+    destruct (uv_walk_fetch pt t1 (upa_map pt (uM_data pt M)) rsf1 w_leaf2
+                (add_vec_int pc 2) Hl2 Hlok2 Hcanon2 Lcp1 Lsxl1 Lmenv1 Hpins1 Htokd1)
       as (rsf2 & t2 & Htr2 & Htr2g & Tr2 & Htlbok2 & Htokd2 & Hshape2).
     pose proof (uv_tree_ok_of_data pt M t1 t2 Htok1 Htokd2 Hshape2) as Htok2.
     pose proof (u_tlb_only_trans rsA rsf1 rsf2 Tr1 Tr2) as Tr12.
@@ -1092,24 +1085,24 @@ Section UvOpen.
     pose proof (proj1 (proj2 (proj2 Htok))) as Hram.
     assert (Hram0 : addr_is_ram (u_walk_pa w_leaf pc)).
     { rewrite <- (pa_add_0 (u_walk_pa w_leaf pc)). apply Hram. apply elem_of_dom.
-      exact (uv_win_some pt M t w_leaf pc 4 32 iw Hinj (proj1 (proj2 Htok)) Hl
-               Hnc4 Hb 0%nat ltac:(lia)). }
+      exact (uv_win_some pt M t w_leaf pc 2 16 _ Hinj (proj1 (proj2 Htok)) Hl
+               Hncl Hb1 0%nat ltac:(lia)). }
     assert (Hram1 : addr_is_ram (pa_add (u_walk_pa w_leaf pc) 1)).
     { apply Hram. apply elem_of_dom.
-      exact (uv_win_some pt M t w_leaf pc 4 32 iw Hinj (proj1 (proj2 Htok)) Hl
-               Hnc4 Hb 1%nat ltac:(lia)). }
-    assert (Hram2 : addr_is_ram (u_walk_pa w_leaf (add_vec_int pc 2))).
-    { rewrite <- (pa_add_0 (u_walk_pa w_leaf (add_vec_int pc 2))). apply Hram.
+      exact (uv_win_some pt M t w_leaf pc 2 16 _ Hinj (proj1 (proj2 Htok)) Hl
+               Hncl Hb1 1%nat ltac:(lia)). }
+    assert (Hram2 : addr_is_ram (u_walk_pa w_leaf2 (add_vec_int pc 2))).
+    { rewrite <- (pa_add_0 (u_walk_pa w_leaf2 (add_vec_int pc 2))). apply Hram.
       apply elem_of_dom.
-      exact (uv_win_some pt M t w_leaf (add_vec_int pc 2) 2 16 _ Hinj
+      exact (uv_win_some pt M t w_leaf2 (add_vec_int pc 2) 2 16 _ Hinj
                (proj1 (proj2 Htok)) Hl2 Hnch Hb2 0%nat ltac:(lia)). }
-    assert (Hram3 : addr_is_ram (pa_add (u_walk_pa w_leaf (add_vec_int pc 2)) 1)).
+    assert (Hram3 : addr_is_ram (pa_add (u_walk_pa w_leaf2 (add_vec_int pc 2)) 1)).
     { apply Hram. apply elem_of_dom.
-      exact (uv_win_some pt M t w_leaf (add_vec_int pc 2) 2 16 _ Hinj
+      exact (uv_win_some pt M t w_leaf2 (add_vec_int pc 2) 2 16 _ Hinj
                (proj1 (proj2 Htok)) Hl2 Hnch Hb2 1%nat ltac:(lia)). }
     assert (Halp1 : is_aligned_paddr (Physaddr (u_walk_pa w_leaf pc)) 2 = true)
       by exact (pa_aligned_div _ pc 2 ltac:(lia) (Z.divide_factor_l 2 2048) Hal2).
-    assert (Halp2 : is_aligned_paddr (Physaddr (u_walk_pa w_leaf (add_vec_int pc 2))) 2
+    assert (Halp2 : is_aligned_paddr (Physaddr (u_walk_pa w_leaf2 (add_vec_int pc 2))) 2
                     = true)
       by exact (pa_aligned_div _ (add_vec_int pc 2) 2 ltac:(lia)
                   (Z.divide_factor_l 2 2048) Hal2h).
@@ -1139,7 +1132,7 @@ Section UvOpen.
                              resv_any cpu_id)%I)
                   (fun _ => (TsoCtx.own_context XI ∗ uv_bytes pt M t2 ∗
                              resv_any cpu_id)%I)
-                  pc (u_walk_pa w_leaf pc) (u_walk_pa w_leaf (add_vec_int pc 2))
+                  pc (u_walk_pa w_leaf pc) (u_walk_pa w_leaf2 (add_vec_int pc 2))
                   (subrange_vec_dec iw 15 0) (subrange_vec_dec iw 31 16)
                   u_disj u_in_PC u_in_misa u_in_mst u_in_priv Lpc Hpc1 Hpriv1
                   Hpriv2 HmisaC Hbit0 Hbit1 Hnal4 HnRVC
@@ -1188,7 +1181,7 @@ Section UvOpen.
             as (Hhtif & Hpma & Hpcfg & Hpaddr & HA & Hord & HX & Hcov & Hallow).
           iApply (swp_mono with "[Hrun Hany] [Hrw Hro Hown]").
           2:{ iApply (swp_checked_mem_read_ifetch2_UR u_Drw u_Dro (u_Df dq) rs2
-                        (u_walk_pa w_leaf (add_vec_int pc 2))
+                        (u_walk_pa w_leaf2 (add_vec_int pc 2))
                         (register_lookup pma_regions rsA)
                         (register_lookup pmpcfg_n rsA)
                         (register_lookup pmpaddr_n rsA) (subrange_vec_dec iw 31 16)
@@ -1196,7 +1189,7 @@ Section UvOpen.
                         u_disj u_in_pma u_in_pcfg u_in_paddr u_in_htif
                         Hhtif Hpma Hpcfg Hpaddr HA Hord HX Hcov Hallow
                         Hram2 Hram3 Halp2 with "Hcert Hrw Hro Hown []").
-              iApply (uv_fetch_pay pt M t2 IK w_leaf (add_vec_int pc 2) 2 2 _
+              iApply (uv_fetch_pay pt M t2 IK w_leaf2 (add_vec_int pc 2) 2 2 _
                         eq_refl Hinj Htok2 Hl2 Hnch Hb2 Htx2 with "Hlb"). }
           iIntros (r) "(-> & Hrw & Hro & Hown)".
           iSplitR; [done|]. iFrame "Hrw Hro Hrun Hany". iExists IK. iFrame "Hlb Hown". }
@@ -1239,7 +1232,7 @@ Section UvOpen.
               uv_fetch_bridge dq pt M rsA t (F_Base w)).
   Proof using .
     intros Hinj Hui Lpc Lcp Lsxl Lmenv Hpins Htok.
-    destruct Hui as [Hal2 Hcanon Hleaf Hinpage Hcode Htext].
+    destruct Hui as [Hal2 Hcanon Hleaf Hhi Hcode Htext].
     destruct Hleaf as (w_leaf & Hum & Hlok).
     iStartProof.
     destruct is_rvc.
@@ -1270,7 +1263,7 @@ Section UvOpen.
                       Hpins Htok with "Hcert Hany Hrw Hro Hctx Hmm") as "H".
         iEval (rewrite HnRVC) in "H". iExact "H".
       + iApply (uv_swp_fetch_base2 pt M t dq rsA w_leaf pc w
-                  Hinj Hum Hlok Hcanon Hinpage Hal2 Hal4 Hbytes HnRVC Htext Lpc
+                  Hinj Hum Hlok Hcanon (Hhi eq_refl eq_refl) Hal2 Hal4 Hbytes HnRVC Htext Lpc
                   Lcp Lsxl Lmenv Hpins Htok with "Hcert Hany Hrw Hro Hctx Hmm").
   Qed.
 

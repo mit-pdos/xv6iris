@@ -1157,7 +1157,7 @@ Section UkGenEcall.
       iDestruct "Hkc" as "[Hkc _]". iFrame "Hbak Hfdr Hkb". iExact "Hkc". }
     destruct (uk_instr_mapped π M Mp' pc false (ECALL tt) pt' sz
                 (loop_ok_wf C' pt' Hlo') Hpm' Hpure Hui)
-      as [Hal2' Hcanon Hleaf Hinpage Hcode Htext].
+      as [Hal2' Hcanon Hleaf Hhi Hcode Htext].
     destruct Hleaf as (w_leaf & Hum & Hlok).
     destruct Hcode as (w & HnRVC & Hbytes & Hdecbase).
     iPoseProof "Hamb" as "(#Hhw & _ & _)".
@@ -1175,7 +1175,7 @@ Section UkGenEcall.
                         with "Hcert Hany Hrw Hro Hctx Hmm") as "H".
           iEval (rewrite HnRVC) in "H". iExact "H".
         - iApply (uv_swp_fetch_base2 (CID := CIDo) (XI := XIo) pt' Mp' t (uc_dqc C')
-                    rsA w_leaf pc w Hinj Hum Hlok Hcanon Hinpage Hal2' Hal4 Hbytes
+                    rsA w_leaf pc w Hinj Hum Hlok Hcanon (Hhi eq_refl eq_refl) Hal2' Hal4 Hbytes
                     HnRVC Htext LpcA LcpA (proj1 HmsokA) LmenvA HpinsA Htok
                     with "Hcert Hany Hrw Hro Hctx Hmm"). }
     iIntros (r) "(-> & Hpost)".

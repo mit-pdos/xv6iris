@@ -89,17 +89,10 @@ func putc
 
 omit 0xc68 exit's [c.jr ra] -- the ecall at 0xc64 never returns
 
-# THE IN-PAGE CLAUSE.  [UserHeap.uinstr_is] carries a temporary in-page
-# clause: the fetch window stays on one page, i.e. [Z.rem (uint pc) 4096]
-# is at most 4092, or 4094 for a compressed instruction (whose window at a
-# 2-mod-4 pc is two bytes).  Before the a083670 bump the bound was a uniform
-# 4092 and vprintf's [c.mv a1,a5] at 0xffe (the SECOND [putc] of the
-# unknown-'%' arm, unreachable from sh's '%s' formats) was omitted; the
-# 8-byte [seccomp] stub moved it past the boundary.  The d66e41c bump
-# (sh's [cmdalloc], text -0x24) put vprintf's epilogue [c.ldsp s7,24(sp)]
-# -- REACHED by every diagnostic -- at 0xffe, and the clause was relaxed
-# to the compressed window rather than omit a fetched pc.  No listed pc
-# violates it.
+# PAGE CROSSINGS.  An instruction may straddle a page boundary (vprintf's
+# [c.ldsp s7,24(sp)] at 0xffe since the d66e41c bump): the instruction fact
+# has no in-page clause, and the split fetch's second read is translated on
+# its own (UmodeMem §4).  Nothing is omitted for page geometry.
 
 skipfunc printf unreachable: every diagnostic in sh.c is an [fprintf(2, ...)]
 skipfunc printint unreachable: vprintf reaches it only from the %d/%u/%x
