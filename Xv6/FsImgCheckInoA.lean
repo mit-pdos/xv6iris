@@ -1,5 +1,5 @@
 /-
-**W3 AT THE LITERAL IMAGE, inums 0-7 and the free tail 23-199** (Rocq
+**W3 AT THE LITERAL IMAGE, inums 0-7 and the free tail 24-199** (Rocq
 `FsImgCheck.fsimg_wf_ok`'s W3 share; `Xv6/FsImgCheckBase.lean` says why it
 is split).  Each live inum with an indirect block costs ~8 s of kernel
 evaluation (the 256-entry indirect sweep), a direct-only one ~2 s.
@@ -18,6 +18,6 @@ theorem fsimgInoOk_6 : fsimgInoOk 6 = true := by decide +kernel
 theorem fsimgInoOk_7 : fsimgInoOk 7 = true := by decide +kernel
 
 /-- The free inums past the last live one: one sweep of type decodes. -/
-theorem fsimgInoOk_free : (List.range' 23 177).all fsimgInoOk = true := by decide +kernel
+theorem fsimgInoOk_free : (List.range' 24 176).all fsimgInoOk = true := by decide +kernel
 
 end Xv6

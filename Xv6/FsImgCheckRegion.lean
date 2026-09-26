@@ -26,10 +26,10 @@ theorem fsimgRegionBareB : fsRegionBare fsImgBlock fsimgSb 13 = true := by decid
 /-- Conjunct (13): a live file's `nlink` IS its ticket count. -/
 theorem fsimgLinksEqB : fsLinksEq fsImgBlock fsimgSb = true := by decide +kernel
 
-/-- The live records are exactly `1 .. 22` (Rocq `fsimg_live_set`'s sweep). -/
+/-- The live records are exactly `1 .. 23` (Rocq `fsimg_live_set`'s sweep). -/
 theorem fsimgLiveSweepB :
     (List.range 200).all (fun z =>
       (!decide ((fsDinode fsImgBlock fsimgSb z).diType.toNat = 0)) ==
-        decide (1 ≤ z ∧ z ≤ 22)) = true := by decide +kernel
+        decide (1 ≤ z ∧ z ≤ 23)) = true := by decide +kernel
 
 end Xv6

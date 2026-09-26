@@ -66,14 +66,14 @@ theorem fsimgSb_logstart : fsimgSb.sbLogstart = 2 := rfl
 theorem fsimgWfOk : fsimgWf fsimgP fsimgSb = true := by
   have hw3 : fsInodesWf fsImgBlock fsimgSb = true := by
     rw [fsimgInodesWf_eq, List.range_eq_range',
-      show (200 : Nat) = 23 + 177 from rfl, ← List.range'_append_1, List.all_append,
-      fsimgInoOk_free, Bool.and_true, show List.range' 0 23 = List.range 23 from rfl]
+      show (200 : Nat) = 24 + 176 from rfl, ← List.range'_append_1, List.all_append,
+      fsimgInoOk_free, Bool.and_true, show List.range' 0 24 = List.range 24 from rfl]
     simp only [List.range_succ, List.range_zero, List.nil_append, List.all_append, List.all_cons,
       List.all_nil, fsimgInoOk_0, fsimgInoOk_1, fsimgInoOk_2, fsimgInoOk_3, fsimgInoOk_4,
       fsimgInoOk_5, fsimgInoOk_6, fsimgInoOk_7, fsimgInoOk_8, fsimgInoOk_9, fsimgInoOk_10,
       fsimgInoOk_11, fsimgInoOk_12, fsimgInoOk_13, fsimgInoOk_14, fsimgInoOk_15,
       fsimgInoOk_16, fsimgInoOk_17, fsimgInoOk_18, fsimgInoOk_19, fsimgInoOk_20,
-      fsimgInoOk_21, fsimgInoOk_22, Bool.and_self]
+      fsimgInoOk_21, fsimgInoOk_22, fsimgInoOk_23, Bool.and_self]
   -- W4 + W5, opened: the sweep file's `match` is its own matcher, so the
   -- set is named here rather than the two matchers compared by defeq
   have hu : ∃ u, fsUsedSet fsImgBlock fsimgSb = some u ∧ fsBitmapWf fsImgBlock fsimgSb u = true := by
@@ -192,17 +192,17 @@ theorem fsimgNlinkShort (z : Nat) (hz : z < 208) :
     (fsDinode fsimgP fsimgSb z).diNlink.toNat ≤ 32767 :=
   fsRegionNlink_short fsimgP fsimgSb fsimgNib z fsimgRegionNlink hz
 
-/-- The live records are exactly `1 .. 22`, as one sweep (Rocq
+/-- The live records are exactly `1 .. 23`, as one sweep (Rocq
 `fsimg_live_set`, deviation 3). -/
 theorem fsimgLiveSweep :
     (List.range 200).all (fun z =>
-      (!decide ((fsDinode fsimgP fsimgSb z).diType.toNat = 0)) == decide (1 ≤ z ∧ z ≤ 22)) =
+      (!decide ((fsDinode fsimgP fsimgSb z).diType.toNat = 0)) == decide (1 ≤ z ∧ z ≤ 23)) =
       true := by
   rw [fsimgP_eq]; exact fsimgLiveSweepB
 
 /-- Rocq `fsimg_live_iff`. -/
 theorem fsimgLiveIff (z : Nat) :
-    (1 ≤ z ∧ z ≤ 22) ↔
+    (1 ≤ z ∧ z ≤ 23) ↔
       z < fsimgSb.sbNinodes ∧ (fsDinode fsimgP fsimgSb z).diType.toNat ≠ 0 := by
   have hn : fsimgSb.sbNinodes = 200 := rfl
   rw [hn]
@@ -220,7 +220,7 @@ theorem fsimgLiveIff (z : Nat) :
   · omega
 
 /-- Rocq `fsimg_live_set_elem`. -/
-theorem fsimgLiveSetMem (z : Nat) : z ∈ fsLiveSet fsimgP fsimgSb ↔ 1 ≤ z ∧ z ≤ 22 := by
+theorem fsimgLiveSetMem (z : Nat) : z ∈ fsLiveSet fsimgP fsimgSb ↔ 1 ≤ z ∧ z ≤ 23 := by
   rw [fsLiveSet_mem, fsimgLiveIff]
 
 /-! ## 3.  PATHS OUT OF THE ROOT -/
