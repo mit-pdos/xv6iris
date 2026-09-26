@@ -28,11 +28,11 @@ reasons are the content):
    compare`), as `Xv6/FsTree.lean` deviation 1 already has it.
 3. **`fsnode_eq_dec` is NOT ported.**  `Fsnode.NDir` carries a
    `Std.ExtTreeMap`, for which this toolchain has no `DecidableEq`.  Its
-   only consumer is Rocq's literal-image check (`FsImgCheck.v`'s
-   `bool_decide (node_at … = Some (NFile bs))`), which this port does not
-   have: `Himg` stays a premise (crash brief D34).  Uses checked: FsImg.v
-   :767 (the instance itself), nothing else in `/shared/xv6rocq/iris`
-   names it.
+   only nominal consumer is Rocq's literal-image check, and that check
+   never uses it: `FsImgCheck.v` decides `bool_decide (fsimg_file_bytes i
+   = <p>_elf)` on a `list (bv 8)` and rewrites `node_at_file`
+   (`Xv6/FsImgCheck.lean` deviation 2).  Uses checked: FsImg.v :767 (the
+   instance itself), nothing else in `/shared/xv6rocq/iris` names it.
 -/
 import Xv6.FsImgDinode
 import Xv6.FsTree

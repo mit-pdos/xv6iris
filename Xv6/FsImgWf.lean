@@ -8,9 +8,9 @@ file of the `FsImg*` chain (`Xv6/FsImg.lean` → `FsImgDinode` →
 
 It reads the superblock, the log header, the inode blocks, the bitmap
 block, the directories' contents and the indirect blocks -- and never a
-single file's contents.  Crash brief D34 keeps it a PREMISE (`Himg`), so
-nothing here is ever evaluated; the executable spelling is kept because it
-IS Rocq's definition and because a later literal-image check would want it.
+single file's contents.  It is EVALUATED once, at the literal mkfs image,
+by `decide +kernel` (`Xv6/FsImgCheck.lean`, which discharges `Himg`); no
+proof file evaluates it.
 
 **DEVIATIONS.**
 
