@@ -168,31 +168,31 @@ Section UkShPipeNode.
     iExists pr. iFrame "Hright Hr".
   Qed.
 
-  (* ---- the PIPE row of the jump table at 0x13c0 ---------------------- *)
-  (* The row is a signed displacement from the table's own base, so 0x13c0 *)
-  (* plus it is 0x84a -- which [vm_compute] checks below rather than this  *)
+  (* ---- the PIPE row of the jump table at 0x13b0 ---------------------- *)
+  (* The row is a signed displacement from the table's own base, so 0x13b0 *)
+  (* plus it is 0x826 -- which [vm_compute] checks below rather than this  *)
   (* comment asserting it. *)
   Lemma ushp_jrow_pipe :
     shp_rodata γt -∗
     [∗ list] j ∈ seq 0 4,
-      utext γt (0x13cc + Z.of_nat j)
-        (nth_byte (mword_of_int 4294964362 : mword 32) j).
+      utext γt (0x13bc + Z.of_nat j)
+        (nth_byte (mword_of_int 4294964342 : mword 32) j).
   Proof using .
     iIntros "#H". rewrite !big_sepL_cons big_sepL_nil.
-    iSplit; [ iApply (ushp_ro_byte (0x13cc + Z.of_nat 0%nat)
-                        (nth_byte (mword_of_int 4294964362 : mword 32) 0%nat)
+    iSplit; [ iApply (ushp_ro_byte (0x13bc + Z.of_nat 0%nat)
+                        (nth_byte (mword_of_int 4294964342 : mword 32) 0%nat)
                         ltac:(vm_compute; f_equal; apply bv_eq;
                               vm_compute; reflexivity) with "H") | ].
-    iSplit; [ iApply (ushp_ro_byte (0x13cc + Z.of_nat 1%nat)
-                        (nth_byte (mword_of_int 4294964362 : mword 32) 1%nat)
+    iSplit; [ iApply (ushp_ro_byte (0x13bc + Z.of_nat 1%nat)
+                        (nth_byte (mword_of_int 4294964342 : mword 32) 1%nat)
                         ltac:(vm_compute; f_equal; apply bv_eq;
                               vm_compute; reflexivity) with "H") | ].
-    iSplit; [ iApply (ushp_ro_byte (0x13cc + Z.of_nat 2%nat)
-                        (nth_byte (mword_of_int 4294964362 : mword 32) 2%nat)
+    iSplit; [ iApply (ushp_ro_byte (0x13bc + Z.of_nat 2%nat)
+                        (nth_byte (mword_of_int 4294964342 : mword 32) 2%nat)
                         ltac:(vm_compute; f_equal; apply bv_eq;
                               vm_compute; reflexivity) with "H") | ].
-    iSplit; [ iApply (ushp_ro_byte (0x13cc + Z.of_nat 3%nat)
-                        (nth_byte (mword_of_int 4294964362 : mword 32) 3%nat)
+    iSplit; [ iApply (ushp_ro_byte (0x13bc + Z.of_nat 3%nat)
+                        (nth_byte (mword_of_int 4294964342 : mword 32) 3%nat)
                         ltac:(vm_compute; f_equal; apply bv_eq;
                               vm_compute; reflexivity) with "H") | done ].
   Qed.

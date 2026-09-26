@@ -9,12 +9,12 @@
 (* and on a symbol-free line that guard is REFUTED at every round, so the  *)
 (* landed walks ([UkShParseExec.wp_kshp_pex_loop], SH-PARSE-2's            *)
 (* [UkShRedirEx.wp_kshp_pex_loop_gt]) only ever take the NOT-TAKEN arm of  *)
-(* the branch at 0x62c.  The pipe line is the first line that makes the    *)
+(* the branch at 0x608.  The pipe line is the first line that makes the    *)
 (* guard TRUE, and this file is that arm.                                  *)
 (*                                                                        *)
 (* THE FINDING: it is ONE INSTRUCTION of new code.                         *)
-(* 0x62c's taken arm goes to 0x662 -- which is exactly where the loop's    *)
-(* exhausted-line exit goes too (0x63a's [c.beqz a0], and                  *)
+(* 0x608's taken arm goes to 0x63e -- which is exactly where the loop's    *)
+(* exhausted-line exit goes too (0x616's [c.beqz a0], and                  *)
 (* [UkShRedirEx.wp_kshp_pex_end] lands there) -- so the argv terminator    *)
 (* stores and [parseexec]'s whole epilogue are ALREADY WALKED, by the      *)
 (* landed walk, unchanged.  What the pipe line needs above this lemma is a *)
@@ -68,8 +68,8 @@ Import Defs.
 (* computed [ushp_peek_res], so a table HIT is a pure lemma and not a      *)
 (* walk -- UkShRedirLex's finding, at the other byte.  Both tables are     *)
 (* read off the image dump: entry 0 of the four argument-loop stoppers at  *)
-(* 0x1328 is '|' (the four are "|)&;"), and so is the one byte of the      *)
-(* pipe table at 0x1330.                                                  *)
+(* 0x1318 is '|' (the four are "|)&;"), and so is the one byte of the      *)
+(* pipe table at 0x1320.                                                  *)
 (* ===================================================================== *)
 
 Lemma ushp_T_arg_bar : ushp_lit ushp_T_arg 0%nat = ushq_bar.
@@ -151,7 +151,7 @@ Proof using.
   intros j Hj. exact (Hne j ltac:(lia)).
 Qed.
 
-(* ...at the '|', for the redirect table "<>" (0x1300) *)
+(* ...at the '|', for the redirect table "<>" (0x12f0) *)
 Lemma ushp_peek_redir_miss_bar (len : nat) (f : nat -> bv 8) (k : nat) :
   f k = ushq_bar -> ushp_peek_res len f k 2 (ushp_lit ushp_T_redir) = 0.
 Proof using.
@@ -197,13 +197,13 @@ Section UkShPipeEx.
   (* ===================================================================== *)
   (* §2 THE ROUND THAT FINDS THE '|'                                        *)
   (*                                                                        *)
-  (*   0x622  c.mv a2,s6        the table "|)&;"                            *)
-  (*   0x624  c.mv a1,s5        es                                          *)
-  (*   0x626  c.mv a0,s4        &s                                          *)
-  (*   0x628  jal  448 <peek>   ...which ANSWERS 1                          *)
-  (*   0x62c  c.bnez a0,0x662   TAKEN -- the loop is done                   *)
+  (*   0x5fe  c.mv a2,s6        the table "|)&;"                            *)
+  (*   0x600  c.mv a1,s5        es                                          *)
+  (*   0x602  c.mv a0,s4        &s                                          *)
+  (*   0x604  jal  424 <peek>   ...which ANSWERS 1                          *)
+  (*   0x608  c.bnez a0,0x63e   TAKEN -- the loop is done                   *)
   (*                                                                        *)
-  (* and 0x662 is the landed exit ([UkShRedirEx.wp_kshp_pex_end]'s).         *)
+  (* and 0x63e is the landed exit ([UkShRedirEx.wp_kshp_pex_end]'s).         *)
   (* ===================================================================== *)
 
   Lemma wp_kshp_pex_bar (dq dw : dfrac) (s0 ps : Z)
@@ -222,7 +222,7 @@ Section UkShPipeEx.
     uword γd ps (mword_of_int (s0 + Z.of_nat cur)) -∗
     ustr γd dq s0 len f -∗
     ustr γd dw ushp_whitespace 5 ushp_ws_f -∗
-    urun N h mc (mword_of_int 0x622) (24 + nn) -∗
+    urun N h mc (mword_of_int 0x5fe) (24 + nn) -∗
     (uword γd ps
        (mword_of_int
           (s0 + Z.of_nat (cur + ushp_skipws (len - cur) cur f))) -∗
@@ -231,7 +231,7 @@ Section UkShPipeEx.
        ∀ (h' : CpuId) (mc' : regfile),
          ⌜ forall r : mword 5, ucallee_saved_idx r = true ->
              mc' !!! Regidx r = mc !!! Regidx r ⌝ -∗
-         urun N h' mc' (mword_of_int 0x662) (24 + nn) -∗
+         urun N h' mc' (mword_of_int 0x63e) (24 + nn) -∗
          mWP (Loop : expr riscv_lang)) -∗
     mWP (Loop : expr riscv_lang).
   Proof using .

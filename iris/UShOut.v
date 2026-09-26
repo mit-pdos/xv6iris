@@ -20,7 +20,7 @@
 (*  against [UkSh.ksh_w], the per-CALL obligation sh's walk spends,       *)
 (*  because sh's prompt is ONE two-byte write and not two one-byte ones.  *)
 (*                                                                       *)
-(*  THE SOURCE RUN IS IN THE TEXT HALF.  "$ " is sh's .rodata at 0x1290,  *)
+(*  THE SOURCE RUN IS IN THE TEXT HALF.  "$ " is sh's .rodata at 0x1270,  *)
 (*  X-and-not-W, so [UserHeap.uheap_ubytes_w] says nothing about it and   *)
 (*  the leaf that answers is lane TXT-ROW's -- [UkSh.wp_ksh_write_chain_  *)
 (*  txt], over [UkRunSys.wp_uk_ecall_write_chain_txt].  That is the same  *)
@@ -86,8 +86,8 @@ Local Open Scope list_scope.
 (* ===================================================================== *)
 (*  S0  THE PURE HALF: sh's rodata prompt IS round 0's alternative        *)
 (*                                                                       *)
-(*  [auipc a1,0x1] at 0x12 and [addi a1,a1,638] put 0x1290 in a1, and     *)
-(*  0x1290 is where "$ " sits in [UCodeShK.shk_ro].  The era's side is    *)
+(*  [auipc a1,0x1] at 0x12 and [addi a1,a1,606] put 0x1270 in a1, and     *)
+(*  0x1270 is where "$ " sits in [UCodeShK.shk_ro].  The era's side is    *)
 (*  [EchoDisc.pro_alts !!! 0] = [u_prompt] = "$ ", and the two bytes of   *)
 (*  the ROUND-0 stream at 18 and 19 are those two -- all four facts are   *)
 (*  closed computations on the literals.                                 *)
@@ -304,7 +304,7 @@ Section UShOut.
     assert (Hua : uint (m !!! Regidx a1_idx) = sh_prompt_pv)
       by (rewrite Ha1; apply uint_moi; unfold sh_prompt_pv, Z64; lia).
     (* the two keys the console chain is indexed by, as plain addresses:
-       the buffer is a .rodata literal at 0x1290, so neither add wraps *)
+       the buffer is a .rodata literal at 0x1270, so neither add wraps *)
     assert (Havi0 : uint (add_vec_int (m !!! Regidx a1_idx) (Z.of_nat 0))
                     = sh_prompt_pv).
     { assert (Hhi : uint (m !!! Regidx a1_idx) + Z.of_nat 0

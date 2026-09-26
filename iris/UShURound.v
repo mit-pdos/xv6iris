@@ -273,14 +273,14 @@ Proof using.
       by (vm_compute in Hp |- *; lia).
     exact (list_lookup_lookup_total_lt FileDisc.alt_execcat p Hl).
   - intros p Hp.
-    apply (UkShDiag.ush_bytes_of_forallb (UkShDiag.shd_lit 0x12b8)
+    apply (UkShDiag.ush_bytes_of_forallb (UkShDiag.shd_lit 0x1298)
              (fun q : nat => FileDisc.alt_execcat !!! q) 0%nat 5%nat);
       [vm_compute; reflexivity | lia].
   - intros j Hj.
     assert (Hj3 : (j < 3)%nat) by (vm_compute in Hj; lia).
     destruct j as [| [| [| j]]]; try lia; vm_compute; reflexivity.
   - intros p Hp.
-    apply (UkShDiag.ush_bytes_of_forallb (UkShDiag.shd_lit 0x12b8)
+    apply (UkShDiag.ush_bytes_of_forallb (UkShDiag.shd_lit 0x1298)
              (fun q : nat => FileDisc.alt_execcat !!! (q + 1)%nat)
              7%nat 8%nat);
       [vm_compute; reflexivity | lia].
@@ -345,14 +345,14 @@ Proof using.
       by (vm_compute in Hp |- *; lia).
     exact (list_lookup_lookup_total_lt FileDisc.alt_execsecc p Hl).
   - intros p Hp.
-    apply (UkShDiag.ush_bytes_of_forallb (UkShDiag.shd_lit 0x12b8)
+    apply (UkShDiag.ush_bytes_of_forallb (UkShDiag.shd_lit 0x1298)
              (fun q : nat => FileDisc.alt_execsecc !!! q) 0%nat 5%nat);
       [vm_compute; reflexivity | lia].
   - intros j Hj.
     assert (Hj7 : (j < 7)%nat) by (vm_compute in Hj; lia).
     destruct j as [| [| [| [| [| [| [| j]]]]]]]; try lia; vm_compute; reflexivity.
   - intros p Hp.
-    apply (UkShDiag.ush_bytes_of_forallb (UkShDiag.shd_lit 0x12b8)
+    apply (UkShDiag.ush_bytes_of_forallb (UkShDiag.shd_lit 0x1298)
              (fun q : nat => FileDisc.alt_execsecc !!! (q + 5)%nat)
              7%nat 8%nat);
       [vm_compute; reflexivity | lia].
@@ -832,7 +832,7 @@ Section UShURound.
     rewrite {1}/ush_deed_at. iDestruct "Hpre" as "[Hpre | #HT]"; last first.
     { iApply (urun_gen (PS := uprogSG_free) (SG := uexecSG_xv6)
                 (ghost_varG0 := offbox_offG) N' T h m
-                (mword_of_int 0x9c0) _ ltac:(vm_compute; reflexivity)
+                (mword_of_int 0x99c) _ ltac:(vm_compute; reflexivity)
                 with "Hgenw HT Hrun"). }
     iDestruct "Hpre" as (cs s v') "(Hd & %Htie & #Hty & #Hpin' & #Hcs & %Hnw)".
     pose proof Htie as [Hlen Hcon].
@@ -997,7 +997,7 @@ Section UShURound.
       rewrite {1}/ush_deed_at. iDestruct "Hpre" as "[Hpre | #HT]"; last first.
       { iApply (urun_gen (PS := uprogSG_free) (SG := uexecSG_xv6)
                   (ghost_varG0 := offbox_offG) N' T h m
-                  (mword_of_int 0x9c0) _ ltac:(vm_compute; reflexivity)
+                  (mword_of_int 0x99c) _ ltac:(vm_compute; reflexivity)
                   with "[] HT Hrun").
         iApply "Hgenw". iIntros "!> #Hk". rewrite /UkShFork.ushf_wq. iRight.
         iApply (uWcu_taint' I 0%nat v0 with "Hpin0"). iApply uHktaint'. iExact "Hk". }
@@ -1013,7 +1013,7 @@ Section UShURound.
     iDestruct "Hstd" as (vw) "[[%Hvok | #HT] Hstd]"; last first.
     { iApply (urun_gen (PS := uprogSG_free) (SG := uexecSG_xv6)
                 (ghost_varG0 := offbox_offG) N' T h m
-                (mword_of_int 0x9c0) _ ltac:(vm_compute; reflexivity)
+                (mword_of_int 0x99c) _ ltac:(vm_compute; reflexivity)
                 with "Hgenw' HT Hrun"). }
     (* ---- THE WALK, at 8 more steps of budget than it needs ---- *)
     assert (Hbud : (68 + (8 + (UkShDiag.ush_Dg + n)))%nat
@@ -1341,14 +1341,14 @@ Section UShURound.
     rewrite {1}/ush_deed_at. iDestruct "Hpre" as "[Hpre | #HT]"; last first.
     { iApply (urun_gen (PS := uprogSG_free) (SG := uexecSG_xv6)
                 (ghost_varG0 := offbox_offG) N' T h m
-                (mword_of_int 0x9c0) _ ltac:(vm_compute; reflexivity)
+                (mword_of_int 0x99c) _ ltac:(vm_compute; reflexivity)
                 with "Hgenw HT Hrun"). }
     iDestruct "Hpre" as (cs s v') "(Hd & %Htie & #Hty & #Hpin' & #Hcs & %Hnw)".
     pose proof Htie as [Hlen Hcon].
     rewrite /uline_wit. iDestruct "Hwit" as "[Hwit | #HT]"; last first.
     { iApply (urun_gen (PS := uprogSG_free) (SG := uexecSG_xv6)
                 (ghost_varG0 := offbox_offG) N' T h m
-                (mword_of_int 0x9c0) _ ltac:(vm_compute; reflexivity)
+                (mword_of_int 0x99c) _ ltac:(vm_compute; reflexivity)
                 with "Hgenw HT Hrun"). }
     pose proof (fline_echof_in I ws file Hpos Hfl) as Hinl.
     rewrite /FileLinksLine.flw. iDestruct "Hwit" as "[%Hnil | Hwit]".

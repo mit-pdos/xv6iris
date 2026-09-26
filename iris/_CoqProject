@@ -1612,6 +1612,7 @@ UkShParse.v
 RefParse.v
 UkShParseSym.v
 RefParseSym.v
+UkShCmdalloc.v
 UkShParseLex.v
 UkShParseTok.v
 UkShGettoken.v

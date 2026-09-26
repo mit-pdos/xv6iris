@@ -11,7 +11,7 @@
 (*                 [UkShRun.ush_cmd g p c] over [UserHeap.uarg]s: the     *)
 (*                 EXEC node in UkShMain, the REDIR node in UkShRedirSeam, *)
 (*                 the PIPE node in UkShPipeSeam;                          *)
-(*   the CHILD  -- the forked child's [parsecmd; runcmd] from 0x9c0, one   *)
+(*   the CHILD  -- the forked child's [parsecmd; runcmd] from 0x99c, one   *)
 (*                 walk per shape (UkShMain.wp_kshm_child, UkShRedirSeam.  *)
 (*                 wp_kshm_child_redir_g, UkShPipeRound.wp_kshm_child_pipe *)
 (*                 -- and two more in UkShEcho and UShPipeChild).           *)
@@ -43,7 +43,7 @@
 (*     scope premise -- and [ush_cmd_of_ref] is it at the parser's own    *)
 (*     cut.  The node's address bound is read off the run's heap, as the  *)
 (*     landed seams read it.                                              *)
-(* (C) THE CHILD.  [wp_ref_child]: from 0x9c0 through [parsecmd] (the     *)
+(* (C) THE CHILD.  [wp_ref_child]: from 0x99c through [parsecmd] (the     *)
 (*     parser theorem at [ref_parsecmd len f = Some t], the allocator     *)
 (*     chained [ushp_nodes t] calls) and the seam to [runcmd]'s ENTRY,     *)
 (*     where the continuation -- the shape's ARM -- takes over with the   *)
@@ -89,6 +89,7 @@ Require Import RefParse.
 Require Import RefParseSym.
 Require Import UkShRedirs.     (* [ushp_malloc_chain] *)
 Require Import UkShParser.     (* [wp_ref_parser], [ushp_zero_at], [ushp_room] *)
+Require UkShCmdalloc.
 Require Import UkShRun.
 Require Import UkShDiag.
 Require Import UkShRedir.      (* the redirect arm *)
@@ -1113,14 +1114,14 @@ Section UkShSeam.
   (* ===================================================================== *)
   (* (C) THE CHILD: parse the line, then hand runcmd the tree.               *)
   (*                                                                        *)
-  (*   0x9c0  c.mv a0,s1        the line                                    *)
-  (*   0x9c2  jal  ra,parsecmd  -> the node, at the reference's answer      *)
-  (*   0x9c6  jal  ra,runcmd    -> the continuation: the shape's arm        *)
+  (*   0x99c  c.mv a0,s1        the line                                    *)
+  (*   0x99e  jal  ra,parsecmd  -> the node, at the reference's answer      *)
+  (*   0x9a2  jal  ra,runcmd    -> the continuation: the shape's arm        *)
   (*                                                                        *)
   (* The room is [ushp_room t] over what the arm needs; the arm gets the    *)
   (* runner's tree at [runcmd]'s entry, the line persisted at the cut, the  *)
   (* two lexer tables back, the allocator's end state and the lend back,   *)
-  (* and the callee-saved file as it was at 0x9c0.                          *)
+  (* and the callee-saved file as it was at 0x99c.                          *)
   (* ===================================================================== *)
 
   (* a write to a register that is not callee-saved keeps the callee-saved
@@ -1137,7 +1138,7 @@ Section UkShSeam.
   Lemma wp_ref_child (UM UM' : iProp Σ)
       (h : CpuId) (m : regfile) (dw dv : dfrac)
       (s0 : Z) (len : nat) (f : nat -> bv 8) (t : ushp_cmd)
-      (n : nat) (Cr : iProp Σ) :
+      (nn : nat) (Cr : iProp Σ) :
     m !!! Regidx s1_idx = (mword_of_int s0 : mword 64) ->
     ref_sym_scope len f ->
     ref_parsecmd len f = Some t ->
@@ -1150,11 +1151,11 @@ Section UkShSeam.
     ustr γd dw ushp_whitespace 5 ushp_ws_f -∗
     ustr γd dv ushp_symbols 7 ushp_sym_f -∗
     UM -∗
-    (* the lend, and the law that turns it into the exit payload where the
-       parser's NULL store kills the process *)
-    □ (Cr -∗ ukn_pay N (-1)) -∗
+    (* the lend, and the out-of-memory law it goes to where the parser's
+       [cmdalloc] panics ([UkShCmdalloc.ushp_oom]; upstream d66e41c) *)
+    UkShCmdalloc.ushp_oom N Cr (nn - 2) -∗
     Cr -∗
-    urun N h m (mword_of_int 0x9c0) (ushp_room t + (8 + (UkShDiag.ush_Dg + n))) -∗
+    urun N h m (mword_of_int 0x99c) (ushp_room t + nn) -∗
     (∀ (h' : CpuId) (m' : regfile) (p : Z),
        ⌜ m' !!! Regidx a0_idx = (mword_of_int p : mword 64) ⌝ -∗
        ⌜ ucallee_saved m m' ⌝ -∗
@@ -1165,7 +1166,7 @@ Section UkShSeam.
        UM' -∗
        Cr -∗
        urun N h' m' (mword_of_int ShSyms.runcmd)
-         (ushp_room t + (8 + (UkShDiag.ush_Dg + n))) -∗
+         (ushp_room t + nn) -∗
        mWP (Loop : expr riscv_lang)) -∗
     mWP (Loop : expr riscv_lang).
   Proof using .
@@ -1173,15 +1174,15 @@ Section UkShSeam.
     iIntros "#Hcode #Hpcode #Hpro Hline Hws Hsy HM #Hpxw Hcr Hrun Hcont".
     iDestruct (ustr_nonul with "Hline") as %Hnn0.
     iDestruct (ustr_len with "Hline") as %Hlen31.
-    (* ---- 0x9c0  c.mv a0,s1 ---- *)
-    iApply (wp_uk_cmv N h m (mword_of_int 0x9c0) a0_idx s1_idx
+    (* ---- 0x99c  c.mv a0,s1 ---- *)
+    iApply (wp_uk_cmv N h m (mword_of_int 0x99c) a0_idx s1_idx
               (add_vec zero_reg (m !!! Regidx s1_idx))
-              (ushp_room t + (8 + (UkShDiag.ush_Dg + n)))
+              (ushp_room t + nn)
               ltac:(unfold unot_sp; vm_compute; discriminate)
               ltac:(vm_compute; discriminate) eq_refl with "[] Hrun").
-    { iApply (uis_shk_9c0 with "Hcode"). }
-    assert (E9c0 : add_vec_int (mword_of_int 0x9c0 : mword 64) 2
-                   = mword_of_int 0x9c2)
+    { iApply (uis_shk_99c with "Hcode"). }
+    assert (E9c0 : add_vec_int (mword_of_int 0x99c : mword 64) 2
+                   = mword_of_int 0x99e)
       by (apply bv_eq; vm_compute; reflexivity).
     rewrite E9c0. iIntros (h1) "Hrun".
     set (m1 := <[Regidx a0_idx
@@ -1197,27 +1198,27 @@ Section UkShSeam.
       rewrite Hm in Hr. exact Hr. }
     assert (Hcs1 : ucallee_saved m m1)
       by exact (ucallee_saved_upd m a0_idx _ ltac:(vm_compute; reflexivity)).
-    (* ---- 0x9c2  jal ra,parsecmd ---- *)
-    iApply (wp_uk_jal N h1 m1 (mword_of_int 0x9c2)
+    (* ---- 0x99e  jal ra,parsecmd ---- *)
+    iApply (wp_uk_jal N h1 m1 (mword_of_int 0x99e)
               (mword_of_int 2096812 : mword 21) (mword_of_int 1 : mword 5)
-              (mword_of_int ShSyms.parsecmd) (mword_of_int 0x9c6)
-              (ushp_room t + (8 + (UkShDiag.ush_Dg + n)))
+              (mword_of_int ShSyms.parsecmd) (mword_of_int 0x9a2)
+              (ushp_room t + nn)
               ltac:(unfold unot_sp; vm_compute; discriminate)
               ltac:(vm_compute; discriminate)
               ltac:(apply bv_eq; vm_compute; reflexivity)
               ltac:(apply bv_eq; vm_compute; reflexivity)
               ltac:(vm_compute; reflexivity)
               with "[] Hrun").
-    { iApply (uis_shk_9c2 with "Hcode"). }
+    { iApply (uis_shk_99e with "Hcode"). }
     iIntros (h2) "Hrun".
     set (m2 := <[Regidx (mword_of_int 1 : mword 5)
-                 := regval_into_reg (mword_of_int 0x9c6 : mword 64)]> m1).
+                 := regval_into_reg (mword_of_int 0x9a2 : mword 64)]> m1).
     assert (Ha0_2 : m2 !!! Regidx a0_idx = (mword_of_int s0 : mword 64))
       by (rewrite /m2 (upd_ne m1 (Regidx (mword_of_int 1 : mword 5))
                          (Regidx a0_idx) _ ltac:(vm_compute; discriminate));
           exact Ha0_1).
     assert (Hra_2 : ret_pc (m2 !!! Regidx (mword_of_int 1 : mword 5))
-                    = (mword_of_int 0x9c6 : mword 64))
+                    = (mword_of_int 0x9a2 : mword 64))
       by (rewrite /m2 (upd_eq m1 (Regidx (mword_of_int 1 : mword 5)) _);
           apply bv_eq; vm_compute; reflexivity).
     assert (Hcs2 : ucallee_saved m m2)
@@ -1226,27 +1227,27 @@ Section UkShSeam.
                      ltac:(vm_compute; reflexivity))).
     (* ---- parsecmd: THE PARSER THEOREM ---- *)
     iApply (UkShParser.wp_ref_parser N h2 m2 dw dv s0 len f t UM UM'
-              (8 + (UkShDiag.ush_Dg + n))
+              nn
               Ha0_2 Hscope Href Hcat Hchain Hs0 Hs64
               with "Hpcode Hpro Hline Hws Hsy HM Hpxw Hcr Hrun").
     iIntros (p) "Hnode Hline %Hcut Hws Hsy".
     iIntros (h3 m3) "%Hcs3 %Ha0_3 HM' Hcr Hrun".
     rewrite Hra_2.
-    (* ---- 0x9c6  jal ra,runcmd ---- *)
-    iApply (wp_uk_jal N h3 m3 (mword_of_int 0x9c6)
-              (mword_of_int 2094792 : mword 21) (mword_of_int 1 : mword 5)
-              (mword_of_int ShSyms.runcmd) (mword_of_int 0x9ca)
-              (ushp_room t + (8 + (UkShDiag.ush_Dg + n)))
+    (* ---- 0x9a2  jal ra,runcmd ---- *)
+    iApply (wp_uk_jal N h3 m3 (mword_of_int 0x9a2)
+              (mword_of_int 2094828 : mword 21) (mword_of_int 1 : mword 5)
+              (mword_of_int ShSyms.runcmd) (mword_of_int 0x9a6)
+              (ushp_room t + nn)
               ltac:(unfold unot_sp; vm_compute; discriminate)
               ltac:(vm_compute; discriminate)
               ltac:(apply bv_eq; vm_compute; reflexivity)
               ltac:(apply bv_eq; vm_compute; reflexivity)
               ltac:(vm_compute; reflexivity)
               with "[] Hrun").
-    { iApply (uis_shk_9c6 with "Hcode"). }
+    { iApply (uis_shk_9a2 with "Hcode"). }
     iIntros (h4) "Hrun".
     set (m4 := <[Regidx (mword_of_int 1 : mword 5)
-                 := regval_into_reg (mword_of_int 0x9ca : mword 64)]> m3).
+                 := regval_into_reg (mword_of_int 0x9a6 : mword 64)]> m3).
     assert (Ha0_4 : m4 !!! Regidx a0_idx = (mword_of_int p : mword 64))
       by (rewrite /m4 (upd_ne m3 (Regidx (mword_of_int 1 : mword 5))
                          (Regidx a0_idx) _ ltac:(vm_compute; discriminate));
@@ -1259,7 +1260,7 @@ Section UkShSeam.
     (* ---- THE SEAM: the node the parser built is the tree runcmd walks ---- *)
     iMod (ubytes_persist γd s0 (S len) _ with "Hline") as "#Hlineq".
     iMod (ush_cmd_of_ushp_tree h4 m4 (mword_of_int ShSyms.runcmd)
-            (ushp_room t + (8 + (UkShDiag.ush_Dg + n))) s0 len _ t
+            (ushp_room t + nn) s0 len _ t
             (ushp_cut_ok_of_ref len f t Hnn0 Href) Hlen31 Hs0 Hs38 p
             with "Hrun Hnode Hlineq") as "(Hrun & #Htree)".
     (* ---- runcmd: the arm's ---- *)
@@ -1298,20 +1299,21 @@ Section UkShSeam.
     UM -∗
     (* the break, read off what the allocator left *)
     (UM' -∗ usz γs szv) -∗
-    urun N h m (mword_of_int 0x9c0) (60 + (8 + (UkShDiag.ush_Dg + n))) -∗
+    (* the out-of-memory law at this record's own payload: the parser's
+       [cmdalloc] panics ([UkShCmdalloc.ushp_oom]; upstream d66e41c) *)
+    UkShCmdalloc.ushp_oom N (ukn_pay N (-1)) (8 + (UkShDiag.ush_Dg + n) - 2) -∗
+    urun N h m (mword_of_int 0x99c) (60 + (8 + (UkShDiag.ush_Dg + n))) -∗
     mWP (Loop : expr riscv_lang).
   Proof using Hpay Hpsok_free.
     intros Hs1 Hscope Href Hchain Hs0 Hs64 Hs38 Hpx.
     iIntros "#Hdp #Hcode #Hxs #Hkw #Hpcode #Hpro #Hjt Hline Hws Hsy Hstd Hcwd
-             Hch HM Husz Hrun".
+             Hch HM Husz #Hpxw Hrun".
     iPoseProof Hpx as "Hpay".
-    iAssert (□ (ukn_pay N (-1) -∗ ukn_pay N (-1)))%I as "#Hpxw";
-      [ iIntros "!> $" | ].
     replace (60 + (8 + (UkShDiag.ush_Dg + n)))%nat
       with (ushp_room (UshpExec toks) + (8 + (UkShDiag.ush_Dg + n)))%nat
       by reflexivity.
-    iApply (wp_ref_child UM UM' h m dw dv s0 len f (UshpExec toks) n
-              (ukn_pay N (-1)) Hs1 Hscope Href I Hchain Hs0 Hs64 Hs38
+    iApply (wp_ref_child UM UM' h m dw dv s0 len f (UshpExec toks)
+              (8 + (UkShDiag.ush_Dg + n)) (ukn_pay N (-1)) Hs1 Hscope Href I Hchain Hs0 Hs64 Hs38
               with "Hcode Hpcode Hpro Hline Hws Hsy HM Hpxw Hpay Hrun").
     iIntros (h' m' p) "%Ha0 %Hcs #Htree #Hlineq Hws Hsy HM' _ Hrun".
     iDestruct ("Husz" with "HM'") as "Hsz".
@@ -1363,12 +1365,15 @@ Section UkShSeam.
     UkShRedir.ush_open_call_g N cwdv
       (UArg (s0 + Z.of_nat q) (e - q)%nat (fun j : nat => g (q + j)%nat)) 1537
       (<[1%nat := FdClosed]> ld) H K Kf -∗
-    □ (Cr -∗ ukn_pay N (-1)) -∗
-    (* THE LEND SPLITS AT THE CALL: whole across the parse (it pays the
-       parser's exits), and then what the open is handed and the rest *)
+    (* the out-of-memory law, at the parse's own budget below: a REDIR
+       line's room is 72 (the redirect's cmdalloc), so the parse runs at
+       [4 + (Dg + n)] of the 76 the child is handed *)
+    UkShCmdalloc.ushp_oom N Cr (4 + (UkShDiag.ush_Dg + n) - 2) -∗
+    (* THE LEND SPLITS AT THE CALL: whole across the parse (it is the
+       out-of-memory law's), and then what the open is handed and the rest *)
     (Cr -∗ H ∗ Cr') -∗
     Cr -∗
-    urun N h m (mword_of_int 0x9c0) (68 + (8 + (UkShDiag.ush_Dg + n))) -∗
+    urun N h m (mword_of_int 0x99c) (68 + (8 + (UkShDiag.ush_Dg + n))) -∗
     ((∀ (h' : CpuId) (m' : regfile) (p : Z) (ty : fdtype),
        ⌜ m' !!! Regidx a0_idx = (mword_of_int p : mword 64) ⌝ -∗
        ush_cmd γd p (UExec (ush_args s0 g toks)) -∗
@@ -1400,14 +1405,14 @@ Section UkShSeam.
     iIntros "#Hcode #Hjt #Hpcode #Hpro Hline Hws Hsy Hstd Hcwd HM Hopen
              #Hpxw Hsplit Hcr Hrun Hk".
     replace (68 + (8 + (UkShDiag.ush_Dg + n)))%nat
-      with (ushp_room (UshpRedir (UshpExec toks) q e 1537 1) + (8 + (UkShDiag.ush_Dg + n)))%nat
+      with (ushp_room (UshpRedir (UshpExec toks) q e 1537 1) + (4 + (UkShDiag.ush_Dg + n)))%nat
       by reflexivity.
     iApply (wp_ref_child UM UM' h m dw dv s0 len f
-              (UshpRedir (UshpExec toks) q e 1537 1) n Cr
+              (UshpRedir (UshpExec toks) q e 1537 1) (4 + (UkShDiag.ush_Dg + n)) Cr
               Hs1 Hscope Href (conj I (conj eq_refl eq_refl)) Hchain Hs0 Hs64 Hs38
               with "Hcode Hpcode Hpro Hline Hws Hsy HM Hpxw Hcr Hrun").
     iIntros (h' m' p) "%Ha0 %Hcs #Htree #Hlineq Hws Hsy HM' Hcr Hrun".
-    replace (ushp_room (UshpRedir (UshpExec toks) q e 1537 1) + (8 + (UkShDiag.ush_Dg + n)))%nat
+    replace (ushp_room (UshpRedir (UshpExec toks) q e 1537 1) + (4 + (UkShDiag.ush_Dg + n)))%nat
       with (6 + (UkShDiag.ush_Dg + (70 + n)))%nat by reflexivity.
     iDestruct ("Hsplit" with "Hcr") as "[HH Hcr]".
     iApply (UkShRedir.wp_kshr_redir_arm_g N
@@ -1470,7 +1475,10 @@ Section UkShSeam.
        ride into whichever of the three it likes *)
     (∀ γp : pipe_names, UM' -∗ Cr -∗ R γp -∗ RcL γp ∗ (RcR γp ∗ Rk γp)) -∗
     UkShPipe.ush_pipe_call N ld R -∗
-    urun N h m (mword_of_int 0x9c0) (68 + (8 + (UkShDiag.ush_Dg + n))) -∗
+    (* the out-of-memory law at the lend: the parser's [cmdalloc] panics
+       ([UkShCmdalloc.ushp_oom]; upstream d66e41c) *)
+    UkShCmdalloc.ushp_oom N Cr (8 + (UkShDiag.ush_Dg + (2 + n)) - 2) -∗
+    urun N h m (mword_of_int 0x99c) (68 + (8 + (UkShDiag.ush_Dg + n))) -∗
     (* ---- THE LEFT CHILD: fd 1 is the pipe's WRITE end ---- *)
     (∀ (N' : uk_names Σ) (h' : CpuId) (m' : regfile) (γ' : gname)
        (γp : pipe_names) (p : Z),
@@ -1531,18 +1539,15 @@ Section UkShSeam.
   Proof using Hpay Hpsok_free.
     intros Hs1 Hscope Href Hg Hchain Hs0 Hs64 Hs38 HQc Hpx Hl0 Hl1 Hne0 Hne1 Hnp0 Hnp1.
     subst g.
-    (* the payload is free, so the parser's exit premise is free *)
-    assert (HpxC : ⊢ □ (Cr -∗ ukn_pay N (-1))).
-    { iIntros "!> _". iApply Hpx. }
     iIntros "#Hdp #Hcode #Hjt #Hpcode #Hpro Hline Hws Hsy Hsz Hstd Hcwd Hch
-             HM Hcr #Hkw Hsplit Hpipe Hrun HcL HcR Hpar".
-    iPoseProof HpxC as "#Hpxw".
+             HM Hcr #Hkw Hsplit Hpipe #Hpxw Hrun HcL HcR Hpar".
     replace (68 + (8 + (UkShDiag.ush_Dg + n)))%nat
       with (ushp_room (UshpPipe (UshpExec toksl) (UshpExec toksr))
             + (8 + (UkShDiag.ush_Dg + (2 + n))))%nat
       by (change (ushp_room (UshpPipe (UshpExec toksl) (UshpExec toksr))) with 66%nat; lia).
     iApply (wp_ref_child UM UM' h m dw dv s0 len f
-              (UshpPipe (UshpExec toksl) (UshpExec toksr)) (2 + n) Cr
+              (UshpPipe (UshpExec toksl) (UshpExec toksr))
+              (8 + (UkShDiag.ush_Dg + (2 + n))) Cr
               Hs1 Hscope Href (conj I I) Hchain Hs0 Hs64 Hs38
               with "Hcode Hpcode Hpro Hline Hws Hsy HM Hpxw Hcr Hrun").
     iIntros (h' m' p) "%Ha0 %Hcs #Htree #Hlineq Hws Hsy HM' Hcr Hrun".

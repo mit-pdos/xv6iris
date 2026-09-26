@@ -576,7 +576,7 @@ Proof.
   rewrite (fsimg_node_file 7 fsimg_init_type), H. reflexivity.
 Qed.
 
-(* ---- sh, inum 13, 58360 bytes ---------------------------------------- *)
+(* ---- sh, inum 13, 58632 bytes ---------------------------------------- *)
 
 Lemma fsimg_sh_type :
   bv_unsigned (di_type (fs_dinode fsimg_P fsimg_sb 13)) = T_FILE_z.

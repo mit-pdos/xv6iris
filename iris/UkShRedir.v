@@ -28,10 +28,10 @@
 (* only the eight instructions between them:                               *)
 (*                                                                        *)
 (*   0xf6   c.lw  a0,36(a0)   rcmd->fd                                     *)
-(*   0xf8   jal   ra,0xcae    close(rcmd->fd)                              *)
+(*   0xf8   jal   ra,0xc8a    close(rcmd->fd)                              *)
 (*   0xfc   c.lw  a1,32(s1)   rcmd->mode                                   *)
 (*   0xfe   c.ld  a0,16(s1)   rcmd->file                                   *)
-(*   0x100  jal   ra,0xcc6    open(file, mode)                             *)
+(*   0x100  jal   ra,0xca2    open(file, mode)                             *)
 (*   0x104  bltz  a0,0x10e    -1 -> the "open %s failed" tail              *)
 (*   0x108  c.ld  a0,8(s1)    rcmd->cmd                                    *)
 (*   0x10a  jal   ra,0x8e     runcmd(rcmd->cmd)  -- the EXEC arm           *)
@@ -315,7 +315,7 @@ Section UkShRedir.
   Qed.
 
   (* ===================================================================== *)
-  (* SS3 close @0xcae, AT THE LEDGER.                                       *)
+  (* SS3 close @0xc8a, AT THE LEDGER.                                       *)
   (*                                                                        *)
   (* [UkSh.wp_ksh_close] spends a TAIL handle; the descriptor a REDIR shuts  *)
   (* is a STANDARD stream, which the ledger owns and nothing else can        *)
@@ -346,22 +346,22 @@ Section UkShRedir.
     mWP (Loop : expr riscv_lang).
   Proof using .
     intros Harg Hs Hkl Hne. iIntros "#Hcode Hdep Hstd Hrun Hcont".
-    assert (Hcl : ShSyms.close = 0xcae)
+    assert (Hcl : ShSyms.close = 0xc8a)
       by (destruct shk_syms_pins as (_&_&_&_&_&_&H&_); exact H).
     rewrite Hcl.
-    (* ---- 0xcae  c.li a7,21 ---- *)
-    iApply (wp_uk_cli N h m (mword_of_int 0xcae)
+    (* ---- 0xc8a  c.li a7,21 ---- *)
+    iApply (wp_uk_cli N h m (mword_of_int 0xc8a)
               (mword_of_int 21 : mword 6) a7_idx avail
               ltac:(unfold unot_sp; vm_compute; discriminate)
               ltac:(vm_compute; discriminate) with "[] Hrun").
-    { iApply (uis_shk_cae with "Hcode"). }
+    { iApply (uis_shk_c8a with "Hcode"). }
     assert (Em : <[Regidx a7_idx
                    := regval_into_reg (sign_extend' 64
                         (mword_of_int 21 : mword 6) : mword 64)]> m
                  = <[Regidx a7_idx := (mword_of_int 21 : mword 64)]> m)
       by (f_equal; apply bv_eq; vm_compute; reflexivity).
-    assert (E01 : add_vec_int (mword_of_int 0xcae : mword 64) 2
-                  = mword_of_int 0xcb0)
+    assert (E01 : add_vec_int (mword_of_int 0xc8a : mword 64) 2
+                  = mword_of_int 0xc8c)
       by (apply bv_eq; vm_compute; reflexivity).
     rewrite E01 Em.
     iIntros (h1) "Hrun".
@@ -369,11 +369,11 @@ Section UkShRedir.
     assert (Ha0_1 : m1 !!! Regidx a0_idx = m !!! Regidx a0_idx)
       by exact (upd_ne m (Regidx a7_idx) (Regidx a0_idx) _
                   ltac:(vm_compute; discriminate)).
-    assert (E12 : add_vec_int (mword_of_int 0xcb0 : mword 64) 4
-                  = mword_of_int 0xcb4)
+    assert (E12 : add_vec_int (mword_of_int 0xc8c : mword 64) 4
+                  = mword_of_int 0xc90)
       by (apply bv_eq; vm_compute; reflexivity).
-    (* ---- 0xcb0  ecall -- CLOSE, at the LEDGER's own slot ---- *)
-    iApply (wp_uk_ecall_close_std N h1 m1 (mword_of_int 0xcb0) l fdn st avail
+    (* ---- 0xc8c  ecall -- CLOSE, at the LEDGER's own slot ---- *)
+    iApply (wp_uk_ecall_close_std N h1 m1 (mword_of_int 0xc8c) l fdn st avail
               ltac:(unfold usysno;
                     rewrite (upd_eq m (Regidx a7_idx)
                                (mword_of_int 21 : mword 64));
@@ -382,7 +382,7 @@ Section UkShRedir.
               Hs Hkl Hne
               ltac:(rewrite E12; vm_compute; reflexivity)
               with "[] Hrun [Hdep] Hstd").
-    { iApply (uis_shk_cb0 with "Hcode"). }
+    { iApply (uis_shk_c8c with "Hcode"). }
     { iApply "Hdep". }
     rewrite E12.
     iIntros (h2 r) "_ Hstd Hrun".
@@ -395,13 +395,13 @@ Section UkShRedir.
                (upd_ne m (Regidx a7_idx) (Regidx ra_idx)
                   (mword_of_int 21 : mword 64)
                   ltac:(vm_compute; discriminate))). }
-    (* ---- 0xcb4  c.jr ra ---- *)
-    iApply (wp_uk_cjr N h2 m2 (mword_of_int 0xcb4) ra_idx
+    (* ---- 0xc90  c.jr ra ---- *)
+    iApply (wp_uk_cjr N h2 m2 (mword_of_int 0xc90) ra_idx
               (ret_pc (m !!! Regidx ra_idx)) avail
               ltac:(vm_compute; discriminate)
               ltac:(rewrite Hra; reflexivity)
               with "[] Hrun").
-    { iApply (uis_shk_cb4 with "Hcode"). }
+    { iApply (uis_shk_c90 with "Hcode"). }
     iIntros (h3) "Hrun".
     iApply ("Hcont" $! h3 r with "Hstd Hrun").
   Qed.
@@ -654,9 +654,9 @@ Section UkShRedir.
                  (mword_of_int 0xfc : mword 64)
                  ltac:(vm_compute; discriminate)) Ha0_2.
       vm_compute. reflexivity. }
-    (* ---- 0xf8  jal ra,0xcae <close> -- at the LEDGER's slot 1 ---- *)
+    (* ---- 0xf8  jal ra,0xc8a <close> -- at the LEDGER's slot 1 ---- *)
     iApply (wp_kshx_rcall N h2 m2 0xf8 ShSyms.close 0xfc 21
-              (mword_of_int 2998 : mword 21) (UkShDiag.ush_Dg + av)
+              (mword_of_int 2962 : mword 21) (UkShDiag.ush_Dg + av)
               (UserFd.ustd (ukn_fd N) ld)
               (fun _ => UserFd.ustd (ukn_fd N) (<[1%nat := FdClosed]> ld))
               (fun h0 avq =>
@@ -740,9 +740,9 @@ Section UkShRedir.
                     = (mword_of_int (ua_ptr file) : mword 64))
       by exact (upd_eq m4 (Regidx a0_idx)
                   (mword_of_int (ua_ptr file) : mword 64)).
-    (* ---- 0x100  jal ra,0xcc6 <open> -- THE CALL PREMISE ---- *)
+    (* ---- 0x100  jal ra,0xca2 <open> -- THE CALL PREMISE ---- *)
     iApply (UkShRun.wp_kshr_jal N h5 m5 0x100 ShSyms.open 0x104
-              (mword_of_int 3014 : mword 21) (UkShDiag.ush_Dg + av)
+              (mword_of_int 2978 : mword 21) (UkShDiag.ush_Dg + av)
               ltac:(destruct shk_syms_pins as (_&_&_&_&_&Ho&_); rewrite Ho;
                     apply bv_eq; vm_compute; reflexivity)
               ltac:(apply bv_eq; vm_compute; reflexivity)

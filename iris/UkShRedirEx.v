@@ -43,6 +43,7 @@ Local Open Scope Z_scope.
 Import Defs.
 Require Import UserFd.
 Require Import UkShParse.
+Require UkShCmdalloc.
 Require Import UkShParseSym.
 Require Import UkShParseLex.
 Require Import UkShRedirCmd.
@@ -126,6 +127,7 @@ Section UkShRedirEx.
   (* stage 4's one Hypothesis, at the type the base file names *)
   Context (UMalloc UMalloc' : iProp Σ).
   Hypothesis ushp_malloc_ok : ushp_malloc_ty UMalloc UMalloc'.
+  Local Notation ushp_oom := (UkShCmdalloc.ushp_oom N).
 
 
   (* ===================================================================== *)
@@ -154,7 +156,7 @@ Section UkShRedirEx.
     ustr γd dq s0 len f -∗
     ustr γd dw ushp_whitespace 5 ushp_ws_f -∗
     ustr γd dv ushp_symbols 7 ushp_sym_f -∗
-    urun N h mc (mword_of_int 0x622) (24 + nn) -∗
+    urun N h mc (mword_of_int 0x5fe) (24 + nn) -∗
     (uword γd ps (mword_of_int (s0 + Z.of_nat len)) -∗
      (∃ w : mword 64, uword γd (fp - 120) w) -∗
      (∃ w : mword 64, uword γd (fp - 128) w) -∗
@@ -164,7 +166,7 @@ Section UkShRedirEx.
        ∀ (h' : CpuId) (mc' : regfile),
          ⌜ forall r : mword 5, ucallee_saved_idx r = true ->
              mc' !!! Regidx r = mc !!! Regidx r ⌝ -∗
-         urun N h' mc' (mword_of_int 0x662) (24 + nn) -∗
+         urun N h' mc' (mword_of_int 0x63e) (24 + nn) -∗
          mWP (Loop : expr riscv_lang)) -∗
     mWP (Loop : expr riscv_lang).
   Proof using .
@@ -227,7 +229,7 @@ Section UkShRedirEx.
     shp_code γt -∗
     shp_rodata γt -∗
     UMalloc -∗
-    □ (Pex -∗ ukn_pay N (-1)) -∗
+    ushp_oom Pex (10 + nn) -∗
     Pex -∗
     ushp_exec_pre s0 p done -∗
     uword γd ps (mword_of_int (s0 + Z.of_nat cur)) -∗
@@ -236,7 +238,7 @@ Section UkShRedirEx.
     ustr γd dq s0 len f -∗
     ustr γd dw ushp_whitespace 5 ushp_ws_f -∗
     ustr γd dv ushp_symbols 7 ushp_sym_f -∗
-    urun N h mc (mword_of_int 0x622) (24 + (8 + nn)) -∗
+    urun N h mc (mword_of_int 0x5fe) (24 + (12 + nn)) -∗
     (∀ t : Z,
      ushp_exec_pre s0 p (done ++ rest) -∗
      ushp_redir_node s0 t p (S (S gp)) fe 1537 1 -∗
@@ -256,7 +258,7 @@ Section UkShRedirEx.
          ⌜ mc' !!! Regidx s2_idx
              = mword_of_int (Z.of_nat (length done + length rest)) ⌝ -∗
          ⌜ mc' !!! Regidx s1_idx = mword_of_int t ⌝ -∗
-         urun N h' mc' (mword_of_int 0x662) (24 + (8 + nn)) -∗
+         urun N h' mc' (mword_of_int 0x63e) (24 + (12 + nn)) -∗
          mWP (Loop : expr riscv_lang)) -∗
     mWP (Loop : expr riscv_lang).
   Proof using ushp_malloc_ok.
@@ -275,7 +277,7 @@ Section UkShRedirEx.
       by exact (ref_args_of_toks_redir len f cur gp fe rest done [] (length rest + 2)
                   Hnonul Hred (ushs_toks_le _ _ _ _ _ Htoks) Htoks Hpos Hcnt
                   ltac:(lia)).
-    iApply (UkShArgs.wp_ref_pex_loop N (Pex := Pex) dq dw dv s0 ps p fp len f (8 + nn)
+    iApply (UkShArgs.wp_ref_pex_loop N (Pex := Pex) dq dw dv s0 ps p fp len f (12 + nn)
               (length rest + 2) done (done ++ rest) []
               ({| rr_q := S (S gp); rr_eq := fe; rr_mode := rr_mode_gt; rr_fd := 1 |} :: [])
               p cur len UMalloc UMalloc' h mc wq weq

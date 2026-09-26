@@ -4,7 +4,7 @@
 (* design/app-file.md §5.1, SKELETON's obligation 18).                    *)
 (*                                                                        *)
 (* WHAT THE LANE FOUND, and it is what decides this file's shape: sh's     *)
-(* body reads its line EXACTLY ONCE, at 0x97a, and only to see that the    *)
+(* body reads its line EXACTLY ONCE, at 0x956, and only to see that the    *)
 (* first byte is not 'c'.  Everything else the walk does with the line is  *)
 (* to hand it to the CHILD's law.  So [UkShFork.wp_kshm_body_at] is        *)
 (* abstract in the line shape, [wp_kshm_body_redir] below is that lemma at *)
@@ -17,7 +17,7 @@
 (*   [LEchoF ws nm] -- [echo a b > nm], first byte 'e' TOO (the redirect is a  *)
 (*     suffix): the SAME walk, at [ushs_lp], closing on the redirect       *)
 (*     child's law.                                                       *)
-(*   [LCat nm]     -- [cat nm], first byte 'c': the [bne] at 0x97a is NOT   *)
+(*   [LCat nm]     -- [cat nm], first byte 'c': the [bne] at 0x956 is NOT   *)
 (*     taken and control goes into the three-byte [cd] test.  That test is *)
 (*     three instructions and [cat f] falls out of it at the second        *)
 (*     ('a' is not 'd'), back into the fork the other two arms use, so the *)
@@ -182,7 +182,7 @@ Section UkShRedirBody.
     UkSh.ush_bstate N γp T Wc Wb Pm l (ws ++ [FileDisc.fd_w_gt; file]) -∗
     ushl_dat -∗ usz γs sz -∗
     ubytes γd sh_buf sh_nbuf f -∗
-    urun N h m (mword_of_int 0x97a) (16 + (UkSh.ush_Dbody + n)) -∗
+    urun N h m (mword_of_int 0x956) (16 + (UkSh.ush_Dbody + n)) -∗
     mWP (Loop : expr riscv_lang).
   Proof using HT HWct Hpay Hpsok_free.
     intros Hregs Hs1 Ha5 Hnn Hnul Hkl Hline Hszlo Hszal Hszok Hpm1 Hpmwb Hwbl.
@@ -306,7 +306,7 @@ Section UkShRedirBody.
           (* EIGHT MORE THAN ECHO'S: the redirect parse is that much
              deeper, and [UkSh.ush_Dbody] carries it (the program stream's
              "one number") *)
-          urun N' h m (mword_of_int 0x9c0)
+          urun N' h m (mword_of_int 0x99c)
             (68 + (8 + (UkShDiag.ush_Dg + n))) -∗
           mWP (Loop : expr riscv_lang)))%I.
 
@@ -362,7 +362,7 @@ Section UkShRedirBody.
   (* =================================================================== *)
   (*  §3b  THE REDIRECT CHILD'S WALK (lane SH-CHILD-2, item 4)            *)
   (*                                                                     *)
-  (*  From 0x9c0 to the exec, at the line the fork lent it.  Two halves:  *)
+  (*  From 0x99c to the exec, at the line the fork lent it.  Two halves:  *)
   (*  [UkShRedirSeam.wp_kshm_child_alloc_redir] -- parse, close(1),       *)
   (*  open(file), and out at runcmd with the EXEC sub-tree and the        *)
   (*  receipt -- and then [UkShEcho.wp_kshr_exec_echo_at_holds] at the    *)
@@ -383,7 +383,7 @@ Section UkShRedirBody.
   Definition ushs_fd1f (ty : fdtype) (l : list fdstate) : Prop :=
     l !! 1%nat = Some (FdOpen false true ty).
 
-  (* [wp_kshm_child_file_redir] -- the walk from 0x9c0 to the child's
+  (* [wp_kshm_child_file_redir] -- the walk from 0x99c to the child's
      exits -- is [UkShRedirChild.v]'s: it is stated on the generic seam, at
      the application's own call ([UkShRedirAns.ush_open_call2]) and the
      paid open-failed diagnostic, neither of which this file sees. *)
@@ -391,15 +391,15 @@ Section UkShRedirBody.
   (* =================================================================== *)
   (*  §3c  THE CAT ARM'S BODY (the program stream; [Hcat_body] discharged) *)
   (*                                                                     *)
-  (*  [cat f] begins with 'c', so 0x97a's [bne a5,s5] is NOT taken and    *)
+  (*  [cat f] begins with 'c', so 0x956's [bne a5,s5] is NOT taken and    *)
   (*  the walk goes into the [cd] test.  That test is THREE instructions  *)
   (*  and it falls out at the second:                                     *)
   (*                                                                     *)
-  (*    0x97a  bne a5,s5,92c   -- NOT taken ('c' IS s5)                   *)
-  (*    0x97e  lbu a5,1(s1)    -- the line's second byte, 'a'             *)
-  (*    0x982  bne a5,s3,92c   -- TAKEN ('a' is not 'd')                  *)
+  (*    0x956  bne a5,s5,92c   -- NOT taken ('c' IS s5)                   *)
+  (*    0x95a  lbu a5,1(s1)    -- the line's second byte, 'a'             *)
+  (*    0x95e  bne a5,s3,92c   -- TAKEN ('a' is not 'd')                  *)
   (*                                                                     *)
-  (*  and 0x92c is the fork, where the echo and redirect arms are.  So    *)
+  (*  and 0x908 is the fork, where the echo and redirect arms are.  So    *)
   (*  the cat arm is the SAME walk with two instructions in front of it   *)
   (*  -- not the 150-300 lines the obligation table priced, because       *)
   (*  [cat f] never reaches [chdir]: [UkShCd.wp_kshc_cd] is deleted and   *)
@@ -472,7 +472,7 @@ Section UkShRedirBody.
       UkSh.ush_bstate N γp T Wc Wb Pm l ws -∗
       ushl_dat -∗ usz γs sz -∗
       ubytes γd sh_buf sh_nbuf f -∗
-      urun N h m (mword_of_int 0x92c) (16 + (UkSh.ush_Dbody + n)) -∗
+      urun N h m (mword_of_int 0x908) (16 + (UkSh.ush_Dbody + n)) -∗
       mWP (Loop : expr riscv_lang).
 
   Lemma wp_kshm_body_ca_with (Hfork : kshf_fork_law)
@@ -509,7 +509,7 @@ Section UkShRedirBody.
     UkSh.ush_bstate N γp T Wc Wb Pm l ws -∗
     ushl_dat -∗ usz γs sz -∗
     ubytes γd sh_buf sh_nbuf f -∗
-    urun N h m (mword_of_int 0x97a) (16 + (UkSh.ush_Dbody + n)) -∗
+    urun N h m (mword_of_int 0x956) (16 + (UkSh.ush_Dbody + n)) -∗
     mWP (Loop : expr riscv_lang).
   Proof using .
     intros HDc Hregs Hs1 Ha5 Hnn Hnul Hkl Hline Hb0 Hb1 Hlen2 Hszlo Hszal Hszok
@@ -522,7 +522,7 @@ Section UkShRedirBody.
     { intros j. pose proof (bv_unsigned_in_range 8 (f j)) as H0.
       assert (Em8 : bv_modulus 8 = 256) by (vm_compute; reflexivity).
       rewrite Em8 in H0. unfold Z64. lia. }
-    (* ---- 0x97a  bne a5,s5 -- NOT taken: the line's first byte IS 'c' ---- *)
+    (* ---- 0x956  bne a5,s5 -- NOT taken: the line's first byte IS 'c' ---- *)
     assert (Htk7a : false = uv_btaken BNE (m !!! Regidx a5_idx)
                               (m !!! Regidx s5_idx)).
     { cbn [uv_btaken]. rewrite Ha5 Hs5 Hb0.
@@ -530,22 +530,22 @@ Section UkShRedirBody.
       rewrite (moi_eq_vec 99 99 ltac:(unfold Z64; lia)
                  ltac:(unfold Z64; lia)).
       reflexivity. }
-    iApply (wp_uk_btype N h m (mword_of_int 0x97a)
+    iApply (wp_uk_btype N h m (mword_of_int 0x956)
               (mword_of_int 8114 : mword 13) s5_idx a5_idx BNE false
-              (mword_of_int 0x92c) (16 + (UkSh.ush_Dbody + n))
+              (mword_of_int 0x908) (16 + (UkSh.ush_Dbody + n))
               Htk7a
               ltac:(apply bv_eq; vm_compute; reflexivity)
               ltac:(intros Hc; discriminate Hc)
               with "[] Hrun").
-    { iApply (UCodeShK.uis_shk_97a with "Hcode"). }
-    assert (E97a : add_vec_int (mword_of_int 0x97a : mword 64) 4
-                   = mword_of_int 0x97e)
+    { iApply (UCodeShK.uis_shk_956 with "Hcode"). }
+    assert (E97a : add_vec_int (mword_of_int 0x956 : mword 64) 4
+                   = mword_of_int 0x95a)
       by (apply bv_eq; vm_compute; reflexivity).
     rewrite E97a. iIntros (h1) "Hrun".
-    (* ---- 0x97e  lbu a5,1(s1) -- the line's second byte ---- *)
+    (* ---- 0x95a  lbu a5,1(s1) -- the line's second byte ---- *)
     iDestruct (ushs_bytes_at (DfracOwn 1) sh_buf sh_nbuf (k + 1)%nat f
                  ltac:(lia) with "Hbuf") as "[Hb Hcl]".
-    iApply (wp_uk_lbu N h1 m (mword_of_int 0x97e)
+    iApply (wp_uk_lbu N h1 m (mword_of_int 0x95a)
               (mword_of_int 1 : mword 12) s1_idx a5_idx (DfracOwn 1)
               (sh_buf + Z.of_nat (k + 1)) (f (k + 1)%nat)
               (16 + (UkSh.ush_Dbody + n))
@@ -555,10 +555,10 @@ Section UkShRedirBody.
                     vm_compute uoff_i12; lia)
               ltac:(vm_compute; discriminate)
               with "[] Hb Hrun").
-    { iApply (UCodeShK.uis_shk_97e with "Hcode"). }
+    { iApply (UCodeShK.uis_shk_95a with "Hcode"). }
     iIntros "Hb". iDestruct ("Hcl" with "Hb") as "Hbuf".
-    assert (E97e : add_vec_int (mword_of_int 0x97e : mword 64) 4
-                   = mword_of_int 0x982)
+    assert (E97e : add_vec_int (mword_of_int 0x95a : mword 64) 4
+                   = mword_of_int 0x95e)
       by (apply bv_eq; vm_compute; reflexivity).
     rewrite E97e. iIntros (h2) "Hrun".
     set (m1 := <[Regidx a5_idx
@@ -580,7 +580,7 @@ Section UkShRedirBody.
     assert (Hs1_1 : m1 !!! Regidx s1_idx
                     = mword_of_int (sh_buf + Z.of_nat k))
       by (rewrite (Hm1 s1_idx ltac:(vm_compute; discriminate)); exact Hs1).
-    (* ---- 0x982  bne a5,s3 -- TAKEN: the second byte is not 'd' ---- *)
+    (* ---- 0x95e  bne a5,s3 -- TAKEN: the second byte is not 'd' ---- *)
     assert (Htk82 : true = uv_btaken BNE (m1 !!! Regidx a5_idx)
                              (m1 !!! Regidx s3_idx)).
     { cbn [uv_btaken].
@@ -590,16 +590,16 @@ Section UkShRedirBody.
       rewrite (moi_eq_vec 97 100 ltac:(unfold Z64; lia)
                  ltac:(unfold Z64; lia)).
       reflexivity. }
-    iApply (wp_uk_btype N h2 m1 (mword_of_int 0x982)
+    iApply (wp_uk_btype N h2 m1 (mword_of_int 0x95e)
               (mword_of_int 8106 : mword 13) s3_idx a5_idx BNE true
-              (mword_of_int 0x92c) (16 + (UkSh.ush_Dbody + n))
+              (mword_of_int 0x908) (16 + (UkSh.ush_Dbody + n))
               Htk82
               ltac:(apply bv_eq; vm_compute; reflexivity)
               ltac:(intros _; vm_compute; reflexivity)
               with "[] Hrun").
-    { iApply (UCodeShK.uis_shk_982 with "Hcode"). }
+    { iApply (UCodeShK.uis_shk_95e with "Hcode"). }
     iIntros (h3) "Hrun".
-    (* ---- 0x92c: the fork, at the cat line's own child law ---- *)
+    (* ---- 0x908: the fork, at the cat line's own child law ---- *)
     iApply (Hfork
               Lp Dc h3 m1 f k len ws sz l n
               HDc Hregs1 Hs1_1 Hnn Hnul Hkl Hline
@@ -642,7 +642,7 @@ Section UkShRedirBody.
     UkSh.ush_bstate N γp T Wc Wb Pm l (FileDisc.uline_ws (FileDisc.LCat nm)) -∗
     ushl_dat -∗ usz γs sz -∗
     ubytes γd sh_buf sh_nbuf f -∗
-    urun N h m (mword_of_int 0x97a) (16 + (UkSh.ush_Dbody + n)) -∗
+    urun N h m (mword_of_int 0x956) (16 + (UkSh.ush_Dbody + n)) -∗
     mWP (Loop : expr riscv_lang).
   Proof using .
     intros HDc Hregs Hs1 Ha5 Hnn Hnul Hkl Hline.
@@ -691,7 +691,7 @@ Section UkShRedirBody.
     UkSh.ush_bstate N γp T Wc Wb Pm l (FileDisc.uline_ws (FileDisc.LCat nm)) -∗
     ushl_dat -∗ usz γs sz -∗
     ubytes γd sh_buf sh_nbuf f -∗
-    urun N h m (mword_of_int 0x97a) (16 + (UkSh.ush_Dbody + n)) -∗
+    urun N h m (mword_of_int 0x956) (16 + (UkSh.ush_Dbody + n)) -∗
     mWP (Loop : expr riscv_lang).
   Proof using HT HWct Hpay Hpsok_free.
     exact (wp_kshm_body_cat_with

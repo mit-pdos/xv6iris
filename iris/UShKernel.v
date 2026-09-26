@@ -170,11 +170,11 @@ Proof.
   cbn [mbind option_bind]. intro H. injection H as H. exact H.
 Qed.
 
-(* sh's two PT_LOADs: (0x0, 0x1c64, 0x1c64, R-X) and (0x2000, 0x10, 0x98, RW-) *)
+(* sh's two PT_LOADs: (0x0, 0x1c74, 0x1c74, R-X) and (0x2000, 0x10, 0x98, RW-) *)
 Lemma sh_loads :
   exists p0 p1 : elf_phdr,
     elf_loads sh_elf = [p0; p1]
-    /\ ep_vaddr p0 = 0 /\ ep_memsz p0 = 0x1c64 /\ ep_flags p0 = 5
+    /\ ep_vaddr p0 = 0 /\ ep_memsz p0 = 0x1c74 /\ ep_flags p0 = 5
     /\ ep_vaddr p1 = 0x2000 /\ ep_memsz p1 = 0x98 /\ ep_flags p1 = 6.
 Proof.
   pose proof (elf_segments_loads sh_elf _ sh_elf_segments) as H.
@@ -212,7 +212,7 @@ Proof.
 Qed.
 
 
-(* the entry, as the resume pc reads it: 0x9d0 is 2-aligned, so [ret_pc]
+(* the entry, as the resume pc reads it: 0x9ac is 4-aligned, so [ret_pc]
    is the identity on it, and [ShData.shEntry] IS [ShSyms.start] *)
 Lemma sh_start_pc :
   ret_pc (mword_of_int ShData.shEntry : mword 64) = mword_of_int ShSyms.start.
@@ -972,7 +972,7 @@ Section UShKernel.
       unfold kexec_seg_pages. rewrite Hld. cbn [take].
       unfold kexec_sz_after. cbn [foldl]. unfold kx_grow, kx_uvmalloc.
       rewrite Hv0 Hm0 Hv1 Hm1. unfold PGSIZE.
-      (* closed arithmetic: [pgroundup 0x1c64 = 0x2000] *)
+      (* closed arithmetic: [pgroundup 0x1c74 = 0x2000] *)
       split; [ reflexivity | zclosed ]. }
     assert (Hperm0 : kexec_seg_perm p0 = MkUperm true false)
       by (unfold kexec_seg_perm; rewrite Hf0; reflexivity).

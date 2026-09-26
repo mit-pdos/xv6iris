@@ -53,6 +53,7 @@ Require User.ShSyms User.ShInstrs.
 Require Import ChildTok.
 Require Import UserFd.
 Require Import UkShParse.
+Require UkShCmdalloc.
 Require Import UkShParseSym.
 Require Import UkShParseCmd.
 Require Import UkShMain.
@@ -273,6 +274,7 @@ Section UkShPipesCmd.
   Context `{Hpay : !ukn_const N}.
   Local Notation γt := (ukn_t N).
   Local Notation γd := (ukn_d N).
+  Local Notation ushp_oom := (UkShCmdalloc.ushp_oom N).
   Context `{!ctokG Σ}.
   Context {SG : uexecSG Σ}.
   Context `{PS : uprogSG Σ}.
@@ -477,7 +479,7 @@ Section UkShPipesCmd.
     ustr γd dw ushp_whitespace 5 ushp_ws_f -∗
     ustr γd dv ushp_symbols 7 ushp_sym_f -∗
     UM i -∗
-    □ (Pex -∗ ukn_pay N (-1)) -∗
+    ushp_oom Pex (20 + (6 + k)) -∗
     Pex -∗
     urun N h m (mword_of_int ShSyms.parseline)
       (6 + (6 + (16 + (24 + (8 + (length rest * 6 + k)))))) -∗
@@ -531,7 +533,7 @@ Section UkShPipesCmd.
     ustr γd dw ushp_whitespace 5 ushp_ws_f -∗
     ustr γd dv ushp_symbols 7 ushp_sym_f -∗
     UM i -∗
-    □ (Pex -∗ ukn_pay N (-1)) -∗
+    ushp_oom Pex (20 + (6 + k)) -∗
     Pex -∗
     urun N h m (mword_of_int ShSyms.parsecmd)
       (8 + (6 + (6 + (16 + (24 + (8 + (length rest * 6 + k))))))) -∗

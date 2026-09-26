@@ -201,7 +201,7 @@ Section UkShLoop.
        UkSh.ush_pstate N γp T Wc Wb Pm l -∗
        ushl_dat γd -∗ usz γs sz -∗
        ubytes γd sh_buf sh_nbuf f -∗
-       urun N h m (mword_of_int 0x938) (16 + (UkSh.ush_Dbody + n)) -∗
+       urun N h m (mword_of_int 0x914) (16 + (UkSh.ush_Dbody + n)) -∗
        mWP (Loop : expr riscv_lang))%I.
 
   (* [UkSh.ush_rest]'s opaque [R], AT THIS SHELL.  The re-cut left [R] a
@@ -239,21 +239,21 @@ Section UkShLoop.
   (* [ushl_head_later] is [ushl_head] with the process state -- and so the *)
   (* era's write credential inside it -- under a [▷].  It is what a caller *)
   (* that redeems its child's exit payload with the plain                  *)
-  (* [ChildTok.gen_pay] at 0x938 would need, and SS4.3o rules it a generic *)
+  (* [ChildTok.gen_pay] at 0x914 would need, and SS4.3o rules it a generic *)
   (* addition over [UkRunLeaf.wp_uk_cmv_later].                            *)
   (*                                                                       *)
   (* IT IS NOT DERIVABLE FROM [ushl_head], and the reason is the head's    *)
   (* own first instruction.  A [▷] is strippable only at a later-providing *)
-  (* step; the step available at 0x938 is [0x938 c.mv a1,s3] itself        *)
+  (* step; the step available at 0x914 is [0x914 c.mv a1,s3] itself        *)
   (* ([UkRunLeaf.wp_uk_cmv_later]), and taking it CONSUMES the head's      *)
-  (* first instruction and leaves the walk at 0x93a, where [ushl_head] --  *)
-  (* stated at [urun ... (mword_of_int 0x938) ...] -- no longer applies.   *)
-  (* The loop offers no entry point at 0x93a; [UkSh.wp_ksh_getcmd] is      *)
+  (* first instruction and leaves the walk at 0x916, where [ushl_head] --  *)
+  (* stated at [urun ... (mword_of_int 0x914) ...] -- no longer applies.   *)
+  (* The loop offers no entry point at 0x916; [UkSh.wp_ksh_getcmd] is      *)
   (* reachable only with [UkSh.ush_read_leaf], which needs the era's       *)
   (* [ukn_pay N = ucons_pay ...] equation that [UkSh.ush_rest_l_at] does   *)
   (* not pass to a body law; and a walk that cannot re-enter cannot close. *)
-  (* So the later has to be paid BEFORE 0x938 -- inside [wait], at         *)
-  (* [0xc94 c.jr ra] ([UkShPipeWait.wp_kshr_wait_pid_later]) -- and this   *)
+  (* So the later has to be paid BEFORE 0x914 -- inside [wait], at         *)
+  (* [0xc70 c.jr ra] ([UkShPipeWait.wp_kshr_wait_pid_later]) -- and this   *)
   (* definition stays as the record of what route (a) asked for.           *)
   (*                                                                       *)
   (* What IS true, and is all that is: the latered head is STRICTLY        *)
@@ -269,7 +269,7 @@ Section UkShLoop.
        ▷ UkSh.ush_pstate N γp T Wc Wb Pm l -∗
        ushl_dat γd -∗ usz γs sz -∗
        ubytes γd sh_buf sh_nbuf f -∗
-       urun N h m (mword_of_int 0x938) (16 + (UkSh.ush_Dbody + n)) -∗
+       urun N h m (mword_of_int 0x914) (16 + (UkSh.ush_Dbody + n)) -∗
        mWP (Loop : expr riscv_lang))%I.
 
   Lemma ushl_head_of_later (T : iProp Σ)

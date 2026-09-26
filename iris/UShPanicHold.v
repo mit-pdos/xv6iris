@@ -53,7 +53,7 @@ Require User.ShSyms.
    on top and [++] would elaborate as String.append *)
 Local Open Scope list_scope.
 
-Local Lemma shp_write : ShSyms.write = 0xca6%Z.
+Local Lemma shp_write : ShSyms.write = 0xc82%Z.
 Proof. reflexivity. Qed.
 
 (* THE TWO CONSTANT ALTERNATIVES' LENGTHS (lane LINK-GEN).  [FileDisc.cont]

@@ -77,11 +77,11 @@ Section UkShDiagAt.
     (* the alternative is long enough for the whole block... *)
     (forall p : nat, (p < 13 + length cmd)%nat -> dg !! p = Some (dg !!! p)) ->
     (* ...and its bytes ARE the literal around the name *)
-    (forall p : nat, (p < 5)%nat -> UkShDiag.shd_lit 0x12b8 p = dg !!! p) ->
+    (forall p : nat, (p < 5)%nat -> UkShDiag.shd_lit 0x1298 p = dg !!! p) ->
     (forall j : nat, (j < length cmd)%nat ->
        cmd !!! j = dg !!! (5 + j)%nat) ->
     (forall p : nat, (7 <= p < 15)%nat ->
-       UkShDiag.shd_lit 0x12b8 p = dg !!! (p + (length cmd - 2))%nat) ->
+       UkShDiag.shd_lit 0x1298 p = dg !!! (p + (length cmd - 2))%nat) ->
     UkShDiag.ush_execfail_law_at dg (13 + length cmd)%nat Cr Cd -∗
     shk_code (ukn_t N) -∗
     shk_rodata (ukn_t N) -∗
@@ -124,10 +124,10 @@ Section UkShDiagAt.
                  (ua_ptr x) (ua_len x) (ua_bytes x)
                  with "Hxs") as "#Hs".
     assert (Hlitsdc : UkShDiag.shd_die_lits 0xdc 0xe0 0xe4 0xe6 0xea 0xec
-                      (mword_of_int 1 : mword 20) (mword_of_int 476 : mword 12)
-                      (mword_of_int 4044 : mword 21) (mword_of_int 2970 : mword 21)
+                      (mword_of_int 1 : mword 20) (mword_of_int 444 : mword 12)
+                      (mword_of_int 4008 : mword 21) (mword_of_int 2934 : mword 21)
                       (mword_of_int 0 : mword 6)
-                      0x12b8 15%nat 5%nat)
+                      0x1298 15%nat 5%nat)
       by shd_die_solve.
     set (C1 := (fun p : nat => UserFd.ustd (ukn_fd N) l ∗ Pf p)%I).
     set (C2 := (fun p : nat => UserFd.ustd (ukn_fd N) l ∗ Pf (5 + p)%nat)%I).
@@ -142,10 +142,10 @@ Section UkShDiagAt.
       reflexivity. }
     iApply (UkShDiag.wp_kshd_die_chain N false DfracDiscarded
               0xdc 0xe0 0xe4 0xe6 0xea 0xec
-              (mword_of_int 1 : mword 20) (mword_of_int 476 : mword 12)
-              (mword_of_int 4044 : mword 21) (mword_of_int 2970 : mword 21)
+              (mword_of_int 1 : mword 20) (mword_of_int 444 : mword 12)
+              (mword_of_int 4008 : mword 21) (mword_of_int 2934 : mword 21)
               (mword_of_int 0 : mword 6)
-              0x12b8 15%nat 5%nat
+              0x1298 15%nat 5%nat
               (ua_ptr x) (ua_len x) (ua_bytes x) C1 C2 C3 h1 m1 (n + 2)
               Hlitsdc
               ltac:(lia)
@@ -191,7 +191,7 @@ End UkShDiagAt.
 Definition ush_execfail_bytes (dg cmd : list (bv 8)) : Prop :=
   (2 <= length cmd)%nat
   /\ (forall p : nat, (p < 13 + length cmd)%nat -> dg !! p = Some (dg !!! p))
-  /\ (forall p : nat, (p < 5)%nat -> UkShDiag.shd_lit 0x12b8 p = dg !!! p)
+  /\ (forall p : nat, (p < 5)%nat -> UkShDiag.shd_lit 0x1298 p = dg !!! p)
   /\ (forall j : nat, (j < length cmd)%nat -> cmd !!! j = dg !!! (5 + j)%nat)
   /\ (forall p : nat, (7 <= p < 15)%nat ->
-        UkShDiag.shd_lit 0x12b8 p = dg !!! (p + (length cmd - 2))%nat).
+        UkShDiag.shd_lit 0x1298 p = dg !!! (p + (length cmd - 2))%nat).

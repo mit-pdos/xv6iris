@@ -92,7 +92,7 @@ Require User.ShSyms.
    on top and [++] would elaborate as String.append *)
 Local Open Scope list_scope.
 
-Local Lemma shp_write : ShSyms.write = 0xca6%Z.
+Local Lemma shp_write : ShSyms.write = 0xc82%Z.
 Proof. reflexivity. Qed.
 
 (* THE TWO CONSTANT ALTERNATIVES' LENGTHS (lane LINK-GEN).  [FileDisc.cont]
@@ -209,14 +209,14 @@ Section UShPanicGen.
   Proof using .
     iIntros "#Hcode Hrun Hsb Hstd Hbuf Hcont".
     rewrite shp_write.
-    (* ---- 0xca6  c.li a7,16 ---- *)
-    iApply (wp_uk_cli N h m (mword_of_int 0xca6)
+    (* ---- 0xc82  c.li a7,16 ---- *)
+    iApply (wp_uk_cli N h m (mword_of_int 0xc82)
               (mword_of_int 16 : mword 6) a7_idx avail
               ltac:(unfold unot_sp; vm_compute; discriminate)
               ltac:(vm_compute; discriminate) with "[] Hrun").
-    { iApply (uis_shk_ca6 with "Hcode"). }
-    assert (Eca6 : add_vec_int (mword_of_int 0xca6 : mword 64) 2
-                   = mword_of_int 0xca8)
+    { iApply (uis_shk_c82 with "Hcode"). }
+    assert (Eca6 : add_vec_int (mword_of_int 0xc82 : mword 64) 2
+                   = mword_of_int 0xc84)
       by (apply bv_eq; vm_compute; reflexivity).
     assert (Em : <[Regidx a7_idx
                    := regval_into_reg (sign_extend' 64 (mword_of_int 16 : mword 6)
@@ -229,8 +229,8 @@ Section UShPanicGen.
     assert (Hm1a1 : m1 !!! Regidx a1_idx = m !!! Regidx a1_idx)
       by exact (upd_ne m (Regidx a7_idx) (Regidx a1_idx) _
                   ltac:(vm_compute; discriminate)).
-    (* ---- 0xca8  ecall -- THE CHAIN-PAYING WRITE, with the run ---- *)
-    iApply (wp_uk_ecall_write_chain_buf N h1 m1 (mword_of_int 0xca8) avail
+    (* ---- 0xc84  ecall -- THE CHAIN-PAYING WRITE, with the run ---- *)
+    iApply (wp_uk_ecall_write_chain_buf N h1 m1 (mword_of_int 0xc84) avail
               fdep l dq nb fb
               ltac:(unfold m1, usysno;
                     rewrite (upd_eq m (Regidx a7_idx)
@@ -238,15 +238,15 @@ Section UShPanicGen.
                     vm_compute; reflexivity)
               ltac:(vm_compute; reflexivity)
               with "[] Hrun Hsb Hstd [Hbuf]").
-    { iApply (uis_shk_ca8 with "Hcode"). }
+    { iApply (uis_shk_c84 with "Hcode"). }
     { rewrite Hm1a1. iExact "Hbuf". }
-    assert (Eca8 : add_vec_int (mword_of_int 0xca8 : mword 64) 4
-                   = mword_of_int 0xcac)
+    assert (Eca8 : add_vec_int (mword_of_int 0xc84 : mword 64) 4
+                   = mword_of_int 0xc88)
       by (apply bv_eq; vm_compute; reflexivity).
     rewrite Eca8.
     iIntros (h2 ret W cw' cs') "%Ha0 %Ha1 %Ha2 %Htk %Hlz %Hnf Hstd Hbuf Hpost Hrun".
     set (m2 := <[Regidx a0_idx := ret]> m1).
-    (* ---- 0xcac  c.jr ra ---- *)
+    (* ---- 0xc88  c.jr ra ---- *)
     assert (Hra : m2 !!! Regidx ra_idx = m !!! Regidx ra_idx).
     { unfold m2, m1.
       exact (eq_trans
@@ -255,12 +255,12 @@ Section UShPanicGen.
                (upd_ne m (Regidx a7_idx) (Regidx ra_idx)
                   (mword_of_int 16 : mword 64)
                   ltac:(vm_compute; discriminate))). }
-    iApply (wp_uk_cjr N h2 m2 (mword_of_int 0xcac) ra_idx
+    iApply (wp_uk_cjr N h2 m2 (mword_of_int 0xc88) ra_idx
               (ret_pc (m !!! Regidx ra_idx)) avail
               ltac:(vm_compute; discriminate)
               ltac:(rewrite Hra; reflexivity)
               with "[] Hrun").
-    { iApply (uis_shk_cac with "Hcode"). }
+    { iApply (uis_shk_c88 with "Hcode"). }
     iIntros (h3) "Hrun".
     (* the three argument words are the CALLER's: the stub writes a7 and
        then a0, and neither is a0/a1/a2 before the bump *)
@@ -477,7 +477,7 @@ Section UShPanicGen.
     assert (Hua : uint (m !!! Regidx a1_idx) = sh_prompt_pv)
       by (rewrite Ha1; apply uint_moi; unfold UkSh.sh_prompt_pv, Z64; lia).
     (* the two keys the console chain is indexed by, as plain addresses:
-       the buffer is a .rodata literal at 0x1290, so neither add wraps *)
+       the buffer is a .rodata literal at 0x1270, so neither add wraps *)
     assert (Havi0 : uint (add_vec_int (m !!! Regidx a1_idx) (Z.of_nat 0))
                     = sh_prompt_pv).
     { assert (Hhi : uint (m !!! Regidx a1_idx) + Z.of_nat 0

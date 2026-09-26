@@ -35,7 +35,7 @@
        segment with no file window.
 
      - The ENTRY IS NOT THE LOWEST TEXT ADDRESS ([syncEntry] = 0x12,
-       [echoEntry] = 0x7c, [shEntry] = 0x9d0, [initEntry] = 0xbc,
+       [echoEntry] = 0x7c, [shEntry] = 0x9ac, [initEntry] = 0xbc,
        [catEntry] = 0xf6): xv6
        links `start` ahead of `main`, and [elf_entry] must report the
        header's [e_entry], not [elf_mem_base].
@@ -329,7 +329,7 @@ Proof. rewrite echo_elf_image, echo_elf_zero_image. reflexivity. Qed.
 (* ====================================================================== *)
 (*  sh                                                                    *)
 (*                                                                        *)
-(*  The interesting one: entry 0x9d0; loads (0x0, 0x1c64, 0x1c64, R-X)    *)
+(*  The interesting one: entry 0x9ac; loads (0x0, 0x1c74, 0x1c74, R-X)    *)
 (*  and (0x2000, 0x10, 0x98, RW-).  The writable segment has a NONEMPTY   *)
 (*  file window (0x10 bytes of .data) AND a .bss tail, so BOTH legs of    *)
 (*  [seg_map] are nonempty for it and both segments contribute to         *)
@@ -368,7 +368,7 @@ Lemma sh_elf_rodata_end :
   elf_rodata_end sh_elf = Some ShData.shRodataEnd.
 Proof. vm_eq. Qed.
 
-(* Here the fold really is over two nonempty file windows: [0x0, 0x1c64)
+(* Here the fold really is over two nonempty file windows: [0x0, 0x1c74)
    from the text segment and [0x2000, 0x2010) from the writable one.  The
    dump's split puts the latter entirely in [sh_data] (whose top is
    0x2010), so this equality checks the [∪] across segments too. *)

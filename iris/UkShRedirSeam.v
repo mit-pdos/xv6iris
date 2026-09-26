@@ -45,6 +45,7 @@ Require Import RefParseSym.    (* [ref_parsecmd_redir]: the redirect line at the
 Require Import UkShRedirs.      (* [ushp_malloc_chain] *)
 Require Import UkShParser.      (* [ushp_zero_at]: the reference's cut *)
 Require Import UkShSeam.        (* THE SEAM AND THE CHILD, once *)
+Require UkShCmdalloc.
 Require Import UkShRun.
 Require Import UkShDiag.
 Require Import UkShMalloc.
@@ -375,9 +376,9 @@ Section UkShRedirSeam.
   (* ===================================================================== *)
   (* §3 THE CHILD, at the redirect shape.                                   *)
   (*                                                                       *)
-  (*   0x9c0  c.mv a0,s1        the line                                    *)
-  (*   0x9c2  jal  ra,parsecmd  -> the REDIR node over the exec node        *)
-  (*   0x9c6  jal  ra,runcmd    -> close(1), open(file), and the sub-tree   *)
+  (*   0x99c  c.mv a0,s1        the line                                    *)
+  (*   0x99e  jal  ra,parsecmd  -> the REDIR node over the exec node        *)
+  (*   0x9a2  jal  ra,runcmd    -> close(1), open(file), and the sub-tree   *)
   (*                                                                       *)
   (* [UkShMain.wp_kshm_child]'s two parser premises become [ushs_redir] /   *)
   (* [ushs_toks] (and the count is bounded BELOW as well, because the       *)
@@ -434,12 +435,14 @@ Section UkShRedirSeam.
     UM0 -∗
     UkShRedir.ush_open_call_g N cwdv (ushs_file s0 len f args gp fe) 1537
       (<[1%nat := FdClosed]> ld) H K Kf -∗
-    □ (Cr -∗ ukn_pay N (-1)) -∗
-    (* THE LEND SPLITS AT THE CALL: whole across the parse (it pays the
-       parser's exits), and then what the open is handed and the rest *)
+    (* the out-of-memory law, at the parse's own budget (a REDIR line's
+       room is 72; [UkShSeam.wp_ref_child_redir]) *)
+    UkShCmdalloc.ushp_oom N Cr (4 + (UkShDiag.ush_Dg + n) - 2) -∗
+    (* THE LEND SPLITS AT THE CALL: whole across the parse (it is the
+       out-of-memory law's), and then what the open is handed and the rest *)
     (Cr -∗ H ∗ Cr') -∗
     Cr -∗
-    urun N h m (mword_of_int 0x9c0)
+    urun N h m (mword_of_int 0x99c)
       (68 + (8 + (UkShDiag.ush_Dg + n))) -∗
     ((∀ (h' : CpuId) (m' : regfile) (q : Z) (ty : fdtype),
        ⌜ m' !!! Regidx a0_idx = (mword_of_int q : mword 64) ⌝ -∗
@@ -530,9 +533,12 @@ Section UkShRedirSeam.
     UM0 -∗
     UkShRedir.ush_open_call N cwdv (s0 + Z.of_nat (S (S gp))) 1537
       (<[1%nat := FdClosed]> ld) K -∗
+    (* the law the FAILED OPEN's diagnostic pays the exit with, and the
+       out-of-memory law the parse hands its run to *)
     □ (Cr -∗ ukn_pay N (-1)) -∗
+    UkShCmdalloc.ushp_oom N Cr (4 + (UkShDiag.ush_Dg + n) - 2) -∗
     Cr -∗
-    urun N h m (mword_of_int 0x9c0)
+    urun N h m (mword_of_int 0x99c)
       (68 + (8 + (UkShDiag.ush_Dg + n))) -∗
     (∀ (h' : CpuId) (m' : regfile) (q : Z) (ty : fdtype),
        ⌜ m' !!! Regidx a0_idx = (mword_of_int q : mword 64) ⌝ -∗
@@ -551,13 +557,13 @@ Section UkShRedirSeam.
   Proof using Hpay.
     intros Hs1 Hred Htoks Hpos Htlen Hs0 Hs64 Hs38 Hst1 Hne Hnp.
     iIntros "#Hdp #Hcode #Hjt #Hpcode #Hpro Hline Hws Hsy Hstd Hcwd HM Hopen
-             #Hpxw Hcr Hrun Hcont".
+             #Hpxw #Hoom Hcr Hrun Hcont".
     iDestruct (ush_jtab_ro with "Hjt") as "#Hro".
     iApply (wp_kshm_child_redir_g UM0 UM1 UM2 Hm0 Hm1 h m dw dv s0 cwdv len f
               args gp fe ld st1 n emp%I K emp%I Cr Cr
               Hs1 Hred Htoks Hpos Htlen Hs0 Hs64 Hs38 Hst1 Hne Hnp
               with "Hcode Hjt Hpcode Hpro Hline Hws Hsy Hstd Hcwd HM [Hopen]
-                    Hpxw [] Hcr Hrun [Hcont]").
+                    Hoom [] Hcr Hrun [Hcont]").
     - iApply (UkShRedir.ush_open_call_g_of N cwdv
                 (ushs_file s0 len f args gp fe) 1537
                 (<[1%nat := FdClosed]> ld) K with "Hopen").
@@ -640,10 +646,10 @@ Section UkShRedirSeam.
     UkShMalloc.ushm_fresh N sz -∗
     UkShRedir.ush_open_call_g N cwdv (ushs_file s0 len f args gp fe) 1537
       (<[1%nat := FdClosed]> ld) H K Kf -∗
-    □ (Cr -∗ ukn_pay N (-1)) -∗
+    UkShCmdalloc.ushp_oom N Cr (4 + (UkShDiag.ush_Dg + n) - 2) -∗
     (Cr -∗ H ∗ Cr') -∗
     Cr -∗
-    urun N h m (mword_of_int 0x9c0)
+    urun N h m (mword_of_int 0x99c)
       (68 + (8 + (UkShDiag.ush_Dg + n))) -∗
     ((∀ (h' : CpuId) (m' : regfile) (q : Z) (ty : fdtype),
        ⌜ m' !!! Regidx a0_idx = (mword_of_int q : mword 64) ⌝ -∗
@@ -724,9 +730,12 @@ Section UkShRedirSeam.
     UkShMalloc.ushm_fresh N sz -∗
     UkShRedir.ush_open_call N cwdv (s0 + Z.of_nat (S (S gp))) 1537
       (<[1%nat := FdClosed]> ld) K -∗
+    (* the law the FAILED OPEN's diagnostic pays the exit with, and the
+       out-of-memory law the parse hands its run to *)
     □ (Cr -∗ ukn_pay N (-1)) -∗
+    UkShCmdalloc.ushp_oom N Cr (4 + (UkShDiag.ush_Dg + n) - 2) -∗
     Cr -∗
-    urun N h m (mword_of_int 0x9c0)
+    urun N h m (mword_of_int 0x99c)
       (68 + (8 + (UkShDiag.ush_Dg + n))) -∗
     (∀ (h' : CpuId) (m' : regfile) (q : Z) (ty : fdtype),
        ⌜ m' !!! Regidx a0_idx = (mword_of_int q : mword 64) ⌝ -∗
@@ -746,7 +755,7 @@ Section UkShRedirSeam.
     intros Hs1 Hred Htoks Hpos Htlen Hs0 Hs64 Hs38 Hst1 Hne Hnp
            Hszlo Hszal Hszok.
     iIntros "#Hdp #Hcode #Hjt #Hpcode #Hpro Hline Hws Hsy Hstd Hcwd HM Hopen
-             #Hpxw Hcr Hrun Hcont".
+             #Hpxw #Hoom Hcr Hrun Hcont".
     iApply (wp_kshm_child_redir
               (UkShMalloc.ushm_fresh N sz)
               (UkShMalloc.ushm_one_ge N (sz + 65536) 4084)
@@ -757,7 +766,7 @@ Section UkShRedirSeam.
               h m dw dv s0 cwdv len f args gp fe ld st1 n K Cr
               Hs1 Hred Htoks Hpos Htlen Hs0 Hs64 Hs38 Hst1 Hne Hnp
               with "Hdp Hcode Hjt Hpcode Hpro Hline Hws Hsy Hstd Hcwd HM
-                    Hopen Hpxw Hcr Hrun Hcont").
+                    Hopen Hpxw Hoom Hcr Hrun Hcont").
   Qed.
 
 End UkShRedirSeam.

@@ -66,6 +66,7 @@ Require Import FsImg.            (* [ROOTINO] -- the cwd the pin resolves at *)
 Require Import UexecSG.          (* [uexecSG] / [uprogSG]: the deposit class *)
 Require Import CtxIdDefs.
 Require User.ShSyms User.ShInstrs.
+Require UkShCmdalloc.
 Require Import ChildTok.
 Local Open Scope Z_scope.
 Import Defs.
@@ -713,7 +714,7 @@ Section UkShEcho.
         UserCwd.ucwd (ukn_cwd N) c -∗
         udepw_at_refR N
           (<[Regidx (mword_of_int 17 : mword 5) := (mword_of_int 7 : mword 64)]> m)
-          (mword_of_int 0xcc0) c R -∗
+          (mword_of_int 0xc9c) c R -∗
         (∀ h' : CpuId,
            UserCwd.ucwd (ukn_cwd N) c -∗
            (* ...AND THE REFUND (step 4), at the shape the supplier named
@@ -886,34 +887,34 @@ Section UkShEcho.
   Proof using .
     intros N Hc h m c avail.
     iIntros "#Hcode Hrun Hcwd Hsbx Hcont".
-    assert (Hexec : ShSyms.exec = 0xcbe)
+    assert (Hexec : ShSyms.exec = 0xc9a)
       by (destruct shk_syms_pins
             as (_&_&_&_&_&_&_&_&_&_&_&_&_&H&_); exact H).
     rewrite Hexec.
-    iApply (wp_uk_cli N h m (mword_of_int 0xcbe)
+    iApply (wp_uk_cli N h m (mword_of_int 0xc9a)
               (mword_of_int 7 : mword 6) a7_idx avail
               ltac:(unfold unot_sp; vm_compute; discriminate)
               ltac:(vm_compute; discriminate) with "[] Hrun").
-    { iApply (uis_shk_cbe with "Hcode"). }
+    { iApply (uis_shk_c9a with "Hcode"). }
     assert (Em : <[Regidx a7_idx
                    := regval_into_reg (sign_extend' 64
                         (mword_of_int 7 : mword 6) : mword 64)]> m
                  = <[Regidx a7_idx := (mword_of_int 7 : mword 64)]> m)
       by (f_equal; apply bv_eq; vm_compute; reflexivity).
-    assert (E0 : add_vec_int (mword_of_int 0xcbe : mword 64) 2
-                 = mword_of_int 0xcc0)
+    assert (E0 : add_vec_int (mword_of_int 0xc9a : mword 64) 2
+                 = mword_of_int 0xc9c)
       by (apply bv_eq; vm_compute; reflexivity).
     rewrite E0 Em. iIntros (h1) "Hrun".
     set (m1 := <[Regidx a7_idx := (mword_of_int 7 : mword 64)]> m).
-    iApply (wp_uk_ecall_exec_at_cwd_refR N h1 m1 (mword_of_int 0xcc0) avail c R
+    iApply (wp_uk_ecall_exec_at_cwd_refR N h1 m1 (mword_of_int 0xc9c) avail c R
               ltac:(rewrite /m1 /usysno
                       (upd_eq m (Regidx a7_idx) (mword_of_int 7 : mword 64));
                     vm_compute; reflexivity)
               ltac:(vm_compute; reflexivity)
               with "[] Hrun Hcwd Hsbx").
-    { iApply (uis_shk_cc0 with "Hcode"). }
-    assert (E1 : add_vec_int (mword_of_int 0xcc0 : mword 64) 4
-                 = mword_of_int 0xcc4)
+    { iApply (uis_shk_c9c with "Hcode"). }
+    assert (E1 : add_vec_int (mword_of_int 0xc9c : mword 64) 4
+                 = mword_of_int 0xca0)
       by (apply bv_eq; vm_compute; reflexivity).
     (* the failed exec's refund goes on to the continuation (step 4) *)
     rewrite E1. iIntros (h2) "Hcwd Hpay Hrun".
@@ -926,12 +927,12 @@ Section UkShEcho.
                (upd_ne m (Regidx a7_idx) (Regidx ra_idx)
                   (mword_of_int 7 : mword 64)
                   ltac:(vm_compute; discriminate))). }
-    iApply (wp_uk_cjr N h2 m2 (mword_of_int 0xcc4) ra_idx
+    iApply (wp_uk_cjr N h2 m2 (mword_of_int 0xca0) ra_idx
               (ret_pc (m !!! Regidx ra_idx)) avail
               ltac:(vm_compute; discriminate)
               ltac:(rewrite Hra; reflexivity)
               with "[] Hrun").
-    { iApply (uis_shk_cc4 with "Hcode"). }
+    { iApply (uis_shk_ca0 with "Hcode"). }
     iIntros (h3) "Hrun". iApply ("Hcont" $! h3 with "Hcwd Hpay Hrun").
   Qed.
 
@@ -1032,7 +1033,7 @@ Section UkShEcho.
                                      : mword 64)]> k1).
     (* ---- 0xd6  jal ra,exec ---- *)
     iApply (wp_kshr_jal N h4 k2 0xd6 ShSyms.exec 0xda
-              (mword_of_int 3048 : mword 21) (2 + (UkShDiag.ush_Dg + n))
+              (mword_of_int 3012 : mword 21) (2 + (UkShDiag.ush_Dg + n))
               ltac:(apply bv_eq; vm_compute; reflexivity)
               ltac:(apply bv_eq; vm_compute; reflexivity)
               ltac:(vm_compute; reflexivity)
@@ -1069,12 +1070,12 @@ Section UkShEcho.
        altitude (durable-notes, "A compile that never finishes"). *)
     iAssert (udepw_at_refR N
                (<[Regidx a7_idx := (mword_of_int 7 : mword 64)]> k3)
-               (mword_of_int 0xcc0) FsImg.ROOTINO
+               (mword_of_int 0xc9c) FsImg.ROOTINO
                (UserFd.ustd (ukn_fd N) ld ∗ Cr))
       with "[Hstd Hcr]" as "Hdepx".
     { iApply ("Hexs" $! N
                 (<[Regidx a7_idx := (mword_of_int 7 : mword 64)]> k3)
-                (mword_of_int 0xcc0) s0 t g ld
+                (mword_of_int 0xc9c) s0 t g ld
                 with "[%] [%] [%] [%] [%] Hstd Htree Hcr").
       - exact Hpeq.
       - (* [echo_off 0] IS 0; the supply names the token's base, the load
@@ -1223,7 +1224,7 @@ Section UkShEcho.
                                      : mword 64)]> k1).
     (* ---- 0xd6  jal ra,exec ---- *)
     iApply (wp_kshr_jal N h4 k2 0xd6 ShSyms.exec 0xda
-              (mword_of_int 3048 : mword 21) (2 + (UkShDiag.ush_Dg + n))
+              (mword_of_int 3012 : mword 21) (2 + (UkShDiag.ush_Dg + n))
               ltac:(apply bv_eq; vm_compute; reflexivity)
               ltac:(apply bv_eq; vm_compute; reflexivity)
               ltac:(vm_compute; reflexivity)
@@ -1260,12 +1261,12 @@ Section UkShEcho.
        altitude (durable-notes, "A compile that never finishes"). *)
     iAssert (udepw_at_refR N
                (<[Regidx a7_idx := (mword_of_int 7 : mword 64)]> k3)
-               (mword_of_int 0xcc0) FsImg.ROOTINO
+               (mword_of_int 0xc9c) FsImg.ROOTINO
                (UserFd.ustd_at (ukn_fd N) ld v ∗ Cr))
       with "[Hstd Hcr]" as "Hdepx".
     { iApply ("Hexs" $! N
                 (<[Regidx a7_idx := (mword_of_int 7 : mword 64)]> k3)
-                (mword_of_int 0xcc0) s0 t g ld
+                (mword_of_int 0xc9c) s0 t g ld
                 with "[%] [%] [%] [%] [%] Hstd Htree Hcr").
       - exact Hpeq.
       - (* [echo_off 0] IS 0; the supply names the token's base, the load
@@ -1328,14 +1329,14 @@ Section UkShEcho.
       assert (Hl : (p < length alt_execfail)%nat) by (vm_compute in Hp |- *; lia).
       exact (list_lookup_lookup_total_lt alt_execfail p Hl).
     - intros p Hp.
-      apply (UkShDiag.ush_bytes_of_forallb (UkShDiag.shd_lit 0x12b8)
+      apply (UkShDiag.ush_bytes_of_forallb (UkShDiag.shd_lit 0x1298)
                (fun q : nat => alt_execfail !!! q) 0%nat 5%nat);
         [ vm_compute; reflexivity | lia ].
     - intros j Hj.
       assert (Hj4 : (j < 4)%nat) by (vm_compute in Hj; lia).
       destruct j as [| [| [| [| j]]]]; try lia; vm_compute; reflexivity.
     - intros p Hp.
-      apply (UkShDiag.ush_bytes_of_forallb (UkShDiag.shd_lit 0x12b8)
+      apply (UkShDiag.ush_bytes_of_forallb (UkShDiag.shd_lit 0x1298)
                (fun q : nat => alt_execfail !!! (q + 2)%nat) 7%nat 8%nat);
         [ vm_compute; reflexivity | lia ].
   Qed.
@@ -1414,10 +1415,11 @@ Section UkShEcho.
          nowhere *)
       ⊢ shk_code (ukn_t N) -∗
         sh_exec_sup_echo_at Fd1 ws Q Cr -∗
-        (* what the lend pays where the parser's walk DIES (the null store
-           at [memset]) -- and the diagnostic's law and what its end pays
-           where the exec FAILED (M4b(2)) *)
-        □ (Cr -∗ Q (-1)) -∗
+        (* the out-of-memory law: what the lend does where the parser's walk
+           finds no memory ([UkShCmdalloc.ushp_oom], at [panic]'s entry;
+           upstream d66e41c) -- and the diagnostic's law and what its end
+           pays where the exec FAILED (M4b(2)) *)
+        UkShCmdalloc.ushp_oom N Cr (18 + (8 + (UkShDiag.ush_Dg + n))) -∗
         UkShDiag.ush_execfail_law_at dg (13 + length (ws !!! 0%nat))%nat
           Cr Cd -∗
         □ (Cd -∗ Q (-1)) -∗
@@ -1430,7 +1432,7 @@ Section UkShEcho.
         UserChildren.uch_any (ukn_ch N) -∗
         UkShMalloc.ushm_fresh N sz -∗
         Cr -∗
-        urun N h m (mword_of_int 0x9c0)
+        urun N h m (mword_of_int 0x99c)
           (60 + (8 + (UkShDiag.ush_Dg + n))) -∗
         mWP (Loop : expr riscv_lang).
 
@@ -1457,10 +1459,11 @@ Section UkShEcho.
          nowhere *)
       ⊢ shk_code (ukn_t N) -∗
         sh_exec_sup_echo_at_v Fd1 ws Q Cr v -∗
-        (* what the lend pays where the parser's walk DIES (the null store
-           at [memset]) -- and the diagnostic's law and what its end pays
-           where the exec FAILED (M4b(2)) *)
-        □ (Cr -∗ Q (-1)) -∗
+        (* the out-of-memory law: what the lend does where the parser's walk
+           finds no memory ([UkShCmdalloc.ushp_oom], at [panic]'s entry;
+           upstream d66e41c) -- and the diagnostic's law and what its end
+           pays where the exec FAILED (M4b(2)) *)
+        UkShCmdalloc.ushp_oom N Cr (18 + (8 + (UkShDiag.ush_Dg + n))) -∗
         UkShDiag.ush_execfail_law_at dg (13 + length (ws !!! 0%nat))%nat
           Cr Cd -∗
         □ (Cd -∗ Q (-1)) -∗
@@ -1473,7 +1476,7 @@ Section UkShEcho.
         UserChildren.uch_any (ukn_ch N) -∗
         UkShMalloc.ushm_fresh N sz -∗
         Cr -∗
-        urun N h m (mword_of_int 0x9c0)
+        urun N h m (mword_of_int 0x99c)
           (60 + (8 + (UkShDiag.ush_Dg + n))) -∗
         mWP (Loop : expr riscv_lang).
 
@@ -1497,10 +1500,11 @@ Section UkShEcho.
          nowhere *)
       ⊢ shk_code (ukn_t N) -∗
         sh_exec_sup_echo ws Q Cr -∗
-        (* what the lend pays where the parser's walk DIES (the null store
-           at [memset]) -- and the diagnostic's law and what its end pays
-           where the exec FAILED (M4b(2)) *)
-        □ (Cr -∗ Q (-1)) -∗
+        (* the out-of-memory law: what the lend does where the parser's walk
+           finds no memory ([UkShCmdalloc.ushp_oom], at [panic]'s entry;
+           upstream d66e41c) -- and the diagnostic's law and what its end
+           pays where the exec FAILED (M4b(2)) *)
+        UkShCmdalloc.ushp_oom N Cr (18 + (8 + (UkShDiag.ush_Dg + n))) -∗
         UkShDiag.ush_execfail_law Cr Cd -∗
         □ (Cd -∗ Q (-1)) -∗
         shp_code (ukn_t N) -∗ shp_rodata (ukn_t N) -∗ ush_jtab (ukn_t N) -∗
@@ -1512,7 +1516,7 @@ Section UkShEcho.
         UserChildren.uch_any (ukn_ch N) -∗
         UkShMalloc.ushm_fresh N sz -∗
         Cr -∗
-        urun N h m (mword_of_int 0x9c0)
+        urun N h m (mword_of_int 0x99c)
           (60 + (8 + (UkShDiag.ush_Dg + n))) -∗
         mWP (Loop : expr riscv_lang).
 
@@ -1542,15 +1546,15 @@ Section UkShEcho.
        string once the cut lands *)
     iDestruct (ustr_nonul with "Hline") as %Hnn0.
     iDestruct (ustr_len with "Hline") as %Hlen31.
-    (* ---- 0x9c0  c.mv a0,s1 ---- *)
-    iApply (wp_uk_cmv N h m (mword_of_int 0x9c0) a0_idx s1_idx
+    (* ---- 0x99c  c.mv a0,s1 ---- *)
+    iApply (wp_uk_cmv N h m (mword_of_int 0x99c) a0_idx s1_idx
               (add_vec zero_reg (m !!! Regidx s1_idx))
               (60 + (8 + (UkShDiag.ush_Dg + n)))
               ltac:(unfold unot_sp; vm_compute; discriminate)
               ltac:(vm_compute; discriminate) eq_refl with "[] Hrun").
-    { iApply (uis_shk_9c0 with "Hcode"). }
-    assert (E9c0 : add_vec_int (mword_of_int 0x9c0 : mword 64) 2
-                   = mword_of_int 0x9c2)
+    { iApply (uis_shk_99c with "Hcode"). }
+    assert (E9c0 : add_vec_int (mword_of_int 0x99c : mword 64) 2
+                   = mword_of_int 0x99e)
       by (apply bv_eq; vm_compute; reflexivity).
     rewrite E9c0. iIntros (h1) "Hrun".
     set (m1 := <[Regidx a0_idx
@@ -1567,10 +1571,10 @@ Section UkShEcho.
     assert (Hs1_1 : m1 !!! Regidx s1_idx = (mword_of_int s0 : mword 64))
       by (rewrite /m1 (upd_ne m (Regidx a0_idx) (Regidx s1_idx) _
                          ltac:(vm_compute; discriminate)); exact Hs1).
-    (* ---- 0x9c2  jal ra,parsecmd ---- *)
-    iApply (wp_uk_jal N h1 m1 (mword_of_int 0x9c2)
+    (* ---- 0x99e  jal ra,parsecmd ---- *)
+    iApply (wp_uk_jal N h1 m1 (mword_of_int 0x99e)
               (mword_of_int 2096812 : mword 21) (mword_of_int 1 : mword 5)
-              (mword_of_int ShSyms.parsecmd) (mword_of_int 0x9c6)
+              (mword_of_int ShSyms.parsecmd) (mword_of_int 0x9a2)
               (60 + (8 + (UkShDiag.ush_Dg + n)))
               ltac:(unfold unot_sp; vm_compute; discriminate)
               ltac:(vm_compute; discriminate)
@@ -1578,27 +1582,26 @@ Section UkShEcho.
               ltac:(apply bv_eq; vm_compute; reflexivity)
               ltac:(vm_compute; reflexivity)
               with "[] Hrun").
-    { iApply (uis_shk_9c2 with "Hcode"). }
+    { iApply (uis_shk_99e with "Hcode"). }
     iIntros (h2) "Hrun".
     set (m2 := <[Regidx (mword_of_int 1 : mword 5)
-                 := regval_into_reg (mword_of_int 0x9c6 : mword 64)]> m1).
+                 := regval_into_reg (mword_of_int 0x9a2 : mword 64)]> m1).
     assert (Ha0_2 : m2 !!! Regidx a0_idx = (mword_of_int s0 : mword 64))
       by (rewrite /m2 (upd_ne m1 (Regidx (mword_of_int 1 : mword 5))
                          (Regidx a0_idx) _ ltac:(vm_compute; discriminate));
           exact Ha0_1).
     assert (Hra_2 : ret_pc (m2 !!! Regidx (mword_of_int 1 : mword 5))
-                    = (mword_of_int 0x9c6 : mword 64))
+                    = (mword_of_int 0x9a2 : mword 64))
       by (rewrite /m2 (upd_eq m1 (Regidx (mword_of_int 1 : mword 5)) _);
           apply bv_eq; vm_compute; reflexivity).
     (* ---- parsecmd ---- *)
-    (* the exit payload goes down the parser's walk (lane IO-LEAF, M3c):
-       [malloc] can return NULL and the store through it kills this
-       process.  This walk still has it for free. *)
     (* the exit resource down the parser's walk is the LEND (step 4): the
-       law [Hcq] pays the exit where the walk dies, and the lend comes back
-       on the arm where the allocation succeeded, for the exec below *)
-    iAssert (□ (Cr -∗ ukn_pay N (-1)))%I as "#Hpxw".
-    { iIntros "!> Hc". rewrite Hpeq. iApply ("Hcq" with "Hc"). }
+       out-of-memory law [Hcq] takes it where [cmdalloc] panics, and the
+       lend comes back on the arm where the allocation succeeded, for the
+       exec below *)
+    iAssert (UkShCmdalloc.ushp_oom N Cr (18 + (8 + (UkShDiag.ush_Dg + n))))%I
+      as "#Hpxw".
+    { iExact "Hcq". }
     (* the parser takes the BOUNDED capability (lane SH-MALLOC-3) and the
        allocator's adapter proves the unbounded one; 168 <= 65504 *)
     iApply (UkShParseCmd.wp_kshp_parser N (UkShMalloc.ushm_fresh N sz)
@@ -1614,10 +1617,10 @@ Section UkShEcho.
     iIntros (p) "%Hparses Hnode Hline %Hcut Hws Hsy".
     iIntros (h3 m3) "%Hcs3 %Ha0_3 Hsz Hcr Hrun".
     rewrite Hra_2.
-    (* ---- 0x9c6  jal ra,runcmd ---- *)
-    iApply (wp_uk_jal N h3 m3 (mword_of_int 0x9c6)
-              (mword_of_int 2094792 : mword 21) (mword_of_int 1 : mword 5)
-              (mword_of_int ShSyms.runcmd) (mword_of_int 0x9ca)
+    (* ---- 0x9a2  jal ra,runcmd ---- *)
+    iApply (wp_uk_jal N h3 m3 (mword_of_int 0x9a2)
+              (mword_of_int 2094828 : mword 21) (mword_of_int 1 : mword 5)
+              (mword_of_int ShSyms.runcmd) (mword_of_int 0x9a6)
               (60 + (8 + (UkShDiag.ush_Dg + n)))
               ltac:(unfold unot_sp; vm_compute; discriminate)
               ltac:(vm_compute; discriminate)
@@ -1625,10 +1628,10 @@ Section UkShEcho.
               ltac:(apply bv_eq; vm_compute; reflexivity)
               ltac:(vm_compute; reflexivity)
               with "[] Hrun").
-    { iApply (uis_shk_9c6 with "Hcode"). }
+    { iApply (uis_shk_9a2 with "Hcode"). }
     iIntros (h4) "Hrun".
     set (m4 := <[Regidx (mword_of_int 1 : mword 5)
-                 := regval_into_reg (mword_of_int 0x9ca : mword 64)]> m3).
+                 := regval_into_reg (mword_of_int 0x9a6 : mword 64)]> m3).
     assert (Ha0_4 : m4 !!! Regidx a0_idx = (mword_of_int p : mword 64))
       by (rewrite /m4 (upd_ne m3 (Regidx (mword_of_int 1 : mword 5))
                          (Regidx a0_idx) _ ltac:(vm_compute; discriminate));
@@ -1678,15 +1681,15 @@ Section UkShEcho.
        string once the cut lands *)
     iDestruct (ustr_nonul with "Hline") as %Hnn0.
     iDestruct (ustr_len with "Hline") as %Hlen31.
-    (* ---- 0x9c0  c.mv a0,s1 ---- *)
-    iApply (wp_uk_cmv N h m (mword_of_int 0x9c0) a0_idx s1_idx
+    (* ---- 0x99c  c.mv a0,s1 ---- *)
+    iApply (wp_uk_cmv N h m (mword_of_int 0x99c) a0_idx s1_idx
               (add_vec zero_reg (m !!! Regidx s1_idx))
               (60 + (8 + (UkShDiag.ush_Dg + n)))
               ltac:(unfold unot_sp; vm_compute; discriminate)
               ltac:(vm_compute; discriminate) eq_refl with "[] Hrun").
-    { iApply (uis_shk_9c0 with "Hcode"). }
-    assert (E9c0 : add_vec_int (mword_of_int 0x9c0 : mword 64) 2
-                   = mword_of_int 0x9c2)
+    { iApply (uis_shk_99c with "Hcode"). }
+    assert (E9c0 : add_vec_int (mword_of_int 0x99c : mword 64) 2
+                   = mword_of_int 0x99e)
       by (apply bv_eq; vm_compute; reflexivity).
     rewrite E9c0. iIntros (h1) "Hrun".
     set (m1 := <[Regidx a0_idx
@@ -1703,10 +1706,10 @@ Section UkShEcho.
     assert (Hs1_1 : m1 !!! Regidx s1_idx = (mword_of_int s0 : mword 64))
       by (rewrite /m1 (upd_ne m (Regidx a0_idx) (Regidx s1_idx) _
                          ltac:(vm_compute; discriminate)); exact Hs1).
-    (* ---- 0x9c2  jal ra,parsecmd ---- *)
-    iApply (wp_uk_jal N h1 m1 (mword_of_int 0x9c2)
+    (* ---- 0x99e  jal ra,parsecmd ---- *)
+    iApply (wp_uk_jal N h1 m1 (mword_of_int 0x99e)
               (mword_of_int 2096812 : mword 21) (mword_of_int 1 : mword 5)
-              (mword_of_int ShSyms.parsecmd) (mword_of_int 0x9c6)
+              (mword_of_int ShSyms.parsecmd) (mword_of_int 0x9a2)
               (60 + (8 + (UkShDiag.ush_Dg + n)))
               ltac:(unfold unot_sp; vm_compute; discriminate)
               ltac:(vm_compute; discriminate)
@@ -1714,27 +1717,26 @@ Section UkShEcho.
               ltac:(apply bv_eq; vm_compute; reflexivity)
               ltac:(vm_compute; reflexivity)
               with "[] Hrun").
-    { iApply (uis_shk_9c2 with "Hcode"). }
+    { iApply (uis_shk_99e with "Hcode"). }
     iIntros (h2) "Hrun".
     set (m2 := <[Regidx (mword_of_int 1 : mword 5)
-                 := regval_into_reg (mword_of_int 0x9c6 : mword 64)]> m1).
+                 := regval_into_reg (mword_of_int 0x9a2 : mword 64)]> m1).
     assert (Ha0_2 : m2 !!! Regidx a0_idx = (mword_of_int s0 : mword 64))
       by (rewrite /m2 (upd_ne m1 (Regidx (mword_of_int 1 : mword 5))
                          (Regidx a0_idx) _ ltac:(vm_compute; discriminate));
           exact Ha0_1).
     assert (Hra_2 : ret_pc (m2 !!! Regidx (mword_of_int 1 : mword 5))
-                    = (mword_of_int 0x9c6 : mword 64))
+                    = (mword_of_int 0x9a2 : mword 64))
       by (rewrite /m2 (upd_eq m1 (Regidx (mword_of_int 1 : mword 5)) _);
           apply bv_eq; vm_compute; reflexivity).
     (* ---- parsecmd ---- *)
-    (* the exit payload goes down the parser's walk (lane IO-LEAF, M3c):
-       [malloc] can return NULL and the store through it kills this
-       process.  This walk still has it for free. *)
     (* the exit resource down the parser's walk is the LEND (step 4): the
-       law [Hcq] pays the exit where the walk dies, and the lend comes back
-       on the arm where the allocation succeeded, for the exec below *)
-    iAssert (□ (Cr -∗ ukn_pay N (-1)))%I as "#Hpxw".
-    { iIntros "!> Hc". rewrite Hpeq. iApply ("Hcq" with "Hc"). }
+       out-of-memory law [Hcq] takes it where [cmdalloc] panics, and the
+       lend comes back on the arm where the allocation succeeded, for the
+       exec below *)
+    iAssert (UkShCmdalloc.ushp_oom N Cr (18 + (8 + (UkShDiag.ush_Dg + n))))%I
+      as "#Hpxw".
+    { iExact "Hcq". }
     (* the parser takes the BOUNDED capability (lane SH-MALLOC-3) and the
        allocator's adapter proves the unbounded one; 168 <= 65504 *)
     iApply (UkShParseCmd.wp_kshp_parser N (UkShMalloc.ushm_fresh N sz)
@@ -1750,10 +1752,10 @@ Section UkShEcho.
     iIntros (p) "%Hparses Hnode Hline %Hcut Hws Hsy".
     iIntros (h3 m3) "%Hcs3 %Ha0_3 Hsz Hcr Hrun".
     rewrite Hra_2.
-    (* ---- 0x9c6  jal ra,runcmd ---- *)
-    iApply (wp_uk_jal N h3 m3 (mword_of_int 0x9c6)
-              (mword_of_int 2094792 : mword 21) (mword_of_int 1 : mword 5)
-              (mword_of_int ShSyms.runcmd) (mword_of_int 0x9ca)
+    (* ---- 0x9a2  jal ra,runcmd ---- *)
+    iApply (wp_uk_jal N h3 m3 (mword_of_int 0x9a2)
+              (mword_of_int 2094828 : mword 21) (mword_of_int 1 : mword 5)
+              (mword_of_int ShSyms.runcmd) (mword_of_int 0x9a6)
               (60 + (8 + (UkShDiag.ush_Dg + n)))
               ltac:(unfold unot_sp; vm_compute; discriminate)
               ltac:(vm_compute; discriminate)
@@ -1761,10 +1763,10 @@ Section UkShEcho.
               ltac:(apply bv_eq; vm_compute; reflexivity)
               ltac:(vm_compute; reflexivity)
               with "[] Hrun").
-    { iApply (uis_shk_9c6 with "Hcode"). }
+    { iApply (uis_shk_9a2 with "Hcode"). }
     iIntros (h4) "Hrun".
     set (m4 := <[Regidx (mword_of_int 1 : mword 5)
-                 := regval_into_reg (mword_of_int 0x9ca : mword 64)]> m3).
+                 := regval_into_reg (mword_of_int 0x9a6 : mword 64)]> m3).
     assert (Ha0_4 : m4 !!! Regidx a0_idx = (mword_of_int p : mword 64))
       by (rewrite /m4 (upd_ne m3 (Regidx (mword_of_int 1 : mword 5))
                          (Regidx a0_idx) _ ltac:(vm_compute; discriminate));
@@ -1940,6 +1942,18 @@ Section UkShEcho.
      ([UkSh.ush_posw]'s third conjunct).  At the file era that is
      [FileDisc.fbody_ok_echo], i.e. "the era filed an [LEcho] line here",
      from which both the stage and [FileHooks.fexfb]'s value follow. *)
+  (* THE OUT-OF-MEMORY LAW AT THE FORK'S PAYLOAD (upstream d66e41c): what
+     the child does with the lend [Wc I 3] when the parser's [cmdalloc]
+     panics -- [UkShCmdalloc.ushp_oom] at the child's own names, for every
+     boundary.  It replaces the null store's death, which paid the lend
+     back untouched ([UkShFork.ushf_wq]'s left arm); its discharge prints
+     "out of memory" (lane SY1-P). *)
+  Definition ush_oom_law_wq (Wc : list (bv 8) -> nat -> iProp Σ) : iProp Σ :=
+    (□ (∀ (N' : uk_names Σ) (Hc : ukn_const N') (I : list (bv 8)) (n : nat),
+          ⌜ ukn_pay N' = (fun _ : Z => UkShFork.ushf_wq Wc I) ⌝ -∗
+          UkShCmdalloc.ushp_oom N' (Wc I 3%nat)
+            (18 + (8 + (UkShDiag.ush_Dg + n)))))%I.
+
   Lemma ushf_child_law_holds_at_D (D : list (bv 8) -> Prop)
       (dg : list (bv 8) -> list (bv 8)) (nn : list (bv 8) -> nat)
       (T : iProp Σ) (Wc : list (bv 8) -> nat -> iProp Σ) :
@@ -1949,9 +1963,10 @@ Section UkShEcho.
     (forall I : list (bv 8),
        D I -> dg I = alt_execfail /\ nn I = 17%nat) ->
     ush_execfail_law_wq_at_D D dg nn Wc -∗
-    sh_exec_sup_echo_wq_at D Wc -∗ UkShFork.ushf_child_law T Wc.
+    sh_exec_sup_echo_wq_at D Wc -∗
+    ush_oom_law_wq Wc -∗ UkShFork.ushf_child_law T Wc.
   Proof using Hpsok_free.
-    intros HD Hdg. iIntros "#Hxl #Hsup".
+    intros HD Hdg. iIntros "#Hxl #Hsup #Hoomw".
     rewrite /UkShFork.ushf_child_law /UkShFork.ushf_child_law_at.
     iIntros "!>" (N' h m dw dv s0 len ws g sz ld n I)
       "%Hpeq %Hs1 %Hline %Hlws %Hfbk %Hs0 %Hs64 %Hs38 %Hszlo %Hszal %Hszok %Hrows
@@ -1973,9 +1988,8 @@ Section UkShEcho.
               with "Hcode [] [] [] [] Hpcode Hpro Hjt Hline Hws Hsy Hstd Hcwd Hch
                     HM Hcr Hrun").
     - iApply ("Hsup" $! I). iPureIntro. exact HDI.
-    - (* a child that died at the null store exits on the block it was
-         lent *)
-      iIntros "!> Hc". rewrite /UkShFork.ushf_wq. iLeft. iExact "Hc".
+    - (* the out-of-memory law, at this child *)
+      iApply ("Hoomw" $! N' Hc I n with "[%]"). exact Hpeq.
     - (* THE DIAGNOSTIC, AT THE ERA'S CARRIER READ AT THIS INPUT *)
       rewrite /UkShDiag.ush_execfail_law.
       rewrite <- Hdg1. rewrite <- Hdg2.
@@ -2004,10 +2018,11 @@ Section UkShEcho.
     (forall I : list (bv 8),
        D I -> dg I = alt_execfail /\ nn I = 17%nat) ->
     ush_execfail_law_wq_at dg nn Wc -∗
-    sh_exec_sup_echo_wq_at D Wc -∗ UkShFork.ushf_child_law T Wc.
+    sh_exec_sup_echo_wq_at D Wc -∗
+    ush_oom_law_wq Wc -∗ UkShFork.ushf_child_law T Wc.
   Proof using Hpsok_free.
-    intros HD Hdg. iIntros "#Hxl #Hsup".
-    iApply (ushf_child_law_holds_at_D D dg nn T Wc HD Hdg with "[] Hsup").
+    intros HD Hdg. iIntros "#Hxl #Hsup #Hoomw".
+    iApply (ushf_child_law_holds_at_D D dg nn T Wc HD Hdg with "[] Hsup Hoomw").
     iApply (ush_execfail_law_wq_at_D_of D dg nn Wc with "Hxl").
   Qed.
 
@@ -2015,14 +2030,15 @@ Section UkShEcho.
      is the constant one *)
   Lemma ushf_child_law_holds (T : iProp Σ) (Wc : list (bv 8) -> nat -> iProp Σ) :
     ush_execfail_law_wq Wc -∗
-    sh_exec_sup_echo_wq Wc -∗ UkShFork.ushf_child_law T Wc.
+    sh_exec_sup_echo_wq Wc -∗
+    ush_oom_law_wq Wc -∗ UkShFork.ushf_child_law T Wc.
   Proof.
-    iIntros "#Hxl #Hsup".
+    iIntros "#Hxl #Hsup #Hoomw".
     iApply (ushf_child_law_holds_at (fun I => line_ok (last_ws I))
               (fun _ => alt_execfail) (fun _ => 17%nat) T Wc
               ltac:(intros I ws Hok Heq _; subst ws; exact Hok)
               ltac:(intros I _; split; reflexivity)
-              with "Hxl Hsup").
+              with "Hxl Hsup Hoomw").
   Qed.
 
   (* =================================================================== *)

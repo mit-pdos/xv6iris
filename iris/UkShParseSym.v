@@ -369,7 +369,7 @@ Qed.
    doubled.  That is precisely the premise of
    [UkShRedirGtk.wp_kshp_gettoken_sym] -- the first conjunct keeps the six
    other switch arms refuted, the second and third refute the '>>'
-   lookahead at 0x3d2/0x3da.  Both line shapes below satisfy it. *)
+   lookahead at 0x3ae/0x3b6.  Both line shapes below satisfy it. *)
 Definition ushs_gt_ok (len : nat) (f : nat -> bv 8) : Prop :=
   forall j : nat, (j < len)%nat -> ushp_is_sym (f j) = true ->
     f j = ushs_gt /\ (S j < len)%nat /\ f (S j) <> ushs_gt.

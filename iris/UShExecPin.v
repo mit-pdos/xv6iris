@@ -156,14 +156,14 @@ Proof using .
     assert (Hl : (j < length alt_execR)%nat) by (vm_compute in Hj |- *; lia).
     exact (list_lookup_lookup_total_lt alt_execR j Hl).
   - intros j Hj.
-    apply (UkShDiag.ush_bytes_of_forallb (UkShDiag.shd_lit 0x12b8)
+    apply (UkShDiag.ush_bytes_of_forallb (UkShDiag.shd_lit 0x1298)
              (fun i : nat => alt_execR !!! i) 0%nat 5%nat);
       [vm_compute; reflexivity | lia].
   - intros j Hj.
     assert (Hj3 : (j < 3)%nat) by (vm_compute in Hj; lia).
     destruct j as [| [| [| j]]]; try lia; vm_compute; reflexivity.
   - intros j Hj.
-    apply (UkShDiag.ush_bytes_of_forallb (UkShDiag.shd_lit 0x12b8)
+    apply (UkShDiag.ush_bytes_of_forallb (UkShDiag.shd_lit 0x1298)
              (fun i : nat => alt_execR !!! (i + 1)%nat) 7%nat 8%nat);
       [vm_compute; reflexivity | lia].
 Qed.
@@ -177,14 +177,14 @@ Proof using .
     assert (Hl : (j < length (filt_alt (FGrep [])))%nat) by (vm_compute in Hj |- *; lia).
     exact (list_lookup_lookup_total_lt _ j Hl).
   - intros j Hj.
-    apply (UkShDiag.ush_bytes_of_forallb (UkShDiag.shd_lit 0x12b8)
+    apply (UkShDiag.ush_bytes_of_forallb (UkShDiag.shd_lit 0x1298)
              (fun i : nat => filt_alt (FGrep []) !!! i) 0%nat 5%nat);
       [vm_compute; reflexivity | lia].
   - intros j Hj.
     assert (Hj4 : (j < 4)%nat) by (vm_compute in Hj; lia).
     destruct j as [| [| [| [| j]]]]; try lia; vm_compute; reflexivity.
   - intros j Hj.
-    apply (UkShDiag.ush_bytes_of_forallb (UkShDiag.shd_lit 0x12b8)
+    apply (UkShDiag.ush_bytes_of_forallb (UkShDiag.shd_lit 0x1298)
              (fun i : nat => filt_alt (FGrep []) !!! (i + 2)%nat) 7%nat 8%nat);
       [vm_compute; reflexivity | lia].
 Qed.

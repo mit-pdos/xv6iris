@@ -22,39 +22,39 @@
 (* that forks twice:                                                      *)
 (*                                                                        *)
 (*   0x13c  addi a0,s0,-40      &p[0] -- the [int p[2]] of the frame       *)
-(*   0x140  jal  ra,0xc96       pipe(p)            -- A CALL PREMISE       *)
+(*   0x140  jal  ra,0xc72       pipe(p)            -- A CALL PREMISE       *)
 (*   0x144  bltz a0,0x172       -1 -> panic("pipe")                        *)
 (*   0x148  jal  ra,0x68        fork1()                                    *)
 (*   0x14c  c.bnez a0,0x17e     parent -> the second fork1                 *)
 (*   -- THE LEFT CHILD, whose fd 1 becomes the WRITE end --                *)
 (*   0x14e  c.li  a0,1                                                     *)
-(*   0x150  jal   ra,0xcae      close(1)                                   *)
+(*   0x150  jal   ra,0xc8a      close(1)                                   *)
 (*   0x154  lw    a0,-36(s0)    p[1]                                       *)
-(*   0x158  jal   ra,0xcfe      dup(p[1])   -- lands on slot 1             *)
+(*   0x158  jal   ra,0xcda      dup(p[1])   -- lands on slot 1             *)
 (*   0x15c  lw    a0,-40(s0)    p[0]                                       *)
-(*   0x160  jal   ra,0xcae      close(p[0])                                *)
+(*   0x160  jal   ra,0xc8a      close(p[0])                                *)
 (*   0x164  lw    a0,-36(s0)    p[1]                                       *)
-(*   0x168  jal   ra,0xcae      close(p[1])                                *)
+(*   0x168  jal   ra,0xc8a      close(p[1])                                *)
 (*   0x16c  c.ld  a0,8(s1)      pcmd->left                                 *)
 (*   0x16e  jal   ra,0x8e       runcmd(pcmd->left)                         *)
 (*   -- panic("pipe") --                                                   *)
-(*   0x172  auipc a0,0x1 ; 0x176 addi a0,a0,358 ; 0x17a jal ra,0x4a        *)
+(*   0x172  auipc a0,0x1 ; 0x176 addi a0,a0,326 ; 0x17a jal ra,0x4a        *)
 (*   -- THE PARENT, second fork --                                         *)
 (*   0x17e  jal   ra,0x68       fork1()                                    *)
 (*   0x182  c.bnez a0,0x1a6     parent -> the two closes and two waits     *)
 (*   -- THE RIGHT CHILD, whose fd 0 becomes the READ end.  a0 IS ALREADY   *)
 (*      ZERO here (it is fork's own answer), which is why this child has   *)
 (*      no [c.li a0,0] before its close --                                 *)
-(*   0x184  jal   ra,0xcae      close(0)                                   *)
-(*   0x188  lw    a0,-40(s0) ; 0x18c jal ra,0xcfe   dup(p[0]) -> slot 0    *)
-(*   0x190  lw    a0,-40(s0) ; 0x194 jal ra,0xcae   close(p[0])            *)
-(*   0x198  lw    a0,-36(s0) ; 0x19c jal ra,0xcae   close(p[1])            *)
+(*   0x184  jal   ra,0xc8a      close(0)                                   *)
+(*   0x188  lw    a0,-40(s0) ; 0x18c jal ra,0xcda   dup(p[0]) -> slot 0    *)
+(*   0x190  lw    a0,-40(s0) ; 0x194 jal ra,0xc8a   close(p[0])            *)
+(*   0x198  lw    a0,-36(s0) ; 0x19c jal ra,0xc8a   close(p[1])            *)
 (*   0x1a0  c.ld  a0,16(s1) ; 0x1a2 jal ra,0x8e     runcmd(pcmd->right)    *)
 (*   -- THE PARENT --                                                      *)
-(*   0x1a6  lw    a0,-40(s0) ; 0x1aa jal ra,0xcae   close(p[0])            *)
-(*   0x1ae  lw    a0,-36(s0) ; 0x1b2 jal ra,0xcae   close(p[1])            *)
-(*   0x1b6  c.li  a0,0 ; 0x1b8 jal ra,0xc8e         wait(0)                *)
-(*   0x1bc  c.li  a0,0 ; 0x1be jal ra,0xc8e         wait(0)                *)
+(*   0x1a6  lw    a0,-40(s0) ; 0x1aa jal ra,0xc8a   close(p[0])            *)
+(*   0x1ae  lw    a0,-36(s0) ; 0x1b2 jal ra,0xc8a   close(p[1])            *)
+(*   0x1b6  c.li  a0,0 ; 0x1b8 jal ra,0xc6a         wait(0)                *)
+(*   0x1bc  c.li  a0,0 ; 0x1be jal ra,0xc6a         wait(0)                *)
 (*   0x1c2  c.j   0xea          break -> the common exit(0)                *)
 (*                                                                        *)
 (* THE THREE CONTINUATIONS ARE THE ARM'S OUTPUT, not walks it closes:     *)
@@ -219,19 +219,19 @@ Section UkShPipe.
   (* ===================================================================== *)
   (* §1a THE SYMBOL PINS, off [shk_syms_pins] -- [UkShRun]'s are [Local].   *)
   (* ===================================================================== *)
-  Local Lemma shp_close  : ShSyms.close  = 0xcae.
+  Local Lemma shp_close  : ShSyms.close  = 0xc8a.
   Proof using . destruct shk_syms_pins as (_&_&_&_&_&_&H&_). exact H. Qed.
   Local Lemma shp_runcmd : ShSyms.runcmd = 0x8e.
   Proof using . destruct shk_syms_pins as (_&_&_&_&_&_&_&_&_&_&H&_). exact H. Qed.
   Local Lemma shp_fork1  : ShSyms.fork1  = 0x68.
   Proof using . destruct shk_syms_pins as (_&_&_&_&_&_&_&_&_&_&_&H&_). exact H. Qed.
-  Local Lemma shp_pipe   : ShSyms.pipe   = 0xc96.
+  Local Lemma shp_pipe   : ShSyms.pipe   = 0xc72.
   Proof using . destruct shk_syms_pins as (_&_&_&_&_&_&_&_&_&_&_&_&_&_&H&_). exact H. Qed.
-  Local Lemma shp_wait   : ShSyms.wait   = 0xc8e.
+  Local Lemma shp_wait   : ShSyms.wait   = 0xc6a.
   Proof using . destruct shk_syms_pins as (_&_&_&_&_&_&_&_&_&_&_&_&_&_&_&H&_). exact H. Qed.
   Local Lemma shp_panic  : ShSyms.panic  = 0x4a.
   Proof using . reflexivity. Qed.
-  Local Lemma shp_dup    : ShSyms.dup    = 0xcfe.
+  Local Lemma shp_dup    : ShSyms.dup    = 0xcda.
   Proof using . destruct shk_syms_pins as (_&_&_&_&_&_&_&_&_&_&_&_&_&_&_&_&H&_). exact H. Qed.
 
   (* ===================================================================== *)
@@ -319,30 +319,30 @@ Section UkShPipe.
   Proof using .
     intros Harg. iIntros "#Hcode #Hdep Hh Hrun Hcont".
     rewrite shp_close.
-    (* ---- 0xcae  c.li a7,21 ---- *)
-    iApply (wp_uk_cli N h m (mword_of_int 0xcae)
+    (* ---- 0xc8a  c.li a7,21 ---- *)
+    iApply (wp_uk_cli N h m (mword_of_int 0xc8a)
               (mword_of_int 21 : mword 6) a7_idx avail
               ltac:(unfold unot_sp; vm_compute; discriminate)
               ltac:(vm_compute; discriminate) with "[] Hrun").
-    { iApply (uis_shk_cae with "Hcode"). }
+    { iApply (uis_shk_c8a with "Hcode"). }
     assert (Em : <[Regidx a7_idx
                    := regval_into_reg (sign_extend' 64
                         (mword_of_int 21 : mword 6) : mword 64)]> m
                  = <[Regidx a7_idx := (mword_of_int 21 : mword 64)]> m)
       by (f_equal; apply bv_eq; vm_compute; reflexivity).
-    assert (E01 : add_vec_int (mword_of_int 0xcae : mword 64) 2
-                  = mword_of_int 0xcb0)
+    assert (E01 : add_vec_int (mword_of_int 0xc8a : mword 64) 2
+                  = mword_of_int 0xc8c)
       by (apply bv_eq; vm_compute; reflexivity).
     rewrite E01 Em. iIntros (h1) "Hrun".
     set (m1 := <[Regidx a7_idx := (mword_of_int 21 : mword 64)]> m).
     assert (Ha0_1 : m1 !!! Regidx a0_idx = m !!! Regidx a0_idx)
       by exact (upd_ne m (Regidx a7_idx) (Regidx a0_idx) _
                   ltac:(vm_compute; discriminate)).
-    assert (E12 : add_vec_int (mword_of_int 0xcb0 : mword 64) 4
-                  = mword_of_int 0xcb4)
+    assert (E12 : add_vec_int (mword_of_int 0xc8c : mword 64) 4
+                  = mword_of_int 0xc90)
       by (apply bv_eq; vm_compute; reflexivity).
-    (* ---- 0xcb0  ecall -- CLOSE, at the HANDLE ---- *)
-    iApply (wp_uk_ecall_close N h1 m1 (mword_of_int 0xcb0) fd st avail
+    (* ---- 0xc8c  ecall -- CLOSE, at the HANDLE ---- *)
+    iApply (wp_uk_ecall_close N h1 m1 (mword_of_int 0xc8c) fd st avail
               ltac:(unfold usysno;
                     rewrite (upd_eq m (Regidx a7_idx)
                                (mword_of_int 21 : mword 64));
@@ -350,7 +350,7 @@ Section UkShPipe.
               ltac:(rewrite Ha0_1; exact Harg)
               ltac:(rewrite E12; vm_compute; reflexivity)
               with "[] Hrun [] Hh").
-    { iApply (uis_shk_cb0 with "Hcode"). }
+    { iApply (uis_shk_c8c with "Hcode"). }
     { iApply "Hdep". }
     rewrite E12.
     iIntros (h2 r) "_ Hrun".
@@ -363,13 +363,13 @@ Section UkShPipe.
                (upd_ne m (Regidx a7_idx) (Regidx ra_idx)
                   (mword_of_int 21 : mword 64)
                   ltac:(vm_compute; discriminate))). }
-    (* ---- 0xcb4  c.jr ra ---- *)
-    iApply (wp_uk_cjr N h2 m2 (mword_of_int 0xcb4) ra_idx
+    (* ---- 0xc90  c.jr ra ---- *)
+    iApply (wp_uk_cjr N h2 m2 (mword_of_int 0xc90) ra_idx
               (ret_pc (m !!! Regidx ra_idx)) avail
               ltac:(vm_compute; discriminate)
               ltac:(rewrite Hra; reflexivity)
               with "[] Hrun").
-    { iApply (uis_shk_cb4 with "Hcode"). }
+    { iApply (uis_shk_c90 with "Hcode"). }
     iIntros (h3) "Hrun".
     iApply ("Hcont" $! h3 r with "Hrun").
   Qed.
@@ -411,30 +411,30 @@ Section UkShPipe.
   Proof using Hpsok_free.
     intros Harg Hne. iIntros "#Hcode Hstd Hown Hrun Hcont".
     rewrite shp_dup.
-    (* ---- 0xcfe  c.li a7,10 ---- *)
-    iApply (wp_uk_cli N h m (mword_of_int 0xcfe)
+    (* ---- 0xcda  c.li a7,10 ---- *)
+    iApply (wp_uk_cli N h m (mword_of_int 0xcda)
               (mword_of_int 10 : mword 6) a7_idx avail
               ltac:(unfold unot_sp; vm_compute; discriminate)
               ltac:(vm_compute; discriminate) with "[] Hrun").
-    { iApply (uis_shk_cfe with "Hcode"). }
+    { iApply (uis_shk_cda with "Hcode"). }
     assert (Em : <[Regidx a7_idx
                    := regval_into_reg (sign_extend' 64
                         (mword_of_int 10 : mword 6) : mword 64)]> m
                  = <[Regidx a7_idx := (mword_of_int 10 : mword 64)]> m)
       by (f_equal; apply bv_eq; vm_compute; reflexivity).
-    assert (E01 : add_vec_int (mword_of_int 0xcfe : mword 64) 2
-                  = mword_of_int 0xd00)
+    assert (E01 : add_vec_int (mword_of_int 0xcda : mword 64) 2
+                  = mword_of_int 0xcdc)
       by (apply bv_eq; vm_compute; reflexivity).
     rewrite E01 Em. iIntros (h1) "Hrun".
     set (m1 := <[Regidx a7_idx := (mword_of_int 10 : mword 64)]> m).
     assert (Ha0_1 : m1 !!! Regidx a0_idx = m !!! Regidx a0_idx)
       by exact (upd_ne m (Regidx a7_idx) (Regidx a0_idx) _
                   ltac:(vm_compute; discriminate)).
-    assert (E12 : add_vec_int (mword_of_int 0xd00 : mword 64) 4
-                  = mword_of_int 0xd04)
+    assert (E12 : add_vec_int (mword_of_int 0xcdc : mword 64) 4
+                  = mword_of_int 0xce0)
       by (apply bv_eq; vm_compute; reflexivity).
-    (* ---- 0xd00  ecall -- DUP, at the ledger and the source claim ---- *)
-    iApply (wp_uk_ecall_dup N h1 m1 (mword_of_int 0xd00) l fd0 st avail
+    (* ---- 0xcdc  ecall -- DUP, at the ledger and the source claim ---- *)
+    iApply (wp_uk_ecall_dup N h1 m1 (mword_of_int 0xcdc) l fd0 st avail
               ltac:(unfold usysno;
                     rewrite (upd_eq m (Regidx a7_idx)
                                (mword_of_int 10 : mword 64));
@@ -443,7 +443,7 @@ Section UkShPipe.
               Hne
               ltac:(vm_compute; reflexivity)
               with "[] Hrun [] Hstd Hown").
-    { iApply (uis_shk_d00 with "Hcode"). }
+    { iApply (uis_shk_cdc with "Hcode"). }
     { iApply udepw_of_psok; [ apply Hpsok_free; free_lit | ];
       (discriminate || assumption || (vm_compute; discriminate)). }
     rewrite E12.
@@ -457,13 +457,13 @@ Section UkShPipe.
                (upd_ne m (Regidx a7_idx) (Regidx ra_idx)
                   (mword_of_int 10 : mword 64)
                   ltac:(vm_compute; discriminate))). }
-    (* ---- 0xd04  c.jr ra ---- *)
-    iApply (wp_uk_cjr N h2 m2 (mword_of_int 0xd04) ra_idx
+    (* ---- 0xce0  c.jr ra ---- *)
+    iApply (wp_uk_cjr N h2 m2 (mword_of_int 0xce0) ra_idx
               (ret_pc (m !!! Regidx ra_idx)) avail
               ltac:(vm_compute; discriminate)
               ltac:(rewrite Hra; reflexivity)
               with "[] Hrun").
-    { iApply (uis_shk_d04 with "Hcode"). }
+    { iApply (uis_shk_ce0 with "Hcode"). }
     iIntros (h3) "Hrun".
     iApply ("Hcont" $! h3 r with "Hans Hrun").
   Qed.
@@ -1122,11 +1122,11 @@ Section UkShPipe.
     Wr -∗
     ush_wait0_law N Wr Pw -∗
     (* ---- THE THREE PANIC TAILS, as continuations.  Each is at [panic]'s
-       own entry with the message's address in a0 -- 0x12d8 for the pipe
-       panic and 0x12a8 for the fork one -- and holds the ledger and the
+       own entry with the message's address in a0 -- 0x12b8 for the pipe
+       panic and 0x1288 for the fork one -- and holds the ledger and the
        credential that pays it. ---- *)
     □ (∀ (h' : CpuId) (m' : regfile),
-         ⌜ uint (m' !!! Regidx a0_idx) = 0x12d8 ⌝ -∗
+         ⌜ uint (m' !!! Regidx a0_idx) = 0x12b8 ⌝ -∗
          UserFd.ustd (ukn_fd N) ld -∗
          Cr -∗
          urun N h' m' (mword_of_int ShSyms.panic)
@@ -1144,7 +1144,7 @@ Section UkShPipe.
        [Pex] slot, so the returning arm gets it back unchanged and the
        second [fork1] is entered exactly as before. *)
     □ (∀ (h' : CpuId) (m' : regfile) (r : mword 64) (γp : pipe_names),
-         ⌜ uint (m' !!! Regidx a0_idx) = 0x12a8 ⌝ -∗
+         ⌜ uint (m' !!! Regidx a0_idx) = 0x1288 ⌝ -∗
          ⌜ r = (mword_of_int (-1) : mword 64) ⌝ -∗
          ((⌜r = (mword_of_int (-1) : mword 64)⌝
              ∗ UserChildren.uch (ukn_ch N) Sc ∗ RcL γp)
@@ -1165,7 +1165,7 @@ Section UkShPipe.
          mWP (Loop : expr riscv_lang)) -∗
     □ (∀ (h' : CpuId) (m' : regfile) (r : mword 64) (γp : pipe_names)
          (S1 : gset gname),
-         ⌜ uint (m' !!! Regidx a0_idx) = 0x12a8 ⌝ -∗
+         ⌜ uint (m' !!! Regidx a0_idx) = 0x1288 ⌝ -∗
          ⌜ r = (mword_of_int (-1) : mword 64) ⌝ -∗
          ((⌜r = (mword_of_int (-1) : mword 64)⌝
              ∗ UserChildren.uch (ukn_ch N) S1 ∗ RcR γp)
@@ -1329,9 +1329,9 @@ Section UkShPipe.
     { split;
         [ rewrite (Hp1 s0_idx ltac:(vm_compute; discriminate)); exact Hs0_1
         | rewrite (Hp1 s1_idx ltac:(vm_compute; discriminate)); exact Hs1_1 ]. }
-    (* ---- 0x140  jal ra,0xc96 <pipe> -- THE CALL PREMISE ---- *)
+    (* ---- 0x140  jal ra,0xc72 <pipe> -- THE CALL PREMISE ---- *)
     iApply (UkShRun.wp_kshr_jal N h2 p1 0x140 ShSyms.pipe 0x144
-              (mword_of_int 2902 : mword 21) (2 + (UkShDiag.ush_Dg + av))%nat
+              (mword_of_int 2866 : mword 21) (2 + (UkShDiag.ush_Dg + av))%nat
               ltac:(rewrite shp_pipe; apply bv_eq; vm_compute; reflexivity)
               ltac:(apply bv_eq; vm_compute; reflexivity)
               ltac:(rewrite shp_pipe; vm_compute; reflexivity)
@@ -1391,14 +1391,14 @@ Section UkShPipe.
       rewrite E172. iIntros (h6) "Hrun".
       set (z1 := <[Regidx a0_idx
                    := regval_into_reg (mword_of_int 0x1172 : mword 64)]> m4).
-      (* ---- 0x176  addi a0,a0,358 -- 0x12d8, the "pipe" literal ---- *)
+      (* ---- 0x176  addi a0,a0,326 -- 0x12b8, the "pipe" literal ---- *)
       assert (Ead : add_vec (mword_of_int 0x1172 : mword 64)
-                      (sign_extend' 64 (mword_of_int 358 : mword 12))
-                    = (mword_of_int 0x12d8 : mword 64))
+                      (sign_extend' 64 (mword_of_int 326 : mword 12))
+                    = (mword_of_int 0x12b8 : mword 64))
         by (apply bv_eq; vm_compute; reflexivity).
       iApply (wp_uk_addi N h6 z1 (mword_of_int 0x176)
-                (mword_of_int 358 : mword 12) a0_idx a0_idx
-                (mword_of_int 0x12d8) (2 + (UkShDiag.ush_Dg + av))%nat
+                (mword_of_int 326 : mword 12) a0_idx a0_idx
+                (mword_of_int 0x12b8) (2 + (UkShDiag.ush_Dg + av))%nat
                 ltac:(unfold unot_sp; vm_compute; discriminate)
                 ltac:(vm_compute; discriminate)
                 ltac:(rewrite /z1 (upd_eq m4 (Regidx a0_idx)
@@ -1411,7 +1411,7 @@ Section UkShPipe.
         by (apply bv_eq; vm_compute; reflexivity).
       rewrite E176. iIntros (h7) "Hrun".
       set (z2 := <[Regidx a0_idx
-                   := regval_into_reg (mword_of_int 0x12d8 : mword 64)]> z1).
+                   := regval_into_reg (mword_of_int 0x12b8 : mword 64)]> z1).
       (* ---- 0x17a  jal ra,0x4a <panic> ---- *)
       iApply (UkShRun.wp_kshr_jal N h7 z2 0x17a ShSyms.panic 0x17e
                 (mword_of_int 2096848 : mword 21)
@@ -1423,11 +1423,11 @@ Section UkShPipe.
       { iApply (uis_shk_17a with "Hcode"). }
       iIntros (h8) "Hrun".
       set (z3 := <[Regidx ra_idx := (mword_of_int 0x17e : mword 64)]> z2).
-      assert (Ha0_z3 : uint (z3 !!! Regidx a0_idx) = 0x12d8).
+      assert (Ha0_z3 : uint (z3 !!! Regidx a0_idx) = 0x12b8).
       { rewrite /z3 (upd_ne z2 (Regidx ra_idx) (Regidx a0_idx) _
                        ltac:(vm_compute; discriminate)).
         rewrite /z2 (upd_eq z1 (Regidx a0_idx)
-                       (mword_of_int 0x12d8 : mword 64)).
+                       (mword_of_int 0x12b8 : mword 64)).
         vm_compute. reflexivity. }
       replace (2 + (UkShDiag.ush_Dg + av))%nat
         with (UkShDiag.ush_Dg + (2 + av))%nat by lia.
@@ -1643,9 +1643,9 @@ Section UkShPipe.
         assert (Hst_k1 : UkShRun.ush_st k1 sp0 t)
           by (apply UkShRun.ush_st_upd;
               [ exact Hst_mD | vm_compute; lia | vm_compute; lia ]).
-        (* ---- 0x1aa  jal ra,0xcae <close> -- close(p[0]) ---- *)
+        (* ---- 0x1aa  jal ra,0xc8a <close> -- close(p[0]) ---- *)
         iApply (UkShRedir.wp_kshx_rcall N hF k1 0x1aa ShSyms.close 0x1ae 21
-                  (mword_of_int 2820 : mword 21)
+                  (mword_of_int 2784 : mword 21)
                   (2 + (UkShDiag.ush_Dg + av))%nat
                   (ush_cldep (FdOpen true false (FdPipe γp))
                      ∗ UserFd.ufd (ukn_fd N) a
@@ -1692,9 +1692,9 @@ Section UkShPipe.
         assert (Hst_k2 : UkShRun.ush_st k2 sp0 t)
           by (apply UkShRun.ush_st_upd;
               [ exact Hst_mG | vm_compute; lia | vm_compute; lia ]).
-        (* ---- 0x1b2  jal ra,0xcae <close> -- close(p[1]) ---- *)
+        (* ---- 0x1b2  jal ra,0xc8a <close> -- close(p[1]) ---- *)
         iApply (UkShRedir.wp_kshx_rcall N hH k2 0x1b2 ShSyms.close 0x1b6 21
-                  (mword_of_int 2812 : mword 21)
+                  (mword_of_int 2776 : mword 21)
                   (2 + (UkShDiag.ush_Dg + av))%nat
                   (ush_cldep (FdOpen false true (FdPipe γp))
                      ∗ UserFd.ufd (ukn_fd N) b
@@ -1712,7 +1712,7 @@ Section UkShPipe.
         iIntros (hI mI rI) "%HcsI %Ha0_I _ Hrun".
         (* ---- 0x1b6..0x1ba  wait(0) ---- *)
         iApply ("Hwl" $! hI mI 0x1b6 0x1b8 0x1bc
-                  (mword_of_int 2774 : mword 21) S2
+                  (mword_of_int 2738 : mword 21) S2
                   (2 + (UkShDiag.ush_Dg + av))%nat
                   with "[%] [%] [%] [%] [%] Hcode [] [] Hrun Hch HWr").
         { apply bv_eq; vm_compute; reflexivity. }
@@ -1725,7 +1725,7 @@ Section UkShPipe.
         iIntros (hJ mJ rw1 S3) "%HcsJ Hwa1 Hrun Hch HWr".
         (* ---- 0x1bc..0x1c0  wait(0) again ---- *)
         iApply ("Hwl" $! hJ mJ 0x1bc 0x1be 0x1c2
-                  (mword_of_int 2768 : mword 21) S3
+                  (mword_of_int 2732 : mword 21) S3
                   (2 + (UkShDiag.ush_Dg + av))%nat
                   with "[%] [%] [%] [%] [%] Hcode [] [] Hrun Hch HWr").
         { apply bv_eq; vm_compute; reflexivity. }
@@ -1775,7 +1775,7 @@ Section UkShPipe.
                        = mword_of_int 0x184)
           by (apply bv_eq; vm_compute; reflexivity).
         rewrite E182. iIntros (hE) "Hrun".
-        (* ---- 0x184  jal ra,0xcae <close> -- close(0), a0 IS fork's 0 ---- *)
+        (* ---- 0x184  jal ra,0xc8a <close> -- close(0), a0 IS fork's 0 ---- *)
         assert (Hcl0 : bv_signed (trunc32
                   ((<[Regidx ra_idx := (mword_of_int 0x188 : mword 64)]> mD)
                      !!! Regidx a0_idx)) = Z.of_nat 0).
@@ -1783,7 +1783,7 @@ Section UkShPipe.
                      ltac:(vm_compute; discriminate)) Ha0_D.
           vm_compute. reflexivity. }
         iApply (UkShRedir.wp_kshx_rcall N' hE mD 0x184 ShSyms.close 0x188 21
-                  (mword_of_int 2858 : mword 21)
+                  (mword_of_int 2822 : mword 21)
                   (2 + (UkShDiag.ush_Dg + av))%nat
                   (ush_cldep st0 ∗ UserFd.ustd (ukn_fd N') ld)%I
                   (fun _ => UserFd.ustd (ukn_fd N')
@@ -1829,9 +1829,9 @@ Section UkShPipe.
         assert (Hst_y1 : UkShRun.ush_st y1 sp0 t)
           by (apply UkShRun.ush_st_upd;
               [ exact Hst_mF | vm_compute; lia | vm_compute; lia ]).
-        (* ---- 0x18c  jal ra,0xcfe <dup> -- dup(p[0]), onto slot 0 ---- *)
+        (* ---- 0x18c  jal ra,0xcda <dup> -- dup(p[0]), onto slot 0 ---- *)
         iApply (UkShRedir.wp_kshx_rcall N' hG y1 0x18c ShSyms.dup 0x190 10
-                  (mword_of_int 2930 : mword 21)
+                  (mword_of_int 2894 : mword 21)
                   (2 + (UkShDiag.ush_Dg + av))%nat
                   (UserFd.ustd (ukn_fd N') (<[0%nat := FdClosed]> ld)
                      ∗ UserFd.ufd_own (ukn_fd N') (<[0%nat := FdClosed]> ld) a
@@ -1908,9 +1908,9 @@ Section UkShPipe.
         assert (Hst_y2 : UkShRun.ush_st y2 sp0 t)
           by (apply UkShRun.ush_st_upd;
               [ exact Hst_mH | vm_compute; lia | vm_compute; lia ]).
-        (* ---- 0x194  jal ra,0xcae <close> -- close(p[0]) ---- *)
+        (* ---- 0x194  jal ra,0xc8a <close> -- close(p[0]) ---- *)
         iApply (UkShRedir.wp_kshx_rcall N' hI y2 0x194 ShSyms.close 0x198 21
-                  (mword_of_int 2842 : mword 21)
+                  (mword_of_int 2806 : mword 21)
                   (2 + (UkShDiag.ush_Dg + av))%nat
                   (ush_cldep (FdOpen true false (FdPipe γp))
                      ∗ UserFd.ufd (ukn_fd N') a
@@ -1957,9 +1957,9 @@ Section UkShPipe.
         assert (Hst_y3 : UkShRun.ush_st y3 sp0 t)
           by (apply UkShRun.ush_st_upd;
               [ exact Hst_mJ | vm_compute; lia | vm_compute; lia ]).
-        (* ---- 0x19c  jal ra,0xcae <close> -- close(p[1]) ---- *)
+        (* ---- 0x19c  jal ra,0xc8a <close> -- close(p[1]) ---- *)
         iApply (UkShRedir.wp_kshx_rcall N' hK y3 0x19c ShSyms.close 0x1a0 21
-                  (mword_of_int 2834 : mword 21)
+                  (mword_of_int 2798 : mword 21)
                   (2 + (UkShDiag.ush_Dg + av))%nat
                   (ush_cldep (FdOpen false true (FdPipe γp))
                      ∗ UserFd.ufd (ukn_fd N') b
@@ -2067,9 +2067,9 @@ Section UkShPipe.
       assert (Hst_q1 : UkShRun.ush_st q1 sp0 t)
         by (apply UkShRun.ush_st_upd;
             [ exact Hst_m7 | vm_compute; lia | vm_compute; lia ]).
-      (* ---- 0x150  jal ra,0xcae <close> -- close(1) ---- *)
+      (* ---- 0x150  jal ra,0xc8a <close> -- close(1) ---- *)
       iApply (UkShRedir.wp_kshx_rcall N' h9 q1 0x150 ShSyms.close 0x154 21
-                (mword_of_int 2910 : mword 21)
+                (mword_of_int 2874 : mword 21)
                 (2 + (UkShDiag.ush_Dg + av))%nat
                 (UserFd.ustd (ukn_fd N') ld)
                 (fun _ => UserFd.ustd (ukn_fd N') (<[1%nat := FdClosed]> ld))
@@ -2116,9 +2116,9 @@ Section UkShPipe.
       assert (Hst_q2 : UkShRun.ush_st q2 sp0 t)
         by (apply UkShRun.ush_st_upd;
             [ exact Hst_mA | vm_compute; lia | vm_compute; lia ]).
-      (* ---- 0x158  jal ra,0xcfe <dup> -- dup(p[1]), onto slot 1 ---- *)
+      (* ---- 0x158  jal ra,0xcda <dup> -- dup(p[1]), onto slot 1 ---- *)
       iApply (UkShRedir.wp_kshx_rcall N' hB q2 0x158 ShSyms.dup 0x15c 10
-                (mword_of_int 2982 : mword 21)
+                (mword_of_int 2946 : mword 21)
                 (2 + (UkShDiag.ush_Dg + av))%nat
                 (UserFd.ustd (ukn_fd N') (<[1%nat := FdClosed]> ld)
                    ∗ UserFd.ufd_own (ukn_fd N') (<[1%nat := FdClosed]> ld) b
@@ -2195,9 +2195,9 @@ Section UkShPipe.
       assert (Hst_q3 : UkShRun.ush_st q3 sp0 t)
         by (apply UkShRun.ush_st_upd;
             [ exact Hst_mC | vm_compute; lia | vm_compute; lia ]).
-      (* ---- 0x160  jal ra,0xcae <close> -- close(p[0]) ---- *)
+      (* ---- 0x160  jal ra,0xc8a <close> -- close(p[0]) ---- *)
       iApply (UkShRedir.wp_kshx_rcall N' hD q3 0x160 ShSyms.close 0x164 21
-                (mword_of_int 2894 : mword 21)
+                (mword_of_int 2858 : mword 21)
                 (2 + (UkShDiag.ush_Dg + av))%nat
                 (ush_cldep (FdOpen true false (FdPipe γp))
                    ∗ UserFd.ufd (ukn_fd N') a
@@ -2244,9 +2244,9 @@ Section UkShPipe.
       assert (Hst_q4 : UkShRun.ush_st q4 sp0 t)
         by (apply UkShRun.ush_st_upd;
             [ exact Hst_mE | vm_compute; lia | vm_compute; lia ]).
-      (* ---- 0x168  jal ra,0xcae <close> -- close(p[1]) ---- *)
+      (* ---- 0x168  jal ra,0xc8a <close> -- close(p[1]) ---- *)
       iApply (UkShRedir.wp_kshx_rcall N' hF q4 0x168 ShSyms.close 0x16c 21
-                (mword_of_int 2886 : mword 21)
+                (mword_of_int 2850 : mword 21)
                 (2 + (UkShDiag.ush_Dg + av))%nat
                 (ush_cldep (FdOpen false true (FdPipe γp))
                    ∗ UserFd.ufd (ukn_fd N') b
@@ -2351,11 +2351,11 @@ Section UkShPipe.
     Wr -∗
     ush_wait0_law N Wr Pw -∗
     (* ---- THE THREE PANIC TAILS, as continuations.  Each is at [panic]'s
-       own entry with the message's address in a0 -- 0x12d8 for the pipe
-       panic and 0x12a8 for the fork one -- and holds the ledger and the
+       own entry with the message's address in a0 -- 0x12b8 for the pipe
+       panic and 0x1288 for the fork one -- and holds the ledger and the
        credential that pays it. ---- *)
     □ (∀ (h' : CpuId) (m' : regfile),
-         ⌜ uint (m' !!! Regidx a0_idx) = 0x12d8 ⌝ -∗
+         ⌜ uint (m' !!! Regidx a0_idx) = 0x12b8 ⌝ -∗
          UserFd.ustd (ukn_fd N) ld -∗
          Cr -∗
          urun N h' m' (mword_of_int ShSyms.panic)
@@ -2373,7 +2373,7 @@ Section UkShPipe.
        [Pex] slot, so the returning arm gets it back unchanged and the
        second [fork1] is entered exactly as before. *)
     □ (∀ (h' : CpuId) (m' : regfile) (r : mword 64) (γp : pipe_names),
-         ⌜ uint (m' !!! Regidx a0_idx) = 0x12a8 ⌝ -∗
+         ⌜ uint (m' !!! Regidx a0_idx) = 0x1288 ⌝ -∗
          ⌜ r = (mword_of_int (-1) : mword 64) ⌝ -∗
          ((⌜r = (mword_of_int (-1) : mword 64)⌝
              ∗ UserChildren.uch (ukn_ch N) Sc ∗ RcL γp)
@@ -2394,7 +2394,7 @@ Section UkShPipe.
          mWP (Loop : expr riscv_lang)) -∗
     □ (∀ (h' : CpuId) (m' : regfile) (r : mword 64) (γp : pipe_names)
          (S1 : gset gname),
-         ⌜ uint (m' !!! Regidx a0_idx) = 0x12a8 ⌝ -∗
+         ⌜ uint (m' !!! Regidx a0_idx) = 0x1288 ⌝ -∗
          ⌜ r = (mword_of_int (-1) : mword 64) ⌝ -∗
          ((⌜r = (mword_of_int (-1) : mword 64)⌝
              ∗ UserChildren.uch (ukn_ch N) S1 ∗ RcR γp)
@@ -2542,11 +2542,11 @@ Section UkShPipe.
     Wr -∗
     ush_wait0_law N Wr Pw -∗
     (* ---- THE THREE PANIC TAILS, as continuations.  Each is at [panic]'s
-       own entry with the message's address in a0 -- 0x12d8 for the pipe
-       panic and 0x12a8 for the fork one -- and holds the ledger and the
+       own entry with the message's address in a0 -- 0x12b8 for the pipe
+       panic and 0x1288 for the fork one -- and holds the ledger and the
        credential that pays it. ---- *)
     □ (∀ (h' : CpuId) (m' : regfile),
-         ⌜ uint (m' !!! Regidx a0_idx) = 0x12d8 ⌝ -∗
+         ⌜ uint (m' !!! Regidx a0_idx) = 0x12b8 ⌝ -∗
          UserFd.ustd (ukn_fd N) ld -∗
          Cr -∗
          urun N h' m' (mword_of_int ShSyms.panic)
@@ -2564,7 +2564,7 @@ Section UkShPipe.
        [Pex] slot, so the returning arm gets it back unchanged and the
        second [fork1] is entered exactly as before. *)
     □ (∀ (h' : CpuId) (m' : regfile) (r : mword 64) (γp : pipe_names),
-         ⌜ uint (m' !!! Regidx a0_idx) = 0x12a8 ⌝ -∗
+         ⌜ uint (m' !!! Regidx a0_idx) = 0x1288 ⌝ -∗
          ⌜ r = (mword_of_int (-1) : mword 64) ⌝ -∗
          ((⌜r = (mword_of_int (-1) : mword 64)⌝
              ∗ UserChildren.uch (ukn_ch N) Sc ∗ RcL γp)
@@ -2585,7 +2585,7 @@ Section UkShPipe.
          mWP (Loop : expr riscv_lang)) -∗
     □ (∀ (h' : CpuId) (m' : regfile) (r : mword 64) (γp : pipe_names)
          (S1 : gset gname),
-         ⌜ uint (m' !!! Regidx a0_idx) = 0x12a8 ⌝ -∗
+         ⌜ uint (m' !!! Regidx a0_idx) = 0x1288 ⌝ -∗
          ⌜ r = (mword_of_int (-1) : mword 64) ⌝ -∗
          ((⌜r = (mword_of_int (-1) : mword 64)⌝
              ∗ UserChildren.uch (ukn_ch N) S1 ∗ RcR γp)
@@ -3051,7 +3051,7 @@ Section UkShPipe.
       iIntros (h' m' γp r1 r2 rw1 rw2 S1 S2 S3 S4)
         "_ _ _ _ Hch #Hjt3 Hsz Hstd Hcwd _ Hrun".
       iApply (UkShRun.wp_kshr_exit0 N h' m' 0xea 0xec 0xf0
-                (mword_of_int 0 : mword 6) (mword_of_int 2970 : mword 21)
+                (mword_of_int 0 : mword 6) (mword_of_int 2934 : mword 21)
                 (2 + (UkShDiag.ush_Dg
                       + (6 * Nat.max (ush_ht cl) (ush_ht cr) + n)))%nat Hpx
                 ltac:(apply bv_eq; vm_compute; reflexivity)
@@ -3165,29 +3165,29 @@ Section UkShPipe.
     intros Hnone. iIntros "#Hkc #Hcl".
     iIntros (h m av dst f) "%Hdst #Hcode Hstd Hbuf Hrun Hcont".
     rewrite shp_pipe.
-    (* ---- 0xc96  c.li a7,4 ---- *)
-    iApply (wp_uk_cli N h m (mword_of_int 0xc96)
+    (* ---- 0xc72  c.li a7,4 ---- *)
+    iApply (wp_uk_cli N h m (mword_of_int 0xc72)
               (mword_of_int 4 : mword 6) a7_idx av
               ltac:(unfold unot_sp; vm_compute; discriminate)
               ltac:(vm_compute; discriminate) with "[] Hrun").
-    { iApply (uis_shk_c96 with "Hcode"). }
+    { iApply (uis_shk_c72 with "Hcode"). }
     assert (Em : <[Regidx a7_idx
                    := regval_into_reg (sign_extend' 64
                         (mword_of_int 4 : mword 6) : mword 64)]> m
                  = <[Regidx a7_idx := (mword_of_int 4 : mword 64)]> m)
       by (f_equal; apply bv_eq; vm_compute; reflexivity).
-    assert (E01 : add_vec_int (mword_of_int 0xc96 : mword 64) 2
-                  = mword_of_int 0xc98)
+    assert (E01 : add_vec_int (mword_of_int 0xc72 : mword 64) 2
+                  = mword_of_int 0xc74)
       by (apply bv_eq; vm_compute; reflexivity).
     rewrite E01 Em. iIntros (h1) "Hrun".
     set (m1 := <[Regidx a7_idx := (mword_of_int 4 : mword 64)]> m).
     assert (Ha0_1 : m1 !!! Regidx a0_idx = m !!! Regidx a0_idx)
       by exact (upd_ne m (Regidx a7_idx) (Regidx a0_idx) _
                   ltac:(vm_compute; discriminate)).
-    assert (E12 : add_vec_int (mword_of_int 0xc98 : mword 64) 4
-                  = mword_of_int 0xc9c)
+    assert (E12 : add_vec_int (mword_of_int 0xc74 : mword 64) 4
+                  = mword_of_int 0xc78)
       by (apply bv_eq; vm_compute; reflexivity).
-    (* ---- 0xc98  ecall -- the PIPE leaf ---- *)
+    (* ---- 0xc74  ecall -- the PIPE leaf ---- *)
     (* [Rp := emp]: this caller keeps NOTHING of row 4's post, which is
        what [R := fun _ => emp] means one level up.  The REGISTRAR
        (lane PIPE-REG: the slot where the taint premise used to be) is
@@ -3195,7 +3195,7 @@ Section UkShPipe.
        own pipe row from the credential ([UkRun.urun_nopipe_taint]).  A
        caller that wants the pipe's fragment supplies a real registrar and
        takes [R γp] with it; PIPE-PROTO's [pipe_proto_alloc] is that one. *)
-    iApply (wp_uk_ecall_pipe N h1 m1 (mword_of_int 0xc98) l f av
+    iApply (wp_uk_ecall_pipe N h1 m1 (mword_of_int 0xc74) l f av
               (* the seven arguments unannotated: this file does not
                  [Require Import UexecSlot], so [uvis] is not a name here *)
               (fun _ _ _ _ _ _ _ => emp%I)
@@ -3205,7 +3205,7 @@ Section UkShPipe.
                     vm_compute; reflexivity)
               ltac:(vm_compute; reflexivity)
               with "[] Hrun [] [] Hstd [Hbuf]").
-    { iApply (uis_shk_c98 with "Hcode"). }
+    { iApply (uis_shk_c74 with "Hcode"). }
     { iApply udepw_of_psok; [ apply Hpsok_free; free_lit | ];
       (discriminate || assumption || (vm_compute; discriminate)). }
     { iIntros (fdep W r M' fdv' cw' cs') "_ _ _". iModIntro.
@@ -3223,13 +3223,13 @@ Section UkShPipe.
                (upd_ne m (Regidx a7_idx) (Regidx ra_idx)
                   (mword_of_int 4 : mword 64)
                   ltac:(vm_compute; discriminate))). }
-    (* ---- 0xc9c  c.jr ra ---- *)
-    iApply (wp_uk_cjr N h2 m2 (mword_of_int 0xc9c) ra_idx
+    (* ---- 0xc78  c.jr ra ---- *)
+    iApply (wp_uk_cjr N h2 m2 (mword_of_int 0xc78) ra_idx
               (ret_pc (m !!! Regidx ra_idx)) av
               ltac:(vm_compute; discriminate)
               ltac:(rewrite Hra; reflexivity)
               with "[] Hrun").
-    { iApply (uis_shk_c9c with "Hcode"). }
+    { iApply (uis_shk_c78 with "Hcode"). }
     iIntros (h3) "Hrun".
     iApply ("Hcont" $! h3 m2 r with "[%] [%] [Hans Hbuf] Hrun").
     { intros q Hq.
@@ -3519,7 +3519,7 @@ Section UkShPipe.
       iIntros (h' m' γp r1 r2 rw1 rw2 S1 S2 S3 S4)
         "_ _ _ _ Hch #Hjt3 Hsz Hstd Hcwd _ Hrun".
       iApply (UkShRun.wp_kshr_exit0 N h' m' 0xea 0xec 0xf0
-                (mword_of_int 0 : mword 6) (mword_of_int 2970 : mword 21)
+                (mword_of_int 0 : mword 6) (mword_of_int 2934 : mword 21)
                 (2 + (UkShDiag.ush_Dg
                       + (6 * Nat.max (ush_ht cl) (ush_ht cr) + n)))%nat Hpx
                 ltac:(apply bv_eq; vm_compute; reflexivity)

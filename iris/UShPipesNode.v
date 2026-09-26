@@ -681,7 +681,7 @@ Section UShPipesNode.
   Lemma node_pipe_panic (k : nat) (st0 : fdstate) (N : uk_names Σ) `{!ukn_const N}
       (ld : list fdstate) (h' : CpuId) (m' : regfile) (av : nat) :
     (k < nc)%nat -> ukn_pay N = (fun _ : Z => npay k) -> UkSh.ush_fd2p ld ->
-    uint (m' !!! Regidx a0_idx) = 0x12d8 ->
+    uint (m' !!! Regidx a0_idx) = 0x12b8 ->
     FAM -∗ shk_code (ukn_t N) -∗ ush_jtab (ukn_t N) -∗
     UserFd.ustd (ukn_fd N) ld -∗ ncred k st0 -∗
     urun (SG := uexecSG_xv6) (PS := uprogSG_free) N h' m' (mword_of_int ShSyms.panic)
@@ -700,7 +700,7 @@ Section UShPipesNode.
     iMod (below_silence k Hk with "Hfam Hbel") as "[Hws HL]".
     iModIntro.
     iDestruct "HSh" as "[Hc Hm]".
-    iApply (wp_kshd_panic_paid_at (SG := uexecSG_xv6) (PS := uprogSG_free) N 0x12d8 dg_pipe_b
+    iApply (wp_kshd_panic_paid_at (SG := uexecSG_xv6) (PS := uprogSG_free) N 0x12b8 dg_pipe_b
               (wcurN γc (WSh k) (1/2) 0 ∗ wmodeN γm (WSh k) (1/2) None ∗ osP (gF k) ∗ osP (gG k))%I
               (wcurN γc (WSh k) (1/2) 5 ∗ wmodeN γm (WSh k) (1/2) (Some dg_pipe_b))%I
               ld h' m' (2 + av)%nat Hfd2 Ha0 ltac:(discriminate) ushq_pipe_msg_fmt
@@ -756,7 +756,7 @@ Section UShPipesNode.
   Lemma node_fork_panic (k : nat) (st0 : fdstate) (N : uk_names Σ) `{!ukn_const N}
       (ld : list fdstate) (h' : CpuId) (m' : regfile) (av : nat) (γp : pipe_names) :
     (k < nc)%nat -> ukn_pay N = (fun _ : Z => npay k) -> UkSh.ush_fd2p ld ->
-    uint (m' !!! Regidx a0_idx) = 0x12a8 ->
+    uint (m' !!! Regidx a0_idx) = 0x1288 ->
     FAM -∗ shk_code (ukn_t N) -∗ ush_jtab (ukn_t N) -∗
     UserFd.ustd (ukn_fd N) ld -∗ RcRf k st0 γp -∗ Cxf k γp -∗
     urun (SG := uexecSG_xv6) (PS := uprogSG_free) N h' m' (mword_of_int ShSyms.panic)
@@ -769,7 +769,7 @@ Section UShPipesNode.
     iDestruct (UkSh.ush_jtab_ro with "Hjt") as "#Hro".
     assert (HwS : WSh k ∈ wsN) by (apply wids_elem; exact Hk).
     iDestruct "HSh" as "[Hc Hm]".
-    iApply (wp_kshd_panic_paid_at (SG := uexecSG_xv6) (PS := uprogSG_free) N 0x12a8 alt_panic
+    iApply (wp_kshd_panic_paid_at (SG := uexecSG_xv6) (PS := uprogSG_free) N 0x1288 alt_panic
               (wcurN γc (WSh k) (1/2) 0 ∗ wmodeN γm (WSh k) (1/2) None ∗ osP (gF k))%I
               (wcurN γc (WSh k) (1/2) 5 ∗ wmodeN γm (WSh k) (1/2) (Some alt_forkc)
                ∗ ptkV T v I (S gen_id))%I
@@ -848,7 +848,7 @@ Section UShPipesNode.
         replace (S k' - 1)%nat with k' by lia. iFrame "Hro Hsuf". }
     iModIntro.
     iApply (wp_kshr_exit0_paid (PS := uprogSG_free) N h' m' 0xea 0xec 0xf0
-              (mword_of_int 0 : mword 6) (mword_of_int 2970 : mword 21) avail
+              (mword_of_int 0 : mword 6) (mword_of_int 2934 : mword 21) avail
               ltac:(apply bv_eq; vm_compute; reflexivity)
               ltac:(apply bv_eq; vm_compute; reflexivity)
               ltac:(apply bv_eq; vm_compute; reflexivity)

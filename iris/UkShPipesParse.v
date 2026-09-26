@@ -23,8 +23,8 @@
 (*         the landed [UkShPipeCm.ushq_pipecmd_call_holds].               *)
 (*                                                                        *)
 (* THE ALLOCATION ORDER, READ OFF THE CODE.  The turn calls parsepipe at  *)
-(* 0x6d2 and pipecmd at 0x6da (and parseexec, whose execcmd allocates, at *)
-(* 0x698, before either): C evaluates both arguments of pipecmd before    *)
+(* 0x6ae and pipecmd at 0x6b6 (and parseexec, whose execcmd allocates, at *)
+(* 0x674, before either): C evaluates both arguments of pipecmd before    *)
 (* the call, and cmd is already computed.  So a line of N stages mallocs  *)
 (* execcmd N times, left to right, and THEN pipecmd N-1 times, innermost  *)
 (* first -- 2N-1 calls.  The walk threads ONE allocator chain [UM] in     *)
@@ -54,6 +54,7 @@ Require User.ShSyms User.ShInstrs.
 Require Import ChildTok.
 Require Import UserFd.
 Require Import UkShParse.
+Require UkShCmdalloc.
 Require Import UkShParseSym.
 Require Import UkShParseCmd.
 Require Import UkShPipeLex.
@@ -84,6 +85,7 @@ Section UkShPipesParse.
   Context `{Hpay : !ukn_const N}.
   Local Notation γt := (ukn_t N).
   Local Notation γd := (ukn_d N).
+  Local Notation ushp_oom := (UkShCmdalloc.ushp_oom N).
   Context `{!ctokG Σ}.
   Context {SG : uexecSG Σ}.
   Context `{PS : uprogSG Σ}.
@@ -190,7 +192,7 @@ Section UkShPipesParse.
     ustr γd dw ushp_whitespace 5 ushp_ws_f -∗
     ustr γd dv ushp_symbols 7 ushp_sym_f -∗
     UM i -∗
-    □ (Pex -∗ ukn_pay N (-1)) -∗
+    ushp_oom Pex (20 + nn) -∗
     Pex -∗
     urun N h m (mword_of_int ShSyms.parsepipe)
       (6 + (16 + (24 + (2 + (length rest * 6 + nn))))) -∗
@@ -248,6 +250,8 @@ Section UkShPipesParse.
       assert (E3 : (i + 2 * length (b :: rest) + 1)%nat
                    = S (S i + 2 * length rest + 1)) by (cbn [length]; lia).
       rewrite E2 E3.
+      iDestruct (UkShCmdalloc.ushp_oom_mono N Pex (20 + nn)
+                   (20 + (length rest * 6 + nn)) ltac:(lia) with "Hpx") as "#Hpxb".
       iApply (UkShPipeCm.wp_kshp_parsepipe_bar_g N (UM i) (UM (S i))
                 (UM (S i + 2 * length rest + 1))
                 (UM (S (S i + 2 * length rest + 1)))
@@ -255,7 +259,7 @@ Section UkShPipesParse.
                 toks (fun pr : Z => ushp_tree s0 pr (ushq_ptree b rest))
                 (length rest * 6 + nn)
                 Ha0 Ha1 Hbw Hs0 Hs64 Hps0 Hps8 Hpssz
-                with "Hcode Hro Hcur Hstr Hws Hsy HM Hpx Hpay [] [] [] Hrun
+                with "Hcode Hro Hcur Hstr Hws Hsy HM Hpxb Hpay [] [] [] Hrun
                       [Hcont]").
       + (* (i) the stage's own parseexec, from its cursor *)
         iApply (ushq_pex_left_at_holds (UM i) (UM (S i)) dq dw dv ps s0 len c
@@ -269,8 +273,10 @@ Section UkShPipesParse.
                      = (6 + (16 + (24 + (2 + (length rest * 6 + nn)))))%nat)
           by lia.
         rewrite E4.
+        (* the recursion's own law is the one this walk holds: the call
+           premise's is at the outer stage's (larger) budget *)
         iApply (IH (S i) nn h1 m1 ltac:(lia) Ha0' Ha1'
-                  with "Hcode' Hro' Hcur Hstr Hws Hsy HM1 Hpx' Hpay Hrun").
+                  with "Hcode' Hro' Hcur Hstr Hws Hsy HM1 Hpx Hpay Hrun").
         iIntros (t) "Ht". iApply ("Hk" $! t with "Ht").
       + (* (ii) pipecmd, the stage's LAST allocation *)
         iApply (UkShPipeCm.ushq_pipecmd_call_holds N
@@ -308,7 +314,7 @@ Section UkShPipesParse.
     ustr γd dw ushp_whitespace 5 ushp_ws_f -∗
     ustr γd dv ushp_symbols 7 ushp_sym_f -∗
     UM i -∗
-    □ (Pex -∗ ukn_pay N (-1)) -∗
+    ushp_oom Pex (20 + nn) -∗
     Pex -∗
     urun N h m (mword_of_int ShSyms.parsepipe)
       (6 + (16 + (24 + (2 + (1 * 6 + nn))))) -∗

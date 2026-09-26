@@ -82,14 +82,14 @@ Section UShPipeCall.
   Local Notation a0_idx := (mword_of_int 10 : mword 5).
   Local Notation a7_idx := (mword_of_int 17 : mword 5).
 
-  Local Lemma shpc_pipe : ShSyms.pipe = 0xc96.
+  Local Lemma shpc_pipe : ShSyms.pipe = 0xc72.
   Proof using .
     destruct shk_syms_pins as (_&_&_&_&_&_&_&_&_&_&_&_&_&_&H&_). exact H.
   Qed.
 
   (* ===================================================================== *)
-  (*  THE PAID STUB.  Three instructions (0xc96 c.li a7,4; 0xc98 ecall;    *)
-  (*  0xc9c c.jr ra), the middle one the PIPE leaf at the instance.         *)
+  (*  THE PAID STUB.  Three instructions (0xc72 c.li a7,4; 0xc74 ecall;    *)
+  (*  0xc78 c.jr ra), the middle one the PIPE leaf at the instance.         *)
   (*                                                                       *)
   (*  TWO PREMISES, and neither is the taint:                               *)
   (*   - THE REGISTRAR, linear (the stub is walked once per [runcmd] PIPE   *)
@@ -122,30 +122,30 @@ Section UShPipeCall.
     intros Hnone. iIntros "Hreg".
     iIntros (h m av dst f) "%Hdst #Hcode Hstd Hbuf Hrun Hcont".
     rewrite shpc_pipe.
-    (* ---- 0xc96  c.li a7,4 ---- *)
-    iApply (wp_uk_cli N h m (mword_of_int 0xc96)
+    (* ---- 0xc72  c.li a7,4 ---- *)
+    iApply (wp_uk_cli N h m (mword_of_int 0xc72)
               (mword_of_int 4 : mword 6) a7_idx av
               ltac:(unfold unot_sp; vm_compute; discriminate)
               ltac:(vm_compute; discriminate) with "[] Hrun").
-    { iApply (uis_shk_c96 with "Hcode"). }
+    { iApply (uis_shk_c72 with "Hcode"). }
     assert (Em : <[Regidx a7_idx
                    := regval_into_reg (sign_extend' 64
                         (mword_of_int 4 : mword 6) : mword 64)]> m
                  = <[Regidx a7_idx := (mword_of_int 4 : mword 64)]> m)
       by (f_equal; apply bv_eq; vm_compute; reflexivity).
-    assert (E01 : add_vec_int (mword_of_int 0xc96 : mword 64) 2
-                  = mword_of_int 0xc98)
+    assert (E01 : add_vec_int (mword_of_int 0xc72 : mword 64) 2
+                  = mword_of_int 0xc74)
       by (apply bv_eq; vm_compute; reflexivity).
     rewrite E01 Em. iIntros (h1) "Hrun".
     set (m1 := <[Regidx a7_idx := (mword_of_int 4 : mword 64)]> m).
     assert (Ha0_1 : m1 !!! Regidx a0_idx = m !!! Regidx a0_idx)
       by exact (upd_ne m (Regidx a7_idx) (Regidx a0_idx) _
                   ltac:(vm_compute; discriminate)).
-    assert (E12 : add_vec_int (mword_of_int 0xc98 : mword 64) 4
-                  = mword_of_int 0xc9c)
+    assert (E12 : add_vec_int (mword_of_int 0xc74 : mword 64) 4
+                  = mword_of_int 0xc78)
       by (apply bv_eq; vm_compute; reflexivity).
-    (* ---- 0xc98  ecall -- the PIPE leaf, AT THE INSTANCE ---- *)
-    iApply (wp_uk_pipe_read_end N h1 m1 (mword_of_int 0xc98) l f av
+    (* ---- 0xc74  ecall -- the PIPE leaf, AT THE INSTANCE ---- *)
+    iApply (wp_uk_pipe_read_end N h1 m1 (mword_of_int 0xc74) l f av
               (fun γp : pipe_names => (pipe_reg γp ∗ R γp)%I)
               ltac:(unfold usysno;
                     rewrite (upd_eq m (Regidx a7_idx)
@@ -153,7 +153,7 @@ Section UShPipeCall.
                     vm_compute; reflexivity)
               ltac:(vm_compute; reflexivity) Hnone
               with "[] Hrun [] Hreg Hstd [Hbuf]").
-    { iApply (uis_shk_c98 with "Hcode"). }
+    { iApply (uis_shk_c74 with "Hcode"). }
     { iApply udepw_of_psok; [ apply Hpsok_free; free_lit | ];
       (discriminate || assumption || (vm_compute; discriminate)). }
     { rewrite Ha0_1 Hdst. iExact "Hbuf". }
@@ -169,13 +169,13 @@ Section UShPipeCall.
                (upd_ne m (Regidx a7_idx) (Regidx ra_idx)
                   (mword_of_int 4 : mword 64)
                   ltac:(vm_compute; discriminate))). }
-    (* ---- 0xc9c  c.jr ra ---- *)
-    iApply (wp_uk_cjr N h2 m2 (mword_of_int 0xc9c) ra_idx
+    (* ---- 0xc78  c.jr ra ---- *)
+    iApply (wp_uk_cjr N h2 m2 (mword_of_int 0xc78) ra_idx
               (ret_pc (m !!! Regidx ra_idx)) av
               ltac:(vm_compute; discriminate)
               ltac:(rewrite Hra; reflexivity)
               with "[] Hrun").
-    { iApply (uis_shk_c9c with "Hcode"). }
+    { iApply (uis_shk_c78 with "Hcode"). }
     iIntros (h3) "Hrun".
     iApply ("Hcont" $! h3 m2 r with "[%] [%] [Hans Hbuf] Hrun").
     { intros q Hq.

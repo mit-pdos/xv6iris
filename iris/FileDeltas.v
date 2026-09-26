@@ -1215,7 +1215,7 @@ Qed.
 Lemma init_bytes_length : Z.of_nat (length init_bytes) = 36024.
 Proof using . exact ElfUser.init_elf_length. Qed.
 
-Lemma sh_bytes_length : Z.of_nat (length sh_bytes) = 58360.
+Lemma sh_bytes_length : Z.of_nat (length sh_bytes) = 58632.
 Proof using . exact ElfUser.sh_elf_length. Qed.
 
 Lemma echo_bytes_length : Z.of_nat (length echo_bytes) = 35640.

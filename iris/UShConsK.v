@@ -102,8 +102,8 @@ Local Open Scope Z_scope.
 (*                                                                        *)
 (*  [UInitConsK.init_cons_path_of]'s twin at sh's own literal.  The string *)
 (*  is the SAME one ([UInitCons.init_cons_pl]); only the base differs --   *)
-(*  0x980 in /init's image, [UkSh.sh_cons_pv] (0x1388) in sh's, which      *)
-(*  0x8f8/0x8fc compute and 0x902 passes.  Both facts are one              *)
+(*  0x980 in /init's image, [UkSh.sh_cons_pv] (0x1378) in sh's, which      *)
+(*  0x8d4/0x8d8 compute and 0x8de passes.  Both facts are one              *)
 (*  [vm_compute] on the dump.                                             *)
 (* ===================================================================== *)
 Lemma sh_cons_ro_bytes_bool :
@@ -137,7 +137,7 @@ Lemma sh_cons_ro_nul_bool :
 Proof. vm_compute. reflexivity. Qed.
 
 (* sh's own open stub, at the address its symbol catalog pins *)
-Lemma sh_open_pc : User.ShSyms.open = 0xcc6.
+Lemma sh_open_pc : User.ShSyms.open = 0xca2.
 Proof. destruct UCodeShK.shk_syms_pins as (_&_&_&_&_&H&_&_&_&_). exact H. Qed.
 
 Lemma sh_cons_path_of (M : gmap Z (bv 8)) :
@@ -230,8 +230,8 @@ Section UShConsK.
   (* =================================================================== *)
   (*  S3.  THE TWO LEAF DISCHARGES                                        *)
   (*                                                                      *)
-  (*  usys.S's stub is three instructions -- [c.li a7,15] at 0xcc6,        *)
-  (*  [ecall] at 0xcc8, [c.jr ra] at 0xccc -- and each walk is the deleted *)
+  (*  usys.S's stub is three instructions -- [c.li a7,15] at 0xca2,        *)
+  (*  [ecall] at 0xca4, [c.jr ra] at 0xca8 -- and each walk is the deleted *)
   (*  [UkSh.wp_ksh_open]'s with the RECEIPT-KEEPING leaf in the middle.    *)
   (* =================================================================== *)
 
@@ -248,14 +248,14 @@ Section UShConsK.
     iIntros (h m l v avail) "#Hcode #Hro %Hargs Hrun Hcwd Hstd Hcont".
     destruct Hargs as [Ha0 Ha1].
     rewrite sh_open_pc.
-    (* ---- 0xcc6  c.li a7,15 ---- *)
-    iApply (wp_uk_cli (PS := uprogSG_free) N h m (mword_of_int 0xcc6)
+    (* ---- 0xca2  c.li a7,15 ---- *)
+    iApply (wp_uk_cli (PS := uprogSG_free) N h m (mword_of_int 0xca2)
               (mword_of_int 15 : mword 6) a7_idx avail
               ltac:(unfold unot_sp; vm_compute; discriminate)
               ltac:(vm_compute; discriminate) with "[] Hrun").
-    { iApply (UCodeShK.uis_shk_cc6 with "Hcode"). }
-    assert (E0 : add_vec_int (mword_of_int 0xcc6 : mword 64) 2
-                 = mword_of_int 0xcc8)
+    { iApply (UCodeShK.uis_shk_ca2 with "Hcode"). }
+    assert (E0 : add_vec_int (mword_of_int 0xca2 : mword 64) 2
+                 = mword_of_int 0xca4)
       by (apply bv_eq; vm_compute; reflexivity).
     assert (Em : <[Regidx a7_idx
                    := regval_into_reg (sign_extend' 64 (mword_of_int 15 : mword 6)
@@ -278,8 +278,8 @@ Section UShConsK.
                  (mword_of_int 15 : mword 64)
                  ltac:(vm_compute; discriminate)).
       exact Ha1. }
-    (* ---- 0xcc8  ecall -- the RECEIPT-KEEPING open leaf ---- *)
-    iApply (wp_uk_ecall_open_recv_img_at (PS := uprogSG_free) N h1 m1 (mword_of_int 0xcc8) l v avail
+    (* ---- 0xca4  ecall -- the RECEIPT-KEEPING open leaf ---- *)
+    iApply (wp_uk_ecall_open_recv_img_at (PS := uprogSG_free) N h1 m1 (mword_of_int 0xca4) l v avail
               (init_cons_console_fam T i (ukn_pay N)) FsImg.ROOTINO
               UCodeShK.shk_ro
               ltac:(unfold m1, usysno;
@@ -288,16 +288,16 @@ Section UShConsK.
                     vm_compute; reflexivity)
               ltac:(vm_compute; reflexivity)
               with "[] [] Hrun Hcwd [] Hstd").
-    { iApply (UCodeShK.uis_shk_cc8 with "Hcode"). }
+    { iApply (UCodeShK.uis_shk_ca4 with "Hcode"). }
     { iApply (shk_rodata_img with "Hro"). }
     { iApply (cons_sup_console N echo_fs_pure (cons_made r) cons_absent T K i
                 UCodeShK.shk_ro
-                (mword_of_int UkSh.sh_cons_pv) m1 (mword_of_int 0xcc8)
+                (mword_of_int UkSh.sh_cons_pv) m1 (mword_of_int 0xca4)
                 HPT HTT (fun M H => sh_cons_path_of M H) Ha0' Ha1'
                 with "Hlaws Hmade Hinv [Hro]").
       iApply (shk_rodata_img with "Hro"). }
-    assert (E1 : add_vec_int (mword_of_int 0xcc8 : mword 64) 4
-                 = mword_of_int 0xccc)
+    assert (E1 : add_vec_int (mword_of_int 0xca4 : mword 64) 4
+                 = mword_of_int 0xca8)
       by (apply bv_eq; vm_compute; reflexivity).
     rewrite E1.
     iIntros (h2 ret W M' fdv' cw' cs')
@@ -318,7 +318,7 @@ Section UShConsK.
                  (uvis_M W) (mword_of_int UkSh.sh_cons_pv) (mword_of_int 2)
                  (pfam_triv (fun (_ : aview) (_ : Z) (_ : list (bv 8)) => True%I))
                  (uvis_fd W) ret fdv' Hpath init_cons_om2_trunc with "Hrc") as "Hans".
-    (* ---- 0xccc  c.jr ra ---- *)
+    (* ---- 0xca8  c.jr ra ---- *)
     set (m2 := <[Regidx a0_idx := ret]> m1).
     assert (Hra : m2 !!! Regidx ra_idx = m !!! Regidx ra_idx).
     { unfold m2, m1.
@@ -328,12 +328,12 @@ Section UShConsK.
                (upd_ne m (Regidx a7_idx) (Regidx ra_idx)
                   (mword_of_int 15 : mword 64)
                   ltac:(vm_compute; discriminate))). }
-    iApply (wp_uk_cjr (PS := uprogSG_free) N h2 m2 (mword_of_int 0xccc) ra_idx
+    iApply (wp_uk_cjr (PS := uprogSG_free) N h2 m2 (mword_of_int 0xca8) ra_idx
               (ret_pc (m !!! Regidx ra_idx)) avail
               ltac:(vm_compute; discriminate)
               ltac:(rewrite Hra; reflexivity)
               with "[] Hrun").
-    { iApply (UCodeShK.uis_shk_ccc with "Hcode"). }
+    { iApply (UCodeShK.uis_shk_ca8 with "Hcode"). }
     iIntros (h3) "Hrun".
     iApply ("Hcont" $! h3 ret with "[Hfd Hans] Hcwd Hrun").
     iDestruct "Hans" as "[[%Hr _] | [[%Hrcpt _] | #HT]]".
@@ -391,14 +391,14 @@ Section UShConsK.
     destruct Hargs as [Ha0 Ha1].
     iDestruct (sh_cons_abs_law_of_never T K HPK with "Hlaw") as "#Habs".
     rewrite sh_open_pc.
-    (* ---- 0xcc6  c.li a7,15 ---- *)
-    iApply (wp_uk_cli (PS := uprogSG_free) N h m (mword_of_int 0xcc6)
+    (* ---- 0xca2  c.li a7,15 ---- *)
+    iApply (wp_uk_cli (PS := uprogSG_free) N h m (mword_of_int 0xca2)
               (mword_of_int 15 : mword 6) a7_idx avail
               ltac:(unfold unot_sp; vm_compute; discriminate)
               ltac:(vm_compute; discriminate) with "[] Hrun").
-    { iApply (UCodeShK.uis_shk_cc6 with "Hcode"). }
-    assert (E0 : add_vec_int (mword_of_int 0xcc6 : mword 64) 2
-                 = mword_of_int 0xcc8)
+    { iApply (UCodeShK.uis_shk_ca2 with "Hcode"). }
+    assert (E0 : add_vec_int (mword_of_int 0xca2 : mword 64) 2
+                 = mword_of_int 0xca4)
       by (apply bv_eq; vm_compute; reflexivity).
     assert (Em : <[Regidx a7_idx
                    := regval_into_reg (sign_extend' 64 (mword_of_int 15 : mword 6)
@@ -421,8 +421,8 @@ Section UShConsK.
                  (mword_of_int 15 : mword 64)
                  ltac:(vm_compute; discriminate)).
       exact Ha1. }
-    (* ---- 0xcc8  ecall ---- *)
-    iApply (wp_uk_ecall_open_recv_img_at (PS := uprogSG_free) N h1 m1 (mword_of_int 0xcc8) l v avail
+    (* ---- 0xca4  ecall ---- *)
+    iApply (wp_uk_ecall_open_recv_img_at (PS := uprogSG_free) N h1 m1 (mword_of_int 0xca4) l v avail
               (init_cons_absent_fam T K (ukn_pay N))
               FsImg.ROOTINO UCodeShK.shk_ro
               ltac:(unfold m1, usysno;
@@ -431,15 +431,15 @@ Section UShConsK.
                     vm_compute; reflexivity)
               ltac:(vm_compute; reflexivity)
               with "[] [] Hrun Hcwd [HK] Hstd").
-    { iApply (UCodeShK.uis_shk_cc8 with "Hcode"). }
+    { iApply (UCodeShK.uis_shk_ca4 with "Hcode"). }
     { iApply (shk_rodata_img with "Hro"). }
     { iApply (cons_sup_absent N T K UCodeShK.shk_ro
-                (mword_of_int UkSh.sh_cons_pv) m1 (mword_of_int 0xcc8)
+                (mword_of_int UkSh.sh_cons_pv) m1 (mword_of_int 0xca4)
                 HPT HTT HTK (fun M H => sh_cons_path_of M H) Ha0' Ha1'
                 with "Habs Hinv [Hro] HK").
       iApply (shk_rodata_img with "Hro"). }
-    assert (E1 : add_vec_int (mword_of_int 0xcc8 : mword 64) 4
-                 = mword_of_int 0xccc)
+    assert (E1 : add_vec_int (mword_of_int 0xca4 : mword 64) 4
+                 = mword_of_int 0xca8)
       by (apply bv_eq; vm_compute; reflexivity).
     rewrite E1.
     iIntros (h2 ret W M' fdv' cw' cs')
@@ -465,7 +465,7 @@ Section UShConsK.
             (pfam_triv (fun (_ : aview) (_ : Z) (_ : list (bv 8)) => True%I))
             (uvis_fd W) ret fdv' HPT init_cons_om2_trunc Hpath with "Hrc") as "Hans".
     iModIntro.
-    (* ---- 0xccc  c.jr ra ---- *)
+    (* ---- 0xca8  c.jr ra ---- *)
     set (m2 := <[Regidx a0_idx := ret]> m1).
     assert (Hra : m2 !!! Regidx ra_idx = m !!! Regidx ra_idx).
     { unfold m2, m1.
@@ -475,12 +475,12 @@ Section UShConsK.
                (upd_ne m (Regidx a7_idx) (Regidx ra_idx)
                   (mword_of_int 15 : mword 64)
                   ltac:(vm_compute; discriminate))). }
-    iApply (wp_uk_cjr (PS := uprogSG_free) N h2 m2 (mword_of_int 0xccc) ra_idx
+    iApply (wp_uk_cjr (PS := uprogSG_free) N h2 m2 (mword_of_int 0xca8) ra_idx
               (ret_pc (m !!! Regidx ra_idx)) avail
               ltac:(vm_compute; discriminate)
               ltac:(rewrite Hra; reflexivity)
               with "[] Hrun").
-    { iApply (UCodeShK.uis_shk_ccc with "Hcode"). }
+    { iApply (UCodeShK.uis_shk_ca8 with "Hcode"). }
     iIntros (h3) "Hrun".
     iApply ("Hcont" $! h3 ret with "[Hfd Hans] Hcwd Hrun").
     iDestruct "Hans" as "[(%Hr & _ & [#HK | #HT]) | #HT]".

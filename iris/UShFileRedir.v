@@ -68,7 +68,7 @@ Require Import UEchoFile.                (* [ef_pay] / [efq]: echo at a file *)
 Require Import FsAbsDefs.                (* [anode] / [MkAnode] / [AFile] *)
 Require Import ExecRun.                  (* [udepw_at_refR_of_sup]: the U-tier exec rule *)
 Require Import UkShRedirBody.            (* [ushs_fd1f], [sh_redir_child_law] *)
-Require Import UkShRedirChild.           (* the redirect child's walk, 0x9c0 to its exits *)
+Require Import UkShRedirChild.           (* the redirect child's walk, 0x99c to its exits *)
 Require Import ExecWords.                (* [exec_ok]: a word list sh can exec *)
 Require Import UkShDiagAt.               (* [ush_execfail_bytes] *)
 Require Import UShCat.                   (* [cat_elf_loadable] *)
@@ -264,8 +264,8 @@ Section UShFileRedir.
 
           The walk is usys.S's three-instruction stub, [UShConsK.
           sh_open_console_leaf_holds]'s mould with the file leaf in the
-          middle: [c.li a7,15] at 0xcc6, [ecall] at 0xcc8, [c.jr ra] at
-          0xccc. ---- *)
+          middle: [c.li a7,15] at 0xca2, [ecall] at 0xca4, [c.jr ra] at
+          0xca8. ---- *)
   (* ---- NOT A HYPOTHESIS ANY MORE (the PROGRAM STREAM): sh's open STUB,
           walked into the kernel's create corollary at [OffHeld].
 
@@ -287,9 +287,9 @@ Section UShFileRedir.
 
           The walk itself is usys.S's three-instruction stub, [UShConsK.
           sh_open_console_leaf_holds]'s mould with the file leaf in the
-          middle: [c.li a7,15] at 0xcc6, [ecall] at 0xcc8, [c.jr ra] at
-          0xccc. ---- *)
-  Local Lemma sh_open_stub_pc : User.ShSyms.open = 0xcc6.
+          middle: [c.li a7,15] at 0xca2, [ecall] at 0xca4, [c.jr ra] at
+          0xca8. ---- *)
+  Local Lemma sh_open_stub_pc : User.ShSyms.open = 0xca2.
   Proof using .
     destruct UCodeShK.shk_syms_pins as (_&_&_&_&_&H&_&_&_&_). exact H.
   Qed.
@@ -340,15 +340,15 @@ Section UShFileRedir.
     iIntros (h m av Img pl u) "%Ha0 %Ha1 %Hpath %Hnp %Hstart %Hlast %Hfdl
              #Himg Hown #Hcode Hcwd Hstd Hrun Hcont".
     rewrite sh_open_stub_pc.
-    (* ---- 0xcc6  c.li a7,15 ---- *)
+    (* ---- 0xca2  c.li a7,15 ---- *)
     iApply (wp_uk_cli (PS := uprogSG_free) (SG := uexecSG_xv6)
-              (ghost_varG0 := offbox_offG) N h m (mword_of_int 0xcc6)
+              (ghost_varG0 := offbox_offG) N h m (mword_of_int 0xca2)
               (mword_of_int 15 : mword 6) (mword_of_int 17 : mword 5) av
               ltac:(unfold unot_sp; vm_compute; discriminate)
               ltac:(vm_compute; discriminate) with "[] Hrun").
-    { iApply (UCodeShK.uis_shk_cc6 with "Hcode"). }
-    assert (E0 : add_vec_int (mword_of_int 0xcc6 : mword 64) 2
-                 = mword_of_int 0xcc8)
+    { iApply (UCodeShK.uis_shk_ca2 with "Hcode"). }
+    assert (E0 : add_vec_int (mword_of_int 0xca2 : mword 64) 2
+                 = mword_of_int 0xca4)
       by (apply bv_eq; vm_compute; reflexivity).
     assert (Em : <[Regidx (mword_of_int 17 : mword 5)
                    := regval_into_reg
@@ -377,9 +377,9 @@ Section UShFileRedir.
                  (mword_of_int 15 : mword 64)
                  ltac:(vm_compute; discriminate)).
       exact Ha1. }
-    (* ---- 0xcc8  ecall -- the DEED's create corollary at [OffHeld] ---- *)
+    (* ---- 0xca4  ecall -- the DEED's create corollary at [OffHeld] ---- *)
     iApply (UkFileOpen.wp_uk_ecall_open_create_deed_d (PSx := uprogSG_free)
-              N OffHeld h1 m1 (mword_of_int 0xcc8) l av (fgn_cl g) r jo
+              N OffHeld h1 m1 (mword_of_int 0xca4) l av (fgn_cl g) r jo
               nm s0
               ls ws FsImg.ROOTINO Img (mword_of_int file : mword 64) pl
               Hu Heq
@@ -393,11 +393,11 @@ Section UShFileRedir.
               ltac:(rewrite Ha1'; vm_compute; reflexivity)
               Hnp Hstart Hlast Hin Hokw
               with "[] Himg Hrun Hcwd Hstd Hinv Hmade Hlb Hown [Hcont]").
-    { iApply (UCodeShK.uis_shk_cc8 with "Hcode"). }
+    { iApply (UCodeShK.uis_shk_ca4 with "Hcode"). }
     iIntros (h2 rv) "Hans Hcwd Hrun".
-    (* ---- 0xccc  c.jr ra ---- *)
-    assert (E1 : add_vec_int (mword_of_int 0xcc8 : mword 64) 4
-                 = mword_of_int 0xccc)
+    (* ---- 0xca8  c.jr ra ---- *)
+    assert (E1 : add_vec_int (mword_of_int 0xca4 : mword 64) 4
+                 = mword_of_int 0xca8)
       by (apply bv_eq; vm_compute; reflexivity).
     rewrite E1.
     set (m2 := <[Regidx (mword_of_int 10 : mword 5) := rv]> m1).
@@ -413,13 +413,13 @@ Section UShFileRedir.
                   (mword_of_int 15 : mword 64)
                   ltac:(vm_compute; discriminate))). }
     iApply (wp_uk_cjr (PS := uprogSG_free) (SG := uexecSG_xv6)
-              (ghost_varG0 := offbox_offG) N h2 m2 (mword_of_int 0xccc)
+              (ghost_varG0 := offbox_offG) N h2 m2 (mword_of_int 0xca8)
               (mword_of_int 1 : mword 5)
               (ret_pc (m !!! Regidx (mword_of_int 1 : mword 5))) av
               ltac:(vm_compute; discriminate)
               ltac:(rewrite Hra; reflexivity)
               with "[] Hrun").
-    { iApply (UCodeShK.uis_shk_ccc with "Hcode"). }
+    { iApply (UCodeShK.uis_shk_ca8 with "Hcode"). }
     iIntros (h3) "Hrun".
     iApply ("Hcont" $! h3 m2 rv with "[%] [%] Hcwd [Hans] Hrun").
     - exact (ucallee_saved_a0a7 m rv).

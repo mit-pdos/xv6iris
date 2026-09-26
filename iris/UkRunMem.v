@@ -802,7 +802,7 @@ Section UkRunMem.
     - intros j Hj. exact (proj1 (Hall j Hj)).
   Qed.
 
-  (* c.lw rd', uimm(rs1') OUT OF THE TEXT HALF -- sh's jump table at 0x13a8.
+  (* c.lw rd', uimm(rs1') OUT OF THE TEXT HALF -- sh's jump table at 0x1398.
      .rodata shares the executable segment's pages, so the table's words are
      [utext]; the compressed form redirects to the uncompressed [lw], which
      is width 4 and SIGNED.  [utext] is persistent, so -- as in

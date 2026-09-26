@@ -8,7 +8,7 @@
 (* that makes [parseredirs]' loop turn -- is a PURE lemma and not a walk,  *)
 (* the mirror image of [UkShParseLex.ushp_peek_res_sym] (the fact that     *)
 (* makes it not turn).  Both are about [ushp_find] over the literal at     *)
-(* [ushp_T_redir] = 0x1300, which is the two bytes "<>".                    *)
+(* [ushp_T_redir] = 0x12f0, which is the two bytes "<>".                    *)
 (* ===================================================================== *)
 From Stdlib Require Import ZArith Bool Lia List.
 From stdpp Require Import gmap bitvector.definitions.

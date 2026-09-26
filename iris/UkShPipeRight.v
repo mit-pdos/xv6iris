@@ -49,6 +49,7 @@ Require User.ShSyms User.ShInstrs.
 Require Import ChildTok.
 Require Import UserFd.
 Require Import UkShParse.
+Require UkShCmdalloc.
 Require Import UkShParseSym.
 Require Import UkShParseCmd.
 Require Import UkShPipeLex.
@@ -164,6 +165,7 @@ Section UkShPipeRight.
 
   Context (UMalloc UMalloc' : iProp Σ).
   Hypothesis ushp_malloc_ok : ushp_malloc_ty UMalloc UMalloc'.
+  Local Notation ushp_oom := (UkShCmdalloc.ushp_oom N).
 
   Local Notation wp_kshp_parsepipe :=
     (UkShParseCmd.wp_kshp_parsepipe N UMalloc UMalloc' ushp_malloc_ok).
@@ -294,7 +296,7 @@ Section UkShPipeRight.
     ustr γd dw ushp_whitespace 5 ushp_ws_f -∗
     ustr γd dv ushp_symbols 7 ushp_sym_f -∗
     UMalloc -∗
-    □ (Pex -∗ ukn_pay N (-1)) -∗
+    ushp_oom Pex (18 + nn) -∗
     Pex -∗
     urun N h m (mword_of_int ShSyms.parsepipe) (6 + (16 + (24 + nn))) -∗
     (∀ q : Z,
@@ -360,7 +362,7 @@ Section UkShPipeRight.
     ustr γd dw ushp_whitespace 5 ushp_ws_f -∗
     ustr γd dv ushp_symbols 7 ushp_sym_f -∗
     UMalloc -∗
-    □ (Pex -∗ ukn_pay N (-1)) -∗
+    ushp_oom Pex (18 + nn) -∗
     Pex -∗
     urun N h m (mword_of_int ShSyms.parsepipe) (6 + (16 + (24 + nn))) -∗
     (∀ q : Z,

@@ -34,7 +34,7 @@
 (* [16 + n] for an [n] the LOOP picks -- so the two do not meet until      *)
 (* [ush_loop_head]'s budget is re-cut as [16 + (26 + n)].  That re-cut is  *)
 (* mechanical and belongs with the OTHER thing [ush_rest] still needs, the *)
-(* fork arm at 0x92c; this lemma is stated at the budget it actually       *)
+(* fork arm at 0x908; this lemma is stated at the budget it actually       *)
 (* wants so that the re-cut has something to aim at.                       *)
 (*                                                                        *)
 (* WHAT chdir COSTS THE WALK: NOTHING ABOUT THE PATH.  The kernel READS   *)
@@ -309,7 +309,7 @@ Section UkShCd.
   Qed.
 
   (* ===================================================================== *)
-  (* §3 [chdir] @0xcf6 -- li a7,9 ; ecall ; ret.                            *)
+  (* §3 [chdir] @0xcd2 -- li a7,9 ; ecall ; ret.                            *)
   (*                                                                        *)
   (* THE QUIET ROW, at a call that is anything but quiet in the kernel:     *)
   (* [sys_chdir] moves [p->cwd].  It is quiet HERE because the row is       *)
@@ -339,38 +339,38 @@ Section UkShCd.
     mWP (Loop : expr riscv_lang).
   Proof using Hpsok_free.
     iIntros "#Hcode Hcwd Hrun Hcont".
-    assert (Hpin : ShSyms.chdir = 0xcf6)
+    assert (Hpin : ShSyms.chdir = 0xcd2)
       by (destruct shk_syms_pins as (_&_&_&_&_&_&_&_&_&_&_&_&_&_&_&_&_&H&_);
           exact H).
     rewrite Hpin.
-    (* ---- 0xcf6  c.li a7,9 ---- *)
-    iApply (wp_uk_cli N h m (mword_of_int 0xcf6)
+    (* ---- 0xcd2  c.li a7,9 ---- *)
+    iApply (wp_uk_cli N h m (mword_of_int 0xcd2)
               (mword_of_int 9 : mword 6) a7_idx avail
               ltac:(unfold unot_sp; vm_compute; discriminate)
               ltac:(vm_compute; discriminate) with "[] Hrun").
-    { iApply (uis_shk_cf6 with "Hcode"). }
+    { iApply (uis_shk_cd2 with "Hcode"). }
     assert (Em : <[Regidx a7_idx
                    := regval_into_reg (sign_extend' 64
                         (mword_of_int 9 : mword 6) : mword 64)]> m
                  = <[Regidx a7_idx := (mword_of_int 9 : mword 64)]> m)
       by (f_equal; apply bv_eq; vm_compute; reflexivity).
-    assert (E0 : add_vec_int (mword_of_int 0xcf6 : mword 64) 2
-                 = mword_of_int 0xcf8)
+    assert (E0 : add_vec_int (mword_of_int 0xcd2 : mword 64) 2
+                 = mword_of_int 0xcd4)
       by (apply bv_eq; vm_compute; reflexivity).
     rewrite E0 Em. iIntros (h1) "Hrun".
     set (m1 := <[Regidx a7_idx := (mword_of_int 9 : mword 64)]> m).
-    (* ---- 0xcf8  ecall -- THE ROW THAT MOVES THE CWD ---- *)
-    iApply (wp_uk_ecall_chdir_any N h1 m1 (mword_of_int 0xcf8) avail
+    (* ---- 0xcd4  ecall -- THE ROW THAT MOVES THE CWD ---- *)
+    iApply (wp_uk_ecall_chdir_any N h1 m1 (mword_of_int 0xcd4) avail
               ltac:(rewrite /m1 /usysno
                       (upd_eq m (Regidx a7_idx) (mword_of_int 9 : mword 64));
                     vm_compute; reflexivity)
               ltac:(vm_compute; reflexivity)
               with "[] Hrun [] Hcwd").
-    { iApply (uis_shk_cf8 with "Hcode"). }
+    { iApply (uis_shk_cd4 with "Hcode"). }
     { iApply udepw_of_psok; [ apply Hpsok_free; free_lit | ];
       (discriminate || assumption || (vm_compute; discriminate)). }
-    assert (E1 : add_vec_int (mword_of_int 0xcf8 : mword 64) 4
-                 = mword_of_int 0xcfc)
+    assert (E1 : add_vec_int (mword_of_int 0xcd4 : mword 64) 4
+                 = mword_of_int 0xcd8)
       by (apply bv_eq; vm_compute; reflexivity).
     rewrite E1. iIntros (h2 ret) "Hcwd Hrun".
     set (m2 := <[Regidx a0_idx := ret]> m1).
@@ -382,18 +382,18 @@ Section UkShCd.
                (upd_ne m (Regidx a7_idx) (Regidx ra_idx)
                   (mword_of_int 9 : mword 64)
                   ltac:(vm_compute; discriminate))). }
-    (* ---- 0xcfc  c.jr ra ---- *)
-    iApply (wp_uk_cjr N h2 m2 (mword_of_int 0xcfc) ra_idx
+    (* ---- 0xcd8  c.jr ra ---- *)
+    iApply (wp_uk_cjr N h2 m2 (mword_of_int 0xcd8) ra_idx
               (ret_pc (m !!! Regidx ra_idx)) avail
               ltac:(vm_compute; discriminate)
               ltac:(rewrite Hra; reflexivity)
               with "[] Hrun").
-    { iApply (uis_shk_cfc with "Hcode"). }
+    { iApply (uis_shk_cd8 with "Hcode"). }
     iIntros (h3) "Hrun".
     iApply ("Hcont" $! h3 ret with "Hcwd Hrun").
   Qed.
 
-  (* [wp_kshc_cd] -- main's [cd] arm, 0x97a..0x9be -- IS GONE (lane
+  (* [wp_kshc_cd] -- main's [cd] arm, 0x956..0x99a -- IS GONE (lane
      IO-LEAF, step 4).  The disciplined shell's one line is [echo hello
      world], so the body's dispatch refutes the three byte tests before the
      arm ([UkShFork.wp_kshm_body] at the line fact), and the command

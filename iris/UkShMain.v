@@ -2,7 +2,7 @@
 (* UkShMain.v -- sh's MAIN BODY, SH LANE STAGE 6: the walk from the       *)
 (* blank-line test to the fork, and the two lanes it joins.               *)
 (*                                                                        *)
-(* [UkSh.v] walks main down to 0x97a and hands the rest over as an        *)
+(* [UkSh.v] walks main down to 0x956 and hands the rest over as an        *)
 (* abstract continuation, [UkSh.ush_rest]; [UkShParse.v] proves the       *)
 (* parser and [UkShRun.v]/[UkShDiag.v] the command-tree runner.  Nothing   *)
 (* joined them, and joining them is what this file is: the twenty-odd     *)
@@ -11,16 +11,16 @@
 (*                                                                        *)
 (* WHAT MAIN'S BODY IS, at the pcs the catalog names:                     *)
 (*                                                                        *)
-(*   0x97a  bne s5,a5   -> 0x92c      buf[k] != 'c'                        *)
-(*   0x97e  lbu a5,1(s1)                                                   *)
-(*   0x982  bne s3,a5   -> 0x92c      buf[k+1] != 'd'                      *)
-(*   0x986  lbu a5,2(s1)                                                   *)
-(*   0x98a  bne s6,a5   -> 0x92c      buf[k+2] != ' '                      *)
-(*   0x98e..0x9be                     the cd builtin                       *)
-(*   0x92c  jal fork1                                                      *)
-(*   0x930  c.beqz a0   -> 0x9c0      the CHILD                            *)
-(*   0x932  c.li a0,0 ; 0x934 jal wait  ; falls into 0x938, the loop head  *)
-(*   0x9c0  c.mv a0,s1 ; 0x9c2 jal parsecmd ; 0x9c6 jal runcmd             *)
+(*   0x956  bne s5,a5   -> 0x908      buf[k] != 'c'                        *)
+(*   0x95a  lbu a5,1(s1)                                                   *)
+(*   0x95e  bne s3,a5   -> 0x908      buf[k+1] != 'd'                      *)
+(*   0x962  lbu a5,2(s1)                                                   *)
+(*   0x966  bne s6,a5   -> 0x908      buf[k+2] != ' '                      *)
+(*   0x96a..0x99a                     the cd builtin                       *)
+(*   0x908  jal fork1                                                      *)
+(*   0x90c  c.beqz a0   -> 0x99c      the CHILD                            *)
+(*   0x90e  c.li a0,0 ; 0x910 jal wait  ; falls into 0x914, the loop head  *)
+(*   0x99c  c.mv a0,s1 ; 0x99e jal parsecmd ; 0x9a2 jal runcmd             *)
 (*                                                                        *)
 (* THE SEAM.  [UkShParse.ushp_tree] owns its node at [DfracOwn 1] and     *)
 (* names the argument vector as INDEX PAIRS into the line;                *)
@@ -72,6 +72,7 @@ Require Import UkShRedirs.      (* [ushp_malloc_chain] *)
 Require Import UkShSeam.        (* THE SEAM AND THE CHILD, once *)
 Require Import CtxIdDefs.
 Require User.ShSyms User.ShInstrs.
+Require UkShCmdalloc.
 Require Import ChildTok.  (* [genF] -- the capacity the slot's fork arms name *)
 Local Open Scope Z_scope.
 Import Defs.
@@ -201,9 +202,9 @@ Section UkShMain.
   (* ===================================================================== *)
   (* §4 THE CHILD: parse the line, then run the tree.                       *)
   (*                                                                       *)
-  (*   0x9c0  c.mv a0,s1        the line                                    *)
-  (*   0x9c2  jal  ra,parsecmd  -> the node                                 *)
-  (*   0x9c6  jal  ra,runcmd    -> exec, and never back                     *)
+  (*   0x99c  c.mv a0,s1        the line                                    *)
+  (*   0x99e  jal  ra,parsecmd  -> the node                                 *)
+  (*   0x9a2  jal  ra,runcmd    -> exec, and never back                     *)
   (*                                                                       *)
   (* This is where the theorem's content is: the tree [runcmd] walks is the *)
   (* one [parsecmd] just built out of THIS line, so the [exec] at the       *)
@@ -256,13 +257,16 @@ Section UkShMain.
     (* ...and its children set, index-free: runcmd's LIST and BACK arms
        fork, and the set moves at each ([UkShRun.wp_kshr_fork1]) *)
     UserChildren.uch_any γch -∗ UMalloc -∗
-    urun N h m (mword_of_int 0x9c0)
+    (* the out-of-memory law at this record's own payload: the parser's
+       [cmdalloc] panics ([UkShCmdalloc.ushp_oom]; upstream d66e41c) *)
+    UkShCmdalloc.ushp_oom N (ukn_pay N (-1)) (8 + (UkShDiag.ush_Dg + n) - 2) -∗
+    urun N h m (mword_of_int 0x99c)
       (60 + (8 + (UkShDiag.ush_Dg + n))) -∗
     mWP (Loop : expr riscv_lang).
   Proof using Hpay Hpsok_free.
     intros Hs1 Hns Htoks Htlen Hs0 Hs64 Hs38 Hpx.
     iIntros "#Hdp #Hcode #Hxs #Hkw #Hpcode #Hpro #Hjt Hline Hws Hsy Hstd Hcwd
-             Hch HM Hrun".
+             Hch HM #Hpxw Hrun".
     (* the line's own bytes are non-NUL, which is what makes the line the
        reference parses: [ref_parsecmd] at the symbol-free line is ONE EXEC
        node over exactly these tokens (RefParseBridge.ref_parsecmd_nosym) *)
@@ -283,7 +287,7 @@ Section UkShMain.
                        Hmalloc)))
               Hs0 Hs64 Hs38 Hpx
               with "Hdp Hcode Hxs Hkw Hpcode Hpro Hjt Hline Hws Hsy Hstd Hcwd
-                    Hch HM [] Hrun").
+                    Hch HM [] Hpxw Hrun").
     iIntros "$".
   Qed.
 
@@ -338,20 +342,23 @@ Section UkShMain.
     UserCwd.ucwd_any γcwd -∗
     UserChildren.uch_any γch -∗
     UkShMalloc.ushm_fresh N sz -∗
-    urun N h m (mword_of_int 0x9c0)
+    (* the out-of-memory law at this record's own payload: the parser's
+       [cmdalloc] panics ([UkShCmdalloc.ushp_oom]; upstream d66e41c) *)
+    UkShCmdalloc.ushp_oom N (ukn_pay N (-1)) (8 + (UkShDiag.ush_Dg + n) - 2) -∗
+    urun N h m (mword_of_int 0x99c)
       (60 + (8 + (UkShDiag.ush_Dg + n))) -∗
     mWP (Loop : expr riscv_lang).
   Proof using Hpay Hpsok_free.
     intros Hs1 Hns Htoks Htlen Hs0 Hs64 Hs38 Hszlo Hszal Hszok Hpx.
     iIntros "#Hdp #Hcode #Hxs #Hkw #Hpcode #Hpro #Hjt Hline Hws Hsy Hstd Hcwd
-             Hch HM Hrun".
+             Hch HM #Hpxw Hrun".
     iApply (wp_kshm_child (UkShMalloc.ushm_fresh N sz) (sz + 65536)
               (UkShMalloc.ushm_malloc_ok_holds N Hpsok_free sz
                  Hszlo Hszal Hszok)
               h m dw dv s0 len f toks ld n
               Hs1 Hns Htoks Htlen Hs0 Hs64 Hs38 Hpx
               with "Hdp Hcode Hxs Hkw Hpcode Hpro Hjt Hline Hws Hsy Hstd Hcwd
-                    Hch HM Hrun").
+                    Hch HM Hpxw Hrun").
   Qed.
 
 End UkShMain.

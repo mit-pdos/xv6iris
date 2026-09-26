@@ -5,7 +5,7 @@
 (*                                                                        *)
 (* [UkShPipeRound.wp_kshm_child_pipe] and [UShPipeChild.                  *)
 (* wp_kshm_child_pipe_paid_at_sz] are the mould, one pipe over: sh's      *)
-(* forked child enters at 0x9c0 with the line in s1, parses it, and runs  *)
+(* forked child enters at 0x99c with the line in s1, parses it, and runs  *)
 (* [runcmd] on the answer.  At N stages the parse is                      *)
 (* [UkShPipesCmd.wp_kshp_parsecmd_pipes] and the seam                     *)
 (* [UkShPipesSeam.ush_cmd_of_ushp_pipes], whose cut premise is            *)
@@ -30,7 +30,7 @@
 (* are satisfiable (every law discharged, [UkShPipe.                      *)
 (* wp_kshr_runcmd_pipes_closed]'s statement re-proved through the law)    *)
 (* and the end-to-end walk: raw line bytes of [echo ws | cat | ... | cat] *)
-(* at 0x9c0 to every process's exit.                                      *)
+(* at 0x99c to every process's exit.                                      *)
 (*                                                                        *)
 (* WHAT IS LEFT FOR THE ROUND (C5-C7): the laws themselves at a paying    *)
 (* instance.  The left and last laws are the stage entries at the         *)
@@ -75,6 +75,7 @@ Require Import UkShPipesSeam.
 Require Import UkShPipesCmd.
 Require Import CtxIdDefs.
 Require User.ShSyms User.ShInstrs.
+Require UkShCmdalloc.
 Require Import ChildTok.
 Require Import UexecSG.
 Require Import UexecRet.     (* [uwait_ans] *)
@@ -122,7 +123,7 @@ Section UkShPipesRound.
        ush_wait0_law N Wr Pw ∗
        (* panic("pipe") *)
        □ (∀ (h' : CpuId) (m' : regfile),
-            ⌜ uint (m' !!! Regidx a0_idx) = 0x12d8 ⌝ -∗
+            ⌜ uint (m' !!! Regidx a0_idx) = 0x12b8 ⌝ -∗
             UserFd.ustd (ukn_fd N) ld -∗
             Cr -∗
             urun N h' m' (mword_of_int ShSyms.panic)
@@ -130,7 +131,7 @@ Section UkShPipesRound.
             mWP (Loop : expr riscv_lang)) ∗
        (* the first fork1's panic("fork") *)
        □ (∀ (h' : CpuId) (m' : regfile) (r : mword 64) (γp : pipe_names),
-            ⌜ uint (m' !!! Regidx a0_idx) = 0x12a8 ⌝ -∗
+            ⌜ uint (m' !!! Regidx a0_idx) = 0x1288 ⌝ -∗
             ⌜ r = (mword_of_int (-1) : mword 64) ⌝ -∗
             ((⌜r = (mword_of_int (-1) : mword 64)⌝
                 ∗ UserChildren.uch (ukn_ch N) Sc ∗ RcL γp)
@@ -148,7 +149,7 @@ Section UkShPipesRound.
        (* the second fork1's panic("fork") *)
        □ (∀ (h' : CpuId) (m' : regfile) (r : mword 64) (γp : pipe_names)
             (S1 : gset gname),
-            ⌜ uint (m' !!! Regidx a0_idx) = 0x12a8 ⌝ -∗
+            ⌜ uint (m' !!! Regidx a0_idx) = 0x1288 ⌝ -∗
             ⌜ r = (mword_of_int (-1) : mword 64) ⌝ -∗
             ((⌜r = (mword_of_int (-1) : mword 64)⌝
                 ∗ UserChildren.uch (ukn_ch N) S1 ∗ RcR γp)
@@ -376,7 +377,7 @@ Section UkShPipesRound.
   End Law.
 
   (* ===================================================================== *)
-  (* §1 THE CHILD WALK: 0x9c0 TO runcmd, ANY NUMBER OF STAGES               *)
+  (* §1 THE CHILD WALK: 0x99c TO runcmd, ANY NUMBER OF STAGES               *)
   (* ===================================================================== *)
   Section Child.
     Context (N : uk_names Σ).
@@ -415,10 +416,12 @@ Section UkShPipesRound.
       ustr γd dw ushp_whitespace 5 ushp_ws_f -∗
       ustr γd dv ushp_symbols 7 ushp_sym_f -∗
       UM i -∗
-      (* the parse's payer, whole across [parsecmd] *)
+      (* the parse's payer, whole across [parsecmd], and the out-of-memory
+         law it goes to where [cmdalloc] panics ([UkShCmdalloc.ushp_oom];
+         upstream d66e41c) *)
       Cp -∗
-      □ (Cp -∗ ukn_pay N (-1)) -∗
-      urun N h m (mword_of_int 0x9c0) (68 + (length rest * 6 + k)) -∗
+      UkShCmdalloc.ushp_oom N Cp (20 + (6 + k)) -∗
+      urun N h m (mword_of_int 0x99c) (68 + (length rest * 6 + k)) -∗
       (∀ (h' : CpuId) (m' : regfile) (q : Z),
          ⌜ m' !!! Regidx a0_idx = (mword_of_int q : mword 64) ⌝ -∗
          ush_cmd γd q (ushq_stages s0 len f a rest) -∗
@@ -435,15 +438,15 @@ Section UkShPipesRound.
       iIntros "#Hcode #Hpcode #Hpro Hline Hws Hsy HM Hcp #Hpxw Hrun Hcont".
       iDestruct (ustr_nonul with "Hline") as %Hnn0.
       iDestruct (ustr_len with "Hline") as %Hlen31.
-      (* ---- 0x9c0  c.mv a0,s1 ---- *)
-      iApply (wp_uk_cmv N h m (mword_of_int 0x9c0) a0_idx s1_idx
+      (* ---- 0x99c  c.mv a0,s1 ---- *)
+      iApply (wp_uk_cmv N h m (mword_of_int 0x99c) a0_idx s1_idx
                 (add_vec zero_reg (m !!! Regidx s1_idx))
                 (68 + (length rest * 6 + k))
                 ltac:(unfold unot_sp; vm_compute; discriminate)
                 ltac:(vm_compute; discriminate) eq_refl with "[] Hrun").
-      { iApply (uis_shk_9c0 with "Hcode"). }
-      assert (E9c0 : add_vec_int (mword_of_int 0x9c0 : mword 64) 2
-                     = mword_of_int 0x9c2)
+      { iApply (uis_shk_99c with "Hcode"). }
+      assert (E9c0 : add_vec_int (mword_of_int 0x99c : mword 64) 2
+                     = mword_of_int 0x99e)
         by (apply bv_eq; vm_compute; reflexivity).
       rewrite E9c0. iIntros (h1) "Hrun".
       set (m1 := <[Regidx a0_idx
@@ -457,10 +460,10 @@ Section UkShPipesRound.
         assert (Hm : bv_modulus (MachineWord.Z_idx 64) = 18446744073709551616%Z)
           by (vm_compute; reflexivity).
         rewrite Hm in Hr. exact Hr. }
-      (* ---- 0x9c2  jal ra,parsecmd ---- *)
-      iApply (wp_uk_jal N h1 m1 (mword_of_int 0x9c2)
+      (* ---- 0x99e  jal ra,parsecmd ---- *)
+      iApply (wp_uk_jal N h1 m1 (mword_of_int 0x99e)
                 (mword_of_int 2096812 : mword 21) (mword_of_int 1 : mword 5)
-                (mword_of_int ShSyms.parsecmd) (mword_of_int 0x9c6)
+                (mword_of_int ShSyms.parsecmd) (mword_of_int 0x9a2)
                 (68 + (length rest * 6 + k))
                 ltac:(unfold unot_sp; vm_compute; discriminate)
                 ltac:(vm_compute; discriminate)
@@ -468,16 +471,16 @@ Section UkShPipesRound.
                 ltac:(apply bv_eq; vm_compute; reflexivity)
                 ltac:(vm_compute; reflexivity)
                 with "[] Hrun").
-      { iApply (uis_shk_9c2 with "Hcode"). }
+      { iApply (uis_shk_99e with "Hcode"). }
       iIntros (h2) "Hrun".
       set (m2 := <[Regidx (mword_of_int 1 : mword 5)
-                   := regval_into_reg (mword_of_int 0x9c6 : mword 64)]> m1).
+                   := regval_into_reg (mword_of_int 0x9a2 : mword 64)]> m1).
       assert (Ha0_2 : m2 !!! Regidx a0_idx = (mword_of_int s0 : mword 64))
         by (rewrite /m2 (upd_ne m1 (Regidx (mword_of_int 1 : mword 5))
                            (Regidx a0_idx) _ ltac:(vm_compute; discriminate));
             exact Ha0_1).
       assert (Hra_2 : ret_pc (m2 !!! Regidx (mword_of_int 1 : mword 5))
-                      = (mword_of_int 0x9c6 : mword 64))
+                      = (mword_of_int 0x9a2 : mword 64))
         by (rewrite /m2 (upd_eq m1 (Regidx (mword_of_int 1 : mword 5)) _);
             apply bv_eq; vm_compute; reflexivity).
       (* ---- parsecmd, at any number of bars: the payer crosses it whole ---- *)
@@ -487,10 +490,10 @@ Section UkShPipesRound.
       iIntros (p) "Htree Hbytes Hws Hsy".
       iIntros (h3 m3) "%Hcs3 %Ha0_3 HM3 Hcp Hrun".
       rewrite Hra_2.
-      (* ---- 0x9c6  jal ra,runcmd ---- *)
-      iApply (wp_uk_jal N h3 m3 (mword_of_int 0x9c6)
-                (mword_of_int 2094792 : mword 21) (mword_of_int 1 : mword 5)
-                (mword_of_int ShSyms.runcmd) (mword_of_int 0x9ca)
+      (* ---- 0x9a2  jal ra,runcmd ---- *)
+      iApply (wp_uk_jal N h3 m3 (mword_of_int 0x9a2)
+                (mword_of_int 2094828 : mword 21) (mword_of_int 1 : mword 5)
+                (mword_of_int ShSyms.runcmd) (mword_of_int 0x9a6)
                 (68 + (length rest * 6 + k))
                 ltac:(unfold unot_sp; vm_compute; discriminate)
                 ltac:(vm_compute; discriminate)
@@ -498,10 +501,10 @@ Section UkShPipesRound.
                 ltac:(apply bv_eq; vm_compute; reflexivity)
                 ltac:(vm_compute; reflexivity)
                 with "[] Hrun").
-      { iApply (uis_shk_9c6 with "Hcode"). }
+      { iApply (uis_shk_9a2 with "Hcode"). }
       iIntros (h4) "Hrun".
       set (m4 := <[Regidx (mword_of_int 1 : mword 5)
-                   := regval_into_reg (mword_of_int 0x9ca : mword 64)]> m3).
+                   := regval_into_reg (mword_of_int 0x9a6 : mword 64)]> m3).
       assert (Ha0_4 : m4 !!! Regidx a0_idx = (mword_of_int p : mword 64))
         by (rewrite /m4 (upd_ne m3 (Regidx (mword_of_int 1 : mword 5))
                            (Regidx a0_idx) _ ltac:(vm_compute; discriminate));

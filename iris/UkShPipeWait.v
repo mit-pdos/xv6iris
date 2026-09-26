@@ -6,34 +6,34 @@
 (*  app-pipe SS4.3o, route (a)).                                         *)
 (*                                                                       *)
 (*  WHAT SH-PIPE-ROUND-6 MEASURED AND WHAT IT MISSED.  ROUND-6 refuted   *)
-(*  the later repair thus: between the wait's RETURN (0x938) and the      *)
-(*  point the credential is spent the parent executes [0x938 c.mv],      *)
-(*  [0x93a c.mv], [0x93c jal getcmd] -- no later-providing leaf; and    *)
+(*  the later repair thus: between the wait's RETURN (0x914) and the      *)
+(*  point the credential is spent the parent executes [0x914 c.mv],      *)
+(*  [0x916 c.mv], [0x918 jal getcmd] -- no later-providing leaf; and    *)
 (*  design SS4.3o then ruled a later-providing [c.mv] (landed:           *)
 (*  [UkRunLeaf.wp_uk_cmv_later]) plus a [▷]-accepting loop head.  Both   *)
 (*  halves of that are wrong in the same way:                            *)
 (*                                                                       *)
-(*   - a [▷] stripped AT 0x938 consumes the LOOP HEAD'S OWN FIRST        *)
-(*     INSTRUCTION, and the loop offers no re-entry at 0x93a; and the    *)
+(*   - a [▷] stripped AT 0x914 consumes the LOOP HEAD'S OWN FIRST        *)
+(*     INSTRUCTION, and the loop offers no re-entry at 0x916; and the    *)
 (*     head cannot be weakened to accept [▷ ush_pstate] either, for the  *)
-(*     same reason -- from [UkShLoop.ushl_head] at 0x938 there is no way *)
-(*     to reach 0x93a.  (See the lane's report.)                         *)
+(*     same reason -- from [UkShLoop.ushl_head] at 0x914 there is no way *)
+(*     to reach 0x916.  (See the lane's report.)                         *)
 (*                                                                       *)
 (*   - but the resource whose later has to be stripped is available      *)
-(*     EARLIER than 0x938: the escrow token rides [UexecRet.             *)
-(*     uwait_ans_pid], which the wait ECALL delivers at 0xc90, and       *)
+(*     EARLIER than 0x914: the escrow token rides [UexecRet.             *)
+(*     uwait_ans_pid], which the wait ECALL delivers at 0xc6c, and       *)
 (*     [UkShRun.wp_kshr_wait_pid] then runs ONE more instruction --      *)
-(*     [0xc94 c.jr ra] -- before control reaches the caller's return     *)
+(*     [0xc70 c.jr ra] -- before control reaches the caller's return     *)
 (*     address.  That instruction is a later-providing step              *)
 (*     ([UkRunLeaf.wp_uk_cjr_later], landed by this lane).               *)
 (*                                                                       *)
 (*  So this file is [UkShRun.wp_kshr_wait_pid] with its last instruction *)
 (*  taken over: the continuation is handed the ANSWER (and the children  *)
-(*  set and the pid handle) at 0xc94, and owes the rest of the walk --   *)
+(*  set and the pid handle) at 0xc70, and owes the rest of the walk --   *)
 (*  from the caller's return address -- UNDER A [▷].  A caller redeems   *)
 (*  its child's exit payload with [ChildTok.gen_pay] out of the answer,  *)
 (*  lands the [▷ Q] inside that later, and re-enters the command loop at *)
-(*  0x938 with [Q] LATER-FREE, which is the only shape                   *)
+(*  0x914 with [Q] LATER-FREE, which is the only shape                   *)
 (*  [UkShLoop.ushl_head] accepts.                                        *)
 (*                                                                       *)
 (*  NOTHING LANDED MOVES: [UkShRun.wp_kshr_wait_pid] is untouched and    *)
@@ -103,38 +103,38 @@ Section UkShPipeWait.
   Proof using Hpsok_free.
     intros Ha0. iIntros "#Hcode Hrun Hch Hpid Hcont".
     rewrite UkShRun.shr_wait.
-    (* ---- 0xc8e  c.li a7,3 ---- *)
-    iApply (wp_uk_cli N h m (mword_of_int 0xc8e)
+    (* ---- 0xc6a  c.li a7,3 ---- *)
+    iApply (wp_uk_cli N h m (mword_of_int 0xc6a)
               (mword_of_int 3 : mword 6) a7_idx avail
               ltac:(unfold unot_sp; vm_compute; discriminate)
               ltac:(vm_compute; discriminate) with "[] Hrun").
-    { iApply (uis_shk_c8e with "Hcode"). }
+    { iApply (uis_shk_c6a with "Hcode"). }
     assert (Em : <[Regidx a7_idx
                    := regval_into_reg (sign_extend' 64
                         (mword_of_int 3 : mword 6) : mword 64)]> m
                  = <[Regidx a7_idx := (mword_of_int 3 : mword 64)]> m)
       by (f_equal; apply bv_eq; vm_compute; reflexivity).
-    assert (E0 : add_vec_int (mword_of_int 0xc8e : mword 64) 2
-                 = mword_of_int 0xc90)
+    assert (E0 : add_vec_int (mword_of_int 0xc6a : mword 64) 2
+                 = mword_of_int 0xc6c)
       by (apply bv_eq; vm_compute; reflexivity).
     rewrite E0 Em. iIntros (h1) "Hrun".
     set (m1 := <[Regidx a7_idx := (mword_of_int 3 : mword 64)]> m).
     assert (Ha0_1 : uint (m1 !!! Regidx a0_idx) = 0).
     { rewrite /m1 (upd_ne m (Regidx a7_idx) (Regidx a0_idx) _
                      ltac:(vm_compute; discriminate)). exact Ha0. }
-    (* ---- 0xc90  ecall -- the wait row at a null status pointer ---- *)
-    iApply (wp_uk_ecall_wait_null_pid N h1 m1 (mword_of_int 0xc90) avail Sc p
+    (* ---- 0xc6c  ecall -- the wait row at a null status pointer ---- *)
+    iApply (wp_uk_ecall_wait_null_pid N h1 m1 (mword_of_int 0xc6c) avail Sc p
               ltac:(rewrite /m1 /usysno
                       (upd_eq m (Regidx a7_idx) (mword_of_int 3 : mword 64));
                     vm_compute; reflexivity)
               Ha0_1
               ltac:(vm_compute; reflexivity)
               with "[] Hrun [] Hch Hpid").
-    { iApply (uis_shk_c90 with "Hcode"). }
+    { iApply (uis_shk_c6c with "Hcode"). }
     { iApply udepw_of_psok; [ apply Hpsok_free; free_lit | ];
       (discriminate || assumption || (vm_compute; discriminate)). }
-    assert (E1 : add_vec_int (mword_of_int 0xc90 : mword 64) 4
-                 = mword_of_int 0xc94)
+    assert (E1 : add_vec_int (mword_of_int 0xc6c : mword 64) 4
+                 = mword_of_int 0xc70)
       by (apply bv_eq; vm_compute; reflexivity).
     rewrite E1. iIntros (h2 ret Sc' pidv) "%Hpv Hpid %Hm1 Hans Hrun Hch".
     set (m2 := <[Regidx a0_idx := ret]> m1).
@@ -146,13 +146,13 @@ Section UkShPipeWait.
                (upd_ne m (Regidx a7_idx) (Regidx ra_idx)
                   (mword_of_int 3 : mword 64)
                   ltac:(vm_compute; discriminate))). }
-    (* ---- 0xc94  c.jr ra -- AND THIS IS THE STEP THAT PAYS THE LATER --- *)
-    iApply (UkRunLeaf.wp_uk_cjr_later N h2 m2 (mword_of_int 0xc94) ra_idx
+    (* ---- 0xc70  c.jr ra -- AND THIS IS THE STEP THAT PAYS THE LATER --- *)
+    iApply (UkRunLeaf.wp_uk_cjr_later N h2 m2 (mword_of_int 0xc70) ra_idx
               (ret_pc (m !!! Regidx ra_idx)) avail
               ltac:(vm_compute; discriminate)
               ltac:(rewrite Hra; reflexivity)
               with "[] Hrun [Hcont Hpid Hans Hch]").
-    { iApply (uis_shk_c94 with "Hcode"). }
+    { iApply (uis_shk_c70 with "Hcode"). }
     iApply ("Hcont" $! ret Sc' pidv with "[%] Hpid [%] Hans Hch");
       [ exact Hpv | exact Hm1 ].
   Qed.

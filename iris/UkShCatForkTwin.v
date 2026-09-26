@@ -105,7 +105,7 @@ Section UkShCatForkTwin.
     UkSh.ush_bstate N γp T Wc Wb Pm l (FileDisc.uline_ws (FileDisc.LCat nm)) -∗
     UkShLoop.ushl_dat γd -∗ usz γs sz -∗
     ubytes γd sh_buf sh_nbuf f -∗
-    urun N h m (mword_of_int 0x97a) (16 + (UkSh.ush_Dbody + n)) -∗
+    urun N h m (mword_of_int 0x956) (16 + (UkSh.ush_Dbody + n)) -∗
     mWP (Loop : expr riscv_lang).
   Proof using HT Hpay Hpsok_free.
     exact (UkShRedirBody.wp_kshm_body_cat_with N γp T Wc Wb Pm kshf_fork_law_pipe

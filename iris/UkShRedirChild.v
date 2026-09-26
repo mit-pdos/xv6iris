@@ -1,5 +1,5 @@
 (* ===================================================================== *)
-(*  UkShRedirChild.v -- THE REDIRECT CHILD'S WALK, 0x9c0 TO ITS EXITS     *)
+(*  UkShRedirChild.v -- THE REDIRECT CHILD'S WALK, 0x99c TO ITS EXITS     *)
 (*                                                                       *)
 (*  [UkShRedirSeam.wp_kshm_child_alloc_redir_g] (parse, close(1), the     *)
 (*  open as the application's call) with both of its continuations        *)
@@ -33,6 +33,7 @@ Require Import UkShMalloc.
 Require Import UkShRedirCut.    (* [ushs_nulcut]: the redirect line's cut *)
 Require Import UkShEcho.        (* [echo_argv_bytes] and the exec arm *)
 Require Import UkShRedirSeam.   (* [wp_kshm_child_alloc_redir]: the walk *)
+Require UkShCmdalloc.
 Require Import UShLexRedir.     (* [ush_line_toks_holds_redir] *)
 Require Import PipeNames.
 Require Import UkShRedirLine.   (* [ushs_line_is] and the typed bridge *)
@@ -126,11 +127,12 @@ Section UkShRedirChild.
     UkShDiag.ush_execfail_law_at (FileDisc.alt_openfailN file) (13 + length file)%nat
       (Kf a ∗ Cr') Cd -∗
     □ (Cd -∗ Q (-1)) -∗
-    (* ...and the lend, whole across the parse and split at the call *)
-    □ (Cr -∗ Q (-1)) -∗
+    (* ...and the lend, whole across the parse (its out-of-memory law,
+       [UkShCmdalloc.ushp_oom]; upstream d66e41c) and split at the call *)
+    UkShCmdalloc.ushp_oom N' Cr (4 + (UkShDiag.ush_Dg + n) - 2) -∗
     (Cr -∗ Dd a ∗ Cr') -∗
     Cr -∗
-    urun N' h m (mword_of_int 0x9c0)
+    urun N' h m (mword_of_int 0x99c)
       (68 + (8 + (UkShDiag.ush_Dg + n))) -∗
     mWP (Loop : expr riscv_lang).
   Proof using Hpsok_free.
@@ -169,11 +171,10 @@ Section UkShRedirChild.
               Hs1 Hred Htoks Hpos Htlen Hs0 Hs64 Hs38 Hst1 Hne Hnp
               Hszlo Hszal Hszok
               with "Hcode Hjt Hpcode Hpro Hstr Hws Hsy Hstd Hcwd HM
-                    [Hopen] [] Hsplit Hcr Hrun").
+                    [Hopen] Hpx Hsplit Hcr Hrun").
     { iApply (UkShRedirPaid.ush_open_call_g_of_call2 N' fu file 1537
                 (<[1%nat := FdClosed]> ld) K Dd Kf a Hfu Hful Hfub Hfdl
                 with "Hopen"). }
-    { iIntros "!> Hc". rewrite Hpeq. iApply ("Hpx" with "Hc"). }
     iSplit.
     - (* ============ the open SUCCEEDED: exec /echo at fd 1 = f ============ *)
       iIntros (hf mf q ty) "%Ha0f #Hsub Hstd Hcwd HK HM2 Hcr Hrun".
