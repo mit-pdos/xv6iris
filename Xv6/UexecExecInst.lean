@@ -63,13 +63,13 @@ Rocq's header, point for point:
    Lean has no application interface (FirstTok deviation 1): the kill
    credential is MachCSL's `killCred` (SpecSyscall deviation 6) and the
    licence is its own persistent conjunct (Rocq's pre-SUP-ONE triple).
-4. **NO PIPE / CLOSE / EXIT ROWS.**  Rocq's rows 2 (`fileclose_cpays`) and
-   21 (`fileclose_cpay`) and the pipe/close posts (`pipe_qfrag`,
-   `fileclose_cpost_any`) are the byte queue's payments; Lean's pipe layer
-   has no queue ghost and sys_pipe/sys_close/sys_exit take no deposit, so
-   those bundles and posts are `emp` (and so are the `Xfam` fields
-   `rf_pq`/`rf_pqe`/`wf_Qe`/`cl_P`, and `srow_reg` -- not a field of the
-   landed class).
+4. **THE PIPE ROWS, PARTLY.**  Rocq's rows 2 (`fileclose_cpays` of the
+   key's table) and 21 (`fileclose_cpay` at the key's descriptor, payload
+   `cl_P`) and close's post (`fileclose_cpost_any`) are here (appended LAST
+   in the match, Rocq's order, so every reader keeps its skip count); the
+   pipe post (`pipe_qfrag … pst0`) is `emp` until sys_pipe hands out the
+   fragment, and the read/write pipe families (`rf_pq`/`rf_pqe`/`wf_Qe`)
+   are not fields yet.
 5. (retired: row 16 was the interim `filewriteChainIn` while
    `filewriteIn` carried a no-wrap conjunct; SpecFilewrite deviation 5 is
    retired, so row 16 is Rocq's `filewrite_in`, `SpecFilewrite.filewriteIn`,
@@ -93,6 +93,7 @@ Rocq's header, point for point:
 import Xv6.FsAbsInvFire
 import Xv6.SysExecNe
 import Xv6.SpecSyscall
+import Xv6.SpecFileclose
 
 namespace Xv6
 
@@ -244,6 +245,8 @@ structure Xfam (GF : BundledGFunctors) where
   dFun : Pfam GF (Aview → Nat → IProp GF)
   dFok : Pfam GF (Aview → Nat → Fname → Nat → IProp GF)
   dFex : Pfam GF (Aview → Nat → Fname → Nat → IProp GF)
+  /-- close (21): the close link's payload (Rocq `cl_P`) -/
+  clP : IProp GF
   /-- fork (1): what the CHILD's exit owes back (`UexecSG.sforkPay`) -/
   kfPay : Int → IProp GF
   /-- fork (1): what the parent LENDS the child (`UexecSG.sforkLend`) -/
@@ -299,6 +302,7 @@ def xfamPt : Xfam GF where
   dFun := pfamTriv (fun _ _ => iprop(True))
   dFok := pfamTriv (fun _ _ _ _ => iprop(True))
   dFex := pfamTriv (fun _ _ _ _ => iprop(True))
+  clP := iprop(True)
   kfPay := fun _ => iprop(True)
   kfLend := iprop(emp)
   kfXpay := fun _ => iprop(True)
@@ -469,6 +473,8 @@ def xv6SbundleRest (n : Int) (f : Xfam GF) (W : Uvis) : IProp GF :=
   else if n = 19 then xrowLink (hlc := hlc) f.lFtgt f.lFent f.lFunt
   else if n = 20 then xrowMkdir (hlc := hlc) f.dP f.dPmiss f.dFarm f.dFdots f.dFun f.dFok f.dFex W
   else if n = 6 then uKillCred (hlc := hlc)
+  else if n = 21 then filecloseCpay (hlc := hlc) (fdStOfKey (xkA W 0) W.fd) f.clP
+  else if n = USYS_exit then filecloseCpays (hlc := hlc) W.fd
   else iprop(emp)
 
 /-- **Rocq `xv6_sbundle`**: ONE MATCH ON THE NUMBER. -/
@@ -489,6 +495,8 @@ def xv6Spost (_X : Uvis → IProp GF) (n : Int) (f : Xfam GF) (W : Uvis) (r : Bi
   else if n = 18 then xpostUnlink (hlc := hlc) f.uP f.uPmiss f.uFent f.uFtgt f.uFex f.uFmiss W r
   else if n = 19 then xpostLink (hlc := hlc) f.lFtgt f.lFent f.lFunt r
   else if n = 20 then xpostMkdir (hlc := hlc) f.dP f.dPmiss f.dFarm f.dFdots f.dFun f.dFok f.dFex W r
+  else if n = USYS_pipe then iprop(emp)
+  else if n = 21 then filecloseCpostAny (hlc := hlc) (fdStOfKey (xkA W 0) W.fd) f.clP
   else iprop(emp)
 
 /-! ### Non-expansiveness, the key congruence, monotonicity -/
@@ -697,6 +705,18 @@ theorem xv6SbundleRest_supply (n : Int) (W : Uvis) :
     iintro #⟨-, Hkc, -⟩
     iexact Hkc
   rw [if_neg h6]
+  by_cases h21 : n = 21
+  · rw [if_pos h21]
+    unfold xv6Ssupply
+    iintro #⟨-, Hkc, -⟩
+    iapply filecloseCpay_taint _ _ $$ Hkc
+  rw [if_neg h21]
+  by_cases h2 : n = USYS_exit
+  · rw [if_pos h2]
+    unfold xv6Ssupply
+    iintro #⟨-, Hkc, -⟩
+    iapply filecloseCpays_taint _ $$ Hkc
+  rw [if_neg h2]
   iintro _
   iempintro
 
@@ -805,7 +825,7 @@ every other free number's bundle is `emp`). -/
 theorem xv6Sbundle_free (X : Uvis → IProp GF) (n : Int) (W : Uvis) (Q : Int → IProp GF)
     (hn : freeNum n) :
     ⊢ |==> ∃ f : Xfam GF, ⌜f.kfXpay = Q⌝ ∗ xv6Sbundle (hlc := hlc) X n f W := by
-  obtain ⟨hx, h5, h6, h15, h16, h17, h18, h19, h20⟩ := hn
+  obtain ⟨hx, h5, h6, h15, h16, h17, h18, h19, h20, h21, h2⟩ := hn
   imodintro
   iexists (xfamAt Q xfamPt)
   isplitr
@@ -815,7 +835,8 @@ theorem xv6Sbundle_free (X : Uvis → IProp GF) (n : Int) (W : Uvis) (Q : Int �
   rw [if_neg hx, if_neg h5]
   by_cases h9 : n = 9
   · rw [if_pos h9]; unfold xrowChdir; iapply fsabsChdirPre
-  rw [if_neg h9, if_neg h15, if_neg h16, if_neg h17, if_neg h18, if_neg h19, if_neg h20, if_neg h6]
+  rw [if_neg h9, if_neg h15, if_neg h16, if_neg h17, if_neg h18, if_neg h19, if_neg h20, if_neg h6,
+    if_neg h21, if_neg h2]
   iempintro
 
 /-! ## §5 THE PER-NUMBER READERS, and the laws the arms take
@@ -835,7 +856,8 @@ theorem syscSpostEmp_xv6 : SyscSpostEmp (GF := GF) := by
   unfold xv6Spost
   have h7 : n ≠ USYS_exec := fun h => hno (by simp [h, USYS_exec])
   rw [if_neg h7, if_neg (by omega), if_neg (by omega), if_neg (by omega), if_neg (by omega),
-    if_neg (by omega), if_neg (by omega), if_neg (by omega), if_neg (by omega)]
+    if_neg (by omega), if_neg (by omega), if_neg (by omega), if_neg (by omega),
+    if_neg (show ¬ n = USYS_pipe by unfold USYS_pipe; omega), if_neg (by omega)]
   exact .rfl
 
 /-- pipe's out row (Rocq `spost_at_pipe_intro`; deviation 4: `emp`). -/
@@ -847,26 +869,51 @@ theorem spostAt_pipe_xv6 (X : Uvis → IProp GF) (f : Xfam GF) (W : Uvis) (r : B
   simp only [Int.reduceEq, if_false]
   exact .rfl
 
-/-- close's out row (Rocq `spost_at_close_intro`; deviation 4: `emp`). -/
+/-- close's out row (Rocq `spost_at_close_intro`): the close payment's
+answer at the key. -/
 theorem spostAt_close_xv6 (X : Uvis → IProp GF) (f : Xfam GF) (W : Uvis) (r : BitVec 64) (M' : ElfMem)
     (fdv' : List FdState) (cw' : Nat) (cs' : ExtTreeSet GName compare) :
-    ⊢ @UexecSG.spostAt GF _ uexecSGXv6 X 21 f W r M' fdv' cw' cs' := by
-  show ⊢ xv6Spost (hlc := hlc) X 21 f W r M' fdv' cw' cs'
-  unfold xv6Spost USYS_exec
-  simp only [Int.reduceEq, if_false]
+    filecloseCpostAny (hlc := hlc) (fdStOfKey (xkA W 0) W.fd) f.clP ⊢
+      @UexecSG.spostAt GF _ uexecSGXv6 X 21 f W r M' fdv' cw' cs' := by
+  show _ ⊢ xv6Spost (hlc := hlc) X 21 f W r M' fdv' cw' cs'
+  unfold xv6Spost USYS_exec USYS_pipe
+  simp only [Int.reduceEq, if_false, if_true]
   exact .rfl
+
+/-- **Rocq `sbundle_at_close_elim`**: row 21 is the close payment at the
+descriptor key argument 0 names. -/
+theorem sbundleAt_close_elim_xv6 (X : Uvis → IProp GF) (f : Xfam GF) (W : Uvis) :
+    @UexecSG.sbundleAt GF _ uexecSGXv6 X 21 f W ⊢
+      filecloseCpay (hlc := hlc) (fdStOfKey (xkA W 0) W.fd) f.clP := by
+  show xv6Sbundle (hlc := hlc) X 21 f W ⊢ _
+  unfold xv6Sbundle xv6SbundleRest USYS_exec
+  simp only [Int.reduceEq, if_false, if_true]
+  exact .rfl
+
+/-- **Rocq `sbundle_at_exit_elim`**: row 2 is the close payments of the key's
+whole table. -/
+theorem sbundleAt_exit_elim_xv6 (X : Uvis → IProp GF) (f : Xfam GF) (W : Uvis) :
+    @UexecSG.sbundleAt GF _ uexecSGXv6 X USYS_exit f W ⊢ filecloseCpays (hlc := hlc) W.fd := by
+  show xv6Sbundle (hlc := hlc) X USYS_exit f W ⊢ _
+  unfold xv6Sbundle xv6SbundleRest USYS_exec USYS_exit
+  simp only [Int.reduceEq, if_false, if_true]
+  exact .rfl
+
+/-- **Rocq `xv6_sbundle_exit_nopipe`**: at a pipe-free table the exit row is
+minted from nothing. -/
+theorem sbundleAt_exit_nopipe_xv6 (X : Uvis → IProp GF) (f : Xfam GF) (W : Uvis)
+    (h : ∀ st ∈ W.fd, fdstNopipe st) :
+    ⊢ @UexecSG.sbundleAt GF _ uexecSGXv6 X USYS_exit f W := by
+  show ⊢ xv6Sbundle (hlc := hlc) X USYS_exit f W
+  unfold xv6Sbundle xv6SbundleRest USYS_exec USYS_exit
+  simp only [Int.reduceEq, if_false, if_true]
+  exact filecloseCpays_nopipe W.fd h
 
 /-- pipe's law shape at the instance: the (empty) deposit pays the (empty) post. -/
 theorem sbundleAt_spostAt_pipe_xv6 (X : Uvis → IProp GF) (f : Xfam GF) (W : Uvis) (r : BitVec 64)
     (M' : ElfMem) (fdv' : List FdState) (cw' : Nat) (cs' : ExtTreeSet GName compare) :
     @UexecSG.sbundleAt GF _ uexecSGXv6 X 4 f W ⊢ @UexecSG.spostAt GF _ uexecSGXv6 X 4 f W r M' fdv' cw' cs' :=
   (BIAffine.affine _).affine.trans (spostAt_pipe_xv6 (hlc := hlc) X f W r M' fdv' cw' cs')
-
-/-- close's likewise. -/
-theorem sbundleAt_spostAt_close_xv6 (X : Uvis → IProp GF) (f : Xfam GF) (W : Uvis) (r : BitVec 64)
-    (M' : ElfMem) (fdv' : List FdState) (cw' : Nat) (cs' : ExtTreeSet GName compare) :
-    @UexecSG.sbundleAt GF _ uexecSGXv6 X 21 f W ⊢ @UexecSG.spostAt GF _ uexecSGXv6 X 21 f W r M' fdv' cw' cs' :=
-  (BIAffine.affine _).affine.trans (spostAt_close_xv6 (hlc := hlc) X f W r M' fdv' cw' cs')
 
 /-- **Rocq `sbundle_at_kill_elim`** / `sysc_dep_kill`: row 6 is the kill
 credential (no out). -/

@@ -16,13 +16,13 @@ re-spec, no not-init premise: init's exit ends in the live
   `fsReady`; init's identity is the dispatch's `syscInitId ip`; the four
   explicit families are the dispatch's.
 
-## Deviations from Rocq
-
-1. Rocq's exit deposit (`sysc_dep_exit`: `fileclose_cpays sts`) has no Lean
-   taker -- Lean's sys_exit takes `∃ sts, fdFrags V.fdg sts` only -- so the
-   syscall channel `syscSysIn` is dropped at this arm.
+* THE EXIT DEPOSIT (Rocq `sysc_dep_exit`, lane PQ-C): exit deposits a
+  bundle row like any returning number -- the close payments of the key's
+  whole table (`SyscDepExit`, `filecloseCpays sts`) -- and sys_exit relays
+  them to kexit at the dispatch's own table.
 -/
 import Xv6.SyscallRet
+import Xv6.SyscallArmsFdDefs
 
 namespace Xv6
 
@@ -67,7 +67,7 @@ set_option maxHeartbeats 4000000 in
 /-- **Arm 2, `sys_exit`** (Rocq `sysc_arm_exit`): the right conjunct. -/
 theorem syscall_arm_exit (SX : SYSEXIT)
     (PT : SchedNames → IProp GF) [hPT : ∀ Γ, Persistent (PT Γ)] (Γ : SchedNames)
-    [ClaimIs (hlc := hlc) GF Γ]
+    [ClaimIs (hlc := hlc) GF Γ] (hDX : SyscDepExit (hlc := hlc) (GF := GF))
     (c0 cpu : CPU) (k : KCtx) (spie spp : Bool) (R : RegMap) (γw : GName) (γ : FileNames) (j : Nat)
     (pid : BitVec 32) (V : ProcPriv) (M : Nat → List (BitVec 8)) (sts : List FdState) (gn : GName)
     (cs : ExtTreeSet GName compare) (ip : BitVec 64) (f : UexecSG.sfam GF)
@@ -79,11 +79,14 @@ theorem syscall_arm_exit (SX : SYSEXIT)
     syscArmBody 2 PT Γ c0 cpu k spie spp R γw γ j pid V M sts gn cs ip f hE hj hproc hK hnoff htier hgn
       hnum hpins hs1 hs2 hra := by
   unfold syscArmBody
-  iintro ⟨Hk, Hpc, Hframe, #Hpi, Hte, Hce, #Hwl, Hbs, Hip, Hfd, Hir, #Henv, Hpriv, Hfr, Hch, -, -, Hpay,
+  iintro ⟨Hk, Hpc, Hframe, #Hpi, Hte, Hce, #Hwl, Hbs, Hip, Hfd, Hir, #Henv, Hpriv, Hfr, Hch, Hsi, -, Hpay,
     Hslot⟩
   icases Hslot with ⟨-, Hcl⟩
   icases kctx_tier _ _ $$ Hk with ⟨%hti, Hk⟩
   have hn2 : syscNum V = (2 : Int) := hnum
+  -- THE EXIT DEPOSIT (Rocq `sysc_dep_exit`): the table's close payments
+  ihave Hsi := syscSysIn_at f V M sts gn cs pid USYS_exit hn2 (by unfold USYS_exit USYS_fork; decide) $$ Hsi
+  ihave Hcp := hDX f V M sts gn cs pid $$ Hsi
   have hct : curTier = KTier.kpt := by rw [← hti]; exact htier
   have hprocK : (((k.withSpie spie spp).pushed 4).withRegs R).proc = procAddr j := hproc
   have hnoffK : (((k.withSpie spie spp).pushed 4).withRegs R).noff = 0 := hnoff
@@ -108,7 +111,7 @@ theorem syscall_arm_exit (SX : SYSEXIT)
     unfold KCtx.sp
     iexact Hcl
   have hU := SX.wp_sys_exit_eb (hlc := hlc) (GF := GF) Γ cpu
-    (((k.withSpie spie spp).pushed 4).withRegs R) γw γft γ fscKalloc fsReadyKmem none j pid V M ip v cs
+    (((k.withSpie spie spp).pushed 4).withRegs R) γw γft γ fscKalloc fsReadyKmem none j pid V M ip v cs sts
     (UexecSG.sexitPay f) hj hprocK hv
     (by k_norm_g; have : sysExitSlots + 4 ≤ syscallSlots := by decide
         omega)
@@ -123,9 +126,7 @@ theorem syscall_arm_exit (SX : SYSEXIT)
   rw [syscTarget_exit]
   iapply hU
   ihave Hip := (show syscInitId (GF := GF) ip ⊢ initIdentAt curCtx ip from .rfl) $$ Hip
-  iframe Hk Hpi Hte Hce Hwl Hip Hft Hpe Hkl Hka Hrdy Hbs Hfd Hir Hpriv Hch Hmy Hq Hpc
-  isplitl [Hfr]
-  · iexists sts; iexact Hfr
+  iframe Hk Hpi Hte Hce Hwl Hip Hft Hpe Hkl Hka Hrdy Hbs Hfd Hir Hpriv Hfr Hcp Hch Hmy Hq Hpc
   iexact Hcl
 
 end

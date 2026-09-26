@@ -24,6 +24,11 @@ descriptor may have held a pipe's last end).  fileclose's IREF LOAN
 FS arm needs is LENT out of the block for the call (Rocq's
 `proc_priv_pid_ofile` lending).  THE CROSSING IS THE LITERAL `true`.
 
+THE BYTE QUEUE'S CLOSE PAYMENT (Rocq lane PQ-b, design/pipe.md "The byte
+queue"): `filecloseCpay (sysFdSt v V.ofile sts) Φc` in -- the syscall
+dispatcher pays it out of the process's close deposit (bundle row 21) --
+and `filecloseCpostAny` of the same state back.
+
 DEVIATIONS from Rocq: eb-generic at DEPTH 0 (`hnoff : k.noff = 0`; Rocq's
 `cpu_own n eb` at a generic `n` -- fileclose's Lean contract is at depth 0,
 SpecFileclose deviation 1; every caller is the syscall dispatch at depth 0);
@@ -61,15 +66,19 @@ def sysClosePost (γ : FileNames) (γd : GName) (pa : BitVec 64) (pid : BitVec 3
   (∃ (fd : Nat) (fv : BitVec 64), ⌜r = 0#64 ∧ argFd v V.ofile = some (fd, fv)⌝ ∗
     procPrivFd γ pa pid { V with ofile := V.ofile.set fd 0#64 } M ∗ fdFrags γd (sts.set fd .closed))
 
-/-- What sys_close's caller resumes with: the `true` crossing. -/
+/-- What sys_close's caller resumes with: the `true` crossing.  The close
+payment's answer comes back at the state argument 0 names (Rocq
+`fileclose_cpost_any (sys_fd_st v (pv_ofile V) sts) Φc`): the link fired
+(the end's last close), or the payment back. -/
 def sysCloseCont (Γ : SchedNames) (cpu : CPU) (k : KCtx) (γ : FileNames) (γd : GName)
     (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv) (M : Nat → List (BitVec 8)) (sts : List FdState)
-    (v : BitVec 64) (j : Nat) (γkl : GName) (γk : KmemNames) : IProp GF :=
+    (v : BitVec 64) (j : Nat) (γkl : GName) (γk : KmemNames) (Φc : IProp GF) : IProp GF :=
   wpNext true k.proc cpu (fun cpu' => iprop(∀ (spie spp : Bool) (R' : RegMap),
     ⌜calleeSaved k.regs R'⌝ -∗
     kctx cpu' ((k.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k.regs 1#5)) -∗
     trapCsrsExt cpu' k.sie -∗ cpuClaimExt cpu' k.sie k.proc -∗
     sysClosePost γ γd pa pid V M sts v (R' 10#5) -∗
+    filecloseCpostAny (hlc := hlc) (sysFdSt v V.ofile sts) Φc -∗
     -- the whole environment back (the page count may have moved)
     (∃ on', fileclosePipeEnv (hlc := hlc) Γ γkl γk on') -∗
     filecloseFsEnv (hlc := hlc) Γ j k.proc -∗
@@ -80,7 +89,7 @@ depth 0. -/
 def wp_sys_close_eb_body (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ] (cpu : CPU) (k : KCtx)
     (γl : GName) (γ : FileNames)
     (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv) (M : Nat → List (BitVec 8)) (sts : List FdState)
-    (v : BitVec 64) (j : Nat) (γkl : GName) (γk : KmemNames) (on : Option Nat)
+    (v : BitVec 64) (j : Nat) (γkl : GName) (γk : KmemNames) (on : Option Nat) (Φc : IProp GF)
     (hv : V.tf[tfArgIdx 0]? = some v) (hproc : k.proc = pa) (htier : k.tier = KTier.kpt)
     (hsp : 48 ≤ (k.regs 2#5).toNat)
     (hnoff : k.noff = 0) (hK : sysCloseSlots ≤ k.avail) : Prop :=
@@ -90,7 +99,11 @@ def wp_sys_close_eb_body (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ] (cpu : C
   procPrivFd γ pa pid V M ∗ fdFrags V.fdg sts ∗
   irefSlot ∗
   fileclosePipeEnv (hlc := hlc) Γ γkl γk on ∗ filecloseFsEnv (hlc := hlc) Γ j k.proc ∗
-  sysCloseCont Γ cpu k γ V.fdg pa pid V M sts v j γkl γk
+  -- THE BYTE QUEUE'S CLOSE PAYMENT at the descriptor argument 0 names
+  -- (Rocq `fileclose_cpay (sys_fd_st v (pv_ofile V) sts) Φc`, design/pipe.md
+  -- "The byte queue"): a close link on a pipe descriptor, nothing elsewhere
+  filecloseCpay (hlc := hlc) (sysFdSt v V.ofile sts) Φc ∗
+  sysCloseCont Γ cpu k γ V.fdg pa pid V M sts v j γkl γk Φc
   ⊢ wpLoop (GF := GF) cpu
 
 end
@@ -102,9 +115,9 @@ structure SYSCLOSE : Prop where
     [Appcfg GF] [FileG GF] [Fscfg] [Icfg] [CurCtx]
     (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ] (cpu : CPU) (k : KCtx) (γl : GName) (γ : FileNames)
     (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv) (M : Nat → List (BitVec 8)) (sts : List FdState)
-    (v : BitVec 64) (j : Nat) (γkl : GName) (γk : KmemNames) (on : Option Nat)
+    (v : BitVec 64) (j : Nat) (γkl : GName) (γk : KmemNames) (on : Option Nat) (Φc : IProp GF)
     hv hproc htier hsp hnoff hK,
-    wp_sys_close_eb_body (hlc := hlc) (GF := GF) Γ cpu k γl γ pa pid V M sts v j γkl γk on
+    wp_sys_close_eb_body (hlc := hlc) (GF := GF) Γ cpu k γl γ pa pid V M sts v j γkl γk on Φc
       hv hproc htier hsp hnoff hK
 
 end Xv6

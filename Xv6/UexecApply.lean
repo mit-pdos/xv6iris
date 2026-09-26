@@ -206,9 +206,12 @@ theorem uexecArmF_key_mono (S : Uvis → IProp GF) (HS : UKeyCong S) (sc : BitVe
           (fun r cs' => iprop(⌜usysChOk (uvisNum W') r W'.ch cs'⌝)) := by rw [hch]
       rw [e]; exact hcont _
   · simp only [if_neg h1]
-    unfold uexecKillArmF
+    unfold uexecKillArmF ukillCredAt
     rw [hgn]
-    exact BI.and_mono .rfl (HS W W' hk).mp
+    refine BI.and_mono ?_ (HS W W' hk).mp
+    split
+    · exact BI.or_mono .rfl (BI.sep_mono .rfl (sbundleAt_cong S USYS_exit f W W' hsk).mp)
+    · exact .rfl
 
 /-- **Rocq `uexec_arm_F_key_cong`**: THE RETURN CHANNEL SEES the eleven
 readings plus the number and the three argument words (the lengths are

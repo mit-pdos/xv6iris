@@ -455,6 +455,47 @@ def utOwn (Rsys : UtNames → BitVec 32 → IProp GF) (N : UtNames) (V : ProcPri
   bslots 3 ∗ fdSlots FDSPARE ∗ irefSlots IREFSPARE ∗
   procPrivFd N.f N.pj pid V M ∗ fdFrags V.fdg sts ∗ chFrag V.chg N.pj cs ∗ Rsys N pid)
 
+/-- **Rocq `ut_own_nm`**: THE RESIDUE WITHOUT THE INCARNATION'S MARKER
+(Rocq lane PQ-C, design/pipe.md "The exit path").  A process that kills
+ITSELF spends the marker founding `p->lock`'s killed row on its SPENT arm
+(`SpecSetkilled`'s owed side), and walks the rest of the trap -- the jump to
++0xa6, the killed check, kexit -- on the block that is left; kexit is stated
+at that block (`SpecKexit`, `FdTable.procPrivUnmarked`), so the two shapes
+differ by exactly one conjunct (`utOwn_unmark`). -/
+def utOwnNm (Rsys : UtNames → BitVec 32 → IProp GF) (N : UtNames) (V : ProcPriv)
+    (M : Nat → List (BitVec 8)) (sts : List FdState) (cs : ExtTreeSet GName compare)
+    (pid : BitVec 32) : IProp GF := iprop(
+  bslots 3 ∗ fdSlots FDSPARE ∗ irefSlots IREFSPARE ∗
+  procPrivUnmarked N.f N.pj pid V M ∗ fdFrags V.fdg sts ∗ chFrag V.chg N.pj cs ∗ Rsys N pid)
+
+/-- **Rocq `ut_own_unmark`**. -/
+theorem utOwn_unmark (Rsys : UtNames → BitVec 32 → IProp GF) (N : UtNames) (V : ProcPriv)
+    (M : Nat → List (BitVec 8)) (sts : List FdState) (cs : ExtTreeSet GName compare) (pid : BitVec 32) :
+    utOwn (GF := GF) Rsys N V M sts cs pid ⊣⊢ utOwnNm Rsys N V M sts cs pid ∗ takenAt V.gen := by
+  unfold utOwn utOwnNm
+  constructor
+  · iintro ⟨Hb, Hfd, Hir, Hpv, Hfr, Hch, Hsy⟩
+    icases (procPrivFd_unmark N.f N.pj pid V M).1 $$ Hpv with ⟨Hpv, Ht⟩
+    iframe Hb Hfd Hir Hpv Hfr Hch Hsy Ht
+  · iintro ⟨⟨Hb, Hfd, Hir, Hpv, Hfr, Hch, Hsy⟩, Ht⟩
+    iframe Hb Hfd Hir Hfr Hch Hsy
+    iapply (procPrivFd_unmark N.f N.pj pid V M).2
+    iframe Hpv Ht
+
+/-- **Rocq `ut_own_nm_priv`**: `utOwn_priv` one conjunct in. -/
+theorem utOwnNm_priv (Rsys : UtNames → BitVec 32 → IProp GF) (N : UtNames) (V : ProcPriv)
+    (M : Nat → List (BitVec 8)) (sts : List FdState) (cs : ExtTreeSet GName compare) (pid : BitVec 32) :
+    utOwnNm (GF := GF) Rsys N V M sts cs pid ⊢
+      procPrivUnmarked N.f N.pj pid V M ∗ fdFrags V.fdg sts ∗ chFrag V.chg N.pj cs ∗ Rsys N pid ∗
+      (∀ (V' : ProcPriv) (M' : Nat → List (BitVec 8)) (sts' : List FdState) (cs' : ExtTreeSet GName compare),
+        procPrivUnmarked N.f N.pj pid V' M' -∗ fdFrags V'.fdg sts' -∗ chFrag V'.chg N.pj cs' -∗
+        Rsys N pid -∗ utOwnNm Rsys N V' M' sts' cs' pid) := by
+  unfold utOwnNm
+  iintro ⟨Hb, Hfd, Hir, Hpv, Hfr, Hch, Hsy⟩
+  iframe Hpv Hfr Hch Hsy
+  iintro %V' %M' %sts' %cs' Hpv Hfr Hch Hsy
+  iframe Hb Hfd Hir Hpv Hfr Hch Hsy
+
 /-- **Rocq `ut_own_nopt`** (with the trapframe page out, deviation 1). -/
 def utOwnBare (Rsys : UtNames → BitVec 32 → IProp GF) (N : UtNames) (V : ProcPriv)
     (sts : List FdState) (cs : ExtTreeSet GName compare) (pid : BitVec 32) : IProp GF := iprop(

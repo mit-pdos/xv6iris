@@ -68,6 +68,20 @@ def UtReadWhy : Prop :=
 
 end ReadWhy
 
+section ExitElim
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [CtokG GF] [SG : UexecSG GF]
+open UexecSG
+
+/-- **Rocq `UexecExecInst.sbundle_at_exit_elim`, as a hypothesis** (the
+header's device): the exit number's bundle row is the close payments of the
+key's whole table (discharged at the instance by
+`UexecExecInst.sbundleAt_exit_elim_xv6`). -/
+def UtExitElim : Prop :=
+  ∀ (X : Uvis → IProp GF) (f : sfam GF) (W : Uvis),
+    sbundleAt X USYS_exit f W ⊢ filecloseCpays (hlc := hlc) W.fd
+
+end ExitElim
+
 /-! ## §3 The arguments -/
 
 /-- **What the whole walk is about** (the entry's data): the entry context,
@@ -244,23 +258,27 @@ def utLiveRes (A : UtArgs GF) (V2 : ProcPriv) (cs2 : ExtTreeSet GName compare) :
 
 /-- **What `killed()` reads out** (the reading `Rout` of
 `KILLED.wp_killed_r`): at a zero flag the lent `Z` comes back (a shot was
-refuted by the row), at a nonzero flag the shot. -/
+refuted by the row), at a nonzero flag the shot AND THE KILLER'S CREDENTIAL
+(Rocq `kill_paid_shot_tear`, lane PQ-C: the lent marker refutes the row's
+spent arm, so the row was paid by a third party with its taint -- which pays
+the tear-down's closes). -/
 def utKillRead (gn : GName) (Z : IProp GF) (kl : BitVec 32) : IProp GF :=
-  iprop((⌜kl = 0#32⌝ ∗ Z) ∨ (⌜kl ≠ 0#32⌝ ∗ killShot gn))
+  iprop((⌜kl = 0#32⌝ ∗ Z) ∨ (⌜kl ≠ 0#32⌝ ∗ killShot gn ∗ □ MachFixedGS.killCred (hlc := hlc) (GF := GF)))
 
 /-- **The lend** (Rocq `Hkacc`): the block's pid half and registration
-eighth, and `Z ∨ killShot gn`, into `killed`'s critical section; back out
-with the reading. -/
+eighth, the incarnation's MARKER, and `Z ∨ killShot gn`, into `killed`'s
+critical section; back out with the reading and the three lent pieces. -/
 theorem ut_kill_lend (j : Nat) (pid : BitVec 32) (gn : GName) (Z : IProp GF) (hnz : pid.toNat ≠ 0) :
-    wordPointsTo (pPid (procAddr j)) 4 pidPriv pid ∗ pidReg pid (.own qeighth) gn ∗ (Z ∨ killShot gn) ⊢
+    wordPointsTo (pPid (procAddr j)) 4 pidPriv pid ∗ pidReg pid (.own qeighth) gn ∗ takenAt gn ∗
+      (Z ∨ killShot gn) ⊢
       ∀ (pidr klr : BitVec 32),
         wordPointsTo (pPid (procAddr j)) 4 pidPub pidr -∗
         killPaidAt (MachFixedGS.killCred (hlc := hlc) (GF := GF)) pidr klr -∗
         wordPointsTo (pPid (procAddr j)) 4 pidPub pidr ∗
         killPaidAt (MachFixedGS.killCred (hlc := hlc) (GF := GF)) pidr klr ∗
-        (utKillRead gn Z klr ∗ wordPointsTo (pPid (procAddr j)) 4 pidPriv pid ∗
-          pidReg pid (.own qeighth) gn) := by
-  iintro ⟨Hqp, Hrg, HZ⟩ %pidr %klr Hq Hr
+        (utKillRead (hlc := hlc) gn Z klr ∗ wordPointsTo (pPid (procAddr j)) 4 pidPriv pid ∗
+          pidReg pid (.own qeighth) gn ∗ takenAt gn) := by
+  iintro ⟨Hqp, Hrg, Ht, HZ⟩ %pidr %klr Hq Hr
   icases (show wordPointsTo (GF := GF) (pPid (procAddr j)) 4 pidPub pidr ∗
       wordPointsTo (pPid (procAddr j)) 4 pidPriv pid ⊢
       ⌜pidr = pid⌝ ∗ wordPointsTo (pPid (procAddr j)) 4 pidPub pidr ∗
@@ -268,11 +286,11 @@ theorem ut_kill_lend (j : Nat) (pid : BitVec 32) (gn : GName) (Z : IProp GF) (hn
     unfold pidPub pidPriv; exact wordPointsTo_agree_keep _ _ _ _ _ _) $$ [Hq Hqp] with ⟨%he, Hq, Hqp⟩
   · iframe Hq Hqp
   subst he
-  icases killPaid_shot _ pidr klr (.own qeighth) gn hnz $$ [Hr Hrg] with ⟨Hr, Hrg, Hs⟩
-  · iframe Hr Hrg
+  icases killPaid_shot_tear _ pidr klr (.own qeighth) gn $$ [Hr Hrg Ht] with ⟨Hr, Hrg, Ht, Hs⟩
+  · iframe Hr Hrg Ht
   by_cases hk : klr = 0#32
   · icases HZ with (HZ | #Hsh)
-    · iframe Hq Hr Hqp Hrg
+    · iframe Hq Hr Hqp Hrg Ht
       unfold utKillRead
       ileft
       iframe HZ
@@ -280,14 +298,54 @@ theorem ut_kill_lend (j : Nat) (pid : BitVec 32) (gn : GName) (Z : IProp GF) (hn
     · icases killPaid_shot_nz _ pidr klr (.own qeighth) gn hnz $$ [Hr Hrg Hsh] with ⟨Hr, Hrg, %hne⟩
       · iframe Hr Hrg Hsh
       exact absurd hk hne
-  · icases Hs with (%hz | #Hsh)
+  · icases Hs with (%hz | ⟨#Hsh, #Hc⟩)
     · exact absurd hz hk
-    iframe Hq Hr Hqp Hrg
+    iframe Hq Hr Hqp Hrg Ht
     unfold utKillRead
     iright
-    iframe Hsh
+    iframe Hsh Hc
     ipureintro; exact hk
 
+/-- **The lend at the marker-less block** (after a self-kill): the pid half,
+the registration eighth and the already-fired shot; the flag reads nonzero
+(`killPaid_shot_nz`), and the pieces come back. -/
+theorem ut_kill_lend_shot (j : Nat) (pid : BitVec 32) (gn : GName) (hnz : pid.toNat ≠ 0) :
+    wordPointsTo (pPid (procAddr j)) 4 pidPriv pid ∗ pidReg pid (.own qeighth) gn ∗ killShot gn ⊢
+      ∀ (pidr klr : BitVec 32),
+        wordPointsTo (pPid (procAddr j)) 4 pidPub pidr -∗
+        killPaidAt (MachFixedGS.killCred (hlc := hlc) (GF := GF)) pidr klr -∗
+        wordPointsTo (pPid (procAddr j)) 4 pidPub pidr ∗
+        killPaidAt (MachFixedGS.killCred (hlc := hlc) (GF := GF)) pidr klr ∗
+        (⌜klr ≠ 0#32⌝ ∗ wordPointsTo (pPid (procAddr j)) 4 pidPriv pid ∗
+          pidReg pid (.own qeighth) gn) := by
+  iintro ⟨Hqp, Hrg, #Hsh⟩ %pidr %klr Hq Hr
+  icases (show wordPointsTo (GF := GF) (pPid (procAddr j)) 4 pidPub pidr ∗
+      wordPointsTo (pPid (procAddr j)) 4 pidPriv pid ⊢
+      ⌜pidr = pid⌝ ∗ wordPointsTo (pPid (procAddr j)) 4 pidPub pidr ∗
+        wordPointsTo (pPid (procAddr j)) 4 pidPriv pid from by
+    unfold pidPub pidPriv; exact wordPointsTo_agree_keep _ _ _ _ _ _) $$ [Hq Hqp] with ⟨%he, Hq, Hqp⟩
+  · iframe Hq Hqp
+  subst he
+  icases killPaid_shot_nz _ pidr klr (.own qeighth) gn hnz $$ [Hr Hrg Hsh] with ⟨Hr, Hrg, %hne⟩
+  · iframe Hr Hrg Hsh
+  iframe Hq Hr Hqp Hrg
+  ipureintro; exact hne
+
 end Kill
+
+section Tear
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [CtokG GF] [WchG GF]
+
+/-- **THE TEAR-DOWN'S PRICE** (Rocq `ut_kexit`'s package, lane PQ-C,
+design/pipe.md "The exit path"): LEFT, a kill by a THIRD PARTY -- the
+incarnation's shot, its marker (which kexit trades for the killed row's
+payload) and the killer's credential (which pays every close); RIGHT, a
+SELF-KILL -- the closes of the table the trap holds (the exit number's
+bundle row) and the process's own death payload (`ChildTok.killOwed`). -/
+def utTear (gn : GName) (sts : List FdState) : IProp GF :=
+  iprop((killShot gn ∗ takenAt gn ∗ □ MachFixedGS.killCred (hlc := hlc) (GF := GF)) ∨
+    (filecloseCpays (hlc := hlc) sts ∗ killOwed gn))
+
+end Tear
 
 end Xv6

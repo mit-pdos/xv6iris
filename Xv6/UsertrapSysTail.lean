@@ -93,6 +93,7 @@ theorem ut90_tail (hW : UtReadWhy (GF := GF)) (HA : UT_A6 (hlc := hlc) PT Γ) (A
     rw [hpj, hfdg, hchg, hok.hΓ]
     iframe Hbs Hfd Hir Henv Hpriv Hfrag Hch
     ipureintro; exact ⟨rfl, hok.hNj⟩
+  ihave Hown := ut_a6_res_left _ _ _ _ _ _ _ A.gn $$ Hown
   iapply (HA A cpu _ R' V2 M2 sts2 cs2 hok hbase hpins hr0)
   simp only [KCtx.withSpie_sie, KCtx.intrOn_sie]
   iframe Hk Hpc Hfr Hte Hce Hcaps Hown Houts Hpay Hkont

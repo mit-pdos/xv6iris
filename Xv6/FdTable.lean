@@ -721,6 +721,64 @@ theorem procPrivFd_split (γ : FileNames) (pa : BitVec 64) (pid : BitVec 32) (V 
     procPrivFd (GF := GF) γ pa pid V M ⊣⊢ procPrivCoreNoctxAt curCtx pa pid V M ∗ procOfilesOwe γ V.fdg pa V.ofile [] :=
   .rfl
 
+/-- **THE GENERATION ROW WITHOUT THE INCARNATION'S MARKER** (the gen row of
+Rocq `ProcInv.proc_priv_unmarked`, lane PQ-C, design/pipe.md "The exit
+path"): `procGenAt` with the token-free `genHalvesAt` in place of
+`genHalvesPriv`. -/
+def procGenUnmarkedAt (ξ : CtxId) (pa : BitVec 64) (pid : BitVec 32) (g : GName) : IProp GF :=
+  letI : CurCtx := ⟨ξ, KTier.kpt⟩
+  iprop(firstTok (hlc := hlc) ∗
+    (∃ Q : Int → IProp GF, genKq g pa pid Q ∗ myPay g Q) ∗
+    (∃ xsv : BitVec 32, wordPointsTo (pXstate pa) 4 xsHalf xsv) ∗
+    genHalvesAt pa pid g)
+
+/-- The generation row IS the marker-less row and the marker. -/
+theorem procGenAt_unmark (ξ : CtxId) (pa : BitVec 64) (pid : BitVec 32) (g : GName) :
+    procGenAt (GF := GF) ξ pa pid g ⊣⊢ procGenUnmarkedAt ξ pa pid g ∗ takenAt g := by
+  unfold procGenAt procGenUnmarkedAt genHalvesPriv
+  constructor
+  · iintro ⟨Hf, Hq, Hx, Hg, Ht⟩
+    iframe Hf Hq Hx Hg Ht
+  · iintro ⟨⟨Hf, Hq, Hx, Hg⟩, Ht⟩
+    iframe Hf Hq Hx Hg Ht
+
+/-- The core with the marker-less generation row. -/
+def procPrivCoreUnmarkedAt (ξ : CtxId) (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv)
+    (M : Nat → List (BitVec 8)) : IProp GF := iprop%
+  procPrivBareAt ξ pa pid V M ∗ @cwdRefAt hlc GF _ _ _ _ _ ⟨ξ, KTier.kpt⟩ V.cwd V.cwi ∗
+  procGenUnmarkedAt ξ pa pid V.gen
+
+/-- **THE BLOCK WITHOUT THE INCARNATION'S MARKER** (Rocq
+`ProcInv.proc_priv_unmarked`, lane PQ-C, design/pipe.md "The exit path").
+A process that kills ITSELF founds `p->lock`'s killed row on the spent arm
+with its marker (`KillRow.killPaid_kill_two`), and walks on to kexit with
+the rest of its block -- so kexit is stated at this shape, and every other
+caller splits the marker off with `procPrivFd_unmark` and drops it (the
+ZOMBIE block never carried it). -/
+def procPrivUnmarked (γ : FileNames) (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv)
+    (M : Nat → List (BitVec 8)) : IProp GF := iprop%
+  procPrivCoreUnmarkedAt curCtx pa pid V M ∗ procOfiles γ V.fdg pa V.ofile
+
+theorem procPrivUnmarked_split (γ : FileNames) (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv)
+    (M : Nat → List (BitVec 8)) :
+    procPrivUnmarked (GF := GF) γ pa pid V M ⊣⊢
+      procPrivCoreUnmarkedAt curCtx pa pid V M ∗ procOfilesOwe γ V.fdg pa V.ofile [] :=
+  .rfl
+
+/-- Rocq `proc_priv_unmark`. -/
+theorem procPrivFd_unmark (γ : FileNames) (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv)
+    (M : Nat → List (BitVec 8)) :
+    procPrivFd (GF := GF) γ pa pid V M ⊣⊢ procPrivUnmarked γ pa pid V M ∗ takenAt V.gen := by
+  unfold procPrivFd procPrivCoreNoctxAt procPrivUnmarked procPrivCoreUnmarkedAt
+  constructor
+  · iintro ⟨⟨Hb, Hc, Hg⟩, Ho⟩
+    icases (procGenAt_unmark curCtx pa pid V.gen).1 $$ Hg with ⟨Hg, Ht⟩
+    iframe Hb Hc Hg Ho Ht
+  · iintro ⟨⟨⟨Hb, Hc, Hg⟩, Ho⟩, Ht⟩
+    iframe Hb Hc Ho
+    iapply (procGenAt_unmark curCtx pa pid V.gen).2
+    iframe Hg Ht
+
 end Core
 
 /-- One descriptor's cell out of its lent-or-slot and back. -/

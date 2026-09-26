@@ -6,7 +6,7 @@ half of Rocq `ProofSyscall`'s `sysc_dep_<n>`/`sysc_out_<n>` over
 Each syscall arm file states the deposit law it consumes as a `Prop`
 hypothesis over an ABSTRACT `[UexecSG GF]` (`SyscallArmsPath.SyscDep{Chdir,
 Open,Mknod,Unlink,Link,Mkdir}`, `SyscallArmsProc.SyscDepKill`,
-`SyscallArmsExec.SyscDepExec`, `SyscallArmsFdDefs.SyscDep{Read,Write,Pipe,Close}`),
+`SyscallArmsExec.SyscDepExec`, `SyscallArmsFdDefs.SyscDep{Read,Write,Pipe,Close,Exit}`),
 and the syscall seal specialises `SYSCALL` to `UexecExecInst.uexecSGXv6`
 (Rocq's single global instance).  This file proves each of them there, in
 exactly the arm file's statement, beside `SyscSpostEmp`
@@ -164,10 +164,31 @@ theorem syscDepPipe_holds : SyscDepPipe (hlc := hlc) (GF := GF) := by
   intro f V M sts gn cs pid r M' sts' _ _
   exact sbundleAt_spostAt_pipe_xv6 (hlc := hlc) _ f _ r M' sts' _ cs
 
-/-- **`SyscDepClose`** at the instance (UexecExecInst deviation 4). -/
+/-- **`SyscDepClose`** at the instance (Rocq `sysc_dep_close` +
+`sysc_out_close`): row 21's payment at the key's descriptor, its answer
+back into post 21. -/
 theorem syscDepClose_holds : SyscDepClose (hlc := hlc) (GF := GF) := by
-  intro f V M sts gn cs pid r sts' _
-  exact sbundleAt_spostAt_close_xv6 (hlc := hlc) _ f _ r _ sts' _ cs
+  intro f V M sts gn cs pid
+  have e : fdStOfKey (xkA (uvisOf V M sts gn cs pid) 0) (uvisOf V M sts gn cs pid).fd =
+      syscFdKey (tfW V.tf (tfArgIdx 0)) sts := rfl
+  have hin := sbundleAt_close_elim_xv6 (hlc := hlc) (uslot (hlc := hlc)) f (uvisOf V M sts gn cs pid)
+  rw [e] at hin
+  refine hin.trans ?_
+  iintro H
+  iexists (Xfam.clP f)
+  iframe H
+  iintro %r %sts' Hcp
+  have hsp := spostAt_close_xv6 (hlc := hlc) (uslot (hlc := hlc)) f (uvisOf V M sts gn cs pid) r
+    (syscImg V M) sts' V.cwi cs
+  rw [e] at hsp
+  iapply hsp
+  iexact Hcp
+
+/-- **`SyscDepExit`** at the instance (Rocq `sysc_dep_exit`, over
+`sbundle_at_exit_elim`). -/
+theorem syscDepExit_holds : SyscDepExit (hlc := hlc) (GF := GF) := by
+  intro f V M sts gn cs pid
+  exact sbundleAt_exit_elim_xv6 (hlc := hlc) _ f _
 
 end Laws
 

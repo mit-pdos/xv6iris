@@ -85,6 +85,13 @@ theorem utA_killIn_arm (f : UexecSG.sfam GF) (sc : BitVec 64) (W : Uvis) (gn : G
   iframe H
   ipureintro; exact h.1
 
+/-- ...with the key's table (what the self-kill's exit row is read at). -/
+theorem utA_killIn_arm2 (f : UexecSG.sfam GF) (sc : BitVec 64) (W : Uvis) (gn : GName)
+    (sts : List FdState) (hne : sc ≠ uecallScause) :
+    utKillIn (hlc := hlc) f sc W gn sts ⊢ ⌜W.gen = gn ∧ W.fd = sts⌝ ∗ uexecKillArm (hlc := hlc) sc W f := by
+  unfold utKillIn
+  rw [if_neg hne]
+
 /-- ...and off the ecall the kill row owed back is the slot. -/
 theorem utA_killOut_slot (sc : BitVec 64) (W : Uvis) (hne : sc ≠ uecallScause) :
     uslot (hlc := hlc) (GF := GF) W ⊢ utKillOut (hlc := hlc) sc W := by
@@ -139,7 +146,8 @@ theorem usertrap_ea_proof [ClaimIs (hlc := hlc) GF Γ] (KI : KILLED) (HF : UT_FA
   icases kctx_tier _ _ $$ Hk with ⟨%hti, Hk⟩
   have hct : curTier = KTier.kpt := by rw [← hti]; exact hok.htier
   icases utA_own_open _ _ (procAddr A.j) _ _ _ _ _ hok.pj $$ Hown with ⟨Hpv, Hfr, Hch, Hsy, Hownback⟩
-  icases ut_priv_pid hct _ _ _ _ _ $$ Hpv with ⟨%hnz, Hqp, Hrg, Hpvback⟩
+  icases ut_priv_pid_mk hct _ _ _ _ _ $$ Hpv with ⟨%hnz, Hqp, Hrg, Hmk, Hpvback⟩
+  ihave Hmk := (show takenAt (GF := GF) (utV1 A).gen ⊢ takenAt A.gn from by rw [hok.hgn]) $$ Hmk
   icases utA_killIn_arm _ _ _ _ _ hne $$ Hkill with ⟨%hWg, Harm⟩
   ihave Hslot := uexecKillArm_slot _ _ _ $$ Harm
   ihave #Hpi : procsInv Γ $$ [Hcaps]
@@ -154,8 +162,8 @@ theorem usertrap_ea_proof [ClaimIs (hlc := hlc) GF Γ] (KI : KILLED) (HF : UT_FA
   iintro Hk Hpc
   ihave Hrg := (show pidReg (GF := GF) A.pid (.own qeighth) (utV1 A).gen ⊢ pidReg A.pid (.own qeighth) A.gn
     from by rw [hok.hgn]) $$ Hrg
-  iapply (ut_killed Γ KI cpu _ A.j (fun kl => iprop(utKillRead A.gn emp kl ∗
-      wordPointsTo (pPid (procAddr A.j)) 4 pidPriv A.pid ∗ pidReg A.pid (.own qeighth) A.gn))
+  iapply (ut_killed Γ KI cpu _ A.j (fun kl => iprop(utKillRead (hlc := hlc) A.gn emp kl ∗
+      wordPointsTo (pPid (procAddr A.j)) 4 pidPriv A.pid ∗ pidReg A.pid (.own qeighth) A.gn ∗ takenAt A.gn))
       hok.hj ?hp ?hn ?hK ?hl ?ht) $$ [- $Hk $Hpc $Hpi]
   rotate_right 1
   case hp => k_norm; rw [p9]
@@ -163,13 +171,13 @@ theorem usertrap_ea_proof [ClaimIs (hlc := hlc) GF Γ] (KI : KILLED) (HF : UT_FA
   case hK => k_norm; rw [hok.havail]; omega
   case hl => k_norm; rw [hok.hlocks]; simp
   case ht => k_norm; exact hok.htier
-  isplitl [Hqp Hrg]
+  isplitl [Hqp Hrg Hmk]
   · iapply ut_kill_lend A.j A.pid _ emp hnz
-    iframe Hqp Hrg
+    iframe Hqp Hrg Hmk
     ileft; iempintro
   k_norm
   iapply wpNext_off_intro
-  iintro %spie %spp %R1 %kl %hsp Hk Hpc %⟨hcs1, h10⟩ ⟨Hread, Hqp, Hrg⟩
+  iintro %spie %spp %R1 %kl %hsp Hk Hpc %⟨hcs1, h10⟩ ⟨Hread, Hqp, Hrg, Hmk⟩
   have e := hsp (by k_norm)
   k_norm at e
   obtain ⟨rfl, rfl⟩ := e
@@ -182,10 +190,11 @@ theorem usertrap_ea_proof [ClaimIs (hlc := hlc) GF Γ] (KI : KILLED) (HF : UT_FA
      by simp [RegMap.set_apply, p26], by simp [RegMap.set_apply, p27]⟩ hcs1
   ihave Hrg := (show pidReg (GF := GF) A.pid (.own qeighth) A.gn ⊢ pidReg A.pid (.own qeighth) (utV1 A).gen
     from by rw [hok.hgn]) $$ Hrg
-  ihave Hpv := Hpvback $$ Hqp Hrg
+  ihave Hmk := (show takenAt (GF := GF) A.gn ⊢ takenAt (utV1 A).gen from by rw [hok.hgn]) $$ Hmk
+  ihave Hpv := Hpvback $$ Hqp Hrg Hmk
   ihave Hown := Hownback $$ %(utV1 A) %A.M %A.sts %A.cs Hpv Hfr Hch Hsy
   unfold utKillRead
-  icases Hread with (⟨%hk0, -⟩ | ⟨%hk0, #Hshot⟩)
+  icases Hread with (⟨%hk0, -⟩ | ⟨%hk0, #Hshot, #Hcr⟩)
   · -- not killed: beqz taken, +0xfc
     subst hk0
     k_step (wp_s_branch cpu _ (KA.«usertrap» + 0xf0#64) true 12#13 10#5 0#5 (by decide) bop.BEQ)
@@ -212,8 +221,13 @@ theorem usertrap_ea_proof [ClaimIs (hlc := hlc) GF Γ] (KI : KILLED) (HF : UT_FA
     ihave Hframe := (show utFrame (GF := GF) A ⊢ frame4s2 A.ksp (A.k.regs 1#5) (A.k.regs 8#5)
       (A.k.regs 9#5) (A.k.regs 18#5) from by unfold utFrame; rw [hok.hsp]) $$ Hframe
     ihave Hpc := (show pcIs (GF := GF) cpu KA.«kexit» ⊢ pcIs cpu kexitAddr from .rfl) $$ Hpc
+    -- THE TEAR-DOWN'S PRICE: the marker off the block, the killer's credential
+    icases (utOwn_unmark _ _ _ _ _ _ _).1 $$ Hown with ⟨Hown, Hmk⟩
+    ihave Htear : utTear (hlc := hlc) (GF := GF) A.gn A.sts $$ [Hmk]
+    · unfold utTear; ileft; iframe Hshot Hcr
+      iapply (show takenAt (GF := GF) (utV1 A).gen ⊢ takenAt A.gn from by rw [hok.hgn]) $$ Hmk
     iapply (HK A cpu _ (utV1 A) A.M A.sts A.cs _ _ _ _ hok ?k10 ?k2 ?kp ?kn ?kt ?kav rfl rfl)
-      $$ [- $Hk $Hpc $Hframe $Hown $Hshot]
+      $$ [- $Hk $Hpc $Hframe $Hown $Htear]
     rotate_right 1
     case k10 => simp [RegMap.set_apply]
     case k2 => simp [RegMap.set_apply, hpins1.1, hok.hsp]

@@ -55,15 +55,27 @@ the ZOMBIE park.  The acquire also hands back the trap reserve
 (`trapRes k.sie`), which the park wand passes to the caller's closer (Rocq
 `kstack_closer ... (trap_res b + av)`).
 
+THE MARKER-LESS BLOCK (Rocq lane PQ-C, design/pipe.md "The exit path"):
+kexit is stated at `procPrivUnmarked` -- a self-kill spent the incarnation's
+marker founding `p->lock`'s killed row -- so the loop and the fs window run
+on its core (`procPrivCoreUnmarkedAt`, the landed readings one conjunct in:
+the marker sat outside everything they touch), and the marker rides the
+TEAR-DOWN side of the payment, which is where `kx_pay_take` trades it for
+the row's deposit.  The table's close payments (`filecloseCpays sts`) are
+not yet spent by the loop (interim: fileclose takes no close payment until
+the byte queue enters the pipe's lock payload); the loop carries the
+fragment bundle at an existential table, as before.
+
 THE D8 GHOST STEPS (Rocq `kx_park` / `kx_rest`, literally): the block's
 generation row is opened at the fs window (`kx_procGen_open`: firstTok
-dropped, `genHalvesPriv_split`); under `wait_lock` the caller's row is
+dropped); under `wait_lock` the caller's row is
 emptied and its set moved to `ip`'s orphans (`kx_children_move`:
 `childrenOwn_lookup` / `childrenOwn_upd … cs ∅` / `orphans_add`), and after
 `reparent` the invariant follows the cells (`childrenInv_reparent`, read off
 `initIdentAt`); under `p->lock` the pids meet, the payment is the caller's
 `Q` or the killed row's deposit (`kx_pay_take`, `killPaid_take` with the
-shot and the spent marker), the two xstate halves are joined for the `sw`
+shot and the marker the payment's tear-down side brings), the two xstate
+halves are joined for the `sw`
 and re-split, and the escrow (`exitTok_intro`) is keyed at the stored word.
 The ZOMBIE park gets `genHalvesAt`, the xstate half + escrow and the row at
 `∅` (`kx_dormant_build`).
@@ -310,11 +322,11 @@ variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [Fdslot
 (Rocq's `proc_priv_pid_ofile` / `proc_priv_cwd_pid` lending, `1/4`;
 `ProofSysClose`'s `sc_core_pid`). -/
 theorem kx_core_pid (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv) (M : Nat → List (BitVec 8)) :
-    procPrivCoreNoctxAt (GF := GF) curCtx pa pid V M ⊢
+    procPrivCoreUnmarkedAt (GF := GF) curCtx pa pid V M ⊢
       @wordPointsTo hlc GF _ ⟨curCtx, KTier.kpt⟩ (pPid pa) 4 (DFrac.own (1 : Qp).half.half) pid ∗
       (@wordPointsTo hlc GF _ ⟨curCtx, KTier.kpt⟩ (pPid pa) 4 (DFrac.own (1 : Qp).half.half) pid -∗
-        procPrivCoreNoctxAt curCtx pa pid V M) := by
-  unfold procPrivCoreNoctxAt procPrivBareAt pidPriv
+        procPrivCoreUnmarkedAt curCtx pa pid V M) := by
+  unfold procPrivCoreUnmarkedAt procPrivBareAt pidPriv
   iintro ⟨⟨%hf, Hpid, Hf, Hpt, Htfp, %hlz⟩, Hcw⟩
   icases procPrivAcc_split curCtx _ 4 (1 : Qp).half _ $$ Hpid with ⟨Hpid, Hpid1⟩
   iframe Hpid
@@ -336,7 +348,7 @@ def kxLoopExit (Γ : SchedNames) (γ : FileNames) (γkl : GName) (γk : KmemName
   ∀ (c' : CPU) (kk : KCtx), kxFrame kk j eb status spval availval →
     (kctx c' kk ∗ pcIs c' (KA.«kexit» + 0x4c#64) ∗ trapCsrsExt c' eb ∗
       cpuClaimExt c' eb (procAddr j) ∗
-      procPrivCoreNoctxAt curCtx (procAddr j) pid V M ∗
+      procPrivCoreUnmarkedAt curCtx (procAddr j) pid V M ∗
       procOfiles γ V.fdg (procAddr j) (List.replicate NOFILE 0#64) ∗
       (∃ on', fileclosePipeEnv (hlc := hlc) Γ γkl γk on') ∗
       filecloseFsEnv (hlc := hlc) Γ j (procAddr j) ∗ irefSlot ∗ Ψ) ⊢ wpLoop (GF := GF) c'
@@ -364,7 +376,7 @@ theorem kx_loop (FC : FILECLOSE) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
       (∀ i, i < fd → L[i]? = some 0#64) →
       (kctx c k ∗ pcIs c (KA.«kexit» + 0x3e#64) ∗ trapCsrsExt c eb ∗
         cpuClaimExt c eb (procAddr j) ∗ isFtable γl γ ∗ panicEnv ∗
-        procPrivCoreNoctxAt curCtx (procAddr j) pid V M ∗
+        procPrivCoreUnmarkedAt curCtx (procAddr j) pid V M ∗
         procOfiles γ V.fdg (procAddr j) L ∗ (∃ sts, fdFrags V.fdg sts) ∗
         (∃ on', fileclosePipeEnv (hlc := hlc) Γ γkl γk on') ∗
         filecloseFsEnv (hlc := hlc) Γ j (procAddr j) ∗ irefSlot ∗ Ψ)
@@ -384,7 +396,7 @@ theorem kx_loop (FC : FILECLOSE) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
         (∀ i, i < fd + 1 → L'[i]? = some 0#64) →
         (kctx c'' k'' ∗ pcIs c'' (KA.«kexit» + 0x38#64) ∗ trapCsrsExt c'' eb ∗
           cpuClaimExt c'' eb (procAddr j) ∗ isFtable γl γ ∗ panicEnv ∗
-          procPrivCoreNoctxAt curCtx (procAddr j) pid V M ∗
+          procPrivCoreUnmarkedAt curCtx (procAddr j) pid V M ∗
           procOfiles γ V.fdg (procAddr j) L' ∗ (∃ sts, fdFrags V.fdg sts) ∗
           (∃ on', fileclosePipeEnv (hlc := hlc) Γ γkl γk on') ∗
           filecloseFsEnv (hlc := hlc) Γ j (procAddr j) ∗ irefSlot ∗ Ψ) ⊢ wpLoop (GF := GF) c''),
@@ -392,7 +404,7 @@ theorem kx_loop (FC : FILECLOSE) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
         k.regs 9#5 = pOfile (procAddr j) fd → (∀ i, i < fd → L[i]? = some 0#64) →
         (kctx cpu k ∗ pcIs cpu (KA.«kexit» + 0x3e#64) ∗ trapCsrsExt cpu eb ∗
           cpuClaimExt cpu eb (procAddr j) ∗ isFtable γl γ ∗ panicEnv ∗
-          procPrivCoreNoctxAt curCtx (procAddr j) pid V M ∗
+          procPrivCoreUnmarkedAt curCtx (procAddr j) pid V M ∗
           procOfiles γ V.fdg (procAddr j) L ∗ (∃ sts, fdFrags V.fdg sts) ∗
           (∃ on', fileclosePipeEnv (hlc := hlc) Γ γkl γk on') ∗
           filecloseFsEnv (hlc := hlc) Γ j (procAddr j) ∗ irefSlot ∗ Ψ)
@@ -689,12 +701,12 @@ killed row with the shot and the block's spent marker
 (`KillRow.killPaid_take`); `killOwed` IS the escrow's shape, so the take
 costs no later. -/
 theorem kx_pay_take (g : GName) (pa : BitVec 64) (pid kl : BitVec 32) (Q : Int → IProp GF) (x : Int) :
-    myPay g Q ∗ (Q x ∨ (⌜x = -1⌝ ∗ killShot g)) ∗ takenAt g ∗
+    myPay g Q ∗ (Q x ∨ (⌜x = -1⌝ ∗ killShot g ∗ takenAt g)) ∗
       killPaidAt (MachFixedGS.killCred (hlc := hlc) (GF := GF)) pid kl ∗ genHalvesAt pa pid g ⊢
       (∃ Qp : Int → IProp GF, myPay g Qp ∗ Qp x) ∗
       killPaidAt (MachFixedGS.killCred (hlc := hlc) (GF := GF)) pid kl ∗ genHalvesAt pa pid g := by
-  iintro ⟨#Hmy, HQ, Ht, Hkrow, Hgh⟩
-  icases HQ with (HQ | ⟨%hm1, #Hshot⟩)
+  iintro ⟨#Hmy, HQ, Hkrow, Hgh⟩
+  icases HQ with (HQ | ⟨%hm1, #Hshot, Ht⟩)
   · iframe Hkrow Hgh
     iexists Q
     iframe Hmy HQ
@@ -710,21 +722,21 @@ theorem kx_pay_take (g : GName) (pa : BitVec 64) (pid kl : BitVec 32) (Q : Int �
       iframe Hmyp HQp
     · iapply Hback $$ Hpr
 
-/-- the block's generation row, opened: firstTok is dropped, the kernel's
-quarter, the xstate half, the token-free core and the spent marker
-(`SlotGen.genHalvesPriv_split`). -/
+/-- the block's MARKER-LESS generation row, opened (Rocq lane PQ-C: kexit is
+stated at the unmarked block; the marker rides the tear-down side of the
+payment): firstTok is dropped, the kernel's quarter, the xstate half and
+the token-free core. -/
 theorem kx_procGen_open (pa : BitVec 64) (pid : BitVec 32) (g : GName) (hX : curTier = KTier.kpt) :
-    procGenAt (GF := GF) curCtx pa pid g ⊢
+    procGenUnmarkedAt (GF := GF) curCtx pa pid g ⊢
       (∃ Q0 : Int → IProp GF, genKq g pa pid Q0) ∗
       (∃ xsv : BitVec 32, wordPointsTo (pXstate pa) 4 xsHalf xsv) ∗
-      genHalvesAt pa pid g ∗ takenAt g := by
+      genHalvesAt pa pid g := by
   obtain ⟨ξ0, t0⟩ := X
   simp only at hX
   subst hX
-  unfold procGenAt
-  iintro ⟨-, ⟨%Q0, Hkq, -⟩, Hxs, Hgp⟩
-  icases genHalvesPriv_split pa pid g $$ Hgp with ⟨Hgh, Ht⟩
-  iframe Hxs Hgh Ht
+  unfold procGenUnmarkedAt
+  iintro ⟨-, ⟨%Q0, Hkq, -⟩, Hxs, Hgh⟩
+  iframe Hxs Hgh
   iexists Q0
   iexact Hkq
 
@@ -796,7 +808,7 @@ theorem kx_rest (AC : ACQUIRE) (RE : RELEASE) (RP : REPARENT) (WU : WAKEUP) (SC 
     wordPointsTo (pPagetable (procAddr j)) 8 (DFrac.own 1) V.pagetable ∗
     wordPointsTo (pTrapframe (procAddr j)) 8 (DFrac.own 1) V.trapframe ∗
     wordPointsTo (pCwd (procAddr j)) 8 (DFrac.own 1) V.cwd ∗
-    cwdRefAt V.cwd V.cwi ∗ procGenAt curCtx (procAddr j) pid V.gen ∗
+    cwdRefAt V.cwd V.cwi ∗ procGenUnmarkedAt curCtx (procAddr j) pid V.gen ∗
     pnameCells (procAddr j) (DFrac.own 1) V.name ∗
     wordPointsTo (pSecc (procAddr j)) 8 (DFrac.own 1) V.pvSecc ∗
     procPtAt V.upt M ∗ tfPageAt V.upt.tfp V.tf ∗
@@ -804,7 +816,7 @@ theorem kx_rest (AC : ACQUIRE) (RE : RELEASE) (RP : REPARENT) (WU : WAKEUP) (SC 
     (stackOwn (spval + 48#64) ((trapRes eb + availval) + 6) -∗ stackOwn (V.kstack + 4096#64) 512) ∗
     isLock γw waitLockAddr "wait_lock" waitLockPay ∗ initIdentAt curCtx ip ∗
     chFrag V.chg (procAddr j) cs ∗
-    myPay V.gen Q ∗ (Q (xstateOf status) ∨ (⌜xstateOf status = -1⌝ ∗ killShot V.gen))
+    myPay V.gen Q ∗ (Q (xstateOf status) ∨ (⌜xstateOf status = -1⌝ ∗ killShot V.gen ∗ takenAt V.gen))
     ⊢ wpLoop (GF := GF) cpu := by
   obtain ⟨ξ0, t0⟩ := X
   letI : CurCtx := ⟨ξ0, t0⟩
@@ -826,7 +838,7 @@ theorem kx_rest (AC : ACQUIRE) (RE : RELEASE) (RP : REPARENT) (WU : WAKEUP) (SC 
   -- firstTok dropped; the kernel's quarter and the xstate half ride to the
   -- park; the token-free core goes to the ZOMBIE block, the spent marker to
   -- the killed-route take.
-  icases kx_procGen_open (procAddr j) pid V.gen rfl $$ Hgen with ⟨⟨%Q0, Hkq⟩, ⟨%xsb, Hxb⟩, Hgh, Htaken⟩
+  icases kx_procGen_open (procAddr j) pid V.gen rfl $$ Hgen with ⟨⟨%Q0, Hkq⟩, ⟨%xsb, Hxb⟩, Hgh⟩
   -- THE PID CELL: a quarter lent to the fs callees (Rocq `proc_priv_cwd_pid`)
   icases procPrivAcc_split ξ0 (pPid (procAddr j)) 4 (1 : Qp).half pid $$ [Hpid] with ⟨Hpid, Hpidk⟩
   · unfold pidPriv; iexact Hpid
@@ -1110,7 +1122,7 @@ theorem kx_rest (AC : ACQUIRE) (RE : RELEASE) (RP : REPARENT) (WU : WAKEUP) (SC 
   icases kx_pid_agree (procAddr j) pid pid2 $$ [$Hpid $Hpidpub] with ⟨%hpid, Hpid, Hpidpub⟩
   subst pid2
   -- THE DEATH PAYMENT, TAKEN OUT OF THE ROW on the killed route (Rocq `kx_park`)
-  icases kx_pay_take V.gen (procAddr j) pid kl Q (xstateOf status) $$ [$Hmy $HQ $Htaken $Hkrow $Hgh]
+  icases kx_pay_take V.gen (procAddr j) pid kl Q (xstateOf status) $$ [$Hmy $HQ $Hkrow $Hgh]
     with ⟨⟨%Qp, #Hmyp, HQp⟩, Hkrow, Hgh⟩
   -- the two halves of `p->xstate`, joined for the write
   ihave Hxstate := kx_xs_join (procAddr j) xs xsb $$ [$Hxstate $Hxb]
@@ -1341,14 +1353,14 @@ theorem kx_after_loop (AC : ACQUIRE) (RE : RELEASE) (RP : REPARENT) (WU : WAKEUP
         (stackOwn (spval + 48#64) ((trapRes eb + availval) + 6) -∗ stackOwn (V.kstack + 4096#64) 512) ∗
         isLock γw waitLockAddr "wait_lock" waitLockPay ∗ initIdentAt curCtx ip ∗
         chFrag V.chg (procAddr j) cs ∗
-        myPay V.gen Q ∗ (Q (xstateOf status) ∨ (⌜xstateOf status = -1⌝ ∗ killShot V.gen))) := by
+        myPay V.gen Q ∗ (Q (xstateOf status) ∨ (⌜xstateOf status = -1⌝ ∗ killShot V.gen ∗ takenAt V.gen))) := by
   obtain ⟨ξ0, t0⟩ := X
   simp only at hX
   subst hX
   letI : CurCtx := ⟨ξ0, KTier.kpt⟩
   unfold kxLoopExit
   intro c' kk hkk
-  unfold procPrivCoreNoctxAt procPrivBareAt procFieldsNoOfile filecloseFsEnv
+  unfold procPrivCoreUnmarkedAt procPrivBareAt procFieldsNoOfile filecloseFsEnv
   iintro ⟨Hk, Hpc, Hte, Hce, ⟨⟨%hV, Hpid, ⟨Hks, Hsz, Hpg, Htf, Hcwd, Hname, Hsc⟩, HPt, HTf, %hlz⟩, Hcwr, Hgen⟩,
     Hofs, -, ⟨-, -, #Hpinv, #Hrdy, Hbs⟩, Hir, ⟨Hfsp, Hirs, #Hpe, Hframe, Hcloser, #Hwl, #Hinit, Hch, #Hmy, HQ⟩⟩
   icases kx_ofiles_null γ V.fdg (procAddr j) $$ Hofs with ⟨Hofile, Hfds⟩
@@ -1481,14 +1493,14 @@ index with the complement following the thread (`k_step_e`); see
 `kx_rest` for the join at `acquire(&wait_lock)`. -/
 theorem kexit_proof (MP : MYPROC) (FC : FILECLOSE) (BO : BEGIN_OP) (IP : IPUT) (EO : END_OP)
     (AC : ACQUIRE) (RE : RELEASE) (RP : REPARENT) (WU : WAKEUP) (SC : SCHED) (PN : PANIC) : KEXIT :=
-  ⟨fun {hlc GF} _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ X Γ _ cpu k γw γl γ γkl γk on j pid V M ip cs Q
+  ⟨fun {hlc GF} _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ X Γ _ cpu k γw γl γ γkl γk on j pid V M ip cs sts Q
       hj hproc hK hnoff htier => by
   obtain ⟨ξ0, t0⟩ := X
   letI : CurCtx := ⟨ξ0, t0⟩
   unfold wp_kexit_eb_body
   simp only [kexitAddr]
   iintro ⟨Hk, Hpc, #Hpinv, Hte, Hce, #Hwl, #Hinit, #Hft, #Hpe, #Hkl, Hav, #Hrdy, Hbs, Hfsp, Hirs,
-    Hpriv, Hfr, Hch, #Hmy, HQ, Hcloser⟩
+    Hpriv, Hfr, -, Hch, #Hmy, HQ, Hcloser⟩
   icases kctx_tier cpu k $$ Hk with ⟨%hct, Hk⟩
   have ht0 : t0 = KTier.kpt := hct.symm.trans htier
   subst ht0
@@ -1499,7 +1511,10 @@ theorem kexit_proof (MP : MYPROC) (FC : FILECLOSE) (BO : BEGIN_OP) (IP : IPUT) (
     rw [hproc]) $$ Hce
   have hK6 : 6 ≤ k.avail := by rw [kexitSlots_eq] at hK; omega
   -- THE BLOCK: the core rides the loop untouched, the array is what it walks
-  icases (procPrivFd_split γ (procAddr j) pid V M).1 $$ Hpriv with ⟨Hcore, Hofs⟩
+  icases (procPrivUnmarked_split γ (procAddr j) pid V M).1 $$ Hpriv with ⟨Hcore, Hofs⟩
+  -- the loop carries the fragment bundle at an existential table
+  ihave Hfr : (∃ sts', fdFrags (GF := GF) V.fdg sts') $$ [Hfr]
+  · iexists sts; iexact Hfr
   icases procOfilesOwe_len γ V.fdg (procAddr j) V.ofile [] $$ Hofs with ⟨%hoflen, Hofs⟩
   ihave Hofs := (show procOfilesOwe (GF := GF) γ V.fdg (procAddr j) V.ofile [] ⊢
     procOfiles γ V.fdg (procAddr j) V.ofile from .rfl) $$ Hofs
@@ -1627,7 +1642,7 @@ theorem kexit_proof (MP : MYPROC) (FC : FILECLOSE) (BO : BEGIN_OP) (IP : IPUT) (
           stackOwn (V.kstack + 4096#64) 512) ∗
         isLock γw waitLockAddr "wait_lock" waitLockPay ∗ initIdentAt curCtx ip ∗
         chFrag V.chg (procAddr j) cs ∗
-        myPay V.gen Q ∗ (Q (xstateOf (k.regs 10#5)) ∨ (⌜xstateOf (k.regs 10#5) = -1⌝ ∗ killShot V.gen))) rfl
+        myPay V.gen Q ∗ (Q (xstateOf (k.regs 10#5)) ∨ (⌜xstateOf (k.regs 10#5) = -1⌝ ∗ killShot V.gen ∗ takenAt V.gen))) rfl
       (kx_after_loop AC RE RP WU SC BO IP EO Γ γw γ γkl γk j hj pid V M ip cs Q k.sie (k.regs 10#5)
         (k.regs 2#5 - 8#64 * BitVec.ofNat 64 6) (k.avail - 6) rfl)
       15 0 (by decide) cpu _ V.ofile ?hkframe ?h9 hoflen (fun i hi => absurd hi (Nat.not_lt_zero i)))

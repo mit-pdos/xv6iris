@@ -150,7 +150,7 @@ theorem usertrap_d0_proof (VM : VMFAULT) (HA : UT_A6 PT Γ) (H56 : UT_56 PT Γ) 
   icases utA_own_open _ _ (procAddr A.j) _ _ _ _ _ hok.pj $$ Hown with ⟨Hpv, Hfr, Hch, Hsy, Hownback⟩
   icases procPrivFd_facts _ _ _ _ _ $$ Hpv with ⟨Hpv, %hfacts⟩
   icases ut_priv_copy hct _ _ _ _ _ $$ Hpv with ⟨Hsz, Hpg, Hpt, Hpvback⟩
-  icases utA_killIn_arm _ _ _ _ _ hne $$ Hkill with ⟨%hWg, Harm⟩
+  icases utA_killIn_arm2 _ _ _ _ _ hne $$ Hkill with ⟨%⟨hWg, hWfd⟩, Harm⟩
   ihave Hte := (show trapCsrsExt (GF := GF) cpu false ⊢ trapCsrs cpu ∗ intrRes cpu from .rfl) $$ Hte
   icases Hte with ⟨Hcsrs, Hir⟩
   icases trapCsrs_cases cpu $$ Hcsrs with ⟨%e, %s, %t, Hcsrs⟩
@@ -222,9 +222,9 @@ theorem usertrap_d0_proof (VM : VMFAULT) (HA : UT_A6 PT Γ) (H56 : UT_56 PT Γ) 
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
     iintro Hk Hpc
     ihave Hcred := uexecKillArm_cred _ _ _ $$ Harm
-    ihave Hcred := (show ukillCredAt (hlc := hlc) (GF := GF) A.Wk.gen A.sc ⊢ ukillCredAt A.gn A.sc from by
-      rw [hWg]) $$ Hcred
-    iapply (H56 A cpu R1 hok hp1 hks) $$ [- $Hk $Hpc $Hframe $Hte $Hce $Hown $Hcred $Hkont]
+    ihave Hcred := (show ukillCredAt (hlc := hlc) (GF := GF) uslot A.Wk.gen A.sc A.Wk A.f ⊢
+        ukillCredAt uslot A.gn A.sc A.Wk A.f from by rw [hWg]) $$ Hcred
+    iapply (H56 A cpu R1 hok hp1 hks hWfd) $$ [- $Hk $Hpc $Hframe $Hte $Hce $Hown $Hcred $Hkont]
     iframe #
   · -- the fill: bnez taken, +0xa6
     have hr0 : r ≠ 0#64 := PtRun.pageValid_ne_zero r hval
@@ -244,6 +244,7 @@ theorem usertrap_d0_proof (VM : VMFAULT) (HA : UT_A6 PT Γ) (H56 : UT_56 PT Γ) 
     ihave Hte := (show trapCsrsExt (GF := GF) cpu false ⊢ trapCsrsExt cpu A.k.sie from by rw [hsie]) $$ Hte
     ihave Hce := (show cpuClaimExt (GF := GF) cpu false A.k.proc ⊢ cpuClaimExt cpu A.k.sie A.k.proc from by
       rw [hsie]) $$ Hce
+    ihave Hown := ut_a6_res_left _ _ _ _ _ _ _ A.gn $$ Hown
     iapply (HA A cpu A.k R1 _ _ A.sts A.cs hok (utBase_refl _) hp1
       (utD0_rows A hok hne (vpnOf t).toNat r hnone hlt'))
       $$ [- $Hk $Hpc $Hframe $Hte $Hce $Hown $Hres $Hkont]

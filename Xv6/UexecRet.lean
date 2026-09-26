@@ -642,50 +642,62 @@ def uexecWaitF (X : Uvis → IProp GF) (n : Int) (f : sfam GF) (W : Uvis) : IPro
 
 /-! ### The kill row and the transparent arm -/
 
-/-- **Rocq `ukill_cred_at`**: at a cause usertrap kills at, the taint or the
-process's OWN exit payload at -1; `emp` at every cause it handles. -/
-def ukillCredAt (gn : GName) (sc : BitVec 64) : IProp GF :=
-  if ukillSc sc then iprop(□ uKillCred ∨ killOwed gn) else iprop(emp)
+/-- **Rocq `ukill_cred_at`**: at a cause usertrap kills at, the taint, or
+the process's OWN exit payload at -1 BESIDE THE EXIT NUMBER'S BUNDLE ROW --
+the close payments of the very table the trap holds, which kexit spends
+(Rocq lane PQ-C, design/pipe.md "The exit path"; additive with the slot, so
+a served fault loses nothing); `emp` at every cause it handles. -/
+def ukillCredAt (X : Uvis → IProp GF) (gn : GName) (sc : BitVec 64) (W : Uvis) (f : sfam GF) :
+    IProp GF :=
+  if ukillSc sc then iprop(□ uKillCred ∨ (killOwed gn ∗ sbundleAt X USYS_exit f W)) else iprop(emp)
 
-theorem ukillCredAt_not (gn : GName) (sc : BitVec 64) (h : ¬ ukillSc sc) :
-    ⊢ ukillCredAt (GF := GF) gn sc := by
+theorem ukillCredAt_not (X : Uvis → IProp GF) (gn : GName) (sc : BitVec 64) (W : Uvis) (f : sfam GF)
+    (h : ¬ ukillSc sc) : ⊢ ukillCredAt (GF := GF) X gn sc W f := by
   unfold ukillCredAt; rw [if_neg h]; iintro; iempintro
 
-theorem ukillCredAt_of_cred (gn : GName) (sc : BitVec 64) :
-    □ uKillCred ⊢ ukillCredAt (GF := GF) gn sc := by
+theorem ukillCredAt_of_cred (X : Uvis → IProp GF) (gn : GName) (sc : BitVec 64) (W : Uvis) (f : sfam GF) :
+    □ uKillCred ⊢ ukillCredAt (GF := GF) X gn sc W f := by
   unfold ukillCredAt
   split
   · iintro #H; ileft; iexact H
   · iintro -; iempintro
 
-theorem ukillCredAt_of_owed (gn : GName) (sc : BitVec 64) :
-    killOwed gn ⊢ ukillCredAt (GF := GF) gn sc := by
+theorem ukillCredAt_of_owed (X : Uvis → IProp GF) (gn : GName) (sc : BitVec 64) (W : Uvis) (f : sfam GF) :
+    killOwed gn ∗ sbundleAt X USYS_exit f W ⊢ ukillCredAt (GF := GF) X gn sc W f := by
   unfold ukillCredAt
   split
   · iintro H; iright; iexact H
   · iintro -; iempintro
 
-theorem ukillCredAt_ecall (gn : GName) : ⊢ ukillCredAt (GF := GF) gn uecallScause :=
-  ukillCredAt_not gn _ (fun h => h.1 rfl)
+theorem ukillCredAt_ecall (X : Uvis → IProp GF) (gn : GName) (W : Uvis) (f : sfam GF) :
+    ⊢ ukillCredAt (GF := GF) X gn uecallScause W f :=
+  ukillCredAt_not X gn _ W f (fun h => h.1 rfl)
+
+theorem ukillCredAt_ne (k : Nat) (X Y : Uvis → IProp GF) (HX : ∀ W, X W ≡{k}≡ Y W) (gn : GName)
+    (sc : BitVec 64) (W : Uvis) (f : sfam GF) :
+    ukillCredAt X gn sc W f ≡{k}≡ ukillCredAt Y gn sc W f := by
+  unfold ukillCredAt
+  exact uexec_ite_ne (fun _ => BI.or_ne.ne .rfl (BI.sep_ne.ne .rfl (sbundleAt_ne k X Y HX _ f W)))
+    (fun _ => .rfl)
 
 /-- **Rocq `uexec_kill_arm_F`**: THE PAIR, ADDITIVE: the kill row or the
 resume slot, the kernel takes one. -/
-def uexecKillArmF (X : Uvis → IProp GF) (sc : BitVec 64) (W : Uvis) (_f : sfam GF) : IProp GF :=
-  iprop(ukillCredAt W.gen sc ∧ X W)
+def uexecKillArmF (X : Uvis → IProp GF) (sc : BitVec 64) (W : Uvis) (f : sfam GF) : IProp GF :=
+  iprop(ukillCredAt X W.gen sc W f ∧ X W)
 
 theorem uexecKillArmF_slot (X : Uvis → IProp GF) (sc : BitVec 64) (W : Uvis) (f : sfam GF) :
     uexecKillArmF X sc W f ⊢ X W := BI.and_elim_r
 
 theorem uexecKillArmF_cred (X : Uvis → IProp GF) (sc : BitVec 64) (W : Uvis) (f : sfam GF) :
-    uexecKillArmF X sc W f ⊢ ukillCredAt W.gen sc := BI.and_elim_l
+    uexecKillArmF X sc W f ⊢ ukillCredAt X W.gen sc W f := BI.and_elim_l
 
 theorem uexecKillArmF_not (X : Uvis → IProp GF) (sc : BitVec 64) (W : Uvis) (f : sfam GF)
     (h : ¬ ukillSc sc) : X W ⊢ uexecKillArmF X sc W f :=
-  BI.and_intro (BI.affine.trans (ukillCredAt_not W.gen sc h)) .rfl
+  BI.and_intro (BI.affine.trans (ukillCredAt_not X W.gen sc W f h)) .rfl
 
 theorem uexecKillArmF_of_cred (X : Uvis → IProp GF) (sc : BitVec 64) (W : Uvis) (f : sfam GF) :
     □ uKillCred ∗ X W ⊢ uexecKillArmF X sc W f :=
-  BI.and_intro (BI.sep_elim_left.trans (ukillCredAt_of_cred W.gen sc)) BI.sep_elim_right
+  BI.and_intro (BI.sep_elim_left.trans (ukillCredAt_of_cred X W.gen sc W f)) BI.sep_elim_right
 
 /-! ### The arm, the deposit, the return -/
 
@@ -704,8 +716,10 @@ fork's child slot or the number's bundle. -/
 def uexecDepF (X : Uvis → IProp GF) (sc : BitVec 64) (W : Uvis) (f : sfam GF) : IProp GF :=
   iprop(uexecPayDep sc W f ∗
     (if sc = uecallScause then
-      (if uvisNum W = USYS_exit then iprop(emp)
-       else if uvisNum W = USYS_fork then uexecForkChildF X W (sforkPay f) (sforkLend f)
+      -- EXIT DEPOSITS ITS BUNDLE ROW LIKE ANY RETURNING NUMBER (Rocq lane PQ-C,
+      -- design/pipe.md "The exit path"): the row is the table's close
+      -- payments, one per descriptor, which kexit spends
+      (if uvisNum W = USYS_fork then uexecForkChildF X W (sforkPay f) (sforkLend f)
        else sbundleAt X (uvisNum W) f W)
      else iprop(emp)))
 
@@ -714,7 +728,7 @@ OUTSIDE EVERYTHING. -/
 def uexecRetF (X : Uvis → IProp GF) (sc : BitVec 64) (W : Uvis) : IProp GF :=
   iprop(∃ f : sfam GF, uexecPayDep sc W f ∗
     (if sc = uecallScause then
-      (if uvisNum W = USYS_exit then iprop(emp)
+      (if uvisNum W = USYS_exit then sbundleAt X (uvisNum W) f W
        else if uvisNum W = USYS_fork then uexecForkF X W f
        else if uvisNum W = USYS_wait then
          iprop(sbundleAt X (uvisNum W) f W ∗ uexecWaitF X (uvisNum W) f W)
@@ -806,13 +820,13 @@ theorem uexecRetContGen_ne (n : Int) (f : sfam GF) (W : Uvis)
 theorem uexecKillArmF_ne (sc : BitVec 64) (W : Uvis) (f : sfam GF) :
     uexecKillArmF X sc W f ≡{k}≡ uexecKillArmF Y sc W f := by
   unfold uexecKillArmF
-  exact BI.and_ne.ne .rfl (HX W)
+  exact BI.and_ne.ne (ukillCredAt_ne k X Y HX _ sc W f) (HX W)
 
 theorem uexecRetF_ne (sc : BitVec 64) (W : Uvis) : uexecRetF X sc W ≡{k}≡ uexecRetF Y sc W := by
   unfold uexecRetF
   refine BI.exists_ne (fun f => BI.sep_ne.ne .rfl ?_)
   refine uexec_ite_ne (fun _ => ?_) (fun _ => uexecKillArmF_ne k X Y HX sc W f)
-  refine uexec_ite_ne (fun _ => .rfl) (fun _ => ?_)
+  refine uexec_ite_ne (fun _ => sbundleAt_ne k X Y HX _ f W) (fun _ => ?_)
   refine uexec_ite_ne (fun _ => uexecForkF_ne k X Y HX W f) (fun _ => ?_)
   refine uexec_ite_ne (fun _ => ?_) (fun _ => ?_)
   · exact BI.sep_ne.ne (sbundleAt_ne k X Y HX _ f W) (uexecRetContGen_ne k X Y HX _ f W _)
@@ -983,7 +997,7 @@ theorem uslot_bump_run (m : RegMap) (pc : BitVec 64) (M M' : ElfMem) (π π' : N
 /-- **Rocq `uexec_ret_ecall`** (deviation 5: at the arm functionals). -/
 theorem uexecRet_ecall (W : Uvis) :
     uexecRet (GF := GF) uecallScause W = iprop(∃ f : sfam GF, uexecPayDep uecallScause W f ∗
-      (if uvisNum W = USYS_exit then iprop(emp)
+      (if uvisNum W = USYS_exit then sbundleAt uslot (uvisNum W) f W
        else if uvisNum W = USYS_fork then uexecForkF uslot W f
        else if uvisNum W = USYS_wait then
          iprop(sbundleAt uslot (uvisNum W) f W ∗ uexecWaitF uslot (uvisNum W) f W)
@@ -1023,7 +1037,7 @@ theorem uexecKillArm_slot (sc : BitVec 64) (W : Uvis) (f : sfam GF) :
 
 /-- Rocq `uexec_kill_arm_cred`. -/
 theorem uexecKillArm_cred (sc : BitVec 64) (W : Uvis) (f : sfam GF) :
-    uexecKillArm sc W f ⊢ ukillCredAt W.gen sc := uexecKillArmF_cred uslot sc W f
+    uexecKillArm sc W f ⊢ ukillCredAt uslot W.gen sc W f := uexecKillArmF_cred uslot sc W f
 
 /-! ### The split and the join -/
 
@@ -1034,13 +1048,14 @@ theorem uexecRetF_split (X : Uvis → IProp GF) (sc : BitVec 64) (W : Uvis) :
   by_cases h1 : sc = uecallScause
   · simp only [if_pos h1]
     by_cases h2 : uvisNum W = USYS_exit
-    · simp only [if_pos h2]
-      iintro ⟨%f, Hpay, -⟩
+    · have h3 : ¬ uvisNum W = USYS_fork := by rw [h2]; decide
+      simp only [if_pos h2, if_neg h3]
+      iintro ⟨%f, Hpay, Hb⟩
       iexists f
-      isplitl [Hpay]
+      isplitl [Hpay Hb]
       · isplitl [Hpay]
         · iexact Hpay
-        · iempintro
+        · iexact Hb
       · iempintro
     simp only [if_neg h2]
     by_cases h3 : uvisNum W = USYS_fork
@@ -1093,12 +1108,13 @@ theorem uexecRetF_join (X : Uvis → IProp GF) (sc : BitVec 64) (W : Uvis) (f : 
   by_cases h1 : sc = uecallScause
   · simp only [if_pos h1]
     by_cases h2 : uvisNum W = USYS_exit
-    · simp only [if_pos h2]
-      iintro ⟨⟨Hpay, -⟩, -⟩
+    · have h3 : ¬ uvisNum W = USYS_fork := by rw [h2]; decide
+      simp only [if_pos h2, if_neg h3]
+      iintro ⟨⟨Hpay, Hb⟩, -⟩
       iexists f
       isplitl [Hpay]
       · iexact Hpay
-      · iempintro
+      · iexact Hb
     simp only [if_neg h2]
     by_cases h3 : uvisNum W = USYS_fork
     · simp only [if_pos h3]
@@ -1178,18 +1194,27 @@ theorem uexecDepF_of_supply (R : IProp GF) (X : Uvis → IProp GF) (sc : BitVec 
   by_cases h1 : sc = uecallScause
   · simp only [if_pos h1]
     by_cases h2 : uvisNum W = USYS_exit
-    · simp only [if_pos h2]
+    · have h3 : ¬ uvisNum W = USYS_fork := by rw [h2]; decide
+      simp only [if_neg h3]
+      ihave #Hallb : iprop(□ (∀ W' : Uvis, myPay W'.gen (fun _ => R) -∗ □ R -∗ X W')) $$ []
+      · imodintro
+        iintro %W' #Hp #Hr
+        iapply Hall $$ %W' Hp
+        imodintro
+        iintro -
+        iexact Hr
+      ihave Hb := sbundleOfSupply X (uvisNum W) W R $$ Hpay Hsup HRb Hallb
+      imod Hb with ⟨%f, %hfp, Hb⟩
       imodintro
-      iexists fR
+      iexists f
       isplitr
-      · ipureintro; exact hfR
+      · ipureintro; exact hfp
       isplitl []
-      · iapply uexecPayDep_const R sc W fR hfR
+      · iapply uexecPayDep_const R sc W f hfp
         isplitl []
         · iexact Hpay
         · iexact HRb
-      · iempintro
-    simp only [if_neg h2]
+      · iexact Hb
     by_cases h3 : uvisNum W = USYS_fork
     · simp only [if_pos h3]
       imodintro

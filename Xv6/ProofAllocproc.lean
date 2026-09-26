@@ -1773,7 +1773,7 @@ theorem ap_pid_mint (Wk : IProp GF) (pa : BitVec 64) (pid pid0 kl : BitVec 32) (
   icases genNew_myPay γ pa pid Q $$ Hgen with ⟨#Hmy, Hgen⟩
   ihave Hkp := killPaid_of_reg Wk pid 0#32 γ Q hpnz $$ [Hpend Hpr8]
   · iframe Hpr8 Hmy Hw
-    iapply killRow_zero γ $$ Hpend
+    iapply killRow_zero _ γ $$ Hpend
   imodintro
   iexists γ
   isplitr

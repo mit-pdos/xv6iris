@@ -32,7 +32,7 @@ theorem setkilled_br_ffffffffffffea4a : KA.«setkilled» + 0xffffffffffffea4a#64
 set_option maxHeartbeats 4000000 in
 /-- **`setkilled` meets its specification.** -/
 theorem setkilled_proof (AC : ACQUIRE) (RE : RELEASE) : SETKILLED :=
-  ⟨fun {hlc GF} _ _ _ _ _ _ _ X Γ cpu k j pidv gn hj hp hpnz hnoff hK hlk htier => by
+  ⟨fun {hlc GF} _ _ _ _ _ _ _ X Γ cpu k j pidv gn self hj hp hpnz hnoff hK hlk htier => by
   obtain ⟨ξ0, t0⟩ := X
   letI : CurCtx := ⟨ξ0, t0⟩
   unfold wp_setkilled_body
@@ -89,8 +89,8 @@ theorem setkilled_proof (AC : ACQUIRE) (RE : RELEASE) : SETKILLED :=
   -- ...and the store is PAID: the one-shot fires, the row closes on the
   -- paid arm at the flag this function writes
   iapply wpLoop_bupd
-  imod killPaid_kill_two (MachFixedGS.killCred (hlc := hlc) (GF := GF)) pid kl 1#32 (.own qeighth) gn hpnz
-    (by decide) $$ [Hreg Hpay Hkp] with ⟨Hreg, #Hshot, Hkp⟩
+  imod killPaid_kill_two (MachFixedGS.killCred (hlc := hlc) (GF := GF)) pid kl 1#32 (.own qeighth) gn self hpnz
+    (by decide) $$ [Hreg Hpay Hkp] with ⟨Hreg, #Hshot, Hkp, Hback⟩
   · iframe Hreg Hpay Hkp
   imodintro
   have hsie : (k.pushOffAt spie spp).sie = false := rfl
@@ -158,7 +158,7 @@ theorem setkilled_proof (AC : ACQUIRE) (RE : RELEASE) : SETKILLED :=
   ihave HPhi := wpNext_shift _ _ _ _ _ hpin5 $$ HPhi
   iapply wpNext_mono _ _ _ _ _ $$ HPhi
   iintro %cF HPhi Hk Hpc
-  iapply HPhi $$ %spie %spp %_ %hsp1 Hk Hpc [] Hmypid Hreg Hshot
+  iapply HPhi $$ %spie %spp %_ %hsp1 Hk Hpc [] Hmypid Hreg Hshot Hback
   ipureintro
   unfold calleeSaved
   simp only [RegMap.set_apply, BitVec.reduceEq, ite_true, ite_false]

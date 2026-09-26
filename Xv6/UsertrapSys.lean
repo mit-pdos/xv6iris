@@ -334,7 +334,7 @@ theorem ut90_after [hPT : ∀ Γ, Persistent (PT Γ)] [ClaimIs (hlc := hlc) GF �
       utOwn (utRsys (hlc := hlc) PT Γ A) A.N (utV1 A) A.M A.sts A.cs A.pid ∗
       utSysIn (hlc := hlc) A.f A.sc A.sep A.V A.M A.sts A.gn A.cs A.pid ∗
       utForkIn (hlc := hlc) A.f A.sc A.sep A.V A.M A.sts ∗ utPayIn A.f A.sc A.sep A.V ∗
-      utKont PT Γ A ∗ utKillRead A.gn iprop(emp) kl
+      utKont PT Γ A ∗ utKillRead (hlc := hlc) A.gn iprop(emp) kl
     ⊢ wpLoop (GF := GF) cpu := by
   have hsie : A.k.sie = false := hok.hctx.1
   have hav : A.k.avail = 512 := hok.havail
@@ -353,9 +353,14 @@ theorem ut90_after [hPT : ∀ Γ, Persistent (PT Γ)] [ClaimIs (hlc := hlc) GF �
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h10, ut_bne_sext_nz kl hk0]
     iintro Hk Hpc
     unfold utKillRead
-    icases Hrd with (⟨%he, -⟩ | ⟨-, #Hsh⟩)
+    icases Hrd with (⟨%he, -⟩ | ⟨-, #Hsh, #Hcr⟩)
     · exact absurd he hk0
     icases ut90_pay A.f A.sc A.sep A.V $$ Hpi with ⟨#Hmy, -⟩
+    -- THE TEAR-DOWN'S PRICE: the marker off the block, the killer's credential
+    icases (utOwn_unmark _ _ _ _ _ _ _).1 $$ Hown with ⟨Hown, Hmk⟩
+    ihave Htear : utTear (hlc := hlc) (GF := GF) A.gn A.sts $$ [Hmk]
+    · unfold utTear; ileft; iframe Hsh Hcr
+      iapply (show takenAt (GF := GF) (utV1 A).gen ⊢ takenAt A.gn from by rw [hok.hgn]) $$ Hmk
     -- +0xc8  c.li a0,-1 ; +0xca  jal kexit
     k_step (wp_s_addi cpu _ (KA.«usertrap» + 0xc8#64) true 0xfff#12 10#5 0#5 (by decide))
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
@@ -378,7 +383,7 @@ theorem ut90_after [hPT : ∀ Γ, Persistent (PT Γ)] [ClaimIs (hlc := hlc) GF �
     unfold kexitAddr
     rw [← hok.hsp]
     simp only [KCtx.withRegs_sie, KCtx.pushed_sie, hsie]
-    iframe Hk Hpc Hframe Hte Hce Hcaps Hown Hsh
+    iframe Hk Hpc Hframe Hte Hce Hcaps Hown Htear
     unfold utPay; rw [hok.hgn]; iexact Hmy
 
 set_option maxHeartbeats 4000000 in
@@ -396,33 +401,33 @@ theorem usertrap_90_proof [hPT : ∀ Γ, Persistent (PT Γ)] [ClaimIs (hlc := hl
   have hg1 : (utV1 A).gen = A.gn := hok.hgn.symm
   -- open the block: the pid half, the registration eighth
   icases utOwn_priv _ A.N (utV1 A) A.M A.sts A.cs A.pid $$ Hown with ⟨Hpriv, Hfr, Hch, Hsy, Hownb⟩
-  have hacc := ut_priv_pid (hlc := hlc) (GF := GF) hct A.N.f A.N.pj A.pid (utV1 A) A.M
+  have hacc := ut_priv_pid_mk (hlc := hlc) (GF := GF) hct A.N.f A.N.pj A.pid (utV1 A) A.M
   rw [hg1, hok.pj] at hacc
   ihave Hpriv := (show procPrivFd (GF := GF) A.N.f A.N.pj A.pid (utV1 A) A.M ⊢
       procPrivFd A.N.f (procAddr A.j) A.pid (utV1 A) A.M from by rw [hok.pj]) $$ Hpriv
-  icases hacc $$ Hpriv with ⟨%hnz, Hqp, Hrg, Hprivb⟩
+  icases hacc $$ Hpriv with ⟨%hnz, Hqp, Hrg, Hmk, Hprivb⟩
   ihave Hz : iprop(iprop(emp) ∨ killShot (GF := GF) A.gn) $$ []
   · ileft; iempintro
-  ihave Hlend := ut_kill_lend (hlc := hlc) A.j A.pid A.gn iprop(emp) hnz $$ [Hqp Hrg Hz]
-  · iframe Hqp Hrg Hz
+  ihave Hlend := ut_kill_lend (hlc := hlc) A.j A.pid A.gn iprop(emp) hnz $$ [Hqp Hrg Hmk Hz]
+  · iframe Hqp Hrg Hmk Hz
   icases ut90_caps_pw A.N $$ Hcaps with ⟨#Hpinv, -⟩
   rw [hok.hΓ] at *
   -- +0x90  jal killed
   k_step (wp_s_jal cpu _ (KA.«usertrap» + 0x90#64) false 2095878#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [ut_a6_killed_tgt]
   iintro Hk Hpc
-  iapply (ut_killed Γ KI cpu _ A.j (fun kl => iprop(utKillRead A.gn iprop(emp) kl ∗
-      wordPointsTo (pPid (procAddr A.j)) 4 pidPriv A.pid ∗ pidReg A.pid (.own qeighth) A.gn))
+  iapply (ut_killed Γ KI cpu _ A.j (fun kl => iprop(utKillRead (hlc := hlc) A.gn iprop(emp) kl ∗
+      wordPointsTo (pPid (procAddr A.j)) 4 pidPriv A.pid ∗ pidReg A.pid (.own qeighth) A.gn ∗ takenAt A.gn))
       hok.hj ?hp ?hn ?hK ?hl ?ht) $$ [- $Hk $Hpc $Hpinv $Hlend]
   rotate_right 1
   · k_norm
     iapply wpNext_off_intro
-    iintro %spie %spp %R' %kl %hsp Hk Hpc %⟨hcs, h10'⟩ ⟨Hrd, Hqp, Hrg⟩
+    iintro %spie %spp %R' %kl %hsp Hk Hpc %⟨hcs, h10'⟩ ⟨Hrd, Hqp, Hrg, Hmk⟩
     have e := hsp (by k_norm_g <;> exact hsie)
     k_norm_g at e
     obtain ⟨rfl, rfl⟩ := e
     k_norm_g [ut_pushed_withSpie, KCtx.withSpie_self' A.k A.k.spie A.k.spp rfl rfl, ut90_ret_94]
-    ihave Hpriv := Hprivb $$ Hqp Hrg
+    ihave Hpriv := Hprivb $$ Hqp Hrg Hmk
     ihave Hown := Hownb $$ %(utV1 A) %A.M %A.sts %A.cs [Hpriv] Hfr Hch Hsy
     · rw [hok.pj]; iexact Hpriv
     have hpins' : utPins A R' :=

@@ -25,10 +25,9 @@ usertrap's answers re-keyed onto the next slot on the way out.
 2. Exec's failure arm: `syscExecFailed` at the post record up to the kernel
    words (SpecUsertrap deviation 9) gives Rocq's `uround_bump_ok ∧
    usys_mem_ok` reading here (`urc_exec_failed`).
-3. The exit ecall's bundle row is `emp` at the kernel's deposit instance
-   (`urc_sbundle_exit`, `UexecExecInst.xv6SbundleRest`): Lean's `uexecDepF`
-   deposits nothing at exit (Rocq main's exit deposits the close payments --
-   a later Rocq change, UexecRet drift).
+3. (retired: the exit ecall deposits its bundle row -- the close payments
+   of its table -- like any returning number, Rocq lane PQ-C; the former
+   `urc_sbundle_exit` shim is gone.)
 
 Proof-mode lemmas; no instruction stepping.
 -/
@@ -70,15 +69,6 @@ variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [Fdslot
     [Appcfg GF] [FileG GF] [Fscfg] [Icfg]
 open UexecSG
 
-/-- **Exit's bundle row is `emp`** at the kernel's deposit instance
-(deviation 3). -/
-theorem urc_sbundle_exit (X : Uvis → IProp GF) (f : Xfam GF) (W : Uvis) :
-    ⊢ @UexecSG.sbundleAt GF _ (uexecSGXv6 (hlc := hlc)) X USYS_exit f W := by
-  show ⊢ xv6Sbundle (hlc := hlc) X USYS_exit f W
-  unfold xv6Sbundle xv6SbundleRest USYS_exit USYS_exec
-  simp only [Int.reduceEq, if_false]
-  exact .rfl
-
 /-- **THE SPLIT, AT USERTRAP'S ROWS**: the deposit at the trapped key, moved
 onto the record `syscall()` is called with; the ecall arm stays for the
 round. -/
@@ -107,22 +97,6 @@ theorem urc_deposit (W : Uvis) (V : ProcPriv) (Mp : Nat → List (BitVec 8)) (gn
   unfold uexecDep uexecDepF uexecPayDep utSysIn utForkIn utPayIn utKillIn syscSysIn syscForkIn
   by_cases hec : sc = uecallScause
   · simp only [if_pos hec]
-    by_cases hx : uvisNum W = USYS_exit
-    · simp only [if_pos hx]
-      iintro ⟨⟨Hpay, -⟩, Harm⟩
-      ihave Hpay := hpay $$ Hpay
-      iframe Hpay Harm
-      isplitl []
-      · iintro %_ %n %⟨hn, _⟩
-        rw [← hn, hnum, hx]
-        iapply urc_sbundle_exit
-      isplitl []
-      · iintro %_ %hf
-        exfalso; rw [hnum, hx] at hf; exact absurd hf (by decide)
-      isplitl []
-      · ipureintro; exact hkill
-      · iempintro
-    simp only [if_neg hx]
     by_cases hfk : uvisNum W = USYS_fork
     · simp only [if_pos hfk]
       iintro ⟨⟨Hpay, Hd⟩, Harm⟩

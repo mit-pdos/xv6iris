@@ -10,8 +10,15 @@ Interrupts are off throughout.  The trap cells are read out of the folded
 `trapCsrs` at their existential values and folded back; printk's
 credentials are `panicEnv`'s (in `utCaps`); setkilled is paid by the
 process's own kill row (`ukillCredAt` at a kill cause: `□ killCred ∨
-killOwed gn`) and hands back the incarnation's kill shot, which is what the
-kill check at +0xa6 is lent (`utLiveRes`'s right disjunct).
+(killOwed gn ∗ exit row)`) and hands back the incarnation's kill shot, which
+is what the kill check at +0xa6 is lent (`utLiveRes`'s right disjunct).
+
+WHICH PARTY PAYS (Rocq lane PQ-C, design/pipe.md "The exit path"): the
+application's credential (the generic route: the marker stays in the block,
++0xa6 sees the ordinary residue), or the process's OWN death payload beside
+the incarnation's marker -- a SELF-KILL, which founds `p->lock`'s killed row
+on the spent arm, so +0xa6 is entered at the marker-less residue with the
+closes of the table (the exit row, `UtExitElim`) and the payload.
 -/
 import Xv6.UsertrapAux
 import MachCSL.WpSmodeTrapCsr
@@ -46,8 +53,9 @@ variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [Fdslot
 
 set_option maxHeartbeats 8000000 in
 /-- **Rocq `ut_56`**: the unexpected-scause arm. -/
-theorem usertrap_56_proof (PK : PRINTK) (SK : SETKILLED) (HA : UT_A6 PT Γ) : UT_56 PT Γ := by
-  intro A cpu R hok hpins hks
+theorem usertrap_56_proof (PK : PRINTK) (SK : SETKILLED) (hEX : UtExitElim (hlc := hlc) (GF := GF))
+    (HA : UT_A6 PT Γ) : UT_56 PT Γ := by
+  intro A cpu R hok hpins hks hWfd
   have hsie : A.k.sie = false := hok.hctx.1
   have hne : A.sc ≠ uecallScause := ukillSc_ne_ecall hks
   have p9 := hpins.2.1
@@ -65,8 +73,12 @@ theorem usertrap_56_proof (PK : PRINTK) (SK : SETKILLED) (HA : UT_A6 PT Γ) : UT
   · unfold utCaps; icases Hcaps with ⟨-, -, #H, -⟩; iexact H
   unfold panicEnv
   icases Hpe with ⟨%γpr, %γl, %γd, #Hlk, #Htx, #Hsent⟩
-  icases utA_own_open _ _ (procAddr A.j) _ _ _ _ _ hok.pj $$ Hown with ⟨Hpv, Hfr, Hch, Hsy, Hownback⟩
-  icases ut_priv_pid hct _ _ _ _ _ $$ Hpv with ⟨%hnz, Hqp, Hrg, Hpvback⟩
+  -- the incarnation's marker off the residue (the self-kill spends it)
+  icases (utOwn_unmark _ _ _ _ _ _ _).1 $$ Hown with ⟨Hown, Hmk⟩
+  icases utOwnNm_priv _ _ _ _ _ _ _ $$ Hown with ⟨Hpv, Hfr, Hch, Hsy, Hownback⟩
+  ihave Hpv := (show procPrivUnmarked (GF := GF) A.N.f A.N.pj A.pid (utV1 A) A.M ⊢
+    procPrivUnmarked A.N.f (procAddr A.j) A.pid (utV1 A) A.M from by rw [hok.pj]) $$ Hpv
+  icases ut_privNm_pid hct _ _ _ _ _ $$ Hpv with ⟨%hnz, Hqp, Hrg, Hpvback⟩
   ihave Hte := (show trapCsrsExt (GF := GF) cpu false ⊢ trapCsrs cpu ∗ intrRes cpu from .rfl) $$ Hte
   icases Hte with ⟨Hcsrs, Hir⟩
   icases trapCsrs_cases cpu $$ Hcsrs with ⟨%e, %s, %t, Hcsrs⟩
@@ -151,11 +163,36 @@ theorem usertrap_56_proof (PK : PRINTK) (SK : SETKILLED) (HA : UT_A6 PT Γ) : UT
   icases utA_pid_split hct _ _ $$ Hqp with ⟨Hq1, Hq2⟩
   ihave Hrg := (show pidReg (GF := GF) A.pid (.own qeighth) (utV1 A).gen ⊢ pidReg A.pid (.own qeighth) A.gn
     from by rw [hok.hgn]) $$ Hrg
-  ihave Hpay := (show ukillCredAt (hlc := hlc) (GF := GF) A.gn A.sc ⊢
-    iprop(□ MachFixedGS.killCred (hlc := hlc) (GF := GF) ∨ killOwed A.gn) from by
+  ihave Hpay := (show ukillCredAt (hlc := hlc) (GF := GF) uslot A.gn A.sc A.Wk A.f ⊢
+    iprop(□ MachFixedGS.killCred (hlc := hlc) (GF := GF) ∨
+      (killOwed A.gn ∗ UexecSG.sbundleAt uslot USYS_exit A.f A.Wk)) from by
       unfold ukillCredAt; rw [if_pos hks]) $$ Hpay
-  iapply (utA_setkilled SK Γ cpu _ A.j A.pid A.gn hok.hj ?hsp ?hnz ?hss ?hsn ?hsK ?hsl ?hst)
-    $$ [- $Hk $Hpc $Hpi $Hpay $Hrg $Hq1]
+  ihave Hmk := (show takenAt (GF := GF) (utV1 A).gen ⊢ takenAt A.gn from by rw [hok.hgn]) $$ Hmk
+  -- WHICH PARTY PAYS: keyed, so the side setkilled hands back is known
+  icases (show iprop(□ MachFixedGS.killCred (hlc := hlc) (GF := GF) ∨
+      (killOwed A.gn ∗ UexecSG.sbundleAt uslot USYS_exit A.f A.Wk)) ∗ takenAt A.gn ⊢
+      ∃ self : Bool,
+        (if self then iprop(killOwed A.gn ∗ takenAt A.gn)
+          else iprop(□ MachFixedGS.killCred (hlc := hlc) (GF := GF))) ∗
+        ((if self then killOwed A.gn else iprop(□ MachFixedGS.killCred (hlc := hlc) (GF := GF))) -∗
+          (takenAt A.gn ∨ (filecloseCpays (hlc := hlc) A.sts ∗ killOwed A.gn))) from by
+      iintro ⟨(#Hc | ⟨Howed, Hex⟩), Ht⟩
+      · iexists false
+        simp only [Bool.false_eq_true, ↓reduceIte]
+        iframe Hc
+        iintro -
+        ileft; iexact Ht
+      · iexists true
+        simp only [↓reduceIte]
+        iframe Howed Ht
+        iintro Howed
+        iright
+        iframe Howed
+        rw [← hWfd]
+        iapply (hEX uslot A.f A.Wk) $$ Hex) $$ [Hpay Hmk] with ⟨%self, Hsk, Hconv⟩
+  · iframe Hpay Hmk
+  iapply (utA_setkilled SK Γ cpu _ A.j A.pid A.gn self hok.hj ?hsp ?hnz ?hss ?hsn ?hsK ?hsl ?hst)
+    $$ [- $Hk $Hpc $Hpi $Hsk $Hrg $Hq1]
   rotate_right 1
   case hsp => k_norm; rw [hp2.2.1]
   case hnz => exact hnz
@@ -164,7 +201,8 @@ theorem usertrap_56_proof (PK : PRINTK) (SK : SETKILLED) (HA : UT_A6 PT Γ) : UT
   case hsK => k_norm; rw [hok.havail]; omega
   case hsl => k_norm; rw [hok.hlocks]; simp
   case hst => k_norm; exact hok.htier
-  iintro %R3 Hk Hpc %hcs3 Hq1 Hrg #Hshot
+  iintro %R3 Hk Hpc %hcs3 Hq1 Hrg #Hshot Hback
+  ihave Htear := Hconv $$ Hback
   have hp3 : utPins A R3 := utPins_calleeSaved A _ R3 (by ut_pins) hcs3
   k_norm [ut56_ret82]
   -- +0x82  j +0xa6
@@ -177,17 +215,31 @@ theorem usertrap_56_proof (PK : PRINTK) (SK : SETKILLED) (HA : UT_A6 PT Γ) : UT
   ihave Hrg := (show pidReg (GF := GF) A.pid (.own qeighth) A.gn ⊢ pidReg A.pid (.own qeighth) (utV1 A).gen
     from by rw [hok.hgn]) $$ Hrg
   ihave Hpv := Hpvback $$ Hqp Hrg
+  ihave Hpv := (show procPrivUnmarked (GF := GF) A.N.f (procAddr A.j) A.pid (utV1 A) A.M ⊢
+    procPrivUnmarked A.N.f A.N.pj A.pid (utV1 A) A.M from by rw [hok.pj]) $$ Hpv
   ihave Hown := Hownback $$ %(utV1 A) %A.M %A.sts %A.cs Hpv Hfr Hch Hsy
+  -- the residue +0xa6 is entered at: the marker back (a third party's
+  -- credential paid), or the marker-less block with the closes and payload
+  ihave Hres : iprop(utOwn (utRsys PT Γ A) A.N (utV1 A) A.M A.sts A.cs A.pid ∨
+      (utOwnNm (utRsys PT Γ A) A.N (utV1 A) A.M A.sts A.cs A.pid ∗ killShot A.gn ∗
+        filecloseCpays (hlc := hlc) A.sts ∗ killOwed A.gn)) $$ [Hown Htear]
+  · icases Htear with (Ht | ⟨Hcp, Hq⟩)
+    · ileft
+      iapply (utOwn_unmark _ _ _ _ _ _ _).2
+      iframe Hown
+      iapply (show takenAt (GF := GF) A.gn ⊢ takenAt (utV1 A).gen from by rw [hok.hgn]) $$ Ht
+    · iright
+      iframe Hown Hshot Hcp Hq
   ihave Hcsrs := trapCsrs_intro cpu _ _ _ $$ [Hsepc Hscause Hstval]
   · unfold trapCsrsAt; iframe Hsepc Hscause Hstval
   ihave Hte : trapCsrsExt (GF := GF) cpu A.k.sie $$ [Hcsrs Hir]
   · rw [hsie, trapCsrsExt_false]; iframe Hcsrs Hir
   ihave Hce := (show cpuClaimExt (GF := GF) cpu false A.k.proc ⊢ cpuClaimExt cpu A.k.sie A.k.proc from by
     rw [hsie]) $$ Hce
-  ihave Hres : utLiveRes (hlc := hlc) A (utV1 A) A.cs $$ [Hshot]
+  ihave Hlive : utLiveRes (hlc := hlc) A (utV1 A) A.cs $$ [Hshot]
   · unfold utLiveRes; iright; iexact Hshot
   iapply (HA A cpu A.k R3 (utV1 A) A.M A.sts A.cs hok (utBase_refl _) hp3 (utA_rows_entry A hok hne))
-    $$ [- $Hk $Hpc $Hframe $Hte $Hce $Hown $Hres $Hkont]
+    $$ [- $Hk $Hpc $Hframe $Hte $Hce $Hres $Hlive $Hkont]
   iframe #
   iapply utOuts_quiet _ _ _ _ _ hne
 

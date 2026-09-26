@@ -240,9 +240,13 @@ class UprogSG (GF : BundledGFunctors) where
 /-- **Rocq `free_num`**: THE FREE NUMBERS -- every number whose bundle is payable
 at every key from the supplier alone.  Missing: 7 exec (explicit route), 5 read
 (the console arm spends the supply), 6 kill (the kill credential), 15 open, 16
-write, 17–20 mknod/unlink/link/mkdir (write-kind commits).  9 (chdir) is free. -/
+write, 17–20 mknod/unlink/link/mkdir (write-kind commits), 21 close and 2 exit
+(the byte queue's close payments: a pipe key's is a close link, payable only
+by the holder of the pipe's fragment or the taint; Rocq lane PQ-C).  9
+(chdir) is free. -/
 def freeNum (n : Int) : Prop :=
-  n ≠ USYS_exec ∧ n ≠ 5 ∧ n ≠ 6 ∧ n ≠ 15 ∧ n ≠ 16 ∧ n ≠ 17 ∧ n ≠ 18 ∧ n ≠ 19 ∧ n ≠ 20
+  n ≠ USYS_exec ∧ n ≠ 5 ∧ n ≠ 6 ∧ n ≠ 15 ∧ n ≠ 16 ∧ n ≠ 17 ∧ n ≠ 18 ∧ n ≠ 19 ∧ n ≠ 20 ∧
+    n ≠ 21 ∧ n ≠ USYS_exit
 
 instance freeNum_dec (n : Int) : Decidable (freeNum n) := by
   unfold freeNum; infer_instance

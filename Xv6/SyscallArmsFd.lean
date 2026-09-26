@@ -229,6 +229,8 @@ theorem syscall_arm_close (SC : SYSCLOSE)
   icases Hslot with ⟨Hnext, -⟩
   have hn21 : syscNum V = (21 : Int) := hnum
   ihave Hsi := syscSysIn_at f V M sts gn cs pid 21 hn21 (by decide) $$ Hsi
+  -- THE CLOSE DEPOSIT (Rocq `sysc_dep_close`): the payment at the key
+  icases hDC f V M sts gn cs pid $$ Hsi with ⟨%Pc, Hcpay, Hout⟩
   icases syscallEnv_ftable PT Γ γ $$ Henv with ⟨%γft, #Hft⟩
   ihave #Hpe := syscallEnv_panic PT Γ γ $$ Henv
   ihave #Hpipe := syscallEnv_fileclosePipeEnv PT Γ γ $$ Henv Hpi
@@ -246,7 +248,7 @@ theorem syscall_arm_close (SC : SYSCLOSE)
   icases syscKctx_sp cpu (((k.withSpie spie spp).pushed 4).withRegs R) (by
       k_norm_g; have := syscallSlots_val; omega) $$ Hk with ⟨%hsp, Hk⟩
   have hC := SC.wp_sys_close_eb (hlc := hlc) (GF := GF) Γ cpu (((k.withSpie spie spp).pushed 4).withRegs R)
-    γft γ (procAddr j) pid V M sts (tfW V.tf (tfArgIdx 0)) j fscKalloc fsReadyKmem none
+    γft γ (procAddr j) pid V M sts (tfW V.tf (tfArgIdx 0)) j fscKalloc fsReadyKmem none Pc
     (syscArg V hl 0 (by decide)) ?hp ?ht hsp ?hn ?hK
   case hp => k_norm_g; exact hproc
   case ht => k_norm_g; exact htier
@@ -261,8 +263,11 @@ theorem syscall_arm_close (SC : SYSCLOSE)
   iframe Hk Hpc Hte Hce Hft Hpe Hpriv Hfr Hpipe HfsE
   isplitl [Hi1]
   · unfold irefSlot; iexact Hi1
+  isplitl [Hcpay]
+  · rw [sysFdSt_key ha]; iexact Hcpay
   k_next_e
-  iintro %spie2 %spp2 %R2 %hcs Hk Hpc Hte Hce Hpost - HfsE Hi1
+  iintro %spie2 %spp2 %R2 %hcs Hk Hpc Hte Hce Hpost Hcp - HfsE Hi1
+  rw [sysFdSt_key ha]
   have hww : ∀ (K : KCtx) (a b c d : Bool), (K.withSpie a b).withSpie c d = K.withSpie c d :=
     fun _ _ _ _ _ => rfl
   have hpsw : ∀ (K : KCtx) (m : Nat) (a b : Bool),
@@ -285,7 +290,7 @@ theorem syscall_arm_close (SC : SYSCLOSE)
     have hrows := syscRows_ofile V M sts sts cs pid V.ofile (R2 10#5) 21 hn21 (by decide)
       (by decide) (by decide) (by decide) (by decide) (by decide) (by decide) (by decide) (by decide)
       hl0 hfd
-    ihave Hsp := hDC f V M sts gn cs pid (R2 10#5) sts hfd $$ Hsi
+    ihave Hsp := Hout $$ %(R2 10#5) %sts Hcp
     iapply (syscall_ret_fd PT Γ c0 cpu k spie2 spp2 R2 γ j pid V M sts gn cs ip f
       { V with ofile := V.ofile } M sts cs hj hproc hK htier hpins2 hs2' hrows 21 hn21
       (by decide) (by decide) (by decide))
@@ -298,7 +303,7 @@ theorem syscall_arm_close (SC : SYSCLOSE)
     have hrows := syscRows_ofile V M sts _ cs pid (V.ofile.set fd 0#64) (R2 10#5) 21 hn21 (by decide)
       (by decide) (by decide) (by decide) (by decide) (by decide) (by decide) (by decide) (by decide)
       hl0 hfd
-    ihave Hsp := hDC f V M sts gn cs pid (R2 10#5) _ hfd $$ Hsi
+    ihave Hsp := Hout $$ %(R2 10#5) %_ Hcp
     iapply (syscall_ret_fd PT Γ c0 cpu k spie2 spp2 R2 γ j pid V M sts gn cs ip f
       { V with ofile := V.ofile.set fd 0#64 } M _ cs hj hproc hK htier hpins2 hs2' hrows 21 hn21
       (by decide) (by decide) (by decide))

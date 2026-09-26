@@ -113,18 +113,19 @@ theorem utA_printk (PK : PRINTK) (c : CPU) (k' : KCtx) (γpr γl : GName) (γd :
 set_option maxHeartbeats 1000000 in
 /-- `setkilled(p)` at interrupts off. -/
 theorem utA_setkilled (SK : SETKILLED) (Γ : SchedNames) (c : CPU) (k' : KCtx) (j : Nat) (pidv : BitVec 32)
-    (gn : GName) (hj : j < NPROC) (hp : k'.regs 10#5 = procAddr j) (hpnz : pidv.toNat ≠ 0)
+    (gn : GName) (self : Bool) (hj : j < NPROC) (hp : k'.regs 10#5 = procAddr j) (hpnz : pidv.toNat ≠ 0)
     (hsie : k'.sie = false) (hnoff : k'.noff + 1 < 2 ^ 31) (hK : 14 ≤ k'.avail) (hlk : "proc" ∉ k'.locks)
     (htier : k'.tier = KTier.kpt) :
     kctx c k' ∗ pcIs c KA.«setkilled» ∗ procsInv Γ ∗
-    (□ MachFixedGS.killCred (hlc := hlc) (GF := GF) ∨ killOwed gn) ∗
+    (if self then iprop(killOwed gn ∗ takenAt gn) else iprop(□ MachFixedGS.killCred (hlc := hlc) (GF := GF))) ∗
     pidReg pidv (.own qeighth) gn ∗
     wordPointsTo (pPid (procAddr j)) 4 (DFrac.own (1 : Qp).half.half) pidv ∗
     (∀ R' : RegMap, kctx c (k'.withRegs R') -∗ pcIs c (jumpPc (k'.regs 1#5)) -∗ ⌜calleeSaved k'.regs R'⌝ -∗
       wordPointsTo (pPid (procAddr j)) 4 (DFrac.own (1 : Qp).half.half) pidv -∗
-      pidReg pidv (.own qeighth) gn -∗ killShot gn -∗ wpLoop c)
+      pidReg pidv (.own qeighth) gn -∗ killShot gn -∗
+      (if self then killOwed gn else iprop(□ MachFixedGS.killCred (hlc := hlc) (GF := GF))) -∗ wpLoop c)
     ⊢ wpLoop (GF := GF) c := by
-  have h := SK.wp_setkilled (hlc := hlc) (GF := GF) Γ c k' j pidv gn hj hp hpnz hnoff hK hlk htier
+  have h := SK.wp_setkilled (hlc := hlc) (GF := GF) Γ c k' j pidv gn self hj hp hpnz hnoff hK hlk htier
   unfold wp_setkilled_body at h
   simp only [setkilledAddr] at h
   iintro ⟨Hk, Hpc, Hpi, Hpay, Hrg, Hq, HPhi⟩
@@ -132,10 +133,10 @@ theorem utA_setkilled (SK : SETKILLED) (Γ : SchedNames) (c : CPU) (k' : KCtx) (
   iframe Hk Hpc Hpi Hpay Hrg Hq
   rw [hsie]
   iapply wpNext_off_intro
-  iintro %spie %spp %R' %hsp Hk Hpc %hcs Hq Hrg Hs
+  iintro %spie %spp %R' %hsp Hk Hpc %hcs Hq Hrg Hs Hb
   obtain ⟨rfl, rfl⟩ := hsp rfl
   rw [KCtx.withSpie_self' k' _ _ rfl rfl]
-  iapply HPhi $$ %R' Hk Hpc %hcs Hq Hrg Hs
+  iapply HPhi $$ %R' Hk Hpc %hcs Hq Hrg Hs Hb
 
 end Calls
 

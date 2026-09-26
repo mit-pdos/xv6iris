@@ -76,8 +76,8 @@ theorem sysx_argint (AI : ARGINT) (c : CPU) (k' : KCtx) (tfp : BitVec 44) (ws : 
 theorem sysx_kexit (KX : KEXIT) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
     (c : CPU) (k' : KCtx) (γw γl : GName) (γ : FileNames) (γkl : GName) (γk : KmemNames)
     (on : Option Nat) (j : Nat) (pid : BitVec 32) (V : ProcPriv)
-    (M : Nat → List (BitVec 8)) (ip : BitVec 64) (cs : ExtTreeSet GName compare) (Q : Int → IProp GF)
-    (sp : BitVec 64) (n : Nat) (s : Bool) (st : Int)
+    (M : Nat → List (BitVec 8)) (ip : BitVec 64) (cs : ExtTreeSet GName compare) (sts : List FdState)
+    (Q : Int → IProp GF) (sp : BitVec 64) (n : Nat) (s : Bool) (st : Int)
     (hj : j < NPROC) (hproc : k'.proc = procAddr j) (hK : kexitSlots ≤ k'.avail)
     (hs : k'.sie = s) (hnoff : k'.noff = 0)
     (htier : k'.tier = KTier.kpt)
@@ -89,14 +89,14 @@ theorem sysx_kexit (KX : KEXIT) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
     isLock γkl kmemLockAddr "kmem" (kmemRes γk) ∗ kallocAvail γk on ∗
     fsReady (hlc := hlc) ∗ bslots 3 ∗
     fdSlots FDSPARE ∗ irefSlots IREFSPARE ∗
-    procPrivFd γ (procAddr j) pid V M ∗ (∃ sts, fdFrags V.fdg sts) ∗
+    procPrivUnmarked γ (procAddr j) pid V M ∗ fdFrags V.fdg sts ∗ filecloseCpays (hlc := hlc) sts ∗
     chFrag V.chg (procAddr j) cs ∗
-    myPay V.gen Q ∗ (Q st ∨ (⌜st = -1⌝ ∗ killShot V.gen)) ∗
+    myPay V.gen Q ∗ (Q st ∨ (⌜st = -1⌝ ∗ killShot V.gen ∗ takenAt V.gen)) ∗
     (stackOwn sp n -∗ stackOwn (V.kstack + 4096#64) 512)
     ⊢ wpLoop (GF := GF) c := by
   subst hs
   subst hst
-  have h := KX.wp_kexit_eb (hlc := hlc) (GF := GF) Γ c k' γw γl γ γkl γk on j pid V M ip cs Q
+  have h := KX.wp_kexit_eb (hlc := hlc) (GF := GF) Γ c k' γw γl γ γkl γk on j pid V M ip cs sts Q
     hj hproc hK hnoff htier
   unfold wp_kexit_eb_body at h
   simp only [kexitAddr, KCtx.sp, hsp, hav, hproc] at h
@@ -169,16 +169,16 @@ theorem sys_exit_br_fffffffffffff702 : KA.«sys_exit» + 0xfffffffffffff702#64 =
 set_option maxHeartbeats 64000000 in
 set_option maxRecDepth 20000 in
 theorem sys_exit_proof (AI : ARGINT) (KX : KEXIT) : SYSEXIT := ⟨
-  fun {hlc GF} _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ X Γ _ cpu k γw γl γ γkl γk on j pid V M ip v cs Q
+  fun {hlc GF} _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ X Γ _ cpu k γw γl γ γkl γk on j pid V M ip v cs sts Q
       hj hproc hv hK hnoff htier => by
   obtain ⟨ξ0, t0⟩ := X
   letI : CurCtx := ⟨ξ0, t0⟩
   unfold wp_sys_exit_eb_body
   simp only [sysExitAddr]
   iintro ⟨Hk, Hpc, #Hpi, Hte, Hce, #Hwl, #Hinit, #Hft, #Hpe, #Hkl, Hav, #Hrdy, Hbs, Hfsp, Hirs,
-    Hblk, Hfr, Hch, Hmy, Hpay, Hcloser⟩
+    Hblk, Hfr, Hcp, Hch, Hmy, Hpay, Hcloser⟩
   -- Rocq's deposit, at the status argument 0 carries: kexit's left arm
-  ihave Hpay : iprop(Q (xstateOf v) ∨ (⌜xstateOf v = -1⌝ ∗ killShot V.gen)) $$ [Hpay]
+  ihave Hpay : iprop(Q (xstateOf v) ∨ (⌜xstateOf v = -1⌝ ∗ killShot V.gen ∗ takenAt V.gen)) $$ [Hpay]
   case' _ =>
     ileft
     rw [← exitXs_of_arg0 hv]
@@ -253,6 +253,10 @@ theorem sys_exit_proof (AI : ARGINT) (KX : KEXIT) : SYSEXIT := ⟨
       unfold procPrivFd procPrivCoreNoctxAt procPrivBareAt procFieldsNoOfile procOfiles
       iframe Hpid Hks Hsz Hpg Htf Hcwd Hnm Hsc HPt HTf Hcwr Hofs
       ipureintro; exact ⟨hVb, hlz⟩
+    -- THE MARKER COMES OFF THE BLOCK HERE (Rocq lane PQ-C, "The exit path"):
+    -- kexit is stated at the marker-less block; a normal exit takes the LEFT
+    -- side of the payment, which owes no marker, and drops it.
+    icases (procPrivFd_unmark γ (procAddr j) pid V M).1 $$ Hblk with ⟨Hblk, -⟩
     ihave Hce := (show cpuClaimExt (GF := GF) cpu k.sie k.proc ⊢ cpuClaimExt cpu k.sie (procAddr j) from by
       rw [hproc]) $$ Hce
     -- the dead frame joins the closer, re-anchored at kexit's entry sp
@@ -260,10 +264,10 @@ theorem sys_exit_proof (AI : ARGINT) (KX : KEXIT) : SYSEXIT := ⟨
       (by omega) hal
       (stackOwn (V.kstack + 4096#64) 512) $$ [F0 F1 Flo Fnn F3 Hcloser]
     case' _ => iframe
-    iapply (sysx_kexit KX Γ cpu _ γw γl γ γkl γk on j pid V M ip cs Q (k.regs 2#5 + 0xFFFFFFFFFFFFFFE0#64)
+    iapply (sysx_kexit KX Γ cpu _ γw γl γ γkl γk on j pid V M ip cs sts Q (k.regs 2#5 + 0xFFFFFFFFFFFFFFE0#64)
         (trapRes k.sie + k.avail - 4) k.sie (xstateOf v)
         hj ?hpr ?hKx ?hs ?hn2 ?ht ?hsp ?hav ?hst)
-      $$ [- $Hk $Hpc $Hpi $Hte $Hce $Hwl $Hinit $Hft $Hpe $Hkl $Hav $Hrdy $Hbs $Hfsp $Hirs $Hblk $Hfr
+      $$ [- $Hk $Hpc $Hpi $Hte $Hce $Hwl $Hinit $Hft $Hpe $Hkl $Hav $Hrdy $Hbs $Hfsp $Hirs $Hblk $Hfr $Hcp
           $Hch $Hmy $Hpay $Hcloser]
     case hpr => k_norm_g; exact hproc
     case hKx => k_norm_g; unfold sysExitSlots at hK; omega

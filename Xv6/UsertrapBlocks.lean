@@ -154,6 +154,61 @@ theorem ut_priv_pid [X : CurCtx] (hct : curTier = KTier.kpt) (γ : FileNames) (p
   · ipureintro; exact h
   · ipureintro; exact hlz
 
+/-- **The pid half and the registration eighth, out of the MARKER-LESS
+block** (Rocq `ut_priv_nm_pid_reg`), with the pid's nonzeroness. -/
+theorem ut_privNm_pid [X : CurCtx] (hct : curTier = KTier.kpt) (γ : FileNames) (pa : BitVec 64)
+    (pid : BitVec 32) (V : ProcPriv) (M : Nat → List (BitVec 8)) :
+    procPrivUnmarked (GF := GF) γ pa pid V M ⊢
+      ⌜pid.toNat ≠ 0⌝ ∗ wordPointsTo (pPid pa) 4 pidPriv pid ∗ pidReg pid (.own qeighth) V.gen ∗
+      (wordPointsTo (pPid pa) 4 pidPriv pid -∗ pidReg pid (.own qeighth) V.gen -∗
+        procPrivUnmarked γ pa pid V M) := by
+  obtain ⟨ξ, t⟩ := X
+  simp only at hct
+  subst hct
+  unfold procPrivUnmarked procPrivCoreUnmarkedAt procPrivBareAt procGenUnmarkedAt
+  iintro ⟨⟨⟨%h, Hpid, Hf, Hpt, Htfp, %hlz⟩, Hc, Hft, Hq, Hxs, Hgh⟩, Ho⟩
+  ihave %hnz := genHalvesAt_nz pa pid V.gen $$ Hgh
+  icases genHalvesAt_reg pa pid V.gen $$ Hgh with ⟨Hr, Hgb⟩
+  isplitl []
+  · ipureintro; exact hnz
+  iframe Hpid Hr
+  iintro Hpid Hr
+  ihave Hgh := Hgb $$ Hr
+  iframe Hpid Hf Hpt Htfp Hc Hft Hq Hxs Hgh Ho
+  isplitl []
+  · ipureintro; exact h
+  · ipureintro; exact hlz
+
+/-- **The pid half, the registration eighth AND THE INCARNATION'S MARKER**
+out of the block (what a tearing kill check lends `killed`: the marker
+refutes the killed row's spent arm, Rocq `kill_paid_shot_tear`). -/
+theorem ut_priv_pid_mk [X : CurCtx] (hct : curTier = KTier.kpt) (γ : FileNames) (pa : BitVec 64)
+    (pid : BitVec 32) (V : ProcPriv) (M : Nat → List (BitVec 8)) :
+    procPrivFd (GF := GF) γ pa pid V M ⊢
+      ⌜pid.toNat ≠ 0⌝ ∗ wordPointsTo (pPid pa) 4 pidPriv pid ∗ pidReg pid (.own qeighth) V.gen ∗
+      takenAt V.gen ∗
+      (wordPointsTo (pPid pa) 4 pidPriv pid -∗ pidReg pid (.own qeighth) V.gen -∗ takenAt V.gen -∗
+        procPrivFd γ pa pid V M) := by
+  iintro H
+  icases (procPrivFd_unmark γ pa pid V M).1 $$ H with ⟨H, Ht⟩
+  icases ut_privNm_pid hct γ pa pid V M $$ H with ⟨%hnz, Hq, Hr, Hb⟩
+  isplitl []
+  · ipureintro; exact hnz
+  iframe Hq Hr Ht
+  iintro Hq Hr Ht
+  iapply (procPrivFd_unmark γ pa pid V M).2
+  iframe Ht
+  iapply Hb $$ Hq Hr
+
+/-- The ordinary residue is +0xa6's LEFT residue (no self-kill on the way). -/
+theorem ut_a6_res_left [CurCtx] (Rsys : UtNames → BitVec 32 → IProp GF) (N : UtNames) (V : ProcPriv)
+    (M : Nat → List (BitVec 8)) (sts : List FdState) (cs : ExtTreeSet GName compare) (pid : BitVec 32)
+    (gn : GName) :
+    utOwn (GF := GF) Rsys N V M sts cs pid ⊢
+      utOwn Rsys N V M sts cs pid ∨
+        (utOwnNm Rsys N V M sts cs pid ∗ killShot gn ∗ filecloseCpays (hlc := hlc) sts ∗ killOwed gn) :=
+  or_intro_l
+
 /-- **The trapframe pointer (whole) and page** (Rocq `proc_priv_tf_upd`),
 at the ambient context. -/
 theorem ut_priv_tf [X : CurCtx] (hct : curTier = KTier.kpt) (γ : FileNames) (pa : BitVec 64)
@@ -308,7 +363,10 @@ conjunct: what every kexit(-1) keys the ZOMBIE escrow with). -/
 abbrev utPay (A : UtArgs GF) : IProp GF := myPay A.gn (UexecSG.sexitPay A.f)
 
 /-- **Rocq `ut_kexit`** (the dead end, at kexit's entry: every caller's
-`c.li a0,-1; jal kexit` already run). -/
+`c.li a0,-1; jal kexit` already run), on the MARKER-LESS residue with the
+tear-down's price (`utTear`, Rocq lane PQ-C): a third party's kill brings
+the shot, the marker and the killer's credential; a self-kill the closes of
+the table and its own death payload. -/
 def UT_KEXIT [ClaimIs (hlc := hlc) GF Γ] : Prop :=
   ∀ (A : UtArgs GF) (cpu : CPU) (kx : KCtx) (V2 : ProcPriv) (M2 : Nat → List (BitVec 8))
     (sts2 : List FdState) (cs2 : ExtTreeSet GName compare) (a b c d : BitVec 64),
@@ -317,7 +375,7 @@ def UT_KEXIT [ClaimIs (hlc := hlc) GF Γ] : Prop :=
     V2.kstack = A.V.kstack → V2.gen = A.V.gen →
     (kctx cpu kx ∗ pcIs cpu kexitAddr ∗ frame4s2 A.ksp a b c d ∗
       trapCsrsExt cpu kx.sie ∗ cpuClaimExt cpu kx.sie A.k.proc ∗ utCaps A.N ∗
-      utOwn (utRsys PT Γ A) A.N V2 M2 sts2 cs2 A.pid ∗ utPay A ∗ killShot A.gn
+      utOwnNm (utRsys PT Γ A) A.N V2 M2 sts2 cs2 A.pid ∗ utPay A ∗ utTear (hlc := hlc) A.gn sts2
       ⊢ wpLoop (GF := GF) cpu)
 
 /-- **Rocq `ut_ret`** (+0xae: prepare_return, MAKE_SATP, the epilogue, the
@@ -340,7 +398,15 @@ def UT_A6 : Prop :=
     UtOk Γ A → utBase A.k kb → utPins A R → UtRows0 A V2 M2 sts2 cs2 →
     (kctx cpu ((kb.pushed 4).withRegs R) ∗ pcIs cpu (utPc 0xa6#64) ∗ utFrame A ∗
       trapCsrsExt cpu kb.sie ∗ cpuClaimExt cpu kb.sie A.k.proc ∗ utCaps A.N ∗
-      utOwn (utRsys PT Γ A) A.N V2 M2 sts2 cs2 A.pid ∗ utOuts (hlc := hlc) A V2 M2 sts2 cs2 ∗
+      -- THE RESIDUE, AND WHO WOULD PAY A TEAR-DOWN AT THIS CHECK (Rocq lane
+      -- PQ-C): the marked block (the check reads the killer's credential out
+      -- of the row with the marker), or -- after a SELF-KILL on the way here --
+      -- the marker-less block beside the fired shot, the closes of the table
+      -- and the process's own death payload
+      (utOwn (utRsys PT Γ A) A.N V2 M2 sts2 cs2 A.pid ∨
+        (utOwnNm (utRsys PT Γ A) A.N V2 M2 sts2 cs2 A.pid ∗ killShot A.gn ∗
+          filecloseCpays (hlc := hlc) sts2 ∗ killOwed A.gn)) ∗
+      utOuts (hlc := hlc) A V2 M2 sts2 cs2 ∗
       utLiveRes (hlc := hlc) A V2 cs2 ∗ utPay A ∗ utKont PT Γ A
       ⊢ wpLoop (GF := GF) cpu)
 
@@ -371,11 +437,11 @@ def UT_EA : Prop :=
 at the prologue's record, paid by the process's kill row. -/
 def UT_56 : Prop :=
   ∀ (A : UtArgs GF) (cpu : CPU) (R : RegMap),
-    UtOk Γ A → utPins A R → ukillSc A.sc →
+    UtOk Γ A → utPins A R → ukillSc A.sc → A.Wk.fd = A.sts →
     (kctx cpu ((A.k.pushed 4).withRegs R) ∗ pcIs cpu (utPc 0x56#64) ∗ utFrame A ∗
       trapCsrsExt cpu false ∗ cpuClaimExt cpu false A.k.proc ∗ utCaps A.N ∗
       utOwn (utRsys PT Γ A) A.N (utV1 A) A.M A.sts A.cs A.pid ∗
-      ukillCredAt (hlc := hlc) A.gn A.sc ∗ utPay A ∗ utKont PT Γ A
+      ukillCredAt (hlc := hlc) uslot A.gn A.sc A.Wk A.f ∗ utPay A ∗ utKont PT Γ A
       ⊢ wpLoop (GF := GF) cpu)
 
 /-- **Rocq `ut_d0`** (+0xd0: `vmfault(...)`, then +0xa6 or +0x56), at the

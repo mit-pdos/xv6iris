@@ -303,6 +303,145 @@ theorem filecloseLoop_open (Γ : SchedNames) (j : Nat) (p : BitVec 64) (γkl : G
 
 end Env
 
+/-! ## The byte queue's close payment, beside the environment
+
+Rocq `SpecFileclose.fileclose_cpay` & co. (design/pipe.md, "The byte
+queue"): clearing a pipe end's flag word is a step of the pipe's EXACT ghost
+state, so the closer of a pipe descriptor pays a close link (or the taint),
+keyed on the state's own names and writable flag; every other descriptor
+pays nothing.  A separate row rather than a conjunct of `filecloseEnv`, so
+the environment's split/frame/reuse laws and every caller that threads the
+two bundles are untouched.
+
+THE LINK FIRES EXACTLY AT THE LAST CLOSE OF THE END -- the one that reaches
+pipeclose -- and the lock invariant's coupling is what forces it (the flag
+word moves, so the ghost must).  A closer holding the WHOLE reference
+(`q = 1`) is that closer; any other gets its payment back if the close was
+not the last (`PipeQueue.pipeCpost`). -/
+
+section Cpay
+variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
+
+/-- Rocq `fileclose_cpay`. -/
+def filecloseCpay (st : FdState) (Φc : IProp GF) : IProp GF :=
+  match st with
+  | .open _ w (.pipe γp) => pipeCpay (hlc := hlc) γp.pnQueue w Φc
+  | _ => iprop(emp)
+
+/-- Rocq `fileclose_cpost`. -/
+def filecloseCpost (q : Qp) (st : FdState) (Φc : IProp GF) : IProp GF :=
+  match st with
+  | .open _ w (.pipe γp) => pipeCpost (hlc := hlc) γp.pnQueue w Φc (decide (q = 1))
+  | _ => iprop(emp)
+
+/-- ...at a fraction the caller does not know: what sys_close and kexit hand
+their callers (Rocq `fileclose_cpost_any`). -/
+def filecloseCpostAny (st : FdState) (Φc : IProp GF) : IProp GF :=
+  iprop(∃ q : Qp, filecloseCpost (hlc := hlc) q st Φc)
+
+/-- Rocq `fileclose_cpay_none`. -/
+theorem filecloseCpay_none (Φc : IProp GF) : ⊢ filecloseCpay (hlc := hlc) .closed Φc := by
+  unfold filecloseCpay; iempintro
+
+/-- The generic closer pays every row out of the taint (Rocq
+`fileclose_cpay_taint`). -/
+theorem filecloseCpay_taint (st : FdState) (Φc : IProp GF) :
+    MachFixedGS.killCred (hlc := hlc) (GF := GF) ⊢ filecloseCpay (hlc := hlc) st Φc := by
+  unfold filecloseCpay
+  rcases st with _ | ⟨_, w, _ | _ | _⟩
+  · iintro -; iempintro
+  · exact pipeCpay_taint _ w Φc
+  · iintro -; iempintro
+  · iintro -; iempintro
+
+/-- The fast path (`--f->ref > 0`) fires nothing, and cannot be the whole
+reference's close (Rocq `fileclose_cpost_of_cpay`). -/
+theorem filecloseCpost_of_cpay (q : Qp) (st : FdState) (Φc : IProp GF) (hq : q ≠ 1) :
+    filecloseCpay (hlc := hlc) st Φc ⊢ filecloseCpost (hlc := hlc) q st Φc := by
+  unfold filecloseCpay filecloseCpost
+  rcases st with _ | ⟨_, w, _ | _ | _⟩
+  · exact .rfl
+  · rw [decide_eq_false hq]; exact pipeCpost_unfired _ w Φc
+  · exact .rfl
+  · exact .rfl
+
+/-- A half is not the whole reference. -/
+theorem qpHalf_ne_one : (1 : Qp).half ≠ 1 := by
+  intro h
+  have h2 := congrArg Subtype.val h
+  have h3 : ((1 : Qp).half).val = (1 : Qp).val / 2 := rfl
+  have h4 : (1 : Qp).val = 1 := rfl
+  rw [h3, h4] at h2
+  grind
+
+/-- Rocq `fileclose_cpost_any_of`. -/
+theorem filecloseCpostAny_of (q : Qp) (st : FdState) (Φc : IProp GF) :
+    filecloseCpost (hlc := hlc) q st Φc ⊢ filecloseCpostAny (hlc := hlc) st Φc := by
+  unfold filecloseCpostAny
+  iintro H
+  iexists q
+  iexact H
+
+/-- THE PIPE ARM'S POST (Rocq `fileclose_cpost_of_fired`): pipeclose ALWAYS
+clears its flag word, so its post is the FIRED one -- which holds at every
+`last`, in particular at this closer's own `decide (q = 1)`. -/
+theorem filecloseCpost_of_fired (q : Qp) (st : FdState) (Φc : IProp GF) (r w : Bool) (γp : PipeNames)
+    (hst : st = .open r w (.pipe γp)) :
+    pipeCpost (hlc := hlc) γp.pnQueue w Φc true ⊢ filecloseCpost (hlc := hlc) q st Φc := by
+  subst hst
+  unfold filecloseCpost pipeCpost
+  iintro (HΦ | ⟨#Ht, Hp⟩ | ⟨%hf, -⟩)
+  · ileft; iexact HΦ
+  · iright; ileft; iframe Ht Hp
+  · exact absurd hf (by decide)
+
+/-- ...and its INPUT, at the same key: what the closer hands pipeclose (Rocq
+`fileclose_cpay_pipe`). -/
+theorem filecloseCpay_pipe (st : FdState) (Φc : IProp GF) (r w : Bool) (γp : PipeNames)
+    (hst : st = .open r w (.pipe γp)) :
+    filecloseCpay (hlc := hlc) st Φc ⊢ pipeCpay (hlc := hlc) γp.pnQueue w Φc := by
+  subst hst; exact .rfl
+
+/-- ...and a state that is not a pipe pays and gets back nothing (Rocq
+`fileclose_cpost_nonpipe`, at the state rather than the content). -/
+theorem filecloseCpost_nopipe (q : Qp) (st : FdState) (Φc : IProp GF) (h : fdstNopipe st) :
+    filecloseCpay (hlc := hlc) st Φc ⊢ filecloseCpost (hlc := hlc) q st Φc := by
+  unfold filecloseCpay filecloseCpost
+  rcases st with _ | ⟨_, w, _ | _ | _⟩
+  · exact .rfl
+  · exact h.elim
+  · exact .rfl
+  · exact .rfl
+
+/-- kexit's: one payment per row of the dying process's table, at the trivial
+payload -- the process never resumes to be told anything (Rocq
+`fileclose_cpays`). -/
+def filecloseCpays (sts : List FdState) : IProp GF :=
+  iprop([∗list] st ∈ sts, filecloseCpay (hlc := hlc) st iprop(emp))
+
+/-- ...at a table that holds no pipe row, every payment is `emp` (Rocq
+`fileclose_cpays_nopipe`). -/
+theorem filecloseCpays_nopipe (sts : List FdState) (h : ∀ st ∈ sts, fdstNopipe st) :
+    ⊢ filecloseCpays (hlc := hlc) (GF := GF) sts := by
+  unfold filecloseCpays
+  refine BigSepL.bigSepL_intro (P := iprop(emp)) (fun k st hk => ?_)
+  have hn := h st (List.mem_of_getElem? hk)
+  unfold filecloseCpay
+  rcases st with _ | ⟨_, w, _ | _ | _⟩
+  · exact .rfl
+  · exact hn.elim
+  · exact .rfl
+  · exact .rfl
+
+/-- Rocq `fileclose_cpays_taint`. -/
+theorem filecloseCpays_taint (sts : List FdState) :
+    □ MachFixedGS.killCred (hlc := hlc) (GF := GF) ⊢ filecloseCpays (hlc := hlc) sts := by
+  unfold filecloseCpays
+  exact BigSepL.bigSepL_intro (fun k st _ =>
+    intuitionistically_elim.trans (filecloseCpay_taint st iprop(emp)))
+
+end Cpay
+
 /-- **WP of `fileclose(f = a0)`** (Rocq `wp_fileclose_sconf_body`),
 eb-generic at depth 0 (deviation 1). -/
 def wp_fileclose_eb_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]

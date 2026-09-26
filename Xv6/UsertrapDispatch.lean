@@ -215,10 +215,13 @@ theorem ut_disp_dev (DI : DEVINTR) (HEA : UT_EA (hlc := hlc) PT Γ)
 
 /-- The kill row's paying half, at a cause usertrap kills at. -/
 theorem ut_killIn_cred (A : UtArgs GF) (hne : A.sc ≠ uecallScause) :
-    utKillIn (hlc := hlc) (GF := GF) A.f A.sc A.Wk A.gn A.sts ⊢ ukillCredAt (hlc := hlc) A.gn A.sc := by
+    utKillIn (hlc := hlc) (GF := GF) A.f A.sc A.Wk A.gn A.sts ⊢
+      ⌜A.Wk.fd = A.sts⌝ ∗ ukillCredAt (hlc := hlc) uslot A.gn A.sc A.Wk A.f := by
   unfold utKillIn
   rw [if_neg hne]
-  iintro ⟨%⟨hg, -⟩, H⟩
+  iintro ⟨%⟨hg, hf⟩, H⟩
+  isplitr
+  · ipureintro; exact hf
   rw [← hg]
   iapply uexecKillArm_cred $$ H
 
@@ -284,8 +287,8 @@ theorem ut_disp_fault (HD0 : UT_D0 (hlc := hlc) PT Γ) (H56 : UT_56 (hlc := hlc)
         ⟨Hfr, Hte, Hce, #Hcaps, Hown, -, -, Hpi, Hki, Hkont⟩
       · iframe Hsc Hres
       ihave #Hpay := ut_pay_of A hok.hgn $$ Hpi
-      ihave Hcred := ut_killIn_cred A hne $$ Hki
-      iapply (H56 A cpu _ hok ?hp3 (utd_ukill A.sc h8 hsc))
+      icases ut_killIn_cred A hne $$ Hki with ⟨%hWfd, Hcred⟩
+      iapply (H56 A cpu _ hok ?hp3 (utd_ukill A.sc h8 hsc) hWfd)
       rotate_left 1
       iframe Hk Hpc Hfr Hte Hce Hcaps Hown Hcred Hpay Hkont
       case hp3 => ut_pins

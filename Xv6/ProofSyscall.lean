@@ -72,7 +72,7 @@ theorem syscall_proof (MP : MYPROC) (PK : PRINTK)
         hE hj hproc hK hnoff htier hgn hpins hs1 hs2 hra
         (fun h => syscall_arm_fork SFK PT (fun _ => .rfl) Γ c0 cpu k spie spp R γw γ j pid V M sts gn cs ip f hE hj hproc
           hK hnoff htier hgn h hpins hs1 hs2 hra)
-        (fun h => syscall_arm_exit SEX PT Γ c0 cpu k spie spp R γw γ j pid V M sts gn cs ip f hE hj hproc
+        (fun h => syscall_arm_exit SEX PT Γ syscDepExit_holds c0 cpu k spie spp R γw γ j pid V M sts gn cs ip f hE hj hproc
           hK hnoff htier hgn h hpins hs1 hs2 hra)
         (fun h => syscall_arm_wait SWT PT Γ c0 cpu k spie spp R γw γ j pid V M sts gn cs ip f hE hj hproc
           hK hnoff htier hgn h hpins hs1 hs2 hra)

@@ -14,7 +14,9 @@ Setkilled Devintr Vmfault Yield PrepareReturn Kexit Kernelvec`:
 `SYSCALL_XV6` (SpecSyscall's `SYSCALL` at the kernel's deposit instance),
 `PRINTK`, `MYPROC`, `KILLED`, `SETKILLED`, `DEVINTR`, `VMFAULT`, `YIELD`, `PREPARE_RETURN`, `KEXIT`,
 `KERNELVEC`.  The deposit instance's read reason `UtReadWhy` (UsertrapParts,
-Rocq `spost_at_read_why`) is `UtReadWhyXv6.utReadWhy_xv6`.
+Rocq `spost_at_read_why`) is `UtReadWhyXv6.utReadWhy_xv6`; its exit row's
+reading `UtExitElim` (Rocq `sbundle_at_exit_elim`, the self-kill's closes) is
+`UexecExecInst.sbundleAt_exit_elim_xv6`.
 
 The contract proved is SpecUsertrap's `USERTRAP` (at the kernel's deposit
 instance; exec's answer up to the kernel words, SpecUsertrap deviations 9-10).
@@ -47,7 +49,8 @@ theorem usertrap_proof (SY : SYSCALL_XV6) (PK : PRINTK) (MP : MYPROC) (KI : KILL
     have HA6 := usertrap_a6_proof PT Γ KI HR HK
     have HFA := usertrap_fa_proof PT Γ YI HR
     have HEA := usertrap_ea_proof PT Γ KI HFA HK
-    have H56 := usertrap_56_proof PT Γ PK SK HA6
+    have H56 := usertrap_56_proof PT Γ PK SK
+      (fun X f W => sbundleAt_exit_elim_xv6 (hlc := hlc) X f W) HA6
     have HD0 := usertrap_d0_proof PT Γ VM HA6 H56
     have H90 : UT_90 PT Γ := usertrap_90_proof PT Γ KI SY rfl utReadWhy_xv6 HA6 HK
     have HD := usertrap_dispatch_proof PT Γ DI KV H90 HEA HD0 H56

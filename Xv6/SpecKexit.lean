@@ -43,12 +43,24 @@ closed descriptor's slot owns its unit, `FdTable.ofileSlot`'s null arm), the
 cwd's `iref_slot` from the real `iput` at `ld a0,336(s3)`; the `bslots 3`
 ride fileclose's FS environment and iput and come back from both.
 
-THE BLOCK, WHOLE (wave 7 W7-C, Rocq `proc_priv γf pj pid U`): `procPrivFd`
-(the core -- the bare block and `p->cwd`'s reference -- and the descriptor
-array with every descriptor's payload), beside its fragment bundle
-`∃ sts, fdFrags V.fdg sts` (Rocq `fd_frags_any (pv_fdg (us_V U))`), which is
-NOT given back: the bundle dies with the incarnation it is keyed on.  Each
-open descriptor's `fileRef` goes to `fileclose`, the cwd reference to `iput`.
+THE BLOCK, WHOLE BUT FOR THE INCARNATION'S MARKER (wave 7 W7-C; Rocq
+`proc_priv_unmarked γf pj pid U`, lane PQ-C, design/pipe.md "The exit
+path"): `procPrivUnmarked` (the core -- the bare block and `p->cwd`'s
+reference -- and the descriptor array with every descriptor's payload,
+minus `ChildTok.takenAt`: a self-kill spent it founding `p->lock`'s killed
+row, so the marker is a premise of the TEAR-DOWN side of the payment, not
+of the block; `FdTable.procPrivFd_unmark` splits it off), beside its
+fragment bundle at the NAMED table `fdFrags V.fdg sts` (Rocq `fd_frags
+(pv_fdg (us_V U)) sts`), which is NOT given back: the bundle dies with the
+incarnation it is keyed on.  Each open descriptor's `fileRef` goes to
+`fileclose`, the cwd reference to `iput`.
+
+...AND THE BYTE-QUEUE CLOSE PAYMENTS, one per row of that table
+(`SpecFileclose.filecloseCpays sts`, Rocq `fileclose_cpays sts`): every
+descriptor's close is a `fileclose`, and a pipe descriptor's last close
+steps the pipe's exact ghost state, so the dying process pays a close link
+(or the taint) for each pipe row it holds.  The table is NAMED for exactly
+this row.
 
 THE FILE SYSTEM (Rocq's rows verbatim, at the Lean forms): `isFtable`,
 `panicEnv`, the kmem lock and the page count `kallocAvail γk on` (a
@@ -72,7 +84,9 @@ the payload its exit owes its parent, and that payload PAID at the status
 this call stores into `p->xstate` (`xstateOf a0`) -- or, on the kernel's own
 tear-down at `-1`, the incarnation's kill one-shot, whose deposit kexit
 takes out of `p->lock`'s killed row with the spent marker its block carries
-(`KillRow.killRow_take`).  kexit parks the ESCROW (`ChildTok.exitTok`) in the
+(`KillRow.killRow_take`) -- and THE MARKER RIDES THAT TEAR-DOWN SIDE
+(`killShot ∗ takenAt`, Rocq lane PQ-C): only the route that trades a marker
+for the row's payload has to bring one.  kexit parks the ESCROW (`ChildTok.exitTok`) in the
 ZOMBIE slot, keyed at what the cell reads, built from the kernel's quarter
 of the generation the block carries (`FdTable.procGenAt`).  The block's
 generation halves go to the ZOMBIE block (`SlotGen.genHalvesDorm`), its
@@ -132,7 +146,7 @@ def wp_kexit_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF
     (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
     (cpu : CPU) (k : KCtx) (γw γl : GName) (γ : FileNames) (γkl : GName) (γk : KmemNames)
     (on : Option Nat) (j : Nat) (pid : BitVec 32) (V : ProcPriv)
-    (M : Nat → List (BitVec 8)) (ip : BitVec 64) (cs : ExtTreeSet GName compare) (Q : Int → IProp GF)
+    (M : Nat → List (BitVec 8)) (ip : BitVec 64) (cs : ExtTreeSet GName compare) (sts : List FdState) (Q : Int → IProp GF)
     (hj : j < NPROC) (hproc : k.proc = procAddr j) (hK : kexitSlots ≤ k.avail)
     (hsie : k.sie = false) (hnoff : k.noff = 0) (hlocks : k.locks = [])
     (htier : k.tier = KTier.kpt) : Prop :=
@@ -143,9 +157,10 @@ def wp_kexit_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF
   isLock γkl kmemLockAddr "kmem" (kmemRes γk) ∗ kallocAvail γk on ∗
   fsReady (hlc := hlc) ∗ bslots 3 ∗
   fdSlots FDSPARE ∗ irefSlots IREFSPARE ∗
-  procPrivFd γ (procAddr j) pid V M ∗ (∃ sts, fdFrags V.fdg sts) ∗
+  procPrivUnmarked γ (procAddr j) pid V M ∗ fdFrags V.fdg sts ∗ filecloseCpays (hlc := hlc) sts ∗
   chFrag V.chg (procAddr j) cs ∗
-  myPay V.gen Q ∗ (Q (xstateOf (k.regs 10#5)) ∨ (⌜xstateOf (k.regs 10#5) = -1⌝ ∗ killShot V.gen)) ∗
+  myPay V.gen Q ∗
+  (Q (xstateOf (k.regs 10#5)) ∨ (⌜xstateOf (k.regs 10#5) = -1⌝ ∗ killShot V.gen ∗ takenAt V.gen)) ∗
   (stackOwn k.sp k.avail -∗ stackOwn (V.kstack + 4096#64) 512)
   ⊢ wpLoop (GF := GF) cpu
 
@@ -158,7 +173,7 @@ def wp_kexit_eb_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G
     (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
     (cpu : CPU) (k : KCtx) (γw γl : GName) (γ : FileNames) (γkl : GName) (γk : KmemNames)
     (on : Option Nat) (j : Nat) (pid : BitVec 32) (V : ProcPriv)
-    (M : Nat → List (BitVec 8)) (ip : BitVec 64) (cs : ExtTreeSet GName compare) (Q : Int → IProp GF)
+    (M : Nat → List (BitVec 8)) (ip : BitVec 64) (cs : ExtTreeSet GName compare) (sts : List FdState) (Q : Int → IProp GF)
     (hj : j < NPROC) (hproc : k.proc = procAddr j) (hK : kexitSlots ≤ k.avail)
     (hnoff : k.noff = 0)
     (htier : k.tier = KTier.kpt) : Prop :=
@@ -169,9 +184,10 @@ def wp_kexit_eb_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G
   isLock γkl kmemLockAddr "kmem" (kmemRes γk) ∗ kallocAvail γk on ∗
   fsReady (hlc := hlc) ∗ bslots 3 ∗
   fdSlots FDSPARE ∗ irefSlots IREFSPARE ∗
-  procPrivFd γ (procAddr j) pid V M ∗ (∃ sts, fdFrags V.fdg sts) ∗
+  procPrivUnmarked γ (procAddr j) pid V M ∗ fdFrags V.fdg sts ∗ filecloseCpays (hlc := hlc) sts ∗
   chFrag V.chg (procAddr j) cs ∗
-  myPay V.gen Q ∗ (Q (xstateOf (k.regs 10#5)) ∨ (⌜xstateOf (k.regs 10#5) = -1⌝ ∗ killShot V.gen)) ∗
+  myPay V.gen Q ∗
+  (Q (xstateOf (k.regs 10#5)) ∨ (⌜xstateOf (k.regs 10#5) = -1⌝ ∗ killShot V.gen ∗ takenAt V.gen)) ∗
   (stackOwn k.sp (trapRes k.sie + k.avail) -∗ stackOwn (V.kstack + 4096#64) 512)
   ⊢ wpLoop (GF := GF) cpu
 
@@ -184,9 +200,9 @@ structure KEXIT : Prop where
     (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
     (cpu : CPU) (k : KCtx) (γw γl : GName) (γ : FileNames) (γkl : GName) (γk : KmemNames)
     (on : Option Nat) (j : Nat) (pid : BitVec 32) (V : ProcPriv)
-    (M : Nat → List (BitVec 8)) (ip : BitVec 64) (cs : ExtTreeSet GName compare) (Q : Int → IProp GF)
+    (M : Nat → List (BitVec 8)) (ip : BitVec 64) (cs : ExtTreeSet GName compare) (sts : List FdState) (Q : Int → IProp GF)
     hj hproc hK hnoff htier,
-    wp_kexit_eb_body (hlc := hlc) (GF := GF) Γ cpu k γw γl γ γkl γk on j pid V M ip cs Q
+    wp_kexit_eb_body (hlc := hlc) (GF := GF) Γ cpu k γw γl γ γkl γk on j pid V M ip cs sts Q
       hj hproc hK hnoff htier
 
 /-- The interrupts-off instance of `wp_kexit_eb` (the complement is the
@@ -197,17 +213,17 @@ theorem KEXIT.wp_kexit (A : KEXIT) {hlc : HasLC} {GF : BundledGFunctors} [MachGS
     [Appcfg GF] [FileG GF] [Fscfg] [Icfg] [CurCtx] (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
     (cpu : CPU) (k : KCtx) (γw γl : GName) (γ : FileNames) (γkl : GName) (γk : KmemNames)
     (on : Option Nat) (j : Nat) (pid : BitVec 32) (V : ProcPriv)
-    (M : Nat → List (BitVec 8)) (ip : BitVec 64) (cs : ExtTreeSet GName compare) (Q : Int → IProp GF)
+    (M : Nat → List (BitVec 8)) (ip : BitVec 64) (cs : ExtTreeSet GName compare) (sts : List FdState) (Q : Int → IProp GF)
     hj hproc hK hsie hnoff hlocks htier :
-    wp_kexit_body (hlc := hlc) (GF := GF) Γ cpu k γw γl γ γkl γk on j pid V M ip cs Q
+    wp_kexit_body (hlc := hlc) (GF := GF) Γ cpu k γw γl γ γkl γk on j pid V M ip cs sts Q
       hj hproc hK hsie hnoff hlocks htier := by
-  have h := A.wp_kexit_eb (hlc := hlc) (GF := GF) Γ cpu k γw γl γ γkl γk on j pid V M ip cs Q hj hproc hK hnoff htier
+  have h := A.wp_kexit_eb (hlc := hlc) (GF := GF) Γ cpu k γw γl γ γkl γk on j pid V M ip cs sts Q hj hproc hK hnoff htier
   unfold wp_kexit_eb_body at h
   unfold wp_kexit_body
   rw [hsie, trapRes_off] at h
   simp only [trapCsrsExt_false, cpuClaimExt_false] at h
-  iintro ⟨Hk, Hpc, Hpi, Htc, Hcl, Hir, Hwl, Hin, Hft, Hpe, Hkl, Hav, Hrdy, Hbs, Hfs, Hirs, Hpr, Hfr, Hch, Hmy, Hpay, Hcl2⟩
+  iintro ⟨Hk, Hpc, Hpi, Htc, Hcl, Hir, Hwl, Hin, Hft, Hpe, Hkl, Hav, Hrdy, Hbs, Hfs, Hirs, Hpr, Hfr, Hcp, Hch, Hmy, Hpay, Hcl2⟩
   iapply h
-  iframe Hk Hpc Hpi Htc Hcl Hir Hwl Hin Hft Hpe Hkl Hav Hrdy Hbs Hfs Hirs Hpr Hfr Hch Hmy Hpay Hcl2
+  iframe Hk Hpc Hpi Htc Hcl Hir Hwl Hin Hft Hpe Hkl Hav Hrdy Hbs Hfs Hirs Hpr Hfr Hcp Hch Hmy Hpay Hcl2
 
 end Xv6

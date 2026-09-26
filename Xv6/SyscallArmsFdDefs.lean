@@ -23,7 +23,7 @@ The arms themselves are `SyscallArmsFd` (dup, fstat, close) and
 * the stack bound `syscKctx_sp` (Rocq `stack_own_sp_bounds` over the
   context's own region): dup and close take `hsp : 48 ≤ sp`.
 * **THE DEPOSIT LAWS** (interfaces §4): `SyscDepRead`, `SyscDepWrite`,
-  `SyscDepPipe`, `SyscDepClose` -- instance-agnostic Props W8-K proves for
+  `SyscDepPipe`, `SyscDepClose`, `SyscDepExit` -- instance-agnostic Props W8-K proves for
   `uexecSGXv6` and W8-E2 passes at the seal.
 
 ## Deviations from Rocq
@@ -42,12 +42,11 @@ The arms themselves are `SyscallArmsFd` (dup, fstat, close) and
    such row yet, so the payload rides back to the process through the
    receipt.  Rocq's pt-wf / lazy-claim / `gn = pv_gen` premises of
    `sysc_out_read` are not needed by a law stated at the block.
-4. **pipe's and close's receipts are PURE** (the dispatch's own fd/pipe
-   rows): Lean's sys_pipe post names no pipe fragment (Rocq's receipt is
-   `pipe_qfrag (pn_queue γp) pst0`) and Lean's sys_close takes no close
-   payment (Rocq `sysc_dep_close` / `fileclose_cpay` / `fileclose_cpost_any`)
-   -- the byte-queue layer (Rocq design/pipe.md) is not ported.  FLAGGED:
-   when it is, these two laws gain Rocq's resource rows.
+4. **pipe's receipt is PURE** (the dispatch's own fd/pipe rows): Lean's
+   sys_pipe post names no pipe fragment yet (Rocq's receipt is
+   `pipe_qfrag (pn_queue γp) pst0`).  (close's deposit and receipt are
+   Rocq's: `SyscDepClose` carries `fileclose_cpay` in and
+   `fileclose_cpost_any` out; exit's is `SyscDepExit`.)
 -/
 import Xv6.SyscallRet
 import MachCSL.StackOwnBounds
@@ -356,15 +355,29 @@ def SyscDepPipe : Prop :=
     UexecSG.sbundleAt (uslot (hlc := hlc)) 4 f (uvisOf V M sts gn cs pid) ⊢
       UexecSG.spostAt (uslot (hlc := hlc)) 4 f (uvisOf V M sts gn cs pid) r M' sts' V.cwi cs
 
-/-- **Rocq `sysc_dep_close` + `sysc_out_close`** (deviations 1, 4): close's
-armed post, paid by the dispatch's own descriptor row. -/
+/-- **Rocq `sysc_dep_close` + `sysc_out_close`** (deviation 1): close's
+bundle is the byte queue's close payment at the descriptor key argument 0
+names (`SpecFileclose.filecloseCpay`, a close link on a pipe descriptor,
+nothing elsewhere), at the payload the deposit's families name; the payment's
+answer (`filecloseCpostAny`, the link fired or the payment back) pays the
+armed post. -/
 def SyscDepClose : Prop :=
   ∀ (f : UexecSG.sfam GF) (V : ProcPriv) (M : Nat → List (BitVec 8)) (sts : List FdState)
-    (gn : GName) (cs : ExtTreeSet GName compare) (pid : BitVec 32) (r : BitVec 64)
-    (sts' : List FdState),
-    syscFdOk V r sts sts' →
+    (gn : GName) (cs : ExtTreeSet GName compare) (pid : BitVec 32),
     UexecSG.sbundleAt (uslot (hlc := hlc)) 21 f (uvisOf V M sts gn cs pid) ⊢
-      UexecSG.spostAt (uslot (hlc := hlc)) 21 f (uvisOf V M sts gn cs pid) r (syscImg V M) sts' V.cwi cs
+      ∃ P : IProp GF, filecloseCpay (hlc := hlc) (syscFdKey (tfW V.tf (tfArgIdx 0)) sts) P ∗
+        (∀ (r : BitVec 64) (sts' : List FdState),
+          filecloseCpostAny (hlc := hlc) (syscFdKey (tfW V.tf (tfArgIdx 0)) sts) P -∗
+          UexecSG.spostAt (uslot (hlc := hlc)) 21 f (uvisOf V M sts gn cs pid) r (syscImg V M) sts' V.cwi cs)
+
+/-- **Rocq `sysc_dep_exit`**: exit's bundle is the close payments of the
+key's whole table (`SpecFileclose.filecloseCpays`), which the exit arm hands
+kexit through sys_exit (Rocq lane PQ-C, design/pipe.md "The exit path"). -/
+def SyscDepExit : Prop :=
+  ∀ (f : UexecSG.sfam GF) (V : ProcPriv) (M : Nat → List (BitVec 8)) (sts : List FdState)
+    (gn : GName) (cs : ExtTreeSet GName compare) (pid : BitVec 32),
+    UexecSG.sbundleAt (uslot (hlc := hlc)) USYS_exit f (uvisOf V M sts gn cs pid) ⊢
+      filecloseCpays (hlc := hlc) sts
 
 end Dep
 
