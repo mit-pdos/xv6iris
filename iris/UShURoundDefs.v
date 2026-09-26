@@ -95,24 +95,6 @@ Local Notation K := ulmG_hooks.
 (* the round's line and the state before it *)
 Definition ul (I : list (bv 8)) : uline := lm_line_at U I.
 
-(* WITH THE KNOB OFF a disciplined input's last line is not a [seccomp x]
-   line ([UnionDisc.uline_of_u_off]).  Used ONCE, at init's banner reading
-   of sh's wild exit payload ([UInitUnionCC.union_wbn_to]), which S4
-   replaces with the licence path (seccomp design 10.5) *)
-Lemma uwild_disc_off (I : list (bv 8)) :
-  I <> [] -> rest_of I = [] -> lm_disc_input U I -> uwild (ul I) = false.
-Proof using.
-  intros Hne Hr (Hb & _ & _).
-  pose proof (nlines_pos_of_rest_nil I Hne Hr) as Hpos.
-  rewrite /ul /lm_line_at.
-  destruct (lookup_lt_is_Some_2 (bodies_of I) (nlines I - 1)%nat) as [b Hbl];
-    [unfold nlines in Hpos |- *; lia |].
-  rewrite (list_lookup_total_correct _ _ _ Hbl).
-  pose proof (proj1 (Forall_lookup _ _) Hb _ _ Hbl) as Hok.
-  cbn [ulmG ulm lm_body_ok lm_of] in Hok |- *.
-  destruct (uline_of_u b) eqn:He; try reflexivity.
-  exfalso. exact (uline_of_u_off adm_u_g b Hok _ He).
-Qed.
 Definition ust (cs : list nat) (sb : fstate) (I : list (bv 8)) : fstate :=
   lm_upto U cs sb (bodies_of I) (nlines I - 1).
 
@@ -438,8 +420,9 @@ Section UShURoundDefs.
   Global Instance useccomp_shape_timeless I : Timeless (useccomp_shape I).
   Proof using . rewrite /useccomp_shape. apply _. Qed.
 
-  (* sh's fork panic at the wild line hands init the shape (S4 proves
-     init's path through the licence) *)
+  (* sh's fork panic at the wild line hands init the shape; init prints
+     through the era's licence and lends it back to the shell it restarts
+     ([UInitUnionCC.union_Wwild]) *)
   Definition uWbf (I : list (bv 8)) : iProp Σ :=
     ((uWbl I ∗ DONE I) ∨ useccomp_shape I)%I.
 

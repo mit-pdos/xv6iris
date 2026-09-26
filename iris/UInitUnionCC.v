@@ -191,6 +191,43 @@ Section UnionInitCC.
           ∨ file_taint (fgn_cl (ugn_file ug)))
        ∗ ush_done_at ug r s0 I)%I.
 
+  (* THE WILD HOLD: sh's wild shape at the input of the count, what sh's
+     fork panic at a [seccomp x] line hands /init through its exit payload
+     ([UShURoundDefs.uWbf]'s wild arm) and what /init lends back to the
+     shell it restarts (seccomp design 10.5).  Persistent: every print
+     /init makes on it goes through the era's licence and leaves it. *)
+  Definition union_Wwild (HR : riscvGS Σ) (GEN : GenId)
+      `{HBs : !bioslotG Σ, HFd : !fdslotG Σ, HIr : !irefslotG Σ,
+        HPav : !pavG Σ, HWc : !wchG Σ, HF : !fileG Σ}
+      (ug : union_gn) (n : nat) : iProp Σ :=
+    (∃ I : list (bv 8), ⌜length I = n⌝ ∗ useccomp_shape ug I)%I.
+
+  Global Instance union_Wwild_persistent (HR : riscvGS Σ) (GEN : GenId)
+      `{HBs : !bioslotG Σ, HFd : !fdslotG Σ, HIr : !irefslotG Σ,
+        HPav : !pavG Σ, HWc : !wchG Σ, HF : !fileG Σ}
+      (ug : union_gn) (n : nat) : Persistent (union_Wwild HR GEN ug n).
+  Proof using . rewrite /union_Wwild. apply _. Qed.
+
+  (* ANY PRINT /init MAKES ON THE WILD HOLD, through the era's licence *)
+  Lemma union_wild_pay (HR : riscvGS Σ) (GEN : GenId)
+      `{HBs : !bioslotG Σ, HFd : !fdslotG Σ, HIr : !irefslotG Σ,
+        HPav : !pavG Σ, HWc : !wchG Σ, HF : !fileG Σ}
+      (ug : union_gn)
+      (Hcons : @riscv_cons_res Σ (@riscv_fixedGS Σ HR) = ucl ug)
+      (N : uk_names Σ) (n len : nat) (f : nat -> bv 8) (Rt : iProp Σ) :
+    union_Wwild HR GEN ug n -∗ (union_Wwild HR GEN ug n -∗ Rt) -∗
+    UkInit.kinit_banner_pay (PS := uprogSG_free) N (FdOpen true true (FdDevice CONSOLE))
+      len f Rt.
+  Proof using .
+    iIntros "#Hw HRt".
+    iApply (UInitBanner.kinit_banner_pay_of_lic (PS := uprogSG_free) N len f
+              (union_Wwild HR GEN ug n) Rt with "[] Hw HRt").
+    iIntros "!>" (b Φ) "#Hw' HΦ".
+    iDestruct "Hw'" as (I) "[_ [Htok _]]".
+    iApply (union_write_link_wild ug Hcons (S gen_id) b Φ with "[Htok] [HΦ]");
+      [by iApply (usecc_tok_of_at ug) | by iApply "HΦ"].
+  Qed.
+
   Lemma union_cc_rd_timeless (HR : riscvGS Σ) (GEN : GenId)
       `{HBs : !bioslotG Σ, HFd : !fdslotG Σ, HIr : !irefslotG Σ,
         HPav : !pavG Σ, HWc : !wchG Σ, HF : !fileG Σ}
@@ -227,8 +264,10 @@ Section UnionInitCC.
       (uWcu ug r s0 (upterm_shape ug) (updone_shape ug))
       (uWbf ug r s0)
       (union_cc_wb_timeless HR GEN ug r s0)
-      (fun n => (UInitDiag.kinit_pro_at (union_link_inst_at ug s0) n
-                 ∗ union_H HR GEN ug r s0 n)%I).
+      (* the round-open credential, or the wild hold (seccomp design 10.5) *)
+      (fun n => ((UInitDiag.kinit_pro_at (union_link_inst_at ug s0) n
+                  ∗ union_H HR GEN ug r s0 n)
+                 ∨ union_Wwild HR GEN ug n)%I).
 
   (* a prologue credential at the record is a boundary credential *)
   Local Lemma uicc_lcred_of_pban `{!riscvGS Σ} (L : LinkRec Σ) (k : nat) (v : era_pins)
@@ -254,34 +293,44 @@ Section UnionInitCC.
     iApply (uicc_lcred_of_pban (union_link_inst_at ug s0) (S gen_id) v I with "Hpin Hc").
   Qed.
 
-  (* THE BANNER-OWED FAMILY WITH THE HOLD IS THE RECORD'S [cc_wbn] *)
+  (* THE BANNER-OWED FAMILY WITH THE HOLD IS THE RECORD'S [cc_wbn], or the
+     WILD HOLD: sh's fork panic at a [seccomp x] line (seccomp design 10.5)
+     -- /init's banner then goes through the era's licence
+     ([union_wild_pay]) *)
   Lemma union_wbn_to (HR : riscvGS Σ) (GEN : GenId)
       `{HBs : !bioslotG Σ, HFd : !fdslotG Σ, HIr : !irefslotG Σ,
         HPav : !pavG Σ, HWc : !wchG Σ, HF : !fileG Σ}
       (ug : union_gn) (r : file_names) (s0 : fstate) (n : nat) :
     UserConsole.cc_wbn (union_cc HR GEN ug r s0) n -∗
-    UInitBanner.kinit_ban_at (union_link_inst_at ug s0) n
-    ∗ union_H HR GEN ug r s0 n.
+    (UInitBanner.kinit_ban_at (union_link_inst_at ug s0) n
+     ∗ union_H HR GEN ug r s0 n)
+    ∨ union_Wwild HR GEN ug n.
   Proof using .
     rewrite /UserConsole.cc_wbn /union_cc /=. iIntros "H".
     iDestruct "H" as (I) "[%Hlen Hb]".
     iDestruct (uWbf_inp ug r s0 I with "Hb") as "[Hb #Hinp]".
     rewrite /uWbf /uWbl.
     iDestruct "Hb" as "[[Hb Hd] | #Hw]"; last first.
-    { (* THE WILD ARM: with the knob off no disciplined input ends in a
-         [seccomp x] line ([UShURoundDefs.uwild_disc_off]).  S4 replaces
-         this with init's banner through the licence (seccomp design
-         10.5). *)
-      iExFalso. iDestruct "Hw" as "[Htok %Hwl]". rewrite /usecc_tok_at /secc_tok_at.
-      iDestruct "Htok" as (v) "(_ & _ & _ & %Hn & _)". destruct Hn as (Hpos & Hr & Hdi).
-      assert (Hne : I <> []) by (intros ->; rewrite nlines_nil in Hpos; lia).
-      rewrite (uwild_disc_off I Hne Hr Hdi) in Hwl. discriminate Hwl. }
+    { iRight. rewrite /union_Wwild. iExists I. by iFrame "Hw". }
+    iLeft.
     iDestruct "Hb" as (v) "[#Hpin Hb]".
     iSplitL "Hb".
     { rewrite /UInitBanner.kinit_ban_at. iExists v, I.
       iSplitR; [by iPureIntro |]. iFrame "Hpin Hb". }
     rewrite /union_H. iExists I. iSplitR; [by iPureIntro |]. iFrame "Hd".
     iDestruct "Hinp" as "[[Hinp _] | #HT]"; [iLeft; iExact "Hinp" | by iRight].
+  Qed.
+
+  (* ...and the wild hold IS one: [uWbf]'s wild arm *)
+  Lemma union_wbn_of_wild (HR : riscvGS Σ) (GEN : GenId)
+      `{HBs : !bioslotG Σ, HFd : !fdslotG Σ, HIr : !irefslotG Σ,
+        HPav : !pavG Σ, HWc : !wchG Σ, HF : !fileG Σ}
+      (ug : union_gn) (r : file_names) (s0 : fstate) (n : nat) :
+    union_Wwild HR GEN ug n -∗ UserConsole.cc_wbn (union_cc HR GEN ug r s0) n.
+  Proof using .
+    rewrite /union_Wwild /UserConsole.cc_wbn /union_cc /=. iIntros "#Hw".
+    iDestruct "Hw" as (I) "[%Hlen Hw]". iExists I. iSplitR; [by iPureIntro |].
+    rewrite /uWbf. by iRight.
   Qed.
 
   Lemma union_wbn_of (HR : riscvGS Σ) (GEN : GenId)
@@ -380,7 +429,11 @@ Section UnionInitCC.
                (uWcu_inp ug r s0) Hwbi).
     - (* (10) THE STEP: the prologue credential carries the hold, and the
          two inputs -- the record's and the hold's -- are one input *)
-      intros n. iIntros "[Hp Hh]".
+      intros n. iIntros "Hp".
+      iDestruct "Hp" as "[[Hp Hh] | #Hw]"; last first.
+      { (* the wild hold: the restarted shell's wild arm *)
+        iDestruct "Hw" as (I) "[%Hlen Hw]". iExists I. iSplitR; [by iPureIntro |].
+        iApply (uWcu_wild ug r s0 (upterm_shape ug) (updone_shape ug) I 0%nat with "Hw"). }
       iDestruct (union_wp_line HR GEN ug s0 n with "Hp") as (I) "[%Hlen Hc]".
       rewrite /union_H. iDestruct "Hh" as (I') "(%Hlen' & #Hinp' & Hd)".
       iExists I. iSplitR; [by iPureIntro |].

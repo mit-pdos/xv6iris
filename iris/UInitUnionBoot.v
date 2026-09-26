@@ -384,14 +384,29 @@ Section UnionInitBoot.
       iSplitL "Hrd"; [ rewrite ucons_reader_eq; iExact "Hrd" | ].
       iSplitR.
       { iIntros "!>" (n N') "Hb".
-        iDestruct (union_wbn_to HR GEN ug r s0 n with "Hb") as "[Hb Hh]".
-        iApply (kinit_banner_pay_frame HR GEN N' _ _ _ _ _
-                  with "[Hb] Hh").
-        iApply ("Hblaw" $! n N' with "Hb"). }
+        iDestruct (union_wbn_to HR GEN ug r s0 n with "Hb") as "[[Hb Hh] | #Hw]".
+        - iApply (UInitBanner.kinit_banner0_mono_at (PS := uprogSG_free) N'
+                    (UInitDiag.kinit_pro_at (union_link_inst_at ug s0) n
+                     ∗ union_H HR GEN ug r s0 n)%I
+                    with "[] [Hb Hh]").
+          { iIntros "H". rewrite /union_cc /=. by iLeft. }
+          iApply (kinit_banner_pay_frame HR GEN N' _ _ _ _ _ with "[Hb] Hh").
+          iApply ("Hblaw" $! n N' with "Hb").
+        - (* THE WILD HOLD: the banner through the era's licence, and the
+             hold lent on (seccomp design 10.5) *)
+          rewrite /UkInitMain.kinit_banner0.
+          iApply (union_wild_pay HR GEN ug Hcons N' n with "Hw").
+          iIntros "_". rewrite /union_cc /=. by iRight. }
       rewrite /UkInitMain.kinit_diag_law.
       iSplitR; last first.
-      { iIntros "!>" (n N') "[Hp _]". iApply ("Hflaw" $! n N' with "Hp"). }
-      iIntros "!>" (n N') "[Hp Hh]".
+      { iIntros "!>" (n N') "Hp". rewrite /union_cc /=.
+        iDestruct "Hp" as "[[Hp _] | #Hw]".
+        - iApply ("Hflaw" $! n N' with "Hp").
+        - iApply (union_wild_pay HR GEN ug Hcons N' n with "Hw"). by iIntros "_". }
+      iIntros "!>" (n N') "Hp". rewrite {1}/union_cc /=.
+      iDestruct "Hp" as "[[Hp Hh] | #Hw]"; last first.
+      { iApply (union_wild_pay HR GEN ug Hcons N' n with "Hw"). iIntros "_".
+        iApply (union_wbn_of_wild HR GEN ug r s0 n with "Hw"). }
       iPoseProof ("Hxlaw" $! n N' with "Hp") as "H".
       iDestruct (kinit_banner_pay_frame HR GEN N' _ _ _ _ _ with "H Hh") as "H".
       rewrite /UkInit.kinit_banner_pay.

@@ -167,18 +167,20 @@ Section UInitBannerGen.
   Definition bnr_at (v : era_pins) (I : list (bv 8)) (i : nat) : iProp Σ :=
     lk_ban L (S gen_id) v I i.
 
-  Lemma kinit_w1_of_link_at (N : uk_names Σ) (v : era_pins) (I : list (bv 8))
-      (l : list fdstate) (rb : bool) (i : nat) (b : bv 8) :
+  (* ONE BYTE AT fd 1 FROM ANY STEP OF THE CONSOLE LINK: the byte's chain
+     is paid by the step [F0 ~> F1] (the record's banner step below; the
+     era's wild licence after a wild-era fork panic,
+     [kinit_banner_pay_of_lic]).  [UShPanic.ksh_w1_of_step] at /init. *)
+  Lemma kinit_w1_of_step (N : uk_names Σ) (F0 F1 : iProp Σ)
+      (l : list fdstate) (rb : bool) (b : bv 8) :
     l !! 1%nat = Some (FdOpen rb true (FdDevice CONSOLE)) ->
-    u_banner !! i = Some b ->
-    lk_pin L (S gen_id) v -∗
-    lk_links L -∗
+    □ (∀ Φ : iProp Σ, F0 -∗ (F1 -∗ Φ) -∗ out_link Uart0 (S gen_id) b Φ) -∗
     UkInit.kinit_w1 N (mword_of_int 1 : mword 64) b
-      (UserFd.ustd (ukn_fd N) l ∗ bnr_at v I i)
-      (UserFd.ustd (ukn_fd N) l ∗ bnr_at v I (S i)).
+      (UserFd.ustd (ukn_fd N) l ∗ F0)
+      (UserFd.ustd (ukn_fd N) l ∗ F1).
   Proof using .
-    intros Hli Hb.
-    iIntros "#Hpin #Hlk" (h m avail) "%Ha0 %Ha2 #Hcode Hbuf [Hl Hbnd] Hrun Hcont".
+    intros Hli.
+    iIntros "#Hst" (h m avail) "%Ha0 %Ha2 #Hcode Hbuf [Hl Hbnd] Hrun Hcont".
     (* the two halves *)
     iDestruct (ubyte_split with "Hbuf") as "[Hb1 Hb2]".
     set (ua := m !!! Regidx a1_idx).
@@ -186,7 +188,7 @@ Section UInitBannerGen.
        the byte, and the era's cursor before and after this byte *)
     set (Q := (fun k : nat =>
                  ubyteq (ukn_d N) (DfracOwn (1/2)) (uint ua) b
-                 ∗ match k with O => bnr_at v I i | _ => bnr_at v I (S i) end)%I).
+                 ∗ match k with O => F0 | _ => F1 end)%I).
     assert (Ham1 : (<[Regidx a7_idx := (mword_of_int 16 : mword 64)]> m)
                      !!! Regidx a1_idx = ua)
       by exact (upd_ne m (Regidx a7_idx) (Regidx a1_idx) _
@@ -232,9 +234,8 @@ Section UInitBannerGen.
         { pose proof (HM 0%nat ltac:(lia)) as HM0.
           cbn in HM0. rewrite HM0 in Hb'. by injection Hb'. }
         subst b'.
-        iApply (lk_ban_step L (S gen_id) v I i b (Q 1%nat)
-                  Hb with "Hpin Hlk Hbnd [Hb1]").
-        iIntros "Hres". rewrite /Q. iFrame "Hb1". rewrite /bnr_at. iExact "Hres". }
+        iApply ("Hst" $! (Q 1%nat) with "Hbnd [Hb1]").
+        iIntros "Hres". rewrite /Q. iFrame "Hb1". iExact "Hres". }
     { iApply (ubytesq_of_one with "Hb2"). }
     iIntros (h' ret W cw' cs') "%Hka0 %Hka1 %Hka2 %Htk %Hlz %Hnf Hl Hb2 Hpost Hrun".
     (* THE POST: the short arm is refuted from the run the caller owns *)
@@ -250,6 +251,22 @@ Section UInitBannerGen.
     iDestruct (ubytesq_to_one with "Hb2") as "Hb2".
     iDestruct (ubyte_join with "Hb1 Hb2") as "Hbuf".
     iApply ("Hcont" $! h' ret with "Hbuf [$Hl $Hbnd] Hrun").
+  Qed.
+
+  Lemma kinit_w1_of_link_at (N : uk_names Σ) (v : era_pins) (I : list (bv 8))
+      (l : list fdstate) (rb : bool) (i : nat) (b : bv 8) :
+    l !! 1%nat = Some (FdOpen rb true (FdDevice CONSOLE)) ->
+    u_banner !! i = Some b ->
+    lk_pin L (S gen_id) v -∗
+    lk_links L -∗
+    UkInit.kinit_w1 N (mword_of_int 1 : mword 64) b
+      (UserFd.ustd (ukn_fd N) l ∗ bnr_at v I i)
+      (UserFd.ustd (ukn_fd N) l ∗ bnr_at v I (S i)).
+  Proof using .
+    intros Hli Hb. iIntros "#Hpin #Hlk".
+    iApply (kinit_w1_of_step N _ _ l rb b Hli). iIntros "!>" (Φ) "Hbnd HΦ".
+    rewrite /bnr_at.
+    iApply (lk_ban_step L (S gen_id) v I i b Φ Hb with "Hpin Hlk Hbnd HΦ").
   Qed.
 
   (* =================================================================== *)
@@ -337,6 +354,26 @@ Section UInitBannerGen.
     iApply (lk_ban_done L (S gen_id) v I with "[Hbnd]").
     rewrite /bnr_at.
     by replace (length u_banner) with 18%nat by (vm_compute; reflexivity).
+  Qed.
+
+  (* ANY PRINT OF /init'S, THROUGH A LICENCE: a persistent [F] that steps
+     the console link at every byte to itself pays any literal on the
+     console row, and hands [Rt] back.  The era's wild token is such an
+     [F] ([UInitUnionCC]: init's banner and diagnostics after a wild-era
+     fork panic, seccomp design 10.5). *)
+  Lemma kinit_banner_pay_of_lic (N : uk_names Σ) (len : nat) (f : nat -> bv 8)
+      (F Rt : iProp Σ) :
+    □ (∀ (b : bv 8) (Φ : iProp Σ), F -∗ (F -∗ Φ) -∗ out_link Uart0 (S gen_id) b Φ) -∗
+    F -∗ (F -∗ Rt) -∗ UkInit.kinit_banner_pay N stc_cons len f Rt.
+  Proof using .
+    iIntros "#Hst HF HRt". rewrite /UkInit.kinit_banner_pay. iIntros "Hl".
+    iExists (fun _ => UserFd.ustd (ukn_fd N) (ufd_l3 stc_cons) ∗ F)%I.
+    iSplitR.
+    { iIntros "!>" (j) "%Hj".
+      iApply (kinit_w1_of_step N F F (ufd_l3 stc_cons) true (f j)
+                (ufd_l3_row1 stc_cons)).
+      iIntros "!>" (Φ). iApply "Hst". }
+    iFrame "Hl HF". iIntros "[$ HF]". iApply ("HRt" with "HF").
   Qed.
 
   (* =================================================================== *)
