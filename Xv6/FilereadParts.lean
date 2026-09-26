@@ -319,7 +319,7 @@ theorem frd_pay_carve (γ : FileNames) (fk : Nat) (q : Qp) (C : FContent) (r w :
       ∃ (ik : Nat) (inum : BitVec 32) (s : Qp) (g : GName) (ty : BitVec 16) (lo tl : Nat)
         (γb : BoxNames),
         ⌜C.ip = ientry ik ∧ ik < NINODE ∧ inum.toNat < 16 * icfgNib ∧ lo ≤ tl ∧
-          i = inum.toNat ∧ C.type = FD_INODE ∧ om = .parked⌝ ∗
+          i = inum.toNat ∧ C.type = FD_INODE⌝ ∗
         credFloor lo tl ∗ ityShot g ty ∗ inodeShrGenlo ik s icfgDev inum g lo ∗
         offFd fk q γb γo C ∗
         (inodeShrGenlo ik s icfgDev inum g lo -∗ offFd fk q γb γo C -∗
@@ -336,7 +336,7 @@ theorem frd_pay_carve (γ : FileNames) (fk : Nat) (q : Qp) (C : FContent) (r w :
   subst hg
   iexists ik, pn.inum, qpMul q pn.iq, pn.ig, ty, lo, tl, pn.obox
   isplitr
-  · ipureintro; exact ⟨hv, hk, hnib, hle, hi, hty, hom⟩
+  · ipureintro; exact ⟨hv, hk, hnib, hle, hi, hty⟩
   iframe Hfl Hshot Hshr Hoff
   iintro Hshr Hoff
   iexists pn
@@ -361,10 +361,10 @@ end Ref
 
 /-- The dispatch's states, read off the content through `fdstateOk`, past
 the `readable` test. -/
-theorem frd_st_pipe (inum : BitVec 32) (γo : GName) (γp : PipeNames) (C : FContent) (st : FdState)
-    (hok : fdstateOk inum γo γp C st) (h : C.type = FD_PIPE) (hr : C.readable ≠ 0#8) :
+theorem frd_st_pipe (inum : BitVec 32) (γo : GName) (om : OffMode) (γp : PipeNames) (C : FContent) (st : FdState)
+    (hok : fdstateOk inum γo om γp C st) (h : C.type = FD_PIPE) (hr : C.readable ≠ 0#8) :
     ∃ wb, st = .open true wb (.pipe γp) := by
-  have ht := fdstateOk_type inum γo γp C st hok
+  have ht := fdstateOk_type inum γo om γp C st hok
   rw [h] at ht
   rcases st with _ | ⟨rb, wb, g | ⟨i, g, om⟩ | mj⟩
   · simp [fdTypeCode, FD_PIPE, FD_DEVICE, FD_INODE, FD_NONE] at ht
@@ -376,10 +376,10 @@ theorem frd_st_pipe (inum : BitVec 32) (γo : GName) (γp : PipeNames) (C : FCon
   · simp [fdTypeCode, FD_PIPE, FD_DEVICE, FD_INODE, FD_NONE] at ht
   · simp [fdTypeCode, FD_PIPE, FD_DEVICE, FD_INODE, FD_NONE] at ht
 
-theorem frd_st_device (inum : BitVec 32) (γo : GName) (γp : PipeNames) (C : FContent) (st : FdState)
-    (hok : fdstateOk inum γo γp C st) (h : C.type = FD_DEVICE) (hr : C.readable ≠ 0#8) :
+theorem frd_st_device (inum : BitVec 32) (γo : GName) (om : OffMode) (γp : PipeNames) (C : FContent) (st : FdState)
+    (hok : fdstateOk inum γo om γp C st) (h : C.type = FD_DEVICE) (hr : C.readable ≠ 0#8) :
     ∃ wb, st = .open true wb (.device C.major.toNat) := by
-  have ht := fdstateOk_type inum γo γp C st hok
+  have ht := fdstateOk_type inum γo om γp C st hok
   rw [h] at ht
   rcases st with _ | ⟨rb, wb, _ | ⟨i, g, om⟩ | mj⟩
   · simp [fdTypeCode, FD_PIPE, FD_DEVICE, FD_INODE, FD_NONE] at ht
@@ -391,10 +391,10 @@ theorem frd_st_device (inum : BitVec 32) (γo : GName) (γp : PipeNames) (C : FC
     · exact absurd hr' hr
     · exact ⟨wb, rfl⟩
 
-theorem frd_st_inode (inum : BitVec 32) (γo : GName) (γp : PipeNames) (C : FContent) (st : FdState)
-    (hok : fdstateOk inum γo γp C st) (h : C.type = FD_INODE) (hr : C.readable ≠ 0#8) :
-    ∃ wb i, st = .open true wb (.inode i γo .parked) := by
-  have ht := fdstateOk_type inum γo γp C st hok
+theorem frd_st_inode (inum : BitVec 32) (γo : GName) (om : OffMode) (γp : PipeNames) (C : FContent) (st : FdState)
+    (hok : fdstateOk inum γo om γp C st) (h : C.type = FD_INODE) (hr : C.readable ≠ 0#8) :
+    ∃ wb i, st = .open true wb (.inode i γo om) := by
+  have ht := fdstateOk_type inum γo om γp C st hok
   rw [h] at ht
   rcases st with _ | ⟨rb, wb, _ | ⟨i, g, om⟩ | mj⟩
   · simp [fdTypeCode, FD_PIPE, FD_DEVICE, FD_INODE, FD_NONE] at ht

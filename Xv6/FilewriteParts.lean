@@ -482,7 +482,7 @@ theorem fwr_pay_carve (γ : FileNames) (fk : Nat) (q : Qp) (C : FContent) (r : B
       ∃ (ik : Nat) (inum : BitVec 32) (s : Qp) (g : GName) (ty : BitVec 16) (lo tl : Nat)
         (γb : BoxNames),
         ⌜C.ip = ientry ik ∧ ik < NINODE ∧ inum.toNat < 16 * icfgNib ∧ lo ≤ tl ∧
-          i = inum.toNat ∧ C.type = FD_INODE ∧ om = .parked ∧ C.writable = 1#8 ∧
+          i = inum.toNat ∧ C.type = FD_INODE ∧ C.writable = 1#8 ∧
           ty.toNat ≠ T_DIR_z ∧ ty.toNat ≠ T_DEVICE⌝ ∗
         credFloor lo tl ∗ ityShot g ty ∗ inodeShrGenlo ik s icfgDev inum g lo ∗
         offFd fk q γb γo C ∗
@@ -501,7 +501,7 @@ theorem fwr_pay_carve (γ : FileNames) (fk : Nat) (q : Qp) (C : FContent) (r : B
   iexists ik, pn.inum, qpMul q pn.iq, pn.ig, ty, lo, tl, pn.obox
   isplitr
   · ipureintro
-    refine ⟨hv, hk, hnib, hle, hi, hty, hom, by simpa using hw, hnd ?_, hdv hty⟩
+    refine ⟨hv, hk, hnib, hle, hi, hty, by simpa using hw, hnd ?_, hdv hty⟩
     unfold fcWbool; rw [show C.writable = 1#8 by simpa using hw]; decide
   iframe Hfl Hshot Hshr Hoff
   iintro Hshr Hoff

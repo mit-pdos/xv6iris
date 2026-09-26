@@ -84,7 +84,7 @@ end raw
 
 /-- The payload names a free slot starts at (Rocq `inhabitant`). -/
 def fileBootPn0 : FPNames :=
-  ⟨0, ⟨0, 0, 0, 0, 0⟩, 0, 1, 0, 0#32, ⟨0, 0, 0, 0⟩, 0⟩
+  ⟨0, ⟨0, 0, 0, 0, 0⟩, 0, 1, 0, 0#32, ⟨0, 0, 0, 0⟩, 0, .parked⟩
 
 section mint
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]

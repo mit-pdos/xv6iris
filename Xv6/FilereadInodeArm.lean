@@ -80,7 +80,7 @@ set_option maxHeartbeats 32000000 in
 block). -/
 theorem frd_arm_inode (IL : ILOCK) (RD : READI) (IU : IUNLOCK) (Γ : SchedNames)
     [ClaimIs (hlc := hlc) GF Γ] (cpu : CPU) (k : KCtx) (spie spp : Bool) (R : RegMap)
-    (γ : FileNames) (fk : Nat) (q : Qp) (wb : Bool) (i : Nat) (γo : GName) (j : Nat)
+    (γ : FileNames) (fk : Nat) (q : Qp) (wb : Bool) (i : Nat) (γo : GName) (om : OffMode) (j : Nat)
     (pid : BitVec 32) (V : ProcPriv) (M : Nat → List (BitVec 8)) (γkl : GName) (γk : KmemNames)
     (n : Int) (F : Pfam GF (Aview → Nat → Anode → Nat → IProp GF)) (Rd : Nat → Nat → IProp GF)
     (Rin : List (List Obs × BitVec 8) → IProp GF) (P : IProp GF)
@@ -94,11 +94,11 @@ theorem frd_arm_inode (IL : ILOCK) (RD : READI) (IU : IUNLOCK) (Γ : SchedNames)
     trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗
     procsInv Γ ∗ panicEnv ∗ fsReady (hlc := hlc) ∗
     isLock γkl kmemLockAddr "kmem" (kmemRes γk) ∗ kallocAvail γk none ∗
-    foffRow (GF := GF) (.open true wb (.inode i γo .parked)) ∗
-    fileRef γ fk q (.open true wb (.inode i γo .parked)) ∗ procPrivExt (procAddr j) pid V V.upt M ∗
+    foffRow (GF := GF) (.open true wb (.inode i γo om)) ∗
+    fileRef γ fk q (.open true wb (.inode i γo om)) ∗ procPrivExt (procAddr j) pid V V.upt M ∗
     genHalvesPriv (procAddr j) pid V.gen ∗ bslot ∗ P ∗
-    areadInOm (hlc := hlc) .parked (fsGammaL fscFs) appE i γo F ∗
-    frdK (hlc := hlc) k γ fk q (.open true wb (.inode i γo .parked)) j pid V M n F Rd Rin P
+    areadInOm (hlc := hlc) om (fsGammaL fscFs) appE i γo F ∗
+    frdK (hlc := hlc) k γ fk q (.open true wb (.inode i γo om)) j pid V M n F Rd Rin P
     ⊢ wpLoop (GF := GF) cpu := by
   have hK' : 6 + readiSlots ≤ k.avail := hK
   have hK6 : 6 ≤ k.avail := by unfold readiSlots bmapSlots ballocSlots breadSlots panicSlots at hK'; omega
@@ -106,8 +106,8 @@ theorem frd_arm_inode (IL : ILOCK) (RD : READI) (IU : IUNLOCK) (Γ : SchedNames)
     HΦ⟩
   -- THE REFERENCE, OPENED, AND THE CARVE
   icases filerw_ref_open γ fk q _ $$ Href with ⟨%C, %-, Htok, Hfields, Hpay⟩
-  icases frd_pay_carve γ fk q C true wb i γo .parked $$ Hpay with ⟨%ik, %inum, %s, %g, %ty,
-    %lo, %tl, %γb, %⟨hip, hik, hnib, hle, hi, hty, -⟩, #Hfl, #Hshot, Hshr, Hoffd, Hback⟩
+  icases frd_pay_carve γ fk q C true wb i γo om $$ Hpay with ⟨%ik, %inum, %s, %g, %ty,
+    %lo, %tl, %γb, %⟨hip, hik, hnib, hle, hi, hty⟩, #Hfl, #Hshot, Hshr, Hoffd, Hback⟩
   subst hi
   icases filerw_fields_ip fk q C $$ Hfields with ⟨Hip, Hfw⟩
   icases protoReadLlb fk q γb γo C $$ Hoffd with ⟨%m, Hat, #Hllb⟩
@@ -153,7 +153,7 @@ theorem frd_arm_inode (IL : ILOCK) (RD : READI) (IU : IUNLOCK) (Γ : SchedNames)
   -- the lock-held ghost steps after readi: THE FIRE, the checkin, the re-close
   iapply wpLoop_fupd
   icases kctx_token_acc _ _ $$ Hk with ⟨Hrun, Hkb⟩
-  imod frd_post_ghost cpu ik fk q γb γo C m T0 Tr s g lo inum dn bm data v dd F wb .parked hip hik hq hok hloc
+  imod frd_post_ghost cpu ik fk q γb γo C m T0 Tr s g lo inum dn bm data v dd F wb om hip hik hq hok hloc
     hwf hcap $$ [Hrun Hcm Htop Hgv Hcell Hout Hmeta Hmap Hblk]
     with ⟨Hrun, Hoffd, Hrows, Hheld, ⟨%av, %hrow, Hrecv⟩⟩
   · iframe Hrun Hcm Htop Hgv Hcell Hout Hmeta Hmap Hblk
@@ -200,7 +200,7 @@ theorem frd_arm_inode (IL : ILOCK) (RD : READI) (IU : IUNLOCK) (Γ : SchedNames)
     rcases hr10 with h | h
     · rw [h]; exact frd_ret_nat n tot (by omega)
     · rw [h]; exact filereadRet_m1 n
-  iapply filereadExtra_inode_of V.gen V.upt F Rd Rin P _ .parked wb inum.toNat γo n (R' 10#5) M' (k.regs 11#5) rfl $$ HP
+  iapply filereadExtra_inode_of V.gen V.upt F Rd Rin P _ om wb inum.toNat γo n (R' 10#5) M' (k.regs 11#5) rfl $$ HP
   rw [h10']
   iapply (frd_inode_arms inum.toNat γo n F dn bm data v.toNat tot dd a0 P' (viewFaulted V.upt P' M) M'
     (k.regs 11#5) av hn0 hn1 hok hwf hrow hle2 V.upt harm himg.1 himg.2 hpl) $$ Hrecv

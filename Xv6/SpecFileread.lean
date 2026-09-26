@@ -595,9 +595,9 @@ theorem filereadIn_dev_console (st : FdState) (wb : Bool) (mj : Nat)
 
 /-- THE `f->readable == 0` EARLY RETURN (Rocq `fileread_extra_unreadable`):
 the arm there is the -1 claim itself. -/
-theorem filereadExtra_unreadable (inum : BitVec 32) (γo : GName) (γp : PipeNames) (C : FContent) (st : FdState)
+theorem filereadExtra_unreadable (inum : BitVec 32) (γo : GName) (om : OffMode) (γp : PipeNames) (C : FContent) (st : FdState)
     (n : Int) (M' : Nat → List (BitVec 8)) (addr : BitVec 64)
-    (hok : fdstateOk inum γo γp C st) (hz : C.readable = 0#8) :
+    (hok : fdstateOk inum γo om γp C st) (hz : C.readable = 0#8) :
     P ⊢ filereadExtra (hlc := hlc) gn pt st n F Rd Rin P (-1#64) M' addr := by
   rcases st with _ | ⟨rb, wb, t⟩
   · exact filereadExtra_closed gn pt F Rd Rin P n M' addr
@@ -610,8 +610,8 @@ theorem filereadExtra_unreadable (inum : BitVec 32) (γo : GName) (γp : PipeNam
       rw [hz] at hr; exact absurd hr (by decide)
 
 /-- ... and its input, handed straight back. -/
-theorem filereadIn_unreadable (inum : BitVec 32) (γo : GName) (γp : PipeNames) (C : FContent) (st : FdState)
-    (hok : fdstateOk inum γo γp C st) (hz : C.readable = 0#8) :
+theorem filereadIn_unreadable (inum : BitVec 32) (γo : GName) (om : OffMode) (γp : PipeNames) (C : FContent) (st : FdState)
+    (hok : fdstateOk inum γo om γp C st) (hz : C.readable = 0#8) :
     filereadIn (hlc := hlc) st F Rd Rin P ⊢ P -∗ P := by
   rcases st with _ | ⟨rb, wb, t⟩
   · simp only [filereadIn]

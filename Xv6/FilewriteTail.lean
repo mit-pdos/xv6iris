@@ -34,7 +34,8 @@ set_option linter.unusedVariables false
 /-! ## The static arguments -/
 
 /-- filewrite's static arguments on the FD_INODE arm (the descriptor's
-state is `.open rb true (.inode i γo .parked)`). -/
+state is `.open rb true (.inode i γo om)`, `om` the FILE's offset mode --
+Rocq lane OFF-LINK-6's L2: the walk takes the mode from the payload). -/
 structure FwrA where
   γ : FileNames
   fk : Nat
@@ -42,6 +43,7 @@ structure FwrA where
   rb : Bool
   i : Nat
   γo : GName
+  om : OffMode
   j : Nat
   pid : BitVec 32
   V : ProcPriv
@@ -53,7 +55,7 @@ structure FwrA where
   n : Int
 
 /-- The descriptor's state. -/
-abbrev FwrA.st (A : FwrA) : FdState := .open A.rb true (.inode A.i A.γo .parked)
+abbrev FwrA.st (A : FwrA) : FdState := .open A.rb true (.inode A.i A.γo A.om)
 
 /-- The writer's image (SpecFilewrite deviation 4). -/
 abbrev FwrA.img (A : FwrA) : Nat → List (BitVec 8) := writerImg A.V.upt A.M
@@ -173,7 +175,7 @@ theorem fwr_exit_ok (cpu : CPU) (k : KCtx) (A : FwrA) (hA : FwrFacts k A) (Q : N
       (k.regs 20#5) (k.regs 21#5) (k.regs 22#5) (k.regs 23#5) (k.regs 24#5) (k.regs 25#5) v11 ∗
     trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗
     fileRef A.γ A.fk A.q A.st ∗ procPrivExt (procAddr A.j) A.pid A.V P A.img ∗ bslots 3 ∗
-    fwrSt (hlc := hlc) .parked (fsGammaL fscFs) A.i A.γo A.V.upt A.n A.img (k.regs 11#5) Q t p 0 ∗
+    fwrSt (hlc := hlc) A.om (fsGammaL fscFs) A.i A.γo A.V.upt A.n A.img (k.regs 11#5) Q t p 0 ∗
     fwrK (hlc := hlc) k A.γul A.γuu A.γ A.fk A.q A.st A.j A.pid A.V A.M A.n Q
     ⊢ wpLoop (GF := GF) cpu := by
   have hK12 : 12 ≤ k.avail := by have := hA.hK; rw [filewriteSlots_eq] at this; omega
@@ -217,7 +219,7 @@ theorem fwr_exit_ok (cpu : CPU) (k : KCtx) (A : FwrA) (hA : FwrFacts k A) (Q : N
   unfold fwrK
   iapply HΦ $$ %c' %spie %spp %R' %P [] Hk Hpc Hte Hce Href Hpriv [Hbs] [Hst]
   · ipureintro; exact ⟨hcs, hext⟩
-  · iapply (filewrite_env_out_inode (GF := GF) A.γul A.γuu A.rb true A.i A.γo .parked)
+  · iapply (filewrite_env_out_inode (GF := GF) A.γul A.γuu A.rb true A.i A.γo A.om)
     unfold filewriteFsOut; iexact Hbs
   · unfold filewriteArms
     rw [ha0]
@@ -228,7 +230,7 @@ theorem fwr_exit_ok (cpu : CPU) (k : KCtx) (A : FwrA) (hA : FwrFacts k A) (Q : N
     ileft
     isplitr
     · ipureintro; exact ⟨rfl, by have := hA.hn.1; omega⟩
-    iapply fwrSt_ok .parked (fsGammaL fscFs) A.i A.γo A.V.upt A.n A.img (k.regs 11#5) Q t p htn $$ Hst
+    iapply fwrSt_ok A.om (fsGammaL fscFs) A.i A.γo A.V.upt A.n A.img (k.regs 11#5) Q t p htn $$ Hst
 
 set_option maxHeartbeats 16000000 in
 /-- **THE FAIL EXIT** (`+0xe2` taken, `+0x12a .. +0x138`, the tail): a
@@ -243,7 +245,7 @@ theorem fwr_exit_fail (cpu : CPU) (k : KCtx) (A : FwrA) (hA : FwrFacts k A) (Q :
       (k.regs 20#5) (k.regs 21#5) (k.regs 22#5) (k.regs 23#5) (k.regs 24#5) (k.regs 25#5) v11 ∗
     trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗
     fileRef A.γ A.fk A.q A.st ∗ procPrivExt (procAddr A.j) A.pid A.V P A.img ∗ bslots 3 ∗
-    fwrSt (hlc := hlc) .parked (fsGammaL fscFs) A.i A.γo A.V.upt A.n A.img (k.regs 11#5) Q t p x ∗
+    fwrSt (hlc := hlc) A.om (fsGammaL fscFs) A.i A.γo A.V.upt A.n A.img (k.regs 11#5) Q t p x ∗
     fwrK (hlc := hlc) k A.γul A.γuu A.γ A.fk A.q A.st A.j A.pid A.V A.M A.n Q
     ⊢ wpLoop (GF := GF) cpu := by
   have hK12 : 12 ≤ k.avail := by have := hA.hK; rw [filewriteSlots_eq] at this; omega
@@ -292,7 +294,7 @@ theorem fwr_exit_fail (cpu : CPU) (k : KCtx) (A : FwrA) (hA : FwrFacts k A) (Q :
   unfold fwrK
   iapply HΦ $$ %c' %spie %spp %R' %P [] Hk Hpc Hte Hce Href Hpriv [Hbs] [Hst]
   · ipureintro; exact ⟨hcs, hext⟩
-  · iapply (filewrite_env_out_inode (GF := GF) A.γul A.γuu A.rb true A.i A.γo .parked)
+  · iapply (filewrite_env_out_inode (GF := GF) A.γul A.γuu A.rb true A.i A.γo A.om)
     unfold filewriteFsOut; iexact Hbs
   · unfold filewriteArms
     rw [ha0]
@@ -303,7 +305,7 @@ theorem fwr_exit_fail (cpu : CPU) (k : KCtx) (A : FwrA) (hA : FwrFacts k A) (Q :
     iright
     isplitr
     · ipureintro; rfl
-    iapply fwrSt_fail .parked (fsGammaL fscFs) A.i A.γo A.V.upt A.n A.img (k.regs 11#5) Q t p x (Or.inl htn) $$ Hst
+    iapply fwrSt_fail A.om (fsGammaL fscFs) A.i A.γo A.V.upt A.n A.img (k.regs 11#5) Q t p x (Or.inl htn) $$ Hst
 
 end
 

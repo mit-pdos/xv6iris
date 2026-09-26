@@ -108,25 +108,25 @@ theorem sys_open_pub_off (cpu : CPU) (kk kf : Nat) (γo : GName) (C : FContent)
 minted: the two mode cells hold the caller's own omode bits
 (`SysOpenBits.sys_open_rd_byte` / `sys_open_wr_byte`) and the type is the
 store block's (Rocq's `Hstok` + `fdstate_ok_inj`). -/
-theorem sys_open_pub_state (inum : BitVec 32) (γo : GName) (γp : PipeNames) (C : FContent) (vom : BitVec 64)
+theorem sys_open_pub_state (inum : BitVec 32) (γo : GName) (om : OffMode) (γp : PipeNames) (C : FContent) (vom : BitVec 64)
     (t : FdType) (st : FdState)
     (hrd : C.readable = BitVec.extractLsb' 0 8 (soRdWord (BitVec.extractLsb' 0 32 vom)))
     (hwr : C.writable = BitVec.extractLsb' 0 8 (soWrWord (BitVec.extractLsb' 0 32 vom)))
-    (ht : (C.type = FD_INODE ∧ t = .inode inum.toNat γo .parked) ∨
+    (ht : (C.type = FD_INODE ∧ t = .inode inum.toNat γo om) ∨
       (C.type = FD_DEVICE ∧ t = .device C.major.toNat))
-    (hok : fdstateOk inum γo γp C st) :
+    (hok : fdstateOk inum γo om γp C st) :
     st = .open (omReadable vom) (omWritable vom) t := by
   have hrd' : C.readable = if omReadable vom then 1#8 else 0#8 := hrd.trans (sys_open_rd_byte vom)
   have hwr' : C.writable = if omWritable vom then 1#8 else 0#8 := hwr.trans (sys_open_wr_byte vom)
-  have hok' : fdstateOk inum γo γp C (.open (omReadable vom) (omWritable vom) t) := by
+  have hok' : fdstateOk inum γo om γp C (.open (omReadable vom) (omWritable vom) t) := by
     rcases ht with ⟨hc, rfl⟩ | ⟨hc, rfl⟩
     · exact ⟨hrd', hwr', hc, rfl, rfl, rfl⟩
     · exact ⟨hrd', hwr', hc, rfl⟩
-  exact fdstateOk_inj inum γo γp C st _ hok hok'
+  exact fdstateOk_inj inum γo om γp C st _ hok hok'
 
 /-- A published file is never untyped. -/
-theorem sys_open_pub_ne (inum : BitVec 32) (γo : GName) (γp : PipeNames) (C : FContent) (st : FdState)
-    (hty : C.type = FD_INODE ∨ C.type = FD_DEVICE) (hok : fdstateOk inum γo γp C st) :
+theorem sys_open_pub_ne (inum : BitVec 32) (γo : GName) (om : OffMode) (γp : PipeNames) (C : FContent) (st : FdState)
+    (hty : C.type = FD_INODE ∨ C.type = FD_DEVICE) (hok : fdstateOk inum γo om γp C st) :
     st ≠ .closed := by
   rintro rfl
   have h : C.type = FD_NONE := hok
@@ -183,8 +183,8 @@ theorem sys_open_pub (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ] (k : KCtx) (
     hdir hdvw $$ [Hpar Hru Hs Href Hflds Hnames Hcoff] with ⟨%st, %hok, Hfref⟩
   · iframe
     iexact Hshot
-  have hst := sys_open_pub_state inum γo pn.pipe C A.vom t st hrd hwr hty2 hok
-  have hne := sys_open_pub_ne inum γo pn.pipe C st hty hok
+  have hst := sys_open_pub_state inum γo .parked pn.pipe C A.vom t st hrd hwr hty2 hok
+  have hne := sys_open_pub_ne inum γo .parked pn.pipe C st hty hok
   -- ---- THE ONE GHOST STEP ON THE DESCRIPTOR: the settle ----
   icases fdFrags_len A.V.fdg A.sts $$ Hfrags with ⟨%hlens, Hfrags⟩
   have hfdlt : fd < A.sts.length := by rw [hlens]; exact hfd
@@ -193,7 +193,12 @@ theorem sys_open_pub (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ] (k : KCtx) (
   icases fdSt_agree' A.V.fdg fd .closed stq $$ [$Hauth $Hfr] with ⟨%hcl, Hauth, Hfr⟩
   imod procPrivFd_settle A.γ (procAddr A.j) A.pid (sysOpenV2 A P2) (sysOpenM2 A P2) fd kf 1 st
     .closed stq hfd hlen hkf hne $$ Hcore Howe Hfref Hauth Hfr with ⟨Hpriv, Hfr⟩
-  ihave Hrow := foffRow_of_ok inum γo pn.pipe C st hok $$ Huinv
+  ihave Huinv : (if C.type = FD_INODE then foffRow (GF := GF) (.open true true (.inode 0 γo .parked))
+      else iprop(True)) $$ [Huinv]
+  · by_cases hti : C.type = FD_INODE
+    · rw [if_pos hti, if_pos hti]; unfold foffRow; iexact Huinv
+    · rw [if_neg hti, if_neg hti]; iexact Huinv
+  ihave Hrow := foffRow_of_ok inum γo .parked pn.pipe C st hok $$ Huinv
   ihave Hfrags := Hfw $$ %st Hfr Hrow
   imodintro
   -- ---- THE CONTRACT'S CONTINUATION, at the success arm ----

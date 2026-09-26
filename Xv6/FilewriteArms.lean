@@ -91,13 +91,32 @@ theorem fwr_arm_neg (cpu : CPU) (k : KCtx) (spie spp : Bool) (R : RegMap) (γl :
     · ipureintro; exact filewriteRet_m1 n
     iapply filewriteExtra_neg _ st n _ _ Q hneg $$ Hin
 
+/-- THE INODE ARM'S INPUT AT A ZERO COUNT, at either mode: the chain at
+the kernel's table (at a held row the client-advanced chain converts down,
+`awriteChainAt_of_adv`; on its taint arm the plain chain is there). -/
+theorem fwr_in_zero (rb : Bool) (i : Nat) (γo : GName) (om : OffMode) (M : Nat → List (BitVec 8))
+    (ua : BitVec 64) (Q : Nat → IProp GF) (P : UPtd) :
+    filewriteIn (hlc := hlc) (.open rb true (.inode i γo om)) 0 M ua Q ⊢
+      awriteChainAt (hlc := hlc) (fsGammaL fscFs) appE i γo M ua P 0 Q 0 (wchunks 0) := by
+  cases om with
+  | parked =>
+    unfold filewriteIn
+    iintro Hc
+    iapply awriteChainAt_of (hlc := hlc) (fsGammaL fscFs) appE i γo M ua 0 Q 0 (wchunks 0) P $$ Hc
+  | held =>
+    unfold filewriteIn filewriteInHeld
+    iintro (Hc | ⟨Hc, -⟩)
+    · ispecialize Hc $$ %P
+      iapply awriteChainAt_of_adv $$ Hc
+    · iapply awriteChainAt_of (hlc := hlc) (fsGammaL fscFs) appE i γo M ua 0 Q 0 (wchunks 0) P $$ Hc
+
 set_option maxHeartbeats 8000000 in
 /-- **`+0x126`: THE ZERO TRIP** (Rocq's `+0x116`): the hoisted `n <= 0`
 test on the FD_INODE arm at `n = 0` -- `a0 := n`, the chain's empty prefix
 is the OK arm. -/
 theorem fwr_arm_zero (cpu : CPU) (k : KCtx) (spie spp : Bool) (R : RegMap) (γl : GName) (γu : UartNames)
     (γ : FileNames) (fk : Nat)
-    (q : Qp) (rb : Bool) (i : Nat) (γo : GName) (j : Nat) (pid : BitVec 32) (V : ProcPriv)
+    (q : Qp) (rb : Bool) (i : Nat) (γo : GName) (om : OffMode) (j : Nat) (pid : BitVec 32) (V : ProcPriv)
     (M : Nat → List (BitVec 8)) (n : Int) (Q : Nat → IProp GF) (w2 w4 w5 w8 w9 w10 w11 : BitVec 64)
     (hK : 12 ≤ k.avail)
     (hr : fwrRegs k fk n (k.regs 9#5) (k.regs 19#5) (k.regs 20#5) (k.regs 23#5) (k.regs 24#5)
@@ -107,11 +126,11 @@ theorem fwr_arm_zero (cpu : CPU) (k : KCtx) (spie spp : Bool) (R : RegMap) (γl 
     frame12 (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) w2 (k.regs 18#5) w4 w5 (k.regs 21#5)
       (k.regs 22#5) w8 w9 w10 w11 ∗
     trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗
-    fileRef γ fk q (.open rb true (.inode i γo .parked)) ∗ procPrivExt (procAddr j) pid V V.upt M ∗
-    filewriteEnv (hlc := hlc) γl γu (.open rb true (.inode i γo .parked)) ∗
-    filewriteIn (hlc := hlc) (.open rb true (.inode i γo .parked)) n (writerImg V.upt M)
+    fileRef γ fk q (.open rb true (.inode i γo om)) ∗ procPrivExt (procAddr j) pid V V.upt M ∗
+    filewriteEnv (hlc := hlc) γl γu (.open rb true (.inode i γo om)) ∗
+    filewriteIn (hlc := hlc) (.open rb true (.inode i γo om)) n (writerImg V.upt M)
       (k.regs 11#5) Q ∗
-    fwrK (hlc := hlc) k γl γu γ fk q (.open rb true (.inode i γo .parked)) j pid V M n Q
+    fwrK (hlc := hlc) k γl γu γ fk q (.open rb true (.inode i γo om)) j pid V M n Q
     ⊢ wpLoop (GF := GF) cpu := by
   subst hn0
   iintro ⟨Hk, Hpc, Hframe, Hte, Hce, Href, Hpriv, Henv, Hin, HΦ⟩
@@ -138,9 +157,11 @@ theorem fwr_arm_zero (cpu : CPU) (k : KCtx) (spie spp : Bool) (R : RegMap) (γl 
   unfold fwrK
   iapply HΦ $$ %c' %spie %spp %R' %V.upt [] Hk Hpc Hte Hce Href Hpriv Henv [Hin]
   · ipureintro; exact ⟨hcs, UMemL.extSz_refl _ _⟩
-  · unfold filewriteArms filewriteIn filewriteExtra
+  · -- the chain at the writer's table, at EITHER mode (Rocq L2: the
+    -- zero-trip exit pays at the file's mode too)
+    ihave Hc := fwr_in_zero rb i γo om (writerImg V.upt M) (k.regs 11#5) Q V.upt $$ Hin
+    unfold filewriteArms filewriteExtra
     rw [ha0]
-    icases Hin with Hc
     isplitr
     · ipureintro; exact filewriteRet_all 0 (Int.le_refl 0)
     unfold writeArmsAt writePostOkAt
@@ -154,8 +175,6 @@ theorem fwr_arm_zero (cpu : CPU) (k : KCtx) (spie spp : Bool) (R : RegMap) (γl 
     · ipureintro; simp
     isplitr
     · ipureintro; exact ubytesAt_nil _ _
-    ihave Hc := awriteChainAt_of (hlc := hlc) (fsGammaL fscFs) appE i γo (writerImg V.upt M)
-      (k.regs 11#5) 0 Q 0 (wchunks 0) V.upt $$ Hc
     iexact Hc
 
 set_option maxHeartbeats 16000000 in
@@ -587,7 +606,7 @@ theorem fwr_arm_inode (BO : BEGIN_OP) (IL : ILOCK) (WI : WRITEI) (IU : IUNLOCK) 
     -- THE DESCRIPTOR'S OFFSET ROW (Rocq lane OFF-LINK-5): the carrier's
     -- supplier at mode park, read once at the entry
     foffRow (GF := GF) A.st ∗
-    awriteChain (hlc := hlc) (fsGammaL fscFs) appE A.i A.γo A.img (k.regs 11#5) A.n Q 0 (wchunks A.n) ∗
+    filewriteIn (hlc := hlc) A.st A.n A.img (k.regs 11#5) Q ∗
     fwrK (hlc := hlc) k A.γul A.γuu A.γ A.fk A.q A.st A.j A.pid A.V A.M A.n Q
     ⊢ wpLoop (GF := GF) cpu := by
   obtain ⟨r2, r8, r9, r18, r19, r20, r21, r22, r23, r24, r25, r26, r27⟩ := id hr
@@ -639,10 +658,10 @@ theorem fwr_arm_inode (BO : BEGIN_OP) (IL : ILOCK) (WI : WRITEI) (IU : IUNLOCK) 
     refine ⟨?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_⟩ <;>
       simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true] <;> first | assumption | rfl
   ihave Hpriv := fwr_priv_img (procAddr A.j) A.pid A.V A.M $$ Hpriv
-  -- THE CARRIER AT THE ROW'S MODE (Rocq lane OFF-LINK-5's `fw_au_st_init`;
-  -- the one caller is at mode park, which `fdstateOk` still pins)
-  ihave Hinv := foffRow_inode_of (hlc := hlc) _ A.rb true A.i A.γo rfl $$ Hrow
-  ihave Hst := fwrSt_init_parked (fsGammaL fscFs) A.i A.γo A.V.upt A.n A.img (k.regs 11#5) Q $$ Hinv Hc
+  -- THE CARRIER AT THE ROW'S MODE (Rocq lane OFF-LINK-5's `fw_au_st_init`,
+  -- at the file's own mode since L2)
+  ihave Hc := filewriteIn_inode_any (hlc := hlc) A.rb A.om A.i A.γo A.n A.img (k.regs 11#5) Q $$ Hc
+  ihave Hst := fwrSt_init A.om A.rb true A.i A.γo A.V.upt A.n A.img (k.regs 11#5) Q $$ Hrow Hc
   iapply (fwr_loop BO IL WI IU EO Γ k A hA Q A.n.toNat cpu spie spp _ 0 0 A.V.upt (k.regs 9#5)
     (k.regs 19#5) w11 (by omega) (by have := hA.hn.1; omega) (by unfold FW_MAX; omega)
     (UMemL.extSz_refl _ _) hr')

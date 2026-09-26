@@ -135,7 +135,7 @@ theorem filePaySt_merge (γ : FileNames) (k : Nat) (q1 q2 : Qp) (C : FContent) (
   · iframe
   isplitl [Ht Hc]
   · iexists pn; iframe Ht Hc; ipureintro; exact hok1
-  · ipureintro; exact fdstateOk_inj _ _ _ _ _ _ hok1 hok2
+  · ipureintro; exact fdstateOk_inj _ _ _ _ _ _ _ hok1 hok2
 
 /-- A reference's content at `q1 + q2` is two references' worth. -/
 theorem fileBody_split (γ : FileNames) (k : Nat) (q1 q2 : Qp) (C : FContent) (st : FdState) :
@@ -438,7 +438,7 @@ theorem fileRest_join (γ : FileNames) (k : Nat) (s t : List (Nat × Qp)) (id : 
     (C C' : FContent) (pn : FPNames) (st : FdState) (hst : s ++ t = []) :
     fileRestAt (GF := GF) γ curCtx k (qsum (s ++ (id, q) :: t)) q' C' pn ∗
     fileFieldsAt curCtx k q C ∗ filePaySt γ k q C st ⊢
-      ∃ pn'' : FPNames, ⌜fdstateOk pn''.inum pn''.ooff pn''.pipe C st⌝ ∗
+      ∃ pn'' : FPNames, ⌜fdstateOk pn''.inum pn''.ooff pn''.om pn''.pipe C st⌝ ∗
         fileFieldsAt curCtx k 1 C ∗ fpayTok γ k 1 pn'' ∗ fileCore k 1 pn'' C := by
   obtain ⟨rfl, rfl⟩ := List.append_eq_nil_iff.1 hst
   unfold fileRestAt filePaySt

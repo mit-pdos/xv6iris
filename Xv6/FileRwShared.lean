@@ -178,7 +178,7 @@ variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [Fdslot
 state the caller keyed its environment on IS its reading. -/
 theorem filerw_ref_open (γ : FileNames) (fk : Nat) (q : Qp) (st : FdState) :
     fileRef (GF := GF) γ fk q st ⊢
-      ∃ C : FContent, ⌜∃ (inum : BitVec 32) (γo : GName) (γp : PipeNames), fdstateOk inum γo γp C st⌝ ∗
+      ∃ C : FContent, ⌜∃ (inum : BitVec 32) (γo : GName) (om : OffMode) (γp : PipeNames), fdstateOk inum γo om γp C st⌝ ∗
         frefTok γ fk q ∗ fileFieldsAt curCtx fk q C ∗ filePaySt γ fk q C st := by
   unfold fileRef
   iintro ⟨%C, Htok, Hf, Hp⟩
@@ -187,7 +187,7 @@ theorem filerw_ref_open (γ : FileNames) (fk : Nat) (q : Qp) (st : FdState) :
   icases Hp with ⟨%pn, %hok, Hpt, Hc⟩
   iframe Htok Hf
   isplitr
-  · ipureintro; exact ⟨pn.inum, pn.ooff, pn.pipe, hok⟩
+  · ipureintro; exact ⟨pn.inum, pn.ooff, pn.om, pn.pipe, hok⟩
   iexists pn
   iframe Hpt Hc
   ipureintro; exact hok

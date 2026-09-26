@@ -529,7 +529,7 @@ theorem fstat_ref_open (γ : FileNames) (fk : Nat) (q : Qp) (st : FdState) :
   icases Hp with ⟨%pn, %hok, Hpt, Hc⟩
   iframe Htok Hf
   isplitr
-  · ipureintro; exact fstatHasInode_st pn.inum pn.ooff pn.pipe C st hok
+  · ipureintro; exact fstatHasInode_st pn.inum pn.ooff pn.om pn.pipe C st hok
   iexists pn
   iframe Hpt Hc
   ipureintro; exact hok

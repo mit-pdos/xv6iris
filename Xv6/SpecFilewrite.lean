@@ -668,9 +668,9 @@ theorem filewriteExtra_pipe (P : UPtd) (rb wb : Bool) (γp : PipeNames) (n : Int
 
 /-- Rocq `filewrite_extra_unwritable`: the `f->writable == 0` early return
 arms nothing -- every armed state is WRITABLE. -/
-theorem filewriteExtra_unwritable (P : UPtd) (inum : BitVec 32) (γo : GName) (γp : PipeNames) (C : FContent) (st : FdState)
+theorem filewriteExtra_unwritable (P : UPtd) (inum : BitVec 32) (γo : GName) (om : OffMode) (γp : PipeNames) (C : FContent) (st : FdState)
     (n : Int) (M : Nat → List (BitVec 8)) (ua : BitVec 64) (Q : Nat → IProp GF) (r : BitVec 64)
-    (hok : fdstateOk inum γo γp C st) (hw : C.writable = 0#8) :
+    (hok : fdstateOk inum γo om γp C st) (hw : C.writable = 0#8) :
     ⊢ filewriteExtra (hlc := hlc) P st n M ua Q r := by
   rcases st with _ | ⟨rb, wb, t⟩
   · exact .rfl
@@ -681,9 +681,9 @@ theorem filewriteExtra_unwritable (P : UPtd) (inum : BitVec 32) (γo : GName) (�
 
 /-- ... and its input is dropped there (the chains are only asked of a
 writable descriptor). -/
-theorem filewriteIn_unwritable (inum : BitVec 32) (γo : GName) (γp : PipeNames) (C : FContent) (st : FdState)
+theorem filewriteIn_unwritable (inum : BitVec 32) (γo : GName) (om : OffMode) (γp : PipeNames) (C : FContent) (st : FdState)
     (n : Int) (M : Nat → List (BitVec 8)) (ua : BitVec 64) (Q : Nat → IProp GF)
-    (hok : fdstateOk inum γo γp C st) (hw : C.writable = 0#8) :
+    (hok : fdstateOk inum γo om γp C st) (hw : C.writable = 0#8) :
     filewriteIn (hlc := hlc) st n M ua Q ⊢ emp := by
   rcases st with _ | ⟨rb, wb, t⟩
   · exact .rfl

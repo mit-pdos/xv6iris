@@ -267,23 +267,25 @@ theorem foffRow_inode_of (st : FdState) (r w : Bool) (i : Nat) (γo : GName)
   subst h; unfold foffRow; iintro H; iexact H
 
 /-- What a publish owes the row of the descriptor it fills (Rocq
-`foff_row_of_ok`): the user half's invariant on the `FD_INODE` arm, nothing
-on the others; the state decides, and the state's shadow name IS the
-payload's. -/
-theorem foffRow_of_ok (inum : BitVec 32) (γo : GName) (γp : PipeNames) (C : FContent) (st : FdState)
-    (hok : fdstateOk inum γo γp C st) :
-    (if C.type = FD_INODE then offUserInv (GF := GF) γo else iprop(True)) ⊢ foffRow st := by
+`foff_row_of_ok`): on the `FD_INODE` arm the ROW at the file's own mode
+(Rocq L2: the premise is `foff_row` at the mode, no longer `off_user_inv`),
+nothing on the others; the state decides, and the state's shadow name and
+mode ARE the payload's. -/
+theorem foffRow_of_ok (inum : BitVec 32) (γo : GName) (om : OffMode) (γp : PipeNames) (C : FContent) (st : FdState)
+    (hok : fdstateOk inum γo om γp C st) :
+    (if C.type = FD_INODE then foffRow (GF := GF) (.open true true (.inode 0 γo om)) else iprop(True)) ⊢
+      foffRow st := by
   cases st with
   | closed => unfold foffRow; iintro -; ipureintro; trivial
   | «open» r w t =>
     cases t with
     | pipe _ => unfold foffRow; iintro -; ipureintro; trivial
     | device mj => unfold foffRow; iintro -; ipureintro; trivial
-    | inode n g om =>
+    | inode n g m =>
       obtain ⟨-, -, ht, -, hg, hom⟩ := hok
       subst hg; subst hom
       rw [if_pos ht]
-      unfold foffRow; iintro H; iexact H
+      cases m <;> (unfold foffRow; iintro H; iexact H)
 
 /-- The rows of a table (Rocq `foff_rows`). -/
 def foffRows (sts : List FdState) : IProp GF := [∗list] st ∈ sts, foffRow st

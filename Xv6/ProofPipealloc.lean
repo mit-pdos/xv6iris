@@ -714,12 +714,12 @@ theorem pa_success (IL : INITLOCK) (cpu c : CPU) (k : KCtx) (γ : FileNames) (γ
   -- the two files, each owning one end
   iapply wpLoop_bupd
   ihave Hp0 := (show filePaySt (GF := GF) γ k0 1 C0 .closed ⊢
-      ∃ pn : FPNames, ⌜fdstateOk pn.inum pn.ooff pn.pipe C0 .closed⌝ ∗ fpayTok γ k0 1 pn ∗ fileCore k0 1 pn C0 from by
+      ∃ pn : FPNames, ⌜fdstateOk pn.inum pn.ooff pn.om pn.pipe C0 .closed⌝ ∗ fpayTok γ k0 1 pn ∗ fileCore k0 1 pn C0 from by
     unfold filePaySt; iintro H; iexact H) $$ Hp0
   icases Hp0 with ⟨%pn0, %hok0, Ht0, Hc0x⟩
   icases (fileCore_none k0 1 pn0 C0 hok0).1 $$ Hc0x with ⟨Hi0, Ho0⟩
   ihave Hp1 := (show filePaySt (GF := GF) γ k1 1 C1 .closed ⊢
-      ∃ pn : FPNames, ⌜fdstateOk pn.inum pn.ooff pn.pipe C1 .closed⌝ ∗ fpayTok γ k1 1 pn ∗ fileCore k1 1 pn C1 from by
+      ∃ pn : FPNames, ⌜fdstateOk pn.inum pn.ooff pn.om pn.pipe C1 .closed⌝ ∗ fpayTok γ k1 1 pn ∗ fileCore k1 1 pn C1 from by
     unfold filePaySt; iintro H; iexact H) $$ Hp1
   icases Hp1 with ⟨%pn1, %hok1, Ht1, Hc1x⟩
   icases (fileCore_none k1 1 pn1 C1 hok1).1 $$ Hc1x with ⟨Hi1, Ho1⟩

@@ -180,9 +180,9 @@ def fstatStInode (st : FdState) : Prop :=
   | .open _ _ (.device _) => True
 
 /-- The two readings agree on an honest state (`fdstateOk_type`). -/
-theorem fstatHasInode_st (inum : BitVec 32) (γo : GName) (γp : PipeNames) (C : FContent) (st : FdState)
-    (h : fdstateOk inum γo γp C st) : fstatHasInode C ↔ fstatStInode st := by
-  have ht := fdstateOk_type inum γo γp C st h
+theorem fstatHasInode_st (inum : BitVec 32) (γo : GName) (om : OffMode) (γp : PipeNames) (C : FContent) (st : FdState)
+    (h : fdstateOk inum γo om γp C st) : fstatHasInode C ↔ fstatStInode st := by
+  have ht := fdstateOk_type inum γo om γp C st h
   unfold fstatHasInode fstatStInode
   rw [ht]
   cases st with

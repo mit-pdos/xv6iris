@@ -428,19 +428,22 @@ theorem sys_open_publish [Icfg] [CurCtx] (E : CoPset) (γ : FileNames) (kf kk : 
       inodeShrHeldGen (ientry kk) s g inum ∗ ityShot g ty ∗
       frefTok γ kf 1 ∗ fileFieldsAt curCtx kf 1 C ∗ fpayTok γ kf 1 pn ∗
       (if C.type = FD_INODE then offFd kf 1 γb γo C else offFree kf 1) ⊢
-      |={E}=> ∃ st : FdState, ⌜fdstateOk inum γo pn.pipe C st⌝ ∗ fileRef γ kf 1 st := by
+      |={E}=> ∃ st : FdState, ⌜fdstateOk inum γo .parked pn.pipe C st⌝ ∗ fileRef γ kf 1 st := by
   iintro ⟨Hkeep, Hru, Hs, #Hshot, Href, Hflds, Hnames, Hcoff⟩
   imod inodePay_alloc E kk s g lo inum C.type (fcWbool C) ty hkk hinb hipos
     (sys_open_pay_witness om ty C hwrb hdir) hdvw $$ [Hkeep Hru Hs Hshot] with ⟨%gx, Hpay⟩
   · iframe Hkeep Hru Hs Hshot
-  let pn' : FPNames := { pn with icv := gx, iq := s, ig := g, inum := inum, obox := γb, ooff := γo }
+  -- THE PUBLISH MINTS THE FILE'S OFFSET MODE (Rocq L2's `so_publish`): mode
+  -- park, today; relaxing it to the caller's mode is L4
+  let pn' : FPNames :=
+    { pn with icv := gx, iq := s, ig := g, inum := inum, obox := γb, ooff := γo, om := .parked }
   imod fpayTok_update γ kf pn pn' $$ Hnames with Hnames
   have hnp : C.type ≠ FD_PIPE := by
     rcases hty with h | h <;> rw [h] <;> decide
   let stpub : FdState :=
     if C.type = FD_INODE then .open rb wb (.inode inum.toNat γo .parked)
     else .open rb wb (.device C.major.toNat)
-  have hok : fdstateOk inum γo pn.pipe C stpub := by
+  have hok : fdstateOk inum γo .parked pn.pipe C stpub := by
     rcases hty with h | h
     · have e : stpub = .open rb wb (.inode inum.toNat γo .parked) := if_pos h
       rw [e]

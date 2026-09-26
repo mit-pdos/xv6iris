@@ -39,11 +39,11 @@ variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [Fdslot
 `fdstate_ok_inode` / `_device` rewrite of `fileclose_env`). -/
 theorem fc_env_fs [Fscfg] [Icfg] [CurCtx] (Γ : SchedNames) (j : Nat) (p : BitVec 64)
     (γkl : GName) (γk : KmemNames) (on : Option Nat) (st : FdState)
-    (inum : BitVec 32) (γo : GName) (γp : PipeNames) (C : FContent) (hok : fdstateOk inum γo γp C st)
+    (inum : BitVec 32) (γo : GName) (om : OffMode) (γp : PipeNames) (C : FContent) (hok : fdstateOk inum γo om γp C st)
     (hfs : C.type = FD_INODE ∨ C.type = FD_DEVICE) :
     (filecloseEnv (hlc := hlc) (GF := GF) Γ j p γkl γk on st ⊢ filecloseFsEnv (hlc := hlc) Γ j p) ∧
       (filecloseFsOut (GF := GF) ⊢ filecloseEnvOut γk on st) := by
-  have hty := fdstateOk_type _ _ _ _ _ hok
+  have hty := fdstateOk_type _ _ _ _ _ _ hok
   cases st with
   | closed =>
     simp only [fdTypeCode] at hty
@@ -68,7 +68,7 @@ theorem fc_disp (PC : PIPECLOSE) (BO : BEGIN_OP) (IP : IPUT) (EO : END_OP)
     (spie spp : Bool) (R R4 : RegMap)
     (hK : filecloseSlots ≤ k.avail) (hnoff : k.noff = 0) (hlocks : k.locks = [])
     (htier : k.tier = KTier.kpt)
-    (hok2 : fdstateOk pn.inum pn.ooff pn.pipe C st)
+    (hok2 : fdstateOk pn.inum pn.ooff pn.om pn.pipe C st)
     (hpinr : k.sie = false ∨ k.proc = 0#64 → cr = cpu)
     (hR2 : R 2#5 = k.regs 2#5 + 0xFFFFFFFFFFFFFFC0#64) (hpins : faPins k R)
     (e2 : R4 2#5 = R 2#5) (e18 : R4 18#5 = BitVec.signExtend 64 C.type)
@@ -103,7 +103,7 @@ theorem fc_disp (PC : PIPECLOSE) (BO : BEGIN_OP) (IP : IPUT) (EO : END_OP)
   k_step_gen (wp_s_addi cr _ (KA.«fileclose» + 0x54#64) true 1#12 15#5 0#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c1 hp1
   iintro Hk Hpc
-  have hty := fdstateOk_type _ _ _ _ _ hok2
+  have hty := fdstateOk_type _ _ _ _ _ _ hok2
   by_cases hfs : C.type = FD_INODE ∨ C.type = FD_DEVICE
   · -- FD_INODE / FD_DEVICE: beq not taken ; addiw a5,s2,-2 ; li a4,1 ; bgeu taken -> +0xaa
     have hty' := hfs
@@ -125,7 +125,7 @@ theorem fc_disp (PC : PIPECLOSE) (BO : BEGIN_OP) (IP : IPUT) (EO : END_OP)
     ihave Hte := trapCsrsExt_move _ _ _ (fun h => hpin5 (Or.inl h)) $$ Hte
     ihave Hce := cpuClaimExt_move _ _ _ _ (fun h => hpin5 (Or.inl h)) $$ Hce
     ihave Hnext := fc_next_shift k cpu c5 _ hpin5 $$ Hnext
-    obtain ⟨henv, hout⟩ := fc_env_fs (hlc := hlc) (GF := GF) Γ j k.proc γkl γk on st pn.inum pn.ooff pn.pipe C hok2 hfs
+    obtain ⟨henv, hout⟩ := fc_env_fs (hlc := hlc) (GF := GF) Γ j k.proc γkl γk on st pn.inum pn.ooff pn.om pn.pipe C hok2 hfs
     ihave Henv := henv $$ Henv
     unfold filecloseFsEnv
     icases Henv with ⟨%hpj, %hj, #Hpi, #Hrdy, Hbs⟩
@@ -301,7 +301,7 @@ theorem fc_last (RE : RELEASE) (PC : PIPECLOSE) (BO : BEGIN_OP) (IP : IPUT) (EO 
     (Ls : Nat → List (Nat × Qp))
     (hwf : k.wf) (hK : filecloseSlots ≤ k.avail) (hnoff : k.noff = 0) (hlocks : k.locks = [])
     (htier : k.tier = KTier.kpt)
-    (hok2 : fdstateOk pn.inum pn.ooff pn.pipe C st)
+    (hok2 : fdstateOk pn.inum pn.ooff pn.om pn.pipe C st)
     (spie spp : Bool)
     (hpin : k.sie = false ∨ k.proc = 0#64 → c = cpu)
     (R : RegMap) (h9 : R 9#5 = fnode kk) (hR2 : R 2#5 = k.regs 2#5 + 0xFFFFFFFFFFFFFFC0#64)
