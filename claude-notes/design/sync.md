@@ -38,16 +38,33 @@ on success.  Today every file line has one (`REcho 2`, `RFSilent`,
 §5 unraised the same way.  So the silent alternative leaves the MODEL, not
 just the proofs.
 
-**No real execution reaches it.**  sh prints the next `$ ` after `wait`,
-ignoring the status, so the question is which child deaths print nothing on
-the console: `argv[0] == 0` (`sh.c:77`) and `cmd == 0` (`:68`) are
-unreachable at a non-empty admissible line; exec failure and fork failure
-print; a kill needs a `kill` caller (none in the union; the taint covers
-it); an unexpected trap prints on the KERNEL UART (not the theorem's) and
-kills, but a verified program faults nowhere and exec allocates the stack
-eagerly (`exec.c:91`), so the lazy-`vmfault` OOM kill is unreachable.  The
-silent alternative is proof convenience (RULING HOLD-POS) standing on an
-unreachable `sh.c` branch.
+**A real execution DOES reach it: the child's out-of-memory death in
+`parsecmd`.**  sh parses in the CHILD (`sh.c:172`, `runcmd(parsecmd(cmd))`);
+`parsecmd`'s constructors `malloc` and `memset` the result unchecked
+(`sh.c:206-207`, …); `malloc` returns NULL when `sbrk` fails
+(`umalloc.c:54-56`, `growproc`'s `kalloc` can fail), the store to NULL
+faults, and `usertrap` prints on the KERNEL UART (not the theorem's) and
+kills.  sh then prints `$ ` after `wait`, ignoring the status.  So "the
+command did not run and the console shows only the prompt" is an HONEST
+outcome at every forked line (`UkShMalloc.v`'s header: no caller can wish
+the NULL away), and the proofs' left payload arm (`Wc I 3`, "died at the
+null store") is exactly it.  Consequences: the within-era `echo a > f; echo
+b > f; cat f` -> `a` is admitted HONESTLY (the second child may die before
+its open), and a silent `/sync` cannot be told apart from a sync that never
+ran.  The other deaths are visible or unreachable: `argv[0] == 0`
+(`sh.c:77`) and `cmd == 0` (`:68`) at a non-empty line, exec and fork
+failure print, `kill` has no caller in the union (the taint covers it), and
+a verified program faults nowhere.  A BLANK line re-prompts in the parent
+(`sh.c:164`) with no fork; the proofs file it at the silent echo
+alternative of the parser's fallback line `LEcho []`.
+
+OWNER RULING PENDING on how to make a completed sync observable: (a)
+`/sync` prints after `sys_sync` returns (then the silent alternative stays,
+honest, and only `LSync`'s RAN alternative carries the floor); (b) sh
+checks `malloc` (an image change to sh and its parser proofs); (c) a
+memory-capacity argument refuting the OOM (kernel tier, the analogue of
+app-file.md's refused disk-capacity lane).  §2 below was written before
+this finding and is only needed under (b) or (c).
 
 ## 2. Removing it: every silent filing becomes the round's TRUE alternative
 

@@ -13,9 +13,20 @@ durability link.
   checkpoints (owner, 2026-09-26).
 - One lane at a time.
 
-## SY1 -- the silent alternative leaves the file lines
+## SY1 -- the silent alternative leaves the file lines (ON HOLD)
 
-- [ ] **SY1-map** (read-only): the exact consumer map of `lmh_noc` and of
+SY1-map DONE: the silent alternative is HONEST -- sh's child dies of OOM in
+`parsecmd` (malloc NULL, store fault, kernel-UART message) and sh prints
+`$ `; design §1.  Owner ruling pending between (a) `/sync` prints, (b) sh
+checks malloc, (c) a memory-capacity refutation.  The map's other findings,
+kept for whichever route needs them: the pad can use `lmh_exf` (ok/free/
+nopanic already); `uWcf0_of_pre_line_id` can file PEND at its own `a`
+(`lm_aprs`); the fork re-entry's whole-lend row is refutable inside
+`wp_kshf_fork_core` (its `r ≠ -1` is discarded there); `gprompt_dollar`'s
+settled arm is dead at the union; `gwc_line_of_blk0` is reached only under
+taint; `UnionDecU.u_canon_name` needs a non-merging pad output.
+
+- [x] **SY1-map** (read-only): the exact consumer map of `lmh_noc` and of
   (A)-(D) in design §2; which children pay `ushf_wq`'s left arm and why;
   whether the fork re-entry's whole-lend row is refutable; whether (C)/(D)
   are reached at the union or only by the pipeline/seccomp shapes.
