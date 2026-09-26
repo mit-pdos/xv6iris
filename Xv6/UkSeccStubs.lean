@@ -6,11 +6,12 @@ usys.S's three instructions (`c.li a7,N; ecall; c.jr ra`), walked once by
 `UkStub.stub_run` at seccomp's addresses, with the ecall the leaf of
 `UkSysP` (a parameter until UkRunSys/UkRunSecc are ported).
 
-Deviations from Rocq: `UkSeccDefs` deviations 1, 5; the stub laws are
+Deviations from Rocq: `UkSeccDefs` deviation 1; the stub laws are
 `UkStub`'s (`stub_of_text`, `exit_stub_of_text`) at seccomp's text; the
 number `Hpsok_free` section hypothesis is the premise `Hps`; the stub's
 return register file is `stubRet m N ret` (UkStub deviation 2); the
-seccomp leaf is `UkSysP.wpUkEcallSecc Tab Obl` (K3's vocabulary abstract).
+seccomp leaf is Rocq's exact shape `UkSysP.wpUkEcallSeccK utab tabLe` (K3's
+table view and `tab_le`).
 -/
 import Xv6.UkSeccDefs
 
@@ -95,15 +96,15 @@ theorem wp_ksecc_wait (UL : UK_LEAVES) (HS : UK_SYS_P)
 
 /-- **Rocq `wp_ksecc_seccomp_stub`**: seccomp(mask) @0x3f4 -- the stub's
 ecall is row 23 and the process leaves the verified tier into the
-obligation it is handed (`UkSeccDefs` deviation 5). -/
+slot family it is handed: every key at the mask `seccAll &&& a0` whose table
+is below the view (`UkSysP.seccObl tabLe`, Rocq's continuation verbatim). -/
 theorem wp_ksecc_seccomp_stub (UL : UK_LEAVES)
     (Hps : ∀ k : Int, freeNum k → UprogSG.psok (GF := GF) k)
-    (Tab : GName → List FdState → IProp GF) (Obl : UkNames GF → BitVec 64 → List FdState → IProp GF)
-    (HL : UkSysP.wpUkEcallSecc (hlc := hlc) Tab Obl)
+    (HL : UkSysP.wpUkEcallSeccK (hlc := hlc) (utab (GF := GF)) tabLe)
     (N : UkNames GF) (h : CPU) (m : RegMap) (avail : Nat) (v : List FdState) :
     ⊢ ukCode N.t User.Seccomp.code.byte -∗
       urun (hlc := hlc) N h m (BitVec.ofNat 64 User.Seccomp.Sym.«seccomp») avail -∗
-      Tab N.fd v -∗ Obl N (m.get 10#5) v -∗ wpLoop h := by
+      utab N.fd v -∗ UkSysP.seccObl (hlc := hlc) tabLe N (m.get 10#5) v -∗ wpLoop h := by
   iintro #Hc Hrun Htab Hobl
   ihave #HS := secc_stub_secc (hlc := hlc) UL N
   unfold stubLaw

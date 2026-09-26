@@ -38,18 +38,17 @@ variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CtokG GF] [SG : 
 
 /-- **Rocq `wp_ksecc_start`**: push, spill ra/s0, `jal main`. -/
 theorem wp_seccStart (UL : UK_LEAVES) (HM : SECC_MAIN)
-    (Tab : GName → List FdState → IProp GF) (Obl : UkNames GF → BitVec 64 → List FdState → IProp GF)
-    (HL : UkSysP.wpUkEcallSecc (hlc := hlc) Tab Obl)
+    (HL : UkSysP.wpUkEcallSeccK (hlc := hlc) (utab (GF := GF)) tabLe)
     (Hps : ∀ k : Int, freeNum k → UprogSG.psok (GF := GF) k)
     (N : UkNames GF) (h : CPU) (m : RegMap) (na n : Nat) (l v : List FdState) (szv c : Nat)
     (cs : ExtTreeSet GName compare)
     (ha0 : m.get 10#5 = BitVec.ofNat 64 na) (hna : na < 2 ^ 31) (hn : 32 ≤ n) :
     ⊢ □ (∀ s : Int, N.pay s) -∗ ukCode N.t User.Seccomp.code.byte -∗ seccWdep (hlc := hlc) N l -∗
-      seccUniv Obl v -∗ seccTabFork Tab l v -∗ ustd N.fd l -∗ usz N.s szv -∗ ucwd N.cwd c -∗ uch N.ch cs -∗
+      seccUniv (hlc := hlc) v -∗ ustdAt N.fd l v -∗ usz N.s szv -∗ ucwd N.cwd c -∗ uch N.ch cs -∗
       urun (hlc := hlc) N h m (BitVec.ofNat 64 User.Seccomp.Sym.«start») n -∗ wpLoop h := by
   obtain ⟨n', rfl⟩ : ∃ n', n = n' + 32 := ⟨n - 32, by omega⟩
   rw [show n' + 32 = 2 + (4 + (10 + (12 + (4 + n')))) by omega, show User.Seccomp.Sym.«start» = 0x96 from rfl]
-  iintro #Hq #Hc #Hwd #Hu #Htf Hstd Hsz Hcwd Hch Hrun
+  iintro #Hq #Hc #Hwd #Hu Hstd Hsz Hcwd Hch Hrun
   ihave %hstk := urun_stack N h m _ _ $$ Hrun
   obtain ⟨hal8, hroom⟩ := hstk
   -- 0x96  c.addi sp,sp,-16
@@ -100,14 +99,14 @@ theorem wp_seccStart (UL : UK_LEAVES) (HM : SECC_MAIN)
   iintro %h5 Hrun
   rw [show BitVec.ofNat 64 0x9e + BitVec.signExtend 64 0x1fff62#21 = BitVec.ofNat 64 User.Seccomp.Sym.«main»
     from by decide]
-  iapply HM.wp_seccMain Tab Obl HL Hps N h5 _ na n' l v szv c cs (by ureg; exact ha0) hna
-    $$ Hq Hc Hwd Hu Htf Hstd Hsz Hcwd Hch Hrun
+  iapply HM.wp_seccMain HL Hps N h5 _ na n' l v szv c cs (by ureg; exact ha0) hna
+    $$ Hq Hc Hwd Hu Hstd Hsz Hcwd Hch Hrun
 
 /-- **seccomp's `start` holds** (at the engine `UL`, over main's
 interface). -/
 theorem seccStart_holds (UL : UK_LEAVES) (HM : SECC_MAIN) : SECC_START :=
-  ⟨fun Tab Obl HL Hps N h m na n l v szv c cs ha0 hna hn =>
-    wp_seccStart UL HM Tab Obl HL Hps N h m na n l v szv c cs ha0 hna hn⟩
+  ⟨fun HL Hps N h m na n l v szv c cs ha0 hna hn =>
+    wp_seccStart UL HM HL Hps N h m na n l v szv c cs ha0 hna hn⟩
 
 end
 

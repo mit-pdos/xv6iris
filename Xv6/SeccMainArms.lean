@@ -12,7 +12,7 @@
 
 Deviations from Rocq: `UkSeccDefs` deviations 1-6; fprintf enters as its
 interface `SECC_FPRINTF`; the engine is `UL`, the ecall leaves `HS`
-(`UK_SYS_P`), the seccomp leaf `HL` (`UkSysP.wpUkEcallSecc Tab Obl`).
+(`UK_SYS_P`), the seccomp leaf `HL` (`UkSysP.wpUkEcallSeccK utab tabLe`).
 -/
 import Xv6.UkSeccStubs
 
@@ -260,15 +260,14 @@ theorem wp_ksecc_forkneg (UL : UK_LEAVES) (HS : UK_SYS_P) (HF : SECC_FPRINTF)
   iapply wp_ksecc_forkfail UL HS HF N h1 m n l $$ Hq Hc Hwd Hstd Hrun
 
 /-- **Rocq `wp_ksecc_child`**: a0 = 0, both branches fall through to the
-mask literal and `seccomp(mask)` -- there the child is the obligation at
-the literal (`UkSeccDefs` deviation 5). -/
+mask literal and `seccomp(mask)` -- and there the child is the universe
+(ROW 23, the one place the literal enters: `UkSeccDefs.seccUniv_obl`). -/
 theorem wp_ksecc_child (UL : UK_LEAVES)
     (Hps : ∀ k : Int, freeNum k → UprogSG.psok (GF := GF) k)
-    (Tab : GName → List FdState → IProp GF) (Obl : UkNames GF → BitVec 64 → List FdState → IProp GF)
-    (HL : UkSysP.wpUkEcallSecc (hlc := hlc) Tab Obl)
+    (HL : UkSysP.wpUkEcallSeccK (hlc := hlc) (utab (GF := GF)) tabLe)
     (N : UkNames GF) (h : CPU) (m : RegMap) (avail : Nat) (v : List FdState)
     (hpay : N.pay = fun _ => iprop(True)) (ha0 : m.get 10#5 = 0#64) :
-    ⊢ ukCode N.t User.Seccomp.code.byte -∗ seccUniv Obl v -∗ Tab N.fd v -∗
+    ⊢ ukCode N.t User.Seccomp.code.byte -∗ seccUniv (hlc := hlc) v -∗ utab N.fd v -∗
       urun (hlc := hlc) N h m (BitVec.ofNat 64 0x16) avail -∗ wpLoop h := by
   iintro #Hc #Hu Htab Hrun
   -- 0x16  bltz a0 -- not taken
@@ -317,10 +316,8 @@ theorem wp_ksecc_child (UL : UK_LEAVES)
   let m5 := ukWr (ukWr (ukWr m 10#5 (ukUtypeVal .LUI (BitVec.ofNat 64 0x1c) 0xffe18#20)) 10#5
     User.Seccomp.seccMaskLit) 1#5 (BitVec.ofNat 64 0x24 + instrLen false)
   have h5a0 : m5.get 10#5 = User.Seccomp.seccMaskLit := by ureg
-  unfold seccUniv
-  ihave Hobl := Hu $$ %N []
-  · ipureintro; exact hpay
-  iapply wp_ksecc_seccomp_stub UL Hps Tab Obl HL N h5 m5 avail v $$ Hc Hrun Htab
+  ihave Hobl := seccUniv_obl N v hpay $$ Hu
+  iapply wp_ksecc_seccomp_stub UL Hps HL N h5 m5 avail v $$ Hc Hrun Htab
   rw [h5a0]
   iexact Hobl
 

@@ -20,13 +20,13 @@ variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CtokG GF] [Uexec
 
 /-- **Rocq `wp_ksecc_start`**. -/
 def wpSeccStartBody : Prop :=
-  ∀ (Tab : GName → List FdState → IProp GF) (Obl : UkNames GF → BitVec 64 → List FdState → IProp GF),
-    UkSysP.wpUkEcallSecc (hlc := hlc) Tab Obl → (∀ k : Int, freeNum k → UprogSG.psok (GF := GF) k) →
+    UkSysP.wpUkEcallSeccK (hlc := hlc) (utab (GF := GF)) tabLe →
+    (∀ k : Int, freeNum k → UprogSG.psok (GF := GF) k) →
     ∀ (N : UkNames GF) (h : CPU) (m : RegMap) (na n : Nat) (l v : List FdState) (szv c : Nat)
       (cs : ExtTreeSet GName compare),
     m.get 10#5 = BitVec.ofNat 64 na → na < 2 ^ 31 → 32 ≤ n →
     ⊢ □ (∀ s : Int, N.pay s) -∗ ukCode N.t User.Seccomp.code.byte -∗ seccWdep (hlc := hlc) N l -∗
-      seccUniv Obl v -∗ seccTabFork Tab l v -∗ ustd N.fd l -∗ usz N.s szv -∗ ucwd N.cwd c -∗ uch N.ch cs -∗
+      seccUniv (hlc := hlc) v -∗ ustdAt N.fd l v -∗ usz N.s szv -∗ ucwd N.cwd c -∗ uch N.ch cs -∗
       urun (hlc := hlc) N h m (BitVec.ofNat 64 User.Seccomp.Sym.«start») n -∗ wpLoop h
 
 end

@@ -112,3 +112,11 @@ Collected from the U0 agent reports (Sept 26 2026). Each item names the lane tha
 - ExecEntry, ExecBundle, PinnedExec's `pobs_node_id` / `pinned_exec_bundle_boot(_at)`: need K3's seccomp key.
 - FileName.lean / UNamePath.lean still say PENDING for items now in FileNamePins / UNamePathCat — update their
   headers when convenient.
+
+## Exec entries (lane U1-T-exec, landed) — follow-ups
+- P-init analogue of the P-secc follow-up: move init's walks off the pre-K3 heads in UkInitDefs
+  (`kinitHeadL` & co.) onto UInitFdHead's `ufdHead*` at the table view.
+- `urun_rows` lend (K4) in `udepwAtRefR` / the exec supply: one extra persistent premise when K4 lands.
+- Seccomp's printing arms still on the plain ledger `ustd` (UkSeccDefs dev 4) until the write leaf is ported.
+- Stale headers to point at the new files: ExecRun "DEFERRED", UInitFd/UConsOpen "not ported yet",
+  UkSeccLit "pending K3". The rest of `UexecSecc` must import UexecSeccMasked (seccB/seccMasked).

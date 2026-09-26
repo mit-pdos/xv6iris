@@ -4,15 +4,16 @@
 
 The frame (push 4, spill ra/s0), argc's test (`bge a5,a0` at a5 = 1: the
 usage arm at 0x4c), the spill of s1 and `mv s1,a1`, the call to fork's stub
-(`c.li a7,1; ecall; c.jr ra`, the ecall `UkFork.wp_uk_ecall_fork` at the
-payload `ukCode` -- the text crosses the fork, `secc_forkable_code`), and
-the three arms at 0x16 (`SeccMainArms`).
+(`c.li a7,1; ecall; c.jr ra`, the ecall the view-keeping
+`UkFork.wp_uk_ecall_fork_at` at the payload `ukCode` -- the text crosses the
+fork, `secc_forkable_code`), and the three arms at 0x16 (`SeccMainArms`).
 
 Deviations from Rocq: as `SpecSeccMain`; the fork's payload row is the
 trivial one (`Q := True`, the kill price `□ (uKillCred -∗ True)`, UkFork
 deviation 5); nothing is lent (`Rc := emp`) and no descriptor handle
-crosses (`D := ∅`).  The child's table is `seccTabFork`'s (UkSeccDefs
-deviation 5).
+crosses (`D := ∅`).  The child's table view `utab N'.fd v` is read off the
+fork leaf's `ustdAt` (Rocq's `iDestruct "Hstd'" as "[_ Htab]"`); the
+diagnostic arms take the plain ledger (`UkSeccDefs` deviation 4).
 -/
 import Xv6.SpecSeccMain
 import Xv6.SeccMainArms
@@ -62,18 +63,17 @@ variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CtokG GF] [SG : 
 
 /-- **Rocq `wp_ksecc_main`**. -/
 theorem wp_seccMain (UL : UK_LEAVES) (HS : UK_SYS_P) (HF : SECC_FPRINTF)
-    (Tab : GName → List FdState → IProp GF) (Obl : UkNames GF → BitVec 64 → List FdState → IProp GF)
-    (HL : UkSysP.wpUkEcallSecc (hlc := hlc) Tab Obl)
+    (HL : UkSysP.wpUkEcallSeccK (hlc := hlc) (utab (GF := GF)) tabLe)
     (Hps : ∀ k : Int, freeNum k → UprogSG.psok (GF := GF) k)
     (N : UkNames GF) (h : CPU) (m : RegMap) (na n : Nat) (l v : List FdState) (szv c : Nat)
     (cs : ExtTreeSet GName compare)
     (ha0 : m.get 10#5 = BitVec.ofNat 64 na) (hna : na < 2 ^ 31) :
     ⊢ □ (∀ s : Int, N.pay s) -∗ ukCode N.t User.Seccomp.code.byte -∗ seccWdep (hlc := hlc) N l -∗
-      seccUniv Obl v -∗ seccTabFork Tab l v -∗ ustd N.fd l -∗ usz N.s szv -∗ ucwd N.cwd c -∗ uch N.ch cs -∗
+      seccUniv (hlc := hlc) v -∗ ustdAt N.fd l v -∗ usz N.s szv -∗ ucwd N.cwd c -∗ uch N.ch cs -∗
       urun (hlc := hlc) N h m (BitVec.ofNat 64 User.Seccomp.Sym.«main») (4 + (10 + (12 + (4 + n)))) -∗
       wpLoop h := by
   rw [show User.Seccomp.Sym.«main» = 0x0 from rfl]
-  iintro #Hq #Hc #Hwd #Hu #Htf Hstd Hsz Hcwd Hch Hrun
+  iintro #Hq #Hc #Hwd #Hu Hstd Hsz Hcwd Hch Hrun
   ihave %hstk := urun_stack N h m _ _ $$ Hrun
   obtain ⟨hal8, hroom⟩ := hstk
   -- 0x0  c.addi sp,sp,-32
@@ -150,6 +150,7 @@ theorem wp_seccMain (UL : UK_LEAVES) (HS : UK_SYS_P) (HF : SECC_FPRINTF)
     inext
     iintro - %h7 Hrun
     rw [ukPc 0x4c 0x4e true rfl]
+    ihave Hstd := ustdAt_ustd N.fd l v $$ Hstd
     iapply wp_ksecc_usage UL HS HF N h7 m3 n l $$ Hq Hc Hwd Hstd Hrun
   -- ARGUMENTS: 0xe  c.sdsp s1,8(sp)
   rw [if_neg (by simp [hle]), ukPc 0xa 0xe false rfl]
@@ -186,8 +187,8 @@ theorem wp_seccMain (UL : UK_LEAVES) (HS : UK_SYS_P) (HF : SECC_FPRINTF)
   ihave Hi := secc_uis N.t 0x346 false (.ECALL ()) ⟨_, _, _, rfl⟩ (by decide) (by decide) $$ Hc
   have hn : (BitVec.extractLsb' 0 32 ((ukWr mf 17#5 (BitVec.ofInt 64 1)) 17#5)).toInt = USYS_fork :=
     secc_usysno mf 1 (by decide)
-  iapply wp_uk_ecall_fork UL N h10 (ukWr mf 17#5 (BitVec.ofInt 64 1)) (BitVec.ofNat 64 (0x344 + 2))
-    (10 + (12 + (4 + n))) szv l ∅ c cs (fun _ => iprop(True)) iprop(emp)
+  iapply wp_uk_ecall_fork_at UL N h10 (ukWr mf 17#5 (BitVec.ofInt 64 1)) (BitVec.ofNat 64 (0x344 + 2))
+    (10 + (12 + (4 + n))) szv l ∅ c v cs (fun _ => iprop(True)) iprop(emp)
     (fun γt _ _ => ukCode γt User.Seccomp.code.byte) hn (by decide)
     $$ Hi [] Hc Hsz Hstd [] Hcwd Hch [] Hrun
   · iempintro
@@ -208,7 +209,8 @@ theorem wp_seccMain (UL : UK_LEAVES) (HS : UK_SYS_P) (HF : SECC_FPRINTF)
     rw [show retPc ((ukWr (ukWr mf 17#5 (BitVec.ofInt 64 1)) 10#5 r).get 1#5) = BitVec.ofNat 64 0x16
       from by ureg <;> decide]
     icases Harm with (⟨%hm1, -, -⟩ | ⟨%γ, %pidv, %hrp, %hrng, -, -, Hch⟩)
-    · iapply wp_ksecc_forkneg UL HS HF N h'' _ n l (by ureg; exact hm1) $$ Hq Hc Hwd Hstd Hrun
+    · ihave Hstd := ustdAt_ustd N.fd l v $$ Hstd
+      iapply wp_ksecc_forkneg UL HS HF N h'' _ n l (by ureg; exact hm1) $$ Hq Hc Hwd Hstd Hrun
     · iapply wp_ksecc_parent UL HS Hps N h'' _ _ pidv _ hrng (by ureg; exact hrp) $$ Hq Hc Hch Hrun
   · -- THE CHILD
     iintro %N' %h' %γ' %hpq - - #Hc' - Hstd' - - - - Hrun
@@ -219,16 +221,15 @@ theorem wp_seccMain (UL : UK_LEAVES) (HS : UK_SYS_P) (HF : SECC_FPRINTF)
     iintro %h'' Hrun
     rw [show retPc ((ukWr (ukWr mf 17#5 (BitVec.ofInt 64 1)) 10#5 0#64).get 1#5) = BitVec.ofNat 64 0x16
       from by ureg <;> decide]
-    unfold seccTabFork
-    ihave Htab := Htf $$ %N' [] Hstd'
-    · ipureintro; exact hpq
-    iapply wp_ksecc_child UL Hps Tab Obl HL N' h'' _ _ v hpq (by ureg) $$ Hc' Hu Htab Hrun
+    unfold ustdAt
+    icases Hstd' with ⟨-, Htab⟩
+    iapply wp_ksecc_child UL Hps HL N' h'' _ _ v hpq (by ureg) $$ Hc' Hu Htab Hrun
 
 /-- **seccomp's `main` holds** (at the engine `UL`, the ecall leaves `HS`,
 over fprintf's interface). -/
 theorem seccMain_holds (UL : UK_LEAVES) (HS : UK_SYS_P) (HF : SECC_FPRINTF) : SECC_MAIN :=
-  ⟨fun Tab Obl HL Hps N h m na n l v szv c cs ha0 hna =>
-    wp_seccMain UL HS HF Tab Obl HL Hps N h m na n l v szv c cs ha0 hna⟩
+  ⟨fun HL Hps N h m na n l v szv c cs ha0 hna =>
+    wp_seccMain UL HS HF HL Hps N h m na n l v szv c cs ha0 hna⟩
 
 end
 

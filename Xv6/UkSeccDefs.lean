@@ -38,21 +38,20 @@ THE CHILD LEAVES THE VERIFIED TIER AT ROW 23 (Rocq ruling G1): after
    conclusion (at `ustd l`, deviation 4), so `ksecc_wb_cons` is its
    instance and the write stub's walk moves to whoever discharges
    `seccWdep` (the entry, with K3's write leaf).
-4. **The ledger is `ustd`** (pre-K3, `UkFork` deviation 4): Rocq's
-   `ustd_at (ukn_fd N) l v` is `ustd N.fd l`.
-5. **K3's vocabulary is abstract** (`UkSysP` deviation 3): the table view
-   `utab γfd v` is a parameter `Tab`, and the seccomp leaf's post obligation
-   (`∀ W, ⌜uvis_secc W = secc_all &&& a0⌝ -∗ ⌜tab_le (uvis_fd W) v⌝ -∗
-   my_pay (uvis_gen W) (ukn_pay N) -∗ uslot W`) a parameter `Obl`.  Hence:
-   * `secc_univ v` (Rocq: the slot family at every MASKED key) is
-     `seccUniv Obl v`, the obligation AT THE LITERAL MASK (`seccMaskLit`) at
-     every trivially-paid record: Rocq's step from the family to the
-     obligation is `UkSeccLit.secc_mask_masked` over `uvis_secc`, K3's.
-   * the child's table: Rocq's fork leaf (`wp_uk_ecall_fork_at` at
-     `ustd_at l v`) hands the child the parent's VIEW, and the child's arm
-     reads `utab` off it.  Lean's fork leaf is pre-K3 (the child gets `ustd
-     l`), so the child's `Tab N'.fd v` is a premise of main,
-     `seccTabFork Tab l v`, which K3's fork leaf retires.
+4. **The diagnostic arms' ledger is `ustd`** (pre-K3 write leaf): main
+   takes Rocq's `ustd_at (ukn_fd N) l v` and forks at it
+   (`UkFork.wp_uk_ecall_fork_at`), but `seccWdep` / `kseccWb` and the arms
+   that print (usage, fork failure) carry the plain `ustd N.fd l`
+   (`ustdAt_ustd` forgets the view where main hands it to them), until the
+   write leaf `UkRunSys.wp_uk_ecall_write_at` is ported.
+5. (Retired, P-secc follow-up after K3.)  `seccUniv v` is Rocq's
+   `secc_univ v` verbatim (a slot at every MASKED key -- `seccMasked`,
+   `UexecSeccMasked` -- whose table is below the view, at the trivial
+   payload); the seccomp leaf is `UkSysP.wpUkEcallSeccK utab tabLe` (Rocq's
+   exact shape at K3's view and `tab_le`); the literal enters at ROW 23
+   through `seccMask_masked` (Rocq `UkSeccLit.secc_mask_masked`), in
+   `seccUniv_obl`; and the child's `utab N'.fd v` is read off the fork
+   leaf's `ustdAt` (the old `seccTabFork` premise is gone).
 6. `Z` ↦ `Nat`/`Int`; the pid lemmas are stated at `BitVec 32` (the fork
    leaf's `pidv`).
 -/
@@ -61,6 +60,7 @@ import Xv6.UkRunMem
 import Xv6.UkRunBr
 import Xv6.UkSysP
 import Xv6.UkSeccLit
+import Xv6.UexecSeccMasked
 import Xv6.User.SeccompText
 
 namespace Xv6
@@ -227,23 +227,32 @@ instance seccWdep_persistent (N : UkNames GF) (l : List FdState) :
     Persistent (seccWdep (hlc := hlc) N l) := by
   unfold seccWdep; infer_instance
 
-/-- **Rocq `secc_univ`** (deviation 5): the obligation at the literal mask,
-at every record whose payload is the trivial one. -/
-def seccUniv (Obl : UkNames GF → BitVec 64 → List FdState → IProp GF) (v : List FdState) : IProp GF :=
-  iprop(□ ∀ N : UkNames GF, ⌜N.pay = fun _ => iprop(True)⌝ -∗ Obl N User.Seccomp.seccMaskLit v)
+/-- **Rocq `secc_univ`**: THE UNIVERSE AT A TABLE VIEW -- a slot at every
+masked key whose table is bounded by the view, at the trivial payload. -/
+def seccUniv (v : List FdState) : IProp GF :=
+  iprop(□ ∀ W : Uvis, ⌜seccMasked W.secc⌝ -∗ ⌜tabLe W.fd v⌝ -∗
+    myPay W.gen (fun _ => iprop(True)) -∗ uslot (hlc := hlc) W)
 
-instance seccUniv_persistent (Obl : UkNames GF → BitVec 64 → List FdState → IProp GF) (v : List FdState) :
-    Persistent (seccUniv Obl v) := by
+/-- Rocq `secc_univ_persistent`. -/
+instance seccUniv_persistent (v : List FdState) : Persistent (seccUniv (hlc := hlc) (GF := GF) v) := by
   unfold seccUniv; infer_instance
 
-/-- The child's table view across the fork (deviation 5; Rocq reads it off
-`wp_uk_ecall_fork_at`'s `ustd_at`). -/
-def seccTabFork (Tab : GName → List FdState → IProp GF) (l v : List FdState) : IProp GF :=
-  iprop(□ ∀ N : UkNames GF, ⌜N.pay = fun _ => iprop(True)⌝ -∗ ustd N.fd l -∗ Tab N.fd v)
+/-- **Rocq `UkSeccLit.secc_mask_masked`**: THE ONE PLACE THE BINARY'S
+LITERAL ENTERS -- ANDed into the full mask, it clears all six numbers. -/
+theorem seccMask_masked : seccMasked (seccAll &&& User.Seccomp.seccMaskLit) := by
+  unfold seccMasked seccB seccAll
+  decide
 
-instance seccTabFork_persistent (Tab : GName → List FdState → IProp GF) (l v : List FdState) :
-    Persistent (seccTabFork Tab l v) := by
-  unfold seccTabFork; infer_instance
+/-- ROW 23 at the literal (Rocq `wp_ksecc_child`'s last step): the universe
+pays the seccomp leaf's post obligation at the mask `seccMaskLit`, at a
+trivially-paid record. -/
+theorem seccUniv_obl (N : UkNames GF) (v : List FdState) (hpay : N.pay = fun _ => iprop(True)) :
+    ⊢ seccUniv (hlc := hlc) v -∗ UkSysP.seccObl (hlc := hlc) tabLe N User.Seccomp.seccMaskLit v := by
+  unfold seccUniv UkSysP.seccObl
+  rw [hpay]
+  iintro #Hu %W %hsc %hle Hmy
+  have hm : seccMasked W.secc := by rw [hsc]; exact seccMask_masked
+  iapply Hu $$ %W %hm %hle Hmy
 
 /-- **Rocq `ksecc_wb_cons`** (deviation 3). -/
 theorem ksecc_wb_cons (N : UkNames GF) (l : List FdState) (fdw : BitVec 64) (b : BitVec 8)

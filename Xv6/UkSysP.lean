@@ -33,8 +33,9 @@ the engine `UL`.
    abstract: `Tab` is Rocq's `utab`, `TabLe` its `tab_le`.  The number
    premise is the raw `usysno`: `urun` runs at `seccAll`, where the
    effective number `usysEff seccAll` is the raw one (`usysEff_seccAll`).
-   The walk (`UkSeccStubs`, `ProofSeccMain`) is generic in the obligation
-   (`wpUkEcallSecc Tab Obl`) and instantiated at `seccObl`.
+   The seccomp walk (`UkSeccStubs`, `SeccMainArms`, `ProofSeccMain`) takes
+   the leaf at `wpUkEcallSeccK utab tabLe` (K3's view and `tab_le`); the
+   generic `wpUkEcallSecc Tab Obl` is the shape it is stated through.
 4. Statuses: `uexitst m` is `(setWidth 32 a0).toInt` (Rocq
    `bv_signed (trunc32 a0)`); `uint a0 = 0` is `(m.get 10#5).toNat = 0`.
 -/

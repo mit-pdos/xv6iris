@@ -1585,3 +1585,10 @@ import Xv6.ExecRun
 import Xv6.ProofUser
 import Xv6.LinkSystemAdequacyClosed
 import Xv6.UkCatTree
+import Xv6.ExecEntry
+import Xv6.ExecBundle
+import Xv6.PinnedExecBundle
+import Xv6.ExecRunSup
+import Xv6.UInitFdHead
+import Xv6.UConsOpenAny
+import Xv6.UexecSeccMasked
