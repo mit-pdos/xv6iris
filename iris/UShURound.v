@@ -129,6 +129,12 @@ Require UkFileIface.
 Require UkFileEntries.
 Require FileDeltas.
 Require UShFileRedir.
+Require FsSeccPin.
+Require UexecSecc.
+Require UShSecc.
+Require UShExecPin.
+Require UkSeccEntry.
+Require LinkUserinit.            (* [UG.uexec_wp_gen]: the generic user WP *)
 Require Import CtxIdDefs.
 Local Open Scope Z_scope.
 Import Defs.
@@ -284,16 +290,90 @@ Lemma ucat_execfail_bytes (nm : list (bv 8)) :
   UkShDiagAt.ush_execfail_bytes FileDisc.alt_execcat (ucat_ws nm !!! 0%nat).
 Proof using. rewrite ucat_ws_head. exact ucat_execfail_bytes0. Qed.
 
+(* ---- the [seccomp x] line's words and bytes (seccomp lane S4) ---- *)
+Definition usecc_lp (ws : list (list (bv 8))) (g : nat -> bv 8) (k len : nat) : Prop :=
+  exists wsx : list (list (bv 8)),
+    ws = FileDisc.uline_ws (LSecc wsx) /\ UkSh.ush_line_at (LSecc wsx) g k len.
+
+Lemma usecc_ws_exec_ok (wsx : list (list (bv 8))) :
+  FileDisc.secc_ok wsx -> exec_ok (FileDisc.uline_ws (LSecc wsx)).
+Proof using.
+  intros Hok. pose proof (FileDisc.secc_ok_wf wsx Hok) as Hwf.
+  destruct Hok as (_ & _ & H10 & Hl). cbn [FileDisc.uline_ws].
+  split_and!; [exact Hwf | cbn [length]; lia | exact H10 | exact Hl].
+Qed.
+
+Lemma usecc_xline (wsx : list (list (bv 8))) (gb : nat -> bv 8) (len : nat) :
+  UkSh.ush_line_at (LSecc wsx) gb 0%nat len ->
+  UkShEcho.ush_xline_is (FileDisc.uline_ws (LSecc wsx)) gb 0%nat len.
+Proof using.
+  intros (Hu & Hlen & Hby). split; [exact (usecc_ws_exec_ok wsx Hu) |].
+  exact (conj Hlen Hby).
+Qed.
+
+(* its first byte is 's', not the 'c' of a [cd] *)
+Lemma usecc_lp0 (ws : list (list (bv 8))) (g : nat -> bv 8) (k len : nat) :
+  usecc_lp ws g k len -> bv_unsigned (g k) <> 99%Z.
+Proof using.
+  intros (wsx & _ & _ & Hlen & Hby).
+  assert (Hc7 : length FileDisc.cmd_seccomp = 7%nat) by (vm_compute; reflexivity).
+  assert (Hpos : (0 < len)%nat)
+    by (rewrite Hlen /FileDisc.line_bytes length_app /=; lia).
+  pose proof (Hby 0%nat Hpos) as H0. rewrite Nat.add_0_r in H0. rewrite H0.
+  rewrite /FileDisc.line_bytes /FileDisc.line_body /wl_body.
+  rewrite lookup_total_app_l; [| rewrite length_app; lia].
+  rewrite lookup_total_app_l; [| lia].
+  vm_compute. discriminate.
+Qed.
+
+Lemma usecc_lp_of_at (wsx : list (list (bv 8))) (f : nat -> bv 8) (k len : nat) :
+  UkSh.ush_line_at (LSecc wsx) f k len ->
+  usecc_lp (FileDisc.uline_ws (LSecc wsx)) (fun j : nat => f (k + j)%nat) 0%nat len.
+Proof using.
+  intros (Hu & Hlen & Hby). exists wsx. split; [reflexivity |].
+  split_and!; [exact Hu | exact Hlen |]. intros j Hj. exact (Hby j Hj).
+Qed.
+
+(* sh's [exec seccomp failed] *)
+Lemma usecc_execfail_bytes0 :
+  UkShDiagAt.ush_execfail_bytes FileDisc.alt_execsecc FileDisc.cmd_seccomp.
+Proof using.
+  rewrite /UkShDiagAt.ush_execfail_bytes. split_and!.
+  - vm_compute. lia.
+  - intros p Hp.
+    assert (Hl : (p < length FileDisc.alt_execsecc)%nat)
+      by (vm_compute in Hp |- *; lia).
+    exact (list_lookup_lookup_total_lt FileDisc.alt_execsecc p Hl).
+  - intros p Hp.
+    apply (UkShDiag.ush_bytes_of_forallb (UkShDiag.shd_lit 0x12b8)
+             (fun q : nat => FileDisc.alt_execsecc !!! q) 0%nat 5%nat);
+      [vm_compute; reflexivity | lia].
+  - intros j Hj.
+    assert (Hj7 : (j < 7)%nat) by (vm_compute in Hj; lia).
+    destruct j as [| [| [| [| [| [| [| j]]]]]]]; try lia; vm_compute; reflexivity.
+  - intros p Hp.
+    apply (UkShDiag.ush_bytes_of_forallb (UkShDiag.shd_lit 0x12b8)
+             (fun q : nat => FileDisc.alt_execsecc !!! (q + 5)%nat)
+             7%nat 8%nat);
+      [vm_compute; reflexivity | lia].
+Qed.
+
+Lemma usecc_execfail_bytes (wsx : list (list (bv 8))) :
+  UkShDiagAt.ush_execfail_bytes FileDisc.alt_execsecc
+    (FileDisc.uline_ws (LSecc wsx) !!! 0%nat).
+Proof using. exact usecc_execfail_bytes0. Qed.
+
 (* the union's admitted line shapes: the file's three, and the pipelines
    the union's admission lets through *)
 Definition ush_line_pipeU (p : producer) (n : list filt) : Prop :=
   adm_u_g (LPipes p n) = true /\ pl_ok (LPipes p n).
 
-(* a [seccomp] line is NOT among the loop's lines while the model's
-   seccomp knob is off ([UnionDisc.adm_s_off]; seccomp design section 3):
-   every round law cased on this predicate refutes the arm here *)
+(* a [seccomp x] line IS among the loop's lines now the model's seccomp
+   knob is on ([UnionDisc.adm_s_on]; seccomp lane S4): [uline_ok]'s
+   [secc_ok] already asks for a non-empty argument list, which is all the
+   knob admits *)
 Definition ush_line_union (l : uline) : Prop :=
-  match l with LPipe p n => ush_line_pipeU p n | LSecc _ => False | _ => True end.
+  match l with LPipe p n => ush_line_pipeU p n | _ => True end.
 
 Definition ush_line_upipe (l : uline) : Prop :=
   exists (p : producer) (n : list filt), l = LPipe p n /\ ush_line_pipeU p n.
@@ -337,6 +417,10 @@ Section UShURound.
   Context (s0 : fstate).
   Context (Hcons : @riscv_cons_res Σ (@riscv_fixedGS Σ _) = ucl ug).
   Context (Hkill : @app_taint Σ (@riscv_fixedGS Σ _) = file_taint (fgn_cl gf)).
+  (* the era credential at the union IS the era's wild token ([union_ifc]),
+     and the reader-side one is the open premise (seccomp design 10.12) *)
+  Context (Hwild : @riscv_wild Σ (@riscv_fixedGS Σ _) = usecc_tok ug).
+  Context (Hrdw : ush_rdwild_of_shape ug).
 
   Local Notation T := (file_taint (fgn_cl gf)).
   Local Notation FI := (union_link_inst_at ug s0).
@@ -801,6 +885,159 @@ Section UShURound.
   Qed.
 
   (* =================================================================== *)
+  (*  S2s  THE seccomp CHILD (seccomp lane S4)                            *)
+  (*                                                                     *)
+  (*  A [seccomp x] line is WILD: the lend the read left is the wild     *)
+  (*  shape (the clean arm's deed refutes the line, or is the taint).    *)
+  (*  The child execs /seccomp at the parent's ok view; the entry's Pay  *)
+  (*  is the era token (the union's [riscv_wild]), the reader-side       *)
+  (*  credential (the open premise [Hrdw]) and the rows the view         *)
+  (*  guarantees ([UexecSecc.ush_view_secc_rows]); every payload is the  *)
+  (*  shape's, and the exec-failed diagnostic goes through the licence.  *)
+  (* =================================================================== *)
+
+  (* the diagnostic through the era's licence, at any bytes *)
+  Lemma usecc_execfail_law (I : list (bv 8)) (dg : list (bv 8)) (n : nat) :
+    ⊢ UkShDiag.ush_execfail_law_at (PS := uprogSG_free) dg n
+        (useccomp_shape ug I) (useccomp_shape ug I).
+  Proof using Hcons.
+    rewrite /UkShDiag.ush_execfail_law_at.
+    iIntros "!>" (N l) "%Hfd2 #Hsh". destruct Hfd2 as [rb Hl2].
+    iExists (fun _ : nat => useccomp_shape ug I).
+    iSplitR; [iExact "Hsh" |]. iSplit.
+    - iIntros "!>" (p b) "%Hb %Hlt".
+      iApply (UShPanic.ksh_w1_of_step N _ _ l rb b Hl2).
+      iIntros "!>" (Φ) "_ HΦ".
+      iPoseProof "Hsh" as "[Htok _]".
+      iApply (union_write_link_wild ug Hcons (S gen_id) b Φ with "[Htok] [HΦ]").
+      + iApply (usecc_tok_of_at with "Htok").
+      + iApply "HΦ". iExact "Hsh".
+    - iIntros "!> H". iExact "H".
+  Qed.
+
+  (* ---- THE EXEC SUPPLY: [exec seccomp] at the parent's ok view ---- *)
+  Lemma usecc_exec_sup (I : list (bv 8)) (wsx : list (list (bv 8))) (vw : list fdstate) :
+    FileDisc.secc_ok wsx -> ush_view_ok vw ->
+    ⊢ udep (SG := uexecSG_xv6) (PS := uprogSG_free) -∗
+      UShExecPin.sh_secc_slot T -∗
+      useccomp_shape ug I -∗
+      UkShEcho.sh_exec_sup_echo_at_v (SG := uexecSG_xv6)
+        (ghost_varG0 := offbox_offG)
+        ucat_rows (FileDisc.uline_ws (LSecc wsx))
+        (fun _ : Z => UkShFork.ushf_wq Wcu I)
+        (useccomp_shape ug I) vw.
+  Proof using Hwild Hrdw.
+    intros Hok Hvok. iIntros "#Hdep #Hslot #Hsh".
+    iPoseProof LinkUserinit.UG.uexec_wp_gen as "#Hwp".
+    iAssert (□ (∀ s : Z, UkShFork.ushf_wq Wcu I))%I as "#HQ".
+    { iIntros "!>" (_). rewrite /UkShFork.ushf_wq. iRight.
+      iApply (uWcu_wild ug r s0 PT PD I 0%nat with "Hsh"). }
+    iApply (UShExecPin.sh_exec_sup_x_of_entry_v (ghost_varG0 := offbox_offG)
+              ucat_rows (FileDisc.uline_ws (LSecc wsx)) UShExecPin.secc_pl
+              FsSeccPin.era0_secc_pins [FsImg.ROOTINO; FsSeccPin.SECC_INO]
+              FsSeccPin.SECC_INO ElfUser.seccomp_elf T
+              (UkShFork.ushf_wq Wcu I) (useccomp_shape ug I) vw
+              (usecc_ws_exec_ok wsx Hok) eq_refl UShSecc.secc_elf_loadable
+              UShExecPin.sh_secc_pin_resolves with "[] [] Hslot").
+    - iIntros "!>" (M sa t gn sts cs pidv) "%Himg %Hbytes %Hlen %Hrows %Htab #Hnp".
+      destruct Hrows as (_ & _ & [rb2 Hr2]).
+      iPoseProof (UexecSecc.ush_view_secc_rows vw sts Hvok Htab) as "#Hrows".
+      iPoseProof (UkSeccEntry.secc_image_entry (ghost_varG0 := offbox_offG)
+                    (FileDisc.uline_ws (LSecc wsx)) M sa t gn sts FsImg.ROOTINO cs pidv
+                    (fun _ : Z => UkShFork.ushf_wq Wcu I) rb2
+                    (fun _ _ => Logic.I) (usecc_ws_exec_ok wsx Hok) Himg Hbytes Hlen Hr2
+                    with "HQ Hwp Hnp Hdep") as "He".
+      iApply (UShEchoPipePay.image_entry_pay_mono with "[] He").
+      iIntros "!> _". rewrite Hwild.
+      iSplitR; [iPoseProof "Hsh" as "[Htok _]"; iApply (usecc_tok_of_at with "Htok") |].
+      iSplitR; [iApply (Hrdw I with "Hsh") | iExact "Hrows"].
+    - iIntros "!> _". iApply "HQ".
+  Qed.
+
+  (* ---- THE seccomp CHILD'S LAW ---- *)
+  Lemma uHchild_secc :
+    ⊢ udep (SG := uexecSG_xv6) (PS := uprogSG_free) -∗
+      UShExecPin.sh_secc_slot T -∗
+      UkShFork.ushf_child_law_at (PS := uprogSG_free) (SG := uexecSG_xv6)
+        (ghost_varG0 := offbox_offG) T Wcu usecc_lp 68.
+  Proof using Hwild Hrdw Hkill Hcons.
+    iIntros "#Hdep #Hslot".
+    iPoseProof "Hslot" as "(#Hinv & _ & #Hgen)".
+    rewrite /UkShFork.ushf_child_law_at.
+    iIntros "!>" (N' h m dw dv sa len ws gb sz ld n I)
+      "%Hpeq %Hs1 %Hline %Hlws %Hfok %Hsa %Hs64 %Hs38 %Hszlo %Hszal %Hszok
+       %Hrows #Hcode #Hpcode #Hpro #Hjt Hstr Hwsp Hsy Hstd Hcwd Hch _ HM Hcr
+       Hrun".
+    iDestruct (UserChildren.uch_any_of with "Hch") as "Hch".
+    destruct Hline as (wsx & -> & Hlat).
+    pose proof (proj1 Hlat) as Hsok.
+    (* ---- the line, off the fork's words ---- *)
+    assert (Hul : ul I = LSecc wsx).
+    { rewrite ul_lastbody.
+      destruct (FileDisc.fline_ok_secc_words (UkSh.ush_lastbody I) wsx Hfok) as [_ Hb].
+      { rewrite -(last_ws_lastbody I). symmetry. exact Hlws. }
+      rewrite Hb. exact (uline_of_u_secc wsx Hsok). }
+    assert (Hw : uwild (ul I) = true) by (rewrite Hul; reflexivity).
+    (* the taint's continuation, at a payload the caller supplies *)
+    iAssert (□ (app_taint -∗ UkShFork.ushf_wq Wcu I) -∗
+               □ (∀ W : UexecSlot.uvis,
+                    T -∗ ChildTok.my_pay (UexecSlot.uvis_gen W) (ukn_pay N') -∗
+                    UexecRet.uslot (SG := uexecSG_xv6) W))%I as "#Hgenw".
+    { iIntros "#Hkq !>". iIntros (W) "#HT' #Hmy". rewrite Hpeq.
+      iApply ("Hgen" $! (UkShFork.ushf_wq Wcu I) W with "HT' Hmy Hkq"). }
+    iDestruct (uWcu_3 ug r s0 PT PD I with "Hcr") as "[Hcr | #Hsh]".
+    { (* the clean arm: its deed refutes the wild line, or is the taint *)
+      rewrite uWcf_S3. iDestruct "Hcr" as "[Hc [Hpre _]]".
+      iAssert (∃ v0 : era_pins, era_pin (fgn_echo gf) (S gen_id) v0)%I
+        as (v0) "#Hpin0".
+      { rewrite /uWcl /lk_lcred.
+        iDestruct "Hc" as (v0) "[#Hp _]". iExists v0.
+        cbn [lk_pin union_link_inst_at gen_link_inst]. iExact "Hp". }
+      rewrite {1}/ush_deed_at. iDestruct "Hpre" as "[Hpre | #HT]"; last first.
+      { iApply (urun_gen (PS := uprogSG_free) (SG := uexecSG_xv6)
+                  (ghost_varG0 := offbox_offG) N' T h m
+                  (mword_of_int 0x9c0) _ ltac:(vm_compute; reflexivity)
+                  with "[] HT Hrun").
+        iApply "Hgenw". iIntros "!> #Hk". rewrite /UkShFork.ushf_wq. iRight.
+        iApply (uWcu_taint' I 0%nat v0 with "Hpin0"). iApply uHktaint'. iExact "Hk". }
+      iDestruct "Hpre" as (cs s v') "(_ & _ & _ & _ & _ & %Hnw)".
+      rewrite Hw in Hnw. discriminate Hnw. }
+    (* ---- the wild arm ---- *)
+    iAssert (□ (∀ s : Z, UkShFork.ushf_wq Wcu I))%I as "#HQ".
+    { iIntros "!>" (_). rewrite /UkShFork.ushf_wq. iRight.
+      iApply (uWcu_wild ug r s0 PT PD I 0%nat with "Hsh"). }
+    iPoseProof ("Hgenw" with "[]") as "#Hgenw'".
+    { iIntros "!> _". iApply ("HQ" $! 0). }
+    rewrite /UkSh.ush_std /UserFd.ustd_ok.
+    iDestruct "Hstd" as (vw) "[[%Hvok | #HT] Hstd]"; last first.
+    { iApply (urun_gen (PS := uprogSG_free) (SG := uexecSG_xv6)
+                (ghost_varG0 := offbox_offG) N' T h m
+                (mword_of_int 0x9c0) _ ltac:(vm_compute; reflexivity)
+                with "Hgenw' HT Hrun"). }
+    (* ---- THE WALK, at 8 more steps of budget than it needs ---- *)
+    assert (Hbud : (68 + (8 + (UkShDiag.ush_Dg + n)))%nat
+                   = (60 + (8 + (UkShDiag.ush_Dg + (n + 8))))%nat) by lia.
+    rewrite Hbud.
+    iApply (UkShEcho.wp_kshm_child_x_v_holds (PS := uprogSG_free)
+              (SG := uexecSG_xv6) (ghost_varG0 := offbox_offG)
+              (fun k H => H) ucat_rows (FileDisc.uline_ws (LSecc wsx))
+              FileDisc.alt_execsecc
+              (fun _ : Z => UkShFork.ushf_wq Wcu I)
+              (useccomp_shape ug I) (useccomp_shape ug I)
+              N' (ukn_const_of_eq N' _ Hpeq (fun _ _ => eq_refl))
+              h m dw dv sa len gb sz ld vw (n + 8)%nat
+              Hpeq Hs1 (usecc_xline wsx gb len Hlat) (usecc_execfail_bytes wsx)
+              Hsa Hs64 Hs38 Hszlo Hszal Hszok Hrows (proj2 (proj2 Hrows))
+              with "Hcode [] [] [] [] Hpcode Hpro Hjt Hstr Hwsp Hsy Hstd Hcwd
+                    Hch HM [] Hrun").
+    - iApply (usecc_exec_sup I wsx vw Hsok Hvok with "Hdep Hslot Hsh").
+    - iIntros "!> _". iApply "HQ".
+    - iApply usecc_execfail_law.
+    - iIntros "!> _". iApply "HQ".
+    - iExact "Hsh".
+  Qed.
+
+  (* =================================================================== *)
   (*  S3  THE REDIRECT CHILD                                              *)
   (* =================================================================== *)
 
@@ -973,7 +1210,7 @@ Section UShURound.
     iDestruct "Hino" as "[Hino | #HT]"; last first.
     { iApply ("Hgen'" $! (UexecSlot.uvis_fd W') W' with "HT [//] [%] Hmp"); exact Hscw. }
     iDestruct "Hino" as (i γo) "(%Hty & %Hi)".
-    destruct Hi as (Hi1 & Hi2 & Hi3 & Hi4 & Hi5).
+    destruct Hi as (Hi1 & Hi2 & Hi3 & Hi4 & Hi5 & Hi6).
     rewrite /UShFileRedir.redir_K /UkFileOpen.redir_K /FileOpen.file_open_fd_K.
     iDestruct "HK" as "[HK | #HT]"; last first.
     { iApply ("Hgen'" $! (UexecSlot.uvis_fd W') W' with "HT [//] [%] Hmp"); exact Hscw. }
@@ -988,7 +1225,7 @@ Section UShURound.
                   (fun _ : Z => UkShFork.ushf_wq Wcu I)
                   (fun _ _ => eq_refl) Heq Hokws Himg Hbytes Hflen
                   eq_refl
-                  ltac:(rewrite Hl -Hty; exact Hfd1) Hi1 Hi2 Hi3 Hi4 Hi5
+                  ltac:(rewrite Hl -Hty; exact Hfd1) Hi1 Hi2 Hi3 Hi4 Hi5 Hi6
                   with "[] [] [] [] Hinv Hnp0 Hdep") as "#He".
     { (* echo RAN: the exit pays the round's payload *)
       iIntros "!> [[_ Hc] Hex]". iDestruct "Hex" as (sel) "Hcur".
@@ -1251,6 +1488,8 @@ Section UShURound.
       (ghost_varG0 := offbox_offG) T Wcu -∗
     UkShFork.ushf_child_law_at (PS := uprogSG_free) (SG := uexecSG_xv6)
       (ghost_varG0 := offbox_offG) T Wcu UkShRedirBody.ushs_lp_cat 68 -∗
+    UkShFork.ushf_child_law_at (PS := uprogSG_free) (SG := uexecSG_xv6)
+      (ghost_varG0 := offbox_offG) T Wcu usecc_lp 68 -∗
     UkShDiag.ush_panic_law (PS := uprogSG_free) Wcu Wbu -∗
     UkShFork.ushf_body_law (PS := uprogSG_free) (SG := uexecSG_xv6)
       N γp T Wcu Wbu Pm ush_line_upipe sz -∗
@@ -1258,7 +1497,7 @@ Section UShURound.
       N γp T Wcu Wbu Pm ush_line_union sz.
   Proof using .
     intros Hszlo Hszal Hszok.
-    iIntros "#Hkl #Hchl #Hred #Hcatl #Hplaw #Hpipes".
+    iIntros "#Hkl #Hchl #Hred #Hcatl #Hsecl #Hplaw #Hpipes".
     iPoseProof (UkShPipeForkTwin.ushf_body_law_echo_pipe (PS := uprogSG_free)
                   (SG := uexecSG_xv6) N γp T Wcu Wbu Pm
                   (fun k H => H) sz Hszlo Hszal Hszok (uHwbl_u ug r s0 PT PD)
@@ -1275,9 +1514,20 @@ Section UShURound.
       "%Hd %Hlat %Hregs %Hs1 %Ha5 %Hnn %Hnul %Hkl2 %Hpm1 %Hpmwb %Hfd0
        #Hgen #Hcode #Hjt Hhead Hstd Hdat Hsz Hbuf Hrun".
     destruct lu as [ws | ws Nf | Nf | p np | ws].
-    5: { (* [seccomp ..] -- not a line of the loop while the model's seccomp
-            knob is off ([ush_line_union]) *)
-         exfalso. exact Hd. }
+    5: { (* [seccomp ws] -- the wild child, at the generic body twin *)
+         iDestruct (UkSh.ush_jtab_ro (ukn_t N) with "Hjt") as "#Hro".
+         iApply (UkShPipeForkTwin.wp_kshm_body_pipe_nc (PS := uprogSG_free)
+                   (SG := uexecSG_xv6) N γp T Wcu Wbu Pm (fun k0 H => H)
+                   usecc_lp 68 h m f k len
+                   (FileDisc.uline_ws (LSecc ws)) sz l n
+                   ltac:(lia) usecc_lp0
+                   Hregs Hs1 Ha5 Hnn Hnul Hkl2
+                   (usecc_lp_of_at ws f k len Hlat)
+                   Hszlo Hszal Hszok Hpm1 Hpmwb (uHwbl_u ug r s0 PT PD)
+                   with "Hgen Hhead Hcode Hro [] Hjt Hkl Hsecl Hplaw [%] Hstd
+                         Hdat Hsz Hbuf Hrun").
+         + iApply (UkShFork.ushf_code_shp (ukn_t N) with "Hcode").
+         + exact Hfd0. }
     - (* [echo ws] -- the landed walk, at the fork twin *)
       iApply ("Hecho" $! (LEcho ws) h m f k len l n with
                 "[%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] Hgen Hcode Hjt

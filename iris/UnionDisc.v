@@ -394,11 +394,13 @@ Definition adm_u_g (l : pline') : bool :=
   | LPipes (PrCatF g) fs => bool_decide (uname g) && filts_okb fs
   end.
 
-(* THE SECCOMP KNOB IS OFF at the union application until sh's seccomp
-   round is proved (seccomp design section 3, cut S4) *)
+(* THE SECCOMP KNOB (seccomp design section 3).  OFF admits no seccomp
+   line; ON admits every [seccomp x] line with an argument (seccomp lane
+   S4: sh's seccomp round is proved, so the union application runs ON) *)
 Definition adm_s_off : list (list (bv 8)) -> bool := fun _ => false.
+Definition adm_s_on (ws : list (list (bv 8))) : bool := bool_decide (ws <> []).
 
-Definition ulmG : lmodel := ulm adm_u_g adm_s_off.
+Definition ulmG : lmodel := ulm adm_u_g adm_s_on.
 
 Lemma adm_u_g_echo (ws : list (list (bv 8))) (fs : list filt) :
   Forall filt_ok fs -> adm_u_g (LPipes (PrEcho ws) fs) = true.
@@ -668,7 +670,7 @@ Section laws.
 End laws.
 
 Corollary ulmG_laws : lm_laws ulmG.
-Proof using. exact (ulm_laws adm_u_g adm_s_off). Qed.
+Proof using. exact (ulm_laws adm_u_g adm_s_on). Qed.
 
 (* ===================================================================== *)
 (*  4.  THE HOOKS                                                         *)

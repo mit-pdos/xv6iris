@@ -116,4 +116,4 @@ Qed.
 
 (* the union's view at the union application's admission ([adm_u_g]:
    grep stages admitted, cut G8) *)
-Definition pview_unionU : pview ulmG := pview_union adm_u_g adm_s_off.
+Definition pview_unionU : pview ulmG := pview_union adm_u_g adm_s_on.

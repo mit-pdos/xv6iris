@@ -110,7 +110,7 @@ Require Import SpecConsolewrite UkWriteLeaf.  (* [cons_out_chain], the console w
 Require Import ConsoleInv.             (* [CONSOLE] *)
 Require Import FsCfg.
 Require Import AppCfg AppInv.
-Require Import FsInitPin FsShPin FsEchoPin FsCatPin FsGrepPin.
+Require Import FsInitPin FsShPin FsEchoPin FsCatPin FsGrepPin FsSeccPin.
 Require Import EchoDisc EchoOut LineWords.
 Require Import FileState.              (* [echo_chunks] *)
 Require Import AppFile AppFileCons FileOpen.
@@ -664,7 +664,7 @@ Section UkFileIface.
 
   (* the file a redirect holds: the line's chunks from [b] on are owed *)
   Definition fif_out_ok (i : Z) (ws : wordline) : Prop :=
-    i <> INIT_INO /\ i <> SH_INO /\ i <> ECHO_INO /\ i <> CAT_INO /\ i <> GREP_INO
+    i <> INIT_INO /\ i <> SH_INO /\ i <> ECHO_INO /\ i <> CAT_INO /\ i <> GREP_INO /\ i <> SECC_INO
     /\ Forall (fun ch => (length ch <= EchoDisc.line_max)%nat) (echo_chunks ws).
 
   Definition fif_outm (d : nat) (chunks : list (list (bv 8))) : iProp Σ :=
@@ -1089,7 +1089,7 @@ Section UkFileIface.
     iDestruct "Hout" as (nm i γo ws) "[Htk Hout]".
     iDestruct "Hout" as (b) "(%Hch & %Hwok & Hout)".
     destruct (fif_drop_cons _ _ _ _ (eq_sym Hch)) as (Hb & Hbs & Hrest).
-    pose proof Hwok as (Hi1 & Hi2 & Hi3 & Hi4 & Hi5 & Hlm).
+    pose proof Hwok as (Hi1 & Hi2 & Hi3 & Hi4 & Hi5 & Hi6 & Hlm).
     assert (Hbl : (length bs <= EchoDisc.line_max)%nat).
     { rewrite <- Hbs. apply (proj1 (Forall_lookup _ _) Hlm b).
       apply list_lookup_lookup_total_lt. exact Hb. }
@@ -1104,7 +1104,7 @@ Section UkFileIface.
     destruct (Z_of_nat_complete fd H0) as [k ->]. rewrite Nat2Z.id in Hrow.
     iApply (file_write c r sf nm Heq N P Hsw k l rb i γo ws b b bs K
               ltac:(unfold NSTD in *; lia) Hrow Hb ltac:(lia) Hbs
-              ltac:(destruct bs; [done | simpl; lia]) Hbl Hi1 Hi2 Hi3 Hi4 Hi5
+              ltac:(destruct bs; [done | simpl; lia]) Hbl Hi1 Hi2 Hi3 Hi4 Hi5 Hi6
               with "Hbr Hinv Hstd Hout").
     iSplit.
     - iIntros "Hstd Hout". iDestruct "HK" as "[HK _]".

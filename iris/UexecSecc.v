@@ -162,6 +162,19 @@ Section UexecSecc.
   Global Instance secc_rows_persistent sts : Persistent (secc_rows sts).
   Proof using . rewrite /secc_rows. apply _. Qed.
 
+  (* THE WHOLE-TABLE FACT (lane S4): a table under an ok view -- every row
+     closed or a device, [UserFd.ush_view_ok] -- holds the key's rows
+     outright; a row the view shows may have closed, and a closed row
+     asks nothing *)
+  Lemma ush_view_secc_rows (v sts : list fdstate) :
+    ush_view_ok v -> tab_le sts v -> ⊢ secc_rows sts.
+  Proof using .
+    intros Hok [_ Hle]. rewrite /secc_rows. iApply big_sepL_intro. iIntros "!>" (k st Hk).
+    destruct (Hle k st Hk) as [Hv | [-> _]]; [| done].
+    rewrite /ush_view_ok Forall_lookup in Hok.
+    destruct (Hok k st Hv) as [-> | (r & w & mj & ->)]; done.
+  Qed.
+
   (* NOT TIMELESS, and it cannot be: [wild_pipe] is an invariant. *)
   Definition secc_key (W : uvis) : iProp Σ :=
     (⌜secc_masked (uvis_secc W)⌝ ∗ secc_rows (uvis_fd W))%I.

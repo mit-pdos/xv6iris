@@ -217,6 +217,8 @@ Section UShUPipes.
   Context (s0 : fstate).
   Context (Hcons : @riscv_cons_res Σ (@riscv_fixedGS Σ _) = ucl ug).
   Context (Hkill : @app_taint Σ (@riscv_fixedGS Σ _) = file_taint (fgn_cl gf)).
+  Context (Hwild : @riscv_wild Σ (@riscv_fixedGS Σ _) = usecc_tok ug).
+  Context (Hrdw : ush_rdwild_of_shape ug).
 
   (* THE CLAIM A PIPELINE ROUND WRITES THROUGH: the union's, which pays the
      N-writer family's obligation at every pipeline line (a pipeline line
@@ -544,12 +546,12 @@ Section UShUPipes.
     iDestruct (udeed_typed s with "Hty") as %[Hsok _].
     pose proof (upv_line_pipe I (PrEcho ws) (F :: fs') Hul) as HlR.
     assert (Hfc : fc_ok (pv_fc pview_unionU (dst_content s)))
-      by exact (pview_union_fc_ok adm_u_g adm_s_off (dst_content s) Hsok).
+      by exact (pview_union_fc_ok adm_u_g adm_s_on (dst_content s) Hsok).
     assert (Hadmit : pns_admV pview_unionU (LPipes (PrEcho ws) (F :: fs')))
       by exact (adm_u_g_echo ws (F :: fs') HF).
     assert (Hplok : pl_ok (LPipes (PrEcho ws) (F :: fs'))) by exact (pl_ok_of_uline _ _ Hok_u).
     (* THE GATE: echo's content is one NUL-free line *)
-    pose proof (pview_union_gate adm_u_g adm_s_off (dst_content s) (PrEcho ws) (F :: fs') Hsok Hok) as Hgate.
+    pose proof (pview_union_gate adm_u_g adm_s_on (dst_content s) (PrEcho ws) (F :: fs') Hsok Hok) as Hgate.
     (* ---- THE ROUND'S ALLOCATION, at the deed's state ---- *)
     iApply uup_fupd_mwp.
     iMod (pls_nodes_alloc (lcats (LPipes (PrEcho ws) (F :: fs')))) as (P gF gG) "Hnodes".
@@ -690,13 +692,13 @@ Section UShUPipes.
       iFrame "Hdq Htk Hty' Hpin' Hcs'". by iPureIntro. }
     pose proof (upv_line_pipe I (PrCatF nm) (F :: fs') Hul) as HlR.
     assert (Hfc : fc_ok (pv_fc pview_unionU (dst_content s)))
-      by exact (pview_union_fc_ok adm_u_g adm_s_off (dst_content s) Hsok).
+      by exact (pview_union_fc_ok adm_u_g adm_s_on (dst_content s) Hsok).
     assert (Hadmit : pns_admV pview_unionU (LPipes (PrCatF nm) (F :: fs')))
       by exact (proj2 (adm_u_g_catf nm (F :: fs')) (conj Hu HF)).
     assert (Hplok : pl_ok (LPipes (PrCatF nm) (F :: fs'))) by exact (pl_ok_of_uline _ _ Hok_u).
     pose proof (catf_short (dst_content s) nm (Hshort nm)) as HL31.
     (* THE GATE: [f]'s content is one NUL-free line, as the deed types it *)
-    pose proof (pview_union_gate adm_u_g adm_s_off (dst_content s) (PrCatF nm) (F :: fs') Hsok Hok)
+    pose proof (pview_union_gate adm_u_g adm_s_on (dst_content s) (PrCatF nm) (F :: fs') Hsok Hok)
       as Hgate.
     (* ---- THE ROUND'S ALLOCATION, at the deed's state ---- *)
     iApply uup_fupd_mwp.
@@ -840,6 +842,7 @@ Section UShUPipes.
       UShEcho.sh_echo_slot T -∗
       UShCatPay.sh_cat_slot T -∗
       sh_grep_slot T -∗
+      sh_secc_slot T -∗
       (∃ v : era_pins, era_pin (fgn_echo gf) (S gen_id) v) -∗
       (∃ jo : option Z, file_cons_cred (fgn_cl gf) r jo) -∗
       ush_pipes_branch ug r s0 PT PD γp N.
@@ -871,14 +874,15 @@ Section UShUPipes.
       UkSh.ush_rest_l_at (PS := uprogSG_free) (ghost_varG0 := offbox_offG)
         N γp T Wcu Wbu Pm ush_line_union
         (UInitSh.sh_Rsh (ukn_t N) (ukn_d N) (ukn_s N)).
-  Proof using Hcons Hkill Heq HfifR cifRegG0 pipeProtoG0 pnsRegG0.
-    iIntros "#Hlk #Hdep #Hslot #Hcat #Hgrep #Hpin #Hmade".
+  Proof using Hcons Hkill Hwild Hrdw Heq HfifR cifRegG0 pipeProtoG0 pnsRegG0.
+    iIntros "#Hlk #Hdep #Hslot #Hcat #Hgrep #Hsecc #Hpin #Hmade".
     iDestruct "Hpin" as (v) "#Hp".
     iPoseProof (ush_kill_law_u ug r s0 PT PD Hkill v with "Hp") as "#Hkl".
     iPoseProof (ush_child_law_union ug r Heq s0 Hcons Hkill PT PD
                   with "Hlk Hdep Hslot Hmade") as "#Hchl".
     iPoseProof (uHchild_redir ug r Heq s0 Hkill PT PD with "Hlk Hdep Hslot Hmade") as "#Hred".
     iPoseProof (uHchild_cat ug r Heq s0 Hcons Hkill PT PD with "Hlk Hdep Hcat Hmade") as "#Hcatl".
+    iPoseProof (uHchild_secc ug r s0 Hcons Hkill Hwild Hrdw PT PD with "Hdep Hsecc") as "#Hsecl".
     iPoseProof (uHpanic ug r s0 PT PD with "Hlk") as "#Hplaw".
     iPoseProof (upipes_child_law_echo with "Hslot Hcat Hgrep") as "#Hche".
     iPoseProof (upipes_child_law_catf with "Hslot Hcat Hgrep Hmade") as "#Hchc".
@@ -889,7 +893,7 @@ Section UShUPipes.
     iPoseProof (ushq_body_law_union ug r s0 PT PD γp N (Hp := Hc)
                   (SpecKexec.kexec_sz ElfUser.sh_elf)
                   UShKernel.sh_sz_lo UShKernel.sh_sz_al UShKernel.sh_sz_ok
-                  with "Hkl Hchl Hred Hcatl Hplaw Hpipes") as "#Hbody".
+                  with "Hkl Hchl Hred Hcatl Hsecl Hplaw Hpipes") as "#Hbody".
     iPoseProof (UkShPipeForkTwin.ushf_rest_of_body_at_pipe
                   (PS := uprogSG_free) (SG := uexecSG_xv6) (ghost_varG0 := offbox_offG)
                   (Hpay := Hc) N γp T Wcu Wbu Pm (fun k H => H) ush_line_union

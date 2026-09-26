@@ -69,7 +69,7 @@ Require Import FsBytesGamma.
 Require Import FsCfg.
 Require Import AppCfg.
 Require Import AppInv.
-Require Import FsInitPin FsShPin FsEchoPin FsCatPin FsGrepPin.
+Require Import FsInitPin FsShPin FsEchoPin FsCatPin FsGrepPin FsSeccPin.
 Require Import EchoDisc.
 Require Import EchoOut.
 Require Import LineWords.
@@ -215,7 +215,7 @@ Section UEchoFile.
       (jx : nat) (M : gmap Z (bv 8)) (ua : mword 64) (n : Z) (k : nat) :
     (jx < length (echo_chunks ws))%nat ->
     Forall (fun q => (q < jx)%nat) sel ->
-    i <> INIT_INO -> i <> SH_INO -> i <> ECHO_INO -> i <> CAT_INO -> i <> GREP_INO ->
+    i <> INIT_INO -> i <> SH_INO -> i <> ECHO_INO -> i <> CAT_INO -> i <> GREP_INO -> i <> SECC_INO ->
     ubytes_at M (add_vec_int ua (FW_MAX * Z.of_nat k))
       (echo_chunks ws !!! jx) ->
     Z.of_nat (length (echo_chunks ws !!! jx)) = wchunk_at n k ->
@@ -224,10 +224,10 @@ Section UEchoFile.
     awrite_full_adv (fs_gamma_L fsc_fs) appE i γo M ua n k
       (efq i γo ws (sel ++ [jx])).
   Proof using Heq.
-    intros Hjx Hlt Hi1 Hi2 Hi3 Hi4 Hi5 Hbsk Hlenk.
+    intros Hjx Hlt Hi1 Hi2 Hi3 Hi4 Hi5 Hi6 Hbsk Hlenk.
     iIntros "#Hbr #Hinv Hq". rewrite /efq.
     iApply (file_awrite_node_adv fsc_fs c r N s i ws sel jx γo M ua n k
-              Heq Hjx Hlt Hi1 Hi2 Hi3 Hi4 Hi5 Hbsk Hlenk with "Hbr Hinv Hq").
+              Heq Hjx Hlt Hi1 Hi2 Hi3 Hi4 Hi5 Hi6 Hbsk Hlenk with "Hbr Hinv Hq").
   Qed.
 
   (* ...AND THE WHOLE CALL'S CHAIN, at the ONE node echo's chunk needs.
@@ -257,13 +257,13 @@ Section UEchoFile.
     (* the writer's own two rows about its buffer, at the ONE node *)
     ubytes_at M ua (echo_chunks ws !!! jx) ->
     length (echo_chunks ws !!! jx) = nb ->
-    i <> INIT_INO -> i <> SH_INO -> i <> ECHO_INO -> i <> CAT_INO -> i <> GREP_INO ->
+    i <> INIT_INO -> i <> SH_INO -> i <> ECHO_INO -> i <> CAT_INO -> i <> GREP_INO -> i <> SECC_INO ->
     □ (app_taint -∗ file_taint c) -∗
     app_inv fsc_fs -∗ efq i γo ws sel -∗
     awrite_chain_adv (fs_gamma_L fsc_fs) appE i γo M ua P n
       (efcur i γo ws sel jx) 0%nat (wchunks n).
   Proof using Heq.
-    intros Hsrc Hwf Hpm Hlf Hn Hnb0 Hnbm Hsb Hjx Hlt Hby Hlenb Hi1 Hi2 Hi3 Hi4 Hi5.
+    intros Hsrc Hwf Hpm Hlf Hn Hnb0 Hnbm Hsb Hjx Hlt Hby Hlenb Hi1 Hi2 Hi3 Hi4 Hi5 Hi6.
     (* EVERY ONE OF ECHO'S WRITES IS ONE CHUNK: a chunk is a word of a
        line or a single separator byte, and [FW_MAX] is 3072. *)
     assert (Hone : wchunks n = 1%nat)
@@ -287,7 +287,7 @@ Section UEchoFile.
       iExact "Hq".
     - iSplit.
       + (* THE ONE NODE, and what it leaves IS the chain's cursor at node 1 *)
-        iApply (ef_node i γo ws sel jx M ua n 0%nat Hjx Hlt Hi1 Hi2 Hi3 Hi4 Hi5
+        iApply (ef_node i γo ws sel jx M ua n 0%nat Hjx Hlt Hi1 Hi2 Hi3 Hi4 Hi5 Hi6
                   Hby0 Hlen0 with "Hbr Hinv Hq").
       + (* THE PARTIAL ARM, FROM THE SAME CURSOR: refuted where the cursor
            is fired (the offset is the content's length, a line's worth),

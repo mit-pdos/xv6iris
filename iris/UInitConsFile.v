@@ -160,13 +160,14 @@ Section UInitConsFile.
     { intros nm ino bs Hpin Hij. destruct Hpin as (_ & Hr).
       rewrite Hij in Hrow. rewrite Hrow in Hr.
       injection Hr as Hnode. rewrite Hcn in Hnode. discriminate Hnode. }
-    destruct (FileDeltas.file_fs_pure_pins av Hp) as (H1 & H2 & H3 & H4 & H5).
+    destruct (FileDeltas.file_fs_pure_pins av Hp) as (H1 & H2 & H3 & H4 & H5 & H6).
     apply FileDeltas.file_fs_pure_of_pins.
     - exact (FileDeltas.node_pin_unarm _ _ _ i av Hroot (Hne _ _ _ H1) H1).
     - exact (FileDeltas.node_pin_unarm _ _ _ i av Hroot (Hne _ _ _ H2) H2).
     - exact (FileDeltas.node_pin_unarm _ _ _ i av Hroot (Hne _ _ _ H3) H3).
     - exact (FileDeltas.node_pin_unarm _ _ _ i av Hroot (Hne _ _ _ H4) H4).
     - exact (FileDeltas.node_pin_unarm _ _ _ i av Hroot (Hne _ _ _ H5) H5).
+    - exact (FileDeltas.node_pin_unarm _ _ _ i av Hroot (Hne _ _ _ H6) H6).
   Qed.
 
   (* [AppFileCons.file_cons_unarm] with [echo_fs_pure] at the arm's view *)

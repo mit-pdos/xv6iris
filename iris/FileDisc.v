@@ -1113,6 +1113,16 @@ Proof using.
     apply fd_cons_eq in Hw as [Hc _]. exact (cmd_seccomp_ne_cat Hc).
 Qed.
 
+(* ...AND THE [seccomp x] WORD LIST (seccomp lane S4): only a seccomp
+   line has [seccomp] for its first word ([uline_ws_head_secc]) *)
+Lemma fline_ok_secc_words (b : list (bv 8)) (ws : list (list (bv 8))) :
+  fline_ok b -> wl_words b = cmd_seccomp :: ws -> secc_ok ws /\ b = line_body (LSecc ws).
+Proof using.
+  intros (l & Hok & ->) Hw. rewrite (uline_ws_body _ Hok) in Hw.
+  destruct (uline_ws_head_secc l Hok ltac:(rewrite Hw; reflexivity)) as [ws' ->].
+  cbn [uline_ws] in Hw. injection Hw as ->. split; [exact Hok | reflexivity].
+Qed.
+
 (* WHICH LINE A REDIRECT WORD LIST IS (RULING SLOT-WS, option B): an
    admissible body whose words are a command's, then `>', then a file name,
    is THE redirect line of that command at that name, and the name is one

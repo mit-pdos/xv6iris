@@ -75,7 +75,7 @@ Definition ulm_hooks (adm : pline' -> bool) (adm_s : list (list (bv 8)) -> bool)
     (unoc_ok adm) unoc_free unoc_nopanic unoc_cont
     (ucont_prompt adm) (ucont_nonnil adm).
 
-Definition ulmG_hooks : lm_hooks ulmG := ulm_hooks adm_u_g adm_s_off.
+Definition ulmG_hooks : lm_hooks ulmG := ulm_hooks adm_u_g adm_s_on.
 
 (* the hooks' three codes at a pipeline, read back *)
 Lemma ulm_hooks_pan adm adm_s p n :
@@ -113,7 +113,7 @@ Definition c_hi : list (bv 8) := sb "hi" ++ nl1.
 Definition l_cf2 : uline := LPipe (PrCatF txt_a) (cats 2).
 
 Example demo_parse_cf2 :
-  uline_of_u (sb "cat a.txt | cat | cat") = l_cf2 /\ ubody_ok adm_u_g adm_s_off (sb "cat a.txt | cat | cat").
+  uline_of_u (sb "cat a.txt | cat | cat") = l_cf2 /\ ubody_ok adm_u_g adm_s_on (sb "cat a.txt | cat | cat").
 Proof using. split; [vm_compute; reflexivity | dec_yes]. Qed.
 
 (* at a state holding [c]: the content, then the prompt *)
@@ -233,7 +233,7 @@ Example demo_S3_echo_neg : ~ uok adm_u_g {[txt_a := c_hi]} l_hi1 (UPE (PLRun cor
 Proof using. dec_no. Qed.
 
 (* ---- THE ADMISSION: [cat g] at another name is not admitted ---- *)
-Example demo_adm_other : ~ ubody_ok adm_u_g adm_s_off (sb "cat g | cat").
+Example demo_adm_other : ~ ubody_ok adm_u_g adm_s_on (sb "cat g | cat").
 Proof using. dec_no. Qed.
 
 (* ---- GREP STAGES (cut G8): the lines parse and are admitted ---- *)
@@ -243,12 +243,12 @@ Example demo_grep_parse :
 Proof using. vm_compute. reflexivity. Qed.
 
 Example demo_adm_grep :
-  ubody_ok adm_u_g adm_s_off (sb "echo hi | grep h | cat") /\ ubody_ok adm_u_g adm_s_off (sb "cat a.txt | grep h").
+  ubody_ok adm_u_g adm_s_on (sb "echo hi | grep h | cat") /\ ubody_ok adm_u_g adm_s_on (sb "cat a.txt | grep h").
 Proof using. split; dec_yes. Qed.
 
 (* ...but no pattern-less grep, and no grep of two words *)
 Example demo_adm_grep_neg :
-  ~ ubody_ok adm_u_g adm_s_off (sb "echo hi | grep") /\ ~ ubody_ok adm_u_g adm_s_off (sb "echo hi | grep a b").
+  ~ ubody_ok adm_u_g adm_s_on (sb "echo hi | grep") /\ ~ ubody_ok adm_u_g adm_s_on (sb "echo hi | grep a b").
 Proof using. split; dec_no. Qed.
 
 (* echo foo | grep o | cat: the line passes the gate, so it is printed *)
@@ -331,7 +331,7 @@ Example demo_execL_echo :
   /\ (forall s, lm_ok ulmG s l_hi1 (UPE (PLRun PipeDisc.dg_execL)))
   /\ lmh_free ulmG_hooks (UPE (PLRun PipeDisc.dg_execL)) = true.
 Proof using.
-  split_and!; [exact (ulm_hooks_exf adm_u_g adm_s_off (PrEcho [cmd_echo; sb "hi"]) (cats 1)) | | reflexivity].
+  split_and!; [exact (ulm_hooks_exf adm_u_g adm_s_on (PrEcho [cmd_echo; sb "hi"]) (cats 1)) | | reflexivity].
   intros s. left. right. right. reflexivity.
 Qed.
 
@@ -497,7 +497,7 @@ Definition l_cg_h : uline := LPipe (PrCatF txt_a) [FGrep (sb "h"); FCat].
 
 Example demo_txt_grep :
   uline_of_u (sb "cat a.txt | grep h | cat") = l_cg_h
-  /\ ubody_ok adm_u_g adm_s_off (sb "cat a.txt | grep h | cat")
+  /\ ubody_ok adm_u_g adm_s_on (sb "cat a.txt | grep h | cat")
   /\ lm_ok ulmG {[txt_a := c_hi]} l_cg_h (UPC (PLRun c_hi))
   /\ lm_cont ulmG {[txt_a := c_hi]} l_cg_h (UPC (PLRun c_hi)) = c_hi ++ u_prompt.
 Proof using.
@@ -508,20 +508,23 @@ Qed.
    old one-name class's [f], a binary's name), and the dot anywhere but
    a file name ---- *)
 Example demo_txt_neg :
-  ~ ubody_ok adm_u_g adm_s_off (sb "cat README") /\ ~ ubody_ok adm_u_g adm_s_off (sb "cat f")
-  /\ ~ ubody_ok adm_u_g adm_s_off (sb "echo x > sh") /\ ~ ubody_ok adm_u_g adm_s_off (sb "cat /sh")
-  /\ ~ ubody_ok adm_u_g adm_s_off (sb "cat README | cat")
-  /\ ~ ubody_ok adm_u_g adm_s_off (sb "echo a.txt")
-  /\ ~ ubody_ok adm_u_g adm_s_off (sb "echo hi | grep a.txt").
+  ~ ubody_ok adm_u_g adm_s_on (sb "cat README") /\ ~ ubody_ok adm_u_g adm_s_on (sb "cat f")
+  /\ ~ ubody_ok adm_u_g adm_s_on (sb "echo x > sh") /\ ~ ubody_ok adm_u_g adm_s_on (sb "cat /sh")
+  /\ ~ ubody_ok adm_u_g adm_s_on (sb "cat README | cat")
+  /\ ~ ubody_ok adm_u_g adm_s_on (sb "echo a.txt")
+  /\ ~ ubody_ok adm_u_g adm_s_on (sb "echo hi | grep a.txt").
 Proof using. split_and!; dec_no. Qed.
 (*  4.  THE SECCOMP LINE (seccomp design section 3), at the knob ON        *)
 (*                                                                        *)
-(*  The union application's [ulmG] keeps the seccomp knob OFF until sh's  *)
-(*  seccomp round is proved; these demos run at the model with the knob   *)
-(*  on, [ulmS]: every nonempty word list after [seccomp] admitted.        *)
+(*  The union application's [ulmG] runs with the seccomp knob ON (lane   *)
+(*  S4); these demos name it [ulmS], the same model: every nonempty word  *)
+(*  list after [seccomp] admitted.                                        *)
 (* ===================================================================== *)
-Definition adm_s_on (ws : list (list (bv 8))) : bool := bool_decide (ws <> []).
 Definition ulmS : lmodel := ulm adm_u_g adm_s_on.
+
+(* ...which IS the application's model *)
+Lemma ulmS_ulmG : ulmS = ulmG.
+Proof using. reflexivity. Qed.
 
 Definition ws_rmf : list (list (bv 8)) := [sb "rm"; txt_a].
 Definition b_secc : list (bv 8) := sb "seccomp rm a.txt".

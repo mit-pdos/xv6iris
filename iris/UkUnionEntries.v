@@ -73,7 +73,7 @@ Require Import FileLinks FileLinksLine FileLinkGen FileHooks.
 Require Import GenLinksLine.
 Require Import ConsoleInv.
 Require Import UkConsOut ProgTreeFile.
-Require Import FsInitPin FsShPin FsEchoPin FsCatPin FsGrepPin.
+Require Import FsInitPin FsShPin FsEchoPin FsCatPin FsGrepPin FsSeccPin.
 Require Import UkFileDev FileWrite UEchoFile.
 Require Import UkFileIface.
 Require UkFileEntries.
@@ -633,7 +633,7 @@ Section UkUnionEntries.
     length sts = NOFILE ->
     cw = FsImg.ROOTINO ->
     take NSTD sts !! 1%nat = Some (FdOpen rb true (FdInode i γo OffHeld)) ->
-    i <> INIT_INO -> i <> SH_INO -> i <> ECHO_INO -> i <> CAT_INO -> i <> GREP_INO ->
+    i <> INIT_INO -> i <> SH_INO -> i <> ECHO_INO -> i <> CAT_INO -> i <> GREP_INO -> i <> SECC_INO ->
     □ (UEchoFile.ef_exit c r nm s Wq i γo ws -∗ Q (-1)) -∗
     □ (app_taint -∗ UT) -∗
     □ (UT -∗ app_taint) -∗
@@ -644,12 +644,12 @@ Section UkUnionEntries.
     image_entry ElfUser.echo_elf M (mword_of_int (t + 8) : mword 64) sts
       cw ProcDefs.secc_all cs pidv Q (UEchoFile.ef_pay c r nm s Wq i γo ws) uslot.
   Proof using fifRegG0 fileOutG0 pipeOutG0 ufdG0.
-    intros HQc Heq Hline Himg Hbytes Hfdl Hcw Hl1 Hi1 Hi2 Hi3 Hi4 Hi5.
+    intros HQc Heq Hline Himg Hbytes Hfdl Hcw Hl1 Hi1 Hi2 Hi3 Hi4 Hi5 Hi6.
     iIntros "#HQ #Hbr #Hkc #HQt #Hinv #Hnpw #Hdep".
     pose proof (UkFileEntries.efe_drop1_ne ws Hline) as Hne.
     pose proof (UkFileEntries.efe_words_nn ws Hline) as Hnn.
     assert (Hwok : fif_out_ok i ws).
-    { unfold fif_out_ok. split_and!; [exact Hi1 | exact Hi2 | exact Hi3 | exact Hi4 | exact Hi5 |].
+    { unfold fif_out_ok. split_and!; [exact Hi1 | exact Hi2 | exact Hi3 | exact Hi4 | exact Hi5 | exact Hi6 |].
       exact (UkFileEntries.efe_chunks_short ws Hline). }
     set (w0 := fun _ : nat => FDFile nm i γo ws).
     assert (Hw0 : forall d, d ∈ [0%nat] -> forall nm' i' γo', w0 d <> FDIn false nm' i' γo')

@@ -153,12 +153,14 @@ Section UnionInitBoot.
       (ug : union_gn) (r : file_names) :
     @file_app Σ HF = MkAppcfg file_names (file_pred (fgn_cl (ugn_file ug))) r ->
     @riscvF_app_iface Σ (@riscv_fixedGS Σ HR) = union_ifc ug ->
+    (* THE OPEN PREMISE (seccomp design 10.12): stated, not discharged *)
+    ush_rdwild_of_shape ug ->
     ⊢ app_inv fsc_fs -∗ file_boot (fgn_cl (ugn_file ug)) (S gen_id) r -∗
       fturn (ugn_file ug) (S gen_id) -∗
       |==> init_boot_bundle (bv_unsigned InodeInv.ROOTINO) ProcDefs.secc_all fdt0.
   Proof using HU HfifR cifRegG0 pipeProtoG0 pnsRegG0 pipesNG0.
-    intros Heq Hiface.
-    (* the four projections, off the one equation *)
+    intros Heq Hiface Hrdw.
+    (* the five projections, off the one equation *)
     assert (Htag : @riscv_rx_tag Σ (@riscv_fixedGS Σ HR) = utag ug)
       by (rewrite /riscv_rx_tag Hiface; by cbn [union_ifc ai_tag union_tag]).
     assert (Hkill : @app_taint Σ (@riscv_fixedGS Σ HR)
@@ -168,6 +170,8 @@ Section UnionInitBoot.
       by (rewrite /riscv_cons_res Hiface; by cbn [union_ifc ai_cons union_cons]).
     assert (Hrdwild : @riscv_rdwild Σ (@riscv_fixedGS Σ HR) = wild_none)
       by (rewrite /riscv_rdwild Hiface; by cbn [union_ifc ai_rdwild]).
+    assert (Hwild : @riscv_wild Σ (@riscv_fixedGS Σ HR) = usecc_tok ug)
+      by (rewrite /riscv_wild Hiface; by cbn [union_ifc ai_wild]).
     assert (Hktaint : ⊢ app_taint -∗ file_taint (fgn_cl (ugn_file ug))).
     { rewrite Hkill. iIntros "#H". iExact "H". }
     iIntros "#Hinv Hb Hturn".
@@ -227,6 +231,11 @@ Section UnionInitBoot.
     { iApply UShExecPin.sh_grep_slot_of_fs_pure_holds.
       rewrite /UShCatPay.sh_cat_slot_of_fs_pure.
       iSplitR; [iExact "Hinv" |]. iSplitR; [iExact "Hfs" | iExact "Hmint"]. }
+    (* ---- /seccomp's, the same way (seccomp lane S4) ---- *)
+    iAssert (UShExecPin.sh_secc_slot (file_taint (fgn_cl (ugn_file ug)))) as "#Hsecc".
+    { iApply UShExecPin.sh_secc_slot_of_fs_pure_holds.
+      rewrite /UShCatPay.sh_cat_slot_of_fs_pure.
+      iSplitR; [iExact "Hinv" |]. iSplitR; [iExact "Hfs" | iExact "Hmint"]. }
     (* ---- the shell's slot, UNDER THE CONSOLE'S FLAG: the state payload,
            the TAIL at the union's round, the tag ---- *)
     iAssert (□ (∀ jo : option Z,
@@ -245,8 +254,8 @@ Section UnionInitBoot.
                 with "[] [] Htg");
         [iApply UInitSh.sh_pay_state_holds |].
       iIntros (γp N).
-      iApply (sh_round_holds_union_closed ug r Heq s0 Hcons Hkill γp N
-                with "Hlks [] Hslot Hcat Hgrep Hpine []").
+      iApply (sh_round_holds_union_closed ug r Heq s0 Hcons Hkill Hwild Hrdw γp N
+                with "Hlks [] Hslot Hcat Hgrep Hsecc Hpine []").
       - iApply (udep_free).
       - iExists jo. iExact "Hcred". }
     (* ---- THE PROMPT'S LAW at every line boundary, at the widened

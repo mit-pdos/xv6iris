@@ -420,6 +420,14 @@ Section UShURoundDefs.
   Global Instance useccomp_shape_timeless I : Timeless (useccomp_shape I).
   Proof using . rewrite /useccomp_shape. apply _. Qed.
 
+  (* THE ONE PREMISE LEFT OPEN (seccomp design 10.12, owner's ruling): the
+     wild shape buys the era's reader-side credential, which the seccomp
+     child's entry pays read's console row with.  At the union
+     [ai_rdwild] is [wild_none], so this is stated and NOT discharged:
+     the rounds below carry it as a hypothesis. *)
+  Definition ush_rdwild_of_shape : Prop :=
+    forall I : list (bv 8), useccomp_shape I ⊢ riscv_rdwild (S gen_id).
+
   (* sh's fork panic at the wild line hands init the shape; init prints
      through the era's licence and lends it back to the shell it restarts
      ([UInitUnionCC.union_Wwild]) *)

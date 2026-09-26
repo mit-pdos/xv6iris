@@ -48,7 +48,7 @@ Require Import FsCfg.
 Require Import FsImg FsImgCheck.
 Require Import FsAbsDefs FsAbsEra.
 Require Import AppCfg AppInv.
-Require Import FsCatPin FsGrepPin.
+Require Import FsCatPin FsGrepPin FsSeccPin.
 Require Import FileFsPure.
 Require Import PinnedExec.
 Require Import ExecEntry ExecArgs ExecRun ExecWords.
@@ -58,6 +58,7 @@ Require Import PipeDisc PipesDisc.
 Require Import UkSh UkShRun UkShMain UkShDiag.
 Require Import UkShEcho.
 Require Import UShEcho UShEchoPipePay UShCatPay UShCat UShGrep.
+Require UShSecc.
 Require Import UkShPipesLex.
 Require UkShDiagAt.
 Local Open Scope Z_scope.
@@ -85,6 +86,28 @@ Proof using .
     rewrite grep_path_elems. split.
     + exact Hrun.
     + rewrite Hnode. rewrite FsGrepPin.grep_bytes_elf. reflexivity.
+Qed.
+
+(* /seccomp's path is its command word [seccomp] (seccomp lane S4): sh
+   execs the word, resolved at the root *)
+Definition secc_pl : list (bv 8) := FileDisc.cmd_seccomp.
+
+Lemma secc_path_elems : path_elems secc_pl = FsSeccPin.secc_path.
+Proof using . vm_compute. reflexivity. Qed.
+
+Lemma sh_secc_pin_resolves :
+  pin_resolves FsSeccPin.era0_secc_pins FsImg.ROOTINO secc_pl
+    [FsImg.ROOTINO; FsSeccPin.SECC_INO] FsSeccPin.SECC_INO
+    ElfUser.seccomp_elf 1%nat.
+Proof using .
+  split_and!.
+  - unfold FsAbsEra.um_start_of.
+    destruct (decide (secc_pl !! 0%nat = Some PathElems.SLASH)); reflexivity.
+  - rewrite secc_path_elems. reflexivity.
+  - intros v Hv. destruct Hv as (_ & Hnode & Hrun).
+    rewrite secc_path_elems. split.
+    + exact Hrun.
+    + rewrite Hnode. rewrite FsSeccPin.secc_bytes_elf. reflexivity.
 Qed.
 
 (* the image, the path, the inode and the pin of a stage's program *)
@@ -298,6 +321,22 @@ Section UShExecPin.
     - iRight. iExact "HT".
   Qed.
 
+  (* /seccomp's (seccomp lane S4): the claim's fixed part pins it too *)
+  Definition sh_secc_slot (T : iProp Σ) : iProp Σ := sh_pin_slot FsSeccPin.era0_secc_pins T.
+
+  Global Instance sh_secc_slot_persistent T : Persistent (sh_secc_slot T).
+  Proof using . rewrite /sh_secc_slot. apply _. Qed.
+
+  Lemma sh_secc_slot_of_fs_pure_holds (T : iProp Σ) :
+    UShCatPay.sh_cat_slot_of_fs_pure T -∗ sh_secc_slot T.
+  Proof using .
+    iIntros "(#Hinv & #Hcl & #Hgen)". rewrite /sh_secc_slot /sh_pin_slot.
+    iFrame "Hinv Hgen". iIntros "!>" (v) "Hv".
+    iDestruct ("Hcl" $! v with "Hv") as "[$ [%Hpure | HT]]".
+    - iLeft. iPureIntro. exact (FileFsPure.file_fs_pure_secc v Hpure).
+    - iRight. iExact "HT".
+  Qed.
+
   (* a stage's program's slot, from the two *)
   Lemma sh_filt_slot (F : filt) (T : iProp Σ) :
     UShCatPay.sh_cat_slot T -∗ sh_grep_slot T -∗ sh_pin_slot (filt_pins F) T.
@@ -385,6 +424,66 @@ Section UShExecPin.
     iApply (UShEchoPipePay.image_entry_pay_mono elf M
               (mword_of_int (t + 8) : mword 64) fdv FsImg.ROOTINO ProcDefs.secc_all chs pidv
               (fun _ : Z => Qv) Cr (UserFd.ustd (ukn_fd N') ld ∗ Cr)%I uslot with "[] He").
+    iIntros "!> [_ Hc]". iExact "Hc".
+  Qed.
+
+  (* ...AT THE PARENT'S VIEW (seccomp lane S4): the ledger the exec spends
+     names the table's view [v], and the entry is asked for only at a
+     table under it -- which is how a [seccomp x] child learns its rows *)
+  Lemma sh_exec_sup_x_of_entry_v (Fd : list fdstate -> Prop) (ws : list (list (bv 8)))
+      (pl : list (bv 8)) (pins : aview -> Prop) (hops : list Z) (ino : Z) (elf : list (bv 8))
+      (T : iProp Σ) `{!Persistent T} `{!Timeless T} (Qv Cr : iProp Σ) (v : list fdstate) :
+    exec_ok ws -> ws !!! 0%nat = pl -> kexec_loadable elf ->
+    pin_resolves pins FsImg.ROOTINO pl hops ino elf 1%nat ->
+    □ (∀ (M : gmap Z (bv 8)) (s0 t : Z) (gn : nat -> bv 8)
+         (sts : list fdstate) (cs : gset gname) (pidv : mword 32),
+         ⌜UShEcho.echo_node_img ws M s0 t gn⌝ -∗
+         ⌜UkShEcho.echo_argv_bytes ws gn⌝ -∗
+         ⌜length sts = NOFILE⌝ -∗
+         ⌜Fd (take NSTD sts)⌝ -∗
+         ⌜tab_le sts v⌝ -∗
+         UkRun.urun_nopipe sts -∗
+         image_entry elf M (mword_of_int (t + 8) : mword 64)
+           sts FsImg.ROOTINO ProcDefs.secc_all cs pidv (fun _ : Z => Qv) Cr uslot) -∗
+    □ (app_taint -∗ Qv) -∗
+    sh_pin_slot pins T -∗
+    UkShEcho.sh_exec_sup_echo_at_v (SG := uexecSG_xv6) Fd ws (fun _ : Z => Qv) Cr v.
+  Proof using .
+    intros Hok Hhead Hload Hres.
+    iIntros "#Hent #Hkt (#Hinv & #Hcl & #Hgen)".
+    rewrite /UkShEcho.sh_exec_sup_echo_at_v.
+    iIntros "!>" (N' m pc s0 t gn ld) "%Hpeq %Ha0 %Ha1 %Hbytes %Hrows Hstd #Hcmd Hcr".
+    iAssert (∀ sts, image_entry_taint T sts ProcDefs.secc_all (fun _ : Z => Qv) uslot)%I as "#Hgen'".
+    { iIntros (sts). iApply image_entry_taint_intro. iModIntro. iIntros (W') "#HT #Hmp".
+      iApply ("Hgen" $! Qv W' with "HT Hmp Hkt"). }
+    iApply (udepw_at_refR_of_sup N' m pc (mword_of_int s0) (mword_of_int (t + 8))
+              FsImg.ROOTINO T pl elf 1%nat
+              (UserFd.ustd_at (ukn_fd N') ld v ∗ Cr)%I
+              _ Hload Ha0 Ha1 with "[] [] [Hstd Hcr]").
+    { iIntros "!> H". iExact "H". }
+    { rewrite Hpeq. iExact "Hgen'". }
+    rewrite /uexec_sup_run.
+    iIntros (M pm sz fdv chs pidv) "#Hnpw Hheap Hufd".
+    iDestruct (UkRun.urun_rows_nopipe _ _ with "Hnpw") as "#Hnp0".
+    iAssert (⌜UShEcho.echo_node_img ws M s0 t gn⌝)%I as %Himg.
+    { iApply (UShEcho.echo_node_img_of_cmd_x ws _ _ _ M pm sz s0 t gn Hok with "Hheap Hcmd"). }
+    iDestruct (ufd_auth_len with "Hufd") as %Hflen.
+    iDestruct (ustd_at_agree (ukn_fd N') fdv ld v with "Hufd Hstd") as %Hl.
+    iDestruct (ustd_at_tab (ukn_fd N') fdv ld v with "Hufd Hstd") as %Htab.
+    iFrame "Hheap Hufd".
+    iSplitR "Hstd Hcr".
+    { iPureIntro. rewrite -Hhead.
+      exact (UShEcho.sh_exec_path_of_x_holds ws Hok M s0 t gn Himg Hbytes). }
+    iSplitR "Hstd Hcr".
+    { iApply (exec_walk_of_pin pins T FsImg.ROOTINO pl hops ino (MkAnode (AFile elf) 1%nat) Hres
+                with "Hcl Hinv"). }
+    iSplitR "Hstd Hcr"; [ | iFrame "Hstd Hcr" ].
+    rewrite Hpeq.
+    iPoseProof ("Hent" $! M s0 t gn fdv chs pidv with "[%] [%] [%] [%] [%] Hnp0") as "#He";
+      [ exact Himg | exact Hbytes | exact Hflen | rewrite Hl; exact Hrows | exact Htab | ].
+    iApply (UShEchoPipePay.image_entry_pay_mono elf M
+              (mword_of_int (t + 8) : mword 64) fdv FsImg.ROOTINO ProcDefs.secc_all chs pidv
+              (fun _ : Z => Qv) Cr (UserFd.ustd_at (ukn_fd N') ld v ∗ Cr)%I uslot with "[] He").
     iIntros "!> [_ Hc]". iExact "Hc".
   Qed.
 

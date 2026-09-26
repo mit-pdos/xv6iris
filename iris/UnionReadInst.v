@@ -62,7 +62,7 @@ Proof using.
   intros Hd Hj.
   assert (Hin : I !!! j ∈ I).
   { apply elem_of_list_lookup_2 with j. apply list_lookup_lookup_total_lt. exact Hj. }
-  pose proof (lm_disc_input_byte_val U (ulm_byte_laws adm_u_g adm_s_off) I (I !!! j) Hd Hin) as Hv.
+  pose proof (lm_disc_input_byte_val U (ulm_byte_laws adm_u_g adm_s_on) I (I !!! j) Hd Hin) as Hv.
   rewrite /cons_xlate. rewrite decide_False; [reflexivity |].
   intro Hq. apply (f_equal bv_unsigned) in Hq.
   rewrite (_ : bv_unsigned (mword_of_int 13 : mword 8) = 13%Z) in Hq;

@@ -2077,7 +2077,7 @@ Proof using.
 Qed.
 
 Global Instance lm_disc_ulmG_dec (h : list mobs) : Decision (lm_disc ulmG h).
-Proof using. exact (ud_disc_dec adm_u_g adm_s_off true ud_gpat adm_u_g_ok h). Qed.
+Proof using. exact (ud_disc_dec adm_u_g adm_s_on true ud_gpat adm_u_g_ok h). Qed.
 
 (* ...AND AT THE SECCOMP KNOB ON ([UnionDiscDec.ulmS], seccomp design
    section 3): the decider is generic in the knob -- a seccomp round is
