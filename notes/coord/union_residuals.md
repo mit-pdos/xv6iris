@@ -27,3 +27,10 @@ Collected from the U0 agent reports (Sept 26 2026). Each item names the lane tha
 
 ## K3 (seccomp)
 - `LinkRec.lkWildNone` is deliberately distinct from K3's `wildNone`; K3 changes no U0-C statement.
+
+## UkShPipes* / UShUPipes wave (after DU8 repoint)
+- `Xv6/PipesCut.lean` (U0-3) is partial: 15/37 reached decls. The other 22 are statements about
+  the shell's lexer/parser (`UkSh.ush_line_at`, `UkShPipesLex`/`UkShPipesCmd`/`UkShParseCmd`/
+  `UkShMain`/`UkShEcho`, `UmodeAbi.ubyte0`); only consumer is UShUPipes.
+- U0-2 owner note: FileDiscLine's trim dropped `all_cats`, but it is reached via `adm_echo`;
+  U0-3 defines `allCats` in PipesDisc.

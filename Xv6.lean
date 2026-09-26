@@ -1317,3 +1317,8 @@ import Xv6.GenOutWriteBlk
 import Xv6.GenOutWritePro
 import Xv6.GenOutRead
 import Xv6.FileLineWit
+import Xv6.PipesPair
+import Xv6.PipeOutPure
+import Xv6.PipesMerge
+import Xv6.PipeDisc
+import Xv6.PipesCut

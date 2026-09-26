@@ -1,0 +1,61 @@
+USER wave U1 — common brief (all U1 lanes read this first)
+
+You are one lane of the USER proof for the Lean port of the xv6 verification (/shared/lean-xv6,
+branch lean-v2; Rocq authority at /shared/xv6rocq main 1900b8a43). USER is the premise
+`Xv6.USER` of the final theorem `Xv6.xv6FsAdequacy_xv6GF`: arbitrary user code, run by the
+real Sail model at User privilege, preserves the kernel's user invariant. Plan:
+notes/briefs/user_layer.md (read §0, §2.1 for your gap row, §3, §5, §6.2 for your lane).
+Conventions: notes/coord/wave7b_prompt.txt (GCP VM builds, autoImplicit off, never pkill -f,
+never run run-on-gcp from /tmp, Rocq is the authority, one function/family per file, clean
+names). Memory notes worth reading: /root/.claude-kmit/projects/-shared-lean-xv6/memory/
+{gcp-vm-lean-build,iris-lean-and-sail-lean-gotchas,lean-runaway-memory,keep-lean-runs-short}.md
+
+LANDED FOUNDATIONS (on origin/lean-v2; read them before writing anything):
+ - MachCSL/URunRW.lean (U0-B): the walker `runRW D orc s m`, `swp_runRW` (the ONE Iris bridge),
+   `URegFrame` (per-register fractions; a frame is just an instance), `uRegFrameLF`,
+   `uNoBytesF`, the bind toolkit `runRW_bind/_bind_some/_bind_none/_seq_some/_bind_nest`
+   (Rocq gm_*), tactics `kernel_rfl` and `kernel_walk`, `RegPin` + `UWSt.file_pin`.
+ - MachCSL/URunRWDemo.lean: worked examples (RTYPE at symbolic indices via composition,
+   ECALL through the trap tower, Sv39 LD over an owned page). COPY ITS STYLE.
+ - MachCSL/UDecode.lean + UDecodeWalk.lean (U0-C): `drefU`, `decodableU` (54 ctors),
+   `decodableUC` (44), `decodeU_total32/16`, the `udecode_walk` tactic (keeps do-notation's
+   let-bound continuations abstract — reuse the technique).
+ - MachCSL/UDispatch.lean, MachCSL/UTrap.lean (U0-T): U dispatch and the cause-generic U→S
+   trap tower (`utrapMs`, `trapMstatusOk_utrapMs`).
+
+HARD PERFORMANCE RULES (measured by the U0-B spike — violating them costs 30 s to 230 s+ per
+fact, or kernel deterministic timeouts):
+ 1. The elaborator cannot do these walks; plain `rfl`/`decide`/`simp` over the model give up
+    or explode. Close walk equations with `kernel_rfl`; facts that name symbolic data with
+    `kernel_walk` then `bv_decide` for the data equation.
+ 2. SYMBOLIC VALUES MUST NEVER REACH A BRANCH. Everything the model branches on (addresses,
+    mode bits, mstatus/satp/menvcfg fields, register INDICES, opcodes' funct fields) must be a
+    closed value: pin configuration registers through `RegPin`, and split every other
+    control-relevant field into closed cases or sub-lemmas composed with the bind toolkit
+    (as urwDemo_add_sym does for register indices). Symbolic values may only flow as data.
+ 3. Never let `simp` walk the model or see the whole `execute` match. One family per theorem.
+ 4. Budget: no theorem over a few seconds; no file over ~1 min; never a >5 min tactic run.
+    Run big compiles under `timeout`.
+
+PENDING CHANGE YOU MUST TOLERATE (D52, lane U0-D, in flight): the machine rules move to
+Rocq's `hw_config` shape: frozen configuration registers become a persistent `hwConfig cpu`
+(readable, not writable), `swp_runRead` becomes `swp_runRead cpu dref P hacc …` with
+per-register fractions, and MachCSL/URegNode.lean is deleted (UTrap is repointed at
+HwConfig). Stay generic: state your MachCSL facts as pure `runRW` equations over a register
+frame / `RegPin` + the frozen config record (`UConf`, user_layer.md §3), NOT against
+URegNode or the current `swp_readReg` shapes, so that D52 does not touch your files. If you
+genuinely need an Iris-level wrapper, keep it in a separate small file.
+
+WORKFLOW: main-tree lane — create NEW files only under MachCSL/U*.lean (or Xv6/ for Xv6
+lanes); do not edit existing files, do not edit MachCSL.lean/Xv6.lean, do not touch git.
+Check with `lake build MachCSL.<Module>` (single modules are fine locally; anything bigger
+goes on the GCP VM per wave7b_prompt). `tools/check_layering.sh` must pass; no `sorry`; grep
+your new top-level names for clashes across MachCSL/ and Xv6/ (other U1 lanes are writing
+in parallel — use your lane's name prefix). Other U1 lanes running now: U1-C (UCycle/UWait),
+U1-P1 (UWalk/UTlb), U1-P2 (UTranslate/UFetchMem), U1-X1 (UExecAlu), U1-X2 (UExecCtl),
+U1-X3 (UExecCsr). Don't duplicate their scope; if you need a lemma in another lane's scope,
+state it as a hypothesis/parameter and say so in the report.
+
+REPORT (final message): files + imports to add, headline statements, Rocq lemmas mirrored,
+per-theorem timings (largest ones), deviations, names reused, what's left, and anything
+the coordinator must decide.
