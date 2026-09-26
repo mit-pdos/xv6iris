@@ -73,3 +73,11 @@ Collected from the U0 agent reports (Sept 26 2026). Each item names the lane tha
 - UkFork kill price is `□ (uKillCred -∗ Q (-1))` vs Rocq `app_taint` (process-layer deviation; K4's KILL-TAINT).
 - `stubRet` lives in UkStub (Rocq: UkTree) — H-tree's UkTree must reuse it.
 - Axiom baseline note for U4: echo walks show `MachCSL.nthByte_lo0/lo1._native.bv_decide` via UserHeap.uinstrIs_ukInstr.
+
+## P-printf run interface (gap found by P-cat)
+- `UlibRunP` (the printf lane's stand-in run interface) has one fixed `goal`, but the real leaves
+  re-quantify the hart (`∀ h', … wpLoop h'`), and `UlibRunP.ofUkRun` doesn't exist. Until fixed, cat
+  takes `HF : CAT_FPRINTF` (Rocq's `wp_kcat_fprintf(_s)` verbatim over `urun`) as a parameter and has its
+  own `kcatPaySeq`. Fix: make UlibRunP carry the hart (or build it from `urun`/UK_LEAVES), then discharge
+  `CAT_FPRINTF` from `ulibFprintf_link`; same for grep/init/seccomp.
+- UkCatTree's Iris half (23 decls, `cat_prog` … `wp_kcat_start_env`) waits for H-tree (UkTree/UkHandler).

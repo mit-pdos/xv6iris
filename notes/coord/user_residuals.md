@@ -25,7 +25,7 @@ Collected from the USER lane reports (Sept 26 2026). Each item names the lane th
   lanes use `uwk_run`.
 - `UxrCfg` / `UxcCfg` / `UfCfg` / `UtrPins` restate config pins separately; consider one record.
 
-## Reservations (lane U2-R, coordinator decision: Rocq's `resv_any`)
+## Reservations — CLOSED by lane U2-R (Rocq `resv_any`)
 - `runRW`'s exclusive write refuses unless the walk's own `rv` is set; a walk from `ctxTok` starts at
   `rv = false`, so an SC in a later cycle than its LR (every real pair) walks to `none`. Fix: exclusive
   write proceeds from any reservation state (Rocq `resv_any`) + the Iris step for an exclusive write with
