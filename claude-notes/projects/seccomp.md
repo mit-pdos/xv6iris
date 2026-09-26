@@ -191,6 +191,65 @@ Order: 2, 3, 4 first (they need nothing from S0), then merge S0 for 1,
 8. Green; audits 13/14/13; status paragraph; report every refutation
    lemma by name and any escape you had to take.
 
+STATUS (lane S2, `secc/s2`, under design 10.10): items 1-8 landed, tree
+green (VM log s2-f3: EXIT=0, no `Error`, second `make -n` pass 0
+compiles), audits system 13 / union 14 / tree 13 textually the S1
+baseline.  Item 2: `GenOutHist.gin_pure`'s last conjunct records `lm_disc
+(le_hist e) /\ trace_shape (le_hist e) true` for every pop.  Pure lemmas
+(`iris/GenOutWild.v`): `lm_wild`, `lm_d4_wild`, `lm_disc_wild_last`,
+`lm_proc_before_pos`, `lm_blk_stage_inp`, `lm_pro_stage_inp`,
+`lm_alts_pre_snoc_w`, `lm_good_out_wild`, `lm_rd_wild_stage`, the
+`wild_prefix_*` helpers.  The claim (`iris/PipeOutW.v`, the union's
+`UnionOut.ucl := pwclV … uwild`): `secc_flag`, `secc_tok`, `secc_tok_at`
+(the token AT its line, with `lm_disc_input`), `wildV`, `pwclV`; the third
+arm is REFUTED at every presenter: `pwclV_step_write_first`
+(`lm_proc_before_pos`), `pwclV_step_write` (`lm_write_stage_byte`),
+`pwclV_step_write_pro` (`lm_pro_stage_inp`), `pwclV_step_write_blk`
+(`lm_blk_stage_inp` against the premise `WL line = false`),
+`pwclV_open` (D4, `lm_disc_wild_last`), `pwclV_blk_file` /
+`pwclV_ecl_holds` (`wild_cur_refute`: pext's whole `cur_half`),
+`pwclV_blk_file_empty` / `pwclV_ecl_holds` (`wild_blk_refute`); the
+middle arm by `secc_tok_flag0`.  NO ESCAPE: the block-first byte at the
+wild line is refused by premise -- `pwclV_step_write_blk`,
+`UnionOut.ucl_step_write_blk`, `UnionLinks.union_write_link_blk` take
+`uwild (line) = false` first, `GenLinksLine.gl_blk` takes `⌜¬ gwild P I0⌝`
+(new last field `gwild` of `gen_params`: `fun _ => False` at the file,
+`uwild (lm_line_at U I) = true` at the union), and LinkRec's new
+`lk_wild` gates `lk_prompt_dollar(_ban/_post/_line)`, `lk_blk_step`,
+hence `lk_lpr_step`, `lk_panic_step`, with `(⌜¬ lk_wild I⌝ ∨ lk_T) -∗`
+first.  CONSEQUENCE FOR S4: sh's round at an `LSecc` line must never
+present a block-first byte; its prompt and diagnostics there go through
+the licence (`union_write_link_wild`), as `uHpanic` / `ush_prompt_law_u`
+do at the wild arm.  The transition is `pwclV_step_read` (receipt
+`rd_retW`: `⌜rd_wild CH ws⌝ -∗ secc_tok_at k (snd <$> (dl ++ ws)) ∨ T`),
+through `UnionLinks.uread_ret` and `UnionReadInst.uri_arms` into the
+residue `urresw v I`'s new conjunct `⌜uwild_at I⌝ → usecc_tok_at (S
+gen_id) I ∨ UT`.  `lk_T` stays `UT`; the era-pinned taint laws from the
+T' attempt (`gl_taint` taking `PIN k v`, `gl_taint_at`, `rk_rd_taint` at
+`S gen_id`, `GenLinksGl.gcl_gl_taint_at`) are green but UNUSED by the
+token -- S4 must not build on them.  Reader side: `ai_rdwild` /
+`riscv_rdwild` = `wild_none` at every instance, `app_rdcred := app_sup ∨
+riscv_rdwild`; `UexecSecc`: `secc_B := [5;6;15;17;18;19;20]` (pending
+the owner's mask decision), `secc_cons_pay` the write row only,
+`secc_cons_rd_of_wild` deleted.  The shell tier
+(`UShURoundDefs`): `useccomp_shape I := usecc_tok_at (S gen_id) I ∗
+⌜uwild (ul I) = true⌝` (DEVIATION: the token is tied to the shape's own
+line, which is what makes the read after it vacuous by `uterm_read_law`'s
+argument); `uWcu`'s fourth arm, `uWbf`'s wild arm; the deed
+`ush_deed_at` carries `⌜uwild (ul I) = false⌝` (the fact the gated laws
+need, `ush_deed_nw` / `ush_pre_nw`); `uWcu_3` now returns the wild arm
+too, `uWcu_3_nw` refutes it at a known line kind; the wild-arm cases:
+`uWcu_read` (landing: `umid_wild`; vacuous after: `uwild_read_absurd`),
+`uWcu_inp` / `uWbf_inp` (`ushape_inp`), `uHwbl_u`, `uHwbwc_u`,
+`ush_prompt_law_u` and `uHpanic` (through the licence, via the new
+generic `UShPanic.ksh_w1_of_step`); `ush_kill_law_u` unchanged (from
+`UT`).  ONE KNOB-OFF DISCHARGE: `UInitUnionCC.union_wbn_to` (init's
+banner reading of sh's exit payload) refutes `uWbf`'s wild arm by
+`UShURoundDefs.uwild_disc_off` (no disciplined input ends in a seccomp
+line while `adm_s_off`); S4 replaces it with init's licence path.  Not
+done: 10.9's two-taint / tprompt sweep -- moot under 10.10 (`lk_T = UT`
+still pays `sh_deps`).
+
 ## S3 -- the seccomp program (design §7, §9) -- brief written when S1 and S2 land
 
 `UCodeSeccomp.v` is generated.  sh-style proof (fork, wait): the child's
