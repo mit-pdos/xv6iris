@@ -18,6 +18,7 @@ import Xv6.UMem
 import Xv6.UMemLemmas
 import Xv6.LazyFree
 import Xv6.PrintkDefs
+import Xv6.StepLemmas
 
 namespace Xv6
 

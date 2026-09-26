@@ -51,6 +51,7 @@ What is left is pure, and shared by both sides of that seam.
 -/
 import Xv6.InodeInv
 import Xv6.PrintkDefs
+import Xv6.StepLemmas
 
 namespace Xv6
 

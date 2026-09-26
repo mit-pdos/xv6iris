@@ -11,6 +11,7 @@ import MachCSL.WpSmodeFrame
 import Xv6.SpecPopoff
 import Xv6.SpecMycpu
 import Xv6.CodeTactics
+import Xv6.StepLemmas
 
 namespace Xv6
 
@@ -41,14 +42,6 @@ theorem ofNat64_eq_zero_iff (n : Nat) (hn : n < 2 ^ 64) : BitVec.ofNat 64 n = 0#
     exact this
   · intro h; subst h; rfl
 
-theorem bcond_bne_ofNat (n : Nat) (hn : n < 2 ^ 64) :
-    bcond bop.BNE (BitVec.ofNat 64 n) 0#64 = decide (n ≠ 0) := by
-  simp only [bcond]
-  by_cases h : n = 0
-  · subst h; rfl
-  · have : BitVec.ofNat 64 n ≠ 0#64 := fun e => h ((ofNat64_eq_zero_iff n hn).mp e)
-    simp [this, h]
-
 theorem bcond_beq_ofNat (n : Nat) (hn : n < 2 ^ 64) :
     bcond bop.BEQ (BitVec.ofNat 64 n) 0#64 = decide (n = 0) := by
   simp only [bcond]
@@ -69,38 +62,6 @@ theorem bcond_bge_zero_pos (n : Nat) (h1 : 1 ≤ n) (h2 : n < 2 ^ 31) :
     rw [Nat.mod_eq_of_lt (by omega)]
     omega
   simp only [bcond, hlt, Bool.not_true]
-
-theorem extractLsb'_ofNat64 (n : Nat) (hn : n < 2 ^ 32) :
-    BitVec.extractLsb' 0 32 (BitVec.ofNat 64 n) = BitVec.ofNat 32 n := by
-  apply BitVec.eq_of_toNat_eq
-  simp only [BitVec.extractLsb'_toNat, BitVec.toNat_ofNat, Nat.shiftRight_zero, Nat.reducePow]
-  rw [Nat.mod_eq_of_lt (by omega : n < 18446744073709551616)]
-
-theorem ofNat_add_neg1' (i : Nat) (hi : 1 ≤ i) (hi' : i < 2 ^ 32) :
-    BitVec.ofNat 64 i + 0xFFFFFFFFFFFFFFFF#64 = BitVec.ofNat 64 (i - 1) := by
-  apply BitVec.eq_of_toNat_eq
-  rw [BitVec.toNat_add, BitVec.toNat_ofNat, BitVec.toNat_ofNat, BitVec.toNat_ofNat]
-  rw [Nat.mod_eq_of_lt (by omega : i < 2 ^ 64), Nat.mod_eq_of_lt (by omega : i - 1 < 2 ^ 64)]
-  rw [Nat.mod_eq_of_lt (by omega : 0xFFFFFFFFFFFFFFFF < 2 ^ 64)]
-  omega
-
-/-- `addiw a5,a5,-1` on a count in `[1, 2^31)`. -/
-theorem addiw_pred (n : Nat) (h1 : 1 ≤ n) (hn : n < 2 ^ 31) :
-    BitVec.signExtend 64 (BitVec.extractLsb' 0 32 (BitVec.ofNat 64 n + 0xFFFFFFFFFFFFFFFF#64)) =
-      BitVec.ofNat 64 (n - 1) := by
-  rw [ofNat_add_neg1' n h1 (by omega), extractLsb'_ofNat64 _ (by omega)]
-  exact signExtend_ofNat32 _ (by omega)
-
-/-- `addiw a5,a5,1` on a count with `n + 1 < 2^31`. -/
-theorem addiw_succ (n : Nat) (hn : n + 1 < 2 ^ 31) :
-    BitVec.signExtend 64 (BitVec.extractLsb' 0 32 (BitVec.ofNat 64 n + 1#64)) = BitVec.ofNat 64 (n + 1) := by
-  have h32 : BitVec.extractLsb' 0 32 (BitVec.ofNat 64 n + 1#64) = BitVec.ofNat 32 (n + 1) := by
-    apply BitVec.eq_of_toNat_eq
-    simp only [BitVec.extractLsb'_toNat, BitVec.toNat_add, BitVec.toNat_ofNat, Nat.shiftRight_zero, Nat.reducePow]
-    rw [Nat.mod_eq_of_lt (by omega : n < 18446744073709551616)]
-    omega
-  rw [h32]
-  exact signExtend_ofNat32 _ hn
 
 /-- The exit context of a `c->noff` store inside a two-slot body, when the
 new depth is the popped one. -/

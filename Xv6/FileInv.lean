@@ -6,6 +6,7 @@ halves, the fd token parked), and the cursor arithmetic of the scan.
 -/
 import Xv6.FileDefs
 import Xv6.PrintkDefs
+import Xv6.StepLemmas
 
 namespace Xv6
 

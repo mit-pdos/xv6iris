@@ -25,6 +25,7 @@ import Xv6.SpecMappages
 import Xv6.SpecUvmunmap
 import Xv6.UPtCopyLemmas
 import Xv6.CodeTactics
+import Xv6.UvmCallSites
 
 namespace Xv6
 
@@ -71,15 +72,6 @@ theorem uc_toNat_add (b : BitVec 64) (m : Nat) (h : b.toNat + m < 2 ^ 64) :
 theorem uc_toNat_ofNat (m : Nat) (h : m < 2 ^ 64) : (BitVec.ofNat 64 m).toNat = m := by
   simp only [BitVec.toNat_ofNat, Nat.reducePow]
   omega
-
-/-- A branch on a value known to be zero / nonzero. -/
-theorem uc_beq_ne {α : Type} (x : BitVec 64) (h : x ≠ 0#64) (p q : α) :
-    (if bcond bop.BEQ x 0#64 then p else q) = q := by
-  rw [if_neg (by simp only [bcond, beq_iff_eq]; exact h)]
-
-theorem uc_beq_zero {α : Type} (x : BitVec 64) (h : x = 0#64) (p q : α) :
-    (if bcond bop.BEQ x 0#64 then p else q) = p := by
-  rw [if_pos (by simp only [bcond, beq_iff_eq]; exact h)]
 
 /-- The loop test `bgeu s1,s5`: taken exactly when the run is over. -/
 theorem uc_bgeu_test {α : Type} (sz : BitVec 64) (n i : Nat) (hn : n = uvmNp sz)
@@ -134,13 +126,6 @@ theorem uc_aligned (i : Nat) : (BitVec.ofNat 64 (4096 * i)) &&& 0xfff#64 = 0#64 
   rw [this]
   generalize BitVec.ofNat 64 i = q
   bv_decide
-
-/-- The exit interrupt state of a second call replaces the first's. -/
-theorem uc_withSpie_withSpie (k : KCtx) (a b c d : Bool) :
-    (k.withSpie a b).withSpie c d = k.withSpie c d := rfl
-
-theorem uc_pushed_withSpie (k : KCtx) (m : Nat) (a b : Bool) :
-    (k.pushed m).withSpie a b = (k.withSpie a b).pushed m := rfl
 
 theorem uc_pushed_spie_self (k : KCtx) (m : Nat) :
     k.pushed m = (k.pushed m).withSpie k.spie k.spp :=
@@ -218,22 +203,6 @@ theorem uc_walk_call (W : WALK_NOALLOC) [CurCtx] (c : CPU) (k' : KCtx) (dq : DFr
   have h := W.wp_walk_noalloc (hlc := hlc) (GF := GF) c k' dq t' hK' hroot' hva' halloc' hwf'
   unfold wp_walk_noalloc_body at h
   simp only [walkAddr] at h
-  exact h
-
-set_option maxHeartbeats 1000000 in
-theorem uc_kalloc_call (KAL : KALLOC) [CurCtx] (c : CPU) (k' : KCtx) (γl : GName) (γk : KmemNames)
-    (on : Option Nat) (hnoff' : k'.noff + 1 < 2 ^ 31) (hK' : 14 ≤ k'.avail)
-    (hlk' : "kmem" ∉ k'.locks) :
-    kctx c k' ∗ pcIs c KA.«kalloc» ∗ isLock γl kmemLockAddr "kmem" (kmemRes γk) ∗
-    kallocAvail γk on ∗
-    wpNext k'.sie k'.proc c (fun cpu' => iprop(∀ spie : Bool, ∀ spp : Bool, ∀ R' : RegMap,
-      ⌜k'.sie = false → spie = k'.spie ∧ spp = k'.spp⌝ -∗
-      kctx cpu' ((k'.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k'.regs 1#5)) -∗
-      kallocPost γk on (R' 10#5) -∗ ⌜calleeSaved k'.regs R'⌝ -∗ wpLoop cpu'))
-    ⊢ wpLoop (GF := GF) c := by
-  have h := KAL.wp_kalloc (hlc := hlc) (GF := GF) c k' γl γk on hnoff' hK' hlk'
-  unfold wp_kalloc_body at h
-  simp only [kallocAddr] at h
   exact h
 
 set_option maxHeartbeats 1000000 in

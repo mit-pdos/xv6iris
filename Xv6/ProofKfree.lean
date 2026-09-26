@@ -65,12 +65,6 @@ theorem kf_align8 (p : BitVec 64) (h : pageValid p) : p.toNat % 8 = 0 := by
 
 theorem kf_c4096 : BitVec.signExtend 64 (1#20 ++ 0#12) = BitVec.ofNat 64 4096 := by decide
 
-/-- `kmem` leaves the held set. -/
-theorem filter_kmem_cons (l : List String) (h : "kmem" ∉ l) :
-    ("kmem" :: l).filter (fun x => x ≠ "kmem") = l := by
-  simp only [List.filter_cons, ne_eq, not_true_eq_false, decide_false]
-  exact List.filter_eq_self.2 (fun x hx => by simp; intro e; subst e; exact h hx)
-
 /-- Dropping a redundant lock list. -/
 theorem kf_withLocks_self' (k : KCtx) (a b : Bool) :
     (k.withSpie a b).withLocks k.locks = k.withSpie a b := rfl

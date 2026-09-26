@@ -13,6 +13,8 @@ import MachCSL.WpSmodeFrame
 import Xv6.SpecFreerange
 import Xv6.SpecKfree
 import Xv6.CodeTactics
+import Xv6.StepLemmas
+import MachCSL.WpSmodeFrame6
 
 namespace Xv6
 
@@ -25,12 +27,6 @@ set_option linter.unusedSimpArgs false
 attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Functions.currentlyEnabled
 
 /-! ## Arithmetic facts -/
-
-/-- The immediates of the six-slot frame. -/
-theorem imm_m48 : BitVec.signExtend 64 4048#12 = -(8#64 * BitVec.ofNat 64 6) := by
-  simp only [BitVec.reduceSignExtend, BitVec.reduceMul, BitVec.reduceNeg]
-theorem imm_p48 : BitVec.signExtend 64 48#12 = 8#64 * BitVec.ofNat 64 6 := by
-  simp only [BitVec.reduceSignExtend, BitVec.reduceMul]
 
 /-- The two `lui` constants of the rounding. -/
 theorem lui_1k : BitVec.signExtend 64 (1#20 ++ 0#12) = 0x1000#64 := by decide
@@ -157,9 +153,6 @@ theorem KCtx.pushed_withSpie (k : KCtx) (m : Nat) (a b : Bool) :
 /-- Entering the body: the frame's context carries the caller's `spie`/`spp`. -/
 theorem KCtx.pushed_spie_self (k : KCtx) (m : Nat) : k.pushed m = (k.pushed m).withSpie k.spie k.spp :=
   (KCtx.withSpie_self' (k.pushed m) k.spie k.spp rfl rfl).symm
-
-theorem KCtx.withSpie_withSpie (k : KCtx) (a b c d : Bool) :
-    (k.withSpie a b).withSpie c d = k.withSpie c d := rfl
 
 section
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]

@@ -97,6 +97,7 @@ import Xv6.SleepLockDefs
 import Xv6.PrintkDefs
 import MachCSL.Lock
 import MachCSL.CtxBox
+import Xv6.StepLemmas
 
 namespace Xv6
 

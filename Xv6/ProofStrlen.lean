@@ -6,6 +6,7 @@ instruction rules chained -- no symbolic execution.
 import MachCSL.WpSmodeFrame
 import Xv6.SpecStrlen
 import Xv6.CodeTactics
+import Xv6.StepLemmas
 
 namespace Xv6
 
@@ -15,34 +16,6 @@ open LeanRV64D
 attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Functions.currentlyEnabled
 
 /-! ## Arithmetic facts -/
-
-/-- A zero-extended byte is zero iff the byte is. -/
-theorem setWidth64_eq_zero (b : BitVec 8) : (BitVec.setWidth 64 b = 0#64) ↔ b = 0#8 := by
-  constructor
-  · intro h
-    apply BitVec.eq_of_toNat_eq
-    have := congrArg BitVec.toNat h
-    simp only [BitVec.toNat_setWidth, BitVec.toNat_ofNat, Nat.zero_mod] at this
-    have hb := b.isLt
-    rw [Nat.mod_eq_of_lt (by omega)] at this
-    simpa using this
-  · intro h; subst h; rfl
-
-/-- `bnez` on a zero-extended byte. -/
-theorem ite_bne_byte {α : Type} (b : BitVec 8) (x y : α) :
-    (if bcond bop.BNE (BitVec.setWidth 64 b) 0#64 then x else y) = if b = 0#8 then y else x := by
-  by_cases hb : b = 0#8
-  · subst hb; simp [bcond]
-  · have : BitVec.setWidth 64 b ≠ 0#64 := fun h => hb ((setWidth64_eq_zero b).mp h)
-    simp [bcond, hb, this]
-
-/-- `beqz` on a zero-extended byte. -/
-theorem ite_beq_byte {α : Type} (b : BitVec 8) (x y : α) :
-    (if bcond bop.BEQ (BitVec.setWidth 64 b) 0#64 then x else y) = if b = 0#8 then x else y := by
-  by_cases hb : b = 0#8
-  · subst hb; simp [bcond]
-  · have : BitVec.setWidth 64 b ≠ 0#64 := fun h => hb ((setWidth64_eq_zero b).mp h)
-    simp [bcond, hb, this]
 
 /-- `subw a0, a3, a0` with `a3 = s + n`, `a0 = s` yields `n` (`n < 2^31`). -/
 theorem subw_len (s : BitVec 64) (n : Nat) (hn : n < 2 ^ 31) :

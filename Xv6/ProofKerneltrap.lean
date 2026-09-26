@@ -24,6 +24,8 @@ import Xv6.SpecDevintr
 import Xv6.SpecMyproc
 import Xv6.SpecYield
 import Xv6.CodeTactics
+import Xv6.StepLemmas
+import MachCSL.WpSmodeFrame6
 
 namespace Xv6
 
@@ -32,8 +34,6 @@ open LeanRV64D
 
 attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Functions.currentlyEnabled
 
-theorem imm_m48 : BitVec.signExtend 64 4048#12 = -(8#64 * BitVec.ofNat 64 6) := by decide
-theorem imm_p48 : BitVec.signExtend 64 48#12 = 8#64 * BitVec.ofNat 64 6 := by decide
 theorem sp_restore48 (sp0 : BitVec 64) : sp0 + 0xFFFFFFFFFFFFFFD0#64 + 8#64 * BitVec.ofNat 64 6 = sp0 := by
   bv_omega
 
@@ -60,7 +60,6 @@ theorem bcond_beq_22 : bcond bop.BEQ 2#64 2#64 = true := by decide
 theorem bcond_beq_ne0 (p : BitVec 64) (h : p ≠ 0#64) : bcond bop.BEQ p 0#64 = false := by
   simp [bcond, h]
 theorem bcond_beq_00_kt : bcond bop.BEQ 0#64 0#64 = true := by decide
-theorem KCtx.withSpie_withSpie (k : KCtx) (a b c d : Bool) : (k.withSpie a b).withSpie c d = k.withSpie c d := rfl
 
 /-- A context is itself with its own pinned bits. -/
 theorem kctx_withSpie_of {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CurCtx] {lent : Bool}

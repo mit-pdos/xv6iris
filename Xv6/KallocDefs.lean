@@ -268,4 +268,10 @@ theorem kmemAuth_agree (γk : KmemNames) (n : Nat) (on : Option Nat) :
 
 end
 
+/-- The lock list after `release` drops `kmem` (shared by `kalloc` and `kfree`). -/
+theorem filter_kmem_cons (l : List String) (h : "kmem" ∉ l) :
+    ("kmem" :: l).filter (fun x => x ≠ "kmem") = l := by
+  simp only [List.filter_cons, ne_eq, not_true_eq_false, decide_false]
+  exact List.filter_eq_self.2 (fun x hx => by simp; intro e; subst e; exact h hx)
+
 end Xv6

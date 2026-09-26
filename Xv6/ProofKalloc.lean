@@ -30,12 +30,6 @@ attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Funct
 
 /-! ## Arithmetic and address facts -/
 
-/-- The lock list after `release` drops `kmem`. -/
-theorem filter_kmem_cons (l : List String) (h : "kmem" ∉ l) :
-    ("kmem" :: l).filter (fun x => x ≠ "kmem") = l := by
-  simp only [List.filter_cons, ne_eq, not_true_eq_false, decide_false]
-  exact List.filter_eq_self.2 (fun x hx => by simp; intro e; subst e; exact h hx)
-
 /-- `beqz` on a word. -/
 theorem ka_ite_beq {α : Type _} (x : BitVec 64) (p q : α) :
     (if bcond bop.BEQ x 0#64 then p else q) = if x = 0#64 then p else q := by

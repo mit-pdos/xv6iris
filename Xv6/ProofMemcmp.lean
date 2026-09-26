@@ -6,6 +6,7 @@ instruction rules chained -- no symbolic execution.
 import MachCSL.WpSmodeFrame
 import Xv6.SpecMemcmp
 import Xv6.CodeTactics
+import Xv6.StepLemmas
 
 namespace Xv6
 
@@ -15,17 +16,6 @@ open LeanRV64D
 attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Functions.currentlyEnabled
 
 /-! ## Arithmetic facts -/
-
-theorem setWidth64_inj (a b : BitVec 8) : BitVec.setWidth 64 a = BitVec.setWidth 64 b ↔ a = b := by
-  constructor
-  · intro h
-    apply BitVec.eq_of_toNat_eq
-    have := congrArg BitVec.toNat h
-    simp only [BitVec.toNat_setWidth] at this
-    have ha := a.isLt; have hb := b.isLt
-    rw [Nat.mod_eq_of_lt (by omega), Nat.mod_eq_of_lt (by omega)] at this
-    exact this
-  · intro h; rw [h]
 
 /-- `bne` on two zero-extended bytes. -/
 theorem ite_bne_bytes {α : Type} (a b : BitVec 8) (x y : α) :
