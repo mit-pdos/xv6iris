@@ -42,8 +42,10 @@ PowerOn) until BootReset (wave 9) -- Rocq's `SystemAssumptions` note.
 
 1. **`Ai : CT → AppIface GF`** is passed to `riscvPowerAdequacy` as its
    three slots `Tg`/`Kc`/`Cres` (`AppIface.bootFixedGS`, AppIface
-   deviation 1); no era turn `Tnn` (D49 (a)): `Hobs`'s power-on arm yields
-   the console claim only.
+   deviation 1).  The era's turn `Tnn` is Rocq's (union DU6, reversing
+   D49 (a)): `Hobs`'s power-on arm yields the console claim and
+   `Tnn c (obsBoots h + 1)`, and `Hinit_boot` (`EraInitBoot`) receives
+   `Tnn c (gen + 1)`.
 2. **`Hkill_sup`/`Hout_sup` are not premises**: Rocq states them in
    `xv6_power_adequacy_gen` but its proof never reads them (they are the
    `xv6_app_laws` obligations `al_kill`/`al_sup`, which the application's
@@ -85,14 +87,15 @@ variable {hlc : HasLC} {GF : BundledGFunctors} [MachGpreS hlc GF] [Xv6G GF] [Wch
 /-- **THE SYSTEM THEOREM** (Rocq `SystemAdequacy.xv6_power_adequacy_gen`),
 at a generic application: its fixed part `CT` (born by `Hbirth`), its names
 `N`, its claim `appFs` on the abstract view, its per-era boot resource
-`appBoot`, its console interface `Ai`, its trace slot `Pt` and conclusion
-`phi` -- the components of an `Xv6App` record, positionally. -/
+`appBoot`, its console interface `Ai`, its per-era turn `Tnn`, its trace
+slot `Pt` and conclusion `phi` -- the components of an `Xv6App` record, positionally. -/
 theorem xv6PowerAdequacyGen (g : GState) (sb : FsSb) (nib : Nat) (cov : ExtTreeSet Nat compare)
     (CT : Type) (Cl : CT → IProp GF)
     (Hbirth : ⊢@{IProp GF} |==> ∃ c : CT, Cl c)
     (N : Type) (appFs : CT → N → Aview → IProp GF)
     (appBoot : CT → Nat → N → IProp GF)
     (Ai : CT → AppIface GF)
+    (Tnn : CT → Nat → IProp GF)
     (Happ_boot : ∀ (c : CT) (k : Nat), ⊢@{IProp GF} appXferBootRaw (appFs c) (appBoot c k))
     (Happ_init : ∀ c : CT, ⊢@{IProp GF} |==> ∃ r : N,
       appFs c r (absView (imgState (fsBlocks (diskOf g.m.devs)) sb nib).fssInodes))
@@ -101,7 +104,7 @@ theorem xv6PowerAdequacyGen (g : GState) (sb : FsSb) (nib : Nat) (cov : ExtTreeS
         (T : List Obs),
       letI : MachFixedGS hlc GF := (xv6FixedGS N appFs cov sb.sbLogstart (Ai c) Hinv γgen γstart
         γreg γd γsw γobs γhist c T (Pt γobs c))
-      EraInitBoot (hlc := hlc) N appFs appBoot c)
+      EraInitBoot (hlc := hlc) N appFs appBoot Tnn c)
     (Happ_echo : ∀ (Hinv : InvGS_gen hlc GF) (γgen γstart γreg γd γsw γobs γhist : GName) (c : CT)
         (T : List Obs),
       letI : MachFixedGS hlc GF := (xv6FixedGS N appFs cov sb.sbLogstart (Ai c) Hinv γgen γstart
@@ -114,7 +117,9 @@ theorem xv6PowerAdequacyGen (g : GState) (sb : FsSb) (nib : Nat) (cov : ExtTreeS
       diskImgAuthSized γd XV6_DISK_BYTES dk ∗ ▷ Pt γobs c ∗ (γobs ↪VAR{.own (1 : Qp).half} h)
         ⊢@{IProp GF} |==> ◇ (diskImgAuthSized γd XV6_DISK_BYTES dk ∗ ▷ Pt γobs c ∗
           (γobs ↪VAR{.own (1 : Qp).half} (h ++ [powerEv on])) ∗
-          (if on then iprop(emp) else (Ai c).cons (obsBoots h + 1) [] ⟨[], [], [], none⟩)))
+          (if on then iprop(emp)
+           else iprop((Ai c).cons (obsBoots h + 1) [] ⟨[], [], [], none⟩ ∗
+             Tnn c (obsBoots h + 1)))))
     (Hperm : ∀ (Hinv : InvGS_gen hlc GF) (γgen γstart γreg γd γsw γobs γhist : GName) (c : CT)
         (T : List Obs),
       letI : MachFixedGS hlc GF := (xv6FixedGS N appFs cov sb.sbLogstart (Ai c) Hinv γgen γstart
@@ -144,11 +149,11 @@ theorem xv6PowerAdequacyGen (g : GState) (sb : FsSb) (nib : Nat) (cov : ExtTreeS
     (xv6Slot_swap N appFs appBoot cov sb.sbLogstart Happ_boot)
     Pt (fun c => (Ai c).tag) (fun c h => (Ai c).tag_persistent h) (fun c h => (Ai c).tag_timeless h)
     (fun c => (Ai c).kill) (fun c => (Ai c).kill_persistent) (fun c => (Ai c).kill_timeless)
-    (fun c => (Ai c).cons) (fun c k h H => (Ai c).cons_timeless k h H)
+    (fun c => (Ai c).cons) (fun c k h H => (Ai c).cons_timeless k h H) Tnn
     HPt Hobs phi Hphi Hgen0 Hpow ?_ n κs t2 g2 hsteps
   intro F Hinv γgen γstart γreg γd γsw γobs γhist c T hF E gen σ hbf hdv hpp
   subst hF
-  exact xv6BootEra N appFs appBoot sb cov (Ai c) Hinv γgen γstart γreg γd γsw γobs γhist c T
+  exact xv6BootEra N appFs appBoot Tnn sb cov (Ai c) Hinv γgen γstart γreg γd γsw γobs γhist c T
     (Pt γobs c) (appXferRaw_ofBoot _ _ (Happ_boot c (gen + 1)))
     (Hinit_boot Hinv γgen γstart γreg γd γsw γobs γhist c T)
     (Happ_echo Hinv γgen γstart γreg γd γsw γobs γhist c T)
@@ -173,7 +178,8 @@ theorem xv6Triv_initBoot (US : USER) (cov : ExtTreeSet Nat compare) (ls : Nat)
     (Hinv : InvGS_gen hlc GF) (γgen γstart γreg γd γsw γobs γhist : GName) (c : Unit) (T : List Obs) :
     letI : MachFixedGS hlc GF := (xv6FixedGS Unit (fun _ _ _ => iprop(True)) cov ls (appIfaceTriv GF)
       Hinv γgen γstart γreg γd γsw γobs γhist c T (obsPredAt γobs))
-    EraInitBoot (hlc := hlc) (GF := GF) Unit (fun _ _ _ => iprop(True)) (fun _ _ _ => iprop(emp)) c := by
+    EraInitBoot (hlc := hlc) (GF := GF) Unit (fun _ _ _ => iprop(True)) (fun _ _ _ => iprop(emp))
+      (fun _ _ => iprop(emp)) c := by
   intro E gen cP cI W HFd HBs HIr I Fc r
   letI : MachFixedGS hlc GF := xv6FixedGS Unit (fun _ _ _ => iprop(True)) cov ls (appIfaceTriv GF)
       Hinv γgen γstart γreg γd γsw γobs γhist c T (obsPredAt γobs)
@@ -185,7 +191,7 @@ theorem xv6Triv_initBoot (US : USER) (cov : ExtTreeSet Nat compare) (ls : Nat)
     exact BI.true_intro
   have hlic : ⊢@{IProp GF} consLicence (hlc := hlc) := consLicence_triv rfl
   have hgen : ⊢@{IProp GF} □ uexecWp (hlc := hlc) (GF := GF) := (UexecGen US).uexec_wp_gen
-  iintro _ _
+  iintro _ _ _
   ihave #Hs := hsup
   ihave #Hk := hkc
   ihave #Hl := hlic
@@ -247,6 +253,7 @@ theorem xv6PowerAdequacy (US : USER) (g : GState) (sb : FsSb) (nib : Nat)
   xv6PowerAdequacyGen (hlc := hlc) (GF := GF) g sb nib cov
     Unit (fun _ => iprop(True)) (by imodintro; iexists (); itrivial)
     Unit (fun _ _ _ => iprop(True)) (fun _ _ _ => iprop(emp)) (fun _ => appIfaceTriv GF)
+    (fun _ _ => iprop(emp))
     (fun _ _ => appXferBootRaw_triv _ (fun _ _ => .rfl))
     (fun _ => by imodintro; iexists (); itrivial)
     (fun γobs _ => obsPredAt γobs)
@@ -255,8 +262,8 @@ theorem xv6PowerAdequacy (US : USER) (g : GState) (sb : FsSb) (nib : Nat)
     (fun Hinv γgen γstart γreg γd γsw γobs γhist c T =>
       xv6Triv_echo cov sb.sbLogstart Hinv γgen γstart γreg γd γsw γobs γhist c T)
     (fun γobs c => obsPredAt_alloc_cl (fun _ => iprop(True)) γobs c)
-    (fun γd γobs _ h on dk hs => obsPredAt_step XV6_DISK_BYTES consResTriv (fun _ => .rfl)
-      γd γobs h on dk hs)
+    (fun γd γobs _ h on dk hs => obsPredAt_step XV6_DISK_BYTES consResTriv (fun _ => iprop(emp))
+      (fun _ => .rfl) (fun _ => .rfl) γd γobs h on dk hs)
     (fun Hinv γgen γstart γreg γd γsw γobs γhist c T =>
       xv6Triv_perm cov sb.sbLogstart Hinv γgen γstart γreg γd γsw γobs γhist c T)
     (fun g' _ => phi g')

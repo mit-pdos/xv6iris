@@ -23,16 +23,16 @@ Rocq's header on the laws, kept because the reasons are the content:
 > list.  The two that are NOT in it are the two about an IMAGE: `Happ_init`
 > and `Hphi`.
 
-## AMENDMENTS PENDING (marked `AMEND-K1` / `AMEND-K3` at the fields)
+## AMENDMENTS PENDING (marked `AMEND-K3` at the field)
 
-* **`al_pow` (K1, DU6):** Rocq's power-on arm also mints the era's turn
-  `app_turn A c (S (obs_boots h))`.  Lean's `xv6PowerAdequacyGen`'s `Hobs`
-  (hence `obsLedgerAt_step`) carries no turn yet (D49 (a)); when K1 threads
-  `Tn`, the field gains `∗ A.turn c (obsBoots h + 1)` in the `on = false` arm.
-* **`al_programs` (K1 + K3):** Rocq's `Hinit_boot` takes the turn
-  `app_turn A c (S gen_id)` and yields `init_boot_bundle … secc_all fdt0`.
-  Today's hook `EraInitBoot` has neither; K1 adds the turn, K3 the seccomp
-  argument, and this field follows `EraInitBoot` by name, so it moves with it.
+* (Done, K1 / DU6.) `al_pow`'s power-on arm mints the era's turn
+  `A.turn c (obsBoots h + 1)` (Rocq `app_turn A c (S (obs_boots h))`), and
+  `al_programs` (`EraInitBoot` at `A.turn`) takes `A.turn c (gen + 1)`
+  (Rocq `app_turn A c (S gen_id) -∗`).
+* **`al_programs` (K3):** Rocq's `Hinit_boot` yields
+  `init_boot_bundle … secc_all fdt0`.  Today's hook `EraInitBoot` has no
+  seccomp argument; K3 adds it, and this field follows `EraInitBoot` by name,
+  so it moves with it.
 
 ## DEVIATIONS from Rocq
 
@@ -104,12 +104,12 @@ class Xv6AppLaws {hlc : HasLC} {GF : BundledGFunctors} [MachGpreS hlc GF] [Xv6G 
   /-- the ledger is born empty -/
   al_R0 : ∀ c : A.fixed, A.cl c ⊢@{IProp GF} |==> A.R c []
   /-- THE POWER STEP: the ledger takes the power event, and at power-on the
-  era's console claim is minted.  AMEND-K1 (DU6): `∗ A.turn c (obsBoots h + 1)`
-  in the power-on arm, once `Hobs` carries the turn. -/
+  era's console claim and the era's turn are minted. -/
   al_pow : ∀ (c : A.fixed) (h : List Obs) (on : Bool) (dk : Nat → BitVec 8),
     traceShape h on →
     A.R c h ⊢@{IProp GF} |==> (A.R c (h ++ [powerEv on]) ∗
-      (if on then iprop(emp) else A.cons c (obsBoots h + 1) [] ⟨[], [], [], none⟩))
+      (if on then iprop(emp)
+       else iprop(A.cons c (obsBoots h + 1) [] ⟨[], [], [], none⟩ ∗ A.turn c (obsBoots h + 1))))
   /-- THE DRAIN AT EVERY PORT (Rocq `al_tx`): a byte that reached the wire
   moves the ledger, the port's claim lent at a witness prefix and given back. -/
   al_tx : ∀ [MachGS hlc GF] [Fscfg] (c : A.fixed) (i : UartId) (γ : UartNames),
@@ -138,14 +138,14 @@ class Xv6AppLaws {hlc : HasLC} {GF : BundledGFunctors} [MachGpreS hlc GF] [Xv6G 
   al_xfer : ∀ (c : A.fixed) (k : Nat), ⊢@{IProp GF} appXferBootRaw (A.pred c) (A.boot c k)
   /-- THE FIRST PROCESS'S EXEC BUNDLE at every era, at any record whose
   interface slots are the application's and whose generation counter is the
-  pre-structure's (deviation 2).  AMEND-K1/K3: follows `EraInitBoot` (the
-  turn, then the seccomp argument). -/
+  pre-structure's (deviation 2), handed the era's turn.  AMEND-K3: follows
+  `EraInitBoot` (the seccomp argument). -/
   al_programs : ∀ [F : MachFixedGS hlc GF] (c : A.fixed),
     MachFixedGS.rxTag (hlc := hlc) (GF := GF) = A.tag c →
     MachFixedGS.killCred (hlc := hlc) (GF := GF) = A.kill c →
     MachFixedGS.consRes (hlc := hlc) (GF := GF) = A.cons c →
     MachFixedGS.mono (hlc := hlc) (GF := GF) = MachGpreS.mono_pre (hlc := hlc) →
-    EraInitBoot (hlc := hlc) A.names A.pred A.boot c
+    EraInitBoot (hlc := hlc) A.names A.pred A.boot A.turn c
   /-- THE ECHO'S JUSTIFICATION at every era, at any record whose interface
   slots are the application's. -/
   al_echo : ∀ [F : MachFixedGS hlc GF] (c : A.fixed),
@@ -197,7 +197,7 @@ theorem xv6AppAdequacy (g : GState) (sb : FsSb) (nib : Nat) (cov : ExtTreeSet Na
     (∀ e2, e2 ∈ t2 → Reducible (e2, g2)) ∧ A.phi g2 κs :=
   xv6PowerAdequacyGen (hlc := hlc) (GF := GF) g sb nib cov
     A.fixed A.cl AL.al_birth
-    A.names A.pred A.boot A.ifc
+    A.names A.pred A.boot A.ifc A.turn
     AL.al_xfer Happ_init
     (fun γobs c => obsLedgerAt (A.R c) γobs)
     (fun Hinv γgen γstart γreg γd γsw γobs γhist c T =>
@@ -208,7 +208,8 @@ theorem xv6AppAdequacy (g : GState) (sb : FsSb) (nib : Nat) (cov : ExtTreeSet Na
         γreg γd γsw γobs γhist c T (obsLedgerAt (A.R c) γobs)) c rfl rfl rfl)
     (fun γobs c => obsLedgerAt_alloc_cl (A.R c) γobs (A.cl c) (AL.al_R0 c))
     (fun γd γobs c h on dk hs =>
-      obsLedgerAt_step (A.R c) (A.cons c) (AL.al_pow c) XV6_DISK_BYTES γd γobs h on dk hs)
+      obsLedgerAt_step (A.R c) (A.cons c) (A.turn c) (AL.al_pow c) XV6_DISK_BYTES γd γobs h on dk
+        hs)
     -- the permit at the ledger (Rocq's `Hperm` assertion): the application's
     -- two wands at the era's instance, the ledger/tag/claim equations by `rfl`
     -- at the literal
@@ -241,7 +242,8 @@ interface equations instead of the literal. -/
 theorem appTriv_initBoot (US : USER) (c : Unit)
     (hkill : MachFixedGS.killCred (hlc := hlc) (GF := GF) = (appTriv GF).kill c)
     (hcons : MachFixedGS.consRes (hlc := hlc) (GF := GF) = (appTriv GF).cons c) :
-    EraInitBoot (hlc := hlc) (GF := GF) (appTriv GF).names (appTriv GF).pred (appTriv GF).boot c := by
+    EraInitBoot (hlc := hlc) (GF := GF) (appTriv GF).names (appTriv GF).pred (appTriv GF).boot
+      (appTriv GF).turn c := by
   intro E gen cP cI W HFd HBs HIr I Fc r
   letI : MachGS hlc GF := MachGS.ofEra E gen cP cI
   letI : Appcfg GF := ⟨(appTriv GF).names, (appTriv GF).pred c, r⟩
@@ -252,7 +254,7 @@ theorem appTriv_initBoot (US : USER) (c : Unit)
     exact BI.true_intro
   have hlic : ⊢@{IProp GF} consLicence (hlc := hlc) := consLicence_triv hcons
   have hgen : ⊢@{IProp GF} □ uexecWp (hlc := hlc) (GF := GF) := (UexecGen US).uexec_wp_gen
-  iintro _ _
+  iintro _ _ _
   ihave #Hs := hsup
   ihave #Hk := hkc
   ihave #Hl := hlic
@@ -292,11 +294,15 @@ theorem appTriv_laws (US : USER) : Xv6AppLaws (hlc := hlc) (appTriv GF) where
     iintro _; imodintro; iempintro
   al_pow := fun _ h on _ _ => by
     show iprop(emp) ⊢@{IProp GF} |==> (iprop(emp) ∗
-      (if on then iprop(emp) else consResTriv (GF := GF) (obsBoots h + 1) [] ⟨[], [], [], none⟩))
+      (if on then iprop(emp)
+       else iprop(consResTriv (GF := GF) (obsBoots h + 1) [] ⟨[], [], [], none⟩ ∗ iprop(emp))))
     iintro -
     imodintro
     cases on
-    · simp only [Bool.false_eq_true, ↓reduceIte, consResTriv]; isplitl <;> iempintro
+    · simp only [Bool.false_eq_true, ↓reduceIte, consResTriv]
+      isplitl []
+      · iempintro
+      · isplitl [] <;> iempintro
     · simp only [↓reduceIte]; isplitl <;> iempintro
   al_tx := fun c i γ _ => by
     dsimp only [appTriv, Xv6App.cons, appIfaceTriv]

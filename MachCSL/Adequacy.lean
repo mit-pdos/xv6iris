@@ -34,7 +34,8 @@ In Rocq order: `CT`/`Cl`/`Hbirth` (the application's birth step, run first),
 `Pc`/`HPc` (the crash predicate, allocated ONCE into its fixed-layer
 invariant at `crashN`), [`Ppure`/`Hproj`/`Mof`/`Rb`/`Hswap`: see CRASH
 below], `Pt`/`HPt`/`Hobs` (the trace predicate and its power hook), `Tg`,
-`Kc`, `Cres` (record slots at the application's fixed part), `phi`/`Hphi`
+`Kc`, `Cres` (record slots at the application's fixed part), `Tn` (the era's
+turn, Rocq's `Tn : CT -> nat -> iProp`, not a slot), `phi`/`Hphi`
 (consumptive, at the raw gnames, over `powerInterp` at the literal, the
 machine's history half, `obsWf`, `▷ Pc`, `▷ Pt`), `Hgen0`/`Hpow`, and
 `Hboot`, which is handed the record's SHAPE as an equation
@@ -44,9 +45,10 @@ Deviations from Rocq (all inherited from the current MachCSL record, none
 introduced here):
 * no `D`/`nproc`/`ndisk` (Lean's `bootFacts` fixes the geometry);
 * `Ores`/`Ires` are gone (Lean has the merged console resource `consRes`,
-  Rocq's redesign R2 `Cres`); the echo window token `Wres` and the init turn
-  `Tn` are not ported (`wp_power`'s header), so `Hobs`'s on-arm yields
-  `Cres c (obsBoots h + 1) [] ⟨[],[],[],none⟩` only;
+  Rocq's redesign R2 `Cres`); `Hobs`'s on-arm yields
+  `Cres c (obsBoots h + 1) [] ⟨[],[],[],none⟩ ∗ Tn c (obsBoots h + 1)`, as
+  Rocq @ 1900b8a43 (the era's turn threaded by union DU6, reversing
+  D49 (a));
 * the record has no application fields (`riscv_client_T`/`riscv_client`):
   the value `c` is named by the hooks and the slots, not by the record.
 
@@ -221,7 +223,9 @@ The hooks, in Rocq's order:
 * `Pt`/`HPt` -- the trace predicate, born from the birth's yield and the
   client's half of the empty history, sealed into `obsInv`;
 * `Hobs` -- the power hook (durable authority lent): the client moves its
-  half by the power event and, on a power-on, founds the era's console claim;
+  half by the power event and, on a power-on, founds the era's console claim
+  and mints the era's turn `Tn c (obsBoots h + 1)`, which `powerBootRes`
+  carries to the boot as `Tn c (gen + 1)`;
 * `Tg`/`Kc`/`Cres` -- the record's application slots;
 * `phi`/`Hphi` -- the trace invariant, read off `powerInterp` at the literal,
   the machine's history half, `obsWf`, and the two fixed-layer predicates;
@@ -258,6 +262,7 @@ theorem riscvPowerAdequacy [MachGpreS hlc GF] [KernelMap] (ndisk : Nat) (g : GSt
     (Kc : CT → IProp GF) (HKc : ∀ c, Persistent (Kc c)) (HKct : ∀ c, Timeless (Kc c))
     (Cres : CT → Nat → List Obs → ConsHist → IProp GF)
     (HCrest : ∀ c k h H, Timeless (Cres c k h H))
+    (Tn : CT → Nat → IProp GF)
     (HPt : ∀ (γobs : GName) (c : CT),
       Cl c ∗ (γobs ↪VAR{.own (1 : Qp).half} ([] : List Obs)) ⊢@{IProp GF} |==> Pt γobs c)
     (Hobs : ∀ (γdisk γobs : GName) (c : CT) (h : List Obs) (on : Bool) (dk : Nat → BitVec 8),
@@ -265,7 +270,8 @@ theorem riscvPowerAdequacy [MachGpreS hlc GF] [KernelMap] (ndisk : Nat) (g : GSt
       diskImgAuthSized γdisk ndisk dk ∗ ▷ Pt γobs c ∗ (γobs ↪VAR{.own (1 : Qp).half} h) ⊢@{IProp GF}
         |==> ◇ (diskImgAuthSized γdisk ndisk dk ∗ ▷ Pt γobs c ∗
           (γobs ↪VAR{.own (1 : Qp).half} (h ++ [powerEv on])) ∗
-          (if on then iprop(emp) else Cres c (obsBoots h + 1) [] ⟨[], [], [], none⟩)))
+          (if on then iprop(emp)
+           else iprop(Cres c (obsBoots h + 1) [] ⟨[], [], [], none⟩ ∗ Tn c (obsBoots h + 1)))))
     (phi : GState → List Obs → Prop)
     (Hphi : ∀ (Hinv : InvGS_gen hlc GF) (γgen γstart γreg γdisk γswap γobs γhist : GName) (c : CT)
         (T : List Obs) (g' : GState) (h : List Obs),
@@ -283,7 +289,7 @@ theorem riscvPowerAdequacy [MachGpreS hlc GF] [KernelMap] (ndisk : Nat) (g : GSt
       ∀ (E : EraGS) (gen : Nat) (σ : MState), bootFacts σ →
         (∃ ds0 : DevStates, σ.devs = ds0.reset) →
         Ppure (diskOf σ.devs) →
-        obsInv ∗ powerBootRes Mof (Rb c) E gen σ ⊢@{IProp GF} |={⊤}=>
+        obsInv ∗ powerBootRes Mof (Rb c) (Tn c) E gen σ ⊢@{IProp GF} |={⊤}=>
           ([∗list] cpu ∈ cpus, hartWP gen cpu (pure ())) ∗
           ([∗list] d ∈ DevId.all, devWP gen d rootTask (pure ())))
     (n : Nat) (κs : List Obs) (t2 : List Expr) (g2 : GState)
@@ -343,7 +349,7 @@ theorem riscvPowerAdequacy [MachGpreS hlc GF] [KernelMap] (ndisk : Nat) (g : GSt
       (Pc γdisk γswap γreg γstart c) γobs T (Pt γobs c) γhist
       (Tg c) (HTg c) (HTgt c) (Kc c) (HKc c) (HKct c) (Cres c) (HCrest c)).withInv Hinv) _
       Ppure (fun dk => Hproj γdisk γswap γreg γstart c dk)
-      Mof (Rb c) (fun E gen dk => Hswap γdisk γswap γreg γstart c E gen dk)
+      Mof (Rb c) (Tn c) (fun E gen dk => Hswap γdisk γswap γreg γstart c E gen dk)
       (fun h on dk hs => Hobs γdisk γobs c h on dk hs)
       (fun E gen σ hbf hdv hpp => @Hboot ((bootFixedGS Hinv γgen γstart γreg γdisk ndisk γswap
         (Pc γdisk γswap γreg γstart c) γobs T (Pt γobs c) γhist
@@ -417,12 +423,15 @@ theorem obsPredAt_alloc_cl {CT : Type} (Cl : CT → IProp GF) (γ : GName) (c : 
   iapply obsPredAt_alloc γ $$ H
 
 theorem obsPredAt_step (ndisk : Nat) (C : Nat → List Obs → ConsHist → IProp GF)
+    (Tn : Nat → IProp GF)
     (HC : ∀ k : Nat, ⊢@{IProp GF} C k [] ⟨[], [], [], none⟩)
+    (HTn : ∀ k : Nat, ⊢@{IProp GF} Tn k)
     (γdisk γ : GName) (h : List Obs) (on : Bool) (dk : Nat → BitVec 8) (_ : traceShape h on) :
     diskImgAuthSized γdisk ndisk dk ∗ ▷ obsPredAt γ ∗ (γ ↪VAR{.own (1 : Qp).half} h) ⊢@{IProp GF}
       |==> ◇ (diskImgAuthSized γdisk ndisk dk ∗ ▷ obsPredAt γ ∗
         (γ ↪VAR{.own (1 : Qp).half} (h ++ [powerEv on])) ∗
-        (if on then iprop(emp) else C (obsBoots h + 1) [] ⟨[], [], [], none⟩)) := by
+        (if on then iprop(emp)
+         else iprop(C (obsBoots h + 1) [] ⟨[], [], [], none⟩ ∗ Tn (obsBoots h + 1)))) := by
   unfold obsPredAt
   iintro ⟨Hdk, ⟨%h', >Hfrag⟩, Hauth⟩
   ihave %he := ghost_var_agree γ h' _ h _ $$ Hfrag Hauth
@@ -435,7 +444,10 @@ theorem obsPredAt_step (ndisk : Nat) (C : Nat → List Obs → ConsHist → IPro
   · inext; iexists _; iexact Hfrag
   iframe Hauth
   cases on
-  · simp only [Bool.false_eq_true, ↓reduceIte]; iapply HC
+  · simp only [Bool.false_eq_true, ↓reduceIte]
+    isplitl []
+    · iapply HC
+    · iapply HTn
   · simp only [↓reduceIte]; itrivial
 
 /-- The ledger at a raw gname (Rocq `obs_ledger_at`); convertible with
@@ -454,16 +466,18 @@ theorem obsLedgerAt_alloc_cl (R : List Obs → IProp GF) (γ : GName) (P : IProp
   iframe H HR
 
 theorem obsLedgerAt_step (R : List Obs → IProp GF) [∀ h, Timeless (R h)]
-    (C : Nat → List Obs → ConsHist → IProp GF)
+    (C : Nat → List Obs → ConsHist → IProp GF) (Tn : Nat → IProp GF)
     (Hpow : ∀ (h : List Obs) (on : Bool) (dk : Nat → BitVec 8), traceShape h on →
       R h ⊢@{IProp GF} |==> (R (h ++ [powerEv on]) ∗
-        (if on then iprop(emp) else C (obsBoots h + 1) [] ⟨[], [], [], none⟩)))
+        (if on then iprop(emp)
+         else iprop(C (obsBoots h + 1) [] ⟨[], [], [], none⟩ ∗ Tn (obsBoots h + 1)))))
     (ndisk : Nat) (γdisk γ : GName) (h : List Obs) (on : Bool) (dk : Nat → BitVec 8)
     (hs : traceShape h on) :
     diskImgAuthSized γdisk ndisk dk ∗ ▷ obsLedgerAt R γ ∗ (γ ↪VAR{.own (1 : Qp).half} h) ⊢@{IProp GF}
       |==> ◇ (diskImgAuthSized γdisk ndisk dk ∗ ▷ obsLedgerAt R γ ∗
         (γ ↪VAR{.own (1 : Qp).half} (h ++ [powerEv on])) ∗
-        (if on then iprop(emp) else C (obsBoots h + 1) [] ⟨[], [], [], none⟩)) := by
+        (if on then iprop(emp)
+         else iprop(C (obsBoots h + 1) [] ⟨[], [], [], none⟩ ∗ Tn (obsBoots h + 1)))) := by
   unfold obsLedgerAt
   iintro ⟨Hdk, ⟨%h', >Hfrag, >HR⟩, Hauth⟩
   ihave %he := ghost_var_agree γ h' _ h _ $$ Hfrag Hauth
@@ -518,7 +532,7 @@ theorem bootFixedGS_obsLedger (R : List Obs → IProp GF)
 
 /-- THE PACKAGED TRACE THEOREM (Rocq `riscv_trace_adequacy` :2037):
 `riscvPowerAdequacy` at the ledger, the trivial application (`CT := Unit`)
-and the trivial slots; the crash hooks are passed straight through; the
+and the trivial slots, the era's turn `emp` (Rocq: `fun _ _ => emp`); the crash hooks are passed straight through; the
 client gets `P` of the run's observable trace. -/
 theorem riscvTraceAdequacy [KernelMap] (ndisk : Nat) (g : GState)
     (Pc : GName → GName → GName → GName → IProp GF)
@@ -555,7 +569,7 @@ theorem riscvTraceAdequacy [KernelMap] (ndisk : Nat) (g : GState)
       ∀ (E : EraGS) (gen : Nat) (σ : MState), bootFacts σ →
         (∃ ds0 : DevStates, σ.devs = ds0.reset) →
         Ppure (diskOf σ.devs) →
-        obsInv ∗ powerBootRes Mof (fun _ => Rb) E gen σ ⊢@{IProp GF} |={⊤}=>
+        obsInv ∗ powerBootRes Mof (fun _ => Rb) (fun _ => iprop(emp)) E gen σ ⊢@{IProp GF} |={⊤}=>
           ([∗list] cpu ∈ cpus, hartWP gen cpu (pure ())) ∗
           ([∗list] d ∈ DevId.all, devWP gen d rootTask (pure ())))
     (n : Nat) (κs : List Obs) (t2 : List Expr) (g2 : GState)
@@ -571,15 +585,16 @@ theorem riscvTraceAdequacy [KernelMap] (ndisk : Nat) (g : GState)
     (fun _ => rxTagTriv) (fun _ _ => inferInstance) (fun _ _ => inferInstance)
     (fun _ => killCredTriv) (fun _ => inferInstance) (fun _ => inferInstance)
     (fun _ => consResTriv) (fun _ _ _ _ => inferInstance)
+    (fun _ _ => iprop(emp))
     (fun γobs _ => obsLedgerAt_alloc_cl R γobs iprop(True) (by iintro _; iapply HR0))
-    (fun γdisk γobs _ h on dk hs => obsLedgerAt_step R consResTriv
+    (fun γdisk γobs _ h on dk hs => obsLedgerAt_step R consResTriv (fun _ => iprop(emp))
       (fun h on dk hs => by
         iintro Hr
         imod Hpow h on dk hs $$ Hr with Hr
         imodintro
         iframe Hr
         cases on
-        · simp only [Bool.false_eq_true, ↓reduceIte, consResTriv]; itrivial
+        · simp only [Bool.false_eq_true, ↓reduceIte, consResTriv]; isplitl [] <;> iempintro
         · simp only [↓reduceIte]; itrivial)
       ndisk γdisk γobs h on dk hs)
     (fun _ h => P h)

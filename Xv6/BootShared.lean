@@ -12,7 +12,8 @@ thread hands `Hboot` (`MachCSL.powerBootRes`).  Parts 1 and 2 are
 * §1 `powerBootRes_unpack` (Rocq `power_boot_res_unpack`): at `Hboot`'s era
   instance `MachGS.ofEra E gen cP cI` (ANY claim
   payload), `powerBootRes` is `powerBootRows` (its rows at the AMBIENT
-  forms) beside the client's lent resource `Rb gen dk`.  Pure conversion.
+  forms) beside the client's lent resource `Rb gen dk` and the era's turn
+  `Tn (gen + 1)`.  Pure conversion.
 * §2 the carve stages: `bootShared_image` (the read-only image, the GOT
   row, `.data`'s windows, `.bss`, the free run), `bootShared_harts` (the
   eight `bootHartRes` bundles beside the running tokens, Rocq
@@ -67,10 +68,14 @@ thread hands `Hboot` (`MachCSL.powerBootRes`).  Parts 1 and 2 are
    built from `regCellsNoPins`, and the wire invariant arrives already
    sealed on `powerBootRes` (`wireInvAt E`), so `boot_hart_pre`'s pin
    handback has no counterpart.
-3. **No `Tn` (the era's turn)** (D49 (a)): `powerBootRes` does not carry
-   it.  The console port's founded claim is `powerBootRes`'s
-   `consRes (gen+1) [] ⟨⟩`, spelled `chistAt .uart0 …` in
-   `powerBootRows`.
+3. **The era's turn `Tn` is handed to the caller, not threaded through the
+   allocation** (union DU6): `powerBootRes` carries `Tn (gen+1)` (Rocq's
+   `Tn` row) and `powerBootRes_unpack` returns it beside `Rb`, where Rocq's
+   `power_boot_res_unpack`/`boot_shared_alloc` carry it through the mint
+   untouched to the era's caller.  Nothing here reads it either way; the
+   caller (`xv6BootEra`) hands it to `<init>` (`EraInitBoot`).  The console
+   port's founded claim is `powerBootRes`'s `consRes (gen+1) [] ⟨⟩`,
+   spelled `chistAt .uart0 …` in `powerBootRows`.
 4. **The application rows are the caller's** (`bootSupplyCore` +
    `bootPrimarySupply_intro`): Rocq's `boot_shared_alloc` does not produce
    `init_boot_bundle` / `cons_echo_shift` either (`xv6_boot_era` does);
@@ -129,24 +134,27 @@ end rows
 
 section unpack
 
-/-- Pull the second-to-last row of a right-nested chain out to the right. -/
-theorem bs_pull {PROP : Type _} [BI PROP] (a1 a2 a3 a4 a5 a6 a7 a8 a9 a10 a11 a12 a13 r c : PROP) :
-    iprop(a1 ∗ a2 ∗ a3 ∗ a4 ∗ a5 ∗ a6 ∗ a7 ∗ a8 ∗ a9 ∗ a10 ∗ a11 ∗ a12 ∗ a13 ∗ r ∗ c) ⊢
-      iprop((a1 ∗ a2 ∗ a3 ∗ a4 ∗ a5 ∗ a6 ∗ a7 ∗ a8 ∗ a9 ∗ a10 ∗ a11 ∗ a12 ∗ a13 ∗ c) ∗ r) := by
-  iintro ⟨H1, H2, H3, H4, H5, H6, H7, H8, H9, H10, H11, H12, H13, Hr, Hc⟩
-  iframe Hr H1 H2 H3 H4 H5 H6 H7 H8 H9 H10 H11 H12 H13 Hc
+/-- Pull the second-to-last row (the lend `r`) and the twelfth (the turn `t`)
+of a right-nested chain out to the right. -/
+theorem bs_pull {PROP : Type _} [BI PROP] (a1 a2 a3 a4 a5 a6 a7 a8 a9 a10 a11 t a12 a13 r c : PROP) :
+    iprop(a1 ∗ a2 ∗ a3 ∗ a4 ∗ a5 ∗ a6 ∗ a7 ∗ a8 ∗ a9 ∗ a10 ∗ a11 ∗ t ∗ a12 ∗ a13 ∗ r ∗ c) ⊢
+      iprop((a1 ∗ a2 ∗ a3 ∗ a4 ∗ a5 ∗ a6 ∗ a7 ∗ a8 ∗ a9 ∗ a10 ∗ a11 ∗ a12 ∗ a13 ∗ c) ∗ r ∗ t) := by
+  iintro ⟨H1, H2, H3, H4, H5, H6, H7, H8, H9, H10, H11, Ht, H12, H13, Hr, Hc⟩
+  iframe Hr Ht H1 H2 H3 H4 H5 H6 H7 H8 H9 H10 H11 H12 H13 Hc
 
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachFixedGS hlc GF]
 
 /-- **Rocq `power_boot_res_unpack`**: at `Hboot`'s era instance
 (`MachGS.ofEra E gen …`, any claim payload), `powerBootRes`
-is the ambient rows plus the client's lent resource.  Pure conversion. -/
+is the ambient rows plus the client's lent resource and the era's turn
+(deviation 3).  Pure conversion. -/
 theorem powerBootRes_unpack (Mof : (Nat → BitVec 8) → LogMirror)
-    (Rb : Nat → (Nat → BitVec 8) → IProp GF) (E : EraGS) (gen : Nat)
+    (Rb : Nat → (Nat → BitVec 8) → IProp GF) (Tn : Nat → IProp GF) (E : EraGS) (gen : Nat)
     (cP : CPU → BitVec 64 → IProp GF) (cI : ∀ cpu : CPU, ⊢ cP cpu 0#64) (σ : MState) :
-    powerBootRes Mof Rb E gen σ ⊢
-      @powerBootRows hlc GF (MachGS.ofEra E gen cP cI) Mof σ ∗ Rb gen (diskOf σ.devs) :=
-  bs_pull _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+    powerBootRes Mof Rb Tn E gen σ ⊢
+      @powerBootRows hlc GF (MachGS.ofEra E gen cP cI) Mof σ ∗ Rb gen (diskOf σ.devs) ∗
+        Tn (gen + 1) :=
+  bs_pull _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
 
 end unpack
 

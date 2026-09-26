@@ -52,8 +52,13 @@ predicate's lend), every hart's `hartWP` and every device's `devWP`.
    (`uartObsPermit` reads no `Appcfg`) and keeps the console tie
    `i = .uart0 → fscUart = γ`; `EraEcho` is context-free (Lean's
    `consEchoShift` is).
-3. **No era turn `Tn`** (D49 (a), inherited from MachCSL): `EraInitBoot` has
-   no turn argument.
+3. **The era's turn `Tn`** (union DU6, reversing D49 (a)) is a function of
+   the era number, `Tn : CT → Nat → IProp GF`, applied inside (`Tn c
+   (gen + 1)`), where Rocq's `xv6_boot_era` takes it already applied (`Tn :
+   iProp`, instantiated at `app_turn A c (S gen_id)` by the caller).  It
+   reaches the era by `powerBootRes_unpack` beside the lend (BootShared
+   deviation 3), not through `bootSharedAlloc`, and `EraInitBoot` receives
+   it beside the boot resource, as Rocq's `Hinit_boot`.
 4. The hart split is `bootShared_peel`/`xv6Era_glue` over
    `cpus = startedPrimary :: cpus.tail` (Rocq `cpu_enum_cons` et al.), and
    the device loops take their permits as Lean-level entailments
@@ -333,15 +338,17 @@ variable [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF] [FsTopG GF] [FsLinkG G
 /-- THE FIRST PROCESS'S EXEC BUNDLE at every era (Rocq `xv6_boot_era`'s
 `Hinit_boot`): quantified over the era's instance and its minted classes,
 at the era's application record `⟨N, appFs c, r⟩`, handed the application's
-invariant and the era's boot resource. -/
+invariant, the era's boot resource and THE ERA'S TURN `Tn c (gen + 1)` (the
+application's own per-era credential, minted at the power-on step and
+carried by `powerBootRes`; Rocq `Tn -∗`). -/
 def EraInitBoot {CT : Type} (N : Type) (appFs : CT → N → Aview → IProp GF)
-    (appBoot : CT → Nat → N → IProp GF) (c : CT) : Prop :=
+    (appBoot : CT → Nat → N → IProp GF) (Tn : CT → Nat → IProp GF) (c : CT) : Prop :=
   ∀ (E : EraGS) (gen : Nat) (cP : CPU → BitVec 64 → IProp GF) (cI : ∀ cpu : CPU, ⊢ cP cpu 0#64)
    
     [WchG GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [Icfg] [Fscfg] (r : N),
     letI : MachGS hlc GF := MachGS.ofEra E gen cP cI
     letI : Appcfg GF := ⟨N, appFs c, r⟩
-    (⊢@{IProp GF} appInv (hlc := hlc) fscFs -∗ appBoot c (gen + 1) r ==∗
+    (⊢@{IProp GF} appInv (hlc := hlc) fscFs -∗ appBoot c (gen + 1) r -∗ Tn c (gen + 1) ==∗
       initBootBundle (hlc := hlc) (SG := uexecSGXv6) ROOTINO (List.replicate NOFILE FdState.closed))
 
 end inst
@@ -368,13 +375,13 @@ set_option maxHeartbeats 800000 in
 literal, out of the trace invariant and what the power thread hands the
 boot, every hart's and every device's thread. -/
 theorem xv6BootEra {CT : Type} (N : Type) (appFs : CT → N → Aview → IProp GF)
-    (appBoot : CT → Nat → N → IProp GF) (sb : FsSb) (cov : ExtTreeSet Nat compare)
-    (Ai : AppIface GF) (Hinv : InvGS_gen hlc GF) (γgen γstart γreg γd γsw γobs γhist : GName)
+    (appBoot : CT → Nat → N → IProp GF) (Tn : CT → Nat → IProp GF) (sb : FsSb)
+    (cov : ExtTreeSet Nat compare) (Ai : AppIface GF) (Hinv : InvGS_gen hlc GF) (γgen γstart γreg γd γsw γobs γhist : GName)
     (c : CT) (T : List Obs) (Ptp : IProp GF)
     (Happ_xfer : ⊢@{IProp GF} appXferRaw (appFs c))
     (Hinit_boot : letI : MachFixedGS hlc GF := (xv6FixedGS N appFs cov sb.sbLogstart Ai Hinv γgen
       γstart γreg γd γsw γobs γhist c T Ptp)
-      EraInitBoot (hlc := hlc) N appFs appBoot c)
+      EraInitBoot (hlc := hlc) N appFs appBoot Tn c)
     (Hecho : letI : MachFixedGS hlc GF := (xv6FixedGS N appFs cov sb.sbLogstart Ai Hinv γgen γstart
       γreg γd γsw γobs γhist c T Ptp)
       EraEcho (hlc := hlc) (GF := GF))
@@ -389,7 +396,7 @@ theorem xv6BootEra {CT : Type} (N : Type) (appFs : CT → N → Aview → IProp 
     letI : MachFixedGS hlc GF := (xv6FixedGS N appFs cov sb.sbLogstart Ai Hinv γgen γstart γreg γd
       γsw γobs γhist c T Ptp)
     obsInv ∗ powerBootRes (fun dk => mirrorOf (fsBlocks dk))
-        (xv6Lend N appFs appBoot cov sb.sbLogstart c) E gen σ ⊢@{IProp GF} |={⊤}=>
+        (xv6Lend N appFs appBoot cov sb.sbLogstart c) (Tn c) E gen σ ⊢@{IProp GF} |={⊤}=>
       ([∗list] cpu ∈ cpus, hartWP gen cpu (pure ())) ∗
       ([∗list] d ∈ DevId.all, devWP gen d rootTask (pure ())) := by
   letI F : MachFixedGS hlc GF := xv6FixedGS N appFs cov sb.sbLogstart Ai Hinv γgen γstart γreg γd
@@ -398,9 +405,9 @@ theorem xv6BootEra {CT : Type} (N : Type) (appFs : CT → N → Aview → IProp 
   obtain ⟨ds0, hds⟩ := hdv
   iintro ⟨#Hoinv, Hres⟩
   icases powerBootRes_unpack (fun dk => mirrorOf (fsBlocks dk))
-    (xv6Lend N appFs appBoot cov sb.sbLogstart c) E gen (fun _ _ => iprop(True))
+    (xv6Lend N appFs appBoot cov sb.sbLogstart c) (Tn c) E gen (fun _ _ => iprop(True))
     (fun _ => BI.true_intro) σ $$ Hres
-    with ⟨Hrows, Hlend⟩
+    with ⟨Hrows, Hlend, Hturn⟩
   imod xv6Era_lend N appFs appBoot c cov sb.sbLogstart gen (diskOf σ.devs) D hrec hhwf hcovin hlogsub
     hls2 $$ Hlend with ⟨%r, %gt, %gsn, %gln, %S, %⟨hlseq, hwf⟩, Hok, Hsnap, Hbres⟩
   -- the seam at the era's superblock, off the slot's value (the literal)
@@ -425,16 +432,22 @@ theorem xv6BootEra {CT : Type} (N : Type) (appFs : CT → N → Aview → IProp 
   ihave Hout := bootSharedOut_ofEra E gen (fun _ _ => iprop(True)) (procClaim Γ)
     (fun _ => BI.true_intro) (fun cpu => procClaim_idle Γ cpu) σ ξ0 Γ γ0 γ1 γc γl0 γl1 γt cn γd ξd (diskOf σ.devs) S.fssSb (fsNib S)
     cov (fsRecView (fsBlocks (diskOf σ.devs)) D) (snapSpent S (fsNib S)) $$ Hout
-  -- the first process's exec bundle, at the era's record, over the lent boot resource
+  -- the first process's exec bundle, at the era's record, over the lent boot
+  -- resource and the era's turn
   have hI := Hinit_boot E gen (procClaim Γ) (fun cpu => procClaim_idle Γ cpu) r
   have hR := (letI : MachGS hlc GF := M1; letI : Appcfg GF := ⟨N, appFs c, r⟩;
     haveI := hClaim;
     xv6Era_run (hlc := hlc) (GF := GF) σ ξ0 Γ γ0 γ1 γc γl0 γl1 γt cn γd ξd (diskOf σ.devs) S.fssSb
       (fsNib S) cov XV6_DISK_BYTES S (fsRecView (fsBlocks (diskOf σ.devs)) D) (snapSpent S (fsNib S))
       hwf (fun i γ hu => Hperm E gen (procClaim Γ) (fun cpu => procClaim_idle Γ cpu) i γ hu)
-      (appBoot c (gen + 1) r) hI)
-  imod hR $$ Hoinv [] Hbres Hout with ⟨Hharts, Hdevs, #Hcert⟩
+      iprop(appBoot c (gen + 1) r ∗ Tn c (gen + 1)) (by
+        iintro Hai ⟨Hb, Ht⟩
+        iapply hI $$ Hai Hb Ht))
+  imod hR $$ Hoinv [] [Hbres Hturn] Hout with ⟨Hharts, Hdevs, #Hcert⟩
   · iapply (Hecho E gen (procClaim Γ) (fun cpu => procClaim_idle Γ cpu))
+  · isplitl [Hbres]
+    · iexact Hbres
+    · iexact Hturn
   have hc : @genCert hlc GF M1 ⊢ genCertAt gen E := .rfl
   have hd : ([∗list] d ∈ DevId.all, devWP (@genId hlc GF M1) d rootTask (pure ())) ⊢@{IProp GF}
       [∗list] d ∈ DevId.all, devWP gen d rootTask (pure ()) := .rfl

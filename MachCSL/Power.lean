@@ -352,7 +352,13 @@ half (the device's invariant is the client's to build) -- and THE ERA'S
 CONSOLE CLAIM, FOUNDED (Rocq `power_boot_res`'s `riscv_cons_res (S gen) []
 (MkCH [] [] [] None)`): the application's yield at the power-on step
 (`wp_power`'s `Hobs`), carried here to the boot, which founds the console
-port's invariant with it.  `gen + 1` is this era's number.
+port's invariant with it.  `gen + 1` is this era's number.  ...AND THE ERA'S
+TURN (Rocq `power_boot_res`'s `Tn` row, lane CONS-IO milestone F; union DU6,
+reversing D49 (a)): the same power-on step's other yield, the application's
+own per-era credential `Tn (gen + 1)`, carried the same way to the boot, which
+hands it to `<init>`.  A parameter and not a field of the fixed record,
+because it is the application's own `IProp`; like `Rb` it is a function of
+the era number (Rocq passes it applied, `Tn (S gen)`).
 
 THE CRASH ROWS (Rocq `power_boot_res`'s mirror, swap-receipt, `Rb` and
 `crash_inv` rows), appended LAST: the era's mirror variable's HALF at the
@@ -362,8 +368,8 @@ other half went into the crash predicate's custody arm in the same step,
 resource lent out of the crash predicate at that disk (`Rb gen dk`), and the
 crash-spanning invariant -- the SAME one every boot gets. -/
 def powerBootRes [KernelMap] (Mof : (Nat → BitVec 8) → LogMirror)
-    (Rb : Nat → (Nat → BitVec 8) → IProp GF) (E : EraGS) (gen : Nat) (σ : MState) :
-    IProp GF := iprop%
+    (Rb : Nat → (Nat → BitVec 8) → IProp GF) (Tn : Nat → IProp GF) (E : EraGS) (gen : Nat)
+    (σ : MState) : IProp GF := iprop%
   (∃ r : BitVec 44, E.kptRootName ↪VAR r) ∗
   genCertAt gen E ∗
   ([∗list] cpu ∈ cpus, regCellsNoPins (E.regName cpu) (σ.regs cpu)) ∗
@@ -374,6 +380,7 @@ def powerBootRes [KernelMap] (Mof : (Nat → BitVec 8) → LogMirror)
   wireInvAt E ∗
   ([∗list] d ∈ DevId.all, devFragAt E d (σ.devs.st d)) ∗
   MachFixedGS.consRes (hlc := hlc) (GF := GF) (gen + 1) [] ⟨[], [], [], none⟩ ∗
+  Tn (gen + 1) ∗
   (E.mirrorName ↪VAR{.own (1 : Qp).half} (Mof (diskOf σ.devs))) ∗
   swapLb (gen + 1) ∗ Rb gen (diskOf σ.devs) ∗ crashInv
 
@@ -405,10 +412,14 @@ it off. -/
 def powerEv (on : Bool) : Obs := if on then .powerOff else .powerOn
 
 /-- What the client's trace hook yields at a power event: nothing at a
-power loss (it starts no era), the era's founded console claim at a
-power-on, at the era number `obsBoots h + 1` of the post-event history. -/
-def powerYield (on : Bool) (h : List Obs) : IProp GF :=
-  if on then iprop(emp) else MachFixedGS.consRes (hlc := hlc) (GF := GF) (obsBoots h + 1) [] ⟨[], [], [], none⟩
+power loss (it starts no era), the era's founded console claim and the
+era's turn `Tn` (Rocq `Hobs`'s on-arm, lane CONS-IO milestone F) at a
+power-on, both at the era number `obsBoots h + 1` of the post-event
+history. -/
+def powerYield (Tn : Nat → IProp GF) (on : Bool) (h : List Obs) : IProp GF :=
+  if on then iprop(emp)
+  else iprop(MachFixedGS.consRes (hlc := hlc) (GF := GF) (obsBoots h + 1) [] ⟨[], [], [], none⟩ ∗
+    Tn (obsBoots h + 1))
 
 /-- The power thread is safe, given the client's TRACE HOOK and the boot
 client: at every `PowerOn`, from the boot resources of the fresh era at the
@@ -420,7 +431,8 @@ lives in its trace predicate -- so each arm opens `obsN` and runs this:
 given the shape of the history so far (the power is `on`), the client moves
 its half by the arm's event.  At `obsHalf`, NOT `obsAuth`: the growth
 authority riding in `obsAuth` beside it is stepped by the arm itself.  On
-the power-on arm ONLY it FOUNDS THE ERA'S CONSOLE CLAIM (`powerYield`): the
+the power-on arm ONLY it FOUNDS THE ERA'S CONSOLE CLAIM and mints THE ERA'S
+TURN `Tn` (`powerYield`): the
 one step of the machine that runs the client's ledger exactly once per era,
 which is what makes a linear per-era seed mintable here and nowhere else;
 `powerBootRes` carries it to the boot.  A basic update under a `◇`, so the
@@ -445,9 +457,9 @@ authority in hand -- the one point of the run that holds both:
 Both are basic updates under a `◇`, so the client may strip its predicate's
 later; the started and durable authorities are lent and returned.
 
-Deviation from Rocq: Rocq's power-on yield also carries the echo window
-token (`riscv_win_res`) and the init turn (`Tn`); neither is ported yet
-(io-trace track, steps 2/4). -/
+Deviation from Rocq: Rocq's older power-on yield also carried the echo window
+token (`riscv_win_res`); Rocq @ 1900b8a43 yields the console claim and the
+turn only, as here. -/
 theorem wp_power [KernelMap]
     (Ppure : (Nat → BitVec 8) → Prop)
     (Hproj : ∀ dk : Nat → BitVec 8,
@@ -455,6 +467,7 @@ theorem wp_power [KernelMap]
         ◇ (diskFixedAuth dk ∗ ▷ MachFixedGS.crashPred (hlc := hlc) (GF := GF) ∗ ⌜Ppure dk⌝))
     (Mof : (Nat → BitVec 8) → LogMirror)
     (Rb : Nat → (Nat → BitVec 8) → IProp GF)
+    (Tn : Nat → IProp GF)
     (Hswap : ∀ (E : EraGS) (gen : Nat) (dk : Nat → BitVec 8),
       eraRegistered gen E ∗ genStarted gen ∗ startAuth (gen + 1) ∗ diskFixedAuth dk ∗
         (E.mirrorName ↪VAR (Mof dk)) ∗ ▷ MachFixedGS.crashPred (hlc := hlc) (GF := GF)
@@ -464,12 +477,12 @@ theorem wp_power [KernelMap]
     (Hobs : ∀ (h : List Obs) (on : Bool) (dk : Nat → BitVec 8), traceShape h on →
       diskFixedAuth dk ∗ ▷ MachFixedGS.obsPred (hlc := hlc) (GF := GF) ∗ obsHalf h ⊢@{IProp GF}
         |==> ◇ (diskFixedAuth dk ∗ ▷ MachFixedGS.obsPred (hlc := hlc) (GF := GF) ∗
-          obsHalf (h ++ [powerEv on]) ∗ powerYield on h))
+          obsHalf (h ++ [powerEv on]) ∗ powerYield Tn on h))
     (Hboot : ∀ (E : EraGS) (gen : Nat) (σ : MState),
       bootFacts σ →
       (∃ ds0 : DevStates, σ.devs = ds0.reset) →
       Ppure (diskOf σ.devs) →
-      obsInv ∗ powerBootRes Mof Rb E gen σ ⊢@{IProp GF} |={⊤}=>
+      obsInv ∗ powerBootRes Mof Rb Tn E gen σ ⊢@{IProp GF} |={⊤}=>
         ([∗list] cpu ∈ cpus, hartWP gen cpu (pure ())) ∗
         ([∗list] d ∈ DevId.all, devWP gen d rootTask (pure ()))) :
     crashInv ∗ obsInv ⊢@{IProp GF} WP Expr.power @ Stuckness.NotStuck; ⊤ {{ _v, True }} := by
@@ -593,14 +606,15 @@ theorem wp_power [KernelMap]
     imod (wireInvAt_alloc ⟨names, γh, γm, vn, ivn, rvn, γtop, γauth, γresv, lsn, γkmap, γkroot, dn, γmir⟩ ⊤
       (fun c => g₂.m.regs c Register.sig_seip) (fun c => g₂.m.regs c Register.sig_meip))
       $$ Hpins with #Hwire
-    ihave Hres : powerBootRes Mof Rb ⟨names, γh, γm, vn, ivn, rvn, γtop, γauth, γresv, lsn, γkmap, γkroot, dn, γmir⟩ g.gen g₂.m $$ [Hrc Hpts Hctx Hfrags' Hls Hkmap Hkst Hkroot Hdf Hyield Hmir HRb]
+    icases Hyield with ⟨Hyield, Hturn⟩
+    ihave Hres : powerBootRes Mof Rb Tn ⟨names, γh, γm, vn, ivn, rvn, γtop, γauth, γresv, lsn, γkmap, γkroot, dn, γmir⟩ g.gen g₂.m $$ [Hrc Hpts Hctx Hfrags' Hls Hkmap Hkst Hkroot Hdf Hyield Hturn Hmir HRb]
     · unfold powerBootRes genCertAt memCells kmapStaticAt crashInv
       rw [hdk]
       iframe Hmir HRb Hswlb Hcinv
       isplitl [Hkroot]
       · iexists 0#44
         iexact Hkroot
-      iframe Hrc Hpts Hkmap Hkst Hwire Hdf Hyield
+      iframe Hrc Hpts Hkmap Hkst Hwire Hdf Hyield Hturn
       isplitr [Hctx Hfrags' Hls]
       · isplit
         · iexact Hborn

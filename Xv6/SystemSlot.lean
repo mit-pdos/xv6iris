@@ -77,7 +77,8 @@ mint's ledger, the claim at its view, and `fsBootSnapWf`).
 * `cpu_enum_cons`, `big_sepL_cpu_split/peel/glue`, `fin_FS_nz`, `fin_0_z`
   (§1, the hart peel): SA-7's, beside `xv6BootEra`, where `cpus` is split.
 * `cons_res_triv_founded`, `turn_triv_founded`: one-line `iempintro`s at the
-  unit instance's call site (SA-7); `turn` is not carried (D49 (a)).
+  unit instance's call site (SA-7): the turn is `emp` there (`.rfl`; union DU6
+  threads it, reversing D49 (a)).
 * `fs_boot_supply_uart`: a projection of `fsBootSupply`, SA-5/SA-7's.
 
 ## Dependency on SA-M

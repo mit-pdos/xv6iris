@@ -9,8 +9,7 @@ application record, because the user's real target, union adequacy (Rocq
 Only the DATA is ported here: the record `Xv6App` (Rocq `xv6_app`), its
 interface projections (`app_tag`/`app_kill`/`app_cons`), and the generic
 application `appTriv` (Rocq `app_triv`).  The LAWS (Rocq's class
-`xv6_app_laws`) and the theorem `xv6_app_adequacy` are NOT ported: they are
-the obligations of the generic system theorem (SA-7), stated there first.
+`xv6_app_laws`) and the theorem `xv6_app_adequacy` are `Xv6/AppLaws.lean`.
 
 Rocq's header on the record, kept because the reasons are the content:
 
@@ -44,11 +43,12 @@ Rocq's header on the record, kept because the reasons are the content:
    `app_R`/`app_ifc`/`app_turn`/`app_phi` are `fixed`/`cl`/`names`/`pred`/
    `boot`/`R`/`ifc`/`turn`/`phi`.  `aview` is `Aview`, `gstate` is
    `GState`, `mobs` is `Obs`, `LogEntryDefs.cons_hist` is `ConsHist`.
-3. **`turn` is ported but not yet carried.**  Lean's `MachCSL.wp_power` does
-   not thread the era's turn (`Tn`, `MachCSL/Adequacy.lean` header), so no
-   Lean theorem reads `Xv6App.turn` yet (D49 (a)); the field is here so the
-   record has Rocq's shape and union can instantiate it.  `appTriv`'s turn is
-   `emp`, as Rocq's.
+3. (Retired, union DU6 / K1.)  `turn` is carried: `MachCSL.wp_power`'s
+   power-on arm mints `Tn (obsBoots h + 1)` and `powerBootRes` carries
+   `Tn (gen + 1)` to the boot, so `AppLaws.al_pow` mints
+   `A.turn c (obsBoots h + 1)` and `al_programs` (`EraInitBoot`) hands
+   `A.turn c (gen + 1)` to `<init>`, as Rocq's.  `appTriv`'s turn is `emp`,
+   as Rocq's.
 4. The three timelessness/persistence facts are fields, as Rocq's, and are
    also registered as instances on the projections (Rocq's `Global Instance
    app_tag_persistent` etc.).
@@ -161,7 +161,8 @@ structure Xv6App (GF : BundledGFunctors) where
   R : fixed → List Obs → IProp GF
   /-- THE CONSOLE INTERFACE, as one field (redesign R4) -/
   ifc : fixed → AppIface GF
-  /-- THE ERA'S CONSOLE TURN (deviation 3: not yet carried by MachCSL) -/
+  /-- THE ERA'S CONSOLE TURN: minted at the era's power-on step, handed to
+  `<init>` (Rocq `app_turn`) -/
   turn : fixed → Nat → IProp GF
   /-- the conclusion, over the operational state and the run's trace -/
   phi : GState → List Obs → Prop
