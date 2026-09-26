@@ -301,7 +301,7 @@ theorem sys_open_ec_fail (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ] (k : KCt
     sysOpenAny (sysOpenPath (k.regs 2#5)) 128 ∗
     procPrivFd A.γ (procAddr A.j) A.pid (sysOpenV2 A P2) (sysOpenM2 A P2) ∗
     logOp icfgLog u ∗ bslots 3 ∗ irefSlots A.ns ∗ fdSlot ∗ fdFrags A.V.fdg A.sts ∗
-    creFailArms (hlc := hlc) (fsGammaL fscFs) fscFs T_FILE_w.toNat 0 0 (fun _ => True) (fun _ => True) A.P A.Pmiss Farm
+    creFailArms (hlc := hlc) (fsGammaL fscFs) fscFs T_FILE_w.toNat 0 0 (nparNm (sysOpenIm A) A.v.toNat) (fun _ => True) A.P A.Pmiss Farm
       (pfamTriv (fun _ _ _ _ => iprop(True))) Fun Fok Fex pl ∗
     pfAt (aopenCommitAt (hlc := hlc) (fsGammaL fscFs) appE) A.Fo ∗
     openTruncPiece (hlc := hlc) (fsGammaL fscFs) A.vom A.Ft ∗
@@ -371,7 +371,7 @@ theorem sys_open_ec_fresh (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ] (k : KC
     sysOpenKeep kk s g inum ∗
     procPrivFd A.γ (procAddr A.j) A.pid (sysOpenV2 A P2) (sysOpenM2 A P2) ∗
     logOpb icfgLog u ∗ bslots 3 ∗ irefSlots nsj ∗ fdSlot ∗ fdFrags A.V.fdg A.sts ∗
-    creOkArms (hlc := hlc) (fsGammaL fscFs) T_FILE_w.toNat 0 0 (fun _ => True) (fun _ => True) A.P Farm
+    creOkArms (hlc := hlc) (fsGammaL fscFs) T_FILE_w.toNat 0 0 (nparNm (sysOpenIm A) A.v.toNat) (fun _ => True) A.P Farm
       (pfamTriv (fun _ _ _ _ => iprop(True))) Fun Fok Fex pl true inum.toNat ∗
     pfAt (aopenCommitAt (hlc := hlc) (fsGammaL fscFs) appE) A.Fo ∗
     openTruncPiece (hlc := hlc) (fsGammaL fscFs) A.vom A.Ft ∗
@@ -384,7 +384,7 @@ theorem sys_open_ec_fresh (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ] (k : KC
   -- THE RESIDUE: create's payout, the two refunded commits, the inum bound
   ihave HR : sysOpenCrFresh (hlc := hlc) (fsGammaL fscFs) A.P Farm Fun Fok Fex A.Fo pl inum.toNat
     $$ [Hcauf Hoc]
-  · ihave H := creOkFile_fresh (hlc := hlc) (fsGammaL fscFs) 0 0 (fun _ => True) (fun _ => True) A.P Farm _ Fun Fok Fex pl inum.toNat
+  · ihave H := creOkFile_fresh (hlc := hlc) (fsGammaL fscFs) 0 0 (nparNm (sysOpenIm A) A.v.toNat) (fun _ => True) A.P Farm _ Fun Fok Fex pl inum.toNat
       $$ Hcauf
     icases H with ⟨%d, %nm, %av, %ents, %nl, %hl, %hpre, HP, HΦ, Hdl, Hun⟩
     -- the unarm leg comes back at the trivial node predicate (INIT-FILE)
@@ -456,7 +456,7 @@ theorem sys_open_ec_exists (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ] (k : K
     sysOpenKeep kk s g inum ∗
     procPrivFd A.γ (procAddr A.j) A.pid (sysOpenV2 A P2) (sysOpenM2 A P2) ∗
     logOpb icfgLog u ∗ bslots 3 ∗ irefSlots nsj ∗ fdSlot ∗ fdFrags A.V.fdg A.sts ∗
-    creOkArms (hlc := hlc) (fsGammaL fscFs) T_FILE_w.toNat 0 0 (fun _ => True) (fun _ => True) A.P Farm
+    creOkArms (hlc := hlc) (fsGammaL fscFs) T_FILE_w.toNat 0 0 (nparNm (sysOpenIm A) A.v.toNat) (fun _ => True) A.P Farm
       (pfamTriv (fun _ _ _ _ => iprop(True))) Fun Fok Fex pl false inum.toNat ∗
     pfAt (aopenCommitAt (hlc := hlc) (fsGammaL fscFs) appE) A.Fo ∗
     openTruncPiece (hlc := hlc) (fsGammaL fscFs) A.vom A.Ft ∗
@@ -479,12 +479,11 @@ theorem sys_open_ec_exists (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ] (k : K
   ihave Hflat := Hflatb $$ Htop
   ihave Hobs := sys_open_cr_obs_tag inum.toNat (eraNode dn bm data) A.Fo $$ Hobs0
   -- THE RESIDUE: create's payout
-  ihave HR : sysOpenCrExists (hlc := hlc) (fsGammaL fscFs) A.P Farm Fun Fok Fex pl inum.toNat
+  ihave HR : sysOpenCrExists (hlc := hlc) (fsGammaL fscFs) (nparNm (sysOpenIm A) A.v.toNat) A.P Farm Fun Fok Fex pl inum.toNat
     $$ [Hcauf]
-  · ihave H := creOkFile_exists (hlc := hlc) (fsGammaL fscFs) 0 0 (fun _ => True) (fun _ => True) A.P Farm _ Fun Fok Fex pl
+  · ihave H := creOkFile_exists (hlc := hlc) (fsGammaL fscFs) 0 0 (nparNm (sysOpenIm A) A.v.toNat) (fun _ => True) A.P Farm _ Fun Fok Fex pl
       inum.toNat $$ Hcauf
     icases H with ⟨%d, %nm, %av, %ents, %nl, %hl, %hrow, %hent, HP, HΦ, Hac, Hcl⟩
-    ihave Hac := openAcreFile_of_triv (fsGammaL fscFs) _ Farm Fok $$ Hac
     ihave Hcl := creChildUnfired_of_ndp (hlc := hlc) (fsGammaL fscFs) (.AFile []) (fun _ => True)
       Farm Fun (fun _ => trivial) $$ Hcl
     unfold sysOpenCrExists
@@ -495,14 +494,14 @@ theorem sys_open_ec_exists (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ] (k : K
   ihave HΦ := sys_open_cr_post_exists k A Farm Fun Fok Fex pl inum.toNat
     (absRow (eraNode dn bm data)) hpl (sys_open_ec_nd dn bm data hty) $$ HΦ
   let A' := sysOpenCrA A
-    (sysOpenCrP (sysOpenCrExists (hlc := hlc) (fsGammaL fscFs) A.P Farm Fun Fok Fex pl inum.toNat)
+    (sysOpenCrP (sysOpenCrExists (hlc := hlc) (fsGammaL fscFs) (nparNm (sysOpenIm A) A.v.toNat) A.P Farm Fun Fok Fex pl inum.toNat)
       inum.toNat)
-    (sysOpenCrPm (sysOpenCrExists (hlc := hlc) (fsGammaL fscFs) A.P Farm Fun Fok Fex pl inum.toNat))
+    (sysOpenCrPm (sysOpenCrExists (hlc := hlc) (fsGammaL fscFs) (nparNm (sysOpenIm A) A.v.toNat) A.P Farm Fun Fok Fex pl inum.toNat))
     (sysOpenCrFoTag inum.toNat (absRow (eraNode dn bm data)) A.Fo)
   have hJ' := hJ
-    (sysOpenCrP (sysOpenCrExists (hlc := hlc) (fsGammaL fscFs) A.P Farm Fun Fok Fex pl inum.toNat)
+    (sysOpenCrP (sysOpenCrExists (hlc := hlc) (fsGammaL fscFs) (nparNm (sysOpenIm A) A.v.toNat) A.P Farm Fun Fok Fex pl inum.toNat)
       inum.toNat)
-    (sysOpenCrPm (sysOpenCrExists (hlc := hlc) (fsGammaL fscFs) A.P Farm Fun Fok Fex pl inum.toNat))
+    (sysOpenCrPm (sysOpenCrExists (hlc := hlc) (fsGammaL fscFs) (nparNm (sysOpenIm A) A.v.toNat) A.P Farm Fun Fok Fex pl inum.toNat))
     (sysOpenCrFoTag inum.toNat (absRow (eraNode dn bm data)) A.Fo)
   unfold sysOpenJoinBody at hJ'
   ihave #Henv := (show sysOpenEnv (hlc := hlc) (GF := GF) Γ A ⊢ sysOpenEnv (hlc := hlc) Γ A'
@@ -546,7 +545,7 @@ theorem sys_open_ec_ok (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ] (k : KCtx)
     procPrivFd A.γ (procAddr A.j) A.pid (sysOpenV2 A P2) (sysOpenM2 A P2) ∗
     logOpS icfgLog u Sb ∗ bslots 3 ∗ irefSlots nsj ∗ fdSlot ∗ fdFrags A.V.fdg A.sts ∗
     createLocked A.pid kk qi s g inum dn bm ∗
-    creOkArms (hlc := hlc) (fsGammaL fscFs) T_FILE_w.toNat 0 0 (fun _ => True) (fun _ => True) A.P Farm
+    creOkArms (hlc := hlc) (fsGammaL fscFs) T_FILE_w.toNat 0 0 (nparNm (sysOpenIm A) A.v.toNat) (fun _ => True) A.P Farm
       (pfamTriv (fun _ _ _ _ => iprop(True))) Fun Fok Fex pl made inum.toNat ∗
     pfAt (aopenCommitAt (hlc := hlc) (fsGammaL fscFs) appE) A.Fo ∗
     openTruncPiece (hlc := hlc) (fsGammaL fscFs) A.vom A.Ft ∗
@@ -655,32 +654,28 @@ theorem sys_open_entry_c (CR : CREATE) (Γ : SchedNames) [ClaimIs (hlc := hlc) G
     byteBuf (k.regs 2#5 + 18446744073709551440#64) (DFrac.own 1) (bview (plen + 1) bp) from .rfl)
     $$ Hp
   -- THE BUNDLE AT THE FILE TYPE
-  -- THE NAME AND NODE PREDICATES ARE TRIVIAL AT THIS ENTRY (INIT-FILE):
-  -- the parent leg and the child's pair go down through the bridges
-  ihave Hac := (pfAt_mono (acreCommitAt (hlc := hlc) (fsGammaL fscFs) appE (.AFile [])
-      (A.P (nparElems (bview plen bp)).length) Farm)
-    (acreCommitAtNm (hlc := hlc) (fsGammaL fscFs) appE (.AFile []) (fun _ => True)
-      (A.P (nparElems (bview plen bp)).length) Farm) Fok) $$ [] Hac
-  · iintro H
-    iapply (acreCommitAtNm_of (hlc := hlc) (fsGammaL fscFs) appE (.AFile []) (fun _ => True)
-      (A.P (nparElems (bview plen bp)).length) Farm Fok.pfRecv) $$ H
+  -- THE NAME PREDICATE (RULING NM, the open half): the parent leg is held at
+  -- `nparNm` -- the name argument 0's last element spells -- and create's own
+  -- premise for it is paid from the reading `hpl`; THE NODE PREDICATE is
+  -- trivial: the pair goes down through the bridge at `fun _ => True`
   ihave Hcl := creChildUnfiredNdp_of (hlc := hlc) (fsGammaL fscFs) (.AFile []) (fun _ => True)
     Farm Fun $$ Hcl
   ihave Hcre := creCommits_of_file (hlc := hlc) (fsGammaL fscFs) 0 0
-    (fun _ => True) (fun _ => True) (A.P (nparElems (bview plen bp)).length) Farm Fun Fok $$ Hac Hcl
+    (nparNm (sysOpenIm A) A.v.toNat) (fun _ => True) (A.P (nparElems (bview plen bp)).length) Farm Fun Fok $$ Hac Hcl
   ihave Hcre := (show creCommits (hlc := hlc) (GF := GF) (fsGammaL fscFs) T_FILE_w.toNat 0 0
-      (fun _ => True) (fun _ => True) (A.P (nparElems (bview plen bp)).length) Farm (pfamTriv (fun _ _ _ _ => iprop(True))) Fun Fok ⊢
+      (nparNm (sysOpenIm A) A.v.toNat) (fun _ => True) (A.P (nparElems (bview plen bp)).length) Farm (pfamTriv (fun _ _ _ _ => iprop(True))) Fun Fok ⊢
     creCommits (hlc := hlc) (fsGammaL fscFs) T_FILE_w.toNat (0#16 : BitVec 16).toNat
-      (0#16 : BitVec 16).toNat (fun _ => True) (fun _ => True) (A.P (nparElems (bview plen bp)).length) Farm
+      (0#16 : BitVec 16).toNat (nparNm (sysOpenIm A) A.v.toNat) (fun _ => True) (A.P (nparElems (bview plen bp)).length) Farm
       (pfamTriv (fun _ _ _ _ => iprop(True))) Fun Fok from .rfl) $$ Hcre
   ihave Hblk := (show procPrivFd (GF := GF) A.γ (procAddr A.j) A.pid (sysOpenV2 A P2)
       (sysOpenM2 A P2) ⊢ procPrivFd A.γ k.proc A.pid (sysOpenV2 A P2) (sysOpenM2 A P2)
     from by rw [hS.hproc]) $$ Hblk
   iapply (sys_open_ec_create CR Γ A cpu _ k.sie (by k_norm_g) k.proc (by k_norm_g) A.j plen bp
-      T_FILE_w 0#16 0#16 A.γ A.pid (sysOpenV2 A P2) (sysOpenM2 A P2) MAXOPBLOCKS Sb A.ns (fun _ => True) (fun _ => True) A.P
+      T_FILE_w 0#16 0#16 A.γ A.pid (sysOpenV2 A P2) (sysOpenM2 A P2) MAXOPBLOCKS Sb A.ns (nparNm (sysOpenIm A) A.v.toNat) (fun _ => True) A.P
       A.Pmiss Farm (pfamTriv (fun _ _ _ _ => iprop(True))) Fun Fok Fex hS.hj ?cp ?cK ?cn ?ct hnn
       hterm (by omega) sys_open_ec_tfile_nz T_FILE_w_tyOk (le_refl _) hS.hns ?c1 ?c2 ?c3
-      (fun _ _ => trivial) (fun _ => trivial) (fun _ _ => trivial))
+      (fun nm h => nparNm_intro _ _ _ nm hpl (by unfold nlastElem; exact h))
+      (fun _ => trivial) (fun _ _ => trivial))
     $$ [- $Hk $Hpc $Hte $Hce $Henv $Hblk $Hbs $Hir $HopS $Htx $Hst $Hdl $Hcre]
   rotate_right 1
   k_norm_g [sys_open_ec_ret_46]

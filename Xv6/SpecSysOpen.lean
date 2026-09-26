@@ -403,7 +403,8 @@ def openPostOkCreate (Γ : FsViewNames GF) (γ : FileNames) (pa : BitVec 64) (pi
      (∃ (avx : Aview) (entsx : Std.ExtTreeMap Fname Nat compare) (nlx : Nat),
         ⌜PartialMap.get? avx d = some ⟨.ADir entsx, nlx⟩⌝ ∗ ⌜entsx[nm]? = some i⌝ ∗
         Fex.pfRecv avx d nm i ∗
-        pfAt (acreCommitAt (hlc := hlc) Γ appE (.AFile []) (P (nparElems pl).length) Farm) Fok ∗
+        pfAt (acreCommitAtNm (hlc := hlc) Γ appE (.AFile []) (nparNm Mim pv)
+          (P (nparElems pl).length) Farm) Fok ∗
         -- the name was already there: create's child legs are whole
         creChildUnfired (hlc := hlc) Γ (.AFile []) Farm Fun ∗
         (∃ (av : Aview) (nl : Nat),
@@ -437,7 +438,8 @@ def openPostFailCreate (Γ : FsViewNames GF) (γfs : FsNames) (cw : Nat)
     (∃ pl : List (BitVec 8),
       ⌜argPathOf Mim pv pl⌝ ∗
       ((nparWalkDeadEra (hlc := hlc) γfs P Pmiss pl ∗
-          pfAt (acreCommitAt (hlc := hlc) Γ appE (.AFile []) (P (nparElems pl).length) Farm) Fok ∗
+          pfAt (acreCommitAtNm (hlc := hlc) Γ appE (.AFile []) (nparNm Mim pv)
+          (P (nparElems pl).length) Farm) Fok ∗
           pfAt (dlookupCommitAt (hlc := hlc) Γ appE) Fex ∗
           pfAt (aopenCommitAt (hlc := hlc) Γ appE) Fo ∗
           openTruncPiece (hlc := hlc) Γ vom Ft ∗
@@ -461,14 +463,16 @@ def openPostFailCreate (Γ : FsViewNames GF) (γfs : FsNames) (cw : Nat)
               ⌜(pathElems pl).getLast? = some nm⌝ ∗
               ⌜PartialMap.get? av d = some ⟨.ADir ents, nl⟩⌝ ∗ ⌜ents[nm]? = some i⌝ ∗
               Fex.pfRecv av d nm i ∗
-              pfAt (acreCommitAt (hlc := hlc) Γ appE (.AFile []) (P (nparElems pl).length) Farm) Fok ∗
+              pfAt (acreCommitAtNm (hlc := hlc) Γ appE (.AFile []) (nparNm Mim pv)
+          (P (nparElems pl).length) Farm) Fok ∗
               (creChildUnfired (hlc := hlc) Γ (.AFile []) Farm Fun ∨
                 ∃ ic : Nat, creChildPair Farm Fun ic) ∗
               (pfAt (aopenCommitAt (hlc := hlc) Γ appE) Fo ∨
                 ∃ (av' : Aview) (a : Anode), ⌜arowAt av' i a⌝ ∗ Fo.pfRecv av' i a)) ∨
            -- (c) nothing observed: the nlink guard, out of inodes, dirlink
            -- failure, "/"
-           (pfAt (acreCommitAt (hlc := hlc) Γ appE (.AFile []) (P (nparElems pl).length) Farm) Fok ∗
+           (pfAt (acreCommitAtNm (hlc := hlc) Γ appE (.AFile []) (nparNm Mim pv)
+          (P (nparElems pl).length) Farm) Fok ∗
              pfAt (dlookupCommitAt (hlc := hlc) Γ appE) Fex ∗
              pfAt (aopenCommitAt (hlc := hlc) Γ appE) Fo ∗
              (creChildUnfired (hlc := hlc) Γ (.AFile []) Farm Fun ∨
@@ -663,7 +667,8 @@ def openReceiptCreate (Γ : FsViewNames GF) (γfs : FsNames) (cw : Nat)
        (∃ (avx : Aview) (entsx : Std.ExtTreeMap Fname Nat compare) (nlx : Nat),
           ⌜PartialMap.get? avx d = some ⟨.ADir entsx, nlx⟩⌝ ∗ ⌜entsx[nm]? = some i⌝ ∗
           Fex.pfRecv avx d nm i ∗
-          pfAt (acreCommitAt (hlc := hlc) Γ appE (.AFile []) (P (nparElems pl).length) Farm) Fok ∗
+          pfAt (acreCommitAtNm (hlc := hlc) Γ appE (.AFile []) (nparNm Mim pv)
+          (P (nparElems pl).length) Farm) Fok ∗
           creChildUnfired (hlc := hlc) Γ (.AFile []) Farm Fun ∗
           (∃ (av : Aview) (nl : Nat),
             (∃ bs0 : List (BitVec 8),
@@ -950,20 +955,11 @@ arm for arm; the fold adds only sys_open's own two commits, still UNFIRED on
 every one of create's failure arms.  Arm (a) is unreachable from it by
 construction (sys_open builds (a) from the `made = true` arm). -/
 
-/-- THE NAME PREDICATE IS TRIVIAL HERE (Rocq's `open_acre_file_of_triv`,
-INIT-FILE): sys_open's create entry tracks no name of its own, so its parent
-leg is the commit at every name and the bridge is one line. -/
-theorem openAcreFile_of_triv (Γ : FsViewNames GF) (Pd : Nat → IProp GF)
-    (Farm : Pfam GF (Aview → Nat → IProp GF))
-    (Fok : Pfam GF (Aview → Nat → Fname → Nat → IProp GF)) :
-    pfAt (acreCommitAtNm (hlc := hlc) Γ appE (.AFile []) (fun _ => True) Pd Farm) Fok ⊢
-      pfAt (acreCommitAt (hlc := hlc) Γ appE (.AFile []) Pd Farm) Fok := by
-  iintro H
-  iapply (pfAt_mono (acreCommitAtNm (hlc := hlc) Γ appE (.AFile []) (fun _ => True) Pd Farm)
-    (acreCommitAt (hlc := hlc) Γ appE (.AFile []) Pd Farm) Fok) $$ [] H
-  iintro H
-  iapply (acreCommitAt_of_nm (hlc := hlc) Γ appE (.AFile []) (fun _ => True) Pd Farm Fok.pfRecv
-    (fun _ => trivial)) $$ H
+/-! THE NAME PREDICATE (Rocq RULING NM, `8438e5583`, the open half): sys_open's
+create entry holds its parent leg at `nparNm Mim pv` -- the name argument 0's
+last element spells -- on BOTH sides of the fold, exactly as `SpecSysMknod`
+does; a narrowed predicate cannot be widened back, so the refunded leg keeps
+the guarded reading (Rocq's `open_acre_file_of_triv` is retired). -/
 
 /-- Rocq's `cre_fail_to_open`. -/
 theorem creFailToOpen (Γ : FsViewNames GF) (γfs : FsNames) (cw : Nat)
@@ -976,27 +972,27 @@ theorem creFailToOpen (Γ : FsViewNames GF) (γfs : FsNames) (cw : Nat)
     (Fo : Pfam GF (Aview → Nat → Anode → IProp GF))
     (Ft : Pfam GF (Aview → Nat → List (BitVec 8) → IProp GF))
     (pl : List (BitVec 8)) (hpl : argPathOf Mim pv pl) :
-    creFailArms (hlc := hlc) Γ γfs T_FILE_w.toNat ma mi (fun _ => True) (fun _ => True) P Pmiss Farm Fdots Fun Fok Fex pl ⊢
+    creFailArms (hlc := hlc) Γ γfs T_FILE_w.toNat ma mi (nparNm Mim pv) (fun _ => True) P Pmiss Farm
+      Fdots Fun Fok Fex pl ⊢
       pfAt (aopenCommitAt (hlc := hlc) Γ appE) Fo -∗
       openTruncPiece (hlc := hlc) Γ vom Ft -∗
       openPostFailCreate Γ γfs cw Mim pv vom P Pmiss Farm Fun Fok Fex Fo Ft := by
   iintro Hcf Ho Ht
-  ihave Hcf := creFailArms_file Γ γfs ma mi (fun _ => True) (fun _ => True) P Pmiss Farm Fdots Fun Fok Fex pl $$ Hcf
+  ihave Hcf := creFailArms_file Γ γfs ma mi (nparNm Mim pv) (fun _ => True) P Pmiss Farm Fdots Fun Fok
+    Fex pl $$ Hcf
   unfold openPostFailCreate
   iright
   iexists pl
   isplitr
   · ipureintro; exact hpl
   icases Hcf with (⟨Hd, Hac, Hdl, Hcl⟩ | ⟨%d, HP, Hac, Hrest, Hcl⟩)
-  · -- the parent leg and the child's legs come home at the TRIVIAL name and
-    -- node predicates this entry is at (INIT-FILE)
-    ihave Hac := openAcreFile_of_triv Γ _ Farm Fok $$ Hac
+  · -- the parent leg comes home at the guarded name, on the nose; the child's
+    -- legs at the TRIVIAL node predicate this entry is at (INIT-FILE)
     ihave Hcl := creChildUnfired_of_ndp (hlc := hlc) Γ (.AFile []) (fun _ => True) Farm Fun
       (fun _ => trivial) $$ Hcl
     ileft
     iframe Hd Hac Hdl Ho Ht Hcl
-  · ihave Hac := openAcreFile_of_triv Γ _ Farm Fok $$ Hac
-    ihave Hcl : iprop(creChildUnfired (hlc := hlc) Γ (.AFile []) Farm Fun ∨
+  · ihave Hcl : iprop(creChildUnfired (hlc := hlc) Γ (.AFile []) Farm Fun ∨
         ∃ ic : Nat, creChildPair Farm Fun ic) $$ [Hcl]
     · icases Hcl with (Hu | Hp)
       · ileft

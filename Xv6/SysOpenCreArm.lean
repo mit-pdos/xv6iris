@@ -112,7 +112,7 @@ def sysOpenCrFresh (Γ : FsViewNames GF) (P : Nat → Nat → IProp GF)
 
 /-- ARM F-OK's payout: the exists observation fired, the create commit
 refunded (Rocq's `socr_exists`). -/
-def sysOpenCrExists (Γ : FsViewNames GF) (P : Nat → Nat → IProp GF)
+def sysOpenCrExists (Γ : FsViewNames GF) (Nm : Fname → Prop) (P : Nat → Nat → IProp GF)
     (Farm Fun : Pfam GF (Aview → Nat → IProp GF))
     (Fok Fex : Pfam GF (Aview → Nat → Fname → Nat → IProp GF))
     (pl : List (BitVec 8)) (i0 : Nat) : IProp GF :=
@@ -122,7 +122,9 @@ def sysOpenCrExists (Γ : FsViewNames GF) (P : Nat → Nat → IProp GF)
     ⌜ents[nm]? = some i0⌝ ∗
     P (nparElems pl).length d ∗
     Fex.pfRecv av d nm i0 ∗
-    pfAt (acreCommitAt (hlc := hlc) Γ appE (.AFile []) (P (nparElems pl).length) Farm) Fok ∗
+    -- ...at the NAME PREDICATE the entry holds its parent leg at (RULING NM):
+    -- `nparNm M pv` at the syscall tier
+    pfAt (acreCommitAtNm (hlc := hlc) Γ appE (.AFile []) Nm (P (nparElems pl).length) Farm) Fok ∗
     creChildUnfired (hlc := hlc) Γ (.AFile []) Farm Fun)
 
 /-- The record the plain tail runs at: the contract's, with the shim's
@@ -360,8 +362,8 @@ theorem sys_open_cr_arms_exists (Γ : FsViewNames GF) (γfs : FsNames) (cw : Nat
     (pl : List (BitVec 8)) (i0 : Nat) (a0 : Anode) (hpl : argPathOf Mim pv pl)
     (hnd : ∀ (ents : Std.ExtTreeMap Fname Nat compare) (nl : Nat), a0 ≠ ⟨.ADir ents, nl⟩) :
     openArmsPlain (hlc := hlc) Γ γfs cw γ pa pid Mim pv vom
-      (sysOpenCrP (sysOpenCrExists (hlc := hlc) Γ P Farm Fun Fok Fex pl i0) i0)
-      (sysOpenCrPm (sysOpenCrExists (hlc := hlc) Γ P Farm Fun Fok Fex pl i0))
+      (sysOpenCrP (sysOpenCrExists (hlc := hlc) Γ (nparNm Mim pv) P Farm Fun Fok Fex pl i0) i0)
+      (sysOpenCrPm (sysOpenCrExists (hlc := hlc) Γ (nparNm Mim pv) P Farm Fun Fok Fex pl i0))
       (sysOpenCrFoTag i0 a0 Fo) Ft sts VW MW r ⊢
       |={⊤}=> openArmsCreate (hlc := hlc) Γ γfs cw γ pa pid Mim pv vom P Pmiss Farm Fun Fok Fex Fo Ft
         sts VW MW r := by
@@ -478,8 +480,10 @@ theorem sys_open_cr_post_exists (k : KCtx) (A : SysOpenArgs GF)
     (∀ c : CPU, sysOpenPostC (hlc := hlc) k A Farm Fun Fok Fex c) ⊢
       ∀ c : CPU, sysOpenPostP (hlc := hlc) k
         (sysOpenCrA A
-          (sysOpenCrP (sysOpenCrExists (hlc := hlc) (fsGammaL fscFs) A.P Farm Fun Fok Fex pl i0) i0)
-          (sysOpenCrPm (sysOpenCrExists (hlc := hlc) (fsGammaL fscFs) A.P Farm Fun Fok Fex pl i0))
+          (sysOpenCrP (sysOpenCrExists (hlc := hlc) (fsGammaL fscFs) (nparNm (sysOpenIm A) A.v.toNat) A.P Farm Fun Fok Fex pl
+            i0) i0)
+          (sysOpenCrPm (sysOpenCrExists (hlc := hlc) (fsGammaL fscFs) (nparNm (sysOpenIm A) A.v.toNat) A.P Farm Fun Fok Fex
+            pl i0))
           (sysOpenCrFoTag i0 a0 A.Fo)) c := by
   iintro HΦ %c
   ispecialize HΦ $$ %c
