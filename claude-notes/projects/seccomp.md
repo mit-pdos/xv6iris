@@ -28,22 +28,37 @@ textually at the baseline before it reports, one status paragraph under
 its own heading in THIS file (on a rebase conflict in this file keep
 main's text and re-add your paragraph).
 
-WHERE THINGS ARE (trust `git log`/`git worktree list` over this text):
-- `/shared/xv6iris-3`: `secc/bump` = main plus the owner's notes commits.
-  The owner (top-level agent) works here: design, briefs, merges to main.
-- `secc/model`, worktree `secc-model`: lane M, the pure model (§3, §9),
-  DONE and rebased onto main: tip 79c00bfef, green, audits at the
-  baseline.  Owner's answer to its question: the words after `seccomp`
-  ALSO accept file-name words (`fn_wf`, so `seccomp rm a.txt` is a
-  line); S4 widens `secc_ok`.
-- `secc/s0`, worktree `secc-s0`: lane S0 (below), in flight, off main.
-- `secc/s1`, worktree `secc-s1`: lane S1 (below), in flight, off main;
-  merges `secc/s0` for its minter.
-- `secc/s2`, worktree `secc-s2`: lane S2 (below), off 79c00bfef; merges
-  `secc/s0` for its items 1, 5, 6.
-- Then: S3 off S1 + S2 (+ the model); S4 off S3.
-- Origin: every `secc/*` branch is pushed as a safety copy when it
-  reports; `main` moves only at green checkpoints.
+WHERE THINGS ARE (trust `git log`/`git worktree list` over this text;
+updated 2026-09-26):
+- `main` = `origin/main` = ea9b753b4 (+ owner's notes): checkpoint 1, lane
+  M's model (knob OFF), S0 (plumbing), S1 (the universe slot), S2 (the
+  three-arm claim; design §10.11), S2k + S2k2 (the console read's dirty
+  and tokenless arms carry `cons_placed sl lo k d hs`, `cons_chain sl` and
+  the ring's era `cn_era`; the token holder's `cur = nrd` survives the
+  dirty arm), S5a (`secc_tok_at` names the seccomp newline's trace with
+  `ins (open_seg h0) = I0`; `GenOutWild.lm_placed_wild_undisc`).  Whole
+  tree green, audits 13/14/13.
+- `secc/s3`, worktree `secc-s3`: lane S3 DONE (the whole-table view in
+  UserFd, the row-23 leaf `UkRunSecc.wp_uk_ecall_seccomp`, `UkSecc*`,
+  `FsSeccPin`, `secc_image_entry` with `□ (∀ s, Q s)`); merged into S4.
+- `secc/s4`, worktree `secc-s4`: lane S4 IN FLIGHT (the shell's
+  whole-table view as an existential inside `ush_std`, sh's round at
+  `LSecc`, the knob ON, the top theorem; `secc_B` back to six and the
+  universe's console-read payer restored; ONE stated premise
+  `ush_rdwild_of_shape : useccomp_shape I -∗ riscv_rdwild (S gen_id)`
+  left for S5b).
+- NEXT, S5b (after S4 lands, shell tier): `ai_rdwild := usecc_tok` at the
+  union; the union's read-law instance keeps the transition read's
+  window facts (`cons_stored_lb sl'`, the newline at `sl' !! (length I0
+  - 1)`); the read leaf's dirty case at the token half refuted through
+  `cons_placed` + `cons_chain` + the token's newline trace +
+  `lm_placed_wild_undisc` -> the tag's `UT`; S4's premise discharged;
+  `Print Assumptions union_adequacy_closed` = 14.  Then the completed
+  note.
+- The owner's ruling of record on `read`: it stays OPEN (design §10.12);
+  the discipline is D4.
+- Origin: every `secc/*` branch is pushed when it reports; `main` moves
+  only at green, audited tips.
 
 ## Lane M -- the pure model (design §3, §9)
 
