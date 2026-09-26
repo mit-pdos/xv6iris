@@ -1219,3 +1219,4 @@ import Xv6.AppIface
 import Xv6.SystemSlot
 import Xv6.BootCarveProc
 import Xv6.BootChain
+import Xv6.BootCarveFs
