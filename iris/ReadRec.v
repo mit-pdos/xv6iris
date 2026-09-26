@@ -38,6 +38,7 @@ Require Import WpUart.
 Require Import EchoOut.
 Require Import EchoLinks.
 Require Import LinkRec.
+Require Import FsCfg.             (* [fsc_cons]: the ring [rk_arms] reads *)
 Require Import UserConsole.       (* [ucons_swallow] / [ucons_stored_lb]: the swallowed byte's tag *)
 Local Open Scope list_scope.
 
@@ -115,6 +116,10 @@ Section readrec.
      ([FileLinksLine.f0w]), so the window arm is stated there and not at an
      arbitrary [k].  The two LINK fields stay generic in [k]. *)
   Context `{GEN : GenId}.
+  (* THE RING, ambient: the window arm is at the era's own console ring
+     ([FsCfg.fsc_cons]), which is where a reader's residue keeps the
+     seccomp newline's stored position (seccomp S5b) *)
+  Context `{FSC : fscfg}.
 
   Record ReadRec (L : LinkRec Σ) := MkReadRec {
     (* the INPUT's discipline -- [UkSh.ush_read_ans_at]'s parameter *)
@@ -151,7 +156,7 @@ Section readrec.
        too, and its tag is inside [UserConsole.ucons_swallow], so the arm
        takes both rows as the console member hands them over.  An era with
        nothing to read off a tag ignores all three. *)
-    rk_arms : forall (cn : cons_names) (v : era_pins) (I : list (bv 8))
+    rk_arms : forall (v : era_pins) (I : list (bv 8))
                 (ws sl sl' : list (list mobs * bv 8))
                 (hs : list (list mobs)) (dd dc : nat) (g : nat -> bv 8),
       (dd <= dc)%nat -> length ws = dc ->
@@ -161,8 +166,8 @@ Section readrec.
       ⊢ lk_epin L (S gen_id) v -∗ inp_lb v I -∗ lk_rres L v I -∗
         lk_rr L (S gen_id) v (length I) ws -∗
         ([∗ list] hh ∈ hs, riscv_rx_tag hh) -∗
-        ucons_swallow cn False sl dd dc -∗
-        ucons_stored_lb cn sl' -∗
+        ucons_swallow fsc_cons False sl dd dc -∗
+        ucons_stored_lb fsc_cons sl' -∗
         (dl_cnt v (1/2) (length I + dc)%nat
          ∗ ∃ J : list (bv 8),
              ⌜length J = dc⌝ ∗ ⌜rk_disc (I ++ J)⌝
@@ -187,6 +192,7 @@ Section echo_read_inst.
   Context `{HRg : !riscvGS Σ}.
   Context `{!uartGhostG Σ}.
   Context `{GEN : GenId}.
+  Context `{FSC : fscfg}.
 
   Local Notation LE := (echo_link_inst T γ).
 
@@ -216,7 +222,7 @@ Section echo_read_inst.
      bounds of one echoed list ([EchoOut.inp_lb_cmp]) and the lease's is
      the shorter; the residue comes off the receipt where a byte was
      delivered and off the lease where the count did not move. *)
-  Local Lemma eri_arms (cn : cons_names) (v : era_pins) (I : list (bv 8))
+  Local Lemma eri_arms (v : era_pins) (I : list (bv 8))
       (ws sl sl' : list (list mobs * bv 8))
       (hs : list (list mobs)) (dd dc : nat) (g : nat -> bv 8) :
     (dd <= dc)%nat -> length ws = dc ->
@@ -226,8 +232,8 @@ Section echo_read_inst.
     ⊢ era_pin γ (S gen_id) v -∗ inp_lb v I -∗ echo_rres v I -∗
       read_ret T (S gen_id) v (length I) ws -∗
       ([∗ list] hh ∈ hs, riscv_rx_tag hh) -∗
-      ucons_swallow cn False sl dd dc -∗
-      ucons_stored_lb cn sl' -∗
+      ucons_swallow fsc_cons False sl dd dc -∗
+      ucons_stored_lb fsc_cons sl' -∗
       (dl_cnt v (1/2) (length I + dc)%nat
        ∗ ∃ J : list (bv 8),
            ⌜length J = dc⌝ ∗ ⌜disc_input (I ++ J)⌝

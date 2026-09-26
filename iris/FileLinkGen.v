@@ -258,13 +258,13 @@ Section file_link_gen.
 
   Lemma fturn0_gen (k : nat) :
     fturn_pre g k -∗
-    (∃ v : era_pins, FPIN k v ∗ dl_cnt v (1/2) 0%nat ∗ inp_lb v [])
+    (∃ v : era_pins, FPIN k v ∗ dl_cnt v (1/2) 0%nat ∗ inp_lb v [] ∗ rpos_auth v 0%nat)
     ∗ (∃ v : era_pins, FPIN k v ∗ gwc_ban file_lm file_params k v [] 0%nat).
   Proof using .
     rewrite /fturn_pre /FileOut.fturn_core.
     iIntros "(%Hk & Ht & Hpre)".
-    iDestruct "Ht" as (v vf) "(#Hpin & #Hvf & Htn & Hdl & #Hcs & #Hps & #HE)".
-    iSplitL "Hdl"; [iExists v; by iFrame "Hpin Hdl HE" |].
+    iDestruct "Ht" as (v vf) "(#Hpin & #Hvf & Htn & Hdl & #Hcs & #Hps & #HE & Hrp)".
+    iSplitL "Hdl Hrp"; [iExists v; by iFrame "Hpin Hdl HE Hrp" |].
     iExists v. iFrame "Hpin". rewrite /gwc_ban. iRight. iLeft.
     iSplitR; [by iPureIntro |]. rewrite /gH /file_params /fhead.
     iSplitR; [by iPureIntro |]. iSplitR; [by iPureIntro |].

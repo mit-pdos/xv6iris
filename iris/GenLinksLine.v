@@ -1235,7 +1235,7 @@ Section gen_links_line.
   Context (TURN : nat -> iProp Σ)
           (turn0 : forall k,
              TURN k -∗
-             (∃ v : era_pins, PIN k v ∗ dl_cnt v (1/2) 0 ∗ inp_lb v [])
+             (∃ v : era_pins, PIN k v ∗ dl_cnt v (1/2) 0 ∗ inp_lb v [] ∗ rpos_auth v 0)
              ∗ (∃ v : era_pins, PIN k v ∗ gwc_ban k v [] 0)).
   (* the record's residue: the generic one, possibly with a module's extra
      persistent conjunct beside it (the file's typed-lines witness) *)

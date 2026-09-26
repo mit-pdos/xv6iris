@@ -280,7 +280,7 @@ Section linkrec.
 
     lk_turn0 : forall k,
       ⊢ lk_turn k -∗
-        (∃ v : era_pins, lk_pin k v ∗ dl_cnt v (1/2) 0%nat ∗ inp_lb v [])
+        (∃ v : era_pins, lk_pin k v ∗ dl_cnt v (1/2) 0%nat ∗ inp_lb v [] ∗ rpos_auth v 0%nat)
         ∗ (∃ v : era_pins, lk_pin k v ∗ lk_ban k v [] 0%nat);
     lk_panic_done : forall k v I,
       ⊢ lk_blk k v I (lk_pan I) (length (lk_ab I (lk_pan I))) -∗
@@ -687,12 +687,12 @@ Section echo_inst.
      halves of [EchoOut.eturn] come apart). *)
   Local Lemma ei_turn0 (k : nat) :
     eturn γ k -∗
-    (∃ v : era_pins, era_pin γ k v ∗ dl_cnt v (1/2) 0%nat ∗ inp_lb v [])
+    (∃ v : era_pins, era_pin γ k v ∗ dl_cnt v (1/2) 0%nat ∗ inp_lb v [] ∗ rpos_auth v 0%nat)
     ∗ (∃ v : era_pins, era_pin γ k v ∗ EchoLinks.ewc_ban T v [] 0%nat).
   Proof using .
     iIntros "Hturn".
-    iDestruct "Hturn" as (v) "(#Hpin & Htn & Hdl & #Hcs & #Hps & #HE)".
-    iSplitL "Hdl"; [ iExists v; by iFrame "Hpin Hdl HE" | ].
+    iDestruct "Hturn" as (v) "(#Hpin & Htn & Hdl & #Hcs & #Hps & #HE & Hrp)".
+    iSplitL "Hdl Hrp"; [ iExists v; by iFrame "Hpin Hdl HE Hrp" | ].
     iExists v. iFrame "Hpin".
     rewrite /EchoLinks.ewc_ban. iLeft. iExists [], [], 0%nat.
     rewrite Nat.add_0_r. iFrame "Htn Hps Hcs HE".

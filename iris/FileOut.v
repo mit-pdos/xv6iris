@@ -429,7 +429,7 @@ Section file_out.
     (∃ (v : era_pins) (vf : file_era),
        era_pin (fgn_echo g) k v ∗ file_era_pin k vf
        ∗ turn v 0%nat ∗ dl_cnt v (1/2) 0%nat
-       ∗ cs_lb v [] ∗ ps_lb v [] ∗ inp_lb v [])%I.
+       ∗ cs_lb v [] ∗ ps_lb v [] ∗ inp_lb v [] ∗ rpos_auth v 0%nat)%I.
 
   (* ...WITH THE BOOT LEDGER'S AUTHORITY (RULING F0-BOOT): init files the
      era's boot state at its first instruction, out of the deed it holds
@@ -440,7 +440,7 @@ Section file_out.
     (∃ (v : era_pins) (vf : file_era),
        era_pin (fgn_echo g) k v ∗ file_era_pin k vf
        ∗ turn v 0%nat ∗ dl_cnt v (1/2) 0%nat
-       ∗ cs_lb v [] ∗ ps_lb v [] ∗ inp_lb v []
+       ∗ cs_lb v [] ∗ ps_lb v [] ∗ inp_lb v [] ∗ rpos_auth v 0%nat
        ∗ f0_auth vf [])%I.
 
   Global Instance fturn_core_timeless k : Timeless (fturn_core k).
@@ -453,10 +453,10 @@ Section file_out.
       fturn_core k ∗ ∃ vf : file_era, file_era_pin k vf ∗ f0_bl vf s0.
   Proof using .
     rewrite /fturn /fturn_core. iIntros "H".
-    iDestruct "H" as (v vf) "(#Hpin & #Hfp & Ht & Hdl & #Hcs & #Hps & #HE & Hf0)".
+    iDestruct "H" as (v vf) "(#Hpin & #Hfp & Ht & Hdl & #Hcs & #Hps & #HE & Hrp & Hf0)".
     iMod (f0_file vf s0 with "Hf0") as "#Hbl".
     iModIntro. iSplitL.
-    - iExists v, vf. iFrame "Hpin Hfp Ht Hdl Hcs Hps HE".
+    - iExists v, vf. iFrame "Hpin Hfp Ht Hdl Hcs Hps HE Hrp".
     - iExists vf. iFrame "Hfp Hbl".
   Qed.
 

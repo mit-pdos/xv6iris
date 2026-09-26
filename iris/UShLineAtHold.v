@@ -89,10 +89,10 @@ Section UShLineAtHold.
     iDestruct (upos_agree γp n n' with "Hpos Hpa") as %<-.
     rewrite /ush_rd_x_at /UkInit.init_rd /UkInit.init_rd_cred.
     iDestruct "Hcred" as "[Hcred _]".
-    iDestruct "Hcred" as (v I) "([%Hlen %Hrest] & #Hpin & Hdl & #HE & #Hres)".
+    iDestruct "Hcred" as (v I) "([%Hlen %Hrest] & #Hpin & Hdl & #HE & #Hres & Hrp)".
     iExists I. iSplitR; [ by iPureIntro | ].
     iLeft. rewrite /ush_mid_at Hlen. iFrame "Hpos Hpa Hrd0".
-    iExists v. iFrame "Hpin Hdl HE Hres".
+    iExists v. iFrame "Hpin Hdl HE Hres Hrp".
   Qed.
 
   (* ...and the same with the DEED conjoined to the banner-owed family:
@@ -196,8 +196,8 @@ Section UShLineAtHold.
     rewrite /ush_rd_x_at /UkInit.init_rd /UkInit.init_rd_cred /ush_rd_pin_at.
     iSplitR "Hb"; last first.
     { iExists I. iSplitR; [ by iPureIntro | ]. iExact "Hb". }
-    iDestruct "Hcred" as (v) "(#Hpin & Hdl & #HE & #Hres)".
-    iExists v, I. iSplitR; [ by iPureIntro | ]. iFrame "Hpin Hdl HE Hres".
+    iDestruct "Hcred" as (v) "(#Hpin & Hdl & #HE & #Hres & Hrp)".
+    iExists v, I. iSplitR; [ by iPureIntro | ]. iFrame "Hpin Hdl HE Hres Hrp".
   Qed.
 
   (* ...AND THE FRAME.  [ush_wb_inp] is a read-back, so the deed rides
@@ -273,7 +273,7 @@ Section UShLineAtHold.
     iDestruct "Hwc" as (I) "[%Hlen Hwc]".
     iDestruct "Hl" as (n') "(Hrd0 & Hpa & Hcred)".
     iDestruct (upos_agree γp n n' with "Hpos Hpa") as %<-.
-    iDestruct "Hcred" as (v I0) "([%Hlen0 %Hrest] & #Hpin & Hdl & #HE & #Hres)".
+    iDestruct "Hcred" as (v I0) "([%Hlen0 %Hrest] & #Hpin & Hdl & #HE & #Hres & Hrp)".
     iAssert (UkSh.ush_wcp Wc Wb l I 0%nat
              ∗ ((∃ v' : era_pins, era_pin γ (S gen_id) v' ∗ inp_lb v' I)
                 ∨ lk_T L))%I
@@ -297,9 +297,9 @@ Section UShLineAtHold.
     iDestruct (inp_lb_agree v I0 I ltac:(lia) with "HE HE'") as %<-.
     iApply (UkSh.ush_posb_of_wc N γp (lk_T L) Wc Wb
               (ush_mid_at (lk_rres L) γ γp) l 0%nat I0 Hrest
-              with "[Hpos Hpa Hrd0 Hdl] Hwc").
+              with "[Hpos Hpa Hrd0 Hdl Hrp] Hwc").
     rewrite /ush_mid_at Hlen0. iFrame "Hpos Hpa Hrd0".
-    iExists v. iFrame "Hpin Hdl HE Hres".
+    iExists v. iFrame "Hpin Hdl HE Hres Hrp".
   Qed.
 
   (* ...AND THE FRAME.  Both side conditions are read-backs, and [Wc] /

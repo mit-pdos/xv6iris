@@ -312,7 +312,7 @@ Section UInitBannerGen.
      puts it where the lease is minted. *)
   Definition kinit_dl0_at : iProp Σ :=
     (∃ v : era_pins, lk_pin L (S gen_id) v ∗ dl_cnt v (1/2) 0%nat
-                     ∗ inp_lb v [])%I.
+                     ∗ inp_lb v [] ∗ rpos_auth v 0%nat)%I.
 
   (* THE ERA'S TURN AT STAGE 0 IS ROUND 0's BANNER-OWED CREDENTIAL.  Both
      halves of [EchoOut.eturn] come apart here: the write half becomes
