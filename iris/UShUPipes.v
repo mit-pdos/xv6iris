@@ -301,7 +301,7 @@ Section UShUPipes.
     rewrite /Qtop. iDestruct "Hq" as "[#HT | [[Hall HRd] | Hter]]".
     - iApply (uWcu_taint ug r s0 PT PD I 0%nat v with "Hpin HT").
     - (* COMMITTED: every writer at its whole source, the loan back *)
-      rewrite /uWcu. iRight. iRight. iSplitR; [done |].
+      rewrite /uWcu. iRight. iRight. iLeft. iSplitR; [done |].
       iSplitR "Hk HRd"; last first.
       { iSplitL; [iApply Hdeed; iFrame "Hk HRd" | iExact "Hcw"]. }
       rewrite /updone_shape.
@@ -374,7 +374,7 @@ Section UShUPipes.
   Proof using .
     iIntros "Hc [Hpre _]".
     rewrite {1}/ush_deed_at. iDestruct "Hpre" as "[Hpre | #HT]"; last by iLeft.
-    iDestruct "Hpre" as (cs' s v') "(Hd & %Htie & #Hty & #Hpin' & #Hcs')".
+    iDestruct "Hpre" as (cs' s v') "(Hd & %Htie & #Hty & #Hpin' & #Hcs' & %Hnw)".
     rewrite /uWcl /lk_lcred. iDestruct "Hc" as (v) "[#Hpin Hc]".
     cbn [lk_pin lk_lpr union_link_inst_at gen_link_inst gwc_lpr]. rewrite /gwc_blk.
     iDestruct "Hc" as "[Hc | #HT]"; last by iLeft.
@@ -529,7 +529,9 @@ Section UShUPipes.
     iIntros (h' m' q) "%Ha0' #Hcmd _ _ HM3 Hcp Hrun".
     iPoseProof (uup_um_usz N' sz _ with "HM3") as "Hsz".
     (* ---- THE LEND AND THE DEED, opened (or the taint) ---- *)
-    iDestruct (uWcu_3 ug r s0 PT PD I with "Hcp") as "Hcp".
+    iDestruct (uWcu_3_nw ug r s0 PT PD I ltac:(rewrite Hul; reflexivity) with "Hcp")
+      as "Hcp".
+    assert (Hnw : uwild (ul I) = false) by (rewrite Hul; reflexivity).
     rewrite uWcf_S3. iDestruct "Hcp" as "[Hc Hpre]".
     iDestruct (uup_pin0 I with "Hc") as "[Hc Hpin0]". iDestruct "Hpin0" as (v0) "#Hpin0".
     iPoseProof (uup_genw N' I v0 Hpeq with "Hcs Hpin0") as "#Hgenw".
@@ -664,7 +666,9 @@ Section UShUPipes.
     iIntros (h' m' q) "%Ha0' #Hcmd _ _ HM3 Hcp Hrun".
     iPoseProof (uup_um_usz N' sz _ with "HM3") as "Hsz".
     (* ---- THE LEND AND THE DEED, opened (or the taint) ---- *)
-    iDestruct (uWcu_3 ug r s0 PT PD I with "Hcp") as "Hcp".
+    iDestruct (uWcu_3_nw ug r s0 PT PD I ltac:(rewrite Hul; reflexivity) with "Hcp")
+      as "Hcp".
+    assert (Hnw : uwild (ul I) = false) by (rewrite Hul; reflexivity).
     rewrite uWcf_S3. iDestruct "Hcp" as "[Hc Hpre]".
     iDestruct (uup_pin0 I with "Hc") as "[Hc Hpin0]". iDestruct "Hpin0" as (v0) "#Hpin0".
     iPoseProof (uup_genw N' I v0 Hpeq with "Hcs Hpin0") as "#Hgenw".
