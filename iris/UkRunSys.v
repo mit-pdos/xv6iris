@@ -3989,6 +3989,65 @@ Section UkRunSys.
     iApply (udepwf_K_std N m pc USYS_read fdep l with "Hsb").
   Qed.
 
+  (* ...AT A NAMED TABLE VIEW (seccomp S4): the call moves no descriptor,
+     so the ledger comes back at the view it went in at. *)
+  Lemma wp_uk_ecall_read_recv_at (N : uk_names Σ) (h : CpuId)
+      (m : regfile) (pc : mword 64) (cnt : Z) (k : nat) (f : nat -> bv 8)
+      (avail : nat) (fdep : sfam) (l v : list fdstate) :
+    usysno m = USYS_read ->
+    bv_signed (subrange_vec_dec (m !!! Regidx (mword_of_int 12)) 31 0
+               : mword 32) = cnt ->
+    (Z.to_nat cnt <= k)%nat ->
+    is_aligned_vaddr (Virtaddr (add_vec_int pc 4)) 2 = true ->
+    uinstr_is (ukn_t N) pc false (ECALL tt) -∗
+    urun N h m pc avail -∗
+    udepwf_std N m pc USYS_read fdep l -∗
+    UserFd.ustd_at (ukn_fd N) l v -∗
+    ubytes (ukn_d N) (uint (m !!! Regidx (mword_of_int 11))) k f -∗
+    (∀ (h' : CpuId) (r : mword 64) (d : nat) (g : nat -> bv 8)
+       (W : uvis) (M' : gmap Z (bv 8))
+       (fdv' : list fdstate) (cw' : Z) (cs' : gset gname),
+       ⌜ (d <= Z.to_nat cnt)%nat ⌝ -∗
+       ⌜ forall j : nat, (d <= j < k)%nat -> g j = f j ⌝ -∗
+       ⌜ forall i : nat, (i < k)%nat ->
+           uint (add_vec_int (m !!! Regidx (mword_of_int 11)) (Z.of_nat i))
+           = (uint (m !!! Regidx (mword_of_int 11)) + Z.of_nat i)%Z ⌝ -∗
+       ⌜ forall j : nat, (j < k)%nat ->
+           M' !! uint (add_vec_int (m !!! Regidx (mword_of_int 11))
+                         (Z.of_nat j))
+           = Some (g j) ⌝ -∗
+       ⌜ forall (P : uptd) (j : nat),
+           ProcPtOwn.proc_pt_wf P ->
+           perm_of (ud_um P) (uvis_sz W) = uvis_perm W ->
+           lazy_free (ud_um P) (uvis_sz W) ->
+           (j < k)%nat ->
+           UserPtTree.uva_wmapped P
+             (uint (add_vec_int (m !!! Regidx (mword_of_int 11))
+                      (Z.of_nat j))) ⌝ -∗
+       ⌜tf_w (uvis_tf W) (tf_arg_idx 0) = m !!! Regidx (mword_of_int 10)⌝ -∗
+       ⌜tf_w (uvis_tf W) (tf_arg_idx 1) = m !!! Regidx (mword_of_int 11)⌝ -∗
+       ⌜tf_w (uvis_tf W) (tf_arg_idx 2) = m !!! Regidx (mword_of_int 12)⌝ -∗
+       ⌜take NSTD (uvis_fd W) = l⌝ -∗
+       ⌜uvis_lazy W = false⌝ -∗
+       ⌜uexec_live_ok USYS_read (uvis_tf W) (uvis_fd W) r cs'⌝ -∗
+       UserFd.ustd_at (ukn_fd N) l v -∗
+       spost_at uslot USYS_read fdep W r M' fdv' cw' cs' -∗
+       urun N h' (<[Regidx (mword_of_int 10) := r]> m)
+         (add_vec_int pc 4) avail -∗
+       ubytes (ukn_d N) (uint (m !!! Regidx (mword_of_int 11))) k g -∗
+       mWP (Loop : expr riscv_lang)) -∗
+    mWP (Loop : expr riscv_lang).
+  Proof using .
+    intros Hn Hcnt Hcapk Hal4.
+    iIntros "#Hi Hrun Hsb Hstd Hbuf Hcont".
+    iApply (wp_uk_ecall_read_at N h m pc cnt k f avail fdep
+              (UserFd.ustd_at (ukn_fd N) l v) (fun fdv => take NSTD fdv = l)
+              Hn Hcnt Hcapk Hal4
+              (fun fdv => ustd_at_agree (ukn_fd N) fdv l v)
+              with "Hi Hrun [Hsb] Hstd Hbuf Hcont").
+    iApply (udepwf_K_std N m pc USYS_read fdep l with "Hsb").
+  Qed.
+
   (* ------------------------------------------------------------------- *)
   (* ecall, at OPEN -- THE LEAF THAT HANDS THE PROCESS ITS RECEIPT          *)
   (* (app-echo.md, lane OPEN-PIN, O4').                                     *)
@@ -4785,6 +4844,83 @@ Section UkRunSys.
       | exact (proj2 Hsrc) ].
   Qed.
 
+  (* ...AT A NAMED TABLE VIEW (seccomp S4): the call moves no descriptor,
+     so the ledger comes back at the view it went in at. *)
+  Lemma wp_uk_ecall_write_chain_buf_at (N : uk_names Σ) (h : CpuId)
+      (m : regfile) (pc : mword 64) (avail : nat) (fdep : sfam)
+      (l v : list fdstate) (dq : dfrac) (nb : nat) (f : nat -> bv 8) :
+    usysno m = 16 ->
+    is_aligned_vaddr (Virtaddr (add_vec_int pc 4)) 2 = true ->
+    uinstr_is (ukn_t N) pc false (ECALL tt) -∗
+    urun N h m pc avail -∗
+    udepwf_std N m pc 16 fdep l -∗
+    UserFd.ustd_at (ukn_fd N) l v -∗
+    UserHeap.ubytesq (ukn_d N) dq
+      (uint (m !!! Regidx (mword_of_int 11))) nb f -∗
+    (∀ (h' : CpuId) (r : mword 64) (W : uvis) (cw' : Z) (cs' : gset gname),
+       (* THE TRAPPING KEY'S THREE ARGUMENT WORDS ARE THE CALLER'S OWN *)
+       ⌜tf_w (uvis_tf W) (tf_arg_idx 0) = m !!! Regidx (mword_of_int 10)⌝ -∗
+       ⌜tf_w (uvis_tf W) (tf_arg_idx 1) = m !!! Regidx (mword_of_int 11)⌝ -∗
+       ⌜tf_w (uvis_tf W) (tf_arg_idx 2) = m !!! Regidx (mword_of_int 12)⌝ -∗
+       (* ...AND ITS LEDGER IS THE CALLER'S OWN TOO: without this row "fd 1
+          is the console" says nothing about the arm this call took *)
+       ⌜take NSTD (uvis_fd W) = l⌝ -∗
+       (* ...AND ITS LAZY BIT IS [false], definitional at this leaf (the U
+          tier's run is at an empty fill, [UexecRet.ukcq]) and handed back
+          because the POST is where it is spent: row 16's [∃ P] carries
+          [uvis_lazy W = false -> lazy_free (ud_um P) (uvis_sz W)]. *)
+       ⌜uvis_lazy W = false⌝ -∗
+       (* ...AND EVERY BYTE OF THE SOURCE RUN IS READABLE-MAPPED IN ANY
+          TABLE THE KEY'S PROJECTION ADMITS.  Stated POSITIVELY, as the
+          read side's is: the consumer eliminates
+          [SpecFilewrite.write_cons_short] by contradiction. *)
+       ⌜ forall (P : uptd) (j : nat),
+           ProcPtOwn.proc_pt_wf P ->
+           perm_of (ud_um P) (uvis_sz W) = uvis_perm W ->
+           lazy_free (ud_um P) (uvis_sz W) ->
+           (j < nb)%nat ->
+           UserPtTree.uva_rmapped P
+             (uint (add_vec_int (m !!! Regidx (mword_of_int 11))
+                      (Z.of_nat j))) ⌝ -∗
+       (* the ledger comes straight back: write moves no descriptor *)
+       UserFd.ustd_at (ukn_fd N) l v -∗
+       (* ...and so does the source run *)
+       UserHeap.ubytesq (ukn_d N) dq
+         (uint (m !!! Regidx (mword_of_int 11))) nb f -∗
+       (* THE POST, AT THE TRAPPING KEY *)
+       spost_at uslot 16 fdep W r (uvis_M W) (uvis_fd W) cw' cs' -∗
+       urun N h' (<[Regidx (mword_of_int 10) := r]> m)
+         (add_vec_int pc 4) avail -∗
+       mWP (Loop : expr riscv_lang)) -∗
+    mWP (Loop : expr riscv_lang).
+  (* ...AND IT IS NOW [wp_uk_ecall_write_at] AT THE LEDGER READING AND THE
+     DATA HALF (lane RD-6), at its exact former statement: the walk it used
+     to carry is the one walk, and what this leaf adds is the two answers
+     ([UserFd.ustd_agree], [usrc_ok_ubytesq]).  The image row the one walk
+     hands out is DROPPED here, because that is what the former statement
+     said; the file arm is where it is spent. *)
+  Proof using .
+    intros Hn Hal4.
+    iIntros "#Hi Hrun Hsb Hstd Hbuf Hcont".
+    iApply (wp_uk_ecall_write_at N h m pc avail fdep
+              (UserFd.ustd_at (ukn_fd N) l v)
+              (UserHeap.ubytesq (ukn_d N) dq
+                 (uint (m !!! Regidx (mword_of_int 11))) nb f)
+              (fun fdv => take NSTD fdv = l) nb f Hn Hal4
+              (fun fdv => ustd_at_agree (ukn_fd N) fdv l v)
+              (fun M pmv sz =>
+                 usrc_ok_ubytesq (ukn_t N) (ukn_d N) (ukn_s N) M pmv sz dq
+                   (m !!! Regidx (mword_of_int 11)) nb f)
+              with "Hi Hrun [Hsb] Hstd Hbuf").
+    { iApply (udepwf_K_std N m pc 16 fdep l with "Hsb"). }
+    iIntros (h' r W cw' cs')
+      "%Ha0 %Ha1 %Ha2 %Htk %Hlz %Hsrc Hstd Hbuf Hpost Hrun".
+    iApply ("Hcont" $! h' r W cw' cs'
+              with "[%] [%] [%] [%] [%] [%] Hstd Hbuf Hpost Hrun");
+      [ exact Ha0 | exact Ha1 | exact Ha2 | exact Htk | exact Hlz
+      | exact (proj2 Hsrc) ].
+  Qed.
+
   (* ...AND THE BUFFER-FREE LEAF, which is the one above at [nb = 0]: a
      caller that holds no run of its own -- every write stub in the tree
      until lane IO-LEAF -- learns nothing about which bytes the kernel
@@ -4815,6 +4951,39 @@ Section UkRunSys.
   Proof using .
     intros Hn Hal4. iIntros "#Hi Hrun Hsb Hstd Hcont".
     iApply (wp_uk_ecall_write_chain_buf N h m pc avail fdep l (DfracOwn 1)
+              0%nat (fun _ => bv_0 8) Hn Hal4 with "Hi Hrun Hsb Hstd []").
+    { by rewrite /UserHeap.ubytesq. }
+    iIntros (h' r W cw' cs') "%Ha0 %Ha1 %Ha2 %Htk _ _ Hstd _ Hpost Hrun".
+    iApply ("Hcont" $! h' r W cw' cs'
+              with "[%] [%] [%] [%] Hstd Hpost Hrun");
+      assumption.
+  Qed.
+
+  (* ...AT A NAMED TABLE VIEW (seccomp S4): the call moves no descriptor,
+     so the ledger comes back at the view it went in at. *)
+  Lemma wp_uk_ecall_write_chain_at (N : uk_names Σ) (h : CpuId)
+      (m : regfile) (pc : mword 64) (avail : nat) (fdep : sfam)
+      (l v : list fdstate) :
+    usysno m = 16 ->
+    is_aligned_vaddr (Virtaddr (add_vec_int pc 4)) 2 = true ->
+    uinstr_is (ukn_t N) pc false (ECALL tt) -∗
+    urun N h m pc avail -∗
+    udepwf_std N m pc 16 fdep l -∗
+    UserFd.ustd_at (ukn_fd N) l v -∗
+    (∀ (h' : CpuId) (r : mword 64) (W : uvis) (cw' : Z) (cs' : gset gname),
+       ⌜tf_w (uvis_tf W) (tf_arg_idx 0) = m !!! Regidx (mword_of_int 10)⌝ -∗
+       ⌜tf_w (uvis_tf W) (tf_arg_idx 1) = m !!! Regidx (mword_of_int 11)⌝ -∗
+       ⌜tf_w (uvis_tf W) (tf_arg_idx 2) = m !!! Regidx (mword_of_int 12)⌝ -∗
+       ⌜take NSTD (uvis_fd W) = l⌝ -∗
+       UserFd.ustd_at (ukn_fd N) l v -∗
+       spost_at uslot 16 fdep W r (uvis_M W) (uvis_fd W) cw' cs' -∗
+       urun N h' (<[Regidx (mword_of_int 10) := r]> m)
+         (add_vec_int pc 4) avail -∗
+       mWP (Loop : expr riscv_lang)) -∗
+    mWP (Loop : expr riscv_lang).
+  Proof using .
+    intros Hn Hal4. iIntros "#Hi Hrun Hsb Hstd Hcont".
+    iApply (wp_uk_ecall_write_chain_buf_at N h m pc avail fdep l v (DfracOwn 1)
               0%nat (fun _ => bv_0 8) Hn Hal4 with "Hi Hrun Hsb Hstd []").
     { by rewrite /UserHeap.ubytesq. }
     iIntros (h' r W cw' cs') "%Ha0 %Ha1 %Ha2 %Htk _ _ Hstd _ Hpost Hrun".
@@ -4900,6 +5069,69 @@ Section UkRunSys.
                    (uint (m !!! Regidx (mword_of_int 11)) + Z.of_nat j)%Z (f j))%I
               (fun fdv => take NSTD fdv = l) nb f Hn Hal4
               (fun fdv => ustd_agree (ukn_fd N) fdv l)
+              (fun M pmv sz =>
+                 usrc_ok_utext (ukn_t N) (ukn_d N) (ukn_s N) M pmv sz
+                   (m !!! Regidx (mword_of_int 11)) nb f)
+              with "Hi Hrun [Hsb] Hstd Hbs").
+    { iApply (udepwf_K_std N m pc 16 fdep l with "Hsb"). }
+    iIntros (h' r W cw' cs')
+      "%Ha0 %Ha1 %Ha2 %Htk %Hlz %Hsrc Hstd Hbs' Hpost Hrun".
+    iApply ("Hcont" $! h' r W cw' cs'
+              with "[%] [%] [%] [%] [%] [%] Hstd Hbs' Hpost Hrun");
+      [ exact Ha0 | exact Ha1 | exact Ha2 | exact Htk | exact Hlz
+      | exact (proj2 Hsrc) ].
+  Qed.
+
+  (* ...AT A NAMED TABLE VIEW (seccomp S4): the call moves no descriptor,
+     so the ledger comes back at the view it went in at. *)
+  Lemma wp_uk_ecall_write_chain_txt_at (N : uk_names Σ) (h : CpuId)
+      (m : regfile) (pc : mword 64) (avail : nat) (fdep : sfam)
+      (l v : list fdstate) (nb : nat) (f : nat -> bv 8) :
+    usysno m = 16 ->
+    is_aligned_vaddr (Virtaddr (add_vec_int pc 4)) 2 = true ->
+    uinstr_is (ukn_t N) pc false (ECALL tt) -∗
+    urun N h m pc avail -∗
+    udepwf_std N m pc 16 fdep l -∗
+    UserFd.ustd_at (ukn_fd N) l v -∗
+    ([∗ list] j ∈ seq 0 nb,
+       UserHeap.utext (ukn_t N)
+         (uint (m !!! Regidx (mword_of_int 11)) + Z.of_nat j)%Z (f j)) -∗
+    (∀ (h' : CpuId) (r : mword 64) (W : uvis) (cw' : Z) (cs' : gset gname),
+       ⌜tf_w (uvis_tf W) (tf_arg_idx 0) = m !!! Regidx (mword_of_int 10)⌝ -∗
+       ⌜tf_w (uvis_tf W) (tf_arg_idx 1) = m !!! Regidx (mword_of_int 11)⌝ -∗
+       ⌜tf_w (uvis_tf W) (tf_arg_idx 2) = m !!! Regidx (mword_of_int 12)⌝ -∗
+       ⌜take NSTD (uvis_fd W) = l⌝ -∗
+       ⌜uvis_lazy W = false⌝ -∗
+       ⌜ forall (P : uptd) (j : nat),
+           ProcPtOwn.proc_pt_wf P ->
+           perm_of (ud_um P) (uvis_sz W) = uvis_perm W ->
+           lazy_free (ud_um P) (uvis_sz W) ->
+           (j < nb)%nat ->
+           UserPtTree.uva_rmapped P
+             (uint (add_vec_int (m !!! Regidx (mword_of_int 11))
+                      (Z.of_nat j))) ⌝ -∗
+       UserFd.ustd_at (ukn_fd N) l v -∗
+       ([∗ list] j ∈ seq 0 nb,
+          UserHeap.utext (ukn_t N)
+            (uint (m !!! Regidx (mword_of_int 11)) + Z.of_nat j)%Z (f j)) -∗
+       spost_at uslot 16 fdep W r (uvis_M W) (uvis_fd W) cw' cs' -∗
+       urun N h' (<[Regidx (mword_of_int 10) := r]> m)
+         (add_vec_int pc 4) avail -∗
+       mWP (Loop : expr riscv_lang)) -∗
+    mWP (Loop : expr riscv_lang).
+  (* ...AND IT IS THE ONE WALK AT THE TEXT HALF (lane RD-6), at its exact
+     former statement: the only thing that ever differed from the buffer
+     leaf is which answer to [usrc_ok] the caller's run gives. *)
+  Proof using .
+    intros Hn Hal4.
+    iIntros "#Hi Hrun Hsb Hstd #Hbs Hcont".
+    iApply (wp_uk_ecall_write_at N h m pc avail fdep
+              (UserFd.ustd_at (ukn_fd N) l v)
+              ([∗ list] j ∈ seq 0 nb,
+                 UserHeap.utext (ukn_t N)
+                   (uint (m !!! Regidx (mword_of_int 11)) + Z.of_nat j)%Z (f j))%I
+              (fun fdv => take NSTD fdv = l) nb f Hn Hal4
+              (fun fdv => ustd_at_agree (ukn_fd N) fdv l v)
               (fun M pmv sz =>
                  usrc_ok_utext (ukn_t N) (ukn_d N) (ukn_s N) M pmv sz
                    (m !!! Regidx (mword_of_int 11)) nb f)
