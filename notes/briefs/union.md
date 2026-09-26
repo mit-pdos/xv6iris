@@ -1,3 +1,5 @@
+> **USER RULINGS (2026-09-26):** DU1 = only union_adequacy_closed's cone, pinned to Rocq 1900b8a43. DU3/DU4 = Lean's approach (per-program text tables decoded in proofs; printf once, load-address-parametric) — user has slight doubts, so SPIKE FIRST (putc/printf) and fall back to Rocq's structure if it fails. DU8 = general parser walk only (audit first). DU9 = classical where possible. DU2/DU5/DU6/DU7/DU10 = coordinator adopts the recommendations.
+
 # Brief: UNION ADEQUACY — the plan (Rocq `UInitUnion.union_adequacy_closed` in Lean)
 
 Surveyed 2026-09-26 against `lean-v2` @ `f3ac4109f` and `/shared/xv6rocq` `main` @ `1900b8a43`
