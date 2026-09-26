@@ -24,6 +24,7 @@ import MachCSL.Power
 import MachCSL.Adequacy
 import MachCSL.SimpAttr
 import MachCSL.ModelFacts
+import MachCSL.SailHooks
 import MachCSL.Tactics
 import MachCSL.Platform
 import MachCSL.PlatformFacts

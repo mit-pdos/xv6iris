@@ -7,6 +7,11 @@
 #                                  the xv6 deviations (same file as the Rocq
 #                                  MachCSL prototype's model-xv6iris/)
 #   model/sail-modules.txt         the module subset to compile
+#   model/Xv6Extras.lean           HAND-WRITTEN realisations of the Sail
+#                                  platform hooks (LR/SC reservation,
+#                                  plat_term_write, experimental extensions);
+#                                  passed as a second --lean-import-file, NOT
+#                                  regenerated (Rocq: xv6iris_extras.v)
 #
 # The generated Lean project `require`s the vendored lean-sail fork
 # (vendor/lean-sail), whose `PreSailM` is a free monad -- see its README.
@@ -39,6 +44,13 @@ CONFIG_JSON="$REPO_ROOT/model/sail-config-rv64d.json"
 MODULES_FILE="$REPO_ROOT/model/sail-modules.txt"
 OUT_DIR="$REPO_ROOT/model"
 LEAN_SAIL_DIR="$REPO_ROOT/vendor/lean-sail"
+# HAND-WRITTEN, not regenerated: the realisations of the Sail platform hooks
+# (the Lean twin of Rocq's model-xv6iris/xv6iris_extras.v; see its header).
+# Passed as a SECOND --lean-import-file, so sail copies it into the generated
+# project as LeanRV64D/Xv6Extras.lean and every generated module imports it;
+# its definitions (in LeanRV64D.Functions) take precedence over the fork's
+# root-level axioms of the same names in RiscvExtras.lean.
+XV6_EXTRAS="$REPO_ROOT/model/Xv6Extras.lean"
 
 if ! command -v sail >/dev/null 2>&1; then
   echo "error: 'sail' not on PATH -- run under 'opam exec --switch=lean-xv6 --'" >&2
@@ -99,6 +111,7 @@ mkdir -p "$SAIL_RISCV_DIR/build/model"
     --lean-noncomputable-function encdec_compressed_forwards_matches \
     --lean-noncomputable-function encdec_compressed_backwards_matches \
     --lean-import-file ../handwritten_support/RiscvExtras.lean \
+    --lean-import-file "$XV6_EXTRAS" \
     --lean-lib-path "$LEAN_SAIL_DIR" \
     -o Lean_RV64D \
     $SAIL_MODULES \
@@ -151,4 +164,8 @@ new = """  match x with
 assert old in s, "unwrapValue shape changed; update tools/regen_sail_model.sh"
 open(p, 'w').write(s.replace(old, new))
 PY
+# The installed copy of Xv6Extras.lean must be the master copy verbatim
+# (sail only substitutes THE_MODULE_NAME, which the master does not use).
+cmp -s "$XV6_EXTRAS" "$OUT_DIR/Lean_RV64D/LeanRV64D/Xv6Extras.lean" || {
+  echo "error: installed Xv6Extras.lean differs from $XV6_EXTRAS" >&2; exit 1; }
 echo "Done.  Review 'git diff model/' and rebuild with 'lake build'."

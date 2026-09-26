@@ -2,6 +2,7 @@ import Sail
 import LeanRV64D.Defs
 import LeanRV64D.SpecializationV1
 import LeanRV64D.FakeReal
+import LeanRV64D.Xv6Extras
 import LeanRV64D.RiscvExtras
 
 set_option maxHeartbeats 1_000_000_000
