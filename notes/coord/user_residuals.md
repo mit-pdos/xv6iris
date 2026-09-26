@@ -34,3 +34,32 @@ Collected from the USER lane reports (Sept 26 2026). Each item names the lane th
   `acq = true` that `uResvTok`/`ctxTok` don't accept. Same lane.
 - U2-M1 leaves: execute-level arms go to U2-M4 (`rX_bits` → `uma_get_transformed_data_addr` →
   `uma_vmem_read`/`_write`); `transform_effective_address` takes `senvcfg = 0`, `MXR = 0` as hypotheses.
+
+## From U2-M2 / U2-M3 / U2-F / U3-A (Sept 26 2026)
+- **uptWf validity pin (decision: adopt Rocq's `upt_map_wf` `pte_valid`)**: add `uwkInv w = false` for
+  every user leaf to `uptWf` (+ its producers: mappages/uvmalloc/uvmcopy/kexec sites, like D53). Without
+  it, `utlbOk` admits a cached write-without-read leaf whose TLB hit hits `check_PTE_permission`'s assert
+  (no Sail step). Then U2-F's `UftLeavesValid P` premise of `ustFetchSpec_holds` is dropped. Worktree
+  lane after the bump lands (touches kernel uvm proofs).
+- **CSR hypothesis widened (U3-A `UclCsrEager`)**: 11 numbers — 0x747/0x757 (Zkr, missing clause) and
+  0x10D–F/0x60D–F/0x61D–F (eager reads of mstateen1..3/sstateen1..3 outside `ufFoot`). FALSE today (walk
+  = none), so `ucl_execTotal` is vacuous until fixed. The stateen nine should go via the eager-&&
+  elimination lemma (lane andelim); 0x747/0x757 need the Zkr clause or the backend fix (user decision).
+  U3-A duplicated U1-X3's CSR table at a smaller pin (`uclPin`): fold U1-X3's into it later.
+- **Memory contract `UclMemArms`** (6 fields, U2-M4 builds to it): load/store (`uWidth1248`),
+  loadres/storecon (`lrsc_width_valid`), amo (`uAmoWidthOk`), zicbop; stated on `execute i` from the
+  state; compressed memory forms follow via ExecuteAs redirects.
+- **AMO acquire (`.aq`/`.aqrl`)** and LR.aq: walker gap, lane U2-R (resv_any) covers them.
+- **AMO config divergence to check**: Rocq's `arm_AMO_u` comment says only AMOSWAP retires (others trap);
+  Lean's `bootPMA` gives RAM `atomic_support = AMOCASQ` (every op retires). Check Rocq's platform PMA and
+  align (BootReset phase 2 touches bootPMA).
+- **decodableU too weak at width 16**: doesn't record width 16 ⇒ CAS with even rs2/rd; strengthen for the
+  AMOCAS.Q facts (U2-M4/U3-A).
+- **Failing AMOCAS leaves the reservation bit set** (model's reserved-read kind) — noted, not a proof gap.
+- **U2-M2 straddle-store hypothesis**: high part's translation asked for every byte map with the same
+  domain as after the low write; U3/U2-M4 discharges it (user stores can't reach PT bytes — from
+  UserBytes' disjointness).
+- Duplicates: `uma_intra_bv` ≡ `umm_intra_bv`; `umoW` ≡ `umaW`; `umo_gtda` vs M1's vmem front.
+- New walker `uftRun` (U2-F): runRW + fetch nodes via oracle; `swp_uftRun` proved once.
+- **bv_decide enum pitfall**: bv_decide over a Sail enum adds `<Enum>.enumToBitVec`; two modules doing it
+  clash on import. Shared home pattern: MachCSL/BvEnumSatp.lean.
