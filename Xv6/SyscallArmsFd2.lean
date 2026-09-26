@@ -168,16 +168,24 @@ theorem syscall_arm_write (SW : SYSWRITE)
   icases syscall_tf_len hct γ (procAddr j) pid V M $$ Hpriv with ⟨%hl, Hpriv⟩
   icases syscFd_agree γ (procAddr j) pid V M sts $$ [Hpriv Hfr] with ⟨%ha, Hpriv, Hfr⟩
   · iframe
-  ihave Hin := (show filewriteIn (hlc := hlc) (GF := GF) (syscFdKey (tfW V.tf (tfArgIdx 0)) sts)
+  -- THE WRITE GUARD (Rocq RULING WR-TB), discharged where the block is in
+  -- hand: its `uptWf`, the lazy bit's claim, and the permission map's own
+  -- definition
+  icases procPrivFd_facts γ (procAddr j) pid V M $$ Hpriv with ⟨Hpriv, %hfacts⟩
+  have htb : wrTb (permOf V.upt.um V.sz.toNat) V.sz.toNat V.pvLazy V.upt :=
+    wrTb_of_block V.upt V.sz V.pvLazy hfacts.2.2.2 hfacts.2.2.1
+  ihave Hin := (show filewriteIn (hlc := hlc) (GF := GF) (permOf V.upt.um V.sz.toNat) V.sz.toNat V.pvLazy
+      (syscFdKey (tfW V.tf (tfArgIdx 0)) sts)
       (argZ (tfW V.tf (tfArgIdx 2))) (writerImg V.upt M) (tfW V.tf (tfArgIdx 1)) Q ⊢
-      sysWriteIn (hlc := hlc) V (tfW V.tf (tfArgIdx 0)) sts (argZ (tfW V.tf (tfArgIdx 2)))
+      sysWriteIn (hlc := hlc) (permOf V.upt.um V.sz.toNat) V.sz.toNat V.pvLazy V (tfW V.tf (tfArgIdx 0))
+        sts (argZ (tfW V.tf (tfArgIdx 2)))
         (writerImg V.upt M) (tfW V.tf (tfArgIdx 1)) Q from by
     unfold sysWriteIn; rw [sysFdSt_key ha]) $$ Hin
   have hWr := SW.wp_sys_write_eb (hlc := hlc) (GF := GF) Γ cpu (((k.withSpie spie spp).pushed 4).withRegs R)
     γ j pid V M sts (tfW V.tf (tfArgIdx 0)) (tfW V.tf (tfArgIdx 1)) (tfW V.tf (tfArgIdx 2))
-    fscKalloc fsReadyKmem γl γu Q
+    fscKalloc fsReadyKmem γl γu Q (permOf V.upt.um V.sz.toNat) V.sz.toNat V.pvLazy
     (syscArg V hl 0 (by decide)) (syscArg V hl 1 (by decide)) (syscArg V hl 2 (by decide))
-    ?hK hj ?hp ?hn ?ht
+    ?hK hj ?hp ?hn ?ht htb
   case hp => k_norm_g; exact hproc
   case ht => k_norm_g; exact htier
   case hn => simp only [KCtx.withRegs_noff, KCtx.pushed_noff, KCtx.withSpie_noff]; exact hnoff

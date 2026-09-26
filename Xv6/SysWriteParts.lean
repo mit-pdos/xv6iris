@@ -248,22 +248,22 @@ taken at every hart. -/
 theorem swr_filewrite (FW : FILEWRITE) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
     (c : CPU) (k' : KCtx) (γ : FileNames) (fk : Nat) (q : Qp) (st : FdState)
     (j : Nat) (pid : BitVec 32) (V : ProcPriv) (M : Nat → List (BitVec 8))
-    (γkl : GName) (γk : KmemNames) (γl : GName) (γu : UartNames) (n : Int) (Q : Nat → IProp GF)
+    (γkl : GName) (γk : KmemNames) (γl : GName) (γu : UartNames) (n : Int) (Q : Nat → IProp GF) (pmv : Nat → Option UPerm) (szv : Nat) (lzv : Bool)
     (hK : filewriteSlots ≤ k'.avail) (hfk : fk < NFILE)
     (hj : j < NPROC) (hproc : k'.proc = procAddr j)
     (hnoff : k'.noff = 0) (htier : k'.tier = KTier.kpt)
     (ha0 : k'.regs 10#5 = fnode fk) (ha2 : k'.regs 12#5 = BitVec.ofInt 64 n)
-    (hn : -2 ^ 31 ≤ n ∧ n < 2 ^ 31) :
+    (hn : -2 ^ 31 ≤ n ∧ n < 2 ^ 31) (htb : wrTb pmv szv lzv V.upt) :
     kctx c k' ∗ pcIs c KA.«filewrite» ∗ procsInv Γ ∗
     trapCsrsExt c k'.sie ∗ cpuClaimExt c k'.sie k'.proc ∗ panicEnv ∗
     fileRef γ fk q st ∗ procPrivCoreNoctxAt curCtx (procAddr j) pid V M ∗
     isLock γkl kmemLockAddr "kmem" (kmemRes γk) ∗ kallocAvail γk none ∗
     filewriteEnv (hlc := hlc) γl γu st ∗ foffRow st ∗
-    filewriteIn (hlc := hlc) st n (writerImg V.upt M) (k'.regs 11#5) Q ∗
+    filewriteIn (hlc := hlc) pmv szv lzv st n (writerImg V.upt M) (k'.regs 11#5) Q ∗
     (∀ c' : CPU, filewritePost (hlc := hlc) k' γl γu γ fk q st j pid V M n Q c')
     ⊢ wpLoop (GF := GF) c := by
   have h := FW.wp_filewrite_eb (hlc := hlc) (GF := GF) Γ c k' γ fk q st j pid V M γkl γk γl γu n Q
-    hK hfk hj hproc hnoff htier ha0 ha2 hn
+    pmv szv lzv hK hfk hj hproc hnoff htier ha0 ha2 hn htb
   unfold wp_filewrite_eb_body at h
   simp only [filewriteAddr] at h
   iintro ⟨Hk, Hpc, Hpi, Hte, Hce, Hpe, Href, Hpriv, Hkl, Hav, Henv, Hrow, Hin, HK⟩

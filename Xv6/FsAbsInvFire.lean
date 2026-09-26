@@ -224,10 +224,11 @@ theorem fsabsFilereadIn [Xv6G GF] [OffboxG GF] [Fscfg] (st : FdState) (P : IProp
 trivial cursor, the inode arm out of the supply, the console arm out of the
 licence. -/
 theorem fsabsFilewriteIn [Xv6G GF] [OffboxG GF] [Fscfg] (st : FdState) (n : Int)
+    (pmv : Nat → Option UPerm) (szv : Nat) (lzv : Bool)
     (M : Nat → List (BitVec 8)) (ua : BitVec 64) :
     ⊢ appSup (GF := GF) -∗ consLicence (hlc := hlc) (GF := GF) -∗
       MachFixedGS.killCred (hlc := hlc) (GF := GF) -∗
-      filewriteIn (hlc := hlc) st n M ua (fun _ => iprop(True)) := by
+      filewriteIn (hlc := hlc) pmv szv lzv st n M ua (fun _ => iprop(True)) := by
   iintro #Hsup #Hlic #Htaint
   unfold filewriteIn
   rcases st with _ | ⟨rb, wb, ty⟩

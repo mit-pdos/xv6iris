@@ -106,11 +106,13 @@ def sysWriteRet (V : ProcPriv) (v : BitVec 64) (n : Int) (r : BitVec 64) : Prop 
 section Arms
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FsTopG GF] [OffboxG GF]
   [Appcfg GF] [FsBytesG GF] [Fscfg]
+/- the write guard's three key values (Rocq RULING WR-TB) -/
+variable (pmv : Nat → Option UPerm) (szv : Nat) (lzv : Bool)
 
 /-- THE CALLER'S INPUT (Rocq `sys_write_in`): filewrite's, at the key. -/
 def sysWriteIn (V : ProcPriv) (v : BitVec 64) (sts : List FdState) (n : Int)
     (M : Nat → List (BitVec 8)) (ua : BitVec 64) (Q : Nat → IProp GF) : IProp GF :=
-  filewriteIn (hlc := hlc) (sysFdSt v V.ofile sts) n M ua Q
+  filewriteIn (hlc := hlc) pmv szv lzv (sysFdSt v V.ofile sts) n M ua Q
 
 /-- THE ARMED OUTPUT (Rocq `sys_write_arms`): the blanket beside
 filewrite's extra at the key. -/
@@ -151,7 +153,7 @@ theorem sysWriteArms_none (V : ProcPriv) (v : BitVec 64) (sts : List FdState) (n
 theorem sysWriteIn_none (V : ProcPriv) (v : BitVec 64) (sts : List FdState) (n : Int)
     (M : Nat → List (BitVec 8)) (ua : BitVec 64) (Q : Nat → IProp GF)
     (hnone : argFd v V.ofile = none) :
-    sysWriteIn (hlc := hlc) V v sts n M ua Q ⊢ emp := by
+    sysWriteIn (hlc := hlc) pmv szv lzv V v sts n M ua Q ⊢ emp := by
   unfold sysWriteIn
   rw [sysFdSt_none v V.ofile sts hnone]
   unfold filewriteIn; exact .rfl
@@ -160,7 +162,7 @@ theorem sysWriteIn_none (V : ProcPriv) (v : BitVec 64) (sts : List FdState) (n :
 theorem sysWriteIn_of (V : ProcPriv) (v : BitVec 64) (sts : List FdState) (fd : Nat)
     (fv : BitVec 64) (st : FdState) (n : Int) (M : Nat → List (BitVec 8)) (ua : BitVec 64)
     (Q : Nat → IProp GF) (hsome : argFd v V.ofile = some (fd, fv)) (hst : sts[fd]? = some st) :
-    sysWriteIn (hlc := hlc) V v sts n M ua Q ⊢ filewriteIn (hlc := hlc) st n M ua Q := by
+    sysWriteIn (hlc := hlc) pmv szv lzv V v sts n M ua Q ⊢ filewriteIn (hlc := hlc) pmv szv lzv st n M ua Q := by
   unfold sysWriteIn
   rw [sysFdSt_some v V.ofile sts fd fv st hsome hst]
 
@@ -215,10 +217,14 @@ def wp_sys_write_eb_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [
     (cpu : CPU) (k : KCtx) (γ : FileNames) (j : Nat) (pid : BitVec 32) (V : ProcPriv)
     (M : Nat → List (BitVec 8)) (sts : List FdState) (v v1 v2 : BitVec 64)
     (γkl : GName) (γk : KmemNames) (γl : GName) (γu : UartNames) (Q : Nat → IProp GF)
+    (pmv : Nat → Option UPerm) (szv : Nat) (lzv : Bool)
     (hv : V.tf[tfArgIdx 0]? = some v) (hv1 : V.tf[tfArgIdx 1]? = some v1)
     (hv2 : V.tf[tfArgIdx 2]? = some v2)
     (hK : sysWriteSlots ≤ k.avail) (hj : j < NPROC) (hproc : k.proc = procAddr j)
-    (hnoff : k.noff = 0) (htier : k.tier = KTier.kpt) : Prop :=
+    (hnoff : k.noff = 0) (htier : k.tier = KTier.kpt)
+    -- THE WRITE GUARD'S THREE KEY VALUES DESCRIBE THIS CALLER'S TABLE (Rocq
+    -- RULING WR-TB): the dispatcher discharges it at the block's own values
+    (htb : wrTb pmv szv lzv V.upt) : Prop :=
   kctx cpu k ∗ pcIs cpu sysWriteAddr ∗ procsInv Γ ∗
   trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗
   -- filewrite's else arm, and its callees, panic
@@ -229,7 +235,7 @@ def wp_sys_write_eb_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [
   -- the file system in the form that names no file, and the write column
   filewriteFsEnv (hlc := hlc) ∗ filewriteDevsw γl γu ∗
   -- THE CALLER'S INPUT, keyed on the descriptor argument 0 names
-  sysWriteIn (hlc := hlc) V v sts (argZ v2) (writerImg V.upt M) v1 Q ∗
+  sysWriteIn (hlc := hlc) pmv szv lzv V v sts (argZ v2) (writerImg V.upt M) v1 Q ∗
   -- THE CROSSING IS THE LITERAL `true`: filewrite parks
   wpNext true k.proc cpu (sysWritePost k γ j pid V M sts v v1 v2 Q)
   ⊢ wpLoop (GF := GF) cpu
@@ -244,8 +250,9 @@ structure SYSWRITE : Prop where
     (cpu : CPU) (k : KCtx) (γ : FileNames) (j : Nat) (pid : BitVec 32) (V : ProcPriv)
     (M : Nat → List (BitVec 8)) (sts : List FdState) (v v1 v2 : BitVec 64)
     (γkl : GName) (γk : KmemNames) (γl : GName) (γu : UartNames) (Q : Nat → IProp GF)
-    hv hv1 hv2 hK hj hproc hnoff htier,
+    (pmv : Nat → Option UPerm) (szv : Nat) (lzv : Bool)
+    hv hv1 hv2 hK hj hproc hnoff htier htb,
     wp_sys_write_eb_body (hlc := hlc) (GF := GF) Γ cpu k γ j pid V M sts v v1 v2 γkl γk γl γu Q
-      hv hv1 hv2 hK hj hproc hnoff htier
+      pmv szv lzv hv hv1 hv2 hK hj hproc hnoff htier htb
 
 end Xv6

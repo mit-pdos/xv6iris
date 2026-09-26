@@ -351,7 +351,7 @@ def xrowOpen (P Pmiss : Nat → Nat → IProp GF) (Farm Fun : Pfam GF (Aview →
 /-- row 16: write's chains at the key's descriptor, count and buffer. -/
 def xrowWrite (Q : Nat → IProp GF) (W : Uvis) : IProp GF :=
   iprop(∀ Mv : Nat → List (BitVec 8), ⌜imgAgrees W.M Mv⌝ -∗
-    filewriteIn (hlc := hlc) (fdStOfKey (xkA W 0) W.fd) (argZ (xkA W 2)) Mv (xkA W 1) Q)
+    filewriteIn (hlc := hlc) W.perm W.sz W.lazy (fdStOfKey (xkA W 0) W.fd) (argZ (xkA W 2)) Mv (xkA W 1) Q)
 
 /-- row 17: mknod's bundle at argument 0 (the path) and the two devices. -/
 def xrowMknod (P Pmiss : Nat → Nat → IProp GF) (Farm Fun : Pfam GF (Aview → Nat → IProp GF))
@@ -523,7 +523,8 @@ theorem xv6Sbundle_cong (X : Uvis → IProp GF) (n : Int) (f : Xfam GF) (W W' : 
   have e2 : xkA W 2 = xkA W' 2 := h2
   unfold xv6Sbundle xv6SbundleRest xrowExec xrowRead xrowChdir xrowOpen xrowWrite xrowMknod
     xrowUnlink xrowMkdir
-  simp only [hM, e0, e1, e2, hfd, hcw, hg, hch, hpid, hsc]
+  -- row 16 reads the write guard's three key values too (Rocq RULING WR-TB)
+  simp only [hM, e0, e1, e2, hfd, hcw, hg, hch, hpid, hpi, hsz, hlz, hsc]
   exact .rfl
 
 /-- **Rocq `xv6_spost_cong`**: the same rows plus the permission map and the
@@ -1019,7 +1020,8 @@ deviations 1, 2). -/
 theorem syscDepWrite_xv6 (f : Xfam GF) (W : Uvis) :
     @UexecSG.sbundleAt GF _ uexecSGXv6 (uslot (hlc := hlc)) 16 f W ⊢
       (∀ Mv : Nat → List (BitVec 8), ⌜imgAgrees W.M Mv⌝ -∗
-        filewriteIn (hlc := hlc) (fdStOfKey (xkA W 0) W.fd) (argZ (xkA W 2)) Mv (xkA W 1) f.wQ) ∗
+        filewriteIn (hlc := hlc) W.perm W.sz W.lazy (fdStOfKey (xkA W 0) W.fd) (argZ (xkA W 2)) Mv (xkA W 1)
+          f.wQ) ∗
       (∀ (r : BitVec 64) (M' : ElfMem) (fdv' : List FdState) (cw' : Nat) (cs' : ExtTreeSet GName compare),
         xpostWrite (hlc := hlc) f.wQ W r -∗
           @UexecSG.spostAt GF _ uexecSGXv6 (uslot (hlc := hlc)) 16 f W r M' fdv' cw' cs') := by

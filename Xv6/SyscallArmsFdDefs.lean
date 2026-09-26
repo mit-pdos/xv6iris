@@ -337,7 +337,8 @@ def SyscDepWrite : Prop :=
     (gn : GName) (cs : ExtTreeSet GName compare) (pid : BitVec 32),
     UexecSG.sbundleAt (uslot (hlc := hlc)) 16 f (uvisOf V M sts gn cs pid) ⊢
       ∃ Q : Nat → IProp GF,
-        filewriteIn (hlc := hlc) (syscFdKey (tfW V.tf (tfArgIdx 0)) sts) (argZ (tfW V.tf (tfArgIdx 2)))
+        filewriteIn (hlc := hlc) (permOf V.upt.um V.sz.toNat) V.sz.toNat V.pvLazy
+          (syscFdKey (tfW V.tf (tfArgIdx 0)) sts) (argZ (tfW V.tf (tfArgIdx 2)))
           (writerImg V.upt M) (tfW V.tf (tfArgIdx 1)) Q ∗
         (∀ r : BitVec 64, ⌜filewriteRet (argZ (tfW V.tf (tfArgIdx 2))) r⌝ -∗
           filewriteExtra (hlc := hlc) V.upt (syscFdKey (tfW V.tf (tfArgIdx 0)) sts)

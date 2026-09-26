@@ -448,10 +448,15 @@ variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [Fdslot
 (whose mode it is keyed on) and the contract's input at that mode.  At PARK
 the row IS the supplier; at HAND it is `emp` and the two arms of
 `filewriteInHeld` pick which carrier the loop starts in. -/
-theorem fwrSt_init (om : OffMode) (rb wb : Bool) (i : Nat) (γo : GName) (P : UPtd) (n : Int)
-    (M : Nat → List (BitVec 8)) (ua : BitVec 64) (Q : Nat → IProp GF) :
+theorem fwrSt_init (om : OffMode) (rb wb : Bool) (i : Nat) (γo : GName)
+    (pmv : Nat → Option UPerm) (szv : Nat) (lzv : Bool) (P : UPtd) (n : Int)
+    (M : Nat → List (BitVec 8)) (ua : BitVec 64) (Q : Nat → IProp GF)
+    -- ...AND THE TABLE GUARD IS DISCHARGED HERE AND NOWHERE ELSE (Rocq RULING
+    -- WR-TB): the kernel knows `P`, and the client's chain comes out of its
+    -- `∀ P` with the guard paid
+    (htb : wrTb pmv szv lzv P) :
     ⊢@{IProp GF} foffRow (GF := GF) (.open rb wb (.inode i γo om)) -∗
-      filewriteInInodeOm (hlc := hlc) om i γo n M ua Q -∗
+      filewriteInInodeOm (hlc := hlc) pmv szv lzv om i γo n M ua Q -∗
       fwrSt (hlc := hlc) om (fsGammaL fscFs) i γo P n M ua Q 0 0 0 := by
   cases om with
   | parked =>
@@ -462,7 +467,7 @@ theorem fwrSt_init (om : OffMode) (rb wb : Bool) (i : Nat) (γo : GName) (P : UP
   | held =>
     unfold filewriteInInodeOm filewriteInHeld
     iintro _ (Hcm | ⟨Hcm, #Ht⟩)
-    · ispecialize Hcm $$ %P
+    · ispecialize Hcm $$ %P %htb
       iapply fwrSt_init_held $$ Hcm
     · iapply fwrSt_init_taint $$ Ht Hcm
 

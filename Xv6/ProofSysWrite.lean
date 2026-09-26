@@ -110,12 +110,12 @@ the environment it selects and its offset row, and filewrite's block
 theorem swr_ok_jal (FW : FILEWRITE) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
     (cpu : CPU) (k : KCtx) (γ : FileNames) (j : Nat) (pid : BitVec 32)
     (V : ProcPriv) (M : Nat → List (BitVec 8)) (sts : List FdState) (v v1 v2 : BitVec 64)
-    (γkl : GName) (γk : KmemNames) (γl : GName) (γu : UartNames) (Q : Nat → IProp GF)
+    (γkl : GName) (γk : KmemNames) (γl : GName) (γu : UartNames) (Q : Nat → IProp GF) (pmv : Nat → Option UPerm) (szv : Nat) (lzv : Bool)
     (spie spp : Bool) (R : RegMap) (fd0 : Nat) (fv : BitVec 64) (wn : BitVec 32)
     (hK : sysWriteSlots ≤ k.avail) (hj : j < NPROC) (hproc : k.proc = procAddr j)
     (hnoff : k.noff = 0) (htier : k.tier = KTier.kpt) (ht0 : curTier = KTier.kpt)
     (hr : swrRegs k R) (h10 : R 10#5 = fv) (h11 : R 11#5 = v1)
-    (h12 : R 12#5 = BitVec.ofInt 64 (argZ v2)) (hsome : argFd v V.ofile = some (fd0, fv)) :
+    (h12 : R 12#5 = BitVec.ofInt 64 (argZ v2)) (hsome : argFd v V.ofile = some (fd0, fv)) (htb : wrTb pmv szv lzv V.upt) :
     kctx cpu (((k.withSpie spie spp).pushed 6).withRegs R) ∗
     pcIs cpu (KA.«sys_write» + 0x3c#64) ∗ swrEnv Γ γkl γk γl γu ∗
     wordPointsTo (k.regs 2#5 + 0xFFFFFFFFFFFFFFF8#64) 8 (DFrac.own 1) (k.regs 1#5) ∗
@@ -125,7 +125,7 @@ theorem swr_ok_jal (FW : FILEWRITE) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF �
     procPrivCoreNoctxAt curCtx (procAddr j) pid V M ∗
     procOfilesOwe γ V.fdg (procAddr j) V.ofile [] ∗ fdFrags V.fdg sts ∗
     filewriteFsEnv (hlc := hlc) ∗
-    sysWriteIn (hlc := hlc) V v sts (argZ v2) (writerImg V.upt M) v1 Q ∗
+    sysWriteIn (hlc := hlc) pmv szv lzv V v sts (argZ v2) (writerImg V.upt M) v1 Q ∗
     (∀ c : CPU, sysWritePost k γ j pid V M sts v v1 v2 Q c)
     ⊢ wpLoop (GF := GF) cpu := by
   have hK110 := hK
@@ -160,12 +160,12 @@ theorem swr_ok_jal (FW : FILEWRITE) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF �
     obtain ⟨hlt', he'⟩ := List.getElem?_eq_some_iff.mp hsts0
     rw [← he']; exact List.set_getElem_self hlt'
   rw [hset]
-  ihave Hin := sysWriteIn_of V v sts fd0 (fnode kk) st (argZ v2) _ v1 Q hsome hsts0 $$ Hin
+  ihave Hin := sysWriteIn_of pmv szv lzv V v sts fd0 (fnode kk) st (argZ v2) _ v1 Q hsome hsts0 $$ Hin
   -- the environment the state selects
   icases filewrite_env_split γl γu st $$ [Hfs Hdev] with ⟨Hfenv, Henvb⟩
   · iframe Hfs Hdev
-  iapply (swr_filewrite FW Γ cpu _ γ kk q st j pid V M γkl γk γl γu (argZ v2) Q ?hKs hkk hj ?hps ?hno
-      ?hts ?has ?han (argZ_range v2))
+  iapply (swr_filewrite FW Γ cpu _ γ kk q st j pid V M γkl γk γl γu (argZ v2) Q pmv szv lzv ?hKs hkk hj
+      ?hps ?hno ?hts ?has ?han (argZ_range v2) htb)
     $$ [- $Hk $Hpc]
   rotate_right 1
   k_norm_g [swr_ret_40, h11]
@@ -198,11 +198,11 @@ hoisted `li a0,-1`, `bltz` falls through, the three loads (`a2 := n`,
 theorem swr_ok_loads (FW : FILEWRITE) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
     (cpu : CPU) (k : KCtx) (γ : FileNames) (j : Nat) (pid : BitVec 32)
     (V : ProcPriv) (M : Nat → List (BitVec 8)) (sts : List FdState) (v v1 v2 : BitVec 64)
-    (γkl : GName) (γk : KmemNames) (γl : GName) (γu : UartNames) (Q : Nat → IProp GF)
+    (γkl : GName) (γk : KmemNames) (γl : GName) (γu : UartNames) (Q : Nat → IProp GF) (pmv : Nat → Option UPerm) (szv : Nat) (lzv : Bool)
     (spie spp : Bool) (R : RegMap) (fd0 : Nat) (fv : BitVec 64)
     (hK : sysWriteSlots ≤ k.avail) (hj : j < NPROC) (hproc : k.proc = procAddr j)
     (hnoff : k.noff = 0) (htier : k.tier = KTier.kpt) (ht0 : curTier = KTier.kpt)
-    (hr : swrRegs k R) (h10 : R 10#5 = 0#64) (hsome : argFd v V.ofile = some (fd0, fv)) :
+    (hr : swrRegs k R) (h10 : R 10#5 = 0#64) (hsome : argFd v V.ofile = some (fd0, fv)) (htb : wrTb pmv szv lzv V.upt) :
     kctx cpu (((k.withSpie spie spp).pushed 6).withRegs R) ∗
     pcIs cpu (KA.«sys_write» + 0x28#64) ∗ swrEnv Γ γkl γk γl γu ∗
     wordPointsTo (k.regs 2#5 + 0xFFFFFFFFFFFFFFF8#64) 8 (DFrac.own 1) (k.regs 1#5) ∗
@@ -212,7 +212,7 @@ theorem swr_ok_loads (FW : FILEWRITE) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF
     procPrivCoreNoctxAt curCtx (procAddr j) pid V M ∗
     procOfilesOwe γ V.fdg (procAddr j) V.ofile [] ∗ fdFrags V.fdg sts ∗
     filewriteFsEnv (hlc := hlc) ∗
-    sysWriteIn (hlc := hlc) V v sts (argZ v2) (writerImg V.upt M) v1 Q ∗
+    sysWriteIn (hlc := hlc) pmv szv lzv V v sts (argZ v2) (writerImg V.upt M) v1 Q ∗
     (∀ c : CPU, sysWritePost k γ j pid V M sts v v1 v2 Q c)
     ⊢ wpLoop (GF := GF) cpu := by
   iintro ⟨Hk, Hpc, #Henv, Hra, Hs0, Hcells, Hte, Hce, Hcore, Howe, Hfr, Hfs, Hin, HΦ⟩
@@ -243,8 +243,8 @@ theorem swr_ok_loads (FW : FILEWRITE) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF
       (DFrac.own 1) fv)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hr.2.1, swr_f_addr]
   iintro Hk Hpc Hf
-  iapply (swr_ok_jal FW Γ cpu k γ j pid V M sts v v1 v2 γkl γk γl γu Q spie spp _ fd0 fv
-      (BitVec.extractLsb' 0 32 v2) hK hj hproc hnoff htier ht0 ?hr' ?h10' ?h11' ?h12' hsome)
+  iapply (swr_ok_jal FW Γ cpu k γ j pid V M sts v v1 v2 γkl γk γl γu Q pmv szv lzv spie spp _ fd0 fv
+      (BitVec.extractLsb' 0 32 v2) hK hj hproc hnoff htier ht0 ?hr' ?h10' ?h11' ?h12' hsome htb)
     $$ [$Hk $Hpc $Hra $Hs0 $Hte $Hce $Hcore $Howe $Hfr $Hfs $Hin $HΦ Hf Hlo Hn Hp Hu]
   case hr' =>
     repeat (refine swrRegs_set _ _ _ _ ?_ (by decide))
@@ -315,12 +315,12 @@ its answer dispatched to the two arms (`swr_fail_arm`, `swr_ok_loads`). -/
 theorem swr_argfd_call (AF : ARGFD) (FW : FILEWRITE) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
     (cpu : CPU) (k : KCtx) (γ : FileNames) (j : Nat) (pid : BitVec 32)
     (V : ProcPriv) (M : Nat → List (BitVec 8)) (sts : List FdState) (v v1 v2 : BitVec 64)
-    (γkl : GName) (γk : KmemNames) (γl : GName) (γu : UartNames) (Q : Nat → IProp GF)
+    (γkl : GName) (γk : KmemNames) (γl : GName) (γu : UartNames) (Q : Nat → IProp GF) (pmv : Nat → Option UPerm) (szv : Nat) (lzv : Bool)
     (spie spp : Bool) (R : RegMap) (wf : BitVec 64)
     (hv : V.tf[tfArgIdx 0]? = some v)
     (hK : sysWriteSlots ≤ k.avail) (hj : j < NPROC) (hproc : k.proc = procAddr j)
     (hnoff : k.noff = 0) (htier : k.tier = KTier.kpt) (ht0 : curTier = KTier.kpt)
-    (hsp : 48 ≤ (k.regs 2#5).toNat) (hr : swrRegs k R) :
+    (hsp : 48 ≤ (k.regs 2#5).toNat) (hr : swrRegs k R) (htb : wrTb pmv szv lzv V.upt) :
     kctx cpu (((k.withSpie spie spp).pushed 6).withRegs R) ∗
     pcIs cpu (KA.«sys_write» + 0x1c#64) ∗ swrEnv Γ γkl γk γl γu ∗
     wordPointsTo (k.regs 2#5 + 0xFFFFFFFFFFFFFFF8#64) 8 (DFrac.own 1) (k.regs 1#5) ∗
@@ -330,7 +330,7 @@ theorem swr_argfd_call (AF : ARGFD) (FW : FILEWRITE) (Γ : SchedNames) [ClaimIs 
     procPrivCoreNoctxAt curCtx (procAddr j) pid V M ∗
     procOfilesOwe γ V.fdg (procAddr j) V.ofile [] ∗ fdFrags V.fdg sts ∗
     filewriteFsEnv (hlc := hlc) ∗
-    sysWriteIn (hlc := hlc) V v sts (argZ v2) (writerImg V.upt M) v1 Q ∗
+    sysWriteIn (hlc := hlc) pmv szv lzv V v sts (argZ v2) (writerImg V.upt M) v1 Q ∗
     (∀ c : CPU, sysWritePost k γ j pid V M sts v v1 v2 Q c)
     ⊢ wpLoop (GF := GF) cpu := by
   have hK110 := hK
@@ -384,8 +384,8 @@ theorem swr_argfd_call (AF : ARGFD) (FW : FILEWRITE) (Γ : SchedNames) [ClaimIs 
     iframe Hf Hlo Hn Hp Hu
     ipureintro; exact hal
   · -- descriptor fd0 names fv
-    iapply (swr_ok_loads FW Γ cpu k γ j pid V M sts v v1 v2 γkl γk γl γu Q spie2 spp2 R2 fd0 fv hK hj
-        hproc hnoff htier ht0 hr2 h10 hsome)
+    iapply (swr_ok_loads FW Γ cpu k γ j pid V M sts v v1 v2 γkl γk γl γu Q pmv szv lzv spie2 spp2 R2 fd0 fv
+        hK hj hproc hnoff htier ht0 hr2 h10 hsome htb)
       $$ [$Hk $Hpc $Hra $Hs0 $Hte $Hce $Hcore $Howe $Hfr $Hfs $Hin $HΦ Hf Hlo Hn Hp Hu]
     iframe #
     unfold swrCells
@@ -399,12 +399,12 @@ theorem swr_argint_call (AI : ARGINT) (AF : ARGFD) (FW : FILEWRITE) (Γ : SchedN
     [ClaimIs (hlc := hlc) GF Γ]
     (cpu : CPU) (k : KCtx) (γ : FileNames) (j : Nat) (pid : BitVec 32)
     (V : ProcPriv) (M : Nat → List (BitVec 8)) (sts : List FdState) (v v1 v2 : BitVec 64)
-    (γkl : GName) (γk : KmemNames) (γl : GName) (γu : UartNames) (Q : Nat → IProp GF)
+    (γkl : GName) (γk : KmemNames) (γl : GName) (γu : UartNames) (Q : Nat → IProp GF) (pmv : Nat → Option UPerm) (szv : Nat) (lzv : Bool)
     (spie spp : Bool) (R : RegMap) (wf : BitVec 64) (wn : BitVec 32)
     (hv : V.tf[tfArgIdx 0]? = some v) (hv2 : V.tf[tfArgIdx 2]? = some v2)
     (hK : sysWriteSlots ≤ k.avail) (hj : j < NPROC) (hproc : k.proc = procAddr j)
     (hnoff : k.noff = 0) (htier : k.tier = KTier.kpt) (ht0 : curTier = KTier.kpt)
-    (hsp : 48 ≤ (k.regs 2#5).toNat) (hr : swrRegs k R) :
+    (hsp : 48 ≤ (k.regs 2#5).toNat) (hr : swrRegs k R) (htb : wrTb pmv szv lzv V.upt) :
     kctx cpu (((k.withSpie spie spp).pushed 6).withRegs R) ∗
     pcIs cpu (KA.«sys_write» + 0x12#64) ∗ swrEnv Γ γkl γk γl γu ∗
     wordPointsTo (k.regs 2#5 + 0xFFFFFFFFFFFFFFF8#64) 8 (DFrac.own 1) (k.regs 1#5) ∗
@@ -414,7 +414,7 @@ theorem swr_argint_call (AI : ARGINT) (AF : ARGFD) (FW : FILEWRITE) (Γ : SchedN
     procPrivCoreNoctxAt curCtx (procAddr j) pid V M ∗
     procOfilesOwe γ V.fdg (procAddr j) V.ofile [] ∗ fdFrags V.fdg sts ∗
     filewriteFsEnv (hlc := hlc) ∗
-    sysWriteIn (hlc := hlc) V v sts (argZ v2) (writerImg V.upt M) v1 Q ∗
+    sysWriteIn (hlc := hlc) pmv szv lzv V v sts (argZ v2) (writerImg V.upt M) v1 Q ∗
     (∀ c : CPU, sysWritePost k γ j pid V M sts v v1 v2 Q c)
     ⊢ wpLoop (GF := GF) cpu := by
   have hK110 := hK
@@ -457,8 +457,8 @@ theorem swr_argint_call (AI : ARGINT) (AF : ARGFD) (FW : FILEWRITE) (Γ : SchedN
       wordPointsTo (pTrapframe (procAddr j)) 8 (DFrac.own 1) V.trapframe from by
     rw [htf, hproc]) $$ Htf
   ihave Hcore := Hcorew $$ Htf Htfp
-  iapply (swr_argfd_call AF FW Γ cpu k γ j pid V M sts v v1 v2 γkl γk γl γu Q spie1 spp1 R1 wf hv hK hj
-      hproc hnoff htier ht0 hsp hr1)
+  iapply (swr_argfd_call AF FW Γ cpu k γ j pid V M sts v v1 v2 γkl γk γl γu Q pmv szv lzv spie1 spp1 R1 wf
+      hv hK hj hproc hnoff htier ht0 hsp hr1 htb)
     $$ [$Hk $Hpc $Hra $Hs0 $Hte $Hce $Hcore $Howe $Hfr $Hfs $Hin $HΦ Hf Hlo Hn Hp Hu]
   iframe #
   unfold swrCells
@@ -473,12 +473,13 @@ theorem sys_write_main (AA : ARGADDR) (AI : ARGINT) (AF : ARGFD) (FW : FILEWRITE
     (cpu : CPU) (k : KCtx) (γ : FileNames) (j : Nat) (pid : BitVec 32) (V : ProcPriv)
     (M : Nat → List (BitVec 8)) (sts : List FdState) (v v1 v2 : BitVec 64)
     (γkl : GName) (γk : KmemNames) (γl : GName) (γu : UartNames) (Q : Nat → IProp GF)
+    (pmv : Nat → Option UPerm) (szv : Nat) (lzv : Bool)
     (hv : V.tf[tfArgIdx 0]? = some v) (hv1 : V.tf[tfArgIdx 1]? = some v1)
     (hv2 : V.tf[tfArgIdx 2]? = some v2)
     (hK : sysWriteSlots ≤ k.avail) (hj : j < NPROC) (hproc : k.proc = procAddr j)
-    (hnoff : k.noff = 0) (htier : k.tier = KTier.kpt) :
+    (hnoff : k.noff = 0) (htier : k.tier = KTier.kpt) (htb : wrTb pmv szv lzv V.upt) :
     wp_sys_write_eb_body (hlc := hlc) (GF := GF) Γ cpu k γ j pid V M sts v v1 v2 γkl γk γl γu Q
-      hv hv1 hv2 hK hj hproc hnoff htier := by
+      pmv szv lzv hv hv1 hv2 hK hj hproc hnoff htier htb := by
   unfold wp_sys_write_eb_body
   have hK110 := hK
   rw [sysWriteSlots_eq] at hK110
@@ -542,8 +543,8 @@ theorem sys_write_main (AA : ARGADDR) (AI : ARGINT) (AF : ARGFD) (FW : FILEWRITE
       wordPointsTo (pTrapframe (procAddr j)) 8 (DFrac.own 1) V.trapframe from by
     rw [htf, hproc]) $$ Htf
   ihave Hcore := Hcorew $$ Htf Htfp
-  iapply (swr_argint_call AI AF FW Γ cpu k γ j pid V M sts v v1 v2 γkl γk γl γu Q spie1 spp1 R1 wf wn
-      hv hv2 hK hj hproc hnoff htier ht0 hsp hr1)
+  iapply (swr_argint_call AI AF FW Γ cpu k γ j pid V M sts v v1 v2 γkl γk γl γu Q pmv szv lzv spie1 spp1
+      R1 wf wn hv hv2 hK hj hproc hnoff htier ht0 hsp hr1 htb)
     $$ [$Hk $Hpc $Hra $Hs0 $Hte $Hce $Hcore $Howe $Hfr $Hfs $Hin $HΦ Hf Hlo Hn Hp Hu]
   iframe #
   unfold swrCells
@@ -555,8 +556,9 @@ end
 /-- `sys_write`'s proof, from its callees' interfaces (Rocq's `SysWriteProof
 Argaddr Argint Argfd Filewrite`). -/
 theorem sys_write_proof (AA : ARGADDR) (AI : ARGINT) (AF : ARGFD) (FW : FILEWRITE) : SYSWRITE :=
-  ⟨fun Γ _ cpu k γ j pid V M sts v v1 v2 γkl γk γl γu Q hv hv1 hv2 hK hj hproc hnoff htier =>
-    sys_write_main AA AI AF FW Γ cpu k γ j pid V M sts v v1 v2 γkl γk γl γu Q hv hv1 hv2 hK hj hproc
-      hnoff htier⟩
+  ⟨fun Γ _ cpu k γ j pid V M sts v v1 v2 γkl γk γl γu Q pmv szv lzv hv hv1 hv2 hK hj hproc hnoff htier
+      htb =>
+    sys_write_main AA AI AF FW Γ cpu k γ j pid V M sts v v1 v2 γkl γk γl γu Q pmv szv lzv hv hv1 hv2 hK hj
+      hproc hnoff htier htb⟩
 
 end Xv6
