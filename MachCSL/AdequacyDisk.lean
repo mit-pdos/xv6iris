@@ -14,8 +14,8 @@ Deviation (form only): Rocq states `disk_proj_trace` at the record literal
 `boot_fixedGS …`.  Here it is stated over ANY fixed record whose disk name
 and size are `γdisk`/`ndisk` (`hname`/`hsize`, both `rfl` at
 `bootFixedGS …`), and whose crash predicate the caller hands in as `P`.  This
-keeps the file independent of the literal's other fields (the boot image,
-D47).  At the literal, `P := Pc γdisk γswap γreg γstart c` and
+keeps the file independent of the literal's other fields.
+At the literal, `P := Pc γdisk γswap γreg γstart c` and
 `Hproj γdisk γswap γreg γstart c` instantiate it verbatim.
 -/
 import MachCSL.Adequacy

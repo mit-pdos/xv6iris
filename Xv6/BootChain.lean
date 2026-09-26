@@ -120,9 +120,8 @@ set_option maxRecDepth 20000 in
 per-hart precondition: the kernel context at `main`'s entry with the whole
 `bootStackSlots` carve in hand, the parked save area, the raw TLB/trap-CSR
 cells at the reset `tlb`, and `pcIs cpu mainAddr`. -/
-theorem bootEntryBridge [X : CurCtx] (hX : X.curTier = KTier.bare) (image : Mem)
-    (himg : BootImage image) (f : RegFile) (cpu : CPU) :
-    kernelText (GF := GF) ⊢ kernelData -∗ bootHartRes image f cpu -∗ ctxTok cpu curCtx -∗
+theorem bootEntryBridge [X : CurCtx] (hX : X.curTier = KTier.bare) (f : RegFile) (cpu : CPU) :
+    kernelText (GF := GF) ⊢ kernelData -∗ bootHartRes f cpu -∗ ctxTok cpu curCtx -∗
       (∀ R : RegMap, kctx cpu (bootKCtx R bootStackSlots) -∗ cpuCtxFree cpu -∗
         mainHartRaw cpu (f .tlb) -∗ pcIs cpu mainAddr -∗ wpLoop cpu) -∗
       wpLoop cpu := by
@@ -143,7 +142,7 @@ theorem bootEntryBridge [X : CurCtx] (hX : X.curTier = KTier.bare) (image : Mem)
   unfold bootHartRes
   icases Hres with
     ⟨Hm, Hh, Hck, Hpc, H1, H2, H4, H8, H10, H11, H14, H15, Hgpr, Hstv, Hcsr, Hraw, Hl, #Hg, Hb⟩
-  icases bootHartBss_open image himg cpu $$ [Hb] with
+  icases bootHartBss_open cpu $$ [Hb] with
     ⟨Hw, H16, H8', H32, H24, Hr, Hp, Hn, Hi, Hf⟩
   · isplitl []
     · iexact Hk
@@ -183,14 +182,13 @@ deposit, with nothing left over. -/
 theorem bootHartSecondaryAt [X : CurCtx] (hX : X.curTier = KTier.bare)
     (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
     (γ0 γ1 : UartNames) (γc γl0 γl1 : GName) (γd : DiskNames) (γdl γt : GName)
-    [EnvIs (hlc := hlc) GF Γ γ0 γ1 γc γl0 γl1 γd γdl γt]
-    (image : Mem) (himg : BootImage image) (f : RegFile) (cpu : CPU) (γi : GName) (ξd : CtxId)
+    [EnvIs (hlc := hlc) GF Γ γ0 γ1 γc γl0 γl1 γd γdl γt] (f : RegFile) (cpu : CPU) (γi : GName) (ξd : CtxId)
     (hcpu : cpu ≠ startedPrimary) :
-    kernelText (GF := GF) ⊢ kernelData -∗ bootHartRes image f cpu -∗ ctxTok cpu curCtx -∗
+    kernelText (GF := GF) ⊢ kernelData -∗ bootHartRes f cpu -∗ ctxTok cpu curCtx -∗
       startedInv γi ξd (mainDeposit Γ γ0 γ1 γc γl0 γl1 γd γdl γt) -∗
       wpLoop cpu := by
   iintro #Ht #Hd Hres Htok #Hs
-  iapply bootEntryBridge hX image himg f cpu $$ Ht Hd Hres Htok
+  iapply bootEntryBridge hX f cpu $$ Ht Hd Hres Htok
   iintro %R Hk Hf Hraw Hpc
   have hm := MainSecondary.wp_main_secondary (hlc := hlc) (GF := GF) X Γ γ0 γ1 γc γl0 γl1 γd γdl γt
     cpu (bootKCtx R bootStackSlots) γi ξd (f .tlb) hX hcpu bootChain_mainSecondarySlots_le
@@ -206,14 +204,13 @@ context-free. -/
 theorem bootHartSecondary
     (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
     (γ0 γ1 : UartNames) (γc γl0 γl1 : GName) (γd : DiskNames) (γdl γt : GName)
-    [EnvIs (hlc := hlc) GF Γ γ0 γ1 γc γl0 γl1 γd γdl γt]
-    (image : Mem) (himg : BootImage image) (f : RegFile) (cpu : CPU) (γi : GName) (ξd : CtxId)
+    [EnvIs (hlc := hlc) GF Γ γ0 γ1 γc γl0 γl1 γd γdl γt] (f : RegFile) (cpu : CPU) (γi : GName) (ξd : CtxId)
     (hcpu : cpu ≠ startedPrimary) :
-    kernelText (GF := GF) ⊢ kernelData -∗ bootHartRes image f cpu -∗ (∃ ξ : CtxId, ctxTok cpu ξ) -∗
+    kernelText (GF := GF) ⊢ kernelData -∗ bootHartRes f cpu -∗ (∃ ξ : CtxId, ctxTok cpu ξ) -∗
       startedInv γi ξd (mainDeposit Γ γ0 γ1 γc γl0 γl1 γd γdl γt) -∗
       wpLoop cpu := by
   iintro #Ht #Hd Hres ⟨%ξ, Htok⟩ #Hs
-  iapply bootHartSecondaryAt (X := ⟨ξ, KTier.bare⟩) rfl Γ γ0 γ1 γc γl0 γl1 γd γdl γt image himg f
+  iapply bootHartSecondaryAt (X := ⟨ξ, KTier.bare⟩) rfl Γ γ0 γ1 γc γl0 γl1 γd γdl γt f
     cpu γi ξd hcpu $$ Ht Hd Hres Htok Hs
 
 end secondary
@@ -288,8 +285,7 @@ theorem bootHartPrimary [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF] [FsTopG
     [Fscfg] [Icfg] [X : CurCtx] (hX : X.curTier = KTier.bare)
     (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
     (γ0 γ1 : UartNames) (γc γl0 γl1 : GName) (γd : DiskNames) (γdl γt : GName)
-    [EnvIs (hlc := hlc) GF Γ γ0 γ1 γc γl0 γl1 γd γdl γt]
-    (image : Mem) (himg : BootImage image) (f : RegFile) (cpu : CPU)
+    [EnvIs (hlc := hlc) GF Γ γ0 γ1 γc γl0 γl1 γd γdl γt] (f : RegFile) (cpu : CPU)
     (cn : ConsNames) (l0 l1 : List (BitVec 8)) (c0 : VirtioCfg)
     (dk : Nat → BitVec 8) (sb : FsSb) (nib : Nat) (cov : ExtTreeSet Nat compare) (ndisk : Nat)
     (S : FsStateRec) (Pb : Nat → List (BitVec 8)) (Rspent : ExtTreeSet Nat compare)
@@ -297,13 +293,13 @@ theorem bootHartPrimary [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF] [FsTopG
     (hcpu : cpu = startedPrimary)
     (hl0 : l0 = []) (hl1 : l1 = []) (hdead : Virtio.live c0 = false) (hcn : cn.uart = γ0)
     (hdl : fscDlock = γdl) (hsnap : fsBootSnapWf dk ndisk S Pb sb nib cov) :
-    kernelText (GF := GF) ⊢ kernelData -∗ bootHartRes image f cpu -∗ ctxTok cpu curCtx -∗
+    kernelText (GF := GF) ⊢ kernelData -∗ bootHartRes f cpu -∗ ctxTok cpu curCtx -∗
       startedInv γi ξd (mainDeposit Γ γ0 γ1 γc γl0 γl1 γd γdl γt) -∗ startedPrim γi -∗
       bootPrimarySupply X Γ γ0 γ1 γc γl0 γl1 γd γt cn l0 l1 c0 dk sb nib cov Pb Rspent -∗
       wpLoop cpu := by
   have hm := Main.wp_main_boot (hlc := hlc) (GF := GF) X Γ γ0 γ1 γc γl0 γl1 γd γdl γt
   iintro #Ht #Hd Hres Htok #Hs Hprim Hsup
-  iapply bootEntryBridge hX image himg f cpu $$ Ht Hd Hres Htok
+  iapply bootEntryBridge hX f cpu $$ Ht Hd Hres Htok
   iintro %R Hk Hf Hraw Hpc
   have hm' := hm cpu (bootKCtx R bootStackSlots) cn l0 l1 c0 dk sb nib cov ndisk S Pb Rspent (f .tlb)
     γi ξd (mainDeposit Γ γ0 γ1 γc γl0 γl1 γd γdl γt) hcpu hX bootChain_mainSlots_le rfl rfl rfl rfl

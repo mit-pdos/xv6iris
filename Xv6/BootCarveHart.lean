@@ -12,8 +12,8 @@ hart has a thread of control, out of the owned half of the boot image
   for the `first`/`nextpid`/`uarts` rows), `bootRo_ctxBytes` reads a
   persisted image window at ANY context, and `bootGot_word` is the M-mode
   cell `Xv6.wp_boot_body` takes, at the hart's own context.  One persistent
-  row, `bootGotRo image`, serves all eight harts.
-* §2 ONE HART'S `.bss` (Rocq `boot_hart_bss`): `bootHartBss image c` is hart
+  row, `bootGotRo`, serves all eight harts.
+* §2 ONE HART'S `.bss` (Rocq `boot_hart_bss`): `bootHartBss c` is hart
   `c`'s 4096-byte `stack0` slice, the `proc` / `noff`+`intena` windows of
   `cpus[c]` (RAW: context-free, the consumer carves them at its own context,
   Rocq's "the cell crosses at the CONSUMER"), and `cpuCtxFree c` (the 14
@@ -29,7 +29,7 @@ hart has a thread of control, out of the owned half of the boot image
   boot-stack words, and `bootBridge`'s `cpus[c]` cells; `bootStack_rejoin`
   puts the two timerinit words `wp_boot_body` hands back in front of the
   508, as `bootBridge`'s `bootStackSlots`-word stack premise.
-* §4 THE PER-HART BUNDLE (Rocq `boot_hart_res`): `bootHartRes image f c`,
+* §4 THE PER-HART BUNDLE (Rocq `boot_hart_res`): `bootHartRes f c`,
   what hart `c`'s chain consumes beside its running token: `bootEntryPre`'s
   output, the other 23 GPRs, `stvec`, `hartCsrs` (`mstateen0 = 0`,
   `sstateen0 = 0` now pinned by `MachCSL.resetVal` -- BootHart deviation 3
@@ -102,9 +102,9 @@ variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF]
 /-! ## §1 The GOT word, discarded -/
 
 /-- The persisted GOT window: one persistent row for all eight harts. -/
-def bootGotRo (image : Mem) : IProp GF := bootRo (imgFlat image) bhGot (bhGot + 8)
+def bootGotRo : IProp GF := bootRo (imgFlat bootImage) bhGot (bhGot + 8)
 
-instance bootGotRo_persistent (image : Mem) : Persistent (bootGotRo (GF := GF) image) := by
+instance bootGotRo_persistent : Persistent (bootGotRo (GF := GF)) := by
   unfold bootGotRo; infer_instance
 
 /-- **A persisted image window, at any context** (the read-only half's
@@ -120,14 +120,14 @@ theorem bootRo_ctxBytes (ξ : CtxId) (image : Mem) (lo hi : Nat) (pa : PAddr) (n
 
 /-- **Persist the GOT word** out of `.data` (Rocq `boot_shared_alloc`'s GOT
 persist), handing back the two sides of `.data`. -/
-theorem bootCarve_gotRo (image : Mem) :
-    bootRan (GF := GF) (imgFlat image) MachCSL.KernelSyms.«_data» MachCSL.KernelSyms.«_bss» ⊢@{IProp GF}
-      |==> (bootRan (imgFlat image) MachCSL.KernelSyms.«_data» bhGot ∗ bootGotRo image ∗
-        bootRan (imgFlat image) (bhGot + 8) MachCSL.KernelSyms.«_bss») := by
+theorem bootCarve_gotRo :
+    bootRan (GF := GF) (imgFlat bootImage) MachCSL.KernelSyms.«_data» MachCSL.KernelSyms.«_bss» ⊢@{IProp GF}
+      |==> (bootRan (imgFlat bootImage) MachCSL.KernelSyms.«_data» bhGot ∗ bootGotRo ∗
+        bootRan (imgFlat bootImage) (bhGot + 8) MachCSL.KernelSyms.«_bss») := by
   iintro H
-  icases (bootRan_split (GF := GF) (imgFlat image) _ bhGot _ (by decide) (by decide)).1 $$ H with ⟨Hl, H⟩
-  icases (bootRan_split (GF := GF) (imgFlat image) _ (bhGot + 8) _ (by decide) (by decide)).1 $$ H with ⟨H, Hr⟩
-  imod (bootRan_persist (GF := GF) (imgFlat image) bhGot (bhGot + 8)) $$ H with #H
+  icases (bootRan_split (GF := GF) (imgFlat bootImage) _ bhGot _ (by decide) (by decide)).1 $$ H with ⟨Hl, H⟩
+  icases (bootRan_split (GF := GF) (imgFlat bootImage) _ (bhGot + 8) _ (by decide) (by decide)).1 $$ H with ⟨H, Hr⟩
+  imod (bootRan_persist (GF := GF) (imgFlat bootImage) bhGot (bhGot + 8)) $$ H with #H
   imodintro
   unfold bootGotRo
   iframe Hl Hr H
@@ -135,13 +135,13 @@ theorem bootCarve_gotRo (image : Mem) :
 /-- **The GOT word at the hart's own context, discarded** (Rocq
 `mb_ld_ea ↦ₚ₈□ v_stack0`): what `Xv6.wp_boot_body` (at `dqg = DFrac.discard`)
 takes. -/
-theorem bootGot_word [CurCtx] (image : Mem) (himg : BootImage image) :
-    bootGotRo (GF := GF) image ⊢ pwordPointsTo stack0Slot 8 DFrac.discard KA.«stack0» := by
+theorem bootGot_word [CurCtx] :
+    bootGotRo (GF := GF) ⊢ pwordPointsTo stack0Slot 8 DFrac.discard KA.«stack0» := by
   have hA : bcInRam bhGot 8 := by unfold bcInRam bhGot ramBase ramEnd; omega
   rw [bh_stack0Slot]
   unfold bootGotRo
   refine .trans ?_ (pwordPointsTo_intro _ 8 _ _ (bcInRam_inRam hA) (by decide))
-  refine bootRo_ctxBytes curCtx image _ _ _ 8 _ (fun j hj => ?_) (bh_stack0Slot ▸ himg.got)
+  refine bootRo_ctxBytes curCtx bootImage _ _ _ 8 _ (fun j hj => ?_) (bh_stack0Slot ▸ bootImage_wf.got)
   have := bc_addr_toNat bhGot j (by unfold bhGot; omega)
   rw [this]
   refine ⟨by omega, by omega, ?_⟩
@@ -152,10 +152,10 @@ theorem bootGot_word [CurCtx] (image : Mem) (himg : BootImage image) :
 /-- **One hart's `.bss` share** (Rocq `boot_hart_bss`): its `stack0` slice
 and the `proc` / `noff`+`intena` windows of `cpus[c]`, RAW (context-free;
 deviation 1), and its parked save area `cpuCtxFree c`, minted. -/
-def bootHartBss (image : Mem) (c : CPU) : IProp GF := iprop%
-  bootRan (imgFlat image) (bhStackLo c) (bhStackLo c + 4096) ∗
-  bootRan (imgFlat image) (bhCpuLo c) (bhCpuLo c + 8) ∗
-  bootRan (imgFlat image) (bhCpuLo c + 120) (bhCpuLo c + 128) ∗
+def bootHartBss (c : CPU) : IProp GF := iprop%
+  bootRan (imgFlat bootImage) (bhStackLo c) (bhStackLo c + 4096) ∗
+  bootRan (imgFlat bootImage) (bhCpuLo c) (bhCpuLo c + 8) ∗
+  bootRan (imgFlat bootImage) (bhCpuLo c + 120) (bhCpuLo c + 128) ∗
   cpuCtxFree c
 
 /-- A top-down word family: the `n` words below `T`, slot `i` at
@@ -180,15 +180,15 @@ theorem bhRan_down (m : MemF Hist) :
 
 /-- **A `.bss` physical word at its zero** (Rocq `boot_cran_cell8_bss` at
 the M-mode tier). -/
-theorem bh_pword0 [CurCtx] (image : Mem) (himg : BootImage image) (A : Nat)
+theorem bh_pword0 [CurCtx] (A : Nat)
     (hlo : 0x8000a330 ≤ A) (hhi : A + 8 ≤ 0x80023640) (hal : A % 8 = 0) :
-    bootRan (GF := GF) (imgFlat image) A (A + 8) ⊢ pwordPointsTo (BitVec.ofNat 64 A) 8 (DFrac.own 1) 0#64 := by
+    bootRan (GF := GF) (imgFlat bootImage) A (A + 8) ⊢ pwordPointsTo (BitVec.ofNat 64 A) 8 (DFrac.own 1) 0#64 := by
   have hA : bcInRam A 8 := by unfold bcInRam ramBase ramEnd; omega
   refine .trans ?_ (pwordPointsTo_intro _ 8 _ _ (bcInRam_inRam hA) (by rw [bc_ofNat_toNat hA]; exact hal))
-  refine bootImg_ctxBytes curCtx image A 8 0#64 hA (fun j hj => ?_)
+  refine bootImg_ctxBytes curCtx bootImage A 8 0#64 hA (fun j hj => ?_)
   rw [show nthByte (0#(8 * 8)) j = 0#8 by simp [nthByte]]
   have := bc_addr_toNat A j (by omega)
-  exact himg.bss _ (by rw [this, bc_bss_val]; omega) (by rw [this, bc_end_val]; omega)
+  exact bootImage_wf.bss _ (by rw [this, bc_bss_val]; omega) (by rw [this, bc_end_val]; omega)
 
 /-- `sp₀ - k` as a number, inside the slice. -/
 theorem bh_sp_sub (c : CPU) (k : Nat) (hk : k ≤ 4096) :
@@ -215,26 +215,26 @@ theorem bh_slot_addr (c : CPU) (i : Nat) (hi : i < 508) :
   unfold bhStackLo; rw [bh_stack0_val]; omega
 
 /-- The words below a `.bss` top `T`, at the hart's context, top-down. -/
-theorem bh_stack_rest [CurCtx] (image : Mem) (himg : BootImage image) (n T : Nat)
+theorem bh_stack_rest [CurCtx] (n T : Nat)
     (hlo : 0x8000a330 + 8 * n ≤ T) (hhi : T ≤ 0x80023640) (hal : T % 8 = 0) :
-    bootRan (GF := GF) (imgFlat image) (T - 8 * n) T ⊢
+    bootRan (GF := GF) (imgFlat bootImage) (T - 8 * n) T ⊢
       [∗list] i ∈ List.range n,
         ∃ w : BitVec 64, pwordPointsTo (BitVec.ofNat 64 (T - 8 * (i + 1))) 8 (DFrac.own 1) w := by
-  refine (bhRan_down (GF := GF) (imgFlat image) n T (by omega)).trans ?_
+  refine (bhRan_down (GF := GF) (imgFlat bootImage) n T (by omega)).trans ?_
   apply BigSepL.bigSepL_mono
   intro k i hk
   have hi : i < n := List.mem_range.1 (List.mem_of_getElem? hk)
   iintro H
   iexists 0#64
-  iapply bh_pword0 image himg (T - 8 * (i + 1)) (by omega) (by omega) (by omega) $$ H
+  iapply bh_pword0 (T - 8 * (i + 1)) (by omega) (by omega) (by omega) $$ H
 
 set_option maxRecDepth 20000 in
 /-- **One hart's boot stack, carved** (Rocq `boot_hart_stack_raw` +
 `boot_cran_stack_own_phys`, at the hart's own context): `wp_boot_body`'s four
 frame words at their `.bss` zeros (`start`'s at `sp₀ - 16`/`sp₀ - 8`,
 `timerinit`'s at `sp₀ - 32`/`sp₀ - 24`) and the other 508 words below. -/
-theorem bootStack_carve [CurCtx] (image : Mem) (himg : BootImage image) (c : CPU) :
-    bootRan (GF := GF) (imgFlat image) (bhStackLo c) (bhStackLo c + 4096) ⊢
+theorem bootStack_carve [CurCtx] (c : CPU) :
+    bootRan (GF := GF) (imgFlat bootImage) (bhStackLo c) (bhStackLo c + 4096) ⊢
       pwordPointsTo (spOf c - 16#64) 8 (DFrac.own 1) 0#64 ∗
       pwordPointsTo (spOf c - 8#64) 8 (DFrac.own 1) 0#64 ∗
       pwordPointsTo (spOf c - 32#64) 8 (DFrac.own 1) 0#64 ∗
@@ -248,7 +248,7 @@ theorem bootStack_carve [CurCtx] (image : Mem) (himg : BootImage image) (c : CPU
   have e8 : spOf c - 8#64 = BitVec.ofNat 64 (bhStackLo c + 4088) := bh_sp_sub c 8 (by omega)
   have e32 : spOf c - 32#64 = BitVec.ofNat 64 (bhStackLo c + 4064) := bh_sp_sub c 32 (by omega)
   have e24 : spOf c - 24#64 = BitVec.ofNat 64 (bhStackLo c + 4072) := bh_sp_sub c 24 (by omega)
-  have hrest := bh_stack_rest (GF := GF) image himg 508 (bhStackLo c + 4064) (by rw [hL]; omega)
+  have hrest := bh_stack_rest (GF := GF) 508 (bhStackLo c + 4064) (by rw [hL]; omega)
     (by rw [hL]; omega) (by rw [hL]; omega)
   rw [show bhStackLo c + 4064 - 8 * 508 = bhStackLo c by omega] at hrest
   have hslots : ([∗list] i ∈ List.range 508, ∃ w : BitVec 64,
@@ -262,15 +262,15 @@ theorem bootStack_carve [CurCtx] (image : Mem) (himg : BootImage image) (c : CPU
   rw [e16] at hslots
   rw [e16, e8, e32, e24]
   iintro H
-  icases (bootRan_split (GF := GF) (imgFlat image) _ (bhStackLo c + 4064) _ (by omega) (by omega)).1 $$ H with ⟨Hlo, H⟩
-  icases (bootRan_split (GF := GF) (imgFlat image) _ (bhStackLo c + 4072) _ (by omega) (by omega)).1 $$ H with ⟨H32, H⟩
-  icases (bootRan_split (GF := GF) (imgFlat image) _ (bhStackLo c + 4080) _ (by omega) (by omega)).1 $$ H with ⟨H24, H⟩
-  icases (bootRan_split (GF := GF) (imgFlat image) _ (bhStackLo c + 4088) _ (by omega) (by omega)).1 $$ H with ⟨H16, H8⟩
-  ihave H16 := bh_pword0 image himg (bhStackLo c + 4080) (by omega) (by omega) (by omega) $$ H16
-  ihave H8 := bh_pword0 image himg (bhStackLo c + 4088) (by omega) (by omega) (by omega) $$ [H8]
+  icases (bootRan_split (GF := GF) (imgFlat bootImage) _ (bhStackLo c + 4064) _ (by omega) (by omega)).1 $$ H with ⟨Hlo, H⟩
+  icases (bootRan_split (GF := GF) (imgFlat bootImage) _ (bhStackLo c + 4072) _ (by omega) (by omega)).1 $$ H with ⟨H32, H⟩
+  icases (bootRan_split (GF := GF) (imgFlat bootImage) _ (bhStackLo c + 4080) _ (by omega) (by omega)).1 $$ H with ⟨H24, H⟩
+  icases (bootRan_split (GF := GF) (imgFlat bootImage) _ (bhStackLo c + 4088) _ (by omega) (by omega)).1 $$ H with ⟨H16, H8⟩
+  ihave H16 := bh_pword0 (bhStackLo c + 4080) (by omega) (by omega) (by omega) $$ H16
+  ihave H8 := bh_pword0 (bhStackLo c + 4088) (by omega) (by omega) (by omega) $$ [H8]
   · rw [show bhStackLo c + 4088 + 8 = bhStackLo c + 4096 by omega]; iexact H8
-  ihave H32 := bh_pword0 image himg (bhStackLo c + 4064) (by omega) (by omega) (by omega) $$ H32
-  ihave H24 := bh_pword0 image himg (bhStackLo c + 4072) (by omega) (by omega) (by omega) $$ H24
+  ihave H32 := bh_pword0 (bhStackLo c + 4064) (by omega) (by omega) (by omega) $$ H32
+  ihave H24 := bh_pword0 (bhStackLo c + 4072) (by omega) (by omega) (by omega) $$ H24
   iframe H16 H8 H32 H24
   iapply hslots
   iapply hrest $$ Hlo
@@ -310,20 +310,20 @@ theorem bootStack_rejoin [CurCtx] (sp a b : BitVec 64) :
 `boot_hart_pre`'s `cpu_ctx_free`): the 14 `.bss` words of `cpus[c].context`
 in a FRESH stamped context (`MachCSL.ctxStamped_boot`) at stamp 0, with the
 hart's `viewLb c 0` receipt. -/
-theorem bootCpuCtxFree (image : Mem) (himg : BootImage image) (c : CPU) :
+theorem bootCpuCtxFree (c : CPU) :
     kmapStatic (GF := GF) ⊢ viewLb c 0 -∗
-      bootRan (imgFlat image) (bhCpuLo c + 8) (bhCpuLo c + 120) -∗ |==> cpuCtxFree c := by
+      bootRan (imgFlat bootImage) (bhCpuLo c + 8) (bhCpuLo c + 120) -∗ |==> cpuCtxFree c := by
   have hc := c.isLt
   unfold NCPU at hc
   have hC : bhCpuLo c = 0x80012460 + 128 * c.val := by unfold bhCpuLo; rw [bh_cpus_val]
   iintro #Hk #Hv H
   imod ctxStamped_boot (GF := GF) with ⟨%ξ, Hs⟩
   letI X : CurCtx := ⟨ξ, KTier.kpt⟩
-  have hfam := bootRan_stride (GF := GF) (imgFlat image) (bhCpuLo c + 8) 8 14
+  have hfam := bootRan_stride (GF := GF) (imgFlat bootImage) (bhCpuLo c + 8) 8 14
   rw [show bhCpuLo c + 8 + 8 * 14 = bhCpuLo c + 120 by omega] at hfam
   ihave H := hfam $$ H
   have hcells : ([∗list] j ∈ List.range 14,
-      bootRan (GF := GF) (imgFlat image) (bhCpuLo c + 8 + 8 * j) (bhCpuLo c + 8 + 8 * j + 8)) ⊢
+      bootRan (GF := GF) (imgFlat bootImage) (bhCpuLo c + 8 + 8 * j) (bhCpuLo c + 8 + 8 * j + 8)) ⊢
       kmapStatic -∗ @ctxCells hlc GF _ X (cpuCtxAddr c) ((List.range 14).map (fun _ => 0#64)) := by
     iintro H #Hk
     iapply ctxCells_intro _ _ (by simp)
@@ -341,7 +341,7 @@ theorem bootCpuCtxFree (image : Mem) (himg : BootImage image) (c : CPU) :
       rw [BitVec.toNat_add, this, BitVec.toNat_ofNat, Nat.mod_eq_of_lt (by omega : 8 * k < 2 ^ 64)]
       rw [bh_cpus_val] at *
       rw [hC]; omega
-    iapply bootBss_wordAt image himg _ 8 (bhCpuLo c + 8 + 8 * k) _ hva rfl
+    iapply bootBss_wordAt _ 8 (bhCpuLo c + 8 + 8 * k) _ hva rfl
       (by rw [hC]; omega) (by rw [hC]; omega) (by rw [hC]; omega) $$ Hk Hj
   ihave Hc := hcells $$ H Hk
   imodintro
@@ -353,9 +353,9 @@ theorem bootCpuCtxFree (image : Mem) (himg : BootImage image) (c : CPU) :
 /-- **`cpus[c]`'s own cells, carved at the hart's context** (Rocq
 `boot_cpu_slot_raw`'s `proc`/`noff`/`intena` rows, `boot_hart_pre`'s
 `cur_proc`): what `Xv6.bootBridge` takes, at their `.bss` zeros. -/
-theorem bootCpuCells [CurCtx] (image : Mem) (himg : BootImage image) (c : CPU) :
-    kmapStatic (GF := GF) ⊢ bootRan (imgFlat image) (bhCpuLo c) (bhCpuLo c + 8) -∗
-      bootRan (imgFlat image) (bhCpuLo c + 120) (bhCpuLo c + 128) -∗
+theorem bootCpuCells [CurCtx] (c : CPU) :
+    kmapStatic (GF := GF) ⊢ bootRan (imgFlat bootImage) (bhCpuLo c) (bhCpuLo c + 8) -∗
+      bootRan (imgFlat bootImage) (bhCpuLo c + 120) (bhCpuLo c + 128) -∗
       wordPointsTo (aCpuProc c) 8 (DFrac.own 1) 0#64 ∗
       wordPointsTo (aCpuNoff c) 4 (DFrac.own 1) 0#32 ∗
       (∃ b : Bool, wordPointsTo (aCpuIntena c) 4 (DFrac.own 1) (intenaVal b)) := by
@@ -369,13 +369,13 @@ theorem bootCpuCells [CurCtx] (image : Mem) (himg : BootImage image) (c : CPU) :
   have hi : (aCpuIntena c).toNat = bhCpuLo c + 124 := by
     unfold aCpuIntena; rw [cpuField_toNat c intenaOff (by decide), bh_cpusBase_toNat, hC]; rfl
   iintro #Hk Hp Hni
-  icases (bootRan_split (GF := GF) (imgFlat image) _ (bhCpuLo c + 124) _ (by omega) (by omega)).1 $$ Hni
+  icases (bootRan_split (GF := GF) (imgFlat bootImage) _ (bhCpuLo c + 124) _ (by omega) (by omega)).1 $$ Hni
     with ⟨Hn, Hi⟩
-  ihave Hp := bootBss_wordAt image himg (aCpuProc c) 8 (bhCpuLo c) _ hp rfl
+  ihave Hp := bootBss_wordAt (aCpuProc c) 8 (bhCpuLo c) _ hp rfl
     (by rw [hC]; omega) (by rw [hC]; omega) (by rw [hC]; omega) $$ Hk Hp
-  ihave Hn := bootBss_wordAt image himg (aCpuNoff c) 4 (bhCpuLo c + 120) _ hn rfl
+  ihave Hn := bootBss_wordAt (aCpuNoff c) 4 (bhCpuLo c + 120) _ hn rfl
     (by rw [hC]; omega) (by rw [hC]; omega) (by rw [hC]; omega) $$ Hk Hn
-  ihave Hi := bootBss_wordAt image himg (aCpuIntena c) 4 (bhCpuLo c + 124) _ hi
+  ihave Hi := bootBss_wordAt (aCpuIntena c) 4 (bhCpuLo c + 124) _ hi
     (by omega) (by rw [hC]; omega) (by rw [hC]; omega) (by rw [hC]; omega) $$ Hk Hi
   iframe Hp Hn
   iexists false
@@ -385,16 +385,16 @@ theorem bootCpuCells [CurCtx] (image : Mem) (himg : BootImage image) (c : CPU) :
 /-- **One hart's `.bss` share, carved** (Rocq `boot_hart_bss_of_raw` over
 the two families' per-element outputs, with `boot_hart_pre`'s
 `cpu_ctx_free` mint). -/
-theorem bootHartBss_carve (image : Mem) (himg : BootImage image) (c : CPU) :
+theorem bootHartBss_carve (c : CPU) :
     kmapStatic (GF := GF) ⊢ viewLb c 0 -∗
-      bootRan (imgFlat image) (bhStackLo c) (bhStackLo c + 4096) -∗
-      bootRan (imgFlat image) (bhCpuLo c) (bhCpuLo c + 128) -∗ |==> bootHartBss image c := by
+      bootRan (imgFlat bootImage) (bhStackLo c) (bhStackLo c + 4096) -∗
+      bootRan (imgFlat bootImage) (bhCpuLo c) (bhCpuLo c + 128) -∗ |==> bootHartBss c := by
   iintro #Hk #Hv Hs Hc
-  icases (bootRan_split (GF := GF) (imgFlat image) _ (bhCpuLo c + 8) _ (by omega) (by omega)).1 $$ Hc
+  icases (bootRan_split (GF := GF) (imgFlat bootImage) _ (bhCpuLo c + 8) _ (by omega) (by omega)).1 $$ Hc
     with ⟨Hp, Hc⟩
-  icases (bootRan_split (GF := GF) (imgFlat image) _ (bhCpuLo c + 120) _ (by omega) (by omega)).1 $$ Hc
+  icases (bootRan_split (GF := GF) (imgFlat bootImage) _ (bhCpuLo c + 120) _ (by omega) (by omega)).1 $$ Hc
     with ⟨Hx, Hni⟩
-  imod (bootCpuCtxFree image himg c) $$ Hk Hv Hx with Hf
+  imod (bootCpuCtxFree c) $$ Hk Hv Hx with Hf
   imodintro
   unfold bootHartBss
   iframe Hs Hp Hni Hf
@@ -403,21 +403,21 @@ theorem bootHartBss_carve (image : Mem) (himg : BootImage image) (c : CPU) :
 families, `boot_cran_stride_family_seq` over `hart_stack_raw` and
 `cpu_slot_raw`, re-indexed by `big_sepL_cpu_of_nat`): `stack0[8][4096]` and
 `cpus[8]`, carved once for all harts. -/
-theorem bootCarve_harts (image : Mem) (himg : BootImage image) :
+theorem bootCarve_harts :
     kmapStatic (GF := GF) ⊢ ([∗list] c ∈ cpus, viewLb c 0) -∗
-      bootRan (imgFlat image) MachCSL.KernelSyms.«stack0» (MachCSL.KernelSyms.«stack0» + 4096 * NCPU) -∗
-      bootRan (imgFlat image) MachCSL.KernelSyms.«cpus» (MachCSL.KernelSyms.«cpus» + 128 * NCPU) -∗
-      |==> [∗list] c ∈ cpus, bootHartBss image c := by
-  have hS : bootRan (GF := GF) (imgFlat image) MachCSL.KernelSyms.«stack0»
+      bootRan (imgFlat bootImage) MachCSL.KernelSyms.«stack0» (MachCSL.KernelSyms.«stack0» + 4096 * NCPU) -∗
+      bootRan (imgFlat bootImage) MachCSL.KernelSyms.«cpus» (MachCSL.KernelSyms.«cpus» + 128 * NCPU) -∗
+      |==> [∗list] c ∈ cpus, bootHartBss c := by
+  have hS : bootRan (GF := GF) (imgFlat bootImage) MachCSL.KernelSyms.«stack0»
       (MachCSL.KernelSyms.«stack0» + 4096 * NCPU) ⊢
-      [∗list] c ∈ cpus, bootRan (imgFlat image) (bhStackLo c) (bhStackLo c + 4096) := by
-    have h := bootRan_stride (GF := GF) (imgFlat image) MachCSL.KernelSyms.«stack0» 4096 NCPU
+      [∗list] c ∈ cpus, bootRan (imgFlat bootImage) (bhStackLo c) (bhStackLo c + 4096) := by
+    have h := bootRan_stride (GF := GF) (imgFlat bootImage) MachCSL.KernelSyms.«stack0» 4096 NCPU
     rw [bh_range_cpus, BigSepL.bigSepL_map] at h
     exact h
-  have hC : bootRan (GF := GF) (imgFlat image) MachCSL.KernelSyms.«cpus»
+  have hC : bootRan (GF := GF) (imgFlat bootImage) MachCSL.KernelSyms.«cpus»
       (MachCSL.KernelSyms.«cpus» + 128 * NCPU) ⊢
-      [∗list] c ∈ cpus, bootRan (imgFlat image) (bhCpuLo c) (bhCpuLo c + 128) := by
-    have h := bootRan_stride (GF := GF) (imgFlat image) MachCSL.KernelSyms.«cpus» 128 NCPU
+      [∗list] c ∈ cpus, bootRan (imgFlat bootImage) (bhCpuLo c) (bhCpuLo c + 128) := by
+    have h := bootRan_stride (GF := GF) (imgFlat bootImage) MachCSL.KernelSyms.«cpus» 128 NCPU
     rw [bh_range_cpus, BigSepL.bigSepL_map] at h
     exact h
   iintro #Hk Hv Hs Hc
@@ -431,7 +431,7 @@ theorem bootCarve_harts (image : Mem) (himg : BootImage image) :
   iapply BigSepL.bigSepL_impl $$ H
   imodintro
   iintro %k %c %_ ⟨Hv1, Hs1, Hc1⟩
-  iapply bootHartBss_carve image himg c $$ Hk Hv1 Hs1 Hc1
+  iapply bootHartBss_carve c $$ Hk Hv1 Hs1 Hc1
 
 /-! ## §3 The hart's side, at its own context -/
 
@@ -441,8 +441,8 @@ the instantiation `boot_entry_bridge` makes of `boot_hart_bss`'s `∀ ξ`
 rows): the GOT word (discarded), `wp_boot_body`'s four frame words, the
 other 508 stack words, `bootBridge`'s `cpus[c]` cells, and the parked save
 area. -/
-theorem bootHartBss_open [CurCtx] (image : Mem) (himg : BootImage image) (c : CPU) :
-    kmapStatic (GF := GF) ∗ bootGotRo image ∗ bootHartBss image c ⊢
+theorem bootHartBss_open [CurCtx] (c : CPU) :
+    kmapStatic (GF := GF) ∗ bootGotRo ∗ bootHartBss c ⊢
       pwordPointsTo stack0Slot 8 DFrac.discard KA.«stack0» ∗
       pwordPointsTo (spOf c - 16#64) 8 (DFrac.own 1) 0#64 ∗
       pwordPointsTo (spOf c - 8#64) 8 (DFrac.own 1) 0#64 ∗
@@ -456,9 +456,9 @@ theorem bootHartBss_open [CurCtx] (image : Mem) (himg : BootImage image) (c : CP
       cpuCtxFree c := by
   unfold bootHartBss
   iintro ⟨#Hk, #Hg, Hs, Hp, Hni, Hf⟩
-  ihave Hw := bootGot_word image himg $$ Hg
-  icases bootStack_carve image himg c $$ Hs with ⟨H16, H8, H32, H24, Hr⟩
-  icases bootCpuCells image himg c $$ Hk Hp Hni with ⟨Hp, Hn, Hi⟩
+  ihave Hw := bootGot_word $$ Hg
+  icases bootStack_carve c $$ Hs with ⟨H16, H8, H32, H24, Hr⟩
+  icases bootCpuCells c $$ Hk Hp Hni with ⟨Hp, Hn, Hi⟩
   iframe Hw H16 H8 H32 H24 Hr Hp Hn Hi Hf
 
 /-! ## §4 The per-hart bundle -/
@@ -474,7 +474,7 @@ running token: `bootEntryPre`'s output (without the wire pins), the other
 23 GPRs, `stvec`, `hartCsrs` (at the reset `mstateen0 = 0`/`sstateen0 = 0`),
 `mainHartRaw`'s rows at the reset `tlb`, the empty held-lock set, the GOT
 row and the hart's `.bss` share.  Context-free (deviations 1 and 5). -/
-def bootHartRes (image : Mem) (f : RegFile) (c : CPU) : IProp GF := iprop%
+def bootHartRes (f : RegFile) (c : CPU) : IProp GF := iprop%
   mBoot c (DFrac.own 1) ∗
   Register.mhartid ↦ᵣ[c] hartId c ∗ clockCells c ∗ pcIs c KA.«_entry» ∗
   Register.x1 ↦ᵣ[c] f .x1 ∗ Register.x2 ↦ᵣ[c] f .x2 ∗ Register.x4 ↦ᵣ[c] f .x4 ∗
@@ -485,17 +485,17 @@ def bootHartRes (image : Mem) (f : RegFile) (c : CPU) : IProp GF := iprop%
   hartCsrs c ∗
   mainHartRaw c (f .tlb) ∗
   lockSet c [] ∗
-  bootGotRo image ∗
-  bootHartBss image c
+  bootGotRo ∗
+  bootHartBss c
 
 /-- **The bundle, out of the power thread's per-hart rows** (Rocq
 `boot_hart_pre`'s register half + `boot_hart_pre_combine`): a reset file's
 cells (less the wire pins), the empty held-lock set, the GOT row and the
 hart's carved `.bss` share.  `mstateen0`/`sstateen0` are the reset table's
 pins (`MachCSL.resetVal`). -/
-theorem bootHartRes_intro (image : Mem) (f : RegFile) (c : CPU) (hres : resetRegs c f) :
+theorem bootHartRes_intro (f : RegFile) (c : CPU) (hres : resetRegs c f) :
     regCellsNoPins (GF := GF) (regName (hlc := hlc) (GF := GF) c) f ∗ lockSet c [] ∗
-      bootGotRo image ∗ bootHartBss image c ⊢ bootHartRes image f c := by
+      bootGotRo ∗ bootHartBss c ⊢ bootHartRes f c := by
   have hm : f .mstateen0 = 0#64 := hres .mstateen0 _ rfl
   have hs : f .sstateen0 = 0#32 := hres .sstateen0 _ rfl
   iintro ⟨H, Hl, #Hg, Hb⟩
@@ -560,28 +560,27 @@ held-lock set, at the instance the client runs its harts at
 `bootHartRes` at the booted file. -/
 theorem bootHartRes_ofEra (E : EraGS GF) (gen : Nat) (cP : CPU → BitVec 64 → IProp GF)
     (cI : ∀ cpu : CPU, ⊢ cP cpu 0#64) (eP : CtxId → IProp GF) (ePe : ∀ ξ : CtxId, Persistent (eP ξ))
-    (σ : MState) (image : Mem) (hbf : bootFacts σ image) (c : CPU) :
+    (σ : MState) (hbf : bootFacts σ) (c : CPU) :
     letI : MachGS hlc GF := MachGS.ofEra E gen cP cI eP ePe
     regCellsNoPins (GF := GF) (E.regName c) (σ.regs c) ∗ lockSetAt E c [] ∗
-      bootGotRo image ∗ bootHartBss image c ⊢ bootHartRes image (σ.regs c) c :=
+      bootGotRo ∗ bootHartBss c ⊢ bootHartRes (σ.regs c) c :=
   letI : MachGS hlc GF := MachGS.ofEra E gen cP cI eP ePe
-  bootHartRes_intro image (σ.regs c) c (hbf.2.2.2.1 c)
+  bootHartRes_intro (σ.regs c) c (hbf.2.2.2.1 c)
 
 /-- **All eight harts' `.bss` shares at `Hboot`'s era**: `bootCarve_harts`
 with the `viewLb … 0` receipts read off `powerBootRes`'s token row (which is
 handed back). -/
 theorem bootCarve_harts_ofEra (E : EraGS GF) (gen : Nat) (cP : CPU → BitVec 64 → IProp GF)
-    (cI : ∀ cpu : CPU, ⊢ cP cpu 0#64) (eP : CtxId → IProp GF) (ePe : ∀ ξ : CtxId, Persistent (eP ξ))
-    (image : Mem) (himg : BootImage image) :
+    (cI : ∀ cpu : CPU, ⊢ cP cpu 0#64) (eP : CtxId → IProp GF) (ePe : ∀ ξ : CtxId, Persistent (eP ξ)) :
     letI : MachGS hlc GF := MachGS.ofEra E gen cP cI eP ePe
     kmapStatic (GF := GF) ⊢ ([∗list] c ∈ cpus, ∃ ξ : CtxId, ctxTokAt E c ξ) -∗
-      bootRan (imgFlat image) MachCSL.KernelSyms.«stack0» (MachCSL.KernelSyms.«stack0» + 4096 * NCPU) -∗
-      bootRan (imgFlat image) MachCSL.KernelSyms.«cpus» (MachCSL.KernelSyms.«cpus» + 128 * NCPU) -∗
-      |==> (([∗list] c ∈ cpus, ∃ ξ : CtxId, ctxTokAt E c ξ) ∗ [∗list] c ∈ cpus, bootHartBss image c) := by
+      bootRan (imgFlat bootImage) MachCSL.KernelSyms.«stack0» (MachCSL.KernelSyms.«stack0» + 4096 * NCPU) -∗
+      bootRan (imgFlat bootImage) MachCSL.KernelSyms.«cpus» (MachCSL.KernelSyms.«cpus» + 128 * NCPU) -∗
+      |==> (([∗list] c ∈ cpus, ∃ ξ : CtxId, ctxTokAt E c ξ) ∗ [∗list] c ∈ cpus, bootHartBss c) := by
   letI : MachGS hlc GF := MachGS.ofEra E gen cP cI eP ePe
   iintro #Hk Ht Hs Hc
   icases ctxTokAt_viewLb0_list E cpus $$ Ht with ⟨Ht, Hv⟩
-  imod (bootCarve_harts image himg) $$ Hk Hv Hs Hc with Hb
+  imod (bootCarve_harts) $$ Hk Hv Hs Hc with Hb
   imodintro
   iframe Ht Hb
 

@@ -53,11 +53,11 @@ mint's ledger, the claim at its view, and `fsBootSnapWf`).
 4. **`covFacts_ofImage`**'s middle conjunct is `∀ b, logRegion ls b = true →
    b ∈ cov` (Rocq `log_region_set ls ⊆ cov`; `Xv6/FsCfgBoot.lean`'s
    `fsBootSnapWf` row 9 spelling).
-5. **Trace hooks at an arbitrary trace predicate `Ptp` and boot image
-   `img`.**  Rocq fixes the trace slot at `obs_pred_at γobs` in
+5. **Trace hooks at an arbitrary trace predicate `Ptp`.**  Rocq fixes the trace slot at `obs_pred_at γobs` in
    `fs_trace_hook`/`xv6_trace_hook`; neither proof reads it, so `Ptp` is a
    parameter here (the unit instance passes `obsPredAt γobs`, the ledger
-   instance its own).  `img` is the record's `bootImage` (D47: `g.image`).
+   instance its own).  (No boot-image argument: D47 made it the language
+   constant `MachCSL.bootImage`.)
    The record literal is `AppIface.bootFixedGS` (D49; `Xv6/AppIface.lean`
    deviation 1).
 6. `xv6TracePure`'s second conjunct is `g.pow = true → mmOk g.m` (Lean's
@@ -483,13 +483,13 @@ record literal with the composite slot, `diskProjTrace` promotes
 `xv6Slot_project` to the end-of-run shape. -/
 theorem fsTraceHook {CT : Type} (N : Type) (appFs : CT → N → Aview → IProp GF)
     (cov : ExtTreeSet Nat compare) (ls : Nat) (Ai : AppIface GF) (Hinv : InvGS_gen hlc GF)
-    (γgen γstart γreg γd γsw γobs γhist : GName) (c : CT) (img : Mem) (T : List Obs)
+    (γgen γstart γreg γd γsw γobs γhist : GName) (c : CT) (T : List Obs)
     (Ptp : IProp GF) (g' : GState) :
-    @powerInterp hlc GF (Ai.bootFixedGS Hinv γgen γstart γreg γd XV6_DISK_BYTES img γsw
+    @powerInterp hlc GF (Ai.bootFixedGS Hinv γgen γstart γreg γd XV6_DISK_BYTES γsw
         (xv6Slot N appFs cov ls γd γsw γreg γstart c) γobs T Ptp γhist) g' ∗
       ▷ xv6Slot N appFs cov ls γd γsw γreg γstart c ⊢@{IProp GF}
       ◇ ⌜fsBootPure cov ls (diskOf g'.m.devs)⌝ :=
-  @diskProjTrace hlc GF (Ai.bootFixedGS Hinv γgen γstart γreg γd XV6_DISK_BYTES img γsw
+  @diskProjTrace hlc GF (Ai.bootFixedGS Hinv γgen γstart γreg γd XV6_DISK_BYTES γsw
       (xv6Slot N appFs cov ls γd γsw γreg γstart c) γobs T Ptp γhist)
     XV6_DISK_BYTES γd (xv6Slot N appFs cov ls γd γsw γreg γstart c) (fsBootPure cov ls)
     (fun dk => xv6Slot_project N appFs cov ls γd γsw γreg γstart c dk) rfl rfl g'
@@ -499,17 +499,17 @@ the era conjunct (pure, nothing spent), then the disk's reading off the crash
 invariant. -/
 theorem xv6TraceHook {CT : Type} (N : Type) (appFs : CT → N → Aview → IProp GF)
     (cov : ExtTreeSet Nat compare) (ls : Nat) (Ai : AppIface GF) (Hinv : InvGS_gen hlc GF)
-    (γgen γstart γreg γd γsw γobs γhist : GName) (c : CT) (img : Mem) (T : List Obs)
+    (γgen γstart γreg γd γsw γobs γhist : GName) (c : CT) (T : List Obs)
     (Ptp : IProp GF) (g' : GState) :
-    @powerInterp hlc GF (Ai.bootFixedGS Hinv γgen γstart γreg γd XV6_DISK_BYTES img γsw
+    @powerInterp hlc GF (Ai.bootFixedGS Hinv γgen γstart γreg γd XV6_DISK_BYTES γsw
         (xv6Slot N appFs cov ls γd γsw γreg γstart c) γobs T Ptp γhist) g' ∗
       ▷ xv6Slot N appFs cov ls γd γsw γreg γstart c ⊢@{IProp GF}
       ◇ ⌜xv6TracePure cov ls g'⌝ := by
   iintro ⟨Hsi, HP⟩
   ihave %hresv := (@powerInterp_mmOk hlc GF (Ai.bootFixedGS Hinv γgen γstart γreg γd
-    XV6_DISK_BYTES img γsw (xv6Slot N appFs cov ls γd γsw γreg γstart c) γobs T Ptp γhist) g')
+    XV6_DISK_BYTES γsw (xv6Slot N appFs cov ls γd γsw γreg γstart c) γobs T Ptp γhist) g')
     $$ Hsi
-  imod fsTraceHook N appFs cov ls Ai Hinv γgen γstart γreg γd γsw γobs γhist c img T Ptp g'
+  imod fsTraceHook N appFs cov ls Ai Hinv γgen γstart γreg γd γsw γobs γhist c T Ptp g'
     $$ [Hsi HP] with %hdisk
   · isplitl [Hsi]
     · iexact Hsi

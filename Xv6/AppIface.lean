@@ -129,10 +129,10 @@ def appIfaceTriv (GF : BundledGFunctors) : AppIface GF where
 the interface's projections in the three application slots (Rocq's
 `boot_fixedGS … Ai …`; deviation 1). -/
 @[reducible] def AppIface.bootFixedGS {hlc : HasLC} [MachGpreS hlc GF] (Ai : AppIface GF)
-    (Hinv : InvGS_gen hlc GF) (γgen γstart γreg γdisk : GName) (ndisk : Nat) (img : Mem)
+    (Hinv : InvGS_gen hlc GF) (γgen γstart γreg γdisk : GName) (ndisk : Nat)
     (γswap : GName) (Pcp : IProp GF) (γobs : GName) (T : List Obs) (Ptp : IProp GF)
     (γhist : GName) : MachFixedGS hlc GF :=
-  MachCSL.bootFixedGS Hinv γgen γstart γreg γdisk ndisk img γswap Pcp γobs T Ptp γhist
+  MachCSL.bootFixedGS Hinv γgen γstart γreg γdisk ndisk γswap Pcp γobs T Ptp γhist
     Ai.tag Ai.tag_persistent Ai.tag_timeless Ai.kill Ai.kill_persistent Ai.kill_timeless
     Ai.cons Ai.cons_timeless
 
