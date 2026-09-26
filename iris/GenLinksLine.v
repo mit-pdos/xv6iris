@@ -669,9 +669,17 @@ Section gen_links_line.
          -∗ Φ) -∗
         out_link Uart0 k b Φ)%I.
 
+  (* THE TAINT'S BYTE, at the family's own ERA: the taint may license one
+     era only (the union's wild token -- seccomp design 10.7), and every
+     family step holds the era's pin *)
   Definition gl_taint : iProp Σ :=
-    (□ ∀ (k : nat) (b : bv 8) (Φ : iProp Σ),
-        T -∗ (T -∗ Φ) -∗ out_link Uart0 k b Φ)%I.
+    (□ ∀ (k : nat) (v : era_pins) (b : bv 8) (Φ : iProp Σ),
+        PIN k v -∗ T -∗ (T -∗ Φ) -∗ out_link Uart0 k b Φ)%I.
+
+  (* ...and at a NAMED era, for a device that is at one and holds no pin
+     on its taint arm ([UkConsOut.cons_dev_at]) *)
+  Definition gl_taint_at (k : nat) : iProp Σ :=
+    (□ ∀ (b : bv 8) (Φ : iProp Σ), T -∗ (T -∗ Φ) -∗ out_link Uart0 k b Φ)%I.
 
   Definition glinks : iProp Σ := (gl_w ∗ gl_blk ∗ gl_pro ∗ gl_head ∗ gl_taint)%I.
 
@@ -688,6 +696,8 @@ Section gen_links_line.
   Proof using. rewrite /gl_head. apply _. Qed.
   Global Instance gl_taint_persistent : Persistent gl_taint.
   Proof using. rewrite /gl_taint. apply _. Qed.
+  Global Instance gl_taint_at_persistent k : Persistent (gl_taint_at k).
+  Proof using. rewrite /gl_taint_at. apply _. Qed.
   Global Instance glinks_persistent : Persistent glinks.
   Proof using. rewrite /glinks. apply _. Qed.
 
@@ -717,7 +727,7 @@ Section gen_links_line.
     iDestruct (LINKS_gl with "Hlk") as "#(Hw & _ & Hpro & Hhd & Ht)".
     rewrite {1}/gwc_ban.
     iDestruct "Hc" as "[Hl | [[%Hi0 Hh] | #HT]]"; last first.
-    { iApply ("Ht" $! k b Φ with "HT [HΦ]").
+    { iApply ("Ht" $! k v b Φ with "Hpin HT [HΦ]").
       iIntros "#HT'". iApply "HΦ". by iApply gwc_ban_taint. }
     { (* THE ERA'S HEAD: the first byte files the boot state *)
       subst i. iDestruct (gH_inp G with "Hh") as "(Hh & -> & _)".
@@ -781,7 +791,7 @@ Section gen_links_line.
     iDestruct (LINKS_gl with "Hlk") as "#(Hw & Hblk & _ & _ & Ht)".
     destruct (lm_ab_ok M K I a i b Hb) as [Hok Hfr].
     rewrite {1}/gwc_blk. iDestruct "Hc" as "[Hl | #HT]"; last first.
-    { iApply ("Ht" $! k b Φ with "HT [HΦ]").
+    { iApply ("Ht" $! k v b Φ with "Hpin HT [HΦ]").
       iIntros "#HT'". iApply "HΦ". by iApply gwc_blk_taint. }
     iDestruct "Hl" as (ps cs s0 P) "(%Hw & Htn & #Hps & #Hcs & #HE & #Hf)".
     pose proof (proj1 Hw) as Hwb.
@@ -854,7 +864,7 @@ Section gen_links_line.
     iDestruct (LINKS_gl with "Hlk") as "#(_ & Hblk & Hpro & _ & Ht)".
     rewrite {1}/gwc_owed.
     iDestruct "Hc" as "[Hl | [Hh | #HT]]"; last first.
-    { iApply ("Ht" $! k b Φ with "HT [HΦ]").
+    { iApply ("Ht" $! k v b Φ with "Hpin HT [HΦ]").
       iIntros "#HT'". iApply "HΦ". by iApply gwc_sp_taint. }
     { iApply (ghead_dollar k v I b Φ Hb with "Hpin Hlk Hh HΦ"). }
     iDestruct "Hl" as (ps cs s0 P) "(%Hw & Htn & #Hps & #Hcs & #HE & #Hf)".
@@ -899,7 +909,7 @@ Section gen_links_line.
     intros Hb. iIntros "#Hpin #Hlk Hc HΦ".
     iDestruct (LINKS_gl with "Hlk") as "#(Hw & _ & _ & _ & Ht)".
     rewrite {1}/gwc_sp. iDestruct "Hc" as "[Hl | #HT]"; last first.
-    { iApply ("Ht" $! k b Φ with "HT [HΦ]").
+    { iApply ("Ht" $! k v b Φ with "Hpin HT [HΦ]").
       iIntros "#HT'". iApply "HΦ". by iApply gwc_open_taint. }
     iDestruct "Hl" as (ps cs s0 P) "(%Hw & Htn & #Hps & #Hcs & #HE & #Hf)".
     destruct Hw as [Hop Hby].
@@ -953,7 +963,7 @@ Section gen_links_line.
     intros Hb. iIntros "#Hpin #Hlk Hc HΦ".
     iDestruct (LINKS_gl with "Hlk") as "#(Hw & _ & _ & _ & Ht)".
     rewrite {1}/gwc_sp_t. iDestruct "Hc" as "[Hl | #HT]"; last first.
-    { iApply ("Ht" $! k b Φ with "HT [HΦ]").
+    { iApply ("Ht" $! k v b Φ with "Hpin HT [HΦ]").
       iIntros "#HT'". iApply "HΦ". by iApply gwc_open_t_taint. }
     iDestruct "Hl" as (ps cs s0 P) "(%Hw & Htn & #Hps & #Hcs & #HE & #Hf)".
     destruct Hw as [[Hop Hby] Htl].
@@ -980,7 +990,7 @@ Section gen_links_line.
     iDestruct (LINKS_gl with "Hlk") as "#(Hw & Hblk & _ & _ & Ht)".
     pose proof Ha as (Hok & Hnp & Hnt).
     rewrite {1}/gwc_post. iDestruct "Hc" as "[Hl | #HT]"; last first.
-    { iApply ("Ht" $! k b Φ with "HT [HΦ]").
+    { iApply ("Ht" $! k v b Φ with "Hpin HT [HΦ]").
       iIntros "#HT'". iApply "HΦ". rewrite /gwc_sp_t. by iRight. }
     iDestruct "Hl" as (ps cs s0 P) "(%Hw & Htn & #Hps & #Hcs & #HE & #Hf)".
     pose proof (proj1 Hw) as Hwb.
@@ -1030,7 +1040,7 @@ Section gen_links_line.
       iApply (gprompt_dollar_posts k v I a b Φ Ha Hb with "Hpin Hlk Hc HΦ"). }
     iDestruct (LINKS_gl with "Hlk") as "#(_ & _ & Hpro & Hhd & Ht)".
     rewrite {1}/gwc_pro. iDestruct "Hc" as "[Hl | [Hh | #HT]]"; last first.
-    { iApply ("Ht" $! k b Φ with "HT [HΦ]").
+    { iApply ("Ht" $! k v b Φ with "Hpin HT [HΦ]").
       iIntros "#HT'". iApply "HΦ". by iApply gwc_sp_t_taint. }
     { (* the era's head: the '$' is its first byte, and it lands TIGHT *)
       iDestruct (gH_inp G with "Hh") as "(Hh & -> & _)".
@@ -1071,7 +1081,7 @@ Section gen_links_line.
     - (* the choice byte files [a] *)
       rewrite {1}/gwc_pdiag /gwc_pban.
       iDestruct "Hc" as "[Hl | #HT]"; last first.
-      { iApply ("Ht" $! k b Φ with "HT [HΦ]").
+      { iApply ("Ht" $! k v b Φ with "Hpin HT [HΦ]").
         iIntros "#HT'". iApply "HΦ". by iApply gwc_pdiag_taint. }
       iDestruct "Hl" as (ps cs s0 P) "(%Hw & Htn & #Hps & #Hcs & #HE & #Hf)".
       pose proof (lm_wr_pdiag_1_of_pro M L ps cs s0 I P a Hw) as Hnext.
@@ -1089,7 +1099,7 @@ Section gen_links_line.
     - (* a later byte of the diagnostic already chosen *)
       rewrite {1}/gwc_pdiag /gwc_pdg.
       iDestruct "Hc" as "[Hl | #HT]"; last first.
-      { iApply ("Ht" $! k b Φ with "HT [HΦ]").
+      { iApply ("Ht" $! k v b Φ with "Hpin HT [HΦ]").
         iIntros "#HT'". iApply "HΦ". by iApply gwc_pdiag_taint. }
       iDestruct "Hl" as (ps cs s0 P) "(%Hw & Htn & #Hps & #Hcs & #HE & #Hf)".
       pose proof (lm_wr_pdiag_byte M L ps cs s0 I P a (S i') b Hw Hb) as Hby.

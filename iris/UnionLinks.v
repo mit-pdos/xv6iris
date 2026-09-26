@@ -2,7 +2,7 @@
 (*  UnionLinks.v -- THE UNION APPLICATION'S CONSOLE LINKS (cut C9e';      *)
 (*  design: claude-notes/design/union.md section 3).                      *)
 (*                                                                        *)
-(*  [PipesLinksV]'s links at the union claim [UnionOut.ucl]: the taint    *)
+(*  The links at the union claim [UnionOut.ucl] (three arms): the taint   *)
 (*  route, the four single-writer writes (the era head filing the boot    *)
 (*  state out of [f0boot]), the read link and its receipt, the close and  *)
 (*  the byte, the FILING link of an N-writer round through the union's    *)
@@ -43,6 +43,8 @@ Require Import PipesView.
 Require Import PipeOutN.
 Require Import PipeOutNEv.
 Require Import PipesLinksV.
+Require Import GenOutWild.
+Require Import PipeOutW.         (* [rd_retV]/[rd_retW], the wild licence *)
 Require Import UnionDisc.
 Require Import UnionDiscDec.
 Require Import UnionView.
@@ -72,21 +74,49 @@ Section union_links.
   (* the record equations, as section parameters *)
   Context (Hcons : @riscv_cons_res Σ (@riscv_fixedGS Σ HRg) = ucl ug).
 
-  Local Lemma Hcons' :
-    @riscv_cons_res Σ (@riscv_fixedGS Σ HRg) = peclV pg U (ucparams ug) ∅ (uwa ug).
-  Proof using Hcons. exact Hcons. Qed.
+  Lemma uchist_at0 (kk : nat) (hh : list mobs) (HH : LogEntryDefs.cons_hist) :
+    chist_at Uart0 kk hh HH = ucl ug kk hh HH.
+  Proof using Hcons. rewrite /chist_at. by rewrite Hcons. Qed.
 
   (* ---- the taint route ---- *)
   Lemma union_cons_link_of_taint (k : nat) (ev : ConsLog.cons_ev) (Φ : iProp Σ) :
     UT -∗ Φ -∗ cons_link Uart0 k ev Φ.
   Proof using Hcons.
-    exact (vcons_link_of_taint pg U (ucparams ug) ∅ (uwa ug) Hcons' k ev Φ).
+    iIntros "#HT HΦ" (o H) "#Hlb Hres _ _".
+    iModIntro. iExists o. iSplitR; [iExact "Hlb" |]. iSplitR "HΦ"; [| iExact "HΦ"].
+    rewrite !uchist_at0. by iApply (ucl_taint with "HT").
   Qed.
 
   Lemma union_write_link_taint (k : nat) (b : bv 8) (Φ : iProp Σ) :
     UT -∗ (UT -∗ Φ) -∗ out_link Uart0 k b Φ.
   Proof using Hcons.
-    exact (vwrite_link_taint pg U (ucparams ug) ∅ (uwa ug) Hcons' k b Φ).
+    iIntros "#HT HΦ" (o H) "#Hlb Hres".
+    iModIntro. iExists o. iSplitR; [iExact "Hlb" |]. iSplitR "HΦ"; [| by iApply "HΦ"].
+    rewrite !uchist_at0. by iApply (ucl_taint with "HT").
+  Qed.
+
+  (* ---- the WILD route: the era's wild token licenses its own era's
+          process events (seccomp design 10.2) ---- *)
+  Lemma union_write_link_wild (k : nat) (b : bv 8) (Φ : iProp Σ) :
+    usecc_tok ug k -∗ Φ -∗ out_link Uart0 k b Φ.
+  Proof using Hcons.
+    iIntros "#Htok HΦ" (o H) "#Hlb Hres".
+    iDestruct (ucl_wild_lic ug k with "Htok") as "#Hlic".
+    rewrite !uchist_at0.
+    iMod ("Hlic" $! (default [] o) H (ConsLog.EvOut b) with "[%] [%] Hres") as "Hres";
+      [by left; exists b | done |].
+    iModIntro. iExists o. rewrite uchist_at0. by iFrame "Hlb Hres HΦ".
+  Qed.
+
+  Lemma union_read_link_wild (k : nat) (ws : list (list mobs * bv 8)) (Φ : iProp Σ) :
+    usecc_tok ug k -∗ Φ -∗ cons_link Uart0 k (ConsLog.EvRead ws) Φ.
+  Proof using Hcons.
+    iIntros "#Htok HΦ" (o H) "#Hlb Hres _ %Hev".
+    iDestruct (ucl_wild_lic ug k with "Htok") as "#Hlic".
+    rewrite !uchist_at0.
+    iMod ("Hlic" $! (default [] o) H (ConsLog.EvRead ws) with "[%] [%] Hres") as "Hres";
+      [by right; exists ws | done |].
+    iModIntro. iExists o. rewrite uchist_at0. by iFrame "Hlb Hres HΦ".
   Qed.
 
   (* (H) THE ERA'S HEAD WRITE: the first process byte files the boot
@@ -102,12 +132,14 @@ Section union_links.
     out_link Uart0 k b Φ.
   Proof using Hcons.
     intros Hok Halt Hhead.
-    exact (vwrite_link_first pg U (ucparams ug) ∅ (uwa ug) Hcons' k v a b s0 Φ
-             Hok Halt Hhead).
+    iIntros "#Hpin Ht #Hpslb #Hcslb #Hilb Hbt HΦ" (o H) "#Hlb Hres".
+    rewrite !uchist_at0.
+    iMod (ucl_step_write_first ug k v a b s0 (default [] o) H Hok Halt Hhead
+            with "Hpin Ht Hpslb Hcslb Hilb Hbt Hres") as "(Hres & Hret)".
+    iModIntro. iExists o. rewrite uchist_at0. iFrame "Hlb Hres". by iApply "HΦ".
   Qed.
 
-  (* (W) A BYTE INSIDE A BLOCK OR A PROLOGUE ROUND, the open round
-     refuted *)
+  (* (W) A BYTE INSIDE A BLOCK OR A PROLOGUE ROUND *)
   Lemma union_write_link (k : nat) (v : era_pins) (P : nat) (b : bv 8)
       (ps0 cs0 : list nat) (s0 : fstate) (I0 : list (bv 8)) (Φ : iProp Σ) :
     (nlines I0 <= length cs0)%nat ->
@@ -120,11 +152,15 @@ Section union_links.
     out_link Uart0 k b Φ.
   Proof using Hcons.
     intros Hn Hpin0 Hb.
-    exact (vwrite_link pg U (ucparams ug) ∅ (uwa ug) Hcons' k v P b ps0 cs0 s0 I0 Φ
-             Hn Hpin0 Hb).
+    iIntros "#Hpin Ht #Hpslb #Hcslb #Hilb #HW HΦ" (o H) "#Hlb Hres".
+    rewrite !uchist_at0.
+    iMod (ucl_step_write ug k v P b ps0 cs0 s0 I0 (default [] o) H Hn Hpin0 Hb
+            with "Hpin Ht Hpslb Hcslb Hilb HW Hres") as "(Hres & Hret)".
+    iModIntro. iExists o. rewrite uchist_at0. iFrame "Hlb Hres". by iApply "HΦ".
   Qed.
 
-  (* (B) A BLOCK'S FIRST BYTE, filing the round's alternative *)
+  (* (B) A BLOCK'S FIRST BYTE, filing the round's alternative -- or the
+     ESCAPE to the era's wild token at the [seccomp x] line itself *)
   Lemma union_write_link_blk (k : nat) (v : era_pins) (P a : nat) (b : bv 8)
       (ps0 cs0 : list nat) (s0 : fstate) (I0 : list (bv 8)) (Φ : iProp Σ) :
     I0 <> [] ->
@@ -139,13 +175,18 @@ Section union_links.
       (lm_of U (bodies_of I0 !!! (nlines I0 - 1)%nat)) (lm_dec U a) !! 0%nat = Some b ->
     UPIN k v -∗ turn v P -∗ ps_lb v ps0 -∗ cs_lb v cs0 -∗ inp_lb v I0 -∗
     f0cw gf k s0 -∗
-    (((turn v (S P) ∗ ps_lb v ps0 ∗ cs_lb v (cs0 ++ [a]) ∗ inp_lb v I0
-       ∗ f0cw gf k s0) ∨ UT) -∗ Φ) -∗
+    ((((turn v (S P) ∗ ps_lb v ps0 ∗ cs_lb v (cs0 ++ [a]) ∗ inp_lb v I0
+        ∗ f0cw gf k s0) ∨ UT)
+      ∨ (usecc_tok ug k ∗ cs_frozen_at v (nlines I0 - 1)%nat ∗ inp_lb v I0)) -∗ Φ) -∗
     out_link Uart0 k b Φ.
   Proof using Hcons.
     intros Hne Hr Hn Hpin0 HP Hok Hfk Hb.
-    exact (vwrite_link_blk pg U (ucparams ug) UB ∅ (uwa ug) Hcons'
-             k v P a b ps0 cs0 s0 I0 Φ Hne Hr Hn Hpin0 HP Hok Hfk Hb).
+    iIntros "#Hpin Ht #Hpslb #Hcslb #Hilb #HW HΦ" (o H) "#Hlb Hres".
+    rewrite !uchist_at0.
+    iMod (ucl_step_write_blk ug k v P a b ps0 cs0 s0 I0 (default [] o) H
+            Hne Hr Hn Hpin0 HP Hok Hfk Hb
+            with "Hpin Ht Hpslb Hcslb Hilb HW Hres") as "(Hres & Hret)".
+    iModIntro. iExists o. rewrite uchist_at0. iFrame "Hlb Hres". by iApply "HΦ".
   Qed.
 
   (* (P) A PROLOGUE ROUND'S CHOICE BYTE (the file's witness is strict) *)
@@ -166,41 +207,96 @@ Section union_links.
     out_link Uart0 k b Φ.
   Proof using Hcons.
     intros Hr Hop Hn Hpin0 Hnd HP Halt Hb.
-    exact (vwrite_link_pro pg U (ucparams ug) ∅ (uwa ug) Hcons'
-             k v P a b ps0 cs0 s0 I0 Φ (or_intror (or_introl I))
-             Hr Hop Hn Hpin0 Hnd HP Halt Hb).
+    iIntros "#Hpin Ht #Hpslb #Hcslb #Hilb #HW HΦ" (o H) "#Hlb Hres".
+    rewrite !uchist_at0.
+    iMod (ucl_step_write_pro ug k v P a b ps0 cs0 s0 I0 (default [] o) H
+            Hr Hop Hn Hpin0 Hnd HP Halt Hb
+            with "Hpin Ht Hpslb Hcslb Hilb HW Hres") as "(Hres & Hret)".
+    iModIntro. iExists o. rewrite uchist_at0. iFrame "Hlb Hres". by iApply "HΦ".
   Qed.
 
   (* (R) THE READ LINK AND ITS RECEIPT: the window, the era's input at its
      far end, its discipline, and the writer's stage with the state's
-     witness ([f0cw]: the era's file pin and the boot state's bound) *)
+     witness ([f0cw]: the era's file pin and the boot state's bound) --
+     and, at a read that completes a [seccomp x] line, the era's wild
+     token *)
+  Definition uread_wild (I : list (bv 8)) (ws : list (list mobs * bv 8)) : Prop :=
+    ws <> [] /\ I <> [] /\ rest_of I = [] /\ uwild (lm_line_at U I) = true.
+
+  Global Instance uread_wild_dec I ws : Decision (uread_wild I ws).
+  Proof using . rewrite /uread_wild. apply _. Qed.
+
   Definition uread_ret (k : nat) (v : era_pins) (n : nat)
       (ws : list (list mobs * bv 8)) : iProp Σ :=
-    vread_ret U (ucparams ug) k v n ws.
+    ((UT ∗ dl_cnt v (1/2) n)
+     ∨ dl_cnt v (1/2) (n + length ws)%nat
+       ∗ ∃ (pops : list log_entry) (dl : list (list mobs * bv 8)),
+           ⌜read_ok pops dl ws⌝ ∗ ⌜length dl = n⌝
+           ∗ ⌜(dl ++ ws) `prefix_of` echoed pops⌝
+           ∗ ⌜E_index (seg_of (echoed pops))⌝
+           ∗ ⌜lm_E_disc U (seg_of (echoed pops))⌝
+           ∗ ⌜forall x : list mobs * bv 8, x ∈ dl ++ ws -> obs_boots x.1 = k⌝
+           ∗ inp_lb v (snd <$> (dl ++ ws))
+           ∗ ⌜lm_disc_input U (snd <$> (dl ++ ws))⌝
+           ∗ (⌜ws = []⌝
+              ∨ ∃ (cs0 ps0 : list nat) (s0 : fstate),
+                  cs_lb v cs0 ∗ ps_lb v ps0 ∗ f0cw gf k s0
+                  ∗ ⌜(nlines (snd <$> (dl ++ ws)) <= S (length cs0))%nat⌝
+                  ∗ turn_lb v (length (lm_proc_before U ps0 cs0 s0
+                                 (snd <$> (dl ++ ws))))
+                  ∗ ⌜lm_rd_stage U ps0 cs0 s0 (snd <$> (dl ++ ws))⌝)
+           ∗ (⌜uread_wild (snd <$> (dl ++ ws)) ws⌝ -∗ usecc_tok ug k ∨ UT))%I.
 
   Lemma union_read_link (k : nat) (v : era_pins) (n : nat)
       (ws : list (list mobs * bv 8)) (Φ : iProp Σ) :
     UPIN k v -∗ dl_cnt v (1/2) n -∗ (uread_ret k v n ws -∗ Φ) -∗
     cons_link Uart0 k (ConsLog.EvRead ws) Φ.
   Proof using Hcons.
-    exact (vread_link pg U (ucparams ug) UB ∅ (uwa ug) Hcons' k v n ws Φ).
+    iIntros "#Hpin Hdlr HΦ" (o H) "#Hlb Hres _ %Hread".
+    rewrite !uchist_at0.
+    iMod (ucl_step_read ug k v n (default [] o) H ws Hread
+            with "Hpin Hdlr Hres") as "(Hres & Hret & Htok)".
+    iModIntro. iExists o. rewrite uchist_at0. iFrame "Hlb Hres".
+    iApply "HΦ". rewrite /uread_ret /rd_retV.
+    iDestruct "Hret" as "[Ht | (Hdlr & %Hdl & %Hpref & %Hidx & %Hbyte
+                               & %Hboots & Hilb & %Hdi & Hrest)]"; [by iLeft |].
+    iRight. iFrame "Hdlr".
+    iExists (LogEntryDefs.ch_log H), (LogEntryDefs.ch_dl H).
+    iSplitR; [by iPureIntro |]. iSplitR; [by iPureIntro |].
+    iSplitR; [by iPureIntro |]. iSplitR; [by iPureIntro |].
+    iSplitR; [by iPureIntro |]. iSplitR; [iPureIntro; exact Hboots |].
+    iSplitL "Hilb"; [iExact "Hilb" |].
+    iSplitR; [by iPureIntro |]. iFrame "Hrest".
+    iIntros "%Hw". iApply "Htok". iPureIntro. exact Hw.
   Qed.
 
   (* ---- the arm's close and its bytes, both free ---- *)
   Lemma union_close_link (k : nat) (Φ : iProp Σ) :
     Φ -∗ cons_link Uart0 k ConsLog.EvClose Φ.
-  Proof using Hcons. exact (vclose_link pg U (ucparams ug) ∅ (uwa ug) Hcons' k Φ). Qed.
+  Proof using Hcons.
+    iIntros "HΦ" (o H) "#Hlb Hres %Hok %Hev".
+    rewrite uchist_at0.
+    iDestruct (ucl_close ug k (default [] o) H Hok Hev with "Hres") as "Hres".
+    iModIntro. iExists o. rewrite uchist_at0. by iFrame "Hlb Hres HΦ".
+  Qed.
 
   Lemma union_byte_link (k : nat) (b : bv 8) (Φ : iProp Σ) :
     Φ -∗ cons_link Uart0 k (ConsLog.EvByte b) Φ.
   Proof using Hcons.
-    exact (vbyte_link pg U (ucparams ug) UB ∅ (uwa ug) Hcons' k b Φ).
+    iIntros "HΦ" (o H) "#Hlb Hres %Hok %Hev".
+    rewrite uchist_at0.
+    iMod (ucl_step_byte ug k (default [] o) H b Hok Hev with "Hres") as "Hres".
+    iModIntro. iExists o. rewrite uchist_at0. by iFrame "Hlb Hres HΦ".
   Qed.
 
   Lemma union_cons_run (k : nat) (cs : list (bv 8)) (Φ : iProp Σ) :
     Φ -∗ cons_run k cs Φ.
   Proof using Hcons.
-    exact (vcons_run pg U (ucparams ug) UB ∅ (uwa ug) Hcons' k cs Φ).
+    iIntros "HΦ". iInduction cs as [| b cs] "IH" forall (Φ); cbn [cons_run].
+    - by iApply union_close_link.
+    - iSplit.
+      + by iApply union_close_link.
+      + iApply union_byte_link. by iApply "IH".
   Qed.
 
   (* (F) THE FILING LINK OF AN N-WRITER ROUND, through the union's view *)
@@ -216,9 +312,20 @@ Section union_links.
       ∨ UT) -∗ Φ) -∗
     out_link Uart0 k b Φ.
   Proof using Hcons.
-    intros HlR Ha Hbl Hbv.
-    exact (vfile_link pg U (ucparams ug) UB ∅ (uwa ug) (uwa_ext ug) Hcons'
-             pview_unionU k v I sR lR pre b Φ HlR Ha Hbl Hbv).
+    intros HlR Ha Hbl Hbv. iIntros "Hpw HΦ" (o H) "#Hlb Hres".
+    rewrite !uchist_at0.
+    destruct (decide (pre = [])) as [-> | Hne].
+    - iMod (pwc_blkU_file_empty ug v I sR lR k (default [] o) H b HlR Hbv
+              with "Hpw Hres") as "(Hres & Hret)".
+      iModIntro. iExists o. rewrite uchist_at0. iFrame "Hlb Hres".
+      iApply "HΦ". iDestruct "Hret" as "[Hx | HT]"; [| by iRight].
+      iLeft. iDestruct "Hx" as (ps cs s0 P) "(%Hw & HW & Htn & Hps & Hcs & HE)".
+      iExists ps, cs, s0, P. cbn [length]. rewrite Nat.add_0_r.
+      iFrame "HW Htn Hps Hcs HE". by iPureIntro.
+    - iMod (pwc_blkU_file ug v I sR lR k (default [] o) H pre b HlR Ha Hbl Hne Hbv
+              with "Hpw Hres") as "(Hres & Hret)".
+      iModIntro. iExists o. rewrite uchist_at0. iFrame "Hlb Hres".
+      by iApply "HΦ".
   Qed.
 
   (* THE ECHO SHIFT -- [App.al_echo], a CLOSED entailment at the union's
@@ -235,12 +342,12 @@ Section union_links.
     { iApply (union_cons_link_of_taint with "HT [HΦ]").
       by iApply union_cons_run. }
     iIntros (o H) "#Hlb Hres %Hok %Hev".
-    rewrite (vchist_at0 pg U (ucparams ug) ∅ (uwa ug) Hcons').
+    rewrite uchist_at0.
     destruct (um_disc_open_seg U h Hsh Hdisc) as (s & _ & Hseg).
-    iDestruct (peclV_open pg U (ucparams ug) UB ∅ (uwa ug) (S gen_id) (default [] o) H
-                 h c cs Hok Hev (proj1 Hseg) Hk Hdisc Hsh with "Hres") as "Hres".
+    iDestruct (ucl_open ug (S gen_id) (default [] o) H h c cs Hok Hev (proj1 Hseg) Hk
+                 Hdisc Hsh with "Hres") as "Hres".
     iModIntro. iExists (Some h). cbn [obs_hist_lb_o from_option id].
-    rewrite (vchist_at0 pg U (ucparams ug) ∅ (uwa ug) Hcons').
+    rewrite uchist_at0.
     iFrame "Hlbh Hres".
     by iApply union_cons_run.
   Qed.

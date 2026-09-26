@@ -95,7 +95,7 @@ Section UShCatFStage.
   Context (WA : gen_wa LM CP sd).
   Hypothesis Hext : forall k l, gext WA k l = pext g k l.
   Local Notation T := (gcT CP).
-  Context (Hcons : @riscv_cons_res Σ (@riscv_fixedGS Σ HRg) = peclV g LM CP sd WA).
+  Context (Hcons : cons_claimV g LM PV CP sd WA).
   Context (Hkill : @app_taint Σ (@riscv_fixedGS Σ HRg) = T).
   Hypothesis Hsup : ⊢ □ (T -∗ app_sup).
   Context (v : era_pins) (I : list (bv 8)) (sR : lm_st LM) (lR : pline').

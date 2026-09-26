@@ -119,16 +119,33 @@ Section UnionApp.
            union_cons c k h H ==∗ union_cons c k h (ConsLog.cons_step H ev)).
   Proof using .
     rewrite /union_cons /union_kill. iIntros "#Ht !>" (k h H ev) "Ho".
-    iApply (peclV_sup (ugn_pipe c) U (ucparams c) ∅ (uwa c) k h H ev with "Ht Ho").
+    iApply (ucl_sup c k h H ev with "Ht Ho").
+  Qed.
+
+  (* THE WILD LICENCE (seccomp design 10.2): the era's wild token steps
+     its own era's claim by the two process events *)
+  Lemma union_wild_lic (c : union_gn) (k : nat) :
+    usecc_tok c k ⊢
+      □ (∀ (h : list mobs) (H : LogEntryDefs.cons_hist) (ev : ConsLog.cons_ev),
+           ⌜ConsLog.wild_ev ev⌝ -∗ ⌜ConsLog.cons_ev_ok H ev⌝ -∗
+           union_cons c k h H ==∗ union_cons c k h (ConsLog.cons_step H ev)).
+  Proof using .
+    rewrite /union_cons. iIntros "#Htok".
+    iDestruct (ucl_wild_lic c k with "Htok") as "#Hl".
+    iIntros "!>" (h H ev) "%Hw %Hev Ho".
+    iApply ("Hl" with "[%] [%] Ho"); [| exact Hev].
+    destruct ev; cbn [ConsLog.wild_ev] in Hw; try done;
+      [left; by eexists | right; by eexists].
   Qed.
 
   Definition union_ifc (c : union_gn) : app_iface Σ :=
     MkAppIface (union_tag c) (union_tag_persistent c) (union_tag_timeless c)
                (union_kill c) (union_kill_persistent c) (union_kill_timeless c)
                (union_cons c) (union_cons_timeless c) (union_cons_lic c)
-               (* the seccomp universe's era credential (S2); none yet *)
-               wild_none (@wild_none_persistent Σ) (@wild_none_timeless Σ)
-               (wild_none_lic (union_cons c)).
+               (* the seccomp universe's era credential: the era's wild
+                  token (seccomp design 10.1) *)
+               (usecc_tok c) (usecc_tok_persistent c) (usecc_tok_timeless c)
+               (union_wild_lic c).
 
   Definition union_turn (c : union_gn) : nat -> iProp Σ := fturn (ugn_file c).
 
@@ -173,7 +190,7 @@ Section UnionApp.
     iIntros "#Hs".
     iDestruct (file_taint_of_sup (fgn_cl (ugn_file c)) r with "Hs") as "#Ht".
     iIntros "!>" (k h H ev) "Ho".
-    iApply (peclV_sup (ugn_pipe c) U (ucparams c) ∅ (uwa c) k h H ev with "Ht Ho").
+    iApply (ucl_sup c k h H ev with "Ht Ho").
   Qed.
 
   Lemma union_al_R0 (c : app_fixed app_union) :

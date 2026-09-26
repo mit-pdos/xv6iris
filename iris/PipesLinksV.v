@@ -395,7 +395,7 @@ Section peclV_links.
                   with "Hpin Ht Hps Hcs HE Hbt [HΦ Hwb]").
         iIntros "[(Ht & Hps' & Hcs' & HE' & Hw) | #HT]"; iApply "HΦ"; [| by iRight].
         iLeft. iExists s0. iFrame "Ht Hps' Hcs' HE'". by iApply "Hwb".
-      - iIntros "!>" (k b Φ) "#HT HΦ".
+      - iIntros "!>" (k v b Φ) "_ #HT HΦ".
         iApply (vwrite_link_taint with "HT HΦ").
     Qed.
   End glinks_of_peclV.

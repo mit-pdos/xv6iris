@@ -120,14 +120,14 @@ Section union_read_inst_at.
     exact (rk_rd UI UR k n v ws Φ).
   Qed.
 
-  Local Lemma uria_rd_taint (k : nat) (ws : list (list mobs * bv 8))
+  Local Lemma uria_rd_taint (ws : list (list mobs * bv 8))
       (Φ : iProp Σ) :
     ⊢ lk_links UIs -∗ lk_T UIs -∗ (lk_T UIs -∗ Φ) -∗
-      cons_link Uart0 k (ConsLog.EvRead ws) Φ.
+      cons_link Uart0 (S gen_id) (ConsLog.EvRead ws) Φ.
   Proof using Htag uartGhostG0.
     change (lk_links UIs) with (lk_links UI).
     change (lk_T UIs) with (lk_T UI).
-    exact (rk_rd_taint UI UR k ws Φ).
+    exact (rk_rd_taint UI UR ws Φ).
   Qed.
 
   Local Lemma uria_arms (cn : cons_names) (v : era_pins) (I : list (bv 8))
@@ -184,13 +184,15 @@ Section union_read_leaf_at.
   Local Notation UIs := (union_link_inst_at ug s0).
   Local Notation UT := (file_taint (fgn_cl gf)).
 
+  (* the record's pin names the era: at the era's own number it is the
+     echo-side pin *)
   Lemma union_pin_refl_at (v : era_pins) :
     ⊢ era_pin (fgn_echo gf) (S gen_id) v -∗ lk_pin UIs (S gen_id) v.
-  Proof using . by iIntros "$". Qed.
+  Proof using . iIntros "$". by iPureIntro. Qed.
 
   Lemma union_ep_refl_at (v : era_pins) :
     ⊢ era_pin (fgn_echo gf) (S gen_id) v -∗ lk_epin UIs (S gen_id) v.
-  Proof using . by iIntros "$". Qed.
+  Proof using . iIntros "$". by iPureIntro. Qed.
 
   Lemma union_read_leaf_holds_at (Wb : list (bv 8) -> iProp Σ)
       (N : uk_names Σ) (γp : gname) (l : list fdstate) :
@@ -198,7 +200,7 @@ Section union_read_leaf_at.
       = ucons_pay fsc_cons γp (lk_T UIs)
           (UShLine.ush_rd_x_at (lk_rres UIs) (fgn_echo gf) Wb) ->
     (⊢ app_sup -∗ lk_T UIs) ->
-    (⊢ lk_T UIs -∗ app_sup) ->
+    (⊢ lk_T UIs -∗ app_rdcred) ->
     (⊢ riscv_wild (S gen_id) -∗ lk_T UIs) ->
     (⊢ lk_links UIs) ->
     ⊢ UkSh.ush_read_recv_leaf_at (PS := uprogSG_free) N γp (lk_T UIs)

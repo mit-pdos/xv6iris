@@ -654,7 +654,7 @@ Section UkFileIface.
   #[local] Existing Instance LINKS_pers.
   Context (LINKS_w : LINKS -∗ gl_w M Pm).
   Context (LINKS_blk : LINKS -∗ gl_blk M Pm).
-  Context (LINKS_taint : LINKS -∗ gl_taint M Pm).
+  Context (LINKS_taint : LINKS -∗ gl_taint_at M Pm (S gen_id)).
   Local Notation fcons_atc := (cons_dev_atc M Pm LINKS).
 
   (* the console at its round, remembering its codes *)

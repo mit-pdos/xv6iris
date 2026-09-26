@@ -68,6 +68,8 @@ Require Import PipeOutNEv.
 Require Import PipesOut.
 Require Import PipesLedPure.
 Require Import PipesLinksV.
+Require Import GenOutWild.
+Require Import PipeOutW.
 Require Import UnionDisc.
 Require Import UnionDiscDec.
 Require Import UnionDecU.          (* [lm_disc_ulmG_dec]: the ledger's counter *)
@@ -91,6 +93,28 @@ Definition ugn_pipe (ug : union_gn) : pipe_gn :=
 
 Local Notation U := ulmG.
 Local Notation UB := (ulm_byte_laws adm_u_g adm_s_off).
+
+(* THE UNION'S WILD LINES: the [seccomp x] line (seccomp design 10) --
+   any nonempty tail is its terminal alternative's continuation at every
+   state, and its merge set is everything *)
+Definition uwild (l : uline) : bool :=
+  match l with LSecc _ => true | _ => false end.
+
+Lemma uwild_wild (l : uline) : uwild l = true -> lm_wild U l.
+Proof using.
+  destruct l as [ws | ws N | N | p fs | ws]; try discriminate. intros _. split.
+  - intros s u Hu. exists (ualt_code (US u)).
+    cbn [ulmG ulm lm_ok lm_term lm_cont lm_dec]. rewrite ualt_dec_code.
+    split_and!; [exact Hu | reflexivity | reflexivity].
+  - intros u. cbn [ulmG ulm lm_merge umerge]. exact I.
+Qed.
+
+(* a pipeline line is not wild *)
+Lemma uwild_pv (l : uline) (lR : pline') :
+  pv_line pview_unionU l = Some lR -> uwild l = false.
+Proof using.
+  intros Hl. destruct (uv_line_some l lR Hl) as (p & fs & -> & _). reflexivity.
+Qed.
 
 Section union_out.
   Context {Σ : gFunctors}.
@@ -127,12 +151,22 @@ Section union_out.
       : iProp Σ :=
     popenV pg U UPIN (f0wa gf) ∅ k ho H.
 
-  (* THE CLAIM *)
+  (* THE CLAIM: three arms (seccomp design 10.3) -- the taint, the
+     disciplined claim under the era's wild flag at 0, and the WILD arm *)
   Definition ucl : nat -> list mobs -> LogEntryDefs.cons_hist -> iProp Σ :=
-    peclV pg U ucparams ∅ uwa.
+    pwclV pg U ucparams ∅ uwa uwild.
+
+  (* THE ERA'S WILD TOKEN (seccomp design 10.1) *)
+  Definition usecc_tok (k : nat) : iProp Σ := secc_tok U ucparams k.
+
+  Global Instance usecc_tok_persistent k : Persistent (usecc_tok k).
+  Proof using . rewrite /usecc_tok. apply _. Qed.
+  Global Instance usecc_tok_timeless k : Timeless (usecc_tok k).
+  Proof using . rewrite /usecc_tok. apply _. Qed.
 
   Lemma ucl_unfold (k : nat) (ho : list mobs) (H : LogEntryDefs.cons_hist) :
-    ucl k ho H ⊣⊢ gcl U ucparams ∅ uwa k ho H ∨ popenU k ho H.
+    ucl k ho H ⊣⊢ UT ∨ (∃ v, UPIN k v ∗ secc_flag v 0 ∗ peclV pg U ucparams ∅ uwa k ho H)
+                  ∨ wildV U ucparams ∅ uwa uwild k ho H.
   Proof using . done. Qed.
 
   Global Instance ucl_timeless k ho H : Timeless (ucl k ho H).
@@ -140,7 +174,22 @@ Section union_out.
 
   Lemma ucl_taint (k : nat) (ho : list mobs) (H : LogEntryDefs.cons_hist) :
     UT -∗ ucl k ho H.
-  Proof using . iIntros "#HT". iApply (peclV_taint pg U ucparams ∅ uwa k ho H with "HT"). Qed.
+  Proof using . iIntros "#HT". iApply (pwclV_taint pg U ucparams ∅ uwa uwild k ho H with "HT"). Qed.
+
+  (* THE LICENCES: the taint moves the claim by any event, the wild token
+     by any process event *)
+  Lemma ucl_sup (k : nat) (ho : list mobs) (H : LogEntryDefs.cons_hist)
+      (ev : ConsLog.cons_ev) :
+    UT -∗ ucl k ho H ==∗ ucl k ho (ConsLog.cons_step H ev).
+  Proof using . iIntros "#HT Hc". iApply (pwclV_sup pg U ucparams ∅ uwa uwild k ho H ev with "HT Hc"). Qed.
+
+  Lemma ucl_wild_lic (k : nat) :
+    usecc_tok k -∗
+    □ ∀ (h : list mobs) (H : LogEntryDefs.cons_hist) (ev : ConsLog.cons_ev),
+        ⌜(exists b, ev = ConsLog.EvOut b) \/ (exists ws, ev = ConsLog.EvRead ws)⌝ -∗
+        ⌜ConsLog.cons_ev_ok H ev⌝ -∗
+        ucl k h H ==∗ ucl k h (ConsLog.cons_step H ev).
+  Proof using . exact (pwclV_wild_lic pg U ucparams UB ∅ uwa uwild k). Qed.
 
   (* =================================================================== *)
   (*  2.  THE FILE LINES' EVENTS: the generic claim's, the open round     *)
@@ -160,8 +209,8 @@ Section union_out.
       ∗ ((turn v 1 ∗ ps_lb v [a] ∗ cs_lb v [] ∗ inp_lb v [] ∗ f0cw gf k s0) ∨ UT).
   Proof using .
     intros Hok Halt Hhead. iIntros "Hpin Ht Hps Hcs HE Hbt Hcl".
-    iApply (peclV_step_write_first pg U ucparams ∅ uwa k v a b s0 ho H Hok Halt Hhead
-              with "Hpin Ht Hps Hcs HE Hbt Hcl").
+    iApply (pwclV_step_write_first pg U ucparams ∅ uwa uwild uwild_wild
+              k v a b s0 ho H Hok Halt Hhead with "Hpin Ht Hps Hcs HE Hbt Hcl").
   Qed.
 
   (* (W) A BYTE INSIDE A BLOCK OR A PROLOGUE ROUND *)
@@ -177,11 +226,14 @@ Section union_out.
       ∗ ((turn v (S P) ∗ ps_lb v ps0 ∗ cs_lb v cs0 ∗ inp_lb v I0 ∗ f0cw gf k s0) ∨ UT).
   Proof using .
     intros Hn Hpin0 Hb. iIntros "Hpin Ht Hps Hcs HE HW Hcl".
-    iApply (peclV_step_write pg U ucparams ∅ uwa k v P b ps0 cs0 s0 I0 ho H Hn Hpin0 Hb
-              with "Hpin Ht Hps Hcs HE HW Hcl").
+    iApply (pwclV_step_write pg U ucparams ∅ uwa uwild uwild_wild
+              k v P b ps0 cs0 s0 I0 ho H Hn Hpin0 Hb with "Hpin Ht Hps Hcs HE HW Hcl").
   Qed.
 
-  (* (B) A BLOCK'S FIRST BYTE, filing the round's alternative *)
+  (* (B) A BLOCK'S FIRST BYTE, filing the round's alternative -- or, AT
+     THE WILD LINE, the ESCAPE to the era's wild token (the model admits
+     the shell's own non-terminal alternatives at a [seccomp x] line, and
+     the claim has frozen the choice list: seccomp design 10.7) *)
   Lemma ucl_step_write_blk (k : nat) (v : era_pins) (P a : nat) (b : bv 8)
       (ps0 cs0 : list nat) (s0 : fstate) (I0 : list (bv 8)) (ho : list mobs)
       (H : LogEntryDefs.cons_hist) :
@@ -198,12 +250,14 @@ Section union_out.
     UPIN k v -∗ turn v P -∗ ps_lb v ps0 -∗ cs_lb v cs0 -∗ inp_lb v I0 -∗ f0cw gf k s0 -∗
     ucl k ho H ==∗
       ucl k ho (ConsLog.cons_step H (ConsLog.EvOut b))
-      ∗ ((turn v (S P) ∗ ps_lb v ps0 ∗ cs_lb v (cs0 ++ [a]) ∗ inp_lb v I0
-          ∗ f0cw gf k s0) ∨ UT).
+      ∗ (((turn v (S P) ∗ ps_lb v ps0 ∗ cs_lb v (cs0 ++ [a]) ∗ inp_lb v I0
+           ∗ f0cw gf k s0) ∨ UT)
+         ∨ (usecc_tok k ∗ cs_frozen_at v (nlines I0 - 1)%nat ∗ inp_lb v I0)).
   Proof using .
     intros Hne0 Hr0 Hdiv Hpin0 HPeq Hok Hterm Hhead.
     iIntros "Hpin Ht Hps Hcs HE HW Hcl".
-    iApply (peclV_step_write_blk pg U ucparams UB ∅ uwa k v P a b ps0 cs0 s0 I0 ho H
+    iApply (pwclV_step_write_blk pg U ucparams UB ∅ uwa uwild uwild_wild
+              k v P a b ps0 cs0 s0 I0 ho H
               Hne0 Hr0 Hdiv Hpin0 HPeq Hok Hterm Hhead
               with "Hpin Ht Hps Hcs HE HW Hcl").
   Qed.
@@ -229,7 +283,8 @@ Section union_out.
   Proof using .
     intros Hr0 Hopen Hdiv Hpin0 Hnd HPeq Halt Hhead.
     iIntros "Hpin Ht Hps Hcs HE HW Hcl".
-    iApply (peclV_step_write_pro pg U ucparams ∅ uwa k v P a b ps0 cs0 s0 I0 ho CH
+    iApply (pwclV_step_write_pro pg U ucparams ∅ uwa uwild uwild_wild
+              k v P a b ps0 cs0 s0 I0 ho CH
               (or_intror (or_introl I)) Hr0 Hopen Hdiv Hpin0 Hnd HPeq Halt Hhead
               with "Hpin Ht Hps Hcs HE HW Hcl").
   Qed.
@@ -255,12 +310,54 @@ Section union_out.
     ucl k ho CH -∗ ucl k ho CH ∗ udrain_ret k seg.
   Proof using .
     intros Hsh Hk Hpre Hins Hwire Hne. iIntros "Hcl".
-    iDestruct (peclV_drain pg U ucparams UB ∅ uwa k h ho CH seg
+    iDestruct (pwclV_drain pg U ucparams UB ∅ uwa uwild uwild_wild k h ho CH seg
                  Hsh Hk Hpre Hins Hwire Hne with "Hcl") as "[$ Hd]".
     rewrite /udrain_ret /gdrain_ret.
     iDestruct "Hd" as "[#HT | (%s0 & %Hgo & %Hok & #Hty & #Hw)]"; [by iLeft |].
     iRight. iDestruct "Hw" as (vf) "[#Hfp #Hlb]".
     iExists s0, vf. iFrame "Hty Hfp Hlb". by iPureIntro.
+  Qed.
+
+  (* THE READ: the generic receipt, and at a read that completes a wild
+     line the era's wild token (the transition, seccomp design 10.4) *)
+  Lemma ucl_step_read (k : nat) (v : era_pins) (n : nat) (ho : list mobs)
+      (CH : LogEntryDefs.cons_hist) (ws : list (list mobs * bv 8)) :
+    read_ok (LogEntryDefs.ch_log CH) (LogEntryDefs.ch_dl CH) ws ->
+    UPIN k v -∗ dl_cnt v (1/2) n -∗ ucl k ho CH ==∗
+      ucl k ho (ConsLog.cons_step CH (ConsLog.EvRead ws))
+      ∗ rd_retW U ucparams uwild k v n CH ws.
+  Proof using .
+    intros Hread. iIntros "Hpin Hdl Hcl".
+    iApply (pwclV_step_read pg U ucparams UB ∅ uwa uwild uwild_wild k v n ho CH ws Hread
+              with "Hpin Hdl Hcl").
+  Qed.
+
+  (* THE KERNEL'S OWN EVENTS *)
+  Lemma ucl_close (k : nat) (ho : list mobs) (H : LogEntryDefs.cons_hist) :
+    ConsLog.cons_hist_ok H ->
+    ConsLog.cons_ev_ok H ConsLog.EvClose ->
+    ucl k ho H -∗ ucl k ho (ConsLog.cons_step H ConsLog.EvClose).
+  Proof using . intros Hok Hev. exact (pwclV_close pg U ucparams ∅ uwa uwild k ho H Hok Hev). Qed.
+
+  Lemma ucl_step_byte (k : nat) (ho : list mobs) (CH : LogEntryDefs.cons_hist) (b : bv 8) :
+    ConsLog.cons_hist_ok CH ->
+    ConsLog.cons_ev_ok CH (ConsLog.EvByte b) ->
+    ucl k ho CH ==∗ ucl k ho (ConsLog.cons_step CH (ConsLog.EvByte b)).
+  Proof using .
+    intros Hok Hev. exact (pwclV_step_byte pg U ucparams UB ∅ uwa uwild k ho CH b Hok Hev).
+  Qed.
+
+  Lemma ucl_open (k : nat) (ho : list mobs) (H : LogEntryDefs.cons_hist)
+      (h : list mobs) (c : bv 8) (cs : list (bv 8)) :
+    ConsLog.cons_hist_ok H ->
+    ConsLog.cons_ev_ok H (ConsLog.EvOpen h c cs) ->
+    lm_disc_input U (ins (open_seg h)) -> obs_boots h = k ->
+    lm_disc U h -> trace_shape h true ->
+    ucl k ho H -∗ ucl k h (ConsLog.cons_step H (ConsLog.EvOpen h c cs)).
+  Proof using .
+    intros Hok Hev Hd Hb Hdh Hsh.
+    exact (pwclV_open pg U ucparams UB ∅ uwa uwild uwild_wild k ho H h c cs
+             Hok Hev Hd Hb Hdh Hsh).
   Qed.
 
   (* =================================================================== *)
@@ -310,10 +407,16 @@ Section union_out.
               with "Hpin HW Ht Hps Hcs HE").
   Qed.
 
-  (* THE CLAIM PAYS THE FAMILY'S ONE OBLIGATION, at the round's state *)
+  (* THE CLAIM PAYS THE FAMILY'S ONE OBLIGATION, at the round's state, at
+     a line that is NOT WILD (a terminal family byte at the [seccomp x]
+     line would be admissible there; the family's lines are pipelines) *)
   Theorem pblkU_ecl_holds (v : era_pins) (I : list (bv 8)) (sR : fstate) :
+    uwild (lineV U I) = false ->
     ⊢ eclN ucl (pwc_blkU v I sR) (ptkU v I) (pwitU I sR).
-  Proof using . exact (pblkV_ecl_holds pg U ucparams ∅ uwa uwa_ext v I sR). Qed.
+  Proof using .
+    intros Hnw. exact (pwclV_ecl_holds pg U ucparams ∅ uwa uwa_ext uwild uwild_wild
+                         v I sR Hnw).
+  Qed.
 
   (* THE MODEL'S BLOCKS ARE THE CLAIM'S NON-TERMINAL WITNESS, through the
      union's view, at a well-formed round state *)
@@ -343,7 +446,7 @@ Section union_out.
             ∗ ps_lb v ps ∗ cs_lb v (cs ++ [pv_enc pview_unionU lR (PLRun pre)]) ∗ inp_lb v I) ∨ UT).
   Proof using .
     intros HlR Ha Hbl Hne Hbv. iIntros "Hpw Hcl".
-    iApply (pwc_blkV_file pg U ucparams UB ∅ uwa uwa_ext pview_unionU v I sR lR
+    iApply (pwclV_blk_file pg U ucparams UB ∅ uwa uwa_ext uwild pview_unionU v I sR lR
               k ho H pre b HlR Ha Hbl Hne Hbv with "Hpw Hcl").
   Qed.
 
@@ -361,8 +464,8 @@ Section union_out.
             ∗ ps_lb v ps ∗ cs_lb v (cs ++ [pv_enc pview_unionU lR (PLRun [])]) ∗ inp_lb v I) ∨ UT).
   Proof using .
     intros HlR Hbv. iIntros "Hpw Hcl".
-    iApply (pwc_blkV_file_empty pg U ucparams UB ∅ uwa pview_unionU v I sR lR
-              k ho H b HlR Hbv with "Hpw Hcl").
+    iApply (pwclV_blk_file_empty pg U ucparams UB ∅ uwa uwild uwild_wild pview_unionU
+              v I sR lR k ho H b uwild_pv HlR Hbv with "Hpw Hcl").
   Qed.
 
   (* =================================================================== *)
@@ -392,7 +495,7 @@ Section union_out.
     blk_auth w [] -∗ rblk_auth gb [] -∗ cur_half w 1 0%nat gb false -∗
       ucl k [] (LogEntryDefs.MkCH [] [] [] None) ∗ fturn gf k.
   Proof using .
-    iIntros "#Hpin #Hfp #Hpera (Ht & Hcs & Hps & HE & Hdl & Hdll & _) Hf0 Hfla Hblk Hrb Hcur1".
+    iIntros "#Hpin #Hfp #Hpera (Ht & Hcs & Hps & HE & Hdl & Hdll & Hsc) Hf0 Hfla Hblk Hrb Hcur1".
     iEval (rewrite -Qp.half_half) in "Ht".
     iDestruct "Ht" as "[Ht1 Ht2]".
     iEval (rewrite -Qp.half_half) in "Hdl".
@@ -400,8 +503,9 @@ Section union_out.
     iDestruct (cs_lb_get with "Hcs") as "[Hcs #Hcslb]".
     iDestruct (ps_lb_get with "Hps") as "[Hps #Hpslb]".
     iDestruct (dl_list_lb_get with "Hdll") as "[Hdll #Hdllb]".
-    iSplitL "Ht1 Hcs Hps HE Hdl1 Hdll Hfla Hblk Hrb Hcur1".
-    { rewrite /ucl /peclV /gcl. iLeft. iRight. iExists v, (gstage0 U).
+    iSplitL "Ht1 Hcs Hps HE Hdl1 Hdll Hfla Hblk Hrb Hcur1 Hsc".
+    { rewrite /ucl. iApply (pwclV_mid pg U ucparams ∅ uwa uwild k [] (LogEntryDefs.MkCH [] [] [] None) v with "Hpin Hsc").
+      rewrite /peclV /gcl. iLeft. iRight. iExists v, (gstage0 U).
       cbn [gs_ps gs_cs gs_E gs_w gs_st gstage0 LogEntryDefs.ch_dl length].
       iSplitR; [iExact "Hpin" |].
       iSplitL "Hfla".

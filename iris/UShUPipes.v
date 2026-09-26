@@ -218,6 +218,15 @@ Section UShUPipes.
   Context (Hcons : @riscv_cons_res Σ (@riscv_fixedGS Σ _) = ucl ug).
   Context (Hkill : @app_taint Σ (@riscv_fixedGS Σ _) = file_taint (fgn_cl gf)).
 
+  (* THE CLAIM A PIPELINE ROUND WRITES THROUGH: the union's, which pays the
+     N-writer family's obligation at every pipeline line (a pipeline line
+     is not the wild one) *)
+  Lemma ucons_claim : cons_claimV (ugn_pipe ug) ulmG pview_unionU (ucparams ug) ∅ (uwa ug).
+  Proof using Hcons.
+    exists (ucl ug). split; [exact Hcons |].
+    intros v I sR lR HlR. exact (pblkU_ecl_holds ug v I sR (uwild_pv _ _ HlR)).
+  Qed.
+
   (* THE NODES' NAMES: a pipe and two one-shot names per node *)
   Lemma pls_nodes_alloc (n : nat) :
     ⊢ |==> ∃ (P : nat -> pnames) (gF gG : nat -> gname),
@@ -565,13 +574,13 @@ Section UShUPipes.
     iEval (rewrite E2) in "Hrun".
     (* THE PRODUCER'S LAW: echo's, the loan [True] *)
     iPoseProof (plaw_echo (ghost_varG0 := offbox_offG) pg U pview_unionU CPU ∅ WAU
-                  (uwa_ext ug) Hcons Hkill usup v I (dst_content s) (LPipes (PrEcho ws) (F :: fs'))
+                  (uwa_ext ug) ucons_claim Hkill usup v I (dst_content s) (LPipes (PrEcho ws) (F :: fs'))
                   HlR Hfc Hadmit Hplok (wl_line (drop 1 ws))
                   (UkPipesEntries.pe_line_len ws Hok) (PrEcho ws) True%I γc γm P gF gG
                   (F :: fs') eq_refl eq_refl sa (GS ws (F :: fs') len gb) ws eq_refl Hok Hbytes
                   with "Hfam Hes") as "#Hpl".
     iApply (wp_pipes_round_alloc (ghost_varG0 := offbox_offG) pg U pview_unionU CPU ∅ WAU
-              (uwa_ext ug) Hcons Hkill usup v I (dst_content s) (LPipes (PrEcho ws) (F :: fs'))
+              (uwa_ext ug) ucons_claim Hkill usup v I (dst_content s) (LPipes (PrEcho ws) (F :: fs'))
               HlR Hfc Hadmit Hplok (wl_line (drop 1 ws))
               (UkPipesEntries.pe_line_len ws Hok) (PrEcho ws) True%I γc γm P gF gG
               (UkShFork.ushf_wq Wcu I)
@@ -711,7 +720,7 @@ Section UShUPipes.
     iEval (rewrite E2) in "Hrun".
     (* THE PRODUCER'S LAW: [cat f]'s, at the deed *)
     iPoseProof (stage_catf_law_holds (ghost_varG0 := offbox_offG) (fgn_cl gf) r Heq pg U
-                  pview_unionU CPU ∅ WAU (uwa_ext ug) Hcons Hkill usup v I (dst_content s)
+                  pview_unionU CPU ∅ WAU (uwa_ext ug) ucons_claim Hkill usup v I (dst_content s)
                   (LPipes (PrCatF nm) (F :: fs')) HlR Hfc Hadmit Hplok
                   (prod_content (pv_fc pview_unionU (dst_content s)) (PrCatF nm)) HL31
                   (PrCatF nm) γc γm P gF gG
@@ -726,7 +735,7 @@ Section UShUPipes.
     { iIntros "!> H". rewrite Hkill. iExact "H". }
     { iIntros "!> H". rewrite Hkill. iExact "H". }
     iApply (wp_pipes_round_alloc (ghost_varG0 := offbox_offG) pg U pview_unionU CPU ∅ WAU
-              (uwa_ext ug) Hcons Hkill usup v I (dst_content s) (LPipes (PrCatF nm) (F :: fs'))
+              (uwa_ext ug) ucons_claim Hkill usup v I (dst_content s) (LPipes (PrCatF nm) (F :: fs'))
               HlR Hfc Hadmit Hplok
               (prod_content (pv_fc pview_unionU (dst_content s)) (PrCatF nm)) HL31
               (PrCatF nm) (fdq r (1/2)%Qp s) γc γm P gF gG

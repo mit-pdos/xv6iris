@@ -89,8 +89,15 @@ Section gen_links_gl.
                   with "Hpin Ht Hps Hcs HE Hbt [HΦ Hwb]").
         iIntros "[(Ht & Hps' & Hcs' & HE' & Hw) | #HT]"; iApply "HΦ"; [| by iRight].
         iLeft. iExists s0. iFrame "Ht Hps' Hcs' HE'". by iApply "Hwb".
-      - iIntros "!>" (k b Φ) "#HT HΦ".
+      - iIntros "!>" (k v b Φ) "_ #HT HΦ".
         iApply (gwrite_link_taint M G sd A Hcons with "HT HΦ").
+    Qed.
+
+    (* the taint's byte at a named era ([GenLinksLine.gl_taint_at]) *)
+    Lemma gcl_gl_taint_at (k : nat) : ⊢ gl_taint_at M P k.
+    Proof using HPT Hcons.
+      rewrite /gl_taint_at HPT. iIntros "!>" (b Φ) "#HT HΦ".
+      iApply (gwrite_link_taint M G sd A Hcons with "HT HΦ").
     Qed.
   End glinks_of_gcl.
 End gen_links_gl.

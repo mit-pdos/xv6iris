@@ -1258,6 +1258,35 @@ Qed.
 (*  STATE [sR]'s content, the claim is [peclV], the credential           *)
 (*  [pwc_blkV] at [sR].  Section 4b is this at the pipeline application. *)
 (* ===================================================================== *)
+(* THE CONSOLE CLAIM A PIPELINE ROUND WRITES THROUGH: the record's claim
+   is SOME claim that pays the N-writer family's one obligation at every
+   pipeline line of the view -- [peclV] itself ([cons_claimV_peclV]), or
+   the union's three-arm claim, which pays it only at lines that are not
+   wild (seccomp design 10.7) *)
+Section pipes_claim_v.
+  Context {Σ : gFunctors}.
+  Context `{!echoOutG Σ, !pipeOutG Σ}.
+  Context `{HRg : !riscvGS Σ}.
+  Definition cons_claimV (g : pipe_gn) (M : lmodel) (V : pview M) (G : gen_cparams M)
+      (sd : lm_st M) (WA : gen_wa M G sd) : Prop :=
+    exists CL : nat -> list mobs -> LogEntryDefs.cons_hist -> iProp Σ,
+      @riscv_cons_res Σ (@riscv_fixedGS Σ HRg) = CL
+      /\ forall (v : era_pins) (I : list (bv 8)) (sR : lm_st M) (lR : pline'),
+           pv_line V (lineV M I) = Some lR ->
+           ⊢ eclN CL (pwc_blkV g M (gcPIN G) (gcW G) (gcT G) v I sR)
+               (ptkV (gcT G) v I) (pwitV M I sR).
+
+  Lemma cons_claimV_peclV (g : pipe_gn) (M : lmodel) (V : pview M) (G : gen_cparams M)
+      (sd : lm_st M) (WA : gen_wa M G sd) :
+    (forall k l, gext WA k l = pext g k l) ->
+    @riscv_cons_res Σ (@riscv_fixedGS Σ HRg) = peclV g M G sd WA ->
+    cons_claimV g M V G sd WA.
+  Proof using .
+    intros Hext Hc. exists (peclV g M G sd WA). split; [exact Hc |].
+    intros v I sR lR _. exact (pblkV_ecl_holds g M G sd WA Hext v I sR).
+  Qed.
+End pipes_claim_v.
+
 Section pipes_family_v.
   Context {Σ : gFunctors}.
   Context `{!echoOutG Σ, !pipeOutG Σ}.
@@ -1267,7 +1296,7 @@ Section pipes_family_v.
   Context (g : pipe_gn) (M : lmodel) (V : pview M) (G : gen_cparams M) (sd : lm_st M).
   Context (WA : gen_wa M G sd).
   Hypothesis Hext : forall k l, gext WA k l = pext g k l.
-  Context (Hcons : @riscv_cons_res Σ (@riscv_fixedGS Σ HRg) = peclV g M G sd WA).
+  Context (Hcons : cons_claimV g M V G sd WA).
   (* THE ROUND: its pins, its input, its STATE [sR] (the writer's boot
      state read to the round's line), and the pipeline [lR] its line is *)
   Context (v : era_pins) (I : list (bv 8)) (sR : lm_st M) (lR : pline').
@@ -1321,12 +1350,13 @@ Section pipes_family_v.
     out_link Uart0 k b Φ.
   Proof using Hcons Hext HlR Hfc Ha Hl.
     intros Hns Hw Hc Hb Hok. iIntros "#Hinv HcW HmW HΦ".
-    iApply (blkN_cstep wsN (wids_NoDup _) (peclV g M G sd WA) Hcons RUNN PWN
+    destruct Hcons as (CL & HcCL & Hecl).
+    iApply (blkN_cstep wsN (wids_NoDup _) CL HcCL RUNN PWN
               PWN_tl TKN TKN_pers WITN
               HWITV TERM TOK dep dep_tl
               N k γc γm w s c b Φ Hns Hw Hc Hb Hok
               with "[] Hinv HcW HmW HΦ").
-    iApply (pblkV_ecl_holds g M G sd WA Hext v I sR).
+    iApply (Hecl v I sR lR HlR).
   Qed.
 
   (* A WRITER'S FIRST BYTE, spending the exclusions *)
@@ -1348,12 +1378,13 @@ Section pipes_family_v.
     out_link Uart0 k b Φ.
   Proof using Hcons Hext HlR Hfc Ha Hl.
     intros Hns HEx Hw Hb Hok. iIntros "#Hex #Hinv HcW HmW Hdep HΦ".
-    iApply (blkN_fire wsN (wids_NoDup _) (peclV g M G sd WA) Hcons RUNN PWN
+    destruct Hcons as (CL & HcCL & Hecl).
+    iApply (blkN_fire wsN (wids_NoDup _) CL HcCL RUNN PWN
               PWN_tl TKN TKN_pers WITN
               HWITV TERM TOK dep dep_tl
               N Eex k γc γm w s b EXCL Φ Hns HEx Hw Hb Hok
               with "Hex [] Hinv HcW HmW Hdep HΦ").
-    iApply (pblkV_ecl_holds g M G sd WA Hext v I sR).
+    iApply (Hecl v I sR lR HlR).
   Qed.
 
   (* AT THE PROMPT, WITH EVERY HALF BACK: the block is one of the line's,

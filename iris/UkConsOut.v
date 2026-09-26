@@ -123,6 +123,7 @@ Require Import GenOut.
 Require Import GenLinksLine.       (* [gen_params], [gl_w]/[gl_blk]/[gl_taint] *)
 (* the file application's links, for S4's witnesses *)
 Require Import FileDisc FileOutPure AppFile FileOut FileLinks FileLinkGen.
+Require Import GenLinksGl.         (* [gcl_gl_taint_at]: the file taint's byte at the era *)
 Require Import CtxIdDefs.
 Require Import UCodeEcho UCodeCat.
 Require User.EchoSyms User.CatSyms.
@@ -563,7 +564,7 @@ Section UkConsOutGen.
   #[local] Existing Instance LINKS_pers.
   Context (LINKS_w : LINKS -∗ gl_w M Pm).
   Context (LINKS_blk : LINKS -∗ gl_blk M Pm).
-  Context (LINKS_taint : LINKS -∗ gl_taint M Pm).
+  Context (LINKS_taint : LINKS -∗ gl_taint_at M Pm (S gen_id)).
 
   Local Notation T := (gT Pm).
   Local Notation PIN := (gPIN Pm).
@@ -763,7 +764,7 @@ Section UkConsOutGen.
       eapply Z.le_lt_trans; [| exact Hs].
       apply Nat2Z.inj_le. rewrite length_drop. lia. }
     iDestruct "Hd" as "[Hd | #HT]"; last first.
-    { iApply ("Htaint" $! ke b with "HT").
+    { iApply ("Htaint" $! b with "HT").
       iIntros "#HT'". iApply (cons_dev_atc_taint C v I _ Hs' with "Hlk HT'"). }
     iDestruct "Hd" as (ps cs s0 pos) "(%Hw & #Hpin & Hd)".
     pose proof Hw as [Hwb Htl].
@@ -1069,10 +1070,11 @@ Section UkConsOutInst.
   Proof using .
     iIntros "Hlk". iDestruct (file_links_gl g with "Hlk") as "(_ & H & _)". iExact "H".
   Qed.
-  Lemma file_links_gl_taint : file_links g -∗ gl_taint file_lm (file_params g).
+  Lemma file_links_gl_taint : file_links g -∗ gl_taint_at file_lm (file_params g) (S gen_id).
   Proof using .
-    iIntros "Hlk". iDestruct (file_links_gl g with "Hlk") as "(_ & _ & _ & _ & H)".
-    iExact "H".
+    iIntros "%Hc".
+    iApply (gcl_gl_taint_at file_lm (file_cparams g) ∅ (file_wa g) Hc
+              (file_params g) eq_refl (S gen_id)).
   Qed.
 
   Local Notation fcons_dev := (cons_dev file_lm (file_params g) (file_links g)).

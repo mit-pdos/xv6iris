@@ -129,11 +129,12 @@ Section readrec.
         cons_link Uart0 k (ConsLog.EvRead ws) Φ;
 
     (* ...and its TAINT route: on a tainted turn the reader holds no half
-       of the delivered count and the link is free *)
-    rk_rd_taint : forall (k : nat) (ws : list (list mobs * bv 8))
-                         (Φ : iProp Σ),
+       of the delivered count and the link is free.  AT THE ERA'S OWN
+       NUMBER: the taint may license one era only (the union's wild token,
+       seccomp design 10.7), and a tainted lease holds no pin to name it *)
+    rk_rd_taint : forall (ws : list (list mobs * bv 8)) (Φ : iProp Σ),
       ⊢ lk_links L -∗ lk_T L -∗ (lk_T L -∗ Φ) -∗
-        cons_link Uart0 k (ConsLog.EvRead ws) Φ;
+        cons_link Uart0 (S gen_id) (ConsLog.EvRead ws) Φ;
 
     (* THE WINDOW ARM, at exactly what [UShLine.ush_read_recv_era]
        consumes: the call moved the era's input on by the [dc] bytes [J],
@@ -200,14 +201,14 @@ Section echo_read_inst.
     iApply ("Hrdl" $! k v n ws with "Hpin Hdl HΦ").
   Qed.
 
-  Local Lemma eri_rd_taint (k : nat) (ws : list (list mobs * bv 8))
+  Local Lemma eri_rd_taint (ws : list (list mobs * bv 8))
       (Φ : iProp Σ) :
     ⊢ EchoLinks.echo_links T γ -∗ T -∗ (T -∗ Φ) -∗
-      cons_link Uart0 k (ConsLog.EvRead ws) Φ.
+      cons_link Uart0 (S gen_id) (ConsLog.EvRead ws) Φ.
   Proof using .
     iIntros "#Hlk HT HΦ".
     iDestruct (EchoLinks.echo_links_rd_taint with "Hlk") as "#Hrdt".
-    iApply ("Hrdt" $! k ws with "HT HΦ").
+    iApply ("Hrdt" $! (S gen_id) ws with "HT HΦ").
   Qed.
 
   (* [UShLine.ush_read_recv_era]'s own era block, as a law.  The input at
