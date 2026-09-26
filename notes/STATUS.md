@@ -7,6 +7,7 @@ at the concrete functor list xv6GF and the literal mkfs fs.img (Himg discharged 
 language constant (D47). Axioms: 6 Sail externs + propext/Classical.choice/Quot.sound + 416 bv_decide certs
 (notes/adequacy_axioms_baseline.md). Every kernel function proved and linked. Crash durability (D23) included.
 
+USER RULING 2026-09-26: apply build parallelism NOW (quiet tree); THEN bump the kernel to xv6 7b2c1b1b (seccomp: new sys_seccomp, per-proc syscall mask; Rocq main's XV6_REV); prove USER and union adequacy IN PARALLEL (surveys -> notes/briefs/user_layer.md, notes/briefs/union.md).
 REMAINING (user rulings): (1) PROVE `USER` (user-mode machine layer, ~84k Rocq lines) — next;
 (2) UNION adequacy (Rocq UUnionBootAdequacy via App.xv6_app_adequacy at AppUnionRec.app_union) — the real target;
 (3) Rocq drift audit vs main (base 0be24e13b); (4) build parallelism: apply the exact-import edit set
