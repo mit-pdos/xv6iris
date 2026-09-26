@@ -684,3 +684,36 @@ every existing caller instantiate `Tk := T`; the union `T := UT ∨ secc_tok
 (S gen_id)`, `Tk := UT`.  After a tainted read the loop continues through
 the credential's own taint law (`uWcu_taint` at `T`: the `UT` half as
 today, the token half the wild arm), never a generic tainted loop.
+
+### 10.10 No escape; the reader-side credential split off; `read` blocked (owner, 2026-09-25)
+
+Supersedes 10.7's escape and 10.5's `lk_T := T'`:
+- THE BLOCK STEP REFUSES THE WILD LINE.  `ucl_step_write_blk` /
+  `union_write_link_blk` (and `GenLinksLine.gl_blk` through a section
+  parameter `gwild : list (bv 8) -> Prop`, `fun _ => False` at echo/pipe,
+  `is LSecc` at the union) take the premise that the line whose block
+  starts is not the wild line; every caller is a round start at a known
+  line kind.  With it the third arm refutes every presenter and there is
+  no escape, so `lk_T` STAYS `UT`, the link families and the lease never
+  see the token, and the era-pinned taint laws of 10.7 are unnecessary
+  (kept only if already green).  The token reaches the shell tier in
+  ONE way: the read wrapper's transition, landing in `uWcu`'s wild arm.
+- THE READER-SIDE WILD CREDENTIAL IS ITS OWN FIELD.  `app_iface` gets
+  `ai_rdwild : nat -> iProp Σ` (persistent, timeless, no law),
+  `riscv_rdwild`, and `AppInv.app_rdcred := app_sup ∨ riscv_rdwild (S
+  gen_id)`; EVERY instance, the union included, sets it to `fun _ =>
+  False`, so `app_rdcred ⊢ app_sup` and a dirty-ring outcome is the
+  ordinary taint.  Why: the console claim is a single-reader design (a
+  second consuming reader marks the ring dirty and the token holder must
+  absorb by tainting); a shell absorbing a dirty outcome with only the
+  era token has lost its position and cannot be shown never to read a
+  line, and a round on unknown input is unpayable at the token.  No
+  kernel-side fix exists: the dirty path cannot fire the reader's
+  payment (a second consumer breaks the delivered-list chain).
+- HENCE THE MASK ALSO BLOCKS `read` (5): `secc_B := [5;6;15;17;18;19;20]`,
+  `UexecSecc`'s console-read payer is deleted, and `user/seccomp.c`
+  upstream clears bit 5 (owner's decision pending at the time of
+  writing; the proof is built at the widened set).  Under a disciplined
+  trace nothing observable changes -- no input ever arrives after a
+  seccomp line -- but the masked program can read nothing, pipes and
+  inherited files included.  §1's "read the console" is withdrawn.
