@@ -128,3 +128,15 @@ Collected from the U0 agent reports (Sept 26 2026). Each item names the lane tha
 - `ushf_child_law_holds_at_D` owed once sh-run's UkShFork exists (glue over `shChildEcho_holds`).
 - PipesCut: 6 left (`pipes_lpg`, `pipes_lpcg`, `pipes_lpg0`, `pipes_lpcg_bytes`, `pipes_lpg_of_at`,
   `pipes_lpcg_of_at`) — portable now (ushLineAt landed); PipesCutSh header's "STILL LEFT (13)" is stale.
+
+## sh-main (landed except UshDiagLeaf/UshDiagFinal, which import sh-run) — follow-ups
+- `USH_FPRINTF` (Rocq `wp_kshd_fprintf_s_chain`) not dischargeable from printf-once: `ulibFprintfS`'s `%s`
+  takes only a DATA string, panic prints a `.rodata` text literal. Widen `ulibFprintfS`'s string argument
+  (text or data) in the printf-once proof.
+- `hex` (`psok USYS_exit`) premise on memset's NULL arm (U1-R/K4 residual: `wp_uk_sb_denied` doesn't mint
+  its own exit deposit, Rocq `udep_exit_run`).
+- `USH_SYS_P` (UshSysP): close (non-pipe `udepw_cl` arm), `write_chain_at`, `write_chain_txt_at` — confirm
+  the txt variant's post-state page-table spelling against the UkRunSys port.
+- `ush_cmd_of_ushp(_gen)` needs sh-run's `ush_cmd`.
+- sh-exec's `UshExecEnv` to be instantiated from UshDiagDefs/UshDiagFinal (+ a one-line adapter for
+  `wp_kshd_execfail_paid_at`'s bundled byte premises).
