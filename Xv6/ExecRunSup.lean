@@ -175,7 +175,7 @@ theorem udepwAtRefR_of_sup (N : UkNames GF) (m : RegMap) (pc : BitVec 64) (pv av
       udepwAtRefR (hlc := hlc) (SG := uexecSGXv6 (hlc := hlc)) N m pc c R := by
   iintro #Hrf #Hgen Hsup
   unfold udepwAtRefR
-  iintro %M %pm %sz %fdv %gn %cs %pidv Hmp Hh Hf
+  iintro %M %pm %sz %fdv %gn %cs %pidv Hmp - Hh Hf
   unfold uexecSupRun
   icases Hsup $$ %M %pm %sz %fdv %cs %pidv Hh Hf with ⟨Hh, Hf, %hpath, Hw, Hcon, HPay⟩
   isplitl [Hh]
@@ -197,7 +197,7 @@ theorem udepwAtRefRIds_of_supIds (N : UkNames GF) (m : RegMap) (pc : BitVec 64) 
       udepwAtRefRIds (hlc := hlc) (SG := uexecSGXv6 (hlc := hlc)) N m pc c R := by
   iintro #Hrf #Hgen Hsup
   unfold udepwAtRefRIds
-  iintro %M %pm %sz %fdv %gn %cs %pidv Hmp Hh Hf Hids
+  iintro %M %pm %sz %fdv %gn %cs %pidv Hmp - Hh Hf Hids
   unfold uexecSupRunIds
   icases Hsup $$ %M %pm %sz %fdv %cs %pidv Hh Hf Hids with ⟨Hh, Hf, Hids, %hpath, Hw, Hcon, HPay⟩
   isplitl [Hh]

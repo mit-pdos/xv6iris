@@ -155,6 +155,16 @@ class UexecSG (GF : BundledGFunctors) [CtokG GF] where
       (fdv' : List FdState) (cw' : Nat) (cs' : Std.ExtTreeSet GName compare),
     spostAt X USYS_exec f W r M' fdv' cw' cs' = iprop(⌜r = BitVec.ofInt 64 (-1)⌝ -∗ sexecRefund f)
   sexecRefund_at : ∀ (Q : Int → IProp GF) (f : sfam), sexecRefund (sfamAt Q f) = sexecRefund f
+  /-- **THE ROW'S REGISTRATION** (Rocq `srow_reg`, design/app-pipe.md §2,
+  lane PIPE-REG): what one row of a table owes toward exit's close payments,
+  persistently.  The instance answers with `PipeReg.pipeRowReg`; the program
+  tier's run carries one per row (`UkRun.urunNopipe`). -/
+  srowReg : FdState → IProp GF
+  srowReg_persistent : ∀ st : FdState, Persistent (srowReg st)
+  /-- a row that is not a pipe end registers itself -/
+  srowReg_nopipe : ∀ st : FdState, fdstNopipe st → ⊢ srowReg st
+
+attribute [instance] UexecSG.srowReg_persistent
 
 /-! ## The family-free reader, derived -/
 

@@ -94,6 +94,7 @@ import Xv6.FsAbsInvFire
 import Xv6.SysExecNe
 import Xv6.SpecSyscall
 import Xv6.SpecFileclose
+import Xv6.PipeReg
 
 namespace Xv6
 
@@ -836,6 +837,9 @@ instance uexecSGXv6 : UexecSG GF where
   sexecRefund := Xfam.xRs
   spostAt_exec := xv6Spost_exec
   sexecRefund_at := fun _ _ => rfl
+  srowReg := pipeRowReg (hlc := hlc)
+  srowReg_persistent := fun st => pipeRowReg_persistent st
+  srowReg_nopipe := fun st h => pipeRowReg_nopipe st h
 
 /-! ### The generic program's deposit data (deviation 7) -/
 

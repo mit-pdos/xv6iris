@@ -218,3 +218,18 @@ Collected from the U0 agent reports (Sept 26 2026). Each item names the lane tha
 - `ush_cmd_of_ushp(_gen)` needs sh-run's `ush_cmd`.
 - sh-exec's `UshExecEnv` to be instantiated from UshDiagDefs/UshDiagFinal (+ a one-line adapter for
   `wp_kshd_execfail_paid_at`'s bundled byte premises).
+
+## U1-P (landed: PipeProto(+Read), PipeBothN, PipeOut, PipeOutN*, PipeOutNEv, PipesOut, PipesLinksV, PipeOutW*, UexecSecc(+Mint), UnionOutWild)
+- Union* blocked on U1-F (file claims, lane running) + U3's UShLine/UkSh: UnionOut needs AppFile fileAppG/file_taint/
+  fl_auth/fl_lb, FileOut file_gn/fgn_*/fileOutG/file_cl_all/efl_of/f0_*/f0wa*, AppEcho echo_taint; UnionLinkInst(At) also
+  FileLinksLine f0w/fhead/flw/fturn_pre + FileLinkGen f0w_at*/fhead_at*/fturn_pre_at + FileOut file_era*/fturn_core;
+  UnionReadInstAt also UShLine ush_dirty_law/ush_mid_at/ush_rd_x_at/ush_read_recv_leaf_holds_at + UkSh
+  ush_cycles_snoc_in/ush_read_recv_leaf_at/ush_tag_law(_at/_of_at). UnionOut must import UnionOutWild.
+- U4 camera slots to add: PipeProtoG.eofG; PipeOutG.eraG/curG; the pipesNG `GhostVarG GF (Option (List (BitVec 8)))`
+  (+ EchoOutG from U0-C).
+- `ush_view_secc_rows` residual CLOSED (UexecSecc `ushViewSeccRows`).
+
+## UkRunSys (landed) — remaining gaps (reached in Rocq, no Lean consumer record yet)
+- `wp_uk_ecall_pipe`, `upipe_names_agree`; `read_win`/`read_at`/`read_recv_at` (sh-main's `ush_read_leaf` still a
+  parameter); `write_chain_buf(_at)`, `usrc_ok_ubytesq`, `uheap_ubytes_w/_wat` (need `lazy_free_uw_addr`'s size bound,
+  not exposed by `urun` at the leaf); `open_recv_img_at`, `open_recv_gimg`, `quiet_recv_img`, `uimg_view` + lemmas.

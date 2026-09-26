@@ -324,7 +324,7 @@ theorem wp_kinit_exec (UL : UK_LEAVES) (N : UkNames GF) (h : CPU) (m : RegMap) (
   rw [e] at hpc
   rw [e]
   iapply wp_uk_ecall_exec_at_cwd_refR_ids UL N h1 (ukWr m 17#5 (BitVec.ofInt 64 7)) _ avail c R
-    (by have e := kinit_usysno m (BitVec.ofInt 64 7); unfold UkSysP.usysno at e; rw [e]; decide) (by decide)
+    (by have e := kinit_usysno m (BitVec.ofInt 64 7); unfold UkSysP.usysno at e; unfold usysno; rw [e]; decide) (by decide)
     $$ Hi Hrun Hcwd Hdep
   inext
   rw [hpc]

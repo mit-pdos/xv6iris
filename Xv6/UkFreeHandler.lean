@@ -22,7 +22,8 @@ The four free leaves are the application-generic ones: the QUIET write
 
 ## Deviations from Rocq
 
-1. **The syscall rows are PARAMETERS** (UkRunSys is not ported; K3/K4): the
+1. **The syscall rows are PARAMETERS** (DISCHARGED by U1-R-sys:
+   `UkSysFHHolds.ukSysFH_holds UL`, `UkSysPHolds.ukSysP_holds UL`): the
    quiet/open/exit rows are `UK_SYS_P`'s (`UkSysP`), and this file adds the
    three it also needs, in UkSysP's conventions, as `UK_SYS_FH`:
    `UkSysP.wpUkEcallRead`, `UkSysP.wpUkEcallCloseStd`,

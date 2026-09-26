@@ -33,11 +33,9 @@ THE ADDRESS IS A NUMBER: `(m.get rs1).toNat + imm.toInt = a` (Rocq `a = uint
    is read with `BitVec.toInt` (`uoff_i12` is `imm.toInt`); `uwidth` is
    SpecUkLeaves' `ukWidth`; `uaccess_arith` is `ukAccess_page`.
 3. **Continuations under `▷`** (UkRunLeaf deviation 2).
-4. **`wp_uk_sb_denied`'s exit deposit** (Rocq: minted off `udep` through
-   `UkRun.udep_exit_run` and the run's `urun_nopipe` fact, K4-deferred in
-   Lean, UkRun deviation 2) is minted off the key-free law at the premise
-   `UprogSG.psok USYS_exit`; K4 restores the self-minted form.  Rocq states
-   it at the byte width only; so does this.
+4. (Retired, U1-R: `wp_uk_sb_denied`'s exit deposit is minted off the run's
+   own `udep` and rows, `UkRun.udep_exit_run`, as in Rocq.)  Rocq states it
+   at the byte width only; so does this.
 5. A one-byte run is the byte (`ubytesq_one`, `utextRun_one`), with
    `MachCSL.nthByte_one` reused.
 -/
@@ -161,7 +159,7 @@ theorem urun_step_mem (N : UkNames GF) (h : CPU) (m : RegMap) (pc : BitVec 64) (
   iintro #Hi HR Hrun Hcont
   unfold urun
   icases Hrun with ⟨%xi, %C, %pt, %Rfd, %Rut, %sz, %M, %pm, %fdv, %cw, %gn, %cs, %pidv, %hlo, %hpm, %hlzf,
-    %hRut, %hx0, Hheap, Hstk, Hufd, Hcwd, Hids, #Hmy, #Hdep, Hb⟩
+    %hRut, %hx0, Hheap, Hstk, Hufd, Hcwd, Hids, #Hmy, #Hdep, #Hrows, Hb⟩
   ihave %hui := uinstrIs_ukInstr N.t N.d N.s M pm sz pc isRvc i $$ Hheap Hi
   iapply wpLoop_bupd
   imod Hheap M pm sz $$ Hheap HR with ⟨%hP, Hheap, HR'⟩
@@ -174,7 +172,7 @@ theorem urun_step_mem (N : UkNames GF) (h : CPU) (m : RegMap) (pc : BitVec 64) (
   iapply H $$ Hb
   inext
   rw [← hsp]
-  iapply urun_close N (Mf M) pm sz fdv cw gn cs pidv m' pc' avail (h0 hx0) $$ Hheap Hstk Hufd Hcwd Hids Hmy Hdep
+  iapply urun_close N (Mf M) pm sz fdv cw gn cs pidv m' pc' avail (h0 hx0) $$ Hheap Hstk Hufd Hcwd Hids Hmy Hdep Hrows
   ispecialize Hcont $$ HR'
   unfold urun
   iexact Hcont
@@ -400,16 +398,16 @@ theorem wp_uk_sb (UL : UK_LEAVES) (N : UkNames GF) (h : CPU) (m : RegMap) (pc : 
 /-- **Rocq `wp_uk_sb_denied`**: a byte store to a TEXT byte (a page the
 two-heap invariant keeps X-and-not-W) faults and the process is killed; it
 pays its own exit at `-1`, and the exit row's deposit is minted off the
-run's `udep` (at the psok premise, deviation 4).  No continuation. -/
+run's own `udep` and rows (`udep_exit_run`).  No continuation. -/
 theorem wp_uk_sb_denied (UL : UK_LEAVES) (N : UkNames GF) (h : CPU) (m : RegMap) (pc : BitVec 64)
     (isRvc : Bool) (imm : BitVec 12) (rs1 rs2 : BitVec 5) (a : Nat) (b0 : BitVec 8) (avail : Nat)
-    (ha : ((m.get rs1).toNat : Int) + imm.toInt = a) (hok : UprogSG.psok (GF := GF) USYS_exit) :
+    (ha : ((m.get rs1).toNat : Int) + imm.toInt = a) :
     ⊢ uinstrIs N.t pc isRvc (.STORE (imm, .Regidx rs2, .Regidx rs1, 1)) -∗
       utext N.t a b0 -∗ urun (hlc := hlc) N h m pc avail -∗ N.pay (-1) -∗ wpLoop h := by
   iintro #Hi #Ht Hrun Hpay
   unfold urun
   icases Hrun with ⟨%xi, %C, %pt, %Rfd, %Rut, %sz, %M, %pm, %fdv, %cw, %gn, %cs, %pidv, %hlo, %hpm, %hlzf,
-    %hRut, %hx0, Hheap, -, -, -, -, #Hmy, #Hdep, Hb⟩
+    %hRut, %hx0, Hheap, -, -, -, -, #Hmy, #Hdep, #Hrows, Hb⟩
   ihave %hui := uinstrIs_ukInstr N.t N.d N.s M pm sz pc isRvc _ $$ Hheap Hi
   ihave %htx := uheap_text N.t N.d N.s M pm sz a b0 $$ Hheap Ht
   ihave %hnw := uheap_text_nw N.t N.d N.s M pm sz a b0 $$ Hheap Ht
@@ -422,8 +420,7 @@ theorem wp_uk_sb_denied (UL : UK_LEAVES) (N : UkNames GF) (h : CPU) (m : RegMap)
     obtain ⟨q, hq, -, hw⟩ := ht
     exact ⟨q, hq, hw⟩
   iapply wpLoop_bupd
-  imod udep_dep (hlc := hlc) USYS_exit (uvisOfRun m pc M pm sz fdv cw gn cs pidv false seccAll) N.pay hok
-    (by decide) $$ Hdep with Hdepn
+  imod udep_exit_run N m pc M pm sz fdv cw gn cs pidv $$ Hdep Hrows with Hdepn
   imodintro
   unfold sbundlePay
   icases Hdepn with ⟨%fx, %hfx, Hdepn⟩

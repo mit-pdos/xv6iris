@@ -2,15 +2,13 @@
 **The syscall ecall leaves the init and seccomp walks call, as a PARAMETER**
 (Rocq `UkRunSys.v` / `UkRunSecc.v` statements, pinned `1900b8a43`).
 
-`UkRunSys` (the per-number ecall rows over `UsysMemOk`) and `UkRunSecc` are
-NOT PORTED yet: they need K3 (the seccomp key, `usys_secc_ok`, the
-whole-table `ustd_at`) and K4 (the close/exit deposits and pipe rows).  The
-program walks (union wave U2) do not wait for them: per the program brief, a
-walk that needs a syscall leaf takes it as a parameter of Rocq's exact shape.
-This file states those shapes -- ONLY the leaves the init and seccomp walks
-reach -- as `Prop` bodies in the namespace `UkSysP` (so they cannot clash
-with the eventual port, whose names are `Xv6.wp_uk_ecall_*`), bundled in
-`UK_SYS_P`.  When UkRunSys lands, `UK_SYS_P` is discharged field by field.
+The program walks (union wave U2) were written before `UkRunSys` /
+`UkRunSecc` were ported, so a walk that needs a syscall leaf takes it as a
+parameter of Rocq's exact shape.  This file states those shapes -- ONLY the
+leaves the init and seccomp walks reach -- as `Prop` bodies in the namespace
+`UkSysP`, bundled in `UK_SYS_P`.  **DISCHARGED** (lane U1-R-sys):
+`UkSysPHolds.ukSysP_holds UL : UK_SYS_P` and `ukSysSecc_holds UL` (the
+seccomp leaf), from the ported `UkRunSys*` / `UkRunSecc` leaves.
 
 Fork and exec are NOT here: their leaves are ported (`UkFork.wp_uk_ecall_fork_at`,
 `UkRunExecRef.wp_uk_ecall_exec_at_cwd_refR_ids`) and the walks call them at
@@ -18,9 +16,8 @@ the engine `UL`.
 
 ## Deviations from Rocq (all shared with the landed leaves)
 
-1. The number premise is on the register file,
-   `(BitVec.extractLsb' 0 32 (m 17#5)).toInt = n` (Rocq `usysno m = n`;
-   `UkFork` deviation 2), and the alignment premise is
+1. The number premise is `usysno m = n` (`UkRun.usysno`, the register
+   file's a7), and the alignment premise is
    `(pc + 4#64) &&& 1#64 = 0#64` (Rocq `is_aligned_vaddr … 2`).  Registers
    are written with `ukWr` (Rocq `<[Regidx … := r]> m`).
 2. **The ledger**: the rows the pre-K3 walks were written against keep
@@ -55,10 +52,11 @@ set_option linter.unusedSectionVars false
 
 namespace UkSysP
 
-/-- Rocq `usysno m`: the number in a7, as the trap reads it (deviation 1). -/
+/-- Rocq `usysno m`: `UkRun.usysno`'s body (deviation 1; kept as its own
+abbreviation so the stubs' `unfold UkSysP.usysno` reads the register). -/
 abbrev usysno (m : RegMap) : Int := (BitVec.extractLsb' 0 32 (m 17#5)).toInt
 
-/-- Rocq `uexitst m` (deviation 4). -/
+/-- Rocq `uexitst m`: `UkRun.uexitst`'s body (deviation 4). -/
 abbrev uexitst (m : RegMap) : Int := (BitVec.setWidth 32 (m.get 10#5)).toInt
 
 section

@@ -204,6 +204,12 @@ lazy-grow arm, the keep on the eager and shrink arms. -/
 def usysSbrkLazy (lz lz' : Bool) (tf : List (BitVec 64)) (szv szv' : Nat) : Prop :=
   (usysSbrkEager tf ∨ szv' < szv) → usysLazyKeep lz lz'
 
+/-- **Rocq `usys_read_ret`**: WHAT READ ANSWERED -- -1, or a count no larger
+than the one asked for (read's row's last conjunct; `SpecSyscall.syscReadRet`
+is the kernel's spelling, the same body). -/
+def usysReadRet (tf : List (BitVec 64)) (r : BitVec 64) : Prop :=
+  r.toInt = -1 ∨ (0 ≤ r.toInt ∧ r.toInt ≤ max 0 (usysRdcount tf))
+
 /-- **THE TABLE** (Rocq `usys_mem_ok`): syscall `n`, entered with trapframe
 words `tf`, returned `r`, may take the image from `M` to `M'`, the permission
 view from `π` to `π'`, the break from `szv` to `szv'` and the lazy bit from
@@ -224,7 +230,7 @@ def usysMemOk (n : Int) (tf : List (BitVec 64)) (r : BitVec 64)
       π' = π ∧ szv' = szv ∧ lz' = lz
   else if n = USYS_read then
     (∃ bs : List (BitVec 8), (bs.length : Int) ≤ max 0 (usysRdcount tf) ∧
-      M' = usysWr M (tfW tf (tfArgIdx 1)) bs) ∧ π' = π ∧ szv' = szv ∧ lz' = lz
+      M' = usysWr M (tfW tf (tfArgIdx 1)) bs) ∧ π' = π ∧ szv' = szv ∧ lz' = lz ∧ usysReadRet tf r
   else if n = USYS_fstat then
     (∃ bs : List (BitVec 8), bs.length ≤ 24 ∧ M' = usysWr M (tfW tf (tfArgIdx 1)) bs) ∧
       π' = π ∧ szv' = szv ∧ lz' = lz
@@ -261,7 +267,7 @@ theorem usysMemOk_lazy {n : Int} {tf : List (BitVec 64)} {r : BitVec 64} {M M' :
   · rw [if_pos h4] at H; exact H.2.2.2
   rw [if_neg h4] at H
   by_cases h5 : n = USYS_read
-  · rw [if_pos h5] at H; exact H.2.2.2
+  · rw [if_pos h5] at H; exact H.2.2.2.1
   rw [if_neg h5] at H
   by_cases h8 : n = USYS_fstat
   · rw [if_pos h8] at H; exact H.2.2.2
@@ -269,6 +275,14 @@ theorem usysMemOk_lazy {n : Int} {tf : List (BitVec 64)} {r : BitVec 64} {M M' :
   by_cases hf : n = USYS_fork
   · rw [if_pos hf] at H; exact H.2.2.2.2
   · rw [if_neg hf] at H; exact H.2.2.2
+
+/-- Read's answer (Rocq `usys_mem_ok_read_ret`). -/
+theorem usysMemOk_readRet {tf : List (BitVec 64)} {r : BitVec 64} {M M' : ElfMem}
+    {π π' : Nat → Option UPerm} {szv szv' : Nat} {lz lz' : Bool}
+    (H : usysMemOk USYS_read tf r M π szv lz M' π' szv' lz') : usysReadRet tf r := by
+  unfold usysMemOk at H
+  rw [if_neg (by decide), if_neg (by decide), if_neg (by decide), if_neg (by decide), if_pos rfl] at H
+  exact H.2.2.2.2
 
 /-- Exec's failure row (Rocq `usys_mem_ok_exec_row`). -/
 theorem usysMemOk_execRow {tf : List (BitVec 64)} {r : BitVec 64} {M M' : ElfMem}
@@ -758,7 +772,7 @@ theorem usysMemOk_argCong {n : Int} {tf tf' : List (BitVec 64)} {r : BitVec 64} 
     (h0 : tfW tf (tfArgIdx 0) = tfW tf' (tfArgIdx 0)) (h1 : tfW tf (tfArgIdx 1) = tfW tf' (tfArgIdx 1))
     (h2 : tfW tf (tfArgIdx 2) = tfW tf' (tfArgIdx 2))
     (H : usysMemOk n tf r M π szv lz M' π' szv' lz') : usysMemOk n tf' r M π szv lz M' π' szv' lz' := by
-  unfold usysMemOk usysRdcount usysSbrkRet usysSbrkArg usysSbrkLazy usysSbrkEager at *
+  unfold usysMemOk usysReadRet usysRdcount usysSbrkRet usysSbrkArg usysSbrkLazy usysSbrkEager at *
   rw [← h0, ← h1, ← h2]; exact H
 
 /-- Rocq `usys_eff_epc`. -/

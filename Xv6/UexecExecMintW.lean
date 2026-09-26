@@ -30,12 +30,10 @@ Rocq's header, point for point:
    `app_sup ∗ app_taint` (with the console licence read off the taint) is
    Lean's `appSup`, `uKillCred`, `consLicence`, so `_read` / `_write` take
    the licence explicitly.
-2. **`udep` has no close/exit laws in Lean** (UkRun deviation 2: the pipe
-   rows `urun_rows` / `urun_nopipe` and `udep`'s key-guarded close law and
-   registry-fed exit laws are the union lane's): `udep_gen` / `udep_free`
-   prove Lean's one key-free law.  `udepw_row_of_reg_close` /
-   `udepw_cl_of_reg_close` (over `UkRun.udepw_row` / `udepw_cl`, not in
-   Lean) return with those rows.
+2. (Retired, U1-R: `udep` carries Rocq's four laws and `udep_gen` /
+   `udep_free` prove them -- close's off `xv6Sbundle_close_nonpipe`, exit's
+   off `xv6Sbundle_exit_regs` / `_taint`.)  NOT PORTED (unreached):
+   `udepw_row_of_reg_close`, `udepw_cl_of_reg_close`.
 3. A separate file (Rocq keeps these in `UexecExecMint.v`), so the generic
    mint's cone (`SystemAdequacy`) does not import the program tier.
 -/
@@ -71,6 +69,31 @@ theorem xv6Sbundle_exit_taint (X : Uvis → IProp GF) (f : Xfam GF) (W : Uvis) :
   simp only [Int.reduceEq, if_false, if_true]
   exact filecloseCpays_taint _
 
+/-- `UkRun.ukFdStOfKey` IS the instance's `fdStOfKey` (UkRun deviation 2). -/
+theorem ukFdStOfKey_eq (v : BitVec 64) (sts : List FdState) : ukFdStOfKey v sts = fdStOfKey v sts := rfl
+
+/-- **Rocq `xv6_sbundle_close_nonpipe`**: row 21 at a key whose argument 0 is
+not a pipe end is `emp`. -/
+theorem xv6Sbundle_close_nonpipe (X : Uvis → IProp GF) (f : Xfam GF) (W : Uvis) (h : ukeyNonpipe W) :
+    ⊢ xv6Sbundle (hlc := hlc) X 21 f W := by
+  unfold xv6Sbundle xv6SbundleRest USYS_exec
+  simp only [Int.reduceEq, if_false, if_true]
+  have h' : ∀ (rb wb : Bool) (gp : PipeNames), fdStOfKey (xkA W 0) W.fd ≠ .open rb wb (.pipe gp) := h
+  unfold filecloseCpay
+  generalize fdStOfKey (xkA W 0) W.fd = st at h' ⊢
+  rcases st with _ | ⟨rb, wb, gp | _ | _⟩
+  · iempintro
+  · exact absurd rfl (h' rb wb gp)
+  · iempintro
+  · iempintro
+
+/-- **Rocq `xv6_sbundle_exit_regs`**: row 2 off the table's registrations. -/
+theorem xv6Sbundle_exit_regs (X : Uvis → IProp GF) (f : Xfam GF) (W : Uvis) :
+    ([∗list] st ∈ W.fd, pipeRowReg (hlc := hlc) (GF := GF) st) ⊢ xv6Sbundle (hlc := hlc) X USYS_exit f W := by
+  unfold xv6Sbundle xv6SbundleRest USYS_exec USYS_exit
+  simp only [Int.reduceEq, if_false, if_true]
+  exact fileclose_cpays_of_regs _
+
 /-- A flagged deposit at the point family re-keyed at the run's own payload:
 the explicit disjunct of `UkRun.udepw`, from a row proof at the point. -/
 theorem udepw_of_row (PSx : UprogSG GF) (N : UkNames GF) (m : RegMap) (pc : BitVec 64) (n : Int)
@@ -89,6 +112,11 @@ theorem udepw_of_row (PSx : UprogSG GF) (N : UkNames GF) (m : RegMap) (pc : BitV
 
 /-! ## The suppliers -/
 
+/-- A law that does not read its second premise. -/
+theorem udepLaw_drop {P R Q : IProp GF} (h : ⊢ P ==∗ Q) : ⊢ P -∗ R -∗ |==> Q := by
+  iintro HP -
+  iapply h $$ HP
+
 /-- **Rocq `udep_gen`**: the generic slot's supplier is the supply. -/
 theorem udep_gen :
     ⊢ □ xv6Ssupply (hlc := hlc) (GF := GF) -∗
@@ -98,8 +126,11 @@ theorem udep_gen :
   isplitr
   · iexact Hs
   ipureintro
-  intro n W Q _ hne
-  exact xv6SbundleOfSupplyNe (hlc := hlc) uslot n W Q hne
+  refine ⟨fun n W Q _ hne => xv6SbundleOfSupplyNe (hlc := hlc) uslot n W Q hne,
+    fun W Q _ => xv6SbundleOfSupplyNe (hlc := hlc) uslot 21 W Q (by unfold USYS_exec; decide),
+    fun W Q => ?_, fun W Q => ?_⟩
+  · exact udepLaw_drop (xv6SbundleOfSupplyNe (hlc := hlc) uslot USYS_exit W Q (by unfold USYS_exit USYS_exec; decide))
+  · exact udepLaw_drop (xv6SbundleOfSupplyNe (hlc := hlc) uslot USYS_exit W Q (by unfold USYS_exit USYS_exec; decide))
 
 /-- **Rocq `udep_free`**: the verified program's supplier is nothing. -/
 theorem udep_free : ⊢ udep (hlc := hlc) (GF := GF) (SG := uexecSGXv6) (PS := uprogSGFree) := by
@@ -107,10 +138,31 @@ theorem udep_free : ⊢ udep (hlc := hlc) (GF := GF) (SG := uexecSGXv6) (PS := u
   isplitr
   · iapply (show ⊢ □ (iprop(True) : IProp GF) from by iintro; imodintro; ipureintro; trivial)
   ipureintro
-  intro n W Q hok _
-  iintro _
-  iapply (show ⊢ |==> sbundlePay (SG := uexecSGXv6) (uslot (hlc := hlc)) n Q W from
-    xv6Sbundle_free (hlc := hlc) uslot n W Q hok)
+  refine ⟨fun n W Q hok _ => ?_, fun W Q hnp => ?_, fun W Q => ?_, fun W Q => ?_⟩
+  · iintro -
+    iapply (show ⊢ |==> sbundlePay (SG := uexecSGXv6) (uslot (hlc := hlc)) n Q W from
+      xv6Sbundle_free (hlc := hlc) uslot n W Q hok)
+  · iintro -
+    imodintro
+    unfold sbundlePay
+    iexists (xfamAt Q xfamPt)
+    isplitr
+    · ipureintro; rfl
+    iapply xv6Sbundle_close_nonpipe (hlc := hlc) uslot (xfamAt Q xfamPt) W hnp
+  · iintro - Hr
+    imodintro
+    unfold sbundlePay
+    iexists (xfamAt Q xfamPt)
+    isplitr
+    · ipureintro; rfl
+    iapply xv6Sbundle_exit_regs (hlc := hlc) uslot (xfamAt Q xfamPt) W $$ Hr
+  · iintro - #Ht
+    imodintro
+    unfold sbundlePay
+    iexists (xfamAt Q xfamPt)
+    isplitr
+    · ipureintro; rfl
+    iapply xv6Sbundle_exit_taint (hlc := hlc) uslot (xfamAt Q xfamPt) W $$ Ht
 
 /-- **Rocq `udepw_free`**: the generic-route leaf's premise at the free
 instance. -/

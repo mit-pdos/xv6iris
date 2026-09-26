@@ -6,9 +6,9 @@ sh's fprintf contract `HF` (DU10: one function per Spec/Proof file; Rocq's
 
 Parameters: `UL : UK_LEAVES` (DU2); `HS : UK_SYS_P`, `HSS : USH_SYS_P`
 (UkRunSys not ported); `HF : USH_FPRINTF` (Rocq `wp_kshd_fprintf_s_chain`;
-printf-once's `%s` takes a data string only, panic prints a text literal);
-`hex` -- the exit deposit memset's NULL arm mints (UkRunMem deviation 4,
-Rocq `udep_exit_run`, a U1-R/K4 residual).
+printf-once's `%s` takes a data string only, panic prints a text literal).
+(The former `hex` premise -- memset's NULL arm's exit deposit -- is retired:
+`wp_uk_sb_denied` self-mints it, U1-R.)
 -/
 import Xv6.ProofShMemset
 import Xv6.ProofShGets
@@ -22,10 +22,9 @@ namespace Xv6
 open Iris
 
 /-- **sh's command loop**: memset, gets, getcmd, main, start, panic. -/
-theorem shMain_linked (UL : UK_LEAVES) (HS : UK_SYS_P) (HSS : USH_SYS_P) (HF : USH_FPRINTF)
-    (hex : ∀ {GF : BundledGFunctors.{0}} [UprogSG GF], UprogSG.psok (GF := GF) USYS_exit) :
+theorem shMain_linked (UL : UK_LEAVES) (HS : UK_SYS_P) (HSS : USH_SYS_P) (HF : USH_FPRINTF) :
     USH_MEMSET ∧ SH_GETS ∧ SH_GETCMD ∧ SH_MAIN ∧ SH_START ∧ SH_PANIC :=
-  have MS := shMemset_holds UL hex
+  have MS := shMemset_holds UL
   have SG := shGets_holds UL
   have SC := shGetcmd_holds UL HS MS SG
   have SM := shMain_holds UL HS HSS SC

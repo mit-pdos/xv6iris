@@ -85,7 +85,7 @@ theorem wp_kinit_fork (UL : UK_LEAVES) (N : UkNames GF) (T : IProp GF) [Persiste
     iprop(upos (hlc := hlc) γ np ∗ uconsPay (hlc := hlc) cn γ T Cr.ccRd (-1) ∗
       initLendCred T stc Cr.ccWp (ccWbn Cr) l np)
     (fun γt γd _ => iprop(initCode γt ∗ initArgv γd))
-    (by have e := kinit_usysno m (BitVec.ofInt 64 1); unfold UkSysP.usysno at e; rw [e]; decide) (by decide)
+    (by have e := kinit_usysno m (BitVec.ofInt 64 1); unfold UkSysP.usysno at e; unfold usysno; rw [e]; decide) (by decide)
     $$ Hi [Hpos HQ Hcred] [] Hsz Hstd [] Hcwd Hch [] Hrun [Hpar Hchi]
   · iframe Hpos HQ Hcred
   · iframe Hc Hargv

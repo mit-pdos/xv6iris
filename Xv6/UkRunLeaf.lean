@@ -167,7 +167,7 @@ theorem urun_step (N : UkNames GF) (h : CPU) (m : RegMap) (pc : BitVec 64) (avai
   iintro #Hi Hrun Hsw Hcont
   unfold urun
   icases Hrun with ⟨%xi, %C, %pt, %Rfd, %Rut, %sz, %M, %pm, %fdv, %cw, %gn, %cs, %pidv, %hlo, %hpm, %hlzf,
-    %hRut, %hx0, Hheap, Hstk, Hufd, Hcwd, Hids, #Hmy, #Hdep, Hb⟩
+    %hRut, %hx0, Hheap, Hstk, Hufd, Hcwd, Hids, #Hmy, #Hdep, #Hrows, Hb⟩
   ihave %hui := uinstrIs_ukInstr N.t N.d N.s M pm sz pc isRvc i $$ Hheap Hi
   let S : UkSec GF := ⟨h, C, pt, Rfd, Rut, pm, sz, N.pay⟩
   let K : UkKey := ⟨fdv, cw, gn, cs, pidv⟩
@@ -177,7 +177,7 @@ theorem urun_step (N : UkNames GF) (h : CPU) (m : RegMap) (pc : BitVec 64) (avai
   unfold ukStep ukUvb at H
   iapply H $$ Hb
   inext
-  iapply urun_close N M pm sz fdv cw gn cs pidv m' pc' avail' (h0 hx0) $$ Hheap Hstk Hufd Hcwd Hids Hmy Hdep
+  iapply urun_close N M pm sz fdv cw gn cs pidv m' pc' avail' (h0 hx0) $$ Hheap Hstk Hufd Hcwd Hids Hmy Hdep Hrows
   ispecialize Hcont $$ HF
   unfold urun
   iexact Hcont

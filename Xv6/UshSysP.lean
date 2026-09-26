@@ -1,9 +1,10 @@
 /-
 **The ecall leaves sh-main's walks call beyond `UK_SYS_P`, as a PARAMETER**
 (Rocq `UkRunSys.v` statements, pinned `1900b8a43`): close, and the two
-chain-paying writes.  `UkRunSys` is not ported (it needs K4's close/exit
-deposits and pipe rows); per the program brief a walk that needs a syscall
-leaf takes it as a parameter of Rocq's exact shape and reports it.  The
+chain-paying writes.  Per the program brief a walk that needs a syscall
+leaf takes it as a parameter of Rocq's exact shape; **DISCHARGED** by
+U1-R-sys: `UshSysPHolds.ushSysP_holds UL : USH_SYS_P`.  Deviation 4's
+page-table spelling is confirmed by the port (`UkRunSysWrite`).  The
 quiet row, exit and the open are `UkSysP`'s (`UK_SYS_P`); the read is the
 section hypothesis `ush_read_leaf` (`UshMainDefs.ushReadRecvLeafAt`).
 
@@ -19,10 +20,8 @@ Namespace `UshSysP`, so nothing here can clash with the eventual port
    (not landed); the only route sh takes is `UkRun.udepw_cl_nonpipe`, the
    pure left arm, so the parameter takes that premise
    (`∀ rb wb gp, st ≠ .open rb wb (.pipe gp)`) in its place.
-3. **`udepwf_std`** (Rocq `UkRun.udepwf_std`, unported: UkRun deviation 3,
-   U1-R/K4 residual) is defined here as `UshSysP.udepwfStd`, Rocq's body
-   word for word over `UkRun.udepwf`'s Lean spelling; fold into UkRun when
-   that residual lands.
+3. `UshSysP.udepwfStd` is an abbreviation of `UkRun.udepwfStd` (Rocq
+   `UkRun.udepwf_std`, landed by U1-R).
 4. The text-row write's post: Rocq's `ProcPtOwn.proc_pt_wf P` is
    `UPtDefs.uptWf P` (Lean's one pure well-formedness of a live table),
    `perm_of (ud_um P) sz` is `UserPerm.permOf P.um sz`, `lazy_free` is
@@ -49,16 +48,10 @@ variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CtokG GF] [SG : 
   [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
   [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int]
 
-/-- **Rocq `UkRun.udepwf_std`** (deviation 3): the family-named explicit
-deposit at the standard streams' ledger. -/
-def udepwfStd (N : UkNames GF) (m : RegMap) (pc : BitVec 64) (n : Int) (fdep : UexecSG.sfam GF)
+/-- **Rocq `UkRun.udepwf_std`** (deviation 3): now `UkRun.udepwfStd`. -/
+abbrev udepwfStd (N : UkNames GF) (m : RegMap) (pc : BitVec 64) (n : Int) (fdep : UexecSG.sfam GF)
     (l : List FdState) : IProp GF :=
-  iprop(⌜UexecSG.sexitPay fdep = N.pay⌝ ∗
-    ∀ (M : ElfMem) (pm : Nat → Option UPerm) (sz : Nat) (fdv : List FdState) (cw : Nat) (gn : GName)
-      (cs : ExtTreeSet GName compare) (pidv : BitVec 32),
-    ⌜fdv.take NSTD = l⌝ -∗ myPay gn N.pay -∗ uheap N.t N.d N.s M pm sz -∗ ufdAuth N.fd fdv -∗
-    uheap N.t N.d N.s M pm sz ∗ ufdAuth N.fd fdv ∗
-      UexecSG.sbundleAt (uslot (hlc := hlc)) n fdep (uvisOfRun m pc M pm sz fdv cw gn cs pidv false seccAll))
+  Xv6.udepwfStd (hlc := hlc) N m pc n fdep l
 
 /-- **Rocq `wp_uk_ecall_close`** at its non-pipe deposit (deviation 2). -/
 def wpUkEcallCloseNp : Prop :=

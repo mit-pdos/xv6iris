@@ -32,7 +32,7 @@ theorem shExecAtCwd_holds (UL : UK_LEAVES) (R : IProp GF) : wpShExecAtCwdBody (h
   rw [e] at hpc
   rw [e]
   iapply wp_uk_ecall_exec_at_cwd_refR UL N h1 (ukWr m 17#5 (BitVec.ofInt 64 7)) _ avail c R
-    (by rw [ukWr_ne0 _ _ _ (by decide), RegMap.set_same]; decide) (by decide)
+    (by unfold usysno; rw [ukWr_ne0 _ _ _ (by decide), RegMap.set_same]; decide) (by decide)
     $$ Hi Hrun Hcwd Hdep
   inext
   rw [hpc]

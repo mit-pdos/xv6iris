@@ -21,15 +21,11 @@ bumped key is the continuation at `a0 := -1`, `pc + 4`, closed by
 
 ## Deviations from Rocq
 
-1. **The syscall number is stated on the register file**:
-   `(BitVec.extractLsb' 0 32 (m 17#5)).toInt = USYS_exec` (what
-   `UexecRet.tfOf_num` reads off the trap-out key), not Rocq's
-   `usysno m = USYS_exec` -- `usysno` is `UkRunSys`'s (not ported yet); when
-   it lands it should be definitionally this reading.
-2. **No `urun_rows` lend** (Rocq's deposits take the run's pipe-row fact,
-   `design/pipe.md` "The exit path"): the run's pipe rows are not in Lean
-   yet, `UkRun`'s deviation 2.  No seccomp mask (`secc_all`, K3): Lean's key has
-   none yet, so the mask row and `usys_secc_ok_quiet` have nothing to say.
+1. The syscall number is Rocq's `usysno m = USYS_exec` (`UkRun.usysno`,
+   U1-R; what `UexecRet.tfOf_num` reads off the trap-out key).
+2. (Retired, U1-R: the deposits take Rocq's `urun_rows` lend, the run's
+   pipe rows at the key's table, `design/pipe.md` "The exit path"; the key
+   is at the full mask `seccAll`, `usysSeccOk_quiet`.)
 3. The resume alignment is `(pc + 4#64) &&& 1#64 = 0#64` (UexecRet
    deviation 7; Rocq `is_aligned_vaddr (pc + 4) 2`).
 4. The continuation is under `▷` (the engine's ecall leaf gives it,
@@ -64,12 +60,12 @@ consequence a parameter `R`. -/
 def sbundlePayRefR (X : Uvis → IProp GF) (Q : Int → IProp GF) (R : IProp GF) (W : Uvis) : IProp GF :=
   iprop(∃ f : sfam GF, ⌜sexitPay f = Q⌝ ∗ □ (sexecRefund f -∗ R) ∗ sbundleAt X USYS_exec f W)
 
-/-- **Rocq `udepw_at_refR`**: `UkRun.udepwAtRef` at the refund `R`
-(deviation 2: no `urun_rows` lend). -/
+/-- **Rocq `udepw_at_refR`**: `UkRun.udepwAtRef` at the refund `R`, the
+run's pipe rows LENT (persistent, so nothing comes back). -/
 def udepwAtRefR (N : UkNames GF) (m : RegMap) (pc : BitVec 64) (c : Nat) (R : IProp GF) : IProp GF :=
   iprop(∀ (M : ElfMem) (pm : Nat → Option UPerm) (sz : Nat) (fdv : List FdState) (gn : GName)
       (cs : ExtTreeSet GName compare) (pidv : BitVec 32),
-    myPay gn N.pay -∗ uheap N.t N.d N.s M pm sz -∗ ufdAuth N.fd fdv -∗
+    myPay gn N.pay -∗ urunRows (hlc := hlc) N fdv -∗ uheap N.t N.d N.s M pm sz -∗ ufdAuth N.fd fdv -∗
     uheap N.t N.d N.s M pm sz ∗ ufdAuth N.fd fdv ∗
       sbundlePayRefR (uslot (hlc := hlc)) N.pay R (uvisOfRun m pc M pm sz fdv c gn cs pidv false seccAll))
 
@@ -78,7 +74,8 @@ def udepwAtRefR (N : UkNames GF) (m : RegMap) (pc : BitVec 64) (c : Nat) (R : IP
 def udepwAtRefRIds (N : UkNames GF) (m : RegMap) (pc : BitVec 64) (c : Nat) (R : IProp GF) : IProp GF :=
   iprop(∀ (M : ElfMem) (pm : Nat → Option UPerm) (sz : Nat) (fdv : List FdState) (gn : GName)
       (cs : ExtTreeSet GName compare) (pidv : BitVec 32),
-    myPay gn N.pay -∗ uheap N.t N.d N.s M pm sz -∗ ufdAuth N.fd fdv -∗ urunIds N cs pidv -∗
+    myPay gn N.pay -∗ urunRows (hlc := hlc) N fdv -∗ uheap N.t N.d N.s M pm sz -∗ ufdAuth N.fd fdv -∗
+    urunIds N cs pidv -∗
     uheap N.t N.d N.s M pm sz ∗ ufdAuth N.fd fdv ∗ urunIds N cs pidv ∗
       sbundlePayRefR (uslot (hlc := hlc)) N.pay R (uvisOfRun m pc M pm sz fdv c gn cs pidv false seccAll))
 
@@ -98,9 +95,9 @@ run at `a0 := -1`, `pc + 4`. -/
 theorem uexecRet_exec_refR (N : UkNames GF) (m : RegMap) (pc : BitVec 64) (avail : Nat) (c : Nat)
     (R : IProp GF) (M : ElfMem) (pm : Nat → Option UPerm) (sz : Nat) (fdv : List FdState) (gn : GName)
     (cs : ExtTreeSet GName compare) (pidv : BitVec 32)
-    (hn : (BitVec.extractLsb' 0 32 (m 17#5)).toInt = USYS_exec) (hx0 : m 0#5 = 0#64)
+    (hn : usysno m = USYS_exec) (hx0 : m 0#5 = 0#64)
     (hal4 : (pc + 4#64) &&& 1#64 = 0#64) :
-    ⊢ myPay gn N.pay -∗ udep (hlc := hlc) -∗
+    ⊢ myPay gn N.pay -∗ udep (hlc := hlc) -∗ urunRows (hlc := hlc) N fdv -∗
       uheap N.t N.d N.s M pm sz -∗ ustack N.d (m.get spIdx) avail -∗ ufdAuth N.fd fdv -∗ ucwdAuth N.cwd c -∗
       urunIds N cs pidv -∗
       sbundlePayRefR (uslot (hlc := hlc)) N.pay R (uvisOfRun m pc M pm sz fdv c gn cs pidv false seccAll) -∗
@@ -114,7 +111,7 @@ theorem uexecRet_exec_refR (N : UkNames GF) (m : RegMap) (pc : BitVec 64) (avail
     have e : usysNum (tfOf m pc) = USYS_exec := hnum
     rw [usysEff_seccAll _ (by rw [e]; decide) (by rw [e]; decide), e]
   have hnumW : uvisNum (uvisOfRun m pc M pm sz fdv c gn cs pidv false seccAll) = USYS_exec := hnumE
-  iintro #Hmy #Hdep Hheap Hstk Hufd Hcwda Hids Hdepn Hcont
+  iintro #Hmy #Hdep #Hrows Hheap Hstk Hufd Hcwda Hids Hdepn Hcont
   rw [uexecRet_ecall]
   simp only [hnumW, usysExec_ne_exit, usysExec_ne_fork, usysExec_ne_wait, ↓reduceIte]
   unfold sbundlePayRefR
@@ -150,7 +147,7 @@ theorem uexecRet_exec_refR (N : UkNames GF) (m : RegMap) (pc : BitVec 64) (avail
   rw [← ukWr_ne0 m 10#5 (-1#64) (by decide)]
   iapply ukcq_ukc N.pay
   iapply urun_close_wr N M pm m 10#5 (-1#64) sz fdv c gn cs pidv (pc + 4#64) avail
-    (by unfold unotSp spIdx; decide) hx0 $$ Hheap Hstk Hufd Hcwda Hids Hmy Hdep
+    (by unfold unotSp spIdx; decide) hx0 $$ Hheap Hstk Hufd Hcwda Hids Hmy Hdep Hrows
   iintro %h' Hrun
   iapply Hcont $$ %h' HR Hrun
 
@@ -158,7 +155,7 @@ theorem uexecRet_exec_refR (N : UkNames GF) (m : RegMap) (pc : BitVec 64) (avail
 program's working directory `c`, handing back the supplier-named refund. -/
 theorem wp_uk_ecall_exec_at_cwd_refR (UL : UK_LEAVES) (N : UkNames GF) (h : CPU) (m : RegMap)
     (pc : BitVec 64) (avail : Nat) (c : Nat) (R : IProp GF)
-    (hn : (BitVec.extractLsb' 0 32 (m 17#5)).toInt = USYS_exec) (hal4 : (pc + 4#64) &&& 1#64 = 0#64) :
+    (hn : usysno m = USYS_exec) (hal4 : (pc + 4#64) &&& 1#64 = 0#64) :
     ⊢ uinstrIs N.t pc false (.ECALL ()) -∗ urun (hlc := hlc) N h m pc avail -∗ ucwd N.cwd c -∗
       udepwAtRefR (hlc := hlc) N m pc c R -∗
       ▷ (∀ h' : CPU, ucwd N.cwd c -∗ R -∗
@@ -167,11 +164,11 @@ theorem wp_uk_ecall_exec_at_cwd_refR (UL : UK_LEAVES) (N : UkNames GF) (h : CPU)
   iintro #Hi Hrun Hcwd Hsb Hcont
   unfold urun
   icases Hrun with ⟨%xi, %C, %pt, %Rfd, %Rut, %sz, %M, %pm, %fdv, %cw, %gn, %cs, %pidv, %hlo, %hpm, %hlzf,
-    %hRut, %hx0, Hheap, Hstk, Hufd, Hcwda, Hids, #Hmy, #Hdep, Hb⟩
+    %hRut, %hx0, Hheap, Hstk, Hufd, Hcwda, Hids, #Hmy, #Hdep, #Hrows, Hb⟩
   ihave %hcw := ucwd_agree_w N.cwd cw c $$ Hcwda Hcwd
   subst hcw
   unfold udepwAtRefR
-  icases Hsb $$ %M %pm %sz %fdv %gn %cs %pidv Hmy Hheap Hufd with ⟨Hheap, Hufd, Hdepn⟩
+  icases Hsb $$ %M %pm %sz %fdv %gn %cs %pidv Hmy Hrows Hheap Hufd with ⟨Hheap, Hufd, Hdepn⟩
   ihave %hui := uinstrIs_ukInstr N.t N.d N.s M pm sz pc false _ $$ Hheap Hi
   let S : UkSec GF := ⟨h, C, pt, Rfd, Rut, pm, sz, N.pay⟩
   let K : UkKey := ⟨fdv, cw, gn, cs, pidv⟩
@@ -181,7 +178,7 @@ theorem wp_uk_ecall_exec_at_cwd_refR (UL : UK_LEAVES) (N : UkNames GF) (h : CPU)
   iapply H $$ Hb Hmy
   inext
   iapply uexecRet_exec_refR N m pc avail cw R M pm sz fdv gn cs pidv hn hx0 hal4
-    $$ Hmy Hdep Hheap Hstk Hufd Hcwda Hids Hdepn
+    $$ Hmy Hdep Hrows Hheap Hstk Hufd Hcwda Hids Hdepn
   iintro %h' HR Hrun
   unfold urun
   iapply Hcont $$ %h' Hcwd HR Hrun
@@ -190,7 +187,7 @@ theorem wp_uk_ecall_exec_at_cwd_refR (UL : UK_LEAVES) (N : UkNames GF) (h : CPU)
 reading the record's children set and pid off the lent authorities. -/
 theorem wp_uk_ecall_exec_at_cwd_refR_ids (UL : UK_LEAVES) (N : UkNames GF) (h : CPU) (m : RegMap)
     (pc : BitVec 64) (avail : Nat) (c : Nat) (R : IProp GF)
-    (hn : (BitVec.extractLsb' 0 32 (m 17#5)).toInt = USYS_exec) (hal4 : (pc + 4#64) &&& 1#64 = 0#64) :
+    (hn : usysno m = USYS_exec) (hal4 : (pc + 4#64) &&& 1#64 = 0#64) :
     ⊢ uinstrIs N.t pc false (.ECALL ()) -∗ urun (hlc := hlc) N h m pc avail -∗ ucwd N.cwd c -∗
       udepwAtRefRIds (hlc := hlc) N m pc c R -∗
       ▷ (∀ h' : CPU, ucwd N.cwd c -∗ R -∗
@@ -199,11 +196,11 @@ theorem wp_uk_ecall_exec_at_cwd_refR_ids (UL : UK_LEAVES) (N : UkNames GF) (h : 
   iintro #Hi Hrun Hcwd Hsb Hcont
   unfold urun
   icases Hrun with ⟨%xi, %C, %pt, %Rfd, %Rut, %sz, %M, %pm, %fdv, %cw, %gn, %cs, %pidv, %hlo, %hpm, %hlzf,
-    %hRut, %hx0, Hheap, Hstk, Hufd, Hcwda, Hids, #Hmy, #Hdep, Hb⟩
+    %hRut, %hx0, Hheap, Hstk, Hufd, Hcwda, Hids, #Hmy, #Hdep, #Hrows, Hb⟩
   ihave %hcw := ucwd_agree_w N.cwd cw c $$ Hcwda Hcwd
   subst hcw
   unfold udepwAtRefRIds
-  icases Hsb $$ %M %pm %sz %fdv %gn %cs %pidv Hmy Hheap Hufd Hids with ⟨Hheap, Hufd, Hids, Hdepn⟩
+  icases Hsb $$ %M %pm %sz %fdv %gn %cs %pidv Hmy Hrows Hheap Hufd Hids with ⟨Hheap, Hufd, Hids, Hdepn⟩
   ihave %hui := uinstrIs_ukInstr N.t N.d N.s M pm sz pc false _ $$ Hheap Hi
   let S : UkSec GF := ⟨h, C, pt, Rfd, Rut, pm, sz, N.pay⟩
   let K : UkKey := ⟨fdv, cw, gn, cs, pidv⟩
@@ -213,7 +210,7 @@ theorem wp_uk_ecall_exec_at_cwd_refR_ids (UL : UK_LEAVES) (N : UkNames GF) (h : 
   iapply H $$ Hb Hmy
   inext
   iapply uexecRet_exec_refR N m pc avail cw R M pm sz fdv gn cs pidv hn hx0 hal4
-    $$ Hmy Hdep Hheap Hstk Hufd Hcwda Hids Hdepn
+    $$ Hmy Hdep Hrows Hheap Hstk Hufd Hcwda Hids Hdepn
   iintro %h' HR Hrun
   unfold urun
   iapply Hcont $$ %h' Hcwd HR Hrun

@@ -23,13 +23,9 @@ unwritten suffix.
    `ush_bytes_upd`); the postcondition is the same (`fun _ => c`).
 2. The shared prologue-to-loop run is one lemma (`ushMs_head`), used by
    both arms (Rocq writes it out in each).
-3. **The NULL arm needs `UprogSG.psok USYS_exit`** (UkRunMem deviation 4:
-   Lean's `wp_uk_sb_denied` mints the exit deposit off the key-free law at
-   that premise, where Rocq self-mints it off the run -- K4-deferred).
-   `wpUshMemsetNullBody` (UshTreeDefs) has no such premise, so
-   `wp_ushMemsetNullP` proves it WITH the premise, and `shMemset_holds`
-   takes it as a hypothesis `hex` (at every instance).  K4 restoring
-   `udep_exit_run` removes it.
+3. (Retired, U1-R: `wp_uk_sb_denied` self-mints the exit deposit off the
+   run, `UkRun.udep_exit_run`, as in Rocq, so the NULL arm takes no
+   premise and `shMemset_holds` no `hex`.)
 4. Engine `UL : UK_LEAVES` (DU2); addresses are `Nat`.
 -/
 import Xv6.UshTreeDefs
@@ -280,9 +276,8 @@ theorem wp_ushMemset (UL : UK_LEAVES) : wpUshMemsetBody (hlc := hlc) (GF := GF) 
   ipureintro
   exact ush_cs_epi m me _ sp0 rfl hkeep
 
-/-- **Rocq `wp_ksh_memset_null`**, at the exit deposit's premise
-(deviation 3). -/
-theorem wp_ushMemsetNullP (UL : UK_LEAVES) (hok : UprogSG.psok (GF := GF) USYS_exit) :
+/-- **Rocq `wp_ksh_memset_null`**. -/
+theorem wp_ushMemsetNullP (UL : UK_LEAVES) :
     ∀ (N : UkNames GF) (h : CPU) (m : RegMap) (a Nb : Nat) (b0 : BitVec 8) (n : Nat),
     a + Nb < 2 ^ 38 → m.get 10#5 = BitVec.ofNat 64 a → m.get 12#5 = BitVec.ofNat 64 Nb → 0 < Nb → Nb < 2 ^ 31 →
     ⊢ ushCode N.t -∗ utext N.t a b0 -∗ N.pay (-1) -∗
@@ -296,15 +291,13 @@ theorem wp_ushMemsetNullP (UL : UK_LEAVES) (hok : UprogSG.psok (GF := GF) USYS_e
     have e : (ushMsM m a Nb).get 15#5 = BitVec.ofNat 64 a := by unfold ushMsM; ureg
     rw [e, BitVec.toNat_ofNat, Nat.mod_eq_of_lt (by omega)]; simp
   ihave #Hi := ushMI_a70 N.t $$ Hc
-  iapply wp_uk_sb_denied UL N h1 _ _ false 0#12 15#5 11#5 a b0 n ha hok $$ Hi Ht Hrun Hpay
+  iapply wp_uk_sb_denied UL N h1 _ _ false 0#12 15#5 11#5 a b0 n ha $$ Hi Ht Hrun Hpay
 
 end
 
-/-- **sh's `memset` holds**, at the engine `UL` and the exit deposit's
-premise at every instance (deviation 3). -/
-theorem shMemset_holds (UL : UK_LEAVES)
-    (hex : ∀ {GF : BundledGFunctors.{0}} [UprogSG GF], UprogSG.psok (GF := GF) USYS_exit) : USH_MEMSET :=
+/-- **sh's `memset` holds**, at the engine `UL`. -/
+theorem shMemset_holds (UL : UK_LEAVES) : USH_MEMSET :=
   ⟨fun {_ _} _ _ _ _ _ _ _ _ _ => wp_ushMemset UL,
-   fun {_ _} _ _ _ _ _ _ _ _ _ => wp_ushMemsetNullP UL hex⟩
+   fun {_ _} _ _ _ _ _ _ _ _ _ => wp_ushMemsetNullP UL⟩
 
 end Xv6

@@ -23,14 +23,13 @@ child is `Rc` (refunded on the failing arm).
 1. **The engine is a parameter** (`UL : UK_LEAVES`, union DU2): the trap is
    `UL.wp_uk_ecall`; Rocq's `goodmb_execute_ECALL_U` certificate is the
    engine's business (SpecUkLeaves deviation 9).
-2. **The syscall number is stated on the register file**:
-   `(BitVec.extractLsb' 0 32 (m 17#5)).toInt = USYS_fork` (Rocq `usysno m =
-   USYS_fork`; `usysno` is UkRunSys's, not yet ported), which is
-   `usysNum (tfOf m pc)` by `UexecRet.tfOf_num`.  The alignment premise is
-   `(pc + 4#64) &&& 1#64 = 0#64` (UexecRet deviation 7).
-3. **The pipe rows are absent** (K4, UkRun deviation 2): no `urun_rows` /
-   `urun_nopipe`.  The run key is at the all-allowing mask (`seccAll`, as
-   Rocq's `urun`), the ecall read through `usysEff_seccAll`.
+2. The syscall number is Rocq's `usysno m = USYS_fork` (`UkRun.usysno`,
+   U1-R), which is `usysNum (tfOf m pc)` by `UexecRet.tfOf_num`.  The
+   alignment premise is `(pc + 4#64) &&& 1#64 = 0#64` (UexecRet deviation 7).
+3. (Retired, U1-R: the run's pipe rows `urunRows` ride through; the child's
+   table is the parent's, so its rows are the parent's.)  The run key is at
+   the all-allowing mask (`seccAll`, as Rocq's `urun`), the ecall read
+   through `usysEff_seccAll`.
 4. (Retired, K3.)  The ledger is Rocq's whole-table `ustdAt l v` (seccomp
    S3 G2): the child's is re-minted by `ufd_alloc_std_at` at the parent's
    view; `wp_uk_ecall_fork` is the form at a ledger nobody reads.
@@ -63,7 +62,7 @@ variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CtokG GF] [SG : 
   [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int]
 
 /-- The fork number off the key a running machine traps from. -/
-theorem ukFork_num (m : RegMap) (pc : BitVec 64) (hn : (BitVec.extractLsb' 0 32 (m 17#5)).toInt = USYS_fork) :
+theorem ukFork_num (m : RegMap) (pc : BitVec 64) (hn : usysno m = USYS_fork) :
     usysNum (tfOf m pc) = USYS_fork := by rw [tfOf_num]; exact hn
 
 /-- a0 is not sp. -/
@@ -76,7 +75,7 @@ theorem wp_uk_ecall_fork_at (UL : UK_LEAVES) (N : UkNames GF) (h : CPU) (m : Reg
     (avail sz : Nat) (l : List FdState) (D : RegMapF FdState) (c : Nat) (v : List FdState)
     (Sc : ExtTreeSet GName compare)
     (Q : Int → IProp GF) (Rc : IProp GF) (P : GName → GName → GName → IProp GF) [FP : Forkable P]
-    (hn : (BitVec.extractLsb' 0 32 (m 17#5)).toInt = USYS_fork) (hal4 : (pc + 4#64) &&& 1#64 = 0#64) :
+    (hn : usysno m = USYS_fork) (hal4 : (pc + 4#64) &&& 1#64 = 0#64) :
     ⊢ uinstrIs N.t pc false (.ECALL ()) -∗ Rc -∗ P N.t N.d N.s -∗ usz N.s sz -∗ ustdAt N.fd l v -∗
       ([∗map] fd ↦ st ∈ D, ufd N.fd fd st) -∗ ucwd N.cwd c -∗ uch N.ch Sc -∗
       □ (uKillCred (hlc := hlc) -∗ Q (-1)) -∗ urun (hlc := hlc) N h m pc avail -∗
@@ -95,7 +94,7 @@ theorem wp_uk_ecall_fork_at (UL : UK_LEAVES) (N : UkNames GF) (h : CPU) (m : Reg
   iintro #Hi HRc HP Hsz Hstd HD Hcwd Hchf #Hkw Hrun ⟨Hpar, Hchild⟩
   unfold urun
   icases Hrun with ⟨%xi, %C, %pt, %Rfd, %Rut, %sz0, %M, %pm, %fdv, %cw, %gn, %cs, %pidv, %hlo, %hpm, %hlzf,
-    %hRut, %hx0, Hheap, Hstk, Hufd, Hcwda, Hids, #Hmy, #Hdep, Hb⟩
+    %hRut, %hx0, Hheap, Hstk, Hufd, Hcwda, Hids, #Hmy, #Hdep, #Hrows, Hb⟩
   -- the caller's halves pin the key's cwd and children set
   ihave %hcw := ucwd_agree N.cwd cw c $$ [Hcwda Hcwd]
   · iframe Hcwda Hcwd
@@ -175,7 +174,7 @@ theorem wp_uk_ecall_fork_at (UL : UK_LEAVES) (N : UkNames GF) (h : CPU) (m : Reg
       iapply ukcq_ukc
       rw [← ukWr_ne0 m 10#5 r (by decide)]
       iapply urun_close_wr N M pm m 10#5 r sz fdv c gn Sc pidv (pc + 4#64) avail ukFork_a0_ns hx0
-        $$ Hheap Hstk Hufd Hcwda Hids Hmy Hdep
+        $$ Hheap Hstk Hufd Hcwda Hids Hmy Hdep Hrows
       iintro %h' Hrun
       unfold urun
       iapply Hpar $$ %h' %r %hr [Hchf HRc] HP Hsz Hstd HD Hcwd Hrun
@@ -199,7 +198,7 @@ theorem wp_uk_ecall_fork_at (UL : UK_LEAVES) (N : UkNames GF) (h : CPU) (m : Reg
       iapply ukcq_ukc
       rw [← ukWr_ne0 m 10#5 r (by decide)]
       iapply urun_close_wr N M pm m 10#5 r sz fdv c gn (Sc ∪ {γ}) pidv (pc + 4#64) avail ukFork_a0_ns hx0
-        $$ Hheap Hstk Hufd Hcwda Hids Hmy Hdep
+        $$ Hheap Hstk Hufd Hcwda Hids Hmy Hdep Hrows
       iintro %h' Hrun
       unfold urun
       iapply Hpar $$ %h' %r %hr [Hchf Htok] HP Hsz Hstd HD Hcwd Hrun
@@ -233,8 +232,9 @@ theorem wp_uk_ecall_fork_at (UL : UK_LEAVES) (N : UkNames GF) (h : CPU) (m : Reg
     rw [← ukWr_ne0 m 10#5 0#64 (by decide)]
     ihave Hids' := urunIds_intro N' ∅ pidc $$ [Hcha' Hpida']
     · iframe Hcha' Hpida'
+    ihave #Hrows' := (show urunRows (hlc := hlc) N fdv ⊢ urunRows (hlc := hlc) N' fdv from .rfl) $$ Hrows
     iapply urun_close_wr N' M pm m 10#5 0#64 sz fdv c g' ∅ pidc (pc + 4#64) avail ukFork_a0_ns hx0
-      $$ Hheap' Hstk' Hufd' Hcwa' Hids' Hmp Hdep
+      $$ Hheap' Hstk' Hufd' Hcwa' Hids' Hmp Hdep Hrows'
     iintro %h' Hrun
     unfold urun
     iapply Hchild $$ %N' %h' %g' %rfl Hmp HRc HP' Hsz' Hstd' Hfrag' Hcwf' Hchf' [Hpidf'] Hrun
@@ -252,7 +252,7 @@ theorem wp_uk_ecall_fork_at (UL : UK_LEAVES) (N : UkNames GF) (h : CPU) (m : Reg
 theorem wp_uk_ecall_fork (UL : UK_LEAVES) (N : UkNames GF) (h : CPU) (m : RegMap) (pc : BitVec 64)
     (avail sz : Nat) (l : List FdState) (D : RegMapF FdState) (c : Nat) (Sc : ExtTreeSet GName compare)
     (Q : Int → IProp GF) (Rc : IProp GF) (P : GName → GName → GName → IProp GF) [FP : Forkable P]
-    (hn : (BitVec.extractLsb' 0 32 (m 17#5)).toInt = USYS_fork) (hal4 : (pc + 4#64) &&& 1#64 = 0#64) :
+    (hn : usysno m = USYS_fork) (hal4 : (pc + 4#64) &&& 1#64 = 0#64) :
     ⊢ uinstrIs N.t pc false (.ECALL ()) -∗ Rc -∗ P N.t N.d N.s -∗ usz N.s sz -∗ ustd N.fd l -∗
       ([∗map] fd ↦ st ∈ D, ufd N.fd fd st) -∗ ucwd N.cwd c -∗ uch N.ch Sc -∗
       □ (uKillCred (hlc := hlc) -∗ Q (-1)) -∗ urun (hlc := hlc) N h m pc avail -∗

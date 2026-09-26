@@ -25,7 +25,8 @@ runs on (`ushmOne`), and `sbrk`'s failure arm is carried, not assumed away.
    Rocq's `UCodeShM.uis_shm_<pc>`); addresses are U0-7's symbols
    (`User.Sh.Sym.«malloc»`, `«freep»`, `«base»`; Rocq `ShSyms.malloc`,
    `SH_FREEP`, `SH_BASE`).
-2. **The sbrk ecall row is a PARAMETER** (`USHM_SBRK_LEAF`, Rocq
+2. **The sbrk ecall row is a PARAMETER** (DISCHARGED by U1-R-sys:
+   `UshmSbrkHolds.ushmSbrk_holds UL : USHM_SBRK_LEAF`) (`USHM_SBRK_LEAF`, Rocq
    `UkRunSys.wp_uk_ecall_sbrk`, whose file is not ported yet: it needs K3's
    seccomp key and K4's close/exit deposits).  Its statement is Rocq's, with
    the syscall number on the register file (`(extractLsb' 0 32 (m 17#5)).toInt
