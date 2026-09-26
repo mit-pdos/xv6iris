@@ -1695,6 +1695,121 @@ Section UkRunSys.
       iApply ("Hcont" $! h' r with "[] Hstd Hrun"). by iPureIntro.
   Qed.
 
+  (* ...AT A NAMED TABLE VIEW (seccomp S4): nothing moves *)
+  Lemma wp_uk_ecall_dup_closed_at (N : uk_names Σ) (h : CpuId) (m : regfile)
+      (pc : mword 64) (l v : list fdstate) (fd0 : nat) (avail : nat) :
+    usysno m = USYS_dup ->
+    (* the argument register IS the descriptor the ledger is read at, the
+       way [argfd] reads it -- as a C [int] *)
+    bv_signed (trunc32 (m !!! Regidx (mword_of_int 10))) = Z.of_nat fd0 ->
+    (* ...and it is a STANDARD STREAM the ledger has a row for, CLOSED *)
+    (fd0 < NSTD)%nat ->
+    l !! fd0 = Some FdClosed ->
+    is_aligned_vaddr (Virtaddr (add_vec_int pc 4)) 2 = true ->
+    uinstr_is (ukn_t N) pc false (ECALL tt) -∗
+    urun N h m pc avail -∗
+    udepw N m pc USYS_dup -∗
+    ustd_at (ukn_fd N) l v -∗
+    (∀ (h' : CpuId) (r : mword 64),
+       (* THE CALL FAILED: [argfd] rejects a null slot, and the row's
+          success arm -- which now carries `the source was open' -- is
+          refuted by the caller's own [Hrow]. *)
+       ⌜r = (mword_of_int (-1) : mword 64)⌝ -∗
+       (* ...AND THE LEDGER, UNCHANGED *)
+       ustd_at (ukn_fd N) l v -∗
+       urun N h' (<[Regidx (mword_of_int 10) := r]> m)
+         (add_vec_int pc 4) avail -∗
+       mWP (Loop : expr riscv_lang)) -∗
+    mWP (Loop : expr riscv_lang).
+  Proof using .
+    intros Hn Harg Hlt Hrow Hal4.
+    iIntros "#Hi Hrun Hsb Hstd Hcont".
+    iDestruct "Hrun" as (xi C pt Rfd Rut sz M pm fdv cw gn cs pidv) "(%Hlo & %Hpm & %Hlzf & %HRut & Hheap & Hstk & Hufd & Hcwda & Hcha & #Hmy & #Hdep & #Hnpx & Hb)".
+    (* THE LEDGER READS THE VIEW, which is the whole argument: the source
+       slot is CLOSED in the table, so dup's success arm copies [FdClosed]
+       into a slot the scan already found closed and the list does not
+       move ([UserFd.ufd_alloc_least_closed]). *)
+    iDestruct (ustd_at_agree (ukn_fd N) fdv l v with "Hufd Hstd") as %Htake.
+    assert (Htk : take NSTD fdv !! fd0 = Some FdClosed)
+      by (rewrite Htake; exact Hrow).
+    rewrite lookup_take in Htk; [| exact Hlt].
+    iMod (udepw_mint N m pc _ M pm _ fdv cw gn cs pidv
+                with "Hdep Hmy Hsb Hheap Hufd") as "(Hheap & Hufd & Hdepn)".
+    iDestruct (uinstr_is_uk_instr with "Hheap Hi") as %Hui.
+    iDestruct (uvb_x0 with "Hb") as "[%Hx0 Hb]".
+    iApply (UkStep.wp_uk_ecall C pt Rfd Rut pm sz Hlo Hpm HRut Hlzf M m pc fdv cw gn cs pidv Hui
+              (fun (s : mstate)
+                   (Hp : register_lookup cur_privilege s.(sregs) = User)
+                   (Hc : register_lookup (R_bitvector_64 PC) s.(sregs) = pc) =>
+                 UserExecFacts.goodmb_execute_ECALL_U UserFrame.Du_r UserFrame.Du_w
+                   s pc ltac:(vm_compute; reflexivity)
+                   ltac:(vm_compute; reflexivity) Hp Hc)
+              with "Hb Hmy").
+    rewrite (uexec_ret_ecall _ _ eq_refl).
+    assert (Hnum : uvis_num (uvis_of_run m pc M pm sz fdv cw gn cs pidv false secc_all) = USYS_dup).
+    { assert (Hraw : usys_num (uvis_tf (uvis_of_run m pc M pm sz fdv cw gn cs pidv false secc_all)) = USYS_dup)
+        by (cbn [uvis_tf uvis_of_run]; rewrite tf_of_num; exact Hn).
+      rewrite uvis_num_full0; [ exact Hraw | reflexivity | rewrite Hraw; usys_range ]. }
+    rewrite /uexec_pay_dep /upay_at.
+    pose proof Hnum as Hnume. unfold uvis_num in Hnume. rewrite ?Hnum ?Hnume. cbv zeta.
+    destruct (decide (uecall_scause = uecall_scause)) as [_ | Hpne];
+      [ | exfalso; exact (Hpne eq_refl) ].
+    destruct (decide (USYS_dup = USYS_exit)) as [He | _];
+      [ exfalso; vm_compute in He; discriminate | ].
+    destruct (decide (USYS_dup = USYS_fork)) as [He | _];
+      [ exfalso; vm_compute in He; discriminate | ].
+    iDestruct "Hdepn" as (fdep) "[%Hfp Hdepn]".
+    iExists fdep. rewrite Hfp.
+    cbn [uvis_gen uvis_of_run].
+    iSplitR; [ iFrame "Hmy" | ].
+    iSplitL "Hdepn"; [ iExact "Hdepn" | ].
+    iIntros (r M' pm' sz' fdv' cw' gn' cs' lz' secc') "%Hok %Hfdok %Hpiperow %Hcwrow %Hgnrow %Hpidrow %Hliverow %Hscrow %Hchrow _".
+    (* THE LAZY BIT CROSSED THE TRAP UNCHANGED (lane LAZY-FLAG, L6).  The
+       trapping key is at [false] -- the U tier's run is
+       ([UexecRet.ukcq]) -- and every row but sbrk's is the equation
+       ([UsysMemOk.usys_mem_ok_lazy]), so the resume key is at [false] too
+       and the close below is at the run's own bit. *)
+    assert (Hlzq : lz' = false)
+      by (refine (usys_mem_ok_lazy _ _ _ _ _ _ _ _ _ _ _ _ Hok);
+          first [ assumption | vm_compute; discriminate ]).
+    subst lz'.
+    (* ...AND SO DID THE MASK: not seccomp's number, so the row is the
+       equation ([UsysMemOk.usys_secc_ok_quiet]), and the resume key is at
+       the full mask [urun] is keyed at *)
+    pose proof (fun Hne => usys_secc_ok_quiet _ _ _ _ _ Hne Hscrow) as Hscq.
+    specialize (Hscq ltac:(usys_range)).
+    cbn [uvis_secc uvis_of_run] in Hscq. subst secc'.
+    assert (Hcw : cw' = cw)
+      by (refine (usys_cwd_ok_quiet _ _ _ _ _ Hcwrow); vm_compute; discriminate).
+    iDestruct (ucwd_auth_quiet N cw cw' Hcw with "Hcwda") as "Hcwda".
+    assert (Hgn : gn' = gn) by exact (usys_gen_ok_quiet _ _ _ Hgnrow).
+    assert (Hch : cs' = cs) by exact (usys_ch_ok_quiet _ _ _ _ Hchrow).
+    subst gn' cs'.
+    destruct (usys_mem_ok_quiet USYS_dup _ r _ _ _ _ _ _ _ _
+                ltac:(discriminate) ltac:(discriminate) ltac:(discriminate)
+                ltac:(discriminate) ltac:(discriminate) ltac:(discriminate) Hok)
+      as [-> [-> ->]].
+    unfold usys_fd_ok in Hfdok.
+    destruct (decide (USYS_dup = USYS_close)) as [Hc | _]; [ discriminate Hc | ].
+    destruct (decide (USYS_dup = USYS_dup)) as [_ | Hc];
+      [ | exfalso; exact (Hc eq_refl) ].
+    cbn [uvis_M uvis_perm uvis_fd uvis_of_run] in Hfdok |- *.
+    assert (Hai : Z.to_nat (usys_argfd (tf_of m pc)) = fd0).
+    { unfold usys_argfd. cbn [tf_of]. rewrite Harg. exact (Nat2Z.id fd0). }
+    destruct Hfdok as [(fd1 & Hr & Hcl & Hop & ->) | (Hrm & -> & _)].
+    - (* REFUTED: the success arm says the source was OPEN and the caller's
+         own ledger says it was CLOSED. *)
+      exfalso. rewrite Hai in Hop. exact (Hop Htk).
+    - (* the call failed: nothing moved at all, and the row names the -1 *)
+      rewrite (uslot_bump_run m pc M M pm pm sz sz fdv fdv cw cw' gn gn cs cs pidv false false secc_all secc_all r Hx0 Hal4).
+      iApply ukcq_ukc.
+      iApply (urun_close_upd _ _ _ m (mword_of_int 10) _ _ _ _ _ _ _ _ _
+                ltac:(unfold unot_sp; vm_compute; discriminate)
+                with "Hheap Hstk Hufd Hcwda Hcha Hmy Hdep Hnpx").
+      iIntros (h') "Hrun".
+      iApply ("Hcont" $! h' r with "[] Hstd Hrun"). by iPureIntro.
+  Qed.
+
   (* THE KEY'S READING OF ARGUMENT 0, from an index the caller named and a
      row of the table.  [UkReadRows.ufd_fd_st_of_key] is the same fact and
      is the one every ARM file uses; it sits ABOVE this file (it is stated

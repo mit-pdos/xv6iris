@@ -322,8 +322,8 @@ Section TreeInitWrite.
       + iApply ("Hsup" with "Ht").
       + rewrite Hkill /kill_cred_triv. done.
     - (* ...and the closed-fd leaf, which needs no claim at all *)
-      rewrite /UkInit.kinit_wcl. iIntros "!>" (N0 b).
-      iApply (UkWriteClosed.kinit_w1_of_closed_l0 (PS := uprogSG_free) N0 b).
+      rewrite /UkInit.kinit_wcl. iIntros "!>" (N0 b vw).
+      iApply (UkWriteClosed.kinit_w1_of_closed_l0 (PS := uprogSG_free) N0 b vw).
     - iIntros "!> #Ht".
       iApply (udepw_law_of_sup (PSx := uprogSG_free) 15 (or_introl eq_refl)).
       iApply ("Hsup" with "Ht").

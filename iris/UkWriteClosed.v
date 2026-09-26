@@ -238,17 +238,17 @@ Section UkWriteClosed.
      [i] is closed.  The byte comes back with the ledger, as [kinit_w1]
      asks; [UkInit.kinit_w1_of_law] is the free-law twin. *)
   Lemma kinit_w1_of_closed (N : uk_names Σ) (fdw : mword 64) (b : bv 8)
-      (l : list fdstate) (i : nat) :
+      (l v : list fdstate) (i : nat) :
     bv_signed (trunc32 fdw) = Z.of_nat i ->
     (i < NSTD)%nat ->
     l !! i = Some FdClosed ->
     ⊢ UkInit.kinit_w1 N fdw b
-        (UserFd.ustd (ukn_fd N) l) (UserFd.ustd (ukn_fd N) l).
+        (UserFd.ustd_at (ukn_fd N) l v) (UserFd.ustd_at (ukn_fd N) l v).
   Proof using .
     intros Hfd Hi Hli.
     iIntros (h m avail) "%Ha0 %Ha2 #Hcode Hbuf Hstd Hrun Hcont".
-    iApply (UkInit.wp_kinit_write_chain N h m avail
-              (kwc_fam N) l
+    iApply (UkInit.wp_kinit_write_chain_at N h m avail
+              (kwc_fam N) l v
               (DfracOwn 1) 1%nat (fun _ => b)
               with "Hcode Hrun [] Hstd [Hbuf]").
     { (* THE DEPOSIT: the closed arm's, from nothing *)
@@ -279,11 +279,11 @@ Section UkWriteClosed.
              ltac:(reflexivity)).
   Qed.
 
-  Lemma kinit_w1_of_closed_l0 (N : uk_names Σ) (b : bv 8) :
+  Lemma kinit_w1_of_closed_l0 (N : uk_names Σ) (b : bv 8) (v : list fdstate) :
     ⊢ UkInit.kinit_w1 N (mword_of_int 1 : mword 64) b
-        (UserFd.ustd (ukn_fd N) ufd_l0) (UserFd.ustd (ukn_fd N) ufd_l0).
+        (UserFd.ustd_at (ukn_fd N) ufd_l0 v) (UserFd.ustd_at (ukn_fd N) ufd_l0 v).
   Proof using .
-    apply (kinit_w1_of_closed N (mword_of_int 1) b ufd_l0 1%nat
+    apply (kinit_w1_of_closed N (mword_of_int 1) b ufd_l0 v 1%nat
              ltac:(vm_compute; reflexivity)
              ltac:(unfold NSTD; lia)
              ltac:(reflexivity)).

@@ -329,9 +329,10 @@ Section UkInitMain.
       - (* THE CLOSED ROW (lane EXEC-SEAM, (D)): fd 1 is closed, the bytes
            go nowhere, and the ledger itself is the per-byte carrier of the
            closed-fd leaf *)
-        subst l. iExists (fun _ => UserFd.ustd (ukn_fd N') ufd_l0).
+        subst l. iDestruct (ustd_ustd_at with "Hstd") as (vw) "Hstd".
+        iExists (fun _ => UserFd.ustd_at (ukn_fd N') ufd_l0 vw).
         iSplitR; [ | iExact "Hstd" ].
-        iIntros "!>" (j) "_". iApply ("Hwcl" $! N' (init_lit LIT_FORK j)).
+        iIntros "!>" (j) "_". iApply ("Hwcl" $! N' (init_lit LIT_FORK j) vw).
       - (* THE TAINT: the write law under the taint *)
         iDestruct ("Hwrl" with "HT") as "#Hwr".
         iClear "Hstd". iExists (fun _ => emp%I). iSplitR; [ | done ].
@@ -502,9 +503,10 @@ Section UkInitMain.
            and the lend carries the banner-owed credential itself, which is
            what the pair is rebuilt with ((C): the pair has no affine arm
            any more) *)
-        subst l. iExists (fun _ => UserFd.ustd (ukn_fd N') ufd_l0).
+        subst l. iDestruct (ustd_ustd_at with "Hstd") as (vw) "Hstd".
+        iExists (fun _ => UserFd.ustd_at (ukn_fd N') ufd_l0 vw).
         iSplitR; [ | iSplitL "Hstd"; [ iExact "Hstd" | ] ].
-        + iIntros "!>" (j) "_". iApply ("Hwcl" $! N' (init_lit LIT_EXEC j)).
+        + iIntros "!>" (j) "_". iApply ("Hwcl" $! N' (init_lit LIT_EXEC j) vw).
         + iIntros "_". rewrite Hpeq.
           iEval (rewrite /ucons_pay) in "Hlease".
           iDestruct "Hlease" as "[Hl | HT]"; last first.
@@ -1176,7 +1178,7 @@ Section UkInitMain.
   Definition kinit_lent (T : iProp Σ) (stc : fdstate) (cn : cons_names)
       (Cr : cons_cred Σ) : iProp Σ :=
     (∃ l : list fdstate,
-       UserFd.ustd γfd l ∗ UInitFd.ufd_row T stc l
+       UserFd.ustd_ok T γfd l ∗ UInitFd.ufd_row T stc l
        ∗ uinit_tok cn T (fun k => (cc_rd Cr) k ∗ init_lend_cred T stc (cc_wp Cr) (cc_wbn Cr) l k)%I)%I.
 
   (* ...AND THE BANNER ITSELF, both ways round: with the payment through
@@ -1225,9 +1227,9 @@ Section UkInitMain.
        the ledger itself is the carrier); and on the free law UNDER THE
        TAINT otherwise, with the lend assembled up front. *)
     iAssert ((T ∗ kinit_lent T stc cn Cr)
-             ∨ (⌜l = ufd_l3 stc⌝ ∗ UserFd.ustd γfd l
+             ∨ (⌜l = ufd_l3 stc⌝ ∗ UserFd.ustd_ok T γfd l
                 ∗ ∃ k : nat, ucons_reader cn k ∗ (cc_rd Cr) k ∗ (cc_wbn Cr) k)
-             ∨ (⌜l = ufd_l0⌝ ∗ UserFd.ustd γfd l
+             ∨ (⌜l = ufd_l0⌝ ∗ UserFd.ustd_ok T γfd l
                 ∗ ∃ k : nat, ucons_reader cn k ∗ (cc_rd Cr) k ∗ (cc_wbn Cr) k))%I
       with "[Htk Hstd]" as "[[#HT Hrest] | [Hpay | Hcl]]".
     { rewrite /uinit_tok. iDestruct "Htk" as "[Htk | #HT]"; last first.
@@ -1261,24 +1263,26 @@ Section UkInitMain.
             the closed-fd leaf's carrier; the lend keeps the banner-owed
             credential on its closed arm *)
       iDestruct "Hcl" as (Hl0) "[Hl0 Hk]". iDestruct "Hk" as (k) "(Hr & Hd & Hb)".
-      subst l.
+      subst l. iDestruct "Hl0" as (vw) "[Hok Hl0]".
       iApply (wp_kinit_printf_chain N LIT_START 18%nat (init_lit LIT_START)
-                (fun _ => UserFd.ustd γfd ufd_l0) h m n
+                (fun _ => UserFd.ustd_at γfd ufd_l0 vw) h m n
                 ltac:(vm_compute; discriminate)
                 ltac:(vm_compute; reflexivity) ltac:(lia)
                 (fun j Hj => init_lit_nopct LIT_START 18%nat j HokS Hj) Ha0
                 with "[] Hcode Hstr Hl0 Hrun").
-      { iIntros "!>" (j) "_". iApply ("Hwcl" $! N (init_lit LIT_START j)). }
+      { iIntros "!>" (j) "_". iApply ("Hwcl" $! N (init_lit LIT_START j) vw). }
       iIntros (h' m') "%Hcs Hl0 Hrun".
-      iApply ("Hcont" $! h' m' with "[%] [Hl0 Hr Hd Hb] Hrun"); [ exact Hcs | ].
-      rewrite /kinit_lent. iExists ufd_l0. iFrame "Hl0 Hrow".
+      iApply ("Hcont" $! h' m' with "[%] [Hl0 Hok Hr Hd Hb] Hrun"); [ exact Hcs | ].
+      rewrite /kinit_lent. iExists ufd_l0. iFrame "Hrow".
+      iSplitL "Hl0 Hok"; [ rewrite /ustd_ok; iExists vw; iFrame "Hok Hl0" |].
       rewrite /uinit_tok. iLeft. iExists k. iFrame "Hr Hd".
       rewrite /init_lend_cred. iRight. iLeft. iFrame "Hb". by iPureIntro. }
     iDestruct "Hpay" as (Hl3) "[Hl3 Hk]". iDestruct "Hk" as (k) "(Hr & Hd & Hb)".
     subst l.
     iDestruct ("Hblaw" $! k with "Hb") as "Hb".
     rewrite /kinit_banner0 /UkInit.kinit_banner_pay.
-    iDestruct ("Hb" with "Hl3") as (Ch) "(#Hw & HCh & Hgive)".
+    iDestruct "Hl3" as (vw) "[Hok Hl3]".
+    iDestruct ("Hb" $! vw with "Hl3") as (Ch) "(#Hw & HCh & Hgive)".
     iApply (wp_kinit_printf_chain N LIT_START 18%nat (init_lit LIT_START)
               Ch h m n
               ltac:(vm_compute; discriminate)
@@ -1287,8 +1291,9 @@ Section UkInitMain.
               with "Hw Hcode Hstr HCh Hrun").
     iIntros (h' m') "%Hcs HCh Hrun".
     iDestruct ("Hgive" with "HCh") as "[Hl Hwc]".
-    iApply ("Hcont" $! h' m' with "[%] [Hl Hr Hd Hwc] Hrun"); [ exact Hcs | ].
-    rewrite /kinit_lent. iExists (ufd_l3 stc). iFrame "Hl Hrow".
+    iApply ("Hcont" $! h' m' with "[%] [Hl Hok Hr Hd Hwc] Hrun"); [ exact Hcs | ].
+    rewrite /kinit_lent. iExists (ufd_l3 stc). iFrame "Hrow".
+    iSplitL "Hl Hok"; [ rewrite /ustd_ok; iExists vw; iFrame "Hok Hl" |].
     rewrite /uinit_tok. iLeft. iExists k. iFrame "Hr Hd".
     rewrite /init_lend_cred. iLeft. iFrame "Hwc". by iPureIntro.
   Qed.
@@ -1527,7 +1532,8 @@ Section UkInitMain.
              to a small positive, and [blt a0,x0] is not taken on one. *)
           iDestruct "Hans" as "[(%Hrm1 & _ & _ & _ & Hcred) | (%γsh & %pidsh & %Hrpid & %Hrng & _ & _)]".
           { iApply (wp_kinit_main_die_df N T stc (cc_wp Cr) (cc_wbn Cr) l np hp2 _ n
-                      with "Hpay Hwr Hdlaw Hcode Hro Hstd Hcred Hrun"). }
+                      with "Hpay Hwr Hdlaw Hcode Hro [Hstd] Hcred Hrun").
+            iApply (ustd_ok_ustd with "Hstd"). }
           exfalso.
           rewrite Ha0p1 Hrpid (sext32_small pidsh (pid_lt_Z31 _ Hrng)) in Hblt.
           cbn [uv_btaken] in Hblt.
@@ -2463,7 +2469,7 @@ Section UkInitMain.
     init_cons_dance N T Cns stc -∗
     init_rodata γt -∗ init_argv γd -∗ usz γs szv -∗
     (* the all-closed ledger /init is born with *)
-    ustd γfd ufd_l0 -∗
+    ustd_ok T γfd ufd_l0 -∗
     UserCwd.ucwd γcwd FsImg.ROOTINO -∗
     UserChildren.uch_any γch -∗
     (* THE CONSOLE INPUT, on its way to the restart head: the reader token
@@ -2811,7 +2817,7 @@ Section UkInitMain.
     init_cons_sup cn T Cns stc Cr -∗
     init_cons_dance N T Cns stc -∗
     init_rodata γt -∗ init_argv γd -∗ usz γs szv -∗
-    ustd γfd ufd_l0 -∗
+    ustd_ok T γfd ufd_l0 -∗
     UserCwd.ucwd γcwd FsImg.ROOTINO -∗
     UserChildren.uch_any γch -∗
     (* THE CONSOLE INPUT, on its way to the restart head: the reader token
