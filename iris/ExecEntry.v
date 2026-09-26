@@ -169,9 +169,19 @@ Section ExecEntry.
      never read it ([UShEchoPay], [UInitSh] both introduce it as [_]):
      what the row cost was the PREMISE on every builder, and that is what
      this deletes. *)
-  Definition image_entry_taint (T : iProp Σ) (Q : Z -> iProp Σ)
+  (* ...AND IT TAKES THE EXEC'S OWN TWO KEY PINS (design/seccomp.md SS9,
+     the universe): the new key's table is the caller's ([kexec_image_ok]
+     pins [uvis_fd W' = sts], and so does the non-loadable arm's
+     [exec_key_ok]) and so is its mask ([SpecKexec.exec_slot_pre]'s
+     [uvis_secc W' = secc]).  Every generic entry ignores both; the seccomp
+     universe reads its key off them.  An entry carried where no key is in
+     scope is the one at EVERY pair, [∀ sts secc, image_entry_taint T sts
+     secc Q X], which is the unpinned wand ([image_entry_taint_all_elim]). *)
+  Definition image_entry_taint (T : iProp Σ) (sts : list fdstate)
+      (secc : mword 64) (Q : Z -> iProp Σ)
       (X : uvis -d> iPropO Σ) : iProp Σ :=
-    (□ (∀ W' : uvis, T -∗ my_pay (uvis_gen W') Q -∗ X W'))%I.
+    (□ (∀ W' : uvis, T -∗ ⌜uvis_fd W' = sts⌝ -∗ ⌜uvis_secc W' = secc⌝ -∗
+                     my_pay (uvis_gen W') Q -∗ X W'))%I.
 
   Global Instance image_entry_at_persistent f na alen afun sts cw secc cs pidv
       Q Pay X :
@@ -182,9 +192,29 @@ Section ExecEntry.
     Persistent (image_entry f M av sts cw secc cs pidv Q Pay X).
   Proof using . rewrite /image_entry. apply _. Qed.
 
-  Global Instance image_entry_taint_persistent T Q X :
-    Persistent (image_entry_taint T Q X).
+  Global Instance image_entry_taint_persistent T sts secc Q X :
+    Persistent (image_entry_taint T sts secc Q X).
   Proof using . rewrite /image_entry_taint. apply _. Qed.
+
+  (* the constructor side: a generic family ignores the two pins *)
+  Lemma image_entry_taint_intro (T : iProp Σ) (sts : list fdstate)
+      (secc : mword 64) (Q : Z -> iProp Σ) (X : uvis -d> iPropO Σ) :
+    □ (∀ W' : uvis, T -∗ my_pay (uvis_gen W') Q -∗ X W') -∗
+    image_entry_taint T sts secc Q X.
+  Proof using .
+    iIntros "#H". rewrite /image_entry_taint. iIntros "!>" (W') "HT _ _ Hp".
+    iApply ("H" with "HT Hp").
+  Qed.
+
+  (* ...and the entry at EVERY pair is the unpinned wand *)
+  Lemma image_entry_taint_all_elim (T : iProp Σ) (Q : Z -> iProp Σ)
+      (X : uvis -d> iPropO Σ) :
+    (∀ (sts : list fdstate) (secc : mword 64), image_entry_taint T sts secc Q X) -∗
+    □ (∀ W' : uvis, T -∗ my_pay (uvis_gen W') Q -∗ X W').
+  Proof using .
+    iIntros "#H !>" (W') "HT Hp". rewrite /image_entry_taint.
+    iApply ("H" $! (uvis_fd W') (uvis_secc W') W' with "HT [//] [//] Hp").
+  Qed.
 
   (* ------------------------------------------------------------------ *)
   (*  4.  THE TWO SHAPES ARE THE SAME THING                               *)

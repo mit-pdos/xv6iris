@@ -1164,7 +1164,8 @@ Section UInitSh.
              UkSh.ush_open_absent_leaf (PS := uprogSG_free) N T K) ∗ K)
      ∨ T) -∗
     UkSh.ush_fd0 T (take NSTD fdv) -∗
-    image_entry_taint T (ucons_pay cn γp T (UkInit.init_rd (cc_rd Cr) (cc_wbn Cr))) uslot -∗
+    (∀ sts secc, image_entry_taint T sts secc
+       (ucons_pay cn γp T (UkInit.init_rd (cc_rd Cr) (cc_wbn Cr))) uslot) -∗
     image_entry ElfUser.sh_elf M (mword_of_int 0x1000 : mword 64) fdv
       FsImg.ROOTINO ProcDefs.secc_all cs pidv
       (ucons_pay cn γp T (UkInit.init_rd (cc_rd Cr) (cc_wbn Cr)))
@@ -1252,7 +1253,8 @@ Section UInitSh.
                   (ucons_pay_const cn γp T (UkInit.init_rd (cc_rd Cr) (cc_wbn Cr))) Hok Hcwd0
                   (init_sh_room alen n0 Halen Hn0) Hlen Hlzf Hscf Hch0 Hpid1)
       as Hsk.
-    iApply (Hsk with "[] Hnpw Hdep Hdp Htag Hplaw [] [] Hcons Hgen' Hmp Hps
+    iDestruct (image_entry_taint_all_elim with "Hgen'") as "#Hgen0".
+    iApply (Hsk with "[] Hnpw Hdep Hdp Htag Hplaw [] [] Hcons Hgen0 Hmp Hps
                       Hls Hwcp").
     - (* THE KEY'S OWN READING (lane SH-STATE): [sh_pay_state]'s wand
          takes [UShKernel.sh_pay_key], and the two facts it is derived
@@ -1302,7 +1304,8 @@ Section UInitSh.
              UkSh.ush_open_absent_leaf (PS := uprogSG_free) N T K) ∗ K)
      ∨ T) -∗
     UkSh.ush_fd0 T (take NSTD fdv) -∗
-    image_entry_taint T (ucons_pay cn γp T (UkInit.init_rd (cc_rd Cr) (cc_wbn Cr))) uslot -∗
+    (∀ sts secc, image_entry_taint T sts secc
+       (ucons_pay cn γp T (UkInit.init_rd (cc_rd Cr) (cc_wbn Cr))) uslot) -∗
     image_entry ElfUser.sh_elf M (mword_of_int 0x1000 : mword 64) fdv
       FsImg.ROOTINO ProcDefs.secc_all cs pidv
       (ucons_pay cn γp T (UkInit.init_rd (cc_rd Cr) (cc_wbn Cr)))
@@ -1390,9 +1393,9 @@ Section UInitSh.
        [□ (app_taint -∗ R)]), and the arm builds it out of the TAINT
        it is already holding ([UserConsole.ucons_pay_taint]) -- which is
        the whole reason a tainted process needs no lease. *)
-    iAssert (image_entry_taint T
+    iAssert (∀ sts secc, image_entry_taint T sts secc
                (ucons_pay cn γp T (UkInit.init_rd (cc_rd Cr) (cc_wbn Cr))) uslot)%I as "#Hgen'".
-    { rewrite /image_entry_taint. iModIntro. iIntros (W') "#HT #Hmp".
+    { iIntros (sts secc). iApply image_entry_taint_intro. iModIntro. iIntros (W') "#HT #Hmp".
       iApply ("Hgen" $! (ucons_pay cn γp T (UkInit.init_rd (cc_rd Cr) (cc_wbn Cr)) (-1)) W' with "HT [Hmp] []").
       - rewrite ucons_pay_eta. iExact "Hmp".
       - iModIntro. iIntros "_". iApply (ucons_pay_taint with "HT"). }
@@ -1427,7 +1430,7 @@ Section UInitSh.
        which is persistent anyway. ---- *)
     { iIntros "!> (_ & Hps & Hls & Hstd & Hcred)".
       rewrite /UkInit.init_lend_ref. iFrame "Hstd Hps Hls Hcred". }
-    { rewrite Hpeq. iExact "Hgen'". }
+    { rewrite Hpeq. iIntros (sts). iApply "Hgen'". }
     rewrite /uexec_sup_run_ids.
     iIntros (M pm sz fdv cs pidv) "#Hnpw Hheap Hufd Hids".
     (* the run's two table rows come in bundled (lane OFF-HAND-3, R1);

@@ -126,6 +126,31 @@ the model or sh is touched.
 6. Green; audits unchanged; `Print Assumptions useccomp_mint` at the
    baseline; status paragraph; report.
 
+STATUS (lane S1, `secc/s1`): items 1-6 landed, tree green (VM log
+s1-r4: EXIT=0, no `Error`, second pass 0 compiles), audits system 13 /
+union 14 / tree 13 textually the baseline, `Print Assumptions
+UexecSecc.useccomp_mint` = `functional_extensionality_dep`,
+`resv_matches`, `resv_is_valid`.  `iris/UexecSecc.v`: `secc_B`,
+`secc_masked`, `usys_eff_masked(_notin)`, `secc_masked_and`;
+`wild_pipe`/`secc_row`/`secc_rows`/`secc_key` (persistent, NOT timeless --
+`wild_pipe` is an invariant) with preservation along `usys_fd_ok` (every
+number but open and pipe; pipe's two rows given `wild_pipe`; pipe's
+failure arm), `usys_secc_ok`, fork's child key, exec's two pins; the
+wild-pipe links (`wild_clink` hence `wild_reg`, `wild_rchain`,
+`wild_wchain`) and the deposit rows; `secc_cons_pay` (the console rows),
+paid by `secc_cons_pay_of_wild`; `useccomp_mint_of_cons` (the Löb, at
+`secc_fam` = the point at the trivial payload) and `useccomp_mint`;
+`useccomp_image_entry_taint` (the minter answers the generalised taint
+entry at a table in the universe and a masked mask -- what S3's exec
+hands `exec_bundle_of`).  Two deviations from the brief: the universe's
+OWN exec deposit (`secc_sbundle_exec`) is the closed generic bundle
+(`fsabs_exec_half` + `ax_hops_triv`, `xv6_sbundle_of_supply`'s exec
+branch) with both slot wands from the recursion, not the taint-shaped
+walk -- it needs no credential at all; and an entry carried where no key
+is in scope is `∀ sts, image_entry_taint T sts secc_all Q X` (the U-tier
+rules) or `∀ sts secc, …` (sh's entry, which `image_entry_taint_all_elim`
+turns back into the unpinned wand its generic slot is).
+
 ## S2 -- the claim's terminal arm (design §10; §6 where §10 is silent)
 
 Branch `secc/s2` off lane M's tip 79c00bfef; merges `secc/s0` for items

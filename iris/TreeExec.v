@@ -170,7 +170,7 @@ Section TreeExec.
          (pidv : mword 32),
          urun_rows N fdv -∗
          image_entry f M av fdv cw ProcDefs.secc_all cs pidv (ukn_pay N) Pay uslot) -∗
-    image_entry_taint (tree_taint c) (ukn_pay N) uslot -∗
+    (∀ sts, image_entry_taint (tree_taint c) sts ProcDefs.secc_all (ukn_pay N) uslot) -∗
     □ (Pay -∗ R) -∗
     Pay -∗
     (∀ h' : CpuId,

@@ -164,13 +164,13 @@ Section UInitTreeExec.
     file_app = MkAppcfg tree_names (tree_pred c) r ->
     riscv_cons_res = cons_res_triv ->
     app_taint = kill_cred_triv ->
-    ⊢ image_entry_taint (tree_taint c)
+    ⊢ ∀ sts secc, image_entry_taint (tree_taint c) sts secc
         (ucons_pay cn γ (tree_taint c) Rd) uslot.
   Proof using .
     intros Heq Hcons Hkill.
     (* the key's all-parked row (lane OFF-HAND-4, S2) is not read here:
        the generic slot is quantified over every key *)
-    rewrite /image_entry_taint. iIntros "!>" (W') "#HT Hmp".
+    iIntros (sts secc). iApply image_entry_taint_intro. iIntros "!>" (W') "#HT Hmp".
     iDestruct (tree_gen_slot c r Heq Hcons Hkill with "HT") as "#Hgen".
     iApply ("Hgen" $! (ucons_pay cn γ (tree_taint c) Rd (-1)) W'
               with "[Hmp] []").
@@ -212,8 +212,8 @@ Section UInitTreeExec.
     (* THE DOOR IS FREE HERE: the taint is a premise of this lemma, so
        nothing is spent to open the update. *)
     iModIntro.
-    iAssert (image_entry_taint (tree_taint c) (ukn_pay N) uslot) as "#Hgen".
-    { rewrite Hpeq.
+    iAssert (∀ sts, image_entry_taint (tree_taint c) sts ProcDefs.secc_all (ukn_pay N) uslot)%I as "#Hgen".
+    { iIntros (sts). rewrite Hpeq.
       iApply (tree_image_entry_taint c r cn γ
                 (UkInit.init_rd (cc_rd (tree_cc c)) (cc_wbn (tree_cc c)))
                 Heq Hcons Hkill). }
