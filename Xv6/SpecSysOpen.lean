@@ -720,15 +720,18 @@ def openReceipt (omo : OffMode) (Γ : FsViewNames GF) (γfs : FsNames) (cw : Nat
 /-- The kernel's pure row of the split (Rocq's inline disjunction): either
 nothing moved, or fdalloc took the free list's head `fd`, the block's cell
 at `fd` now names file-table slot `k`, the caller's table had `fd` closed,
-and the resume view retypes exactly that row.  (THE PARKED CONJUNCT IS GONE,
-Rocq L4: an open installs the descriptor at the mode its caller's family
-asked for, and nothing reads all-parkedness off this row any more.) -/
+and the resume view retypes exactly that row, and the installed row is NOT
+A PIPE (Rocq `4fab0298e`).  (THE PARKED CONJUNCT IS GONE, Rocq L4: an open
+installs the descriptor at the mode its caller's family asked for, and
+nothing reads all-parkedness off this row any more.) -/
 def openSplitRow (r : BitVec 64) (V V' : ProcPriv) (sts sts' : List FdState) : Prop :=
   (r = 0xFFFFFFFFFFFFFFFF#64 ∧ V' = V ∧ sts' = sts) ∨
   (∃ (fd : Nat) (l : List Nat) (k : Nat) (rb wb : Bool) (t : FdType),
     r = BitVec.ofNat 64 fd ∧ fdFrees V.ofile = fd :: l ∧
     V' = { V with ofile := V.ofile.set fd (fnode k) } ∧
-    sts[fd]? = some .closed ∧ sts' = sts.set fd (.open rb wb t))
+    sts[fd]? = some .closed ∧ sts' = sts.set fd (.open rb wb t) ∧
+    -- ...AND NOT A PIPE (Rocq `4fab0298e`): the one-liner per arm
+    fdstNopipe (.open rb wb t))
 
 /-- Rocq's `open_arms_plain_split`. -/
 theorem openArmsPlain_split (omo : OffMode) (Γ : FsViewNames GF) (γfs : FsNames) (cw : Nat) (γ : FileNames)
@@ -761,7 +764,7 @@ theorem openArmsPlain_split (omo : OffMode) (Γ : FsViewNames GF) (γfs : FsName
       iframe Hpriv Hb Hslot
       isplitr
       · ipureintro
-        exact Or.inr ⟨fd, l, k, _, _, _, hr, hfl, rfl, hcl, hins⟩
+        exact Or.inr ⟨fd, l, k, _, _, _, hr, hfl, rfl, hcl, hins, trivial⟩
       iright
       iexists pl, av, i
       iframe HP
@@ -781,7 +784,7 @@ theorem openArmsPlain_split (omo : OffMode) (Γ : FsViewNames GF) (γfs : FsName
       iframe Hpriv Hb Hslot
       isplitr
       · ipureintro
-        exact Or.inr ⟨fd, l, k, _, _, _, hr, hfl, rfl, hcl, hins⟩
+        exact Or.inr ⟨fd, l, k, _, _, _, hr, hfl, rfl, hcl, hins, trivial⟩
       iright
       iexists pl, av, i
       iframe HP
@@ -801,7 +804,7 @@ theorem openArmsPlain_split (omo : OffMode) (Γ : FsViewNames GF) (γfs : FsName
       iframe Hpriv Hb Hslot
       isplitr
       · ipureintro
-        exact Or.inr ⟨fd, l, k, _, _, _, hr, hfl, rfl, hcl, hins⟩
+        exact Or.inr ⟨fd, l, k, _, _, _, hr, hfl, rfl, hcl, hins, trivial⟩
       iright
       iexists pl, av, i
       iframe HP
@@ -851,7 +854,7 @@ theorem openArmsCreate_split (omo : OffMode) (Γ : FsViewNames GF) (γfs : FsNam
       iframe Hpriv Hb Hslot
       isplitr
       · ipureintro
-        exact Or.inr ⟨fd, l, k, _, _, _, hr, hfl, rfl, hcl, hins⟩
+        exact Or.inr ⟨fd, l, k, _, _, _, hr, hfl, rfl, hcl, hins, trivial⟩
       iright
       iexists pl, d, i, nm
       iframe HP
@@ -876,7 +879,7 @@ theorem openArmsCreate_split (omo : OffMode) (Γ : FsViewNames GF) (γfs : FsNam
         iframe Hpriv Hb Hslot
         isplitr
         · ipureintro
-          exact Or.inr ⟨fd, l, k, _, _, _, hr, hfl, rfl, hcl, hins⟩
+          exact Or.inr ⟨fd, l, k, _, _, _, hr, hfl, rfl, hcl, hins, trivial⟩
         iright
         iexists pl, d, i, nm
         iframe HP
@@ -906,7 +909,7 @@ theorem openArmsCreate_split (omo : OffMode) (Γ : FsViewNames GF) (γfs : FsNam
         iframe Hpriv Hb Hslot
         isplitr
         · ipureintro
-          exact Or.inr ⟨fd, l, k, _, _, _, hr, hfl, rfl, hcl, hins⟩
+          exact Or.inr ⟨fd, l, k, _, _, _, hr, hfl, rfl, hcl, hins, trivial⟩
         iright
         iexists pl, d, i, nm
         iframe HP

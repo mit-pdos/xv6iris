@@ -237,6 +237,84 @@ def fdstNopipe : FdState → Prop
   | .open _ _ (.pipe _) => False
   | _ => True
 
+/-! ### The "not a pipe" kit (Rocq FdSlots.v, `4fab0298e`)
+
+A pipe row's last close steps the pipe's exact ghost state, so exit(2)'s
+deposit at a table that holds one is a link or the taint -- and at a table
+that holds none it is nothing at all.  `fdvNopipe` is what lets a program
+SAY its table holds none: open installs an inode or a device
+(`UsysMemOk.usysFdOk`'s open row carries it), close and fork's rows install
+`.closed`, dup copies a row the table already had; only pipe(2) breaks it.
+Rocq's `Forall` is `∀ st ∈ l` (the `KexecImageOk` deviation-5 reading of
+`fdv_all_parked`); `l !!! k` is `l.getD k .closed`, `<[k := st]> l` is
+`l.set k st`. -/
+
+instance fdstNopipe_dec (st : FdState) : Decidable (fdstNopipe st) :=
+  match st with
+  | .open _ _ (.pipe _) => isFalse id
+  | .open _ _ (.inode _ _ _) => isTrue trivial
+  | .open _ _ (.device _) => isTrue trivial
+  | .closed => isTrue trivial
+
+/-- Rocq `fdv_nopipe`. -/
+def fdvNopipe (l : List FdState) : Prop := ∀ st ∈ l, fdstNopipe st
+
+instance fdvNopipe_dec (l : List FdState) : Decidable (fdvNopipe l) := by
+  unfold fdvNopipe; infer_instance
+
+/-- Rocq `fdst_nopipe_closed`. -/
+theorem fdstNopipe_closed : fdstNopipe .closed := trivial
+
+/-- Rocq `fdst_nopipe_dev`. -/
+theorem fdstNopipe_dev (r w : Bool) (mj : Nat) : fdstNopipe (.open r w (.device mj)) := trivial
+
+/-- Rocq `fdst_nopipe_inode`. -/
+theorem fdstNopipe_inode (r w : Bool) (i : Nat) (γo : GName) (om : OffMode) :
+    fdstNopipe (.open r w (.inode i γo om)) := trivial
+
+/-- Rocq `fdst_nopipe_ne`: what the predicate says of a row, in the shape the
+exit row's mint reads. -/
+theorem fdstNopipe_ne (st : FdState) (h : fdstNopipe st) :
+    ∀ (rb wb : Bool) (gp : PipeNames), st ≠ .open rb wb (.pipe gp) := by
+  intro rb wb gp he; subst he; exact h
+
+/-- Rocq `fdv_nopipe_lookup`. -/
+theorem fdvNopipe_lookup (l : List FdState) (k : Nat) (st : FdState) (hl : fdvNopipe l)
+    (hk : l[k]? = some st) : fdstNopipe st :=
+  hl st (List.mem_of_getElem? hk)
+
+/-- Rocq `fdv_nopipe_lookup_total`. -/
+theorem fdvNopipe_lookup_total (l : List FdState) (k : Nat) (hl : fdvNopipe l) :
+    fdstNopipe (l.getD k .closed) := by
+  rw [List.getD_eq_getElem?_getD]
+  cases h : l[k]? with
+  | none => trivial
+  | some st => exact fdvNopipe_lookup l k st hl h
+
+/-- Rocq `fdv_nopipe_elem`. -/
+theorem fdvNopipe_elem (l : List FdState) (hl : fdvNopipe l) :
+    ∀ st ∈ l, ∀ (rb wb : Bool) (gp : PipeNames), st ≠ .open rb wb (.pipe gp) :=
+  fun st hin => fdstNopipe_ne st (hl st hin)
+
+/-- Rocq `fdv_nopipe_insert`. -/
+theorem fdvNopipe_insert (l : List FdState) (k : Nat) (st : FdState) (hl : fdvNopipe l)
+    (hst : fdstNopipe st) : fdvNopipe (l.set k st) := by
+  intro y hy
+  rcases List.mem_or_eq_of_mem_set hy with h | rfl
+  · exact hl y h
+  · exact hst
+
+/-- Rocq `fdv_nopipe_replicate`. -/
+theorem fdvNopipe_replicate (n : Nat) (st : FdState) (hst : fdstNopipe st) :
+    fdvNopipe (List.replicate n st) := by
+  intro y hy
+  rw [List.eq_of_mem_replicate hy]
+  exact hst
+
+/-- Rocq `fdv_nopipe_closed`. -/
+theorem fdvNopipe_closed (n : Nat) : fdvNopipe (List.replicate n .closed) :=
+  fdvNopipe_replicate n .closed fdstNopipe_closed
+
 /-- A pipe file's ends are complementary (Rocq `fdstate_ok_pipe_ends`). -/
 theorem fdstateOk_pipe_ends (inum : BitVec 32) (γo : GName) (om : OffMode) (γp : PipeNames) (C : FContent)
     (r w : Bool) (g : PipeNames) (h : fdstateOk inum γo om γp C (.open r w (.pipe g))) : w = !r :=

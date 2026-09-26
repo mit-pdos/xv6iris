@@ -419,7 +419,10 @@ def usysFdOk (n : Int) (tf : List (BitVec 64)) (r : BitVec 64) (sts sts' : List 
         fdLowestClosed sts = none))
   else if n = USYS_open then
     (∃ (fd : Nat) (rd wr : Bool) (t : FdType), usysRetIs r fd ∧ fdLeastClosed sts fd ∧
-      sts' = sts.set fd (.open rd wr t)) ∨
+      sts' = sts.set fd (.open rd wr t) ∧
+      -- ...AND NOT A PIPE (Rocq `4fab0298e`): open installs an inode or a
+      -- device, never a pipe end (`FileDefs.fdvNopipe`)
+      fdstNopipe (.open rd wr t)) ∨
     (r = -1#64 ∧ sts' = sts)
   else if n = USYS_pipe then
     (if r.toNat = 0 then
@@ -482,7 +485,7 @@ theorem usysFdOk_length {n : Int} {tf : List (BitVec 64)} {r : BitVec 64} {sts s
   rw [if_neg hd] at H
   by_cases ho : n = USYS_open
   · rw [if_pos ho] at H
-    rcases H with ⟨_, _, _, _, -, -, rfl⟩ | ⟨-, rfl⟩ <;> simp
+    rcases H with ⟨_, _, _, _, -, -, rfl, -⟩ | ⟨-, rfl⟩ <;> simp
   rw [if_neg ho] at H
   by_cases hp : n = USYS_pipe
   · rw [if_pos hp] at H
@@ -500,6 +503,35 @@ principle retires; the generic tier pays the TAINT and is told nothing about
 offsets.  The OPEN row above no longer pins `fdstParked` either (Rocq L4,
 abe94870d): an open installs the descriptor at the mode its caller's family
 asked for, and nothing in the tier reads all-parkedness off it any more. -/
+
+
+/-- **...AND THE SAME FOR "NO PIPE ROW"** (Rocq `usys_fd_ok_nopipe`,
+`4fab0298e`), at every number but pipe(2), the one call that installs one:
+what lets a program that never calls pipe(2) carry `FileDefs.fdvNopipe` of
+its table across every trap. -/
+theorem usysFdOk_nopipe {n : Int} {tf : List (BitVec 64)} {r : BitVec 64} {sts sts' : List FdState}
+    (hnp : n ≠ USYS_pipe) (H : usysFdOk n tf r sts sts') (hpk : fdvNopipe sts) : fdvNopipe sts' := by
+  unfold usysFdOk at H
+  by_cases hc : n = USYS_close
+  · rw [if_pos hc] at H
+    obtain ⟨H, -⟩ := H
+    split at H <;> subst H
+    · exact fdvNopipe_insert _ _ _ hpk fdstNopipe_closed
+    · exact hpk
+  rw [if_neg hc] at H
+  by_cases hd : n = USYS_dup
+  · rw [if_pos hd] at H
+    rcases H with ⟨_, -, -, -, rfl⟩ | ⟨-, rfl, -⟩
+    · exact fdvNopipe_insert _ _ _ hpk (fdvNopipe_lookup_total _ _ hpk)
+    · exact hpk
+  rw [if_neg hd] at H
+  by_cases ho : n = USYS_open
+  · rw [if_pos ho] at H
+    rcases H with ⟨_, _, _, _, -, -, rfl, hop⟩ | ⟨-, rfl⟩
+    · exact fdvNopipe_insert _ _ _ hpk hop
+    · exact hpk
+  rw [if_neg ho, if_neg hnp] at H
+  subst H; exact hpk
 
 /-! ## §2c Pipe's two rows, joined -/
 

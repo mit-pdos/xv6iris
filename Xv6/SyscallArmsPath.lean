@@ -755,9 +755,9 @@ theorem syscPath_openFdOk (V V' : ProcPriv) (P' : UPtd) (sts sts' : List FdState
   rw [hn]
   unfold usysFdOk
   rw [if_neg (by decide), if_neg (by decide), if_pos (by decide)]
-  rcases hrow with ⟨hr, -, rfl⟩ | ⟨fd, l, kk, rb, wb, t, hr, hfree, rfl, hcl, rfl⟩
+  rcases hrow with ⟨hr, -, rfl⟩ | ⟨fd, l, kk, rb, wb, t, hr, hfree, rfl, hcl, rfl, hnp⟩
   · exact Or.inr ⟨hr.trans (by decide), rfl⟩
-  · refine Or.inl ⟨fd, rb, wb, t, hr, ?_, rfl⟩
+  · refine Or.inl ⟨fd, rb, wb, t, hr, ?_, rfl, hnp⟩
     apply fdLeastClosed_intro hcl
     intro i hi hic
     have hlt : fd < V.ofile.length := fdFrees_head_lt V.ofile fd l hfree
