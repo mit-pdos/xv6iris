@@ -183,7 +183,7 @@ theorem bootShared_image (σ : MState) (hbf : bootFacts σ) :
   imod H with ⟨⟨#Ht, #Hd, -⟩, Hown⟩
   icases bootCarve_owned (GF := GF) (imgFlat bootImage) $$ Hown with ⟨Hdata, Hbss, Hfree⟩
   have hw := bcpDataWindows (GF := GF) (imgFlat bootImage)
-  rw [show (0x8000a318 : Nat) = bhGot from rfl] at hw
+  rw [show (0x8000a348 : Nat) = bhGot from rfl] at hw
   imod bootCarve_gotRo (GF := GF) $$ Hdata with ⟨Hdata, #Hg, -⟩
   icases hw $$ Hdata with ⟨H1, H2, H3, H4⟩
   imodintro
@@ -237,14 +237,14 @@ theorem bootShared_harts (σ : MState) (hbf : bootFacts σ) :
 theorem bootShared_startedCell :
     bootRan (GF := GF) (imgFlat bootImage) MachCSL.KernelSyms.«started» (MachCSL.KernelSyms.«started» + 4) ⊢
       wordCell startedAddr 4 0 startedClear [] := by
-  have hS : MachCSL.KernelSyms.«started» = 0x8000a330 := rfl
-  have hA : bcInRam 0x8000a330 4 := by unfold bcInRam ramBase ramEnd; omega
+  have hS : MachCSL.KernelSyms.«started» = 0x8000a360 := rfl
+  have hA : bcInRam 0x8000a360 4 := by unfold bcInRam ramBase ramEnd; omega
   rw [hS]
-  refine (bootImg_run (GF := GF) bootImage 0x8000a330 4 (fun _ => 0#8) hA (fun j hj => ?_)).trans ?_
-  · have := bc_addr_toNat 0x8000a330 j (by omega)
+  refine (bootImg_run (GF := GF) bootImage 0x8000a360 4 (fun _ => 0#8) hA (fun j hj => ?_)).trans ?_
+  · have := bc_addr_toNat 0x8000a360 j (by omega)
     exact bootImage_wf.bss _ (by rw [this, bc_bss_val]; omega) (by rw [this, bc_end_val]; omega)
   refine .trans ?_ (wordCell_of_fresh startedAddr 4 startedClear (fun _ => 0))
-  rw [show startedAddr = BitVec.ofNat 64 0x8000a330 from rfl]
+  rw [show startedAddr = BitVec.ofNat 64 0x8000a360 from rfl]
   unfold histBytes
   apply BigSepL.bigSepL_mono
   intro k j hj
@@ -290,7 +290,7 @@ rows, `main_globals_raw`, `main_sb_raw`, `main_log_raw`, `main_data_raw`'s
 windows, the ring's boot ghosts and the slot supplies' proc-layer shares. -/
 theorem bootShared_kptRows [CurCtx] (cn : ConsNames) :
     kmapStatic (GF := GF) ⊢
-      bootRan (imgFlat bootImage) MachCSL.KernelSyms.«proc» (MachCSL.KernelSyms.«proc» + 360 * NPROC) -∗
+      bootRan (imgFlat bootImage) MachCSL.KernelSyms.«proc» (MachCSL.KernelSyms.«proc» + 368 * NPROC) -∗
       bootRan (imgFlat bootImage) MachCSL.KernelSyms.«initproc» (MachCSL.KernelSyms.«initproc» + 8) -∗
       bootRan (imgFlat bootImage) MachCSL.KernelSyms.«ticks» (MachCSL.KernelSyms.«ticks» + 4) -∗
       bootRan (imgFlat bootImage) (MachCSL.KernelSyms.«cons» + 24) (MachCSL.KernelSyms.«cons» + 164) -∗
@@ -339,7 +339,7 @@ variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
 /-- The `.bss`/`.data` windows the kernel-tier rows are carved from
 (`bootShared_kptRows`' premises, in its order). -/
 def bsKptWin : IProp GF := iprop%
-  bootRan (imgFlat bootImage) MachCSL.KernelSyms.«proc» (MachCSL.KernelSyms.«proc» + 360 * NPROC) ∗
+  bootRan (imgFlat bootImage) MachCSL.KernelSyms.«proc» (MachCSL.KernelSyms.«proc» + 368 * NPROC) ∗
   bootRan (imgFlat bootImage) MachCSL.KernelSyms.«initproc» (MachCSL.KernelSyms.«initproc» + 8) ∗
   bootRan (imgFlat bootImage) MachCSL.KernelSyms.«ticks» (MachCSL.KernelSyms.«ticks» + 4) ∗
   bootRan (imgFlat bootImage) (MachCSL.KernelSyms.«cons» + 24) (MachCSL.KernelSyms.«cons» + 164) ∗

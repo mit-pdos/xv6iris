@@ -40,8 +40,7 @@ theorem pi_imm_p64 : BitVec.signExtend 64 64#12 = 8#64 * BitVec.ofNat 64 8 := by
 theorem pi_u6 : BitVec.signExtend 64 (6#20 ++ 0#12) = 0x6000#64 := by bv_decide
 theorem pi_u11 : BitVec.signExtend 64 (0x11#20 ++ 0#12) = 0x11000#64 := by bv_decide
 theorem pi_u17 : BitVec.signExtend 64 (0x17#20 ++ 0#12) = 0x17000#64 := by bv_decide
-theorem pi_lui_a5 : BitVec.signExtend 64 (0xa5#20 ++ 0#12) = 0xa5000#64 := by bv_decide
-theorem pi_lui_4fa50 : BitVec.signExtend 64 (0x4fa50#20 ++ 0#12) = 0x4fa50000#64 := by bv_decide
+theorem pi_lui_ff4df : BitVec.signExtend 64 (0xff4df#20 ++ 0#12) = 0xffffffffff4df000#64 := by bv_decide
 theorem pi_lui_4000 : BitVec.signExtend 64 (0x4000#20 ++ 0#12) = 0x4000000#64 := by bv_decide
 
 /-- `ret` out of `initlock` lands on the instruction after the `jal`. -/
@@ -60,9 +59,9 @@ theorem pi_procs_toNat : (KA.«proc» : BitVec 64).toNat = KernelSyms.«proc» :
 theorem pi_procs_lt : KernelSyms.«proc» < 2 ^ 32 := by decide
 
 theorem pi_procAddr_toNat (i : Nat) (hi : i ≤ 64) :
-    (procAddr i).toNat = KernelSyms.«proc» + 360 * i := by
+    (procAddr i).toNat = KernelSyms.«proc» + 368 * i := by
   have hp := pi_procs_lt
-  rw [procAddr_eq, BitVec.toNat_add, pi_toNat (360 * i) (by omega), pi_procs_toNat]
+  rw [procAddr_eq, BitVec.toNat_add, pi_toNat (368 * i) (by omega), pi_procs_toNat]
   exact Nat.mod_eq_of_lt (by omega)
 
 /-- `&proc[0]`. -/
@@ -72,28 +71,28 @@ theorem pi_procAddr_zero : procAddr 0 = KA.«proc» := by
 
 /-- The compiler's `(p - proc)` after the `sub`. -/
 theorem pi_h1 (i : Nat) :
-    procAddr i + -KA.«proc» = BitVec.ofNat 64 (360 * i) := by
+    procAddr i + -KA.«proc» = BitVec.ofNat 64 (368 * i) := by
   rw [procAddr_eq]
-  generalize BitVec.ofNat 64 (360 * i) = y
+  generalize BitVec.ofNat 64 (368 * i) = y
   generalize (KA.«proc» : BitVec 64) = q
   bv_omega
 
 theorem pi_h2 (i : Nat) (hi : i < 64) :
-    (BitVec.ofNat 64 (360 * i)).sshiftRight 3 = BitVec.ofNat 64 (45 * i) := by
-  have ht : (BitVec.ofNat 64 (360 * i)).toNat = 360 * i := pi_toNat _ (by omega)
-  have hmsb : (BitVec.ofNat 64 (360 * i)).msb = false := by
+    (BitVec.ofNat 64 (368 * i)).sshiftRight 4 = BitVec.ofNat 64 (23 * i) := by
+  have ht : (BitVec.ofNat 64 (368 * i)).toNat = 368 * i := pi_toNat _ (by omega)
+  have hmsb : (BitVec.ofNat 64 (368 * i)).msb = false := by
     simp only [BitVec.msb_eq_decide, ht, decide_eq_false_iff_not, Nat.not_le]
     omega
   rw [BitVec.sshiftRight_eq_of_msb_false hmsb]
   apply BitVec.eq_of_toNat_eq
-  rw [BitVec.toNat_ushiftRight, ht, pi_toNat (45 * i) (by omega), Nat.shiftRight_eq_div_pow]
+  rw [BitVec.toNat_ushiftRight, ht, pi_toNat (23 * i) (by omega), Nat.shiftRight_eq_div_pow]
   omega
 
 theorem pi_h3 (i : Nat) (hi : i < 64) :
-    BitVec.ofNat 64 (45 * i) * 5738987045154082725#64 = BitVec.ofNat 64 i := by
+    BitVec.ofNat 64 (23 * i) * 15238614669586151335#64 = BitVec.ofNat 64 i := by
   apply BitVec.eq_of_toNat_eq
-  rw [BitVec.toNat_mul, pi_toNat (45 * i) (by omega), pi_toNat i (by omega),
-    pi_toNat 5738987045154082725 (by omega)]
+  rw [BitVec.toNat_mul, pi_toNat (23 * i) (by omega), pi_toNat i (by omega),
+    pi_toNat 15238614669586151335 (by omega)]
   omega
 
 theorem pi_h4 (i : Nat) (hi : i < 64) :
@@ -137,15 +136,15 @@ theorem pi_h9 (i : Nat) :
   rw [show (i + 1) * 8192 = 8192 * (i + 1) from Nat.mul_comm _ _, BitVec.sub_eq_add_neg]
 
 /-- The cursor one process on. -/
-theorem pi_cursor (i : Nat) : procAddr i + 360#64 = procAddr (i + 1) := by
-  rw [procAddr_eq, procAddr_eq, show 360 * (i + 1) = 360 * i + 360 from by omega,
+theorem pi_cursor (i : Nat) : procAddr i + 368#64 = procAddr (i + 1) := by
+  rw [procAddr_eq, procAddr_eq, show 368 * (i + 1) = 368 * i + 368 from by omega,
     BitVec.ofNat_add, BitVec.add_assoc]
 
 theorem pi_s1_eq (i : Nat) (hi : i < 64) :
     (procAddr (i + 1) = KA.«tickslock») ↔ i + 1 = 64 := by
   have hval := pi_procAddr_toNat (i + 1) (by omega)
   have hr : (KA.«tickslock»).toNat = KernelSyms.«tickslock» := rfl
-  have hts : KernelSyms.«tickslock» = KernelSyms.«proc» + 360 * 64 := by decide
+  have hts : KernelSyms.«tickslock» = KernelSyms.«proc» + 368 * 64 := by decide
   constructor
   · intro he
     have h := congrArg BitVec.toNat he
@@ -391,7 +390,7 @@ theorem procinit_br_fffffffffffff33a : KA.«procinit» + 0xfffffffffffff33a#64 =
 
 theorem pi_iter (IL : INITLOCK) [CurCtx] (k : KCtx) (hK : 10 ≤ k.avail)
     (i : Nat) (hi : i < 64) (R : RegMap)
-    (h9 : R 9#5 = procAddr i) (h18 : R 18#5 = 5738987045154082725#64)
+    (h9 : R 9#5 = procAddr i) (h18 : R 18#5 = 15238614669586151335#64)
     (h19 : R 19#5 = 274877902848#64) (h20 : R 20#5 = KA.«tickslock»)
     (h21 : R 21#5 = KA.«proc») (h22 : R 22#5 = procNameAddr)
     (cur : CPU) :
@@ -433,7 +432,7 @@ theorem pi_iter (IL : INITLOCK) [CurCtx] (k : KCtx) (hK : 10 ≤ k.avail)
   k_norm_g at hcs1
   obtain ⟨e2, e8, e9, e18, e19, e20, e21, e22, e23, e24, e25, e26, e27⟩ := hcs1
   have g9 : R1 9#5 = procAddr i := e9.trans h9
-  have g18 : R1 18#5 = 5738987045154082725#64 := e18.trans h18
+  have g18 : R1 18#5 = 15238614669586151335#64 := e18.trans h18
   have g19 : R1 19#5 = 274877902848#64 := e19.trans h19
   have g20 : R1 20#5 = KA.«tickslock» := e20.trans h20
   have g21 : R1 21#5 = KA.«proc» := e21.trans h21
@@ -446,7 +445,7 @@ theorem pi_iter (IL : INITLOCK) [CurCtx] (k : KCtx) (hK : 10 ≤ k.avail)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
     with [g9, g21, pi_h1 i] next c6 hp6
   iintro Hk Hpc
-  k_step_gen (wp_s_srai c6 _ (KA.«procinit» + 0x88#64) true 3#6 15#5 15#5 (by decide))
+  k_step_gen (wp_s_srai c6 _ (KA.«procinit» + 0x88#64) true 4#6 15#5 15#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [pi_h2 i hi] next c7 hp7
   iintro Hk Hpc
   k_step_gen (wp_s_mul c7 _ (KA.«procinit» + 0x8a#64) false 15#5 15#5 18#5 (by decide))
@@ -469,8 +468,8 @@ theorem pi_iter (IL : INITLOCK) [CurCtx] (k : KCtx) (hK : 10 ≤ k.avail)
   k_step_gen (wp_s_sd c12 _ (KA.«procinit» + 0x98#64) true 64#12 9#5 15#5 (by decide) vks)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [g9] next c13 hp13
   iintro Hk Hpc Hks
-  -- addi s1,s1,360 ; bne s1,s4
-  k_step_gen (wp_s_addi c13 _ (KA.«procinit» + 0x9a#64) false 360#12 9#5 9#5 (by decide))
+  -- addi s1,s1,368 ; bne s1,s4
+  k_step_gen (wp_s_addi c13 _ (KA.«procinit» + 0x9a#64) false 368#12 9#5 9#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
     with [g9, pi_cursor i] next c14 hp14
   iintro Hk Hpc
@@ -520,7 +519,7 @@ set_option maxHeartbeats 4000000 in
 runs to the epilogue at `(KernelSyms.«procinit» + 0xa2)`. -/
 theorem pi_loop (IL : INITLOCK) [CurCtx] (k : KCtx) (hK : 10 ≤ k.avail) (fuel : Nat) :
     ∀ (i : Nat) (_ : i + fuel + 1 = 64) (R : RegMap)
-      (_ : R 9#5 = procAddr i) (_ : R 18#5 = 5738987045154082725#64)
+      (_ : R 9#5 = procAddr i) (_ : R 18#5 = 15238614669586151335#64)
       (_ : R 19#5 = 274877902848#64) (_ : R 20#5 = KA.«tickslock»)
       (_ : R 21#5 = KA.«proc») (_ : R 22#5 = procNameAddr)
       (cur : CPU),
@@ -574,17 +573,17 @@ theorem pi_loop (IL : INITLOCK) [CurCtx] (k : KCtx) (hK : 10 ≤ k.avail) (fuel 
 
 /-! ## The function -/
 
-theorem procinit_br_169c2 : KA.«procinit» + 0x169c2#64 = KA.«tickslock» := by decide
+theorem procinit_br_16bf2 : KA.«procinit» + 0x16bf2#64 = KA.«tickslock» := by decide
 
 theorem procinit_br_58e2 : KA.«procinit» + 0x58e2#64 = KStr.«proc» := by decide
 
-theorem procinit_br_10fc2 : KA.«procinit» + 0x10fc2#64 = KA.«proc» := by decide
+theorem procinit_br_10ff2 : KA.«procinit» + 0x10ff2#64 = KA.«proc» := by decide
 
-theorem procinit_br_10baa : KA.«procinit» + 0x10baa#64 = KA.«wait_lock» := by decide
+theorem procinit_br_10bda : KA.«procinit» + 0x10bda#64 = KA.«wait_lock» := by decide
 
 theorem procinit_br_58d2 : KA.«procinit» + 0x58d2#64 = KStr.«wait_lock» := by decide
 
-theorem procinit_br_10b92 : KA.«procinit» + 0x10b92#64 = KA.«pid_lock» := by decide
+theorem procinit_br_10bc2 : KA.«procinit» + 0x10bc2#64 = KA.«pid_lock» := by decide
 
 theorem procinit_br_58ca : KA.«procinit» + 0x58ca#64 = KStr.«nextpid» := by decide
 
@@ -635,8 +634,8 @@ theorem procinit_cells (IL : INITLOCK) {hlc : HasLC} {GF : BundledGFunctors} [Ma
   k_step_gen (wp_s_auipc c3 _ (KA.«procinit» + 0x1c#64) false 0x11#20 10#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [pi_u11] next c4 hp4
   iintro Hk Hpc
-  k_step_gen (wp_s_addi c4 _ (KA.«procinit» + 0x20#64) false 2934#12 10#5 10#5 (by decide))
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [procinit_br_10b92] next c5 hp5
+  k_step_gen (wp_s_addi c4 _ (KA.«procinit» + 0x20#64) false 2982#12 10#5 10#5 (by decide))
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [procinit_br_10bc2] next c5 hp5
   iintro Hk Hpc
   k_step_gen (wp_s_jal c5 _ (KA.«procinit» + 0x24#64) false 2093846#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [procinit_br_fffffffffffff33a] next c6 hp6
@@ -666,8 +665,8 @@ theorem procinit_cells (IL : INITLOCK) {hlc : HasLC} {GF : BundledGFunctors} [Ma
   k_step_gen (wp_s_auipc c8 _ (KA.«procinit» + 0x30#64) false 0x11#20 10#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [pi_u11] next c9 hp9
   iintro Hk Hpc
-  k_step_gen (wp_s_addi c9 _ (KA.«procinit» + 0x34#64) false 2938#12 10#5 10#5 (by decide))
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [procinit_br_10baa] next c10 hp10
+  k_step_gen (wp_s_addi c9 _ (KA.«procinit» + 0x34#64) false 2986#12 10#5 10#5 (by decide))
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [procinit_br_10bda] next c10 hp10
   iintro Hk Hpc
   k_step_gen (wp_s_jal c10 _ (KA.«procinit» + 0x38#64) false 2093826#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [procinit_br_fffffffffffff33a] next c11 hp11
@@ -691,8 +690,8 @@ theorem procinit_cells (IL : INITLOCK) {hlc : HasLC} {GF : BundledGFunctors} [Ma
   k_step_gen (wp_s_auipc cB _ (KA.«procinit» + 0x3c#64) false 0x11#20 9#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [pi_u11] next c12 hp12
   iintro Hk Hpc
-  k_step_gen (wp_s_addi c12 _ (KA.«procinit» + 0x40#64) false 3974#12 9#5 9#5 (by decide))
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [procinit_br_10fc2] next c13 hp13
+  k_step_gen (wp_s_addi c12 _ (KA.«procinit» + 0x40#64) false 4022#12 9#5 9#5 (by decide))
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [procinit_br_10ff2] next c13 hp13
   iintro Hk Hpc
   k_step_gen (wp_s_auipc c13 _ (KA.«procinit» + 0x44#64) false 6#20 22#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [pi_u6] next c14 hp14
@@ -703,28 +702,28 @@ theorem procinit_cells (IL : INITLOCK) {hlc : HasLC} {GF : BundledGFunctors} [Ma
   k_step_gen (wp_s_add c15 _ (KA.«procinit» + 0x4c#64) true 21#5 0#5 9#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c16 hp16
   iintro Hk Hpc
-  k_step_gen (wp_s_lui c16 _ (KA.«procinit» + 0x4e#64) false 0xa5#20 15#5 (by decide))
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [pi_lui_a5] next c17 hp17
+  k_step_gen (wp_s_lui c16 _ (KA.«procinit» + 0x4e#64) false 0xff4df#20 18#5 (by decide))
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [pi_lui_ff4df] next c17 hp17
   iintro Hk Hpc
-  k_step_gen (wp_s_addi c17 _ (KA.«procinit» + 0x52#64) false 4005#12 15#5 15#5 (by decide))
+  k_step_gen (wp_s_addi c17 _ (KA.«procinit» + 0x52#64) false 2493#12 18#5 18#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c18 hp18
   iintro Hk Hpc
-  k_step_gen (wp_s_slli c18 _ (KA.«procinit» + 0x56#64) true 12#6 15#5 15#5 (by decide))
+  k_step_gen (wp_s_slli c18 _ (KA.«procinit» + 0x56#64) true 13#6 18#5 18#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c19 hp19
   iintro Hk Hpc
-  k_step_gen (wp_s_addi c19 _ (KA.«procinit» + 0x58#64) false 4005#12 15#5 15#5 (by decide))
+  k_step_gen (wp_s_addi c19 _ (KA.«procinit» + 0x58#64) false 1781#12 18#5 18#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c20 hp20
   iintro Hk Hpc
-  k_step_gen (wp_s_lui c20 _ (KA.«procinit» + 0x5c#64) false 0x4fa50#20 18#5 (by decide))
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [pi_lui_4fa50] next c21 hp21
+  k_step_gen (wp_s_slli c20 _ (KA.«procinit» + 0x5c#64) true 13#6 18#5 18#5 (by decide))
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c21 hp21
   iintro Hk Hpc
-  k_step_gen (wp_s_addi c21 _ (KA.«procinit» + 0x60#64) false 2639#12 18#5 18#5 (by decide))
+  k_step_gen (wp_s_addi c21 _ (KA.«procinit» + 0x5e#64) false 3027#12 18#5 18#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c22 hp22
   iintro Hk Hpc
-  k_step_gen (wp_s_slli c22 _ (KA.«procinit» + 0x64#64) true 32#6 18#5 18#5 (by decide))
+  k_step_gen (wp_s_slli c22 _ (KA.«procinit» + 0x62#64) true 12#6 18#5 18#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c23 hp23
   iintro Hk Hpc
-  k_step_gen (wp_s_add c23 _ (KA.«procinit» + 0x66#64) true 18#5 18#5 15#5 (by decide))
+  k_step_gen (wp_s_addi c23 _ (KA.«procinit» + 0x64#64) false 1959#12 18#5 18#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c24 hp24
   iintro Hk Hpc
   k_step_gen (wp_s_lui c24 _ (KA.«procinit» + 0x68#64) false 0x4000#20 19#5 (by decide))
@@ -739,8 +738,8 @@ theorem procinit_cells (IL : INITLOCK) {hlc : HasLC} {GF : BundledGFunctors} [Ma
   k_step_gen (wp_s_auipc c27 _ (KA.«procinit» + 0x70#64) false 0x17#20 20#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [pi_u17] next c28 hp28
   iintro Hk Hpc
-  k_step_gen (wp_s_addi c28 _ (KA.«procinit» + 0x74#64) false 2386#12 20#5 20#5 (by decide))
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [procinit_br_169c2] next c29 hp29
+  k_step_gen (wp_s_addi c28 _ (KA.«procinit» + 0x74#64) false 2946#12 20#5 20#5 (by decide))
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [procinit_br_16bf2] next c29 hp29
   iintro Hk Hpc
   -- the loop
   rw [show List.range 64 = List.range' 0 (63 + 1) from List.range_eq_range']

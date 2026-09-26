@@ -158,7 +158,7 @@ theorem kxcB_rows_12c (fb ef : List (BitVec 8)) (um : RegMapF (BitVec 64)) (Mv :
     (kxbWalkOk fb ef → kxbPermLeaves fb ef 0 um) := by
   refine ⟨fun _ => ⟨rfl, fun p hp => by cases hp⟩, fun _ => KexecBuilt.kxbPermLeaves_0 fb ef um⟩
 
-theorem kxcB_br_ppt : KA.«kexec» + 0x94#64 + BitVec.signExtend 64 2085136#21 =
+theorem kxcB_br_ppt : KA.«kexec» + 0x94#64 + BitVec.signExtend 64 2085056#21 =
     KA.«proc_pagetable» := by decide
 theorem kxcB_ret_94 : jumpPc (KA.«kexec» + 0x94#64 + 4#64) = KA.«kexec» + 0x94#64 + 4#64 := by
   decide
@@ -935,7 +935,7 @@ theorem kxc_b1 (IUP : IUNLOCKPUT) (EO : END_OP) (PPT : PROC_PAGETABLE) (Γ : Sch
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h9]
   iintro Hk Hpc
   -- +0x094  jal proc_pagetable
-  iapply (kxcB_call_ppt PPT Γ cpu k A spie spp _ (KA.«kexec» + 0x94#64) 2085136#21 kxcB_br_ppt
+  iapply (kxcB_call_ppt PPT Γ cpu k A spie spp _ (KA.«kexec» + 0x94#64) 2085056#21 kxcB_br_ppt
       kxcB_ret_94 k.proc (pageAddr A.V.upt.tfp) _ hK hnoff (by simp [RegMap.set_apply])
       (kxc_tf_align _) htfv)
     $$ [- $Hk $Hpc $Hte $Hce $Hfab $Htf]

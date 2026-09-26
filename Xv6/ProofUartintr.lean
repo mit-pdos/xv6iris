@@ -38,10 +38,10 @@ fold to `&uarts`, the `jal` to `wakeup`, and the hook word of port 0 to
 `consoleintr`. -/
 
 /-- The three `auipc a?,0xa; addi a?,a?,-N` pairs all name `&uarts`. -/
-theorem ui_uarts : KA.«uartintr» + 0x98aa#64 = KA.«uarts» := by decide
+theorem ui_uarts : KA.«uartintr» + 0x98da#64 = KA.«uarts» := by decide
 
 /-- The call `jal wakeup` at `+0x70`. -/
-theorem ui_wakeup_br : KA.«uartintr» + 0x161c#64 = KA.«wakeup» := by decide
+theorem ui_wakeup_br : KA.«uartintr» + 0x162a#64 = KA.«wakeup» := by decide
 
 /-- `&uarts[i]` out of `((uid << 2) + uid) << 3 + &uarts`. -/
 theorem ui_elt (i : UartId) :
@@ -474,7 +474,7 @@ theorem ui_l0 (CI : CONSOLEINTR) [CurCtx]
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
   -- +0x3a  addi s1,s1,-1932
-  k_step (wp_s_addi cpu _ (KA.«uartintr» + 0x3a#64) false 2164#12 9#5 9#5 (by decide))
+  k_step (wp_s_addi cpu _ (KA.«uartintr» + 0x3a#64) false 2212#12 9#5 9#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [ui_uarts]
   iintro Hk Hpc
   -- +0x3e  add s1,s1,a5
@@ -566,7 +566,7 @@ theorem ui_wake (CI : CONSOLEINTR) (WK : WAKEUP) [CurCtx]
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
   -- +0x6a  addi a0,a0,-1980
-  k_step (wp_s_addi cpu _ (KA.«uartintr» + 0x6a#64) false 2116#12 10#5 10#5 (by decide))
+  k_step (wp_s_addi cpu _ (KA.«uartintr» + 0x6a#64) false 2164#12 10#5 10#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [ui_uarts]
   iintro Hk Hpc
   -- +0x6e  add a0,a0,a5
@@ -574,7 +574,7 @@ theorem ui_wake (CI : CONSOLEINTR) (WK : WAKEUP) [CurCtx]
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [ui_elt' i]
   iintro Hk Hpc
   -- +0x70  jal wakeup
-  k_step (wp_s_jal cpu _ (KA.«uartintr» + 0x70#64) false 5548#21 1#5 (by decide))
+  k_step (wp_s_jal cpu _ (KA.«uartintr» + 0x70#64) false 5562#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [ui_wakeup_br]
   iintro Hk Hpc
   iapply (ui_call_wakeup WK Γ cpu _ ?hs2 ?hn2 ?hK2 ?hl2 ?ht2) $$ [- $Hk $Hpc]
@@ -657,7 +657,7 @@ theorem uartintr_proof (CI : CONSOLEINTR) (WK : WAKEUP) : UARTINTR :=
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
   -- +0x18  addi a4,a4,-1898
-  k_step (wp_s_addi cpu _ (KA.«uartintr» + 0x18#64) false 2198#12 14#5 14#5 (by decide))
+  k_step (wp_s_addi cpu _ (KA.«uartintr» + 0x18#64) false 2246#12 14#5 14#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [ui_uarts]
   iintro Hk Hpc
   -- +0x1c  add a5,a5,a4

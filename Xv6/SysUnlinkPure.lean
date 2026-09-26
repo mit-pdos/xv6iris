@@ -106,12 +106,12 @@ theorem sys_unlink_dotdot_name : bname 14 sysUnlinkDotdotF = dotdotName := by de
 /-- the `auipc`/`addi` pair at +0x34, computed (Rocq's `su_dotaddr`) -/
 theorem sys_unlink_dotaddr :
     KA.«sys_unlink» + 0x34#64 + BitVec.signExtend 64 (0x2#20 ++ 0#12) +
-      BitVec.signExtend 64 1330#12 = KStr.«.» := by decide
+      BitVec.signExtend 64 1250#12 = KStr.«.» := by decide
 
 /-- the pair at +0x48 (Rocq's `su_dotdotaddr`) -/
 theorem sys_unlink_dotdotaddr :
     KA.«sys_unlink» + 0x48#64 + BitVec.signExtend 64 (0x2#20 ++ 0#12) +
-      BitVec.signExtend 64 1318#12 = KStr.«..» := by decide
+      BitVec.signExtend 64 1238#12 = KStr.«..» := by decide
 
 /-- `diType dn = T_DIR` at the sixteen-bit width, read as the `Nat`
 equality `DirView` states its type tests at (Rocq's `su_tdir_zof`) -/

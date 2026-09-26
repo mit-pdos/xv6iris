@@ -558,10 +558,10 @@ theorem iput_tail_exit (RH : RELEASE_HOOK) (c : CPU) (k : KCtx)
   k_step (wp_s_auipc c _ (KA.«iput» + 0x24#64) false 0x1d#20 10#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
-  k_step (wp_s_addi c _ (KA.«iput» + 0x28#64) false 1220#12 10#5 10#5 (by decide))
+  k_step (wp_s_addi c _ (KA.«iput» + 0x28#64) false 1700#12 10#5 10#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [iput_lock]
   iintro Hk Hpc
-  k_step (wp_s_jal c _ (KA.«iput» + 0x2c#64) false 2086980#21 1#5 (by decide))
+  k_step (wp_s_jal c _ (KA.«iput» + 0x2c#64) false 2086900#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [iput_br_release]
   iintro Hk Hpc
   iapply (iput_release RH c k hwf hK' hlk _ ?h10 (KA.«iput» + 0x30#64) ?h1)

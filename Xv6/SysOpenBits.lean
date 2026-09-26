@@ -11,7 +11,7 @@ test re-loads it with `lw a5,-180(s0)`, which leaves `signExtend 64 om`
 (`soOmv`), and masks it with an `andi` against a twelve-bit literal
 (`soAnd`).  So each test is a statement about ONE BIT of the stored word,
 and that bit IS the bit of `omArg vom` (`sys_open_om_bit`).  In the Lean
-image (`KA.«sys_open»` = 0x80005202):
+image (`KA.«sys_open»` = 0x80005252):
     +0x2e/+0x32  `lw a5,-180(s0) ; andi a5,a5,512 ; c.beqz`   O_CREATE
     +0x8c..+0xa4 `lw ; andi a4,a5,1 ; xori a4,a4,1 ; sb a4,8(s2)`   readable
                  `andi a4,a5,3 ; snez a4,a4 ; sb a4,9(s2)`         writable

@@ -327,7 +327,7 @@ theorem kxc_a1_au (MP : MYPROC) (BO : BEGIN_OP) (NE : NAMEI_ERA) (EO : END_OP)
   ihave Hk := kctx_eq_mono cpu _ (((k.withSpie k.spie k.spp).pushed 68).withRegs R)
     (by kctx_ext) $$ Hk
   -- +0x020  jal myproc
-  iapply (kxcA_call_myproc MP cpu k k.spie k.spp R (KA.«kexec» + 0x20#64) 2085052#21 kxcA_br_myproc
+  iapply (kxcA_call_myproc MP cpu k k.spie k.spp R (KA.«kexec» + 0x20#64) 2084972#21 kxcA_br_myproc
       kxcA_ret_24 hK hnoff) $$ [- $Hk $Hpc $Hte $Hce]
   isplitr
   · iapply (text_instr _ _ _ _ rfl rfl); iexact Htext

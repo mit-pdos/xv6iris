@@ -218,8 +218,8 @@ theorem fkr_head [X : CurCtx] (MP : MYPROC) (RE : RELEASE) (Γ : SchedNames) [Cl
 end Head
 
 /-- `first`'s address, as the `auipc`/`lw` pair computes it. -/
-theorem fkr_first_addr : KA.«forkret» + 35062#64 = firstAddr := by decide
-theorem fkr_first_addr' : KA.«forkret» + 36884#64 + 18446744073709549794#64 = firstAddr := by decide
+theorem fkr_first_addr : KA.«forkret» + 35110#64 = firstAddr := by decide
+theorem fkr_first_addr' : KA.«forkret» + 36884#64 + 18446744073709549842#64 = firstAddr := by decide
 theorem fkr_beqz_taken : KA.«forkret» + 0x1c#64 + BitVec.signExtend 64 56#13 = KA.«forkret» + 0x54#64 := by
   decide
 theorem fkr_beqz_tgt : KA.«forkret» + 84#64 = KA.«forkret» + 0x54#64 := rfl
@@ -258,7 +258,7 @@ theorem fkr_first_steady [CurCtx] (c : CPU) (kr : KCtx) (eb : Bool) (root : BitV
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c1 hp1
   iintro Hk Hpc
   -- +0x18  lw a5,-1822(a5)
-  k_step_gen (wp_s_lw c1 _ (KA.«forkret» + 0x18#64) false 2274#12 15#5 15#5 (by decide) (by decide)
+  k_step_gen (wp_s_lw c1 _ (KA.«forkret» + 0x18#64) false 2322#12 15#5 15#5 (by decide) (by decide)
     DFrac.discard 0#32) from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
     with [KCtx.rget_eq, KCtx.setReg_regs, RegMap.set_apply, fkr_first_addr', fkr_first_addr] next c2 hp2
   iintro Hk Hpc -
@@ -290,7 +290,7 @@ theorem fkr_first_boot [CurCtx] (c : CPU) (kr : KCtx) (eb : Bool) (root : BitVec
   k_step_gen (wp_s_auipc c _ (KA.«forkret» + 0x14#64) false 9#20 15#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c1 hp1
   iintro Hk Hpc
-  k_step_gen (wp_s_lw c1 _ (KA.«forkret» + 0x18#64) false 2274#12 15#5 15#5 (by decide) (by decide)
+  k_step_gen (wp_s_lw c1 _ (KA.«forkret» + 0x18#64) false 2322#12 15#5 15#5 (by decide) (by decide)
     (DFrac.own 1) 1#32) from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
     with [KCtx.rget_eq, KCtx.setReg_regs, RegMap.set_apply, fkr_first_addr', fkr_first_addr] next c2 hp2
   iintro Hk Hpc Hf

@@ -61,7 +61,7 @@ set_option linter.unusedVariables false
 
 theorem cwj_4a : jumpPc (KA.«consolewrite» + 0x4a#64) = KA.«consolewrite» + 0x4a#64 := by decide
 theorem cwj_58 : jumpPc (KA.«consolewrite» + 0x58#64) = KA.«consolewrite» + 0x58#64 := by decide
-theorem cw_br_copyin : KA.«consolewrite» + 0x22ce#64 = KA.«either_copyin» := by decide
+theorem cw_br_copyin : KA.«consolewrite» + 0x22dc#64 = KA.«either_copyin» := by decide
 theorem cw_br_uartwrite : KA.«consolewrite» + 0x848#64 = KA.«uartwrite» := by decide
 
 /-! ## Word arithmetic, as the instructions compute it -/
@@ -962,7 +962,7 @@ theorem cw_body (EC : EITHER_COPYIN) (UW : UARTWRITE) (Γ : SchedNames) [ClaimIs
   k_step_e (wp_s_add cpu _ (KA.«consolewrite» + 0x44#64) true 10#5 0#5 21#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [g21]
   iintro Hk Hpc
-  k_step_e (wp_s_jal cpu _ (KA.«consolewrite» + 0x46#64) false 8840#21 1#5 (by decide))
+  k_step_e (wp_s_jal cpu _ (KA.«consolewrite» + 0x46#64) false 8854#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [cw_br_copyin]
   iintro Hk Hpc
   -- the bounce buffer, split at the chunk length

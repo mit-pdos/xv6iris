@@ -127,7 +127,7 @@ theorem sw_frame_close (sp ra s0 w1 w2 : BitVec 64) :
 /-! ## The epilogue at `(KernelSyms.«sys_wait» + 0x1a)`, after `kwait` -/
 
 set_option maxHeartbeats 4000000 in
-/-- The epilogue at `0x80002a40` over a generic frame base `kb`. -/
+/-- The epilogue at `0x80002a62` over a generic frame base `kb`. -/
 theorem sw_tail (c : CPU) (kb : KCtx) (hK : 4 ≤ kb.avail)
     (KR : RegMap) (hregs : kb.regs = KR)
     (R : RegMap) (hR2 : R 2#5 = KR 2#5 + 0xFFFFFFFFFFFFFFE0#64) (P : IProp GF) :
@@ -212,9 +212,9 @@ end
 
 /-! ## The function -/
 
-theorem sys_wait_br_fffffffffffff828 : KA.«sys_wait» + 0xfffffffffffff828#64 = KA.«kwait» := by decide
+theorem sys_wait_br_fffffffffffff814 : KA.«sys_wait» + 0xfffffffffffff814#64 = KA.«kwait» := by decide
 
-theorem sys_wait_br_ffffffffffffff0a : KA.«sys_wait» + 0xffffffffffffff0a#64 = KA.«argaddr» := by decide
+theorem sys_wait_br_fffffffffffffef6 : KA.«sys_wait» + 0xfffffffffffffef6#64 = KA.«argaddr» := by decide
 
 set_option maxHeartbeats 64000000 in
 set_option maxRecDepth 20000 in
@@ -264,8 +264,8 @@ theorem sys_wait_proof (AA : ARGADDR) (KW : KWAIT) : SYSWAIT := ⟨
   k_step_gen (wp_s_addi c2 _ (KA.«sys_wait» + 0xc#64) true 0#12 10#5 0#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [sw_li0] next c3 hp3
   iintro Hk Hpc
-  k_step_gen (wp_s_jal c3 _ (KA.«sys_wait» + 0xe#64) false 2096892#21 1#5 (by decide))
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [sys_wait_br_ffffffffffffff0a] next c4 hp4
+  k_step_gen (wp_s_jal c3 _ (KA.«sys_wait» + 0xe#64) false 2096872#21 1#5 (by decide))
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [sys_wait_br_fffffffffffffef6] next c4 hp4
   iintro Hk Hpc
   iapply (sysfile_argaddr_wp AA c4 _ 0 V.upt.tfp V.tf v w1 (DFrac.own 1) (by decide) ?ha0 hv ?hn ?hKa)
     $$ [- $Hk $Hpc]
@@ -288,8 +288,8 @@ theorem sys_wait_proof (AA : ARGADDR) (KW : KWAIT) : SYSWAIT := ⟨
   k_step_gen (wp_s_ld c5 _ (KA.«sys_wait» + 0x12#64) false 4072#12 10#5 8#5 (by decide) (by decide) (DFrac.own 1) v)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [b8, sw_p_addr] next c6 hp6
   iintro Hk Hpc Hslot
-  k_step_gen (wp_s_jal c6 _ (KA.«sys_wait» + 0x16#64) false 2095122#21 1#5 (by decide))
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [sys_wait_br_fffffffffffff828] next c7 hp7
+  k_step_gen (wp_s_jal c6 _ (KA.«sys_wait» + 0x16#64) false 2095102#21 1#5 (by decide))
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [sys_wait_br_fffffffffffff814] next c7 hp7
   iintro Hk Hpc
   have hpin7 : k.sie = false ∨ k.proc = 0#64 → c7 = cpu := fun h =>
     (hp7 h).trans ((hp6 h).trans (hpin5 h))

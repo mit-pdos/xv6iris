@@ -59,9 +59,9 @@ set_option linter.unusedSectionVars false
 set_option linter.unusedSimpArgs false
 set_option linter.unusedVariables false
 
-theorem sys_exec_br_fetchaddr : KA.«sys_exec» + 0xffffffffffffd408#64 = KA.«fetchaddr» := by decide
-theorem sys_exec_br_kalloc : KA.«sys_exec» + 0xffffffffffffb6fe#64 = KA.«kalloc» := by decide
-theorem sys_exec_br_fetchstr : KA.«sys_exec» + 0xffffffffffffd452#64 = KA.«fetchstr» := by decide
+theorem sys_exec_br_fetchaddr : KA.«sys_exec» + 0xffffffffffffd3c6#64 = KA.«fetchaddr» := by decide
+theorem sys_exec_br_kalloc : KA.«sys_exec» + 0xffffffffffffb6ae#64 = KA.«kalloc» := by decide
+theorem sys_exec_br_fetchstr : KA.«sys_exec» + 0xffffffffffffd410#64 = KA.«fetchstr» := by decide
 theorem sys_exec_ret_66 : jumpPc (KA.«sys_exec» + 0x66#64) = KA.«sys_exec» + 0x66#64 := by decide
 theorem sys_exec_ret_74 : jumpPc (KA.«sys_exec» + 0x74#64) = KA.«sys_exec» + 0x74#64 := by decide
 theorem sys_exec_ret_86 : jumpPc (KA.«sys_exec» + 0x86#64) = KA.«sys_exec» + 0x86#64 := by decide
@@ -173,7 +173,7 @@ theorem sys_exec_step_str (FS : FETCHSTR) (Γ : SchedNames) (k : KCtx) (A : SysE
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [a8]
   iintro Hk Hpc H60
   -- +0x82  jal fetchstr
-  k_step_e (wp_s_jal cpu _ (KA.«sys_exec» + 0x82#64) false 2085840#21 1#5 (by decide))
+  k_step_e (wp_s_jal cpu _ (KA.«sys_exec» + 0x82#64) false 2085774#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [sys_exec_br_fetchstr]
   iintro Hk Hpc
   ihave #Hrdy := sysExecEnv_ready Γ A $$ Henv
@@ -324,7 +324,7 @@ theorem sys_exec_step_kalloc (KL : KALLOC) (FS : FETCHSTR) (Γ : SchedNames) (k 
   simp only [sysExecAddr]
   ihave #Hrdy := sysExecEnv_ready Γ A $$ Henv
   -- +0x70  jal kalloc
-  k_step_e (wp_s_jal cpu _ (KA.«sys_exec» + 0x70#64) false 2078350#21 1#5 (by decide))
+  k_step_e (wp_s_jal cpu _ (KA.«sys_exec» + 0x70#64) false 2078270#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [sys_exec_br_kalloc]
   iintro Hk Hpc
   iapply (sys_exec_kalloc KL cpu _ k.sie (by k_norm_g) k.proc (by k_norm_g) ?gn ?gK)
@@ -429,7 +429,7 @@ theorem sys_exec_step (FA : FETCHADDR) (KL : KALLOC) (FS : FETCHSTR) (Γ : Sched
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
   -- +0x62  jal fetchaddr
-  k_step_e (wp_s_jal cpu _ (KA.«sys_exec» + 0x62#64) false 2085798#21 1#5 (by decide))
+  k_step_e (wp_s_jal cpu _ (KA.«sys_exec» + 0x62#64) false 2085732#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [sys_exec_br_fetchaddr]
   iintro Hk Hpc
   icases sysfile_blk_bare A.γ (procAddr A.j) A.pid (sysExecV2 A P) (sysExecM2 A P) $$ Hblk

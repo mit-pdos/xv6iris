@@ -209,7 +209,7 @@ end mint
 /-- `&ftable.file[k]`, as a number. -/
 def fileB (k : Nat) : Nat := (MachCSL.KernelSyms.«ftable» + 0x18) + 40 * k
 
-theorem fileB_val (k : Nat) : fileB k = 0x80022560 + 40 * k := by
+theorem fileB_val (k : Nat) : fileB k = 0x80022790 + 40 * k := by
   unfold fileB; rfl
 
 theorem fileB_off (k o : Nat) (hk : k < NFILE) (ho : o < 40) :
@@ -231,8 +231,8 @@ theorem bootCarve_fileEntry [CurCtx] (ξ : CtxId) (k : Nat)
     have := fnode_toNat k (Nat.le_of_lt hk); unfold aFtype; rw [this]; rfl
   have hB := fileB_val k
   have hkN : k < 100 := hk
-  have hlo : 0x8000a330 ≤ fileB k := by omega
-  have hend : fileB k + 40 ≤ 0x80023640 := by omega
+  have hlo : 0x8000a360 ≤ fileB k := by omega
+  have hend : fileB k + 40 ≤ 0x80023870 := by omega
   have hal : fileB k % 8 = 0 := by omega
   clear hB hkN
   generalize fileB k = B at *
@@ -312,13 +312,13 @@ theorem bootCarve_ftable [CurCtx] (ξ : CtxId) :
     kmapStatic (GF := GF) ⊢
       bootRan (imgFlat bootImage) MachCSL.KernelSyms.«ftable» (MachCSL.KernelSyms.«ftable» + 0xfb8) -∗
       lockWords ftableLockAddr 0#32 0#64 0#64 ∗ [∗list] k ∈ List.range NFILE, fentryRaw ξ k := by
-  have hF : MachCSL.KernelSyms.«ftable» = 0x80022548 := rfl
-  have hlk : ftableLockAddr.toNat = 0x80022548 := rfl
-  have h0 : fileB 0 = 0x80022548 + 24 := rfl
+  have hF : MachCSL.KernelSyms.«ftable» = 0x80022778 := rfl
+  have hlk : ftableLockAddr.toNat = 0x80022778 := rfl
+  have h0 : fileB 0 = 0x80022778 + 24 := rfl
   have hN : NFILE = 100 := rfl
   rw [hF]
   iintro #Hk H
-  icases (bootRan_split (GF := GF) (imgFlat bootImage) 0x80022548 (0x80022548 + 24) (0x80022548 + 0xfb8)
+  icases (bootRan_split (GF := GF) (imgFlat bootImage) 0x80022778 (0x80022778 + 24) (0x80022778 + 0xfb8)
     (by omega) (by omega)).1 $$ H with ⟨Hl, H⟩
   ihave Hl := bootCarve_lockWords (GF := GF) ftableLockAddr _ hlk (by omega) (by omega) (by omega) $$ Hk Hl
   iframe Hl

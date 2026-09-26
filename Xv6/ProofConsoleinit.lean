@@ -31,15 +31,15 @@ theorem ci_u22 : BitVec.signExtend 64 (0x22#20 ++ 0#12) = 0x22000#64 := by decid
 
 /-- `"cons"` and `&cons.lock`, as the two address pairs compute them. -/
 theorem ci_br_6bcc : KA.«consoleinit» + 0x6BCC#64 = KStr.«cons» := by decide
-theorem ci_br_11f1c : KA.«consoleinit» + 0x11F1C#64 = consAddr := by decide
+theorem ci_br_11f4c : KA.«consoleinit» + 0x11f4c#64 = consAddr := by decide
 
 /-- `consoleread` and `consolewrite`, as the two `auipc`/`addi` pairs compute them. -/
 theorem ci_br_read : KA.«consoleinit» + 0xFFFFFFFFFFFFFD46#64 = KA.«consoleread» := by decide
 theorem ci_br_write : KA.«consoleinit» + 0xFFFFFFFFFFFFFCA2#64 = KA.«consolewrite» := by decide
 
 /-- The two `devsw[CONSOLE]` slots, as `16(a5)` and `24(a5)` compute them. -/
-theorem ci_devsw_read : KA.«consoleinit» + 0x22084#64 = devswConsoleRead := by decide
-theorem ci_devsw_write : KA.«consoleinit» + 0x2208C#64 = devswConsoleWrite := by decide
+theorem ci_devsw_read : KA.«consoleinit» + 0x222b4#64 = devswConsoleRead := by decide
+theorem ci_devsw_write : KA.«consoleinit» + 0x222bc#64 = devswConsoleWrite := by decide
 
 /-- The two `jal`s. -/
 theorem ci_br_initlock : KA.«consoleinit» + 0x7A4#64 = KA.«initlock» := by decide
@@ -176,8 +176,8 @@ theorem consoleinit_proof (IL : INITLOCK) (UI : UARTINIT) : CONSOLEINIT :=
   k_step_gen (wp_s_auipc c3 _ (KA.«consoleinit» + 0x10#64) false 0x12#20 10#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [ci_u12] next c4 hp4
   iintro Hk Hpc
-  k_step_gen (wp_s_addi c4 _ (KA.«consoleinit» + 0x14#64) false 3852#12 10#5 10#5 (by decide))
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [ci_br_11f1c] next c5 hp5
+  k_step_gen (wp_s_addi c4 _ (KA.«consoleinit» + 0x14#64) false 3900#12 10#5 10#5 (by decide))
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [ci_br_11f4c] next c5 hp5
   iintro Hk Hpc
   -- jal ra, initlock
   k_step_gen (wp_s_jal c5 _ (KA.«consoleinit» + 0x18#64) false 1932#21 1#5 (by decide))
@@ -190,7 +190,7 @@ theorem consoleinit_proof (IL : INITLOCK) (UI : UARTINIT) : CONSOLEINIT :=
   iframe #
   iframe Hwlock Hwname Hwcpu
   case hKi => k_norm_g; omega
-  case ha0 => k_norm_g [ci_br_11f1c]
+  case ha0 => k_norm_g [ci_br_11f4c]
   case ha1 => k_norm_g [ci_br_6bcc]
   -- past initlock
   iapply wpNext_intro_pin
@@ -222,7 +222,7 @@ theorem consoleinit_proof (IL : INITLOCK) (UI : UARTINIT) : CONSOLEINIT :=
   k_step_gen (wp_s_auipc c9 _ (KA.«consoleinit» + 0x20#64) false 0x22#20 15#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [ci_u22] next c10 hp10
   iintro Hk Hpc
-  k_step_gen (wp_s_addi c10 _ (KA.«consoleinit» + 0x24#64) false 84#12 15#5 15#5 (by decide))
+  k_step_gen (wp_s_addi c10 _ (KA.«consoleinit» + 0x24#64) false 644#12 15#5 15#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c11 hp11
   iintro Hk Hpc
   -- a4 = consoleread

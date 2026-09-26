@@ -50,8 +50,8 @@ set_option linter.unusedVariables false
 /-! ## Constants -/
 
 theorem sys_mknod_br_begin_op : KA.«sys_mknod» + 0xffffffffffffe9b8#64 = KA.«begin_op» := by decide
-theorem sys_mknod_br_argint : KA.«sys_mknod» + 0xffffffffffffd574#64 = KA.«argint» := by decide
-theorem sys_mknod_br_argstr : KA.«sys_mknod» + 0xffffffffffffd5ac#64 = KA.«argstr» := by decide
+theorem sys_mknod_br_argint : KA.«sys_mknod» + 0xffffffffffffd532#64 = KA.«argint» := by decide
+theorem sys_mknod_br_argstr : KA.«sys_mknod» + 0xffffffffffffd56a#64 = KA.«argstr» := by decide
 theorem sys_mknod_br_create : KA.«sys_mknod» + 0xfffffffffffff900#64 = KA.«create» := by decide
 theorem sys_mknod_br_iunlockput : KA.«sys_mknod» + 0xffffffffffffe1a2#64 = KA.«iunlockput» := by
   decide

@@ -290,7 +290,7 @@ theorem dsAlign (k q off dv : Nat) (hk : k < NBUF) (hq : q < 16) (hoff : off < 6
     (hdv : dv = 2 ∨ dv = 4) (hm : off % dv = 0) :
     (aBufData (bnode k) + BitVec.ofNat 64 (64 * q + off)).toNat % dv = 0 := by
   rw [bufData_toNat k (64 * q + off) hk (by unfold BSIZE; omega)]
-  have hbc : KernelSyms.«bcache» = 0x80018278 := rfl
+  have hbc : KernelSyms.«bcache» = 0x800184a8 := rfl
   rw [hbc]
   rcases hdv with rfl | rfl <;> omega
 

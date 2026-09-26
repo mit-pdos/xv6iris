@@ -34,7 +34,7 @@ set_option linter.unusedVariables false
 /-! ## Addresses and contexts -/
 
 /-- `jal ra,myproc` at `+0x08`. -/
-theorem prepare_return_br_myproc : KA.«prepare_return» + 0xfffffffffffff44a#64 = KA.«myproc» := by decide
+theorem prepare_return_br_myproc : KA.«prepare_return» + 0xfffffffffffff43c#64 = KA.«myproc» := by decide
 
 /-- The link register of the call. -/
 theorem prepare_return_ret_0c : jumpPc (KA.«prepare_return» + 0xc#64) = KA.«prepare_return» + 0xc#64 := by
@@ -99,7 +99,7 @@ theorem prepare_return_proof (MP : MYPROC) : PREPARE_RETURN :=
   iapply wpNext_intro_pin
   iintro %c1 %hp1 Hk Hpc Hframe
   -- jal myproc
-  k_step_gen (wp_s_jal c1 _ (KA.«prepare_return» + 0x8#64) false 2094146#21 1#5 (by decide))
+  k_step_gen (wp_s_jal c1 _ (KA.«prepare_return» + 0x8#64) false 2094132#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [prepare_return_br_myproc] next c2 hp2
   iintro Hk Hpc
   iapply (prepare_return_myproc MP c2 _ ?hnm ?hKm) $$ [- $Hk $Hpc]

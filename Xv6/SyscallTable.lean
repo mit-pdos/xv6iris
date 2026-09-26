@@ -58,14 +58,14 @@ set_option linter.unusedSectionVars false
 
 /-- The return address every entry answers at: the `jalr a5` at `+0x38`
 writes `syscall + 0x3a` into `ra` (Rocq `sysc_target_ret_pc`). -/
-def syscallRet : BitVec 64 := syscallAddr + 0x3a#64
+def syscallRet : BitVec 64 := syscallAddr + 0x46#64
 
 theorem syscallRet_jumpPc : jumpPc syscallRet = syscallRet := by
   unfold syscallRet syscallAddr; decide
 
 /-- The fallback (`bltu`/`beqz` taken, `+0x40`) and the epilogue (`+0x58`). -/
-def syscallFallback : BitVec 64 := syscallAddr + 0x40#64
-def syscallEpi : BitVec 64 := syscallAddr + 0x58#64
+def syscallFallback : BitVec 64 := syscallAddr + 0x54#64
+def syscallEpi : BitVec 64 := syscallAddr + 0x6c#64
 
 /-- `bltu a4,a5` at `+0x22` (offset `0x1e`) and `beqz a5` at `+0x36`
 (offset `0xa`) both land on the fallback. -/
@@ -75,7 +75,7 @@ theorem syscall_beqz_tgt : syscallAddr + 0x36#64 + BitVec.signExtend 64 (0xa#13)
   unfold syscallFallback syscallAddr; decide
 
 /-- `c.j` at `+0x3e` (offset `0x1a`) lands on the epilogue. -/
-theorem syscall_j_tgt : syscallAddr + 0x3e#64 + BitVec.signExtend 64 (0x1a#21) = syscallEpi := by
+theorem syscall_j_tgt : syscallAddr + 0x4a#64 + BitVec.signExtend 64 (0x1a#21) = syscallEpi := by
   unfold syscallEpi syscallAddr; decide
 
 /-- `auipc a5,0x5 ; addi a5,a5,-518` at `+0x2a`/`+0x2e` is the table's base
@@ -88,7 +88,7 @@ theorem syscall_tbl_addr :
 /-- `auipc a0,0x5 ; addi a0,a0,-1570` at `+0x46`/`+0x4a`: the fallback's
 format string (Rocq `sysc_fmt_a`, 0x80007398). -/
 theorem syscall_fmt_addr :
-    syscallAddr + 0x46#64 + BitVec.signExtend 64 (5#20 ++ 0#12) + BitVec.signExtend 64 (0x9de#12) =
+    syscallAddr + 0x5a#64 + BitVec.signExtend 64 (5#20 ++ 0#12) + BitVec.signExtend 64 (0x9de#12) =
       0x80007398#64 := by
   unfold syscallAddr; decide
 

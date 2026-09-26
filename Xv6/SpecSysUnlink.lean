@@ -33,7 +33,7 @@ are `Xv6/SysUnlinkDefs.lean`; the reference allowance is
       iunlockput(dp); end_op(); return -1;
     }
 
-`KA.«sys_unlink»` = 0x80005082, 384 bytes (the LEAN image's offsets are
+`KA.«sys_unlink»` = 0x800050d2, 384 bytes (the LEAN image's offsets are
 `SysUnlinkParts`' header).  A THIRTY-slot frame (`addi sp,sp,-240`); the
 three register saves are SHRINK-WRAPPED (`s1` at +0x1a, `s2` at +0x5c, `s3`
 at +0x72); `isdirempty` has no symbol (gcc inlined it at +0xf8..+0x12c);

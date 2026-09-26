@@ -47,17 +47,17 @@ set_option linter.unusedVariables false
 /-! ## Addresses -/
 
 /-- `&tickslock`, folded out of both `auipc a0,0x16; addi a0,a0,-<off>` pairs. -/
-theorem cki_tickslock_addr : KA.«clockintr» + 0x15cae#64 = tickslockAddr := by
+theorem cki_tickslock_addr : KA.«clockintr» + 0x15ed0#64 = tickslockAddr := by
   unfold tickslockAddr; decide
 
 /-- `&ticks`, folded out of `auipc a4,0x8; addi a4,a4,-680`. -/
-theorem cki_ticks_addr : KA.«clockintr» + 0x7d96#64 = ticksAddr := by
+theorem cki_ticks_addr : KA.«clockintr» + 0x7db8#64 = ticksAddr := by
   unfold ticksAddr; decide
 
-theorem cki_br_cpuid : KA.«clockintr» + 0xfffffffffffff3a2#64 = KA.«cpuid» := by decide
-theorem cki_br_acquire : KA.«clockintr» + 0xffffffffffffe6a6#64 = KA.«acquire» := by decide
+theorem cki_br_cpuid : KA.«clockintr» + 0xfffffffffffff394#64 = KA.«cpuid» := by decide
+theorem cki_br_acquire : KA.«clockintr» + 0xffffffffffffe698#64 = KA.«acquire» := by decide
 theorem cki_br_wakeup : KA.«clockintr» + 0xfffffffffffffa80#64 = KA.«wakeup» := by decide
-theorem cki_br_release : KA.«clockintr» + 0xffffffffffffe72e#64 = KA.«release» := by decide
+theorem cki_br_release : KA.«clockintr» + 0xffffffffffffe720#64 = KA.«release» := by decide
 
 /-- The link registers of the four calls. -/
 theorem cki_ret_0c : jumpPc (KA.«clockintr» + 0xc#64) = KA.«clockintr» + 0xc#64 := by decide
@@ -285,7 +285,7 @@ theorem clockintr_crit (RE : RELEASE) (WK : WAKEUP) (Γ : SchedNames)
   k_step (wp_s_auipc cpu _ (KA.«clockintr» + 0x34#64) false 8#20 14#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [cki_u_8]
   iintro Hk Hpc
-  k_step (wp_s_addi cpu _ (KA.«clockintr» + 0x38#64) false 3426#12 14#5 14#5 (by decide))
+  k_step (wp_s_addi cpu _ (KA.«clockintr» + 0x38#64) false 3460#12 14#5 14#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [cki_ticks_addr]
   iintro Hk Hpc
   -- lw a5,0(a4) ; addiw a5,a5,1 ; sw a5,0(a4)
@@ -332,10 +332,10 @@ theorem clockintr_crit (RE : RELEASE) (WK : WAKEUP) (Γ : SchedNames)
   k_step (wp_s_auipc cpu _ (KA.«clockintr» + 0x48#64) false 22#20 10#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [cki_u_16]
   iintro Hk Hpc
-  k_step (wp_s_addi cpu _ (KA.«clockintr» + 0x4c#64) false 3174#12 10#5 10#5 (by decide))
+  k_step (wp_s_addi cpu _ (KA.«clockintr» + 0x4c#64) false 3720#12 10#5 10#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [cki_tickslock_addr]
   iintro Hk Hpc
-  k_step (wp_s_jal cpu _ (KA.«clockintr» + 0x50#64) false 2090718#21 1#5 (by decide))
+  k_step (wp_s_jal cpu _ (KA.«clockintr» + 0x50#64) false 2090704#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [cki_br_release]
   iintro Hk Hpc
   iapply (cki_release RE cpu _ γt ?ha0r ?hsr ?hnr ?hKr false ?hrr ?hor)
@@ -393,10 +393,10 @@ theorem clockintr_ticks (AC : ACQUIRE) (RE : RELEASE) (WK : WAKEUP) (Γ : SchedN
   k_step (wp_s_auipc cpu _ (KA.«clockintr» + 0x28#64) false 22#20 10#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [cki_u_16]
   iintro Hk Hpc
-  k_step (wp_s_addi cpu _ (KA.«clockintr» + 0x2c#64) false 3206#12 10#5 10#5 (by decide))
+  k_step (wp_s_addi cpu _ (KA.«clockintr» + 0x2c#64) false 3752#12 10#5 10#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [cki_tickslock_addr]
   iintro Hk Hpc
-  k_step (wp_s_jal cpu _ (KA.«clockintr» + 0x30#64) false 2090614#21 1#5 (by decide))
+  k_step (wp_s_jal cpu _ (KA.«clockintr» + 0x30#64) false 2090600#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [cki_br_acquire]
   iintro Hk Hpc
   iapply (cki_acquire AC cpu _ γt ?ha0 ?hna ?hKa ?hla) $$ [- $Hk $Hpc]
@@ -448,7 +448,7 @@ theorem clockintr_proof (CU : CPUID) (AC : ACQUIRE) (RE : RELEASE) (WK : WAKEUP)
   inext
   iintro Hk Hpc Hframe
   -- jal cpuid
-  k_step (wp_s_jal cpu _ (KA.«clockintr» + 0x8#64) false 2093978#21 1#5 (by decide))
+  k_step (wp_s_jal cpu _ (KA.«clockintr» + 0x8#64) false 2093964#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [cki_br_cpuid]
   iintro Hk Hpc
   iapply (cki_cpuid CU cpu _ ?hsc ?hKc) $$ [- $Hk $Hpc]

@@ -61,7 +61,7 @@ theorem fi_initlock_call (IL : INITLOCK) [CurCtx] (c : CPU) (k' : KCtx)
 /-! ## The epilogue -/
 
 set_option maxHeartbeats 4000000 in
-/-- The epilogue at `0x80004166`: restore `ra`, `s0`, pop the frame and
+/-- The epilogue at `0x800041b6`: restore `ra`, `s0`, pop the frame and
 return to the caller with the name word and `lkFresh`. -/
 theorem fileinit_finish [CurCtx] (cpu c : CPU) (k : KCtx)
     (hpin : k.sie = false ∨ k.proc = 0#64 → c = cpu) (hK : 2 ≤ k.avail)
@@ -97,11 +97,11 @@ theorem fileinit_finish [CurCtx] (cpu c : CPU) (k : KCtx)
 
 /-! ## The function -/
 
-theorem fileinit_br_ffffffffffffca8e : KA.«fileinit» + 0xffffffffffffca8e#64 = KA.«initlock» := by decide
+theorem fileinit_br_ffffffffffffca3e : KA.«fileinit» + 0xffffffffffffca3e#64 = KA.«initlock» := by decide
 
-theorem fileinit_br_1e3fe : KA.«fileinit» + 0x1e3fe#64 = KA.«ftable» := by decide
+theorem fileinit_br_1e5de : KA.«fileinit» + 0x1e5de#64 = KA.«ftable» := by decide
 
-theorem fileinit_br_3436 : KA.«fileinit» + 0x3436#64 = KStr.«ftable» := by decide
+theorem fileinit_br_33e6 : KA.«fileinit» + 0x33e6#64 = KStr.«ftable» := by decide
 
 set_option maxHeartbeats 4000000 in
 theorem fileinit_proof (IL : INITLOCK) : FILEINIT :=
@@ -123,19 +123,19 @@ theorem fileinit_proof (IL : INITLOCK) : FILEINIT :=
   k_step_gen (wp_s_auipc c1 _ (KA.«fileinit» + 0x8#64) false 3#20 11#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [fi_u3] next c2 hp2
   iintro Hk Hpc
-  k_step_gen (wp_s_addi c2 _ (KA.«fileinit» + 0xc#64) false 1070#12 11#5 11#5 (by decide))
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [fileinit_br_3436] next c3 hp3
+  k_step_gen (wp_s_addi c2 _ (KA.«fileinit» + 0xc#64) false 990#12 11#5 11#5 (by decide))
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [fileinit_br_33e6] next c3 hp3
   iintro Hk Hpc
   -- a0 = &ftable.lock
   k_step_gen (wp_s_auipc c3 _ (KA.«fileinit» + 0x10#64) false 0x1e#20 10#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [fi_u1e] next c4 hp4
   iintro Hk Hpc
-  k_step_gen (wp_s_addi c4 _ (KA.«fileinit» + 0x14#64) false 1006#12 10#5 10#5 (by decide))
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [fileinit_br_1e3fe] next c5 hp5
+  k_step_gen (wp_s_addi c4 _ (KA.«fileinit» + 0x14#64) false 1486#12 10#5 10#5 (by decide))
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [fileinit_br_1e5de] next c5 hp5
   iintro Hk Hpc
   -- jal ra, initlock
-  k_step_gen (wp_s_jal c5 _ (KA.«fileinit» + 0x18#64) false 2083446#21 1#5 (by decide))
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [fileinit_br_ffffffffffffca8e] next c6 hp6
+  k_step_gen (wp_s_jal c5 _ (KA.«fileinit» + 0x18#64) false 2083366#21 1#5 (by decide))
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [fileinit_br_ffffffffffffca3e] next c6 hp6
   iintro Hk Hpc
   have hpin6 : k.sie = false ∨ k.proc = 0#64 → c6 = cpu := fun h =>
     (hp6 h).trans ((hp5 h).trans ((hp4 h).trans ((hp3 h).trans ((hp2 h).trans (hp1 h)))))

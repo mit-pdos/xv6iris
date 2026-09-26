@@ -37,13 +37,13 @@ set_option linter.unusedVariables false
 /-! ## Addresses -/
 
 /-- `&disk.vdisk_lock`, folded out of `auipc a0,0x1e; addi a0,a0,-950`. -/
-theorem vdrw_lock_addr : KA.«virtio_disk_rw» + 0x1dc74#64 = aVdiskLock := by
+theorem vdrw_lock_addr : KA.«virtio_disk_rw» + 0x1de54#64 = aVdiskLock := by
   unfold aVdiskLock diskAddr dOffLock; decide
 
 /-- `&disk`, folded out of `auipc s5,0x1e; addi s5,s5,-1260`. -/
-theorem vdrw_disk_addr : KA.«virtio_disk_rw» + 0x1db4c#64 = KA.«disk» := by decide
+theorem vdrw_disk_addr : KA.«virtio_disk_rw» + 0x1dd2c#64 = KA.«disk» := by decide
 
-theorem vdrw_br_acquire : KA.«virtio_disk_rw» + 0xffffffffffffb2a4#64 = KA.«acquire» := by decide
+theorem vdrw_br_acquire : KA.«virtio_disk_rw» + 0xffffffffffffb254#64 = KA.«acquire» := by decide
 
 theorem vdrw_ret_36 :
     jumpPc (KA.«virtio_disk_rw» + 0x36#64) = KA.«virtio_disk_rw» + 0x36#64 := by decide
@@ -149,10 +149,10 @@ theorem vdrw_P1 {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] 
   k_step_e (wp_s_auipc cpu _ (KA.«virtio_disk_rw» + 0x2a#64) false 0x1e#20 10#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
-  k_step_e (wp_s_addi cpu _ (KA.«virtio_disk_rw» + 0x2e#64) false 3146#12 10#5 10#5 (by decide))
+  k_step_e (wp_s_addi cpu _ (KA.«virtio_disk_rw» + 0x2e#64) false 3626#12 10#5 10#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [vdrw_lock_addr]
   iintro Hk Hpc
-  k_step_e (wp_s_jal cpu _ (KA.«virtio_disk_rw» + 0x32#64) false 2077298#21 1#5 (by decide))
+  k_step_e (wp_s_jal cpu _ (KA.«virtio_disk_rw» + 0x32#64) false 2077218#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [vdrw_br_acquire]
   iintro Hk Hpc
   iapply (vdrw_acquire AC cpu _ γ γl pd pav pu ?ha0 ?hna ?hKa ?hsa) $$ [- $Hk $Hpc]
@@ -181,7 +181,7 @@ theorem vdrw_P1 {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] 
   k_step (wp_s_auipc cpu _ (KA.«virtio_disk_rw» + 0x38#64) false 0x1e#20 21#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
-  k_step (wp_s_addi cpu _ (KA.«virtio_disk_rw» + 0x3c#64) false 2836#12 21#5 21#5 (by decide))
+  k_step (wp_s_addi cpu _ (KA.«virtio_disk_rw» + 0x3c#64) false 3316#12 21#5 21#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [vdrw_disk_addr]
   iintro Hk Hpc
   k_step (wp_s_addi cpu _ (KA.«virtio_disk_rw» + 0x40#64) true 3#12 20#5 0#5 (by decide))

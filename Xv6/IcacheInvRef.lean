@@ -317,7 +317,7 @@ Rocq's `wordw_claim`; deviation 3). -/
 theorem iRef_ram_aligned (k : Nat) (hk : k < NINODE) :
     inRam (iRef (ientry k)) 4 ∧ (iRef (ientry k)).toNat % 4 = 0 := by
   have e := ientry_unsigned k (Nat.le_of_lt hk)
-  have hv : KernelSyms.«itable» = 0x80020958 := rfl
+  have hv : KernelSyms.«itable» = 0x80020b88 := rfl
   have e2 : (iRef (ientry k)).toNat = KernelSyms.«itable» + 24 + ISLOTSZ * k + 8 := by
     unfold iRef
     rw [BitVec.toNat_add, e]

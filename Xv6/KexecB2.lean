@@ -88,11 +88,11 @@ set_option linter.unusedVariables false
 
 /-! ## Branch targets and return addresses -/
 
-theorem kxcB2_br_pfp : KA.«kexec» + 0x324#64 + BitVec.signExtend 64 2084612#21 =
+theorem kxcB2_br_pfp : KA.«kexec» + 0x324#64 + BitVec.signExtend 64 2084532#21 =
     KA.«proc_freepagetable» := by decide
 theorem kxcB2_ret_324 : jumpPc (KA.«kexec» + 0x324#64 + 4#64) = KA.«kexec» + 0x324#64 + 4#64 := by
   decide
-theorem kxcB2_br_walk : KA.«kexec» + 0x100#64 + BitVec.signExtend 64 2082460#21 = KA.«walkaddr» := by
+theorem kxcB2_br_walk : KA.«kexec» + 0x100#64 + BitVec.signExtend 64 2082380#21 = KA.«walkaddr» := by
   decide
 theorem kxcB2_ret_100 : jumpPc (KA.«kexec» + 0x100#64 + 4#64) = KA.«kexec» + 0x100#64 + 4#64 := by
   decide
@@ -382,7 +382,7 @@ theorem kxc_bad31e (IUP : IUNLOCKPUT) (EO : END_OP) (PFP : PROC_FREEPAGETABLE) (
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h22]
   iintro Hk Hpc
   -- +0x324  jal proc_freepagetable
-  iapply (kxc_call_pfp PFP Γ cpu k A spie spp _ (KA.«kexec» + 0x324#64) 2084612#21 kxcB2_br_pfp
+  iapply (kxc_call_pfp PFP Γ cpu k A spie spp _ (KA.«kexec» + 0x324#64) 2084532#21 kxcB2_br_pfp
       kxcB2_ret_324 P Mi hK hnoff (by simp [RegMap.set_apply, h22]) (by simpa [RegMap.set_apply] using hsz)
       (by simpa [RegMap.set_apply] using hbelow))
     $$ [- $Hk $Hpc $Hte $Hce $Hfab $Hpt]
@@ -457,7 +457,7 @@ def kxcB2MsgStr : List (BitVec 8) :=
     0x72#8, 0x65#8, 0x73#8, 0x73#8, 0x20#8, 0x73#8, 0x68#8, 0x6f#8, 0x75#8, 0x6c#8, 0x64#8, 0x20#8,
     0x65#8, 0x78#8, 0x69#8, 0x73#8, 0x74#8]
 
-theorem kxcB2_br_panic : KA.«kexec» + 0xd6#64 + BitVec.signExtend 64 2080438#21 = KA.«panic» := by
+theorem kxcB2_br_panic : KA.«kexec» + 0xd6#64 + BitVec.signExtend 64 2080358#21 = KA.«panic» := by
   decide
 
 section Panic
@@ -753,8 +753,8 @@ theorem kxcB2_ls_da (RD : READI) (IUP : IUNLOCKPUT) (EO : END_OP) (PFP : PROC_FR
     unfold kxcResB
     iframe
 
-theorem kxcB2_msg_addr : KA.«kexec» + 0x2d1c#64 = KStr.«loadseg: address should exist» := by decide
-theorem kxcB2_br_panic' : KA.«kexec» + 0xffffffffffffbf8c#64 = KA.«panic» := by decide
+theorem kxcB2_msg_addr : KA.«kexec» + 0x2ccc#64 = KStr.«loadseg: address should exist» := by decide
+theorem kxcB2_br_panic' : KA.«kexec» + 0xffffffffffffbf3c#64 = KA.«panic» := by decide
 
 /-- `bgeu s9,a5` with `s9 = PGSIZE` and `a5` the ABI word `filesz - i`. -/
 theorem kxcB2_bgeu4096 (d : Nat) (h : d < 2 ^ 32) :
@@ -836,7 +836,7 @@ theorem kxcB2_ls_step (RD : READI) (WA : WALKADDR) (PA : PANIC) (IUP : IUNLOCKPU
   icases Hres with ⟨Hop, Hlog, Hirs, Hbs, Hpt, Hpriv, Hbufs, He, Hfr⟩
   icases UPtAlloc.procPtAt_split P Mi $$ Hpt with ⟨%hwf, Hrep, Hum⟩
   icases UPtAlloc.ptOwnRep_split _ _ $$ Hrep with ⟨%t, %⟨htb, hrep⟩, Ht⟩
-  iapply (kxcB2_call_walkaddr WA cpu k spie spp _ (KA.«kexec» + 0x100#64) 2082460#21 kxcB2_br_walk
+  iapply (kxcB2_call_walkaddr WA cpu k spie spp _ (KA.«kexec» + 0x100#64) 2082380#21 kxcB2_br_walk
       kxcB2_ret_100 t P.leaves hK (by simp [RegMap.set_apply, h22, htb]) hrep)
     $$ [- $Hk $Hpc $Hte $Hce $Ht]
   isplitr
@@ -887,10 +887,10 @@ theorem kxcB2_ls_step (RD : READI) (WA : WALKADDR) (PA : PANIC) (IUP : IUNLOCKPU
     k_step_e (wp_s_auipc cpu _ (KA.«kexec» + 0xce#64) false 3#20 10#5 (by decide))
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
     iintro Hk Hpc
-    k_step_e (wp_s_addi cpu _ (KA.«kexec» + 0xd2#64) false 3150#12 10#5 10#5 (by decide))
+    k_step_e (wp_s_addi cpu _ (KA.«kexec» + 0xd2#64) false 3070#12 10#5 10#5 (by decide))
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [kxcB2_msg_addr]
     iintro Hk Hpc
-    k_step_e (wp_s_jal cpu _ (KA.«kexec» + 0xd6#64) false 2080438#21 1#5 (by decide))
+    k_step_e (wp_s_jal cpu _ (KA.«kexec» + 0xd6#64) false 2080358#21 1#5 (by decide))
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [kxcB2_br_panic, kxcB2_br_panic']
     iintro Hk Hpc
     iapply (kxcB2_panic PA cpu _ ?paddr ?pK ?pnoff ?ppr ?puart) $$ [- $Hk $Hpc]

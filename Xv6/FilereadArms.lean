@@ -223,11 +223,11 @@ theorem frd_arm_panic (PA : PANIC) (cpu : CPU) (k : KCtx) (spie spp : Bool) (R :
   k_step_e (wp_s_auipc cpu _ (KA.«fileread» + 0xa4#64) false 3#20 10#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
-  k_step_e (wp_s_addi cpu _ (KA.«fileread» + 0xa8#64) false 450#12 10#5 10#5 (by decide))
+  k_step_e (wp_s_addi cpu _ (KA.«fileread» + 0xa8#64) false 370#12 10#5 10#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [frd_msg_addr]
   iintro Hk Hpc
   -- +0xac  jal panic
-  k_step_e (wp_s_jal cpu _ (KA.«fileread» + 0xac#64) false 2081874#21 1#5 (by decide))
+  k_step_e (wp_s_jal cpu _ (KA.«fileread» + 0xac#64) false 2081794#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [frd_br_panic]
   iintro Hk Hpc
   iapply (frd_panic PA cpu _ ?paddr ?pK ?pnoff ?ppr ?puart) $$ [- $Hk $Hpc]

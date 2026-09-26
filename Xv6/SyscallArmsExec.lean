@@ -319,14 +319,14 @@ theorem syscFb_kinds : pkKinds syscFbFmt = [PkKind.num, PkKind.str, PkKind.num] 
   unfold syscFbFmt; decide
 
 /-- `jal ra,printk` at `+0x4e`. -/
-theorem syscFb_jal_tgt : KA.«syscall» + 0x4e#64 + BitVec.signExtend 64 (0x1fdb64#21) = KA.«printk» := by
+theorem syscFb_jal_tgt : KA.«syscall» + 0x62#64 + BitVec.signExtend 64 (0x1fdb64#21) = KA.«printk» := by
   decide
 
 /-- The format string (`auipc`/`addi` at `+0x46`/`+0x4a`), printk (`jal` at
 `+0x4e`) and the return pc, as the normaliser leaves them. -/
-theorem syscFb_fmt_norm : KA.«syscall» + 18980#64 = KStr.«%d %s: unknown sys call %d\n» := by decide
-theorem syscFb_printk_norm : KA.«syscall» + 18446744073709542322#64 = KA.«printk» := by decide
-theorem syscFb_ret_norm : jumpPc (KA.«syscall» + 82#64) = KA.«syscall» + 82#64 := by decide
+theorem syscFb_fmt_norm : KA.«syscall» + 18966#64 = KStr.«%d %s: unknown sys call %d\n» := by decide
+theorem syscFb_printk_norm : KA.«syscall» + 18446744073709542308#64 = KA.«printk» := by decide
+theorem syscFb_ret_norm : jumpPc (KA.«syscall» + 102#64) = KA.«syscall» + 102#64 := by decide
 
 /-- The three varargs `p->pid, p->name, num` (Rocq `sysc_descs_mk`). -/
 theorem syscFb_descs (R : RegMap) (dq : DFrac) (s : List (BitVec 8)) (h : R 12#5 ≠ 0#64) :
@@ -510,25 +510,25 @@ theorem syscall_fallback (PK : PRINTK)
   icases syscFb_pid hct γ (procAddr j) pid V M $$ Hpriv with ⟨Hpid, Hpback⟩
   unfold syscallFallback syscallAddr
   -- +0x40  addi a2,s1,344
-  k_step_e (wp_s_addi cpu _ (KA.«syscall» + 0x40#64) false 344#12 12#5 9#5 (by decide))
+  k_step_e (wp_s_addi cpu _ (KA.«syscall» + 0x54#64) false 344#12 12#5 9#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hs1]
   iintro Hk Hpc
   -- +0x44  c.lw a1,48(s1)
-  k_step_e (wp_s_lw cpu _ (KA.«syscall» + 0x44#64) true 48#12 11#5 9#5 (by decide) (by decide) (DFrac.own (1 : Qp).half.half) pid)
+  k_step_e (wp_s_lw cpu _ (KA.«syscall» + 0x58#64) true 48#12 11#5 9#5 (by decide) (by decide) (DFrac.own (1 : Qp).half.half) pid)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hs1]
   iintro Hk Hpc Hpid
   ihave Hpriv := Hpback $$ Hpid
   icases syscFb_name hct γ (procAddr j) pid V M $$ Hpriv with ⟨Hname, Hnback⟩
   -- +0x46  auipc a0,0x5
-  k_step_e (wp_s_auipc cpu _ (KA.«syscall» + 0x46#64) false 5#20 10#5 (by decide))
+  k_step_e (wp_s_auipc cpu _ (KA.«syscall» + 0x5a#64) false 5#20 10#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
   -- +0x4a  addi a0,a0,-1570
-  k_step_e (wp_s_addi cpu _ (KA.«syscall» + 0x4a#64) false 0x9de#12 10#5 10#5 (by decide))
+  k_step_e (wp_s_addi cpu _ (KA.«syscall» + 0x5e#64) false 0x9bc#12 10#5 10#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
   -- +0x4e  jal ra,printk
-  k_step_e (wp_s_jal cpu _ (KA.«syscall» + 0x4e#64) false 0x1fdb64#21 1#5 (by decide))
+  k_step_e (wp_s_jal cpu _ (KA.«syscall» + 0x62#64) false 0x1fdb42#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [syscFb_jal_tgt]
   iintro Hk Hpc
   k_norm_g [syscFb_printk_norm]
@@ -567,16 +567,16 @@ theorem syscall_fallback (PK : PRINTK)
   rw [show BitVec.ofNat 64 (8 * tfArgIdx 0) = 112#64 from rfl] at hst
   icases hst $$ Htf with ⟨⟨%w, Hc⟩, Htfw⟩
   -- +0x52  c.ld a5,88(s1)
-  k_step_e (wp_s_ld cpu _ (KA.«syscall» + 82#64) true 88#12 15#5 9#5 (by decide) (by decide)
+  k_step_e (wp_s_ld cpu _ (KA.«syscall» + 102#64) true 88#12 15#5 9#5 (by decide) (by decide)
       (DFrac.own 1) (pageAddr V.upt.tfp))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [g9]
   iintro Hk Hpc Htfc
   -- +0x54  c.li a4,-1
-  k_step_e (wp_s_addi cpu _ (KA.«syscall» + 84#64) true 0xfff#12 14#5 0#5 (by decide))
+  k_step_e (wp_s_addi cpu _ (KA.«syscall» + 104#64) true 0xfff#12 14#5 0#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
   -- +0x56  c.sd a4,112(a5)
-  k_step_e (wp_s_sd cpu _ (KA.«syscall» + 86#64) true 112#12 15#5 14#5 (by decide) w)
+  k_step_e (wp_s_sd cpu _ (KA.«syscall» + 106#64) true 112#12 15#5 14#5 (by decide) w)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc Hc
   ihave Htf := Htfw $$ %_ Hc

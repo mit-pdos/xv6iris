@@ -32,7 +32,7 @@ attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Funct
 /-! ## Pure facts -/
 
 /-- `&uarts`, folded out of `auipc s4,0xa; addi s4,s4,-1794`. -/
-theorem ups_uarts_addr : KA.«uartputc_sync» + 0x9914#64 = KA.«uarts» := by decide
+theorem ups_uarts_addr : KA.«uartputc_sync» + 0x9944#64 = KA.«uarts» := by decide
 
 /-- The call targets. -/
 theorem ups_br_acquire : KA.«uartputc_sync» + 0x2ac#64 = KA.«acquire» := by decide
@@ -254,7 +254,7 @@ theorem uartputc_sync_proof (AC : ACQUIRE) (RE : RELEASE) : UARTPUTC_SYNC :=
   k_step (wp_s_auipc cpu _ (KA.«uartputc_sync» + 0x16#64) false 10#20 20#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
-  k_step (wp_s_addi cpu _ (KA.«uartputc_sync» + 0x1a#64) false 2302#12 20#5 20#5 (by decide))
+  k_step (wp_s_addi cpu _ (KA.«uartputc_sync» + 0x1a#64) false 2350#12 20#5 20#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [ups_uarts_addr]
   iintro Hk Hpc
   -- slli s2,a0,0x2 ; add s1,s2,a0 ; slli s1,s1,0x3 ; addi s1,s1,16 ; add s1,s1,s4

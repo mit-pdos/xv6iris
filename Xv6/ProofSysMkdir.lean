@@ -316,7 +316,7 @@ theorem sys_mkdir_args (AS : ARGSTR) (CR : CREATE) (IUP : IUNLOCKPUT) (EO : END_
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
   -- +0x16  jal argstr
-  k_step_e (wp_s_jal cpu _ (KA.«sys_mkdir» + 0x16#64) false 2086366#21 1#5 (by decide))
+  k_step_e (wp_s_jal cpu _ (KA.«sys_mkdir» + 0x16#64) false 2086300#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [sys_mkdir_br_argstr]
   iintro Hk Hpc
   icases sysfile_blk_bare _ _ _ _ _ $$ Hblk with ⟨Hbare, Hclose⟩

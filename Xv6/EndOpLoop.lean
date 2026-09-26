@@ -475,7 +475,7 @@ theorem eo_body (BR : BREAD) (BW : BWRITE) (BE : BRELSE) (MM : MEMMOVE)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
     with [(id hfix3).2.2.1, eo_bufData]
   iintro Hk Hpc
-  k_step_e (wp_s_jal cpu _ (KA.«end_op» + 0xe2#64) false 2084530#21 1#5 (by decide))
+  k_step_e (wp_s_jal cpu _ (KA.«end_op» + 0xe2#64) false 2084450#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [eo_br_memmove]
   iintro Hk Hpc
   iapply (eo_memmove MM cpu _ bsD bsL BSIZE (DFrac.own 1) (aBufData (bnode kkD))

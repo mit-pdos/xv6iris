@@ -92,7 +92,7 @@ theorem bfree_proof (BD : BREAD) (LW : LOG_WRITE) (BE : BRELSE) : BFREE := ⟨
   k_step_e (wp_s_auipc cpu _ (KA.«bfree» + 0x12#64) false 0x1e#20 11#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
-  k_step_e (wp_s_lw cpu _ (KA.«bfree» + 0x16#64) false 2376#12 11#5 11#5 (by decide) (by decide)
+  k_step_e (wp_s_lw cpu _ (KA.«bfree» + 0x16#64) false 2856#12 11#5 11#5 (by decide) (by decide)
       dqb (BitVec.ofNat 32 bmapstart))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [bf_sb_addr]
   iintro Hk Hpc Hsb

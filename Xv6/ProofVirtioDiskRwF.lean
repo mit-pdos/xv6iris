@@ -325,7 +325,7 @@ theorem vdrw_P6 (FD : FREE_DESC) (RE : RELEASE)
   k_step (wp_s_auipc cpu _ (KA.«virtio_disk_rw» + 0x1de#64) false 0x1e#20 15#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [vdrwK_sie]
   iintro Hk Hpc
-  k_step (wp_s_addi cpu _ (KA.«virtio_disk_rw» + 0x1e2#64) false 2414#12 15#5 15#5 (by decide))
+  k_step (wp_s_addi cpu _ (KA.«virtio_disk_rw» + 0x1e2#64) false 2894#12 15#5 15#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [vdrwK_sie, vdrw3_disk_addr]
   iintro Hk Hpc
   -- +0x1e6  add a5,a5,a4 ; +0x1e8  sd zero,8(a5)
@@ -340,7 +340,7 @@ theorem vdrw_P6 (FD : FREE_DESC) (RE : RELEASE)
   k_step (wp_s_auipc cpu _ (KA.«virtio_disk_rw» + 0x1ec#64) false 0x1e#20 19#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [vdrwK_sie]
   iintro Hk Hpc
-  k_step (wp_s_addi cpu _ (KA.«virtio_disk_rw» + 0x1f0#64) false 2400#12 19#5 19#5 (by decide))
+  k_step (wp_s_addi cpu _ (KA.«virtio_disk_rw» + 0x1f0#64) false 2880#12 19#5 19#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [vdrwK_sie, vdrw3_disk_addr]
   iintro Hk Hpc
   -- the head's windows, as `free_desc` and the payload want them
@@ -445,10 +445,10 @@ theorem vdrw_P6 (FD : FREE_DESC) (RE : RELEASE)
   k_step (wp_s_auipc cpu _ (KA.«virtio_disk_rw» + 0x210#64) false 0x1e#20 10#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [vdrwK_sie]
   iintro Hk Hpc
-  k_step (wp_s_addi cpu _ (KA.«virtio_disk_rw» + 0x214#64) false 2660#12 10#5 10#5 (by decide))
+  k_step (wp_s_addi cpu _ (KA.«virtio_disk_rw» + 0x214#64) false 3140#12 10#5 10#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [vdrwK_sie, vdrw2_lock_addr]
   iintro Hk Hpc
-  k_step (wp_s_jal cpu _ (KA.«virtio_disk_rw» + 0x218#64) false 2076948#21 1#5 (by decide))
+  k_step (wp_s_jal cpu _ (KA.«virtio_disk_rw» + 0x218#64) false 2076868#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [vdrwK_sie, vdrw2_br_release]
   iintro Hk Hpc
   -- the release takes back the arm the acquire paid out; the complement stays

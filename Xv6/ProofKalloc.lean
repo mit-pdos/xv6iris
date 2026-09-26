@@ -35,27 +35,27 @@ theorem ka_ite_beq {α : Type _} (x : BitVec 64) (p q : α) :
 
 /-- `auipc a0,0x12 ; addi a0,a0,-1922` at `0x80000b88`: `&kmem.lock`. -/
 theorem ka_lock_aea :
-    KA.«kalloc» + 0x11892#64 = kmemLockAddr := by
+    KA.«kalloc» + 0x118c2#64 = kmemLockAddr := by
   decide
 
 /-- `auipc s1,0x12 ; ld s1,-1910(s1)` at `0x80000b94`: `&kmem.freelist`. -/
 theorem ka_free_af6 :
-    KA.«kalloc» + 0x118aa#64 = kmemFreelistAddr := by
+    KA.«kalloc» + 0x118da#64 = kmemFreelistAddr := by
   decide
 
 /-- `auipc a4,0x12 ; sd a5,-1922(a4)` at `0x80000ba0`: `&kmem.freelist`. -/
 theorem ka_free_b02 :
-    KA.«kalloc» + 0x118aa#64 = kmemFreelistAddr := by
+    KA.«kalloc» + 0x118da#64 = kmemFreelistAddr := by
   decide
 
 /-- `auipc a0,0x12 ; addi a0,a0,-1954` at `0x80000ba8`: `&kmem.lock`. -/
 theorem ka_lock_b0a :
-    KA.«kalloc» + 0x11892#64 = kmemLockAddr := by
+    KA.«kalloc» + 0x118c2#64 = kmemLockAddr := by
   decide
 
 /-- `auipc a0,0x12 ; addi a0,a0,-1988` at `0x80000bca`: `&kmem.lock`. -/
 theorem ka_lock_b2c :
-    KA.«kalloc» + 0x11892#64 = kmemLockAddr := by
+    KA.«kalloc» + 0x118c2#64 = kmemLockAddr := by
   decide
 
 /-- `lui a2,0x1` is `4096`. -/
@@ -278,9 +278,9 @@ theorem kalloc_br_162 : KA.«kalloc» + 0x162#64 = KA.«release» := by decide
 
 theorem kalloc_br_da : KA.«kalloc» + 0xda#64 = KA.«acquire» := by decide
 
-theorem kalloc_br_118aa : KA.«kalloc» + 0x118aa#64 = kmemFreelistAddr := by decide
+theorem kalloc_br_118da : KA.«kalloc» + 0x118da#64 = kmemFreelistAddr := by decide
 
-theorem kalloc_br_11892 : KA.«kalloc» + 0x11892#64 = kmemLockAddr := by decide
+theorem kalloc_br_118c2 : KA.«kalloc» + 0x118c2#64 = kmemLockAddr := by decide
 
 set_option maxHeartbeats 4000000 in
 theorem kalloc_proof (AC : ACQUIRE) (RE : RELEASE) (MS : MEMSET) : KALLOC :=
@@ -303,8 +303,8 @@ theorem kalloc_proof (AC : ACQUIRE) (RE : RELEASE) (MS : MEMSET) : KALLOC :=
   k_step_gen (wp_s_auipc c1 _ (KA.«kalloc» + 0xa#64) false 18#20 10#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) Htext
     $$ [- $Hk $Hpc] next c2 hp2
   iintro Hk Hpc
-  k_step_gen (wp_s_addi c2 _ (KA.«kalloc» + 0xe#64) false 2184#12 10#5 10#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) Htext
-    $$ [- $Hk $Hpc] with [kalloc_br_11892, ka_lock_aea] next c3 hp3
+  k_step_gen (wp_s_addi c2 _ (KA.«kalloc» + 0xe#64) false 2232#12 10#5 10#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) Htext
+    $$ [- $Hk $Hpc] with [kalloc_br_118c2, ka_lock_aea] next c3 hp3
   iintro Hk Hpc
   k_step_gen (wp_s_jal c3 _ (KA.«kalloc» + 0x12#64) false 200#21 1#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) Htext
     $$ [- $Hk $Hpc] with [kalloc_br_da] next c4 hp4
@@ -363,8 +363,8 @@ theorem kalloc_proof (AC : ACQUIRE) (RE : RELEASE) (MS : MEMSET) : KALLOC :=
   k_step (wp_s_auipc c _ (KA.«kalloc» + 0x16#64) false 18#20 9#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) Htext
     $$ [- $Hk $Hpc]
   iintro Hk Hpc
-  k_step (wp_s_ld c _ (KA.«kalloc» + 0x1a#64) false 2196#12 9#5 9#5 (by decide) (by decide) (DFrac.own 1) head)
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [kalloc_br_118aa, ka_free_af6]
+  k_step (wp_s_ld c _ (KA.«kalloc» + 0x1a#64) false 2244#12 9#5 9#5 (by decide) (by decide) (DFrac.own 1) head)
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [kalloc_br_118da, ka_free_af6]
   iintro Hk Hpc Hfl
   k_step (wp_s_branch c _ (KA.«kalloc» + 0x1e#64) true 46#13 9#5 0#5 (by decide) bop.BEQ)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [ka_ite_beq]
@@ -379,8 +379,8 @@ theorem kalloc_proof (AC : ACQUIRE) (RE : RELEASE) (MS : MEMSET) : KALLOC :=
     k_step (wp_s_auipc c _ (KA.«kalloc» + 0x4c#64) false 18#20 10#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) Htext
       $$ [- $Hk $Hpc]
     iintro Hk Hpc
-    k_step (wp_s_addi c _ (KA.«kalloc» + 0x50#64) false 2118#12 10#5 10#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) Htext
-      $$ [- $Hk $Hpc] with [kalloc_br_11892, ka_lock_b2c]
+    k_step (wp_s_addi c _ (KA.«kalloc» + 0x50#64) false 2166#12 10#5 10#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) Htext
+      $$ [- $Hk $Hpc] with [kalloc_br_118c2, ka_lock_b2c]
     iintro Hk Hpc
     k_step (wp_s_jal c _ (KA.«kalloc» + 0x54#64) false 270#21 1#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) Htext
       $$ [- $Hk $Hpc] with [kalloc_br_162]
@@ -463,15 +463,15 @@ theorem kalloc_proof (AC : ACQUIRE) (RE : RELEASE) (MS : MEMSET) : KALLOC :=
     k_step (wp_s_auipc c _ (KA.«kalloc» + 0x22#64) false 18#20 14#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) Htext
       $$ [- $Hk $Hpc]
     iintro Hk Hpc
-    k_step (wp_s_sd c _ (KA.«kalloc» + 0x26#64) false 2184#12 14#5 15#5 (by decide) pg)
-      from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [kalloc_br_118aa, ka_free_b02]
+    k_step (wp_s_sd c _ (KA.«kalloc» + 0x26#64) false 2232#12 14#5 15#5 (by decide) pg)
+      from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [kalloc_br_118da, ka_free_b02]
     iintro Hk Hpc Hfl
     -- a0 = &kmem.lock ; jal release
     k_step (wp_s_auipc c _ (KA.«kalloc» + 0x2a#64) false 18#20 10#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) Htext
       $$ [- $Hk $Hpc]
     iintro Hk Hpc
-    k_step (wp_s_addi c _ (KA.«kalloc» + 0x2e#64) false 2152#12 10#5 10#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) Htext
-      $$ [- $Hk $Hpc] with [kalloc_br_11892, ka_lock_b0a]
+    k_step (wp_s_addi c _ (KA.«kalloc» + 0x2e#64) false 2200#12 10#5 10#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) Htext
+      $$ [- $Hk $Hpc] with [kalloc_br_118c2, ka_lock_b0a]
     iintro Hk Hpc
     k_step (wp_s_jal c _ (KA.«kalloc» + 0x32#64) false 304#21 1#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) Htext
       $$ [- $Hk $Hpc] with [kalloc_br_162]

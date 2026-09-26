@@ -514,7 +514,7 @@ theorem writei_dst (kk o : Nat) :
 theorem writei_zext (m : Nat) (h : m < 2 ^ 32) :
     BitVec.ofNat 64 m <<< 32 >>> 32 = BitVec.ofNat 64 m := writei_zext32 m h
 
-theorem writei_br_ecopy : KA.«writei» + 0xFFFFFFFFFFFFEBEA#64 = KA.«either_copyin» := by decide
+theorem writei_br_ecopy : KA.«writei» + 0xffffffffffffeba8#64 = KA.«either_copyin» := by decide
 theorem writei_ret_64 : jumpPc (KA.«writei» + 0x64#64) = KA.«writei» + 0x64#64 := by decide
 theorem writei_beq_ok : bcond bop.BEQ 0#64 0xFFFFFFFFFFFFFFFF#64 = false := by decide
 theorem writei_beq_fail : bcond bop.BEQ 0xFFFFFFFFFFFFFFFF#64 0xFFFFFFFFFFFFFFFF#64 = true := by decide
@@ -599,7 +599,7 @@ theorem writei_iter_copy (IU : IUPDATE) (LW : LOG_WRITE) (BE : BRELSE) (EC : EIT
   k_step_e (wp_s_add cpu _ (KA.«writei» + 0x5e#64) true 10#5 10#5 15#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
-  k_step_e (wp_s_jal cpu _ (KA.«writei» + 0x60#64) false 2091914#21 1#5 (by decide))
+  k_step_e (wp_s_jal cpu _ (KA.«writei» + 0x60#64) false 2091848#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [writei_br_ecopy]
   iintro Hk Hpc
   ihave Henv' := Henv

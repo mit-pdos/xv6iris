@@ -12,7 +12,7 @@
       }
     }
 
-`KA.«syscall»` (0x80002974), 100 bytes: the `ra/s0/s1/s2` four-slot frame
+`KA.«syscall»` (0x80002982), 100 bytes: the `ra/s0/s1/s2` four-slot frame
 (+0x00), `jal myproc` (+0x0c), `ld s2,88(a0)` (`p->trapframe`, +0x12),
 `ld a5,168(s2)` (word 21 = `tfArgIdx 7`, +0x16), the fused range check
 (+0x1a..+0x22), the table load and `jalr a5` (+0x26..+0x38), the store of

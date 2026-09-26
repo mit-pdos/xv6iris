@@ -37,7 +37,7 @@ theorem and_lsb_of_even (pc : BitVec 64) (h : pc.toNat % 2 = 0) : pc &&& 0xFFFFF
 theorem bv5_cases (i : BitVec 5) : i = 0#5 ∨ i = 1#5 ∨ i = 2#5 ∨ i = 3#5 ∨ i = 4#5 ∨ i = 5#5 ∨ i = 6#5 ∨ i = 7#5 ∨ i = 8#5 ∨ i = 9#5 ∨ i = 10#5 ∨ i = 11#5 ∨ i = 12#5 ∨ i = 13#5 ∨ i = 14#5 ∨ i = 15#5 ∨ i = 16#5 ∨ i = 17#5 ∨ i = 18#5 ∨ i = 19#5 ∨ i = 20#5 ∨ i = 21#5 ∨ i = 22#5 ∨ i = 23#5 ∨ i = 24#5 ∨ i = 25#5 ∨ i = 26#5 ∨ i = 27#5 ∨ i = 28#5 ∨ i = 29#5 ∨ i = 30#5 ∨ i = 31#5 := by
   revert i; decide
 
-theorem kernelvec_br_ffffffffffffd116 : KA.«kernelvec» + 0xffffffffffffd116#64 = KA.«kerneltrap» := by decide
+theorem kernelvec_br_ffffffffffffd0d4 : KA.«kernelvec» + 0xffffffffffffd0d4#64 = KA.«kerneltrap» := by decide
 
 set_option maxHeartbeats 8000000 in
 /-- **`kernelvec` meets the handler contract**, given `kerneltrap`. -/
@@ -138,7 +138,7 @@ theorem kernelvec_proof (KT : KERNELTRAP) : KERNELVEC :=
   k_step (wp_s_sd cpu _ (KA.«kernelvec» + 0x22#64) true 240#12 2#5 31#5 (by decide) w1) from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc C1
   -- jal ra, kerneltrap
-  k_step (wp_s_jal cpu _ (KA.«kernelvec» + 0x24#64) false 2085106#21 1#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [kernelvec_br_ffffffffffffd116]
+  k_step (wp_s_jal cpu _ (KA.«kernelvec» + 0x24#64) false 2085040#21 1#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [kernelvec_br_ffffffffffffd0d4]
   iintro Hk Hpc
   -- kerneltrap (its contract, unfolded, at the callee's context)
   have hkt' : ∀ (k' : KCtx) (hsie' : k'.sie = false) (hspie' : k'.spie = true) (hspp' : k'.spp = true)

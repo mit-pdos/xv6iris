@@ -159,7 +159,7 @@ theorem vdrw_P3 (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
   k_step (wp_s_auipc cpu _ (KA.«virtio_disk_rw» + 0xcc#64) false 0x1e#20 15#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
-  k_step (wp_s_addi cpu _ (KA.«virtio_disk_rw» + 0xd0#64) false 2688#12 15#5 15#5 (by decide))
+  k_step (wp_s_addi cpu _ (KA.«virtio_disk_rw» + 0xd0#64) false 3168#12 15#5 15#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [vdrw3_disk_addr]
   iintro Hk Hpc
   -- +0xd4  slli a4,a0,0x4 ; +0xd8  addi a4,a4,160 ; +0xdc  add a4,a4,a5

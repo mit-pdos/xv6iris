@@ -34,7 +34,7 @@ set_option linter.unusedSectionVars false
 attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Functions.currentlyEnabled
 
 /-- The call `jal cpuid` at `+0x0c`. -/
-theorem pcm_cpuid_br : KA.«plic_complete» + 0xFFFFFFFFFFFFC204#64 = KA.«cpuid» := by decide
+theorem pcm_cpuid_br : KA.«plic_complete» + 0xffffffffffffc1b4#64 = KA.«cpuid» := by decide
 
 /-- The return address of that call. -/
 theorem pcm_jump_10 :
@@ -116,7 +116,7 @@ theorem plic_complete_proof (CI : CPUID) : PLIC_COMPLETE :=
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
   -- +0x0c  jal cpuid
-  k_step (wp_s_jal cpu _ (KA.«plic_complete» + 0xc#64) false 2081272#21 1#5 (by decide))
+  k_step (wp_s_jal cpu _ (KA.«plic_complete» + 0xc#64) false 2081192#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [pcm_cpuid_br]
   iintro Hk Hpc
   iapply (pcm_call_cpuid CI cpu _ ?hs2 ?hK2) $$ [- $Hk $Hpc]

@@ -1017,7 +1017,7 @@ theorem bufData_toNat (k m : Nat) (hk : k < NBUF) (hm : m < BSIZE) :
     (aBufData (bnode k) + BitVec.ofNat 64 m).toNat
       = (KernelSyms.«bcache» + 0x18) + 1112 * k + 88 + m := by
   have hbn := bnode_toNat k hk
-  have hbc : KernelSyms.«bcache» = 0x80018278 := rfl
+  have hbc : KernelSyms.«bcache» = 0x800184a8 := rfl
   unfold aBufData bOffData BSIZE NBUF at *
   rw [BitVec.toNat_add, BitVec.toNat_add, BitVec.toNat_ofNat, BitVec.toNat_ofNat, hbn]
   omega
@@ -1030,7 +1030,7 @@ theorem bnode_ne_bhead (k : Nat) (hk : k < NBUF) : bnode k ≠ bhead := by
   have h2 : bhead.toNat = KernelSyms.«bcache» + 0x8268 := by
     unfold bhead bcacheHeadAddr
     have hb : KA.«bcache».toNat = KernelSyms.«bcache» := rfl
-    have : KernelSyms.«bcache» = 0x80018278 := rfl
+    have : KernelSyms.«bcache» = 0x800184a8 := rfl
     rw [BitVec.toNat_add, hb, this]
     decide
   rw [h] at h1
@@ -1050,7 +1050,7 @@ object inside the kernel's identity window and the array's stride is 1112. -/
 theorem bnode_off_toNat (k m : Nat) (hk : k < NBUF) (hm : m < 1112) :
     (bnode k + BitVec.ofNat 64 m).toNat = (KernelSyms.«bcache» + 0x18) + 1112 * k + m := by
   have hbn := bnode_toNat k hk
-  have hbc : KernelSyms.«bcache» = 0x80018278 := rfl
+  have hbc : KernelSyms.«bcache» = 0x800184a8 := rfl
   unfold NBUF at hk
   rw [BitVec.toNat_add, BitVec.toNat_ofNat, hbn]
   omega
@@ -1058,24 +1058,24 @@ theorem bnode_off_toNat (k m : Nat) (hk : k < NBUF) (hm : m < 1112) :
 theorem bnode_off_kmapRw (k m : Nat) (hk : k < NBUF) (hm : m < 1112) :
     kmapClass (vpnOf (bnode k + BitVec.ofNat 64 m)).toNat = some .rw := by
   have ha := bnode_off_toNat k m hk hm
-  have hbc : KernelSyms.«bcache» = 0x80018278 := rfl
+  have hbc : KernelSyms.«bcache» = 0x800184a8 := rfl
   rw [hbc] at ha
   have hk' : k < 30 := by unfold NBUF at hk; exact hk
   have hv : (vpnOf (bnode k + BitVec.ofNat 64 m)).toNat
       = (bnode k + BitVec.ofNat 64 m).toNat / 4096 % 134217728 := by
     simp only [vpnOf, BitVec.extractLsb'_toNat, Nat.reducePow, Nat.shiftRight_eq_div_pow]
   rw [hv, ha]
-  have hq : (2147582584 + 24 + 1112 * k + m) / 4096 < 134217728 := by omega
+  have hq : (2147583144 + 24 + 1112 * k + m) / 4096 < 134217728 := by omega
   rw [Nat.mod_eq_of_lt hq]
-  have hlo : 0x80007 ≤ (2147582584 + 24 + 1112 * k + m) / 4096 := by omega
-  have hhi : (2147582584 + 24 + 1112 * k + m) / 4096 < 0x88000 := by omega
+  have hlo : 0x80007 ≤ (2147583144 + 24 + 1112 * k + m) / 4096 := by omega
+  have hhi : (2147583144 + 24 + 1112 * k + m) / 4096 < 0x88000 := by omega
   unfold kmapClass
   rw [if_neg (by omega), if_pos (Or.inl ⟨hlo, hhi⟩)]
 
 theorem bufData_kmapRw (k m : Nat) (hk : k < NBUF) (hm : m < BSIZE) :
     kmapClass (vpnOf (aBufData (bnode k) + BitVec.ofNat 64 m)).toNat = some .rw := by
   have ha := bufData_toNat k m hk hm
-  have hbc : KernelSyms.«bcache» = 0x80018278 := rfl
+  have hbc : KernelSyms.«bcache» = 0x800184a8 := rfl
   rw [hbc] at ha
   have hk' : k < 30 := by unfold NBUF at hk; exact hk
   have hm' : m < 1024 := by unfold BSIZE at hm; exact hm
@@ -1083,10 +1083,10 @@ theorem bufData_kmapRw (k m : Nat) (hk : k < NBUF) (hm : m < BSIZE) :
       = (aBufData (bnode k) + BitVec.ofNat 64 m).toNat / 4096 % 134217728 := by
     simp only [vpnOf, BitVec.extractLsb'_toNat, Nat.reducePow, Nat.shiftRight_eq_div_pow]
   rw [hv, ha]
-  have hq : (2147582584 + 24 + 1112 * k + 88 + m) / 4096 < 134217728 := by omega
+  have hq : (2147583144 + 24 + 1112 * k + 88 + m) / 4096 < 134217728 := by omega
   rw [Nat.mod_eq_of_lt hq]
-  have hlo : 0x80007 ≤ (2147582584 + 24 + 1112 * k + 88 + m) / 4096 := by omega
-  have hhi : (2147582584 + 24 + 1112 * k + 88 + m) / 4096 < 0x88000 := by omega
+  have hlo : 0x80007 ≤ (2147583144 + 24 + 1112 * k + 88 + m) / 4096 := by omega
+  have hhi : (2147583144 + 24 + 1112 * k + 88 + m) / 4096 < 0x88000 := by omega
   unfold kmapClass
   rw [if_neg (by omega), if_pos (Or.inl ⟨hlo, hhi⟩)]
 

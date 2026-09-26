@@ -54,10 +54,10 @@ attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Funct
 
 /-! ## Addresses -/
 
-theorem dv_br_plic_claim : KA.«devintr» + 0x3128#64 = KA.«plic_claim» := by decide
-theorem dv_br_plic_complete : KA.«devintr» + 0x3148#64 = KA.«plic_complete» := by decide
-theorem dv_br_uartintr : KA.«devintr» + 0xffffffffffffe40e#64 = KA.«uartintr» := by decide
-theorem dv_br_virtio : KA.«devintr» + 0x35e0#64 = KA.«virtio_disk_intr» := by decide
+theorem dv_br_plic_claim : KA.«devintr» + 0x316a#64 = KA.«plic_claim» := by decide
+theorem dv_br_plic_complete : KA.«devintr» + 0x318a#64 = KA.«plic_complete» := by decide
+theorem dv_br_uartintr : KA.«devintr» + 0xffffffffffffe400#64 = KA.«uartintr» := by decide
+theorem dv_br_virtio : KA.«devintr» + 0x3622#64 = KA.«virtio_disk_intr» := by decide
 theorem dv_br_clockintr : KA.«devintr» + 0xffffffffffffffaa#64 = KA.«clockintr» := by decide
 
 theorem dv_ret_30 : jumpPc (KA.«devintr» + 0x30#64) = KA.«devintr» + 0x30#64 := by decide
@@ -345,7 +345,7 @@ theorem dv_join (PM : PLIC_COMPLETE) (cpu : CPU) (k : KCtx) (sc : BitVec 64) (γ
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h9]
   iintro Hk Hpc
   -- +0x56  jal plic_complete
-  k_step (wp_s_jal cpu _ (KA.«devintr» + 0x56#64) false 12530#21 1#5 (by decide))
+  k_step (wp_s_jal cpu _ (KA.«devintr» + 0x56#64) false 12596#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [dv_br_plic_complete]
   iintro Hk Hpc
   iapply (dv_call_plic_complete PM cpu _ γ0 γ1 irq ?h10 ?hs ?hKc) $$ [- $Hk $Hpc]
@@ -441,7 +441,7 @@ theorem dv_arm_uart0 (PM : PLIC_COMPLETE) (UI : UARTINTR) (Γ : SchedNames) (cpu
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
   -- +0x50  jal uartintr
-  k_step (wp_s_jal cpu _ (KA.«devintr» + 0x50#64) false 2089918#21 1#5 (by decide))
+  k_step (wp_s_jal cpu _ (KA.«devintr» + 0x50#64) false 2089904#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [dv_br_uartintr]
   iintro Hk Hpc
   iapply (dv_call_uartintr UI Γ cpu _ UartId.uart0 γc γl0 γ0 kp hl ?hs ?hn ?hKu ?hl ?ht ?hid)
@@ -494,7 +494,7 @@ theorem dv_arm_uart1 (PM : PLIC_COMPLETE) (UI : UARTINTR) (Γ : SchedNames) (cpu
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
   -- +0x62  jal uartintr
-  k_step (wp_s_jal cpu _ (KA.«devintr» + 0x62#64) false 2089900#21 1#5 (by decide))
+  k_step (wp_s_jal cpu _ (KA.«devintr» + 0x62#64) false 2089886#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [dv_br_uartintr]
   iintro Hk Hpc
   iapply (dv_call_uartintr UI Γ cpu _ UartId.uart1 γc γl1 γ1 kp hl ?hs ?hn ?hKu ?hl ?ht ?hid)
@@ -549,7 +549,7 @@ theorem dv_arm_virtio (PM : PLIC_COMPLETE) (VI : VIRTIO_DISK_INTR) (Γ : SchedNa
   iintro ⟨Hk, Hpc, Hframe, #Hinv, #Hi0, #Hi1, #Hdc, #HΓ, Hsc, HΦ⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
   -- +0x68  jal virtio_disk_intr
-  k_step (wp_s_jal cpu _ (KA.«devintr» + 0x68#64) false 13688#21 1#5 (by decide))
+  k_step (wp_s_jal cpu _ (KA.«devintr» + 0x68#64) false 13754#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [dv_br_virtio]
   iintro Hk Hpc
   iapply (dv_call_virtio VI Γ cpu _ γd γdl pd pav pu ?hs ?hn ?hKv ?hl ?ht) $$ [- $Hk $Hpc]
@@ -845,7 +845,7 @@ theorem dv_ext (PC : PLIC_CLAIM) (PM : PLIC_COMPLETE) (UI : UARTINTR) (VI : VIRT
     $$ [Hra Hs0 Hslot Hspare]
   case' _ => iframe Hra Hs0 Hslot Hspare
   -- +0x2c  jal plic_claim
-  k_step (wp_s_jal cpu _ (KA.«devintr» + 0x2c#64) false 12540#21 1#5 (by decide))
+  k_step (wp_s_jal cpu _ (KA.«devintr» + 0x2c#64) false 12606#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [dv_br_plic_claim]
   iintro Hk Hpc
   iapply (dv_call_plic_claim PC cpu _ γ0 γ1 ?hs ?hKc) $$ [- $Hk $Hpc]

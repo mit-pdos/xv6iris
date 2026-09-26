@@ -441,7 +441,7 @@ theorem ci_kill (CP : CONSPUTC) (RE : RELEASE)
   k_step (wp_s_auipc c _ (KA.«consoleintr» + 0x96#64) false 18#20 14#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
-  k_step (wp_s_addi c _ (KA.«consoleintr» + 0x9a#64) false 4082#12 14#5 14#5 (by decide))
+  k_step (wp_s_addi c _ (KA.«consoleintr» + 0x9a#64) false 34#12 14#5 14#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [ci_cons_addr]
   iintro Hk Hpc
   k_step (wp_s_lw c _ (KA.«consoleintr» + 0x9e#64) false 160#12 15#5 14#5 (by decide) (by decide)
@@ -456,7 +456,7 @@ theorem ci_kill (CP : CONSPUTC) (RE : RELEASE)
   k_step (wp_s_auipc c _ (KA.«consoleintr» + 0xa6#64) false 18#20 9#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
-  k_step (wp_s_addi c _ (KA.«consoleintr» + 0xaa#64) false 4066#12 9#5 9#5 (by decide))
+  k_step (wp_s_addi c _ (KA.«consoleintr» + 0xaa#64) false 18#12 9#5 9#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [ci_cons_addr]
   iintro Hk Hpc
   k_step (wp_s_addi c _ (KA.«consoleintr» + 0xae#64) true 10#12 18#5 0#5 (by decide))

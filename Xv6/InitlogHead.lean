@@ -139,7 +139,7 @@ theorem il_slli2 (n : Nat) (h : n < 2 ^ 31) :
   omega
 
 /-- `auipc a4,0x1e ; addi a4,a4,1802` at `+0x46`/`+0x4a`: `&log.lh.block[0]`. -/
-theorem il_lhb0 : KA.«initlog» + 0x1e75a#64 = lhBlock 0 := by
+theorem il_lhb0 : KA.«initlog» + 0x1e93a#64 = lhBlock 0 := by
   unfold lhBlock logAddr; decide
 
 /-- The loop's source cursor `a5 = buf + 4t` (Rocq's `il_cur`). -/
@@ -197,7 +197,7 @@ theorem il_data_align (kk : Nat) (hkk : kk < NBUF) : (aBufData (bnode kk)).toNat
   have h := bufData_toNat kk 0 hkk (by unfold BSIZE; omega)
   have hz : aBufData (bnode kk) + BitVec.ofNat 64 0 = aBufData (bnode kk) := by simp
   rw [hz] at h
-  have hbc : KernelSyms.«bcache» = 0x80018278 := rfl
+  have hbc : KernelSyms.«bcache» = 0x800184a8 := rfl
   rw [hbc] at h
   omega
 
@@ -485,10 +485,10 @@ theorem il_read_head {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CurC
       from (text_instr _ _ _ _ rfl rfl) HT $$ [- $Hk $Hpc] with [h10]
     iintro Hk Hpc
     -- +0x46 auipc a4,0x1e ; +0x4a addi a4,a4,1802
-    k_step_e (wp_s_auipc cpu _ (KA.«initlog» + 0x46#64) false 0x1e#20 14#5 (by decide))
+    k_step_e (wp_s_auipc cpu _ (KA.«initlog» + 0x46#64) false 0x1f#20 14#5 (by decide))
       from (text_instr _ _ _ _ rfl rfl) HT $$ [- $Hk $Hpc]
     iintro Hk Hpc
-    k_step_e (wp_s_addi cpu _ (KA.«initlog» + 0x4a#64) false 1812#12 14#5 14#5 (by decide))
+    k_step_e (wp_s_addi cpu _ (KA.«initlog» + 0x4a#64) false 2292#12 14#5 14#5 (by decide))
       from (text_instr _ _ _ _ rfl rfl) HT $$ [- $Hk $Hpc] with [il_lhb0]
     iintro Hk Hpc
     -- +0x4e c.slli a2,a2,2 ; +0x50 c.add a2,a2,a0
@@ -504,7 +504,7 @@ theorem il_read_head {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CurC
       simp only [List.take_zero, List.nil_append, List.drop_zero]; exact .rfl) $$ HW
     iapply (il_loop kb s hsie pj kk hkk bs C hl hnB hC (hdrN bs - 1) 0 (by omega)
       (((((((R.set 12#5 (BitVec.signExtend 64 (BitVec.ofNat 32 (hdrN bs)))).set 15#5 (bnode kk)).set
-        14#5 (KA.«initlog» + 0x1e046#64)).set 14#5 (lhBlock 0)).set 12#5
+        14#5 (KA.«initlog» + 0x1f046#64)).set 14#5 (lhBlock 0)).set 12#5
         (BitVec.ofNat 64 (4 * hdrN bs))).set 12#5 (ilCur kk (hdrN bs))))
       (by simp only [RegMap.set_apply, BitVec.reduceEq, ite_true, ite_false])
       (by simp only [RegMap.set_apply, BitVec.reduceEq, ite_true, ite_false]

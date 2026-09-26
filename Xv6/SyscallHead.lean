@@ -59,7 +59,7 @@ set_option linter.unusedVariables false
 /-! ## §1 Addresses and the pure steps -/
 
 /-- `jal myproc` at `+0x0c`. -/
-theorem syscall_head_br_myproc : KA.«syscall» + 18446744073709547540#64 = KA.«myproc» := by
+theorem syscall_head_br_myproc : KA.«syscall» + 18446744073709547526#64 = KA.«myproc» := by
   decide
 
 /-- Every table entry is a legal jump target (bit 0 clear). -/
@@ -167,7 +167,7 @@ theorem syscall_head_split (PT : SchedNames → IProp GF) (Γ : SchedNames) [Cla
     have hbr : bcond bop.BLTU (21#64)
         (BitVec.signExtend 64 (BitVec.extractLsb' 0 32 (w + 0xFFFFFFFFFFFFFFFF#64))) = false :=
       (syscall_bltu w).mpr hr
-    k_step_e (wp_s_branch cpu _ (KA.«syscall» + 0x22#64) false 0x1e#13 14#5 15#5 (by decide) bop.BLTU)
+    k_step_e (wp_s_branch cpu _ (KA.«syscall» + 0x22#64) false 0x32#13 14#5 15#5 (by decide) bop.BLTU)
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h14, h15, hbr]
     iintro Hk Hpc
     -- +0x26  slli a4,a3,3
@@ -179,7 +179,7 @@ theorem syscall_head_split (PT : SchedNames → IProp GF) (Γ : SchedNames) [Cla
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
     iintro Hk Hpc
     -- +0x2e  addi a5,a5,-518
-    k_step_e (wp_s_addi cpu _ (KA.«syscall» + 0x2e#64) false 0xdfa#12 15#5 15#5 (by decide))
+    k_step_e (wp_s_addi cpu _ (KA.«syscall» + 0x2e#64) false 0xdec#12 15#5 15#5 (by decide))
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
     iintro Hk Hpc
     -- +0x32  add a5,a5,a4
@@ -211,17 +211,17 @@ theorem syscall_head_split (PT : SchedNames → IProp GF) (Γ : SchedNames) [Cla
     k_norm_g
     iintro Hk Hpc -
     -- +0x36  beqz a5 (dead)
-    k_step_e (wp_s_branch cpu _ (KA.«syscall» + 0x36#64) true 0xa#13 15#5 0#5 (by decide) bop.BEQ)
+    k_step_e (wp_s_branch cpu _ (KA.«syscall» + 0x36#64) true 0x1e#13 15#5 0#5 (by decide) bop.BEQ)
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [syscall_head_beqz n hn1' hn22']
     iintro Hk Hpc
     -- +0x38  jalr a5: INTO THE ARM
-    k_step_e (wp_s_jalr cpu _ (KA.«syscall» + 0x38#64) true 15#5 1#5 (by decide))
+    k_step_e (wp_s_jalr cpu _ (KA.«syscall» + 0x44#64) true 15#5 1#5 (by decide))
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [syscall_head_jump n hn1' hn22']
     iintro Hk Hpc
     have hb := hA cpu spie spp
       ((((((R.set (14#5) (BitVec.ofNat 64 (8 * n))).set (15#5) (KA.«syscall» + 20522#64)).set (15#5)
-        (KA.«syscall» + 20004#64)).set (15#5) (syscallsTbl + BitVec.ofNat 64 (8 * n))).set
-        (15#5) (syscTarget n)).set (1#5) (KA.«syscall» + 58#64))
+        (KA.«syscall» + 19990#64)).set (15#5) (syscallsTbl + BitVec.ofNat 64 (8 * n))).set
+        (15#5) (syscTarget n)).set (1#5) (KA.«syscall» + 70#64))
       n hn1' hn22' hnum ?hp ?h1 ?h2 ?hra
     case hp =>
       obtain ⟨p2, p19, p20, p21, p22, p23, p24, p25, p26, p27⟩ := hpins
@@ -242,14 +242,14 @@ theorem syscall_head_split (PT : SchedNames → IProp GF) (Γ : SchedNames) [Cla
       simpa using h
     have htgt : KA.«syscall» + 0x22#64 + BitVec.signExtend 64 (0x1e#13) = syscallFallback :=
       syscall_bltu_tgt
-    k_step_e (wp_s_branch cpu _ (KA.«syscall» + 0x22#64) false 0x1e#13 14#5 15#5 (by decide) bop.BLTU)
+    k_step_e (wp_s_branch cpu _ (KA.«syscall» + 0x22#64) false 0x32#13 14#5 15#5 (by decide) bop.BLTU)
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h14, h15, hbr, htgt]
     iintro Hk Hpc
     have hrange : syscNum V < 1 ∨ 22 < syscNum V := by
       rw [syscNum_eq, hw]; omega
     have hb := hF cpu spie spp R hrange hpins hs1 hs2
     unfold syscFallbackBody at hb
-    have hfb : KA.«syscall» + 64#64 = syscallFallback := rfl
+    have hfb : KA.«syscall» + 84#64 = syscallFallback := rfl
     rw [hfb]
     iapply hb
     unfold syscHeadRest
@@ -335,7 +335,7 @@ theorem syscall_head_num (PT : SchedNames → IProp GF) (Γ : SchedNames) [Claim
   k_step_e (wp_s_addiw cpu _ (KA.«syscall» + 0x1e#64) true 0xfff#12 15#5 15#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
-  k_step_e (wp_s_addi cpu _ (KA.«syscall» + 0x20#64) true 21#12 14#5 0#5 (by decide))
+  k_step_e (wp_s_addi cpu _ (KA.«syscall» + 0x20#64) true 22#12 14#5 0#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
   have hpins' := hpins
@@ -397,7 +397,7 @@ theorem syscall_head_entry (MP : MYPROC) (PT : SchedNames → IProp GF) (Γ : Sc
       kctx cpu (((k.withSpie k.spie k.spp).pushed 4).withRegs
         ((k.regs.set 2#5 (k.regs 2#5 + 0xFFFFFFFFFFFFFFE0#64)).set 8#5 (k.regs 2#5))) from .rfl) $$ Hk
   -- +0x0c  jal myproc
-  k_step_e (wp_s_jal cpu _ (KA.«syscall» + 0xc#64) false 2093064#21 1#5 (by decide))
+  k_step_e (wp_s_jal cpu _ (KA.«syscall» + 0xc#64) false 2093050#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [syscall_head_br_myproc]
   iintro Hk Hpc
   have hmp := MP.wp_myproc (hlc := hlc) (GF := GF)

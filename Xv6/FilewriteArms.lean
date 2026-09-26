@@ -258,7 +258,7 @@ theorem fwr_bltu9 (w : BitVec 16) :
 /-- `&devsw[major].write`, as the `slli`/`auipc`/`addi`/`add`/`ld 8(...)`
 chain computes it, at a major the range test admitted. -/
 theorem fwr_devsw_slot (w : BitVec 16) (h : w.toNat ≤ 9) :
-    BitVec.signExtend 64 w <<< 4 + (KA.«filewrite» + 123048#64) = aDevswWrite w.toNat := by
+    BitVec.signExtend 64 w <<< 4 + (KA.«filewrite» + 123528#64) = aDevswWrite w.toNat := by
   have hw : w = BitVec.ofNat 16 w.toNat := by simp
   generalize w.toNat = m at h hw ⊢
   subst hw
@@ -410,7 +410,7 @@ theorem fwr_arm_dev (CW : CONSOLEWRITE) (Γ : SchedNames) [ClaimIs (hlc := hlc) 
   k_step_e (wp_s_auipc cpu _ (KA.«filewrite» + 0x76#64) false 0x1e#20 14#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
-  k_step_e (wp_s_addi cpu _ (KA.«filewrite» + 0x7a#64) false 42#12 14#5 14#5 (by decide))
+  k_step_e (wp_s_addi cpu _ (KA.«filewrite» + 0x7a#64) false 522#12 14#5 14#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
   -- +0x7e  c.add a5,a5,a4
@@ -419,7 +419,7 @@ theorem fwr_arm_dev (CW : CONSOLEWRITE) (Γ : SchedNames) [ClaimIs (hlc := hlc) 
   iintro Hk Hpc
   -- +0x80  c.ld a5,8(a5)
   have ea := fwr_devsw_slot C.major (by omega)
-  ihave Hc2 : wordPointsTo (BitVec.signExtend 64 C.major <<< 4 + (KA.«filewrite» + 123048#64)) 8
+  ihave Hc2 : wordPointsTo (BitVec.signExtend 64 C.major <<< 4 + (KA.«filewrite» + 123528#64)) 8
       DFrac.discard (devswWriteVal mj) $$ [Hcell]
   · rw [ea, ← hmj]; iexact Hcell
   k_step_e (wp_s_ld cpu _ (KA.«filewrite» + 0x80#64) true 8#12 15#5 15#5 (by decide) (by decide)
@@ -544,11 +544,11 @@ theorem fwr_arm_panic (PA : PANIC) (cpu : CPU) (k : KCtx) (spie spp : Bool) (R :
   k_step_e (wp_s_auipc cpu _ (KA.«filewrite» + 0x10e#64) false 3#20 10#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
-  k_step_e (wp_s_addi cpu _ (KA.«filewrite» + 0x112#64) false 154#12 10#5 10#5 (by decide))
+  k_step_e (wp_s_addi cpu _ (KA.«filewrite» + 0x112#64) false 74#12 10#5 10#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [fwr_msg_addr]
   iintro Hk Hpc
   -- +0x116  jal panic
-  k_step_e (wp_s_jal cpu _ (KA.«filewrite» + 0x116#64) false 2081562#21 1#5 (by decide))
+  k_step_e (wp_s_jal cpu _ (KA.«filewrite» + 0x116#64) false 2081482#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [fwr_br_panic]
   iintro Hk Hpc
   iapply (fwr_panic PA cpu _ ?paddr ?pK ?pnoff ?ppr ?puart) $$ [- $Hk $Hpc]

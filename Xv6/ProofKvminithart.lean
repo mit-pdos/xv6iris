@@ -18,7 +18,7 @@ attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Funct
   LeanRV64D.Functions.virtual_memory_supported
 
 /-- `auipc a5,0x9 ; ld a5,904(a5)` at `0x80000f8e` reads `kernel_pagetable`. -/
-theorem kpt_addr : KA.«kvminithart» + 0x93b6#64 = KA.«kernel_pagetable» := by decide
+theorem kpt_addr : KA.«kvminithart» + 0x93e6#64 = KA.«kernel_pagetable» := by decide
 
 /-- `(rootAddr >> 12) | (1 << 63)` is the Sv39 satp word of the root. -/
 theorem satp_word (rootAddr : BitVec 64) (hhi : BitVec.extractLsb' 56 8 rootAddr = 0#8) :
@@ -26,7 +26,7 @@ theorem satp_word (rootAddr : BitVec 64) (hhi : BitVec.extractLsb' 56 8 rootAddr
   simp only [satpOf]
   bv_decide
 
-theorem kvminithart_br_93b6 : KA.«kvminithart» + 0x93b6#64 = KA.«kernel_pagetable» := by decide
+theorem kvminithart_br_93e6 : KA.«kvminithart» + 0x93e6#64 = KA.«kernel_pagetable» := by decide
 
 set_option maxHeartbeats 4000000 in
 theorem kvminithart_proof : KVMINITHART := ⟨fun {hlc GF} _ X cpu k tlb0 rootAddr dqr t M hX hsie hK hhi hroot => by
@@ -53,8 +53,8 @@ theorem kvminithart_proof : KVMINITHART := ⟨fun {hlc GF} _ X cpu k tlb0 rootAd
   iintro Hk Hpc
   ihave #Hid := kmapStatic_rw KA.«kernel_pagetable» (by decide) $$ HS
   ihave Hroot := pwordPointsTo_kernel _ _ _ _ $$ Hid Hroot
-  k_step (wp_s_ld cpu _ (KA.«kvminithart» + 0x10#64) false 938#12 15#5 15#5 (by decide) (by decide) dqr rootAddr) from (text_instr _ _ _ _ rfl rfl) Htext
-    $$ [- $Hk $Hpc] with [kvminithart_br_93b6, kpt_addr]
+  k_step (wp_s_ld cpu _ (KA.«kvminithart» + 0x10#64) false 986#12 15#5 15#5 (by decide) (by decide) dqr rootAddr) from (text_instr _ _ _ _ rfl rfl) Htext
+    $$ [- $Hk $Hpc] with [kvminithart_br_93e6, kpt_addr]
   iintro Hk Hpc Hroot
   -- srli a5,a5,12 ; li a4,-1 ; slli a4,a4,63 ; or a5,a5,a4 : the satp word
   k_step (wp_s_srli cpu _ (KA.«kvminithart» + 0x14#64) true 12#6 15#5 15#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]

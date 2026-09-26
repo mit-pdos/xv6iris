@@ -33,7 +33,7 @@ set_option linter.unusedSectionVars false
 attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Functions.currentlyEnabled
 
 /-- The call `jal cpuid` at `+0x08`. -/
-theorem pc_cpuid_br : KA.«plic_claim» + 0xFFFFFFFFFFFFC224#64 = KA.«cpuid» := by decide
+theorem pc_cpuid_br : KA.«plic_claim» + 0xffffffffffffc1d4#64 = KA.«cpuid» := by decide
 
 /-- The return address of that call. -/
 theorem pc_jump_0c : jumpPc (KA.«plic_claim» + 0xc#64) = KA.«plic_claim» + 0xc#64 := by decide
@@ -111,7 +111,7 @@ theorem plic_claim_proof (CI : CPUID) : PLIC_CLAIM :=
   inext
   iintro Hk Hpc Hframe
   -- +0x08  jal cpuid
-  k_step (wp_s_jal cpu _ (KA.«plic_claim» + 0x8#64) false 2081308#21 1#5 (by decide))
+  k_step (wp_s_jal cpu _ (KA.«plic_claim» + 0x8#64) false 2081228#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [pc_cpuid_br]
   iintro Hk Hpc
   iapply (pc_call_cpuid CI cpu _ ?hs2 ?hK2) $$ [- $Hk $Hpc]

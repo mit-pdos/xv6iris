@@ -455,7 +455,7 @@ theorem ialloc_claim (MS : MEMSET) (LW : LOG_WRITE) (BE : BRELSE) (IG : IGET) [F
   k_step_e (wp_s_add cpu _ (KA.«ialloc» + 0x8e#64) true 10#5 0#5 19#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h19]
   iintro Hk Hpc
-  k_step_e (wp_s_jal cpu _ (KA.«ialloc» + 0x90#64) false 2087690#21 1#5 (by decide))
+  k_step_e (wp_s_jal cpu _ (KA.«ialloc» + 0x90#64) false 2087610#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [ialloc_br_memset]
   iintro Hk Hpc
   iapply (memset_zero_call MS cpu _ (dinodeBytes ds[islot inum]!)

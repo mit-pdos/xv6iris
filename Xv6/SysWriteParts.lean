@@ -36,8 +36,8 @@ set_option linter.unusedVariables false
 
 /-! ## Constants -/
 
-theorem sys_write_br_argaddr : KA.«sys_write» + 0xffffffffffffda98#64 = KA.«argaddr» := by decide
-theorem sys_write_br_argint : KA.«sys_write» + 0xffffffffffffda7c#64 = KA.«argint» := by decide
+theorem sys_write_br_argaddr : KA.«sys_write» + 0xffffffffffffda56#64 = KA.«argaddr» := by decide
+theorem sys_write_br_argint : KA.«sys_write» + 0xffffffffffffda3a#64 = KA.«argint» := by decide
 theorem sys_write_br_argfd : KA.«sys_write» + 0xfffffffffffffd6e#64 = KA.«argfd» := by decide
 theorem sys_write_br_filewrite : KA.«sys_write» + 0xfffffffffffff570#64 = KA.«filewrite» := by decide
 

@@ -14,13 +14,14 @@ and the trapframe words `tf`, and the private block owns them through
 Layout of `struct proc` (kernel/proc.h, spinlock = {locked; name; cpu} =
 24 bytes, NOFILE = 16), corroborated by the compiled image (`myproc`'s
 `ld a5,48(a5)` off `pid_lock` = `cpus` + 48 - 48 ...; `allocproc`'s
-`auipc/addi` pins `proc` at (KernelSyms.«cpus» + 0x3b0); sizeof = 360 = 96 + 14*8 + 16*8
-+ 8 + 16, the Rocq `proc_size`):
+`auipc/addi` pins `proc` at (KernelSyms.«cpus» + 0x3b0); sizeof = 368 = 96 + 14*8 + 16*8
++ 8 + 16 + 8, the Rocq `proc_size`):
 
   lock@0 (locked@0, name@8, cpu@16), state@24, chan@32, killed@40,
   xstate@44, pid@48, parent@56, kstack@64, sz@72, pagetable@80,
   trapframe@88, context@96..207 (14 words: ra sp s0..s11),
-  ofile@208..335 (16 pointers), cwd@336, name@344..359.
+  ofile@208..335 (16 pointers), cwd@336, name@344..359, seccomp@360
+  (xv6 7b2c1b1b's syscall mask, appended last).
 
 Imports only definitional files.
 -/

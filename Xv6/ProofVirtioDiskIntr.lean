@@ -60,20 +60,20 @@ attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Funct
 /-! ## Addresses -/
 
 /-- `&disk`, folded out of `auipc s1,0x1e; addi s1,s1,-1778`. -/
-theorem vdis_disk_addr : KA.«virtio_disk_intr» + 0x1d918#64 = KA.«disk» := by decide
+theorem vdis_disk_addr : KA.«virtio_disk_intr» + 0x1daf8#64 = KA.«disk» := by decide
 
 /-- `&disk.vdisk_lock`, folded out of either `auipc/addi a0` pair. -/
-theorem vdis_lock_addr : KA.«virtio_disk_intr» + 0x1da40#64 = aVdiskLock := by
+theorem vdis_lock_addr : KA.«virtio_disk_intr» + 0x1dc20#64 = aVdiskLock := by
   unfold aVdiskLock diskAddr dOffLock; decide
 
 theorem vdis_br_acquire :
-    KA.«virtio_disk_intr» + 0xffffffffffffb070#64 = KA.«acquire» := by decide
+    KA.«virtio_disk_intr» + 0xffffffffffffb020#64 = KA.«acquire» := by decide
 
 theorem vdis_br_wakeup :
-    KA.«virtio_disk_intr» + 0xffffffffffffc44a#64 = KA.«wakeup» := by decide
+    KA.«virtio_disk_intr» + 0xffffffffffffc408#64 = KA.«wakeup» := by decide
 
 theorem vdis_br_release :
-    KA.«virtio_disk_intr» + 0xffffffffffffb0f8#64 = KA.«release» := by decide
+    KA.«virtio_disk_intr» + 0xffffffffffffb0a8#64 = KA.«release» := by decide
 
 theorem vdis_ret_1e : jumpPc (KA.«virtio_disk_intr» + 0x1e#64) = KA.«virtio_disk_intr» + 0x1e#64 := by
   decide
@@ -453,11 +453,11 @@ theorem vdis_exit (RE : RELEASE) (cpu : CPU) (k : KCtx) (γ : DiskNames) (γl : 
   k_step (wp_s_auipc cpu _ (KA.«virtio_disk_intr» + 0x8a#64) false 0x1e#20 10#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [vdisK_sie k]
   iintro Hk Hpc
-  k_step (wp_s_addi cpu _ (KA.«virtio_disk_intr» + 0x8e#64) false 2486#12 10#5 10#5 (by decide))
+  k_step (wp_s_addi cpu _ (KA.«virtio_disk_intr» + 0x8e#64) false 2966#12 10#5 10#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [vdisK_sie k, vdis_lock_addr]
   iintro Hk Hpc
   -- +0x92  jal release
-  k_step (wp_s_jal cpu _ (KA.«virtio_disk_intr» + 0x92#64) false 2076774#21 1#5 (by decide))
+  k_step (wp_s_jal cpu _ (KA.«virtio_disk_intr» + 0x92#64) false 2076694#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [vdisK_sie k, vdis_br_release]
   iintro Hk Hpc
   iapply (vdis_release RE cpu _ γ γl pd pav pu ?ha0 ?hsr ?hnr ?hKr false ?hrr ?hor)
@@ -817,7 +817,7 @@ theorem vdis_loop (WK : WAKEUP)
     with [vdisK_sie k, vdis_bufdisk_addr c.bp]
   iintro Hk Hpc Hdsk
   -- +0x6e  jal wakeup
-  k_step (wp_s_jal cpu _ (KA.«virtio_disk_intr» + 0x6e#64) false 2081756#21 1#5 (by decide))
+  k_step (wp_s_jal cpu _ (KA.«virtio_disk_intr» + 0x6e#64) false 2081690#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [vdisK_sie k, vdis_br_wakeup]
   iintro Hk Hpc
   iapply (vdis_wakeup WK Γ cpu _ ?hsw ?hnw ?hKw ?hlw ?htw) $$ [- $Hk $Hpc]
@@ -1002,18 +1002,18 @@ theorem virtio_disk_intr_proof
   k_step (wp_s_auipc cpu _ (KA.«virtio_disk_intr» + 0xa#64) false 0x1e#20 9#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
-  k_step (wp_s_addi cpu _ (KA.«virtio_disk_intr» + 0xe#64) false 2318#12 9#5 9#5 (by decide))
+  k_step (wp_s_addi cpu _ (KA.«virtio_disk_intr» + 0xe#64) false 2798#12 9#5 9#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [vdis_disk_addr]
   iintro Hk Hpc
   -- +0x12  auipc a0,0x1e ; +0x16  addi a0,a0,-1490
   k_step (wp_s_auipc cpu _ (KA.«virtio_disk_intr» + 0x12#64) false 0x1e#20 10#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
-  k_step (wp_s_addi cpu _ (KA.«virtio_disk_intr» + 0x16#64) false 2606#12 10#5 10#5 (by decide))
+  k_step (wp_s_addi cpu _ (KA.«virtio_disk_intr» + 0x16#64) false 3086#12 10#5 10#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [vdis_lock_addr]
   iintro Hk Hpc
   -- +0x1a  jal acquire
-  k_step (wp_s_jal cpu _ (KA.«virtio_disk_intr» + 0x1a#64) false 2076758#21 1#5 (by decide))
+  k_step (wp_s_jal cpu _ (KA.«virtio_disk_intr» + 0x1a#64) false 2076678#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [vdis_br_acquire]
   iintro Hk Hpc
   iapply (vdis_acquire AC cpu _ γ γl pd pav pu ?ha0 ?hna ?hKa ?hsa) $$ [- $Hk $Hpc]

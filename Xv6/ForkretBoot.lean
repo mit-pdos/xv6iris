@@ -52,7 +52,7 @@ set_option linter.unusedSimpArgs false
 
 theorem fkr_rootdev : (1#64 : BitVec 64) = BitVec.signExtend 64 (BitVec.ofNat 32 ROOTDEV) := by
   unfold ROOTDEV; decide
-theorem fkr_br_fsinit : KA.«forkret» + 7280#64 = KA.«fsinit» := by decide
+theorem fkr_br_fsinit : KA.«forkret» + 7360#64 = KA.«fsinit» := by decide
 theorem fkr_ret24 : jumpPc (KA.«forkret» + 0x24#64) = KA.«forkret» + 0x24#64 := by decide
 
 /-- `FkrAfter` survives a call: the callee-saved `sp`/`s0`/`s1` come back,
@@ -152,7 +152,7 @@ theorem fkr_fsinit_call [CurCtx] (FS : FSINIT) (Γ : SchedNames) [ClaimIs (hlc :
 theorem fkr_fsinit_slots : fsinitSlots ≤ 416 := by decide
 
 theorem fkr_first_addr2 : KA.«forkret» + 36900#64 + 18446744073709549778#64 = firstAddr := by decide
-theorem fkr_first_addr2' : KA.«forkret» + 35062#64 = firstAddr := by decide
+theorem fkr_first_addr2' : KA.«forkret» + 35110#64 = firstAddr := by decide
 
 set_option maxHeartbeats 8000000 in
 /-- **+0x1e .. +0x2c**: `fsinit(ROOTDEV)`, then `first = 0`, persisted at
@@ -180,7 +180,7 @@ theorem fkr_boot_fsinit [CurCtx] (FS : FSINIT) (Γ : SchedNames) [ClaimIs (hlc :
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [KCtx.rget_zero] next c1 hp1
   iintro Hk Hpc
   -- +0x20  jal fsinit
-  k_step_gen (wp_s_jal c1 _ (KA.«forkret» + 0x20#64) false 7248#21 1#5 (by decide))
+  k_step_gen (wp_s_jal c1 _ (KA.«forkret» + 0x20#64) false 7328#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [fkr_br_fsinit] next c2 hp2
   iintro Hk Hpc
   simp only [KCtx.setReg_sie, KCtx.setReg_proc, hs, hp] at hp1 hp2
@@ -204,7 +204,7 @@ theorem fkr_boot_fsinit [CurCtx] (FS : FSINIT) (Γ : SchedNames) [ClaimIs (hlc :
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c4 hp4
   iintro Hk Hpc
   -- +0x28  sw zero,-1838(a5)
-  k_step_gen (wp_s_sw c4 _ (KA.«forkret» + 0x28#64) false 2258#12 15#5 0#5 (by decide) 1#32)
+  k_step_gen (wp_s_sw c4 _ (KA.«forkret» + 0x28#64) false 2306#12 15#5 0#5 (by decide) 1#32)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
     with [KCtx.rget_eq, KCtx.setReg_regs, RegMap.set_apply, fkr_first_addr2, fkr_first_addr2'] next c5 hp5
   iintro Hk Hpc Hf

@@ -25,9 +25,9 @@ attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Funct
 
 /-! ## `setkilled` -/
 
-theorem setkilled_br_ffffffffffffeae0 : KA.«setkilled» + 0xffffffffffffeae0#64 = KA.«release» := by decide
+theorem setkilled_br_ffffffffffffead2 : KA.«setkilled» + 0xffffffffffffead2#64 = KA.«release» := by decide
 
-theorem setkilled_br_ffffffffffffea58 : KA.«setkilled» + 0xffffffffffffea58#64 = KA.«acquire» := by decide
+theorem setkilled_br_ffffffffffffea4a : KA.«setkilled» + 0xffffffffffffea4a#64 = KA.«acquire» := by decide
 
 set_option maxHeartbeats 4000000 in
 /-- **`setkilled` meets its specification.** -/
@@ -58,8 +58,8 @@ theorem setkilled_proof (AC : ACQUIRE) (RE : RELEASE) : SETKILLED :=
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c2 hp2
   iintro Hk Hpc
   -- jal ra, acquire
-  k_step_gen (wp_s_jal c2 _ (KA.«setkilled» + 0xc#64) false 2091596#21 1#5 (by decide))
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [setkilled_br_ffffffffffffea58] next c3 hp3
+  k_step_gen (wp_s_jal c2 _ (KA.«setkilled» + 0xc#64) false 2091582#21 1#5 (by decide))
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [setkilled_br_ffffffffffffea4a] next c3 hp3
   iintro Hk Hpc
   iapply (kl_acquire AC c3 _ (Γ.lock j) (procLockPay Γ j) ?hna ?hKa ?hla) $$ [- $Hk $Hpc]
   rotate_right 1
@@ -107,8 +107,8 @@ theorem setkilled_proof (AC : ACQUIRE) (RE : RELEASE) : SETKILLED :=
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [g9]
   iintro Hk Hpc
   -- jal ra, release
-  k_step (wp_s_jal c _ (KA.«setkilled» + 0x16#64) false 2091722#21 1#5 (by decide))
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [setkilled_br_ffffffffffffeae0]
+  k_step (wp_s_jal c _ (KA.«setkilled» + 0x16#64) false 2091708#21 1#5 (by decide))
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [setkilled_br_ffffffffffffead2]
   iintro Hk Hpc
   ihave Hrest := kl_rest_intro ξ0 (procAddr j) 1#32 xs pid $$ [Hkilled Hxs Hpid Hkp]
   case' _ => simp only [pKilled, pXstate, pPid, pidPub]; iframe

@@ -32,8 +32,8 @@ set_option linter.unusedVariables false
 theorem ba_imm_p80 : BitVec.signExtend 64 80#12 = 8#64 * BitVec.ofNat 64 10 := by decide
 
 /-- `auipc a0,0x4 ; addi a0,a0,1190` at `+0xf6`: the format string. -/
-theorem ba_a_fmt : KA.«balloc» + 0x45a6#64 = KStr.«balloc: out of blocks\n» := by decide
-theorem ba_br_printk : KA.«balloc» + 0xffffffffffffd6dc#64 = KA.«printk» := by decide
+theorem ba_a_fmt : KA.«balloc» + 0x4556#64 = KStr.«balloc: out of blocks\n» := by decide
+theorem ba_br_printk : KA.«balloc» + 0xffffffffffffd68c#64 = KA.«printk» := by decide
 theorem ba_ret_102 : jumpPc (KA.«balloc» + 0x102#64) = KA.«balloc» + 0x102#64 := by decide
 theorem ba_br_brelse : KA.«balloc» + 0xFFFFFFFFFFFFFF14#64 = KA.«brelse» := by decide
 theorem ba_ret_90 : jumpPc (KA.«balloc» + 0x90#64) = KA.«balloc» + 0x90#64 := by decide
@@ -239,11 +239,11 @@ theorem ba_out (PK : PRINTK) (cpu c0 : CPU) (k : KCtx) (spie spp : Bool) (R : Re
   k_step_e (wp_s_auipc cpu _ (KA.«balloc» + 0xf6#64) false 0x4#20 10#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
-  k_step_e (wp_s_addi cpu _ (KA.«balloc» + 0xfa#64) false 1200#12 10#5 10#5 (by decide))
+  k_step_e (wp_s_addi cpu _ (KA.«balloc» + 0xfa#64) false 1120#12 10#5 10#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [ba_a_fmt]
   iintro Hk Hpc
   -- +0xfe  jal printk
-  k_step_e (wp_s_jal cpu _ (KA.«balloc» + 0xfe#64) false 2086366#21 1#5 (by decide))
+  k_step_e (wp_s_jal cpu _ (KA.«balloc» + 0xfe#64) false 2086286#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [ba_br_printk]
   iintro Hk Hpc
   iapply (printk_msg_call PK cpu _ _ baFmtStr (by unfold baFmtStr; decide) ba_pkKinds

@@ -737,7 +737,7 @@ theorem sys_link_walk_a (AS : ARGSTR) (BO : BEGIN_OP) (NI : NAMEI) (IL : ILOCK) 
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
   -- +0x12  jal argstr (0, old)
-  k_step_e (wp_s_jal cpu _ (KA.«sys_link» + 0x12#64) false 2087388#21 1#5 (by decide))
+  k_step_e (wp_s_jal cpu _ (KA.«sys_link» + 0x12#64) false 2087322#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [sys_link_br_argstr]
   iintro Hk Hpc
   icases (show sysfileAny (GF := GF) (sysLinkOld (k.regs 2#5)) 128 ⊢ ∃ bs : List (BitVec 8),
@@ -801,7 +801,7 @@ theorem sys_link_walk_a (AS : ARGSTR) (BO : BEGIN_OP) (NI : NAMEI) (IL : ILOCK) 
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
   -- +0x26  jal argstr (1, new)
-  k_step_e (wp_s_jal cpu _ (KA.«sys_link» + 0x26#64) false 2087368#21 1#5 (by decide))
+  k_step_e (wp_s_jal cpu _ (KA.«sys_link» + 0x26#64) false 2087302#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [sys_link_br_argstr]
   iintro Hk Hpc
   icases (show sysfileAny (GF := GF) (sysLinkNew (k.regs 2#5)) 128 ⊢ ∃ bs : List (BitVec 8),

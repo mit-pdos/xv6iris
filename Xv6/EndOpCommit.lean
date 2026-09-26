@@ -333,7 +333,7 @@ theorem eo_commit (WH : WRITE_HEAD) (IT : INSTALL_TRANS) (AC : ACQUIRE) (RE : RE
   k_step_e (wp_s_auipc cpu _ (KA.«end_op» + 0x10e#64) false 0x1e#20 15#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
-  k_step_e (wp_s_sw cpu _ (KA.«end_op» + 0x112#64) false 1338#12 15#5 0#5 (by decide)
+  k_step_e (wp_s_sw cpu _ (KA.«end_op» + 0x112#64) false 1818#12 15#5 0#5 (by decide)
       (BitVec.ofNat 32 n))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [eo_lhn, KCtx.rget_zero]
   iintro Hk Hpc HlhN

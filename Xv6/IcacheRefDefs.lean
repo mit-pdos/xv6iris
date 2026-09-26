@@ -458,7 +458,7 @@ def itableLock : BitVec 64 := KA.«itable»
 /-- `&itable.inode[k]`.  (`24` is `Xv6.ITABLE_OFF`.) -/
 def ientry (k : Nat) : BitVec 64 := BitVec.ofNat 64 (KernelSyms.«itable» + 24 + ISLOTSZ * k)
 
-private theorem itable_val : KernelSyms.«itable» = 0x80020958 := rfl
+private theorem itable_val : KernelSyms.«itable» = 0x80020b88 := rfl
 
 /-- The whole geometry as ONE arithmetic fact: every entry address in range
 is its literal offset, with no wrap.  Injectivity, the scan's step and the

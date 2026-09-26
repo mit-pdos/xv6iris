@@ -57,8 +57,8 @@ theorem dirlink_br_dirlookup : KA.«dirlink» + 0xFFFFFFFFFFFFFE06#64 = KA.«dir
   decide
 theorem dirlink_br_readi : KA.«dirlink» + 0xFFFFFFFFFFFFFBF8#64 = KA.«readi» := by decide
 theorem dirlink_br_iput : KA.«dirlink» + 0xFFFFFFFFFFFFF9A0#64 = KA.«iput» := by decide
-theorem dirlink_br_panic : KA.«dirlink» + 0xffffffffffffcd68#64 = KA.«panic» := by decide
-theorem dirlink_br_strncpy : KA.«dirlink» + 0xffffffffffffd356#64 = KA.«strncpy» := by decide
+theorem dirlink_br_panic : KA.«dirlink» + 0xffffffffffffcd18#64 = KA.«panic» := by decide
+theorem dirlink_br_strncpy : KA.«dirlink» + 0xffffffffffffd306#64 = KA.«strncpy» := by decide
 theorem dirlink_br_writei : KA.«dirlink» + 0xFFFFFFFFFFFFFCEA#64 = KA.«writei» := by decide
 
 theorem dirlink_ret_1a : jumpPc (KA.«dirlink» + 0x1a#64) = KA.«dirlink» + 0x1a#64 := by decide
@@ -68,7 +68,7 @@ theorem dirlink_ret_7c : jumpPc (KA.«dirlink» + 0x7c#64) = KA.«dirlink» + 0x
 theorem dirlink_ret_90 : jumpPc (KA.«dirlink» + 0x90#64) = KA.«dirlink» + 0x90#64 := by decide
 
 /-- `auipc a0,0x4` + `addi a0,a0,-1610` at `+0x60`: the panic literal. -/
-theorem dirlink_msg_addr : KA.«dirlink» + 0x3a20#64 = KStr.«dirlink read» := by decide
+theorem dirlink_msg_addr : KA.«dirlink» + 0x39d0#64 = KStr.«dirlink read» := by decide
 
 /-- `dirlink read` at `0x800074f0` (Rocq's `dl_msg`). -/
 def dirlinkMsgStr : List (BitVec 8) :=

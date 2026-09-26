@@ -70,7 +70,7 @@ theorem mn_started [CurCtx] (cpu : CPU) (k : KCtx) (R0 : RegMap) (hsie : k.sie =
   k_step (wp_s_auipc startedPrimary _ (KA.«main» + 162#64) false 9#20 15#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
-  k_step (wp_s_addi startedPrimary _ (KA.«main» + 166#64) false 960#12 15#5 15#5 (by decide))
+  k_step (wp_s_addi startedPrimary _ (KA.«main» + 166#64) false 1008#12 15#5 15#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
   -- +0xaa  li a4,1
@@ -121,7 +121,7 @@ theorem mn_sched (SCH : SCHEDULER) (KV : KERNELVEC) [Y : CurCtx] (hY : curTier =
     icases Hcaps with ⟨-, -, -, -, -, -, -, -, -, -, -, HP⟩
     iexact HP
   -- +0x3e  jal scheduler
-  k_step (wp_s_jal cpu _ (KA.«main» + 62#64) false 3870#21 1#5 (by decide))
+  k_step (wp_s_jal cpu _ (KA.«main» + 62#64) false 3884#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [ms_scheduler_br]
   iintro Hk Hpc
   have hsch := SCH.wp_scheduler (hlc := hlc) (GF := GF) Γ cpu

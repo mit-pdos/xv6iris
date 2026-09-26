@@ -212,7 +212,7 @@ theorem frd_arm_dev (CR : CONSOLEREAD) (Γ : SchedNames) [ClaimIs (hlc := hlc) G
   k_step_e (wp_s_auipc cpu _ (KA.«fileread» + 0x8a#64) false 0x1e#20 14#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
-  k_step_e (wp_s_addi cpu _ (KA.«fileread» + 0x8e#64) false 228#12 14#5 14#5 (by decide))
+  k_step_e (wp_s_addi cpu _ (KA.«fileread» + 0x8e#64) false 708#12 14#5 14#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [frd_devsw_addr]
   iintro Hk Hpc
   -- +0x92  c.add a5,a5,a4

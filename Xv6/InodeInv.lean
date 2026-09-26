@@ -213,12 +213,12 @@ fields. -/
 
 /-- `&sb.inodestart`, at `sb + 24`: the `lw a1,<off>(a1)` off the
 `auipc a1,0x1d` in `iupdate` (+0x14) and in `ilock` (+0x3e) both resolve to
-`0x80020950` = `KA.«sb» + 0x18` (Rocq's `sb_inodestart`). -/
+`0x80020b80` = `KA.«sb» + 0x18` (Rocq's `sb_inodestart`). -/
 def sbInodestart : BitVec 64 := KA.«sb» + 24#64
 
 /-- `&sb.ninodes`, at `sb + 12`: the inode region's SIZE, in inodes.
 `ialloc`'s and `ireclaim`'s scan bound (`lw a4,12(s4)`; `ialloc` also reads
-it once through `auipc a4 / lw a4,1972(a4)`, resolving to `0x80020944` =
+it once through `auipc a4 / lw a4,1972(a4)`, resolving to `0x80020b74` =
 `KA.«sb» + 0xc`) (Rocq's `sb_ninodes`). -/
 def sbNinodes : BitVec 64 := KA.«sb» + 12#64
 

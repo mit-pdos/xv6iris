@@ -26,12 +26,12 @@ attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Funct
 
 /-- `&end`, folded out of `auipc a5,0x23; addi a5,a5,-1132`. -/
 theorem kf_end_addr :
-    KA.«kfree» + 0x22baa#64 = KA.«end» := by
+    KA.«kfree» + 0x22dda#64 = KA.«end» := by
   decide
 
 /-- `&kmem`, folded out of `auipc s2,0x12; addi s2,s2,-1734`. -/
 theorem kf_kmem_addr :
-    KA.«kfree» + 0x1197a#64 = KA.«kmem» := by
+    KA.«kfree» + 0x119aa#64 = KA.«kmem» := by
   decide
 
 /-- The first panic check (`pa < end || PHYSTOP-1 < pa`) is not taken. -/
@@ -199,7 +199,7 @@ theorem kfree_br_24a : KA.«kfree» + 0x24a#64 = KA.«release» := by decide
 
 theorem kfree_br_1c2 : KA.«kfree» + 0x1c2#64 = KA.«acquire» := by decide
 
-theorem kfree_br_1197a : KA.«kfree» + 0x1197a#64 = KA.«kmem» := by decide
+theorem kfree_br_119aa : KA.«kfree» + 0x119aa#64 = KA.«kmem» := by decide
 
 theorem kfree_tail (AC : ACQUIRE) (RE : RELEASE) {hlc : HasLC} {GF : BundledGFunctors}
     [MachGS hlc GF] [Xv6G GF] [CurCtx]
@@ -227,8 +227,8 @@ theorem kfree_tail (AC : ACQUIRE) (RE : RELEASE) {hlc : HasLC} {GF : BundledGFun
   k_step_gen (wp_s_auipc c _ (KA.«kfree» + 0x36#64) false 18#20 18#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) Htext
     $$ [- $Hk $Hpc] next c1 hq1
   iintro Hk Hpc
-  k_step_gen (wp_s_addi c1 _ (KA.«kfree» + 0x3a#64) false 2372#12 18#5 18#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) Htext
-    $$ [- $Hk $Hpc] with [kfree_br_1197a, kf_kmem_addr] next c2 hq2
+  k_step_gen (wp_s_addi c1 _ (KA.«kfree» + 0x3a#64) false 2420#12 18#5 18#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) Htext
+    $$ [- $Hk $Hpc] with [kfree_br_119aa, kf_kmem_addr] next c2 hq2
   iintro Hk Hpc
   -- mv a0,s2 ; jal acquire
   k_step_gen (wp_s_add c2 _ (KA.«kfree» + 0x3e#64) true 10#5 0#5 18#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) Htext
@@ -348,7 +348,7 @@ theorem kfree_tail (AC : ACQUIRE) (RE : RELEASE) {hlc : HasLC} {GF : BundledGFun
 
 theorem kfree_br_282 : KA.«kfree» + 0x282#64 = KA.«memset» := by decide
 
-theorem kfree_br_22baa : KA.«kfree» + 0x22baa#64 = KA.«end» := by decide
+theorem kfree_br_22dda : KA.«kfree» + 0x22dda#64 = KA.«end» := by decide
 
 set_option maxHeartbeats 4000000 in
 theorem kfree_proof (AC : ACQUIRE) (RE : RELEASE) (MS : MEMSET) : KFREE :=
@@ -370,8 +370,8 @@ theorem kfree_proof (AC : ACQUIRE) (RE : RELEASE) (MS : MEMSET) : KFREE :=
   k_step_gen (wp_s_auipc c1 _ (KA.«kfree» + 0xc#64) false 35#20 15#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) Htext
     $$ [- $Hk $Hpc] next c2 hp2
   iintro Hk Hpc
-  k_step_gen (wp_s_addi c2 _ (KA.«kfree» + 0x10#64) false 2974#12 15#5 15#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) Htext
-    $$ [- $Hk $Hpc] with [kfree_br_22baa, kf_end_addr] next c3 hp3
+  k_step_gen (wp_s_addi c2 _ (KA.«kfree» + 0x10#64) false 3534#12 15#5 15#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) Htext
+    $$ [- $Hk $Hpc] with [kfree_br_22dda, kf_end_addr] next c3 hp3
   iintro Hk Hpc
   -- sltu a4,a0,a5
   k_step_gen (wp_s_sltu c3 _ (KA.«kfree» + 0x14#64) false 14#5 10#5 15#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) Htext
@@ -466,8 +466,8 @@ theorem kfree_free_proof (AC : ACQUIRE) (RE : RELEASE) (MS : MEMSET_FREE) : KFRE
   k_step_gen (wp_s_auipc c1 _ (KA.«kfree» + 0xc#64) false 35#20 15#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) Htext
     $$ [- $Hk $Hpc] next c2 hp2
   iintro Hk Hpc
-  k_step_gen (wp_s_addi c2 _ (KA.«kfree» + 0x10#64) false 2974#12 15#5 15#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) Htext
-    $$ [- $Hk $Hpc] with [kfree_br_22baa, kf_end_addr] next c3 hp3
+  k_step_gen (wp_s_addi c2 _ (KA.«kfree» + 0x10#64) false 3534#12 15#5 15#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) Htext
+    $$ [- $Hk $Hpc] with [kfree_br_22dda, kf_end_addr] next c3 hp3
   iintro Hk Hpc
   -- sltu a4,a0,a5
   k_step_gen (wp_s_sltu c3 _ (KA.«kfree» + 0x14#64) false 14#5 10#5 15#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) Htext

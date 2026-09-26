@@ -102,7 +102,7 @@ end Calls
 
 /-! ## §3 +0xd0 -/
 
-theorem utD0_vmfault_tgt : KA.«usertrap» + 18446744073709547192#64 = KA.«vmfault» := by decide
+theorem utD0_vmfault_tgt : KA.«usertrap» + 18446744073709547178#64 = KA.«vmfault» := by decide
 theorem utD0_ret : jumpPc (KA.«usertrap» + 0xe6#64) = KA.«usertrap» + 0xe6#64 := by decide
 theorem utD0_bne_z : bcond bop.BNE 0#64 0#64 = false := by decide
 theorem utD0_bne_nz (r : BitVec 64) (h : r ≠ 0#64) : bcond bop.BNE r 0#64 = true := by
@@ -185,7 +185,7 @@ theorem usertrap_d0_proof (VM : VMFAULT) (HA : UT_A6 PT Γ) (H56 : UT_56 PT Γ) 
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [p9]
   iintro Hk Hpc Hpg
   -- +0xe2  jal vmfault
-  k_step (wp_s_jal cpu _ (KA.«usertrap» + 0xe2#64) false 0x1fedd6#21 1#5 (by decide))
+  k_step (wp_s_jal cpu _ (KA.«usertrap» + 0xe2#64) false 0x1fedc8#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [utD0_vmfault_tgt]
   iintro Hk Hpc
   iapply (utD0_vmfault VM cpu _ fscKalloc fsReadyKmem (utV1 A).upt A.M ?hs1 ?hn1 ?hK1 ?hl1 ?hr1 ?hz1)

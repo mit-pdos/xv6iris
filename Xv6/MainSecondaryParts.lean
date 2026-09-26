@@ -55,7 +55,7 @@ attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Funct
 
 theorem ms_cpuid_br : KA.«main» + 2694#64 = KA.«cpuid» := by decide
 theorem ms_ret_0c : jumpPc (KA.«main» + 12#64) = KA.«main» + 0xc#64 := by decide
-theorem ms_started_addr : KA.«main» + 37986#64 = KA.«started» := by decide
+theorem ms_started_addr : KA.«main» + 38034#64 = KA.«started» := by decide
 
 /-- `cpuid()` returns nonzero exactly off the primary. -/
 theorem ms_cpuidRet_ne (cpu : CPU) (h : cpu ≠ startedPrimary) : cpuidRet (hartId cpu) ≠ 0#64 := by
@@ -120,7 +120,7 @@ theorem ms_entry (CI : CPUID) [CurCtx] (cpu : CPU) (k : KCtx) (hsie : k.sie = fa
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
   -- +0x10  addi a4,a4,1110
-  k_step (wp_s_addi cpu _ (KA.«main» + 0x10#64) false 1110#12 14#5 14#5 (by decide))
+  k_step (wp_s_addi cpu _ (KA.«main» + 0x10#64) false 1158#12 14#5 14#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
   -- +0x14  beqz a0,main+0x42 : falls through
@@ -363,11 +363,11 @@ section
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF]
   [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [DiskG GF]
 
-theorem ms_trapinithart_br : KA.«main» + 5716#64 = KA.«trapinithart» := by decide
+theorem ms_trapinithart_br : KA.«main» + 5730#64 = KA.«trapinithart» := by decide
 theorem ms_ret_36 : jumpPc (KA.«main» + 58#64) = KA.«main» + 58#64 := by decide
-theorem ms_plicinithart_br : KA.«main» + 18476#64 = KA.«plicinithart» := by decide
+theorem ms_plicinithart_br : KA.«main» + 18556#64 = KA.«plicinithart» := by decide
 theorem ms_ret_3a : jumpPc (KA.«main» + 62#64) = KA.«main» + 62#64 := by decide
-theorem ms_scheduler_br : KA.«main» + 3932#64 = KA.«scheduler» := by decide
+theorem ms_scheduler_br : KA.«main» + 3946#64 = KA.«scheduler» := by decide
 
 set_option maxHeartbeats 4000000 in
 /-- **+0x36 → scheduler, at the kernel tier**: trapinithart, the installed
@@ -385,7 +385,7 @@ theorem ms_tail_kpt (TIH : TRAPINITHART) (PIH : PLICINITHART) (SCH : SCHEDULER) 
   iintro ⟨Hk, Hpc, ⟨%tv0, Hstv⟩, Hcsrs, Hfree, #Hcaps⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
   -- +0x36  jal trapinithart
-  k_step (wp_s_jal cpu _ (KA.«main» + 54#64) false 5662#21 1#5 (by decide))
+  k_step (wp_s_jal cpu _ (KA.«main» + 54#64) false 5676#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [ms_trapinithart_br]
   iintro Hk Hpc
   have htih := TIH.wp_trapinithart (hlc := hlc) (GF := GF) cpu (k.withRegs (R.set 1#5 (KA.«main» + 58#64)))
@@ -403,7 +403,7 @@ theorem ms_tail_kpt (TIH : TRAPINITHART) (PIH : PLICINITHART) (SCH : SCHEDULER) 
     icases Hcaps with ⟨-, -, -, -, -, -, -, -, -, -, -, HP⟩
     iexact HP
   -- +0x3a  jal plicinithart
-  k_step (wp_s_jal cpu _ (KA.«main» + 58#64) false 18418#21 1#5 (by decide))
+  k_step (wp_s_jal cpu _ (KA.«main» + 58#64) false 18498#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [ms_plicinithart_br]
   iintro Hk Hpc
   have hpih := PIH.wp_plicinithart (hlc := hlc) (GF := GF) cpu
@@ -420,7 +420,7 @@ theorem ms_tail_kpt (TIH : TRAPINITHART) (PIH : PLICINITHART) (SCH : SCHEDULER) 
   iintro %R3 Hk Hpc _
   k_norm [ms_ret_3a]
   -- +0x3e  jal scheduler
-  k_step (wp_s_jal cpu _ (KA.«main» + 62#64) false 3870#21 1#5 (by decide))
+  k_step (wp_s_jal cpu _ (KA.«main» + 62#64) false 3884#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [ms_scheduler_br]
   iintro Hk Hpc
   have hsch := SCH.wp_scheduler (hlc := hlc) (GF := GF) Γ cpu

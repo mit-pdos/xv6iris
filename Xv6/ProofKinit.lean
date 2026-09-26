@@ -166,11 +166,11 @@ theorem kinit_finish [CurCtx] (cpu c : CPU) (k : KCtx)
 
 theorem kinit_br_ffffffffffffffb8 : KA.«kinit» + 0xffffffffffffffb8#64 = KA.«freerange» := by decide
 
-theorem kinit_br_22af6 : KA.«kinit» + 0x22af6#64 = KA.«end» := by decide
+theorem kinit_br_22d26 : KA.«kinit» + 0x22d26#64 = KA.«end» := by decide
 
 theorem kinit_br_8e : KA.«kinit» + 0x8e#64 = KA.«initlock» := by decide
 
-theorem kinit_br_118c6 : KA.«kinit» + 0x118c6#64 = KA.«kmem» := by decide
+theorem kinit_br_118f6 : KA.«kinit» + 0x118f6#64 = KA.«kmem» := by decide
 
 theorem kinit_br_64fe : KA.«kinit» + 0x64fe#64 = KStr.«kmem» := by decide
 
@@ -201,8 +201,8 @@ theorem kinit_proof (IL : INITLOCK) (FR : FREERANGE) : KINIT :=
   k_step_gen (wp_s_auipc c3 _ (KA.«kinit» + 0x10#64) false 0x12#20 10#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [ki_u12] next c4 hp4
   iintro Hk Hpc
-  k_step_gen (wp_s_addi c4 _ (KA.«kinit» + 0x14#64) false 2230#12 10#5 10#5 (by decide))
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [kinit_br_118c6] next c5 hp5
+  k_step_gen (wp_s_addi c4 _ (KA.«kinit» + 0x14#64) false 2278#12 10#5 10#5 (by decide))
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [kinit_br_118f6] next c5 hp5
   iintro Hk Hpc
   -- jal ra, initlock
   k_step_gen (wp_s_jal c5 _ (KA.«kinit» + 0x18#64) false 118#21 1#5 (by decide))
@@ -248,8 +248,8 @@ theorem kinit_proof (IL : INITLOCK) (FR : FREERANGE) : KINIT :=
   k_step_gen (wp_s_auipc c9 _ (KA.«kinit» + 0x20#64) false 0x23#20 10#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [ki_u23] next c10 hp10
   iintro Hk Hpc
-  k_step_gen (wp_s_addi c10 _ (KA.«kinit» + 0x24#64) false 2774#12 10#5 10#5 (by decide))
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [kinit_br_22af6] next c11 hp11
+  k_step_gen (wp_s_addi c10 _ (KA.«kinit» + 0x24#64) false 3334#12 10#5 10#5 (by decide))
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [kinit_br_22d26] next c11 hp11
   iintro Hk Hpc
   -- jal ra, freerange
   k_step_gen (wp_s_jal c11 _ (KA.«kinit» + 0x28#64) false 2097040#21 1#5 (by decide))

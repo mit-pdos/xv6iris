@@ -9,7 +9,7 @@ a NEW NAME that splits one Rocq file; `SpecCreate.lean` keeps the rest).
     create(char *path, short type, short major, short minor)
 
 (the C text and the decode are `SpecCreate.v`'s header; the offsets below are
-this image's, `KA.«create»` = 0x80004ca0, 356 bytes, re-read with objdump.)
+this image's, `KA.«create»` = 0x80004cf0, 356 bytes, re-read with objdump.)
 
 ## What is here (Rocq `SpecCreate.v` line)
 

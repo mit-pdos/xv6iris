@@ -27,7 +27,7 @@ theorem kvi_ret_117c : jumpPc (KA.«kvminit» + 0xc#64) = (KA.«kvminit» + 0xc#
 
 /-- `auipc a5,0x9 ; sd a0,252(a5)` at `0x8000122a`: `&kernel_pagetable`. -/
 theorem kvi_root_117c :
-    KA.«kvminit» + 0x911a#64 = kernelPagetableAddr := by
+    KA.«kvminit» + 0x914a#64 = kernelPagetableAddr := by
   decide
 
 /-- The context algebra of the exit interrupt state. -/
@@ -64,7 +64,7 @@ theorem kvi_kvmmake_call (KV : KVMMAKE) [CurCtx] (c : CPU) (k' : KCtx)
 
 theorem kvminit_br_ffffffffffffff42 : KA.«kvminit» + 0xffffffffffffff42#64 = KA.«kvmmake» := by decide
 
-theorem kvminit_br_911a : KA.«kvminit» + 0x911a#64 = kernelPagetableAddr := by decide
+theorem kvminit_br_914a : KA.«kvminit» + 0x914a#64 = kernelPagetableAddr := by decide
 
 set_option maxHeartbeats 4000000 in
 theorem kvminit_proof (KV : KVMMAKE) : KVMINIT :=
@@ -109,9 +109,9 @@ theorem kvminit_proof (KV : KVMMAKE) : KVMINIT :=
   k_step_gen (wp_s_auipc c3 _ (KA.«kvminit» + 0xc#64) false 9#20 15#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c4 hp4
   iintro Hk Hpc
-  k_step_gen (wp_s_sd c4 _ (KA.«kvminit» + 0x10#64) false 270#12 15#5 10#5 (by decide) v0)
+  k_step_gen (wp_s_sd c4 _ (KA.«kvminit» + 0x10#64) false 318#12 15#5 10#5 (by decide) v0)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
-    with [kvminit_br_911a, kvi_root_117c, hroot] next c5 hp5
+    with [kvminit_br_914a, kvi_root_117c, hroot] next c5 hp5
   iintro Hk Hpc Hword
   -- the epilogue
   have hpin5 : k.sie = false ∨ k.proc = 0#64 → c5 = cpu := fun h =>

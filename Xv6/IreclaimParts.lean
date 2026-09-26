@@ -40,19 +40,19 @@ set_option linter.unusedSectionVars false
 /-! ## Addresses -/
 
 /-- `auipc a4,0x1d ; lw a4,984(a4)` at `+0x00`: `sb.ninodes`. -/
-theorem ireclaim_a_ninodes : KA.«ireclaim» + 0x1d3e2#64 = sbNinodes := by
+theorem ireclaim_a_ninodes : KA.«ireclaim» + 0x1d5c2#64 = sbNinodes := by
   unfold sbNinodes; decide
 /-- `auipc s4,0x1d ; addi s4,s4,934` at `+0x26`: `&sb`. -/
-theorem ireclaim_a_sb : KA.«ireclaim» + 0x1d3d6#64 = KA.«sb» := by decide
+theorem ireclaim_a_sb : KA.«ireclaim» + 0x1d5b6#64 = KA.«sb» := by decide
 /-- `auipc s6,0x4 ; addi s6,s6,-266` at `+0x2e`: the format string. -/
-theorem ireclaim_a_fmt : KA.«ireclaim» + 0x3f2e#64 = KStr.«ireclaim: orphaned inode %d\n» := by
+theorem ireclaim_a_fmt : KA.«ireclaim» + 0x3ede#64 = KStr.«ireclaim: orphaned inode %d\n» := by
   decide
 theorem ireclaim_ist_addr : KA.«sb» + 24#64 = sbInodestart := rfl
 theorem ireclaim_nin_addr : KA.«sb» + 12#64 = sbNinodes := rfl
 
 /-! ## Call targets and return addresses -/
 
-theorem ireclaim_br_printk : KA.«ireclaim» + 0xffffffffffffcfc4#64 = KA.«printk» := by decide
+theorem ireclaim_br_printk : KA.«ireclaim» + 0xffffffffffffcf74#64 = KA.«printk» := by decide
 theorem ireclaim_br_iget : KA.«ireclaim» + 0xFFFFFFFFFFFFF9EE#64 = KA.«iget» := by decide
 theorem ireclaim_br_brelse : KA.«ireclaim» + 0xFFFFFFFFFFFFF7FC#64 = KA.«brelse» := by decide
 theorem ireclaim_br_begin_op : KA.«ireclaim» + 0x7F6#64 = KA.«begin_op» := by decide

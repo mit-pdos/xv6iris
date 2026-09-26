@@ -89,12 +89,12 @@ def argrawTbl : BitVec 64 := (KA.«etext» + 0x780#64)
 
 /-- Entry `i`: the case body's displacement from the table base. -/
 def argrawEntry : Nat → BitVec 32
-  | 0 => 0xffffb0d0#32
-  | 1 => 0xffffb0de#32
-  | 2 => 0xffffb0e4#32
-  | 3 => 0xffffb0ea#32
-  | 4 => 0xffffb0f0#32
-  | _ => 0xffffb0f6#32
+  | 0 => 0xffffb0de#32
+  | 1 => 0xffffb0ec#32
+  | 2 => 0xffffb0f2#32
+  | 3 => 0xffffb0f8#32
+  | 4 => 0xffffb0fe#32
+  | _ => 0xffffb104#32
 
 /-- The case body entry `i` lands on: `argraw + 0x28`, then `+0x36, +0x3c, ...`. -/
 def argrawCase : Nat → BitVec 64
@@ -152,67 +152,67 @@ theorem argraw_tbl_word (i : Nat) (hi : i < 6) :
     iframe H0 H1 H2 H3
   match i, hi with
   | 0, _ =>
-    ihave #B0 := hb 1920 (KernelSyms.«etext» + 0x780) 0xd0 rfl (by decide) (by decide) $$ HS H
+    ihave #B0 := hb 1920 (KernelSyms.«etext» + 0x780) 0xde rfl (by decide) (by decide) $$ HS H
     ihave #B1 := hb 1921 (KernelSyms.«etext» + 0x781) 0xb0 rfl (by decide) (by decide) $$ HS H
     ihave #B2 := hb 1922 (KernelSyms.«etext» + 0x782) 0xff rfl (by decide) (by decide) $$ HS H
     ihave #B3 := hb 1923 (KernelSyms.«etext» + 0x783) 0xff rfl (by decide) (by decide) $$ HS H
     iapply (show wordPointsTo (GF := GF) (BitVec.ofNat 64 (KernelSyms.«etext» + 0x780)) 4 DFrac.discard
-        (bytes4ToWord [0xd0#8, 0xb0#8, 0xff#8, 0xff#8]) ⊢
+        (bytes4ToWord [0xde#8, 0xb0#8, 0xff#8, 0xff#8]) ⊢
         wordPointsTo (argrawTbl + BitVec.ofNat 64 (4 * 0)) 4 DFrac.discard (argrawEntry 0) from by
       unfold argrawTbl argrawEntry; simp only [Nat.mul_zero, BitVec.add_zero]; rfl)
     iapply hfour (KernelSyms.«etext» + 0x780) _ _ _ _ (by decide) (by decide) (by decide)
     iframe B0 B1 B2 B3
   | 1, _ =>
-    ihave #B0 := hb 1924 (KernelSyms.«etext» + 0x784) 0xde rfl (by decide) (by decide) $$ HS H
+    ihave #B0 := hb 1924 (KernelSyms.«etext» + 0x784) 0xec rfl (by decide) (by decide) $$ HS H
     ihave #B1 := hb 1925 (KernelSyms.«etext» + 0x785) 0xb0 rfl (by decide) (by decide) $$ HS H
     ihave #B2 := hb 1926 (KernelSyms.«etext» + 0x786) 0xff rfl (by decide) (by decide) $$ HS H
     ihave #B3 := hb 1927 (KernelSyms.«etext» + 0x787) 0xff rfl (by decide) (by decide) $$ HS H
     iapply (show wordPointsTo (GF := GF) (BitVec.ofNat 64 (KernelSyms.«etext» + 0x784)) 4 DFrac.discard
-        (bytes4ToWord [0xde#8, 0xb0#8, 0xff#8, 0xff#8]) ⊢
+        (bytes4ToWord [0xec#8, 0xb0#8, 0xff#8, 0xff#8]) ⊢
         wordPointsTo (argrawTbl + BitVec.ofNat 64 (4 * 1)) 4 DFrac.discard (argrawEntry 1) from by
       unfold argrawTbl argrawEntry; rfl)
     iapply hfour (KernelSyms.«etext» + 0x784) _ _ _ _ (by decide) (by decide) (by decide)
     iframe B0 B1 B2 B3
   | 2, _ =>
-    ihave #B0 := hb 1928 (KernelSyms.«etext» + 0x788) 0xe4 rfl (by decide) (by decide) $$ HS H
+    ihave #B0 := hb 1928 (KernelSyms.«etext» + 0x788) 0xf2 rfl (by decide) (by decide) $$ HS H
     ihave #B1 := hb 1929 (KernelSyms.«etext» + 0x789) 0xb0 rfl (by decide) (by decide) $$ HS H
     ihave #B2 := hb 1930 (KernelSyms.«etext» + 0x78a) 0xff rfl (by decide) (by decide) $$ HS H
     ihave #B3 := hb 1931 (KernelSyms.«etext» + 0x78b) 0xff rfl (by decide) (by decide) $$ HS H
     iapply (show wordPointsTo (GF := GF) (BitVec.ofNat 64 (KernelSyms.«etext» + 0x788)) 4 DFrac.discard
-        (bytes4ToWord [0xe4#8, 0xb0#8, 0xff#8, 0xff#8]) ⊢
+        (bytes4ToWord [0xf2#8, 0xb0#8, 0xff#8, 0xff#8]) ⊢
         wordPointsTo (argrawTbl + BitVec.ofNat 64 (4 * 2)) 4 DFrac.discard (argrawEntry 2) from by
       unfold argrawTbl argrawEntry; rfl)
     iapply hfour (KernelSyms.«etext» + 0x788) _ _ _ _ (by decide) (by decide) (by decide)
     iframe B0 B1 B2 B3
   | 3, _ =>
-    ihave #B0 := hb 1932 (KernelSyms.«etext» + 0x78c) 0xea rfl (by decide) (by decide) $$ HS H
+    ihave #B0 := hb 1932 (KernelSyms.«etext» + 0x78c) 0xf8 rfl (by decide) (by decide) $$ HS H
     ihave #B1 := hb 1933 (KernelSyms.«etext» + 0x78d) 0xb0 rfl (by decide) (by decide) $$ HS H
     ihave #B2 := hb 1934 (KernelSyms.«etext» + 0x78e) 0xff rfl (by decide) (by decide) $$ HS H
     ihave #B3 := hb 1935 (KernelSyms.«etext» + 0x78f) 0xff rfl (by decide) (by decide) $$ HS H
     iapply (show wordPointsTo (GF := GF) (BitVec.ofNat 64 (KernelSyms.«etext» + 0x78c)) 4 DFrac.discard
-        (bytes4ToWord [0xea#8, 0xb0#8, 0xff#8, 0xff#8]) ⊢
+        (bytes4ToWord [0xf8#8, 0xb0#8, 0xff#8, 0xff#8]) ⊢
         wordPointsTo (argrawTbl + BitVec.ofNat 64 (4 * 3)) 4 DFrac.discard (argrawEntry 3) from by
       unfold argrawTbl argrawEntry; rfl)
     iapply hfour (KernelSyms.«etext» + 0x78c) _ _ _ _ (by decide) (by decide) (by decide)
     iframe B0 B1 B2 B3
   | 4, _ =>
-    ihave #B0 := hb 1936 (KernelSyms.«etext» + 0x790) 0xf0 rfl (by decide) (by decide) $$ HS H
+    ihave #B0 := hb 1936 (KernelSyms.«etext» + 0x790) 0xfe rfl (by decide) (by decide) $$ HS H
     ihave #B1 := hb 1937 (KernelSyms.«etext» + 0x791) 0xb0 rfl (by decide) (by decide) $$ HS H
     ihave #B2 := hb 1938 (KernelSyms.«etext» + 0x792) 0xff rfl (by decide) (by decide) $$ HS H
     ihave #B3 := hb 1939 (KernelSyms.«etext» + 0x793) 0xff rfl (by decide) (by decide) $$ HS H
     iapply (show wordPointsTo (GF := GF) (BitVec.ofNat 64 (KernelSyms.«etext» + 0x790)) 4 DFrac.discard
-        (bytes4ToWord [0xf0#8, 0xb0#8, 0xff#8, 0xff#8]) ⊢
+        (bytes4ToWord [0xfe#8, 0xb0#8, 0xff#8, 0xff#8]) ⊢
         wordPointsTo (argrawTbl + BitVec.ofNat 64 (4 * 4)) 4 DFrac.discard (argrawEntry 4) from by
       unfold argrawTbl argrawEntry; rfl)
     iapply hfour (KernelSyms.«etext» + 0x790) _ _ _ _ (by decide) (by decide) (by decide)
     iframe B0 B1 B2 B3
   | 5, _ =>
-    ihave #B0 := hb 1940 (KernelSyms.«etext» + 0x794) 0xf6 rfl (by decide) (by decide) $$ HS H
-    ihave #B1 := hb 1941 (KernelSyms.«etext» + 0x795) 0xb0 rfl (by decide) (by decide) $$ HS H
+    ihave #B0 := hb 1940 (KernelSyms.«etext» + 0x794) 0x04 rfl (by decide) (by decide) $$ HS H
+    ihave #B1 := hb 1941 (KernelSyms.«etext» + 0x795) 0xb1 rfl (by decide) (by decide) $$ HS H
     ihave #B2 := hb 1942 (KernelSyms.«etext» + 0x796) 0xff rfl (by decide) (by decide) $$ HS H
     ihave #B3 := hb 1943 (KernelSyms.«etext» + 0x797) 0xff rfl (by decide) (by decide) $$ HS H
     iapply (show wordPointsTo (GF := GF) (BitVec.ofNat 64 (KernelSyms.«etext» + 0x794)) 4 DFrac.discard
-        (bytes4ToWord [0xf6#8, 0xb0#8, 0xff#8, 0xff#8]) ⊢
+        (bytes4ToWord [0x04#8, 0xb1#8, 0xff#8, 0xff#8]) ⊢
         wordPointsTo (argrawTbl + BitVec.ofNat 64 (4 * 5)) 4 DFrac.discard (argrawEntry 5) from by
       unfold argrawTbl argrawEntry; rfl)
     iapply hfour (KernelSyms.«etext» + 0x794) _ _ _ _ (by decide) (by decide) (by decide)

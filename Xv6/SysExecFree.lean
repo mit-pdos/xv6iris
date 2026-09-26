@@ -379,13 +379,13 @@ theorem sys_exec_free_gen (KF : KFREE) (Γ : SchedNames) (k : KCtx) (A : SysExec
 theorem sys_exec_free_ce96 :
     sysExecAddr + 0x96#64 + (2#64 + BitVec.signExtend 64 92#13) = sysExecAddr + 0xf4#64 := by decide
 theorem sys_exec_free_ji96 :
-    sysExecAddr + 0x96#64 + (4#64 + BitVec.signExtend 64 2078076#21) = KA.«kfree» := by decide
+    sysExecAddr + 0x96#64 + (4#64 + BitVec.signExtend 64 2077996#21) = KA.«kfree» := by decide
 theorem sys_exec_free_ret96 : jumpPc (sysExecAddr + 0x96#64 + 8#64) = sysExecAddr + 0x96#64 + 8#64 := by
   decide
 theorem sys_exec_free_ced4 :
     sysExecAddr + 0xd4#64 + (2#64 + BitVec.signExtend 64 12#13) = sysExecAddr + 0xe2#64 := by decide
 theorem sys_exec_free_jid4 :
-    sysExecAddr + 0xd4#64 + (4#64 + BitVec.signExtend 64 2078014#21) = KA.«kfree» := by decide
+    sysExecAddr + 0xd4#64 + (4#64 + BitVec.signExtend 64 2077934#21) = KA.«kfree» := by decide
 theorem sys_exec_free_retd4 : jumpPc (sysExecAddr + 0xd4#64 + 8#64) = sysExecAddr + 0xd4#64 + 8#64 := by
   decide
 
@@ -416,14 +416,14 @@ theorem sys_exec_free_body (KF : KFREE) (Γ : SchedNames) (k : KCtx) (A : SysExe
 /-- **bad:'s free loop, +0x096** (exits +0x0f4 / +0x0a4). -/
 theorem sys_exec_free_bad (KF : KFREE) (Γ : SchedNames) (k : KCtx) (A : SysExecArgs)
     (hS : SysExecStatic k A) : ⊢ sysExecFreeBody (hlc := hlc) (GF := GF) Γ k A 0x96#64 0xf4#64 :=
-  sys_exec_free_body KF Γ k A hS 0x96#64 0xf4#64 92#13 2078076#21 sys_exec_free_ce96
+  sys_exec_free_body KF Γ k A hS 0x96#64 0xf4#64 92#13 2077996#21 sys_exec_free_ce96
     sys_exec_free_ji96 sys_exec_free_ret96 (text_instr _ _ _ _ rfl rfl) (text_instr _ _ _ _ rfl rfl)
     (text_instr _ _ _ _ rfl rfl) (text_instr _ _ _ _ rfl rfl) (text_instr _ _ _ _ rfl rfl)
 
 /-- **The success tail's free loop, +0x0d4** (both exits +0x0e2). -/
 theorem sys_exec_free_succ (KF : KFREE) (Γ : SchedNames) (k : KCtx) (A : SysExecArgs)
     (hS : SysExecStatic k A) : ⊢ sysExecFreeBody (hlc := hlc) (GF := GF) Γ k A 0xd4#64 0xe2#64 :=
-  sys_exec_free_body KF Γ k A hS 0xd4#64 0xe2#64 12#13 2078014#21 sys_exec_free_ced4
+  sys_exec_free_body KF Γ k A hS 0xd4#64 0xe2#64 12#13 2077934#21 sys_exec_free_ced4
     sys_exec_free_jid4 sys_exec_free_retd4 (text_instr _ _ _ _ rfl rfl) (text_instr _ _ _ _ rfl rfl)
     (text_instr _ _ _ _ rfl rfl) (text_instr _ _ _ _ rfl rfl) (text_instr _ _ _ _ rfl rfl)
 

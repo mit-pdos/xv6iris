@@ -19,7 +19,7 @@ unit, the armed post `mkdir_arms`, the whole-function body and the
       return 0;
     }
 
-`KA.«sys_mkdir»` = 0x80005358, 72 bytes / 26 instructions.  An
+`KA.«sys_mkdir»` = 0x800053a8, 72 bytes / 26 instructions.  An
 EIGHTEEN-slot frame: ra @ `sp0-8` (slot 1), s0 @ `sp0-16` (slot 2, the
 frame pointer, = the entry sp) and the low SIXTEEN slots -- `sp0-144 ..
 sp0-16` -- being the `char path[128]` local.  No callee-saved register

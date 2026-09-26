@@ -37,7 +37,7 @@ set_option linter.unusedVariables false
 
 /-! ## Constants -/
 
-theorem sys_fstat_br_argaddr : KA.«sys_fstat» + 0xffffffffffffda0c#64 = KA.«argaddr» := by decide
+theorem sys_fstat_br_argaddr : KA.«sys_fstat» + 0xffffffffffffd9ca#64 = KA.«argaddr» := by decide
 theorem sys_fstat_br_argfd : KA.«sys_fstat» + 0xfffffffffffffce2#64 = KA.«argfd» := by decide
 theorem sys_fstat_br_filestat : KA.«sys_fstat» + 0xfffffffffffff3b0#64 = KA.«filestat» := by decide
 

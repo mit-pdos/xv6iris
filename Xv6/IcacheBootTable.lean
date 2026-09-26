@@ -200,8 +200,8 @@ Rocq mints the pinw leaves' address claims off the boot cells
 come from the kernel map's static half.  The whole itable (`0x1aa8` bytes at
 `KernelSyms.itable`) is kernel read-write data. -/
 
-theorem itable_kmapRw (a : BitVec 64) (h1 : 0x80020958 ≤ a.toNat)
-    (h2 : a.toNat < 0x80020958 + 0x1aa8) : kmapClass (vpnOf a).toNat = some .rw := by
+theorem itable_kmapRw (a : BitVec 64) (h1 : 0x80020b88 ≤ a.toNat)
+    (h2 : a.toNat < 0x80020b88 + 0x1aa8) : kmapClass (vpnOf a).toNat = some .rw := by
   have hv : (vpnOf a).toNat = a.toNat / 4096 % 134217728 := by
     simp only [vpnOf, BitVec.extractLsb'_toNat, Nat.reducePow, Nat.shiftRight_eq_div_pow]
   rw [hv, Nat.mod_eq_of_lt (by omega)]
@@ -209,9 +209,9 @@ theorem itable_kmapRw (a : BitVec 64) (h1 : 0x80020958 ≤ a.toNat)
   rw [if_neg (by omega), if_pos (Or.inl ⟨by omega, by omega⟩)]
 
 theorem ientry_off_toNat (k m : Nat) (hk : k < NINODE) (hm : m < ISLOTSZ) :
-    (ientry k + BitVec.ofNat 64 m).toNat = 0x80020958 + 24 + ISLOTSZ * k + m := by
+    (ientry k + BitVec.ofNat 64 m).toNat = 0x80020b88 + 24 + ISLOTSZ * k + m := by
   have e := ientry_unsigned k (Nat.le_of_lt hk)
-  have hv : KernelSyms.«itable» = 0x80020958 := rfl
+  have hv : KernelSyms.«itable» = 0x80020b88 := rfl
   rw [hv] at e
   have hI : ISLOTSZ = 136 := rfl
   unfold NINODE at hk
@@ -242,8 +242,8 @@ theorem ientry_kmapId [CurCtx] (k m : Nat) (hk : k < NINODE) (hm : m < ISLOTSZ) 
 /-- The itable spinlock's two words. -/
 theorem itableLock_kmapIds [CurCtx] :
     kmapStatic (GF := GF) ⊢ kmapId itableLock ∗ kmapId (itableLock + 16#64) := by
-  have e0 : itableLock.toNat = 0x80020958 := rfl
-  have e16 : (itableLock + 16#64).toNat = 0x80020958 + 16 := by
+  have e0 : itableLock.toNat = 0x80020b88 := rfl
+  have e16 : (itableLock + 16#64).toNat = 0x80020b88 + 16 := by
     rw [BitVec.toNat_add, e0]; rfl
   iintro #HS
   isplitl []

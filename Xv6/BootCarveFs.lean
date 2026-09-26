@@ -110,12 +110,12 @@ theorem bootCarveFs_mainLocksRaw [CurCtx] :
       lockWords itableLockAddr 0#32 0#64 0#64 -∗
       lockWords ftableLockAddr 0#32 0#64 0#64 -∗
       mainLocksRaw := by
-  have hp : pidLockAddr.toNat = 0x80012430 := rfl
-  have hw : waitLockAddr.toNat = 0x80012448 := rfl
-  have ht : tickslockAddr.toNat = 0x80018260 := rfl
-  rw [show MachCSL.KernelSyms.«pid_lock» = 0x80012430 from rfl,
-    show MachCSL.KernelSyms.«wait_lock» = 0x80012448 from rfl,
-    show MachCSL.KernelSyms.«tickslock» = 0x80018260 from rfl]
+  have hp : pidLockAddr.toNat = 0x80012460 := rfl
+  have hw : waitLockAddr.toNat = 0x80012478 := rfl
+  have ht : tickslockAddr.toNat = 0x80018490 := rfl
+  rw [show MachCSL.KernelSyms.«pid_lock» = 0x80012460 from rfl,
+    show MachCSL.KernelSyms.«wait_lock» = 0x80012478 from rfl,
+    show MachCSL.KernelSyms.«tickslock» = 0x80018490 from rfl]
   iintro #Hk Hp Hw Ht Hb Hi Hf
   ihave Hp := bootCarve_lockWords (GF := GF) pidLockAddr _ hp (by omega) (by omega) (by omega) $$ Hk Hp
   ihave Hw := bootCarve_lockWords (GF := GF) waitLockAddr _ hw (by omega) (by omega) (by omega) $$ Hk Hw
@@ -138,16 +138,16 @@ theorem bootCarveFs_mainLocksRaw [CurCtx] :
 theorem bootCarveFs_sb [CurCtx] :
     kmapStatic (GF := GF) ⊢
       bootRan (imgFlat bootImage) MachCSL.KernelSyms.«sb» (MachCSL.KernelSyms.«sb» + 32) -∗ mainSbRaw := by
-  have hA : bcInRam 0x80020938 32 := by unfold bcInRam ramBase ramEnd; omega
-  rw [show MachCSL.KernelSyms.«sb» = 0x80020938 from rfl]
+  have hA : bcInRam 0x80020b68 32 := by unfold bcInRam ramBase ramEnd; omega
+  rw [show MachCSL.KernelSyms.«sb» = 0x80020b68 from rfl]
   iintro #Hk H
-  ihave H := bootImg_bytes_ex (GF := GF) curCtx 0x80020938 32 hA (by omega) $$ Hk H
+  ihave H := bootImg_bytes_ex (GF := GF) curCtx 0x80020b68 32 hA (by omega) $$ Hk H
   icases H with ⟨%bs, %hl, H⟩
   unfold mainSbRaw byteBuf
   iexists bs
   isplitr
   · ipureintro; exact hl
-  rw [show (KA.«sb» : BitVec 64) = BitVec.ofNat 64 0x80020938 from rfl]
+  rw [show (KA.«sb» : BitVec 64) = BitVec.ofNat 64 0x80020b68 from rfl]
   simp only [← wordAtN_cur]
   iexact H
 
@@ -159,31 +159,31 @@ header words, all at the loader's zero. -/
 theorem bootCarveFs_log [CurCtx] :
     kmapStatic (GF := GF) ⊢
       bootRan (imgFlat bootImage) MachCSL.KernelSyms.«log» (MachCSL.KernelSyms.«log» + 168) -∗ mainLogRaw := by
-  have hL : logAddr.toNat = 0x80022400 := rfl
-  have o : ∀ j, j < 168 → (logAddr + BitVec.ofNat 64 j).toNat = 0x80022400 + j :=
+  have hL : logAddr.toNat = 0x80022630 := rfl
+  have o : ∀ j, j < 168 → (logAddr + BitVec.ofNat 64 j).toNat = 0x80022630 + j :=
     fun j _ => bc_toNat_add _ j _ hL (by omega)
-  have a24 : lStart.toNat = 0x80022400 + 24 := o 24 (by omega)
-  have a28 : lOut.toNat = 0x80022400 + 28 := o 28 (by omega)
-  have a32 : lCmt.toNat = 0x80022400 + 32 := o 32 (by omega)
-  have a36 : lDev.toNat = 0x80022400 + 36 := o 36 (by omega)
-  have a40 : lNcommit.toNat = 0x80022400 + 40 := o 40 (by omega)
-  have a44 : lhNAddr.toNat = 0x80022400 + 44 := o 44 (by omega)
-  have hN : 0x80022400 + 168 = (0x80022400 + 48) + 4 * LOGBLOCKS := rfl
-  rw [show MachCSL.KernelSyms.«log» = 0x80022400 from rfl]
+  have a24 : lStart.toNat = 0x80022630 + 24 := o 24 (by omega)
+  have a28 : lOut.toNat = 0x80022630 + 28 := o 28 (by omega)
+  have a32 : lCmt.toNat = 0x80022630 + 32 := o 32 (by omega)
+  have a36 : lDev.toNat = 0x80022630 + 36 := o 36 (by omega)
+  have a40 : lNcommit.toNat = 0x80022630 + 40 := o 40 (by omega)
+  have a44 : lhNAddr.toNat = 0x80022630 + 44 := o 44 (by omega)
+  have hN : 0x80022630 + 168 = (0x80022630 + 48) + 4 * LOGBLOCKS := rfl
+  rw [show MachCSL.KernelSyms.«log» = 0x80022630 from rfl]
   iintro #Hk H
-  icases (bootRan_split (GF := GF) (imgFlat bootImage) 0x80022400 (0x80022400 + 24) (0x80022400 + 168)
+  icases (bootRan_split (GF := GF) (imgFlat bootImage) 0x80022630 (0x80022630 + 24) (0x80022630 + 168)
     (by omega) (by omega)).1 $$ H with ⟨Hl, H⟩
-  icases (bootRan_split (GF := GF) (imgFlat bootImage) (0x80022400 + 24) (0x80022400 + 28) (0x80022400 + 168)
+  icases (bootRan_split (GF := GF) (imgFlat bootImage) (0x80022630 + 24) (0x80022630 + 28) (0x80022630 + 168)
     (by omega) (by omega)).1 $$ H with ⟨Hs, H⟩
-  icases (bootRan_split (GF := GF) (imgFlat bootImage) (0x80022400 + 28) (0x80022400 + 32) (0x80022400 + 168)
+  icases (bootRan_split (GF := GF) (imgFlat bootImage) (0x80022630 + 28) (0x80022630 + 32) (0x80022630 + 168)
     (by omega) (by omega)).1 $$ H with ⟨Ho, H⟩
-  icases (bootRan_split (GF := GF) (imgFlat bootImage) (0x80022400 + 32) (0x80022400 + 36) (0x80022400 + 168)
+  icases (bootRan_split (GF := GF) (imgFlat bootImage) (0x80022630 + 32) (0x80022630 + 36) (0x80022630 + 168)
     (by omega) (by omega)).1 $$ H with ⟨Hc, H⟩
-  icases (bootRan_split (GF := GF) (imgFlat bootImage) (0x80022400 + 36) (0x80022400 + 40) (0x80022400 + 168)
+  icases (bootRan_split (GF := GF) (imgFlat bootImage) (0x80022630 + 36) (0x80022630 + 40) (0x80022630 + 168)
     (by omega) (by omega)).1 $$ H with ⟨Hd, H⟩
-  icases (bootRan_split (GF := GF) (imgFlat bootImage) (0x80022400 + 40) (0x80022400 + 44) (0x80022400 + 168)
+  icases (bootRan_split (GF := GF) (imgFlat bootImage) (0x80022630 + 40) (0x80022630 + 44) (0x80022630 + 168)
     (by omega) (by omega)).1 $$ H with ⟨Hn, H⟩
-  icases (bootRan_split (GF := GF) (imgFlat bootImage) (0x80022400 + 44) (0x80022400 + 48) (0x80022400 + 168)
+  icases (bootRan_split (GF := GF) (imgFlat bootImage) (0x80022630 + 44) (0x80022630 + 48) (0x80022630 + 168)
     (by omega) (by omega)).1 $$ H with ⟨Hh, H⟩
   ihave Hl := bootCarve_lockWords (GF := GF) logAddr _ hL (by omega) (by omega) (by omega) $$ Hk Hl
   ihave Hl := bootCarveFs_lkRaw logAddr _ _ _ $$ Hl
@@ -194,7 +194,7 @@ theorem bootCarveFs_log [CurCtx] :
   ihave Hn := bootBss_wordAt (GF := GF) lNcommit 4 _ _ a40 rfl (by omega) (by omega) (by omega) $$ Hk Hn
   ihave Hh := bootBss_wordAt (GF := GF) lhNAddr 4 _ _ a44 rfl (by omega) (by omega) (by omega) $$ Hk Hh
   rw [hN]
-  ihave H := bootRan_stride (GF := GF) (imgFlat bootImage) (0x80022400 + 48) 4 LOGBLOCKS $$ H
+  ihave H := bootRan_stride (GF := GF) (imgFlat bootImage) (0x80022630 + 48) 4 LOGBLOCKS $$ H
   unfold mainLogRaw
   iframe Hl
   isplitl [Hs Ho Hc Hd Hn Hh]
@@ -205,7 +205,7 @@ theorem bootCarveFs_log [CurCtx] :
   iintro %k %i %hk Hi
   obtain ⟨-, hi⟩ := bootCarveFs_range_get hk
   have hi' : i < 30 := hi
-  have ai : (lhBlock i).toNat = 0x80022400 + 48 + 4 * i := by
+  have ai : (lhBlock i).toNat = 0x80022630 + 48 + 4 * i := by
     have := o (48 + 4 * i) (by omega); unfold lhBlock; omega
   iexists 0#32
   iapply bootBss_wordAt (GF := GF) (lhBlock i) 4 _ _ ai rfl (by omega) (by omega) (by omega) $$ Hk Hi
@@ -215,7 +215,7 @@ theorem bootCarveFs_log [CurCtx] :
 /-- `&itable.inode[k]`, as a number. -/
 def bootCarveFs_ient (k : Nat) : Nat := (MachCSL.KernelSyms.«itable» + 24) + 136 * k
 
-theorem bootCarveFs_ient_val (k : Nat) : bootCarveFs_ient k = 0x80020970 + 136 * k := rfl
+theorem bootCarveFs_ient_val (k : Nat) : bootCarveFs_ient k = 0x80020ba0 + 136 * k := rfl
 
 /-- The dinode mirror's zero. -/
 def bootCarveFs_dinode0 : Dinode := ⟨0#16, 0#16, 0#16, 0#16, 0#32, []⟩
@@ -230,13 +230,13 @@ theorem bootCarveFs_inodeEntry [CurCtx] (k : Nat) (hk : k < NINODE) :
   have hB := bootCarveFs_ient_val k
   have hkN : k < 50 := hk
   -- the numeric side conditions FIRST: `omega` is slow once the address facts are in scope
-  have lo : ∀ o, 0x8000a330 ≤ bootCarveFs_ient k + o := fun o => by omega
-  have hi : ∀ o n, o + n ≤ 136 → bootCarveFs_ient k + o + n ≤ 0x80023640 := fun o n h => by omega
+  have lo : ∀ o, 0x8000a360 ≤ bootCarveFs_ient k + o := fun o => by omega
+  have hi : ∀ o n, o + n ≤ 136 → bootCarveFs_ient k + o + n ≤ 0x80023870 := fun o n h => by omega
   have al2 : ∀ o, o % 2 = 0 → (bootCarveFs_ient k + o) % 2 = 0 := fun o h => by omega
   have al4 : ∀ o, o % 4 = 0 → (bootCarveFs_ient k + o) % 4 = 0 := fun o h => by omega
   have al8 : ∀ o, o % 8 = 0 → (bootCarveFs_ient k + o) % 8 = 0 := fun o h => by omega
-  have loA : ∀ j, 0x8000a330 ≤ bootCarveFs_ient k + 80 + 4 * j := fun j => by omega
-  have hiA : ∀ j, j < 13 → bootCarveFs_ient k + 80 + 4 * j + 4 ≤ 0x80023640 := fun j h => by omega
+  have loA : ∀ j, 0x8000a360 ≤ bootCarveFs_ient k + 80 + 4 * j := fun j => by omega
+  have hiA : ∀ j, j < 13 → bootCarveFs_ient k + 80 + 4 * j + 4 ≤ 0x80023870 := fun j h => by omega
   have alA : ∀ j, (bootCarveFs_ient k + 80 + 4 * j) % 4 = 0 := fun j => by omega
   have hbo : bootCarveFs_ient k + 16 + 120 < 2 ^ 64 := by omega
   have hbi : bootCarveFs_ient k + 136 < 2 ^ 64 := by omega
@@ -247,7 +247,7 @@ theorem bootCarveFs_inodeEntry [CurCtx] (k : Nat) (hk : k < NINODE) :
     rw [ientry_unsigned k (Nat.le_of_lt hk)]; rfl
   have o : ∀ j, j < 136 → (ientry k + BitVec.ofNat 64 j).toNat = bootCarveFs_ient k + j :=
     fun j hj => bc_toNat_add _ j _ e0 (Nat.lt_of_le_of_lt (Nat.add_le_add_left (Nat.le_of_lt hj) _) hbi)
-  have eL0 : (MachCSL.KA.«itable» + 0x28#64).toNat = 0x80020980 := rfl
+  have eL0 : (MachCSL.KA.«itable» + 0x28#64).toNat = 0x80020bb0 := rfl
   have eL : (inodeAddr k).toNat = bootCarveFs_ient k + 16 := by
     unfold inodeAddr; rw [bc_toNat_add _ (136 * k) _ eL0 (by omega)]; omega
   have ol : ∀ j, j < 120 → (inodeAddr k + BitVec.ofNat 64 j).toNat = bootCarveFs_ient k + 16 + j :=
@@ -358,23 +358,23 @@ theorem bootCarveFs_itable [CurCtx] :
       lockWords itableLockAddr 0#32 0#64 0#64 ∗
       ([∗list] i ∈ List.range NINODE, sleepLockIn (inodeAddr i)) ∗
       ([∗list] k ∈ List.range NINODE, ientryRaw k) := by
-  have hI : MachCSL.KernelSyms.«itable» = 0x80020958 := rfl
-  have hlk : itableLockAddr.toNat = 0x80020958 := rfl
-  have hN : 0x80020958 + 0x1aa8 = (0x80020958 + 24) + 136 * NINODE := rfl
+  have hI : MachCSL.KernelSyms.«itable» = 0x80020b88 := rfl
+  have hlk : itableLockAddr.toNat = 0x80020b88 := rfl
+  have hN : 0x80020b88 + 0x1aa8 = (0x80020b88 + 24) + 136 * NINODE := rfl
   rw [hI]
   iintro #Hk H
-  icases (bootRan_split (GF := GF) (imgFlat bootImage) 0x80020958 (0x80020958 + 24) (0x80020958 + 0x1aa8)
+  icases (bootRan_split (GF := GF) (imgFlat bootImage) 0x80020b88 (0x80020b88 + 24) (0x80020b88 + 0x1aa8)
     (by omega) (by omega)).1 $$ H with ⟨Hl, H⟩
   ihave Hl := bootCarve_lockWords (GF := GF) itableLockAddr _ hlk (by omega) (by omega) (by omega) $$ Hk Hl
   iframe Hl
   rw [hN]
-  ihave H := bootRan_stride (GF := GF) (imgFlat bootImage) (0x80020958 + 24) 136 NINODE $$ H
+  ihave H := bootRan_stride (GF := GF) (imgFlat bootImage) (0x80020b88 + 24) 136 NINODE $$ H
   iapply BigSepL.bigSepL_sep_eqv.1
   iapply BigSepL.bigSepL_impl $$ H
   imodintro
   iintro %n %k %hk Hi
   obtain ⟨-, hk'⟩ := bootCarveFs_range_get hk
-  have e : 0x80020958 + 24 + 136 * k = bootCarveFs_ient k := by unfold bootCarveFs_ient; rw [hI]
+  have e : 0x80020b88 + 24 + 136 * k = bootCarveFs_ient k := by unfold bootCarveFs_ient; rw [hI]
   rw [e]
   iapply bootCarveFs_inodeEntry k hk' $$ Hk Hi
 
@@ -405,33 +405,33 @@ theorem bootCarveFs_bcache [CurCtx] (ξ : CtxId) :
 /-! ## The virtio disk's `.bss` -/
 
 /-- `&disk`, as a number. -/
-theorem bootCarveFs_disk_val : MachCSL.KernelSyms.«disk» = 0x80023500 := rfl
+theorem bootCarveFs_disk_val : MachCSL.KernelSyms.«disk» = 0x80023730 := rfl
 
-theorem bootCarveFs_diskAddr (o : Nat) (ho : o < 0x140) : (diskAddr o).toNat = 0x80023500 + o := by
+theorem bootCarveFs_diskAddr (o : Nat) (ho : o < 0x140) : (diskAddr o).toNat = 0x80023730 + o := by
   unfold diskAddr
   exact bc_toNat_add _ o _ rfl (by omega)
 
 /-- One `info[i]` pair, out of its 16-byte slot: `b` and `status`, zero. -/
 theorem bootCarveFs_diskInfo [CurCtx] (i : Nat) (hi : i < NUM) :
     kmapStatic (GF := GF) ⊢
-      bootRan (imgFlat bootImage) (0x80023500 + 40 + 16 * i) (0x80023500 + 40 + 16 * i + 16) -∗
+      bootRan (imgFlat bootImage) (0x80023730 + 40 + 16 * i) (0x80023730 + 40 + 16 * i + 16) -∗
       wordPointsTo (aInfoB i) 8 (DFrac.own 1) (0 : BitVec (8 * 8)) ∗
       wordPointsTo (aInfoStatus i) 1 (DFrac.own 1) (0 : BitVec (8 * 1)) := by
   have hi8 : i < 8 := hi
-  have hlo : 0x8000a330 ≤ 0x80023500 + 40 + 16 * i := by omega
-  have hhi1 : 0x80023500 + 40 + 16 * i + 8 ≤ 0x80023640 := by omega
-  have hhi2 : 0x80023500 + 40 + 16 * i + 8 + 1 ≤ 0x80023640 := by omega
-  have hal : (0x80023500 + 40 + 16 * i) % 8 = 0 := by omega
-  have hlo2 : 0x8000a330 ≤ 0x80023500 + 40 + 16 * i + 8 := by omega
-  have ab : (aInfoB i).toNat = 0x80023500 + 40 + 16 * i := by
+  have hlo : 0x8000a360 ≤ 0x80023730 + 40 + 16 * i := by omega
+  have hhi1 : 0x80023730 + 40 + 16 * i + 8 ≤ 0x80023870 := by omega
+  have hhi2 : 0x80023730 + 40 + 16 * i + 8 + 1 ≤ 0x80023870 := by omega
+  have hal : (0x80023730 + 40 + 16 * i) % 8 = 0 := by omega
+  have hlo2 : 0x8000a360 ≤ 0x80023730 + 40 + 16 * i + 8 := by omega
+  have ab : (aInfoB i).toNat = 0x80023730 + 40 + 16 * i := by
     unfold aInfoB dOffInfo infoSize; rw [bootCarveFs_diskAddr _ (by omega)]; omega
-  have asec : (aInfoStatus i).toNat = 0x80023500 + 40 + 16 * i + 8 := by
+  have asec : (aInfoStatus i).toNat = 0x80023730 + 40 + 16 * i + 8 := by
     unfold aInfoStatus dOffInfo infoSize; rw [bootCarveFs_diskAddr _ (by omega)]; omega
   iintro #Hk H
-  icases (bootRan_split (GF := GF) (imgFlat bootImage) (0x80023500 + 40 + 16 * i) (0x80023500 + 40 + 16 * i + 8)
-    (0x80023500 + 40 + 16 * i + 16) (by omega) (by omega)).1 $$ H with ⟨Hb, H⟩
-  icases (bootRan_split (GF := GF) (imgFlat bootImage) (0x80023500 + 40 + 16 * i + 8) (0x80023500 + 40 + 16 * i + 8 + 1)
-    (0x80023500 + 40 + 16 * i + 16) (by omega) (by omega)).1 $$ H with ⟨Hs, -⟩
+  icases (bootRan_split (GF := GF) (imgFlat bootImage) (0x80023730 + 40 + 16 * i) (0x80023730 + 40 + 16 * i + 8)
+    (0x80023730 + 40 + 16 * i + 16) (by omega) (by omega)).1 $$ H with ⟨Hb, H⟩
+  icases (bootRan_split (GF := GF) (imgFlat bootImage) (0x80023730 + 40 + 16 * i + 8) (0x80023730 + 40 + 16 * i + 8 + 1)
+    (0x80023730 + 40 + 16 * i + 16) (by omega) (by omega)).1 $$ H with ⟨Hs, -⟩
   ihave Hb := bootBss_wordAt (GF := GF) _ 8 _ _ ab rfl hlo hhi1 hal $$ Hk Hb
   ihave Hs := bootBss_wordAt (GF := GF) _ 1 _ _ asec rfl hlo2 hhi2 (Nat.mod_one _) $$ Hk Hs
   iframe Hb Hs
@@ -440,23 +440,23 @@ theorem bootCarveFs_diskInfo [CurCtx] (i : Nat) (hi : i < NUM) :
 doubleword and the sector, zero. -/
 theorem bootCarveFs_diskOps [CurCtx] (i : Nat) (hi : i < NUM) :
     kmapStatic (GF := GF) ⊢
-      bootRan (imgFlat bootImage) (0x80023500 + 168 + 16 * i) (0x80023500 + 168 + 16 * i + 16) -∗
+      bootRan (imgFlat bootImage) (0x80023730 + 168 + 16 * i) (0x80023730 + 168 + 16 * i + 16) -∗
       wordPointsTo (aOps i) 8 (DFrac.own 1) (0 : BitVec (8 * 8)) ∗
       wordPointsTo (aOpsSector i) 8 (DFrac.own 1) (0 : BitVec (8 * 8)) := by
   have hi8 : i < 8 := hi
-  have hlo : 0x8000a330 ≤ 0x80023500 + 168 + 16 * i := by omega
-  have hhi1 : 0x80023500 + 168 + 16 * i + 8 ≤ 0x80023640 := by omega
-  have hhi2 : 0x80023500 + 168 + 16 * i + 8 + 8 ≤ 0x80023640 := by omega
-  have hal1 : (0x80023500 + 168 + 16 * i) % 8 = 0 := by omega
-  have hal2 : (0x80023500 + 168 + 16 * i + 8) % 8 = 0 := by omega
-  have hlo2 : 0x8000a330 ≤ 0x80023500 + 168 + 16 * i + 8 := by omega
-  have ao : (aOps i).toNat = 0x80023500 + 168 + 16 * i := by
+  have hlo : 0x8000a360 ≤ 0x80023730 + 168 + 16 * i := by omega
+  have hhi1 : 0x80023730 + 168 + 16 * i + 8 ≤ 0x80023870 := by omega
+  have hhi2 : 0x80023730 + 168 + 16 * i + 8 + 8 ≤ 0x80023870 := by omega
+  have hal1 : (0x80023730 + 168 + 16 * i) % 8 = 0 := by omega
+  have hal2 : (0x80023730 + 168 + 16 * i + 8) % 8 = 0 := by omega
+  have hlo2 : 0x8000a360 ≤ 0x80023730 + 168 + 16 * i + 8 := by omega
+  have ao : (aOps i).toNat = 0x80023730 + 168 + 16 * i := by
     unfold aOps dOffOps opsSize; rw [bootCarveFs_diskAddr _ (by omega)]; omega
-  have asec : (aOpsSector i).toNat = 0x80023500 + 168 + 16 * i + 8 := by
+  have asec : (aOpsSector i).toNat = 0x80023730 + 168 + 16 * i + 8 := by
     unfold aOpsSector dOffOps opsSize; rw [bootCarveFs_diskAddr _ (by omega)]; omega
   iintro #Hk H
-  icases (bootRan_split (GF := GF) (imgFlat bootImage) (0x80023500 + 168 + 16 * i) (0x80023500 + 168 + 16 * i + 8)
-    (0x80023500 + 168 + 16 * i + 16) (by omega) (by omega)).1 $$ H with ⟨Ho, Hs⟩
+  icases (bootRan_split (GF := GF) (imgFlat bootImage) (0x80023730 + 168 + 16 * i) (0x80023730 + 168 + 16 * i + 8)
+    (0x80023730 + 168 + 16 * i + 16) (by omega) (by omega)).1 $$ H with ⟨Ho, Hs⟩
   ihave Ho := bootBss_wordAt (GF := GF) _ 8 _ _ ao rfl hlo hhi1 hal1 $$ Hk Ho
   ihave Hs := bootBss_wordAt (GF := GF) _ 8 _ _ asec rfl hlo2 hhi2 hal2 $$ Hk Hs
   iframe Ho Hs
@@ -470,44 +470,44 @@ theorem bootCarveFs_disk [CurCtx] :
       bootRan (imgFlat bootImage) MachCSL.KernelSyms.«disk» (MachCSL.KernelSyms.«disk» + 0x140) -∗
       diskInitCells 0#32 0#64 0#64 0#64 0#64 0#64 (List.replicate NUM 0#8) := by
   have hN : NUM = 8 := rfl
-  have aD : aDescPtr.toNat = 0x80023500 := rfl
-  have aA : aAvailPtr.toNat = 0x80023500 + 8 := rfl
-  have aU : aUsedPtr.toNat = 0x80023500 + 16 := rfl
-  have aI : aUsedIdx.toNat = 0x80023500 + 32 := rfl
-  have aL : aVdiskLock.toNat = 0x80023500 + 296 := rfl
-  have aF0 : (aFree 0).toNat = 0x80023500 + 24 := rfl
-  have aF : ∀ j, j < 8 → (aFree 0 + BitVec.ofNat 64 j).toNat = 0x80023500 + 24 + 1 * j := by
+  have aD : aDescPtr.toNat = 0x80023730 := rfl
+  have aA : aAvailPtr.toNat = 0x80023730 + 8 := rfl
+  have aU : aUsedPtr.toNat = 0x80023730 + 16 := rfl
+  have aI : aUsedIdx.toNat = 0x80023730 + 32 := rfl
+  have aL : aVdiskLock.toNat = 0x80023730 + 296 := rfl
+  have aF0 : (aFree 0).toNat = 0x80023730 + 24 := rfl
+  have aF : ∀ j, j < 8 → (aFree 0 + BitVec.ofNat 64 j).toNat = 0x80023730 + 24 + 1 * j := by
     intro j hj; rw [bc_toNat_add _ j _ aF0 (by omega)]; omega
-  have e40 : 0x80023500 + 168 = (0x80023500 + 40) + 16 * NUM := rfl
-  have e168 : 0x80023500 + 296 = (0x80023500 + 168) + 16 * NUM := rfl
-  have e24 : 0x80023500 + 32 = (0x80023500 + 24) + 1 * NUM := rfl
+  have e40 : 0x80023730 + 168 = (0x80023730 + 40) + 16 * NUM := rfl
+  have e168 : 0x80023730 + 296 = (0x80023730 + 168) + 16 * NUM := rfl
+  have e24 : 0x80023730 + 32 = (0x80023730 + 24) + 1 * NUM := rfl
   rw [bootCarveFs_disk_val]
   iintro #Hk H
-  icases (bootRan_split (GF := GF) (imgFlat bootImage) 0x80023500 (0x80023500 + 8) (0x80023500 + 0x140)
+  icases (bootRan_split (GF := GF) (imgFlat bootImage) 0x80023730 (0x80023730 + 8) (0x80023730 + 0x140)
     (by omega) (by omega)).1 $$ H with ⟨Hd, H⟩
-  icases (bootRan_split (GF := GF) (imgFlat bootImage) (0x80023500 + 8) (0x80023500 + 16) (0x80023500 + 0x140)
+  icases (bootRan_split (GF := GF) (imgFlat bootImage) (0x80023730 + 8) (0x80023730 + 16) (0x80023730 + 0x140)
     (by omega) (by omega)).1 $$ H with ⟨Ha, H⟩
-  icases (bootRan_split (GF := GF) (imgFlat bootImage) (0x80023500 + 16) (0x80023500 + 24) (0x80023500 + 0x140)
+  icases (bootRan_split (GF := GF) (imgFlat bootImage) (0x80023730 + 16) (0x80023730 + 24) (0x80023730 + 0x140)
     (by omega) (by omega)).1 $$ H with ⟨Hu, H⟩
-  icases (bootRan_split (GF := GF) (imgFlat bootImage) (0x80023500 + 24) (0x80023500 + 32) (0x80023500 + 0x140)
+  icases (bootRan_split (GF := GF) (imgFlat bootImage) (0x80023730 + 24) (0x80023730 + 32) (0x80023730 + 0x140)
     (by omega) (by omega)).1 $$ H with ⟨Hf, H⟩
-  icases (bootRan_split (GF := GF) (imgFlat bootImage) (0x80023500 + 32) (0x80023500 + 34) (0x80023500 + 0x140)
+  icases (bootRan_split (GF := GF) (imgFlat bootImage) (0x80023730 + 32) (0x80023730 + 34) (0x80023730 + 0x140)
     (by omega) (by omega)).1 $$ H with ⟨Hx, H⟩
-  icases (bootRan_split (GF := GF) (imgFlat bootImage) (0x80023500 + 34) (0x80023500 + 40) (0x80023500 + 0x140)
+  icases (bootRan_split (GF := GF) (imgFlat bootImage) (0x80023730 + 34) (0x80023730 + 40) (0x80023730 + 0x140)
     (by omega) (by omega)).1 $$ H with ⟨-, H⟩
-  icases (bootRan_split (GF := GF) (imgFlat bootImage) (0x80023500 + 40) (0x80023500 + 168) (0x80023500 + 0x140)
+  icases (bootRan_split (GF := GF) (imgFlat bootImage) (0x80023730 + 40) (0x80023730 + 168) (0x80023730 + 0x140)
     (by omega) (by omega)).1 $$ H with ⟨Hi, H⟩
-  icases (bootRan_split (GF := GF) (imgFlat bootImage) (0x80023500 + 168) (0x80023500 + 296) (0x80023500 + 0x140)
+  icases (bootRan_split (GF := GF) (imgFlat bootImage) (0x80023730 + 168) (0x80023730 + 296) (0x80023730 + 0x140)
     (by omega) (by omega)).1 $$ H with ⟨Ho, Hl⟩
   ihave Hd := bootBss_wordAt (GF := GF) _ 8 _ _ aD rfl (by omega) (by omega) (by omega) $$ Hk Hd
   ihave Ha := bootBss_wordAt (GF := GF) _ 8 _ _ aA rfl (by omega) (by omega) (by omega) $$ Hk Ha
   ihave Hu := bootBss_wordAt (GF := GF) _ 8 _ _ aU rfl (by omega) (by omega) (by omega) $$ Hk Hu
   ihave Hx := bootBss_wordAt (GF := GF) _ 2 _ _ aI rfl (by omega) (by omega) (by omega) $$ Hk Hx
-  rw [show 0x80023500 + 0x140 = (0x80023500 + 296) + 24 from rfl]
+  rw [show 0x80023730 + 0x140 = (0x80023730 + 296) + 24 from rfl]
   ihave Hl := bootCarve_lockWords (GF := GF) aVdiskLock _ aL (by omega) (by omega) (by omega) $$ Hk Hl
-  ihave Hf := bootCarveFs_stride (GF := GF) (imgFlat bootImage) (0x80023500 + 24) 1 NUM _ e24 $$ Hf
-  ihave Hi := bootCarveFs_stride (GF := GF) (imgFlat bootImage) (0x80023500 + 40) 16 NUM _ e40 $$ Hi
-  ihave Ho := bootCarveFs_stride (GF := GF) (imgFlat bootImage) (0x80023500 + 168) 16 NUM _ e168 $$ Ho
+  ihave Hf := bootCarveFs_stride (GF := GF) (imgFlat bootImage) (0x80023730 + 24) 1 NUM _ e24 $$ Hf
+  ihave Hi := bootCarveFs_stride (GF := GF) (imgFlat bootImage) (0x80023730 + 40) 16 NUM _ e40 $$ Hi
+  ihave Ho := bootCarveFs_stride (GF := GF) (imgFlat bootImage) (0x80023730 + 168) 16 NUM _ e168 $$ Ho
   unfold diskInitCells lockWords byteBuf
   icases Hl with ⟨Hl1, Hl2, Hl3, Hl4, Hl5⟩
   iframe Hd Ha Hu Hx Hl1 Hl2 Hl3 Hl4 Hl5

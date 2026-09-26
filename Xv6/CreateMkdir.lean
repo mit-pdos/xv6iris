@@ -1918,10 +1918,10 @@ theorem create_mkdir_dotdot (DLK : DIRLINK) (Γ : SchedNames) [ClaimIs (hlc := h
   ihave Hcinum : wordPointsTo (iInum (ientry kslot)) 4 (DFrac.own (1 : Qp).half) cinum $$ [Hcinum]
   · unfold iInum; iexact Hcinum
   -- ===== +0x110  auipc a1,0x3 ; +0x114  addi a1,a1,-1994 : a1 = ".." =====
-  k_step_e (wp_s_auipc cpu _ (KA.«create» + 0x110#64) false 3#20 11#5 (by decide))
+  k_step_e (wp_s_auipc cpu _ (KA.«create» + 0x110#64) false 2#20 11#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
-  k_step_e (wp_s_addi cpu _ (KA.«create» + 0x114#64) false 2112#12 11#5 11#5 (by decide))
+  k_step_e (wp_s_addi cpu _ (KA.«create» + 0x114#64) false 2032#12 11#5 11#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
   -- ===== +0x118  c.mv a0,s3 : the CHILD =====
@@ -2186,10 +2186,10 @@ theorem create_mkdir_dot (DLK : DIRLINK) (Γ : SchedNames) [ClaimIs (hlc := hlc)
   ihave Hinum : wordPointsTo (iInum (ientry kd)) 4 (DFrac.own (1 : Qp).half) dind $$ [Hinum]
   · unfold iInum; iexact Hinum
   -- ===== +0xfc  auipc a1,0x3 ; +0x100  addi a1,a1,-1982 : a1 = "." =====
-  k_step_e (wp_s_auipc cpu _ (KA.«create» + 0xfc#64) false 3#20 11#5 (by decide))
+  k_step_e (wp_s_auipc cpu _ (KA.«create» + 0xfc#64) false 2#20 11#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
-  k_step_e (wp_s_addi cpu _ (KA.«create» + 0x100#64) false 2124#12 11#5 11#5 (by decide))
+  k_step_e (wp_s_addi cpu _ (KA.«create» + 0x100#64) false 2044#12 11#5 11#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
   -- ===== +0x104  c.mv a0,s3 : the CHILD =====

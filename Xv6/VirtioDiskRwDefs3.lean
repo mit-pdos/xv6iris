@@ -647,7 +647,7 @@ end rules
 /-! ## Addresses of the P3/P4 region -/
 
 /-- `&disk`, out of `auipc a5,0x1e; addi a5,a5,-1408` at `+0xcc`. -/
-theorem vdrw3_disk_addr : KA.«virtio_disk_rw» + 0x1db4c#64 = KA.«disk» := by decide
+theorem vdrw3_disk_addr : KA.«virtio_disk_rw» + 0x1dd2c#64 = KA.«disk» := by decide
 
 /-- `slli rd,rs,4` on a descriptor index. -/
 theorem vdrw3_shl4 (i : Nat) : BitVec.ofNat 64 i <<< 4 = BitVec.ofNat 64 (16 * i) := by

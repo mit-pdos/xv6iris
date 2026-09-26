@@ -28,7 +28,7 @@ set_option linter.unusedSimpArgs false
 set_option linter.unusedVariables false
 
 theorem ba_br_bread : KA.«balloc» + 0xFFFFFFFFFFFFFE0C#64 = KA.«bread» := by decide
-theorem ba_br_memset : KA.«balloc» + 0xffffffffffffdece#64 = KA.«memset» := by decide
+theorem ba_br_memset : KA.«balloc» + 0xffffffffffffde7e#64 = KA.«memset» := by decide
 theorem ba_br_logwrite : KA.«balloc» + 0x10BC#64 = KA.«log_write» := by decide
 theorem ba_ret_54 : jumpPc (KA.«balloc» + 0x54#64) = KA.«balloc» + 0x54#64 := by decide
 theorem ba_ret_64 : jumpPc (KA.«balloc» + 0x64#64) = KA.«balloc» + 0x64#64 := by decide
@@ -101,7 +101,7 @@ theorem ba_bzero_fill (LW : LOG_WRITE) (BE : BRELSE) (MS : MEMSET)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [ha0kk]
   iintro Hk Hpc
   -- +0x60  jal memset
-  k_step_e (wp_s_jal cpu _ (KA.«balloc» + 0x60#64) false 2088558#21 1#5 (by decide))
+  k_step_e (wp_s_jal cpu _ (KA.«balloc» + 0x60#64) false 2088478#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [ba_br_memset]
   iintro Hk Hpc
   iapply (memset_zero_call MS cpu _ bs2 (aBufData (bnode kk2)) BSIZE (by unfold BSIZE; omega)

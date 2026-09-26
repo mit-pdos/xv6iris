@@ -69,22 +69,22 @@ theorem spj_2ab4 : jumpPc (KA.«sys_pause» + 0xa8#64) = (KA.«sys_pause» + 0xa
 /-! ## Addresses -/
 
 theorem sp_lk_2a26 :
-    KA.«sys_pause» + 0x157a0#64 = tickslockAddr := by
+    KA.«sys_pause» + 0x159ae#64 = tickslockAddr := by
   unfold tickslockAddr; decide
 theorem sp_lk_2a4e :
-    KA.«sys_pause» + 0x157a0#64 = tickslockAddr := by
+    KA.«sys_pause» + 0x159ae#64 = tickslockAddr := by
   unfold tickslockAddr; decide
 theorem sp_lk_2a8c :
-    KA.«sys_pause» + 0x157a0#64 = tickslockAddr := by
+    KA.«sys_pause» + 0x159ae#64 = tickslockAddr := by
   unfold tickslockAddr; decide
 theorem sp_lk_2aa8 :
-    KA.«sys_pause» + 0x157a0#64 = tickslockAddr := by
+    KA.«sys_pause» + 0x159ae#64 = tickslockAddr := by
   unfold tickslockAddr; decide
 theorem sp_tk_2a42 :
-    KA.«sys_pause» + 0x7888#64 = ticksAddr := by
+    KA.«sys_pause» + 0x7896#64 = ticksAddr := by
   unfold ticksAddr; decide
 theorem sp_tk_2a46 :
-    KA.«sys_pause» + 0x7888#64 = ticksAddr := by
+    KA.«sys_pause» + 0x7896#64 = ticksAddr := by
   unfold ticksAddr; decide
 
 theorem sp_ticks_nz : ticksAddr ≠ 0#64 := by unfold ticksAddr; decide
@@ -500,12 +500,12 @@ end
 section
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [X : CurCtx]
 
-theorem sys_pause_br_ffffffffffffe220 : KA.«sys_pause» + 0xffffffffffffe220#64 = KA.«release» := by decide
+theorem sys_pause_br_ffffffffffffe1fe : KA.«sys_pause» + 0xffffffffffffe1fe#64 = KA.«release» := by decide
 
-theorem sys_pause_br_157a0 : KA.«sys_pause» + 0x157a0#64 = tickslockAddr := by decide
+theorem sys_pause_br_159ae : KA.«sys_pause» + 0x159ae#64 = tickslockAddr := by decide
 
 set_option maxHeartbeats 8000000 in
-/-- `0x80002b40`: `release(&tickslock); return 0`. -/
+/-- `0x80002b62`: `release(&tickslock); return 0`. -/
 theorem sp_ret0 (RE : RELEASE) (cpu : CPU) (k kb : KCtx) (hb : SpBase k kb) (γt : GName)
     (j : Nat) (tfp : BitVec 44) (ws : List (BitVec 64)) (dqt : DFrac)
     (hj : j < NPROC) (hkproc : k.proc = procAddr j)
@@ -526,14 +526,14 @@ theorem sp_ret0 (RE : RELEASE) (cpu : CPU) (k kb : KCtx) (hb : SpBase k kb) (γt
   icases armExt_split cpu kb.sie k.proc $$ [$Htc $Hcl $Hir] with ⟨Harm, Hte, Hce⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
   -- auipc a0,0x15 ; addi a0,a0,1836 ; jal release
-  k_step (wp_s_auipc cpu _ (KA.«sys_pause» + 0x80#64) false 0x15#20 10#5 (by decide))
+  k_step (wp_s_auipc cpu _ (KA.«sys_pause» + 0x80#64) false 0x16#20 10#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
-  k_step (wp_s_addi cpu _ (KA.«sys_pause» + 0x84#64) false 1824#12 10#5 10#5 (by decide))
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [sys_pause_br_157a0, sp_lk_2a8c]
+  k_step (wp_s_addi cpu _ (KA.«sys_pause» + 0x84#64) false 2350#12 10#5 10#5 (by decide))
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [sys_pause_br_159ae, sp_lk_2a8c]
   iintro Hk Hpc
-  k_step (wp_s_jal cpu _ (KA.«sys_pause» + 0x88#64) false 2089368#21 1#5 (by decide))
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [sys_pause_br_ffffffffffffe220]
+  k_step (wp_s_jal cpu _ (KA.«sys_pause» + 0x88#64) false 2089334#21 1#5 (by decide))
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [sys_pause_br_ffffffffffffe1fe]
   iintro Hk Hpc
   iapply (sp_release RE cpu _ γt ?ha0 ?hsr ?hnr ?hKr kb.sie k.proc ?hpr ?hrr ?hor)
     $$ [- $Hk $Hpc $Hlk $Hlocked $Hpay $Harm]
@@ -575,7 +575,7 @@ theorem sp_ret0 (RE : RELEASE) (cpu : CPU) (k kb : KCtx) (hb : SpBase k kb) (γt
     k_norm_g; rw [hon]; unfold sysPauseSlots sleepSlots at hK; omega
 
 set_option maxHeartbeats 8000000 in
-/-- `0x80002b5c`: `release(&tickslock); return -1`, restoring `s1..s3`. -/
+/-- `0x80002b7e`: `release(&tickslock); return -1`, restoring `s1..s3`. -/
 theorem sp_retm1 (RE : RELEASE) (cpu : CPU) (k kb : KCtx) (hb : SpBase k kb) (γt : GName)
     (j : Nat) (tfp : BitVec 44) (ws : List (BitVec 64)) (dqt : DFrac)
     (hj : j < NPROC) (hkproc : k.proc = procAddr j)
@@ -599,14 +599,14 @@ theorem sp_retm1 (RE : RELEASE) (cpu : CPU) (k kb : KCtx) (hb : SpBase k kb) (γ
   icases armExt_split cpu kb.sie k.proc $$ [$Htc $Hcl $Hir] with ⟨Harm, Hte, Hce⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
   -- auipc a0,0x15 ; addi a0,a0,1808 ; jal release
-  k_step (wp_s_auipc cpu _ (KA.«sys_pause» + 0x9c#64) false 0x15#20 10#5 (by decide))
+  k_step (wp_s_auipc cpu _ (KA.«sys_pause» + 0x9c#64) false 0x16#20 10#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
-  k_step (wp_s_addi cpu _ (KA.«sys_pause» + 0xa0#64) false 1796#12 10#5 10#5 (by decide))
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [sys_pause_br_157a0, sp_lk_2aa8]
+  k_step (wp_s_addi cpu _ (KA.«sys_pause» + 0xa0#64) false 2322#12 10#5 10#5 (by decide))
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [sys_pause_br_159ae, sp_lk_2aa8]
   iintro Hk Hpc
-  k_step (wp_s_jal cpu _ (KA.«sys_pause» + 0xa4#64) false 2089340#21 1#5 (by decide))
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [sys_pause_br_ffffffffffffe220]
+  k_step (wp_s_jal cpu _ (KA.«sys_pause» + 0xa4#64) false 2089306#21 1#5 (by decide))
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [sys_pause_br_ffffffffffffe1fe]
   iintro Hk Hpc
   iapply (sp_release RE cpu _ γt ?ha0 ?hsr ?hnr ?hKr kb.sie k.proc ?hpr ?hrr ?hor)
     $$ [- $Hk $Hpc $Hlk $Hlocked $Hpay $Harm]
@@ -640,7 +640,7 @@ theorem sp_retm1 (RE : RELEASE) (cpu : CPU) (k kb : KCtx) (hb : SpBase k kb) (γ
         (DFrac.own 1) (k.regs 19#5))
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [e2]
     iintro Hk Hpc F4
-    -- c.j 0x80002b4e
+    -- c.j 0x80002b70
     k_step_e (wp_s_j cpu _ (KA.«sys_pause» + 0xb0#64) true 2097118#21)
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
     iintro Hk Hpc
@@ -681,7 +681,7 @@ end
 section
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [X : CurCtx]
 
-/-- The loop invariant at `0x80002b0a`: the lock held, the counter reading
+/-- The loop invariant at `0x80002b2c`: the lock held, the counter reading
 `t0` in `s3`, `&ticks` in `s2`, `&tickslock` in `s1`. -/
 def spLoop (k kb : KCtx) (γt : GName) (j : Nat) (tfp : BitVec 44)
     (ws : List (BitVec 64)) (dqt : DFrac) (t0 nn lo : BitVec 32) (v4 v6 : BitVec 64) :
@@ -731,14 +731,14 @@ theorem spLoop_intro (k kb : KCtx) (γt : GName) (j : Nat) (tfp : BitVec 44)
   unfold spLoop; iintro H; iexact H
 
 set_option maxHeartbeats 16000000 in
-/-- From `0x80002b14` (not killed): `sleep_prepare(&ticks); release; sleep;
+/-- From `0x80002b36` (not killed): `sleep_prepare(&ticks); release; sleep;
 acquire`, then the `ticks - ticks0 < n` test -- the back edge into the Löb
 hypothesis, or the loop exit at `(KernelSyms.«sys_pause» + 0x7a)`. -/
-theorem sys_pause_br_ffffffffffffe198 : KA.«sys_pause» + 0xffffffffffffe198#64 = KA.«acquire» := by decide
+theorem sys_pause_br_ffffffffffffe176 : KA.«sys_pause» + 0xffffffffffffe176#64 = KA.«acquire» := by decide
 
-theorem sys_pause_br_fffffffffffff542 : KA.«sys_pause» + 0xfffffffffffff542#64 = KA.«sleep» := by decide
+theorem sys_pause_br_fffffffffffff52e : KA.«sys_pause» + 0xfffffffffffff52e#64 = KA.«sleep» := by decide
 
-theorem sys_pause_br_fffffffffffff506 : KA.«sys_pause» + 0xfffffffffffff506#64 = KA.«sleep_prepare» := by decide
+theorem sys_pause_br_fffffffffffff4f2 : KA.«sys_pause» + 0xfffffffffffff4f2#64 = KA.«sleep_prepare» := by decide
 
 theorem sp_round (AC : ACQUIRE) (RE : RELEASE) (SP : SLEEP_PREPARE) (SL : SLEEP)
     (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
@@ -768,8 +768,8 @@ theorem sp_round (AC : ACQUIRE) (RE : RELEASE) (SP : SLEEP_PREPARE) (SL : SLEEP)
   k_step (wp_s_add cpu _ (KA.«sys_pause» + 0x54#64) true 10#5 0#5 18#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h18]
   iintro Hk Hpc
-  k_step (wp_s_jal cpu _ (KA.«sys_pause» + 0x56#64) false 2094256#21 1#5 (by decide))
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [sys_pause_br_fffffffffffff506]
+  k_step (wp_s_jal cpu _ (KA.«sys_pause» + 0x56#64) false 2094236#21 1#5 (by decide))
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [sys_pause_br_fffffffffffff4f2]
   iintro Hk Hpc
   iapply (sp_sleep_prepare SP Γ cpu _ j hj ?hspp ?hspchan ?hspn ?hspK ?hsplk ?hspt)
     $$ [- $Hk $Hpc $Hpinv]
@@ -801,8 +801,8 @@ theorem sp_round (AC : ACQUIRE) (RE : RELEASE) (SP : SLEEP_PREPARE) (SL : SLEEP)
     k_step (wp_s_add cpu _ (KA.«sys_pause» + 0x5a#64) true 10#5 0#5 9#5 (by decide))
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hP9]
     iintro Hk Hpc
-    k_step (wp_s_jal cpu _ (KA.«sys_pause» + 0x5c#64) false 2089412#21 1#5 (by decide))
-      from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [sys_pause_br_ffffffffffffe220]
+    k_step (wp_s_jal cpu _ (KA.«sys_pause» + 0x5c#64) false 2089378#21 1#5 (by decide))
+      from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [sys_pause_br_ffffffffffffe1fe]
     iintro Hk Hpc
     -- the release takes back the arm; the complement goes on to `sleep`
     icases armExt_split cpu kb.sie k.proc $$ [$Htc $Hcl $Hir] with ⟨Harm, Hte, Hce⟩
@@ -832,8 +832,8 @@ theorem sp_round (AC : ACQUIRE) (RE : RELEASE) (SP : SLEEP_PREPARE) (SL : SLEEP)
         simp only [RegMap.set_apply, BitVec.reduceEq, ite_false] at h
         exact h.trans hP19
       -- jal sleep()
-      k_step_e (wp_s_jal cpu _ (KA.«sys_pause» + 0x60#64) false 2094306#21 1#5 (by decide))
-        from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [sys_pause_br_fffffffffffff542]
+      k_step_e (wp_s_jal cpu _ (KA.«sys_pause» + 0x60#64) false 2094286#21 1#5 (by decide))
+        from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [sys_pause_br_fffffffffffff52e]
       iintro Hk Hpc
       iapply (sp_sleep SL Γ cpu _ j kb.sie k.proc hj ?hslp ?hslK ?hsln ?hslt ?hsls ?hslq)
         $$ [- $Hk $Hpc $Hpinv $Hte $Hce]
@@ -862,8 +862,8 @@ theorem sp_round (AC : ACQUIRE) (RE : RELEASE) (SP : SLEEP_PREPARE) (SL : SLEEP)
         k_step_e (wp_s_add cpu _ (KA.«sys_pause» + 0x64#64) true 10#5 0#5 9#5 (by decide))
           from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hS9]
         iintro Hk Hpc
-        k_step_e (wp_s_jal cpu _ (KA.«sys_pause» + 0x66#64) false 2089266#21 1#5 (by decide))
-          from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [sys_pause_br_ffffffffffffe198]
+        k_step_e (wp_s_jal cpu _ (KA.«sys_pause» + 0x66#64) false 2089232#21 1#5 (by decide))
+          from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [sys_pause_br_ffffffffffffe176]
         iintro Hk Hpc
         iapply (sp_acquire AC cpu _ γt ?ha0a ?hna ?hKa ?hla) $$ [- $Hk $Hpc $Hlk]
         rotate_right 1
@@ -995,12 +995,12 @@ theorem sp_round (AC : ACQUIRE) (RE : RELEASE) (SP : SLEEP_PREPARE) (SL : SLEEP)
   case hsplk => k_norm_g; decide
   case hspt => k_norm_g; exact hb.tier
 
-theorem sys_pause_br_fffffffffffff764 : KA.«sys_pause» + 0xfffffffffffff764#64 = KA.«killed» := by decide
+theorem sys_pause_br_fffffffffffff750 : KA.«sys_pause» + 0xfffffffffffff750#64 = KA.«killed» := by decide
 
-theorem sys_pause_br_ffffffffffffeec8 : KA.«sys_pause» + 0xffffffffffffeec8#64 = KA.«myproc» := by decide
+theorem sys_pause_br_ffffffffffffeea6 : KA.«sys_pause» + 0xffffffffffffeea6#64 = KA.«myproc» := by decide
 
 set_option maxHeartbeats 16000000 in
-/-- One round of the loop from `0x80002b0a`: `killed(myproc())` decides
+/-- One round of the loop from `0x80002b2c`: `killed(myproc())` decides
 between the `-1` arm and `sp_round`. -/
 theorem sp_loop_body (AC : ACQUIRE) (RE : RELEASE) (MP : MYPROC) (KL : KILLED)
     (SP : SLEEP_PREPARE) (SL : SLEEP) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
@@ -1027,8 +1027,8 @@ theorem sp_loop_body (AC : ACQUIRE) (RE : RELEASE) (MP : MYPROC) (KL : KILLED)
   iintro ⟨Hk, Hpc, #Hpinv, #Hlk, Hlocked, Hpay, Hframe, Htc, Hcl, Hir, Htf, Htp, HΦ, IH⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
   -- jal myproc
-  k_step (wp_s_jal cpu _ (KA.«sys_pause» + 0x4a#64) false 2092670#21 1#5 (by decide))
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [sys_pause_br_ffffffffffffeec8]
+  k_step (wp_s_jal cpu _ (KA.«sys_pause» + 0x4a#64) false 2092636#21 1#5 (by decide))
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [sys_pause_br_ffffffffffffeea6]
   iintro Hk Hpc
   iapply (sp_myproc MP cpu _ ?hnm ?hKm) $$ [- $Hk $Hpc]
   rotate_right 1
@@ -1058,8 +1058,8 @@ theorem sp_loop_body (AC : ACQUIRE) (RE : RELEASE) (MP : MYPROC) (KL : KILLED)
       simp only [RegMap.set_apply, BitVec.reduceEq, ite_false] at h
       exact h.trans h19
     -- jal killed
-    k_step (wp_s_jal cpu _ (KA.«sys_pause» + 0x4e#64) false 2094870#21 1#5 (by decide))
-      from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [sys_pause_br_fffffffffffff764]
+    k_step (wp_s_jal cpu _ (KA.«sys_pause» + 0x4e#64) false 2094850#21 1#5 (by decide))
+      from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [sys_pause_br_fffffffffffff750]
     iintro Hk Hpc
     iapply (sp_killed KL Γ cpu _ j hj ?hkp ?hkn ?hkK ?hkl ?hkt) $$ [- $Hk $Hpc $Hpinv]
     rotate_right 1
@@ -1086,7 +1086,7 @@ theorem sp_loop_body (AC : ACQUIRE) (RE : RELEASE) (MP : MYPROC) (KL : KILLED)
         have h := hcsK.2.2.2.2.1
         simp only [RegMap.set_apply, BitVec.reduceEq, ite_false] at h
         exact h.trans hM19
-      -- c.bnez a0,0x80002b5c
+      -- c.bnez a0,0x80002b7e
       cases hbn : bcond bop.BNE (BitVec.signExtend 64 kl) 0#64
       case true =>
         k_step (wp_s_branch cpu _ (KA.«sys_pause» + 0x52#64) true 74#13 10#5 0#5 (by decide) bop.BNE)
@@ -1112,7 +1112,7 @@ theorem sp_loop_body (AC : ACQUIRE) (RE : RELEASE) (MP : MYPROC) (KL : KILLED)
   case hKm => k_norm_g; unfold sysPauseSlots sleepSlots at hK; omega
 
 set_option maxHeartbeats 16000000 in
-/-- The loop at `0x80002b0a`, closed by Löb induction. -/
+/-- The loop at `0x80002b2c`, closed by Löb induction. -/
 theorem sp_loop (AC : ACQUIRE) (RE : RELEASE) (MP : MYPROC) (KL : KILLED)
     (SP : SLEEP_PREPARE) (SL : SLEEP) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
     (k kb : KCtx) (hb : SpBase k kb) (γt : GName)
@@ -1139,7 +1139,7 @@ end
 section
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [X : CurCtx]
 
-theorem sys_pause_br_7888 : KA.«sys_pause» + 0x7888#64 = ticksAddr := by decide
+theorem sys_pause_br_7896 : KA.«sys_pause» + 0x7896#64 = ticksAddr := by decide
 
 set_option maxHeartbeats 16000000 in
 theorem sp_from_a26 (AC : ACQUIRE) (RE : RELEASE) (MP : MYPROC) (KL : KILLED)
@@ -1168,14 +1168,14 @@ theorem sp_from_a26 (AC : ACQUIRE) (RE : RELEASE) (MP : MYPROC) (KL : KILLED)
   ihave Hk := (show kctx (GF := GF) cpu kb ⊢ kctx cpu (kb.withRegs R) from by
     rw [← hkbr, KCtx.withRegs_self]) $$ Hk
   -- auipc a0,0x15 ; addi a0,a0,1938 ; jal acquire
-  k_step_e (wp_s_auipc cpu _ (KA.«sys_pause» + 0x1a#64) false 0x15#20 10#5 (by decide))
+  k_step_e (wp_s_auipc cpu _ (KA.«sys_pause» + 0x1a#64) false 0x16#20 10#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
-  k_step_e (wp_s_addi cpu _ (KA.«sys_pause» + 0x1e#64) false 1926#12 10#5 10#5 (by decide))
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [sys_pause_br_157a0, sp_lk_2a26]
+  k_step_e (wp_s_addi cpu _ (KA.«sys_pause» + 0x1e#64) false 2452#12 10#5 10#5 (by decide))
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [sys_pause_br_159ae, sp_lk_2a26]
   iintro Hk Hpc
-  k_step_e (wp_s_jal cpu _ (KA.«sys_pause» + 0x22#64) false 2089334#21 1#5 (by decide))
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [sys_pause_br_ffffffffffffe198]
+  k_step_e (wp_s_jal cpu _ (KA.«sys_pause» + 0x22#64) false 2089300#21 1#5 (by decide))
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [sys_pause_br_ffffffffffffe176]
   iintro Hk Hpc
   iapply (sp_acquire AC cpu _ γt ?ha0a ?hna ?hKa ?hla) $$ [- $Hk $Hpc $Hlk]
   rotate_right 1
@@ -1197,7 +1197,7 @@ theorem sp_from_a26 (AC : ACQUIRE) (RE : RELEASE) (MP : MYPROC) (KL : KILLED)
           exact ⟨q9, q18, q19⟩) hcsA
     obtain ⟨a2, a8, a20, a21, a22, a23, a24, a25, a26, a27⟩ := id hpreA
     obtain ⟨b9, b18, b19⟩ := id hsvA
-    -- lw a5,-52(s0) ; cpu.beqz a5,0x80002b40
+    -- lw a5,-52(s0) ; cpu.beqz a5,0x80002b62
     icases spFrame_elim _ _ _ _ _ _ _ _ _ _ $$ Hframe
       with ⟨F0, F1, F2, F3, F4, F5, Flo, Fnn, F6⟩
     k_step (wp_s_lw cpu _ (KA.«sys_pause» + 0x26#64) false 4044#12 15#5 8#5 (by decide) (by decide)
@@ -1244,24 +1244,24 @@ theorem sp_from_a26 (AC : ACQUIRE) (RE : RELEASE) (MP : MYPROC) (KL : KILLED)
       k_step (wp_s_auipc cpu _ (KA.«sys_pause» + 0x32#64) false 0x8#20 19#5 (by decide))
         from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
       iintro Hk Hpc
-      k_step (wp_s_lw cpu _ (KA.«sys_pause» + 0x36#64) false 2134#12 19#5 19#5 (by decide) (by decide)
+      k_step (wp_s_lw cpu _ (KA.«sys_pause» + 0x36#64) false 2148#12 19#5 19#5 (by decide) (by decide)
           (DFrac.own 1) t0)
-        from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [sys_pause_br_7888, sp_tk_2a42]
+        from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [sys_pause_br_7896, sp_tk_2a42]
       iintro Hk Hpc Hticks
       ihave Hpay := ticksRes_intro t0 $$ Hticks
       -- auipc s2,0x8 ; addi s2,s2,-1982  (s2 = &ticks)
       k_step (wp_s_auipc cpu _ (KA.«sys_pause» + 0x3a#64) false 0x8#20 18#5 (by decide))
         from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
       iintro Hk Hpc
-      k_step (wp_s_addi cpu _ (KA.«sys_pause» + 0x3e#64) false 2126#12 18#5 18#5 (by decide))
-        from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [sys_pause_br_7888, sp_tk_2a46]
+      k_step (wp_s_addi cpu _ (KA.«sys_pause» + 0x3e#64) false 2140#12 18#5 18#5 (by decide))
+        from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [sys_pause_br_7896, sp_tk_2a46]
       iintro Hk Hpc
       -- auipc s1,0x15 ; addi s1,s1,1898  (s1 = &tickslock)
-      k_step (wp_s_auipc cpu _ (KA.«sys_pause» + 0x42#64) false 0x15#20 9#5 (by decide))
+      k_step (wp_s_auipc cpu _ (KA.«sys_pause» + 0x42#64) false 0x16#20 9#5 (by decide))
         from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
       iintro Hk Hpc
-      k_step (wp_s_addi cpu _ (KA.«sys_pause» + 0x46#64) false 1886#12 9#5 9#5 (by decide))
-        from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [sys_pause_br_157a0, sp_lk_2a4e]
+      k_step (wp_s_addi cpu _ (KA.«sys_pause» + 0x46#64) false 2412#12 9#5 9#5 (by decide))
+        from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [sys_pause_br_159ae, sp_lk_2a4e]
       iintro Hk Hpc
       ihave Hframe := spFrame_intro (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) (k.regs 9#5)
         (k.regs 18#5) (k.regs 19#5) v4 v6 lo nn $$ [F0 F1 F2 F3 F4 F5 Flo Fnn F6]
@@ -1288,7 +1288,7 @@ end
 
 /-! ## The function -/
 
-theorem sys_pause_br_fffffffffffffe54 : KA.«sys_pause» + 0xfffffffffffffe54#64 = KA.«argint» := by decide
+theorem sys_pause_br_fffffffffffffe40 : KA.«sys_pause» + 0xfffffffffffffe40#64 = KA.«argint» := by decide
 
 set_option maxHeartbeats 32000000 in
 set_option maxRecDepth 20000 in
@@ -1328,8 +1328,8 @@ theorem sys_pause_proof (AI : ARGINT) (AC : ACQUIRE) (RE : RELEASE) (MP : MYPROC
   k_step_e (wp_s_addi cpu _ (KA.«sys_pause» + 0xc#64) true 0#12 10#5 0#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [KCtx.rget_zero]
   iintro Hk Hpc
-  k_step_e (wp_s_jal cpu _ (KA.«sys_pause» + 0xe#64) false 2096710#21 1#5 (by decide))
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [sys_pause_br_fffffffffffffe54]
+  k_step_e (wp_s_jal cpu _ (KA.«sys_pause» + 0xe#64) false 2096690#21 1#5 (by decide))
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [sys_pause_br_fffffffffffffe40]
   iintro Hk Hpc
   iapply (sp_argint AI cpu _ tfp ws v n0 dqt ?ha0 hws ?hn ?hKa)
     $$ [- $Hk $Hpc]
@@ -1343,12 +1343,12 @@ theorem sys_pause_proof (AI : ARGINT) (AC : ACQUIRE) (RE : RELEASE) (MP : MYPROC
     unfold calleeSaved at hcs1
     k_norm_g at hcs1
     obtain ⟨c2, c8, c9, c18, c19, c20, c21, c22, c23, c24, c25, c26, c27⟩ := hcs1
-    -- lw a5,-52(s0) ; bltz a5,0x80002b56
+    -- lw a5,-52(s0) ; bltz a5,0x80002b78
     k_step_e (wp_s_lw cpu _ (KA.«sys_pause» + 0x12#64) false 4044#12 15#5 8#5 (by decide) (by decide)
         (DFrac.own 1) (BitVec.extractLsb' 0 32 v))
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [c8]
     iintro Hk Hpc Fnn
-    -- the shared tail at 0x80002ada, parametric in the cell's contents
+    -- the shared tail at 0x80002afc, parametric in the cell's contents
     ihave Ha26 : (∀ (c : CPU) (nn : BitVec 32) (Rz : RegMap),
         ⌜spPre k Rz ∧ spSaved k Rz⌝ -∗
         kctx c (((k.pushed 8).withSpie spie1 spp1).withRegs Rz) -∗
@@ -1390,7 +1390,7 @@ theorem sys_pause_proof (AI : ARGINT) (AC : ACQUIRE) (RE : RELEASE) (MP : MYPROC
       k_step_e (wp_s_branch cpu _ (KA.«sys_pause» + 0x16#64) false 128#13 15#5 0#5 (by decide) bop.BLT)
         from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hbz]
       iintro Hk Hpc
-      -- sw zero,-52(s0) ; c.j 0x80002ada
+      -- sw zero,-52(s0) ; c.j 0x80002afc
       k_step_e (wp_s_sw cpu _ (KA.«sys_pause» + 0x96#64) false 4044#12 8#5 0#5 (by decide)
           (BitVec.extractLsb' 0 32 v))
         from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [c8, KCtx.rget_zero]

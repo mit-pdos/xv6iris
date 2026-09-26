@@ -170,10 +170,10 @@ theorem iput_main (AC : ACQUIRE_LLB) (HN : IputTailNeSpec) (HE : IputEntrySpec)
   k_step_e (wp_s_auipc cpu _ (KA.«iput» + 0xc#64) false 0x1d#20 10#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
-  k_step_e (wp_s_addi cpu _ (KA.«iput» + 0x10#64) false 1244#12 10#5 10#5 (by decide))
+  k_step_e (wp_s_addi cpu _ (KA.«iput» + 0x10#64) false 1724#12 10#5 10#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [iput_lock]
   iintro Hk Hpc
-  k_step_e (wp_s_jal cpu _ (KA.«iput» + 0x14#64) false 2086868#21 1#5 (by decide))
+  k_step_e (wp_s_jal cpu _ (KA.«iput» + 0x14#64) false 2086788#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [iput_br_acquire]
   iintro Hk Hpc
   iapply (iput_acquire AC cpu k (maxStamp mst) hwf hnoff hK16 hlk _ ?h10

@@ -90,7 +90,7 @@ theorem rsl_acquire (AC : ACQUIRE) (c : CPU) (k' : KCtx) (γl γ : GName) (slk :
   unfold isSleeplockGen
   exact h
 
-/-- `wakeup` inside the critical section (entry `0x80002032`). -/
+/-- `wakeup` inside the critical section (entry `0x80002040`). -/
 theorem rsl_wakeup (WK : WAKEUP) (Γ : SchedNames) (c : CPU) (k' : KCtx)
     (hnoff : k'.noff + 1 < 2 ^ 31) (hK : wakeupSlots ≤ k'.avail) (hlk : "proc" ∉ k'.locks)
     (htier : k'.tier = KTier.kpt) :
@@ -133,7 +133,7 @@ theorem rsl_release (RE : RELEASE_HOOK) (c : CPU) (k' : KCtx) (γl γ : GName) (
 /-! ## The epilogue -/
 
 set_option maxHeartbeats 4000000 in
-/-- **releasesleep's epilogue** at `0x800040f4`: restore `ra/s0/s1/s2`, pop
+/-- **releasesleep's epilogue** at `0x80004144`: restore `ra/s0/s1/s2`, pop
 the 4-slot frame, return, handing the caller `P` (the deposit `H q`). -/
 theorem rsl_epi (cpu cE : CPU) (k : KCtx) (P : IProp GF)
     (hpin : k.sie = false ∨ k.proc = 0#64 → cE = cpu) (hK : 4 ≤ k.avail)
@@ -173,10 +173,10 @@ theorem rsl_epi (cpu cE : CPU) (k : KCtx) (P : IProp GF)
 
 /-! ## `mv a0,s2; jal release`, then the epilogue -/
 
-theorem releasesleep_br_ffffffffffffcc18 : KA.«releasesleep» + 0xffffffffffffcc18#64 = KA.«release» := by decide
+theorem releasesleep_br_ffffffffffffcbc8 : KA.«releasesleep» + 0xffffffffffffcbc8#64 = KA.«release» := by decide
 
 set_option maxHeartbeats 4000000 in
-/-- From `0x800040ee`: put the inner spinlock down (depositing the rebuilt
+/-- From `0x8000413e`: put the inner spinlock down (depositing the rebuilt
 FREE payload) and return with the deposit `H q`. -/
 theorem rsl_rel (RE : RELEASE_HOOK) (cpu c : CPU) (k : KCtx)
     (γl γ : GName) (slk : BitVec 64) (Rp Rin : CtxId → IProp GF) [CtxMorph Rp] [CtxMorph Rin]
@@ -208,8 +208,8 @@ theorem rsl_rel (RE : RELEASE_HOOK) (cpu c : CPU) (k : KCtx)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hR18]
   iintro Hk Hpc
   -- jal release
-  k_step (wp_s_jal c _ (KA.«releasesleep» + 0x28#64) false 2083824#21 1#5 (by decide))
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [releasesleep_br_ffffffffffffcc18]
+  k_step (wp_s_jal c _ (KA.«releasesleep» + 0x28#64) false 2083744#21 1#5 (by decide))
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [releasesleep_br_ffffffffffffcbc8]
   iintro Hk Hpc
   iapply (rsl_release RE c _ γl γ slk Rp Rin H ?ha0 ?hsr ?hnr ?hKr k.sie ?hrr ?hor)
     $$ [- $Hk $Hpc $Hlocked $Hbody $Hhook]
@@ -248,10 +248,10 @@ theorem rsl_rel (RE : RELEASE_HOOK) (cpu c : CPU) (k : KCtx)
 /-! ## The critical section: the two stores, the ghost step, `wakeup` -/
 
 set_option maxHeartbeats 8000000 in
-/-- From `0x800040e0`, inside the critical section with the payload opened as
+/-- From `0x80004130`, inside the critical section with the payload opened as
 the HOLDER: clear the `locked` word and the pid field, rebuild the FREE
 payload, `wakeup(lk)`, then `rsl_rel`. -/
-theorem releasesleep_br_ffffffffffffdf6a : KA.«releasesleep» + 0xffffffffffffdf6a#64 = KA.«wakeup» := by decide
+theorem releasesleep_br_ffffffffffffdf28 : KA.«releasesleep» + 0xffffffffffffdf28#64 = KA.«wakeup» := by decide
 
 theorem rsl_mid (WK : WAKEUP) (RE : RELEASE_HOOK) (Γ : SchedNames) (cpu c : CPU) (k : KCtx)
     (γl γ : GName) (slk : BitVec 64) (Rp Rin : CtxId → IProp GF) [CtxMorph Rp] [CtxMorph Rin]
@@ -304,8 +304,8 @@ theorem rsl_mid (WK : WAKEUP) (RE : RELEASE_HOOK) (Γ : SchedNames) (cpu c : CPU
   k_step (wp_s_add c _ (KA.«releasesleep» + 0x20#64) true 10#5 0#5 9#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hR9]
   iintro Hk Hpc
-  k_step (wp_s_jal c _ (KA.«releasesleep» + 0x22#64) false 2088776#21 1#5 (by decide))
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [releasesleep_br_ffffffffffffdf6a]
+  k_step (wp_s_jal c _ (KA.«releasesleep» + 0x22#64) false 2088710#21 1#5 (by decide))
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [releasesleep_br_ffffffffffffdf28]
   iintro Hk Hpc
   iapply (rsl_wakeup WK Γ c _ ?hnw ?hKw ?hlw ?htw) $$ [- $Hk $Hpc $Hpi]
   rotate_right 1
@@ -341,7 +341,7 @@ end
 
 /-! ## The function -/
 
-theorem releasesleep_br_ffffffffffffcb90 : KA.«releasesleep» + 0xffffffffffffcb90#64 = KA.«acquire» := by decide
+theorem releasesleep_br_ffffffffffffcb40 : KA.«releasesleep» + 0xffffffffffffcb40#64 = KA.«acquire» := by decide
 
 set_option maxHeartbeats 16000000 in
 theorem releasesleep_hook_proof (AC : ACQUIRE) (RE : RELEASE_HOOK) (WK : WAKEUP) :
@@ -379,8 +379,8 @@ theorem releasesleep_hook_proof (AC : ACQUIRE) (RE : RELEASE_HOOK) (WK : WAKEUP)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c4 hp4
   iintro Hk Hpc
   -- jal acquire
-  k_step_gen (wp_s_jal c4 _ (KA.«releasesleep» + 0x14#64) false 2083708#21 1#5 (by decide))
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [releasesleep_br_ffffffffffffcb90] next c5 hp5
+  k_step_gen (wp_s_jal c4 _ (KA.«releasesleep» + 0x14#64) false 2083628#21 1#5 (by decide))
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [releasesleep_br_ffffffffffffcb40] next c5 hp5
   iintro Hk Hpc
   iapply (rsl_acquire AC c5 _ γl γ (k.regs 10#5) Rp H ?ha0 ?hna ?hKa ?hla) $$ [- $Hk $Hpc]
   rotate_right 1

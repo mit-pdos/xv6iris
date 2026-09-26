@@ -564,7 +564,7 @@ theorem sys_chdir_args (AS : ARGSTR) (NI : NAMEI_ERA) (IL : ILOCK) (IU : IUNLOCK
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
   -- +0x1e  jal argstr
-  k_step_e (wp_s_jal cpu _ (KA.«sys_chdir» + 0x1e#64) false 2086190#21 1#5 (by decide))
+  k_step_e (wp_s_jal cpu _ (KA.«sys_chdir» + 0x1e#64) false 2086124#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [sys_chdir_br_argstr]
   iintro Hk Hpc
   icases sysfile_blk_bare _ _ _ _ _ $$ Hblk with ⟨Hbare, Hclose⟩
@@ -645,7 +645,7 @@ theorem sys_chdir_main (MP : MYPROC) (AS : ARGSTR) (BO : BEGIN_OP) (NI : NAMEI_E
         ((k.regs.set 2#5 (k.regs 2#5 + 0xFFFFFFFFFFFFFF60#64)).set 8#5 (k.regs 2#5))) from .rfl) $$ Hk
   have hp0 := sysChdirPins_entry k
   -- +0x0a  jal myproc
-  k_step_e (wp_s_jal cpu _ (KA.«sys_chdir» + 0xa#64) false 2082174#21 1#5 (by decide))
+  k_step_e (wp_s_jal cpu _ (KA.«sys_chdir» + 0xa#64) false 2082094#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [sys_chdir_br_myproc]
   iintro Hk Hpc
   have hmp := MP.wp_myproc (hlc := hlc) (GF := GF)

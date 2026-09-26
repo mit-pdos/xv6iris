@@ -253,7 +253,7 @@ theorem sys_unlink_w5_zero (WI : WRITEI) (MS : MEMSET) (PA : PANIC) (Γ : SchedN
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
   -- +0x94  jal memset
-  k_step_e (wp_s_jal cpu _ (KA.«sys_unlink» + 0x94#64) false 2079746#21 1#5 (by decide))
+  k_step_e (wp_s_jal cpu _ (KA.«sys_unlink» + 0x94#64) false 2079666#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [sys_unlink_br_memset]
   iintro Hk Hpc
   icases (show suAny (GF := GF) (sysUnlinkDe (k.regs 2#5)) 16 ⊢ ∃ bs : List (BitVec 8),

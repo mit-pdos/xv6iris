@@ -59,8 +59,8 @@ theorem sk_calleeSaved_mk (KR R : RegMap)
       | rfl
       | assumption
 
-theorem sys_kill_br_argint : KA.«sys_kill» + 0xfffffffffffffda2#64 = KA.«argint» := by decide
-theorem sys_kill_br_kkill : KA.«sys_kill» + 0xfffffffffffff622#64 = KA.«kkill» := by decide
+theorem sys_kill_br_argint : KA.«sys_kill» + 0xfffffffffffffd8e#64 = KA.«argint» := by decide
+theorem sys_kill_br_kkill : KA.«sys_kill» + 0xfffffffffffff60e#64 = KA.«kkill» := by decide
 
 section
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [CurCtx]
@@ -184,7 +184,7 @@ theorem sys_kill_proof (AI : ARGINT) (KK : KKILL) : SYSKILL := ⟨
   k_step_gen (wp_s_addi c2 _ (KA.«sys_kill» + 0xc#64) true 0#12 10#5 0#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [sk_li0] next c3 hp3
   iintro Hk Hpc
-  k_step_gen (wp_s_jal c3 _ (KA.«sys_kill» + 0xe#64) false 2096532#21 1#5 (by decide))
+  k_step_gen (wp_s_jal c3 _ (KA.«sys_kill» + 0xe#64) false 2096512#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [sys_kill_br_argint] next c4 hp4
   iintro Hk Hpc
   iapply (sk_argint AI c4 _ tfp ws v old dqt ?ha0 hws ?hn ?hKa) $$ [- $Hk $Hpc]
@@ -208,7 +208,7 @@ theorem sys_kill_proof (AI : ARGINT) (KK : KKILL) : SYSKILL := ⟨
       (DFrac.own 1) (BitVec.extractLsb' 0 32 v))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [b8, sk_pid_addr, hapid] next c6 hp6
   iintro Hk Hpc Hpid
-  k_step_gen (wp_s_jal c6 _ (KA.«sys_kill» + 0x16#64) false 2094604#21 1#5 (by decide))
+  k_step_gen (wp_s_jal c6 _ (KA.«sys_kill» + 0x16#64) false 2094584#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [sys_kill_br_kkill] next c7 hp7
   iintro Hk Hpc
   iapply (sk_kkill KK Γ c7 _ ?hn2 ?hK2 ?hlk2 ?ht2) $$ [- $Hk $Hpc]

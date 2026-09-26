@@ -48,7 +48,7 @@ set_option linter.unusedVariables false
 /-! ## Constants -/
 
 theorem sys_mkdir_br_begin_op : KA.«sys_mkdir» + 0xffffffffffffea00#64 = KA.«begin_op» := by decide
-theorem sys_mkdir_br_argstr : KA.«sys_mkdir» + 0xffffffffffffd5f4#64 = KA.«argstr» := by decide
+theorem sys_mkdir_br_argstr : KA.«sys_mkdir» + 0xffffffffffffd5b2#64 = KA.«argstr» := by decide
 theorem sys_mkdir_br_create : KA.«sys_mkdir» + 0xfffffffffffff948#64 = KA.«create» := by decide
 theorem sys_mkdir_br_iunlockput : KA.«sys_mkdir» + 0xffffffffffffe1ea#64 = KA.«iunlockput» := by
   decide

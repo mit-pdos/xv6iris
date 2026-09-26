@@ -86,7 +86,7 @@ set_option linter.unusedVariables false
 
 /-! ## The branch targets and return addresses of phase A's calls -/
 
-theorem kxcA_br_myproc : KA.«kexec» + 0x20#64 + BitVec.signExtend 64 2085052#21 = KA.«myproc» := by
+theorem kxcA_br_myproc : KA.«kexec» + 0x20#64 + BitVec.signExtend 64 2084972#21 = KA.«myproc» := by
   decide
 theorem kxcA_ret_24 : jumpPc (KA.«kexec» + 0x20#64 + 4#64) = KA.«kexec» + 0x20#64 + 4#64 := by decide
 theorem kxcA_br_beginop : KA.«kexec» + 0x26#64 + BitVec.signExtend 64 2094214#21 = KA.«begin_op» := by
@@ -596,7 +596,7 @@ theorem kxc_a1 (MP : MYPROC) (BO : BEGIN_OP) (NI : NAMEI) (EO : END_OP)
   ihave Hk := kctx_eq_mono cpu _ (((k.withSpie k.spie k.spp).pushed 68).withRegs R)
     (by kctx_ext) $$ Hk
   -- +0x020  jal myproc
-  iapply (kxcA_call_myproc MP cpu k k.spie k.spp R (KA.«kexec» + 0x20#64) 2085052#21 kxcA_br_myproc
+  iapply (kxcA_call_myproc MP cpu k k.spie k.spp R (KA.«kexec» + 0x20#64) 2084972#21 kxcA_br_myproc
       kxcA_ret_24 hK hnoff) $$ [- $Hk $Hpc $Hte $Hce]
   isplitr
   · iapply (text_instr _ _ _ _ rfl rfl); iexact Htext

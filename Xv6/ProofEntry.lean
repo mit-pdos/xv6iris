@@ -20,7 +20,7 @@ attribute [local semireducible] LeanRV64D.Functions.hartSupports LeanRV64D.Funct
 
 /-- The addresses `_entry` materialises: the GOT slot holding `&stack0`
 (`auipc sp,0xa; ld sp,792(sp)`) and the `jal start` target. -/
-theorem entry_br_got : KA.«_entry» + 0xa318#64 = KA.«_GLOBAL_OFFSET_TABLE_» + 8#64 := by decide
+theorem entry_br_got : KA.«_entry» + 0xa348#64 = KA.«_GLOBAL_OFFSET_TABLE_» + 8#64 := by decide
 theorem entry_br_start : KA.«_entry» + 0x58#64 = KA.«start» := by decide
 /-- The return address of the `jal`: the `spin` label. -/
 theorem entry_br_spin : KA.«_entry» + 0x1a#64 = KA.«spin» := by decide
@@ -56,7 +56,7 @@ theorem EntryProof : ENTRY where
     iintro HmBoot Hclock Hpc Hx2
     entry_norm
     -- 80000004: ld sp, 600(sp)
-    entry_step wp_m_ld_same cpu dq dqg bootConf bootConf_ok _ false 792#12 2#5 (by decide) (KA.«_entry» + 0xa000#64) s0
+    entry_step wp_m_ld_same cpu dq dqg bootConf bootConf_ok _ false 840#12 2#5 (by decide) (KA.«_entry» + 0xa000#64) s0
     iintro HmBoot Hclock Hpc Hx2 Htok Hslot
     entry_norm
     -- 80000008: c.lui a0, 0x1

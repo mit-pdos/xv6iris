@@ -42,7 +42,7 @@ set_option linter.unusedSectionVars false
 set_option linter.unusedSimpArgs false
 set_option linter.unusedVariables false
 
-theorem sys_exec_br_memset : KA.«sys_exec» + 0xffffffffffffb898#64 = KA.«memset» := by decide
+theorem sys_exec_br_memset : KA.«sys_exec» + 0xffffffffffffb848#64 = KA.«memset» := by decide
 theorem sys_exec_ret_46 : jumpPc (KA.«sys_exec» + 0x46#64) = KA.«sys_exec» + 0x46#64 := by decide
 
 section
@@ -148,7 +148,7 @@ theorem sys_exec_setup (MS : MEMSET) (k : KCtx) (hK : sysExecSlots ≤ k.avail) 
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
   -- +0x42  jal memset
-  k_step_e (wp_s_jal cpu _ (KA.«sys_exec» + 0x42#64) false 2078806#21 1#5 (by decide))
+  k_step_e (wp_s_jal cpu _ (KA.«sys_exec» + 0x42#64) false 2078726#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [sys_exec_br_memset]
   iintro Hk Hpc
   unfold sysfileAny

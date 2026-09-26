@@ -342,12 +342,12 @@ end
 section
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [SleepLockG GF] [X : CurCtx]
 
-theorem acquiresleep_br_ffffffffffffcc6c : KA.«acquiresleep» + 0xffffffffffffcc6c#64 = KA.«release» := by decide
+theorem acquiresleep_br_ffffffffffffcc1c : KA.«acquiresleep» + 0xffffffffffffcc1c#64 = KA.«release» := by decide
 
-theorem acquiresleep_br_ffffffffffffd914 : KA.«acquiresleep» + 0xffffffffffffd914#64 = KA.«myproc» := by decide
+theorem acquiresleep_br_ffffffffffffd8c4 : KA.«acquiresleep» + 0xffffffffffffd8c4#64 = KA.«myproc» := by decide
 
 set_option maxHeartbeats 8000000 in
-/-- From `0x800040aa`, with the inner lock held and its payload OPEN in the
+/-- From `0x800040fa`, with the inner lock held and its payload OPEN in the
 FREE state: `lk->locked = 1`, `lk->pid = myproc()->pid`, `release(&lk->lk)`
 (re-enabling interrupts when the caller had them on: the bundle is re-split
 against the complement, `armExt_split`), the epilogue at the caller's
@@ -394,8 +394,8 @@ theorem asl_exit (RE : RELEASE) (MP : MYPROC) (c0 cpu : CPU) (k kb : KCtx) (hb :
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [p9, asl_add0, asl_ext_one]
   iintro Hk Hpc Hw
   -- jal myproc
-  k_step (wp_s_jal cpu _ (KA.«acquiresleep» + 0x3a#64) false 2087130#21 1#5 (by decide))
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [acquiresleep_br_ffffffffffffd914]
+  k_step (wp_s_jal cpu _ (KA.«acquiresleep» + 0x3a#64) false 2087050#21 1#5 (by decide))
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [acquiresleep_br_ffffffffffffd8c4]
   iintro Hk Hpc
   iapply (asl_myproc MP cpu _ ?hnm ?hKm) $$ [- $Hk $Hpc]
   rotate_right 1
@@ -442,8 +442,8 @@ theorem asl_exit (RE : RELEASE) (MP : MYPROC) (c0 cpu : CPU) (k kb : KCtx) (hb :
     k_step (wp_s_add cpu _ (KA.«acquiresleep» + 0x42#64) true 10#5 0#5 18#5 (by decide))
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [m18]
     iintro Hk Hpc
-    k_step (wp_s_jal cpu _ (KA.«acquiresleep» + 0x44#64) false 2083880#21 1#5 (by decide))
-      from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [acquiresleep_br_ffffffffffffcc6c]
+    k_step (wp_s_jal cpu _ (KA.«acquiresleep» + 0x44#64) false 2083800#21 1#5 (by decide))
+      from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [acquiresleep_br_ffffffffffffcc1c]
     iintro Hk Hpc
     -- the release takes back the arm the entry acquire paid out; the complement stays
     icases armExt_split cpu k.sie k.proc $$ [$Htc $Hcl $Hir] with ⟨Harm, Hte, Hce⟩
@@ -507,7 +507,7 @@ end
 section
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [SleepLockG GF] [X : CurCtx]
 
-/-- The loop invariant at `0x80004090`: the inner lock held with its payload
+/-- The loop invariant at `0x800040e0`: the inner lock held with its payload
 closed, `s1 = lk`, `s2 = &lk->lk`, the deposit still in hand, and the WHOLE
 trap bundle (the acquire's arm joined with the caller's complement). -/
 def aslLoop (cpu : CPU) (k kb : KCtx) (γl γ : GName) (Rp : CtxId → IProp GF)
@@ -551,14 +551,14 @@ theorem aslLoop_intro (cpu : CPU) (k kb : KCtx) (γl γ : GName) (Rp : CtxId →
     aslLoop (GF := GF) cpu k kb γl γ Rp Hd q slk pid dqp := by
   unfold aslLoop; iintro H; iexact H
 
-theorem acquiresleep_br_ffffffffffffcbe4 : KA.«acquiresleep» + 0xffffffffffffcbe4#64 = KA.«acquire» := by decide
+theorem acquiresleep_br_ffffffffffffcb94 : KA.«acquiresleep» + 0xffffffffffffcb94#64 = KA.«acquire» := by decide
 
-theorem acquiresleep_br_ffffffffffffdf8e : KA.«acquiresleep» + 0xffffffffffffdf8e#64 = KA.«sleep» := by decide
+theorem acquiresleep_br_ffffffffffffdf4c : KA.«acquiresleep» + 0xffffffffffffdf4c#64 = KA.«sleep» := by decide
 
-theorem acquiresleep_br_ffffffffffffdf52 : KA.«acquiresleep» + 0xffffffffffffdf52#64 = KA.«sleep_prepare» := by decide
+theorem acquiresleep_br_ffffffffffffdf10 : KA.«acquiresleep» + 0xffffffffffffdf10#64 = KA.«sleep_prepare» := by decide
 
 set_option maxHeartbeats 16000000 in
-/-- One round from `0x80004090`: `sleep_prepare(lk); release; sleep; acquire`,
+/-- One round from `0x800040e0`: `sleep_prepare(lk); release; sleep; acquire`,
 then the `lk->locked` test -- the back edge into the Löb hypothesis, or the
 exit at `(KernelSyms.«acquiresleep» + 0x36)`.  The release re-splits the
 bundle (its arm back to the pop, the complement to `sleep`); the re-acquire
@@ -590,8 +590,8 @@ theorem asl_round (AC : ACQUIRE) (RE : RELEASE) (MP : MYPROC) (SP : SLEEP_PREPAR
   k_step (wp_s_add cpu _ (KA.«acquiresleep» + 0x1c#64) true 10#5 0#5 9#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [p9]
   iintro Hk Hpc
-  k_step (wp_s_jal cpu _ (KA.«acquiresleep» + 0x1e#64) false 2088756#21 1#5 (by decide))
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [acquiresleep_br_ffffffffffffdf52]
+  k_step (wp_s_jal cpu _ (KA.«acquiresleep» + 0x1e#64) false 2088690#21 1#5 (by decide))
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [acquiresleep_br_ffffffffffffdf10]
   iintro Hk Hpc
   iapply (asl_sleep_prepare SP Γ cpu _ j hj ?hspp ?hspchan ?hspn ?hspK ?hsplk ?hspt)
     $$ [- $Hk $Hpc $Hpinv]
@@ -612,8 +612,8 @@ theorem asl_round (AC : ACQUIRE) (RE : RELEASE) (MP : MYPROC) (SP : SLEEP_PREPAR
     k_step (wp_s_add cpu _ (KA.«acquiresleep» + 0x22#64) true 10#5 0#5 18#5 (by decide))
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [P18]
     iintro Hk Hpc
-    k_step (wp_s_jal cpu _ (KA.«acquiresleep» + 0x24#64) false 2083912#21 1#5 (by decide))
-      from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [acquiresleep_br_ffffffffffffcc6c]
+    k_step (wp_s_jal cpu _ (KA.«acquiresleep» + 0x24#64) false 2083832#21 1#5 (by decide))
+      from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [acquiresleep_br_ffffffffffffcc1c]
     iintro Hk Hpc
     -- the release takes back the arm; the complement goes on to `sleep`
     icases armExt_split cpu k.sie k.proc $$ [$Htc $Hcl $Hir] with ⟨Harm, Hte, Hce⟩
@@ -634,8 +634,8 @@ theorem asl_round (AC : ACQUIRE) (RE : RELEASE) (MP : MYPROC) (SP : SLEEP_PREPAR
         (by unfold aslPre at hpreP ⊢
             simp only [RegMap.set_apply, BitVec.reduceEq, ite_false]; exact hpreP) hcs6
       -- jal sleep()
-      k_step_e (wp_s_jal cpu _ (KA.«acquiresleep» + 0x28#64) false 2088806#21 1#5 (by decide))
-        from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [acquiresleep_br_ffffffffffffdf8e]
+      k_step_e (wp_s_jal cpu _ (KA.«acquiresleep» + 0x28#64) false 2088740#21 1#5 (by decide))
+        from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [acquiresleep_br_ffffffffffffdf4c]
       iintro Hk Hpc
       iapply (asl_sleep SL Γ cpu _ j k.sie k.proc hj ?hslp ?hslK ?hsln ?hslt ?hsls ?hslpp)
         $$ [- $Hk $Hpc $Hpinv $Hte $Hce]
@@ -653,8 +653,8 @@ theorem asl_round (AC : ACQUIRE) (RE : RELEASE) (MP : MYPROC) (SP : SLEEP_PREPAR
         k_step_e (wp_s_add cpu _ (KA.«acquiresleep» + 0x2c#64) true 10#5 0#5 18#5 (by decide))
           from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [S18]
         iintro Hk Hpc
-        k_step_e (wp_s_jal cpu _ (KA.«acquiresleep» + 0x2e#64) false 2083766#21 1#5 (by decide))
-          from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [acquiresleep_br_ffffffffffffcbe4]
+        k_step_e (wp_s_jal cpu _ (KA.«acquiresleep» + 0x2e#64) false 2083686#21 1#5 (by decide))
+          from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [acquiresleep_br_ffffffffffffcb94]
         iintro Hk Hpc
         iapply (asl_acquire AC cpu _ γl (slk + 8#64) (slBody γ slk Rp Hd) ?ha0a ?hna ?hKa ?hla)
           $$ [- $Hk $Hpc $Hlk]
@@ -743,7 +743,7 @@ theorem asl_round (AC : ACQUIRE) (RE : RELEASE) (MP : MYPROC) (SP : SLEEP_PREPAR
   case hspt => k_norm_g; exact hb.tier
 
 set_option maxHeartbeats 16000000 in
-/-- The loop at `0x80004090`, closed by Löb induction. -/
+/-- The loop at `0x800040e0`, closed by Löb induction. -/
 theorem asl_loop (AC : ACQUIRE) (RE : RELEASE) (MP : MYPROC) (SP : SLEEP_PREPARE) (SL : SLEEP)
     (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
     (cpu : CPU) (k kb : KCtx) (hb : AslBase k kb)
@@ -818,8 +818,8 @@ theorem acquiresleep_llb_proof (ACL : ACQUIRE_LLB) (RE : RELEASE) (MP : MYPROC) 
   k_step_e (wp_s_add cpu _ (KA.«acquiresleep» + 0x12#64) true 10#5 0#5 18#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
-  k_step_e (wp_s_jal cpu _ (KA.«acquiresleep» + 0x14#64) false 2083792#21 1#5 (by decide))
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [acquiresleep_br_ffffffffffffcbe4]
+  k_step_e (wp_s_jal cpu _ (KA.«acquiresleep» + 0x14#64) false 2083712#21 1#5 (by decide))
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [acquiresleep_br_ffffffffffffcb94]
   iintro Hk Hpc
   iapply (asl_acquire_llb ACL cpu _ γl (k.regs 10#5 + 8#64) (slBody γ (k.regs 10#5) Rp Hd) tl
       ?ha0a ?hna ?hKa ?hla) $$ [- $Hk $Hpc $Hlk $Htl]
@@ -957,7 +957,7 @@ theorem asl_kctx_spie_nb (cpu : CPU) (k : KCtx) (R : RegMap) :
   iintro H; iexact H
 
 set_option maxHeartbeats 8000000 in
-/-- From `0x800040aa` at a GENERIC base (any depth, any lock set without
+/-- From `0x800040fa` at a GENERIC base (any depth, any lock set without
 "sleep lock"), with the inner lock held and its payload OPEN in the FREE
 state: mint the deposit out of the authoritative zero, `lk->locked = 1`,
 `lk->pid = myproc()->pid`, `release(&lk->lk)`, the epilogue. -/
@@ -996,8 +996,8 @@ theorem asl_exit_nb (RE : RELEASE) (MP : MYPROC) (cpu : CPU) (k : KCtx)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [p9, asl_add0, asl_ext_one]
   iintro Hk Hpc Hw
   -- jal myproc
-  k_step (wp_s_jal cpu _ (KA.«acquiresleep» + 0x3a#64) false 2087130#21 1#5 (by decide))
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [acquiresleep_br_ffffffffffffd914]
+  k_step (wp_s_jal cpu _ (KA.«acquiresleep» + 0x3a#64) false 2087050#21 1#5 (by decide))
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [acquiresleep_br_ffffffffffffd8c4]
   iintro Hk Hpc
   iapply (asl_myproc MP cpu _ ?hnm ?hKm) $$ [- $Hk $Hpc]
   rotate_right 1
@@ -1043,8 +1043,8 @@ theorem asl_exit_nb (RE : RELEASE) (MP : MYPROC) (cpu : CPU) (k : KCtx)
     k_step (wp_s_add cpu _ (KA.«acquiresleep» + 0x42#64) true 10#5 0#5 18#5 (by decide))
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [m18]
     iintro Hk Hpc
-    k_step (wp_s_jal cpu _ (KA.«acquiresleep» + 0x44#64) false 2083880#21 1#5 (by decide))
-      from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [acquiresleep_br_ffffffffffffcc6c]
+    k_step (wp_s_jal cpu _ (KA.«acquiresleep» + 0x44#64) false 2083800#21 1#5 (by decide))
+      from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [acquiresleep_br_ffffffffffffcc1c]
     iintro Hk Hpc
     iapply (asl_release RE cpu _ γl (slk + 8#64) (slBody γ slk Rp (slhTok γt)) ?ha0 ?hsr ?hnr
         ?hKr false ?hrr ?hor) $$ [- $Hk $Hpc $Hlk $Hlocked $Hpay]
@@ -1128,8 +1128,8 @@ theorem acquiresleep_nb_proof (AC : ACQUIRE) (RE : RELEASE) (MP : MYPROC) : ACQU
   k_step (wp_s_add cpu _ (KA.«acquiresleep» + 0x12#64) true 10#5 0#5 18#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
-  k_step (wp_s_jal cpu _ (KA.«acquiresleep» + 0x14#64) false 2083792#21 1#5 (by decide))
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [acquiresleep_br_ffffffffffffcbe4]
+  k_step (wp_s_jal cpu _ (KA.«acquiresleep» + 0x14#64) false 2083712#21 1#5 (by decide))
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [acquiresleep_br_ffffffffffffcb94]
   iintro Hk Hpc
   iapply (asl_acquire AC cpu _ γl (k.regs 10#5 + 8#64) (slBody γ (k.regs 10#5) Rp (slhTok γt))
       ?ha0a ?hna ?hKa ?hla) $$ [- $Hk $Hpc $Hlk]

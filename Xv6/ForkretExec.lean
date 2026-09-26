@@ -60,7 +60,7 @@ set_option linter.unusedSimpArgs false
 /-! ## §1.  The literal, the vector, kexec's record -/
 
 theorem fkr_init_addr : KA.«forkret» + 20524#64 + 1954#64 = KStr.«/init» := by decide
-theorem fkr_br_kexec : KA.«forkret» + 12018#64 = KA.«kexec» := by decide
+theorem fkr_br_kexec : KA.«forkret» + 12098#64 = KA.«kexec» := by decide
 theorem fkr_ret46 : jumpPc (KA.«forkret» + 0x46#64) = KA.«forkret» + 0x46#64 := by decide
 theorem fkr_br_panic : KA.«forkret» + 0xffffffffffffee7e#64 = KA.«panic» := by decide
 theorem fkr_msg_addr : KA.«forkret» + 20618#64 + 1868#64 = KStr.«exec» := by decide
@@ -435,7 +435,7 @@ theorem fkr_boot_exec [X : CurCtx] (KX : KEXEC) (PN : PANIC) (Γ : SchedNames) [
     with [KCtx.rget_eq, KCtx.setReg_regs, RegMap.set_apply] next c6 hp6
   iintro Hk Hpc
   -- +0x42  jal kexec
-  k_step_gen (wp_s_jal c6 _ (KA.«forkret» + 0x42#64) false 11952#21 1#5 (by decide))
+  k_step_gen (wp_s_jal c6 _ (KA.«forkret» + 0x42#64) false 12032#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [fkr_br_kexec] next c7 hp7
   iintro Hk Hpc
   simp only [KCtx.setReg_sie, KCtx.setReg_proc, hs, hp] at hp1 hp2 hp3 hp4 hp5 hp6 hp7

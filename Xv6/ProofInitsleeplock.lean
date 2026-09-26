@@ -61,7 +61,7 @@ theorem isl_initlock_call (IL : INITLOCK) [CurCtx] (c : CPU) (k' : KCtx)
 /-! ## The field stores and the epilogue -/
 
 set_option maxHeartbeats 4000000 in
-/-- From `0x8000405c`: `lk->name = name`, `lk->locked = 0`, `lk->pid = 0`,
+/-- From `0x800040ac`: `lk->name = name`, `lk->locked = 0`, `lk->pid = 0`,
 then restore `ra`, `s0`, `s1`, `s2`, pop the frame and return. -/
 theorem initsleeplock_finish [CurCtx] (cpu c : CPU) (k : KCtx)
     (hpin : k.sie = false ∨ k.proc = 0#64 → c = cpu) (hK : 4 ≤ k.avail)
@@ -124,9 +124,9 @@ theorem initsleeplock_finish [CurCtx] (cpu c : CPU) (k : KCtx)
 
 /-! ## The function -/
 
-theorem initsleeplock_br_ffffffffffffcb9a : KA.«initsleeplock» + 0xffffffffffffcb9a#64 = KA.«initlock» := by decide
+theorem initsleeplock_br_ffffffffffffcb4a : KA.«initsleeplock» + 0xffffffffffffcb4a#64 = KA.«initlock» := by decide
 
-theorem initsleeplock_br_3532 : KA.«initsleeplock» + 0x3532#64 = KStr.«sleep lock» := by decide
+theorem initsleeplock_br_34e2 : KA.«initsleeplock» + 0x34e2#64 = KStr.«sleep lock» := by decide
 
 set_option maxHeartbeats 4000000 in
 theorem initsleeplock_proof (IL : INITLOCK) : INITSLEEPLOCK :=
@@ -157,16 +157,16 @@ theorem initsleeplock_proof (IL : INITLOCK) : INITSLEEPLOCK :=
   k_step_gen (wp_s_auipc c3 _ (KA.«initsleeplock» + 0x10#64) false 3#20 11#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [isl_u3] next c4 hp4
   iintro Hk Hpc
-  k_step_gen (wp_s_addi c4 _ (KA.«initsleeplock» + 0x14#64) false 1314#12 11#5 11#5 (by decide))
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [initsleeplock_br_3532] next c5 hp5
+  k_step_gen (wp_s_addi c4 _ (KA.«initsleeplock» + 0x14#64) false 1234#12 11#5 11#5 (by decide))
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [initsleeplock_br_34e2] next c5 hp5
   iintro Hk Hpc
   -- a0 = &lk->lk
   k_step_gen (wp_s_addi c5 _ (KA.«initsleeplock» + 0x18#64) true 8#12 10#5 10#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c6 hp6
   iintro Hk Hpc
   -- jal ra, initlock
-  k_step_gen (wp_s_jal c6 _ (KA.«initsleeplock» + 0x1a#64) false 2083712#21 1#5 (by decide))
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [initsleeplock_br_ffffffffffffcb9a] next c7 hp7
+  k_step_gen (wp_s_jal c6 _ (KA.«initsleeplock» + 0x1a#64) false 2083632#21 1#5 (by decide))
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [initsleeplock_br_ffffffffffffcb4a] next c7 hp7
   iintro Hk Hpc
   have hpin7 : k.sie = false ∨ k.proc = 0#64 → c7 = cpu := fun h =>
     (hp7 h).trans ((hp6 h).trans ((hp5 h).trans ((hp4 h).trans

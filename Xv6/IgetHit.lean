@@ -257,10 +257,10 @@ theorem ig_hit (RH : RELEASE_HOOK) (c cpu : CPU) (k : KCtx) (spie spp : Bool) (h
   k_step (wp_s_auipc c _ (KA.«iget» + 0x5a#64) false 0x1e#20 10#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
-  k_step (wp_s_addi c _ (KA.«iget» + 0x5e#64) false 2478#12 10#5 10#5 (by decide))
+  k_step (wp_s_addi c _ (KA.«iget» + 0x5e#64) false 2958#12 10#5 10#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [ig_lock]
   iintro Hk Hpc
-  k_step (wp_s_jal c _ (KA.«iget» + 0x62#64) false 2088238#21 1#5 (by decide))
+  k_step (wp_s_jal c _ (KA.«iget» + 0x62#64) false 2088158#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [ig_br_rel]
   iintro Hk Hpc
   iapply (ig_release RH c cpu k spie spp hwf hK hlk hpin _ ?h10 (KA.«iget» + 0x66#64) ?h1)

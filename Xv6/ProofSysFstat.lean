@@ -441,7 +441,7 @@ theorem sys_fstat_main (AA : ARGADDR) (AF : ARGFD) (FS : FILESTAT)
   k_step_e (wp_s_addi cpu _ (KA.«sys_fstat» + 0xc#64) true 1#12 10#5 0#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [sfs_li1]
   iintro Hk Hpc
-  k_step_e (wp_s_jal cpu _ (KA.«sys_fstat» + 0xe#64) false 2087422#21 1#5 (by decide))
+  k_step_e (wp_s_jal cpu _ (KA.«sys_fstat» + 0xe#64) false 2087356#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [sys_fstat_br_argaddr]
   iintro Hk Hpc
   icases sysfile_core_tf ht0 (procAddr j) pid V M $$ Hcore with ⟨%htf, Htf, Htfp, Hcorew⟩

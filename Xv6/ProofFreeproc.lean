@@ -641,12 +641,12 @@ end
 
 /-- `&pid_lock`, folded out of `auipc a0,0x11; addi a0,a0,-1822`. -/
 theorem fp_pidlock_addr1 :
-    KA.«freeproc» + 0x10916#64
+    KA.«freeproc» + 0x10946#64
       = KA.«pid_lock» := by decide
 
 /-- ...and out of `auipc a0,0x11; addi a0,a0,-1838`. -/
 theorem fp_pidlock_addr2 :
-    KA.«freeproc» + 0x10916#64
+    KA.«freeproc» + 0x10946#64
       = KA.«pid_lock» := by decide
 
 /-- `"nextpid"` leaves the held set. -/
@@ -678,7 +678,7 @@ theorem freeproc_br_fffffffffffff1c6 : KA.«freeproc» + 0xfffffffffffff1c6#64 =
 
 theorem freeproc_br_fffffffffffff13e : KA.«freeproc» + 0xfffffffffffff13e#64 = KA.«acquire» := by decide
 
-theorem freeproc_br_10916 : KA.«freeproc» + 0x10916#64 = KA.«pid_lock» := by decide
+theorem freeproc_br_10946 : KA.«freeproc» + 0x10946#64 = KA.«pid_lock» := by decide
 
 theorem fp_pid (AC : ACQUIRE) (RE : RELEASE) [X : CurCtx]
     (Γ : SchedNames) (cpu : CPU) (k : KCtx) (γp : GName) (j : Nat) (hj : j < NPROC)
@@ -709,8 +709,8 @@ theorem fp_pid (AC : ACQUIRE) (RE : RELEASE) [X : CurCtx]
   k_step (wp_s_auipc cpu _ (KA.«freeproc» + 0x2a#64) false 17#20 10#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
-  k_step (wp_s_addi cpu _ (KA.«freeproc» + 0x2e#64) false 2284#12 10#5 10#5 (by decide))
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [freeproc_br_10916, fp_pidlock_addr1]
+  k_step (wp_s_addi cpu _ (KA.«freeproc» + 0x2e#64) false 2332#12 10#5 10#5 (by decide))
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [freeproc_br_10946, fp_pidlock_addr1]
   iintro Hk Hpc
   -- jal ra, acquire
   k_step (wp_s_jal cpu _ (KA.«freeproc» + 0x32#64) false 2093324#21 1#5 (by decide))
@@ -760,8 +760,8 @@ theorem fp_pid (AC : ACQUIRE) (RE : RELEASE) [X : CurCtx]
   k_step (wp_s_auipc cpu _ (KA.«freeproc» + 0x3a#64) false 17#20 10#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
-  k_step (wp_s_addi cpu _ (KA.«freeproc» + 0x3e#64) false 2268#12 10#5 10#5 (by decide))
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [freeproc_br_10916, fp_pidlock_addr2]
+  k_step (wp_s_addi cpu _ (KA.«freeproc» + 0x3e#64) false 2316#12 10#5 10#5 (by decide))
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [freeproc_br_10946, fp_pidlock_addr2]
   iintro Hk Hpc
   k_step (wp_s_jal cpu _ (KA.«freeproc» + 0x42#64) false 2093444#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [freeproc_br_fffffffffffff1c6]

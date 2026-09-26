@@ -6,7 +6,7 @@ cluster, the `++` / `--` clusters, and the record either flush writes.
 
 The walk is `SysLinkWalkA` / `SysLinkWalkB` / `ProofSysLink` (not yet
 written); the contract is `SpecSysLink` (after C0).  THE LEAN IMAGE
-(`KA.«sys_link»` = 0x80004f5e, 292 B), whose offsets every lemma below
+(`KA.«sys_link»` = 0x80004fae, 292 B), whose offsets every lemma below
 uses (never Rocq's comments):
     +0x00 `addi sp,sp,-304` ... +0x12/+0x26 `jal argstr` (old at s0-304,
     new at s0-176), +0x18/+0x2c `bltz`, +0x32 `jal begin_op`, +0x3a `jal
@@ -83,7 +83,7 @@ open MachCSL LeanRV64D
 
 /-! ## Call targets and return addresses -/
 
-theorem sys_link_br_argstr : KA.«sys_link» + 0xffffffffffffd9ee#64 = KA.«argstr» := by decide
+theorem sys_link_br_argstr : KA.«sys_link» + 0xffffffffffffd9ac#64 = KA.«argstr» := by decide
 theorem sys_link_br_begin_op : KA.«sys_link» + 0xffffffffffffedfa#64 = KA.«begin_op» := by decide
 theorem sys_link_br_namei : KA.«sys_link» + 0xffffffffffffec1c#64 = KA.«namei» := by decide
 theorem sys_link_br_ilock : KA.«sys_link» + 0xffffffffffffe390#64 = KA.«ilock» := by decide

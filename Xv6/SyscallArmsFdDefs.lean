@@ -570,7 +570,7 @@ theorem syscall_ret_fd (PT : SchedNames → IProp GF) (Γ : SchedNames)
     (htier : k.tier = KTier.kpt) (hpins : syscPins k R) (hs2 : R 18#5 = pageAddr V1.upt.tfp)
     (hrows : SyscRows V M (syscStore V1 (R 10#5)) M1 sts sts' cs cs' pid)
     (n : Int) (hn : syscNum V = n) (h1 : n ≠ 1) (h3 : n ≠ 3) (h7 : n ≠ 7) :
-    kctx cpu (((k.withSpie spie spp).pushed 4).withRegs R) ∗ pcIs cpu (KA.«syscall» + 0x3a#64) ∗
+    kctx cpu (((k.withSpie spie spp).pushed 4).withRegs R) ∗ pcIs cpu (KA.«syscall» + 0x46#64) ∗
     frame4s2 (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) (k.regs 9#5) (k.regs 18#5) ∗
     trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗
     bslots 3 ∗ syscInitId ip ∗ fdSlots FDSPARE ∗ irefSlots IREFSPARE ∗

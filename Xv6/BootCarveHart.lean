@@ -77,7 +77,7 @@ set_option linter.unusedSectionVars false
 /-! ## Geometry -/
 
 /-- The GOT slot `_entry` loads `&stack0` from, as a number. -/
-def bhGot : Nat := 0x8000a318
+def bhGot : Nat := 0x8000a348
 
 theorem bh_stack0Slot : stack0Slot = BitVec.ofNat 64 bhGot := by decide
 
@@ -87,10 +87,10 @@ def bhStackLo (c : CPU) : Nat := MachCSL.KernelSyms.«stack0» + 4096 * c.val
 /-- `&cpus[c]`, as a number. -/
 def bhCpuLo (c : CPU) : Nat := MachCSL.KernelSyms.«cpus» + 128 * c.val
 
-theorem bh_stack0_val : MachCSL.KernelSyms.«stack0» = 0x8000a350 := rfl
-theorem bh_cpus_val : MachCSL.KernelSyms.«cpus» = 0x80012460 := rfl
+theorem bh_stack0_val : MachCSL.KernelSyms.«stack0» = 0x8000a380 := rfl
+theorem bh_cpus_val : MachCSL.KernelSyms.«cpus» = 0x80012490 := rfl
 
-theorem bh_cpusBase_toNat : (KernelGeom.cpusBase : BitVec 64).toNat = 0x80012460 := by decide
+theorem bh_cpusBase_toNat : (KernelGeom.cpusBase : BitVec 64).toNat = 0x80012490 := by decide
 
 /-- `cpus` enumerates the hart indices `0 .. NCPU - 1`. -/
 theorem bh_range_cpus : List.range NCPU = cpus.map Fin.val := by decide
@@ -180,7 +180,7 @@ theorem bhRan_down (m : MemF Hist) :
 /-- **A `.bss` physical word at its zero** (Rocq `boot_cran_cell8_bss` at
 the M-mode tier). -/
 theorem bh_pword0 [CurCtx] (A : Nat)
-    (hlo : 0x8000a330 ≤ A) (hhi : A + 8 ≤ 0x80023640) (hal : A % 8 = 0) :
+    (hlo : 0x8000a360 ≤ A) (hhi : A + 8 ≤ 0x80023870) (hal : A % 8 = 0) :
     bootRan (GF := GF) (imgFlat bootImage) A (A + 8) ⊢ pwordPointsTo (BitVec.ofNat 64 A) 8 (DFrac.own 1) 0#64 := by
   have hA : bcInRam A 8 := by unfold bcInRam ramBase ramEnd; omega
   refine .trans ?_ (pwordPointsTo_intro _ 8 _ _ (bcInRam_inRam hA) (by rw [bc_ofNat_toNat hA]; exact hal))
@@ -198,7 +198,7 @@ theorem bh_sp_sub (c : CPU) (k : Nat) (hk : k ≤ 4096) :
   rw [bh_stack0_val]
   apply BitVec.eq_of_toNat_eq
   rw [BitVec.toNat_sub, hs, BitVec.toNat_ofNat, BitVec.toNat_ofNat]
-  rw [Nat.mod_eq_of_lt (a := k) (by omega), Nat.mod_eq_of_lt (by omega : 0x8000a350 + 4096 * c.val + 4096 - k < 2 ^ 64)]
+  rw [Nat.mod_eq_of_lt (a := k) (by omega), Nat.mod_eq_of_lt (by omega : 0x8000a380 + 4096 * c.val + 4096 - k < 2 ^ 64)]
   omega
 
 /-- The bridge's slot `i + 3` below `sp₀ - 16`, as a number. -/
@@ -215,7 +215,7 @@ theorem bh_slot_addr (c : CPU) (i : Nat) (hi : i < 508) :
 
 /-- The words below a `.bss` top `T`, at the hart's context, top-down. -/
 theorem bh_stack_rest [CurCtx] (n T : Nat)
-    (hlo : 0x8000a330 + 8 * n ≤ T) (hhi : T ≤ 0x80023640) (hal : T % 8 = 0) :
+    (hlo : 0x8000a360 + 8 * n ≤ T) (hhi : T ≤ 0x80023870) (hal : T % 8 = 0) :
     bootRan (GF := GF) (imgFlat bootImage) (T - 8 * n) T ⊢
       [∗list] i ∈ List.range n,
         ∃ w : BitVec 64, pwordPointsTo (BitVec.ofNat 64 (T - 8 * (i + 1))) 8 (DFrac.own 1) w := by
@@ -242,7 +242,7 @@ theorem bootStack_carve [CurCtx] (c : CPU) :
         ∃ w : BitVec 64, pwordPointsTo (spOf c - 16#64 - 8#64 * BitVec.ofNat 64 (i + 3)) 8 (DFrac.own 1) w := by
   have hc := c.isLt
   unfold NCPU at hc
-  have hL : bhStackLo c = 0x8000a350 + 4096 * c.val := by unfold bhStackLo; rw [bh_stack0_val]
+  have hL : bhStackLo c = 0x8000a380 + 4096 * c.val := by unfold bhStackLo; rw [bh_stack0_val]
   have e16 : spOf c - 16#64 = BitVec.ofNat 64 (bhStackLo c + 4080) := bh_sp_sub c 16 (by omega)
   have e8 : spOf c - 8#64 = BitVec.ofNat 64 (bhStackLo c + 4088) := bh_sp_sub c 8 (by omega)
   have e32 : spOf c - 32#64 = BitVec.ofNat 64 (bhStackLo c + 4064) := bh_sp_sub c 32 (by omega)
@@ -314,7 +314,7 @@ theorem bootCpuCtxFree (c : CPU) :
       bootRan (imgFlat bootImage) (bhCpuLo c + 8) (bhCpuLo c + 120) -∗ |==> cpuCtxFree c := by
   have hc := c.isLt
   unfold NCPU at hc
-  have hC : bhCpuLo c = 0x80012460 + 128 * c.val := by unfold bhCpuLo; rw [bh_cpus_val]
+  have hC : bhCpuLo c = 0x80012490 + 128 * c.val := by unfold bhCpuLo; rw [bh_cpus_val]
   iintro #Hk #Hv H
   imod ctxStamped_boot (GF := GF) with ⟨%ξ, Hs⟩
   letI X : CurCtx := ⟨ξ, KTier.kpt⟩
@@ -360,7 +360,7 @@ theorem bootCpuCells [CurCtx] (c : CPU) :
       (∃ b : Bool, wordPointsTo (aCpuIntena c) 4 (DFrac.own 1) (intenaVal b)) := by
   have hc := c.isLt
   unfold NCPU at hc
-  have hC : bhCpuLo c = 0x80012460 + 128 * c.val := by unfold bhCpuLo; rw [bh_cpus_val]
+  have hC : bhCpuLo c = 0x80012490 + 128 * c.val := by unfold bhCpuLo; rw [bh_cpus_val]
   have hp : (aCpuProc c).toNat = bhCpuLo c := by
     unfold aCpuProc; rw [cpuField_toNat c procOff (by decide), bh_cpusBase_toNat, hC]; rfl
   have hn : (aCpuNoff c).toNat = bhCpuLo c + 120 := by

@@ -154,7 +154,7 @@ theorem syscall_epilogue_tail (PT : SchedNames → IProp GF) (Γ : SchedNames)
     (V2 : ProcPriv) (M2 : Nat → List (BitVec 8)) (sts' : List FdState) (cs' : ExtTreeSet GName compare)
     (hj : j < NPROC) (hproc : k.proc = procAddr j) (hK : syscallSlots ≤ k.avail)
     (hpins : syscPins k R) (hrows : SyscRows V M V2 M2 sts sts' cs cs' pid) :
-    kctx cpu (((k.withSpie spie spp).pushed 4).withRegs R) ∗ pcIs cpu (KA.«syscall» + 0x58#64) ∗
+    kctx cpu (((k.withSpie spie spp).pushed 4).withRegs R) ∗ pcIs cpu (KA.«syscall» + 0x6c#64) ∗
     frame4s2 (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) (k.regs 9#5) (k.regs 18#5) ∗
     trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗
     bslots 3 ∗ syscInitId ip ∗ fdSlots FDSPARE ∗ irefSlots IREFSPARE ∗
@@ -179,7 +179,7 @@ theorem syscall_epilogue_tail (PT : SchedNames → IProp GF) (Γ : SchedNames)
         ((k.withSpie spie spp).regs 8#5) ((k.withSpie spie spp).regs 9#5)
         ((k.withSpie spie spp).regs 18#5) from by
     simp only [KCtx.withSpie_regs]; iintro H; iexact H) $$ Hframe
-  iapply (wp_epilogue4s2_gen cpu (k.withSpie spie spp) (KA.«syscall» + 0x58#64)
+  iapply (wp_epilogue4s2_gen cpu (k.withSpie spie spp) (KA.«syscall» + 0x6c#64)
       (by simp only [KCtx.withSpie_avail]; exact hK4) R
       (by simp only [KCtx.withSpie_regs]; exact h2) ((k.withSpie spie spp).regs 1#5)
       ((k.withSpie spie spp).regs 8#5) ((k.withSpie spie spp).regs 9#5)
@@ -211,7 +211,7 @@ theorem syscall_ret_tail (PT : SchedNames → IProp GF) (Γ : SchedNames)
     (hj : j < NPROC) (hproc : k.proc = procAddr j) (hK : syscallSlots ≤ k.avail)
     (htier : k.tier = KTier.kpt) (hpins : syscPins k R) (hs2 : R 18#5 = pageAddr V1.upt.tfp)
     (hrows : SyscRows V M (syscStore V1 (R 10#5)) M1 sts sts' cs cs' pid) :
-    kctx cpu (((k.withSpie spie spp).pushed 4).withRegs R) ∗ pcIs cpu (KA.«syscall» + 0x3a#64) ∗
+    kctx cpu (((k.withSpie spie spp).pushed 4).withRegs R) ∗ pcIs cpu (KA.«syscall» + 0x46#64) ∗
     frame4s2 (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) (k.regs 9#5) (k.regs 18#5) ∗
     trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗
     bslots 3 ∗ syscInitId ip ∗ fdSlots FDSPARE ∗ irefSlots IREFSPARE ∗
@@ -236,13 +236,13 @@ theorem syscall_ret_tail (PT : SchedNames → IProp GF) (Γ : SchedNames)
   rw [show BitVec.ofNat 64 (8 * tfArgIdx 0) = 112#64 from rfl] at hst
   icases hst $$ Htf with ⟨⟨%w, Hc⟩, Htfw⟩
   -- +0x3a  sd a0,112(s2)
-  k_step_e (wp_s_sd cpu _ (KA.«syscall» + 0x3a#64) false 112#12 18#5 10#5 (by decide) w)
+  k_step_e (wp_s_sd cpu _ (KA.«syscall» + 0x46#64) false 112#12 18#5 10#5 (by decide) w)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hs2]
   iintro Hk Hpc Hc
   ihave Htf := Htfw $$ %_ Hc
   ihave Hpriv := Hback $$ %_ Htf
   -- +0x3e  c.j +0x58
-  k_step_e (wp_s_j cpu _ (KA.«syscall» + 0x3e#64) true 0x1a#21)
+  k_step_e (wp_s_j cpu _ (KA.«syscall» + 0x4a#64) true 0x22#21)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
   iapply (syscall_epilogue_tail PT Γ c0 cpu k spie spp R γ j pid V M sts gn cs ip f

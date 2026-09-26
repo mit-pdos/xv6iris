@@ -28,10 +28,10 @@ set_option linter.unusedVariables false
 set_option linter.unusedSectionVars false
 set_option linter.unusedSimpArgs false
 
-theorem ut56_fmt1 : KA.«usertrap» + 19498#64 = KStr.«usertrap(): unexpected scause 0x%lx pid=%d\n» := by
+theorem ut56_fmt1 : KA.«usertrap» + 19484#64 = KStr.«usertrap(): unexpected scause 0x%lx pid=%d\n» := by
   decide
-theorem ut56_fmt2 : KA.«usertrap» + 19546#64 = KStr.«            sepc=0x%lx stval=0x%lx\n» := by decide
-theorem ut56_printk : KA.«usertrap» + 18446744073709543064#64 = KA.«printk» := by decide
+theorem ut56_fmt2 : KA.«usertrap» + 19532#64 = KStr.«            sepc=0x%lx stval=0x%lx\n» := by decide
+theorem ut56_printk : KA.«usertrap» + 18446744073709543050#64 = KA.«printk» := by decide
 theorem ut56_setkilled : KA.«usertrap» + 18446744073709550450#64 = KA.«setkilled» := by decide
 theorem ut56_ret68 : jumpPc (KA.«usertrap» + 0x68#64) = KA.«usertrap» + 0x68#64 := by decide
 theorem ut56_ret7c : jumpPc (KA.«usertrap» + 0x7c#64) = KA.«usertrap» + 0x7c#64 := by decide
@@ -86,11 +86,11 @@ theorem usertrap_56_proof (PK : PRINTK) (SK : SETKILLED) (HA : UT_A6 PT Γ) : UT
   k_step (wp_s_auipc cpu _ (KA.«usertrap» + 0x5c#64) false 5#20 10#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
-  k_step (wp_s_addi cpu _ (KA.«usertrap» + 0x60#64) false 3022#12 10#5 10#5 (by decide))
+  k_step (wp_s_addi cpu _ (KA.«usertrap» + 0x60#64) false 3008#12 10#5 10#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
   -- +0x64  jal printk
-  k_step (wp_s_jal cpu _ (KA.«usertrap» + 0x64#64) false 0x1fde34#21 1#5 (by decide))
+  k_step (wp_s_jal cpu _ (KA.«usertrap» + 0x64#64) false 0x1fde26#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [ut56_printk]
   iintro Hk Hpc
   iapply (utA_printk PK cpu _ γpr γl γd [] DFrac.discard utFmt1 ?hK1 ?hf1 utFmt1_kinds ?hs1 ?hn1 ?hp1 ?hu1)
@@ -118,11 +118,11 @@ theorem usertrap_56_proof (PK : PRINTK) (SK : SETKILLED) (HA : UT_A6 PT Γ) : UT
   k_step (wp_s_auipc cpu _ (KA.«usertrap» + 0x70#64) false 5#20 10#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
-  k_step (wp_s_addi cpu _ (KA.«usertrap» + 0x74#64) false 3050#12 10#5 10#5 (by decide))
+  k_step (wp_s_addi cpu _ (KA.«usertrap» + 0x74#64) false 3036#12 10#5 10#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
   -- +0x78  jal printk
-  k_step (wp_s_jal cpu _ (KA.«usertrap» + 0x78#64) false 0x1fde20#21 1#5 (by decide))
+  k_step (wp_s_jal cpu _ (KA.«usertrap» + 0x78#64) false 0x1fde12#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [ut56_printk]
   iintro Hk Hpc
   iapply (utA_printk PK cpu _ γpr γl γd [] DFrac.discard utFmt2 ?hK2 ?hf2 utFmt2_kinds ?hs2 ?hn2 ?hp2 ?hu2)

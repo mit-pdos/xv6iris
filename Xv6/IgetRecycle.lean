@@ -487,10 +487,10 @@ theorem ig_recycle_rel (RH : RELEASE_HOOK) (c cpu : CPU) (k : KCtx) (spie spp : 
   k_step (wp_s_auipc c _ (KA.«iget» + 0x80#64) false 0x1e#20 10#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
-  k_step (wp_s_addi c _ (KA.«iget» + 0x84#64) false 2440#12 10#5 10#5 (by decide))
+  k_step (wp_s_addi c _ (KA.«iget» + 0x84#64) false 2920#12 10#5 10#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [ig_lock]
   iintro Hk Hpc
-  k_step (wp_s_jal c _ (KA.«iget» + 0x88#64) false 2088200#21 1#5 (by decide))
+  k_step (wp_s_jal c _ (KA.«iget» + 0x88#64) false 2088120#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [ig_br_rel]
   iintro Hk Hpc
   iapply (ig_release RH c cpu k spie spp hwf hK hlk hpin _ ?h10 (KA.«iget» + 0x8c#64) ?h1)
@@ -643,10 +643,10 @@ theorem ig_panic_arm (PA : PANIC) (c : CPU) (k : KCtx) (spie spp : Bool)
   k_step (wp_s_auipc c _ (KA.«iget» + 0x9e#64) false 0x4#20 10#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
-  k_step (wp_s_addi c _ (KA.«iget» + 0xa2#64) false 1050#12 10#5 10#5 (by decide))
+  k_step (wp_s_addi c _ (KA.«iget» + 0xa2#64) false 970#12 10#5 10#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [ig_msg]
   iintro Hk Hpc
-  k_step (wp_s_jal c _ (KA.«iget» + 0xa6#64) false 2086978#21 1#5 (by decide))
+  k_step (wp_s_jal c _ (KA.«iget» + 0xa6#64) false 2086898#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [ig_br_panic]
   iintro Hk Hpc
   iapply (ig_panic PA c _ ?pa ?pk ?pn ?pp ?pu) $$ [- $Hk $Hpc $Hpe $Hmsg]

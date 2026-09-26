@@ -44,8 +44,8 @@ theorem kk_toNat (m : Nat) (h : m < 2 ^ 64) : (BitVec.ofNat 64 m).toNat = m := b
 
 /-- `&proc[i]` as a number, up to and including the sentinel `&proc[NPROC]`. -/
 theorem kk_procAddr_toNat (j : Nat) (hj : j ≤ NPROC) :
-    (procAddr j).toNat = KernelSyms.«proc» + 360 * j := by
-  have h1 : (BitVec.ofNat 64 (procSize * j)).toNat = 360 * j := by
+    (procAddr j).toNat = KernelSyms.«proc» + 368 * j := by
+  have h1 : (BitVec.ofNat 64 (procSize * j)).toNat = 368 * j := by
     simp only [BitVec.toNat_ofNat, procSize]
     exact Nat.mod_eq_of_lt (by unfold NPROC at hj; omega)
   have h2 : (procsAddr : BitVec 64).toNat = KernelSyms.«proc» := by decide
@@ -54,13 +54,13 @@ theorem kk_procAddr_toNat (j : Nat) (hj : j ≤ NPROC) :
   rw [BitVec.toNat_add, h1, h2]
   exact Nat.mod_eq_of_lt (by unfold NPROC at hj; omega)
 
-/-- The cursor one slot on (`addi s1,s1,360`). -/
-theorem kk_cursor (i : Nat) : procAddr i + 360#64 = procAddr (i + 1) := by
+/-- The cursor one slot on (`addi s1,s1,368`). -/
+theorem kk_cursor (i : Nat) : procAddr i + 368#64 = procAddr (i + 1) := by
   unfold procAddr procSize
-  rw [show 360 * (i + 1) = 360 * i + 360 from by omega, BitVec.ofNat_add,
-    show BitVec.ofNat 64 360 = 360#64 from rfl, BitVec.add_assoc]
+  rw [show 368 * (i + 1) = 368 * i + 368 from by omega, BitVec.ofNat_add,
+    show BitVec.ofNat 64 368 = 368#64 from rfl, BitVec.add_assoc]
 
-/-- The sentinel `&proc[NPROC] = 0x80018260`. -/
+/-- The sentinel `&proc[NPROC] = 0x80018490`. -/
 theorem kk_sentinel : procAddr NPROC = KA.«tickslock» := by decide
 
 /-- The loop test: the scan stops exactly at the last slot. -/
@@ -71,7 +71,7 @@ theorem kk_cursor_eq (i : Nat) (hi : i < NPROC) :
     have h := congrArg BitVec.toNat he
     rw [kk_procAddr_toNat (i + 1) (by unfold NPROC at hi ⊢; omega)] at h
     have hr : (KA.«tickslock»).toNat = KernelSyms.«tickslock» := rfl
-    have hts : KernelSyms.«tickslock» = KernelSyms.«proc» + 360 * 64 := by decide
+    have hts : KernelSyms.«tickslock» = KernelSyms.«proc» + 368 * 64 := by decide
     rw [hr] at h
     unfold NPROC
     omega
@@ -108,11 +108,11 @@ theorem kk_sext_sleeping (st : BitVec 32) (h : BitVec.signExtend 64 st = 2#64) :
 
 /-- `&proc`, folded out of `auipc s1,0x10 ; addi s1,s1,1714`. -/
 theorem kk_proc0_addr :
-    KA.«kkill» + 0x106cc#64 = KA.«proc» := by decide
+    KA.«kkill» + 0x106ee#64 = KA.«proc» := by decide
 
 /-- `&proc[NPROC]`, folded out of `auipc s3,0x16 ; addi s3,s3,170`. -/
 theorem kk_sent_addr :
-    KA.«kkill» + 0x160cc#64 = KA.«tickslock» := by decide
+    KA.«kkill» + 0x162ee#64 = KA.«tickslock» := by decide
 
 theorem kk_procAddr_zero : procAddr 0 = KA.«proc» := by decide
 
@@ -219,7 +219,7 @@ set_option maxHeartbeats 4000000 in
 /-- The no-match tail at `+0x2e`: `release(&p->lock)`, the cursor step
 and the termination test.  The lock is still held, so the hart is pinned up
 to the release. -/
-theorem kkill_br_ffffffffffffeb4c : KA.«kkill» + 0xffffffffffffeb4c#64 = KA.«release» := by decide
+theorem kkill_br_ffffffffffffeb3e : KA.«kkill» + 0xffffffffffffeb3e#64 = KA.«release» := by decide
 
 theorem kk_rel_nomatch (RE : RELEASE) {hlc : HasLC} {GF : BundledGFunctors}
     [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [CurCtx]
@@ -253,8 +253,8 @@ theorem kk_rel_nomatch (RE : RELEASE) {hlc : HasLC} {GF : BundledGFunctors}
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h9] next c1 hq1
   iintro Hk Hpc
   -- jal ra, release
-  k_step_gen (wp_s_jal c1 _ (KA.«kkill» + 0x30#64) false 2091804#21 1#5 (by decide))
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [kkill_br_ffffffffffffeb4c] next c2 hq2
+  k_step_gen (wp_s_jal c1 _ (KA.«kkill» + 0x30#64) false 2091790#21 1#5 (by decide))
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [kkill_br_ffffffffffffeb3e] next c2 hq2
   iintro Hk Hpc
   have e1 : c1 = c := hq1 (Or.inl rfl)
   subst e1
@@ -292,8 +292,8 @@ theorem kk_rel_nomatch (RE : RELEASE) {hlc : HasLC} {GF : BundledGFunctors}
   have h9' : R3 9#5 = procAddr i := d9.trans h9
   have h18' : R3 18#5 = arg := d18.trans h18
   have h19' : R3 19#5 = KA.«tickslock» := d19.trans h19
-  -- addi s1,s1,360
-  k_step_gen (wp_s_addi c3 _ (KA.«kkill» + 0x34#64) false 360#12 9#5 9#5 (by decide))
+  -- addi s1,s1,368
+  k_step_gen (wp_s_addi c3 _ (KA.«kkill» + 0x34#64) false 368#12 9#5 9#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
     with [h9', kk_cursor i] next c4 hq4
   iintro Hk Hpc
@@ -354,8 +354,8 @@ theorem kk_rel_found (RE : RELEASE) {hlc : HasLC} {GF : BundledGFunctors}
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h9] next c1 hq1
   iintro Hk Hpc
   -- jal ra, release
-  k_step_gen (wp_s_jal c1 _ (KA.«kkill» + 0x4e#64) false 2091774#21 1#5 (by decide))
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [kkill_br_ffffffffffffeb4c] next c2 hq2
+  k_step_gen (wp_s_jal c1 _ (KA.«kkill» + 0x4e#64) false 2091760#21 1#5 (by decide))
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [kkill_br_ffffffffffffeb3e] next c2 hq2
   iintro Hk Hpc
   have e1 : c1 = c := hq1 (Or.inl rfl)
   subst e1
@@ -534,7 +534,7 @@ theorem kk_found (RE : RELEASE) {hlc : HasLC} {GF : BundledGFunctors}
 
 /-! ## `kkill`: one iteration of the scan -/
 
-theorem kkill_br_ffffffffffffeac4 : KA.«kkill» + 0xffffffffffffeac4#64 = KA.«acquire» := by decide
+theorem kkill_br_ffffffffffffeab6 : KA.«kkill» + 0xffffffffffffeab6#64 = KA.«acquire» := by decide
 
 set_option maxHeartbeats 4000000 in
 /-- The body at `+0x22` for slot `i`: `acquire(&p->lock)`, the pid
@@ -572,8 +572,8 @@ theorem kk_iter (AC : ACQUIRE) (RE : RELEASE) {hlc : HasLC} {GF : BundledGFuncto
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h9] next c1 hp1
   iintro Hk Hpc
   -- jal ra, acquire
-  k_step_gen (wp_s_jal c1 _ (KA.«kkill» + 0x24#64) false 2091680#21 1#5 (by decide))
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [kkill_br_ffffffffffffeac4] next c2 hp2
+  k_step_gen (wp_s_jal c1 _ (KA.«kkill» + 0x24#64) false 2091666#21 1#5 (by decide))
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [kkill_br_ffffffffffffeab6] next c2 hp2
   iintro Hk Hpc
   iapply (kl_acquire AC c2 _ (Γ.lock i) (procLockPay Γ i) ?hna ?hKa ?hla) $$ [- $Hk $Hpc]
   rotate_right 1
@@ -840,9 +840,9 @@ theorem kk_epi {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CurCtx]
   · simp only [RegMap.set_apply, BitVec.reduceEq, ite_true, ite_false]
     exact hret
 
-theorem kkill_br_160cc : KA.«kkill» + 0x160cc#64 = KA.«tickslock» := by decide
+theorem kkill_br_162ee : KA.«kkill» + 0x162ee#64 = KA.«tickslock» := by decide
 
-theorem kkill_br_106cc : KA.«kkill» + 0x106cc#64 = KA.«proc» := by decide
+theorem kkill_br_106ee : KA.«kkill» + 0x106ee#64 = KA.«proc» := by decide
 
 set_option maxHeartbeats 4000000 in
 /-- **`kkill` meets its specification.** -/
@@ -918,14 +918,14 @@ theorem kkill_proof (AC : ACQUIRE) (RE : RELEASE) : KKILL :=
   k_step_gen (wp_s_auipc c8 _ (KA.«kkill» + 0x12#64) false 16#20 9#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c9 hp9
   iintro Hk Hpc
-  k_step_gen (wp_s_addi c9 _ (KA.«kkill» + 0x16#64) false 1722#12 9#5 9#5 (by decide))
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [kkill_br_106cc, kk_proc0_addr] next c10 hp10
+  k_step_gen (wp_s_addi c9 _ (KA.«kkill» + 0x16#64) false 1756#12 9#5 9#5 (by decide))
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [kkill_br_106ee, kk_proc0_addr] next c10 hp10
   iintro Hk Hpc
   k_step_gen (wp_s_auipc c10 _ (KA.«kkill» + 0x1a#64) false 22#20 19#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c11 hp11
   iintro Hk Hpc
-  k_step_gen (wp_s_addi c11 _ (KA.«kkill» + 0x1e#64) false 178#12 19#5 19#5 (by decide))
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [kkill_br_160cc, kk_sent_addr] next c12 hp12
+  k_step_gen (wp_s_addi c11 _ (KA.«kkill» + 0x1e#64) false 724#12 19#5 19#5 (by decide))
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [kkill_br_162ee, kk_sent_addr] next c12 hp12
   iintro Hk Hpc
   have hpin12 : k.sie = false ∨ k.proc = 0#64 → c12 = cpu := fun h =>
     (hp12 h).trans ((hp11 h).trans ((hp10 h).trans ((hp9 h).trans ((hp8 h).trans

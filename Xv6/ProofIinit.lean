@@ -218,7 +218,7 @@ theorem ii_initsleeplock_call (IS : INITSLEEPLOCK) [CurCtx] (c : CPU) (k' : KCtx
 theorem iinit_br_f18 : KA.«iinit» + 0xf18#64 = KA.«initsleeplock» := by decide
 
 set_option maxHeartbeats 4000000 in
-/-- The body at `0x80003160`: `initsleeplock(&itable.inode[i], "inode")`,
+/-- The body at `0x800031b0`: `initsleeplock(&itable.inode[i], "inode")`,
 step the cursor and test for the last inode. -/
 theorem ii_iter (IS : INITSLEEPLOCK) [CurCtx] (k : KCtx) (hK : 12 ≤ k.avail)
     (i : Nat) (hi : i < 50) (R : RegMap)
@@ -286,7 +286,7 @@ theorem ii_iter (IS : INITSLEEPLOCK) [CurCtx] (k : KCtx) (hK : 12 ≤ k.avail)
 /-! ## The loop -/
 
 set_option maxHeartbeats 4000000 in
-/-- The loop from `0x80003160` with `i` inodes initialised (`i < 50`) runs to
+/-- The loop from `0x800031b0` with `i` inodes initialised (`i < 50`) runs to
 the epilogue at `(KernelSyms.«iinit» + 0x4a)`.  The hart is quantified inside the induction. -/
 theorem ii_loop (IS : INITSLEEPLOCK) [CurCtx] (k : KCtx) (hK : 12 ≤ k.avail) (fuel : Nat) :
     ∀ (i : Nat) (_ : 50 - i = fuel + 1) (R : RegMap)
@@ -344,7 +344,7 @@ theorem ii_loop (IS : INITSLEEPLOCK) [CurCtx] (k : KCtx) (hK : 12 ≤ k.avail) (
 /-! ## The epilogue -/
 
 set_option maxHeartbeats 4000000 in
-/-- The epilogue at `0x80003170`: restore `ra`, `s0`, `s1`, `s2`, `s3`, pop
+/-- The epilogue at `0x800031c0`: restore `ra`, `s0`, `s1`, `s2`, `s3`, pop
 the frame and return to the caller (carrying the body's resources `Q`). -/
 theorem ii_epi [CurCtx] (cpu cur : CPU) (k : KCtx)
     (hpin : k.sie = false ∨ k.proc = 0#64 → cur = cpu) (hK : 6 ≤ k.avail)
@@ -404,17 +404,17 @@ theorem ii_epi [CurCtx] (cpu cur : CPU) (k : KCtx)
 
 /-! ## The function -/
 
-theorem iinit_br_432a : KA.«iinit» + 0x432a#64 = KStr.«inode» := by decide
+theorem iinit_br_42da : KA.«iinit» + 0x42da#64 = KStr.«inode» := by decide
 
-theorem iinit_br_1f2ea : KA.«iinit» + 0x1f2ea#64 = (KA.«log» + 0x10#64) := by decide
+theorem iinit_br_1f4ca : KA.«iinit» + 0x1f4ca#64 = (KA.«log» + 0x10#64) := by decide
 
-theorem iinit_br_1d85a : KA.«iinit» + 0x1d85a#64 = (KA.«itable» + 0x28#64) := by decide
+theorem iinit_br_1da3a : KA.«iinit» + 0x1da3a#64 = (KA.«itable» + 0x28#64) := by decide
 
-theorem iinit_br_ffffffffffffdab2 : KA.«iinit» + 0xffffffffffffdab2#64 = KA.«initlock» := by decide
+theorem iinit_br_ffffffffffffda62 : KA.«iinit» + 0xffffffffffffda62#64 = KA.«initlock» := by decide
 
-theorem iinit_br_1d832 : KA.«iinit» + 0x1d832#64 = KA.«itable» := by decide
+theorem iinit_br_1da12 : KA.«iinit» + 0x1da12#64 = KA.«itable» := by decide
 
-theorem iinit_br_4322 : KA.«iinit» + 0x4322#64 = KStr.«itable» := by decide
+theorem iinit_br_42d2 : KA.«iinit» + 0x42d2#64 = KStr.«itable» := by decide
 
 set_option maxHeartbeats 4000000 in
 theorem iinit_proof (IL : INITLOCK) (IS : INITSLEEPLOCK) : IINIT :=
@@ -453,18 +453,18 @@ theorem iinit_proof (IL : INITLOCK) (IS : INITSLEEPLOCK) : IINIT :=
   k_step_gen (wp_s_auipc c7 _ (KA.«iinit» + 0xe#64) false 4#20 11#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [ii_u4] next c8 hp8
   iintro Hk Hpc
-  k_step_gen (wp_s_addi c8 _ (KA.«iinit» + 0x12#64) false 788#12 11#5 11#5 (by decide))
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [iinit_br_4322] next c9 hp9
+  k_step_gen (wp_s_addi c8 _ (KA.«iinit» + 0x12#64) false 708#12 11#5 11#5 (by decide))
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [iinit_br_42d2] next c9 hp9
   iintro Hk Hpc
   k_step_gen (wp_s_auipc c9 _ (KA.«iinit» + 0x16#64) false 0x1e#20 10#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [ii_u1e] next c10 hp10
   iintro Hk Hpc
-  k_step_gen (wp_s_addi c10 _ (KA.«iinit» + 0x1a#64) false 2076#12 10#5 10#5 (by decide))
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [iinit_br_1d832] next c11 hp11
+  k_step_gen (wp_s_addi c10 _ (KA.«iinit» + 0x1a#64) false 2556#12 10#5 10#5 (by decide))
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [iinit_br_1da12] next c11 hp11
   iintro Hk Hpc
   -- jal ra, initlock
-  k_step_gen (wp_s_jal c11 _ (KA.«iinit» + 0x1e#64) false 2087572#21 1#5 (by decide))
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [iinit_br_ffffffffffffdab2] next c12 hp12
+  k_step_gen (wp_s_jal c11 _ (KA.«iinit» + 0x1e#64) false 2087492#21 1#5 (by decide))
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [iinit_br_ffffffffffffda62] next c12 hp12
   iintro Hk Hpc
   have hpin12 : k.sie = false ∨ k.proc = 0#64 → c12 = cpu := fun h =>
     (hp12 h).trans ((hp11 h).trans ((hp10 h).trans ((hp9 h).trans ((hp8 h).trans ((hp7 h).trans
@@ -490,20 +490,20 @@ theorem iinit_proof (IL : INITLOCK) (IS : INITSLEEPLOCK) : IINIT :=
   k_step_gen (wp_s_auipc c13 _ (KA.«iinit» + 0x22#64) false 0x1e#20 9#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [ii_u1e] next c14 hp14
   iintro Hk Hpc
-  k_step_gen (wp_s_addi c14 _ (KA.«iinit» + 0x26#64) false 2104#12 9#5 9#5 (by decide))
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [iinit_br_1d85a] next c15 hp15
+  k_step_gen (wp_s_addi c14 _ (KA.«iinit» + 0x26#64) false 2584#12 9#5 9#5 (by decide))
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [iinit_br_1da3a] next c15 hp15
   iintro Hk Hpc
   k_step_gen (wp_s_auipc c15 _ (KA.«iinit» + 0x2a#64) false 0x1f#20 19#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [ii_u1f] next c16 hp16
   iintro Hk Hpc
-  k_step_gen (wp_s_addi c16 _ (KA.«iinit» + 0x2e#64) false 704#12 19#5 19#5 (by decide))
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [iinit_br_1f2ea] next c17 hp17
+  k_step_gen (wp_s_addi c16 _ (KA.«iinit» + 0x2e#64) false 1184#12 19#5 19#5 (by decide))
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [iinit_br_1f4ca] next c17 hp17
   iintro Hk Hpc
   k_step_gen (wp_s_auipc c17 _ (KA.«iinit» + 0x32#64) false 4#20 18#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [ii_u4] next c18 hp18
   iintro Hk Hpc
-  k_step_gen (wp_s_addi c18 _ (KA.«iinit» + 0x36#64) false 760#12 18#5 18#5 (by decide))
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [iinit_br_432a] next c19 hp19
+  k_step_gen (wp_s_addi c18 _ (KA.«iinit» + 0x36#64) false 680#12 18#5 18#5 (by decide))
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [iinit_br_42da] next c19 hp19
   iintro Hk Hpc
   have hpin19 : k.sie = false ∨ k.proc = 0#64 → c19 = cpu := fun h =>
     (hp19 h).trans ((hp18 h).trans ((hp17 h).trans ((hp16 h).trans ((hp15 h).trans
@@ -516,7 +516,7 @@ theorem iinit_proof (IL : INITLOCK) (IS : INITSLEEPLOCK) : IINIT :=
   · isplitl []
     · simp only [List.range_zero]
       exact BigSepL.bigSepL_nil_intro
-    -- the exit at 0x80003170 and the epilogue
+    -- the exit at 0x800031c0 and the epilogue
     · iapply wpNext_intro_pin
       iintro %cE %hpE %R2 Hk Hpc Hdone %hkept
       have hk2 : R2 2#5 = k.regs 2#5 + 0xFFFFFFFFFFFFFFD0#64 := by

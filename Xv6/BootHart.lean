@@ -61,7 +61,7 @@ set_option linter.unusedSectionVars false
 index at reset (`MachCSL.resetVal`), and the GOT slot holds `&stack0`. -/
 def spOf (cpu : CPU) : BitVec 64 := bootSp KA.«stack0» (hartId cpu)
 
-theorem spOf_toNat (cpu : CPU) : (spOf cpu).toNat = 0x8000a350 + 4096 * (cpu.val + 1) := by
+theorem spOf_toNat (cpu : CPU) : (spOf cpu).toNat = 0x8000a380 + 4096 * (cpu.val + 1) := by
   revert cpu; decide
 
 /-- `sp₀` is 16-aligned (the RISC-V ABI's stack alignment). -/
@@ -76,7 +76,7 @@ def bootStackSlots : Nat := 510
 /-- The address of slot `i` below `main`'s entry `sp`. -/
 theorem bootStack_slot_toNat (cpu : CPU) (i : Nat) (hi : i < bootStackSlots) :
     (spOf cpu - 16#64 - 8#64 * BitVec.ofNat 64 (i + 1)).toNat =
-      0x8000a350 + 4096 * (cpu.val + 1) - 16 - 8 * (i + 1) := by
+      0x8000a380 + 4096 * (cpu.val + 1) - 16 - 8 * (i + 1) := by
   have hs := spOf_toNat cpu
   have hc := cpu.isLt
   unfold bootStackSlots NCPU at *
@@ -107,12 +107,12 @@ theorem bootStack_rw (cpu : CPU) (i : Nat) (hi : i < bootStackSlots) :
   generalize spOf cpu - 16#64 - 8#64 * BitVec.ofNat 64 (i + 1) = a at *
   unfold vpnOf kmapClass
   rw [BitVec.extractLsb'_toNat, Nat.shiftRight_eq_div_pow, h]
-  have h1 : 0x80007 ≤ (0x8000a350 + 4096 * (cpu.val + 1) - 16 - 8 * (i + 1)) / 2 ^ 12 % 2 ^ 27 := by
+  have h1 : 0x80007 ≤ (0x8000a380 + 4096 * (cpu.val + 1) - 16 - 8 * (i + 1)) / 2 ^ 12 % 2 ^ 27 := by
     omega
-  have h2 : (0x8000a350 + 4096 * (cpu.val + 1) - 16 - 8 * (i + 1)) / 2 ^ 12 % 2 ^ 27 < 0x88000 := by
+  have h2 : (0x8000a380 + 4096 * (cpu.val + 1) - 16 - 8 * (i + 1)) / 2 ^ 12 % 2 ^ 27 < 0x88000 := by
     omega
-  have h3 : ¬ (0x80000 ≤ (0x8000a350 + 4096 * (cpu.val + 1) - 16 - 8 * (i + 1)) / 2 ^ 12 % 2 ^ 27 ∧
-      (0x8000a350 + 4096 * (cpu.val + 1) - 16 - 8 * (i + 1)) / 2 ^ 12 % 2 ^ 27 < 0x80007) := by
+  have h3 : ¬ (0x80000 ≤ (0x8000a380 + 4096 * (cpu.val + 1) - 16 - 8 * (i + 1)) / 2 ^ 12 % 2 ^ 27 ∧
+      (0x8000a380 + 4096 * (cpu.val + 1) - 16 - 8 * (i + 1)) / 2 ^ 12 % 2 ^ 27 < 0x80007) := by
     omega
   rw [if_neg h3, if_pos (Or.inl ⟨h1, h2⟩)]
 

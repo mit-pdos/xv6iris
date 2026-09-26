@@ -51,7 +51,7 @@ set_option linter.unusedVariables false
 /-! ## The addresses `uartwrite` computes -/
 
 /-- `&uarts` as the `auipc`/`addi` pair at `+0x24` leaves it. -/
-theorem uw_uarts : KA.«uartwrite» + 0x99a2#64 = KA.«uarts» := by decide
+theorem uw_uarts : KA.«uartwrite» + 0x99d2#64 = KA.«uarts» := by decide
 
 /-- `40 * uid`, as `slli; add; slli` computes it. -/
 theorem uw_idx40 (i : UartId) :
@@ -135,8 +135,8 @@ theorem uw_ext8 (x : BitVec 8) : BitVec.extractLsb' 0 8 (BitVec.setWidth 64 x) =
 /-! ## The jump targets -/
 
 theorem uw_br_release : KA.«uartwrite» + 0x3c2#64 = KA.«release» := by decide
-theorem uw_br_sleep : KA.«uartwrite» + 0x16e4#64 = KA.«sleep» := by decide
-theorem uw_br_sleep_prepare : KA.«uartwrite» + 0x16a8#64 = KA.«sleep_prepare» := by decide
+theorem uw_br_sleep : KA.«uartwrite» + 0x16f2#64 = KA.«sleep» := by decide
+theorem uw_br_sleep_prepare : KA.«uartwrite» + 0x16b6#64 = KA.«sleep_prepare» := by decide
 theorem uw_br_acquire : KA.«uartwrite» + 0x33a#64 = KA.«acquire» := by decide
 
 theorem uwj_40 : jumpPc (KA.«uartwrite» + 0x40#64) = KA.«uartwrite» + 0x40#64 := by decide
@@ -570,7 +570,7 @@ theorem uw_body (SP : SLEEP_PREPARE) (AC : ACQUIRE) (RE : RELEASE) (SL : SLEEP)
   k_step_e (wp_s_add cpu _ (KA.«uartwrite» + 0x48#64) true 10#5 0#5 21#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [g21]
   iintro Hk Hpc
-  k_step_e (wp_s_jal cpu _ (KA.«uartwrite» + 0x4a#64) false 5726#21 1#5 (by decide))
+  k_step_e (wp_s_jal cpu _ (KA.«uartwrite» + 0x4a#64) false 5740#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [uw_br_sleep_prepare]
   iintro Hk Hpc
   iapply (uw_sleep_prepare SP Γ cpu _ j hj ?hspp ?hspchan ?hspn ?hspK ?hsplk ?hspt) $$ [- $Hk $Hpc]
@@ -687,7 +687,7 @@ theorem uw_body (SP : SLEEP_PREPARE) (AC : ACQUIRE) (RE : RELEASE) (SL : SLEEP)
     have hfix3 : uwFix k i n R3 := uwFix_cs k i n _ R3 (uwFix_call k i n R2 hfix2 _ _) hcs3
     have h9_3 : R3 9#5 = BitVec.ofNat 64 m := (uw_cs9 _ _ _ _ hcs3).trans h9_2
     -- jal sleep
-    k_step_e (wp_s_jal cpu _ (KA.«uartwrite» + 0x40#64) false 5796#21 1#5 (by decide))
+    k_step_e (wp_s_jal cpu _ (KA.«uartwrite» + 0x40#64) false 5810#21 1#5 (by decide))
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [uw_br_sleep]
     iintro Hk Hpc
     iapply (uw_sleep SL Γ cpu _ j kb.sie k.proc hj ?hslp ?hslK ?hsln ?hslt ?hsls ?hslpp)
@@ -966,7 +966,7 @@ theorem uartwrite_proof (SP : SLEEP_PREPARE) (AC : ACQUIRE) (RE : RELEASE) (SL :
     k_step_e (wp_s_auipc cpu _ (KA.«uartwrite» + 0x24#64) false 10#20 18#5 (by decide))
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
     iintro Hk Hpc
-    k_step_e (wp_s_addi cpu _ (KA.«uartwrite» + 0x28#64) false 2430#12 18#5 18#5 (by decide))
+    k_step_e (wp_s_addi cpu _ (KA.«uartwrite» + 0x28#64) false 2478#12 18#5 18#5 (by decide))
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [uw_uarts]
     iintro Hk Hpc
     -- add s5,s2,a5 ; c.addi a5,a5,16 ; c.add s2,s2,a5

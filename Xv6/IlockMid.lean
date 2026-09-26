@@ -176,7 +176,7 @@ theorem il_mid (MM : MEMMOVE) (BL : BRELSE) (PA : PANIC)
   k_step_e (wp_s_addi cpu _ (KA.«ilock» + 0x86#64) false 80#12 10#5 9#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hs1]
   iintro Hk Hpc
-  k_step_e (wp_s_jal cpu _ (KA.«ilock» + 0x8a#64) false 2087424#21 1#5 (by decide))
+  k_step_e (wp_s_jal cpu _ (KA.«ilock» + 0x8a#64) false 2087344#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [il_br_memmove]
   iintro Hk Hpc
   -- the DESTINATION: the thirteen addrs cells as 52 contiguous bytes

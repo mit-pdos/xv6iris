@@ -37,14 +37,14 @@ set_option linter.unusedVariables false
 /-! ## Addresses folded out of the `auipc` pairs -/
 
 /-- `&cons`, folded out of every `auipc a?,0x12; addi a?,a?,<off>` pair. -/
-theorem ci_cons_addr : KA.«consoleintr» + 0x12088#64 = KA.«cons» := by decide
+theorem ci_cons_addr : KA.«consoleintr» + 0x120b8#64 = KA.«cons» := by decide
 /-- `&cons.r`, folded out of `auipc a4,0x12; lw a4,162(a4)` (and of the
 `addi a0,a0,-62` that makes `wakeup`'s argument). -/
-theorem ci_r_addr : KA.«consoleintr» + 0x12120#64 = consRAddr := by decide
+theorem ci_r_addr : KA.«consoleintr» + 0x12150#64 = consRAddr := by decide
 /-- `&cons.w`, folded out of `auipc a5,0x12; sw a2,-50(a5)`. -/
-theorem ci_w_addr : KA.«consoleintr» + 0x12124#64 = consWAddr := by decide
+theorem ci_w_addr : KA.«consoleintr» + 0x12154#64 = consWAddr := by decide
 /-- `&cons.e`, folded out of `auipc a4,0x12; sw a5,12(a4)`. -/
-theorem ci_e_addr : KA.«consoleintr» + 0x12128#64 = consEAddr := by decide
+theorem ci_e_addr : KA.«consoleintr» + 0x12158#64 = consEAddr := by decide
 
 /-- The three index fields, as offsets off `&cons`. -/
 theorem ci_rA : KA.«cons» + 152#64 = consRAddr := rfl
@@ -55,7 +55,7 @@ theorem ci_eA : KA.«cons» + 160#64 = consEAddr := rfl
 theorem ci_br_acquire : KA.«consoleintr» + 0x990#64 = KA.«acquire» := by decide
 theorem ci_br_release : KA.«consoleintr» + 0xa18#64 = KA.«release» := by decide
 theorem ci_br_consputc : KA.«consoleintr» + 0xffffffffffffffc4#64 = KA.«consputc» := by decide
-theorem ci_br_wakeup : KA.«consoleintr» + 0x1d6a#64 = KA.«wakeup» := by decide
+theorem ci_br_wakeup : KA.«consoleintr» + 0x1d78#64 = KA.«wakeup» := by decide
 
 /-- The return addresses of the five calls. -/
 theorem ci_ret_18 : jumpPc (KA.«consoleintr» + 0x18#64) = KA.«consoleintr» + 0x18#64 := by decide
@@ -299,7 +299,7 @@ theorem ci_tail (RE : RELEASE) (c : CPU) (k : KCtx) (a b : Bool) (γc : GName) (
   k_step (wp_s_auipc c _ (KA.«consoleintr» + 0x104#64) false 18#20 10#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
-  k_step (wp_s_addi c _ (KA.«consoleintr» + 0x108#64) false 3972#12 10#5 10#5 (by decide))
+  k_step (wp_s_addi c _ (KA.«consoleintr» + 0x108#64) false 4020#12 10#5 10#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [ci_cons_addr]
   iintro Hk Hpc
   -- jal release

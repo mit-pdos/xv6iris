@@ -29,7 +29,7 @@ set_option linter.unusedVariables false
 /-! ## The constants `+0x24 .. +0xa8` computes -/
 
 /-- `auipc s6,0x1e ; addi s6,s6,-1348` at `+0x28`: `&sb`. -/
-theorem ba_a_sb : KA.«balloc» + 0x1daee#64 = KA.«sb» := by decide
+theorem ba_a_sb : KA.«balloc» + 0x1dcce#64 = KA.«sb» := by decide
 theorem ba_bm_addr : KA.«sb» + 28#64 = sbBmapstartAddr := rfl
 theorem ba_lui2 : BitVec.signExtend 64 (2#20 ++ 0#12) = 0x2000#64 := by decide
 theorem ba_sraiw13_0 : BitVec.signExtend 64 ((BitVec.extractLsb' 0 32 (0#64)).sshiftRight 13) =
@@ -184,7 +184,7 @@ theorem ba_setup (BR : BREAD) (LW : LOG_WRITE) (BE : BRELSE) (MS : MEMSET) (PK :
   k_step_e (wp_s_auipc cpu _ (KA.«balloc» + 0x28#64) false 0x1e#20 22#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
-  k_step_e (wp_s_addi cpu _ (KA.«balloc» + 0x2c#64) false 2758#12 22#5 22#5 (by decide))
+  k_step_e (wp_s_addi cpu _ (KA.«balloc» + 0x2c#64) false 3238#12 22#5 22#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [ba_a_sb]
   iintro Hk Hpc
   k_step_e (wp_s_addi cpu _ (KA.«balloc» + 0x30#64) true 1#12 19#5 0#5 (by decide))

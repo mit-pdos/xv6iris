@@ -47,7 +47,7 @@ set_option linter.unusedSimpArgs false
 /-- The pc at offset `o` of forkret. -/
 abbrev fkrPc (o : BitVec 64) : BitVec 64 := KA.«forkret» + o
 
-theorem fkr_br_prepare_return : KA.«forkret» + 2948#64 = KA.«prepare_return» := by
+theorem fkr_br_prepare_return : KA.«forkret» + 2962#64 = KA.«prepare_return» := by
   decide
 
 theorem fkr_ret58 : jumpPc (KA.«forkret» + 0x54#64 + 4#64) = KA.«forkret» + 0x58#64 := by decide
@@ -174,7 +174,7 @@ theorem fkr_tail [X : CurCtx] (PR : PREPARE_RETURN) (c : CPU) (k : KCtx) (γ : F
   iintro ⟨Hk, Hpc, Hte, Hce, Hpv, Hnext⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
   -- +0x54  jal prepare_return
-  k_step_gen (wp_s_jal c _ (KA.«forkret» + 0x54#64) false 2864#21 1#5 (by decide))
+  k_step_gen (wp_s_jal c _ (KA.«forkret» + 0x54#64) false 2878#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [fkr_br_prepare_return] next c1 hp1
   iintro Hk Hpc
   have hp1' : k.sie = false → c1 = c := fun h => hp1 (Or.inl h)

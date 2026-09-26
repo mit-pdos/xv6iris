@@ -270,7 +270,7 @@ theorem consoleintr_proof (CP : CONSPUTC) (AC : ACQUIRE) (RE : RELEASE) (WK : WA
   k_step_gen (wp_s_auipc c2 _ (KA.«consoleintr» + 0xc#64) false 18#20 10#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c3 hp3
   iintro Hk Hpc
-  k_step_gen (wp_s_addi c3 _ (KA.«consoleintr» + 0x10#64) false 124#12 10#5 10#5 (by decide))
+  k_step_gen (wp_s_addi c3 _ (KA.«consoleintr» + 0x10#64) false 172#12 10#5 10#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [ci_cons_addr] next c4 hp4
   iintro Hk Hpc
   k_step_gen (wp_s_jal c4 _ (KA.«consoleintr» + 0x14#64) false 2428#21 1#5 (by decide))

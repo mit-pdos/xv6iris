@@ -429,10 +429,10 @@ variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [Fdslot
   [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
   [Appcfg GF] [FileG GF] [Fscfg] [Icfg] [CurCtx]
 
-theorem kxd_br_ss : KA.«kexec» + 0x2d8#64 + BitVec.signExtend 64 2081512#21 = KA.«safestrcpy» := by
+theorem kxd_br_ss : KA.«kexec» + 0x2d8#64 + BitVec.signExtend 64 2081432#21 = KA.«safestrcpy» := by
   decide
 theorem kxd_ret_ss : jumpPc (KA.«kexec» + 0x2d8#64 + 4#64) = KA.«kexec» + 0x2d8#64 + 4#64 := by decide
-theorem kxd_br_pfp : KA.«kexec» + 0x2fc#64 + BitVec.signExtend 64 2084652#21 =
+theorem kxd_br_pfp : KA.«kexec» + 0x2fc#64 + BitVec.signExtend 64 2084572#21 =
     KA.«proc_freepagetable» := by decide
 theorem kxd_ret_pfp : jumpPc (KA.«kexec» + 0x2fc#64 + 4#64) = KA.«kexec» + 0x2fc#64 + 4#64 := by
   decide
@@ -537,7 +537,7 @@ theorem kxd_commit1 (SS : SAFESTRCPY_SRC) (cpu : CPU) (k : KCtx) (A : KexecArgs)
     rw [List.getElem?_drop, show q + (A.plen - q) = A.plen by omega,
       bview_lookup _ _ _ (by omega), hterm]
   -- +0x2d8  jal safestrcpy
-  iapply (kxd_call_ss SS cpu k spie spp _ (KA.«kexec» + 0x2d8#64) 2081512#21 kxd_br_ss kxd_ret_ss
+  iapply (kxd_call_ss SS cpu k spie spp _ (KA.«kexec» + 0x2d8#64) 2081432#21 kxd_br_ss kxd_ret_ss
       (pName k.proc) (k.regs 10#5 + BitVec.ofNat 64 q) V.name ((bview (A.plen + 1) A.pfun).drop q)
       A.dqpv hK (by simp [RegMap.set_apply, pName]) (by simp [RegMap.set_apply])
       (by simp [RegMap.set_apply]) (by rw [hnl]; rfl) hsrc)
@@ -663,7 +663,7 @@ theorem kxd_commit2 (PFP : PROC_FREEPAGETABLE) (Γ : SchedNames) (cpu : CPU) (k 
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [RegMap.set_apply, h21]
   iintro Hk Hpc
   -- +0x2fc  jal proc_freepagetable(old table, oldsz)
-  iapply (kxc_call_pfp PFP Γ cpu k A spie spp _ (KA.«kexec» + 0x2fc#64) 2084652#21 kxd_br_pfp
+  iapply (kxc_call_pfp PFP Γ cpu k A spie spp _ (KA.«kexec» + 0x2fc#64) 2084572#21 kxd_br_pfp
       kxd_ret_pfp V.upt A.M hK hnoff (by simp [RegMap.set_apply]) (by simpa [RegMap.set_apply] using hszo)
       (by simpa [RegMap.set_apply] using hbo))
     $$ [- $Hk $Hpc $Hte $Hce $Hfab $Hpto]

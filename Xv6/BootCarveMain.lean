@@ -88,13 +88,13 @@ theorem bc_buf_bounds (i : Nat) (hi : i < NBUF) :
   simp only [MachCSL.KernelSyms.«_bss», MachCSL.KernelSyms.«end», MachCSL.KernelSyms.«bcache»]
   omega
 
-theorem bc_bss_val : MachCSL.KernelSyms.«_bss» = 0x8000a330 := rfl
-theorem bc_end_val : MachCSL.KernelSyms.«end» = 0x80023640 := rfl
+theorem bc_bss_val : MachCSL.KernelSyms.«_bss» = 0x8000a360 := rfl
+theorem bc_end_val : MachCSL.KernelSyms.«end» = 0x80023870 := rfl
 
 /-- A `.bss` cell at a named address, as the ambient `wordPointsTo`. -/
 theorem bootBss_wordAt [CurCtx]
     (va : PAddr) (n A hi : Nat) (hva : va.toNat = A) (hhi : hi = A + n)
-    (hlo : 0x8000a330 ≤ A) (hend : A + n ≤ 0x80023640) (hal : A % n = 0) (hn : 0 < n := by decide) :
+    (hlo : 0x8000a360 ≤ A) (hend : A + n ≤ 0x80023870) (hal : A % n = 0) (hn : 0 < n := by decide) :
     kmapStatic (GF := GF) ⊢ bootRan (imgFlat bootImage) A hi -∗ wordPointsTo va n (DFrac.own 1) 0#(8 * n) :=
   bootBss_cellAt curCtx va n A hi hva hhi (by rw [bc_bss_val]; exact hlo)
     (by rw [bc_end_val]; exact hend) hal hn
@@ -177,7 +177,7 @@ theorem bootCarve_buf [CurCtx] (ξ : CtxId) (i : Nat) (hi : i < NBUF) :
 /-- A static lock's three words at zero, with its two identity claims (the
 input shape `initlock`'s callers pass as `lockWords`). -/
 theorem bootCarve_lockWords [CurCtx] (lk : PAddr) (L : Nat)
-    (hlk : lk.toNat = L) (hlo : 0x8000a330 ≤ L) (hend : L + 24 ≤ 0x80023640) (hal : L % 8 = 0) :
+    (hlk : lk.toNat = L) (hlo : 0x8000a360 ≤ L) (hend : L + 24 ≤ 0x80023870) (hal : L % 8 = 0) :
     kmapStatic (GF := GF) ⊢ bootRan (imgFlat bootImage) L (L + 24) -∗ lockWords lk 0#32 0#64 0#64 := by
   have h8 : (lk + 8#64).toNat = L + 8 := bc_toNat_add _ 8 _ hlk (by omega)
   have h16 : (lk + 16#64).toNat = L + 16 := bc_toNat_add _ 16 _ hlk (by omega)
@@ -195,7 +195,7 @@ theorem bootCarve_lockWords [CurCtx] (lk : PAddr) (L : Nat)
   unfold lockWords
   iframe Hid1 Hid2 H0 H1 H2
 
-theorem bc_bcache_val : MachCSL.KernelSyms.«bcache» = 0x80018278 := rfl
+theorem bc_bcache_val : MachCSL.KernelSyms.«bcache» = 0x800184a8 := rfl
 
 /-- **THE WHOLE BUFFER CACHE, CARVED** (Rocq `boot_bcache_nodes` with the
 lock and head rows of `main_globals_raw`): the `.bss` bytes of `bcache` are
@@ -208,33 +208,33 @@ theorem bootCarve_bcache [CurCtx] (ξ : CtxId) :
       wordPointsTo (bcacheHeadAddr + 72#64) 8 (DFrac.own 1) 0#64 ∗
       wordPointsTo (bcacheHeadAddr + 80#64) 8 (DFrac.own 1) 0#64 ∗
       ([∗list] i ∈ List.range NBUF, bufIn i ∗ bdBss ξ i) := by
-  have hlk : bcacheLockAddr.toNat = 0x80018278 := rfl
-  have hh : bcacheHeadAddr.toNat = 0x80018278 + 0x8268 := rfl
+  have hlk : bcacheLockAddr.toNat = 0x800184a8 := rfl
+  have hh : bcacheHeadAddr.toNat = 0x800184a8 + 0x8268 := rfl
   have h72 := bc_toNat_add _ 72 _ hh (by omega)
   have h80 := bc_toNat_add _ 80 _ hh (by omega)
   have hN : NBUF = 30 := rfl
   rw [bc_bcache_val]
   iintro #Hk H
-  icases (bootRan_split (GF := GF) (imgFlat bootImage) 0x80018278 (0x80018278 + 24) (0x80018278 + 0x86c0)
+  icases (bootRan_split (GF := GF) (imgFlat bootImage) 0x800184a8 (0x800184a8 + 24) (0x800184a8 + 0x86c0)
     (by omega) (by omega)).1 $$ H with ⟨Hl, H⟩
-  icases (bootRan_split (GF := GF) (imgFlat bootImage) (0x80018278 + 24) (0x80018278 + 24 + 1112 * NBUF)
-    (0x80018278 + 0x86c0) (by omega) (by omega)).1 $$ H with ⟨Hb, H⟩
-  icases (bootRan_split (GF := GF) (imgFlat bootImage) (0x80018278 + 24 + 1112 * NBUF) (0x80018278 + 0x8268 + 72)
-    (0x80018278 + 0x86c0) (by omega) (by omega)).1 $$ H with ⟨-, H⟩
-  icases (bootRan_split (GF := GF) (imgFlat bootImage) (0x80018278 + 0x8268 + 72) (0x80018278 + 0x8268 + 80)
-    (0x80018278 + 0x86c0) (by omega) (by omega)).1 $$ H with ⟨Hp, H⟩
-  icases (bootRan_split (GF := GF) (imgFlat bootImage) (0x80018278 + 0x8268 + 80) (0x80018278 + 0x8268 + 88)
-    (0x80018278 + 0x86c0) (by omega) (by omega)).1 $$ H with ⟨Hn, -⟩
+  icases (bootRan_split (GF := GF) (imgFlat bootImage) (0x800184a8 + 24) (0x800184a8 + 24 + 1112 * NBUF)
+    (0x800184a8 + 0x86c0) (by omega) (by omega)).1 $$ H with ⟨Hb, H⟩
+  icases (bootRan_split (GF := GF) (imgFlat bootImage) (0x800184a8 + 24 + 1112 * NBUF) (0x800184a8 + 0x8268 + 72)
+    (0x800184a8 + 0x86c0) (by omega) (by omega)).1 $$ H with ⟨-, H⟩
+  icases (bootRan_split (GF := GF) (imgFlat bootImage) (0x800184a8 + 0x8268 + 72) (0x800184a8 + 0x8268 + 80)
+    (0x800184a8 + 0x86c0) (by omega) (by omega)).1 $$ H with ⟨Hp, H⟩
+  icases (bootRan_split (GF := GF) (imgFlat bootImage) (0x800184a8 + 0x8268 + 80) (0x800184a8 + 0x8268 + 88)
+    (0x800184a8 + 0x86c0) (by omega) (by omega)).1 $$ H with ⟨Hn, -⟩
   ihave Hl := bootCarve_lockWords (GF := GF) bcacheLockAddr _ hlk (by omega) (by omega) (by omega) $$ Hk Hl
   ihave Hp := bootBss_wordAt (GF := GF) _ 8 _ _ h72 rfl (by omega) (by omega) (by omega) $$ Hk Hp
   ihave Hn := bootBss_wordAt (GF := GF) _ 8 _ _ h80 rfl (by omega) (by omega) (by omega) $$ Hk Hn
-  ihave Hb := bootRan_stride (GF := GF) (imgFlat bootImage) (0x80018278 + 24) 1112 NBUF $$ Hb
+  ihave Hb := bootRan_stride (GF := GF) (imgFlat bootImage) (0x800184a8 + 24) 1112 NBUF $$ Hb
   iframe Hl Hp Hn
   iapply BigSepL.bigSepL_impl $$ Hb
   imodintro
   iintro %k %i %hk Hi
   have hi : i < NBUF := List.mem_range.1 (List.mem_of_getElem? hk)
-  have e : 0x80018278 + 24 + 1112 * i = bcBuf i := by unfold bcBuf; rw [bc_bcache_val]
+  have e : 0x800184a8 + 24 + 1112 * i = bcBuf i := by unfold bcBuf; rw [bc_bcache_val]
   rw [e]
   iapply bootCarve_buf ξ i hi $$ Hk Hi
 
@@ -277,12 +277,12 @@ theorem bootCarve_kmem [CurCtx] :
     kmapStatic (GF := GF) ⊢
       bootRan (imgFlat bootImage) MachCSL.KernelSyms.«kmem» (MachCSL.KernelSyms.«kmem» + 0x20) -∗
       lockWords kmemLockAddr 0#32 0#64 0#64 ∗ wordPointsTo kmemFreelistAddr 8 (DFrac.own 1) 0#64 := by
-  have hK : MachCSL.KernelSyms.«kmem» = 0x80012410 := rfl
-  have hlk : kmemLockAddr.toNat = 0x80012410 := rfl
-  have hfl : kmemFreelistAddr.toNat = 0x80012410 + 0x18 := rfl
+  have hK : MachCSL.KernelSyms.«kmem» = 0x80012440 := rfl
+  have hlk : kmemLockAddr.toNat = 0x80012440 := rfl
+  have hfl : kmemFreelistAddr.toNat = 0x80012440 + 0x18 := rfl
   rw [hK]
   iintro #Hk H
-  icases (bootRan_split (GF := GF) (imgFlat bootImage) 0x80012410 (0x80012410 + 24) (0x80012410 + 0x20)
+  icases (bootRan_split (GF := GF) (imgFlat bootImage) 0x80012440 (0x80012440 + 24) (0x80012440 + 0x20)
     (by omega) (by omega)).1 $$ H with ⟨Hl, Hf⟩
   ihave Hl := bootCarve_lockWords (GF := GF) kmemLockAddr _ hlk (by omega) (by omega) (by omega) $$ Hk Hl
   ihave Hf := bootBss_wordAt (GF := GF) _ 8 _ _ hfl (by omega) (by omega) (by omega) (by omega) $$ Hk Hf

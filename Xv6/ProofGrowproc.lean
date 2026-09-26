@@ -163,7 +163,7 @@ theorem gp_lazy_shrink (P : UPtd) (sz new : BitVec 64) (h : lazyFree P.um sz) :
   · exact h
 
 set_option maxHeartbeats 1000000 in
-/-- The epilogue at `0x80001cf6`, shared by the five endings: `a0` is
+/-- The epilogue at `0x80001cfc`, shared by the five endings: `a0` is
 already the return value. -/
 theorem gp_epi (c : CPU) (kb : KCtx) (hK : 4 ≤ kb.avail) (spie spp : Bool) (R : RegMap)
     (hR2 : R 2#5 = kb.regs 2#5 + 0xFFFFFFFFFFFFFFE0#64)
@@ -378,11 +378,11 @@ theorem gp_slli_13 : (0x1FFFFFF#64) <<< (13 : Nat) = 0x3FFFFFE000#64 := by decid
 theorem gp_minus_one : BitVec.signExtend 64 (4095#12) = -1#64 := by decide
 theorem gp_uvmMaxsz_toNat : (0x3FFFFFE000#64).toNat = uvmMaxsz := by decide
 
-theorem growproc_br_fffffffffffff630 : KA.«growproc» + 0xfffffffffffff630#64 = KA.«uvmdealloc» := by decide
+theorem growproc_br_fffffffffffff62a : KA.«growproc» + 0xfffffffffffff62a#64 = KA.«uvmdealloc» := by decide
 
-theorem growproc_br_fffffffffffff674 : KA.«growproc» + 0xfffffffffffff674#64 = KA.«uvmalloc» := by decide
+theorem growproc_br_fffffffffffff66e : KA.«growproc» + 0xfffffffffffff66e#64 = KA.«uvmalloc» := by decide
 
-theorem growproc_br_fffffffffffffcce : KA.«growproc» + 0xfffffffffffffcce#64 = KA.«myproc» := by decide
+theorem growproc_br_fffffffffffffcc8 : KA.«growproc» + 0xfffffffffffffcc8#64 = KA.«myproc» := by decide
 
 set_option maxHeartbeats 4000000 in
 theorem growproc_proof (MP : MYPROC) (UA : UVMALLOC) (UD : UVMDEALLOC) : GROWPROC :=
@@ -465,8 +465,8 @@ theorem growproc_proof (MP : MYPROC) (UA : UVMALLOC) (UD : UVMDEALLOC) : GROWPRO
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c2 hp2
   iintro Hk Hpc
   -- jal myproc
-  k_step_gen (wp_s_jal c2 _ (KA.«growproc» + 0xe#64) false 2096320#21 1#5 (by decide))
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [growproc_br_fffffffffffffcce] next c3 hp3
+  k_step_gen (wp_s_jal c2 _ (KA.«growproc» + 0xe#64) false 2096314#21 1#5 (by decide))
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [growproc_br_fffffffffffffcc8] next c3 hp3
   iintro Hk Hpc
   iapply (hmp c3 _ ?hn1 ?hK1) $$ [- $Hk $Hpc]
   case hn1 => k_norm_g; omega
@@ -579,8 +579,8 @@ theorem growproc_proof (MP : MYPROC) (UA : UVMALLOC) (UD : UVMDEALLOC) : GROWPRO
         from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
         with [KCtx.rget_eq, h10_1, gp_pt_off] next c14 hp14
       iintro Hk Hpc Hpt
-      k_step_gen (wp_s_jal c14 _ (KA.«growproc» + 0x2e#64) false 2094662#21 1#5 (by decide))
-        from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [growproc_br_fffffffffffff674] next c15 hp15
+      k_step_gen (wp_s_jal c14 _ (KA.«growproc» + 0x2e#64) false 2094656#21 1#5 (by decide))
+        from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [growproc_br_fffffffffffff66e] next c15 hp15
       iintro Hk Hpc
       iapply (hua c15 _ V.upt M ?hnU ?hKU ?hlU ?hrU ?hoU ?hwU ?hpU ?hfU) $$ [- $Hk $Hpc]
       rotate_right 1
@@ -761,8 +761,8 @@ theorem growproc_proof (MP : MYPROC) (UA : UVMALLOC) (UD : UVMDEALLOC) : GROWPRO
         from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
         with [KCtx.rget_eq, h10_1, gp_pt_off] next c10 hp10
       iintro Hk Hpc Hpt
-      k_step_gen (wp_s_jal c10 _ (KA.«growproc» + 0x52#64) false 2094558#21 1#5 (by decide))
-        from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [growproc_br_fffffffffffff630] next c11 hp11
+      k_step_gen (wp_s_jal c10 _ (KA.«growproc» + 0x52#64) false 2094552#21 1#5 (by decide))
+        from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [growproc_br_fffffffffffff62a] next c11 hp11
       iintro Hk Hpc
       iapply (hud c11 _ V.upt M ?hnD ?hKD ?hlD ?hrD ?hoD) $$ [- $Hk $Hpc]
       rotate_right 1
@@ -785,7 +785,7 @@ theorem growproc_proof (MP : MYPROC) (UA : UVMALLOC) (UD : UVMDEALLOC) : GROWPRO
         BitVec.reduceEq, ite_true, ite_false, d2, d8, d9, d18, d19, d20, d21, d22, d23, d24, d25,
         d26, d27, h10_1] at hcs2 hr10
       obtain ⟨e2, e8, e9, e18, e19, e20, e21, e22, e23, e24, e25, e26, e27⟩ := hcs2
-      -- c.mv a1,a0 ; j 0x80001cf0
+      -- c.mv a1,a0 ; j 0x80001cf6
       k_step_gen (wp_s_add c12 _ (KA.«growproc» + 0x56#64) true 11#5 0#5 10#5 (by decide))
         from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c13 hp13
       iintro Hk Hpc

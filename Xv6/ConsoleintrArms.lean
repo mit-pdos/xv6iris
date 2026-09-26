@@ -110,7 +110,7 @@ theorem ci_wake (RE : RELEASE) (WK : WAKEUP) (Γ : SchedNames) (c : CPU) (k : KC
   k_step (wp_s_auipc c _ (KA.«consoleintr» + 0x156#64) false 18#20 15#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
-  k_step (wp_s_sw c _ (KA.«consoleintr» + 0x15a#64) false 4046#12 15#5 12#5 (by decide) w)
+  k_step (wp_s_sw c _ (KA.«consoleintr» + 0x15a#64) false 4094#12 15#5 12#5 (by decide) w)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [ci_w_addr]
   iintro Hk Hpc Hw
   -- THE COMMIT
@@ -125,10 +125,10 @@ theorem ci_wake (RE : RELEASE) (WK : WAKEUP) (Γ : SchedNames) (c : CPU) (k : KC
   k_step (wp_s_auipc c _ (KA.«consoleintr» + 0x15e#64) false 18#20 10#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
-  k_step (wp_s_addi c _ (KA.«consoleintr» + 0x162#64) false 4034#12 10#5 10#5 (by decide))
+  k_step (wp_s_addi c _ (KA.«consoleintr» + 0x162#64) false 4082#12 10#5 10#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [ci_r_addr]
   iintro Hk Hpc
-  k_step (wp_s_jal c _ (KA.«consoleintr» + 0x166#64) false 7172#21 1#5 (by decide))
+  k_step (wp_s_jal c _ (KA.«consoleintr» + 0x166#64) false 7186#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [ci_br_wakeup]
   iintro Hk Hpc
   iapply (ci_wakeup WK Γ c _ rfl ?hnw ?hKw ?hlw ?htw) $$ [- $Hk $Hpc $Hpi]
@@ -268,7 +268,7 @@ theorem ci_nl (CP : CONSPUTC) (RE : RELEASE) (WK : WAKEUP) (Γ : SchedNames)
   k_step (wp_s_auipc c _ (KA.«consoleintr» + 0x134#64) false 18#20 15#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
-  k_step (wp_s_addi c _ (KA.«consoleintr» + 0x138#64) false 3924#12 15#5 15#5 (by decide))
+  k_step (wp_s_addi c _ (KA.«consoleintr» + 0x138#64) false 3972#12 15#5 15#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [ci_cons_addr]
   iintro Hk Hpc
   -- lw a4,160(a5)
@@ -424,7 +424,7 @@ theorem ci_echo (CP : CONSPUTC) (RE : RELEASE) (WK : WAKEUP) (Γ : SchedNames)
   k_step (wp_s_auipc c _ (KA.«consoleintr» + 0x54#64) false 18#20 14#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
-  k_step (wp_s_addi c _ (KA.«consoleintr» + 0x58#64) false 52#12 14#5 14#5 (by decide))
+  k_step (wp_s_addi c _ (KA.«consoleintr» + 0x58#64) false 100#12 14#5 14#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [ci_cons_addr]
   iintro Hk Hpc
   -- lw a3,160(a4) ; addiw a5,a3,1 ; mv a2,a5 ; sw a5,160(a4)
@@ -552,7 +552,7 @@ theorem ci_echo (CP : CONSPUTC) (RE : RELEASE) (WK : WAKEUP) (Γ : SchedNames)
       k_step (wp_s_auipc c _ (KA.«consoleintr» + 0x7e#64) false 18#20 14#5 (by decide))
         from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
       iintro Hk Hpc
-      k_step (wp_s_lw c _ (KA.«consoleintr» + 0x82#64) false 162#12 14#5 14#5 (by decide)
+      k_step (wp_s_lw c _ (KA.«consoleintr» + 0x82#64) false 210#12 14#5 14#5 (by decide)
           (by decide) (DFrac.own 1) r)
         from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [ci_r_addr]
       iintro Hk Hpc Hr
@@ -695,7 +695,7 @@ theorem ci_bs (CP : CONSPUTC) (RE : RELEASE)
   k_step (wp_s_auipc c _ (KA.«consoleintr» + 0xf0#64) false 18#20 14#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
-  k_step (wp_s_addi c _ (KA.«consoleintr» + 0xf4#64) false 3992#12 14#5 14#5 (by decide))
+  k_step (wp_s_addi c _ (KA.«consoleintr» + 0xf4#64) false 4040#12 14#5 14#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [ci_cons_addr]
   iintro Hk Hpc
   -- lw a5,160(a4) ; lw a4,156(a4)
@@ -740,7 +740,7 @@ theorem ci_bs (CP : CONSPUTC) (RE : RELEASE)
     k_step (wp_s_auipc c _ (KA.«consoleintr» + 0x11c#64) false 18#20 14#5 (by decide))
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
     iintro Hk Hpc
-    k_step (wp_s_sw c _ (KA.«consoleintr» + 0x120#64) false 12#12 14#5 15#5 (by decide) e)
+    k_step (wp_s_sw c _ (KA.«consoleintr» + 0x120#64) false 60#12 14#5 15#5 (by decide) e)
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [ci_e_addr]
     iintro Hk Hpc He
     ihave He := (show wordPointsTo (GF := GF) consEAddr 4 (DFrac.own 1)
@@ -867,7 +867,7 @@ theorem ci_ring (CP : CONSPUTC) (RE : RELEASE) (WK : WAKEUP) (Γ : SchedNames)
   k_step (wp_s_auipc c _ (KA.«consoleintr» + 0x2e#64) false 18#20 14#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
-  k_step (wp_s_addi c _ (KA.«consoleintr» + 0x32#64) false 90#12 14#5 14#5 (by decide))
+  k_step (wp_s_addi c _ (KA.«consoleintr» + 0x32#64) false 138#12 14#5 14#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [ci_cons_addr]
   iintro Hk Hpc
   k_step (wp_s_lw c _ (KA.«consoleintr» + 0x36#64) false 160#12 15#5 14#5 (by decide) (by decide)

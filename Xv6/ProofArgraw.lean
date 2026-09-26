@@ -30,13 +30,13 @@ set_option linter.unusedVariables false
 
 /-! ## Constants and register bookkeeping -/
 
-/-- `myproc` returns to `0x80002838`. -/
+/-- `myproc` returns to `0x80002846`. -/
 theorem ar_ret_2784 : jumpPc (KA.«argraw» + 0x10#64) = (KA.«argraw» + 0x10#64) := by
   decide
 
 /-- `auipc a4,0x5 ; addi a4,a4,-192` is the table base. -/
 theorem ar_tbl_2790 :
-    KA.«argraw» + 0x4f58#64 = argrawTbl := by
+    KA.«argraw» + 0x4f4a#64 = argrawTbl := by
   unfold argrawTbl; decide
 
 /-- The index guard is dead: `5 <u i` is false for `i < 6`. -/
@@ -181,9 +181,9 @@ theorem ar_case5 : argrawCase 5 = (KA.«argraw» + 0x4e#64) := rfl
 
 /-! ## The function -/
 
-theorem argraw_br_fffffffffffff160 : KA.«argraw» + 0xfffffffffffff160#64 = KA.«myproc» := by decide
+theorem argraw_br_fffffffffffff152 : KA.«argraw» + 0xfffffffffffff152#64 = KA.«myproc» := by decide
 
-theorem argraw_br_4f58 : KA.«argraw» + 0x4f58#64 = argrawTbl := by decide
+theorem argraw_br_4f4a : KA.«argraw» + 0x4f4a#64 = argrawTbl := by decide
 
 set_option maxHeartbeats 16000000 in
 theorem argraw_proof (MP : MYPROC) : ARGRAW := ⟨
@@ -211,8 +211,8 @@ theorem argraw_proof (MP : MYPROC) : ARGRAW := ⟨
   k_step_gen (wp_s_add c1 _ (KA.«argraw» + 0xa#64) true 9#5 0#5 10#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [ha0] next c2 hp2
   iintro Hk Hpc
-  k_step_gen (wp_s_jal c2 _ (KA.«argraw» + 0xc#64) false 2093396#21 1#5 (by decide))
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [argraw_br_fffffffffffff160] next c3 hp3
+  k_step_gen (wp_s_jal c2 _ (KA.«argraw» + 0xc#64) false 2093382#21 1#5 (by decide))
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [argraw_br_fffffffffffff152] next c3 hp3
   iintro Hk Hpc
   iapply (ar_myproc MP c3 _ ?hnm ?hKm) $$ [- $Hk $Hpc]
   rotate_right 1
@@ -244,8 +244,8 @@ theorem argraw_proof (MP : MYPROC) : ARGRAW := ⟨
   k_step_gen (wp_s_auipc c6 _ (KA.«argraw» + 0x18#64) false 0x5#20 14#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c7 hp7
   iintro Hk Hpc
-  k_step_gen (wp_s_addi c7 _ (KA.«argraw» + 0x1c#64) false 3904#12 14#5 14#5 (by decide))
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [argraw_br_4f58, ar_tbl_2790] next c8 hp8
+  k_step_gen (wp_s_addi c7 _ (KA.«argraw» + 0x1c#64) false 3890#12 14#5 14#5 (by decide))
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [argraw_br_4f4a, ar_tbl_2790] next c8 hp8
   iintro Hk Hpc
   k_step_gen (wp_s_add c8 _ (KA.«argraw» + 0x20#64) true 9#5 9#5 14#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c9 hp9

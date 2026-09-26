@@ -35,8 +35,8 @@ set_option linter.unusedVariables false
 
 /-! ## Constants -/
 
-theorem srd_br_argaddr : KA.«sys_read» + 0xffffffffffffdae0#64 = KA.«argaddr» := by decide
-theorem srd_br_argint : KA.«sys_read» + 0xffffffffffffdac4#64 = KA.«argint» := by decide
+theorem srd_br_argaddr : KA.«sys_read» + 0xffffffffffffda9e#64 = KA.«argaddr» := by decide
+theorem srd_br_argint : KA.«sys_read» + 0xffffffffffffda82#64 = KA.«argint» := by decide
 theorem srd_br_argfd : KA.«sys_read» + 0xfffffffffffffdb6#64 = KA.«argfd» := by decide
 theorem srd_br_fileread : KA.«sys_read» + 0xfffffffffffff4ea#64 = KA.«fileread» := by decide
 

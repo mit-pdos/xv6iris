@@ -66,9 +66,9 @@ set_option linter.unusedVariables false
 theorem sys_unlink_li0 : BitVec.signExtend 64 0#12 = 0#64 := by decide
 
 /-- The panic literals, as the `auipc` / `addi` pair leaves them. -/
-theorem sys_unlink_msg_nlink : KA.«sys_unlink» + 0x2576#64 = KStr.«unlink: nlink < 1» := by decide
-theorem sys_unlink_msg_readi : KA.«sys_unlink» + 0x258e#64 = KStr.«isdirempty: readi» := by decide
-theorem sys_unlink_msg_writei : KA.«sys_unlink» + 0x25a6#64 = KStr.«unlink: writei» := by decide
+theorem sys_unlink_msg_nlink : KA.«sys_unlink» + 0x2526#64 = KStr.«unlink: nlink < 1» := by decide
+theorem sys_unlink_msg_readi : KA.«sys_unlink» + 0x253e#64 = KStr.«isdirempty: readi» := by decide
+theorem sys_unlink_msg_writei : KA.«sys_unlink» + 0x2556#64 = KStr.«unlink: writei» := by decide
 
 section
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
@@ -426,10 +426,10 @@ theorem sys_unlink_panic_nlink (PA : PANIC) (cpu : CPU) (k : KCtx) (A : SysUnlin
   k_step_e (wp_s_auipc cpu _ (KA.«sys_unlink» + 0xec#64) false 2#20 10#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
-  k_step_e (wp_s_addi cpu _ (KA.«sys_unlink» + 0xf0#64) false 1162#12 10#5 10#5 (by decide))
+  k_step_e (wp_s_addi cpu _ (KA.«sys_unlink» + 0xf0#64) false 1082#12 10#5 10#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
-  k_step_e (wp_s_jal cpu _ (KA.«sys_unlink» + 0xf4#64) false 2078402#21 1#5 (by decide))
+  k_step_e (wp_s_jal cpu _ (KA.«sys_unlink» + 0xf4#64) false 2078322#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [sys_unlink_br_panic]
   iintro Hk Hpc
   iapply (sys_unlink_panic PA cpu _ KStr.«unlink: nlink < 1» sysUnlinkNlinkMsg ?ha (by decide)
@@ -459,10 +459,10 @@ theorem sys_unlink_panic_readi (PA : PANIC) (cpu : CPU) (k : KCtx) (A : SysUnlin
   k_step_e (wp_s_auipc cpu _ (KA.«sys_unlink» + 0x12e#64) false 2#20 10#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
-  k_step_e (wp_s_addi cpu _ (KA.«sys_unlink» + 0x132#64) false 1120#12 10#5 10#5 (by decide))
+  k_step_e (wp_s_addi cpu _ (KA.«sys_unlink» + 0x132#64) false 1040#12 10#5 10#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
-  k_step_e (wp_s_jal cpu _ (KA.«sys_unlink» + 0x136#64) false 2078336#21 1#5 (by decide))
+  k_step_e (wp_s_jal cpu _ (KA.«sys_unlink» + 0x136#64) false 2078256#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [sys_unlink_br_panic]
   iintro Hk Hpc
   iapply (sys_unlink_panic PA cpu _ KStr.«isdirempty: readi» sysUnlinkReadiMsg ?ha (by decide)
@@ -492,10 +492,10 @@ theorem sys_unlink_panic_writei (PA : PANIC) (cpu : CPU) (k : KCtx) (A : SysUnli
   k_step_e (wp_s_auipc cpu _ (KA.«sys_unlink» + 0x13a#64) false 2#20 10#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
-  k_step_e (wp_s_addi cpu _ (KA.«sys_unlink» + 0x13e#64) false 1132#12 10#5 10#5 (by decide))
+  k_step_e (wp_s_addi cpu _ (KA.«sys_unlink» + 0x13e#64) false 1052#12 10#5 10#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
-  k_step_e (wp_s_jal cpu _ (KA.«sys_unlink» + 0x142#64) false 2078324#21 1#5 (by decide))
+  k_step_e (wp_s_jal cpu _ (KA.«sys_unlink» + 0x142#64) false 2078244#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [sys_unlink_br_panic]
   iintro Hk Hpc
   iapply (sys_unlink_panic PA cpu _ KStr.«unlink: writei» sysUnlinkWriteiMsg ?ha (by decide)

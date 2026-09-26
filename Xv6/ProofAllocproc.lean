@@ -43,44 +43,44 @@ set_option linter.unusedSimpArgs false
 
 /-- `auipc s1,0x11 ; addi s1,s1,-820` at `0x80001b8a`: `&proc[0]`. -/
 theorem ap_proc_aec :
-    KA.«allocproc» + 0x10ce2#64 = procAddr 0 := by
+    KA.«allocproc» + 0x10d12#64 = procAddr 0 := by
   unfold procAddr procsAddr procSize
   decide
 
 /-- `auipc a5,0x11 ; addi a5,a5,-916` at `0x80001bea`: `&proc[0]`. -/
 theorem ap_proc_b4c :
-    KA.«allocproc» + 0x10ce2#64 = procAddr 0 := by
+    KA.«allocproc» + 0x10d12#64 = procAddr 0 := by
   unfold procAddr procsAddr procSize
   decide
 
 /-- `auipc s2,0x16 ; addi s2,s2,1732` at `0x80001b92`: `&proc[NPROC]`. -/
 theorem ap_end_af4 :
-    KA.«allocproc» + 0x166e2#64 = KA.«tickslock» := by
+    KA.«allocproc» + 0x16912#64 = KA.«tickslock» := by
   decide
 
 /-- `auipc a2,0x16 ; addi a2,a2,1670` at `0x80001bd0`: `&proc[NPROC]`. -/
 theorem ap_end_b32 :
-    KA.«allocproc» + 0x166e2#64 = KA.«tickslock» := by
+    KA.«allocproc» + 0x16912#64 = KA.«tickslock» := by
   decide
 
 /-- `auipc a0,0x11 ; addi a0,a0,-1936` at `0x80001bb6`: `&pid_lock`. -/
 theorem ap_pidlock_b18 :
-    KA.«allocproc» + 0x108b2#64 = pidLockAddr := by
+    KA.«allocproc» + 0x108e2#64 = pidLockAddr := by
   decide
 
 /-- `auipc a0,0x11 ; addi a0,a0,-2020` at `0x80001c0a`: `&pid_lock`. -/
 theorem ap_pidlock_b6c :
-    KA.«allocproc» + 0x108b2#64 = pidLockAddr := by
+    KA.«allocproc» + 0x108e2#64 = pidLockAddr := by
   decide
 
 /-- `auipc a3,0x8 ; lw a3,1824(a3)` at `0x80001bc2`: `&nextpid`. -/
 theorem ap_nextpid_b24 :
-    KA.«allocproc» + 0x8736#64 = nextpidAddr := by
+    KA.«allocproc» + 0x8766#64 = nextpidAddr := by
   decide
 
 /-- `auipc a5,0x8 ; sw a1,1762(a5)` at `0x80001c00`: `&nextpid`. -/
 theorem ap_nextpid_b62 :
-    KA.«allocproc» + 0x8736#64 = nextpidAddr := by
+    KA.«allocproc» + 0x8766#64 = nextpidAddr := by
   decide
 
 /-- `auipc a5,0x0 ; addi a5,a5,-660` at `0x80001c3e`: `forkret`. -/
@@ -90,11 +90,11 @@ theorem ap_forkret_ba0 :
   decide
 
 /-- The cursor one process on. -/
-theorem ap_procAddr_succ (n : Nat) : procAddr n + 360#64 = procAddr (n + 1) := by
+theorem ap_procAddr_succ (n : Nat) : procAddr n + 368#64 = procAddr (n + 1) := by
   unfold procAddr procSize
   rw [BitVec.add_assoc]
   congr 1
-  rw [show 360 * (n + 1) = 360 * n + 360 from by omega, BitVec.ofNat_add]
+  rw [show 368 * (n + 1) = 368 * n + 368 from by omega, BitVec.ofNat_add]
 
 theorem ap_procAddr_end : procAddr NPROC = KA.«tickslock» := by
   unfold procAddr procsAddr procSize NPROC
@@ -105,7 +105,7 @@ theorem ap_procAddr_ne_end {m : Nat} (h : m < NPROC) : procAddr m ≠ KA.«ticks
   have h1 := procAddr_toNat m h
   rw [he] at h1
   have h2 : (KA.«tickslock» : BitVec 64).toNat = KernelSyms.«tickslock» := by decide
-  have h3 : KernelSyms.«tickslock» = KernelSyms.«proc» + 360 * 64 := by decide
+  have h3 : KernelSyms.«tickslock» = KernelSyms.«proc» + 368 * 64 := by decide
   rw [h2, h3] at h1
   unfold NPROC at h
   omega
@@ -975,8 +975,8 @@ theorem ap_pidscan {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G G
       exact h15
     · rw [if_neg (by simp only [hmatch, decide_false]; exact Bool.false_ne_true)]
       k_norm
-      -- addi a5,a5,360
-      k_step (wp_s_addi c _ (KA.«allocproc» + 0x7a#64) false 360#12 15#5 15#5 (by decide))
+      -- addi a5,a5,368
+      k_step (wp_s_addi c _ (KA.«allocproc» + 0x7a#64) false 368#12 15#5 15#5 (by decide))
         from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h15, ap_procAddr_succ]
       iintro Hk Hpc
       -- bne a5,a2
@@ -1019,8 +1019,8 @@ theorem ap_pidscan {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G G
       exact h15
     · rw [if_neg (by simp only [hmatch, decide_false]; exact Bool.false_ne_true)]
       k_norm
-      -- addi a5,a5,360
-      k_step (wp_s_addi c _ (KA.«allocproc» + 0x7a#64) false 360#12 15#5 15#5 (by decide))
+      -- addi a5,a5,368
+      k_step (wp_s_addi c _ (KA.«allocproc» + 0x7a#64) false 368#12 15#5 15#5 (by decide))
         from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h15, ap_procAddr_succ]
       iintro Hk Hpc
       -- bne a5,a2
@@ -1144,7 +1144,7 @@ set_option maxHeartbeats 4000000 in
 by Löb induction.  The candidate stays in `[1, PIDMAX]`; the inner scan of
 the 64 pid words either finds it free (exit at `(KernelSyms.«allocproc» + 0x82)`) or sends the
 loop back with the next candidate. -/
-theorem allocproc_br_10ce2 : KA.«allocproc» + 0x10ce2#64 = procAddr 0 := by decide
+theorem allocproc_br_10d12 : KA.«allocproc» + 0x10d12#64 = procAddr 0 := by decide
 
 theorem ap_pidloop [CurCtx] (c : CPU) (kh : KCtx) (hsie : kh.sie = false)
     (pids : Nat → BitVec 32) (R0 : RegMap) (B : Prop)
@@ -1173,8 +1173,8 @@ theorem ap_pidloop [CurCtx] (c : CPU) (kh : KCtx) (hsie : kh.sie = false)
     k_step (wp_s_auipc c _ (KA.«allocproc» + 0x6c#64) false 0x11#20 15#5 (by decide))
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
     iintro Hk Hpc
-    k_step (wp_s_addi c _ (KA.«allocproc» + 0x70#64) false 3190#12 15#5 15#5 (by decide))
-      from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [allocproc_br_10ce2, ap_proc_b4c]
+    k_step (wp_s_addi c _ (KA.«allocproc» + 0x70#64) false 3238#12 15#5 15#5 (by decide))
+      from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [allocproc_br_10d12, ap_proc_b4c]
     iintro Hk Hpc
     k_norm
     -- the inner scan
@@ -1792,11 +1792,11 @@ theorem allocproc_br_fffffffffffff000 : KA.«allocproc» + 0xfffffffffffff000#64
 
 theorem allocproc_br_fffffffffffffe3c : KA.«allocproc» + 0xfffffffffffffe3c#64 = forkretAddr := by decide
 
-theorem allocproc_br_166e2 : KA.«allocproc» + 0x166e2#64 = KA.«tickslock» := by decide
+theorem allocproc_br_16912 : KA.«allocproc» + 0x16912#64 = KA.«tickslock» := by decide
 
-theorem allocproc_br_8736 : KA.«allocproc» + 0x8736#64 = nextpidAddr := by decide
+theorem allocproc_br_8766 : KA.«allocproc» + 0x8766#64 = nextpidAddr := by decide
 
-theorem allocproc_br_108b2 : KA.«allocproc» + 0x108b2#64 = pidLockAddr := by decide
+theorem allocproc_br_108e2 : KA.«allocproc» + 0x108e2#64 = pidLockAddr := by decide
 
 set_option maxHeartbeats 8000000 in
 /-- `0x80001bb6 ..`: the whole found arm, under `p->lock`. -/
@@ -1847,8 +1847,8 @@ theorem ap_found (AC : ACQUIRE) (RE : RELEASE) (KAL : KALLOC) (MS : MEMSET)
   k_step (wp_s_auipc c _ (KA.«allocproc» + 0x38#64) false 0x11#20 10#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
-  k_step (wp_s_addi c _ (KA.«allocproc» + 0x3c#64) false 2170#12 10#5 10#5 (by decide))
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [allocproc_br_108b2, ap_pidlock_b18]
+  k_step (wp_s_addi c _ (KA.«allocproc» + 0x3c#64) false 2218#12 10#5 10#5 (by decide))
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [allocproc_br_108e2, ap_pidlock_b18]
   iintro Hk Hpc
   -- 0x80001bbe jal acquire
   k_step (wp_s_jal c _ (KA.«allocproc» + 0x40#64) false 2093210#21 1#5 (by decide))
@@ -1892,8 +1892,8 @@ theorem ap_found (AC : ACQUIRE) (RE : RELEASE) (KAL : KALLOC) (MS : MEMSET)
   k_step (wp_s_auipc c _ (KA.«allocproc» + 0x44#64) false 0x8#20 13#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
-  k_step (wp_s_lw c _ (KA.«allocproc» + 0x48#64) false 1778#12 13#5 13#5 (by decide) (by decide) (DFrac.own 1) np)
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [allocproc_br_8736, ap_nextpid_b24]
+  k_step (wp_s_lw c _ (KA.«allocproc» + 0x48#64) false 1826#12 13#5 13#5 (by decide) (by decide) (DFrac.own 1) np)
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [allocproc_br_8766, ap_nextpid_b24]
   iintro Hk Hpc Hnp
   -- 0x80001bca addi a6,zero,1000 ; 0x80001bce c.li a0,1
   k_step (wp_s_addi c _ (KA.«allocproc» + 0x4c#64) false 1000#12 16#5 0#5 (by decide))
@@ -1903,11 +1903,11 @@ theorem ap_found (AC : ACQUIRE) (RE : RELEASE) (KAL : KALLOC) (MS : MEMSET)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
   -- 0x80001bd0 auipc a2,0x16 ; 0x80001bd4 addi a2,a2,1670 : a2 = &proc[NPROC]
-  k_step (wp_s_auipc c _ (KA.«allocproc» + 0x52#64) false 0x16#20 12#5 (by decide))
+  k_step (wp_s_auipc c _ (KA.«allocproc» + 0x52#64) false 0x17#20 12#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
-  k_step (wp_s_addi c _ (KA.«allocproc» + 0x56#64) false 1680#12 12#5 12#5 (by decide))
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [allocproc_br_166e2, ap_end_b32]
+  k_step (wp_s_addi c _ (KA.«allocproc» + 0x56#64) false 2240#12 12#5 12#5 (by decide))
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [allocproc_br_16912, ap_end_b32]
   iintro Hk Hpc
   -- 0x80001bd8 c.j 0x80001be0
   k_step (wp_s_j c _ (KA.«allocproc» + 0x5a#64) true 8#21)
@@ -1945,8 +1945,8 @@ theorem ap_found (AC : ACQUIRE) (RE : RELEASE) (KAL : KALLOC) (MS : MEMSET)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
   -- 0x80001c04 sw a1,1762(a5) : nextpid := apNewPid pid
-  k_step (wp_s_sw c _ (KA.«allocproc» + 0x86#64) false 1716#12 15#5 11#5 (by decide) np)
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [allocproc_br_8736, ap_nextpid_b62]
+  k_step (wp_s_sw c _ (KA.«allocproc» + 0x86#64) false 1764#12 15#5 11#5 (by decide) np)
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [allocproc_br_8766, ap_nextpid_b62]
   iintro Hk Hpc Hnp
   -- open the dormant block and the pid word's three fractions
   icases ap_slots_unused_elim Γ ξ0 (procAddr n) $$ Hslots with ⟨Hdorm, Hhart, Hpavarm⟩
@@ -2026,8 +2026,8 @@ theorem ap_found (AC : ACQUIRE) (RE : RELEASE) (KAL : KALLOC) (MS : MEMSET)
   k_step (wp_s_auipc c _ (KA.«allocproc» + 0x8c#64) false 0x11#20 10#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
-  k_step (wp_s_addi c _ (KA.«allocproc» + 0x90#64) false 2086#12 10#5 10#5 (by decide))
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [allocproc_br_108b2, ap_pidlock_b6c]
+  k_step (wp_s_addi c _ (KA.«allocproc» + 0x90#64) false 2134#12 10#5 10#5 (by decide))
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [allocproc_br_108e2, ap_pidlock_b6c]
   iintro Hk Hpc
   k_step (wp_s_jal c _ (KA.«allocproc» + 0x94#64) false 2093262#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [allocproc_br_fffffffffffff162]
@@ -2474,11 +2474,11 @@ theorem ap_found (AC : ACQUIRE) (RE : RELEASE) (KAL : KALLOC) (MS : MEMSET)
         iintro Hk Hpc
         k_norm
         -- alignment facts for the context buffer
-        have hpaN : (procAddr n).toNat = KernelSyms.«proc» + 360 * n := procAddr_toNat n hn
+        have hpaN : (procAddr n).toNat = KernelSyms.«proc» + 368 * n := procAddr_toNat n hn
         have hn64 : n < 64 := by unfold NPROC at hn; exact hn
         have hplt := procs_lt
         have hp8 : KernelSyms.«proc» % 8 = 0 := by decide
-        have hcbN : (procAddr n + 96#64).toNat = KernelSyms.«proc» + 360 * n + 96 := by
+        have hcbN : (procAddr n + 96#64).toNat = KernelSyms.«proc» + 368 * n + 96 := by
           rw [BitVec.toNat_add, hpaN, show (96#64 : BitVec 64).toNat = 96 from by decide,
             Nat.mod_eq_of_lt (by omega)]
         have hcb8 : (procAddr n + 96#64).toNat % 8 = 0 := by rw [hcbN]; omega
@@ -3183,8 +3183,8 @@ theorem ap_scan (AC : ACQUIRE) (RE : RELEASE) (KAL : KALLOC) (MS : MEMSET)
       icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
       have h9'' : R3 9#5 = procAddr n := hcs3.2.2.1.trans h9'
       have h18'' : R3 18#5 = KA.«tickslock» := hcs3.2.2.2.1.trans (hcs2.2.2.2.1.trans h18)
-      -- addi s1,s1,360
-      k_step_gen (wp_s_addi c3 _ (KA.«allocproc» + 0x2c#64) false 360#12 9#5 9#5 (by decide))
+      -- addi s1,s1,368
+      k_step_gen (wp_s_addi c3 _ (KA.«allocproc» + 0x2c#64) false 368#12 9#5 9#5 (by decide))
         from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
         with [h9'', ap_procAddr_succ] next c4 hp4
       iintro Hk Hpc
@@ -3337,8 +3337,8 @@ theorem ap_scan (AC : ACQUIRE) (RE : RELEASE) (KAL : KALLOC) (MS : MEMSET)
       icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
       have h9'' : R3 9#5 = procAddr n := hcs3.2.2.1.trans h9'
       have h18'' : R3 18#5 = KA.«tickslock» := hcs3.2.2.2.1.trans (hcs2.2.2.2.1.trans h18)
-      -- addi s1,s1,360
-      k_step_gen (wp_s_addi c3 _ (KA.«allocproc» + 0x2c#64) false 360#12 9#5 9#5 (by decide))
+      -- addi s1,s1,368
+      k_step_gen (wp_s_addi c3 _ (KA.«allocproc» + 0x2c#64) false 368#12 9#5 9#5 (by decide))
         from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
         with [h9'', ap_procAddr_succ] next c4 hp4
       iintro Hk Hpc
@@ -3427,15 +3427,15 @@ theorem allocproc_cells (AC : ACQUIRE) (RE : RELEASE) (KAL : KALLOC) (MS : MEMSE
   k_step_gen (wp_s_auipc c1 _ (KA.«allocproc» + 0xc#64) false 0x11#20 9#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c2 hp2
   iintro Hk Hpc
-  k_step_gen (wp_s_addi c2 _ (KA.«allocproc» + 0x10#64) false 3286#12 9#5 9#5 (by decide))
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [allocproc_br_10ce2, ap_proc_aec] next c3 hp3
+  k_step_gen (wp_s_addi c2 _ (KA.«allocproc» + 0x10#64) false 3334#12 9#5 9#5 (by decide))
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [allocproc_br_10d12, ap_proc_aec] next c3 hp3
   iintro Hk Hpc
   -- auipc s2,0x16 ; addi s2,s2,1732 : s2 = &proc[NPROC]
-  k_step_gen (wp_s_auipc c3 _ (KA.«allocproc» + 0x14#64) false 0x16#20 18#5 (by decide))
+  k_step_gen (wp_s_auipc c3 _ (KA.«allocproc» + 0x14#64) false 0x17#20 18#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c4 hp4
   iintro Hk Hpc
-  k_step_gen (wp_s_addi c4 _ (KA.«allocproc» + 0x18#64) false 1742#12 18#5 18#5 (by decide))
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [allocproc_br_166e2, ap_end_af4] next c5 hp5
+  k_step_gen (wp_s_addi c4 _ (KA.«allocproc» + 0x18#64) false 2302#12 18#5 18#5 (by decide))
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [allocproc_br_16912, ap_end_af4] next c5 hp5
   iintro Hk Hpc
   have hpin : k.sie = false ∨ k.proc = 0#64 → c5 = cpu :=
     fun h => (hp5 h).trans ((hp4 h).trans ((hp3 h).trans ((hp2 h).trans (hp1 h))))

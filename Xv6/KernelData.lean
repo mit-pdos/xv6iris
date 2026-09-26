@@ -2159,7 +2159,7 @@ def rodataChunk5 : List (Nat × Nat) := [
   (0x80007856, 0x00),
   (0x80007857, 0x00)]
 
-/-- All 2120 bytes of `.rodata`, in address order (from 0x80007000). -/
+/-- All 2136 bytes of `.rodata`, in address order (from 0x80007000). -/
 def rodata : List (Nat × Nat) :=
   rodataChunk0 ++ rodataChunk1 ++ rodataChunk2 ++ rodataChunk3 ++ rodataChunk4 ++ rodataChunk5
 

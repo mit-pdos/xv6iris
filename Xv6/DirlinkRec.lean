@@ -125,7 +125,7 @@ theorem dirlink_after (SN : STRNCPY) (WI : WRITEI) (Γ : SchedNames) [ClaimIs (h
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
   -- +0x78  jal strncpy
-  k_step_e (wp_s_jal cpu _ (KA.«dirlink» + 0x78#64) false 2085598#21 1#5 (by decide))
+  k_step_e (wp_s_jal cpu _ (KA.«dirlink» + 0x78#64) false 2085518#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [dirlink_br_strncpy]
   iintro Hk Hpc
   icases dirlink_keep_name k ip dinum bm data dn dn0 fn pidv dqp dqd dqf dqn dqs dqbs dqb $$ Hkeep

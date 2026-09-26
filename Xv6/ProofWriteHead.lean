@@ -223,7 +223,7 @@ theorem wh_bufdata_align (kk : Nat) (hkk : kk < NBUF) : (aBufData (bnode kk)).to
   have h := bufData_toNat kk 0 hkk (by unfold BSIZE; omega)
   have hz : aBufData (bnode kk) + BitVec.ofNat 64 0 = aBufData (bnode kk) := by simp
   rw [hz] at h
-  have hbc : KernelSyms.«bcache» = 0x80018278 := rfl
+  have hbc : KernelSyms.«bcache» = 0x800184a8 := rfl
   rw [hbc] at h
   omega
 
@@ -465,9 +465,9 @@ theorem wh_br_bread : KA.«write_head» + 0xFFFFFFFFFFFFF0AA#64 = KA.«bread» :
 theorem wh_br_bwrite : KA.«write_head» + 0xFFFFFFFFFFFFF180#64 = KA.«bwrite» := by decide
 theorem wh_br_brelse : KA.«write_head» + 0xFFFFFFFFFFFFF1B2#64 = KA.«brelse» := by decide
 
-theorem wh_log_addr : KA.«write_head» + 0x1e854#64 = logAddr := by
+theorem wh_log_addr : KA.«write_head» + 0x1ea34#64 = logAddr := by
   unfold logAddr; decide
-theorem wh_lhb0 : KA.«write_head» + 0x1e884#64 = lhBlock 0 := by
+theorem wh_lhb0 : KA.«write_head» + 0x1ea64#64 = lhBlock 0 := by
   unfold lhBlock logAddr; decide
 
 theorem wh_lStart : logAddr + 24#64 = lStart := rfl
@@ -752,7 +752,7 @@ theorem writeHead_proof (BD : BREAD) (BW : BWRITE) (BE : BRELSE) : WRITE_HEAD :=
   k_step_e (wp_s_auipc cpu _ (KA.«write_head» + 0xc#64) false 0x1f#20 18#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
-  k_step_e (wp_s_addi cpu _ (KA.«write_head» + 0x10#64) false 2120#12 18#5 18#5 (by decide))
+  k_step_e (wp_s_addi cpu _ (KA.«write_head» + 0x10#64) false 2600#12 18#5 18#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [wh_log_addr]
   iintro Hk Hpc
   -- +0x14 lw a1,24(s2) ; +0x18 lw a0,36(s2)
@@ -879,7 +879,7 @@ theorem writeHead_proof (BD : BREAD) (BW : BWRITE) (BE : BRELSE) : WRITE_HEAD :=
     k_step_e (wp_s_auipc cpu _ (KA.«write_head» + 0x2c#64) false 0x1f#20 14#5 (by decide))
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
     iintro Hk Hpc
-    k_step_e (wp_s_addi cpu _ (KA.«write_head» + 0x30#64) false 2136#12 14#5 14#5 (by decide))
+    k_step_e (wp_s_addi cpu _ (KA.«write_head» + 0x30#64) false 2616#12 14#5 14#5 (by decide))
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [wh_lhb0]
     iintro Hk Hpc
     -- +0x34 c.mv a5,a0 ; +0x36 c.slli a2,a2,2 ; +0x38 c.add a2,a2,a0

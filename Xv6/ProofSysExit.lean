@@ -162,9 +162,9 @@ theorem sysx_status (v : BitVec 64) :
 
 /-! ## The function -/
 
-theorem sys_exit_br_ffffffffffffff3c : KA.«sys_exit» + 0xffffffffffffff3c#64 = KA.«argint» := by decide
+theorem sys_exit_br_ffffffffffffff28 : KA.«sys_exit» + 0xffffffffffffff28#64 = KA.«argint» := by decide
 
-theorem sys_exit_br_fffffffffffff716 : KA.«sys_exit» + 0xfffffffffffff716#64 = KA.«kexit» := by decide
+theorem sys_exit_br_fffffffffffff702 : KA.«sys_exit» + 0xfffffffffffff702#64 = KA.«kexit» := by decide
 
 set_option maxHeartbeats 64000000 in
 set_option maxRecDepth 20000 in
@@ -221,8 +221,8 @@ theorem sys_exit_proof (AI : ARGINT) (KX : KEXIT) : SYSEXIT := ⟨
   k_step_e (wp_s_addi cpu _ (KA.«sys_exit» + 0xc#64) true 0#12 10#5 0#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [KCtx.rget_zero]
   iintro Hk Hpc
-  k_step_e (wp_s_jal cpu _ (KA.«sys_exit» + 0xe#64) false 2096942#21 1#5 (by decide))
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [sys_exit_br_ffffffffffffff3c]
+  k_step_e (wp_s_jal cpu _ (KA.«sys_exit» + 0xe#64) false 2096922#21 1#5 (by decide))
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [sys_exit_br_ffffffffffffff28]
   iintro Hk Hpc
   iapply (sysx_argint AI cpu _ V.upt.tfp V.tf v n0 (DFrac.own 1) ?ha0 hv ?hn ?hKa)
     $$ [- $Hk $Hpc]
@@ -241,8 +241,8 @@ theorem sys_exit_proof (AI : ARGINT) (KX : KEXIT) : SYSEXIT := ⟨
         (DFrac.own 1) (BitVec.extractLsb' 0 32 v))
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [c8, sysx_n_addr]
     iintro Hk Hpc Fnn
-    k_step_e (wp_s_jal cpu _ (KA.«sys_exit» + 0x16#64) false 2094848#21 1#5 (by decide))
-      from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [sys_exit_br_fffffffffffff716]
+    k_step_e (wp_s_jal cpu _ (KA.«sys_exit» + 0x16#64) false 2094828#21 1#5 (by decide))
+      from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [sys_exit_br_fffffffffffff702]
     iintro Hk Hpc
     -- the block, closed again
     ihave Htf := (show wordPointsTo (GF := GF) (pTrapframe k.proc) 8 (DFrac.own 1) (pageAddr V.upt.tfp) ⊢

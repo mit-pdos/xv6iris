@@ -895,7 +895,7 @@ theorem cpuCtxAddr_toNat (h : CPU) : (cpuCtxAddr h).toNat = KernelSyms.«cpus» 
   omega
 
 theorem pContext0_toNat (j : Nat) (hj : j < NPROC) :
-    (pContext (procAddr j) 0).toNat = KernelSyms.«proc» + 96 + 360 * j := by
+    (pContext (procAddr j) 0).toNat = KernelSyms.«proc» + 96 + 368 * j := by
   have hp := procs_lt
   unfold pContext
   simp only [Nat.mul_zero]

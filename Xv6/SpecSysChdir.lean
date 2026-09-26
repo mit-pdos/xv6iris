@@ -25,7 +25,7 @@ The interface of `sys_chdir` (kernel/sysfile.c).  A port of Rocq
       return 0;
     }
 
-`KA.«sys_chdir»` = 0x80005400, 128 bytes / 45 instructions.  A TWENTY-slot
+`KA.«sys_chdir»` = 0x80005450, 128 bytes / 45 instructions.  A TWENTY-slot
 frame: ra @ `sp0-8`, s0 @ `sp0-16` (the frame pointer, = the entry sp), s1
 @ `sp0-24` (the inode, saved only on the paths that have one), s2 @ `sp0-32`
 (the proc), and the low sixteen slots -- `sp0-160 .. sp0-32` -- being the

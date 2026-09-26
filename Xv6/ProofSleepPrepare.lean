@@ -75,11 +75,11 @@ theorem sp_calleeSaved_mk (KR R : RegMap)
 
 /-! ## The function -/
 
-theorem sleep_prepare_br_ffffffffffffed1a : KA.«sleep_prepare» + 0xffffffffffffed1a#64 = KA.«release» := by decide
+theorem sleep_prepare_br_ffffffffffffed0c : KA.«sleep_prepare» + 0xffffffffffffed0c#64 = KA.«release» := by decide
 
-theorem sleep_prepare_br_ffffffffffffec92 : KA.«sleep_prepare» + 0xffffffffffffec92#64 = KA.«acquire» := by decide
+theorem sleep_prepare_br_ffffffffffffec84 : KA.«sleep_prepare» + 0xffffffffffffec84#64 = KA.«acquire» := by decide
 
-theorem sleep_prepare_br_fffffffffffff9c2 : KA.«sleep_prepare» + 0xfffffffffffff9c2#64 = KA.«myproc» := by decide
+theorem sleep_prepare_br_fffffffffffff9b4 : KA.«sleep_prepare» + 0xfffffffffffff9b4#64 = KA.«myproc» := by decide
 
 set_option maxHeartbeats 4000000 in
 /-- **`sleep_prepare` meets its specification.** -/
@@ -110,8 +110,8 @@ theorem sleep_prepare_proof (MP : MYPROC) (AC : ACQUIRE) (RE : RELEASE) : SLEEP_
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c2 hp2
   iintro Hk Hpc
   -- jal myproc
-  k_step_gen (wp_s_jal c2 _ (KA.«sleep_prepare» + 0xe#64) false 2095540#21 1#5 (by decide))
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [sleep_prepare_br_fffffffffffff9c2] next c3 hp3
+  k_step_gen (wp_s_jal c2 _ (KA.«sleep_prepare» + 0xe#64) false 2095526#21 1#5 (by decide))
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [sleep_prepare_br_fffffffffffff9b4] next c3 hp3
   iintro Hk Hpc
   have hmp : ∀ (cc : CPU) (k' : KCtx) (hnoff' : k'.noff + 1 < 2 ^ 31) (hK' : 10 ≤ k'.avail),
       kctx cc k' ∗ pcIs cc KA.«myproc» ∗
@@ -143,8 +143,8 @@ theorem sleep_prepare_proof (MP : MYPROC) (AC : ACQUIRE) (RE : RELEASE) : SLEEP_
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h10M, hproc] next c5 hp5
   iintro Hk Hpc
   -- jal acquire
-  k_step_gen (wp_s_jal c5 _ (KA.«sleep_prepare» + 0x14#64) false 2092158#21 1#5 (by decide))
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [sleep_prepare_br_ffffffffffffec92] next c6 hp6
+  k_step_gen (wp_s_jal c5 _ (KA.«sleep_prepare» + 0x14#64) false 2092144#21 1#5 (by decide))
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [sleep_prepare_br_ffffffffffffec84] next c6 hp6
   iintro Hk Hpc
   have hac : ∀ (cc : CPU) (k' : KCtx) (hnoff' : k'.noff + 1 < 2 ^ 31) (hK' : 10 ≤ k'.avail)
       (hs' : "proc" ∉ k'.locks),
@@ -204,8 +204,8 @@ theorem sleep_prepare_proof (MP : MYPROC) (AC : ACQUIRE) (RE : RELEASE) : SLEEP_
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [e18]
   iintro Hk Hpc
   -- jal release
-  k_step (wp_s_jal c _ (KA.«sleep_prepare» + 0x20#64) false 2092282#21 1#5 (by decide))
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [sleep_prepare_br_ffffffffffffed1a]
+  k_step (wp_s_jal c _ (KA.«sleep_prepare» + 0x20#64) false 2092268#21 1#5 (by decide))
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [sleep_prepare_br_ffffffffffffed0c]
   iintro Hk Hpc
   have hre : ∀ (k' : KCtx) (hsie' : k'.sie = false) (hnoff' : 1 ≤ k'.noff) (hK' : 10 ≤ k'.avail)
       (reen : Bool) (hreen : reen = (decide (k'.noff = 1) && k'.intena))

@@ -42,7 +42,7 @@ set_option linter.unusedSectionVars false
 
 /-! ## Call targets and return addresses -/
 
-theorem rd_br_either : KA.«readi» + 0xFFFFFFFFFFFFEC90#64 = KA.«either_copyout» := by decide
+theorem rd_br_either : KA.«readi» + 0xffffffffffffec4e#64 = KA.«either_copyout» := by decide
 theorem rd_br_brelse : KA.«readi» + 0xFFFFFFFFFFFFF696#64 = KA.«brelse» := by decide
 theorem rd_br_bmap : KA.«readi» + 0xFFFFFFFFFFFFF99E#64 = KA.«bmap» := by decide
 theorem rd_br_bread : KA.«readi» + 0xFFFFFFFFFFFFF58E#64 = KA.«bread» := by decide

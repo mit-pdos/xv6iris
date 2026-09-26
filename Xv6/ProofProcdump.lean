@@ -175,8 +175,8 @@ theorem pd_toNat (m : Nat) (h : m < 2 ^ 64) : (BitVec.ofNat 64 m).toNat = m := b
 
 /-- The cursor `&proc[i].name`, as a number, up to and including the sentinel. -/
 theorem pd_cursor_toNat (j : Nat) (hj : j ≤ NPROC) :
-    (pName (procAddr j)).toNat = KernelSyms.«proc» + 344 + 360 * j := by
-  have h1 : (BitVec.ofNat 64 (procSize * j)).toNat = 360 * j := by
+    (pName (procAddr j)).toNat = KernelSyms.«proc» + 344 + 368 * j := by
+  have h1 : (BitVec.ofNat 64 (procSize * j)).toNat = 368 * j := by
     simp only [BitVec.toNat_ofNat, procSize]
     exact Nat.mod_eq_of_lt (by unfold NPROC at hj; omega)
   have h2 : (procsAddr : BitVec 64).toNat = KernelSyms.«proc» := by decide
@@ -185,19 +185,19 @@ theorem pd_cursor_toNat (j : Nat) (hj : j ≤ NPROC) :
   unfold NPROC at hj
   unfold pName procAddr
   rw [BitVec.toNat_add, BitVec.toNat_add, h1, h2, h3,
-    Nat.mod_eq_of_lt (show KernelSyms.«proc» + 360 * j < 2 ^ 64 by omega),
-    Nat.mod_eq_of_lt (show KernelSyms.«proc» + 360 * j + 344 < 2 ^ 64 by omega)]
+    Nat.mod_eq_of_lt (show KernelSyms.«proc» + 368 * j < 2 ^ 64 by omega),
+    Nat.mod_eq_of_lt (show KernelSyms.«proc» + 368 * j + 344 < 2 ^ 64 by omega)]
   omega
 
-/-- The cursor one slot on (`addi s1,s1,360`). -/
-theorem pd_cursor (i : Nat) : pName (procAddr i) + 360#64 = pName (procAddr (i + 1)) := by
+/-- The cursor one slot on (`addi s1,s1,368`). -/
+theorem pd_cursor (i : Nat) : pName (procAddr i) + 368#64 = pName (procAddr (i + 1)) := by
   unfold pName procAddr procSize
-  rw [show 360 * (i + 1) = 360 * i + 360 from by omega, BitVec.ofNat_add,
-    show BitVec.ofNat 64 360 = 360#64 from rfl]
+  rw [show 368 * (i + 1) = 368 * i + 368 from by omega, BitVec.ofNat_add,
+    show BitVec.ofNat 64 368 = 368#64 from rfl]
   bv_omega
 
-/-- The end sentinel `&proc[NPROC].name = 0x800183b8`. -/
-theorem pd_bcache_end : (KA.«bcache» + 0x140#64).toNat = KernelSyms.«proc» + 344 + 360 * 64 := by
+/-- The end sentinel `&proc[NPROC].name = 0x800185e8`. -/
+theorem pd_bcache_end : (KA.«bcache» + 0x140#64).toNat = KernelSyms.«proc» + 344 + 368 * 64 := by
   decide
 
 theorem pd_sentinel : pName (procAddr NPROC) = (KA.«bcache» + 0x140#64) := by
@@ -296,24 +296,24 @@ theorem pd_pushed_spie_self (k : KCtx) (m : Nat) :
 /-! ## The `auipc`/`addi` address pairs -/
 
 theorem pd_nl_addr :
-    KA.«procdump» + 0x4c90#64
+    KA.«procdump» + 0x4c82#64
       = KStr.«\n» := by decide
 theorem pd_s1_addr :
-    KA.«procdump» + 0x105c8#64 = (KA.«proc» + 0x158#64) := by decide
+    KA.«procdump» + 0x105ea#64 = (KA.«proc» + 0x158#64) := by decide
 theorem pd_s2_addr :
-    KA.«procdump» + 0x15fc8#64
+    KA.«procdump» + 0x161ea#64
       = (KA.«bcache» + 0x140#64) := by decide
 theorem pd_s3_addr :
-    KA.«procdump» + 0x4e38#64
+    KA.«procdump» + 0x4e2a#64
       = KStr.«???» := by decide
 theorem pd_s5_addr :
-    KA.«procdump» + 0x4e40#64
+    KA.«procdump» + 0x4e32#64
       = KStr.«%d %s %s» := by decide
 theorem pd_s4_addr :
-    KA.«procdump» + 0x4c90#64
+    KA.«procdump» + 0x4c82#64
       = KStr.«\n» := by decide
 theorem pd_s7_addr :
-    KA.«procdump» + 0x5360#64 = KA.«states_0» := by decide
+    KA.«procdump» + 0x5352#64 = KA.«states_0» := by decide
 
 /-! ## The view, slot by slot -/
 
@@ -416,7 +416,7 @@ theorem pd_descs3_elim [CurCtx] (R : RegMap) (dq1 dq2 : DFrac) (s1 s2 : List (Bi
 /-! ## The tail every arm falls into -/
 
 set_option maxHeartbeats 4000000 in
-/-- The stretch at `0x80002456`: step the cursor and test it against the
+/-- The stretch at `0x80002464`: step the cursor and test it against the
 sentinel. -/
 theorem pd_tail [CurCtx] (k : KCtx) (i : Nat) (hi : i < NPROC) (spie spp : Bool) (R R0 : RegMap)
     (hkept0 : pdKept R0 R)
@@ -431,7 +431,7 @@ theorem pd_tail [CurCtx] (k : KCtx) (i : Nat) (hi : i < NPROC) (spie spp : Bool)
     ⊢ wpLoop (GF := GF) c := by
   iintro ⟨Hk, Hpc, HPhi⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
-  k_step_gen (wp_s_addi c _ (KA.«procdump» + 0x66#64) false 360#12 9#5 9#5 (by decide))
+  k_step_gen (wp_s_addi c _ (KA.«procdump» + 0x66#64) false 368#12 9#5 9#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
     with [h9, pd_cursor i] next c1 hq1
   iintro Hk Hpc
@@ -543,10 +543,10 @@ theorem pdKept_of_calleeSaved {R R' : RegMap} (h : calleeSaved R R') : pdKept R 
     h.2.2.2.2.2.2.2.2.1, h.2.2.2.2.2.2.2.2.2.1, h.2.2.2.2.2.2.2.2.2.2.1,
     h.2.2.2.2.2.2.2.2.2.2.2.1, h.2.2.2.2.2.2.2.2.2.2.2.2⟩
 
-theorem procdump_br_ffffffffffffe136 : KA.«procdump» + 0xffffffffffffe136#64 = KA.«printk» := by decide
+theorem procdump_br_ffffffffffffe128 : KA.«procdump» + 0xffffffffffffe128#64 = KA.«printk» := by decide
 
 set_option maxHeartbeats 4000000 in
-/-- The print site at `0x80002446`: `printk("%d %s %s", p->pid, state, p->name)`,
+/-- The print site at `0x80002454`: `printk("%d %s %s", p->pid, state, p->name)`,
 then `printk("\n")`, then the cursor step and the termination test. -/
 theorem pd_print (PK : PRINTK) [CurCtx] (k : KCtx) (γpr γl : GName) (γd : UartNames)
     (hnoff : k.noff + 2 < 2 ^ 31) (hK : procdumpSlots ≤ k.avail)
@@ -598,8 +598,8 @@ theorem pd_print (PK : PRINTK) [CurCtx] (k : KCtx) (γpr γl : GName) (γd : Uar
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h21] next c2 hq2
   iintro Hk Hpc
   -- jal ra, printk
-  k_step_gen (wp_s_jal c2 _ (KA.«procdump» + 0x5c#64) false 2089178#21 1#5 (by decide))
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [procdump_br_ffffffffffffe136] next c3 hq3
+  k_step_gen (wp_s_jal c2 _ (KA.«procdump» + 0x5c#64) false 2089164#21 1#5 (by decide))
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [procdump_br_ffffffffffffe128] next c3 hq3
   iintro Hk Hpc
   iapply (pd_printk3 PK c3 _ γpr γl γd bs' DFrac.discard DFrac.discard dqn pdFmtStr sv nm
     ?hK1 ?hf1 ?hkin1 ?hn1 ?hp1 ?hu1 ?hv1 ?hv2) $$ [- $Hk $Hpc]
@@ -631,8 +631,8 @@ theorem pd_print (PK : PRINTK) [CurCtx] (k : KCtx) (γpr γl : GName) (γd : Uar
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [g20] next c5 hq5
   iintro Hk Hpc
   -- jal ra, printk
-  k_step_gen (wp_s_jal c5 _ (KA.«procdump» + 0x62#64) false 2089172#21 1#5 (by decide))
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [procdump_br_ffffffffffffe136] next c6 hq6
+  k_step_gen (wp_s_jal c5 _ (KA.«procdump» + 0x62#64) false 2089158#21 1#5 (by decide))
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [procdump_br_ffffffffffffe128] next c6 hq6
   iintro Hk Hpc
   iapply (pd_printk0 PK c6 _ γpr γl γd (bs' ++ cs1) DFrac.discard pdNlStr
     ?hK2 ?hf2 ?hkin2 ?hn2 ?hp2 ?hu2) $$ [- $Hk $Hpc]
@@ -691,7 +691,7 @@ theorem pd_state_fold [CurCtx] (pa : BitVec 64) (dq : DFrac) (w : BitVec 32) :
   unfold pState; iintro H; iexact H
 
 set_option maxHeartbeats 4000000 in
-/-- The table arm at `0x8000246c`: `states[p->state]` out of `.rodata`, then
+/-- The table arm at `0x8000247a`: `states[p->state]` out of `.rodata`, then
 the print.  The five live states differ only in `ta`, `ptr` and `sv`. -/
 theorem pd_tbl_arm (PK : PRINTK) [CurCtx] (k : KCtx) (γpr γl : GName) (γd : UartNames)
     (hnoff : k.noff + 2 < 2 ^ 31) (hK : procdumpSlots ≤ k.avail)
@@ -771,7 +771,7 @@ section
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
 
 set_option maxHeartbeats 4000000 in
-/-- One iteration of the scan, from the loop head at `0x8000245e`: read
+/-- One iteration of the scan, from the loop head at `0x8000246c`: read
 `p->state`, skip it if `UNUSED`, otherwise pick the string ("???" when the
 unsigned test against 5 fires, the table entry otherwise) and print. -/
 theorem pd_iter (PK : PRINTK) [CurCtx] (k : KCtx) (γpr γl : GName) (γd : UartNames)
@@ -1062,7 +1062,7 @@ theorem pd_loop (PK : PRINTK) [CurCtx] (k : KCtx) (γpr γl : GName) (γd : Uart
 /-! ## The epilogue -/
 
 set_option maxHeartbeats 4000000 in
-/-- The epilogue at `0x8000247e`: restore `ra`, `s0`, `s1`..`s7`, pop the
+/-- The epilogue at `0x8000248c`: restore `ra`, `s0`, `s1`..`s7`, pop the
 ten-slot frame, return. -/
 theorem pd_epi [CurCtx] (cpu cur : CPU) (k : KCtx)
     (hpin : k.sie = false ∨ k.proc = 0#64 → cur = cpu) (hK : 10 ≤ k.avail)
@@ -1153,17 +1153,17 @@ variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [Fdslot
 
 /-! ## The function -/
 
-theorem procdump_br_4e40 : KA.«procdump» + 0x4e40#64 = KStr.«%d %s %s» := by decide
+theorem procdump_br_4e32 : KA.«procdump» + 0x4e32#64 = KStr.«%d %s %s» := by decide
 
-theorem procdump_br_4e38 : KA.«procdump» + 0x4e38#64 = KStr.«???» := by decide
+theorem procdump_br_4e2a : KA.«procdump» + 0x4e2a#64 = KStr.«???» := by decide
 
-theorem procdump_br_15fc8 : KA.«procdump» + 0x15fc8#64 = (KA.«bcache» + 0x140#64) := by decide
+theorem procdump_br_161ea : KA.«procdump» + 0x161ea#64 = (KA.«bcache» + 0x140#64) := by decide
 
-theorem procdump_br_4c90 : KA.«procdump» + 0x4c90#64 = KStr.«\n» := by decide
+theorem procdump_br_4c82 : KA.«procdump» + 0x4c82#64 = KStr.«\n» := by decide
 
-theorem procdump_br_5360 : KA.«procdump» + 0x5360#64 = KA.«states_0» := by decide
+theorem procdump_br_5352 : KA.«procdump» + 0x5352#64 = KA.«states_0» := by decide
 
-theorem procdump_br_105c8 : KA.«procdump» + 0x105c8#64 = (KA.«proc» + 0x158#64) := by decide
+theorem procdump_br_105ea : KA.«procdump» + 0x105ea#64 = (KA.«proc» + 0x158#64) := by decide
 
 set_option maxHeartbeats 4000000 in
 /-- **`procdump` meets its specification.** -/
@@ -1221,11 +1221,11 @@ theorem procdump_proof (PK : PRINTK) : PROCDUMP :=
   k_step_gen (wp_s_auipc c11 _ (KA.«procdump» + 0x16#64) false 5#20 10#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next c12 hp12
   iintro Hk Hpc
-  k_step_gen (wp_s_addi c12 _ (KA.«procdump» + 0x1a#64) false 3194#12 10#5 10#5 (by decide))
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [procdump_br_4c90, pd_nl_addr] next c13 hp13
+  k_step_gen (wp_s_addi c12 _ (KA.«procdump» + 0x1a#64) false 3180#12 10#5 10#5 (by decide))
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [procdump_br_4c82, pd_nl_addr] next c13 hp13
   iintro Hk Hpc
-  k_step_gen (wp_s_jal c13 _ (KA.«procdump» + 0x1e#64) false 2089240#21 1#5 (by decide))
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [procdump_br_ffffffffffffe136] next c14 hp14
+  k_step_gen (wp_s_jal c13 _ (KA.«procdump» + 0x1e#64) false 2089226#21 1#5 (by decide))
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [procdump_br_ffffffffffffe128] next c14 hp14
   iintro Hk Hpc
   -- printk("\n")
   iapply (pd_printk0 PK c14 _ γpr γl γd bs DFrac.discard pdNlStr
@@ -1250,14 +1250,14 @@ theorem procdump_proof (PK : PRINTK) : PROCDUMP :=
   k_step_gen (wp_s_auipc d0 _ (KA.«procdump» + 0x22#64) false 16#20 9#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next d1 hd1
   iintro Hk Hpc
-  k_step_gen (wp_s_addi d1 _ (KA.«procdump» + 0x26#64) false 1446#12 9#5 9#5 (by decide))
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [procdump_br_105c8, pd_s1_addr] next d2 hd2
+  k_step_gen (wp_s_addi d1 _ (KA.«procdump» + 0x26#64) false 1480#12 9#5 9#5 (by decide))
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [procdump_br_105ea, pd_s1_addr] next d2 hd2
   iintro Hk Hpc
   k_step_gen (wp_s_auipc d2 _ (KA.«procdump» + 0x2a#64) false 22#20 18#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next d3 hd3
   iintro Hk Hpc
-  k_step_gen (wp_s_addi d3 _ (KA.«procdump» + 0x2e#64) false 3998#12 18#5 18#5 (by decide))
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [procdump_br_15fc8, pd_s2_addr] next d4 hd4
+  k_step_gen (wp_s_addi d3 _ (KA.«procdump» + 0x2e#64) false 448#12 18#5 18#5 (by decide))
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [procdump_br_161ea, pd_s2_addr] next d4 hd4
   iintro Hk Hpc
   k_step_gen (wp_s_addi d4 _ (KA.«procdump» + 0x32#64) true 5#12 22#5 0#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next d5 hd5
@@ -1265,26 +1265,26 @@ theorem procdump_proof (PK : PRINTK) : PROCDUMP :=
   k_step_gen (wp_s_auipc d5 _ (KA.«procdump» + 0x34#64) false 5#20 19#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next d6 hd6
   iintro Hk Hpc
-  k_step_gen (wp_s_addi d6 _ (KA.«procdump» + 0x38#64) false 3588#12 19#5 19#5 (by decide))
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [procdump_br_4e38, pd_s3_addr] next d7 hd7
+  k_step_gen (wp_s_addi d6 _ (KA.«procdump» + 0x38#64) false 3574#12 19#5 19#5 (by decide))
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [procdump_br_4e2a, pd_s3_addr] next d7 hd7
   iintro Hk Hpc
   k_step_gen (wp_s_auipc d7 _ (KA.«procdump» + 0x3c#64) false 5#20 21#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next d8 hd8
   iintro Hk Hpc
-  k_step_gen (wp_s_addi d8 _ (KA.«procdump» + 0x40#64) false 3588#12 21#5 21#5 (by decide))
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [procdump_br_4e40, pd_s5_addr] next d9 hd9
+  k_step_gen (wp_s_addi d8 _ (KA.«procdump» + 0x40#64) false 3574#12 21#5 21#5 (by decide))
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [procdump_br_4e32, pd_s5_addr] next d9 hd9
   iintro Hk Hpc
   k_step_gen (wp_s_auipc d9 _ (KA.«procdump» + 0x44#64) false 5#20 20#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next d10 hd10
   iintro Hk Hpc
-  k_step_gen (wp_s_addi d10 _ (KA.«procdump» + 0x48#64) false 3148#12 20#5 20#5 (by decide))
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [procdump_br_4c90, pd_s4_addr] next d11 hd11
+  k_step_gen (wp_s_addi d10 _ (KA.«procdump» + 0x48#64) false 3134#12 20#5 20#5 (by decide))
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [procdump_br_4c82, pd_s4_addr] next d11 hd11
   iintro Hk Hpc
   k_step_gen (wp_s_auipc d11 _ (KA.«procdump» + 0x4c#64) false 5#20 23#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next d12 hd12
   iintro Hk Hpc
-  k_step_gen (wp_s_addi d12 _ (KA.«procdump» + 0x50#64) false 788#12 23#5 23#5 (by decide))
-    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [procdump_br_5360, pd_s7_addr] next d13 hd13
+  k_step_gen (wp_s_addi d12 _ (KA.«procdump» + 0x50#64) false 774#12 23#5 23#5 (by decide))
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [procdump_br_5352, pd_s7_addr] next d13 hd13
   iintro Hk Hpc
   k_step_gen (wp_s_j d13 _ (KA.«procdump» + 0x54#64) true 26#21)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] next d14 hd14

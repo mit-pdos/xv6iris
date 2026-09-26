@@ -950,7 +950,7 @@ theorem pkKinds_at_none (f : List (BitVec 8)) (i : Nat) (hi : i < f.length) (hp 
   rw [pkKinds_at f i hi hp, h]
   rfl
 
-theorem pr_addr_520 : KA.«printk» + 0x11ed2#64 = KA.«pr» := by
+theorem pr_addr_520 : KA.«printk» + 0x11f02#64 = KA.«pr» := by
   decide
 
 theorem ret_52c : jumpPc (KA.«printk» + 0x2a#64) = (KA.«printk» + 0x2a#64) := by decide

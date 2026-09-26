@@ -2,7 +2,7 @@
 Proof of `sys_pipe`'s specification (`SpecSysPipe.SYSPIPE`), given the
 interfaces of `myproc`, `argaddr`, `pipealloc`, `fdalloc`, `copyout` and
 `fileclose`.  Mirrors Rocq ProofSysPipe.v against the Lean image
-(`KernelSyms.«sys_pipe» = 0x8000558c`, 71 instructions).
+(`KernelSyms.«sys_pipe» = 0x800055dc`, 71 instructions).
 
     +0x00: addi sp,-64; sd ra,56(sp); sd s0,48(sp); sd s1,40(sp); addi s0,sp,64   -- wp_prologue8s1_gen
     +0x0a: jal myproc; mv s1,a0
@@ -69,7 +69,7 @@ theorem sys_pipe_proof (MP : MYPROC) (AA : ARGADDR) (PA : PIPEALLOC) (FD : FDALL
   iapply wpNext_intro_pin
   iintro %c1 %hp1 Hk Hpc Hframe
   icases sys_pipe_frame_open _ _ _ _ $$ Hframe with ⟨%fa, %rf, %wf, %w0, %w1, Hfr, Hrf, Hwf⟩
-  k_step_gen (wp_s_jal c1 _ (KA.«sys_pipe» + 0xa#64) false 2081778#21 1#5 (by decide))
+  k_step_gen (wp_s_jal c1 _ (KA.«sys_pipe» + 0xa#64) false 2081698#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [sys_pipe_br_myproc] next c2 hp2
   iintro Hk Hpc
   iapply (sys_pipe_myproc MP c2 _ ?hnm ?hKm) $$ [- $Hk $Hpc]
@@ -104,7 +104,7 @@ theorem sys_pipe_proof (MP : MYPROC) (AA : ARGADDR) (PA : PIPEALLOC) (FD : FDALL
   k_step_gen (wp_s_addi c5 _ (KA.«sys_pipe» + 0x14#64) true 0#12 10#5 0#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [sys_pipe_li0] next c6 hp6
   iintro Hk Hpc
-  k_step_gen (wp_s_jal c6 _ (KA.«sys_pipe» + 0x16#64) false 2085774#21 1#5 (by decide))
+  k_step_gen (wp_s_jal c6 _ (KA.«sys_pipe» + 0x16#64) false 2085708#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [sys_pipe_br_argaddr] next c7 hp7
   iintro Hk Hpc
   icases sys_pipe_core_tf pa pid V M $$ Hcore with ⟨%htf, Htf, Htfp, Hcorew⟩

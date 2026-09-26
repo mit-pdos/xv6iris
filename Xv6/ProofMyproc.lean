@@ -45,9 +45,9 @@ theorem hart_shift' (cpu : CPU) :
 hart's `128 * id`, plus the load's `48`. -/
 theorem myproc_cpu_addr (cpu : CPU) :
     BitVec.signExtend 64 (BitVec.extractLsb' 0 32 (hartId cpu)) <<< 7 +
-      (KA.«myproc» + 0x10ad8#64) = aCpuProc cpu := by
+      (KA.«myproc» + 0x10b08#64) = aCpuProc cpu := by
   rw [hart_shift']
-  have hcp : KA.«myproc» + 0x10ad8#64 = KA.«cpus» := by decide
+  have hcp : KA.«myproc» + 0x10b08#64 = KA.«cpus» := by decide
   rw [hcp]
   unfold aCpuProc cpuAddr procOff cpuSize
   have hb : (KernelGeom.cpusBase : BitVec 64) = KA.«cpus» := rfl
@@ -55,7 +55,7 @@ theorem myproc_cpu_addr (cpu : CPU) :
 
 theorem myproc_br_fffffffffffff310 : KA.«myproc» + 0xfffffffffffff310#64 = KA.«pop_off» := by decide
 
-theorem myproc_br_10aa8 : KA.«myproc» + 0x10aa8#64 = KA.«pid_lock» := by decide
+theorem myproc_br_10ad8 : KA.«myproc» + 0x10ad8#64 = KA.«pid_lock» := by decide
 
 theorem myproc_br_fffffffffffff296 : KA.«myproc» + 0xfffffffffffff296#64 = KA.«push_off» := by decide
 
@@ -121,7 +121,7 @@ theorem myproc_proof (PU : PUSHOFF) (PO : POPOFF) : MYPROC := ⟨fun {hlc GF} _ 
 
   iintro Hk Hpc
   -- addi a4,a4,-1334
-  k_step (wp_s_addi c3 _ (KA.«myproc» + 0x18#64) false 2708#12 14#5 14#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [myproc_br_10aa8]
+  k_step (wp_s_addi c3 _ (KA.«myproc» + 0x18#64) false 2756#12 14#5 14#5 (by decide)) from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [myproc_br_10ad8]
 
   iintro Hk Hpc
   -- add a5,a5,a4

@@ -350,7 +350,7 @@ theorem rd_copy (BE : BRELSE) (EC : EITHER_COPYOUT) (Γ : SchedNames)
   k_step_e (wp_s_add cpu _ (KA.«readi» + 0x5e#64) true 10#5 0#5 23#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [r23]
   iintro Hk Hpc
-  k_step_e (wp_s_jal cpu _ (KA.«readi» + 0x60#64) false 2092080#21 1#5 (by decide))
+  k_step_e (wp_s_jal cpu _ (KA.«readi» + 0x60#64) false 2092014#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [rd_br_either]
   iintro Hk Hpc
   -- THE WINDOW out of the held buffer
