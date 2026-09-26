@@ -261,22 +261,26 @@ binary's mask, true at upstream 7b2c1b1); the `fprintf` diagnostic and
 `exit(1)`; the parent's `wait(0)`, `exit(0)`; an entry `secc_image_entry`
 whose `Pay` carries `secc_tok k`; `FsSeccPin.v` on `FsGrepPin.v`'s mould.
 
-STATUS (lane S3, `secc/s3`): STOPPED at a design question after the
-design-independent half.  Landed, green (VM log s3-r1: EXIT=0, no
-`Error`, second pass 0 compiles): the fprintf cone at seccomp's addresses
-(`UkSeccPutc`/`Vprintf`/`VprintfS`/`Fprintf`, grep's ported 0x1d0 down,
-no printf), `UkSeccLit` (the four literals; `secc_mask_masked :
-secc_masked (and_vec secc_all secc_mask_lit)` at the catalog's lui/addi
-immediates -- the one place the literal enters) and `FsSeccPin` (inum
-23).  NOT started: `UkSeccMain`, the entry.  Two gaps, both in the
-engine, not the program: (G1) `urun`, `ukcq`, `udepw`/`udepw_at` and every
-leaf are keyed at `secc_all`, and there is no row-23 leaf
-(`wp_uk_ecall_quiet` excludes 23), so the child after `seccomp(mask)` has
-no run to walk exec / the `%s` diagnostic / `exit(1)` on; (G2) `secc_key`
-(and `useccomp_image_entry_taint`'s premise) needs `secc_rows` of the
-child's WHOLE table, and `urun` hides the table -- the program's handle is
-the NSTD ledger plus handles for open high slots, from which a closed (or
-inode-free) high slot cannot be read.  Options in the lane's report.
+STATUS (lane S3, `secc/s3`): built on rulings G1 (b) / G2 (i), merged
+with main (S2), RED at exactly one lemma: `UkSeccLit.secc_mask_masked`
+is FALSE at S2's widened `secc_B` (5 added) -- the pinned binary's mask
+0xffff_ffff_ffe1_7fbf keeps bit 5 (read); upstream must clear it and the
+tree be bumped.  Everything else is green (VM log s3-r4: the one
+`Error`, in `UkSeccLit`; `UkSeccMain`/`UkSeccEntry` are its only
+dependents and compiled before the merge).  Landed: the fprintf cone
+(`UkSeccPutc/Vprintf/VprintfS/Fprintf`), `UkSeccLit`, `FsSeccPin` (inum
+23); G2's TABLE VIEW in `UserFd` (key `None` of the one ghost map, half in
+`ufd_auth` under `tab_le fdv v`, half in the ledger: `ustd` hides it,
+`ustd_at` names it; a tail close keeps it, every ledger move resets it --
+no leaf or program statement moved), `UkRun.uslot_of_urun_ro_at`,
+`UkFork.wp_uk_ecall_fork_at` (old forms corollaries); G1's
+`UkRunSecc.wp_uk_ecall_seccomp`; `UShSecc` (UShCat's geometry at
+/seccomp, no buffer, cat's 42-word frame); `UkSeccMain` (start, main,
+usage and fork-fail diagnostics, the parent's wait(0)/exit(0), the child
+to row 23 where the slot comes from `secc_univ`); `UkSeccEntry.
+secc_image_entry` (Pay `riscv_wild (S gen_id) ∗ secc_rows sts`, context
+`□ uexec_wp`, `udep`, `urun_nopipe sts`, the console at fd 2 of `sts`,
+`Q` free, grep's `exec_ok ws` argv reading).
 
 ## S4 -- the round and the knob (design §7, §10.6) -- brief written when S3 lands
 
