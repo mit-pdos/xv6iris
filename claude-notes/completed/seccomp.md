@@ -161,6 +161,11 @@ answered by a law (`UShLine.ush_dirty_law`), discharged at the union by
   alternative's CODE -- `ualt_code (US u) = 4 * encode_nat u + 3` is a
   unary `nat` far too large to build.  Codes are read back with
   `ualt_dec_code`, never computed.
+- ONE COMPILE THAT WOULD NOT FINISH IN THE PROGRAM TIER: lane S3's first
+  compile of `UkSeccMain` ran 28 minutes and 135 GB on one argument
+  tactic in the one-byte write stub's call; replacing the argument by
+  plain hypotheses brought the file to about a minute.  Time the step
+  (as S3 did) rather than raising a budget.
 - TWO INSTANCE HANGS, both now in `durable-notes.md`: S4's
   `usecc_execfail_law`, where `UShPanic.ksh_w1_of_step N _ _ …` in a
   section with no `ghost_varG Σ Z` binder sat at a flat 2.5 GB; and S5b's
