@@ -148,7 +148,7 @@ gives up the target's link token (`entToks_unlink`), whose type the region
 reads as a FILE (`iregInv_tok_nz`), so the marker set does not move; the
 parent's `dlinks` re-sealed at the flushed record; `ufUent_fire` at `dec =
 0`; the parent re-parked. -/
-theorem sys_unlink_w5f_ghost (Fent : Pfam GF (Aview → Nat → Fname → Nat → IProp GF))
+theorem sys_unlink_w5f_ghost (Pd : Nat → IProp GF) (Fent : Pfam GF (Aview → Nat → Fname → Nat → IProp GF))
     (kd : Nat) (dinum : BitVec 32) (dnd dnW : Dinode) (bmd bmW : Blkmap)
     (datd datW : Nat → List (BitVec 8)) (kk : Nat) (nf : Nat → BitVec 8)
     (dni : Dinode) (bmi : Blkmap) (dati : Nat → List (BitVec 8))
@@ -165,8 +165,10 @@ theorem sys_unlink_w5f_ghost (Fent : Pfam GF (Aview → Nat → Fname → Nat �
       topFrag (fsGammaL fscFs) dinum.toNat (eraNode dnd bmd datd) -∗
       dinodeAt fscIreg (BitVec.setWidth 32 (dirInum datd kk)) dni -∗
       topFrag (fsGammaL fscFs) (BitVec.setWidth 32 (dirInum datd kk)).toNat (eraNode dni bmi dati) -∗
-      pfAt (uentCommitAt (hlc := hlc) (fsGammaL fscFs) appE (fun _ => iprop(True))) Fent -∗
-      |={⊤}=> (icLoaded fscFs fscIreg fscCov fscLogst kd dinum dnW bmW ∗
+      pfAt (uentCommitAt (hlc := hlc) (fsGammaL fscFs) appE Pd) Fent -∗
+      -- THE PARENT CURSOR the walk handed back, lent to the leg (TL-3C)
+      Pd dinum.toNat -∗
+      |={⊤}=> (icLoaded fscFs fscIreg fscCov fscLogst kd dinum dnW bmW ∗ Pd dinum.toNat ∗
         dinodeAt fscIreg (BitVec.setWidth 32 (dirInum datd kk)) dni ∗
         topFrag (fsGammaL fscFs) (BitVec.setWidth 32 (dirInum datd kk)).toNat
           (eraNode dni bmi dati) ∗
@@ -176,7 +178,7 @@ theorem sys_unlink_w5f_ghost (Fent : Pfam GF (Aview → Nat → Fname → Nat �
             (dirEntries (eraNode dnd bmd datd)) (fnNlink (eraNode dnd bmd datd))
             (BitVec.setWidth 32 (dirInum datd kk)).toNat (absRow (eraNode dni bmi dati))⌝ ∗
           Fent.pfRecv av0 dinum.toNat (dirBname datd kk) (BitVec.setWidth 32 (dirInum datd kk)).toNat) := by
-  iintro #Hinv Hdl Hdi Hmeta Hmap Hblk Htop Hdii Htopi Hcm
+  iintro #Hinv Hdl Hdi Hmeta Hmap Hblk Htop Hdii Htopi Hcm HPd
   have hop0 := hop
   obtain ⟨hok, hrl, hdok, hddix, hdoc, hduq⟩ := hop0
   obtain ⟨hok', hrl', hdok', hddix', hdoc', hduq'⟩ := hZ.ok
@@ -224,13 +226,13 @@ theorem sys_unlink_w5f_ghost (Fent : Pfam GF (Aview → Nat → Fname → Nat �
   ihave Htopi := (show topFrag (GF := GF) (fsGammaL fscFs) (BitVec.setWidth 32 (dirInum datd kk)).toNat
       (eraNode dni bmi dati) ⊢ topFragQ (fsGammaL fscFs) (DFrac.own 1)
         (BitVec.setWidth 32 (dirInum datd kk)).toNat (eraNode dni bmi dati) from .rfl) $$ Htopi
-  imod (ufUent_fire (hlc := hlc) fscFs ⊤ (DFrac.own 1) (fun _ => iprop(True)) Fent dinum.toNat
+  imod (ufUent_fire (hlc := hlc) fscFs ⊤ (DFrac.own 1) Pd Fent dinum.toNat
       (BitVec.setWidth 32 (dirInum datd kk)).toNat (dirBname datd kk) 0 (eraNode dnd bmd datd)
       (eraNode dnW bmW datW) (eraNode dni bmi dati) ufNd_top hloc (mkfEra_is_dir dnd bmd datd htyz)
       (sys_unlink_ent_at dinum.toNat dnd bmd datd kk nf hop hty hfn) hnD hnDD
       (sys_unlink_nl1 dnd bmd datd hlive) (sys_unlink_nl1 dni bmi dati hnli)
       (sys_unlink_nondir_node _ hipnd) (sys_unlink_nondir_dec _ hipnd) habsp hoki.2.2.2.1)
-    $$ Hftop Happ Hcm %trivial Htop Htopi with ⟨Htop, Htopi, -, %av0, %hpre, Hrecv⟩
+    $$ Hftop Happ Hcm HPd Htop Htopi with ⟨Htop, Htopi, HPd, %av0, %hpre, Hrecv⟩
   ihave Htopi := (show topFragQ (GF := GF) (fsGammaL fscFs) (DFrac.own 1)
         (BitVec.setWidth 32 (dirInum datd kk)).toNat (eraNode dni bmi dati) ⊢
       topFrag (fsGammaL fscFs) (BitVec.setWidth 32 (dirInum datd kk)).toNat
@@ -240,7 +242,7 @@ theorem sys_unlink_w5f_ghost (Fent : Pfam GF (Aview → Nat → Fname → Nat �
   ihave Hload := icMkLoaded fscFs fscIreg fscCov fscLogst kd dinum dnW bmW datW hok' hrl' hdok'
     hddix' hdoc' hduq' $$ Hdl Hdi Hmeta Ha Hr Hblk Htop
   imodintro
-  iframe Hload Hdii Htopi
+  iframe Hload Hdii Htopi HPd
   isplitl [Htok]
   · iexists uty; iexact Htok
   iexists av0
@@ -283,11 +285,13 @@ theorem sys_unlink_w5_file (IU : IUPDATE) (IUP : IUNLOCKPUT) (EO : END_OP) (Γ :
   icases fsReady_region $$ Hrdy with ⟨#Hinv, #Hopen⟩
   unfold sysUnlinkCommits
   icases Hcm with ⟨He, Ht, Hx, Hm⟩
+  ihave HP := (show A.P (npElems pl).length dinum.toNat ⊢ A.P (nparElems pl).length dinum.toNat
+    from .rfl) $$ HP
   iapply wpLoop_fupd
-  imod (sys_unlink_w5f_ghost (hlc := hlc) A.Fent kd dinum dnd dnW bmd bmW datd datW kk nf dni bmi
-      dati hop hZ hlive hty hnd hndd hfn hoki hnli hnibi htyi)
-    $$ Hinv Hdl Hdi Hmeta Hmap Hblk Htop Hdii Htopi He
-    with ⟨Hloadd, Hdii, Htopi, ⟨%uty, Htok⟩, %av0, %hpre, Hrecv⟩
+  imod (sys_unlink_w5f_ghost (hlc := hlc) (A.P (nparElems pl).length) A.Fent kd dinum dnd dnW bmd
+      bmW datd datW kk nf dni bmi dati hop hZ hlive hty hnd hndd hfn hoki hnli hnibi htyi)
+    $$ Hinv Hdl Hdi Hmeta Hmap Hblk Htop Hdii Htopi He HP
+    with ⟨Hloadd, HP, Hdii, Htopi, ⟨%uty, Htok⟩, %av0, %hpre, Hrecv⟩
   imodintro
   -- +0xae  lh a4,68(s2) ; +0xb2  c.li a5,1 ; +0xb4  beq a4,a5 (FALLS)
   unfold inodeMeta
@@ -328,8 +332,6 @@ theorem sys_unlink_w5_file (IU : IUPDATE) (IUP : IUNLOCKPUT) (EO : END_OP) (Γ :
   ihave Hbufs : sysUnlinkBufs (k.regs 2#5) $$ [Hjunk Hde Hnm Hpath Hoff Hdel]
   · unfold sysUnlinkBufs; iframe
   ihave Hlkd := sys_unlink_lkat_ty A.pid kd q g lo tl dinum dnd dnW γil γisl t _ hZ.ty $$ Hlkd
-  ihave HP := (show A.P (npElems pl).length dinum.toNat ⊢ A.P (nparElems pl).length dinum.toNat
-    from .rfl) $$ HP
   have hlast : (pathElems pl).getLast? = some (dirBname datd kk) := by
     rw [sys_unlink_bname_kk datd _ kk nf hfn]; exact sys_unlink_last_of_npar pl nf hname
   iapply (sys_unlink_w5_spine IU IUP EO Γ cpu k A ok spie spp

@@ -35,8 +35,8 @@ channel: the law's out-wand at the entry's receipt).
    view it fired at; the arm instantiates at its own view
    (`syscPath_imgLazy`, = W8-K's `imgAgrees_viewLazy`).  mkdir's law has
    the same guard since its bundle became path-fixed (Rocq TL-3C
-   `3e3a157ae`); chdir/unlink/link read no image (their Lean bundles are
-   path-generic).
+   `3e3a157ae`), and so has unlink's (`88cc6612c`); chdir/link read no
+   image (their Lean bundles are path-generic).
 3. The ledgers: chdir borrows `irefSlots 2` and link `irefSlots
    sysLinkIrefs` (3) and unlink `irefSlots sysUnlinkSlots` (2) out of
    `IREFSPARE` and join them back (Rocq `sysc_iref_split/join`); open,
@@ -173,8 +173,10 @@ def SyscDepChdir : Prop :=
           chdirReceipt (hlc := hlc) (fsGammaL fscFs) fscFs W.cwd P Pmiss Fo r cw' -∗
             spostAt (uslot (hlc := hlc)) 9 f W r M' fdv' cw' cs')
 
-/-- **Rocq `sysc_dep_unlink` + `sysc_out_unlink`**: branch 18 is unlink's
-caller bundle at the key's cwd; unlink's arms (ghost-free) pay the post. -/
+/-- **Rocq `sysc_dep_unlink` + `sysc_out_unlink`** (deviation 2: the image
+guard; TL-3C made unlink's bundle path-fixed): branch 18 is unlink's caller
+bundle at the key's cwd and the path at argument 0; unlink's arms
+(ghost-free) at the view it fired at pay the post. -/
 def SyscDepUnlink : Prop :=
   ∀ (f : sfam GF) (W : Uvis),
     sbundleAt (uslot (hlc := hlc)) 18 f W ⊢
@@ -183,10 +185,14 @@ def SyscDepUnlink : Prop :=
         (Ftgt : Pfam GF (Aview → Nat → IProp GF))
         (Fex : Pfam GF (Aview → Nat → Fname → Nat → IProp GF))
         (Fmiss : Pfam GF (Aview → Nat → Fname → IProp GF)),
-        unlinkAuPre (hlc := hlc) (fsGammaL fscFs) fscFs W.cwd P Pmiss Fent Ftgt Fex Fmiss ∗
-        (∀ (r : BitVec 64) (M' : ElfMem) (fdv' : List FdState) (cw' : Nat)
-            (cs' : ExtTreeSet GName compare),
-          unlinkArms (hlc := hlc) (fsGammaL fscFs) fscFs W.cwd P Pmiss Fent Ftgt Fex Fmiss r -∗
+        (∀ Mv : Nat → List (BitVec 8), ⌜∀ (a : Nat) (b : BitVec 8), W.M a = some b → umemByte Mv a = b⌝ -∗
+          unlinkAuAt (hlc := hlc) (fsGammaL fscFs) fscFs W.cwd Mv (tfW W.tf (tfArgIdx 0)).toNat
+            P Pmiss Fent Ftgt Fex Fmiss) ∗
+        (∀ (Mv : Nat → List (BitVec 8)) (r : BitVec 64) (M' : ElfMem) (fdv' : List FdState)
+            (cw' : Nat) (cs' : ExtTreeSet GName compare),
+          ⌜∀ (a : Nat) (b : BitVec 8), W.M a = some b → umemByte Mv a = b⌝ -∗
+          unlinkArms (hlc := hlc) (fsGammaL fscFs) fscFs W.cwd Mv (tfW W.tf (tfArgIdx 0)).toNat
+              P Pmiss Fent Ftgt Fex Fmiss r -∗
             spostAt (uslot (hlc := hlc)) 18 f W r M' fdv' cw' cs')
 
 /-- **Rocq `sysc_dep_link` + `sysc_out_link`**: branch 19 is link's three
@@ -396,7 +402,10 @@ theorem syscall_arm_unlink (SU : SYSUNLINK) (hdep : SyscDepUnlink (hlc := hlc) (
   ihave Hdep := syscSysIn_at f V M sts gn cs pid 18 hn (by decide) $$ Hsin
   icases hdep f (uvisOf V M sts gn cs pid) $$ Hdep with
     ⟨%P, %Pmiss, %Fent, %Ftgt, %Fex, %Fmiss, Hau, Hout⟩
-  rw [show (uvisOf V M sts gn cs pid).cwd = V.cwi from rfl]
+  rw [show (uvisOf V M sts gn cs pid).cwd = V.cwi from rfl,
+    show (uvisOf V M sts gn cs pid).tf = V.tf from rfl,
+    show (uvisOf V M sts gn cs pid).M = umemLazy V.upt V.sz.toNat M from rfl]
+  ihave Hau := Hau $$ %(viewLazy V.upt V.sz M) %(syscPath_imgLazy V.upt V.sz M)
   ihave #Hpe := syscallEnv_panic PT Γ γ $$ Henv
   ihave #Hrdy := syscallEnv_fsReady PT Γ γ $$ Henv
   icases (show irefSlots (GF := GF) IREFSPARE ⊢ irefSlots sysUnlinkSlots ∗ irefSlots 2 from
@@ -443,7 +452,7 @@ theorem syscall_arm_unlink (SU : SYSUNLINK) (hdep : SyscDepUnlink (hlc := hlc) (
   isplitl [Hout Harms]
   · iapply (syscSysOut_at f V M sts gn cs pid _ _ _ _ _ 18 hn (by decide) (by decide))
     rw [ha0]
-    iapply Hout
+    iapply Hout $$ %(viewLazy V.upt V.sz M) %_ %_ %_ %_ %_ %(syscPath_imgLazy V.upt V.sz M)
     iexact Harms
   isplitr
   · iapply syscForkOut_ne; rw [hn]; decide

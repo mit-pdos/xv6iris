@@ -20,6 +20,8 @@ structure SysUnlinkArgs (GF : BundledGFunctors) where
   pid : BitVec 32
   V : ProcPriv
   M : Nat → List (BitVec 8)
+  /-- the path argument (trapframe argument 0; TL-3C's path-fixed bundle) -/
+  v0 : BitVec 64
   P : Nat → Nat → IProp GF
   Pmiss : Nat → Nat → IProp GF
   Fent : Pfam GF (Aview → Nat → Fname → Nat → IProp GF)

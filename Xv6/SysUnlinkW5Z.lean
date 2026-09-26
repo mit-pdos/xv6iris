@@ -190,7 +190,7 @@ def sysUnlinkAtAe (Γ : SchedNames) (cpu : CPU) (k : KCtx) (A : SysUnlinkArgs GF
   sysUnlinkOpen ks (BitVec.setWidth 32 (dirInum datd kk)) dni bmi dati ∗
   txPin icfgLog t (1 : Qp).half ∗
   A.P (npElems pl).length dinum.toNat ∗
-  bslots 3 ∗ logOpS icfgLog nw Sbw ∗ sysUnlinkCommits A
+  bslots 3 ∗ logOpS icfgLog nw Sbw ∗ sysUnlinkCommits A pl
 
 theorem sys_unlink_li0' : BitVec.signExtend 64 0#12 = 0#64 := by decide
 

@@ -75,10 +75,10 @@ Rocq's header, point for point:
    `filewriteIn` carried a no-wrap conjunct; SpecFilewrite deviation 5 is
    retired, so row 16 is Rocq's `filewrite_in`, `SpecFilewrite.filewriteIn`,
    paid from the supply at every key.)
-6. **UNLINK IS NOT PATH-FIXED YET** (Lean's `unlinkAuPre` quantifies the
-   walk at every path; Rocq's `unlink_au_at` reads argument 0).  MKDIR IS
-   (Rocq TL-3C `3e3a157ae`): row/post 20 are `mkdirAuAt`/`mkdirArms` at
-   argument 0 under deviation 1's image guard, as mknod's.
+6. (retired by Rocq TL-3C `3e3a157ae` / `88cc6612c`: mkdir and unlink are
+   path-fixed; rows/posts 18 and 20 are `unlinkAuAt`/`unlinkArms` and
+   `mkdirAuAt`/`mkdirArms` at argument 0 under deviation 1's image guard,
+   as mknod's.)
 7. **`uprogSG_gen` / `uprogSG_free` are `def`s, not instances** (no Lean
    consumer yet -- the `UkRun` program tier is wave 9 -- and a global
    `UprogSG` instance would be ambiguous against a verified program's).
@@ -360,11 +360,14 @@ def xrowMknod (P Pmiss : Nat → Nat → IProp GF) (Farm Fun : Pfam GF (Aview �
     mknodAuAt (hlc := hlc) (fsGammaL fscFs) fscFs W.cwd Mv (xkA W 0).toNat (devArg (xkA W 1))
       (devArg (xkA W 2)) P Pmiss Farm Fun Fok Fex)
 
-/-- row 18 (deviation 6). -/
+/-- row 18: unlink's bundle AT ITS PATH ARGUMENT (Rocq TL-3C item (M),
+`88cc6612c`), at every page view agreeing with the key's image (deviation 1). -/
 def xrowUnlink (P Pmiss : Nat → Nat → IProp GF) (Fent : Pfam GF (Aview → Nat → Fname → Nat → IProp GF))
     (Ftgt : Pfam GF (Aview → Nat → IProp GF)) (Fex : Pfam GF (Aview → Nat → Fname → Nat → IProp GF))
     (Fmiss : Pfam GF (Aview → Nat → Fname → IProp GF)) (W : Uvis) : IProp GF :=
-  unlinkAuPre (hlc := hlc) (fsGammaL fscFs) fscFs W.cwd P Pmiss Fent Ftgt Fex Fmiss
+  iprop(∀ Mv : Nat → List (BitVec 8), ⌜imgAgrees W.M Mv⌝ -∗
+    unlinkAuAt (hlc := hlc) (fsGammaL fscFs) fscFs W.cwd Mv (xkA W 0).toNat
+      P Pmiss Fent Ftgt Fex Fmiss)
 
 /-- row 19. -/
 def xrowLink (Ftgt : Pfam GF (Aview → Nat → Anode → IProp GF))
@@ -429,7 +432,9 @@ def xpostMknod (P Pmiss : Nat → Nat → IProp GF) (Farm Fun : Pfam GF (Aview �
 def xpostUnlink (P Pmiss : Nat → Nat → IProp GF) (Fent : Pfam GF (Aview → Nat → Fname → Nat → IProp GF))
     (Ftgt : Pfam GF (Aview → Nat → IProp GF)) (Fex : Pfam GF (Aview → Nat → Fname → Nat → IProp GF))
     (Fmiss : Pfam GF (Aview → Nat → Fname → IProp GF)) (W : Uvis) (r : BitVec 64) : IProp GF :=
-  unlinkArms (hlc := hlc) (fsGammaL fscFs) fscFs W.cwd P Pmiss Fent Ftgt Fex Fmiss r
+  iprop(∃ Mv : Nat → List (BitVec 8), ⌜imgAgrees W.M Mv⌝ ∗
+    unlinkArms (hlc := hlc) (fsGammaL fscFs) fscFs W.cwd Mv (xkA W 0).toNat
+      P Pmiss Fent Ftgt Fex Fmiss r)
 
 /-- post 19. -/
 def xpostLink (Ftgt : Pfam GF (Aview → Nat → Anode → IProp GF))
@@ -634,7 +639,7 @@ theorem xrowUnlink_supply (W : Uvis) :
       xrowUnlink (hlc := hlc) (xfamPt (GF := GF)).uP xfamPt.uPmiss xfamPt.uFent xfamPt.uFtgt xfamPt.uFex
         xfamPt.uFmiss W := by
   dsimp only [xrowUnlink, xfamPt, xv6Ssupply]
-  iintro #⟨Hsup, -, -⟩
+  iintro #⟨Hsup, -, -⟩ %Mv %_
   iapply (fsabsUnlinkPre (hlc := hlc) fscFs) $$ Hsup
 
 theorem xrowLink_supply :
@@ -1054,20 +1059,26 @@ theorem syscDepMknod_xv6 (f : Xfam GF) (W : Uvis) :
 /-- **`SyscDepUnlink`** (Rocq `sbundle_at_unlink_elim` + `spost_at_unlink_intro`). -/
 theorem syscDepUnlink_xv6 (f : Xfam GF) (W : Uvis) :
     @UexecSG.sbundleAt GF _ uexecSGXv6 (uslot (hlc := hlc)) 18 f W ⊢
-      unlinkAuPre (hlc := hlc) (fsGammaL fscFs) fscFs W.cwd f.uP f.uPmiss f.uFent f.uFtgt f.uFex f.uFmiss ∗
-      (∀ (r : BitVec 64) (M' : ElfMem) (fdv' : List FdState) (cw' : Nat) (cs' : ExtTreeSet GName compare),
-        unlinkArms (hlc := hlc) (fsGammaL fscFs) fscFs W.cwd f.uP f.uPmiss f.uFent f.uFtgt f.uFex
-          f.uFmiss r -∗
+      (∀ Mv : Nat → List (BitVec 8), ⌜imgAgrees W.M Mv⌝ -∗
+        unlinkAuAt (hlc := hlc) (fsGammaL fscFs) fscFs W.cwd Mv (xkA W 0).toNat f.uP f.uPmiss
+          f.uFent f.uFtgt f.uFex f.uFmiss) ∗
+      (∀ (Mv : Nat → List (BitVec 8)) (r : BitVec 64) (M' : ElfMem) (fdv' : List FdState) (cw' : Nat)
+          (cs' : ExtTreeSet GName compare),
+        ⌜imgAgrees W.M Mv⌝ -∗
+        unlinkArms (hlc := hlc) (fsGammaL fscFs) fscFs W.cwd Mv (xkA W 0).toNat f.uP f.uPmiss
+          f.uFent f.uFtgt f.uFex f.uFmiss r -∗
           @UexecSG.spostAt GF _ uexecSGXv6 (uslot (hlc := hlc)) 18 f W r M' fdv' cw' cs') := by
   rw [sbundleAt_xv6_unlink]
   unfold xrowUnlink
   iintro H
   isplitl [H]
   · iexact H
-  · iintro %r %M' %fdv' %cw' %cs' Hp
+  · iintro %Mv %r %M' %fdv' %cw' %cs' %hag Hp
     rw [spostAt_xv6_unlink]
     unfold xpostUnlink
-    iexact Hp
+    iexists Mv
+    iframe Hp
+    ipureintro; exact hag
 
 /-- **`SyscDepLink`** (Rocq `sbundle_at_link_elim` + `spost_at_link_intro`). -/
 theorem syscDepLink_xv6 (f : Xfam GF) (W : Uvis) :

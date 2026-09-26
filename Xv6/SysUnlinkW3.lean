@@ -412,7 +412,7 @@ def sysUnlinkAt8a (Γ : SchedNames) (cpu : CPU) (k : KCtx) (A : SysUnlinkArgs GF
   sysUnlinkOpen ks (BitVec.setWidth 32 (dirInum datd kk)) dni bmi dati ∗
   txPin icfgLog t (1 : Qp).half ∗
   A.P (npElems pl).length dinum.toNat ∗
-  bslots 3 ∗ logOpS icfgLog n Sb ∗ sysUnlinkCommits A
+  bslots 3 ∗ logOpS icfgLog n Sb ∗ sysUnlinkCommits A pl
 
 /-! ## ARM E: the isdirempty refusal, with the found observation fired -/
 
@@ -455,7 +455,7 @@ theorem sys_unlink_w3_e (IUP : IUNLOCKPUT) (EO : END_OP) (Γ : SchedNames)
       (1 : Qp).half.half ∗
     sysUnlinkIpRest ks (BitVec.setWidth 32 (dirInum datd kk)) dni bmi dati ∗
     txPin icfgLog t (1 : Qp).half ∗
-    A.P (npElems pl).length dinum.toNat ∗ logOpS icfgLog n Sb ∗ sysUnlinkCommits A
+    A.P (npElems pl).length dinum.toNat ∗ logOpS icfgLog n Sb ∗ sysUnlinkCommits A pl
     ⊢ wpLoop (GF := GF) cpu := by
   iintro ⟨Hk, Hpc, Hte, Hce, Hip, Hdel, Hpid, Hbs, Hcells, Hjunk, Hde, Hnm, Htl, Hpath, Hoff, #Henv,
     Hhole, HΦ, Hlkd, Hopd, Hlki, Hresti, Hres, HP, Hop, Hcm⟩
@@ -490,7 +490,8 @@ theorem sys_unlink_w3_e (IUP : IUNLOCKPUT) (EO : END_OP) (Γ : SchedNames)
   rw [← topFrag_1, ← topFrag_1]
   ihave HP := (show A.P (npElems pl).length dinum.toNat ⊢ A.P (nparElems pl).length dinum.toNat
     from .rfl) $$ HP
-  ihave Harms := unlinkArms_dex (hlc := hlc) (fsGammaL fscFs) fscFs A.V.cwi A.P A.Pmiss A.Fent
+  ihave Harms := unlinkArms_dex (hlc := hlc) (fsGammaL fscFs) fscFs A.V.cwi (viewLazy A.V.upt A.V.sz A.M)
+      A.v0.toNat A.P A.Pmiss A.Fent
     A.Ftgt A.Fex A.Fmiss pl dinum.toNat av _ (bname 14 nf) _ _ _ _
     (sys_unlink_last_of_npar pl nf hname) hrowd hnm' hrowt hne' $$ [$HP $He $Ht $Hrecv $Hm]
   ihave Hloadd := sys_unlink_close kd dinum dnd bmd datd $$ [Hdl Hdi Hmeta Hadd Hind Hblk Htop]
@@ -562,7 +563,7 @@ theorem sys_unlink_w3_dir (RD : READI) (PA : PANIC) (IUP : IUNLOCKPUT) (EO : END
     sysUnlinkOpen ks (BitVec.setWidth 32 (dirInum datd kk)) dni bmi dati ∗
     txPin icfgLog t (1 : Qp).half ∗
     A.P (npElems pl).length dinum.toNat ∗
-    bslots 3 ∗ logOpS icfgLog n Sb ∗ sysUnlinkCommits A
+    bslots 3 ∗ logOpS icfgLog n Sb ∗ sysUnlinkCommits A pl
     ⊢ wpLoop (GF := GF) cpu := by
   iintro ⟨Hk, Hpc, Hcells, Hjunk, Hde, Hnm, Htl, Hpath, Hoff, Hdel, Hte, Hce, #Henv, Hpid, Hhole,
     HΦ, Hlkd, Hopd, Hlki, Hopi, Hres, HP, Hbs, Hop, Hcm⟩
@@ -621,7 +622,7 @@ theorem sys_unlink_w3_dir (RD : READI) (PA : PANIC) (IUP : IUNLOCKPUT) (EO : END
           t (1 : Qp).half.half ∗
         sysUnlinkIpRest ks (BitVec.setWidth 32 (dirInum datd kk)) dni bmi dati ∗
         txPin icfgLog t (1 : Qp).half ∗
-        A.P (npElems pl).length dinum.toNat ∗ logOpS icfgLog n Sb ∗ sysUnlinkCommits A)
+        A.P (npElems pl).length dinum.toNat ∗ logOpS icfgLog n Sb ∗ sysUnlinkCommits A pl)
       ⊢ wpLoop cpu := by
     intro cpu spie spp R s3v
     iintro ⟨%⟨hp, hdead⟩, Hk, Hpc, Hte, Hce, Hip, Hdel, Hpid, Hbs, Hcells, Hjunk, Hde, Hnm, Htl,
@@ -681,7 +682,7 @@ theorem sys_unlink_w3_dir (RD : READI) (PA : PANIC) (IUP : IUNLOCKPUT) (EO : END
           t (1 : Qp).half.half ∗
         sysUnlinkIpRest ks (BitVec.setWidth 32 (dirInum datd kk)) dni bmi dati ∗
         txPin icfgLog t (1 : Qp).half ∗
-        A.P (npElems pl).length dinum.toNat ∗ logOpS icfgLog n Sb ∗ sysUnlinkCommits A)
+        A.P (npElems pl).length dinum.toNat ∗ logOpS icfgLog n Sb ∗ sysUnlinkCommits A pl)
     hopi.1 ?hE hD dni.diSize.toNat 2 cpu spie spp
     (((R.set (14#5) (BitVec.ofNat 64 dni.diSize.toNat)).set 15#5 32#64).set 19#5 32#64)
     (le_refl 2) (by omega) (by omega)

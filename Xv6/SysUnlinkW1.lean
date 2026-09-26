@@ -82,16 +82,30 @@ def sysUnlinkPathBuf (a : BitVec 64) (plen : Nat) (pfun : Nat → BitVec 8) : IP
   byteBuf a (DFrac.own 1) (bview (plen + 1) pfun) ∗
   suAny (a + BitVec.ofNat 64 (plen + 1)) (128 - (plen + 1))
 
+/-- the fetched path's buffer view is the path itself -/
+theorem sys_unlink_bview_self (pl : List (BitVec 8)) :
+    bview pl.length (fun j => (pl ++ [0#8])[j]!) = pl := by
+  apply List.ext_getElem?
+  intro j
+  rcases Nat.lt_or_ge j pl.length with hj | hj
+  · rw [bview_lookup _ _ j hj, List.getElem!_eq_getElem?_getD, List.getElem?_append_left hj,
+      List.getElem?_eq_getElem hj]
+    rfl
+  · rw [List.getElem?_eq_none_iff.mpr (by rw [bview_length]; omega),
+      List.getElem?_eq_none_iff.mpr (by omega)]
+
 /-- THE CARVE OF argstr's SUCCESS ARM (Rocq `su_buf_split`): the buffer
 argstr filled is the path, NUL-free below its length and terminated, and the
-rest of the buffer. -/
+rest of the buffer -- and (TL-3C, the path-fixed bundle) THE READING OF
+ARGUMENT 0 at that path, which Rocq's `ProofSysUnlinkW1` used to discard. -/
 theorem sys_unlink_path_of (a : BitVec 64) (M : Nat → List (BitVec 8)) (va : Nat)
     (old bs pl : List (BitVec 8)) (hold : old.length = 128)
     (hs : umemStr M va old.length = some (pl ++ [0#8]))
     (hbs : bs = pl ++ 0#8 :: old.drop (pl.length + 1)) :
     byteBuf (GF := GF) a (DFrac.own 1) bs ⊢
       ∃ pfun : Nat → BitVec 8, ⌜(∀ i, i < pl.length → pfun i ≠ 0#8) ∧ pfun pl.length = 0#8 ∧
-        pl.length < 128⌝ ∗ sysUnlinkPathBuf a pl.length pfun := by
+        pl.length < 128 ∧ argPathOf M va (bview pl.length pfun)⌝ ∗
+        sysUnlinkPathBuf a pl.length pfun := by
   rw [hold] at hs
   obtain ⟨pl', hpl', hof⟩ := argPathOf_umemStr M va 128 _ (by decide) hs
   have hpl : pl = pl' := List.append_cancel_right hpl'
@@ -109,7 +123,7 @@ theorem sys_unlink_path_of (a : BitVec 64) (M : Nat → List (BitVec 8)) (va : N
   iexists (fun j => (pl ++ [0#8])[j]!)
   isplitr
   · ipureintro
-    refine ⟨fun i hi => ?_, ?_, by omega⟩
+    refine ⟨fun i hi => ?_, ?_, by omega, by rw [sys_unlink_bview_self]; exact hof⟩
     · have h1 : (pl ++ [0#8])[i]! = pl[i]! := by
         rw [List.getElem!_eq_getElem?_getD, List.getElem!_eq_getElem?_getD,
           List.getElem?_append_left hi]
@@ -184,8 +198,8 @@ theorem sys_unlink_name_close (sp0 : BitVec 64) (nf : Nat → BitVec 8) (tl : Li
 
 /-- The four commits, as the bundle hands them in and the refusals hand
 them back. -/
-def sysUnlinkCommits (A : SysUnlinkArgs GF) : IProp GF := iprop%
-  pfAt (uentCommitAt (hlc := hlc) (fsGammaL fscFs) appE (fun _ => iprop(True))) A.Fent ∗
+def sysUnlinkCommits (A : SysUnlinkArgs GF) (pl : List (BitVec 8)) : IProp GF := iprop%
+  pfAt (uentCommitAt (hlc := hlc) (fsGammaL fscFs) appE (A.P (nparElems pl).length)) A.Fent ∗
   pfAt (utgtCommitAt (hlc := hlc) (fsGammaL fscFs) appE) A.Ftgt ∗
   pfAt (dlookupCommitAt (hlc := hlc) (fsGammaL fscFs) appE) A.Fex ∗
   pfAt (dmissCommitAt (hlc := hlc) (fsGammaL fscFs) appE) A.Fmiss
@@ -214,7 +228,7 @@ def sysUnlinkAt30 (Γ : SchedNames) (cpu : CPU) (k : KCtx) (A : SysUnlinkArgs GF
   (∀ c : CPU, sysUnlinkPostA k A c) ∗
   inodeHeldTyAt dpv T_DIR iL ∗ A.P (npElems pl).length iL ∗
   bslots 3 ∗ irefSlots 1 ∗ logOpS icfgLog n Sb ∗ logTx icfgLog ∗
-  sysUnlinkCommits A
+  sysUnlinkCommits A pl
 
 /-! ## W1, after argstr: begin_op and nameiparent -/
 
@@ -228,6 +242,7 @@ theorem sys_unlink_w1_walk (BO : BEGIN_OP) (NP : NPAR_WRAP_ERA) (EO : END_OP) (�
     (plen : Nat) (pfun : Nat → BitVec 8)
     (hpins : sysUnlinkPins k R (k.regs 9#5) (k.regs 18#5) (k.regs 19#5))
     (hnn : ∀ i, i < plen → pfun i ≠ 0#8) (hterm : pfun plen = 0#8) (hplen : plen < 128)
+    (hpof : argPathOf (viewLazy A.V.upt A.V.sz A.M) A.v0.toNat (bview plen pfun))
     (hW2 : ∀ (cpu : CPU) (spie spp : Bool) (R : RegMap) (dpv : BitVec 64)
         (nf : Nat → BitVec 8) (tl : List (BitVec 8)) (iL n : Nat) (Sb : List Nat),
       sysUnlinkAt30 (hlc := hlc) Γ cpu k A spie spp R dpv w₄ w₅ nf tl P2 (bview plen pfun) iL n Sb
@@ -298,10 +313,14 @@ theorem sys_unlink_w1_walk (BO : BEGIN_OP) (NP : NPAR_WRAP_ERA) (EO : END_OP) (�
   icases sys_unlink_name_open (k.regs 2#5) $$ Hnm with ⟨%nfun, %tl, %htl, Hnm, Htl⟩
   unfold sysUnlinkPathBuf
   icases Hpath with ⟨Hpath, Hrest⟩
-  unfold sysUnlinkAuA unlinkAuPre
+  unfold sysUnlinkAuA unlinkAuAt
   icases Hau with ⟨Hpre, Hcent, Hctgt, Hcex, Hcmiss⟩
   ihave Hir := (show irefSlots (GF := GF) sysUnlinkSlots ⊢ irefSlots 2 from .rfl) $$ Hir
-  ihave Hst := npStart_of_mknod (hlc := hlc) fscFs A.V.cwi A.P A.Pmiss (bview plen pfun) $$ Hpre
+  -- THE WALK AT THE STRING ARGUMENT 0 NAMES, and the entry leg's cursor
+  -- moved to it (TL-3C, `unlinkUent_inst`)
+  ihave Hst := Hpre $$ %(bview plen pfun) %hpof
+  ihave Hcent := unlinkUent_inst (hlc := hlc) (fsGammaL fscFs) (viewLazy A.V.upt A.V.sz A.M)
+    A.v0.toNat (bview plen pfun) A.P A.Fent hpof $$ Hcent
   iapply (sys_unlink_nameiparent NP Γ cpu _ k.sie (by k_norm_g) k.proc (by k_norm_g) A.j
       (procAddr A.j) plen pfun nfun MAXOPBLOCKS Sb0 A.P A.Pmiss A.pid { A.V with upt := P2 }
       (viewFaulted A.V.upt P2 A.M) ok.hj ?np ?np2 ?nK ?nn ?nt hnn hterm (by omega)
@@ -349,7 +368,8 @@ theorem sys_unlink_w1_walk (BO : BEGIN_OP) (NP : NPAR_WRAP_ERA) (EO : END_OP) (�
         bop.BEQ)
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [h10, sysfile_beqz, decide_true]
     iintro Hk Hpc
-    ihave Harms := unlinkArms_npdead (hlc := hlc) (fsGammaL fscFs) fscFs A.V.cwi A.P A.Pmiss
+    ihave Harms := unlinkArms_npdead (hlc := hlc) (fsGammaL fscFs) fscFs A.V.cwi (viewLazy A.V.upt A.V.sz A.M)
+      A.v0.toNat A.P A.Pmiss
       A.Fent A.Ftgt A.Fex A.Fmiss (bview plen pfun) $$ [$Hdead $Hcent $Hctgt $Hcex $Hcmiss]
     ihave Hop := logOpS_op icfgLog n' Sb' $$ Hop Htx
     ihave Hnm := sys_unlink_name_close (k.regs 2#5) nf tl htl $$ [$Hnm $Htl]
@@ -397,7 +417,7 @@ set_option maxHeartbeats 16000000 in
 argstr's -1 with the WHOLE bundle back, `sys_unlink_w1_walk` otherwise. -/
 theorem sys_unlink_w1_args (AS : ARGSTR_W) (BO : BEGIN_OP) (NP : NPAR_WRAP_ERA) (EO : END_OP)
     (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ] (cpu : CPU) (k : KCtx) (A : SysUnlinkArgs GF)
-    (ok : SuOk k A) (v0 : BitVec 64) (hv0 : A.V.tf[tfArgIdx 0]? = some v0) (spie spp : Bool)
+    (ok : SuOk k A) (hv0 : A.V.tf[tfArgIdx 0]? = some A.v0) (spie spp : Bool)
     (R : RegMap) (w₃ w₄ w₅ : BitVec 64)
     (hpins : sysUnlinkPins k R (k.regs 9#5) (k.regs 18#5) (k.regs 19#5))
     (hW2 : ∀ (P2 : UPtd) (plen : Nat) (pfun : Nat → BitVec 8) (cpu : CPU) (spie spp : Bool)
@@ -437,7 +457,7 @@ theorem sys_unlink_w1_args (AS : ARGSTR_W) (BO : BEGIN_OP) (NP : NPAR_WRAP_ERA) 
   icases (procPrivFd_split _ _ _ _ _).1 $$ Hblk with ⟨Hcore, Howe⟩
   icases (procPrivCoreNoctxAt_bare _ _ _ _ _).1 $$ Hcore with ⟨Hbare, Hcwr⟩
   iapply (sys_unlink_argstr AS Γ cpu _ k.sie (by k_norm_g) k.proc (by k_norm_g) (procAddr A.j)
-      A.pid A.V A.M 0 v0 old sysfile_arg0_lt ?ga0 hv0 ?gpr ?gt ?gn ?gK ?gmx (by omega)
+      A.pid A.V A.M 0 A.v0 old sysfile_arg0_lt ?ga0 hv0 ?gpr ?gt ?gn ?gK ?gmx (by omega)
       (sysUnlinkPath (k.regs 2#5)) ?gba)
     $$ [- $Hk $Hpc $Hte $Hce $Henv $Hbare $Hpath]
   rotate_right 1
@@ -468,9 +488,9 @@ theorem sys_unlink_w1_args (AS : ARGSTR_W) (BO : BEGIN_OP) (NP : NPAR_WRAP_ERA) 
       with [hr, sysfile_bltz_nat pl.length (by omega)]
     iintro Hk Hpc
     icases sys_unlink_path_of (GF := GF) (sysUnlinkPath (k.regs 2#5)) _ _ old bs pl hold hs hbs
-      $$ Hpath with ⟨%pfun, %⟨hnn, hterm, -⟩, Hpath⟩
+      $$ Hpath with ⟨%pfun, %⟨hnn, hterm, -, hpof⟩, Hpath⟩
     iapply (sys_unlink_w1_walk BO NP EO Γ cpu k A ok P2 hext spie1 spp1 R1 w₃ w₄ w₅ pl.length pfun
-        hp1 hnn hterm hpl (hW2 P2 pl.length pfun))
+        hp1 hnn hterm hpl hpof (hW2 P2 pl.length pfun))
     iframe
     iframe #
   · -- ARM A: argstr failed, nothing fs-visible happened
@@ -478,7 +498,8 @@ theorem sys_unlink_w1_args (AS : ARGSTR_W) (BO : BEGIN_OP) (NP : NPAR_WRAP_ERA) 
         bop.BLT)
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hr, sysfile_bltz_m1]
     iintro Hk Hpc
-    ihave Harms := unlinkArms_whole (hlc := hlc) (fsGammaL fscFs) fscFs A.V.cwi A.P A.Pmiss A.Fent
+    ihave Harms := unlinkArms_whole (hlc := hlc) (fsGammaL fscFs) fscFs A.V.cwi (viewLazy A.V.upt A.V.sz A.M)
+      A.v0.toNat A.P A.Pmiss A.Fent
       A.Ftgt A.Fex A.Fmiss $$ Hau
     ihave Hout : sysUnlinkOut A 0xFFFFFFFFFFFFFFFF#64 $$ [Hbs Hir Hcore Howe Harms]
     · unfold sysUnlinkOut
@@ -499,7 +520,7 @@ set_option maxHeartbeats 16000000 in
 prologue, then `sys_unlink_w1_args`. -/
 theorem sys_unlink_w1 (AS : ARGSTR_W) (BO : BEGIN_OP) (NP : NPAR_WRAP_ERA) (EO : END_OP)
     (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ] (cpu : CPU) (k : KCtx) (A : SysUnlinkArgs GF)
-    (v0 : BitVec 64) (hv0 : A.V.tf[tfArgIdx 0]? = some v0)
+    (hv0 : A.V.tf[tfArgIdx 0]? = some A.v0)
     (hj : A.j < NPROC) (hproc : k.proc = procAddr A.j) (htier : k.tier = KTier.kpt)
     (hnoff : k.noff = 0) (hK : sysUnlinkK ≤ k.avail)
     (hW2 : ∀ (ok : SuOk k A) (w₄ w₅ : BitVec 64) (P2 : UPtd) (plen : Nat)
@@ -514,7 +535,8 @@ theorem sys_unlink_w1 (AS : ARGSTR_W) (BO : BEGIN_OP) (NP : NPAR_WRAP_ERA) (EO :
     bslots 3 ∗ irefSlots sysUnlinkSlots ∗
     procPrivFd A.γ (procAddr A.j) A.pid A.V A.M ∗
     sysUnlinkAuA (hlc := hlc) A ∗
-    sysUnlinkCont cpu k A.γ (procAddr A.j) A.pid A.V A.M A.P A.Pmiss A.Fent A.Ftgt A.Fex A.Fmiss
+    sysUnlinkCont cpu k A.γ (procAddr A.j) A.pid A.V A.M A.v0.toNat A.P A.Pmiss A.Fent A.Ftgt A.Fex
+      A.Fmiss
     ⊢ wpLoop (GF := GF) cpu := by
   iintro ⟨Hk, Hpc, Hte, Hce, #Hpi, #Hpe, #Hrdy, Hbs, Hir, Hblk, Hau, Hnext⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
@@ -536,7 +558,7 @@ theorem sys_unlink_w1 (AS : ARGSTR_W) (BO : BEGIN_OP) (NP : NPAR_WRAP_ERA) (EO :
   ihave Hk := sys_unlink_ctx_entry cpu k _ $$ Hk
   ihave %hsp := sys_unlink_sp_bound (k.regs 2#5) $$ Hbufs
   have ok : SuOk k A := ⟨hj, hproc, hK, hnoff, htier, hsp, hal⟩
-  iapply (sys_unlink_w1_args AS BO NP EO Γ cpu k A ok v0 hv0 k.spie k.spp _ w₃ w₄ w₅
+  iapply (sys_unlink_w1_args AS BO NP EO Γ cpu k A ok hv0 k.spie k.spp _ w₃ w₄ w₅
       (sysUnlinkPins_entry k) (hW2 ok w₄ w₅))
     $$ [$Hk $Hpc $Hcells $Hbufs $Hte $Hce $Henv $Hblk $HΦ $Hbs $Hir $Hau]
 

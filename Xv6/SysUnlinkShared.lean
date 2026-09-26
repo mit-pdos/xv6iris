@@ -159,7 +159,8 @@ section Arms
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [FsTopG GF] [FsBytesG GF]
   [Appcfg GF] [Icfg]
 
-variable (Γ : FsViewNames GF) (γfs : FsNames) (cw : Nat) (P Pmiss : Nat → Nat → IProp GF)
+variable (Γ : FsViewNames GF) (γfs : FsNames) (cw : Nat) (M : Nat → List (BitVec 8)) (pv : Nat)
+  (P Pmiss : Nat → Nat → IProp GF)
   (Fent : Pfam GF (Aview → Nat → Fname → Nat → IProp GF))
   (Ftgt : Pfam GF (Aview → Nat → IProp GF))
   (Fex : Pfam GF (Aview → Nat → Fname → Nat → IProp GF))
@@ -167,8 +168,8 @@ variable (Γ : FsViewNames GF) (γfs : FsNames) (cw : Nat) (P Pmiss : Nat → Na
 
 /-- ARM (i): nothing fs-visible happened, the whole bundle back. -/
 theorem unlinkArms_whole :
-    unlinkAuPre (hlc := hlc) Γ γfs cw P Pmiss Fent Ftgt Fex Fmiss ⊢
-      unlinkArms (hlc := hlc) Γ γfs cw P Pmiss Fent Ftgt Fex Fmiss 0xFFFFFFFFFFFFFFFF#64 := by
+    unlinkAuAt (hlc := hlc) Γ γfs cw M pv P Pmiss Fent Ftgt Fex Fmiss ⊢
+      unlinkArms (hlc := hlc) Γ γfs cw M pv P Pmiss Fent Ftgt Fex Fmiss 0xFFFFFFFFFFFFFFFF#64 := by
   iintro H
   unfold unlinkArms
   iright
@@ -181,11 +182,11 @@ theorem unlinkArms_whole :
 /-- ARM (ii): the walk died strictly inside the parent prefix. -/
 theorem unlinkArms_dead (pl : List (BitVec 8)) :
     nparWalkDeadEra (hlc := hlc) γfs P Pmiss pl ∗
-      pfAt (uentCommitAt (hlc := hlc) Γ appE (fun _ => iprop(True))) Fent ∗
+      pfAt (uentCommitAt (hlc := hlc) Γ appE (P (nparElems pl).length)) Fent ∗
       pfAt (utgtCommitAt (hlc := hlc) Γ appE) Ftgt ∗
       pfAt (dlookupCommitAt (hlc := hlc) Γ appE) Fex ∗
       pfAt (dmissCommitAt (hlc := hlc) Γ appE) Fmiss ⊢
-      unlinkArms (hlc := hlc) Γ γfs cw P Pmiss Fent Ftgt Fex Fmiss 0xFFFFFFFFFFFFFFFF#64 := by
+      unlinkArms (hlc := hlc) Γ γfs cw M pv P Pmiss Fent Ftgt Fex Fmiss 0xFFFFFFFFFFFFFFFF#64 := by
   iintro H
   unfold unlinkArms
   iright
@@ -200,7 +201,7 @@ theorem unlinkArms_dead (pl : List (BitVec 8)) :
 /-- The (iii) arms' common head: the walk delivered the parent `d`. -/
 theorem unlinkArms_at (pl : List (BitVec 8)) (d : Nat) :
     P (nparElems pl).length d ∗
-      pfAt (uentCommitAt (hlc := hlc) Γ appE (fun _ => iprop(True))) Fent ∗
+      pfAt (uentCommitAt (hlc := hlc) Γ appE (P (nparElems pl).length)) Fent ∗
       pfAt (utgtCommitAt (hlc := hlc) Γ appE) Ftgt ∗
       ((∃ nm : Fname,
           ⌜(pathElems pl).getLast? = some nm⌝ ∗ ⌜nm = DOT ∨ nm = DOTDOT⌝ ∗
@@ -223,7 +224,7 @@ theorem unlinkArms_at (pl : List (BitVec 8)) (d : Nat) :
           pfAt (dmissCommitAt (hlc := hlc) Γ appE) Fmiss) ∨
         (pfAt (dlookupCommitAt (hlc := hlc) Γ appE) Fex ∗
           pfAt (dmissCommitAt (hlc := hlc) Γ appE) Fmiss)) ⊢
-      unlinkArms (hlc := hlc) Γ γfs cw P Pmiss Fent Ftgt Fex Fmiss 0xFFFFFFFFFFFFFFFF#64 := by
+      unlinkArms (hlc := hlc) Γ γfs cw M pv P Pmiss Fent Ftgt Fex Fmiss 0xFFFFFFFFFFFFFFFF#64 := by
   iintro H
   unfold unlinkArms
   iright
@@ -240,13 +241,13 @@ theorem unlinkArms_at (pl : List (BitVec 8)) (d : Nat) :
 theorem unlinkArms_dot (pl : List (BitVec 8)) (d : Nat) (nm : Fname)
     (hlast : (pathElems pl).getLast? = some nm) (hdot : nm = DOT ∨ nm = DOTDOT) :
     P (nparElems pl).length d ∗
-      pfAt (uentCommitAt (hlc := hlc) Γ appE (fun _ => iprop(True))) Fent ∗
+      pfAt (uentCommitAt (hlc := hlc) Γ appE (P (nparElems pl).length)) Fent ∗
       pfAt (utgtCommitAt (hlc := hlc) Γ appE) Ftgt ∗
       pfAt (dlookupCommitAt (hlc := hlc) Γ appE) Fex ∗
       pfAt (dmissCommitAt (hlc := hlc) Γ appE) Fmiss ⊢
-      unlinkArms (hlc := hlc) Γ γfs cw P Pmiss Fent Ftgt Fex Fmiss 0xFFFFFFFFFFFFFFFF#64 := by
+      unlinkArms (hlc := hlc) Γ γfs cw M pv P Pmiss Fent Ftgt Fex Fmiss 0xFFFFFFFFFFFFFFFF#64 := by
   iintro ⟨HP, He, Ht, Hx, Hm⟩
-  iapply unlinkArms_at Γ γfs cw P Pmiss Fent Ftgt Fex Fmiss pl d
+  iapply unlinkArms_at Γ γfs cw M pv P Pmiss Fent Ftgt Fex Fmiss pl d
   iframe HP He Ht
   ileft
   iexists nm
@@ -259,13 +260,13 @@ theorem unlinkArms_miss (pl : List (BitVec 8)) (d : Nat) (av : Aview) (nm : Fnam
     (hlast : (pathElems pl).getLast? = some nm) (hrow : arowAt av d ⟨.ADir ents, nl⟩)
     (hnm : ents[nm]? = none) :
     P (nparElems pl).length d ∗
-      pfAt (uentCommitAt (hlc := hlc) Γ appE (fun _ => iprop(True))) Fent ∗
+      pfAt (uentCommitAt (hlc := hlc) Γ appE (P (nparElems pl).length)) Fent ∗
       pfAt (utgtCommitAt (hlc := hlc) Γ appE) Ftgt ∗
       Fmiss.pfRecv av d nm ∗
       pfAt (dlookupCommitAt (hlc := hlc) Γ appE) Fex ⊢
-      unlinkArms (hlc := hlc) Γ γfs cw P Pmiss Fent Ftgt Fex Fmiss 0xFFFFFFFFFFFFFFFF#64 := by
+      unlinkArms (hlc := hlc) Γ γfs cw M pv P Pmiss Fent Ftgt Fex Fmiss 0xFFFFFFFFFFFFFFFF#64 := by
   iintro ⟨HP, He, Ht, Hm, Hx⟩
-  iapply unlinkArms_at Γ γfs cw P Pmiss Fent Ftgt Fex Fmiss pl d
+  iapply unlinkArms_at Γ γfs cw M pv P Pmiss Fent Ftgt Fex Fmiss pl d
   iframe HP He Ht
   iright; ileft
   iexists av, nm, ents, nl
@@ -279,13 +280,13 @@ theorem unlinkArms_dex (pl : List (BitVec 8)) (d : Nat) (av : Aview) (t : Nat) (
     (hrowd : PartialMap.get? av d = some ⟨.ADir ents, nl⟩) (hnm : ents[nm]? = some t)
     (hrowt : PartialMap.get? av t = some ⟨.ADir est, nlt⟩) (hne : ¬ dotsOnly est) :
     P (nparElems pl).length d ∗
-      pfAt (uentCommitAt (hlc := hlc) Γ appE (fun _ => iprop(True))) Fent ∗
+      pfAt (uentCommitAt (hlc := hlc) Γ appE (P (nparElems pl).length)) Fent ∗
       pfAt (utgtCommitAt (hlc := hlc) Γ appE) Ftgt ∗
       Fex.pfRecv av d nm t ∗
       pfAt (dmissCommitAt (hlc := hlc) Γ appE) Fmiss ⊢
-      unlinkArms (hlc := hlc) Γ γfs cw P Pmiss Fent Ftgt Fex Fmiss 0xFFFFFFFFFFFFFFFF#64 := by
+      unlinkArms (hlc := hlc) Γ γfs cw M pv P Pmiss Fent Ftgt Fex Fmiss 0xFFFFFFFFFFFFFFFF#64 := by
   iintro ⟨HP, He, Ht, Hx, Hm⟩
-  iapply unlinkArms_at Γ γfs cw P Pmiss Fent Ftgt Fex Fmiss pl d
+  iapply unlinkArms_at Γ γfs cw M pv P Pmiss Fent Ftgt Fex Fmiss pl d
   iframe HP He Ht
   iright; iright; ileft
   iexists av, t, nm, ents, est, nl, nlt
@@ -295,13 +296,13 @@ theorem unlinkArms_dex (pl : List (BitVec 8)) (d : Nat) (av : Aview) (t : Nat) (
 /-- ARM (iii-d): no abstract observation to report (the `k = Lp` deaths). -/
 theorem unlinkArms_lp (pl : List (BitVec 8)) (d : Nat) :
     P (nparElems pl).length d ∗
-      pfAt (uentCommitAt (hlc := hlc) Γ appE (fun _ => iprop(True))) Fent ∗
+      pfAt (uentCommitAt (hlc := hlc) Γ appE (P (nparElems pl).length)) Fent ∗
       pfAt (utgtCommitAt (hlc := hlc) Γ appE) Ftgt ∗
       pfAt (dlookupCommitAt (hlc := hlc) Γ appE) Fex ∗
       pfAt (dmissCommitAt (hlc := hlc) Γ appE) Fmiss ⊢
-      unlinkArms (hlc := hlc) Γ γfs cw P Pmiss Fent Ftgt Fex Fmiss 0xFFFFFFFFFFFFFFFF#64 := by
+      unlinkArms (hlc := hlc) Γ γfs cw M pv P Pmiss Fent Ftgt Fex Fmiss 0xFFFFFFFFFFFFFFFF#64 := by
   iintro ⟨HP, He, Ht, Hx, Hm⟩
-  iapply unlinkArms_at Γ γfs cw P Pmiss Fent Ftgt Fex Fmiss pl d
+  iapply unlinkArms_at Γ γfs cw M pv P Pmiss Fent Ftgt Fex Fmiss pl d
   iframe HP He Ht
   iright; iright; iright
   iframe Hx Hm
@@ -310,16 +311,16 @@ theorem unlinkArms_lp (pl : List (BitVec 8)) (d : Nat) :
 arms (ii) / (iii-d)). -/
 theorem unlinkArms_npdead (pl : List (BitVec 8)) :
     npDead γfs P Pmiss pl ∗
-      pfAt (uentCommitAt (hlc := hlc) Γ appE (fun _ => iprop(True))) Fent ∗
+      pfAt (uentCommitAt (hlc := hlc) Γ appE (P (nparElems pl).length)) Fent ∗
       pfAt (utgtCommitAt (hlc := hlc) Γ appE) Ftgt ∗
       pfAt (dlookupCommitAt (hlc := hlc) Γ appE) Fex ∗
       pfAt (dmissCommitAt (hlc := hlc) Γ appE) Fmiss ⊢
-      unlinkArms (hlc := hlc) Γ γfs cw P Pmiss Fent Ftgt Fex Fmiss 0xFFFFFFFFFFFFFFFF#64 := by
+      unlinkArms (hlc := hlc) Γ γfs cw M pv P Pmiss Fent Ftgt Fex Fmiss 0xFFFFFFFFFFFFFFFF#64 := by
   iintro ⟨Hd, He, Ht, Hx, Hm⟩
   icases npDead_to_mknod (hlc := hlc) γfs P Pmiss pl $$ Hd with (Hd | ⟨%d, HP⟩)
-  · iapply unlinkArms_dead Γ γfs cw P Pmiss Fent Ftgt Fex Fmiss pl
+  · iapply unlinkArms_dead Γ γfs cw M pv P Pmiss Fent Ftgt Fex Fmiss pl
     iframe
-  · iapply unlinkArms_lp Γ γfs cw P Pmiss Fent Ftgt Fex Fmiss pl d
+  · iapply unlinkArms_lp Γ γfs cw M pv P Pmiss Fent Ftgt Fex Fmiss pl d
     iframe
 
 /-- ret 0. -/
@@ -331,7 +332,7 @@ theorem unlinkArms_ok (pl : List (BitVec 8)) (av0 av1 : Aview) (d t : Nat) (nm :
       pfAt (dlookupCommitAt (hlc := hlc) Γ appE) Fex ∗
       pfAt (dmissCommitAt (hlc := hlc) Γ appE) Fmiss ∗
       Fent.pfRecv av0 d nm t ∗ Ftgt.pfRecv av1 t ⊢
-      unlinkArms (hlc := hlc) Γ γfs cw P Pmiss Fent Ftgt Fex Fmiss 0#64 := by
+      unlinkArms (hlc := hlc) Γ γfs cw M pv P Pmiss Fent Ftgt Fex Fmiss 0#64 := by
   iintro ⟨HP, Hx, Hm, He, Ht⟩
   unfold unlinkArms
   ileft

@@ -285,17 +285,22 @@ theorem fsabsLinkPre (γfs : FsNames) :
         (pfamTriv (fun _ _ _ _ => iprop(True))) (pfamTriv (fun _ _ => iprop(True))) :=
   linkCommits_unit γfs
 
-/-- **Rocq `fsabs_unlink_pre`** (Lean's bundle is the unkeyed `unlinkAuPre`). -/
-theorem fsabsUnlinkPre (γfs : FsNames) (cw : Nat) :
+/-- **Rocq `fsabs_unlink_pre`**, AT THE SYSCALL TIER (TL-3C item (M)):
+unlink's bundle is path-fixed under the reading of argument 0, and the
+generic family owes the walk at EVERY string (`unlinkAuAt_of_all`). -/
+theorem fsabsUnlinkPre (γfs : FsNames) (cw : Nat) (M : Nat → List (BitVec 8)) (pv : Nat) :
     appSup (GF := GF) ⊢
-      unlinkAuPre (hlc := hlc) (fsGammaL γfs) γfs cw (fun _ _ => iprop(True))
+      unlinkAuAt (hlc := hlc) (fsGammaL γfs) γfs cw M pv (fun _ _ => iprop(True))
         (fun _ _ => iprop(True)) (pfamTriv (fun _ _ _ _ => iprop(True)))
         (pfamTriv (fun _ _ => iprop(True))) (pfamTriv (fun _ _ _ _ => iprop(True)))
         (pfamTriv (fun _ _ _ => iprop(True))) := by
-  unfold unlinkAuPre
+  unfold unlinkAuAt
   iintro #Hsup
   isplitl []
-  · iapply fsabsMknodWalk
+  · iintro %pl %_
+    iapply (npStart_of_mknod (hlc := hlc) γfs cw (fun _ _ => iprop(True)) (fun _ _ => iprop(True))
+      pl)
+    iapply fsabsMknodWalk
   isplitl []
   · iapply (fsabsUent (hlc := hlc) γfs) $$ Hsup
   isplitl []

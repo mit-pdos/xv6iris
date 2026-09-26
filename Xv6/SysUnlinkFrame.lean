@@ -521,16 +521,19 @@ variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [Fdslot
 /-- The contract's post, at the record (hart-free: a `true` crossing at a
 process pins nothing). -/
 abbrev sysUnlinkPostA (k : KCtx) (A : SysUnlinkArgs GF) (c : CPU) : IProp GF :=
-  sysUnlinkPost (hlc := hlc) k A.γ (procAddr A.j) A.pid A.V A.M A.P A.Pmiss A.Fent A.Ftgt A.Fex
+  sysUnlinkPost (hlc := hlc) k A.γ (procAddr A.j) A.pid A.V A.M A.v0.toNat A.P A.Pmiss A.Fent A.Ftgt
+    A.Fex
     A.Fmiss c
 
 /-- The armed post, at the record. -/
 abbrev sysUnlinkArmsA (A : SysUnlinkArgs GF) (r : BitVec 64) : IProp GF :=
-  unlinkArms (hlc := hlc) (fsGammaL fscFs) fscFs A.V.cwi A.P A.Pmiss A.Fent A.Ftgt A.Fex A.Fmiss r
+  unlinkArms (hlc := hlc) (fsGammaL fscFs) fscFs A.V.cwi (viewLazy A.V.upt A.V.sz A.M) A.v0.toNat
+    A.P A.Pmiss A.Fent A.Ftgt A.Fex A.Fmiss r
 
 /-- The caller's bundle, at the record. -/
 abbrev sysUnlinkAuA (A : SysUnlinkArgs GF) : IProp GF :=
-  unlinkAuPre (hlc := hlc) (fsGammaL fscFs) fscFs A.V.cwi A.P A.Pmiss A.Fent A.Ftgt A.Fex A.Fmiss
+  unlinkAuAt (hlc := hlc) (fsGammaL fscFs) fscFs A.V.cwi (viewLazy A.V.upt A.V.sz A.M) A.v0.toNat
+    A.P A.Pmiss A.Fent A.Ftgt A.Fex A.Fmiss
 
 /-- What every exit hands the epilogue beside the machine state: the two
 allowances whole, the block at some grown page table, and the armed post on

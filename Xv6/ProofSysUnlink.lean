@@ -45,9 +45,9 @@ theorem sys_unlink_proof (AS : ARGSTR) (BO : BEGIN_OP) (NP : NPAR_WRAP_ERA) (IL 
     (NC : NAMECMP) (DL : DIRLOOKUP) (MS : MEMSET) (RD : READI) (WI : WRITEI) (IU : IUPDATE)
     (IUP : IUNLOCKPUT) (EO : END_OP) (PA : PANIC) : SYSUNLINK := ⟨
   fun Γ _ cpu k γ j pid V M v0 P Pmiss Fent Ftgt Fex Fmiss hj hproc htier hnoff hK hv0 => by
-  let A : SysUnlinkArgs _ := ⟨γ, j, pid, V, M, P, Pmiss, Fent, Ftgt, Fex, Fmiss⟩
+  let A : SysUnlinkArgs _ := ⟨γ, j, pid, V, M, v0, P, Pmiss, Fent, Ftgt, Fex, Fmiss⟩
   unfold wp_sys_unlink_eb_body
-  exact sys_unlink_w1 (argstrW_of_argstr AS) BO NP EO Γ cpu k A v0 hv0 hj hproc htier hnoff hK
+  exact sys_unlink_w1 (argstrW_of_argstr AS) BO NP EO Γ cpu k A hv0 hj hproc htier hnoff hK
     (fun ok w₄ w₅ P2 plen pfun cpu spie spp R dpv nf tln iL n Sb =>
       sys_unlink_w2 IL NC DL IUP EO Γ cpu k A ok spie spp R dpv w₄ w₅ nf tln P2 (bview plen pfun)
         iL n Sb

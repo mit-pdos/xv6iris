@@ -59,6 +59,7 @@ theorem syscDepChdir_holds : SyscDepChdir (hlc := hlc) (GF := GF) := by
 theorem syscDepUnlink_holds : SyscDepUnlink (hlc := hlc) (GF := GF) := by
   intro f W
   refine (syscDepUnlink_xv6 (hlc := hlc) f W).trans ?_
+  dsimp only [imgAgrees, xkA]
   iintro H
   iexists (Xfam.uP f), (Xfam.uPmiss f), (Xfam.uFent f), (Xfam.uFtgt f), (Xfam.uFex f), (Xfam.uFmiss f)
   iexact H

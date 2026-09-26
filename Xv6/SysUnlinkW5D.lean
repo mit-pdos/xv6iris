@@ -466,11 +466,15 @@ theorem sys_unlink_w5_dir (IU : IUPDATE) (IUP : IUNLOCKPUT) (EO : END_OP) (Γ : 
   ihave #Happ := iregInv_app fscIreg fscFs icfgIst icfgNib $$ Hinv
   unfold sysUnlinkCommits
   icases Hcm with ⟨He, Ht, Hx, Hm⟩
+  -- the cursor the walk handed back, lent to the entry leg (TL-3C)
+  ihave HP := (show A.P (npElems pl).length dinum.toNat ⊢ A.P (nparElems pl).length dinum.toNat
+    from .rfl) $$ HP
   ihave Htopi := (show topFrag (GF := GF) (fsGammaL fscFs) (BitVec.setWidth 32 (dirInum datd kk)).toNat
       (eraNode dni bmi dati) ⊢ topFragQ (fsGammaL fscFs) (DFrac.own 1)
         (BitVec.setWidth 32 (dirInum datd kk)).toNat (eraNode dni bmi dati) from .rfl) $$ Htopi
   iapply wpLoop_fupd
-  imod (ufUent_fire (hlc := hlc) fscFs ⊤ (DFrac.own 1) (fun _ => iprop(True)) A.Fent dinum.toNat
+  imod (ufUent_fire (hlc := hlc) fscFs ⊤ (DFrac.own 1) (A.P (nparElems pl).length) A.Fent
+      dinum.toNat
       (BitVec.setWidth 32 (dirInum datd kk)).toNat (dirBname datd kk) 1 (eraNode dnd bmd datd)
       (eraNode (sysUnlinkDF2 dnW) bmW datW) (eraNode dni bmi dati) ufNd_top hloc
       (mkfEra_is_dir dnd bmd datd htyz)
@@ -480,7 +484,7 @@ theorem sys_unlink_w5_dir (IU : IUPDATE) (IUP : IUNLOCKPUT) (EO : END_OP) (Γ : 
       (sys_unlink_nl1 dnd bmd datd hlive) (sys_unlink_nl1 dni bmi dati hnli)
       (sys_unlink_dir_dots dni bmi dati hoki.2.2.2.2.2.1 hoki.2.2.2.2.1 htyi hdots)
       (sys_unlink_dir_dec _ hdiri) habsp hoki.2.2.2.1)
-    $$ Hftop Happ He %trivial Htop Htopi with ⟨Htop, Htopi, -, %av0, %hpre, Hrecv⟩
+    $$ Hftop Happ He HP Htop Htopi with ⟨Htop, Htopi, HP, %av0, %hpre, Hrecv⟩
   imodintro
   ihave Htopi := (show topFragQ (GF := GF) (fsGammaL fscFs) (DFrac.own 1)
         (BitVec.setWidth 32 (dirInum datd kk)).toNat (eraNode dni bmi dati) ⊢
@@ -507,8 +511,6 @@ theorem sys_unlink_w5_dir (IU : IUPDATE) (IUP : IUNLOCKPUT) (EO : END_OP) (Γ : 
   · iexists _; iexact Hoff
   ihave Hbufs : sysUnlinkBufs (k.regs 2#5) $$ [Hjunk Hde Hnm Hpath Hoff Hdel]
   · unfold sysUnlinkBufs; iframe
-  ihave HP := (show A.P (npElems pl).length dinum.toNat ⊢ A.P (nparElems pl).length dinum.toNat
-    from .rfl) $$ HP
   have hlast : (pathElems pl).getLast? = some (dirBname datd kk) := by
     rw [sys_unlink_bname_kk datd _ kk nf hfn]; exact sys_unlink_last_of_npar pl nf hname
   have hnl2z : (sysUnlinkDni2 dni).diNlink.toNat = 0 := by
