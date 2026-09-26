@@ -744,6 +744,148 @@ theorem plic_complete_au (γ0 γ1 : UartNames) (hrt : Nat) (hh : hrt < NCPU) (w 
   imodintro
   itrivial
 
+
+/-! ## The boot deposit (Rocq `uart_rx_tok_deposit`)
+
+Once `uartinit` has run a port, the boot hart parks the port's popper
+resource (`uartRxWriter`, the PLIC payload) in the port's slot, flipping the
+slot's one-shot from `uartPreinit` to the persistent `uartInited`.  If the
+source happens to be in service at that moment the slot holds nothing and
+the resource is dropped (it could not have been claimed at boot, but the
+invariant does not need to know that). -/
+
+/-- The slot of source `10` takes UART0's writer. -/
+theorem plicSlot_deposit10 (γ0 γ1 : UartNames) (p : PlicState) (k : Nat) (hl : Option (List Obs)) :
+    plicSlot (GF := GF) γ0 γ1 p 10 ∗ uartRxWriter γ0 k hl ⊢ |==> (plicSlot γ0 γ1 p 10 ∗ uartInited γ0) := by
+  unfold plicSlot
+  simp only [plicNames_10]
+  cases hb : p.claimed 10 <;> simp only [plicHeld_true, plicHeld_false, plicPayload_10]
+  · iintro ⟨Hs, Hw⟩
+    icases Hs with (Hpre | ⟨#Hin, -⟩)
+    · imod uartPreinit_deposit γ0 $$ Hpre with #Hin
+      imodintro
+      isplitl [Hw]
+      · iright
+        isplitr
+        · iexact Hin
+        · unfold plicPayloadUart
+          iexists k, hl
+          iexact Hw
+      · iexact Hin
+    · imodintro
+      isplitl [Hw]
+      · iright
+        isplitr
+        · iexact Hin
+        · unfold plicPayloadUart
+          iexists k, hl
+          iexact Hw
+      · iexact Hin
+  · iintro ⟨Hs, -⟩
+    icases Hs with (Hpre | ⟨#Hin, -⟩)
+    · imod uartPreinit_deposit γ0 $$ Hpre with #Hin
+      imodintro
+      isplitl []
+      · iright
+        isplitr
+        · iexact Hin
+        · iempintro
+      · iexact Hin
+    · imodintro
+      isplitl []
+      · iright
+        isplitr
+        · iexact Hin
+        · iempintro
+      · iexact Hin
+
+/-- The slot of source `12` takes UART1's writer. -/
+theorem plicSlot_deposit12 (γ0 γ1 : UartNames) (p : PlicState) (k : Nat) (hl : Option (List Obs)) :
+    plicSlot (GF := GF) γ0 γ1 p 12 ∗ uartRxWriter γ1 k hl ⊢ |==> (plicSlot γ0 γ1 p 12 ∗ uartInited γ1) := by
+  unfold plicSlot
+  simp only [plicNames_12]
+  cases hb : p.claimed 12 <;> simp only [plicHeld_true, plicHeld_false, plicPayload_12]
+  · iintro ⟨Hs, Hw⟩
+    icases Hs with (Hpre | ⟨#Hin, -⟩)
+    · imod uartPreinit_deposit γ1 $$ Hpre with #Hin
+      imodintro
+      isplitl [Hw]
+      · iright
+        isplitr
+        · iexact Hin
+        · unfold plicPayloadUart
+          iexists k, hl
+          iexact Hw
+      · iexact Hin
+    · imodintro
+      isplitl [Hw]
+      · iright
+        isplitr
+        · iexact Hin
+        · unfold plicPayloadUart
+          iexists k, hl
+          iexact Hw
+      · iexact Hin
+  · iintro ⟨Hs, -⟩
+    icases Hs with (Hpre | ⟨#Hin, -⟩)
+    · imod uartPreinit_deposit γ1 $$ Hpre with #Hin
+      imodintro
+      isplitl []
+      · iright
+        isplitr
+        · iexact Hin
+        · iempintro
+      · iexact Hin
+    · imodintro
+      isplitl []
+      · iright
+        isplitr
+        · iexact Hin
+        · iempintro
+      · iexact Hin
+
+/-- **UART0's receive token, deposited** (Rocq `uart_rx_tok_deposit` at
+`Uart0`). -/
+theorem plicInv_deposit10 (γ0 γ1 : UartNames) (E : CoPset) (hE : (↑plicN : CoPset) ⊆ E) (k : Nat)
+    (hl : Option (List Obs)) :
+    plicInv (GF := GF) γ0 γ1 ∗ uartRxWriter γ0 k hl ⊢ |={E}=> uartInited γ0 := by
+  unfold plicInv devInvR
+  iintro ⟨#Hinv, Hw⟩
+  imod (inv_acc_timeless (E := E) (N := plicN) (P := iprop(∃ s : DevSt .plic, devFrag .plic s ∗ plicGhosts γ0 γ1 s)) hE) $$ Hinv with ⟨Hbody, Hclose⟩
+  icases Hbody with ⟨%p, Hfrag, HG⟩
+  icases (show plicGhosts (GF := GF) γ0 γ1 p ⊢ ⌜plicOk p⌝ ∗ plicSlot γ0 γ1 p 10 ∗ plicSlot γ0 γ1 p 12
+    from .rfl) $$ HG with ⟨%hok, H10, H12⟩
+  imod plicSlot_deposit10 γ0 γ1 p k hl $$ [$H10 $Hw] with ⟨H10, #Hin⟩
+  imod Hclose $$ [Hfrag H10 H12]
+  · iexists p
+    iframe Hfrag
+    unfold plicGhosts plicSlots
+    iframe H10 H12
+    ipureintro; exact hok
+  imodintro
+  iexact Hin
+
+/-- **UART1's receive token, deposited** (Rocq `uart_rx_tok_deposit` at
+`Uart1`). -/
+theorem plicInv_deposit12 (γ0 γ1 : UartNames) (E : CoPset) (hE : (↑plicN : CoPset) ⊆ E) (k : Nat)
+    (hl : Option (List Obs)) :
+    plicInv (GF := GF) γ0 γ1 ∗ uartRxWriter γ1 k hl ⊢ |={E}=> uartInited γ1 := by
+  unfold plicInv devInvR
+  iintro ⟨#Hinv, Hw⟩
+  imod (inv_acc_timeless (E := E) (N := plicN) (P := iprop(∃ s : DevSt .plic, devFrag .plic s ∗ plicGhosts γ0 γ1 s)) hE) $$ Hinv with ⟨Hbody, Hclose⟩
+  icases Hbody with ⟨%p, Hfrag, HG⟩
+  icases (show plicGhosts (GF := GF) γ0 γ1 p ⊢ ⌜plicOk p⌝ ∗ plicSlot γ0 γ1 p 10 ∗ plicSlot γ0 γ1 p 12
+    from .rfl) $$ HG with ⟨%hok, H10, H12⟩
+  imod plicSlot_deposit12 γ0 γ1 p k hl $$ [$H12 $Hw] with ⟨H12, #Hin⟩
+  imod Hclose $$ [Hfrag H10 H12]
+  · iexists p
+    iframe Hfrag
+    unfold plicGhosts plicSlots
+    iframe H10 H12
+    ipureintro; exact hok
+  imodintro
+  iexact Hin
+
 end
 
 end Xv6

@@ -81,6 +81,7 @@ import MachCSL.CtxBox
 import MachCSL.WpSmodeFenceFloor
 import Xv6.UartTrace
 import Xv6.Image
+import MachCSL.WpStoreOrd
 
 namespace Xv6
 
@@ -394,6 +395,79 @@ theorem started_absorb [CurCtx] (E : CoPset) (γ : GName) (ξd : CtxId) (P : Ctx
       ipureintro; exact hT
     imodintro
     iframe Hrun HP'
+
+
+/-! ## The primary's store (Rocq `started_store_obl`), in two openings
+
+The deposit needs the running token, which the store's accessor does not
+see, so it runs at a first opening, just before the store: the payload is
+deposited into `ξd` and the (unarmed) window closed again with the new
+stamp.  The store's accessor (`MachCSL.writeAUT`) is the second opening: it
+names the stamp's store-order receipt, learns that the flag's position
+passes it, and arms the invariant (`started_store_close`). -/
+
+/-- **The deposit**, at a first opening: the payload moves from the
+primary's context into `ξd`, whose stamp advances; the window stays
+unarmed (the payload is persistent and is kept outside). -/
+theorem started_deposit_open [CurCtx] (γ : GName) (ξd : CtxId) (P : CtxId → IProp GF) [CtxMorph P]
+    [∀ ξ, Persistent (P ξ)] (cpu : CPU) :
+    startedInv γ ξd P ∗ startedPrim γ ∗ ownCtx cpu curCtx ∗ P curCtx ⊢
+      |={⊤}=> (ownCtx cpu curCtx ∗ startedPrim γ ∗ P ξd) := by
+  iintro ⟨#Hinv, Hprim, Hrun, HP⟩
+  unfold startedInv
+  imod (inv_acc (E := ⊤) (N := startedN) (P := startedBody γ ξd P) CoPset.subseteq_top) $$ Hinv
+    with ⟨Hbody, Hclose⟩
+  unfold startedBody startedUnarmed startedArmed
+  icases Hbody with (⟨>Hw, >Hg, >Hst⟩ | ⟨%t, %T, >Hw, >Hidx, >%hT, >Hst, HPd⟩)
+  · imod started_deposit cpu ξd P $$ [$Hrun $Hst $HP] with ⟨Hrun, %T, Hst, -, #HPd⟩
+    imod Hclose $$ [Hw Hg Hst]
+    · inext
+      ileft
+      iframe Hw Hg
+      iexists T
+      iexact Hst
+    imodintro
+    iframe Hrun Hprim HPd
+  · iexfalso
+    iapply startedPrim_idx γ t $$ Hprim Hidx
+
+/-- **The store's accessor**, at a second opening: the window's histories,
+the stamp's receipt as the order bound, and the arming. -/
+theorem started_writeAUT (γ : GName) (ξd : CtxId) (P : CtxId → IProp GF) [∀ ξ, Persistent (P ξ)] :
+    startedInv (GF := GF) γ ξd P ∗ startedPrim γ ∗ P ξd ⊢
+      writeAUT startedPrimary startedAddr 4 startedSet iprop(emp) := by
+  iintro ⟨#Hinv, Hprim, #HP⟩
+  unfold writeAUT startedInv
+  imod (inv_acc (E := ⊤) (N := startedN) (P := startedBody γ ξd P) CoPset.subseteq_top) $$ Hinv
+    with ⟨Hbody, Hclose⟩
+  unfold startedBody startedUnarmed startedArmed
+  icases Hbody with (⟨>Hw, >Hg, >⟨%T0, Hst⟩⟩ | ⟨%t, %T, >Hw, >Hidx, >%hT, >Hst, HPd⟩)
+  · icases wordCell_cases _ 4 0 startedClear [] $$ Hw with ⟨%Hold, Hb, %htail⟩
+    icases startedStamped_topLb ξd T0 $$ Hst with ⟨Hst, #HT⟩
+    iapply fupd_mask_intro LawfulSet.empty_subset
+    iintro Hmask
+    iexists WordHist.hist ([] : WordHist 4) Hold, T0
+    iframe Hb HT
+    inext
+    iintro %t %hTt Hb _ _
+    rw [WordHist.hist_push] at *
+    imod Hmask
+    ihave Hw := wordCell_intro _ 4 0 startedClear _ Hold htail $$ Hb
+    unfold startedPrim
+    imod ghost_var_update_halves (t + 1) γ (0 : Nat) (0 : Nat) $$ Hprim Hg with ⟨H1, -⟩
+    imod ghost_var_persist γ _ (t + 1) $$ H1 with #H1
+    imod Hclose $$ [Hw Hst]
+    · inext
+      iright
+      iexists t, T0
+      iframe Hw Hst HP
+      isplit
+      · unfold startedIdx; iexact H1
+      · ipureintro; exact hTt
+    imodintro
+    iempintro
+  · iexfalso
+    iapply startedPrim_idx γ t $$ Hprim Hidx
 
 end
 
