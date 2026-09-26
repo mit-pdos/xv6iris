@@ -1,17 +1,18 @@
 # Lean xv6 port — coordinator status (RESUME HERE)
 
-Last updated: 2026-09-25, origin/lean-v2 = e707b09be (full `lake build Xv6 MachCSL` 1587 jobs, layering ok).
+MILESTONE 2026-09-26 (origin/lean-v2 = 455450293): **the xv6 system theorem is proved.**
+`Xv6.xv6FsAdequacy_xv6GF : USER → g.gen = 0 → g.pow = false → diskOf g.m.devs = fsImgDisk → NSteps … →
+ (∀ threads reducible) ∧ xv6TracePure fsimgCov fsimgSb.sbLogstart g2`
+at the concrete functor list xv6GF and the literal mkfs fs.img (Himg discharged by kernel decide), kernel image a
+language constant (D47). Axioms: 6 Sail externs + propext/Classical.choice/Quot.sound + 416 bv_decide certs
+(notes/adequacy_axioms_baseline.md). Every kernel function proved and linked. Crash durability (D23) included.
 
-A new coordinator session should read, in order: this file; `notes/coord/wave7b_prompt.txt`
-(the binding rules every agent prompt starts from); `notes/briefs/wave8_top.md` and
-`notes/briefs/crash_layer.md` (USER RULINGS at the top of each are final);
-`notes/coord/pending_edits.txt` (queued cleanups and deferrals).
-
-## ROCQ SOURCE (2026-09-25): /shared/xv6rocq is now on Rocq `main` (user updated it; f22c1c9ca).
-Everything landed before 2026-09-25 was ported against an older base (the WIP branch sail-upstream-bump,
-forked from main Sept 16, 1466 commits behind). User ruling: bump the kernel now (xv6 verified 3e9926ea =
-Rocq main's XV6_REV); AUDIT the landed contracts against Rocq main LATER (after wave 8) ->
-notes/briefs/rocq_drift.md (to be written; diff base = 0be24e13b).
+REMAINING (user rulings): (1) PROVE `USER` (user-mode machine layer, ~84k Rocq lines) — next;
+(2) UNION adequacy (Rocq UUnionBootAdequacy via App.xv6_app_adequacy at AppUnionRec.app_union) — the real target;
+(3) Rocq drift audit vs main (base 0be24e13b); (4) build parallelism: apply the exact-import edit set
+(notes/import_graph_report.md; 5:39 → ~4:50 clean on GCP) and the definition moves (~4:00).
+Coordination files: notes/coord/ (wave7b_prompt.txt = agent rules incl. GCP VM builds + autoImplicit off;
+pending_edits.txt). Rocq source: /shared/xv6rocq (on main).
 
 ## Workflow (how every result lands)
 - Main-tree agents write new files in /shared/lean-xv6 (no git, no Xv6.lean edits); the
