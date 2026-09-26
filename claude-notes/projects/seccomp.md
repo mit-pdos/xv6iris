@@ -80,6 +80,21 @@ Branch `secc/s0` off main.  Small, cross-cutting, ahead of S1 and S2.
    replaces that discharge by `iRight` of `lk_T := UT ∨ secc_tok`.
 5. Green; audits 13/14/13; status paragraph; report.
 
+STATUS (lane S0, `secc/s0` at 24695eabb): items 1, 3, 4, 5 landed,
+tree green, audits 13/14/13 textually the baseline.  `ConsLog.wild_ev`;
+`ai_wild`/`ai_wild_lic` with every instance at `RiscvPtsto.wild_none`;
+`WpUart.cons_licence_at` (+ `_of_licence`, `_of_wild`) and
+`cons_read_pay_triv_at`.  Item 4 took the SEPARATE premise `(⊢ riscv_wild
+(S gen_id) -∗ lk_T L)` on the eight `UShLine` read lemmas, discharged in
+`UInitUnionCC.union_cc_holds` from `Hwild : riscv_wild = wild_none`
+(read off `union_ifc` in `UInitUnionBoot`); echo has no discharge site in
+the tree (its `UShLine` instances only pass the premise on).  OPEN:
+`out_link_of_licence_at` is not provable at this licence -- `out_link`
+hands its writer no `⌜cons_hist_ok H⌝` (only `cons_link` does), so either
+`out_link` gains that premise (its ~15 direct providers ignore it; its one
+consumer, `cons_link_of_out_link`, has it) or the wild licence drops
+`cons_hist_ok` at `EvOut`.  Owner's call; S1's console write row needs it.
+
 ## S1 -- the universe: the generic slot without the taint (design §5, §9)
 
 Branch `secc/s1` off main; merges `secc/s0` before item 5.  New file

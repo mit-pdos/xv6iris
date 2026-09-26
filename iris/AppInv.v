@@ -223,6 +223,40 @@ Section AppInv.
     (forall r av, app_pred r av ⊣⊢ True) -> ⊢ app_sup.
   Proof using . intros Htriv. rewrite /app_sup. by apply app_sup_raw_triv. Qed.
 
+  (* THE READ CREDENTIAL (seccomp design §9, lane S0): what the console's
+     dirty escrow ([ConsoleInv.cons_dirty_cred]) holds.  A tokenless
+     console read is paid by EITHER the supply -- the generic reader, which
+     pays [app_sup] ([app_rdcred_of_sup]) -- OR the era's WILD credential
+     ([RiscvPtsto.riscv_wild], [app_rdcred_of_wild]), which a program under
+     a syscall mask holds in place of the supply.  Only the ESCROWED
+     proposition widens: the generic tier's supply law still pays
+     [app_sup].  The era is the one the escrow is allocated in
+     ([ProofMain]), and the reader's console era is [S gen_id] -- the
+     index of [WpUart.cons_read_pay] at the same read. *)
+  Context {GEN : RiscvLang.GenId}.
+
+  Definition app_rdcred : iProp Σ :=
+    (app_sup ∨ riscv_wild (S RiscvLang.gen_id))%I.
+
+  Global Instance app_rdcred_persistent : Persistent app_rdcred.
+  Proof using . rewrite /app_rdcred. apply _. Qed.
+
+  Lemma app_rdcred_of_sup : app_sup -∗ app_rdcred.
+  Proof using . rewrite /app_rdcred. iIntros "H". by iLeft. Qed.
+
+  Lemma app_rdcred_of_wild : riscv_wild (S RiscvLang.gen_id) -∗ app_rdcred.
+  Proof using . rewrite /app_rdcred. iIntros "H". by iRight. Qed.
+
+  (* ...and its elimination at a Coq-level reading of each arm, which is
+     the shape the shell tier's dirty arm spends it at *)
+  Lemma app_rdcred_elim (T : iProp Σ) :
+    (⊢ app_sup -∗ T) -> (⊢ riscv_wild (S RiscvLang.gen_id) -∗ T) ->
+    ⊢ app_rdcred -∗ T.
+  Proof using .
+    intros Hs Hw. rewrite /app_rdcred.
+    iIntros "[H | H]"; [by iApply Hs | by iApply Hw].
+  Qed.
+
   (* THE TRANSPORT, PINNED (round C): parked in the body so the era owns
      it, and the one application-side premise of the era mint. *)
   Definition app_xfer : iProp Σ := app_xfer_raw app_pred.

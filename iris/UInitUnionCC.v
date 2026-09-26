@@ -307,7 +307,8 @@ Section UnionInitCC.
       (ug : union_gn) (r : file_names) (s0 : fstate)
       (Heq : @file_app Σ HF = MkAppcfg file_names (file_pred (fgn_cl (ugn_file ug))) r)
       (Hcons : @riscv_cons_res Σ (@riscv_fixedGS Σ HR) = ucl ug)
-      (Htag : @riscv_rx_tag Σ (@riscv_fixedGS Σ HR) = utag ug) :
+      (Htag : @riscv_rx_tag Σ (@riscv_fixedGS Σ HR) = utag ug)
+      (Hwild : @riscv_wild Σ (@riscv_fixedGS Σ HR) = wild_none) :
     (⊢ union_links ug) ->
     UInitSh.cons_cred_holds_at fsc_cons (file_taint (fgn_cl (ugn_file ug)))
       (lm_disc_input U) union_disc_snoc_ncr union_disc_rest_short
@@ -321,12 +322,16 @@ Section UnionInitCC.
     assert (Hstw : ⊢ app_sup -∗ file_taint (fgn_cl (ugn_file ug))).
     { iIntros "#Hs".
       iApply (UInitFileLeaves.file_taint_of_sup_at (ugn_file ug) r Heq with "Hs"). }
+    (* the wild credential's reading (lane S0): the union has none yet *)
+    assert (Hwdw : ⊢ riscv_wild (S gen_id) -∗ file_taint (fgn_cl (ugn_file ug))).
+    { rewrite Hwild /wild_none. by iIntros "[]". }
     pose proof (uWbf_inp ug r s0) as Hwbi.
     rewrite /UInitSh.cons_cred_holds_at /union_cc /=.
     split_and!.
     - (* (1) the read leaf at the index *)
       intros γp N l Hpeq.
-      exact (union_read_leaf_holds_at ug Htag s0 (uWbf ug r s0) N γp l Hpeq Hstw Htsw Hlkp).
+      exact (union_read_leaf_holds_at ug Htag s0 (uWbf ug r s0) N γp l Hpeq Hstw Htsw Hwdw
+               Hlkp).
     - intros γp N i Hpeq.
       exact (UShLine.ush_lease_of_at (lk_rres (union_link_inst_at ug s0))
                (fgn_echo (ugn_file ug)) (file_taint (fgn_cl (ugn_file ug))) (uWbf ug r s0)
@@ -394,6 +399,7 @@ Section UnionInitCC.
       (Heq : @file_app Σ HF = MkAppcfg file_names (file_pred (fgn_cl (ugn_file ug))) r)
       (Hcons : @riscv_cons_res Σ (@riscv_fixedGS Σ HR) = ucl ug)
       (Htag : @riscv_rx_tag Σ (@riscv_fixedGS Σ HR) = utag ug)
+      (Hwild : @riscv_wild Σ (@riscv_fixedGS Σ HR) = wild_none)
       (st : fdstate) (n0 : nat) :
     (forall k : Z, free_num k -> @psok Σ uprogSG_free k) ->
     8 * Z.of_nat (2 + (8 + (16 + (UkSh.ush_Dbody + n0)))) <= 0xFE0 ->
@@ -423,7 +429,7 @@ Section UnionInitCC.
                 (file_taint (fgn_cl (ugn_file ug))) fsc_cons st (cons_never (fn_cons r))
                 (union_cc HR GEN ug r s0) UInitSh.sh_Rsh n0
                 Hpsok_free Hn0 Hst
-                (union_cc_holds HR GEN ug r s0 Heq Hcons Htag Hlkp)
+                (union_cc_holds HR GEN ug r s0 Heq Hcons Htag Hwild Hlkp)
                 with "Hdep Hdp Hplaw [] Hcore'").
       iApply (file_cons_in_of_Cns HR GEN (ugn_file ug) r Heq with "[] Hcns").
       iDestruct "Hcore'" as "(#Hinv & _)". iExact "Hinv".

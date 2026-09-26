@@ -1222,8 +1222,8 @@ Section EchoPred.
   Qed.
 
   (* ...AND THE CONVERSE, which is what makes the credential a tokenless
-     console read leaves ([ConsoleInv.cons_dirty_cred app_sup]) READ AS THE
-     TAINT (app-echo.md, lane SH-LINE, S4).  The claim is about EVERY view,
+     console read leaves ([ConsoleInv.cons_dirty_cred app_rdcred], at its
+     [app_sup] arm) READ AS THE TAINT (app-echo.md, lane SH-LINE, S4).  The claim is about EVERY view,
      and the empty view is a view: it satisfies none of the three pins, so
      the only disjunct that can hold at it is the taint.  That is the step
      sh's read takes when its window comes back under the dirty
@@ -1455,7 +1455,9 @@ Section EchoApp.
                (echo_taint γ) (echo_taint_persistent γ)
                (echo_taint_timeless γ)
                (echo_cons γ) (echo_cons_timeless γ)
-               (echo_cons_lic γ).
+               (echo_cons_lic γ)
+               wild_none (@wild_none_persistent Σ) (@wild_none_timeless Σ)
+               (wild_none_lic (echo_cons γ)).
 
   Definition app_echo : xv6_app Σ :=
     MkApp echo_fixed echo_cl echo_names echo_pred echo_boot echo_R

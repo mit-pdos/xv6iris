@@ -2425,6 +2425,40 @@ Section DevLoops.
     iIntros "Ht". iApply (ai_lic riscvF_app_iface with "Ht").
   Qed.
 
+  (* THE LICENCE AT ONE ERA, FOR THE PROCESS EVENTS (seccomp design §9,
+     §10.2, lane S0): the [∀ k] of [cons_licence] instantiated, at the two
+     events a process steps the claim by ([ConsLog.wild_ev]) and under the
+     console log's two validity premises, as [cons_link] supplies them.
+     The general licence buys it at every era by ignoring all three
+     premises; the WILD credential ([RiscvPtsto.riscv_wild], the
+     interface's [ai_wild_lic]) buys it at its own.  The read payment
+     below has its era-k form at this; the echo arm's [cons_run] does not
+     (its events are the interrupt's). *)
+  Definition cons_licence_at (k : nat) : iProp Σ :=
+    (□ ∀ (h : list mobs) (H : LogEntryDefs.cons_hist)
+         (ev : ConsLog.cons_ev),
+        ⌜ConsLog.wild_ev ev⌝ -∗
+        ⌜ConsLog.cons_hist_ok H⌝ -∗ ⌜ConsLog.cons_ev_ok H ev⌝ -∗
+        riscv_cons_res k h H ==∗ riscv_cons_res k h (ConsLog.cons_step H ev))%I.
+
+  Global Instance cons_licence_at_persistent k :
+    Persistent (cons_licence_at k).
+  Proof using . rewrite /cons_licence_at. apply _. Qed.
+
+  Lemma cons_licence_at_of_licence (k : nat) :
+    cons_licence -∗ cons_licence_at k.
+  Proof using .
+    rewrite /cons_licence /cons_licence_at.
+    iIntros "#Hlic !>" (h H ev _ _ _). iApply ("Hlic" $! k h H ev).
+  Qed.
+
+  Lemma cons_licence_at_of_wild (k : nat) :
+    riscv_wild k -∗ cons_licence_at k.
+  Proof using .
+    rewrite /cons_licence_at /riscv_cons_res /riscv_wild.
+    iIntros "Hw". iApply (ai_wild_lic riscvF_app_iface k with "Hw").
+  Qed.
+
   (* A PROCESS BYTE REACHING THE WIRE (redesign R2).  The name and the
      shape every writer threads are unchanged; what moves underneath is the
      port's ONE claim, by [EvOut].  Keeping the name is what leaves the
@@ -2697,10 +2731,21 @@ Section DevLoops.
   (* the generic process's, out of the licence the supply already carries
      ([UexecExecInst.xv6_ssupply]'s fourth conjunct): it claims nothing
      about the window and is told nothing *)
+  Lemma cons_read_pay_triv_at (k : nat) :
+    cons_licence_at k -∗ cons_read_pay k (fun _ => True%I).
+  Proof using .
+    iIntros "#Hlic" (ws o H) "#Hlb Hres %Hok %Hev".
+    iMod ("Hlic" $! (default [] o) H (ConsLog.EvRead ws)
+            with "[] [//] [//] Hres") as "Hres".
+    { iPureIntro. exact I. }
+    iModIntro. iExists o. by iFrame "Hlb Hres".
+  Qed.
+
   Lemma cons_read_pay_triv (k : nat) :
     cons_licence -∗ cons_read_pay k (fun _ => True%I).
   Proof using .
-    iIntros "#Hlic" (ws). iApply (cons_link_of_licence with "Hlic"). done.
+    iIntros "#Hlic". iApply (cons_read_pay_triv_at with "[]").
+    by iApply cons_licence_at_of_licence.
   Qed.
 
   (* the trivial application's: the claim is [emp] and both halves are free *)

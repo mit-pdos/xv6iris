@@ -747,14 +747,16 @@ Section ProofMain.
     iDestruct "Hcl0" as (γcl) "#Hconslk0".
     (* THE CREDENTIAL ESCROW, bought with the clean token
        ([ConsoleInv.cons_cred_inv_alloc]) and folded into [is_conslock]
-       beside the handle.  [Wd] is [AppInv.app_sup]: the credential a
-       process that answers for nothing runs on, which is what the kernel
+       beside the handle.  [Wd] is [AppInv.app_rdcred]: the credential a
+       process that answers for nothing runs on ([app_sup]) OR this era's
+       wild credential ([RiscvPtsto.riscv_wild (S gen_id)], the one a
+       program under a syscall mask holds), which is what the kernel
        charges a console read taken without the reader token.  The
        interrupt path's [console_caps] takes the RAW handle instead -- it
        stores bytes, it does not read them. *)
-    iMod (ConsoleInv.cons_cred_inv_alloc cn AppInv.app_sup ⊤ with "Hclean")
+    iMod (ConsoleInv.cons_cred_inv_alloc cn AppInv.app_rdcred ⊤ with "Hclean")
       as "#Hcred".
-    iPoseProof (ConsoleInv.is_conslock_intro cn AppInv.app_sup γcl
+    iPoseProof (ConsoleInv.is_conslock_intro cn AppInv.app_rdcred γcl
                   with "Hconslk0 Hcred") as "#Hconslk".
     iAssert (console_caps γd) as "#Hccaps".
     { rewrite /console_caps. iExists γtx, γcl, cn.

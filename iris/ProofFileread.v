@@ -1836,7 +1836,7 @@ Section ProofFileread.
                    THE CALLER'S PAYMENT, OPENED ONCE.  The major is
                    [CONSOLE] (the environment's tie), so [fileread_in]'s
                    device arm is the accessor
-                   [ConsoleInv.cons_acc fsc_cons app_sup Rd], and
+                   [ConsoleInv.cons_acc fsc_cons app_rdcred Rd], and
                    [cons_acc_open] turns it into ONE payment
                    ([ConsoleInv.cons_pay] at whichever [ord] the caller's
                    disjunct decided) plus the wand that turns consoleread's
@@ -1912,7 +1912,7 @@ Section ProofFileread.
                 iDestruct (cpu_own_transport CID CID58 0%nat eb pj b ltac:(wp_next_chain)
                              with "Hcnt") as "Hcnt".
                 iApply (Consoleread.wp_consoleread_sconf fsc_kalloc γf γs j γlp
-                          (frn_cons fn) fsc_cons AppInv.app_sup
+                          (frn_cons fn) fsc_cons AppInv.app_rdcred
                           E2 (K - 6)%nat eb pidv U n b
                           lks ord Rin Hj Hgs Hlens HE2a0 HE2a2 (fr_n_range n Hn)
                           (fr_av_cons K HK) Heb

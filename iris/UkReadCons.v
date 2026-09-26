@@ -12,9 +12,9 @@
 (* kernel's own console boundary.  [SpecFileread.fileread_in]'s console    *)
 (* arm is two payments side by side:                                       *)
 (*                                                                        *)
-(*   - THE RING's, [ConsoleInv.cons_acc fsc_cons app_sup Rd] -- the reader *)
-(*     token at the caller's own cursor, or the credential a tainted or    *)
-(*     generic caller already holds;                                       *)
+(*   - THE RING's, [ConsoleInv.cons_acc fsc_cons app_rdcred Rd] -- the     *)
+(*     reader token at the caller's own cursor, or the credential a        *)
+(*     tainted or generic caller already holds;                            *)
 (*   - THE CONSOLE HISTORY's, [WpUart.cons_read_pay (S gen_id) Rin], which *)
 (*     is [∀ ws, WpUart.cons_link (S gen_id) ws (Rin ws)] -- and           *)
 (*     [read_link] IS ConsLog's [EvRead] EVENT, spelled as an atomic       *)
@@ -77,7 +77,7 @@ Require Import UexecExecInst.      (* THE INSTANCE: [uexecSG_xv6] *)
 Require Import UkReadRows.         (* the shared key-level rows *)
 Require Import SpecFileread.       (* [fileread_in] / [console_receipt] *)
 Require Import SpecSysRead.        (* [sys_rw_count] *)
-Require Import AppInv.             (* [app_sup] *)
+Require Import AppInv.             (* [app_rdcred] *)
 Require Import FsCfg.              (* [fsc_cons] *)
 Require Import ConsoleInv.         (* [cons_acc] / [cons_window] / [CONSOLE] *)
 Require Import WpUart.             (* [cons_read_pay] -- the console history's AU *)
@@ -149,7 +149,7 @@ Section UkReadCons.
     bv_signed (trunc32 (m !!! Regidx a0_idx)) = Z.of_nat fd ->
     (fd < NSTD)%nat ->
     l !! fd = Some (FdOpen true wr (FdDevice CONSOLE)) ->
-    cons_acc fsc_cons app_sup Rd -∗
+    cons_acc fsc_cons app_rdcred Rd -∗
     cons_read_pay (S gen_id) Rin -∗
     udepwf_std N m pc USYS_read (read_cons_fam (ukn_pay N) Rd Rin) l.
   Proof using .
@@ -214,7 +214,7 @@ Section UkReadCons.
        ⌜dd = 0%nat -> (0 < cap)%nat -> dc = (dd + 1)%nat⌝ ∗
        ([∗ list] hh ∈ hs, riscv_rx_tag hh) ∗
        Rd cur dc ∗
-       (uread_cons_win cnm Rin cur dd dc g hs ∨ cons_dirty_cred app_sup))%I.
+       (uread_cons_win cnm Rin cur dd dc g hs ∨ cons_dirty_cred app_rdcred))%I.
 
   (* =================================================================== *)
   (*  4.  THE LEAF                                                        *)
@@ -243,7 +243,7 @@ Section UkReadCons.
     ubytes (ukn_d N) a k f -∗
     (* THE PAYMENT: the ring's, and ONE ATOMIC UPDATE ON THE CONSOLE
        HISTORY'S INPUT QUEUE *)
-    cons_acc fsc_cons app_sup Rd -∗
+    cons_acc fsc_cons app_rdcred Rd -∗
     cons_read_pay (S gen_id) Rin -∗
     (∀ (h' : CpuId) (r : mword 64) (d : nat) (g : nat -> bv 8),
        ⌜ (d <= cap)%nat ⌝ -∗
