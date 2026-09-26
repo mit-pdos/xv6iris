@@ -403,6 +403,43 @@ theorem file_close_step (γ : FileNames) (M : RegMapF (Nat × Qp)) (Ls : Nat →
   · ipureintro
     exact ⟨close_keys_nodup s t id q hnd, close_ftableOk M Ls s t id k q hok hL hnd, close_fresh M nx id hfresh⟩
 
+/-- The closer's share of a slot that still has other references is not the
+whole (Rocq ProofFileclose's `Hqne`, off `fref_tok_lookup`): the rest reads
+`q + x = 1` or `q' + (q + x) = 1`, and neither holds at `q = 1`. -/
+theorem fileRest_q_ne_one (γ : FileNames) (k : Nat) (s t : List (Nat × Qp)) (id : Nat) (q q' : Qp)
+    (C : FContent) (pn : FPNames) (hne : s ++ t ≠ []) :
+    fileRestAt (GF := GF) γ curCtx k (qsum (s ++ (id, q) :: t)) q' C pn ⊢
+      ⌜q ≠ 1⌝ ∗ fileRestAt γ curCtx k (qsum (s ++ (id, q) :: t)) q' C pn := by
+  unfold fileRestAt
+  rw [qsum_app_cons s t (id, q) hne]
+  iintro H
+  icases H with (%hone | ⟨%hq, Hf, Ht, Hc⟩)
+  · isplitr
+    · ipureintro
+      intro h1
+      subst h1
+      have h2 := congrArg Subtype.val hone
+      have e : ((1 : Qp) + qsum (s ++ t)).val = 1 + (qsum (s ++ t)).val := rfl
+      have e1 : (1 : Qp).val = 1 := rfl
+      have hx := (qsum (s ++ t)).2
+      rw [e, e1] at h2
+      grind
+    · ileft; ipureintro; exact hone
+  · isplitr
+    · ipureintro
+      intro h1
+      subst h1
+      have h2 := congrArg Subtype.val hq
+      have e : (q' + ((1 : Qp) + qsum (s ++ t))).val = q'.val + (1 + (qsum (s ++ t)).val) := rfl
+      have e1 : (1 : Qp).val = 1 := rfl
+      have hx := (qsum (s ++ t)).2
+      have hq' := q'.2
+      rw [e, e1] at h2
+      grind
+    · iright
+      iframe Hf Ht Hc
+      ipureintro; exact hq
+
 /-- Not the last reference: the departing fraction is absorbed into the
 lock's leftover (`fileRestAt` at the shorter list's fraction). -/
 theorem fileRest_absorb (γ : FileNames) (k : Nat) (s t : List (Nat × Qp)) (id : Nat) (q q' : Qp)

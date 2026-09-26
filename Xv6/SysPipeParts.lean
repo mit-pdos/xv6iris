@@ -360,41 +360,110 @@ theorem sys_pipe_copyout (CO : COPYOUT) (c : CPU) (k' : KCtx) (γl : GName) (γk
   simp only [copyoutAddr] at h
   exact h
 
+/-! ## THE ROLLBACK'S TWO CLOSE PAYMENTS (Rocq `ProofSysPipe`, design/pipe.md "The byte queue")
+
+Every error path of sys_pipe closes BOTH ends of a pipe it still holds the
+exact fragment of, and `SpecFileclose` wants one payment per close.  The
+fragment pays the FIRST directly, at the payload "the fragment, moved"; what
+pays the SECOND is whatever the first close handed back -- the moved
+fragment (the link fired, i.e. that close was the end's last), the taint, or
+the payment itself if the close was NOT the last.  In that last case the
+unfired link is still total control of the state, BECAUSE ITS PAYLOAD IS THE
+FRAGMENT: fire it and both halves are in hand, so the state can be set to
+exactly what the second close's own step demands (`sp_clink_relink`).
+Nothing in the failure arm's post names the fragment, so the second close's
+payload is trivial. -/
+
+/-- Rocq `sp_clink_relink`. -/
+theorem sp_clink_relink (γ : GName) (w w' : Bool) (s1 : PipeSt) (Φ : IProp GF) :
+    pipeClink (GF := GF) γ w (pipeQfrag γ s1) -∗
+    (∀ s : PipeSt, pipeQfrag γ (pstClose w' s) ={⊤}=∗ Φ) -∗
+    pipeClink γ w' Φ := by
+  unfold pipeClink
+  iintro Hl Hk %s Ha
+  imod Hl $$ %s Ha with ⟨Ha, Hf⟩
+  imod pipeQueue_update γ (pstClose w s) s1 (pstClose w' s) $$ Ha Hf with ⟨Ha, Hf⟩
+  imod Hk $$ %s Hf with HΦ
+  imodintro
+  iframe Ha HΦ
+
+/-- Rocq `sp_cpay_of_cpost`. -/
+theorem sp_cpay_of_cpost (γ : GName) (w w' : Bool) (s1 : PipeSt) (last : Bool) :
+    pipeCpost (hlc := hlc) γ w (pipeQfrag (GF := GF) γ s1) last ⊢ pipeCpay (hlc := hlc) γ w' iprop(True) := by
+  unfold pipeCpost pipeCpay
+  iintro (Hf | ⟨#Ht, -⟩ | ⟨-, Hp⟩)
+  · ileft
+    iapply pipeClink_of_frag γ w' iprop(True) s1 $$ Hf
+    iintro -
+    imodintro
+    itrivial
+  · iright; iexact Ht
+  · icases Hp with (Hl | #Ht)
+    · ileft
+      iapply sp_clink_relink γ w w' s1 iprop(True) $$ Hl
+      iintro %s -
+      imodintro
+      itrivial
+    · iright; iexact Ht
+
+/-- Rocq `sp_fc_cpay_frag`: the fragment pays the first close. -/
+theorem sp_fc_cpay_frag (γp : PipeNames) (r w : Bool) :
+    pipeQfrag (GF := GF) γp.pnQueue pst0 ⊢
+      filecloseCpay (hlc := hlc) (.open r w (.pipe γp)) (pipeQfrag γp.pnQueue (pstClose w pst0)) := by
+  unfold filecloseCpay pipeCpay
+  iintro Hf
+  ileft
+  iapply pipeClink_of_frag γp.pnQueue w _ pst0 $$ Hf
+  iintro H
+  imodintro
+  iexact H
+
+/-- Rocq `sp_fc_cpay_of_cpost`: whatever the first close handed back pays the
+second. -/
+theorem sp_fc_cpay_of_cpost (γp : PipeNames) (r0 w0 r1 w1 : Bool) (q : Qp) (s1 : PipeSt) :
+    filecloseCpost (hlc := hlc) q (.open r0 w0 (.pipe γp)) (pipeQfrag (GF := GF) γp.pnQueue s1) ⊢
+      filecloseCpay (hlc := hlc) (.open r1 w1 (.pipe γp)) iprop(True) := by
+  unfold filecloseCpost filecloseCpay
+  exact sp_cpay_of_cpost γp.pnQueue w0 w1 s1 _
+
 /-- `fileclose` on one of the two pipe ends sys_pipe holds in its locals:
 the environment is the PIPE bundle (`fileclosePipeEnv`), whose rows are
 sys_pipe's own persistent ones at the uncounted page count; the returned
 page-count disjunction is dropped. -/
 theorem sys_pipe_fileclose (FC : FILECLOSE) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ] (c : CPU)
     (k' : KCtx) (γl : GName) (γ : FileNames) (kk : Nat) (r w : Bool) (γp : PipeNames) (γkl : GName) (γk : KmemNames)
-    (pidv : BitVec 32) (dqp : DFrac) (s : Bool) (hs : k'.sie = s) (pj : BitVec 64) (hpj : k'.proc = pj)
+    (pidv : BitVec 32) (dqp : DFrac) (Φc : IProp GF) (s : Bool) (hs : k'.sie = s) (pj : BitVec 64)
+    (hpj : k'.proc = pj)
     (hK : filecloseSlots ≤ k'.avail) (hnoff : k'.noff = 0) (htier : k'.tier = KTier.kpt)
     (ha0 : k'.regs 10#5 = fnode kk) :
     kctx c k' ∗ pcIs c KA.«fileclose» ∗ trapCsrsExt c s ∗ cpuClaimExt c s pj ∗
     isFtable γl γ ∗ panicEnv ∗ fileRef γ kk 1 (.open r w (.pipe γp)) ∗
     wordPointsTo (pPid pj) 4 dqp pidv ∗ irefSlot ∗
     procsInv Γ ∗ isLock γkl kmemLockAddr "kmem" (kmemRes γk) ∗ kallocAvail γk none ∗
+    filecloseCpay (hlc := hlc) (.open r w (.pipe γp)) Φc ∗
     wpNext true pj c (fun cpu' => iprop(∀ (spie spp : Bool) (R' : RegMap),
       ⌜calleeSaved k'.regs R'⌝ -∗
       kctx cpu' ((k'.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k'.regs 1#5)) -∗
       trapCsrsExt cpu' s -∗ cpuClaimExt cpu' s pj -∗
-      wordPointsTo (pPid pj) 4 dqp pidv -∗ fdSlot -∗ irefSlot -∗ wpLoop cpu'))
+      wordPointsTo (pPid pj) 4 dqp pidv -∗ fdSlot -∗ irefSlot -∗
+      filecloseCpost (hlc := hlc) 1 (.open r w (.pipe γp)) Φc -∗ wpLoop cpu'))
     ⊢ wpLoop (GF := GF) c := by
   subst hs hpj
   have h := FC.wp_fileclose_eb (hlc := hlc) (GF := GF) Γ c k' γl γ kk 1 (.open r w (.pipe γp)) 0 γkl γk none
-    pidv dqp hK hnoff htier ha0
+    pidv dqp Φc hK hnoff htier ha0
   unfold wp_fileclose_eb_body at h
   simp only [filecloseAddr] at h
-  iintro ⟨Hk, Hpc, Hte, Hce, #Hft, #Hpe, Href, Hpid, Hir, #Hpi, #Hkl, #Hav, Hnext⟩
+  iintro ⟨Hk, Hpc, Hte, Hce, #Hft, #Hpe, Href, Hpid, Hir, #Hpi, #Hkl, #Hav, Hcpay, Hnext⟩
   iapply h
-  iframe Hk Hpc Hte Hce Hft Hpe Href Hpid Hir
+  iframe Hk Hpc Hte Hce Hft Hpe Href Hpid Hir Hcpay
   isplitl []
   · iapply (show fileclosePipeEnv (hlc := hlc) (GF := GF) Γ γkl γk none ⊢
         filecloseEnv (hlc := hlc) Γ 0 k'.proc γkl γk none (.open r w (.pipe γp)) from .rfl)
     unfold fileclosePipeEnv
     iframe Hpi Hkl Hav
   iapply wpNext_mono _ _ _ _ _ $$ Hnext
-  iintro %c' HK %spie %spp %R' %hcs Hk Hpc Hte Hce Hpid Hfd Hir -
-  iapply HK $$ %spie %spp %R' %hcs Hk Hpc Hte Hce Hpid Hfd Hir
+  iintro %c' HK %spie %spp %R' %hcs Hk Hpc Hte Hce Hpid Hfd Hir - Hcp
+  iapply HK $$ %spie %spp %R' %hcs Hk Hpc Hte Hce Hpid Hfd Hir Hcp
 
 /-! ## The frame -/
 

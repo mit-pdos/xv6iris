@@ -105,43 +105,44 @@ def sysWriteRet (V : ProcPriv) (v : BitVec 64) (n : Int) (r : BitVec 64) : Prop 
 
 section Arms
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FsTopG GF] [OffboxG GF]
-  [Appcfg GF] [FsBytesG GF] [Fscfg]
+  [CtokG GF] [Appcfg GF] [FsBytesG GF] [Fscfg]
 /- the write guard's three key values (Rocq RULING WR-TB) -/
 variable (pmv : Nat → Option UPerm) (szv : Nat) (lzv : Bool)
 
 /-- THE CALLER'S INPUT (Rocq `sys_write_in`): filewrite's, at the key. -/
 def sysWriteIn (V : ProcPriv) (v : BitVec 64) (sts : List FdState) (n : Int)
-    (M : Nat → List (BitVec 8)) (ua : BitVec 64) (Q : Nat → IProp GF) : IProp GF :=
-  filewriteIn (hlc := hlc) pmv szv lzv (sysFdSt v V.ofile sts) n M ua Q
+    (M : Nat → List (BitVec 8)) (ua : BitVec 64) (Q : Nat → IProp GF) (Qe : Nat → PipeSt → IProp GF) :
+    IProp GF :=
+  filewriteIn (hlc := hlc) pmv szv lzv (sysFdSt v V.ofile sts) n M ua Q Qe
 
 /-- THE ARMED OUTPUT (Rocq `sys_write_arms`): the blanket beside
 filewrite's extra at the key. -/
 def sysWriteArms (V : ProcPriv) (v : BitVec 64) (sts : List FdState) (n : Int)
-    (M : Nat → List (BitVec 8)) (ua : BitVec 64) (Q : Nat → IProp GF) (r : BitVec 64) : IProp GF :=
-  iprop(⌜sysWriteRet V v n r⌝ ∗ filewriteExtra (hlc := hlc) V.upt (sysFdSt v V.ofile sts) n M ua Q r)
+    (M : Nat → List (BitVec 8)) (ua : BitVec 64) (Q : Nat → IProp GF) (Qe : Nat → PipeSt → IProp GF) (r : BitVec 64) : IProp GF :=
+  iprop(⌜sysWriteRet V v n r⌝ ∗ filewriteExtra (hlc := hlc) V.gen V.upt (sysFdSt v V.ofile sts) n M ua Q Qe r)
 
 /-- Rocq `sys_write_arms_ret`. -/
 theorem sysWriteArms_ret (V : ProcPriv) (v : BitVec 64) (sts : List FdState) (n : Int)
-    (M : Nat → List (BitVec 8)) (ua : BitVec 64) (Q : Nat → IProp GF) (r : BitVec 64) :
-    sysWriteArms (hlc := hlc) V v sts n M ua Q r ⊢ ⌜sysWriteRet V v n r⌝ := by
+    (M : Nat → List (BitVec 8)) (ua : BitVec 64) (Q : Nat → IProp GF) (Qe : Nat → PipeSt → IProp GF) (r : BitVec 64) :
+    sysWriteArms (hlc := hlc) V v sts n M ua Q Qe r ⊢ ⌜sysWriteRet V v n r⌝ := by
   unfold sysWriteArms
   iintro ⟨%h, -⟩
   ipureintro; exact h
 
 /-- Rocq `sys_write_arms_extra`. -/
 theorem sysWriteArms_extra (V : ProcPriv) (v : BitVec 64) (sts : List FdState) (n : Int)
-    (M : Nat → List (BitVec 8)) (ua : BitVec 64) (Q : Nat → IProp GF) (r : BitVec 64) :
-    sysWriteArms (hlc := hlc) V v sts n M ua Q r ⊢
-      filewriteExtra (hlc := hlc) V.upt (sysFdSt v V.ofile sts) n M ua Q r := by
+    (M : Nat → List (BitVec 8)) (ua : BitVec 64) (Q : Nat → IProp GF) (Qe : Nat → PipeSt → IProp GF) (r : BitVec 64) :
+    sysWriteArms (hlc := hlc) V v sts n M ua Q Qe r ⊢
+      filewriteExtra (hlc := hlc) V.gen V.upt (sysFdSt v V.ofile sts) n M ua Q Qe r := by
   unfold sysWriteArms
   iintro ⟨-, H⟩
   iexact H
 
 /-- Rocq `sys_write_arms_none`: argfd said no, and the answer is -1. -/
 theorem sysWriteArms_none (V : ProcPriv) (v : BitVec 64) (sts : List FdState) (n : Int)
-    (M : Nat → List (BitVec 8)) (ua : BitVec 64) (Q : Nat → IProp GF) (r : BitVec 64)
+    (M : Nat → List (BitVec 8)) (ua : BitVec 64) (Q : Nat → IProp GF) (Qe : Nat → PipeSt → IProp GF) (r : BitVec 64)
     (hnone : argFd v V.ofile = none) (hr : r = -1#64) :
-    ⊢ sysWriteArms (hlc := hlc) V v sts n M ua Q r := by
+    ⊢ sysWriteArms (hlc := hlc) V v sts n M ua Q Qe r := by
   unfold sysWriteArms
   rw [sysFdSt_none v V.ofile sts hnone]
   isplitl []
@@ -151,9 +152,9 @@ theorem sysWriteArms_none (V : ProcPriv) (v : BitVec 64) (sts : List FdState) (n
 /-- ... and the input is dropped there (Rocq's `sys_write_in` at
 `FdClosed`). -/
 theorem sysWriteIn_none (V : ProcPriv) (v : BitVec 64) (sts : List FdState) (n : Int)
-    (M : Nat → List (BitVec 8)) (ua : BitVec 64) (Q : Nat → IProp GF)
+    (M : Nat → List (BitVec 8)) (ua : BitVec 64) (Q : Nat → IProp GF) (Qe : Nat → PipeSt → IProp GF)
     (hnone : argFd v V.ofile = none) :
-    sysWriteIn (hlc := hlc) pmv szv lzv V v sts n M ua Q ⊢ emp := by
+    sysWriteIn (hlc := hlc) pmv szv lzv V v sts n M ua Q Qe ⊢ emp := by
   unfold sysWriteIn
   rw [sysFdSt_none v V.ofile sts hnone]
   unfold filewriteIn; exact .rfl
@@ -161,17 +162,19 @@ theorem sysWriteIn_none (V : ProcPriv) (v : BitVec 64) (sts : List FdState) (n :
 /-- Rocq `sys_write_in_of`. -/
 theorem sysWriteIn_of (V : ProcPriv) (v : BitVec 64) (sts : List FdState) (fd : Nat)
     (fv : BitVec 64) (st : FdState) (n : Int) (M : Nat → List (BitVec 8)) (ua : BitVec 64)
-    (Q : Nat → IProp GF) (hsome : argFd v V.ofile = some (fd, fv)) (hst : sts[fd]? = some st) :
-    sysWriteIn (hlc := hlc) pmv szv lzv V v sts n M ua Q ⊢ filewriteIn (hlc := hlc) pmv szv lzv st n M ua Q := by
+    (Q : Nat → IProp GF) (Qe : Nat → PipeSt → IProp GF) (hsome : argFd v V.ofile = some (fd, fv))
+    (hst : sts[fd]? = some st) :
+    sysWriteIn (hlc := hlc) pmv szv lzv V v sts n M ua Q Qe ⊢
+      filewriteIn (hlc := hlc) pmv szv lzv st n M ua Q Qe := by
   unfold sysWriteIn
   rw [sysFdSt_some v V.ofile sts fd fv st hsome hst]
 
 /-- Rocq `sys_write_arms_of`. -/
 theorem sysWriteArms_of (V : ProcPriv) (v : BitVec 64) (sts : List FdState) (fd : Nat)
     (fv : BitVec 64) (st : FdState) (n : Int) (M : Nat → List (BitVec 8)) (ua : BitVec 64)
-    (Q : Nat → IProp GF) (r : BitVec 64) (hsome : argFd v V.ofile = some (fd, fv))
+    (Q : Nat → IProp GF) (Qe : Nat → PipeSt → IProp GF) (r : BitVec 64) (hsome : argFd v V.ofile = some (fd, fv))
     (hst : sts[fd]? = some st) :
-    filewriteArms (hlc := hlc) V.upt st n M ua Q r ⊢ sysWriteArms (hlc := hlc) V v sts n M ua Q r := by
+    filewriteArms (hlc := hlc) V.gen V.upt st n M ua Q Qe r ⊢ sysWriteArms (hlc := hlc) V v sts n M ua Q Qe r := by
   unfold filewriteArms sysWriteArms
   rw [sysFdSt_some v V.ofile sts fd fv st hsome hst]
   iintro ⟨%h, H⟩
@@ -192,7 +195,7 @@ block back at filewrite's extended descriptor, the descriptor bundle
 unchanged, the fs environment's output, and the armed output. -/
 def sysWritePost (k : KCtx) (γ : FileNames) (j : Nat) (pid : BitVec 32) (V : ProcPriv)
     (M : Nat → List (BitVec 8)) (sts : List FdState) (v v1 v2 : BitVec 64) (Q : Nat → IProp GF)
-    (cpu' : CPU) : IProp GF :=
+    (Qe : Nat → PipeSt → IProp GF) (cpu' : CPU) : IProp GF :=
   iprop(∀ (spie spp : Bool) (R' : RegMap) (P' : UPtd),
     ⌜calleeSaved k.regs R' ∧ V.upt.extSz V.sz P'⌝ -∗
     kctx cpu' ((k.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k.regs 1#5)) -∗
@@ -200,7 +203,7 @@ def sysWritePost (k : KCtx) (γ : FileNames) (j : Nat) (pid : BitVec 32) (V : Pr
     procPrivFd γ (procAddr j) pid { V with upt := P' } (viewFaulted V.upt P' M) -∗
     fdFrags V.fdg sts -∗
     filewriteFsOut -∗
-    sysWriteArms (hlc := hlc) V v sts (argZ v2) (writerImg V.upt M) v1 Q (R' 10#5) -∗
+    sysWriteArms (hlc := hlc) V v sts (argZ v2) (writerImg V.upt M) v1 Q Qe (R' 10#5) -∗
     wpLoop cpu')
 
 end
@@ -216,7 +219,7 @@ def wp_sys_write_eb_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [
     (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
     (cpu : CPU) (k : KCtx) (γ : FileNames) (j : Nat) (pid : BitVec 32) (V : ProcPriv)
     (M : Nat → List (BitVec 8)) (sts : List FdState) (v v1 v2 : BitVec 64)
-    (γkl : GName) (γk : KmemNames) (γl : GName) (γu : UartNames) (Q : Nat → IProp GF)
+    (γkl : GName) (γk : KmemNames) (γl : GName) (γu : UartNames) (Q : Nat → IProp GF) (Qe : Nat → PipeSt → IProp GF)
     (pmv : Nat → Option UPerm) (szv : Nat) (lzv : Bool)
     (hv : V.tf[tfArgIdx 0]? = some v) (hv1 : V.tf[tfArgIdx 1]? = some v1)
     (hv2 : V.tf[tfArgIdx 2]? = some v2)
@@ -235,9 +238,9 @@ def wp_sys_write_eb_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [
   -- the file system in the form that names no file, and the write column
   filewriteFsEnv (hlc := hlc) ∗ filewriteDevsw γl γu ∗
   -- THE CALLER'S INPUT, keyed on the descriptor argument 0 names
-  sysWriteIn (hlc := hlc) pmv szv lzv V v sts (argZ v2) (writerImg V.upt M) v1 Q ∗
+  sysWriteIn (hlc := hlc) pmv szv lzv V v sts (argZ v2) (writerImg V.upt M) v1 Q Qe ∗
   -- THE CROSSING IS THE LITERAL `true`: filewrite parks
-  wpNext true k.proc cpu (sysWritePost k γ j pid V M sts v v1 v2 Q)
+  wpNext true k.proc cpu (sysWritePost k γ j pid V M sts v v1 v2 Q Qe)
   ⊢ wpLoop (GF := GF) cpu
 
 /-- The interface of `sys_write` (Rocq's `Module Type SYSWRITE`). -/
@@ -249,10 +252,10 @@ structure SYSWRITE : Prop where
     (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
     (cpu : CPU) (k : KCtx) (γ : FileNames) (j : Nat) (pid : BitVec 32) (V : ProcPriv)
     (M : Nat → List (BitVec 8)) (sts : List FdState) (v v1 v2 : BitVec 64)
-    (γkl : GName) (γk : KmemNames) (γl : GName) (γu : UartNames) (Q : Nat → IProp GF)
+    (γkl : GName) (γk : KmemNames) (γl : GName) (γu : UartNames) (Q : Nat → IProp GF) (Qe : Nat → PipeSt → IProp GF)
     (pmv : Nat → Option UPerm) (szv : Nat) (lzv : Bool)
     hv hv1 hv2 hK hj hproc hnoff htier htb,
-    wp_sys_write_eb_body (hlc := hlc) (GF := GF) Γ cpu k γ j pid V M sts v v1 v2 γkl γk γl γu Q
+    wp_sys_write_eb_body (hlc := hlc) (GF := GF) Γ cpu k γ j pid V M sts v v1 v2 γkl γk γl γu Q Qe
       pmv szv lzv hv hv1 hv2 hK hj hproc hnoff htier htb
 
 end Xv6

@@ -102,14 +102,28 @@ instance fwrEnv_persistent (Γ : SchedNames) (A : FwrA) :
 (filestat's `fstatK`): `SpecFilewrite.filewritePost` with the hart
 quantified and the block as `EitherDefs.procPrivExt`. -/
 def fwrK (k : KCtx) (γl : GName) (γu : UartNames) (γ : FileNames) (fk : Nat) (q : Qp) (st : FdState) (j : Nat) (pid : BitVec 32)
-    (V : ProcPriv) (M : Nat → List (BitVec 8)) (n : Int) (Q : Nat → IProp GF) : IProp GF :=
+    (V : ProcPriv) (M : Nat → List (BitVec 8)) (n : Int) (Q : Nat → IProp GF) (Qe : Nat → PipeSt → IProp GF) : IProp GF :=
   iprop(∀ (c : CPU) (spie spp : Bool) (R' : RegMap) (P' : UPtd),
     ⌜calleeSaved k.regs R' ∧ V.upt.extSz V.sz P'⌝ -∗
     kctx c ((k.withSpie spie spp).withRegs R') -∗ pcIs c (jumpPc (k.regs 1#5)) -∗
     trapCsrsExt c k.sie -∗ cpuClaimExt c k.sie k.proc -∗
     fileRef γ fk q st -∗ procPrivExt (procAddr j) pid V P' (viewFaulted V.upt P' M) -∗
     filewriteEnvOut γl γu st -∗
-    filewriteArms (hlc := hlc) V.upt st n (writerImg V.upt M) (k.regs 11#5) Q (R' 10#5) -∗ wpLoop c)
+    filewriteArms (hlc := hlc) V.gen V.upt st n (writerImg V.upt M) (k.regs 11#5) Q Qe (R' 10#5) -∗ wpLoop c)
+
+/-- ...WITH THE GENERATION HALVES OUT: the continuation that takes the
+block's `genHalvesPriv` back (pipewrite's kill read lends them; every other
+arm hands them straight back, `fwrKG_fwrK`). -/
+def fwrKG (k : KCtx) (γl : GName) (γu : UartNames) (γ : FileNames) (fk : Nat) (q : Qp) (st : FdState) (j : Nat) (pid : BitVec 32)
+    (V : ProcPriv) (M : Nat → List (BitVec 8)) (n : Int) (Q : Nat → IProp GF) (Qe : Nat → PipeSt → IProp GF) :
+    IProp GF :=
+  iprop(genHalvesPriv (procAddr j) pid V.gen -∗ fwrK (hlc := hlc) k γl γu γ fk q st j pid V M n Q Qe)
+
+theorem fwrKG_elim {k : KCtx} {γl : GName} {γu : UartNames} {γ : FileNames} {fk : Nat} {q : Qp}
+    {st : FdState} {j : Nat} {pid : BitVec 32} {V : ProcPriv} {M : Nat → List (BitVec 8)} {n : Int}
+    {Q : Nat → IProp GF} {Qe : Nat → PipeSt → IProp GF} :
+    fwrKG (hlc := hlc) k γl γu γ fk q st j pid V M n Q Qe ⊢
+      genHalvesPriv (procAddr j) pid V.gen -∗ fwrK (hlc := hlc) k γl γu γ fk q st j pid V M n Q Qe := .rfl
 
 set_option maxHeartbeats 8000000 in
 /-- **`+0xf4 .. +0x100`: THE TAIL** (Rocq's `fw_epi`). -/
@@ -157,15 +171,15 @@ theorem fwr_bne_lt (t : Nat) (n : Int) (h : (t : Int) < n) (hn : n < 2 ^ 31) :
   omega
 
 /-- The FD_INODE arm's extra, at a writable parked state, IS `writeArmsAt`. -/
-theorem fwr_extra_of (P : UPtd) (A : FwrA) (Mv : Nat → List (BitVec 8)) (ua : BitVec 64)
-    (Q : Nat → IProp GF) (r : BitVec 64) :
+theorem fwr_extra_of (gn : GName) (P : UPtd) (A : FwrA) (Mv : Nat → List (BitVec 8)) (ua : BitVec 64)
+    (Q : Nat → IProp GF) (Qe : Nat → PipeSt → IProp GF) (r : BitVec 64) :
     writeArmsAt (hlc := hlc) (fsGammaL fscFs) A.i A.γo P A.n Mv ua Q r ⊢
-      filewriteExtra (hlc := hlc) P A.st A.n Mv ua Q r := .rfl
+      filewriteExtra (hlc := hlc) gn P A.st A.n Mv ua Q Qe r := .rfl
 
 set_option maxHeartbeats 16000000 in
 /-- **THE OK EXIT** (`+0xe2` falls, `+0xe6 .. +0xf2`, the tail): every chunk
 landed, `a0 := n`. -/
-theorem fwr_exit_ok (cpu : CPU) (k : KCtx) (A : FwrA) (hA : FwrFacts k A) (Q : Nat → IProp GF)
+theorem fwr_exit_ok (cpu : CPU) (k : KCtx) (A : FwrA) (hA : FwrFacts k A) (Q : Nat → IProp GF) (Qe : Nat → PipeSt → IProp GF)
     (spie spp : Bool) (R : RegMap) (t p : Nat) (P : UPtd) (v9 v19 v11 : BitVec 64)
     (htn : (t : Int) = A.n) (hext : A.V.upt.extSz A.V.sz P)
     (hr : fwrRegs k A.fk A.n v9 v19 (BitVec.ofNat 64 t) 3072#64 1#64 3072#64 R) :
@@ -176,7 +190,7 @@ theorem fwr_exit_ok (cpu : CPU) (k : KCtx) (A : FwrA) (hA : FwrFacts k A) (Q : N
     trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗
     fileRef A.γ A.fk A.q A.st ∗ procPrivExt (procAddr A.j) A.pid A.V P A.img ∗ bslots 3 ∗
     fwrSt (hlc := hlc) A.om (fsGammaL fscFs) A.i A.γo A.V.upt A.n A.img (k.regs 11#5) Q t p 0 ∗
-    fwrK (hlc := hlc) k A.γul A.γuu A.γ A.fk A.q A.st A.j A.pid A.V A.M A.n Q
+    fwrK (hlc := hlc) k A.γul A.γuu A.γ A.fk A.q A.st A.j A.pid A.V A.M A.n Q Qe
     ⊢ wpLoop (GF := GF) cpu := by
   have hK12 : 12 ≤ k.avail := by have := hA.hK; rw [filewriteSlots_eq] at this; omega
   obtain ⟨r2, r8, r9, r18, r19, r20, r21, r22, r23, r24, r25, r26, r27⟩ := id hr
@@ -235,7 +249,7 @@ theorem fwr_exit_ok (cpu : CPU) (k : KCtx) (A : FwrA) (hA : FwrFacts k A) (Q : N
 set_option maxHeartbeats 16000000 in
 /-- **THE FAIL EXIT** (`+0xe2` taken, `+0x12a .. +0x138`, the tail): a
 short chunk broke the loop, `a0 := -1`. -/
-theorem fwr_exit_fail (cpu : CPU) (k : KCtx) (A : FwrA) (hA : FwrFacts k A) (Q : Nat → IProp GF)
+theorem fwr_exit_fail (cpu : CPU) (k : KCtx) (A : FwrA) (hA : FwrFacts k A) (Q : Nat → IProp GF) (Qe : Nat → PipeSt → IProp GF)
     (spie spp : Bool) (R : RegMap) (t p x : Nat) (P : UPtd) (v9 v19 v11 : BitVec 64)
     (htn : (t : Int) < A.n) (hext : A.V.upt.extSz A.V.sz P)
     (hr : fwrRegs k A.fk A.n v9 v19 (BitVec.ofNat 64 t) 3072#64 1#64 3072#64 R) :
@@ -246,7 +260,7 @@ theorem fwr_exit_fail (cpu : CPU) (k : KCtx) (A : FwrA) (hA : FwrFacts k A) (Q :
     trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗
     fileRef A.γ A.fk A.q A.st ∗ procPrivExt (procAddr A.j) A.pid A.V P A.img ∗ bslots 3 ∗
     fwrSt (hlc := hlc) A.om (fsGammaL fscFs) A.i A.γo A.V.upt A.n A.img (k.regs 11#5) Q t p x ∗
-    fwrK (hlc := hlc) k A.γul A.γuu A.γ A.fk A.q A.st A.j A.pid A.V A.M A.n Q
+    fwrK (hlc := hlc) k A.γul A.γuu A.γ A.fk A.q A.st A.j A.pid A.V A.M A.n Q Qe
     ⊢ wpLoop (GF := GF) cpu := by
   have hK12 : 12 ≤ k.avail := by have := hA.hK; rw [filewriteSlots_eq] at this; omega
   obtain ⟨r2, r8, r9, r18, r19, r20, r21, r22, r23, r24, r25, r26, r27⟩ := id hr

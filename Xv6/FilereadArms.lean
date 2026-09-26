@@ -103,10 +103,11 @@ theorem frd_arm_pipe (PR : PIPEREAD) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF 
     (q : Qp) (C : FContent) (wb : Bool) (γp : PipeNames) (j : Nat) (pid : BitVec 32) (V : ProcPriv)
     (M : Nat → List (BitVec 8)) (γkl : GName) (γk : KmemNames) (n : Int)
     (F : Pfam GF (Aview → Nat → Anode → Nat → IProp GF)) (Rd : Nat → Nat → IProp GF)
-    (Rin : List (List Obs × BitVec 8) → IProp GF) (P : IProp GF)
+    (Rin : List (List Obs × BitVec 8) → IProp GF)
+    (Rp : List (BitVec 8) → IProp GF) (Rpe : List (BitVec 8) → PipeSt → IProp GF) (P : IProp GF)
     (hK : filereadSlots ≤ k.avail) (hj : j < NPROC) (hproc : k.proc = procAddr j)
     (hnoff : k.noff = 0) (htier : k.tier = KTier.kpt) (ht : curTier = KTier.kpt)
-    (hn : -2 ^ 31 ≤ n ∧ n < 2 ^ 31) (hn0 : 0 ≤ n) (hty : C.type = FD_PIPE)
+    (hn : -2 ^ 31 ≤ n ∧ n < 2 ^ 31) (hn0 : 0 ≤ n) (hty : C.type = FD_PIPE) (hwb : fcWbool C = false)
     (hr : frdRegs k (fnode fk) (k.regs 11#5) (BitVec.ofInt 64 n) R) (h10 : R 10#5 = fnode fk)
     (h11 : R 11#5 = k.regs 11#5) (h12 : R 12#5 = BitVec.ofInt 64 n) :
     kctx cpu (((k.withSpie spie spp).pushed 6).withRegs R) ∗
@@ -116,11 +117,13 @@ theorem frd_arm_pipe (PR : PIPEREAD) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF 
     procsInv Γ ∗ isLock γkl kmemLockAddr "kmem" (kmemRes γk) ∗ kallocAvail γk none ∗
     frefTok γ fk q ∗ fileFieldsAt curCtx fk q C ∗ filePaySt γ fk q C (.open true wb (.pipe γp)) ∗
     procPrivExt (procAddr j) pid V V.upt M ∗ genHalvesPriv (procAddr j) pid V.gen ∗ P ∗
-    frdK (hlc := hlc) k γ fk q (.open true wb (.pipe γp)) j pid V M n F Rd Rin P
+    -- THE PIPE ARM'S INPUT: the reader's links over the byte queue, or the taint
+    pipeRpay (hlc := hlc) γp.pnQueue Rp Rpe n.toNat ∗
+    frdK (hlc := hlc) k γ fk q (.open true wb (.pipe γp)) j pid V M n F Rd Rin Rp Rpe P
     ⊢ wpLoop (GF := GF) cpu := by
   have hK' : 6 + readiSlots ≤ k.avail := hK
   have hK6 : 6 ≤ k.avail := by unfold readiSlots bmapSlots ballocSlots breadSlots panicSlots at hK'; omega
-  iintro ⟨Hk, Hpc, Hframe, Hte, Hce, #Hpi, #Hkl, #Hav, Htok, Hfields, Hpay, Hpriv, Hgen, HP, HΦ⟩
+  iintro ⟨Hk, Hpc, Hframe, Hte, Hce, #Hpi, #Hkl, #Hav, Htok, Hfields, Hpay, Hpriv, Hgen, HP, Hrpay, HΦ⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
   icases filerw_fields_pipe fk q C $$ Hfields with ⟨Hpcell, Hfw⟩
   icases filerw_pay_pipe γ fk q C true wb γp hty $$ Hpay with ⟨%γl, #Hpp, Hpref, Hpback⟩
@@ -133,8 +136,8 @@ theorem frd_arm_pipe (PR : PIPEREAD) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF 
   k_step_e (wp_s_jal cpu _ (KA.«fileread» + 0x6c#64) false 994#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [frd_br_piperead]
   iintro Hk Hpc
-  iapply (frd_piperead PR Γ cpu _ γl γp (fcWbool C) q γkl γk j pid V M n ht hj ?pproc ?pK ?pnoff
-      ?ptier ?pn hn) $$ [- $Hk $Hpc]
+  iapply (frd_piperead PR Γ cpu _ γl γp (fcWbool C) q γkl γk j pid V M n Rp Rpe hwb ht hj ?pproc ?pK
+      ?pnoff ?ptier ?pn hn) $$ [- $Hk $Hpc]
   rotate_right 1
   k_norm_g [frd_ret_70]
   iframe
@@ -149,6 +152,7 @@ theorem frd_arm_pipe (PR : PIPEREAD) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF 
   case pn => k_norm_g; exact h12
   -- ===== back from piperead =====
   iintro %cpu %spie1 %spp1 %R1 %P' %M' %d %⟨hcs1, hext, hdle, hret, hwin⟩ Hk Hpc Hte Hce Hpref Hpriv
+    Hgen Hpost
   k_norm_g [frd_ret_70, frd_ww, frd_psw] at hwin
   rw [h11] at hwin
   k_norm_g [frd_ret_70, frd_ww, frd_psw]
@@ -192,7 +196,7 @@ theorem frd_arm_pipe (PR : PIPEREAD) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF 
     · exact Or.inr hm
     · exact Or.inl (by rw [hd, BitVec.ofInt_natCast])
   unfold frdK
-  iapply HΦ $$ %c' %spie1 %spp1 %R' %P' %M' %d [] Hk Hpc Hte Hce Href Hpriv Hgen [] [HP]
+  iapply HΦ $$ %c' %spie1 %spp1 %R' %P' %M' %d [] Hk Hpc Hte Hce Href Hpriv Hgen [] [HP Hpost]
   · ipureintro; exact ⟨hcs, hext, hdle, hr10, hwin⟩
   · iapply frd_envout_pipe
   · unfold filereadArms
@@ -201,7 +205,10 @@ theorem frd_arm_pipe (PR : PIPEREAD) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF 
       rcases hr10 with hd | hm
       · rw [hd]; exact frd_ret_nat n d hdle
       · rw [hm]; exact filereadRet_m1 n
-    iapply filereadExtra_pipe V.gen V.upt F Rd Rin P wb γp n _ M' _ $$ HP
+    iapply filereadExtra_pipe V.gen V.upt F Rd Rin P Rp Rpe wb γp n _ M' _ $$ HP
+    rw [h10']
+    try rw [h11]
+    iexact Hpost
 
 set_option maxHeartbeats 8000000 in
 /-- **`+0xa4 .. +0xac`: THE ELSE ARM** (Rocq's `fr_panic`): the literal,

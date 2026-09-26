@@ -24,11 +24,10 @@ licence to reclaim the page (`pipeResDead`).
 
 THE BYTE QUEUE (Rocq `PipeQueue.v`, `pipe_queue_ok`, `pipe_qres`): the ring
 coupling (`pipeQueueOk` with its push/pop steps) and the queue's authority
-coupled-or-tainted (`pipeQres`) are ported here.  DEVIATION (interim):
-`pipeQres` is NOT yet the payload's last conjunct (Rocq's `pipe_res_at`
-has it): pipeclose's flag store must then step the ghost, paid by the
-closer's `pipe_cpay`, which fileclose can only supply once it takes
-Rocq's `fileclose_cpay` (the PQ-b wave's close payment).
+coupled-or-tainted (`pipeQres`), which IS THE PAYLOAD'S LAST CONJUNCT (Rocq
+`pipe_res_at`): the sites that move the queue -- pipewrite's and
+piperead's byte stores, pipeclose's flag store -- open it explicitly and
+step it (`PipeQstep`), paid by the caller's links or the taint.
 -/
 import MachCSL.KCtxMove
 import Xv6.PipeQueue
@@ -499,7 +498,10 @@ def pipeResAt (γp : PipeNames) (pi : BitVec 64) (ξ : CtxId) : IProp GF := ipro
     pipeEndstate γp true wo ∗
     ⌜pipeCountOk nr nw⌝ ∗
     ⌜bs.length = PIPESIZE⌝ ∗ pipeDataAt ξ pi bs ∗
-    pipeSlackAt ξ pi
+    pipeSlackAt ξ pi ∗
+    -- ...AND THE BYTE QUEUE'S AUTHORITY, coupled to the ring or tainted
+    -- (Rocq `pipe_qres`, the payload's last conjunct)
+    pipeQres (hlc := hlc) γp nr nw ro wo bs
 
 /-- The payload at the ambient context. -/
 def pipeRes (γp : PipeNames) (pi : BitVec 64) : IProp GF := pipeResAt γp pi curCtx
@@ -586,8 +588,10 @@ theorem pipeRes_dead (γl : GName) (γp : PipeNames) (pi : BitVec 64) (B : Nat) 
     pipeDead γl γp ∗ pipeBytes pi := by
   unfold pipeRes pipeResAt pipeDead pipeBytes
   iintro #Hs0 #Hs1 Hfrag Hres
+  -- the queue's authority is dropped on the floor: no step is possible on a
+  -- dead pipe, and every snapshot of it stays true (Rocq's note)
   icases Hres with ⟨%nr, %nw, %ro, %wo, %vname, %bs,
-    Hnm, Hnr, Hnw, Hro, Hwo, Hst0, Hst1, %Hcnt, %Hlen, Hdat, Hslack⟩
+    Hnm, Hnr, Hnw, Hro, Hwo, Hst0, Hst1, %Hcnt, %Hlen, Hdat, Hslack, -⟩
   ihave ⟨%hr0, H0⟩ := pipeEndstate_shut_elim γp false ro $$ Hs0 Hst0
   ihave ⟨%hr1, H1⟩ := pipeEndstate_shut_elim γp true wo $$ Hs1 Hst1
   subst hr0 hr1

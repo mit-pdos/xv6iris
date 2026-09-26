@@ -1,7 +1,7 @@
 /-
 **THE REGISTRY** -- a pipe row's exit payment as a PERSISTENT handle, so a
 verified program may hold a pipe without the taint.  The port of Rocq
-`iris/PipeReg.v` (pinned 1900b8a43), sections 1-3 and 5.
+`iris/PipeReg.v` (pinned 1900b8a43), sections 1-5.
 
 Rocq's header, in short (every clause kept).  kexit closes every descriptor
 a dying process holds, so exit's bundle row is `fileclose_cpays` of the
@@ -29,11 +29,10 @@ arm is a fupd-producing wand.
 
 ## Deviations from Rocq
 
-1. **Section 4 (`fileclose_cpay_of_reg`, `fileclose_cpay_of_reg_true`,
-   `fileclose_cpays_of_regs`) is NOT ported here**: its statements are over
-   `SpecFileclose.fileclose_cpay(s)`, the close payment fileclose's
-   contract takes, which is the PQ-b wave's (union brief DU5, row K4).
-   Its one queue-level lemma, `pipe_cpay_of_reg_true`, is here.
+1. (retired: section 4 is ported whole -- `fileclose_cpay_of_reg`,
+   `fileclose_cpay_of_reg_true`, `fileclose_cpays_of_regs` over
+   `SpecFileclose.filecloseCpay(s)`, fileclose's close payment since lane
+   K4.)
 2. Rocq's section context is `xv6G` only ("a second `pipeG` beside the
    bundle would make every term a different proposition"); Lean's queue
    camera IS an `Xv6G` field (`Xv6G.pipeqG`), so the one instance is
@@ -41,6 +40,7 @@ arm is a fupd-producing wand.
 3. `<[k := st]> l` is `l.set k st`; `l !! k` is `l[k]?`.
 -/
 import Xv6.FileDefs
+import Xv6.SpecFileclose
 
 namespace Xv6
 
@@ -134,7 +134,7 @@ theorem pipeRowReg_nopipe (st : FdState) (h : fdstNopipe st) :
   · iempintro
   · iempintro
 
-/-! ## 4.  WHAT IT PAYS (the queue-level part; see deviation 1) -/
+/-! ## 4.  WHAT IT PAYS -/
 
 /-- THE SAME ROW AT A PAYLOAD THE REGISTRY CAN REACH (Rocq
 `pipe_cpay_of_reg_true`): a registered row pays its own close at `True`,
@@ -149,6 +149,40 @@ theorem pipeCpay_of_reg_true (γp : PipeNames) (w : Bool) :
     iintro -
     ipureintro; trivial
   · iright; iexact Ht
+
+/-- WHAT THE REGISTRY PAYS: a registered row's close at `emp`, kexit's
+payload (Rocq `fileclose_cpay_of_reg`). -/
+theorem fileclose_cpay_of_reg (st : FdState) :
+    pipeRowReg (hlc := hlc) (GF := GF) st ⊢ filecloseCpay (hlc := hlc) st iprop(emp) := by
+  unfold pipeRowReg filecloseCpay
+  rcases st with _ | ⟨_, w, _ | _ | _⟩
+  · iintro -; iempintro
+  · unfold pipeReg
+    iintro #Hr
+    iapply Hr $$ %w
+  · iintro -; iempintro
+  · iintro -; iempintro
+
+/-- ...AND THE SAME ROW AT A PAYLOAD THE REGISTRY CAN REACH (Rocq
+`fileclose_cpay_of_reg_true`): close(21)'s bundle row is `filecloseCpay st
+(clP f)` at the family the caller deposited at, and the POINT family's `clP`
+is `True` (`UexecExecInst.xfamPt`) -- so a registered row pays its own close
+too, for a caller that reads nothing back from it. -/
+theorem fileclose_cpay_of_reg_true (st : FdState) :
+    pipeRowReg (hlc := hlc) (GF := GF) st ⊢ filecloseCpay (hlc := hlc) st iprop(True) := by
+  unfold pipeRowReg filecloseCpay
+  rcases st with _ | ⟨_, w, _ | _ | _⟩
+  · iintro -; iempintro
+  · exact pipeCpay_of_reg_true _ w
+  · iintro -; iempintro
+  · iintro -; iempintro
+
+/-- The whole table's close payments out of its rows' registrations (Rocq
+`fileclose_cpays_of_regs`): exit's bundle row, from what a run carries. -/
+theorem fileclose_cpays_of_regs (sts : List FdState) :
+    ([∗list] st ∈ sts, pipeRowReg (hlc := hlc) (GF := GF) st) ⊢ filecloseCpays (hlc := hlc) sts := by
+  unfold filecloseCpays
+  exact BigSepL.bigSepL_mono_of_forall (fun {_ st} => fileclose_cpay_of_reg st)
 
 /-! ## 5.  THE TABLE'S ROWS, as a big-op the run can carry -/
 

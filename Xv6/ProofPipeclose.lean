@@ -27,6 +27,13 @@ body, factored as whole lemmas (all checked, zero `sorry`):
                       `wp_epilogue4s2_gen` at whichever hart release/kfree
                       quantify over (pinned back to the entry hart).
 
+THE CLOSE STEP OF THE BYTE QUEUE (Rocq ProofPipeclose.v): the payload now
+carries `pipeQres` last (`pc_res_elim` / `pc_res_intro`); at the flag store
+(`sw zero,544/548(s1)`) the queue's authority is stepped by the caller's
+close payment (`PipeQstep.pipeQres_close_w` / `_r`, one fupd beside the
+endstate's shut step), and the FIRED post is folded into the caller's
+continuation (`pc_cont_fold`) before the shared tail.
+
 The disassembly the body walks (kernel image, `KernelSyms.pipeclose = KernelSyms.«pipeclose»`):
 
     455a: addi sp,-32; sd ra/s0/s1/s2; addi s0,sp,32   -- wp_prologue4s2_gen
@@ -116,6 +123,7 @@ import Xv6.SpecWakeup
 import Xv6.SpecKfree
 import Xv6.CodeTactics
 import Xv6.StepLemmas
+import Xv6.PipeQstep
 
 namespace Xv6
 
@@ -344,11 +352,12 @@ theorem pc_res_intro (γp : PipeNames) (pi : BitVec 64) (nr nw ro wo : BitVec 32
     wordAtN curCtx (aPopen pi false) 4 (DFrac.own 1) ro ∗
     wordAtN curCtx (aPopen pi true) 4 (DFrac.own 1) wo ∗
     pipeEndstate γp false ro ∗ pipeEndstate γp true wo ∗
-    pipeDataAt curCtx pi bs ∗ pipeSlack pi ⊢ pipeResAt γp pi curCtx := by
+    pipeDataAt curCtx pi bs ∗ pipeSlack pi ∗ pipeQres (hlc := hlc) γp nr nw ro wo bs ⊢
+      pipeResAt γp pi curCtx := by
   unfold pipeResAt
-  iintro ⟨H1, H2, H3, H4, H5, H6, H7, H8, H9⟩
+  iintro ⟨H1, H2, H3, H4, H5, H6, H7, H8, H9, H10⟩
   iexists nr, nw, ro, wo, vname, bs
-  iframe H1 H2 H3 H4 H5 H6 H7 H8 H9
+  iframe H1 H2 H3 H4 H5 H6 H7 H8 H9 H10
   ipureintro; exact ⟨hcnt, hlen⟩
 
 /-- The destroy licence for the last closer: both receipts in hand, the
@@ -593,8 +602,31 @@ theorem pc_res_elim (γp : PipeNames) (pi : BitVec 64) :
         wordAtN curCtx (aPopen pi false) 4 (DFrac.own 1) ro ∗
         wordAtN curCtx (aPopen pi true) 4 (DFrac.own 1) wo ∗
         pipeEndstate γp false ro ∗ pipeEndstate γp true wo ∗
-        ⌜pipeCountOk nr nw⌝ ∗ ⌜bs.length = PIPESIZE⌝ ∗ pipeDataAt curCtx pi bs ∗ pipeSlack pi := by
+        ⌜pipeCountOk nr nw⌝ ∗ ⌜bs.length = PIPESIZE⌝ ∗ pipeDataAt curCtx pi bs ∗ pipeSlack pi ∗
+        pipeQres (hlc := hlc) γp nr nw ro wo bs := by
   unfold pipeResAt; iintro H; iexact H
+
+/-- THE CLOSE STEP'S RECEIPT, folded into the caller's continuation: the
+continuation that takes the fired post, with the post in hand, is the plain
+one the shared tail threads. -/
+theorem pc_cont_fold (cpu : CPU) (k : KCtx) (γk : KmemNames) (on : Option Nat) (γ : GName)
+    (w : Bool) (Φ : IProp GF) :
+    wpNext k.sie k.proc cpu (fun cpu' => iprop(∀ spie : Bool, ∀ spp : Bool, ∀ R' : RegMap,
+      ⌜k.sie = false → spie = k.spie ∧ spp = k.spp⌝ -∗
+      kctx cpu' ((k.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k.regs 1#5)) -∗
+      ⌜calleeSaved k.regs R'⌝ -∗
+      (kallocAvail γk on ∨ kallocAvail γk (availInc on)) -∗
+      pipeCpost (hlc := hlc) γ w Φ true -∗ wpLoop cpu')) -∗
+    pipeCpost (hlc := hlc) γ w Φ true -∗
+    wpNext k.sie k.proc cpu (fun cpu' => iprop(∀ spie : Bool, ∀ spp : Bool, ∀ R' : RegMap,
+      ⌜k.sie = false → spie = k.spie ∧ spp = k.spp⌝ -∗
+      kctx cpu' ((k.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k.regs 1#5)) -∗
+      ⌜calleeSaved k.regs R'⌝ -∗
+      (kallocAvail γk on ∨ kallocAvail γk (availInc on)) -∗ wpLoop cpu')) := by
+  iintro H Hc
+  iapply wpNext_mono _ _ _ _ _ $$ H
+  iintro %cpu' HK %spie %spp %R' %hsp Hk Hpc %hcs Hav
+  iapply HK $$ %spie %spp %R' %hsp Hk Hpc %hcs Hav Hc
 
 /-! ## The shared tail from `(KernelSyms.«pipeclose» + 0x24)`: read both flags, dispatch -/
 
@@ -631,7 +663,7 @@ theorem pc_tail (Rel : RELEASE_REFUTE) (RelC : RELEASE_CANCEL) (Kf : KFREE_FREE)
   iintro ⟨Hk, Hpc, #Hopen, #Hm1, #Hm2, Hlocked, HR, Hframe, #Hkl, Hav, Harm, HPhi⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
   have hsie : (k.pushOffAt spie spp).sie = false := rfl
-  icases pc_res_elim γp pi $$ HR with ⟨%nr, %nw, %ro, %wo, %vname, %bs, Hname, Hnr, Hnw, Hro, Hwo, Hst0, Hst1, %hcnt, %hlen, Hdat, Hslack⟩
+  icases pc_res_elim γp pi $$ HR with ⟨%nr, %nw, %ro, %wo, %vname, %bs, Hname, Hnr, Hnw, Hro, Hwo, Hst0, Hst1, %hcnt, %hlen, Hdat, Hslack, Hq⟩
   ihave Hro := (show wordAtN (GF := GF) curCtx (aPopen pi false) 4 (DFrac.own 1) ro ⊢
       wordPointsTo (pi + BitVec.signExtend 64 544#12) 4 (DFrac.own 1) ro from by
     rw [wordAtN_cur, pc_addr_ro]) $$ Hro
@@ -648,7 +680,7 @@ theorem pc_tail (Rel : RELEASE_REFUTE) (RelC : RELEASE_CANCEL) (Kf : KFREE_FREE)
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [pc_bne_sext_open ro hro]
     iintro Hk Hpc
     ihave HR := pc_res_intro γp pi nr nw ro wo vname bs hcnt hlen
-      $$ [Hname Hnr Hnw Hro Hwo Hst0 Hst1 Hdat Hslack]
+      $$ [Hname Hnr Hnw Hro Hwo Hst0 Hst1 Hdat Hslack Hq]
     case' _ => iframe
     iapply (pc_nonfree Rel cpu c k γl γp pi γk on hwf hK hpipe spie spp hsp hpin (R2.set 15#5 (BitVec.signExtend 64 ro))
         (by simp only [RegMap.set_apply, BitVec.reduceEq, ite_false]; exact hR9)
@@ -683,7 +715,7 @@ theorem pc_tail (Rel : RELEASE_REFUTE) (RelC : RELEASE_CANCEL) (Kf : KFREE_FREE)
         from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [pc_beq_sext_open wo hwo]
       iintro Hk Hpc
       ihave HR := pc_res_intro γp pi nr nw ro wo vname bs hcnt hlen
-        $$ [Hname Hnr Hnw Hro Hwo Hst0 Hst1 Hdat Hslack]
+        $$ [Hname Hnr Hnw Hro Hwo Hst0 Hst1 Hdat Hslack Hq]
       case' _ => iframe
       iapply (pc_nonfree Rel cpu c k γl γp pi γk on hwf hK hpipe spie spp hsp hpin ((R2.set 15#5 (BitVec.signExtend 64 ro)).set 15#5 (BitVec.signExtend 64 wo))
           (by simp only [RegMap.set_apply, BitVec.reduceEq, ite_false]; exact hR9)
@@ -706,7 +738,7 @@ theorem pc_tail (Rel : RELEASE_REFUTE) (RelC : RELEASE_CANCEL) (Kf : KFREE_FREE)
       icases pipeEndstate_closed γp false ro hro $$ Hst0 with ⟨Hst0, #Hs0⟩
       icases pipeEndstate_closed γp true wo hwo $$ Hst1 with ⟨Hst1, #Hs1⟩
       ihave HR := pc_res_intro γp pi nr nw ro wo vname bs hcnt hlen
-        $$ [Hname Hnr Hnw Hro Hwo Hst0 Hst1 Hdat Hslack]
+        $$ [Hname Hnr Hnw Hro Hwo Hst0 Hst1 Hdat Hslack Hq]
       case' _ => iframe
       iapply (pc_free RelC Kf cpu c k γl γp pi γkl γk on hwf hnoff hK hpipe hkmem hok hpv spie spp hsp hpin ((R2.set 15#5 (BitVec.signExtend 64 ro)).set 15#5 (BitVec.signExtend 64 wo))
           (by simp only [RegMap.set_apply, BitVec.reduceEq, ite_false]; exact hR9)
@@ -734,10 +766,10 @@ theorem pipeclose_br_ffffffffffffc5fa : KA.«pipeclose» + 0xffffffffffffc5fa#64
 set_option maxHeartbeats 8000000 in
 theorem pipeclose_proof (Acq : ACQUIRE_GEN) (Wk : WAKEUP) (Rel : RELEASE_REFUTE)
     (RelC : RELEASE_CANCEL) (Kf : KFREE_FREE) : PIPECLOSE := ⟨
-  fun {hlc GF} _ _ _ _ _ _ _ _ Γ cpu k γl γp w γkl γk on hw hnoff hK hpipe hproc hkmem htier => by
+  fun {hlc GF} _ _ _ _ _ _ _ _ Γ cpu k γl γp w γkl γk on Φ hw hnoff hK hpipe hproc hkmem htier => by
   unfold wp_pipeclose_body
   simp only [pipecloseAddr]
-  iintro ⟨Hk, Hpc, #Hpipe, Href, #Hkl, Hav, #Hpinv, HPhi⟩
+  iintro ⟨Hk, Hpc, #Hpipe, Href, Hcpay, #Hkl, Hav, #Hpinv, HPhi⟩
   icases kctx_wf _ _ $$ Hk with ⟨%hwf, Hk⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
   ihave %hok := isPipe_valid γl γp _ $$ Hpipe
@@ -782,7 +814,7 @@ theorem pipeclose_proof (Acq : ACQUIRE_GEN) (Wk : WAKEUP) (Rel : RELEASE_REFUTE)
   have hpin5 : k.sie = false ∨ k.proc = 0#64 → c = cpu := fun h =>
     (hp5 h).trans ((hp4 h).trans ((hp3 h).trans ((hp2 h).trans (hp1 h))))
   have hsie : (k.pushOffAt spie spp).sie = false := rfl
-  icases pc_res_elim γp (k.regs 10#5) $$ HR with ⟨%nr, %nw, %ro, %wo, %vname, %bs, Hname, Hnr, Hnw, Hro, Hwo, Hst0, Hst1, %hcnt, %hlen, Hdat, Hslack⟩
+  icases pc_res_elim γp (k.regs 10#5) $$ HR with ⟨%nr, %nw, %ro, %wo, %vname, %bs, Hname, Hnr, Hnw, Hro, Hwo, Hst0, Hst1, %hcnt, %hlen, Hdat, Hslack, Hq⟩
   cases w with
   | true =>
     -- writable: beqz s2 not taken; sw zero,548(s1) closes writeopen
@@ -799,12 +831,15 @@ theorem pipeclose_proof (Acq : ACQUIRE_GEN) (Wk : WAKEUP) (Rel : RELEASE_REFUTE)
     ihave Hwo := (show wordPointsTo (GF := GF) (k.regs 10#5 + 548#64) 4 (DFrac.own 1) 0#32 ⊢
         wordAtN curCtx (aPopen (k.regs 10#5) true) 4 (DFrac.own 1) 0#32 from by
       rw [wordAtN_cur, pc_addr_wo, pc_sext548]) $$ Hwo
-    iapply wpLoop_bupd
+    iapply wpLoop_fupd
     ihave Hup := pipeEndstate_shut γp true wo $$ Hst1 Href
     imod Hup with ⟨Hst1, Hsh⟩
+    -- THE CLOSE STEP: the flag store steps the queue, paid by the close link
+    imod pipeQres_close_w γp Φ nr nw ro wo 0#32 bs pflagBool_zero $$ Hcpay Hq with ⟨Hq, Hcp⟩
+    ihave HPhi := pc_cont_fold cpu k γk on γp.pnQueue true Φ $$ HPhi Hcp
     imodintro
     ihave HR := pc_res_intro γp (k.regs 10#5) nr nw ro 0#32 vname bs hcnt hlen
-      $$ [Hname Hnr Hnw Hro Hwo Hst0 Hst1 Hdat Hslack]
+      $$ [Hname Hnr Hnw Hro Hwo Hst0 Hst1 Hdat Hslack Hq]
     case' _ => iframe
     -- addi a0,s1,536 ; jal wakeup(&pi->nread)
     k_step (wp_s_addi c _ (KA.«pipeclose» + 0x1c#64) false 536#12 10#5 9#5 (by decide))
@@ -857,12 +892,15 @@ theorem pipeclose_proof (Acq : ACQUIRE_GEN) (Wk : WAKEUP) (Rel : RELEASE_REFUTE)
     ihave Hro := (show wordPointsTo (GF := GF) (k.regs 10#5 + 544#64) 4 (DFrac.own 1) 0#32 ⊢
         wordAtN curCtx (aPopen (k.regs 10#5) false) 4 (DFrac.own 1) 0#32 from by
       rw [wordAtN_cur, pc_addr_ro, pc_sext544]) $$ Hro
-    iapply wpLoop_bupd
+    iapply wpLoop_fupd
     ihave Hup := pipeEndstate_shut γp false ro $$ Hst0 Href
     imod Hup with ⟨Hst0, Hsh⟩
+    -- THE CLOSE STEP: the flag store steps the queue, paid by the close link
+    imod pipeQres_close_r γp Φ nr nw ro 0#32 wo bs pflagBool_zero $$ Hcpay Hq with ⟨Hq, Hcp⟩
+    ihave HPhi := pc_cont_fold cpu k γk on γp.pnQueue false Φ $$ HPhi Hcp
     imodintro
     ihave HR := pc_res_intro γp (k.regs 10#5) nr nw 0#32 wo vname bs hcnt hlen
-      $$ [Hname Hnr Hnw Hro Hwo Hst0 Hst1 Hdat Hslack]
+      $$ [Hname Hnr Hnw Hro Hwo Hst0 Hst1 Hdat Hslack Hq]
     case' _ => iframe
     -- addi a0,s1,540 ; jal wakeup(&pi->nwrite) ; j 0x457e
     k_step (wp_s_addi c _ (KA.«pipeclose» + 0x46#64) false 540#12 10#5 9#5 (by decide))

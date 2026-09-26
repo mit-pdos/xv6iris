@@ -243,7 +243,8 @@ theorem srd_fileread (FR : FILEREAD) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF 
     (j : Nat) (pid : BitVec 32) (V : ProcPriv) (M : Nat → List (BitVec 8))
     (γkl : GName) (γk : KmemNames) (n : Int)
     (F : Pfam GF (Aview → Nat → Anode → Nat → IProp GF)) (Rd : Nat → Nat → IProp GF)
-    (Rin : List (List Obs × BitVec 8) → IProp GF) (P : IProp GF)
+    (Rin : List (List Obs × BitVec 8) → IProp GF)
+    (Rp : List (BitVec 8) → IProp GF) (Rpe : List (BitVec 8) → PipeSt → IProp GF) (P : IProp GF)
     (hK : filereadSlots ≤ k'.avail) (hfk : fk < NFILE)
     (hj : j < NPROC) (hproc : k'.proc = procAddr j)
     (hnoff : k'.noff = 0) (htier : k'.tier = KTier.kpt)
@@ -254,10 +255,10 @@ theorem srd_fileread (FR : FILEREAD) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF 
     fileRef γ fk q st ∗ procPrivCoreNoctxAt curCtx (procAddr j) pid V M ∗
     isLock γkl kmemLockAddr "kmem" (kmemRes γk) ∗ kallocAvail γk none ∗
     filereadEnv (hlc := hlc) st ∗ foffRow st ∗
-    filereadIn (hlc := hlc) st F Rd Rin P ∗ P ∗
-    (∀ c' : CPU, filereadPost (hlc := hlc) k' γ fk q st j pid V M n F Rd Rin P c')
+    filereadIn (hlc := hlc) st n F Rd Rin Rp Rpe P ∗ P ∗
+    (∀ c' : CPU, filereadPost (hlc := hlc) k' γ fk q st j pid V M n F Rd Rin Rp Rpe P c')
     ⊢ wpLoop (GF := GF) c := by
-  have h := FR.wp_fileread_eb (hlc := hlc) (GF := GF) Γ c k' γ fk q st j pid V M γkl γk n F Rd Rin P
+  have h := FR.wp_fileread_eb (hlc := hlc) (GF := GF) Γ c k' γ fk q st j pid V M γkl γk n F Rd Rin Rp Rpe P
     hK hfk hj hproc hnoff htier ha0 ha2 hn
   unfold wp_fileread_eb_body at h
   simp only [filereadAddr] at h

@@ -146,18 +146,20 @@ theorem udepwLaw_of_sup (PSx : UprogSG GF) (n : Int) (hn : n = 15 ∨ n = 17) :
 
 /-- **Rocq `udepw_of_sup_read`** (deviation 1: the licence explicit). -/
 theorem udepw_of_sup_read (PSx : UprogSG GF) (N : UkNames GF) (m : RegMap) (pc : BitVec 64) :
-    □ (appSup (GF := GF) ∗ consLicence (hlc := hlc) (GF := GF)) ⊢
+    □ (appSup (GF := GF) ∗ MachFixedGS.killCred (hlc := hlc) (GF := GF) ∗
+        consLicence (hlc := hlc) (GF := GF)) ⊢
       udepw (hlc := hlc) (SG := uexecSGXv6) (PS := PSx) N m pc 5 := by
   refine udepw_of_row PSx N m pc 5 _ (fun W => ?_)
   unfold xv6Sbundle xv6SbundleRest USYS_exec xrowRead
   simp only [Int.reduceEq, if_false, if_true]
   dsimp only [xfamAt, xfamPt]
-  iintro #⟨Hsup, Hlic⟩
-  iapply (fsabsFilereadIn (hlc := hlc) _ iprop(True)) $$ Hsup Hlic
+  iintro #⟨Hsup, Hkc, Hlic⟩
+  iapply (fsabsFilereadIn (hlc := hlc) _ _ iprop(True)) $$ Hsup Hlic Hkc
 
 /-- **Rocq `udepw_law_of_sup_read`**. -/
 theorem udepwLaw_of_sup_read (PSx : UprogSG GF) :
-    □ (appSup (GF := GF) ∗ consLicence (hlc := hlc) (GF := GF)) ⊢
+    □ (appSup (GF := GF) ∗ MachFixedGS.killCred (hlc := hlc) (GF := GF) ∗
+        consLicence (hlc := hlc) (GF := GF)) ⊢
       udepwLaw (hlc := hlc) (SG := uexecSGXv6) (PS := PSx) 5 := by
   unfold udepwLaw
   iintro #H
@@ -168,18 +170,20 @@ theorem udepwLaw_of_sup_read (PSx : UprogSG GF) :
 /-- **Rocq `udepw_of_sup_write`** (deviation 1: the licence explicit;
 Rocq's `filewrite_in_of_sup` is `FsAbsInvFire.fsabsFilewriteIn`). -/
 theorem udepw_of_sup_write (PSx : UprogSG GF) (N : UkNames GF) (m : RegMap) (pc : BitVec 64) :
-    □ (appSup (GF := GF) ∗ consLicence (hlc := hlc) (GF := GF)) ⊢
+    □ (appSup (GF := GF) ∗ MachFixedGS.killCred (hlc := hlc) (GF := GF) ∗
+        consLicence (hlc := hlc) (GF := GF)) ⊢
       udepw (hlc := hlc) (SG := uexecSGXv6) (PS := PSx) N m pc 16 := by
   refine udepw_of_row PSx N m pc 16 _ (fun W => ?_)
   unfold xv6Sbundle xv6SbundleRest USYS_exec xrowWrite
   simp only [Int.reduceEq, if_false, if_true]
   dsimp only [xfamAt, xfamPt]
-  iintro #⟨Hsup, Hlic⟩ %Mv %_
-  iapply (fsabsFilewriteIn (hlc := hlc)) $$ Hsup Hlic
+  iintro #⟨Hsup, Hkc, Hlic⟩ %Mv %_
+  iapply (fsabsFilewriteIn (hlc := hlc)) $$ Hsup Hlic Hkc
 
 /-- **Rocq `udepw_law_of_sup_write`**. -/
 theorem udepwLaw_of_sup_write (PSx : UprogSG GF) :
-    □ (appSup (GF := GF) ∗ consLicence (hlc := hlc) (GF := GF)) ⊢
+    □ (appSup (GF := GF) ∗ MachFixedGS.killCred (hlc := hlc) (GF := GF) ∗
+        consLicence (hlc := hlc) (GF := GF)) ⊢
       udepwLaw (hlc := hlc) (SG := uexecSGXv6) (PS := PSx) 16 := by
   unfold udepwLaw
   iintro #H

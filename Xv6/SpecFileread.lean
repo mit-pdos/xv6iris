@@ -45,9 +45,17 @@ joins the shared epilogue (+0x5e) with the answer in `s2`.
   it what the arm the state selects proved (`filereadExtra`): on a readable
   inode the observation's receipt (`FsAbsReadFire.readArms`, which names the
   BYTES the call left in the caller's buffer), on the console the
-  `consoleReceipt` (the bytes' TAGS and the window), `emp` on a pipe or
-  another major, the `-1` claim on an unreadable or closed descriptor.  The
-  CALLER'S PAYLOAD `P` is lent for the call and returned on every arm.
+  `consoleReceipt` (the bytes' TAGS and the window), on a readable pipe
+  piperead's queue post at the image (`PipeQueue.pipeRpostImg`: the chain at
+  the dequeued bytes, the caller's buffer holding them, the stop's reason
+  with the kill arm's credential -- or the taint with the payment back),
+  `emp` on another major, the `-1` claim on an unreadable or closed
+  descriptor.  The CALLER'S PAYLOAD `P` is lent for the call and returned on
+  every arm.
+* THE PIPE ARM'S INPUT (Rocq design/pipe.md, "The byte queue"): the
+  caller's read links over the pipe's byte queue, at its cursor `Rp` and
+  observation `Rpe`, one per byte of the request (`pipeRpay … n.toNat`) --
+  or the taint.
 * THE OFFSET: `f->off` is borrowed from the fd's off box under `ip->lock`
   (`FileOffProto.protoReadCheckout` / `protoReadPark`); the advance is the
   fire's (`FsAbsReadFire.arfRead_fire`), paid out of the descriptor's
@@ -433,8 +441,9 @@ from the caller's payload `P`.  On an open, readable INODE the observation
 commit (its refund beside it) and `P` back; on the readable CONSOLE the
 accessor `consAcc` (whose answer carries `P` back beside `Rd`) and the
 input link `consReadPay (genId + 1) Rin`; `P` back everywhere else. -/
-def filereadIn (st : FdState) (F : Pfam GF (Aview → Nat → Anode → Nat → IProp GF))
-    (Rd : Nat → Nat → IProp GF) (Rin : List (List Obs × BitVec 8) → IProp GF) (P : IProp GF) :
+def filereadIn (st : FdState) (n : Int) (F : Pfam GF (Aview → Nat → Anode → Nat → IProp GF))
+    (Rd : Nat → Nat → IProp GF) (Rin : List (List Obs × BitVec 8) → IProp GF)
+    (Rp : List (BitVec 8) → IProp GF) (Rpe : List (BitVec 8) → PipeSt → IProp GF) (P : IProp GF) :
     IProp GF :=
   iprop(P -∗
     match st with
@@ -447,12 +456,17 @@ def filereadIn (st : FdState) (F : Pfam GF (Aview → Nat → Anode → Nat → 
         iprop(consAcc fscCons (appRdcred (hlc := hlc) (GF := GF)) (fun cur dc => iprop(P ∗ Rd cur dc)) ∗
           consReadPay (genId (hlc := hlc) (GF := GF) + 1) Rin)
       else P
+    -- THE PIPE ARM (Rocq design/pipe.md, "The byte queue"): the caller's links
+    -- over the pipe's byte queue, one per byte it may take, at its cursor `Rp`
+    -- and observation `Rpe` -- or the taint (what the generic supply pays)
+    | .open true _ (.pipe γp) => iprop(P ∗ pipeRpay (hlc := hlc) γp.pnQueue Rp Rpe n.toNat)
     | _ => P)
 
 /-- WHAT THE ARM PAYS BEYOND THE LANDED BLANKET, WITHOUT THE PAYLOAD (Rocq
 `fileread_extra_core`, deviation 4). -/
 def filereadExtraCore (gn : GName) (pt : UPtd) (st : FdState) (n : Int) (F : Pfam GF (Aview → Nat → Anode → Nat → IProp GF))
-    (Rd : Nat → Nat → IProp GF) (Rin : List (List Obs × BitVec 8) → IProp GF) (r : BitVec 64)
+    (Rd : Nat → Nat → IProp GF) (Rin : List (List Obs × BitVec 8) → IProp GF)
+    (Rp : List (BitVec 8) → IProp GF) (Rpe : List (BitVec 8) → PipeSt → IProp GF) (r : BitVec 64)
     (M' : Nat → List (BitVec 8)) (addr : BitVec 64) : IProp GF :=
   match st with
   | .open true _ (.inode i γo _) =>
@@ -461,29 +475,38 @@ def filereadExtraCore (gn : GName) (pt : UPtd) (st : FdState) (n : Int) (F : Pfa
     readArms (hlc := hlc) (fsGammaL fscFs) i γo pt n F r M' addr
   | .open true _ (.device mj) =>
     if mj = CONSOLE then consoleReceipt (hlc := hlc) gn pt Rd Rin n r M' addr else iprop(emp)
-  | .open true _ (.pipe _) => iprop(emp)
+  -- THE PIPE ARM: the chain at the dequeued bytes, the caller's buffer holding
+  -- them, and the stop's reason -- or the taint with the payment back (Rocq
+  -- `pipe_rpost_img`); the kill arm carries the killer's credential beside the
+  -- shot (Rocq lane KILL-TAINT)
+  | .open true _ (.pipe γp) =>
+    pipeRpostImg (hlc := hlc) pt γp.pnQueue Rp Rpe
+      iprop(killShot gn ∗ □ MachFixedGS.killCred (hlc := hlc) (GF := GF)) n.toNat r M' addr
   | .closed => iprop(⌜r = -1#64⌝)
   | .open false _ _ => iprop(⌜r = -1#64⌝)
 
 /-- ... and WITH the payload back, on every arm (Rocq `fileread_extra`). -/
 def filereadExtra (gn : GName) (pt : UPtd) (st : FdState) (n : Int) (F : Pfam GF (Aview → Nat → Anode → Nat → IProp GF))
-    (Rd : Nat → Nat → IProp GF) (Rin : List (List Obs × BitVec 8) → IProp GF) (P : IProp GF)
+    (Rd : Nat → Nat → IProp GF) (Rin : List (List Obs × BitVec 8) → IProp GF)
+    (Rp : List (BitVec 8) → IProp GF) (Rpe : List (BitVec 8) → PipeSt → IProp GF) (P : IProp GF)
     (r : BitVec 64) (M' : Nat → List (BitVec 8)) (addr : BitVec 64) : IProp GF :=
-  iprop(P ∗ filereadExtraCore (hlc := hlc) gn pt st n F Rd Rin r M' addr)
+  iprop(P ∗ filereadExtraCore (hlc := hlc) gn pt st n F Rd Rin Rp Rpe r M' addr)
 
 /-- THE WHOLE POST'S ARMED PART (Rocq `fileread_arms`). -/
 def filereadArms (gn : GName) (pt : UPtd) (st : FdState) (n : Int) (F : Pfam GF (Aview → Nat → Anode → Nat → IProp GF))
-    (Rd : Nat → Nat → IProp GF) (Rin : List (List Obs × BitVec 8) → IProp GF) (P : IProp GF)
+    (Rd : Nat → Nat → IProp GF) (Rin : List (List Obs × BitVec 8) → IProp GF)
+    (Rp : List (BitVec 8) → IProp GF) (Rpe : List (BitVec 8) → PipeSt → IProp GF) (P : IProp GF)
     (r : BitVec 64) (M' : Nat → List (BitVec 8)) (addr : BitVec 64) : IProp GF :=
-  iprop(⌜filereadRet n r⌝ ∗ filereadExtra (hlc := hlc) gn pt st n F Rd Rin P r M' addr)
+  iprop(⌜filereadRet n r⌝ ∗ filereadExtra (hlc := hlc) gn pt st n F Rd Rin Rp Rpe P r M' addr)
 
 variable (gn : GName) (pt : UPtd) (F : Pfam GF (Aview → Nat → Anode → Nat → IProp GF))
   (Rd : Nat → Nat → IProp GF) (Rin : List (List Obs × BitVec 8) → IProp GF) (P : IProp GF)
+  (Rp : List (BitVec 8) → IProp GF) (Rpe : List (BitVec 8) → PipeSt → IProp GF)
 
 /-- Rocq `fileread_arms_ret`. -/
 theorem filereadArms_ret (st : FdState) (n : Int) (r : BitVec 64) (M' : Nat → List (BitVec 8))
     (addr : BitVec 64) :
-    filereadArms (hlc := hlc) gn pt st n F Rd Rin P r M' addr ⊢ ⌜filereadRet n r⌝ := by
+    filereadArms (hlc := hlc) gn pt st n F Rd Rin Rp Rpe P r M' addr ⊢ ⌜filereadRet n r⌝ := by
   unfold filereadArms
   iintro ⟨%h, -⟩
   ipureintro; exact h
@@ -491,25 +514,25 @@ theorem filereadArms_ret (st : FdState) (n : Int) (r : BitVec 64) (M' : Nat → 
 /-- Rocq `fileread_extra_pay`. -/
 theorem filereadExtra_pay (st : FdState) (n : Int) (r : BitVec 64) (M' : Nat → List (BitVec 8))
     (addr : BitVec 64) :
-    filereadExtra (hlc := hlc) gn pt st n F Rd Rin P r M' addr ⊢
-      P ∗ filereadExtraCore (hlc := hlc) gn pt st n F Rd Rin r M' addr := .rfl
+    filereadExtra (hlc := hlc) gn pt st n F Rd Rin Rp Rpe P r M' addr ⊢
+      P ∗ filereadExtraCore (hlc := hlc) gn pt st n F Rd Rin Rp Rpe r M' addr := .rfl
 
 /-- **The console arm's `-1` reason, read off the payout without spending
 it** (Rocq `fileread_extra_core_m1_why`): the sign guard, or the kill shot. -/
 theorem filereadExtraCore_m1_why (rb : Bool) (n : Int) (r : BitVec 64) (M' : Nat → List (BitVec 8))
     (addr : BitVec 64) (hnb : n < 2 ^ 31) (hr : r = -1#64) :
-    filereadExtraCore (hlc := hlc) gn pt (.open true rb (.device CONSOLE)) n F Rd Rin r M' addr ⊢
+    filereadExtraCore (hlc := hlc) gn pt (.open true rb (.device CONSOLE)) n F Rd Rin Rp Rpe r M' addr ⊢
       □ (⌜n < 0⌝ ∨ killShot gn) ∗
-        filereadExtraCore (hlc := hlc) gn pt (.open true rb (.device CONSOLE)) n F Rd Rin r M' addr := by
+        filereadExtraCore (hlc := hlc) gn pt (.open true rb (.device CONSOLE)) n F Rd Rin Rp Rpe r M' addr := by
   unfold filereadExtraCore
   dsimp only
   rw [if_pos rfl]
   exact consoleReceipt_m1_why gn pt Rd Rin n r M' addr hnb hr
 
 /-- Rocq `fileread_in_inode_of`. -/
-theorem filereadIn_inode_of (st : FdState) (om : OffMode) (wb : Bool) (i : Nat) (γo : GName)
+theorem filereadIn_inode_of (st : FdState) (n : Int) (om : OffMode) (wb : Bool) (i : Nat) (γo : GName)
     (h : st = .open true wb (.inode i γo om)) :
-    filereadIn (hlc := hlc) st F Rd Rin P ⊢ P -∗
+    filereadIn (hlc := hlc) st n F Rd Rin Rp Rpe P ⊢ P -∗
       P ∗ areadInOm (hlc := hlc) om (fsGammaL fscFs) appE i γo F := by
   subst h
   unfold filereadIn
@@ -521,24 +544,38 @@ theorem filereadExtra_inode_of (st : FdState) (om : OffMode) (wb : Bool) (i : Na
     (n : Int) (r : BitVec 64) (M' : Nat → List (BitVec 8)) (addr : BitVec 64)
     (h : st = .open true wb (.inode i γo om)) :
     P ⊢ readArms (hlc := hlc) (fsGammaL fscFs) i γo pt n F r M' addr -∗
-      filereadExtra (hlc := hlc) gn pt st n F Rd Rin P r M' addr := by
+      filereadExtra (hlc := hlc) gn pt st n F Rd Rin Rp Rpe P r M' addr := by
   subst h
   unfold filereadExtra filereadExtraCore
   iintro HP H
   iframe HP H
 
-/-- Rocq `fileread_extra_pipe`. -/
+/-- Rocq `fileread_in_of_pipe`: the pipe arm's input, at the key the walk
+holds -- what the reader hands piperead. -/
+theorem filereadIn_pipe (st : FdState) (n : Int) (wb : Bool) (γp : PipeNames)
+    (h : st = .open true wb (.pipe γp)) :
+    filereadIn (hlc := hlc) st n F Rd Rin Rp Rpe P ⊢ P -∗
+      P ∗ pipeRpay (hlc := hlc) γp.pnQueue Rp Rpe n.toNat := by
+  subst h
+  unfold filereadIn
+  iintro H HP
+  iapply H $$ HP
+
+/-- Rocq `fileread_extra_pipe` (`fileread_extra_of_pipe`): piperead's post at
+the image pays the pipe arm. -/
 theorem filereadExtra_pipe (wb : Bool) (γp : PipeNames) (n : Int) (r : BitVec 64) (M' : Nat → List (BitVec 8))
     (addr : BitVec 64) :
-    P ⊢ filereadExtra (hlc := hlc) gn pt (.open true wb (.pipe γp)) n F Rd Rin P r M' addr := by
+    P ⊢ pipeRpostImg (hlc := hlc) pt γp.pnQueue Rp Rpe
+        iprop(killShot gn ∗ □ MachFixedGS.killCred (hlc := hlc) (GF := GF)) n.toNat r M' addr -∗
+      filereadExtra (hlc := hlc) gn pt (.open true wb (.pipe γp)) n F Rd Rin Rp Rpe P r M' addr := by
   unfold filereadExtra filereadExtraCore
-  iintro HP
-  iframe HP
+  iintro HP H
+  iframe HP H
 
 /-- Rocq `fileread_extra_dev_other`. -/
 theorem filereadExtra_dev_other (wb : Bool) (mj : Nat) (n : Int) (r : BitVec 64)
     (M' : Nat → List (BitVec 8)) (addr : BitVec 64) (hmj : mj ≠ CONSOLE) :
-    P ⊢ filereadExtra (hlc := hlc) gn pt (.open true wb (.device mj)) n F Rd Rin P r M' addr := by
+    P ⊢ filereadExtra (hlc := hlc) gn pt (.open true wb (.device mj)) n F Rd Rin Rp Rpe P r M' addr := by
   unfold filereadExtra filereadExtraCore
   dsimp only
   rw [if_neg hmj]
@@ -549,7 +586,7 @@ theorem filereadExtra_dev_other (wb : Bool) (mj : Nat) (n : Int) (r : BitVec 64)
 theorem filereadExtra_dev_console (wb : Bool) (n : Int) (r : BitVec 64)
     (M' : Nat → List (BitVec 8)) (addr : BitVec 64) :
     P ⊢ consoleReceipt (hlc := hlc) gn pt Rd Rin n r M' addr -∗
-      filereadExtra (hlc := hlc) gn pt (.open true wb (.device CONSOLE)) n F Rd Rin P r M' addr := by
+      filereadExtra (hlc := hlc) gn pt (.open true wb (.device CONSOLE)) n F Rd Rin Rp Rpe P r M' addr := by
   unfold filereadExtra filereadExtraCore
   dsimp only
   rw [if_pos rfl]
@@ -561,8 +598,8 @@ theorem filereadExtra_dev_console (wb : Bool) (n : Int) (r : BitVec 64)
 consumed but `P`. -/
 theorem filereadExtra_dev_m1 (rb wb : Bool) (mj : Nat) (n : Int) (M' : Nat → List (BitVec 8))
     (addr : BitVec 64) (hne : mj ≠ CONSOLE) :
-    filereadIn (hlc := hlc) (.open rb wb (.device mj)) F Rd Rin P ⊢ P -∗
-      filereadExtra (hlc := hlc) gn pt (.open rb wb (.device mj)) n F Rd Rin P (-1#64) M' addr := by
+    filereadIn (hlc := hlc) (.open rb wb (.device mj)) n F Rd Rin Rp Rpe P ⊢ P -∗
+      filereadExtra (hlc := hlc) gn pt (.open rb wb (.device mj)) n F Rd Rin Rp Rpe P (-1#64) M' addr := by
   cases rb
   · simp only [filereadIn, filereadExtra, filereadExtraCore]
     iintro H HP
@@ -576,16 +613,16 @@ theorem filereadExtra_dev_m1 (rb wb : Bool) (mj : Nat) (n : Int) (M' : Nat → L
 
 /-- Rocq `fileread_extra_closed`. -/
 theorem filereadExtra_closed (n : Int) (M' : Nat → List (BitVec 8)) (addr : BitVec 64) :
-    P ⊢ filereadExtra (hlc := hlc) gn pt .closed n F Rd Rin P (-1#64) M' addr := by
+    P ⊢ filereadExtra (hlc := hlc) gn pt .closed n F Rd Rin Rp Rpe P (-1#64) M' addr := by
   simp only [filereadExtra, filereadExtraCore]
   iintro HP
   iframe HP
   try (ipureintro; first | rfl | trivial)
 
 /-- Rocq `fileread_in_dev_console`. -/
-theorem filereadIn_dev_console (st : FdState) (wb : Bool) (mj : Nat)
+theorem filereadIn_dev_console (st : FdState) (n : Int) (wb : Bool) (mj : Nat)
     (h : st = .open true wb (.device mj)) (hmj : mj = CONSOLE) :
-    filereadIn (hlc := hlc) st F Rd Rin P ⊢ P -∗
+    filereadIn (hlc := hlc) st n F Rd Rin Rp Rpe P ⊢ P -∗
       consAcc fscCons (appRdcred (hlc := hlc) (GF := GF)) (fun cur dc => iprop(P ∗ Rd cur dc)) ∗
         consReadPay (genId (hlc := hlc) (GF := GF) + 1) Rin := by
   subst h hmj
@@ -598,9 +635,9 @@ the arm there is the -1 claim itself. -/
 theorem filereadExtra_unreadable (inum : BitVec 32) (γo : GName) (om : OffMode) (γp : PipeNames) (C : FContent) (st : FdState)
     (n : Int) (M' : Nat → List (BitVec 8)) (addr : BitVec 64)
     (hok : fdstateOk inum γo om γp C st) (hz : C.readable = 0#8) :
-    P ⊢ filereadExtra (hlc := hlc) gn pt st n F Rd Rin P (-1#64) M' addr := by
+    P ⊢ filereadExtra (hlc := hlc) gn pt st n F Rd Rin Rp Rpe P (-1#64) M' addr := by
   rcases st with _ | ⟨rb, wb, t⟩
-  · exact filereadExtra_closed gn pt F Rd Rin P n M' addr
+  · exact filereadExtra_closed gn pt F Rd Rin P Rp Rpe n M' addr
   · cases rb
     · simp only [filereadExtra, filereadExtraCore]
       iintro HP
@@ -610,9 +647,9 @@ theorem filereadExtra_unreadable (inum : BitVec 32) (γo : GName) (om : OffMode)
       rw [hz] at hr; exact absurd hr (by decide)
 
 /-- ... and its input, handed straight back. -/
-theorem filereadIn_unreadable (inum : BitVec 32) (γo : GName) (om : OffMode) (γp : PipeNames) (C : FContent) (st : FdState)
-    (hok : fdstateOk inum γo om γp C st) (hz : C.readable = 0#8) :
-    filereadIn (hlc := hlc) st F Rd Rin P ⊢ P -∗ P := by
+theorem filereadIn_unreadable (inum : BitVec 32) (γo : GName) (om : OffMode) (γp : PipeNames) (C : FContent)
+    (st : FdState) (n : Int) (hok : fdstateOk inum γo om γp C st) (hz : C.readable = 0#8) :
+    filereadIn (hlc := hlc) st n F Rd Rin Rp Rpe P ⊢ P -∗ P := by
   rcases st with _ | ⟨rb, wb, t⟩
   · simp only [filereadIn]
     iintro H HP; iapply H $$ HP
@@ -627,8 +664,8 @@ the inode arm hands the piece back UNSPENT, the console arm pays `Rd` out of
 `consAcc_ret`, the rest pay nothing or the -1 claim. -/
 theorem filereadExtra_neg (st : FdState) (n : Int) (M' : Nat → List (BitVec 8)) (addr : BitVec 64)
     (hn : n < 0) :
-    filereadIn (hlc := hlc) st F Rd Rin P ⊢ P ==∗
-      filereadExtra (hlc := hlc) gn pt st n F Rd Rin P (-1#64) M' addr := by
+    filereadIn (hlc := hlc) st n F Rd Rin Rp Rpe P ⊢ P ==∗
+      filereadExtra (hlc := hlc) gn pt st n F Rd Rin Rp Rpe P (-1#64) M' addr := by
   rcases st with _ | ⟨rb, wb, _ | ⟨i, γo, om⟩ | mj⟩
   · simp only [filereadIn, filereadExtra, filereadExtraCore]
     iintro H HP; ihave H := H $$ HP; imodintro; iframe H
@@ -637,8 +674,14 @@ theorem filereadExtra_neg (st : FdState) (n : Int) (M' : Nat → List (BitVec 8)
     · simp only [filereadIn, filereadExtra, filereadExtraCore]
       iintro H HP; ihave H := H $$ HP; imodintro; iframe H
       try (ipureintro; first | rfl | trivial)
-    · simp only [filereadIn, filereadExtra, filereadExtraCore]
-      iintro H HP; ihave H := H $$ HP; imodintro; iframe H
+    · -- a negative request never reaches the pipe (Rocq `pipe_rpost_img_neg`)
+      simp only [filereadIn, filereadExtra, filereadExtraCore]
+      iintro H HP
+      icases H $$ HP with ⟨HP, Hpay⟩
+      imodintro
+      iframe HP
+      rw [show n.toNat = 0 by omega]
+      iapply pipeRpostImg_neg $$ Hpay
   · cases rb
     · simp only [filereadIn, filereadExtra, filereadExtraCore]
       iintro H HP; ihave H := H $$ HP; imodintro; iframe H
@@ -696,7 +739,9 @@ image and the destination. -/
 def filereadPost (k : KCtx) (γ : FileNames) (fk : Nat) (q : Qp) (st : FdState) (j : Nat)
     (pid : BitVec 32) (V : ProcPriv) (M : Nat → List (BitVec 8)) (n : Int)
     (F : Pfam GF (Aview → Nat → Anode → Nat → IProp GF)) (Rd : Nat → Nat → IProp GF)
-    (Rin : List (List Obs × BitVec 8) → IProp GF) (P : IProp GF) (cpu' : CPU) : IProp GF :=
+    (Rin : List (List Obs × BitVec 8) → IProp GF)
+    (Rp : List (BitVec 8) → IProp GF) (Rpe : List (BitVec 8) → PipeSt → IProp GF) (P : IProp GF)
+    (cpu' : CPU) : IProp GF :=
   iprop(∀ (spie spp : Bool) (R' : RegMap) (P' : UPtd) (M' : Nat → List (BitVec 8)) (d : Nat),
     ⌜calleeSaved k.regs R' ∧ V.upt.extSz V.sz P' ∧ (d : Int) ≤ max 0 n ∧
       (R' 10#5 = BitVec.ofNat 64 d ∨ R' 10#5 = -1#64) ∧
@@ -706,7 +751,7 @@ def filereadPost (k : KCtx) (γ : FileNames) (fk : Nat) (q : Qp) (st : FdState) 
     fileRef γ fk q st -∗
     procPrivCoreNoctxAt curCtx (procAddr j) pid { V with upt := P' } M' -∗
     filereadEnvOut (hlc := hlc) st -∗
-    filereadArms (hlc := hlc) V.gen V.upt st n F Rd Rin P (R' 10#5) M' (k.regs 11#5) -∗
+    filereadArms (hlc := hlc) V.gen V.upt st n F Rd Rin Rp Rpe P (R' 10#5) M' (k.regs 11#5) -∗
     wpLoop cpu')
 
 end Post
@@ -725,7 +770,8 @@ def wp_fileread_eb_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [X
     (j : Nat) (pid : BitVec 32) (V : ProcPriv) (M : Nat → List (BitVec 8))
     (γkl : GName) (γk : KmemNames) (n : Int)
     (F : Pfam GF (Aview → Nat → Anode → Nat → IProp GF)) (Rd : Nat → Nat → IProp GF)
-    (Rin : List (List Obs × BitVec 8) → IProp GF) (P : IProp GF)
+    (Rin : List (List Obs × BitVec 8) → IProp GF)
+    (Rp : List (BitVec 8) → IProp GF) (Rpe : List (BitVec 8) → PipeSt → IProp GF) (P : IProp GF)
     (hK : filereadSlots ≤ k.avail) (hfk : fk < NFILE)
     (hj : j < NPROC) (hproc : k.proc = procAddr j)
     (hnoff : k.noff = 0) (htier : k.tier = KTier.kpt)
@@ -746,9 +792,9 @@ def wp_fileread_eb_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [X
   -- THE DESCRIPTOR'S OFFSET ROW (persistent): what advances `f->off`
   foffRow st ∗
   -- THE CALLER'S INPUT, KEYED ON `st`, and the payload it is a wand from
-  filereadIn (hlc := hlc) st F Rd Rin P ∗ P ∗
+  filereadIn (hlc := hlc) st n F Rd Rin Rp Rpe P ∗ P ∗
   -- THE CROSSING IS THE LITERAL `true`: every arm can park
-  wpNext true k.proc cpu (filereadPost (hlc := hlc) k γ fk q st j pid V M n F Rd Rin P)
+  wpNext true k.proc cpu (filereadPost (hlc := hlc) k γ fk q st j pid V M n F Rd Rin Rp Rpe P)
   ⊢ wpLoop (GF := GF) cpu
 
 /-- The interface of `fileread` (Rocq's `Module Type FILEREAD`): ONE
@@ -763,9 +809,10 @@ structure FILEREAD : Prop where
     (j : Nat) (pid : BitVec 32) (V : ProcPriv) (M : Nat → List (BitVec 8))
     (γkl : GName) (γk : KmemNames) (n : Int)
     (F : Pfam GF (Aview → Nat → Anode → Nat → IProp GF)) (Rd : Nat → Nat → IProp GF)
-    (Rin : List (List Obs × BitVec 8) → IProp GF) (P : IProp GF)
+    (Rin : List (List Obs × BitVec 8) → IProp GF)
+    (Rp : List (BitVec 8) → IProp GF) (Rpe : List (BitVec 8) → PipeSt → IProp GF) (P : IProp GF)
     hK hfk hj hproc hnoff htier ha0 ha2 hn,
-    wp_fileread_eb_body (hlc := hlc) (GF := GF) Γ cpu k γ fk q st j pid V M γkl γk n F Rd Rin P
+    wp_fileread_eb_body (hlc := hlc) (GF := GF) Γ cpu k γ fk q st j pid V M γkl γk n F Rd Rin Rp Rpe P
       hK hfk hj hproc hnoff htier ha0 ha2 hn
 
 end Xv6

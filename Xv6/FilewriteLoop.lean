@@ -123,30 +123,30 @@ variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [Fdslot
   [Appcfg GF] [FileG GF] [Fscfg] [Icfg] [CurCtx]
 
 /-- The loop head's resources (beside the context, pc and complement). -/
-def fwrHead (Γ : SchedNames) (k : KCtx) (A : FwrA) (Q : Nat → IProp GF) (t p : Nat) (P : UPtd)
+def fwrHead (Γ : SchedNames) (k : KCtx) (A : FwrA) (Q : Nat → IProp GF) (Qe : Nat → PipeSt → IProp GF) (t p : Nat) (P : UPtd)
     (v11 : BitVec 64) : IProp GF := iprop%
   frame12 (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) (k.regs 9#5) (k.regs 18#5) (k.regs 19#5)
     (k.regs 20#5) (k.regs 21#5) (k.regs 22#5) (k.regs 23#5) (k.regs 24#5) (k.regs 25#5) v11 ∗
   fwrEnv (hlc := hlc) Γ A ∗ fileRef A.γ A.fk A.q A.st ∗
   procPrivExt (procAddr A.j) A.pid A.V P A.img ∗ bslots 3 ∗
   fwrSt (hlc := hlc) A.om (fsGammaL fscFs) A.i A.γo A.V.upt A.n A.img (k.regs 11#5) Q t p 0 ∗
-  fwrK (hlc := hlc) k A.γul A.γuu A.γ A.fk A.q A.st A.j A.pid A.V A.M A.n Q
+  fwrK (hlc := hlc) k A.γul A.γuu A.γ A.fk A.q A.st A.j A.pid A.V A.M A.n Q Qe
 
 /-- **THE LOOP INVARIANT** at the bottom test `+0xd4`, over the fuel. -/
-def FwrLoopGoal (Γ : SchedNames) (k : KCtx) (A : FwrA) (Q : Nat → IProp GF) (W : Nat) : Prop :=
+def FwrLoopGoal (Γ : SchedNames) (k : KCtx) (A : FwrA) (Q : Nat → IProp GF) (Qe : Nat → PipeSt → IProp GF) (W : Nat) : Prop :=
   ∀ (cpu : CPU) (spie spp : Bool) (R : RegMap) (t p : Nat) (P : UPtd) (v9 v19 v11 : BitVec 64),
     A.n.toNat - t ≤ W → (t : Int) < A.n → (t : Int) = FW_MAX * p → A.V.upt.extSz A.V.sz P →
     fwrRegs k A.fk A.n v9 v19 (BitVec.ofNat 64 t) 3072#64 1#64 3072#64 R →
     kctx cpu (((k.withSpie spie spp).pushed 12).withRegs R) ∗
     pcIs cpu (KA.«filewrite» + 0xd4#64) ∗
     trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗
-    fwrHead (hlc := hlc) Γ k A Q t p P v11 ⊢ wpLoop (GF := GF) cpu
+    fwrHead (hlc := hlc) Γ k A Q Qe t p P v11 ⊢ wpLoop (GF := GF) cpu
 
 set_option maxHeartbeats 16000000 in
 /-- **`+0xc8 .. +0xd0`: the short-write break, `i += r`, the exhaustion
 test** (Rocq's `+0xc0 .. +0xc8`). -/
-theorem fwr_tests (Γ : SchedNames) (k : KCtx) (A : FwrA) (hA : FwrFacts k A) (Q : Nat → IProp GF)
-    (W : Nat) (IH : FwrLoopGoal (hlc := hlc) Γ k A Q W)
+theorem fwr_tests (Γ : SchedNames) (k : KCtx) (A : FwrA) (hA : FwrFacts k A) (Q : Nat → IProp GF) (Qe : Nat → PipeSt → IProp GF)
+    (W : Nat) (IH : FwrLoopGoal (hlc := hlc) Γ k A Q Qe W)
     (cpu : CPU) (spie spp : Bool) (R : RegMap) (t p c tot : Nat) (P : UPtd)
     (a0 v19 v11 : BitVec 64)
     (hfuel : A.n.toNat - t ≤ W + 1) (htn : (t : Int) < A.n) (htie : (t : Int) = FW_MAX * p)
@@ -164,7 +164,7 @@ theorem fwr_tests (Γ : SchedNames) (k : KCtx) (A : FwrA) (hA : FwrFacts k A) (Q
         (p + 1) 0) ∨
      (⌜tot < c⌝ ∗ ∃ x : Nat, ⌜x ≤ 1⌝ ∗
         fwrSt (hlc := hlc) A.om (fsGammaL fscFs) A.i A.γo A.V.upt A.n A.img (k.regs 11#5) Q t p x)) ∗
-    fwrK (hlc := hlc) k A.γul A.γuu A.γ A.fk A.q A.st A.j A.pid A.V A.M A.n Q
+    fwrK (hlc := hlc) k A.γul A.γuu A.γ A.fk A.q A.st A.j A.pid A.V A.M A.n Q Qe
     ⊢ wpLoop (GF := GF) cpu := by
   have hn := hA.hn
   have hcle := fwrChunk_le A.n.toNat t
@@ -206,7 +206,7 @@ theorem fwr_tests (Γ : SchedNames) (k : KCtx) (A : FwrA) (hA : FwrFacts k A) (Q
         from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [r21, hb2]
       iintro Hk Hpc
       have heq : ((t + c : Nat) : Int) = A.n := by omega
-      iapply (fwr_exit_ok cpu k A hA Q spie spp _ (t + c) (p + 1) P a0 (BitVec.ofNat 64 c) v11 heq hext
+      iapply (fwr_exit_ok cpu k A hA Q Qe spie spp _ (t + c) (p + 1) P a0 (BitVec.ofNat 64 c) v11 heq hext
           hr1) $$ [$Hk $Hpc $Hframe $Hte $Hce $Href $Hpriv $Hbs $Hst $HΦ]
     · -- +0xd0  bge s4,s5 : falls, the back edge to +0xd4
       have hb2 : bcond bop.BGE (BitVec.ofNat 64 c + BitVec.ofNat 64 t) (BitVec.ofInt 64 A.n) = false := by
@@ -231,7 +231,7 @@ theorem fwr_tests (Γ : SchedNames) (k : KCtx) (A : FwrA) (hA : FwrFacts k A) (Q
     k_step_e (wp_s_branch cpu _ (KA.«filewrite» + 0xc8#64) false 26#13 19#5 9#5 (by decide) bop.BNE)
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [r19, r9, hb]
     iintro Hk Hpc
-    iapply (fwr_exit_fail cpu k A hA Q spie spp R t p x P a0 (BitVec.ofNat 64 c) v11 htn hext hr)
+    iapply (fwr_exit_fail cpu k A hA Q Qe spie spp R t p x P a0 (BitVec.ofNat 64 c) v11 htn hext hr)
     iframe
 
 set_option maxHeartbeats 16000000 in
@@ -307,7 +307,7 @@ open segment (begin_op, ilock), the lock-held ghost steps before writei
 (iunlock, end_op), the reference re-assembled, and the tests. -/
 theorem fwr_iter (BO : BEGIN_OP) (IL : ILOCK) (WI : WRITEI) (IU : IUNLOCK) (EO : END_OP)
     (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ] (k : KCtx) (A : FwrA) (hA : FwrFacts k A)
-    (Q : Nat → IProp GF) (W : Nat) (IH : FwrLoopGoal (hlc := hlc) Γ k A Q W)
+    (Q : Nat → IProp GF) (Qe : Nat → PipeSt → IProp GF) (W : Nat) (IH : FwrLoopGoal (hlc := hlc) Γ k A Q Qe W)
     (cpu : CPU) (spie spp : Bool) (R : RegMap) (t p : Nat) (P : UPtd) (v9 v11 : BitVec 64)
     (hfuel : A.n.toNat - t ≤ W + 1) (htn : (t : Int) < A.n) (htie : (t : Int) = FW_MAX * p)
     (hext : A.V.upt.extSz A.V.sz P)
@@ -316,7 +316,7 @@ theorem fwr_iter (BO : BEGIN_OP) (IL : ILOCK) (WI : WRITEI) (IU : IUNLOCK) (EO :
     kctx cpu (((k.withSpie spie spp).pushed 12).withRegs R) ∗
     pcIs cpu (KA.«filewrite» + 0x8a#64) ∗
     trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗
-    fwrHead (hlc := hlc) Γ k A Q t p P v11 ⊢ wpLoop (GF := GF) cpu := by
+    fwrHead (hlc := hlc) Γ k A Q Qe t p P v11 ⊢ wpLoop (GF := GF) cpu := by
   have hn := hA.hn
   have hcle := fwrChunk_le A.n.toNat t
   have hcrem := fwrChunk_le_rem A.n.toNat t
@@ -442,7 +442,7 @@ theorem fwr_iter (BO : BEGIN_OP) (IL : ILOCK) (WI : WRITEI) (IU : IUNLOCK) (EO :
     rcases harms with ⟨h, h2, -⟩ | ⟨h, -⟩
     · exact Or.inl ⟨h, h2⟩
     · exact Or.inr h
-  iapply (fwr_tests Γ k A hA Q W IH cpu spie3 spp3 R3 t p (fwrChunk A.n.toNat t) tot P' a0
+  iapply (fwr_tests Γ k A hA Q Qe W IH cpu spie3 spp3 R3 t p (fwrChunk A.n.toNat t) tot P' a0
       (BitVec.ofNat 64 (fwrChunk A.n.toNat t)) v11 hfuel htn htie (UMemL.extSz_trans hext hPP) rfl
       hr3 ha0 htotc)
   iframe Hk Hpc Hte Hce Hframe Href Hpriv Hbs Hst HΦ
@@ -453,7 +453,7 @@ theorem fwr_iter (BO : BEGIN_OP) (IL : ILOCK) (WI : WRITEI) (IU : IUNLOCK) (EO :
 the test, then one chunk, whose back edge is the induction hypothesis. -/
 theorem fwr_loop (BO : BEGIN_OP) (IL : ILOCK) (WI : WRITEI) (IU : IUNLOCK) (EO : END_OP)
     (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ] (k : KCtx) (A : FwrA) (hA : FwrFacts k A)
-    (Q : Nat → IProp GF) : ∀ W, FwrLoopGoal (hlc := hlc) Γ k A Q W := by
+    (Q : Nat → IProp GF) (Qe : Nat → PipeSt → IProp GF) : ∀ W, FwrLoopGoal (hlc := hlc) Γ k A Q Qe W := by
   intro W
   induction W with
   | zero =>
@@ -463,11 +463,11 @@ theorem fwr_loop (BO : BEGIN_OP) (IL : ILOCK) (WI : WRITEI) (IU : IUNLOCK) (EO :
   | succ W IH =>
     intro cpu spie spp R t p P v9 v19 v11 hfuel htn htie hext hr
     iintro ⟨Hk, Hpc, Hte, Hce, HF⟩
-    iapply (fwr_test cpu k A.fk A.n spie spp R t v9 v19 (fwrHead (hlc := hlc) Γ k A Q t p P v11) htn
+    iapply (fwr_test cpu k A.fk A.n spie spp R t v9 v19 (fwrHead (hlc := hlc) Γ k A Q Qe t p P v11) htn
       hA.hn.2 hr)
     iframe
     iintro %c' %R' %hr' Hk Hpc Hte Hce HF
-    iapply (fwr_iter BO IL WI IU EO Γ k A hA Q W IH c' spie spp R' t p P v9 v11 hfuel htn htie hext hr')
+    iapply (fwr_iter BO IL WI IU EO Γ k A hA Q Qe W IH c' spie spp R' t p P v9 v11 hfuel htn htie hext hr')
     iframe
 
 end

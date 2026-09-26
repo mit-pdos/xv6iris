@@ -19,6 +19,14 @@ exactly that about the page count (`kallocAvail on ∨ kallocAvail (availInc on)
 and NOTHING about the pipe.  The reference is gone either way; `isPipe` is
 persistent and stays, but with no reference it is worth nothing.
 
+THE CLOSE STEP OF THE BYTE QUEUE (Rocq `SpecPipeclose`, design/pipe.md "The
+byte queue"): clearing `pi->{read,write}open` is a ghost step of the exact
+state, so the caller pays a close link (`PipeQueue.pipeCpay`) -- or the
+taint, which disconnects the ghost for good.  pipeclose ALWAYS clears its
+flag, so this call is the last close of the end and the post is the FIRED
+one (`pipeCpost … true`): the closer's payload `Φ`, or the taint with the
+payment back.
+
 `pipeclose` is BALANCED and generic in the interrupt index (as `wakeup` and
 `kfree` are): it takes and releases `pi->lock` inside, so with interrupts on
 at entry they are on at exit with `SPIE`/`SPP` pinned by whatever trap ran,
@@ -53,20 +61,24 @@ nothing the caller holds is `"pipe"`, and `wakeup`'s `"proc"` is free too. -/
 def wp_pipeclose_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [CurCtx]
     (Γ : SchedNames) (cpu : CPU) (k : KCtx)
     (γl : GName) (γp : PipeNames) (w : Bool)
-    (γkl : GName) (γk : KmemNames) (on : Option Nat)
+    (γkl : GName) (γk : KmemNames) (on : Option Nat) (Φ : IProp GF)
     (hw : w = decide (k.regs 11#5 ≠ 0#64))
     (hnoff : k.noff + 2 < 2 ^ 31) (hK : pipecloseSlots ≤ k.avail)
     (hpipe : "pipe" ∉ k.locks) (hproc : "proc" ∉ k.locks) (hkmem : "kmem" ∉ k.locks)
     (htier : k.tier = KTier.kpt) : Prop :=
   kctx cpu k ∗ pcIs cpu pipecloseAddr ∗
   isPipe γl γp (k.regs 10#5) ∗ pipeRef γp w 1 ∗
+  -- THE CLOSE STEP OF THE BYTE QUEUE: a close link, or the taint
+  pipeCpay (hlc := hlc) γp.pnQueue w Φ ∗
   isLock γkl kmemLockAddr "kmem" (kmemRes γk) ∗ kallocAvail γk on ∗
   procsInv Γ ∗
   wpNext k.sie k.proc cpu (fun cpu' => iprop(∀ spie : Bool, ∀ spp : Bool, ∀ R' : RegMap,
     ⌜k.sie = false → spie = k.spie ∧ spp = k.spp⌝ -∗
     kctx cpu' ((k.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k.regs 1#5)) -∗
     ⌜calleeSaved k.regs R'⌝ -∗
-    (kallocAvail γk on ∨ kallocAvail γk (availInc on)) -∗ wpLoop cpu'))
+    (kallocAvail γk on ∨ kallocAvail γk (availInc on)) -∗
+    -- the link fired, or the pipe is tainted and the payment comes back
+    pipeCpost (hlc := hlc) γp.pnQueue w Φ true -∗ wpLoop cpu'))
   ⊢ wpLoop (GF := GF) cpu
 
 /-- The interface of `pipeclose`. -/
@@ -74,9 +86,9 @@ structure PIPECLOSE : Prop where
   wp_pipeclose : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [CurCtx]
     (Γ : SchedNames) (cpu : CPU) (k : KCtx)
     (γl : GName) (γp : PipeNames) (w : Bool)
-    (γkl : GName) (γk : KmemNames) (on : Option Nat)
+    (γkl : GName) (γk : KmemNames) (on : Option Nat) (Φ : IProp GF)
     hw hnoff hK hpipe hproc hkmem htier,
-    wp_pipeclose_body (hlc := hlc) (GF := GF) Γ cpu k γl γp w γkl γk on
+    wp_pipeclose_body (hlc := hlc) (GF := GF) Γ cpu k γl γp w γkl γk on Φ
       hw hnoff hK hpipe hproc hkmem htier
 
 end Xv6

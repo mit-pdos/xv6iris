@@ -35,13 +35,16 @@ children and the pid.  Rocq's header, point for point:
    own x0 (UexecRet deviation 2), and the slot round trip needs it
    (`uslot_run`); the leaves never write x0 (`SpecUkLeaves.ukWr`), so every
    leaf re-establishes it for free (`ukWr_x0`).
-2. **The pipe rows are deferred to K4 (PQ-b)**, as the union brief's DU5
-   orders: `udep`'s close(21)/exit(2) laws (they name `PipeQueue`'s close
-   link, `UexecSG.srow_reg` and `app_taint`, none landed in Lean), `urun_rows`
-   / `urun_nopipe` and their movers, `udep_close_dep`, `udep_exit_*`,
-   `udepw_row*`, `udepw_cl*`.  Lean's `UexecSG.freeNum` still admits 2 and
-   21 (no close payments yet), so the key-free law covers them today.  The
-   union lane adds them back in K4's wake.
+2. **The run's pipe rows are not here yet**: `urun_rows` / `urun_nopipe`
+   and their movers, `udep_close_dep`, `udep_exit_*`, `udepw_row*`,
+   `udepw_cl*` (they read the run's per-row registration,
+   `UexecSG.srow_reg`, not in Lean's class).  The close payments themselves
+   landed with K4 (PQ-b): bundle rows 21 and 2 are `filecloseCpay` /
+   `filecloseCpays`, `UexecSG.freeNum` excludes both, and the programs'
+   supplies at those numbers are the instance's
+   (`UexecExecMintW.udepw_of_sup_close` / `_exit`, the taint's arm) plus
+   `PipeReg.fileclose_cpay(s)_of_reg(s)` for a registered table; the union
+   lane (U1-R) adds the run's rows on top.
 3. **The whole-table view (seccomp S3 ruling G2, K3)**: the primitive entry
    is `uslot_of_urun_all_at`, handing out the ledger at the key's table as
    its view (`ustdAt N.fd (W.fd.take NSTD) W.fd`); `uslot_of_urun_all` and

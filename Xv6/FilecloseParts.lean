@@ -269,26 +269,52 @@ theorem fclose_core_take [Icfg] [CurCtx] (E : CoPset) (kk : Nat) (pn : FPNames) 
 /-- `pipeclose`'s contract at fileclose's call site. -/
 theorem fc_pipeclose [CurCtx] (PC : PIPECLOSE) (Γ : SchedNames) (c : CPU) (k' : KCtx)
     (γl : GName) (γp : PipeNames) (w : Bool) (γkl : GName) (γk : KmemNames) (on : Option Nat)
-    (hw : w = decide (k'.regs 11#5 ≠ 0#64))
+    (Φ : IProp GF) (hw : w = decide (k'.regs 11#5 ≠ 0#64))
     (hnoff : k'.noff + 2 < 2 ^ 31) (hK : pipecloseSlots ≤ k'.avail)
     (hpipe : "pipe" ∉ k'.locks) (hproc : "proc" ∉ k'.locks) (hkmem : "kmem" ∉ k'.locks)
     (htier : k'.tier = KTier.kpt) :
     kctx c k' ∗ pcIs c KA.«pipeclose» ∗
     isPipe γl γp (k'.regs 10#5) ∗ pipeRef γp w 1 ∗
+    pipeCpay (hlc := hlc) γp.pnQueue w Φ ∗
     isLock γkl kmemLockAddr "kmem" (kmemRes γk) ∗ kallocAvail γk on ∗
     procsInv Γ ∗
     wpNext k'.sie k'.proc c (fun cpu' => iprop(∀ spie : Bool, ∀ spp : Bool, ∀ R' : RegMap,
       ⌜k'.sie = false → spie = k'.spie ∧ spp = k'.spp⌝ -∗
       kctx cpu' ((k'.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k'.regs 1#5)) -∗
       ⌜calleeSaved k'.regs R'⌝ -∗
-      (kallocAvail γk on ∨ kallocAvail γk (availInc on)) -∗ wpLoop cpu'))
+      (kallocAvail γk on ∨ kallocAvail γk (availInc on)) -∗
+      pipeCpost (hlc := hlc) γp.pnQueue w Φ true -∗ wpLoop cpu'))
     ⊢ wpLoop (GF := GF) c := by
-  have h := PC.wp_pipeclose (hlc := hlc) (GF := GF) Γ c k' γl γp w γkl γk on hw hnoff hK hpipe hproc hkmem htier
+  have h := PC.wp_pipeclose (hlc := hlc) (GF := GF) Γ c k' γl γp w γkl γk on Φ hw hnoff hK hpipe hproc hkmem htier
   unfold wp_pipeclose_body at h
   simp only [pipecloseAddr] at h
   exact h
 
 /-! ## The exit: the epilogue at `(KernelSyms.«fileclose» + 0x8e)` -/
+
+/-- THE CLOSE PAYMENT'S RECEIPT, folded into the caller's continuation (Rocq
+threads `fileclose_cpost` to the post directly): the continuation that takes
+the post, with the post in hand, is the plain one every exit threads. -/
+theorem fc_cont_fold [Fscfg] [Icfg] [CurCtx] (cpu : CPU) (k : KCtx) (γk : KmemNames)
+    (on : Option Nat) (st : FdState) (pidv : BitVec 32) (dqp : DFrac) (q : Qp) (Φc : IProp GF) :
+    wpNext true k.proc cpu (fun cpu' => iprop(∀ (spie spp : Bool) (R' : RegMap),
+      ⌜calleeSaved k.regs R'⌝ -∗
+      kctx cpu' ((k.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k.regs 1#5)) -∗
+      trapCsrsExt cpu' k.sie -∗ cpuClaimExt cpu' k.sie k.proc -∗
+      wordPointsTo (pPid k.proc) 4 dqp pidv -∗
+      fdSlot -∗ irefSlot -∗ filecloseEnvOut (GF := GF) γk on st -∗
+      filecloseCpost (hlc := hlc) q st Φc -∗ wpLoop cpu')) -∗
+    filecloseCpost (hlc := hlc) q st Φc -∗
+    wpNext true k.proc cpu (fun cpu' => iprop(∀ (spie spp : Bool) (R' : RegMap),
+      ⌜calleeSaved k.regs R'⌝ -∗
+      kctx cpu' ((k.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k.regs 1#5)) -∗
+      trapCsrsExt cpu' k.sie -∗ cpuClaimExt cpu' k.sie k.proc -∗
+      wordPointsTo (pPid k.proc) 4 dqp pidv -∗
+      fdSlot -∗ irefSlot -∗ filecloseEnvOut (GF := GF) γk on st -∗ wpLoop cpu')) := by
+  iintro H Hc
+  iapply wpNext_mono _ _ _ _ _ $$ H
+  iintro %cpu' HK %spie %spp %R' %hcs Hk Hpc Hte Hce Hpid Hfd Hir Hout
+  iapply HK $$ %spie %spp %R' %hcs Hk Hpc Hte Hce Hpid Hfd Hir Hout Hc
 
 set_option maxHeartbeats 4000000 in
 /-- **Any arm's exit** (Rocq `fc_epi`): at the epilogue with the fd unit,

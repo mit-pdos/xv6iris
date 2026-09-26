@@ -20,6 +20,15 @@ and the departing fraction goes back into the lock's leftover
 into the whole slot (`fileRest_join`), which the last arm reads, frees and
 spends.
 
+THE BYTE QUEUE'S CLOSE PAYMENT (Rocq ProofFileclose.v, design/pipe.md "The
+byte queue"): the not-last arm hands it back unfired -- the closer's share is
+strictly below the outstanding total, which is at most one
+(`FileFrac.fileRest_q_ne_one`, Rocq's `Hqne`), so `filecloseCpost_of_cpay`
+applies; the last arm hands a pipe end's link to pipeclose and its FIRED post
+comes back (`filecloseCpost_of_fired`), and every other arm pays and gets
+nothing (`filecloseCpost_nopipe`).  The post is folded into the caller's
+continuation (`FilecloseParts.fc_cont_fold`) so the exits are unchanged.
+
 Stage files (FilecloseParts, FilecloseInode, FilecloseLast) carry the parts;
 this file is the entry, the not-last arm and the seal.
 
@@ -58,10 +67,10 @@ set_option maxHeartbeats 16000000 in
 theorem fileclose_proof (AC : ACQUIRE) (RE : RELEASE) (PC : PIPECLOSE) (BO : BEGIN_OP)
     (IP : IPUT) (EO : END_OP) : FILECLOSE := ⟨
   fun {hlc GF} _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ Γ _ cpu k γl γ kk q st j γkl γk on pidv dqp
-      hK hnoff htier ha0 => by
+      Φc hK hnoff htier ha0 => by
   unfold wp_fileclose_eb_body
   simp only [filecloseAddr]
-  iintro ⟨Hk, Hpc, Hte, Hce, #Hft, #Hpe, Href, Hpid, Hir, Henv, Hnext⟩
+  iintro ⟨Hk, Hpc, Hte, Hce, #Hft, #Hpe, Href, Hpid, Hir, Henv, Hcpay, Hnext⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
   icases kctx_wf _ _ $$ Hk with ⟨%hwf, Hk⟩
   obtain ⟨hKi, hKb, hKp, hK18⟩ := filecloseSlots_callees
@@ -176,7 +185,7 @@ theorem fileclose_proof (AC : ACQUIRE) (RE : RELEASE) (PC : PIPECLOSE) (BO : BEG
     rw [hlast] at hok'
     icases fileRest_join γ kk s t id q q' C C' pn st hlast $$ [Hrest Hf Hp] with ⟨%pn2, %hok2, Hf, Ht, Hc⟩
     · iframe
-    iapply (fc_last RE PC BO IP EO Γ cpu c k γl γ j γkl γk on pidv dqp kk st C pn2 _ nx Ls hwf hK
+    iapply (fc_last RE PC BO IP EO Γ cpu c k γl γ j γkl γk on pidv dqp kk st q Φc C pn2 _ nx Ls hwf hK
         hnoff hlocks htier hok2 spie spp hpin _
         (by simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true]; exact h9)
         (by simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true]; exact b2)
@@ -185,7 +194,7 @@ theorem fileclose_proof (AC : ACQUIRE) (RE : RELEASE) (PC : PIPECLOSE) (BO : BEG
             simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true] <;> assumption)
         hfresh' hok')
       $$ [$Hk $Hpc $Hlk $Hlocked $Ha $Hcl $Hrefc $Hhalves $Hfdn $Hf $Ht $Hc $Hfd $Hframe $Harm
-        $Hte $Hce $Hpe $Hpid $Hir $Henv $Hnext]
+        $Hte $Hce $Hpe $Hpid $Hir $Henv $Hcpay $Hnext]
   · -- not the last: taken to 0x41e0 ; release ; the epilogue
     have hn2 : 2 ≤ n := by
       have : (s ++ t).length ≠ 0 := by intro h; exact hlast (List.eq_nil_of_length_eq_zero h)
@@ -194,6 +203,13 @@ theorem fileclose_proof (AC : ACQUIRE) (RE : RELEASE) (PC : PIPECLOSE) (BO : BEG
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
       with [fc_bgtz n hn1 hlt', fc_bgtz' n hn1 hlt', decide_eq_true hn2]
     iintro Hk Hpc
+    -- THE BYTE QUEUE'S PAYMENT COMES BACK UNTOUCHED: this close fires nothing,
+    -- and it cannot have been the whole reference -- the closer's share is
+    -- strictly below the outstanding total, which is at most one (Rocq's
+    -- `Hqne`) -- which is exactly `filecloseCpost_of_cpay`'s `q ≠ 1`
+    icases fileRest_q_ne_one γ kk s t id q q' C' pn hlast $$ Hrest with ⟨%hq1, Hrest⟩
+    ihave Hcp := filecloseCpost_of_cpay q st Φc hq1 $$ Hcpay
+    ihave Hnext := fc_cont_fold cpu k γk on st pidv dqp q Φc $$ Hnext Hcp
     icases fileRest_absorb γ kk s t id q q' C C' pn st hlast $$ [Hrest Hf Hp] with ⟨%C'', %pn'', %q'', Hrest⟩
     · iframe
     ihave Hrefc := (show wordPointsTo (GF := GF) (fnode kk + 4#64) 4 (DFrac.own 1) (BitVec.ofNat 32 (n - 1)) ⊢

@@ -158,7 +158,9 @@ untouched); the `n < 0` test (+0x1c); the three-way dispatch; FD_PIPE
    `filewriteIn/Extra/Arms`, `fw_chunk_joint` → `fwrChunkJoint`,
    `fw_off_advance` → `fwrOffAdvance` (the `fw_` prefix is taken:
    FsWords / freewalk).
-11. **THE FD_PIPE ARM** of `filewriteExtra` is `⌜pipeWpostR P ua n.toNat r⌝`
+11. (retired: the FD_PIPE arms are Rocq's -- `filewriteIn`'s is `pipe_wpay`,
+    `filewriteExtra`'s is `pipe_wpost` at the key's generation.)  Formerly:
+    the FD_PIPE arm of `filewriteExtra` was `⌜pipeWpostR P ua n.toNat r⌝`
    (Rocq `pipe_wpost P …`, lane TRAP-ROWS T1): pipewrite's answer and its
    short reason at the writer's table, WITHOUT Rocq's byte-queue resources
    (the chain at the stop cursor, the read-shut observation, the kill shot,
@@ -473,7 +475,7 @@ end Arms
 
 section Keyed
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FsTopG GF] [OffboxG GF]
-  [Appcfg GF] [FsBytesG GF] [Fscfg]
+  [CtokG GF] [Appcfg GF] [FsBytesG GF] [Fscfg]
 /- THE THREE KEY VALUES THE WRITE GUARD IS STATED AT (Rocq RULING WR-TB,
 0478e04bc): the permission map, the break and the lazy bit -- the
 USER-VISIBLE values the table's facts are about (`Uvis.perm`/`sz`/`lazy`). -/
@@ -580,7 +582,7 @@ chunk; on an open, writable DEVICE (at EVERY major: the walk calls whatever
 the cell holds) consolewrite's output CHAIN, one node per byte; both with
 nothing elsewhere. -/
 def filewriteIn (st : FdState) (n : Int) (M : Nat → List (BitVec 8)) (ua : BitVec 64)
-    (Q : Nat → IProp GF) : IProp GF :=
+    (Q : Nat → IProp GF) (Qe : Nat → PipeSt → IProp GF) : IProp GF :=
   match st with
   -- KEYED ON THE ROW'S OFFSET MODE (Rocq lane OFF-LINK-4): a PARKED row pays
   -- what it always paid, a HELD one `link ∨ taint` (`filewriteInHeld`)
@@ -589,6 +591,10 @@ def filewriteIn (st : FdState) (n : Int) (M : Nat → List (BitVec 8)) (ua : Bit
   | .open _ true (.inode i γo .held) => filewriteInHeld (hlc := hlc) pmv szv lzv i γo n M ua Q
   | .open _ true (.device _) =>
     consOutChain (genId (hlc := hlc) (GF := GF) + 1) M ua Q 0 n.toNat
+  -- THE PIPE ARM (Rocq design/pipe.md, "The byte queue"): the caller's write
+  -- links, one per byte pinned to its image, with the read-shut observation
+  -- `Qe` -- or the taint (what the generic supply pays)
+  | .open _ true (.pipe γp) => pipeWpay (hlc := hlc) γp.pnQueue M ua Q Qe n.toNat
   | _ => emp
 
 /-- WHAT THE ARM PAYS BEYOND THE LANDED BLANKET (Rocq `filewrite_extra`;
@@ -597,32 +603,37 @@ by the short reason of each arm: the inode chain's partial arms, the
 console's short count, pipewrite's answer -- deviation 11).  A device at a
 major other than the console arms nothing: the caller cannot know the
 callee was consolewrite. -/
-def filewriteExtra (P : UPtd) (st : FdState) (n : Int) (M : Nat → List (BitVec 8)) (ua : BitVec 64)
-    (Q : Nat → IProp GF) (r : BitVec 64) : IProp GF :=
+def filewriteExtra (gn : GName) (P : UPtd) (st : FdState) (n : Int) (M : Nat → List (BitVec 8))
+    (ua : BitVec 64) (Q : Nat → IProp GF) (Qe : Nat → PipeSt → IProp GF) (r : BitVec 64) : IProp GF :=
   match st with
   | .open _ true (.inode i γo _) => writeArmsAt (hlc := hlc) (fsGammaL fscFs) i γo P n M ua Q r
   | .open _ true (.device mj) => if mj = CONSOLE then writeConsArms P ua Q n r else emp
-  | .open _ true (.pipe _) => iprop(⌜pipeWpostR P ua n.toNat r⌝)
+  -- THE PIPE ARM: pipewrite's queue post -- the chain at the stop cursor with
+  -- the answer's reason (the kill arm with the killer's credential, Rocq lane
+  -- KILL-TAINT), or the taint with the payment back
+  | .open _ true (.pipe γp) =>
+    pipeWpost (hlc := hlc) P γp.pnQueue M ua Q Qe
+      iprop(killShot gn ∗ □ MachFixedGS.killCred (hlc := hlc) (GF := GF)) n.toNat r
   | _ => emp
 
 /-- THE WHOLE POST'S ARMED PART (Rocq `filewrite_arms`): the landed blanket
 beside the arm's extra. -/
-def filewriteArms (P : UPtd) (st : FdState) (n : Int) (M : Nat → List (BitVec 8)) (ua : BitVec 64)
-    (Q : Nat → IProp GF) (r : BitVec 64) : IProp GF :=
-  iprop(⌜filewriteRet n r⌝ ∗ filewriteExtra (hlc := hlc) P st n M ua Q r)
+def filewriteArms (gn : GName) (P : UPtd) (st : FdState) (n : Int) (M : Nat → List (BitVec 8))
+    (ua : BitVec 64) (Q : Nat → IProp GF) (Qe : Nat → PipeSt → IProp GF) (r : BitVec 64) : IProp GF :=
+  iprop(⌜filewriteRet n r⌝ ∗ filewriteExtra (hlc := hlc) gn P st n M ua Q Qe r)
 
 /-- Rocq `filewrite_arms_ret`. -/
-theorem filewriteArms_ret (P : UPtd) (st : FdState) (n : Int) (M : Nat → List (BitVec 8)) (ua : BitVec 64)
-    (Q : Nat → IProp GF) (r : BitVec 64) :
-    filewriteArms (hlc := hlc) P st n M ua Q r ⊢ ⌜filewriteRet n r⌝ := by
+theorem filewriteArms_ret (gn : GName) (P : UPtd) (st : FdState) (n : Int) (M : Nat → List (BitVec 8))
+    (ua : BitVec 64) (Q : Nat → IProp GF) (Qe : Nat → PipeSt → IProp GF) (r : BitVec 64) :
+    filewriteArms (hlc := hlc) gn P st n M ua Q Qe r ⊢ ⌜filewriteRet n r⌝ := by
   unfold filewriteArms
   iintro ⟨%h, -⟩
   ipureintro; exact h
 
 /-- Rocq `filewrite_in_inode`. -/
 theorem filewriteIn_inode (rb : Bool) (i : Nat) (γo : GName) (n : Int) (M : Nat → List (BitVec 8))
-    (ua : BitVec 64) (Q : Nat → IProp GF) :
-    filewriteIn (hlc := hlc) pmv szv lzv (.open rb true (.inode i γo .parked)) n M ua Q ⊣⊢
+    (ua : BitVec 64) (Q : Nat → IProp GF) (Qe : Nat → PipeSt → IProp GF) :
+    filewriteIn (hlc := hlc) pmv szv lzv (.open rb true (.inode i γo .parked)) n M ua Q Qe ⊣⊢
       awriteChain (hlc := hlc) (fsGammaL fscFs) appE i γo M ua n Q 0 (wchunks n) := .rfl
 
 /-- The inode arm at either mode (Rocq `filewrite_in_inode_om`): what the
@@ -635,70 +646,81 @@ def filewriteInInodeOm (om : OffMode) (i : Nat) (γo : GName) (n : Int) (M : Nat
 
 /-- Rocq `filewrite_in_inode_any`. -/
 theorem filewriteIn_inode_any (rb : Bool) (om : OffMode) (i : Nat) (γo : GName) (n : Int)
-    (M : Nat → List (BitVec 8)) (ua : BitVec 64) (Q : Nat → IProp GF) :
-    filewriteIn (hlc := hlc) pmv szv lzv (.open rb true (.inode i γo om)) n M ua Q ⊢
+    (M : Nat → List (BitVec 8)) (ua : BitVec 64) (Q : Nat → IProp GF) (Qe : Nat → PipeSt → IProp GF) :
+    filewriteIn (hlc := hlc) pmv szv lzv (.open rb true (.inode i γo om)) n M ua Q Qe ⊢
       filewriteInInodeOm (hlc := hlc) pmv szv lzv om i γo n M ua Q := by
   cases om <;> exact .rfl
 
 /-- Rocq `filewrite_in_inode_held`: the HELD row's reading. -/
 theorem filewriteIn_inode_held (rb : Bool) (i : Nat) (γo : GName) (n : Int)
-    (M : Nat → List (BitVec 8)) (ua : BitVec 64) (Q : Nat → IProp GF) :
-    filewriteIn (hlc := hlc) pmv szv lzv (.open rb true (.inode i γo .held)) n M ua Q ⊣⊢
+    (M : Nat → List (BitVec 8)) (ua : BitVec 64) (Q : Nat → IProp GF) (Qe : Nat → PipeSt → IProp GF) :
+    filewriteIn (hlc := hlc) pmv szv lzv (.open rb true (.inode i γo .held)) n M ua Q Qe ⊣⊢
       filewriteInHeld (hlc := hlc) pmv szv lzv i γo n M ua Q := .rfl
 
 /-- Rocq `filewrite_in_cons`. -/
 theorem filewriteIn_cons (rb : Bool) (mj : Nat) (n : Int) (M : Nat → List (BitVec 8))
-    (ua : BitVec 64) (Q : Nat → IProp GF) :
-    filewriteIn (hlc := hlc) pmv szv lzv (.open rb true (.device mj)) n M ua Q ⊣⊢
+    (ua : BitVec 64) (Q : Nat → IProp GF) (Qe : Nat → PipeSt → IProp GF) :
+    filewriteIn (hlc := hlc) pmv szv lzv (.open rb true (.device mj)) n M ua Q Qe ⊣⊢
       consOutChain (genId (hlc := hlc) (GF := GF) + 1) M ua Q 0 n.toNat := .rfl
 
 /-- Rocq `filewrite_extra_inode`. -/
-theorem filewriteExtra_inode (P : UPtd) (rb : Bool) (i : Nat) (γo : GName) (n : Int)
-    (M : Nat → List (BitVec 8)) (ua : BitVec 64) (Q : Nat → IProp GF) (r : BitVec 64) :
+theorem filewriteExtra_inode (gn : GName) (P : UPtd) (rb : Bool) (i : Nat) (γo : GName) (n : Int)
+    (M : Nat → List (BitVec 8)) (ua : BitVec 64) (Q : Nat → IProp GF) (Qe : Nat → PipeSt → IProp GF)
+    (r : BitVec 64) :
     writeArmsAt (hlc := hlc) (fsGammaL fscFs) i γo P n M ua Q r ⊢
-      filewriteExtra (hlc := hlc) P (.open rb true (.inode i γo .parked)) n M ua Q r := .rfl
+      filewriteExtra (hlc := hlc) gn P (.open rb true (.inode i γo .parked)) n M ua Q Qe r := .rfl
 
 /-- Rocq `filewrite_extra_cons`. -/
-theorem filewriteExtra_cons (P : UPtd) (rb : Bool) (n : Int) (M : Nat → List (BitVec 8)) (ua : BitVec 64)
-    (Q : Nat → IProp GF) (r : BitVec 64) :
-    writeConsArms P ua Q n r ⊢ filewriteExtra (hlc := hlc) P (.open rb true (.device CONSOLE)) n M ua Q r := by
+theorem filewriteExtra_cons (gn : GName) (P : UPtd) (rb : Bool) (n : Int) (M : Nat → List (BitVec 8))
+    (ua : BitVec 64) (Q : Nat → IProp GF) (Qe : Nat → PipeSt → IProp GF) (r : BitVec 64) :
+    writeConsArms P ua Q n r ⊢
+      filewriteExtra (hlc := hlc) gn P (.open rb true (.device CONSOLE)) n M ua Q Qe r := by
   unfold filewriteExtra; simp only [if_true]; exact .rfl
 
 /-- Rocq `filewrite_extra_dev_other`: a device at any OTHER major arms
 nothing. -/
-theorem filewriteExtra_dev_other (P : UPtd) (rb wb : Bool) (mj : Nat) (hmj : mj ≠ CONSOLE) (n : Int)
-    (M : Nat → List (BitVec 8)) (ua : BitVec 64) (Q : Nat → IProp GF) (r : BitVec 64) :
-    ⊢ filewriteExtra (hlc := hlc) P (.open rb wb (.device mj)) n M ua Q r := by
+theorem filewriteExtra_dev_other (gn : GName) (P : UPtd) (rb wb : Bool) (mj : Nat) (hmj : mj ≠ CONSOLE)
+    (n : Int) (M : Nat → List (BitVec 8)) (ua : BitVec 64) (Q : Nat → IProp GF)
+    (Qe : Nat → PipeSt → IProp GF) (r : BitVec 64) :
+    ⊢ filewriteExtra (hlc := hlc) gn P (.open rb wb (.device mj)) n M ua Q Qe r := by
   unfold filewriteExtra
   cases wb
   · exact .rfl
   · simp only [hmj, if_false]; exact .rfl
 
 /-- Rocq `filewrite_extra_dev_drop`: ... so the chain is simply dropped. -/
-theorem filewriteExtra_dev_drop (P : UPtd) (rb : Bool) (mj : Nat) (hmj : mj ≠ CONSOLE) (n : Int)
-    (M : Nat → List (BitVec 8)) (ua : BitVec 64) (Q : Nat → IProp GF) (r : BitVec 64) :
-    filewriteIn (hlc := hlc) pmv szv lzv (.open rb true (.device mj)) n M ua Q ⊢
-      filewriteExtra (hlc := hlc) P (.open rb true (.device mj)) n M ua Q r := by
+theorem filewriteExtra_dev_drop (gn : GName) (P : UPtd) (rb : Bool) (mj : Nat) (hmj : mj ≠ CONSOLE)
+    (n : Int) (M : Nat → List (BitVec 8)) (ua : BitVec 64) (Q : Nat → IProp GF)
+    (Qe : Nat → PipeSt → IProp GF) (r : BitVec 64) :
+    filewriteIn (hlc := hlc) pmv szv lzv (.open rb true (.device mj)) n M ua Q Qe ⊢
+      filewriteExtra (hlc := hlc) gn P (.open rb true (.device mj)) n M ua Q Qe r := by
   iintro -
-  iapply filewriteExtra_dev_other P rb true mj hmj
+  iapply filewriteExtra_dev_other gn P rb true mj hmj
 
-/-- Rocq `filewrite_extra_pipe`: the pipe arm is pipewrite's answer and its
-reason (`SpecPipewrite.pipeWpostR`, Rocq `pipe_wpost`'s pure part) at a
+/-- Rocq `filewrite_in_pipe`: the pipe arm's input, at a writable end -- what
+the writer hands pipewrite. -/
+theorem filewriteIn_pipe (rb : Bool) (γp : PipeNames) (n : Int) (M : Nat → List (BitVec 8))
+    (ua : BitVec 64) (Q : Nat → IProp GF) (Qe : Nat → PipeSt → IProp GF) :
+    filewriteIn (hlc := hlc) pmv szv lzv (.open rb true (.pipe γp)) n M ua Q Qe ⊣⊢
+      pipeWpay (hlc := hlc) γp.pnQueue M ua Q Qe n.toNat := .rfl
+
+/-- Rocq `filewrite_extra_pipe`: the pipe arm is pipewrite's queue post at a
 writable end. -/
-theorem filewriteExtra_pipe (P : UPtd) (rb wb : Bool) (γp : PipeNames) (n : Int) (M : Nat → List (BitVec 8)) (ua : BitVec 64)
-    (Q : Nat → IProp GF) (r : BitVec 64) (h : wb = true → pipeWpostR P ua n.toNat r) :
-    ⊢ filewriteExtra (hlc := hlc) P (.open rb wb (.pipe γp)) n M ua Q r := by
-  unfold filewriteExtra
-  cases wb
-  · exact .rfl
-  · exact BI.pure_intro (h rfl)
+theorem filewriteExtra_pipe (gn : GName) (P : UPtd) (rb : Bool) (γp : PipeNames) (n : Int)
+    (M : Nat → List (BitVec 8)) (ua : BitVec 64) (Q : Nat → IProp GF) (Qe : Nat → PipeSt → IProp GF)
+    (r : BitVec 64) :
+    pipeWpost (hlc := hlc) P γp.pnQueue M ua Q Qe
+        iprop(killShot gn ∗ □ MachFixedGS.killCred (hlc := hlc) (GF := GF)) n.toNat r ⊢
+      filewriteExtra (hlc := hlc) gn P (.open rb true (.pipe γp)) n M ua Q Qe r := .rfl
 
 /-- Rocq `filewrite_extra_unwritable`: the `f->writable == 0` early return
 arms nothing -- every armed state is WRITABLE. -/
-theorem filewriteExtra_unwritable (P : UPtd) (inum : BitVec 32) (γo : GName) (om : OffMode) (γp : PipeNames) (C : FContent) (st : FdState)
-    (n : Int) (M : Nat → List (BitVec 8)) (ua : BitVec 64) (Q : Nat → IProp GF) (r : BitVec 64)
+theorem filewriteExtra_unwritable (gn : GName) (P : UPtd) (inum : BitVec 32) (γo : GName) (om : OffMode)
+    (γp : PipeNames) (C : FContent) (st : FdState)
+    (n : Int) (M : Nat → List (BitVec 8)) (ua : BitVec 64) (Q : Nat → IProp GF)
+    (Qe : Nat → PipeSt → IProp GF) (r : BitVec 64)
     (hok : fdstateOk inum γo om γp C st) (hw : C.writable = 0#8) :
-    ⊢ filewriteExtra (hlc := hlc) P st n M ua Q r := by
+    ⊢ filewriteExtra (hlc := hlc) gn P st n M ua Q Qe r := by
   rcases st with _ | ⟨rb, wb, t⟩
   · exact .rfl
   · cases wb
@@ -710,8 +732,9 @@ theorem filewriteExtra_unwritable (P : UPtd) (inum : BitVec 32) (γo : GName) (o
 writable descriptor). -/
 theorem filewriteIn_unwritable (inum : BitVec 32) (γo : GName) (om : OffMode) (γp : PipeNames) (C : FContent) (st : FdState)
     (n : Int) (M : Nat → List (BitVec 8)) (ua : BitVec 64) (Q : Nat → IProp GF)
+    (Qe : Nat → PipeSt → IProp GF)
     (hok : fdstateOk inum γo om γp C st) (hw : C.writable = 0#8) :
-    filewriteIn (hlc := hlc) pmv szv lzv st n M ua Q ⊢ emp := by
+    filewriteIn (hlc := hlc) pmv szv lzv st n M ua Q Qe ⊢ emp := by
   rcases st with _ | ⟨rb, wb, t⟩
   · exact .rfl
   · cases wb
@@ -722,22 +745,25 @@ theorem filewriteIn_unwritable (inum : BitVec 32) (γo : GName) (om : OffMode) (
 /-- THE SIGN GUARD'S EXIT, AT EVERY ARM AT ONCE (Rocq
 `filewrite_extra_neg`): the `n < 0` test fires before the type dispatch;
 the console arm's NEG disjunct is pure. -/
-theorem filewriteExtra_neg (P : UPtd) (st : FdState) (n : Int) (M : Nat → List (BitVec 8)) (ua : BitVec 64)
-    (Q : Nat → IProp GF) (hn : n < 0)
+theorem filewriteExtra_neg (gn : GName) (P : UPtd) (st : FdState) (n : Int) (M : Nat → List (BitVec 8))
+    (ua : BitVec 64) (Q : Nat → IProp GF) (Qe : Nat → PipeSt → IProp GF) (hn : n < 0)
     -- THE SIGN GUARD'S EXIT TAKES THE WRITE GUARD (Rocq RULING WR-TB / EFQ): at a
     -- held row the input is the chain under the guard, and this exit is the
     -- kernel, which pays the guard at its own table
     (htb : wrTb pmv szv lzv P) :
-    filewriteIn (hlc := hlc) pmv szv lzv st n M ua Q ⊢ filewriteExtra (hlc := hlc) P st n M ua Q (-1#64) := by
+    filewriteIn (hlc := hlc) pmv szv lzv st n M ua Q Qe ⊢
+      filewriteExtra (hlc := hlc) gn P st n M ua Q Qe (-1#64) := by
   rcases st with _ | ⟨rb, wb, t⟩
   · exact .rfl
   · cases wb
     · unfold filewriteIn filewriteExtra; rcases t with _ | ⟨i, g, om⟩ | mj <;> exact .rfl
     · rcases t with γp | ⟨i, g, om⟩ | mj
       · -- a negative request never reaches the pipe (Rocq `pipe_wpost_neg`)
-        iintro -
-        iapply filewriteExtra_pipe P rb true γp n M ua Q (-1#64) (fun _ => by
-          rw [show n.toNat = 0 by omega]; exact pipeWpostR_neg P ua)
+        have h0 : n.toNat = 0 := by omega
+        refine (filewriteIn_pipe pmv szv lzv rb γp n M ua Q Qe).1.trans ?_
+        refine .trans ?_ (filewriteExtra_pipe gn P rb γp n M ua Q Qe (-1#64))
+        rw [h0]
+        exact pipeWpost_neg P γp.pnQueue M ua Q Qe _
       · -- the HELD row's two arms (Rocq lanes OFF-LINK-4/5): the link's
         -- own cursor, or the plain chain beside the taint
         cases om with
@@ -759,7 +785,7 @@ theorem filewriteExtra_neg (P : UPtd) (st : FdState) (n : Int) (M : Nat → List
           unfold writeConsArms
           iright; iright
           ipureintro; exact ⟨rfl, hn⟩
-        · iapply filewriteExtra_dev_other P rb true mj hc
+        · iapply filewriteExtra_dev_other gn P rb true mj hc
 
 end Keyed
 
@@ -778,7 +804,7 @@ environment's output, and the armed output keyed on the state at the
 return value `R' 10#5`. -/
 def filewritePost (k : KCtx) (γl : GName) (γu : UartNames) (γ : FileNames) (fk : Nat) (q : Qp)
     (st : FdState) (j : Nat) (pid : BitVec 32) (V : ProcPriv) (M : Nat → List (BitVec 8)) (n : Int)
-    (Q : Nat → IProp GF) (cpu' : CPU) : IProp GF :=
+    (Q : Nat → IProp GF) (Qe : Nat → PipeSt → IProp GF) (cpu' : CPU) : IProp GF :=
   iprop(∀ (spie spp : Bool) (R' : RegMap) (P' : UPtd),
     ⌜calleeSaved k.regs R' ∧ V.upt.extSz V.sz P'⌝ -∗
     kctx cpu' ((k.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k.regs 1#5)) -∗
@@ -786,7 +812,7 @@ def filewritePost (k : KCtx) (γl : GName) (γu : UartNames) (γ : FileNames) (f
     fileRef γ fk q st -∗
     procPrivCoreNoctxAt curCtx (procAddr j) pid { V with upt := P' } (viewFaulted V.upt P' M) -∗
     filewriteEnvOut γl γu st -∗
-    filewriteArms (hlc := hlc) V.upt st n (writerImg V.upt M) (k.regs 11#5) Q (R' 10#5) -∗
+    filewriteArms (hlc := hlc) V.gen V.upt st n (writerImg V.upt M) (k.regs 11#5) Q Qe (R' 10#5) -∗
     wpLoop cpu')
 
 end Post
@@ -803,6 +829,7 @@ def wp_filewrite_eb_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [
     (cpu : CPU) (k : KCtx) (γ : FileNames) (fk : Nat) (q : Qp) (st : FdState)
     (j : Nat) (pid : BitVec 32) (V : ProcPriv) (M : Nat → List (BitVec 8))
     (γkl : GName) (γk : KmemNames) (γl : GName) (γu : UartNames) (n : Int) (Q : Nat → IProp GF)
+    (Qe : Nat → PipeSt → IProp GF)
     (pmv : Nat → Option UPerm) (szv : Nat) (lzv : Bool)
     (hK : filewriteSlots ≤ k.avail) (hfk : fk < NFILE)
     (hj : j < NPROC) (hproc : k.proc = procAddr j)
@@ -830,9 +857,9 @@ def wp_filewrite_eb_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [
   -- THE DESCRIPTOR'S OFFSET ROW (persistent): what advances `f->off`
   foffRow st ∗
   -- THE CALLER'S INPUT, KEYED ON `st`
-  filewriteIn (hlc := hlc) pmv szv lzv st n (writerImg V.upt M) (k.regs 11#5) Q ∗
+  filewriteIn (hlc := hlc) pmv szv lzv st n (writerImg V.upt M) (k.regs 11#5) Q Qe ∗
   -- THE CROSSING IS THE LITERAL `true`: every arm can park
-  wpNext true k.proc cpu (filewritePost (hlc := hlc) k γl γu γ fk q st j pid V M n Q)
+  wpNext true k.proc cpu (filewritePost (hlc := hlc) k γl γu γ fk q st j pid V M n Q Qe)
   ⊢ wpLoop (GF := GF) cpu
 
 /-- The interface of `filewrite` (Rocq's `Module Type FILEWRITE`): ONE
@@ -846,9 +873,10 @@ structure FILEWRITE : Prop where
     (cpu : CPU) (k : KCtx) (γ : FileNames) (fk : Nat) (q : Qp) (st : FdState)
     (j : Nat) (pid : BitVec 32) (V : ProcPriv) (M : Nat → List (BitVec 8))
     (γkl : GName) (γk : KmemNames) (γl : GName) (γu : UartNames) (n : Int) (Q : Nat → IProp GF)
+    (Qe : Nat → PipeSt → IProp GF)
     (pmv : Nat → Option UPerm) (szv : Nat) (lzv : Bool)
     hK hfk hj hproc hnoff htier ha0 ha2 hn htb,
-    wp_filewrite_eb_body (hlc := hlc) (GF := GF) Γ cpu k γ fk q st j pid V M γkl γk γl γu n Q
+    wp_filewrite_eb_body (hlc := hlc) (GF := GF) Γ cpu k γ fk q st j pid V M γkl γk γl γu n Q Qe
       pmv szv lzv hK hfk hj hproc hnoff htier ha0 ha2 hn htb
 
 end Xv6

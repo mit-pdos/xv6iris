@@ -36,12 +36,12 @@ theorem utReadWhy_xv6 : UtReadWhy (GF := GF) (SG := uexecSGXv6 (hlc := hlc)) := 
     rw [hst']
     rfl
   have hnb : argZ (xkA W 2) < 2 ^ 31 := (argZ_range _).2
-  show xpostRead (hlc := hlc) f.rF f.rRd f.rRin W r M' ⊢
-    □ (⌜usysRdcount W.tf < 0⌝ ∨ killShot W.gen) ∗ xpostRead (hlc := hlc) f.rF f.rRd f.rRin W r M'
+  show xpostRead (hlc := hlc) f.rF f.rRd f.rRin f.rPq f.rPqe W r M' ⊢
+    □ (⌜usysRdcount W.tf < 0⌝ ∨ killShot W.gen) ∗ xpostRead (hlc := hlc) f.rF f.rRd f.rRin f.rPq f.rPqe W r M'
   unfold xpostRead
   rw [hkey, show usysRdcount W.tf = argZ (xkA W 2) from rfl]
   iintro ⟨%hret, %P, %Pr, %Mv, %h1, %h2, %h3, Hc⟩
-  icases filereadExtraCore_m1_why W.gen Pr f.rF f.rRd f.rRin rb (argZ (xkA W 2)) r Mv (xkA W 1)
+  icases filereadExtraCore_m1_why W.gen Pr f.rF f.rRd f.rRin f.rPq f.rPqe rb (argZ (xkA W 2)) r Mv (xkA W 1)
     hnb hr $$ Hc with ⟨#Hwhy, Hc⟩
   isplitr
   · imodintro

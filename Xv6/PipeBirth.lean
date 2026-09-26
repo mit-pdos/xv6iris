@@ -282,18 +282,27 @@ theorem newPipe (cpu : CPU) (pi : BitVec 64) (hpv : pageValid pi) (vname : BitVe
     wordPointsTo (aPopen pi false) 4 (DFrac.own 1) 1#32 ∗ wordPointsTo (aPopen pi true) 4 (DFrac.own 1) 1#32 ∗
     pipeDataAt curCtx pi bs ∗ pipeSlack pi
     ⊢ |={E}=> (ownCtx cpu curCtx ∗ ∃ (γl : GName) (γp : PipeNames),
-        isPipe γl γp pi ∗ pipeRef γp false 1 ∗ pipeRef γp true 1) := by
+        isPipe γl γp pi ∗ pipeRef γp false 1 ∗ pipeRef γp true 1 ∗ pipeQfrag γp.pnQueue pst0) := by
   unfold lkFresh
   iintro ⟨#Hcl, #Hcl', Hrun, ⟨%hok, ⟨%lo, %lc, Hw, #Hflo, Hc, #Hflc⟩⟩,
     Hnm, Hnr, Hnw, Hro, Hwo, Hdat, Hslack⟩
-  imod pipe_ends_alloc with ⟨%γp, Hf0, Hf1, Hm0, Hm1, -, -⟩
+  imod pipe_ends_alloc with ⟨%γp, Hf0, Hf1, Hm0, Hm1, Hqa, Hqf⟩
   ihave Hst0 := pipeEndstate_open_intro γp false 1#32 pflag_one_open $$ Hm0
   ihave Hst1 := pipeEndstate_open_intro γp true 1#32 pflag_one_open $$ Hm1
-  ihave HR : pipeResAt γp pi curCtx $$ [Hnm Hnr Hnw Hro Hwo Hst0 Hst1 Hdat Hslack]
+  -- THE QUEUE, COUPLED AT BIRTH: nothing written, nothing read, both ends
+  -- open (Rocq `new_pipe`'s `pipe_queue_ok_00`)
+  ihave Hq : pipeQres (hlc := hlc) γp 0#32 0#32 1#32 1#32 bs $$ [Hqa]
+  · unfold pipeQres
+    ileft
+    iexists [], 0
+    isplitr
+    · ipureintro; exact pipeQueueOk_00 bs
+    · rw [pflagBool_one]; unfold pst0; iexact Hqa
+  ihave HR : pipeResAt γp pi curCtx $$ [Hnm Hnr Hnw Hro Hwo Hst0 Hst1 Hdat Hslack Hq]
   · unfold pipeResAt
     simp only [wordAtN_cur]
     iexists 0#32, 0#32, 1#32, 1#32, vname, bs
-    iframe Hnm Hnr Hnw Hro Hwo Hst0 Hst1 Hdat Hslack
+    iframe Hnm Hnr Hnw Hro Hwo Hst0 Hst1 Hdat Hslack Hq
     isplit
     · ipureintro; exact pipeCount_ok_00
     · ipureintro; exact hlen
@@ -325,7 +334,7 @@ theorem newPipe (cpu : CPU) (pi : BitVec 64) (hpv : pageValid pi) (vname : BitVe
     unfold pipeEndFull; iintro H; iexact H) $$ Hf0
   ihave Hf1 := (show pipeEndFull (GF := GF) γp true ⊢ pipeRef γp true 1 from by
     unfold pipeEndFull; iintro H; iexact H) $$ Hf1
-  isplitr [Hf0 Hf1]
+  isplitr [Hf0 Hf1 Hqf]
   · unfold isPipe
     isplit
     · ipureintro; exact hok
@@ -341,7 +350,7 @@ theorem newPipe (cpu : CPU) (pi : BitVec 64) (hpv : pageValid pi) (vname : BitVe
     isplit
     · iexact Hflo
     · iexact Hflc
-  · iframe Hf0 Hf1
+  · iframe Hf0 Hf1 Hqf
 
 /-- The same at the kernel execution context (which carries the running
 context inside its `ctxTok`), under a fancy update. -/
@@ -354,14 +363,14 @@ theorem kctx_newPipe [KernelImage GF] {lent : Bool} (cpu : CPU) (k : KCtx) (pi :
     wordPointsTo (aPopen pi false) 4 (DFrac.own 1) 1#32 ∗ wordPointsTo (aPopen pi true) 4 (DFrac.own 1) 1#32 ∗
     pipeDataAt curCtx pi bs ∗ pipeSlack pi
     ⊢ |={⊤}=> (kctxL lent cpu k ∗ ∃ (γl : GName) (γp : PipeNames),
-        isPipe γl γp pi ∗ pipeRef γp false 1 ∗ pipeRef γp true 1) := by
+        isPipe γl γp pi ∗ pipeRef γp false 1 ∗ pipeRef γp true 1 ∗ pipeQfrag γp.pnQueue pst0) := by
   iintro ⟨Hk, #Hcl, #Hcl', Hfresh, Hnm, Hnr, Hnw, Hropen, Hwopen, Hdat, Hslack⟩
   icases kctx_cases cpu k $$ Hk with
     ⟨%hwf, HConf, HF, Hstack, Htrans, Harm, Hcpu, Htok, Hclock, #Hro⟩
   icases ctxTok_cases cpu curCtx $$ Htok with ⟨Hctx, %r, Hfrag⟩
   imod newPipe cpu pi hpv vname bs hlen ⊤
     $$ [Hctx Hfresh Hnm Hnr Hnw Hropen Hwopen Hdat Hslack]
-    with ⟨Hctx, ⟨%γl, %γp, #Hpipe, Hr0, Hr1⟩⟩
+    with ⟨Hctx, ⟨%γl, %γp, #Hpipe, Hr0, Hr1, Hqf⟩⟩
   · iframe Hcl Hcl' Hctx Hfresh Hnm Hnr Hnw Hropen Hwopen Hdat Hslack
   imodintro
   isplitl [HConf HF Hstack Htrans Harm Hcpu Hctx Hfrag Hclock]
@@ -372,7 +381,7 @@ theorem kctx_newPipe [KernelImage GF] {lent : Bool} (cpu : CPU) (k : KCtx) (pi :
       iframe Hctx Hfrag
     · iexact Hro
   · iexists γl, γp
-    iframe Hpipe Hr0 Hr1
+    iframe Hpipe Hr0 Hr1 Hqf
 
 end
 

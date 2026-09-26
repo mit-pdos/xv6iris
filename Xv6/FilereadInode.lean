@@ -129,7 +129,8 @@ and the block as `EitherDefs.procPrivExt`. -/
 def frdK (k : KCtx) (γ : FileNames) (fk : Nat) (q : Qp) (st : FdState) (j : Nat) (pid : BitVec 32)
     (V : ProcPriv) (M : Nat → List (BitVec 8)) (n : Int)
     (F : Pfam GF (Aview → Nat → Anode → Nat → IProp GF)) (Rd : Nat → Nat → IProp GF)
-    (Rin : List (List Obs × BitVec 8) → IProp GF) (P : IProp GF) : IProp GF :=
+    (Rin : List (List Obs × BitVec 8) → IProp GF)
+    (Rp : List (BitVec 8) → IProp GF) (Rpe : List (BitVec 8) → PipeSt → IProp GF) (P : IProp GF) : IProp GF :=
   iprop(∀ (c : CPU) (spie spp : Bool) (R' : RegMap) (P' : UPtd) (M' : Nat → List (BitVec 8)) (d : Nat),
     ⌜calleeSaved k.regs R' ∧ V.upt.extSz V.sz P' ∧ (d : Int) ≤ max 0 n ∧
       (R' 10#5 = BitVec.ofNat 64 d ∨ R' 10#5 = -1#64) ∧
@@ -139,7 +140,7 @@ def frdK (k : KCtx) (γ : FileNames) (fk : Nat) (q : Qp) (st : FdState) (j : Nat
     fileRef γ fk q st -∗ procPrivExt (procAddr j) pid V P' M' -∗
     genHalvesPriv (procAddr j) pid V.gen -∗
     filereadEnvOut (hlc := hlc) st -∗
-    filereadArms (hlc := hlc) V.gen V.upt st n F Rd Rin P (R' 10#5) M' (k.regs 11#5) -∗ wpLoop c)
+    filereadArms (hlc := hlc) V.gen V.upt st n F Rd Rin Rp Rpe P (R' 10#5) M' (k.regs 11#5) -∗ wpLoop c)
 
 /-! ## The lock-held ghost steps -/
 

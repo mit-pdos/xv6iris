@@ -308,11 +308,13 @@ theorem fwr_writei (WI : WRITEI) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
 
 set_option maxHeartbeats 8000000 in
 /-- `pipewrite(f->pipe, addr, n)` at `+0x5e`: the eb contract, the block
-converted at the kernel-page-table tier. -/
+converted at the kernel-page-table tier, the generation halves lent and
+returned, the queue's payment in and its post out. -/
 theorem fwr_pipewrite (PW : PIPEWRITE) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
     (c : CPU) (k' : KCtx) (γl : GName) (γp : PipeNames) (w : Bool) (q : Qp)
     (γkl : GName) (γk : KmemNames) (j : Nat) (pid : BitVec 32) (V : ProcPriv)
-    (M : Nat → List (BitVec 8)) (n : Int) (ht : curTier = KTier.kpt)
+    (M : Nat → List (BitVec 8)) (n : Int) (Q : Nat → IProp GF) (Qe : Nat → PipeSt → IProp GF)
+    (hw : w = true) (ht : curTier = KTier.kpt)
     (hj : j < NPROC) (hproc : k'.proc = procAddr j) (hK : pipewriteSlots ≤ k'.avail)
     (hnoff : k'.noff = 0) (htier : k'.tier = KTier.kpt)
     (hn : k'.regs 12#5 = BitVec.ofInt 64 n) (hn' : -2 ^ 31 ≤ n ∧ n < 2 ^ 31) :
@@ -320,27 +322,31 @@ theorem fwr_pipewrite (PW : PIPEWRITE) (Γ : SchedNames) [ClaimIs (hlc := hlc) G
     trapCsrsExt c k'.sie ∗ cpuClaimExt c k'.sie k'.proc ∗
     isPipe γl γp (k'.regs 10#5) ∗ pipeRef γp w q ∗
     isLock γkl kmemLockAddr "kmem" (kmemRes γk) ∗ kallocAvail γk none ∗
-    procPrivExt (procAddr j) pid V V.upt M ∗
+    procPrivExt (procAddr j) pid V V.upt M ∗ genHalvesPriv (procAddr j) pid V.gen ∗
+    pipeWpay (hlc := hlc) γp.pnQueue (writerImg V.upt M) (k'.regs 11#5) Q Qe n.toNat ∗
     (∀ (c' : CPU) (spie spp : Bool) (R' : RegMap) (P' : UPtd),
-      ⌜calleeSaved k'.regs R' ∧ V.upt.extSz V.sz P' ∧ pipeRwRet n (R' 10#5) ∧
-        pipeWpostR V.upt (k'.regs 11#5) n.toNat (R' 10#5)⌝ -∗
+      ⌜calleeSaved k'.regs R' ∧ V.upt.extSz V.sz P' ∧ pipeRwRet n (R' 10#5)⌝ -∗
       kctx c' ((k'.withSpie spie spp).withRegs R') -∗ pcIs c' (jumpPc (k'.regs 1#5)) -∗
       trapCsrsExt c' k'.sie -∗ cpuClaimExt c' k'.sie k'.proc -∗
       pipeRef γp w q -∗
-      procPrivExt (procAddr j) pid V P' (viewFaulted V.upt P' M) -∗ wpLoop c')
+      procPrivExt (procAddr j) pid V P' (viewFaulted V.upt P' M) -∗
+      genHalvesPriv (procAddr j) pid V.gen -∗
+      pipeWpost (hlc := hlc) V.upt γp.pnQueue (writerImg V.upt M) (k'.regs 11#5) Q Qe
+        iprop(killShot V.gen ∗ □ MachFixedGS.killCred (hlc := hlc) (GF := GF)) n.toNat (R' 10#5) -∗
+      wpLoop c')
     ⊢ wpLoop (GF := GF) c := by
-  have h := PW.wp_pipewrite_eb (hlc := hlc) (GF := GF) Γ c k' γl γp w q γkl γk j pid V M n
+  have h := PW.wp_pipewrite_eb (hlc := hlc) (GF := GF) Γ c k' γl γp w q γkl γk j pid V M n Q Qe hw
     hj hproc hK hnoff htier hn hn'
   unfold wp_pipewrite_eb_body at h
   simp only [pipewriteAddr] at h
-  iintro ⟨Hk, Hpc, #Hpi, Hte, Hce, #Hpp, Href, #Hkl, #Hav, Hpriv, HK⟩
+  iintro ⟨Hk, Hpc, #Hpi, Hte, Hce, #Hpp, Href, #Hkl, #Hav, Hpriv, Hgen, Hpay, HK⟩
   ihave Hpriv := (procPrivExt_conv0 ht (procAddr j) pid V M).2 $$ Hpriv
   iapply h
-  iframe Hk Hpc Hpi Hte Hce Hpp Href Hkl Hav Hpriv
+  iframe Hk Hpc Hpi Hte Hce Hpp Href Hkl Hav Hpriv Hgen Hpay
   iapply wpNext_intro
-  iintro %c' %spie %spp %R' %P' %hp Hk Hpc Hte Hce Href Hpriv
+  iintro %c' %spie %spp %R' %P' %hp Hk Hpc Hte Hce Href Hpriv Hgen Hpost
   ihave Hpriv := (procPrivExt_conv ht (procAddr j) pid V P' (viewFaulted V.upt P' M)).1 $$ Hpriv
-  iapply HK $$ %c' %spie %spp %R' %P' %hp Hk Hpc Hte Hce Href Hpriv
+  iapply HK $$ %c' %spie %spp %R' %P' %hp Hk Hpc Hte Hce Href Hpriv Hgen Hpost
 
 set_option maxHeartbeats 8000000 in
 /-- `devsw[CONSOLE].write(1, addr, n)` -- consolewrite -- at `+0x86`

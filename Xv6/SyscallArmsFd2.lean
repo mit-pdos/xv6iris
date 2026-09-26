@@ -60,7 +60,7 @@ theorem syscall_arm_read (SR : SYSREAD)
   icases Hslot with ⟨Hnext, -⟩
   have hn5 : syscNum V = (5 : Int) := hnum
   ihave Hsi := syscSysIn_at f V M sts gn cs pid 5 hn5 (by decide) $$ Hsi
-  icases hDR f V M sts gn cs pid $$ Hsi with ⟨%F, %Rd, %Rin, %P, Hin, HP, Hout⟩
+  icases hDR f V M sts gn cs pid $$ Hsi with ⟨%F, %Rd, %Rin, %Rp, %Rpe, %P, Hin, HP, Hout⟩
   icases syscallEnv_kmem PT Γ γ $$ Henv with ⟨#Hkl, #Hka⟩
   ihave #Hpe := syscallEnv_panic PT Γ γ $$ Henv
   ihave #Hcons := syscallEnv_console PT Γ γ $$ Henv
@@ -72,11 +72,12 @@ theorem syscall_arm_read (SR : SYSREAD)
   icases syscFd_agree γ (procAddr j) pid V M sts $$ [Hpriv Hfr] with ⟨%ha, Hpriv, Hfr⟩
   · iframe
   ihave Hin := (show filereadIn (hlc := hlc) (GF := GF) (syscFdKey (tfW V.tf (tfArgIdx 0)) sts)
-      F Rd Rin P ⊢ sysReadIn (hlc := hlc) V (tfW V.tf (tfArgIdx 0)) sts F Rd Rin P from by
+      (argZ (tfW V.tf (tfArgIdx 2))) F Rd Rin Rp Rpe P ⊢
+      sysReadIn (hlc := hlc) V (tfW V.tf (tfArgIdx 0)) sts (argZ (tfW V.tf (tfArgIdx 2))) F Rd Rin Rp Rpe P from by
     unfold sysReadIn; rw [sysFdSt_key ha]) $$ Hin
   have hRd := SR.wp_sys_read_eb (hlc := hlc) (GF := GF) Γ cpu (((k.withSpie spie spp).pushed 4).withRegs R)
     γ j pid V M sts (tfW V.tf (tfArgIdx 0)) (tfW V.tf (tfArgIdx 1)) (tfW V.tf (tfArgIdx 2))
-    fscKalloc fsReadyKmem F Rd Rin P
+    fscKalloc fsReadyKmem F Rd Rin Rp Rpe P
     (syscArg V hl 0 (by decide)) (syscArg V hl 1 (by decide)) (syscArg V hl 2 (by decide))
     ?hK hj ?hp ?hn ?ht
   case hp => k_norm_g; exact hproc
@@ -158,7 +159,7 @@ theorem syscall_arm_write (SW : SYSWRITE)
   icases Hslot with ⟨Hnext, -⟩
   have hn16 : syscNum V = (16 : Int) := hnum
   ihave Hsi := syscSysIn_at f V M sts gn cs pid 16 hn16 (by decide) $$ Hsi
-  icases hDW f V M sts gn cs pid $$ Hsi with ⟨%Q, Hin, Hout⟩
+  icases hDW f V M sts gn cs pid $$ Hsi with ⟨%Q, %Qe, Hin, Hout⟩
   icases syscallEnv_kmem PT Γ γ $$ Henv with ⟨#Hkl, #Hka⟩
   ihave #Hpe := syscallEnv_panic PT Γ γ $$ Henv
   icases syscallEnv_devsw PT Γ γ $$ Henv with ⟨%γl, %γu, #Hdev⟩
@@ -176,14 +177,14 @@ theorem syscall_arm_write (SW : SYSWRITE)
     wrTb_of_block V.upt V.sz V.pvLazy hfacts.2.2.2 hfacts.2.2.1
   ihave Hin := (show filewriteIn (hlc := hlc) (GF := GF) (permOf V.upt.um V.sz.toNat) V.sz.toNat V.pvLazy
       (syscFdKey (tfW V.tf (tfArgIdx 0)) sts)
-      (argZ (tfW V.tf (tfArgIdx 2))) (writerImg V.upt M) (tfW V.tf (tfArgIdx 1)) Q ⊢
+      (argZ (tfW V.tf (tfArgIdx 2))) (writerImg V.upt M) (tfW V.tf (tfArgIdx 1)) Q Qe ⊢
       sysWriteIn (hlc := hlc) (permOf V.upt.um V.sz.toNat) V.sz.toNat V.pvLazy V (tfW V.tf (tfArgIdx 0))
         sts (argZ (tfW V.tf (tfArgIdx 2)))
-        (writerImg V.upt M) (tfW V.tf (tfArgIdx 1)) Q from by
+        (writerImg V.upt M) (tfW V.tf (tfArgIdx 1)) Q Qe from by
     unfold sysWriteIn; rw [sysFdSt_key ha]) $$ Hin
   have hWr := SW.wp_sys_write_eb (hlc := hlc) (GF := GF) Γ cpu (((k.withSpie spie spp).pushed 4).withRegs R)
     γ j pid V M sts (tfW V.tf (tfArgIdx 0)) (tfW V.tf (tfArgIdx 1)) (tfW V.tf (tfArgIdx 2))
-    fscKalloc fsReadyKmem γl γu Q (permOf V.upt.um V.sz.toNat) V.sz.toNat V.pvLazy
+    fscKalloc fsReadyKmem γl γu Q Qe (permOf V.upt.um V.sz.toNat) V.sz.toNat V.pvLazy
     (syscArg V hl 0 (by decide)) (syscArg V hl 1 (by decide)) (syscArg V hl 2 (by decide))
     ?hK hj ?hp ?hn ?ht htb
   case hp => k_norm_g; exact hproc
@@ -228,14 +229,15 @@ theorem syscall_arm_write (SW : SYSWRITE)
     · rw [hm1]; exact filewriteRet_m1 _
     · exact h
   rw [sysFdSt_key ha] at *
+  subst hgn
   ihave Hsp := Hout $$ %(R2 10#5) %hfr Hx
   unfold filewriteFsOut
   unfold syscallRet syscallAddr at *
-  iapply (syscall_ret_fd PT Γ c0 cpu k spie2 spp2 R2 γ j pid V M sts gn cs ip f
+  iapply (syscall_ret_fd PT Γ c0 cpu k spie2 spp2 R2 γ j pid V M sts V.gen cs ip f
     { V with upt := P' } (viewFaulted V.upt P' M) sts cs hj hproc hK htier hpins2 hs2' hrows 16 hn16
     (by decide) (by decide) (by decide))
   iframe Hk Hpc Hframe Hte Hce Hbs Hip Hfd Hir Henv Hpriv Hfr Hch Hnext
-  iapply (syscSysOut_ret f V M sts gn cs pid { V with upt := P' } (viewFaulted V.upt P' M) (R2 10#5)
+  iapply (syscSysOut_ret f V M sts V.gen cs pid { V with upt := P' } (viewFaulted V.upt P' M) (R2 10#5)
     (syscImg V M) sts V.cwi cs 16 hn16 (by decide) (by decide) hl0 himg rfl)
   iexact Hsp
 
@@ -312,7 +314,9 @@ theorem syscall_arm_pipe (SP : SYSPIPE)
   unfold sysPipePost
   icases Hpost with ⟨⟨%hr, Hpriv, Hfr⟩ |
     ⟨%fd0, %fd1, %l, %d0, %d1, %P', %M1, %⟨hr, hfr, hd, hext, heq, hm⟩, Hpriv, Hfr⟩ |
-    ⟨%fd0, %fd1, %l, %k0, %k1, %γp, %P', %M1, %⟨hr, hfr, hne, -, -, hext, heq, hm⟩, Hpriv, Hfr⟩⟩
+    ⟨%fd0, %fd1, %l, %k0, %k1, %γp, %P', %M1, %⟨hr, hfr, hne, -, -, hext, heq, hm⟩, Hpriv, Hfr, Hqf⟩⟩
+  -- pipe deposits nothing: its row is `emp`, and the post is sys_pipe's receipt
+  iclear Hsi
   · -- nothing moved
     have hmem : syscMemOk V (syscStore { V with ofile := V.ofile, upt := V.upt } (R2 10#5)) (syscImg V M)
         (syscImg (syscStore { V with ofile := V.ofile, upt := V.upt } (R2 10#5)) M) := by
@@ -325,7 +329,11 @@ theorem syscall_arm_pipe (SP : SYSPIPE)
     rw [← hr] at hfd hpp
     have hrows := syscRows_gen V M M sts sts cs pid V.ofile V.upt (R2 10#5) 4 hn4 (by decide)
       (by decide) (by decide) (by decide) (by decide) hl0 (UMemL.extSz_refl _ _) hmem hfd hpp
-    ihave Hsp := hDP f V M sts gn cs pid (R2 10#5) _ sts hfd hpp $$ Hsi
+    ihave Hsp := hDP f V M sts gn cs pid (R2 10#5) _ sts $$ []
+    · iintro %h0
+      exfalso
+      rw [hr] at h0
+      exact absurd h0 (by decide)
     iapply (syscall_ret_fd PT Γ c0 cpu k spie2 spp2 R2 γ j pid V M sts gn cs ip f
       { V with ofile := V.ofile, upt := V.upt } M sts cs hj hproc hK htier hpins2 hs2' hrows 4 hn4
       (by decide) (by decide) (by decide))
@@ -352,7 +360,11 @@ theorem syscall_arm_pipe (SP : SYSPIPE)
       (by decide) (by decide) (by decide) (by decide) hl0 hext hmem hfd hpp
     have hs2'' : R2 18#5 = pageAddr ({ V with ofile := V.ofile, upt := P' } : ProcPriv).upt.tfp := by
       rw [hs2']; simp only; rw [hext.1.2.1]
-    ihave Hsp := hDP f V M sts gn cs pid (R2 10#5) _ sts hfd hpp $$ Hsi
+    ihave Hsp := hDP f V M sts gn cs pid (R2 10#5) _ sts $$ []
+    · iintro %h0
+      exfalso
+      rw [hr] at h0
+      exact absurd h0 (by decide)
     iapply (syscall_ret_fd PT Γ c0 cpu k spie2 spp2 R2 γ j pid V M sts gn cs ip f
       { V with ofile := V.ofile, upt := P' } M1 sts cs hj hproc hK htier hpins2 hs2'' hrows 4 hn4
       (by decide) (by decide) (by decide))
@@ -382,7 +394,13 @@ theorem syscall_arm_pipe (SP : SYSPIPE)
       (R2 10#5) 4 hn4 (by decide) (by decide) (by decide) (by decide) (by decide) hl0 hext hmem hfd hpp
     have hs2'' : R2 18#5 = pageAddr ({ V with ofile := (V.ofile.set fd0 (fnode k0)).set fd1 (fnode k1), upt := P' } : ProcPriv).upt.tfp := by
       rw [hs2']; simp only; rw [hext.1.2.1]
-    ihave Hsp := hDP f V M sts gn cs pid (R2 10#5) _ _ hfd hpp $$ Hsi
+    ihave Hsp := hDP f V M sts gn cs pid (R2 10#5) _
+      ((sts.set fd0 (.open true false (.pipe γp))).set fd1 (.open false true (.pipe γp))) $$ [Hqf]
+    · iintro -
+      iexists fd0, fd1, γp
+      iframe Hqf
+      ipureintro
+      exact ⟨hne, hl0', hl1', rfl⟩
     iapply (syscall_ret_fd PT Γ c0 cpu k spie2 spp2 R2 γ j pid V M sts gn cs ip f
       { V with ofile := (V.ofile.set fd0 (fnode k0)).set fd1 (fnode k1), upt := P' } M1 _ cs
       hj hproc hK htier hpins2 hs2'' hrows 4 hn4 (by decide) (by decide) (by decide))

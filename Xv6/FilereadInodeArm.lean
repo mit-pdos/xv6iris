@@ -83,7 +83,8 @@ theorem frd_arm_inode (IL : ILOCK) (RD : READI) (IU : IUNLOCK) (Γ : SchedNames)
     (γ : FileNames) (fk : Nat) (q : Qp) (wb : Bool) (i : Nat) (γo : GName) (om : OffMode) (j : Nat)
     (pid : BitVec 32) (V : ProcPriv) (M : Nat → List (BitVec 8)) (γkl : GName) (γk : KmemNames)
     (n : Int) (F : Pfam GF (Aview → Nat → Anode → Nat → IProp GF)) (Rd : Nat → Nat → IProp GF)
-    (Rin : List (List Obs × BitVec 8) → IProp GF) (P : IProp GF)
+    (Rin : List (List Obs × BitVec 8) → IProp GF)
+    (Rp : List (BitVec 8) → IProp GF) (Rpe : List (BitVec 8) → PipeSt → IProp GF) (P : IProp GF)
     (hK : filereadSlots ≤ k.avail) (hj : j < NPROC) (hproc : k.proc = procAddr j)
     (hnoff : k.noff = 0) (hlocks : k.locks = []) (htier : k.tier = KTier.kpt)
     (ht : curTier = KTier.kpt) (hn0 : 0 ≤ n) (hn1 : n < 2 ^ 31)
@@ -98,7 +99,7 @@ theorem frd_arm_inode (IL : ILOCK) (RD : READI) (IU : IUNLOCK) (Γ : SchedNames)
     fileRef γ fk q (.open true wb (.inode i γo om)) ∗ procPrivExt (procAddr j) pid V V.upt M ∗
     genHalvesPriv (procAddr j) pid V.gen ∗ bslot ∗ P ∗
     areadInOm (hlc := hlc) om (fsGammaL fscFs) appE i γo F ∗
-    frdK (hlc := hlc) k γ fk q (.open true wb (.inode i γo om)) j pid V M n F Rd Rin P
+    frdK (hlc := hlc) k γ fk q (.open true wb (.inode i γo om)) j pid V M n F Rd Rin Rp Rpe P
     ⊢ wpLoop (GF := GF) cpu := by
   have hK' : 6 + readiSlots ≤ k.avail := hK
   have hK6 : 6 ≤ k.avail := by unfold readiSlots bmapSlots ballocSlots breadSlots panicSlots at hK'; omega
@@ -200,7 +201,7 @@ theorem frd_arm_inode (IL : ILOCK) (RD : READI) (IU : IUNLOCK) (Γ : SchedNames)
     rcases hr10 with h | h
     · rw [h]; exact frd_ret_nat n tot (by omega)
     · rw [h]; exact filereadRet_m1 n
-  iapply filereadExtra_inode_of V.gen V.upt F Rd Rin P _ om wb inum.toNat γo n (R' 10#5) M' (k.regs 11#5) rfl $$ HP
+  iapply filereadExtra_inode_of V.gen V.upt F Rd Rin P Rp Rpe _ om wb inum.toNat γo n (R' 10#5) M' (k.regs 11#5) rfl $$ HP
   rw [h10']
   iapply (frd_inode_arms inum.toNat γo n F dn bm data v.toNat tot dd a0 P' (viewFaulted V.upt P' M) M'
     (k.regs 11#5) av hn0 hn1 hok hwf hrow hle2 V.upt harm himg.1 himg.2 hpl) $$ Hrecv

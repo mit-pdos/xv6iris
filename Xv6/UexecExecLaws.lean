@@ -120,7 +120,7 @@ theorem syscDepRead_holds : SyscDepRead (hlc := hlc) (GF := GF) := by
   refine (syscDepRead_xv6 (hlc := hlc) f (uvisOf V M sts gn cs pid)).trans ?_
   dsimp only [uvisOf, xkA, fdStOfKey, syscFdKey, xpostRead, filereadExtra]
   iintro ⟨H, Hw⟩
-  iexists (Xfam.rF f), (Xfam.rRd f), (Xfam.rRin f), iprop(True)
+  iexists (Xfam.rF f), (Xfam.rRd f), (Xfam.rRin f), (Xfam.rPq f), (Xfam.rPqe f), iprop(True)
   iframe H
   isplitl []
   · ipureintro; trivial
@@ -143,7 +143,7 @@ theorem syscDepWrite_holds : SyscDepWrite (hlc := hlc) (GF := GF) := by
   refine (syscDepWrite_xv6 (hlc := hlc) f (uvisOf V M sts gn cs pid)).trans ?_
   dsimp only [uvisOf, xkA, fdStOfKey, syscFdKey, xpostWrite]
   iintro ⟨H, Hw⟩
-  iexists f.wQ
+  iexists f.wQ, f.wQe
   isplitl [H]
   · iapply H
     ipureintro
@@ -158,11 +158,11 @@ theorem syscDepWrite_holds : SyscDepWrite (hlc := hlc) (GF := GF) := by
     · ipureintro; rfl
     · ipureintro; exact imgAgrees_writerImg V.upt V.sz.toNat M
 
-/-- **`SyscDepPipe`** at the instance (UexecExecInst deviation 4: both rows
-`emp`). -/
+/-- **`SyscDepPipe`** at the instance (Rocq `sysc_out_pipe`): the receipt
+IS post 4 at the key. -/
 theorem syscDepPipe_holds : SyscDepPipe (hlc := hlc) (GF := GF) := by
-  intro f V M sts gn cs pid r M' sts' _ _
-  exact sbundleAt_spostAt_pipe_xv6 (hlc := hlc) _ f _ r M' sts' _ cs
+  intro f V M sts gn cs pid r M' sts'
+  exact spostAt_pipe_xv6 (hlc := hlc) _ f (uvisOf V M sts gn cs pid) r M' sts' _ cs
 
 /-- **`SyscDepClose`** at the instance (Rocq `sysc_dep_close` +
 `sysc_out_close`): row 21's payment at the key's descriptor, its answer

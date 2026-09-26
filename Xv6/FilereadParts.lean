@@ -376,6 +376,17 @@ theorem frd_st_pipe (inum : BitVec 32) (γo : GName) (om : OffMode) (γp : PipeN
   · simp [fdTypeCode, FD_PIPE, FD_DEVICE, FD_INODE, FD_NONE] at ht
   · simp [fdTypeCode, FD_PIPE, FD_DEVICE, FD_INODE, FD_NONE] at ht
 
+/-- The read end of a pipe is not the writable one (Rocq `fdpipe_ends`):
+the end piperead is handed is the read end, `w = false`. -/
+theorem frd_pipe_wb (inum : BitVec 32) (γo : GName) (om : OffMode) (γp γp' : PipeNames) (C : FContent)
+    (wb : Bool) (hok : fdstateOk inum γo om γp C (.open true wb (.pipe γp'))) : fcWbool C = false := by
+  obtain ⟨-, hw, -, -, he⟩ := hok
+  simp only [fdpipeEnds] at he
+  subst he
+  unfold fcWbool
+  rw [hw]
+  decide
+
 theorem frd_st_device (inum : BitVec 32) (γo : GName) (om : OffMode) (γp : PipeNames) (C : FContent) (st : FdState)
     (hok : fdstateOk inum γo om γp C st) (h : C.type = FD_DEVICE) (hr : C.readable ≠ 0#8) :
     ∃ wb, st = .open true wb (.device C.major.toNat) := by

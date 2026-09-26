@@ -248,7 +248,8 @@ taken at every hart. -/
 theorem swr_filewrite (FW : FILEWRITE) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
     (c : CPU) (k' : KCtx) (γ : FileNames) (fk : Nat) (q : Qp) (st : FdState)
     (j : Nat) (pid : BitVec 32) (V : ProcPriv) (M : Nat → List (BitVec 8))
-    (γkl : GName) (γk : KmemNames) (γl : GName) (γu : UartNames) (n : Int) (Q : Nat → IProp GF) (pmv : Nat → Option UPerm) (szv : Nat) (lzv : Bool)
+    (γkl : GName) (γk : KmemNames) (γl : GName) (γu : UartNames) (n : Int) (Q : Nat → IProp GF)
+    (Qe : Nat → PipeSt → IProp GF) (pmv : Nat → Option UPerm) (szv : Nat) (lzv : Bool)
     (hK : filewriteSlots ≤ k'.avail) (hfk : fk < NFILE)
     (hj : j < NPROC) (hproc : k'.proc = procAddr j)
     (hnoff : k'.noff = 0) (htier : k'.tier = KTier.kpt)
@@ -259,10 +260,10 @@ theorem swr_filewrite (FW : FILEWRITE) (Γ : SchedNames) [ClaimIs (hlc := hlc) G
     fileRef γ fk q st ∗ procPrivCoreNoctxAt curCtx (procAddr j) pid V M ∗
     isLock γkl kmemLockAddr "kmem" (kmemRes γk) ∗ kallocAvail γk none ∗
     filewriteEnv (hlc := hlc) γl γu st ∗ foffRow st ∗
-    filewriteIn (hlc := hlc) pmv szv lzv st n (writerImg V.upt M) (k'.regs 11#5) Q ∗
-    (∀ c' : CPU, filewritePost (hlc := hlc) k' γl γu γ fk q st j pid V M n Q c')
+    filewriteIn (hlc := hlc) pmv szv lzv st n (writerImg V.upt M) (k'.regs 11#5) Q Qe ∗
+    (∀ c' : CPU, filewritePost (hlc := hlc) k' γl γu γ fk q st j pid V M n Q Qe c')
     ⊢ wpLoop (GF := GF) c := by
-  have h := FW.wp_filewrite_eb (hlc := hlc) (GF := GF) Γ c k' γ fk q st j pid V M γkl γk γl γu n Q
+  have h := FW.wp_filewrite_eb (hlc := hlc) (GF := GF) Γ c k' γ fk q st j pid V M γkl γk γl γu n Q Qe
     pmv szv lzv hK hfk hj hproc hnoff htier ha0 ha2 hn htb
   unfold wp_filewrite_eb_body at h
   simp only [filewriteAddr] at h

@@ -83,6 +83,16 @@ theorem fwr_st_pipe (inum : BitVec 32) (γo : GName) (om : OffMode) (γp : PipeN
   · simp [fdTypeCode, FD_PIPE, FD_DEVICE, FD_INODE, FD_NONE] at ht
   · simp [fdTypeCode, FD_PIPE, FD_DEVICE, FD_INODE, FD_NONE] at ht
 
+/-- The end pipewrite is handed is the write end (Rocq `fdpipe_ends`, at a
+writable descriptor). -/
+theorem fwr_pipe_wb (inum : BitVec 32) (γo : GName) (om : OffMode) (γp γp' : PipeNames) (C : FContent)
+    (rb wb : Bool)
+    (hok : fdstateOk inum γo om γp C (.open rb wb (.pipe γp'))) (hw : ¬ C.writable = 0#8) : wb = true := by
+  obtain ⟨-, hwr, -⟩ := hok
+  cases wb
+  · simp at hwr; exact absurd hwr hw
+  · rfl
+
 theorem fwr_st_device (inum : BitVec 32) (γo : GName) (om : OffMode) (γp : PipeNames) (C : FContent) (st : FdState)
     (hok : fdstateOk inum γo om γp C st) (h : C.type = FD_DEVICE) (hw : C.writable ≠ 0#8) :
     ∃ rb mj, st = .open rb true (.device mj) ∧ mj = C.major.toNat := by
@@ -133,7 +143,7 @@ theorem fwr_dispatch (PW : PIPEWRITE) (IL : ILOCK) (WI : WRITEI) (IU : IUNLOCK) 
     (cpu : CPU) (k : KCtx) (R : RegMap) (γ : FileNames) (fk : Nat) (q : Qp) (st : FdState)
     (C : FContent) (inumC : BitVec 32) (γoC : GName) (omC : OffMode) (γpC : PipeNames)
     (j : Nat) (pid : BitVec 32) (V : ProcPriv) (M : Nat → List (BitVec 8))
-    (γkl : GName) (γk : KmemNames) (γl : GName) (γu : UartNames) (n : Int) (Q : Nat → IProp GF) (pmv : Nat → Option UPerm) (szv : Nat) (lzv : Bool)
+    (γkl : GName) (γk : KmemNames) (γl : GName) (γu : UartNames) (n : Int) (Q : Nat → IProp GF) (Qe : Nat → PipeSt → IProp GF) (pmv : Nat → Option UPerm) (szv : Nat) (lzv : Bool)
     (w2 w4 w5 w8 w9 w10 w11 : BitVec 64)
     (hK : filewriteSlots ≤ k.avail) (hK12 : 12 ≤ k.avail) (hfk : fk < NFILE)
     (hj : j < NPROC) (hproc : k.proc = procAddr j)
@@ -152,11 +162,12 @@ theorem fwr_dispatch (PW : PIPEWRITE) (IL : ILOCK) (WI : WRITEI) (IU : IUNLOCK) 
     foffRow st ∗
     frefTok γ fk q ∗ fileFieldsAt curCtx fk q C ∗ filePaySt γ fk q C st ∗
     procPrivExt (procAddr j) pid V V.upt M ∗ filewriteEnv (hlc := hlc) γl γu st ∗
-    filewriteIn (hlc := hlc) pmv szv lzv st n (writerImg V.upt M) (k.regs 11#5) Q ∗
-    fwrK (hlc := hlc) k γl γu γ fk q st j pid V M n Q
+    filewriteIn (hlc := hlc) pmv szv lzv st n (writerImg V.upt M) (k.regs 11#5) Q Qe ∗
+    genHalvesPriv (procAddr j) pid V.gen ∗
+    fwrKG (hlc := hlc) k γl γu γ fk q st j pid V M n Q Qe
     ⊢ wpLoop (GF := GF) cpu := by
   iintro ⟨Hk, Hpc, Hframe, Hte, Hce, #Hpi, #Hpe, #Hkl, #Hav, #Hfoff, Htok, Hfields, Hpay, Hpriv,
-    Henv, Hin, HΦ⟩
+    Henv, Hin, Hgen, HΦG⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
   -- +0x24  c.lw a5,0(a0)
   icases filerw_fields_type fk q C $$ Hfields with ⟨Hty, Hft⟩
@@ -175,8 +186,10 @@ theorem fwr_dispatch (PW : PIPEWRITE) (IL : ILOCK) (WI : WRITEI) (IU : IUNLOCK) 
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [filerw_beq1, decide_eq_true h1]
     iintro Hk Hpc
     obtain ⟨rb, wb, rfl⟩ := fwr_st_pipe inumC γoC omC γpC C st hok h1
-    iapply (fwr_arm_pipe PW Γ cpu k k.spie k.spp _ γl γu γ fk q C rb wb γpC j pid V M γkl γk n Q w2 w4 w5 w8 w9
-      w10 w11 hK hj hproc hnoff htier ht0 hn h1 ?hrp ?h10p ?h12p ?h11p) $$ [- $Hk $Hpc]
+    obtain rfl : wb = true := fwr_pipe_wb inumC γoC omC γpC γpC C rb wb hok hw
+    iapply (fwr_arm_pipe PW Γ cpu k k.spie k.spp _ γl γu γ fk q C rb γpC j pid V M γkl γk n Q Qe pmv szv lzv
+      w2 w4 w5 w8 w9 w10 w11 hK hj hproc hnoff htier ht0 hn h1 (fwr_wbool C hw) ?hrp ?h10p ?h12p ?h11p)
+      $$ [- $Hk $Hpc]
     rotate_right 1
     k_norm_g
     iframe
@@ -187,6 +200,8 @@ theorem fwr_dispatch (PW : PIPEWRITE) (IL : ILOCK) (WI : WRITEI) (IU : IUNLOCK) 
     case h10p => simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true]; exact h10
     case h12p => simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true]; exact h12
     case h11p => simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true]; exact h11
+  -- every other arm hands the generation halves straight back
+  ihave HΦ := fwrKG_elim $$ HΦG Hgen
   -- FD_PIPE: falls
   k_step_e (wp_s_branch cpu _ (KA.«filewrite» + 0x28#64) false 52#13 15#5 14#5 (by decide) bop.BEQ)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [filerw_beq1, decide_eq_false h1]
@@ -202,7 +217,7 @@ theorem fwr_dispatch (PW : PIPEWRITE) (IL : ILOCK) (WI : WRITEI) (IU : IUNLOCK) 
     iintro Hk Hpc
     obtain ⟨rb, mj, rfl, hmj⟩ := fwr_st_device inumC γoC omC γpC C st hok h3 hw
     unfold filewriteEnv
-    iapply (fwr_arm_dev CW Γ cpu k k.spie k.spp _ γl γu γ fk q C rb mj j pid V M γkl γk n Q pmv szv lzv w2 w4 w5
+    iapply (fwr_arm_dev CW Γ cpu k k.spie k.spp _ γl γu γ fk q C rb mj j pid V M γkl γk n Q Qe pmv szv lzv w2 w4 w5
       w8 w9 w10 w11 hK hj hproc hnoff htier ht0 hn hn0 hmj ?hrv ?h10v ?h11v ?h12v) $$ [- $Hk $Hpc]
     rotate_right 1
     k_norm_g
@@ -251,7 +266,7 @@ theorem fwr_dispatch (PW : PIPEWRITE) (IL : ILOCK) (WI : WRITEI) (IU : IUNLOCK) 
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
       with [h12, fwr_blez n ⟨hn0, hn.2⟩, decide_eq_true hz]
     iintro Hk Hpc
-    iapply (fwr_arm_zero cpu k k.spie k.spp _ γl γu γ fk q rb i γoC omC j pid V M n Q pmv szv lzv w2 w4 w5 w8 w9 w10 w11 hK12
+    iapply (fwr_arm_zero cpu k k.spie k.spp _ γl γu γ fk q rb i γoC omC j pid V M n Q Qe pmv szv lzv w2 w4 w5 w8 w9 w10 w11 hK12
       ?hrz ?h12z hz htb) $$ [- $Hk $Hpc]
     rotate_right 1
     k_norm_g
@@ -270,7 +285,7 @@ theorem fwr_dispatch (PW : PIPEWRITE) (IL : ILOCK) (WI : WRITEI) (IU : IUNLOCK) 
   have hpos : 0 < n ∧ n < 2 ^ 31 := ⟨by omega, hn.2⟩
   let A : FwrA := ⟨γ, fk, q, rb, i, γoC, omC, j, pid, V, M, γkl, γk, γl, γu, n⟩
   have hA : FwrFacts k A := ⟨hK, hfk, hj, hproc, hnoff, hlocks, htier, ht0, hpos⟩
-  iapply (fwr_arm_inode BO IL WI IU EO Γ cpu k k.spie k.spp _ A hA Q pmv szv lzv htb w2 w4 w5 w8 w9 w10 w11 ?hri)
+  iapply (fwr_arm_inode BO IL WI IU EO Γ cpu k k.spie k.spp _ A hA Q Qe pmv szv lzv htb w2 w4 w5 w8 w9 w10 w11 ?hri)
     $$ [- $Hk $Hpc]
   rotate_right 1
   k_norm_g
@@ -289,14 +304,14 @@ theorem filewrite_main (PW : PIPEWRITE) (IL : ILOCK) (WI : WRITEI) (IU : IUNLOCK
     (cpu : CPU) (k : KCtx) (γ : FileNames) (fk : Nat) (q : Qp) (st : FdState)
     (j : Nat) (pid : BitVec 32) (V : ProcPriv) (M : Nat → List (BitVec 8))
     (γkl : GName) (γk : KmemNames) (γl : GName) (γu : UartNames) (n : Int) (Q : Nat → IProp GF)
-    (pmv : Nat → Option UPerm) (szv : Nat) (lzv : Bool)
+    (Qe : Nat → PipeSt → IProp GF) (pmv : Nat → Option UPerm) (szv : Nat) (lzv : Bool)
     (hK : filewriteSlots ≤ k.avail) (hfk : fk < NFILE)
     (hj : j < NPROC) (hproc : k.proc = procAddr j)
     (hnoff : k.noff = 0) (htier : k.tier = KTier.kpt)
     (ha0 : k.regs 10#5 = fnode fk)
     (ha2 : k.regs 12#5 = BitVec.ofInt 64 n) (hn : -2 ^ 31 ≤ n ∧ n < 2 ^ 31)
     (htb : wrTb pmv szv lzv V.upt) :
-    wp_filewrite_eb_body (hlc := hlc) (GF := GF) Γ cpu k γ fk q st j pid V M γkl γk γl γu n Q
+    wp_filewrite_eb_body (hlc := hlc) (GF := GF) Γ cpu k γ fk q st j pid V M γkl γk γl γu n Q Qe
       pmv szv lzv hK hfk hj hproc hnoff htier ha0 ha2 hn htb := by
   unfold wp_filewrite_eb_body
   have hK12 : 12 ≤ k.avail := by have := hK; rw [filewriteSlots_eq] at this; omega
@@ -308,13 +323,17 @@ theorem filewrite_main (PW : PIPEWRITE) (IL : ILOCK) (WI : WRITEI) (IU : IUNLOCK
   have hlocks : k.locks = [] := List.eq_nil_of_length_eq_zero (by have := hkwf.2.2.2.1; omega)
   -- THE CONTRACT'S CONTINUATION, hart-free, at the ambient block form (the cwd
   -- reference and the generation row parked in it)
-  icases (filerw_core_conv ht0 (procAddr j) pid V V.upt M).1 $$ Hpriv with ⟨Hpriv, Hcwd⟩
-  ihave HΦ : fwrK (hlc := hlc) k γl γu γ fk q st j pid V M n Q $$ [Hnext Hcwd]
-  · unfold fwrK filewritePost
-    iintro %c %spie %spp %R' %P' %hp Hk Hpc Hte Hce Href Hpriv Henv Harms
+  icases (filerw_core_conv ht0 (procAddr j) pid V V.upt M).1 $$ Hpriv with ⟨Hpriv, Hcwd, Hpg⟩
+  -- the generation halves stay out: pipewrite's kill read lends them
+  unfold procGenAt
+  icases Hpg with ⟨Hft, HQ, Hxs, Hgen⟩
+  ihave HΦG : fwrKG (hlc := hlc) k γl γu γ fk q st j pid V M n Q Qe $$ [Hnext Hcwd Hft HQ Hxs]
+  · unfold fwrKG fwrK filewritePost
+    iintro Hgen %c %spie %spp %R' %P' %hp Hk Hpc Hte Hce Href Hpriv Henv Harms
     ihave HK := wpNext_at true k.proc cpu c _ (fwr_pin hj k hproc c cpu) $$ Hnext
-    ihave Hpriv := (filerw_core_conv ht0 (procAddr j) pid V P' _).2 $$ [Hpriv Hcwd]
-    · iframe
+    ihave Hpriv := (filerw_core_conv ht0 (procAddr j) pid V P' _).2 $$ [Hpriv Hcwd Hft HQ Hxs Hgen]
+    · unfold procGenAt
+      iframe
     iapply HK $$ %spie %spp %R' %P' %hp Hk Hpc Hte Hce Href Hpriv Henv Harms
   -- the reference, taken apart
   icases filerw_ref_open γ fk q st $$ Href with ⟨%C, %⟨inumC, γoC, omC, γpC, hok⟩, Htok, Hfields, Hpay⟩
@@ -348,7 +367,8 @@ theorem filewrite_main (PW : PIPEWRITE) (IL : ILOCK) (WI : WRITEI) (IU : IUNLOCK
     · iframe
     ihave Hpriv := fwr_priv_self (procAddr j) pid V M $$ Hpriv
     ihave Henv := filewrite_env_out_of_env γl γu st $$ Henv
-    ihave - := filewriteIn_unwritable pmv szv lzv inumC γoC omC γpC C st n _ _ Q hok hw $$ Hin
+    ihave - := filewriteIn_unwritable pmv szv lzv inumC γoC omC γpC C st n _ _ Q Qe hok hw $$ Hin
+    ihave HΦ := fwrKG_elim $$ HΦG Hgen
     unfold fwrK
     iapply HΦ $$ %cpu %k.spie %k.spp %_ %V.upt [] Hk Hpc Hte Hce Href Hpriv Henv []
     · ipureintro
@@ -357,7 +377,7 @@ theorem filewrite_main (PW : PIPEWRITE) (IL : ILOCK) (WI : WRITEI) (IU : IUNLOCK
     · unfold filewriteArms
       isplitr
       · ipureintro; simp only [RegMap.set_apply]; exact filewriteRet_m1 n
-      iapply filewriteExtra_unwritable _ inumC γoC omC γpC C st n _ _ Q _ hok hw
+      iapply filewriteExtra_unwritable _ _ inumC γoC omC γpC C st n _ _ Q Qe _ hok hw
   -- +0x04  beqz a5 : falls (a writable descriptor)
   k_step_e (wp_s_branch cpu _ (KA.«filewrite» + 4#64) false 310#13 15#5 0#5 (by decide) bop.BEQ)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [filerw_beqz, decide_eq_false hw]
@@ -395,7 +415,8 @@ theorem filewrite_main (PW : PIPEWRITE) (IL : ILOCK) (WI : WRITEI) (IU : IUNLOCK
     ihave Hk := fwr_ctx_entry _ _ _ _ $$ Hk
     ihave Href := filerw_ref_close γ fk q st C $$ [Htok Hfields Hpay]
     · iframe
-    iapply (fwr_arm_neg cpu k k.spie k.spp _ γl γu γ fk q st j pid V M n Q pmv szv lzv w2 w4 w5 w8 w9 w10
+    ihave HΦ := fwrKG_elim $$ HΦG Hgen
+    iapply (fwr_arm_neg cpu k k.spie k.spp _ γl γu γ fk q st j pid V M n Q Qe pmv szv lzv w2 w4 w5 w8 w9 w10
       w11 hK12 ?hrn hneg htb) $$ [- $Hk $Hpc]
     rotate_right 1
     k_norm_g
@@ -411,7 +432,7 @@ theorem filewrite_main (PW : PIPEWRITE) (IL : ILOCK) (WI : WRITEI) (IU : IUNLOCK
   iintro Hk Hpc
   ihave Hk := fwr_ctx_entry _ _ _ _ $$ Hk
   iapply (fwr_dispatch PW IL WI IU BO EO CW PA Γ cpu k _ γ fk q st C inumC γoC omC γpC j pid V M γkl γk γl γu
-    n Q pmv szv lzv w2 w4 w5 w8 w9 w10 w11 hK hK12 hfk hj hproc hnoff htier ht0 hlocks hn (by omega) hok
+    n Q Qe pmv szv lzv w2 w4 w5 w8 w9 w10 w11 hK hK12 hfk hj hproc hnoff htier ht0 hlocks hn (by omega) hok
     hw ?hrd ?h10d ?h11d ?h12d htb) $$ [- $Hk $Hpc]
   rotate_right 1
   k_norm_g
@@ -431,9 +452,9 @@ end
 Pipewrite Ilock Writei Iunlock BeginOp EndOp Consolewrite Panic`). -/
 theorem filewrite_proof (PW : PIPEWRITE) (IL : ILOCK) (WI : WRITEI) (IU : IUNLOCK) (BO : BEGIN_OP)
     (EO : END_OP) (CW : CONSOLEWRITE) (PA : PANIC) : FILEWRITE :=
-  ⟨fun Γ _ cpu k γ fk q st j pid V M γkl γk γl γu n Q pmv szv lzv hK hfk hj hproc hnoff htier ha0 ha2
+  ⟨fun Γ _ cpu k γ fk q st j pid V M γkl γk γl γu n Q Qe pmv szv lzv hK hfk hj hproc hnoff htier ha0 ha2
       hn htb =>
-    filewrite_main PW IL WI IU BO EO CW PA Γ cpu k γ fk q st j pid V M γkl γk γl γu n Q pmv szv lzv hK
+    filewrite_main PW IL WI IU BO EO CW PA Γ cpu k γ fk q st j pid V M γkl γk γl γu n Q Qe pmv szv lzv hK
       hfk hj hproc hnoff htier ha0 ha2 hn htb⟩
 
 end Xv6

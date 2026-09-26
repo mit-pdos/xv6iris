@@ -43,13 +43,41 @@ variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [Fdslot
   [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
   [Appcfg GF] [Fscfg] [Icfg] [CurCtx]
 
+/-- PIPEREAD'S WINDOW, AT THE IMAGE (Rocq `pipe_rpost_img_of` at the
+caller): piperead's post over the list `bsW` it wrote is the post at the
+resume image, the written pages being full (`umPageLen`). -/
+theorem frd_rpost_img (P : UPtd) (γ : GName) (addr : BitVec 64) (Q : List (BitVec 8) → IProp GF)
+    (Qe : List (BitVec 8) → PipeSt → IProp GF) (Rk : IProp GF) (n d : Nat) (bsW : List (BitVec 8))
+    (r : BitVec 64) (P' : UPtd) (Vw M' : Nat → List (BitVec 8)) (hlen : bsW.length = d)
+    (hM : M' = umemWrite Vw addr.toNat bsW) (hmap : umMapped P' addr.toNat d)
+    (hpl : umPageLen P' M') :
+    pipeRpost (hlc := hlc) P γ addr Q Qe Rk n d (fun i => bsW.getD i 0#8) r ⊢
+      pipeRpostImg (hlc := hlc) P γ Q Qe Rk n r M' addr := by
+  have hbs : (List.range d).map (fun i => bsW.getD i 0#8) = bsW := by
+    apply List.ext_getElem
+    · simp [hlen]
+    · intro i h1 h2
+      simp only [List.getElem_map, List.getElem_range]
+      simp [List.getD_eq_getElem?_getD, List.getElem?_eq_getElem h2]
+  have e : M' = umemWrite Vw addr.toNat ((List.range d).map (fun i => bsW.getD i 0#8)) := by
+    rw [hbs]; exact hM
+  rw [e]
+  refine pipeRpostImg_of P γ addr Q Qe Rk n d _ r Vw (fun j hj => ?_)
+  obtain ⟨w, hw⟩ := Option.isSome_iff_exists.mp (hmap j hj)
+  have hl := hpl _ w hw
+  rw [e, UMemL.umemWrite_length] at hl
+  exact hl
+
 set_option maxHeartbeats 8000000 in
 /-- `piperead(f->pipe, addr, n)` at `+0x6c`: the eb contract, the block
-converted at the kernel-page-table tier. -/
+converted at the kernel-page-table tier; the generation halves lent and
+returned; the queue's post read at the resume image (`frd_rpost_img`). -/
 theorem frd_piperead (PR : PIPEREAD) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
     (c : CPU) (k' : KCtx) (γl : GName) (γp : PipeNames) (w : Bool) (q : Qp)
     (γkl : GName) (γk : KmemNames) (j : Nat) (pid : BitVec 32) (V : ProcPriv)
-    (M : Nat → List (BitVec 8)) (n : Int) (ht : curTier = KTier.kpt)
+    (M : Nat → List (BitVec 8)) (n : Int)
+    (Rp : List (BitVec 8) → IProp GF) (Rpe : List (BitVec 8) → PipeSt → IProp GF) (hw : w = false)
+    (ht : curTier = KTier.kpt)
     (hj : j < NPROC) (hproc : k'.proc = procAddr j) (hK : pipereadSlots ≤ k'.avail)
     (hnoff : k'.noff = 0) (htier : k'.tier = KTier.kpt)
     (hn : k'.regs 12#5 = BitVec.ofInt 64 n) (hn' : -2 ^ 31 ≤ n ∧ n < 2 ^ 31) :
@@ -57,26 +85,37 @@ theorem frd_piperead (PR : PIPEREAD) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF 
     trapCsrsExt c k'.sie ∗ cpuClaimExt c k'.sie k'.proc ∗
     isPipe γl γp (k'.regs 10#5) ∗ pipeRef γp w q ∗
     isLock γkl kmemLockAddr "kmem" (kmemRes γk) ∗ kallocAvail γk none ∗
-    procPrivExt (procAddr j) pid V V.upt M ∗
+    procPrivExt (procAddr j) pid V V.upt M ∗ genHalvesPriv (procAddr j) pid V.gen ∗
+    pipeRpay (hlc := hlc) γp.pnQueue Rp Rpe n.toNat ∗
     (∀ (c' : CPU) (spie spp : Bool) (R' : RegMap) (P' : UPtd) (M' : Nat → List (BitVec 8)) (d : Nat),
       ⌜calleeSaved k'.regs R' ∧ V.upt.extSz V.sz P' ∧ (d : Int) ≤ max 0 n ∧
         pipeReadRet d (R' 10#5) ∧ umemWrote V.upt M (k'.regs 11#5) d P' M'⌝ -∗
       kctx c' ((k'.withSpie spie spp).withRegs R') -∗ pcIs c' (jumpPc (k'.regs 1#5)) -∗
       trapCsrsExt c' k'.sie -∗ cpuClaimExt c' k'.sie k'.proc -∗
-      pipeRef γp w q -∗ procPrivExt (procAddr j) pid V P' M' -∗ wpLoop c')
+      pipeRef γp w q -∗ procPrivExt (procAddr j) pid V P' M' -∗
+      genHalvesPriv (procAddr j) pid V.gen -∗
+      pipeRpostImg (hlc := hlc) V.upt γp.pnQueue Rp Rpe
+        iprop(killShot V.gen ∗ □ MachFixedGS.killCred (hlc := hlc) (GF := GF)) n.toNat (R' 10#5) M'
+        (k'.regs 11#5) -∗ wpLoop c')
     ⊢ wpLoop (GF := GF) c := by
-  have h := PR.wp_piperead_eb (hlc := hlc) (GF := GF) Γ c k' γl γp w q γkl γk j pid V M n
+  have h := PR.wp_piperead_eb (hlc := hlc) (GF := GF) Γ c k' γl γp w q γkl γk j pid V M n Rp Rpe hw
     hj hproc hK hnoff htier hn hn'
   unfold wp_piperead_eb_body at h
   simp only [pipereadAddr] at h
-  iintro ⟨Hk, Hpc, #Hpi, Hte, Hce, #Hpp, Href, #Hkl, #Hav, Hpriv, HK⟩
+  iintro ⟨Hk, Hpc, #Hpi, Hte, Hce, #Hpp, Href, #Hkl, #Hav, Hpriv, Hgen, Hpay, HK⟩
   ihave Hpriv := (procPrivExt_conv0 ht (procAddr j) pid V M).2 $$ Hpriv
   iapply h
-  iframe Hk Hpc Hpi Hte Hce Hpp Href Hkl Hav Hpriv
+  iframe Hk Hpc Hpi Hte Hce Hpp Href Hkl Hav Hpriv Hgen Hpay
   iapply wpNext_intro
-  iintro %c' %spie %spp %R' %P' %M' %d %hp Hk Hpc Hte Hce Href Hpriv
+  iintro %c' %spie %spp %R' %P' %M' %d %bsW %⟨hcs, hext, hdle, hret, hlen, hM, hmap⟩ Hk Hpc Hte Hce
+    Href Hpriv Hgen Hpost
   ihave Hpriv := (procPrivExt_conv ht (procAddr j) pid V P' M').1 $$ Hpriv
-  iapply HK $$ %c' %spie %spp %R' %P' %M' %d %hp Hk Hpc Hte Hce Href Hpriv
+  icases frd_pageLen (procAddr j) pid V P' M' $$ Hpriv with ⟨%hpl, Hpriv⟩
+  ihave Hpost := frd_rpost_img V.upt γp.pnQueue (k'.regs 11#5) Rp Rpe _ n.toNat d bsW (R' 10#5) P'
+    (viewFaulted V.upt P' M) M' hlen hM hmap hpl $$ Hpost
+  iapply HK $$ %c' %spie %spp %R' %P' %M' %d [] Hk Hpc Hte Hce Href Hpriv Hgen Hpost
+  ipureintro
+  exact ⟨hcs, hext, hdle, hret, ⟨bsW, hlen, hM, hmap⟩⟩
 
 set_option maxHeartbeats 8000000 in
 /-- `devsw[CONSOLE].read(1, addr, n)` at `+0x9a` (the INDIRECT call):

@@ -269,7 +269,7 @@ theorem pa_fileclose (FC : FILECLOSE) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF
     ⊢ wpLoop (GF := GF) c := by
   subst hs hpj
   have h := FC.wp_fileclose_eb (hlc := hlc) (GF := GF) Γ c k' γl γ kk 1 .closed 0 γkl γk on pidv dqp
-    hK hnoff htier ha0
+    iprop(emp) hK hnoff htier ha0
   unfold wp_fileclose_eb_body at h
   simp only [filecloseAddr] at h
   iintro ⟨Hk, Hpc, Hte, Hce, #Hft, #Hpe, Href, Hpid, Hir, Hnext⟩
@@ -277,8 +277,11 @@ theorem pa_fileclose (FC : FILECLOSE) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF
   iframe Hk Hpc Hte Hce Hft Hpe Href Hpid Hir
   isplitl []
   · iapply filecloseEnv_none
+  -- an untyped file pays no close link (Rocq `fileclose_cpay_none`)
+  isplitl []
+  · iapply filecloseCpay_none
   iapply wpNext_mono _ _ _ _ _ $$ Hnext
-  iintro %c' HK %spie %spp %R' %hcs Hk Hpc Hte Hce Hpid Hfd Hir -
+  iintro %c' HK %spie %spp %R' %hcs Hk Hpc Hte Hce Hpid Hfd Hir - -
   iapply HK $$ %spie %spp %R' %hcs Hk Hpc Hte Hce Hpid Hfd Hir
 
 /-! ## The tail: the epilogue at `(KernelSyms.«pipealloc» + 0xb8)` -/
@@ -611,7 +614,7 @@ theorem pa_success (IL : INITLOCK) (cpu c : CPU) (k : KCtx) (γ : FileNames) (γ
       wordPointsTo (aPopen pi true) 4 (DFrac.own 1) 1#32 from by rw [pa_addr_wo]) $$ Hwo
   iapply wpLoop_fupd
   imod (kctx_newPipe cA _ pi hpv _ bs hbs) $$ [Hk Hid0 Hid16 Hfresh Hnm Hnr Hnw Hro Hwo Hdat Hslack]
-    with ⟨Hk, %γlp, %γp, #Hpipe, Hr0, Hr1⟩
+    with ⟨Hk, %γlp, %γp, #Hpipe, Hr0, Hr1, Hqf⟩
   · iframe Hid0 Hid16 Hfresh Hnm Hnr Hnw Hro Hwo Hdat Hslack
     iexact Hk
   imodintro
@@ -785,7 +788,7 @@ theorem pa_success (IL : INITLOCK) (cpu c : CPU) (k : KCtx) (γ : FileNames) (γ
   ihave Hframe := pa_frame_close (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) (k.regs 9#5) (k.regs 20#5) _ _
     $$ [Hra Hs0 Hs1 Hs4 Hsp1 Hsp2]
   case' _ => iframe
-  ihave Hpost : pipeallocPost (GF := GF) γ γk on (k.regs 10#5) (k.regs 11#5) 0#64 $$ [Hav Hc0 Hc1 Href0' Href1']
+  ihave Hpost : pipeallocPost (GF := GF) γ γk on (k.regs 10#5) (k.regs 11#5) 0#64 $$ [Hav Hc0 Hc1 Href0' Href1' Hqf]
   case' _ =>
     unfold pipeallocPost
     iright
@@ -793,7 +796,7 @@ theorem pa_success (IL : INITLOCK) (cpu c : CPU) (k : KCtx) (γ : FileNames) (γ
     isplitl []
     · ipureintro; rfl
     iexists k0, k1, γp
-    iframe Hc0 Hc1 Href0' Href1'
+    iframe Hc0 Hc1 Href0' Href1' Hqf
     ipureintro; exact ⟨hk0, hk1⟩
   iapply (pa_exit_pin cpu cU k γ γk on pidv dqp hK6 hpinU spie spp _
       (by simp only [RegMap.set_apply, BitVec.reduceEq, ite_false]; exact a2.trans hR2)

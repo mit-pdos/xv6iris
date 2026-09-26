@@ -56,7 +56,11 @@ header on the three-quarter trap).
 
 DEVIATIONS FROM ROCQ:
   * THE SUCCESS ARM NAMES THE PIPE (`∃ γp`, both rows `.pipe γp`, Rocq's)
-    but hands out no queue fragment yet (SpecPipealloc deviation 4).
+    and hands out its byte queue's fragment at the birth state
+    (`pipeQfrag γp.pnQueue pst0`, Rocq's).  The failure arms that already
+    hold the two pipe files close both ends paying out of that fragment
+    (the first close's link, the second's out of the first's post -- Rocq
+    `ProofSysPipe.sp_close2`).
   * eb-GENERIC AT DEPTH 0 (Rocq's `cpu_own 0 eb` -- the same).
   * THE PAGE COUNT IS THE UNCOUNTED MODE (`kallocAvail γk none`, Rocq's
     `kalloc_env γa None`): copyout's vmfault needs it, and `none` is
@@ -126,7 +130,9 @@ def sysPipePost (γ : FileNames) (γd : GName) (pa : BitVec 64) (pid : BitVec 32
       sts[fd0]? = some .closed ∧ sts[fd1]? = some .closed ∧
       sysPipeMem V.sz V.upt M v (sysPipeFdBytes fd0) (sysPipeFdBytes fd1) P' M'⌝ ∗
     procPrivFd γ pa pid { V with ofile := (V.ofile.set fd0 (fnode k0)).set fd1 (fnode k1), upt := P' } M' ∗
-    fdFrags γd ((sts.set fd0 (.open true false (.pipe γp))).set fd1 (.open false true (.pipe γp))))
+    fdFrags γd ((sts.set fd0 (.open true false (.pipe γp))).set fd1 (.open false true (.pipe γp))) ∗
+    -- ...AND THE PIPE'S BYTE QUEUE FRAGMENT AT ITS BIRTH STATE (Rocq)
+    pipeQfrag γp.pnQueue pst0)
 
 /-- What sys_pipe's caller resumes with: the `true` crossing. -/
 def sysPipeCont (cpu : CPU) (k : KCtx) (γ : FileNames) (γd : GName) (pa : BitVec 64)

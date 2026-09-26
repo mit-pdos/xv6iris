@@ -46,6 +46,13 @@ end_op), so fileclose can return on another hart whatever SIE was doing; the
 trap-CSR complement `trapCsrsExt` / `cpuClaimExt` goes in and comes back on
 EVERY arm.
 
+THE BYTE QUEUE'S CLOSE PAYMENT (Rocq `fileclose_cpay st Φc` in,
+`fileclose_cpost q st Φc` out, design/pipe.md "The byte queue"): the fast
+path (`--f->ref > 0`) fires nothing and is not the whole reference's close
+(`filecloseCpost_of_cpay`); the last close of a pipe end hands the payment
+to pipeclose and its FIRED post comes back (`filecloseCpost_of_fired`); a
+descriptor that is not a pipe pays and gets back nothing.
+
 ## DEVIATIONS from Rocq
 
 1. **eb-generic at DEPTH 0** (the session's `_eb` form, `hnoff : k.noff = 0`):
@@ -365,15 +372,6 @@ theorem filecloseCpost_of_cpay (q : Qp) (st : FdState) (Φc : IProp GF) (hq : q 
   · exact .rfl
   · exact .rfl
 
-/-- A half is not the whole reference. -/
-theorem qpHalf_ne_one : (1 : Qp).half ≠ 1 := by
-  intro h
-  have h2 := congrArg Subtype.val h
-  have h3 : ((1 : Qp).half).val = (1 : Qp).val / 2 := rfl
-  have h4 : (1 : Qp).val = 1 := rfl
-  rw [h3, h4] at h2
-  grind
-
 /-- Rocq `fileclose_cpost_any_of`. -/
 theorem filecloseCpostAny_of (q : Qp) (st : FdState) (Φc : IProp GF) :
     filecloseCpost (hlc := hlc) q st Φc ⊢ filecloseCpostAny (hlc := hlc) st Φc := by
@@ -451,7 +449,7 @@ def wp_fileclose_eb_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [
     (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
     (cpu : CPU) (k : KCtx) (γl : GName) (γ : FileNames) (kk : Nat) (q : Qp) (st : FdState)
     (j : Nat) (γkl : GName) (γk : KmemNames) (on : Option Nat)
-    (pidv : BitVec 32) (dqp : DFrac)
+    (pidv : BitVec 32) (dqp : DFrac) (Φc : IProp GF)
     (hK : filecloseSlots ≤ k.avail) (hnoff : k.noff = 0) (htier : k.tier = KTier.kpt)
     (ha0 : k.regs 10#5 = fnode kk) : Prop :=
   kctx cpu k ∗ pcIs cpu filecloseAddr ∗
@@ -463,13 +461,19 @@ def wp_fileclose_eb_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [
   -- ONE IREF UNIT, BORROWED ACROSS THE CALL
   irefSlot ∗
   filecloseEnv (hlc := hlc) Γ j k.proc γkl γk on st ∗
+  -- THE BYTE QUEUE'S CLOSE PAYMENT: a link or the taint on a pipe
+  -- descriptor, nothing on any other (Rocq `fileclose_cpay st Φc`)
+  filecloseCpay (hlc := hlc) st Φc ∗
   -- THE CROSSING IS THE LITERAL `true`
   wpNext true k.proc cpu (fun cpu' => iprop(∀ (spie spp : Bool) (R' : RegMap),
     ⌜calleeSaved k.regs R'⌝ -∗
     kctx cpu' ((k.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k.regs 1#5)) -∗
     trapCsrsExt cpu' k.sie -∗ cpuClaimExt cpu' k.sie k.proc -∗
     wordPointsTo (pPid k.proc) 4 dqp pidv -∗
-    fdSlot -∗ irefSlot -∗ filecloseEnvOut γk on st -∗ wpLoop cpu'))
+    fdSlot -∗ irefSlot -∗ filecloseEnvOut γk on st -∗
+    -- the link fired if this was the whole reference; otherwise the payment
+    -- back, or fired anyway if this close happened to be the last
+    filecloseCpost (hlc := hlc) q st Φc -∗ wpLoop cpu'))
   ⊢ wpLoop (GF := GF) cpu
 
 /-- The interface of `fileclose` (Rocq `Module Type FILECLOSE`). -/
@@ -481,8 +485,8 @@ structure FILECLOSE : Prop where
     (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
     (cpu : CPU) (k : KCtx) (γl : GName) (γ : FileNames) (kk : Nat) (q : Qp) (st : FdState)
     (j : Nat) (γkl : GName) (γk : KmemNames) (on : Option Nat) (pidv : BitVec 32) (dqp : DFrac)
-    hK hnoff htier ha0,
-    wp_fileclose_eb_body (hlc := hlc) (GF := GF) Γ cpu k γl γ kk q st j γkl γk on pidv dqp
+    (Φc : IProp GF) hK hnoff htier ha0,
+    wp_fileclose_eb_body (hlc := hlc) (GF := GF) Γ cpu k γl γ kk q st j γkl γk on pidv dqp Φc
       hK hnoff htier ha0
 
 end Xv6

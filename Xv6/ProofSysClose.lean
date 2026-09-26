@@ -21,9 +21,8 @@ pid cell fileclose's FS arm needs is lent out of the block for the call
 (`sc_core_pid`), and the trap-CSR complement and the iref loan pass
 through.  THE CLOSE PAYMENT (`filecloseCpay (sysFdSt …) Φc`) comes back as
 the post's `filecloseCpostAny`: `emp` at argfd's `none` arm (the state is
-closed), and -- interim, until fileclose takes the payment -- handed back
-unfired at a fraction that is not the whole reference
-(`filecloseCpost_of_cpay`).  eb-generic at depth 0: the balanced stretch before fileclose keeps
+closed), and fileclose's own receipt at the reference's fraction otherwise
+(`filecloseCpostAny_of`).  eb-generic at depth 0: the balanced stretch before fileclose keeps
 the complement at the entry hart (one wide hop to the call), and after
 fileclose everything is at its return hart.
 -/
@@ -166,6 +165,7 @@ theorem sc_myproc (MP : MYPROC) (c : CPU) (k' : KCtx) (hnoff : k'.noff + 1 < 2 ^
 theorem sc_fileclose (FC : FILECLOSE) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ] (c : CPU)
     (k' : KCtx) (γl : GName) (γ : FileNames) (kk : Nat) (q : Qp) (st : FdState) (j : Nat)
     (γkl : GName) (γk : KmemNames) (on : Option Nat) (pidv : BitVec 32) (dqp : DFrac)
+    (Φc : IProp GF)
     (s : Bool) (hs : k'.sie = s) (pj : BitVec 64) (hpj : k'.proc = pj)
     (hK : filecloseSlots ≤ k'.avail) (hnoff : k'.noff = 0) (htier : k'.tier = KTier.kpt)
     (ha0 : k'.regs 10#5 = fnode kk) :
@@ -173,16 +173,18 @@ theorem sc_fileclose (FC : FILECLOSE) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF
     isFtable γl γ ∗ panicEnv ∗ fileRef γ kk q st ∗
     wordPointsTo (pPid pj) 4 dqp pidv ∗ irefSlot ∗
     filecloseEnv (hlc := hlc) Γ j pj γkl γk on st ∗
+    filecloseCpay (hlc := hlc) st Φc ∗
     wpNext true pj c (fun cpu' => iprop(∀ (spie spp : Bool) (R' : RegMap),
       ⌜calleeSaved k'.regs R'⌝ -∗
       kctx cpu' ((k'.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k'.regs 1#5)) -∗
       trapCsrsExt cpu' s -∗ cpuClaimExt cpu' s pj -∗
       wordPointsTo (pPid pj) 4 dqp pidv -∗
-      fdSlot -∗ irefSlot -∗ filecloseEnvOut γk on st -∗ wpLoop cpu'))
+      fdSlot -∗ irefSlot -∗ filecloseEnvOut γk on st -∗
+      filecloseCpost (hlc := hlc) q st Φc -∗ wpLoop cpu'))
     ⊢ wpLoop (GF := GF) c := by
   subst hs hpj
   have h := FC.wp_fileclose_eb (hlc := hlc) (GF := GF) Γ c k' γl γ kk q st j γkl γk on pidv dqp
-    hK hnoff htier ha0
+    Φc hK hnoff htier ha0
   unfold wp_fileclose_eb_body at h
   simp only [filecloseAddr] at h
   exact h
@@ -511,9 +513,13 @@ theorem sys_close_proof (AF : ARGFD) (MP : MYPROC) (FC : FILECLOSE) : SYSCLOSE :
         wordPointsTo (pPid k.proc) 4 pidPriv pid from by rw [hproc]) $$ Hpid
     icases filecloseEnv_frame Γ j k.proc γkl γk on st $$ [Hpenv Hfenv] with ⟨Henv, Hback⟩
     · iframe
-    iapply (sc_fileclose FC Γ c17 _ γl γ kk q st j γkl γk on pid pidPriv k.sie (by k_norm_g) k.proc
+    -- THE CLOSE PAYMENT, at the descriptor argfd named
+    have hkey := sysFdSt_some v V.ofile sts fd0 _ _ hsome hrow
+    ihave Hcpay := (show filecloseCpay (hlc := hlc) (GF := GF) (sysFdSt v V.ofile sts) Φc ⊢
+        filecloseCpay st Φc from by rw [hkey]) $$ Hcpay
+    iapply (sc_fileclose FC Γ c17 _ γl γ kk q st j γkl γk on pid pidPriv Φc k.sie (by k_norm_g) k.proc
         (by k_norm_g) ?hK2 ?hn2 ?ht2 ?ha2)
-      $$ [- $Hk $Hpc $Hte $Hce $Hft $Hpe $Href $Hpid $Hir $Henv]
+      $$ [- $Hk $Hpc $Hte $Hce $Hft $Hpe $Href $Hpid $Hir $Henv $Hcpay]
     rotate_right 1
     k_norm_g [sc_ret_4e64]
     case hK2 => k_norm_g; rw [sysCloseSlots_eq] at hK; rw [filecloseSlots_eq]; omega
@@ -522,7 +528,7 @@ theorem sys_close_proof (AF : ARGFD) (MP : MYPROC) (FC : FILECLOSE) : SYSCLOSE :
     case ha2 => k_norm_g
     -- past fileclose (at any hart): settle the descriptor ; li a5,0 ; exit
     iapply wpNext_intro_pin
-    iintro %c18 %hp18 %spie3 %spp3 %R3 %hcs3 Hk Hpc Hte Hce Hpid Hu Hir Hout
+    iintro %c18 %hp18 %spie3 %spp3 %R3 %hcs3 Hk Hpc Hte Hce Hpid Hu Hir Hout Hcpost
     k_norm_g [sc_withSpie_withSpie, sc_pushed_withSpie, sc_withRegs_withSpie]
     unfold calleeSaved at hcs3
     k_norm_g at hcs3
@@ -565,12 +571,12 @@ theorem sys_close_proof (AF : ARGFD) (MP : MYPROC) (FC : FILECLOSE) : SYSCLOSE :
       iexists fd0, fnode kk
       iframe Hblk Hfr
       ipureintro; exact ⟨rfl, hsome⟩
-    -- THE CLOSE PAYMENT'S ANSWER (interim, until fileclose takes the payment):
-    -- handed back unfired, at a fraction that is not the whole reference
-    ihave Hcp : filecloseCpostAny (hlc := hlc) (GF := GF) (sysFdSt v V.ofile sts) Φc $$ [Hcpay]
-    · iapply filecloseCpostAny_of (1 : Qp).half
-      iapply filecloseCpost_of_cpay (1 : Qp).half _ Φc qpHalf_ne_one
-      iexact Hcpay
+    -- THE CLOSE PAYMENT'S ANSWER: fileclose's receipt at the reference's own
+    -- fraction, which the caller does not know (Rocq `fileclose_cpost_any`)
+    ihave Hcp : filecloseCpostAny (hlc := hlc) (GF := GF) (sysFdSt v V.ofile sts) Φc $$ [Hcpost]
+    · rw [hkey]
+      iapply filecloseCpostAny_of q st Φc
+      iexact Hcpost
     iapply (sc_exit Γ c19 k γ V.fdg pa pid V M sts v j γkl γk Φc hK4 spie3 spp3 _
         (by simp only [RegMap.set_apply, BitVec.reduceEq, ite_false]; exact f2.trans d2')
         (by

@@ -25,12 +25,12 @@ Rocq's header, point for point:
 
 ## Deviations from Rocq
 
-1. **NO TAINT, AND THE LICENCE IS ITS OWN PREMISE.**  Rocq pays the pipe
-   arms and the console licence out of `RiscvPtsto.app_taint`
+1. **THE LICENCE IS ITS OWN PREMISE.**  Rocq pays the pipe arms and the
+   console licence out of `RiscvPtsto.app_taint`
    (`WpUart.cons_licence_of_taint`, the application interface's `ai_lic`).
-   Lean has no application interface (FirstTok deviation 1): the pipe arms
-   of `filereadIn`/`filewriteIn` owe nothing (no byte-queue payments,
-   `pipe_rpay_taint`/`pipe_wpay_taint` have nothing to pay), and the
+   The pipe arms are paid as Rocq's, out of the taint (Lean spells
+   `app_taint` `MachFixedGS.killCred`; `pipe_rpay_taint`/`pipe_wpay_taint`);
+   Lean has no application interface (FirstTok deviation 1), so the
    console's output/input links are paid out of `UartLinks.consLicence`,
    taken as an explicit persistent premise (Rocq's pre-SUP-ONE form).
 2. **THE OFFSET-MODE SPLIT IS ROCQ'S (lane K6-C; Rocq OFF-LINK-4/5,
@@ -182,11 +182,11 @@ and ANY payload `P`, at a bare descriptor state.  The inode arm is the
 trivial piece; the console arm is the DIRTY credential (the supply itself)
 beside the read link the licence pays (deviation 1); every other arm hands
 `P` back. -/
-theorem fsabsFilereadIn [Xv6G GF] [OffboxG GF] [Fscfg] (st : FdState) (P : IProp GF) :
+theorem fsabsFilereadIn [Xv6G GF] [OffboxG GF] [Fscfg] (st : FdState) (n : Int) (P : IProp GF) :
     ⊢ appSup (GF := GF) -∗ consLicence (hlc := hlc) (GF := GF) -∗
       MachFixedGS.killCred (hlc := hlc) (GF := GF) -∗
-      filereadIn (hlc := hlc) st (pfamTriv (fun _ _ _ _ => iprop(True))) (fun _ _ => iprop(True))
-        (fun _ => iprop(True)) P := by
+      filereadIn (hlc := hlc) st n (pfamTriv (fun _ _ _ _ => iprop(True))) (fun _ _ => iprop(True))
+        (fun _ => iprop(True)) (fun _ => iprop(True)) (fun _ _ => iprop(True)) P := by
   iintro #Hsup #Hlic #Htaint
   unfold filereadIn
   iintro HP
@@ -194,8 +194,11 @@ theorem fsabsFilereadIn [Xv6G GF] [OffboxG GF] [Fscfg] (st : FdState) (P : IProp
   · iexact HP
   cases rb
   · iexact HP
-  rcases ty with _ | ⟨i, γo, om⟩ | mj
-  · iexact HP
+  rcases ty with γp | ⟨i, γo, om⟩ | mj
+  · -- the pipe arm: the taint (Rocq `pipe_rpay_taint`)
+    dsimp only
+    iframe HP
+    iapply (pipeRpay_taint (hlc := hlc) (GF := GF)) $$ Htaint
   · -- the inode arm at the row's mode (Rocq lane OFF-LINK-4): at a HELD row
     -- the generic tier has no `uoff` to lend and takes the RIGHT arm -- the
     -- same commit beside the taint it already holds
@@ -229,15 +232,16 @@ theorem fsabsFilewriteIn [Xv6G GF] [OffboxG GF] [Fscfg] (st : FdState) (n : Int)
     (M : Nat → List (BitVec 8)) (ua : BitVec 64) :
     ⊢ appSup (GF := GF) -∗ consLicence (hlc := hlc) (GF := GF) -∗
       MachFixedGS.killCred (hlc := hlc) (GF := GF) -∗
-      filewriteIn (hlc := hlc) pmv szv lzv st n M ua (fun _ => iprop(True)) := by
+      filewriteIn (hlc := hlc) pmv szv lzv st n M ua (fun _ => iprop(True)) (fun _ _ => iprop(True)) := by
   iintro #Hsup #Hlic #Htaint
   unfold filewriteIn
   rcases st with _ | ⟨rb, wb, ty⟩
   · iempintro
   cases wb
   · iempintro
-  rcases ty with _ | ⟨i, γo, om⟩ | mj
-  · iempintro
+  rcases ty with γp | ⟨i, γo, om⟩ | mj
+  · -- the pipe arm: the taint (Rocq `pipe_wpay_taint`)
+    iapply (pipeWpay_taint (hlc := hlc) (GF := GF)) $$ Htaint
   · -- THE INODE ARM, keyed on the row's offset mode (Rocq lane OFF-LINK-4):
     -- at a HELD row the generic tier takes the RIGHT arm, the same chain
     -- beside the taint it already holds

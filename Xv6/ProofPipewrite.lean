@@ -22,6 +22,17 @@ epilogue run at the caller's index (`k_step_pwc` / `k_next_pwc`, the current
 hart being `c` here), `sleep` at its eb contract, and the re-acquire joins
 again.  `pw_restore5` is stated at a named index: `false` inside the
 critical section, the entry `SIE` after the release.
+
+THE BYTE QUEUE (Rocq ProofPipewrite.v, design/pipe.md "The byte queue"):
+the loop carries the payment at the cursor it has reached (`PipeQstep.pwPay`
+at `i`) beside the generation halves; the byte store fires node `i`'s link
+(`pwQres_push`, after the `sb` into the ring), and every exit hands the
+caller `pipeWpost` (`pwOut`): the count with its reason (`pwPost_count`, at
+the guard's exit, copyin's `-1` and the empty request), the read end
+observed shut (`pwPost_ro`, a flag-word observation fired at the
+`readopen` test), or the kill arm, whose shot and killer's credential come
+out of `killed()`'s reading with the incarnation's marker lent
+(`pw_kill_lend`, Rocq `kill_paid_shot_tear`).
 -/
 import Xv6.SpecPipewrite
 import Xv6.PipeRw
@@ -32,6 +43,9 @@ import Xv6.SpecSleepPrepare
 import Xv6.SpecSleep
 import Xv6.SpecKilled
 import MachCSL.WpLock
+import Xv6.PipeQstep
+import Xv6.KillRow
+import Xv6.WordFrac
 
 namespace Xv6
 
@@ -160,19 +174,104 @@ theorem pw_release (RE : RELEASE_GEN) (c : CPU) (k' : KCtx)
   rw [ha0] at h
   exact h
 
-theorem pw_killed (KL : KILLED) (Γ : SchedNames) (c : CPU) (k' : KCtx) (j : Nat)
+/-- `killed` with the READING (Rocq `wp_killed_sconf_body`): the caller's
+wand reads the row inside `p->lock`'s critical section. -/
+theorem pw_killed_r (KL : KILLED) (Γ : SchedNames) (c : CPU) (k' : KCtx) (j : Nat)
+    (Rout : BitVec 32 → IProp GF)
     (hj : j < NPROC) (hp : k'.regs 10#5 = procAddr j)
     (hnoff : k'.noff + 1 < 2 ^ 31) (hK : 14 ≤ k'.avail) (hlk : "proc" ∉ k'.locks) (htier : k'.tier = KTier.kpt) :
     kctx c k' ∗ pcIs c KA.«killed» ∗ procsInv Γ ∗
-    wpNext k'.sie k'.proc c (fun cpu' => iprop(∀ spie : Bool, ∀ spp : Bool, ∀ R' : RegMap,
+    (∀ (pidr klr : BitVec 32),
+      wordPointsTo (pPid (procAddr j)) 4 pidPub pidr -∗
+      killPaidAt (MachFixedGS.killCred (hlc := hlc) (GF := GF)) pidr klr -∗
+      wordPointsTo (pPid (procAddr j)) 4 pidPub pidr ∗
+      killPaidAt (MachFixedGS.killCred (hlc := hlc) (GF := GF)) pidr klr ∗ Rout klr) ∗
+    wpNext k'.sie k'.proc c (fun cpu' => iprop(∀ spie : Bool, ∀ spp : Bool, ∀ R' : RegMap, ∀ kl : BitVec 32,
       ⌜k'.sie = false → spie = k'.spie ∧ spp = k'.spp⌝ -∗
       kctx cpu' ((k'.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k'.regs 1#5)) -∗
-      ⌜calleeSaved k'.regs R' ∧ ∃ kl : BitVec 32, R' 10#5 = BitVec.signExtend 64 kl⌝ -∗ wpLoop cpu'))
+      ⌜calleeSaved k'.regs R' ∧ R' 10#5 = BitVec.signExtend 64 kl⌝ -∗ Rout kl -∗ wpLoop cpu'))
     ⊢ wpLoop (GF := GF) c := by
-  have h := KL.wp_killed (hlc := hlc) (GF := GF) Γ c k' j hj hp hnoff hK hlk htier
-  unfold wp_killed_body at h
+  have h := KL.wp_killed_r (hlc := hlc) (GF := GF) Γ c k' j Rout hj hp hnoff hK hlk htier
+  unfold wp_killed_r_body at h
   simp only [killedAddr] at h
   exact h
+
+/-- WHAT `killed()` HANDS PIPEWRITE BACK (Rocq's reading at the kill check,
+lane KILL-TAINT): at a nonzero flag the incarnation's shot AND THE KILLER'S
+CREDENTIAL, beside the three lent pieces. -/
+def pwKillOut (j : Nat) (pid : BitVec 32) (gn : GName) (kl : BitVec 32) : IProp GF :=
+  iprop((⌜kl = 0#32⌝ ∨ (killShot gn ∗ □ MachFixedGS.killCred (hlc := hlc) (GF := GF))) ∗
+    wordPointsTo (pPid (procAddr j)) 4 pidPriv pid ∗ pidReg pid (.own qeighth) gn ∗ takenAt gn)
+
+/-- **The lend** (Rocq `kill_paid_shot_tear` at pipewrite's kill check): the
+block's pid half, the registration eighth and the incarnation's MARKER go
+into `killed`'s critical section; the marker refutes the row's spent arm, so
+a nonzero flag was paid by a third party with its credential. -/
+theorem pw_kill_lend (j : Nat) (pid : BitVec 32) (gn : GName) :
+    wordPointsTo (pPid (procAddr j)) 4 pidPriv pid ∗ pidReg pid (.own qeighth) gn ∗ takenAt gn ⊢
+      ∀ (pidr klr : BitVec 32),
+        wordPointsTo (pPid (procAddr j)) 4 pidPub pidr -∗
+        killPaidAt (MachFixedGS.killCred (hlc := hlc) (GF := GF)) pidr klr -∗
+        wordPointsTo (pPid (procAddr j)) 4 pidPub pidr ∗
+        killPaidAt (MachFixedGS.killCred (hlc := hlc) (GF := GF)) pidr klr ∗
+        pwKillOut (hlc := hlc) j pid gn klr := by
+  iintro ⟨Hqp, Hrg, Ht⟩ %pidr %klr Hq Hr
+  icases (show wordPointsTo (GF := GF) (pPid (procAddr j)) 4 pidPub pidr ∗
+      wordPointsTo (pPid (procAddr j)) 4 pidPriv pid ⊢
+      ⌜pidr = pid⌝ ∗ wordPointsTo (pPid (procAddr j)) 4 pidPub pidr ∗
+        wordPointsTo (pPid (procAddr j)) 4 pidPriv pid from by
+    unfold pidPub pidPriv; exact wordPointsTo_agree_keep _ _ _ _ _ _) $$ [Hq Hqp] with ⟨%he, Hq, Hqp⟩
+  · iframe Hq Hqp
+  subst he
+  icases killPaid_shot_tear _ pidr klr (.own qeighth) gn $$ [Hr Hrg Ht] with ⟨Hr, Hrg, Ht, Hs⟩
+  · iframe Hr Hrg Ht
+  unfold pwKillOut
+  iframe Hq Hr Hs Hqp Hrg Ht
+
+/-- The generation halves, opened for the lend. -/
+theorem pw_gen_open (pa : BitVec 64) (pid : BitVec 32) (g : GName) :
+    genHalvesPriv (GF := GF) pa pid g ⊢
+      pidReg pid (.own qeighth) g ∗ takenAt g ∗
+        (pidReg pid (.own qeighth) g -∗ takenAt g -∗ genHalvesPriv pa pid g) := by
+  unfold genHalvesPriv genHalvesAt
+  iintro ⟨⟨%h, Hs, Hr⟩, Ht⟩
+  iframe Hr Ht
+  iintro Hr Ht
+  isplitl [Hs Hr]
+  · isplitr
+    · ipureintro; exact h
+    · iframe Hs Hr
+  · iexact Ht
+
+/-- The block's pid half, lent out of the bare block. -/
+theorem pw_priv_pid (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv) (M : Nat → List (BitVec 8)) :
+    procPrivBareAt (GF := GF) curCtx pa pid V M ⊢
+      @wordPointsTo hlc GF _ ⟨curCtx, KTier.kpt⟩ (pPid pa) 4 pidPriv pid ∗
+      (@wordPointsTo hlc GF _ ⟨curCtx, KTier.kpt⟩ (pPid pa) 4 pidPriv pid -∗
+        procPrivBareAt curCtx pa pid V M) := by
+  unfold procPrivBareAt
+  iintro ⟨%h, Hp, Hf, Ht, Htf, %hl⟩
+  iframe Hp
+  iintro Hp
+  isplitr
+  · ipureintro; exact h
+  iframe Hp Hf Ht Htf
+  ipureintro; exact hl
+
+/-- THE WRITE END IS OPEN, with the two pieces kept (`PipeQstep.pwWo_open`). -/
+theorem pw_wo_keep (γp : PipeNames) (w : Bool) (wo : BitVec 32) (q : Qp) (hw : w = true) :
+    pipeEndstate (GF := GF) γp true wo ∗ pipeRef γp w q ⊢
+      ⌜pflagOpen wo⌝ ∗ pipeEndstate γp true wo ∗ pipeRef γp w q := by
+  refine (and_intro ?_ .rfl).trans persistent_and_sep_mp
+  iintro ⟨Hs, Hr⟩
+  iapply pwWo_open γp w wo q hw $$ Hs Hr
+
+/-- THE CALLER'S POST at the answer `r` (the spec's `pipeWpost` at the entry
+table, the kill arm's resource the shot and the killer's credential). -/
+def pwOut (V : ProcPriv) (γp : PipeNames) (M : Nat → List (BitVec 8)) (ua : BitVec 64)
+    (Q : Nat → IProp GF) (Qe : Nat → PipeSt → IProp GF) (n : Int) (r : BitVec 64) : IProp GF :=
+  pipeWpost (hlc := hlc) V.upt γp.pnQueue (writerImg V.upt M) ua Q Qe
+    iprop(killShot V.gen ∗ □ MachFixedGS.killCred (hlc := hlc) (GF := GF)) n.toNat r
 
 theorem pw_wakeup (WK : WAKEUP) (Γ : SchedNames) (c : CPU) (k' : KCtx)
     (hnoff' : k'.noff + 1 < 2 ^ 31) (hK' : wakeupSlots ≤ k'.avail) (hlk' : "proc" ∉ k'.locks)
@@ -250,6 +349,31 @@ theorem pw_copyin (CI : COPYIN) (c : CPU) (k' : KCtx) (γl : GName) (γk : KmemN
   simp only [copyinAddr] at h
   exact h
 
+/-! ## The byte the link is pinned to, and the ring index -/
+
+/-- The byte a successful one-byte `copyin` read IS the writer's image's
+there: the page is mapped in the returned table (`writerImg_back`). -/
+theorem pw_byte_img (Pv P2 : UPtd) (M : Nat → List (BitVec 8)) (va : Nat) (b : BitVec 8)
+    (hb : [b] = umemRead (viewFaulted Pv P2 M) va 1) (hm : umMapped P2 va 1) :
+    umemByte (writerImg Pv M) va = b := by
+  rw [UMemL.umemRead_one] at hb
+  have hb' : b = umemByte (viewFaulted Pv P2 M) va := by simpa using hb
+  have h0 := hm 0 (by omega)
+  simp only [Nat.add_zero] at h0
+  obtain ⟨w, hw⟩ := Option.isSome_iff_exists.mp h0
+  rw [hb']
+  unfold umemByte
+  rw [writerImg_back Pv P2 M (va / 4096) w hw]
+
+/-- `andi a5,a5,511` on the sign-extended `nwrite` is `nwrite % 512`. -/
+theorem pw_idx_mod (nw : BitVec 32) : (BitVec.signExtend 64 nw &&& 511#64).toNat = nw.toNat % 512 := by
+  have h : (BitVec.signExtend 64 nw &&& 511#64) = BitVec.setWidth 64 (nw &&& 511#32) := by bv_decide
+  rw [h, BitVec.toNat_setWidth, BitVec.toNat_and]
+  have e : (511#32).toNat = 2 ^ 9 - 1 := rfl
+  rw [e, Nat.and_two_pow_sub_one_eq_mod]
+  have : nw.toNat % 2 ^ 9 < 2 ^ 64 := by omega
+  rw [Nat.mod_eq_of_lt this]
+
 /-! ## The fourteen-slot frame -/
 
 /-- pipewrite's frame below the entry `sp`: `ra`, `s0..s5`, the shrink-wrapped
@@ -299,39 +423,51 @@ theorem pwFix_set (k : KCtx) (j : Nat) (n : Int) (R : RegMap) (h : pwFix k j n R
 
 /-- The caller's continuation (the spec's, named). -/
 def pwPost (k : KCtx) (γp : PipeNames) (w : Bool) (q : Qp) (j : Nat) (pid : BitVec 32)
-    (V : ProcPriv) (M : Nat → List (BitVec 8)) (n : Int) : CPU → IProp GF :=
+    (V : ProcPriv) (M : Nat → List (BitVec 8)) (n : Int)
+    (Q : Nat → IProp GF) (Qe : Nat → PipeSt → IProp GF) : CPU → IProp GF :=
   fun cpu' => iprop(∀ (spie spp : Bool) (R' : RegMap) (P' : UPtd),
-    ⌜calleeSaved k.regs R' ∧ V.upt.extSz V.sz P' ∧ pipeRwRet n (R' 10#5) ∧
-      pipeWpostR V.upt (k.regs 11#5) n.toNat (R' 10#5)⌝ -∗
+    ⌜calleeSaved k.regs R' ∧ V.upt.extSz V.sz P' ∧ pipeRwRet n (R' 10#5)⌝ -∗
     kctx cpu' ((k.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k.regs 1#5)) -∗
     trapCsrsExt cpu' k.sie -∗ cpuClaimExt cpu' k.sie k.proc -∗
     pipeRef γp w q -∗
-    procPrivBareAt curCtx (procAddr j) pid { V with upt := P' } (viewFaulted V.upt P' M) -∗ wpLoop cpu')
+    procPrivBareAt curCtx (procAddr j) pid { V with upt := P' } (viewFaulted V.upt P' M) -∗
+    genHalvesPriv (procAddr j) pid V.gen -∗
+    pipeWpost (hlc := hlc) V.upt γp.pnQueue (writerImg V.upt M) (k.regs 11#5) Q Qe
+      iprop(killShot V.gen ∗ □ MachFixedGS.killCred (hlc := hlc) (GF := GF)) n.toNat (R' 10#5) -∗
+    wpLoop cpu')
 
 theorem pwPost_elim (k : KCtx) (γp : PipeNames) (w : Bool) (q : Qp) (j : Nat) (pid : BitVec 32)
-    (V : ProcPriv) (M : Nat → List (BitVec 8)) (n : Int) (cpu' : CPU) :
-    pwPost (GF := GF) k γp w q j pid V M n cpu' ⊢ ∀ (spie spp : Bool) (R' : RegMap) (P' : UPtd),
-      ⌜calleeSaved k.regs R' ∧ V.upt.extSz V.sz P' ∧ pipeRwRet n (R' 10#5) ∧
-      pipeWpostR V.upt (k.regs 11#5) n.toNat (R' 10#5)⌝ -∗
+    (V : ProcPriv) (M : Nat → List (BitVec 8)) (n : Int)
+    (Q : Nat → IProp GF) (Qe : Nat → PipeSt → IProp GF) (cpu' : CPU) :
+    pwPost (GF := GF) k γp w q j pid V M n Q Qe cpu' ⊢ ∀ (spie spp : Bool) (R' : RegMap) (P' : UPtd),
+      ⌜calleeSaved k.regs R' ∧ V.upt.extSz V.sz P' ∧ pipeRwRet n (R' 10#5)⌝ -∗
       kctx cpu' ((k.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k.regs 1#5)) -∗
       trapCsrsExt cpu' k.sie -∗ cpuClaimExt cpu' k.sie k.proc -∗
       pipeRef γp w q -∗
-      procPrivBareAt curCtx (procAddr j) pid { V with upt := P' } (viewFaulted V.upt P' M) -∗ wpLoop cpu' := by
+      procPrivBareAt curCtx (procAddr j) pid { V with upt := P' } (viewFaulted V.upt P' M) -∗
+      genHalvesPriv (procAddr j) pid V.gen -∗
+      pipeWpost (hlc := hlc) V.upt γp.pnQueue (writerImg V.upt M) (k.regs 11#5) Q Qe
+        iprop(killShot V.gen ∗ □ MachFixedGS.killCred (hlc := hlc) (GF := GF)) n.toNat (R' 10#5) -∗
+      wpLoop cpu' := by
   unfold pwPost; iintro H; iexact H
 
 /-- The whole-function continuation at any hart: the process is real, so the
 `wpNext true` pin is vacuous. -/
 theorem pw_post_at (cpu c : CPU) (k : KCtx) (γp : PipeNames) (w : Bool) (q : Qp) (j : Nat)
     (pid : BitVec 32) (V : ProcPriv) (M : Nat → List (BitVec 8)) (n : Int)
+    (Q : Nat → IProp GF) (Qe : Nat → PipeSt → IProp GF)
     (hj : j < NPROC) (hkproc : k.proc = procAddr j) :
-    wpNext true k.proc cpu (pwPost (GF := GF) k γp w q j pid V M n) ⊢
+    wpNext true k.proc cpu (pwPost (GF := GF) k γp w q j pid V M n Q Qe) ⊢
       ∀ (spie spp : Bool) (R' : RegMap) (P' : UPtd),
-      ⌜calleeSaved k.regs R' ∧ V.upt.extSz V.sz P' ∧ pipeRwRet n (R' 10#5) ∧
-      pipeWpostR V.upt (k.regs 11#5) n.toNat (R' 10#5)⌝ -∗
+      ⌜calleeSaved k.regs R' ∧ V.upt.extSz V.sz P' ∧ pipeRwRet n (R' 10#5)⌝ -∗
       kctx c ((k.withSpie spie spp).withRegs R') -∗ pcIs c (jumpPc (k.regs 1#5)) -∗
       trapCsrsExt c k.sie -∗ cpuClaimExt c k.sie k.proc -∗
       pipeRef γp w q -∗
-      procPrivBareAt curCtx (procAddr j) pid { V with upt := P' } (viewFaulted V.upt P' M) -∗ wpLoop c := by
+      procPrivBareAt curCtx (procAddr j) pid { V with upt := P' } (viewFaulted V.upt P' M) -∗
+      genHalvesPriv (procAddr j) pid V.gen -∗
+      pipeWpost (hlc := hlc) V.upt γp.pnQueue (writerImg V.upt M) (k.regs 11#5) Q Qe
+        iprop(killShot V.gen ∗ □ MachFixedGS.killCred (hlc := hlc) (GF := GF)) n.toNat (R' 10#5) -∗
+      wpLoop c := by
   iintro H
   ihave H := wpNext_at true k.proc cpu c _
     (fun h => h.elim (fun h => absurd h (by decide))
@@ -505,21 +641,23 @@ set_option maxHeartbeats 4000000 in
 /-- **pipewrite's epilogue** at `0x80004714`: `mv a0,s2`, restore, pop,
 return; deliver the result to the caller's continuation at this hart. -/
 theorem pw_epi (cpu c : CPU) (k : KCtx) (γp : PipeNames) (w : Bool) (q : Qp) (j : Nat)
-    (pid : BitVec 32) (V : ProcPriv) (M : Nat → List (BitVec 8)) (n : Int) (P' : UPtd)
+    (pid : BitVec 32) (V : ProcPriv) (M : Nat → List (BitVec 8)) (n : Int)
+    (Q : Nat → IProp GF) (Qe : Nat → PipeSt → IProp GF) (P' : UPtd)
     (hj : j < NPROC) (hkproc : k.proc = procAddr j) (hK : 14 ≤ k.avail)
     (spie spp : Bool) (R : RegMap) (hR2 : R 2#5 = k.regs 2#5 + 0xFFFFFFFFFFFFFF90#64)
     (h22 : R 22#5 = k.regs 22#5) (h23 : R 23#5 = k.regs 23#5) (h24 : R 24#5 = k.regs 24#5)
     (h25 : R 25#5 = k.regs 25#5) (h26 : R 26#5 = k.regs 26#5) (h27 : R 27#5 = k.regs 27#5)
-    (hrv : pipeRwRet n (R 18#5)) (hwp : pipeWpostR V.upt (k.regs 11#5) n.toNat (R 18#5))
+    (hrv : pipeRwRet n (R 18#5)) (r : BitVec 64) (hr : R 18#5 = r)
     (hext : V.upt.extSz V.sz P') (v7 v8 v9 v10 v11 v12 v13 : BitVec 64) :
     kctx c (((k.withSpie spie spp).pushed 14).withRegs R) ∗ pcIs c (KA.«pipewrite» + 0x58#64) ∗
     pwFrame (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) (k.regs 9#5) (k.regs 18#5) (k.regs 19#5)
       (k.regs 20#5) (k.regs 21#5) v7 v8 v9 v10 v11 v12 v13 ∗
     trapCsrsExt c k.sie ∗ cpuClaimExt c k.sie k.proc ∗ pipeRef γp w q ∗
     procPrivBareAt curCtx (procAddr j) pid { V with upt := P' } (viewFaulted V.upt P' M) ∗
-    wpNext true k.proc cpu (pwPost k γp w q j pid V M n)
+    genHalvesPriv (procAddr j) pid V.gen ∗ pwOut (hlc := hlc) V γp M (k.regs 11#5) Q Qe n r ∗
+    wpNext true k.proc cpu (pwPost k γp w q j pid V M n Q Qe)
     ⊢ wpLoop (GF := GF) c := by
-  iintro ⟨Hk, Hpc, Hframe, Hte, Hce, Href, Hpriv, Hnext⟩
+  iintro ⟨Hk, Hpc, Hframe, Hte, Hce, Href, Hpriv, Hgen, Hpost, Hnext⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
   -- c.mv a0,s2
   k_step_pwc (wp_s_add c _ (KA.«pipewrite» + 0x58#64) true 10#5 0#5 18#5 (by decide))
@@ -538,18 +676,20 @@ theorem pw_epi (cpu c : CPU) (k : KCtx) (γp : PipeNames) (w : Bool) (q : Qp) (j
   k_norm_g
   k_next_pwc
   iintro Hk Hpc
-  ihave HK := pw_post_at cpu c k γp w q j pid V M n hj hkproc $$ Hnext
-  iapply HK $$ %spie %spp %_ %P' [] Hk Hpc Hte Hce Href Hpriv
-  ipureintro
-  refine ⟨?_, hext, ?_, ?_⟩
-  · unfold calleeSaved
+  ihave HK := pw_post_at cpu c k γp w q j pid V M n Q Qe hj hkproc $$ Hnext
+  iapply HK $$ %spie %spp %_ %P' [] Hk Hpc Hte Hce Href Hpriv Hgen [Hpost]
+  · ipureintro
+    refine ⟨?_, hext, ?_⟩
+    · unfold calleeSaved
+      simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true]
+      refine ⟨?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_⟩ <;>
+        first | trivial | assumption
+    · simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true]
+      exact hrv
+  · unfold pwOut
     simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true]
-    refine ⟨?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_, ?_⟩ <;>
-      first | trivial | assumption
-  · simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true]
-    exact hrv
-  · simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true]
-    exact hwp
+    rw [hr]
+    iexact Hpost
 
 /-! ## Contexts inside and after the critical section -/
 
@@ -626,14 +766,15 @@ theorem pipewrite_br_ffffffffffffd984 : KA.«pipewrite» + 0xffffffffffffd984#64
 theorem pw_tail (WK : WAKEUP) (RE : RELEASE_GEN) (Γ : SchedNames)
     (cpu c : CPU) (k kb : KCtx) (hb : PwBase k kb)
     (γl : GName) (γp : PipeNames) (w : Bool) (q : Qp) (j : Nat) (pid : BitVec 32)
-    (V : ProcPriv) (M : Nat → List (BitVec 8)) (n : Int) (P' : UPtd)
+    (V : ProcPriv) (M : Nat → List (BitVec 8)) (n : Int)
+    (Q : Nat → IProp GF) (Qe : Nat → PipeSt → IProp GF) (P' : UPtd)
     (hj : j < NPROC) (hkproc : k.proc = procAddr j)
     (hK : pipewriteSlots ≤ k.avail) (hkt : k.tier = KTier.kpt)
     (a b : Bool) (R : RegMap) (hR2 : R 2#5 = k.regs 2#5 + 0xFFFFFFFFFFFFFF90#64)
     (hR9 : R 9#5 = k.regs 10#5)
     (h22 : R 22#5 = k.regs 22#5) (h23 : R 23#5 = k.regs 23#5) (h24 : R 24#5 = k.regs 24#5)
     (h25 : R 25#5 = k.regs 25#5) (h26 : R 26#5 = k.regs 26#5) (h27 : R 27#5 = k.regs 27#5)
-    (hrv : pipeRwRet n (R 18#5)) (hwp : pipeWpostR V.upt (k.regs 11#5) n.toNat (R 18#5))
+    (hrv : pipeRwRet n (R 18#5)) (r : BitVec 64) (hr : R 18#5 = r)
     (hext : V.upt.extSz V.sz P') (v7 v8 v9 v10 v11 v12 v13 : BitVec 64) :
     kctx c (((kb.pushOffAt a b).withLocks ["pipe"]).withRegs R) ∗ pcIs c (KA.«pipewrite» + 0x108#64) ∗
     procsInv Γ ∗
@@ -643,9 +784,10 @@ theorem pw_tail (WK : WAKEUP) (RE : RELEASE_GEN) (Γ : SchedNames)
       (k.regs 20#5) (k.regs 21#5) v7 v8 v9 v10 v11 v12 v13 ∗
     trapCsrs c ∗ cpuClaim c k.proc ∗ intrRes c ∗
     procPrivBareAt curCtx (procAddr j) pid { V with upt := P' } (viewFaulted V.upt P' M) ∗
-    wpNext true k.proc cpu (pwPost k γp w q j pid V M n)
+    genHalvesPriv (procAddr j) pid V.gen ∗ pwOut (hlc := hlc) V γp M (k.regs 11#5) Q Qe n r ∗
+    wpNext true k.proc cpu (pwPost k γp w q j pid V M n Q Qe)
     ⊢ wpLoop (GF := GF) c := by
-  iintro ⟨Hk, Hpc, #Hpinv, #Hopen, Hlocked, HR, Href, Hframe, Htc, Hcl, Hir, Hpriv, Hnext⟩
+  iintro ⟨Hk, Hpc, #Hpinv, #Hopen, Hlocked, HR, Href, Hframe, Htc, Hcl, Hir, Hpriv, Hgen, Hpost, Hnext⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
   have hsie : kb.sie = k.sie := hb.sie
   have hav : kb.avail = k.avail - 14 := hb.avail
@@ -715,12 +857,12 @@ theorem pw_tail (WK : WAKEUP) (RE : RELEASE_GEN) (Γ : SchedNames)
   k_step_pwc (wp_s_j c _ (KA.«pipewrite» + 0x116#64) true 2096962#21)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
   iintro Hk Hpc
-  iapply (pw_epi cpu c k γp w q j pid V M n P' hj hkproc
+  iapply (pw_epi cpu c k γp w q j pid V M n Q Qe P' hj hkproc
       (by unfold pipewriteSlots at hK; omega) a b R4 (f2.trans (d2.trans hR2))
       (f22.trans (d22.trans h22)) (f23.trans (d23.trans h23)) (f24.trans (d24.trans h24))
       (f25.trans (d25.trans h25)) (f26.trans (d26.trans h26)) (f27.trans (d27.trans h27))
-      (by rw [f18, d18]; exact hrv) (by rw [f18, d18]; exact hwp) hext v7 v8 v9 v10 v11 v12 v13)
-    $$ [- $Hk $Hpc $Hframe $Hte $Hce $Href $Hpriv $Hnext]
+      (by rw [f18, d18]; exact hrv) r (by rw [f18, d18]; exact hr) hext v7 v8 v9 v10 v11 v12 v13)
+    $$ [- $Hk $Hpc $Hframe $Hte $Hce $Href $Hpriv $Hgen $Hpost $Hnext]
 
 /-! ## The frame, opened -/
 
@@ -766,7 +908,8 @@ set_option maxHeartbeats 8000000 in
 theorem pw_minus1 (RE : RELEASE_GEN)
     (cpu c : CPU) (k kb : KCtx) (hb : PwBase k kb)
     (γl : GName) (γp : PipeNames) (w : Bool) (q : Qp) (j : Nat) (pid : BitVec 32)
-    (V : ProcPriv) (M : Nat → List (BitVec 8)) (n : Int) (P' : UPtd)
+    (V : ProcPriv) (M : Nat → List (BitVec 8)) (n : Int)
+    (Q : Nat → IProp GF) (Qe : Nat → PipeSt → IProp GF) (P' : UPtd)
     (hj : j < NPROC) (hkproc : k.proc = procAddr j)
     (hK : pipewriteSlots ≤ k.avail)
     (a b : Bool) (R : RegMap) (hfix : pwFix k j n R)
@@ -779,9 +922,10 @@ theorem pw_minus1 (RE : RELEASE_GEN)
       (k.regs 26#5) v12 v13 ∗
     trapCsrs c ∗ cpuClaim c k.proc ∗ intrRes c ∗
     procPrivBareAt curCtx (procAddr j) pid { V with upt := P' } (viewFaulted V.upt P' M) ∗
-    wpNext true k.proc cpu (pwPost k γp w q j pid V M n)
+    genHalvesPriv (procAddr j) pid V.gen ∗ pwOut (hlc := hlc) V γp M (k.regs 11#5) Q Qe n (-1#64) ∗
+    wpNext true k.proc cpu (pwPost k γp w q j pid V M n Q Qe)
     ⊢ wpLoop (GF := GF) c := by
-  iintro ⟨Hk, Hpc, #Hopen, Hlocked, HR, Href, Hframe, Htc, Hcl, Hir, Hpriv, Hnext⟩
+  iintro ⟨Hk, Hpc, #Hopen, Hlocked, HR, Href, Hframe, Htc, Hcl, Hir, Hpriv, Hgen, Hpost, Hnext⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
   have hsie : kb.sie = k.sie := hb.sie
   have hav : kb.avail = k.avail - 14 := hb.avail
@@ -844,7 +988,7 @@ theorem pw_minus1 (RE : RELEASE_GEN)
   ihave Hk := (show kctx (GF := GF) c ((kb.withSpie a b).withRegs _)
       ⊢ kctx c (((k.withSpie a b).pushed 14).withRegs _) from by
     rw [hstruct, pw_epi_ctx]) $$ Hk
-  iapply (pw_epi cpu c k γp w q j pid V M n P' hj hkproc
+  iapply (pw_epi cpu c k γp w q j pid V M n Q Qe P' hj hkproc
       (by unfold pipewriteSlots at hK; omega) a b _
       (by simp only [RegMap.set_apply, BitVec.reduceEq, ite_false]; exact f2.trans hR2)
       (by simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true])
@@ -854,10 +998,9 @@ theorem pw_minus1 (RE : RELEASE_GEN)
       (by simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true])
       (by simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true]; exact f27.trans hR27)
       (by simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true]; exact Or.inl (by decide))
-      (by simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true]
-          exact ⟨0, Nat.zero_le _, Or.inr ⟨by decide, by omega⟩⟩)
+      18446744073709551615#64 (by simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true] <;> first | rfl | decide)
       hext (k.regs 22#5) (k.regs 23#5) (k.regs 24#5) (k.regs 25#5) (k.regs 26#5) v12 v13)
-    $$ [- $Hk $Hpc $Hframe $Hte $Hce $Href $Hpriv $Hnext]
+    $$ [- $Hk $Hpc $Hframe $Hte $Hce $Href $Hpriv $Hgen $Hpost $Hnext]
 
 /-! ## The copyin-failure arm `(KernelSyms.«pipewrite» + 0xe0)` -/
 
@@ -867,7 +1010,8 @@ means `s2 := a0 = -1`; either way restore `s6..s10` and take the tail. -/
 theorem pw_fail (WK : WAKEUP) (RE : RELEASE_GEN) (Γ : SchedNames)
     (cpu c : CPU) (k kb : KCtx) (hb : PwBase k kb)
     (γl : GName) (γp : PipeNames) (w : Bool) (q : Qp) (j : Nat) (pid : BitVec 32)
-    (V : ProcPriv) (M : Nat → List (BitVec 8)) (n : Int) (P' : UPtd)
+    (V : ProcPriv) (M : Nat → List (BitVec 8)) (n : Int)
+    (Q : Nat → IProp GF) (Qe : Nat → PipeSt → IProp GF) (P' : UPtd)
     (hj : j < NPROC) (hkproc : k.proc = procAddr j)
     (hK : pipewriteSlots ≤ k.avail) (hkt : k.tier = KTier.kpt)
     (a b : Bool) (R : RegMap) (hfix : pwFix k j n R) (m : Nat) (hm : (m : Int) ≤ max 0 n)
@@ -883,9 +1027,11 @@ theorem pw_fail (WK : WAKEUP) (RE : RELEASE_GEN) (Γ : SchedNames)
       (k.regs 26#5) v12 v13 ∗
     trapCsrs c ∗ cpuClaim c k.proc ∗ intrRes c ∗
     procPrivBareAt curCtx (procAddr j) pid { V with upt := P' } (viewFaulted V.upt P' M) ∗
-    wpNext true k.proc cpu (pwPost k γp w q j pid V M n)
+    genHalvesPriv (procAddr j) pid V.gen ∗
+    pwPay (hlc := hlc) γp (writerImg V.upt M) (k.regs 11#5) Q Qe m n.toNat ∗
+    wpNext true k.proc cpu (pwPost k γp w q j pid V M n Q Qe)
     ⊢ wpLoop (GF := GF) c := by
-  iintro ⟨Hk, Hpc, #Hpinv, #Hopen, Hlocked, HR, Href, Hframe, Htc, Hcl, Hir, Hpriv, Hnext⟩
+  iintro ⟨Hk, Hpc, #Hpinv, #Hopen, Hlocked, HR, Href, Hframe, Htc, Hcl, Hir, Hpriv, Hgen, Hpay, Hnext⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
   have hsie : kb.sie = k.sie := hb.sie
   have hav : kb.avail = k.avail - 14 := hb.avail
@@ -897,6 +1043,11 @@ theorem pw_fail (WK : WAKEUP) (RE : RELEASE_GEN) (Γ : SchedNames)
   by_cases hm0 : m = 0
   · -- nothing written: `beqz s2` taken; `mv s2,a0` (= -1)
     subst hm0
+    -- THE ANSWER'S REASON: copyin's unreadable first byte (Rocq `pw_post_count`)
+    ihave Hpost : pwOut (hlc := hlc) V γp M (k.regs 11#5) Q Qe n (-1#64) $$ [Hpay]
+    · unfold pwOut
+      iapply (pwPost_count V.upt γp (writerImg V.upt M) (k.regs 11#5) Q Qe _ n.toNat 0 (-1#64)
+        (Nat.zero_le _) (Or.inr ⟨rfl, rfl⟩) (Or.inr hwhy)) $$ Hpay
     k_step (wp_s_branch c _ (KA.«pipewrite» + 0xe0#64) false 16#13 18#5 0#5 (by decide) bop.BEQ)
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
       with [h18, (by decide : bcond bop.BEQ (BitVec.ofNat 64 0) 0#64 = true)]
@@ -922,7 +1073,7 @@ theorem pw_fail (WK : WAKEUP) (RE : RELEASE_GEN) (Γ : SchedNames)
     k_step (wp_s_j c _ (KA.«pipewrite» + 0xfc#64) true 12#21)
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
     iintro Hk Pc
-    iapply (pw_tail WK RE Γ cpu c k kb hb γl γp w q j pid V M n P' hj hkproc hK hkt a b _
+    iapply (pw_tail WK RE Γ cpu c k kb hb γl γp w q j pid V M n Q Qe P' hj hkproc hK hkt a b _
         (by simp only [RegMap.set_apply, BitVec.reduceEq, ite_false]; exact hR2)
         (by simp only [RegMap.set_apply, BitVec.reduceEq, ite_false]; exact hR9)
         (by simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true])
@@ -932,12 +1083,15 @@ theorem pw_fail (WK : WAKEUP) (RE : RELEASE_GEN) (Γ : SchedNames)
         (by simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true])
         (by simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true]; exact hR27)
         (by simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true]; exact Or.inl rfl)
-        (by simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true]
-            exact ⟨0, Nat.zero_le _, Or.inl ⟨Or.inr ⟨rfl, rfl⟩, Or.inr hwhy⟩⟩)
+        18446744073709551615#64 (by simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true] <;> first | rfl | decide | exact h10)
         hext (k.regs 22#5) (k.regs 23#5) (k.regs 24#5) (k.regs 25#5) (k.regs 26#5) v12 v13)
-      $$ [- $Hk $Pc $Hlocked $HR $Href $Hframe $Htc $Hcl $Hir $Hpriv $Hnext]
+      $$ [- $Hk $Pc $Hlocked $HR $Href $Hframe $Htc $Hcl $Hir $Hpriv $Hgen $Hpost $Hnext]
     iframe #
   · -- some bytes written: return the count
+    ihave Hpost : pwOut (hlc := hlc) V γp M (k.regs 11#5) Q Qe n (BitVec.ofNat 64 m) $$ [Hpay]
+    · unfold pwOut
+      iapply (pwPost_count V.upt γp (writerImg V.upt M) (k.regs 11#5) Q Qe _ n.toNat m (BitVec.ofNat 64 m)
+        (by omega) (Or.inl rfl) (Or.inr hwhy)) $$ Hpay
     k_step (wp_s_branch c _ (KA.«pipewrite» + 0xe0#64) false 16#13 18#5 0#5 (by decide) bop.BEQ)
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
       with [h18, (pw_beqz_nat m hm64).trans (decide_eq_false hm0)]
@@ -959,7 +1113,7 @@ theorem pw_fail (WK : WAKEUP) (RE : RELEASE_GEN) (Γ : SchedNames)
     k_step (wp_s_j c _ (KA.«pipewrite» + 0xee#64) true 26#21)
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
     iintro Hk Pc
-    iapply (pw_tail WK RE Γ cpu c k kb hb γl γp w q j pid V M n P' hj hkproc hK hkt a b _
+    iapply (pw_tail WK RE Γ cpu c k kb hb γl γp w q j pid V M n Q Qe P' hj hkproc hK hkt a b _
         (by simp only [RegMap.set_apply, BitVec.reduceEq, ite_false]; exact hR2)
         (by simp only [RegMap.set_apply, BitVec.reduceEq, ite_false]; exact hR9)
         (by simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true])
@@ -970,10 +1124,9 @@ theorem pw_fail (WK : WAKEUP) (RE : RELEASE_GEN) (Γ : SchedNames)
         (by simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true]; exact hR27)
         (by simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true]
             exact Or.inr ⟨m, by rw [h18, pw_ofInt_nat], by omega, hm⟩)
-        (by simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true]
-            exact ⟨m, by omega, Or.inl ⟨Or.inl h18, Or.inr hwhy⟩⟩)
+        (BitVec.ofNat 64 m) (by simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true] <;> first | rfl | exact h18)
         hext (k.regs 22#5) (k.regs 23#5) (k.regs 24#5) (k.regs 25#5) (k.regs 26#5) v12 v13)
-      $$ [- $Hk $Pc $Hlocked $HR $Href $Hframe $Htc $Hcl $Hir $Hpriv $Hnext]
+      $$ [- $Hk $Pc $Hlocked $HR $Href $Hframe $Htc $Hcl $Hir $Hpriv $Hgen $Hpost $Hnext]
     iframe #
 
 /-! ## Register bookkeeping across calls -/
@@ -999,7 +1152,8 @@ theorem pw_withSpie_collapse (kb : KCtx) (a b s s' : Bool) (R R' : RegMap) :
 extended process block, the frame (its `ch` slot arbitrary), and the caller's
 continuation. -/
 def pwLoop (cpu : CPU) (k kb : KCtx) (γl : GName) (γp : PipeNames) (w : Bool) (q : Qp) (j : Nat)
-    (pid : BitVec 32) (V : ProcPriv) (M : Nat → List (BitVec 8)) (n : Int) (v13 : BitVec 64) :
+    (pid : BitVec 32) (V : ProcPriv) (M : Nat → List (BitVec 8)) (n : Int)
+    (Q : Nat → IProp GF) (Qe : Nat → PipeSt → IProp GF) (v13 : BitVec 64) :
     IProp GF := iprop(
   ∀ (curL : CPU) (a b : Bool) (Rl : RegMap) (m : Nat) (P : UPtd) (v12 : BitVec 64),
     ⌜pwFix k j n Rl ∧ Rl 18#5 = BitVec.ofNat 64 m ∧ (m : Int) ≤ max 0 n ∧ V.upt.extSz V.sz P⌝ -∗
@@ -1007,39 +1161,47 @@ def pwLoop (cpu : CPU) (k kb : KCtx) (γl : GName) (γp : PipeNames) (w : Bool) 
     trapCsrs curL -∗ cpuClaim curL k.proc -∗ intrRes curL -∗
     locked γl curL -∗ pipeResAt γp (k.regs 10#5) curCtx -∗ pipeRef γp w q -∗
     procPrivBareAt curCtx (procAddr j) pid { V with upt := P } (viewFaulted V.upt P M) -∗
+    genHalvesPriv (procAddr j) pid V.gen -∗
+    pwPay (hlc := hlc) γp (writerImg V.upt M) (k.regs 11#5) Q Qe m n.toNat -∗
     pwFrame (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) (k.regs 9#5) (k.regs 18#5) (k.regs 19#5)
       (k.regs 20#5) (k.regs 21#5) (k.regs 22#5) (k.regs 23#5) (k.regs 24#5) (k.regs 25#5)
       (k.regs 26#5) v12 v13 -∗
-    wpNext true k.proc cpu (pwPost k γp w q j pid V M n) -∗ wpLoop curL)
+    wpNext true k.proc cpu (pwPost k γp w q j pid V M n Q Qe) -∗ wpLoop curL)
 
 theorem pwLoop_elim (cpu : CPU) (k kb : KCtx) (γl : GName) (γp : PipeNames) (w : Bool) (q : Qp) (j : Nat)
-    (pid : BitVec 32) (V : ProcPriv) (M : Nat → List (BitVec 8)) (n : Int) (v13 : BitVec 64) :
-    pwLoop (GF := GF) cpu k kb γl γp w q j pid V M n v13 ⊢
+    (pid : BitVec 32) (V : ProcPriv) (M : Nat → List (BitVec 8)) (n : Int)
+    (Q : Nat → IProp GF) (Qe : Nat → PipeSt → IProp GF) (v13 : BitVec 64) :
+    pwLoop (GF := GF) cpu k kb γl γp w q j pid V M n Q Qe v13 ⊢
     ∀ (curL : CPU) (a b : Bool) (Rl : RegMap) (m : Nat) (P : UPtd) (v12 : BitVec 64),
       ⌜pwFix k j n Rl ∧ Rl 18#5 = BitVec.ofNat 64 m ∧ (m : Int) ≤ max 0 n ∧ V.upt.extSz V.sz P⌝ -∗
       kctx curL (((kb.pushOffAt a b).withLocks ["pipe"]).withRegs Rl) -∗ pcIs curL (KA.«pipewrite» + 0x88#64) -∗
       trapCsrs curL -∗ cpuClaim curL k.proc -∗ intrRes curL -∗
       locked γl curL -∗ pipeResAt γp (k.regs 10#5) curCtx -∗ pipeRef γp w q -∗
       procPrivBareAt curCtx (procAddr j) pid { V with upt := P } (viewFaulted V.upt P M) -∗
+    genHalvesPriv (procAddr j) pid V.gen -∗
+    pwPay (hlc := hlc) γp (writerImg V.upt M) (k.regs 11#5) Q Qe m n.toNat -∗
       pwFrame (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) (k.regs 9#5) (k.regs 18#5) (k.regs 19#5)
         (k.regs 20#5) (k.regs 21#5) (k.regs 22#5) (k.regs 23#5) (k.regs 24#5) (k.regs 25#5)
         (k.regs 26#5) v12 v13 -∗
-      wpNext true k.proc cpu (pwPost k γp w q j pid V M n) -∗ wpLoop curL := by
+      wpNext true k.proc cpu (pwPost k γp w q j pid V M n Q Qe) -∗ wpLoop curL := by
   unfold pwLoop; iintro H; iexact H
 
 theorem pwLoop_intro (cpu : CPU) (k kb : KCtx) (γl : GName) (γp : PipeNames) (w : Bool) (q : Qp) (j : Nat)
-    (pid : BitVec 32) (V : ProcPriv) (M : Nat → List (BitVec 8)) (n : Int) (v13 : BitVec 64) :
+    (pid : BitVec 32) (V : ProcPriv) (M : Nat → List (BitVec 8)) (n : Int)
+    (Q : Nat → IProp GF) (Qe : Nat → PipeSt → IProp GF) (v13 : BitVec 64) :
     (∀ (curL : CPU) (a b : Bool) (Rl : RegMap) (m : Nat) (P : UPtd) (v12 : BitVec 64),
       ⌜pwFix k j n Rl ∧ Rl 18#5 = BitVec.ofNat 64 m ∧ (m : Int) ≤ max 0 n ∧ V.upt.extSz V.sz P⌝ -∗
       kctx curL (((kb.pushOffAt a b).withLocks ["pipe"]).withRegs Rl) -∗ pcIs curL (KA.«pipewrite» + 0x88#64) -∗
       trapCsrs curL -∗ cpuClaim curL k.proc -∗ intrRes curL -∗
       locked γl curL -∗ pipeResAt γp (k.regs 10#5) curCtx -∗ pipeRef γp w q -∗
       procPrivBareAt curCtx (procAddr j) pid { V with upt := P } (viewFaulted V.upt P M) -∗
+    genHalvesPriv (procAddr j) pid V.gen -∗
+    pwPay (hlc := hlc) γp (writerImg V.upt M) (k.regs 11#5) Q Qe m n.toNat -∗
       pwFrame (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) (k.regs 9#5) (k.regs 18#5) (k.regs 19#5)
         (k.regs 20#5) (k.regs 21#5) (k.regs 22#5) (k.regs 23#5) (k.regs 24#5) (k.regs 25#5)
         (k.regs 26#5) v12 v13 -∗
-      wpNext true k.proc cpu (pwPost k γp w q j pid V M n) -∗ wpLoop curL) ⊢
-    pwLoop (GF := GF) cpu k kb γl γp w q j pid V M n v13 := by
+      wpNext true k.proc cpu (pwPost k γp w q j pid V M n Q Qe) -∗ wpLoop curL) ⊢
+    pwLoop (GF := GF) cpu k kb γl γp w q j pid V M n Q Qe v13 := by
   unfold pwLoop; iintro H; iexact H
 
 /-! ## The sleep arm `(KernelSyms.«pipewrite» + 0x6c)`: pipe full -/
@@ -1058,7 +1220,8 @@ theorem pw_sleep_arm (AC : ACQUIRE_GEN) (RE : RELEASE_GEN) (WK : WAKEUP) (SP : S
     (SL : SLEEP) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
     (cpu c : CPU) (k kb : KCtx) (hb : PwBase k kb)
     (γl : GName) (γp : PipeNames) (w : Bool) (q : Qp) (j : Nat) (pid : BitVec 32)
-    (V : ProcPriv) (M : Nat → List (BitVec 8)) (n : Int) (P : UPtd)
+    (V : ProcPriv) (M : Nat → List (BitVec 8)) (n : Int)
+    (Q : Nat → IProp GF) (Qe : Nat → PipeSt → IProp GF) (P : UPtd)
     (hj : j < NPROC) (hkproc : k.proc = procAddr j) (hK : pipewriteSlots ≤ k.avail)
     (hpv : pageValid (k.regs 10#5))
     (a b : Bool) (R : RegMap) (hfix : pwFix k j n R) (m : Nat) (h18 : R 18#5 = BitVec.ofNat 64 m)
@@ -1072,10 +1235,12 @@ theorem pw_sleep_arm (AC : ACQUIRE_GEN) (RE : RELEASE_GEN) (WK : WAKEUP) (SP : S
       (k.regs 26#5) v12 v13 ∗
     trapCsrs c ∗ cpuClaim c k.proc ∗ intrRes c ∗
     procPrivBareAt curCtx (procAddr j) pid { V with upt := P } (viewFaulted V.upt P M) ∗
-    wpNext true k.proc cpu (pwPost k γp w q j pid V M n) ∗
-    pwLoop cpu k kb γl γp w q j pid V M n v13
+    genHalvesPriv (procAddr j) pid V.gen ∗
+    pwPay (hlc := hlc) γp (writerImg V.upt M) (k.regs 11#5) Q Qe m n.toNat ∗
+    wpNext true k.proc cpu (pwPost k γp w q j pid V M n Q Qe) ∗
+    pwLoop cpu k kb γl γp w q j pid V M n Q Qe v13
     ⊢ wpLoop (GF := GF) c := by
-  iintro ⟨Hk, Hpc, #Hpinv, #Hopen, Hlocked, HR, Href, Hframe, Htc, Hcl, Hir, Hpriv, Hnext, IH⟩
+  iintro ⟨Hk, Hpc, #Hpinv, #Hopen, Hlocked, HR, Href, Hframe, Htc, Hcl, Hir, Hpriv, Hgen, Hpay, Hnext, IH⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
   have hsie : kb.sie = k.sie := hb.sie
   have hav : kb.avail = k.avail - 14 := hb.avail
@@ -1207,8 +1372,8 @@ theorem pw_sleep_arm (AC : ACQUIRE_GEN) (RE : RELEASE_GEN) (WK : WAKEUP) (SP : S
     KCtx.withRegs_withLocks, KCtx.withRegs_withRegs, hb.locks]
   have hfix7 : pwFix k j n R7 := pwFix_cs k j n _ R7 (pwFix_call k j n RS hfixS _ _) hcs7
   have h18_7 : R7 18#5 = BitVec.ofNat 64 m := (pw_cs18 _ _ _ _ hcs7).trans h18_S
-  ihave IH' := pwLoop_elim cpu k kb γl γp w q j pid V M n v13 $$ IH
-  iapply IH' $$ %c %spie7 %spp7 %R7 %m %P %v12 [] Hk Hpc Htc Hcl Hir Hlocked HR Href Hpriv Hframe Hnext
+  ihave IH' := pwLoop_elim cpu k kb γl γp w q j pid V M n Q Qe v13 $$ IH
+  iapply IH' $$ %c %spie7 %spp7 %R7 %m %P %v12 [] Hk Hpc Htc Hcl Hir Hlocked HR Href Hpriv Hgen Hpay Hframe Hnext
   ipureintro; exact ⟨hfix7, h18_7, hm, hext⟩
 
 theorem pw_pSz_r (pa : BitVec 64) : pa + BitVec.signExtend 64 72#12 = pSz pa := (pw_pSz pa).symm
@@ -1235,10 +1400,11 @@ theorem pw_body (AC : ACQUIRE_GEN) (RE : RELEASE_GEN) (WK : WAKEUP) (SP : SLEEP_
     (SL : SLEEP) (KL : KILLED) (CI : COPYIN) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
     (cpu c : CPU) (k kb : KCtx) (hb : PwBase k kb)
     (γl : GName) (γp : PipeNames) (w : Bool) (q : Qp) (γkl : GName) (γk : KmemNames)
-    (j : Nat) (pid : BitVec 32) (V : ProcPriv) (M : Nat → List (BitVec 8)) (n : Int) (P : UPtd)
+    (j : Nat) (pid : BitVec 32) (V : ProcPriv) (M : Nat → List (BitVec 8)) (n : Int)
+    (Q : Nat → IProp GF) (Qe : Nat → PipeSt → IProp GF) (P : UPtd)
     (hj : j < NPROC) (hkproc : k.proc = procAddr j)
     (hK : pipewriteSlots ≤ k.avail) (hkt : k.tier = KTier.kpt) (hn' : -2 ^ 31 ≤ n ∧ n < 2 ^ 31)
-    (hpv : pageValid (k.regs 10#5))
+    (hpv : pageValid (k.regs 10#5)) (hw : w = true)
     (a b : Bool) (R : RegMap) (hfix : pwFix k j n R) (m : Nat) (h18 : R 18#5 = BitVec.ofNat 64 m)
     (hm : (m : Int) < n) (hext : V.upt.extSz V.sz P) (v12 v13 : BitVec 64) :
     kctx c (((kb.pushOffAt a b).withLocks ["pipe"]).withRegs R) ∗ pcIs c (KA.«pipewrite» + 0x8c#64) ∗
@@ -1251,12 +1417,15 @@ theorem pw_body (AC : ACQUIRE_GEN) (RE : RELEASE_GEN) (WK : WAKEUP) (SP : SLEEP_
       (k.regs 26#5) v12 v13 ∗
     trapCsrs c ∗ cpuClaim c k.proc ∗ intrRes c ∗
     procPrivBareAt curCtx (procAddr j) pid { V with upt := P } (viewFaulted V.upt P M) ∗
-    wpNext true k.proc cpu (pwPost k γp w q j pid V M n) ∗
-    pwLoop cpu k kb γl γp w q j pid V M n v13
+    genHalvesPriv (procAddr j) pid V.gen ∗
+    pwPay (hlc := hlc) γp (writerImg V.upt M) (k.regs 11#5) Q Qe m n.toNat ∗
+    wpNext true k.proc cpu (pwPost k γp w q j pid V M n Q Qe) ∗
+    pwLoop cpu k kb γl γp w q j pid V M n Q Qe v13
     ⊢ wpLoop (GF := GF) c := by
   obtain ⟨ξ0, t0⟩ := X
   letI : CurCtx := ⟨ξ0, t0⟩
-  iintro ⟨Hk, Hpc, #Hpinv, #Hopen, #Hkl, #Hav, Hlocked, HR, Href, Hframe, Htc, Hcl, Hir, Hpriv, Hnext, IH⟩
+  iintro ⟨Hk, Hpc, #Hpinv, #Hopen, #Hkl, #Hav, Hlocked, HR, Href, Hframe, Htc, Hcl, Hir, Hpriv, Hgen, Hpay,
+    Hnext, IH⟩
   icases kctx_tier c _ $$ Hk with ⟨%hct, Hk⟩
   have ht0 : t0 = KTier.kpt := by
     have h := hct.symm
@@ -1270,7 +1439,8 @@ theorem pw_body (AC : ACQUIRE_GEN) (RE : RELEASE_GEN) (WK : WAKEUP) (SP : SLEEP_
   have hm64 : m < 2 ^ 64 := by omega
   -- the payload, opened; lw a5,544(s1): readopen
   icases pw_res_elim γp (k.regs 10#5) $$ HR with
-    ⟨%nr, %nw, %ro, %wo, %vname, %bs, Hname, Hnr, Hnw, Hro, Hwo, Hst0, Hst1, %hcnt, %hlen, Hdat, Hslack⟩
+    ⟨%nr, %nw, %ro, %wo, %vname, %bs, Hname, Hnr, Hnw, Hro, Hwo, Hst0, Hst1, %hcnt, %hlen, Hdat, Hslack,
+      Hq⟩
   ihave Hro := (show wordAtN (GF := GF) curCtx (aPopen (k.regs 10#5) false) 4 (DFrac.own 1) ro ⊢
       wordPointsTo (k.regs 10#5 + BitVec.signExtend 64 544#12) 4 (DFrac.own 1) ro from by
     rw [wordAtN_cur, pw_addr_ro']) $$ Hro
@@ -1286,13 +1456,23 @@ theorem pw_body (AC : ACQUIRE_GEN) (RE : RELEASE_GEN) (WK : WAKEUP) (SP : SLEEP_
     k_step (wp_s_branch c _ (KA.«pipewrite» + 0x90#64) true 8118#13 15#5 0#5 (by decide) bop.BEQ)
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [pw_beq_sext_closed ro hro]
     iintro Hk Hpc
+    -- THE READ END IS OBSERVED SHUT (Rocq `pw_post_ro`): node `m`'s
+    -- observation fires at the flag words' state, the node is spent
+    icases pw_wo_keep γp w wo q hw $$ [Hst1 Href] with ⟨%hwo, Hst1, Href⟩
+    · iframe Hst1 Href
+    iapply wpLoop_fupd
+    imod pwPost_ro V.upt γp (writerImg V.upt M) (k.regs 11#5) Q Qe iprop(killShot V.gen ∗ □ MachFixedGS.killCred (hlc := hlc) (GF := GF)) n.toNat m
+      nr nw ro wo bs (by omega) hro hwo $$ Hpay Hq with ⟨Hq, Hpost⟩
+    imodintro
+    ihave Hpost : pwOut (hlc := hlc) V γp M (k.regs 11#5) Q Qe n (-1#64) $$ [Hpost]
+    · unfold pwOut; iexact Hpost
     ihave HR := pw_res_intro γp (k.regs 10#5) nr nw ro wo vname bs hcnt hlen
-      $$ [Hname Hnr Hnw Hro Hwo Hst0 Hst1 Hdat Hslack]
+      $$ [Hname Hnr Hnw Hro Hwo Hst0 Hst1 Hdat Hslack Hq]
     case' _ => iframe
-    iapply (pw_minus1 RE cpu c k kb hb γl γp w q j pid V M n P hj hkproc hK a b _
+    iapply (pw_minus1 RE cpu c k kb hb γl γp w q j pid V M n Q Qe P hj hkproc hK a b _
         (by unfold pwFix at hfix ⊢; simp only [RegMap.set_apply, BitVec.reduceEq, ite_false]; exact hfix)
         hext (by omega) v12 v13)
-      $$ [- $Hk $Hpc $Hlocked $HR $Href $Hframe $Htc $Hcl $Hir $Hpriv $Hnext]
+      $$ [- $Hk $Hpc $Hlocked $HR $Href $Hframe $Htc $Hcl $Hir $Hpriv $Hgen $Hpost $Hnext]
     iframe #
   -- readopen set: c.mv a0,s3 ; jal killed
   k_step (wp_s_branch c _ (KA.«pipewrite» + 0x90#64) true 8118#13 15#5 0#5 (by decide) bop.BEQ)
@@ -1304,7 +1484,14 @@ theorem pw_body (AC : ACQUIRE_GEN) (RE : RELEASE_GEN) (WK : WAKEUP) (SP : SLEEP_
   k_step (wp_s_jal c _ (KA.«pipewrite» + 0x94#64) false 2087650#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [pipewrite_br_ffffffffffffdb76]
   iintro Hk Hpc
-  iapply (pw_killed KL Γ c _ j hj ?hkp ?hkn ?hkK ?hkl ?hkt) $$ [- $Hk $Hpc]
+  -- THE KILL CHECK READS THE ROW WITH THE MARKER LENT (Rocq
+  -- `kill_paid_shot_tear`): the pid half, the registration eighth, the marker
+  icases pw_priv_pid (procAddr j) pid { V with upt := P } (viewFaulted V.upt P M) $$ Hpriv with ⟨Hpw, Hpcl⟩
+  icases pw_gen_open (procAddr j) pid V.gen $$ Hgen with ⟨Hrg, Htk, Hgcl⟩
+  ihave Hlend := pw_kill_lend j pid V.gen $$ [Hpw Hrg Htk]
+  · iframe
+  iapply (pw_killed_r KL Γ c _ j (pwKillOut (hlc := hlc) j pid V.gen) hj ?hkp ?hkn ?hkK ?hkl ?hkt)
+    $$ [- $Hk $Hpc $Hlend]
   rotate_right 1
   k_norm_g [pwj_4650]
   iframe #
@@ -1314,7 +1501,11 @@ theorem pw_body (AC : ACQUIRE_GEN) (RE : RELEASE_GEN) (WK : WAKEUP) (SP : SLEEP_
   case hkl => k_norm_g; decide
   case hkt => k_norm_g; exact hb.tier
   iapply wpNext_off_intro
-  iintro %spieK %sppK %RK %hspK Hk Hpc %⟨hcsK, kl, hkl⟩
+  iintro %spieK %sppK %RK %kl %hspK Hk Hpc %⟨hcsK, hkl⟩ Hko
+  unfold pwKillOut
+  icases Hko with ⟨Hkr, Hpw, Hrg, Htk⟩
+  ihave Hgen := Hgcl $$ Hrg Htk
+  ihave Hpriv := Hpcl $$ Hpw
   k_norm_g at hspK
   obtain ⟨e1, e2⟩ := hspK trivial
   subst spieK; subst sppK
@@ -1326,17 +1517,25 @@ theorem pw_body (AC : ACQUIRE_GEN) (RE : RELEASE_GEN) (WK : WAKEUP) (SP : SLEEP_
   obtain ⟨j2, j8, j9, j19, j20, j21, j22, j23, j24, j25, j26, j27⟩ := id hfixK
   by_cases hkilled : kl = 0#32
   case neg =>
-    -- killed: c.bnez taken, the -1 arm
+    -- killed: c.bnez taken, the -1 arm; the shot and the killer's credential
+    -- ride beside the untouched node (Rocq `pw_post_kill`)
+    icases Hkr with (%hz | HRk)
+    · exact absurd hz hkilled
+    ihave Hpost := pwPost_kill V.upt γp (writerImg V.upt M) (k.regs 11#5) Q Qe iprop(killShot V.gen ∗ □ MachFixedGS.killCred (hlc := hlc) (GF := GF)) n.toNat m
+      (by omega) $$ HRk Hpay
+    ihave Hpost : pwOut (hlc := hlc) V γp M (k.regs 11#5) Q Qe n (-1#64) $$ [Hpost]
+    · unfold pwOut; iexact Hpost
     k_step (wp_s_branch c _ (KA.«pipewrite» + 0x98#64) true 8110#13 10#5 0#5 (by decide) bop.BNE)
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hkl, bcond_bne_sext_ne kl hkilled]
     iintro Hk Hpc
     ihave HR := pw_res_intro γp (k.regs 10#5) nr nw ro wo vname bs hcnt hlen
-      $$ [Hname Hnr Hnw Hro Hwo Hst0 Hst1 Hdat Hslack]
+      $$ [Hname Hnr Hnw Hro Hwo Hst0 Hst1 Hdat Hslack Hq]
     case' _ => iframe
-    iapply (pw_minus1 RE cpu c k kb hb γl γp w q j pid V M n P hj hkproc hK a b RK hfixK hext (by omega) v12 v13)
-      $$ [- $Hk $Hpc $Hlocked $HR $Href $Hframe $Htc $Hcl $Hir $Hpriv $Hnext]
+    iapply (pw_minus1 RE cpu c k kb hb γl γp w q j pid V M n Q Qe P hj hkproc hK a b RK hfixK hext (by omega) v12 v13)
+      $$ [- $Hk $Hpc $Hlocked $HR $Href $Hframe $Htc $Hcl $Hir $Hpriv $Hgen $Hpost $Hnext]
     iframe #
   subst hkilled
+  iclear Hkr
   k_step (wp_s_branch c _ (KA.«pipewrite» + 0x98#64) true 8110#13 10#5 0#5 (by decide) bop.BNE)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hkl, pw_bne0, bcond_bne_zero]
   iintro Hk Hpc
@@ -1369,12 +1568,12 @@ theorem pw_body (AC : ACQUIRE_GEN) (RE : RELEASE_GEN) (WK : WAKEUP) (SP : SLEEP_
         wordAtN curCtx (aPnwrite (k.regs 10#5)) 4 (DFrac.own 1) nw from by
       rw [wordAtN_cur, pw_addr_nw]) $$ Hnw
     ihave HR := pw_res_intro γp (k.regs 10#5) nr nw ro wo vname bs hcnt hlen
-      $$ [Hname Hnr Hnw Hro Hwo Hst0 Hst1 Hdat Hslack]
+      $$ [Hname Hnr Hnw Hro Hwo Hst0 Hst1 Hdat Hslack Hq]
     case' _ => iframe
-    iapply (pw_sleep_arm AC RE WK SP SL Γ cpu c k kb hb γl γp w q j pid V M n P hj hkproc hK hpv a b _
+    iapply (pw_sleep_arm AC RE WK SP SL Γ cpu c k kb hb γl γp w q j pid V M n Q Qe P hj hkproc hK hpv a b _
         (by unfold pwFix at hfixK ⊢; simp only [RegMap.set_apply, BitVec.reduceEq, ite_false]; exact hfixK)
         m (by simp only [RegMap.set_apply, BitVec.reduceEq, ite_false]; exact h18K) (by omega) hext v12 v13)
-      $$ [- $Hk $Hpc $Hlocked $HR $Href $Hframe $Htc $Hcl $Hir $Hpriv $Hnext $IH]
+      $$ [- $Hk $Hpc $Hlocked $HR $Href $Hframe $Htc $Hcl $Hir $Hpriv $Hgen $Hpay $Hnext $IH]
     iframe #
   -- room: the copy.  mv a4,s7 ; add a3,s2,s5 ; mv a2,s8 ; ld a1,72(s3) ; ld a0,80(s3) ; jal copyin
   k_step (wp_s_branch c _ (KA.«pipewrite» + 0xa6#64) false 8134#13 14#5 15#5 (by decide) bop.BEQ)
@@ -1435,8 +1634,22 @@ theorem pw_body (AC : ACQUIRE_GEN) (RE : RELEASE_GEN) (WK : WAKEUP) (SP : SLEEP_
       apply hn
       have := UMemL.uvaRmapped_mono hext.1 hc
       simpa [BitVec.add_comm] using this
+  have hmapC : RC 10#5 = 0#64 → umMapped P2 (k.regs 11#5 + BitVec.ofNat 64 m).toNat 1 := by
+    intro h1
+    rcases hpost with ⟨-, -, hmp⟩ | ⟨h1', -⟩
+    · simpa [BitVec.add_comm] using hmp
+    · rw [h1] at h1'; exact absurd h1' (by decide)
   replace hpost := hpost.imp (fun h => And.intro h.1 h.2.1) (fun h => And.intro h.1 h.2.1)
   obtain ⟨b', rfl⟩ := pw_copyin_one _ _ _ _ _ hpost
+  -- THE BYTE THE LINK IS PINNED TO: copyin's byte is the writer's image's
+  have hbC : RC 10#5 = 0#64 →
+      umemByte (writerImg V.upt M) (k.regs 11#5 + BitVec.ofNat 64 m).toNat = b' := by
+    intro h1
+    rcases hpost with ⟨-, hb⟩ | ⟨h1', -⟩
+    · have hb2 : [b'] = umemRead (viewFaulted V.upt P2 M) (k.regs 11#5 + BitVec.ofNat 64 m).toNat 1 := by
+        rw [← UMemL.viewFaulted_trans M hext.1 hext2.1]; simpa [BitVec.add_comm] using hb
+      exact pw_byte_img V.upt P2 M _ b' hb2 (hmapC h1)
+    · rw [h1] at h1'; exact absurd h1' (by decide)
   have hfixC : pwFix k j n RC := pwFix_cs k j n _ RC
     (by unfold pwFix at hfixK ⊢; simp only [RegMap.set_apply, BitVec.reduceEq, ite_false]; exact hfixK) hcsC
   have h18C : RC 18#5 = BitVec.ofNat 64 m := hcsC.2.2.2.1.trans
@@ -1461,16 +1674,16 @@ theorem pw_body (AC : ACQUIRE_GEN) (RE : RELEASE_GEN) (WK : WAKEUP) (SP : SLEEP_
       with [hr1, l22, pw_m1_lit, pw_beq_m1, pw_beq_m1']
     iintro Hk Hpc
     ihave HR := pw_res_intro γp (k.regs 10#5) nr nw ro wo vname bs hcnt hlen
-      $$ [Hname Hnr Hnw Hro Hwo Hst0 Hst1 Hdat Hslack]
+      $$ [Hname Hnr Hnw Hro Hwo Hst0 Hst1 Hdat Hslack Hq]
     case' _ => iframe
     ihave Hf12 := Hchcl $$ %b' Hch
     ihave Hframe := pwFrame_intro _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
       $$ [Hf0 Hf1 Hf2 Hf3 Hf4 Hf5 Hf6 Hf7 Hf8 Hf9 Hf10 Hf11 Hf12 Hf13]
     case' _ => iframe
-    iapply (pw_fail WK RE Γ cpu c k kb hb γl γp w q j pid V M n P2 hj hkproc hK hkt a b RC hfixC m
+    iapply (pw_fail WK RE Γ cpu c k kb hb γl γp w q j pid V M n Q Qe P2 hj hkproc hK hkt a b RC hfixC m
         (by omega) hn' h18C (by first | exact hr1 | (rw [pw_m1_lit]; exact hr1)) hext'
         (hwhyC (by first | exact hr1 | (rw [pw_m1_lit]; exact hr1))) (setByte7 v12 b') v13)
-      $$ [- $Hk $Hpc $Hlocked $HR $Href $Hframe $Htc $Hcl $Hir $Hpriv $Hnext]
+      $$ [- $Hk $Hpc $Hlocked $HR $Href $Hframe $Htc $Hcl $Hir $Hpriv $Hgen $Hpay $Hnext]
     iframe #
   -- copied: lw a5,540(s1) ; addiw a4,a5,1 ; sw a4,540(s1)
   k_step (wp_s_branch c _ (KA.«pipewrite» + 0xbe#64) false 34#13 10#5 22#5 (by decide) bop.BEQ)
@@ -1516,6 +1729,17 @@ theorem pw_body (AC : ACQUIRE_GEN) (RE : RELEASE_GEN) (WK : WAKEUP) (SP : SLEEP_
         (BitVec.ofNat 64 pipeDataOff + BitVec.ofNat 64 (BitVec.signExtend 64 nw &&& 511#64).toNat)) 1 (DFrac.own 1) b'
       from by rw [wordAtN_cur, ← BitVec.ofNat_add, pw_data_addr'' _ _ (pw_idx_lt'' nw)]) $$ Hb
   ihave Hdat := Hdcl $$ %b' Hb
+  -- THE BYTE LANDS (Rocq `pw_qres_push`): node `m`'s link fires with the
+  -- byte the image holds, the ring takes it at `nwrite % 512`
+  icases pw_wo_keep γp w wo q hw $$ [Hst1 Href] with ⟨%hwo, Hst1, Href⟩
+  · iframe Hst1 Href
+  iapply wpLoop_fupd
+  imod pwQres_push γp (writerImg V.upt M) (k.regs 11#5) Q Qe m n.toNat nr nw ro wo bs b' (by omega)
+    (hbC (by first | exact hr0 | (rw [pw_m1_lit] at hr0; exact hr0))) hlen hfull hwo hro $$ Hpay Hq with ⟨Hq, Hpay⟩
+  imodintro
+  ihave Hq := (show pipeQres (hlc := hlc) (GF := GF) γp nr (nw + 1#32) ro wo (bs.set (nw.toNat % 512) b') ⊢
+      pipeQres (hlc := hlc) γp nr (nw + 1#32) ro wo (bs.set (BitVec.signExtend 64 nw &&& 511#64).toNat b') from by
+    rw [pw_idx_mod]) $$ Hq
   -- c.addiw s2,s2,1 ; c.j 0x4640
   k_step (wp_s_addiw c _ (KA.«pipewrite» + 0xdc#64) true 1#12 18#5 18#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
@@ -1528,15 +1752,15 @@ theorem pw_body (AC : ACQUIRE_GEN) (RE : RELEASE_GEN) (WK : WAKEUP) (SP : SLEEP_
   ihave HR := pw_res_intro γp (k.regs 10#5) nr (nw + 1#32) ro wo vname
     (bs.set (BitVec.signExtend 64 nw &&& 511#64).toNat b') (pipeCount_incr_w nr nw hcnt hfull)
     (by rw [List.length_set]; exact hlen)
-    $$ [Hname Hnr Hnw Hro Hwo Hst0 Hst1 Hdat Hslack]
+    $$ [Hname Hnr Hnw Hro Hwo Hst0 Hst1 Hdat Hslack Hq]
   case' _ => iframe
   ihave Hf12 := Hchcl $$ %b' Hch
   ihave Hframe := pwFrame_intro _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
     $$ [Hf0 Hf1 Hf2 Hf3 Hf4 Hf5 Hf6 Hf7 Hf8 Hf9 Hf10 Hf11 Hf12 Hf13]
   case' _ => iframe
-  ihave IH' := pwLoop_elim cpu k kb γl γp w q j pid V M n v13 $$ IH
+  ihave IH' := pwLoop_elim cpu k kb γl γp w q j pid V M n Q Qe v13 $$ IH
   iapply IH' $$ %c %a %b %_ %(m + 1) %P2 %(setByte7 v12 b') []
-    Hk Hpc Htc Hcl Hir Hlocked HR Href Hpriv Hframe Hnext
+    Hk Hpc Htc Hcl Hir Hlocked HR Href Hpriv Hgen Hpay Hframe Hnext
   ipureintro
   refine ⟨?_, ?_, by omega, hext'⟩
   · unfold pwFix at hfixC ⊢; simp only [RegMap.set_apply, BitVec.reduceEq, ite_false]; exact hfixC
@@ -1551,17 +1775,18 @@ theorem pw_loop (AC : ACQUIRE_GEN) (RE : RELEASE_GEN) (WK : WAKEUP) (SP : SLEEP_
     (cpu : CPU) (k kb : KCtx) (hb : PwBase k kb)
     (γl : GName) (γp : PipeNames) (w : Bool) (q : Qp) (γkl : GName) (γk : KmemNames)
     (j : Nat) (pid : BitVec 32) (V : ProcPriv) (M : Nat → List (BitVec 8)) (n : Int)
+    (Q : Nat → IProp GF) (Qe : Nat → PipeSt → IProp GF)
     (hj : j < NPROC) (hkproc : k.proc = procAddr j)
     (hK : pipewriteSlots ≤ k.avail) (hkt : k.tier = KTier.kpt) (hn' : -2 ^ 31 ≤ n ∧ n < 2 ^ 31)
-    (hpv : pageValid (k.regs 10#5)) (v13 : BitVec 64) :
+    (hpv : pageValid (k.regs 10#5)) (hw : w = true) (v13 : BitVec 64) :
     procsInv (GF := GF) Γ -∗
     lockOpenable γl (k.regs 10#5) "pipe" (pipeResAt γp (k.regs 10#5)) (pipeDead γl γp) -∗
     isLock γkl kmemLockAddr "kmem" (kmemRes γk) -∗ kallocAvail γk none -∗
-    pwLoop cpu k kb γl γp w q j pid V M n v13 := by
+    pwLoop cpu k kb γl γp w q j pid V M n Q Qe v13 := by
   iintro #Hpinv #Hopen #Hkl #Hav
   iloeb as IH
   iapply pwLoop_intro
-  iintro %curL %a %b %Rl %m %P %v12 %⟨hfix, h18, hm, hext⟩ Hk Hpc Htc Hcl Hir Hlocked HR Href Hpriv Hframe Hnext
+  iintro %curL %a %b %Rl %m %P %v12 %⟨hfix, h18, hm, hext⟩ Hk Hpc Htc Hcl Hir Hlocked HR Href Hpriv Hgen Hpay Hframe Hnext
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
   have hsie : kb.sie = k.sie := hb.sie
   obtain ⟨g2, g8, g9, g19, g20, g21, g22, g23, g24, g25, g26, g27⟩ := id hfix
@@ -1586,7 +1811,12 @@ theorem pw_loop (AC : ACQUIRE_GEN) (RE : RELEASE_GEN) (WK : WAKEUP) (SP : SLEEP_
     ihave Hframe := pwFrame_intro _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
       $$ [Hf0 Hf1 Hf2 Hf3 Hf4 Hf5 Hf6 Hf7 Hf8 Hf9 Hf10 Hf11 Hf12 Hf13]
     case' _ => iframe
-    iapply (pw_tail WK RE Γ cpu curL k kb hb γl γp w q j pid V M n P hj hkproc hK hkt a b _
+    -- THE REQUEST MET (Rocq `pw_post_count` at the guard's exit)
+    ihave Hpost : pwOut (hlc := hlc) V γp M (k.regs 11#5) Q Qe n (BitVec.ofNat 64 m) $$ [Hpay]
+    · unfold pwOut
+      iapply (pwPost_count V.upt γp (writerImg V.upt M) (k.regs 11#5) Q Qe _ n.toNat m (BitVec.ofNat 64 m)
+        (by omega) (Or.inl rfl) (Or.inl (by omega))) $$ Hpay
+    iapply (pw_tail WK RE Γ cpu curL k kb hb γl γp w q j pid V M n Q Qe P hj hkproc hK hkt a b _
         (by simp only [RegMap.set_apply, BitVec.reduceEq, ite_false]; exact g2)
         (by simp only [RegMap.set_apply, BitVec.reduceEq, ite_false]; exact g9)
         (by simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true])
@@ -1597,19 +1827,18 @@ theorem pw_loop (AC : ACQUIRE_GEN) (RE : RELEASE_GEN) (WK : WAKEUP) (SP : SLEEP_
         (by simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true]; exact g27)
         (by simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true]
             exact Or.inr ⟨m, by rw [h18, pw_ofInt_nat], by omega, hm⟩)
-        (by simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true]
-            exact ⟨m, by omega, Or.inl ⟨Or.inl h18, Or.inl (by omega)⟩⟩)
+        (BitVec.ofNat 64 m) (by simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true] <;> first | rfl | exact h18)
         hext (k.regs 22#5) (k.regs 23#5) (k.regs 24#5) (k.regs 25#5) (k.regs 26#5) v12 v13)
-      $$ [- $Hk $Hpc $Hlocked $HR $Href $Hframe $Htc $Hcl $Hir $Hpriv $Hnext]
+      $$ [- $Hk $Hpc $Hlocked $HR $Href $Hframe $Htc $Hcl $Hir $Hpriv $Hgen $Hpost $Hnext]
     iframe #
   · -- i < n: the body
     k_step (wp_s_branch curL _ (KA.«pipewrite» + 0x88#64) false 118#13 18#5 20#5 (by decide) bop.BGE)
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
       with [h18, g20, pw_bge m n (by omega) (by omega), decide_eq_false hge]
     iintro Hk Hpc
-    iapply (pw_body AC RE WK SP SL KL CI Γ cpu curL k kb hb γl γp w q γkl γk j pid V M n P hj hkproc
-        hK hkt hn' hpv a b Rl hfix m h18 (by omega) hext v12 v13)
-      $$ [- $Hk $Hpc $Hlocked $HR $Href $Hframe $Htc $Hcl $Hir $Hpriv $Hnext $IH]
+    iapply (pw_body AC RE WK SP SL KL CI Γ cpu curL k kb hb γl γp w q γkl γk j pid V M n Q Qe P hj hkproc
+        hK hkt hn' hpv hw a b Rl hfix m h18 (by omega) hext v12 v13)
+      $$ [- $Hk $Hpc $Hlocked $HR $Href $Hframe $Htc $Hcl $Hir $Hpriv $Hgen $Hpay $Hnext $IH]
     iframe #
 
 /-! ## Entry bookkeeping -/
@@ -1626,15 +1855,19 @@ theorem pw_wr_ws_wr (X : KCtx) (R : RegMap) (s s' : Bool) (R' : RegMap) :
 
 /-- The spec's continuation is `pwPost`. -/
 theorem pw_post_of_spec (cpu : CPU) (k : KCtx) (γp : PipeNames) (w : Bool) (q : Qp) (j : Nat)
-    (pid : BitVec 32) (V : ProcPriv) (M : Nat → List (BitVec 8)) (n : Int) :
+    (pid : BitVec 32) (V : ProcPriv) (M : Nat → List (BitVec 8)) (n : Int)
+    (Q : Nat → IProp GF) (Qe : Nat → PipeSt → IProp GF) :
     wpNext true k.proc cpu (fun cpu' => iprop(∀ (spie spp : Bool) (R' : RegMap) (P' : UPtd),
-      ⌜calleeSaved k.regs R' ∧ V.upt.extSz V.sz P' ∧ pipeRwRet n (R' 10#5) ∧
-      pipeWpostR V.upt (k.regs 11#5) n.toNat (R' 10#5)⌝ -∗
+      ⌜calleeSaved k.regs R' ∧ V.upt.extSz V.sz P' ∧ pipeRwRet n (R' 10#5)⌝ -∗
       kctx cpu' ((k.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k.regs 1#5)) -∗
       trapCsrsExt cpu' k.sie -∗ cpuClaimExt cpu' k.sie k.proc -∗
       pipeRef γp w q -∗
-      procPrivBareAt curCtx (procAddr j) pid { V with upt := P' } (viewFaulted V.upt P' M) -∗ wpLoop cpu'))
-    ⊢ wpNext true k.proc cpu (pwPost (GF := GF) k γp w q j pid V M n) := by
+      procPrivBareAt curCtx (procAddr j) pid { V with upt := P' } (viewFaulted V.upt P' M) -∗
+      genHalvesPriv (procAddr j) pid V.gen -∗
+      pipeWpost (hlc := hlc) V.upt γp.pnQueue (writerImg V.upt M) (k.regs 11#5) Q Qe
+        iprop(killShot V.gen ∗ □ MachFixedGS.killCred (hlc := hlc) (GF := GF)) n.toNat (R' 10#5) -∗
+      wpLoop cpu'))
+    ⊢ wpNext true k.proc cpu (pwPost (GF := GF) k γp w q j pid V M n Q Qe) := by
   unfold pwPost; iintro H; iexact H
 
 end
@@ -1650,10 +1883,12 @@ theorem pipewrite_br_ffffffffffffd2cc : KA.«pipewrite» + 0xffffffffffffd2cc#64
 
 theorem pipewrite_proof (MP : MYPROC) (AC : ACQUIRE_GEN) (RE : RELEASE_GEN) (WK : WAKEUP)
     (SP : SLEEP_PREPARE) (SL : SLEEP) (KL : KILLED) (CI : COPYIN) : PIPEWRITE := ⟨
-  fun {hlc GF} _ _ _ _ _ _ _ X Γ _ cpu k γl γp w q γkl γk j pid V M n hj hproc hK hnoff htier hn hn' => by
+  fun {hlc GF} _ _ _ _ _ _ _ X Γ _ cpu k γl γp w q γkl γk j pid V M n Q Qe hw hj hproc hK hnoff htier hn hn' => by
   unfold wp_pipewrite_eb_body
   simp only [pipewriteAddr]
-  iintro ⟨Hk, Hpc, #Hpinv, Hte, Hce, #Hpipe, Href, #Hkl, #Hav, Hpriv, HΦ⟩
+  iintro ⟨Hk, Hpc, #Hpinv, Hte, Hce, #Hpipe, Href, #Hkl, #Hav, Hpriv, Hgen, Hpay, HΦ⟩
+  -- THE PAYMENT AT CURSOR 0 (Rocq `pw_pay_0`)
+  ihave Hpay := pwPay_0 γp (writerImg V.upt M) (k.regs 11#5) Q Qe n.toNat $$ Hpay
   icases kctx_wf _ _ $$ Hk with ⟨%hwf, Hk⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
   ihave %hpv := isPipe_pageValid γl γp _ $$ Hpipe
@@ -1661,9 +1896,9 @@ theorem pipewrite_proof (MP : MYPROC) (AC : ACQUIRE_GEN) (RE : RELEASE_GEN) (WK 
   have hK14 : 14 ≤ k.avail := by unfold pipewriteSlots at hK; omega
   have hint : k.intena = k.sie := (hwf.1 hnoff).symm
   have hlocks : k.locks = [] := List.eq_nil_of_length_eq_zero (by have := hwf.2.2.2.1; omega)
-  ihave HΦ := pw_post_of_spec cpu k γp w q j pid V M n $$ HΦ
+  ihave HΦ := pw_post_of_spec cpu k γp w q j pid V M n Q Qe $$ HΦ
   -- the caller's continuation is hart-free (a park's crossing, at a proc)
-  ihave HΦ : ∀ c : CPU, pwPost k γp w q j pid V M n c $$ [HΦ]
+  ihave HΦ : ∀ c : CPU, pwPost k γp w q j pid V M n Q Qe c $$ [HΦ]
   · iintro %c
     iapply wpNext_at true k.proc cpu c _ (fun hc => Or.elim hc (fun hx => absurd hx (by decide))
       (fun hx => absurd (hproc ▸ hx) (procAddr_nonzero hj))) $$ HΦ
@@ -1758,7 +1993,12 @@ theorem pipewrite_proof (MP : MYPROC) (AC : ACQUIRE_GEN) (RE : RELEASE_GEN) (WK 
     k_step (wp_s_j cpu _ (KA.«pipewrite» + 0x11a#64) true 2097134#21)
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
     iintro Hk Hpc
-    iapply (pw_tail WK RE Γ cpu cpu k kb hb γl γp w q j pid V M n V.upt hj hproc hK htier
+    -- THE EMPTY REQUEST IS MET (Rocq `pw_post_count` at `0`)
+    ihave Hpost : pwOut (hlc := hlc) V γp M (k.regs 11#5) Q Qe n (BitVec.ofNat 64 0) $$ [Hpay]
+    · unfold pwOut
+      iapply (pwPost_count V.upt γp (writerImg V.upt M) (k.regs 11#5) Q Qe _ n.toNat 0 (BitVec.ofNat 64 0)
+        (Nat.zero_le _) (Or.inl rfl) (Or.inl (by omega))) $$ Hpay
+    iapply (pw_tail WK RE Γ cpu cpu k kb hb γl γp w q j pid V M n Q Qe V.upt hj hproc hK htier
         spieA sppA _
         (by simp only [RegMap.set_apply, BitVec.reduceEq, ite_false]; exact p2)
         (by simp only [RegMap.set_apply, BitVec.reduceEq, ite_false]; exact p9)
@@ -1770,10 +2010,9 @@ theorem pipewrite_proof (MP : MYPROC) (AC : ACQUIRE_GEN) (RE : RELEASE_GEN) (WK 
         (by simp only [RegMap.set_apply, BitVec.reduceEq, ite_false]; exact p27)
         (by simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true]
             exact Or.inr ⟨0, by first | rfl | decide, by omega, by omega⟩)
-        (by simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true]
-            exact ⟨0, Nat.zero_le _, Or.inl ⟨Or.inl (by first | rfl | decide), Or.inl (by omega)⟩⟩)
+        (BitVec.ofNat 64 0) (by simp only [RegMap.set_apply, BitVec.reduceEq, ite_false, ite_true] <;> first | rfl | decide)
         (UMemL.extSz_refl _ _) w7 w8 w9 w10 w11 w12 w13)
-      $$ [- $Hk $Hpc $Hlocked $HR $Href $Hframe $Htc $Hcl $Hir $Hpriv $HΦ]
+      $$ [- $Hk $Hpc $Hlocked $HR $Href $Hframe $Htc $Hcl $Hir $Hpriv $Hgen $Hpost $HΦ]
     iframe #
   · -- n > 0: shrink-wrap s6..s10, set up the loop registers, into the body
     k_step (wp_s_branch0 cpu _ (KA.«pipewrite» + 0x24#64) false 244#13 20#5 (by decide) bop.BGE)
@@ -1822,11 +2061,11 @@ theorem pipewrite_proof (MP : MYPROC) (AC : ACQUIRE_GEN) (RE : RELEASE_GEN) (WK 
     ihave Hframe := pwFrame_intro _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
       $$ [Hf0 Hf1 Hf2 Hf3 Hf4 Hf5 Hf6 Hf7 Hf8 Hf9 Hf10 Hf11 Hf12 Hf13]
     case' _ => iframe
-    ihave IH := pw_loop AC RE WK SP SL KL CI Γ cpu k kb hb γl γp w q γkl γk j pid V M n hj hproc
-      hK htier hn' hpv w13 $$ Hpinv Hopen Hkl Hav
-    iapply (pw_body AC RE WK SP SL KL CI Γ cpu cpu k kb hb γl γp w q γkl γk j pid V M n V.upt hj hproc
-        hK htier hn' hpv spieA sppA _ ?hfix 0 ?h18 (by omega) (UMemL.extSz_refl _ _) w12 w13)
-      $$ [- $Hk $Hpc $Hlocked $HR $Href $Hframe $Htc $Hcl $Hir $Hpriv $HΦ $IH]
+    ihave IH := pw_loop AC RE WK SP SL KL CI Γ cpu k kb hb γl γp w q γkl γk j pid V M n Q Qe hj hproc
+      hK htier hn' hpv hw w13 $$ Hpinv Hopen Hkl Hav
+    iapply (pw_body AC RE WK SP SL KL CI Γ cpu cpu k kb hb γl γp w q γkl γk j pid V M n Q Qe V.upt hj hproc
+        hK htier hn' hpv hw spieA sppA _ ?hfix 0 ?h18 (by omega) (UMemL.extSz_refl _ _) w12 w13)
+      $$ [- $Hk $Hpc $Hlocked $HR $Href $Hframe $Htc $Hcl $Hir $Hpriv $Hgen $Hpay $HΦ $IH]
     rotate_right 1
     iframe #
     case hfix =>

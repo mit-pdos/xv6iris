@@ -266,11 +266,13 @@ theorem sys_open_tails_fileclose_none (FC : FILECLOSE) (Γ : SchedNames) [ClaimI
   unfold sysOpenEnv
   icases Henv with ⟨#Hpi, #Hpe, #Hrdy, #Hft⟩
   ihave Henvf := filecloseEnv_none (hlc := hlc) (GF := GF) Γ A.j (procAddr A.j) 0 ⟨0, 0⟩ none
-  iapply (fileclose_call FC Γ cpu k' A.γl A.γ kf 1 .closed A.j 0 ⟨0, 0⟩ none A.pid pidPriv se hs
-    (procAddr A.j) hpj hK hnoff htier ha0)
-  iframe Hk Hpc Hte Hce Hft Hpe Hf Hpid Hiru Henvf
+  -- an untyped file pays no close link (Rocq `fileclose_cpay_none`)
+  ihave Hcpay := filecloseCpay_none (hlc := hlc) (GF := GF) iprop(emp)
+  iapply (fileclose_call FC Γ cpu k' A.γl A.γ kf 1 .closed A.j 0 ⟨0, 0⟩ none A.pid pidPriv iprop(emp)
+    se hs (procAddr A.j) hpj hK hnoff htier ha0)
+  iframe Hk Hpc Hte Hce Hft Hpe Hf Hpid Hiru Henvf Hcpay
   iapply wpNext_intro_pin
-  iintro %c %_ %spie %spp %R' %hcs Hk Hpc Hte Hce Hpid Hfd Hiru -
+  iintro %c %_ %spie %spp %R' %hcs Hk Hpc Hte Hce Hpid Hfd Hiru - -
   iapply HK $$ %c %spie %spp %R' %hcs Hk Hpc Hte Hce Hpid Hfd Hiru
 
 /-! ## ARM A-FAIL and ARM B-FAIL -/

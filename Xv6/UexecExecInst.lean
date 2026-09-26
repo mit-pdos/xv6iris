@@ -63,13 +63,13 @@ Rocq's header, point for point:
    Lean has no application interface (FirstTok deviation 1): the kill
    credential is MachCSL's `killCred` (SpecSyscall deviation 6) and the
    licence is its own persistent conjunct (Rocq's pre-SUP-ONE triple).
-4. **THE PIPE ROWS, PARTLY.**  Rocq's rows 2 (`fileclose_cpays` of the
-   key's table) and 21 (`fileclose_cpay` at the key's descriptor, payload
-   `cl_P`) and close's post (`fileclose_cpost_any`) are here (appended LAST
-   in the match, Rocq's order, so every reader keeps its skip count); the
-   pipe post (`pipe_qfrag … pst0`) is `emp` until sys_pipe hands out the
-   fragment, and the read/write pipe families (`rf_pq`/`rf_pqe`/`wf_Qe`)
-   are not fields yet.
+4. **THE PIPE ROWS ARE ROCQ'S.**  Rows 2 (`fileclose_cpays` of the key's
+   table) and 21 (`fileclose_cpay` at the key's descriptor, payload `cl_P`)
+   and close's post (`fileclose_cpost_any`) are appended LAST in the match
+   (Rocq's order, so every reader keeps its skip count); pipe's post is the
+   receipt with the fresh pipe's fragment (`xpostPipe`), and the read/write
+   pipe families are the fields `rPq`/`rPqe`/`wQe` (Rocq
+   `rf_pq`/`rf_pqe`/`wf_Qe`).
 5. (retired: row 16 was the interim `filewriteChainIn` while
    `filewriteIn` carried a no-wrap conjunct; SpecFilewrite deviation 5 is
    retired, so row 16 is Rocq's `filewrite_in`, `SpecFilewrite.filewriteIn`,
@@ -187,7 +187,7 @@ theorem imgAgrees_writerImg (P : UPtd) (sz : Nat) (M : Nat → List (BitVec 8)) 
 /-! ## §1 THE DEPOSIT'S FAMILIES, as one record -/
 
 /-- **Rocq `xfam`**: one field per syscall whose contract takes
-caller-chosen families (deviation 4 for the dropped pipe fields), and
+caller-chosen families (deviation 4), and
 the three payload fields fork/exit read. -/
 structure Xfam (GF : BundledGFunctors) where
   /-- exec (7) -/
@@ -199,6 +199,9 @@ structure Xfam (GF : BundledGFunctors) where
   rF : Pfam GF (Aview → Nat → Anode → Nat → IProp GF)
   rRd : Nat → Nat → IProp GF
   rRin : List (List Obs × BitVec 8) → IProp GF
+  /-- read (5): the byte queue's cursor and observation (Rocq `rf_pq`/`rf_pqe`) -/
+  rPq : List (BitVec 8) → IProp GF
+  rPqe : List (BitVec 8) → PipeSt → IProp GF
   /-- chdir (9) -/
   cP : Nat → Nat → IProp GF
   cPmiss : Nat → Nat → IProp GF
@@ -219,6 +222,8 @@ structure Xfam (GF : BundledGFunctors) where
   oOm : OffMode
   /-- write (16): the chain's prefix cursor -/
   wQ : Nat → IProp GF
+  /-- write (16): the byte queue's read-shut observation (Rocq `wf_Qe`) -/
+  wQe : Nat → PipeSt → IProp GF
   /-- mknod (17) -/
   nP : Nat → Nat → IProp GF
   nPmiss : Nat → Nat → IProp GF
@@ -267,6 +272,8 @@ def xfamPt : Xfam GF where
   rF := pfamTriv (fun _ _ _ _ => iprop(True))
   rRd := fun _ _ => iprop(True)
   rRin := fun _ => iprop(True)
+  rPq := fun _ => iprop(True)
+  rPqe := fun _ _ => iprop(True)
   cP := fun _ _ => iprop(True)
   cPmiss := fun _ _ => iprop(True)
   cFo := pfamTriv (fun _ _ _ => iprop(True))
@@ -280,6 +287,7 @@ def xfamPt : Xfam GF where
   oFt := pfamTriv (fun _ _ _ => iprop(True))
   oOm := .parked
   wQ := fun _ => iprop(True)
+  wQe := fun _ _ => iprop(True)
   nP := fun _ _ => iprop(True)
   nPmiss := fun _ _ => iprop(True)
   nFarm := pfamTriv (fun _ _ => iprop(True))
@@ -338,10 +346,13 @@ def xrowExec (X : Uvis → IProp GF) (Q : Int → IProp GF) (P Pmiss : Nat → N
       sysExecAuPre (hlc := hlc) ⟨X, Rs⟩ (fsGammaL fscFs) fscFs W.cwd W.secc Q P Pmiss Fo Mv
         (xkA W 0) (xkA W 1) W.fd W.ch W.pid)
 
-/-- row 5: fileread's input at the key's descriptor, payload `True`. -/
+/-- row 5: fileread's input at the key's descriptor and count, payload
+`True`. -/
 def xrowRead (F : Pfam GF (Aview → Nat → Anode → Nat → IProp GF)) (Rd : Nat → Nat → IProp GF)
-    (Rin : List (List Obs × BitVec 8) → IProp GF) (W : Uvis) : IProp GF :=
-  filereadIn (hlc := hlc) (fdStOfKey (xkA W 0) W.fd) F Rd Rin iprop(True)
+    (Rin : List (List Obs × BitVec 8) → IProp GF)
+    (Rp : List (BitVec 8) → IProp GF) (Rpe : List (BitVec 8) → PipeSt → IProp GF) (W : Uvis) :
+    IProp GF :=
+  filereadIn (hlc := hlc) (fdStOfKey (xkA W 0) W.fd) (argZ (xkA W 2)) F Rd Rin Rp Rpe iprop(True)
 
 /-- row 9: chdir's bundle at the key's cwd. -/
 def xrowChdir (P Pmiss : Nat → Nat → IProp GF) (Fo : Pfam GF (Aview → Nat → Anode → IProp GF))
@@ -358,9 +369,9 @@ def xrowOpen (P Pmiss : Nat → Nat → IProp GF) (Farm Fun : Pfam GF (Aview →
       P Pmiss Farm Fun Fok Fex Fo Ft)
 
 /-- row 16: write's chains at the key's descriptor, count and buffer. -/
-def xrowWrite (Q : Nat → IProp GF) (W : Uvis) : IProp GF :=
+def xrowWrite (Q : Nat → IProp GF) (Qe : Nat → PipeSt → IProp GF) (W : Uvis) : IProp GF :=
   iprop(∀ Mv : Nat → List (BitVec 8), ⌜imgAgrees W.M Mv⌝ -∗
-    filewriteIn (hlc := hlc) W.perm W.sz W.lazy (fdStOfKey (xkA W 0) W.fd) (argZ (xkA W 2)) Mv (xkA W 1) Q)
+    filewriteIn (hlc := hlc) W.perm W.sz W.lazy (fdStOfKey (xkA W 0) W.fd) (argZ (xkA W 2)) Mv (xkA W 1) Q Qe)
 
 /-- row 17: mknod's bundle at argument 0 (the path) and the two devices. -/
 def xrowMknod (P Pmiss : Nat → Nat → IProp GF) (Farm Fun : Pfam GF (Aview → Nat → IProp GF))
@@ -398,13 +409,15 @@ def xrowMkdir (P Pmiss : Nat → Nat → IProp GF) (Farm : Pfam GF (Aview → Na
 /-- post 5 (deviation 2): read's answer in range, and fileread's receipt at
 a page view the resume image projects from. -/
 def xpostRead (F : Pfam GF (Aview → Nat → Anode → Nat → IProp GF)) (Rd : Nat → Nat → IProp GF)
-    (Rin : List (List Obs × BitVec 8) → IProp GF) (W : Uvis) (r : BitVec 64) (M' : ElfMem) :
+    (Rin : List (List Obs × BitVec 8) → IProp GF)
+    (Rp : List (BitVec 8) → IProp GF) (Rpe : List (BitVec 8) → PipeSt → IProp GF)
+    (W : Uvis) (r : BitVec 64) (M' : ElfMem) :
     IProp GF :=
   iprop(⌜filereadRet (argZ (xkA W 2)) r⌝ ∗
     ∃ (P Pr : UPtd) (Mv : Nat → List (BitVec 8)),
       ⌜umemLazy P W.sz Mv = M'⌝ ∗ ⌜permOf P.um W.sz = W.perm⌝ ∗ ⌜permOf Pr.um W.sz = W.perm⌝ ∗
-      filereadExtraCore (hlc := hlc) W.gen Pr (fdStOfKey (xkA W 0) W.fd) (argZ (xkA W 2)) F Rd Rin r
-        Mv (xkA W 1))
+      filereadExtraCore (hlc := hlc) W.gen Pr (fdStOfKey (xkA W 0) W.fd) (argZ (xkA W 2)) F Rd Rin
+        Rp Rpe r Mv (xkA W 1))
 
 /-- post 9: chdir's RECEIPT at the cwd the call resumes at. -/
 def xpostChdir (P Pmiss : Nat → Nat → IProp GF) (Fo : Pfam GF (Aview → Nat → Anode → IProp GF))
@@ -423,11 +436,23 @@ def xpostOpen (omo : OffMode) (P Pmiss : Nat → Nat → IProp GF) (Farm Fun : P
 
 /-- post 16 (deviation 2): write's answer in range, and filewrite's extra at
 some table projecting to the key's map and a view agreeing with its image. -/
-def xpostWrite (Q : Nat → IProp GF) (W : Uvis) (r : BitVec 64) : IProp GF :=
+def xpostWrite (Q : Nat → IProp GF) (Qe : Nat → PipeSt → IProp GF) (W : Uvis) (r : BitVec 64) :
+    IProp GF :=
   iprop(⌜filewriteRet (argZ (xkA W 2)) r⌝ ∗
     ∃ (P : UPtd) (Mv : Nat → List (BitVec 8)),
       ⌜permOf P.um W.sz = W.perm⌝ ∗ ⌜imgAgrees W.M Mv⌝ ∗
-      filewriteExtra (hlc := hlc) P (fdStOfKey (xkA W 0) W.fd) (argZ (xkA W 2)) Mv (xkA W 1) Q r)
+      filewriteExtra (hlc := hlc) W.gen P (fdStOfKey (xkA W 0) W.fd) (argZ (xkA W 2)) Mv (xkA W 1)
+        Q Qe r)
+
+/-- post 4 (Rocq `sysc_out_pipe`'s receipt, design/pipe.md "The byte
+queue"): on success, the two lowest closed slots opened on one fresh pipe,
+and THE PIPE'S FRAGMENT at the empty queue. -/
+def xpostPipe (W : Uvis) (r : BitVec 64) (fdv' : List FdState) : IProp GF :=
+  iprop(⌜r.toNat = 0⌝ -∗
+    ∃ (a b : Nat) (γp : PipeNames),
+      ⌜a ≠ b ∧ fdLeastClosed W.fd a ∧ fdLeastClosed (W.fd.set a (.open true false (.pipe γp))) b ∧
+        fdv' = (W.fd.set a (.open true false (.pipe γp))).set b (.open false true (.pipe γp))⌝ ∗
+      pipeQfrag γp.pnQueue pst0)
 
 /-- post 17: mknod's arms verbatim, at the view they fired at. -/
 def xpostMknod (P Pmiss : Nat → Nat → IProp GF) (Farm Fun : Pfam GF (Aview → Nat → IProp GF))
@@ -464,10 +489,10 @@ def xpostMkdir (P Pmiss : Nat → Nat → IProp GF) (Farm : Pfam GF (Aview → N
 
 /-- every number but exec: the slot family does not occur. -/
 def xv6SbundleRest (n : Int) (f : Xfam GF) (W : Uvis) : IProp GF :=
-  if n = 5 then xrowRead (hlc := hlc) f.rF f.rRd f.rRin W
+  if n = 5 then xrowRead (hlc := hlc) f.rF f.rRd f.rRin f.rPq f.rPqe W
   else if n = 9 then xrowChdir (hlc := hlc) f.cP f.cPmiss f.cFo W
   else if n = 15 then xrowOpen (hlc := hlc) f.oP f.oPmiss f.oFarm f.oFun f.oFok f.oFex f.oFo f.oFt W
-  else if n = 16 then xrowWrite (hlc := hlc) f.wQ W
+  else if n = 16 then xrowWrite (hlc := hlc) f.wQ f.wQe W
   else if n = 17 then xrowMknod (hlc := hlc) f.nP f.nPmiss f.nFarm f.nFun f.nFok f.nFex W
   else if n = 18 then xrowUnlink (hlc := hlc) f.uP f.uPmiss f.uFent f.uFtgt f.uFex f.uFmiss W
   else if n = 19 then xrowLink (hlc := hlc) f.lFtgt f.lFent f.lFunt
@@ -487,15 +512,15 @@ the slot family does not occur. -/
 def xv6Spost (_X : Uvis → IProp GF) (n : Int) (f : Xfam GF) (W : Uvis) (r : BitVec 64) (M' : ElfMem)
     (fdv' : List FdState) (cw' : Nat) (_cs' : ExtTreeSet GName compare) : IProp GF :=
   if n = USYS_exec then iprop(⌜r = BitVec.ofInt 64 (-1)⌝ -∗ f.xRs)
-  else if n = 5 then xpostRead (hlc := hlc) f.rF f.rRd f.rRin W r M'
+  else if n = 5 then xpostRead (hlc := hlc) f.rF f.rRd f.rRin f.rPq f.rPqe W r M'
   else if n = 9 then xpostChdir (hlc := hlc) f.cP f.cPmiss f.cFo W r cw'
   else if n = 15 then xpostOpen (hlc := hlc) f.oOm f.oP f.oPmiss f.oFarm f.oFun f.oFok f.oFex f.oFo f.oFt W r fdv'
-  else if n = 16 then xpostWrite (hlc := hlc) f.wQ W r
+  else if n = 16 then xpostWrite (hlc := hlc) f.wQ f.wQe W r
   else if n = 17 then xpostMknod (hlc := hlc) f.nP f.nPmiss f.nFarm f.nFun f.nFok f.nFex W r
   else if n = 18 then xpostUnlink (hlc := hlc) f.uP f.uPmiss f.uFent f.uFtgt f.uFex f.uFmiss W r
   else if n = 19 then xpostLink (hlc := hlc) f.lFtgt f.lFent f.lFunt r
   else if n = 20 then xpostMkdir (hlc := hlc) f.dP f.dPmiss f.dFarm f.dFdots f.dFun f.dFok f.dFex W r
-  else if n = USYS_pipe then iprop(emp)
+  else if n = USYS_pipe then xpostPipe W r fdv'
   else if n = 21 then filecloseCpostAny (hlc := hlc) (fdStOfKey (xkA W 0) W.fd) f.clP
   else iprop(emp)
 
@@ -550,7 +575,7 @@ theorem xv6Spost_cong (X : Uvis → IProp GF) (n : Int) (f : Xfam GF) (W W' : Uv
   have e0 : xkA W 0 = xkA W' 0 := h0
   have e1 : xkA W 1 = xkA W' 1 := h1
   have e2 : xkA W 2 = xkA W' 2 := h2
-  unfold xv6Spost xpostRead xpostChdir xpostOpen xpostWrite xpostMknod xpostUnlink xpostMkdir
+  unfold xv6Spost xpostRead xpostChdir xpostOpen xpostWrite xpostMknod xpostUnlink xpostMkdir xpostPipe
   simp only [hM, e0, e1, e2, hfd, hcw, hg, hpi, hsz]
   exact .rfl
 
@@ -615,10 +640,11 @@ def xv6Ssupply : IProp GF :=
 /-! The supply's branches, one row each, at the point's families. -/
 
 theorem xrowRead_supply (W : Uvis) :
-    □ xv6Ssupply (hlc := hlc) (GF := GF) ⊢ xrowRead (hlc := hlc) (xfamPt (GF := GF)).rF xfamPt.rRd xfamPt.rRin W := by
+    □ xv6Ssupply (hlc := hlc) (GF := GF) ⊢
+      xrowRead (hlc := hlc) (xfamPt (GF := GF)).rF xfamPt.rRd xfamPt.rRin xfamPt.rPq xfamPt.rPqe W := by
   dsimp only [xrowRead, xfamPt, xv6Ssupply]
   iintro #⟨Hsup, Hkc, Hlic⟩
-  iapply (fsabsFilereadIn (hlc := hlc) _ iprop(True)) $$ Hsup Hlic Hkc
+  iapply (fsabsFilereadIn (hlc := hlc) _ _ iprop(True)) $$ Hsup Hlic Hkc
 
 theorem xrowChdir_supply (W : Uvis) :
     □ xv6Ssupply (hlc := hlc) (GF := GF) ⊢ xrowChdir (hlc := hlc) (xfamPt (GF := GF)).cP xfamPt.cPmiss xfamPt.cFo W := by
@@ -635,7 +661,7 @@ theorem xrowOpen_supply (W : Uvis) :
   iapply (fsabsOpenIn (hlc := hlc) fscFs) $$ Hsup
 
 theorem xrowWrite_supply (W : Uvis) :
-    □ xv6Ssupply (hlc := hlc) (GF := GF) ⊢ xrowWrite (hlc := hlc) (xfamPt (GF := GF)).wQ W := by
+    □ xv6Ssupply (hlc := hlc) (GF := GF) ⊢ xrowWrite (hlc := hlc) (xfamPt (GF := GF)).wQ xfamPt.wQe W := by
   dsimp only [xrowWrite, xfamPt, xv6Ssupply]
   iintro #⟨Hsup, Hkc, Hlic⟩ %Mv %_
   iapply (fsabsFilewriteIn (hlc := hlc)) $$ Hsup Hlic Hkc
@@ -860,13 +886,14 @@ theorem syscSpostEmp_xv6 : SyscSpostEmp (GF := GF) := by
     if_neg (show ¬ n = USYS_pipe by unfold USYS_pipe; omega), if_neg (by omega)]
   exact .rfl
 
-/-- pipe's out row (Rocq `spost_at_pipe_intro`; deviation 4: `emp`). -/
+/-- pipe's out row (Rocq `spost_at_pipe_intro`): the receipt -- on
+success the two slots and the fresh pipe's fragment. -/
 theorem spostAt_pipe_xv6 (X : Uvis → IProp GF) (f : Xfam GF) (W : Uvis) (r : BitVec 64) (M' : ElfMem)
     (fdv' : List FdState) (cw' : Nat) (cs' : ExtTreeSet GName compare) :
-    ⊢ @UexecSG.spostAt GF _ uexecSGXv6 X 4 f W r M' fdv' cw' cs' := by
-  show ⊢ xv6Spost (hlc := hlc) X 4 f W r M' fdv' cw' cs'
-  unfold xv6Spost USYS_exec
-  simp only [Int.reduceEq, if_false]
+    xpostPipe (GF := GF) W r fdv' ⊢ @UexecSG.spostAt GF _ uexecSGXv6 X 4 f W r M' fdv' cw' cs' := by
+  show _ ⊢ xv6Spost (hlc := hlc) X 4 f W r M' fdv' cw' cs'
+  unfold xv6Spost USYS_exec USYS_pipe
+  simp only [Int.reduceEq, if_false, if_true]
   exact .rfl
 
 /-- close's out row (Rocq `spost_at_close_intro`): the close payment's
@@ -909,12 +936,6 @@ theorem sbundleAt_exit_nopipe_xv6 (X : Uvis → IProp GF) (f : Xfam GF) (W : Uvi
   simp only [Int.reduceEq, if_false, if_true]
   exact filecloseCpays_nopipe W.fd h
 
-/-- pipe's law shape at the instance: the (empty) deposit pays the (empty) post. -/
-theorem sbundleAt_spostAt_pipe_xv6 (X : Uvis → IProp GF) (f : Xfam GF) (W : Uvis) (r : BitVec 64)
-    (M' : ElfMem) (fdv' : List FdState) (cw' : Nat) (cs' : ExtTreeSet GName compare) :
-    @UexecSG.sbundleAt GF _ uexecSGXv6 X 4 f W ⊢ @UexecSG.spostAt GF _ uexecSGXv6 X 4 f W r M' fdv' cw' cs' :=
-  (BIAffine.affine _).affine.trans (spostAt_pipe_xv6 (hlc := hlc) X f W r M' fdv' cw' cs')
-
 /-- **Rocq `sbundle_at_kill_elim`** / `sysc_dep_kill`: row 6 is the kill
 credential (no out). -/
 theorem syscDepKill_xv6 (X : Uvis → IProp GF) (f : Xfam GF) (W : Uvis) :
@@ -954,11 +975,11 @@ theorem sbundleAt_exec_intro_xv6 (X : Uvis → IProp GF) (W : Uvis) (Q : Int →
 each is the match at one literal, by computation. -/
 
 theorem sbundleAt_xv6_read (X : Uvis → IProp GF) (f : Xfam GF) (W : Uvis) :
-    @UexecSG.sbundleAt GF _ uexecSGXv6 X 5 f W = xrowRead (hlc := hlc) f.rF f.rRd f.rRin W := rfl
+    @UexecSG.sbundleAt GF _ uexecSGXv6 X 5 f W = xrowRead (hlc := hlc) f.rF f.rRd f.rRin f.rPq f.rPqe W := rfl
 
 theorem spostAt_xv6_read (X : Uvis → IProp GF) (f : Xfam GF) (W : Uvis) (r : BitVec 64) (M' : ElfMem)
     (fdv' : List FdState) (cw' : Nat) (cs' : ExtTreeSet GName compare) :
-    @UexecSG.spostAt GF _ uexecSGXv6 X 5 f W r M' fdv' cw' cs' = xpostRead (hlc := hlc) f.rF f.rRd f.rRin W r M' := rfl
+    @UexecSG.spostAt GF _ uexecSGXv6 X 5 f W r M' fdv' cw' cs' = xpostRead (hlc := hlc) f.rF f.rRd f.rRin f.rPq f.rPqe W r M' := rfl
 
 theorem sbundleAt_xv6_chdir (X : Uvis → IProp GF) (f : Xfam GF) (W : Uvis) :
     @UexecSG.sbundleAt GF _ uexecSGXv6 X 9 f W = xrowChdir (hlc := hlc) f.cP f.cPmiss f.cFo W := rfl
@@ -975,11 +996,11 @@ theorem spostAt_xv6_open (X : Uvis → IProp GF) (f : Xfam GF) (W : Uvis) (r : B
     @UexecSG.spostAt GF _ uexecSGXv6 X 15 f W r M' fdv' cw' cs' = xpostOpen (hlc := hlc) f.oOm f.oP f.oPmiss f.oFarm f.oFun f.oFok f.oFex f.oFo f.oFt W r fdv' := rfl
 
 theorem sbundleAt_xv6_write (X : Uvis → IProp GF) (f : Xfam GF) (W : Uvis) :
-    @UexecSG.sbundleAt GF _ uexecSGXv6 X 16 f W = xrowWrite (hlc := hlc) f.wQ W := rfl
+    @UexecSG.sbundleAt GF _ uexecSGXv6 X 16 f W = xrowWrite (hlc := hlc) f.wQ f.wQe W := rfl
 
 theorem spostAt_xv6_write (X : Uvis → IProp GF) (f : Xfam GF) (W : Uvis) (r : BitVec 64) (M' : ElfMem)
     (fdv' : List FdState) (cw' : Nat) (cs' : ExtTreeSet GName compare) :
-    @UexecSG.spostAt GF _ uexecSGXv6 X 16 f W r M' fdv' cw' cs' = xpostWrite (hlc := hlc) f.wQ W r := rfl
+    @UexecSG.spostAt GF _ uexecSGXv6 X 16 f W r M' fdv' cw' cs' = xpostWrite (hlc := hlc) f.wQ f.wQe W r := rfl
 
 theorem sbundleAt_xv6_mknod (X : Uvis → IProp GF) (f : Xfam GF) (W : Uvis) :
     @UexecSG.sbundleAt GF _ uexecSGXv6 X 17 f W = xrowMknod (hlc := hlc) f.nP f.nPmiss f.nFarm f.nFun f.nFok f.nFex W := rfl
@@ -1012,9 +1033,10 @@ theorem spostAt_xv6_mkdir (X : Uvis → IProp GF) (f : Xfam GF) (W : Uvis) (r : 
 /-- **`SyscDepRead`** (Rocq `sbundle_at_read_elim` + `spost_at_read_intro`). -/
 theorem syscDepRead_xv6 (f : Xfam GF) (W : Uvis) :
     @UexecSG.sbundleAt GF _ uexecSGXv6 (uslot (hlc := hlc)) 5 f W ⊢
-      filereadIn (hlc := hlc) (fdStOfKey (xkA W 0) W.fd) f.rF f.rRd f.rRin iprop(True) ∗
+      filereadIn (hlc := hlc) (fdStOfKey (xkA W 0) W.fd) (argZ (xkA W 2)) f.rF f.rRd f.rRin f.rPq f.rPqe
+        iprop(True) ∗
       (∀ (r : BitVec 64) (M' : ElfMem) (fdv' : List FdState) (cw' : Nat) (cs' : ExtTreeSet GName compare),
-        xpostRead (hlc := hlc) f.rF f.rRd f.rRin W r M' -∗
+        xpostRead (hlc := hlc) f.rF f.rRd f.rRin f.rPq f.rPqe W r M' -∗
           @UexecSG.spostAt GF _ uexecSGXv6 (uslot (hlc := hlc)) 5 f W r M' fdv' cw' cs') := by
   rw [sbundleAt_xv6_read]
   unfold xrowRead
@@ -1073,9 +1095,9 @@ theorem syscDepWrite_xv6 (f : Xfam GF) (W : Uvis) :
     @UexecSG.sbundleAt GF _ uexecSGXv6 (uslot (hlc := hlc)) 16 f W ⊢
       (∀ Mv : Nat → List (BitVec 8), ⌜imgAgrees W.M Mv⌝ -∗
         filewriteIn (hlc := hlc) W.perm W.sz W.lazy (fdStOfKey (xkA W 0) W.fd) (argZ (xkA W 2)) Mv (xkA W 1)
-          f.wQ) ∗
+          f.wQ f.wQe) ∗
       (∀ (r : BitVec 64) (M' : ElfMem) (fdv' : List FdState) (cw' : Nat) (cs' : ExtTreeSet GName compare),
-        xpostWrite (hlc := hlc) f.wQ W r -∗
+        xpostWrite (hlc := hlc) f.wQ f.wQe W r -∗
           @UexecSG.spostAt GF _ uexecSGXv6 (uslot (hlc := hlc)) 16 f W r M' fdv' cw' cs') := by
   rw [sbundleAt_xv6_write]
   unfold xrowWrite

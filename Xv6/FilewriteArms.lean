@@ -39,6 +39,10 @@ variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [Fdslot
   [FsTopG GF] [FsLinkG GF] [IcboxG GF] [OffboxG GF] [OffboxBoxG GF] [IrefslotG GF] [CtokG GF] [WchG GF]
   [Appcfg GF] [FileG GF] [Fscfg] [Icfg] [CurCtx]
 
+/-- A writable descriptor's pipe end is the write end. -/
+theorem fwr_wbool (C : FContent) (hw : ¬ C.writable = 0#8) : fcWbool C = true := by
+  unfold fcWbool; simp [hw]
+
 /-- The block at the entry table, read as the post's `viewFaulted` form. -/
 theorem fwr_priv_self (pa : BitVec 64) (pid : BitVec 32) (V : ProcPriv) (M : Nat → List (BitVec 8)) :
     procPrivExt (GF := GF) pa pid V V.upt M ⊢ procPrivExt pa pid V V.upt (viewFaulted V.upt V.upt M) := by
@@ -49,7 +53,7 @@ set_option maxHeartbeats 8000000 in
 theorem fwr_arm_neg (cpu : CPU) (k : KCtx) (spie spp : Bool) (R : RegMap) (γl : GName) (γu : UartNames)
     (γ : FileNames) (fk : Nat)
     (q : Qp) (st : FdState) (j : Nat) (pid : BitVec 32) (V : ProcPriv) (M : Nat → List (BitVec 8))
-    (n : Int) (Q : Nat → IProp GF) (pmv : Nat → Option UPerm) (szv : Nat) (lzv : Bool) (w2 w4 w5 w8 w9 w10 w11 : BitVec 64) (hK : 12 ≤ k.avail)
+    (n : Int) (Q : Nat → IProp GF) (Qe : Nat → PipeSt → IProp GF) (pmv : Nat → Option UPerm) (szv : Nat) (lzv : Bool) (w2 w4 w5 w8 w9 w10 w11 : BitVec 64) (hK : 12 ≤ k.avail)
     (hr : fwrRegs k fk n (k.regs 9#5) (k.regs 19#5) (k.regs 20#5) (k.regs 23#5) (k.regs 24#5)
       (k.regs 25#5) R) (hneg : n < 0) (htb : wrTb pmv szv lzv V.upt) :
     kctx cpu (((k.withSpie spie spp).pushed 12).withRegs R) ∗
@@ -58,8 +62,8 @@ theorem fwr_arm_neg (cpu : CPU) (k : KCtx) (spie spp : Bool) (R : RegMap) (γl :
       (k.regs 22#5) w8 w9 w10 w11 ∗
     trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗
     fileRef γ fk q st ∗ procPrivExt (procAddr j) pid V V.upt M ∗ filewriteEnv (hlc := hlc) γl γu st ∗
-    filewriteIn (hlc := hlc) pmv szv lzv st n (writerImg V.upt M) (k.regs 11#5) Q ∗
-    fwrK (hlc := hlc) k γl γu γ fk q st j pid V M n Q
+    filewriteIn (hlc := hlc) pmv szv lzv st n (writerImg V.upt M) (k.regs 11#5) Q Qe ∗
+    fwrK (hlc := hlc) k γl γu γ fk q st j pid V M n Q Qe
     ⊢ wpLoop (GF := GF) cpu := by
   iintro ⟨Hk, Hpc, Hframe, Hte, Hce, Href, Hpriv, Henv, Hin, HΦ⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
@@ -89,15 +93,15 @@ theorem fwr_arm_neg (cpu : CPU) (k : KCtx) (spie spp : Bool) (R : RegMap) (γl :
     rw [ha0]
     isplitr
     · ipureintro; exact filewriteRet_m1 n
-    iapply filewriteExtra_neg (pmv := pmv) (szv := szv) (lzv := lzv) _ st n _ _ Q hneg htb $$ Hin
+    iapply filewriteExtra_neg (pmv := pmv) (szv := szv) (lzv := lzv) _ _ st n _ _ Q Qe hneg htb $$ Hin
 
 /-- THE INODE ARM'S INPUT AT A ZERO COUNT, at either mode: the chain at
 the kernel's table (at a held row the client-advanced chain converts down,
 `awriteChainAt_of_adv`; on its taint arm the plain chain is there). -/
 theorem fwr_in_zero (rb : Bool) (i : Nat) (γo : GName) (om : OffMode) (M : Nat → List (BitVec 8))
-    (ua : BitVec 64) (Q : Nat → IProp GF) (pmv : Nat → Option UPerm) (szv : Nat) (lzv : Bool) (P : UPtd)
+    (ua : BitVec 64) (Q : Nat → IProp GF) (Qe : Nat → PipeSt → IProp GF) (pmv : Nat → Option UPerm) (szv : Nat) (lzv : Bool) (P : UPtd)
     (htb : wrTb pmv szv lzv P) :
-    filewriteIn (hlc := hlc) pmv szv lzv (.open rb true (.inode i γo om)) 0 M ua Q ⊢
+    filewriteIn (hlc := hlc) pmv szv lzv (.open rb true (.inode i γo om)) 0 M ua Q Qe ⊢
       awriteChainAt (hlc := hlc) (fsGammaL fscFs) appE i γo M ua P 0 Q 0 (wchunks 0) := by
   cases om with
   | parked =>
@@ -118,7 +122,7 @@ is the OK arm. -/
 theorem fwr_arm_zero (cpu : CPU) (k : KCtx) (spie spp : Bool) (R : RegMap) (γl : GName) (γu : UartNames)
     (γ : FileNames) (fk : Nat)
     (q : Qp) (rb : Bool) (i : Nat) (γo : GName) (om : OffMode) (j : Nat) (pid : BitVec 32) (V : ProcPriv)
-    (M : Nat → List (BitVec 8)) (n : Int) (Q : Nat → IProp GF) (pmv : Nat → Option UPerm) (szv : Nat) (lzv : Bool) (w2 w4 w5 w8 w9 w10 w11 : BitVec 64)
+    (M : Nat → List (BitVec 8)) (n : Int) (Q : Nat → IProp GF) (Qe : Nat → PipeSt → IProp GF) (pmv : Nat → Option UPerm) (szv : Nat) (lzv : Bool) (w2 w4 w5 w8 w9 w10 w11 : BitVec 64)
     (hK : 12 ≤ k.avail)
     (hr : fwrRegs k fk n (k.regs 9#5) (k.regs 19#5) (k.regs 20#5) (k.regs 23#5) (k.regs 24#5)
       (k.regs 25#5) R) (h12 : R 12#5 = BitVec.ofInt 64 n) (hn0 : n = 0)
@@ -131,8 +135,8 @@ theorem fwr_arm_zero (cpu : CPU) (k : KCtx) (spie spp : Bool) (R : RegMap) (γl 
     fileRef γ fk q (.open rb true (.inode i γo om)) ∗ procPrivExt (procAddr j) pid V V.upt M ∗
     filewriteEnv (hlc := hlc) γl γu (.open rb true (.inode i γo om)) ∗
     filewriteIn (hlc := hlc) pmv szv lzv (.open rb true (.inode i γo om)) n (writerImg V.upt M)
-      (k.regs 11#5) Q ∗
-    fwrK (hlc := hlc) k γl γu γ fk q (.open rb true (.inode i γo om)) j pid V M n Q
+      (k.regs 11#5) Q Qe ∗
+    fwrK (hlc := hlc) k γl γu γ fk q (.open rb true (.inode i γo om)) j pid V M n Q Qe
     ⊢ wpLoop (GF := GF) cpu := by
   subst hn0
   iintro ⟨Hk, Hpc, Hframe, Hte, Hce, Href, Hpriv, Henv, Hin, HΦ⟩
@@ -161,7 +165,7 @@ theorem fwr_arm_zero (cpu : CPU) (k : KCtx) (spie spp : Bool) (R : RegMap) (γl 
   · ipureintro; exact ⟨hcs, UMemL.extSz_refl _ _⟩
   · -- the chain at the writer's table, at EITHER mode (Rocq L2: the
     -- zero-trip exit pays at the file's mode too)
-    ihave Hc := fwr_in_zero rb i γo om (writerImg V.upt M) (k.regs 11#5) Q pmv szv lzv V.upt htb $$ Hin
+    ihave Hc := fwr_in_zero rb i γo om (writerImg V.upt M) (k.regs 11#5) Q Qe pmv szv lzv V.upt htb $$ Hin
     unfold filewriteArms filewriteExtra
     rw [ha0]
     isplitr
@@ -185,12 +189,13 @@ set_option maxHeartbeats 16000000 in
 `c.j`. -/
 theorem fwr_arm_pipe (PW : PIPEWRITE) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
     (cpu : CPU) (k : KCtx) (spie spp : Bool) (R : RegMap) (γl : GName) (γu : UartNames)
-    (γ : FileNames) (fk : Nat) (q : Qp) (C : FContent) (rb wb : Bool) (γp : PipeNames) (j : Nat) (pid : BitVec 32) (V : ProcPriv)
-    (M : Nat → List (BitVec 8)) (γkl : GName) (γk : KmemNames) (n : Int) (Q : Nat → IProp GF)
+    (γ : FileNames) (fk : Nat) (q : Qp) (C : FContent) (rb : Bool) (γp : PipeNames) (j : Nat) (pid : BitVec 32) (V : ProcPriv)
+    (M : Nat → List (BitVec 8)) (γkl : GName) (γk : KmemNames) (n : Int) (Q : Nat → IProp GF) (Qe : Nat → PipeSt → IProp GF)
+    (pmv : Nat → Option UPerm) (szv : Nat) (lzv : Bool)
     (w2 w4 w5 w8 w9 w10 w11 : BitVec 64)
     (hK : filewriteSlots ≤ k.avail) (hj : j < NPROC) (hproc : k.proc = procAddr j)
     (hnoff : k.noff = 0) (htier : k.tier = KTier.kpt) (ht : curTier = KTier.kpt)
-    (hn : -2 ^ 31 ≤ n ∧ n < 2 ^ 31) (hty : C.type = FD_PIPE)
+    (hn : -2 ^ 31 ≤ n ∧ n < 2 ^ 31) (hty : C.type = FD_PIPE) (hfw : fcWbool C = true)
     (hr : fwrRegs k fk n (k.regs 9#5) (k.regs 19#5) (k.regs 20#5) (k.regs 23#5) (k.regs 24#5)
       (k.regs 25#5) R) (h10 : R 10#5 = fnode fk) (h12 : R 12#5 = BitVec.ofInt 64 n)
     (h11 : R 11#5 = k.regs 11#5) :
@@ -200,15 +205,20 @@ theorem fwr_arm_pipe (PW : PIPEWRITE) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF
       (k.regs 22#5) w8 w9 w10 w11 ∗
     trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗
     procsInv Γ ∗ isLock γkl kmemLockAddr "kmem" (kmemRes γk) ∗ kallocAvail γk none ∗
-    frefTok γ fk q ∗ fileFieldsAt curCtx fk q C ∗ filePaySt γ fk q C (.open rb wb (.pipe γp)) ∗
+    frefTok γ fk q ∗ fileFieldsAt curCtx fk q C ∗ filePaySt γ fk q C (.open rb true (.pipe γp)) ∗
     procPrivExt (procAddr j) pid V V.upt M ∗
-    fwrK (hlc := hlc) k γl γu γ fk q (.open rb wb (.pipe γp)) j pid V M n Q
+    -- THE PIPE ARM'S INPUT (the writer's links over the byte queue, or the
+    -- taint), and the generation halves pipewrite's kill read borrows
+    filewriteIn (hlc := hlc) pmv szv lzv (.open rb true (.pipe γp)) n (writerImg V.upt M) (k.regs 11#5) Q Qe ∗
+    genHalvesPriv (procAddr j) pid V.gen ∗
+    fwrKG (hlc := hlc) k γl γu γ fk q (.open rb true (.pipe γp)) j pid V M n Q Qe
     ⊢ wpLoop (GF := GF) cpu := by
   have hK' : 12 + writeiSlots ≤ k.avail := hK
-  iintro ⟨Hk, Hpc, Hframe, Hte, Hce, #Hpi, #Hkl, #Hav, Htok, Hfields, Hpay, Hpriv, HΦ⟩
+  iintro ⟨Hk, Hpc, Hframe, Hte, Hce, #Hpi, #Hkl, #Hav, Htok, Hfields, Hpay, Hpriv, Hin, Hgen, HΦG⟩
+  ihave Hin := (filewriteIn_pipe (hlc := hlc) pmv szv lzv rb γp n (writerImg V.upt M) (k.regs 11#5) Q Qe).1 $$ Hin
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
   icases filerw_fields_pipe fk q C $$ Hfields with ⟨Hpcell, Hfw⟩
-  icases filerw_pay_pipe γ fk q C rb wb γp hty $$ Hpay with ⟨%γl, #Hpp, Hpref, Hpback⟩
+  icases filerw_pay_pipe γ fk q C rb true γp hty $$ Hpay with ⟨%γl, #Hpp, Hpref, Hpback⟩
   -- +0x5c  c.ld a0,16(a0)
   k_step_e (wp_s_ld cpu _ (KA.«filewrite» + 0x5c#64) true 16#12 10#5 10#5 (by decide) (by decide)
       (DFrac.own q) C.pipe)
@@ -218,10 +228,11 @@ theorem fwr_arm_pipe (PW : PIPEWRITE) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF
   k_step_e (wp_s_jal cpu _ (KA.«filewrite» + 0x5e#64) false 518#21 1#5 (by decide))
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [fwr_br_pipewrite]
   iintro Hk Hpc
-  iapply (fwr_pipewrite PW Γ cpu _ γl γp (fcWbool C) q γkl γk j pid V M n ht hj ?pproc ?pK ?pnoff
-      ?ptier ?pn hn) $$ [- $Hk $Hpc]
+  iapply (fwr_pipewrite PW Γ cpu _ γl γp (fcWbool C) q γkl γk j pid V M n Q Qe hfw ht hj ?pproc ?pK
+      ?pnoff ?ptier ?pn hn) $$ [- $Hk $Hpc]
   rotate_right 1
   k_norm_g [fwr_ret_62]
+  try rw [h11]
   iframe
   iframe #
   case pproc => k_norm_g; exact hproc
@@ -233,7 +244,8 @@ theorem fwr_arm_pipe (PW : PIPEWRITE) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF
   case ptier => k_norm_g; exact htier
   case pn => k_norm_g; exact h12
   -- ===== back from pipewrite =====
-  iintro %cpu %spie1 %spp1 %R1 %P' %⟨hcs1, hext, hret, hwp⟩ Hk Hpc Hte Hce Hpref Hpriv
+  iintro %cpu %spie1 %spp1 %R1 %P' %⟨hcs1, hext, hret⟩ Hk Hpc Hte Hce Hpref Hpriv Hgen Hpost
+  ihave HΦ := fwrKG_elim $$ HΦG Hgen
   k_norm_g [fwr_ret_62, fwr_ww, fwr_psw]
   have hr1 : fwrRegs k fk n (k.regs 9#5) (k.regs 19#5) (k.regs 20#5) (k.regs 23#5) (k.regs 24#5)
       (k.regs 25#5) R1 := by
@@ -252,17 +264,19 @@ theorem fwr_arm_pipe (PW : PIPEWRITE) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF
   iintro %c' %R' %⟨hcs, h10'⟩ Hk Hpc Hte Hce
   ihave Hpay := Hpback $$ Hpref
   ihave Hfields := Hfw $$ Hpcell
-  ihave Href := filerw_ref_close γ fk q (.open rb wb (.pipe γp)) C $$ [Htok Hfields Hpay]
+  ihave Href := filerw_ref_close γ fk q (.open rb true (.pipe γp)) C $$ [Htok Hfields Hpay]
   · iframe
   unfold fwrK
-  iapply HΦ $$ %c' %spie1 %spp1 %R' %P' [] Hk Hpc Hte Hce Href Hpriv [] []
+  iapply HΦ $$ %c' %spie1 %spp1 %R' %P' [] Hk Hpc Hte Hce Href Hpriv [] [Hpost]
   · ipureintro; exact ⟨hcs, hext⟩
   · unfold filewriteEnvOut; iempintro
   · unfold filewriteArms
     rw [h10']
     isplitr
     · ipureintro; exact hret
-    iapply filewriteExtra_pipe _ _ _ _ _ _ _ _ _ (fun _ => by rw [h11] at hwp; exact hwp)
+    iapply filewriteExtra_pipe
+    try rw [h11]
+    iexact Hpost
 
 /-! ## The FD_DEVICE arm's readings -/
 
@@ -307,7 +321,7 @@ not the console's, so the chain is dropped (Rocq
 theorem fwr_dev_m1 (cpu : CPU) (k : KCtx) (spie spp : Bool) (R : RegMap) (γl : GName)
     (γu : UartNames) (γ : FileNames) (fk : Nat) (q : Qp) (C : FContent) (rb : Bool) (mj : Nat)
     (j : Nat) (pid : BitVec 32) (V : ProcPriv) (M : Nat → List (BitVec 8)) (n : Int)
-    (Q : Nat → IProp GF) (pmv : Nat → Option UPerm) (szv : Nat) (lzv : Bool) (w2 w4 w5 w8 w9 w10 w11 : BitVec 64) (hK : 12 ≤ k.avail)
+    (Q : Nat → IProp GF) (Qe : Nat → PipeSt → IProp GF) (pmv : Nat → Option UPerm) (szv : Nat) (lzv : Bool) (w2 w4 w5 w8 w9 w10 w11 : BitVec 64) (hK : 12 ≤ k.avail)
     (hnc : mj ≠ CONSOLE)
     (hr : fwrRegs k fk n (k.regs 9#5) (k.regs 19#5) (k.regs 20#5) (k.regs 23#5) (k.regs 24#5)
       (k.regs 25#5) R) (h10 : R 10#5 = -1#64) :
@@ -318,8 +332,8 @@ theorem fwr_dev_m1 (cpu : CPU) (k : KCtx) (spie spp : Bool) (R : RegMap) (γl : 
     trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗
     frefTok γ fk q ∗ fileFieldsAt curCtx fk q C ∗ filePaySt γ fk q C (.open rb true (.device mj)) ∗
     procPrivExt (procAddr j) pid V V.upt M ∗ filewriteDevEnv γl γu mj ∗
-    filewriteIn (hlc := hlc) pmv szv lzv (.open rb true (.device mj)) n (writerImg V.upt M) (k.regs 11#5) Q ∗
-    fwrK (hlc := hlc) k γl γu γ fk q (.open rb true (.device mj)) j pid V M n Q
+    filewriteIn (hlc := hlc) pmv szv lzv (.open rb true (.device mj)) n (writerImg V.upt M) (k.regs 11#5) Q Qe ∗
+    fwrK (hlc := hlc) k γl γu γ fk q (.open rb true (.device mj)) j pid V M n Q Qe
     ⊢ wpLoop (GF := GF) cpu := by
   iintro ⟨Hk, Hpc, Hframe, Hte, Hce, Htok, Hfields, Hpay, Hpriv, #Henv, Hin, HΦ⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
@@ -341,7 +355,7 @@ theorem fwr_dev_m1 (cpu : CPU) (k : KCtx) (spie spp : Bool) (R : RegMap) (γl : 
     rw [ha0]
     isplitr
     · ipureintro; exact filewriteRet_m1 n
-    iapply filewriteExtra_dev_drop (pmv := pmv) (szv := szv) (lzv := lzv) _ rb mj hnc n _ _ Q _ $$ Hin
+    iapply filewriteExtra_dev_drop (pmv := pmv) (szv := szv) (lzv := lzv) _ _ rb mj hnc n _ _ Q Qe _ $$ Hin
 
 set_option maxHeartbeats 16000000 in
 /-- **`+0x64 .. +0x88`: THE FD_DEVICE ARM** (Rocq's `+0x5c .. +0x80`):
@@ -355,7 +369,7 @@ theorem fwr_arm_dev (CW : CONSOLEWRITE) (Γ : SchedNames) [ClaimIs (hlc := hlc) 
     (cpu : CPU) (k : KCtx) (spie spp : Bool) (R : RegMap) (γl : GName) (γu : UartNames)
     (γ : FileNames) (fk : Nat) (q : Qp) (C : FContent) (rb : Bool) (mj : Nat) (j : Nat)
     (pid : BitVec 32) (V : ProcPriv) (M : Nat → List (BitVec 8)) (γkl : GName) (γk : KmemNames)
-    (n : Int) (Q : Nat → IProp GF) (pmv : Nat → Option UPerm) (szv : Nat) (lzv : Bool) (w2 w4 w5 w8 w9 w10 w11 : BitVec 64)
+    (n : Int) (Q : Nat → IProp GF) (Qe : Nat → PipeSt → IProp GF) (pmv : Nat → Option UPerm) (szv : Nat) (lzv : Bool) (w2 w4 w5 w8 w9 w10 w11 : BitVec 64)
     (hK : filewriteSlots ≤ k.avail) (hj : j < NPROC) (hproc : k.proc = procAddr j)
     (hnoff : k.noff = 0) (htier : k.tier = KTier.kpt) (ht : curTier = KTier.kpt)
     (hn : -2 ^ 31 ≤ n ∧ n < 2 ^ 31) (hn0 : 0 ≤ n) (hmj : mj = C.major.toNat)
@@ -371,8 +385,8 @@ theorem fwr_arm_dev (CW : CONSOLEWRITE) (Γ : SchedNames) [ClaimIs (hlc := hlc) 
     frefTok γ fk q ∗ fileFieldsAt curCtx fk q C ∗ filePaySt γ fk q C (.open rb true (.device mj)) ∗
     procPrivExt (procAddr j) pid V V.upt M ∗
     filewriteDevEnv γl γu mj ∗
-    filewriteIn (hlc := hlc) pmv szv lzv (.open rb true (.device mj)) n (writerImg V.upt M) (k.regs 11#5) Q ∗
-    fwrK (hlc := hlc) k γl γu γ fk q (.open rb true (.device mj)) j pid V M n Q
+    filewriteIn (hlc := hlc) pmv szv lzv (.open rb true (.device mj)) n (writerImg V.upt M) (k.regs 11#5) Q Qe ∗
+    fwrK (hlc := hlc) k γl γu γ fk q (.open rb true (.device mj)) j pid V M n Q Qe
     ⊢ wpLoop (GF := GF) cpu := by
   have hK' : 12 + writeiSlots ≤ k.avail := hK
   iintro ⟨Hk, Hpc, Hframe, Hte, Hce, #Hpi, #Hkl, #Hav, Htok, Hfields, Hpay, Hpriv, #Henv, Hin, HΦ⟩
@@ -407,7 +421,7 @@ theorem fwr_arm_dev (CW : CONSOLEWRITE) (Γ : SchedNames) [ClaimIs (hlc := hlc) 
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
     iintro Hk Hpc
     have hnc : mj ≠ CONSOLE := by unfold CONSOLE; omega
-    iapply (fwr_dev_m1 cpu k spie spp _ γl γu γ fk q C rb mj j pid V M n Q pmv szv lzv w2 w4 w5 w8 w9 w10 w11
+    iapply (fwr_dev_m1 cpu k spie spp _ γl γu γ fk q C rb mj j pid V M n Q Qe pmv szv lzv w2 w4 w5 w8 w9 w10 w11
       (by omega) hnc ?hrm ?h10m) $$ [- $Hk $Hpc]
     rotate_right 1
     k_norm_g
@@ -460,7 +474,7 @@ theorem fwr_arm_dev (CW : CONSOLEWRITE) (Γ : SchedNames) [ClaimIs (hlc := hlc) 
     k_step_e (wp_s_j cpu _ (KA.«filewrite» + 0x124#64) true 2097104#21)
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
     iintro Hk Hpc
-    iapply (fwr_dev_m1 cpu k spie spp _ γl γu γ fk q C rb mj j pid V M n Q pmv szv lzv w2 w4 w5 w8 w9 w10 w11
+    iapply (fwr_dev_m1 cpu k spie spp _ γl γu γ fk q C rb mj j pid V M n Q Qe pmv szv lzv w2 w4 w5 w8 w9 w10 w11
       (by omega) hc ?hrn ?h10n) $$ [- $Hk $Hpc]
     rotate_right 1
     k_norm_g
@@ -532,7 +546,7 @@ theorem fwr_arm_dev (CW : CONSOLEWRITE) (Γ : SchedNames) [ClaimIs (hlc := hlc) 
     ihave %hr := writeConsArms_ret _ _ Q n _ $$ H
     isplitr
     · ipureintro; exact hr
-    iapply filewriteExtra_cons _ rb n _ _ Q _ $$ H
+    iapply filewriteExtra_cons _ _ rb n _ _ Q Qe _ $$ H
 
 set_option maxHeartbeats 8000000 in
 /-- **`+0x102 .. +0x116`: THE ELSE ARM** (Rocq's `fw_panic`): the six lazy
@@ -594,7 +608,7 @@ started (`fwrRaw_init`), the block's view read at the writer's image
 (`fwr_priv_img`), and the loop (`fwr_loop`). -/
 theorem fwr_arm_inode (BO : BEGIN_OP) (IL : ILOCK) (WI : WRITEI) (IU : IUNLOCK) (EO : END_OP)
     (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ] (cpu : CPU) (k : KCtx) (spie spp : Bool)
-    (R : RegMap) (A : FwrA) (hA : FwrFacts k A) (Q : Nat → IProp GF) (pmv : Nat → Option UPerm) (szv : Nat) (lzv : Bool)
+    (R : RegMap) (A : FwrA) (hA : FwrFacts k A) (Q : Nat → IProp GF) (Qe : Nat → PipeSt → IProp GF) (pmv : Nat → Option UPerm) (szv : Nat) (lzv : Bool)
     (htb : wrTb pmv szv lzv A.V.upt)
     (w2 w4 w5 w8 w9 w10 w11 : BitVec 64)
     (hr : fwrRegs k A.fk A.n (k.regs 9#5) (k.regs 19#5) (k.regs 20#5) (k.regs 23#5) (k.regs 24#5)
@@ -609,8 +623,8 @@ theorem fwr_arm_inode (BO : BEGIN_OP) (IL : ILOCK) (WI : WRITEI) (IU : IUNLOCK) 
     -- THE DESCRIPTOR'S OFFSET ROW (Rocq lane OFF-LINK-5): the carrier's
     -- supplier at mode park, read once at the entry
     foffRow (GF := GF) A.st ∗
-    filewriteIn (hlc := hlc) pmv szv lzv A.st A.n A.img (k.regs 11#5) Q ∗
-    fwrK (hlc := hlc) k A.γul A.γuu A.γ A.fk A.q A.st A.j A.pid A.V A.M A.n Q
+    filewriteIn (hlc := hlc) pmv szv lzv A.st A.n A.img (k.regs 11#5) Q Qe ∗
+    fwrK (hlc := hlc) k A.γul A.γuu A.γ A.fk A.q A.st A.j A.pid A.V A.M A.n Q Qe
     ⊢ wpLoop (GF := GF) cpu := by
   obtain ⟨r2, r8, r9, r18, r19, r20, r21, r22, r23, r24, r25, r26, r27⟩ := id hr
   iintro ⟨Hk, Hpc, Hframe, Hte, Hce, #Henv, Href, Hpriv, Hbs, #Hrow, Hc, HΦ⟩
@@ -663,9 +677,9 @@ theorem fwr_arm_inode (BO : BEGIN_OP) (IL : ILOCK) (WI : WRITEI) (IU : IUNLOCK) 
   ihave Hpriv := fwr_priv_img (procAddr A.j) A.pid A.V A.M $$ Hpriv
   -- THE CARRIER AT THE ROW'S MODE (Rocq lane OFF-LINK-5's `fw_au_st_init`,
   -- at the file's own mode since L2)
-  ihave Hc := filewriteIn_inode_any (hlc := hlc) pmv szv lzv A.rb A.om A.i A.γo A.n A.img (k.regs 11#5) Q $$ Hc
+  ihave Hc := filewriteIn_inode_any (hlc := hlc) pmv szv lzv A.rb A.om A.i A.γo A.n A.img (k.regs 11#5) Q Qe $$ Hc
   ihave Hst := fwrSt_init A.om A.rb true A.i A.γo pmv szv lzv A.V.upt A.n A.img (k.regs 11#5) Q htb $$ Hrow Hc
-  iapply (fwr_loop BO IL WI IU EO Γ k A hA Q A.n.toNat cpu spie spp _ 0 0 A.V.upt (k.regs 9#5)
+  iapply (fwr_loop BO IL WI IU EO Γ k A hA Q Qe A.n.toNat cpu spie spp _ 0 0 A.V.upt (k.regs 9#5)
     (k.regs 19#5) w11 (by omega) (by have := hA.hn.1; omega) (by unfold FW_MAX; omega)
     (UMemL.extSz_refl _ _) hr')
   iframe Hk Hpc Hte Hce

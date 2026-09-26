@@ -60,6 +60,83 @@ Collected from the U0 agent reports (Sept 26 2026). Each item names the lane tha
 - U0-2 owner note: FileDiscLine's trim dropped `all_cats`, but it is reached via `adm_echo`;
   U0-3 defines `allCats` in PipesDisc.
 
+## K4 (PQ-b, after the bump) — absorbs the rest of PQ-a — DONE (branch k4-pq)
+- C1: KILL-TAINT kill row (`KillRow.killRow` at the killer's `□ Wk`, `killPaid_shot_tear`),
+  setkilled keyed on `self`; fileclose_cpay(s)/cpost(_any) (SpecFileclose); kexit/sys_exit on
+  `procPrivUnmarked` + `filecloseCpays`; sys_close cpay→cpostAny; UexecExecInst rows 21/2 + Xfam.clP,
+  freeNum excludes 21/2; usertrap exit+kill arms (`UtExitElim`, `utTear`); UexecExecMintW (udepw suppliers).
+- C2: `pipeQres` is `pipeResAt`'s last conjunct; pipealloc/sys_pipe hand out `pipeQfrag … pst0`
+  (sys_pipe's rollback pays its two closes from the fragment: `sp_fc_cpay_frag`,
+  `sp_fc_cpay_of_cpost`); pipeclose takes `pipeCpay` → fired `pipeCpost`; fileclose takes
+  `filecloseCpay` → `filecloseCpost` (not-last: `fileRest_q_ne_one`); kexit's loop spends the table's
+  payments (`kx_fdpay`); pipewrite/piperead take `pipeWpay`/`pipeRpay` (+ genHalvesPriv, kill arm with
+  the credential); fileread/filewrite/sys_read/sys_write pipe arms are Rocq's; Xfam gains
+  rPq/rPqe/wQe, post 4 is the pipe receipt (`xpostPipe`), `SyscDepPipe` is Rocq's `sysc_out_pipe`;
+  FsAbsInvFire's read/write dischargers pay pipe arms from the taint; PipeReg §4 ported.
+- Retired: PipeInvDefs interim, SpecPipealloc dev 4, SpecSysPipe, PipeReg dev 1, SyscallArmsFdDefs
+  dev 4, UexecExecInst dev 4 (only `of_om` left), SpecFilewrite dev 11.
+- Left for U1-R: the run's pipe rows (`urun_rows`/`urun_nopipe`, `udepw_row*`/`udepw_cl*`,
+  `udep_close_dep`/`udep_exit_*`) and `wp_uk_sb_denied`'s self-minted exit deposit (needs the rows).
+- Name watch: K2 added `fdstNopipe` in FileDefs (Rocq FdSlots name) — U1-R / U0-6 must reuse it.
+
+## U1-T (image pins)
+- `EchoFsPure`, `FileFsPure` (U0-2) wait on `FsInitPinBoot`, `FsShPin`, `FsEchoPin`, `FsCatPin`,
+  `FsGrepPin`, `FsSeccPin`.
+- Rest of `Xv6/FileName.lean` (existing file → worktree lane): `sys_names`, `name_laws`,
+  `txt_laws`, `txt_sys_ok`, `txt_img_ok`, `nl_ne_sys`, `nl_ne_console`, three `era0_*` lemmas.
+  Needs `fname_*` pins (missing from `FsImgCheck`), `fname_console`, `TreeImg.img_root_ents`,
+  `FsInitPin`.
+- `UNamePath.cat_words_head` needs `fname_cat` (then `rfl`).
+- When porting `UserConsole`: reuse the kernel's `consSwallow` / `consStoredLb` (as `ReadRec`
+  does) instead of redefining Rocq's `ucons_*` duplicates.
+
+## MachCSL/ObsTrace
+- `obs_ins` missing (U0-1 defined `consIns` directly by recursion); `open_seg_prefix_of_boots`
+  missing (copy lives at `EchoOutPure.openSeg_prefix_boots`). Fold back when convenient.
+
+## U4 (seal)
+- `EchoOutG` (new camera class, one field: era map `GhostMapG GF Nat EraPins RegMapF`) needs a
+  slot in `xv6GF` / `unionGF`.
+
+## U0-5 (union model) — CLOSED
+- Anti-vacuity demos done in `Xv6/UnionDemo.lean` (`demo_disc : lmDisc ulmG hist`, thread demo,
+  admission demos) via the round-trip `ulineOfU_body`. Those general lemmas (`ulineOfU_body`,
+  `parseLine_pipe_none`, `plParse_pipe_body`) live in UnionDemo; move to UnionDisc if a lane
+  needs them.
+
+## K3 (seccomp) — DONE (branch k3-secc: S0, S2k–S2k3, exec mask pin, whole-table view)
+- `LinkRec.lkWildNone` is deliberately distinct from K3's `wildNone`; K3 changes no U0-C statement.
+- Landed: `MachFixedGS.wild`/`rdwild` slots + `wildNone` (MachCSL); `AppIface.wild`/`wild_lic`/`rdwild`,
+  `wildNone_lic`, `consLicenceAt_of_wild` (takes the wild/consRes slot equations: Rocq reads
+  riscvF_app_iface); `ConsLog.wildEv`; `UartLinks.consLicenceAt` (+`_of_licence`),
+  `outLink_of_licenceAt`, `consReadPay_trivAt`; `AppInv.appRdcred` (+`_of_sup`/`_of_rdwild`/`_elim`)
+  at the console escrow; `AppLaws.al_programs`/`al_echo` take `wild`/`rdwild` slot equations.
+- S2k: `ConsNames.era`, `consEra`, `consPlaced`, `consSwallowPlaced`, `consoleCaps`/`consoleReadyApp`
+  carry `era = genId + 1` (`consoleReadyApp_era`); consoleread/fileread marked arms relayed at
+  `genId + 1`. DEVIATION: `consResCur` got only relax-d2's `nrd ≤ cur` (Rocq's `cons_dlcnt`/`ndl ≤ nrd`
+  still unported, pre-existing).
+- S5b (`ep_rpos`): nothing kernel-side; EchoOut/LinkRec/GenLinksLine/ReadRec already at the pin (U0-C).
+- Exec mask pin: `execSlotPre`/`execAuPre … cw secc …`, `initBootBundle cw secc sts`,
+  `EraInitBoot` at `ROOTINO seccAll fdt0`, `parkMode`/`parkPkg` carry `secc`.
+- Whole-table view: UserFd camera is `GhostMapG GF (Option Nat) UfdCell UfdMapF` (FileG slot 64);
+  `ustdAt`, `tabLe`, `ushViewOk`, `ustdOk`, `uallocV`; `uslot_of_urun_all_at`/`_ro_at`,
+  `UkFork.wp_uk_ecall_fork_at`, `UConsOpen.ukOpenFdArmAt`/`initCons_fail_std_at`.
+- Left for U1-T: UConsOpen `init_cons_any_std(_at)`; UInitFd `ufd_alloc0_v`, `ufd_headL*`,
+  `ufd_head1*`, `ufd_head*`, `ufd_row`, `ufd_head_open_row`, `ufd_head_of_row` (no non-`_at` forms yet);
+  ExecEntry/ExecBundle's `image_entry_taint` two key pins (Rocq 3e7fee0d2, union-side).
+- Left for U1-R/K4: UkRun `udepwf_std*`. For U1-P: `UexecSecc.ush_view_secc_rows`.
+- For P-secc / P-init: `UkFork.wp_uk_ecall_fork_at` is now Rocq's view-keeping leaf (`ustdAt l v`);
+  the plain-ledger statement is `wp_uk_ecall_fork`, which InitMainFork / ProofSeccMain now call.
+  Retire UkSeccDefs deviation 5 (`seccTabFork`) and the `Obl` mask parameter onto the `_at` leaf and
+  `uvis_secc` (`UkSeccLit.secc_mask_masked`).
+
+## UkShPipes* / UShUPipes wave (after DU8 repoint)
+- `Xv6/PipesCut.lean` (U0-3) is partial: 15/37 reached decls. The other 22 are statements about
+  the shell's lexer/parser (`UkSh.ush_line_at`, `UkShPipesLex`/`UkShPipesCmd`/`UkShParseCmd`/
+  `UkShMain`/`UkShEcho`, `UmodeAbi.ubyte0`); only consumer is UShUPipes.
+- U0-2 owner note: FileDiscLine's trim dropped `all_cats`, but it is reached via `adm_echo`;
+  U0-3 defines `allCats` in PipesDisc.
+
 ## K4 (PQ-b, after the bump) — absorbs the rest of PQ-a
 - K2 landed only PQ-a steps 1–2 (PipeNames/PipeQueue/PipeReg defs, `Xv6G.pipeqG` slot 94,
   `FdType.pipe γp`, `fdstateOk … γp`, `Xv6/PipeQstep.lean` ghost steps). The re-proofs of

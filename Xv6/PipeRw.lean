@@ -485,7 +485,8 @@ theorem pw_res_elim (γp : PipeNames) (pi : BitVec 64) :
         wordAtN curCtx (aPopen pi false) 4 (DFrac.own 1) ro ∗
         wordAtN curCtx (aPopen pi true) 4 (DFrac.own 1) wo ∗
         pipeEndstate γp false ro ∗ pipeEndstate γp true wo ∗
-        ⌜pipeCountOk nr nw⌝ ∗ ⌜bs.length = PIPESIZE⌝ ∗ pipeDataAt curCtx pi bs ∗ pipeSlack pi := by
+        ⌜pipeCountOk nr nw⌝ ∗ ⌜bs.length = PIPESIZE⌝ ∗ pipeDataAt curCtx pi bs ∗ pipeSlack pi ∗
+        pipeQres (hlc := hlc) γp nr nw ro wo bs := by
   unfold pipeResAt; iintro H; iexact H
 
 theorem pw_res_intro (γp : PipeNames) (pi : BitVec 64) (nr nw ro wo : BitVec 32)
@@ -496,11 +497,12 @@ theorem pw_res_intro (γp : PipeNames) (pi : BitVec 64) (nr nw ro wo : BitVec 32
     wordAtN curCtx (aPopen pi false) 4 (DFrac.own 1) ro ∗
     wordAtN curCtx (aPopen pi true) 4 (DFrac.own 1) wo ∗
     pipeEndstate γp false ro ∗ pipeEndstate γp true wo ∗
-    pipeDataAt curCtx pi bs ∗ pipeSlack pi ⊢ pipeResAt γp pi curCtx := by
+    pipeDataAt curCtx pi bs ∗ pipeSlack pi ∗ pipeQres (hlc := hlc) γp nr nw ro wo bs ⊢
+      pipeResAt γp pi curCtx := by
   unfold pipeResAt
-  iintro ⟨H1, H2, H3, H4, H5, H6, H7, H8, H9⟩
+  iintro ⟨H1, H2, H3, H4, H5, H6, H7, H8, H9, H10⟩
   iexists nr, nw, ro, wo, vname, bs
-  iframe H1 H2 H3 H4 H5 H6 H7 H8 H9
+  iframe H1 H2 H3 H4 H5 H6 H7 H8 H9 H10
   ipureintro; exact ⟨hcnt, hlen⟩
 
 end

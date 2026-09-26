@@ -42,10 +42,9 @@ The arms themselves are `SyscallArmsFd` (dup, fstat, close) and
    such row yet, so the payload rides back to the process through the
    receipt.  Rocq's pt-wf / lazy-claim / `gn = pv_gen` premises of
    `sysc_out_read` are not needed by a law stated at the block.
-4. **pipe's receipt is PURE** (the dispatch's own fd/pipe rows): Lean's
-   sys_pipe post names no pipe fragment yet (Rocq's receipt is
-   `pipe_qfrag (pn_queue γp) pst0`).  (close's deposit and receipt are
-   Rocq's: `SyscDepClose` carries `fileclose_cpay` in and
+4. (retired: pipe's receipt is Rocq's `sysc_out_pipe` -- the two slots and
+   `pipe_qfrag (pn_queue γp) pst0` on success; close's deposit and receipt
+   are Rocq's: `SyscDepClose` carries `fileclose_cpay` in and
    `fileclose_cpost_any` out; exit's is `SyscDepExit`.)
 -/
 import Xv6.SyscallRet
@@ -317,13 +316,15 @@ def SyscDepRead : Prop :=
     (gn : GName) (cs : ExtTreeSet GName compare) (pid : BitVec 32),
     UexecSG.sbundleAt (uslot (hlc := hlc)) 5 f (uvisOf V M sts gn cs pid) ⊢
       ∃ (F : Pfam GF (Aview → Nat → Anode → Nat → IProp GF)) (Rd : Nat → Nat → IProp GF)
-        (Rin : List (List Obs × BitVec 8) → IProp GF) (P : IProp GF),
-        filereadIn (hlc := hlc) (syscFdKey (tfW V.tf (tfArgIdx 0)) sts) F Rd Rin P ∗ P ∗
+        (Rin : List (List Obs × BitVec 8) → IProp GF)
+        (Rp : List (BitVec 8) → IProp GF) (Rpe : List (BitVec 8) → PipeSt → IProp GF) (P : IProp GF),
+        filereadIn (hlc := hlc) (syscFdKey (tfW V.tf (tfArgIdx 0)) sts) (argZ (tfW V.tf (tfArgIdx 2)))
+          F Rd Rin Rp Rpe P ∗ P ∗
         (∀ (r : BitVec 64) (P' : UPtd) (M1 : Nat → List (BitVec 8)) (d : Nat),
           ⌜V.upt.extSz V.sz P' ∧ umemWrote V.upt M (tfW V.tf (tfArgIdx 1)) d P' M1 ∧
             filereadRet (argZ (tfW V.tf (tfArgIdx 2))) r⌝ -∗
           filereadExtra (hlc := hlc) gn V.upt (syscFdKey (tfW V.tf (tfArgIdx 0)) sts)
-            (argZ (tfW V.tf (tfArgIdx 2))) F Rd Rin P r M1 (tfW V.tf (tfArgIdx 1)) -∗
+            (argZ (tfW V.tf (tfArgIdx 2))) F Rd Rin Rp Rpe P r M1 (tfW V.tf (tfArgIdx 1)) -∗
           UexecSG.spostAt (uslot (hlc := hlc)) 5 f (uvisOf V M sts gn cs pid) r
             (umemLazy P' V.sz.toNat M1) sts V.cwi cs)
 
@@ -335,24 +336,29 @@ def SyscDepWrite : Prop :=
   ∀ (f : UexecSG.sfam GF) (V : ProcPriv) (M : Nat → List (BitVec 8)) (sts : List FdState)
     (gn : GName) (cs : ExtTreeSet GName compare) (pid : BitVec 32),
     UexecSG.sbundleAt (uslot (hlc := hlc)) 16 f (uvisOf V M sts gn cs pid) ⊢
-      ∃ Q : Nat → IProp GF,
+      ∃ (Q : Nat → IProp GF) (Qe : Nat → PipeSt → IProp GF),
         filewriteIn (hlc := hlc) (permOf V.upt.um V.sz.toNat) V.sz.toNat V.pvLazy
           (syscFdKey (tfW V.tf (tfArgIdx 0)) sts) (argZ (tfW V.tf (tfArgIdx 2)))
-          (writerImg V.upt M) (tfW V.tf (tfArgIdx 1)) Q ∗
+          (writerImg V.upt M) (tfW V.tf (tfArgIdx 1)) Q Qe ∗
         (∀ r : BitVec 64, ⌜filewriteRet (argZ (tfW V.tf (tfArgIdx 2))) r⌝ -∗
-          filewriteExtra (hlc := hlc) V.upt (syscFdKey (tfW V.tf (tfArgIdx 0)) sts)
-            (argZ (tfW V.tf (tfArgIdx 2))) (writerImg V.upt M) (tfW V.tf (tfArgIdx 1)) Q r -∗
+          filewriteExtra (hlc := hlc) gn V.upt (syscFdKey (tfW V.tf (tfArgIdx 0)) sts)
+            (argZ (tfW V.tf (tfArgIdx 2))) (writerImg V.upt M) (tfW V.tf (tfArgIdx 1)) Q Qe r -∗
           UexecSG.spostAt (uslot (hlc := hlc)) 16 f (uvisOf V M sts gn cs pid) r
             (syscImg V M) sts V.cwi cs)
 
-/-- **Rocq `sysc_out_pipe`** (deviations 1, 4): pipe deposits nothing, and
-its armed post is paid by the dispatch's own descriptor and pipe rows. -/
+/-- **Rocq `sysc_out_pipe`** (deviation 1): pipe deposits nothing, and its
+armed post is sys_pipe's receipt -- on success the two lowest closed slots
+opened on one fresh pipe, and THE PIPE'S FRAGMENT at the empty queue
+(design/pipe.md, "The byte queue"). -/
 def SyscDepPipe : Prop :=
   ∀ (f : UexecSG.sfam GF) (V : ProcPriv) (M : Nat → List (BitVec 8)) (sts : List FdState)
     (gn : GName) (cs : ExtTreeSet GName compare) (pid : BitVec 32) (r : BitVec 64) (M' : ElfMem)
     (sts' : List FdState),
-    syscFdOk V r sts sts' → syscPipeOk V (syscImg V M) M' r sts sts' →
-    UexecSG.sbundleAt (uslot (hlc := hlc)) 4 f (uvisOf V M sts gn cs pid) ⊢
+    (⌜r.toNat = 0⌝ -∗
+      ∃ (a b : Nat) (γp : PipeNames),
+        ⌜a ≠ b ∧ fdLeastClosed sts a ∧ fdLeastClosed (sts.set a (.open true false (.pipe γp))) b ∧
+          sts' = (sts.set a (.open true false (.pipe γp))).set b (.open false true (.pipe γp))⌝ ∗
+        pipeQfrag γp.pnQueue pst0) ⊢
       UexecSG.spostAt (uslot (hlc := hlc)) 4 f (uvisOf V M sts gn cs pid) r M' sts' V.cwi cs
 
 /-- **Rocq `sysc_dep_close` + `sysc_out_close`** (deviation 1): close's

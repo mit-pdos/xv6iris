@@ -27,8 +27,8 @@ bumped key is the continuation at `a0 := -1`, `pc + 4`, closed by
    `usysno m = USYS_exec` -- `usysno` is `UkRunSys`'s (not ported yet); when
    it lands it should be definitionally this reading.
 2. **No `urun_rows` lend** (Rocq's deposits take the run's pipe-row fact,
-   `design/pipe.md` "The exit path"): K4 (PQ-b) deferred in Lean, as
-   `UkRun`'s deviation 2.  No seccomp mask (`secc_all`, K3): Lean's key has
+   `design/pipe.md` "The exit path"): the run's pipe rows are not in Lean
+   yet, `UkRun`'s deviation 2.  No seccomp mask (`secc_all`, K3): Lean's key has
    none yet, so the mask row and `usys_secc_ok_quiet` have nothing to say.
 3. The resume alignment is `(pc + 4#64) &&& 1#64 = 0#64` (UexecRet
    deviation 7; Rocq `is_aligned_vaddr (pc + 4) 2`).

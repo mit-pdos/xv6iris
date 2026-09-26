@@ -165,6 +165,7 @@ theorem fileclose_call [Fscfg] [Icfg] [CurCtx] [FileG GF] (FC : FILECLOSE) (Γ :
     [ClaimIs (hlc := hlc) GF Γ] (c : CPU)
     (k' : KCtx) (γl : GName) (γ : FileNames) (kk : Nat) (q : Qp) (st : FdState) (j : Nat)
     (γkl : GName) (γk : KmemNames) (on : Option Nat) (pidv : BitVec 32) (dqp : DFrac)
+    (Φc : IProp GF)
     (s : Bool) (hs : k'.sie = s) (pj : BitVec 64) (hpj : k'.proc = pj)
     (hK : filecloseSlots ≤ k'.avail) (hnoff : k'.noff = 0) (htier : k'.tier = KTier.kpt)
     (ha0 : k'.regs 10#5 = fnode kk) :
@@ -172,16 +173,18 @@ theorem fileclose_call [Fscfg] [Icfg] [CurCtx] [FileG GF] (FC : FILECLOSE) (Γ :
     isFtable γl γ ∗ panicEnv ∗ fileRef γ kk q st ∗
     wordPointsTo (pPid pj) 4 dqp pidv ∗ irefSlot ∗
     filecloseEnv (hlc := hlc) Γ j pj γkl γk on st ∗
+    filecloseCpay (hlc := hlc) st Φc ∗
     wpNext true pj c (fun cpu' => iprop(∀ (spie spp : Bool) (R' : RegMap),
       ⌜calleeSaved k'.regs R'⌝ -∗
       kctx cpu' ((k'.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k'.regs 1#5)) -∗
       trapCsrsExt cpu' s -∗ cpuClaimExt cpu' s pj -∗
       wordPointsTo (pPid pj) 4 dqp pidv -∗
-      fdSlot -∗ irefSlot -∗ filecloseEnvOut γk on st -∗ wpLoop cpu'))
+      fdSlot -∗ irefSlot -∗ filecloseEnvOut γk on st -∗
+      filecloseCpost (hlc := hlc) q st Φc -∗ wpLoop cpu'))
     ⊢ wpLoop (GF := GF) c := by
   subst hs hpj
   have h := FC.wp_fileclose_eb (hlc := hlc) (GF := GF) Γ c k' γl γ kk q st j γkl γk on pidv dqp
-    hK hnoff htier ha0
+    Φc hK hnoff htier ha0
   unfold wp_fileclose_eb_body at h
   simp only [filecloseAddr] at h
   exact h
