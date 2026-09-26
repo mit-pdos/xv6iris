@@ -198,7 +198,7 @@ end
 /-! ## At the era the power thread mints
 
 `MachCSL.riscvPowerAdequacy`'s `Hboot` (through `MachCSL.wp_power`) hands the
-client `powerBootRes E gen σ` with `bootFacts σ image`; the client runs its
+client `powerBootRes E gen σ` with `bootFacts σ`; the client runs its
 harts at `MachCSL.MachGS.ofEra E gen …`, whose `regName` IS `E.regName`.  So
 `Xv6.bootEntryPre` applies to `powerBootRes`'s per-hart row verbatim. -/
 
@@ -209,7 +209,7 @@ variable {hlc : HasLC} {GF : BundledGFunctors} [MachFixedGS hlc GF]
 power thread's per-hart register row and its `bootFacts`. -/
 theorem bootEntryPre_ofEra (E : EraGS GF) (gen : Nat) (cP : CPU → BitVec 64 → IProp GF)
     (cI : ∀ cpu : CPU, ⊢ cP cpu 0#64) (eP : CtxId → IProp GF) (ePe : ∀ ξ : CtxId, Persistent (eP ξ))
-    (σ : MState) (image : Mem) (hbf : bootFacts σ image) (cpu : CPU) :
+    (σ : MState) (hbf : bootFacts σ) (cpu : CPU) :
     letI : MachGS hlc GF := MachGS.ofEra E gen cP cI eP ePe
     regCellsNoPins (GF := GF) (E.regName cpu) (σ.regs cpu) ⊢
       mBoot cpu (DFrac.own 1) ∗

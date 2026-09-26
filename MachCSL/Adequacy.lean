@@ -59,9 +59,9 @@ initial `powerInterp`'s last conjunct `diskFixedInterp`), then the swap
 counter at 0, then `Pc γdisk γswap γreg γstart c` from `HPc`, sealed into
 `crashInv` (`inv crashN crashPred` at the literal, `crashN = nroot .@
 "crash"`) and consumed at the end of the run by `Hphi` beside `▷ Pt`.
-`bootFixedGS` carries `γdisk ndisk γswap Pcp` in Rocq's positions, with the
-boot image `img` (Rocq's language constant `RiscvLang.boot_image`; Lean's
-`GState.image`, pinned by `powerInterp`) after `ndisk`.
+`bootFixedGS` carries `γdisk ndisk γswap Pcp` in Rocq's positions.  The boot
+image is not a record field: it is the language constant `MachCSL.bootImage`
+(Rocq `RiscvLang.boot_image`), so no hook takes a premise about it.
 `wp_power`'s crash hooks (`Ppure`/`Hproj`/`Mof`/`Rb`/`Hswap`) are taken at
 the raw gnames and passed through; `Hobs` is lent the durable authority;
 `Hboot` gets the projection `Ppure` at its own disk and, inside
@@ -152,7 +152,7 @@ so that `Hboot` can be told its shape: every functor instance from
 `MachGpreS`, the invariant world, the fixed gnames, the run's trace `T`, the
 trace predicate `Ptp`, and the application's slots. -/
 @[reducible] def bootFixedGS [MachGpreS hlc GF] (Hinv : InvGS_gen hlc GF)
-    (γgen γstart γreg γdisk : GName) (ndisk : Nat) (img : Mem) (γswap : GName) (Pcp : IProp GF)
+    (γgen γstart γreg γdisk : GName) (ndisk : Nat) (γswap : GName) (Pcp : IProp GF)
     (γobs : GName) (T : List Obs) (Ptp : IProp GF) (γhist : GName)
     (Tg : List Obs → IProp GF) (HTg : ∀ h, Persistent (Tg h)) (HTgt : ∀ h, Timeless (Tg h))
     (Kc : IProp GF) (HKc : Persistent Kc) (HKct : Timeless Kc)
@@ -191,7 +191,6 @@ trace predicate `Ptp`, and the application's slots. -/
   diskImgG := MachGpreS.diskImg_pre
   diskName := γdisk
   diskSize := ndisk
-  bootImage := img
   crashPred := Pcp
   swapName := γswap
   mirrorG := MachGpreS.mirror_pre
@@ -228,10 +227,9 @@ The hooks, in Rocq's order:
   the machine's history half, `obsWf`, and the two fixed-layer predicates;
 * `Hboot` -- the client's whole system, told the record's shape, handed the
   projection at its own disk and, inside `powerBootRes`, the crash invariant
-  and the lent resource; the booted machine's `bootFacts` are at THE INITIAL
-  STATE'S IMAGE `g.image` (the record's `bootImage`, Rocq's language
-  constant `boot_image`), so a client with a premise about `g.image` can use
-  it at every boot. -/
+  and the lent resource; the booted machine's `bootFacts` are at the
+  language's boot image `bootImage` (Rocq's `boot_image`): no premise on the
+  initial state's memory. -/
 theorem riscvPowerAdequacy [MachGpreS hlc GF] [KernelMap] (ndisk : Nat) (g : GState)
     (CT : Type) (Cl : CT → IProp GF)
     (Hbirth : ⊢@{IProp GF} |==> ∃ c : CT, Cl c)
@@ -271,7 +269,7 @@ theorem riscvPowerAdequacy [MachGpreS hlc GF] [KernelMap] (ndisk : Nat) (g : GSt
     (phi : GState → List Obs → Prop)
     (Hphi : ∀ (Hinv : InvGS_gen hlc GF) (γgen γstart γreg γdisk γswap γobs γhist : GName) (c : CT)
         (T : List Obs) (g' : GState) (h : List Obs),
-      @powerInterp hlc GF (bootFixedGS Hinv γgen γstart γreg γdisk ndisk g.image γswap
+      @powerInterp hlc GF (bootFixedGS Hinv γgen γstart γreg γdisk ndisk γswap
           (Pc γdisk γswap γreg γstart c) γobs T (Pt γobs c) γhist
           (Tg c) (HTg c) (HTgt c) (Kc c) (HKc c) (HKct c) (Cres c) (HCrest c)) g' ∗
         (γobs ↪VAR{.own (1 : Qp).half} h) ∗ ⌜obsWf h g'⌝ ∗
@@ -279,10 +277,10 @@ theorem riscvPowerAdequacy [MachGpreS hlc GF] [KernelMap] (ndisk : Nat) (g : GSt
     (Hgen0 : g.gen = 0) (Hpow : g.pow = false)
     (Hboot : ∀ [F : MachFixedGS hlc GF] (Hinv : InvGS_gen hlc GF)
         (γgen γstart γreg γdisk γswap γobs γhist : GName) (c : CT) (T : List Obs),
-      F = bootFixedGS Hinv γgen γstart γreg γdisk ndisk g.image γswap (Pc γdisk γswap γreg γstart c)
+      F = bootFixedGS Hinv γgen γstart γreg γdisk ndisk γswap (Pc γdisk γswap γreg γstart c)
           γobs T (Pt γobs c) γhist
           (Tg c) (HTg c) (HTgt c) (Kc c) (HKc c) (HKct c) (Cres c) (HCrest c) →
-      ∀ (E : EraGS GF) (gen : Nat) (σ : MState), bootFacts σ g.image →
+      ∀ (E : EraGS GF) (gen : Nat) (σ : MState), bootFacts σ →
         (∃ ds0 : DevStates, σ.devs = ds0.reset) →
         Ppure (diskOf σ.devs) →
         obsInv ∗ powerBootRes Mof (Rb c) E gen σ ⊢@{IProp GF} |={⊤}=>
@@ -315,7 +313,7 @@ theorem riscvPowerAdequacy [MachGpreS hlc GF] [KernelMap] (ndisk : Nat) (g : GSt
   imod (inv_alloc obsN ⊤ (Pt γobs c)) $$ [HPt0] with #Hoinv
   · inext; iexact HPt0
   imodintro
-  iexists (bootFixedGS Hinv γgen γstart γreg γdisk ndisk g.image γswap (Pc γdisk γswap γreg γstart c)
+  iexists (bootFixedGS Hinv γgen γstart γreg γdisk ndisk γswap (Pc γdisk γswap γreg γstart c)
     γobs T (Pt γobs c) γhist
     (Tg c) (HTg c) (HTgt c) (Kc c) (HKc c) (HKct c) (Cres c) (HCrest c))
   unfold adeqBirth
@@ -325,9 +323,6 @@ theorem riscvPowerAdequacy [MachGpreS hlc GF] [KernelMap] (ndisk : Nat) (g : GSt
   · isplitl [Hgauth Hsauth HRauth Hdauth]
     · unfold powerInterp genAuth startAuth eraCur diskFixedInterp diskFixedAuth
       iframe Hgauth Hsauth Hdauth
-      -- the image pin: the literal's `bootImage` IS `g.image`
-      have Himg : g.image = g.image := rfl
-      iframe %Himg
       iexists ∅
       iframe HRauth
       rw [Hpow]
@@ -344,13 +339,13 @@ theorem riscvPowerAdequacy [MachGpreS hlc GF] [KernelMap] (ndisk : Nat) (g : GSt
       · ipureintro; exact obsWf_init g Hpow Hgen0
       iframe HobA HobH
   isplitl []
-  · iapply (@wp_power hlc GF ((bootFixedGS Hinv γgen γstart γreg γdisk ndisk g.image γswap
+  · iapply (@wp_power hlc GF ((bootFixedGS Hinv γgen γstart γreg γdisk ndisk γswap
       (Pc γdisk γswap γreg γstart c) γobs T (Pt γobs c) γhist
       (Tg c) (HTg c) (HTgt c) (Kc c) (HKc c) (HKct c) (Cres c) (HCrest c)).withInv Hinv) _
       Ppure (fun dk => Hproj γdisk γswap γreg γstart c dk)
       Mof (Rb c) (fun E gen dk => Hswap γdisk γswap γreg γstart c E gen dk)
       (fun h on dk hs => Hobs γdisk γobs c h on dk hs)
-      (fun E gen σ hbf hdv hpp => @Hboot ((bootFixedGS Hinv γgen γstart γreg γdisk ndisk g.image γswap
+      (fun E gen σ hbf hdv hpp => @Hboot ((bootFixedGS Hinv γgen γstart γreg γdisk ndisk γswap
         (Pc γdisk γswap γreg γstart c) γobs T (Pt γobs c) γhist
         (Tg c) (HTg c) (HTgt c) (Kc c) (HKc c) (HKct c) (Cres c) (HCrest c)).withInv Hinv)
         Hinv γgen γstart γreg γdisk γswap γobs γhist c T rfl E gen σ hbf hdv hpp))
@@ -498,27 +493,27 @@ theorem obsLedgerAt_phi (R : List Obs → IProp GF) [∀ h, Timeless (R h)]
 
 /-- At the literal, the trivial trace predicate IS `obsPredAt`. -/
 theorem bootFixedGS_obsPredTriv (Hinv : InvGS_gen hlc GF)
-    (γgen γstart γreg γdisk : GName) (ndisk : Nat) (img : Mem) (γswap : GName) (Pcp : IProp GF)
+    (γgen γstart γreg γdisk : GName) (ndisk : Nat) (γswap : GName) (Pcp : IProp GF)
     (γobs : GName) (T : List Obs) (γhist : GName)
     (Tg : List Obs → IProp GF) (HTg : ∀ h, Persistent (Tg h)) (HTgt : ∀ h, Timeless (Tg h))
     (Kc : IProp GF) (HKc : Persistent Kc) (HKct : Timeless Kc)
     (Cres : Nat → List Obs → ConsHist → IProp GF) (HCrest : ∀ k h H, Timeless (Cres k h H)) :
-    @MachFixedGS.obsPred hlc GF (bootFixedGS Hinv γgen γstart γreg γdisk ndisk img γswap Pcp γobs T (obsPredAt γobs) γhist
+    @MachFixedGS.obsPred hlc GF (bootFixedGS Hinv γgen γstart γreg γdisk ndisk γswap Pcp γobs T (obsPredAt γobs) γhist
         Tg HTg HTgt Kc HKc HKct Cres HCrest) =
-      @obsPredTriv hlc GF (bootFixedGS Hinv γgen γstart γreg γdisk ndisk img γswap Pcp γobs T (obsPredAt γobs) γhist
+      @obsPredTriv hlc GF (bootFixedGS Hinv γgen γstart γreg γdisk ndisk γswap Pcp γobs T (obsPredAt γobs) γhist
         Tg HTg HTgt Kc HKc HKct Cres HCrest) := rfl
 
 /-- ...and the ledger IS `obsLedger`. -/
 theorem bootFixedGS_obsLedger (R : List Obs → IProp GF)
     (Hinv : InvGS_gen hlc GF)
-    (γgen γstart γreg γdisk : GName) (ndisk : Nat) (img : Mem) (γswap : GName) (Pcp : IProp GF)
+    (γgen γstart γreg γdisk : GName) (ndisk : Nat) (γswap : GName) (Pcp : IProp GF)
     (γobs : GName) (T : List Obs) (γhist : GName)
     (Tg : List Obs → IProp GF) (HTg : ∀ h, Persistent (Tg h)) (HTgt : ∀ h, Timeless (Tg h))
     (Kc : IProp GF) (HKc : Persistent Kc) (HKct : Timeless Kc)
     (Cres : Nat → List Obs → ConsHist → IProp GF) (HCrest : ∀ k h H, Timeless (Cres k h H)) :
-    @MachFixedGS.obsPred hlc GF (bootFixedGS Hinv γgen γstart γreg γdisk ndisk img γswap Pcp γobs T (obsLedgerAt R γobs) γhist
+    @MachFixedGS.obsPred hlc GF (bootFixedGS Hinv γgen γstart γreg γdisk ndisk γswap Pcp γobs T (obsLedgerAt R γobs) γhist
         Tg HTg HTgt Kc HKc HKct Cres HCrest) =
-      @obsLedger hlc GF (bootFixedGS Hinv γgen γstart γreg γdisk ndisk img γswap Pcp γobs T (obsLedgerAt R γobs) γhist
+      @obsLedger hlc GF (bootFixedGS Hinv γgen γstart γreg γdisk ndisk γswap Pcp γobs T (obsLedgerAt R γobs) γhist
         Tg HTg HTgt Kc HKc HKct Cres HCrest) R := rfl
 
 /-- THE PACKAGED TRACE THEOREM (Rocq `riscv_trace_adequacy` :2037):
@@ -552,12 +547,12 @@ theorem riscvTraceAdequacy [KernelMap] (ndisk : Nat) (g : GState)
     (Hgen0 : g.gen = 0) (Hpow0 : g.pow = false)
     (Hboot : ∀ [F : MachFixedGS hlc GF] (Hinv : InvGS_gen hlc GF)
         (γgen γstart γreg γdisk γswap γobs γhist : GName) (T : List Obs),
-      F = bootFixedGS Hinv γgen γstart γreg γdisk ndisk g.image γswap (Pc γdisk γswap γreg γstart)
+      F = bootFixedGS Hinv γgen γstart γreg γdisk ndisk γswap (Pc γdisk γswap γreg γstart)
           γobs T (obsLedgerAt R γobs) γhist
           rxTagTriv (fun _ => inferInstance) (fun _ => inferInstance)
           killCredTriv inferInstance inferInstance
           consResTriv (fun _ _ _ => inferInstance) →
-      ∀ (E : EraGS GF) (gen : Nat) (σ : MState), bootFacts σ g.image →
+      ∀ (E : EraGS GF) (gen : Nat) (σ : MState), bootFacts σ →
         (∃ ds0 : DevStates, σ.devs = ds0.reset) →
         Ppure (diskOf σ.devs) →
         obsInv ∗ powerBootRes Mof (fun _ => Rb) E gen σ ⊢@{IProp GF} |={⊤}=>

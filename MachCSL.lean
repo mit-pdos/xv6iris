@@ -1,5 +1,7 @@
 import MachCSL.Hello
 import MachCSL.TsoMem
+import MachCSL.KernelElf
+import MachCSL.BootImage
 import MachCSL.Dev.DevIds
 import MachCSL.Dev.DevLang
 import MachCSL.Dev.Uart

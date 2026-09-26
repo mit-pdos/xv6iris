@@ -585,7 +585,7 @@ theorem primStep_obsWf (e : Expr) (g : GState) (κ : List Obs) (e' : Expr) (g' :
       show obsBoots (h ++ [Obs.powerOff]) = g.gen + 1 + 0
       rw [obsBoots_app]; simpa [obsBoots] using hbt
     · -- PowerOn: the next cycle opens empty, over reset UARTs
-      obtain ⟨hgen, hpw', _, _, hdevs⟩ := hb
+      obtain ⟨hgen, hpw', _, hdevs⟩ := hb
       rw [hpw] at hsh hbt
       refine ⟨?_, ?_, fun _ i => ?_⟩
       · rw [hpw']; exact traceShape_snoc h _ false true hsh rfl

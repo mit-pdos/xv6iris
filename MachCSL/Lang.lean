@@ -48,6 +48,7 @@ import Sail
 import LeanRV64D
 import MachCSL.Platform
 import MachCSL.TsoMem
+import MachCSL.BootImage
 import MachCSL.Dev.Fabric
 import Iris.ProgramLogic.Language
 
@@ -222,21 +223,19 @@ inductive Obs where
 
 /-! ## The global state -/
 
-/-- The global state: the machine (registers and memory) of the current era,
-the era bookkeeping, and the boot image.
+/-- The global state: the machine (registers and memory) of the current era
+and the era bookkeeping.
 
-* `gen` is the current generation and `pow` the power bit.  A generation's
-  threads are live iff the power is on and `gen` is theirs; `PowerOff` bumps
-  `gen`, so "`gen` has passed" is a stable death certificate.
-* `image` is what memory is reset to at power-on (the ROM the machine boots
-  from).  It is a constant of the run: no arm changes it.  Keeping it in the
-  state (rather than baking a kernel into the language) keeps `MachCSL`
-  independent of any particular kernel; adequacy picks it. -/
+`gen` is the current generation and `pow` the power bit.  A generation's
+threads are live iff the power is on and `gen` is theirs; `PowerOff` bumps
+`gen`, so "`gen` has passed" is a stable death certificate.  What memory is
+reset to at power-on is NOT state: it is the language constant
+`MachCSL.bootImage` (Rocq `RiscvLang.boot_image`), the kernel ELF's loaded
+image. -/
 structure GState where
   m : MState
   gen : Nat
   pow : Bool
-  image : Mem
 
 /-- A generation-`gen` thread is live iff the power is on and `gen` is the
 current generation. -/
@@ -304,30 +303,30 @@ theorem resetRegs_resetWith (cpu : CPU) (f₀ : RegFile) : resetRegs cpu (resetW
   simp [resetWith, h]
 
 /-- A booted machine, with no reference to the one it replaces: memory is the
-boot image and every hart is reset.  This is the fact set the power thread
+boot image (the language constant `bootImage`, Rocq `boot_facts`' memory
+clauses) and every hart is reset.  This is the fact set the power thread
 hands the boot client (`wp_power`'s `Hboot`). -/
-def bootFacts (σ : MState) (image : Mem) : Prop :=
-  σ.mem = imgFlat image ∧ σ.log = [] ∧
+def bootFacts (σ : MState) : Prop :=
+  σ.mem = imgFlat bootImage ∧ σ.log = [] ∧
   (∀ cpu, σ.tv cpu = 0 ∧ σ.itv cpu = 0 ∧ σ.hr cpu = HRead.zero ∧ σ.resv cpu = none) ∧
   (∀ cpu, resetRegs cpu (σ.regs cpu)) ∧
   ∀ d, σ.devrt d = DevRt.init
 
 /-- The state a `PowerOn` hands over: same generation (`PowerOff` already
-bumped it), power on, the same image, a booted machine, and every device
-reset from what it was (the disk keeps its durable image). -/
+bumped it), power on, a booted machine, and every device reset from what it
+was (the disk keeps its durable image). -/
 def bootShape (g g' : GState) : Prop :=
-  g'.gen = g.gen ∧ g'.pow = true ∧ g'.image = g.image ∧ bootFacts g'.m g.image ∧
-  g'.m.devs = g.m.devs.reset
+  g'.gen = g.gen ∧ g'.pow = true ∧ bootFacts g'.m ∧ g'.m.devs = g.m.devs.reset
 
 /-- A booted state exists (so the power-on arm is always enabled): reset every
 hart's file, reload the image, reset the devices. -/
 def bootWitness (g : GState) : GState :=
-  { m := ⟨fun cpu => resetWith cpu (g.m.regs cpu), imgFlat g.image, [], fun _ => 0, fun _ => 0,
+  { m := ⟨fun cpu => resetWith cpu (g.m.regs cpu), imgFlat bootImage, [], fun _ => 0, fun _ => 0,
           fun _ => HRead.zero, fun _ => none, g.m.devs.reset, fun _ => DevRt.init⟩,
-    gen := g.gen, pow := true, image := g.image }
+    gen := g.gen, pow := true }
 
 theorem bootShape_bootWitness (g : GState) : bootShape g (bootWitness g) :=
-  ⟨rfl, rfl, rfl, ⟨rfl, rfl, fun _ => ⟨rfl, rfl, rfl, rfl⟩, fun cpu => resetRegs_resetWith cpu _,
+  ⟨rfl, rfl, ⟨rfl, rfl, fun _ => ⟨rfl, rfl, rfl, rfl⟩, fun cpu => resetRegs_resetWith cpu _,
     fun _ => rfl⟩, rfl⟩
 
 /-- All harts. -/
@@ -521,7 +520,7 @@ def devStep (gen : Nat) (d : DevId) (tid : TaskId) (m : DevProg d) (σ : MState)
   arm.
 * The power thread: with the power on, `PowerOff` (observed) bumps the
   generation and clears the power bit, freezing the machine; with the power
-  off, `PowerOn` (observed) resets the machine to the image and forks the new
+  off, `PowerOn` (observed) resets the machine to `bootImage` and forks the new
   generation's harts and device roots. -/
 def primStep : Expr × GState → List Obs → Expr × GState × List Expr → Prop
   | (.hart gen cpu m, g), obs, (e', g', efs) =>

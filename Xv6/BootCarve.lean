@@ -3,20 +3,23 @@
 
 A boot client is handed, by `MachCSL.riscvPowerAdequacy`'s `Hboot` (through
 `MachCSL.wp_power`), the machine's memory as RAW per-byte history cells
-(`MachCSL.memCells E σ.mem`, with `σ.mem = imgFlat image` by `bootFacts`) plus
+(`MachCSL.memCells E σ.mem`, with `σ.mem = imgFlat bootImage` by `bootFacts`) plus
 the static-map claims (`MachCSL.kmapStaticAt E`) -- and nothing else.
 Everything a kernel precondition mentions (the read-only image `kctx` owns,
 typed cells, byte buffers, the kalloc page run) has to be CARVED out of
 those.  This file is the carve's vocabulary and its generic lemmas; the
 bundles at `main`'s altitude are `Xv6.BootCarveMain`.
 
-* §0 `BootImage` -- THE IMAGE HYPOTHESIS (see DEVIATION 1): the boot image
-  holds the ELF's text (`Kernel.text`), rodata (`Kernel.rodata`), the GOT
-  word, the initialized writable image `[_data, _bss)` (`Kernel.dataInit`),
-  a zero `.bss`, and some byte at every RAM address.  The text/rodata
-  address bounds are closed by chunked `decide +kernel` (`bc_text*`,
-  `bc_ro*`; each well under a second; the literals are never unfolded in
-  the proof mode).
+* §0 `BootImage` -- what the carve reads of a boot image: the ELF's text
+  (`Kernel.text`), rodata (`Kernel.rodata`), the GOT word, the initialized
+  writable image `[_data, _bss)` (`Kernel.dataInit`), a zero `.bss`, and
+  some byte at every RAM address.  `bootImage_wf` PROVES it of the
+  language's constant `MachCSL.bootImage` (Rocq `boot_image`), byte by byte
+  against the ELF's loaded image, by chunked `decide +kernel` (`bc_img_*`),
+  as the text/rodata address bounds are (`bc_text*`, `bc_ro*`); each chunk
+  is well under a second, and the literals are never unfolded in the proof
+  mode.  The carve's lemmas are stated over an image `image` with
+  `BootImage image`; `bootCarve_era` instantiates them at `bootImage`.
 * §1 RANGES (Rocq §6 `ran_bytes`/`boot_raw_ran`): `Xv6.bootRan m lo hi`,
   the histories at `[lo, hi)` as a `PartialMap.filter`; `bootRaw_ran`,
   `bootRan_split` (Rocq `boot_ran_split`), `bootRan_one`, the run induction
@@ -46,15 +49,10 @@ already persists the static claims (`MachCSL.kmapStatic_persist`) and hands
 them over as `kmapStaticAt E` in `powerBootRes`.
 
 DEVIATIONS from Rocq (none process-layer):
-1. THE IMAGE IS A HYPOTHESIS.  Rocq's language fixes the boot memory to the
-   literal ELF image (`RiscvLang.boot_mem`), so `boot_byte` is a definition.
-   Lean's language carries an arbitrary `GState.image`, so the carve takes
-   `BootImage image` as a premise; discharging it for the concrete image is
-   a later bounded computation (the D34 precedent).  The top-level client
-   supplies it from a premise on the initial state: `powerInterp` pins
-   `GState.image` to `MachFixedGS.bootImage`, and
-   `MachCSL.riscvPowerAdequacy`'s `Hboot` receives `bootFacts σ g.image` at
-   the initial `g`, so `BootImage g.image` holds at every boot.
+1. (Retired, D47.)  As in Rocq, the boot memory is a language constant
+   (`MachCSL.bootImage`, Rocq `RiscvLang.boot_image`), so `BootImage` is a
+   theorem (`bootImage_wf`), not a premise.  The carve lemmas stay generic
+   in the image (with `BootImage image`); only `bootCarve_era` fixes it.
 2. `.data` (`first`, `nextpid`, `uarts`), `.got` and `.got.plt` are in
    `BootImage.data` (`Kernel.dataInit`, 136 bytes, emitted by
    tools/gen_kernel_data.py; `bc_dataInit_addrs`: exactly `[_data, _bss)`).
@@ -390,6 +388,110 @@ theorem bc_dataInit_addrs :
       List.range' MachCSL.KernelSyms.«_data» (MachCSL.KernelSyms.«_bss» - MachCSL.KernelSyms.«_data») := by
   decide
 
+/-! ### THE IMAGE IS THE ELF (Rocq: `boot_image` is a definition, so this is
+by computation there too)
+
+`MachCSL.bootImage` is the language's constant, built from the ELF's loaded
+file image (`MachCSL.KernelElf`, tools/dump_elf_image.py).  The carve reads
+it through the text/rodata/data dumps (`Kernel.text`, `Kernel.rodata`,
+`Kernel.dataInit`); `bootImage_wf` checks every one of their bytes against
+it, by chunked `decide +kernel` (`bcImgOk` is a byte-by-byte comparison
+with its RAM bound). -/
+
+/-- The loaded image holds `e`'s `w` little-endian bytes at `a`, inside RAM. -/
+def bcImgOk (a w e : Nat) : Bool :=
+  decide (ramBase ≤ a ∧ a + w ≤ ramEnd) &&
+    (List.range w).all fun j => bootByte (a + j) == nthByte (BitVec.ofNat (8 * w) e) j
+
+theorem bootImage_has (a w e : Nat) (h : bcImgOk a w e = true) :
+    bootImgHas bootImage (BitVec.ofNat 64 a) w (BitVec.ofNat (8 * w) e) := by
+  simp only [bcImgOk, Bool.and_eq_true, decide_eq_true_eq, List.all_eq_true, List.mem_range] at h
+  obtain ⟨⟨h1, h2⟩, hc⟩ := h
+  unfold ramBase at h1; unfold ramEnd at h2
+  intro j hj
+  have ha := bc_addr_toNat a j (by omega)
+  rw [bootImage_get?, if_pos (by unfold inRam ramBase ramEnd; rw [ha]; omega), ha]
+  exact congrArg some (beq_iff_eq.1 (hc j hj))
+
+theorem bc_img_text0 : Kernel.textChunk0.all (fun k => bcImgOk k.addr k.width k.enc) = true := by
+  decide +kernel
+theorem bc_img_text1 : Kernel.textChunk1.all (fun k => bcImgOk k.addr k.width k.enc) = true := by
+  decide +kernel
+theorem bc_img_text2 : Kernel.textChunk2.all (fun k => bcImgOk k.addr k.width k.enc) = true := by
+  decide +kernel
+theorem bc_img_text3 : Kernel.textChunk3.all (fun k => bcImgOk k.addr k.width k.enc) = true := by
+  decide +kernel
+theorem bc_img_text4 : Kernel.textChunk4.all (fun k => bcImgOk k.addr k.width k.enc) = true := by
+  decide +kernel
+theorem bc_img_text5 : Kernel.textChunk5.all (fun k => bcImgOk k.addr k.width k.enc) = true := by
+  decide +kernel
+theorem bc_img_text6 : Kernel.textChunk6.all (fun k => bcImgOk k.addr k.width k.enc) = true := by
+  decide +kernel
+theorem bc_img_text7 : Kernel.textChunk7.all (fun k => bcImgOk k.addr k.width k.enc) = true := by
+  decide +kernel
+theorem bc_img_text8 : Kernel.textChunk8.all (fun k => bcImgOk k.addr k.width k.enc) = true := by
+  decide +kernel
+theorem bc_img_text9 : Kernel.textChunk9.all (fun k => bcImgOk k.addr k.width k.enc) = true := by
+  decide +kernel
+theorem bc_img_text10 : Kernel.textChunk10.all (fun k => bcImgOk k.addr k.width k.enc) = true := by
+  decide +kernel
+theorem bc_img_text11 : Kernel.textChunk11.all (fun k => bcImgOk k.addr k.width k.enc) = true := by
+  decide +kernel
+theorem bc_img_text12 : Kernel.textChunk12.all (fun k => bcImgOk k.addr k.width k.enc) = true := by
+  decide +kernel
+theorem bc_img_text13 : Kernel.textChunk13.all (fun k => bcImgOk k.addr k.width k.enc) = true := by
+  decide +kernel
+theorem bc_img_text14 : Kernel.textChunk14.all (fun k => bcImgOk k.addr k.width k.enc) = true := by
+  decide +kernel
+theorem bc_img_text15 : Kernel.textChunk15.all (fun k => bcImgOk k.addr k.width k.enc) = true := by
+  decide +kernel
+theorem bc_img_text16 : Kernel.textChunk16.all (fun k => bcImgOk k.addr k.width k.enc) = true := by
+  decide +kernel
+theorem bc_img_text17 : Kernel.textChunk17.all (fun k => bcImgOk k.addr k.width k.enc) = true := by
+  decide +kernel
+
+theorem bc_img_text_all : Kernel.text.all (fun k => bcImgOk k.addr k.width k.enc) = true := by
+  unfold Kernel.text
+  simp only [List.all_append, bc_img_text0, bc_img_text1, bc_img_text2, bc_img_text3, bc_img_text4, bc_img_text5, bc_img_text6, bc_img_text7, bc_img_text8, bc_img_text9, bc_img_text10, bc_img_text11, bc_img_text12, bc_img_text13, bc_img_text14, bc_img_text15, bc_img_text16, bc_img_text17, Bool.and_self]
+
+theorem bc_img_ro0 : Kernel.rodataChunk0.all (fun p => bcImgOk p.1 1 p.2) = true := by
+  decide +kernel
+theorem bc_img_ro1 : Kernel.rodataChunk1.all (fun p => bcImgOk p.1 1 p.2) = true := by
+  decide +kernel
+theorem bc_img_ro2 : Kernel.rodataChunk2.all (fun p => bcImgOk p.1 1 p.2) = true := by
+  decide +kernel
+theorem bc_img_ro3 : Kernel.rodataChunk3.all (fun p => bcImgOk p.1 1 p.2) = true := by
+  decide +kernel
+theorem bc_img_ro4 : Kernel.rodataChunk4.all (fun p => bcImgOk p.1 1 p.2) = true := by
+  decide +kernel
+theorem bc_img_ro5 : Kernel.rodataChunk5.all (fun p => bcImgOk p.1 1 p.2) = true := by
+  decide +kernel
+
+theorem bc_img_ro_all : Kernel.rodata.all (fun p => bcImgOk p.1 1 p.2) = true := by
+  unfold Kernel.rodata
+  simp only [List.all_append, bc_img_ro0, bc_img_ro1, bc_img_ro2, bc_img_ro3, bc_img_ro4, bc_img_ro5, Bool.and_self]
+
+theorem bc_img_data : Kernel.dataInit.all (fun p => bcImgOk p.1 1 p.2) = true := by
+  decide +kernel
+
+theorem bc_img_got : bcImgOk 0x8000a318 8 MachCSL.KernelSyms.«stack0» = true := by
+  decide +kernel
+
+/-- **THE BOOT IMAGE IS THE KERNEL'S ELF**, as far as the carve reads it (was
+the carve's premise; now a theorem about the language constant). -/
+theorem bootImage_wf : BootImage bootImage where
+  ram a h := ⟨bootByte a.toNat, by rw [bootImage_get?, if_pos h]⟩
+  text k hk := bootImage_has _ _ _ (List.all_eq_true.1 bc_img_text_all k hk)
+  rodata p hp := bootImage_has _ _ _ (List.all_eq_true.1 bc_img_ro_all p hp)
+  got := by
+    rw [show stack0Slot = BitVec.ofNat 64 0x8000a318 by decide]
+    exact bootImage_has _ _ _ bc_img_got
+  data p hp := bootImage_has _ _ _ (List.all_eq_true.1 bc_img_data p hp)
+  bss a h1 h2 := by
+    simp only [MachCSL.KernelSyms.«_bss», MachCSL.KernelSyms.«end»] at h1 h2
+    rw [bootImage_get?, if_pos (by unfold inRam ramBase ramEnd; omega),
+      bootByte_zero _ (by unfold KernelElf.elfEnd; omega)]
+
 /-- **The kernel text** out of the persisted window (Rocq `kernel_text_intro`). -/
 theorem kernelText_intro (image : Mem) (himg : BootImage image) :
     kmapStatic (GF := GF) ∗ bootRo (imgFlat image) bcRoLo bcRoHi ⊢ kernelText := by
@@ -617,17 +719,17 @@ variable {hlc : HasLC} {GF : BundledGFunctors} [MachFixedGS hlc GF]
 
 /-- **THE CARVE AT `Hboot`'s ERA** (Rocq `riscv_system_adequacy`'s use of
 §1-§5): `powerBootRes`'s static claims and byte histories, at the instance
-the client runs its harts at (`MachCSL.MachGS.ofEra`), under the image
-hypothesis, are the kernel's read-only image and the owned half. -/
+the client runs its harts at (`MachCSL.MachGS.ofEra`), at the language's
+boot image, are the kernel's read-only image and the owned half. -/
 theorem bootCarve_era (E : EraGS GF) (gen : Nat) (cP : CPU → BitVec 64 → IProp GF)
     (cI : ∀ cpu : CPU, ⊢ cP cpu 0#64) (eP : CtxId → IProp GF) (ePe : ∀ ξ : CtxId, Persistent (eP ξ))
-    (σ : MState) (image : Mem) (hbf : bootFacts σ image) (himg : BootImage image) :
+    (σ : MState) (hbf : bootFacts σ) :
     letI : MachGS hlc GF := MachGS.ofEra E gen cP cI eP ePe
     kmapStaticAt E ∗ memCells E σ.mem ⊢@{IProp GF}
-      |==> ((kernelText ∗ kernelData ∗ kmapStatic) ∗ bootRan (imgFlat image) bcRoHi ramEnd) := by
+      |==> ((kernelText ∗ kernelData ∗ kmapStatic) ∗ bootRan (imgFlat bootImage) bcRoHi ramEnd) := by
   letI : MachGS hlc GF := MachGS.ofEra E gen cP cI eP ePe
   rw [hbf.1]
-  exact bootCarve_image image himg
+  exact bootCarve_image bootImage bootImage_wf
 
 end era
 

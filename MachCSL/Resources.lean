@@ -291,14 +291,6 @@ class MachFixedGS (hlc : outParam HasLC) (GF : BundledGFunctors) where
   `[0, size)` fragment -- the crash predicate -- move the image under any
   write at all.  A machine constant of the run. -/
   diskSize : Nat
-  /-- THE BOOT IMAGE (Rocq's language constant `RiscvLang.boot_image`): what
-  memory is reset to at every power-on.  Lean's language keeps it in the
-  state (`GState.image`, which no arm changes); `powerInterp` pins the state's
-  image to this field, so the power thread's boot client (`wp_power`'s
-  `Hboot`) is handed `bootFacts σ bootImage` at the image the run started
-  from (`riscvPowerAdequacy` instantiates it at the initial `g.image`).  A
-  machine constant of the run. -/
-  bootImage : Mem
   /-- THE CRASH PREDICATE (Rocq `riscv_crash_pred`): the client's durability
   invariant over the durable disk, sealed into `crashInv`.  A bare
   proposition: it owns the durable fragments, and a disk DRAIN
@@ -829,14 +821,14 @@ theorem mmOk_setRt (σ : MState) (d : DevId) (rt : DevRt)
   · simp only [hd, if_false]; exact h5 d'
 
 /-- A booted machine satisfies the step invariant. -/
-theorem mmOk_boot (σ : MState) (image : Mem) (h : bootFacts σ image) : mmOk σ := by
+theorem mmOk_boot (σ : MState) (h : bootFacts σ) : mmOk σ := by
   obtain ⟨hmem, hlog, hhart, _, hrt⟩ := h
   refine ⟨?_, ?_, ?_, ?_, fun d => by rw [hrt d]; exact Nat.zero_lt_one⟩
   · intro a H hget
     rw [hmem, imgFlat_get?] at hget
     split at hget
     case isFalse => simp at hget
-    cases hi : image[a]? with
+    cases hi : bootImage[a]? with
     | none => rw [hi] at hget; simp at hget
     | some v =>
       rw [hi] at hget
@@ -1031,15 +1023,14 @@ def diskFixedInterp (g : GState) : IProp GF := diskFixedAuth (diskOf g.m.devs)
 /-- The state interpretation: the fixed ghosts pinned to the state, and the
 current era's interpretation while powered.  The durable disk's authority
 rides LAST (Rocq places `disk_fixed_interp` third; last here so the
-positional patterns of the lifting rules keep their shape), followed by the
-image pin `g.image = bootImage` (Rocq needs none: its boot memory is the
-language constant `boot_image`). -/
+positional patterns of the lifting rules keep their shape).  No image pin:
+the boot memory is the language constant `bootImage`, as in Rocq. -/
 def powerInterp (g : GState) : IProp GF := iprop%
   genAuth g.gen ∗ startAuth (startCount g) ∗
   (∃ R : RegMapF (EraGS GF),
     (MachFixedGS.registryName (hlc := hlc) (GF := GF) ↪●MAP R) ∗ ⌜registryOk R (startCount g)⌝ ∗
     eraCur R g) ∗
-  diskFixedInterp g ∗ ⌜g.image = MachFixedGS.bootImage (hlc := hlc) (GF := GF)⌝
+  diskFixedInterp g
 
 /-! ### The observation history (Rocq `RiscvPtsto`: `obs_hist_lb` … `obs_interp`) -/
 
