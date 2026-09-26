@@ -520,13 +520,12 @@ Section UShKernel.
       (Hwc : forall I l : list (bv 8), wl_nl ∉ l ->
          ⊢ Pm (I ++ l ++ [wl_nl]) -∗ Wc I 2%nat ={⊤}=∗
            Pm (I ++ l ++ [wl_nl]) ∗ Wc (I ++ l ++ [wl_nl]) 3%nat)
-      (* ...AND THE THREE CONVERSIONS OF STEP 4, Coq-level like [Hwc]: the
+      (* ...AND THE TWO CONVERSIONS OF STEP 4, Coq-level like [Hwc]: the
          banner-owed credential is the prompt's once the console reaches
-         fd 2 ([UkSh.ush_wb_wc]); a block owed with nothing chosen is a
-         boundary credential ([ush_wc_blk_line]); a line read at an
-         unwritten prompt is the taint ([ush_wb_read]). *)
+         fd 2 ([UkSh.ush_wb_wc]); a line read at an unwritten prompt is
+         the taint ([ush_wb_read]).  A block owed is never converted back
+         to a boundary credential (sync design section 2). *)
       (Hwbwc : forall I : list (bv 8), ⊢ Wb I -∗ Wc I 0%nat)
-      (Hwbl : forall I : list (bv 8), ⊢ Wc I 3%nat -∗ Wc I 0%nat)
       (Hwbr : forall I l : list (bv 8), wl_nl ∉ l ->
          ⊢ Pm (I ++ l ++ [wl_nl]) -∗ Wb I -∗ Pm (I ++ l ++ [wl_nl]) ∗ T)
       (W : uvis) (n0 n : nat) :
@@ -743,7 +742,7 @@ Section UShKernel.
     iAssert (shk_rodata (ukn_t N)) as "#Hro".
     { iApply (shk_rodata_of_text (ukn_t N) (uvis_M W) (uvis_perm W)
                 (shk_img_data _ Hsub) Hx with "Ht"). }
-    iApply (wp_ksh_start N γp T Wc Wb Hwbwc Hwbl Pm
+    iApply (wp_ksh_start N γp T Wc Wb Hwbwc Pm
               (fun i => Hpm1 N i Hpayeq)
               (fun I => Hpm3 N I Hpayeq)
               (fun I => Hpmwb N I Hpayeq)
@@ -830,13 +829,12 @@ Section UShKernel.
       (Hwc : forall I l : list (bv 8), wl_nl ∉ l ->
          ⊢ Pm (I ++ l ++ [wl_nl]) -∗ Wc I 2%nat ={⊤}=∗
            Pm (I ++ l ++ [wl_nl]) ∗ Wc (I ++ l ++ [wl_nl]) 3%nat)
-      (* ...AND THE THREE CONVERSIONS OF STEP 4, Coq-level like [Hwc]: the
+      (* ...AND THE TWO CONVERSIONS OF STEP 4, Coq-level like [Hwc]: the
          banner-owed credential is the prompt's once the console reaches
-         fd 2 ([UkSh.ush_wb_wc]); a block owed with nothing chosen is a
-         boundary credential ([ush_wc_blk_line]); a line read at an
-         unwritten prompt is the taint ([ush_wb_read]). *)
+         fd 2 ([UkSh.ush_wb_wc]); a line read at an unwritten prompt is
+         the taint ([ush_wb_read]).  A block owed is never converted back
+         to a boundary credential (sync design section 2). *)
       (Hwbwc : forall I : list (bv 8), ⊢ Wb I -∗ Wc I 0%nat)
-      (Hwbl : forall I : list (bv 8), ⊢ Wc I 3%nat -∗ Wc I 0%nat)
       (Hwbr : forall I l : list (bv 8), wl_nl ∉ l ->
          ⊢ Pm (I ++ l ++ [wl_nl]) -∗ Wb I -∗ Pm (I ++ l ++ [wl_nl]) ∗ T)
       (na : nat)
@@ -1020,7 +1018,7 @@ Section UShKernel.
     rewrite <- Hfd.
     iApply (sh_uexec_slot R γp cn T K Q Ql Pm Wc Wb Dsc Hdncr Hdshort
               Dl Hdline Hrl Hpm1 Hpm3 Hpmwb
-              Hwc Hwbwc Hwbl Hwbr W' n0 n Hbd).
+              Hwc Hwbwc Hwbr W' n0 n Hbd).
     - exact HQc.
     - rewrite Hpc. exact sh_start_pc.
     - exact (shk_img_sub_of_elf M Himg).
@@ -1109,7 +1107,6 @@ Section UShKernel.
          ⊢ Pm (I ++ l ++ [wl_nl]) -∗ Wc I 2%nat ={⊤}=∗
            Pm (I ++ l ++ [wl_nl]) ∗ Wc (I ++ l ++ [wl_nl]) 3%nat)
       (Hwbwc : forall I : list (bv 8), ⊢ Wb I -∗ Wc I 0%nat)
-      (Hwbl : forall I : list (bv 8), ⊢ Wc I 3%nat -∗ Wc I 0%nat)
       (Hwbr : forall I l : list (bv 8), wl_nl ∉ l ->
          ⊢ Pm (I ++ l ++ [wl_nl]) -∗ Wb I -∗ Pm (I ++ l ++ [wl_nl]) ∗ T)
       (na : nat) (alen : nat -> nat) (afun : nat -> nat -> bv 8)
@@ -1178,7 +1175,7 @@ Section UShKernel.
       by (rewrite Hpiq; exact Hpid1).
     iApply (sh_slot_of_kexec R γp cn T K Q Ql Pm Wc Wb Dsc Hdncr Hdshort
               Dl Hdline Hrl Hpm1 Hpm3 Hpmwb
-              Hwc Hwbwc Hwbl Hwbr na alen afun sts W' n0 n Hbd HQc Hok Hcwd0
+              Hwc Hwbwc Hwbr na alen afun sts W' n0 n Hbd HQc Hok Hcwd0
               Hroom Hlen Hlzf Hscf Hch0 Hpid1'
               with "[] Hnpw Hdep Hdp Htag Hplaw Hrest Hfd0 Hvok [] [] Hmp Hpos Hlease
                     Hwcp").

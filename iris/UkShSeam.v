@@ -1367,8 +1367,9 @@ Section UkShSeam.
       (<[1%nat := FdClosed]> ld) H K Kf -∗
     (* the out-of-memory law, at the parse's own budget below: a REDIR
        line's room is 72 (the redirect's cmdalloc), so the parse runs at
-       [4 + (Dg + n)] of the 76 the child is handed *)
-    UkShCmdalloc.ushp_oom N Cr (4 + (UkShDiag.ush_Dg + n) - 2) -∗
+       [4 + (Dg + n)] of the 76 the child is handed.  The ledger crosses
+       the parse beside the lend (the panic prints on fd 2) *)
+    UkShCmdalloc.ushp_oom N (Cr ∗ UserFd.ustd γfd ld) (4 + (UkShDiag.ush_Dg + n) - 2) -∗
     (* THE LEND SPLITS AT THE CALL: whole across the parse (it is the
        out-of-memory law's), and then what the open is handed and the rest *)
     (Cr -∗ H ∗ Cr') -∗
@@ -1408,10 +1409,11 @@ Section UkShSeam.
       with (ushp_room (UshpRedir (UshpExec toks) q e 1537 1) + (4 + (UkShDiag.ush_Dg + n)))%nat
       by reflexivity.
     iApply (wp_ref_child UM UM' h m dw dv s0 len f
-              (UshpRedir (UshpExec toks) q e 1537 1) (4 + (UkShDiag.ush_Dg + n)) Cr
+              (UshpRedir (UshpExec toks) q e 1537 1) (4 + (UkShDiag.ush_Dg + n))
+              (Cr ∗ UserFd.ustd γfd ld)
               Hs1 Hscope Href (conj I (conj eq_refl eq_refl)) Hchain Hs0 Hs64 Hs38
-              with "Hcode Hpcode Hpro Hline Hws Hsy HM Hpxw Hcr Hrun").
-    iIntros (h' m' p) "%Ha0 %Hcs #Htree #Hlineq Hws Hsy HM' Hcr Hrun".
+              with "Hcode Hpcode Hpro Hline Hws Hsy HM Hpxw [$Hcr $Hstd] Hrun").
+    iIntros (h' m' p) "%Ha0 %Hcs #Htree #Hlineq Hws Hsy HM' [Hcr Hstd] Hrun".
     replace (ushp_room (UshpRedir (UshpExec toks) q e 1537 1) + (4 + (UkShDiag.ush_Dg + n)))%nat
       with (6 + (UkShDiag.ush_Dg + (70 + n)))%nat by reflexivity.
     iDestruct ("Hsplit" with "Hcr") as "[HH Hcr]".

@@ -277,13 +277,15 @@ Section UkShFork.
   (* ([UEchoOut.echo_uexec_slot_at], through [EchoLinksLine.               *)
   (* ewc_lcred_blk_lend]).  WHAT THE CHILD HANDS BACK through its exit is   *)
   (* the credential AFTER the block -- the shell's next prompt is paid from *)
-  (* it -- or the block still owed (a failed exec: the diagnostic, M4b(2)); *)
-  (* [ushf_wq] is the pair, and a KILLED child pays it with the taint       *)
-  (* through [ushf_kill_law] (the taint inhabits every shape).  Both are    *)
-  (* opaque here for [Wc]'s reason and are discharged at the top.           *)
+  (* it -- and nothing else: every way a child ends prints first (the       *)
+  (* program, a failed exec's diagnostic, and since upstream d66e41c the    *)
+  (* parse's out-of-memory panic), so no child hands the lend back          *)
+  (* untouched (sync design section 2).  A KILLED child pays [ushf_wq]      *)
+  (* with the taint through [ushf_kill_law] (the taint inhabits every       *)
+  (* shape).  Both are opaque here for [Wc]'s reason and are discharged at  *)
+  (* the top.                                                               *)
   (* ===================================================================== *)
-  Definition ushf_wq (I : list (bv 8)) : iProp Σ :=
-    (Wc I 3%nat ∨ Wc I 0%nat)%I.
+  Definition ushf_wq (I : list (bv 8)) : iProp Σ := Wc I 0%nat.
 
   Global Instance ushf_wq_timeless I : Timeless (ushf_wq I).
   Proof. rewrite /ushf_wq. apply _. Qed.
@@ -402,14 +404,14 @@ Section UkShFork.
   Proof using . rewrite /ushf_child_law. apply _. Qed.
 
   (* WHAT THE FORK LEFT IN THE PARENT'S HAND, beside the children set it
-     grew to: the lend back whole (fork failed -- and fork1 panicked, so
-     this arm is the relayed row's and never runs), or the token of the
-     child it forked, at the payload it chose. *)
-  Definition ushf_fans (Sc : gset gname) (Q : Z -> iProp Σ) (Rc : iProp Σ)
+     grew to: the token of the child it forked, at the payload it chose.
+     The row's other arm -- the lend back whole, at a [-1] -- is refuted in
+     [wp_kshf_fork_core]: fork1 panics at [-1], and its returning arm says
+     the answer is not [-1]. *)
+  Definition ushf_fans (Sc : gset gname) (Q : Z -> iProp Σ)
       (Sw : gset gname) : iProp Σ :=
-    ((⌜Sw = Sc⌝ ∗ Rc)
-     ∨ (∃ (γ : gname) (pidc : mword 32),
-          ⌜Sw = Sc ∪ {[γ]}⌝ ∗ child_tok γ pidc Q))%I.
+    (∃ (γ : gname) (pidc : mword 32),
+       ⌜Sw = Sc ∪ {[γ]}⌝ ∗ child_tok γ pidc Q)%I.
 
   (* THE SET AFTER THE WAIT IS EMPTY AGAIN (lane EXEC-SEAM).  sh enters
      with no children ([UkSh.ush_pstate]'s [uch γch ∅]), a turn forks at
@@ -419,11 +421,11 @@ Section UkShFork.
      pidv = 1], the right disjunct refuted), and the only generation in
      that set is the one the fork put there.  Pure, so the caller reads
      it with an [iAssert ... as %] and keeps both answers. *)
-  Lemma ushf_wait_empty (Q : Z -> iProp Σ) (Rc : iProp Σ)
+  Lemma ushf_wait_empty (Q : Z -> iProp Σ)
       (Sw Sw' : gset gname) (ret : mword 64) (pidv : mword 32) :
     pidv <> (mword_of_int 1 : mword 32) ->
     (ret = (mword_of_int (-1) : mword 64) -> Sw' = (∅ : gset gname)) ->
-    ushf_fans ∅ Q Rc Sw -∗ uwait_ans_pid ret Sw Sw' pidv -∗
+    ushf_fans ∅ Q Sw -∗ uwait_ans_pid ret Sw Sw' pidv -∗
     ⌜Sw' = (∅ : gset gname)⌝.
   Proof using .
     intros Hne Hm1. iIntros "Hfans Hans".
@@ -435,11 +437,9 @@ Section UkShFork.
     iDestruct "Hreap" as (γ') "(%Hrng & %Hoci & _ & _)".
     destruct Hoci as [Hin | Heq]; [ | exfalso; exact (Hne Heq) ].
     destruct Hrng as [HSw' _].
-    rewrite /ushf_fans. iDestruct "Hfans" as "[[%HSw _] | Hf]".
-    - iPureIntro. exfalso. rewrite HSw in Hin. set_solver.
-    - iDestruct "Hf" as (γ pidc) "[%HSw _]". iPureIntro.
-      rewrite HSw in Hin. rewrite HSw' HSw.
-      assert (Hg : γ' = γ) by set_solver. subst γ'. set_solver.
+    rewrite /ushf_fans. iDestruct "Hfans" as (γ pidc) "[%HSw _]". iPureIntro.
+    rewrite HSw in Hin. rewrite HSw' HSw.
+    assert (Hg : γ' = γ) by set_solver. subst γ'. set_solver.
   Qed.
 
   (* sh's pid handle, as the wait row reads it: a [Z] other than 1 is a
@@ -539,7 +539,7 @@ Section UkShFork.
     (∀ (Sw Sw' : gset gname) (ret : mword 64) (pidv : mword 32),
        ⌜ pidv <> (mword_of_int 1 : mword 32) ⌝ -∗
        ⌜ ret = (mword_of_int (-1) : mword 64) -> Sw' = (∅ : gset gname) ⌝ -∗
-       ushf_fans ∅ Q Rc Sw -∗
+       ushf_fans ∅ Q Sw -∗
        uwait_ans_pid ret Sw Sw' pidv -∗
        Pex -∗
        ◇ UkSh.ush_posb N γp T Wc Wb Pm l 0%nat) -∗
@@ -621,21 +621,23 @@ Section UkShFork.
         [ exact Hmsg | exact HrA | by iApply ustd_at_ustd ]. }
     iSplitL "Hhead Hpid Hre".
     - (* ================= THE PARENT: reap, and round again ============= *)
-      iIntros (hA mA rA) "%HrA _ %HcsA %Ha0A Hans Hpay Hsz Hustd Hcwd _ Hlease
-                          Hrun".
+      iIntros (hA mA rA) "%HrA %Hrm1 %HcsA %Ha0A Hans Hpay Hsz Hustd Hcwd _
+                          Hlease Hrun".
       iDestruct "Hpay" as "(_ & _ & _ & Hdat & Hbuf)".
-      (* WHAT THE FORK LEFT IN sh's HAND, at the set it grew to *)
+      (* WHAT THE FORK LEFT IN sh's HAND, at the set it grew to.  The row's
+         whole-lend arm is at [-1], and fork1's returning arm is not: the
+         lend never comes back to the parent *)
       iAssert (∃ Sw : gset gname,
-                 UserChildren.uch (ukn_ch N) Sw ∗ ushf_fans ∅ Q Rc Sw)%I
+                 UserChildren.uch (ukn_ch N) Sw ∗ ushf_fans ∅ Q Sw)%I
         with "[Hans]" as "Hchx".
       { rewrite /ushf_fans.
-        iDestruct "Hans" as "[(_ & Hf & HRc) | Hpid']".
-        - iExists ∅. iFrame "Hf". iLeft. iFrame "HRc". by iPureIntro.
+        iDestruct "Hans" as "[(%Hr & _ & _) | Hpid']".
+        - exfalso. exact (Hrm1 Hr).
         (* one slot more since design app-pipe SS4.3y: the answer's pid
            arm carries the generation's freshness, which this era's
            [ushf_fans] does not record. *)
         - iDestruct "Hpid'" as (γ pidv) "(_ & _ & _ & Htok & Hf)".
-          iExists (∅ ∪ {[γ]}). iFrame "Hf". iRight.
+          iExists (∅ ∪ {[γ]}). iFrame "Hf".
           iExists γ, pidv. iFrame "Htok". by iPureIntro. }
       iDestruct "Hchx" as (Sw) "[Hch Hfans]".
       (* ---- 0x90c  c.beqz a0,0x99c -- NOT taken: this is the parent ---- *)
@@ -705,7 +707,7 @@ Section UkShFork.
       assert (Hpv1 : pidv <> (mword_of_int 1 : mword 32))
         by exact (ushf_pid_ne_1 pidv pid Hpv Hpid1).
       iAssert (⌜Sw' = (∅ : gset gname)⌝)%I as %HSw'.
-      { iApply (ushf_wait_empty Q Rc Sw Sw' ret pidv Hpv1 Hneg1
+      { iApply (ushf_wait_empty Q Sw Sw' ret pidv Hpv1 Hneg1
                   with "Hfans Hans"). }
       iEval (rewrite HSw') in "Hch".
       iAssert ush_pid with "[Hpid]" as "Hpid";
@@ -848,8 +850,6 @@ Section UkShFork.
        leaves is the banner-owed credential, and the exit is paid from it *)
     (forall I : list (bv 8),
        ⊢ Pm I -∗ Wb I -∗ UkSh.ush_at N γp (length I)) ->
-    (* ...and the credential's conversion at a fork that failed (step 4) *)
-    (forall I : list (bv 8), ⊢ Wc I 3%nat -∗ Wc I 0%nat) ->
     (* THE TAINT'S CONTINUATION (lane R3), in place of the free write law
        and the exec supply: a tainted process does not run sh's code, so
        the arm hands its run to the generic slot right here rather than
@@ -875,7 +875,7 @@ Section UkShFork.
     mWP (Loop : expr riscv_lang).
   Proof using HT HWct Hpay Hpsok_free.
     intros HDc Hregs Hs1 Hnn Hnul Hkl Hline Hszlo Hszal Hszok
-           Hpm1 Hpmwb Hwbl.
+           Hpm1 Hpmwb.
     iIntros "#Hgen Hhead #Hcode #Hro #Hjt #Hkl #Hchl #Hplaw %Hfd0 Hstd
              Hdat Hsz Hbuf Hrun".
     iDestruct "Hstd" as "(Hustd & Hcwd & Hch & Hpid & Hpos)".
@@ -904,7 +904,7 @@ Section UkShFork.
          banner-owed credential the message leaves; a fork that returned
          hands the pieces back to the re-entry. *)
       iAssert (□ (app_taint -∗ ushf_wq np))%I as "#Hkw".
-      { iIntros "!> Hk". rewrite /ushf_wq. iRight. iApply ("Hkl" $! np with "Hk"). }
+      { iIntros "!> Hk". rewrite /ushf_wq. iApply ("Hkl" $! np with "Hk"). }
       iApply (wp_kshf_fork_core h m f k len sz l n (fun _ : Z => ushf_wq np)
                 (Wc np 3%nat) (Pm np) ltac:(intros x y; reflexivity)
                 Hregs Hs1 Hnn Hnul Hkl
@@ -966,15 +966,7 @@ Section UkShFork.
         * iApply (ushf_rodata_shp with "Hro'").
       + (* the re-entry, with the pieces back in hand *)
         iIntros (Sw Sw' ret pidv) "%Hpv1 %Hm1 Hfans Hans Hpm".
-        rewrite /ushf_fans. iDestruct "Hfans" as "[[%HSw HRc] | Hfans]".
-        { (* the lend came back whole: a fork that failed (the relayed
-             row; fork1 panics before this) re-enters at the boundary *)
-          iModIntro.
-          iApply (UkSh.ush_posb_of_wc N γp T Wc Wb Pm l 0%nat np Hbnd
-                    with "Hpm [HRc]").
-          rewrite /UkSh.ush_wcp. iLeft. iSplitR; [ by iPureIntro | ].
-          iApply (Hwbl np with "HRc"). }
-        iDestruct "Hfans" as (γ pidc) "[%HSw Htok]". subst Sw.
+        rewrite /ushf_fans. iDestruct "Hfans" as (γ pidc) "[%HSw Htok]". subst Sw.
         rewrite /uwait_ans_pid /uwait_ans_at.
         iDestruct "Hans" as (gn b rv xs) "[%Hr Hwa]".
         rewrite /UserChildren.wait_ans.
@@ -1000,8 +992,7 @@ Section UkShFork.
         iApply (UkSh.ush_posb_of_wc N γp T Wc Wb Pm l 0%nat np Hbnd
                   with "Hpm [HQ]").
         rewrite /UkSh.ush_wcp. iLeft. iSplitR; [ by iPureIntro | ].
-        rewrite /ushf_wq. iDestruct "HQ" as "[HQ | HQ]";
-          [ iApply (Hwbl np with "HQ") | iExact "HQ" ].
+        rewrite /ushf_wq. iExact "HQ".
     - (* ============ THE TAINT: sh's code is left HERE (lane R3).  A
          tainted process may run anything, so the arm hands its run to the
          GENERIC SLOT at 0x908 rather than walking fork1/runcmd on the free
@@ -1059,7 +1050,6 @@ Section UkShFork.
          ∃ I : list (bv 8), ⌜length I = n'⌝ ∗ UkSh.ush_lease N γp T Pm I) ->
     (forall I : list (bv 8),
        ⊢ Pm I -∗ Wb I -∗ UkSh.ush_at N γp (length I)) ->
-    (forall I : list (bv 8), ⊢ Wc I 3%nat -∗ Wc I 0%nat) ->
     (* the taint's continuation, in place of the free write law and the
        exec supply (lane R3) -- see [wp_kshf_fork] *)
     UkSh.ush_gen_slot N T -∗
@@ -1077,7 +1067,7 @@ Section UkShFork.
     mWP (Loop : expr riscv_lang).
   Proof using HT HWct Hpay Hpsok_free.
     intros HDc Hlp0 Hregs Hs1 Ha5 Hnn Hnul Hkl Hline Hszlo Hszal Hszok
-           Hpm1 Hpmwb Hwbl.
+           Hpm1 Hpmwb.
     iIntros "#Hgen Hhead #Hcode #Hro #Hpcode #Hjt #Hkl #Hchl #Hplaw %Hfd0
              Hstd Hdat Hsz Hbuf Hrun".
     assert (Hbr : forall j : nat, 0 <= bv_unsigned (f j) < Z64).
@@ -1110,7 +1100,7 @@ Section UkShFork.
     iIntros (h1) "Hrun".
     iApply (wp_kshf_fork_at Lp Dc h1 m f k len ws sz l n
               HDc Hregs Hs1 Hnn Hnul Hkl Hline
-              Hszlo Hszal Hszok Hpm1 Hpmwb Hwbl
+              Hszlo Hszal Hszok Hpm1 Hpmwb
               with "Hgen Hhead Hcode Hro Hjt Hkl Hchl Hplaw [%] Hstd Hdat
                     Hsz Hbuf Hrun").
     exact Hfd0.
@@ -1256,13 +1246,12 @@ Section UkShFork.
     8344 <= sz ->
     UserPtTree.pgroundup sz = sz ->
     usz_ok (sz + 65536) ->
-    (forall I : list (bv 8), ⊢ Wc I 3%nat -∗ Wc I 0%nat) ->
     ushf_kill_law -∗
     ushf_child_law -∗
     UkShDiag.ush_panic_law Wc Wb -∗
     ushf_body_law UkSh.ush_line_echo sz.
   Proof using HT HWct Hpay Hpsok_free.
-    intros Hszlo Hszal Hszok Hwbl.
+    intros Hszlo Hszal Hszok.
     iIntros "#Hkl #Hchl #Hplaw !>" (lu h m f k len l n)
       "%Hd %Hlat %Hregs %Hs1 %Ha5 %Hnn %Hnul %Hkl2 %Hpm1 %Hpmwb %Hfd0
        #Hgen #Hcode #Hjt Hhead Hstd Hdat Hsz Hbuf Hrun".
@@ -1270,7 +1259,7 @@ Section UkShFork.
     iDestruct (ush_jtab_ro γt with "Hjt") as "#Hro".
     iApply (wp_kshm_body_at UkSh.ush_line_is 60 h m f k len ws sz l n
               ltac:(lia) ushf_lp0_echo Hregs Hs1 Ha5 Hnn Hnul Hkl2 Hlat
-              Hszlo Hszal Hszok Hpm1 Hpmwb Hwbl
+              Hszlo Hszal Hszok Hpm1 Hpmwb
               with "Hgen Hhead Hcode Hro [] Hjt Hkl Hchl Hplaw [%] Hstd
                     Hdat Hsz Hbuf Hrun").
     - iApply (ushf_code_shp with "Hcode").
@@ -1283,8 +1272,6 @@ Section UkShFork.
     8344 <= sz ->
     UserPtTree.pgroundup sz = sz ->
     usz_ok (sz + 65536) ->
-    (* the credential's conversion at a fork that failed (step 4) *)
-    (forall I : list (bv 8), ⊢ Wc I 3%nat -∗ Wc I 0%nat) ->
     (* THE PAYLOAD'S OWN ASSEMBLER AND THE TAINT'S CONTINUATION ARE NOT
        PREMISES HERE ANY MORE (lane R3): both are facts about the RECORD
        the kernel minted -- the assembler is guarded by [ukn_pay N], the
@@ -1299,7 +1286,7 @@ Section UkShFork.
     ushf_body_law D sz -∗
     UkSh.ush_rest_l_at N γp T Wc Wb Pm D (UkShLoop.ushl_R N sz).
   Proof using HT HWct Hpay Hpsok_free.
-    intros Hszlo Hszal Hszok Hwbl.
+    intros Hszlo Hszal Hszok.
     iIntros "#Hbody".
     (* THE RECORD'S OWN THREE COME OUT OF THE OBLIGATION now (lane SH-LINE
        2b, (b)): sh's text, its jump table and the constancy of its exit
@@ -1341,18 +1328,17 @@ Section UkShFork.
     8344 <= sz ->
     UserPtTree.pgroundup sz = sz ->
     usz_ok (sz + 65536) ->
-    (forall I : list (bv 8), ⊢ Wc I 3%nat -∗ Wc I 0%nat) ->
     ushf_kill_law -∗
     ushf_child_law -∗
     UkShDiag.ush_panic_law Wc Wb -∗
     UkSh.ush_rest_l N γp T Wc Wb Pm (UkShLoop.ushl_R N sz).
   Proof using HT HWct Hpay Hpsok_free.
-    intros Hszlo Hszal Hszok Hwbl.
+    intros Hszlo Hszal Hszok.
     iIntros "#Hkl #Hchl #Hplaw".
     rewrite /UkSh.ush_rest_l.
     iApply (ushf_rest_of_body_at UkSh.ush_line_echo sz
-              Hszlo Hszal Hszok Hwbl).
-    iApply (ushf_body_law_echo sz Hszlo Hszal Hszok Hwbl
+              Hszlo Hszal Hszok).
+    iApply (ushf_body_law_echo sz Hszlo Hszal Hszok
               with "Hkl Hchl Hplaw").
   Qed.
 

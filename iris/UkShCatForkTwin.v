@@ -93,7 +93,6 @@ Section UkShCatForkTwin.
          ∃ I : list (bv 8), ⌜length I = n'⌝ ∗ UkSh.ush_lease N γp T Pm I) ->
     (forall I : list (bv 8),
        ⊢ Pm I -∗ Wb I -∗ UkSh.ush_at N γp (length I)) ->
-    (forall I : list (bv 8), ⊢ Wc I 3%nat -∗ Wc I 0%nat) ->
     UkSh.ush_gen_slot N T -∗
     UkShLoop.ushl_head N γp T Wc Wb Pm l sz -∗
     UCodeShK.shk_code γt -∗
@@ -117,14 +116,13 @@ Section UkShCatForkTwin.
     8344 <= sz ->
     UserPtTree.pgroundup sz = sz ->
     usz_ok (sz + 65536) ->
-    (forall I : list (bv 8), ⊢ Wc I 3%nat -∗ Wc I 0%nat) ->
     UkShFork.ushf_kill_law Wc -∗
     UkShFork.ushf_child_law_at T Wc UkShRedirBody.ushs_lp_cat 68 -∗
     UkShDiag.ush_panic_law Wc Wb -∗
     UkShFork.ushf_body_law N γp T Wc Wb Pm
       (fun l : uline => exists nm : list (bv 8), l = LCat nm) sz.
   Proof using HT Hpay Hpsok_free.
-    intros Hszlo Hszal Hszok Hwbl.
+    intros Hszlo Hszal Hszok.
     iIntros "#Hkl #Hchl #Hplaw".
     rewrite /UkShFork.ushf_body_law.
     iIntros "!>" (lu h m f k len l n)
@@ -134,7 +132,7 @@ Section UkShCatForkTwin.
     iDestruct (UkSh.ush_jtab_ro γt with "Hjt") as "#Hro".
     iApply (wp_kshm_body_cat_pipe 68 nm h m f k len sz l n ltac:(lia)
               Hregs Hs1 Ha5 Hnn Hnul Hkl2 Hlat Hszlo Hszal Hszok
-              Hpm1 Hpmwb Hwbl
+              Hpm1 Hpmwb
               with "Hgen Hhead Hcode Hro [] Hjt Hkl Hchl Hplaw [%] Hstd
                     Hdat Hsz Hbuf Hrun").
     - iApply (UkShFork.ushf_code_shp with "Hcode").

@@ -128,8 +128,10 @@ Section UkShRedirChild.
       (Kf a ∗ Cr') Cd -∗
     □ (Cd -∗ Q (-1)) -∗
     (* ...and the lend, whole across the parse (its out-of-memory law,
-       [UkShCmdalloc.ushp_oom]; upstream d66e41c) and split at the call *)
-    UkShCmdalloc.ushp_oom N' Cr (4 + (UkShDiag.ush_Dg + n) - 2) -∗
+       [UkShCmdalloc.ushp_oom], the ledger beside it; upstream d66e41c)
+       and split at the call *)
+    UkShCmdalloc.ushp_oom N' (Cr ∗ UserFd.ustd (ukn_fd N') ld)
+      (4 + (UkShDiag.ush_Dg + n) - 2) -∗
     (Cr -∗ Dd a ∗ Cr') -∗
     Cr -∗
     urun N' h m (mword_of_int 0x99c)

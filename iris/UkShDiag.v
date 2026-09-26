@@ -8954,6 +8954,87 @@ Section UkShDiagLeaf.
       iApply ("Hpay" with "Hstd"). iApply ("Hdone" with "HPf"). }
   Qed.
 
+  (* ===================================================================== *)
+  (* §Z2 THE OUT-OF-MEMORY DIAGNOSTIC, PAID (upstream d66e41c; sync design  *)
+  (* section 2).                                                            *)
+  (*                                                                        *)
+  (* [cmdalloc]'s NULL arm is [panic("out of memory")]: [fprintf(2,         *)
+  (* "%s\n", s)] and [exit(1)] -- fourteen bytes, "out of memory" at 0x12c0 *)
+  (* and the '\n' of panic's format at 0x1280 + 2, the out-of-memory        *)
+  (* alternative ([FileDisc.alt_oom]) up to its prompt.  The walk is        *)
+  (* [wp_kshd_panic_paid]'s at the diagnostic law's shape                   *)
+  (* ([ush_execfail_law_at], whose [n] is the fourteen): what the child     *)
+  (* holds when the parse runs out of memory is its lend ([Cr]), and what   *)
+  (* the bytes leave ([Cd]) is what its exit hands the parent.              *)
+  (* ===================================================================== *)
+  Lemma ush_oom_len : length FileDisc.alt_oom = 16%nat.
+  Proof using . vm_compute. reflexivity. Qed.
+
+  Lemma ush_oom_lookup (p : nat) :
+    (p < 16)%nat -> FileDisc.alt_oom !! p = Some (FileDisc.alt_oom !!! p).
+  Proof using .
+    intros Hp. apply list_lookup_lookup_total_lt. rewrite ush_oom_len. exact Hp.
+  Qed.
+
+  Lemma ush_oom_msg :
+    forall p : nat, (0 <= p < 0 + 13)%nat ->
+      shd_lit 0x12c0 p = FileDisc.alt_oom !!! p.
+  Proof using . apply ush_bytes_of_forallb. vm_compute. reflexivity. Qed.
+
+  Lemma ush_oom_nl : shd_lit 0x1280 2%nat = FileDisc.alt_oom !!! 13%nat.
+  Proof using . apply bv_eq. vm_compute. reflexivity. Qed.
+
+  Lemma wp_kshd_oom_paid (N : uk_names Σ) `{!ukn_const N}
+      (Cr Cd : iProp Σ) (l : list fdstate) (h : CpuId) (m : regfile)
+      (n : nat) :
+    UkSh.ush_fd2p l ->
+    uint (m !!! Regidx a0_idx) = 0x12c0 ->
+    ush_execfail_law_at FileDisc.alt_oom 14 Cr Cd -∗
+    shk_code (ukn_t N) -∗
+    shk_rodata (ukn_t N) -∗
+    UserFd.ustd (ukn_fd N) l -∗
+    Cr -∗
+    (UserFd.ustd (ukn_fd N) l -∗ Cd -∗ ukn_pay N (-1)) -∗
+    urun N h m (mword_of_int ShSyms.panic) (ush_Dg + n) -∗
+    mWP (Loop : expr riscv_lang).
+  Proof using .
+    intros Hfd2 Hmsg. iIntros "#Hlaw #Hcode #Hro Hstd Hc Hpay Hrun".
+    iDestruct ("Hlaw" $! N l with "[%] Hc") as (Pf) "(HPf & #Hstep & #Hdone)";
+      [ exact Hfd2 | ].
+    replace (ush_Dg + n)%nat with (2 + (10 + (12 + (4 + n))))%nat
+      by (unfold ush_Dg; lia).
+    assert (Ha0 : m !!! Regidx a0_idx = (mword_of_int 0x12c0 : mword 64))
+      by (rewrite <- Hmsg; symmetry; apply moi_of_uint).
+    iDestruct (shd_msg_str (ukn_t N) (ukn_d N) DfracDiscarded 0x12c0 13%nat
+                 ltac:(vm_compute; reflexivity) ltac:(lia)
+                 with "Hro") as "#Hs".
+    (* the three families, the ledger riding beside the credential: no
+       literal before the argument, the thirteen letters, then the '\n' *)
+    set (C1 := (fun _ : nat => UserFd.ustd (ukn_fd N) l ∗ Pf 0%nat)%I).
+    set (C2 := (fun p : nat => UserFd.ustd (ukn_fd N) l ∗ Pf p)%I).
+    set (C3 := (fun p : nat => UserFd.ustd (ukn_fd N) l ∗ Pf (p + 11)%nat)%I).
+    assert (E12 : C1 0%nat = C2 0%nat) by reflexivity.
+    assert (E23 : C2 13%nat = C3 2%nat) by reflexivity.
+    iApply (wp_kshd_panic_chain N true DfracDiscarded 0x12c0 13%nat
+              (shd_lit 0x12c0) C1 C2 C3 h m n ltac:(lia) Ha0 E12 E23
+              with "[] [] [] [Hstd HPf] Hcode Hro Hs [Hpay] Hrun").
+    { iModIntro. iIntros (p) "%Hp". exfalso. lia. }
+    { iModIntro. iIntros (p) "%Hp". rewrite /C2.
+      rewrite (ush_oom_msg p ltac:(lia)).
+      iApply ("Hstep" $! p (FileDisc.alt_oom !!! p) with "[%] [%]").
+      - apply ush_oom_lookup. lia.
+      - lia. }
+    { iModIntro. iIntros (p) "%Hp". rewrite /C3.
+      assert (Hp2 : p = 2%nat) by lia. subst p. cbn [Nat.add].
+      rewrite ush_oom_nl.
+      iApply ("Hstep" $! 13%nat (FileDisc.alt_oom !!! 13%nat) with "[%] [%]").
+      - apply ush_oom_lookup. lia.
+      - lia. }
+    { rewrite /C1. iFrame "Hstd HPf". }
+    { rewrite /C3. iIntros "[Hstd HPf]". cbn [Nat.add].
+      iApply ("Hpay" with "Hstd"). iApply ("Hdone" with "HPf"). }
+  Qed.
+
   (* ...AND fork1 WITH THE PANIC THE CALLER'S (M4b(2)): [UkShRun.
      wp_kshr_fork1] at this file's stack need.  The site pays the panic --
      sh's fork arm through [wp_kshd_panic_paid], the generic runner on the

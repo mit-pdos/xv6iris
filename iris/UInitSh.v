@@ -530,21 +530,21 @@ Section UInitSh.
      than assumes. *)
 
   (* =================================================================== *)
-  (*  THE TEN LAWS THE CONSOLE'S SUPPLY ASKS OF THE CREDENTIAL             *)
+  (*  THE NINE LAWS THE CONSOLE'S SUPPLY ASKS OF THE CREDENTIAL            *)
   (* =================================================================== *)
   (*  Gathered VERBATIM from what [init_exec_sup_of_sh_slot] below used to *)
   (*  take one at a time.  Together with [UserConsole.cons_cred] they are  *)
   (*  the seam's whole interface to the application: a record and a proof  *)
-  (*  where there were five predicates and ten [forall ... -> ⊢ ...]       *)
+  (*  where there were five predicates and nine [forall ... -> ⊢ ...]      *)
   (*  premises at every lemma of the chain.                                *)
   (*                                                                       *)
   (*  This file names no era, so they stay Coq-level -- their one          *)
   (*  discharge is [UInitBoot.echo_cc_holds], where the record's equations *)
   (*  are.  The application proves them ONCE.                              *)
   (* =================================================================== *)
-  (*  THE TEN AT AN ARBITRARY DISCIPLINE (lane APP-FILE).  Only the FIRST
+  (*  THE NINE AT AN ARBITRARY DISCIPLINE (lane APP-FILE).  Only the FIRST
       conjunct reads the discipline -- sh's read leaf is
-      [UkSh.ush_read_recv_leaf_at] at it -- and the other nine are
+      [UkSh.ush_read_recv_leaf_at] at it -- and the other eight are
       era-free already.  [cons_cred_holds] below is this at echo's five,
       so its type and its meaning are the landed ones. *)
   Definition cons_cred_holds_at (cn : cons_names) (T : iProp Σ)
@@ -596,9 +596,9 @@ Section UInitSh.
             cc_wc Cr I 2%nat ={⊤}=∗
             cc_mid Cr γp (I ++ l ++ [wl_nl])
             ∗ cc_wc Cr (I ++ l ++ [wl_nl]) 3%nat)
-    (* the three conversions of step 4 *)
+    (* the two conversions of step 4 (a block owed is never a boundary
+       credential again: sync design section 2) *)
     /\ (forall I : list (bv 8), ⊢ cc_wb Cr I -∗ cc_wc Cr I 0%nat)
-    /\ (forall I : list (bv 8), ⊢ cc_wc Cr I 3%nat -∗ cc_wc Cr I 0%nat)
     /\ (forall (γp : gname) (I l : list (bv 8)), wl_nl ∉ l ->
           ⊢ cc_mid Cr γp (I ++ l ++ [wl_nl]) -∗
             cc_wb Cr I -∗
@@ -618,7 +618,7 @@ Section UInitSh.
   (* ...AND THE ECHO INSTANCE, WHICH IS THE NAME THE SEAM STILL USES.  A
      definitional instance and not a lemma: [UInitBoot.echo_cc_holds]
      proves this very [Prop] and the two constructors below take it, so
-     the ten laws stay ONE unfolding away from the conjunction. *)
+     the nine laws stay ONE unfolding away from the conjunction. *)
   Definition cons_cred_holds (cn : cons_names) (T : iProp Σ)
       (Cr : cons_cred Σ) : Prop :=
     cons_cred_holds_at cn T EchoDisc.disc_input UkSh.ush_disc_snoc_ncr
@@ -1184,7 +1184,7 @@ Section UInitSh.
   Proof using .
     intros Hpsok_free Hn0 Hsav Hsro Hl Hcs Hpid Hlen HCr.
     pose proof HCr as (Hrl & Hpm1 & Hpm3 & Hpmwb & Hwc
-                       & Hwbwc & Hwbl & Hwbr & Hbd & Hpw).
+                       & Hwbwc & Hwbr & Hbd & Hpw).
     (* the credential's laws are stated over EVERY position ghost; this
        lemma runs at the one [γp] its caller minted for the round. *)
     specialize (Hrl γp). specialize (Hpm1 γp). specialize (Hpm3 γp).
@@ -1252,7 +1252,7 @@ Section UInitSh.
                      [UkSh.ush_read_recv_leaf_at] at it. *)
                   Dsc Hdncr Hdshort Dl Hdline
                   Hrl Hpm1 Hpm3
-                  Hpmwb Hwc Hwbwc Hwbl Hwbr
+                  Hpmwb Hwc Hwbwc Hwbr
                   1%nat alen afun fdv W' n0 np
                   Hbd
                   (ucons_pay_const cn γp T (UkInit.init_rd (cc_rd Cr) (cc_wbn Cr))) Hok Hcwd0
@@ -1335,7 +1335,7 @@ Section UInitSh.
   (*  THE SAME ASSEMBLY AT AN ARBITRARY INPUT DISCIPLINE (lane APP-FILE)  *)
   (*                                                                      *)
   (*  [init_sh_image_entry_at]'s five extra parameters, relayed, and the   *)
-  (*  credential's ten laws at the same [Dsc]                              *)
+  (*  credential's nine laws at the same [Dsc]                             *)
   (*  ([cons_cred_holds_at]).  [init_exec_sup_of_sh_slot] below is this    *)
   (*  at echo's five, so [UInitBoot.init_cons_sup_of_sh_slot] does not     *)
   (*  move.  Every other binder is commented on the landed statement.     *)
@@ -1378,7 +1378,7 @@ Section UInitSh.
   Proof using .
     intros Hpsok_free Hn0 Hst HCr.
     pose proof HCr as (Hrl & Hpm1 & Hpm3 & Hpmwb & Hwc
-                       & Hwbwc & Hwbl & Hwbr & Hbd & Hpw).
+                       & Hwbwc & Hwbr & Hbd & Hpw).
     subst st.
     iIntros "#Hdep #Hdp #Hplaw #Hcons (#Hinv & #Hcl0 & #Hgen & #Hpay)".
     (* E4: what crosses is the WHOLE pins law and each consumer projects *)

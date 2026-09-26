@@ -118,18 +118,29 @@ Definition upend_tie (cs : list nat) (sb : fstate) (I : list (bv 8)) (c : fstate
 
 (* ---- the identity steps ---- *)
 
-(* the silent alternative moves no file, at every line *)
-Lemma ustep_noc (s : fstate) (l : uline) :
-  lm_step U s l (lm_dec U (lmh_noc K l)) = s.
+(* THE OUT-OF-MEMORY ALTERNATIVE (sync design section 2): admissible at
+   every line, state-free and not a panic -- the record's own -- its bytes
+   [alt_oom], and it moves no file *)
+Lemma ulm_step_oom (s : fstate) (l : uline) : lm_step U s l (lm_dec U uoom) = s.
 Proof using.
   change (lm_step ulmG) with ustep. change (lm_dec ulmG) with ualt_dec.
-  change (lmh_noc ulmG_hooks) with unoc.
-  destruct l as [ws | ws Nf | Nf | p n | ws]; cbn [unoc].
-  - rewrite ualt_dec_R. exact (UShFileRedir.fsm_fnoc s (LEcho ws)).
-  - rewrite ualt_dec_R. exact (UShFileRedir.fsm_fnoc s (LEchoF ws Nf)).
-  - rewrite ualt_dec_R. exact (UShFileRedir.fsm_fnoc s (LCat Nf)).
-  - rewrite ualt_dec_code. by destruct p.
-  - rewrite ualt_dec_R. exact (UShFileRedir.fsm_fnoc s (LSecc ws)).
+  exact (uoom_step s l).
+Qed.
+
+Lemma ulm_apr_oom (I : list (bv 8)) : lm_apr U K I uoom.
+Proof using.
+  rewrite /lm_apr. change (lm_ok ulmG) with (uok adm_u_g).
+  change (lm_dec ulmG) with ualt_dec. change (lmh_free ulmG_hooks) with ufree.
+  change (lm_panic ulmG) with upanic.
+  split_and!; [exact (uoom_ok adm_u_g _ _) | exact uoom_free | exact uoom_nopanic].
+Qed.
+
+Lemma ulm_ab_oom (I : list (bv 8)) : lm_ab U K I uoom = alt_oom.
+Proof using.
+  destruct (ulm_apr_oom I) as (Hok & Hfr & _).
+  rewrite /lm_ab decide_True; [| split; [exact Hok | exact Hfr]].
+  change (lm_cont ulmG) with ucont. change (lm_dec ulmG) with ualt_dec.
+  exact (uoom_cont _ _).
 Qed.
 
 (* a panic alternative moves no file, at every line *)
@@ -195,17 +206,6 @@ Lemma udone_tie_of_pre_id (cs : list nat) (a : nat) (sb : fstate)
 Proof using.
   intros Hp [Hl Hc] Hid. apply (udone_tie_snoc cs a sb I c Hl Hp).
   rewrite Hid. exact Hc.
-Qed.
-
-(* PEND-of-PRE at the line's silent alternative *)
-Lemma upend_tie_of_pre (cs : list nat) (sb : fstate) (I : list (bv 8)) (c : fstate) :
-  (0 < nlines I)%nat -> upre_tie cs sb I c ->
-  upend_tie_at cs sb I c (lmh_noc K (ul I)).
-Proof using.
-  intros Hp [Hl Hc]. split_and!;
-    [ exact Hl | exact Hp | exact (lmh_noc_ok K _ _)
-    | exact (lmh_free_term K _ (lmh_noc_free K _))
-    | exact (lmh_noc_cont K _ _) | rewrite ustep_noc; exact Hc ].
 Qed.
 
 (* at a FILED list: the holder of PRE meets a list one longer that
@@ -744,40 +744,29 @@ Section UShURoundDefs.
     iApply (gwc_post_of_blk U PA (S gen_id) v I a Hapr with "Hblk").
   Qed.
 
-  (* ---- THE LOOP'S LAWS AT THE FAMILY ---- *)
-
-  (* a fork that failed re-enters at the boundary -- the deed pending at
-     the line's silent alternative *)
-  Lemma uHwbl_f (I : list (bv 8)) : ⊢ uWcf I 3%nat -∗ uWcf I 0%nat.
+  (* THE FOLD AT AN ALTERNATIVE WHOSE STEP IS THE IDENTITY, with the deed
+     still at its PRE tie: the block written up to its prompt at [a] and
+     the deed as the round found it are a position-0 credential -- DONE
+     once the prompt's first byte is out, PEND at [a] before it.  The
+     out-of-memory death is the one caller ([uHoom]): it dies in the
+     parse, before any line shape moves [f]. *)
+  Lemma uWcf0_of_post_pre_id (I : list (bv 8)) (a : nat) (v : era_pins) :
+    lm_apr U K I a -> uwild (ul I) = false -> (0 < nlines I)%nat ->
+    (forall s : fstate, lm_step U s (ul I) (lm_dec U a) = s) ->
+    lk_pin FI (S gen_id) v -∗ lk_post FI (S gen_id) v I a -∗ PRE I -∗
+    uWcf I 0%nat.
   Proof using .
-    rewrite uWcf_S3 uWcf_0. iIntros "[Hc Hp]".
+    intros Hapr Hnw Hpos Hid. iIntros "#Hpin Hblk Hp".
     rewrite {1}/ush_pre_at /ush_deed_at. iDestruct "Hp" as "[Hp _]".
     iDestruct "Hp" as "[Hp | #HT]"; last first.
-    { iDestruct (lk_lcred_blk_lend FI (S gen_id) I with "Hc") as (v) "[#Hpin _]".
-      iLeft. iSplitL "";
-        [iApply (uHcltaint I 0%nat v with "Hpin HT") | iApply (ush_deed_taint with "HT")]. }
-    rewrite /uWcl.
-    iDestruct (lk_lcred_blk_lend FI (S gen_id) I with "Hc") as (v) "[#Hpin Hl]".
-    cbn [lk_pin lk_lend union_link_inst_at gen_link_inst]. rewrite /gwc_lend.
-    iDestruct "Hl" as "[Hl | #HT]"; last first.
-    { iLeft. iSplitL "";
-        [iApply (uHcltaint I 0%nat v with "Hpin HT") | iApply (ush_deed_taint with "HT")]. }
-    iDestruct "Hl" as (ps cs sw P) "(%Hw & Hcur)".
-    iEval (rewrite /gcur; cbn [gH gW gT union_params_at]; rewrite /f0w_at) in "Hcur".
-    iDestruct "Hcur" as "(Htn & #Hps & #Hcs & #HE & #[Hf %Hs])".
-    subst sw.
-    iRight. iSplitL "Htn".
-    { iApply (uWcl3_close I v ps cs P Hw with "Hpin [Htn]").
-      rewrite /gcur. cbn [gW union_params_at]. rewrite /f0w_at.
-      iFrame "Htn Hps Hcs HE Hf". by iPureIntro. }
-    rewrite /ush_pend_at /ush_deed_at. iLeft.
-    iDestruct "Hp" as (cs' s v') "(Hd & %Htie & #Hty & #Hpin' & #Hcs' & %Hnw)".
-    iExists cs', s, v'. iFrame "Hd Hty Hpin' Hcs' %". iPureIntro.
-    destruct Hw as [(_ & _ & Hn & _) _].
-    exists (lmh_noc K (ul I)).
-    exact (upend_tie_of_pre cs' s0 I _ ltac:(lia) Htie).
+    { iApply (uWcf_taint I 0%nat v with "Hpin HT"). }
+    iDestruct "Hp" as (cs' s v') "(Hd & %Htie & #Hty & #Hpin' & #Hcs' & _)".
+    destruct Htie as [Hlen Hc].
+    iApply (uWcf0_of_post_alt I a v v' cs' s Hapr Hnw Hlen Hpos
+              ltac:(rewrite Hid; exact Hc) with "Hpin Hblk Hd Hty Hpin' Hcs'").
   Qed.
 
+  (* ---- THE LOOP'S LAWS AT THE FAMILY ---- *)
 
   (* the banner-owed credential is a boundary one, at the DONE arm *)
   Lemma uHwbwc_f (I : list (bv 8)) : ⊢ uWbl I ∗ DONE I -∗ uWcf I 0%nat.
@@ -872,14 +861,6 @@ Section UShURoundDefs.
     era_pin (fgn_echo gf) (S gen_id) v -∗ T -∗ uWcu I p.
   Proof using . iIntros "#Hpin #HT". iApply uWcu_of. iApply (uWcf_taint with "Hpin HT"). Qed.
 
-
-  Lemma uHwbl_u (I : list (bv 8)) : ⊢ uWcu I 3%nat -∗ uWcu I 0%nat.
-  Proof using .
-    iIntros "H". iDestruct (uWcu_3 with "H") as "[H | #Hw]";
-      [| by iApply uWcu_wild].
-    iApply uWcu_of. iApply (uHwbl_f with "H").
-  Qed.
-
   (* the banner-owed credential is a boundary one, its wild arm the wild
      arm *)
   Lemma uHwbwc_u (I : list (bv 8)) : ⊢ uWbf I -∗ uWcu I 0%nat.
@@ -916,6 +897,41 @@ Section UShURoundDefs.
     iDestruct ("Hend" with "Hp5") as "[Hb Hpre]".
     rewrite /uWbf. iLeft. iApply (ush_done_of_pre_ban I with "[Hb] Hpre").
     rewrite /uWbl. iExact "Hb".
+  Qed.
+
+  (* THE CHILD'S OUT-OF-MEMORY DIAGNOSTIC (upstream d66e41c; sync design
+     section 2), at the widened credential: the lend opens into the
+     record's block at the out-of-memory alternative ([uoom]), the
+     fourteen bytes of "out of memory" and the newline step it, and the
+     end is the block written up to its prompt beside the deed as the
+     round found it -- the alternative's step is the identity, so that is
+     a position-0 credential ([uWcf0_of_post_pre_id]).  At every line the
+     record disciplines (the wild line's lend is its own shape). *)
+  Lemma uHoom (I : list (bv 8)) :
+    uwild (ul I) = false -> (0 < nlines I)%nat ->
+    ⊢ union_links ug -∗
+      UkShDiag.ush_execfail_law_at (PS := uprogSG_free) alt_oom 14
+        (uWcu I 3%nat) (uWcu I 0%nat).
+  Proof using .
+    intros Hnw Hpos. iIntros "#Hlk".
+    iPoseProof (UShPanic.ush_diag_law_hold_at_alt (PS := uprogSG_free) FI (PRE I) I uoom
+                  with "[] []") as "#Hx".
+    { iLeft. iPureIntro. rewrite ufi_wild Hnw. discriminate. }
+    { cbn [lk_links union_link_inst_at gen_link_inst]. iExact "Hlk". }
+    assert (Hab : lk_ab FI I uoom = alt_oom).
+    { change (lk_ab FI I uoom) with (lm_ab U K I uoom). exact (ulm_ab_oom I). }
+    assert (Hn : (length alt_oom - 2 = 14)%nat) by (vm_compute; reflexivity).
+    iEval (rewrite Hab Hn) in "Hx".
+    rewrite /UkShDiag.ush_execfail_law_at.
+    iIntros "!>" (N l) "%Hfd Hc".
+    iDestruct (uWcu_3_nw I Hnw with "Hc") as "Hc". rewrite uWcf_S3.
+    iDestruct ("Hx" $! N l with "[%] [Hc]") as (Pf) "(H0 & #Hs & #He)";
+      [exact Hfd | rewrite /uWcl; iExact "Hc" |].
+    iExists Pf. iFrame "H0 Hs". iIntros "!> Hp".
+    iDestruct ("He" with "Hp") as (v) "(#Hpin & Hblk & Hpre)".
+    iApply uWcu_of.
+    iApply (uWcf0_of_post_pre_id I uoom v (ulm_apr_oom I) Hnw Hpos
+              (fun s => ulm_step_oom s (ul I)) with "Hpin Hblk Hpre").
   Qed.
 
   (* a KILLED child pays the payload with the taint *)

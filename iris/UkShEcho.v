@@ -584,8 +584,8 @@ Section UkShEcho.
   (* =================================================================== *)
   (* AT THE CHILD'S PAID PAYLOAD (lane IO-LEAF, step 4): the process that
      execs is the one sh FORKED, and its payload is the one sh CHOSE at the
-     fork ([UkShFork.ushf_wq] -- the credential after echo's block, or the
-     block still owed) -- so [Q] is a parameter, and so is what the child
+     fork ([UkShFork.ushf_wq] -- the credential after echo's block) -- so
+     [Q] is a parameter, and so is what the child
      was LENT ([Cr], the block credential the paid entry is built on).
      [UShEcho.sh_exec_sup_of_echo_slot] is the one discharge. *)
   Definition sh_exec_sup_echo (ws : list (list (bv 8))) (Q : Z -> iProp Σ)
@@ -1417,9 +1417,11 @@ Section UkShEcho.
         sh_exec_sup_echo_at Fd1 ws Q Cr -∗
         (* the out-of-memory law: what the lend does where the parser's walk
            finds no memory ([UkShCmdalloc.ushp_oom], at [panic]'s entry;
-           upstream d66e41c) -- and the diagnostic's law and what its end
-           pays where the exec FAILED (M4b(2)) *)
-        UkShCmdalloc.ushp_oom N Cr (18 + (8 + (UkShDiag.ush_Dg + n))) -∗
+           upstream d66e41c), WITH THE LEDGER beside it -- the panic prints
+           on fd 2 -- and the diagnostic's law and what its end pays where
+           the exec FAILED (M4b(2)) *)
+        UkShCmdalloc.ushp_oom N (Cr ∗ UserFd.ustd (ukn_fd N) ld)
+          (18 + (8 + (UkShDiag.ush_Dg + n))) -∗
         UkShDiag.ush_execfail_law_at dg (13 + length (ws !!! 0%nat))%nat
           Cr Cd -∗
         □ (Cd -∗ Q (-1)) -∗
@@ -1461,9 +1463,11 @@ Section UkShEcho.
         sh_exec_sup_echo_at_v Fd1 ws Q Cr v -∗
         (* the out-of-memory law: what the lend does where the parser's walk
            finds no memory ([UkShCmdalloc.ushp_oom], at [panic]'s entry;
-           upstream d66e41c) -- and the diagnostic's law and what its end
-           pays where the exec FAILED (M4b(2)) *)
-        UkShCmdalloc.ushp_oom N Cr (18 + (8 + (UkShDiag.ush_Dg + n))) -∗
+           upstream d66e41c), WITH THE LEDGER beside it -- the panic prints
+           on fd 2 -- and the diagnostic's law and what its end pays where
+           the exec FAILED (M4b(2)) *)
+        UkShCmdalloc.ushp_oom N (Cr ∗ UserFd.ustd (ukn_fd N) ld)
+          (18 + (8 + (UkShDiag.ush_Dg + n))) -∗
         UkShDiag.ush_execfail_law_at dg (13 + length (ws !!! 0%nat))%nat
           Cr Cd -∗
         □ (Cd -∗ Q (-1)) -∗
@@ -1502,9 +1506,11 @@ Section UkShEcho.
         sh_exec_sup_echo ws Q Cr -∗
         (* the out-of-memory law: what the lend does where the parser's walk
            finds no memory ([UkShCmdalloc.ushp_oom], at [panic]'s entry;
-           upstream d66e41c) -- and the diagnostic's law and what its end
-           pays where the exec FAILED (M4b(2)) *)
-        UkShCmdalloc.ushp_oom N Cr (18 + (8 + (UkShDiag.ush_Dg + n))) -∗
+           upstream d66e41c), WITH THE LEDGER beside it -- the panic prints
+           on fd 2 -- and the diagnostic's law and what its end pays where
+           the exec FAILED (M4b(2)) *)
+        UkShCmdalloc.ushp_oom N (Cr ∗ UserFd.ustd (ukn_fd N) ld)
+          (18 + (8 + (UkShDiag.ush_Dg + n))) -∗
         UkShDiag.ush_execfail_law Cr Cd -∗
         □ (Cd -∗ Q (-1)) -∗
         shp_code (ukn_t N) -∗ shp_rodata (ukn_t N) -∗ ush_jtab (ukn_t N) -∗
@@ -1595,11 +1601,12 @@ Section UkShEcho.
       by (rewrite /m2 (upd_eq m1 (Regidx (mword_of_int 1 : mword 5)) _);
           apply bv_eq; vm_compute; reflexivity).
     (* ---- parsecmd ---- *)
-    (* the exit resource down the parser's walk is the LEND (step 4): the
-       out-of-memory law [Hcq] takes it where [cmdalloc] panics, and the
-       lend comes back on the arm where the allocation succeeded, for the
-       exec below *)
-    iAssert (UkShCmdalloc.ushp_oom N Cr (18 + (8 + (UkShDiag.ush_Dg + n))))%I
+    (* the exit resource down the parser's walk is the LEND (step 4) and
+       the LEDGER: the out-of-memory law [Hcq] takes both where [cmdalloc]
+       panics, and they come back on the arm where the allocation
+       succeeded, for the exec below *)
+    iAssert (UkShCmdalloc.ushp_oom N (Cr ∗ UserFd.ustd (ukn_fd N) ld)
+               (18 + (8 + (UkShDiag.ush_Dg + n))))%I
       as "#Hpxw".
     { iExact "Hcq". }
     (* the parser takes the BOUNDED capability (lane SH-MALLOC-3) and the
@@ -1613,9 +1620,9 @@ Section UkShEcho.
               h2 m2 dw dv s0 len f (echo_toks ws)
               (8 + (UkShDiag.ush_Dg + n))
               Ha0_2 Hns Htoks Htlen Hs0 Hs64
-              with "Hpcode Hpro Hline Hws Hsy HM Hpxw Hcr Hrun").
+              with "Hpcode Hpro Hline Hws Hsy HM Hpxw [$Hcr $Hstd] Hrun").
     iIntros (p) "%Hparses Hnode Hline %Hcut Hws Hsy".
-    iIntros (h3 m3) "%Hcs3 %Ha0_3 Hsz Hcr Hrun".
+    iIntros (h3 m3) "%Hcs3 %Ha0_3 Hsz [Hcr Hstd] Hrun".
     rewrite Hra_2.
     (* ---- 0x9a2  jal ra,runcmd ---- *)
     iApply (wp_uk_jal N h3 m3 (mword_of_int 0x9a2)
@@ -1730,13 +1737,15 @@ Section UkShEcho.
       by (rewrite /m2 (upd_eq m1 (Regidx (mword_of_int 1 : mword 5)) _);
           apply bv_eq; vm_compute; reflexivity).
     (* ---- parsecmd ---- *)
-    (* the exit resource down the parser's walk is the LEND (step 4): the
-       out-of-memory law [Hcq] takes it where [cmdalloc] panics, and the
-       lend comes back on the arm where the allocation succeeded, for the
-       exec below *)
-    iAssert (UkShCmdalloc.ushp_oom N Cr (18 + (8 + (UkShDiag.ush_Dg + n))))%I
+    (* the exit resource down the parser's walk is the LEND (step 4) and
+       the LEDGER: the out-of-memory law [Hcq] takes both where [cmdalloc]
+       panics, and they come back on the arm where the allocation
+       succeeded, for the exec below *)
+    iAssert (UkShCmdalloc.ushp_oom N (Cr ∗ UserFd.ustd_at (ukn_fd N) ld v)
+               (18 + (8 + (UkShDiag.ush_Dg + n))))%I
       as "#Hpxw".
-    { iExact "Hcq". }
+    { iApply (UkShCmdalloc.ushp_oom_wand N with "[] Hcq").
+      iIntros "!> [$ Hstd]". iApply (UserFd.ustd_at_ustd with "Hstd"). }
     (* the parser takes the BOUNDED capability (lane SH-MALLOC-3) and the
        allocator's adapter proves the unbounded one; 168 <= 65504 *)
     iApply (UkShParseCmd.wp_kshp_parser N (UkShMalloc.ushm_fresh N sz)
@@ -1748,9 +1757,9 @@ Section UkShEcho.
               h2 m2 dw dv s0 len f (echo_toks ws)
               (8 + (UkShDiag.ush_Dg + n))
               Ha0_2 Hns Htoks Htlen Hs0 Hs64
-              with "Hpcode Hpro Hline Hws Hsy HM Hpxw Hcr Hrun").
+              with "Hpcode Hpro Hline Hws Hsy HM Hpxw [$Hcr $Hstd] Hrun").
     iIntros (p) "%Hparses Hnode Hline %Hcut Hws Hsy".
-    iIntros (h3 m3) "%Hcs3 %Ha0_3 Hsz Hcr Hrun".
+    iIntros (h3 m3) "%Hcs3 %Ha0_3 Hsz [Hcr Hstd] Hrun".
     rewrite Hra_2.
     (* ---- 0x9a2  jal ra,runcmd ---- *)
     iApply (wp_uk_jal N h3 m3 (mword_of_int 0x9a2)
@@ -1812,8 +1821,8 @@ Section UkShEcho.
   (* S3b THE BODY'S CHILD LAW, DISCHARGED (lane IO-LEAF, step 4).         *)
   (*                                                                      *)
   (* [UkShFork.ushf_child_law] is the dispatch above at the payload sh's   *)
-  (* fork chose -- [ushf_wq I], the credential after echo's block or the   *)
-  (* block still owed -- and the lend [Wc I 3], for every boundary [I].    *)
+  (* fork chose -- [ushf_wq I], the credential after echo's block -- and   *)
+  (* the lend [Wc I 3], for every boundary [I].                            *)
   (* The line the child runs is the LAST body of that boundary             *)
   (* ([LineWords.last_ws I]), which is what [UkSh.ush_posw] ties together. *)
   (* The exec supply at that payload is the one thing it needs, and it is  *)
@@ -1942,17 +1951,62 @@ Section UkShEcho.
      ([UkSh.ush_posw]'s third conjunct).  At the file era that is
      [FileDisc.fbody_ok_echo], i.e. "the era filed an [LEcho] line here",
      from which both the stage and [FileHooks.fexfb]'s value follow. *)
-  (* THE OUT-OF-MEMORY LAW AT THE FORK'S PAYLOAD (upstream d66e41c): what
-     the child does with the lend [Wc I 3] when the parser's [cmdalloc]
-     panics -- [UkShCmdalloc.ushp_oom] at the child's own names, for every
-     boundary.  It replaces the null store's death, which paid the lend
-     back untouched ([UkShFork.ushf_wq]'s left arm); its discharge prints
-     "out of memory" (lane SY1-P). *)
+  (* THE CHILD'S OUT-OF-MEMORY LAW (upstream d66e41c; sync design section
+     2).  When the parser's [cmdalloc] finds no memory the child runs
+     [panic("out of memory")]: fourteen bytes on fd 2, then [exit(1)].  So
+     what the era owes is the DIAGNOSTIC's law at the out-of-memory
+     alternative's bytes ([FileDisc.alt_oom], up to its prompt), from the
+     lend to the credential after the block -- the exec-failed
+     diagnostic's shape, and it is paid the same way
+     ([UShPanic.ush_diag_law_hold_at_alt] at the era's out-of-memory
+     code).  The walk is [UkShDiag.wp_kshd_oom_paid]; [ushp_oom_of_diag]
+     turns the law into the parser's abstract continuation. *)
+  Definition ush_oom_law_wq_at_D (D : list (bv 8) -> Prop)
+      (Wc : list (bv 8) -> nat -> iProp Σ) : iProp Σ :=
+    (□ (∀ I : list (bv 8),
+          ⌜D I⌝ -∗
+          UkShDiag.ush_execfail_law_at FileDisc.alt_oom 14
+            (Wc I 3%nat) (Wc I 0%nat)))%I.
+
   Definition ush_oom_law_wq (Wc : list (bv 8) -> nat -> iProp Σ) : iProp Σ :=
-    (□ (∀ (N' : uk_names Σ) (Hc : ukn_const N') (I : list (bv 8)) (n : nat),
-          ⌜ ukn_pay N' = (fun _ : Z => UkShFork.ushf_wq Wc I) ⌝ -∗
-          UkShCmdalloc.ushp_oom N' (Wc I 3%nat)
-            (18 + (8 + (UkShDiag.ush_Dg + n)))))%I.
+    (□ (∀ I : list (bv 8),
+          UkShDiag.ush_execfail_law_at FileDisc.alt_oom 14
+            (Wc I 3%nat) (Wc I 0%nat)))%I.
+
+  Global Instance ush_oom_law_wq_at_D_persistent D Wc :
+    Persistent (ush_oom_law_wq_at_D D Wc).
+  Proof using . rewrite /ush_oom_law_wq_at_D. apply _. Qed.
+  Global Instance ush_oom_law_wq_persistent Wc : Persistent (ush_oom_law_wq Wc).
+  Proof using . rewrite /ush_oom_law_wq. apply _. Qed.
+
+  Lemma ush_oom_law_wq_at_D_of (D : list (bv 8) -> Prop)
+      (Wc : list (bv 8) -> nat -> iProp Σ) :
+    ush_oom_law_wq Wc -∗ ush_oom_law_wq_at_D D Wc.
+  Proof using .
+    iIntros "#Hx". rewrite /ush_oom_law_wq /ush_oom_law_wq_at_D.
+    iIntros "!>" (I) "_". iApply ("Hx" $! I).
+  Qed.
+
+  (* THE ONE OUT-OF-MEMORY WALK, as the parser's continuation: a
+     diagnostic law at [alt_oom] from [Cr] to [Cd], and an exit paid from
+     [Cd], make [UkShCmdalloc.ushp_oom] at the lend WITH THE LEDGER at any
+     budget panic's walk fits in *)
+  Lemma ushp_oom_of_diag (N : uk_names Σ) `{!ukn_const N} (Cr Cd : iProp Σ)
+      (ld : list fdstate) (K : nat) :
+    (UkShDiag.ush_Dg <= K)%nat ->
+    UkSh.ush_fd2p ld ->
+    UkShDiag.ush_execfail_law_at FileDisc.alt_oom 14 Cr Cd -∗
+    □ (Cd -∗ ukn_pay N (-1)) -∗
+    shk_code (ukn_t N) -∗ shk_rodata (ukn_t N) -∗
+    UkShCmdalloc.ushp_oom N (Cr ∗ UserFd.ustd (ukn_fd N) ld) K.
+  Proof using .
+    intros HK Hfd2. iIntros "#Hlaw #Hpay #Hcode #Hro".
+    rewrite /UkShCmdalloc.ushp_oom. iIntros "!>" (h m k) "%Hk %Ha0 [Hcr Hstd] Hrun".
+    replace k with (UkShDiag.ush_Dg + (k - UkShDiag.ush_Dg))%nat by lia.
+    iApply (UkShDiag.wp_kshd_oom_paid N Cr Cd ld h m (k - UkShDiag.ush_Dg)
+              Hfd2 Ha0 with "Hlaw Hcode Hro Hstd Hcr [] Hrun").
+    iIntros "_ Hd". iApply ("Hpay" with "Hd").
+  Qed.
 
   Lemma ushf_child_law_holds_at_D (D : list (bv 8) -> Prop)
       (dg : list (bv 8) -> list (bv 8)) (nn : list (bv 8) -> nat)
@@ -1964,7 +2018,7 @@ Section UkShEcho.
        D I -> dg I = alt_execfail /\ nn I = 17%nat) ->
     ush_execfail_law_wq_at_D D dg nn Wc -∗
     sh_exec_sup_echo_wq_at D Wc -∗
-    ush_oom_law_wq Wc -∗ UkShFork.ushf_child_law T Wc.
+    ush_oom_law_wq_at_D D Wc -∗ UkShFork.ushf_child_law T Wc.
   Proof using Hpsok_free.
     intros HD Hdg. iIntros "#Hxl #Hsup #Hoomw".
     rewrite /UkShFork.ushf_child_law /UkShFork.ushf_child_law_at.
@@ -1988,14 +2042,21 @@ Section UkShEcho.
               with "Hcode [] [] [] [] Hpcode Hpro Hjt Hline Hws Hsy Hstd Hcwd Hch
                     HM Hcr Hrun").
     - iApply ("Hsup" $! I). iPureIntro. exact HDI.
-    - (* the out-of-memory law, at this child *)
-      iApply ("Hoomw" $! N' Hc I n with "[%]"). exact Hpeq.
+    - (* the out-of-memory law, at this child: the era's diagnostic at
+         this input, its exit the payload *)
+      iApply (ushp_oom_of_diag N' (Wc I 3%nat) (Wc I 0%nat) ld
+                (18 + (8 + (UkShDiag.ush_Dg + n)))%nat
+                ltac:(lia) (proj2 (proj2 Hrows))
+                with "[] [] Hcode []").
+      + iApply ("Hoomw" $! I). iPureIntro. exact HDI.
+      + iIntros "!> Hc". rewrite Hpeq /UkShFork.ushf_wq. iExact "Hc".
+      + iApply (UkSh.ush_jtab_ro with "Hjt").
     - (* THE DIAGNOSTIC, AT THE ERA'S CARRIER READ AT THIS INPUT *)
       rewrite /UkShDiag.ush_execfail_law.
       rewrite <- Hdg1. rewrite <- Hdg2.
       iApply ("Hxl" $! I). iPureIntro. exact HDI.
     - (* a failed exec's child exits on the block written up to its prompt *)
-      iIntros "!> Hc". rewrite /UkShFork.ushf_wq. iRight. iExact "Hc".
+      iIntros "!> Hc". rewrite /UkShFork.ushf_wq. iExact "Hc".
   Qed.
 
   (* ...and the landed statement, through the guarded one.  ITS GUARD IS
@@ -2022,8 +2083,9 @@ Section UkShEcho.
     ush_oom_law_wq Wc -∗ UkShFork.ushf_child_law T Wc.
   Proof using Hpsok_free.
     intros HD Hdg. iIntros "#Hxl #Hsup #Hoomw".
-    iApply (ushf_child_law_holds_at_D D dg nn T Wc HD Hdg with "[] Hsup Hoomw").
-    iApply (ush_execfail_law_wq_at_D_of D dg nn Wc with "Hxl").
+    iApply (ushf_child_law_holds_at_D D dg nn T Wc HD Hdg with "[] Hsup []").
+    - iApply (ush_execfail_law_wq_at_D_of D dg nn Wc with "Hxl").
+    - iApply (ush_oom_law_wq_at_D_of D Wc with "Hoomw").
   Qed.
 
   (* the landed name: the echo era's guard is [line_ok] and its diagnostic

@@ -422,8 +422,8 @@ Section UkShRedirSeam.
     (* THE EXIT IS PAID FROM THE LEND (lane SH-CHILD-2), not from a free
        payload: this walk is the PAID child's, whose [ukn_pay] is the block
        credential it was lent ([UkShFork.ushf_wq]).  Both places that can
-       exit -- the parser's NULL store and the open's failure -- take the
-       pair, and the lend comes back on the arm where neither fired. *)
+       exit -- the parse's out-of-memory panic and the open's failure --
+       take the lend, and it comes back on the arm where neither fired. *)
     shk_code γt -∗
     ush_jtab γt -∗
     shp_code γt -∗ shp_rodata γt -∗
@@ -436,8 +436,9 @@ Section UkShRedirSeam.
     UkShRedir.ush_open_call_g N cwdv (ushs_file s0 len f args gp fe) 1537
       (<[1%nat := FdClosed]> ld) H K Kf -∗
     (* the out-of-memory law, at the parse's own budget (a REDIR line's
-       room is 72; [UkShSeam.wp_ref_child_redir]) *)
-    UkShCmdalloc.ushp_oom N Cr (4 + (UkShDiag.ush_Dg + n) - 2) -∗
+       room is 72; [UkShSeam.wp_ref_child_redir]), the ledger beside the
+       lend *)
+    UkShCmdalloc.ushp_oom N (Cr ∗ UserFd.ustd γfd ld) (4 + (UkShDiag.ush_Dg + n) - 2) -∗
     (* THE LEND SPLITS AT THE CALL: whole across the parse (it is the
        out-of-memory law's), and then what the open is handed and the rest *)
     (Cr -∗ H ∗ Cr') -∗
@@ -519,8 +520,8 @@ Section UkShRedirSeam.
     (* THE EXIT IS PAID FROM THE LEND (lane SH-CHILD-2), not from a free
        payload: this walk is the PAID child's, whose [ukn_pay] is the block
        credential it was lent ([UkShFork.ushf_wq]).  Both places that can
-       exit -- the parser's NULL store and the open's failure -- take the
-       pair, and the lend comes back on the arm where neither fired. *)
+       exit -- the parse's out-of-memory panic and the open's failure --
+       take the lend, and it comes back on the arm where neither fired. *)
     UkSh.sh_deps -∗
     shk_code γt -∗
     ush_jtab γt -∗
@@ -563,10 +564,13 @@ Section UkShRedirSeam.
               args gp fe ld st1 n emp%I K emp%I Cr Cr
               Hs1 Hred Htoks Hpos Htlen Hs0 Hs64 Hs38 Hst1 Hne Hnp
               with "Hcode Hjt Hpcode Hpro Hline Hws Hsy Hstd Hcwd HM [Hopen]
-                    Hoom [] Hcr Hrun [Hcont]").
+                    [] [] Hcr Hrun [Hcont]").
     - iApply (UkShRedir.ush_open_call_g_of N cwdv
                 (ushs_file s0 len f args gp fe) 1537
                 (<[1%nat := FdClosed]> ld) K with "Hopen").
+    - (* the landed law, at the lend alone: the ledger is dropped *)
+      iApply (UkShCmdalloc.ushp_oom_wand N with "[] Hoom").
+      iIntros "!> [$ _]".
     - iIntros "$".
     - iSplit.
       + iExact "Hcont".
@@ -646,7 +650,7 @@ Section UkShRedirSeam.
     UkShMalloc.ushm_fresh N sz -∗
     UkShRedir.ush_open_call_g N cwdv (ushs_file s0 len f args gp fe) 1537
       (<[1%nat := FdClosed]> ld) H K Kf -∗
-    UkShCmdalloc.ushp_oom N Cr (4 + (UkShDiag.ush_Dg + n) - 2) -∗
+    UkShCmdalloc.ushp_oom N (Cr ∗ UserFd.ustd γfd ld) (4 + (UkShDiag.ush_Dg + n) - 2) -∗
     (Cr -∗ H ∗ Cr') -∗
     Cr -∗
     urun N h m (mword_of_int 0x99c)

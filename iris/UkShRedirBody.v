@@ -169,7 +169,6 @@ Section UkShRedirBody.
          ∃ I : list (bv 8), ⌜length I = n'⌝ ∗ UkSh.ush_lease N γp T Pm I) ->
     (forall I : list (bv 8),
        ⊢ Pm I -∗ Wb I -∗ UkSh.ush_at N γp (length I)) ->
-    (forall I : list (bv 8), ⊢ Wc I 3%nat -∗ Wc I 0%nat) ->
     UkSh.ush_gen_slot N T -∗
     ushl_head l sz -∗
     UCodeShK.shk_code γt -∗
@@ -185,13 +184,13 @@ Section UkShRedirBody.
     urun N h m (mword_of_int 0x956) (16 + (UkSh.ush_Dbody + n)) -∗
     mWP (Loop : expr riscv_lang).
   Proof using HT HWct Hpay Hpsok_free.
-    intros Hregs Hs1 Ha5 Hnn Hnul Hkl Hline Hszlo Hszal Hszok Hpm1 Hpmwb Hwbl.
+    intros Hregs Hs1 Ha5 Hnn Hnul Hkl Hline Hszlo Hszal Hszok Hpm1 Hpmwb.
     exact (UkShFork.wp_kshm_body_at N γp T Wc Wb Pm Hpsok_free ushs_lp 68
              h m f k len (ws ++ [FileDisc.fd_w_gt; file]) sz l n
              ltac:(lia) ushs_lp0
              Hregs Hs1 Ha5 Hnn Hnul Hkl
              (ex_intro _ ws (ex_intro _ file (conj eq_refl Hline)))
-             Hszlo Hszal Hszok Hpm1 Hpmwb Hwbl).
+             Hszlo Hszal Hszok Hpm1 Hpmwb).
   Qed.
 
   (* =================================================================== *)
@@ -371,9 +370,8 @@ Section UkShRedirBody.
   (*                                                                     *)
   (*  THE LEND PAYS EVERY EXIT.  The child's payload is                   *)
   (*  [UkShFork.ushf_wq Wc I] and the walk can leave at three places --   *)
-  (*  the parser's NULL store, the open's failure and the exec's -- so    *)
-  (*  the lend [Wc I 3] goes in and the law that turns it into the        *)
-  (*  payload is one [iLeft].                                            *)
+  (*  the parse's out-of-memory panic, the open's failure and the exec's  *)
+  (*  -- each printing its diagnostic on the lend [Wc I 3] first.         *)
   (*                                                                     *)
   (*  THE OPEN AND THE SUPPLY ARE PREMISES, not hypotheses: both are the  *)
   (*  APPLICATION's ([UShRound.Hopen_hand] and K1's entry), and both come *)
@@ -460,7 +458,6 @@ Section UkShRedirBody.
          ∃ I : list (bv 8), ⌜length I = n'⌝ ∗ UkSh.ush_lease N γp T Pm I) ->
     (forall I : list (bv 8),
        ⊢ Pm I -∗ Wb I -∗ UkSh.ush_at N γp (length I)) ->
-    (forall I : list (bv 8), ⊢ Wc I 3%nat -∗ Wc I 0%nat) ->
     ⊢ UkSh.ush_gen_slot N T -∗
       ushl_head l sz -∗
       UCodeShK.shk_code γt -∗
@@ -497,7 +494,6 @@ Section UkShRedirBody.
          ∃ I : list (bv 8), ⌜length I = n'⌝ ∗ UkSh.ush_lease N γp T Pm I) ->
     (forall I : list (bv 8),
        ⊢ Pm I -∗ Wb I -∗ UkSh.ush_at N γp (length I)) ->
-    (forall I : list (bv 8), ⊢ Wc I 3%nat -∗ Wc I 0%nat) ->
     UkSh.ush_gen_slot N T -∗
     UkShLoop.ushl_head N γp T Wc Wb Pm l sz -∗
     UCodeShK.shk_code γt -∗
@@ -513,7 +509,7 @@ Section UkShRedirBody.
     mWP (Loop : expr riscv_lang).
   Proof using .
     intros HDc Hregs Hs1 Ha5 Hnn Hnul Hkl Hline Hb0 Hb1 Hlen2 Hszlo Hszal Hszok
-           Hpm1 Hpmwb Hwbl.
+           Hpm1 Hpmwb.
     iIntros "#Hgen Hhead #Hcode #Hro #Hpcode #Hjt #Hkl #Hchl #Hplaw %Hfd0
              Hstd Hdat Hsz Hbuf Hrun".
     pose proof Hregs as Hregs'.
@@ -603,7 +599,7 @@ Section UkShRedirBody.
     iApply (Hfork
               Lp Dc h3 m1 f k len ws sz l n
               HDc Hregs1 Hs1_1 Hnn Hnul Hkl Hline
-              Hszlo Hszal Hszok Hpm1 Hpmwb Hwbl
+              Hszlo Hszal Hszok Hpm1 Hpmwb
               with "Hgen Hhead Hcode Hro Hjt Hkl Hchl Hplaw [%] Hstd Hdat
                     Hsz Hbuf Hrun").
     exact Hfd0.
@@ -630,7 +626,6 @@ Section UkShRedirBody.
          ∃ I : list (bv 8), ⌜length I = n'⌝ ∗ UkSh.ush_lease N γp T Pm I) ->
     (forall I : list (bv 8),
        ⊢ Pm I -∗ Wb I -∗ UkSh.ush_at N γp (length I)) ->
-    (forall I : list (bv 8), ⊢ Wc I 3%nat -∗ Wc I 0%nat) ->
     UkSh.ush_gen_slot N T -∗
     UkShLoop.ushl_head N γp T Wc Wb Pm l sz -∗
     UCodeShK.shk_code γt -∗
@@ -679,7 +674,6 @@ Section UkShRedirBody.
          ∃ I : list (bv 8), ⌜length I = n'⌝ ∗ UkSh.ush_lease N γp T Pm I) ->
     (forall I : list (bv 8),
        ⊢ Pm I -∗ Wb I -∗ UkSh.ush_at N γp (length I)) ->
-    (forall I : list (bv 8), ⊢ Wc I 3%nat -∗ Wc I 0%nat) ->
     UkSh.ush_gen_slot N T -∗
     UkShLoop.ushl_head N γp T Wc Wb Pm l sz -∗
     UCodeShK.shk_code γt -∗
@@ -727,14 +721,13 @@ Section UkShRedirBody.
     8344 <= sz ->
     UserPtTree.pgroundup sz = sz ->
     usz_ok (sz + 65536) ->
-    (forall I : list (bv 8), ⊢ Wc I 3%nat -∗ Wc I 0%nat) ->
     UkShFork.ushf_kill_law Wc -∗
     UkShFork.ushf_child_law_at T Wc ushs_lp_cat 68 -∗
     UkShDiag.ush_panic_law Wc Wb -∗
     UkShFork.ushf_body_law N γp T Wc Wb Pm
       (fun l : uline => exists nm : list (bv 8), l = LCat nm) sz.
   Proof using HT HWct Hpay Hpsok_free.
-    intros Hszlo Hszal Hszok Hwbl.
+    intros Hszlo Hszal Hszok.
     iIntros "#Hkl #Hchl #Hplaw".
     rewrite /UkShFork.ushf_body_law.
     iIntros "!>" (lu h m f k len l n)
@@ -744,7 +737,7 @@ Section UkShRedirBody.
     iDestruct (UkSh.ush_jtab_ro γt with "Hjt") as "#Hro".
     iApply (wp_kshm_body_cat 68 nm h m f k len sz l n ltac:(lia)
               Hregs Hs1 Ha5 Hnn Hnul Hkl2 Hlat Hszlo Hszal Hszok
-              Hpm1 Hpmwb Hwbl
+              Hpm1 Hpmwb
               with "Hgen Hhead Hcode Hro [] Hjt Hkl Hchl Hplaw [%] Hstd
                     Hdat Hsz Hbuf Hrun").
     - iApply (UkShFork.ushf_code_shp with "Hcode").
@@ -755,7 +748,6 @@ Section UkShRedirBody.
     8344 <= sz ->
     UserPtTree.pgroundup sz = sz ->
     usz_ok (sz + 65536) ->
-    (forall I : list (bv 8), ⊢ Wc I 3%nat -∗ Wc I 0%nat) ->
     UkShFork.ushf_kill_law Wc -∗
     UkShFork.ushf_child_law T Wc -∗
     sh_redir_child_law -∗
@@ -763,11 +755,11 @@ Section UkShRedirBody.
     UkShDiag.ush_panic_law Wc Wb -∗
     UkShFork.ushf_body_law N γp T Wc Wb Pm ush_line_file sz.
   Proof using HT HWct Hpay Hpsok_free.
-    intros Hszlo Hszal Hszok Hwbl.
+    intros Hszlo Hszal Hszok.
     iIntros "#Hkl #Hchl #Hred #Hcatl #Hplaw".
     iPoseProof (UkShFork.ushf_body_law_echo N γp T Wc Wb Pm Hpsok_free sz
-                  Hszlo Hszal Hszok Hwbl with "Hkl Hchl Hplaw") as "#Hecho".
-    iPoseProof (ushf_body_law_cat sz Hszlo Hszal Hszok Hwbl
+                  Hszlo Hszal Hszok with "Hkl Hchl Hplaw") as "#Hecho".
+    iPoseProof (ushf_body_law_cat sz Hszlo Hszal Hszok
                   with "Hkl Hcatl Hplaw") as "#Hcat".
     iPoseProof (ushf_child_law_at_of_redir with "Hred") as "#Hchr".
     rewrite /UkShFork.ushf_body_law.
@@ -791,7 +783,7 @@ Section UkShRedirBody.
                 ltac:(lia) ushs_lp0
                 Hregs Hs1 Ha5 Hnn Hnul Hkl2
                 (ushs_lp_of_at ws Nf f k len Hlat)
-                Hszlo Hszal Hszok Hpm1 Hpmwb Hwbl
+                Hszlo Hszal Hszok Hpm1 Hpmwb
                 with "Hgen Hhead Hcode Hro [] Hjt Hkl Hchr Hplaw [%] Hstd
                       Hdat Hsz Hbuf Hrun").
       + iApply (UkShFork.ushf_code_shp with "Hcode").
@@ -811,7 +803,6 @@ Section UkShRedirBody.
     8344 <= sz ->
     UserPtTree.pgroundup sz = sz ->
     usz_ok (sz + 65536) ->
-    (forall I : list (bv 8), ⊢ Wc I 3%nat -∗ Wc I 0%nat) ->
     UkShFork.ushf_kill_law Wc -∗
     UkShFork.ushf_child_law T Wc -∗
     sh_redir_child_law -∗
@@ -820,11 +811,11 @@ Section UkShRedirBody.
     UkSh.ush_rest_l_at N γp T Wc Wb Pm ush_line_file
       (UkShLoop.ushl_R N sz).
   Proof using HT HWct Hpay Hpsok_free.
-    intros Hszlo Hszal Hszok Hwbl.
+    intros Hszlo Hszal Hszok.
     iIntros "#Hkl #Hchl #Hred #Hcatl #Hplaw".
     iApply (UkShFork.ushf_rest_of_body_at N γp T Wc Wb Pm Hpsok_free
-              ush_line_file sz Hszlo Hszal Hszok Hwbl).
-    iApply (ushf_body_law_file sz Hszlo Hszal Hszok Hwbl
+              ush_line_file sz Hszlo Hszal Hszok).
+    iApply (ushf_body_law_file sz Hszlo Hszal Hszok
               with "Hkl Hchl Hred Hcatl Hplaw").
   Qed.
 

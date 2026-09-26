@@ -81,8 +81,8 @@ Section UEchoPipe.
   Context `{PS : uprogSG Σ}.
 
   (* THE ERA'S CONSOLE CREDENTIAL, OPAQUE -- [UEchoFile]'s [Wq].  echo
-     writes no console byte at a pipe, so whatever the fork lent
-     ([UkShFork.ushf_wq]'s left arm) crosses this entry untouched. *)
+     writes no console byte at a pipe, so whatever the fork lent (the
+     block credential) crosses this entry untouched. *)
   Context (Wq : iProp Σ).
 
   Local Notation a0_idx := (mword_of_int 10 : mword 5).

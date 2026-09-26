@@ -117,6 +117,16 @@ Section UkShCmdalloc.
     iApply "H". iPureIntro. lia.
   Qed.
 
+  (* ...and CONTRAVARIANT in the lend: a law at [Pex] serves a walk that
+     crosses the parse holding more (the child's ledger beside its lend) *)
+  Lemma ushp_oom_wand (Pex Pex' : iProp Σ) (K : nat) :
+    □ (Pex' -∗ Pex) -∗ ushp_oom Pex K -∗ ushp_oom Pex' K.
+  Proof using .
+    rewrite /ushp_oom. iIntros "#Hw #H !>" (h m k) "%Hk %Ha0 Hp Hrun".
+    iApply ("H" $! h m k with "[%] [%] [Hp] Hrun");
+      [ exact Hk | exact Ha0 | iApply ("Hw" with "Hp") ].
+  Qed.
+
   Local Notation ushp_malloc_ty := (UkShParse.ushp_malloc_ty_le N 168).
   Local Notation wp_kshp_frame_pro_ci := (UkShParse.wp_kshp_frame_pro_ci N).
   Local Notation wp_kshp_frame_epi := (UkShParse.wp_kshp_frame_epi N).

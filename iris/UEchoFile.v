@@ -112,7 +112,7 @@ Section UEchoFile.
   Context (Heq : file_app = MkAppcfg file_names (file_pred c) r).
 
   (* THE ERA'S CONSOLE CREDENTIAL, OPAQUE.  echo writes no console byte at
-     a file, so what the fork lent ([UkShFork.ushf_wq]'s left arm) crosses
+     a file, so what the fork lent (the block credential, [Wc I 3]) crosses
      this entry untouched and is handed back at the exit.  Keeping it
      abstract is what keeps this file out of [EchoLinks]' cone, which is
      what lane LINK-GEN is about. *)

@@ -1,5 +1,5 @@
 (* ===================================================================== *)
-(*  UInitUnionCC.v -- THE UNION ERA'S CONSOLE CREDENTIAL, ITS TEN LAWS,   *)
+(*  UInitUnionCC.v -- THE UNION ERA'S CONSOLE CREDENTIAL, ITS NINE LAWS,  *)
 (*  AND /init's FIRST CREDENTIAL (cut C9g; design:                        *)
 (*  claude-notes/design/union.md section 4).                              *)
 (*                                                                        *)
@@ -365,7 +365,7 @@ Section UnionInitCC.
   Qed.
 
   (* =================================================================== *)
-  (*  2.  THE TEN LAWS ([UInitSh.cons_cred_holds_at]) at the union era    *)
+  (*  2.  THE NINE LAWS ([UInitSh.cons_cred_holds_at]) at the union era   *)
   (* =================================================================== *)
   Lemma union_cc_holds (HR : riscvGS Σ) (GEN : GenId)
       `{HBs : !bioslotG Σ, HFd : !fdslotG Σ, HIr : !irefslotG Σ,
@@ -414,21 +414,19 @@ Section UnionInitCC.
     - (* (6) the banner-owed credential is a boundary credential *)
       intros I. iIntros "H".
       iApply (uHwbwc_u ug r s0 (upterm_shape ug) (updone_shape ug) I with "H").
-    - (* (7) a block owed is one too *)
-      intros I. exact (uHwbl_u ug r s0 (upterm_shape ug) (updone_shape ug) I).
-    - (* (8) a line read at an unwritten prompt is the taint *)
+    - (* (7) a line read at an unwritten prompt is the taint *)
       intros γp I l Hnl. iIntros "Hm [[Hb _] | #Hw]"; last first.
       { (* the wild shape: the read is vacuous (seccomp design 10.5) *)
         iExFalso. iApply (uwild_read_absurd ug s0 γp I l with "Hm Hw"). }
       iApply (UShLine.ush_wb_read_holds_at (union_link_inst_at ug s0) (fgn_echo (ugn_file ug))
                 γp (S gen_id) I l Hnl (union_ep_refl_at ug s0) with "Hm Hb").
-    - (* (9) the cursor's boundary, at the widened credential *)
+    - (* (8) the cursor's boundary, at the widened credential *)
       intros γp N l i Hpeq.
       exact (UShLine.ush_posb_of_lend_at (lk_rres (union_link_inst_at ug s0))
                (fgn_echo (ugn_file ug)) (file_taint (fgn_cl (ugn_file ug))) N γp
                (uWcu ug r s0 (upterm_shape ug) (updone_shape ug)) (uWbf ug r s0) l i Hpeq
                (uWcu_inp ug r s0) Hwbi).
-    - (* (10) THE STEP: the prologue credential carries the hold, and the
+    - (* (9) THE STEP: the prologue credential carries the hold, and the
          two inputs -- the record's and the hold's -- are one input *)
       intros n. iIntros "Hp".
       iDestruct "Hp" as "[[Hp Hh] | #Hw]"; last first.
