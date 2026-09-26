@@ -1457,7 +1457,8 @@ Section EchoApp.
                (echo_cons γ) (echo_cons_timeless γ)
                (echo_cons_lic γ)
                wild_none (@wild_none_persistent Σ) (@wild_none_timeless Σ)
-               (wild_none_lic (echo_cons γ)).
+               (wild_none_lic (echo_cons γ))
+               wild_none (@wild_none_persistent Σ) (@wild_none_timeless Σ).
 
   Definition app_echo : xv6_app Σ :=
     MkApp echo_fixed echo_cl echo_names echo_pred echo_boot echo_R

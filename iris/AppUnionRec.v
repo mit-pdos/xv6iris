@@ -145,7 +145,9 @@ Section UnionApp.
                (* the seccomp universe's era credential: the era's wild
                   token (seccomp design 10.1) *)
                (usecc_tok c) (usecc_tok_persistent c) (usecc_tok_timeless c)
-               (union_wild_lic c).
+               (union_wild_lic c)
+               (* no tokenless masked READER (seccomp design 10.7) *)
+               wild_none (@wild_none_persistent Σ) (@wild_none_timeless Σ).
 
   Definition union_turn (c : union_gn) : nat -> iProp Σ := fturn (ugn_file c).
 

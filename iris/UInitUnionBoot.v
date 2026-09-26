@@ -166,8 +166,8 @@ Section UnionInitBoot.
       by (rewrite /app_taint Hiface; by cbn [union_ifc ai_kill union_kill]).
     assert (Hcons : @riscv_cons_res Σ (@riscv_fixedGS Σ HR) = ucl ug)
       by (rewrite /riscv_cons_res Hiface; by cbn [union_ifc ai_cons union_cons]).
-    assert (Hwild : @riscv_wild Σ (@riscv_fixedGS Σ HR) = wild_none)
-      by (rewrite /riscv_wild Hiface; by cbn [union_ifc ai_wild]).
+    assert (Hrdwild : @riscv_rdwild Σ (@riscv_fixedGS Σ HR) = wild_none)
+      by (rewrite /riscv_rdwild Hiface; by cbn [union_ifc ai_rdwild]).
     assert (Hktaint : ⊢ app_taint -∗ file_taint (fgn_cl (ugn_file ug))).
     { rewrite Hkill. iIntros "#H". iExact "H". }
     iIntros "#Hinv Hb Hturn".
@@ -258,7 +258,7 @@ Section UnionInitBoot.
     iAssert (UkInit.init_cons_sup fsc_cons (file_taint (fgn_cl (ugn_file ug)))
                (init_cons_cred (file_taint (fgn_cl (ugn_file ug))) (fn_cons r)) init_cons_fd
                (union_cc HR GEN ug r s0))%I as "#Hxs".
-    { iApply (union_cons_sup_of_sh_slot HR GEN ug r s0 Heq Hcons Htag Hwild
+    { iApply (union_cons_sup_of_sh_slot HR GEN ug r s0 Heq Hcons Htag Hrdwild
                 init_cons_fd 0%nat (fun k H => H)
                 ltac:(vm_compute; discriminate)
                 ltac:(reflexivity) Hlkp

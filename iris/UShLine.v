@@ -1013,7 +1013,7 @@ Section UShLine.
     (⊢ app_sup -∗ lk_T L) ->
     (⊢ lk_T L -∗ app_rdcred) ->
     (* ...and the era's WILD credential's (lane S0) *)
-    (⊢ riscv_wild (S gen_id) -∗ lk_T L) ->
+    (⊢ riscv_rdwild (S gen_id) -∗ lk_T L) ->
     (* the pieces' own pin IS the record's ([lk_pin file_link_inst :=
        era_pin (fgn_echo g)]; at echo it is the identity) *)
     (forall v : era_pins, ⊢ era_pin γ (S gen_id) v -∗ lk_pin L (S gen_id) v) ->
@@ -1087,7 +1087,7 @@ Section UShLine.
       (N : uk_names Σ) (γp : gname) (I : list (bv 8)) :
     (⊢ app_sup -∗ T) ->
     (⊢ T -∗ app_sup) ->
-    (⊢ riscv_wild (S gen_id) -∗ T) ->
+    (⊢ riscv_rdwild (S gen_id) -∗ T) ->
     echo_links T γ -∗
     UkSh.ush_lease N γp T (ush_mid γ γp) I -∗
     cons_acc fsc_cons app_rdcred (ush_rd_ret γp T (length I))
@@ -1112,7 +1112,7 @@ Section UShLine.
     (⊢ app_sup -∗ lk_T L) ->
     (⊢ lk_T L -∗ app_rdcred) ->
     (* ...and the era's WILD credential's (lane S0) *)
-    (⊢ riscv_wild (S gen_id) -∗ lk_T L) ->
+    (⊢ riscv_rdwild (S gen_id) -∗ lk_T L) ->
     (forall v : era_pins, ⊢ era_pin γ (S gen_id) v -∗ lk_pin L (S gen_id) v) ->
     lk_links L -∗
     UkSh.ush_lease N γp (lk_T L) (ush_mid_at (lk_rres L) γ γp) I -∗
@@ -1136,7 +1136,7 @@ Section UShLine.
     l !! 0%nat = Some (FdOpen true wr (FdDevice CONSOLE)) ->
     (⊢ app_sup -∗ T) ->
     (⊢ T -∗ app_sup) ->
-    (⊢ riscv_wild (S gen_id) -∗ T) ->
+    (⊢ riscv_rdwild (S gen_id) -∗ T) ->
     echo_links T γ -∗
     UkSh.ush_lease N γp T (ush_mid γ γp) I -∗
     udepwf_std N m pc USYS_read (ush_read_fam_era T γ γp I (ukn_pay N)) l
@@ -1194,7 +1194,7 @@ Section UShLine.
     (⊢ app_sup -∗ lk_T L) ->
     (⊢ lk_T L -∗ app_rdcred) ->
     (* ...and the era's WILD credential's (lane S0) *)
-    (⊢ riscv_wild (S gen_id) -∗ lk_T L) ->
+    (⊢ riscv_rdwild (S gen_id) -∗ lk_T L) ->
     (forall v : era_pins, ⊢ era_pin γ (S gen_id) v -∗ lk_pin L (S gen_id) v) ->
     usysno m = USYS_read ->
     bv_signed (trunc32 (m !!! Regidx a0_idx)) = 0 ->
@@ -1399,7 +1399,7 @@ Section UShLine.
     (⊢ app_sup -∗ lk_T L) ->
     (⊢ lk_T L -∗ app_rdcred) ->
     (* ...and the era's WILD credential's (lane S0) *)
-    (⊢ riscv_wild (S gen_id) -∗ lk_T L) ->
+    (⊢ riscv_rdwild (S gen_id) -∗ lk_T L) ->
     (forall v : era_pins, ⊢ era_pin γ (S gen_id) v -∗ lk_pin L (S gen_id) v) ->
     (⊢ lk_links L) ->
     (* AT THE FREE INSTANCE, NAMED (durable-notes, the two-instances
@@ -1430,7 +1430,7 @@ Section UShLine.
     ukn_pay N = ucons_pay fsc_cons γp T (ush_rd_x γ Wb) ->
     (⊢ app_sup -∗ T) ->
     (⊢ T -∗ app_sup) ->
-    (⊢ riscv_wild (S gen_id) -∗ T) ->
+    (⊢ riscv_rdwild (S gen_id) -∗ T) ->
     usysno m = USYS_read ->
     bv_signed (trunc32 (m !!! Regidx a0_idx)) = 0 ->
     uint (m !!! Regidx a1_idx) = a ->
@@ -1465,7 +1465,7 @@ Section UShLine.
     ukn_pay N = ucons_pay fsc_cons γp T (ush_rd_x γ Wb) ->
     (⊢ app_sup -∗ T) ->
     (⊢ T -∗ app_sup) ->
-    (⊢ riscv_wild (S gen_id) -∗ T) ->
+    (⊢ riscv_rdwild (S gen_id) -∗ T) ->
     (⊢ echo_links T γ) ->
     ⊢ UkSh.ush_read_recv_leaf (PS := uprogSG_free) N γp T
         (ush_mid γ γp) fsc_cons l
