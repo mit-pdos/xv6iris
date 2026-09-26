@@ -51,7 +51,7 @@ Landed at the old pin (e8728827e), rebased onto W3, W4 and main
 (79c00bfef): `LSecc`, `US`, the line-indexed `lm_merge`, the knob `ulm
 adm adm_s` / `ulmG := ulm adm_u_g adm_s_off`, `RSExec`, the knob-generic
 decider, the demos (`echo hi > a.txt`, `seccomp rm a`, power cycle, `cat
-a.txt` prints `hi`; `demo_secc_nodot`; `demo_secc_d4`).  Its detailed
+a.txt` prints `hi`; `demo_secc_d4`).  Its detailed
 status (conflicts at each rebase, deviations from §3 -- now accepted as
 §9) is in the `secc/model` branch's copy of this file.
 
@@ -289,3 +289,32 @@ the exec resolution (W) of `/seccomp`; wait; prompt through the licence);
 init's wild arm on the panic path; `secc_ok` widened to file-name words;
 the knob `adm_s := fun ws => bool_decide (ws <> [])`; the top theorem's
 statement changes only through the model; audits; the completed note.
+
+STATUS (lane S4, `secc/s4` off `secc/s3`): items 1 and 3 landed and
+green (VM log s4-r1: the one `Error` is S3's `UkSeccLit`, whose two
+dependents `UkSeccMain`/`UkSeccEntry` are the only files left to
+compile), audits system 13 / tree 13 / union 14 textually the baseline.
+Item 1: `FileDisc.secc_ok` at `fn_wf` (`seccomp rm a.txt` is a line;
+demo `demo_secc_path` replaces `demo_secc_nodot`; the decider unchanged).
+Item 3: `UInitBanner.kinit_w1_of_step` / `kinit_banner_pay_of_lic`;
+`UInitUnionCC.union_Wwild` (sh's wild shape at a count), the record's
+`cc_wp` gains it as a second arm, `union_wbn_to` returns it at `uWbf`'s
+wild arm, law (10) lends it on as `uWcu`'s wild arm, `UInitUnionBoot`'s
+banner and both diagnostics go through the licence (`union_wild_pay`);
+`uwild_disc_off` is deleted.  STOPPED at item 2, so items 4-5 (the knob,
+the statement) are not done: the Pay's `secc_rows sts` needs sh's WHOLE
+TABLE, and sh's proof never names its table view -- `UkSh.ush_std l :=
+ustd γfd l` hides it, every sh-tier leaf that takes the ledger (the write
+chains, `wp_ksh_read`/`gets`/`getcmd`, the prompt/panic/exec-fail laws,
+the fork arm, sh's console open) states `ustd` in and out, and the
+ledger reaches sh from init's `ustd` (init's open/dup leaves) and sh's
+view-free entry.  What is missing: `ustd_at` at a named view threaded
+init entry -> open/dup -> `wp_uk_ecall_fork_at` -> sh's entry (a pure
+fact on the exec'ing table) -> sh's startup open/close (view = console
+at 0-3, closed above) -> every round of sh's loop, i.e. the ledger a
+section parameter (or `ush_std` at `ustd_at`) of the generic sh/init tier
+with view-preserving leaves.  A second, smaller misfit: `secc_image_entry`
+takes `forall s, ⊢ Q s`, but sh's child's payload is `ushf_wq Wcu I`,
+paid at the wild arm only by the (persistent) token -- the entry should
+take `□ (∀ s, Q s)` (UkSeccMain's `wp_ksecc_start` likewise).
+
