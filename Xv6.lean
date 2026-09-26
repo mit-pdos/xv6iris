@@ -1278,3 +1278,11 @@ import Xv6.SpecUlibPutc
 import Xv6.ProofUlibPutc
 import Xv6.UlibPutcReloc
 import Xv6.AppLaws
+import Xv6.UmodeArith
+import Xv6.UmodeAbi
+import Xv6.UkProgAbi
+import Xv6.SpecUkLeaves
+import Xv6.UkAbi
+import Xv6.UserCwd
+import Xv6.UserHeap
+import Xv6.UkRun
