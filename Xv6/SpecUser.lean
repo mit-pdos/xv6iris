@@ -25,7 +25,7 @@ cur_ctx`); the user tier borrows it per step, so the accessor is a premise
 of the body, supplied by the concrete caller from its residue.
 
 **USER DECISION D24.**  `USER` is an explicit PARAMETER structure of the
-final theorem (as `DISK_INIT_WM`/`PRINTK` are parameters of today's links):
+final theorem (as `PRINTK` once was a parameter of the links):
 the ~84k-line tower that proves it is wave 9.  There are NO totality
 hypotheses, as in Rocq.
 
@@ -40,8 +40,8 @@ hypotheses, as in Rocq.
 3. `WP (Loop : expr riscv_lang)` is MachCSL's `wpLoop cpu` (the hart's safety
    from a cycle boundary, given the generation's certificate).
 4. `Module Type USER` is a `Prop` structure quantified over the ambient
-   instances (`hlc`, `GF`, `MachGS`, `CurCtx`), the `DiskAcc.DISK_INIT_WM`
-   form; Rocq's `GenId` is MachCSL's `genId` (inside `MachGS`), its `CpuId`
+   instances (`hlc`, `GF`, `MachGS`, `CurCtx`), the form of the retired
+   `DiskAcc.DISK_INIT_WM`; Rocq's `GenId` is MachCSL's `genId` (inside `MachGS`), its `CpuId`
    the explicit `cpu`.
 -/
 import Xv6.UserExec

@@ -5145,6 +5145,63 @@ theorem slotBody_member (γ : DiskNames) (ξ : CtxId) (pd : PAddr) (i h : Nat) :
     slotBody (GF := GF) γ ξ pd i (.member h) =
       iprop(wordAtN ξ (aFree i) 1 (DFrac.own 1) 0#8 ∗ opsWin ξ i ∗ infoWin ξ i) := rfl
 
+/-- **The justification of the handler watermark's position** (Rocq's
+`lk_floor` in `disk_res`'s `disk_fl`).  At a watermark past the first
+completion it is a CONTEXT FLOOR (`MachCSL.ctxFloor`): the handler that
+published it had fenced, and `MachCSL.ctx_absorb` made its view the
+context's.  At the BASE (`nr = 0`) it is a KEY (`MachCSL.keyAt`: a floor,
+or one of the context's own buffered stores): the base is the position of
+the `memset` that zeroed the used page, and `virtio_disk_init` has no fence
+after it, so the store may still be the creator's own, unflushed.  A
+holder cashes a key at the handler's `__sync_synchronize()`
+(`MachCSL.wp_s_fence_iorw_iorw_pub` for the own-store arm). -/
+def diskPayFl (nr : Nat) (ξ : CtxId) (T : Nat) : IProp GF :=
+  match nr with
+  | 0 => keyAt (MachGS.era (hlc := hlc) (GF := GF)) ξ T
+  | _ + 1 => ctxFloor ξ T
+
+instance diskPayFl_persistent (nr : Nat) (ξ : CtxId) (T : Nat) :
+    Persistent (diskPayFl (GF := GF) nr ξ T) := by
+  cases nr <;> (unfold diskPayFl; infer_instance)
+
+instance instCtxMorphPayFl (nr T : Nat) : CtxMorph (GF := GF) (fun ξ => diskPayFl nr ξ T) := by
+  cases nr
+  · constructor
+    intro ξ ξ'
+    unfold diskPayFl
+    iintro ⟨Hdom, Hkey⟩
+    icases ctx_dom_key ξ ξ' _ T $$ [Hdom Hkey] with ⟨Hdom, Hkey⟩
+    · iframe
+    imodintro
+    iframe
+  · exact instCtxMorphFloor T
+
+theorem diskPayFl_zero (ξ : CtxId) (T : Nat) :
+    diskPayFl (GF := GF) 0 ξ T = keyAt (MachGS.era (hlc := hlc) (GF := GF)) ξ T := rfl
+
+theorem diskPayFl_succ (n : Nat) (ξ : CtxId) (T : Nat) :
+    diskPayFl (GF := GF) (n + 1) ξ T = ctxFloor ξ T := rfl
+
+/-- A floor is a key. -/
+theorem diskPayFl_key (nr : Nat) (ξ : CtxId) (T : Nat) :
+    diskPayFl (GF := GF) nr ξ T ⊢ keyAt (MachGS.era (hlc := hlc) (GF := GF)) ξ T := by
+  cases nr
+  · exact .rfl
+  · unfold diskPayFl keyAt
+    iintro H
+    ileft
+    iexact H
+
+/-- A floor justifies the position at every watermark. -/
+theorem diskPayFl_of_floor (nr : Nat) (ξ : CtxId) (T : Nat) :
+    ctxFloor (GF := GF) ξ T ⊢ diskPayFl nr ξ T := by
+  cases nr
+  · unfold diskPayFl keyAt
+    iintro H
+    ileft
+    iexact H
+  · exact .rfl
+
 /-- **The handler's ENTRY credential, carried by the LOCK PAYLOAD**
 (Rocq's `disk_flr` in `disk_res`).  `Xv6.disk_used_idx_read` at the
 watermark `nr` consumes `Xv6.diskWm γ nr K` for a `K` the reading hart's
@@ -5153,39 +5210,49 @@ previous read, and the FIRST one gets it from HERE -- the lock's
 release-acquire edge is exactly what puts the new holder's floor past the
 previous holder's deposit.
 
-It TRANSPORTS (`MachCSL.instCtxMorphFloor`), so it survives the lock's
-handoffs; it is CASHED by `MachCSL.ownCtx_floor_view` (the holder's
-`MachCSL.ownCtx` comes out of its `kctxL` by `MachCSL.kctx_token_acc`)
-into `∃ K, viewLb cpu K ∗ ⌜T ≤ K⌝`, with `Xv6.diskWm_mono` carrying the
-credential up to `K`; and it is RESTORED at each release by
-`MachCSL.ctx_absorb`, which turns the hart's `viewLb cpu F` -- which
-`disk_used_idx_read` and the loop's fence leave behind -- back into
-`ctxFloor curCtx F`. -/
+It TRANSPORTS (`MachCSL.instCtxMorphFloor`, `MachCSL.instCtxMorphKeyAt`),
+so it survives the lock's handoffs; it is CASHED at the handler's fence
+(`MachCSL.ownCtx_floor_view` / `MachCSL.ownCtx_key_vis`, and the drain
+edge for a key that is the holder's own store) into `∃ K, viewLb cpu K ∗
+⌜T ≤ K⌝`, with `Xv6.diskWm_mono` carrying the credential up to `K`; and it
+is RESTORED at each release by `MachCSL.ctx_absorb`, which turns the hart's
+`viewLb cpu F` -- which `disk_used_idx_read` and the loop's fence leave
+behind -- back into `ctxFloor curCtx F`.  At the base the position is a
+KEY, not a floor (`Xv6.diskPayFl`). -/
 def diskPayWm (γ : DiskNames) (nr : Nat) (ξ : CtxId) : IProp GF := iprop%
-  ∃ T : Nat, diskWm γ nr T ∗ ctxFloor ξ T
+  ∃ T : Nat, diskWm γ nr T ∗ diskPayFl nr ξ T
 
 instance diskPayWm_persistent (γ : DiskNames) (nr : Nat) (ξ : CtxId) :
     Persistent (diskPayWm (GF := GF) γ nr ξ) := by unfold diskPayWm; infer_instance
 
-/-- The credential at the base: a watermark of zero needs only a floor
-past the positions of the stores that zeroed the used page. -/
+/-- The credential at the base: a watermark of zero needs only a KEY for
+the position of the stores that zeroed the used page. -/
 theorem diskPayWm_zero (γ : DiskNames) (ξ : CtxId) (b : Nat) :
-    diskBaseFrozen (GF := GF) γ b ∗ ctxFloor ξ b ⊢ diskPayWm γ 0 ξ := by
+    diskBaseFrozen (GF := GF) γ b ∗ keyAt (MachGS.era (hlc := hlc) (GF := GF)) ξ b ⊢ diskPayWm γ 0 ξ := by
   unfold diskPayWm
   iintro ⟨#Hb, #Hfl⟩
   iexists b
-  iframe Hfl
-  iapply diskWm_zero γ b b (Nat.le_refl b)
-  iexact Hb
+  isplitl []
+  · iapply diskWm_zero γ b b (Nat.le_refl b)
+    iexact Hb
+  · rw [diskPayFl_zero]; iexact Hfl
 
 theorem diskPayWm_mono (γ : DiskNames) (ξ : CtxId) (n n' : Nat) (h : n' ≤ n) :
     diskPayWm (GF := GF) γ n ξ ⊢ diskPayWm γ n' ξ := by
   unfold diskPayWm
   iintro ⟨%T, #Hw, #Hfl⟩
   iexists T
-  iframe Hfl
-  iapply diskWm_mono γ n n' T T h (Nat.le_refl T)
-  iexact Hw
+  isplitl []
+  · iapply diskWm_mono γ n n' T T h (Nat.le_refl T)
+    iexact Hw
+  · cases n' with
+    | zero =>
+      rw [diskPayFl_zero]
+      iapply diskPayFl_key n ξ T $$ Hfl
+    | succ m' =>
+      obtain ⟨m, rfl⟩ : ∃ m, n = m + 1 := ⟨n - 1, by omega⟩
+      rw [diskPayFl_succ, diskPayFl_succ] at *
+      iexact Hfl
 
 /-- **The payload of `disk.vdisk_lock`** (Rocq's `disk_res`): the
 publisher's and the handler's halves of the counters (the watermark
@@ -5239,7 +5306,7 @@ instance instCtxMorphSlots (γ : DiskNames) (pd : PAddr) :
 instance instCtxMorphPayWm (γ : DiskNames) (nr : Nat) :
     CtxMorph (GF := GF) (fun ξ => diskPayWm γ nr ξ) := by
   unfold diskPayWm
-  exact instCtxMorphExists (fun (T : Nat) ξ => iprop(diskWm γ nr T ∗ ctxFloor ξ T))
+  exact instCtxMorphExists (fun (T : Nat) ξ => iprop(diskWm γ nr T ∗ diskPayFl nr ξ T))
 
 instance instCtxMorphDiskRes (γ : DiskNames) (pd pav pu : PAddr) :
     CtxMorph (GF := GF) (diskRes γ pd pav pu) := by

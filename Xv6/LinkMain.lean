@@ -59,7 +59,7 @@ namespace Xv6
 open Iris MachCSL
 
 /-- The proved interface of `main`'s boot arm. -/
-theorem Main (WM : DISK_INIT_WM) : MAIN :=
+theorem Main : MAIN :=
   let AC := Acquire
   let RE := Release
   let MS := Memset
@@ -75,7 +75,7 @@ theorem Main (WM : DISK_INIT_WM) : MAIN :=
   main_proof Cpuid Consoleinit (Printkinit IL) Printk (Kinit IL (Freerange KF))
     (Kvminit (Kvmmake KAL MS KM (ProcMapstacks KAL KM))) Kvminithart (Procinit IL) (Trapinit IL)
     Trapinithart Plicinit Plicinithart (Binit IL (Initsleeplock IL)) (Iinit IL (Initsleeplock IL))
-    (Fileinit IL) (VirtioDiskInit WM IL KAL MS) (Userinit AL RE ForkretParkPaid) Scheduler
+    (Fileinit IL) (VirtioDiskInit IL KAL MS) (Userinit AL RE ForkretParkPaid) Scheduler
     (Kernelvec (Kerneltrap Yield))
 
 end Xv6

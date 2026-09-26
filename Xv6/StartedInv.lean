@@ -35,9 +35,10 @@ The primary opens the unarmed arm (`started_store_open`), deposits `P`
 into `ξd` (`started_deposit`, `MachCSL.ctxDeposit`) and, after its store at
 `t`, arms the invariant (`started_store_close`).
 
-This is the edge `DiskAcc.DISK_INIT_WM` stands for (main's
-`__sync_synchronize(); started = 1;` and the other harts' spin), which
-`LinkMain` retires (8-4).
+This is main's `__sync_synchronize(); started = 1;` edge and the other
+harts' spin.  (The disk's `DiskAcc.DISK_INIT_WM`, once said to stand for
+it, is retired differently: the used index's base is a KEY, cashed at the
+handler's own fence -- `DiskInvDefs.diskPayFl`.)
 
 ## Deviations from Rocq
 
@@ -61,10 +62,9 @@ This is the edge `DiskAcc.DISK_INIT_WM` stands for (main's
    `authoredBy t` and `topLb t` but no order against an earlier `topLb T`;
    `MachCSL.exclWriteAU` has exactly that field (`T ≤ t`) and
    `MachCSL/WpDevDma`'s disk store has `Kb < t`.  `started_store_close`
-   takes `T ≤ t` as a hypothesis; the plain-store rule that supplies it
-   (`execSpecF_sw_au` with a client-named `topLb T`) is a MachCSL addition
-   for 8-4.  Likewise the READ is a width-4 `readAUr` load (`lw`), and
-   `MachCSL/WpSmodeFenceFloor` has only the width-2 (`lhu`) stack so far.
+   takes `T ≤ t` as a hypothesis; the plain-store rule that supplies it is
+   `MachCSL.WpStoreOrd` (`writeAUT` / `wp_s_sw_auT`, the ordered store), and
+   main's store runs it through `started_writeAUT` (two openings, below).
 4. The ghost is a `ghost_var` over `Nat` (the existing `Xv6G.gvNatG`
    capacity: one instance per camera), `0` unarmed and `t + 1` armed,
    frozen at the store; Rocq's `dset_auth`/`dset_in` set camera is not

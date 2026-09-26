@@ -281,6 +281,15 @@ theorem vdrw_P6 (FD : FREE_DESC) (RE : RELEASE)
   isimp only [diskPayWm] at Hwm
   icases Hwm with ⟨%T, #Hwm1, #Hfl⟩
   ihave #Hwmn := diskWm_mono γ nr n T T hnle (Nat.le_refl T) $$ Hwm1
+  -- the record's counter is at least one, so the watermark is past the
+  -- base, where the payload's justification is a FLOOR
+  iapply wpLoop_fupd
+  imod disk_doneE_pos γ pd pav pu n c.hd c.ep $$ [Hinv Hgeom Hdone] with %hpos
+  · iframe #
+  imodintro
+  have hnr' : nr = (nr - 1) + 1 := by omega
+  ihave #Hfl := (show diskPayFl (GF := GF) nr curCtx T ⊢ ctxFloor curCtx T from by
+    rw [hnr']; exact .rfl) $$ Hfl
   -- the collect
   iapply wpLoop_fupd
   imod disk_collect γ pd pav pu c n T nr hcwf hnle hctx hramc hkmc

@@ -1340,7 +1340,7 @@ def diskFlipIn [CurCtx] (γ : DiskNames) (pd pav pu : PAddr) : IProp GF := iprop
   ctxBytes curCtx (availIdxAt pav) 2 (DFrac.own 1) (wrap16 0) ∗
   ([∗list] j ∈ List.range NUM,
     ctxBytes curCtx (availRingAt pav j) 2 (DFrac.own 1) (BitVec.ofNat 16 (ringInit j))) ∗
-  (∃ b : Nat, usedIdxCell (usedIdxAt pu) b [] ∗ ctxFloor curCtx b) ∗
+  (∃ b : Nat, usedIdxCell (usedIdxAt pu) b [] ∗ keyAt (MachGS.era (hlc := hlc) (GF := GF)) curCtx b) ∗
   ([∗list] j ∈ List.range NUM,
     ctxBytes curCtx (usedElemAt pu j) 8 (DFrac.own 1) (0 : BitVec (8 * 8))) ∗
   wordAtN curCtx aUsedIdx 2 (DFrac.own 1) (wrap16 0) ∗
@@ -1348,39 +1348,47 @@ def diskFlipIn [CurCtx] (γ : DiskNames) (pd pav pu : PAddr) : IProp GF := iprop
   wordPointsTo aAvailPtr 8 (DFrac.own 1) pav ∗
   wordPointsTo aUsedPtr 8 (DFrac.own 1) pu
 
-/-- **The one TSO fact this port leaves open at BOOT.**
-
-`Xv6.diskFlipIn` asks for the used-index cell as the invariant's empty
-write log (`Xv6.usedIdxCell (usedIdxAt pu) b []`) TOGETHER WITH a context
-floor past `b` -- the positions of the stores that zeroed the cell.  The
-floor is what the handler's entry credential `Xv6.diskPayWm` is minted
-from, and it is what makes a racy `used->idx` read that sees no device
-write return the `0` the zeroing left: `MachCSL.Hist.read` returns the
-newest VISIBLE entry, and an entry the reader's view has not passed is
-not visible to it.
-
-`virtio_disk_init` cannot produce it from what it holds.  Its `memset` of
-the used page is its OWN store, and `Xv6.MEMSET`'s frozen postcondition
-returns the buffer at its value with no `MachCSL.authoredBy` and no
-position; the context key the store minted is therefore DIRTY at this
-hart (`MachCSL.dirtyOk`'s `h = cpu` case), not under the context's bound,
-and `virtio_disk_init` has no `__sync_synchronize()` after the memsets
-that could turn that authorship into a view
-(`MachCSL.wp_s_fence_iorw_iorw_pub`).  Raising the context's bound to the
-dirty watermark is `MachCSL.ctx_stamp`, which STAMPS the context -- it
-does not keep it running.
-
-The edge that makes it true on the real machine is `main()`'s
-`__sync_synchronize(); started = 1;` and the other harts' spin on
-`started`, which is outside `virtio_disk_init` and outside this file.
-Stated here, at the one place that needs it, rather than handed to the
-interrupt handler as a credential out of nowhere (which is what
-`DISK_INTR_EXTRA.pay_wm` used to be). -/
-structure DISK_INIT_WM : Prop where
-  used_idx_floor : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
-      [CurCtx] (pu : PAddr),
-    ctxBytes (GF := GF) curCtx (usedIdxAt pu) 2 (DFrac.own 1) (0 : BitVec (8 * 2)) ⊢
-      ∃ b : Nat, usedIdxCell (usedIdxAt pu) b [] ∗ ctxFloor curCtx b
+/-- **The used index's base, KEYED** (what `DiskAcc.DISK_INIT_WM` used to
+assume at FLOOR strength; Rocq's `DiskAvail.used_split_init`, whose floors
+are `lk_floor`s -- "floor or wrote").  The two zeroed bytes of `used->idx`,
+owned at a context, are the invariant's empty write log over tails at
+positions at most `b` -- the larger of the two bytes' positions -- and the
+context holds a KEY for `b` (`MachCSL.keyAt`: under its bound, or one of
+its hart's own buffered stores).  It is NOT a floor: `virtio_disk_init`'s
+`memset` of the used page is the creator's own store and nothing after it
+fences, so its position need not be under the context's bound.  The key
+is enough: a holder that reads the index cashes it at the handler's
+`__sync_synchronize()` (`MachCSL.wp_s_fence_iorw_iorw_pub` drains the
+holder's own store), and the lock's handoffs transport it
+(`MachCSL.ctx_dom_key`); see `Xv6.diskPayFl`. -/
+theorem ctxBytes_usedIdxKey (ξ : CtxId) (pa : PAddr) :
+    ctxBytes (GF := GF) ξ pa 2 (DFrac.own 1) (0 : BitVec (8 * 2)) ⊢
+      ∃ b : Nat, usedIdxCell pa b [] ∗ keyAt (MachGS.era (hlc := hlc) (GF := GF)) ξ b := by
+  unfold ctxBytes usedIdxCell
+  simp only [show List.range 2 = [0, 1] from rfl, Iris.Algebra.BigOpL.bigOpL_cons,
+    Iris.Algebra.BigOpL.bigOpL_nil]
+  iintro ⟨H0, H1, -⟩
+  unfold ctxByte
+  icases H0 with ⟨%e0, %T0, Hp0, %hv0, #Hk0⟩
+  icases H1 with ⟨%e1, %T1, Hp1, %hv1, #Hk1⟩
+  iexists (max e0.t e1.t)
+  isplitl [Hp0 Hp1]
+  · iexists (fun j => if j = 0 then e0 :: T0 else e1 :: T1)
+    rw [usedW_nil, WordHist.hist_nil]
+    unfold histBytes
+    simp only [show List.range 2 = [0, 1] from rfl, Iris.Algebra.BigOpL.bigOpL_cons,
+      Iris.Algebra.BigOpL.bigOpL_nil]
+    isplitl [Hp0 Hp1]
+    · simp only [if_true, show (1 : Nat) = 0 ↔ False from by decide, if_false]
+      iframe Hp0 Hp1
+    · ipureintro
+      intro j hj
+      rcases (show j = 0 ∨ j = 1 by omega) with rfl | rfl
+      · exact ⟨e0, T0, by simp, by rw [hv0], Nat.le_max_left _ _⟩
+      · exact ⟨e1, T1, by simp, by rw [hv1], Nat.le_max_right _ _⟩
+  · rcases Nat.le_total e0.t e1.t with h | h
+    · rw [Nat.max_eq_right h]; iexact Hk1
+    · rw [Nat.max_eq_left h]; iexact Hk0
 
 /-- What comes out of the flip: the persistent geometry and the payload of
 `disk.vdisk_lock`. -/
@@ -2601,6 +2609,65 @@ theorem diskWm_pos_le (γ : DiskNames) (dl dl0 : List UsedRec) (pm : RegMapF Per
     have hle := usedOk_pos_le pm dl dl0 nc M hu hc r ((m2, t2, hd2, ep2) : UsedRec) hr hmem2
       (by rw [hcnt]; exact hb.1)
     exact Nat.le_trans hle hb.2
+
+set_option maxRecDepth 8000 in
+/-- **A completion record's counter is at least one** (the counters ARE
+the log's indices, shifted: `Xv6.cntOk_pos`). -/
+theorem diskProto_doneE_pos (γ : DiskNames) (c0 : VirtioCfg) (v : VirtioState) (n h ep : Nat)
+    (hlive : Virtio.live c0 = true) :
+    diskCfgFrozen (GF := GF) γ c0 ∗ diskProto γ v ∗ headDoneE γ n h ep ⊢
+      diskProto γ v ∗ ⌜1 ≤ n⌝ := by
+  unfold diskProto
+  iintro ⟨#Hfr0, ⟨%hc, %pn, %pm, Hpm, %hfr, Harm⟩, #Hdone⟩
+  icases Harm with ⟨Hd | ⟨%c0', #Hfr, %hc0, Hl⟩⟩
+  · unfold diskDead
+    icases Hd with ⟨%m, Hm, Hcfg, Hlo0, HnpM0, Hpos0, HstgA0, Hbs0, Hdn0, Hnr0, %hp⟩
+    ihave %heq := diskCfgFrozen_auth_agree γ c0 v.cfg $$ Hfr0 Hcfg
+    rw [heq, hp.1] at hlive
+    exact absurd hlive (by simp)
+  · unfold diskLive
+    icases Hl with ⟨%st, %nc, %np, %lo, %ring, %m, %pmap, %stg, %b, %M, %dl, %dl0, %nq, %sb, %ue,
+      Hm, Ha, Hr, Hu, Hav, Hnc, Hnp, Hlo, HnpM, Hpos, Hstg, Hui, Hdn, #Hbs, #Htp, Hnq, Hsb,
+      Hcr, %hpure⟩
+    obtain ⟨e1, e2, e3, e4, e5, e5b, e6, e7, e9, e10, e11, e12, e13, e14, e15, e16, e17, e18⟩ :=
+      hpure
+    ihave %hl0 := headDoneE_lookup γ dl0 n h ep $$ Hdn Hdone
+    obtain ⟨t, hmem0⟩ := hl0
+    have hmem : ((n, t, h, ep) : UsedRec) ∈ dl := List.IsPrefix.subset e10.1 hmem0
+    have hpos := cntOk_pos pm dl nc e12 _ hmem
+    isplitl
+    · isplitr
+      · ipureintro; exact hc
+      iexists pn, pm
+      iframe Hpm
+      isplitr
+      · ipureintro; exact hfr
+      iright
+      iexists c0'
+      iframe Hfr
+      isplitr
+      · ipureintro; exact hc0
+      iexists st, nc, np, lo, ring, m, pmap, stg, b, M, dl, dl0, nq, sb, ue
+      iframe Hm Ha Hr Hu Hav Hnc Hnp Hlo HnpM Hpos Hstg Hui Hdn Hbs Htp Hnq Hsb Hcr
+      ipureintro
+      exact ⟨e1, e2, e3, e4, e5, e5b, e6, e7, e9, e10, e11, e12, e13, e14, e15, e16, e17, e18⟩
+    · ipureintro; exact hpos
+
+/-- **A completion record's counter is at least one**, at the invariant. -/
+theorem disk_doneE_pos [CurCtx] (γ : DiskNames) (pd pav pu : PAddr) (n h ep : Nat) :
+    diskInv (GF := GF) γ ∗ diskGeom γ pd pav pu ∗ headDoneE γ n h ep ⊢ |={⊤}=> ⌜1 ≤ n⌝ := by
+  unfold diskInv devInvR
+  iintro ⟨#Hinv, #Hgeom, #Hdone⟩
+  icases diskGeom_cfg γ pd pav pu $$ Hgeom with ⟨%c0, #Hfr, %hg⟩
+  iinv Hinv with Hbody Hclose
+  icases Hbody with ⟨%v, >Hfrag, >Hproto⟩
+  icases diskProto_doneE_pos γ c0 v n h ep hg.2.2.2.1 $$ [$Hfr $Hproto $Hdone] with ⟨Hproto, %hpos⟩
+  imod Hclose $$ [Hfrag Hproto]
+  · inext
+    iexists v
+    iframe Hfrag Hproto
+  imodintro
+  ipureintro; exact hpos
 
 set_option maxRecDepth 8000 in
 /-- **The collect, as the protocol sees it.** -/
