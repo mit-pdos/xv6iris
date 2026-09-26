@@ -202,6 +202,23 @@ binary's mask, true at upstream 7b2c1b1); the `fprintf` diagnostic and
 `exit(1)`; the parent's `wait(0)`, `exit(0)`; an entry `secc_image_entry`
 whose `Pay` carries `secc_tok k`; `FsSeccPin.v` on `FsGrepPin.v`'s mould.
 
+STATUS (lane S3, `secc/s3`): STOPPED at a design question after the
+design-independent half.  Landed, green (VM log s3-r1: EXIT=0, no
+`Error`, second pass 0 compiles): the fprintf cone at seccomp's addresses
+(`UkSeccPutc`/`Vprintf`/`VprintfS`/`Fprintf`, grep's ported 0x1d0 down,
+no printf), `UkSeccLit` (the four literals; `secc_mask_masked :
+secc_masked (and_vec secc_all secc_mask_lit)` at the catalog's lui/addi
+immediates -- the one place the literal enters) and `FsSeccPin` (inum
+23).  NOT started: `UkSeccMain`, the entry.  Two gaps, both in the
+engine, not the program: (G1) `urun`, `ukcq`, `udepw`/`udepw_at` and every
+leaf are keyed at `secc_all`, and there is no row-23 leaf
+(`wp_uk_ecall_quiet` excludes 23), so the child after `seccomp(mask)` has
+no run to walk exec / the `%s` diagnostic / `exit(1)` on; (G2) `secc_key`
+(and `useccomp_image_entry_taint`'s premise) needs `secc_rows` of the
+child's WHOLE table, and `urun` hides the table -- the program's handle is
+the NSTD ledger plus handles for open high slots, from which a closed (or
+inode-free) high slot cannot be read.  Options in the lane's report.
+
 ## S4 -- the round and the knob (design §7, §10.6) -- brief written when S3 lands
 
 `ush_line_union` at `LSecc`; sh's round law at the wild shape (fork twin;
