@@ -67,6 +67,10 @@ Require Import ArgPath.           (* [arg_path_shape] / [arg_path_of] *)
 Require Import SpecKexec SpecSysExec SpecCopyin.
 Require Import UImgWordDefs.  (* [img_word_of_bytes] / [uimg_word_det] *)
 Require Import EchoFsPure.    (* [echo_fs_pure] -- reached through [UInitSh] before *)
+Require Import UShGeom.           (* THE EXEC GEOMETRY, once (user-once C1):
+                                     the push helpers, the room, the chain at
+                                     [(E, frame)]; this file is it at
+                                     [(ElfUser.echo_elf, 12)] *)
 Require Import UShKernel.         (* the entry geometry: [sh_page_perm],
                                      [udata_lo_is_Some], [kxc_sp_final_mod8],
                                      [csp_rs1_eq], [elf_segments_loads] *)
@@ -131,11 +135,9 @@ Proof.
   exact (line_nonul_x ws j (line_ok_exec_ok _ Hok__)).
 Qed.
 
-Lemma ubyte0_bv0 : ubyte0 = (bv_0 8 : bv 8).
-Proof. apply bv_eq. vm_compute. reflexivity. Qed.
-
-Lemma ubyte0_moi0 : ubyte0 = (mword_of_int 0 : mword 8).
-Proof. apply bv_eq. vm_compute. reflexivity. Qed.
+(* MOVED to [UShGeom] (user-once C1), re-exported under the landed names *)
+Notation ubyte0_bv0 := UShGeom.ubyte0_bv0.
+Notation ubyte0_moi0 := UShGeom.ubyte0_moi0.
 
 Lemma echo_pl_shape : arg_path_shape echo_pl.
 Proof.
@@ -244,9 +246,7 @@ Lemma echo_room (ws : list (list (bv 8))) (alen : nat -> nat) :
   kexec_sz ElfUser.echo_elf - PGSIZE + 96
     <= kxc_sp_final (kexec_sz ElfUser.echo_elf) alen (length ws).
 Proof.
-  rewrite /echo_argv_fits. intro Hfit. rewrite echo_kexec_sz.
-  pose proof (kxc_sp_final_ge 0x4000 alen (length ws)).
-  unfold PGSIZE in *. lia.
+  exact (UShGeom.img_room ElfUser.echo_elf 12 ws alen echo_kexec_sz).
 Qed.
 
 (* ...AND EVERY ADMISSIBLE LINE EARNS THE ROOM.  One argument costs its
@@ -257,37 +257,18 @@ Qed.
    1200 bytes of a 4096-byte stack page.  A line long enough to crowd
    echo's frame off that page is a line the claim must not be about, and
    [line_ok] is where it is excluded. *)
-Lemma kxc_span_le_line (len : nat -> nat) (n : nat) :
-  (forall i : nat, (i < n)%nat -> (len i < line_max)%nat) ->
-  kxc_span len n <= 115 * Z.of_nat n.       (* 115 = (line_max - 1) + 16 *)
-Proof.
-  unfold line_max.
-  induction n as [| n IH]; cbn [kxc_span]; intro Hb; [ lia | ].
-  assert (Hb' : forall i : nat, (i < n)%nat -> (len i < 100)%nat)
-    by (intros i Hi; apply Hb; lia).
-  pose proof (IH Hb') as Hprev. pose proof (Hb n ltac:(lia)) as Hn. lia.
-Qed.
+Notation kxc_span_le_line := UShGeom.kxc_span_le_line.
 
 Lemma echo_argv_fits_of_ok_x (ws : list (list (bv 8))) :
   exec_ok ws -> echo_argv_fits ws (UkShEcho.echo_alen ws).
 Proof.
-  intro Hok. rewrite /echo_argv_fits.
-  assert (Hb : forall i : nat, (i < length ws)%nat ->
-            (UkShEcho.echo_alen ws i < line_max)%nat).
-  { intros i Hi.
-    pose proof (UkShEcho.echo_off_lt_x ws i (UkShEcho.echo_alen ws i)
-                  Hok Hi ltac:(lia)) as Hlt.
-    pose proof (exec_ok_len ws Hok) as Hlm. lia. }
-  pose proof (kxc_span_le_line (UkShEcho.echo_alen ws) (length ws) Hb) as Hsp.
-  pose proof (exec_ok_lt10 ws Hok) as H10.
-  unfold PGSIZE. lia.
+  exact (UShGeom.img_argv_fits_of_ok_x 12 ws ltac:(lia)).
 Qed.
 
 Lemma echo_argv_fits_of_ok (ws : list (list (bv 8))) :
   line_ok ws -> echo_argv_fits ws (UkShEcho.echo_alen ws).
 Proof.
-  intro Hok__.
-  exact (echo_argv_fits_of_ok_x ws (line_ok_exec_ok _ Hok__)).
+  exact (UShGeom.img_argv_fits_of_ok 12 ws ltac:(lia)).
 Qed.
 
 (* ===================================================================== *)
@@ -321,148 +302,18 @@ Lemma echo_start_pc :
 Proof. apply bv_eq. vm_compute. reflexivity. Qed.
 
 (* ===================================================================== *)
-(*  3c. THE CANONICAL STRING LENGTH, OUT OF A TERMINATOR ALONE             *)
-(*                                                                        *)
-(*  [UkAbi.uk_args_c] is stated at [uk_slens] -- a SCAN -- and             *)
-(*  [uk_slen_ucstr] runs it only where a [ucstr] is already in hand.  What *)
-(*  [SpecKexec.kexec_args_at] gives is weaker: a NUL at [alen i] and bytes *)
-(*  below it, with NOTHING said about whether those bytes are themselves   *)
-(*  NUL (exec copies whatever the caller's pointer names).  So the         *)
-(*  canonical length has to be produced from the TERMINATOR alone, and     *)
-(*  that is this induction.  It is what makes [uk_args_c] provable of the  *)
-(*  image exec builds for ARBITRARY arguments, which is what echo's        *)
-(*  bridge is quantified over.                                            *)
+(*  3c. THE PUSH HELPERS -- MOVED to [UShGeom] SS1 (user-once C1): the      *)
+(*  canonical string length out of a terminator alone ([uscan_nul],       *)
+(*  [uk_slen_nul]), the vector's bytes ([bv_le8_is_Some],                 *)
+(*  [kexec_vec_bytes]) and the pointer eight bytes pin                     *)
+(*  ([uk_argv_p_of_bytes]).  None of them names a program; every consumer *)
+(*  keeps its [UShEcho.X] spelling through the abbreviations below.       *)
 (* ===================================================================== *)
-Lemma uscan_nul (M : gmap Z (bv 8)) (n : nat) :
-  forall (fu : nat) (a : Z),
-    (n < fu)%nat ->
-    (forall j : nat, (j < n)%nat -> is_Some (M !! (a + Z.of_nat j))) ->
-    M !! (a + Z.of_nat n) = Some ubyte0 ->
-    (uscan M a fu <= n)%nat /\ ucstr M a (Z.of_nat (uscan M a fu)).
-Proof.
-  induction n as [| n IH ]; intros fu a Hlt Hex Hnul.
-  - destruct fu as [| fu ]; [ exfalso; lia | ].
-    rewrite Z.add_0_r in Hnul. cbn [uscan]. rewrite Hnul.
-    rewrite (bool_decide_eq_true_2 (ubyte0 = ubyte0) eq_refl).
-    split; [ lia | ].
-    constructor; [ lia | intros j Hj; exfalso; lia | ].
-    rewrite Z.add_0_r. exact Hnul.
-  - destruct fu as [| fu ]; [ exfalso; lia | ].
-    destruct (Hex 0%nat ltac:(lia)) as [b Hb].
-    rewrite Z.add_0_r in Hb. cbn [uscan]. rewrite Hb.
-    destruct (decide (b = ubyte0)) as [Hz | Hnz].
-    + rewrite (bool_decide_eq_true_2 (b = ubyte0) Hz).
-      split; [ lia | ].
-      constructor; [ lia | intros j Hj; exfalso; lia | ].
-      rewrite Z.add_0_r. rewrite Hb. rewrite Hz. reflexivity.
-    + rewrite (bool_decide_eq_false_2 (b = ubyte0) Hnz).
-      destruct (IH fu (a + 1)%Z ltac:(lia)
-                  ltac:(intros j Hj;
-                        destruct (Hex (S j) ltac:(lia)) as [c Hc];
-                        exists c;
-                        replace (a + 1 + Z.of_nat j)%Z
-                          with (a + Z.of_nat (S j))%Z by lia;
-                        exact Hc)
-                  ltac:(replace (a + 1 + Z.of_nat n)%Z
-                          with (a + Z.of_nat (S n))%Z by lia;
-                        exact Hnul))
-        as [Hle Hs].
-      split; [ lia | ].
-      constructor.
-      * lia.
-      * intros j Hj.
-        destruct (decide (j = 0)) as [-> | Hj0].
-        { rewrite Z.add_0_r. exists b. exact (conj Hb Hnz). }
-        { destruct (ucs_body _ _ _ Hs (j - 1) ltac:(lia)) as (c & Hc & Hc0).
-          exists c. replace (a + j)%Z with (a + 1 + (j - 1))%Z by lia.
-          exact (conj Hc Hc0). }
-      * pose proof (ucs_nul _ _ _ Hs) as Hn.
-        replace (a + Z.of_nat (S (uscan M (a + 1) fu)))%Z
-          with (a + 1 + Z.of_nat (uscan M (a + 1) fu))%Z by lia.
-        exact Hn.
-Qed.
-
-(* ...at [uk_slen]'s own fuel, which the ABI's length bound clears *)
-Lemma uk_slen_nul (M : gmap Z (bv 8)) (a : Z) (n : nat) :
-  Z.of_nat n < 2 ^ 31 ->
-  (forall j : nat, (j < n)%nat -> is_Some (M !! (a + Z.of_nat j))) ->
-  M !! (a + Z.of_nat n) = Some ubyte0 ->
-  uk_slen M a <= Z.of_nat n /\ ucstr M a (uk_slen M a).
-Proof.
-  intros Hn Hex Hnul.
-  unfold uk_slen, uk_slen_fuel.
-  destruct (uscan_nul M n (Z.to_nat (2 ^ 31)) a ltac:(lia) Hex Hnul)
-    as [Hle Hs].
-  split; [ lia | exact Hs ].
-Qed.
-
-(* a word's eight little-endian bytes are all there *)
-Lemma bv_le8_is_Some (z : Z) (k : nat) :
-  (k < 8)%nat -> exists b : bv 8, bv_to_little_endian 8 8 z !! k = Some b.
-Proof.
-  intro Hk.
-  assert (Hlen : length (bv_to_little_endian 8 8 z) = 8%nat)
-    by (rewrite (length_bv_to_little_endian 8 8 z ltac:(lia)); reflexivity).
-  destruct (bv_to_little_endian 8 8 z !! k) as [b |] eqn:Ek.
-  - exists b. reflexivity.
-  - exfalso. apply lookup_ge_None_1 in Ek. rewrite Hlen in Ek. lia.
-Qed.
-
-Lemma kexec_vec_bytes (top : Z) (alen : nat -> nat) (na : nat)
-    (M : gmap Z (bv 8)) :
-  (forall i k, (i <= na)%nat -> (k < 8)%nat ->
-     M !! (kxc_sp_final top alen na + 8 * Z.of_nat i + Z.of_nat k)
-     = bv_to_little_endian 8 8 (kexec_ustack top alen na i) !! k) ->
-  forall j : Z, 0 <= j < 8 * (Z.of_nat na + 1) ->
-    exists b : bv 8, M !! (kxc_sp_final top alen na + j) = Some b.
-Proof.
-  intros Hvec j Hj.
-  pose proof (Z.div_pos j 8 ltac:(lia) ltac:(lia)) as Hq0.
-  pose proof (Z.mod_pos_bound j 8 ltac:(lia)) as Hr.
-  assert (Hq : (Z.to_nat (j / 8) <= na)%nat).
-  { assert (Hd : j / 8 < Z.of_nat na + 1)
-      by (apply Z.div_lt_upper_bound; lia).
-    lia. }
-  destruct (bv_le8_is_Some (kexec_ustack top alen na (Z.to_nat (j / 8)))
-              (Z.to_nat (j mod 8)) ltac:(lia)) as [b Hb].
-  exists b.
-  replace (kxc_sp_final top alen na + j)
-    with (kxc_sp_final top alen na
-          + 8 * Z.of_nat (Z.to_nat (j / 8))
-          + Z.of_nat (Z.to_nat (j mod 8))) by lia.
-  rewrite (Hvec (Z.to_nat (j / 8)) (Z.to_nat (j mod 8)) Hq ltac:(lia)).
-  exact Hb.
-Qed.
-
-(* ...and eight image bytes PIN the pointer the ABI reads off that slot:
-   [UkAbi.uk_argv_p] is [uM_word] read back as a [Z], and [UInitSh.
-   uimg_word_det] is what says two spellings of a word's bytes agree. *)
-Lemma uk_argv_p_of_bytes (M : gmap Z (bv 8)) (av i z : Z) :
-  0 <= z < Z64 ->
-  (forall k : nat, (k < 8)%nat ->
-     M !! (av + 8 * i + Z.of_nat k) = bv_to_little_endian 8 8 z !! k) ->
-  uk_argv_p M av i = z.
-Proof.
-  intros Hz Hb.
-  assert (Hex : forall k : nat, (k < Z.to_nat 8)%nat ->
-            exists b : bv 8, M !! (av + 8 * i + Z.of_nat k) = Some b).
-  { intros k Hk. destruct (bv_le8_is_Some z k ltac:(lia)) as [b Hbk].
-    exists b. rewrite (Hb k ltac:(lia)). exact Hbk. }
-  pose proof (uM_word_bytes M (av + 8 * i) 8 ltac:(lia) Hex) as Hw.
-  assert (Hww : (mword_of_int (bv_unsigned (uM_word M (av + 8 * i) 8))
-                 : mword 64)
-                = uM_word M (av + 8 * i) 8)
-    by (rewrite <- uint_unsigned; apply moi_of_uint).
-  assert (Hiw : uimg_word_at M (av + 8 * i) (uM_word M (av + 8 * i) 8)).
-  { intros k Hk.
-    rewrite (bv_le_nth_byte (bv_unsigned (uM_word M (av + 8 * i) 8)) k Hk).
-    rewrite Hww. exact (Hw k ltac:(lia)). }
-  pose proof (uimg_word_det M (av + 8 * i) (uM_word M (av + 8 * i) 8) z
-                ltac:(unfold Z64 in Hz; lia) Hiw Hb) as He.
-  unfold uk_argv_p, uk_argv_w. rewrite He.
-  exact (uint_moi z Hz).
-Qed.
-
+Notation uscan_nul := UShGeom.uscan_nul.
+Notation uk_slen_nul := UShGeom.uk_slen_nul.
+Notation bv_le8_is_Some := UShGeom.bv_le8_is_Some.
+Notation kexec_vec_bytes := UShGeom.kexec_vec_bytes.
+Notation uk_argv_p_of_bytes := UShGeom.uk_argv_p_of_bytes.
 
 (* ===================================================================== *)
 (*  3d. THE ELEVEN ROWS ECHO'S ENTRY READS OFF THE KEY                    *)
@@ -507,93 +358,7 @@ Lemma echo_kexec_geom (na : nat) (alen : nat -> nat)
   /\ (forall a : Z, 0x3000 <= a < kxc_sp_final 0x4000 alen na ->
         uvis_M W' !! a = Some (bv_0 8)).
 Proof.
-  intros Hok Hroom.
-  (* the two readers of the key that need no geometry; the ENTRY is the
-     page half's ([echo_kexec_pages]) and does not come back here. *)
-  pose proof echo_kexec_sz as Hsz.
-  rewrite Hsz in Hroom. unfold PGSIZE in Hroom.
-  unfold kexec_image_ok in Hok. cbv zeta in Hok. rewrite Hsz in Hok.
-  destruct Hok as (_ & Hszv & Hspw & Ha1w & Ha0w & Himg
-                   & (Hstr & Hnul & Hvec) & (_ & Hzero) & _ & _ & _ & _).
-  unfold PGSIZE in Hzero.
-  (* ---- THE STACK PAGE'S GEOMETRY, in three numbers ---- *)
-  (* [kxc_sp] at zero pushes IS the top; naming the equation keeps [cbn]
-     away from the [S i] side, which it would unfold into the recurrence. *)
-  assert (Hsp00 : kxc_sp 0x4000 alen 0%nat = 0x4000) by reflexivity.
-  pose proof (kxc_sp_final_gap 0x4000 alen na) as Hgap.
-  pose proof (kxc_sp_mono 0x4000 alen 0 na (Nat.le_0_l na)) as Hmono.
-  rewrite Hsp00 in Hmono.
-  assert (Hlo : 0x3060 <= kxc_sp_final 0x4000 alen na) by lia.
-  assert (Hhi : kxc_sp_final 0x4000 alen na + 8 * (Z.of_nat na + 1)
-                <= 0x4000) by lia.
-  assert (Hna : 0 <= Z.of_nat na < 2 ^ 31) by lia.
-  (* ---- the three registers echo's entry reads off the trapframe ---- *)
-  assert (Hsp' : uint (uvis_sp W') = kxc_sp_final 0x4000 alen na).
-  { unfold uvis_sp. rewrite UShKernel.csp_rs1_eq. unfold tf_resume_gpr0.
-    rewrite tf_resume_gpr_sp. change tf_sp_idx with kxc_tf_sp_idx.
-    rewrite Hspw. apply uint_moi. unfold Z64. lia. }
-  assert (Hav : uvis_av W' = kxc_sp_final 0x4000 alen na).
-  { unfold uvis_av. unfold tf_resume_gpr0. rewrite tf_resume_gpr_a1.
-    rewrite Ha1w. apply uint_moi. unfold Z64. lia. }
-  assert (Hargc : uvis_argc W' = Z.of_nat na).
-  { unfold uvis_argc. unfold tf_resume_gpr0. rewrite tf_resume_gpr_a0.
-    rewrite Ha0w. apply uint_moi. unfold Z64. lia. }
-  (* ---- THE VECTOR: each slot's eight bytes pin its pointer ---- *)
-  assert (Hptr : forall i : nat, (i <= na)%nat ->
-            uk_argv_p (uvis_M W') (kxc_sp_final 0x4000 alen na) (Z.of_nat i)
-            = kexec_ustack 0x4000 alen na i).
-  { intros i Hi.
-    apply uk_argv_p_of_bytes; [ | intros k Hk; exact (Hvec i k Hi Hk) ].
-    unfold kexec_ustack.
-    destruct (decide (i < na)%nat) as [Hlt | Hge]; [ | unfold Z64; lia ].
-    pose proof (kxc_sp_mono 0x4000 alen 0 (S i) ltac:(lia)) as H1.
-    rewrite Hsp00 in H1.
-    pose proof (kxc_sp_mono 0x4000 alen (S i) na ltac:(lia)) as H2.
-    unfold Z64. lia. }
-  (* ---- THE STRINGS: where they sit, and that they end ---- *)
-  assert (Hsi : forall i : nat, (i < na)%nat ->
-            kxc_sp_final 0x4000 alen na < kxc_sp 0x4000 alen (S i)
-            /\ kxc_sp 0x4000 alen (S i) + Z.of_nat (alen i) < 0x4000).
-  { intros i Hi.
-    pose proof (kxc_sp_gap 0x4000 alen i) as Hg.
-    pose proof (kxc_sp_mono 0x4000 alen 0 i (Nat.le_0_l i)) as H0.
-    rewrite Hsp00 in H0.
-    pose proof (kxc_sp_mono 0x4000 alen (S i) na ltac:(lia)) as H2.
-    lia. }
-  assert (Hsb : forall i : nat, (i < na)%nat ->
-            forall j : nat, (j <= alen i)%nat ->
-              exists b : bv 8,
-                uvis_M W' !! (kxc_sp 0x4000 alen (S i) + Z.of_nat j)
-                = Some b).
-  { intros i Hi j Hj.
-    destruct (decide (j < alen i)%nat) as [Hlt | Hge].
-    - exists (afun i j). exact (Hstr i j Hi Hlt).
-    - assert (Hje : j = alen i) by lia. subst j.
-      exists (bv_0 8). exact (Hnul i Hi). }
-  assert (Hslen : forall i : nat, (i < na)%nat ->
-            uk_slen (uvis_M W') (kxc_sp 0x4000 alen (S i))
-              <= Z.of_nat (alen i)
-            /\ ucstr (uvis_M W') (kxc_sp 0x4000 alen (S i))
-                 (uk_slen (uvis_M W') (kxc_sp 0x4000 alen (S i)))).
-  { intros i Hi. destruct (Hsi i Hi) as [Hlo1 Hhi1].
-    apply uk_slen_nul.
-    - lia.
-    - intros j Hj. exists (afun i j). exact (Hstr i j Hi Hj).
-    - rewrite ubyte0_bv0. exact (Hnul i Hi). }
-  (* ---- every byte of the vector is in the image ---- *)
-  assert (Hvb : forall j : Z, 0 <= j < 8 * (Z.of_nat na + 1) ->
-            exists b : bv 8,
-              uvis_M W' !! (kxc_sp_final 0x4000 alen na + j) = Some b).
-  { exact (kexec_vec_bytes 0x4000 alen na (uvis_M W') Hvec). }
-  assert (Hbelow : forall a : Z,
-            0x3000 <= a < kxc_sp_final 0x4000 alen na ->
-            uvis_M W' !! a = Some (bv_0 8)).
-  { intros a Ha. apply Hzero; [ lia | ].
-    intros [ (i & Hi & Hlo1 & _) | (Hlo1 & _) ]; [ | lia ].
-    pose proof (kxc_sp_mono 0x4000 alen (S i) na ltac:(lia)) as Hm. lia. }
-  exact (conj Hszv (conj Hlo (conj Hhi (conj Hsp' (conj Hav (conj Hargc
-           (conj Hptr (conj Hsi (conj Hsb (conj Hslen
-             (conj Hvb Hbelow))))))))))).
+  exact (UShGeom.img_kexec_geom ElfUser.echo_elf 12 na alen afun sts W' echo_kexec_sz).
 Qed.
 
 (* ---- THE PAGE/TEXT HALF, split off so the kernel checks it on its own.
@@ -613,54 +378,12 @@ Lemma echo_kexec_pages (na : nat) (alen : nat -> nat)
         uk_rpage (uvis_perm W') (mword_of_int a : mword 64)).
 Proof.
   intros Hok.
-  (* ---- the three readers of the key that need no geometry ---- *)
-  pose proof (kexec_image_ok_below _ _ _ _ _ _ Hok) as Hstop.
-  pose proof (kexec_image_ok_pc _ _ _ _ _ _ _ Hok ElfUser.echo_elf_entry)
-    as Hpcw.
-  pose proof (kexec_image_ok_fd _ _ _ _ _ _ Hok) as Hfd.
   destruct echo_loads as (p0 & p1 & Hld & Hv0 & Hm0 & Hf0 & _ & _ & _).
-  pose proof echo_kexec_sz as Hsz. pose proof echo_kexec_top as Htop.
-  unfold kexec_image_ok in Hok. cbv zeta in Hok. rewrite Hsz in Hok.
-  destruct Hok as (_ & Hszv & Hspw & Ha1w & Ha0w & Himg
-                   & (Hstr & Hnul & Hvec) & (_ & Hzero) & Hperm & _ & _ & _).
-  destruct Hperm as (Hpg & _ & Hstpg).
-  rewrite Htop in Hstpg. change (0x2000 + PGSIZE) with 0x3000 in Hstpg.
-  unfold PGSIZE in Hzero.
-  (* ---- the stack page is RW, at every byte of it ---- *)
-  assert (Hstkperm : forall a : Z, 0x3000 <= a < 0x4000 ->
-            uperm_at (uvis_perm W') (mword_of_int a : mword 64)
-            = Some uperm_rw).
-  { intros a Ha.
-    apply (UShKernel.sh_page_perm (uvis_perm W') 0x3000 a uperm_rw Hstpg);
-      [ reflexivity | lia | lia | lia ]. }
-  assert (Hwr : forall a : Z, 0x3000 <= a < 0x4000 ->
-            uw_addr (uvis_perm W') a)
-    by (intros a Ha; exists uperm_rw; exact (conj (Hstkperm a Ha) eq_refl)).
-  assert (Hrp : forall a : Z, 0x3000 <= a < 0x4000 ->
-            uk_rpage (uvis_perm W') (mword_of_int a : mword 64))
-    by (intros a Ha; exists uperm_rw; exact (conj (Hstkperm a Ha) eq_refl)).
-  (* ---- page 0 is echo's text: X and not W ---- *)
-  assert (Hpg0 : uvis_perm W' !! kexec_pg 0 = Some (kexec_seg_perm p0)).
-  { apply (Hpg 0%nat p0); [ rewrite Hld; reflexivity | ].
-    unfold kexec_seg_pages. rewrite Hld. cbn [take].
-    rewrite kexec_sz_after_nil. rewrite Hv0 Hm0.
-    split_and!; [ vm_compute; reflexivity
-                | vm_compute; discriminate | vm_compute; reflexivity ]. }
-  assert (Hperm0 : kexec_seg_perm p0 = MkUperm true false)
-    by (unfold kexec_seg_perm; rewrite Hf0; reflexivity).
-  assert (Hx : forall a : Z, 0 <= a < 4096 ->
-            ux_addr (uvis_perm W') a /\ ~ uw_addr (uvis_perm W') a).
-  { intros a Ha.
-    assert (Hat : uperm_at (uvis_perm W') (mword_of_int a : mword 64)
-                  = Some (MkUperm true false)).
-    { rewrite <- Hperm0.
-      apply (UShKernel.sh_page_perm (uvis_perm W') 0 a
-               (kexec_seg_perm p0) Hpg0); [ reflexivity | lia | lia | lia ]. }
-    split.
-    - exists (MkUperm true false). exact (conj Hat eq_refl).
-    - intros (q & Hq & Hw). rewrite Hat in Hq. injection Hq as <-.
-      discriminate Hw. }
-  (* ---- the entry pc and the text inclusion ---- *)
+  destruct (UShGeom.img_kexec_pages ElfUser.echo_elf EchoData.echoEntry p0 [p1]
+              na alen afun sts W' echo_kexec_top ElfUser.echo_elf_entry Hld Hv0
+              ltac:(rewrite Hm0; lia) Hf0 Hok)
+    as (Hpcw & Himg & Hx & Hwr & Hrp).
+  (* ---- the entry pc and the text inclusion: echo's own two rows ---- *)
   assert (Hpc : tf_resume_pc (uvis_tf W')
                 = (mword_of_int EchoSyms.start : mword 64))
     by (rewrite Hpcw; exact echo_start_pc).
@@ -685,38 +408,7 @@ Lemma echo_kexec_argsc (na : nat) (alen : nat -> nat)
   uk_args_c (uvis_perm W') (uvis_M W') (uvis_av W') (uvis_argc W')
     (uint (uvis_sp W')).
 Proof.
-  intros Hok Hroom Hwr Hrp.
-  destruct (echo_kexec_geom na alen afun sts W' Hok Hroom)
-    as (Hszv & Hlo & Hhi & Hsp' & Hav & Hargc & Hptr & Hsi & Hsb & Hslen
-        & Hvb & Hbelow).
-  assert (Hargsrow : uk_args_c (uvis_perm W') (uvis_M W')
-                       (uvis_av W') (uvis_argc W') (uint (uvis_sp W'))).
-  { rewrite Hav Hargc Hsp'. constructor.
-    - rewrite Z.rem_mod_nonneg; [ | lia | lia ].
-      exact (UShKernel.kxc_sp_final_mod8 0x4000 alen na).
-    - lia.
-    - lia.
-    - constructor; [ lia | lia | lia | | ].
-      + intros j Hj. apply Hrp. lia.
-      + intros j Hj. apply Hvb. lia.
-    - intros i Hi.
-      destruct (Z_of_nat_complete i ltac:(lia)) as [n0 ->].
-      assert (Hn0 : (n0 < na)%nat) by lia.
-      unfold uk_slens. rewrite (Hptr n0 ltac:(lia)).
-      unfold kexec_ustack.
-      destruct (decide (n0 < na)%nat) as [Hlt | Hge]; [ | exfalso; lia ].
-      destruct (Hsi n0 Hn0) as [Hlo1 Hhi1].
-      destruct (Hslen n0 Hn0) as [Hle1 Hcs1].
-      pose proof (ucs_len _ _ _ Hcs1) as Hge0.
-      split_and!; [ lia | lia | lia | exact Hcs1 | ].
-      constructor; [ lia | lia | lia | | ].
-      + intros j Hj. apply Hrp. lia.
-      + intros j Hj.
-        replace (kxc_sp 0x4000 alen (S n0) + j)
-          with (kxc_sp 0x4000 alen (S n0) + Z.of_nat (Z.to_nat j)) by lia.
-        apply (Hsb n0 Hn0). lia. }
-  (* =============== THE TWO PRESENCE ROWS =============== *)
-  exact Hargsrow.
+  exact (UShGeom.img_kexec_argsc ElfUser.echo_elf 12 na alen afun sts W' echo_kexec_sz).
 Qed.
 
 Lemma echo_kexec_avd (na : nat) (alen : nat -> nat)
@@ -729,14 +421,7 @@ Lemma echo_kexec_avd (na : nat) (alen : nat -> nat)
      is_Some (udata_lo (uvis_M W') (uvis_perm W') (uvis_sz W')
                 !! (uvis_av W' + Z.of_nat j)%Z)).
 Proof.
-  intros Hok Hroom Hwr.
-  destruct (echo_kexec_geom na alen afun sts W' Hok Hroom)
-    as (Hszv & Hlo & Hhi & Hsp' & Hav & Hargc & Hptr & Hsi & Hsb & Hslen
-        & Hvb & Hbelow).
-  intros j Hj. rewrite Hargc in Hj. rewrite Hav. rewrite Hszv.
-  destruct (Hvb (Z.of_nat j) ltac:(lia)) as [b Hb].
-  apply (UShKernel.udata_lo_is_Some _ _ _ _ b Hb);
-    [ apply Hwr; lia | lia ].
+  exact (UShGeom.img_kexec_avd ElfUser.echo_elf 12 na alen afun sts W' echo_kexec_sz).
 Qed.
 
 Lemma echo_kexec_avs (na : nat) (alen : nat -> nat)
@@ -751,36 +436,7 @@ Lemma echo_kexec_avs (na : nat) (alen : nat -> nat)
                 !! (uk_argv_p (uvis_M W') (uvis_av W') (Z.of_nat i)
                     + Z.of_nat j)%Z)).
 Proof.
-  intros Hok Hroom Hwr.
-  destruct (echo_kexec_geom na alen afun sts W' Hok Hroom)
-    as (Hszv & Hlo & Hhi & Hsp' & Hav & Hargc & Hptr & Hsi & Hsb & Hslen
-        & Hvb & Hbelow).
-  (* THE TWO READINGS, EACH ONCE AND IN THE ROW'S OWN VOCABULARY.  A
-     [rewrite ... in Hj] would carry the [Z.to_nat] of the opaque scan
-     through the rest of the walk, and a [Qed] over that does not fit the
-     kernel's stack; so the pointer and the scanned length are converted
-     up front and the row's own hypotheses are never rewritten. *)
-  assert (Hpi : forall i : nat, (i < na)%nat ->
-            uk_argv_p (uvis_M W') (uvis_av W') (Z.of_nat i)
-            = kxc_sp 0x4000 alen (S i)).
-  { intros i Hi. rewrite Hav. rewrite (Hptr i ltac:(lia)).
-    unfold kexec_ustack.
-    destruct (decide (i < na)%nat) as [Hlt | Hge];
-      [ reflexivity | exfalso; lia ]. }
-  assert (Hle2 : forall i : nat, (i < na)%nat ->
-            (Z.to_nat (uk_slens (uvis_M W') (uvis_av W') (Z.of_nat i))
-             <= alen i)%nat).
-  { intros i Hi. unfold uk_slens. rewrite (Hpi i Hi).
-    destruct (Hslen i Hi) as [Hle1 Hcs1].
-    pose proof (ucs_len _ _ _ Hcs1) as Hge0. lia. }
-  intros i j Hi Hj.
-  assert (Hin : (i < na)%nat) by lia.
-  pose proof (Hle2 i Hin) as Hle3.
-  destruct (Hsi i Hin) as [Hlo1 Hhi1].
-  rewrite (Hpi i Hin). rewrite Hszv.
-  destruct (Hsb i Hin j ltac:(lia)) as [b Hb].
-  apply (UShKernel.udata_lo_is_Some _ _ _ _ b Hb);
-    [ apply Hwr; lia | lia ].
+  exact (UShGeom.img_kexec_avs ElfUser.echo_elf 12 na alen afun sts W' echo_kexec_sz).
 Qed.
 
 Lemma echo_kexec_avrows (na : nat) (alen : nat -> nat)
@@ -800,9 +456,7 @@ Lemma echo_kexec_avrows (na : nat) (alen : nat -> nat)
                    !! (uk_argv_p (uvis_M W') (uvis_av W') (Z.of_nat i)
                        + Z.of_nat j)%Z)).
 Proof.
-  intros Hok Hroom Hwr Hrp.
-  exact (conj (echo_kexec_avd na alen afun sts W' Hok Hroom Hwr)
-              (echo_kexec_avs na alen afun sts W' Hok Hroom Hwr)).
+  exact (UShGeom.img_kexec_avrows ElfUser.echo_elf 12 na alen afun sts W' echo_kexec_sz).
 Qed.
 
 Lemma echo_kexec_stkrow (na : nat) (alen : nat -> nat)
@@ -817,18 +471,8 @@ Lemma echo_kexec_stkrow (na : nat) (alen : nat -> nat)
      is_Some (udata_lo (uvis_M W') (uvis_perm W') (uvis_sz W')
                 !! (uint (uvis_sp W') - 8 * Z.of_nat 12 + Z.of_nat j)%Z)).
 Proof.
-  intros Hok Hroom Hwr Hrp.
-  destruct (echo_kexec_geom na alen afun sts W' Hok Hroom)
-    as (Hszv & Hlo & Hhi & Hsp' & Hav & Hargc & Hptr & Hsi & Hsb & Hslen
-        & Hvb & Hbelow).
-  assert (Hstkrow : forall j : nat, (j < 8 * 12)%nat ->
-            is_Some (udata_lo (uvis_M W') (uvis_perm W') (uvis_sz W')
-                       !! (uint (uvis_sp W') - 8 * Z.of_nat 12
-                           + Z.of_nat j)%Z)).
-  { intros j Hj. rewrite Hsp'. rewrite Hszv.
-    apply (UShKernel.udata_lo_is_Some _ _ _ _ (bv_0 8));
-      [ apply Hbelow; lia | apply Hwr; lia | lia ]. }
-  exact Hstkrow.
+  intros Hok Hroom Hwr _.
+  exact (UShGeom.img_kexec_stkrow ElfUser.echo_elf 12 na alen afun sts W' echo_kexec_sz Hok Hroom Hwr).
 Qed.
 
 Lemma echo_kexec_entry_rows (na : nat) (alen : nat -> nat)
@@ -860,22 +504,10 @@ Lemma echo_kexec_entry_rows (na : nat) (alen : nat -> nat)
         bv_unsigned p * 4096 < UserPtTree.pgroundup (uvis_sz W')).
 Proof.
   intros Hok Hroom Hfdl Hwr Hrp.
-  pose proof (kexec_image_ok_below _ _ _ _ _ _ Hok) as Hstop.
-  pose proof (kexec_image_ok_fd _ _ _ _ _ _ Hok) as Hfd.
-  destruct (echo_kexec_geom na alen afun sts W' Hok Hroom)
-    as (_ & Hlo & _ & Hsp' & _ & _ & _ & _ & _ & _ & _ & _).
-  pose proof (echo_kexec_argsc na alen afun sts W' Hok Hroom Hwr Hrp)
-    as Hargsrow.
-  destruct (echo_kexec_avrows na alen afun sts W' Hok Hroom Hwr Hrp)
-    as [Havd Havs].
-  pose proof (echo_kexec_stkrow na alen afun sts W' Hok Hroom Hwr Hrp)
-    as Hstkrow.
-  assert (Hroom96 : 96 <= uint (uvis_sp W')) by (rewrite Hsp'; lia).
-  assert (Hal8 : uint (uvis_sp W') mod 8 = 0)
-    by (rewrite Hsp'; exact (UShKernel.kxc_sp_final_mod8 0x4000 alen na)).
-  rewrite <- Hfd in Hfdl.
-  exact (conj Hroom96 (conj Hal8 (conj Hstkrow (conj Hargsrow
-           (conj Havd (conj Havs (conj Hfdl Hstop))))))).
+  destruct (UShGeom.img_kexec_entry_rows ElfUser.echo_elf 12 na alen afun sts W'
+              echo_kexec_sz Hok Hroom Hfdl Hwr Hrp)
+    as (H1 & H2 & _ & H4 & H5 & H6 & H7 & H8 & H9).
+  exact (conj H1 (conj H2 (conj H4 (conj H5 (conj H6 (conj H7 (conj H8 H9))))))).
 Qed.
 
 
@@ -1554,20 +1186,8 @@ Section UShEcho.
        alen i = UkShEcho.echo_alen ws i) ->
     kexec_sz ElfUser.echo_elf - PGSIZE + 96
       <= kxc_sp_final (kexec_sz ElfUser.echo_elf) alen na.
-  Proof using .
-    intros Hok Hna Halen.
-    rewrite Hna. apply (echo_room ws).
-    (* the push's span reads the SAME lengths at every index the vector
-       has, so the line's own bound transports to [alen] *)
-    rewrite /echo_argv_fits.
-    assert (Hsp : kxc_span alen (length ws)
-                  = kxc_span (UkShEcho.echo_alen ws) (length ws)).
-    { assert (Hgen : forall n : nat, (n <= length ws)%nat ->
-                kxc_span alen n = kxc_span (UkShEcho.echo_alen ws) n).
-      { induction n as [| n IH]; intro Hn; cbn [kxc_span]; [ reflexivity | ].
-        rewrite (IH ltac:(lia)) (Halen n ltac:(lia)). reflexivity. }
-      exact (Hgen (length ws) ltac:(lia)). }
-    rewrite Hsp. exact (echo_argv_fits_of_ok_x ws Hok).
+  Proof.
+  exact (UShGeom.img_room_of_det_x ElfUser.echo_elf 12 ws na alen echo_kexec_sz ltac:(lia)).
   Qed.
 
   Lemma echo_room_of_det (ws : list (list (bv 8))) (na : nat)
@@ -1578,9 +1198,8 @@ Section UShEcho.
        alen i = UkShEcho.echo_alen ws i) ->
     kexec_sz ElfUser.echo_elf - PGSIZE + 96
       <= kxc_sp_final (kexec_sz ElfUser.echo_elf) alen na.
-  Proof using .
-    intro Hok__.
-    exact (echo_room_of_det_x ws na alen (line_ok_exec_ok _ Hok__)).
+  Proof.
+  exact (UShGeom.img_room_of_det ElfUser.echo_elf 12 ws na alen echo_kexec_sz ltac:(lia)).
   Qed.
 
   (* ---- ...AND ECHO'S ENTRY AS THE NAMED OBLIGATION (E) --------------- *)
@@ -1697,64 +1316,8 @@ Section UShEcho.
                  = afun i j).
 
   Lemma echo_key_args_holds : echo_key_args.
-  Proof using .
-    intros na alen afun sts W' Hok Hno.
-    pose proof echo_kexec_sz as Hsz.
-    unfold kexec_image_ok in Hok. cbv zeta in Hok. rewrite Hsz in Hok.
-    destruct Hok as (_ & _ & _ & Ha1w & Ha0w & _
-                     & (Hstr & Hnul & Hvec) & (Hfit & _) & _ & _ & _ & _).
-    unfold PGSIZE in Hfit.
-    (* ---- THE BLOCK IS INSIDE THE STACK PAGE ---- *)
-    pose proof (kxc_argc_bound 0x4000 (0x4000 - 4096) alen na Hfit) as Hnab.
-    assert (Hsprange : forall i : nat, (i < na)%nat ->
-              0x4000 - 4096 <= kxc_sp 0x4000 alen (S i) <= 0x4000)
-      by (intros i Hi;
-          exact (kxc_sp_range 0x4000 (0x4000 - 4096) alen na (S i)
-                   Hfit ltac:(lia) ltac:(lia))).
-    pose proof (kxc_sp_final_range 0x4000 (0x4000 - 4096) alen na Hfit)
-      as Hfinal.
-    (* ---- the key's own a0/a1 ---- *)
-    assert (Hav : uvis_av W' = kxc_sp_final 0x4000 alen na).
-    { unfold uvis_av. unfold tf_resume_gpr0. rewrite tf_resume_gpr_a1.
-      rewrite Ha1w. apply uint_moi. unfold Z64. lia. }
-    assert (Hargc : uvis_argc W' = Z.of_nat na).
-    { unfold uvis_argc. unfold tf_resume_gpr0. rewrite tf_resume_gpr_a0.
-      rewrite Ha0w. apply uint_moi. unfold Z64. lia. }
-    (* ---- the pointers the vector spells ---- *)
-    assert (Hptr : forall i : nat, (i < na)%nat ->
-              uk_argv_p (uvis_M W') (kxc_sp_final 0x4000 alen na) (Z.of_nat i)
-              = kxc_sp 0x4000 alen (S i)).
-    { intros i Hi. apply uk_argv_p_of_bytes.
-      - pose proof (Hsprange i Hi). unfold Z64. lia.
-      - intros k Hk.
-        pose proof (Hvec i k ltac:(lia) Hk) as Hb.
-        unfold kexec_ustack in Hb.
-        destruct (decide (i < na)%nat) as [Hlt | Hge]; [ | exfalso; lia ].
-        exact Hb. }
-    (* ---- each string is NUL-terminated exactly where exec put the NUL ---- *)
-    assert (Hcs : forall i : nat, (i < na)%nat ->
-              ucstr (uvis_M W') (kxc_sp 0x4000 alen (S i))
-                (Z.of_nat (alen i))).
-    { intros i Hi. constructor.
-      - lia.
-      - intros j Hj. exists (afun i (Z.to_nat j)). split.
-        + replace (kxc_sp 0x4000 alen (S i) + j)
-            with (kxc_sp 0x4000 alen (S i) + Z.of_nat (Z.to_nat j)) by lia.
-          apply Hstr; lia.
-        + apply Hno; lia.
-      - rewrite ubyte0_bv0. exact (Hnul i Hi). }
-    assert (Hlen : forall i : nat, (i < na)%nat ->
-              uk_slen (uvis_M W') (kxc_sp 0x4000 alen (S i))
-              = Z.of_nat (alen i)).
-    { intros i Hi. apply uk_slen_ucstr; [ | exact (Hcs i Hi) ].
-      pose proof (kxc_len_bound 0x4000 (0x4000 - 4096) alen na i Hfit Hi).
-      change (2 ^ 31) with 2147483648. lia. }
-    (* ---- and that is the key's own reading ---- *)
-    split; [ rewrite Hargc; lia | ].
-    intros i Hi. unfold echo_arg. cbn [ua_len ua_bytes].
-    rewrite Hav. unfold uk_slens. rewrite (Hptr i Hi). rewrite (Hlen i Hi).
-    split; [ lia | ].
-    intros j Hj. rewrite (Hstr i j Hi Hj). reflexivity.
+  Proof.
+    exact (UShGeom.img_key_args_holds ElfUser.echo_elf echo_kexec_sz).
   Qed.
 
   (* ---- the shape a list of [uarg]s has when it IS the line's words ---- *)

@@ -1667,6 +1667,7 @@ UConsOpen.v
 UInitConsK.v
 UShConsK.v
 
+UShGeom.v
 UShEcho.v
 UShLine.v
 

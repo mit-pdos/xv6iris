@@ -268,8 +268,29 @@ console instance waits for its M3.
 
 ## C. The program-generic exec (alongside A2)
 
-- [ ] **C1** `image_geom E frame` (from `UShEcho` §1-§2); `UShEcho`'s and
-  `UShCat`'s rows as instances.
+- [x] **C1** `image_geom E frame` -- LANDED (2026-09-26, `user-once/A3`;
+  `iris/UShGeom.v`, ~870 lines, before `UShEcho`).  AS LANDED: not one
+  record but the CHAIN at `(E, frame)` with `kexec_sz E = 0x4000` its one
+  premise -- `img_kexec_geom` (the twelve readings; the room
+  `0x3000 + 8 * frame`), the rows off it (`img_kexec_argsc`/`_avd`/`_avs`/
+  `_avrows`/`_stkrow` at `8 * frame` bytes/`img_kexec_entry_rows`, nine
+  conjuncts: echo's landed eight are a projection), the room
+  (`img_argv_fits frame`, `img_room`, `img_argv_fits_of_ok` at any
+  `frame <= 370`: the push is under 1131 bytes), `img_room_of_det`, the
+  key's reading `img_key_args`, and the push helpers moved down from
+  `UShEcho` SS3c verbatim (re-exported by `Notation`).  THE PAGE HALF splits:
+  `img_kexec_pages` is the image-generic part (stack page RW, page 0
+  X-and-not-W off the FIRST PT_LOAD's shape as premises, the image
+  inclusion, the entry pc at `ret_pc e`); `img_kexec_page1_w` the second
+  load's W page (cat's .bss); what stays per image is the text/data
+  INCLUSIONS (a union shape of the literal), the zero window, and the
+  closed facts (`X_kexec_top/sz`, `X_loads`, `X_start_pc`, `X_elf_loadable`).
+  `UShEcho` (1,800 -> 1,363) is it at `(echo_elf, 12)`, `UShCat` (1,161 ->
+  874) at `(cat_elf, 42)`; every statement byte-identical, the instances
+  by `exact` (the literal `96` / `0x3060` vs `8 * Z.of_nat 12` /
+  `0x3000 + 8 * Z.of_nat 12` is conversion).  cat's own three rows
+  (`cat_kexec_bufrow`/`_argnz`/`_argpath`) stay cat's, off `cat_kexec_geom`.
+  Gate: 27 files (the cone above `UShEcho`), 0 errors, nothing pending; audits unmoved (system 13, tree 13, file 14, pipe 14).
 - [ ] **C2** `cmd_spec` and `sh_exec_arm C` (from `UkShEcho`; the three
   differences `UkShCat.v`'s header lists are the fields); echo's and cat's
   arms as instances; `cat_line_premises_absurd` becomes the note on why
@@ -299,4 +320,28 @@ RULED by the owner: A starts now.  Branch `user-once/A` off `main` at
 monotonicity, the symbol-free bridge both ways, the redirect and pipe
 bridges, the three line-shape facts on `ush_line_is`/`ushs_line_is`/
 `ushq_line_is`) is stated and elaborates; its proofs are with a subagent.
-A1 and A2a-e are on `main`; A3a and A3b are on branch `user-once/A3` -- LANE A IS COMPLETE there, awaiting the owner's merge to `main`.  NEXT: C1 (independent of everything; `image_geom E frame` from `UShEcho` §1-§2) or B1 (`UkFdStream.v`); B2 waits on app-both's M3.  Still owed elsewhere: the fork law's `Lp` at the reference equation is app-both's SLOT-WS (M4).
+A1 and A2a-e are on `main`; A3a and A3b are on branch `user-once/A3` -- LANE A IS COMPLETE there, awaiting the owner's merge to `main`.  C1 is on the same branch.
+
+**THE DIVERGENCE (read off `git fetch`, 2026-09-26) -- RULE ON THIS BEFORE
+ANY FURTHER LANE.**  Nothing of this campaign has reached `origin/main`:
+local `main` is 9 commits (A1-A2e) ahead of it and `origin/main` is 386
+commits / 774 files ahead of local `main`, 24 of them files this branch
+touched (twelve of them files A3b deleted).  Upstream's changes to this tier
+are structural: PIPES-C3/C8 rebuilt sh's pipe walk for pipelines of any
+length (new `UkShPipes*`, `UShPipes*`, `UShURound*`; `UShPipeChild`,
+`UShPipeRound`, `UShRound`, `UShEchoPay`, `UShRedirPay` DELETED there --
+the files A3b re-pointed and C3 targets); the seccomp bump changed the
+U-tier entry constructors and `exec_slot_pre`/`image_entry` to take the
+caller's mask (the shape C1/C2 sit on); an `XV6_REV` bump regenerated the
+images; upstream still has `UkShRedirTok` and `UkShPipeRight` (A2a/A2e
+deleted them) and never had `RefParse*`, `UkShGettoken`, `UkShRedirs`,
+`UkShArgs`, `UkShParser`, `UkShPipeNode`, `UkShSeam`, `UkShRedirCut`,
+`UShGeom`.  So merging or rebasing `user-once/A3` onto `origin/main` is a
+RE-LANDING, not a conflict resolution: A1 (the pure reference parser and
+its bridges) carries over; A2c-A3b and C1 were proved against a pipe tier
+and an entry interface that no longer exist upstream.  Options: (a) re-land
+user-once on `origin/main` from A1 and the design note, with the
+pipeline-of-any-length walk as the thing the reference parser generalizes
+(`ref_parsepipe` is already cursor-indexed and N-ary); (b) hold the branch
+until the seccomp and pipes work settles.  Do NOT start C2 or B1 on this
+base.  Still owed elsewhere: the fork law's `Lp` at the reference equation is app-both's SLOT-WS (M4).

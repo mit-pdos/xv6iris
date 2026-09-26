@@ -249,7 +249,14 @@ statement with the constants named as parameters.
   `kexec_sz`, the two `PT_LOAD` sizes, the entry, the room `PGSIZE -
   8*frame`), derived from `SpecKexec.kexec_image_ok` at `E` by
   `vm_compute` on the literal.  echo is `image_geom echo_elf 12`, cat is
-  `image_geom cat_elf 42`.
+  `image_geom cat_elf 42`.  AS LANDED (C1, `iris/UShGeom.v`): not a
+  record but the derivation CHAIN at `(E, frame)`, whose one premise is
+  `kexec_sz E = 0x4000` (both images round to the same top) -- the page
+  half takes the first PT_LOAD's shape as premises rather than computing
+  it, so the literal enters only through the per-image closed facts
+  (`X_kexec_top`, `X_loads`, `X_start_pc`), and the frame enters as
+  `8 * frame` bytes with `frame <= 370` the bound an admissible line
+  pays for.
 - **`sh_exec_arm (C : cmd_spec)`**, `cmd_spec := { cs_name : list (bv 8);
   cs_argv : Z → (nat → bv 8) → list uarg → Prop; cs_diag_len : nat;
   cs_entry : image_entry_stmt }`: `UkShEcho.sh_exec_sup_echo`'s arm with
