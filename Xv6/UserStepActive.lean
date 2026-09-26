@@ -14,9 +14,10 @@ re-seal `userInv` / `userTrapFrame`.  The cycle is UCycleSwp's
 * the FETCH arm: the fetch (`UstFetchSpec`, U2-F's deliverable), then by the
   fetch result: a fault → `ust_armOb_fetchFail`; a word or halfword →
   decode (`decodeU_total32/16`, total, transported to the walker by
-  `uc_runRW_of_runRead`) and execute (`UstExecTotal`, U3-A's deliverable)
-  through the cycle's tail (`swp_ucAfterFetch_base`/`_rvc`), then the arm of
-  the outcome (`ust_armOb_exec`).
+  `uc_runRW_of_runRead`) and execute (`UstExecTotalSc`, U3-A's deliverable,
+  a walk up to discarded reads) through the cycle's tail
+  (`swp_ucAfterFetchSc_base`/`_rvc`, MachCSL/UCycleSc, over `swp_URunSc`),
+  then the arm of the outcome (`ust_armOb_exec`).
 
 ## The two hypotheses (the contracts U2-F and U3-A are built to)
 
@@ -24,10 +25,12 @@ re-seal `userInv` / `userTrapFrame`.  The cycle is UCycleSwp's
   MachCSL/UFetchMem): from the user frames at any `UstLand` state `s`,
   `fetch ()` runs to some result `fr` and a state `s'` with
   `UstFetchOut C P t0 mm0 fr s'` (UserStepLand), frames handed back.
-* `UstExecTotal C P` (PURE; UserStepLand): every decodable instruction's
-  execute walk from `nextPC := PC + len` lands in `UstResOk`.
+* `UstExecTotalSc C P` (PURE; UserStepLand): every decodable instruction's
+  execute walk (up to discarded reads, `URunSc`) from `nextPC := PC + len`
+  lands in `UstResOk`.
 -/
 import Xv6.UserStepTrap
+import MachCSL.UCycleSc
 
 namespace Xv6
 
@@ -51,17 +54,23 @@ def UstFetchSpec (cpu : CPU) (C : UCfg) (P : UPtd) : Prop :=
 
 variable (cpu : CPU) (C : UCfg) (P : UPtd) (t0 : PTree) (mm0 : BMap)
 
-/-- An execute fact, as a function of the oracle (the cycle's tail takes the
-landing as one). -/
-theorem ustExecOk_fn {s : UWSt} {i : instruction} {len : Int} (h : UstExecOk C P t0 mm0 s i len) :
-    ∃ E : UOrc → ExecutionResult × UWSt × UOrc, ∀ orc,
-      runRW ufFoot orc (ucNpcS s len) (uxaExecAs i) = some (E orc) ∧ UstResOk C P t0 mm0 (E orc).1 (E orc).2.1 :=
-  ⟨fun orc => ((h orc).choose, (h orc).choose_spec.choose, (h orc).choose_spec.choose_spec.choose),
-   fun orc => (h orc).choose_spec.choose_spec.choose_spec⟩
+/-- An execute fact up to discards, with its landing a function of the oracle
+(the cycle's tail takes the landing as one). -/
+theorem ustExecOkSc_fn {s : UWSt} {i : instruction} {len : Int} (h : UstExecOkSc C P t0 mm0 s i len) :
+    ∃ E : UOrc → ExecutionResult × UWSt × UOrc,
+      URunSc ufFoot (ucNpcS s len) (uxaExecAs i) (fun orc => some (E orc)) ∧
+        ∀ orc, UstResOk C P t0 mm0 (E orc).1 (E orc).2.1 := by
+  obtain ⟨res, hr, hok⟩ := h
+  let E : UOrc → ExecutionResult × UWSt × UOrc := fun orc =>
+    ((hok orc).choose, (hok orc).choose_spec.choose, (hok orc).choose_spec.choose_spec.choose)
+  have hE : ∀ orc, res orc = some (E orc) ∧ UstResOk C P t0 mm0 (E orc).1 (E orc).2.1 := fun orc =>
+    (hok orc).choose_spec.choose_spec.choose_spec
+  have e : res = fun orc => some (E orc) := funext fun orc => (hE orc).1
+  exact ⟨E, e ▸ hr, fun orc => (hE orc).2⟩
 
 /-- **The fetch arm** (Rocq `run_fetch_*` through `active_class`): fetch,
 decode, execute, and the arm of the outcome. -/
-theorem ust_fetchArm (hF : UstFetchSpec (GF := GF) cpu C P) (hX : UstExecTotal C P) (s : UWSt)
+theorem ust_fetchArm (hF : UstFetchSpec (GF := GF) cpu C P) (hX : UstExecTotalSc C P) (s : UWSt)
     (hl : UstLand C P t0 mm0 s) :
     hwConfig (GF := GF) cpu ∗ uFr (ufRegF cpu C) (ubFrame curCtx (ubUAddrs P t0)) s ⊢
       swp cpu (fetch () >>= ucAfterFetch)
@@ -86,31 +95,30 @@ theorem ust_fetchArm (hF : UstFetchSpec (GF := GF) cpu C P) (hX : UstExecTotal C
     obtain ⟨i, b, hdr, hdi⟩ := decodeU_total32 w
     have hdec : ∀ orc, runRW ufFoot orc s' (ext_decode w) = some (i, s', orc) := fun orc =>
       uc_runRW_of_runRead ufFoot drefU orc s' (ust_drefU_hd s' hl'.cfg hl'.priv) _ i b hdr
-    obtain ⟨E, hE⟩ := ustExecOk_fn C P t0 mm0 (hX.base t0 mm0 s' i hl' hal hdi)
-    iapply swp_ucAfterFetch_base (ufRegF cpu C) (ubFrame curCtx (ubUAddrs P t0)) ufFoot_uc s' w i
-      (ufFoot_rd _ (by decide)) (hl'.cfg.hw .elp _ rfl) hdec E (fun orc => (hE orc).1)
+    obtain ⟨E, hEx, hE⟩ := ustExecOkSc_fn C P t0 mm0 (hX.base t0 mm0 s' i hl' hal hdi)
+    iapply swp_ucAfterFetchSc_base (ufRegF cpu C) (ubFrame curCtx (ubUAddrs P t0)) ufFoot_uc s' w i
+      (ufFoot_rd _ (by decide)) (hl'.cfg.hw .elp _ rfl) hdec E hEx
     iframe Hfr
     iintro %orc Hfr
-    iapply ust_armOb_exec cpu C P t0 mm0 (E orc).1 (E orc).2.1 _ (hE orc).2
+    iapply ust_armOb_exec cpu C P t0 mm0 (E orc).1 (E orc).2.1 _ (hE orc)
     iframe Hhw Hfr
   | F_RVC h =>
     obtain ⟨hl', hal⟩ := hout
     obtain ⟨i, b, hdr, hdi⟩ := decodeU_total16 h
     have hdec : ∀ orc, runRW ufFoot orc s' (ext_decode_compressed h) = some (i, s', orc) := fun orc =>
       uc_runRW_of_runRead ufFoot drefU orc s' (ust_drefU_hd s' hl'.cfg hl'.priv) _ i b hdr
-    obtain ⟨E, hE⟩ := ustExecOk_fn C P t0 mm0 (hX.rvc t0 mm0 s' i hl' hal hdi)
-    iapply swp_ucAfterFetch_rvc (ufRegF cpu C) (ubFrame curCtx (ubUAddrs P t0)) ufFoot_uc s' h i
-      (ufFoot_rd _ (by decide)) (hl'.cfg.hw .elp _ rfl) (uf_ucMisa C P s' hl'.cfg) hdec E
-      (fun orc => (hE orc).1)
+    obtain ⟨E, hEx, hE⟩ := ustExecOkSc_fn C P t0 mm0 (hX.rvc t0 mm0 s' i hl' hal hdi)
+    iapply swp_ucAfterFetchSc_rvc (ufRegF cpu C) (ubFrame curCtx (ubUAddrs P t0)) ufFoot_uc s' h i
+      (ufFoot_rd _ (by decide)) (hl'.cfg.hw .elp _ rfl) (uf_ucMisa C P s' hl'.cfg) hdec E hEx
     iframe Hfr
     iintro %orc Hfr
-    iapply ust_armOb_exec cpu C P t0 mm0 (E orc).1 (E orc).2.1 _ (hE orc).2
+    iapply ust_armOb_exec cpu C P t0 mm0 (E orc).1 (E orc).2.1 _ (hE orc)
     iframe Hhw Hfr
 
 /-- **One machine step of an ACTIVE user hart** (Rocq `wp_user_step_active`
 ∘ `active_class_intro`): the cycle (interrupt or fetch arm), the optional
 tick, and the landing handed to the continuation. -/
-theorem ust_step_active (hF : UstFetchSpec (GF := GF) cpu C P) (hX : UstExecTotal C P) (v : UfVals) (mm : BMap)
+theorem ust_step_active (hF : UstFetchSpec (GF := GF) cpu C P) (hX : UstExecTotalSc C P) (v : UfVals) (mm : BMap)
     (hu : UfUser v) (ha : v.hs = .HART_ACTIVE ()) (hwf : UbMemWf P t0 mm) (htlb : utlbOk t0 v.tlb) :
     hwConfig (GF := GF) cpu ∗ uFr (ufRegF cpu C) (ubFrame curCtx (ubUAddrs P t0)) (ustS0 C P v mm) ∗
       ▷ (∀ s3, ⌜UstUserAt C P t0 mm s3 ∨ UstTrapAt C P t0 mm s3⌝ -∗

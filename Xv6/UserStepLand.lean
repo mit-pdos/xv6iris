@@ -26,9 +26,10 @@ relative to the tree and map `(t0, mm0)` the step started from:
 * `UstFetchOut` -- **THE FETCH OUTCOME (U2-F's contract).**  `F_Base`/`F_RVC`
   at a 2-aligned `PC`, or `F_Error` of a user exception, landing in
   `UstLand`; never `F_Ext_Error`.
-* `UstExecOk` / `UstExecTotal` -- U3-A's hypothesis: every decodable
-  instruction's execute walk, from `nextPC := PC + len` at a `UstLand` state
-  with a 2-aligned `PC`, lands in `UstResOk` (every oracle).
+* `UstExecOk` / `UstExecOkSc` / `UstExecTotalSc` -- U3-A's hypothesis:
+  every decodable instruction's execute walk (up to discarded reads,
+  `URunSc`), from `nextPC := PC + len` at a `UstLand` state with a 2-aligned
+  `PC`, lands in `UstResOk` (every oracle).
 * `UstUserAt` / `UstTrapAt` -- where a whole cycle (and the optional tick)
   lands: exactly `uf_close_inv`'s / `uf_close_trap`'s premise lists.
 
@@ -51,6 +52,7 @@ tower's `ufTrapSet`, the clock tick).
 -/
 import Xv6.UserFrameFoot
 import MachCSL.UTrap
+import MachCSL.SailAndElim
 
 namespace Xv6
 
@@ -110,15 +112,30 @@ def UstExecOk (C : UCfg) (P : UPtd) (t0 : PTree) (mm0 : BMap) (s : UWSt) (i : in
   ∀ orc : UOrc, ∃ (res : ExecutionResult) (s' : UWSt) (orc' : UOrc),
     runRW ufFoot orc (ucNpcS s len) (uxaExecAs i) = some (res, s', orc') ∧ UstResOk C P t0 mm0 res s'
 
+/-- **One instruction's execute fact, up to discarded reads** (the form the
+loop consumes, `swp_URunSc`): a walk of a short-circuit form of
+`uxaExecAs i` (lane AND-ELIM's `URunSc`) from the `nextPC := PC + len`
+state answers, for every oracle, an admissible outcome.  The model's eager
+`&&` in `check_CSR` reads `mstateen1..3`/`sstateen1..3` outside `ufFoot`;
+Sail/Rocq short-circuit, and so does this contract.  A plain `UstExecOk`
+fact is one of these (`ustExecOkSc_of`, UserClassifySc). -/
+def UstExecOkSc (C : UCfg) (P : UPtd) (t0 : PTree) (mm0 : BMap) (s : UWSt) (i : instruction) (len : Int) :
+    Prop :=
+  ∃ res : UOrc → Option (ExecutionResult × UWSt × UOrc),
+    URunSc ufFoot (ucNpcS s len) (uxaExecAs i) res ∧
+      ∀ orc, ∃ (r : ExecutionResult) (s' : UWSt) (orc' : UOrc),
+        res orc = some (r, s', orc') ∧ UstResOk C P t0 mm0 r s'
+
 /-- **The execute classification** (U3-A's deliverable; Rocq
-`base_exec_total_u` / `rvc_exec_total_u`): every instruction of the 32-bit
-decode image (`decodableU`, `len = 4`) and of the 16-bit one (`decodableUC`,
-`len = 2`), at every `UstLand` state with a 2-aligned `PC`. -/
-structure UstExecTotal (C : UCfg) (P : UPtd) : Prop where
+`base_exec_total_u` / `rvc_exec_total_u`), up to discarded reads: every
+instruction of the 32-bit decode image (`decodableU`, `len = 4`) and of the
+16-bit one (`decodableUC`, `len = 2`), at every `UstLand` state with a
+2-aligned `PC`. -/
+structure UstExecTotalSc (C : UCfg) (P : UPtd) : Prop where
   base : ∀ (t0 : PTree) (mm0 : BMap) (s : UWSt) (i : instruction), UstLand C P t0 mm0 s →
-    (s.file .PC).getLsbD 0 = false → decodableU i = true → UstExecOk C P t0 mm0 s i 4
+    (s.file .PC).getLsbD 0 = false → decodableU i = true → UstExecOkSc C P t0 mm0 s i 4
   rvc : ∀ (t0 : PTree) (mm0 : BMap) (s : UWSt) (i : instruction), UstLand C P t0 mm0 s →
-    (s.file .PC).getLsbD 0 = false → decodableUC i = true → UstExecOk C P t0 mm0 s i 2
+    (s.file .PC).getLsbD 0 = false → decodableUC i = true → UstExecOkSc C P t0 mm0 s i 2
 
 /-- **Where a cycle lands at User** (`uf_close_inv`'s premises). -/
 structure UstUserAt (C : UCfg) (P : UPtd) (t0 : PTree) (mm0 : BMap) (s : UWSt) : Prop where

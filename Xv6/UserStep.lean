@@ -16,7 +16,7 @@ Rocq `UserExec.user_step_obligation(_active)`/`wp_user_exec`,
   obligation.
 * `ust_obligationActive_holds` (Rocq `wp_user_step_active` ∘
   `active_class_intro`): the active obligation from the two classification
-  facts (`UstFetchSpec`, U2-F; `UstExecTotal`, U3-A).
+  facts (`UstFetchSpec`, U2-F; `UstExecTotalSc`, U3-A).
 * `ust_body` (Rocq `wp_user_exec_full`): `SpecUser.wpUserExecClosedBody` with
   the static kernel map (`kmapStatic`, lane U1-K's addition to USER's
   ambient premises) beside `hwConfig`, from the two facts.
@@ -121,7 +121,7 @@ theorem ust_exec_active (cpu : CPU) (C : UCfg) (pt : UPtd) (Rut : UPtd → IProp
 /-- **Rocq `wp_user_step_active`** (with `active_class_intro` reduced to the
 two classification facts): the ACTIVE step obligation holds. -/
 theorem ust_obligationActive_holds (cpu : CPU) (C : UCfg) (pt : UPtd) (Rut : UPtd → IProp GF)
-    (hF : UstFetchSpec (GF := GF) cpu C pt) (hX : UstExecTotal C pt)
+    (hF : UstFetchSpec (GF := GF) cpu C pt) (hX : UstExecTotalSc C pt)
     (hacc : Rut pt ⊢ ctxToken cpu ∗ (ctxToken cpu -∗ Rut pt)) :
     ⊢ hwConfig cpu -∗ kmapStatic -∗ ustStepObligationActive cpu C pt Rut := by
   unfold ustStepObligationActive
@@ -139,7 +139,7 @@ theorem ust_obligationActive_holds (cpu : CPU) (C : UCfg) (pt : UPtd) (Rut : UPt
 `wpUserExecClosedBody`, with `kmapStatic` beside `hwConfig` (U1-K), from
 the fetch (U2-F) and execute (U3-A) classification facts. -/
 theorem ust_body (cpu : CPU) (C : UCfg) (pt : UPtd) (Rut : UPtd → IProp GF)
-    (hF : UstFetchSpec (GF := GF) cpu C pt) (hX : UstExecTotal C pt)
+    (hF : UstFetchSpec (GF := GF) cpu C pt) (hX : UstExecTotalSc C pt)
     (hacc : ∀ pt' : UPtd, Rut pt' ⊢ ctxToken cpu ∗ (ctxToken cpu -∗ Rut pt')) :
     ⊢ hwConfig cpu -∗ kmapStatic -∗ wireInv -∗ userInv cpu C pt Rut -∗ ▷ stvecHandlerWp cpu C pt Rut -∗
       wpLoop cpu := by

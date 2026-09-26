@@ -15,28 +15,11 @@ UserStepLand), built from the landed per-family walks at the user footprint
   dispatched with the causes named by `MachCSL.UclCtl`): retire, `nextPC`
   and a GPR written; ECALL/EBREAK/C.EBREAK trap at User with a user cause and
   no payload; the privileged ones illegal; WRS waits;
-* `ucl_row_csr` -- CSRReg/CSRImm (U1-X3's check chain at the user read set,
-  `MachCSL.UclCsr`): `Illegal_Instruction`, nothing written -- except the
-  eleven `uclEager` numbers, which are the hypothesis `UclCsrEager`;
+* CSRReg/CSRImm -- not here: their rows are stated up to discarded reads
+  (`Xv6/UserClassifySc`, U1-X3's `uxr_execute_CSRReg/Imm`), the backend's
+  eager `&&` in `check_CSR` reading cells off the user footprint;
 * `ucl_row_cfgRefused` -- ZICBOM/ZICBOZ/SSAMOSWAP (`MachCSL.UclCbo`):
   `Illegal_Instruction`, nothing written.
-
-## The one hypothesis: `UclCsrEager` (the `hZkr` of the report)
-
-For a CSR number in `uclEager` (`0x747`/`0x757` = `mseccfg`/`mseccfgh`, and
-`0x10D..0x10F`/`0x60D..0x60F`/`0x61D..0x61F`, the stateen-1..3-gated ones),
-the Lean backend's EAGER `&&` in `check_CSR` makes the check at User either
-fail outright (`mseccfg`: `currentlyEnabled Ext_Zkr` has no clause, an
-`assert false`; U1-X3's `uxr_ccr_zkr`) or read `mstateen1..3`/`sstateen1..3`,
-which are off the user footprint (Rocq's too).  Sail and Rocq short-circuit
-at the privilege gate, so in them these are plain `Illegal_Instruction`.
-**As the model stands, `UclCsrEager` is FALSE** (the walk is `none`); it
-becomes provable -- by exactly `ucl_row_csr`'s proof -- once the backend
-short-circuits `&&` (or the missing `Ext_Zkr` clause is added and the six
-stateen cells join the user footprint).
-Up to discarded reads (lane AND-ELIM's `URunSc`) the nine stateen numbers
-ARE proved; `Xv6/UserClassifySc` states the contract that way and needs only
-`0x747`/`0x757` (`UclCsrZkr`).
 -/
 import Xv6.UserClassifyLand
 import MachCSL.UclCbo
@@ -60,16 +43,6 @@ def uclCsrU : instruction → Bool
 def uclCfgRefusedU : instruction → Bool
   | .ZICBOM _ | .ZICBOZ _ | .SSAMOSWAP _ => true
   | _ => false
-
-/-- **The CSR numbers the eager backend breaks** (the report's `hZkr`): each
-such CSR instruction's execute fact, in `UstExecTotal.base`'s shape. -/
-structure UclCsrEager (C : UCfg) (P : UPtd) : Prop where
-  reg : ∀ (t0 : PTree) (mm0 : BMap) (s : UWSt) (csr : BitVec 12) (rs1 rd : regidx) (op : csrop),
-    UstLand C P t0 mm0 s → (s.file .PC).getLsbD 0 = false → uclEager csr.toNat = true →
-      UstExecOk C P t0 mm0 s (.CSRReg (csr, rs1, rd, op)) 4
-  imm : ∀ (t0 : PTree) (mm0 : BMap) (s : UWSt) (csr : BitVec 12) (imm : BitVec 5) (rd : regidx) (op : csrop),
-    UstLand C P t0 mm0 s → (s.file .PC).getLsbD 0 = false → uclEager csr.toNat = true →
-      UstExecOk C P t0 mm0 s (.CSRImm (csr, imm, rd, op)) 4
 
 variable {C : UCfg} {P : UPtd} {t0 : PTree} {mm0 : BMap}
 
@@ -114,36 +87,6 @@ theorem ucl_row_illegal {s : UWSt} (hL : UstLand C P t0 mm0 s) (len : Int) (i : 
     UstExecOk C P t0 mm0 s i len := fun orc =>
   ⟨_, _, _, uxc_execAs_of ufFoot orc _ _ i (fun _ e => by cases e) (h orc),
     ucl_resOk_illegal (ucl_land_npc hL len)⟩
-
-/-- **The CSRReg row, off the eager numbers**: `Illegal_Instruction`. -/
-theorem ucl_row_csrReg_ok {s : UWSt} (hL : UstLand C P t0 mm0 s) (len : Int) (csr : BitVec 12)
-    (hz : uclEager csr.toNat = false) (rs1 rd : regidx) (op : csrop) :
-    UstExecOk C P t0 mm0 s (.CSRReg (csr, rs1, rd, op)) len :=
-  ucl_row_illegal hL len _ fun orc =>
-    ucl_execute_CSRReg ufFoot_uxa ufFoot_uxr (ucl_uxrCfg (ucl_land_npc hL len)) orc csr hz rs1 rd op
-
-/-- **The CSRImm row, off the eager numbers**: `Illegal_Instruction`. -/
-theorem ucl_row_csrImm_ok {s : UWSt} (hL : UstLand C P t0 mm0 s) (len : Int) (csr : BitVec 12)
-    (hz : uclEager csr.toNat = false) (imm : BitVec 5) (rd : regidx) (op : csrop) :
-    UstExecOk C P t0 mm0 s (.CSRImm (csr, imm, rd, op)) len :=
-  ucl_row_illegal hL len _ fun orc =>
-    ucl_execute_CSRImm ufFoot_uxr (ucl_uxrCfg (ucl_land_npc hL len)) orc csr hz imm rd op
-
-/-- **The CSR row** (every number: the eager ones from `hZkr`). -/
-theorem ucl_row_csr (hZkr : UclCsrEager C P) {s : UWSt} (hL : UstLand C P t0 mm0 s)
-    (hpc : (s.file .PC).getLsbD 0 = false) (i : instruction) (h : uclCsrU i = true) :
-    UstExecOk C P t0 mm0 s i 4 := by
-  cases i <;> first | exact absurd h Bool.false_ne_true | skip
-  case CSRReg p =>
-    obtain ⟨csr, rs1, rd, op⟩ := p
-    cases hz : uclEager csr.toNat
-    · exact ucl_row_csrReg_ok hL 4 csr hz rs1 rd op
-    · exact hZkr.reg t0 mm0 s csr rs1 rd op hL hpc hz
-  case CSRImm p =>
-    obtain ⟨csr, imm, rd, op⟩ := p
-    cases hz : uclEager csr.toNat
-    · exact ucl_row_csrImm_ok hL 4 csr hz imm rd op
-    · exact hZkr.imm t0 mm0 s csr imm rd op hL hpc hz
 
 /-- **The configuration-refused row**: ZICBOM/ZICBOZ/SSAMOSWAP are illegal. -/
 theorem ucl_row_cfgRefused {s : UWSt} (hL : UstLand C P t0 mm0 s) (len : Int) (i : instruction)

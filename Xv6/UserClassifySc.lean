@@ -1,18 +1,15 @@
 /-
 **The execute classification UP TO DISCARDED READS** (lane U3-A, on lane
-AND-ELIM's walker form `URunSc`, MachCSL/SailAndElim).
+AND-ELIM's walker form `URunSc`, MachCSL/SailAndElim): the user loop's
+execute contract `UstExecTotalSc` (UserStepLand), consumed through
+`swp_URunSc` (MachCSL/UCycleSc).
 
-The user loop's contract `UstExecOk` (UserStepLand) is a plain `runRW`
-equation for the model's EAGER `uxaExecAs i`.  For the CSR instructions the
-eager program is not a walk over the user footprint at eleven numbers (the
-eager `&&` of `check_CSR`: `uclEager`), so `ucl_execTotal` carries them as
-`UclCsrEager`.  Lane U1-X3's (post-AND-ELIM) facts instead state `execute`
-up to discarded reads (`URunSc`), for every number but `0x747`/`0x757`.
-
-This file restates the contract in that form -- `UstExecOkSc` /
-`UstExecTotalSc`, consumed by `swp_URunSc` (the eager program's `swp` from a
-walk of its short-circuit form) -- and proves it with the CSR hypothesis
-shrunk to `mseccfg`/`mseccfgh` (`UclCsrZkr`, the report's `hZkr`):
+The model's eager `&&` in `check_CSR` reads `mstateen1..3`/`sstateen1..3`
+(outside `ufFoot`) and, for `0x747`/`0x757`, reaches `currentlyEnabled
+Ext_Zkr`, which has no clause (`assert false`).  Lane U1-X3's (post-AND-ELIM)
+facts state `execute` up to discarded reads (`URunSc`), for every number but
+`0x747`/`0x757`; so the contract is proved with the CSR hypothesis shrunk to
+`mseccfg`/`mseccfgh` (`UclCsrZkr`, the report's `hZkr`):
 
 * `ustExecOkSc_of`: every `UstExecOk` fact is a `UstExecOkSc` fact (a plain
   walk is a walk up to discards), so every non-CSR row carries over;
@@ -20,12 +17,6 @@ shrunk to `mseccfg`/`mseccfgh` (`UclCsrZkr`, the report's `hZkr`):
   `uxr_execute_CSRReg/Imm` (`URunSc.bind` through the redirect);
 * `ucl_execTotalSc (hZkr : UclCsrZkr C P) (hM : UclMemArms C P) :
   UstExecTotalSc C P`.
-
-Switching the loop (UserStepActive's execute tail) from `UstExecTotal` to
-`UstExecTotalSc` is lane U3-L's call: the tail composes the execute walk
-under `ucAfterFetch` by `runRW_bind_some`; the `URunSc` twin is
-`URunSc.bind` + `swp_URunSc`.  `UstExecTotal → UstExecTotalSc`
-(`ustExecTotalSc_of`), so nothing proved against the old contract is lost.
 -/
 import Xv6.UserClassify
 import MachCSL.SailAndElim
@@ -36,24 +27,6 @@ open MachCSL
 open Sail LeanRV64D LeanRV64D.Functions
 
 set_option linter.unusedSectionVars false
-
-/-- **One instruction's execute fact, up to discarded reads**: a walk (of a
-short-circuit form) of `uxaExecAs i` from the `nextPC := PC + len` state
-answers, for every oracle, an admissible outcome. -/
-def UstExecOkSc (C : UCfg) (P : UPtd) (t0 : PTree) (mm0 : BMap) (s : UWSt) (i : instruction) (len : Int) :
-    Prop :=
-  ∃ res : UOrc → Option (ExecutionResult × UWSt × UOrc),
-    URunSc ufFoot (ucNpcS s len) (uxaExecAs i) res ∧
-      ∀ orc, ∃ (r : ExecutionResult) (s' : UWSt) (orc' : UOrc),
-        res orc = some (r, s', orc') ∧ UstResOk C P t0 mm0 r s'
-
-/-- **The execute classification, up to discarded reads** (`UstExecTotal`'s
-twin). -/
-structure UstExecTotalSc (C : UCfg) (P : UPtd) : Prop where
-  base : ∀ (t0 : PTree) (mm0 : BMap) (s : UWSt) (i : instruction), UstLand C P t0 mm0 s →
-    (s.file .PC).getLsbD 0 = false → decodableU i = true → UstExecOkSc C P t0 mm0 s i 4
-  rvc : ∀ (t0 : PTree) (mm0 : BMap) (s : UWSt) (i : instruction), UstLand C P t0 mm0 s →
-    (s.file .PC).getLsbD 0 = false → decodableUC i = true → UstExecOkSc C P t0 mm0 s i 2
 
 /-- **The CSR hypothesis, up to discards** (the report's `hZkr`): only
 `mseccfg`/`mseccfgh`, whose check has no Sail step in the current model. -/
@@ -71,11 +44,6 @@ variable {C : UCfg} {P : UPtd} {t0 : PTree} {mm0 : BMap}
 theorem ustExecOkSc_of {s : UWSt} {i : instruction} {len : Int} (h : UstExecOk C P t0 mm0 s i len) :
     UstExecOkSc C P t0 mm0 s i len :=
   ⟨fun orc => runRW ufFoot orc (ucNpcS s len) (uxaExecAs i), URunSc.of_runRW fun _ => rfl, h⟩
-
-/-- The old contract implies the new one. -/
-theorem ustExecTotalSc_of (h : UstExecTotal C P) : UstExecTotalSc C P :=
-  ⟨fun t0 mm0 s i hL hpc hd => ustExecOkSc_of (h.base t0 mm0 s i hL hpc hd),
-   fun t0 mm0 s i hL hpc hd => ustExecOkSc_of (h.rvc t0 mm0 s i hL hpc hd)⟩
 
 /-- An illegal `execute`, up to discards and state-preserving, is an
 admissible row. -/
