@@ -48,8 +48,9 @@ genuinely need an Iris-level wrapper, keep it in a separate small file.
 
 WORKFLOW: main-tree lane — create NEW files only under MachCSL/U*.lean (or Xv6/ for Xv6
 lanes); do not edit existing files, do not edit MachCSL.lean/Xv6.lean, do not touch git.
-Check with `lake build MachCSL.<Module>` (single modules are fine locally; anything bigger
-goes on the GCP VM per wave7b_prompt). `tools/check_layering.sh` must pass; no `sorry`; grep
+ALL builds, including single modules and scratch files, run on the GCP VM from your own
+lane worktree — see notes/coord/gcp_rule.txt (NO LEAN LOCALLY, EVER). Final files are copied
+into /shared/lean-xv6. `tools/check_layering.sh` must pass; no `sorry`; grep
 your new top-level names for clashes across MachCSL/ and Xv6/ (other U1 lanes are writing
 in parallel — use your lane's name prefix). Other U1 lanes running now: U1-C (UCycle/UWait),
 U1-P1 (UWalk/UTlb), U1-P2 (UTranslate/UFetchMem), U1-X1 (UExecAlu), U1-X2 (UExecCtl),

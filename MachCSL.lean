@@ -138,6 +138,8 @@ import MachCSL.URunRW
 import MachCSL.URunRWDemo
 import MachCSL.UTranslate
 import MachCSL.UFetchMem
+import MachCSL.UExecAlu
+import MachCSL.UExecCtl
 import MachCSL.ArchReset
 import MachCSL.BootRun
 import MachCSL.BootPeel

@@ -14,12 +14,34 @@ LANDED SINCE (lean-v2 08fb8e122): C0 — Xv6/SlotSupply.lean (fixed-name `Fdslot
 
 AUTO-IMPLICITS ARE OFF (2026-09-25, lakefile leanOptions autoImplicit=false, relaxedAutoImplicit=false): every variable in a signature must be bound explicitly (`{GF : BundledGFunctors}`, `{n : Nat}`, …). This caught a real bug: `Fscfg` fields were silently `∀ α, α` because FsCfgDefs lacked `open Iris`.
 
-BUILDING ON THE GCP VM (allowed, 2026-09-26; 96 cores, clean full build ~5.5 min vs ~10+ min locally):
-- `cd` to YOUR tree first (worktree dir, or /shared/lean-xv6 for main-tree agents). NEVER run it from /tmp or an unrelated dir: it syncs $PWD.
-- `/shared/xv6rocq/gcp-rocq/run-on-gcp --sync-only` pushes $PWD (honours .gitignore, so no .lake) to /mnt/rocq/trees/<flattened path>. Each directory gets its own remote tree; the first build there is a full build.
-- Build detached (the ssh pipe dies at tool timeouts), then poll:
-  run-on-gcp --no-sync bash -lc 'export PATH=$HOME/.elan/bin:$PATH; setsid nohup bash -c "lake build Xv6 MachCSL > /mnt/rocq/<you>.log 2>&1; echo EXIT=\$? >> /mnt/rocq/<you>.log" >/dev/null 2>&1 < /dev/null &'
-  run-on-gcp --no-sync bash -lc 'tail -3 /mnt/rocq/<you>.log'      # re-sync with --sync-only after every edit
-- Pick a unique <you> log name. Never pkill -f on the VM (shared machine); kill by PID. Two agents must not build in the same remote tree at once. Main-tree agents all share /mnt/rocq/trees/_shared_lean-xv6, so they should prefer local module builds, or coordinate.
-- WORKTREE agents: do FULL builds on the VM by default (the local machine overloads with many agents; lake has no jobs flag). Local = single-module checks only.
-- The final pre-push verification still happens locally in the coordinator's verify worktree.
+NO LEAN ON THE LOCAL MACHINE — EVER (user rule, 2026-09-26; local lean runs caused OOM and killed
+every agent). Do not run `lake`, `lean`, `lake env lean`, `lake build` (even one module), or any
+scratch-file elaboration locally. Local = git, reading, editing, grep, python only. ALL
+elaboration happens on the GCP VM (96 cores, 365 GB).
+
+Setup (once per agent; <L> = your lane name, e.g. u1c, k5, printf):
+  MAIN-TREE lanes get a PRIVATE worktree so they get a private remote tree:
+    cd /shared/lean-xv6 && git fetch -q origin && \
+      git worktree add --detach /shared/lean-xv6/.claude/worktrees/lane-<L> origin/lean-v2
+  (worktree lanes already have one: use it.)
+  Seed its remote .lake so the first build is incremental, not full:
+    cd <your worktree> && /shared/xv6rocq/gcp-rocq/run-on-gcp --sync-only && \
+      /shared/xv6rocq/gcp-rocq/run-on-gcp --no-sync bash -lc \
+        'test -d .lake || cp -a /mnt/rocq/lean-seed/.lake .'
+Work:
+  - Always `cd` into YOUR worktree before run-on-gcp (it syncs $PWD; NEVER from /tmp or the
+    main tree /shared/lean-xv6 — the main tree's remote dir is not yours).
+  - Main-tree lanes: write your new files in your lane worktree. Files other lanes have not
+    landed yet can be copied in from /shared/lean-xv6. When you finish, COPY your final new
+    files into /shared/lean-xv6 (same relative paths) — that is where the coordinator lands
+    from — and list them in the report.
+  - Scratch/experiment files go in <worktree>/scratch/ (synced, never imported) and run
+    remotely: run-on-gcp --no-sync bash -lc 'export PATH=$HOME/.elan/bin:$PATH; lake env lean scratch/X.lean'
+  - Builds: re-sync (`--sync-only`) after edits, then build DETACHED with a unique log and poll:
+      run-on-gcp --no-sync bash -lc 'export PATH=$HOME/.elan/bin:$PATH; setsid nohup bash -c "lake build Xv6.Mod1 MachCSL.Mod2 > /mnt/rocq/<L>.log 2>&1; echo EXIT=\$? >> /mnt/rocq/<L>.log" >/dev/null 2>&1 < /dev/null &'
+      run-on-gcp --no-sync bash -lc 'tail -5 /mnt/rocq/<L>.log'
+    Short module checks may run in the foreground under `timeout 600`. Worktree lanes do the full
+    `lake build Xv6 MachCSL` there before their final commit.
+  - To pick up newly landed work: `git fetch origin && git checkout --detach origin/lean-v2`
+    in your worktree (untracked files survive), then re-sync.
+  - The VM is a COLLABORATOR's shared machine: never pkill -f / killall there; kill by PID.
