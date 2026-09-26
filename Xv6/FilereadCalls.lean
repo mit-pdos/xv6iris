@@ -91,7 +91,7 @@ theorem frd_consoleread (CR : CONSOLEREAD) (Γ : SchedNames) [ClaimIs (hlc := hl
     (hn : k'.regs 12#5 = BitVec.ofInt 64 n) (hn' : -2 ^ 31 ≤ n ∧ n < 2 ^ 31) :
     kctx c k' ∗ pcIs c KA.«consoleread» ∗ procsInv Γ ∗
     trapCsrsExt c k'.sie ∗ cpuClaimExt c k'.sie k'.proc ∗
-    isConslock fscCons (appSup (GF := GF)) γc ∗ consPay fscCons (appSup (GF := GF)) ord ∗
+    isConslock fscCons (appRdcred (hlc := hlc) (GF := GF)) γc ∗ consPay fscCons (appRdcred (hlc := hlc) (GF := GF)) ord ∗
     consReadPay (genId (hlc := hlc) (GF := GF) + 1) Rin ∗ uartInv .uart0 fscCons.uart ∗
     isLock γkl kmemLockAddr "kmem" (kmemRes γk) ∗ kallocAvail γk none ∗
     procPrivExt (procAddr j) pid V V.upt M ∗ genHalvesPriv (procAddr j) pid V.gen ∗
@@ -112,13 +112,13 @@ theorem frd_consoleread (CR : CONSOLEREAD) (Γ : SchedNames) [ClaimIs (hlc := hl
          (∃ sl' ws : List (List Obs × BitVec 8),
             consStoredLb fscCons sl' ∗ ⌜sl <+: sl'⌝ ∗ ⌜sl'.length = cur + dc⌝ ∗ ⌜ws.length = dc⌝ ∗
             ⌜∀ i : Nat, i < dc → ws[i]? = sl'[cur + i]?⌝ ∗ Rin ws)) ∨
-        consDirtyCred (appSup (GF := GF))) -∗
-      consOut fscCons (appSup (GF := GF)) ord cur dc -∗
+        consDirtyCred (appRdcred (hlc := hlc) (GF := GF))) -∗
+      consOut fscCons (appRdcred (hlc := hlc) (GF := GF)) ord cur dc -∗
       kctx c' ((k'.withSpie spie spp).withRegs R') -∗ pcIs c' (jumpPc (k'.regs 1#5)) -∗
       trapCsrsExt c' k'.sie -∗ cpuClaimExt c' k'.sie k'.proc -∗
       procPrivExt (procAddr j) pid V P' M' -∗ genHalvesPriv (procAddr j) pid V.gen -∗ wpLoop c')
     ⊢ wpLoop (GF := GF) c := by
-  have h := CR.wp_consoleread_eb (hlc := hlc) (GF := GF) Γ c k' γc fscCons appSup ord Rin γkl γk j
+  have h := CR.wp_consoleread_eb (hlc := hlc) (GF := GF) Γ c k' γc fscCons (appRdcred (hlc := hlc) (GF := GF)) ord Rin γkl γk j
     pid V M n hj hproc hK hnoff htier huser hn hn'
   unfold wp_consoleread_eb_body at h
   simp only [consolereadAddr] at h

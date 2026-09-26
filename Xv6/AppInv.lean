@@ -234,6 +234,52 @@ theorem appSup_of_triv [Appcfg GF] (htriv : ∀ r av, appPred (GF := GF) r av �
   unfold appSup
   exact appSupRaw_triv _ _ htriv
 
+/-- **THE READ CREDENTIAL** (Rocq `app_rdcred`, seccomp design §9, lane
+S0/S2): what the console's dirty escrow (`ConsoleInvDefs.consDirtyCred`)
+holds.  A tokenless console read is paid by EITHER the supply -- the generic
+reader, which pays `appSup` (`appRdcred_of_sup`) -- OR the era's READER-SIDE
+wild credential (`MachFixedGS.rdwild`, Rocq `riscv_rdwild`;
+`appRdcred_of_rdwild`), split off the write licence: the dirty outcome hands
+this credential to whichever reader finds the marker moved, the shell
+included.  Only the ESCROWED proposition widens: the generic tier's supply
+law still pays `appSup`.  The era is the one the escrow is allocated in
+(`MainFs`), and the reader's console era is `genId + 1` -- the index of
+`consReadPay` at the same read. -/
+def appRdcred [MachGS hlc GF] [Appcfg GF] : IProp GF :=
+  iprop(appSup (GF := GF) ∨ MachFixedGS.rdwild (hlc := hlc) (GF := GF) (genId (hlc := hlc) (GF := GF) + 1))
+
+instance appRdcred_persistent [MachGS hlc GF] [Appcfg GF] :
+    Persistent (appRdcred (hlc := hlc) (GF := GF)) := by
+  unfold appRdcred; infer_instance
+
+/-- Rocq `app_rdcred_of_sup`. -/
+theorem appRdcred_of_sup [MachGS hlc GF] [Appcfg GF] :
+    appSup (GF := GF) ⊢ appRdcred (hlc := hlc) (GF := GF) := by
+  unfold appRdcred
+  iintro H
+  ileft
+  iexact H
+
+/-- Rocq `app_rdcred_of_rdwild`. -/
+theorem appRdcred_of_rdwild [MachGS hlc GF] [Appcfg GF] :
+    MachFixedGS.rdwild (hlc := hlc) (GF := GF) (genId (hlc := hlc) (GF := GF) + 1) ⊢
+      appRdcred (hlc := hlc) (GF := GF) := by
+  unfold appRdcred
+  iintro H
+  iright
+  iexact H
+
+/-- Rocq `app_rdcred_elim`: its elimination at a meta-level reading of each
+arm, the shape the shell tier's dirty arm spends it at. -/
+theorem appRdcred_elim [MachGS hlc GF] [Appcfg GF] (T : IProp GF)
+    (hs : ⊢ appSup (GF := GF) -∗ T)
+    (hw : ⊢ MachFixedGS.rdwild (hlc := hlc) (GF := GF) (genId (hlc := hlc) (GF := GF) + 1) -∗ T) :
+    ⊢ appRdcred (hlc := hlc) (GF := GF) -∗ T := by
+  unfold appRdcred
+  iintro (H | H)
+  · iapply hs $$ H
+  · iapply hw $$ H
+
 /-- THE TRANSPORT, PINNED (round C; Rocq's `app_xfer`): parked in the body
 so the era owns it, and the one application-side premise of the era
 mint. -/

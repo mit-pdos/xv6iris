@@ -415,7 +415,7 @@ theorem mn_consLock [Fscfg] [CurCtx] (cpu : CPU) (k : KCtx) (γc γl0 : GName) (
   icases mn_cons_kmap $$ HS with ⟨#Hc0, #Hc16⟩
   imod (kctx_newlockAt cpu k γc consAddr "cons" (consResAt cn)) $$ [Hk Hlf HR Hfr] with ⟨Hk, #Hlk⟩
   · iframe Hk Hlf HR Hfr Hc0 Hc16
-  imod consCredInv_alloc cn (appSup (GF := GF)) ⊤ $$ Hcl with #Hcred
+  imod consCredInv_alloc cn (appRdcred (hlc := hlc) (GF := GF)) ⊤ $$ Hcl with #Hcred
   imodintro
   iframe Hk
   unfold mnConsole consoleCaps consoleReadyApp

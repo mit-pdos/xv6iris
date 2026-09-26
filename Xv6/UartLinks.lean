@@ -153,17 +153,51 @@ theorem outChain_mono (i : UartId) (k : Nat) (bs : List (BitVec 8)) (Φ Φ' : IP
     iintro H
     iapply ih Φ Φ' $$ HΦ H
 
-/-- The licence pays ONE link at the witness it was handed (Rocq
-`out_link_of_licence`). -/
-theorem outLink_of_licence (k : Nat) (b : BitVec 8) (Φ : IProp GF) :
-    consLicence ⊢ Φ -∗ outLink .uart0 k b Φ := by
-  unfold consLicence outLink
+/-- THE LICENCE AT ONE ERA, FOR THE PROCESS EVENTS (Rocq `cons_licence_at`,
+seccomp design §9/§10.2, lane S0): the `∀ k` of `consLicence` instantiated,
+at the two events a process steps the claim by (`wildEv`) and under the
+event's validity premise `consEvOk` (`True` at `evOut`, so `outLink` pays it
+with no premise of its own).  The general licence buys it at every era by
+ignoring both premises (`consLicenceAt_of_licence`); the WILD credential buys
+it at its own (`consLicenceAt_of_wild`, AppIface).  The write link and the
+read payment have their era-`k` forms at this; the echo arm's `consRun` does
+not (its events are the interrupt's). -/
+def consLicenceAt (k : Nat) : IProp GF := iprop%
+  □ ∀ (h : List Obs) (H : ConsHist) (ev : ConsEv),
+    ⌜wildEv ev⌝ -∗ ⌜consEvOk H ev⌝ -∗
+    MachFixedGS.consRes (hlc := hlc) (GF := GF) k h H ==∗
+      MachFixedGS.consRes (hlc := hlc) (GF := GF) k h (consStep H ev)
+
+instance consLicenceAt_persistent (k : Nat) : Persistent (consLicenceAt (GF := GF) k) := by
+  unfold consLicenceAt; infer_instance
+
+/-- Rocq `cons_licence_at_of_licence`. -/
+theorem consLicenceAt_of_licence (k : Nat) :
+    consLicence (GF := GF) ⊢ consLicenceAt k := by
+  unfold consLicence consLicenceAt
+  iintro #Hlic !> %h %H %ev %_ %_
+  iapply Hlic $$ %k %h %H %ev
+
+/-- The era licence pays ONE link at the witness it was handed (Rocq
+`out_link_of_licence_at`): a licensed writer moves no witness, because it
+claims nothing about the input. -/
+theorem outLink_of_licenceAt (k : Nat) (b : BitVec 8) (Φ : IProp GF) :
+    consLicenceAt k ⊢ Φ -∗ outLink .uart0 k b Φ := by
+  unfold consLicenceAt outLink
   iintro #Hlic HΦ %o %Hh #Hlb Hres
   unfold chistAt
-  imod Hlic $$ %k %(o.getD []) %Hh %(.evOut b) Hres with Hres
+  imod Hlic $$ %(o.getD []) %Hh %(.evOut b) %trivial %trivial Hres with Hres
   imodintro
   iexists o
   iframe Hlb Hres HΦ
+
+/-- The licence pays ONE link at the witness it was handed (Rocq
+`out_link_of_licence`, now the corollary of the era form). -/
+theorem outLink_of_licence (k : Nat) (b : BitVec 8) (Φ : IProp GF) :
+    consLicence ⊢ Φ -∗ outLink .uart0 k b Φ := by
+  iintro #Hlic
+  iapply outLink_of_licenceAt k b Φ
+  iapply consLicenceAt_of_licence k $$ Hlic
 
 theorem outChain_of_licence (k : Nat) (bs : List (BitVec 8)) (Φ : IProp GF) :
     consLicence ⊢ Φ -∗ outChain .uart0 k bs Φ := by
@@ -255,12 +289,24 @@ quantified over the window. -/
 def consReadPay (k : Nat) (R : List (List Obs × BitVec 8) → IProp GF) : IProp GF := iprop%
   ∀ ws : List (List Obs × BitVec 8), readLink k ws (R ws)
 
+/-- THE GENERAL READ PAYMENT (Rocq `cons_read_pay_triv_at`, lane S0): the era
+licence claims nothing about the window and is told nothing. -/
+theorem consReadPay_trivAt (k : Nat) :
+    consLicenceAt k ⊢@{IProp GF} consReadPay k (fun _ => iprop(True)) := by
+  unfold consReadPay readLink consLink consLicenceAt
+  iintro #Hlic %ws %o %H #Hlb Hres %_ %hev
+  unfold chistAt
+  imod Hlic $$ %(o.getD []) %H %(.evRead ws) %trivial %hev Hres with Hres
+  imodintro
+  iexists o
+  iframe Hlb Hres
+
+/-- Rocq `cons_read_pay_triv`, the corollary. -/
 theorem consReadPay_triv (k : Nat) :
     consLicence ⊢@{IProp GF} consReadPay k (fun _ => iprop(True)) := by
-  unfold consReadPay
-  iintro #Hlic %ws
-  iapply readLink_of_licence k ws _ $$ Hlic
-  ipureintro; trivial
+  iintro #Hlic
+  iapply consReadPay_trivAt k
+  iapply consLicenceAt_of_licence k $$ Hlic
 
 /-- THE WHOLE ARM, run to the end (Rocq `cons_run_full`). -/
 theorem consRun_full (k : Nat) (h : List Obs) (bs : List (BitVec 8)) (Φ : IProp GF) :

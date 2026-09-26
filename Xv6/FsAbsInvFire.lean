@@ -192,8 +192,8 @@ theorem fsabsFilereadIn [Xv6G GF] [OffboxG GF] [Fscfg] (st : FdState) (P : IProp
   · dsimp only
     split
     · isplitl [HP]
-      · iapply (consAcc_cred fscCons (appSup (GF := GF)) (fun cur dc => iprop(P ∗ True)))
-        · unfold consDirtyCred; imodintro; iexact Hsup
+      · iapply (consAcc_cred fscCons (appRdcred (hlc := hlc) (GF := GF)) (fun cur dc => iprop(P ∗ True)))
+        · unfold consDirtyCred; imodintro; iapply appRdcred_of_sup $$ Hsup
         · iintro %cur %dc
           imodintro
           iframe HP

@@ -280,6 +280,24 @@ class MachFixedGS (hlc : outParam HasLC) (GF : BundledGFunctors) where
   boot (`powerBootRes`). -/
   consRes : Nat → List Obs → ConsHist → IProp GF
   consRes_timeless : ∀ k h H, Timeless (consRes k h H)
+  /-- THE WILD CREDENTIAL, per era (Rocq `riscv_wild` := `ai_wild
+  riscvF_app_iface`; seccomp design §6.1, lane S0): what an unverified
+  program running under a syscall mask holds where a generic program holds
+  the taint.  Persistent and timeless (fields).  Its LAW -- the era's
+  licence for the two process events -- names Xv6's console events, so it
+  lives on the Xv6-level record (`Xv6.AppIface.wild_lic`), read back at a
+  record whose slots are the interface's (`Xv6.consLicenceAt_of_wild`).
+  `wildNone` (`False`) for an application with no masked program. -/
+  wild : Nat → IProp GF
+  wild_persistent : ∀ k, Persistent (wild k)
+  wild_timeless : ∀ k, Timeless (wild k)
+  /-- THE READER-SIDE WILD CREDENTIAL, per era (Rocq `riscv_rdwild` :=
+  `ai_rdwild riscvF_app_iface`; seccomp design 10.7): what a tokenless
+  reader under a mask may pay the console escrow's DIRTY arm with
+  (`Xv6.appRdcred`).  No law. -/
+  rdwild : Nat → IProp GF
+  rdwild_persistent : ∀ k, Persistent (rdwild k)
+  rdwild_timeless : ∀ k, Timeless (rdwild k)
   /-- THE DURABLE DISK'S TYPING (Rocq `riscvF_diskGS`): the ONE capacity
   instance of the `Nat ↦ BitVec 8` ghost map (`MachCSL.DiskImg`). -/
   diskImgG : GhostMapG GF Nat (BitVec 8) DiskMapF
@@ -334,6 +352,8 @@ attribute [reducible, instance] MachFixedGS.mirrorG
 attribute [instance] MachFixedGS.rxTag_persistent MachFixedGS.rxTag_timeless
 attribute [instance] MachFixedGS.killCred_persistent MachFixedGS.killCred_timeless
 attribute [instance] MachFixedGS.consRes_timeless
+attribute [instance] MachFixedGS.wild_persistent MachFixedGS.wild_timeless
+attribute [instance] MachFixedGS.rdwild_persistent MachFixedGS.rdwild_timeless
 
 /-- A context: a thread of control's ghost identity -- its bound (a monotone
 counter) and its dirty set (a ghost map keyed by timestamp).  The laws live
@@ -1134,6 +1154,17 @@ def consResTriv {GF : BundledGFunctors} : Nat → List Obs → ConsHist → IPro
 instance {GF : BundledGFunctors} (k : Nat) (h : List Obs) (H : ConsHist) :
     Timeless (consResTriv (GF := GF) k h H) := by
   unfold consResTriv; infer_instance
+
+/-- THE ABSENT WILD CREDENTIAL (Rocq `RiscvPtsto.wild_none`): what an
+application with no masked program fills the `wild` and `rdwild` slots
+with.  Its law (`Xv6.wildNone_lic`) is proved from `False`, at any claim. -/
+def wildNone {GF : BundledGFunctors} : Nat → IProp GF := fun _ => iprop(False)
+instance wildNone_persistent {GF : BundledGFunctors} (k : Nat) :
+    Persistent (wildNone (GF := GF) k) := by
+  unfold wildNone; infer_instance
+instance wildNone_timeless {GF : BundledGFunctors} (k : Nat) :
+    Timeless (wildNone (GF := GF) k) := by
+  unfold wildNone; infer_instance
 
 /-- The TRIVIAL trace predicate -- the client's half and nothing about it. -/
 def obsPredTriv : IProp GF := iprop% ∃ h : List Obs, obsFrag h

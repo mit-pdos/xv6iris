@@ -207,6 +207,15 @@ inductive ConsEv where
   | evClose
   | evRead (ws : List (List Obs × BitVec 8))
 
+/-- THE PROCESS EVENTS (Rocq `wild_ev`, seccomp design §10.2): the two a
+PROCESS steps the claim by -- a byte it writes (`evOut`) and a read it takes
+(`evRead`).  The echo arm's `evOpen`/`evByte`/`evClose` are the interrupt's.
+The per-era WILD licence (`AppIface.wild_lic`) covers these two only. -/
+def wildEv : ConsEv → Prop
+  | .evOut _ => True
+  | .evRead _ => True
+  | _ => False
+
 def consStep (H : ConsHist) : ConsEv → ConsHist
   | .evOut b => ⟨H.chAcc ++ [b], H.chLog, H.chDl, H.chArm⟩
   | .evOpen h c cs => ⟨H.chAcc, H.chLog, H.chDl, some ((h, c, cs), 0)⟩

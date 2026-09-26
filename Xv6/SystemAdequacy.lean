@@ -41,8 +41,8 @@ PowerOn) until BootReset (wave 9) -- Rocq's `SystemAssumptions` note.
 ## DEVIATIONS from Rocq
 
 1. **`Ai : CT → AppIface GF`** is passed to `riscvPowerAdequacy` as its
-   three slots `Tg`/`Kc`/`Cres` (`AppIface.bootFixedGS`, AppIface
-   deviation 1).  The era's turn `Tnn` is Rocq's (union DU6, reversing
+   five slots `Tg`/`Kc`/`Cres`/`Wd`/`Rw` (`AppIface.bootFixedGS`, AppIface
+   deviations 1 and 5; the wild pair is seccomp S0's).  The era's turn `Tnn` is Rocq's (union DU6, reversing
    D49 (a)): `Hobs`'s power-on arm yields the console claim and
    `Tnn c (obsBoots h + 1)`, and `Hinit_boot` (`EraInitBoot`) receives
    `Tnn c (gen + 1)`.
@@ -149,7 +149,10 @@ theorem xv6PowerAdequacyGen (g : GState) (sb : FsSb) (nib : Nat) (cov : ExtTreeS
     (xv6Slot_swap N appFs appBoot cov sb.sbLogstart Happ_boot)
     Pt (fun c => (Ai c).tag) (fun c h => (Ai c).tag_persistent h) (fun c h => (Ai c).tag_timeless h)
     (fun c => (Ai c).kill) (fun c => (Ai c).kill_persistent) (fun c => (Ai c).kill_timeless)
-    (fun c => (Ai c).cons) (fun c k h H => (Ai c).cons_timeless k h H) Tnn
+    (fun c => (Ai c).cons) (fun c k h H => (Ai c).cons_timeless k h H)
+    (fun c => (Ai c).wild) (fun c k => (Ai c).wild_persistent k) (fun c k => (Ai c).wild_timeless k)
+    (fun c => (Ai c).rdwild) (fun c k => (Ai c).rdwild_persistent k)
+    (fun c k => (Ai c).rdwild_timeless k) Tnn
     HPt Hobs phi Hphi Hgen0 Hpow ?_ n κs t2 g2 hsteps
   intro F Hinv γgen γstart γreg γd γsw γobs γhist c T hF E gen σ hbf hdv hpp
   subst hF

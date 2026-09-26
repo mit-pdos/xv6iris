@@ -570,7 +570,7 @@ theorem frd_receipt_of_dirty (gn : GName) (pt : UPtd) (Rd : Nat → Nat → IPro
     (hpl : ∀ kp w, Iris.Std.PartialMap.get? P'.um kp = some w → (M' kp).length = 4096)
     (htag : consTagged bs hs d) :
     ([∗list] h ∈ hs, MachFixedGS.rxTag (hlc := hlc) (GF := GF) h) ⊢
-      consStoredLb fscCons sl -∗ consDirtyCred (appSup (GF := GF)) -∗
+      consStoredLb fscCons sl -∗ consDirtyCred (appRdcred (hlc := hlc) (GF := GF)) -∗
       Rd cur dc -∗ consoleReceipt (hlc := hlc) gn pt Rd Rin n r M' addr := by
   have hled := frd_ledger P' Vw M' addr d bs hs hM hmap hpl htag
   have hhl := htag.1

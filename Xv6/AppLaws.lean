@@ -143,6 +143,8 @@ class Xv6AppLaws {hlc : HasLC} {GF : BundledGFunctors} [MachGpreS hlc GF] [Xv6G 
     MachFixedGS.rxTag (hlc := hlc) (GF := GF) = A.tag c →
     MachFixedGS.killCred (hlc := hlc) (GF := GF) = A.kill c →
     MachFixedGS.consRes (hlc := hlc) (GF := GF) = A.cons c →
+    MachFixedGS.wild (hlc := hlc) (GF := GF) = (A.ifc c).wild →
+    MachFixedGS.rdwild (hlc := hlc) (GF := GF) = (A.ifc c).rdwild →
     MachFixedGS.mono (hlc := hlc) (GF := GF) = MachGpreS.mono_pre (hlc := hlc) →
     EraInitBoot (hlc := hlc) A.names A.pred A.boot A.turn c
   /-- THE ECHO'S JUSTIFICATION at every era, at any record whose interface
@@ -151,6 +153,8 @@ class Xv6AppLaws {hlc : HasLC} {GF : BundledGFunctors} [MachGpreS hlc GF] [Xv6G 
     MachFixedGS.rxTag (hlc := hlc) (GF := GF) = A.tag c →
     MachFixedGS.killCred (hlc := hlc) (GF := GF) = A.kill c →
     MachFixedGS.consRes (hlc := hlc) (GF := GF) = A.cons c →
+    MachFixedGS.wild (hlc := hlc) (GF := GF) = (A.ifc c).wild →
+    MachFixedGS.rdwild (hlc := hlc) (GF := GF) = (A.ifc c).rdwild →
     EraEcho (hlc := hlc) (GF := GF)
 
 section inst
@@ -201,10 +205,10 @@ theorem xv6AppAdequacy (g : GState) (sb : FsSb) (nib : Nat) (cov : ExtTreeSet Na
     (fun γobs c => obsLedgerAt (A.R c) γobs)
     (fun Hinv γgen γstart γreg γd γsw γobs γhist c T =>
       AL.al_programs (F := xv6FixedGS A.names A.pred cov sb.sbLogstart (A.ifc c) Hinv γgen γstart
-        γreg γd γsw γobs γhist c T (obsLedgerAt (A.R c) γobs)) c rfl rfl rfl rfl)
+        γreg γd γsw γobs γhist c T (obsLedgerAt (A.R c) γobs)) c rfl rfl rfl rfl rfl rfl)
     (fun Hinv γgen γstart γreg γd γsw γobs γhist c T =>
       AL.al_echo (F := xv6FixedGS A.names A.pred cov sb.sbLogstart (A.ifc c) Hinv γgen γstart
-        γreg γd γsw γobs γhist c T (obsLedgerAt (A.R c) γobs)) c rfl rfl rfl)
+        γreg γd γsw γobs γhist c T (obsLedgerAt (A.R c) γobs)) c rfl rfl rfl rfl rfl)
     (fun γobs c => obsLedgerAt_alloc_cl (A.R c) γobs (A.cl c) (AL.al_R0 c))
     (fun γd γobs c h on dk hs =>
       obsLedgerAt_step (A.R c) (A.cons c) (A.turn c) (AL.al_pow c) XV6_DISK_BYTES γd γobs h on dk
@@ -317,8 +321,8 @@ theorem appTriv_laws (US : USER) : Xv6AppLaws (hlc := hlc) (appTriv GF) where
     · iexact HR
     · itrivial
   al_xfer := fun _ _ => appXferBootRaw_triv _ (fun _ _ => .rfl)
-  al_programs := fun c _ hkill hcons _ => appTriv_initBoot US c hkill hcons
-  al_echo := fun c _ _ hcons => by
+  al_programs := fun c _ hkill hcons _ _ _ => appTriv_initBoot US c hkill hcons
+  al_echo := fun c _ _ hcons _ _ => by
     intro E gen cP cI
     letI : MachGS hlc GF := MachGS.ofEra E gen cP cI
     exact consEchoShift_triv hcons

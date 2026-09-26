@@ -73,7 +73,7 @@ joins the shared epilogue (+0x5e) with the answer in `s2`.
    values (deviation 3).
 3. **THE FD_DEVICE ARM'S ENVIRONMENT IS `consoleReadyApp`** at an in-range
    major (`filereadDevEnv`): Rocq's `console_ready_app` (the console
-   invariant at `fscCons` / `appSup`, gname existential, beside the port's
+   invariant at `fscCons` / `appRdcred`, gname existential, beside the port's
    `uartInv .uart0`).  Rocq's `fileread_dev_env` lists the ONE devsw cell at
    the caller's names-record values and fraction and the exclusive
    "null and not the console, or consoleread" tie; every caller of Rocq's
@@ -197,14 +197,14 @@ deviation 3): the console invariant at the ambient ring names and the
 application's credential (the lock handle's gname existential) beside the
 port's invariant.  Persistent. -/
 def consoleReadyApp : IProp GF :=
-  iprop((∃ γc : GName, consoleInv fscCons (appSup (GF := GF)) γc) ∗ uartInv .uart0 fscCons.uart)
+  iprop((∃ γc : GName, consoleInv fscCons (appRdcred (hlc := hlc) (GF := GF)) γc) ∗ uartInv .uart0 fscCons.uart)
 
 instance consoleReadyApp_persistent : Persistent (consoleReadyApp (GF := GF)) := by
   unfold consoleReadyApp; infer_instance
 
 /-- Rocq `console_ready_app_intro`. -/
 theorem consoleReadyApp_intro (γc : GName) :
-    consoleInv (GF := GF) fscCons appSup γc ⊢ uartInv .uart0 fscCons.uart -∗ consoleReadyApp := by
+    consoleInv (GF := GF) fscCons (appRdcred (hlc := hlc) (GF := GF)) γc ⊢ uartInv .uart0 fscCons.uart -∗ consoleReadyApp := by
   unfold consoleReadyApp
   iintro #H #Hu
   iframe Hu
@@ -225,7 +225,7 @@ theorem consoleReadyApp_uart : consoleReadyApp (GF := GF) ⊢ uartInv .uart0 fsc
 
 /-- The lock handle (Rocq `fileread_dev_caps_lock`). -/
 theorem consoleReadyApp_conslock :
-    consoleReadyApp (GF := GF) ⊢ ∃ γc : GName, isConslock fscCons appSup γc := by
+    consoleReadyApp (GF := GF) ⊢ ∃ γc : GName, isConslock fscCons (appRdcred (hlc := hlc) (GF := GF)) γc := by
   unfold consoleReadyApp
   iintro ⟨⟨%γc, #H⟩, -⟩
   iexists γc
@@ -359,7 +359,7 @@ def consoleReceipt (gn : GName) (pt : UPtd) (Rd : Nat → Nat → IProp GF)
           (∃ sl' ws : List (List Obs × BitVec 8),
             consStoredLb fscCons sl' ∗ ⌜sl <+: sl'⌝ ∗ ⌜sl'.length = cur + dc⌝ ∗ ⌜ws.length = dc⌝ ∗
             ⌜∀ i : Nat, i < dc → ws[i]? = sl'[cur + i]?⌝ ∗ Rin ws)) ∨
-        consDirtyCred (appSup (GF := GF))) ∗
+        consDirtyCred (appRdcred (hlc := hlc) (GF := GF))) ∗
       Rd cur dc)
 
 /-- Rocq `console_receipt_m1`: the `-1` arm, at its reason. -/
@@ -420,7 +420,7 @@ def filereadIn (st : FdState) (F : Pfam GF (Aview → Nat → Anode → Nat → 
     | .open true _ (.inode i γo _) => iprop(P ∗ pfAt (areadCommitAt (fsGammaL fscFs) appE i γo) F)
     | .open true _ (.device mj) =>
       if mj = CONSOLE then
-        iprop(consAcc fscCons (appSup (GF := GF)) (fun cur dc => iprop(P ∗ Rd cur dc)) ∗
+        iprop(consAcc fscCons (appRdcred (hlc := hlc) (GF := GF)) (fun cur dc => iprop(P ∗ Rd cur dc)) ∗
           consReadPay (genId (hlc := hlc) (GF := GF) + 1) Rin)
       else P
     | _ => P)
@@ -559,7 +559,7 @@ theorem filereadExtra_closed (n : Int) (M' : Nat → List (BitVec 8)) (addr : Bi
 theorem filereadIn_dev_console (st : FdState) (wb : Bool) (mj : Nat)
     (h : st = .open true wb (.device mj)) (hmj : mj = CONSOLE) :
     filereadIn (hlc := hlc) st F Rd Rin P ⊢ P -∗
-      consAcc fscCons (appSup (GF := GF)) (fun cur dc => iprop(P ∗ Rd cur dc)) ∗
+      consAcc fscCons (appRdcred (hlc := hlc) (GF := GF)) (fun cur dc => iprop(P ∗ Rd cur dc)) ∗
         consReadPay (genId (hlc := hlc) (GF := GF) + 1) Rin := by
   subst h hmj
   simp only [filereadIn, if_pos]
