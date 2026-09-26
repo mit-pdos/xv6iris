@@ -288,15 +288,15 @@ Section UShOut.
      the console, which is /init's pinned table inherited through the exec
      channel.  What comes back is the cursor two bytes on, or the taint. *)
   Lemma ksh_w_of_link_prompt (N : uk_names Σ) (v : era_pins)
-      (I : list (bv 8)) (l : list fdstate) (rb : bool) :
+      (I : list (bv 8)) (l vw : list fdstate) (rb : bool) :
     l !! 2%nat = Some (FdOpen rb true (FdDevice CONSOLE)) ->
     era_pin γ (S gen_id) v -∗
     echo_links T γ -∗
     shk_rodata (ukn_t N) -∗
     UkSh.ksh_w N (mword_of_int 2 : mword 64)
       (mword_of_int sh_prompt_pv) 2%nat
-      (UserFd.ustd (ukn_fd N) l ∗ ushpr v I 0%nat)
-      (UserFd.ustd (ukn_fd N) l ∗ ushpr v I 2%nat).
+      (UserFd.ustd_at (ukn_fd N) l vw ∗ ushpr v I 0%nat)
+      (UserFd.ustd_at (ukn_fd N) l vw ∗ ushpr v I 2%nat).
   Proof.
     intros Hl2.
     iIntros "#Hpin #Hlk #Hro" (h m avail)
@@ -364,8 +364,8 @@ Section UShOut.
                      ((<[Regidx a7_idx := (mword_of_int 16 : mword 64)]> m)
                         !!! Regidx a2_idx)) = 2%nat)
       by (rewrite Ham2 sh_count2; lia).
-    iApply (UkSh.wp_ksh_write_chain_txt N h m avail
-              (ksh_fam N (fun j : nat => ushpr v I j)) l
+    iApply (UkSh.wp_ksh_write_chain_txt_at N h m avail
+              (ksh_fam N (fun j : nat => ushpr v I j)) l vw
               2%nat (fun j : nat => u_prompt !!! j)
               with "Hcode Hrun [Hc] Hstd Hbs").
     { (* THE DEPOSIT: sh's own chain at its own cursor *)
@@ -416,19 +416,19 @@ Section UShOut.
   (*      it back.  This is what [UShKernel.sh_prompt_law] is built from. *)
   (* =================================================================== *)
   Lemma ksh_w_of_link_cred (N : uk_names Σ) (I : list (bv 8))
-      (l : list fdstate) (rb : bool) :
+      (l vw : list fdstate) (rb : bool) :
     l !! 2%nat = Some (FdOpen rb true (FdDevice CONSOLE)) ->
     echo_links T γ -∗
     shk_rodata (ukn_t N) -∗
     UkSh.ksh_w N (mword_of_int 2 : mword 64)
       (mword_of_int sh_prompt_pv) 2%nat
-      (UserFd.ustd (ukn_fd N) l ∗ EchoLinks.ewc_cred T γ (S gen_id) I 0%nat)
-      (UserFd.ustd (ukn_fd N) l ∗ EchoLinks.ewc_cred T γ (S gen_id) I 2%nat).
+      (UserFd.ustd_at (ukn_fd N) l vw ∗ EchoLinks.ewc_cred T γ (S gen_id) I 0%nat)
+      (UserFd.ustd_at (ukn_fd N) l vw ∗ EchoLinks.ewc_cred T γ (S gen_id) I 2%nat).
   Proof.
     intros Hl2. iIntros "#Hlk #Hro" (h m avail)
       "%Ha0 %Ha1 %Ha2 #Hcode [Hstd Hc] Hrun Hcont".
     rewrite /EchoLinks.ewc_cred. iDestruct "Hc" as (v) "[#Hpin Hc]".
-    iApply (ksh_w_of_link_prompt N v I l rb Hl2
+    iApply (ksh_w_of_link_prompt N v I l vw rb Hl2
               with "Hpin Hlk Hro [%] [%] [%] Hcode [$Hstd $Hc] Hrun [Hcont]");
       [ exact Ha0 | exact Ha1 | exact Ha2 | ].
     iIntros (h' ret) "[Hstd Hc] Hrun".
@@ -446,11 +446,11 @@ Section UShOut.
     iIntros "#Hlk". rewrite /UShKernel.sh_prompt_law.
     iIntros "!>" (N) "#Hro". rewrite /UkSh.ush_prompt_law.
     iModIntro. iSplitL "".
-    - iIntros (I l) "%Hfd2". destruct Hfd2 as [rb Hl2].
-      iApply (ksh_w_of_link_cred N I l rb Hl2 with "Hlk Hro").
-    - iIntros (l) "%Hcl".
-      iApply (UkWriteClosed.ksh_w_of_closed N (mword_of_int 2)
-                (mword_of_int sh_prompt_pv) 2%nat l 2%nat
+    - iIntros (I l vw) "%Hfd2". destruct Hfd2 as [rb Hl2].
+      iApply (ksh_w_of_link_cred N I l vw rb Hl2 with "Hlk Hro").
+    - iIntros (l vw) "%Hcl".
+      iApply (UkWriteClosed.ksh_w_of_closed_at N (mword_of_int 2)
+                (mword_of_int sh_prompt_pv) 2%nat l vw 2%nat
                 sh_fd2_signed ltac:(unfold NSTD; lia) Hcl).
   Qed.
 

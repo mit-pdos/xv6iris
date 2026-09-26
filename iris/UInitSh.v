@@ -1474,6 +1474,14 @@ Section UInitSh.
        spent here -- the process that execs is replaced, and the new image
        gets its ledger from its own run -- and its row ([UInitFd.ufd_row])
        is what sh's entry is told about slot 0. *)
+    (* THE TABLE'S VIEW (seccomp S4): the child's ledger is at an ok view
+       of the table it execs with, or the taint *)
+    iDestruct "Hstd" as (vw) "[#Hvw Hstd]".
+    iDestruct (ustd_at_tab with "Hufd Hstd") as %Htab.
+    iAssert (⌜ush_view_ok fdv⌝ ∨ T)%I as "#Hvok".
+    { iDestruct "Hvw" as "[%Hv | $]". iLeft. iPureIntro.
+      exact (ush_view_ok_tab fdv vw Hv Htab). }
+    iDestruct (ustd_at_ustd with "Hstd") as "Hstd".
     iDestruct (ustd_agree (ukn_fd N) fdv l with "Hufd Hstd") as %Hl.
     iAssert (UkSh.ush_fd0 T (take NSTD fdv)) with "[Hrow]" as "#Hfd0".
     { rewrite Hl /UInitFd.ufd_row. iDestruct "Hrow" as "[%Hr1 | [%Hr2 | HT]]".
@@ -1525,7 +1533,7 @@ Section UInitSh.
                 T cn K Cr Rsh n0 γp np N l
                 M fdv cs pidv Hpsok_free Hn0 Hsav Hsro Hl Hcs
                 ltac:(rewrite Hpv; exact Hp1) Hlen HCr
-                with "Hnp0 Hdep Hdp Hplaw Hcons Hfd0 Hgen'"). }
+                with "Hnp0 Hdep Hdp Hplaw Hcons Hfd0 Hvok Hgen'"). }
     (* ...AND THE LINEAR PAYLOAD, WHOLE: [PinnedExec]'s one [Pay] slot is
        sh's persistent state, the position init minted for this round, the
        lease, and the ledger with its credential. *)

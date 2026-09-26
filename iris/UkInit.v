@@ -1796,7 +1796,9 @@ Section UkInit.
        ⌜ m !!! Regidx a1_idx = (mword_of_int 0x1000 : mword 64) ⌝ -∗
        init_rodata (ukn_t N') -∗
        init_argv (ukn_d N') -∗
-       UserFd.ustd (ukn_fd N') l -∗
+       (* ...AT AN OK VIEW, or the taint (seccomp S4): what sh's entry is
+          told about the table it is exec'd at *)
+       UserFd.ustd_ok T (ukn_fd N') l -∗
        UInitFd.ufd_row T st l -∗
        init_lend_cred T st (cc_wp Cr) (cc_wbn Cr) l n -∗
        upos γ n -∗

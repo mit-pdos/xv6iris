@@ -495,23 +495,23 @@ Section UShURoundLaws.
 
   (* a tainted round writes its prompt on the record's own law, DONE := T *)
   Local Lemma uksh_w_prompt_taint (N : uk_names Σ) (I : list (bv 8))
-      (l : list fdstate) (rb : bool) :
+      (l vw : list fdstate) (rb : bool) :
     l !! 2%nat = Some (FdOpen rb true (FdDevice ConsoleInv.CONSOLE)) ->
     T -∗ union_links ug -∗ UCodeShK.shk_rodata (ukn_t N) -∗
     UkSh.ksh_w (PS := uprogSG_free) N (mword_of_int 2 : mword 64)
       (mword_of_int UkSh.sh_prompt_pv) 2%nat
-      (UserFd.ustd (ukn_fd N) l ∗ Wcl I 0%nat)
-      (UserFd.ustd (ukn_fd N) l ∗ (Wcl I 2%nat ∗ DONE I)).
+      (UserFd.ustd_at (ukn_fd N) l vw ∗ Wcl I 0%nat)
+      (UserFd.ustd_at (ukn_fd N) l vw ∗ (Wcl I 2%nat ∗ DONE I)).
   Proof using .
     intros Hl2. iIntros "#HT #Hlk #Hro".
     iApply (UShPanicHold.ksh_w_mono (PS := uprogSG_free) N _ _ _
-              (UserFd.ustd (ukn_fd N) l ∗ lk_lcred FI (S gen_id) I 0%nat)%I _
-              (UserFd.ustd (ukn_fd N) l ∗ lk_lcred FI (S gen_id) I 2%nat)%I
+              (UserFd.ustd_at (ukn_fd N) l vw ∗ lk_lcred FI (S gen_id) I 0%nat)%I _
+              (UserFd.ustd_at (ukn_fd N) l vw ∗ lk_lcred FI (S gen_id) I 2%nat)%I
               with "[] []").
     { iIntros "[Hs Hc]". iFrame "Hs". rewrite /uWcl. iExact "Hc". }
     { iIntros "[Hs Hc]". iFrame "Hs". iSplitL "Hc";
         [rewrite /uWcl; iExact "Hc" | iApply (ush_deed_taint ug r with "HT")]. }
-    iApply (UShPanic.ksh_w_of_link_lcred_at (PS := uprogSG_free) FI N I l rb
+    iApply (UShPanic.ksh_w_of_link_lcred_at (PS := uprogSG_free) FI N I l vw rb
               Hl2 with "[] [] Hro"); [by iRight |].
     cbn [lk_links union_link_inst_at gen_link_inst]. iExact "Hlk".
   Qed.
@@ -588,13 +588,13 @@ Section UShURoundLaws.
 
   (* the PEND arm of the prompt call *)
   Local Lemma uksh_w_prompt_pend (N : uk_names Σ) (I : list (bv 8))
-      (l : list fdstate) (rb : bool) :
+      (l vw : list fdstate) (rb : bool) :
     l !! 2%nat = Some (FdOpen rb true (FdDevice ConsoleInv.CONSOLE)) ->
     union_links ug -∗ UCodeShK.shk_rodata (ukn_t N) -∗
     UkSh.ksh_w (PS := uprogSG_free) N (mword_of_int 2 : mword 64)
       (mword_of_int UkSh.sh_prompt_pv) 2%nat
-      (UserFd.ustd (ukn_fd N) l ∗ (Wcl I 3%nat ∗ PEND I))
-      (UserFd.ustd (ukn_fd N) l ∗ (Wcl I 2%nat ∗ DONE I)).
+      (UserFd.ustd_at (ukn_fd N) l vw ∗ (Wcl I 3%nat ∗ PEND I))
+      (UserFd.ustd_at (ukn_fd N) l vw ∗ (Wcl I 2%nat ∗ DONE I)).
   Proof using Hcons.
     intros Hl2. iIntros "#Hlk #Hro" (h m avail)
       "%Ha0 %Ha1 %Ha2 #Hcode [Hstd [Hc Hp]] Hrun Hcont".
@@ -602,7 +602,7 @@ Section UShURoundLaws.
     rewrite {1}/ush_pend_at /ush_deed_at.
     iDestruct "Hp" as "[Hp | #HT]"; last first.
     { iDestruct (lk_lcred_blk_line FI (S gen_id) I with "Hc") as "Hc".
-      iApply (uksh_w_prompt_taint N I l rb Hl2
+      iApply (uksh_w_prompt_taint N I l vw rb Hl2
                 with "HT Hlk Hro [%] [%] [%] Hcode [$Hstd $Hc] Hrun Hcont");
         assumption. }
     iDestruct "Hp" as (cs' s v') "(Hd & %Htie & #Hty & #Hpin' & #Hcs' & %Hnw)".
@@ -613,7 +613,7 @@ Section UShURoundLaws.
     cbn [lk_pin lk_lend union_link_inst_at gen_link_inst]. rewrite /gwc_lend.
     iDestruct "Hl" as "[Hl | #HT]"; last first.
     { iDestruct (uHcltaint ug s0 I 0%nat v with "Hpin HT") as "Hc0".
-      iApply (uksh_w_prompt_taint N I l rb Hl2
+      iApply (uksh_w_prompt_taint N I l vw rb Hl2
                 with "HT Hlk Hro [%] [%] [%] Hcode [$Hstd $Hc0] Hrun Hcont");
         assumption. }
     iDestruct "Hl" as (ps cs sw P) "(%Hw & Hcur)".
@@ -629,7 +629,7 @@ Section UShURoundLaws.
     iPoseProof (upfam_step v ps cs P a I s Hw Htie Hnw
                   with "Hlk Hpin Hps Hcs HE Hcw Hty") as "#Hst".
     iApply (UShPanic.ksh_w_of_link_prompt_fam (PS := uprogSG_free) N
-              (upfam v P I s) l rb Hl2
+              (upfam v P I s) l vw rb Hl2
               with "Hst Hro [%] [%] [%] Hcode [$Hstd Htn Hd] Hrun [Hcont]");
       [ exact Ha0 | exact Ha1 | exact Ha2 | cbn [upfam]; iFrame "Htn Hd" | ].
     iIntros (h' ret) "[Hstd Hc] Hrun".
@@ -649,14 +649,14 @@ Section UShURoundLaws.
     rewrite /UShKernel.sh_prompt_law. iIntros "!>" (N) "#Hro".
     iDestruct ("Hpld" $! N with "Hro") as "#Hd". rewrite /UkSh.ush_prompt_law.
     iDestruct "Hd" as "#[Hdopen Hdclosed]". iModIntro. iSplitL "".
-    - iIntros (I l) "%Hfd". pose proof Hfd as [rb Hl2].
+    - iIntros (I l vw) "%Hfd". pose proof Hfd as [rb Hl2].
       rewrite uWcf_0 uWcf_2.
-      iApply (uksh_w_or N _ _ _ (UserFd.ustd (ukn_fd N) l)
+      iApply (uksh_w_or N _ _ _ (UserFd.ustd_at (ukn_fd N) l vw)
                 (Wcl I 0%nat ∗ DONE I)%I (Wcl I 3%nat ∗ PEND I)%I
                 with "[] []").
-      + iApply ("Hdopen" $! I l). by iPureIntro.
-      + iApply (uksh_w_prompt_pend N I l rb Hl2 with "Hlk Hro").
-    - iIntros (l) "%Hcl". iApply ("Hdclosed" $! l). by iPureIntro.
+      + iApply ("Hdopen" $! I l vw). by iPureIntro.
+      + iApply (uksh_w_prompt_pend N I l vw rb Hl2 with "Hlk Hro").
+    - iIntros (l vw) "%Hcl". iApply ("Hdclosed" $! l vw). by iPureIntro.
   Qed.
 
   (* =================================================================== *)
@@ -699,18 +699,18 @@ Section UShURoundLaws.
   Qed.
 
   Lemma uterm_prompt_arm (Np : uk_names Σ) (I : list (bv 8))
-      (l : list fdstate) (rb : bool) :
+      (l vw : list fdstate) (rb : bool) :
     l !! 2%nat = Some (FdOpen rb true (FdDevice CONSOLE)) ->
     shk_rodata (ukn_t Np) -∗
     UkSh.ksh_w (PS := uprogSG_free) Np (mword_of_int 2 : mword 64)
       (mword_of_int UkSh.sh_prompt_pv) 2%nat
-      (UserFd.ustd (ukn_fd Np) l ∗ PT I 5%nat)
-      (UserFd.ustd (ukn_fd Np) l ∗ PT I 7%nat).
+      (UserFd.ustd_at (ukn_fd Np) l vw ∗ PT I 5%nat)
+      (UserFd.ustd_at (ukn_fd Np) l vw ∗ PT I 7%nat).
   Proof using Hcons.
     intros Hl2. iIntros "#Hro".
     iPoseProof (uterm_prompt_step I) as "#Hst".
     iApply (UShPanic.ksh_w_of_link_prompt_fam (PS := uprogSG_free) Np
-              (fun p : nat => PT I (5 + p)%nat) l rb Hl2
+              (fun p : nat => PT I (5 + p)%nat) l vw rb Hl2
               with "Hst Hro").
   Qed.
 
@@ -802,18 +802,18 @@ Section UShURoundLaws.
   Qed.
 
   Lemma udone_prompt_arm (Np : uk_names Σ) (I : list (bv 8))
-      (l : list fdstate) (rb : bool) :
+      (l vw : list fdstate) (rb : bool) :
     l !! 2%nat = Some (FdOpen rb true (FdDevice CONSOLE)) ->
     shk_rodata (ukn_t Np) -∗
     UkSh.ksh_w (PS := uprogSG_free) Np (mword_of_int 2 : mword 64)
       (mword_of_int UkSh.sh_prompt_pv) 2%nat
-      (UserFd.ustd (ukn_fd Np) l ∗ udone_fam I 0%nat)
-      (UserFd.ustd (ukn_fd Np) l ∗ udone_fam I 2%nat).
+      (UserFd.ustd_at (ukn_fd Np) l vw ∗ udone_fam I 0%nat)
+      (UserFd.ustd_at (ukn_fd Np) l vw ∗ udone_fam I 2%nat).
   Proof using Hcons.
     intros Hl2. iIntros "#Hro".
     iPoseProof (udone_prompt_step I) as "#Hst".
     iApply (UShPanic.ksh_w_of_link_prompt_fam (PS := uprogSG_free) Np
-              (udone_fam I) l rb Hl2 with "Hst Hro").
+              (udone_fam I) l vw rb Hl2 with "Hst Hro").
   Qed.
 
   (* =================================================================== *)
@@ -829,13 +829,13 @@ Section UShURoundLaws.
     rewrite {1}/UkSh.ush_prompt_law.
     iDestruct "Hlaw" as "[#Hplaw #Hclaw]".
     rewrite /UkSh.ush_prompt_law. iModIntro. iSplitR "".
-    - iIntros (I l) "%Hfd2". destruct Hfd2 as [rb Hl2].
-      iPoseProof (uterm_prompt_arm Np I l rb Hl2 with "Hro") as "Hta".
-      iPoseProof (udone_prompt_arm Np I l rb Hl2 with "Hro") as "Hda".
+    - iIntros (I l vw) "%Hfd2". destruct Hfd2 as [rb Hl2].
+      iPoseProof (uterm_prompt_arm Np I l vw rb Hl2 with "Hro") as "Hta".
+      iPoseProof (udone_prompt_arm Np I l vw rb Hl2 with "Hro") as "Hda".
       iIntros (h m avail) "%Ha0 %Ha1 %Ha2 #Hcode [Hstd Hc] Hrun Hcont".
       rewrite {1}/uWcu.
       iDestruct "Hc" as "[Hc | [[_ Hsh] | [[_ Hsh] | #Hw]]]".
-      + iApply ("Hplaw" $! I l with "[%] [%] [%] [%] Hcode [$Hstd $Hc] Hrun [Hcont]");
+      + iApply ("Hplaw" $! I l vw with "[%] [%] [%] [%] Hcode [$Hstd $Hc] Hrun [Hcont]");
           [ by exists rb | exact Ha0 | exact Ha1 | exact Ha2 | ].
         iIntros (h' ret) "[Hstd Hw] Hrun".
         iApply ("Hcont" $! h' ret with "[$Hstd Hw] Hrun").
@@ -862,7 +862,7 @@ Section UShURoundLaws.
           iApply (union_write_link_wild ug Hcons (S gen_id) b Φ with "[Htok] [HΦ]");
             [by iApply (usecc_tok_of_at ug) | by iApply "HΦ"]. }
         iApply (UShPanic.ksh_w_of_link_prompt_fam (PS := uprogSG_free) Np
-                  (fun _ : nat => useccomp_shape ug I) l rb Hl2
+                  (fun _ : nat => useccomp_shape ug I) l vw rb Hl2
                   with "Hst Hro [%] [%] [%] Hcode [$Hstd $Hw] Hrun [Hcont]");
           [ exact Ha0 | exact Ha1 | exact Ha2 | ].
         iIntros (h' ret) "[Hstd _] Hrun".

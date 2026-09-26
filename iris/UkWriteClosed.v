@@ -196,6 +196,29 @@ Section UkWriteClosed.
     iApply ("Hcont" $! h' ret with "Hstd Hrun").
   Qed.
 
+  (* ...AT A NAMED TABLE VIEW (seccomp S4) *)
+  Lemma ksh_w_of_closed_at (N : uk_names Σ) (fdw ua : mword 64) (nb : nat)
+      (l v : list fdstate) (i : nat) :
+    bv_signed (trunc32 fdw) = Z.of_nat i ->
+    (i < NSTD)%nat ->
+    l !! i = Some FdClosed ->
+    ⊢ UkSh.ksh_w N fdw ua nb
+        (UserFd.ustd_at (ukn_fd N) l v) (UserFd.ustd_at (ukn_fd N) l v).
+  Proof using .
+    intros Hfd Hi Hli.
+    iIntros (h m avail) "%Ha0 %Ha1 %Ha2 #Hcode Hstd Hrun Hcont".
+    iApply (UkSh.wp_ksh_write_chain_at N h m avail
+              (kwc_fam N) l v
+              with "Hcode Hrun [] Hstd").
+    { (* THE DEPOSIT: the closed arm's, from nothing *)
+      iApply (uwrite_sup_closed N (fun _ => True%I)
+                (<[Regidx a7_idx := (mword_of_int 16 : mword 64)]> m)
+                (add_vec_int (mword_of_int ShSyms.write : mword 64) 2)
+                l i (a0_after_a7 m fdw i Ha0 Hfd) Hi Hli). }
+    iIntros (h' ret W cw' cs') "_ _ _ _ Hstd _ Hrun".
+    iApply ("Hcont" $! h' ret with "Hstd Hrun").
+  Qed.
+
   (* one byte as the one-byte run the buffered leaf takes, both ways
      ([UInitBanner.ubytesq_one], restated here because that file sits
      above the application and this one does not) *)

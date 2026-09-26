@@ -462,14 +462,14 @@ Section UShPanicGen.
      the ONE ledger row it asks for -- [UShOut.ksh_w_of_link_prompt]'s
      proof at [F]. *)
   Lemma ksh_w_of_link_prompt_fam (N : uk_names Σ) (F : nat -> iProp Σ)
-      (l : list fdstate) (rb : bool) :
+      (l vw : list fdstate) (rb : bool) :
     l !! 2%nat = Some (FdOpen rb true (FdDevice CONSOLE)) ->
     prompt_step F -∗
     shk_rodata (ukn_t N) -∗
     UkSh.ksh_w N (mword_of_int 2 : mword 64)
       (mword_of_int sh_prompt_pv) 2%nat
-      (UserFd.ustd (ukn_fd N) l ∗ F 0%nat)
-      (UserFd.ustd (ukn_fd N) l ∗ F 2%nat).
+      (UserFd.ustd_at (ukn_fd N) l vw ∗ F 0%nat)
+      (UserFd.ustd_at (ukn_fd N) l vw ∗ F 2%nat).
   Proof using .
     intros Hl2.
     iIntros "#Hst #Hro" (h m avail)
@@ -537,8 +537,8 @@ Section UShPanicGen.
                      ((<[Regidx a7_idx := (mword_of_int 16 : mword 64)]> m)
                         !!! Regidx a2_idx)) = 2%nat)
       by (rewrite Ham2 sh_count2; lia).
-    iApply (UkSh.wp_ksh_write_chain_txt N h m avail
-              (UShOut.ksh_fam N F) l
+    iApply (UkSh.wp_ksh_write_chain_txt_at N h m avail
+              (UShOut.ksh_fam N F) l vw
               2%nat (fun j : nat => u_prompt !!! j)
               with "Hcode Hrun [Hc] Hstd Hbs").
     { (* THE DEPOSIT: sh's own chain at its own cursor *)
@@ -600,7 +600,7 @@ Section UShPanicGen.
   (* =================================================================== *)
   Lemma ksh_w_of_link_prompt_post_at (N : uk_names Σ) (v : era_pins)
       (I : list (bv 8)) (a : nat)
-      (l : list fdstate) (rb : bool) :
+      (l vw : list fdstate) (rb : bool) :
     lk_apr L I a ->
     l !! 2%nat = Some (FdOpen rb true (FdDevice CONSOLE)) ->
     (⌜¬ lk_wild L I⌝ ∨ lk_T L) -∗
@@ -609,15 +609,15 @@ Section UShPanicGen.
     shk_rodata (ukn_t N) -∗
     UkSh.ksh_w N (mword_of_int 2 : mword 64)
       (mword_of_int sh_prompt_pv) 2%nat
-      (UserFd.ustd (ukn_fd N) l ∗ lk_post L (S gen_id) v I a)
-      (UserFd.ustd (ukn_fd N) l ∗ lk_open_t L (S gen_id) v I).
+      (UserFd.ustd_at (ukn_fd N) l vw ∗ lk_post L (S gen_id) v I a)
+      (UserFd.ustd_at (ukn_fd N) l vw ∗ lk_open_t L (S gen_id) v I).
   Proof using .
     intros Ha Hl2. rewrite <- (lk_lpr_2 L (S gen_id) v I).
     iIntros "#Hnw #Hpin #Hlk #Hro" (h m avail)
       "%Ha0 %Ha1 %Ha2 #Hcode [Hstd Hc] Hrun Hcont".
     iDestruct (prompt_step_lpr_at v I with "Hnw Hpin Hlk") as "#Hst".
     iApply (ksh_w_of_link_prompt_fam N
-              (fun p : nat => lk_lpr L (S gen_id) v I p) l rb Hl2
+              (fun p : nat => lk_lpr L (S gen_id) v I p) l vw rb Hl2
               with "Hst Hro [%] [%] [%] Hcode [$Hstd Hc] Hrun Hcont");
       [ exact Ha0 | exact Ha1 | exact Ha2 | ].
     rewrite (lk_lpr_0 L) /lk_post.
@@ -631,22 +631,22 @@ Section UShPanicGen.
   (*      credential, the call reads it out and puts it back.             *)
   (* =================================================================== *)
   Lemma ksh_w_of_link_lcred_at (N : uk_names Σ) (I : list (bv 8))
-      (l : list fdstate) (rb : bool) :
+      (l vw : list fdstate) (rb : bool) :
     l !! 2%nat = Some (FdOpen rb true (FdDevice CONSOLE)) ->
     (⌜¬ lk_wild L I⌝ ∨ lk_T L) -∗
     lk_links L -∗
     shk_rodata (ukn_t N) -∗
     UkSh.ksh_w N (mword_of_int 2 : mword 64)
       (mword_of_int sh_prompt_pv) 2%nat
-      (UserFd.ustd (ukn_fd N) l ∗ lk_lcred L (S gen_id) I 0%nat)
-      (UserFd.ustd (ukn_fd N) l ∗ lk_lcred L (S gen_id) I 2%nat).
+      (UserFd.ustd_at (ukn_fd N) l vw ∗ lk_lcred L (S gen_id) I 0%nat)
+      (UserFd.ustd_at (ukn_fd N) l vw ∗ lk_lcred L (S gen_id) I 2%nat).
   Proof using .
     intros Hl2. iIntros "#Hnw #Hlk #Hro" (h m avail)
       "%Ha0 %Ha1 %Ha2 #Hcode [Hstd Hc] Hrun Hcont".
     rewrite /lk_lcred. iDestruct "Hc" as (v) "[#Hpin Hc]".
     iDestruct (prompt_step_lpr_at v I with "Hnw Hpin Hlk") as "#Hst".
     iApply (ksh_w_of_link_prompt_fam N
-              (fun p : nat => lk_lpr L (S gen_id) v I p) l rb Hl2
+              (fun p : nat => lk_lpr L (S gen_id) v I p) l vw rb Hl2
               with "Hst Hro [%] [%] [%] Hcode [$Hstd $Hc] Hrun [Hcont]");
       [ exact Ha0 | exact Ha1 | exact Ha2 | ].
     iIntros (h' ret) "[Hstd Hc] Hrun".
@@ -662,13 +662,13 @@ Section UShPanicGen.
     iIntros "#Hlk". rewrite /UShKernel.sh_prompt_law.
     iIntros "!>" (N) "#Hro". rewrite /UkSh.ush_prompt_law.
     iModIntro. iSplitL "".
-    - iIntros (I l) "%Hfd2". destruct Hfd2 as [rb Hl2].
-      iApply (ksh_w_of_link_lcred_at N I l rb Hl2 with "[] Hlk Hro").
+    - iIntros (I l vw) "%Hfd2". destruct Hfd2 as [rb Hl2].
+      iApply (ksh_w_of_link_lcred_at N I l vw rb Hl2 with "[] Hlk Hro").
       iLeft. iPureIntro. exact (Hnw I).
     - (* the closed arm (step 3): see [UShOut.sh_prompt_law_holds] *)
-      iIntros (l) "%Hcl".
-      iApply (UkWriteClosed.ksh_w_of_closed N (mword_of_int 2)
-                (mword_of_int sh_prompt_pv) 2%nat l 2%nat
+      iIntros (l vw) "%Hcl".
+      iApply (UkWriteClosed.ksh_w_of_closed_at N (mword_of_int 2)
+                (mword_of_int sh_prompt_pv) 2%nat l vw 2%nat
                 UShOut.sh_fd2_signed ltac:(unfold NSTD; lia) Hcl).
   Qed.
 
@@ -682,16 +682,16 @@ Section UShPanicGen.
     iIntros "#Hlk". rewrite /UShKernel.sh_prompt_law.
     iIntros "!>" (N) "#Hro". rewrite /UkSh.ush_prompt_law.
     iModIntro. iSplitL "".
-    - iIntros (I l) "%Hfd2". destruct Hfd2 as [rb Hl2].
+    - iIntros (I l vw) "%Hfd2". destruct Hfd2 as [rb Hl2].
       iIntros (h m avail) "%Ha0 %Ha1 %Ha2 #Hcode [Hstd [Hc Hh]] Hrun Hcont".
       iDestruct (Hnw I with "Hh") as "[#Hnw Hh]".
-      iApply (ksh_w_of_link_lcred_at N I l rb Hl2 with "Hnw Hlk Hro [%] [%] [%] Hcode
+      iApply (ksh_w_of_link_lcred_at N I l vw rb Hl2 with "Hnw Hlk Hro [%] [%] [%] Hcode
                 [$Hstd $Hc] Hrun [Hcont Hh]"); [exact Ha0 | exact Ha1 | exact Ha2 |].
       iIntros (h' ret) "[Hstd Hc] Hrun".
       iApply ("Hcont" $! h' ret with "[$Hstd $Hc $Hh] Hrun").
-    - iIntros (l) "%Hcl".
-      iApply (UkWriteClosed.ksh_w_of_closed N (mword_of_int 2)
-                (mword_of_int sh_prompt_pv) 2%nat l 2%nat
+    - iIntros (l vw) "%Hcl".
+      iApply (UkWriteClosed.ksh_w_of_closed_at N (mword_of_int 2)
+                (mword_of_int sh_prompt_pv) 2%nat l vw 2%nat
                 UShOut.sh_fd2_signed ltac:(unfold NSTD; lia) Hcl).
   Qed.
 

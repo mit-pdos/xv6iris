@@ -1932,15 +1932,47 @@ Section UkSh.
      ([UkWriteClosed.ksh_w_of_closed] is that arm's discharge -- it sits
      ABOVE this file, which is why the arm is a law here and not a
      lemma). *)
+  (* ...AT ANY NAMED TABLE VIEW (seccomp S4): the write moves no
+     descriptor, so the ledger comes back at the view it went in at *)
   Definition ush_prompt_law : iProp Σ :=
-    (□ ((∀ (I : list (bv 8)) (l : list fdstate),
+    (□ ((∀ (I : list (bv 8)) (l v : list fdstate),
            ⌜ ush_fd2p l ⌝ -∗
            ksh_w (mword_of_int 2) (mword_of_int sh_prompt_pv) 2%nat
-             (ush_std l ∗ Wc I 0%nat) (ush_std l ∗ Wc I 2%nat))
-        ∗ (∀ l : list fdstate,
+             (ustd_at γfd l v ∗ Wc I 0%nat) (ustd_at γfd l v ∗ Wc I 2%nat))
+        ∗ (∀ l v : list fdstate,
              ⌜ l !! 2%nat = Some FdClosed ⌝ -∗
              ksh_w (mword_of_int 2) (mword_of_int sh_prompt_pv) 2%nat
-               (ush_std l) (ush_std l))))%I.
+               (ustd_at γfd l v) (ustd_at γfd l v))))%I.
+
+  (* A WRITE AT EVERY VIEW IS A WRITE AT sh'S LEDGER *)
+  Lemma ksh_w_ush_std (fdw ua : mword 64) (nb : nat) (l : list fdstate)
+      (Ci Co : iProp Σ) :
+    (∀ v : list fdstate,
+       ksh_w fdw ua nb (ustd_at γfd l v ∗ Ci) (ustd_at γfd l v ∗ Co)) -∗
+    ksh_w fdw ua nb (ush_std l ∗ Ci) (ush_std l ∗ Co).
+  Proof using HT.
+    iIntros "Hw" (h m avail) "%Ha0 %Ha1 %Ha2 #Hcode [Hstd HCi] Hrun Hcont".
+    rewrite /ush_std /ustd_ok. iDestruct "Hstd" as (v) "[#Hok Hstd]".
+    iApply ("Hw" $! v h m avail with "[%] [%] [%] Hcode [$Hstd $HCi] Hrun");
+      [ exact Ha0 | exact Ha1 | exact Ha2 | ].
+    iIntros (h' ret) "[Hstd HCo] Hrun".
+    iApply ("Hcont" $! h' ret with "[Hstd HCo] Hrun"). iFrame "HCo".
+    iExists v. iFrame "Hok Hstd".
+  Qed.
+
+  Lemma ksh_w_ush_std1 (fdw ua : mword 64) (nb : nat) (l : list fdstate)
+      (Co : iProp Σ) :
+    (∀ v : list fdstate, ksh_w fdw ua nb (ustd_at γfd l v) (ustd_at γfd l v ∗ Co)) -∗
+    ksh_w fdw ua nb (ush_std l) (ush_std l ∗ Co).
+  Proof using HT.
+    iIntros "Hw" (h m avail) "%Ha0 %Ha1 %Ha2 #Hcode Hstd Hrun Hcont".
+    rewrite /ush_std /ustd_ok. iDestruct "Hstd" as (v) "[#Hok Hstd]".
+    iApply ("Hw" $! v h m avail with "[%] [%] [%] Hcode Hstd Hrun");
+      [ exact Ha0 | exact Ha1 | exact Ha2 | ].
+    iIntros (h' ret) "[Hstd HCo] Hrun".
+    iApply ("Hcont" $! h' ret with "[Hstd HCo] Hrun"). iFrame "HCo".
+    iExists v. iFrame "Hok Hstd".
+  Qed.
 
   Global Instance ush_prompt_law_persistent : Persistent ush_prompt_law.
   Proof using . rewrite /ush_prompt_law. apply _. Qed.
@@ -2006,19 +2038,20 @@ Section UkSh.
     ush_wcp l I 0%nat -∗
     ksh_w (mword_of_int 2) (mword_of_int sh_prompt_pv) 2%nat
       (ush_std l) (ush_std l ∗ ush_wcp l I 2%nat).
-  Proof using .
+  Proof using HT.
     iIntros "#Hlaw Hwc". rewrite /ush_prompt_law.
     iDestruct "Hlaw" as "[#Hplaw #Hclaw]".
+    iApply ksh_w_ush_std1. iIntros (v).
     iDestruct "Hwc" as "[[%Hrow Hc] | [%Hcl Hb]]"; last first.
     { destruct Hcl as [[j [Hj2 Hlcl]] _].
-      iDestruct ("Hclaw" $! l with "[%]") as "Hw"; [ exact (ush_lcl_2 l j Hj2 Hlcl) | ].
-      iApply (ksh_w_mono _ _ _ (ush_std l) (ush_std l) with "[Hb] [Hw]").
+      iDestruct ("Hclaw" $! l v with "[%]") as "Hw"; [ exact (ush_lcl_2 l j Hj2 Hlcl) | ].
+      iApply (ksh_w_mono _ _ _ (ustd_at γfd l v) (ustd_at γfd l v) with "[Hb] [Hw]").
       - iIntros "$". rewrite /ush_wcp. iRight. iFrame "Hb".
         iPureIntro. split; [ exists j; split; [ exact Hj2 | exact Hlcl ] | lia ].
       - iExact "Hw". }
     destruct Hrow as (Hfd0c & Hfd1 & Hfd2).
-    iDestruct ("Hplaw" $! I l with "[%]") as "Hw"; [ exact Hfd2 | ].
-    iApply (ksh_w_mono _ _ _ (ush_std l) (ush_std l ∗ Wc I 2%nat)
+    iDestruct ("Hplaw" $! I l v with "[%]") as "Hw"; [ exact Hfd2 | ].
+    iApply (ksh_w_mono _ _ _ (ustd_at γfd l v) (ustd_at γfd l v ∗ Wc I 2%nat)
               with "[] [Hc Hw]").
     - iIntros "[$ Hc]". rewrite /ush_wcp. iLeft. iFrame "Hc".
       iPureIntro. split_and!; [ exact Hfd0c | exact Hfd1 | exact Hfd2 ].

@@ -135,15 +135,15 @@ Section UShPanicHold.
     iDestruct ("H" $! N with "Hro") as "#Hp".
     rewrite /UkSh.ush_prompt_law.
     iDestruct "Hp" as "#[Hopen Hclosed]". iModIntro. iSplitR.
-    - iIntros (I l) "%Hfd".
+    - iIntros (I l vw) "%Hfd".
       iApply (ksh_w_mono N _ _ _
-                ((UserFd.ustd (ukn_fd N) l ∗ Wc I 0%nat) ∗ Hold I)%I
-                _ ((UserFd.ustd (ukn_fd N) l ∗ Wc I 2%nat) ∗ Hold I)%I
+                ((UserFd.ustd_at (ukn_fd N) l vw ∗ Wc I 0%nat) ∗ Hold I)%I
+                _ ((UserFd.ustd_at (ukn_fd N) l vw ∗ Wc I 2%nat) ∗ Hold I)%I
                 with "[] []").
       { iIntros "[Hs [Hc Hh]]". iFrame "Hs Hc Hh". }
       { iIntros "[[Hs Hc] Hh]". iFrame "Hs Hc Hh". }
-      iApply ksh_w_hold. iApply ("Hopen" $! I l). by iPureIntro.
-    - iIntros (l) "%Hcl". iApply ("Hclosed" $! l). by iPureIntro.
+      iApply ksh_w_hold. iApply ("Hopen" $! I l vw). by iPureIntro.
+    - iIntros (l vw) "%Hcl". iApply ("Hclosed" $! l vw). by iPureIntro.
   Qed.
 
   (* ...and at the existential shape, where the RECORD itself is indexed
@@ -158,11 +158,11 @@ Section UShPanicHold.
          ∃ x : A, Wc x I p ∗ Hold x I)%I.
   Proof using .
     iIntros "#H !>" (N) "#Hro". iModIntro. iSplitR.
-    - iIntros (I l) "%Hfd".
+    - iIntros (I l vw) "%Hfd".
       iApply (ksh_w_mono N _ _ _
-                (∃ x : A, (UserFd.ustd (ukn_fd N) l ∗ Wc x I 0%nat)
+                (∃ x : A, (UserFd.ustd_at (ukn_fd N) l vw ∗ Wc x I 0%nat)
                           ∗ Hold x I)%I
-                _ (∃ x : A, (UserFd.ustd (ukn_fd N) l ∗ Wc x I 2%nat)
+                _ (∃ x : A, (UserFd.ustd_at (ukn_fd N) l vw ∗ Wc x I 2%nat)
                             ∗ Hold x I)%I
                 with "[] []").
       { iIntros "[Hs Hc]". iDestruct "Hc" as (x) "[Hc Hh]".
@@ -170,18 +170,18 @@ Section UShPanicHold.
       { iIntros "Hq". iDestruct "Hq" as (x) "[[Hs Hc] Hh]".
         iFrame "Hs". iExists x. iFrame "Hc Hh". }
       iApply (ksh_w_ex N _ _ _
-                (fun x : A => (UserFd.ustd (ukn_fd N) l ∗ Wc x I 0%nat)
+                (fun x : A => (UserFd.ustd_at (ukn_fd N) l vw ∗ Wc x I 0%nat)
                               ∗ Hold x I)%I
-                (fun x : A => (UserFd.ustd (ukn_fd N) l ∗ Wc x I 2%nat)
+                (fun x : A => (UserFd.ustd_at (ukn_fd N) l vw ∗ Wc x I 2%nat)
                               ∗ Hold x I)%I).
       iIntros (x). iApply ksh_w_hold.
       iDestruct ("H" $! x N with "Hro") as "#Hpx".
       rewrite /UkSh.ush_prompt_law. iDestruct "Hpx" as "#[Hopen _]".
-      iApply ("Hopen" $! I l). by iPureIntro.
-    - iIntros (l) "%Hcl".
+      iApply ("Hopen" $! I l vw). by iPureIntro.
+    - iIntros (l vw) "%Hcl".
       iDestruct ("H" $! x0 N with "Hro") as "#Hp0".
       rewrite /UkSh.ush_prompt_law. iDestruct "Hp0" as "#[_ Hclosed]".
-      iApply ("Hclosed" $! l). by iPureIntro.
+      iApply ("Hclosed" $! l vw). by iPureIntro.
   Qed.
 
 End UShPanicHold.
