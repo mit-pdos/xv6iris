@@ -29,7 +29,7 @@ open LeanRV64D
 set_option maxHeartbeats 4000000 in
 theorem main_secondary_proof (CI : CPUID) (PK : PRINTK) (KVH : KVMINITHART) (TIH : TRAPINITHART)
     (PIH : PLICINITHART) (SCH : SCHEDULER) (KV : KERNELVEC) : MAIN_SECONDARY :=
-  ⟨fun {hlc GF} _ _ _ _ _ _ _ _ X Γ _ γ0 γ1 γc γl0 γl1 γd γdl γt pd pav pu _ cpu k γi ξd tlb0
+  ⟨fun {hlc GF} _ _ _ _ _ _ _ _ X Γ _ γ0 γ1 γc γl0 γl1 γd γdl γt _ cpu k γi ξd tlb0
       hX hcpu hK hsie hnoff hlocks hproc => by
   obtain ⟨ξ, τ⟩ := X
   obtain rfl : τ = KTier.bare := hX
@@ -45,7 +45,7 @@ theorem main_secondary_proof (CI : CPUID) (PK : PRINTK) (KVH : KVMINITHART) (TIH
     %⟨by simp [hsie], by simp [ha4]⟩ Hk Hpc
   iintro %v Hk Hpc Hdep
   unfold mainDeposit
-  icases Hdep with ⟨%γpr, %rootAddr, %t, %M, %⟨hhi, hroot⟩, #Hpr, #Htx, #Hsent, #Hkpt, #Hroot, #Hcaps⟩
+  icases Hdep with ⟨%γpr, %rootAddr, %t, %M, %pd, %pav, %pu, %⟨hhi, hroot⟩, #Hpr, #Htx, #Hsent, #Hkpt, #Hroot, #Hcaps⟩
   iapply (ms_printk CI PK cpu (k.pushed 2) (by simp [hsie]) (by simp; omega) (by simp [hnoff])
     (by simp [hlocks]) γpr γl1 γ1 (R.set 15#5 v))
   iframe Hpr Htx Hsent

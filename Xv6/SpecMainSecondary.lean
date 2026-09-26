@@ -34,10 +34,11 @@ cannot make for itself --
 The ghost names the handler environment is stated at (`Γ γ0 γ1 γc γl0 γl1
 γd γdl γt`) are the client's choice of `MachGS.envP` (`Xv6.EnvIs`), fixed
 when the era's machine instance is built, so they are PARAMETERS here, not
-Rocq's existentials (the disk pages `pd pav pu` are the family's own
-existential, `HandlerEnv.envFam`; they are named here only because the
-deposit's credentials carry them); what stays existential is what
-hart 0 alone chooses: the `pr` lock's name and the table's root / tree.
+Rocq's existentials; what stays existential is what hart 0 alone
+chooses: the `pr` lock's name, the table's root / tree, and the disk's
+pages `pd pav pu` (`virtio_disk_init` picks them by `kalloc`;
+`HandlerEnv.envFam` packs them the same way, and a secondary installs its
+handler at the deposit's).
 
 WHAT DOES NOT CROSS: this hart's own resources enter as preconditions --
 its kernel context at `main`'s entry (Bare, interrupts off, depth 0, no
@@ -106,8 +107,9 @@ to `NCPU - 1` readers.  The tiers are explicit: printk's credential at the
 Bare tier (a secondary prints before its own `kvminithart`), devintr's at
 the kernel tier (where the installed handler and the scheduler run). -/
 def mainDeposit (Γ : SchedNames) (γ0 γ1 : UartNames) (γc γl0 γl1 : GName) (γd : DiskNames)
-    (γdl γt : GName) (pd pav pu : BitVec 64) (ξ : CtxId) : IProp GF := iprop%
-  ∃ (γpr : GName) (rootAddr : BitVec 64) (t : PTree) (M : RegMapF (BitVec 64)),
+    (γdl γt : GName) (ξ : CtxId) : IProp GF := iprop%
+  ∃ (γpr : GName) (rootAddr : BitVec 64) (t : PTree) (M : RegMapF (BitVec 64))
+    (pd pav pu : BitVec 64),
     ⌜BitVec.extractLsb' 56 8 rootAddr = 0#8 ∧ t.base = BitVec.extractLsb' 12 44 rootAddr⌝ ∗
     @isLock hlc GF _ _ ⟨ξ, KTier.bare⟩ γpr prLock "pr" (fun _ => emp) ∗
     @isTxLock hlc GF _ _ ⟨ξ, KTier.bare⟩ γl1 γ1 ∗
@@ -122,8 +124,8 @@ instance mainSec_pword_discard_persistent [CurCtx] (pa : PAddr) (n : Nat) (w : B
   unfold pwordPointsTo; infer_instance
 
 instance mainDeposit_persistent (Γ : SchedNames) (γ0 γ1 : UartNames) (γc γl0 γl1 : GName)
-    (γd : DiskNames) (γdl γt : GName) (pd pav pu : BitVec 64) (ξ : CtxId) :
-    Persistent (mainDeposit (GF := GF) Γ γ0 γ1 γc γl0 γl1 γd γdl γt pd pav pu ξ) := by
+    (γd : DiskNames) (γdl γt : GName) (ξ : CtxId) :
+    Persistent (mainDeposit (GF := GF) Γ γ0 γ1 γc γl0 γl1 γd γdl γt ξ) := by
   unfold mainDeposit; infer_instance
 
 /-- UART1's port bundle at the Bare tier transports (the kernel-tier
@@ -143,8 +145,8 @@ instance mainSec_instCtxMorphPword (tier : KTier) (pa : PAddr) (n : Nat) (dq : D
 /-- **The deposit transports** (Rocq `main_dep_morph`): what the record
 carries at `ξd` and each secondary absorbs into its own context. -/
 instance mainDeposit_morph (Γ : SchedNames) (γ0 γ1 : UartNames) (γc γl0 γl1 : GName)
-    (γd : DiskNames) (γdl γt : GName) (pd pav pu : BitVec 64) :
-    CtxMorph (GF := GF) (mainDeposit (GF := GF) Γ γ0 γ1 γc γl0 γl1 γd γdl γt pd pav pu) := by
+    (γd : DiskNames) (γdl γt : GName) :
+    CtxMorph (GF := GF) (mainDeposit (GF := GF) Γ γ0 γ1 γc γl0 γl1 γd γdl γt) := by
   unfold mainDeposit isTxLock
   infer_instance
 
@@ -157,13 +159,13 @@ interrupts off, depth 0, no lock, no proc), holding its own
 `started` channel at the CONCRETE deposit. -/
 def wp_main_secondary_body (X : CurCtx) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
     (γ0 γ1 : UartNames) (γc γl0 γl1 : GName) (γd : DiskNames) (γdl γt : GName)
-    (pd pav pu : BitVec 64) [EnvIs (hlc := hlc) GF Γ γ0 γ1 γc γl0 γl1 γd γdl γt]
+    [EnvIs (hlc := hlc) GF Γ γ0 γ1 γc γl0 γl1 γd γdl γt]
     (cpu : CPU) (k : KCtx) (γi : GName) (ξd : CtxId) (tlb0 : Tlb)
     (hX : X.curTier = KTier.bare) (hcpu : cpu ≠ startedPrimary) (hK : mainSecondarySlots ≤ k.avail)
     (hsie : k.sie = false) (hnoff : k.noff = 0) (hlocks : k.locks = []) (hproc : k.proc = 0#64) :
     Prop :=
   kctxL (X := X) false cpu k ∗ pcIs cpu mainAddr ∗ cpuCtxFree cpu ∗
-  startedInv γi ξd (mainDeposit Γ γ0 γ1 γc γl0 γl1 γd γdl γt pd pav pu) ∗
+  startedInv γi ξd (mainDeposit Γ γ0 γ1 γc γl0 γl1 γd γdl γt) ∗
   mainHartRaw cpu tlb0
   ⊢ wpLoop (GF := GF) cpu
 
@@ -175,9 +177,9 @@ structure MAIN_SECONDARY : Prop where
     [BioslotG GF] [IrefslotG GF] [CtokG GF] [WchG GF] [DiskG GF] (X : CurCtx)
     (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
     (γ0 γ1 : UartNames) (γc γl0 γl1 : GName) (γd : DiskNames) (γdl γt : GName)
-    (pd pav pu : BitVec 64) [EnvIs (hlc := hlc) GF Γ γ0 γ1 γc γl0 γl1 γd γdl γt]
+    [EnvIs (hlc := hlc) GF Γ γ0 γ1 γc γl0 γl1 γd γdl γt]
     (cpu : CPU) (k : KCtx) (γi : GName) (ξd : CtxId) (tlb0 : Tlb) hX hcpu hK hsie hnoff hlocks hproc,
-    wp_main_secondary_body (hlc := hlc) (GF := GF) X Γ γ0 γ1 γc γl0 γl1 γd γdl γt pd pav pu
+    wp_main_secondary_body (hlc := hlc) (GF := GF) X Γ γ0 γ1 γc γl0 γl1 γd γdl γt
       cpu k γi ξd tlb0 hX hcpu hK hsie hnoff hlocks hproc
 
 end Xv6
