@@ -125,6 +125,7 @@ import Xv6.SpecSysLink
 import Xv6.SpecSysMkdir
 import Xv6.SpecSysClose
 import Xv6.SpecSysSync
+import Xv6.SpecSysSeccomp
 
 namespace Xv6
 
@@ -160,6 +161,7 @@ theorem syscallSlots_entries :
     syscallFrame + sysMknodSlots ≤ syscallSlots ∧ syscallFrame + sysUnlinkK ≤ syscallSlots ∧
     syscallFrame + sysLinkSlots ≤ syscallSlots ∧ syscallFrame + sysMkdirSlots ≤ syscallSlots ∧
     syscallFrame + sysCloseSlots ≤ syscallSlots ∧ syscallFrame + sysSyncSlots ≤ syscallSlots ∧
+    syscallFrame + sysSeccompSlots ≤ syscallSlots ∧
     syscallFrame + 10 ≤ syscallSlots ∧ syscallFrame + 52 ≤ syscallSlots := by
   decide
 
@@ -265,6 +267,11 @@ structure SyscRows (V : ProcPriv) (M : Nat → List (BitVec 8)) (V' : ProcPriv)
   Rocq's eighteen -- usertrap's residue needs it, Rocq's `is_kstack` is
   persistent) -/
   ks : V'.kstack = V.kstack
+  /-- **THE MASK** (Rocq's last pure row, xv6 7b2c1b1b): sys_seccomp (23)
+  ANDs it with its argument 0 and answers 0; every other entry -- exec
+  included, `kexecOk` keeps it -- hands the block back at the mask it came
+  in with (`UsysMemOk.usysSeccOk`, at the outgoing a0 word). -/
+  secc : usysSeccOk (syscNum V) V.tf V.pvSecc V'.pvSecc (syscA0 V')
 
 /-! ## §2 The deposit channels (Rocq `Section SyscExec`, deviation 2) -/
 
@@ -310,7 +317,7 @@ def syscForkIn (f : sfam GF) (V : ProcPriv) (M : Nat → List (BitVec 8)) (sts :
 /-- **Rocq `sysc_pay_in`**: THE PAYMENT -- the process's knowledge of what
 its exit owes and, at exit, that payload paid; at the block's generation. -/
 def syscPayIn (f : sfam GF) (V : ProcPriv) : IProp GF :=
-  upayAt V.gen uecallScause V.tf f
+  upayAt V.gen uecallScause V.pvSecc V.tf f
 
 /-- **Rocq `sysc_fork_out`**: FORK'S ANSWER (`UexecRet.uforkAns`). -/
 def syscForkOut (f : sfam GF) (V : ProcPriv) (r : BitVec 64) (cs cs' : ExtTreeSet GName compare) :
@@ -431,7 +438,7 @@ carries -- what sys_exit's `myPay V.gen Q ∗ Q (exitXs V.tf)` takes at
 theorem syscPayIn_exit (hk : syscNum V = USYS_exit) :
     syscPayIn f V ⊢ myPay V.gen (sexitPay f) ∗ sexitPay f (exitXs V.tf) := by
   unfold syscPayIn upayAt
-  have hn : usysNum V.tf = USYS_exit := hk
+  have hn : usysEff V.pvSecc V.tf = USYS_exit := hk
   rw [if_pos rfl, if_pos hn]
 
 /-- **Rocq `sysc_sys_out_quiet`** (deviation 2: at the instance's

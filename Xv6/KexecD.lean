@@ -860,7 +860,7 @@ theorem kxd_ok (Q : BitVec 64 → ProcPriv → (Nat → List (BitVec 8)) → Pro
   refine Or.inr ⟨hQ _ _ ⟨rfl, hargs, ⟨hstk, hzero⟩, himg.1, himg.2.1, himg.2.2,
     KexecBuilt.kxbPermBelow_intro hbelow, hcov⟩, ?_⟩
   refine ⟨rfl, by unfold MAXARG at hmax ⊢; omega, hstk, rfl, rfl, hPtfp, ?_, rfl, rfl, rfl, rfl, rfl,
-    rfl, hns, by omega, by omega, rfl, rfl, rfl⟩
+    rfl, hns, by omega, by omega, rfl, rfl, rfl, rfl⟩
   unfold kxcTf
   exact kxd_tf_swap _ _ _
 

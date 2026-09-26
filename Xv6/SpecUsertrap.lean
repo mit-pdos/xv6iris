@@ -125,8 +125,11 @@ def utSysTf (sep : BitVec 64) (V : ProcPriv) : List (BitVec 64) := V.tf.set tfEp
 def utSysRec (sep : BitVec 64) (V : ProcPriv) : ProcPriv := { V with tf := utSysTf sep V }
 
 /-- The epc stores leave the syscall number alone. -/
-theorem utSysRec_num (sep : BitVec 64) (V : ProcPriv) : syscNum (utSysRec sep V) = usysNum V.tf := by
-  unfold syscNum utSysRec utSysTf usysNum tfW
+theorem utSysRec_num (sep : BitVec 64) (V : ProcPriv) :
+    syscNum (utSysRec sep V) = usysEff V.pvSecc V.tf := by
+  unfold syscNum utSysRec utSysTf
+  refine usysEff_argCong _ _ _ ?_
+  unfold tfW
   simp only [List.getD_eq_getElem?_getD]
   rw [List.getElem?_set_ne (by unfold tfEpcIdx tfArgIdx; omega)]
 
@@ -139,73 +142,73 @@ record `(V', M')`. -/
 def utRound (sep sc : BitVec 64) (V : ProcPriv) (M : Nat → List (BitVec 8)) (V' : ProcPriv)
     (M' : Nat → List (BitVec 8)) : Prop :=
   uroundOk sc (utProTf sep V) (syscImg V M) (permOf V.upt.um V.sz.toNat) V.sz.toNat V.cwi V.pvLazy
-    V'.tf (syscImg V' M') (permOf V'.upt.um V'.sz.toNat) V'.sz.toNat V'.cwi V'.pvLazy
+    V.pvSecc V'.tf (syscImg V' M') (permOf V'.upt.um V'.sz.toNat) V'.sz.toNat V'.cwi V'.pvLazy V'.pvSecc
 
 /-- **Rocq `ut_fd_kept`**: off the ecall nothing retypes a descriptor. -/
 def utFdKept (sc : BitVec 64) (sts sts' : List FdState) : Prop := sc ≠ uecallScause → sts' = sts
 
 /-- **Rocq `ut_ch_kept`**: only fork and wait move the children set. -/
-def utChKept (sc : BitVec 64) (tf : List (BitVec 64)) (cs cs' : ExtTreeSet GName compare) : Prop :=
-  ¬ (sc = uecallScause ∧ (usysNum tf = USYS_fork ∨ usysNum tf = USYS_wait)) → cs' = cs
+def utChKept (sc secc : BitVec 64) (tf : List (BitVec 64)) (cs cs' : ExtTreeSet GName compare) : Prop :=
+  ¬ (sc = uecallScause ∧ (usysEff secc tf = USYS_fork ∨ usysEff secc tf = USYS_wait)) → cs' = cs
 
 /-- **Rocq `ut_gen_kept`**: a round never re-incarnates. -/
 def utGenKept (V V' : ProcPriv) : Prop := V'.gen = V.gen
 
 /-- **Rocq `ut_fd_ecall`**: the ecall's descriptor half (the number and
 argument off the entry frame, the answer off the exit frame's a0). -/
-def utFdEcall (sc : BitVec 64) (tf tf' : List (BitVec 64)) (sts sts' : List FdState) : Prop :=
-  sc = uecallScause → usysFdOk (usysNum tf) tf (tfW tf' (tfArgIdx 0)) sts sts'
+def utFdEcall (sc secc : BitVec 64) (tf tf' : List (BitVec 64)) (sts sts' : List FdState) : Prop :=
+  sc = uecallScause → usysFdOk (usysEff secc tf) tf (tfW tf' (tfArgIdx 0)) sts sts'
 
 /-- **Rocq `ut_ret_pid`**: getpid's answer. -/
-def utRetPid (sc : BitVec 64) (tf tf' : List (BitVec 64)) (pid : BitVec 32) : Prop :=
-  sc = uecallScause → usysRetPid (usysNum tf) (tfW tf' (tfArgIdx 0)) pid
+def utRetPid (sc secc : BitVec 64) (tf tf' : List (BitVec 64)) (pid : BitVec 32) : Prop :=
+  sc = uecallScause → usysRetPid (usysEff secc tf) (tfW tf' (tfArgIdx 0)) pid
 
 /-- **Rocq `ut_pipe_ecall`**: pipe's join. -/
-def utPipeEcall (sc : BitVec 64) (tf tf' : List (BitVec 64)) (M M' : ElfMem) (sts sts' : List FdState) :
+def utPipeEcall (sc secc : BitVec 64) (tf tf' : List (BitVec 64)) (M M' : ElfMem) (sts sts' : List FdState) :
     Prop :=
-  sc = uecallScause → usysPipeOk (usysNum tf) tf (tfW tf' (tfArgIdx 0)) M M' sts sts'
+  sc = uecallScause → usysPipeOk (usysEff secc tf) tf (tfW tf' (tfArgIdx 0)) M M' sts sts'
 
 /-- **Rocq `ut_live_out`** (deviation 4): what a resume proves by its own
 survival -- the read did not fail at an open console descriptor, a null-status
 wait that failed had no children. -/
-def utLiveOut (sc : BitVec 64) (tf : List (BitVec 64)) (sts : List FdState) (r : BitVec 64)
+def utLiveOut (sc secc : BitVec 64) (tf : List (BitVec 64)) (sts : List FdState) (r : BitVec 64)
     (cs' : ExtTreeSet GName compare) : Prop :=
-  sc = uecallScause → uexecLiveOk (usysNum tf) tf sts r cs'
+  sc = uecallScause → uexecLiveOk (usysEff secc tf) tf sts r cs'
 
 /-- **Rocq `ut_pro`**: the prologue's own move -- one trapframe word. -/
 def utPro (sep : BitVec 64) (V : ProcPriv) (M : Nat → List (BitVec 8)) (V' : ProcPriv)
     (M' : Nat → List (BitVec 8)) : Prop :=
   V'.tf = utProTf sep V ∧ V'.upt = V.upt ∧ V'.sz = V.sz ∧ M' = M ∧ V'.cwi = V.cwi ∧
-    V'.gen = V.gen ∧ V'.pvLazy = V.pvLazy
+    V'.gen = V.gen ∧ V'.pvLazy = V.pvLazy ∧ V'.pvSecc = V.pvSecc
 
 section Pure
 
 theorem utFdKept_refl (sc : BitVec 64) (sts : List FdState) : utFdKept sc sts sts := fun _ => rfl
 
-theorem utChKept_refl (sc : BitVec 64) (tf : List (BitVec 64)) (cs : ExtTreeSet GName compare) :
-    utChKept sc tf cs cs := fun _ => rfl
+theorem utChKept_refl (sc secc : BitVec 64) (tf : List (BitVec 64)) (cs : ExtTreeSet GName compare) :
+    utChKept sc secc tf cs cs := fun _ => rfl
 
-theorem utFdEcall_quiet (sc : BitVec 64) (tf tf' : List (BitVec 64)) (sts sts' : List FdState)
-    (h : sc ≠ uecallScause) : utFdEcall sc tf tf' sts sts' := fun hc => absurd hc h
+theorem utFdEcall_quiet (sc secc : BitVec 64) (tf tf' : List (BitVec 64)) (sts sts' : List FdState)
+    (h : sc ≠ uecallScause) : utFdEcall sc secc tf tf' sts sts' := fun hc => absurd hc h
 
-theorem utPipeEcall_quiet (sc : BitVec 64) (tf tf' : List (BitVec 64)) (M M' : ElfMem)
-    (sts sts' : List FdState) (h : sc ≠ uecallScause) : utPipeEcall sc tf tf' M M' sts sts' :=
+theorem utPipeEcall_quiet (sc secc : BitVec 64) (tf tf' : List (BitVec 64)) (M M' : ElfMem)
+    (sts sts' : List FdState) (h : sc ≠ uecallScause) : utPipeEcall sc secc tf tf' M M' sts sts' :=
   fun hc => absurd hc h
 
 /-- Rocq `ut_ret_pid_ne`. -/
-theorem utRetPid_ne (sc : BitVec 64) (tf tf' : List (BitVec 64)) (pid : BitVec 32)
-    (h : usysNum tf ≠ USYS_getpid) : utRetPid sc tf tf' pid :=
+theorem utRetPid_ne (sc secc : BitVec 64) (tf tf' : List (BitVec 64)) (pid : BitVec 32)
+    (h : usysEff secc tf ≠ USYS_getpid) : utRetPid sc secc tf tf' pid :=
   fun _ => usysRetPid_ne _ _ _ h
 
 /-- Rocq `ut_live_out_ne`. -/
-theorem utLiveOut_ne (sc : BitVec 64) (tf : List (BitVec 64)) (sts : List FdState) (r : BitVec 64)
-    (cs' : ExtTreeSet GName compare) (h : sc ≠ uecallScause) : utLiveOut sc tf sts r cs' :=
+theorem utLiveOut_ne (sc secc : BitVec 64) (tf : List (BitVec 64)) (sts : List FdState) (r : BitVec 64)
+    (cs' : ExtTreeSet GName compare) (h : sc ≠ uecallScause) : utLiveOut sc secc tf sts r cs' :=
   fun hc => absurd hc h
 
 /-- Rocq `ut_live_out_num`. -/
-theorem utLiveOut_num (sc : BitVec 64) (tf : List (BitVec 64)) (sts : List FdState) (r : BitVec 64)
-    (cs' : ExtTreeSet GName compare) (hr : usysNum tf ≠ USYS_read) (hw : usysNum tf ≠ USYS_wait) :
-    utLiveOut sc tf sts r cs' :=
+theorem utLiveOut_num (sc secc : BitVec 64) (tf : List (BitVec 64)) (sts : List FdState) (r : BitVec 64)
+    (cs' : ExtTreeSet GName compare) (hr : usysEff secc tf ≠ USYS_read) (hw : usysEff secc tf ≠ USYS_wait) :
+    utLiveOut sc secc tf sts r cs' :=
   fun _ => uexecLiveOk_ne tf sts r cs' hr hw
 
 /-- **Rocq `ut_round_entry`**: at a non-ecall cause, the prologue's record
@@ -213,19 +216,20 @@ is a round (the identity). -/
 theorem utRound_entry (sep sc : BitVec 64) (V : ProcPriv) (M : Nat → List (BitVec 8)) (V' : ProcPriv)
     (M' : Nat → List (BitVec 8)) (hne : sc ≠ uecallScause) (h : utPro sep V M V' M') :
     utRound sep sc V M V' M' := by
-  obtain ⟨htf, hupt, hsz, hM, hcwi, -, hlz⟩ := h
+  obtain ⟨htf, hupt, hsz, hM, hcwi, -, hlz, hsc⟩ := h
   unfold utRound uroundOk syscImg
-  rw [if_neg hne, htf, hupt, hsz, hM, hcwi, hlz]
-  exact ⟨⟨rfl, rfl⟩, rfl, rfl, rfl, rfl, rfl⟩
+  rw [if_neg hne, htf, hupt, hsz, hM, hcwi, hlz, hsc]
+  exact ⟨⟨rfl, rfl⟩, rfl, rfl, rfl, rfl, rfl, rfl⟩
 
 /-- **Rocq `ut_round_same`**: a block that does not move the user-visible
 state relays the round. -/
 theorem utRound_same (sep sc : BitVec 64) (V : ProcPriv) (M : Nat → List (BitVec 8)) (V' V'' : ProcPriv)
     (M' M'' : Nat → List (BitVec 8)) (h1 : V''.tf = V'.tf) (h2 : V''.upt = V'.upt) (h3 : M'' = M')
     (h4 : V''.sz = V'.sz) (h5 : V''.cwi = V'.cwi) (h6 : V''.pvLazy = V'.pvLazy)
+    (h7 : V''.pvSecc = V'.pvSecc)
     (h : utRound sep sc V M V' M') : utRound sep sc V M V'' M'' := by
   unfold utRound syscImg at h ⊢
-  rw [h1, h2, h3, h4, h5, h6]
+  rw [h1, h2, h3, h4, h5, h6, h7]
   exact h
 
 end Pure
@@ -259,7 +263,7 @@ def utForkIn (f : sfam GF) (sc sep : BitVec 64) (V : ProcPriv) (M : Nat → List
 killed checks tear down at any cause), at the block's generation and the
 prologue's frame. -/
 def utPayIn (f : sfam GF) (sc sep : BitVec 64) (V : ProcPriv) : IProp GF :=
-  upayAt V.gen sc (utProTf sep V) f
+  upayAt V.gen sc V.pvSecc (utProTf sep V) f
 
 /-- **Rocq `ut_fork_out`**: fork's answer. -/
 def utForkOut (f : sfam GF) (sc sep : BitVec 64) (V : ProcPriv) (r : BitVec 64)
@@ -379,11 +383,11 @@ def usertrapPost (R : CPU → UPtd → BitVec 64 → ProcPriv → List FdState �
       (cs' : ExtTreeSet GName compare) (uepc : BitVec 64),
     ⌜calleeSaved k.regs R' ∧ R' 10#5 = satpOf KTier.kpt P'.root⌝ -∗
     ⌜V'.upt = P' ∧ P'.tfp = P.tfp⌝ -∗
-    ⌜utRound sep sc V M V' M'⌝ -∗ ⌜utFdKept sc sts sts'⌝ -∗ ⌜utChKept sc V.tf cs cs'⌝ -∗
-    ⌜utGenKept V V'⌝ -∗ ⌜utFdEcall sc V.tf V'.tf sts sts'⌝ -∗
-    ⌜utPipeEcall sc V.tf V'.tf (syscImg V M) (syscImg V' M') sts sts'⌝ -∗
-    ⌜utRetPid sc V.tf V'.tf pid⌝ -∗ ⌜retPc uepc = tfResumePc V'.tf⌝ -∗
-    ⌜utLiveOut sc (utProTf sep V) sts (tfW V'.tf (tfArgIdx 0)) cs'⌝ -∗
+    ⌜utRound sep sc V M V' M'⌝ -∗ ⌜utFdKept sc sts sts'⌝ -∗ ⌜utChKept sc V.pvSecc V.tf cs cs'⌝ -∗
+    ⌜utGenKept V V'⌝ -∗ ⌜utFdEcall sc V.pvSecc V.tf V'.tf sts sts'⌝ -∗
+    ⌜utPipeEcall sc V.pvSecc V.tf V'.tf (syscImg V M) (syscImg V' M') sts sts'⌝ -∗
+    ⌜utRetPid sc V.pvSecc V.tf V'.tf pid⌝ -∗ ⌜retPc uepc = tfResumePc V'.tf⌝ -∗
+    ⌜utLiveOut sc V.pvSecc (utProTf sep V) sts (tfW V'.tf (tfArgIdx 0)) cs'⌝ -∗
     kctx cpu' ((k.intrOff true false).withRegs R') -∗ pcIs cpu' (jumpPc (k.regs 1#5)) -∗
     Register.sepc ↦ᵣ[cpu'] uepc -∗
     (∃ v : BitVec 64, Register.scause ↦ᵣ[cpu'] v) -∗ (∃ v : BitVec 64, Register.stval ↦ᵣ[cpu'] v) -∗

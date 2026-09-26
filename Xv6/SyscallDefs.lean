@@ -20,11 +20,11 @@ image (`syscMemOk`, sbrk's `syscSbrkOk`), to the descriptor table
 user-side table `UsysMemOk.usysMemOk` read at the kernel's vocabulary;
 `UsysMemOkSpec` is the bridge.
 
-§2 THE DISPATCH TABLE: `syscalls[]` at `KA.«syscalls»` in `.rodata`, 23
+§2 THE DISPATCH TABLE: `syscalls[]` at `KA.«syscalls»` in `.rodata`, 24
 eight-byte slots (slot 0 is 0), entry `k` the address of `sys_<k>`
 (`syscTarget`), read out of the image by `syscall_tbl_word` (Rocq
-`sysc_table_word`); the fused range check `addiw a5,a5,-1 ; li a4,21 ;
-bltu a4,a5` falls through iff `1 ≤ num ≤ 22` (`syscall_bltu`), and the index
+`sysc_table_word`); the fused range check `addiw a5,a5,-1 ; li a4,22 ;
+bltu a4,a5` falls through iff `1 ≤ num ≤ 23` (`syscall_bltu`), and the index
 shift `slli a4,a3,3` of the sign-extended number is slot `num`'s offset
 (`syscall_idx`).
 
@@ -54,8 +54,16 @@ open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
 
 /-! ## §1 The rows -/
 
-/-- The number `syscall()` dispatches on (Rocq `sysc_num`). -/
-def syscNum (V : ProcPriv) : Int := usysNum V.tf
+/-- THE RAW NUMBER (Rocq `sysc_raw`): the a7 word as the C reads it -- what
+the range check and the table lookup see (`ld a5,168(s2)` / `sext.w a3,a5`). -/
+def syscRaw (V : ProcPriv) : Int := usysNum V.tf
+
+/-- **THE EFFECTIVE NUMBER** (Rocq `sysc_num`, xv6 7b2c1b1b): the raw one
+where the process's mask allows it, 0 where it blocks it -- a blocked call IS
+the unknown-number call (`UsysMemOk.usysEff`).  Every row of the contract is
+keyed on it, so each row, textually unchanged, now speaks of the call that
+actually RAN. -/
+def syscNum (V : ProcPriv) : Int := usysEff V.pvSecc V.tf
 
 /-- `read`'s count (Rocq `sysc_rdcount`). -/
 def syscRdcount (V : ProcPriv) : Int := usysRdcount V.tf
@@ -141,17 +149,18 @@ def syscTarget : Nat → BitVec 64
   | 20 => KA.«sys_mkdir»
   | 21 => KA.«sys_close»
   | 22 => KA.«sys_sync»
+  | 23 => KA.«sys_seccomp»
   | _ => 0#64
 
 /-- Every entry is nonzero: the `beqz a5` is dead (Rocq `sysc_target_nz`). -/
-theorem syscTarget_ne_zero (k : Nat) (hk1 : 1 ≤ k) (hk : k ≤ 22) : syscTarget k ≠ 0#64 := by
-  have : ∀ k, k < 22 → syscTarget (k + 1) ≠ 0#64 := by decide
+theorem syscTarget_ne_zero (k : Nat) (hk1 : 1 ≤ k) (hk : k ≤ 23) : syscTarget k ≠ 0#64 := by
+  have : ∀ k, k < 23 → syscTarget (k + 1) ≠ 0#64 := by decide
   obtain ⟨j, rfl⟩ : ∃ j, k = j + 1 := ⟨k - 1, by omega⟩
   exact this j (by omega)
 
 set_option maxRecDepth 100000 in
-/-- The table's bytes, one decision for all 22 slots. -/
-theorem syscall_tbl_run : ∀ k, k < 22 →
+/-- The table's bytes, one decision for all 23 slots. -/
+theorem syscall_tbl_run : ∀ k, k < 23 →
     rodataRun (syscallsTbl + BitVec.ofNat 64 (8 * (k + 1))).toNat (wordToBytes (syscTarget (k + 1))) := by
   decide +kernel
 
@@ -160,13 +169,13 @@ variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF]
 
 /-- **Slot `k` of the table, straight out of the read-only image** (Rocq
 `sysc_table_word`). -/
-theorem syscall_tbl_word [CurCtx] (k : Nat) (hk1 : 1 ≤ k) (hk : k ≤ 22) :
+theorem syscall_tbl_word [CurCtx] (k : Nat) (hk1 : 1 ≤ k) (hk : k ≤ 23) :
     kmapStatic (GF := GF) ⊢ kernelData -∗
       wordPointsTo (syscallsTbl + BitVec.ofNat 64 (8 * k)) 8 DFrac.discard (syscTarget k) := by
   obtain ⟨j, rfl⟩ : ∃ j, k = j + 1 := ⟨k - 1, by omega⟩
   have hrun := syscall_tbl_run j (by omega)
   have hal : (syscallsTbl + BitVec.ofNat 64 (8 * (j + 1))).toNat % 8 = 0 := by
-    have : ∀ j, j < 22 → (syscallsTbl + BitVec.ofNat 64 (8 * (j + 1))).toNat % 8 = 0 := by decide
+    have : ∀ j, j < 23 → (syscallsTbl + BitVec.ofNat 64 (8 * (j + 1))).toNat % 8 = 0 := by decide
     exact this j (by omega)
   iintro #HS #H
   ihave Hb := kernelData_buf _ _ hrun $$ HS H
@@ -177,14 +186,14 @@ theorem syscall_tbl_word [CurCtx] (k : Nat) (hk1 : 1 ≤ k) (hk : k ≤ 22) :
 end
 
 /-- **The fused range check** (Rocq `sysc_addiw_signed_clean` and the
-`bltu` lemmas): `addiw a5,a5,-1 ; bltu a4(=21),a5` falls through exactly at
-the numbers `1 ≤ num ≤ 22`, where `num` is the low word of `a7` as an
+`bltu` lemmas): `addiw a5,a5,-1 ; bltu a4(=22),a5` falls through exactly at
+the numbers `1 ≤ num ≤ 23`, where `num` is the low word of `a7` as an
 `int`. -/
 theorem syscall_bltu (w : BitVec 64) :
-    (21#64).ult (BitVec.signExtend 64 (BitVec.extractLsb' 0 32 (w + 0xFFFFFFFFFFFFFFFF#64))) = false ↔
-      1 ≤ (BitVec.extractLsb' 0 32 w).toInt ∧ (BitVec.extractLsb' 0 32 w).toInt ≤ 22 := by
-  have hx : 1 ≤ (BitVec.extractLsb' 0 32 w).toInt ∧ (BitVec.extractLsb' 0 32 w).toInt ≤ 22 ↔
-      (1#32 ≤ BitVec.extractLsb' 0 32 w ∧ BitVec.extractLsb' 0 32 w ≤ 22#32) := by
+    (22#64).ult (BitVec.signExtend 64 (BitVec.extractLsb' 0 32 (w + 0xFFFFFFFFFFFFFFFF#64))) = false ↔
+      1 ≤ (BitVec.extractLsb' 0 32 w).toInt ∧ (BitVec.extractLsb' 0 32 w).toInt ≤ 23 := by
+  have hx : 1 ≤ (BitVec.extractLsb' 0 32 w).toInt ∧ (BitVec.extractLsb' 0 32 w).toInt ≤ 23 ↔
+      (1#32 ≤ BitVec.extractLsb' 0 32 w ∧ BitVec.extractLsb' 0 32 w ≤ 23#32) := by
     generalize BitVec.extractLsb' 0 32 w = x
     have := x.isLt
     rw [BitVec.toInt_eq_toNat_cond, BitVec.le_def, BitVec.le_def]
@@ -197,15 +206,15 @@ theorem syscall_bltu (w : BitVec 64) :
 /-- **The index shift** `slli a4,a3,3` of the sign-extended number `a3`, in
 range, is slot `num`'s offset. -/
 theorem syscall_idx (w : BitVec 64) (h1 : 1 ≤ (BitVec.extractLsb' 0 32 w).toInt)
-    (h2 : (BitVec.extractLsb' 0 32 w).toInt ≤ 22) :
+    (h2 : (BitVec.extractLsb' 0 32 w).toInt ≤ 23) :
     BitVec.signExtend 64 (BitVec.extractLsb' 0 32 w) <<< 3 =
       BitVec.ofNat 64 (8 * (BitVec.extractLsb' 0 32 w).toInt.toNat) := by
   generalize hx : BitVec.extractLsb' 0 32 w = x at *
   have hlt := x.isLt
-  have hsmall : x.toNat ≤ 22 := by
+  have hsmall : x.toNat ≤ 23 := by
     rw [BitVec.toInt_eq_toNat_cond] at h1 h2
     split at h2 <;> split at h1 <;> omega
-  have hle : x ≤ 22#32 := by rw [BitVec.le_def]; simpa using hsmall
+  have hle : x ≤ 23#32 := by rw [BitVec.le_def]; simpa using hsmall
   have hti : x.toInt.toNat = x.toNat := by
     rw [BitVec.toInt_eq_toNat_cond, if_pos (by omega)]; simp
   rw [hti]
@@ -219,6 +228,10 @@ theorem syscall_idx (w : BitVec 64) (h1 : 1 ≤ (BitVec.extractLsb' 0 32 w).toIn
 
 /-- The number `syscall()` reads is `syscNum` (the `ld a5,168(s2)` is word
 `tfArgIdx 7`). -/
-theorem syscNum_eq (V : ProcPriv) : syscNum V = (BitVec.extractLsb' 0 32 (tfW V.tf (tfArgIdx 7))).toInt := rfl
+theorem syscRaw_eq (V : ProcPriv) : syscRaw V = (BitVec.extractLsb' 0 32 (tfW V.tf (tfArgIdx 7))).toInt := rfl
+
+/-- A nonzero effective number is the raw one. -/
+theorem syscNum_raw {V : ProcPriv} {n : Int} (h : syscNum V = n) (hn : n ≠ 0) : syscRaw V = n :=
+  usysEff_raw h hn
 
 end Xv6

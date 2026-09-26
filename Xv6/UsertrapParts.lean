@@ -140,17 +140,17 @@ structure UtRows0 (A : UtArgs GF) (V2 : ProcPriv) (M2 : Nat → List (BitVec 8))
     (cs2 : ExtTreeSet GName compare) : Prop where
   round : utRound A.sep A.sc A.V A.M V2 M2
   fdk : utFdKept A.sc A.sts sts2
-  chk : utChKept A.sc A.V.tf A.cs cs2
+  chk : utChKept A.sc A.V.pvSecc A.V.tf A.cs cs2
   gen : utGenKept A.V V2
-  fde : utFdEcall A.sc A.V.tf V2.tf A.sts sts2
-  pipe : utPipeEcall A.sc A.V.tf V2.tf (syscImg A.V A.M) (syscImg V2 M2) A.sts sts2
-  rpid : utRetPid A.sc A.V.tf V2.tf A.pid
+  fde : utFdEcall A.sc A.V.pvSecc A.V.tf V2.tf A.sts sts2
+  pipe : utPipeEcall A.sc A.V.pvSecc A.V.tf V2.tf (syscImg A.V A.M) (syscImg V2 M2) A.sts sts2
+  rpid : utRetPid A.sc A.V.pvSecc A.V.tf V2.tf A.pid
   tfp : V2.upt.tfp = A.P.tfp
   ks : V2.kstack = A.V.kstack
 
 /-- The live row at the parked record. -/
 abbrev utLive (A : UtArgs GF) (V2 : ProcPriv) (cs2 : ExtTreeSet GName compare) : Prop :=
-  utLiveOut A.sc (utProTf A.sep A.V) A.sts (tfW V2.tf (tfArgIdx 0)) cs2
+  utLiveOut A.sc A.V.pvSecc (utProTf A.sep A.V) A.sts (tfW V2.tf (tfArgIdx 0)) cs2
 
 /-- prepare_return's four stores are invisible to `tfUeq`. -/
 theorem tfUeq_prepareReturnTf (ws : List (BitVec 64)) (a b c : BitVec 64) :

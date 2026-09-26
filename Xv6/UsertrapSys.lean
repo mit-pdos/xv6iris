@@ -237,8 +237,9 @@ theorem ut90_bump [hPT : ∀ Γ, Persistent (PT Γ)] [ClaimIs (hlc := hlc) GF Γ
   icases ut90_pay A.f A.sc A.sep A.V $$ Hpi with ⟨#Hmy, Hpi⟩
   ihave Hpi : syscPayIn A.f (utSysRec A.sep A.V) $$ [Hpi]
   · unfold syscPayIn utPayIn
-    rw [← hsc]
-    iapply (upayAt_ueq (gn := A.V.gen) (gn' := (utSysRec A.sep A.V).gen) A.sc A.f (ut_sysNum A.sep A.V).symm
+    rw [← hsc, show (utSysRec A.sep A.V).pvSecc = A.V.pvSecc from rfl]
+    iapply (upayAt_ueq (gn := A.V.gen) (gn' := (utSysRec A.sep A.V).gen) A.sc A.V.pvSecc A.f
+      (ut_sysNum_raw A.sep A.V).symm
       (ut_sysTf_arg A.sep A.V (tfArgIdx 0) (by decide)).symm rfl)
     iexact Hpi
   ihave #Hpay : utPay A $$ [Hmy]

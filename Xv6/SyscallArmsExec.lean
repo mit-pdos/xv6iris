@@ -90,15 +90,15 @@ def SyscDepExec : Prop :=
 theorem syscExec_kexecOk_facts (V V' : ProcPriv) (r entry spv szv' : BitVec 64) (na : Nat)
     (alen : Nat → Nat) (hne : r ≠ 0xFFFFFFFFFFFFFFFF#64) (hok : kexecOk V V' r entry spv szv' na alen) :
     r = BitVec.ofNat 64 na ∧ V'.upt.tfp = V.upt.tfp ∧ V'.fdg = V.fdg ∧ V'.cwi = V.cwi ∧
-      V'.gen = V.gen ∧ V'.chg = V.chg ∧ V'.kstack = V.kstack := by
-  rcases hok with ⟨hr, -⟩ | ⟨hr, -, -, -, -, htfp, -, -, hfdg, -, hcwi, hgen, hchg, -, -, -, -, hks, -⟩
+      V'.gen = V.gen ∧ V'.chg = V.chg ∧ V'.kstack = V.kstack ∧ V'.pvSecc = V.pvSecc := by
+  rcases hok with ⟨hr, -⟩ | ⟨hr, -, -, -, -, htfp, -, -, hfdg, -, hcwi, hgen, hchg, -, -, -, -, hks, -, hsc⟩
   · exact absurd hr hne
-  · exact ⟨hr, htfp, hfdg, hcwi, hgen, hchg, hks⟩
+  · exact ⟨hr, htfp, hfdg, hcwi, hgen, hchg, hks, hsc⟩
 
 /-- The six record facts the shared tail needs of the returned block. -/
 def SyscExecKeep (V V' : ProcPriv) : Prop :=
   V'.upt.tfp = V.upt.tfp ∧ V'.fdg = V.fdg ∧ V'.chg = V.chg ∧ V'.gen = V.gen ∧ V'.cwi = V.cwi ∧
-    V'.kstack = V.kstack
+    V'.kstack = V.kstack ∧ V'.pvSecc = V.pvSecc
 
 /-- A successful exec's slot is at the record after the a0 store (Rocq
 `exec_key`'s shape). -/
@@ -133,7 +133,7 @@ theorem syscExec_arms_read (f : UexecSG.sfam GF) (V : ProcPriv) (M : Nat → Lis
     subst hV hM hr
     ihave Hrf := sysExecPostFail_refund (hlc := hlc) _ _ _ _ _ _ _ _ _ _ _ _ _ _ $$ Hfail
     isplitr
-    · ipureintro; exact ⟨htfp0, rfl, rfl, rfl, rfl, rfl⟩
+    · ipureintro; exact ⟨htfp0, rfl, rfl, rfl, rfl, rfl, rfl⟩
     isplitr
     · unfold syscExecOut
       iintro %_
@@ -160,10 +160,10 @@ theorem syscExec_arms_read (f : UexecSG.sfam GF) (V : ProcPriv) (M : Nat → Lis
         ipureintro; exact ⟨hne, hk⟩
     icases Hs with ⟨%entry, %spv, %szv', %hk, Hslot⟩
     obtain ⟨hne, hok⟩ := hk
-    obtain ⟨hr, htfp, hfdg, hcwi, hgen, hchg, hks⟩ :=
+    obtain ⟨hr, htfp, hfdg, hcwi, hgen, hchg, hks, hsc⟩ :=
       syscExec_kexecOk_facts _ V' r entry spv szv' na alen hne hok
     isplitr
-    · ipureintro; exact ⟨htfp.trans htfp0, hfdg, hchg, hgen, hcwi, hks⟩
+    · ipureintro; exact ⟨htfp.trans htfp0, hfdg, hchg, hgen, hcwi, hks, hsc⟩
     isplitl [Hslot]
     · unfold syscExecOut
       iintro %_
@@ -194,12 +194,13 @@ theorem syscRows_exec (V : ProcPriv) (M : Nat → List (BitVec 8)) (V' : ProcPri
     (r : BitVec 64) (hn : syscNum V = USYS_exec) (hk : SyscExecKeep V V') :
     SyscRows V M (syscStore V' r) M' sts sts cs cs pid := by
   have hne : ∀ m : Int, (7 : Int) ≠ m → syscNum V ≠ m := fun m h => by rw [hn]; exact h
-  obtain ⟨htfp, hfdg, hchg, hgen, hcwi, hks⟩ := hk
+  obtain ⟨htfp, hfdg, hchg, hgen, hcwi, hks, hsc⟩ := hk
   exact ⟨syscMemOk_exec V _ _ _ hn, syscFdOk_refl_at V _ sts 7 hn (by decide) (by decide) (by decide)
       (by decide), syscPipeOk_quiet V _ _ _ sts sts (hne 4 (by decide)), syscChOk_refl V cs,
     hne 2 (by decide), Or.inl hn, Or.inl hn, Or.inl hn, Or.inl hn, htfp, hfdg, hchg, hgen,
     Or.inr hcwi, Or.inl (hne 12 (by decide)), Or.inl (hne 1 (by decide)), Or.inl (hne 5 (by decide)),
-    syscRetPid_ne _ _ _ 7 hn (by decide), hks⟩
+    syscRetPid_ne _ _ _ 7 hn (by decide), hks,
+    by rw [show (syscStore V' r).pvSecc = V.pvSecc from hsc]; exact usysSeccOk_refl _ _ _ _ (hne 23 (by decide))⟩
 
 /-- The trapframe's word `i < 36` is its `tfW` reading. -/
 theorem syscTf_get (tf : List (BitVec 64)) (hl : tf.length = 36) (i : Nat) (hi : i < 36) :
@@ -319,7 +320,7 @@ theorem syscFb_kinds : pkKinds syscFbFmt = [PkKind.num, PkKind.str, PkKind.num] 
   unfold syscFbFmt; decide
 
 /-- `jal ra,printk` at `+0x4e`. -/
-theorem syscFb_jal_tgt : KA.«syscall» + 0x62#64 + BitVec.signExtend 64 (0x1fdb64#21) = KA.«printk» := by
+theorem syscFb_jal_tgt : KA.«syscall» + 0x62#64 + BitVec.signExtend 64 (0x1fdb42#21) = KA.«printk» := by
   decide
 
 /-- The format string (`auipc`/`addi` at `+0x46`/`+0x4a`), printk (`jal` at
@@ -469,8 +470,8 @@ theorem syscFb_tf [X : CurCtx] (hct : curTier = KTier.kpt) (γ : FileNames) (pa 
   exact hacc
 
 /-- The number is out of range: every arm's number is refuted. -/
-theorem syscFb_ne (V : ProcPriv) (h : syscNum V < 1 ∨ 22 < syscNum V) (m : Int) (h1 : 1 ≤ m)
-    (h22 : m ≤ 22) : syscNum V ≠ m := by omega
+theorem syscFb_ne (V : ProcPriv) (h : syscNum V < 1 ∨ 23 < syscNum V) (m : Int) (h1 : 1 ≤ m)
+    (h22 : m ≤ 23) : syscNum V ≠ m := by omega
 
 set_option maxHeartbeats 4000000 in
 /-- **THE PRINTK FALLBACK** (Rocq `sysc_fallback`). -/
@@ -483,7 +484,7 @@ theorem syscall_fallback (PK : PRINTK)
     (hE : SyscSpostEmp (GF := GF))
     (hj : j < NPROC) (hproc : k.proc = procAddr j) (hK : syscallSlots ≤ k.avail)
     (hnoff : k.noff = 0) (htier : k.tier = KTier.kpt) (hgn : gn = V.gen)
-    (hrange : syscNum V < 1 ∨ 22 < syscNum V) (hpins : syscPins k R) (hs1 : R 9#5 = procAddr j)
+    (hrange : syscNum V < 1 ∨ 23 < syscNum V) (hpins : syscPins k R) (hs1 : R 9#5 = procAddr j)
     (hs2 : R 18#5 = pageAddr V.upt.tfp) :
     syscFallbackBody PT Γ c0 cpu k spie spp R γw γ j pid V M sts gn cs ip f hE hj hproc hK hnoff htier
       hgn hrange hpins hs1 hs2 := by
@@ -591,7 +592,7 @@ theorem syscall_fallback (PK : PRINTK)
     (hne 4 (by decide) (by decide)) (hne 5 (by decide) (by decide)) (hne 7 (by decide) (by decide))
     (hne 8 (by decide) (by decide)) (hne 10 (by decide) (by decide)) (hne 12 (by decide) (by decide))
     (hne 15 (by decide) (by decide)) (hne 21 (by decide) (by decide)) (by rw [hl]; decide)
-    (syscRetPid_ne _ _ _ _ rfl (hne 11 (by decide) (by decide)))
+    (syscRetPid_ne _ _ _ _ rfl (hne 11 (by decide) (by decide))) (hne 23 (by decide) (by decide))
   -- +0x58: the shared epilogue
   iapply (syscall_epilogue_tail PT Γ c0 cpu k spie1 spp1 _ γ j pid V M sts gn cs ip f
     (syscStore V 0xFFFFFFFFFFFFFFFF#64) M sts cs hj hproc hK hpinsF hrows)
@@ -606,6 +607,73 @@ theorem syscall_fallback (PK : PRINTK)
   isplitr
   · iapply syscForkOut_ne; exact hne 1 (by decide) (by decide)
   · iapply syscWaitOut_ne; exact hne 3 (by decide) (by decide)
+
+
+set_option maxHeartbeats 4000000 in
+/-- **THE BLOCKED ARM** (xv6 7b2c1b1b; Rocq `sysc_blocked`): the mask's bit
+is clear, so the effective number is 0 -- `li a5,-1 ; sd a5,112(s2) ; j
+epilogue` -- the unknown-number call's contract (the fallback's rows at
+number 0), minus the diagnostic. -/
+theorem syscall_blocked
+    (PT : SchedNames → IProp GF) [hPT : ∀ Γ, Persistent (PT Γ)] (Γ : SchedNames)
+    [ClaimIs (hlc := hlc) GF Γ]
+    (c0 cpu : CPU) (k : KCtx) (spie spp : Bool) (R : RegMap) (γw : GName) (γ : FileNames) (j : Nat)
+    (pid : BitVec 32) (V : ProcPriv) (M : Nat → List (BitVec 8)) (sts : List FdState) (gn : GName)
+    (cs : ExtTreeSet GName compare) (ip : BitVec 64) (f : UexecSG.sfam GF)
+    (hE : SyscSpostEmp (GF := GF))
+    (hj : j < NPROC) (hproc : k.proc = procAddr j) (hK : syscallSlots ≤ k.avail)
+    (hnoff : k.noff = 0) (htier : k.tier = KTier.kpt) (hgn : gn = V.gen)
+    (hblk : syscNum V = 0) (hpins : syscPins k R) (hs1 : R 9#5 = procAddr j)
+    (hs2 : R 18#5 = pageAddr V.upt.tfp) :
+    syscBlockedBody PT Γ c0 cpu k spie spp R γw γ j pid V M sts gn cs ip f hE hj hproc hK hnoff htier
+      hgn hblk hpins hs1 hs2 := by
+  unfold syscBlockedBody
+  iintro ⟨Hk, Hpc, Hframe, #Hpi, Hte, Hce, #Hwl, Hbs, Hip, Hfd, Hir, #Henv, Hpriv, Hfr, Hch, -, -, -,
+    Hslot⟩
+  icases Hslot with ⟨Hnext, -⟩
+  icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
+  icases kctx_tier _ _ $$ Hk with ⟨%hti, Hk⟩
+  have hct : curTier = KTier.kpt := by rw [← hti]; exact htier
+  icases syscall_tf_len hct γ (procAddr j) pid V M $$ Hpriv with ⟨%hl, Hpriv⟩
+  icases syscall_tf_acc hct γ (procAddr j) pid V M $$ Hpriv with ⟨Htf, Hback⟩
+  have hst := prepare_return_tf_store (GF := GF) V.upt.tfp V.tf (tfArgIdx 0) (by decide)
+  rw [show BitVec.ofNat 64 (8 * tfArgIdx 0) = 112#64 from rfl] at hst
+  icases hst $$ Htf with ⟨⟨%w, Hc⟩, Htfw⟩
+  unfold syscallBlocked syscallAddr
+  -- +0x4c  c.li a5,-1
+  k_step_e (wp_s_addi cpu _ (KA.«syscall» + 0x4c#64) true 0xfff#12 15#5 0#5 (by decide))
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
+  iintro Hk Hpc
+  -- +0x4e  sd a5,112(s2)
+  k_step_e (wp_s_sd cpu _ (KA.«syscall» + 0x4e#64) false 112#12 18#5 15#5 (by decide) w)
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hs2]
+  iintro Hk Hpc Hc
+  ihave Htf := Htfw $$ %_ Hc
+  ihave Hpriv := Hback $$ %_ Htf
+  -- +0x52  c.j the epilogue
+  k_step_e (wp_s_j cpu _ (KA.«syscall» + 0x52#64) true 0x1a#21)
+    from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
+  iintro Hk Hpc
+  have hpinsF : syscPins k (R.set 15#5 0xFFFFFFFFFFFFFFFF#64) := by
+    unfold syscPins
+    simp only [RegMap.set_apply, BitVec.reduceEq, ite_false]
+    exact hpins
+  have hrows := syscRows_keep V M sts cs pid 0xFFFFFFFFFFFFFFFF#64 0 hblk (by decide) (by decide)
+    (by decide) (by decide) (by decide) (by decide) (by decide) (by decide) (by decide) (by decide)
+    (by decide) (by rw [hl]; decide) (syscRetPid_ne _ _ _ 0 hblk (by decide))
+  -- +0x6c: the shared epilogue
+  iapply (syscall_epilogue_tail PT Γ c0 cpu k spie spp _ γ j pid V M sts gn cs ip f
+    (syscStore V 0xFFFFFFFFFFFFFFFF#64) M sts cs hj hproc hK hpinsF hrows)
+  iframe Hk Hpc Hframe Hte Hce Hbs Hip Hfd Hir Henv Hfr Hch Hnext
+  isplitl [Hpriv]
+  · unfold syscStore; iexact Hpriv
+  isplitr
+  · iapply syscExecOut_ne; rw [hblk]; decide
+  isplitr
+  · iapply syscSysOut_quiet f V M sts hE gn cs pid _ _ sts _ cs 0 hblk (by decide)
+  isplitr
+  · iapply syscForkOut_ne; rw [hblk]; decide
+  · iapply syscWaitOut_ne; rw [hblk]; decide
 
 end
 
@@ -636,7 +704,7 @@ def SyscArmAt (n : Nat)
     syscArmBody n PT Γ c0 cpu k spie spp R γw γ j pid V M sts gn cs ip f hE hj hproc hK hnoff htier hgn
       hnum hpins hs1 hs2 hra
 
-/-- **Rocq `sysc_arm_dispatch`'s case split**: every table index `1 ≤ n ≤ 22`
+/-- **Rocq `sysc_arm_dispatch`'s case split**: every table index `1 ≤ n ≤ 23`
 has its arm -- the 21 others as hypotheses (deviation 4), exec discharged
 here from `SYSEXEC` and its deposit law. -/
 theorem syscall_arms_all (SE : SYSEXEC) (hD : SyscDepExec (hlc := hlc) (GF := GF))
@@ -671,7 +739,8 @@ theorem syscall_arms_all (SE : SYSEXEC) (hD : SyscDepExec (hlc := hlc) (GF := GF
     (h20 : SyscArmAt 20 PT Γ c0 cpu k spie spp R γw γ j pid V M sts gn cs ip f hE hj hproc hK hnoff htier hgn hpins hs1 hs2 hra) -- mkdir
     (h21 : SyscArmAt 21 PT Γ c0 cpu k spie spp R γw γ j pid V M sts gn cs ip f hE hj hproc hK hnoff htier hgn hpins hs1 hs2 hra) -- close
     (h22 : SyscArmAt 22 PT Γ c0 cpu k spie spp R γw γ j pid V M sts gn cs ip f hE hj hproc hK hnoff htier hgn hpins hs1 hs2 hra) -- sync
-    (n : Nat) (hn1 : 1 ≤ n) (hn22 : n ≤ 22) (hnum : syscNum V = ((n : Nat) : Int)) :
+    (h23 : SyscArmAt 23 PT Γ c0 cpu k spie spp R γw γ j pid V M sts gn cs ip f hE hj hproc hK hnoff htier hgn hpins hs1 hs2 hra) -- seccomp
+    (n : Nat) (hn1 : 1 ≤ n) (hn22 : n ≤ 23) (hnum : syscNum V = ((n : Nat) : Int)) :
     syscArmBody n PT Γ c0 cpu k spie spp R γw γ j pid V M sts gn cs ip f hE hj hproc hK hnoff htier hgn
       hnum hpins hs1 hs2 hra := by
   match n, hn1, hn22, hnum with
@@ -700,7 +769,8 @@ theorem syscall_arms_all (SE : SYSEXEC) (hD : SyscDepExec (hlc := hlc) (GF := GF
   | 20, _, _, hnum => exact h20 hnum
   | 21, _, _, hnum => exact h21 hnum
   | 22, _, _, hnum => exact h22 hnum
-  | _ + 23, _, h, _ => exact absurd h (by omega)
+  | 23, _, _, hnum => exact h23 hnum
+  | _ + 24, _, h, _ => exact absurd h (by omega)
 
 end
 

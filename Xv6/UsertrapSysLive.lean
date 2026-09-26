@@ -43,7 +43,7 @@ theorem ut_sys_live (hW : UtReadWhy (GF := GF)) (A : UtArgs GF) (V2 : ProcPriv)
       syscSysOut (hlc := hlc) A.f (utSysRec A.sep A.V) A.M A.sts A.gn A.cs A.pid (syscA0 V2)
         (syscImg V2 M2) sts2 V2.cwi cs2 ∗
       syscWaitOut (GF := GF) (utSysRec A.sep A.V) A.M (syscImg V2 M2) (syscA0 V2) A.cs cs2 A.pid := by
-  have hnp : usysNum (utProTf A.sep A.V) = syscNum (utSysRec A.sep A.V) := (ut_sysNum _ _).symm
+  have hnp : usysEff A.V.pvSecc (utProTf A.sep A.V) = syscNum (utSysRec A.sep A.V) := (ut_sysNum _ _).symm
   unfold utLive utLiveOut
   rw [hnp]
   iintro ⟨Hs, Hw⟩

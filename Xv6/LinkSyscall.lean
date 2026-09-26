@@ -1,7 +1,7 @@
 /-
 Link `syscall` (Rocq `LinkSyscall.v`: `SyscallProof SysFork SysExit SysWait
 SysPipe SysRead SysKill SysExec SysFstat SysChdir SysDup SysGetpid SysSbrk
-SysPause SysUptime SysWrite SysMknod SysLink SysMkdir SysClose SysSync
+SysPause SysUptime SysWrite SysMknod SysLink SysMkdir SysClose SysSync SysSeccomp
 SysOpen SysUnlink Myproc PrintkGen`), the only place the dispatch's proof
 meets the twenty-two table entries' (each already linked against its own
 callees) and `myproc` / `printk`.
@@ -52,6 +52,7 @@ import Xv6.LinkSysLink
 import Xv6.LinkSysMkdir
 import Xv6.LinkSysClose
 import Xv6.LinkSysSync
+import Xv6.LinkSysSeccomp
 
 namespace Xv6
 
@@ -89,5 +90,6 @@ theorem Syscall : SYSCALL_XV6 :=
     (SysSbrk AI Myproc (Growproc Myproc (Uvmalloc KAL KF MS MA UM) (Uvmdealloc UM)))
     (SysPause AI AC RE Myproc Killed SP SL) SysUptime SysOpenClosed SysWriteClosed
     SysMknodClosed SysUnlinkClosed SysLinkClosed SysMkdirClosed SysCloseClosed SysSync
+    (SysSeccomp AA Myproc)
 
 end Xv6

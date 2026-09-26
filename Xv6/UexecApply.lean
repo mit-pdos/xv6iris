@@ -66,7 +66,7 @@ describes, written back out as a trapframe.  Not the same list (the kernel
 words are dropped, the epc `retPc`'d) but the same KEY. -/
 def uvisRun (W : Uvis) : Uvis :=
   uvisOfRun (tfResumeGpr0 W.tf) (retPc (tfW W.tf tfEpcIdx)) W.M W.perm W.sz W.fd W.cwd W.gen W.ch W.pid
-    W.lazy
+    W.lazy W.secc
 
 theorem uvisRun_length (W : Uvis) : (uvisRun W).tf.length = 36 := tfOf_length _ _
 
@@ -94,28 +94,36 @@ theorem uvisRun_arg (W : Uvis) (k : Nat) (hk : k < 8) :
 theorem uvisRun_num (W : Uvis) : usysNum (uvisRun W).tf = usysNum W.tf :=
   usysNum_argCong _ _ (uvisRun_arg W 7 (by decide))
 
+/-- Rocq `uvis_run_secc`. -/
+theorem uvisRun_secc (W : Uvis) : (uvisRun W).secc = W.secc := rfl
+
+/-- Rocq `uvis_run_eff`: the run projection's effective number is the key's. -/
+theorem uvisRun_eff (W : Uvis) : uvisNum (uvisRun W) = uvisNum W :=
+  usysEff_numCong _ _ _ (uvisRun_num W)
+
 /-- **The eleven readings a slot sees** (Rocq `uslot_key_cong`'s premises,
 bundled: deviation 2). -/
 def ukeyEq (W W' : Uvis) : Prop :=
   tfResumeGpr0 W.tf = tfResumeGpr0 W'.tf ∧ tfResumePc W.tf = tfResumePc W'.tf ∧ W.M = W'.M ∧
   W.perm = W'.perm ∧ W.sz = W'.sz ∧ W.fd = W'.fd ∧ W.cwd = W'.cwd ∧ W.gen = W'.gen ∧ W.ch = W'.ch ∧
-  W.pid = W'.pid ∧ W.lazy = W'.lazy
+  W.pid = W'.pid ∧ W.lazy = W'.lazy ∧ W.secc = W'.secc
 
 theorem ukeyEq_symm {W W' : Uvis} (h : ukeyEq W W') : ukeyEq W' W := by
-  obtain ⟨a, b, c, d, e, f, g, i, j, k, l⟩ := h
-  exact ⟨a.symm, b.symm, c.symm, d.symm, e.symm, f.symm, g.symm, i.symm, j.symm, k.symm, l.symm⟩
+  obtain ⟨a, b, c, d, e, f, g, i, j, k, l, m⟩ := h
+  exact ⟨a.symm, b.symm, c.symm, d.symm, e.symm, f.symm, g.symm, i.symm, j.symm, k.symm, l.symm, m.symm⟩
 
 /-- the key and its run projection -/
 theorem ukeyEq_run (W : Uvis) : ukeyEq W (uvisRun W) :=
-  ⟨(uvisRun_gpr W).symm, (uvisRun_pc W).symm, rfl, rfl, rfl, rfl, rfl, rfl, rfl, rfl, rfl⟩
+  ⟨(uvisRun_gpr W).symm, (uvisRun_pc W).symm, rfl, rfl, rfl, rfl, rfl, rfl, rfl, rfl, rfl, rfl⟩
 
 /-- the BUMPED keys agree too, at every return value and resume components -/
 theorem ukeyEq_bump {W W' : Uvis} (hl : W.tf.length = 36) (hl' : W'.tf.length = 36)
     (hg : tfResumeGpr0 W.tf = tfResumeGpr0 W'.tf) (hp : tfResumePc W.tf = tfResumePc W'.tf)
     (hpid : W.pid = W'.pid) (r : BitVec 64) (M' : ElfMem) (π' : Nat → Option UPerm) (szv' : Nat)
-    (fdv' : List FdState) (cw' : Nat) (g' : GName) (cs' : ExtTreeSet GName compare) (lz' : Bool) :
-    ukeyEq (bump W r M' π' szv' fdv' cw' g' cs' lz') (bump W' r M' π' szv' fdv' cw' g' cs' lz') := by
-  refine ⟨?_, ?_, rfl, rfl, rfl, rfl, rfl, rfl, rfl, hpid, rfl⟩
+    (fdv' : List FdState) (cw' : Nat) (g' : GName) (cs' : ExtTreeSet GName compare) (lz' : Bool)
+    (secc' : BitVec 64) :
+    ukeyEq (bump W r M' π' szv' fdv' cw' g' cs' lz' secc') (bump W' r M' π' szv' fdv' cw' g' cs' lz' secc') := by
+  refine ⟨?_, ?_, rfl, rfl, rfl, rfl, rfl, rfl, rfl, hpid, rfl, rfl⟩
   · show tfResumeGpr0 (bumpTf W.tf r) = tfResumeGpr0 (bumpTf W'.tf r)
     rw [tfResumeGpr0_bump _ _ (by rw [hl]; decide), tfResumeGpr0_bump _ _ (by rw [hl']; decide), hg]
   · show tfResumePc (bumpTf W.tf r) = tfResumePc (bumpTf W'.tf r)
@@ -134,18 +142,18 @@ def UKeyCong (S : Uvis → IProp GF) : Prop := ∀ W W' : Uvis, ukeyEq W W' → 
 ITS KEY AND NOTHING ELSE (`uslot_ukc` is the whole content). -/
 theorem uslot_keyCong : UKeyCong (uslot (GF := GF)) := by
   intro W W' h
-  obtain ⟨hg, hp, hM, hpi, hsz, hfd, hcw, hgn, hch, hpid, hlz⟩ := h
+  obtain ⟨hg, hp, hM, hpi, hsz, hfd, hcw, hgn, hch, hpid, hlz, hsc⟩ := h
   refine (uslot_ukc W).trans (BI.BiEntails.trans ?_ (uslot_ukc W').symm)
-  rw [hg, hp, hM, hpi, hsz, hfd, hcw, hgn, hch, hpid, hlz]
+  rw [hg, hp, hM, hpi, hsz, hfd, hcw, hgn, hch, hpid, hlz, hsc]
   exact .rfl
 
 /-- **Rocq `uslot_key_cong`**, unbundled. -/
 theorem uslot_key_cong {W W' : Uvis} (hg : tfResumeGpr0 W.tf = tfResumeGpr0 W'.tf)
     (hp : tfResumePc W.tf = tfResumePc W'.tf) (hM : W.M = W'.M) (hpi : W.perm = W'.perm)
     (hsz : W.sz = W'.sz) (hfd : W.fd = W'.fd) (hcw : W.cwd = W'.cwd) (hgn : W.gen = W'.gen)
-    (hch : W.ch = W'.ch) (hpid : W.pid = W'.pid) (hlz : W.lazy = W'.lazy) :
+    (hch : W.ch = W'.ch) (hpid : W.pid = W'.pid) (hlz : W.lazy = W'.lazy) (hsc : W.secc = W'.secc) :
     uslot (GF := GF) W ⊣⊢ uslot W' :=
-  uslot_keyCong W W' ⟨hg, hp, hM, hpi, hsz, hfd, hcw, hgn, hch, hpid, hlz⟩
+  uslot_keyCong W W' ⟨hg, hp, hM, hpi, hsz, hfd, hcw, hgn, hch, hpid, hlz, hsc⟩
 
 /-- One direction of `uexecArmF_key_cong` (the hypotheses are symmetric). -/
 theorem uexecArmF_key_mono (S : Uvis → IProp GF) (HS : UKeyCong S) (sc : BitVec 64) (W W' : Uvis)
@@ -154,37 +162,39 @@ theorem uexecArmF_key_mono (S : Uvis → IProp GF) (HS : UKeyCong S) (sc : BitVe
     (ha2 : tfW W.tf (tfArgIdx 2) = tfW W'.tf (tfArgIdx 2)) (hk : ukeyEq W W') :
     uexecArmF S sc W f ⊢ uexecArmF S sc W' f := by
   have hk' := hk
-  obtain ⟨hg, hp, hM, hpi, hsz, hfd, hcw, hgn, hch, hpid, hlz⟩ := hk'
-  have hsk : skeyEq W W' := ⟨hM, ha0, ha1, ha2, hfd, hcw, hgn, hch, hpid, hpi, hsz, hlz⟩
+  obtain ⟨hg, hp, hM, hpi, hsz, hfd, hcw, hgn, hch, hpid, hlz, hsc⟩ := hk'
+  have hsk : skeyEq W W' := ⟨hM, ha0, ha1, ha2, hfd, hcw, hgn, hch, hpid, hpi, hsz, hlz, hsc⟩
   have hb := ukeyEq_bump hl hl' hg hp hpid
+  have hne : uvisNum W = uvisNum W' := by unfold uvisNum; rw [hsc]; exact usysEff_numCong _ _ _ hn
   unfold uexecArmF
-  rw [hn]
+  rw [hne]
   by_cases h1 : sc = uecallScause
   · simp only [if_pos h1]
-    by_cases h2 : usysNum W'.tf = USYS_exit
+    by_cases h2 : uvisNum W' = USYS_exit
     · simp only [if_pos h2]; exact .rfl
     simp only [if_neg h2]
-    by_cases h3 : usysNum W'.tf = USYS_fork
+    by_cases h3 : uvisNum W' = USYS_fork
     · simp only [if_pos h3]
       unfold uexecForkParentF
-      rw [hM, hpi, hsz, hfd, hcw, hgn, hch, hlz]
+      rw [hM, hpi, hsz, hfd, hcw, hgn, hch, hlz, hsc]
       iintro H %r %fdv' %cw' %cs' %hr %hf %hc Hans
-      iapply (HS _ _ (hb r W'.M W'.perm W'.sz fdv' cw' W'.gen cs' W'.lazy)).mp
+      iapply (HS _ _ (hb r W'.M W'.perm W'.sz fdv' cw' W'.gen cs' W'.lazy W'.secc)).mp
       iapply H $$ %r %fdv' %cw' %cs' %hr %hf %hc Hans
     simp only [if_neg h3]
     have hcont : ∀ CH : BitVec 64 → ExtTreeSet GName compare → IProp GF,
-        uexecRetContGen S (usysNum W'.tf) f W CH ⊢ uexecRetContGen S (usysNum W'.tf) f W' CH := by
+        uexecRetContGen S (uvisNum W') f W CH ⊢ uexecRetContGen S (uvisNum W') f W' CH := by
       intro CH
       unfold uexecRetContGen
-      rw [hM, hpi, hsz, hfd, hcw, hgn, hpid, hlz]
-      iintro H %r %M' %π' %szv' %fdv' %cw' %g' %cs' %lz' %hmo %hfo %hpo %hco %hgo %hpio %hlo Hch Hsp
-      iapply (HS _ _ (hb r M' π' szv' fdv' cw' g' cs' lz')).mp
-      iapply H $$ %r %M' %π' %szv' %fdv' %cw' %g' %cs' %lz'
+      rw [hM, hpi, hsz, hfd, hcw, hgn, hpid, hlz, hsc]
+      iintro H %r %M' %π' %szv' %fdv' %cw' %g' %cs' %lz' %secc' %hmo %hfo %hpo %hco %hgo %hpio %hlo %hso Hch Hsp
+      iapply (HS _ _ (hb r M' π' szv' fdv' cw' g' cs' lz' secc')).mp
+      iapply H $$ %r %M' %π' %szv' %fdv' %cw' %g' %cs' %lz' %secc'
         %(usysMemOk_argCong ha0.symm ha1.symm ha2.symm hmo) %(usysFdOk_argCong ha0.symm hfo)
-        %(usysPipeOk_argCong ha0.symm hpo) %hco %hgo %hpio %(uexecLiveOk_cong ha0.symm ha2.symm hlo) Hch [Hsp]
-      iapply (spostAt_cong S (usysNum W'.tf) f W W' r M' fdv' cw' cs' hsk).mpr
+        %(usysPipeOk_argCong ha0.symm hpo) %hco %hgo %hpio %(uexecLiveOk_cong ha0.symm ha2.symm hlo)
+        %(usysSeccOk_argCong ha0.symm hso) Hch [Hsp]
+      iapply (spostAt_cong S (uvisNum W') f W W' r M' fdv' cw' cs' hsk).mpr
       iexact Hsp
-    by_cases h4 : usysNum W'.tf = USYS_wait
+    by_cases h4 : uvisNum W' = USYS_wait
     · simp only [if_pos h4]
       unfold uexecWaitF
       have e : (fun r cs' => uwaitAnsPid (GF := GF) r W.ch cs' W.pid) =
@@ -192,8 +202,8 @@ theorem uexecArmF_key_mono (S : Uvis → IProp GF) (HS : UKeyCong S) (sc : BitVe
       rw [e]; exact hcont _
     · simp only [if_neg h4]
       unfold uexecRetContF
-      have e : (fun r cs' => iprop(⌜usysChOk (usysNum W'.tf) r W.ch cs'⌝ : IProp GF)) =
-          (fun r cs' => iprop(⌜usysChOk (usysNum W'.tf) r W'.ch cs'⌝)) := by rw [hch]
+      have e : (fun r cs' => iprop(⌜usysChOk (uvisNum W') r W.ch cs'⌝ : IProp GF)) =
+          (fun r cs' => iprop(⌜usysChOk (uvisNum W') r W'.ch cs'⌝)) := by rw [hch]
       rw [e]; exact hcont _
   · simp only [if_neg h1]
     unfold uexecKillArmF
@@ -276,24 +286,25 @@ VALUE IS THE OUTGOING a0 WORD (read off the bump at a0). -/
 theorem uexecRetF_returning (S : Uvis → IProp GF) (HS : UKeyCong S) (W W' : Uvis) (f : sfam GF)
     (r : BitVec 64) (CH : BitVec 64 → ExtTreeSet GName compare → IProp GF) (hgn : W'.gen = W.gen)
     (hb : uroundBumpOk (uvisRun W).tf W'.tf r)
-    (hm : usysMemOk (usysNum (uvisRun W).tf) (uvisRun W).tf r W.M W.perm W.sz W.lazy W'.M W'.perm W'.sz W'.lazy)
-    (hfdrow : usysFdOk (usysNum (uvisRun W).tf) (uvisRun W).tf (tfW W'.tf (tfArgIdx 0)) W.fd W'.fd)
-    (hpiperow : usysPipeOk (usysNum (uvisRun W).tf) (uvisRun W).tf (tfW W'.tf (tfArgIdx 0)) W.M W'.M W.fd W'.fd)
-    (hcwrow : usysCwdOk (usysNum (uvisRun W).tf) r W.cwd W'.cwd)
-    (hpidrow : usysRetPid (usysNum (uvisRun W).tf) (tfW W'.tf (tfArgIdx 0)) W.pid)
-    (hliverow : uexecLiveOk (usysNum (uvisRun W).tf) (uvisRun W).tf W.fd (tfW W'.tf (tfArgIdx 0)) W'.ch)
+    (hm : usysMemOk (uvisNum (uvisRun W)) (uvisRun W).tf r W.M W.perm W.sz W.lazy W'.M W'.perm W'.sz W'.lazy)
+    (hfdrow : usysFdOk (uvisNum (uvisRun W)) (uvisRun W).tf (tfW W'.tf (tfArgIdx 0)) W.fd W'.fd)
+    (hpiperow : usysPipeOk (uvisNum (uvisRun W)) (uvisRun W).tf (tfW W'.tf (tfArgIdx 0)) W.M W'.M W.fd W'.fd)
+    (hcwrow : usysCwdOk (uvisNum (uvisRun W)) r W.cwd W'.cwd)
+    (hpidrow : usysRetPid (uvisNum (uvisRun W)) (tfW W'.tf (tfArgIdx 0)) W.pid)
+    (hliverow : uexecLiveOk (uvisNum (uvisRun W)) (uvisRun W).tf W.fd (tfW W'.tf (tfArgIdx 0)) W'.ch)
+    (hscrow : usysSeccOk (uvisNum (uvisRun W)) (uvisRun W).tf W.secc W'.secc r)
     (hpidk : W'.pid = W.pid) :
     CH (tfW W'.tf (tfArgIdx 0)) W'.ch ∗
-      spostAt S (usysNum (uvisRun W).tf) f (uvisRun W) (tfW W'.tf (tfArgIdx 0)) W'.M W'.fd W'.cwd W'.ch ∗
-      uexecRetContGen S (usysNum (uvisRun W).tf) f (uvisRun W) CH ⊢ S W' := by
+      spostAt S (uvisNum (uvisRun W)) f (uvisRun W) (tfW W'.tf (tfArgIdx 0)) W'.M W'.fd W'.cwd W'.ch ∗
+      uexecRetContGen S (uvisNum (uvisRun W)) f (uvisRun W) CH ⊢ S W' := by
   obtain ⟨hb1, hb2⟩ := hb
   have ha0 : tfW W'.tf (tfArgIdx 0) = r := by
     have := congrFun hb1 10#5
     rw [tfResumeGpr0, tfResumeGpr_a0] at this
     rw [this]; simp
   rw [ha0] at hfdrow hpiperow hpidrow hliverow ⊢
-  have hkey : ukeyEq (bump (uvisRun W) r W'.M W'.perm W'.sz W'.fd W'.cwd W'.gen W'.ch W'.lazy) W' := by
-    refine ⟨?_, ?_, rfl, rfl, rfl, rfl, rfl, rfl, rfl, hpidk.symm, rfl⟩
+  have hkey : ukeyEq (bump (uvisRun W) r W'.M W'.perm W'.sz W'.fd W'.cwd W'.gen W'.ch W'.lazy W'.secc) W' := by
+    refine ⟨?_, ?_, rfl, rfl, rfl, rfl, rfl, rfl, rfl, hpidk.symm, rfl, rfl⟩
     · show tfResumeGpr0 (bumpTf (uvisRun W).tf r) = _
       rw [tfResumeGpr0_bump _ _ (by rw [uvisRun_length]; decide), hb1]
     · show tfResumePc (bumpTf (uvisRun W).tf r) = _
@@ -301,8 +312,8 @@ theorem uexecRetF_returning (S : Uvis → IProp GF) (HS : UKeyCong S) (W W' : Uv
   unfold uexecRetContGen
   iintro ⟨Hch, Hsp, Hret⟩
   iapply (HS _ _ hkey).mp
-  iapply Hret $$ %r %W'.M %W'.perm %W'.sz %W'.fd %W'.cwd %W'.gen %W'.ch %W'.lazy %hm %hfdrow %hpiperow
-    %hcwrow %hgn %hpidrow %hliverow Hch Hsp
+  iapply Hret $$ %r %W'.M %W'.perm %W'.sz %W'.fd %W'.cwd %W'.gen %W'.ch %W'.lazy %W'.secc %hm %hfdrow
+    %hpiperow %hcwrow %hgn %hpidrow %hliverow %hscrow Hch Hsp
 
 /-- **Rocq `uexec_ret_round_slot`**: STEPS A + B -- the returned arm, re-keyed
 onto the RUN projection (`uexecArm_run`), and the round's own arm picks which
@@ -311,27 +322,28 @@ answer off the process's own exec deposit), ecall/fork (the parent's arm at
 the pid) or ecall/other (the bumped slot).  NOTHING IS MINTED. -/
 theorem uexecRet_roundSlot (sc : BitVec 64) (W W' : Uvis) (f : sfam GF) (hl : W.tf.length = 36)
     (hgn : W'.gen = W.gen) (hpidk : W'.pid = W.pid)
-    (hch : ¬ (sc = uecallScause ∧ (usysNum (uvisRun W).tf = USYS_fork ∨ usysNum (uvisRun W).tf = USYS_wait)) →
+    (hch : ¬ (sc = uecallScause ∧ (uvisNum (uvisRun W) = USYS_fork ∨ uvisNum (uvisRun W) = USYS_wait)) →
       W'.ch = W.ch)
     (hfd : sc ≠ uecallScause → W'.fd = W.fd)
     (hfdrow : sc = uecallScause →
-      usysFdOk (usysNum (uvisRun W).tf) (uvisRun W).tf (tfW W'.tf (tfArgIdx 0)) W.fd W'.fd)
+      usysFdOk (uvisNum (uvisRun W)) (uvisRun W).tf (tfW W'.tf (tfArgIdx 0)) W.fd W'.fd)
     (hpiperow : sc = uecallScause →
-      usysPipeOk (usysNum (uvisRun W).tf) (uvisRun W).tf (tfW W'.tf (tfArgIdx 0)) W.M W'.M W.fd W'.fd)
-    (hpidrow : sc = uecallScause → usysRetPid (usysNum (uvisRun W).tf) (tfW W'.tf (tfArgIdx 0)) W.pid)
+      usysPipeOk (uvisNum (uvisRun W)) (uvisRun W).tf (tfW W'.tf (tfArgIdx 0)) W.M W'.M W.fd W'.fd)
+    (hpidrow : sc = uecallScause → usysRetPid (uvisNum (uvisRun W)) (tfW W'.tf (tfArgIdx 0)) W.pid)
     (hliverow : sc = uecallScause →
-      uexecLiveOk (usysNum (uvisRun W).tf) (uvisRun W).tf W.fd (tfW W'.tf (tfArgIdx 0)) W'.ch)
-    (hr : uroundOk sc (uvisRun W).tf W.M W.perm W.sz W.cwd W.lazy W'.tf W'.M W'.perm W'.sz W'.cwd W'.lazy) :
-    ⊢ (⌜sc = uecallScause ∧ usysNum (uvisRun W).tf = USYS_exec⌝ -∗
+      uexecLiveOk (uvisNum (uvisRun W)) (uvisRun W).tf W.fd (tfW W'.tf (tfArgIdx 0)) W'.ch)
+    (hr : uroundOk sc (uvisRun W).tf W.M W.perm W.sz W.cwd W.lazy W.secc W'.tf W'.M W'.perm W'.sz W'.cwd
+      W'.lazy W'.secc) :
+    ⊢ (⌜sc = uecallScause ∧ uvisNum (uvisRun W) = USYS_exec⌝ -∗
         (⌜∃ r : BitVec 64, uroundBumpOk (uvisRun W).tf W'.tf r ∧
             usysMemOk USYS_exec (uvisRun W).tf r W.M W.perm W.sz W.lazy W'.M W'.perm W'.sz W'.lazy ∧
             W'.fd = W.fd⌝ ∨ uslot W')) -∗
-      (⌜sc = uecallScause ∧ usysNum (uvisRun W).tf = USYS_fork⌝ -∗
+      (⌜sc = uecallScause ∧ uvisNum (uvisRun W) = USYS_fork⌝ -∗
         uforkAns (sforkPay f) (sforkLend f) (tfW W'.tf (tfArgIdx 0)) W.ch W'.ch) -∗
-      (⌜sc = uecallScause ∧ usysNum (uvisRun W).tf = USYS_wait⌝ -∗
+      (⌜sc = uecallScause ∧ uvisNum (uvisRun W) = USYS_wait⌝ -∗
         uwaitAnsPid (tfW W'.tf (tfArgIdx 0)) W.ch W'.ch W.pid) -∗
-      (⌜sc = uecallScause ∧ usysNum (uvisRun W).tf ≠ USYS_exit ∧ usysNum (uvisRun W).tf ≠ USYS_fork⌝ -∗
-        spostAt uslot (usysNum (uvisRun W).tf) f (uvisRun W) (tfW W'.tf (tfArgIdx 0)) W'.M W'.fd W'.cwd W'.ch) -∗
+      (⌜sc = uecallScause ∧ uvisNum (uvisRun W) ≠ USYS_exit ∧ uvisNum (uvisRun W) ≠ USYS_fork⌝ -∗
+        spostAt uslot (uvisNum (uvisRun W)) f (uvisRun W) (tfW W'.tf (tfArgIdx 0)) W'.M W'.fd W'.cwd W'.ch) -∗
       (if sc = uecallScause then uexecArm sc W f else uslot (uvisRun W)) -∗
       uslot W' := by
   iintro Hxo Hfo Hwo Hsp Hret
@@ -340,36 +352,44 @@ theorem uexecRet_roundSlot (sc : BitVec 64) (W W' : Uvis) (f : sfam GF) (hl : W.
     ihave Hret := (uexecArm_run sc W f hl).mp $$ Hret
     subst hec
     rw [uexecArm_ecall]
-    rcases uroundOk_ecall hr with ⟨hexec, hcwx⟩ | ⟨hnex, r, hb, hm, hc⟩
+    rcases uroundOk_ecall hr with ⟨hexec, hcwx, hscx⟩ | ⟨hnex, r, hb, hm, hc, hsc⟩
     · -- exec: the round says NOTHING by design -- the kernel answers
-      have hx1 : usysNum (uvisRun W).tf ≠ USYS_exit := by rw [hexec]; decide
-      have hx2 : usysNum (uvisRun W).tf ≠ USYS_fork := by rw [hexec]; decide
-      have hx3 : usysNum (uvisRun W).tf ≠ USYS_wait := by rw [hexec]; decide
+      change uvisNum (uvisRun W) = USYS_exec at hexec
+      have hx1 : uvisNum (uvisRun W) ≠ USYS_exit := by rw [hexec]; decide
+      have hx2 : uvisNum (uvisRun W) ≠ USYS_fork := by rw [hexec]; decide
+      have hx3 : uvisNum (uvisRun W) ≠ USYS_wait := by rw [hexec]; decide
       rw [if_neg hx1, if_neg hx2, if_neg hx3]
       ihave H := Hxo $$ %⟨rfl, hexec⟩
       icases H with (%hfail | Hslot)
       · obtain ⟨r, hb, hm, hfd'⟩ := hfail
         ispecialize Hsp $$ %⟨rfl, hx1, hx2⟩
         have hchq : W'.ch = W.ch := hch (fun h => h.2.elim hx2 hx3)
-        have hc : usysCwdOk (usysNum (uvisRun W).tf) r W.cwd W'.cwd := by
+        have hc : usysCwdOk (uvisNum (uvisRun W)) r W.cwd W'.cwd := by
           rw [hcwx]; exact usysCwdOk_refl_at _ USYS_exec r _ hexec (by decide)
+        have hsc : usysSeccOk (uvisNum (uvisRun W)) (uvisRun W).tf W.secc W'.secc r := by
+          rw [hscx, hexec]; exact usysSeccOk_refl _ _ _ _ (by decide)
         rw [← hexec] at hm
         unfold uexecRetContF
         rw [show (uvisRun W).ch = W.ch from rfl]
         iapply uexecRetF_returning uslot uslot_keyCong W W' f r
-          (fun r' cs2 => iprop(⌜usysChOk (usysNum (uvisRun W).tf) r' W.ch cs2⌝)) hgn hb hm
-          (hfdrow rfl) (hpiperow rfl) hc (hpidrow rfl) (hliverow rfl) hpidk
+          (fun r' cs2 => iprop(⌜usysChOk (uvisNum (uvisRun W)) r' W.ch cs2⌝)) hgn hb hm
+          (hfdrow rfl) (hpiperow rfl) hc (hpidrow rfl) (hliverow rfl) hsc hpidk
         isplitr
         · ipureintro; exact hchq
         isplitl [Hsp]
         · iexact Hsp
         · iexact Hret
       · iexact Hslot
-    · rw [if_neg hnex]
-      by_cases hfk : usysNum (uvisRun W).tf = USYS_fork
+    · change uvisNum (uvisRun W) ≠ USYS_exit at hnex
+      change usysMemOk (uvisNum (uvisRun W)) _ _ _ _ _ _ _ _ _ _ at hm
+      change usysCwdOk (uvisNum (uvisRun W)) _ _ _ at hc
+      change usysSeccOk (uvisNum (uvisRun W)) _ _ _ _ at hsc
+      rw [if_neg hnex]
+      by_cases hfk : uvisNum (uvisRun W) = USYS_fork
       · -- THE FORK ROW: the PARENT's arm, instantiated at the pid the round returned
         rw [if_pos hfk]
-        rw [hfk] at hm hc
+        rw [hfk] at hm hc hsc
+        have hsc' : W'.secc = W.secc := usysSeccOk_quiet (by decide) hsc
         have hrne : r ≠ 0#64 := usysMemOk_forkNz hm
         obtain ⟨hM', hpi', hsz'⟩ := usysMemOk_quiet (by decide) (by decide) (by decide) (by decide)
           (by decide) (by decide) hm
@@ -389,8 +409,9 @@ theorem uexecRet_roundSlot (sc : BitVec 64) (W W' : Uvis) (f : sfam GF) (hl : W.
         rw [show (uvisRun W).ch = W.ch from rfl]
         ihave Hs := Hret $$ %r %W'.fd %W'.cwd %W'.ch %hrne %hfd' %hcw' Hans
         have hkey : ukeyEq (bump (uvisRun W) r (uvisRun W).M (uvisRun W).perm (uvisRun W).sz W'.fd W'.cwd
-            (uvisRun W).gen W'.ch (uvisRun W).lazy) W' := by
-          refine ⟨?_, ?_, hM'.symm, hpi'.symm, hsz'.symm, rfl, rfl, hgn.symm, rfl, hpidk.symm, hlz'.symm⟩
+            (uvisRun W).gen W'.ch (uvisRun W).lazy (uvisRun W).secc) W' := by
+          refine ⟨?_, ?_, hM'.symm, hpi'.symm, hsz'.symm, rfl, rfl, hgn.symm, rfl, hpidk.symm, hlz'.symm,
+            hsc'.symm⟩
           · show tfResumeGpr0 (bumpTf (uvisRun W).tf r) = _
             rw [tfResumeGpr0_bump _ _ (by rw [uvisRun_length]; decide), hb1]
           · show tfResumePc (bumpTf (uvisRun W).tf r) = _
@@ -399,7 +420,7 @@ theorem uexecRet_roundSlot (sc : BitVec 64) (W W' : Uvis) (f : sfam GF) (hl : W.
         iexact Hs
       · rw [if_neg hfk]
         ispecialize Hsp $$ %⟨rfl, hnex, hfk⟩
-        by_cases hwt : usysNum (uvisRun W).tf = USYS_wait
+        by_cases hwt : uvisNum (uvisRun W) = USYS_wait
         · -- WAIT'S ROW: the kernel's answer pays the children row
           rw [if_pos hwt]
           ihave Hans := Hwo $$ %⟨rfl, hwt⟩
@@ -407,7 +428,7 @@ theorem uexecRet_roundSlot (sc : BitVec 64) (W W' : Uvis) (f : sfam GF) (hl : W.
           rw [show (uvisRun W).ch = W.ch from rfl, show (uvisRun W).pid = W.pid from rfl]
           iapply uexecRetF_returning uslot uslot_keyCong W W' f r
             (fun r' cs2 => uwaitAnsPid r' W.ch cs2 W.pid) hgn hb hm
-            (hfdrow rfl) (hpiperow rfl) hc (hpidrow rfl) (hliverow rfl) hpidk
+            (hfdrow rfl) (hpiperow rfl) hc (hpidrow rfl) (hliverow rfl) hsc hpidk
           isplitl [Hans]
           · iexact Hans
           isplitl [Hsp]
@@ -418,8 +439,8 @@ theorem uexecRet_roundSlot (sc : BitVec 64) (W W' : Uvis) (f : sfam GF) (hl : W.
           unfold uexecRetContF
           rw [show (uvisRun W).ch = W.ch from rfl]
           iapply uexecRetF_returning uslot uslot_keyCong W W' f r
-            (fun r' cs2 => iprop(⌜usysChOk (usysNum (uvisRun W).tf) r' W.ch cs2⌝)) hgn hb hm
-            (hfdrow rfl) (hpiperow rfl) hc (hpidrow rfl) (hliverow rfl) hpidk
+            (fun r' cs2 => iprop(⌜usysChOk (uvisNum (uvisRun W)) r' W.ch cs2⌝)) hgn hb hm
+            (hfdrow rfl) (hpiperow rfl) hc (hpidrow rfl) (hliverow rfl) hsc hpidk
           isplitr
           · ipureintro; exact hchq
           isplitl [Hsp]
@@ -427,11 +448,11 @@ theorem uexecRet_roundSlot (sc : BitVec 64) (W W' : Uvis) (f : sfam GF) (hl : W.
           · iexact Hret
   · -- TRANSPARENT: the slot arrives directly, and the key congruence is all
     rw [if_neg hec]
-    obtain ⟨⟨hi1, hi2⟩, hM, hpi, hsz, hcw, hlz⟩ := uroundOk_transparent hec hr
+    obtain ⟨⟨hi1, hi2⟩, hM, hpi, hsz, hcw, hlz, hscq⟩ := uroundOk_transparent hec hr
     have hchq : W'.ch = W.ch := hch (fun h => hec h.1)
     have hkey : ukeyEq (uvisRun W) W' :=
       ⟨hi1.symm, hi2.symm, hM.symm, hpi.symm, hsz.symm, (hfd hec).symm, hcw.symm, hgn.symm, hchq.symm,
-        hpidk.symm, hlz.symm⟩
+        hpidk.symm, hlz.symm, hscq.symm⟩
     iapply (uslot_keyCong _ _ hkey).mp
     iexact Hret
 
@@ -443,30 +464,30 @@ theorem uexecRet_roundSlot_of (sc : BitVec 64) (W : Uvis) (f : sfam GF) (g : Reg
     (V : ProcPriv) (M : Nat → List (BitVec 8)) (fdv' : List FdState) (cs' : ExtTreeSet GName compare)
     (hl : W.tf.length = 36) (hg : g = tfResumeGpr0 W.tf) (hs : sep = tfW W.tf tfEpcIdx)
     (hfd : sc ≠ uecallScause → fdv' = W.fd)
-    (hchrow : ¬ (sc = uecallScause ∧ (usysNum (tfOf g (retPc sep)) = USYS_fork ∨
-      usysNum (tfOf g (retPc sep)) = USYS_wait)) → cs' = W.ch)
+    (hchrow : ¬ (sc = uecallScause ∧ (usysEff W.secc (tfOf g (retPc sep)) = USYS_fork ∨
+      usysEff W.secc (tfOf g (retPc sep)) = USYS_wait)) → cs' = W.ch)
     (hfdrow : sc = uecallScause →
-      usysFdOk (usysNum (tfOf g (retPc sep))) (tfOf g (retPc sep)) (tfW V.tf (tfArgIdx 0)) W.fd fdv')
+      usysFdOk (usysEff W.secc (tfOf g (retPc sep))) (tfOf g (retPc sep)) (tfW V.tf (tfArgIdx 0)) W.fd fdv')
     (hpiperow : sc = uecallScause →
-      usysPipeOk (usysNum (tfOf g (retPc sep))) (tfOf g (retPc sep)) (tfW V.tf (tfArgIdx 0)) W.M
+      usysPipeOk (usysEff W.secc (tfOf g (retPc sep))) (tfOf g (retPc sep)) (tfW V.tf (tfArgIdx 0)) W.M
         (umemLazy V.upt V.sz.toNat M) W.fd fdv')
-    (hpidrow : sc = uecallScause → usysRetPid (usysNum (tfOf g (retPc sep))) (tfW V.tf (tfArgIdx 0)) W.pid)
+    (hpidrow : sc = uecallScause → usysRetPid (usysEff W.secc (tfOf g (retPc sep))) (tfW V.tf (tfArgIdx 0)) W.pid)
     (hliverow : sc = uecallScause →
-      uexecLiveOk (usysNum (tfOf g (retPc sep))) (tfOf g (retPc sep)) W.fd (tfW V.tf (tfArgIdx 0)) cs')
-    (hr : uroundOk sc (tfOf g (retPc sep)) W.M W.perm W.sz W.cwd W.lazy V.tf (umemLazy V.upt V.sz.toNat M)
-      (permOf V.upt.um V.sz.toNat) V.sz.toNat V.cwi V.pvLazy) :
-    ⊢ (⌜sc = uecallScause ∧ usysNum (tfOf g (retPc sep)) = USYS_exec⌝ -∗
+      uexecLiveOk (usysEff W.secc (tfOf g (retPc sep))) (tfOf g (retPc sep)) W.fd (tfW V.tf (tfArgIdx 0)) cs')
+    (hr : uroundOk sc (tfOf g (retPc sep)) W.M W.perm W.sz W.cwd W.lazy W.secc V.tf
+      (umemLazy V.upt V.sz.toNat M) (permOf V.upt.um V.sz.toNat) V.sz.toNat V.cwi V.pvLazy V.pvSecc) :
+    ⊢ (⌜sc = uecallScause ∧ usysEff W.secc (tfOf g (retPc sep)) = USYS_exec⌝ -∗
         (⌜∃ r : BitVec 64, uroundBumpOk (tfOf g (retPc sep)) V.tf r ∧
             usysMemOk USYS_exec (tfOf g (retPc sep)) r W.M W.perm W.sz W.lazy (umemLazy V.upt V.sz.toNat M)
               (permOf V.upt.um V.sz.toNat) V.sz.toNat V.pvLazy ∧ fdv' = W.fd⌝ ∨
           uslot (uvisOf V M fdv' W.gen cs' W.pid))) -∗
-      (⌜sc = uecallScause ∧ usysNum (tfOf g (retPc sep)) = USYS_fork⌝ -∗
+      (⌜sc = uecallScause ∧ usysEff W.secc (tfOf g (retPc sep)) = USYS_fork⌝ -∗
         uforkAns (sforkPay f) (sforkLend f) (tfW V.tf (tfArgIdx 0)) W.ch cs') -∗
-      (⌜sc = uecallScause ∧ usysNum (tfOf g (retPc sep)) = USYS_wait⌝ -∗
+      (⌜sc = uecallScause ∧ usysEff W.secc (tfOf g (retPc sep)) = USYS_wait⌝ -∗
         uwaitAnsPid (tfW V.tf (tfArgIdx 0)) W.ch cs' W.pid) -∗
-      (⌜sc = uecallScause ∧ usysNum (tfOf g (retPc sep)) ≠ USYS_exit ∧
-          usysNum (tfOf g (retPc sep)) ≠ USYS_fork⌝ -∗
-        spostAt uslot (usysNum (tfOf g (retPc sep))) f (uvisRun W) (tfW V.tf (tfArgIdx 0))
+      (⌜sc = uecallScause ∧ usysEff W.secc (tfOf g (retPc sep)) ≠ USYS_exit ∧
+          usysEff W.secc (tfOf g (retPc sep)) ≠ USYS_fork⌝ -∗
+        spostAt uslot (usysEff W.secc (tfOf g (retPc sep))) f (uvisRun W) (tfW V.tf (tfArgIdx 0))
           (umemLazy V.upt V.sz.toNat M) fdv' V.cwi cs') -∗
       (if sc = uecallScause then uexecArm sc W f else uslot (uvisRun W)) -∗
       uslot (uvisOf V M fdv' W.gen cs' W.pid) := by
@@ -483,12 +504,12 @@ payment for the key's fd view. -/
 theorem ukc_apply [xi : CurCtx] (cpu : CPU) (C : UCfg) (pt : UPtd) (Rfd : List FdState → IProp GF)
     (Rut : UPtd → IProp GF) (hRut : ∀ pt' : UPtd, Rut pt' ⊢ ctxToken cpu ∗ (ctxToken cpu -∗ Rut pt'))
     (sz : Nat) (fdv : List FdState) (cw : Nat) (gn : GName) (cs : ExtTreeSet GName compare)
-    (pidv : BitVec 32) (lz : Bool) (M : ElfMem) (m : RegMap) (ms sc stv sep pc : BitVec 64)
+    (pidv : BitVec 32) (lz : Bool) (secc : BitVec 64) (M : ElfMem) (m : RegMap) (ms sc stv sep pc : BitVec 64)
     (hlo : loopOk C pt) (hsz : uszOk sz) (hms : userMstatusOk ms)
     (hlz : lz = false → lazyFree pt.um (BitVec.ofNat 64 sz)) :
-    ⊢ ukc (permOf pt.um sz) M sz fdv cw gn cs pidv lz m pc -∗ hwConfig cpu -∗ kmapStatic (hlc := hlc) (GF := GF) -∗ wireInv -∗
+    ⊢ ukc (permOf pt.um sz) M sz fdv cw gn cs pidv lz secc m pc -∗ hwConfig cpu -∗ kmapStatic (hlc := hlc) (GF := GF) -∗ wireInv -∗
       uRegs cpu (HartState.HART_ACTIVE ()) ms sc stv sep pc pc m -∗ userPtmInvX cpu pt sz M -∗ Rfd fdv -∗
-      userCfg cpu C -∗ Rut pt -∗ ▷ ukb cpu C pt Rfd Rut sz (permOf pt.um sz) fdv cw gn cs pidv lz -∗
+      userCfg cpu C -∗ Rut pt -∗ ▷ ukb cpu C pt Rfd Rut sz (permOf pt.um sz) fdv cw gn cs pidv lz secc -∗
       wpLoop cpu := by
   iintro Hkc #Hhw #Hks #Hwi Hregs Hupt Hfrag Hcfg Hrut Hk
   ihave ⟨Hur, Hg, Hpc⟩ := uRegs_uvRegs cpu ms sc stv sep pc m hms $$ Hregs
@@ -525,19 +546,20 @@ fixpoint. -/
 theorem uslot_applyLoop [xi : CurCtx] (cpu : CPU) (C : UCfg) (pt : UPtd) (Rfd : List FdState → IProp GF)
     (Rut : UPtd → IProp GF) (hRut : ∀ pt' : UPtd, Rut pt' ⊢ ctxToken cpu ∗ (ctxToken cpu -∗ Rut pt'))
     (sz : Nat) (fdv : List FdState) (cw : Nat) (gn : GName) (cs : ExtTreeSet GName compare)
-    (pidv : BitVec 32) (lz : Bool) (W : Uvis) (M : ElfMem) (m : RegMap) (ms sc stv sep pc : BitVec 64)
+    (pidv : BitVec 32) (lz : Bool) (secc : BitVec 64) (W : Uvis) (M : ElfMem) (m : RegMap)
+    (ms sc stv sep pc : BitVec 64)
     (hlo : loopOk C pt) (hsz : uszOk sz) (hms : userMstatusOk ms) (hpi : W.perm = permOf pt.um sz)
     (hM : W.M = M) (hsw : W.sz = sz) (hfd : W.fd = fdv) (hcw : W.cwd = cw) (hgn : W.gen = gn)
-    (hch : W.ch = cs) (hpid : W.pid = pidv) (hlzw : W.lazy = lz)
+    (hch : W.ch = cs) (hpid : W.pid = pidv) (hlzw : W.lazy = lz) (hscw : W.secc = secc)
     (hlf : lz = false → lazyFree pt.um (BitVec.ofNat 64 sz)) (hg : tfResumeGpr0 W.tf = m)
     (hpc : tfResumePc W.tf = pc) :
     ⊢ uslot W -∗ hwConfig cpu -∗ kmapStatic (hlc := hlc) (GF := GF) -∗ wireInv -∗ uRegs cpu (HartState.HART_ACTIVE ()) ms sc stv sep pc pc m -∗
       userPtmInvX cpu pt sz M -∗ Rfd fdv -∗ userCfg cpu C -∗ Rut pt -∗
-      ▷ ukb cpu C pt Rfd Rut sz (permOf pt.um sz) fdv cw gn cs pidv lz -∗ wpLoop cpu := by
+      ▷ ukb cpu C pt Rfd Rut sz (permOf pt.um sz) fdv cw gn cs pidv lz secc -∗ wpLoop cpu := by
   iintro Hs
   ihave Hs := (uslot_ukc W).mp $$ Hs
-  rw [hpi, hM, hsw, hfd, hcw, hgn, hch, hpid, hlzw, hg, hpc]
-  iapply ukc_apply cpu C pt Rfd Rut hRut sz fdv cw gn cs pidv lz M m ms sc stv sep pc hlo hsz hms hlf $$ Hs
+  rw [hpi, hM, hsw, hfd, hcw, hgn, hch, hpid, hlzw, hscw, hg, hpc]
+  iapply ukc_apply cpu C pt Rfd Rut hRut sz fdv cw gn cs pidv lz secc M m ms sc stv sep pc hlo hsz hms hlf $$ Hs
 
 end LoopApply
 

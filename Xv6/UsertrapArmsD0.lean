@@ -127,11 +127,11 @@ theorem utD0_rows {Γ : SchedNames} (A : UtArgs GF) (hok : UtOk Γ A) (hne : A.s
     UtRows0 A { utV1 A with upt := A.V.upt.insertLeaf vpn r (PTE_W ||| PTE_U ||| PTE_R) }
       (viewZero A.M vpn) A.sts A.cs := by
   have hext := UMemL.extSz_insertLeaf A.V.sz A.V.upt vpn r hn hlt
-  refine ⟨?_, utFdKept_refl _ _, utChKept_refl _ _ _, rfl, utFdEcall_quiet _ _ _ _ _ hne,
-    utPipeEcall_quiet _ _ _ _ _ _ _ hne, fun hc => absurd hc hne, by rw [← hok.hP]; rfl, rfl⟩
+  refine ⟨?_, utFdKept_refl _ _, utChKept_refl _ _ _ _, rfl, utFdEcall_quiet _ _ _ _ _ _ hne,
+    utPipeEcall_quiet _ _ _ _ _ _ _ _ hne, fun hc => absurd hc hne, by rw [← hok.hP]; rfl, rfl⟩
   unfold utRound uroundOk
   rw [if_neg hne]
-  refine ⟨⟨rfl, rfl⟩, ?_, permOf_extSz hext, rfl, rfl, rfl⟩
+  refine ⟨⟨rfl, rfl⟩, ?_, permOf_extSz hext, rfl, rfl, rfl, rfl⟩
   exact utD0_umemLazy_fill _ _ _ _ _ _ hn hlt
 
 set_option maxHeartbeats 8000000 in

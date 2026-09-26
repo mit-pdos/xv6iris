@@ -305,7 +305,7 @@ structure UkKey where
 /-- The bundle at `(M, m, pc)`. -/
 abbrev ukUvb [CurCtx] (S : UkSec GF) (K : UkKey) (M : ElfMem) (m : RegMap) (pc : BitVec 64) :
     IProp GF :=
-  uvb S.cpu S.C S.pt S.Rfd S.Rut S.sz S.π K.fdv K.cw K.gn K.cs K.pid false M m pc
+  uvb S.cpu S.C S.pt S.Rfd S.Rut S.sz S.π K.fdv K.cw K.gn K.cs K.pid false seccAll M m pc
 
 /-- **The retiring leaf's shape** (Rocq `wp_uk_retire_later`'s conclusion):
 the bundle at the pre state and the (later) continuation at the post state
@@ -316,7 +316,7 @@ def ukStep [CurCtx] (S : UkSec GF) (K : UkKey) (M : ElfMem) (m : RegMap) (pc : B
 
 /-- The trap-out key of a running machine (Rocq `uvis_of_run … false`). -/
 abbrev ukRunKey (S : UkSec GF) (K : UkKey) (M : ElfMem) (m : RegMap) (pc : BitVec 64) : Uvis :=
-  uvisOfRun m pc M S.π S.sz K.fdv K.cw K.gn K.cs K.pid false
+  uvisOfRun m pc M S.π S.sz K.fdv K.cw K.gn K.cs K.pid false seccAll
 
 /-! ### The leaf bodies (one per family; deviations 1–4) -/
 

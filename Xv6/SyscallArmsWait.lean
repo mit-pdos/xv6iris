@@ -60,7 +60,8 @@ theorem syscRows_wait (V : ProcPriv) (M M2 : Nat → List (BitVec 8)) (P' : UPtd
     fun _ h => absurd hnum h, hn 2 (by decide), Or.inr ⟨r, rfl⟩, Or.inr (Or.inr hext),
     Or.inr (Or.inr rfl), Or.inr (Or.inr rfl), hext.1.2.1, rfl, rfl, rfl, Or.inr rfl,
     Or.inl (hn 12 (by decide)), Or.inl (hn 1 (by decide)), Or.inl (hn 5 (by decide)),
-    syscRetPid_ne _ _ _ 3 hnum (by decide), rfl⟩
+    syscRetPid_ne _ _ _ 3 hnum (by decide), rfl,
+    usysSeccOk_refl _ _ _ _ (hn 23 (by decide))⟩
   · unfold syscMemOk
     rw [if_neg (hn USYS_exec (by decide)), if_neg (hn USYS_sbrk (by decide)),
       if_pos (show syscNum V = USYS_wait from hnum)]

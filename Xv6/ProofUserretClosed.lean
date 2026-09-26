@@ -44,16 +44,16 @@ variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [Fdslot
 /-- The loop hypothesis, introduced pointwise out of a persistent premise. -/
 theorem urcLoop_of (P : IProp GF) [Persistent P] (PT : SchedNames → IProp GF) (Γ : SchedNames) (j : Nat)
     (H : ∀ (h : CPU) (C : UCfg) (pt : UPtd) (sz : Nat) (γfd : GName) (cw : Nat) (gn : GName)
-      (cs : ExtTreeSet GName compare) (pid : BitVec 32) (lz : Bool) (fdv : List FdState),
+      (cs : ExtTreeSet GName compare) (pid : BitVec 32) (lz : Bool) (secc : BitVec 64) (fdv : List FdState),
       loopOk C pt →
-      P ∗ hwConfig h ⊢ ukb (hlc := hlc) h C pt (fdFrags γfd) (urcRut PT Γ j h sz γfd cw gn cs pid lz) sz
-        (permOf pt.um sz) fdv cw gn cs pid lz) :
+      P ∗ hwConfig h ⊢ ukb (hlc := hlc) h C pt (fdFrags γfd) (urcRut PT Γ j h sz γfd cw gn cs pid lz secc) sz
+        (permOf pt.um sz) fdv cw gn cs pid lz secc) :
     P ⊢ urcLoop (hlc := hlc) PT Γ j := by
   unfold urcLoop
   iintro #HP
   imodintro
-  iintro %h %C %pt %sz %γfd %cw %gn %cs %pid %lz %fdv %hlo #Hhw
-  iapply (H h C pt sz γfd cw gn cs pid lz fdv hlo)
+  iintro %h %C %pt %sz %γfd %cw %gn %cs %pid %lz %secc %fdv %hlo #Hhw
+  iapply (H h C pt sz γfd cw gn cs pid lz secc fdv hlo)
   isplit
   · iexact HP
   · iexact Hhw
@@ -68,8 +68,8 @@ theorem urc_loop (UT : USERTRAP) (UV : USERVEC) (UR : USERRET)
   iintro #Hw #Hc
   iloeb as IH
   iapply (urcLoop_of iprop(wireInv ∗ kmapAt trampVpn (kLeaf trampPpn .rx 0#1 0#1) ∗ ▷ urcLoop (hlc := hlc) PT Γ j)
-    PT Γ j (fun h C pt sz γfd cw gn cs pid lz fdv hlo =>
-      urc_round UT UV UR PT Γ hPT0 j hj h C pt sz γfd cw gn cs pid lz fdv hlo))
+    PT Γ j (fun h C pt sz γfd cw gn cs pid lz secc fdv hlo =>
+      urc_round UT UV UR PT Γ hPT0 j hj h C pt sz γfd cw gn cs pid lz secc fdv hlo))
   iframe Hw Hc IH
 
 end

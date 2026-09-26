@@ -620,6 +620,110 @@ theorem usysRetPid_of (n : Int) (r : BitVec 64) (pid : BitVec 32) (h : r = BitVe
 theorem usysRetPid_getpid {r : BitVec 64} {pid : BitVec 32} (H : usysRetPid USYS_getpid r pid) :
     r = BitVec.signExtend 64 pid := H rfl
 
+/-! ## §2h The mask (xv6 7b2c1b1b's seccomp): the EFFECTIVE number, and the
+one entry that moves the mask (Rocq UsysMemOk SS2h)
+
+`p->seccomp` decides whether an in-range number runs: bit `n` clear and the
+dispatcher stores -1 and runs nothing.  That is exactly the unknown-number
+arm (minus its diagnostic), so A BLOCKED CALL IS THE UNKNOWN-NUMBER CALL: the
+number every row is keyed on is the effective one, `usysEff`: the raw a7
+reading where the mask allows it, 0 (no table entry) where it does not.  A
+negative number tests no bit (Rocq `Z.testbit` at a negative index). -/
+
+/-- Rocq `Z.testbit (bv_unsigned secc) n`. -/
+def usysTestbit (secc : BitVec 64) (n : Int) : Bool := decide (0 ≤ n) && secc.getLsbD n.toNat
+
+/-- Rocq `usys_eff`. -/
+def usysEff (secc : BitVec 64) (tf : List (BitVec 64)) : Int :=
+  if usysTestbit secc (usysNum tf) then usysNum tf else 0
+
+/-- kernel/syscall.h (Rocq `USYS_seccomp`). -/
+def USYS_seccomp : Int := 23
+
+/-- Rocq `usys_eff_num_cong`. -/
+theorem usysEff_numCong (secc : BitVec 64) (tf1 tf2 : List (BitVec 64)) (h : usysNum tf1 = usysNum tf2) :
+    usysEff secc tf1 = usysEff secc tf2 := by
+  unfold usysEff; rw [h]
+
+/-- Rocq `usys_eff_all`: the all-allowing mask leaves every number in
+`[0, 64)` its own. -/
+theorem usysEff_all (tf : List (BitVec 64)) (h0 : 0 ≤ usysNum tf) (h1 : usysNum tf < 64) :
+    usysEff (-1#64) tf = usysNum tf := by
+  unfold usysEff usysTestbit
+  have hb : (-1#64 : BitVec 64).getLsbD (usysNum tf).toNat = true := by
+    rw [show (-1#64 : BitVec 64) = BitVec.allOnes 64 by decide, BitVec.getLsbD_allOnes]
+    simp only [decide_eq_true_eq]; omega
+  rw [if_pos (by rw [hb]; simp [h0])]
+
+/-- Rocq `usys_eff_allowed`. -/
+theorem usysEff_allowed (secc : BitVec 64) (tf : List (BitVec 64))
+    (h : usysTestbit secc (usysNum tf) = true) : usysEff secc tf = usysNum tf := by
+  unfold usysEff; rw [if_pos h]
+
+/-- Rocq `usys_eff_blocked`. -/
+theorem usysEff_blocked (secc : BitVec 64) (tf : List (BitVec 64))
+    (h : usysTestbit secc (usysNum tf) = false) : usysEff secc tf = 0 := by
+  unfold usysEff; rw [if_neg (by simp [h])]
+
+/-- Rocq `usys_eff_arg_cong`. -/
+theorem usysEff_argCong (secc : BitVec 64) (tf1 tf2 : List (BitVec 64))
+    (h : tfW tf1 (tfArgIdx 7) = tfW tf2 (tfArgIdx 7)) : usysEff secc tf1 = usysEff secc tf2 :=
+  usysEff_numCong secc tf1 tf2 (usysNum_argCong tf1 tf2 h)
+
+/-- An effective number is the raw one or 0. -/
+theorem usysEff_cases (secc : BitVec 64) (tf : List (BitVec 64)) :
+    usysEff secc tf = usysNum tf ∨ usysEff secc tf = 0 := by
+  unfold usysEff; split <;> simp
+
+/-- A nonzero effective number IS the raw one. -/
+theorem usysEff_raw {secc : BitVec 64} {tf : List (BitVec 64)} {n : Int} (h : usysEff secc tf = n)
+    (hn : n ≠ 0) : usysNum tf = n := by
+  rcases usysEff_cases secc tf with e | e
+  · rw [← e, h]
+  · exact absurd (e.symm.trans h).symm hn
+
+/-- **The effective number of a key** (Rocq `UexecSlot.uvis_num`; here,
+not in UexecSlot, because Lean's UsysMemOk sits above UexecSlot): every
+row of the trap contract is keyed on it, not on the raw reading. -/
+def uvisNum (W : Uvis) : Int := usysEff W.secc W.tf
+
+/-- Rocq `uvis_num_full0`: at a key whose mask allows everything (every
+verified program's), a number in `[0, 64)` is its own. -/
+theorem uvisNum_full (W : Uvis) (hs : W.secc = seccAll) (h0 : 0 ≤ usysNum W.tf)
+    (h1 : usysNum W.tf < 64) : uvisNum W = usysNum W.tf := by
+  unfold uvisNum; rw [hs]; exact usysEff_all W.tf h0 h1
+
+/-- Rocq `usys_eff_secc_all`. -/
+theorem usysEff_seccAll (tf : List (BitVec 64)) (h0 : 0 ≤ usysNum tf) (h1 : usysNum tf < 64) :
+    usysEff seccAll tf = usysNum tf := usysEff_all tf h0 h1
+
+/-- **THE MASK ROW** (Rocq `usys_secc_ok`): sys_seccomp (23) ANDs the mask
+with its argument 0 and returns 0; every other entry leaves the mask alone.
+Keyed, like every row, on the EFFECTIVE number. -/
+def usysSeccOk (n : Int) (tf : List (BitVec 64)) (secc secc' r : BitVec 64) : Prop :=
+  if n = USYS_seccomp then secc' = secc &&& tfW tf (tfArgIdx 0) ∧ r = 0#64 else secc' = secc
+
+/-- Rocq `usys_secc_ok_quiet`. -/
+theorem usysSeccOk_quiet {n : Int} {tf : List (BitVec 64)} {secc secc' r : BitVec 64}
+    (hn : n ≠ USYS_seccomp) (h : usysSeccOk n tf secc secc' r) : secc' = secc := by
+  unfold usysSeccOk at h; rw [if_neg hn] at h; exact h
+
+/-- Rocq `usys_secc_ok_refl`. -/
+theorem usysSeccOk_refl (n : Int) (tf : List (BitVec 64)) (secc r : BitVec 64) (hn : n ≠ USYS_seccomp) :
+    usysSeccOk n tf secc secc r := by
+  unfold usysSeccOk; rw [if_neg hn]
+
+/-- Rocq `usys_secc_ok_seccomp`. -/
+theorem usysSeccOk_seccomp (tf : List (BitVec 64)) (secc r : BitVec 64) (hr : r = 0#64) :
+    usysSeccOk USYS_seccomp tf secc (secc &&& tfW tf (tfArgIdx 0)) r := by
+  unfold usysSeccOk; rw [if_pos rfl]; exact ⟨rfl, hr⟩
+
+/-- Rocq `usys_secc_ok_arg_cong`. -/
+theorem usysSeccOk_argCong {n : Int} {tf1 tf2 : List (BitVec 64)} {secc secc' r : BitVec 64}
+    (h : tfW tf1 (tfArgIdx 0) = tfW tf2 (tfArgIdx 0)) (H : usysSeccOk n tf1 secc secc' r) :
+    usysSeccOk n tf2 secc secc' r := by
+  unfold usysSeccOk at *; rw [← h]; exact H
+
 /-! ## §3 The resume trapframe -/
 
 /-- **The trapframe after a returning syscall** (Rocq `bump_tf`): epc past
@@ -664,6 +768,11 @@ theorem usysMemOk_argCong {n : Int} {tf tf' : List (BitVec 64)} {r : BitVec 64} 
     (H : usysMemOk n tf r M π szv lz M' π' szv' lz') : usysMemOk n tf' r M π szv lz M' π' szv' lz' := by
   unfold usysMemOk usysRdcount usysSbrkRet usysSbrkArg usysSbrkLazy usysSbrkEager at *
   rw [← h0, ← h1, ← h2]; exact H
+
+/-- Rocq `usys_eff_epc`. -/
+theorem usysEff_epc (secc : BitVec 64) (tf : List (BitVec 64)) (v : BitVec 64) :
+    usysEff secc (tf.set tfEpcIdx v) = usysEff secc tf :=
+  usysEff_numCong _ _ _ (usysNum_epc tf v)
 
 /-- Rocq `usys_mem_ok_epc`. -/
 theorem usysMemOk_epc {n : Int} {tf : List (BitVec 64)} {v r : BitVec 64} {M M' : ElfMem}

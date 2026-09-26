@@ -59,7 +59,7 @@ open Iris.Std (get?)
 /-- **Rocq `uvis`**: the trapframe (all 36 words), the va-keyed image, the
 permission view, the break, the descriptor view, the cwd's inum, this
 incarnation's generation, the generations of its live children, its pid, and
-the lazy-page flag (LAST, as in Rocq). -/
+the lazy-page flag and the syscall mask (LAST, as in Rocq). -/
 structure Uvis where
   tf : List (BitVec 64)
   M : ElfMem
@@ -71,6 +71,11 @@ structure Uvis where
   ch : Std.ExtTreeSet GName compare
   pid : BitVec 32
   lazy : Bool
+  /-- THE SYSCALL MASK (Rocq `uvis_secc`, xv6 7b2c1b1b): `ProcPriv.pvSecc`
+  read off the block exactly as the lazy bit is.  Process-visible because
+  it decides a call's effect: a number the mask blocks is the unknown-number
+  call (`UsysMemOk.usysEff`, `uvisNum`).  LAST, after the lazy bit. -/
+  secc : BitVec 64
 
 /-- **Rocq `uvis_of`**: the projection from the kernel's process state
 (deviation 1) at the descriptor view, generation, children and pid the
@@ -78,7 +83,7 @@ boundary is holding. -/
 def uvisOf (V : ProcPriv) (M : Nat → List (BitVec 8)) (sts : List FdState) (g : GName)
     (cs : Std.ExtTreeSet GName compare) (pid : BitVec 32) : Uvis :=
   ⟨V.tf, umemLazy V.upt V.sz.toNat M, permOf V.upt.um V.sz.toNat, V.sz.toNat, sts, V.cwi, g, cs, pid,
-    V.pvLazy⟩
+    V.pvLazy, V.pvSecc⟩
 
 /-- Rocq `uvis_lz`: the key with its lazy bit replaced. -/
 def uvisLz (W : Uvis) (lz : Bool) : Uvis := { W with lazy := lz }

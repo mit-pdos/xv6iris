@@ -192,45 +192,45 @@ components the KERNEL is holding (`π`, `szv`, `fdv`, `cw`, `g`, `cs`, `pidv`,
 `lz` are parameters, not functions of the registers). -/
 def uvisOfRun (m : RegMap) (pc : BitVec 64) (M : ElfMem) (π : Nat → Option UPerm) (szv : Nat)
     (fdv : List FdState) (cw : Nat) (g : GName) (cs : ExtTreeSet GName compare) (pidv : BitVec 32)
-    (lz : Bool) : Uvis :=
-  ⟨tfOf m pc, M, π, szv, fdv, cw, g, cs, pidv, lz⟩
+    (lz : Bool) (secc : BitVec 64) : Uvis :=
+  ⟨tfOf m pc, M, π, szv, fdv, cw, g, cs, pidv, lz, secc⟩
 
 /-- **Rocq `bump_at`**: the general key former (fork's child is a different
 process). -/
 def bumpAt (W : Uvis) (r : BitVec 64) (M' : ElfMem) (π' : Nat → Option UPerm) (szv' : Nat)
     (fdv' : List FdState) (cw' : Nat) (g' : GName) (cs' : ExtTreeSet GName compare) (pid' : BitVec 32)
-    (lz' : Bool) : Uvis :=
-  ⟨bumpTf W.tf r, M', π', szv', fdv', cw', g', cs', pid', lz'⟩
+    (lz' : Bool) (secc' : BitVec 64) : Uvis :=
+  ⟨bumpTf W.tf r, M', π', szv', fdv', cw', g', cs', pid', lz', secc'⟩
 
 /-- **Rocq `bump`**: the resume key after a returning syscall, at the caller's
 own pid (THE PID IS STRUCTURAL). -/
 def bump (W : Uvis) (r : BitVec 64) (M' : ElfMem) (π' : Nat → Option UPerm) (szv' : Nat)
-    (fdv' : List FdState) (cw' : Nat) (g' : GName) (cs' : ExtTreeSet GName compare) (lz' : Bool) :
-    Uvis :=
-  bumpAt W r M' π' szv' fdv' cw' g' cs' W.pid lz'
+    (fdv' : List FdState) (cw' : Nat) (g' : GName) (cs' : ExtTreeSet GName compare) (lz' : Bool)
+    (secc' : BitVec 64) : Uvis :=
+  bumpAt W r M' π' szv' fdv' cw' g' cs' W.pid lz' secc'
 
 /-- Rocq `bump_pid`: THE PID IS KEPT. -/
 @[simp] theorem bump_pid (W : Uvis) (r : BitVec 64) (M' : ElfMem) (π' : Nat → Option UPerm)
     (szv' : Nat) (fdv' : List FdState) (cw' : Nat) (g' : GName) (cs' : ExtTreeSet GName compare)
-    (lz' : Bool) : (bump W r M' π' szv' fdv' cw' g' cs' lz').pid = W.pid := rfl
+    (lz' : Bool) (secc' : BitVec 64) : (bump W r M' π' szv' fdv' cw' g' cs' lz' secc').pid = W.pid := rfl
 
 /-- Rocq `bump_run_gpr` (at `bumpAt`, fork's child's key). -/
 theorem bumpRun_gpr (m : RegMap) (pc : BitVec 64) (M M' : ElfMem) (π π' : Nat → Option UPerm)
     (szv szv' : Nat) (fdv fdv' : List FdState) (cw cw' : Nat) (g g' : GName)
-    (cs cs' : ExtTreeSet GName compare) (pidv pidv' : BitVec 32) (lz lz' : Bool) (r : BitVec 64)
+    (cs cs' : ExtTreeSet GName compare) (pidv pidv' : BitVec 32) (lz lz' : Bool) (secc secc' : BitVec 64) (r : BitVec 64)
     (h0 : m 0#5 = 0#64) :
-    tfResumeGpr0 (bumpAt (uvisOfRun m pc M π szv fdv cw g cs pidv lz) r M' π' szv' fdv' cw' g' cs'
-      pidv' lz').tf = m.set 10#5 r := by
+    tfResumeGpr0 (bumpAt (uvisOfRun m pc M π szv fdv cw g cs pidv lz secc) r M' π' szv' fdv' cw' g' cs'
+      pidv' lz' secc').tf = m.set 10#5 r := by
   show tfResumeGpr0 (bumpTf (tfOf m pc) r) = _
   rw [tfResumeGpr0_bump _ _ (by rw [tfOf_length]; decide), tfOf_resumeGpr m pc h0]
 
 /-- Rocq `bump_run_pc`. -/
 theorem bumpRun_pc (m : RegMap) (pc : BitVec 64) (M M' : ElfMem) (π π' : Nat → Option UPerm)
     (szv szv' : Nat) (fdv fdv' : List FdState) (cw cw' : Nat) (g g' : GName)
-    (cs cs' : ExtTreeSet GName compare) (pidv pidv' : BitVec 32) (lz lz' : Bool) (r : BitVec 64)
+    (cs cs' : ExtTreeSet GName compare) (pidv pidv' : BitVec 32) (lz lz' : Bool) (secc secc' : BitVec 64) (r : BitVec 64)
     (hal : (pc + 4#64) &&& 1#64 = 0#64) :
-    tfResumePc (bumpAt (uvisOfRun m pc M π szv fdv cw g cs pidv lz) r M' π' szv' fdv' cw' g' cs'
-      pidv' lz').tf = pc + 4#64 := by
+    tfResumePc (bumpAt (uvisOfRun m pc M π szv fdv cw g cs pidv lz secc) r M' π' szv' fdv' cw' g' cs'
+      pidv' lz' secc').tf = pc + 4#64 := by
   show tfResumePc (bumpTf (tfOf m pc) r) = _
   rw [tfResumePc_bump _ _ (by rw [tfOf_length]; decide), tfOf_epc]
   unfold retPc; bv_decide
@@ -244,24 +244,25 @@ re-keying party names. -/
 def urunEq (Wk : Uvis) (V : ProcPriv) (M : Nat → List (BitVec 8)) : Prop :=
   tfResumeGpr0 Wk.tf = tfResumeGpr0 V.tf ∧ tfResumePc Wk.tf = tfResumePc V.tf ∧
   Wk.M = umemLazy V.upt V.sz.toNat M ∧ Wk.perm = permOf V.upt.um V.sz.toNat ∧
-  Wk.sz = V.sz.toNat ∧ Wk.cwd = V.cwi ∧ Wk.lazy = V.pvLazy
+  Wk.sz = V.sz.toNat ∧ Wk.cwd = V.cwi ∧ Wk.lazy = V.pvLazy ∧ Wk.secc = V.pvSecc
 
 /-- Rocq `urun_eq_of`: the projection IS the run key, at any descriptor view. -/
 theorem urunEq_of (V : ProcPriv) (M : Nat → List (BitVec 8)) (sts : List FdState) (g : GName)
     (cs : ExtTreeSet GName compare) (pidv : BitVec 32) : urunEq (uvisOf V M sts g cs pidv) V M :=
-  ⟨rfl, rfl, rfl, rfl, rfl, rfl, rfl⟩
+  ⟨rfl, rfl, rfl, rfl, rfl, rfl, rfl, rfl⟩
 
 /-- **Rocq `urun_eq_resume`**: THE FACT FORKRET'S STEADY ARM HAS --
 prepare_return moves only the kernel words, and the table's leaves, the size,
 the cwd, the image and the lazy bit do not move. -/
 theorem urunEq_resume {Wk : Uvis} {V V2 : ProcPriv} {M M2 : Nat → List (BitVec 8)}
     (h : urunEq Wk V M) (hueq : tfUeq V.tf V2.tf) (hum : V2.upt.um = V.upt.um) (hsz : V2.sz = V.sz)
-    (hcw : V2.cwi = V.cwi) (hM : M2 = M) (hlz : V2.pvLazy = V.pvLazy) : urunEq Wk V2 M2 := by
-  obtain ⟨hg, hp, hMk, hpi, hs, hc, hl⟩ := h
+    (hcw : V2.cwi = V.cwi) (hM : M2 = M) (hlz : V2.pvLazy = V.pvLazy) (hsc : V2.pvSecc = V.pvSecc) :
+    urunEq Wk V2 M2 := by
+  obtain ⟨hg, hp, hMk, hpi, hs, hc, hl, hsk⟩ := h
   have hlazy : umemLazy V2.upt V2.sz.toNat M2 = umemLazy V.upt V.sz.toNat M := by
     unfold umemLazy; rw [hum, hsz, hM]
   refine ⟨hg.trans (tfUeq_resumeGpr0 hueq), hp.trans (tfResumePc_tfUeq hueq), hMk.trans hlazy.symm,
-    ?_, hs.trans (by rw [hsz]), hc.trans hcw.symm, hl.trans hlz.symm⟩
+    ?_, hs.trans (by rw [hsz]), hc.trans hcw.symm, hl.trans hlz.symm, hsk.trans hsc.symm⟩
   rw [hpi, hum, hsz]
 
 /-! ## §2 The trapped machine -/
@@ -293,20 +294,20 @@ theorem trappedMachine_intro [CurCtx] (cpu : CPU) (C : UCfg) (pt : UPtd) (Rut : 
 machine at the key uservec saves, at the components the caller names. -/
 theorem userTrapFrame_trapped [CurCtx] (cpu : CPU) (C : UCfg) (pt : UPtd) (Rut : UPtd → IProp GF)
     (sz : Nat) (π : Nat → Option UPerm) (fdv : List FdState) (cw : Nat) (gn : GName)
-    (cs : ExtTreeSet GName compare) (pidv : BitVec 32) (lz : Bool) :
+    (cs : ExtTreeSet GName compare) (pidv : BitVec 32) (lz : Bool) (secc : BitVec 64) :
     userTrapFrame (GF := GF) cpu C pt Rut ⊢
       ∃ (W : Uvis) (sc stv : BitVec 64),
         ⌜W.perm = π ∧ W.sz = sz ∧ W.fd = fdv ∧ W.cwd = cw ∧ W.gen = gn ∧ W.ch = cs ∧ W.pid = pidv ∧
-          W.lazy = lz⌝ ∗ trappedMachine cpu C pt Rut sz sc stv W := by
+          W.lazy = lz ∧ W.secc = secc⌝ ∗ trappedMachine cpu C pt Rut sz sc stv W := by
   unfold userTrapFrame
   iintro ⟨%ms, %sc, %stv, %sep, %g, %hto, Hhs, Hpr, Hms, Hsc, Hstv, Hsep, Hpc, Hck, Hg, Hany, Hcfg, Hrut⟩
   ihave ⟨%M, Hpt⟩ := userPtmInv_intro cpu pt sz $$ Hany
   let g0 : RegMap := g.set 0#5 0#64
   have hg0 : g0 0#5 = 0#64 := by simp [g0]
   ihave Hg0 := uexec_gprFile_congr cpu g g0 (fun i hi => by simp [g0, RegMap.set, hi]) $$ Hg
-  iexists uvisOfRun g0 sep M π sz fdv cw gn cs pidv lz, sc, stv
+  iexists uvisOfRun g0 sep M π sz fdv cw gn cs pidv lz secc, sc, stv
   isplitr
-  · ipureintro; exact ⟨rfl, rfl, rfl, rfl, rfl, rfl, rfl, rfl⟩
+  · ipureintro; exact ⟨rfl, rfl, rfl, rfl, rfl, rfl, rfl, rfl, rfl⟩
   unfold trappedMachine userTrapFrameAtm
   iexists ms
   dsimp only [uvisOfRun]
@@ -354,30 +355,30 @@ abbrev uKillCred : IProp GF := MachFixedGS.killCred (hlc := hlc) (GF := GF)
 /-- **Rocq `upay_at`**: THE ROW, at a generation and a frame: the process's
 persistent knowledge of its own payload, and AT THE EXIT ECALL the payload at
 the exit status (the kill status is the KILLER's price, lane SELF-KILL P6). -/
-def upayAt (gn : GName) (sc : BitVec 64) (tf : List (BitVec 64)) (f : sfam GF) : IProp GF :=
+def upayAt (gn : GName) (sc secc : BitVec 64) (tf : List (BitVec 64)) (f : sfam GF) : IProp GF :=
   iprop(myPay gn (sexitPay f) ∗
-    (if sc = uecallScause then (if usysNum tf = USYS_exit then sexitPay f (exitXs tf) else iprop(emp))
+    (if sc = uecallScause then (if usysEff secc tf = USYS_exit then sexitPay f (exitXs tf) else iprop(emp))
      else iprop(emp)))
 
 /-- Rocq `upay_at_ueq`. -/
-theorem upayAt_ueq {gn gn' : GName} (sc : BitVec 64) {tf tf' : List (BitVec 64)} (f : sfam GF)
+theorem upayAt_ueq {gn gn' : GName} (sc secc : BitVec 64) {tf tf' : List (BitVec 64)} (f : sfam GF)
     (hn : usysNum tf = usysNum tf') (ha : tfW tf (tfArgIdx 0) = tfW tf' (tfArgIdx 0)) (hg : gn = gn') :
-    upayAt gn sc tf f ⊢ upayAt gn' sc tf' f := by
-  unfold upayAt; rw [hn, exitXs_arg0 ha, hg]
+    upayAt gn sc secc tf f ⊢ upayAt gn' sc secc tf' f := by
+  unfold upayAt; rw [usysEff_numCong secc tf tf' hn, exitXs_arg0 ha, hg]
 
 /-- **Rocq `uexec_pay_dep`**. -/
-def uexecPayDep (sc : BitVec 64) (W : Uvis) (f : sfam GF) : IProp GF := upayAt W.gen sc W.tf f
+def uexecPayDep (sc : BitVec 64) (W : Uvis) (f : sfam GF) : IProp GF := upayAt W.gen sc W.secc W.tf f
 
 /-- **Rocq `uexec_pay_dep_free`**: AT EVERY TRAP BUT THE EXIT ECALL THE
 DEPOSIT IS FREE. -/
 theorem uexecPayDep_free (sc : BitVec 64) (W : Uvis) (Q : Int → IProp GF) (f : sfam GF)
-    (hne : ¬ (sc = uecallScause ∧ usysNum W.tf = USYS_exit)) (hf : sexitPay f = Q) :
+    (hne : ¬ (sc = uecallScause ∧ uvisNum W = USYS_exit)) (hf : sexitPay f = Q) :
     myPay W.gen Q ⊢ uexecPayDep sc W f := by
   unfold uexecPayDep upayAt; rw [hf]
-  have hr : (if sc = uecallScause then (if usysNum W.tf = USYS_exit then Q (exitXs W.tf) else iprop(emp))
+  have hr : (if sc = uecallScause then (if usysEff W.secc W.tf = USYS_exit then Q (exitXs W.tf) else iprop(emp))
       else iprop(emp)) = iprop(emp) := by
     by_cases h1 : sc = uecallScause
-    · rw [if_pos h1, if_neg (fun h2 => hne ⟨h1, h2⟩)]
+    · rw [if_pos h1, if_neg (show ¬ usysEff W.secc W.tf = USYS_exit from fun h2 => hne ⟨h1, h2⟩)]
     · rw [if_neg h1]
   rw [hr]
   iintro #H
@@ -422,22 +423,22 @@ theorem uexecPayDep_ne (sc : BitVec 64) (W : Uvis) (Q : Int → IProp GF) (f : s
 /-- Rocq `uexec_pay_dep_ret` (b): at an ecall of a RETURNING number. -/
 theorem uexecPayDep_ret (n : Int) (m : RegMap) (pc : BitVec 64) (M : ElfMem) (pm : Nat → Option UPerm)
     (sz : Nat) (fdv : List FdState) (cw : Nat) (gn : GName) (cs : ExtTreeSet GName compare)
-    (pidv : BitVec 32) (lz : Bool) (Q : Int → IProp GF) (f : sfam GF)
-    (hn : usysNum (tfOf m pc) = n) (hx : n ≠ USYS_exit) (hf : sexitPay f = Q) :
-    myPay gn Q ⊢ uexecPayDep uecallScause (uvisOfRun m pc M pm sz fdv cw gn cs pidv lz) f :=
-  uexecPayDep_free _ (uvisOfRun m pc M pm sz fdv cw gn cs pidv lz) Q f
+    (pidv : BitVec 32) (lz : Bool) (secc : BitVec 64) (Q : Int → IProp GF) (f : sfam GF)
+    (hn : usysEff secc (tfOf m pc) = n) (hx : n ≠ USYS_exit) (hf : sexitPay f = Q) :
+    myPay gn Q ⊢ uexecPayDep uecallScause (uvisOfRun m pc M pm sz fdv cw gn cs pidv lz secc) f :=
+  uexecPayDep_free _ (uvisOfRun m pc M pm sz fdv cw gn cs pidv lz secc) Q f
     (fun h => hx (hn ▸ h.2)) hf
 
 /-- Rocq `uexec_pay_dep_exit` (c): at the EXIT ecall, the payload outright. -/
 theorem uexecPayDep_exit (m : RegMap) (pc : BitVec 64) (M : ElfMem) (pm : Nat → Option UPerm)
     (sz : Nat) (fdv : List FdState) (cw : Nat) (gn : GName) (cs : ExtTreeSet GName compare)
-    (pidv : BitVec 32) (lz : Bool) (Q : Int → IProp GF) (f : sfam GF)
-    (hn : usysNum (tfOf m pc) = USYS_exit) (hf : sexitPay f = Q) :
+    (pidv : BitVec 32) (lz : Bool) (secc : BitVec 64) (Q : Int → IProp GF) (f : sfam GF)
+    (hn : usysEff secc (tfOf m pc) = USYS_exit) (hf : sexitPay f = Q) :
     myPay gn Q ∗ Q (exitXs (tfOf m pc)) ⊢
-      uexecPayDep uecallScause (uvisOfRun m pc M pm sz fdv cw gn cs pidv lz) f := by
+      uexecPayDep uecallScause (uvisOfRun m pc M pm sz fdv cw gn cs pidv lz secc) f := by
   unfold uexecPayDep upayAt; rw [hf]
   show _ ⊢ iprop(myPay gn Q ∗ (if uecallScause = uecallScause then
-    (if usysNum (tfOf m pc) = USYS_exit then Q (exitXs (tfOf m pc)) else iprop(emp)) else iprop(emp)))
+    (if usysEff secc (tfOf m pc) = USYS_exit then Q (exitXs (tfOf m pc)) else iprop(emp)) else iprop(emp)))
   rw [if_pos rfl, if_pos hn]
 
 /-! ### Fork's and wait's answers -/
@@ -533,7 +534,7 @@ own table and cwd unmoved, fork's answer, the bumped key. -/
 def uexecForkParentF (X : Uvis → IProp GF) (W : Uvis) (Q : Int → IProp GF) (Rc : IProp GF) : IProp GF :=
   iprop(∀ (r : BitVec 64) (fdv' : List FdState) (cw' : Nat) (cs' : ExtTreeSet GName compare),
     ⌜r ≠ 0#64⌝ -∗ ⌜fdv' = W.fd⌝ -∗ ⌜cw' = W.cwd⌝ -∗ uforkAns Q Rc r W.ch cs' -∗
-      X (bump W r W.M W.perm W.sz fdv' cw' W.gen cs' W.lazy))
+      X (bump W r W.M W.perm W.sz fdv' cw' W.gen cs' W.lazy W.secc))
 
 /-- **Rocq `uexec_fork_child_F`**: the child's arm AT ITS ONE RECORD (a0 := 0,
 the parent's image/map/break/table/cwd, a fresh generation and pid, no
@@ -541,7 +542,7 @@ children), with the killer's price and the lend beside it. -/
 def uexecForkChildF (X : Uvis → IProp GF) (W : Uvis) (Q : Int → IProp GF) (Rc : IProp GF) : IProp GF :=
   iprop(□ (uKillCred -∗ Q (-1)) ∗ Rc ∗
     ∀ (g' : GName) (pidc : BitVec 32), ⌜pidc ≠ 1#32⌝ -∗ myPay g' Q -∗ Rc -∗
-      X (bumpAt W 0#64 W.M W.perm W.sz W.fd W.cwd g' ∅ pidc W.lazy))
+      X (bumpAt W 0#64 W.M W.perm W.sz W.fd W.cwd g' ∅ pidc W.lazy W.secc))
 
 /-- **Rocq `uexec_fork_F`**: the two together, at the families the process
 chose; the child's leg under `∀ fdv' cw'` guards. -/
@@ -550,7 +551,7 @@ def uexecForkF (X : Uvis → IProp GF) (W : Uvis) (f : sfam GF) : IProp GF :=
     sforkLend f ∗
     ∀ (fdv' : List FdState) (cw' : Nat) (g' : GName) (pidc : BitVec 32),
       ⌜pidc ≠ 1#32⌝ -∗ myPay g' (sforkPay f) -∗ ⌜fdv' = W.fd⌝ -∗ ⌜cw' = W.cwd⌝ -∗ sforkLend f -∗
-        X (bumpAt W 0#64 W.M W.perm W.sz fdv' cw' g' ∅ pidc W.lazy))
+        X (bumpAt W 0#64 W.M W.perm W.sz fdv' cw' g' ∅ pidc W.lazy W.secc))
 
 /-- Rocq `uexec_fork_child_of`: the guarded child conjunct collapses to the
 one record. -/
@@ -558,7 +559,7 @@ theorem uexecForkChild_of (X : Uvis → IProp GF) (W : Uvis) (Q : Int → IProp 
     □ (uKillCred -∗ Q (-1)) ∗ Rc ∗
       (∀ (fdv' : List FdState) (cw' : Nat) (g' : GName) (pidc : BitVec 32),
         ⌜pidc ≠ 1#32⌝ -∗ myPay g' Q -∗ ⌜fdv' = W.fd⌝ -∗ ⌜cw' = W.cwd⌝ -∗ Rc -∗
-          X (bumpAt W 0#64 W.M W.perm W.sz fdv' cw' g' ∅ pidc W.lazy)) ⊢
+          X (bumpAt W 0#64 W.M W.perm W.sz fdv' cw' g' ∅ pidc W.lazy W.secc)) ⊢
       uexecForkChildF X W Q Rc := by
   unfold uexecForkChildF
   iintro ⟨#Hk, HRc, H⟩
@@ -575,7 +576,7 @@ theorem uexecForkChild_to (X : Uvis → IProp GF) (W : Uvis) (Q : Int → IProp 
       □ (uKillCred -∗ Q (-1)) ∗ Rc ∗
         (∀ (fdv' : List FdState) (cw' : Nat) (g' : GName) (pidc : BitVec 32),
           ⌜pidc ≠ 1#32⌝ -∗ myPay g' Q -∗ ⌜fdv' = W.fd⌝ -∗ ⌜cw' = W.cwd⌝ -∗ Rc -∗
-            X (bumpAt W 0#64 W.M W.perm W.sz fdv' cw' g' ∅ pidc W.lazy)) := by
+            X (bumpAt W 0#64 W.M W.perm W.sz fdv' cw' g' ∅ pidc W.lazy W.secc)) := by
   unfold uexecForkChildF
   iintro ⟨#Hk, HRc, H⟩
   isplitl []
@@ -617,7 +618,7 @@ the bumped key. -/
 def uexecRetContGen (X : Uvis → IProp GF) (n : Int) (f : sfam GF) (W : Uvis)
     (CH : BitVec 64 → ExtTreeSet GName compare → IProp GF) : IProp GF :=
   iprop(∀ (r : BitVec 64) (M' : ElfMem) (π' : Nat → Option UPerm) (szv' : Nat) (fdv' : List FdState)
-      (cw' : Nat) (g' : GName) (cs' : ExtTreeSet GName compare) (lz' : Bool),
+      (cw' : Nat) (g' : GName) (cs' : ExtTreeSet GName compare) (lz' : Bool) (secc' : BitVec 64),
     ⌜usysMemOk n W.tf r W.M W.perm W.sz W.lazy M' π' szv' lz'⌝ -∗
     ⌜usysFdOk n W.tf r W.fd fdv'⌝ -∗
     ⌜usysPipeOk n W.tf r W.M M' W.fd fdv'⌝ -∗
@@ -625,9 +626,10 @@ def uexecRetContGen (X : Uvis → IProp GF) (n : Int) (f : sfam GF) (W : Uvis)
     ⌜usysGenOk n W.gen g'⌝ -∗
     ⌜usysRetPid n r W.pid⌝ -∗
     ⌜uexecLiveOk n W.tf W.fd r cs'⌝ -∗
+    ⌜usysSeccOk n W.tf W.secc secc' r⌝ -∗
     CH r cs' -∗
     spostAt X n f W r M' fdv' cw' cs' -∗
-    X (bump W r M' π' szv' fdv' cw' g' cs' lz'))
+    X (bump W r M' π' szv' fdv' cw' g' cs' lz' secc'))
 
 /-- Rocq `uexec_ret_cont_F`: the twenty entries that keep the children
 reading. -/
@@ -691,10 +693,10 @@ theorem uexecKillArmF_of_cred (X : Uvis → IProp GF) (sc : BitVec 64) (W : Uvis
 consumes. -/
 def uexecArmF (X : Uvis → IProp GF) (sc : BitVec 64) (W : Uvis) (f : sfam GF) : IProp GF :=
   if sc = uecallScause then
-    if usysNum W.tf = USYS_exit then iprop(emp)
-    else if usysNum W.tf = USYS_fork then uexecForkParentF X W (sforkPay f) (sforkLend f)
-    else if usysNum W.tf = USYS_wait then uexecWaitF X (usysNum W.tf) f W
-    else uexecRetContF X (usysNum W.tf) f W
+    if uvisNum W = USYS_exit then iprop(emp)
+    else if uvisNum W = USYS_fork then uexecForkParentF X W (sforkPay f) (sforkLend f)
+    else if uvisNum W = USYS_wait then uexecWaitF X (uvisNum W) f W
+    else uexecRetContF X (uvisNum W) f W
   else uexecKillArmF X sc W f
 
 /-- **Rocq `uexec_dep_F`**: THE DEPOSIT ALONE -- the payment, and at an ecall
@@ -702,9 +704,9 @@ fork's child slot or the number's bundle. -/
 def uexecDepF (X : Uvis → IProp GF) (sc : BitVec 64) (W : Uvis) (f : sfam GF) : IProp GF :=
   iprop(uexecPayDep sc W f ∗
     (if sc = uecallScause then
-      (if usysNum W.tf = USYS_exit then iprop(emp)
-       else if usysNum W.tf = USYS_fork then uexecForkChildF X W (sforkPay f) (sforkLend f)
-       else sbundleAt X (usysNum W.tf) f W)
+      (if uvisNum W = USYS_exit then iprop(emp)
+       else if uvisNum W = USYS_fork then uexecForkChildF X W (sforkPay f) (sforkLend f)
+       else sbundleAt X (uvisNum W) f W)
      else iprop(emp)))
 
 /-- **Rocq `uexec_ret_F`**: the two together, THE FAMILIES BOUND ONCE,
@@ -712,11 +714,11 @@ OUTSIDE EVERYTHING. -/
 def uexecRetF (X : Uvis → IProp GF) (sc : BitVec 64) (W : Uvis) : IProp GF :=
   iprop(∃ f : sfam GF, uexecPayDep sc W f ∗
     (if sc = uecallScause then
-      (if usysNum W.tf = USYS_exit then iprop(emp)
-       else if usysNum W.tf = USYS_fork then uexecForkF X W f
-       else if usysNum W.tf = USYS_wait then
-         iprop(sbundleAt X (usysNum W.tf) f W ∗ uexecWaitF X (usysNum W.tf) f W)
-       else iprop(sbundleAt X (usysNum W.tf) f W ∗ uexecRetContF X (usysNum W.tf) f W))
+      (if uvisNum W = USYS_exit then iprop(emp)
+       else if uvisNum W = USYS_fork then uexecForkF X W f
+       else if uvisNum W = USYS_wait then
+         iprop(sbundleAt X (uvisNum W) f W ∗ uexecWaitF X (uvisNum W) f W)
+       else iprop(sbundleAt X (uvisNum W) f W ∗ uexecRetContF X (uvisNum W) f W))
      else uexecKillArmF X sc W f))
 
 /-! ### The kernel obligation, the bundle, the slot -/
@@ -727,18 +729,18 @@ descriptor fragments back and the return. -/
 def ukbF (X : Uvis → IProp GF) [xi : CurCtx] (cpu : CPU) (C : UCfg) (pt : UPtd)
     (Rfd : List FdState → IProp GF) (Rut : UPtd → IProp GF) (sz : Nat) (π : Nat → Option UPerm)
     (fdv : List FdState) (cw : Nat) (g : GName) (cs : ExtTreeSet GName compare) (pidv : BitVec 32)
-    (lz : Bool) : IProp GF :=
+    (lz : Bool) (secc : BitVec 64) : IProp GF :=
   iprop(∀ (W' : Uvis) (sc stv : BitVec 64),
     ⌜W'.perm = π⌝ -∗ ⌜W'.sz = sz⌝ -∗ ⌜W'.fd = fdv⌝ -∗ ⌜W'.cwd = cw⌝ -∗ ⌜W'.gen = g⌝ -∗
-    ⌜W'.ch = cs⌝ -∗ ⌜W'.pid = pidv⌝ -∗ ⌜W'.lazy = lz⌝ -∗
+    ⌜W'.ch = cs⌝ -∗ ⌜W'.pid = pidv⌝ -∗ ⌜W'.lazy = lz⌝ -∗ ⌜W'.secc = secc⌝ -∗
     (trappedMachine cpu C pt Rut sz sc stv W' ∗ Rfd W'.fd ∗ uexecRetF X sc W') -∗ wpLoop cpu)
 
 /-- **Rocq `ukont_F`**: the guarded form. -/
 def ukontF (X : Uvis → IProp GF) [xi : CurCtx] (cpu : CPU) (C : UCfg) (pt : UPtd)
     (Rfd : List FdState → IProp GF) (Rut : UPtd → IProp GF) (sz : Nat) (π : Nat → Option UPerm)
     (fdv : List FdState) (cw : Nat) (g : GName) (cs : ExtTreeSet GName compare) (pidv : BitVec 32)
-    (lz : Bool) : IProp GF :=
-  iprop(▷ ukbF X cpu C pt Rfd Rut sz π fdv cw g cs pidv lz)
+    (lz : Bool) (secc : BitVec 64) : IProp GF :=
+  iprop(▷ ukbF X cpu C pt Rfd Rut sz π fdv cw g cs pidv lz secc)
 
 /-- **Rocq `uvb_F`**: THE BUNDLE -- ambient, cells, the size bound, the image
 at the key's (lazy, stamped) view, the descriptor fragments `Rfd fdv` (the
@@ -746,9 +748,9 @@ image's arrangement again), config, register file, pc, residue, obligation. -/
 def uvbF (X : Uvis → IProp GF) [xi : CurCtx] (cpu : CPU) (C : UCfg) (pt : UPtd)
     (Rfd : List FdState → IProp GF) (Rut : UPtd → IProp GF) (sz : Nat) (π : Nat → Option UPerm)
     (fdv : List FdState) (cw : Nat) (g : GName) (cs : ExtTreeSet GName compare) (pidv : BitVec 32)
-    (lz : Bool) (M : ElfMem) (m : RegMap) (pc : BitVec 64) : IProp GF :=
+    (lz : Bool) (secc : BitVec 64) (M : ElfMem) (m : RegMap) (pc : BitVec 64) : IProp GF :=
   iprop(uvAmb cpu ∗ uvRegs cpu ∗ ⌜uszOk sz⌝ ∗ userPtmInvX cpu pt sz M ∗ Rfd fdv ∗ userCfg cpu C ∗
-    gprFile cpu m ∗ pcIs cpu pc ∗ Rut pt ∗ ukontF X cpu C pt Rfd Rut sz π fdv cw g cs pidv lz)
+    gprFile cpu m ∗ pcIs cpu pc ∗ Rut pt ∗ ukontF X cpu C pt Rfd Rut sz π fdv cw g cs pidv lz secc)
 
 /-- **Rocq `uslot_F`**: the slot's functional -- at every hart, context,
 config, table, descriptor resource and residue (with the residue-token
@@ -759,7 +761,7 @@ def uslotF (X : Uvis → IProp GF) (W : Uvis) : IProp GF :=
     ⌜∀ pt' : UPtd, Rut pt' ⊢ @ctxToken hlc GF _ xi h ∗ (@ctxToken hlc GF _ xi h -∗ Rut pt')⌝ -∗
     ⌜loopOk C pt⌝ -∗ ⌜permOf pt.um W.sz = W.perm⌝ -∗
     ⌜W.lazy = false → lazyFree pt.um (BitVec.ofNat 64 W.sz)⌝ -∗
-    uvbF (xi := xi) X h C pt Rfd Rut W.sz W.perm W.fd W.cwd W.gen W.ch W.pid W.lazy W.M
+    uvbF (xi := xi) X h C pt Rfd Rut W.sz W.perm W.fd W.cwd W.gen W.ch W.pid W.lazy W.secc W.M
       (tfResumeGpr0 W.tf) (tfResumePc W.tf) -∗
     wpLoop h)
 
@@ -795,9 +797,10 @@ theorem uexecRetContGen_ne (n : Int) (f : sfam GF) (W : Uvis)
   unfold uexecRetContGen
   refine BI.forall_ne (fun r => BI.forall_ne (fun M' => BI.forall_ne (fun _ => BI.forall_ne (fun _ =>
     BI.forall_ne (fun fdv' => BI.forall_ne (fun cw' => BI.forall_ne (fun _ => BI.forall_ne (fun cs' =>
-    BI.forall_ne (fun _ => ?_)))))))))
+    BI.forall_ne (fun _ => BI.forall_ne (fun _ => ?_))))))))))
   refine BI.wand_ne.ne .rfl (BI.wand_ne.ne .rfl (BI.wand_ne.ne .rfl (BI.wand_ne.ne .rfl
-    (BI.wand_ne.ne .rfl (BI.wand_ne.ne .rfl (BI.wand_ne.ne .rfl (BI.wand_ne.ne .rfl ?_)))))))
+    (BI.wand_ne.ne .rfl (BI.wand_ne.ne .rfl (BI.wand_ne.ne .rfl (BI.wand_ne.ne .rfl
+    (BI.wand_ne.ne .rfl ?_))))))))
   exact BI.wand_ne.ne (spostAt_ne k X Y HX n f W r M' fdv' cw' cs') (HX _)
 
 theorem uexecKillArmF_ne (sc : BitVec 64) (W : Uvis) (f : sfam GF) :
@@ -817,12 +820,14 @@ theorem uexecRetF_ne (sc : BitVec 64) (W : Uvis) : uexecRetF X sc W ≡{k}≡ ue
 
 theorem ukbF_ne [CurCtx] (cpu : CPU) (C : UCfg) (pt : UPtd) (Rfd : List FdState → IProp GF)
     (Rut : UPtd → IProp GF) (sz : Nat) (π : Nat → Option UPerm) (fdv : List FdState) (cw : Nat)
-    (g : GName) (cs : ExtTreeSet GName compare) (pidv : BitVec 32) (lz : Bool) :
-    ukbF X cpu C pt Rfd Rut sz π fdv cw g cs pidv lz ≡{k}≡ ukbF Y cpu C pt Rfd Rut sz π fdv cw g cs pidv lz := by
+    (g : GName) (cs : ExtTreeSet GName compare) (pidv : BitVec 32) (lz : Bool) (secc : BitVec 64) :
+    ukbF X cpu C pt Rfd Rut sz π fdv cw g cs pidv lz secc ≡{k}≡
+      ukbF Y cpu C pt Rfd Rut sz π fdv cw g cs pidv lz secc := by
   unfold ukbF
   refine BI.forall_ne (fun W' => BI.forall_ne (fun sc => BI.forall_ne (fun _ => ?_)))
   refine BI.wand_ne.ne .rfl (BI.wand_ne.ne .rfl (BI.wand_ne.ne .rfl (BI.wand_ne.ne .rfl
-    (BI.wand_ne.ne .rfl (BI.wand_ne.ne .rfl (BI.wand_ne.ne .rfl (BI.wand_ne.ne .rfl ?_)))))))
+    (BI.wand_ne.ne .rfl (BI.wand_ne.ne .rfl (BI.wand_ne.ne .rfl (BI.wand_ne.ne .rfl
+    (BI.wand_ne.ne .rfl ?_))))))))
   exact BI.wand_ne.ne (BI.sep_ne.ne .rfl (BI.sep_ne.ne .rfl (uexecRetF_ne k X Y HX sc W'))) .rfl
 
 end Ne
@@ -841,7 +846,7 @@ instance uslotF_contractive : OFE.Contractive (uslotF (GF := GF)) where
       (BI.sep_ne.ne .rfl (BI.sep_ne.ne .rfl (BI.sep_ne.ne .rfl (BI.sep_ne.ne .rfl
       (BI.sep_ne.ne .rfl ?_))))))))
     exact OFE.Contractive.distLater_dist (f := BIBase.later)
-      (fun m hm => @ukbF_ne hlc GF _ _ _ m X Y (fun W' => HX m hm W') xi h C pt Rfd Rut _ _ _ _ _ _ _ _)
+      (fun m hm => @ukbF_ne hlc GF _ _ _ m X Y (fun W' => HX m hm W') xi h C pt Rfd Rut _ _ _ _ _ _ _ _ _)
 
 /-- **Rocq `uslot`**: the fixpoint. -/
 def uslot : Uvis → IProp GF := fixpoint (uslotF (GF := GF))
@@ -863,32 +868,32 @@ abbrev uexecDep (sc : BitVec 64) (W : Uvis) (f : sfam GF) : IProp GF := uexecDep
 /-- Rocq `ukb`. -/
 abbrev ukb [xi : CurCtx] (cpu : CPU) (C : UCfg) (pt : UPtd) (Rfd : List FdState → IProp GF)
     (Rut : UPtd → IProp GF) (sz : Nat) (π : Nat → Option UPerm) (fdv : List FdState) (cw : Nat)
-    (g : GName) (cs : ExtTreeSet GName compare) (pidv : BitVec 32) (lz : Bool) : IProp GF :=
-  ukbF uslot cpu C pt Rfd Rut sz π fdv cw g cs pidv lz
+    (g : GName) (cs : ExtTreeSet GName compare) (pidv : BitVec 32) (lz : Bool) (secc : BitVec 64) : IProp GF :=
+  ukbF uslot cpu C pt Rfd Rut sz π fdv cw g cs pidv lz secc
 
 /-- Rocq `ukont`. -/
 abbrev ukont [xi : CurCtx] (cpu : CPU) (C : UCfg) (pt : UPtd) (Rfd : List FdState → IProp GF)
     (Rut : UPtd → IProp GF) (sz : Nat) (π : Nat → Option UPerm) (fdv : List FdState) (cw : Nat)
-    (g : GName) (cs : ExtTreeSet GName compare) (pidv : BitVec 32) (lz : Bool) : IProp GF :=
-  ukontF uslot cpu C pt Rfd Rut sz π fdv cw g cs pidv lz
+    (g : GName) (cs : ExtTreeSet GName compare) (pidv : BitVec 32) (lz : Bool) (secc : BitVec 64) : IProp GF :=
+  ukontF uslot cpu C pt Rfd Rut sz π fdv cw g cs pidv lz secc
 
 /-- Rocq `uvb`. -/
 abbrev uvb [xi : CurCtx] (cpu : CPU) (C : UCfg) (pt : UPtd) (Rfd : List FdState → IProp GF)
     (Rut : UPtd → IProp GF) (sz : Nat) (π : Nat → Option UPerm) (fdv : List FdState) (cw : Nat)
-    (g : GName) (cs : ExtTreeSet GName compare) (pidv : BitVec 32) (lz : Bool) (M : ElfMem) (m : RegMap)
-    (pc : BitVec 64) : IProp GF :=
-  uvbF uslot cpu C pt Rfd Rut sz π fdv cw g cs pidv lz M m pc
+    (g : GName) (cs : ExtTreeSet GName compare) (pidv : BitVec 32) (lz : Bool) (secc : BitVec 64)
+    (M : ElfMem) (m : RegMap) (pc : BitVec 64) : IProp GF :=
+  uvbF uslot cpu C pt Rfd Rut sz π fdv cw g cs pidv lz secc M m pc
 
 /-- **Rocq `ukc`**: THE U-MODE CONTINUATION at a natural state -- what every
 U-mode leaf's continuation is, and what a program function proves. -/
 def ukc (π : Nat → Option UPerm) (M : ElfMem) (szv : Nat) (fdv : List FdState) (cw : Nat) (g : GName)
-    (cs : ExtTreeSet GName compare) (pidv : BitVec 32) (lz : Bool) (m : RegMap) (pc : BitVec 64) :
-    IProp GF :=
+    (cs : ExtTreeSet GName compare) (pidv : BitVec 32) (lz : Bool) (secc : BitVec 64) (m : RegMap)
+    (pc : BitVec 64) : IProp GF :=
   iprop(∀ (h : CPU) (xi : CurCtx) (C : UCfg) (pt : UPtd) (Rfd : List FdState → IProp GF)
       (Rut : UPtd → IProp GF),
     ⌜∀ pt' : UPtd, Rut pt' ⊢ @ctxToken hlc GF _ xi h ∗ (@ctxToken hlc GF _ xi h -∗ Rut pt')⌝ -∗
     ⌜loopOk C pt⌝ -∗ ⌜permOf pt.um szv = π⌝ -∗ ⌜lz = false → lazyFree pt.um (BitVec.ofNat 64 szv)⌝ -∗
-    uvb (xi := xi) h C pt Rfd Rut szv π fdv cw g cs pidv lz M m pc -∗
+    uvb (xi := xi) h C pt Rfd Rut szv π fdv cw g cs pidv lz secc M m pc -∗
     wpLoop h)
 
 /-- **Rocq `ukcq`**: the continuation with the pay fact beside it, AT THE LAZY
@@ -896,19 +901,20 @@ FLAG `false` (the verified-program tier's run). -/
 def ukcq (Q : Int → IProp GF) (π : Nat → Option UPerm) (M : ElfMem) (szv : Nat) (fdv : List FdState)
     (cw : Nat) (g : GName) (cs : ExtTreeSet GName compare) (pidv : BitVec 32) (m : RegMap)
     (pc : BitVec 64) : IProp GF :=
-  iprop(myPay g Q ∗ ukc π M szv fdv cw g cs pidv false m pc)
+  iprop(myPay g Q ∗ ukc π M szv fdv cw g cs pidv false seccAll m pc)
 
 /-- Rocq `ukcq_ukc`. -/
 theorem ukcq_ukc (Q : Int → IProp GF) (π : Nat → Option UPerm) (M : ElfMem) (szv : Nat)
     (fdv : List FdState) (cw : Nat) (g : GName) (cs : ExtTreeSet GName compare) (pidv : BitVec 32)
     (m : RegMap) (pc : BitVec 64) :
-    ukcq Q π M szv fdv cw g cs pidv m pc ⊢ ukc π M szv fdv cw g cs pidv false m pc :=
+    ukcq Q π M szv fdv cw g cs pidv m pc ⊢ ukc π M szv fdv cw g cs pidv false seccAll m pc :=
   BI.sep_elim_right
 
 /-- **Rocq `uslot_ukc`**: the slot IS the continuation at the key's state. -/
 theorem uslot_ukc (W : Uvis) :
     uslot (GF := GF) W ⊣⊢
-      ukc W.perm W.M W.sz W.fd W.cwd W.gen W.ch W.pid W.lazy (tfResumeGpr0 W.tf) (tfResumePc W.tf) :=
+      ukc W.perm W.M W.sz W.fd W.cwd W.gen W.ch W.pid W.lazy W.secc (tfResumeGpr0 W.tf)
+        (tfResumePc W.tf) :=
   uslot_unfold W
 
 /-- **Rocq `uslot_bupd`**: A SLOT ABSORBS A GHOST UPDATE (it ends in a WP). -/
@@ -930,9 +936,9 @@ theorem uslot_of_urunEq {Wk : Uvis} {V : ProcPriv} {M : Nat → List (BitVec 8)}
     (hfd : Wk.fd = sts) (hgn : Wk.gen = gn) (hch : Wk.ch = cs) (hpid : Wk.pid = pidv) :
     uslot (GF := GF) Wk ⊣⊢ uslot (uvisOf V M sts gn cs pidv) := by
   refine (uslot_ukc Wk).trans (BI.BiEntails.trans ?_ (uslot_ukc _).symm)
-  obtain ⟨hg, hp, hM, hpi, hsz, hcw, hlz⟩ := h
+  obtain ⟨hg, hp, hM, hpi, hsz, hcw, hlz, hsc⟩ := h
   simp only [uvisOf]
-  rw [hg, hp, hM, hpi, hsz, hcw, hfd, hgn, hch, hpid, hlz]
+  rw [hg, hp, hM, hpi, hsz, hcw, hfd, hgn, hch, hpid, hlz, hsc]
   exact .rfl
 
 /-- **Rocq `uslot_run`**: the slot at the TRAP-OUT key is the continuation at
@@ -940,10 +946,10 @@ the running state (x0 = 0, a 2-aligned pc). -/
 theorem uslot_run (m : RegMap) (pc : BitVec 64) (M : ElfMem) (π : Nat → Option UPerm) (szv : Nat)
     (fdv : List FdState) (cw : Nat) (gn : GName) (cs : ExtTreeSet GName compare) (pidv : BitVec 32)
     (h0 : m 0#5 = 0#64) (hal : pc &&& 1#64 = 0#64) :
-    uslot (GF := GF) (uvisOfRun m pc M π szv fdv cw gn cs pidv false) ⊣⊢
-      ukc π M szv fdv cw gn cs pidv false m pc := by
+    uslot (GF := GF) (uvisOfRun m pc M π szv fdv cw gn cs pidv false seccAll) ⊣⊢
+      ukc π M szv fdv cw gn cs pidv false seccAll m pc := by
   refine (uslot_ukc _).trans ?_
-  show ukc π M szv fdv cw gn cs pidv false (tfResumeGpr0 (tfOf m pc)) (tfResumePc (tfOf m pc)) ⊣⊢ _
+  show ukc π M szv fdv cw gn cs pidv false seccAll (tfResumeGpr0 (tfOf m pc)) (tfResumePc (tfOf m pc)) ⊣⊢ _
   rw [tfOf_resumeGpr m pc h0, tfOf_resumePc m pc hal]
   exact .rfl
 
@@ -952,43 +958,45 @@ continuation after the syscall returned (a0 := r, pc + 4), at a NAMED pid
 (fork's child). -/
 theorem uslot_bumpAt_run (m : RegMap) (pc : BitVec 64) (M M' : ElfMem) (π π' : Nat → Option UPerm)
     (szv szv' : Nat) (fdv fdv' : List FdState) (cw cw' : Nat) (gn gn' : GName)
-    (cs cs' : ExtTreeSet GName compare) (pidv pidv' : BitVec 32) (lz lz' : Bool) (r : BitVec 64)
+    (cs cs' : ExtTreeSet GName compare) (pidv pidv' : BitVec 32) (lz lz' : Bool) (secc secc' : BitVec 64) (r : BitVec 64)
     (h0 : m 0#5 = 0#64) (hal : (pc + 4#64) &&& 1#64 = 0#64) :
-    uslot (GF := GF) (bumpAt (uvisOfRun m pc M π szv fdv cw gn cs pidv lz) r M' π' szv' fdv' cw' gn' cs'
-      pidv' lz') ⊣⊢ ukc π' M' szv' fdv' cw' gn' cs' pidv' lz' (m.set 10#5 r) (pc + 4#64) := by
+    uslot (GF := GF) (bumpAt (uvisOfRun m pc M π szv fdv cw gn cs pidv lz secc) r M' π' szv' fdv' cw' gn' cs'
+      pidv' lz' secc') ⊣⊢ ukc π' M' szv' fdv' cw' gn' cs' pidv' lz' secc' (m.set 10#5 r) (pc + 4#64) := by
   refine (uslot_ukc _).trans ?_
-  rw [bumpRun_gpr m pc M M' π π' szv szv' fdv fdv' cw cw' gn gn' cs cs' pidv pidv' lz lz' r h0,
-    bumpRun_pc m pc M M' π π' szv szv' fdv fdv' cw cw' gn gn' cs cs' pidv pidv' lz lz' r hal]
+  rw [bumpRun_gpr m pc M M' π π' szv szv' fdv fdv' cw cw' gn gn' cs cs' pidv pidv' lz lz' secc secc' r h0,
+    bumpRun_pc m pc M M' π π' szv szv' fdv fdv' cw cw' gn gn' cs cs' pidv pidv' lz lz' secc secc' r hal]
   exact .rfl
 
 /-- Rocq `uslot_bump_run`: ...and the returning one, at the caller's own pid. -/
 theorem uslot_bump_run (m : RegMap) (pc : BitVec 64) (M M' : ElfMem) (π π' : Nat → Option UPerm)
     (szv szv' : Nat) (fdv fdv' : List FdState) (cw cw' : Nat) (gn gn' : GName)
-    (cs cs' : ExtTreeSet GName compare) (pidv : BitVec 32) (lz lz' : Bool) (r : BitVec 64)
-    (h0 : m 0#5 = 0#64) (hal : (pc + 4#64) &&& 1#64 = 0#64) :
-    uslot (GF := GF) (bump (uvisOfRun m pc M π szv fdv cw gn cs pidv lz) r M' π' szv' fdv' cw' gn' cs' lz') ⊣⊢
-      ukc π' M' szv' fdv' cw' gn' cs' pidv lz' (m.set 10#5 r) (pc + 4#64) :=
-  uslot_bumpAt_run m pc M M' π π' szv szv' fdv fdv' cw cw' gn gn' cs cs' pidv pidv lz lz' r h0 hal
+    (cs cs' : ExtTreeSet GName compare) (pidv : BitVec 32) (lz lz' : Bool) (secc secc' : BitVec 64)
+    (r : BitVec 64) (h0 : m 0#5 = 0#64) (hal : (pc + 4#64) &&& 1#64 = 0#64) :
+    uslot (GF := GF) (bump (uvisOfRun m pc M π szv fdv cw gn cs pidv lz secc) r M' π' szv' fdv' cw' gn' cs'
+      lz' secc') ⊣⊢
+      ukc π' M' szv' fdv' cw' gn' cs' pidv lz' secc' (m.set 10#5 r) (pc + 4#64) :=
+  uslot_bumpAt_run m pc M M' π π' szv szv' fdv fdv' cw cw' gn gn' cs cs' pidv pidv lz lz' secc secc' r h0
+    hal
 
 /-! ### The arms, read at the fixpoint -/
 
 /-- **Rocq `uexec_ret_ecall`** (deviation 5: at the arm functionals). -/
 theorem uexecRet_ecall (W : Uvis) :
     uexecRet (GF := GF) uecallScause W = iprop(∃ f : sfam GF, uexecPayDep uecallScause W f ∗
-      (if usysNum W.tf = USYS_exit then iprop(emp)
-       else if usysNum W.tf = USYS_fork then uexecForkF uslot W f
-       else if usysNum W.tf = USYS_wait then
-         iprop(sbundleAt uslot (usysNum W.tf) f W ∗ uexecWaitF uslot (usysNum W.tf) f W)
-       else iprop(sbundleAt uslot (usysNum W.tf) f W ∗ uexecRetContF uslot (usysNum W.tf) f W))) := by
+      (if uvisNum W = USYS_exit then iprop(emp)
+       else if uvisNum W = USYS_fork then uexecForkF uslot W f
+       else if uvisNum W = USYS_wait then
+         iprop(sbundleAt uslot (uvisNum W) f W ∗ uexecWaitF uslot (uvisNum W) f W)
+       else iprop(sbundleAt uslot (uvisNum W) f W ∗ uexecRetContF uslot (uvisNum W) f W))) := by
   unfold uexecRet uexecRetF; simp only [if_true]
 
 /-- Rocq `uexec_arm_ecall`. -/
 theorem uexecArm_ecall (W : Uvis) (f : sfam GF) :
     uexecArm uecallScause W f =
-      (if usysNum W.tf = USYS_exit then iprop(emp)
-       else if usysNum W.tf = USYS_fork then uexecForkParentF uslot W (sforkPay f) (sforkLend f)
-       else if usysNum W.tf = USYS_wait then uexecWaitF uslot (usysNum W.tf) f W
-       else uexecRetContF uslot (usysNum W.tf) f W) := by
+      (if uvisNum W = USYS_exit then iprop(emp)
+       else if uvisNum W = USYS_fork then uexecForkParentF uslot W (sforkPay f) (sforkLend f)
+       else if uvisNum W = USYS_wait then uexecWaitF uslot (uvisNum W) f W
+       else uexecRetContF uslot (uvisNum W) f W) := by
   unfold uexecArm uexecArmF; simp only [if_true]
 
 /-- Rocq `uexec_ret_transparent`: THE TRANSPARENT ARM PAYS TOO. -/
@@ -1025,7 +1033,7 @@ theorem uexecRetF_split (X : Uvis → IProp GF) (sc : BitVec 64) (W : Uvis) :
   unfold uexecRetF uexecDepF uexecArmF
   by_cases h1 : sc = uecallScause
   · simp only [if_pos h1]
-    by_cases h2 : usysNum W.tf = USYS_exit
+    by_cases h2 : uvisNum W = USYS_exit
     · simp only [if_pos h2]
       iintro ⟨%f, Hpay, -⟩
       iexists f
@@ -1035,7 +1043,7 @@ theorem uexecRetF_split (X : Uvis → IProp GF) (sc : BitVec 64) (W : Uvis) :
         · iempintro
       · iempintro
     simp only [if_neg h2]
-    by_cases h3 : usysNum W.tf = USYS_fork
+    by_cases h3 : uvisNum W = USYS_fork
     · simp only [if_pos h3]
       iintro ⟨%f, Hpay, H⟩
       iexists f
@@ -1052,7 +1060,7 @@ theorem uexecRetF_split (X : Uvis → IProp GF) (sc : BitVec 64) (W : Uvis) :
           · iexact Hc
       · iexact Hp
     simp only [if_neg h3]
-    by_cases h4 : usysNum W.tf = USYS_wait
+    by_cases h4 : uvisNum W = USYS_wait
     · simp only [if_pos h4]
       iintro ⟨%f, Hpay, Hd, Ha⟩
       iexists f
@@ -1084,7 +1092,7 @@ theorem uexecRetF_join (X : Uvis → IProp GF) (sc : BitVec 64) (W : Uvis) (f : 
   unfold uexecRetF uexecDepF uexecArmF
   by_cases h1 : sc = uecallScause
   · simp only [if_pos h1]
-    by_cases h2 : usysNum W.tf = USYS_exit
+    by_cases h2 : uvisNum W = USYS_exit
     · simp only [if_pos h2]
       iintro ⟨⟨Hpay, -⟩, -⟩
       iexists f
@@ -1092,7 +1100,7 @@ theorem uexecRetF_join (X : Uvis → IProp GF) (sc : BitVec 64) (W : Uvis) (f : 
       · iexact Hpay
       · iempintro
     simp only [if_neg h2]
-    by_cases h3 : usysNum W.tf = USYS_fork
+    by_cases h3 : uvisNum W = USYS_fork
     · simp only [if_pos h3]
       iintro ⟨⟨Hpay, Hd⟩, Ha⟩
       iexists f
@@ -1108,7 +1116,7 @@ theorem uexecRetF_join (X : Uvis → IProp GF) (sc : BitVec 64) (W : Uvis) (f : 
       · iexact HRc
       · iexact Hc
     simp only [if_neg h3]
-    by_cases h4 : usysNum W.tf = USYS_wait
+    by_cases h4 : uvisNum W = USYS_wait
     · simp only [if_pos h4]
       iintro ⟨⟨Hpay, Hd⟩, Ha⟩
       iexists f
@@ -1169,7 +1177,7 @@ theorem uexecDepF_of_supply (R : IProp GF) (X : Uvis → IProp GF) (sc : BitVec 
   unfold uexecDepF
   by_cases h1 : sc = uecallScause
   · simp only [if_pos h1]
-    by_cases h2 : usysNum W.tf = USYS_exit
+    by_cases h2 : uvisNum W = USYS_exit
     · simp only [if_pos h2]
       imodintro
       iexists fR
@@ -1182,7 +1190,7 @@ theorem uexecDepF_of_supply (R : IProp GF) (X : Uvis → IProp GF) (sc : BitVec 
         · iexact HRb
       · iempintro
     simp only [if_neg h2]
-    by_cases h3 : usysNum W.tf = USYS_fork
+    by_cases h3 : uvisNum W = USYS_fork
     · simp only [if_pos h3]
       imodintro
       iexists fR
@@ -1211,7 +1219,7 @@ theorem uexecDepF_of_supply (R : IProp GF) (X : Uvis → IProp GF) (sc : BitVec 
         imodintro
         iintro -
         iexact Hr
-      ihave Hb := sbundleOfSupply X (usysNum W.tf) W R $$ Hpay Hsup HRb Hallb
+      ihave Hb := sbundleOfSupply X (uvisNum W) W R $$ Hpay Hsup HRb Hallb
       imod Hb with ⟨%f, %hfp, Hb⟩
       imodintro
       iexists f
@@ -1241,32 +1249,32 @@ theorem uexecArm_of_all (R : IProp GF) (sc : BitVec 64) (W : Uvis) (f : sfam GF)
   unfold uexecArm uexecArmF
   by_cases h1 : sc = uecallScause
   · simp only [if_pos h1]
-    by_cases h2 : usysNum W.tf = USYS_exit
+    by_cases h2 : uvisNum W = USYS_exit
     · simp only [if_pos h2]; iempintro
     simp only [if_neg h2]
-    by_cases h3 : usysNum W.tf = USYS_fork
+    by_cases h3 : uvisNum W = USYS_fork
     · simp only [if_pos h3]
       unfold uexecForkParentF
       iintro %r %fdv' %cw' %cs' %_ %_ %_ -
-      iapply H $$ %(bump W r W.M W.perm W.sz fdv' cw' W.gen cs' W.lazy) [] HR
+      iapply H $$ %(bump W r W.M W.perm W.sz fdv' cw' W.gen cs' W.lazy W.secc) [] HR
       dsimp only [bump, bumpAt]
       iexact Hpay
     simp only [if_neg h3]
-    by_cases h4 : usysNum W.tf = USYS_wait
+    by_cases h4 : uvisNum W = USYS_wait
     · simp only [if_pos h4]
       unfold uexecWaitF uexecRetContGen
-      iintro %r %M' %π' %szv' %fdv' %cw' %g' %cs' %lz' %_ %_ %_ %_ %hg %_ %_ - -
+      iintro %r %M' %π' %szv' %fdv' %cw' %g' %cs' %lz' %secc' %_ %_ %_ %_ %hg %_ %_ %_ - -
       have hg' : g' = W.gen := hg
       subst hg'
-      iapply H $$ %(bump W r M' π' szv' fdv' cw' W.gen cs' lz') [] HR
+      iapply H $$ %(bump W r M' π' szv' fdv' cw' W.gen cs' lz' secc') [] HR
       dsimp only [bump, bumpAt]
       iexact Hpay
     · simp only [if_neg h4]
       unfold uexecRetContF uexecRetContGen
-      iintro %r %M' %π' %szv' %fdv' %cw' %g' %cs' %lz' %_ %_ %_ %_ %hg %_ %_ - -
+      iintro %r %M' %π' %szv' %fdv' %cw' %g' %cs' %lz' %secc' %_ %_ %_ %_ %hg %_ %_ %_ - -
       have hg' : g' = W.gen := hg
       subst hg'
-      iapply H $$ %(bump W r M' π' szv' fdv' cw' W.gen cs' lz') [] HR
+      iapply H $$ %(bump W r M' π' szv' fdv' cw' W.gen cs' lz' secc') [] HR
       dsimp only [bump, bumpAt]
       iexact Hpay
   · simp only [if_neg h1]
@@ -1330,8 +1338,8 @@ theorem uslot_of_creds (R : IProp GF) :
   inext
   iintro ⟨Hframe, -⟩
   ihave ⟨%W', %sc', %stv', %hpins, Htm⟩ :=
-    @userTrapFrame_trapped hlc GF _ xi h C pt Rut W.sz W.perm W.fd W.cwd W.gen W.ch W.pid W.lazy $$ Hframe
-  obtain ⟨hperm, hszw, hfdw, hcww, hgnw, hchw, hpidw, hlzw⟩ := hpins
+    @userTrapFrame_trapped hlc GF _ xi h C pt Rut W.sz W.perm W.fd W.cwd W.gen W.ch W.pid W.lazy W.secc $$ Hframe
+  obtain ⟨hperm, hszw, hfdw, hcww, hgnw, hchw, hpidw, hlzw, hscw⟩ := hpins
   iapply wpLoop_bupd
   ihave #Hpay' : iprop(myPay W'.gen (fun _ => R)) $$ []
   · rw [hgnw]; iexact Hpay
@@ -1342,7 +1350,7 @@ theorem uslot_of_creds (R : IProp GF) :
   ihave Hret := uexecRet_of_all R sc' W' $$ Hpay' HR Hsup Hkc HIH Htriv
   imod Hret
   imodintro
-  iapply Hk $$ %W' %sc' %stv' %hperm %hszw %hfdw %hcww %hgnw %hchw %hpidw %hlzw
+  iapply Hk $$ %W' %sc' %stv' %hperm %hszw %hfdw %hcww %hgnw %hchw %hpidw %hlzw %hscw
   isplitl [Htm]
   · iexact Htm
   isplitl [Hfrag]

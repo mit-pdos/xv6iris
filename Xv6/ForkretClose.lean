@@ -111,7 +111,7 @@ theorem fkr_close [X : CurCtx] (UC : USERRET_CLOSED) (W : IProp GF) (Γ : SchedN
   have hrk' : parkRunKey Wk (fkrPrep Vx k.root c) Mx := by
     cases Wk with
     | none => trivial
-    | some W0 => exact urunEq_resume hrk hu rfl rfl rfl rfl rfl
+    | some W0 => exact urunEq_resume hrk hu rfl rfl rfl rfl rfl rfl
   iintro ⟨Hk, Hpc, Hsepc, ⟨%sc, Hsc⟩, ⟨%tv, Htv⟩, Hstv, Hcl, Hpv, Hfr, #Hglob, #HG, #Hdone, HW, Hsin, Hclose⟩
   icases ut_kctx_kptOnAt c _ (by simp only [KCtx.withRegs_tier, KCtx.intrOff_tier]; exact h.tier)
     $$ Hk with ⟨#Hkp, Hk⟩
@@ -148,7 +148,7 @@ theorem fkr_close [X : CurCtx] (UC : USERRET_CLOSED) (W : IProp GF) (Γ : SchedN
       unfold fkrSlotIn
       iapply (uslot_of_urunEq (hlc := hlc) (GF := GF) (SG := uexecSGXv6)
         (Wk := uvisOf Vx Mx sts gn cs N.pid) (sts := sts) (gn := gn) (cs := cs) (pidv := N.pid)
-        (urunEq_resume (urunEq_of Vx Mx sts gn cs N.pid) hu rfl rfl rfl rfl rfl) rfl rfl rfl rfl).1
+        (urunEq_resume (urunEq_of Vx Mx sts gn cs N.pid) hu rfl rfl rfl rfl rfl rfl) rfl rfl rfl rfl).1
       iexact Hsin
   have hsp6 : ((k.intrOff true false).withRegs R').sp + 8#64 * BitVec.ofNat 64 6 = ksp := by
     simp only [KCtx.sp, KCtx.withRegs_regs, hR.2, h.sp]; bv_omega

@@ -89,18 +89,25 @@ theorem urc_sysTf_arg (W : Uvis) (V : ProcPriv) (hl : V.tf.length = 36) (k : Nat
     tfUeq_arg k hk (urc_proTf_ueq V (tfResumeGpr0 W.tf) _ hl)]
   exact uvisRun_arg W k hk
 
-/-- The number `syscall()` dispatches on is the trapped key's. -/
-theorem urc_num (W : Uvis) (V : ProcPriv) (hl : V.tf.length = 36) :
-    syscNum (utSysRec (tfW W.tf tfEpcIdx) { V with tf := uservecTf V.tf (tfResumeGpr0 W.tf) }) =
+/-- The RAW number `syscall()` reads is the trapped key's. -/
+theorem urc_num_raw (W : Uvis) (V : ProcPriv) (hl : V.tf.length = 36) :
+    usysNum (utSysTf (tfW W.tf tfEpcIdx) { V with tf := uservecTf V.tf (tfResumeGpr0 W.tf) }) =
       usysNum W.tf :=
   usysNum_argCong _ _ (urc_sysTf_arg W V hl 7 (by decide))
+
+/-- The (effective) number `syscall()` dispatches on is the trapped key's, at
+the block's mask. -/
+theorem urc_num (W : Uvis) (V : ProcPriv) (hl : V.tf.length = 36) :
+    syscNum (utSysRec (tfW W.tf tfEpcIdx) { V with tf := uservecTf V.tf (tfResumeGpr0 W.tf) }) =
+      usysEff V.pvSecc W.tf :=
+  usysEff_numCong _ _ _ (urc_num_raw W V hl)
 
 /-- ...and the entry frame's (usertrap's `V.tf` rows). -/
 theorem urc_num_entry (W : Uvis) (V : ProcPriv) (hl : V.tf.length = 36) :
     usysNum (uservecTf V.tf (tfResumeGpr0 W.tf)) = usysNum W.tf := by
-  have h := urc_num W V hl
-  rw [utSysRec_num] at h
-  exact h
+  have h := urc_num_raw W V hl
+  unfold utSysTf at h
+  rwa [usysNum_epc] at h
 
 /-- The prologue's frame is the run projection's, up to the kernel words. -/
 theorem urc_proTf_run (W : Uvis) (V : ProcPriv) (hl : V.tf.length = 36) :
@@ -113,11 +120,11 @@ theorem urc_skey (W : Uvis) (V : ProcPriv) (Mp : Nat → List (BitVec 8)) (gn : 
     (cs : ExtTreeSet GName compare) (pid : BitVec 32) (hl : V.tf.length = 36)
     (hM : umemLazy V.upt V.sz.toNat Mp = W.M) (hpi : W.perm = permOf V.upt.um V.sz.toNat)
     (hsz : W.sz = V.sz.toNat) (hcw : W.cwd = V.cwi) (hgn : W.gen = gn) (hch : W.ch = cs)
-    (hpid : W.pid = pid) (hlz : W.lazy = V.pvLazy) :
+    (hpid : W.pid = pid) (hlz : W.lazy = V.pvLazy) (hsc : W.secc = V.pvSecc) :
     skeyEq W (uvisOf (utSysRec (tfW W.tf tfEpcIdx) { V with tf := uservecTf V.tf (tfResumeGpr0 W.tf) })
       Mp W.fd gn cs pid) := by
   refine ⟨hM.symm, (urc_sysTf_arg W V hl 0 (by decide)).symm, (urc_sysTf_arg W V hl 1 (by decide)).symm,
-    (urc_sysTf_arg W V hl 2 (by decide)).symm, rfl, hcw, hgn, hch, hpid, hpi, hsz, hlz⟩
+    (urc_sysTf_arg W V hl 2 (by decide)).symm, rfl, hcw, hgn, hch, hpid, hpi, hsz, hlz, hsc⟩
 
 /-- `syscall()`'s frame is the prologue's, bumped by 4 at the epc word. -/
 theorem urc_sysTf_bump (sep : BitVec 64) (V : ProcPriv) (r : BitVec 64) (hl : V.tf.length = 36) :
@@ -131,8 +138,8 @@ child slot at (`bumpAt W 0 …`), up to what a slot reads. -/
 theorem urc_child_ukey (W : Uvis) (V : ProcPriv) (Mp : Nat → List (BitVec 8)) (g' : GName) (pidc : BitVec 32)
     (hl : V.tf.length = 36) (hlw : W.tf.length = 36) (hM : umemLazy V.upt V.sz.toNat Mp = W.M)
     (hpi : W.perm = permOf V.upt.um V.sz.toNat) (hsz : W.sz = V.sz.toNat) (hcw : W.cwd = V.cwi)
-    (hlz : W.lazy = V.pvLazy) :
-    ukeyEq (bumpAt W 0#64 W.M W.perm W.sz W.fd W.cwd g' ∅ pidc W.lazy)
+    (hlz : W.lazy = V.pvLazy) (hsc : W.secc = V.pvSecc) :
+    ukeyEq (bumpAt W 0#64 W.M W.perm W.sz W.fd W.cwd g' ∅ pidc W.lazy W.secc)
       (uvisOf (syscForkChild (utSysRec (tfW W.tf tfEpcIdx)
         { V with tf := uservecTf V.tf (tfResumeGpr0 W.tf) })) Mp W.fd g' syscNoChildren pidc) := by
   have hlV : ({ V with tf := uservecTf V.tf (tfResumeGpr0 W.tf) } : ProcPriv).tf.length = 36 := by
@@ -144,7 +151,7 @@ theorem urc_child_ukey (W : Uvis) (V : ProcPriv) (Mp : Nat → List (BitVec 8)) 
     urc_sysTf_bump _ _ _ hlV
   have hlp : (utProTf (tfW W.tf tfEpcIdx) { V with tf := uservecTf V.tf (tfResumeGpr0 W.tf) }).length = 36 := by
     unfold utProTf; rw [List.length_set]; exact hlV
-  refine ⟨?_, ?_, hM.symm, hpi, hsz, rfl, hcw, rfl, rfl, rfl, hlz⟩
+  refine ⟨?_, ?_, hM.symm, hpi, hsz, rfl, hcw, rfl, rfl, rfl, hlz, hsc⟩
   · show tfResumeGpr0 (bumpTf W.tf 0#64) = tfResumeGpr0 (syscForkChild _).tf
     rw [hct, tfResumeGpr0_bump _ _ (by rw [hlw]; decide), tfResumeGpr0_bump _ _ (by rw [hlp]; decide),
       tfUeq_resumeGpr0 hu, uvisRun_gpr]
@@ -160,10 +167,11 @@ theorem urc_jump_retPc (v : BitVec 64) : v &&& 0xFFFFFFFFFFFFFFFE#64 = retPc v :
 
 /-! ## §2 The parked residue and the loop hypothesis -/
 
-/-- The pure facts the parked residue records (Rocq `Rut_at`'s five pins,
-and the context facts D27 moved into `KCtx`). -/
-structure UrcPins (j sz : Nat) (γfd : GName) (cw : Nat) (gn : GName) (lz : Bool) (k : KCtx)
-    (ksp : BitVec 64) (V : ProcPriv) : Prop where
+/-- The pure facts the parked residue records (Rocq `Rut_at`'s pins -- the
+mask the ninth, xv6 7b2c1b1b -- and the context facts D27 moved into
+`KCtx`). -/
+structure UrcPins (j sz : Nat) (γfd : GName) (cw : Nat) (gn : GName) (lz : Bool) (secc : BitVec 64)
+    (k : KCtx) (ksp : BitVec 64) (V : ProcPriv) : Prop where
   sie : k.sie = false
   tier : k.tier = KTier.kpt
   noff : k.noff = 0
@@ -174,6 +182,7 @@ structure UrcPins (j sz : Nat) (γfd : GName) (cw : Nat) (gn : GName) (lz : Bool
   cwi : V.cwi = cw
   gen : V.gen = gn
   lazy : V.pvLazy = lz
+  secc : V.pvSecc = secc
 
 section
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FdslotG GF] [BioslotG GF]
@@ -185,18 +194,18 @@ variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [Fdslot
 minus the descriptor fragments -- the context's remainder, the trapframe
 page and the residue's closer, at the pins. -/
 def urcRut (PT : SchedNames → IProp GF) (Γ : SchedNames) (j : Nat) (cpu : CPU) (sz : Nat) (γfd : GName)
-    (cw : Nat) (gn : GName) (cs : ExtTreeSet GName compare) (pid : BitVec 32) (lz : Bool) :
-    UPtd → IProp GF :=
-  fun p => iprop(∃ (k : KCtx) (ksp : BitVec 64) (V : ProcPriv), ⌜UrcPins j sz γfd cw gn lz k ksp V⌝ ∗
+    (cw : Nat) (gn : GName) (cs : ExtTreeSet GName compare) (pid : BitVec 32) (lz : Bool)
+    (secc : BitVec 64) : UPtd → IProp GF :=
+  fun p => iprop(∃ (k : KCtx) (ksp : BitVec 64) (V : ProcPriv), ⌜UrcPins j sz γfd cw gn lz secc k ksp V⌝ ∗
     userretLeft cpu k ∗ tfPageAt p.tfp V.tf ∗
     (∀ sts' : List FdState, fdFrags γfd sts' -∗ usertrapResAt (hlc := hlc) PT Γ j cpu p ksp V sts' cs pid))
 
 /-- **Rocq `Rut_at_acc`**: the running token, borrowed. -/
 theorem urcRut_acc (PT : SchedNames → IProp GF) (Γ : SchedNames) (j : Nat) (cpu : CPU) (sz : Nat)
     (γfd : GName) (cw : Nat) (gn : GName) (cs : ExtTreeSet GName compare) (pid : BitVec 32) (lz : Bool)
-    (p : UPtd) :
-    urcRut PT Γ j cpu sz γfd cw gn cs pid lz p ⊢
-      ctxToken cpu ∗ (ctxToken cpu -∗ urcRut PT Γ j cpu sz γfd cw gn cs pid lz p) := by
+    (secc : BitVec 64) (p : UPtd) :
+    urcRut PT Γ j cpu sz γfd cw gn cs pid lz secc p ⊢
+      ctxToken cpu ∗ (ctxToken cpu -∗ urcRut PT Γ j cpu sz γfd cw gn cs pid lz secc p) := by
   unfold urcRut userretLeft
   iintro ⟨%k, %ksp, %V, %hp, ⟨%hw, Hs, Hc, Ht, #Hk, #Hro⟩, Htf, Hcl⟩
   iframe Ht
@@ -212,10 +221,10 @@ table and key reading, the kernel obligation a slot's bundle carries,
 at the parked residue. -/
 def urcLoop (PT : SchedNames → IProp GF) (Γ : SchedNames) (j : Nat) : IProp GF :=
   iprop(□ ∀ (h : CPU) (C : UCfg) (pt : UPtd) (sz : Nat) (γfd : GName) (cw : Nat) (gn : GName)
-      (cs : ExtTreeSet GName compare) (pid : BitVec 32) (lz : Bool) (fdv : List FdState),
+      (cs : ExtTreeSet GName compare) (pid : BitVec 32) (lz : Bool) (secc : BitVec 64) (fdv : List FdState),
     ⌜loopOk C pt⌝ -∗ hwConfig h -∗
-    ukb (hlc := hlc) h C pt (fdFrags γfd) (urcRut PT Γ j h sz γfd cw gn cs pid lz) sz (permOf pt.um sz)
-      fdv cw gn cs pid lz)
+    ukb (hlc := hlc) h C pt (fdFrags γfd) (urcRut PT Γ j h sz γfd cw gn cs pid lz secc) sz (permOf pt.um sz)
+      fdv cw gn cs pid lz secc)
 
 instance urcLoop_persistent (PT : SchedNames → IProp GF) (Γ : SchedNames) (j : Nat) :
     Persistent (urcLoop (hlc := hlc) (GF := GF) PT Γ j) := by

@@ -84,19 +84,45 @@ theorem syscRows_keep (V : ProcPriv) (M : Nat → List (BitVec 8)) (sts : List F
     (cs : ExtTreeSet GName compare) (pid : BitVec 32) (r : BitVec 64) (n : Int)
     (hnum : syscNum V = n) (h1 : n ≠ 1) (h2 : n ≠ 2) (h3 : n ≠ 3) (h4 : n ≠ 4) (h5 : n ≠ 5)
     (h7 : n ≠ 7) (h8 : n ≠ 8) (h10 : n ≠ 10) (h12 : n ≠ 12) (h15 : n ≠ 15) (h21 : n ≠ 21)
-    (hl : tfArgIdx 0 < V.tf.length) (hpid : syscRetPid V r pid) :
+    (hl : tfArgIdx 0 < V.tf.length) (hpid : syscRetPid V r pid) (h23 : n ≠ 23 := by decide) :
     SyscRows V M (syscStore V r) M sts sts cs cs pid := by
   have hn : ∀ m : Int, n ≠ m → syscNum V ≠ m := fun m h => by rw [hnum]; exact h
   rw [← syscStore_a0 V r hl] at hpid
   refine ⟨?_, ?_, ?_, syscChOk_refl V cs, hn 2 h2, Or.inr ⟨r, rfl⟩,
     Or.inr (Or.inr (UMemL.extSz_refl _ _)), Or.inr (Or.inr rfl), Or.inr (Or.inr rfl), rfl, rfl, rfl,
-    rfl, Or.inr rfl, Or.inl (hn 12 h12), Or.inl (hn 1 h1), Or.inl (hn 5 h5), hpid, rfl⟩
+    rfl, Or.inr rfl, Or.inl (hn 12 h12), Or.inl (hn 1 h1), Or.inl (hn 5 h5), hpid, rfl,
+    usysSeccOk_refl _ _ _ _ (hn 23 h23)⟩
   · unfold syscMemOk
     rw [if_neg (hn USYS_exec h7), if_neg (hn USYS_sbrk h12), if_neg (hn USYS_wait h3),
       if_neg (hn USYS_pipe h4), if_neg (hn USYS_read h5), if_neg (hn USYS_fstat h8)]
     rfl
   · exact syscFdOk_refl_at V _ sts n hnum h21 h10 h15 h4
   · exact syscPipeOk_quiet V _ _ _ sts sts (hn 4 h4)
+
+/-- **The rows of sys_seccomp's arm** (xv6 7b2c1b1b; Rocq `sysc_arm_seccomp`):
+the block back with the mask ANDed with argument 0 and `a0 := 0`; every
+other row quiet, the mask row `usysSeccOk_seccomp`. -/
+theorem syscRows_secc (V : ProcPriv) (M : Nat → List (BitVec 8)) (sts : List FdState)
+    (cs : ExtTreeSet GName compare) (pid : BitVec 32) (r : BitVec 64)
+    (hnum : syscNum V = 23) (hl : tfArgIdx 0 < V.tf.length) (hr : r = 0#64) :
+    SyscRows V M (syscStore { V with pvSecc := V.pvSecc &&& tfW V.tf (tfArgIdx 0) } r) M sts sts cs cs
+      pid := by
+  have hn : ∀ m : Int, (23 : Int) ≠ m → syscNum V ≠ m := fun m h => by rw [hnum]; exact h
+  have ha0 : syscA0 (syscStore { V with pvSecc := V.pvSecc &&& tfW V.tf (tfArgIdx 0) } r) = r :=
+    syscStore_a0 { V with pvSecc := V.pvSecc &&& tfW V.tf (tfArgIdx 0) } r hl
+  refine ⟨?_, ?_, ?_, syscChOk_refl V cs, hn 2 (by decide), Or.inr ⟨r, rfl⟩,
+    Or.inr (Or.inr (UMemL.extSz_refl _ _)), Or.inr (Or.inr rfl), Or.inr (Or.inr rfl), rfl, rfl, rfl,
+    rfl, Or.inr rfl, Or.inl (hn 12 (by decide)), Or.inl (hn 1 (by decide)), Or.inl (hn 5 (by decide)),
+    syscRetPid_ne _ _ _ 23 hnum (by decide), rfl, ?_⟩
+  · unfold syscMemOk
+    rw [if_neg (hn USYS_exec (by decide)), if_neg (hn USYS_sbrk (by decide)),
+      if_neg (hn USYS_wait (by decide)), if_neg (hn USYS_pipe (by decide)),
+      if_neg (hn USYS_read (by decide)), if_neg (hn USYS_fstat (by decide))]
+    rfl
+  · exact syscFdOk_refl_at V _ sts 23 hnum (by decide) (by decide) (by decide) (by decide)
+  · exact syscPipeOk_quiet V _ _ _ sts sts (hn 4 (by decide))
+  · rw [hnum, ha0]
+    exact usysSeccOk_seccomp V.tf V.pvSecc r hr
 
 /-- The block's trapframe page, out for a store and back at any word list
 (the ambient-context form of `procPrivFd_tfUpd`; the tier is the kernel's). -/

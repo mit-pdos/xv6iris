@@ -467,6 +467,9 @@ import Xv6.LinkVirtioDiskRw
 import Xv6.SpecSysGetpid
 import Xv6.ProofSysGetpid
 import Xv6.LinkSysGetpid
+import Xv6.SpecSysSeccomp
+import Xv6.ProofSysSeccomp
+import Xv6.LinkSysSeccomp
 import Xv6.SpecSysUptime
 import Xv6.ProofSysUptime
 import Xv6.LinkSysUptime

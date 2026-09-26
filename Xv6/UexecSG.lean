@@ -57,7 +57,7 @@ set_option linter.unusedSectionVars false
 
 /-- **Rocq `skey_eq`**: a bundle for syscall `n` reads the image, argument
 words 0/1/2, the descriptor view, the working directory, the generation, the
-children, the pid, the permission map, the size and the lazy bit -- and
+children, the pid, the permission map, the size, the lazy bit and the mask -- and
 nothing else off the key.  None of them moves under the epc bump. -/
 def skeyEq (W W' : Uvis) : Prop :=
   W.M = W'.M ∧
@@ -65,17 +65,17 @@ def skeyEq (W W' : Uvis) : Prop :=
   tfW W.tf (tfArgIdx 1) = tfW W'.tf (tfArgIdx 1) ∧
   tfW W.tf (tfArgIdx 2) = tfW W'.tf (tfArgIdx 2) ∧
   W.fd = W'.fd ∧ W.cwd = W'.cwd ∧ W.gen = W'.gen ∧ W.ch = W'.ch ∧ W.pid = W'.pid ∧
-  W.perm = W'.perm ∧ W.sz = W'.sz ∧ W.lazy = W'.lazy
+  W.perm = W'.perm ∧ W.sz = W'.sz ∧ W.lazy = W'.lazy ∧ W.secc = W'.secc
 
 /-- Rocq `skey_eq_refl`. -/
 theorem skeyEq_refl (W : Uvis) : skeyEq W W :=
-  ⟨rfl, rfl, rfl, rfl, rfl, rfl, rfl, rfl, rfl, rfl, rfl, rfl⟩
+  ⟨rfl, rfl, rfl, rfl, rfl, rfl, rfl, rfl, rfl, rfl, rfl, rfl, rfl⟩
 
 /-- Rocq `skey_eq_sym`. -/
 theorem skeyEq_symm {W W' : Uvis} (h : skeyEq W W') : skeyEq W' W := by
-  obtain ⟨hM, h0, h1, h2, hfd, hcw, hg, hch, hpid, hpi, hsz, hlz⟩ := h
+  obtain ⟨hM, h0, h1, h2, hfd, hcw, hg, hch, hpid, hpi, hsz, hlz, hsc⟩ := h
   exact ⟨hM.symm, h0.symm, h1.symm, h2.symm, hfd.symm, hcw.symm, hg.symm, hch.symm, hpid.symm,
-    hpi.symm, hsz.symm, hlz.symm⟩
+    hpi.symm, hsz.symm, hlz.symm, hsc.symm⟩
 
 /-! ## The class -/
 

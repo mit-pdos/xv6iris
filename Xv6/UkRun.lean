@@ -141,7 +141,7 @@ def udepw (N : UkNames GF) (m : RegMap) (pc : BitVec 64) (n : Int) : IProp GF :=
     myPay gn N.pay -∗ uheap N.t N.d N.s M pm sz -∗ ufdAuth N.fd fdv -∗
     uheap N.t N.d N.s M pm sz ∗ ufdAuth N.fd fdv ∗
       (⌜UprogSG.psok (GF := GF) n ∧ n ≠ USYS_exec⌝ ∨
-        sbundlePay (uslot (hlc := hlc)) n N.pay (uvisOfRun m pc M pm sz fdv cw gn cs pidv false)))
+        sbundlePay (uslot (hlc := hlc)) n N.pay (uvisOfRun m pc M pm sz fdv cw gn cs pidv false seccAll)))
 
 /-- **Rocq `udepwf`**: the FAMILY-NAMED explicit deposit. -/
 def udepwf (N : UkNames GF) (m : RegMap) (pc : BitVec 64) (n : Int) (fdep : UexecSG.sfam GF) : IProp GF :=
@@ -150,7 +150,7 @@ def udepwf (N : UkNames GF) (m : RegMap) (pc : BitVec 64) (n : Int) (fdep : Uexe
       (cs : ExtTreeSet GName compare) (pidv : BitVec 32),
     myPay gn N.pay -∗ uheap N.t N.d N.s M pm sz -∗ ufdAuth N.fd fdv -∗
     uheap N.t N.d N.s M pm sz ∗ ufdAuth N.fd fdv ∗
-      UexecSG.sbundleAt (uslot (hlc := hlc)) n fdep (uvisOfRun m pc M pm sz fdv cw gn cs pidv false))
+      UexecSG.sbundleAt (uslot (hlc := hlc)) n fdep (uvisOfRun m pc M pm sz fdv cw gn cs pidv false seccAll))
 
 /-- Rocq `udepwf_udepw`: the forgetful direction. -/
 theorem udepwf_udepw (N : UkNames GF) (m : RegMap) (pc : BitVec 64) (n : Int) (fdep : UexecSG.sfam GF) :
@@ -204,7 +204,7 @@ theorem udepw_mint (N : UkNames GF) (m : RegMap) (pc : BitVec 64) (n : Int) (M :
     ⊢ udep (hlc := hlc) (GF := GF) -∗ myPay gn N.pay -∗ udepw N m pc n -∗
       uheap N.t N.d N.s M pm sz -∗ ufdAuth N.fd fdv ==∗
       uheap N.t N.d N.s M pm sz ∗ ufdAuth N.fd fdv ∗
-        sbundlePay uslot n N.pay (uvisOfRun m pc M pm sz fdv cw gn cs pidv false) := by
+        sbundlePay uslot n N.pay (uvisOfRun m pc M pm sz fdv cw gn cs pidv false seccAll) := by
   unfold udepw
   iintro #Hdep #Hmp Hsb Hh Hf
   icases Hsb $$ %M %pm %sz %fdv %cw %gn %cs %pidv Hmp Hh Hf with ⟨Hh, Hf, Hd⟩
@@ -262,7 +262,7 @@ def udepwAt (N : UkNames GF) (m : RegMap) (pc : BitVec 64) (n : Int) (c : Nat) :
     myPay gn N.pay -∗ uheap N.t N.d N.s M pm sz -∗ ufdAuth N.fd fdv -∗
     uheap N.t N.d N.s M pm sz ∗ ufdAuth N.fd fdv ∗
       (⌜UprogSG.psok (GF := GF) n ∧ n ≠ USYS_exec⌝ ∨
-        sbundlePay (uslot (hlc := hlc)) n N.pay (uvisOfRun m pc M pm sz fdv c gn cs pidv false)))
+        sbundlePay (uslot (hlc := hlc)) n N.pay (uvisOfRun m pc M pm sz fdv c gn cs pidv false seccAll)))
 
 /-- Rocq `udepw_at_of_udepw`. -/
 theorem udepwAt_of_udepw (N : UkNames GF) (m : RegMap) (pc : BitVec 64) (n : Int) (c : Nat) :
@@ -276,7 +276,7 @@ theorem udepwAt_of_bundle (N : UkNames GF) (m : RegMap) (pc : BitVec 64) (n : In
     (hne : n ≠ USYS_read) (hnx : n ≠ USYS_exec) :
     ⊢ (∀ (M : ElfMem) (pm : Nat → Option UPerm) (sz : Nat) (fdv : List FdState) (gn : GName)
         (cs : ExtTreeSet GName compare) (pidv : BitVec 32),
-        sbundle (uslot (hlc := hlc)) n (uvisOfRun m pc M pm sz fdv c gn cs pidv false)) -∗
+        sbundle (uslot (hlc := hlc)) n (uvisOfRun m pc M pm sz fdv c gn cs pidv false seccAll)) -∗
       udepwAt N m pc n c := by
   unfold udepwAt
   iintro Hb %M %pm %sz %fdv %gn %cs %pidv _ Hh Hf
@@ -311,7 +311,7 @@ theorem udepwAt_mint (N : UkNames GF) (m : RegMap) (pc : BitVec 64) (n : Int) (c
     ⊢ udep (hlc := hlc) (GF := GF) -∗ myPay gn N.pay -∗ udepwAt N m pc n c -∗
       uheap N.t N.d N.s M pm sz -∗ ufdAuth N.fd fdv ==∗
       uheap N.t N.d N.s M pm sz ∗ ufdAuth N.fd fdv ∗
-        sbundlePay uslot n N.pay (uvisOfRun m pc M pm sz fdv c gn cs pidv false) := by
+        sbundlePay uslot n N.pay (uvisOfRun m pc M pm sz fdv c gn cs pidv false seccAll) := by
   unfold udepwAt
   iintro #Hdep #Hmp Hsb Hh Hf
   icases Hsb $$ %M %pm %sz %fdv %gn %cs %pidv Hmp Hh Hf with ⟨Hh, Hf, Hd⟩
@@ -326,7 +326,7 @@ def udepwAtRef (N : UkNames GF) (m : RegMap) (pc : BitVec 64) (c : Nat) : IProp 
       (cs : ExtTreeSet GName compare) (pidv : BitVec 32),
     myPay gn N.pay -∗ uheap N.t N.d N.s M pm sz -∗ ufdAuth N.fd fdv -∗
     uheap N.t N.d N.s M pm sz ∗ ufdAuth N.fd fdv ∗
-      sbundlePayRef (uslot (hlc := hlc)) N.pay (uvisOfRun m pc M pm sz fdv c gn cs pidv false))
+      sbundlePayRef (uslot (hlc := hlc)) N.pay (uvisOfRun m pc M pm sz fdv c gn cs pidv false seccAll))
 
 /-- Rocq `udepw_at_of_ref`. -/
 theorem udepwAt_of_ref (N : UkNames GF) (m : RegMap) (pc : BitVec 64) (c : Nat) :
@@ -344,7 +344,7 @@ theorem udepwAtRef_of_uxsup (N : UkNames GF) [ht : UknTriv N] (m : RegMap) (pc :
   unfold uxsup uxsupAt udepwAtRef
   iintro #Hx %M %pm %sz %fdv %gn %cs %pidv _ Hh Hf
   iframe Hh Hf
-  ihave Hb := Hx $$ %(uvisOfRun m pc M pm sz fdv c gn cs pidv false)
+  ihave Hb := Hx $$ %(uvisOfRun m pc M pm sz fdv c gn cs pidv false seccAll)
   unfold sbundlePay sbundlePayRef
   icases Hb with ⟨%f, %hpay, Hb⟩
   iexists f
@@ -363,7 +363,7 @@ def udepwfAt (N : UkNames GF) (m : RegMap) (pc : BitVec 64) (n : Int) (fdep : Ue
       (cs : ExtTreeSet GName compare) (pidv : BitVec 32),
     myPay gn N.pay -∗ uheap N.t N.d N.s M pm sz -∗ ufdAuth N.fd fdv -∗
     uheap N.t N.d N.s M pm sz ∗ ufdAuth N.fd fdv ∗
-      UexecSG.sbundleAt (uslot (hlc := hlc)) n fdep (uvisOfRun m pc M pm sz fdv c gn cs pidv false))
+      UexecSG.sbundleAt (uslot (hlc := hlc)) n fdep (uvisOfRun m pc M pm sz fdv c gn cs pidv false seccAll))
 
 /-- Rocq `udepwf_at_of_udepwf`. -/
 theorem udepwfAt_of_udepwf (N : UkNames GF) (m : RegMap) (pc : BitVec 64) (n : Int) (fdep : UexecSG.sfam GF)
@@ -429,7 +429,7 @@ def urun (N : UkNames GF) (h : CPU) (m : RegMap) (pc : BitVec 64) (avail : Nat) 
     ⌜m 0#5 = 0#64⌝ ∗
     uheap N.t N.d N.s M pm sz ∗ ustack N.d (m.get spIdx) avail ∗ ufdAuth N.fd fdv ∗ ucwdAuth N.cwd cw ∗
     urunIds N cs pidv ∗ myPay gn N.pay ∗ udep (hlc := hlc) ∗
-    @uvb hlc GF _ _ _ xi h C pt Rfd Rut sz pm fdv cw gn cs pidv false M m pc)
+    @uvb hlc GF _ _ _ xi h C pt Rfd Rut sz pm fdv cw gn cs pidv false seccAll M m pc)
 
 /-- Rocq `ucwd_auth_quiet`. -/
 theorem ucwdAuth_quiet (N : UkNames GF) (cw cw' : Nat) (h : cw' = cw) :
@@ -531,8 +531,8 @@ theorem urun_gen (N : UkNames GF) (T : IProp GF) (h : CPU) (m : RegMap) (pc : Bi
   unfold urun
   icases Hrun with ⟨%xi, %C, %pt, %Rfd, %Rut, %sz, %M, %pm, %fdv, %cw, %gn, %cs, %pidv, %hlo, %hpm, %hlzf,
     %hRut, %h0, -, -, -, -, -, #Hmy, -, Hb⟩
-  have egen : (uvisOfRun m pc M pm sz fdv cw gn cs pidv false).gen = gn := rfl
-  ihave Hslot := Hgen $$ %(uvisOfRun m pc M pm sz fdv cw gn cs pidv false) HT [Hmy]
+  have egen : (uvisOfRun m pc M pm sz fdv cw gn cs pidv false seccAll).gen = gn := rfl
+  ihave Hslot := Hgen $$ %(uvisOfRun m pc M pm sz fdv cw gn cs pidv false seccAll) HT [Hmy]
   · rw [egen]; iexact Hmy
   ihave Hk := (uslot_run m pc M pm sz fdv cw gn cs pidv h0 hal).1 $$ Hslot
   unfold ukc
@@ -596,9 +596,9 @@ variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CtokG GF] [SG : 
 /-- The bundle's image is below MAXVA. -/
 theorem uvb_img_bound [xi : CurCtx] (cpu : CPU) (C : UCfg) (pt : UPtd) (Rfd : List FdState → IProp GF)
     (Rut : UPtd → IProp GF) (sz : Nat) (π : Nat → Option UPerm) (fdv : List FdState) (cw : Nat) (g : GName)
-    (cs : ExtTreeSet GName compare) (pidv : BitVec 32) (lz : Bool) (M : ElfMem) (m : RegMap) (pc : BitVec 64)
-    (hwf : uptWf pt) :
-    ⊢ uvb cpu C pt Rfd Rut sz π fdv cw g cs pidv lz M m pc -∗ ⌜uszOk sz ∧ ∀ a, (M a).isSome → a < uCap⌝ := by
+    (cs : ExtTreeSet GName compare) (pidv : BitVec 32) (lz : Bool) (secc : BitVec 64) (M : ElfMem) (m : RegMap)
+    (pc : BitVec 64) (hwf : uptWf pt) :
+    ⊢ uvb cpu C pt Rfd Rut sz π fdv cw g cs pidv lz secc M m pc -∗ ⌜uszOk sz ∧ ∀ a, (M a).isSome → a < uCap⌝ := by
   unfold uvb uvbF userPtmInvX userPtmInv
   iintro ⟨-, -, %hsz, ⟨%Mp, -, %hM⟩, -⟩
   ipureintro
@@ -618,7 +618,7 @@ theorem uslot_of_urun_all (W : Uvis) (avail : Nat) (Q : Int → IProp GF)
     (hstk : ∀ j, j < 8 * avail →
       (get? (udataLo W.M W.perm W.sz) ((ukeySp W).toNat - 8 * avail + j)).isSome)
     (hfdlen : W.fd.length = NOFILE) (hstop : ∀ p q, W.perm p = some q → p * 4096 < pgRoundUpN W.sz)
-    (hlz : W.lazy = false) :
+    (hlz : W.lazy = false) (hsc : W.secc = seccAll) :
     ⊢ udep (hlc := hlc) (GF := GF) -∗ myPay W.gen Q -∗
       (∀ (N : UkNames GF) (h : CPU), ⌜N.pay = Q⌝ -∗ ⌜uszOk W.sz⌝ -∗ usz N.s W.sz -∗
         utextAll N.t W.M W.perm -∗ ustd N.fd (W.fd.take NSTD) -∗ ucwd N.cwd W.cwd -∗ uch N.ch W.ch -∗
@@ -632,11 +632,11 @@ theorem uslot_of_urun_all (W : Uvis) (avail : Nat) (Q : Int → IProp GF)
   iintro #Hdep #Hpay Hprog
   iapply (uslot_ukc W).2
   unfold ukc
-  rw [hlz]
+  rw [hlz, hsc]
   iintro %h %xi %C %pt %Rfd %Rut %hRut %hlo %hpm %hlzf Hb
   have hwf : uptWf pt := hlo.2.2.2.2
   ihave %hbd := uvb_img_bound (xi := xi) h C pt Rfd Rut W.sz W.perm W.fd W.cwd W.gen W.ch W.pid false
-    W.M (tfResumeGpr0 W.tf) (tfResumePc W.tf) hwf $$ Hb
+    seccAll W.M (tfResumeGpr0 W.tf) (tfResumePc W.tf) hwf $$ Hb
   obtain ⟨hsz, hcan⟩ := hbd
   iapply wpLoop_bupd
   imod uheap_alloc (GF := GF) W.M W.perm W.sz hcan hstop with ⟨%γt, %γd, %γs, Hheap, Hszf, Ht, Hd⟩
@@ -703,7 +703,7 @@ theorem uslot_of_urun (W : Uvis) (avail : Nat) (Q : Int → IProp GF)
     (hstk : ∀ j, j < 8 * avail →
       (get? (udataLo W.M W.perm W.sz) ((ukeySp W).toNat - 8 * avail + j)).isSome)
     (hfdlen : W.fd.length = NOFILE) (hstop : ∀ p q, W.perm p = some q → p * 4096 < pgRoundUpN W.sz)
-    (hlz : W.lazy = false) :
+    (hlz : W.lazy = false) (hsc : W.secc = seccAll) :
     ⊢ udep (hlc := hlc) (GF := GF) -∗ myPay W.gen Q -∗
       (∀ (N : UkNames GF) (h : CPU), ⌜N.pay = Q⌝ -∗ ⌜uszOk W.sz⌝ -∗ usz N.s W.sz -∗
         utextAll N.t W.M W.perm -∗ ustd N.fd (W.fd.take NSTD) -∗ ucwd N.cwd W.cwd -∗ uch N.ch W.ch -∗
@@ -711,7 +711,7 @@ theorem uslot_of_urun (W : Uvis) (avail : Nat) (Q : Int → IProp GF)
         urun (hlc := hlc) N h (tfResumeGpr0 W.tf) (tfResumePc W.tf) avail -∗ wpLoop h) -∗
       uslot (hlc := hlc) W := by
   iintro #Hdep #Hpay Hprog
-  iapply uslot_of_urun_all W avail Q hal8 hroom hstk hfdlen hstop hlz $$ Hdep Hpay
+  iapply uslot_of_urun_all W avail Q hal8 hroom hstk hfdlen hstop hlz hsc $$ Hdep Hpay
   iintro %N %h %hq %hs Hs Ht Hstd Hc Hch Hp _ _ Hrun
   iapply Hprog $$ %N %h %hq %hs Hs Ht Hstd Hc Hch Hp Hrun
 
@@ -723,7 +723,7 @@ theorem uslot_of_urun_ro (W : Uvis) (avail : Nat) (Q : Int → IProp GF)
     (hstk : ∀ j, j < 8 * avail →
       (get? (udataLo W.M W.perm W.sz) ((ukeySp W).toNat - 8 * avail + j)).isSome)
     (hfdlen : W.fd.length = NOFILE) (hstop : ∀ p q, W.perm p = some q → p * 4096 < pgRoundUpN W.sz)
-    (hlz : W.lazy = false) :
+    (hlz : W.lazy = false) (hsc : W.secc = seccAll) :
     ⊢ udep (hlc := hlc) (GF := GF) -∗ myPay W.gen Q -∗
       (∀ (N : UkNames GF) (h : CPU), ⌜N.pay = Q⌝ -∗ ⌜uszOk W.sz⌝ -∗ usz N.s W.sz -∗
         utextAll N.t W.M W.perm -∗ ustd N.fd (W.fd.take NSTD) -∗ ucwd N.cwd W.cwd -∗ uch N.ch W.ch -∗
@@ -733,7 +733,7 @@ theorem uslot_of_urun_ro (W : Uvis) (avail : Nat) (Q : Int → IProp GF)
         urun (hlc := hlc) N h (tfResumeGpr0 W.tf) (tfResumePc W.tf) avail -∗ wpLoop h) -∗
       uslot (hlc := hlc) W := by
   iintro #Hdep #Hpay Hprog
-  iapply uslot_of_urun_all W avail Q hal8 hroom hstk hfdlen hstop hlz $$ Hdep Hpay
+  iapply uslot_of_urun_all W avail Q hal8 hroom hstk hfdlen hstop hlz hsc $$ Hdep Hpay
   iintro %N %h %hq %hs Hs Ht Hstd Hc Hch Hp _ Dtop Hrun
   iapply wpLoop_bupd
   imod uarea_persist N.d _ $$ Dtop with Dtop

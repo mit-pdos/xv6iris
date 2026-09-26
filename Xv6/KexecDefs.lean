@@ -281,7 +281,11 @@ def kexecOk (V V' : ProcPriv) (r entry spv szv' : BitVec 64) (na : Nat) (alen : 
    V'.pvLazy = false ∧
    -- deviation 4 (Lean-only fields, flagged): exec writes neither.
    V'.kstack = V.kstack ∧
-   V'.context = V.context)
+   V'.context = V.context ∧
+   -- ...AND THE MASK IS KEPT (xv6 7b2c1b1b; Rocq `kexec_ok`'s last row): exec
+   -- does not touch `p->seccomp`, so a masked process stays masked across
+   -- exec, which is the whole point of the mask.
+   V'.pvSecc = V.pvSecc)
 
 /-! ## THE FILE SYSTEM FABRIC, as one bundle
 

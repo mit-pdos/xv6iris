@@ -113,7 +113,8 @@ def kexecOkWin (V V' : ProcPriv) (r entry spv szv' : BitVec 64) (na : Nat) (alen
   spv.toNat ≤ szv'.toNat ∧
   V'.pvLazy = false ∧
   V'.kstack = V.kstack ∧
-  V'.context = V.context
+  V'.context = V.context ∧
+  V'.pvSecc = V.pvSecc
 
 /-- The landed relation IS `fail ∨ win` (definitional). -/
 theorem kexecOk_iff (V V' : ProcPriv) (r entry spv szv' : BitVec 64) (na : Nat) (alen : Nat → Nat) :

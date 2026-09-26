@@ -440,6 +440,71 @@ theorem syscall_arm_sync
   · iapply syscForkOut_ne; rw [hnN]; decide
   · iapply syscWaitOut_ne; rw [hnN]; decide
 
+
+set_option maxHeartbeats 4000000 in
+/-- **Arm 23, `sys_seccomp`** (xv6 7b2c1b1b; Rocq `sysc_arm_seccomp`): the
+block back with the mask ANDed with argument 0, `a0 := 0`
+(`SyscallRet.syscRows_secc`). -/
+theorem syscall_arm_seccomp
+    (SSC : SYSSECCOMP)
+    (PT : SchedNames → IProp GF) [hPT : ∀ Γ, Persistent (PT Γ)] (Γ : SchedNames)
+    [ClaimIs (hlc := hlc) GF Γ]
+    (c0 cpu : CPU) (k : KCtx) (spie spp : Bool) (R : RegMap) (γw : GName) (γ : FileNames) (j : Nat)
+    (pid : BitVec 32) (V : ProcPriv) (M : Nat → List (BitVec 8)) (sts : List FdState) (gn : GName)
+    (cs : ExtTreeSet GName compare) (ip : BitVec 64) (f : UexecSG.sfam GF)
+    (hE : SyscSpostEmp (GF := GF))
+    (hj : j < NPROC) (hproc : k.proc = procAddr j) (hK : syscallSlots ≤ k.avail)
+    (hnoff : k.noff = 0) (htier : k.tier = KTier.kpt) (hgn : gn = V.gen)
+    (hnum : syscNum V = ((23 : Nat) : Int)) (hpins : syscPins k R) (hs1 : R 9#5 = procAddr j)
+    (hs2 : R 18#5 = pageAddr V.upt.tfp) (hra : R 1#5 = syscallRet) :
+    syscArmBody 23 PT Γ c0 cpu k spie spp R γw γ j pid V M sts gn cs ip f hE hj hproc hK hnoff htier hgn
+      hnum hpins hs1 hs2 hra := by
+  unfold syscArmBody
+  iintro ⟨Hk, Hpc, Hframe, #Hpi, Hte, Hce, #Hwl, Hbs, Hip, Hfd, Hir, #Henv, Hpriv, Hfr, Hch, HsIn, -, -, Hslot⟩
+  icases Hslot with ⟨Hnext, -⟩
+  icases kctx_tier _ _ $$ Hk with ⟨%hti, Hk⟩
+  have hww : ∀ (K : KCtx) (a b c d : Bool), (K.withSpie a b).withSpie c d = K.withSpie c d :=
+    fun _ _ _ _ _ => rfl
+  have hpsw : ∀ (K : KCtx) (m : Nat) (a b : Bool),
+      (K.pushed m).withSpie a b = (K.withSpie a b).pushed m := fun _ _ _ _ => rfl
+  have hnN : syscNum V = (23 : Int) := hnum
+  have hct : curTier = KTier.kpt := by rw [← hti]; exact htier
+  have hprocK : (((k.withSpie spie spp).pushed 4).withRegs R).proc = procAddr j := hproc
+  have hnoffK : (((k.withSpie spie spp).pushed 4).withRegs R).noff = 0 := hnoff
+  icases syscall_tf_len hct γ (procAddr j) pid V M $$ Hpriv with ⟨%hl, Hpriv⟩
+  have hv : V.tf[tfArgIdx 0]? = some (tfW V.tf (tfArgIdx 0)) := by
+    unfold tfW
+    rw [List.getD_eq_getElem?_getD, List.getElem?_eq_getElem (by rw [hl]; decide)]
+    rfl
+  have hU := SSC.wp_sys_seccomp (hlc := hlc) (GF := GF) cpu (((k.withSpie spie spp).pushed 4).withRegs R)
+    γ (procAddr j) pid V M (tfW V.tf (tfArgIdx 0)) hprocK (by k_norm_g; exact htier) hv
+    (by rw [hnoffK]; decide)
+    (by k_norm_g; have : sysSeccompSlots + 4 ≤ syscallSlots := by decide
+        omega)
+  unfold wp_sys_seccomp_body at hU
+  rw [syscTarget_seccomp]
+  iapply hU
+  iframe Hk Hpriv Hpc
+  k_next_e
+  iintro %spie2 %spp2 %R2 %- Hk Hpc %⟨hcs, ha0⟩ Hpriv
+  k_norm_g [hra, syscallRet_jumpPc, hww, hpsw]
+  k_norm_g at hcs
+  have hpins2 := syscPins_calleeSaved k R R2 hpins hcs
+  have hs2' : R2 18#5 = pageAddr ({ V with pvSecc := V.pvSecc &&& tfW V.tf (tfArgIdx 0) } : ProcPriv).upt.tfp :=
+    hcs.2.2.2.1.trans hs2
+  have hrows := syscRows_secc V M sts cs pid (R2 10#5) hnN (by rw [hl]; decide) ha0
+  unfold syscallRet syscallAddr at *
+  iapply (syscall_ret_tail PT Γ c0 cpu k spie2 spp2 R2 γ j pid V M sts gn cs ip f
+    { V with pvSecc := V.pvSecc &&& tfW V.tf (tfArgIdx 0) } M sts cs hj hproc hK htier hpins2 hs2' hrows)
+  iframe Hk Hpc Hframe Hte Hce Hbs Hip Hfd Hir Henv Hpriv Hfr Hch Hnext
+  isplitr
+  · iapply syscExecOut_ne; rw [hnN]; decide
+  isplitr
+  · iapply syscSysOut_quiet f V M sts hE gn cs pid _ _ sts _ cs 23 hnN (by decide)
+  isplitr
+  · iapply syscForkOut_ne; rw [hnN]; decide
+  · iapply syscWaitOut_ne; rw [hnN]; decide
+
 end
 
 end Xv6

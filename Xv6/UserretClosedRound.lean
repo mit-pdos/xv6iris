@@ -63,9 +63,9 @@ variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [Fdslot
 /-- The parked residue, opened. -/
 theorem urcRut_open (PT : SchedNames → IProp GF) (Γ : SchedNames) (j : Nat) (cpu : CPU) (sz : Nat)
     (γfd : GName) (cw : Nat) (gn : GName) (cs : ExtTreeSet GName compare) (pid : BitVec 32) (lz : Bool)
-    (p : UPtd) :
-    urcRut (hlc := hlc) PT Γ j cpu sz γfd cw gn cs pid lz p ⊢
-      ∃ (k : KCtx) (ksp : BitVec 64) (V : ProcPriv), ⌜UrcPins j sz γfd cw gn lz k ksp V⌝ ∗
+    (secc : BitVec 64) (p : UPtd) :
+    urcRut (hlc := hlc) PT Γ j cpu sz γfd cw gn cs pid lz secc p ⊢
+      ∃ (k : KCtx) (ksp : BitVec 64) (V : ProcPriv), ⌜UrcPins j sz γfd cw gn lz secc k ksp V⌝ ∗
         userretLeft cpu k ∗ tfPageAt p.tfp V.tf ∗
         (∀ sts' : List FdState, fdFrags γfd sts' -∗ usertrapResAt (hlc := hlc) PT Γ j cpu p ksp V sts' cs pid) :=
   .rfl
@@ -90,7 +90,7 @@ theorem urc_exit (UR : USERRET) (PT : SchedNames → IProp GF) (Γ : SchedNames)
     (hl : V.tf.length = 36) (hlw : W.tf.length = 36)
     (hM : umemLazy V.upt V.sz.toNat Mp = W.M) (hpi : W.perm = permOf V.upt.um V.sz.toNat)
     (hsz : W.sz = V.sz.toNat) (hcw : W.cwd = V.cwi) (hgn : W.gen = gn) (hch : W.ch = cs)
-    (hpid : W.pid = pid) (hlz : W.lazy = V.pvLazy) (hVgn : V.gen = gn)
+    (hpid : W.pid = pid) (hlz : W.lazy = V.pvLazy) (hsc : W.secc = V.pvSecc) (hVgn : V.gen = gn)
     (hproc : k.proc = procAddr j) (hsie : k.sie = false) (htier : k.tier = KTier.kpt) (hnoff : k.noff = 0)
     (hsp : (uservecCtx k (tfResumeGpr0 W.tf) V.tf).sp = ksp) (hav : k.avail = 512) :
     wireInv ∗ kmapAt trampVpn (kLeaf trampPpn .rx 0#1 0#1) ∗ ▷ urcLoop (hlc := hlc) PT Γ j ∗
@@ -103,7 +103,7 @@ theorem urc_exit (UR : USERRET) (PT : SchedNames → IProp GF) (Γ : SchedNames)
     %hfdk %hchk %hgk %hfde %hpipe %hrp %hpc' %hlive Hk Hpc Hsep ⟨%sc2, Hsc⟩ ⟨%tv2, Hstv⟩ Hstvec Hppt Htf Hres
     Hxo Hfo Hwo Hko Hso
   -- steps A/B: the next slot
-  ihave Hslot := urc_post W V Mp gn cs pid sc f V' M' sts' cs' hl hlw hM hpi hsz hcw hgn hch hpid hlz hround
+  ihave Hslot := urc_post W V Mp gn cs pid sc f V' M' sts' cs' hl hlw hM hpi hsz hcw hgn hch hpid hlz hsc hround
     hfdk hchk hfde hpipe hrp hlive $$ [Hxo Hfo Hwo Hko Hso Harm]
   · iframe Hxo Hfo Hwo Hko Hso Harm
   -- the resume, at usertrap's exit
@@ -138,17 +138,18 @@ theorem urc_round (UT : USERTRAP) (UV : USERVEC) (UR : USERRET)
     (PT : SchedNames → IProp GF) [∀ Γ, Persistent (PT Γ)] (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
     (hPT0 : PT = parkToken (hlc := hlc) (GF := GF) (SG := uexecSGXv6))
     (j : Nat) (hj : j < NPROC) (h : CPU) (C : UCfg) (pt : UPtd) (sz : Nat) (γfd : GName) (cw : Nat)
-    (gn : GName) (cs : ExtTreeSet GName compare) (pid : BitVec 32) (lz : Bool) (fdv : List FdState)
-    (hlo : loopOk C pt) :
+    (gn : GName) (cs : ExtTreeSet GName compare) (pid : BitVec 32) (lz : Bool) (secc : BitVec 64)
+    (fdv : List FdState) (hlo : loopOk C pt) :
     (wireInv ∗ kmapAt trampVpn (kLeaf trampPpn .rx 0#1 0#1) ∗ ▷ urcLoop (hlc := hlc) PT Γ j) ∗ hwConfig h ⊢
-      ukb (hlc := hlc) h C pt (fdFrags γfd) (urcRut PT Γ j h sz γfd cw gn cs pid lz) sz (permOf pt.um sz)
-        fdv cw gn cs pid lz := by
+      ukb (hlc := hlc) h C pt (fdFrags γfd) (urcRut PT Γ j h sz γfd cw gn cs pid lz secc) sz (permOf pt.um sz)
+        fdv cw gn cs pid lz secc := by
   unfold ukb ukbF trappedMachine
-  iintro ⟨⟨#Hwire, #Hcl, #Hloop⟩, #Hhw⟩ %W %sc %stv %hpe %hsz %hfd %hcw %hgn %hch %hpid %hlz ⟨⟨%ms, %hlw, Htm⟩, Hfrag, Hret⟩
+  iintro ⟨⟨#Hwire, #Hcl, #Hloop⟩, #Hhw⟩ %W %sc %stv %hpe %hsz %hfd %hcw %hgn %hch %hpid %hlz %hsc
+    ⟨⟨%ms, %hlw, Htm⟩, Hfrag, Hret⟩
   -- the frame, its residue out
   icases urc_frame_rut h C pt _ sz W.M ms sc stv (tfW W.tf tfEpcIdx) (tfResumeGpr0 W.tf) $$ Htm with ⟨Hfr, Hrut⟩
-  icases urcRut_open PT Γ j h sz γfd cw gn cs pid lz pt $$ Hrut with ⟨%k, %ksp, %V, %hp, Hleft, Htf, Hclose⟩
-  obtain ⟨hsie, htier, hnoff, hproc, ⟨hksp, hkav⟩, hVsz, hVfdg, hVcwi, hVgen, hVlz⟩ := hp
+  icases urcRut_open PT Γ j h sz γfd cw gn cs pid lz secc pt $$ Hrut with ⟨%k, %ksp, %V, %hp, Hleft, Htf, Hclose⟩
+  obtain ⟨hsie, htier, hnoff, hproc, ⟨hksp, hkav⟩, hVsz, hVfdg, hVcwi, hVgen, hVlz, hVsc⟩ := hp
   -- the residue, at the view the process handed back
   ihave Hres := Hclose $$ %W.fd Hfrag
   icases urc_tfPage_len pt.tfp V.tf $$ Htf with ⟨Htf, %hl⟩
@@ -175,7 +176,7 @@ theorem urc_round (UT : USERTRAP) (UV : USERVEC) (UR : USERRET)
   have hM' : umemLazy V.upt V.sz.toNat Mp = W.M := by rw [hVP, hVsz]; exact hM
   have hpi' : W.perm = permOf V.upt.um V.sz.toNat := by rw [hVP, hVsz]; exact hpe
   icases urc_deposit W V Mp gn cs pid sc f hl hlw hM' hpi' (hsz.trans hVsz.symm) (hcw.trans hVcwi.symm) hgn hch
-    hpid (hlz.trans hVlz.symm) hVgen $$ [Hdep Harm] with ⟨Hsin, Hfin, Hpin, Hkin, Harm⟩
+    hpid (hlz.trans hVlz.symm) (hsc.trans hVsc.symm) hVgen $$ [Hdep Harm] with ⟨Hsin, Hfin, Hpin, Hkin, Harm⟩
   · iframe Hdep Harm
   -- usertrap
   have hstk : utStackTop (uservecCtx k (tfResumeGpr0 W.tf) V.tf) ksp :=
@@ -190,7 +191,8 @@ theorem urc_round (UT : USERTRAP) (UV : USERVEC) (UR : USERRET)
   iapply wpNext_intro
   iintro %cpu'
   iapply (urc_exit UR (parkToken (hlc := hlc) (GF := GF) (SG := uexecSGXv6)) Γ j W V Mp k pt ksp gn cs pid sc f cpu' hl hlw hM' hpi' (hsz.trans hVsz.symm)
-    (hcw.trans hVcwi.symm) hgn hch hpid (hlz.trans hVlz.symm) hVgen hproc hsie htier hnoff hstk.1 hkav)
+    (hcw.trans hVcwi.symm) hgn hch hpid (hlz.trans hVlz.symm) (hsc.trans hVsc.symm) hVgen hproc hsie htier
+    hnoff hstk.1 hkav)
   iframe Hwire Hcl Hloop Harm
 
 end

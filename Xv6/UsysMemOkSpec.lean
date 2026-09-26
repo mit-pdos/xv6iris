@@ -35,9 +35,9 @@ namespace Xv6
 open MachCSL
 open Iris.Std (get?)
 
-/-- The number the dispatcher reads is the number the table is keyed by
-(Rocq `sysc_num_usys`). -/
-theorem syscNum_usys (V : ProcPriv) : syscNum V = usysNum V.tf := rfl
+/-- The number the dispatcher's rows are keyed by is the table's EFFECTIVE
+number at the block's mask (Rocq `sysc_num_usys`, xv6 7b2c1b1b). -/
+theorem syscNum_usys (V : ProcPriv) : syscNum V = usysEff V.pvSecc V.tf := rfl
 
 /-- **Every entry but exec and sbrk**: the kernel's table implies the
 user's, given the permission view, the break and the lazy bit did not move

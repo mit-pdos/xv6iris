@@ -56,39 +56,48 @@ set_option linter.unusedSectionVars false
 
 /-! ## §1 Addresses -/
 
-/-- The return address every entry answers at: the `jalr a5` at `+0x38`
-writes `syscall + 0x3a` into `ra` (Rocq `sysc_target_ret_pc`). -/
+/-- The return address every entry answers at: the `jalr a4` at `+0x44`
+writes `syscall + 0x46` into `ra` (Rocq `sysc_target_ret_pc`). -/
 def syscallRet : BitVec 64 := syscallAddr + 0x46#64
 
 theorem syscallRet_jumpPc : jumpPc syscallRet = syscallRet := by
   unfold syscallRet syscallAddr; decide
 
-/-- The fallback (`bltu`/`beqz` taken, `+0x40`) and the epilogue (`+0x58`). -/
+/-- The fallback (`bltu`/`beqz a4` taken, `+0x54`), THE BLOCKED ARM (the
+mask's `beqz a5` taken, `+0x4c`: `li a5,-1 ; sd a5,112(s2) ; j epilogue`,
+xv6 7b2c1b1b) and the epilogue (`+0x6c`). -/
 def syscallFallback : BitVec 64 := syscallAddr + 0x54#64
+def syscallBlocked : BitVec 64 := syscallAddr + 0x4c#64
 def syscallEpi : BitVec 64 := syscallAddr + 0x6c#64
 
-/-- `bltu a4,a5` at `+0x22` (offset `0x1e`) and `beqz a5` at `+0x36`
-(offset `0xa`) both land on the fallback. -/
-theorem syscall_bltu_tgt : syscallAddr + 0x22#64 + BitVec.signExtend 64 (0x1e#13) = syscallFallback := by
+/-- `bltu a4,a5` at `+0x22` (offset `0x32`) and `beqz a4` at `+0x36`
+(offset `0x1e`) both land on the fallback. -/
+theorem syscall_bltu_tgt : syscallAddr + 0x22#64 + BitVec.signExtend 64 (0x32#13) = syscallFallback := by
   unfold syscallFallback syscallAddr; decide
-theorem syscall_beqz_tgt : syscallAddr + 0x36#64 + BitVec.signExtend 64 (0xa#13) = syscallFallback := by
+theorem syscall_beqz_tgt : syscallAddr + 0x36#64 + BitVec.signExtend 64 (0x1e#13) = syscallFallback := by
   unfold syscallFallback syscallAddr; decide
+/-- The mask's `beqz a5` at `+0x42` (offset `0xa`) lands on the blocked arm. -/
+theorem syscall_mask_tgt : syscallAddr + 0x42#64 + BitVec.signExtend 64 (0xa#13) = syscallBlocked := by
+  unfold syscallBlocked syscallAddr; decide
 
-/-- `c.j` at `+0x3e` (offset `0x1a`) lands on the epilogue. -/
-theorem syscall_j_tgt : syscallAddr + 0x4a#64 + BitVec.signExtend 64 (0x1a#21) = syscallEpi := by
+/-- `c.j` at `+0x4a` (offset `0x22`) and the blocked arm's `c.j` at `+0x52`
+(offset `0x1a`) land on the epilogue. -/
+theorem syscall_j_tgt : syscallAddr + 0x4a#64 + BitVec.signExtend 64 (0x22#21) = syscallEpi := by
+  unfold syscallEpi syscallAddr; decide
+theorem syscall_jblk_tgt : syscallAddr + 0x52#64 + BitVec.signExtend 64 (0x1a#21) = syscallEpi := by
   unfold syscallEpi syscallAddr; decide
 
-/-- `auipc a5,0x5 ; addi a5,a5,-518` at `+0x2a`/`+0x2e` is the table's base
+/-- `auipc a5,0x5 ; addi a5,a5,-532` at `+0x2a`/`+0x2e` is the table's base
 (Rocq's `syscalls` fold). -/
 theorem syscall_tbl_addr :
-    syscallAddr + 0x2a#64 + BitVec.signExtend 64 (5#20 ++ 0#12) + BitVec.signExtend 64 (0xdfa#12) =
+    syscallAddr + 0x2a#64 + BitVec.signExtend 64 (5#20 ++ 0#12) + BitVec.signExtend 64 (0xdec#12) =
       syscallsTbl := by
   unfold syscallsTbl syscallAddr; decide
 
-/-- `auipc a0,0x5 ; addi a0,a0,-1570` at `+0x46`/`+0x4a`: the fallback's
+/-- `auipc a0,0x5 ; addi a0,a0,-1604` at `+0x5a`/`+0x5e`: the fallback's
 format string (Rocq `sysc_fmt_a`, 0x80007398). -/
 theorem syscall_fmt_addr :
-    syscallAddr + 0x5a#64 + BitVec.signExtend 64 (5#20 ++ 0#12) + BitVec.signExtend 64 (0x9de#12) =
+    syscallAddr + 0x5a#64 + BitVec.signExtend 64 (5#20 ++ 0#12) + BitVec.signExtend 64 (0x9bc#12) =
       0x80007398#64 := by
   unfold syscallAddr; decide
 
@@ -116,6 +125,7 @@ theorem syscTarget_link : syscTarget 19 = sysLinkAddr := rfl
 theorem syscTarget_mkdir : syscTarget 20 = sysMkdirAddr := rfl
 theorem syscTarget_close : syscTarget 21 = sysCloseAddr := rfl
 theorem syscTarget_sync : syscTarget 22 = sysSyncAddr := rfl
+theorem syscTarget_seccomp : syscTarget 23 = sysSeccompAddr := rfl
 
 /-! ## §2 The number -/
 
@@ -125,18 +135,102 @@ theorem syscall_num_ne (V : ProcPriv) (n : Nat) (m : Int) (hnum : syscNum V = (n
     (h : (n : Int) ≠ m) : syscNum V ≠ m := by
   rw [hnum]; exact h
 
-/-- **The fall-through fixes the number**: the dispatch reached slot `n` of
-the table (`1 ≤ n ≤ 22`) iff the low word of `a7` read as an `int` is `n`
-(`syscall_bltu` + `syscall_idx`), which is `syscNum V`. -/
+/-- **The fall-through fixes the RAW number**: the dispatch reached slot `n`
+of the table (`1 ≤ n ≤ 23`) iff the low word of `a7` read as an `int` is `n`
+(`syscall_bltu` + `syscall_idx`), which is `syscRaw V`. -/
 theorem syscall_num_of_idx (V : ProcPriv) (n : Nat)
     (hn : (BitVec.extractLsb' 0 32 (tfW V.tf (tfArgIdx 7))).toInt.toNat = n)
     (h1 : 1 ≤ (BitVec.extractLsb' 0 32 (tfW V.tf (tfArgIdx 7))).toInt) :
-    syscNum V = (n : Int) := by
-  rw [syscNum_eq, ← hn]; omega
+    syscRaw V = (n : Int) := by
+  rw [syscRaw_eq, ← hn]; omega
+
+/-- **The mask's check fixes the EFFECTIVE number** (xv6 7b2c1b1b): at a raw
+number `n` in `[1, 23]`, the bit set means the effective number is `n` (the
+call runs), the bit clear means it is `0` (the blocked call, which IS the
+unknown-number call). -/
+theorem syscall_eff_allowed (V : ProcPriv) (n : Nat) (hraw : syscRaw V = (n : Int))
+    (hb : V.pvSecc.getLsbD n = true) : syscNum V = (n : Int) := by
+  unfold syscNum
+  rw [usysEff_allowed _ _ (by unfold usysTestbit; rw [show usysNum V.tf = syscRaw V from rfl, hraw]; simp [hb])]
+  exact hraw
+
+theorem syscall_eff_blocked (V : ProcPriv) (n : Nat) (hraw : syscRaw V = (n : Int))
+    (hb : V.pvSecc.getLsbD n = false) : syscNum V = 0 := by
+  unfold syscNum
+  exact usysEff_blocked _ _ (by unfold usysTestbit; rw [show usysNum V.tf = syscRaw V from rfl, hraw]; simp [hb])
+
+/-- Out of the table's range the effective number is out of range too (the
+raw one, or 0). -/
+theorem syscall_eff_range (V : ProcPriv) (h : syscRaw V < 1 ∨ 23 < syscRaw V) :
+    syscNum V < 1 ∨ 23 < syscNum V := by
+  unfold syscNum
+  rcases usysEff_cases V.pvSecc V.tf with e | e
+  · rw [e]; exact h
+  · rw [e]; omega
+
+/-- **The mask test** `srl a5,a5,a3 ; andi a5,a5,1` at a shift amount in
+range: bit `n` of the mask, as a word. -/
+theorem syscall_srl_and1 (secc : BitVec 64) (k : Nat) :
+    (secc >>> k) &&& 1#64 = if secc.getLsbD k then 1#64 else 0#64 := by
+  apply BitVec.eq_of_getLsbD_eq
+  intro i hi
+  by_cases h : secc.getLsbD k
+  · simp only [h, if_true, BitVec.getLsbD_and, BitVec.getLsbD_ushiftRight, BitVec.getLsbD_one]
+    by_cases hi0 : i = 0
+    · subst hi0; simp [h]
+    · simp [hi0]
+  · simp only [h, Bool.false_eq_true, if_false, BitVec.getLsbD_and, BitVec.getLsbD_ushiftRight,
+      BitVec.getLsbD_one, BitVec.getLsbD_zero]
+    by_cases hi0 : i = 0
+    · subst hi0; simp [h]
+    · simp [hi0]
+
+theorem syscall_shamt (n : Nat) (hn : n < 64) :
+    (Sail.BitVec.extractLsb (BitVec.ofNat 64 n) 5 0).toNat = n := by
+  simp only [Sail.BitVec.extractLsb, BitVec.extractLsb, BitVec.extractLsb'_toNat, BitVec.toNat_ofNat]
+  omega
+
+theorem syscall_mask_bit (secc : BitVec 64) (n : Nat) (hn : n < 64) :
+    (secc >>> Sail.BitVec.extractLsb (BitVec.ofNat 64 n) 5 0) &&& BitVec.signExtend 64 (1#12) =
+      if secc.getLsbD n then 1#64 else 0#64 := by
+  rw [show BitVec.signExtend 64 (1#12) = 1#64 by decide, BitVec.ushiftRight_eq', syscall_shamt n hn]
+  exact syscall_srl_and1 secc n
+
+/-- `syscall_mask_bit` once the `andi` immediate is normalised to `1#64`. -/
+theorem syscall_mask_bit1 (secc : BitVec 64) (n : Nat) (hn : n < 64) :
+    (secc >>> Sail.BitVec.extractLsb (BitVec.ofNat 64 n) 5 0) &&& 1#64 =
+      if secc.getLsbD n then 1#64 else 0#64 := by
+  rw [BitVec.ushiftRight_eq', syscall_shamt n hn]
+  exact syscall_srl_and1 secc n
+
+/-- `beqz a5` on the mask bit: taken iff the bit is clear. -/
+theorem syscall_beqz_bit (b : Bool) :
+    bcond bop.BEQ (if b then 1#64 else 0#64) 0#64 = !b := by
+  cases b <;> decide
+
+theorem syscall_beq10 : bcond bop.BEQ 1#64 0#64 = false := by decide
+theorem syscall_beq00 : bcond bop.BEQ 0#64 0#64 = true := by decide
+
+/-- The sign-extended number `a3`, in range, is the number as a word. -/
+theorem syscall_sext_small (x : BitVec 32) (h1 : 1 ≤ x.toInt) (h2 : x.toInt ≤ 23) :
+    BitVec.signExtend 64 x = BitVec.ofNat 64 x.toInt.toNat := by
+  have hlt := x.isLt
+  have hsmall : x.toNat ≤ 23 := by
+    rw [BitVec.toInt_eq_toNat_cond] at h1 h2
+    split at h2 <;> split at h1 <;> omega
+  have hle : x ≤ 23#32 := by rw [BitVec.le_def]; simpa using hsmall
+  have hti : x.toInt.toNat = x.toNat := by
+    rw [BitVec.toInt_eq_toNat_cond, if_pos (by omega)]; simp
+  rw [hti]
+  have e1 : BitVec.ofNat 64 x.toNat = BitVec.setWidth 64 x := by
+    apply BitVec.eq_of_toNat_eq
+    rw [BitVec.toNat_setWidth, BitVec.toNat_ofNat]
+  rw [e1]
+  bv_decide
 
 /-- **The fallback's number is out of range** (the `bltu` taken): no entry's
 row applies, and in particular `syscNumNofs`. -/
-theorem syscall_nofs_of_range (V : ProcPriv) (h : syscNum V < 1 ∨ 22 < syscNum V) :
+theorem syscall_nofs_of_range (V : ProcPriv) (h : syscNum V < 1 ∨ 23 < syscNum V) :
     syscNumNofs (syscNum V) := by
   unfold syscNumNofs; omega
 
@@ -274,7 +368,7 @@ def syscArmBody (n : Nat) (PT : SchedNames → IProp GF) (Γ : SchedNames) [Clai
 
 /-- **WHAT THE PRINTK FALLBACK PROVES** (Rocq `sysc_fallback`'s statement):
 entered at `+0x40` when the `bltu` is taken (the number is out of range --
-`syscNum V < 1 ∨ 22 < syscNum V`; the `beqz` is dead, `syscTarget_ne_zero`),
+`syscNum V < 1 ∨ 23 < syscNum V`; the `beqz` is dead, `syscTarget_ne_zero`),
 with the same resources as an arm, it prints, stores `-1` to
 `p->trapframe->a0` and leaves through the shared epilogue
 (`SyscallRet.syscall_epilogue_tail`).  `ra` is not pinned (myproc's link). -/
@@ -285,9 +379,44 @@ def syscFallbackBody (PT : SchedNames → IProp GF) (Γ : SchedNames) [ClaimIs (
     (_hE : SyscSpostEmp (GF := GF))
     (_hj : j < NPROC) (_hproc : k.proc = procAddr j) (_hK : syscallSlots ≤ k.avail)
     (_hnoff : k.noff = 0) (_htier : k.tier = KTier.kpt) (_hgn : gn = V.gen)
-    (_hrange : syscNum V < 1 ∨ 22 < syscNum V) (_hpins : syscPins k R) (_hs1 : R 9#5 = procAddr j)
+    (_hrange : syscNum V < 1 ∨ 23 < syscNum V) (_hpins : syscPins k R) (_hs1 : R 9#5 = procAddr j)
     (_hs2 : R 18#5 = pageAddr V.upt.tfp) : Prop :=
   kctx cpu (((k.withSpie spie spp).pushed 4).withRegs R) ∗ pcIs cpu syscallFallback ∗
+  frame4s2 (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) (k.regs 9#5) (k.regs 18#5) ∗
+  procsInv Γ ∗ trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗
+  isLock γw waitLockAddr "wait_lock" waitLockPay ∗
+  bslots 3 ∗ syscInitId ip ∗ fdSlots FDSPARE ∗ irefSlots IREFSPARE ∗
+  syscallEnv (hlc := hlc) PT Γ γ ∗
+  procPrivFd γ (procAddr j) pid V M ∗ fdFrags V.fdg sts ∗ chFrag V.chg (procAddr j) cs ∗
+  syscSysIn (hlc := hlc) f V M sts gn cs pid ∗ syscForkIn (hlc := hlc) f V M sts ∗ syscPayIn f V ∗
+  (wpNext true k.proc c0 (syscallPost (hlc := hlc) PT Γ k γ j pid V M sts gn cs ip f) ∧
+    syscallCloser k V)
+  ⊢ wpLoop (GF := GF) cpu
+
+
+/-- **WHAT THE BLOCKED ARM PROVES** (xv6 7b2c1b1b; Rocq `sysc_blocked`):
+entered at `+0x4c` when the mask's `beqz a5` is taken (the raw number is in
+the table's range, its bit in `p->seccomp` is clear: the EFFECTIVE number is
+`0`, `syscNum V = 0`), it stores `-1` to `p->trapframe->a0` through `s2` and
+jumps to the shared epilogue -- the unknown-number call's contract, minus
+the diagnostic.  Same resources as an arm.
+
+The fallback's own doc, for comparison: **WHAT THE PRINTK FALLBACK PROVES** (Rocq `sysc_fallback`'s statement):
+entered at `+0x40` when the `bltu` is taken (the number is out of range --
+`syscNum V < 1 ∨ 23 < syscNum V`; the `beqz` is dead, `syscTarget_ne_zero`),
+with the same resources as an arm, it prints, stores `-1` to
+`p->trapframe->a0` and leaves through the shared epilogue
+(`SyscallRet.syscall_epilogue_tail`).  `ra` is not pinned (myproc's link). -/
+def syscBlockedBody (PT : SchedNames → IProp GF) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
+    (c0 cpu : CPU) (k : KCtx) (spie spp : Bool) (R : RegMap) (γw : GName) (γ : FileNames) (j : Nat)
+    (pid : BitVec 32) (V : ProcPriv) (M : Nat → List (BitVec 8)) (sts : List FdState) (gn : GName)
+    (cs : ExtTreeSet GName compare) (ip : BitVec 64) (f : UexecSG.sfam GF)
+    (_hE : SyscSpostEmp (GF := GF))
+    (_hj : j < NPROC) (_hproc : k.proc = procAddr j) (_hK : syscallSlots ≤ k.avail)
+    (_hnoff : k.noff = 0) (_htier : k.tier = KTier.kpt) (_hgn : gn = V.gen)
+    (_hblk : syscNum V = 0) (_hpins : syscPins k R) (_hs1 : R 9#5 = procAddr j)
+    (_hs2 : R 18#5 = pageAddr V.upt.tfp) : Prop :=
+  kctx cpu (((k.withSpie spie spp).pushed 4).withRegs R) ∗ pcIs cpu syscallBlocked ∗
   frame4s2 (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) (k.regs 9#5) (k.regs 18#5) ∗
   procsInv Γ ∗ trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗
   isLock γw waitLockAddr "wait_lock" waitLockPay ∗

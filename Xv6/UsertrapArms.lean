@@ -42,13 +42,13 @@ theorem utA_sCause_nokill (sc : BitVec 64) (h : sCauseOk sc) : ¬ ukillSc sc := 
 `ut_round_entry` plus the quiet rows) off the ecall. -/
 theorem utA_rows_entry {Γ : SchedNames} (A : UtArgs GF) (hok : UtOk Γ A) (hne : A.sc ≠ uecallScause) :
     UtRows0 A (utV1 A) A.M A.sts A.cs :=
-  ⟨utRound_entry A.sep A.sc A.V A.M (utV1 A) A.M hne ⟨rfl, rfl, rfl, rfl, rfl, rfl, rfl⟩,
-    utFdKept_refl _ _, utChKept_refl _ _ _, rfl, utFdEcall_quiet _ _ _ _ _ hne,
-    utPipeEcall_quiet _ _ _ _ _ _ _ hne, fun hc => absurd hc hne, by rw [← hok.hP], rfl⟩
+  ⟨utRound_entry A.sep A.sc A.V A.M (utV1 A) A.M hne ⟨rfl, rfl, rfl, rfl, rfl, rfl, rfl, rfl⟩,
+    utFdKept_refl _ _, utChKept_refl _ _ _ _, rfl, utFdEcall_quiet _ _ _ _ _ _ hne,
+    utPipeEcall_quiet _ _ _ _ _ _ _ _ hne, fun hc => absurd hc hne, by rw [← hok.hP], rfl⟩
 
 theorem utA_live_ne (A : UtArgs GF) (V2 : ProcPriv) (cs2 : ExtTreeSet GName compare)
     (hne : A.sc ≠ uecallScause) : utLive A V2 cs2 :=
-  utLiveOut_ne _ _ _ _ _ hne
+  utLiveOut_ne _ _ _ _ _ _ hne
 
 theorem utA_bcond_beq_sext (kl : BitVec 32) :
     bcond bop.BEQ (BitVec.signExtend 64 kl) 0#64 = decide (kl = 0#32) := by

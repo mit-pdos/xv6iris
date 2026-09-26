@@ -59,14 +59,14 @@ theorem syscall_proof (MP : MYPROC) (PK : PRINTK)
     (SEC : SYSEXEC) (SFS : SYSFSTAT) (SCD : SYSCHDIR) (SDP : SYSDUP) (SGP : SYSGETPID)
     (SSB : SYSSBRK) (SPS : SYSPAUSE) (SUP : SYSUPTIME) (SOP : SYSOPEN) (SWR : SYSWRITE)
     (SMN : SYSMKNOD) (SUL : SYSUNLINK) (SLK : SYSLINK) (SMD : SYSMKDIR) (SCL : SYSCLOSE)
-    (SSY : SYS_SYNC) :
+    (SSY : SYS_SYNC) (SSC : SYSSECCOMP) :
     SYSCALL_XV6 :=
   ⟨fun {hlc GF} _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
       Γ _ c0 k γw γ j pid V M sts gn cs ip f hj hproc hK hnoff htier hgn => by
     let PT := parkToken (hlc := hlc) (GF := GF) (SG := uexecSGXv6)
     have hE : SyscSpostEmp (GF := GF) := syscSpostEmp_xv6 (hlc := hlc)
     refine syscall_head_entry MP PT Γ c0 k γw γ j pid V M sts gn cs ip f hE hj hproc hK hnoff htier hgn
-      ?_ ?_
+      ?_ ?_ ?_
     · intro cpu spie spp R n hn1 hn22 hnum hpins hs1 hs2 hra
       exact syscall_arms_all SEC syscDepExec_holds PT Γ c0 cpu k spie spp R γw γ j pid V M sts gn cs ip f
         hE hj hproc hK hnoff htier hgn hpins hs1 hs2 hra
@@ -112,9 +112,14 @@ theorem syscall_proof (MP : MYPROC) (PK : PRINTK)
           cs ip f hE hj hproc hK hnoff htier hgn h hpins hs1 hs2 hra)
         (fun h => syscall_arm_sync SSY PT Γ c0 cpu k spie spp R γw γ j pid V M sts gn cs ip f hE hj
           hproc hK hnoff htier hgn h hpins hs1 hs2 hra)
+        (fun h => syscall_arm_seccomp SSC PT Γ c0 cpu k spie spp R γw γ j pid V M sts gn cs ip f hE hj
+          hproc hK hnoff htier hgn h hpins hs1 hs2 hra)
         n hn1 hn22 hnum
     · intro cpu spie spp R hrange hpins hs1 hs2
       exact syscall_fallback PK PT Γ c0 cpu k spie spp R γw γ j pid V M sts gn cs ip f hE hj hproc hK
-        hnoff htier hgn hrange hpins hs1 hs2⟩
+        hnoff htier hgn hrange hpins hs1 hs2
+    · intro cpu spie spp R hblk hpins hs1 hs2
+      exact syscall_blocked PT Γ c0 cpu k spie spp R γw γ j pid V M sts gn cs ip f hE hj hproc hK
+        hnoff htier hgn hblk hpins hs1 hs2⟩
 
 end Xv6

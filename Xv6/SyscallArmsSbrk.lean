@@ -185,19 +185,19 @@ the table and the lazy bit (Rocq `sysc_sbrk_tfp` and the `upd_*` shape of
 theorem sbrkArm_shape (V V' : ProcPriv) (M M' : Nat → List (BitVec 8)) (v0 v1 r : BitVec 64)
     (hok : sysSbrkOk V V' M M' v0 v1 r) :
     V'.tf = V.tf ∧ V'.ofile = V.ofile ∧ V'.fdg = V.fdg ∧ V'.chg = V.chg ∧ V'.cwd = V.cwd ∧
-      V'.cwi = V.cwi ∧ V'.gen = V.gen ∧ V'.upt.tfp = V.upt.tfp ∧ V'.kstack = V.kstack := by
+      V'.cwi = V.cwi ∧ V'.gen = V.gen ∧ V'.upt.tfp = V.upt.tfp ∧ V'.kstack = V.kstack ∧ V'.pvSecc = V.pvSecc := by
   rcases hok with ⟨-, rfl, -⟩ | ⟨-, ⟨-, h0, hpos, hneg⟩ | ⟨-, -, -, hV, -, -⟩⟩
-  · exact ⟨rfl, rfl, rfl, rfl, rfl, rfl, rfl, rfl, rfl⟩
+  · exact ⟨rfl, rfl, rfl, rfl, rfl, rfl, rfl, rfl, rfl, rfl⟩
   · rcases lt_trichotomy (sysSbrkArg v0).toInt 0 with h | h | h
     · obtain ⟨-, hV, -⟩ := hneg h
-      rw [hV]; exact ⟨rfl, rfl, rfl, rfl, rfl, rfl, rfl, rfl, rfl⟩
+      rw [hV]; exact ⟨rfl, rfl, rfl, rfl, rfl, rfl, rfl, rfl, rfl, rfl⟩
     · obtain ⟨-, rfl, -⟩ := h0 h
-      exact ⟨rfl, rfl, rfl, rfl, rfl, rfl, rfl, rfl, rfl⟩
+      exact ⟨rfl, rfl, rfl, rfl, rfl, rfl, rfl, rfl, rfl, rfl⟩
     · rcases hpos h with ⟨hr, -⟩ | ⟨-, -, hV, halloc⟩
       · exact absurd hr (by decide)
       · have htfp := halloc.1.2.1
-        rw [hV]; exact ⟨rfl, rfl, rfl, rfl, rfl, rfl, rfl, htfp, rfl⟩
-  · rw [hV]; exact ⟨rfl, rfl, rfl, rfl, rfl, rfl, rfl, rfl, rfl⟩
+        rw [hV]; exact ⟨rfl, rfl, rfl, rfl, rfl, rfl, rfl, htfp, rfl, rfl⟩
+  · rw [hV]; exact ⟨rfl, rfl, rfl, rfl, rfl, rfl, rfl, rfl, rfl, rfl⟩
 
 /-- Rocq `sbrk_ok_still`, at the lazy view. -/
 theorem sbrkArm_still (P : UPtd) (sz : BitVec 64) (M : Nat → List (BitVec 8)) (hlen : umPageLen P M) :
@@ -285,14 +285,15 @@ theorem syscRows_sbrk (V V' : ProcPriv) (M M' : Nat → List (BitVec 8)) (sts : 
     (hok : sysSbrkOk V V' M M' v0 v1 r) (hlen : umPageLen V.upt M) (hbelow : umBelow V.sz V.upt) :
     SyscRows V M (syscStore V' r) M' sts sts cs cs pid := by
   have hn : ∀ m : Int, (12 : Int) ≠ m → syscNum V ≠ m := fun m h => by rw [hnum]; exact h
-  obtain ⟨htf, -, hfdg, hchg, -, hcwi, hgen, htfp, hks⟩ := sbrkArm_shape V V' M M' v0 v1 r hok
+  obtain ⟨htf, -, hfdg, hchg, -, hcwi, hgen, htfp, hks, hsc⟩ := sbrkArm_shape V V' M M' v0 v1 r hok
   obtain ⟨⟨hmem, hlz⟩, hret⟩ := sbrkArm_ok V V' M M' v0 v1 r hv0 hv1 hok hlen hbelow
   have ha0 := syscStore_a0 V' r (by rw [htf]; exact hl)
   refine ⟨?_, ?_, syscPipeOk_quiet V _ _ _ sts sts (hn 4 (by decide)), syscChOk_refl V cs,
     hn 2 (by decide), Or.inr ⟨r, by simp only [syscStore, htf]⟩, Or.inr (Or.inl hnum),
     Or.inr (Or.inl hnum), Or.inr (Or.inl hnum), htfp, hfdg, hchg, hgen, Or.inr hcwi,
     Or.inr (by rw [ha0]; exact hret), Or.inl (hn 1 (by decide)), Or.inl (hn 5 (by decide)),
-    syscRetPid_ne _ _ _ 12 hnum (by decide), hks⟩
+    syscRetPid_ne _ _ _ 12 hnum (by decide), hks,
+    by rw [show (syscStore V' r).pvSecc = V.pvSecc from hsc]; exact usysSeccOk_refl _ _ _ _ (hn 23 (by decide))⟩
   · unfold syscMemOk
     rw [if_neg (hn USYS_exec (by decide)), if_pos (show syscNum V = USYS_sbrk from hnum)]
     exact ⟨hmem, hlz⟩
