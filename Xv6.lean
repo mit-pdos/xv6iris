@@ -1359,3 +1359,9 @@ import Xv6.UnionDiscDec
 import Xv6.UnionView
 import Xv6.UnionOutPure
 import Xv6.UnionDemo
+import Xv6.UImgWordDefs
+import Xv6.UStrImg
+import Xv6.UserConsole
+import Xv6.UInitFd
+import Xv6.PinnedObs
+import Xv6.UConsOpen
