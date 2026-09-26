@@ -18,7 +18,10 @@ half and `UkInitPrintf`, stated once at printf.o's `base`.
   difference is that it names the byte at the call's own `a1` instead of
   quantifying the address -- equivalent at `putc`'s call site.
 
-Deviation (DU4): stated once; `UlibRunP` stand-in.
+Deviation (DU4): stated once, over `UlibRunP` (the engine's instance and
+Rocq's per-image shapes: `UlibRunUk`, `UlibUkProg`).  The two obligations
+agree at putc's call site: `UlibUkProg.ulibUkW1_ulib` turns `kinit_w1`
+into `ulibPutcWb` at the instance (`InitPrintfLink.kinitW1_ulib`).
 -/
 import Xv6.SpecUlibVprintf
 

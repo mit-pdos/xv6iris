@@ -62,7 +62,8 @@ theorem ulibTabDecodes_get (tab : List UlibIns) (hd : ulibTabDecodes tab) (k : N
 
 /-- The table's entries are present at `base` in the program text `t`. -/
 def ulibTabAt (t : Xv6.User.UTextTree) (tab : List UlibIns) (base : Nat) : Bool :=
-  tab.all fun x => (t.find? (base + x.off)).map (fun k => (k.width, k.enc)) == some (x.width, x.enc)
+  tab.all fun x => (t.find? (base + x.off)).map (fun k => (k.width, k.enc)) == some (x.width, x.enc) &&
+    uTextGeom t x.width (base + x.off)
 
 /-- **THE RELOCATION LEMMA** (any table): a program text carrying the
 table's encodings at `base` gives the table's code resource at `base`. -/
@@ -75,9 +76,11 @@ theorem ulibTabCode_of_text (L : UlibRun GF) (tab : List UlibIns) (hd : ulibTabD
   iapply BigSepL.bigSepL_intro (P := iprop(□ L.utext t))
   · intro k x hk
     have hmem : x ∈ tab := List.mem_of_getElem? hk
+    have hx := List.all_eq_true.1 h x hmem
+    rw [Bool.and_eq_true] at hx
     have hat : (t.find? (base + x.off)).map (fun k => (k.width, k.enc)) = some (x.width, x.enc) := by
-      have := List.all_eq_true.1 h x hmem
-      simpa using this
+      simpa using hx.1
+    have hg : uTextGeom t x.width (base + x.off) = true := hx.2
     have hoff : x.off < sz := by
       have := List.all_eq_true.1 hsz x hmem
       simpa using this
@@ -92,7 +95,7 @@ theorem ulibTabCode_of_text (L : UlibRun GF) (tab : List UlibIns) (hd : ulibTabD
       | some e =>
         rw [hf] at hat
         simp only [Option.map_some, Option.some.injEq, Prod.mk.injEq] at hat
-        simp only [Option.bind_some, hat.1, hat.2]
+        simp only [Option.bind_some, hat.1, hat.2, hg, if_true]
         exact ulibTabDecodes_get tab hd k x hk
     iintro #H'
     iapply L.utext_instr t _ x.rvc x.ast hdec

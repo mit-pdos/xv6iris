@@ -15,7 +15,9 @@ twins `UkGrepFprintf`, `UkSeccFprintf`), stated once at printf.o's `base`.
 
 The code is `fprintf`'s (plus, for the instances, `vprintf`'s and `putc`'s),
 each supplied by the image at its own printf.o (`UlibPrintfReloc`); `base`
-is even.  Deviation (DU4): stated once; `UlibRunP` stand-in.
+is even.  Deviation (DU4): stated once, over the run interface `UlibRunP`
+(instantiated by the engine in `UlibRunUk`; Rocq's per-image shape over
+`urun` is `UlibUkProg.wp_ulibUkFprintf(S)`).
 -/
 import Xv6.SpecUlibVprintf
 

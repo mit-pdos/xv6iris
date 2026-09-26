@@ -1569,3 +1569,9 @@ import Xv6.UshRedirsWalk
 import Xv6.UshSeamPure
 import Xv6.UshStep
 import Xv6.UshTreeDefs
+import Xv6.UlibRunUk
+import Xv6.UlibUkProg
+import Xv6.CatPrintfLink
+import Xv6.InitPrintfLink
+import Xv6.SeccPrintfLink
+import Xv6.GrepPrintfLink

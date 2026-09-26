@@ -2,13 +2,15 @@
 The user-program run interface the ulib cone is proved against (DU4 spike,
 union brief §5 row U0-8).
 
-**SPIKE STAND-IN.**  The real interface is U0-6's (`Xv6/SpecUkLeaves.lean`,
-`UkRun`, `UkRunLeaf`, `UkRunMem`, `UserHeap`: Rocq `UkRun.urun`, the
-`UkRunLeaf`/`UkRunMem` leaves, `UserHeap.uword`/`ubyte`/`ustack`), which was
-not written when this spike ran.  `UlibRun` names exactly the pieces of it
+**An abstract interface, instantiated by the real engine.**  The engine is
+U0-6's (`Xv6/SpecUkLeaves.lean`, `UkRun`, `UkRunLeaf`, `UkRunMem`,
+`UserHeap`: Rocq `UkRun.urun`, the `UkRunLeaf`/`UkRunMem` leaves,
+`UserHeap.uword`/`ubyte`/`ustack`).  `UlibRun` names exactly the pieces of it
 that ulib's `putc` uses, in the SHAPE of Rocq's `UkRunLeaf`/`UkRunMem`
-leaves (`#Hi Hrun Hcont`, continuation `∀ h', urun … -∗ mWP Loop`), so that
-the eventual engine instantiates it field by field (`UlibRun.ofUkRun`, U2).
+leaves (`#Hi Hrun Hcont`, continuation `urun … -∗ mWP Loop`), and the
+engine instantiates it field by field: `UlibRunUk.UlibRun.ofUkRun` /
+`UlibRunP.ofUkRun` (the hart, which Lean's `wpLoop` names and Rocq's
+`mWP Loop` does not, rides in a ghost variable there; `UlibRunUk` header).
 Two deliberate differences from Rocq's leaf statements, both Lean
 conventions already in force for the kernel:
 
@@ -20,19 +22,29 @@ conventions already in force for the kernel:
   never looked up: `ulibRget` reads it as 0), and heap addresses are `Nat`.
 
 The hart (`h : CpuId` in Rocq's `urun`) is hidden inside `urun`: every
-Rocq leaf re-quantifies it (`∀ h'`), and nothing in the ulib cone names it.
+Rocq leaf re-quantifies it (`∀ h'`), and nothing in the ulib cone names it;
+`goal` is one proposition (Rocq's `mWP Loop`).
 
 `uTextDecode` is the per-program text lookup of DU3 (U0-7's search tree
 `Xv6.User.UTextTree`, `Xv6/User/<P>Tree.lean`, plus the decode walk) and
 `utext_instr` stands for U0-7's tree→fetch lemma (`Xv6.User.utext_find` +
-`Xv6.User.utextDecode_facts`, whose fetch-geometry and byte-window side
-facts the real instance discharges).  The decode walk runs on
-`DecodeBridge.drefS` until the user reference map lands (U0-C decode spike);
-for every instruction of the ulib cone the two agree (no privileged or
-config-gated decode).
+`Xv6.User.utextDecode_facts`).  The decode walk runs at the U-mode
+reference map `SpecUkLeaves.udrefU` and makes the address-free checks the
+real fetch lemma makes (`isRVC`, `instrWf`, a 16-bit encoding); the
+address geometry the real fetch needs -- `pc` even, the fetch inside one
+page, and a compressed instruction at a 4-aligned `pc` followed by another
+instruction (the fetch reads four bytes) -- is `uTextGeom`, decided on the
+tree.  With both, the real instance (`UlibRunUk.UlibRunP.ofUkRun`) proves
+`utext_instr` from `UserHeap.uinstrIs_of_text`.
+
+The jump leaf carries the model's target-alignment premise (SpecUkLeaves
+`wpUkJalBody`), and the frame close carries the room below `sp` (UserHeap's
+`ustack` holds it, UserHeap deviation 4), so the real instance exists.
 -/
 import MachCSL.DecodeBridge
 import Xv6.UserTextDefs
+import Xv6.SpecUkLeaves
+import MachCSL.Instr
 
 namespace Xv6
 
@@ -64,22 +76,36 @@ noncomputable def ulibExpand (i : instruction) : Option instruction :=
   | .pure (.ExecuteAs j) => some j
   | _ => none
 
-/-- Decode one encoding: `(compressed?, expanded AST)`.  The walk is the
-read-only `runRead` of `DecodeBridge`, at `drefS` (see the header). -/
+/-- Decode one encoding: `(compressed?, expanded AST)`, at the U-mode
+reference map `udrefU`, with the address-free checks of the real fetch
+lemma (`User.utextDecodeWith`): the width's `isRVC` bit, the decoder's
+immediate shape `instrWf`, a 16-bit compressed encoding. -/
 noncomputable def ulibDecodeEnc (w e : Nat) : Option (Bool × instruction) :=
   if w = 4 then
-    match runRead drefS (Functions.ext_decode (BitVec.ofNat 32 e)) with
-    | some (i, true) => some (false, i)
+    match runRead udrefU (Functions.ext_decode (BitVec.ofNat 32 e)) with
+    | some (i, true) =>
+      if Functions.isRVC (BitVec.extractLsb' 0 16 (BitVec.ofNat 32 e)) = false ∧ instrWf i then some (false, i) else none
     | _ => none
   else if w = 2 then
-    match runRead drefS (Functions.ext_decode_compressed (BitVec.ofNat 16 e)) with
-    | some (i₀, true) => (ulibExpand i₀).map fun i => (true, i)
+    match runRead udrefU (Functions.ext_decode_compressed (BitVec.ofNat 16 e)) with
+    | some (i₀, true) =>
+      match ulibExpand i₀ with
+      | some i => if Functions.isRVC (BitVec.ofNat 16 e) = true ∧ instrWf i ∧ e < 65536 then some (true, i) else none
+      | none => none
     | _ => none
   else none
 
+/-- The fetch geometry at `pc` for an encoding of width `w` (see the
+header): `pc` even, inside one page, and a compressed instruction at a
+4-aligned `pc` followed by an instruction of the text. -/
+def uTextGeom (t : Xv6.User.UTextTree) (w pc : Nat) : Bool :=
+  pc % 2 == 0 && decide (pc % 4096 ≤ 4092) &&
+    (!(w == 2 && pc % 4 == 0) || (t.find? (pc + 2)).any (fun k => decide (2 ≤ k.width)))
+
 /-- What the program text (search tree `t`) says about `pc`. -/
 noncomputable def uTextDecode (t : Xv6.User.UTextTree) (pc : BitVec 64) : Option (Bool × instruction) :=
-  (t.find? pc.toNat).bind fun k => ulibDecodeEnc k.width k.enc
+  (t.find? pc.toNat).bind fun k =>
+    if uTextGeom t k.width pc.toNat then ulibDecodeEnc k.width k.enc else none
 
 /-! ## The interface -/
 
@@ -110,8 +136,8 @@ structure UlibRun (GF : BundledGFunctors) where
   ustack_4_open : ∀ sp, ustack sp 4 ⊢
     ⌜sp.toNat % 8 = 0⌝ ∗ (∃ w, uword (sp.toNat - 8) w) ∗ (∃ w, uword (sp.toNat - 16) w) ∗
       (∃ w, uword (sp.toNat - 24) w) ∗ (∃ w, uword (sp.toNat - 32) w)
-  /-- Rocq `ustack_4_close`. -/
-  ustack_4_close : ∀ sp, sp.toNat % 8 = 0 →
+  /-- Rocq `ustack_4_close` (with the room below `sp`, header). -/
+  ustack_4_close : ∀ sp, sp.toNat % 8 = 0 → 32 ≤ sp.toNat →
     (∃ w, uword (sp.toNat - 8) w) ∗ (∃ w, uword (sp.toNat - 16) w) ∗
       (∃ w, uword (sp.toNat - 24) w) ∗ (∃ w, uword (sp.toNat - 32) w) ⊢ ustack sp 4
   /-- Rocq `uword_byte7_acc`. -/
@@ -159,9 +185,9 @@ structure UlibRun (GF : BundledGFunctors) where
     ⊢ uinstrIs pc rvc (.LOAD (imm, .Regidx rs1, .Regidx rd, false, 8)) -∗ uword a w -∗ urun m pc av -∗
       (uword a w -∗ urun (m.set rd w) (pc + ulibLen rvc) av -∗ goal) -∗
       goal
-  /-- `jal rd, imm` (Rocq `wp_uk_jal`). -/
+  /-- `jal rd, imm` (Rocq `wp_uk_jal`; the target 2-aligned, header). -/
   wp_jal : ∀ (m : RegMap) (pc : BitVec 64) (av : Nat) (imm : BitVec 21) (rd : BitVec 5),
-    rd ≠ 0#5 → rd ≠ 2#5 →
+    rd ≠ 0#5 → rd ≠ 2#5 → (pc + BitVec.signExtend 64 imm).getLsbD 0 = false →
     ⊢ uinstrIs pc false (.JAL (imm, .Regidx rd)) -∗ urun m pc av -∗
       (urun (m.set rd (pc + 4#64)) (pc + BitVec.signExtend 64 imm) av -∗ goal) -∗
       goal

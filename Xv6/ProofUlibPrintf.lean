@@ -84,7 +84,7 @@ theorem wp_ulibPrintf_gen {hlc : HasLC} [MachGS hlc GF] (L : UlibRunP GF) (base 
   iintro Hrun
   -- +0x3cc  jal vprintf : the caller's premise
   iapply (ulibS_call L _ (ulibPrintf_i3cc L.toUlibRun base) 0x3d0 rfl (ulibVprintfAt base)
-    (ulibPc_jmp _ _ _ _ (by decide)) _ _) $$ Hc Hrun
+    (ulibPc_jmp _ _ _ _ (by decide)) (ulibPc_even base hb 0xbc rfl) _ _) $$ Hc Hrun
   iintro Hrun
   iapply Hvp $$ %_ %?h11 %?h12 %?h1 %?h10 W7 Hrun
   case h11 => ulib_regs; exact ha
@@ -102,7 +102,7 @@ theorem wp_ulibPrintf_gen {hlc : HasLC} [MachGS hlc GF] (L : UlibRunP GF) (base 
   iintro W10 Hrun
   -- +0x3d4  addi sp,sp,96 : the pop
   ihave Hstk : L.ustack (m 2#5) 12 $$ [W1 W2 W3 W4 W5 W6 W7 W8 W9 W10 W11 W12]
-  · iapply L.ustack_close _ _ hal
+  · iapply L.ustack_close _ _ hal (by omega)
     iapply ulibWords_close12
     isplitl [W1]; · iexists _; iexact W1
     isplitl [W2]; · iexists _; iexact W2

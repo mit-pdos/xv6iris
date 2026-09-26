@@ -98,7 +98,8 @@ Collected from the U0 agent reports (Sept 26 2026). Each item names the lane tha
 - `stubRet` lives in UkStub (Rocq: UkTree) — H-tree's UkTree must reuse it.
 - Axiom baseline note for U4: echo walks show `MachCSL.nthByte_lo0/lo1._native.bv_decide` via UserHeap.uinstrIs_ukInstr.
 
-## P-printf run interface (gap found by P-cat)
+## P-printf run interface — CLOSED by the printf bridge (UlibRunUk/UlibUkProg; cat/init/secc `*_linked_ulib`, grep `wp_grep*_ulib`; hart rides in a ghost var). Remaining: grep's `kgrepPaySeq` → `ulibUkPaySeq_of`; stale 'pending' notes in UkCatDefs/UkInitDefs/UkSeccDefs/Link* headers.
+## (old text)
 - `UlibRunP` (the printf lane's stand-in run interface) has one fixed `goal`, but the real leaves
   re-quantify the hart (`∀ h', … wpLoop h'`), and `UlibRunP.ofUkRun` doesn't exist. Until fixed, cat
   takes `HF : CAT_FPRINTF` (Rocq's `wp_kcat_fprintf(_s)` verbatim over `urun`) as a parameter and has its

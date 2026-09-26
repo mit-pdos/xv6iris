@@ -63,7 +63,7 @@ theorem ulibVprintf_sloop {hlc : HasLC} [MachGS hlc GF] (P : ULIB_PUTC) (L : Uli
       fd (by ulib_regs; exact h22)) $$ Hc Hrun
     iintro Hrun
     iapply (ulibS_call L _ (ulibVprintf_i2b0 L.toUlibRun base) 0x2b4 rfl base
-      (ulibPc_back _ _ _ (by decide)) _ _) $$ Hc Hrun
+      (ulibPc_back _ _ _ (by decide)) ((lsb0_iff_even base).2 hb) _ _) $$ Hc Hrun
     iintro Hrun
     iapply (ulibPutc_callAt (hlc := hlc) P L.toUlibRun base hb _ n fd (sf j) Cj Cm (by ulib_regs)
       (by ulib_regs; rw [h11]; exact ulibZext_low _) (base + 0x2b4#64)

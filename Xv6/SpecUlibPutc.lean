@@ -25,7 +25,8 @@ callee-saved registers (Rocq `ucallee_saved`) and the obligation's `Co`.
 
 Deviation from Rocq (DU4, recorded here): Rocq states this four times at
 concrete addresses (`CatSyms.putc` etc.); here it is stated once.  The run
-interface is the spike's stand-in `UlibRun` (see `UlibRun.lean`); Rocq's
+interface is `UlibRun` (see `UlibRun.lean`; the engine's instance is
+`UlibRunUk.UlibRun.ofUkRun`); Rocq's
 `cat_code γt -∗` premise of `kcat_w` is dropped (the stub's code is the
 obligation's supplier's business, and it is persistent there).
 -/

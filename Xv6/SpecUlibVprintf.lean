@@ -27,7 +27,8 @@ text (`ulibTextStr`, Rocq `utext_str`), `vprintf` spills twelve words and
 post is the callee-saved registers (Rocq `ucallee_saved`).
 
 Deviation from Rocq (DU4, recorded): stated once, not four times; the run
-interface is the stand-in `UlibRunP` (`UlibRunPrintf.lean`); the program's
+interface is `UlibRunP` (`UlibRunPrintf.lean`; the engine's instance is
+`UlibRunUk.UlibRunP.ofUkRun`); the program's
 `cat_code γt` premise is the two code resources at `base`.  Rocq's `0 <= a`
 is vacuous over `Nat`.
 -/

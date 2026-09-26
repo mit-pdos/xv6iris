@@ -1,6 +1,6 @@
 /-
 The run interface the ulib PRINTF cone is proved against (union brief §5
-row P-printf; DU4).  It EXTENDS the putc spike's stand-in `UlibRun`
+row P-printf; DU4).  It EXTENDS the putc spike's interface `UlibRun`
 (`Xv6/UlibRun.lean`, same conventions, same reasons -- read its header) by
 the pieces `vprintf`/`fprintf`/`printf` use and `putc` did not:
 
@@ -21,8 +21,8 @@ the pieces `vprintf`/`fprintf`/`printf` use and `putc` did not:
   leaves carry the model's target-alignment premise (SpecUkLeaves
   `wpUkJalBody`/`wpUkBtypeBody`).
 
-SPIKE STAND-IN, like `UlibRun`: U2 instantiates it from `UkRun.urun` and
-`UK_LEAVES` (`UlibRunP.ofUkRun`).
+The real instance, from `UkRun.urun` and `UK_LEAVES`, is
+`UlibRunUk.UlibRunP.ofUkRun`.
 -/
 import Xv6.UlibRun
 import Xv6.SpecUkLeaves
@@ -66,7 +66,7 @@ structure UlibRunP (GF : BundledGFunctors) extends UlibRun GF where
   urun_uwordq_bnd : ∀ m pc av dq a w, urun m pc av ∗ uwordq dq a w ⊢ ⌜a + 8 ≤ 2 ^ 64⌝
   /-- Rocq `ustack_open`/`ustack_close` (UserHeap deviation 4). -/
   ustack_open : ∀ sp k, ustack sp k ⊢ ⌜sp.toNat % 8 = 0⌝ ∗ ulibWords toUlibRun sp.toNat k
-  ustack_close : ∀ sp k, sp.toNat % 8 = 0 → ulibWords toUlibRun sp.toNat k ⊢ ustack sp k
+  ustack_close : ∀ sp k, sp.toNat % 8 = 0 → 8 * k ≤ sp.toNat → ulibWords toUlibRun sp.toNat k ⊢ ustack sp k
   /-- `jal x0, imm` = `j`/`c.j` (Rocq `wp_uk_cj`). -/
   wp_j : ∀ (m : RegMap) (pc : BitVec 64) (av : Nat) (rvc : Bool) (imm : BitVec 21),
     (pc + BitVec.signExtend 64 imm).getLsbD 0 = false →

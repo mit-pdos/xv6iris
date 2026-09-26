@@ -89,7 +89,7 @@ theorem ulibVprintf_epi (L : UlibRunP GF) (base : BitVec 64) (m0 m : RegMap) (n 
   iintro W3 Hrun
   -- +0x2f6  addi sp,sp,96 : the pop
   ihave Hstk : L.ustack (m0 2#5) 12 $$ [W1 W2 W3 W4 W5 W6 W7 W8 W9 W10 W11 W12]
-  · iapply L.ustack_close _ _ hal
+  · iapply L.ustack_close _ _ hal (by omega)
     iapply ulibWords_close12
     isplitl [W1]; · iexists _; iexact W1
     isplitl [W2]; · iexists _; iexact W2
@@ -157,7 +157,7 @@ theorem ulibVprintf_step {hlc : HasLC} [MachGS hlc GF] (P : ULIB_PUTC) (L : Ulib
   iintro Hrun
   -- +0xf6  jal putc
   iapply (ulibS_call L _ (ulibVprintf_i0f6 L.toUlibRun base) 0xfa rfl base (ulibPc_back _ _ _ (by decide))
-    _ _) $$ Hc Hrun
+    ((lsb0_iff_even base).2 hb) _ _) $$ Hc Hrun
   iintro Hrun
   iapply (ulibPutc_callAt (hlc := hlc) P L.toUlibRun base hb _ n fd c0 Ci Co (by ulib_regs) (by ulib_regs; exact ulibZext_low c0)
     (base + 0xfa#64) (by ulib_regs; exact ulibRetPc_at base hb 0xfa (by decide))) $$ Hw Hpc HCi Hrun

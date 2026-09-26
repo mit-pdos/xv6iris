@@ -35,6 +35,13 @@ theorem ulibPutc_jal (b : BitVec 64) :
     b + BitVec.ofNat 64 0x12 + BitVec.signExtend 64 2096990#21 = ulibWriteAt b := by
   unfold ulibWriteAt; bv_decide
 
+/-- The `jal`'s target is 2-aligned at an even `base`. -/
+theorem ulibPutc_jal_even (b : BitVec 64) (hb : b.toNat % 2 = 0) :
+    (b + BitVec.ofNat 64 0x12 + BitVec.signExtend 64 2096990#21).getLsbD 0 = false := by
+  rw [ulibPutc_jal]
+  have hb' : b.getLsbD 0 = false := (lsb0_iff_even b).2 hb
+  unfold ulibWriteAt; bv_decide
+
 /-- The return address survives `jalr`'s mask at an even `base`. -/
 theorem ulibPutc_ret (b : BitVec 64) (hb : b.toNat % 2 = 0) :
     ulibRetPc (b + BitVec.ofNat 64 0x12 + 4#64) = b + BitVec.ofNat 64 0x16 := by
@@ -180,7 +187,7 @@ theorem wp_ulibPutc (L : UlibRun GF) (base : BitVec 64) (m : RegMap) (n : Nat) (
   iintro Hrun
   -- +0x12  jal ra,<write>
   ihave #Hi7 := c7 $$ Hcode
-  iapply (L.wp_jal _ _ n 2096990#21 1#5 (by decide) (by decide)) $$ Hi7 Hrun
+  iapply (L.wp_jal _ _ n 2096990#21 1#5 (by decide) (by decide) (ulibPutc_jal_even base hbase)) $$ Hi7 Hrun
   rw [ulibPutc_jal base]
   iintro Hrun
   -- write(fd, sp0-17, 1): the per-call obligation, at the stored byte
@@ -214,7 +221,7 @@ theorem wp_ulibPutc (L : UlibRun GF) (base : BitVec 64) (m : RegMap) (n : Nat) (
   iintro Hws0 Hrun
   -- +0x1a  addi sp,sp,32 : the pop, the frame goes back
   ihave Hstk : L.ustack (m 2#5) 4 $$ [Hwra Hws0 Hwb Hw32]
-  · iapply L.ustack_4_close _ hal
+  · iapply L.ustack_4_close _ hal (by omega)
     isplitl [Hwra]
     · iexists _; iexact Hwra
     isplitl [Hws0]

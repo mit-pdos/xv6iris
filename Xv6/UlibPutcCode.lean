@@ -109,7 +109,8 @@ theorem ulibPutcCode_instr (L : UlibRun GF) (base : BitVec 64) (k : Nat) (x : Ul
 /-- The table's entries are present at `base` in the program text `t`
 (decidable: a program's instance is `by decide +kernel` on its tree). -/
 def ulibPutcAt (t : Xv6.User.UTextTree) (base : Nat) : Bool :=
-  ulibPutcTab.all fun x => (t.find? (base + x.off)).map (fun k => (k.width, k.enc)) == some (x.width, x.enc)
+  ulibPutcTab.all fun x => (t.find? (base + x.off)).map (fun k => (k.width, k.enc)) == some (x.width, x.enc) &&
+    uTextGeom t x.width (base + x.off)
 
 /-- **THE RELOCATION LEMMA.**  A program text carrying `putc`'s encodings
 at `base` gives `putc`'s code resource at `base`: each entry's lookup is
@@ -122,9 +123,11 @@ theorem ulibPutcCode_of_text (L : UlibRun GF) (t : Xv6.User.UTextTree) (base : N
   iapply BigSepL.bigSepL_intro (P := iprop(□ L.utext t))
   · intro k x hk
     have hmem : x ∈ ulibPutcTab := List.mem_of_getElem? hk
+    have hx := List.all_eq_true.1 h x hmem
+    rw [Bool.and_eq_true] at hx
     have hat : (t.find? (base + x.off)).map (fun k => (k.width, k.enc)) = some (x.width, x.enc) := by
-      have := List.all_eq_true.1 h x hmem
-      simpa using this
+      simpa using hx.1
+    have hg : uTextGeom t x.width (base + x.off) = true := hx.2
     have hoff : x.off < ulibPutcSize := by
       simp only [ulibPutcTab, List.mem_cons, List.not_mem_nil, or_false] at hmem
       rcases hmem with h | h | h | h | h | h | h | h | h | h | h | h <;> subst h <;> decide
@@ -139,7 +142,7 @@ theorem ulibPutcCode_of_text (L : UlibRun GF) (t : Xv6.User.UTextTree) (base : N
       | some e =>
         rw [hf] at hat
         simp only [Option.map_some, Option.some.injEq, Prod.mk.injEq] at hat
-        simp only [Option.bind_some, hat.1, hat.2]
+        simp only [Option.bind_some, hat.1, hat.2, hg, if_true]
         exact ulibPutcTab_decode k x hk
     iintro #H'
     iapply L.utext_instr t _ x.rvc x.ast hdec

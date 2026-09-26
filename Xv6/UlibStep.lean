@@ -173,12 +173,12 @@ theorem ulibS_j {b : BitVec 64} {x : Nat} {rvc : Bool} {imm : BitVec 21}
 theorem ulibS_call {b : BitVec 64} {x : Nat} {imm : BitVec 21}
     (hc : C ⊢ L.uinstrIs (b + BitVec.ofNat 64 x) false (.JAL (imm, .Regidx 1#5)))
     (y : Nat) (hy : x + 4 = y) (tgt : BitVec 64) (ht : b + BitVec.ofNat 64 x + BitVec.signExtend 64 imm = tgt)
-    (m : RegMap) (av : Nat) :
+    (hal : tgt.getLsbD 0 = false) (m : RegMap) (av : Nat) :
     ⊢ C -∗ L.urun m (b + BitVec.ofNat 64 x) av -∗
       (L.urun (m.set 1#5 (b + BitVec.ofNat 64 y)) tgt av -∗ L.goal) -∗ L.goal := by
   iintro #HC Hrun Hk
   ihave #Hi := hc $$ HC
-  iapply (L.wp_jal m _ av imm 1#5 (by decide) (by decide)) $$ Hi Hrun
+  iapply (L.wp_jal m _ av imm 1#5 (by decide) (by decide) (by rw [ht]; exact hal)) $$ Hi Hrun
   have e : b + BitVec.ofNat 64 x + 4#64 = b + BitVec.ofNat 64 y := ulibPc_next b x y false hy
   rw [e, ht]
   iexact Hk
