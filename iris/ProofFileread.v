@@ -2092,14 +2092,16 @@ Section ProofFileread.
                      post says why the kernel cannot exclude them). *)
                   iDestruct "Hwin"
                     as "[(%Hwincr & %Hchcr & #Hswcr & Hincr)
-                        | (Hcred & %Hchdcr & %Hpldcr)]";
+                        | (Hcred & %Hchdcr & %Hpldcr & #Hswdcr)]";
                     last first.
                   { iApply (console_receipt_of_dirty _ _ (us_M U) (m !!! Regidx Ra1)
                               n (mword_of_int r) dcr dccr curcr bscr Rd Rin
                               hscr slcr
                               Hdb Hdcr Hb1cr (Hb4cr H0) Htagcr Hchdcr
                               (cons_placed_era _ _ _ _ _ _ Hconsera Hpldcr)
-                              with "Htagsc Hlbcr Hcred Hrd"). }
+                              with "Htagsc Hlbcr Hcred [] Hrd").
+                    iApply (cons_swallow_placed_era with "Hswdcr").
+                    exact Hconsera. }
                   iApply (console_receipt_of_run _ _ (us_M U) (m !!! Regidx Ra1)
                             n (mword_of_int r) dcr dccr curcr bscr Rd Rin
                             hscr slcr

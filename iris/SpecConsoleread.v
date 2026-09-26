@@ -373,7 +373,12 @@ Definition wp_consoleread_sconf_body
           no witness that its cursor is monotone across a release -- and
           nothing is fired. *)
        ∨ cons_dirty_cred Wd ∗ ⌜cons_chain sl⌝
-           ∗ ⌜cons_placed sl cur (cn_era cn) d hs⌝) -∗
+           ∗ ⌜cons_placed sl cur (cn_era cn) d hs⌝
+           (* ...AND THE SWALLOWED BYTE, PLACED THE SAME WAY (lane seccomp
+              S2k3): at [dc = d + 1] the call popped one byte it did not
+              deliver, and it sits in [sl] at or after [cur] with its tag
+              and the ring's era ([ConsoleInv.cons_swallow_placed]). *)
+           ∗ cons_swallow_placed sl cur (cn_era cn) d dc) -∗
       cons_out cn Wd ord cur dc -∗
       sie_cap_gpr KT1 mf av b pj -∗
       cpu_own 0%nat eb pj b lks -∗

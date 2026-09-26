@@ -1207,7 +1207,9 @@ Section SpecFileread.
              positions need not be consecutive, and are not promised to
              increase. *)
           ∨ cons_dirty_cred app_rdcred ∗ ⌜cons_chain sl⌝
-              ∗ ⌜cons_placed sl cur (S gen_id) d hs⌝) ∗
+              ∗ ⌜cons_placed sl cur (S gen_id) d hs⌝
+              (* ...and the swallowed byte, placed the same way (S2k3) *)
+              ∗ cons_swallow_placed sl cur (S gen_id) d dc) ∗
          Rd cur dc)%I.
 
   (* the -1 arm, at every caller: whatever the caller asked for comes back,
@@ -1334,11 +1336,12 @@ Section SpecFileread.
     ([∗ list] h ∈ hs, riscv_rx_tag h) -∗
     cons_stored_lb fsc_cons sl -∗
     cons_dirty_cred app_rdcred -∗
+    cons_swallow_placed sl cur (S gen_id) d dc -∗
     Rd cur dc -∗
     console_receipt gn P Rd Rin n r (umem_wr M addr d bs) addr.
   Proof using .
     intros Hd Hdmax Hb1 Hb4 [Hhl Htie] Hchd Hpld.
-    iIntros "Hts Hlb #Hcred Hrd".
+    iIntros "Hts Hlb #Hcred #Hsw Hrd".
     rewrite /console_receipt. iRight. iExists d, dc, cur, hs, sl.
     iSplitR; [by iPureIntro |]. iSplitR; [by iPureIntro |].
     iSplitR; [by iPureIntro |]. iSplitR; [by iPureIntro |].
@@ -1350,7 +1353,7 @@ Section SpecFileread.
       rewrite (umem_wr_lookup_in M addr d bs j Hj Hlin). by rewrite Hbj. }
     iFrame "Hts Hlb". iSplitR; [| iExact "Hrd"].
     iRight. iSplitR; [iExact "Hcred" |].
-    iSplitR; [by iPureIntro | by iPureIntro].
+    iSplitR; [by iPureIntro |]. iSplitR; [by iPureIntro | iExact "Hsw"].
   Qed.
 
   (* THE ARM'S PAYOUT WITHOUT THE PAYLOAD.  This is what the PROCESS is
