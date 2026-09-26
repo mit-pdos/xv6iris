@@ -32,10 +32,16 @@ merge to `main` when the whole tree and the audits are green.  Design §2.
   `LEcho []`; `RFSilent`/`RCSilent` out; `lmh_noc` optional, the pad on
   `lmh_exf`; the decider; demos, including the NEGATIVE `echo a > f; echo b
   > f; cat f` -> `a` (refuted again once the OOM death prints).
-- [ ] **SY1-P** (proofs): the child's OOM law (print, file `ROom`, pay `Wc I
+- [x] **SY1-P** (proofs): the child's OOM law (print, file `ROom`, pay `Wc I
   0`) discharging SY1-U's continuation at every child; `ushf_wq`'s left arm
   gone; the fork re-entry's whole-lend row refuted; PEND at the block's own
-  alternative; audits 13/13/14.
+  alternative; audits 13/13/14.  Findings: (i) `ushp_oom`'s lend must carry
+  the child's LEDGER (panic writes fd 2), so the child walks pass `Cr ∗ ustd
+  ld`; (ii) the blank-line arm is the TAINT's (the read's clean arm
+  delivers an admissible line, never newline-first), so no `Wc I 3 -∗ Wc I
+  0` law survives anywhere and `REcho 2` at `LEcho []` has no proof use;
+  (iii) the node-0 pipeline OOM budget fits because a pipeline has at most
+  15 stages (`UShUPipes.upls_fs_le15`).
 
 ## SY2 -- the `sync` line
 
