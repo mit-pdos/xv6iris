@@ -475,9 +475,9 @@ Record app_iface (Σ : gFunctors) := MkAppIface {
      credential ([AppInv.app_rdcred]) admits it beside [app_sup], and
      [WpUart.cons_licence_at_of_wild] reads the era's licence off it.  The
      law covers the two PROCESS events only ([ConsLog.wild_ev]: [EvOut],
-     [EvRead] -- the echo arm's events are the interrupt's), and is stated
-     WITH the console log's two validity premises, exactly as
-     [WpUart.cons_link] supplies them.  An
+     [EvRead] -- the echo arm's events are the interrupt's), under the
+     event's validity premise [ConsLog.cons_ev_ok] ([True] at [EvOut], so
+     a bare [WpUart.out_link] can pay it; [read_ok] at [EvRead]).  An
      application with no such program sets it to [fun _ => False]
      ([wild_none]). *)
   ai_wild : nat -> iProp Σ;
@@ -486,8 +486,7 @@ Record app_iface (Σ : gFunctors) := MkAppIface {
   ai_wild_lic : forall k, ai_wild k ⊢
     □ (∀ (h : list mobs) (H : LogEntryDefs.cons_hist)
          (ev : ConsLog.cons_ev),
-         ⌜ConsLog.wild_ev ev⌝ -∗
-         ⌜ConsLog.cons_hist_ok H⌝ -∗ ⌜ConsLog.cons_ev_ok H ev⌝ -∗
+         ⌜ConsLog.wild_ev ev⌝ -∗ ⌜ConsLog.cons_ev_ok H ev⌝ -∗
          ai_cons k h H ==∗ ai_cons k h (ConsLog.cons_step H ev));
 }.
 Arguments MkAppIface {Σ} _ _ _ _ _ _ _ _ _ _ _ _ _.
@@ -515,8 +514,7 @@ Lemma wild_none_lic {Σ : gFunctors}
   wild_none k ⊢
     □ (∀ (h : list mobs) (H : LogEntryDefs.cons_hist)
          (ev : ConsLog.cons_ev),
-         ⌜ConsLog.wild_ev ev⌝ -∗
-         ⌜ConsLog.cons_hist_ok H⌝ -∗ ⌜ConsLog.cons_ev_ok H ev⌝ -∗
+         ⌜ConsLog.wild_ev ev⌝ -∗ ⌜ConsLog.cons_ev_ok H ev⌝ -∗
          C k h H ==∗ C k h (ConsLog.cons_step H ev)).
 Proof using . rewrite /wild_none. by iIntros "[]". Qed.
 
