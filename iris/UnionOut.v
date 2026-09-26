@@ -164,6 +164,16 @@ Section union_out.
   Global Instance usecc_tok_timeless k : Timeless (usecc_tok k).
   Proof using . rewrite /usecc_tok. apply _. Qed.
 
+  (* ...at its own line *)
+  Definition usecc_tok_at (k : nat) (I0 : list (bv 8)) : iProp Σ :=
+    secc_tok_at U ucparams k I0.
+  Global Instance usecc_tok_at_persistent k I0 : Persistent (usecc_tok_at k I0).
+  Proof using . rewrite /usecc_tok_at. apply _. Qed.
+  Global Instance usecc_tok_at_timeless k I0 : Timeless (usecc_tok_at k I0).
+  Proof using . rewrite /usecc_tok_at. apply _. Qed.
+  Lemma usecc_tok_of_at (k : nat) (I0 : list (bv 8)) : usecc_tok_at k I0 -∗ usecc_tok k.
+  Proof using . exact (secc_tok_of_at U ucparams k I0). Qed.
+
   Lemma ucl_unfold (k : nat) (ho : list mobs) (H : LogEntryDefs.cons_hist) :
     ucl k ho H ⊣⊢ UT ∨ (∃ v, UPIN k v ∗ secc_flag v 0 ∗ peclV pg U ucparams ∅ uwa k ho H)
                   ∨ wildV U ucparams ∅ uwa uwild k ho H.
@@ -230,13 +240,13 @@ Section union_out.
               k v P b ps0 cs0 s0 I0 ho H Hn Hpin0 Hb with "Hpin Ht Hps Hcs HE HW Hcl").
   Qed.
 
-  (* (B) A BLOCK'S FIRST BYTE, filing the round's alternative -- or, AT
-     THE WILD LINE, the ESCAPE to the era's wild token (the model admits
-     the shell's own non-terminal alternatives at a [seccomp x] line, and
-     the claim has frozen the choice list: seccomp design 10.7) *)
+  (* (B) A BLOCK'S FIRST BYTE, filing the round's alternative, at a line
+     that is not a [seccomp x] line (premise; seccomp design 10.10: no
+     escape -- the shell's round there never presents a block-first byte) *)
   Lemma ucl_step_write_blk (k : nat) (v : era_pins) (P a : nat) (b : bv 8)
       (ps0 cs0 : list nat) (s0 : fstate) (I0 : list (bv 8)) (ho : list mobs)
       (H : LogEntryDefs.cons_hist) :
+    uwild (lm_of U (bodies_of I0 !!! (nlines I0 - 1)%nat)) = false ->
     I0 <> [] ->
     rest_of I0 = [] ->
     (nlines I0 <= S (length cs0))%nat ->
@@ -250,15 +260,14 @@ Section union_out.
     UPIN k v -∗ turn v P -∗ ps_lb v ps0 -∗ cs_lb v cs0 -∗ inp_lb v I0 -∗ f0cw gf k s0 -∗
     ucl k ho H ==∗
       ucl k ho (ConsLog.cons_step H (ConsLog.EvOut b))
-      ∗ (((turn v (S P) ∗ ps_lb v ps0 ∗ cs_lb v (cs0 ++ [a]) ∗ inp_lb v I0
-           ∗ f0cw gf k s0) ∨ UT)
-         ∨ (usecc_tok k ∗ cs_frozen_at v (nlines I0 - 1)%nat ∗ inp_lb v I0)).
+      ∗ ((turn v (S P) ∗ ps_lb v ps0 ∗ cs_lb v (cs0 ++ [a]) ∗ inp_lb v I0
+          ∗ f0cw gf k s0) ∨ UT).
   Proof using .
-    intros Hne0 Hr0 Hdiv Hpin0 HPeq Hok Hterm Hhead.
+    intros Hnw Hne0 Hr0 Hdiv Hpin0 HPeq Hok Hterm Hhead.
     iIntros "Hpin Ht Hps Hcs HE HW Hcl".
     iApply (pwclV_step_write_blk pg U ucparams UB ∅ uwa uwild uwild_wild
               k v P a b ps0 cs0 s0 I0 ho H
-              Hne0 Hr0 Hdiv Hpin0 HPeq Hok Hterm Hhead
+              Hnw Hne0 Hr0 Hdiv Hpin0 HPeq Hok Hterm Hhead
               with "Hpin Ht Hps Hcs HE HW Hcl").
   Qed.
 

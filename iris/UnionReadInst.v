@@ -87,25 +87,22 @@ Section union_read_inst.
 
   Local Lemma uri_rd (k n : nat) (v : era_pins)
       (ws : list (list mobs * bv 8)) (Φ : iProp Σ) :
-    ⊢ union_links ug -∗ upin ug k v -∗ dl_cnt v (1/2) n -∗
+    ⊢ union_links ug -∗ UPIN k v -∗ dl_cnt v (1/2) n -∗
       (uread_ret ug k v n ws -∗ Φ) -∗
       cons_link Uart0 k (ConsLog.EvRead ws) Φ.
   Proof using .
-    iIntros "#Hlk [#Hpin _] Hdl HΦ".
+    iIntros "#Hlk #Hpin Hdl HΦ".
     iDestruct (union_links_rd with "Hlk") as "#Hrdl".
     iApply ("Hrdl" $! k v n ws with "Hpin Hdl HΦ").
   Qed.
 
   Local Lemma uri_rd_taint (ws : list (list mobs * bv 8)) (Φ : iProp Σ) :
-    ⊢ union_links ug -∗ uT ug -∗ (uT ug -∗ Φ) -∗
+    ⊢ union_links ug -∗ UT -∗ (UT -∗ Φ) -∗
       cons_link Uart0 (S gen_id) (ConsLog.EvRead ws) Φ.
   Proof using .
-    iIntros "#Hlk #HT HΦ". rewrite /uT.
-    iDestruct "HT" as "[#HU | #Htok]".
-    - iDestruct (union_links_rd_taint with "Hlk") as "#Hrdt".
-      iApply ("Hrdt" $! (S gen_id) ws with "HU [HΦ]"). iIntros "_". iApply "HΦ". by iLeft.
-    - iDestruct (union_links_eq with "Hlk") as %Hc.
-      iApply (union_read_link_wild ug Hc with "Htok"). iApply "HΦ". by iRight.
+    iIntros "#Hlk #HT HΦ".
+    iDestruct (union_links_rd_taint with "Hlk") as "#Hrdt".
+    iApply ("Hrdt" $! (S gen_id) ws with "HT HΦ").
   Qed.
 
   (* THE LAST CONSUMED ENTRY'S TAG ([FileReadInst]'s, verbatim): the
@@ -165,7 +162,7 @@ Section union_read_inst.
     cons_window sl (length I) dd g0 hs ->
     sl `prefix_of` sl' ->
     (forall j : nat, (j < dc)%nat -> ws !! j = sl' !! (length I + j)%nat) ->
-    ⊢ upin ug (S gen_id) v -∗ inp_lb v I -∗
+    ⊢ UPIN (S gen_id) v -∗ inp_lb v I -∗
       urresw ug v I -∗
       uread_ret ug (S gen_id) v (length I) ws -∗
       ([∗ list] hh ∈ hs, riscv_rx_tag hh) -∗
@@ -176,19 +173,14 @@ Section union_read_inst.
            ⌜length J = dc⌝ ∗ ⌜lm_disc_input U (I ++ J)⌝
            ∗ ⌜(0 < dd)%nat -> g0 0%nat = J !!! 0%nat⌝
            ∗ inp_lb v (I ++ J) ∗ urresw ug v (I ++ J))
-      ∨ uT ug.
+      ∨ UT.
   Proof using Htag.
     intros Hddc Hlws Hwinf Hpre2 Hwsj.
-    iIntros "[#Hpin _] #HE0 [#Hres0 #Hw0] Hret #Htags #Hsw #Hlb2".
+    iIntros "#Hpin #HE0 (#Hres0 & #Hw0 & #Hwt0) Hret #Htags #Hsw #Hlb2".
     rewrite /uread_ret.
-    iDestruct "Hret" as "[[#HT _] | [Hdlr Hfacts]]"; [ iRight; by iLeft | ].
+    iDestruct "Hret" as "[[#HT _] | [Hdlr Hfacts]]"; [ by iRight | ].
     iDestruct "Hfacts" as (pops dl)
       "(%Hrok & %Hdl & %Hpref & %Hidx & %Hdsce & %Hboots & #HEin & %Hdinp & Hrest & Htok)".
-    (* A READ THAT COMPLETES THE [seccomp x] LINE: the era is wild, and the
-       reader leaves with the token (seccomp design 10.4) *)
-    destruct (decide (uread_wild (snd <$> (dl ++ ws)) ws)) as [Hwd | _].
-    { iDestruct ("Htok" with "[//]") as "#Htk". iRight. rewrite /uT.
-      iDestruct "Htk" as "[Htk | HU]"; [by iRight | by iLeft]. }
     iEval (rewrite Hlws) in "Hdlr".
     iDestruct (inp_lb_cmp v I (snd <$> (dl ++ ws)) with "HE0 HEin") as %Hcmp.
     assert (Hlen' : length (snd <$> (dl ++ ws)) = (length I + dc)%nat).
@@ -207,6 +199,17 @@ Section union_read_inst.
     assert (HJlen : length J = dc)
       by (rewrite HJ length_app in Hlen'; lia).
     assert (HJdisc : lm_disc_input U (I ++ J)) by (rewrite <- HJ; exact Hdinp).
+    (* A READ THAT COMPLETES THE [seccomp x] LINE: the era is wild, and the
+       residue carries the token (seccomp design 10.4/10.10) -- off the
+       receipt where bytes were consumed, off the old residue where none *)
+    iAssert (⌜uwild_at (I ++ J)⌝ → usecc_tok_at ug (S gen_id) (I ++ J) ∨ UT)%I
+      with "[Htok]" as "#Hwtn".
+    { destruct (decide (ws = [])) as [Hws0 | Hws0].
+      - assert (HJnil : J = []).
+        { subst ws. cbn in Hlws. apply nil_length_inv. lia. }
+        rewrite HJnil app_nil_r. iExact "Hwt0".
+      - iIntros "%Hwa". rewrite -HJ. iApply "Htok". iPureIntro.
+        rewrite -HJ in Hwa. destruct Hwa as (? & ? & ?). by repeat split. }
     iDestruct "Hrest" as "#Hrest".
     iAssert (gwc_rres U (union_params ug) v (I ++ J)) as "#Hresn".
     { iDestruct "Hrest" as "[%Hws0 | Hbb]".
@@ -249,10 +252,10 @@ Section union_read_inst.
       - rewrite last_app Hlast. reflexivity.
       - exact Hsh.
       - exact Hw. }
-    iDestruct "Hwn" as "[#Hwn | #HT]"; [ | iRight; by iLeft ].
+    iDestruct "Hwn" as "[#Hwn | #HT]"; [ | by iRight ].
     iLeft. iFrame "Hdlr". iExists J.
     iSplitR; [ by iPureIntro | ]. iSplitR; [ by iPureIntro | ].
-    iSplitR; [ | iFrame "HEn"; rewrite /urresw; iFrame "Hresn Hwn" ].
+    iSplitR; [ | iFrame "HEn"; rewrite /urresw; iFrame "Hresn Hwn Hwtn" ].
     iPureIntro. intro Hdd0.
     exact (rr_byte_of_rows (lm_disc_input U) sl sl' ws dl hs pops I J dd dc g0
              lm_disc_input_U_no_cr

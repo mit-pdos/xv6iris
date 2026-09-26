@@ -159,10 +159,11 @@ Section union_links.
     iModIntro. iExists o. rewrite uchist_at0. iFrame "Hlb Hres". by iApply "HΦ".
   Qed.
 
-  (* (B) A BLOCK'S FIRST BYTE, filing the round's alternative -- or the
-     ESCAPE to the era's wild token at the [seccomp x] line itself *)
+  (* (B) A BLOCK'S FIRST BYTE, filing the round's alternative, at a line
+     that is not a [seccomp x] line (premise) *)
   Lemma union_write_link_blk (k : nat) (v : era_pins) (P a : nat) (b : bv 8)
       (ps0 cs0 : list nat) (s0 : fstate) (I0 : list (bv 8)) (Φ : iProp Σ) :
+    uwild (lm_of U (bodies_of I0 !!! (nlines I0 - 1)%nat)) = false ->
     I0 <> [] ->
     rest_of I0 = [] ->
     (nlines I0 <= S (length cs0))%nat ->
@@ -175,16 +176,15 @@ Section union_links.
       (lm_of U (bodies_of I0 !!! (nlines I0 - 1)%nat)) (lm_dec U a) !! 0%nat = Some b ->
     UPIN k v -∗ turn v P -∗ ps_lb v ps0 -∗ cs_lb v cs0 -∗ inp_lb v I0 -∗
     f0cw gf k s0 -∗
-    ((((turn v (S P) ∗ ps_lb v ps0 ∗ cs_lb v (cs0 ++ [a]) ∗ inp_lb v I0
-        ∗ f0cw gf k s0) ∨ UT)
-      ∨ (usecc_tok ug k ∗ cs_frozen_at v (nlines I0 - 1)%nat ∗ inp_lb v I0)) -∗ Φ) -∗
+    (((turn v (S P) ∗ ps_lb v ps0 ∗ cs_lb v (cs0 ++ [a]) ∗ inp_lb v I0
+       ∗ f0cw gf k s0) ∨ UT) -∗ Φ) -∗
     out_link Uart0 k b Φ.
   Proof using Hcons.
-    intros Hne Hr Hn Hpin0 HP Hok Hfk Hb.
+    intros Hnw Hne Hr Hn Hpin0 HP Hok Hfk Hb.
     iIntros "#Hpin Ht #Hpslb #Hcslb #Hilb #HW HΦ" (o H) "#Hlb Hres".
     rewrite !uchist_at0.
     iMod (ucl_step_write_blk ug k v P a b ps0 cs0 s0 I0 (default [] o) H
-            Hne Hr Hn Hpin0 HP Hok Hfk Hb
+            Hnw Hne Hr Hn Hpin0 HP Hok Hfk Hb
             with "Hpin Ht Hpslb Hcslb Hilb HW Hres") as "(Hres & Hret)".
     iModIntro. iExists o. rewrite uchist_at0. iFrame "Hlb Hres". by iApply "HΦ".
   Qed.
@@ -245,7 +245,8 @@ Section union_links.
                   ∗ turn_lb v (length (lm_proc_before U ps0 cs0 s0
                                  (snd <$> (dl ++ ws))))
                   ∗ ⌜lm_rd_stage U ps0 cs0 s0 (snd <$> (dl ++ ws))⌝)
-           ∗ (⌜uread_wild (snd <$> (dl ++ ws)) ws⌝ -∗ usecc_tok ug k ∨ UT))%I.
+           ∗ (⌜uread_wild (snd <$> (dl ++ ws)) ws⌝
+              -∗ usecc_tok_at ug k (snd <$> (dl ++ ws)) ∨ UT))%I.
 
   Lemma union_read_link (k : nat) (v : era_pins) (n : nat)
       (ws : list (list mobs * bv 8)) (Φ : iProp Σ) :

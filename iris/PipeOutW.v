@@ -21,12 +21,12 @@
 (*     line.  The log is FROZEN: an open is refuted by D4.                *)
 (*  3. EVERY STEP of [peclV] at the new claim: the middle arm is the old  *)
 (*     step; the third arm is closed by REFUTING the presenter off the    *)
-(*     turn agreement ([GenOutWild]'s pins), except the block-first byte  *)
-(*     AT the wild line itself, whose non-terminal alternative the model  *)
-(*     admits: [pwclV_step_write_blk] returns the ESCAPE                  *)
-(*     [secc_tok k ∗ cs_frozen_at v (nlines I0 - 1) ∗ inp_lb v I0] there  *)
-(*     (owner's ruling: the union's link record absorbs it into its       *)
-(*     taint [UT ∨ secc_tok (S gen_id)]).                                 *)
+(*     turn agreement ([GenOutWild]'s pins).  The block-first byte AT    *)
+(*     the wild line itself (a non-terminal alternative the model admits) *)
+(*     is REFUSED BY PREMISE: [pwclV_step_write_blk] takes               *)
+(*     [WL (line) = false] (owner's ruling (d), no escape: the shell     *)
+(*     never presents a block-first byte at a wild line; its diagnostics *)
+(*     there go through the licence [pwclV_wild_lic]).                    *)
 (*  4. THE TRANSITION (10.4) inside the read: a read whose window         *)
 (*     completes a wild line bumps the flag, freezes [cs] and re-closes   *)
 (*     the claim at [wildV]; the reader's receipt carries the token.     *)
@@ -126,12 +126,29 @@ Section pipes_wild_v.
        ∗ ⌜(0 < nlines I0)%nat /\ rest_of I0 = []⌝
        ∗ cs_frozen_at v (nlines I0 - 1)%nat)%I.
 
+  (* ...AT ITS OWN LINE: the input the read completed, named *)
+  Definition secc_tok_at (k : nat) (I0 : list (bv 8)) : iProp Σ :=
+    (∃ v : era_pins,
+       PIN k v ∗ mono_nat_lb_own (ep_secc v) 1 ∗ inp_lb v I0
+       ∗ ⌜(0 < nlines I0)%nat /\ rest_of I0 = [] /\ lm_disc_input M I0⌝
+       ∗ cs_frozen_at v (nlines I0 - 1)%nat)%I.
+
   Global Instance secc_flag_timeless v n : Timeless (secc_flag v n).
   Proof using . rewrite /secc_flag. apply _. Qed.
   Global Instance secc_tok_persistent k : Persistent (secc_tok k).
   Proof using . rewrite /secc_tok. apply _. Qed.
   Global Instance secc_tok_timeless k : Timeless (secc_tok k).
   Proof using . rewrite /secc_tok. apply _. Qed.
+  Global Instance secc_tok_at_persistent k I0 : Persistent (secc_tok_at k I0).
+  Proof using . rewrite /secc_tok_at. apply _. Qed.
+  Global Instance secc_tok_at_timeless k I0 : Timeless (secc_tok_at k I0).
+  Proof using . rewrite /secc_tok_at. apply _. Qed.
+
+  Lemma secc_tok_of_at (k : nat) (I0 : list (bv 8)) : secc_tok_at k I0 -∗ secc_tok k.
+  Proof using .
+    iIntros "(%v & Hp & Hlb & HI & %Hn & Hf)". iExists v, I0. iFrame.
+    iPureIntro. split; [exact (proj1 Hn) | exact (proj1 (proj2 Hn))].
+  Qed.
 
   (* THE TOKEN REFUTES THE MIDDLE ARM *)
   Lemma secc_tok_flag0 (k : nat) (v : era_pins) :
@@ -471,12 +488,13 @@ Section pipes_wild_v.
       pose proof (prefix_length _ _ Hcsp). rewrite HEI in Hlen H0. lia.
   Qed.
 
-  (* (B) A BLOCK'S FIRST BYTE: below the wild line the cursor refutes it
-     ([lm_blk_stage_inp]); AT the wild line the model admits the shell's
-     own non-terminal alternatives, and the byte ESCAPES to the token *)
+  (* (B) A BLOCK'S FIRST BYTE, at a line that is NOT wild (premise): the
+     wild arm is refuted -- the cursor pins the presenter's line to the
+     frozen one ([lm_blk_stage_inp]), which is wild *)
   Lemma pwclV_step_write_blk (k : nat) (v : era_pins) (P a : nat) (b : bv 8)
       (ps0 cs0 : list nat) (s0 : lm_st M) (I0 : list (bv 8)) (ho : list mobs)
       (H : LogEntryDefs.cons_hist) :
+    WL (lm_of M (bodies_of I0 !!! (nlines I0 - 1)%nat)) = false ->
     I0 <> [] ->
     rest_of I0 = [] ->
     (nlines I0 <= S (length cs0))%nat ->
@@ -490,18 +508,17 @@ Section pipes_wild_v.
     PIN k v -∗ turn v P -∗ ps_lb v ps0 -∗ cs_lb v cs0 -∗ inp_lb v I0 -∗ gcW G k s0 -∗
     pwclV k ho H ==∗
       pwclV k ho (ConsLog.cons_step H (ConsLog.EvOut b))
-      ∗ (((turn v (S P) ∗ ps_lb v ps0 ∗ cs_lb v (cs0 ++ [a]) ∗ inp_lb v I0
-           ∗ gcW G k s0) ∨ T)
-         ∨ (secc_tok k ∗ cs_frozen_at v (nlines I0 - 1)%nat ∗ inp_lb v I0)).
+      ∗ ((turn v (S P) ∗ ps_lb v ps0 ∗ cs_lb v (cs0 ++ [a]) ∗ inp_lb v I0
+          ∗ gcW G k s0) ∨ T).
   Proof using B HWL.
-    intros Hne0 Hr0 Hdiv Hpin0 HPeq Hok Hterm Hhead.
+    intros Hnw Hne0 Hr0 Hdiv Hpin0 HPeq Hok Hterm Hhead.
     iIntros "#Hpin Ht #Hpslb #Hcslb #Hilb #HW Hcl". rewrite /pwclV.
     iDestruct "Hcl" as "[#HT | [(%v1 & #Hp1 & Hf & Hc) | Hw]]".
-    - iModIntro. iSplitR; [by iLeft | iLeft; by iRight].
+    - iModIntro. iSplitR; [by iLeft | by iRight].
     - iMod (peclV_step_write_blk g M G B sd WA k v P a b ps0 cs0 s0 I0 ho H
               Hne0 Hr0 Hdiv Hpin0 HPeq Hok Hterm Hhead
               with "Hpin Ht Hpslb Hcslb Hilb HW Hc") as "[Hc Hr]".
-      iModIntro. iSplitR "Hr"; [| by iLeft].
+      iModIntro. iSplitR "Hr"; [| done].
       iApply (pwclV_mid with "Hp1 Hf Hc").
     - iDestruct "Hw" as (v' so u)
         "(#Hpn & Hfl & Hwa & Hx & Hta & #Hcs & Hps & HE & Hdl & Hdll & %Hw)".
@@ -520,16 +537,8 @@ Section pipes_wild_v.
       pose proof (lm_blk_stage_inp M K ps0 (gs_ps M so) cs0 (gs_cs M so) (st so)
                     I0 (snd <$> gs_E M so) Hpsp Hcsp Hpin0 Hne0 Hr0 Hdiv HIp Hcsb
                     ltac:(rewrite -HPeq HP Hpc; reflexivity)) as HIE.
-      iAssert (mono_nat_lb_own (ep_secc v) 1)%I as "#Hlb".
-      { iApply (mono_nat_lb_own_get with "Hfl"). }
-      iAssert (cs_frozen_at v (nlines I0 - 1)%nat)%I as "#Hfz".
-      { iApply (cs_frozen_at_of with "Hcs"). by rewrite Hlen HIE. }
-      iModIntro. iSplitR "Hpin"; last first.
-      { iRight. iSplitR; [| iSplitR; [iExact "Hfz" | iExact "Hilb"]].
-        iExists v, I0. iFrame "Hpin Hlb Hilb Hfz".
-        iPureIntro. split; [exact (nlines_pos_of_rest_nil I0 Hne0 Hr0) | exact Hr0]. }
-      iRight. iRight. iApply wildV_out.
-      iExists v, so, u. iFrame "Hpn Hfl Hwa Hx Hta Hcs Hps HE Hdl Hdll". by iPureIntro.
+      pose proof Hw as (_ & _ & _ & _ & _ & _ & _ & _ & Hwl).
+      rewrite -HIE /lm_line_at in Hwl. by rewrite Hwl in Hnw.
   Qed.
 
 
@@ -639,7 +648,8 @@ Section pipes_wild_v.
      a wild line -- the era's wild token (or the taint) *)
   Definition rd_retW (k : nat) (v : era_pins) (n : nat) (CH : LogEntryDefs.cons_hist)
       (ws : list (list mobs * bv 8)) : iProp Σ :=
-    (rd_retV M G k v n CH ws ∗ (⌜rd_wild CH ws⌝ -∗ secc_tok k ∨ T))%I.
+    (rd_retV M G k v n CH ws
+     ∗ (⌜rd_wild CH ws⌝ -∗ secc_tok_at k (snd <$> (LogEntryDefs.ch_dl CH ++ ws)) ∨ T))%I.
 
   Lemma pwclV_step_read (k : nat) (v : era_pins) (n : nat) (ho : list mobs)
       (CH : LogEntryDefs.cons_hist) (ws : list (list mobs * bv 8)) :
@@ -750,8 +760,8 @@ Section pipes_wild_v.
         iSplitR; [| by iPureIntro].
         iApply (turn_lb_weaken with "Htlb").
         rewrite /lm_pcount Hw0 HEI. cbn [length]. unfold I' in *. lia.
-      + iIntros "_". iLeft. iExists v, I'. iFrame "Hpin2 Hlb HI' Hfzat".
-        iPureIntro. split; [exact Hpos | exact Hr].
+      + iIntros "_". iLeft. iExists v. iFrame "Hpin2 Hlb HI' Hfzat".
+        iPureIntro. split_and!; [exact Hpos | exact Hr | exact Hdi].
     - (* THE WILD ERA: nothing is delivered *)
       iDestruct "Hw" as (v2 so u)
         "(#Hpn & Hfl & Hwa & Hx & Hta & #Hcs & Hps & HE & Hdl & Hdll & %Hw)".

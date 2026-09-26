@@ -191,7 +191,8 @@ Section file_link_gen.
       FPIN _ _ (era_pin_agree (fgn_echo g))
       (f0w g) _ _
       f0bwk _ _ (S gen_id) f0w_bwk f0w_bwk0 f0bwk_agree
-      (fhead g) _ fhead_cur fhead_inp.
+      (fhead g) _ fhead_cur fhead_inp
+      (fun _ => False).
 
   (* =================================================================== *)
   (*  2.  THE LINKS ENTAIL THE INTERFACE                                  *)
@@ -343,7 +344,8 @@ Section file_link_gen.
       FPIN _ _ (era_pin_agree (fgn_echo g))
       (f0w_at s0) _ _
       f0bwk _ _ (S gen_id) (f0w_at_bwk s0) (f0w_at_bwk0 s0) f0bwk_agree
-      (fhead_at s0) _ (fhead_at_cur s0) (fhead_at_inp s0).
+      (fhead_at s0) _ (fhead_at_cur s0) (fhead_at_inp s0)
+      (fun _ => False).
 
   Lemma f0w_at_cw (s0 : fstate) (k : nat) (s : fstate) :
     f0w_at s0 k s -∗ f0cw g k s.

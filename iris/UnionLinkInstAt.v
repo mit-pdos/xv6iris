@@ -86,15 +86,16 @@ Section union_link_inst_at.
 
   Definition union_params_at (s0 : fstate) : gen_params U :=
     MkGP U ulmG_laws ulmG_hooks
-      (uT ug) _ _
-      (upin ug) _ _ (upin_agree ug)
+      UT _ _
+      UPIN _ _ (era_pin_agree (fgn_echo gf))
       (f0w_at gf s0) _ _
       (uf0bwk ug) _ _ (S gen_id) (uf0w_at_bwk s0) (uf0w_at_bwk0 s0) (uf0bwk_agree ug)
-      (fhead_at gf s0) _ (fhead_at_cur gf s0) (fhead_at_inp gf s0).
+      (fhead_at gf s0) _ (fhead_at_cur gf s0) (fhead_at_inp gf s0)
+      (fun I => uwild (lm_line_at U I) = true).
 
-  Lemma union_params_at_T (s0 : fstate) : gT (union_params_at s0) = uT ug.
+  Lemma union_params_at_T (s0 : fstate) : gT (union_params_at s0) = UT.
   Proof using . reflexivity. Qed.
-  Lemma union_params_at_PIN (s0 : fstate) : gPIN (union_params_at s0) = upin ug.
+  Lemma union_params_at_PIN (s0 : fstate) : gPIN (union_params_at s0) = UPIN.
   Proof using . reflexivity. Qed.
   Lemma union_params_at_W (s0 : fstate) : gW (union_params_at s0) = f0w_at gf s0.
   Proof using . reflexivity. Qed.
@@ -105,40 +106,38 @@ Section union_link_inst_at.
   Proof using .
     iIntros "Hlk". iDestruct (union_links_eq with "Hlk") as %Hc.
     rewrite /glinks /gl_w /gl_blk /gl_pro /gl_head /gl_taint.
-    cbn [gT gPIN gW gH union_params_at].
+    cbn [gT gPIN gW gH gwild union_params_at].
     iSplitR; [| iSplitR; [| iSplitR; [| iSplitR]]].
     - iIntros "!>" (k v P0 b ps0 cs0 s0' I0 Φ)
-        "%H1 %H2 %H3 [#Hpin _] #Hw Ht #Hps #Hcs #HE HΦ".
+        "%H1 %H2 %H3 #Hpin #Hw Ht #Hps #Hcs #HE HΦ".
       iApply (union_write_link ug Hc k v P0 b ps0 cs0 s0' I0 Φ H1 H2 H3
                 with "Hpin Ht Hps Hcs HE [Hw] [HΦ]"); [by iApply f0w_at_cw |].
       iIntros "[(Ht & Hps' & Hcs' & HE' & _) | #HT]"; iApply "HΦ";
-        [iLeft; by iFrame "Ht Hps' Hcs' HE'" | iRight; by iLeft].
+        [iLeft; by iFrame "Ht Hps' Hcs' HE'" | by iRight].
     - iIntros "!>" (k v P0 a b ps0 cs0 s0' I0 Φ)
-        "%H1 %H2 %H3 %H4 %H5 %H6 %H7 %H8 [#Hpin %Hk] #Hw Ht #Hps #Hcs #HE HΦ".
-      rewrite /lm_abs /lm_line_at in H6 H8.
-      iApply (union_write_link_blk ug Hc k v P0 a b ps0 cs0 s0' I0 Φ H1 H2 H3 H4 H5 H6 H7 H8
+        "%H0 %H1 %H2 %H3 %H4 %H5 %H6 %H7 %H8 #Hpin #Hw Ht #Hps #Hcs #HE HΦ".
+      rewrite /lm_abs /lm_line_at in H0 H6 H8.
+      iApply (union_write_link_blk ug Hc k v P0 a b ps0 cs0 s0' I0 Φ
+                (not_true_is_false _ H0) H1 H2 H3 H4 H5 H6 H7 H8
                 with "Hpin Ht Hps Hcs HE [Hw] [HΦ]"); [by iApply f0w_at_cw |].
-      iIntros "[[(Ht & Hps' & Hcs' & HE' & _) | #HT] | (#Htok & _ & _)]"; iApply "HΦ";
-        [iLeft; by iFrame "Ht Hps' Hcs' HE'" | iRight; by iLeft |].
-      iRight. iRight. subst k. iExact "Htok".
+      iIntros "[(Ht & Hps' & Hcs' & HE' & _) | #HT]"; iApply "HΦ";
+        [iLeft; by iFrame "Ht Hps' Hcs' HE'" | by iRight].
     - iIntros "!>" (k v P0 a b ps0 cs0 s0' I0 Φ)
-        "%H1 %H2 %H3 %H4 %H5 %H6 %H7 %H8 [#Hpin _] #Hw Ht #Hps #Hcs #HE HΦ".
+        "%H1 %H2 %H3 %H4 %H5 %H6 %H7 %H8 #Hpin #Hw Ht #Hps #Hcs #HE HΦ".
       iApply (union_write_link_pro ug Hc k v P0 a b ps0 cs0 s0' I0 Φ
                 H1 H2 H3 H4 H5 H6 H7 H8
                 with "Hpin Ht Hps Hcs HE [Hw] [HΦ]"); [by iApply f0w_at_cw |].
       iIntros "[(Ht & Hps' & Hcs' & HE' & _) | #HT]"; iApply "HΦ";
-        [iLeft; by iFrame "Ht Hps' Hcs' HE'" | iRight; by iLeft].
-    - iIntros "!>" (k v I a b Φ) "%H1 %H2 [#Hpin _] Hh HΦ".
+        [iLeft; by iFrame "Ht Hps' Hcs' HE'" | by iRight].
+    - iIntros "!>" (k v I a b Φ) "%H1 %H2 #Hpin Hh HΦ".
       iDestruct (fhead_at_boot gf s0 with "Hh")
         as "(Ht & #Hps & #Hcs & #HE & %s1 & %Hok & Hbt & Hwb)".
       iApply (union_write_link_first ug Hc k v a b s1 Φ Hok H1 H2
                 with "Hpin Ht Hps Hcs HE Hbt [HΦ Hwb]").
-      iIntros "[(Ht & Hps' & Hcs' & HE' & Hw) | #HT]"; iApply "HΦ"; [| iRight; by iLeft].
+      iIntros "[(Ht & Hps' & Hcs' & HE' & Hw) | #HT]"; iApply "HΦ"; [| by iRight].
       iLeft. iExists s1. iFrame "Ht Hps' Hcs' HE'". by iApply "Hwb".
-    - iIntros "!>" (k v b Φ) "[_ %Hk] #HT HΦ". rewrite /uT.
-      iDestruct "HT" as "[#HU | #Htok]".
-      + iApply (union_write_link_taint ug Hc with "HU"). iIntros "_". iApply "HΦ". by iLeft.
-      + subst k. iApply (union_write_link_wild ug Hc with "Htok"). iApply "HΦ". by iRight.
+    - iIntros "!>" (k v b Φ) "_ #HT HΦ".
+      iApply (union_write_link_taint ug Hc with "HT HΦ").
   Qed.
 
   Lemma union_links_gl_w_at (s0 : fstate) : union_links ug -∗ gl_w U (union_params_at s0).
@@ -155,10 +154,8 @@ Section union_link_inst_at.
   Proof using .
     iIntros "Hlk". iDestruct (union_links_eq with "Hlk") as %Hc.
     rewrite /gl_taint_at. cbn [gT union_params_at].
-    iIntros "!>" (b Φ) "#HT HΦ". rewrite /uT.
-    iDestruct "HT" as "[#HU | #Htok]".
-    - iApply (union_write_link_taint ug Hc with "HU"). iIntros "_". iApply "HΦ". by iLeft.
-    - iApply (union_write_link_wild ug Hc with "Htok"). iApply "HΦ". by iRight.
+    iIntros "!>" (b Φ) "#HT HΦ".
+    iApply (union_write_link_taint ug Hc with "HT HΦ").
   Qed.
 
   (* =================================================================== *)
@@ -166,14 +163,14 @@ Section union_link_inst_at.
   (* =================================================================== *)
   Lemma uturn0_at (s0 : fstate) (k : nat) :
     fturn_pre_at gf s0 k -∗
-    (∃ v : era_pins, upin ug k v ∗ dl_cnt v (1/2) 0%nat ∗ inp_lb v [])
-    ∗ (∃ v : era_pins, upin ug k v ∗ gwc_ban U (union_params_at s0) k v [] 0%nat).
+    (∃ v : era_pins, UPIN k v ∗ dl_cnt v (1/2) 0%nat ∗ inp_lb v [])
+    ∗ (∃ v : era_pins, UPIN k v ∗ gwc_ban U (union_params_at s0) k v [] 0%nat).
   Proof using .
     rewrite /fturn_pre_at /FileOut.fturn_core.
     iIntros "(%Hk & Ht & Hpre)".
     iDestruct "Ht" as (v vf) "(#Hpin & #Hvf & Htn & Hdl & #Hcs & #Hps & #HE)".
-    iSplitL "Hdl"; [iExists v; iFrame "Hpin Hdl HE"; by iPureIntro |].
-    iExists v. iSplitR; [iFrame "Hpin"; by iPureIntro |]. rewrite /gwc_ban. iRight. iLeft.
+    iSplitL "Hdl"; [iExists v; by iFrame "Hpin Hdl HE" |].
+    iExists v. iFrame "Hpin". rewrite /gwc_ban. iRight. iLeft.
     iSplitR; [by iPureIntro |]. rewrite /gH /union_params_at /fhead_at.
     iSplitR; [by iPureIntro |]. iSplitR; [by iPureIntro |].
     iFrame "Htn Hps Hcs HE Hpre". iExists vf. iExact "Hvf".
@@ -200,7 +197,7 @@ Section union_link_inst_at.
   Lemma union_X_dollar_at (s0 : fstate) (k : nat) (v : era_pins) (I : list (bv 8))
       (b : bv 8) (Φ : iProp Σ) :
     b = u_prompt !!! 0%nat ->
-    upin ug k v -∗ union_links ug -∗ union_X_at s0 k v I -∗
+    UPIN k v -∗ union_links ug -∗ union_X_at s0 k v I -∗
     (gwc_sp_t U (union_params_at s0) k v I -∗ Φ) -∗ out_link Uart0 k b Φ.
   Proof using .
     intros Hb. iIntros "#Hpin #Hlk [Hx #Hw0] HΦ".
@@ -229,9 +226,9 @@ Section union_link_inst_at.
       (uturn0_at s0) (urresw ug) (urresw_persistent ug) (urresw_timeless ug)
       (urresw_res_at s0) (ualt_code (UR RFSilent)).
 
-  Lemma union_at_T (s0 : fstate) : lk_T (union_link_inst_at s0) = uT ug.
+  Lemma union_at_T (s0 : fstate) : lk_T (union_link_inst_at s0) = UT.
   Proof using . reflexivity. Qed.
-  Lemma union_at_pin (s0 : fstate) : lk_pin (union_link_inst_at s0) = upin ug.
+  Lemma union_at_pin (s0 : fstate) : lk_pin (union_link_inst_at s0) = UPIN.
   Proof using . reflexivity. Qed.
   Lemma union_at_links (s0 : fstate) : lk_links (union_link_inst_at s0) = union_links ug.
   Proof using . reflexivity. Qed.

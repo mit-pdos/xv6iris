@@ -188,11 +188,11 @@ Section union_read_leaf_at.
      echo-side pin *)
   Lemma union_pin_refl_at (v : era_pins) :
     ⊢ era_pin (fgn_echo gf) (S gen_id) v -∗ lk_pin UIs (S gen_id) v.
-  Proof using . iIntros "$". by iPureIntro. Qed.
+  Proof using . by iIntros "$". Qed.
 
   Lemma union_ep_refl_at (v : era_pins) :
     ⊢ era_pin (fgn_echo gf) (S gen_id) v -∗ lk_epin UIs (S gen_id) v.
-  Proof using . iIntros "$". by iPureIntro. Qed.
+  Proof using . by iIntros "$". Qed.
 
   Lemma union_read_leaf_holds_at (Wb : list (bv 8) -> iProp Σ)
       (N : uk_names Σ) (γp : gname) (l : list fdstate) :
@@ -201,7 +201,7 @@ Section union_read_leaf_at.
           (UShLine.ush_rd_x_at (lk_rres UIs) (fgn_echo gf) Wb) ->
     (⊢ app_sup -∗ lk_T UIs) ->
     (⊢ lk_T UIs -∗ app_rdcred) ->
-    (⊢ riscv_wild (S gen_id) -∗ lk_T UIs) ->
+    (⊢ riscv_rdwild (S gen_id) -∗ lk_T UIs) ->
     (⊢ lk_links UIs) ->
     ⊢ UkSh.ush_read_recv_leaf_at (PS := uprogSG_free) N γp (lk_T UIs)
         (UShLine.ush_mid_at (lk_rres UIs) (fgn_echo gf) γp) (lm_disc_input U)

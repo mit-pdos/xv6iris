@@ -241,7 +241,8 @@ Section UkUnionLend.
     assert (Hbodies : lm_body U s1 cs I <$> [0%nat] = [wl_line (drop 1 ws)]).
     { cbn [fmap list_fmap]. rewrite (ulm_echo_body s1 cs I ws Hfl). reflexivity. }
     rewrite -Hbodies.
-    iApply (cons_dev_atc_of_blk0 U (PA sb) LK [0%nat] v I ps cs s1 pos [0%nat] Hw
+    iApply (cons_dev_atc_of_blk0 U (PA sb) LK [0%nat] v I ps cs s1 pos [0%nat]
+              ltac:(cbn [gwild union_params_at]; rewrite Hfl; intros ?; discriminate) Hw
               ltac:(intros x Hx; exact Hx)
               ltac:(constructor; [exact (ulm_echo_adm s1 cs I ws Hfl) | constructor])
               ltac:(rewrite Hbodies; exact Hs)
@@ -280,7 +281,8 @@ Section UkUnionLend.
       cbn [ucat_alts]. rewrite -Hbodies.
       iApply (cons_dev_atc_of_blk0 U (PA sb) LK
                 [ualt_code (UR RCRan); ualt_code (UR RCNoOpen)] v I ps cs sb pos
-                [ualt_code (UR RCRan); ualt_code (UR RCNoOpen)] Hw
+                [ualt_code (UR RCRan); ualt_code (UR RCNoOpen)]
+                ltac:(cbn [gwild union_params_at]; rewrite Hfl; intros ?; discriminate) Hw
                 ltac:(intros x Hx; exact Hx)
                 ltac:(constructor;
                       [ apply (ulm_cons_adm_R sb cs I RCRan Hnp); rewrite Hfl; exact Logic.I |];
@@ -295,7 +297,8 @@ Section UkUnionLend.
       cbn [ucat_alts]. rewrite -Hbodies.
       iApply (cons_dev_atc_of_blk0 U (PA sb) LK
                 [ualt_code (UR RCRan); ualt_code (UR RCNoOpen)] v I ps cs sb pos
-                [ualt_code (UR RCRan)] Hw
+                [ualt_code (UR RCRan)]
+                ltac:(cbn [gwild union_params_at]; rewrite Hfl; intros ?; discriminate) Hw
                 ltac:(intros x Hx; apply elem_of_list_singleton in Hx as ->; constructor)
                 ltac:(constructor;
                       [ apply (ulm_cons_adm_R sb cs I RCRan Hnp); rewrite Hfl; exact Logic.I

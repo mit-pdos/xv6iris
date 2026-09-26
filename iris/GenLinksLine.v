@@ -78,6 +78,11 @@ Record gen_params {Σ : gFunctors} `{!echoOutG Σ} (M : lmodel) := MkGP {
   gH_cur : forall k v I,
     gH k v I -∗ ⌜I = []⌝ ∗ turn v 0 ∗ ps_lb v [] ∗ cs_lb v [] ∗ inp_lb v [];
   gH_inp : forall k v I, gH k v I -∗ gH k v I ∗ ⌜I = []⌝ ∗ inp_lb v [];
+  (* THE WILD LINES (seccomp design 10.7): an input whose last line is one
+     after which the era's claim may have gone wild; a block-first byte
+     there is refused ([gl_blk]'s premise).  [fun _ => False] at every
+     instance but the union. *)
+  gwild : list (bv 8) -> Prop;
 }.
 Global Arguments MkGP {Σ _} M.
 Global Arguments gL {Σ _ M} _.
@@ -103,6 +108,7 @@ Global Arguments gH {Σ _ M} _ _ _ _.
 Global Arguments gH_tl {Σ _ M} _ _ _ _.
 Global Arguments gH_cur {Σ _ M} _ _ _ _.
 Global Arguments gH_inp {Σ _ M} _ _ _ _.
+Global Arguments gwild {Σ _ M} _ _.
 Global Existing Instances gT_pers gT_tl gPIN_pers gPIN_tl gW_pers gW_tl gWb_pers gWb_tl gH_tl.
 
 Section gen_links_line.
@@ -119,6 +125,7 @@ Section gen_links_line.
   Local Notation Wb := (gWb G).
   Local Notation k0 := (gk0 G).
   Local Notation H := (gH G).
+  Local Notation WL := (gwild G).
 
   (* ================================================================== *)
   (*  1.  THE CURSOR AND THE FAMILIES                                    *)
@@ -624,6 +631,7 @@ Section gen_links_line.
   Definition gl_blk : iProp Σ :=
     (□ ∀ (k : nat) (v : era_pins) (P a : nat) (b : bv 8)
          (ps0 cs0 : list nat) (s0 : lm_st M) (I0 : list (bv 8)) (Φ : iProp Σ),
+        ⌜¬ WL I0⌝ -∗
         ⌜I0 <> []⌝ -∗
         ⌜rest_of I0 = []⌝ -∗
         ⌜nlines I0 <= S (length cs0)⌝ -∗
@@ -784,12 +792,16 @@ Section gen_links_line.
   Lemma gblk_step (k : nat) (v : era_pins) (I : list (bv 8)) (a i : nat)
       (b : bv 8) (Φ : iProp Σ) :
     lm_ab M K I a !! i = Some b ->
+    (⌜¬ WL I⌝ ∨ T) -∗
     PIN k v -∗ LINKS -∗ gwc_blk k v I a i -∗
     (gwc_blk k v I a (S i) -∗ Φ) -∗ out_link Uart0 k b Φ.
   Proof using LINKS_gl LINKS_pers.
-    intros Hb. iIntros "#Hpin #Hlk Hc HΦ".
+    intros Hb. iIntros "Hnw #Hpin #Hlk Hc HΦ".
     iDestruct (LINKS_gl with "Hlk") as "#(Hw & Hblk & _ & _ & Ht)".
     destruct (lm_ab_ok M K I a i b Hb) as [Hok Hfr].
+    iDestruct "Hnw" as "[%Hnw | #HT]".
+    2: { iApply ("Ht" $! k v b Φ with "Hpin HT [HΦ]").
+         iIntros "#HT'". iApply "HΦ". by iApply gwc_blk_taint. }
     rewrite {1}/gwc_blk. iDestruct "Hc" as "[Hl | #HT]"; last first.
     { iApply ("Ht" $! k v b Φ with "Hpin HT [HΦ]").
       iIntros "#HT'". iApply "HΦ". by iApply gwc_blk_taint. }
@@ -801,7 +813,8 @@ Section gen_links_line.
     - (* THE BLOCK-FIRST BYTE files the alternative *)
       cbn [lm_blkcs]. rewrite Nat.add_0_r.
       iApply ("Hblk" $! k v P a b ps cs s0 I Φ
-                with "[%] [%] [%] [%] [%] [%] [%] [%] Hpin Hf Htn Hps Hcs HE [HΦ]").
+                with "[%] [%] [%] [%] [%] [%] [%] [%] [%] Hpin Hf Htn Hps Hcs HE [HΦ]").
+      { exact Hnw. }
       { exact Hne. }
       { exact Hr. }
       { rewrite Hn. lia. }
@@ -857,11 +870,15 @@ Section gen_links_line.
   Lemma gprompt_dollar (k : nat) (v : era_pins) (I : list (bv 8))
       (b : bv 8) (Φ : iProp Σ) :
     b = u_prompt !!! 0 ->
+    (⌜¬ WL I⌝ ∨ T) -∗
     PIN k v -∗ LINKS -∗ gwc_owed k v I -∗
     (gwc_sp k v I -∗ Φ) -∗ out_link Uart0 k b Φ.
   Proof using LINKS_gl LINKS_pers.
-    intros Hb. iIntros "#Hpin #Hlk Hc HΦ".
+    intros Hb. iIntros "Hnw #Hpin #Hlk Hc HΦ".
     iDestruct (LINKS_gl with "Hlk") as "#(_ & Hblk & Hpro & _ & Ht)".
+    iDestruct "Hnw" as "[%Hnw | #HT]".
+    2: { iApply ("Ht" $! k v b Φ with "Hpin HT [HΦ]").
+         iIntros "#HT'". iApply "HΦ". by iApply gwc_sp_taint. }
     rewrite {1}/gwc_owed.
     iDestruct "Hc" as "[Hl | [Hh | #HT]]"; last first.
     { iApply ("Ht" $! k v b Φ with "Hpin HT [HΦ]").
@@ -887,8 +904,8 @@ Section gen_links_line.
       pose proof (lm_wr_blk_nonnil M ps cs s0 I P Hw) as Hne.
       pose proof Hw as (Hpin0 & Hm & Hdv & HP).
       iApply ("Hblk" $! k v P (lmh_noc K (lm_line_at M I)) b ps cs s0 I Φ
-                with "[%] [%] [%] [%] [%] [%] [%] [%] Hpin Hf Htn Hps Hcs HE [HΦ]").
-      { exact Hne. } { exact Hm. } { rewrite Hdv. lia. } { exact Hpin0. }
+                with "[%] [%] [%] [%] [%] [%] [%] [%] [%] Hpin Hf Htn Hps Hcs HE [HΦ]").
+      { exact Hnw. } { exact Hne. } { exact Hm. } { rewrite Hdv. lia. } { exact Hpin0. }
       { exact HP. }
       { exact (lmh_noc_ok K _ (lm_line_at M I)). }
       { exact (lmh_free_term K _ (lmh_noc_free K (lm_line_at M I))). }
@@ -927,11 +944,12 @@ Section gen_links_line.
   Lemma gprompt_dollar_ban (k : nat) (v : era_pins) (I : list (bv 8))
       (b : bv 8) (Φ : iProp Σ) :
     b = u_prompt !!! 0 ->
+    (⌜¬ WL I⌝ ∨ T) -∗
     PIN k v -∗ LINKS -∗ gwc_ban k v I 0 -∗
     (gwc_sp k v I -∗ Φ) -∗ out_link Uart0 k b Φ.
   Proof using LINKS_gl LINKS_pers.
-    intros Hb. iIntros "#Hpin #Hlk Hc HΦ".
-    iApply (gprompt_dollar k v I b Φ Hb with "Hpin Hlk [Hc] HΦ").
+    intros Hb. iIntros "Hnw #Hpin #Hlk Hc HΦ".
+    iApply (gprompt_dollar k v I b Φ Hb with "Hnw Hpin Hlk [Hc] HΦ").
     iApply (gwc_ban_owed with "Hc").
   Qed.
 
@@ -939,16 +957,17 @@ Section gen_links_line.
   Lemma gprompt_dollar_post (k : nat) (v : era_pins) (I : list (bv 8))
       (a : nat) (b : bv 8) (Φ : iProp Σ) :
     lm_apr M K I a -> b = u_prompt !!! 0 ->
+    (⌜¬ WL I⌝ ∨ T) -∗
     PIN k v -∗ LINKS -∗
     gwc_blk k v I a (length (lm_ab M K I a) - 2) -∗
     (gwc_sp_t k v I -∗ Φ) -∗ out_link Uart0 k b Φ.
   Proof using LINKS_gl LINKS_pers.
-    intros Ha Hb. iIntros "#Hpin #Hlk Hc HΦ".
+    intros Ha Hb. iIntros "Hnw #Hpin #Hlk Hc HΦ".
     pose proof (lm_ab_len_ge2 M K I a Ha) as Hlen.
     assert (Hby : lm_ab M K I a !! (length (lm_ab M K I a) - 2) = Some b)
       by (rewrite Hb; exact (lm_ab_dollar M K I a Ha)).
     iApply (gblk_step k v I a (length (lm_ab M K I a) - 2) b Φ Hby
-              with "Hpin Hlk Hc [HΦ]").
+              with "Hnw Hpin Hlk Hc [HΦ]").
     iIntros "Hc". iApply "HΦ".
     replace (S (length (lm_ab M K I a) - 2)) with (length (lm_ab M K I a) - 1) by lia.
     iApply (gwc_blk_sp k v I a Ha with "Hc").
@@ -983,12 +1002,16 @@ Section gen_links_line.
   Lemma gprompt_dollar_posts (k : nat) (v : era_pins) (I : list (bv 8))
       (a : nat) (b : bv 8) (Φ : iProp Σ) :
     lm_aprs M I a -> b = u_prompt !!! 0 ->
+    (⌜¬ WL I⌝ ∨ T) -∗
     PIN k v -∗ LINKS -∗ gwc_post k v I a -∗
     (gwc_sp_t k v I -∗ Φ) -∗ out_link Uart0 k b Φ.
   Proof using LINKS_gl LINKS_pers.
-    intros Ha Hb. iIntros "#Hpin #Hlk Hc HΦ".
+    intros Ha Hb. iIntros "Hnw #Hpin #Hlk Hc HΦ".
     iDestruct (LINKS_gl with "Hlk") as "#(Hw & Hblk & _ & _ & Ht)".
     pose proof Ha as (Hok & Hnp & Hnt).
+    iDestruct "Hnw" as "[%Hnw | #HT]".
+    2: { iApply ("Ht" $! k v b Φ with "Hpin HT [HΦ]").
+         iIntros "#HT'". iApply "HΦ". rewrite /gwc_sp_t. by iRight. }
     rewrite {1}/gwc_post. iDestruct "Hc" as "[Hl | #HT]"; last first.
     { iApply ("Ht" $! k v b Φ with "Hpin HT [HΦ]").
       iIntros "#HT'". iApply "HΦ". rewrite /gwc_sp_t. by iRight. }
@@ -1003,8 +1026,8 @@ Section gen_links_line.
     - (* the prompt IS the block's first byte: it files the alternative *)
       cbn [lm_blkcs]. rewrite Nat.add_0_r.
       iApply ("Hblk" $! k v P a b ps cs s0 I Φ
-                with "[%] [%] [%] [%] [%] [%] [%] [%] Hpin Hf Htn Hps Hcs HE [HΦ]").
-      { exact Hne. } { exact Hr. } { rewrite Hn. lia. } { exact Hpin0. }
+                with "[%] [%] [%] [%] [%] [%] [%] [%] [%] Hpin Hf Htn Hps Hcs HE [HΦ]").
+      { exact Hnw. } { exact Hne. } { exact Hr. } { rewrite Hn. lia. } { exact Hpin0. }
       { exact HP. } { exact (Hok _). } { exact Hnt. }
       { exact Hby. }
       iIntros "Hres". iApply "HΦ". rewrite /gwc_sp_t.
@@ -1030,14 +1053,15 @@ Section gen_links_line.
   Lemma gprompt_dollar_line (k : nat) (v : era_pins) (I : list (bv 8))
       (b : bv 8) (Φ : iProp Σ) :
     b = u_prompt !!! 0 ->
+    (⌜¬ WL I⌝ ∨ T) -∗
     PIN k v -∗ LINKS -∗ gwc_line k v I -∗
     (gwc_sp_t k v I -∗ Φ) -∗ out_link Uart0 k b Φ.
   Proof using LINKS_gl LINKS_pers X_dollar.
-    intros Hb. iIntros "#Hpin #Hlk Hc HΦ".
+    intros Hb. iIntros "Hnw #Hpin #Hlk Hc HΦ".
     rewrite {1}/gwc_line. iDestruct "Hc" as "[Hc | [Hc | Hx]]"; last first.
     { iApply (X_dollar k v I b Φ Hb with "Hpin Hlk Hx HΦ"). }
     { iDestruct "Hc" as (a) "[%Ha Hc]".
-      iApply (gprompt_dollar_posts k v I a b Φ Ha Hb with "Hpin Hlk Hc HΦ"). }
+      iApply (gprompt_dollar_posts k v I a b Φ Ha Hb with "Hnw Hpin Hlk Hc HΦ"). }
     iDestruct (LINKS_gl with "Hlk") as "#(_ & _ & Hpro & Hhd & Ht)".
     rewrite {1}/gwc_pro. iDestruct "Hc" as "[Hl | [Hh | #HT]]"; last first.
     { iApply ("Ht" $! k v b Φ with "Hpin HT [HΦ]").
@@ -1239,6 +1263,7 @@ Section gen_links_line.
        lk_epin := PIN;
        lk_links := LINKS;
        lk_ab := lm_ab M K;
+       lk_wild := WL;
        lk_apr := lm_apr M K;
        lk_pan := fun I => lmh_pan K (lm_line_at M I);
        lk_exf := fun I => lmh_exf K (lm_line_at M I);
