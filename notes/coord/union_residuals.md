@@ -48,6 +48,10 @@ Collected from the U0 agent reports (Sept 26 2026). Each item names the lane tha
   `ufd_head1*`, `ufd_head*`, `ufd_row`, `ufd_head_open_row`, `ufd_head_of_row` (no non-`_at` forms yet);
   ExecEntry/ExecBundle's `image_entry_taint` two key pins (Rocq 3e7fee0d2, union-side).
 - Left for U1-R/K4: UkRun `udepwf_std*`. For U1-P: `UexecSecc.ush_view_secc_rows`.
+- For P-secc / P-init: `UkFork.wp_uk_ecall_fork_at` is now Rocq's view-keeping leaf (`ustdAt l v`);
+  the plain-ledger statement is `wp_uk_ecall_fork`, which InitMainFork / ProofSeccMain now call.
+  Retire UkSeccDefs deviation 5 (`seccTabFork`) and the `Obl` mask parameter onto the `_at` leaf and
+  `uvis_secc` (`UkSeccLit.secc_mask_masked`).
 
 ## UkShPipes* / UShUPipes wave (after DU8 repoint)
 - `Xv6/PipesCut.lean` (U0-3) is partial: 15/37 reached decls. The other 22 are statements about
