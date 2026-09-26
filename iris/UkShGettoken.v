@@ -1155,7 +1155,7 @@ Section UkShGettoken.
     m !!! Regidx a3_idx = mword_of_int eqp ->
     (off <= len)%nat ->
     w0 = mword_of_int (s0 + Z.of_nat off) ->
-    ref_sym_scope len f ->
+    ref_sym_scope_from len f off ->
     0 <= s0 -> s0 + Z.of_nat len < Z64 ->
     0 < ps -> ps mod 8 = 0 -> ps + 8 < Z64 ->
     ref_gettoken len f off = (ret, q, e, fin) ->
@@ -1545,7 +1545,7 @@ Section UkShGettoken.
     { (* ---- THE SYMBOL ARM, either byte ---- *)
       apply andb_true_iff in Egt as [ Ekkb Esym ].
       apply bool_decide_eq_true in Ekkb.
-      pose proof (Hsymok kk Ekkb Esym) as Hdisj.
+      pose proof (Hsymok kk (conj (Nat.le_add_r off (ushp_skipws (len - off) off f)) Ekkb) Esym) as Hdisj.
       assert (Hres : ushs_gettok_res len f kk = bv_unsigned (f kk)).
       { unfold ushs_gettok_res.
         rewrite (bool_decide_eq_true_2 _ Ekkb) Esym. reflexivity. }
@@ -1982,7 +1982,7 @@ Section UkShGettoken.
     m !!! Regidx a3_idx = mword_of_int eqp ->
     (off <= len)%nat ->
     w0 = mword_of_int (s0 + Z.of_nat off) ->
-    ref_sym_scope len f ->
+    ref_sym_scope_from len f off ->
     0 <= s0 -> s0 + Z.of_nat len < Z64 ->
     0 < ps -> ps mod 8 = 0 -> ps + 8 < Z64 ->
     shp_code γt -∗

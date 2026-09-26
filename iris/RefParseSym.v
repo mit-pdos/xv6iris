@@ -260,7 +260,7 @@ Proof using. vm_compute. discriminate. Qed.
    cursor after the blank scan is [k]; NUL at [k = len]; a '|' or a single
    '>' answers the byte and steps once; anything else is a word *)
 Lemma ref_gettoken_ushs (len : nat) (f : nat -> bv 8) (off : nat) :
-  ref_sym_scope len f -> ref_nonnul len f -> off <= len ->
+  ref_sym_scope_from len f off -> ref_nonnul len f -> off <= len ->
   ref_gettoken len f off
   = (ushs_gettok_res len f (off + ushp_skipws (len - off) off f),
      off + ushp_skipws (len - off) off f,
@@ -274,7 +274,8 @@ Proof using.
     by (unfold k; pose proof (ushp_skipws_le (len - off) off f); lia).
   destruct (lt_dec k len) as [ Hlt | Hge ].
   - destruct (ushp_is_sym (f k)) eqn:Esym.
-    + destruct (Hscope k Hlt Esym) as [ Hbar | (Hgt & Hk1 & Hnext) ].
+    + destruct (Hscope k (conj (Nat.le_add_r off (ushp_skipws (len - off) off f)) Hlt) Esym)
+        as [ Hbar | (Hgt & Hk1 & Hnext) ].
       * rewrite (ref_gettoken_sym len f off k Hnn Hk Hlt Esym
                    ltac:(rewrite Hbar; exact rb_bar_ne_gt)).
         unfold ushs_gettok_fin, ushs_gettok_end, ushs_gettok_res, ref_skip.
@@ -461,6 +462,26 @@ Lemma ref_peek_miss_inv (len : nat) (f : nat -> bv 8) (i s : nat) (toks : list (
 Proof using. unfold ref_peek. intro H. injection H as _ Hs. exact (eq_sym Hs). Qed.
 
 (* gettoken leaves the cursor inside the line *)
+(* ...and never moves backwards: every arm answers a [ref_skip] of a
+   cursor at or above [i] *)
+Lemma ref_gettoken_fin_ge (len : nat) (f : nat -> bv 8) (i : nat) (ret : Z) (q e fin : nat) :
+  ref_gettoken len f i = (ret, q, e, fin) -> i <= fin.
+Proof using.
+  intro H. unfold ref_gettoken in H.
+  pose proof (ref_skip_ge len f i) as Hs.
+  set (s := ref_skip len f i) in *.
+  destruct (bool_decide (ref_at len f s = ubyte0)).
+  { injection H as _ _ _ <-. pose proof (ref_skip_ge len f s). lia. }
+  destruct (bool_decide (ref_at len f s = rb_gt)).
+  { destruct (bool_decide (ref_at len f (S s) = rb_gt));
+      injection H as _ _ _ <-;
+      [ pose proof (ref_skip_ge len f (S (S s))) | pose proof (ref_skip_ge len f (S s)) ]; lia. }
+  destruct (ushp_is_sym (ref_at len f s)).
+  { injection H as _ _ _ <-. pose proof (ref_skip_ge len f (S s)). lia. }
+  injection H as _ _ _ <-. pose proof (ref_skip_ge len f (ref_tokend len f s)).
+  unfold ref_tokend in *. lia.
+Qed.
+
 Lemma ref_gettoken_fin_le (len : nat) (f : nat -> bv 8) (i : nat) (ret : Z) (q e fin : nat) :
   i <= len -> ref_gettoken len f i = (ret, q, e, fin) -> fin <= len.
 Proof using.
@@ -491,7 +512,7 @@ Qed.
 
 (* a peek that hit the redirect table under the scope hit a single '>' *)
 Lemma ref_redir_hit_gt (len : nat) (f : nat -> bv 8) (s : nat) :
-  ref_sym_scope len f -> ref_at len f s <> ubyte0 -> ref_at len f s ∈ [rb_lt; rb_gt] ->
+  ref_sym_scope_from len f s -> ref_at len f s <> ubyte0 -> ref_at len f s ∈ [rb_lt; rb_gt] ->
   s < len /\ f s = rb_gt /\ S s < len /\ f (S s) <> rb_gt.
 Proof using.
   intros Hsc Hnn Hin.
@@ -503,7 +524,7 @@ Proof using.
   { apply elem_of_cons in Hin as [ -> | Hin ]; [ exact ushp_is_sym_lt | ].
     apply elem_of_cons in Hin as [ -> | Hin ]; [ exact ushp_is_sym_gt | ].
     exfalso. exact (not_elem_of_nil _ Hin). }
-  destruct (Hsc s Hlt Hsym) as [ Hbar | (Hgt & Hk1 & Hnext) ].
+  destruct (Hsc s (conj (Nat.le_refl s) Hlt) Hsym) as [ Hbar | (Hgt & Hk1 & Hnext) ].
   - exfalso. rewrite Hbar in Hin.
     apply elem_of_cons in Hin as [ E | Hin ]; [ exact (rb_bar_ne_lt E) | ].
     apply elem_of_cons in Hin as [ E | Hin ]; [ exact (rb_bar_ne_gt E) | ].
@@ -532,7 +553,7 @@ Qed.
    '>' one, and the loop goes on at [s2] with one unit of fuel less *)
 Lemma ref_redirs_cons_inv (len : nat) (f : nat -> bv 8) (n i : nat)
     (r : rredir) (rs : list rredir) (fin : nat) :
-  ref_sym_scope len f -> ref_nonnul len f -> i <= len ->
+  ref_sym_scope_from len f i -> ref_nonnul len f -> i <= len ->
   ref_redirs len f (S n) i [] = Some (r :: rs, fin) ->
   exists s s1 q e s2 : nat,
     ref_peek len f i [rb_lt; rb_gt] = (true, s) /\ s <= len
@@ -545,7 +566,10 @@ Proof using.
   destruct (ref_peek len f i [rb_lt; rb_gt]) as [ hit s ] eqn:Epk.
   destruct hit; [ | injection H as H _; discriminate H ].
   destruct (ref_peek_hit_inv len f i s [rb_lt; rb_gt] Epk) as (Hs & Hnn & Hin).
-  destruct (ref_redir_hit_gt len f s Hsc Hnn Hin) as (Hlt & Hgt & HSs & Hnext).
+  destruct (ref_redir_hit_gt len f s
+              (ref_sym_scope_from_mono len f i s Hsc
+                 ltac:(rewrite Hs; exact (ref_skip_ge len f i)))
+              Hnn Hin) as (Hlt & Hgt & HSs & Hnext).
   assert (Hskip : ref_skip len f s = s) by (rewrite Hs; exact (ref_skip_idem len f i Hi)).
   assert (Hnext' : ref_at len f (S s) <> rb_gt) by (rewrite (ref_at_lt len f (S s) HSs); exact Hnext).
   pose proof (ref_gettoken_gt len f s s Hnonul Hskip Hlt Hgt Hnext') as E1.
@@ -643,6 +667,28 @@ Proof using.
     exact (ref_skip_le len f i Hi).
 Qed.
 
+(* ...and never moves backwards *)
+Lemma ref_redirs_fin_ge (len : nat) (f : nat -> bv 8) (n i : nat)
+    (acc rs : list rredir) (fin : nat) :
+  ref_redirs len f n i acc = Some (rs, fin) -> i <= fin.
+Proof using.
+  revert i acc. induction n as [| n IH ]; intros i acc H; [ discriminate H | ].
+  cbn [ref_redirs] in H.
+  destruct (ref_peek len f i [rb_lt; rb_gt]) as [ hit s ] eqn:Epk.
+  destruct hit.
+  - apply ref_peek_hit_inv in Epk as (Hs & _ & _).
+    pose proof (ref_skip_ge len f i) as Hsge. rewrite <- Hs in Hsge.
+    destruct (ref_gettoken len f s) as [[[ tok q0 ] e0 ] s1 ] eqn:E1.
+    pose proof (ref_gettoken_fin_ge len f s _ _ _ _ E1) as Hs1.
+    destruct (ref_gettoken len f s1) as [[[ t2 q ] e ] s2 ] eqn:E2.
+    pose proof (ref_gettoken_fin_ge len f s1 _ _ _ _ E2) as Hs2.
+    destruct (bool_decide (t2 = rt_word)); [ | discriminate H ].
+    destruct (rredir_of tok q e); [ | discriminate H ].
+    pose proof (IH s2 _ H). lia.
+  - apply ref_peek_miss_inv in Epk. injection H as _ Hfin. subst fin. rewrite Epk.
+    exact (ref_skip_ge len f i).
+Qed.
+
 (* the argument loop only ever appends to its redirect accumulator *)
 Lemma ref_args_prefix (len : nat) (f : nat -> bv 8) (n i : nat)
     (toks0 toks : list (nat * nat)) (rs0 rs : list rredir) (fin : nat) :
@@ -664,6 +710,63 @@ Proof using.
   destruct (ref_redirs len f n s1 []) as [[ rs1 s2 ] | ]; [ | discriminate H ].
   destruct (IH s2 _ _ H) as [ rs' -> ].
   exists (rs1 ++ rs'). rewrite app_assoc. reflexivity.
+Qed.
+
+(* the argument loop, parseexec and parsepipe never move the cursor
+   backwards either -- what lets a scope FROM the cursor travel down *)
+Lemma ref_args_fin_ge (len : nat) (f : nat -> bv 8) (n : nat) :
+  forall (i : nat) (toks0 toks : list (nat * nat)) (rs0 rs : list rredir) (fin : nat),
+    ref_args len f n i toks0 rs0 = Some (toks, rs, fin) -> i <= fin.
+Proof using.
+  induction n as [| n IH ]; intros i toks0 toks rs0 rs fin H; [ discriminate H | ].
+  cbn [ref_args] in H.
+  destruct (ref_peek len f i [rb_bar; rb_rpar; rb_amp; rb_semi]) as [ stop s ] eqn:Epk.
+  assert (Hs : i <= s)
+    by (unfold ref_peek in Epk; injection Epk as _ Es; rewrite <- Es; exact (ref_skip_ge len f i)).
+  destruct stop. { injection H as _ _ <-. exact Hs. }
+  destruct (ref_gettoken len f s) as [[[ tok q ] e ] s1 ] eqn:Eg.
+  pose proof (ref_gettoken_fin_ge len f s _ _ _ _ Eg) as Hs1.
+  destruct (bool_decide (tok = 0%Z)). { injection H as _ _ <-. lia. }
+  destruct (negb (bool_decide (tok = rt_word))); [ discriminate H | ].
+  cbv zeta in H.
+  destruct (bool_decide (10 <= length (toks0 ++ [(q, e)]))); [ discriminate H | ].
+  destruct (ref_redirs len f n s1 rs0) as [[ rs' s2 ] | ] eqn:Er; [ | discriminate H ].
+  pose proof (ref_redirs_fin_ge len f n s1 _ _ _ Er) as Hs2.
+  pose proof (IH _ _ _ _ _ _ H). lia.
+Qed.
+
+Lemma ref_parseexec_fin_ge (len : nat) (f : nat -> bv 8) (n i : nat) (t : ushp_cmd) (fin : nat) :
+  ref_parseexec len f n i = Some (t, fin) -> i <= fin.
+Proof using.
+  unfold ref_parseexec. intro H.
+  destruct (ref_peek len f i [rb_lpar]) as [ blk s ] eqn:Epk.
+  assert (Hs : i <= s)
+    by (unfold ref_peek in Epk; injection Epk as _ Es; rewrite <- Es; exact (ref_skip_ge len f i)).
+  destruct blk; [ discriminate H | ].
+  destruct (ref_redirs len f n s []) as [[ rs s1 ] | ] eqn:Er; [ | discriminate H ].
+  pose proof (ref_redirs_fin_ge len f n s _ _ _ Er) as Hs1.
+  destruct (ref_args len f n s1 [] rs) as [[[ toks rs' ] s2 ] | ] eqn:Ea; [ | discriminate H ].
+  pose proof (ref_args_fin_ge len f n s1 _ _ _ _ _ Ea) as Hs2.
+  injection H as _ <-. lia.
+Qed.
+
+Lemma ref_parsepipe_fin_ge (len : nat) (f : nat -> bv 8) (n : nat) :
+  forall (i : nat) (t : ushp_cmd) (fin : nat),
+    ref_parsepipe len f n i = Some (t, fin) -> i <= fin.
+Proof using.
+  induction n as [| n IH ]; intros i t fin H; [ discriminate H | ].
+  cbn [ref_parsepipe] in H.
+  destruct (ref_parseexec len f n i) as [[ t1 s ] | ] eqn:Ex; [ | discriminate H ].
+  pose proof (ref_parseexec_fin_ge len f n i t1 s Ex) as Hs.
+  destruct (ref_peek len f s [rb_bar]) as [ bar s1 ] eqn:Epk.
+  assert (Hs1 : s <= s1)
+    by (unfold ref_peek in Epk; injection Epk as _ Es; rewrite <- Es; exact (ref_skip_ge len f s)).
+  destruct bar.
+  - destruct (ref_gettoken len f s1) as [[[ tok q ] e ] s2 ] eqn:Eg.
+    pose proof (ref_gettoken_fin_ge len f s1 _ _ _ _ Eg) as Hs2.
+    destruct (ref_parsepipe len f n s2) as [[ r s3 ] | ] eqn:Er; [ | discriminate H ].
+    pose proof (IH s2 r s3 Er). injection H as _ <-. lia.
+  - injection H as _ <-. lia.
 Qed.
 
 (* what one round of the loop did, read off its answer: the stop set was
@@ -1035,7 +1138,7 @@ Proof using. constructor. Qed.
 
 (* ...so under the scope such a peek MISSES, and the cursor is the skip *)
 Lemma ref_peek_scope_miss (len : nat) (f : nat -> bv 8) (i : nat) (toks : list (bv 8)) :
-  ref_sym_scope len f -> ref_out_scope toks ->
+  ref_sym_scope_from len f i -> ref_out_scope toks ->
   ref_peek len f i toks = (false, ref_skip len f i).
 Proof using.
   intros Hsc Hout. apply ref_peek_miss. intro Hin.
@@ -1044,14 +1147,14 @@ Proof using.
   destruct (Forall_lookup_1 _ _ _ _ Hout Hk) as (Hsym & Hnb & Hng).
   destruct (lt_dec s len) as [ Hlt | Hge ].
   - rewrite (ref_at_lt len f s Hlt) in Hsym, Hnb, Hng.
-    destruct (Hsc s Hlt Hsym) as [ E | (E & _) ]; [ exact (Hnb E) | exact (Hng E) ].
+    destruct (Hsc s (conj (ref_skip_ge len f i) Hlt) Hsym) as [ E | (E & _) ]; [ exact (Hnb E) | exact (Hng E) ].
   - rewrite (ref_at_ge len f s ltac:(lia)) in Hsym.
     rewrite ushp_is_sym_nul in Hsym. discriminate Hsym.
 Qed.
 
 (* the backgrounding loop never turns under the scope *)
 Lemma ref_backs_scope (len : nat) (f : nat -> bv 8) (n i : nat) (t : ushp_cmd) :
-  ref_sym_scope len f -> 0 < n ->
+  ref_sym_scope_from len f i -> 0 < n ->
   ref_backs len f n i t = Some (t, ref_skip len f i).
 Proof using.
   intros Hsc Hn. destruct n as [| n ]; [ lia | ]. cbn [ref_backs].

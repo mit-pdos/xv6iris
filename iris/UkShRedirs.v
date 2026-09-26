@@ -575,7 +575,7 @@ Section UkShRedirs.
       (h : CpuId) (m : regfile) (dq dw dv : dfrac) (cmd ps s0 : Z)
       (len s s1 q e s2 : nat) (f : nat -> bv 8) (fp wB wC : mword 64)
       (nn : nat) :
-    ref_sym_scope len f ->
+    ref_sym_scope_from len f s ->
     (s <= len)%nat -> (s1 <= len)%nat ->
     ref_gettoken len f s = (bv_unsigned rb_gt, s, S s, s1) ->
     ref_gettoken len f s1 = (rt_word, q, e, s2) ->
@@ -939,7 +939,9 @@ Section UkShRedirs.
               (uint fp - 104) (uint fp - 112) s0 len s1 f
               (mword_of_int (s0 + Z.of_nat s1)) wB wC (12 + nn)
               rt_word q e s2
-              Fa0 Fa1 Fa2 Fa3 Hs1le eq_refl Hscope
+              Fa0 Fa1 Fa2 Fa3 Hs1le eq_refl
+              (ref_sym_scope_from_mono len f s s1 Hscope
+                 (ref_gettoken_fin_ge len f s _ _ _ _ E1))
               Hs0 Hs64 Hps0 Hps8 Hpssz E2
               with "Hcode Hcur [HB] [HC] Hstr Hws Hsy Hrun").
     { iRight. iSplitR; [ iPureIntro; exact Hqok | iExact "HB" ]. }
@@ -1249,7 +1251,7 @@ Section UkShRedirs.
       (UM UM' : iProp Σ) (nn : nat),
     ref_redirs len f n off [] = Some (rs, fin) ->
     ushp_malloc_chain (length rs) UM UM' ->
-    (rs <> [] -> ref_sym_scope len f) ->
+    (rs <> [] -> ref_sym_scope_from len f off) ->
     (rs <> [] -> (12 <= nn)%nat) ->
     (off <= len)%nat ->
     0 <= s0 -> s0 + Z.of_nat len < Z64 ->
@@ -1325,9 +1327,15 @@ Section UkShRedirs.
       iDestruct (ustr_nonul with "Hstr") as %Hnonul.
       cbn [ushp_redirs_res]. iDestruct "Hres" as "(Hsy & Hpay & #Hpx)".
       destruct n as [| n ]; [ discriminate Href | ].
-      assert (Hsc : ref_sym_scope len f) by (apply Hscope; discriminate).
+      assert (Hsc : ref_sym_scope_from len f off) by (apply Hscope; discriminate).
       destruct (ref_redirs_cons_inv len f n off r rs' fin Hsc Hnonul Hoffle Href)
         as (s & s1 & q & e & s2 & Hpk & Hsle & E1 & Hs1le & E2 & Hs2le & -> & Href').
+      (* the cursor never moves backwards: the scope travels down the turn *)
+      assert (Hoffs : (off <= s)%nat)
+        by (destruct (ref_peek_hit_inv _ _ _ _ _ Hpk) as (-> & _ & _); exact (ref_skip_ge len f off)).
+      assert (Hoffs2 : (off <= s2)%nat)
+        by (pose proof (ref_gettoken_fin_ge len f s _ _ _ _ E1);
+            pose proof (ref_gettoken_fin_ge len f s1 _ _ _ _ E2); lia).
       cbn [ushp_malloc_chain length] in Hchain.
       destruct Hchain as (UM1 & Hty & Hchain').
       assert (Hnn' : exists nn' : nat, nn = (12 + nn')%nat)
@@ -1354,7 +1362,7 @@ Section UkShRedirs.
         by exact Hm1.
       iApply (wp_kshp_parseredirs_turn UM UM1 Hty h2 m1 dq dw dv cmd ps s0
                 len s s1 q e s2 f fp wB wC nn'
-                Hsc Hsle Hs1le E1 E2 Hs0 Hs64 Hps0 Hps8 Hpssz Hfp8 Hfplo Hfphi
+                (ref_sym_scope_from_mono len f off s Hsc Hoffs) Hsle Hs1le E1 E2 Hs0 Hs64 Hps0 Hps8 Hpssz Hfp8 Hfplo Hfphi
                 ltac:(rewrite (Hm1cs s0_idx ltac:(vm_compute; reflexivity)
                                  ltac:(vm_compute; discriminate)); exact Rs0)
                 ltac:(rewrite (Hm1cs s2_idx ltac:(vm_compute; reflexivity)
@@ -1380,7 +1388,7 @@ Section UkShRedirs.
       iApply (IH h3 m3 dq dw dv t1 ps s0 len s2 n fin f fp
                 (mword_of_int (s0 + Z.of_nat q)) (mword_of_int (s0 + Z.of_nat e))
                 UM1 UM' (12 + nn')%nat
-                Href' Hchain' (fun _ => Hsc) (fun _ => ltac:(lia))
+                Href' Hchain' (fun _ => ref_sym_scope_from_mono len f off s2 Hsc Hoffs2) (fun _ => ltac:(lia))
                 Hs2le Hs0 Hs64 Hps0 Hps8 Hpssz Hfp8 Hfplo Hfphi
                 ltac:(rewrite (Hm3cs s0_idx ltac:(vm_compute; reflexivity)
                                  ltac:(vm_compute; discriminate)
@@ -1445,7 +1453,7 @@ Section UkShRedirs.
     w0 = mword_of_int (s0 + Z.of_nat off) ->
     ref_redirs len f n off [] = Some (rs, fin) ->
     ushp_malloc_chain (length rs) UM UM' ->
-    (rs <> [] -> ref_sym_scope len f) ->
+    (rs <> [] -> ref_sym_scope_from len f off) ->
     (rs <> [] -> (12 <= nn)%nat) ->
     0 <= s0 -> s0 + Z.of_nat len < Z64 ->
     0 < ps -> ps mod 8 = 0 -> ps + 8 < Z64 ->
@@ -2029,7 +2037,7 @@ Section UkShRedirs.
     m !!! Regidx a2_idx = mword_of_int (s0 + Z.of_nat len) ->
     (off <= len)%nat ->
     w0 = mword_of_int (s0 + Z.of_nat off) ->
-    ref_sym_scope len f ->
+    ref_sym_scope_from len f off ->
     ref_redirs len f n off [] = Some (rs, fin) ->
     ushp_malloc_chain (length rs) UM UM' ->
     0 <= s0 -> s0 + Z.of_nat len < Z64 ->
