@@ -41,7 +41,7 @@ Collected from the USER lane reports (Sept 26 2026). Each item names the lane th
   it, `utlbOk` admits a cached write-without-read leaf whose TLB hit hits `check_PTE_permission`'s assert
   (no Sail step). Then U2-F's `UftLeavesValid P` premise of `ustFetchSpec_holds` is dropped. Worktree
   lane after the bump lands (touches kernel uvm proofs).
-- **CSR hypothesis widened (U3-A `UclCsrEager`)**: 11 numbers — 0x747/0x757 (Zkr, missing clause) and
+- **(RESOLVED by U3-Lsc: loop consumes `UstExecTotalSc`; only `UclCsrZkr` = 0x747/0x757 remains)** CSR hypothesis widened (U3-A `UclCsrEager`): 11 numbers — 0x747/0x757 (Zkr, missing clause) and
   0x10D–F/0x60D–F/0x61D–F (eager reads of mstateen1..3/sstateen1..3 outside `ufFoot`). FALSE today (walk
   = none), so `ucl_execTotal` is vacuous until fixed. The stateen nine should go via the eager-&&
   elimination lemma (lane andelim); 0x747/0x757 need the Zkr clause or the backend fix (user decision).
