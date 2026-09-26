@@ -1220,3 +1220,6 @@ import Xv6.SystemSlot
 import Xv6.BootCarveProc
 import Xv6.BootChain
 import Xv6.BootCarveFs
+import Xv6.BootSharedDev
+import Xv6.BootSharedFs
+import Xv6.BootShared
