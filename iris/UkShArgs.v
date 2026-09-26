@@ -270,7 +270,7 @@ Section UkShArgs.
       (mc : regfile) (wq weq : mword 64) (stop : bool) (s q e fin : nat) :
     (cur <= len)%nat ->
     ref_peek len f cur [rb_bar; rb_rpar; rb_amp; rb_semi] = (stop, s) ->
-    (stop = false -> ref_sym_scope len f) ->
+    (stop = false -> ref_sym_scope_from len f cur) ->
     (stop = false -> ref_gettoken len f s = (0%Z, q, e, fin)) ->
     0 <= s0 -> s0 + Z.of_nat len < Z64 ->
     0 < ps -> ps mod 8 = 0 -> ps + 8 < Z64 ->
@@ -438,6 +438,8 @@ Section UkShArgs.
       iPureIntro. exact Hk5.
     - (* =========== A MISS, THEN gettoken ANSWERS NUL ===================== *)
       specialize (Hscope eq_refl). specialize (Hgtk eq_refl).
+      assert (Hcurs : (cur <= s)%nat)
+        by (rewrite (ref_peek_miss_inv _ _ _ _ _ Hpk); exact (ref_skip_ge len f cur)).
       destruct (Hfp eq_refl) as (Hfp0 & Hfp8 & Hfpl & Hfph).
       specialize (Hs7v eq_refl). specialize (Hs8v eq_refl).
       rewrite /ushp_pex_gtk_in. iDestruct "Hin" as "(Hq & Heq & Hsy)".
@@ -597,7 +599,8 @@ Section UkShArgs.
       iApply (wp_ref_gettoken h11 n10 dq dw dv ps (fp - 120) (fp - 128)
                 s0 len s f (mword_of_int (s0 + Z.of_nat s)) wq weq (14 + nn)
                 0%Z q e fin
-                Ha0_10 Ha1_10 Ha2_10 Ha3_10 Hsle eq_refl Hscope Hs0 Hs64
+                Ha0_10 Ha1_10 Ha2_10 Ha3_10 Hsle eq_refl
+                (ref_sym_scope_from_mono len f cur s Hscope Hcurs) Hs0 Hs64
                 Hps0 Hps8 Hpssz Hgtk
                 with "Hcode Hcur [Hq] [Heq] Hstr Hws Hsy Hrun").
       { iRight. iSplitR;
@@ -666,7 +669,7 @@ Section UkShArgs.
     forall (n : nat) (done toks : list (nat * nat)) (rs0 rs' : list rredir)
            (t0 : Z) (cur fin : nat) (UM UM' : iProp Σ) (h : CpuId)
            (mc : regfile) (wq weq : mword 64),
-    ref_sym_scope len f ->
+    ref_sym_scope_from len f cur ->
     ref_args len f n cur done rs0 = Some (toks, rs0 ++ rs', fin) ->
     ushp_malloc_chain (length rs') UM UM' ->
     (rs' <> [] -> (12 <= nn)%nat) ->
@@ -1062,10 +1065,18 @@ Section UkShArgs.
                    (regval_into_reg
                       (mword_of_int (fp - 128) : mword 64))) | ].
       rewrite <- shpp_gettoken.
+      (* the cursor never moves backwards: the scope travels down the turn *)
+      assert (Hcurs : (cur <= s)%nat)
+        by (rewrite (ref_peek_miss_inv _ _ _ _ _ Hpk); exact (ref_skip_ge len f cur)).
+      assert (Hcurs1 : (cur <= s1)%nat)
+        by (pose proof (ref_gettoken_fin_ge len f s _ _ _ _ Hgtk); lia).
+      assert (Hcurs2 : (cur <= s2)%nat)
+        by (pose proof (ref_redirs_fin_ge len f n s1 _ _ _ Hrd); lia).
       iApply (wp_ref_gettoken h11 n10 dq dw dv ps (fp - 120) (fp - 128)
                 s0 len s f (mword_of_int (s0 + Z.of_nat s)) wq weq (14 + nn)
                 rt_word q e s1
-                Ha0_10 Ha1_10 Ha2_10 Ha3_10 Hsle eq_refl Hscope Hs0 Hs64
+                Ha0_10 Ha1_10 Ha2_10 Ha3_10 Hsle eq_refl
+                (ref_sym_scope_from_mono len f cur s Hscope Hcurs) Hs0 Hs64
                 Hps0 Hps8 Hpssz Hgtk
                 with "Hcode Hcur [Hq] [Heq] Hstr Hws Hsy Hrun").
       { iRight. iSplitR;
@@ -1409,7 +1420,7 @@ Section UkShArgs.
       iApply (wp_ref_parseredirs h25 n19 dq dw dv t0 ps s0 len s1 n s2 f rs1
                 UM UM1 (mword_of_int (s0 + Z.of_nat s1)) nn
                 Ha0_19 Ha1_19 Ha2_19 Hs1 eq_refl Hrd Hchain1
-                (fun _ => Hscope)
+                (fun _ => ref_sym_scope_from_mono len f cur s1 Hscope Hcurs1)
                 (fun Hne => Hnn (app_ne_l rs1 rs'' Hne))
                 Hs0 Hs64
                 Hps0 Hps8 Hpssz
@@ -1472,7 +1483,7 @@ Section UkShArgs.
                 h27 n21
                 (mword_of_int (s0 + Z.of_nat q))
                 (mword_of_int (s0 + Z.of_nat e))
-                Hscope Hrest Hchain2
+                (ref_sym_scope_from_mono len f cur s2 Hscope Hcurs2) Hrest Hchain2
                 (fun Hne => Hnn (app_ne_r rs1 rs'' Hne))
                 Hs0 Hs64 Hps0 Hps8 Hpssz Hfp0 Hfp8 Hfpl Hfph
                 Hp0 Hp8 Hpsz Hs2
@@ -1590,7 +1601,7 @@ Section UkShArgs.
     m !!! Regidx a1_idx = mword_of_int (s0 + Z.of_nat len) ->
     (off <= len)%nat ->
     w0 = mword_of_int (s0 + Z.of_nat off) ->
-    ref_sym_scope len f ->
+    ref_sym_scope_from len f off ->
     ref_parseexec len f n off = Some (t, fin) ->
     ushp_malloc_chain (ushp_nodes t) UM UM' ->
     (ref_has_redir t = true -> (12 <= nn)%nat) ->
@@ -2227,11 +2238,16 @@ Section UkShArgs.
     (* the cursor has already been moved once, by the block peek: it sits
        at [s], where the reference ran parseredirs *)
     rewrite <- shpp_parseredirs.
+    (* the cursor never moves backwards: the scope travels down the walk *)
+    assert (Hoffs : (off <= s)%nat)
+      by (rewrite (ref_peek_miss_inv _ _ _ _ _ Epk); exact (ref_skip_ge len f off)).
+    assert (Hoffs1 : (off <= s1)%nat)
+      by (pose proof (ref_redirs_fin_ge len f n s [] rs_l s1 Erd); lia).
     iDestruct (ushp_redirs_res_of rs_l dv Pex with "Hpx Hsy Hpay") as "[Hrres Hback]".
     iApply (wp_ref_parseredirs h19 m16 dq dw dv p ps s0 len s n s1 f rs_l
               UM1 UM2 (mword_of_int (s0 + Z.of_nat s)) nn
               Ha0_16 Ha1_16 Ha2_16 Hs eq_refl Erd Hch1
-              (fun _ => Hscope)
+              (fun _ => ref_sym_scope_from_mono len f off s Hscope Hoffs)
               (fun Hne => Hnn (ref_has_redir_wrap _ _ (app_ne_l rs_l rs' Hne)))
               Hs0 Hs64
               Hps0 Hps8 Hpssz
@@ -2493,7 +2509,7 @@ Section UkShArgs.
     iDestruct (ushp_pex_res_of rs' Pex with "Hpx Hpay") as "[Hres Hback']".
     iApply (wp_ref_pex_loop dq dw dv s0 ps p (uint sp0) len f nn
               n (@nil (nat * nat)) toks rs_l rs' t0 s1 s2 UM2 UM' h29 m25 wq weq
-              Hscope Eargs Hch2
+              (ref_sym_scope_from_mono len f off s1 Hscope Hoffs1) Eargs Hch2
               (fun Hne => Hnn (ref_has_redir_wrap _ _ (app_ne_r rs_l rs' Hne)))
               Hs0 Hs64 Hps0 Hps8 Hpssz
               ltac:(lia) Hsp8al ltac:(lia) ltac:(lia)
@@ -3014,7 +3030,7 @@ Section UkShArgs.
     m !!! Regidx a1_idx = mword_of_int (s0 + Z.of_nat len) ->
     (off <= len)%nat ->
     w0 = mword_of_int (s0 + Z.of_nat off) ->
-    ref_sym_scope len f ->
+    ref_sym_scope_from len f off ->
     ref_parseexec len f n off = Some (t, fin) ->
     ushp_malloc_chain (ushp_nodes t) UM UM' ->
     (ref_has_redir t = true -> (12 <= nn)%nat) ->

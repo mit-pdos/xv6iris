@@ -179,7 +179,7 @@ Section UkShRedirEx.
     iApply (UkShArgs.wp_ref_pex_exit N dq dw dv s0 ps fp len f nn cur h mc wq weq
               false len len len len Hcur
               (ref_peek_end len f cur _ Hskip ref_symtoks_stop)
-              (fun _ => ushs_gt_ok_scope len f Hgtok)
+              (fun _ => ref_sym_scope_from_of len f cur (ushs_gt_ok_scope len f Hgtok))
               (fun _ => ref_gettoken_nul len f len (ref_skip_at_len len f))
               Hs0 Hs64 Hps0 Hps8 Hpssz
               (fun _ => conj Hfp0 (conj Hfp8 (conj Hfpl Hfph))) Hs4v Hs5v Hs6v
@@ -281,7 +281,8 @@ Section UkShRedirEx.
               (length rest + 2) done (done ++ rest) []
               ({| rr_q := S (S gp); rr_eq := fe; rr_mode := rr_mode_gt; rr_fd := 1 |} :: [])
               p cur len UMalloc UMalloc' h mc wq weq
-              (ushs_gt_ok_scope len f (ushs_gt_ok_redir len f gp fe Hred)) Href
+              (ref_sym_scope_from_of len f cur
+                 (ushs_gt_ok_scope len f (ushs_gt_ok_redir len f gp fe Hred))) Href
               (UkShRedirs.ushp_malloc_chain_1 N UMalloc UMalloc' ushp_malloc_ok)
               (fun _ => ltac:(lia))
               Hs0 Hs64 Hps0 Hps8 Hpssz Hfp0 Hfp8 Hfpl Hfph Hp0 Hp8 Hpsz Hcur

@@ -427,7 +427,7 @@ Section UkShParser.
     m !!! Regidx a1_idx = mword_of_int (s0 + Z.of_nat len) ->
     (off <= len)%nat ->
     w0 = mword_of_int (s0 + Z.of_nat off) ->
-    ref_sym_scope len f ->
+    ref_sym_scope_from len f off ->
     ref_parseexec len f n off = Some (t1, s) ->
     ref_peek len f s [rb_bar] = (hit, s1) ->
     ushp_malloc_chain (ushp_nodes t1) UM UM1 ->
@@ -1041,7 +1041,7 @@ Section UkShParser.
     m !!! Regidx a1_idx = mword_of_int (s0 + Z.of_nat len) ->
     (off <= len)%nat ->
     w0 = mword_of_int (s0 + Z.of_nat off) ->
-    ref_sym_scope len f ->
+    ref_sym_scope_from len f off ->
     ref_parsepipe len f (S n) off = Some (t, fin) ->
     ushp_malloc_chain (ushp_nodes t) UM UM' ->
     0 <= s0 -> s0 + Z.of_nat len < Z64 ->
@@ -1263,12 +1263,18 @@ Section UkShParser.
                 (Hq3 a3_idx ltac:(vm_compute; discriminate))
                 (Hq2 a3_idx ltac:(vm_compute; discriminate)). exact Ha3_q1. }
       rewrite <- shpp_gettoken.
+      (* the cursor never moves backwards: the scope travels down the turn *)
+      assert (Hoffs1 : (off <= s1)%nat)
+        by (pose proof (ref_parseexec_fin_ge len f _ off t1 s Hex);
+            unfold ref_peek in Hpk; injection Hpk as _ Es1; rewrite <- Es1;
+            pose proof (ref_skip_ge len f s); lia).
       (* gettoken at the '|', at the reference's own answer; both
          out-parameters are NULL, which is [ushp_cell]'s left disjunct *)
       iApply (wp_ref_gettoken h19 q5 dq dw dv ps 0 0 s0 len s1 f
                 (mword_of_int (s0 + Z.of_nat s1)) (mword_of_int 0) (mword_of_int 0)
                 (30 + nn') gr gq ge s2
-                Ha0_q5 Ha1_q5 Ha2_q5 Ha3_q5 Hs1le eq_refl Hscope Hs0 Hs64
+                Ha0_q5 Ha1_q5 Ha2_q5 Ha3_q5 Hs1le eq_refl
+                (ref_sym_scope_from_mono len f off s1 Hscope Hoffs1) Hs0 Hs64
                 Hps0 Hps8 Hpssz Eg
                 with "Hcode Hcur [] [] Hstr Hws Hsy Hrun").
       { iLeft. iPureIntro. reflexivity. }
@@ -1357,8 +1363,14 @@ Section UkShParser.
       (* THE RECURSION: the induction hypothesis at the cursor the '|'
          gettoken left, on the same line *)
       iEval (rewrite Ebud2) in "Hrun".
+      assert (Hoffs2 : (off <= s2)%nat)
+        by (pose proof (ref_parseexec_fin_ge len f _ off t1 s Hex);
+            unfold ref_peek in Hpk; injection Hpk as _ Es1;
+            pose proof (ref_skip_ge len f s);
+            pose proof (ref_gettoken_fin_ge len f s1 _ _ _ _ Eg); lia).
       iApply (IH h23 g4 s2 s3 (mword_of_int (s0 + Z.of_nat s2)) r UM1 UM2 nnr
-                Ha0_g4 Ha1_g4 Hs2le eq_refl Hscope Er Hch2 Hs0 Hs64 Hps0 Hps8 Hpssz
+                Ha0_g4 Ha1_g4 Hs2le eq_refl
+                (ref_sym_scope_from_mono len f off s2 Hscope Hoffs2) Er Hch2 Hs0 Hs64 Hps0 Hps8 Hpssz
                 with "Hcode Hro Hcur Hstr Hws Hsy HM1 Hpxr Hpay Hrun").
       iIntros (pr) "Hotr Hcur Hstr Hws Hsy".
       iIntros (h24 r1) "%Hcsr %Ha0_r HM2 Hpay Hrun".
@@ -1569,7 +1581,7 @@ Section UkShParser.
     m !!! Regidx a1_idx = mword_of_int (s0 + Z.of_nat len) ->
     (off <= len)%nat ->
     w0 = mword_of_int (s0 + Z.of_nat off) ->
-    ref_sym_scope len f ->
+    ref_sym_scope_from len f off ->
     ref_parseline len f (S n) off = Some (t, fin) ->
     ushp_malloc_chain (ushp_nodes t) UM UM' ->
     0 <= s0 -> s0 + Z.of_nat len < Z64 ->
@@ -1605,17 +1617,20 @@ Section UkShParser.
     rewrite ref_parseline_S in Href.
     destruct (ref_parsepipe len f n off) as [[ t1 s ] | ] eqn:Hpp; [ | discriminate Href ].
     destruct n as [| n ]; [ cbn [ref_parsepipe] in Hpp; discriminate Hpp | ].
-    rewrite (ref_backs_scope len f (S n) s t1 Hscope ltac:(lia)) in Href.
+    assert (Hoffs : (off <= s)%nat) by exact (ref_parsepipe_fin_ge len f (S n) off t1 s Hpp).
+    pose proof (ref_sym_scope_from_mono len f off s Hscope Hoffs) as Hscs.
+    pose proof (ref_sym_scope_from_mono len f s (ref_skip len f s) Hscs (ref_skip_ge len f s)) as Hscs1.
+    rewrite (ref_backs_scope len f (S n) s t1 Hscs ltac:(lia)) in Href.
     set (s1 := ref_skip len f s) in *.
-    rewrite (ref_peek_scope_miss len f s1 [rb_semi] Hscope ref_out_scope_semi) in Href.
+    rewrite (ref_peek_scope_miss len f s1 [rb_semi] Hscs1 ref_out_scope_semi) in Href.
     set (s2 := ref_skip len f s1) in *.
     injection Href as Et Efin. subst t1 fin.
     assert (Hs : (s <= len)%nat)
       by exact (proj2 (ref_parsepipe_bounded len f (S n) off t s Hoffle Hpp)).
     assert (Hs1 : (s1 <= len)%nat) by exact (ref_skip_le len f s Hs).
     assert (Hs2 : (s2 <= len)%nat) by exact (ref_skip_le len f s1 Hs1).
-    pose proof (ref_peek_scope_miss len f s [rb_amp] Hscope ref_out_scope_amp) as Hpk1.
-    pose proof (ref_peek_scope_miss len f s1 [rb_semi] Hscope ref_out_scope_semi) as Hpk2.
+    pose proof (ref_peek_scope_miss len f s [rb_amp] Hscs ref_out_scope_amp) as Hpk1.
+    pose proof (ref_peek_scope_miss len f s1 [rb_semi] Hscs1 ref_out_scope_semi) as Hpk2.
     fold s1 in Hpk1. fold s2 in Hpk2.
     (* the budget in the landed spelling *)
     pose proof (ushp_pp_room_ge t) as Hrge.
@@ -3493,10 +3508,10 @@ Section UkShParser.
     unfold ref_parsecmd in Href.
     destruct (ref_parseline len f (ref_fuel len) 0%nat) as [[ t1 s ] | ] eqn:Hpl;
       [ | discriminate Href ].
-    rewrite (ref_peek_scope_miss len f s [] Hscope ref_out_scope_nil) in Href.
+    rewrite (ref_peek_scope_miss len f s [] (ref_sym_scope_from_of len f s Hscope) ref_out_scope_nil) in Href.
     destruct (bool_decide (ref_skip len f s = len)) eqn:Es1; [ | discriminate Href ].
     apply bool_decide_eq_true_1 in Es1. injection Href as Et. subst t1.
-    pose proof (ref_peek_scope_miss len f s [] Hscope ref_out_scope_nil) as Hpk.
+    pose proof (ref_peek_scope_miss len f s [] (ref_sym_scope_from_of len f s Hscope) ref_out_scope_nil) as Hpk.
     rewrite Es1 in Hpk.
     rewrite ref_fuel_SS in Hpl. set (n := S (4 * len + 6)%nat) in Hpl.
     assert (Hs : (s <= len)%nat)
@@ -3885,7 +3900,7 @@ Section UkShParser.
               (B - ushp_pl_room t + nn)%nat
               Ha0_12 Ha1_12 ltac:(lia)
               ltac:(f_equal; lia)
-              Hscope Hpl Hchain ltac:(lia) ltac:(lia)
+              (ref_sym_scope_from_of len f 0 Hscope) Hpl Hchain ltac:(lia) ltac:(lia)
               Hcur0 Hcur8 Hcurz
               with "Hcode Hro Lcur Hstr Hws Hsy HM Hpxl Hpay Hrun").
     iIntros (p) "Hot Lcur Hstr Hws Hsy".

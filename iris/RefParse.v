@@ -355,6 +355,33 @@ Proof.
   intros Hns j Hj Hsym. rewrite (Hns j Hj) in Hsym. discriminate.
 Qed.
 
+(* ...FROM A CURSOR (user-once N): the parser never reads a byte below the
+   cursor it was called at, so every walk's scope premise is this at its
+   own cursor; the whole-line scope is the instance at 0, and a line's
+   suffix with junk below the cursor is admitted. *)
+Definition ref_sym_scope_from (len : nat) (f : nat -> bv 8) (c : nat) : Prop :=
+  forall j : nat, (c <= j < len)%nat -> ushp_is_sym (f j) = true ->
+    f j = rb_bar
+    \/ (f j = rb_gt /\ (S j < len)%nat /\ f (S j) <> rb_gt).
+
+Lemma ref_sym_scope_from_mono (len : nat) (f : nat -> bv 8) (c c' : nat) :
+  ref_sym_scope_from len f c -> (c <= c')%nat -> ref_sym_scope_from len f c'.
+Proof.
+  intros H Hle j Hj Hs. apply (H j); [ lia | exact Hs ].
+Qed.
+
+Lemma ref_sym_scope_from_of (len : nat) (f : nat -> bv 8) (c : nat) :
+  ref_sym_scope len f -> ref_sym_scope_from len f c.
+Proof.
+  intros H j Hj Hs. apply (H j); [ lia | exact Hs ].
+Qed.
+
+Lemma ref_sym_scope_of_from_0 (len : nat) (f : nat -> bv 8) :
+  ref_sym_scope_from len f 0 -> ref_sym_scope len f.
+Proof.
+  intros H j Hj Hs. apply (H j); [ lia | exact Hs ].
+Qed.
+
 (* ===================================================================== *)
 (* §6 ANTI-VACUITY: the three line shapes, computed                        *)
 (* ===================================================================== *)

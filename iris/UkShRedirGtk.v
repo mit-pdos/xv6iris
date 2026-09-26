@@ -114,7 +114,8 @@ Section UkShRedirGtk.
   Proof using .
     intros Ha0 Ha1 Ha2 Ha3 Hoffle Hw0 Hgtok Hs0 Hs64 Hps0 Hps8 Hpssz.
     exact (wp_ref_gettoken_ushs h m dq dw dv ps qp eqp s0 len off f w0 wq weq nn
-             Ha0 Ha1 Ha2 Ha3 Hoffle Hw0 (ushs_gt_ok_scope len f Hgtok)
+             Ha0 Ha1 Ha2 Ha3 Hoffle Hw0
+             (ref_sym_scope_from_of len f off (ushs_gt_ok_scope len f Hgtok))
              Hs0 Hs64 Hps0 Hps8 Hpssz).
   Qed.
 
