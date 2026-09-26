@@ -23,7 +23,7 @@ deviation 1), so the only work is naming each body's premises:
     the case split                wp_sys_open_eb_of_arms     (SpecSysOpen)
 
 The create entry reaches the plain-arm bodies at `SysOpenCreArm`'s shim
-record (`sysOpenCrA A P Pmiss Fo`, the join instantiated there with
+record (`sysOpenCrA A P Pmiss Fo Ft`, the join instantiated there with
 `sysOpenCrA_static`), exactly Rocq's `socr_*` instantiation.
 
 The stage files are `SysOpenParts` (vocabulary, frame, bodies),
@@ -97,8 +97,8 @@ theorem sys_open_proof (AI : ARGINT) (AS : ARGSTR) (BO : BEGIN_OP) (NI : NAMEI_E
         (sys_open_tail_c IUP EO Γ k A hS)) hc)
     (fun hc => sys_open_create AI AS BO Γ cpu k A Farm Fun Fok Fex hS
       (sys_open_entry_c CR Γ k A hS Farm Fun Fok Fex
-        (fun P' Pm' Fo' => sys_open_join_all IU IUP EO FC IT FA FD Γ k (sysOpenCrA A P' Pm' Fo')
-          (sysOpenCrA_static k A P' Pm' Fo' hS))
+        (fun P' Pm' Fo' Ft' => sys_open_join_all IU IUP EO FC IT FA FD Γ k
+          (sysOpenCrA A P' Pm' Fo' Ft') (sysOpenCrA_static k A P' Pm' Fo' Ft' hS))
         (sys_open_tail_a EO Γ k A hS)) hc)⟩
 
 end Xv6

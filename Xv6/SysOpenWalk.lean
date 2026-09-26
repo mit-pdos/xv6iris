@@ -254,7 +254,7 @@ theorem sys_open_walk_dead (Γ : SchedNames) (k : KCtx) (A : SysOpenArgs GF)
     fdSlot ∗ fdFrags A.V.fdg A.sts ∗
     nameiWalkDeadEra (hlc := hlc) fscFs A.P A.Pmiss pl ∗
     pfAt (aopenCommitAt (hlc := hlc) (fsGammaL fscFs) appE) A.Fo ∗
-    openTruncPiece (hlc := hlc) (fsGammaL fscFs) A.vom A.Ft ∗
+    openTruncPiece (hlc := hlc) (fsGammaL fscFs) A.vom (truncTermAt pl A.P) A.Ft ∗
     (∀ c' : CPU, sysOpenPostP (hlc := hlc) k A c')
     ⊢ wpLoop (GF := GF) cpu := by
   unfold sysOpenTailBBody at hTB
@@ -317,7 +317,7 @@ theorem sys_open_walk_found (IL : ILOCK) (Γ : SchedNames) [ClaimIs (hlc := hlc)
     fdSlot ∗ fdFrags A.V.fdg A.sts ∗
     inodeHeldAt ipv iL ∗ A.P (pathElems pl).length iL ∗
     pfAt (aopenCommitAt (hlc := hlc) (fsGammaL fscFs) appE) A.Fo ∗
-    openTruncPiece (hlc := hlc) (fsGammaL fscFs) A.vom A.Ft ∗
+    openTruncPiece (hlc := hlc) (fsGammaL fscFs) A.vom (truncTermAt pl A.P) A.Ft ∗
     (∀ c' : CPU, sysOpenPostP (hlc := hlc) k A c')
     ⊢ wpLoop (GF := GF) cpu := by
   iintro ⟨Hk, Hpc, Hte, Hce, #Henv, Hcells, Hbuf, Hpriv, HopS, Htx, Hbs, Hir1, Hirr, Hfds, Hfrags,
@@ -391,6 +391,11 @@ theorem sys_open_walk_found (IL : ILOCK) (Γ : SchedNames) [ClaimIs (hlc := hlc)
   · unfold sysOpenLk; iframe; iframe #
   ihave Hkeep : sysOpenKeep (GF := GF) kk q.half g inum $$ [Hkeep Hru]
   · unfold sysOpenKeep; iframe
+  -- THE PLAIN PERMIT IS PAID HERE (Rocq TRUNC-PERMIT, `plain_trunc_key`): the
+  -- walk has an inode, so the terminal cursor splits into the permit's
+  -- payment and what the arms keep (`SpecSysOpen.curKept`)
+  ihave Hkey := plainTruncKey (hlc := hlc) (fsGammaL fscFs) A.vom pl A.P inum.toNat A.Ft $$ Htc HP
+  icases Hkey with ⟨HP, Htc⟩
   ihave Hres : sysOpenResidue (hlc := hlc) A pl inum dn bm data $$ [HP HFo Htc]
   · unfold sysOpenResidue sysOpenObs
     iframe HP Htc

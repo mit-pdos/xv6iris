@@ -1159,14 +1159,19 @@ def sysOpenOffCell (kf : Nat) (C : FContent) (γo : GName) : IProp GF :=
       offGv γo 1 (vo.toNat : Int))
   else offFree kf 1
 
-/-- The walk's AU RESIDUE below the fire (Rocq's three rows `P (length
-(path_elems pl)) (bv_unsigned inum) -∗ so_obs Fo … -∗ open_trunc_piece …`),
-at the path the caller passed. -/
+/-- The walk's AU RESIDUE below the fire (Rocq's three rows `cur_kept vom P
+(length (path_elems pl)) (bv_unsigned inum) -∗ so_obs Fo … -∗
+plain_trunc_kept … pl P (bv_unsigned inum) Ft`, lane TRUNC-PERMIT), at the
+path the caller passed. -/
 def sysOpenResidue (A : SysOpenArgs GF) (pl : List (BitVec 8)) (inum : BitVec 32) (dn : Dinode)
     (bm : Blkmap) (data : Nat → List (BitVec 8)) : IProp GF :=
-  iprop(⌜argPathOf (sysOpenIm A) A.v.toNat pl⌝ ∗ A.P (pathElems pl).length inum.toNat ∗
+  iprop(⌜argPathOf (sysOpenIm A) A.v.toNat pl⌝ ∗
+    -- THE TERMINAL CURSOR AND THE KEYED PIECE (Rocq TRUNC-PERMIT): the permit
+    -- was paid at the join out of the cursor (`SysOpenKept.plainTruncKey`),
+    -- which rides the kept piece's refund at O_TRUNC
+    curKept A.vom A.P (pathElems pl).length inum.toNat ∗
     sysOpenObs A.Fo inum.toNat (eraNode dn bm data) ∗
-    openTruncPiece (hlc := hlc) (fsGammaL fscFs) A.vom A.Ft)
+    plainTruncKept (hlc := hlc) (fsGammaL fscFs) A.vom pl A.P inum.toNat A.Ft)
 
 end Vocab
 
@@ -1594,7 +1599,8 @@ def sysOpenEntryNBody (Γ : SchedNames) (k : KCtx) (A : SysOpenArgs GF) : IProp 
     -- THE AU BUNDLE, at the string argstr fetched
     exStart (hlc := hlc) fscFs A.V.cwi A.P A.Pmiss (bview plen bp) -∗
     pfAt (aopenCommitAt (hlc := hlc) (fsGammaL fscFs) appE) A.Fo -∗
-    openTruncPiece (hlc := hlc) (fsGammaL fscFs) A.vom A.Ft -∗
+    -- the truncate's permit is the walk's terminal cursor (Rocq TRUNC-PERMIT)
+    openTruncPiece (hlc := hlc) (fsGammaL fscFs) A.vom (truncTermAt (bview plen bp) A.P) A.Ft -∗
     (∀ c' : CPU, sysOpenPostP (hlc := hlc) k A c') -∗
     wpLoop c)
 
@@ -1625,7 +1631,9 @@ def sysOpenEntryCBody (Γ : SchedNames) (k : KCtx) (A : SysOpenArgs GF)
       (A.P (nparElems (bview plen bp)).length) Farm) Fok -∗
     pfAt (dlookupCommitAt (hlc := hlc) (fsGammaL fscFs) appE) Fex -∗
     pfAt (aopenCommitAt (hlc := hlc) (fsGammaL fscFs) appE) A.Fo -∗
-    openTruncPiece (hlc := hlc) (fsGammaL fscFs) A.vom A.Ft -∗
+    -- the truncate's permit is create's own payout at this path (Rocq F-OPEN-3)
+    openTruncPiece (hlc := hlc) (fsGammaL fscFs) A.vom
+      (crePermit (hlc := hlc) (fsGammaL fscFs) (bview plen bp) A.P Farm Fok Fex) A.Ft -∗
     creChildUnfired (hlc := hlc) (fsGammaL fscFs) (.AFile []) Farm Fun -∗
     (∀ c' : CPU, sysOpenPostC (hlc := hlc) k A Farm Fun Fok Fex c') -∗
     wpLoop c)

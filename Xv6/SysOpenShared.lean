@@ -234,7 +234,8 @@ theorem sys_open_arm_fail (omo : OffMode) (Γ : FsViewNames GF) (γfs : FsNames)
     (VW : ProcPriv) (MW : Nat → List (BitVec 8)) (r : BitVec 64) (pl : List (BitVec 8))
     (i : Nat) (n : FsNode) (hpl : argPathOf Mim pv pl) (hr : r = 0xFFFFFFFFFFFFFFFF#64) :
     procPrivFd (GF := GF) γ pa pid VW MW ⊢ fdFrags VW.fdg sts -∗ fdSlot -∗
-      P (pathElems pl).length i -∗ sysOpenObs Fo i n -∗ openTruncPiece (hlc := hlc) Γ vom Ft -∗
+      curKept vom P (pathElems pl).length i -∗ sysOpenObs Fo i n -∗
+      plainTruncKept (hlc := hlc) Γ vom pl P i Ft -∗
       openArmsPlain (hlc := hlc) omo Γ γfs cw γ pa pid Mim pv vom P Pmiss Fo Ft sts VW MW r := by
   iintro Hpriv Hfrag Hfds HP Hobs Htc
   unfold openArmsPlain openPostFailPlain sysOpenObs
@@ -265,7 +266,8 @@ theorem sys_open_arm_dead (omo : OffMode) (Γ : FsViewNames GF) (γfs : FsNames)
     (hpl : argPathOf Mim pv pl) (hr : r = 0xFFFFFFFFFFFFFFFF#64) :
     procPrivFd (GF := GF) γ pa pid VW MW ⊢ fdFrags VW.fdg sts -∗ fdSlot -∗
       nameiWalkDeadEra (hlc := hlc) γfs P Pmiss pl -∗
-      pfAt (aopenCommitAt (hlc := hlc) Γ appE) Fo -∗ openTruncPiece (hlc := hlc) Γ vom Ft -∗
+      pfAt (aopenCommitAt (hlc := hlc) Γ appE) Fo -∗
+      openTruncPiece (hlc := hlc) Γ vom (truncTermAt pl P) Ft -∗
       openArmsPlain (hlc := hlc) omo Γ γfs cw γ pa pid Mim pv vom P Pmiss Fo Ft sts VW MW r := by
   iintro Hpriv Hfrag Hfds Hdead Hoc Htc
   unfold openArmsPlain openPostFailPlain
@@ -315,9 +317,9 @@ theorem sys_open_arm_dev (omo : OffMode) (Γ : FsViewNames GF) (γ : FileNames) 
     (Ft : Pfam GF (Aview → Nat → List (BitVec 8) → IProp GF)) (sts : List FdState)
     (VW : ProcPriv) (MW : Nat → List (BitVec 8)) (pl : List (BitVec 8)) (i ma mi nl : Nat)
     (hpl : argPathOf Mim pv pl) (hma : ma ≤ NDEV_max) :
-    P (pathElems pl).length i ⊢
+    curKept vom P (pathElems pl).length i ⊢
       (∃ av : Aview, ⌜arowAt av i ⟨.ADev ma mi, nl⟩⌝ ∗ Fo.pfRecv av i ⟨.ADev ma mi, nl⟩) -∗
-      openTruncPiece (hlc := hlc) Γ vom Ft -∗
+      plainTruncKept (hlc := hlc) Γ vom pl P i Ft -∗
       ∀ r : BitVec 64,
         openFdOk γ pa pid VW MW (omReadable vom) (omWritable vom) (.device ma) sts r -∗
         foffPubT omo (.device ma) -∗
@@ -342,7 +344,7 @@ theorem sys_open_arm_file (omo : OffMode) (Γ : FsViewNames GF) (γ : FileNames)
     (VW : ProcPriv) (MW : Nat → List (BitVec 8)) (pl : List (BitVec 8)) (i : Nat)
     (bs0 : List (BitVec 8)) (nl : Nat) (γo : GName)
     (hpl : argPathOf Mim pv pl) (hnt : omTrunc vom = false) :
-    P (pathElems pl).length i ⊢
+    curKept vom P (pathElems pl).length i ⊢
       (∃ av : Aview, ⌜arowAt av i ⟨.AFile bs0, nl⟩⌝ ∗ Fo.pfRecv av i ⟨.AFile bs0, nl⟩) -∗
       ∀ r : BitVec 64,
         openFdOk γ pa pid VW MW (omReadable vom) (omWritable vom) (.inode i γo omo) sts r -∗
@@ -376,7 +378,7 @@ theorem sys_open_arm_file_tr (omo : OffMode) (Γ : FsViewNames GF) (γ : FileNam
     (VW : ProcPriv) (MW : Nat → List (BitVec 8)) (pl : List (BitVec 8)) (i : Nat)
     (bs0 : List (BitVec 8)) (nl : Nat) (γo : GName)
     (hpl : argPathOf Mim pv pl) (ht : omTrunc vom = true) :
-    P (pathElems pl).length i ⊢
+    curKept vom P (pathElems pl).length i ⊢
       (∃ av : Aview, ⌜arowAt av i ⟨.AFile bs0, nl⟩⌝ ∗ Fo.pfRecv av i ⟨.AFile bs0, nl⟩) -∗
       (∃ av' : Aview, ⌜arowAt av' i ⟨.AFile bs0, nl⟩⌝ ∗ Ft.pfRecv av' i bs0) -∗
       ∀ r : BitVec 64,
@@ -411,9 +413,9 @@ theorem sys_open_arm_dir (omo : OffMode) (Γ : FsViewNames GF) (γ : FileNames) 
     (VW : ProcPriv) (MW : Nat → List (BitVec 8)) (pl : List (BitVec 8)) (i : Nat)
     (ents : Std.ExtTreeMap Fname Nat compare) (nl : Nat) (γo : GName)
     (hpl : argPathOf Mim pv pl) (h0 : omArg vom = 0) :
-    P (pathElems pl).length i ⊢
+    curKept vom P (pathElems pl).length i ⊢
       (∃ av : Aview, ⌜arowAt av i ⟨.ADir ents, nl⟩⌝ ∗ Fo.pfRecv av i ⟨.ADir ents, nl⟩) -∗
-      openTruncPiece (hlc := hlc) Γ vom Ft -∗
+      plainTruncKept (hlc := hlc) Γ vom pl P i Ft -∗
       ∀ r : BitVec 64,
         openFdOk γ pa pid VW MW (omReadable vom) (omWritable vom) (.inode i γo omo) sts r -∗
         foffPubT omo (.inode i γo omo) -∗
@@ -455,8 +457,8 @@ theorem sys_open_arm_notr (omo : OffMode) (Γ : FsViewNames GF) (γ : FileNames)
       dn.diMajor.toNat ≤ NDEV_max ∧ t = .device dn.diMajor.toNat)
     (hino : dn.diType.toNat ≠ T_DEVICE → t = .inode i γo omo)
     (hen : dn.diType.toNat = T_DIR_z ∨ dn.diType.toNat = T_FILE ∨ dn.diType.toNat = T_DEVICE) :
-    P (pathElems pl).length i ⊢
-      sysOpenObs Fo i (eraNode dn bm data) -∗ openTruncPiece (hlc := hlc) Γ vom Ft -∗
+    curKept vom P (pathElems pl).length i ⊢
+      sysOpenObs Fo i (eraNode dn bm data) -∗ plainTruncKept (hlc := hlc) Γ vom pl P i Ft -∗
       ∀ r : BitVec 64,
         openFdOk γ pa pid VW MW (omReadable vom) (omWritable vom) t sts r -∗
         foffPubT omo t -∗

@@ -116,14 +116,15 @@ theorem fsabsAtrunc (γfs : FsNames) :
       pfAt (atruncCommitAt (hlc := hlc) (fsGammaL γfs) appE) (pfamTriv (fun _ _ _ => iprop(True))) :=
   (atruncCommitAt_unit (fsGammaL γfs) appE).trans (pfAt_triv _ _)
 
-/-- Rocq `fsabs_trunc_piece`: at `omTrunc vom = false` nothing is owed. -/
-theorem fsabsTruncPiece (γfs : FsNames) (vom : BitVec 64) :
+/-- Rocq `fsabs_trunc_piece`: at `omTrunc vom = false` nothing is owed.
+THE PERMIT IS FREE HERE (Rocq lane F-OPEN-3), exactly as `Pd` is below: a
+family that answers at EVERY file row answers at the permitted one and never
+reads the permit (`SysOpenDefs.openTruncPiece_of_all`), so the generic supply
+is one line at whatever permit the bundle it is handed to carries. -/
+theorem fsabsTruncPiece (γfs : FsNames) (vom : BitVec 64) (Kt : Nat → IProp GF) :
     appSup (GF := GF) ⊢
-      openTruncPiece (hlc := hlc) (fsGammaL γfs) vom (pfamTriv (fun _ _ _ => iprop(True))) := by
-  unfold openTruncPiece
-  split
-  · exact fsabsAtrunc γfs
-  · iintro _; iempintro
+      openTruncPiece (hlc := hlc) (fsGammaL γfs) vom Kt (pfamTriv (fun _ _ _ => iprop(True))) :=
+  (fsabsAtrunc γfs).trans (openTruncPiece_of_all _ vom Kt _)
 
 /-- Rocq `fsabs_acre`.  `Pd` IS FREE HERE (TL-3K): the generic application
 ignores the parent cursor, so it discharges the commit at whatever cursor
@@ -277,12 +278,12 @@ theorem fsabsOpenIn (γfs : FsNames) (cw : Nat) (M : Nat → List (BitVec 8)) (p
     · iapply (fsabsAcre (hlc := hlc) γfs) $$ Hsup
     · iapply fsabsDlookup
     · iapply fsabsAopen
-    · iapply (fsabsTruncPiece (hlc := hlc) γfs vom) $$ Hsup
+    · iapply (fsabsTruncPiece (hlc := hlc) γfs vom _) $$ Hsup
     · iapply (fsabsChild (hlc := hlc) γfs) $$ Hsup
   · iapply (openAuPlainAt_of_all (hlc := hlc) (fsGammaL γfs) γfs cw M pv vom)
     · iapply fsabsOpenWalk
     · iapply fsabsAopen
-    · iapply (fsabsTruncPiece (hlc := hlc) γfs vom) $$ Hsup
+    · iapply (fsabsTruncPiece (hlc := hlc) γfs vom _) $$ Hsup
 
 /-- **Rocq `fsabs_mknod_pre`**. -/
 theorem fsabsMknodPre (γfs : FsNames) (cw : Nat) (M : Nat → List (BitVec 8)) (pv ma mi : Nat) :

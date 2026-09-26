@@ -393,20 +393,27 @@ theorem sys_open_stores_trunc (IT : ITRUNC) (Γ : SchedNames) [ClaimIs (hlc := h
     inodeLocal_ofOkRec inum.toNat fscCov fscLogst (diTrunc dn) bmEmpty _
       (sys_open_trunc_ok fscCov fscLogst dn hnz) (sys_open_trunc_rec_local dn hrl)
       (dirUniq_not_dir _ _ hnd') (dirDotsIx_not_dir _ _ _ hnd')
-  unfold sysOpenResidue
+  unfold sysOpenResidue plainTruncKept
   icases Hres with ⟨%hpl, HP, Hobs, Htc⟩
-  ihave Htc := (openTruncPiece_true (hlc := hlc) (fsGammaL fscFs) A.vom A.Ft htr).1 $$ Htc
+  -- THE KEYED PIECE AT THIS INODE (Rocq F-OPEN-3 / TRUNC-PERMIT): the caller's
+  -- omode has O_TRUNC, so it is the commit at `inum`; the permit that keyed it
+  -- was the walk's terminal cursor, paid at the join (`plainTruncKey`), so
+  -- this fires the caller's own step
+  ihave Htc := (openTruncAt_true (hlc := hlc) (fsGammaL fscFs) A.vom inum.toNat
+    (creFtKept (truncTermAt pl A.P) inum.toNat A.Ft) htr).1 $$ Htc
   ihave #Hrdy := sys_open_stores_ready Γ A $$ Henv
   icases fsReady_region $$ Hrdy with ⟨#Hinv, #Hopen⟩
   ihave #Hftop := iregInv_ftop fscIreg fscFs icfgIst icfgNib $$ Hinv
   ihave #Happ := iregInv_app fscIreg fscFs icfgIst icfgNib $$ Hinv
   iapply wpLoop_fupd
-  imod opfAtrunc_fire fscFs ⊤ A.Ft inum.toNat (fnFileBytes (eraNode dn bm data))
+  imod opfAtrunc_fire fscFs ⊤ (creFtKept (truncTermAt pl A.P) inum.toNat A.Ft) inum.toNat (fnFileBytes (eraNode dn bm data))
     (fnNlink (eraNode dn bm data)) (eraNode dn bm data)
     (eraNode (diTrunc dn) bmEmpty (fun _ => List.replicate BSIZE 0)) CoPset.subseteq_top hloc
     (opfEra_file_typed dn bm data hfile) (opfEra_file_row dn bm data hfile)
     (opfEra_file_typed (diTrunc dn) bmEmpty _ hfile)
     (opfTrunc_row dn bm bmEmpty data _ hfile) $$ Hftop Happ Htc Htop with ⟨Htop, Htr2⟩
+  -- the kept family's receipt IS the caller's (`SysOpenDefs.creFtKept`)
+  rw [creFtKept_pfRecv]
   imodintro
   ihave Hload := sys_open_trunc_loaded fscFs fscIreg fscCov fscLogst kk inum dn hnz hnd hrl
     $$ Hat Hmeta Hmap Hblk Htop

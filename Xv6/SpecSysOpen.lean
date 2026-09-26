@@ -82,6 +82,19 @@ reaches this contract.
   died (the era refund); (iii) the walk completed and open failed past it --
   PLAIN: the observation HAS fired; CREATE: (a) fresh create stood and open
   failed (the delta STANDS), (b) the name existed, (c) nothing observed.
+* THE TRUNCATE'S PIECE IS KEYED (Rocq `39cb7fced` F-OPEN-3, `40de8468f`
+  F-OPEN-6, `f23a85c44` TRUNC-PERMIT; lane K6-B).  The bundle's
+  `openTruncPiece Γ vom Kt Ft` takes a PERMIT: the plain surface's is the
+  walk's TERMINAL CURSOR (`truncTermArg` / `truncTermAt`), paid at the join
+  (`SysOpenKept.plainTruncKey`); the O_CREATE surface's is the walk's TIE
+  beside whichever of create's two arms ran (`crePermit`), paid at create's
+  return (`SysOpenCreArm.sys_open_cr_fresh_key` / `_exists_key`).  So a
+  TRUNCATING open's arms report the cursor as `curKept` (spent at O_TRUNC)
+  and the piece as `plainTruncKept` / `creTruncKept` (keyed at the node the
+  call reached, the permit on its refund side); create's receipts as
+  `creRcptKept`, its child legs as `creChildKept` / `creFailKept`, and the
+  O_CREATE EXISTS-DEVICE sub-arm names its branch (`creTruncKeptEx`).  At
+  `omTrunc vom = false` every one of these is what it always was.
 * THE REFERENCE LEDGER: `createIrefSlots` = 3 in, and back.  THE LOG LEDGER
   closes at three (`SysOpenBudget`).  THE FILE-TABLE LEDGER: one `fdSlot`
   in, one out on every arm (F-FAIL's `fileclose` is free:
@@ -186,6 +199,7 @@ Imports only definitional files and callee `Spec*` files.
 -/
 import Xv6.SpecCreate
 import Xv6.SysOpenDefs
+import Xv6.SysOpenKept
 import Xv6.ConsoleInvDefs
 import Xv6.UMemLazy
 import Xv6.UserOff
@@ -311,12 +325,15 @@ def openPostOkPlain (omo : OffMode) (Γ : FsViewNames GF) (γ : FileNames) (pa :
     IProp GF :=
   iprop(∃ (pl : List (BitVec 8)) (av : Aview) (i : Nat),
     ⌜argPathOf Mim pv pl⌝ ∗
-    P (pathElems pl).length i ∗
+    -- THE TERMINAL CURSOR, as the truncate's permit left it (Rocq TRUNC-PERMIT):
+    -- whole at `omTrunc vom = false`, on the kept piece's refund where the
+    -- truncate did not fire, spent where it did
+    curKept vom P (pathElems pl).length i ∗
     (-- DEVICE (the init arm): the major is in range, O_TRUNC never applies
      (∃ (ma mi nl : Nat),
         ⌜arowAt av i ⟨.ADev ma mi, nl⟩⌝ ∗ ⌜ma ≤ NDEV_max⌝ ∗
         Fo.pfRecv av i ⟨.ADev ma mi, nl⟩ ∗
-        openTruncPiece (hlc := hlc) Γ vom Ft ∗
+        plainTruncKept (hlc := hlc) Γ vom pl P i Ft ∗
         openFdOk γ pa pid VW MW (omReadable vom) (omWritable vom) (.device ma) sts r) ∨
      -- FILE: the ONE delta of this surface, iff O_TRUNC, at a state still
      -- holding the OBSERVED row (the lock-hold tie)
@@ -336,7 +353,7 @@ def openPostOkPlain (omo : OffMode) (Γ : FsViewNames GF) (γ : FileNames) (pa :
      (∃ (ents : Std.ExtTreeMap Fname Nat compare) (nl : Nat),
         ⌜arowAt av i ⟨.ADir ents, nl⟩⌝ ∗ ⌜omArg vom = 0⌝ ∗
         Fo.pfRecv av i ⟨.ADir ents, nl⟩ ∗
-        openTruncPiece (hlc := hlc) Γ vom Ft ∗
+        plainTruncKept (hlc := hlc) Γ vom pl P i Ft ∗
         ∃ γo : GName, openFdOk γ pa pid VW MW true false (.inode i γo omo) sts r ∗
           foffPub omo γo)))
 
@@ -353,11 +370,15 @@ def openPostFailPlain (Γ : FsViewNames GF) (γfs : FsNames) (cw : Nat)
     (∃ pl : List (BitVec 8),
       ⌜argPathOf Mim pv pl⌝ ∗
       ((nameiWalkDeadEra (hlc := hlc) γfs P Pmiss pl ∗
-          pfAt (aopenCommitAt (hlc := hlc) Γ appE) Fo ∗ openTruncPiece (hlc := hlc) Γ vom Ft) ∨
+          pfAt (aopenCommitAt (hlc := hlc) Γ appE) Fo ∗
+          openTruncPiece (hlc := hlc) Γ vom (truncTermAt pl P) Ft) ∨
         (∃ i : Nat,
-          P (pathElems pl).length i ∗
+          curKept vom P (pathElems pl).length i ∗
           (∃ (av : Aview) (a : Anode), ⌜arowAt av i a⌝ ∗ Fo.pfRecv av i a) ∗
-          openTruncPiece (hlc := hlc) Γ vom Ft))))
+          -- the piece is KEYED once the walk has an inode: the permit was paid
+          -- where what pays it was in hand, and the cursor that paid it rides
+          -- its refund
+          plainTruncKept (hlc := hlc) Γ vom pl P i Ft))))
 
 /-- THE ARMED DISJUNCTION the continuation receives on the plain side,
 keyed on a0 (Rocq's `open_arms_plain`), with the landed post's fd-side
@@ -391,11 +412,11 @@ def openPostOkCreate (omo : OffMode) (Γ : FsViewNames GF) (γ : FileNames) (pa 
     IProp GF :=
   iprop(∃ (pl : List (BitVec 8)) (d i : Nat) (nm : Fname),
     ⌜argPathOf Mim pv pl⌝ ∗ ⌜(pathElems pl).getLast? = some nm⌝ ∗
-    P (nparElems pl).length d ∗
+    curKept vom P (nparElems pl).length d ∗
     (-- FRESH
      (∃ (av : Aview) (ents : Std.ExtTreeMap Fname Nat compare) (nl : Nat),
         ⌜crePre av d nm ents nl i (.AFile [])⌝ ∗ ⌜0 < i ∧ i < 16 * icfgNib⌝ ∗
-        Fok.pfRecv av d nm i ∗
+        creRcptKept vom Fok av d nm i ∗
         pfAt (dlookupCommitAt (hlc := hlc) Γ appE) Fex ∗
         pfAt (aopenCommitAt (hlc := hlc) Γ appE) Fo ∗
         (if omTrunc vom then
@@ -411,11 +432,13 @@ def openPostOkCreate (omo : OffMode) (Γ : FsViewNames GF) (γ : FileNames) (pa 
      -- EXISTS-OPENS
      (∃ (avx : Aview) (entsx : Std.ExtTreeMap Fname Nat compare) (nlx : Nat),
         ⌜PartialMap.get? avx d = some ⟨.ADir entsx, nlx⟩⌝ ∗ ⌜entsx[nm]? = some i⌝ ∗
-        Fex.pfRecv avx d nm i ∗
+        creRcptKept vom Fex avx d nm i ∗
         pfAt (acreCommitAtNm (hlc := hlc) Γ appE (.AFile []) (nparNm Mim pv)
           (P (nparElems pl).length) Farm) Fok ∗
-        -- the name was already there: create's child legs are whole
-        creChildUnfired (hlc := hlc) Γ (.AFile []) Farm Fun ∗
+        -- the name was already there: create's child legs are whole -- and at
+        -- a TRUNCATING open the ARM's half went into the permit, so what comes
+        -- back is the unarm alone
+        creChildKept (hlc := hlc) Γ vom Farm Fun ∗
         (∃ (av : Aview) (nl : Nat),
           -- the found node is a FILE
           (∃ bs0 : List (BitVec 8),
@@ -431,7 +454,11 @@ def openPostOkCreate (omo : OffMode) (Γ : FsViewNames GF) (γ : FileNames) (pa 
           (∃ (ma mi : Nat),
             ⌜arowAt av i ⟨.ADev ma mi, nl⟩⌝ ∗ ⌜ma ≤ NDEV_max⌝ ∗
             Fo.pfRecv av i ⟨.ADev ma mi, nl⟩ ∗
-            openTruncPiece (hlc := hlc) Γ vom Ft ∗
+            -- THE PERMIT NAMES ITS BRANCH (Rocq lane F-OPEN-6): this arm is
+            -- reached on the EXISTS run alone, so the keyed piece refunds the
+            -- EXISTS permit -- the lookup's receipt beside the arm piece create
+            -- never fired
+            creTruncKeptEx (hlc := hlc) Γ vom pl P Farm Fex i Ft ∗
             openFdOk γ pa pid VW MW (omReadable vom) (omWritable vom) (.device ma) sts r)))))
 
 /-- ret -1 on the create side (Rocq's `open_post_fail_create`).  Note arm
@@ -451,19 +478,21 @@ def openPostFailCreate (Γ : FsViewNames GF) (γfs : FsNames) (cw : Nat)
           (P (nparElems pl).length) Farm) Fok ∗
           pfAt (dlookupCommitAt (hlc := hlc) Γ appE) Fex ∗
           pfAt (aopenCommitAt (hlc := hlc) Γ appE) Fo ∗
-          openTruncPiece (hlc := hlc) Γ vom Ft ∗
+          openTruncPiece (hlc := hlc) Γ vom (crePermit (hlc := hlc) Γ pl P Farm Fok Fex) Ft ∗
           creChildUnfired (hlc := hlc) Γ (.AFile []) Farm Fun) ∨
         (∃ d : Nat,
-          P (nparElems pl).length d ∗
-          openTruncPiece (hlc := hlc) Γ vom Ft ∗
+          curKept vom P (nparElems pl).length d ∗
           (-- (a) create succeeded FRESH; open failed past it
            (∃ (av : Aview) (i : Nat) (nm : Fname) (ents : Std.ExtTreeMap Fname Nat compare)
               (nl : Nat),
               ⌜(pathElems pl).getLast? = some nm⌝ ∗
               ⌜crePre av d nm ents nl i (.AFile [])⌝ ∗ ⌜0 < i ∧ i < 16 * icfgNib⌝ ∗
-              Fok.pfRecv av d nm i ∗
+              creRcptKept vom Fok av d nm i ∗
               pfAt (dlookupCommitAt (hlc := hlc) Γ appE) Fex ∗
               pfAt (aopenCommitAt (hlc := hlc) Γ appE) Fo ∗
+              -- the truncate never ran (itrunc is past fdalloc), so its piece
+              -- comes home KEYED at the created child
+              creTruncKept (hlc := hlc) Γ vom pl P Farm Fok Fex i Ft ∗
               pfAt (aunarmOfArm (hlc := hlc) Γ appE Farm) Fun) ∨
            -- (b) the name existed (found DIR, a bad found-device major, or
            -- table full past a good found node)
@@ -471,11 +500,12 @@ def openPostFailCreate (Γ : FsViewNames GF) (γfs : FsNames) (cw : Nat)
               (nl : Nat),
               ⌜(pathElems pl).getLast? = some nm⌝ ∗
               ⌜PartialMap.get? av d = some ⟨.ADir ents, nl⟩⌝ ∗ ⌜ents[nm]? = some i⌝ ∗
-              Fex.pfRecv av d nm i ∗
+              creRcptKept vom Fex av d nm i ∗
               pfAt (acreCommitAtNm (hlc := hlc) Γ appE (.AFile []) (nparNm Mim pv)
           (P (nparElems pl).length) Farm) Fok ∗
-              (creChildUnfired (hlc := hlc) Γ (.AFile []) Farm Fun ∨
-                ∃ ic : Nat, creChildPair Farm Fun ic) ∗
+              -- create's child legs, whole or the do-then-undo PAIR; at a
+              -- TRUNCATING open they travel with the truncate's own piece
+              creFailKept (hlc := hlc) Γ vom pl P Farm Fun Fok Fex i Ft ∗
               (pfAt (aopenCommitAt (hlc := hlc) Γ appE) Fo ∨
                 ∃ (av' : Aview) (a : Anode), ⌜arowAt av' i a⌝ ∗ Fo.pfRecv av' i a)) ∨
            -- (c) nothing observed: the nlink guard, out of inodes, dirlink
@@ -484,6 +514,9 @@ def openPostFailCreate (Γ : FsViewNames GF) (γfs : FsNames) (cw : Nat)
           (P (nparElems pl).length) Farm) Fok ∗
              pfAt (dlookupCommitAt (hlc := hlc) Γ appE) Fex ∗
              pfAt (aopenCommitAt (hlc := hlc) Γ appE) Fo ∗
+             -- create never returned a node, so the permit was never paid and
+             -- the piece is the one the caller handed in
+             openTruncPiece (hlc := hlc) Γ vom (crePermit (hlc := hlc) Γ pl P Farm Fok Fex) Ft ∗
              (creChildUnfired (hlc := hlc) Γ (.AFile []) Farm Fun ∨
                ∃ ic : Nat, creChildPair Farm Fun ic)))))))
 
@@ -629,11 +662,11 @@ def openReceiptPlain (omo : OffMode) (Γ : FsViewNames GF) (γfs : FsNames) (cw 
       openPostFailPlain Γ γfs cw Mim pv vom P Pmiss Fo Ft) ∨
     (∃ (pl : List (BitVec 8)) (av : Aview) (i : Nat),
       ⌜argPathOf Mim pv pl⌝ ∗
-      P (pathElems pl).length i ∗
+      curKept vom P (pathElems pl).length i ∗
       ((∃ (ma mi nl : Nat),
           ⌜arowAt av i ⟨.ADev ma mi, nl⟩⌝ ∗ ⌜ma ≤ NDEV_max⌝ ∗
           Fo.pfRecv av i ⟨.ADev ma mi, nl⟩ ∗
-          openTruncPiece (hlc := hlc) Γ vom Ft ∗
+          plainTruncKept (hlc := hlc) Γ vom pl P i Ft ∗
           ⌜openFdRcpt (omReadable vom) (omWritable vom) (.device ma) sts r fdv'⌝) ∨
        (∃ (bs0 : List (BitVec 8)) (nl : Nat),
           ⌜arowAt av i ⟨.AFile bs0, nl⟩⌝ ∗
@@ -649,7 +682,7 @@ def openReceiptPlain (omo : OffMode) (Γ : FsViewNames GF) (γfs : FsNames) (cw 
        (∃ (ents : Std.ExtTreeMap Fname Nat compare) (nl : Nat),
           ⌜arowAt av i ⟨.ADir ents, nl⟩⌝ ∗ ⌜omArg vom = 0⌝ ∗
           Fo.pfRecv av i ⟨.ADir ents, nl⟩ ∗
-          openTruncPiece (hlc := hlc) Γ vom Ft ∗
+          plainTruncKept (hlc := hlc) Γ vom pl P i Ft ∗
           ∃ γo : GName, ⌜openFdRcpt true false (.inode i γo omo) sts r fdv'⌝ ∗
             foffPub omo γo))))
 
@@ -665,10 +698,10 @@ def openReceiptCreate (omo : OffMode) (Γ : FsViewNames GF) (γfs : FsNames) (cw
       openPostFailCreate Γ γfs cw Mim pv vom P Pmiss Farm Fun Fok Fex Fo Ft) ∨
     (∃ (pl : List (BitVec 8)) (d i : Nat) (nm : Fname),
       ⌜argPathOf Mim pv pl⌝ ∗ ⌜(pathElems pl).getLast? = some nm⌝ ∗
-      P (nparElems pl).length d ∗
+      curKept vom P (nparElems pl).length d ∗
       ((∃ (av : Aview) (ents : Std.ExtTreeMap Fname Nat compare) (nl : Nat),
           ⌜crePre av d nm ents nl i (.AFile [])⌝ ∗ ⌜0 < i ∧ i < 16 * icfgNib⌝ ∗
-          Fok.pfRecv av d nm i ∗
+          creRcptKept vom Fok av d nm i ∗
           pfAt (dlookupCommitAt (hlc := hlc) Γ appE) Fex ∗
           pfAt (aopenCommitAt (hlc := hlc) Γ appE) Fo ∗
           (if omTrunc vom then
@@ -682,10 +715,10 @@ def openReceiptCreate (omo : OffMode) (Γ : FsViewNames GF) (γfs : FsNames) (cw
             foffPub omo γo) ∨
        (∃ (avx : Aview) (entsx : Std.ExtTreeMap Fname Nat compare) (nlx : Nat),
           ⌜PartialMap.get? avx d = some ⟨.ADir entsx, nlx⟩⌝ ∗ ⌜entsx[nm]? = some i⌝ ∗
-          Fex.pfRecv avx d nm i ∗
+          creRcptKept vom Fex avx d nm i ∗
           pfAt (acreCommitAtNm (hlc := hlc) Γ appE (.AFile []) (nparNm Mim pv)
           (P (nparElems pl).length) Farm) Fok ∗
-          creChildUnfired (hlc := hlc) Γ (.AFile []) Farm Fun ∗
+          creChildKept (hlc := hlc) Γ vom Farm Fun ∗
           (∃ (av : Aview) (nl : Nat),
             (∃ bs0 : List (BitVec 8),
               ⌜arowAt av i ⟨.AFile bs0, nl⟩⌝ ∗
@@ -699,7 +732,8 @@ def openReceiptCreate (omo : OffMode) (Γ : FsViewNames GF) (γfs : FsNames) (cw
             (∃ (ma mi : Nat),
               ⌜arowAt av i ⟨.ADev ma mi, nl⟩⌝ ∗ ⌜ma ≤ NDEV_max⌝ ∗
               Fo.pfRecv av i ⟨.ADev ma mi, nl⟩ ∗
-              openTruncPiece (hlc := hlc) Γ vom Ft ∗
+              -- the EXISTS branch of the permit, named (Rocq lane F-OPEN-6)
+              creTruncKeptEx (hlc := hlc) Γ vom pl P Farm Fex i Ft ∗
               ⌜openFdRcpt (omReadable vom) (omWritable vom) (.device ma) sts r fdv'⌝))))))
 
 /-- ...and the one receipt, keyed on the O_CREATE bit (Rocq's
@@ -999,7 +1033,9 @@ theorem creFailToOpen (Γ : FsViewNames GF) (γfs : FsNames) (cw : Nat)
     creFailArms (hlc := hlc) Γ γfs T_FILE_w.toNat ma mi (nparNm Mim pv) (fun _ => True) P Pmiss Farm
       Fdots Fun Fok Fex pl ⊢
       pfAt (aopenCommitAt (hlc := hlc) Γ appE) Fo -∗
-      openTruncPiece (hlc := hlc) Γ vom Ft -∗
+      -- the piece at the ONE-PATH permit, which is how the create entry holds
+      -- it once argstr has answered (`openAuCreateAt_inst`)
+      openTruncPiece (hlc := hlc) Γ vom (crePermit (hlc := hlc) Γ pl P Farm Fok Fex) Ft -∗
       openPostFailCreate Γ γfs cw Mim pv vom P Pmiss Farm Fun Fok Fex Fo Ft := by
   iintro Hcf Ho Ht
   ihave Hcf := creFailArms_file Γ γfs ma mi (nparNm Mim pv) (fun _ => True) P Pmiss Farm Fdots Fun Fok
@@ -1025,9 +1061,15 @@ theorem creFailToOpen (Γ : FsViewNames GF) (γfs : FsNames) (cw : Nat)
       · iright; iexact Hp
     iright
     iexists d
-    iframe HP Ht
+    ihave HP := curKept_of vom P _ d $$ HP
+    iframe HP
     icases Hrest with (⟨%av, %i, %nm, %ents, %nl, %hl, %hrow, %hent, HΦ⟩ | Hdl)
-    · -- (b): the name was there and the observation fired
+    · -- (b): the name was there and the observation fired.  THE TRUNCATE'S
+      -- PIECE IS STILL THE CALLER'S here -- create returned 0, so sys_open
+      -- never reached the node and the permit was never paid
+      -- (`creFailKept`'s right disjunct)
+      ihave HΦ := creRcptKept_of vom Fex av d nm i $$ HΦ
+      ihave Hcl := creFailKept_of_piece (hlc := hlc) Γ vom pl P Farm Fun Fok Fex i Ft $$ Ht Hcl
       iright; ileft
       iexists av, i, nm, ents, nl
       iframe HΦ Hac Hcl
@@ -1040,7 +1082,7 @@ theorem creFailToOpen (Γ : FsViewNames GF) (γfs : FsNames) (cw : Nat)
       ileft; iexact Ho
     · -- (c): nothing observed
       iright; iright
-      iframe Hac Hdl Ho Hcl
+      iframe Hac Hdl Ho Ht Hcl
 
 end Arms
 

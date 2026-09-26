@@ -139,6 +139,10 @@ theorem sys_open_split_plain (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ] (k :
   unfold openAuPlainAt
   icases Hx with ⟨Hw, Ho, Ht⟩
   ihave Hst := Hw $$ %(bview plen bp) %hpo
+  -- the truncate's permit at this path: the terminal cursor stands bare once
+  -- the reading has answered (Rocq TRUNC-PERMIT, `open_trunc_piece_term_arg_to_at`)
+  ihave Ht := openTruncPiece_term_arg_to_at (hlc := hlc) (fsGammaL fscFs) A.vom (sysOpenIm A)
+    A.v.toNat (bview plen bp) A.P A.Ft hpo $$ Ht
   iapply hEN $$ %cpu %spie %spp %R %(k.regs 9#5) %w4 %w5 %w6 %lo %w24 %P2 %plen %bp %Sb %hP2
     %⟨hnn, hterm, hplen, hpo⟩ %hpins %hal Hk Hpc Hte Hce Henv Hcells Hbuf Hblk HopS Htx Hbs Hir
     Hfd Hfr Hst Ho Ht HΦ
@@ -178,6 +182,14 @@ theorem sys_open_split_create (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ] (k 
   -- it at THE path argstr read (`SysOpenDefs.openAcre_inst`, TL-3K)
   ihave Hac := openAcre_inst (hlc := hlc) (fsGammaL fscFs) (sysOpenIm A) A.v.toNat (bview plen bp)
     A.P Farm Fok hpo $$ Hac
+  -- ...and the truncate's permit: the tie's two facts stand bare once the
+  -- reading has answered (Rocq F-OPEN-3, `open_trunc_piece_arg_to_at`)
+  ihave Ht := openTruncPiece_arg_to_at (hlc := hlc) (fsGammaL fscFs) A.vom (sysOpenIm A) A.v.toNat
+    (bview plen bp) A.P Farm Fok Fex A.Ft hpo $$ Ht
+  ihave Ht := (show openTruncPiece (hlc := hlc) (GF := GF) (fsGammaL fscFs) A.vom
+      (truncPermitOf (hlc := hlc) (fsGammaL fscFs) (truncTieAt (bview plen bp) A.P) Farm Fok Fex) A.Ft ⊢
+    openTruncPiece (hlc := hlc) (fsGammaL fscFs) A.vom
+      (crePermit (hlc := hlc) (fsGammaL fscFs) (bview plen bp) A.P Farm Fok Fex) A.Ft from .rfl) $$ Ht
   iapply hEC $$ %cpu %spie %spp %R %(k.regs 9#5) %w4 %w5 %w6 %lo %w24 %P2 %plen %bp %Sb %hP2
     %⟨hnn, hterm, hplen, hpo⟩ %hpins %hal Hk Hpc Hte Hce Henv Hcells Hbuf Hblk HopS Htx Hbs Hir
     Hfd Hfr Hst Hac Hdl Ho Ht Hcl HΦ

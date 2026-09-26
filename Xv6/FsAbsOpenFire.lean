@@ -293,7 +293,10 @@ theorem opfAtrunc_fire [Icfg] [Appcfg GF] (γfs : FsNames) (E : CoPset)
     (hnz : fnType n ≠ 0) (habs : absRow n = ⟨.AFile bs0, nl⟩)
     (hnz' : fnType n' ≠ 0) (habs' : absRow n' = ⟨.AFile [], nl⟩) :
     ⊢@{IProp GF} ftopInv (hlc := hlc) γfs -∗ appInv (hlc := hlc) γfs -∗
-      pfAt (atruncCommitAt (hlc := hlc) (fsGammaL γfs) appE) Ft -∗
+      -- THE PIECE ARRIVES KEYED AT THE INUM (Rocq lane F-OPEN-3): the permit
+      -- was paid where what pays it was still in hand
+      -- (`SysOpenDefs.openTruncAt`)
+      pfAt (atruncCommitI (hlc := hlc) (fsGammaL γfs) appE i) Ft -∗
       topFrag (fsGammaL γfs) i n ={E}=∗
         topFrag (fsGammaL γfs) i n' ∗
         ∃ av : Aview, ⌜arowAt av i ⟨.AFile bs0, nl⟩⌝ ∗ Ft.pfRecv av i bs0 := by
@@ -321,8 +324,8 @@ theorem opfAtrunc_fire [Icfg] [Appcfg GF] (γfs : FsNames) (E : CoPset)
     · rename_i hz
       rw [deltaTrunc_file (absView I) i bs0 nl (arowAt_live _ _ _ hrow hz)]
   have hsub : appE ⊆ E \ ↑ftopN := appN_sub_ftop E hE
-  unfold atruncCommitAt
-  ihave Hcm := Hcm $$ %I %i %bs0 %nl %hrow Ha
+  unfold atruncCommitI
+  ihave Hcm := Hcm $$ %I %bs0 %nl %hrow Ha
   imod (fupd_mask_mono hsub) $$ Hcm with ⟨Ha, Hstep, Hph2⟩
   -- THE MOVE, at the whole authority (`AppInv.appTopUpdate`)
   imod (appTopUpdate (E \ ↑ftopN) γfs I i n n' hsub) $$ Hai [Hstep] Ha Hf with ⟨Ha, Hf⟩

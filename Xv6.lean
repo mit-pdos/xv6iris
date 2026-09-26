@@ -872,7 +872,6 @@ import Xv6.FsAbsLinkFire
 import Xv6.SysUnlinkBudget
 import Xv6.SysLinkBudget
 import Xv6.SysOpenDefs
-import Xv6.SysOpenPermit
 import Xv6.SysOpenKept
 import Xv6.SysOpenBits
 import Xv6.SysLinkParts
