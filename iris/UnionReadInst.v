@@ -46,9 +46,11 @@ Require Import LinkRec.
 Require Import ReadRec.
 Require Import RiscvPtsto.
 Require Import ConsoleInv.
+Require Import FsCfg.
 Require Import UserConsole.
 Require Import WpUart.
 Require Import Xv6Cameras.
+Require Import Xv6G.
 From stdpp Require Import list.
 Local Open Scope list_scope.
 
@@ -78,8 +80,9 @@ Section union_read_inst.
   Local Notation UT := (file_taint (fgn_cl gf)).
   Local Notation UPIN := (era_pin (fgn_echo gf)).
   Context `{HRg : !riscvGS Σ}.
-  Context `{!uartGhostG Σ}.
+  Context `{!xv6G Σ}.
   Context `{GEN : GenId}.
+  Context `{FSC : fscfg}.
   (* THE TAG IS THE UNION ERA'S ([UnionOut.utag]) *)
   Context (Htag : @riscv_rx_tag Σ (@riscv_fixedGS Σ HRg) = utag ug).
 
@@ -155,7 +158,7 @@ Section union_read_inst.
   (* THE WINDOW ARM at the union: the receipt's trailing disjunct carries
      the state's witness beside the writer's cursor, and the typed lines'
      witness at the far end is read off the last consumed byte's tag *)
-  Local Lemma uri_arms (cn : cons_names) (v : era_pins) (I : list (bv 8))
+  Local Lemma uri_arms (v : era_pins) (I : list (bv 8))
       (ws sl sl' : list (list mobs * bv 8))
       (hs : list (list mobs)) (dd dc : nat) (g0 : nat -> bv 8) :
     (dd <= dc)%nat -> length ws = dc ->
@@ -166,8 +169,8 @@ Section union_read_inst.
       urresw ug v I -∗
       uread_ret ug (S gen_id) v (length I) ws -∗
       ([∗ list] hh ∈ hs, riscv_rx_tag hh) -∗
-      ucons_swallow cn False sl dd dc -∗
-      ucons_stored_lb cn sl' -∗
+      ucons_swallow fsc_cons False sl dd dc -∗
+      ucons_stored_lb fsc_cons sl' -∗
       (dl_cnt v (1/2) (length I + dc)%nat
        ∗ ∃ J : list (bv 8),
            ⌜length J = dc⌝ ∗ ⌜lm_disc_input U (I ++ J)⌝
@@ -202,14 +205,31 @@ Section union_read_inst.
     (* A READ THAT COMPLETES THE [seccomp x] LINE: the era is wild, and the
        residue carries the token (seccomp design 10.4/10.10) -- off the
        receipt where bytes were consumed, off the old residue where none *)
-    iAssert (⌜uwild_at (I ++ J)⌝ → usecc_tok_at ug (S gen_id) (I ++ J) ∨ UT)%I
+    iAssert (⌜uwild_at (I ++ J)⌝ →
+               (usecc_tok_at ug (S gen_id) (I ++ J) ∗ uring_at (I ++ J)) ∨ UT)%I
       with "[Htok]" as "#Hwtn".
     { destruct (decide (ws = [])) as [Hws0 | Hws0].
       - assert (HJnil : J = []).
         { subst ws. cbn in Hlws. apply nil_length_inv. lia. }
         rewrite HJnil app_nil_r. iExact "Hwt0".
-      - iIntros "%Hwa". rewrite -HJ. iApply "Htok". iPureIntro.
-        rewrite -HJ in Hwa. destruct Hwa as (? & ? & ?). by repeat split. }
+      - iIntros "%Hwa". rewrite -HJ.
+        iDestruct ("Htok" with "[%]") as "[[#Htk %Hnl] | #HT]"; [| | by iRight].
+        { rewrite -HJ in Hwa. destruct Hwa as (? & ? & ?). by repeat split. }
+        iLeft. iFrame "Htk".
+        (* THE NEWLINE'S STORED POSITION: the window's last entry, which the
+           consumed segment puts at [length I + dc - 1] of the ring *)
+        destruct Hnl as (h0 & Hlw & Hins & Hbt).
+        assert (Hdc : (0 < dc)%nat).
+        { destruct ws; [done | cbn in Hlws; lia]. }
+        assert (Hws1 : ws !! (dc - 1)%nat = Some (h0, wl_nl)).
+        { rewrite -Hlws (_ : (length ws - 1)%nat = Init.Nat.pred (length ws)); [| lia].
+          rewrite -last_lookup. exact Hlw. }
+        pose proof (Hwsj (dc - 1)%nat ltac:(lia)) as Hsl1. rewrite Hws1 in Hsl1.
+        rewrite /uring_at. iExists sl', h0. iFrame "Hlb2". iPureIntro.
+        split_and!; [| exact Hins | exact Hbt].
+        rewrite length_fmap length_app Hlws Hdl.
+        rewrite (_ : (length I + dc - 1)%nat = (length I + (dc - 1))%nat); [| lia].
+        by rewrite -Hsl1. }
     iDestruct "Hrest" as "#Hrest".
     iAssert (gwc_rres U (union_params ug) v (I ++ J)) as "#Hresn".
     { iDestruct "Hrest" as "[%Hws0 | Hbb]".
@@ -233,7 +253,7 @@ Section union_read_inst.
         rewrite HJnil app_nil_r. iLeft. iExact "Hw0". }
       destruct (list_basics.last ws) as [y |] eqn:Hlast; last first.
       { exfalso. apply last_None in Hlast. subst ws. cbn in Hlws. lia. }
-      iDestruct (uri_last_tag cn I ws sl sl' hs dd dc g0 y
+      iDestruct (uri_last_tag fsc_cons I ws sl sl' hs dd dc g0 y
                    Hddc Hlws Hwinf Hpre2 Hwsj Hlast
                    with "Htags Hsw Hlb2") as "Hty".
       iEval (rewrite Htag /utag) in "Hty".

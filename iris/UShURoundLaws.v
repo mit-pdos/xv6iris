@@ -309,13 +309,13 @@ Section UShURoundLaws.
     Pm I -∗ Pm I ∗ FileLinksLine.flw gf I.
   Proof using .
     rewrite /UShLine.ush_mid_at. iIntros "(Hu & Hua & Hrd & Hv)".
-    iDestruct "Hv" as (v) "(#Hpin & Hdl & #HE & #Hres)".
+    iDestruct "Hv" as (v) "(#Hpin & Hdl & #HE & #Hres & Hrp)".
     iAssert (FileLinksLine.flw gf I) as "#Hw".
     { iEval (cbn [lk_rres union_link_inst_at gen_link_inst]; rewrite /urresw) in "Hres".
       iDestruct "Hres" as "(_ & $ & _)". }
     iSplitL; [| iExact "Hw"]. iFrame "Hu Hua Hrd". iExists v.
     iSplitR; [iExact "Hpin" |]. iSplitL "Hdl"; [iExact "Hdl" |].
-    iSplitR; [iExact "HE" | iExact "Hres"].
+    iSplitR; [iExact "HE" | iFrame "Hres Hrp"].
   Qed.
 
   (* ...and the era's pin *)
@@ -323,26 +323,31 @@ Section UShURoundLaws.
     Pm J -∗ Pm J ∗ ∃ v : era_pins, era_pin (fgn_echo gf) (S gen_id) v.
   Proof using .
     rewrite /UShLine.ush_mid_at. iIntros "(Hu & Hua & Hrd & Hv)".
-    iDestruct "Hv" as (v) "(#Hpin & Hdl & #HE & #Hres)".
+    iDestruct "Hv" as (v) "(#Hpin & Hdl & #HE & #Hres & Hrp)".
     iSplitL; [| iExists v; iExact "Hpin"].
     iFrame "Hu Hua Hrd". iExists v.
     iSplitR; [iExact "Hpin" |]. iSplitL "Hdl"; [iExact "Hdl" |].
-    iSplitR; [iExact "HE" | iExact "Hres"].
+    iSplitR; [iExact "HE" | iFrame "Hres Hrp"].
   Qed.
 
   (* ...and the TRANSITION'S RECEIPT: at a [seccomp x] line the read
      completed, the era's wild token at that line (or the taint) *)
   Lemma umid_wild (J : list (bv 8)) :
-    Pm J -∗ Pm J ∗ (⌜uwild_at J⌝ → usecc_tok_at ug (S gen_id) J ∨ T).
+    Pm J -∗ Pm J
+    ∗ (⌜uwild_at J⌝ → (usecc_tok_at ug (S gen_id) J ∗ uring_at J) ∨ T)
+    (* ...and the reader's position at [J] (seccomp S5b) *)
+    ∗ ∃ v : era_pins, era_pin (fgn_echo gf) (S gen_id) v ∗ rpos_lb v (length J).
   Proof using .
     rewrite /UShLine.ush_mid_at. iIntros "(Hu & Hua & Hrd & Hv)".
-    iDestruct "Hv" as (v) "(#Hpin & Hdl & #HE & #Hres)".
-    iAssert (⌜uwild_at J⌝ → usecc_tok_at ug (S gen_id) J ∨ T)%I as "#Hw".
+    iDestruct "Hv" as (v) "(#Hpin & Hdl & #HE & #Hres & Hrp)".
+    iAssert (⌜uwild_at J⌝ → (usecc_tok_at ug (S gen_id) J ∗ uring_at J) ∨ T)%I
+      as "#Hw".
     { iEval (cbn [lk_rres union_link_inst_at gen_link_inst]; rewrite /urresw) in "Hres".
       iDestruct "Hres" as "(_ & _ & $)". }
-    iSplitL; [| iExact "Hw"]. iFrame "Hu Hua Hrd". iExists v.
+    iDestruct (rpos_lb_get with "Hrp") as "#Hlb".
+    iSplitL; [| iSplitR; [iExact "Hw" | iExists v; iSplitR; [iExact "Hpin" | iExact "Hlb"]]]. iFrame "Hu Hua Hrd". iExists v.
     iSplitR; [iExact "Hpin" |]. iSplitL "Hdl"; [iExact "Hdl" |].
-    iSplitR; [iExact "HE" | iExact "Hres"].
+    iSplitR; [iExact "HE" | iFrame "Hres Hrp"].
   Qed.
 
   (* THE READ AFTER THE WILD SHAPE IS VACUOUS: the token froze the choice
@@ -353,7 +358,7 @@ Section UShURoundLaws.
   Proof using .
     iIntros "Hpm [Htok _]".
     rewrite /UShLine.ush_mid_at. iDestruct "Hpm" as "(_ & _ & _ & Hv)".
-    iDestruct "Hv" as (v') "(#Hpin' & _ & _ & #Hres)".
+    iDestruct "Hv" as (v') "(#Hpin' & _ & _ & #Hres & _)".
     rewrite /usecc_tok_at /secc_tok_at.
     iDestruct "Htok" as (v) "(#Hpin & _ & _ & %Hn & #Hfz & _)".
     destruct Hn as (Hpos & _).
@@ -421,15 +426,15 @@ Section UShURoundLaws.
   Proof using .
     intros I l Hnl. iIntros "Hpm Hsh".
     rewrite /UShLine.ush_mid_at. iDestruct "Hpm" as "(Hu & Hua & Hrd & Hv)".
-    iDestruct "Hv" as (v') "(#Hpin' & Hdl & #HE & #Hres)".
+    iDestruct "Hv" as (v') "(#Hpin' & Hdl & #HE & #Hres & Hrp)".
     rewrite /upterm_shape.
     iDestruct "Hsh" as (v γc γm dep i sw sR lR) "(%Hp & #Hpin & _ & Hfe & _)".
     destruct Hp as (_ & _ & _ & _ & _ & Hpos & _).
     iDestruct (era_pin_agree with "Hpin' Hpin") as %->.
-    iModIntro. iSplitL "Hu Hua Hrd Hdl".
+    iModIntro. iSplitL "Hu Hua Hrd Hdl Hrp".
     { iFrame "Hu Hua Hrd". iExists v.
       iSplitR; [iExact "Hpin" |]. iSplitL "Hdl"; [iExact "Hdl" |].
-      iSplitR; [iExact "HE" | iExact "Hres"]. }
+      iSplitR; [iExact "HE" | iFrame "Hres Hrp"]. }
     rewrite /pwc_fork_exitN. iDestruct "Hfe" as "(_ & _ & _ & [#Hfz | #HT])";
       [| iExact "HT"].
     iExFalso.
@@ -455,16 +460,17 @@ Section UShURoundLaws.
       + (* THE TRANSITION'S LANDING: the read completed a [seccomp x] line,
            the residue hands over the era's wild token (seccomp design
            10.4, 10.10) *)
-        iDestruct (umid_wild with "Hpm") as "[Hpm #Hwt]".
+        iDestruct (umid_wild with "Hpm") as "(Hpm & #Hwt & #Hlb)".
         iDestruct (umid_pin with "Hpm") as "[Hpm Hv]". iDestruct "Hv" as (v) "#Hpin".
         iModIntro. iFrame "Hpm".
         assert (HJne : (I ++ l ++ [wl_nl])%list <> []).
         { intros Hq. apply (f_equal length) in Hq. rewrite !length_app in Hq.
           cbn [length] in Hq. lia. }
-        iDestruct ("Hwt" with "[%]") as "[#Htok | #HT]".
+        iDestruct ("Hwt" with "[%]") as "[[#Htok _] | #HT]".
         { split; [exact HJne |]. split; [rewrite app_assoc; apply rest_of_snoc_nl |].
           exact Hwl. }
-        * iApply (uWcu_wild ug r s0 PT PD _ 3%nat). iFrame "Htok". by iPureIntro.
+        * iApply (uWcu_wild ug r s0 PT PD _ 3%nat). rewrite /useccomp_shape.
+          iSplitR; [iExact "Htok" |]. iSplitR; [by iPureIntro |]. iExact "Hlb".
         * iApply (uWcu_taint ug r s0 PT PD _ 3%nat v with "Hpin HT").
       + iMod (uHwc_f I l Hnl (not_true_is_false _ Hwl) with "Hpm Hc") as "[$ Hw]".
         iModIntro. iApply (uWcu_of ug r s0 PT PD _ 3%nat with "Hw").

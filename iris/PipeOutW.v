@@ -658,7 +658,13 @@ Section pipes_wild_v.
   Definition rd_retW (k : nat) (v : era_pins) (n : nat) (CH : LogEntryDefs.cons_hist)
       (ws : list (list mobs * bv 8)) : iProp Σ :=
     (rd_retV M G k v n CH ws
-     ∗ (⌜rd_wild CH ws⌝ -∗ secc_tok_at k (snd <$> (LogEntryDefs.ch_dl CH ++ ws)) ∨ T))%I.
+     ∗ (⌜rd_wild CH ws⌝ -∗
+          (secc_tok_at k (snd <$> (LogEntryDefs.ch_dl CH ++ ws))
+           (* ...and the newline is the window's own last entry (S5b) *)
+           ∗ ⌜exists h0 : list mobs, list_basics.last ws = Some (h0, wl_nl)
+               /\ ins (open_seg h0) = snd <$> (LogEntryDefs.ch_dl CH ++ ws)
+               /\ obs_boots h0 = k⌝)
+          ∨ T))%I.
 
   Lemma pwclV_step_read (k : nat) (v : era_pins) (n : nat) (ho : list mobs)
       (CH : LogEntryDefs.cons_hist) (ws : list (list mobs * bv 8)) :
@@ -779,7 +785,13 @@ Section pipes_wild_v.
         iSplitR; [| by iPureIntro].
         iApply (turn_lb_weaken with "Htlb").
         rewrite /lm_pcount Hw0 HEI. cbn [length]. unfold I' in *. lia.
-      + iIntros "_". iLeft. iExists v. iFrame "Hpin2 Hlb HI' Hfzat".
+      + iIntros "_". iLeft.
+        assert (Hlw : list_basics.last ws = Some (h0, wl_nl)).
+        { destruct (exists_last Hws) as (ws0 & x & ->).
+          rewrite app_assoc last_snoc in Hl0. rewrite last_snoc. exact Hl0. }
+        iSplitR; last first.
+        { iPureIntro. exists h0. split_and!; [exact Hlw | exact Hins0 | exact Hb0]. }
+        iExists v. iFrame "Hpin2 Hlb HI' Hfzat".
         iSplit; [iPureIntro; split_and!; [exact Hpos | exact Hr | exact Hdi] |].
         iExists (LogEntryDefs.ch_dl CH ++ ws), h0. iFrame "Hdllb".
         iPureIntro. split_and!; [reflexivity | exact Hl0 | exact Hins0 | exact Hb0

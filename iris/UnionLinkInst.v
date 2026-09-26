@@ -55,6 +55,9 @@ Require Import GenLinksLine.
 Require Import LinkRec.
 Require Import RiscvPtsto.
 Require Import WpUart.
+Require Import FsCfg.             (* [fsc_cons] *)
+Require Import Xv6G.              (* the ring's cameras, at the kernel's own instance *)
+Require Import UserConsole.       (* [ucons_stored_lb] *)
 From stdpp Require Import list.
 Local Open Scope list_scope.
 
@@ -99,6 +102,9 @@ Section union_link_inst.
   Local Notation UPIN := (era_pin (fgn_echo gf)).
   Context `{HRg : !riscvGS Σ}.
   Context `{GEN : GenId}.
+  (* the console ring's names and cameras (seccomp S5b): the residue at a
+     [seccomp x] line keeps the line's newline's stored position *)
+  Context `{!xv6G Σ} `{FSC : fscfg}.
 
   (* =================================================================== *)
   (*  1.  THE PARAMETERS: the file's witness and head                     *)
@@ -268,13 +274,13 @@ Section union_link_inst.
 
   Lemma uturn0 (k : nat) :
     fturn_pre gf k -∗
-    (∃ v : era_pins, UPIN k v ∗ dl_cnt v (1/2) 0%nat ∗ inp_lb v [])
+    (∃ v : era_pins, UPIN k v ∗ dl_cnt v (1/2) 0%nat ∗ inp_lb v [] ∗ rpos_auth v 0%nat)
     ∗ (∃ v : era_pins, UPIN k v ∗ gwc_ban U union_params k v [] 0%nat).
   Proof using .
     rewrite /fturn_pre /FileOut.fturn_core.
     iIntros "(%Hk & Ht & Hpre)".
-    iDestruct "Ht" as (v vf) "(#Hpin & #Hvf & Htn & Hdl & #Hcs & #Hps & #HE)".
-    iSplitL "Hdl"; [iExists v; by iFrame "Hpin Hdl HE" |].
+    iDestruct "Ht" as (v vf) "(#Hpin & #Hvf & Htn & Hdl & #Hcs & #Hps & #HE & Hrp)".
+    iSplitL "Hdl Hrp"; [iExists v; by iFrame "Hpin Hdl HE Hrp" |].
     iExists v. iFrame "Hpin". rewrite /gwc_ban. iRight. iLeft.
     iSplitR; [by iPureIntro |]. rewrite /gH /union_params /fhead.
     iSplitR; [by iPureIntro |]. iSplitR; [by iPureIntro |].
@@ -286,9 +292,24 @@ Section union_link_inst.
   (* ...AND, at an input whose last line is a [seccomp x] one, THE ERA'S
      WILD TOKEN (or the taint): the read that completed that line minted it
      (seccomp design 10.4), and the reader's pieces carry it from there *)
+  (* ...AND WHERE THE RING STORED THE LINE'S NEWLINE (seccomp design
+     10.12, lane S5b): position [length I - 1] of the console ring's stored
+     sequence, its push trace's era input the line's own input.  What the
+     marked arm of a later read at [I] is refuted against. *)
+  Definition uring_at (I : list (bv 8)) : iProp Σ :=
+    (∃ (sl : list (list mobs * bv 8)) (h0 : list mobs),
+       ucons_stored_lb fsc_cons sl
+       ∗ ⌜sl !! (length I - 1)%nat = Some (h0, wl_nl)
+          /\ ins (open_seg h0) = I /\ obs_boots h0 = S gen_id⌝)%I.
+
+  Global Instance uring_at_persistent I : Persistent (uring_at I).
+  Proof using . rewrite /uring_at. apply _. Qed.
+  Global Instance uring_at_timeless I : Timeless (uring_at I).
+  Proof using . rewrite /uring_at. apply _. Qed.
+
   Definition urresw (v : era_pins) (I : list (bv 8)) : iProp Σ :=
     (gwc_rres U union_params v I ∗ flw gf I
-     ∗ (⌜uwild_at I⌝ → usecc_tok_at ug (S gen_id) I ∨ UT))%I.
+     ∗ (⌜uwild_at I⌝ → (usecc_tok_at ug (S gen_id) I ∗ uring_at I) ∨ UT))%I.
 
   Global Instance urresw_persistent v I : Persistent (urresw v I).
   Proof using . rewrite /urresw. apply _. Qed.

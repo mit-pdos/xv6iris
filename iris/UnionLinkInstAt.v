@@ -57,6 +57,9 @@ Require Import GenLinksLine.
 Require Import LinkRec.
 Require Import RiscvPtsto.
 Require Import WpUart.
+Require Import FsCfg.             (* [fsc_cons] *)
+Require Import Xv6G.              (* the ring's cameras, at the kernel's own instance *)
+Require Import UserConsole.       (* [ucons_stored_lb] *)
 From stdpp Require Import list.
 Local Open Scope list_scope.
 
@@ -72,6 +75,9 @@ Section union_link_inst_at.
   Local Notation UPIN := (era_pin (fgn_echo gf)).
   Context `{HRg : !riscvGS Σ}.
   Context `{GEN : GenId}.
+  (* the console ring's names and cameras (seccomp S5b): the residue at a
+     [seccomp x] line keeps the line's newline's stored position *)
+  Context `{!xv6G Σ} `{FSC : fscfg}.
 
   (* =================================================================== *)
   (*  1.  THE PARAMETERS AT [s0]                                          *)
@@ -163,13 +169,13 @@ Section union_link_inst_at.
   (* =================================================================== *)
   Lemma uturn0_at (s0 : fstate) (k : nat) :
     fturn_pre_at gf s0 k -∗
-    (∃ v : era_pins, UPIN k v ∗ dl_cnt v (1/2) 0%nat ∗ inp_lb v [])
+    (∃ v : era_pins, UPIN k v ∗ dl_cnt v (1/2) 0%nat ∗ inp_lb v [] ∗ rpos_auth v 0%nat)
     ∗ (∃ v : era_pins, UPIN k v ∗ gwc_ban U (union_params_at s0) k v [] 0%nat).
   Proof using .
     rewrite /fturn_pre_at /FileOut.fturn_core.
     iIntros "(%Hk & Ht & Hpre)".
-    iDestruct "Ht" as (v vf) "(#Hpin & #Hvf & Htn & Hdl & #Hcs & #Hps & #HE)".
-    iSplitL "Hdl"; [iExists v; by iFrame "Hpin Hdl HE" |].
+    iDestruct "Ht" as (v vf) "(#Hpin & #Hvf & Htn & Hdl & #Hcs & #Hps & #HE & Hrp)".
+    iSplitL "Hdl Hrp"; [iExists v; by iFrame "Hpin Hdl HE Hrp" |].
     iExists v. iFrame "Hpin". rewrite /gwc_ban. iRight. iLeft.
     iSplitR; [by iPureIntro |]. rewrite /gH /union_params_at /fhead_at.
     iSplitR; [by iPureIntro |]. iSplitR; [by iPureIntro |].

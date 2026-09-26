@@ -52,7 +52,6 @@ Require Import UnionOut.
 Require Import UUnionBootAdequacy.       (* [union_prog_law], [unionΣ] *)
 Require Import AppUnionRec.              (* [app_union]'s projections *)
 Require Import UInitUnionBoot.           (* [union_Hinit_boot_at]: the assembly *)
-Require UShURoundDefs.                   (* [ush_rdwild_of_shape] *)
 Require PipeProto.                       (* [pipeProtoG]: the binders below need them in scope *)
 Require UkPipesIface.
 Require UkCatFIface.
@@ -70,24 +69,15 @@ Section UInitUnion.
             HPN : !UkPipesIface.pipesNG Σ, HCR : !UkCatFIface.cifRegG Σ}.
   Context `{HfifR : !UkFileIface.fifRegG Σ}.
 
-  (* THE OPEN PREMISE (seccomp design 10.12, owner's ruling): the wild
-     shape buys the era's reader-side credential, at every instance the
-     law quantifies.  At the union [ai_rdwild] is [wild_none], so this is
-     STATED AND NOT DISCHARGED; the law below is proved under it. *)
-  Definition union_rdwild_premise : Prop :=
-    forall (HR : riscvGS Σ) (GEN : GenId)
-           (HBs : bioslotG Σ) (HFd : fdslotG Σ) (HIr : irefslotG Σ)
-           (HPav : pavG Σ) (HWc : wchG Σ) (HF : fileG Σ) (c : union_gn),
-      UShURoundDefs.ush_rdwild_of_shape c.
-
-  (* THE LAW, BY ITS NAME, under the open premise *)
-  Theorem union_Hinit_boot_rd : union_rdwild_premise -> union_prog_law (Σ := Σ).
+  (* THE LAW, BY ITS NAME.  The wild shape's reader-side credential is
+     the union's own [ai_rdwild] ([UnionOut.urdwild]; seccomp design 10.12,
+     lane S5b), so [UInitUnionBoot.union_Hinit_boot_at] needs nothing more. *)
+  Theorem union_Hinit_boot : union_prog_law (Σ := Σ).
   Proof using HU HfifR HPP HPR HPN HCR.
-    intros Hrdw HR GEN HBs HFd HIr HPav HWc HF c r Heq Hiface Hgen.
+    intros HR GEN HBs HFd HIr HPav HWc HF c r Heq Hiface Hgen.
     cbn [app_union app_names app_pred app_ifc] in Heq, Hiface.
     iIntros "#Hinv Hb Hturn".
-    iApply (union_Hinit_boot_at HR GEN c r Heq Hiface
-              (Hrdw HR GEN HBs HFd HIr HPav HWc HF c) with "Hinv [Hb] [Hturn]").
+    iApply (union_Hinit_boot_at HR GEN c r Heq Hiface with "Hinv [Hb] [Hturn]").
     - cbn [app_union app_boot]. iExact "Hb".
     - cbn [app_union app_turn union_turn]. iExact "Hturn".
   Qed.
@@ -97,23 +87,6 @@ End UInitUnion.
 (* ===================================================================== *)
 (*  THE COROLLARY -- ONE LINE.                                           *)
 (* ===================================================================== *)
-(* FIRST, green, the conclusion under the open premise: what the audit
-   reads while [union_adequacy_closed] waits on it *)
-Corollary union_adequacy_closed_rd
-    (Hrdw : union_rdwild_premise (Σ := unionΣ))
-    (g : gstate)
-    (Hgen0 : g.(ggen) = 0%nat) (Hpow0 : g.(gpow) = false)
-    (Hdisk : v_disk (g.(gdev).(dvirtio)) = fsimg_dk) :
-  forall (n : nat) (κs : list mobs) t2 g2,
-    language.nsteps n ([PowerLoopE : language.expr riscv_lang], g)
-      κs (t2, g2) ->
-    (forall e2, e2 ∈ t2 -> language.reducible (Λ := riscv_lang) e2 g2)
-    /\ UnionOutPure.union_phi κs.
-Proof.
-  exact (union_adequacy_unionΣ (union_Hinit_boot_rd (Σ := unionΣ) Hrdw)
-           g Hgen0 Hpow0 Hdisk).
-Qed.
-
 Corollary union_adequacy_closed
     (g : gstate)
     (Hgen0 : g.(ggen) = 0%nat) (Hpow0 : g.(gpow) = false)
@@ -124,8 +97,6 @@ Corollary union_adequacy_closed
     (forall e2, e2 ∈ t2 -> language.reducible (Λ := riscv_lang) e2 g2)
     /\ UnionOutPure.union_phi κs.
 Proof.
-  refine (union_adequacy_unionΣ (union_Hinit_boot_rd (Σ := unionΣ) _)
-            g Hgen0 Hpow0 Hdisk).
-  (* THE OPEN PREMISE, [union_rdwild_premise] at [unionΣ]: NOT discharged
-     (seccomp design 10.12).  This proof is the one red spot. *)
+  exact (union_adequacy_unionΣ (union_Hinit_boot (Σ := unionΣ))
+           g Hgen0 Hpow0 Hdisk).
 Qed.

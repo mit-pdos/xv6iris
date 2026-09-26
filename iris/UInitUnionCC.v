@@ -246,7 +246,7 @@ Section UnionInitCC.
     apply bi.sep_timeless; [apply era_pin_timeless |].
     apply bi.sep_timeless; [apply _ |].
     apply bi.sep_timeless; [apply inp_lb_timeless |].
-    apply (lk_rres_tl (union_link_inst_at ug s0)).
+    apply bi.sep_timeless; [apply (lk_rres_tl (union_link_inst_at ug s0)) | apply _].
   Qed.
 
   Lemma union_cc_wb_timeless (HR : riscvGS Σ) (GEN : GenId)
@@ -374,7 +374,7 @@ Section UnionInitCC.
       (Heq : @file_app Σ HF = MkAppcfg file_names (file_pred (fgn_cl (ugn_file ug))) r)
       (Hcons : @riscv_cons_res Σ (@riscv_fixedGS Σ HR) = ucl ug)
       (Htag : @riscv_rx_tag Σ (@riscv_fixedGS Σ HR) = utag ug)
-      (Hrdwild : @riscv_rdwild Σ (@riscv_fixedGS Σ HR) = wild_none) :
+      (Hrdwild : @riscv_rdwild Σ (@riscv_fixedGS Σ HR) = urdwild ug) :
     (⊢ union_links ug) ->
     UInitSh.cons_cred_holds_at fsc_cons (file_taint (fgn_cl (ugn_file ug)))
       (lm_disc_input U) union_disc_snoc_ncr union_disc_rest_short
@@ -389,15 +389,13 @@ Section UnionInitCC.
     { iIntros "#Hs".
       iApply (UInitFileLeaves.file_taint_of_sup_at (ugn_file ug) r Heq with "Hs"). }
     (* the wild credential's reading (lane S0): the union has none yet *)
-    assert (Hwdw : ⊢ riscv_rdwild (S gen_id) -∗ file_taint (fgn_cl (ugn_file ug))).
-    { rewrite Hrdwild /wild_none. by iIntros "[]". }
     pose proof (uWbf_inp ug r s0) as Hwbi.
     rewrite /UInitSh.cons_cred_holds_at /union_cc /=.
     split_and!.
     - (* (1) the read leaf at the index *)
       intros γp N l Hpeq.
       exact (union_read_leaf_holds_at ug Htag s0 (uWbf ug r s0) N γp l Hpeq Hstw
-               (UShLine.ush_rdcred_w _ Htsw) Hwdw
+               (UShLine.ush_rdcred_w _ Htsw) Hrdwild
                Hlkp).
     - intros γp N i Hpeq.
       exact (UShLine.ush_lease_of_at (lk_rres (union_link_inst_at ug s0))
@@ -472,7 +470,7 @@ Section UnionInitCC.
       (Heq : @file_app Σ HF = MkAppcfg file_names (file_pred (fgn_cl (ugn_file ug))) r)
       (Hcons : @riscv_cons_res Σ (@riscv_fixedGS Σ HR) = ucl ug)
       (Htag : @riscv_rx_tag Σ (@riscv_fixedGS Σ HR) = utag ug)
-      (Hrdwild : @riscv_rdwild Σ (@riscv_fixedGS Σ HR) = wild_none)
+      (Hrdwild : @riscv_rdwild Σ (@riscv_fixedGS Σ HR) = urdwild ug)
       (st : fdstate) (n0 : nat) :
     (forall k : Z, free_num k -> @psok Σ uprogSG_free k) ->
     8 * Z.of_nat (2 + (8 + (16 + (UkSh.ush_Dbody + n0)))) <= 0xFE0 ->
@@ -533,11 +531,11 @@ Section UnionInitHead.
     ∗ ∃ v : era_pins, era_pin (fgn_echo gf) (S gen_id) v ∗ urresw ug v [].
   Proof using .
     iIntros "Ht #Hpre". rewrite /FileOut.fturn_core.
-    iDestruct "Ht" as (v vf) "(#Hpin & #Hvf & Htn & Hdl & #Hcs & #Hps & #HE)".
+    iDestruct "Ht" as (v vf) "(#Hpin & #Hvf & Htn & Hdl & #Hcs & #Hps & #HE & Hrp)".
     iEval (rewrite /EchoOut.turn) in "Htn".
     iDestruct (mono_nat_lb_own_get with "Htn") as "#Hlb0".
-    iSplitL "Htn Hdl".
-    { iExists v, vf. iFrame "Hpin Hvf Htn Hdl Hcs Hps HE". }
+    iSplitL "Htn Hdl Hrp".
+    { iExists v, vf. iFrame "Hpin Hvf Htn Hdl Hcs Hps HE Hrp". }
     iExists v. iFrame "Hpin".
     rewrite /urresw /gwc_rres.
     iDestruct "Hpre" as "(_ & _ & #Hbw)".
@@ -557,16 +555,16 @@ Section UnionInitHead.
     FileOut.fturn_core gf (S gen_id) -∗ f0pre_at gf s0 -∗
     fown r s -∗ UInitFileLeaves.boot_at gf s0 s -∗
     (∃ v : era_pins, era_pin (fgn_echo gf) (S gen_id) v
-       ∗ dl_cnt v (1/2) 0%nat ∗ inp_lb v [])
+       ∗ dl_cnt v (1/2) 0%nat ∗ inp_lb v [] ∗ rpos_auth v 0%nat)
     ∗ uWbf ug r s0 [].
   Proof using .
     iIntros "Ht Hpre Hd Hb". rewrite /FileOut.fturn_core.
-    iDestruct "Ht" as (v vf) "(#Hpin & #Hvf & Htn & Hdl & #Hcs & #Hps & #HE)".
-    iAssert (lk_turn (union_link_inst_at ug s0) (S gen_id)) with "[Htn Hdl Hpre]"
+    iDestruct "Ht" as (v vf) "(#Hpin & #Hvf & Htn & Hdl & #Hcs & #Hps & #HE & Hrp)".
+    iAssert (lk_turn (union_link_inst_at ug s0) (S gen_id)) with "[Htn Hdl Hrp Hpre]"
       as "Hturn".
     { cbn [lk_turn union_link_inst_at gen_link_inst]. rewrite /fturn_pre_at.
       iSplitR; [by iPureIntro |]. iFrame "Hpre". rewrite /FileOut.fturn_core.
-      iExists v, vf. iFrame "Hpin Hvf Htn Hdl Hcs Hps HE". }
+      iExists v, vf. iFrame "Hpin Hvf Htn Hdl Hcs Hps HE Hrp". }
     iDestruct (lk_turn0 (union_link_inst_at ug s0) (S gen_id) with "Hturn")
       as "[Hrd Hwb]".
     iFrame "Hrd". rewrite /uWbf. iLeft. iSplitL "Hwb"; [rewrite /uWbl; iExact "Hwb" |].

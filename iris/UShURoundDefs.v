@@ -413,20 +413,31 @@ Section UShURoundDefs.
   (* THE WILD SHAPE (seccomp design 10.5, 10.10): the era's wild token AT
      the [seccomp x] line the read completed.  No deed (B3). *)
   Definition useccomp_shape (I : list (bv 8)) : iProp Σ :=
-    (usecc_tok_at ug (S gen_id) I ∗ ⌜uwild (ul I) = true⌝)%I.
+    (usecc_tok_at ug (S gen_id) I ∗ ⌜uwild (ul I) = true⌝
+     (* ...and the reader's position at the line (seccomp S5b): what the
+        era's reader-side credential carries to every later reader *)
+     ∗ ∃ v : era_pins, era_pin (fgn_echo gf) (S gen_id) v ∗ rpos_lb v (length I))%I.
 
   Global Instance useccomp_shape_persistent I : Persistent (useccomp_shape I).
   Proof using . rewrite /useccomp_shape. apply _. Qed.
   Global Instance useccomp_shape_timeless I : Timeless (useccomp_shape I).
   Proof using . rewrite /useccomp_shape. apply _. Qed.
 
-  (* THE ONE PREMISE LEFT OPEN (seccomp design 10.12, owner's ruling): the
-     wild shape buys the era's reader-side credential, which the seccomp
-     child's entry pays read's console row with.  At the union
-     [ai_rdwild] is [wild_none], so this is stated and NOT discharged:
-     the rounds below carry it as a hypothesis. *)
+  (* THE WILD SHAPE BUYS THE ERA'S READER-SIDE CREDENTIAL (seccomp design
+     10.12), which the seccomp child's entry pays read's console row with.
+     The rounds below carry it as a hypothesis; at the union's interface
+     ([AppUnionRec.union_ifc]: [ai_rdwild := UnionOut.urdwild]) it holds by
+     construction ([ush_rdwild_of_shape_holds], lane S5b). *)
   Definition ush_rdwild_of_shape : Prop :=
     forall I : list (bv 8), useccomp_shape I ⊢ riscv_rdwild (S gen_id).
+
+  Lemma ush_rdwild_of_shape_holds :
+    @riscv_rdwild Σ (@riscv_fixedGS Σ _) = urdwild ug -> ush_rdwild_of_shape.
+  Proof using .
+    intros Hrdw I. rewrite /useccomp_shape.
+    iIntros "(#Htok & %Hw & %v & #Hp & #Hlb)". rewrite Hrdw /urdwild.
+    iExists I, v. iFrame "Htok Hp Hlb". by iPureIntro.
+  Qed.
 
   (* sh's fork panic at the wild line hands init the shape; init prints
      through the era's licence and lends it back to the shell it restarts
@@ -842,7 +853,7 @@ Section UShURoundDefs.
   Lemma uWcu_3_nw (I : list (bv 8)) :
     uwild (ul I) = false -> uWcu I 3%nat -∗ uWcf I 3%nat.
   Proof using .
-    intros Hnw. iIntros "H". iDestruct (uWcu_3 with "H") as "[H | [_ %Hw]]"; [done |].
+    intros Hnw. iIntros "H". iDestruct (uWcu_3 with "H") as "[H | [_ [%Hw _]]]"; [done |].
     by rewrite Hnw in Hw.
   Qed.
 

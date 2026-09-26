@@ -146,8 +146,10 @@ Section UnionApp.
                   token (seccomp design 10.1) *)
                (usecc_tok c) (usecc_tok_persistent c) (usecc_tok_timeless c)
                (union_wild_lic c)
-               (* no tokenless masked READER (seccomp design 10.7) *)
-               wild_none (@wild_none_persistent Σ) (@wild_none_timeless Σ).
+               (* the tokenless masked READER's credential: the era's token
+                  at its line, and the reader's position there (seccomp
+                  design 10.12, lane S5b) *)
+               (urdwild c) (urdwild_persistent c) (urdwild_timeless c).
 
   Definition union_turn (c : union_gn) : nat -> iProp Σ := fturn (ugn_file c).
 

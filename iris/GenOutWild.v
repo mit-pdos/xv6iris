@@ -460,19 +460,18 @@ Section gen_out_wild.
      ends in a complete wild line) has a push trace that strictly extends
      the newline's; in the newline's own era that trace's input has a byte
      after [I0], so D4 ([lm_disc_wild_last]) says it is not disciplined. *)
-  Lemma lm_placed_wild_undisc (sl : list (list mobs * bv 8)) (n0 lo k d : nat)
-      (hs : list (list mobs)) (j : nat) (h0 : list mobs) (c0 : bv 8)
-      (I0 : list (bv 8)) :
-    cons_chain sl -> sl !! n0 = Some (h0, c0) -> (n0 < lo)%nat ->
-    cons_placed sl lo k d hs -> (j < d)%nat ->
+  (* ...AT ONE STORED ENTRY: the per-byte form the read leaf's law is
+     stated at (seccomp S5b) *)
+  Lemma lm_stored_wild_undisc (sl : list (list mobs * bv 8)) (n0 p : nat)
+      (h0 h : list mobs) (c0 b : bv 8) (I0 : list (bv 8)) :
+    cons_chain sl -> sl !! n0 = Some (h0, c0) -> (n0 < p)%nat ->
+    sl !! p = Some (h, b) -> obs_ends_in Uart0 h b ->
     I0 `prefix_of` ins (open_seg h0) ->
     I0 <> [] -> rest_of I0 = [] -> lm_wild (lm_line_at M I0) ->
-    trace_shape (hs !!! j) true -> obs_boots (hs !!! j) = obs_boots h0 ->
-    ~ lm_disc M (hs !!! j).
+    trace_shape h true -> obs_boots h = obs_boots h0 ->
+    ~ lm_disc M h.
   Proof using.
-    intros Hch Hn0 Hlo [_ Hpl] Hj HI0 Hne Hr Hw Hsh Hbt Hd.
-    destruct (Hpl j Hj) as (p & h & b & Hp & Hhs & [g Hg] & Hsl & _).
-    rewrite (list_lookup_total_correct _ _ _ Hhs) in Hsh Hbt Hd.
+    intros Hch Hn0 Hlo Hsl [g Hg] HI0 Hne Hr Hw Hsh Hbt Hd.
     destruct (Hch n0 p h0 h c0 b Hn0 Hsl ltac:(lia)) as [[z Hz] Hlt].
     subst h.
     assert (Hg0 : h0 `prefix_of` g).
@@ -495,5 +494,22 @@ Section gen_out_wild.
     rewrite Hins Hu. destruct u as [| x u]; cbn [c].
     - rewrite app_nil_r. done.
     - exists (u ++ [b]). by rewrite -!app_assoc.
+  Qed.
+
+  Lemma lm_placed_wild_undisc (sl : list (list mobs * bv 8)) (n0 lo k d : nat)
+      (hs : list (list mobs)) (j : nat) (h0 : list mobs) (c0 : bv 8)
+      (I0 : list (bv 8)) :
+    cons_chain sl -> sl !! n0 = Some (h0, c0) -> (n0 < lo)%nat ->
+    cons_placed sl lo k d hs -> (j < d)%nat ->
+    I0 `prefix_of` ins (open_seg h0) ->
+    I0 <> [] -> rest_of I0 = [] -> lm_wild (lm_line_at M I0) ->
+    trace_shape (hs !!! j) true -> obs_boots (hs !!! j) = obs_boots h0 ->
+    ~ lm_disc M (hs !!! j).
+  Proof using.
+    intros Hch Hn0 Hlo [_ Hpl] Hj HI0 Hne Hr Hw Hsh Hbt.
+    destruct (Hpl j Hj) as (p & h & b & Hp & Hhs & He & Hsl & _).
+    rewrite (list_lookup_total_correct _ _ _ Hhs) in Hsh Hbt |- *.
+    exact (lm_stored_wild_undisc sl n0 p h0 h c0 b I0 Hch Hn0 ltac:(lia) Hsl He
+             HI0 Hne Hr Hw Hsh Hbt).
   Qed.
 End gen_out_wild.

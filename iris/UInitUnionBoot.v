@@ -153,13 +153,11 @@ Section UnionInitBoot.
       (ug : union_gn) (r : file_names) :
     @file_app Σ HF = MkAppcfg file_names (file_pred (fgn_cl (ugn_file ug))) r ->
     @riscvF_app_iface Σ (@riscv_fixedGS Σ HR) = union_ifc ug ->
-    (* THE OPEN PREMISE (seccomp design 10.12): stated, not discharged *)
-    ush_rdwild_of_shape ug ->
     ⊢ app_inv fsc_fs -∗ file_boot (fgn_cl (ugn_file ug)) (S gen_id) r -∗
       fturn (ugn_file ug) (S gen_id) -∗
       |==> init_boot_bundle (bv_unsigned InodeInv.ROOTINO) ProcDefs.secc_all fdt0.
   Proof using HU HfifR cifRegG0 pipeProtoG0 pnsRegG0 pipesNG0.
-    intros Heq Hiface Hrdw.
+    intros Heq Hiface.
     (* the five projections, off the one equation *)
     assert (Htag : @riscv_rx_tag Σ (@riscv_fixedGS Σ HR) = utag ug)
       by (rewrite /riscv_rx_tag Hiface; by cbn [union_ifc ai_tag union_tag]).
@@ -168,8 +166,10 @@ Section UnionInitBoot.
       by (rewrite /app_taint Hiface; by cbn [union_ifc ai_kill union_kill]).
     assert (Hcons : @riscv_cons_res Σ (@riscv_fixedGS Σ HR) = ucl ug)
       by (rewrite /riscv_cons_res Hiface; by cbn [union_ifc ai_cons union_cons]).
-    assert (Hrdwild : @riscv_rdwild Σ (@riscv_fixedGS Σ HR) = wild_none)
+    assert (Hrdwild : @riscv_rdwild Σ (@riscv_fixedGS Σ HR) = urdwild ug)
       by (rewrite /riscv_rdwild Hiface; by cbn [union_ifc ai_rdwild]).
+    (* THE WILD SHAPE BUYS THE READER-SIDE CREDENTIAL, by construction *)
+    pose proof (ush_rdwild_of_shape_holds ug Hrdwild) as Hrdw.
     assert (Hwild : @riscv_wild Σ (@riscv_fixedGS Σ HR) = usecc_tok ug)
       by (rewrite /riscv_wild Hiface; by cbn [union_ifc ai_wild]).
     assert (Hktaint : ⊢ app_taint -∗ file_taint (fgn_cl (ugn_file ug))).
@@ -333,11 +333,11 @@ Section UnionInitBoot.
         as "[Hdl Hbn]".
       iSplitL "Hdl".
       { rewrite /union_cc /=. rewrite /UShLine.ush_rd_pin_at.
-        iDestruct "Hdl" as (v) "(#Hpin & Hdl & #HE)".
+        iDestruct "Hdl" as (v) "(#Hpin & Hdl & #HE & Hrp)".
         iDestruct (era_pin_agree with "Hpin0 Hpin") as %<-.
         iExists v0, []. iSplitR;
           [ iPureIntro; split; [ reflexivity | exact rest_of_nil ] | ].
-        iFrame "Hpin0 Hdl HE". iExact "Hres0". }
+        iFrame "Hpin0 Hdl HE Hrp". iExact "Hres0". }
       rewrite /UserConsole.cc_wbn /union_cc /=. iExists []. by iFrame "Hbn". }
     (* ---- THE THREE LAWS, at the record, and the bundle's payload ---- *)
     iDestruct (UInitDiag.kinit_banner_law_pro_holds_at

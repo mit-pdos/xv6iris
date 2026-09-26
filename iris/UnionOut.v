@@ -171,6 +171,21 @@ Section union_out.
   Proof using . rewrite /usecc_tok_at. apply _. Qed.
   Global Instance usecc_tok_at_timeless k I0 : Timeless (usecc_tok_at k I0).
   Proof using . rewrite /usecc_tok_at. apply _. Qed.
+  (* THE UNION'S READER-SIDE WILD CREDENTIAL ([AppUnionRec.union_ifc]'s
+     [ai_rdwild]; seccomp design 10.12, lane S5b): the era's token at the
+     [seccomp x] line it was minted at, and the reader's position at that
+     line -- a lower bound every later reader's position, of whichever
+     shell, is above *)
+  Definition urdwild (k : nat) : iProp Σ :=
+    (∃ (I0 : list (bv 8)) (v : era_pins),
+       usecc_tok_at k I0 ∗ ⌜uwild (lm_line_at U I0) = true⌝
+       ∗ UPIN k v ∗ rpos_lb v (length I0))%I.
+
+  Global Instance urdwild_persistent k : Persistent (urdwild k).
+  Proof using . rewrite /urdwild. apply _. Qed.
+  Global Instance urdwild_timeless k : Timeless (urdwild k).
+  Proof using . rewrite /urdwild. apply _. Qed.
+
   Lemma usecc_tok_of_at (k : nat) (I0 : list (bv 8)) : usecc_tok_at k I0 -∗ usecc_tok k.
   Proof using . exact (secc_tok_of_at U ucparams k I0). Qed.
 
@@ -504,7 +519,7 @@ Section union_out.
     blk_auth w [] -∗ rblk_auth gb [] -∗ cur_half w 1 0%nat gb false -∗
       ucl k [] (LogEntryDefs.MkCH [] [] [] None) ∗ fturn gf k.
   Proof using .
-    iIntros "#Hpin #Hfp #Hpera (Ht & Hcs & Hps & HE & Hdl & Hdll & Hsc) Hf0 Hfla Hblk Hrb Hcur1".
+    iIntros "#Hpin #Hfp #Hpera (Ht & Hcs & Hps & HE & Hdl & Hdll & Hsc & Hrp) Hf0 Hfla Hblk Hrb Hcur1".
     iEval (rewrite -Qp.half_half) in "Ht".
     iDestruct "Ht" as "[Ht1 Ht2]".
     iEval (rewrite -Qp.half_half) in "Hdl".
@@ -540,7 +555,7 @@ Section union_out.
       - rewrite /ch_E. cbn [LogEntryDefs.ch_log LogEntryDefs.ch_arm ch_arm_E].
         rewrite app_nil_r echoed_nil /seg_of fmap_nil. reflexivity.
       - exact (lm_dl_ok_0 U). }
-    rewrite /fturn. iExists v, vf. iFrame "Hpin Hfp Ht2 Hdl2 Hcslb Hpslb Hf0".
+    rewrite /fturn. iExists v, vf. iFrame "Hpin Hfp Ht2 Hdl2 Hcslb Hpslb Hf0 Hrp".
     iApply (inp_lb_of_dl_lb v [] []); [apply prefix_nil | iExact "Hdllb"].
   Qed.
 

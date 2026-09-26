@@ -246,7 +246,11 @@ Section union_links.
                                  (snd <$> (dl ++ ws))))
                   ∗ ⌜lm_rd_stage U ps0 cs0 s0 (snd <$> (dl ++ ws))⌝)
            ∗ (⌜uread_wild (snd <$> (dl ++ ws)) ws⌝
-              -∗ usecc_tok_at ug k (snd <$> (dl ++ ws)) ∨ UT))%I.
+              -∗ (usecc_tok_at ug k (snd <$> (dl ++ ws))
+                  ∗ ⌜exists h0 : list mobs, list_basics.last ws = Some (h0, wl_nl)
+                      /\ ins (open_seg h0) = snd <$> (dl ++ ws)
+                      /\ obs_boots h0 = k⌝)
+                 ∨ UT))%I.
 
   Lemma union_read_link (k : nat) (v : era_pins) (n : nat)
       (ws : list (list mobs * bv 8)) (Φ : iProp Σ) :
