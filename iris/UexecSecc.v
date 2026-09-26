@@ -39,6 +39,7 @@ Require Import WpUart.
 Require Import AppInv.
 Require Import SpecFileread.    (* [fileread_in] *)
 Require Import SpecFilewrite.   (* [filewrite_in] *)
+Require Import SpecConsolewrite. (* [cons_out_chain] *)
 Require Import SpecFileclose.   (* [fileclose_cpay] / [fileclose_cpays] *)
 Require Import SpecKexec.       (* [kexec_image_ok] / [exec_key_ok] / [exec_slot_pre] *)
 Require Import SpecSysExec.     (* [sys_exec_au_pre] *)
@@ -783,6 +784,82 @@ Section UexecSecc.
     iApply ("Hmint" with "[] Hp").
     iModIntro. iApply (secc_key_of_pins W' sts secc Hfd Hsc with "Hr").
     iPureIntro. exact Hm.
+  Qed.
+
+  (* =================================================================== *)
+  (*  8.  THE ERA CREDENTIAL PAYS THE CONSOLE ROWS                       *)
+  (* =================================================================== *)
+
+  (* READ at a console row: the ring's DIRTY arm at [AppInv.app_rdcred]'s
+     right disjunct, and the boundary's input link off the era licence *)
+  Lemma secc_cons_rd_of_wild :
+    riscv_wild (S gen_id) -∗
+    □ (∀ (wb : bool) (mj n : Z) (P : iProp Σ),
+         fileread_in (FdOpen true wb (FdDevice mj)) n
+           (pfam_triv (fun _ _ _ _ => True%I)) (fun _ _ => True%I)
+           (fun _ => True%I) (fun _ => True%I) (fun _ _ => True%I) P).
+  Proof using .
+    iIntros "#Hw".
+    iDestruct (cons_licence_at_of_wild with "Hw") as "#Hlic".
+    iIntros "!>" (wb mj n P). rewrite /fileread_in. iIntros "HP".
+    case_decide; [ | iExact "HP" ].
+    iSplitL "HP".
+    - iApply (ConsoleInv.cons_acc_cred fsc_cons app_rdcred
+                (fun (_ _ : nat) => (P ∗ True)%I)).
+      + rewrite /ConsoleInv.cons_dirty_cred. iModIntro.
+        iApply (app_rdcred_of_wild with "Hw").
+      + iIntros (cur dc). iModIntro. by iFrame "HP".
+    - iApply (cons_read_pay_triv_at with "Hlic").
+  Qed.
+
+  (* WRITE at a console row: the output chain at the trivial cursor, one
+     [out_link] per byte off the era licence
+     ([SpecConsolewrite.cons_out_chain_of_licence]'s induction at era k) *)
+  Lemma secc_cons_out_chain (k : nat) (M : gmap Z (bv 8)) (ua : mword 64)
+      (j cnt : nat) :
+    cons_licence_at k -∗ cons_out_chain k M ua (fun _ => True%I) j cnt.
+  Proof using .
+    iIntros "#Hlic". iInduction cnt as [| cnt] "IH" forall (j); [ done | ].
+    cbn [cons_out_chain]. iSplit; [ done | ].
+    iIntros (b) "_". iApply (out_link_of_licence_at k b with "Hlic").
+    by iApply "IH".
+  Qed.
+
+  Lemma secc_cons_wr_of_wild :
+    riscv_wild (S gen_id) -∗
+    □ (∀ (rb : bool) (mj n : Z) (pmv : gmap (mword 27) uperm) (sz : Z)
+         (lz : bool) (M : gmap Z (bv 8)) (ua : mword 64),
+         filewrite_in pmv sz lz (FdOpen rb true (FdDevice mj)) n M ua
+           (fun _ => True%I) (fun _ _ => True%I)).
+  Proof using .
+    iIntros "#Hw".
+    iDestruct (cons_licence_at_of_wild with "Hw") as "#Hlic".
+    iIntros "!>" (rb mj n pmv sz lz M ua). rewrite /filewrite_in.
+    iApply (secc_cons_out_chain with "Hlic").
+  Qed.
+
+  Lemma secc_cons_pay_of_wild : riscv_wild (S gen_id) -∗ secc_cons_pay.
+  Proof using .
+    iIntros "#Hw". rewrite /secc_cons_pay.
+    iDestruct (secc_cons_rd_of_wild with "Hw") as "#Hr".
+    iDestruct (secc_cons_wr_of_wild with "Hw") as "#Hwr".
+    iModIntro. iSplit; [ iExact "Hr" | iExact "Hwr" ].
+  Qed.
+
+  (* =================================================================== *)
+  (*  9.  THE MINTER                                                     *)
+  (*                                                                     *)
+  (*  The universe's slot at every key in the universe, out of the era   *)
+  (*  credential and the generic user-execution WP: no [app_sup], no     *)
+  (*  [app_taint] (design SS5, SS9).                                     *)
+  (* =================================================================== *)
+  Lemma useccomp_mint :
+    riscv_wild (S gen_id) -∗ □ uexec_wp -∗
+    □ (∀ W : uvis, □ secc_key W -∗ my_pay (uvis_gen W) (fun _ => True%I) -∗ uslot W).
+  Proof using .
+    iIntros "#Hw #Hwp".
+    iApply (useccomp_mint_of_cons with "[] Hwp").
+    iApply (secc_cons_pay_of_wild with "Hw").
   Qed.
 
 End UexecSecc.
