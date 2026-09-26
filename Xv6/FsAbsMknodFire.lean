@@ -452,6 +452,8 @@ theorem cafAcre_fire [Icfg] (γfs : FsNames) (E : CoPset) (cf : Nat → Nat → 
     (d i : Nat) (nm : Fname) (dqc : DFrac) (np np' nc : FsNode)
     (hE : (↑ftopN : CoPset) ∪ ↑appN ⊆ E) (hloc : InodeLocal d np')
     (hdir : fnIsDir np = true) (hnl : fnNlink np ≠ 0) (hnone : (dirEntries np)[nm]? = none)
+    -- THE NAME CREDENTIAL (TL-3C): the name dirlink files is a PROPER one
+    (hpnm : nm ≠ DOT ∧ nm ≠ DOTDOT)
     (habsp' : absOf np' =
       some ⟨.ADir ((dirEntries np).insert nm i), fnNlink np + acreBump (cf d i)⟩)
     (habsc : absOf nc = some ⟨cf d i, 1⟩) :
@@ -488,7 +490,7 @@ theorem cafAcre_fire [Icfg] (γfs : FsNames) (E : CoPset) (cf : Nat → Nat → 
       deltaCreate_armed (absView I) d nm (dirEntries np) (fnNlink np) i (cf d i) hpre hne]
   have hsub : appE ⊆ E \ ↑ftopN := appN_sub_ftop E hE
   unfold acreCommitAtGen
-  ihave Hcm := Hcm $$ %I %d %i %nm %(dirEntries np) %(fnNlink np) %hpre Harm HPd Ha
+  ihave Hcm := Hcm $$ %I %d %i %nm %(dirEntries np) %(fnNlink np) %hpre %hpnm Harm HPd Ha
   imod (fupd_mask_mono hsub) $$ Hcm with ⟨Ha, HPd, Hstep, Hph2⟩
   -- THE MOVE, at the whole authority (`AppInv.appTopUpdate`)
   imod (appTopUpdate (E \ ↑ftopN) γfs I d np np' hsub) $$ Hai [Hstep] Ha Hfp with ⟨Ha, Hfp⟩
@@ -521,6 +523,7 @@ theorem cafAcre_fire_file [Icfg] (γfs : FsNames) (E : CoPset)
     (d i : Nat) (nm : Fname) (dqc : DFrac) (np np' nc : FsNode)
     (hE : (↑ftopN : CoPset) ∪ ↑appN ⊆ E) (hloc : InodeLocal d np')
     (hdir : fnIsDir np = true) (hnl : fnNlink np ≠ 0) (hnone : (dirEntries np)[nm]? = none)
+    (hpnm : nm ≠ DOT ∧ nm ≠ DOTDOT)
     (habsp' : absOf np' = some ⟨.ADir ((dirEntries np).insert nm i), fnNlink np⟩)
     (habsc : absOf nc = some ⟨.AFile [], 1⟩) :
     ⊢@{IProp GF} ftopInv (hlc := hlc) γfs -∗ appInv (hlc := hlc) γfs -∗
@@ -533,7 +536,7 @@ theorem cafAcre_fire_file [Icfg] (γfs : FsNames) (E : CoPset)
         ∃ av : Aview, ⌜crePre av d nm (dirEntries np) (fnNlink np) i (.AFile [])⌝ ∗
           Fok.pfRecv av d nm i :=
   cafAcre_fire γfs E (fun _ _ => .AFile []) Pd Farm Fok d i nm dqc np np' nc hE hloc hdir hnl hnone
-    habsp' habsc
+    hpnm habsp' habsc
 
 end CreateFire2
 

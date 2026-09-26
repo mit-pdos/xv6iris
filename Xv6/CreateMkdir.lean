@@ -2725,7 +2725,8 @@ theorem create_mkdir_bump (IU : IUPDATE) (Γ : SchedNames) [ClaimIs (hlc := hlc)
   imod (cafAcre_fire (hlc := hlc) fscFs ⊤ (creChild ty.toNat major.toNat minor.toNat)
       (P (nparElems (bview plen pfun)).length) Farm Fok
       dind.toNat cinum.toNat (bname 14 nf) (DFrac.own 1) (eraNode dn bm data) _ _
-      CoPset.subseteq_top hlocp hdir hnl0' happ.hnonep habsp habsc)
+      CoPset.subseteq_top hlocp hdir hnl0' happ.hnonep
+      (createMkdir_nm_not_dots plen pfun kd dind dn bm data nf hpar) habsp habsc)
     $$ Hft Hap Hacre Harm HPpar Htop Hctop with ⟨Htop, Hctop, HPpar, ⟨%av, %hpre, HFok⟩⟩
   ihave Hkeep := Hkeep $$ HPpar
   ihave Hctop : topFrag (fsGammaL fscFs) cinum.toNat (eraNode dc2 bm2 dat2) $$ [Hctop]

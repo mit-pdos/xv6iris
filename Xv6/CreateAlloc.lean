@@ -544,7 +544,8 @@ theorem create_alloc_repark (dind cinum : BitVec 32) (dn dn' : Dinode) (bm bm' :
   · rw [← topFrag_1]; iexact Hctop
   imod (cafAcre_fire (hlc := hlc) fscFs ⊤ (creChild ty.toNat major.toNat minor.toNat) Pd Farm Fok
     dind.toNat cinum.toNat (bname 14 nf) (DFrac.own 1) _ _ _ CoPset.subseteq_top hloc
-    (mkfEra_is_dir dn bm data hdz) (mkfEra_live dn bm data hnl0z) hnoneE habsp' habsc)
+    (mkfEra_is_dir dn bm data hdz) (mkfEra_live dn bm data hnl0z) hnoneE
+    ⟨by rw [DOT_dot]; exact hnd.1, by rw [DOTDOT_dotdot]; exact hnd.2⟩ habsp' habsc)
     $$ Hft Hap Hacre Harm HPd Htop Hctop with ⟨Htop, Hctop, HPd, ⟨%av, %hpre, HFok⟩⟩
   ihave Hctop : topFrag (fsGammaL fscFs) cinum.toNat
       (eraNode (createSetf dnc major minor 1#16) bmc datc) $$ [Hctop]

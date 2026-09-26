@@ -272,6 +272,12 @@ def acreCommitAtGen [Appcfg GF] (Γ : FsViewNames GF) (E : CoPset) (cf : Nat →
   iprop(∀ (I : RegMapF FsNode) (d i : Nat) (nm : Fname)
       (ents : Std.ExtTreeMap Fname Nat compare) (nl : Nat),
     ⌜crePre (absView I) d nm ents nl i (cf d i)⌝ -∗
+    -- THE NAME CREDENTIAL (Rocq TL-3C, `84090c137`): `nm` is quantified
+    -- inside, and the tree layer's `own_wf` preservation is FALSE at a dot
+    -- name.  The kernel pays it: dirlink is reached only over a name the
+    -- parent's record range MISSED, and a live directory's records 0 and 1
+    -- ARE the two dot names (`dirDots_miss_not_dots`).
+    ⌜nm ≠ DOT ∧ nm ≠ DOTDOT⌝ -∗
     creArmFired Farm i -∗
     Pd d -∗
     (Γ.top ↪●MAP{DFrac.own (1 : Qp).half} I) ={E}=∗
@@ -316,9 +322,9 @@ theorem acreCommitAtGen_mono [Appcfg GF] (Γ : FsViewNames GF) (E : CoPset)
       acreCommitAtGen (hlc := hlc) Γ E cf Pd Farm Φ -∗
       acreCommitAtGen (hlc := hlc) Γ E cf Pd' Farm Φ := by
   unfold acreCommitAtGen
-  iintro #Hin #Hout H %I %d %i %nm %ents %nl %hpre Harm HPd Ha
+  iintro #Hin #Hout H %I %d %i %nm %ents %nl %hpre %hnm Harm HPd Ha
   ihave HPd := Hin $$ %d HPd
-  imod H $$ %I %d %i %nm %ents %nl %hpre Harm HPd Ha with ⟨Ha, HPd, Hstep, Hph2⟩
+  imod H $$ %I %d %i %nm %ents %nl %hpre %hnm Harm HPd Ha with ⟨Ha, HPd, Hstep, Hph2⟩
   ihave HPd := Hout $$ %d HPd
   imodintro
   iframe Ha HPd Hstep Hph2
@@ -333,8 +339,8 @@ theorem acreCommitAtGen_cur [Appcfg GF] (Γ : FsViewNames GF) (E : CoPset)
     acreCommitAtGen (hlc := hlc) Γ E cf (fun _ => iprop(True)) Farm Φ ⊢
       acreCommitAtGen (hlc := hlc) Γ E cf Pd Farm Φ := by
   unfold acreCommitAtGen
-  iintro H %I %d %i %nm %ents %nl %hpre Harm HPd Ha
-  imod H $$ %I %d %i %nm %ents %nl %hpre Harm %trivial Ha with ⟨Ha, -, Hstep, Hph2⟩
+  iintro H %I %d %i %nm %ents %nl %hpre %hnm Harm HPd Ha
+  imod H $$ %I %d %i %nm %ents %nl %hpre %hnm Harm %trivial Ha with ⟨Ha, -, Hstep, Hph2⟩
   imodintro
   iframe Ha HPd Hstep Hph2
 
@@ -446,7 +452,7 @@ theorem acreCommitAtGen_unit [Appcfg GF] [FsBytesG GF] (γfs : FsNames) (E : CoP
     appSup (GF := GF) ⊢
       acreCommitAtGen (hlc := hlc) (fsGammaL γfs) E cf Pd Farm (fun _ _ _ _ => iprop(True)) := by
   unfold acreCommitAtGen
-  iintro #Hsup %I %d %i %nm %ents %nl %_ _ HPd Ha
+  iintro #Hsup %I %d %i %nm %ents %nl %_ %_ _ HPd Ha
   ihave Hstep := appStep_acc d I (deltaCreate d nm i (cf d i) (absView I)) $$ Hsup
   imodintro
   iframe Ha HPd Hstep
