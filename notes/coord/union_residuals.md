@@ -63,3 +63,13 @@ Collected from the U0 agent reports (Sept 26 2026). Each item names the lane tha
   `cons_sup_absent`, `init_cons_console_fam`, `cons_sup_console`; on Xfam after K4 + `utext_img`:
   `xfam_open`, `sbundle_at_open_intro_at`, `spost_at_open_elim_at`, `cons_ro_sub`; on `wp_triv`: `fupd_wp_triv`.
 - `pobs_elend_aents` proved directly; repoint at K5's `FsAbsEraState.elend_aents` when convenient.
+
+## U1-R (post-K3/K4 remainder; pre-bump part: UkRunLeaf/Mem/Br, UkCode, UkStub, echo walk, UkFork, UkRunExecRef, UEchoKernel)
+- UkRunSys, UkRunSecc (need K3 secc key/rows, K4 close/exit deposits).
+- Restore `wp_uk_sb_denied`'s self-minted exit deposit (Rocq `udep_exit_run`; now from `UprogSG.psok USYS_exit`).
+- UkFork / UkRunExecRef: ledger (`ustd_at`, K3), pipe rows (`urun_rows`/`urun_nopipe`, K4), seccomp mask (K3).
+- Syscall-number premise is on the register file (`extractLsb' 0 32 (m 17#5)).toInt = USYS_…`); switch to
+  UkRunSys's `usysno`.
+- UkFork kill price is `□ (uKillCred -∗ Q (-1))` vs Rocq `app_taint` (process-layer deviation; K4's KILL-TAINT).
+- `stubRet` lives in UkStub (Rocq: UkTree) — H-tree's UkTree must reuse it.
+- Axiom baseline note for U4: echo walks show `MachCSL.nthByte_lo0/lo1._native.bv_decide` via UserHeap.uinstrIs_ukInstr.
