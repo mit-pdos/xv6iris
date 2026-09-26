@@ -449,7 +449,7 @@ Definition wp_sys_read_sconf_body
      projection, and the two equations above are what pin the names record to
      the table's own values. *)
   fileread_fs_env γf fn -∗
-  ConsoleInv.console_inv fsc_cons AppInv.app_sup (frn_cons fn) -∗
+  ConsoleInv.console_inv fsc_cons AppInv.app_rdcred (frn_cons fn) -∗
   (* ...AND THE CONSOLE PORT'S OWN INVARIANT beside it (lane CONS-IO,
      milestone B, ruling F6): consoleread fires the boundary's input link
      at its final release, and this is what it opens.  It comes off

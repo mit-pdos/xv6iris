@@ -1826,7 +1826,10 @@ Proof.
                  Cres HCrest
                  (* the LICENCE law (lane SUP-ONE): the client's own
                     [Hout_lic], which this theorem already takes *)
-                 ltac:(iIntros "_"; iApply Hout_lic))
+                 ltac:(iIntros "_"; iApply Hout_lic)
+                 (* no masked program: the wild credential is absent *)
+                 wild_none (@wild_none_persistent _) (@wild_none_timeless _)
+                 (wild_none_lic Cres))
             (fun (_ : unit) (_ : nat) => emp%I)
             (* THE TRANSPORT IS THE CLIENT'S at this theorem: it is what
                founds the client's own output claim per era. *)

@@ -271,9 +271,10 @@ Section FsAbsInvFire.
      an arbitrary user process under the ARM. *)
   (* ...AND THE CONSOLE ARM IS PAID FROM THE SUPPLY ITSELF (app-echo.md,
      lane CONS-CURSOR, C3, and the LEASE ruling).  A read of the console
-     takes [ConsoleInv.cons_acc fsc_cons app_sup Rd] -- ONE ARM, two
+     takes [ConsoleInv.cons_acc fsc_cons app_rdcred Rd] -- ONE ARM, two
      disjuncts -- and this is the TAINTED one: the caller hands in the
-     credential it already holds, which is [app_sup] itself, and owes [Rd]
+     credential it already holds, which is [app_sup] itself (the left arm
+     of [AppInv.app_rdcred]), and owes [Rd]
      at every position, which at the generic family's [fun _ _ => True] is
      free.
 
@@ -334,9 +335,10 @@ Section FsAbsInvFire.
     - iFrame "HP". by iApply pipe_rpay_taint.
     - case_decide; [| iExact "HP"].
       iSplitL "HP".
-      + iApply (ConsoleInv.cons_acc_cred fsc_cons app_sup
+      + iApply (ConsoleInv.cons_acc_cred fsc_cons app_rdcred
                   (fun (_ _ : nat) => (P ∗ True)%I)).
-        * rewrite /ConsoleInv.cons_dirty_cred. iModIntro. iExact "Hsup".
+        * rewrite /ConsoleInv.cons_dirty_cred. iModIntro.
+          by iApply app_rdcred_of_sup.
         * iIntros (cur dc). iModIntro. by iFrame "HP".
       + iApply (WpUart.cons_read_pay_triv with "Hilic").
   Qed.
