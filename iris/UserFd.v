@@ -824,57 +824,6 @@ Section UserFd.
      descriptor is DETERMINED and the ledger's slot is updated in place; if
      it knows all three are open, the descriptor is somewhere above them and
      a fresh handle is minted for it.  Nothing else can happen. *)
-  Lemma ufd_alloc_least (γf : gname) (fdv l : list fdstate) (fd : nat)
-      (st : fdstate) :
-    fd_least_closed fdv fd -> st <> FdClosed ->
-    ufd_auth γf fdv -∗ ustd γf l ==∗
-    ufd_auth γf (<[fd := st]> fdv) ∗ ualloc γf l fd st.
-  Proof using .
-    intros Hle Hne. iIntros "Ha Hl".
-    iDestruct (ufd_auth_len with "Ha") as %Hlen.
-    iDestruct (ustd_len with "Hl") as %Hll.
-    iDestruct (ustd_agree with "Ha Hl") as %Hst.
-    pose proof (fd_least_closed_free _ _ Hle) as Hfree.
-    pose proof (lookup_lt_Some _ _ _ Hfree) as Hlt.
-    (* THE VIEW MOVES WITH THE LEDGER: re-set to the new table *)
-    iDestruct "Ha" as (v) "(Ha & _ & _ & Hta)".
-    iDestruct "Hl" as "[Hl [%v' Htl]]".
-    iMod (ufd_retab γf _ v v' (<[fd := st]> fdv) with "Ha Hta Htl")
-      as "(Ha & Hta & Htl)".
-    iAssert (ustd γf l) with "[Hl Htl]" as "Hl";
-      [ iFrame "Hl"; by iExists _ | ].
-    rewrite /ualloc /ualloc_at /ustd_after.
-    destruct (fd_lowest_closed l) as [k |] eqn:Hk.
-    - (* THE DESCRIPTOR IS THE LEDGER'S OWN ANSWER. *)
-      assert (Hfd : fd = k)
-        by (apply (fd_least_closed_prefix fdv NSTD fd k Hle); by rewrite Hst).
-      subst fd.
-      assert (Hkl : l !! k = Some FdClosed)
-        by (exact (fd_lowest_closed_is_closed l k Hk)).
-      assert (Hklt : (k < NSTD)%nat)
-        by (rewrite <- Hll; exact (fd_lowest_closed_bound l k Hk)).
-      iDestruct (ustd_acc γf l k FdClosed Hkl with "Hl") as "[Hs Hback]".
-      iMod (ghost_map_update (UCSlot st) with "Ha Hs") as "[Ha Hs]".
-      iEval (rewrite ufd_gm_insert -(ufd_map_insert fdv k st Hlt ltac:(by left))) in "Ha".
-      iModIntro. iSplitL "Ha Hta".
-      + iExists _. iFrame "Ha Hta". iPureIntro.
-        split; [ by rewrite length_insert | apply tab_le_refl ].
-      + iSplitL; [ iApply ("Hback" with "Hs") | by iPureIntro ].
-    - (* IT IS ABOVE THE STANDARD STREAMS, so the ledger does not move and a
-         fresh handle is minted. *)
-      assert (Hge : (NSTD <= fd)%nat)
-        by (apply (fd_least_closed_prefix_none fdv NSTD fd Hle); by rewrite Hst).
-      assert (Hnone : ufd_gm (ufd_map fdv) (<[fd := st]> fdv) !! Some fd = None)
-        by (rewrite ufd_gm_some (ufd_map_lookup_None fdv fd Hge Hfree); reflexivity).
-      iMod (ghost_map_insert (Some fd) (UCSlot st) Hnone with "Ha") as "[Ha Hs]".
-      iEval (rewrite ufd_gm_insert -(ufd_map_insert fdv fd st Hlt ltac:(by right))) in "Ha".
-      iModIntro. iSplitL "Ha Hta".
-      + iExists _. iFrame "Ha Hta". iPureIntro.
-        split; [ by rewrite length_insert | apply tab_le_refl ].
-      + iFrame "Hl". iSplitR; [ by iPureIntro |].
-        iFrame "Hs". iPureIntro. exact (conj Hne Hge).
-  Qed.
-
   (* ...AT A NAMED VIEW (seccomp S4): the allocation reads the caller's
      view against the table ([tab_le]) and re-sets it to the new table,
      and says so -- what a program that must know its whole table (sh,
@@ -932,6 +881,21 @@ Section UserFd.
       + iFrame "Hl". iSplitR; [ by iPureIntro |].
         iFrame "Hs". iPureIntro. exact (conj Hne Hge).
   Qed.
+
+
+  Lemma ufd_alloc_least (γf : gname) (fdv l : list fdstate) (fd : nat)
+      (st : fdstate) :
+    fd_least_closed fdv fd -> st <> FdClosed ->
+    ufd_auth γf fdv -∗ ustd γf l ==∗
+    ufd_auth γf (<[fd := st]> fdv) ∗ ualloc γf l fd st.
+  Proof using .
+    intros Hle Hne. iIntros "Ha Hl".
+    iDestruct (ustd_ustd_at with "Hl") as (v) "Hl".
+    iMod (ufd_alloc_least_at γf fdv l v fd st Hle Hne with "Ha Hl")
+      as "(_ & $ & Hl & Hat)".
+    iModIntro. rewrite /ualloc. iFrame "Hat". iApply (ustd_at_ustd with "Hl").
+  Qed.
+
 
   (* ---- CLOSE, IN ITS TWO FOOTPRINTS. ----
      A TAIL descriptor's handle is simply SPENT: the slot leaves the map, so
