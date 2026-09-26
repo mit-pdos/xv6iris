@@ -750,6 +750,94 @@ Section UkShPipeForkTwin.
     exact Hfd0.
   Qed.
 
+  (* ...AT ANY LINE WHOSE FIRST BYTE IS NOT 'c' (seccomp S4: a [seccomp x]
+     line begins with 's'): all the walk reads of the byte *)
+  Lemma wp_kshm_body_pipe_nc
+      (Lp : list (list (bv 8)) -> (nat -> bv 8) -> nat -> nat -> Prop)
+      (Dc : nat)
+      (h : CpuId) (m : regfile) (f : nat -> bv 8) (k len : nat)
+      (ws : list (list (bv 8)))
+      (sz : Z) (l : list fdstate) (n : nat) :
+    (Dc <= 68 + UkSh.ush_Dpipe)%nat ->
+    (forall (ws' : list (list (bv 8))) (g : nat -> bv 8) (k' len' : nat),
+       Lp ws' g k' len' -> bv_unsigned (g k') <> 99%Z) ->
+    UkSh.ush_regs m ->
+    m !!! Regidx s1_idx = mword_of_int (sh_buf + Z.of_nat k) ->
+    m !!! Regidx a5_idx = mword_of_int (bv_unsigned (f k)) ->
+    (* the line at [k] *)
+    (forall j : nat, (j < len)%nat -> f (k + j)%nat <> ubyte0) ->
+    f (k + len)%nat = ubyte0 ->
+    (k + len < sh_nbuf)%nat ->
+    (* ...and it is a line the discipline admits (step 4) *)
+    Lp ws (fun j : nat => f (k + j)%nat) 0%nat len ->
+    (* the break, as [exec] leaves it *)
+    8344 <= sz ->
+    UserPtTree.pgroundup sz = sz ->
+    usz_ok (sz + 65536) ->
+    (* the lease's two laws the fork arm spends (lane IO-LEAF, step 3):
+       premises of the obligation, see [UkSh.ush_rest_l] *)
+    (forall n' : nat,
+       ⊢ UkSh.ush_at N γp n' -∗
+         ∃ I : list (bv 8), ⌜length I = n'⌝ ∗ UkSh.ush_lease N γp T Pm I) ->
+    (forall I : list (bv 8),
+       ⊢ Pm I -∗ Wb I -∗ UkSh.ush_at N γp (length I)) ->
+    (forall I : list (bv 8), ⊢ Wc I 3%nat -∗ Wc I 0%nat) ->
+    (* the taint's continuation, in place of the free write law and the
+       exec supply (lane R3) -- see [wp_kshf_fork] *)
+    UkSh.ush_gen_slot N T -∗
+    ushl_head l sz -∗
+    shk_code γt -∗
+    shk_rodata γt -∗ shp_code γt -∗ ush_jtab γt -∗
+    ushf_kill_law -∗
+    ushf_child_law_at Lp Dc -∗
+    UkShDiag.ush_panic_law Wc Wb -∗
+    ⌜ UkSh.ush_fd0p l ⌝ -∗
+    ush_bstate l ws -∗
+    ushl_dat -∗ usz γs sz -∗
+    ubytes γd sh_buf sh_nbuf f -∗
+    urun N h m (mword_of_int 0x97a) (16 + (UkSh.ush_Dbody + n)) -∗
+    mWP (Loop : expr riscv_lang).
+  Proof using HT Hpay Hpsok_free.
+    intros HDc Hlp0 Hregs Hs1 Ha5 Hnn Hnul Hkl Hline Hszlo Hszal Hszok
+           Hpm1 Hpmwb Hwbl.
+    iIntros "#Hgen Hhead #Hcode #Hro #Hpcode #Hjt #Hkl #Hchl #Hplaw %Hfd0
+             Hstd Hdat Hsz Hbuf Hrun".
+    assert (Hbr : forall j : nat, 0 <= bv_unsigned (f j) < Z64).
+    { intros j. pose proof (bv_unsigned_in_range 8 (f j)) as H0.
+      assert (Em8 : bv_modulus 8 = 256) by (vm_compute; reflexivity).
+      rewrite Em8 in H0. unfold Z64. lia. }
+    (* THE FIRST BYTE IS 'e', so the line is not a [cd] command -- at any
+       admissible line, because the command it runs IS /echo
+       ([EchoDisc.line_ok_head_byte0]) *)
+    assert (Hnck : bv_unsigned (f k) <> 99).
+    { pose proof (Hlp0 ws (fun j : nat => f (k + j)%nat) 0%nat len Hline)
+        as H0. cbn beta in H0. rewrite Nat.add_0_r in H0. exact H0. }
+    pose proof Hregs as Hregs'.
+    destruct Hregs' as (Hs2 & Hs3 & Hs4 & Hs5 & Hs6).
+    (* ---- 0x97a  bne a5,s5 -- TAKEN ---- *)
+    assert (Htk7a : true = uv_btaken BNE (m !!! Regidx a5_idx)
+                             (m !!! Regidx s5_idx)).
+    { cbn [uv_btaken]. rewrite Ha5 Hs5.
+      rewrite (moi_neq_vec (bv_unsigned (f k)) 99 (Hbr k)
+                 ltac:(unfold Z64; lia)).
+      symmetry. apply negb_true_iff. apply Z.eqb_neq. exact Hnck. }
+    iApply (wp_uk_btype N h m (mword_of_int 0x97a)
+              (mword_of_int 8114 : mword 13) s5_idx a5_idx BNE true
+              (mword_of_int 0x92c) (16 + (UkSh.ush_Dbody + n))
+              Htk7a
+              ltac:(apply bv_eq; vm_compute; reflexivity)
+              ltac:(intros _; vm_compute; reflexivity)
+              with "[] Hrun").
+    { iApply (uis_shk_97a with "Hcode"). }
+    iIntros (h1) "Hrun".
+    iApply (wp_kshf_fork_pipe Lp Dc h1 m f k len ws sz l n
+              HDc Hregs Hs1 Hnn Hnul Hkl Hline
+              Hszlo Hszal Hszok Hpm1 Hpmwb Hwbl
+              with "Hgen Hhead Hcode Hro Hjt Hkl Hchl Hplaw [%] Hstd Hdat
+                    Hsz Hbuf Hrun").
+    exact Hfd0.
+  Qed.
+
   Lemma ushf_body_law_echo_pipe (sz : Z) :
     8344 <= sz ->
     UserPtTree.pgroundup sz = sz ->
