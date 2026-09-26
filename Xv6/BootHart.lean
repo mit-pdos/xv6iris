@@ -31,14 +31,12 @@ DEVIATIONS from Rocq (none process-layer):
    `mBoot` is `BootConfig.mBoot_of_cells`; the clock cells are
    `MachCSL.clockCells` (existential values); there is no reservation mirror
    to thread (the Lean reservation fragment rides `ctxTok`).
-3. **Rocq §3 (`boot_hart_res`, the per-hart bundle) is NOT stated** -- BLOCKED
-   on `SpecMain` (W8-I) and on the reset table: its S-mode half is
-   `Xv6.bootBridge`'s premise list, whose `hartCsrs` row needs
-   `mstateen0 = 0`/`sstateen0 = 0`, and `MachCSL.resetVal` pins neither
-   (Rocq's `reset_regs` pins both: `mstateen0` from the model's
-   `reset_stateen`, `sstateen0` as a board write).  The remainder
-   `regCellsEx … bootEntryTaken` holds both cells at the reset file's
-   UNCONSTRAINED values.
+3. **Rocq §3 (`boot_hart_res`, the per-hart bundle) is not stated HERE**
+   (it is the shared allocation's, wave 8-5).  It is no longer blocked on
+   the reset table: `MachCSL.resetVal` now pins `mstateen0 = 0` and
+   `sstateen0 = 0` (as Rocq's `reset_regs` does), so the remainder
+   `regCellsEx … bootEntryTaken` yields both cells at `0`, exactly the
+   `hartCsrs` row `Xv6.bootBridge` takes.
 4. `wp_boot_body`'s eight GPRs come out at the reset file's values `f .xN`
    (the contract quantifies them); Rocq's `boot_regfile` builds the whole GPR
    file at once because `wp_entry_boot` takes a `gpr_file`.

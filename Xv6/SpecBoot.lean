@@ -25,7 +25,8 @@ abbrev bootSp (s0 hartid : BitVec 64) : BitVec 64 := s0 + 4096#64 * (hartid + 1#
 
 Hart `cpu` at `_entry` in machine mode with the reset configuration, its hart
 id in `mhartid`, the kernel text, the GOT slot holding `stack0`'s address
-`s0`, the registers the path touches at arbitrary values, and the two stack
+`s0` at any fraction `dqg` (Rocq's `↦ₚ₈{dq}`; the top level passes each hart a
+`DFrac.discard` copy, since eight harts share the one slot), the registers the path touches at arbitrary values, and the two stack
 frames below the hart's boot stack pointer `sp₀ = bootSp s0 hartid`
 (16-aligned, in RAM), is safe to run provided the continuation is safe in
 supervisor mode at `main`, for every time `t` the clock read, with
@@ -39,14 +40,14 @@ supervisor mode at `main`, for every time `t` the clock read, with
 `timerinit`'s frame below it, the hart id and GOT slot unchanged, and the
 clock cells at some value. -/
 def wp_boot_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CurCtx]
-    (cpu : CPU) (hartid s0 v1 v2 v4 v8 v10 v11 v14 v15 f0 f8 g0 g8 : BitVec 64) :
+    (cpu : CPU) (dqg : DFrac) (hartid s0 v1 v2 v4 v8 v10 v11 v14 v15 f0 f8 g0 g8 : BitVec 64) :
     Prop :=
   mBoot cpu (DFrac.own 1) ∗
   Register.mhartid ↦ᵣ[cpu] hartid ∗
   clockCells cpu ∗
   ctxTok cpu curCtx ∗
   kernelText ∗
-  pwordPointsTo stack0Slot 8 (DFrac.own 1) s0 ∗
+  pwordPointsTo stack0Slot 8 dqg s0 ∗
   pcIs cpu (KA.«_entry») ∗
   Register.x1 ↦ᵣ[cpu] v1 ∗ Register.x2 ↦ᵣ[cpu] v2 ∗ Register.x4 ↦ᵣ[cpu] v4 ∗
   Register.x8 ↦ᵣ[cpu] v8 ∗ Register.x10 ↦ᵣ[cpu] v10 ∗ Register.x11 ↦ᵣ[cpu] v11 ∗
@@ -60,7 +61,7 @@ def wp_boot_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CurCtx]
    Register.mhartid ↦ᵣ[cpu] hartid -∗
    clockCells cpu -∗
    ctxTok cpu curCtx -∗
-   pwordPointsTo stack0Slot 8 (DFrac.own 1) s0 -∗
+   pwordPointsTo stack0Slot 8 dqg s0 -∗
    pcIs cpu mainAddr -∗
    Register.x1 ↦ᵣ[cpu] (startAddr + 0x6a#64) -∗
    Register.x2 ↦ᵣ[cpu] (bootSp s0 hartid - 16#64) -∗
@@ -80,8 +81,7 @@ def wp_boot_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CurCtx]
 /-- The interface of the boot path. -/
 structure BOOT : Prop where
   wp_boot : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CurCtx]
-    (cpu : CPU) (hartid s0 v1 v2 v4 v8 v10 v11 v14 v15 f0 f8 g0 g8 : BitVec 64),
-    wp_boot_body (hlc := hlc) (GF := GF) cpu hartid s0 v1 v2 v4 v8 v10 v11 v14 v15 f0 f8 g0 g8
-     
+    (cpu : CPU) (dqg : DFrac) (hartid s0 v1 v2 v4 v8 v10 v11 v14 v15 f0 f8 g0 g8 : BitVec 64),
+    wp_boot_body (hlc := hlc) (GF := GF) cpu dqg hartid s0 v1 v2 v4 v8 v10 v11 v14 v15 f0 f8 g0 g8
 
 end Xv6

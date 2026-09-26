@@ -43,10 +43,10 @@ DEVIATIONS from Rocq:
 3. The trap CSRs (`sepc`/`scause`/`stval`) and `tlb` are not threaded
    (Rocq's `main_hart_raw`): Lean's `kctx` does not hold them at
    `sie = false`, so they stay with the caller, beside the bridge.
-4. `mstateen0 ↦ 0`/`sstateen0 ↦ 0` are premises exactly as in Rocq, but in
-   Lean nothing can yet DISCHARGE them from the reset machine:
-   `MachCSL.resetVal` does not pin either register (Rocq `reset_regs` pins
-   both).  Recorded in `Xv6.BootHart` (deviation 3).
+4. `mstateen0 ↦ 0`/`sstateen0 ↦ 0` are premises exactly as in Rocq, and
+   the reset machine discharges them: `MachCSL.resetVal` pins both (Rocq
+   `reset_regs` likewise), so the per-hart bundle (`boot_hart_res`) can
+   supply them.
 
 Imports only definitional files.
 -/

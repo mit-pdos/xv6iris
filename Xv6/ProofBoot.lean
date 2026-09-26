@@ -11,13 +11,13 @@ open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std MachCSL
 open LeanRV64D
 
 theorem BootProof (E : ENTRY) (S : START) : BOOT where
-  wp_boot cpu hartid s0 v1 v2 v4 v8 v10 v11 v14 v15 f0 f8 g0 g8 := by
+  wp_boot cpu dqg hartid s0 v1 v2 v4 v8 v10 v11 v14 v15 f0 f8 g0 g8 := by
     rename_i hlc GF inst instC
     unfold wp_boot_body
     iintro ⟨HmConf, Hmhartid, Hclock, Htok, #Htext, Hslot, Hpc, Hx1, Hx2, Hx4, Hx8, Hx10, Hx11, Hx14,
       Hx15, Hf0, Hf8, Hg0, Hg8, HΦ⟩
     -- `_entry`, up to its `jal start`
-    have hE := E.wp_entry (hlc := hlc) (GF := GF) cpu (DFrac.own 1) hartid s0 v1 v2 v10 v11
+    have hE := E.wp_entry (hlc := hlc) (GF := GF) cpu (DFrac.own 1) dqg hartid s0 v1 v2 v10 v11
     unfold wp_entry_body at hE
     iapply hE
     iframe

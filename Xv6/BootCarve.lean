@@ -594,7 +594,8 @@ theorem bootCarve_owned (m : MemF Hist) :
   iframe Hd Hb Hf
 
 /-- **The GOT word** `_entry` loads `&stack0` from (BootHart deviation 1),
-out of `.data`/`.got`, as the M-mode physical cell `wp_boot_body` takes. -/
+out of `.data`/`.got`, as the M-mode physical cell `wp_boot_body` takes (at any
+fraction: the shared allocation discards it and gives each hart a copy). -/
 theorem bootCarve_got [CurCtx] (image : Mem) (himg : BootImage image) :
     bootRan (GF := GF) (imgFlat image) MachCSL.KernelSyms.«_data» MachCSL.KernelSyms.«_bss» ⊢
       pwordPointsTo stack0Slot 8 (DFrac.own 1) KA.«stack0» := by

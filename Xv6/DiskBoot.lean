@@ -41,12 +41,10 @@ DEVIATIONS from Rocq:
    returns the BODY and `WpUart.dev_inv_alloc` seals it beside `disk_inv`;
    this mint already seals the disk invariant, so it seals the channel
    beside it.
-3. The reset facts are PREMISES (as in Rocq's `disk_ghosts_alloc`).  Their
-   discharge at the boot is BLOCKED on MachCSL: `wp_power`'s `Hboot` (hence
-   `MachCSL.riscvPowerAdequacy`'s) receives only `bootFacts σ image`, which
-   says nothing about `σ.devs`; the device reset is in `bootShape`'s LAST
-   clause (`g'.m.devs = g.m.devs.reset`), which the power arm does not pass
-   on.  Rocq's boot receives it (`Hv0 : v = virtio_reset …`).
+3. The reset facts are PREMISES (as in Rocq's `disk_ghosts_alloc`), and
+   the boot can discharge them: `MachCSL.riscvPowerAdequacy`'s `Hboot` now
+   receives `∃ ds0, σ.devs = ds0.reset` (`MachCSL.DevStates.reset`), as
+   Rocq's boot receives `Hv0 : v = virtio_reset …`.
 4. The eight per-descriptor receipts come out as BOTH halves
    (`headAuth`/`headTok`), because `Xv6.diskInitGhosts` asks for both.
 
