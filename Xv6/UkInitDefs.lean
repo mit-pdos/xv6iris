@@ -22,14 +22,11 @@ for the `UlibRunP.ofUkRun` bridge.
    `init_rodata γt` (`utext_img γt init_ro`) is the SAME resource here: U0-7's
    image `Init.code` is the whole R-X segment, `.rodata` included, so every
    `init_rodata γt` premise is `initCode γt` (and dropped where both appear).
-2. **PRE-K3 LEDGER** (`UkFork` deviation 4): Rocq's seccomp-S4 view
-   (`UserFd.ustd_ok T γ l = ∃ v, (⌜ush_view_ok v⌝ ∨ T) ∗ ustd_at γ l v`,
-   `ustd_at γ l v`) is K3's; here `ustd_ok T γ l` and `ustd_at γ l v` are
-   both `ustd γ l`.  The `UInitFd` heads (`ufd_headL`, `ufd_head1`,
-   `ufd_head`, `ufd_row` and their lemmas, U1-T's post-K3 remainder) are
-   stated at that form under the prefix `kinit` (`kinitHeadL` …) so they do
-   not clash with the eventual `UInitFd` port; K3 re-states them at the view.
-   `kinit_banner_pay`'s `∀ v` and `kinit_wcl`'s `∀ v` drop with it.
+2. (Retired, P-init follow-up after K3.)  The ledger is Rocq's seccomp-S4
+   view verbatim: `ustd_ok T γ l` is `UserFd.ustdOk`, `ustd_at γ l v`
+   `UserFd.ustdAt`, and /init's head is `UInitFdHead`'s (`ufdHeadL`,
+   `ufdHead1`, `ufdHead`, `ufdRow`); `kinit_banner_pay` and `kinit_wcl` keep
+   their `∀ v`.  The pre-K3 copies (`kinitHeadL` …) are gone.
 3. `init_argv` (Rocq `UInitArgv`, the persisted sixteen `.data` bytes at
    0x1000) is `ubytesq γd DFrac.discard 0x1000 16 initArgvByte` over U0-7's
    `Init.data` rows (Rocq: a big-op over the filtered data map).
@@ -47,7 +44,7 @@ import Xv6.UkSysP
 import Xv6.UkStub
 import Xv6.UkRunExecRef
 import Xv6.UserConsole
-import Xv6.UInitFd
+import Xv6.UInitFdHead
 import Xv6.UkInitLit
 import Xv6.User.InitText
 import Xv6.FsGeom
@@ -120,76 +117,6 @@ instance forkable_initImg :
 
 end Code
 
-/-! ## §1 THE HEADS (Rocq `UInitFd`, pre-K3: deviation 2) -/
-
-section Heads
-variable {GF : BundledGFunctors} [GhostMapG GF (Option Nat) UfdCell UfdMapF]
-
-/-- **Rocq `ufd_headL`**: the ledger is at `l`, or still the all-closed
-one, or the taint. -/
-def kinitHeadL (T : IProp GF) (γfd : GName) (l : List FdState) : IProp GF :=
-  iprop(ustd γfd l ∨ ustd γfd ufdL0 ∨ (ustdAny γfd ∗ T))
-
-/-- **Rocq `ufd_head1`**: the head before the two dups. -/
-abbrev kinitHead1 (T : IProp GF) (st : FdState) (γfd : GName) : IProp GF := kinitHeadL T γfd (ufdL1 st)
-
-/-- **Rocq `ufd_head`**: the head after them. -/
-abbrev kinitHead (T : IProp GF) (st : FdState) (γfd : GName) : IProp GF := kinitHeadL T γfd (ufdL3 st)
-
-/-- **Rocq `ufd_row`**: the row a ledger the head opened to is at. -/
-def kinitRow (T : IProp GF) (st : FdState) (l : List FdState) : IProp GF :=
-  iprop(⌜l = ufdL3 st⌝ ∨ ⌜l = ufdL0⌝ ∨ T)
-
-instance kinitRow_persistent (T : IProp GF) [Persistent T] (st : FdState) (l : List FdState) :
-    Persistent (kinitRow T st l) := by
-  unfold kinitRow; infer_instance
-
-/-- Rocq `ufd_headL_taint`. -/
-theorem kinitHeadL_taint (T : IProp GF) (γfd : GName) (l l' : List FdState) :
-    ⊢ T -∗ ustd γfd l' -∗ kinitHeadL T γfd l := by
-  iintro HT Hl
-  unfold kinitHeadL
-  iright; iright
-  iframe HT
-  unfold ustdAny
-  iexists l'
-  iexact Hl
-
-/-- **Rocq `ufd_head_open_row`**: the head opened to its ledger, the row,
-and the way back at any name. -/
-theorem kinitHead_open_row (T : IProp GF) [Persistent T] (st : FdState) (γfd : GName) :
-    ⊢ kinitHead T st γfd -∗ ∃ l : List FdState, ustd γfd l ∗ kinitRow T st l ∗
-      □ (∀ γ : GName, ustd γ l -∗ kinitHead T st γ) := by
-  unfold kinitHead kinitHeadL kinitRow ustdAny
-  iintro (H | H | ⟨Hl, #HT⟩)
-  · iexists (ufdL3 st)
-    iframe H
-    isplitr
-    · ileft; ipureintro; rfl
-    · imodintro; iintro %γ H; ileft; iexact H
-  · iexists ufdL0
-    iframe H
-    isplitr
-    · iright; ileft; ipureintro; rfl
-    · imodintro; iintro %γ H; iright; ileft; iexact H
-  · icases Hl with ⟨%l, Hl⟩
-    iexists l
-    iframe Hl
-    isplitr
-    · iright; iright; iexact HT
-    · imodintro; iintro %γ H; iright; iright; iframe HT; iexists l; iexact H
-
-/-- **Rocq `ufd_head_of_row`**. -/
-theorem kinitHead_of_row (T : IProp GF) [Persistent T] (st : FdState) (γfd : GName) (l : List FdState) :
-    ⊢ kinitRow T st l -∗ ustd γfd l -∗ kinitHead T st γfd := by
-  unfold kinitRow kinitHead kinitHeadL ustdAny
-  iintro (%hl | %hl | #HT) H
-  · subst hl; ileft; iexact H
-  · subst hl; iright; ileft; iexact H
-  · iright; iright; iframe HT; iexists l; iexact H
-
-end Heads
-
 /-! ## §2 THE CONSOLE PROLOGUE'S LEAVES (Rocq `UkInit`, lane OPEN-PIN) -/
 
 section Dance
@@ -209,9 +136,10 @@ def ukiOpenConsoleLeaf (N : UkNames GF) (T : IProp GF) (stc : FdState) : IProp G
   iprop(∀ (h : CPU) (m : RegMap) (avail : Nat),
     initCode N.t -∗ ⌜kinitOpenArgs m⌝ -∗
     urun (hlc := hlc) N h m (BitVec.ofNat 64 User.Init.Sym.«open») avail -∗ ucwd N.cwd ROOTINO -∗
-    ustd N.fd ufdL0 -∗
+    ustdOk T N.fd ufdL0 -∗
     (∀ (h' : CPU) (ret : BitVec 64),
-      ((⌜ret = 0#64⌝ ∗ ustd N.fd (ufdL1 stc)) ∨ (⌜ret = -1#64⌝ ∗ ustd N.fd ufdL0) ∨ (ustdAny N.fd ∗ T)) -∗
+      ((⌜ret = 0#64⌝ ∗ ustdOk T N.fd (ufdL1 stc)) ∨ (⌜ret = -1#64⌝ ∗ ustdOk T N.fd ufdL0) ∨
+        (ustdAny N.fd ∗ T)) -∗
       ucwd N.cwd ROOTINO -∗
       urun (hlc := hlc) N h' (stubRet m 15 ret) (retPc (m.get 1#5)) avail -∗ wpLoop h') -∗
     wpLoop h)
@@ -221,9 +149,9 @@ def ukiOpenAbsentLeaf (N : UkNames GF) (T K : IProp GF) : IProp GF :=
   iprop(∀ (h : CPU) (m : RegMap) (l : List FdState) (avail : Nat),
     initCode N.t -∗ ⌜kinitOpenArgs m⌝ -∗
     urun (hlc := hlc) N h m (BitVec.ofNat 64 User.Init.Sym.«open») avail -∗ ucwd N.cwd ROOTINO -∗
-    ustd N.fd l -∗ K -∗
+    ustdOk T N.fd l -∗ K -∗
     (∀ (h' : CPU) (ret : BitVec 64),
-      ((⌜ret = -1#64⌝ ∗ ustd N.fd l ∗ K) ∨ (ustdAny N.fd ∗ T)) -∗
+      ((⌜ret = -1#64⌝ ∗ ustdOk T N.fd l ∗ K) ∨ (ustdAny N.fd ∗ T)) -∗
       ucwd N.cwd ROOTINO -∗
       urun (hlc := hlc) N h' (stubRet m 15 ret) (retPc (m.get 1#5)) avail -∗ wpLoop h') -∗
     wpLoop h)
@@ -252,7 +180,7 @@ instance initConsLeaves_persistent (N : UkNames GF) (T K Cns : IProp GF) (stc : 
 
 /-- **Rocq `uki_open2_in`**: what the repair arm's second open is called at. -/
 def ukiOpen2In (N : UkNames GF) (T : IProp GF) : IProp GF :=
-  iprop(ustd N.fd ufdL0 ∨ (ustdAny N.fd ∗ T))
+  iprop(ustdOk T N.fd ufdL0 ∨ (ustdAny N.fd ∗ T))
 
 /-- **Rocq `uki_open2`**: the repair arm's second open, whichever leaf
 answers it: it lands /init's head. -/
@@ -261,7 +189,7 @@ def ukiOpen2 (N : UkNames GF) (T : IProp GF) (stc : FdState) : IProp GF :=
     initCode N.t -∗ ⌜kinitOpenArgs m⌝ -∗
     urun (hlc := hlc) N h m (BitVec.ofNat 64 User.Init.Sym.«open») avail -∗ ucwd N.cwd ROOTINO -∗
     ukiOpen2In N T -∗
-    (∀ (h' : CPU) (ret : BitVec 64), kinitHead1 T stc N.fd -∗ ucwd N.cwd ROOTINO -∗
+    (∀ (h' : CPU) (ret : BitVec 64), ufdHead1 T stc N.fd -∗ ucwd N.cwd ROOTINO -∗
       urun (hlc := hlc) N h' (stubRet m 15 ret) (retPc (m.get 1#5)) avail -∗ wpLoop h') -∗
     wpLoop h)
 
@@ -312,8 +240,8 @@ theorem initConsDance_hit (N : UkNames GF) (T Cns : IProp GF) (stc : FdState) :
 
 /-- **Rocq `uki_open1_out`**: the first open's three arms. -/
 def ukiOpen1Out (N : UkNames GF) (T Cns : IProp GF) (stc : FdState) (ret : BitVec 64) : IProp GF :=
-  iprop((⌜ret = 0#64⌝ ∗ ustd N.fd (ufdL1 stc) ∗ Cns) ∨
-    (⌜ret = -1#64⌝ ∗ ustd N.fd ufdL0 ∗ ukiMknodHitLeaf (hlc := hlc) N T Cns stc) ∨
+  iprop((⌜ret = 0#64⌝ ∗ ustdOk T N.fd (ufdL1 stc) ∗ Cns) ∨
+    (⌜ret = -1#64⌝ ∗ ustdOk T N.fd ufdL0 ∗ ukiMknodHitLeaf (hlc := hlc) N T Cns stc) ∨
     (ustdAny N.fd ∗ T ∗ ukiMknodHitLeaf (hlc := hlc) N T Cns stc))
 
 /-- **Rocq `uki_open1`**: the first open at either arm of the dance. -/
@@ -321,7 +249,7 @@ def ukiOpen1 (N : UkNames GF) (T Cns : IProp GF) (stc : FdState) : IProp GF :=
   iprop(∀ (h : CPU) (m : RegMap) (avail : Nat),
     initCode N.t -∗ ⌜kinitOpenArgs m⌝ -∗
     urun (hlc := hlc) N h m (BitVec.ofNat 64 User.Init.Sym.«open») avail -∗ ucwd N.cwd ROOTINO -∗
-    ustd N.fd ufdL0 -∗
+    ustdOk T N.fd ufdL0 -∗
     (∀ (h' : CPU) (ret : BitVec 64), ukiOpen1Out (hlc := hlc) N T Cns stc ret -∗ ucwd N.cwd ROOTINO -∗
       urun (hlc := hlc) N h' (stubRet m 15 ret) (retPc (m.get 1#5)) avail -∗ wpLoop h') -∗
     wpLoop h)
@@ -352,14 +280,14 @@ theorem kinitW1_frame (N : UkNames GF) (fdv : BitVec 64) (b : BitVec 8) (Ci Co R
   iapply Hcont $$ %h' %ret Hb [HCo HR] Hrun
   iframe HCo HR
 
-/-- **Rocq `kinit_banner_pay`** (deviation 2): a wand from init's ledger at
-the console row to a per-byte family, its start token, and the ledger back
-with `Rt`. -/
+/-- **Rocq `kinit_banner_pay`**: a wand from init's ledger at the console
+row, AT ANY NAMED TABLE VIEW (a print moves no descriptor), to a per-byte
+family, its start token, and the ledger back at that view with `Rt`. -/
 def kinitBannerPay (N : UkNames GF) (stc : FdState) (len : Nat) (f : Nat → BitVec 8) (Rt : IProp GF) :
     IProp GF :=
-  iprop(ustd N.fd (ufdL3 stc) -∗ ∃ Ch : Nat → IProp GF,
+  iprop(∀ v : List FdState, ustdAt N.fd (ufdL3 stc) v -∗ ∃ Ch : Nat → IProp GF,
     □ (∀ j : Nat, ⌜j < len⌝ -∗ kinitW1 (hlc := hlc) N 1#64 (f j) (Ch j) (Ch (j + 1))) ∗
-    Ch 0 ∗ (Ch len -∗ ustd N.fd (ufdL3 stc) ∗ Rt))
+    Ch 0 ∗ (Ch len -∗ ustdAt N.fd (ufdL3 stc) v ∗ Rt))
 
 end Dance
 
@@ -418,7 +346,7 @@ def initExecSupPos (cn : ConsNames) (T : IProp GF) (st : FdState) (Cr : ConsCred
   iprop(∀ (N' : UkNames GF) (m : RegMap) (pc : BitVec 64) (l : List FdState),
     ⌜N'.pay = uconsPay (hlc := hlc) cn γ T (initRd Cr.ccRd (ccWbn Cr))⌝ -∗
     ⌜m.get 10#5 = 0x9b8#64⌝ -∗ ⌜m.get 11#5 = 0x1000#64⌝ -∗
-    initCode N'.t -∗ initArgv N'.d -∗ ustd N'.fd l -∗ kinitRow T st l -∗
+    initCode N'.t -∗ initArgv N'.d -∗ ustdOk T N'.fd l -∗ ufdRow T st l -∗
     initLendCred T st Cr.ccWp (ccWbn Cr) l n -∗ upos (hlc := hlc) γ n -∗
     uconsPay (hlc := hlc) cn γ T Cr.ccRd (-1) -∗ uch N'.ch ∅ -∗
     (∃ p : Int, ⌜p ≠ 1⌝ ∗ upid N'.pid p) -∗
@@ -448,11 +376,11 @@ theorem initConsSup_taint (cn : ConsNames) (T Cns : IProp GF) (st : FdState) (Cr
   iapply H1
   iapply H2 $$ HT
 
-/-- **Rocq `kinit_wcl`**: the closed-fd write leaf, at every record
-(deviation 2: no view). -/
+/-- **Rocq `kinit_wcl`**: the closed-fd write leaf, at every record and
+every table view. -/
 def kinitWcl : IProp GF :=
-  iprop(□ ∀ (N0 : UkNames GF) (b : BitVec 8),
-    kinitW1 (hlc := hlc) N0 1#64 b (ustd N0.fd ufdL0) (ustd N0.fd ufdL0))
+  iprop(□ ∀ (N0 : UkNames GF) (b : BitVec 8) (v : List FdState),
+    kinitW1 (hlc := hlc) N0 1#64 b (ustdAt N0.fd ufdL0 v) (ustdAt N0.fd ufdL0 v))
 
 instance kinitWcl_persistent : Persistent (kinitWcl (hlc := hlc) (GF := GF)) := by
   unfold kinitWcl; infer_instance
@@ -504,7 +432,7 @@ instance kinitBanLaw_persistent (N : UkNames GF) (stc : FdState) (Wp Wb : Nat �
 /-- **Rocq `kinit_lent`**: what the banner leaves behind. -/
 def kinitLent (N : UkNames GF) (T : IProp GF) (stc : FdState) (cn : ConsNames) (Cr : ConsCred GF) :
     IProp GF :=
-  iprop(∃ l : List FdState, ustd N.fd l ∗ kinitRow T stc l ∗
+  iprop(∃ l : List FdState, ustdOk T N.fd l ∗ ufdRow T stc l ∗
     uinitTok (hlc := hlc) cn T (fun k => iprop(Cr.ccRd k ∗ initLendCred T stc Cr.ccWp (ccWbn Cr) l k)))
 
 end Round

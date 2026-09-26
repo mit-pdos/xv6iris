@@ -40,7 +40,7 @@ theorem wp_kinit_main_from_1e (UL : UK_LEAVES) (HS : UK_SYS_P) (HP : INIT_PRINTF
     (m : RegMap) (n : Nat) (hne : stc ≠ .closed) (hkt : ⊢ initKillLaw (hlc := hlc) T stc Cr.ccWp (ccWbn Cr)) :
     ⊢ initDeps (hlc := hlc) T -∗ kinitBanLaw (hlc := hlc) N stc Cr.ccWp (ccWbn Cr) -∗
       kinitDiagLaw (hlc := hlc) stc Cr.ccWp (ccWbn Cr) -∗ initCode N.t -∗
-      initExecSupLend (hlc := hlc) cn T stc Cr -∗ initArgv N.d -∗ usz N.s szv -∗ kinitHead1 T stc N.fd -∗
+      initExecSupLend (hlc := hlc) cn T stc Cr -∗ initArgv N.d -∗ usz N.s szv -∗ ufdHead1 T stc N.fd -∗
       ucwd N.cwd ROOTINO -∗ uchAny N.ch -∗ uinitTok (hlc := hlc) cn T (initRd Cr.ccRd (ccWbn Cr)) -∗
       urun (hlc := hlc) N h m (BitVec.ofNat 64 0x1e) (12 + (12 + (4 + n))) -∗ wpLoop h := by
   iintro #Hdeps #Hblaw #Hdlaw #Hc #Hxs #Hargv Hsz Hstd Hcwd Hch Htk Hrun
@@ -60,6 +60,7 @@ theorem wp_kinit_main_from_1e (UL : UK_LEAVES) (HS : UK_SYS_P) (HP : INIT_PRINTF
   iintro %h2 Hrun
   rw [show BitVec.ofNat 64 0x20 + BitVec.signExtend 64 0x3ca#21 = BitVec.ofNat 64 User.Init.Sym.«dup» from by decide]
   let m2 := ukWr (ukWr m 10#5 (BitVec.ofNat 64 0)) 1#5 (BitVec.ofNat 64 0x20 + instrLen false)
+  ihave Hstd := ufdHead1_to_l1 T stc N.fd $$ Hstd
   iapply wp_kinit_dup_headL UL HS hpsok N T stc (ufdL1 stc) 1 h2 m2 _ hne (ufdL1_row0 stc) (ufd_scan1 stc hne)
     (by ureg) $$ Hc Hrun Hstd
   iintro %h3 %r1 Hstd Hrun
@@ -88,6 +89,7 @@ theorem wp_kinit_main_from_1e (UL : UK_LEAVES) (HS : UK_SYS_P) (HP : INIT_PRINTF
     (by ureg) $$ Hc Hrun Hstd
   iintro %h6 %r2 Hstd Hrun
   rw [show (ufdL2 stc).set 2 stc = ufdL3 stc from rfl]
+  ihave Hstd := ufdHead_of_l3 T stc N.fd $$ Hstd
   have hra5 : retPc (m5.get 1#5) = BitVec.ofNat 64 0x2a := by
     have e : m5.get 1#5 = BitVec.ofNat 64 0x26 + instrLen false := by ureg
     rw [e]; decide

@@ -23,8 +23,11 @@ the engine `UL`.
    `UkFork` deviation 2), and the alignment premise is
    `(pc + 4#64) &&& 1#64 = 0#64` (Rocq `is_aligned_vaddr … 2`).  Registers
    are written with `ukWr` (Rocq `<[Regidx … := r]> m`).
-2. **The ledger is `ustd`** (pre-K3; `UkFork` deviation 4): Rocq's `_at`
-   leaves (`ustd_at l v`) are stated in their pre-seccomp-S4 `ustd l` form.
+2. **The ledger**: the rows the pre-K3 walks were written against keep
+   Rocq's plain `ustd l` form (`open`, `dup`, `dupUntracked`, `dupClosed`);
+   init's prologue (P-init follow-up) takes the dup rows AT A NAMED TABLE
+   VIEW, Rocq's `wp_uk_ecall_dup_at` / `wp_uk_ecall_dup_closed_at` verbatim
+   (`dupAt`, `dupClosedAt`: `ustdAt l v`, `uallocV`, `tabLe`).
 3. **`wp_uk_ecall_seccomp`** is stated at the 7b2c1b1b bump's key
    (`Uvis.secc`, `seccAll`, `UsysMemOk.USYS_seccomp = 23`): its post
    obligation is `seccObl` (`∀ W, ⌜W.secc = seccAll &&& a0⌝ -∗ ⌜tab_le W.fd
@@ -137,6 +140,42 @@ def wpUkEcallDupClosed : Prop :=
         urun (hlc := hlc) N h' (ukWr m 10#5 r) (pc + 4#64) avail -∗ wpLoop h') -∗
       wpLoop h
 
+/-- **Rocq `wp_uk_ecall_dup_at`**: the TRACKED dup AT A NAMED TABLE VIEW
+(seccomp S4): on success the ledger is at the NEW table as its view -- the
+old table under the caller's view, the copied row the source's. -/
+def wpUkEcallDupAt : Prop :=
+  ∀ (N : UkNames GF) (h : CPU) (m : RegMap) (pc : BitVec 64) (l v : List FdState) (fd0 : Nat) (st : FdState)
+    (avail : Nat),
+    usysno m = USYS_dup →
+    (BitVec.setWidth 32 (m.get 10#5)).toInt = (fd0 : Int) →
+    st ≠ .closed →
+    (pc + 4#64) &&& 1#64 = 0#64 →
+    ⊢ uinstrIs N.t pc false (.ECALL ()) -∗ urun (hlc := hlc) N h m pc avail -∗
+      udepw (hlc := hlc) N m pc USYS_dup -∗ ustdAt N.fd l v -∗ ufdOwn N.fd l fd0 st -∗
+      (∀ (h' : CPU) (r : BitVec 64),
+        ((∃ fd1 : Nat, ⌜r = BitVec.ofNat 64 fd1 ∧ fd1 < NOFILE⌝ ∗
+            (∃ fdv : List FdState, ⌜tabLe fdv v ∧ fdv[fd0]? = some st⌝ ∗
+              uallocV N.fd l fd1 st (fdv.set fd1 st)) ∗
+            ufdOwn N.fd (ustdAfter l st) fd0 st) ∨
+          (⌜r = -1#64 ∧ fdLowestClosed l = none⌝ ∗ ustdAt N.fd l v ∗ ufdOwn N.fd l fd0 st)) -∗
+        urun (hlc := hlc) N h' (ukWr m 10#5 r) (pc + 4#64) avail -∗ wpLoop h') -∗
+      wpLoop h
+
+/-- **Rocq `wp_uk_ecall_dup_closed_at`**: dup of a CLOSED standard stream,
+at a named table view: nothing moves. -/
+def wpUkEcallDupClosedAt : Prop :=
+  ∀ (N : UkNames GF) (h : CPU) (m : RegMap) (pc : BitVec 64) (l v : List FdState) (fd0 : Nat) (avail : Nat),
+    usysno m = USYS_dup →
+    (BitVec.setWidth 32 (m.get 10#5)).toInt = (fd0 : Int) →
+    fd0 < NSTD →
+    l[fd0]? = some .closed →
+    (pc + 4#64) &&& 1#64 = 0#64 →
+    ⊢ uinstrIs N.t pc false (.ECALL ()) -∗ urun (hlc := hlc) N h m pc avail -∗
+      udepw (hlc := hlc) N m pc USYS_dup -∗ ustdAt N.fd l v -∗
+      (∀ (h' : CPU) (r : BitVec 64), ⌜r = -1#64⌝ -∗ ustdAt N.fd l v -∗
+        urun (hlc := hlc) N h' (ukWr m 10#5 r) (pc + 4#64) avail -∗ wpLoop h') -∗
+      wpLoop h
+
 /-- **Rocq `wp_uk_ecall_wait_null_live`**: wait(0), what the process sees,
 and a `-1` only at an empty set. -/
 def wpUkEcallWaitNullLive : Prop :=
@@ -219,6 +258,12 @@ structure UK_SYS_P : Prop where
   dupClosed : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CtokG GF] [UexecSG GF] [UprogSG GF]
     [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
     [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int], UkSysP.wpUkEcallDupClosed (hlc := hlc) (GF := GF)
+  dupAt : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CtokG GF] [UexecSG GF] [UprogSG GF]
+    [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
+    [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int], UkSysP.wpUkEcallDupAt (hlc := hlc) (GF := GF)
+  dupClosedAt : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CtokG GF] [UexecSG GF] [UprogSG GF]
+    [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
+    [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int], UkSysP.wpUkEcallDupClosedAt (hlc := hlc) (GF := GF)
   waitNullLive : ∀ {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CtokG GF] [UexecSG GF] [UprogSG GF]
     [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
     [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int], UkSysP.wpUkEcallWaitNullLive (hlc := hlc) (GF := GF)

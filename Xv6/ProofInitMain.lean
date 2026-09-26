@@ -51,7 +51,7 @@ theorem wp_initMain (UL : UK_LEAVES) (HS : UK_SYS_P) (HP : INIT_PRINTF)
     ⊢ initDeps (hlc := hlc) T -∗ kinitBanLaw (hlc := hlc) N stc Cr.ccWp (ccWbn Cr) -∗
       kinitDiagLaw (hlc := hlc) stc Cr.ccWp (ccWbn Cr) -∗ initCode N.t -∗
       initConsSup (hlc := hlc) cn T Cns stc Cr -∗ initConsDance (hlc := hlc) N T Cns stc -∗
-      initArgv N.d -∗ usz N.s szv -∗ ustd N.fd ufdL0 -∗ ucwd N.cwd ROOTINO -∗ uchAny N.ch -∗
+      initArgv N.d -∗ usz N.s szv -∗ ustdOk T N.fd ufdL0 -∗ ucwd N.cwd ROOTINO -∗ uchAny N.ch -∗
       uinitTok (hlc := hlc) cn T (initRd Cr.ccRd (ccWbn Cr)) -∗
       urun (hlc := hlc) N h m (BitVec.ofNat 64 User.Init.Sym.«main») (4 + (12 + (12 + (4 + n)))) -∗ wpLoop h := by
   rw [show User.Init.Sym.«main» = 0 from rfl]
@@ -175,8 +175,7 @@ theorem wp_initMain (UL : UK_LEAVES) (HS : UK_SYS_P) (HP : INIT_PRINTF)
     ihave #Hxsl := Hw $$ HC
     iapply wp_kinit_main_from_1e UL HS HP hpsok N hpayfree T stc Cr cn szv h11 m10 n hne hkt $$ Hdeps Hblaw
       Hdlaw Hc Hxsl Hargv Hsz [Hstd] Hcwd Hch Htk Hrun
-    unfold kinitHead1 kinitHeadL
-    ileft; iexact Hstd
+    iapply ufdHead1_l1 T stc N.fd $$ Hstd
   · -- THE CALL RETURNED -1: the repair arm
     have hbt : ukBtaken .BLT (m10.get 10#5) 0#64 = true := by rw [ha0, hro]; decide
     iapply wp_uk_btype0 UL N h10 m10 (BitVec.ofNat 64 0x1a) false 0x4a#13 10#5 .BLT _
@@ -218,7 +217,7 @@ theorem wp_initMain (UL : UK_LEAVES) (HS : UK_SYS_P) (HP : INIT_PRINTF)
         Hdlaw Hc Hxsl Hargv Hsz [Hstd] Hcwd Hch Htk Hrun
       unfold ustdAny
       icases Hstd with ⟨%l, Hl⟩
-      iapply kinitHeadL_taint $$ HT Hl
+      iapply ufdHead1_taint T stc N.fd l $$ HT Hl
 
 /-- **init's `main` holds** (at the engine `UL`, the syscall rows `HS`, over
 printf's interface `HP`). -/

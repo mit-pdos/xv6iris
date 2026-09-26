@@ -46,7 +46,7 @@ conjunct). -/
 def kinitRestartHead (N : UkNames GF) (T : IProp GF) (stc : FdState) (Cr : ConsCred GF) (cn : ConsNames)
     (szv n : Nat) : IProp GF :=
   iprop(∀ (h : CPU) (m : RegMap), ⌜m.get 18#5 = BitVec.ofNat 64 kinitLitStart⌝ -∗ usz N.s szv -∗
-    kinitHead T stc N.fd -∗ ucwd N.cwd ROOTINO -∗ uchAny N.ch -∗
+    ufdHead T stc N.fd -∗ ucwd N.cwd ROOTINO -∗ uchAny N.ch -∗
     uinitTok (hlc := hlc) cn T (initRd Cr.ccRd (ccWbn Cr)) -∗
     urun (hlc := hlc) N h m (BitVec.ofNat 64 0x32) (12 + (12 + (4 + n))) -∗ wpLoop h)
 
@@ -55,7 +55,7 @@ def kinitWaitHead (N : UkNames GF) (T : IProp GF) (stc : FdState) (Cr : ConsCred
     (szv n : Nat) : IProp GF :=
   iprop(∀ (h : CPU) (m : RegMap) (cs : ExtTreeSet GName compare) (γ γsh : GName) (pidsh : BitVec 32),
     ⌜m.get 18#5 = BitVec.ofNat 64 kinitLitStart⌝ -∗ ⌜m.get 9#5 = BitVec.signExtend 64 pidsh⌝ -∗ ⌜γsh ∈ cs⌝ -∗
-    ⌜BitVec.signExtend 64 pidsh ≠ -1#64⌝ -∗ usz N.s szv -∗ kinitHead T stc N.fd -∗ ucwd N.cwd ROOTINO -∗
+    ⌜BitVec.signExtend 64 pidsh ≠ -1#64⌝ -∗ usz N.s szv -∗ ufdHead T stc N.fd -∗ ucwd N.cwd ROOTINO -∗
     uch N.ch cs -∗ childTok γsh pidsh (uconsPay (hlc := hlc) cn γ T (initRd Cr.ccRd (ccWbn Cr))) -∗
     urun (hlc := hlc) N h m (BitVec.ofNat 64 0x44) (12 + (12 + (4 + n))) -∗ wpLoop h)
 
@@ -165,6 +165,7 @@ theorem wp_kinit_main_loop (UL : UK_LEAVES) (HS : UK_SYS_P) (HP : INIT_PRINTF)
         rw [hbt, if_pos rfl, show BitVec.ofNat 64 0x3e + BitVec.signExtend 64 0x46#13 = BitVec.ofNat 64 0x84
           from by decide]
         ihave Hpay := hpayfree
+        ihave Hstd := ustdOk_ustd T N.fd l $$ Hstd
         iapply wp_kinit_main_die_df UL HS HP N T stc Cr.ccWp (ccWbn Cr) l np hp2 mp1 n $$ Hpay Hwl Hdlaw Hc Hstd
           Hcred Hrun
       · -- fork SUCCEEDED, this is the parent
@@ -200,7 +201,7 @@ theorem wp_kinit_main_loop (UL : UK_LEAVES) (HS : UK_SYS_P) (HP : INIT_PRINTF)
           exact LawfulSet.mem_union.2 (Or.inr (LawfulSet.mem_singleton.2 rfl))
         · ipureintro
           exact kinit_pid_ne_m1 pidv hrng.2
-        · iapply kinitHead_of_row T stc N.fd l $$ Hrow Hstd
+        · iapply ufdHead_of_row T stc N.fd l $$ Hrow Hstd
     · ------------------------------------------------ the CHILD: r = 0
       iintro %N' %hc %hpeq ⟨#Hc', #Hargv'⟩ Hsz Hstd #Hrow' Hcred Hpos HQ Hcwd Hch Hpid Hrun
       -- 0x3c  c.mv s1,a0

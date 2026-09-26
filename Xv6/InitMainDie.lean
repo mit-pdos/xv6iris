@@ -7,7 +7,7 @@ pinned `1900b8a43`).  A stage file of `ProofInitMain`.
     0x96  exec("sh", argv);
     0xaa  printf("init: exec sh failed\n");  exit(1);
 
-Deviations: `UkInitDefs` deviations 1-5; printf is `INIT_PRINTF`; the exec
+Deviations: `UkInitDefs` deviations 1, 3-5; printf is `INIT_PRINTF`; the exec
 deposit is built off init's own supply (`initExecSupPos`) in the WP goal,
 through `wpLoop_bupd` (Rocq's `iMod` at the WP).
 -/
@@ -108,16 +108,19 @@ theorem wp_kinit_main_die_df (UL : UK_LEAVES) (HS : UK_SYS_P) (HP : INIT_PRINTF)
     · subst hl
       ihave Hpay' := Hflaw $$ %np %N' Hp
       unfold kinitBannerPay
-      icases Hpay' $$ Hstd with ⟨%Ch, #Hw, HCh, -⟩
+      icases ustd_ustdAt N'.fd (ufdL3 stc) $$ Hstd with ⟨%vw, Hstd⟩
+      ihave Hpay' := Hpay' $$ %vw Hstd
+      icases Hpay' with ⟨%Ch, #Hw, HCh, -⟩
       iexists Ch
       iframe Hw HCh
     · subst hl
-      iexists (fun _ => ustd N'.fd ufdL0)
+      icases ustd_ustdAt N'.fd ufdL0 $$ Hstd with ⟨%vw, Hstd⟩
+      iexists (fun _ => ustdAt N'.fd ufdL0 vw)
       iframe Hstd
       unfold kinitWcl
       imodintro
       iintro %j -
-      iapply Hwcl $$ %N' %(User.Init.initLit 0x9a0 j)
+      iapply Hwcl $$ %N' %(User.Init.initLit 0x9a0 j) %vw
     · icases Hwrl $$ HT with #Hwr
       iexists (fun _ => iprop(emp))
       isplitl []
@@ -168,20 +171,23 @@ theorem wp_kinit_main_die_de (UL : UK_LEAVES) (HS : UK_SYS_P) (HP : INIT_PRINTF)
     · subst hl
       ihave Hpay' := Hxlaw $$ %np %N' Hp
       unfold kinitBannerPay
-      icases Hpay' $$ Hstd with ⟨%Ch, #Hw, HCh, Hgive⟩
+      icases ustd_ustdAt N'.fd (ufdL3 stc) $$ Hstd with ⟨%vw, Hstd⟩
+      ihave Hpay' := Hpay' $$ %vw Hstd
+      icases Hpay' with ⟨%Ch, #Hw, HCh, Hgive⟩
       iexists Ch
       iframe Hw HCh
       iintro HC
       icases Hgive $$ HC with ⟨-, Hb⟩
       iapply Hback $$ Hpos Hlease Hb
     · subst hl
-      iexists (fun _ => ustd N'.fd ufdL0)
+      icases ustd_ustdAt N'.fd ufdL0 $$ Hstd with ⟨%vw, Hstd⟩
+      iexists (fun _ => ustdAt N'.fd ufdL0 vw)
       iframe Hstd
       isplitr [Hpos Hlease Hb]
       · unfold kinitWcl
         imodintro
         iintro %j -
-        iapply Hwcl $$ %N' %(User.Init.initLit 0x9c0 j)
+        iapply Hwcl $$ %N' %(User.Init.initLit 0x9c0 j) %vw
       · iintro -
         iapply Hback $$ Hpos Hlease Hb
     · icases Hwrl $$ HT with #Hwr
@@ -209,7 +215,7 @@ theorem wp_kinit_main_child (UL : UK_LEAVES) (HS : UK_SYS_P) (HP : INIT_PRINTF)
     (hpeq : N'.pay = uconsPay (hlc := hlc) cn γ T (initRd Cr.ccRd (ccWbn Cr))) :
     ⊢ initDeps (hlc := hlc) T -∗ kinitDiagLaw (hlc := hlc) stc Cr.ccWp (ccWbn Cr) -∗ initCode N'.t -∗
       initExecSupLend (hlc := hlc) cn T stc Cr -∗ initArgv N'.d -∗ ucwd N'.cwd ROOTINO -∗ uch N'.ch ∅ -∗
-      (∃ p : Int, ⌜p ≠ 1⌝ ∗ upid N'.pid p) -∗ ustd N'.fd l -∗ kinitRow T stc l -∗
+      (∃ p : Int, ⌜p ≠ 1⌝ ∗ upid N'.pid p) -∗ ustdOk T N'.fd l -∗ ufdRow T stc l -∗
       initLendCred T stc Cr.ccWp (ccWbn Cr) l np -∗ upos (hlc := hlc) γ np -∗
       uconsPay (hlc := hlc) cn γ T Cr.ccRd (-1) -∗
       urun (hlc := hlc) N' h m (BitVec.ofNat 64 0x96) (12 + (12 + (4 + n))) -∗ wpLoop h := by

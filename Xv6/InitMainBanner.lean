@@ -52,34 +52,38 @@ theorem wp_kinit_banner (UL : UK_LEAVES) (HS : UK_SYS_P) (HP : INIT_PRINTF) (N :
     (ha0 : m.get 10#5 = BitVec.ofNat 64 kinitLitStart) :
     ⊢ kinitWlaw (hlc := hlc) T -∗ kinitBanLaw (hlc := hlc) N stc Cr.ccWp (ccWbn Cr) -∗ initCode N.t -∗
       utextStr N.t 0x988 18 (User.Init.initLit 0x988) -∗
-      uinitTok (hlc := hlc) cn T (initRd Cr.ccRd (ccWbn Cr)) -∗ kinitHead T stc N.fd -∗
+      uinitTok (hlc := hlc) cn T (initRd Cr.ccRd (ccWbn Cr)) -∗ ufdHead T stc N.fd -∗
       urun (hlc := hlc) N h m (BitVec.ofNat 64 User.Init.Sym.«printf») (12 + (12 + (4 + n))) -∗
       (∀ (h' : CPU) (m' : RegMap), ⌜ucalleeSaved m m'⌝ -∗ kinitLent (hlc := hlc) N T stc cn Cr -∗
         urun (hlc := hlc) N h' m' (retPc (m.get 1#5)) (12 + (12 + (4 + n))) -∗ wpLoop h') -∗
       wpLoop h := by
   unfold kinitWlaw
   iintro ⟨#Hwrl, #Hwcl⟩ #Hblaw #Hc #Hstr Htk Hhd Hrun Hcont
-  icases kinitHead_open_row T stc N.fd $$ Hhd with ⟨%l, Hstd, #Hrow, -⟩
+  icases ufdHead_open_row T stc N.fd $$ Hhd with ⟨%l, Hstd, #Hrow, -⟩
   unfold uinitTok
   icases Htk with (⟨%k, Hr, Hd⟩ | #HT)
   · unfold initRd initRdCred
     icases Hd with ⟨Hd, Hb⟩
-    unfold kinitRow
+    unfold ufdRow
     icases Hrow with (%hl | %hl | #HT)
-    · -- THE CONSOLE ROW: the payment through the link
+    · -- THE CONSOLE ROW: the payment through the link, at the head's view
       subst hl
-      unfold kinitBanLaw kinitBanner0 kinitBannerPay
+      unfold kinitBanLaw kinitBanner0 kinitBannerPay ustdOk
+      icases Hstd with ⟨%vw, Hok, Hstd⟩
       ihave Hpay := Hblaw $$ %k Hb
-      icases Hpay $$ Hstd with ⟨%Ch, #Hw, HCh, Hgive⟩
+      ihave Hpay := Hpay $$ %vw Hstd
+      icases Hpay with ⟨%Ch, #Hw, HCh, Hgive⟩
       iapply HP.wp_initPrintfChain N 0x988 18 (User.Init.initLit 0x988) Ch h m n (by decide) (by decide)
         (fun j hj => User.litOk_nopct _ _ _ j kinit_lit_start_ok hj) ha0 $$ Hw Hc Hstr HCh Hrun
       iintro %h' %m' %hcs HC Hrun
       icases Hgive $$ HC with ⟨Hl, Hwc⟩
-      iapply Hcont $$ %h' %m' [] [Hl Hr Hd Hwc] Hrun
+      iapply Hcont $$ %h' %m' [] [Hl Hok Hr Hd Hwc] Hrun
       · ipureintro; exact hcs
-      unfold kinitLent kinitRow uinitTok initLendCred
+      unfold kinitLent ufdRow uinitTok initLendCred ustdOk
       iexists (ufdL3 stc)
-      iframe Hl
+      isplitl [Hl Hok]
+      · iexists vw
+        iframe Hok Hl
       isplitr
       · ileft; ipureintro; rfl
       ileft
@@ -90,19 +94,22 @@ theorem wp_kinit_banner (UL : UK_LEAVES) (HS : UK_SYS_P) (HP : INIT_PRINTF) (N :
       iframe Hwc
     · -- THE CLOSED ROW: the bytes go nowhere; the ledger is the carrier
       subst hl
-      unfold kinitWcl
-      iapply HP.wp_initPrintfChain N 0x988 18 (User.Init.initLit 0x988) (fun _ => ustd N.fd ufdL0) h m n
+      unfold kinitWcl ustdOk
+      icases Hstd with ⟨%vw, Hok, Hstd⟩
+      iapply HP.wp_initPrintfChain N 0x988 18 (User.Init.initLit 0x988) (fun _ => ustdAt N.fd ufdL0 vw) h m n
         (by decide) (by decide) (fun j hj => User.litOk_nopct _ _ _ j kinit_lit_start_ok hj) ha0
         $$ [] Hc Hstr Hstd Hrun
       · imodintro
         iintro %j -
-        iapply Hwcl $$ %N %(User.Init.initLit 0x988 j)
+        iapply Hwcl $$ %N %(User.Init.initLit 0x988 j) %vw
       iintro %h' %m' %hcs Hl Hrun
-      iapply Hcont $$ %h' %m' [] [Hl Hr Hd Hb] Hrun
+      iapply Hcont $$ %h' %m' [] [Hl Hok Hr Hd Hb] Hrun
       · ipureintro; exact hcs
-      unfold kinitLent kinitRow uinitTok initLendCred
+      unfold kinitLent ufdRow uinitTok initLendCred ustdOk
       iexists ufdL0
-      iframe Hl
+      isplitl [Hl Hok]
+      · iexists vw
+        iframe Hok Hl
       isplitr
       · iright; ileft; ipureintro; rfl
       ileft
@@ -117,7 +124,7 @@ theorem wp_kinit_banner (UL : UK_LEAVES) (HS : UK_SYS_P) (HP : INIT_PRINTF) (N :
       iintro %h' %m' %hcs Hrun
       iapply Hcont $$ %h' %m' [] [Hstd Hr Hd] Hrun
       · ipureintro; exact hcs
-      unfold kinitLent kinitRow uinitTok initLendCred
+      unfold kinitLent ufdRow uinitTok initLendCred
       iexists l
       iframe Hstd
       isplitr

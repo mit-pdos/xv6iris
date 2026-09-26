@@ -27,7 +27,7 @@ def wpInitStartBody : Prop :=
     ⊢ initDeps (hlc := hlc) T -∗ kinitBanLaw (hlc := hlc) N stc Cr.ccWp (ccWbn Cr) -∗
       kinitDiagLaw (hlc := hlc) stc Cr.ccWp (ccWbn Cr) -∗ initCode N.t -∗
       initConsSup (hlc := hlc) cn T Cns stc Cr -∗ initConsDance (hlc := hlc) N T Cns stc -∗
-      initArgv N.d -∗ usz N.s szv -∗ ustd N.fd ufdL0 -∗ ucwd N.cwd ROOTINO -∗ uchAny N.ch -∗
+      initArgv N.d -∗ usz N.s szv -∗ ustdOk T N.fd ufdL0 -∗ ucwd N.cwd ROOTINO -∗ uchAny N.ch -∗
       uinitTok (hlc := hlc) cn T (initRd Cr.ccRd (ccWbn Cr)) -∗
       urun (hlc := hlc) N h m (BitVec.ofNat 64 User.Init.Sym.«start») (2 + (4 + (12 + (12 + (4 + n))))) -∗
       wpLoop h

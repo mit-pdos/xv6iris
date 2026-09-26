@@ -36,11 +36,10 @@ CONE (re-walked on the pinned globs: UInitFd 33/50 reached).  This file:
 1. As `UInitFd` deviation 1 (`l.set k st`, `l[k]?`, `.closed`); the ghost
    map is the section hypothesis `[GhostMapG GF (Option Nat) UfdCell
    UfdMapF]` (`UserFd`'s binder).
-2. **Two names for one head.**  The P-init lane stated the PRE-K3 heads at
-   the plain ledger as `UkInitDefs.kinitHeadL` / `kinitHead1` / `kinitHead` /
-   `kinitRow` (its deviation 2, deliberately not clashing with this port).
-   These are Rocq's, at `ustdOk`; re-pointing the init walks onto them is
-   the P-init follow-up (the P-secc analogue).
+2. (Retired.)  The P-init lane's pre-K3 copies at the plain ledger
+   (`UkInitDefs.kinitHeadL` / `kinitHead1` / `kinitHead` / `kinitRow`) are
+   gone: init's walks (`UkInitDefs`, `UkInitStubs`, `InitMain*`) are stated
+   over these heads at `ustdOk` (the P-init follow-up).
 -/
 import Xv6.UInitFd
 

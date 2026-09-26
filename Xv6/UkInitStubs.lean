@@ -16,19 +16,19 @@ The stubs are walked ONCE by `UkStub.stubLaw` (instantiated at init's text:
 
 ## Deviations from Rocq
 
-1. `UkInitDefs` deviations 1, 2, 4, 5.  The engine is `UL : UK_LEAVES`
+1. `UkInitDefs` deviations 1, 4, 5.  The engine is `UL : UK_LEAVES`
    (DU2); the syscall rows are `HS : UK_SYS_P` (UkRunSys not ported,
    `UkSysP`); exec is `UkRunExecRef.wp_uk_ecall_exec_at_cwd_refR_ids`.
-2. **The `_at` dups are their `ustd` forms** (pre-K3): Rocq's reached
-   `wp_kinit_dup_cons_at` / `wp_kinit_dup_closed_at` are stated as the
-   (Rocq-unreached, pre-seccomp-S4) `wp_kinit_dup_cons` / `wp_kinit_dup_closed`;
-   the tracked arm's `∃ fdv, ⌜tab_le fdv v ∧ …⌝ ∗ ualloc_v …` is `ualloc`.
+2. (Retired, P-init follow-up.)  The dups are Rocq's reached
+   `wp_kinit_dup_cons_at` / `wp_kinit_dup_closed_at` verbatim, over the
+   view-level rows `UK_SYS_P.dupAt` / `dupClosedAt`; the unreached
+   pre-seccomp-S4 `wp_kinit_dup_cons` / `wp_kinit_dup_closed` are not ported.
 3. **NOT PORTED**: `wp_kinit_write_chain_at` (reached from UInitBanner and
    UkWriteClosed only, not from the walk): it needs `UkRun.udepwf_std`
    (K3) and UkRunSys's `wp_uk_ecall_write_chain_at`, whose post names the
    key's page-table facts.  `nth_byte0_moi` (its only use is putc's spill,
    which P-printf proved).  The unreached `wp_kinit_dup_cons`,
-   `wp_kinit_dup_closed` are ported as deviation 2 says.
+   `wp_kinit_dup_closed` (deviation 2).
 4. `Hpsok_free` (Rocq's section hypothesis) is the explicit premise
    `hpsok : ∀ k, freeNum k → UprogSG.psok k` of the lemmas that
    take a free number's deposit (dup, wait).
@@ -221,17 +221,19 @@ theorem wp_kinit_dup (UL : UK_LEAVES) (HS : UK_SYS_P) (hpsok : ∀ k : Int, free
   iexists l'
   iexact Hl
 
-/-- **Rocq `wp_kinit_dup_cons(_at)`** (deviation 2): the TRACKED dup of an
-open standard stream; the destination is the ledger's. -/
-theorem wp_kinit_dup_cons (UL : UK_LEAVES) (HS : UK_SYS_P)
+/-- **Rocq `wp_kinit_dup_cons_at`**: the TRACKED dup of an open standard
+stream AT A NAMED TABLE VIEW; the destination is the ledger's, and the
+ledger comes back at the new table as its view. -/
+theorem wp_kinit_dup_cons_at (UL : UK_LEAVES) (HS : UK_SYS_P)
     (hpsok : ∀ k : Int, freeNum k → UprogSG.psok (GF := GF) k)
-    (N : UkNames GF) (h : CPU) (m : RegMap) (avail : Nat) (l : List FdState) (fd0 : Nat) (st : FdState)
+    (N : UkNames GF) (h : CPU) (m : RegMap) (avail : Nat) (l v : List FdState) (fd0 : Nat) (st : FdState)
     (harg : (BitVec.setWidth 32 (m.get 10#5)).toInt = (fd0 : Int)) (hne : st ≠ .closed) (hlt : fd0 < NSTD)
     (hrow : l[fd0]? = some st) :
-    ⊢ initCode N.t -∗ urun (hlc := hlc) N h m (BitVec.ofNat 64 User.Init.Sym.«dup») avail -∗ ustd N.fd l -∗
+    ⊢ initCode N.t -∗ urun (hlc := hlc) N h m (BitVec.ofNat 64 User.Init.Sym.«dup») avail -∗ ustdAt N.fd l v -∗
       (∀ (h' : CPU) (ret : BitVec 64),
-        ((∃ fd1 : Nat, ⌜ret = BitVec.ofNat 64 fd1 ∧ fd1 < NOFILE⌝ ∗ ualloc N.fd l fd1 st) ∨
-          (⌜ret = -1#64 ∧ fdLowestClosed l = none⌝ ∗ ustd N.fd l)) -∗
+        ((∃ fd1 : Nat, ⌜ret = BitVec.ofNat 64 fd1 ∧ fd1 < NOFILE⌝ ∗
+            ∃ fdv : List FdState, ⌜tabLe fdv v ∧ fdv[fd0]? = some st⌝ ∗ uallocV N.fd l fd1 st (fdv.set fd1 st)) ∨
+          (⌜ret = -1#64 ∧ fdLowestClosed l = none⌝ ∗ ustdAt N.fd l v)) -∗
         urun (hlc := hlc) N h' (stubRet m 10 ret) (retPc (m.get 1#5)) avail -∗ wpLoop h') -∗
       wpLoop h := by
   iintro #Hc Hrun Hstd Hcont
@@ -240,7 +242,7 @@ theorem wp_kinit_dup_cons (UL : UK_LEAVES) (HS : UK_SYS_P)
   iapply Hs $$ %h %m %avail Hc Hrun
   iintro %h1 %hpc %hal #Hi Hrun Hmid
   unfold stubRet
-  iapply HS.dup N h1 (ukWr m 17#5 (BitVec.ofInt 64 10)) _ l fd0 st avail (by rw [kinit_usysno]; decide)
+  iapply HS.dupAt N h1 (ukWr m 17#5 (BitVec.ofInt 64 10)) _ l v fd0 st avail (by rw [kinit_usysno]; decide)
     (by rw [ukWr_get_other _ _ _ _ (by decide)]; exact harg) hne (by decide) $$ Hi Hrun [] Hstd []
   · rw [show USYS_dup = (10 : Int) from rfl]
     iapply udepw_of_psok (hlc := hlc) N _ _ 10 (hpsok 10 (by decide)) (by decide)
@@ -259,15 +261,15 @@ theorem wp_kinit_dup_cons (UL : UK_LEAVES) (HS : UK_SYS_P)
     iframe Hl
     ipureintro; exact hr
 
-/-- **Rocq `wp_kinit_dup_closed(_at)`** (deviation 2): dup of a CLOSED
-standard stream fails and moves nothing. -/
-theorem wp_kinit_dup_closed (UL : UK_LEAVES) (HS : UK_SYS_P)
+/-- **Rocq `wp_kinit_dup_closed_at`**: dup of a CLOSED standard stream, at
+a named table view, fails and moves nothing. -/
+theorem wp_kinit_dup_closed_at (UL : UK_LEAVES) (HS : UK_SYS_P)
     (hpsok : ∀ k : Int, freeNum k → UprogSG.psok (GF := GF) k)
-    (N : UkNames GF) (h : CPU) (m : RegMap) (avail : Nat) (l : List FdState) (fd0 : Nat)
+    (N : UkNames GF) (h : CPU) (m : RegMap) (avail : Nat) (l v : List FdState) (fd0 : Nat)
     (harg : (BitVec.setWidth 32 (m.get 10#5)).toInt = (fd0 : Int)) (hlt : fd0 < NSTD)
     (hrow : l[fd0]? = some .closed) :
-    ⊢ initCode N.t -∗ urun (hlc := hlc) N h m (BitVec.ofNat 64 User.Init.Sym.«dup») avail -∗ ustd N.fd l -∗
-      (∀ (h' : CPU) (ret : BitVec 64), ⌜ret = -1#64⌝ -∗ ustd N.fd l -∗
+    ⊢ initCode N.t -∗ urun (hlc := hlc) N h m (BitVec.ofNat 64 User.Init.Sym.«dup») avail -∗ ustdAt N.fd l v -∗
+      (∀ (h' : CPU) (ret : BitVec 64), ⌜ret = -1#64⌝ -∗ ustdAt N.fd l v -∗
         urun (hlc := hlc) N h' (stubRet m 10 ret) (retPc (m.get 1#5)) avail -∗ wpLoop h') -∗
       wpLoop h := by
   iintro #Hc Hrun Hstd Hcont
@@ -276,7 +278,7 @@ theorem wp_kinit_dup_closed (UL : UK_LEAVES) (HS : UK_SYS_P)
   iapply Hs $$ %h %m %avail Hc Hrun
   iintro %h1 %hpc %hal #Hi Hrun Hmid
   unfold stubRet
-  iapply HS.dupClosed N h1 (ukWr m 17#5 (BitVec.ofInt 64 10)) _ l fd0 avail (by rw [kinit_usysno]; decide)
+  iapply HS.dupClosedAt N h1 (ukWr m 17#5 (BitVec.ofInt 64 10)) _ l v fd0 avail (by rw [kinit_usysno]; decide)
     (by rw [ukWr_get_other _ _ _ _ (by decide)]; exact harg) hlt hrow (by decide) $$ Hi Hrun [] Hstd
   · rw [show USYS_dup = (10 : Int) from rfl]
     iapply udepw_of_psok (hlc := hlc) N _ _ 10 (hpsok 10 (by decide)) (by decide)
@@ -432,13 +434,14 @@ theorem ukiOpen2_taint_arm (UL : UK_LEAVES) (HS : UK_SYS_P) (N : UkNames GF) (T 
   iapply wp_kinit_open UL HS N h m avail $$ Hw Hc Hrun [Hin]
   · unfold ustdAny
     icases Hin with (H | ⟨H, -⟩)
-    · iexists ufdL0; iexact H
+    · ihave H := ustdOk_ustd T N.fd ufdL0 $$ H
+      iexists ufdL0; iexact H
     · iexact H
   iintro %h' %ret Hstd Hrun
   iapply Hcont $$ %h' %ret [Hstd] Hcwd Hrun
   unfold ustdAny
   icases Hstd with ⟨%l, H⟩
-  iapply kinitHeadL_taint $$ HT H
+  iapply ufdHead1_taint T stc N.fd l $$ HT H
 
 /-- **Rocq `uki_open2_of_console`**: the node exists, the PINNED open at the
 resolving pin. -/
@@ -456,11 +459,12 @@ theorem ukiOpen2_of_console (UL : UK_LEAVES) (HS : UK_SYS_P) (N : UkNames GF) (T
     · ipureintro; exact hargs
     iintro %h' %ret Hans Hcwd Hrun
     iapply Hcont $$ %h' %ret [Hans] Hcwd Hrun
-    unfold kinitHead1 kinitHeadL
-    icases Hans with (⟨-, H⟩ | ⟨-, H⟩ | ⟨Hl, HT⟩)
-    · ileft; iexact H
-    · iright; ileft; iexact H
-    · iright; iright; iframe Hl HT
+    icases Hans with (⟨-, H⟩ | ⟨-, H⟩ | ⟨Hl, #HT⟩)
+    · iapply ufdHead1_l1 T stc N.fd $$ H
+    · iapply ufdHead1_closed T stc N.fd $$ H
+    · unfold ustdAny
+      icases Hl with ⟨%l, Hl⟩
+      iapply ufdHead1_taint T stc N.fd l $$ HT Hl
   · ihave Hop := ukiOpen2_taint_arm UL HS N T stc $$ Hwl HT
     unfold ukiOpen2 ukiOpen2In
     iapply Hop $$ %h %m %avail Hc [] Hrun Hcwd [Hstd] Hcont
@@ -482,10 +486,11 @@ theorem ukiOpen2_of_absent (UL : UK_LEAVES) (HS : UK_SYS_P) (N : UkNames GF) (T 
     · ipureintro; exact hargs
     iintro %h' %ret Hans Hcwd Hrun
     iapply Hcont $$ %h' %ret [Hans] Hcwd Hrun
-    unfold kinitHead1 kinitHeadL
-    icases Hans with (⟨-, H, -⟩ | ⟨Hl, HT⟩)
-    · iright; ileft; iexact H
-    · iright; iright; iframe Hl HT
+    icases Hans with (⟨-, H, -⟩ | ⟨Hl, #HT⟩)
+    · iapply ufdHead1_closed T stc N.fd $$ H
+    · unfold ustdAny
+      icases Hl with ⟨%l, Hl⟩
+      iapply ufdHead1_taint T stc N.fd l $$ HT Hl
   · ihave Hop := ukiOpen2_taint_arm UL HS N T stc $$ Hwl HT
     unfold ukiOpen2 ukiOpen2In
     iapply Hop $$ %h %m %avail Hc [] Hrun Hcwd [Hstd] Hcont
@@ -493,36 +498,49 @@ theorem ukiOpen2_of_absent (UL : UK_LEAVES) (HS : UK_SYS_P) (N : UkNames GF) (T 
     · iright; iframe Hstd HT
 
 /-- **Rocq `wp_kinit_dup_headL`**: `dup(0)` at the head: the console arm
-lands at the ledger's lowest closed slot, the closed arm fails, the taint
-walks the untracked leaf. -/
+lands at the ledger's lowest closed slot (and the ok view stays ok: the
+copied row is the table's own, `ushViewOk_dup`), the closed arm fails, the
+taint walks the untracked leaf. -/
 theorem wp_kinit_dup_headL (UL : UK_LEAVES) (HS : UK_SYS_P)
     (hpsok : ∀ k : Int, freeNum k → UprogSG.psok (GF := GF) k)
     (N : UkNames GF) (T : IProp GF) (stc : FdState) (l : List FdState) (k : Nat) (h : CPU) (m : RegMap)
     (avail : Nat) (hne : stc ≠ .closed) (hrow : l[0]? = some stc) (hk : fdLowestClosed l = some k)
     (harg : (BitVec.setWidth 32 (m.get 10#5)).toInt = ((0 : Nat) : Int)) :
     ⊢ initCode N.t -∗ urun (hlc := hlc) N h m (BitVec.ofNat 64 User.Init.Sym.«dup») avail -∗
-      kinitHeadL T N.fd l -∗
-      (∀ (h' : CPU) (ret : BitVec 64), kinitHeadL T N.fd (l.set k stc) -∗
+      ufdHeadL T N.fd l -∗
+      (∀ (h' : CPU) (ret : BitVec 64), ufdHeadL T N.fd (l.set k stc) -∗
         urun (hlc := hlc) N h' (stubRet m 10 ret) (retPc (m.get 1#5)) avail -∗ wpLoop h') -∗
       wpLoop h := by
   iintro #Hc Hrun Hhd Hcont
-  unfold kinitHeadL
+  unfold ufdHeadL
   icases Hhd with (Hstd | H | ⟨H, HT⟩)
   · -- CONSOLE: the TRACKED leaf, and the ledger decides where it lands
-    iapply wp_kinit_dup_cons UL HS hpsok N h m avail l 0 stc harg hne (by decide) hrow $$ Hc Hrun Hstd
+    unfold ustdOk
+    icases Hstd with ⟨%vw, Hok, Hstd⟩
+    iapply wp_kinit_dup_cons_at UL HS hpsok N h m avail l vw 0 stc harg hne (by decide) hrow $$ Hc Hrun Hstd
     iintro %h' %ret Hal Hrun
-    iapply Hcont $$ %h' %ret [Hal] Hrun
-    icases Hal with (⟨%fd1, -, Ha⟩ | ⟨%hf, -⟩)
+    iapply Hcont $$ %h' %ret [Hal Hok] Hrun
+    icases Hal with (⟨%fd1, -, %fdv, %hfv, Ha⟩ | ⟨%hf, -⟩)
     · ileft
-      icases (ualloc_std N.fd l fd1 k stc hk) $$ Ha with ⟨-, H⟩
-      iexact H
+      icases (uallocV_std N.fd l fd1 k stc (fdv.set fd1 stc) hk) $$ Ha with ⟨-, H⟩
+      iexists (fdv.set fd1 stc)
+      iframe H
+      icases Hok with (%hok | HT)
+      · ileft
+        ipureintro
+        exact ushViewOk_dup fd1 0 stc hok hfv.1 hfv.2
+      · iright
+        iexact HT
     · exact absurd (hk.symm.trans hf.2) (by simp)
   · -- CLOSED: the source is a closed standard stream
-    iapply wp_kinit_dup_closed UL HS hpsok N h m avail ufdL0 0 harg (by decide) ufdL0_row0 $$ Hc Hrun H
+    unfold ustdOk
+    icases H with ⟨%vw, Hok, H⟩
+    iapply wp_kinit_dup_closed_at UL HS hpsok N h m avail ufdL0 vw 0 harg (by decide) ufdL0_row0 $$ Hc Hrun H
     iintro %h' %ret - Hstd Hrun
-    iapply Hcont $$ %h' %ret [Hstd] Hrun
+    iapply Hcont $$ %h' %ret [Hstd Hok] Hrun
     iright; ileft
-    iexact Hstd
+    iexists vw
+    iframe Hok Hstd
   · -- TAINT: nothing is named, the untracked leaf is the honest one
     iapply wp_kinit_dup UL HS hpsok N h m avail $$ Hc Hrun H
     iintro %h' %ret Hstd Hrun
