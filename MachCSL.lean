@@ -160,3 +160,6 @@ import MachCSL.UByteFrame
 import MachCSL.UFrameDf
 import MachCSL.URunRWMono
 import MachCSL.UExecCsr
+import MachCSL.UWalkRun
+import MachCSL.UWalk
+import MachCSL.UTlb
