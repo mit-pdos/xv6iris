@@ -18,12 +18,13 @@ decision (PMP range, PMA region, alignment, the MMIO windows) is rewritten
 by the `UmaRam` hypothesis.
 
 * reads (`uma_checked_mem_read_load`/`_lr`, `uma_mem_read_load`/`_lr`): the
-  map's little-endian value; LR (`lr`, no acquire) takes the walker's
-  reservation bit;
+  map's little-endian value; LR (`lr`, `lr.aq`, `lr.aqrl`) takes the
+  walker's reservation bit;
 * writes (`uma_mem_write_ea`, `uma_checked_mem_write`, `uma_mem_write_value`):
   the map updated (`bmWrite`), the reservation bit dropped; a STORE writes
   plainly, an SC (the three conditional kinds of `sc`/`sc.rl`/`sc.aqrl`)
-  needs the walker's reservation bit and spends it.
+  from any reservation state (Rocq `resv_any`: the SC reached its write
+  because the model's `match_reservation` said so).
 -/
 import MachCSL.UMemPhys
 import MachCSL.Tactics
@@ -52,7 +53,7 @@ set_option hygiene false in
 /-- The shared script of the `checked_mem_read` composites: the PMA check,
 the one-chunk plan, the read kind, one loop iteration (PMP, MMIO window, the
 RAM read), the result. -/
-macro "uma_cmr_proof" hpma:term:max hpmp:term:max hmmio:term:max hrd:term:max : tactic => `(tactic| (
+macro "uma_cmr_proof" hrk:term:max hpma:term:max hpmp:term:max hmmio:term:max hrd:term:max : tactic => `(tactic| (
   unfold checked_mem_read
   sail_norm
   simp only [runRW_bind]
@@ -60,7 +61,7 @@ macro "uma_cmr_proof" hpma:term:max hpmp:term:max hmmio:term:max hrd:term:max : 
   simp only [Option.bind_some]
   erw [runRW_pure]
   simp only [Option.bind_some]
-  simp only [uma_split_misaligned_one, read_kind_of_flags]
+  simp only [uma_split_misaligned_one, $hrk:term]
   try sail_norm
   simp only [untilFuelM, untilFuelM.go]
   try sail_norm
@@ -73,6 +74,8 @@ macro "uma_cmr_proof" hpma:term:max hpmp:term:max hmmio:term:max hrd:term:max : 
   uma_pures
   try rfl))
 
+theorem uma_rk_load : read_kind_of_flags false false false = pure .Read_plain := rfl
+
 /-- **An aligned plain LOAD from RAM** (Rocq `exec_checked_mem_read_ram_g`):
 the bytes' little-endian value, the state unchanged. -/
 theorem uma_checked_mem_read_load (D : UFoot) (orc : UOrc) (s : UWSt) (hp : UmaPhys D s) (pa : BitVec 64)
@@ -83,21 +86,34 @@ theorem uma_checked_mem_read_load (D : UFoot) (orc : UOrc) (s : UWSt) (hp : UmaP
   have hpmp := uma_pmp D orc s hp pa w hr.ram (.Load .Data) rfl
   have hmmio := uma_within_mmio_readable_ram D orc s pa w hp.pins.dhtif hp.pins.htif hr.ram
   have hrd := uma_read_ram_plain D orc s pa w (umaW_lt hw) v hv
-  rcases hw with rfl | rfl | rfl | rfl <;> uma_cmr_proof hpma hpmp hmmio hrd
+  rcases hw with rfl | rfl | rfl | rfl <;> uma_cmr_proof uma_rk_load hpma hpmp hmmio hrd
 
-/-- **An aligned LR from RAM** (`lr.w`/`lr.d` without acquire; Rocq §5d):
-the value, and the walker takes the reservation. -/
+/-- The read kind of an `lr` with the instruction's ordering bits (the model
+passes `aq`, `aq && rl`). -/
+def umaLrRk (aq rl : Bool) : read_kind :=
+  if aq then (if rl then .Read_RISCV_reserved_strong_acquire else .Read_RISCV_reserved_acquire)
+  else .Read_RISCV_reserved
+
+theorem uma_rk_lr (aq rl : Bool) : read_kind_of_flags aq (aq && rl) true = pure (umaLrRk aq rl) := by
+  cases aq <;> cases rl <;> rfl
+
+theorem umaResvRk_lr (aq rl : Bool) : umaResvRk (umaLrRk aq rl) = true := by
+  cases aq <;> cases rl <;> rfl
+
+/-- **An aligned LR from RAM** (`lr.w`/`lr.d`, `.aq`/`.aqrl` or not; Rocq
+§5d): the value, and the walker takes the reservation bit. -/
 theorem uma_checked_mem_read_lr (D : UFoot) (orc : UOrc) (s : UWSt) (hp : UmaPhys D s) (pa : BitVec 64)
     (w : Nat) (hw : umaW w) (hr : UmaRam pa w) (aq rl : Bool) (v : BitVec (8 * w))
     (hv : bmRead s.mm pa w = some v) :
     runRW D orc s (checked_mem_read (.LoadReserved (aq, rl, .Data)) .PBMT_PMA .User (.Physaddr pa) w
-        false false true false) =
+        aq (aq && rl) true false) =
       some (.Ok (v, ()), { s with rv := true }, orc) := by
+  have hrk := uma_rk_lr aq rl
   have hpma := uma_check_pma D orc s hp pa w hw hr (.LoadReserved (aq, rl, .Data)) true rfl
   have hpmp := uma_pmp D orc s hp pa w hr.ram (.LoadReserved (aq, rl, .Data)) rfl
   have hmmio := uma_within_mmio_readable_ram D orc s pa w hp.pins.dhtif hp.pins.htif hr.ram
-  have hrd := uma_read_ram_resv D orc s pa w (umaW_lt hw) v hv
-  rcases hw with rfl | rfl | rfl | rfl <;> uma_cmr_proof hpma hpmp hmmio hrd
+  have hrd := uma_read_ram_resv D orc s _ (umaResvRk_lr aq rl) pa w (umaW_lt hw) v hv
+  rcases hw with rfl | rfl | rfl | rfl <;> uma_cmr_proof hrk hpma hpmp hmmio hrd
 
 /-- **`mem_read` of an aligned plain LOAD** (Rocq `UserMemPt.exec_mem_read_*`):
 the effective privilege is User (`MPRV = 0`), the value is the map's. -/
@@ -115,12 +131,12 @@ theorem uma_mem_read_load (D : UFoot) (orc : UOrc) (s : UWSt) (hp : UmaPhys D s)
   uma_pures
   rfl
 
-/-- **`mem_read` of an aligned LR** (Rocq §5e): the value; the walker holds
-the reservation. -/
+/-- **`mem_read` of an aligned LR** (Rocq §5e; `lr`, `lr.aq`, `lr.aqrl`):
+the value; the walker holds the reservation bit. -/
 theorem uma_mem_read_lr (D : UFoot) (orc : UOrc) (s : UWSt) (hp : UmaPhys D s) (pa : BitVec 64)
     (w : Nat) (hw : umaW w) (hr : UmaRam pa w) (aq rl : Bool) (v : BitVec (8 * w))
     (hv : bmRead s.mm pa w = some v) :
-    runRW D orc s (mem_read (.LoadReserved (aq, rl, .Data)) .PBMT_PMA (.Physaddr pa) w false false true) =
+    runRW D orc s (mem_read (.LoadReserved (aq, rl, .Data)) .PBMT_PMA (.Physaddr pa) w aq (aq && rl) true) =
       some (.Ok v, { s with rv := true }, orc) := by
   have hc := uma_checked_mem_read_lr D orc s hp pa w hw hr aq rl v hv
   unfold mem_read mem_read_priv mem_read_priv_meta
@@ -128,9 +144,12 @@ theorem uma_mem_read_lr (D : UFoot) (orc : UOrc) (s : UWSt) (hp : UmaPhys D s) (
   simp only [runRW_bind, utr_readReg D orc s _ hp.dms, utr_readReg D orc s _ hp.dcp, Option.bind_some, hp.cp,
     utr_effPriv _ _ _ hp.mprv]
   uma_pures
-  uma_seq hc
-  uma_pures
-  rfl
+  -- the ordering bits select the model's `lr.rl` refusal arm: split them
+  cases aq <;> cases rl <;> (
+    simp only [Bool.and_true, Bool.and_false] at hc ⊢
+    uma_seq hc
+    uma_pures
+    rfl)
 
 /-! ## §2 Writes -/
 
@@ -234,17 +253,17 @@ theorem uma_mem_write_value_store (D : UFoot) (orc : UOrc) (s : UWSt) (hp : UmaP
   uma_mem_write_value D orc s _ hp pa w hw hr (.Store .Data) rfl false rfl false false .Write_plain uma_wk_store
     data (uma_write_ram_plain D orc s pa w (umaW_lt hw) data ho)
 
-/-- **An aligned SC's value write** (the reservation held): the map updated,
-the reservation spent. -/
+/-- **An aligned SC's value write**, from any reservation state (Rocq
+`resv_any`): the map updated, the reservation bit dropped. -/
 theorem uma_mem_write_value_sc (D : UFoot) (orc : UOrc) (s : UWSt) (hp : UmaPhys D s) (pa : BitVec 64)
     (w : Nat) (hw : umaW w) (hr : UmaRam pa w) (aq rl : Bool) (data : BitVec (8 * w))
-    (ho : bmOwned s.mm pa w = true) (hrv : s.rv = true) :
+    (ho : bmOwned s.mm pa w = true) :
     runRW D orc s (mem_write_value (.Physaddr pa) w data (.StoreConditional (aq, rl, .Data)) .PBMT_PMA
         (aq && rl) rl true) =
       some (.Ok true, { s with mm := bmWrite s.mm pa w data, rv := false }, orc) :=
   uma_mem_write_value D orc s _ hp pa w hw hr (.StoreConditional (aq, rl, .Data)) rfl true rfl (aq && rl) rl
     (umaScWk aq rl) (uma_wk_sc aq rl) data
-    (uma_write_ram_cond D orc s _ (umaCondWk_sc aq rl) pa w (umaW_lt hw) data ho hrv)
+    (uma_write_ram_cond D orc s _ (umaCondWk_sc aq rl) pa w (umaW_lt hw) data ho)
 
 /-- An aligned STORE's announce. -/
 theorem uma_mem_write_ea_store (D : UFoot) (orc : UOrc) (s : UWSt) (hp : UmaPhys D s) (pa : BitVec 64)

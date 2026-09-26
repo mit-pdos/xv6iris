@@ -28,12 +28,14 @@ The composed corollaries (`uma_vmem_read_addr_load`/`_lr` here,
 whole access over the owned byte map; `uma_utrTranslate_hit`/`_miss` put lane
 U1-P1's TLB facts in the translation hypothesis's shape.
 
-**Reservations** (risk 5).  LR's exclusive read sets the walker's
-reservation bit `rv` (`URunRW`); across cycles the bit rides `ctxTok`'s
-reservation fragment (`uResvTok`).  SC splits on the platform predicate
-`match_reservation pa` (opaque, `SailHooks`): `true` writes the bytes and
-spends the reservation (the walker's exclusive write needs `rv = true`),
-`false` only CHECKS the access (PMP/PMA) and writes nothing.  Nothing is
+**Reservations** (risk 5).  The walker follows Rocq's `resv_any` design
+(`URunRW`): LR's exclusive read (`lr`, `lr.aq`, `lr.aqrl`) sets the walker's
+bookkeeping bit `rv`, and the hart's reservation fragment (any reservation,
+any acquire bit) rides `ctxTok` across cycles (`uResvTok`).  SC splits on the
+platform predicate `match_reservation pa` (opaque, `SailHooks`): `true`
+writes the bytes from ANY reservation state (the machine only blocks the
+write while another hart reserves the bytes), `false` only CHECKS the access
+(PMP/PMA) and writes nothing.  Nothing is
 assumed about the predicate: both arms are theorems.  A misaligned LR/SC
 faults before any access (`plat_misaligned_access.lrsc = AccessFault`):
 `uma_vmem_read_addr_lr_mis`, `uma_vmem_write_addr_sc_mis`.
@@ -230,19 +232,19 @@ theorem uma_vmem_read_addr_load (D : UFoot) (orc orc1 : UOrc) (s s1 : UWSt) (hp 
     (uma_translateAddr_ok D orc orc1 s s1 hp va _ rfl hc ppn htr)
     (uma_mem_read_load D orc1 s1 hp1 (paOf ppn va) w hw hr v hv)
 
-/-- **An aligned LR of owned bytes** (`lr.w`/`lr.d`; the model passes
-`aq = false` for an instruction without `.aq`): the value, and the walker
-takes the reservation. -/
+/-- **An aligned LR of owned bytes** (`lr.w`/`lr.d`, `.aq`/`.aqrl` or not;
+the model passes `aq`, `aq && rl`): the value, and the walker takes the
+reservation bit. -/
 theorem uma_vmem_read_addr_lr (D : UFoot) (orc orc1 : UOrc) (s s1 : UWSt) (hp : UtrPins D s)
     (hp1 : UmaPhys D s1) (va : BitVec 64) (w : Nat) (hw : umaW w) (hal : va.toNat % w = 0) (hc : utrCanon va)
-    (rl : Bool) (ppn : BitVec 44)
-    (htr : runRW D orc s (utrTranslate s va (.LoadReserved (false, rl, .Data))) =
+    (aq rl : Bool) (ppn : BitVec 44)
+    (htr : runRW D orc s (utrTranslate s va (.LoadReserved (aq, rl, .Data))) =
       some (.Ok (ppn, .PBMT_PMA, ()), s1, orc1))
     (hr : UmaRam (paOf ppn va) w) (v : BitVec (8 * w)) (hv : bmRead s1.mm (paOf ppn va) w = some v) :
-    runRW D orc s (vmem_read_addr (.Virtaddr va) w (.LoadReserved (false, rl, .Data)) false (false && rl) true) =
+    runRW D orc s (vmem_read_addr (.Virtaddr va) w (.LoadReserved (aq, rl, .Data)) aq (aq && rl) true) =
       some (.Ok v, { s1 with rv := true }, orc1) :=
-  uma_vmem_read_addr_al D orc orc1 s s1 _ hp va w hw hal _ false false true (paOf ppn va) v
+  uma_vmem_read_addr_al D orc orc1 s s1 _ hp va w hw hal _ aq (aq && rl) true (paOf ppn va) v
     (uma_translateAddr_ok D orc orc1 s s1 hp va _ rfl hc ppn htr)
-    (uma_mem_read_lr D orc1 s1 hp1 (paOf ppn va) w hw hr false rl v hv)
+    (uma_mem_read_lr D orc1 s1 hp1 (paOf ppn va) w hw hr aq rl v hv)
 
 end MachCSL

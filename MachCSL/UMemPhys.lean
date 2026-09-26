@@ -20,11 +20,12 @@ iteration is
 * reads: `within_mmio_readable (Physaddr pa') b` -- `uma_within_mmio_readable_ram`
   (answers `false` on RAM), then `read_ram rk (Physaddr pa') b false` --
   `uma_read_ram_plain` (`Read_plain`) / `uma_read_ram_resv`
-  (`Read_RISCV_reserved`, which sets the walker's reservation bit);
+  (the three reserved kinds, acquire or not, which set the walker's
+  reservation bit);
 * writes: `within_mmio_writable (Physaddr pa') b` -- `uma_within_mmio_writable_ram`,
   then `write_ram wk (Physaddr pa') b v ()` -- `uma_write_ram_plain`
-  (`Write_plain`) / `uma_write_ram_cond` (the three conditional kinds, under
-  the walker's reservation bit);
+  (`Write_plain`) / `uma_write_ram_cond` (the three conditional kinds, from
+  any reservation state -- Rocq `resv_any`);
 * `mem_write_ea`'s iteration is `pmpCheck` and the pure `write_ram_ea`.
 
 Each atom is WIDTH-GENERIC (any `b < 2^64`; `inRam pa' b` for the MMIO ones)
@@ -81,38 +82,29 @@ theorem uma_mrd {X : Type} (D : UFoot) (orc : UOrc) (s : UWSt) {n vasize : Nat}
   show runRW D orc s (FreeM.impure (.ok (.memRead n vasize req)) k) = _
   simp only [runRW, hif, hn, hex, hr, Bool.false_eq_true, ↓reduceIte]
 
-/-- The read half of an exclusive pair: it takes the reservation. -/
+/-- The read half of an exclusive pair (acquire or not): it takes the
+reservation bit. -/
 theorem uma_mrdx {X : Type} (D : UFoot) (orc : UOrc) (s : UWSt) {n vasize : Nat}
     (req : Mem_read_request n vasize Arch.pa Arch.translation Arch.arch_ak)
     (k : Result ((BitVec (8 * n)) × (Option Bool)) Arch.abort → SailM X) (w : BitVec (8 * n))
     (hif : akIfetch req.access_kind = false) (hn : n < 2 ^ 64) (hex : akExcl req.access_kind = true)
-    (hacq : akAcq req.access_kind = false) (hr : bmRead s.mm req.pa n = some w) :
+    (hr : bmRead s.mm req.pa n = some w) :
     runRW D orc s (ConcurrencyInterfaceV1.sail_mem_read req >>= k) =
       runRW D orc { s with rv := true } (k (.Ok (w, none))) := by
   show runRW D orc s (FreeM.impure (.ok (.memRead n vasize req)) k) = _
-  simp only [runRW, hif, hn, hex, hacq, hr, Bool.false_eq_true, ↓reduceIte]
+  simp only [runRW, hif, hn, hex, hr, Bool.false_eq_true, ↓reduceIte]
 
-/-- A plain write of owned bytes (it drops the reservation bit). -/
+/-- A write of owned bytes, plain or the write half of an exclusive pair
+(from any reservation state, Rocq `resv_any`): the map updated, the
+reservation bit dropped. -/
 theorem uma_mwr {X : Type} (D : UFoot) (orc : UOrc) (s : UWSt) {n vasize : Nat}
     (req : Mem_write_request n vasize Arch.pa Arch.translation Arch.arch_ak)
     (k : Result (Option Bool) Arch.abort → SailM X) (w : BitVec (8 * n))
-    (hn : n < 2 ^ 64) (hv : req.value = some w) (ho : bmOwned s.mm req.pa n = true)
-    (hex : akExcl req.access_kind = false) :
+    (hn : n < 2 ^ 64) (hv : req.value = some w) (ho : bmOwned s.mm req.pa n = true) :
     runRW D orc s (ConcurrencyInterfaceV1.sail_mem_write req >>= k) =
       runRW D orc { s with mm := bmWrite s.mm req.pa n w, rv := false } (k (.Ok (some true))) := by
   show runRW D orc s (FreeM.impure (.ok (.memWrite n vasize req)) k) = _
-  simp only [runRW, hn, hv, ho, hex, Bool.false_eq_true, ↓reduceIte]
-
-/-- The write half of an exclusive pair: it pays with the reservation. -/
-theorem uma_mwrx {X : Type} (D : UFoot) (orc : UOrc) (s : UWSt) {n vasize : Nat}
-    (req : Mem_write_request n vasize Arch.pa Arch.translation Arch.arch_ak)
-    (k : Result (Option Bool) Arch.abort → SailM X) (w : BitVec (8 * n))
-    (hn : n < 2 ^ 64) (hv : req.value = some w) (ho : bmOwned s.mm req.pa n = true)
-    (hex : akExcl req.access_kind = true) (hrv : s.rv = true) :
-    runRW D orc s (ConcurrencyInterfaceV1.sail_mem_write req >>= k) =
-      runRW D orc { s with mm := bmWrite s.mm req.pa n w, rv := false } (k (.Ok (some true))) := by
-  show runRW D orc s (FreeM.impure (.ok (.memWrite n vasize req)) k) = _
-  simp only [runRW, hn, hv, ho, hex, hrv, ↓reduceIte]
+  simp only [runRW, hn, hv, ho, ↓reduceIte]
 
 /-! ## §2 The per-chunk atoms (Rocq `UserMemCert`'s RAM leaves) -/
 
@@ -126,16 +118,22 @@ theorem uma_read_ram_plain (D : UFoot) (orc : UOrc) (s : UWSt) (pa : BitVec 64) 
   rw [uma_mrd D orc s _ _ v rfl hn rfl h]
   rfl
 
-/-- **A reserved RAM read** (`lr`, no acquire): the value, and the walker
-takes the reservation. -/
-theorem uma_read_ram_resv (D : UFoot) (orc : UOrc) (s : UWSt) (pa : BitVec 64) (n : Nat)
-    (hn : n < 2 ^ 64) (v : BitVec (8 * n)) (h : bmRead s.mm pa n = some v) :
-    runRW D orc s (read_ram .Read_RISCV_reserved (.Physaddr pa) n false) =
+/-- The read kinds of a load-reserved. -/
+def umaResvRk : read_kind → Bool
+  | .Read_RISCV_reserved => true
+  | .Read_RISCV_reserved_acquire => true
+  | .Read_RISCV_reserved_strong_acquire => true
+  | _ => false
+
+/-- **A reserved RAM read** (`lr`, `lr.aq`, `lr.aqrl`): the value, and the
+walker takes the reservation bit. -/
+theorem uma_read_ram_resv (D : UFoot) (orc : UOrc) (s : UWSt) (rk : read_kind) (hrk : umaResvRk rk = true)
+    (pa : BitVec 64) (n : Nat) (hn : n < 2 ^ 64) (v : BitVec (8 * n)) (h : bmRead s.mm pa n = some v) :
+    runRW D orc s (read_ram rk (.Physaddr pa) n false) =
       some ((v, ()), { s with rv := true }, orc) := by
   unfold read_ram
-  sail_norm
-  rw [uma_mrdx D orc s _ _ v rfl hn rfl rfl h]
-  rfl
+  cases rk <;> simp only [umaResvRk, Bool.false_eq_true] at hrk <;> sail_norm <;>
+    rw [uma_mrdx D orc s _ _ v rfl hn rfl h] <;> rfl
 
 /-- **A plain RAM write** of owned bytes: the map updated, the reservation
 bit dropped. -/
@@ -145,7 +143,7 @@ theorem uma_write_ram_plain (D : UFoot) (orc : UOrc) (s : UWSt) (pa : BitVec 64)
       some (true, { s with mm := bmWrite s.mm pa n v, rv := false }, orc) := by
   unfold write_ram
   sail_norm
-  rw [uma_mwr D orc s _ _ v hn rfl ho rfl]
+  rw [uma_mwr D orc s _ _ v hn rfl ho]
   rfl
 
 /-- The write kinds of a store-conditional. -/
@@ -155,16 +153,16 @@ def umaCondWk : write_kind → Bool
   | .Write_RISCV_conditional_strong_release => true
   | _ => false
 
-/-- **A conditional RAM write** (`sc`, any ordering), under the walker's
-reservation: the map updated, the reservation spent. -/
+/-- **A conditional RAM write** (`sc`, any ordering), from ANY reservation
+state (Rocq `resv_any`; the model's `match_reservation` already let the SC
+through): the map updated, the reservation bit dropped. -/
 theorem uma_write_ram_cond (D : UFoot) (orc : UOrc) (s : UWSt) (wk : write_kind) (hwk : umaCondWk wk = true)
-    (pa : BitVec 64) (n : Nat) (hn : n < 2 ^ 64) (v : BitVec (8 * n)) (ho : bmOwned s.mm pa n = true)
-    (hrv : s.rv = true) :
+    (pa : BitVec 64) (n : Nat) (hn : n < 2 ^ 64) (v : BitVec (8 * n)) (ho : bmOwned s.mm pa n = true) :
     runRW D orc s (write_ram wk (.Physaddr pa) n v ()) =
       some (true, { s with mm := bmWrite s.mm pa n v, rv := false }, orc) := by
   unfold write_ram
   cases wk <;> simp only [umaCondWk, Bool.false_eq_true] at hwk <;> sail_norm <;>
-    rw [uma_mwrx D orc s _ _ v hn rfl ho rfl hrv] <;> rfl
+    rw [uma_mwr D orc s _ _ v hn rfl ho] <;> rfl
 
 /-- The signal window is not configured. -/
 theorem uma_within_sig (pa : BitVec 64) (n : Nat) : within_sig (.Physaddr pa) n = pure false := by
