@@ -195,39 +195,52 @@ variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [Fdslot
 /-- **THE CONSOLE, READY FOR THE APPLICATION** (Rocq `console_ready_app`,
 deviation 3): the console invariant at the ambient ring names and the
 application's credential (the lock handle's gname existential) beside the
-port's invariant.  Persistent. -/
+port's invariant, AND THE RING IS THIS ERA'S (Rocq seccomp S2k follow-up:
+main mints it with `era := genId + 1`, `consGhostsAlloc`; consoleread's
+marked receipt places each byte at the ring's own era, and this is what
+reads it as `genId + 1`).  Persistent. -/
 def consoleReadyApp : IProp GF :=
-  iprop((∃ γc : GName, consoleInv fscCons (appRdcred (hlc := hlc) (GF := GF)) γc) ∗ uartInv .uart0 fscCons.uart)
+  iprop((∃ γc : GName, consoleInv fscCons (appRdcred (hlc := hlc) (GF := GF)) γc) ∗
+    uartInv .uart0 fscCons.uart ∗ ⌜fscCons.era = genId (hlc := hlc) (GF := GF) + 1⌝)
 
 instance consoleReadyApp_persistent : Persistent (consoleReadyApp (GF := GF)) := by
   unfold consoleReadyApp; infer_instance
 
 /-- Rocq `console_ready_app_intro`. -/
-theorem consoleReadyApp_intro (γc : GName) :
+theorem consoleReadyApp_intro (γc : GName) (hera : fscCons.era = genId (hlc := hlc) (GF := GF) + 1) :
     consoleInv (GF := GF) fscCons (appRdcred (hlc := hlc) (GF := GF)) γc ⊢ uartInv .uart0 fscCons.uart -∗ consoleReadyApp := by
   unfold consoleReadyApp
   iintro #H #Hu
   iframe Hu
-  iexists γc
-  iexact H
+  isplitl
+  · iexists γc
+    iexact H
+  ipureintro; exact hera
 
 /-- Rocq `console_ready_app_devsw`. -/
 theorem consoleReadyApp_devsw : consoleReadyApp (GF := GF) ⊢ devswTable := by
   unfold consoleReadyApp
-  iintro ⟨⟨%γc, #H⟩, -⟩
+  iintro ⟨⟨%γc, #H⟩, -, -⟩
   iapply consoleInv_devsw $$ H
 
 /-- Rocq `console_ready_app_uart`. -/
 theorem consoleReadyApp_uart : consoleReadyApp (GF := GF) ⊢ uartInv .uart0 fscCons.uart := by
   unfold consoleReadyApp
-  iintro ⟨-, #H⟩
+  iintro ⟨-, #H, -⟩
   iexact H
+
+/-- THE ERA OF THE RING (Rocq `console_ready_app_era`, seccomp S2k). -/
+theorem consoleReadyApp_era :
+    consoleReadyApp (GF := GF) ⊢ ⌜fscCons.era = genId (hlc := hlc) (GF := GF) + 1⌝ := by
+  unfold consoleReadyApp
+  iintro ⟨-, -, %h⟩
+  ipureintro; exact h
 
 /-- The lock handle (Rocq `fileread_dev_caps_lock`). -/
 theorem consoleReadyApp_conslock :
     consoleReadyApp (GF := GF) ⊢ ∃ γc : GName, isConslock fscCons (appRdcred (hlc := hlc) (GF := GF)) γc := by
   unfold consoleReadyApp
-  iintro ⟨⟨%γc, #H⟩, -⟩
+  iintro ⟨⟨%γc, #H⟩, -, -⟩
   iexists γc
   iapply consoleInv_conslock $$ H
 
@@ -337,7 +350,8 @@ image `M'` at `addr + j` is the translated byte its tag's history ends in,
 under the caller's linearity), the stored-sequence bound, and EITHER the
 window (the bytes are the stored sequence at `[cur, cur + d)`, the chain,
 the swallowed byte, the input link's answer `Rin ws`) OR the dirty
-credential; and `Rd cur dc`. -/
+credential with where each byte came from (`consPlaced`/`consSwallowPlaced`
+at `genId + 1`, Rocq seccomp S2k); and `Rd cur dc`. -/
 def consoleReceipt (gn : GName) (pt : UPtd) (Rd : Nat → Nat → IProp GF)
     (Rin : List (List Obs × BitVec 8) → IProp GF)
     (n : Int) (r : BitVec 64) (M' : Nat → List (BitVec 8)) (addr : BitVec 64) : IProp GF :=
@@ -359,7 +373,14 @@ def consoleReceipt (gn : GName) (pt : UPtd) (Rd : Nat → Nat → IProp GF)
           (∃ sl' ws : List (List Obs × BitVec 8),
             consStoredLb fscCons sl' ∗ ⌜sl <+: sl'⌝ ∗ ⌜sl'.length = cur + dc⌝ ∗ ⌜ws.length = dc⌝ ∗
             ⌜∀ i : Nat, i < dc → ws[i]? = sl'[cur + i]?⌝ ∗ Rin ws)) ∨
-        consDirtyCred (appRdcred (hlc := hlc) (GF := GF))) ∗
+        -- ...AND ON THE CREDENTIAL ARM, WHERE THE BYTES CAME FROM (Rocq seccomp
+        -- S2k/S2k3), relayed from consoleread's post: each delivered byte
+        -- sits in `sl` at some position at or after `cur`, its history in
+        -- THIS era (`genId + 1`, read off `consoleReadyApp`), along the
+        -- stored order; and the swallowed byte, placed the same way
+        (consDirtyCred (appRdcred (hlc := hlc) (GF := GF)) ∗ ⌜consChain sl⌝ ∗
+          ⌜consPlaced sl cur (genId (hlc := hlc) (GF := GF) + 1) d hs⌝ ∗
+          consSwallowPlaced sl cur (genId (hlc := hlc) (GF := GF) + 1) d dc)) ∗
       Rd cur dc)
 
 /-- Rocq `console_receipt_m1`: the `-1` arm, at its reason. -/

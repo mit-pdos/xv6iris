@@ -156,7 +156,8 @@ theorem xv6Era_harts (σ : MState) (ξ0 : CtxId) (Γ : SchedNames) [ClaimIs (hlc
     (γ0 γ1 : UartNames) (γc γl0 γl1 : GName) (γd : DiskNames) (γt : GName)
     (cn : ConsNames) (dk : Nat → BitVec 8) (sb : FsSb) (nib : Nat) (cov : ExtTreeSet Nat compare)
     (ndisk : Nat) (S : FsStateRec) (Pb : Nat → List (BitVec 8)) (Rspent : ExtTreeSet Nat compare)
-    (γi : GName) (ξd : CtxId) (hcn : cn.uart = γ0) (hsnap : fsBootSnapWf dk ndisk S Pb sb nib cov) :
+    (γi : GName) (ξd : CtxId) (hcn : cn.uart = γ0) (hcne : cn.era = genId (hlc := hlc) (GF := GF) + 1)
+    (hsnap : fsBootSnapWf dk ndisk S Pb sb nib cov) :
     kernelText (GF := GF) ⊢ kernelData -∗
       startedInv γi ξd (mainDeposit Γ γ0 γ1 γc γl0 γl1 γd fscDlock γt) -∗ startedPrim γi -∗
       ctxTok (hlc := hlc) (GF := GF) startedPrimary ξ0 -∗
@@ -172,7 +173,7 @@ theorem xv6Era_harts (σ : MState) (ξ0 : CtxId) (Γ : SchedNames) [ClaimIs (hlc
   · have hp := (letI : CurCtx := bootSharedX ξ0;
       bootHartPrimary (hlc := hlc) (GF := GF) rfl Γ γ0 γ1 γc γl0 γl1 γd fscDlock γt
         (σ.regs startedPrimary) startedPrimary cn [] [] Virtio.cfg0 dk sb nib cov ndisk S Pb Rspent
-        γi ξd rfl rfl rfl rfl hcn rfl hsnap)
+        γi ξd rfl rfl rfl rfl hcn hcne rfl hsnap)
     iapply hp $$ Ht Hd Hb0 Htok Hs Hprim Hsup
   · iapply xv6Era_secondaries σ Γ γ0 γ1 γc γl0 γl1 γd γt γi ξd $$ Ht Hd Hs Hrest
 
@@ -218,7 +219,7 @@ theorem xv6Era_run (σ : MState) (ξ0 : CtxId) (Γ : SchedNames) [ClaimIs (hlc :
         genCert (hlc := hlc) (GF := GF) := by
   iintro #Hoinv #Hecho Hinit Hout
   unfold bootSharedOut
-  icases Hout with ⟨%hcn, #Ht, #Hd, Htok, Hb0, Hrest, Hsc, Hstmp, Hcore, #Hai, #Hu0, #Hu1, #Hpl, #Hw,
+  icases Hout with ⟨%hcn, %hcne, #Ht, #Hd, Htok, Hb0, Hrest, Hsc, Hstmp, Hcore, #Hai, #Hu0, #Hu1, #Hpl, #Hw,
     #Hcert, #Hdi, #Hci, #Hcc, Hroot⟩
   icases xv6Era_coreTies _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ $$ Hcore with ⟨%hties, Hcore⟩
   have hu : fscUart = γ0 := hties.2.2.2.1
@@ -233,7 +234,7 @@ theorem xv6Era_run (σ : MState) (ξ0 : CtxId) (Γ : SchedNames) [ClaimIs (hlc :
   ihave #Hp1 := hperm .uart1 γ1 (fun h => nomatch h) $$ Hoinv
   imodintro
   isplitl [Htok Hb0 Hrest Hsup Hprim]
-  · iapply xv6Era_harts σ ξ0 Γ γ0 γ1 γc γl0 γl1 γd γt cn dk sb nib cov ndisk S Pb Rspent γi ξd hcn hsnap
+  · iapply xv6Era_harts σ ξ0 Γ γ0 γ1 γc γl0 γl1 γd γt cn dk sb nib cov ndisk S Pb Rspent γi ξd hcn hcne hsnap
       $$ Ht Hd Hs Hprim Htok Hb0 Hrest Hsup
   isplitl [Hroot]
   · iapply xv6Era_devs γ0 γ1 γd

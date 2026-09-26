@@ -476,7 +476,8 @@ variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [WchGpr
 
 /-- **WHAT THE SHARED ALLOCATION PRODUCES** (Rocq `boot_shared_alloc`'s
 postcondition), at the minted instances and names:
-* the ring's tie `cn.uart = γ0` (`bootHartPrimary`'s `hcn`);
+* the ring's tie `cn.uart = γ0` (`bootHartPrimary`'s `hcn`) and its era
+  `cn.era = genId + 1` (`hcne`, Rocq seccomp S2k follow-up);
 * the shared persistents `kernelText`/`kernelData`;
 * the boot hart's running token at `ξ0` (its chain runs at `bootSharedX ξ0`, the
   context the supply was carved at) and its bundle; every other hart's
@@ -500,7 +501,7 @@ def bootSharedOut [WchG GF] [FdslotG GF] [BioslotG GF] [IrefslotG GF] [Icfg] [Fs
     (γc γl0 γl1 γt : GName) (cn : ConsNames) (γd : DiskNames) (ξd : CtxId)
     (dk : Nat → BitVec 8) (sb : FsSb) (nib : Nat) (cov : ExtTreeSet Nat compare)
     (Pb : Nat → List (BitVec 8)) (Rspent : ExtTreeSet Nat compare) : IProp GF := iprop%
-  ⌜cn.uart = γ0⌝ ∗
+  ⌜cn.uart = γ0⌝ ∗ ⌜cn.era = genId (hlc := hlc) (GF := GF) + 1⌝ ∗
   kernelText ∗ kernelData ∗
   ctxTok (hlc := hlc) (GF := GF) startedPrimary ξ0 ∗
   bootHartRes (σ.regs startedPrimary) startedPrimary ∗
@@ -557,7 +558,7 @@ theorem bootSharedAlloc (σ : MState) (hbf : bootFacts σ) (ds0 : DevStates) (hd
     [Hdevs Hch HU0 HU1] with ⟨%γ0, %γ1, %cn, %γd, Hdv⟩
   · iframe Hdevs Hch HU0 HU1
   unfold bsdDevRows
-  icases Hdv with ⟨%hcn, #Hi0, #Hi1, #Hpl, #Hdi, #Hcc, Hm0, Hm1, Hg, Hcfg, Hgh, Hroot, Hblk⟩
+  icases Hdv with ⟨%hcn, %hcne, #Hi0, #Hi1, #Hpl, #Hdi, #Hcc, Hm0, Hm1, Hg, Hcfg, Hgh, Hroot, Hblk⟩
   unfold bsdNameRows
   icases Hn with ⟨Hh, Hs, Hav, Hsf, Hchb, Htc, Htl0, Htl1, Htt, Hlks, Hfd, Hi1, Hi2, Hi3, Hia, Hb1, Hb2⟩
   -- the kernel-tier rows
@@ -579,6 +580,8 @@ theorem bootSharedAlloc (σ : MState) (hbf : bootFacts σ) (ds0 : DevStates) (hd
   unfold bootSharedOut bootSupplyCore
   isplitr
   · ipureintro; exact hcn
+  isplitr
+  · ipureintro; exact hcne
   iframe Htx Hd Ht0 Hb0 Hrest Hsc Hstmp Hai Hi0 Hi1 Hpl Hwire Hcert Hdi Hcinv Hcc Hroot
   iframe HL HG HLr HGr HSb HLog HF HNp Hh Hs Hav Hsf Hchb Htc Htl0 Htl1 Htt Hlks Hsup Hmb Hib Hiau
     Hbs Hcs Hm0 Hm1 Hcfg Hgh HDk Hkpt Hkauth HP

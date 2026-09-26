@@ -606,7 +606,8 @@ def crPost (k : KCtx) (j : Nat) (pid : BitVec 32) (V : ProcPriv)
        (∃ sl' ws : List (List Obs × BitVec 8),
           consStoredLb cn sl' ∗ ⌜sl <+: sl'⌝ ∗ ⌜sl'.length = cur + dc⌝ ∗ ⌜ws.length = dc⌝ ∗
           ⌜∀ i : Nat, i < dc → ws[i]? = sl'[cur + i]?⌝ ∗ Rin ws)) ∨
-      consDirtyCred Wd) -∗
+      (consDirtyCred Wd ∗ ⌜consChain sl⌝ ∗ ⌜consPlaced sl cur cn.era d hs⌝ ∗
+        consSwallowPlaced sl cur cn.era d dc)) -∗
     consOut cn Wd ord cur dc -∗
     kctx cpu' ((k.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k.regs 1#5)) -∗
     trapCsrsExt cpu' k.sie -∗ cpuClaimExt cpu' k.sie k.proc -∗

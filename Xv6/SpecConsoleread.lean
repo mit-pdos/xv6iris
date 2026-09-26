@@ -24,8 +24,9 @@ two control-flow rows on the cursor's advance `dc`; the LEDGER
 ring's stored sequence; the WINDOW (the bytes are the stored sequence at
 `[cur, cur + d)`, in order), the swallowed byte (`consSwallow`) and the
 link's answer `Rin ws` at the consumed window -- or, if somebody read
-behind the caller's back, the CREDENTIAL; and `consOut` (the token back at
-`cur + dc`).
+behind the caller's back, the CREDENTIAL and where each byte came from
+(`consPlaced`, `consSwallowPlaced`: Rocq seccomp S2k/S2k3, at the ring's era
+`cn.era`); and `consOut` (the token back at `cur + dc`).
 
 AND A `-1` HANDS THE READER THE KILL FACT (Rocq lane TRAP-ROWS T2): the
 one `-1` exit is the `killed(myproc())` test inside the wait loop, which
@@ -117,7 +118,12 @@ def wp_consoleread_eb_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF]
        (∃ sl' ws : List (List Obs × BitVec 8),
           consStoredLb cn sl' ∗ ⌜sl <+: sl'⌝ ∗ ⌜sl'.length = cur + dc⌝ ∗ ⌜ws.length = dc⌝ ∗
           ⌜∀ i : Nat, i < dc → ws[i]? = sl'[cur + i]?⌝ ∗ Rin ws)) ∨
-      consDirtyCred Wd) -∗
+      -- ...AND ON THE MARKED ARM, WHERE THE BYTES CAME FROM (Rocq seccomp
+      -- S2k/S2k3): each delivered byte sits in `sl` at some position at or
+      -- after `cur`, with its history in the ring's own era, along the
+      -- stored order; and the swallowed byte, placed the same way
+      (consDirtyCred Wd ∗ ⌜consChain sl⌝ ∗ ⌜consPlaced sl cur cn.era d hs⌝ ∗
+        consSwallowPlaced sl cur cn.era d dc)) -∗
     consOut cn Wd ord cur dc -∗
     kctx cpu' ((k.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k.regs 1#5)) -∗
     trapCsrsExt cpu' k.sie -∗ cpuClaimExt cpu' k.sie k.proc -∗

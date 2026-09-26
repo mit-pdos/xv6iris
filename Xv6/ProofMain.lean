@@ -342,7 +342,8 @@ theorem mn_phaseB (PR : PROCINIT) (TI : TRAPINIT) (TIH : TRAPINITHART) (PLI : PL
     (γ0 γ1 : UartNames) (γc γl0 γl1 : GName) (γd : DiskNames) (γdl γt : GName)
     (k : KCtx) (R0 : RegMap) (hsie : k.sie = false) (hK : mainSlots ≤ k.avail + 2) (hnoff : k.noff = 0)
     (hlocks : k.locks = []) (hproc : k.proc = 0#64) (htier : k.tier = KTier.kpt)
-    (cn : ConsNames) (hcn : cn.uart = γ0) (hcons : fscCons = cn)
+    (cn : ConsNames) (hcn : cn.uart = γ0) (hcne : cn.era = genId (hlc := hlc) (GF := GF) + 1)
+    (hcons : fscCons = cn)
     (c0 : VirtioCfg) (hdead : Virtio.live c0 = false)
     (dk : Nat → BitVec 8) (sb : FsSb) (Rspent : ExtTreeSet Nat compare) (Pb : Nat → List (BitVec 8))
     (hg : FsGeomOk) (hpures : firstFsinitPures dk sb Pb) (hcov0 : (0 : Nat) ∉ fscCov)
@@ -395,7 +396,7 @@ theorem mn_phaseB (PR : PROCINIT) (TI : TRAPINIT) (TIH : TRAPINITHART) (PLI : PL
   imod mn_pidWait_born startedPrimary (k.withRegs R1) $$ [$Hk $Hpli $Hwli $Hnp $Hpq $Hpra $Hpar $Hchb $Horph]
     with ⟨Hk, ⟨%γp, #Hpidl⟩, ⟨%γw, #Hwaitl⟩⟩
   -- the cons lock and the console bundles
-  imod mn_consLock startedPrimary (k.withRegs R1) γc γl0 γ0 cn hcn hcons
+  imod mn_consLock startedPrimary (k.withRegs R1) γc γl0 γ0 cn hcn hcne hcons
     $$ [$Hk $Hclf $Hcfr $Hcres $Hclean $Htbl $Hp0 $Hecho] with ⟨Hk, #Hcons⟩
   imodintro
   -- +0x7e  trapinit, and the ticks lock
@@ -458,7 +459,7 @@ theorem main_proof (CI : CPUID) (CN : CONSOLEINIT) (PI : PRINTKINIT) (PK : PRINT
     (VD : VIRTIO_DISK_INIT) (UI : USERINIT) (SCH : SCHEDULER) (KVE : KERNELVEC) : MAIN :=
   ⟨fun {hlc GF} _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ X Γ _ γ0 γ1 γc γl0 γl1 γd γdl γt cpu k cn
       l0 l1 c0 dk sb nib cov ndisk S Pb Rspent tlb0 γi ξd P _ _ hcpu hX hK hsie hnoff hlocks hproc hl0 hl1
-      hdead hcn hdl hsnap => by
+      hdead hcn hcne hdl hsnap => by
   obtain ⟨ξ, τ⟩ := X
   obtain rfl : τ = KTier.bare := hX
   letI : CurCtx := ⟨ξ, KTier.bare⟩
@@ -592,7 +593,7 @@ theorem main_proof (CI : CPUID) (CN : CONSOLEINIT) (PI : PRINTKINIT) (PK : PRINT
   -- Phase B, at the kernel tier
   iapply (mn_phaseB PR TI TIH PLI PLIH BI II FI VD UI SCH KVE ξ (Y := ⟨ξ, KTier.kpt⟩) rfl Γ γ0 γ1 γc γl0 γl1
     γd γdl γt ((k.pushed 2).toKpt t.base) R9 (by simp [hsie]) (by simp; omega) (by simp [hnoff])
-    (by simp [hlocks]) (by simp [hproc]) (by simp) fscCons hcn rfl c0 hdead dk sb Rspent Pb hg hpures
+    (by simp [hlocks]) (by simp [hproc]) (by simp) fscCons hcn hcne rfl c0 hdead dk sb Rspent Pb hg hpures
     hcov0 hnib0 hdev hγd hdl γi ξd P fscPrintk (pageAddr t.base) t (kvmMapT pas) (mn_pageAddr_hi t.base)
     (mn_pageAddr_extract t.base).symm pas hok)
   iframe Hk Hpc HB Hγt Hγc Hcfr Hstk Hsmap HW Hstv HFs Hkav Hdinv Hcrash Hcfg Hgh Hcells Hpav Hipt

@@ -501,6 +501,10 @@ theorem bootCarveProc_consRes [CurCtx] (cn : ConsNames) :
   · ipureintro; intro i j hi hj bi bj h; simp at h
   isplitr
   · ipureintro; intro j h b hj; simp at hj
+  isplitr
+  · ipureintro; exact consEra_nil _
+  isplitr
+  · ipureintro; exact Nat.le_refl 0
   isplitl [Hb]
   · unfold consData byteBuf; iexact Hb
   isplitr

@@ -112,7 +112,8 @@ theorem frd_consoleread (CR : CONSOLEREAD) (Γ : SchedNames) [ClaimIs (hlc := hl
          (∃ sl' ws : List (List Obs × BitVec 8),
             consStoredLb fscCons sl' ∗ ⌜sl <+: sl'⌝ ∗ ⌜sl'.length = cur + dc⌝ ∗ ⌜ws.length = dc⌝ ∗
             ⌜∀ i : Nat, i < dc → ws[i]? = sl'[cur + i]?⌝ ∗ Rin ws)) ∨
-        consDirtyCred (appRdcred (hlc := hlc) (GF := GF))) -∗
+        (consDirtyCred (appRdcred (hlc := hlc) (GF := GF)) ∗ ⌜consChain sl⌝ ∗
+          ⌜consPlaced sl cur fscCons.era d hs⌝ ∗ consSwallowPlaced sl cur fscCons.era d dc)) -∗
       consOut fscCons (appRdcred (hlc := hlc) (GF := GF)) ord cur dc -∗
       kctx c' ((k'.withSpie spie spp).withRegs R') -∗ pcIs c' (jumpPc (k'.regs 1#5)) -∗
       trapCsrsExt c' k'.sie -∗ cpuClaimExt c' k'.sie k'.proc -∗

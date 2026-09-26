@@ -89,6 +89,13 @@ Deviations from Rocq:
     `DiskAcc.diskWordPersist`), none importable here without a large
     cone, so it is restated as `consWord_persist` (cleanup candidate: hoist
     one copy to `MachCSL/WordPointsTo.lean`).
+11. (seccomp S2k, K3.)  `consResCur` carries Rocq's era clause
+    `consEra (st ++ pd) cn.era` and, of relax-d2 (lane K2), ONLY the
+    reader-position bound `nrd ≤ cur` -- the marked arm's placement needs
+    it (a holder's popped byte sits at the cursor, which the token's own
+    count never exceeds).  Rocq's `cons_dlcnt`/`ndl ≤ nrd` half is still
+    unported (it predates this lane's scope).  `cons_placed`/`cons_era`
+    live in `ConsoleTags` (pure), `cons_swallow_placed` here.
 -/
 import MachCSL.CtxBox
 import Xv6.ConsNames
@@ -423,6 +430,50 @@ theorem consSwallow_range (cn : ConsNames) (fault : Prop) (sl : List (List Obs �
   unfold consSwallow
   iintro (%he | ⟨%he, -⟩) <;> ipureintro <;> omega
 
+/-- THE SWALLOWED BYTE ON A MARKED RING (Rocq `cons_swallow_placed`, seccomp
+S2k3).  The marked arm has no window, so `consSwallow`'s "the next element of
+the sequence" is not available; what IS is where the popped byte sat: every
+pop is at the ring's cursor, which is at or after `lo`, and the byte carries
+its input tag and the ring's era `k` -- exactly `consPlaced`'s per-byte
+facts, for the one byte popped and not delivered.  `dc` is `d` or one
+more, as on the clean arm. -/
+def consSwallowPlaced (sl : List (List Obs × BitVec 8)) (lo k d dc : Nat) : IProp GF := iprop%
+  ⌜dc = d⌝ ∨
+  (⌜dc = d + 1⌝ ∗ ∃ (p : Nat) (h : List Obs) (b : BitVec 8),
+    ⌜lo ≤ p ∧ sl[p]? = some (h, b) ∧ obsEndsIn .uart0 h b ∧ obsBoots h = k⌝ ∗
+    MachFixedGS.rxTag (hlc := hlc) (GF := GF) h)
+
+instance consSwallowPlaced_persistent (sl : List (List Obs × BitVec 8)) (lo k d dc : Nat) :
+    Persistent (consSwallowPlaced (GF := GF) sl lo k d dc) := by
+  unfold consSwallowPlaced; infer_instance
+
+/-- Rocq `cons_swallow_placed_eq`. -/
+theorem consSwallowPlaced_eq (sl : List (List Obs × BitVec 8)) (lo k d : Nat) :
+    ⊢ consSwallowPlaced (GF := GF) sl lo k d d := by
+  unfold consSwallowPlaced
+  ileft; ipureintro; rfl
+
+/-- The bound only grows (Rocq `cons_swallow_placed_prefix`). -/
+theorem consSwallowPlaced_prefix (sl sl' : List (List Obs × BitVec 8)) (lo k d dc : Nat)
+    (hp : sl <+: sl') :
+    consSwallowPlaced (GF := GF) sl lo k d dc ⊢ consSwallowPlaced sl' lo k d dc := by
+  unfold consSwallowPlaced
+  iintro (%he | ⟨%he, %q, %h, %b, %hq, #Ht⟩)
+  · ileft; ipureintro; exact he
+  · iright
+    isplitr
+    · ipureintro; exact he
+    iexists q, h, b
+    iframe Ht
+    ipureintro
+    exact ⟨hq.1, consPrefix_lookup _ _ _ _ hp hq.2.1, hq.2.2⟩
+
+/-- The era, restated where a caller knows which era the ring is (Rocq
+`cons_swallow_placed_era`). -/
+theorem consSwallowPlaced_era (sl : List (List Obs × BitVec 8)) (lo k k' d dc : Nat) (he : k = k') :
+    consSwallowPlaced (GF := GF) sl lo k d dc ⊢ consSwallowPlaced sl lo k' d dc := by
+  subst he; exact .rfl
+
 /-! ## A console read without the reader token is legal, and priced
 
 The kernel CANNOT make console reading exclusive (a generic process may call
@@ -589,12 +640,16 @@ def consResCur [X : CurCtx] (cn : ConsNames) : IProp GF := iprop%
     ⌜consPend r w e pd bs ts⌝ ∗
     ⌜consChain (st ++ pd)⌝ ∗
     ⌜consBelow (st ++ pd) hh⌝ ∗
+    ⌜consEra (st ++ pd) cn.era⌝ ∗
+    -- the reader's position never runs ahead of the ring's consumed count
+    -- (Rocq's `nrd <= cur`, relax-d2 K2; the `dlcnt` half is not ported)
+    ⌜nrd ≤ cur⌝ ∗
     consData bs ∗ consTags ts ∗
     consStoredAuth cn st ∗ consCursor cn nrd ∗ consHi cn hh ∗
     consLogm cn L0 ∗ ⌜consLogOk L0 (st ++ pd) gp⌝ ∗
     (⌜cur = nrd⌝ ∨ consDirtyLb cn)
 
--- the payload has twelve binders and nineteen conjuncts: the default instance size is too small
+-- the payload has twelve binders and twenty-one conjuncts: the default instance size is too small
 set_option synthInstance.maxSize 1024 in
 /-- A LOCK PAYLOAD must be timeless (acquire strips a `▷` off it). -/
 instance consResCur_timeless [X : CurCtx] (cn : ConsNames) : Timeless (consResCur (GF := GF) cn) := by
@@ -617,7 +672,7 @@ instance consData_morph (t : KTier) (bs : List (BitVec 8)) :
     (fun j b ξ => @wordPointsTo hlc GF _ ⟨ξ, t⟩ (consBufAddr + BitVec.ofNat 64 j) 1 (DFrac.own 1) b)
     (fun _ _ => instCtxMorphWordAt _ _ _ _ _)
 
--- the payload has twelve binders and nineteen conjuncts: the default instance size is too small
+-- the payload has twelve binders and twenty-one conjuncts: the default instance size is too small
 set_option synthInstance.maxSize 1024 in
 instance consResAt_morph [X : CurCtx] (cn : ConsNames) : CtxMorph (GF := GF) (consResAt cn) := by
   unfold consResAt consResCur; infer_instance
@@ -636,13 +691,18 @@ theorem consPay_none (cn : ConsNames) (Wd : IProp GF) : consPay cn Wd none = con
 stood when the call read it and `dc` how far the cursor moved.  A token
 holder gets its half back at `cur + dc` with the one fact it cares about:
 the window began at ITS OWN position, or somebody read behind its back (and
-then the CREDENTIAL). -/
+then the CREDENTIAL).  THE MARKED ARM KEEPS THE POSITION (Rocq seccomp S2k,
+design 10.12): consoleread answers a token holder at its own `nrd` on both
+arms, and the receipt's marked arm places every delivered byte at or after
+`cur` (`consPlaced`) -- worth something to the holder only if it can tell
+that `cur` is its own position, so the credential comes with `cur = nrd`. -/
 def consOut (cn : ConsNames) (Wd : IProp GF) : Option Nat → Nat → Nat → IProp GF
-  | some nrd, cur, dc => iprop(consReader cn (cur + dc) ∗ (⌜cur = nrd⌝ ∨ consDirtyCred Wd))
+  | some nrd, cur, dc => iprop(consReader cn (cur + dc) ∗ (⌜cur = nrd⌝ ∨ consDirtyCred Wd ∗ ⌜cur = nrd⌝))
   | none, _, _ => iprop(emp)
 
 theorem consOut_some (cn : ConsNames) (Wd : IProp GF) (nrd cur dc : Nat) :
-    consOut cn Wd (some nrd) cur dc = iprop(consReader cn (cur + dc) ∗ (⌜cur = nrd⌝ ∨ consDirtyCred Wd)) :=
+    consOut cn Wd (some nrd) cur dc =
+      iprop(consReader cn (cur + dc) ∗ (⌜cur = nrd⌝ ∨ consDirtyCred Wd ∗ ⌜cur = nrd⌝)) :=
   rfl
 theorem consOut_none (cn : ConsNames) (Wd : IProp GF) (cur dc : Nat) :
     consOut cn Wd none cur dc = iprop(emp) := rfl
@@ -720,17 +780,19 @@ def consGhostsBoot (cn : ConsNames) : IProp GF := iprop%
 minted with the UART's ghosts, one half for the PLIC payload / the port's
 claim and one for the ring, and this allocation takes the ring's halves as
 its input -- which is why the ring's names record carries the uart's. -/
-theorem consGhostsAlloc (γu : UartNames) :
+theorem consGhostsAlloc (γu : UartNames) (k : Nat) :
     rxHi (GF := GF) γu (1 : Qp).half none ⊢
       uartDeliv γu (1 : Qp).half [] -∗ uartLogm γu (1 : Qp).half [] -∗
-      |==> ∃ cn : ConsNames, ⌜cn.uart = γu⌝ ∗ consGhostsBoot cn := by
+      |==> ∃ cn : ConsNames, ⌜cn.uart = γu⌝ ∗ ⌜cn.era = k⌝ ∗ consGhostsBoot cn := by
   iintro Hhi Hdv Hlm
   imod MonoList.own_alloc (GF := GF) ([] : List (List Obs × BitVec 8)) with ⟨%γl, Hl, #Hlb⟩
   imod ghost_var_alloc (GF := GF) (0 : Nat) with ⟨%γr, Hr⟩
   icases ghostVar_halves γr (0 : Nat) $$ Hr with ⟨Hr1, Hr2⟩
   imod MonoNat.own_alloc (GF := GF) 0 with ⟨%γk, Hk, -⟩
   imodintro
-  iexists (⟨γu, γl, γr, γk⟩ : ConsNames)
+  iexists (⟨γu, γl, γr, γk, k⟩ : ConsNames)
+  isplitr
+  · ipureintro; rfl
   isplitr
   · ipureintro; rfl
   unfold consGhostsBoot consStoredAuth consCursor consReader consRdtok consDl consDeliv consLogm

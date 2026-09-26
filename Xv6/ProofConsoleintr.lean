@@ -50,7 +50,7 @@ set_option maxHeartbeats 8000000 in
 theorem ci_body (CP : CONSPUTC) (RE : RELEASE) (WK : WAKEUP) (Γ : SchedNames)
     (c : CPU) (k : KCtx) (a b : Bool) (γc γl : GName) (cn : ConsNames) (γ : UartNames)
     (hb : List Obs) (cb : BitVec 8) (hh : Option (List Obs))
-    (hcn : cn.uart = γ) (hends : obsEndsIn .uart0 hb cb) (hx : ohistExt hh hb)
+    (hcn : cn.uart = γ) (hbe : obsBoots hb = cn.era) (hends : obsEndsIn .uart0 hb cb) (hx : ohistExt hh hb)
     (hwf : k.wf) (hnoff : k.noff + 2 < 2 ^ 31) (hK : consoleintrSlots ≤ k.avail)
     (hlk : "cons" ∉ k.locks) (hlp : "proc" ∉ k.locks) (hlu : "uart0" ∉ k.locks)
     (htier : k.tier = KTier.kpt)
@@ -210,7 +210,7 @@ theorem ci_body (CP : CONSPUTC) (RE : RELEASE) (WK : WAKEUP) (Γ : SchedNames)
             from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
             with [KCtx.rget_zero, hs1, ci_beq_ne _ _ (ci_sw_ne' cb 0#8 0#64 (by decide) hz)]
           iintro Hk Hpc
-          iapply (ci_ring CP RE WK Γ c k a b γc γl cn γ hb cb hh r w e bs ts hlb hlt hok hrow hcn
+          iapply (ci_ring CP RE WK Γ c k a b γc γl cn γ hb cb hh r w e bs ts hlb hlt hok hrow hcn hbe
               hends hx hwf hnoff hK hlk hlp hlu htier _ ?hr2 ?hsvv ?hs1')
             $$ [- $Hk $Hpc $Hlocked $Hr $Hw $He $Hd $Hgh $Hframe $Hhi $Hmark $HΦ]
           rotate_right 1
@@ -245,7 +245,8 @@ theorem consoleintr_proof (CP : CONSPUTC) (AC : ACQUIRE) (RE : RELEASE) (WK : WA
   simp only [consoleintrAddr]
   iintro ⟨Hk, Hpc, #Hpi, #Hcaps, #Htag, #Hlbh, #Hwlb, Hhi, Hlgh, Harm, Hnext⟩
   unfold consoleCaps
-  icases Hcaps with ⟨%cn, %hcn, #Hlk0, #Hport, #Hsh⟩
+  icases Hcaps with ⟨%cn, %hcn, %hcne, #Hlk0, #Hport, #Hsh⟩
+  have hbe : obsBoots hb = cn.era := by rw [hcne]; exact hboots
   ihave #Hlk : ciLk γc cn $$ [Hlk0]
   · unfold ciLk; iexact Hlk0
   ihave #Hpay := ciMkPay γ hb cb hends hboots $$ Hsh Htag Hlbh Hwlb
@@ -301,7 +302,7 @@ theorem consoleintr_proof (CP : CONSPUTC) (AC : ACQUIRE) (RE : RELEASE) (WK : WA
     iapply wpNext_mono _ _ _ _ _ $$ Hnext
     iintro %c' HΦ %R' Hk Hpc %hcs Hhi Hlgh Harm
     iapply HΦ $$ %spie %spp %R' %hsp' Hk Hpc %hcs Hhi Hlgh Harm
-  iapply (ci_body CP RE WK Γ c k spie spp γc γl cn γ hb cb hh hcn hends hx hwf hnoff hK hlk1 hlk2 hlk3
+  iapply (ci_body CP RE WK Γ c k spie spp γc γl cn γ hb cb hh hcn hbe hends hx hwf hnoff hK hlk1 hlk2 hlk3
       htier R1 f2 ⟨f18, f19, f20, f21, f22, f23, f24, f25, f26, f27⟩ ?hs1)
     $$ [- $Hk $Hpc $Hlocked $Hres $Hframe $Hhi $Hmark $Hret]
   case hs1 => rw [f9]; k_norm_g

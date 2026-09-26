@@ -304,6 +304,9 @@ theorem frd_arm_dev (CR : CONSOLEREAD) (Γ : SchedNames) [ClaimIs (hlc := hlc) G
   icases consAcc_open _ _ _ $$ Hacc with ⟨%ord, Hpay, Hback⟩
   icases consoleReadyApp_conslock $$ Hready with ⟨%γc, #Hcl⟩
   ihave #Hui := consoleReadyApp_uart $$ Hready
+  -- ...and the ring's era, which reads consoleread's marked receipt at
+  -- `genId + 1` (Rocq seccomp S2k follow-up)
+  ihave %hconsera := consoleReadyApp_era $$ Hready
   iapply (frd_consoleread CR Γ cpu _ γc ord Rin γkl γk j pid V M n ht hj ?cproc ?cK ?cnoff ?ctier
       ?cuser ?cn hn) $$ [- $Hk $Hpc]
   rotate_right 1
@@ -391,11 +394,13 @@ theorem frd_arm_dev (CR : CONSOLEREAD) (Γ : SchedNames) [ClaimIs (hlc := hlc) G
     iright; iexact Hsh
   · have hdr : d = (R1 10#5).toNat := by rw [hd]; exact (frd_ofInt_toNat d hd63).symm
     have hb4' := hb4 hd
-    icases Hwin with (⟨%hw, %hch, #Hsw, Hin⟩ | #Hcred)
+    icases Hwin with (⟨%hw, %hch, #Hsw, Hin⟩ | ⟨#Hcred, %hchd, %hpld, #Hswd⟩)
     · iapply (frd_receipt_of_run V.gen V.upt Rd Rin P' (viewFaulted V.upt P' M) M' (k.regs 11#5) n (R1 10#5)
         d dc cur bs hs sl hdr hdle hb1 hb4' hM hmap hpl htag hw hch) $$ Hts Hlb Hsw Hin Hrd
-    · iapply (frd_receipt_of_dirty V.gen V.upt Rd Rin P' (viewFaulted V.upt P' M) M' (k.regs 11#5) n (R1 10#5)
-        d dc cur bs hs sl hdr hdle hb1 hb4' hM hmap hpl htag) $$ Hts Hlb Hcred Hrd
+    · ihave #Hswd' := consSwallowPlaced_era sl cur _ _ d dc hconsera $$ Hswd
+      iapply (frd_receipt_of_dirty V.gen V.upt Rd Rin P' (viewFaulted V.upt P' M) M' (k.regs 11#5) n (R1 10#5)
+        d dc cur bs hs sl hdr hdle hb1 hb4' hM hmap hpl htag hchd
+        (consPlaced_era sl cur _ _ d hs hconsera hpld)) $$ Hts Hlb Hcred Hswd' Hrd
 
 end
 

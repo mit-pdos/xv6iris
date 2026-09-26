@@ -568,14 +568,17 @@ theorem frd_receipt_of_dirty (gn : GName) (pt : UPtd) (Rd : Nat → Nat → IPro
     (hb4 : d = 0 → 0 < n → dc = d + 1)
     (hM : M' = umemWrite Vw addr.toNat ((List.range d).map bs)) (hmap : umMapped P' addr.toNat d)
     (hpl : ∀ kp w, Iris.Std.PartialMap.get? P'.um kp = some w → (M' kp).length = 4096)
-    (htag : consTagged bs hs d) :
+    (htag : consTagged bs hs d)
+    -- ...and where each byte came from (Rocq seccomp S2k)
+    (hchd : consChain sl) (hpld : consPlaced sl cur (genId (hlc := hlc) (GF := GF) + 1) d hs) :
     ([∗list] h ∈ hs, MachFixedGS.rxTag (hlc := hlc) (GF := GF) h) ⊢
       consStoredLb fscCons sl -∗ consDirtyCred (appRdcred (hlc := hlc) (GF := GF)) -∗
+      consSwallowPlaced sl cur (genId (hlc := hlc) (GF := GF) + 1) d dc -∗
       Rd cur dc -∗ consoleReceipt (hlc := hlc) gn pt Rd Rin n r M' addr := by
   have hled := frd_ledger P' Vw M' addr d bs hs hM hmap hpl htag
   have hhl := htag.1
   unfold consoleReceipt
-  iintro Hts Hlb #Hcred Hrd
+  iintro Hts Hlb #Hcred #Hsw Hrd
   iright
   iexists d, dc, cur, hs, sl
   iframe Hts Hlb Hrd
@@ -592,7 +595,8 @@ theorem frd_receipt_of_dirty (gn : GName) (pt : UPtd) (Rd : Nat → Nat → IPro
   isplitr
   · ipureintro; exact hled
   iright
-  iexact Hcred
+  iframe Hcred Hsw
+  ipureintro; exact ⟨hchd, hpld⟩
 
 end Receipt
 

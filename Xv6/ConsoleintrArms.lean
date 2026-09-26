@@ -177,7 +177,7 @@ theorem ci_port_inv (γl : GName) (γ : UartNames) :
 the log entry filed; what the wake arm or the release needs. -/
 theorem ci_store_gh (cn : ConsNames) (γ : UartNames) (r w e : BitVec 32) (bs : List (BitVec 8))
     (ts : List (Option (List Obs))) (i : Nat) (hb : List Obs) (cb : BitVec 8)
-    (hh hg : Option (List Obs)) (hcn : cn.uart = γ) (hlb : bs.length = INPUT_BUF_SIZE)
+    (hh hg : Option (List Obs)) (hcn : cn.uart = γ) (hbe : obsBoots hb = cn.era) (hlb : bs.length = INPUT_BUF_SIZE)
     (hlt : ts.length = INPUT_BUF_SIZE) (hok : consOk r w e) (hroom : (e - r).toNat < INPUT_BUF_SIZE)
     (hi : i = consSlot e 0) (hends : obsEndsIn .uart0 hb cb) (hx : ohistExt hh hb)
     (hxg : ohistExt hg hb) :
@@ -190,7 +190,7 @@ theorem ci_store_gh (cn : ConsNames) (γ : UartNames) (r w e : BitVec 32) (bs : 
         ciGh cn none r w (e + 1#32) (bs.set i (consXlate cb)) (ts.set i (some hb)) := by
   iintro ⟨#Hinv, #Htag, Hhi, Hlgh, Hap, #Hts, Hgh⟩
   imod ciGh_push cn γ r w e bs ts i hb cb hh hg [echoOf cb] [echoOf cb].length iprop(True) hcn
-    hlb hlt hok hroom hi hends hx hxg rfl $$ [Hinv Hhi Hlgh Hap Hgh] with ⟨Hhi, Hlgh, Harm, -, Hgh⟩
+    hlb hlt hok hroom hi hends hx hxg rfl hbe $$ [Hinv Hhi Hlgh Hap Hgh] with ⟨Hhi, Hlgh, Harm, -, Hgh⟩
   · iframe Hinv Hhi Hlgh Hap Hgh
   imodintro
   ihave Hts' := consTags_upd ts i hb $$ Htag Hts
@@ -209,7 +209,7 @@ theorem ci_nl (CP : CONSPUTC) (RE : RELEASE) (WK : WAKEUP) (Γ : SchedNames)
     (r w e : BitVec 32) (bs : List (BitVec 8)) (ts : List (Option (List Obs)))
     (hlb : bs.length = INPUT_BUF_SIZE) (hlt : ts.length = INPUT_BUF_SIZE)
     (hok : consOk r w e) (hrow : consRow r e bs ts) (hroom : (e - r).toNat < INPUT_BUF_SIZE)
-    (hcn : cn.uart = γ) (hends : obsEndsIn .uart0 hb 13#8) (hx : ohistExt hh hb)
+    (hcn : cn.uart = γ) (hbe : obsBoots hb = cn.era) (hends : obsEndsIn .uart0 hb 13#8) (hx : ohistExt hh hb)
     (hwf : k.wf) (hnoff : k.noff + 2 < 2 ^ 31) (hK : consoleintrSlots ≤ k.avail)
     (hlk : "cons" ∉ k.locks) (hlp : "proc" ∉ k.locks) (hlu : "uart0" ∉ k.locks)
     (htier : k.tier = KTier.kpt)
@@ -312,7 +312,7 @@ theorem ci_nl (CP : CONSPUTC) (RE : RELEASE) (WK : WAKEUP) (Γ : SchedNames)
   -- THE STORE
   have hi := consSlot_of_and e
   iapply wpLoop_fupd
-  imod ci_store_gh cn γ r w e bs ts _ hb 13#8 hh hg hcn hlb hlt hok hroom hi hends hx hxg
+  imod ci_store_gh cn γ r w e bs ts _ hb 13#8 hh hg hcn hbe hlb hlt hok hroom hi hends hx hxg
     $$ [Hinv Htag Hhi Hlgh Hap Hts Hgh] with ⟨Hhi, Hlgh, Harm, #Hts', Hgh⟩
   · iframe Hinv Htag Hhi Hlgh Hap Hts Hgh
   imodintro
@@ -364,7 +364,7 @@ theorem ci_echo (CP : CONSPUTC) (RE : RELEASE) (WK : WAKEUP) (Γ : SchedNames)
     (r w e : BitVec 32) (bs : List (BitVec 8)) (ts : List (Option (List Obs)))
     (hlb : bs.length = INPUT_BUF_SIZE) (hlt : ts.length = INPUT_BUF_SIZE)
     (hok : consOk r w e) (hrow : consRow r e bs ts) (hroom : (e - r).toNat < INPUT_BUF_SIZE)
-    (hcn : cn.uart = γ) (hends : obsEndsIn .uart0 hb cb) (hx : ohistExt hh hb)
+    (hcn : cn.uart = γ) (hbe : obsBoots hb = cn.era) (hends : obsEndsIn .uart0 hb cb) (hx : ohistExt hh hb)
     (hc13 : cb ≠ 13#8)
     (hwf : k.wf) (hnoff : k.noff + 2 < 2 ^ 31) (hK : consoleintrSlots ≤ k.avail)
     (hlk : "cons" ∉ k.locks) (hlp : "proc" ∉ k.locks) (hlu : "uart0" ∉ k.locks)
@@ -462,7 +462,7 @@ theorem ci_echo (CP : CONSPUTC) (RE : RELEASE) (WK : WAKEUP) (Γ : SchedNames)
   -- THE STORE
   have hi := consSlot_of_and e
   iapply wpLoop_fupd
-  imod ci_store_gh cn γ r w e bs ts _ hb cb hh hg hcn hlb hlt hok hroom hi hends hx hxg
+  imod ci_store_gh cn γ r w e bs ts _ hb cb hh hg hcn hbe hlb hlt hok hroom hi hends hx hxg
     $$ [Hinv Htag Hhi Hlgh Hap Hts Hgh] with ⟨Hhi, Hlgh, Harm, #Hts', Hgh⟩
   · iframe Hinv Htag Hhi Hlgh Hap Hts Hgh
   imodintro
@@ -844,7 +844,7 @@ theorem ci_ring (CP : CONSPUTC) (RE : RELEASE) (WK : WAKEUP) (Γ : SchedNames)
     (r w e : BitVec 32) (bs : List (BitVec 8)) (ts : List (Option (List Obs)))
     (hlb : bs.length = INPUT_BUF_SIZE) (hlt : ts.length = INPUT_BUF_SIZE)
     (hok : consOk r w e) (hrow : consRow r e bs ts)
-    (hcn : cn.uart = γ) (hends : obsEndsIn .uart0 hb cb) (hx : ohistExt hh hb)
+    (hcn : cn.uart = γ) (hbe : obsBoots hb = cn.era) (hends : obsEndsIn .uart0 hb cb) (hx : ohistExt hh hb)
     (hwf : k.wf) (hnoff : k.noff + 2 < 2 ^ 31) (hK : consoleintrSlots ≤ k.avail)
     (hlk : "cons" ∉ k.locks) (hlp : "proc" ∉ k.locks) (hlu : "uart0" ∉ k.locks)
     (htier : k.tier = KTier.kpt)
@@ -904,7 +904,7 @@ theorem ci_ring (CP : CONSPUTC) (RE : RELEASE) (WK : WAKEUP) (Γ : SchedNames)
         from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
         with [hs1, ci_beq_eq (BitVec.setWidth 64 13#8) 13#64 (by decide), ci_beq_eq 13#64 13#64 rfl]
       iintro Hk Hpc
-      iapply (ci_nl CP RE WK Γ c k a b γc γl cn γ hb hh r w e bs ts hlb hlt hok hrow hroom hcn hends hx
+      iapply (ci_nl CP RE WK Γ c k a b γc γl cn γ hb hh r w e bs ts hlb hlt hok hrow hroom hcn hbe hends hx
           hwf hnoff hK hlk hlp hlu htier _ ?hr2 ?hsvv)
         $$ [- $Hk $Hpc $Hlocked $Hr $Hw $He $Hd $Hgh $Hframe $Hhi $Hmark $HΦ]
       rotate_right 1
@@ -928,7 +928,7 @@ theorem ci_ring (CP : CONSPUTC) (RE : RELEASE) (WK : WAKEUP) (Γ : SchedNames)
           bop.BEQ)
         from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [hs1, ci_beq_ne _ _ hne]
       iintro Hk Hpc
-      iapply (ci_echo CP RE WK Γ c k a b γc γl cn γ hb cb hh r w e bs ts hlb hlt hok hrow hroom hcn
+      iapply (ci_echo CP RE WK Γ c k a b γc γl cn γ hb cb hh r w e bs ts hlb hlt hok hrow hroom hcn hbe
           hends hx hcr hwf hnoff hK hlk hlp hlu htier _ ?hr2 ?hsvv ?hs1')
         $$ [- $Hk $Hpc $Hlocked $Hr $Hw $He $Hd $Hgh $Hframe $Hhi $Hmark $HΦ]
       rotate_right 1

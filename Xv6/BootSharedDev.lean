@@ -160,6 +160,7 @@ theorem bootSharedDev_uarts (X : CurCtx) :
       chistAt .uart0 (genId (hlc := hlc) (GF := GF) + 1) [] uartBootHist ∗
       bcpUartCells (Y := X) .uart0 ∗ bcpUartCells (Y := X) .uart1 ⊢
       |={⊤}=> ∃ (γ0 γ1 : UartNames) (cn : ConsNames), ⌜cn.uart = γ0⌝ ∗
+        ⌜cn.era = genId (hlc := hlc) (GF := GF) + 1⌝ ∗
         uartInv .uart0 γ0 ∗ uartInv .uart1 γ1 ∗
         mainUartRaw (hlc := hlc) X .uart0 γ0 [] ∗ mainUartRaw (hlc := hlc) X .uart1 γ1 [] ∗
         consGhostsBoot cn ∗ uartPreinit γ0 ∗ uartPreinit γ1 := by
@@ -172,11 +173,14 @@ theorem bootSharedDev_uarts (X : CurCtx) :
   · iframe Hc1 Hi1 Hr1
   icases Hu0 with ⟨Hm0, Hhi0, Hdv0, Hlm0, Hpre0⟩
   icases Hu1 with ⟨Hm1, -, -, -, Hpre1⟩
-  imod consGhostsAlloc (GF := GF) γ0 $$ Hhi0 Hdv0 Hlm0 with ⟨%cn, %hcn, Hg⟩
+  imod consGhostsAlloc (GF := GF) γ0 (genId (hlc := hlc) (GF := GF) + 1) $$ Hhi0 Hdv0 Hlm0
+    with ⟨%cn, %hcn, %hcne, Hg⟩
   imodintro
   iexists γ0, γ1, cn
   isplitr
   · ipureintro; exact hcn
+  isplitr
+  · ipureintro; exact hcne
   iframe Hi0 Hi1 Hm0 Hm1 Hg Hpre0 Hpre1
 
 /-- **The PLIC's invariant** (Rocq `dev_inv_alloc`'s PLIC share), over the
@@ -219,7 +223,7 @@ disk's init ghosts at the reset configuration, its root half, and the era
 image's first `nb` blocks. -/
 def bsdDevRows (X : CurCtx) (γ0 γ1 : UartNames) (cn : ConsNames) (γd : DiskNames)
     (dk : Nat → BitVec 8) (nb : Nat) : IProp GF := iprop%
-  ⌜cn.uart = γ0⌝ ∗
+  ⌜cn.uart = γ0⌝ ∗ ⌜cn.era = genId (hlc := hlc) (GF := GF) + 1⌝ ∗
   uartInv .uart0 γ0 ∗ uartInv .uart1 γ1 ∗ plicInv γ0 γ1 ∗ diskInv γd ∗ diskCrashCaps (hlc := hlc) γd ∗
   mainUartRaw (hlc := hlc) X .uart0 γ0 [] ∗ mainUartRaw (hlc := hlc) X .uart1 γ1 [] ∗
   consGhostsBoot cn ∗
@@ -262,7 +266,7 @@ theorem bootSharedDev_devs (X : CurCtx) (ds0 : DevStates) (nb : Nat) :
   iintro ⟨Hds, Hch, Hc0, Hc1⟩
   icases bsd_devFrags ds0 $$ Hds with ⟨Hf0, Hf1, Hfp, Hfv⟩
   imod bootSharedDev_uarts (hlc := hlc) X $$ [Hf0 Hf1 Hch Hc0 Hc1] with
-    ⟨%γ0, %γ1, %cn, %hcn, #Hi0, #Hi1, Hm0, Hm1, Hg, Hp0, Hp1⟩
+    ⟨%γ0, %γ1, %cn, %hcn, %hcne, #Hi0, #Hi1, Hm0, Hm1, Hg, Hp0, Hp1⟩
   · iframe Hf0 Hf1 Hch Hc0 Hc1
   imod bootSharedDev_plic (hlc := hlc) γ0 γ1 $$ [Hfp Hp0 Hp1] with #Hpl
   · iframe Hfp Hp0 Hp1
@@ -273,6 +277,8 @@ theorem bootSharedDev_devs (X : CurCtx) (ds0 : DevStates) (nb : Nat) :
   unfold bsdDevRows
   isplitr
   · ipureintro; exact hcn
+  isplitr
+  · ipureintro; exact hcne
   iframe Hi0 Hi1 Hpl Hdi Hcc Hm0 Hm1 Hg Hcfg Hgh Hroot
   rw [show diskOf ds0.reset = (ds0.st .virtio).disk from rfl]
   iexact Hblk

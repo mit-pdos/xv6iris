@@ -71,7 +71,7 @@ def ciGh (cn : ConsNames) (pe : Option (List Obs × BitVec 8)) (r w e : BitVec 3
   ∃ (cur nrd : Nat) (st pd : List (List Obs × BitVec 8)) (hh : Option (List Obs))
     (L0 : List LogEntry) (gp : Bool),
     ⌜consStored r w cur st bs ts⌝ ∗ ⌜consPend r w e pd bs ts⌝ ∗ ⌜consChain (st ++ pd)⌝ ∗
-    ⌜consBelow (st ++ pd) hh⌝ ∗
+    ⌜consBelow (st ++ pd) hh⌝ ∗ ⌜consEra (st ++ pd) cn.era⌝ ∗ ⌜nrd ≤ cur⌝ ∗
     consStoredAuth cn st ∗ consCursor cn nrd ∗ consHi cn hh ∗
     consLogm cn L0 ∗ ⌜consOwed L0 pe (st ++ pd) gp⌝ ∗
     (⌜cur = nrd⌝ ∨ consDirtyLb cn)
@@ -90,13 +90,13 @@ theorem ciGh_res [CurCtx] (cn : ConsNames) (r w e : BitVec 32) (bs : List (BitVe
     consData bs ∗ consTags ts ∗ ciGh cn none r w e bs ts ⊢ consResCur cn := by
   iintro ⟨Hr, Hw, He, Hd, #Hts, Hgh⟩
   unfold ciGh
-  icases Hgh with ⟨%cur, %nrd, %st, %pd, %hh, %L0, %gp, %hst, %hpd, %hch, %hbl, Ha, Hcur, Hhi, Hlm,
+  icases Hgh with ⟨%cur, %nrd, %st, %pd, %hh, %L0, %gp, %hst, %hpd, %hch, %hbl, %her, %hnc, Ha, Hcur, Hhi, Hlm,
     %hlog, Hmk⟩
   unfold consResCur
   iexists r, w, e, bs, ts, cur, nrd, st, pd, hh, L0, gp
   iframe Hr Hw He Hd Hts Ha Hcur Hhi Hlm Hmk
   ipureintro
-  exact ⟨hlb, hlt, hok, hrow, hst, hpd, hch, hbl, hlog⟩
+  exact ⟨hlb, hlt, hok, hrow, hst, hpd, hch, hbl, her, hnc, hlog⟩
 
 /-- ...and taken apart (Rocq `ct_res_gh`). -/
 theorem ciRes_gh [CurCtx] (cn : ConsNames) :
@@ -109,7 +109,7 @@ theorem ciRes_gh [CurCtx] (cn : ConsNames) :
       consData bs ∗ consTags ts ∗ ciGh cn none r w e bs ts := by
   unfold consResCur
   iintro ⟨%r, %w, %e, %bs, %ts, %cur, %nrd, %st, %pd, %hh, %L0, %gp, Hr, Hw, He, %hlb, %hlt, %hok,
-    %hrow, %hst, %hpd, %hch, %hbl, Hd, #Hts, Ha, Hcur, Hhi, Hlm, %hlog, Hmk⟩
+    %hrow, %hst, %hpd, %hch, %hbl, %her, %hnc, Hd, #Hts, Ha, Hcur, Hhi, Hlm, %hlog, Hmk⟩
   iexists r, w, e, bs, ts
   iframe Hr Hw He Hd Hts
   isplitr; · ipureintro; exact hlb
@@ -120,7 +120,7 @@ theorem ciRes_gh [CurCtx] (cn : ConsNames) :
   iexists cur, nrd, st, pd, hh, L0, gp
   iframe Ha Hcur Hhi Hlm Hmk
   ipureintro
-  exact ⟨hst, hpd, hch, hbl, hlog⟩
+  exact ⟨hst, hpd, hch, hbl, her, hnc, hlog⟩
 
 /-- THE EDIT (`cons.e--`, backspace and C('U')), only legal while the erase
 character is owed (Rocq `ct_gh_pop`). -/
@@ -128,7 +128,7 @@ theorem ciGh_pop (cn : ConsNames) (hb : List Obs) (cb : BitVec 8) (r w e : BitVe
     (bs : List (BitVec 8)) (ts : List (Option (List Obs))) (hne : e ≠ w) :
     ciGh (GF := GF) cn (some (hb, cb)) r w e bs ts ⊢ ciGh cn (some (hb, cb)) r w (e - 1#32) bs ts := by
   unfold ciGh
-  iintro ⟨%cur, %nrd, %st, %pd, %hh, %L0, %gp, %hst, %hpd, %hch, %hbl, Ha, Hcur, Hhi, Hlm, %hlog,
+  iintro ⟨%cur, %nrd, %st, %pd, %hh, %L0, %gp, %hst, %hpd, %hch, %hbl, %her, %hnc, Ha, Hcur, Hhi, Hlm, %hlog,
     Hmk⟩
   have hge := consSub_ne e w hne
   rcases List.eq_nil_or_concat pd with hpd0 | ⟨pd', x, hpdx⟩
@@ -137,7 +137,7 @@ theorem ciGh_pop (cn : ConsNames) (hb : List Obs) (cb : BitVec 8) (r w e : BitVe
     rw [hpd0, List.length_nil] at h0
     omega
   subst hpdx
-  simp only [List.concat_eq_append] at hpd hch hbl hlog
+  simp only [List.concat_eq_append] at hpd hch hbl her hlog
   have hsnoc : st ++ (pd' ++ [x]) = (st ++ pd') ++ [x] := by simp
   have hpfx : st ++ pd' <+: st ++ (pd' ++ [x]) := by
     rw [hsnoc]; exact List.prefix_append _ _
@@ -145,7 +145,8 @@ theorem ciGh_pop (cn : ConsNames) (hb : List Obs) (cb : BitVec 8) (r w e : BitVe
   iframe Ha Hcur Hhi Hlm Hmk
   ipureintro
   refine ⟨hst, consPend_pop r w e pd' x bs ts (by rw [hpd.1.symm] at hge ⊢; exact hge) hpd,
-    consChain_prefix _ _ hpfx hch, consBelow_prefix _ _ hh hpfx hbl, ?_⟩
+    consChain_prefix _ _ hpfx hch, consBelow_prefix _ _ hh hpfx hbl,
+    consEra_prefix _ _ _ hpfx her, hnc, ?_⟩
   obtain ⟨hgp, hall⟩ := hlog
   refine ⟨hgp, fun cs => ?_⟩
   rw [hsnoc] at hch
@@ -159,7 +160,7 @@ theorem ciGh_commit (cn : ConsNames) (pe : Option (List Obs × BitVec 8)) (r w e
     (bs : List (BitVec 8)) (ts : List (Option (List Obs))) (hok : consOk r w e) :
     ciGh (GF := GF) cn pe r w e bs ts ⊢ |==> ciGh cn pe r e e bs ts := by
   unfold ciGh
-  iintro ⟨%cur, %nrd, %st, %pd, %hh, %L0, %gp, %hst, %hpd, %hch, %hbl, Ha, Hcur, Hhi, Hlm, %hlog,
+  iintro ⟨%cur, %nrd, %st, %pd, %hh, %L0, %gp, %hst, %hpd, %hch, %hbl, %her, %hnc, Ha, Hcur, Hhi, Hlm, %hlog,
     Hmk⟩
   imod consStored_append cn st pd $$ Ha with Ha
   imodintro
@@ -167,7 +168,7 @@ theorem ciGh_commit (cn : ConsNames) (pe : Option (List Obs × BitVec 8)) (r w e
   iframe Ha Hcur Hhi Hlm Hmk
   ipureintro
   simp only [List.append_nil]
-  exact ⟨consStored_commit r w e cur st pd bs ts hok hst hpd, consPend_commit r e bs ts, hch, hbl, hlog⟩
+  exact ⟨consStored_commit r w e cur st pd bs ts hok hst hpd, consPend_commit r e bs ts, hch, hbl, her, hnc, hlog⟩
 
 /-- WHAT AN OPEN ARM OWES THE LOG (Rocq `ct_append`): the kernel's half of the
 arm at the position it has reached, and the application's licence to close
@@ -185,7 +186,7 @@ theorem ciGh_push (cn : ConsNames) (γ : UartNames) (r w e : BitVec 32) (bs : Li
     (hcn : cn.uart = γ) (hlb : bs.length = INPUT_BUF_SIZE) (hlt : ts.length = INPUT_BUF_SIZE)
     (hok : consOk r w e) (hroom : (e - r).toNat < INPUT_BUF_SIZE) (hi : i = consSlot e 0)
     (hends : obsEndsIn .uart0 h c) (hx : ohistExt hh h) (hxg : ohistExt hg h)
-    (hes : cs.take j = [echoOf c]) :
+    (hes : cs.take j = [echoOf c]) (hbe : obsBoots h = cn.era) :
     uartInv (GF := GF) .uart0 γ ∗ rxHi γ (1 : Qp).half hh ∗ logHi γ (1 : Qp).half hg ∗
       ciAppend γ h c cs j Φ ∗ ciGh cn none r w e bs ts ⊢
       |={⊤}=> rxHi γ (1 : Qp).half (some h) ∗ logHi γ (1 : Qp).half (some h) ∗
@@ -194,7 +195,7 @@ theorem ciGh_push (cn : ConsNames) (γ : UartNames) (r w e : BitVec 32) (bs : Li
   subst hcn
   unfold ciGh ciAppend
   iintro ⟨#Hinv, Hhi0, Hlgh, ⟨Harm, Hap⟩, ⟨%cur, %nrd, %st, %pd, %hh1, %L0, %gp, %hst, %hpd, %hch,
-    %hbl, Ha, Hcur, Hhi, Hlm, %hlog, Hmk⟩⟩
+    %hbl, %her, %hnc, Ha, Hcur, Hhi, Hlm, %hlog, Hmk⟩⟩
   unfold consHi consLogm
   icases rxHi_agree cn.uart _ _ _ _ $$ [Hhi0 Hhi] with ⟨%hagr, Hhi0, Hhi⟩
   · iframe Hhi0 Hhi
@@ -215,6 +216,7 @@ theorem ciGh_push (cn : ConsNames) (γ : UartNames) (r w e : BitVec 32) (bs : Li
     consPend_push r w e pd bs ts i h c hlb hlt hok hroom hi hends hpd,
     consChain_snoc _ hh h c hch hbl hx,
     consBelow_snoc _ hh h c hbl hx,
+    consEra_snoc _ _ h c her hbe, hnc,
     consLogOk_push L0 _ gp h c hch hbelow (consGtop_of_below _ hh h hbl hx) hlog⟩
 
 /-- A DROP (a NUL byte, a full ring, an erase with nothing to erase): the ring
@@ -230,7 +232,7 @@ theorem ciGh_drop (cn : ConsNames) (γ : UartNames) (r w e : BitVec 32) (bs : Li
   subst hcn
   unfold ciGh ciAppend
   iintro ⟨#Hinv, Hlgh, ⟨Harm, Hap⟩, ⟨%cur, %nrd, %st, %pd, %hh, %L0, %gp, %hst, %hpd, %hch,
-    %hbl, Ha, Hcur, Hhi, Hlm, %hlog, Hmk⟩⟩
+    %hbl, %her, %hnc, Ha, Hcur, Hhi, Hlm, %hlog, Hmk⟩⟩
   unfold consLogm
   imod uartInv_consClose cn.uart h c cs j hg L0 Φ (by rw [hes]; left; rfl)
     $$ [Hinv Hlgh Hlm Harm Hap] with ⟨Hlgh, Hlm, %hbelow, Harm, HΦ⟩
@@ -241,7 +243,7 @@ theorem ciGh_drop (cn : ConsNames) (γ : UartNames) (r w e : BitVec 32) (bs : Li
   iexists cur, nrd, st, pd, hh, L0 ++ [(h, c, [])], gp
   iframe Ha Hcur Hhi Hlm Hmk
   ipureintro
-  exact ⟨hst, hpd, hch, hbl, consLogOk_snoc_nil L0 _ gp (h, c, []) rfl hlog⟩
+  exact ⟨hst, hpd, hch, hbl, her, hnc, consLogOk_snoc_nil L0 _ gp (h, c, []) rfl hlog⟩
 
 /-- ...and the same at the SEALED ring (Rocq `ct_res_drop`). -/
 theorem ciRes_drop [CurCtx] (cn : ConsNames) (γ : UartNames) (h : List Obs) (c : BitVec 8)
@@ -271,7 +273,7 @@ theorem ciGh_owe (cn : ConsNames) (γ : UartNames) (r w e : BitVec 32) (bs : Lis
       rxHi γ (1 : Qp).half hh ∗ ciGh cn (some (h, c)) r w e bs ts := by
   subst hcn
   unfold ciGh
-  iintro ⟨Hhi0, ⟨%cur, %nrd, %st, %pd, %hh1, %L0, %gp, %hst, %hpd, %hch, %hbl, Ha, Hcur, Hhi, Hlm,
+  iintro ⟨Hhi0, ⟨%cur, %nrd, %st, %pd, %hh1, %L0, %gp, %hst, %hpd, %hch, %hbl, %hera, %hnc, Ha, Hcur, Hhi, Hlm,
     %hlog, Hmk⟩⟩
   unfold consHi
   icases rxHi_agree cn.uart _ _ _ _ $$ [Hhi0 Hhi] with ⟨%hagr, Hhi0, Hhi⟩
@@ -281,7 +283,7 @@ theorem ciGh_owe (cn : ConsNames) (γ : UartNames) (r w e : BitVec 32) (bs : Lis
   iexists cur, nrd, st, pd, hh, L0, true
   iframe Ha Hcur Hhi Hlm Hmk
   ipureintro
-  refine ⟨hst, hpd, hch, hbl, rfl, fun cs => ?_⟩
+  refine ⟨hst, hpd, hch, hbl, hera, hnc, rfl, fun cs => ?_⟩
   exact consLogOk_owe L0 _ gp h c cs hch (consGtop_of_below _ hh h hbl hx)
     (consEndsIn_nonnil .uart0 h c hends) her hlog
 
@@ -297,7 +299,7 @@ theorem ciGh_pay (cn : ConsNames) (γ : UartNames) (r w e : BitVec 32) (bs : Lis
   subst hcn
   unfold ciGh ciAppend
   iintro ⟨#Hinv, Hlgh, ⟨Harm, Hap⟩, ⟨%cur, %nrd, %st, %pd, %hh, %L0, %gp, %hst, %hpd, %hch,
-    %hbl, Ha, Hcur, Hhi, Hlm, %hlog, Hmk⟩⟩
+    %hbl, %her, %hnc, Ha, Hcur, Hhi, Hlm, %hlog, Hmk⟩⟩
   unfold consLogm
   imod uartInv_consClose cn.uart h c cs j hg L0 Φ (by rw [hes]; exact hecho)
     $$ [Hinv Hlgh Hlm Harm Hap] with ⟨Hlgh, Hlm, %hbelow, Harm, HΦ⟩
@@ -308,7 +310,7 @@ theorem ciGh_pay (cn : ConsNames) (γ : UartNames) (r w e : BitVec 32) (bs : Lis
   iexists cur, nrd, st, pd, hh, L0 ++ [(h, c, es)], true
   iframe Ha Hcur Hhi Hlm Hmk
   ipureintro
-  exact ⟨hst, hpd, hch, hbl, hlog.2 es⟩
+  exact ⟨hst, hpd, hch, hbl, her, hnc, hlog.2 es⟩
 
 /-! ## What the caller gets back -/
 

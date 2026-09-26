@@ -309,6 +309,8 @@ def wp_main_boot_body [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF] [FsTopG G
     (hdead : Virtio.live c0 = false)
     -- the console ring's names carry the receive side's
     (hcn : cn.uart = γ0)
+    -- ...and the ring is THIS era's (Rocq seccomp S2k follow-up)
+    (hcne : cn.era = genId (hlc := hlc) (GF := GF) + 1)
     -- the vdisk lock is born at the ambient name (kit 1's free token)
     (hdl : fscDlock = γdl)
     -- THE WHOLE SNAPSHOT HYPOTHESIS (Rocq `fs_boot_snap_wf`)
@@ -371,9 +373,9 @@ structure MAIN : Prop where
     (S : FsStateRec) (Pb : Nat → List (BitVec 8)) (Rspent : ExtTreeSet Nat compare)
     (tlb0 : Tlb) (γi : GName) (ξd : CtxId) (P : CtxId → IProp GF)
     [∀ ξ, Persistent (P ξ)] [CtxMorph P]
-    hcpu hX hK hsie hnoff hlocks hproc hl0 hl1 hdead hcn hdl hsnap,
+    hcpu hX hK hsie hnoff hlocks hproc hl0 hl1 hdead hcn hcne hdl hsnap,
     wp_main_boot_body (hlc := hlc) (GF := GF) X Γ γ0 γ1 γc γl0 γl1 γd γdl γt cpu k cn
       l0 l1 c0 dk sb nib cov ndisk S Pb Rspent tlb0 γi ξd P hcpu hX hK hsie hnoff hlocks hproc hl0 hl1
-      hdead hcn hdl hsnap
+      hdead hcn hcne hdl hsnap
 
 end Xv6

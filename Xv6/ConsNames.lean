@@ -28,11 +28,18 @@ import Xv6.UartTrace
 namespace Xv6
 
 /-- The console ring's ghost names (Rocq `cons_names`: `cn_uart cn_log cn_rd
-cn_dirty`). -/
+cn_dirty cn_era`). -/
 structure ConsNames where
   uart : UartNames
   log : Iris.GName
   rd : Iris.GName
   dirty : Iris.GName
+  /-- THE BOOT ERA the ring belongs to (Rocq `cn_era`, seccomp S2k follow-up):
+  a plain number fixed when the record is built -- every entry the ring
+  stores or holds pending arrived in this era (`consEra`).  A name and not a
+  ghost because the ring is re-founded empty at every boot; the caps that
+  know the current era (`consoleCaps`, `consoleReadyApp`) say
+  `cn.era = genId + 1`. -/
+  era : Nat
 
 end Xv6

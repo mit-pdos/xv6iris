@@ -255,6 +255,7 @@ theorem bootHartPrimary [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF] [FsTopG
     (γi : GName) (ξd : CtxId)
     (hcpu : cpu = startedPrimary)
     (hl0 : l0 = []) (hl1 : l1 = []) (hdead : Virtio.live c0 = false) (hcn : cn.uart = γ0)
+    (hcne : cn.era = genId (hlc := hlc) (GF := GF) + 1)
     (hdl : fscDlock = γdl) (hsnap : fsBootSnapWf dk ndisk S Pb sb nib cov) :
     kernelText (GF := GF) ⊢ kernelData -∗ bootHartRes f cpu -∗ ctxTok cpu curCtx -∗
       startedInv γi ξd (mainDeposit Γ γ0 γ1 γc γl0 γl1 γd γdl γt) -∗ startedPrim γi -∗
@@ -266,7 +267,7 @@ theorem bootHartPrimary [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF] [FsTopG
   iintro %R Hk Hf Hraw Hpc
   have hm' := hm cpu (bootKCtx R bootStackSlots) cn l0 l1 c0 dk sb nib cov ndisk S Pb Rspent (f .tlb)
     γi ξd (mainDeposit Γ γ0 γ1 γc γl0 γl1 γd γdl γt) hcpu hX bootChain_mainSlots_le rfl rfl rfl rfl
-    hl0 hl1 hdead hcn hdl hsnap
+    hl0 hl1 hdead hcn hcne hdl hsnap
   unfold wp_main_boot_body at hm'
   iapply hm'
   isplitl [Hk]

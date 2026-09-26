@@ -69,9 +69,13 @@ theorem consEchoShift_triv (hc : MachFixedGS.consRes (hlc := hlc) (GF := GF) = c
     ⊢@{IProp GF} consEchoShift :=
   (consLicence_triv hc).trans consEchoShift_of_licence
 
-/-- THE CONSOLE'S BUNDLE ON THE INTERRUPT PATH (Rocq `console_caps`). -/
+/-- THE CONSOLE'S BUNDLE ON THE INTERRUPT PATH (Rocq `console_caps`).  AND THE
+RING IS THIS ERA'S (Rocq seccomp S2k follow-up): what lets the store arm
+keep `consResCur`'s era clause with the byte's own stamp
+`obsBoots hb = genId + 1`. -/
 def consoleCaps [CurCtx] (γc γl : GName) (γ : UartNames) : IProp GF := iprop%
-  ∃ cn : ConsNames, ⌜cn.uart = γ⌝ ∗ isLock γc consAddr "cons" (consResAt cn) ∗
+  ∃ cn : ConsNames, ⌜cn.uart = γ⌝ ∗ ⌜cn.era = genId (hlc := hlc) (GF := GF) + 1⌝ ∗
+    isLock γc consAddr "cons" (consResAt cn) ∗
     uartPort .uart0 γl γ ∗ consEchoShift
 
 instance consoleCaps_persistent [CurCtx] (γc γl : GName) (γ : UartNames) :

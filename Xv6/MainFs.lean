@@ -406,7 +406,7 @@ tier switch because the ring's payload is a kernel-tier fact): the lock is
 born at `γc` over the ring, the clean token buys the credential escrow, and
 the two bundles are assembled while the lock's name is concrete. -/
 theorem mn_consLock [Fscfg] [CurCtx] (cpu : CPU) (k : KCtx) (γc γl0 : GName) (γ0 : UartNames) (cn : ConsNames)
-    (hcn : cn.uart = γ0) (hcons : fscCons = cn) :
+    (hcn : cn.uart = γ0) (hcne : cn.era = genId (hlc := hlc) (GF := GF) + 1) (hcons : fscCons = cn) :
     kctx cpu k ∗ lockFreeTok γc ∗ lkFresh consAddr ∗ consResAt cn curCtx ∗ consCleanTok cn ∗
     devswTable ∗ uartPort .uart0 γl0 γ0 ∗ consEchoShift
     ⊢ |={⊤}=> (kctx (GF := GF) cpu k ∗ mnConsole γc γl0 γ0) := by
@@ -421,17 +421,20 @@ theorem mn_consLock [Fscfg] [CurCtx] (cpu : CPU) (k : KCtx) (γc γl0 : GName) (
   unfold mnConsole consoleCaps consoleReadyApp
   isplitl []
   · iexists cn
+    isplitr; · ipureintro; exact hcn
+    isplitr; · ipureintro; exact hcne
     iframe Hlk Hport Hecho
-    ipureintro; exact hcn
   isplitl []
   · iexists γc
     unfold consoleInv isConslock
     rw [hcons]
     iframe Hlk Hcred Htbl
+  isplitl []
   · rw [hcons, hcn]
     unfold uartPort
     icases Hport with ⟨Hi, -⟩
     iexact Hi
+  · ipureintro; rw [hcons]; exact hcne
 
 end
 

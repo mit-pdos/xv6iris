@@ -488,4 +488,83 @@ theorem consWindow_snoc (l : List (List Obs × BitVec 8)) (n d : Nat) (bs bs' : 
     · rw [List.getElem?_append_right (by omega), hl]; simp
     · rw [List.getElem?_append_right (by omega), hhl]; simp
 
+/-! ## The marked arm: where the bytes came from (seccomp S2k) -/
+
+/-- THE RING'S ERA CLAUSE (Rocq `cons_era`, seccomp S2k follow-up): every
+stored and pending entry arrived in era `k` (the names record's `era`).
+Pure, over the ring's own sequence, and preserved by every transition: a
+push files a byte of the current era, and nothing else adds an entry. -/
+def consEra (l : List (List Obs × BitVec 8)) (k : Nat) : Prop :=
+  ∀ p, p ∈ l → obsBoots p.1 = k
+
+theorem consEra_nil (k : Nat) : consEra [] k := fun _ hp => by simp at hp
+
+theorem consEra_prefix (l1 l2 : List (List Obs × BitVec 8)) (k : Nat) (hp : l1 <+: l2)
+    (he : consEra l2 k) : consEra l1 k :=
+  fun p hmem => he p (hp.sublist.subset hmem)
+
+theorem consEra_snoc (l : List (List Obs × BitVec 8)) (k : Nat) (h : List Obs) (c : BitVec 8)
+    (he : consEra l k) (hh : obsBoots h = k) : consEra (l ++ [(h, c)]) k := by
+  intro p hp
+  rcases List.mem_append.mp hp with hp | hp
+  · exact he p hp
+  · rw [List.mem_singleton.mp hp]; exact hh
+
+theorem consEra_lookup (l : List (List Obs × BitVec 8)) (k p : Nat) (h : List Obs) (b : BitVec 8)
+    (he : consEra l k) (hl : l[p]? = some (h, b)) : obsBoots h = k :=
+  he (h, b) (List.mem_of_getElem? hl)
+
+/-- WHAT A READ WHOSE RING WENT DIRTY STILL KNOWS (Rocq `cons_placed`,
+seccomp S2k, design 10.12).  A marked ring takes the WINDOW away -- a
+tokenless reader popped in one of this call's sleeps, so the bytes are no
+longer consecutive -- but not where each byte came from: every pop is at the
+ring's cursor, the byte it takes is the stored sequence's element there, and
+the cursor is never below the reader's own position.  So the `j`th
+delivered byte sits at SOME position `p ≥ lo` of the bound `l`, with its own
+history, in era `k`.  The positions are NOT promised to increase with `j`. -/
+def consPlaced (l : List (List Obs × BitVec 8)) (lo k d : Nat) (hs : List (List Obs)) : Prop :=
+  hs.length = d ∧
+  ∀ j : Nat, j < d → ∃ (p : Nat) (h : List Obs) (b : BitVec 8),
+    lo ≤ p ∧ hs[j]? = some h ∧ obsEndsIn .uart0 h b ∧ l[p]? = some (h, b) ∧ obsBoots h = k
+
+theorem consPlaced_0 (l : List (List Obs × BitVec 8)) (lo k : Nat) : consPlaced l lo k 0 [] :=
+  ⟨rfl, fun _ hj => absurd hj (Nat.not_lt_zero _)⟩
+
+/-- A clean window is placed, at its own start, in the era of its bound. -/
+theorem consPlaced_of_window (l : List (List Obs × BitVec 8)) (n k d : Nat) (bs : Nat → BitVec 8)
+    (hs : List (List Obs)) (her : consEra l k) (hw : consWindow l n d bs hs) :
+    consPlaced l n k d hs := by
+  obtain ⟨_, hhl, hwin⟩ := hw
+  refine ⟨hhl, fun j hj => ?_⟩
+  obtain ⟨h, b, hl, hh, he, _⟩ := hwin j hj
+  exact ⟨n + j, h, b, by omega, hh, he, hl, consEra_lookup l k (n + j) h b her hl⟩
+
+/-- The bound only grows. -/
+theorem consPlaced_prefix (l l' : List (List Obs × BitVec 8)) (lo k d : Nat) (hs : List (List Obs))
+    (hp : l <+: l') (hpl : consPlaced l lo k d hs) : consPlaced l' lo k d hs := by
+  obtain ⟨hhl, hpl⟩ := hpl
+  refine ⟨hhl, fun j hj => ?_⟩
+  obtain ⟨p, h, b, hlo, hh, he, hl, hk⟩ := hpl j hj
+  exact ⟨p, h, b, hlo, hh, he, consPrefix_lookup _ _ _ _ hp hl, hk⟩
+
+/-- ...and a pop at a position at or after `lo` places one more byte. -/
+theorem consPlaced_snoc (l : List (List Obs × BitVec 8)) (lo k d p : Nat) (hs : List (List Obs))
+    (h : List Obs) (b : BitVec 8) (hpl : consPlaced l lo k d hs) (hlo : lo ≤ p)
+    (hl : l[p]? = some (h, b)) (he : obsEndsIn .uart0 h b) (hk : obsBoots h = k) :
+    consPlaced l lo k (d + 1) (hs ++ [h]) := by
+  obtain ⟨hhl, hpl⟩ := hpl
+  refine ⟨by simp [hhl], fun j hj => ?_⟩
+  by_cases hjd : j < d
+  · obtain ⟨p', h', b', hlo', hh', he', hl', hk'⟩ := hpl j hjd
+    refine ⟨p', h', b', hlo', ?_, he', hl', hk'⟩
+    rw [List.getElem?_append_left (by omega)]; exact hh'
+  · have hje : j = d := by omega
+    subst hje
+    refine ⟨p, h, b, hlo, ?_, he, hl, hk⟩
+    rw [List.getElem?_append_right (by omega), hhl]; simp
+
+/-- The era, restated where a caller knows which era the ring is. -/
+theorem consPlaced_era (l : List (List Obs × BitVec 8)) (lo k k' d : Nat) (hs : List (List Obs))
+    (he : k = k') (hpl : consPlaced l lo k d hs) : consPlaced l lo k' d hs := he ▸ hpl
+
 end Xv6
