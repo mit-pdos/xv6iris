@@ -140,7 +140,7 @@ def xv6GF : BundledGFunctors :=
   |>.set 61 ⟨xgfGm Nat (Nat × Qp) RegMapF, inferInstance⟩
   |>.set 62 ⟨GhostVarF FPNames, inferInstance⟩
   |>.set 63 ⟨FdstF, inferInstance⟩
-  |>.set 64 ⟨xgfGm Nat FdState RegMapF, inferInstance⟩
+  |>.set 64 ⟨xgfGm (Option Nat) UfdCell UfdMapF, inferInstance⟩
   -- CtokG
   |>.set 65 ⟨DFracAgree.DFracAgreeRF GenF, inferInstance⟩
   |>.set 66 ⟨constOF AtokR, inferInstance⟩
@@ -262,7 +262,7 @@ instance xgfOps : GhostMapG xv6GF Nat OpEntry RegMapF := ⟨xgf_slot 60⟩
 instance xgfFref : GhostMapG xv6GF Nat (Nat × Qp) RegMapF := ⟨xgf_slot 61⟩
 instance xgfFpay : GhostVarG xv6GF FPNames := { elemG := xgf_slot 62 }
 instance xgfFdst : ElemG xv6GF FdstF := xgf_slot 63
-instance xgfUfd : GhostMapG xv6GF Nat FdState RegMapF := ⟨xgf_slot 64⟩
+instance xgfUfd : GhostMapG xv6GF (Option Nat) UfdCell UfdMapF := ⟨xgf_slot 64⟩
 -- CtokG
 instance xgfGen : SavedAnythingG xv6GF GenF := { elemG := xgf_slot 65 }
 instance xgfAtok : ElemG xv6GF (constOF AtokR) := xgf_slot 66

@@ -29,11 +29,11 @@ child is `Rc` (refunded on the failing arm).
    `usysNum (tfOf m pc)` by `UexecRet.tfOf_num`.  The alignment premise is
    `(pc + 4#64) &&& 1#64 = 0#64` (UexecRet deviation 7).
 3. **The pipe rows are absent** (K4, UkRun deviation 2): no `urun_rows` /
-   `urun_nopipe`; **the seccomp mask is absent** (K3, UkRun deviation 5): no
-   `secc_all`, no `usys_eff_secc_all` / `uvis_num_full0`.
-4. **The ledger is `ustd`** (the standard streams' view, `fdv.take NSTD`),
-   not Rocq's whole-table `ustd_at l v` (seccomp S4 G2, K3; UkRun deviation
-   3): the child's ledger is re-minted by `ufd_alloc_std` at the same list.
+   `urun_nopipe`.  The run key is at the all-allowing mask (`seccAll`, as
+   Rocq's `urun`), the ecall read through `usysEff_seccAll`.
+4. (Retired, K3.)  The ledger is Rocq's whole-table `ustdAt l v` (seccomp
+   S3 G2): the child's is re-minted by `ufd_alloc_std_at` at the parent's
+   view; `wp_uk_ecall_fork` is the form at a ledger nobody reads.
 5. The killer's price is `□ (uKillCred -∗ Q (-1))` (Rocq `□ (app_taint -∗ Q
    (-1))`; MachCSL's ambient kill credential is Lean's name for the taint,
    `UexecRet.uKillCred`).
@@ -42,8 +42,7 @@ child is `Rc` (refunded on the failing arm).
    `(pidc.toNat : Int)` (UkRun deviation 7).
 7. **The continuations are not under `▷`** at the leaf's own statement
    (Rocq's shape); the engine's trap later is stripped before them.
-8. NOT PORTED (unreached from `union_adequacy_closed`): `wp_uk_ecall_fork`
-   (the form at a ledger nobody reads) and `wp_uk_ecall_fork_argv`.
+8. NOT PORTED (unreached from `union_adequacy_closed`): `wp_uk_ecall_fork_argv`.
 -/
 import Xv6.UkForkHeap
 import Xv6.UkRunLeaf
@@ -60,7 +59,7 @@ set_option linter.unusedSectionVars false
 
 section UkFork
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CtokG GF] [SG : UexecSG GF] [PS : UprogSG GF]
-  [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF Nat FdState RegMapF]
+  [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
   [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int]
 
 /-- The fork number off the key a running machine traps from. -/
@@ -70,12 +69,15 @@ theorem ukFork_num (m : RegMap) (pc : BitVec 64) (hn : (BitVec.extractLsb' 0 32 
 /-- a0 is not sp. -/
 theorem ukFork_a0_ns : unotSp 10#5 := by unfold unotSp spIdx; decide
 
-/-- **Rocq `wp_uk_ecall_fork_at`**: THE FORK LEAF. -/
+/-- **Rocq `wp_uk_ecall_fork_at`**: THE FORK LEAF, at the ledger's TABLE VIEW
+(seccomp S3 ruling G2): the child's is the parent's, so a parent that knows its
+whole table hands its child the same knowledge. -/
 theorem wp_uk_ecall_fork_at (UL : UK_LEAVES) (N : UkNames GF) (h : CPU) (m : RegMap) (pc : BitVec 64)
-    (avail sz : Nat) (l : List FdState) (D : RegMapF FdState) (c : Nat) (Sc : ExtTreeSet GName compare)
+    (avail sz : Nat) (l : List FdState) (D : RegMapF FdState) (c : Nat) (v : List FdState)
+    (Sc : ExtTreeSet GName compare)
     (Q : Int → IProp GF) (Rc : IProp GF) (P : GName → GName → GName → IProp GF) [FP : Forkable P]
     (hn : (BitVec.extractLsb' 0 32 (m 17#5)).toInt = USYS_fork) (hal4 : (pc + 4#64) &&& 1#64 = 0#64) :
-    ⊢ uinstrIs N.t pc false (.ECALL ()) -∗ Rc -∗ P N.t N.d N.s -∗ usz N.s sz -∗ ustd N.fd l -∗
+    ⊢ uinstrIs N.t pc false (.ECALL ()) -∗ Rc -∗ P N.t N.d N.s -∗ usz N.s sz -∗ ustdAt N.fd l v -∗
       ([∗map] fd ↦ st ∈ D, ufd N.fd fd st) -∗ ucwd N.cwd c -∗ uch N.ch Sc -∗
       □ (uKillCred (hlc := hlc) -∗ Q (-1)) -∗ urun (hlc := hlc) N h m pc avail -∗
       ((∀ (h' : CPU) (r : BitVec 64), ⌜r ≠ 0#64⌝ -∗
@@ -83,10 +85,10 @@ theorem wp_uk_ecall_fork_at (UL : UK_LEAVES) (N : UkNames GF) (h : CPU) (m : Reg
             ∃ (γ : GName) (pidv : BitVec 32), ⌜r = BitVec.signExtend 64 pidv⌝ ∗
               ⌜1 ≤ pidv.toNat ∧ pidv.toNat ≤ PIDMAX⌝ ∗ ⌜γ ∉ Sc⌝ ∗ childTok γ pidv Q ∗
               uch N.ch (Sc ∪ {γ})) -∗
-          P N.t N.d N.s -∗ usz N.s sz -∗ ustd N.fd l -∗ ([∗map] fd ↦ st ∈ D, ufd N.fd fd st) -∗
+          P N.t N.d N.s -∗ usz N.s sz -∗ ustdAt N.fd l v -∗ ([∗map] fd ↦ st ∈ D, ufd N.fd fd st) -∗
           ucwd N.cwd c -∗ urun (hlc := hlc) N h' (ukWr m 10#5 r) (pc + 4#64) avail -∗ wpLoop h') ∗
         (∀ (N' : UkNames GF) (h' : CPU) (γ' : GName), ⌜N'.pay = Q⌝ -∗ myPay γ' Q -∗ Rc -∗
-          P N'.t N'.d N'.s -∗ usz N'.s sz -∗ ustd N'.fd l -∗ ([∗map] fd ↦ st ∈ D, ufd N'.fd fd st) -∗
+          P N'.t N'.d N'.s -∗ usz N'.s sz -∗ ustdAt N'.fd l v -∗ ([∗map] fd ↦ st ∈ D, ufd N'.fd fd st) -∗
           ucwd N'.cwd c -∗ uch N'.ch ∅ -∗ (∃ p : Int, ⌜p ≠ 1⌝ ∗ upid N'.pid p) -∗
           urun (hlc := hlc) N' h' (ukWr m 10#5 0#64) (pc + 4#64) avail -∗ wpLoop h')) -∗
       wpLoop h := by
@@ -108,7 +110,8 @@ theorem wp_uk_ecall_fork_at (UL : UK_LEAVES) (N : UkNames GF) (h : CPU) (m : Reg
   subst sz0
   ihave %hfdlen := ufdAuth_len N.fd fdv $$ Hufd
   ihave %hsub := ufd_sub_hi N.fd fdv D $$ Hufd HD
-  ihave %hstl := ustd_agree N.fd fdv l $$ Hufd Hstd
+  ihave %hstl := ustdAt_agree N.fd fdv l v $$ Hufd Hstd
+  ihave %hle := ustdAt_tab N.fd fdv l v $$ Hufd Hstd
   -- fork the payload TOGETHER WITH THE FREE STACK
   have FPS : Forkable (GF := GF) (fun γt γd γs => iprop(P γt γd γs ∗ ustack γd (m.get spIdx) avail)) :=
     forkable_sep P (fun _ γd _ => ustack γd (m.get spIdx) avail)
@@ -213,7 +216,7 @@ theorem wp_uk_ecall_fork_at (UL : UK_LEAVES) (N : UkNames GF) (h : CPU) (m : Reg
     simp only [uvisOfRun] at hfd hcwv
     subst fdv' cw'
     iapply uslot_bupd
-    imod ufd_alloc_std (GF := GF) fdv D hfdlen hsub with ⟨%γfd', Hufd', Hstd', Hfrag'⟩
+    imod ufd_alloc_std_at (GF := GF) fdv v D hfdlen hsub hle with ⟨%γfd', Hufd', Hstd', Hfrag'⟩
     rw [hstl]
     imod ucwd_alloc (GF := GF) c with ⟨%γc', Hcwa', Hcwf'⟩
     imod uch_alloc (GF := GF) (∅ : ExtTreeSet GName compare) with ⟨%γch', Hcha', Hchf'⟩
@@ -243,6 +246,39 @@ theorem wp_uk_ecall_fork_at (UL : UK_LEAVES) (N : UkNames GF) (h : CPU) (m : Reg
     apply BitVec.eq_of_toNat_eq
     have : pidc.toNat = 1 := by omega
     rw [this]; rfl
+
+/-- **Rocq `wp_uk_ecall_fork`**: ...AND AT A LEDGER WHOSE VIEW NOBODY READS
+(every caller but the seccomp program's). -/
+theorem wp_uk_ecall_fork (UL : UK_LEAVES) (N : UkNames GF) (h : CPU) (m : RegMap) (pc : BitVec 64)
+    (avail sz : Nat) (l : List FdState) (D : RegMapF FdState) (c : Nat) (Sc : ExtTreeSet GName compare)
+    (Q : Int → IProp GF) (Rc : IProp GF) (P : GName → GName → GName → IProp GF) [FP : Forkable P]
+    (hn : (BitVec.extractLsb' 0 32 (m 17#5)).toInt = USYS_fork) (hal4 : (pc + 4#64) &&& 1#64 = 0#64) :
+    ⊢ uinstrIs N.t pc false (.ECALL ()) -∗ Rc -∗ P N.t N.d N.s -∗ usz N.s sz -∗ ustd N.fd l -∗
+      ([∗map] fd ↦ st ∈ D, ufd N.fd fd st) -∗ ucwd N.cwd c -∗ uch N.ch Sc -∗
+      □ (uKillCred (hlc := hlc) -∗ Q (-1)) -∗ urun (hlc := hlc) N h m pc avail -∗
+      ((∀ (h' : CPU) (r : BitVec 64), ⌜r ≠ 0#64⌝ -∗
+          ((⌜r = -1#64⌝ ∗ uch N.ch Sc ∗ Rc) ∨
+            ∃ (γ : GName) (pidv : BitVec 32), ⌜r = BitVec.signExtend 64 pidv⌝ ∗
+              ⌜1 ≤ pidv.toNat ∧ pidv.toNat ≤ PIDMAX⌝ ∗ ⌜γ ∉ Sc⌝ ∗ childTok γ pidv Q ∗
+              uch N.ch (Sc ∪ {γ})) -∗
+          P N.t N.d N.s -∗ usz N.s sz -∗ ustd N.fd l -∗ ([∗map] fd ↦ st ∈ D, ufd N.fd fd st) -∗
+          ucwd N.cwd c -∗ urun (hlc := hlc) N h' (ukWr m 10#5 r) (pc + 4#64) avail -∗ wpLoop h') ∗
+        (∀ (N' : UkNames GF) (h' : CPU) (γ' : GName), ⌜N'.pay = Q⌝ -∗ myPay γ' Q -∗ Rc -∗
+          P N'.t N'.d N'.s -∗ usz N'.s sz -∗ ustd N'.fd l -∗ ([∗map] fd ↦ st ∈ D, ufd N'.fd fd st) -∗
+          ucwd N'.cwd c -∗ uch N'.ch ∅ -∗ (∃ p : Int, ⌜p ≠ 1⌝ ∗ upid N'.pid p) -∗
+          urun (hlc := hlc) N' h' (ukWr m 10#5 0#64) (pc + 4#64) avail -∗ wpLoop h')) -∗
+      wpLoop h := by
+  iintro #Hi HRc HP Hsz Hstd HD Hcwd Hchf #Hkw Hrun ⟨Hpar, Hchild⟩
+  icases ustd_ustdAt N.fd l $$ Hstd with ⟨%v, Hstd⟩
+  iapply wp_uk_ecall_fork_at UL N h m pc avail sz l D c v Sc Q Rc P hn hal4
+    $$ Hi HRc HP Hsz Hstd HD Hcwd Hchf Hkw Hrun
+  isplitl [Hpar]
+  · iintro %h' %r %hr Harm HP Hsz Hstd HD Hcwd Hrun
+    ihave Hstd := ustdAt_ustd N.fd l v $$ Hstd
+    iapply Hpar $$ %h' %r %hr Harm HP Hsz Hstd HD Hcwd Hrun
+  · iintro %N' %h' %γ' %hq Hmp HRc' HP' Hsz' Hstd' Hfrag' Hcwd' Hch' Hpid' Hrun
+    ihave Hstd' := ustdAt_ustd N'.fd l v $$ Hstd'
+    iapply Hchild $$ %N' %h' %γ' %hq Hmp HRc' HP' Hsz' Hstd' Hfrag' Hcwd' Hch' Hpid' Hrun
 
 end UkFork
 

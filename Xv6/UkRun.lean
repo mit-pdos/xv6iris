@@ -25,7 +25,7 @@ children and the pid.  Rocq's header, point for point:
 * THE DEPOSIT SUPPLIER AND ITS MINTING LAW (`udep`), abstract and key-free,
   riding in `urun`, not `uvb`; the ecall leaf's deposit premise as a wand off
   the authorities the leaf holds (`udepw` and its family).
-* THE ENTRY (`uslot_of_urun_all`): the process's first WP mints the heap,
+* THE ENTRY (`uslot_of_urun_all_at`): the process's first WP mints the heap,
   the descriptor ledger, the cwd/children/pid pairs, and carves the free
   stack out of the data.
 
@@ -42,12 +42,15 @@ children and the pid.  Rocq's header, point for point:
    `udepw_row*`, `udepw_cl*`.  Lean's `UexecSG.freeNum` still admits 2 and
    21 (no close payments yet), so the key-free law covers them today.  The
    union lane adds them back in K4's wake.
-3. **`ustd_at` (seccomp S4 G2) is K3's**: `uslot_of_urun_all_at` and
-   `udepwf_std*` are not ported; `uslot_of_urun_all` (the `ustd` form) is.
-4. `uslot_of_urun` and `uslot_of_urun_ro` are DERIVED from
-   `uslot_of_urun_all` (Rocq proves the three separately; the carve is one).
-5. The seccomp mask (`uvis_secc W = secc_all`) is absent until K3 adds it to
-   Lean's key.
+3. **The whole-table view (seccomp S3 ruling G2, K3)**: the primitive entry
+   is `uslot_of_urun_all_at`, handing out the ledger at the key's table as
+   its view (`ustdAt N.fd (W.fd.take NSTD) W.fd`); `uslot_of_urun_all` and
+   `uslot_of_urun_ro` forget it (`ustdAt_ustd`), `uslot_of_urun_ro_at` keeps
+   it (Rocq's view form).  `udepwf_std*` are not ported (K4/U1-R).
+4. `uslot_of_urun`, `uslot_of_urun_all`, `uslot_of_urun_ro(_at)` are DERIVED
+   from `uslot_of_urun_all_at` (Rocq proves them separately; the carve is
+   one).
+5. (Retired, bump 7b2c1b1b: the key's mask is pinned at `seccAll`, `hsc`.)
 6. `uheap_text_byte`/`_pc`/`_pc_text` and `uinstr_is_uk_instr` are
    `UserHeap.uheap_text_pc`/`uinstrIs_ukInstr` (the leaves' `UkInstr` is
    stated on the key's projection, SpecUkLeaves deviation 6).
@@ -110,7 +113,7 @@ theorem ukn_pay_const {GF : BundledGFunctors} (N : UkNames GF) [h : UknConst N] 
 
 section UkRun
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CtokG GF] [SG : UexecSG GF] [PS : UprogSG GF]
-  [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF Nat FdState RegMapF]
+  [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
   [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int]
 
 /-! ## §1 THE DEPOSIT SUPPLIER AND ITS MINTING LAW (deviation 2) -/
@@ -482,7 +485,7 @@ theorem ukWr_x0 (m : RegMap) (rd : BitVec 5) (v : BitVec 64) (h0 : m 0#5 = 0#64)
 
 section UkRunLeaf
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CtokG GF] [SG : UexecSG GF] [PS : UprogSG GF]
-  [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF Nat FdState RegMapF]
+  [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
   [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int]
 
 /-- **Rocq `urun_close`**: THE CLOSE -- a continuation phrased on `urun`
@@ -590,7 +593,7 @@ theorem umemLazy_bound (P : UPtd) (sz : Nat) (Mp : Nat → List (BitVec 8)) (hwf
 
 section UkEntry
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CtokG GF] [SG : UexecSG GF] [PS : UprogSG GF]
-  [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF Nat FdState RegMapF]
+  [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
   [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int]
 
 /-- The bundle's image is below MAXVA. -/
@@ -608,12 +611,14 @@ theorem uvb_img_bound [xi : CurCtx] (cpu : CPU) (C : UCfg) (pt : UPtd) (Rfd : Li
 /-- The resume sp of a key. -/
 abbrev ukeySp (W : Uvis) : BitVec 64 := (tfResumeGpr0 W.tf).get spIdx
 
-/-- **Rocq `uslot_of_urun_all`**: THE ENTRY, with the data OUTSIDE the
-initial free stack handed over EXCLUSIVELY -- the bytes below the frame's
-base and the bytes at or above sp.  The program is handed a FRESH `urun`
-(heap, descriptor ledger, cwd/children/pid pairs, all minted at this WP) in
-exchange for a proof that it is safe from the key's resume state. -/
-theorem uslot_of_urun_all (W : Uvis) (avail : Nat) (Q : Int → IProp GF)
+/-- **Rocq `uslot_of_urun_all`, AT THE WHOLE TABLE'S VIEW** (seccomp S3
+ruling G2; Rocq states the view form on `uslot_of_urun_ro_at`): THE ENTRY,
+with the data OUTSIDE the initial free stack handed over EXCLUSIVELY -- the
+bytes below the frame's base and the bytes at or above sp.  The program is
+handed a FRESH `urun` (heap, descriptor ledger at the key's table as its
+view, cwd/children/pid pairs, all minted at this WP) in exchange for a proof
+that it is safe from the key's resume state. -/
+theorem uslot_of_urun_all_at (W : Uvis) (avail : Nat) (Q : Int → IProp GF)
     (hal8 : (ukeySp W).toNat % 8 = 0) (hroom : 8 * avail ≤ (ukeySp W).toNat)
     (hstk : ∀ j, j < 8 * avail →
       (get? (udataLo W.M W.perm W.sz) ((ukeySp W).toNat - 8 * avail + j)).isSome)
@@ -621,7 +626,7 @@ theorem uslot_of_urun_all (W : Uvis) (avail : Nat) (Q : Int → IProp GF)
     (hlz : W.lazy = false) (hsc : W.secc = seccAll) :
     ⊢ udep (hlc := hlc) (GF := GF) -∗ myPay W.gen Q -∗
       (∀ (N : UkNames GF) (h : CPU), ⌜N.pay = Q⌝ -∗ ⌜uszOk W.sz⌝ -∗ usz N.s W.sz -∗
-        utextAll N.t W.M W.perm -∗ ustd N.fd (W.fd.take NSTD) -∗ ucwd N.cwd W.cwd -∗ uch N.ch W.ch -∗
+        utextAll N.t W.M W.perm -∗ ustdAt N.fd (W.fd.take NSTD) W.fd -∗ ucwd N.cwd W.cwd -∗ uch N.ch W.ch -∗
         upid N.pid (W.pid.toNat : Int) -∗
         ([∗map] k ↦ b ∈ PartialMap.filter (fun k _ => decide (k < (ukeySp W).toNat - 8 * avail))
             (udataLo W.M W.perm W.sz), ubyte N.d k b) -∗
@@ -640,7 +645,8 @@ theorem uslot_of_urun_all (W : Uvis) (avail : Nat) (Q : Int → IProp GF)
   obtain ⟨hsz, hcan⟩ := hbd
   iapply wpLoop_bupd
   imod uheap_alloc (GF := GF) W.M W.perm W.sz hcan hstop with ⟨%γt, %γd, %γs, Hheap, Hszf, Ht, Hd⟩
-  imod ufd_alloc_std (GF := GF) W.fd ∅ hfdlen (LawfulPartialMap.empty_subset _) with ⟨%γf, Hufd, Hstd, -⟩
+  imod ufd_alloc_std_at (GF := GF) W.fd W.fd ∅ hfdlen (LawfulPartialMap.empty_subset _) (tabLe_refl _)
+    with ⟨%γf, Hufd, Hstd, -⟩
   imod ucwd_alloc (GF := GF) W.cwd with ⟨%γc, Hcwa, Hcwf⟩
   imod uch_alloc (GF := GF) W.ch with ⟨%γch, Hcha, Hchf⟩
   imod upid_alloc (GF := GF) (W.pid.toNat : Int) with ⟨%γp, Hpa, Hpf⟩
@@ -696,6 +702,30 @@ theorem uslot_of_urun_all (W : Uvis) (avail : Nat) (Q : Int → IProp GF)
   ipureintro
   exact ⟨hlo, hpm, hlzf rfl, hRut, tfResumeGpr0_x0 W.tf⟩
 
+/-- **Rocq `uslot_of_urun_all`**: the entry at a ledger whose view nobody
+reads (every entry but seccomp's). -/
+theorem uslot_of_urun_all (W : Uvis) (avail : Nat) (Q : Int → IProp GF)
+    (hal8 : (ukeySp W).toNat % 8 = 0) (hroom : 8 * avail ≤ (ukeySp W).toNat)
+    (hstk : ∀ j, j < 8 * avail →
+      (get? (udataLo W.M W.perm W.sz) ((ukeySp W).toNat - 8 * avail + j)).isSome)
+    (hfdlen : W.fd.length = NOFILE) (hstop : ∀ p q, W.perm p = some q → p * 4096 < pgRoundUpN W.sz)
+    (hlz : W.lazy = false) (hsc : W.secc = seccAll) :
+    ⊢ udep (hlc := hlc) (GF := GF) -∗ myPay W.gen Q -∗
+      (∀ (N : UkNames GF) (h : CPU), ⌜N.pay = Q⌝ -∗ ⌜uszOk W.sz⌝ -∗ usz N.s W.sz -∗
+        utextAll N.t W.M W.perm -∗ ustd N.fd (W.fd.take NSTD) -∗ ucwd N.cwd W.cwd -∗ uch N.ch W.ch -∗
+        upid N.pid (W.pid.toNat : Int) -∗
+        ([∗map] k ↦ b ∈ PartialMap.filter (fun k _ => decide (k < (ukeySp W).toNat - 8 * avail))
+            (udataLo W.M W.perm W.sz), ubyte N.d k b) -∗
+        ([∗map] k ↦ b ∈ PartialMap.filter (fun k _ => !decide (k < (ukeySp W).toNat))
+            (udataLo W.M W.perm W.sz), ubyte N.d k b) -∗
+        urun (hlc := hlc) N h (tfResumeGpr0 W.tf) (tfResumePc W.tf) avail -∗ wpLoop h) -∗
+      uslot (hlc := hlc) W := by
+  iintro #Hdep #Hpay Hprog
+  iapply uslot_of_urun_all_at W avail Q hal8 hroom hstk hfdlen hstop hlz hsc $$ Hdep Hpay
+  iintro %N %h %hq %hs Hs Ht Hstd Hc Hch Hp Dlo Dtop Hrun
+  ihave Hstd := ustdAt_ustd N.fd _ _ $$ Hstd
+  iapply Hprog $$ %N %h %hq %hs Hs Ht Hstd Hc Hch Hp Dlo Dtop Hrun
+
 /-- **Rocq `uslot_of_urun`** (derived, deviation 4): the lossy entry -- the
 data outside the free stack is DROPPED. -/
 theorem uslot_of_urun (W : Uvis) (avail : Nat) (Q : Int → IProp GF)
@@ -715,9 +745,33 @@ theorem uslot_of_urun (W : Uvis) (avail : Nat) (Q : Int → IProp GF)
   iintro %N %h %hq %hs Hs Ht Hstd Hc Hch Hp _ _ Hrun
   iapply Hprog $$ %N %h %hq %hs Hs Ht Hstd Hc Hch Hp Hrun
 
-/-- **Rocq `uslot_of_urun_ro`** (derived, deviation 4): the entry with the
+/-- **Rocq `uslot_of_urun_ro_at`** (derived, deviation 4): the entry with the
 area at or above the entry sp (exec's argument vector) PERSISTED and handed
-over read-only. -/
+over read-only, AT THE WHOLE TABLE'S VIEW (seccomp S3 ruling G2: the key's
+table is the view, so the program knows it outright). -/
+theorem uslot_of_urun_ro_at (W : Uvis) (avail : Nat) (Q : Int → IProp GF)
+    (hal8 : (ukeySp W).toNat % 8 = 0) (hroom : 8 * avail ≤ (ukeySp W).toNat)
+    (hstk : ∀ j, j < 8 * avail →
+      (get? (udataLo W.M W.perm W.sz) ((ukeySp W).toNat - 8 * avail + j)).isSome)
+    (hfdlen : W.fd.length = NOFILE) (hstop : ∀ p q, W.perm p = some q → p * 4096 < pgRoundUpN W.sz)
+    (hlz : W.lazy = false) (hsc : W.secc = seccAll) :
+    ⊢ udep (hlc := hlc) (GF := GF) -∗ myPay W.gen Q -∗
+      (∀ (N : UkNames GF) (h : CPU), ⌜N.pay = Q⌝ -∗ ⌜uszOk W.sz⌝ -∗ usz N.s W.sz -∗
+        utextAll N.t W.M W.perm -∗ ustdAt N.fd (W.fd.take NSTD) W.fd -∗ ucwd N.cwd W.cwd -∗ uch N.ch W.ch -∗
+        upid N.pid (W.pid.toNat : Int) -∗
+        ([∗map] k ↦ b ∈ PartialMap.filter (fun k _ => !decide (k < (ukeySp W).toNat))
+            (udataLo W.M W.perm W.sz), ubyteq N.d DFrac.discard k b) -∗
+        urun (hlc := hlc) N h (tfResumeGpr0 W.tf) (tfResumePc W.tf) avail -∗ wpLoop h) -∗
+      uslot (hlc := hlc) W := by
+  iintro #Hdep #Hpay Hprog
+  iapply uslot_of_urun_all_at W avail Q hal8 hroom hstk hfdlen hstop hlz hsc $$ Hdep Hpay
+  iintro %N %h %hq %hs Hs Ht Hstd Hc Hch Hp _ Dtop Hrun
+  iapply wpLoop_bupd
+  imod uarea_persist N.d _ $$ Dtop with Dtop
+  imodintro
+  iapply Hprog $$ %N %h %hq %hs Hs Ht Hstd Hc Hch Hp Dtop Hrun
+
+/-- **Rocq `uslot_of_urun_ro`**: ...at a ledger whose view nobody reads. -/
 theorem uslot_of_urun_ro (W : Uvis) (avail : Nat) (Q : Int → IProp GF)
     (hal8 : (ukeySp W).toNat % 8 = 0) (hroom : 8 * avail ≤ (ukeySp W).toNat)
     (hstk : ∀ j, j < 8 * avail →
@@ -733,11 +787,9 @@ theorem uslot_of_urun_ro (W : Uvis) (avail : Nat) (Q : Int → IProp GF)
         urun (hlc := hlc) N h (tfResumeGpr0 W.tf) (tfResumePc W.tf) avail -∗ wpLoop h) -∗
       uslot (hlc := hlc) W := by
   iintro #Hdep #Hpay Hprog
-  iapply uslot_of_urun_all W avail Q hal8 hroom hstk hfdlen hstop hlz hsc $$ Hdep Hpay
-  iintro %N %h %hq %hs Hs Ht Hstd Hc Hch Hp _ Dtop Hrun
-  iapply wpLoop_bupd
-  imod uarea_persist N.d _ $$ Dtop with Dtop
-  imodintro
+  iapply uslot_of_urun_ro_at W avail Q hal8 hroom hstk hfdlen hstop hlz hsc $$ Hdep Hpay
+  iintro %N %h %hq %hs Hs Ht Hstd Hc Hch Hp Dtop Hrun
+  ihave Hstd := ustdAt_ustd N.fd _ _ $$ Hstd
   iapply Hprog $$ %N %h %hq %hs Hs Ht Hstd Hc Hch Hp Dtop Hrun
 
 end UkEntry

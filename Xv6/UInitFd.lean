@@ -34,7 +34,7 @@ reached declarations that wait for it: `ufd_alloc0_v`, `ufd_headL`,
    2).  `ufd_l0` is `fdt0.take NSTD` (Rocq `take NSTD fdt0`).
 2. Only the reached declarations: the unreached `*_len`, `ufd_scan3`,
    `ufd_after_l1/l2`, `ufd_alloc0/1/2` and `ufd_after_row0` are not ported.
-3. The ghost map is a section hypothesis `[GhostMapG GF Nat FdState RegMapF]`
+3. The ghost map is a section hypothesis `[GhostMapG GF (Option Nat) UfdCell UfdMapF]`
    (`UserFd`'s own binder; `FileG.gmUfdG` fills it).
 -/
 import Xv6.UserFd
@@ -101,7 +101,7 @@ theorem ufd_scan2 (st : FdState) (hne : st ≠ .closed) : fdLowestClosed (ufdL2 
 /-! ## 3.  THE SOURCE CLAIM THE TWO DUPS HAND IN -/
 
 section UInitFd
-variable {GF : BundledGFunctors} [GhostMapG GF Nat FdState RegMapF]
+variable {GF : BundledGFunctors} [GhostMapG GF (Option Nat) UfdCell UfdMapF]
 
 /-- **Rocq `ufd_dup_src`**: init's claim on the descriptor being duplicated
 is its own LEDGER's row -- a standard stream, `ufdOwn`'s LEFT arm. -/

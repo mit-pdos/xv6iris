@@ -324,6 +324,18 @@ abbrev FdstUR : Type := RegMapF (DFracAgree.DFracAgreeR (DiscreteO FdState))
 
 abbrev FdstF : COFE.OFunctorPre := constOF FdstUR
 
+/-- THE CELLS OF A USER PROGRAM'S ONE DESCRIPTOR GHOST MAP (Rocq
+`UserFd.ufdcell`, design/seccomp.md S3 ruling G2): key `some k` is
+descriptor `k`'s slot, key `none` the WHOLE TABLE's view
+(`Xv6/UserFd.lean`). -/
+inductive UfdCell where
+  | slot (st : FdState)
+  | tab (v : List FdState)
+
+/-- The map type of that ghost map: `Option Nat`-keyed (Rocq's `gmap (option
+nat) ufdcell`), the `Std.ExtTreeMap` `RegMapF` is at `Nat`. -/
+abbrev UfdMapF := fun V => Std.ExtTreeMap (Option Nat) V compare
+
 /-- The ghost libraries the file table uses (Rocq's `fileG`/`fdslotG`).  The
 fd-slot tokens (`FdslotG.fdslotName`) use the SHARED `Xv6G.gmUnitG`; the inode
 arm's cancellable invariant the shared `Xv6G.cinvG`. -/
@@ -334,10 +346,10 @@ class FileG (GF : BundledGFunctors) where
   process incarnation, named by `ProcPriv.fdg` (Rocq's `fdst_inG`, which
   rides `fdslotG`; here the file table's class owns the camera, rule 1) -/
   [fdstG : ElemG GF FdstF]
-  /-- a user program's descriptor table (Rocq `ufdG := ghost_mapG Σ nat
-  fdstate`, `Xv6/UserFd.lean`; D29), one map per program, named by its
-  ghost name -/
-  [gmUfdG : GhostMapG GF Nat FdState RegMapF]
+  /-- a user program's descriptor table (Rocq `ufdG := ghost_mapG Σ (option
+  nat) ufdcell`, `Xv6/UserFd.lean`; D29, seccomp S3 G2), one map per
+  program, named by its ghost name -/
+  [gmUfdG : GhostMapG GF (Option Nat) UfdCell UfdMapF]
 
 attribute [reducible, instance] FileG.gmRefG FileG.gvPayG FileG.fdstG FileG.gmUfdG
 

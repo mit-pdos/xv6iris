@@ -145,7 +145,7 @@ macro "ureg" : tactic => `(tactic| simp (config := {decide := true, zetaDelta :=
 
 section UkRunLeaf
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CtokG GF] [SG : UexecSG GF] [PS : UprogSG GF]
-  [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF Nat FdState RegMapF]
+  [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
   [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int]
 
 /-- What an engine leaf gives for one instruction: at every ambient, from

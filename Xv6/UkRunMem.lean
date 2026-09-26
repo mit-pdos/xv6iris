@@ -85,7 +85,7 @@ theorem uMWord_of_bytes {M : ElfMem} {a k : Nat} {w : BitVec (8 * k)}
 
 section UkRunMem
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [CtokG GF] [SG : UexecSG GF] [PS : UprogSG GF]
-  [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF Nat FdState RegMapF]
+  [GhostMapG GF Nat (BitVec 8) RegMapF] [GhostVarG GF Nat] [GhostMapG GF (Option Nat) UfdCell UfdMapF]
   [GhostVarG GF (ExtTreeSet GName compare)] [GhostVarG GF Int]
 
 /-! ## §1 The access bridges (Rocq `uheap_access`, `uheap_text_access`) -/

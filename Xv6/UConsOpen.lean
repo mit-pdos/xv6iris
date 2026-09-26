@@ -113,7 +113,7 @@ end UConsOpen
 /-! ## 4.  THE LEDGER ARM, READ -/
 
 section UConsOpenFd
-variable {GF : BundledGFunctors} [GhostMapG GF Nat FdState RegMapF]
+variable {GF : BundledGFunctors} [GhostMapG GF (Option Nat) UfdCell UfdMapF]
 
 /-- **Rocq `uk_open_fd_arm`**: a receipt either allocated a (non-pipe)
 descriptor, read off the ledger by `ualloc`, or said `-1` and left the table
@@ -131,6 +131,26 @@ theorem initCons_fail_std (γfd : GName) (l sts fdv' : List FdState) (r : BitVec
     (hr : r = 0xFFFFFFFFFFFFFFFF#64) :
     ⊢ ukOpenFdArm (GF := GF) γfd l sts fdv' r -∗ ustd γfd l := by
   unfold ukOpenFdArm
+  iintro (⟨%fd, %rd, %wr, %t, %hb, -⟩ | ⟨-, H⟩)
+  · obtain ⟨hfd, hlt, -⟩ := hb
+    exact absurd (hr ▸ hfd).symm (initCons_moiNat_m1 fd hlt)
+  · iexact H
+
+/-- **Rocq `uk_open_fd_arm_at`**: ...AT A NAMED TABLE VIEW (seccomp S4): the
+allocation arm hands the ledger back at the new table as its view (and the
+old view's `tabLe` fact), the `-1` arm at the view it came in with. -/
+def ukOpenFdArmAt (γfd : GName) (l v sts fdv' : List FdState) (r : BitVec 64) : IProp GF :=
+  iprop((∃ (fd : Nat) (rd wr : Bool) (t : FdType),
+      ⌜r = BitVec.ofNat 64 fd ∧ fd < NOFILE ∧ fdv' = sts.set fd (.open rd wr t) ∧
+        fdstNopipe (.open rd wr t)⌝ ∗
+      (uallocV γfd l fd (.open rd wr t) fdv' ∗ ⌜tabLe sts v⌝)) ∨
+    (⌜r = 0xFFFFFFFFFFFFFFFF#64 ∧ fdv' = sts⌝ ∗ ustdAt γfd l v))
+
+/-- **Rocq `init_cons_fail_std_at`**. -/
+theorem initCons_fail_std_at (γfd : GName) (l v sts fdv' : List FdState) (r : BitVec 64)
+    (hr : r = 0xFFFFFFFFFFFFFFFF#64) :
+    ⊢ ukOpenFdArmAt (GF := GF) γfd l v sts fdv' r -∗ ustdAt γfd l v := by
+  unfold ukOpenFdArmAt
   iintro (⟨%fd, %rd, %wr, %t, %hb, -⟩ | ⟨-, H⟩)
   · obtain ⟨hfd, hlt, -⟩ := hb
     exact absurd (hr ▸ hfd).symm (initCons_moiNat_m1 fd hlt)
