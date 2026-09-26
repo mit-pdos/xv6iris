@@ -27,6 +27,7 @@ split as `x0` / not `x0` (the model branches on `rs ≠ zreg`); inside, the
 two GPR accesses are lane U1-X1's `uxa_rX`/`uxa_wX`.
 -/
 import MachCSL.UWalkRun
+import MachCSL.UTlb
 import MachCSL.UExecCtlBase
 import MachCSL.UTranslate
 import MachCSL.BvEnumSatp
