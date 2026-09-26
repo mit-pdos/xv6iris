@@ -131,8 +131,11 @@ theorem wp_uk_ecall_fork_at (UL : UK_LEAVES) (N : UkNames GF) (h : CPU) (m : Reg
   inext
   have hnum := ukFork_num m pc hn
   rw [uexecRet_ecall]
-  have hW : (uvisOfRun m pc M pm sz fdv c gn Sc pidv false).tf = tfOf m pc := rfl
-  rw [hW, hnum]
+  -- the boot shapes run at the all-allowing mask: the effective number is the raw one
+  have hnumE : usysEff seccAll (tfOf m pc) = USYS_fork := by
+    rw [usysEff_seccAll _ (by rw [hnum]; decide) (by rw [hnum]; decide), hnum]
+  have hnumW : uvisNum (uvisOfRun m pc M pm sz fdv c gn Sc pidv false seccAll) = USYS_fork := hnumE
+  rw [hnumW]
   simp only [show ¬ (USYS_fork = USYS_exit) by decide, if_false, if_true]
   -- the families: the point family at the child's payload and the lend
   let f : sfam GF := sfamAt N.pay (sfamPay Q Rc)
@@ -141,7 +144,7 @@ theorem wp_uk_ecall_fork_at (UL : UK_LEAVES) (N : UkNames GF) (h : CPU) (m : Reg
   have hfl : sforkLend f = Rc := by show sforkLend (sfamAt _ _) = _; rw [sforkLend_at, sforkLend_pay]
   iexists f
   isplitl []
-  · iapply uexecPayDep_ret USYS_fork m pc M pm sz fdv c gn Sc pidv false N.pay f hnum (by decide) hfx
+  · iapply uexecPayDep_ret USYS_fork m pc M pm sz fdv c gn Sc pidv false seccAll N.pay f hnumE (by decide) hfx
     iexact Hmy
   unfold uexecForkF
   rw [hfp, hfl]
@@ -158,13 +161,14 @@ theorem wp_uk_ecall_fork_at (UL : UK_LEAVES) (N : UkNames GF) (h : CPU) (m : Reg
       subst cs'
       ihave Hids := Hidsb $$ %Sc Hcha
       imodintro
-      rw [show (uvisOfRun m pc M pm sz fdv c gn Sc pidv false).M = M from rfl,
-        show (uvisOfRun m pc M pm sz fdv c gn Sc pidv false).perm = pm from rfl,
-        show (uvisOfRun m pc M pm sz fdv c gn Sc pidv false).sz = sz from rfl,
-        show (uvisOfRun m pc M pm sz fdv c gn Sc pidv false).gen = gn from rfl,
-        show (uvisOfRun m pc M pm sz fdv c gn Sc pidv false).ch = Sc from rfl,
-        show (uvisOfRun m pc M pm sz fdv c gn Sc pidv false).lazy = false from rfl]
-      iapply (uslot_bump_run m pc M M pm pm sz sz fdv fdv c c gn gn Sc Sc pidv false false r hx0 hal4).2
+      rw [show (uvisOfRun m pc M pm sz fdv c gn Sc pidv false seccAll).M = M from rfl,
+        show (uvisOfRun m pc M pm sz fdv c gn Sc pidv false seccAll).perm = pm from rfl,
+        show (uvisOfRun m pc M pm sz fdv c gn Sc pidv false seccAll).sz = sz from rfl,
+        show (uvisOfRun m pc M pm sz fdv c gn Sc pidv false seccAll).gen = gn from rfl,
+        show (uvisOfRun m pc M pm sz fdv c gn Sc pidv false seccAll).ch = Sc from rfl,
+        show (uvisOfRun m pc M pm sz fdv c gn Sc pidv false seccAll).lazy = false from rfl,
+        show (uvisOfRun m pc M pm sz fdv c gn Sc pidv false seccAll).secc = seccAll from rfl]
+      iapply (uslot_bump_run m pc M M pm pm sz sz fdv fdv c c gn gn Sc Sc pidv false false seccAll seccAll r hx0 hal4).2
       iapply ukcq_ukc
       rw [← ukWr_ne0 m 10#5 r (by decide)]
       iapply urun_close_wr N M pm m 10#5 r sz fdv c gn Sc pidv (pc + 4#64) avail ukFork_a0_ns hx0
@@ -180,13 +184,14 @@ theorem wp_uk_ecall_fork_at (UL : UK_LEAVES) (N : UkNames GF) (h : CPU) (m : Reg
       · iframe Hcha Hchf
       ihave Hids := Hidsb $$ %(Sc ∪ {γ}) Hcha
       imodintro
-      rw [show (uvisOfRun m pc M pm sz fdv c gn Sc pidv false).M = M from rfl,
-        show (uvisOfRun m pc M pm sz fdv c gn Sc pidv false).perm = pm from rfl,
-        show (uvisOfRun m pc M pm sz fdv c gn Sc pidv false).sz = sz from rfl,
-        show (uvisOfRun m pc M pm sz fdv c gn Sc pidv false).gen = gn from rfl,
-        show (uvisOfRun m pc M pm sz fdv c gn Sc pidv false).ch = Sc from rfl,
-        show (uvisOfRun m pc M pm sz fdv c gn Sc pidv false).lazy = false from rfl]
-      iapply (uslot_bump_run m pc M M pm pm sz sz fdv fdv c c gn gn Sc (Sc ∪ {γ}) pidv false false r hx0
+      rw [show (uvisOfRun m pc M pm sz fdv c gn Sc pidv false seccAll).M = M from rfl,
+        show (uvisOfRun m pc M pm sz fdv c gn Sc pidv false seccAll).perm = pm from rfl,
+        show (uvisOfRun m pc M pm sz fdv c gn Sc pidv false seccAll).sz = sz from rfl,
+        show (uvisOfRun m pc M pm sz fdv c gn Sc pidv false seccAll).gen = gn from rfl,
+        show (uvisOfRun m pc M pm sz fdv c gn Sc pidv false seccAll).ch = Sc from rfl,
+        show (uvisOfRun m pc M pm sz fdv c gn Sc pidv false seccAll).lazy = false from rfl,
+        show (uvisOfRun m pc M pm sz fdv c gn Sc pidv false seccAll).secc = seccAll from rfl]
+      iapply (uslot_bump_run m pc M M pm pm sz sz fdv fdv c c gn gn Sc (Sc ∪ {γ}) pidv false false seccAll seccAll r hx0
         hal4).2
       iapply ukcq_ukc
       rw [← ukWr_ne0 m 10#5 r (by decide)]
@@ -214,11 +219,12 @@ theorem wp_uk_ecall_fork_at (UL : UK_LEAVES) (N : UkNames GF) (h : CPU) (m : Reg
     imod uch_alloc (GF := GF) (∅ : ExtTreeSet GName compare) with ⟨%γch', Hcha', Hchf'⟩
     imod upid_alloc (GF := GF) (pidc.toNat : Int) with ⟨%γpid', Hpida', Hpidf'⟩
     imodintro
-    rw [show (uvisOfRun m pc M pm sz fdv c gn Sc pidv false).M = M from rfl,
-      show (uvisOfRun m pc M pm sz fdv c gn Sc pidv false).perm = pm from rfl,
-      show (uvisOfRun m pc M pm sz fdv c gn Sc pidv false).sz = sz from rfl,
-      show (uvisOfRun m pc M pm sz fdv c gn Sc pidv false).lazy = false from rfl]
-    iapply (uslot_bumpAt_run m pc M M pm pm sz sz fdv fdv c c gn g' Sc ∅ pidv pidc false false 0#64 hx0 hal4).2
+    rw [show (uvisOfRun m pc M pm sz fdv c gn Sc pidv false seccAll).M = M from rfl,
+      show (uvisOfRun m pc M pm sz fdv c gn Sc pidv false seccAll).perm = pm from rfl,
+      show (uvisOfRun m pc M pm sz fdv c gn Sc pidv false seccAll).sz = sz from rfl,
+      show (uvisOfRun m pc M pm sz fdv c gn Sc pidv false seccAll).lazy = false from rfl,
+        show (uvisOfRun m pc M pm sz fdv c gn Sc pidv false seccAll).secc = seccAll from rfl]
+    iapply (uslot_bumpAt_run m pc M M pm pm sz sz fdv fdv c c gn g' Sc ∅ pidv pidc false false seccAll seccAll 0#64 hx0 hal4).2
     let N' : UkNames GF := ⟨γt', γd', γs', γfd', γc', γch', Q, γpid'⟩
     iapply ukcq_ukc (Q := N'.pay)
     rw [← ukWr_ne0 m 10#5 0#64 (by decide)]

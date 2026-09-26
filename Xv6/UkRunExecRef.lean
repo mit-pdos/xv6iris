@@ -71,7 +71,7 @@ def udepwAtRefR (N : UkNames GF) (m : RegMap) (pc : BitVec 64) (c : Nat) (R : IP
       (cs : ExtTreeSet GName compare) (pidv : BitVec 32),
     myPay gn N.pay -∗ uheap N.t N.d N.s M pm sz -∗ ufdAuth N.fd fdv -∗
     uheap N.t N.d N.s M pm sz ∗ ufdAuth N.fd fdv ∗
-      sbundlePayRefR (uslot (hlc := hlc)) N.pay R (uvisOfRun m pc M pm sz fdv c gn cs pidv false))
+      sbundlePayRefR (uslot (hlc := hlc)) N.pay R (uvisOfRun m pc M pm sz fdv c gn cs pidv false seccAll))
 
 /-- **Rocq `udepw_at_refR_ids`**: ...with the identity authorities lent too
 (lane EXEC-SEAM). -/
@@ -80,7 +80,7 @@ def udepwAtRefRIds (N : UkNames GF) (m : RegMap) (pc : BitVec 64) (c : Nat) (R :
       (cs : ExtTreeSet GName compare) (pidv : BitVec 32),
     myPay gn N.pay -∗ uheap N.t N.d N.s M pm sz -∗ ufdAuth N.fd fdv -∗ urunIds N cs pidv -∗
     uheap N.t N.d N.s M pm sz ∗ ufdAuth N.fd fdv ∗ urunIds N cs pidv ∗
-      sbundlePayRefR (uslot (hlc := hlc)) N.pay R (uvisOfRun m pc M pm sz fdv c gn cs pidv false))
+      sbundlePayRefR (uslot (hlc := hlc)) N.pay R (uvisOfRun m pc M pm sz fdv c gn cs pidv false seccAll))
 
 /-- The cwd agreement, as a wand (the halves are kept by the pure reading). -/
 theorem ucwd_agree_w (γc : GName) (c c' : Nat) :
@@ -103,26 +103,31 @@ theorem uexecRet_exec_refR (N : UkNames GF) (m : RegMap) (pc : BitVec 64) (avail
     ⊢ myPay gn N.pay -∗ udep (hlc := hlc) -∗
       uheap N.t N.d N.s M pm sz -∗ ustack N.d (m.get spIdx) avail -∗ ufdAuth N.fd fdv -∗ ucwdAuth N.cwd c -∗
       urunIds N cs pidv -∗
-      sbundlePayRefR (uslot (hlc := hlc)) N.pay R (uvisOfRun m pc M pm sz fdv c gn cs pidv false) -∗
+      sbundlePayRefR (uslot (hlc := hlc)) N.pay R (uvisOfRun m pc M pm sz fdv c gn cs pidv false seccAll) -∗
       (∀ h' : CPU, R -∗ urun (hlc := hlc) N h' (ukWr m 10#5 (-1#64)) (pc + 4#64) avail -∗ wpLoop h') -∗
-      uexecRet (hlc := hlc) uecallScause (uvisOfRun m pc M pm sz fdv c gn cs pidv false) := by
-  have hnum : usysNum (uvisOfRun m pc M pm sz fdv c gn cs pidv false).tf = USYS_exec := by
+      uexecRet (hlc := hlc) uecallScause (uvisOfRun m pc M pm sz fdv c gn cs pidv false seccAll) := by
+  have hnum : usysNum (uvisOfRun m pc M pm sz fdv c gn cs pidv false seccAll).tf = USYS_exec := by
     show usysNum (tfOf m pc) = _
     rw [tfOf_num]; exact hn
+  -- the boot shapes run at the all-allowing mask: the effective number is the raw one
+  have hnumE : usysEff seccAll (tfOf m pc) = USYS_exec := by
+    have e : usysNum (tfOf m pc) = USYS_exec := hnum
+    rw [usysEff_seccAll _ (by rw [e]; decide) (by rw [e]; decide), e]
+  have hnumW : uvisNum (uvisOfRun m pc M pm sz fdv c gn cs pidv false seccAll) = USYS_exec := hnumE
   iintro #Hmy #Hdep Hheap Hstk Hufd Hcwda Hids Hdepn Hcont
   rw [uexecRet_ecall]
-  simp only [hnum, usysExec_ne_exit, usysExec_ne_fork, usysExec_ne_wait, ↓reduceIte]
+  simp only [hnumW, usysExec_ne_exit, usysExec_ne_fork, usysExec_ne_wait, ↓reduceIte]
   unfold sbundlePayRefR
   icases Hdepn with ⟨%fdep, %hfp, #Href, Hdepn⟩
   iexists fdep
   isplitl []
-  · iapply (uexecPayDep_ret USYS_exec m pc M pm sz fdv c gn cs pidv false N.pay fdep hnum usysExec_ne_exit
+  · iapply (uexecPayDep_ret USYS_exec m pc M pm sz fdv c gn cs pidv false seccAll N.pay fdep hnumE usysExec_ne_exit
       hfp)
     iexact Hmy
   isplitl [Hdepn]
   · iexact Hdepn
   unfold uexecRetContF uexecRetContGen
-  iintro %r %M' %pm' %sz' %fdv' %cw' %g' %cs' %lz' %hok %hfd %_ %hcwr %hgn %_ %_ %hch
+  iintro %r %M' %pm' %sz' %fdv' %cw' %g' %cs' %lz' %secc' %hok %hfd %_ %hcwr %hgn %_ %_ %hsc %hch
   obtain ⟨hr, hM, hpm', hsz⟩ := usysMemOk_execRow hok
   have hlz : lz' = false := usysMemOk_lazy (by unfold USYS_exec USYS_sbrk; decide) hok
   have hfd' : fdv' = fdv := usysFdOk_quiet (by unfold USYS_exec USYS_close; decide)
@@ -131,16 +136,17 @@ theorem uexecRet_exec_refR (N : UkNames GF) (m : RegMap) (pc : BitVec 64) (avail
   have hcw : cw' = c := usysCwdOk_quiet (by unfold USYS_exec USYS_chdir; decide) hcwr
   have hg : g' = gn := hgn
   have hc : cs' = cs := hch
-  subst r M' pm' sz' lz' fdv' cw' g' cs'
+  have hs : secc' = seccAll := usysSeccOk_quiet (by unfold USYS_exec USYS_seccomp; decide) hsc
+  subst r M' pm' sz' lz' fdv' cw' g' cs' secc'
   rw [spostAt_exec]
   iintro Hsp
   ispecialize Hsp $$ %(by decide)
   ihave HR := Href $$ Hsp
-  rw [show (uvisOfRun m pc M pm sz fdv c gn cs pidv false).M = M from rfl,
-    show (uvisOfRun m pc M pm sz fdv c gn cs pidv false).perm = pm from rfl,
-    show (uvisOfRun m pc M pm sz fdv c gn cs pidv false).sz = sz from rfl,
-    show (uvisOfRun m pc M pm sz fdv c gn cs pidv false).gen = gn from rfl]
-  iapply (uslot_bump_run m pc M M pm pm sz sz fdv fdv c c gn gn cs cs pidv false false (-1#64) hx0 hal4).2
+  rw [show (uvisOfRun m pc M pm sz fdv c gn cs pidv false seccAll).M = M from rfl,
+    show (uvisOfRun m pc M pm sz fdv c gn cs pidv false seccAll).perm = pm from rfl,
+    show (uvisOfRun m pc M pm sz fdv c gn cs pidv false seccAll).sz = sz from rfl,
+    show (uvisOfRun m pc M pm sz fdv c gn cs pidv false seccAll).gen = gn from rfl]
+  iapply (uslot_bump_run m pc M M pm pm sz sz fdv fdv c c gn gn cs cs pidv false false seccAll seccAll (-1#64) hx0 hal4).2
   rw [← ukWr_ne0 m 10#5 (-1#64) (by decide)]
   iapply ukcq_ukc N.pay
   iapply urun_close_wr N M pm m 10#5 (-1#64) sz fdv c gn cs pidv (pc + 4#64) avail

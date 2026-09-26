@@ -422,7 +422,7 @@ theorem wp_uk_sb_denied (UL : UK_LEAVES) (N : UkNames GF) (h : CPU) (m : RegMap)
     obtain ⟨q, hq, -, hw⟩ := ht
     exact ⟨q, hq, hw⟩
   iapply wpLoop_bupd
-  imod udep_dep (hlc := hlc) USYS_exit (uvisOfRun m pc M pm sz fdv cw gn cs pidv false) N.pay hok
+  imod udep_dep (hlc := hlc) USYS_exit (uvisOfRun m pc M pm sz fdv cw gn cs pidv false seccAll) N.pay hok
     (by decide) $$ Hdep with Hdepn
   imodintro
   unfold sbundlePay
