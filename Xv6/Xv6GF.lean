@@ -26,21 +26,15 @@ abbreviations force (each checked by an `example ... = … := rfl` below):
   `UserChildren`'s `ExtTreeSet GName compare`;
 * `MonoListG _ BlockMap`: `Xv6G.mlHistG` (the crash history).
 
-**THE BLOCKER (reported, not worked around).**  `MachGpreS`/`MachFixedGS`
-carry the era registry `GhostMapG GF Nat (EraGS GF) RegMapF`, whose VALUE
-TYPE mentions `GF` itself: `EraGS GF` has a field
-`mem : genHeapGS PAddr Hist GF MemF`, which contains `ElemG GF _` proofs.
-A concrete `xv6GF` would need a slot `xv6GF τ = ⟨constOF (HeapView Nat
-(Agree (DiscreteO (EraGS xv6GF))) RegMapF), _⟩`, a self-referential
-definition Lean cannot state (and `EraGS G₁ = EraGS G₂` is unprovable for
-distinct `G₁ G₂`, so no two-stage construction helps).  Rocq has no such
-cycle: its `riscvEraGS` (`RiscvPtsto.v:182`) holds gnames only.  The fix is
-in MachCSL: make the era record `GF`-free (replace `EraGS.mem` by its two
-names `heapName metaName`, and rebuild `MachGS.mem`'s `genHeapGS` from
-`MachFixedGS.memPre` and those names), after which the registry slot is an
-ordinary `gmF Nat EraNames RegMapF` row here and `MachGpreS xv6GF` closes
-from the instances below (every other `MachGpreS` field is instantiated
-here: `xv6GF_machPreRows`).
+**THE ERA REGISTRY** (`MachGpreS.registry_pre`, slot 93).  Its value type
+is the era record `EraGS`, which holds ghost NAMES only (Rocq `riscvEraGS`,
+`RiscvPtsto.v:182`; the heap's `genHeapGS` is rebuilt from the fixed layer's
+`MachFixedGS.memPre` and the era's `heapName`/`metaName`, `EraGS.mem`), so
+the registry is an ordinary `GhostMapG xv6GF Nat EraGS RegMapF` row.  (Before
+the record dropped its `mem : genHeapGS … GF …` field the slot would have
+been self-referential.)  `MachGpreS` carries one name (`mono_pre`'s
+`MonoNatG.name`), so it is given at a name (`xv6GF_machGpreS`), like the
+name-bearing classes below.
 
 The name-bearing classes (`FdslotG BioslotG IrefslotG WchG MonoNatG`, and
 `Icfg Fscfg Appcfg ClaimIs EnvIs`) are minted per era in the final theorem
@@ -198,6 +192,8 @@ def xv6GF : BundledGFunctors :=
   |>.set 90 ⟨GhostVarF (SlotReg Nat Unit), inferInstance⟩
   |>.set 91 ⟨GhostVarF (L2Reg Nat), inferInstance⟩
   |>.set 92 ⟨constOF OffSetUR, inferInstance⟩
+  -- MachCSL: the era registry (`MachGpreS.registry_pre`)
+  |>.set 93 ⟨xgfGm Nat EraGS RegMapF, inferInstance⟩
 
 /-! ## One instance per camera -/
 
@@ -318,6 +314,8 @@ instance xgfOffStamps : ElemG xv6GF (StampsRF Nat) := xgf_slot 89
 instance xgfOffSlotd : GhostVarG xv6GF (SlotReg Nat Unit) := { elemG := xgf_slot 90 }
 instance xgfOffSlotp : GhostVarG xv6GF (L2Reg Nat) := { elemG := xgf_slot 91 }
 instance xgfOffSet : ElemG xv6GF (constOF OffSetUR) := xgf_slot 92
+-- MachCSL: the era registry
+instance xgfRegistry : GhostMapG xv6GF Nat EraGS RegMapF := ⟨xgf_slot 93⟩
 
 end cameras
 
@@ -356,32 +354,29 @@ example : (inferInstance : MonoListG xv6GF BlockMap) = xgfMlHist := rfl
 example : (Xv6G.gvNatG : GhostVarG xv6GF Nat) = xgfGvNat := rfl
 example : (OffboxG.offG : GhostVarG xv6GF Int) = xgfGvInt := rfl
 
-/-! ## `MachGpreS`'s rows, every one but the era registry (see the header) -/
+/-! ## `MachGpreS`, every row from the cameras above -/
 
-/-- Every field of `MachGpreS xv6GF` except `registry_pre` (whose camera
-`GhostMapG xv6GF Nat (EraGS xv6GF) RegMapF` cannot be a slot: `EraGS` is
-`GF`-dependent).  `mono_pre` carries a name, which the adequacy proof
-supplies; any name inhabits it. -/
-theorem xv6GF_machPreRows :
-    Nonempty (InvGpreS xv6GF) ∧
-    Nonempty (GhostMapG xv6GF Nat RegVal RegMapF) ∧
-    Nonempty (genHeapPreS PAddr Hist xv6GF MemF) ∧
-    Nonempty (MonoNatG xv6GF) ∧
-    Nonempty (GhostMapG xv6GF Nat Agent RegMapF) ∧
-    Nonempty (GhostMapG xv6GF Nat ResvVal RegMapF) ∧
-    Nonempty (GhostMapG xv6GF Nat CPU RegMapF) ∧
-    Nonempty (GhostMapG xv6GF String Unit StrMapF) ∧
-    Nonempty (GhostVarG xv6GF (LockState × Nat)) ∧
-    Nonempty (GhostMapG xv6GF Nat (BitVec 64) RegMapF) ∧
-    Nonempty (GhostVarG xv6GF (BitVec 44)) ∧
-    Nonempty (GhostVarG xv6GF DevVal) ∧
-    Nonempty (GhostVarG xv6GF (List Obs)) ∧
-    Nonempty (MonoListG xv6GF Obs) ∧
-    Nonempty (GhostMapG xv6GF Nat (BitVec 8) DiskMapF) ∧
-    Nonempty (GhostVarG xv6GF LogMirror) :=
-  ⟨⟨inferInstance⟩, ⟨inferInstance⟩, ⟨⟨inferInstance, inferInstance, inferInstance⟩⟩, ⟨⟨inferInstance, 0⟩⟩, ⟨inferInstance⟩, ⟨inferInstance⟩,
-    ⟨inferInstance⟩, ⟨inferInstance⟩, ⟨inferInstance⟩, ⟨inferInstance⟩, ⟨inferInstance⟩,
-    ⟨inferInstance⟩, ⟨inferInstance⟩, ⟨inferInstance⟩, ⟨inferInstance⟩, ⟨inferInstance⟩⟩
+/-- `MachGpreS` at the concrete functor list (Rocq `subG_riscvGpreS` at
+`xv6Σ`).  `mono_pre` carries a name, which the adequacy proof supplies; the
+rest are the single-camera instances above, the era registry included. -/
+@[reducible] def xv6GF_machGpreS (hlc : HasLC) (γ : GName) : MachGpreS hlc xv6GF :=
+  { toInvGpreS := xv6GF_invGpreS
+    reg_pre := inferInstance
+    mem_pre := ⟨inferInstance, inferInstance, inferInstance⟩
+    mono_pre := ⟨inferInstance, γ⟩
+    registry_pre := xgfRegistry
+    auth_pre := inferInstance
+    resv_pre := inferInstance
+    dirty_pre := inferInstance
+    lockset_pre := inferInstance
+    lock_pre := inferInstance
+    kmap_pre := inferInstance
+    kptroot_pre := inferInstance
+    dev_pre := inferInstance
+    obsVar_pre := inferInstance
+    obsHist_pre := inferInstance
+    diskImg_pre := inferInstance
+    mirror_pre := inferInstance }
 
 /-! ## The name-bearing classes over the same cameras (minted per era in
 the final theorem; here at arbitrary names, to show they add no camera) -/
@@ -401,9 +396,10 @@ the final theorem; here at arbitrary names, to show they add no camera) -/
 
 /-- **JOINT INSTANTIABILITY** of the capacity-only binder list of the final
 theorem (brief §3, `xv6FsAdequacy`), at ONE concrete functor list: every
-class resolves, together, through the single-camera instances above.
-(`MachGpreS` is the one absent row: the header's blocker.) -/
-theorem xv6GF_capacityClasses :
+class resolves, together, through the single-camera instances above
+(`MachGpreS` at any `HasLC` and any name for its mono counter). -/
+theorem xv6GF_capacityClasses (hlc : HasLC) :
+    Nonempty (MachGpreS hlc xv6GF) ∧
     Nonempty (Xv6G xv6GF) ∧ Nonempty (WchGpre xv6GF) ∧ Nonempty (CtokG xv6GF) ∧
     Nonempty (DiskG xv6GF) ∧ Nonempty (IcacheG xv6GF) ∧ Nonempty (IcboxG xv6GF) ∧
     Nonempty (LogG xv6GF) ∧ Nonempty (FsBytesG xv6GF) ∧ Nonempty (FsBlocksG xv6GF) ∧
@@ -411,7 +407,7 @@ theorem xv6GF_capacityClasses :
     Nonempty (SleepLockG xv6GF) ∧ Nonempty (BcacheG xv6GF) ∧ Nonempty (OffboxG xv6GF) ∧
     Nonempty (OffboxBoxG xv6GF) ∧ Nonempty (FileG xv6GF) ∧ Nonempty (CrashPermG xv6GF) ∧
     Nonempty (CInvG xv6GF) :=
-  ⟨⟨inferInstance⟩, ⟨inferInstance⟩, ⟨inferInstance⟩, ⟨inferInstance⟩, ⟨inferInstance⟩,
+  ⟨⟨xv6GF_machGpreS hlc 0⟩, ⟨inferInstance⟩, ⟨inferInstance⟩, ⟨inferInstance⟩, ⟨inferInstance⟩, ⟨inferInstance⟩,
     ⟨inferInstance⟩, ⟨inferInstance⟩, ⟨inferInstance⟩, ⟨inferInstance⟩, ⟨inferInstance⟩,
     ⟨inferInstance⟩, ⟨inferInstance⟩, ⟨inferInstance⟩, ⟨inferInstance⟩, ⟨inferInstance⟩,
     ⟨inferInstance⟩, ⟨inferInstance⟩, ⟨inferInstance⟩, ⟨inferInstance⟩⟩
