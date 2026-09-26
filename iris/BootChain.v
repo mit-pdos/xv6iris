@@ -367,6 +367,9 @@ Section BootPrimary.
     (* the console ring's names carry the RECEIVE side's, which is where the
        high-water mark's two halves live (app-echo.md, CONS-CURSOR C2) *)
     cn_uart cn = γd ->
+    (* ...and the ring is THIS era's (lane seccomp S2k, the follow-up):
+       [ConsoleInv.cons_ghosts_alloc] records the era in the names *)
+    cn_era cn = Datatypes.S gen_id ->
     (* THE SNAPSHOT HYPOTHESIS, forwarded whole (fs-cfg-boot.md stage (f);
        durable-disk lane E-himg).  This chain still neither reads nor opens
        it; [ProofMain] is what turns it into [FsReady.fs_geom_ok] and
@@ -488,7 +491,7 @@ Section BootPrimary.
     ([∗ list] p ∈ ps, page_own p) -∗
     mWP (Loop : expr riscv_lang).
   Proof.
-    intros Hreset Hz Hprun Hlen Hlive Hl0 Hl1 Hcnu Himg.
+    intros Hreset Hz Hprun Hlen Hlive Hl0 Hl1 Hcnu Hcne Himg.
     iIntros "#Htext #Hdata Hres Hthr #Hstarted Hprim #Hecho Hlk Hgl Hfirst Hnext Hpark Hpst Hpav Hchb
              Hfs Hmir Hirslot Hirauth #Hcert #Hseam
              #Hdev #Hwire Hinitb Htx Hsent Hlb Htok Hhi Hlgh Harm Hdlab
@@ -506,7 +509,7 @@ Section BootPrimary.
               (register_lookup tlb rs) γi ξd (main_dep γd γv)
               (cid_word_of_zero _ Hz) K_main_boot_le Hl0 Hl1
               eq_refl eq_refl Hprun Hlen
-              Hlive Hcnu Himg eq_refl
+              Hlive Hcnu Hcne Himg eq_refl
               with "Hcap Hctx Hcpu Hg Htext Hdata Hpc Hstarted Hprim [] Hecho Hlk Hgl
                     Hfirst Hnext Hpark Hpst Hpav Hchb Hfs Hmir Hirslot Hirauth
                     Hcert Hseam

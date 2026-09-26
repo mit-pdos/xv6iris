@@ -28,22 +28,37 @@ textually at the baseline before it reports, one status paragraph under
 its own heading in THIS file (on a rebase conflict in this file keep
 main's text and re-add your paragraph).
 
-WHERE THINGS ARE (trust `git log`/`git worktree list` over this text):
-- `/shared/xv6iris-3`: `secc/bump` = main plus the owner's notes commits.
-  The owner (top-level agent) works here: design, briefs, merges to main.
-- `secc/model`, worktree `secc-model`: lane M, the pure model (§3, §9),
-  DONE and rebased onto main: tip 79c00bfef, green, audits at the
-  baseline.  Owner's answer to its question: the words after `seccomp`
-  ALSO accept file-name words (`fn_wf`, so `seccomp rm a.txt` is a
-  line); S4 widens `secc_ok`.
-- `secc/s0`, worktree `secc-s0`: lane S0 (below), in flight, off main.
-- `secc/s1`, worktree `secc-s1`: lane S1 (below), in flight, off main;
-  merges `secc/s0` for its minter.
-- `secc/s2`, worktree `secc-s2`: lane S2 (below), off 79c00bfef; merges
-  `secc/s0` for its items 1, 5, 6.
-- Then: S3 off S1 + S2 (+ the model); S4 off S3.
-- Origin: every `secc/*` branch is pushed as a safety copy when it
-  reports; `main` moves only at green checkpoints.
+WHERE THINGS ARE (trust `git log`/`git worktree list` over this text;
+updated 2026-09-26):
+- `main` = `origin/main` = ea9b753b4 (+ owner's notes): checkpoint 1, lane
+  M's model (knob OFF), S0 (plumbing), S1 (the universe slot), S2 (the
+  three-arm claim; design §10.11), S2k + S2k2 (the console read's dirty
+  and tokenless arms carry `cons_placed sl lo k d hs`, `cons_chain sl` and
+  the ring's era `cn_era`; the token holder's `cur = nrd` survives the
+  dirty arm), S5a (`secc_tok_at` names the seccomp newline's trace with
+  `ins (open_seg h0) = I0`; `GenOutWild.lm_placed_wild_undisc`).  Whole
+  tree green, audits 13/14/13.
+- `secc/s3`, worktree `secc-s3`: lane S3 DONE (the whole-table view in
+  UserFd, the row-23 leaf `UkRunSecc.wp_uk_ecall_seccomp`, `UkSecc*`,
+  `FsSeccPin`, `secc_image_entry` with `□ (∀ s, Q s)`); merged into S4.
+- `secc/s4`, worktree `secc-s4`: lane S4 IN FLIGHT (the shell's
+  whole-table view as an existential inside `ush_std`, sh's round at
+  `LSecc`, the knob ON, the top theorem; `secc_B` back to six and the
+  universe's console-read payer restored; ONE stated premise
+  `ush_rdwild_of_shape : useccomp_shape I -∗ riscv_rdwild (S gen_id)`
+  left for S5b).
+- NEXT, S5b (after S4 lands, shell tier): `ai_rdwild := usecc_tok` at the
+  union; the union's read-law instance keeps the transition read's
+  window facts (`cons_stored_lb sl'`, the newline at `sl' !! (length I0
+  - 1)`); the read leaf's dirty case at the token half refuted through
+  `cons_placed` + `cons_chain` + the token's newline trace +
+  `lm_placed_wild_undisc` -> the tag's `UT`; S4's premise discharged;
+  `Print Assumptions union_adequacy_closed` = 14.  Then the completed
+  note.
+- The owner's ruling of record on `read`: it stays OPEN (design §10.12);
+  the discipline is D4.
+- Origin: every `secc/*` branch is pushed when it reports; `main` moves
+  only at green, audited tips.
 
 ## Lane M -- the pure model (design §3, §9)
 
@@ -280,6 +295,58 @@ compared; that would need a `mono_nat` for `cur` in `cons_res`.  The
 holder does get `p_j >= n0 + j` per pop, but only `>= n0` is stated.
 UShLine: pattern-only (`[#Hdirty _]` at the cons_out and receipt
 disjuncts).
+
+S2k FOLLOW-UP (the era of a placed byte, for S5b's
+`GenOutWild.lm_placed_wild_undisc`): STOPPED -- the ring keeps NO
+per-entry era.  `cons_res` (ConsoleInv.v) is not era-aware at all (its
+section has no `GenId`); its entries are `(h, b)` under `cons_stored` /
+`cons_pend` / `cons_chain` / `cons_below` / `cons_log_ok`, none naming
+`obs_boots`.  `cons_logged` ties each entry to an entry of the log `L0`,
+but the port invariant keeps the era of the log's TOP only
+(`WpUart.cons_log_ins`, `uart_col_ok`'s `ht` clause).  Where the era IS,
+closest to the receipt: (1) the uart's rx queue, per queued byte (the
+receive column's `⌜obs_boots h = S gen_id⌝` row in `WpUart.v`), relayed
+at the POP beside `riscv_rx_tag h`, in hand at consoleintr's push
+(`ProofConsoleintr.v` ~823/1294/1573) and dropped when the byte is
+filed into the ring; (2) the application's tag, minted at that same push
+under the premise `obs_boots h = S gen_id` (`AppUnionRec.union_al_rx`;
+the era survives `h ++ [ObsUartIn i b]` by `obs_boots_app` /
+`obs_boots_io`, as at `WpUart.v:4073`) and ALREADY relayed by every
+receipt arm, the dirty one included (`[∗ list] h ∈ hs, riscv_rx_tag h`).
+The cheap route is (2): `UnionOut.utag` carries an era-keyed persistent
+witness the reader compares with its own era (`ai_tag` is era-agnostic,
+so a bare `⌜obs_boots h = S gen_id⌝` cannot be written in it).  The
+kernel route is a new `cons_res` clause `⌜∀ p, p ∈ st ++ pd -> obs_boots
+p.1 = S gen_id⌝`: `GenId` into ConsoleInv's section (every statement
+naming `cons_res`/`is_conslock`/`console_inv` then needs an ambient era),
+maintained by consoleintr's store arm, vacuous at the boot allocation,
+carried by `cr_ghost`/`cr_racc` into `cons_placed`'s per-byte clause.
+
+S2k ERA (the owner's ruling on the follow-up above, `secc/s2k2`): DONE,
+kernel side, the era in the NAMES.  `UartNames.cons_names` gains `cn_era
+: nat`; `ConsoleInv.cons_era l k := ∀ p, p ∈ l -> obs_boots p.1 = k`
+(with `_nil`, `_prefix`, `_snoc`, `_lookup`), and `cons_res` /
+`cons_res_at` / `cr_ghost` / `ct_gh` carry `⌜cons_era (st ++ pd) (cn_era
+cn)⌝` after `cons_below`.  `cons_ghosts_alloc γu k` returns `⌜cn_era cn =
+k⌝`; BootShared calls it at `S gen_id` and exports `⌜cn_era cnm = S
+gen_id⌝` beside `cn_uart cnm = γd`, threaded through SystemAdequacy,
+`BootChain.boot_hart_primary`, `SpecMain`, `ProofMain` (and
+`mn_grp_printk`) as a premise `cn_era cn = S gen_id`.  The CAPS FACTS:
+`SpecConsoleintr.console_caps` gains `⌜cn_era cn = S gen_id⌝` (after
+`cn_uart cn = γu`), which consoleintr's store arm (`ct_cr`, `ct_store`,
+`ct_dflt`, `ct_gh_push`) spends against the byte's own `obs_boots hb = S
+gen_id`; on the reader side `SpecFileread.console_ready_app` and
+`fileread_dev_caps` gain `⌜cn_era fsc_cons = S gen_id⌝` (readers
+`console_ready_app_era`, `fileread_dev_caps_era`), and `SpecSysRead`
+takes it as a premise from `ProofSyscall`.  `cons_placed l lo k d hs`'s
+per-byte clause is now `(lo <= p) /\ hs !! j = Some h /\ obs_ends_in
+Uart0 h b /\ l !! p = Some (h, b) /\ obs_boots h = k`; consoleread's
+receipt states it at `k := cn_era cn`, fileread converts it to `S
+gen_id` (`cons_placed_era` off `fileread_dev_caps_era`), so
+`console_receipt` and `UkReadCons.uread_cons_ans` state it at `S gen_id`
+-- S5b reads the era straight off the receipt, no caps fact needed at
+the U tier.  `GenOutWild.lm_placed_wild_undisc` takes the extra era
+argument (its proof drops the new conjunct).
 
 STATUS (lane S5a, `secc/s5a` off main aa793e35c, design 10.12's UNION
 bullet, the claim/pure half): landed, tree green (VM log s5a-3: EXIT=0, no

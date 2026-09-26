@@ -778,7 +778,7 @@ Section SystemBoot.
             S Pb (MkAppcfg N A rap) (fun _ => emp)%I Tn gsn gln gtn Hbf Hbundle
             with "Hok Hxfer Hseamg Hdursnap Hres")
       as (Hfd Hir Hpav Hbs Hwch HF γd γd1 γv cnm Rspent γi ξd)
-      "(%Hdimg & %Hcnu & %Happ & #Htext & #Hdata &
+      "(%Hdimg & %Hcnu & %Hcne & %Happ & #Htext & #Hdata &
         #Hpinned & #Hubw0 & #Hubw1 & #Hurw0 & #Hurw1 &
         #Hstarted & Hprim & #Hdev & #Hdev1 & #Hplic & #Hwinv & Hturn &
         #Hcinv & #Hcert & Hharts & Hlk & Hgl & Hmdata & Hpark & Hpst & Hpavail & Hchb & Huart &
@@ -894,7 +894,7 @@ Section SystemBoot.
                   (v_disk (g.(gdev).(dvirtio))) (fss_sb S) (fs_nib S) cov
                   XV6_DISK_BYTES S Pb Rspent
                   (boot_regs_of_facts g Hbf 0%fin) fin_0_z Hprun Hplen Hlive
-                  Hl0 Hl1 Hcnu Hbundle) as "HP".
+                  Hl0 Hl1 Hcnu Hcne Hbundle) as "HP".
         iSpecialize ("HP" with "Htext").
         iSpecialize ("HP" with "Hdata").
         iSpecialize ("HP" with "Hh0").

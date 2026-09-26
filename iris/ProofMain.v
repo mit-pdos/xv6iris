@@ -442,6 +442,8 @@ Section ProofMain.
     (* the ring's names carry the RECEIVE side's, which is where the
        high-water mark's two halves live *)
     cn_uart cn = γd ->
+    (* ...and its names record THIS era (lane seccomp S2k, the follow-up) *)
+    cn_era cn = Datatypes.S gen_id ->
     (* ...AND THE RING IS THE ERA'S OWN.  [SpecFileread.console_ready_app]
        -- what the read syscall's arm opens -- is stated at the AMBIENT
        [fsc_cons], and this tie is [FsCfgBoot.fs_boot_supply]'s: the boot
@@ -542,7 +544,7 @@ Section ProofMain.
         mWP (Loop : expr riscv_lang)) -∗
     mWP (Loop : expr riscv_lang).
   Proof using .
-    intros Hn Hl0 Hl1 Hhl0 Hhl1 Hcnu Hconsq.
+    intros Hn Hl0 Hl1 Hhl0 Hhl1 Hcnu Hcne Hconsq.
     iIntros "Hcg #Htext #Hkdata #Hdev Hpc Hfree Hcpu Hlcons Hltx0 Hltx1 Hlpr".
     iIntros "Hkprintk Hdevsw Hrest Hring Hclean Htx Hsent Hlb Htok Hhi Hlgh Harm Hdlab".
     iIntros "#Hplic #Hpinned #Huinv1 #Hubw0 #Hurw0 #Hubw1 #Hurw1".
@@ -763,6 +765,7 @@ Section ProofMain.
       iSplitR; [iExact "Htxl" |].
       iSplitR; [iExact "Hconslk0" |].
       iSplitR; [iPureIntro; exact Hcnu |].
+      iSplitR; [iPureIntro; exact Hcne |].
       iSplitR; [iExact "Hecho" |].
       (* THE ARRAY'S FOUR `.data` WORDS, at the VA tier, as one row
          ([SpecUartPutc.uarts_words]).  The driver LOADS both fields of the
@@ -794,7 +797,7 @@ Section ProofMain.
        afterwards would have nothing to pair. *)
     iAssert (SpecFileread.console_ready_app) as "#Hcready".
     { rewrite /SpecFileread.console_ready_app Hconsq.
-      iSplitR.
+      iSplitR; last iSplitR; last (iPureIntro; exact Hcne).
       - iExists γcl. rewrite /ConsoleInv.console_inv.
         iSplitR; [iExact "Hconslk" | iExact "Htbl"].
       (* ...AND THE CONSOLE PORT'S OWN INVARIANT (lane CONS-IO, milestone
@@ -2432,7 +2435,7 @@ Section ProofMain.
         γd γv cn l0 b0 c0 γd1 l1 b1 dk sb nib cov ndisk S Pb Rspent tlbvec0 γi ξd P.
   Proof.
     cbv beta delta [wp_main_boot_sconf_body].
-    intros pcE Hcid HK Hl0 Hl1 Hphystop Hs1 Hprun Hlen Hlive Hcnu Hsnap Hp0.
+    intros pcE Hcid HK Hl0 Hl1 Hphystop Hs1 Hprun Hlen Hlive Hcnu Hcne Hsnap Hp0.
     (* THE SNAPSHOT HYPOTHESIS, READ HERE (fs-cfg-boot.md stage (f);
        durable-disk lane E-himg).  Two of its rows are main's own ([0 < nib]
        for userinit's namei corner, [0 ∉ cov] for [bio_init_at]); the rest
@@ -2558,7 +2561,7 @@ Section ProofMain.
     (* --- 0x42 .. 0x6a : console / printk --- *)
     iApply (mn_grp_printk γd γv cn m1 (K - 2)%nat p0 l0 b0 0%nat None
               γd1 l1 b1 0%nat None Hn50 Hl0 Hl1 eq_refl eq_refl
-              Hcnu Hconsq
+              Hcnu Hcne Hconsq
               with "Hcg Htext Hkdata Hdev Hpc Hfree Hcpu Hlcons Hltx0 Hltx1 Hlpr
                     Hkprintk Hdevsw Hdevrest Hring Hclean Htx Hsent Hlb Htok
                     Hhi Hlgh Harm Hdlab

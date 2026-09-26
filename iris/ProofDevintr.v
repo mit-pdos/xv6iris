@@ -459,7 +459,7 @@ Section ProofDevintr.
     (* the deposit witness, out of the console credential: it is what the
        PLIC leaves need to know the invariant is past its pre-deposit arm *)
     iAssert (uart_inited γu) as "#Hinit".
-    { iDestruct "Hccaps" as (γtx γc cn) "(_ & _ & _ & _ & #Hin & _)". iExact "Hin". }
+    { iDestruct "Hccaps" as (γtx γc cn) "(_ & _ & _ & _ & _ & #Hin & _)". iExact "Hin". }
     (* THE FOUR `.data` WORDS, out of the SAME bundle, AT BOTH PORTS.
        uartintr's contract is port-generic and takes that element's two
        immutable fields at the VA tier; all four ride
@@ -469,7 +469,7 @@ Section ProofDevintr.
        projection.  DLAB at the console comes out of the same bundle's
        [is_txlock]; at [Uart1] it is [uart1_caps]' own row above. *)
     iAssert (uarts_words) as "#Hwords".
-    { iDestruct "Hccaps" as (γtx γc cn) "(_ & _ & _ & _ & _ & #Hw)".
+    { iDestruct "Hccaps" as (γtx γc cn) "(_ & _ & _ & _ & _ & _ & #Hw)".
       iExact "Hw". }
     iPoseProof (uarts_words_base Uart0 with "Hwords") as "#Hubw0".
     iPoseProof (uarts_words_rx   Uart0 with "Hwords") as "#Hurw0".

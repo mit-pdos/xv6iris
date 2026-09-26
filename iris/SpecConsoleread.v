@@ -364,14 +364,16 @@ Definition wp_consoleread_sconf_body
           ring's cursor, the byte it takes is the stored sequence's element
           there, and the cursor is never below the reader's own position.
           So the [j]th delivered byte sits in [sl] at SOME position at or
-          after [cur] ([ConsoleInv.cons_placed]), along the stored order
+          after [cur] ([ConsoleInv.cons_placed]), with its history in the
+          ring's own era [cn_era cn], along the stored order
           [cons_chain sl].  [cur] is the position this call reports: a
           token holder's own [n0] on both arms ([cons_out] says so on the
           marked arm too), and nothing at all for a tokenless caller.  The
           positions are NOT promised to increase with [j] -- the ring keeps
           no witness that its cursor is monotone across a release -- and
           nothing is fired. *)
-       ∨ cons_dirty_cred Wd ∗ ⌜cons_chain sl⌝ ∗ ⌜cons_placed sl cur d hs⌝) -∗
+       ∨ cons_dirty_cred Wd ∗ ⌜cons_chain sl⌝
+           ∗ ⌜cons_placed sl cur (cn_era cn) d hs⌝) -∗
       cons_out cn Wd ord cur dc -∗
       sie_cap_gpr KT1 mf av b pj -∗
       cpu_own 0%nat eb pj b lks -∗

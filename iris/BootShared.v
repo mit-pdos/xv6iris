@@ -1689,6 +1689,8 @@ Section BootAlloc.
              (γi : gname) (ξd : CtxId),
       ⌜dn_img γv = disk_img_name⌝ ∗
       ⌜cn_uart cnm = γd⌝ ∗
+      (* ...and the ring is this era's (lane seccomp S2k, the follow-up) *)
+      ⌜cn_era cnm = Datatypes.S gen_id⌝ ∗
       (* THE ERA'S [fileG] CARRIES THE APPLICATION RECORD THIS MINT WAS
          GIVEN.  It is [fileG_of]'s third projection, so the equation holds
          by iota -- and it is stated because the caller needs it: the
@@ -2186,8 +2188,8 @@ Section BootAlloc.
     (* ...AND THE DELIVERED COUNT'S RING HALF (relax-d2, lane K2), which
        travels the same way and has no PLIC sink either. *)
     iEval (rewrite /uart_dlcnt) in "Hdch".
-    iMod (cons_ghosts_alloc γd with "Hhi1 Hdvh Hlmh Hdch")
-      as (cnm) "[%Hcnu Hcgb]".
+    iMod (cons_ghosts_alloc γd (Datatypes.S gen_id) with "Hhi1 Hdvh Hlmh Hdch")
+      as (cnm) "(%Hcnu & %Hcne & Hcgb)".
     (* ---- the .bss, in address order.  It runs AFTER the two mints above
        because the console ring's resource now owns three of their ghost
        rows. ---- *)
@@ -2369,6 +2371,7 @@ Section BootAlloc.
                        cnm, (snap_spent S nib), γi, ξd.
     iSplitR; [iPureIntro; exact Himg |].
     iSplitR; [iPureIntro; exact Hcnu |].
+    iSplitR; [iPureIntro; exact Hcne |].
     iSplitR; [iPureIntro; exact Hpa |].
     iSplitR; [iExact "Hktext" |].
     iSplitR; [iExact "Hkdata" |].
