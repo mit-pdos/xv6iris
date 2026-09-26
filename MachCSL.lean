@@ -168,3 +168,4 @@ import MachCSL.UMemRam
 import MachCSL.UMemAccess
 import MachCSL.UMemStore
 import MachCSL.UMemAddr
+import MachCSL.BvEnumSatp

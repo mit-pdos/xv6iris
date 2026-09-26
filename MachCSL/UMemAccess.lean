@@ -43,6 +43,7 @@ every proof (performance rule 2); the walks are run by `uwk_run` (UWalkRun),
 which is handed the sub-walk facts instead of re-walking them.
 -/
 import MachCSL.UMemRam
+import MachCSL.BvEnumSatp
 import MachCSL.UTlb
 import MachCSL.UWalkRun
 import MachCSL.SailHooks
