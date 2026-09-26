@@ -339,7 +339,7 @@ Section SpecFileread.
      also carries the UART's), because consoleread never touches the
      transmitter.  Persistent, so a caller pays for it once. *)
   Definition fileread_dev_caps (fn : fread_names) : iProp Σ :=
-    (is_conslock fsc_cons app_sup (frn_cons fn) ∗
+    (is_conslock fsc_cons app_rdcred (frn_cons fn) ∗
      (* ...AND THE CONSOLE PORT'S INVARIANT (lane CONS-IO, milestone B,
         ruling F6): consoleread fires the boundary's input link at its
         final release and opens [uartN Uart0] to do it.  Persistent, and it
@@ -351,7 +351,7 @@ Section SpecFileread.
   Proof using . apply _. Qed.
 
   Lemma fileread_dev_caps_lock (fn : fread_names) :
-    fileread_dev_caps fn -∗ is_conslock fsc_cons app_sup (frn_cons fn).
+    fileread_dev_caps fn -∗ is_conslock fsc_cons app_rdcred (frn_cons fn).
   Proof using . by iIntros "[$ _]". Qed.
   Lemma fileread_dev_caps_uart (fn : fread_names) :
     fileread_dev_caps fn -∗ WpUart.uart_inv Uart0 (cn_uart fsc_cons).
@@ -365,13 +365,13 @@ Section SpecFileread.
      window a read hands back is stated at the AMBIENT [fsc_cons] (the
      trap route's per-number post row has no gname parameter of its own)
      and the credential the tokenless arm pays is the application's own
-     [AppInv.app_sup] -- so [SpecSysRead] takes [ConsoleInv.console_inv
-     fsc_cons app_sup _], and an existential over the first two arguments
+     [AppInv.app_rdcred] -- so [SpecSysRead] takes [ConsoleInv.console_inv
+     fsc_cons app_rdcred _], and an existential over the first two arguments
      cannot be specialised to it.
 
      THE PIN IS AT THIS TIER because this is the lowest file that names
      both: [ConsoleInv] sits below [FsCfg] (which carries [fsc_cons]) and
-     below [AppInv] (which defines [app_sup]), and it must, since the ring
+     below [AppInv] (which defines [app_rdcred]), and it must, since the ring
      is device state and the file system's config is not.  Only the GNAME
      stays existential -- nothing above the console names the cons lock's
      handle, and the read arm binds it once and builds its callee's names
@@ -385,14 +385,14 @@ Section SpecFileread.
      [cn_uart cn = γd].  Persistent, so it costs its carriers nothing and
      no tie has to be threaded down the read path. *)
   Definition console_ready_app : iProp Σ :=
-    ((∃ γ : gname, ConsoleInv.console_inv fsc_cons app_sup γ) ∗
+    ((∃ γ : gname, ConsoleInv.console_inv fsc_cons app_rdcred γ) ∗
      WpUart.uart_inv Uart0 (cn_uart fsc_cons))%I.
 
   Global Instance console_ready_app_persistent : Persistent console_ready_app.
   Proof using . rewrite /console_ready_app. apply _. Qed.
 
   Lemma console_ready_app_intro (γ : gname) :
-    ConsoleInv.console_inv fsc_cons app_sup γ -∗
+    ConsoleInv.console_inv fsc_cons app_rdcred γ -∗
     WpUart.uart_inv Uart0 (cn_uart fsc_cons) -∗ console_ready_app.
   Proof using . iIntros "H #Hu". rewrite /console_ready_app. iFrame "Hu". iExists γ. iExact "H". Qed.
 
@@ -483,7 +483,7 @@ Section SpecFileread.
   Lemma fileread_devsw_of_console (fn : fread_names) :
     frn_rp fn = ConsoleInv.devsw_read_val ->
     frn_dqv fn = (fun _ => DfracDiscarded) ->
-    ConsoleInv.console_inv fsc_cons app_sup (frn_cons fn) -∗
+    ConsoleInv.console_inv fsc_cons app_rdcred (frn_cons fn) -∗
     WpUart.uart_inv Uart0 (cn_uart fsc_cons) -∗
     fileread_devsw fn.
   Proof using .
@@ -877,14 +877,14 @@ Section SpecFileread.
      contract takes beside the input. *)
   (* ...AND THE CONSOLE ARM IS NO LONGER [emp] (app-echo.md, lane
      CONS-CURSOR, C3, and the LEASE ruling).  A read of the console is
-     [ConsoleInv.cons_acc] at the application's credential [app_sup]: ONE
+     [ConsoleInv.cons_acc] at the read credential [AppInv.app_rdcred]: ONE
      ARM, whose two disjuncts are the two kinds of caller.
 
      A LEASE HOLDER supplies the reader token at its own cursor together
      with the wand that turns consoleread's [cons_out] into what it wants to
      know -- for sh, that the window began at ITS position, and the token
-     back advanced.  A TAINTED OR GENERIC CALLER supplies [app_sup] itself,
-     the credential it already holds, and owes [Rd] at every position, which
+     back advanced.  A TAINTED OR GENERIC CALLER supplies [app_sup] itself
+     (the left arm of [app_rdcred]), the credential it already holds, and owes [Rd] at every position, which
      for a caller that tracks nothing is [True].
 
      THAT IS WHY THERE IS NO [option] HERE ANY MORE.  The two callers differ
@@ -950,7 +950,7 @@ Section SpecFileread.
          P ∗ aread_in_om om (fs_gamma_L fsc_fs) appE i γo F
      | FdOpen true _ (FdDevice mj) =>
          if decide (mj = CONSOLE)
-         then cons_acc fsc_cons app_sup (fun cur dc => P ∗ Rd cur dc)
+         then cons_acc fsc_cons app_rdcred (fun cur dc => P ∗ Rd cur dc)
               (* ...AND THE BOUNDARY'S INPUT LINK (app-echo.md, lane
                  CONS-IO, milestone B, B4).  A console read moves the
                  application's DELIVERED sequence, and it moves it through
@@ -1176,7 +1176,7 @@ Section SpecFileread.
                 ⌜forall j : nat, (j < dc)%nat ->
                    ws !! j = sl' !! (cur + j)%nat⌝ ∗
                 Rin ws)
-          ∨ cons_dirty_cred app_sup) ∗
+          ∨ cons_dirty_cred app_rdcred) ∗
          Rd cur dc)%I.
 
   (* the -1 arm, at every caller: whatever the caller asked for comes back,
@@ -1299,7 +1299,7 @@ Section SpecFileread.
     cons_tagged bs hs d ->
     ([∗ list] h ∈ hs, riscv_rx_tag h) -∗
     cons_stored_lb fsc_cons sl -∗
-    cons_dirty_cred app_sup -∗
+    cons_dirty_cred app_rdcred -∗
     Rd cur dc -∗
     console_receipt gn P Rd Rin n r (umem_wr M addr d bs) addr.
   Proof using .
@@ -1679,7 +1679,7 @@ Section SpecFileread.
   Lemma fileread_in_dev_console (st : fdstate) (wb : bool) (mj : Z) n F Rd Rin Rp Rpe P :
     st = FdOpen true wb (FdDevice mj) -> mj = CONSOLE ->
     fileread_in st n F Rd Rin Rp Rpe P -∗ P -∗
-    cons_acc fsc_cons app_sup (fun cur dc => P ∗ Rd cur dc)
+    cons_acc fsc_cons app_rdcred (fun cur dc => P ∗ Rd cur dc)
     ∗ WpUart.cons_read_pay (S gen_id) Rin.
   Proof using .
     intros -> ->. rewrite /fileread_in.
@@ -1777,7 +1777,7 @@ Section FilereadConsoleMorph.
     iIntros (ξ ξ') "Hd H". rewrite /console_ready_app.
     iDestruct "H" as "[H #Hu]".
     iDestruct "H" as (γ) "H".
-    iMod (ConsoleInv.console_inv_morph fsc_cons app_sup γ ξ ξ' with "Hd H")
+    iMod (ConsoleInv.console_inv_morph fsc_cons app_rdcred γ ξ ξ' with "Hd H")
       as "[Hd H]".
     (* the port invariant does not mention the context axis at all, so it
        crosses unchanged (lane CONS-IO, milestone B) *)
@@ -1803,7 +1803,7 @@ Definition wp_fileread_sconf_body
     (F : pfam Σ (aview -> nat -> anode -> nat -> iProp Σ))
     (* WHAT THE CALLER ASKS TO BE TOLD ABOUT THE CONSOLE WINDOW (app-echo.md,
        lane CONS-CURSOR, C3, and the LEASE ruling).  The console arm takes
-       [ConsoleInv.cons_acc fsc_cons app_sup Rd] -- one arm, two disjuncts --
+       [ConsoleInv.cons_acc fsc_cons app_rdcred Rd] -- one arm, two disjuncts --
        and pays [Rd cur dc] at the position the ring's committed sequence
        stood at and the advance the cursor made.  A lease holder instantiates
        [Rd] with "[cur] is my own [n], and here is my token back"; a tainted

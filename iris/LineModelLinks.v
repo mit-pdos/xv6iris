@@ -844,16 +844,6 @@ Section line_model_links.
     intros (_ & Hr & Hn & _). by rewrite (ll_nstarted_rest_nil I Hr) Hn.
   Qed.
 
-  Lemma lm_wr_blk_t_stage (ps cs : list nat) (s0 : lm_st M) (I : list (bv 8))
-      (P : nat) :
-    lm_wr_blk_t M ps cs s0 I P ->
-    rest_of I = []
-    /\ nlines I = S (length cs)
-    /\ P = length (lm_proc_before M ps cs s0 I)
-    /\ lm_pro_pin M ps cs I
-    /\ lm_wr_tail M ps cs.
-  Proof using. intros [(Hpin & Hr & Hn & HP) Ht]. split_and!; assumption. Qed.
-
   (* filing an alternative reads no round below the boundary *)
   Lemma lm_wr_blk_pin_snoc (ps cs : list nat) (s0 : lm_st M) (I : list (bv 8))
       (P a : nat) : lm_wr_blk M ps cs s0 I P -> lm_pro_pin M ps (cs ++ [a]) I.

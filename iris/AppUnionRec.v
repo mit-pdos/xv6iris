@@ -125,7 +125,10 @@ Section UnionApp.
   Definition union_ifc (c : union_gn) : app_iface Σ :=
     MkAppIface (union_tag c) (union_tag_persistent c) (union_tag_timeless c)
                (union_kill c) (union_kill_persistent c) (union_kill_timeless c)
-               (union_cons c) (union_cons_timeless c) (union_cons_lic c).
+               (union_cons c) (union_cons_timeless c) (union_cons_lic c)
+               (* the seccomp universe's era credential (S2); none yet *)
+               wild_none (@wild_none_persistent Σ) (@wild_none_timeless Σ)
+               (wild_none_lic (union_cons c)).
 
   Definition union_turn (c : union_gn) : nat -> iProp Σ := fturn (ugn_file c).
 

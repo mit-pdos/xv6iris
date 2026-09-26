@@ -324,11 +324,6 @@ Inductive uline :=
   | LPipe (p : producer) (fs : list filt)
   | LSecc (ws : list (list (bv 8))).
 
-(* the lines at the one name the shell tier still speaks of (cut W1:
-   the claim, the handler and the programs are at [f] until cuts W2-W3) *)
-Notation LEchoF_f ws := (LEchoF ws fname_f).
-Notation LCat_f := (LCat fname_f).
-
 Global Instance uline_eq_dec : EqDecision uline.
 Proof using. solve_decision. Defined.
 Global Instance uline_inhabited : Inhabited uline := populate (LEcho []).

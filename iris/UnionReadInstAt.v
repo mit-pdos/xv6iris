@@ -199,14 +199,15 @@ Section union_read_leaf_at.
           (UShLine.ush_rd_x_at (lk_rres UIs) (fgn_echo gf) Wb) ->
     (⊢ app_sup -∗ lk_T UIs) ->
     (⊢ lk_T UIs -∗ app_sup) ->
+    (⊢ riscv_wild (S gen_id) -∗ lk_T UIs) ->
     (⊢ lk_links UIs) ->
     ⊢ UkSh.ush_read_recv_leaf_at (PS := uprogSG_free) N γp (lk_T UIs)
         (UShLine.ush_mid_at (lk_rres UIs) (fgn_echo gf) γp) (lm_disc_input U)
         fsc_cons l.
   Proof using Htag.
-    intros Hpeq Hstw Htsw Hlk.
+    intros Hpeq Hstw Htsw Hwdw Hlk.
     iApply (UShLine.ush_read_recv_leaf_holds_at (union_read_inst_at ug Htag s0)
-              (fgn_echo gf) Wb N γp l Hpeq Hstw Htsw
+              (fgn_echo gf) Wb N γp l Hpeq Hstw Htsw Hwdw
               (fun v => union_pin_refl_at v) Hlk).
   Qed.
 

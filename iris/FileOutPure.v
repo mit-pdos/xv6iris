@@ -278,9 +278,6 @@ Qed.
    [GenOutPure.lm_out_pure] pins the stage's input and written bytes to be empty. *)
 Definition f0_st (f0 : option fstate) : fstate := default ∅ f0.
 
-Lemma f0_st_some (s : fstate) : f0_st (Some s) = s.
-Proof using. reflexivity. Qed.
-
 Definition pending_at_f (ps cs : list nat) (f0 : option fstate)
     (I : list (bv 8)) : list (bv 8) :=
   if decide (I = []) then pro_of ps
@@ -288,31 +285,6 @@ Definition pending_at_f (ps cs : list nat) (f0 : option fstate)
        then alt_cont_f ps cs (f0_st f0) (bodies_of I) (nlines I - 1) else [].
 
 (* the round pointer a block-opening stage stands at *)
-Lemma pro_idx_f_nlines (cs : list nat) (I : list (bv 8)) :
-  I <> [] -> rest_of I = [] ->
-  ralt_panic (ralt_at cs (nlines I - 1)) = true ->
-  S (pro_idx_f cs (nlines I - 1)) = pro_idx_f cs (nlines I).
-Proof using.
-  intros H0 Hm H3. pose proof (nlines_pos_of_rest_nil I H0 Hm) as Hq.
-  replace (nlines I) with (S (nlines I - 1))%nat at 2 by lia.
-  symmetry. by apply pro_idx_f_Sp.
-Qed.
-
-Lemma pending_at_f_ps_ext ps ps' cs f0 I :
-  ps `prefix_of` ps' ->
-  (pro_idx_f cs (nlines I) < pro_rounds ps)%nat ->
-  pending_at_f ps cs f0 I = pending_at_f ps' cs f0 I.
-Proof using.
-  intros Hp Hr. rewrite /pending_at_f. case_decide as H0.
-  { subst I. apply (pro_of_from_done_ext 0%nat); [exact Hp |].
-    rewrite nlines_nil in Hr. cbn [pro_idx_f] in Hr. exact Hr. }
-  case_decide as Hm; [| done].
-  rewrite /alt_cont_f. f_equal.
-  destruct (ralt_panic (ralt_at cs (nlines I - 1))) eqn:H3; [| done].
-  rewrite (pro_idx_f_nlines cs I H0 Hm H3).
-  by apply pro_of_from_done_ext.
-Qed.
-
 (* E's INDEX LAW is [EchoOutPure.E_index] verbatim (it names no discipline);
    its CONTENT LAW is D3 for the file application. *)
 Definition E_disc_f (E : list (list mobs * bv 8)) : Prop :=
@@ -442,141 +414,10 @@ Definition proc_stream_f (ps cs : list nat) (f0 : option fstate)
 Lemma proc_before_f_nil ps cs f0 : proc_before_f ps cs f0 [] = [].
 Proof using. reflexivity. Qed.
 
-Lemma fop_snoc_cases {A} (l : list A) : l = [] \/ exists u x, l = u ++ [x].
-Proof using.
-  induction l as [| a l IH]; [by left |]. right.
-  destruct IH as [-> | (u & x & ->)].
-  - by exists [], a.
-  - by exists (a :: u), x.
-Qed.
-
-Lemma fop_removelast_take {A} (l : list A) :
-  removelast l = take (length l - 1)%nat l.
-Proof using.
-  induction l as [| a l IH]; [done |].
-  destruct l as [| b l']; [reflexivity |].
-  change (removelast (a :: b :: l')) with (a :: removelast (b :: l')).
-  rewrite IH.
-  replace (length (a :: b :: l') - 1)%nat with (S (length (b :: l') - 1)%nat)
-    by (cbn [length]; lia).
-  reflexivity.
-Qed.
-
-Lemma fop_prefix_of_removelast {A} (l l' : list A) :
-  l `prefix_of` l' -> l <> l' -> l `prefix_of` removelast l'.
-Proof using.
-  intros Hp Hne. pose proof (prefix_length _ _ Hp) as Hlen.
-  assert (Hlt : (length l < length l')%nat).
-  { destruct (decide (length l = length l')) as [He | He]; [| lia].
-    exfalso. exact (Hne (prefix_length_eq _ _ Hp ltac:(lia))). }
-  assert (Hl : l = take (length l) l').
-  { destruct Hp as [z ->]. by rewrite take_app_length. }
-  rewrite fop_removelast_take {1}Hl. apply prefix_take_le. lia.
-Qed.
-
-Lemma fop_nlines_removelast (I : list (bv 8)) :
-  rest_of I = [] -> nlines (removelast I) = (nlines I - 1)%nat.
-Proof using.
-  intros Hr. destruct (fop_snoc_cases I) as [-> | (u & x & ->)].
-  - cbn [removelast]. rewrite nlines_nil. lia.
-  - destruct (decide (x = wl_nl)) as [-> | Hx].
-    + rewrite epu_removelast_snoc nlines_snoc_nl. lia.
-    + exfalso. rewrite (rest_of_snoc_other u x Hx) in Hr.
-      by destruct (app_eq_nil (rest_of u) [x] Hr) as [_ Hb].
-Qed.
-
-Lemma fop_nstarted_rest_nil (I : list (bv 8)) :
-  rest_of I = [] -> nstarted I = nlines I.
-Proof using.
-  intros Hr. rewrite /nstarted Hr. case_decide as Hd;
-    [lia | by destruct (Hd eq_refl)].
-Qed.
-
 Lemma fop_lta_prefix (cs0 cs : list nat) (i : nat) :
   cs0 `prefix_of` cs -> (i < length cs0)%nat -> cs !!! i = cs0 !!! i.
 Proof using.
   intros [z ->] Hi. rewrite !list_lookup_total_alt lookup_app_l; [done | lia].
-Qed.
-
-Lemma pending_at_f_cs_ext ps cs0 cs f0 I :
-  cs0 `prefix_of` cs -> (nlines I <= length cs0)%nat ->
-  pending_at_f ps cs0 f0 I = pending_at_f ps cs f0 I.
-Proof using.
-  intros Hp Hn. rewrite /pending_at_f.
-  case_decide as H0; [done |].
-  case_decide as Hr; [| done].
-  pose proof (nlines_pos_of_rest_nil I H0 Hr) as Hpos.
-  assert (Hlk : forall j, (j < nlines I)%nat -> cs0 !!! j = cs !!! j).
-  { intros j Hj. symmetry. apply (fop_lta_prefix cs0 cs j Hp). lia. }
-  rewrite /alt_cont_f /ralt_at (Hlk (nlines I - 1)%nat ltac:(lia)).
-  rewrite (fstate_upto_ext cs0 cs (f0_st f0) (bodies_of I) (bodies_of I)
-             (nlines I - 1)%nat ltac:(intros j Hj; apply Hlk; lia)
-             ltac:(intros j Hj; reflexivity)).
-  by rewrite (pro_idx_f_ext cs0 cs (nlines I) Hlk (nlines I - 1)%nat
-                ltac:(lia)).
-Qed.
-
-Lemma pending_at_f_cs_prefix ps0 ps cs0 cs f0 I :
-  ps0 `prefix_of` ps -> cs0 `prefix_of` cs ->
-  (nlines I <= length cs0)%nat ->
-  (pro_idx_f cs0 (nlines I) < pro_rounds ps0)%nat ->
-  pending_at_f ps0 cs0 f0 I = pending_at_f ps cs f0 I.
-Proof using.
-  intros Hps Hcs Hn Hr.
-  rewrite (pending_at_f_ps_ext ps0 ps cs0 f0 I Hps Hr).
-  by apply pending_at_f_cs_ext.
-Qed.
-
-Lemma pending_at_f_stage_ext ps0 ps cs0 cs f0 I0 J :
-  ps0 `prefix_of` ps -> cs0 `prefix_of` cs -> pro_pin_f ps0 cs0 I0 ->
-  (nlines (removelast I0) <= length cs0)%nat ->
-  J `prefix_of` I0 -> J <> I0 ->
-  pending_at_f ps0 cs0 f0 J = pending_at_f ps cs f0 J.
-Proof using.
-  intros Hps Hcs Hpin Hn HJ Hne.
-  assert (Hjl : (nlines J <= length cs0)%nat).
-  { etrans; [| exact Hn].
-    apply nlines_prefix, (fop_prefix_of_removelast J I0 HJ Hne). }
-  apply (pending_at_f_cs_prefix ps0 ps cs0 cs f0 J Hps Hcs Hjl).
-  apply Hpin. exact (nstarted_strict J I0 HJ Hne).
-Qed.
-
-Lemma proc_before_from_f_ext ps0 ps cs0 cs f0 pre I :
-  (forall J, pre `prefix_of` J -> J `prefix_of` pre ++ I -> J <> pre ++ I ->
-     pending_at_f ps0 cs0 f0 J = pending_at_f ps cs f0 J) ->
-  proc_before_from_f ps0 cs0 f0 pre I = proc_before_from_f ps cs f0 pre I.
-Proof using.
-  revert pre. induction I as [| b I IH]; intros pre Hj; [done |].
-  assert (Hshape : (pre ++ [b]) ++ I = pre ++ b :: I) by apply epu_app_snoc.
-  assert (Hhere : pending_at_f ps0 cs0 f0 pre = pending_at_f ps cs f0 pre).
-  { apply Hj.
-    - reflexivity.
-    - by eexists.
-    - apply (epu_app_cons_ne pre b I). }
-  cbn [proc_before_from_f]. rewrite Hhere. f_equal.
-  apply IH. intros J H1 H2 H3. apply Hj.
-  - etrans; [| exact H1]. by eexists.
-  - rewrite -Hshape. exact H2.
-  - rewrite -Hshape. exact H3.
-Qed.
-
-Lemma proc_before_f_ext ps0 ps cs0 cs f0 I :
-  (forall J, J `prefix_of` I -> J <> I ->
-     pending_at_f ps0 cs0 f0 J = pending_at_f ps cs f0 J) ->
-  proc_before_f ps0 cs0 f0 I = proc_before_f ps cs f0 I.
-Proof using.
-  intros Hj. rewrite /proc_before_f. apply proc_before_from_f_ext.
-  intros J _ H2 H3. rewrite app_nil_l in H2, H3. by apply Hj.
-Qed.
-
-Lemma proc_before_f_cs_prefix ps0 ps cs0 cs f0 I0 :
-  ps0 `prefix_of` ps -> cs0 `prefix_of` cs -> pro_pin_f ps0 cs0 I0 ->
-  (nlines (removelast I0) <= length cs0)%nat ->
-  proc_before_f ps0 cs0 f0 I0 = proc_before_f ps cs f0 I0.
-Proof using.
-  intros Hps Hcs Hpin Hn. apply proc_before_f_ext.
-  intros J HJ Hne.
-  exact (pending_at_f_stage_ext ps0 ps cs0 cs f0 I0 J Hps Hcs Hpin Hn HJ Hne).
 Qed.
 
 (* [sessf] is never empty once round 0 has settled *)

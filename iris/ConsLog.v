@@ -294,6 +294,13 @@ Inductive cons_ev :=
   | EvClose
   | EvRead (ws : list (list mobs * bv 8)).
 
+(* THE PROCESS EVENTS (seccomp design §10.2): the two a PROCESS steps the
+   claim by -- a byte it writes ([EvOut]) and a read it takes ([EvRead]).
+   The echo arm's [EvOpen]/[EvByte]/[EvClose] are the interrupt's.  The
+   per-era WILD licence ([RiscvPtsto.ai_wild_lic]) covers these two only. *)
+Definition wild_ev (ev : cons_ev) : Prop :=
+  match ev with EvOut _ | EvRead _ => True | _ => False end.
+
 Definition cons_step (H : cons_hist) (ev : cons_ev) : cons_hist :=
   match ev with
   | EvOut b => MkCH (ch_acc H ++ [b]) (ch_log H) (ch_dl H) (ch_arm H)

@@ -467,14 +467,56 @@ Record app_iface (Σ : gFunctors) := MkAppIface {
     □ (∀ (k : nat) (h : list mobs) (H : LogEntryDefs.cons_hist)
          (ev : ConsLog.cons_ev),
          ai_cons k h H ==∗ ai_cons k h (ConsLog.cons_step H ev));
+  (* THE WILD CREDENTIAL (seccomp design §6/§9, lane S0): a PER-ERA twin
+     of the taint.  Whoever holds [ai_wild k] may step era [k]'s console
+     claim by any event -- the same law as [ai_lic], at one era only.  It
+     is what an unverified program running under a syscall mask holds
+     where a generic program holds the taint: the escrowed dirty
+     credential ([AppInv.app_rdcred]) admits it beside [app_sup], and
+     [WpUart.cons_licence_at_of_wild] reads the era's licence off it.  The
+     law covers the two PROCESS events only ([ConsLog.wild_ev]: [EvOut],
+     [EvRead] -- the echo arm's events are the interrupt's), under the
+     event's validity premise [ConsLog.cons_ev_ok] ([True] at [EvOut], so
+     a bare [WpUart.out_link] can pay it; [read_ok] at [EvRead]).  An
+     application with no such program sets it to [fun _ => False]
+     ([wild_none]). *)
+  ai_wild : nat -> iProp Σ;
+  ai_wild_persistent : forall k, Persistent (ai_wild k);
+  ai_wild_timeless : forall k, Timeless (ai_wild k);
+  ai_wild_lic : forall k, ai_wild k ⊢
+    □ (∀ (h : list mobs) (H : LogEntryDefs.cons_hist)
+         (ev : ConsLog.cons_ev),
+         ⌜ConsLog.wild_ev ev⌝ -∗ ⌜ConsLog.cons_ev_ok H ev⌝ -∗
+         ai_cons k h H ==∗ ai_cons k h (ConsLog.cons_step H ev));
 }.
-Arguments MkAppIface {Σ} _ _ _ _ _ _ _ _ _.
+Arguments MkAppIface {Σ} _ _ _ _ _ _ _ _ _ _ _ _ _.
 Arguments ai_tag {Σ} _ _. Arguments ai_kill {Σ} _.
 Arguments ai_cons {Σ} _ _ _ _.
 Arguments ai_tag_persistent {Σ} _ _. Arguments ai_tag_timeless {Σ} _ _.
 Arguments ai_kill_persistent {Σ} _. Arguments ai_kill_timeless {Σ} _.
 Arguments ai_cons_timeless {Σ} _ _ _ _.
 Arguments ai_lic {Σ} _.
+Arguments ai_wild {Σ} _ _.
+Arguments ai_wild_persistent {Σ} _ _. Arguments ai_wild_timeless {Σ} _ _.
+Arguments ai_wild_lic {Σ} _ _.
+
+(* THE ABSENT WILD CREDENTIAL: what an application with no masked program
+   sets [ai_wild] to.  Its law is proved from [False], at ANY claim. *)
+Definition wild_none {Σ : gFunctors} : nat -> iProp Σ := fun _ => False%I.
+Lemma wild_none_persistent {Σ : gFunctors} k :
+  Persistent (wild_none (Σ := Σ) k).
+Proof using . rewrite /wild_none. apply _. Qed.
+Lemma wild_none_timeless {Σ : gFunctors} k :
+  Timeless (wild_none (Σ := Σ) k).
+Proof using . rewrite /wild_none. apply _. Qed.
+Lemma wild_none_lic {Σ : gFunctors}
+    (C : nat -> list mobs -> LogEntryDefs.cons_hist -> iProp Σ) k :
+  wild_none k ⊢
+    □ (∀ (h : list mobs) (H : LogEntryDefs.cons_hist)
+         (ev : ConsLog.cons_ev),
+         ⌜ConsLog.wild_ev ev⌝ -∗ ⌜ConsLog.cons_ev_ok H ev⌝ -∗
+         C k h H ==∗ C k h (ConsLog.cons_step H ev)).
+Proof using . rewrite /wild_none. by iIntros "[]". Qed.
 
 Class riscvFixedGS (Σ : gFunctors) := RiscvFixedGS {
   riscvF_invGS :: invGS Σ;
@@ -667,6 +709,10 @@ Definition app_taint `{!riscvFixedGS Σ} : iProp Σ :=
 Definition riscv_cons_res `{!riscvFixedGS Σ} :
     nat -> list mobs -> LogEntryDefs.cons_hist -> iProp Σ :=
   ai_cons riscvF_app_iface.
+(* THE WILD CREDENTIAL, per era (lane S0): [ai_wild] at the machine's
+   interface.  Persistent like the taint, so it too is written bare. *)
+Definition riscv_wild `{!riscvFixedGS Σ} : nat -> iProp Σ :=
+  ai_wild riscvF_app_iface.
 
 (* ...and their instances, off the interface's own fields.  They are
    [Global Instance] and not [Existing Instance] because the projections
@@ -687,6 +733,12 @@ Proof. rewrite /app_taint. apply ai_kill_timeless. Qed.
 Global Instance riscv_cons_res_timeless `{!riscvFixedGS Σ} k h H :
   Timeless (riscv_cons_res k h H).
 Proof. rewrite /riscv_cons_res. apply ai_cons_timeless. Qed.
+Global Instance riscv_wild_persistent `{!riscvFixedGS Σ} k :
+  Persistent (riscv_wild k).
+Proof using . rewrite /riscv_wild. apply ai_wild_persistent. Qed.
+Global Instance riscv_wild_timeless `{!riscvFixedGS Σ} k :
+  Timeless (riscv_wild k).
+Proof using . rewrite /riscv_wild. apply ai_wild_timeless. Qed.
 
 Class riscvGS (Σ : gFunctors) := RiscvGS {
   riscv_fixedGS :: riscvFixedGS Σ;
@@ -1004,7 +1056,9 @@ Definition app_iface_triv (Σ : gFunctors) : app_iface Σ :=
              kill_cred_triv (@kill_cred_triv_persistent Σ)
              (@kill_cred_triv_timeless Σ)
              cons_res_triv (@cons_res_triv_timeless Σ)
-             (@cons_res_triv_lic Σ).
+             (@cons_res_triv_lic Σ)
+             wild_none (@wild_none_persistent Σ) (@wild_none_timeless Σ)
+             (wild_none_lic cons_res_triv).
 
 (* [win_res_triv] lived here. *)
 
