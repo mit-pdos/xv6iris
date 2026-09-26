@@ -99,7 +99,7 @@ Section UkEchoTree.
   Qed.
 
   Lemma bytes_of_one (b : bv 8) : bytes_of [b] (fun _ => b).
-  Proof. intros j Hj. simpl in Hj. by destruct j; [| lia]. Qed.
+  Proof using . intros j Hj. simpl in Hj. by destruct j; [| lia]. Qed.
 
   Lemma usrc_lit (a : Z) (b : bv 8) :
     echo_ro !! a = Some b ->
