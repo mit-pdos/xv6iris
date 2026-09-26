@@ -764,3 +764,26 @@ that when the kernel reports its ring dirty:
   refutes the tag's `lm_disc`, the tag's other half is `UT`, and the
   outcome is the ordinary taint.  The refutation lives at the U-tier read
   leaf (where the tags are), not in `cons_acc`.
+
+### 10.13 The two gaps of the wild read, and their closures (owner, 2026-09-26)
+
+Lane S5b found that the dirty arm's refutation (10.12) needs two facts the
+tree did not have:
+- GAP A, "this read is past the seccomp line": `cons_placed`'s positions
+  are at or after the holder's own position `length I`, and the chain
+  lemma needs `length I0 <= length I`.  Nothing persistent recorded the
+  shell's position at the transition.  CLOSURE, U tier: the shell's read
+  position (`UkSh.upos`) becomes a `mono_nat` with a persistent lower
+  bound; the transition records `upos_lb γp (length I0)` beside the token
+  (in `usecc_tok_at`'s union form / the residue), and the dirty read
+  compares its `upos γp (length I)` against it.  No kernel change.
+- GAP B, "a zero-byte dirty return carries no byte": a typed Ctrl-D is
+  swallowed (`d = 0`, `dc = 1`) and the dirty arm said nothing about it.
+  CLOSURE, kernel (lane S2k3): the dirty arms gain `⌜dc = d⌝ ∨ (⌜dc = S
+  d⌝ ∗ ∃ p h b, ⌜lo <= p ∧ sl !! p = Some (h, b) ∧ obs_ends_in Uart0 h b ∧
+  obs_boots h = k⌝ ∗ riscv_rx_tag h)` (the pops have every fact in hand);
+  and the shell's read leaf takes `⌜0 < cap⌝` (`gets` reads one byte).
+The union's `ai_rdwild` is the token in the form that carries what the
+discharge needs.  With both, the leaf's dirty case at the token half has
+three sub-cases (a delivered byte, the swallowed byte, nothing), the first
+two refuted through `lm_placed_wild_undisc`, the third by `0 < cap`.
