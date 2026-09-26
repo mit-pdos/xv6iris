@@ -1,3 +1,5 @@
+> **USER RULINGS (2026-09-26):** D50 = Rocq's pure classifier (runRW walker, proved sound once). D51 = do NOT patch the generated model; like Rocq, supply an IMPLEMENTATION of the stubs the Sail backend emits (load/cancel_reservation etc.), so ARBITRARY user programs (incl. LR/SC) are covered. D52 = Rocq's read-only hardware-config fact (hw_config), refactoring every kernel machine rule as needed ("I like cleaner things"). D53 = G=0 on user leaves (+ NAPOT/PBMT pins). D54 = recommended placement (MachCSL/U*.lean generic, Xv6/User*.lean instantiation).
+
 # Brief: wave 9, proving `USER` (the user-mode machine layer)
 
 Surveyed 2026-09-26 against `lean-v2` @ `f3ac4109f` (the system theorem `Xv6.xv6FsAdequacy_xv6GF
