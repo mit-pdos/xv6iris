@@ -1332,6 +1332,12 @@ Record era_pins := MkPins {
                        claim holds the whole authority; the era's wild
                        token is a lower bound at 1.  No other application
                        reads it. *)
+  ep_rpos : gname;  (* mono_nat: THE READER'S POSITION in the era's input
+                       (seccomp design 10.12, lane S5b): the delivered count
+                       again, but WHOLE in the lease's hand (no half in the
+                       claim) and only ever advanced, so a persistent lower
+                       bound can outlive the shell that took it.  The read
+                       link never sees it. *)
 }.
 
 (* THE ERA MAP'S BOUND.  Every era the ledger has ever founded is at most
@@ -2470,13 +2476,39 @@ Section echo_out.
     by iMod (ghost_var_update_halves m with "H1 H2") as "[$ $]".
   Qed.
 
+  (* THE READER'S POSITION, whole, and its persistent lower bound *)
+  Definition rpos_auth (v : era_pins) (n : nat) : iProp Σ :=
+    mono_nat_auth_own (ep_rpos v) 1 n.
+  Definition rpos_lb (v : era_pins) (n : nat) : iProp Σ :=
+    mono_nat_lb_own (ep_rpos v) n.
+
+  Global Instance rpos_auth_timeless v n : Timeless (rpos_auth v n).
+  Proof using . rewrite /rpos_auth. apply _. Qed.
+  Global Instance rpos_lb_timeless v n : Timeless (rpos_lb v n).
+  Proof using . rewrite /rpos_lb. apply _. Qed.
+  Global Instance rpos_lb_persistent v n : Persistent (rpos_lb v n).
+  Proof using . rewrite /rpos_lb. apply _. Qed.
+
+  Lemma rpos_lb_get v n : rpos_auth v n -∗ rpos_lb v n.
+  Proof using . iIntros "H". iApply (mono_nat_lb_own_get with "H"). Qed.
+
+  Lemma rpos_lb_le v n m : rpos_auth v n -∗ rpos_lb v m -∗ ⌜(m <= n)%nat⌝.
+  Proof using .
+    iIntros "H Hl". by iDestruct (mono_nat_lb_own_valid with "H Hl") as %[_ ?].
+  Qed.
+
+  Lemma rpos_update v n n' : (n <= n')%nat -> rpos_auth v n ==∗ rpos_auth v n'.
+  Proof using .
+    intros Hle. iIntros "H". by iMod (mono_nat_own_update n' Hle with "H") as "[$ _]".
+  Qed.
+
   (* THE CREDENTIAL INIT IS HANDED AT ITS ERA'S FIRST INSTRUCTION: the
-     cursor at zero, the delivered count's other half, and the three
-     lower bounds at the empty era. *)
+     cursor at zero, the delivered count's other half, the reader's
+     position, and the three lower bounds at the empty era. *)
   Definition eturn (k : nat) : iProp Σ :=
     (∃ v : era_pins,
        era_pin k v ∗ turn v 0%nat ∗ dl_cnt v (1/2) 0%nat
-       ∗ cs_lb v [] ∗ ps_lb v [] ∗ inp_lb v [])%I.
+       ∗ cs_lb v [] ∗ ps_lb v [] ∗ inp_lb v [] ∗ rpos_auth v 0%nat)%I.
 
   (* ====================================================================== *)
   (*  THE MERGED CLAIM (redesign lane R1) -- THE application's claim since  *)
@@ -2608,7 +2640,8 @@ Section echo_out.
   Definition era_full (v : era_pins) : iProp Σ :=
     (mono_nat_auth_own (ep_go v) 1 0%nat ∗ cs_auth v [] ∗ ps_auth v []
      ∗ Elist_auth v [] ∗ ghost_var (ep_gdl v) 1 0%nat
-     ∗ dl_list_auth v [] ∗ mono_nat_auth_own (ep_secc v) 1 0%nat)%I.
+     ∗ dl_list_auth v [] ∗ mono_nat_auth_own (ep_secc v) 1 0%nat
+     ∗ mono_nat_auth_own (ep_rpos v) 1 0%nat)%I.
 
   Global Instance era_full_timeless v : Timeless (era_full v).
   Proof using . rewrite /era_full. apply _. Qed.
@@ -2626,9 +2659,10 @@ Section echo_out.
     iMod (own_alloc (●ML ([] : list (leibnizO (list mobs * bv 8)))))
       as (gdll) "Hdll"; [apply mono_list_auth_valid |].
     iMod (mono_nat_own_alloc 0%nat) as (gsc) "[Hsc _]".
-    iModIntro. iExists (MkPins go gcs gps gE gdl gdll gsc).
+    iMod (mono_nat_own_alloc 0%nat) as (grp) "[Hrp _]".
+    iModIntro. iExists (MkPins go gcs gps gE gdl gdll gsc grp).
     rewrite /era_full /cs_auth /ps_auth /Elist_auth /dl_list_auth /=.
-    iFrame "Ht Hcs Hps HE Hdl Hdll Hsc".
+    iFrame "Ht Hcs Hps HE Hdl Hdll Hsc Hrp".
   Qed.
 
   Lemma pcount_nil (ps cs : list nat) : pcount ps cs [] [] = 0%nat.
@@ -2643,7 +2677,7 @@ Section echo_out.
     era_pin k v -∗ era_full v -∗
       ecl k [] (LogEntryDefs.MkCH [] [] [] None) ∗ eturn k.
   Proof using .
-    iIntros "#Hpin (Ht & Hcs & Hps & HE & Hdl & Hdll & _)".
+    iIntros "#Hpin (Ht & Hcs & Hps & HE & Hdl & Hdll & _ & Hrp)".
     iAssert (turn_lb v 0%nat) as "#Htlb0".
     { rewrite /turn_lb. iApply (mono_nat_lb_own_get with "Ht"). }
     iEval (rewrite -Qp.half_half) in "Ht".
@@ -2670,7 +2704,7 @@ Section echo_out.
       - rewrite /ch_E. cbn [LogEntryDefs.ch_log LogEntryDefs.ch_arm ch_arm_E].
         rewrite app_nil_r. by rewrite seg_of_echoed_nil.
       - exact dl_ok_0. }
-    rewrite /eturn. iExists v. iFrame "Hpin Ht2 Hdl2 Hcslb Hpslb".
+    rewrite /eturn. iExists v. iFrame "Hpin Ht2 Hdl2 Hcslb Hpslb Hrp".
     iApply (inp_lb_of_dl_lb v [] []); [apply prefix_nil | iExact "Hdllb"].
   Qed.
 
