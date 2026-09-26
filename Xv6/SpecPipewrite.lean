@@ -55,6 +55,7 @@ import Xv6.FdTable
 import Xv6.UMem
 import Xv6.Image
 import Xv6.Geom
+import Xv6.ProcPrivBare
 
 namespace Xv6
 

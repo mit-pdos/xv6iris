@@ -49,6 +49,7 @@ import Xv6.SpecMyproc
 import Xv6.SpecMemmove
 import Xv6.SpecCopyin
 import Xv6.CodeTactics
+import Xv6.ProcPrivBare
 
 namespace Xv6
 

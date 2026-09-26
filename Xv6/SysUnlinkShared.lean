@@ -30,6 +30,7 @@ import Xv6.SysUnlinkCalls
 import Xv6.FsAbsUnlinkFire
 import Xv6.DirlookupParts
 import Xv6.IcacheBox
+import Xv6.SysUnlinkArgs
 
 namespace Xv6
 

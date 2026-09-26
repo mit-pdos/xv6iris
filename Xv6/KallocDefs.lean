@@ -17,6 +17,7 @@ import Xv6.UartTrace
 import MachCSL.CallConv
 import MachCSL.CtxLaws
 import MachCSL.WpStoreFree
+import MachCSL.BytesFree
 
 namespace Xv6
 

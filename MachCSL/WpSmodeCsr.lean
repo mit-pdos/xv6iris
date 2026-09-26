@@ -12,6 +12,7 @@ answers filled in (what the executor produces), and
 import MachCSL.WpSmodeCycle
 import MachCSL.WpMmodeCsr
 import MachCSL.WpCsrS
+import MachCSL.SConfPhysDefs
 
 namespace MachCSL
 

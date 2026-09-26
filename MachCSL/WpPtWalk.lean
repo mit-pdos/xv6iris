@@ -10,6 +10,7 @@ the accessors the shared table's invariant provides (`MachCSL.KptInv`).
 import MachCSL.WpSmodeAu
 import MachCSL.KptInv
 
+
 namespace MachCSL
 
 open Iris Iris.ProgramLogic Iris.BI Iris.ProofMode Std

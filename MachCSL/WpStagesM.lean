@@ -8,6 +8,7 @@ RAM reads, fetch), stated over `mConf cpu dq c` for any `c` satisfying
 -/
 import MachCSL.MConf
 import MachCSL.WpStages
+import MachCSL.FetchedDefs
 
 namespace MachCSL
 

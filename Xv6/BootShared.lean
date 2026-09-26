@@ -97,6 +97,7 @@ import Xv6.BootChain
 import Xv6.BootCarveFs
 import Xv6.StartedInv
 import MachCSL.CtxBoot
+import Xv6.BootPrimarySupply
 
 namespace Xv6
 

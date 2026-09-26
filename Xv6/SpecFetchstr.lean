@@ -55,6 +55,7 @@ page it is `M` itself (`UMemL.viewLazy_of_lazyFree`).
 import Xv6.SpecCopyinstr
 import Xv6.UMemLazy
 import Xv6.FdTable
+import Xv6.ProcPrivBare
 
 namespace Xv6
 

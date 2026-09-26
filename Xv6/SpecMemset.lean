@@ -16,6 +16,7 @@ import MachCSL.WpSmodeFrame
 import MachCSL.WpStoreFree
 import Xv6.Image
 import Xv6.Geom
+import MachCSL.BytesFree
 
 namespace Xv6
 

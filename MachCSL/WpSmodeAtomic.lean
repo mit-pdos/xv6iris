@@ -28,6 +28,7 @@ separately and the client re-forms the token.
 import MachCSL.WpSmodeMem
 import MachCSL.WpSmodeCtl
 import MachCSL.WpSmodeAu
+import MachCSL.SmodeMemFacts
 
 namespace MachCSL
 

@@ -7,6 +7,7 @@ arithmetic `subw`/`addw`.  Execute stages only; the `kctx` rules are in
 -/
 import MachCSL.WpSmodeCycle
 import MachCSL.WpMmodeCtl
+import MachCSL.SConfPhysDefs
 
 namespace MachCSL
 

@@ -13,6 +13,7 @@ import MachCSL.Tactics
 import MachCSL.PlatformFacts
 import MachCSL.Boot
 import MachCSL.WpGpr
+import MachCSL.PmpXv6Defs
 
 namespace MachCSL
 
@@ -335,11 +336,7 @@ def menvcfgWrite (o v : BitVec 64) : BitVec 64 :=
   (_get_MEnvcfg_ADUE v))
   (_get_MEnvcfg_PBMTE v))
 
-/-- The PMP tables after `start()`: entry 0 is TOR up to `0x3fffffffffffff` (all
-of physical memory), R/W/X, unlocked. -/
-def xv6Pmpcfg : Vector (BitVec 8) 64 := Sail.vectorUpdate bootPmpcfg 0 0x0f#8
-def xv6Pmpaddr : Vector (BitVec 64) 64 := Sail.vectorUpdate bootPmpaddr 0 0x3fffffffffffff#64
-theorem xv6Pmpaddr_0 : xv6Pmpaddr[0]! = 0x3fffffffffffff#64 := by decide
+-- `xv6Pmpcfg` / `xv6Pmpaddr` (the tables after `start()`) live in `MachCSL.PmpXv6Defs`.
 
 /-! ### `write_CSR` -/
 

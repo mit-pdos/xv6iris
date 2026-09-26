@@ -15,6 +15,7 @@ raw histories the word cell owns, all headed by the store's entry.
 import MachCSL.WpSmodeAtomic
 import MachCSL.WpSmodeRules
 import MachCSL.Lock
+import MachCSL.BytesFree
 
 namespace MachCSL
 
@@ -24,50 +25,8 @@ open LeanRV64D
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF]
 variable {lent : Bool}
 
-/-! ## The bytes as raw histories -/
-
-theorem range_getElem?_lt {n k x : Nat} (hx : (List.range n)[k]? = some x) : x < n := by
-  obtain ⟨h1, h2⟩ := List.getElem?_eq_some_iff.1 hx
-  rw [List.length_range] at h1
-  rw [List.getElem_range] at h2
-  omega
-
-/-- The bytes of a window, forgotten down to their histories: what a word
-cell owns. -/
-theorem histBytes_of_bytes (ξ : CtxId) (pa : PAddr) (dq : DFrac) (bs : Nat → BitVec 8) :
-    ∀ n : Nat, ([∗list] j ∈ List.range n, ctxByte ξ (pa + BitVec.ofNat 64 j) dq (bs j)) ⊢@{IProp GF}
-      ∃ Hs : Nat → Hist, histBytes pa n (fun _ => dq) Hs
-  | 0 => by
-    iintro H
-    iexists (fun _ => [])
-    unfold histBytes
-    simp only [List.range_zero]
-    exact BigSepL.bigSepL_nil_intro
-  | n + 1 => by
-    rw [List.range_succ]
-    iintro H
-    icases BigSepL.bigSepL_snoc.1 $$ H with ⟨H1, H2⟩
-    icases histBytes_of_bytes ξ pa dq bs n $$ H1 with ⟨%Hs, Hb⟩
-    icases ctxByte_cases ξ (pa + BitVec.ofNat 64 n) dq (bs n) $$ H2 with ⟨%e, %He, Hpt, %_, _⟩
-    iexists (fun j => if j = n then e :: He else Hs j)
-    unfold histBytes
-    rw [List.range_succ]
-    iapply BigSepL.bigSepL_snoc.2
-    isplitl [Hb]
-    · rw [BigSepL.bigSepL_eq (l := List.range n)
-        (Φ := fun _ (j : Nat) => iprop((pa + BitVec.ofNat 64 j) ↦ₕ{dq} (if j = n then e :: He else Hs j)))
-        (Ψ := fun _ (j : Nat) => iprop((pa + BitVec.ofNat 64 j) ↦ₕ{dq} Hs j))
-        (fun {_ x} hx => by rw [if_neg (Nat.ne_of_lt (range_getElem?_lt hx))])]
-      iexact Hb
-    · simp only [↓reduceIte]
-      iexact Hpt
-
-/-- A window owned at the running context, as raw histories. -/
-theorem histBytes_of_wordBytes (ξ : CtxId) (pa : PAddr) (n : Nat) (dq : DFrac)
-    (w : BitVec (8 * n)) :
-    ctxBytes (GF := GF) ξ pa n dq w ⊢ ∃ Hs : Nat → Hist, histBytes pa n (fun _ => dq) Hs := by
-  unfold ctxBytes
-  exact histBytes_of_bytes ξ pa dq (nthByte w) n
+-- The raw-history view of a window (`histBytes_of_bytes`, `histBytes_of_wordBytes`)
+-- lives in `MachCSL.BytesFree`.
 
 /-! ## Registering the store's own position as a key -/
 

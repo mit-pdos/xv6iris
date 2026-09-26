@@ -181,6 +181,7 @@ import Iris.Algebra.Numbers
 import Iris.Algebra.Lib.DFracAgree
 import Iris.BI.Lib.MonoNat
 import Xv6.OffBoxCam
+import Xv6.SleepLockGhost
 
 namespace Xv6
 

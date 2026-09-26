@@ -5,6 +5,7 @@ opens an invariant for at the access (lock words, page-table entries).
 -/
 import MachCSL.WpSmode
 import MachCSL.WpAtomic
+import MachCSL.SConfPhysDefs
 
 namespace MachCSL
 

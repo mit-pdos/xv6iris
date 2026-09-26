@@ -15,6 +15,7 @@ arbitrary `MemoryAccessType`.
 import MachCSL.WpPmp
 import MachCSL.WpCsr
 import MachCSL.MConf
+import MachCSL.PmpXv6Defs
 
 namespace MachCSL
 
@@ -42,11 +43,6 @@ theorem toNat_to_bits_small (width : Nat) (h : width < 2 ^ 64) :
   rw [BitVec.extractLsb'_toNat, BitVec.toNat_ofInt, Nat.shiftRight_zero]
   have : ((width : Int) % (2 ^ 65 : Nat)) = width := Int.emod_eq_of_lt (by omega) (by omega)
   rw [this, Int.toNat_natCast, Nat.mod_eq_of_lt h]
-
-/-- An access xv6's TOR entry 0 covers: the footprint lies below `2^56 - 4`
-(every RAM access, and every device-window access). -/
-def pmpOk (addr : BitVec 64) (width : Nat) : Prop :=
-  0 < addr.toNat + width ∧ addr.toNat + width ≤ 72057594037927932 ∧ addr.toNat < 72057594037927932
 
 theorem pmpOk_of_inRam {addr : BitVec 64} {width : Nat} (h : inRam addr width) : pmpOk addr width := by
   simp only [inRam, ramBase, ramEnd] at h; unfold pmpOk; omega

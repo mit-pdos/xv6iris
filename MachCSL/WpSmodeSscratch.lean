@@ -14,6 +14,7 @@ kernel-context schemas both consume them.
 -/
 import MachCSL.WpSmodeCsr
 import MachCSL.WpSmodeTrapCsr
+import MachCSL.SConfPhysDefs
 
 namespace MachCSL
 

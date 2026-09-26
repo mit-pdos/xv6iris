@@ -19,6 +19,7 @@ import MachCSL.WpMmodeMret
 import Xv6.KernelText
 import Xv6.SpecTimerinit
 import Xv6.SpecEntry
+import MachCSL.PmpXv6Defs
 
 namespace Xv6
 

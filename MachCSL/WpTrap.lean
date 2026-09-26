@@ -8,6 +8,7 @@ vocabulary (`trapMs`, `trapConf`, `sCause`, `sCauseOk`, `stvecDirect`) is
 in `MachCSL.KCtx`, where the handler contract needs it.
 -/
 import MachCSL.WpSmode
+import MachCSL.SConfPhysDefs
 
 namespace MachCSL
 

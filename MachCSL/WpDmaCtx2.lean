@@ -25,6 +25,7 @@ sub-window of `w` is byte `o + j` of `w`.
 -/
 import MachCSL.WpDmaCtx
 import MachCSL.ByteWord
+import MachCSL.BytesFree
 
 namespace MachCSL
 

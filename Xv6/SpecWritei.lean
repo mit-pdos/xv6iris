@@ -154,6 +154,7 @@ import Xv6.SpecBmap
 import Xv6.SpecIupdate
 import Xv6.SpecEitherCopyin
 import Xv6.SysWriteDefs
+import Xv6.ProcPrivBare
 
 namespace Xv6
 
