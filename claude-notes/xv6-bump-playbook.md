@@ -151,6 +151,22 @@ What bit, and what a script must special-case:
   dump and `FsImgRaw.v`** (7b2c1b1: `user/seccomp.c`); confirm the kernel
   and every other user dump byte-identical and the job is §4g plus the one
   program's catalog.
+- **What the d66e41c relayout (sh's `cmdalloc`, text -0x24, .rodata
+  -0x20/-0x10) added to the list.**  (1) A RETURN ADDRESS past an unmoved
+  function's end can equal a moved symbol's OLD address: runcmd's last
+  `jal` returns to 0x1d2, which was `execcmd` -- remap by what the literal
+  IS, not by value.  (2) A jump table's CONTENTS are text-minus-table
+  offsets and move whenever the table and its targets move differently
+  (runcmd's rows +0x10, nulterminate's -0x14); proofs spell them in hex
+  and in unsigned decimal (`4294964314`).  (3) A proof restates a
+  sign-extended immediate outside the instruction (`sign_extend' 64 (518 :
+  mword 12) = mword_of_int 518`); the width-less literal is not a catalog
+  token and a token-keyed rewrite misses it.  (4) A relayout can put a
+  REACHABLE compressed instruction at page offset 0xffe; `ui_inpage` bounds
+  a compressed instruction by 4094 since then, a base one by 4092.  (5) A
+  reshaped callee whose FRAME grew raises every walk budget above it (§4d):
+  the constructors' shared `cmdalloc` put four words on every redirect
+  parse (the redirect room 68 -> 72).
 
 ## 2. Classify before you fix
 
