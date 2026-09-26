@@ -8,6 +8,7 @@ language constant (D47). Axioms: 6 Sail externs + propext/Classical.choice/Quot.
 (notes/adequacy_axioms_baseline.md). Every kernel function proved and linked. Crash durability (D23) included.
 
 USER RULING 2026-09-26: apply build parallelism NOW (quiet tree); THEN bump the kernel to xv6 7b2c1b1b (seccomp: new sys_seccomp, per-proc syscall mask; Rocq main's XV6_REV); prove USER and union adequacy IN PARALLEL (surveys -> notes/briefs/user_layer.md, notes/briefs/union.md).
+IN FLIGHT (2026-09-26): import-graph speedups (wt); USER U0 = U0-M Sail stub impl (wt, D51), U0-B runRW spike, U0-C decode spike, U0-T trap tower, U0-D footprint audit + hw_config refactor (wt, D52/D53); union U0 = U0-X cone audit, U0-6 run core+UK_LEAVES, U0-7 user images (echo spike, DU3), U0-8 printf-once spike (DU4), U0-A app laws. QUEUED: kernel bump 7b2c1b1b (after import speedups); union U0-1..U0-5 pure models, U0-C claims, K1 era turn (wt), K2 pipe queue (wt); then U1+.
 REMAINING (user rulings): (1) PROVE `USER` (user-mode machine layer, ~84k Rocq lines) — next;
 (2) UNION adequacy (Rocq UUnionBootAdequacy via App.xv6_app_adequacy at AppUnionRec.app_union) — the real target;
 (3) Rocq drift audit vs main (base 0be24e13b); (4) build parallelism: apply the exact-import edit set
