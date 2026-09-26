@@ -727,9 +727,9 @@ unowned critical item (WRITE-RELAY-3's `TB` guard).  RULES, replacing
     Wcf I p := Wcl I p ∗ DONE I   (p = 1, 2);   Wbf I := Wbl I ∗ DONE I.
   Consequences, each one lemma: (i) the read law is PRE-of-DONE (a prefix
   fact on `bodies_of`, `rest_of I = []` read off `Wcl I 2`); (ii) `Hwbl`
-  (`Wcf I 3 -∗ Wcf I 0`) takes the folded arm at the line's silent identity
-  alternative — `REcho 2` / `RFSilent` / `RCSilent` — which is why RFSilent's
-  f-effect is identity (§1); (iii) `Hwbwc` is the DONE arm; (iv) the prompt
+  (`Wcf I 3 -∗ Wcf I 0`) took the folded arm at the line's silent
+  alternative -- gone since sync.md §2 (no child returns its lend
+  untouched); (iii) `Hwbwc` is the DONE arm; (iv) the prompt
   law is NOT a frame: on the DONE arm it is the record's law framed
   (`UShPanicHold.sh_prompt_law_hold` at `Hold := DONE`), on the PEND arm it
   is `UShRound.sh_prompt_alt_of_deed` (S3) filing the pending `a` at the
