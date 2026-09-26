@@ -163,3 +163,8 @@ import MachCSL.UExecCsr
 import MachCSL.UWalkRun
 import MachCSL.UWalk
 import MachCSL.UTlb
+import MachCSL.UMemPhys
+import MachCSL.UMemRam
+import MachCSL.UMemAccess
+import MachCSL.UMemStore
+import MachCSL.UMemAddr

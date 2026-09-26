@@ -1,0 +1,26 @@
+Union wave U2 — program walks: common brief (every program lane reads this first)
+
+You are one lane of the union-adequacy port for the Lean xv6 verification (/shared/lean-xv6, branch
+lean-v2; Rocq authority /shared/xv6rocq main 1900b8a43, union cone pinned there). Read:
+ - notes/coord/gcp_rule.txt — HARD RULE: NO lake/lean on the local machine, ever. All elaboration on
+   the GCP VM from your own worktree /shared/lean-xv6/.claude/worktrees/lane-<L> (created off
+   origin/lean-v2 per the rule, seeded from /mnt/rocq/lean-seed). Copy not-yet-landed files you need
+   from /shared/lean-xv6; copy your final files back into /shared/lean-xv6.
+ - notes/coord/wave7b_prompt.txt (conventions), notes/briefs/union.md (§5 wave U2, rulings DU2 engine
+   is a parameter `UL : UK_LEAVES`, DU3 text tables instead of catalogs, DU4 printf once, DU8 general
+   parser only, DU9 classical, DU10 one function per Spec/Proof file), notes/briefs/union_cone.md (port
+   ONLY cone-reached declarations; re-run the glob walk on the VM's pinned globs for your files),
+   notes/coord/union_residuals.md.
+Worked example to COPY: the echo program (Xv6/UkEchoDefs, SpecEcho*/ProofEcho*, LinkEcho — lane
+U1-R), built on Xv6/UkRunLeaf/UkRunMem/UkRunBr (run leaves), UkCode + UkStub (code resource
+`ukCode γt <P>.code.byte`, each instruction fact a `rfl` evaluation of the program's text via
+`uinstrIs_of_text`; stubs + `stubRet`), UserHeap, UkProgAbi. Program images/text: Xv6/User/<P>*.lean,
+UserText/UserTextDecode. printf is proved once: Xv6/SpecUlib{Vprintf,Fprintf,Printf}, UlibPrintfReloc
+(per-image `…_sym`/`…_at`/`ulib*Code_<p>`), LinkUlibPrintf; putc: SpecUlibPutc/UlibPutcReloc.
+Syscall rows (UkRunSys) and seccomp (UkRunSecc) are NOT ported yet (need K3/K4): if a walk needs a
+syscall leaf, take it as a parameter of the exact Rocq shape and report it. Program ENTRIES
+(`*_image_entry`) need H-tree — out of scope; do the walks.
+Main-tree lane: new files only under Xv6/, no Xv6.lean edits, no git in /shared/lean-xv6. Module builds
+on the VM; tools/check_layering.sh (plain grep, fine locally); no sorry; grep new names for clashes
+(other program lanes run in parallel — use your program's prefix). Report: files + import order, Rocq
+decls ported/dropped, deviations, parameters taken (syscall leaves etc.), slowest theorems.

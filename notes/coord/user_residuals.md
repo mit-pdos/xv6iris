@@ -24,3 +24,13 @@ Collected from the USER lane reports (Sept 26 2026). Each item names the lane th
 - Walk tactics: `uwk_run` (UWalkRun, general MetaM stepper) vs U1-P2's hand-rolled `utr_*`; new
   lanes use `uwk_run`.
 - `UxrCfg` / `UxcCfg` / `UfCfg` / `UtrPins` restate config pins separately; consider one record.
+
+## Reservations (lane U2-R, coordinator decision: Rocq's `resv_any`)
+- `runRW`'s exclusive write refuses unless the walk's own `rv` is set; a walk from `ctxTok` starts at
+  `rv = false`, so an SC in a later cycle than its LR (every real pair) walks to `none`. Fix: exclusive
+  write proceeds from any reservation state (Rocq `resv_any`) + the Iris step for an exclusive write with
+  no reservation (`resvFrag … none`). Then U2-M1's SC-success lemmas drop `s.rv = true`.
+- `lr.aq`/`lr.aqrl`: walker refuses acquire exclusive reads; the Iris read rule returns a fragment with
+  `acq = true` that `uResvTok`/`ctxTok` don't accept. Same lane.
+- U2-M1 leaves: execute-level arms go to U2-M4 (`rX_bits` → `uma_get_transformed_data_addr` →
+  `uma_vmem_read`/`_write`); `transform_effective_address` takes `senvcfg = 0`, `MXR = 0` as hypotheses.
