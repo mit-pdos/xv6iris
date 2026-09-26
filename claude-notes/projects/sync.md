@@ -13,30 +13,29 @@ durability link.
   checkpoints (owner, 2026-09-26).
 - One lane at a time.
 
-## SY1 -- the silent alternative leaves the file lines (ON HOLD)
+## SY1 -- the bump to d66e41c, and the silent alternative out (branch `sync-bump`)
 
-SY1-map DONE: the silent alternative is HONEST -- sh's child dies of OOM in
-`parsecmd` (malloc NULL, store fault, kernel-UART message) and sh prints
-`$ `; design §1.  Owner ruling pending between (a) `/sync` prints, (b) sh
-checks malloc, (c) a memory-capacity refutation.  The map's other findings,
-kept for whichever route needs them: the pad can use `lmh_exf` (ok/free/
-nopanic already); `uWcf0_of_pre_line_id` can file PEND at its own `a`
-(`lm_aprs`); the fork re-entry's whole-lend row is refutable inside
-`wp_kshf_fork_core` (its `r ≠ -1` is discarded there); `gprompt_dollar`'s
-settled arm is dead at the union; `gwc_line_of_blk0` is reached only under
-taint; `UnionDecU.u_canon_name` needs a non-merging pad output.
+RULED (owner): option (b), sh checks malloc; upstream `d66e41c`.  The bump
+and the model change land TOGETHER (the image prints `out of memory` where
+the pinned model has no such output), so `sync-bump` is red until the end;
+merge to `main` when the whole tree and the audits are green.  Design §2.
 
-- [x] **SY1-map** (read-only): the exact consumer map of `lmh_noc` and of
-  (A)-(D) in design §2; which children pay `ushf_wq`'s left arm and why;
-  whether the fork re-entry's whole-lend row is refutable; whether (C)/(D)
-  are reached at the union or only by the pipeline/seccomp shapes.
-- [ ] **SY1a** (pure): split `lmh_noc` into `lmh_pad` (total) and `lmh_sil`
-  (optional); instances; `GenOutPure` pad re-pointed; `ralt_ok` drops
-  `REcho 2`/`RFSilent`/`RCSilent`; decider re-checked; the negative demo
-  `echo a > f; echo b > f; cat f` -> `a` refuted.
-- [ ] **SY1b** (proofs): (A) PEND at the credential's own alternative; (B)
-  the re-entry row refuted, children paying at their own alternative; (C)/(D)
-  at `lmh_sil` or a named alternative.
+- [x] **SY1-map** (read-only): the consumer map (findings folded into design §2).
+- [x] **SY1-pin**: `XV6_REV` d66e41c, `make dump-force`; only sh's dumps and
+  `FsImgRaw.v` moved (`dff753bee`).
+- [ ] **SY1-U** (the user-image relayout): sh's catalogs (`tools/ucode_sh*.txt`
+  re-derived, `cmdalloc` catalogued, `make gen-ucode`), every sh pc/data/
+  immediate/size literal remapped (playbook §1 "THE USER-IMAGE RELAYOUT"),
+  `cmdalloc`'s walk and the five constructors' reshaped walks, the NULL
+  arm stated as an ABSTRACT continuation at `panic("out of memory")`.
+- [ ] **SY1-M** (pure): `ROom` at every forked line shape; `REcho 2` only at
+  `LEcho []`; `RFSilent`/`RCSilent` out; `lmh_noc` optional, the pad on
+  `lmh_exf`; the decider; demos, including the NEGATIVE `echo a > f; echo b
+  > f; cat f` -> `a` (refuted again once the OOM death prints).
+- [ ] **SY1-P** (proofs): the child's OOM law (print, file `ROom`, pay `Wc I
+  0`) discharging SY1-U's continuation at every child; `ushf_wq`'s left arm
+  gone; the fork re-entry's whole-lend row refuted; PEND at the block's own
+  alternative; audits 13/13/14.
 
 ## SY2 -- the `sync` line
 

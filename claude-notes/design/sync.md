@@ -58,63 +58,48 @@ a verified program faults nowhere.  A BLANK line re-prompts in the parent
 (`sh.c:164`) with no fork; the proofs file it at the silent echo
 alternative of the parser's fallback line `LEcho []`.
 
-OWNER RULING PENDING on how to make a completed sync observable: (a)
-`/sync` prints after `sys_sync` returns (then the silent alternative stays,
-honest, and only `LSync`'s RAN alternative carries the floor); (b) sh
-checks `malloc` (an image change to sh and its parser proofs); (c) a
-memory-capacity argument refuting the OOM (kernel tier, the analogue of
-app-file.md's refused disk-capacity lane).  §2 below was written before
-this finding and is only needed under (b) or (c).
+RULED (owner, 2026-09-26): option (b) -- sh checks `malloc`.  Upstream
+`d66e41c` ("sh: panic when out of memory") adds `cmdalloc(n)`: `malloc`,
+`panic("out of memory")` on NULL, `memset`; the five constructors call it.
+So the out-of-memory death PRINTS `out of memory\n` on fd 2 and exits the
+child, and sh prints `$ `.  Checked in QEMU with a memory hog: the pinned
+sh printed nothing (the kill message went to the kernel UART) and sync never
+ran; `d66e41c` prints the diagnostic.
 
-## 2. Removing it: every silent filing becomes the round's TRUE alternative
+## 2. The model after `d66e41c`: an out-of-memory alternative, no silent one
 
-The model: `ralt_ok` drops `REcho 2`, `RFSilent`, `RCSilent` from the echo,
-redirect and cat lines; `LSync` never has one.  Pipelines keep `PLRun []`
-(a pipeline that printed nothing is a real outcome, e.g. `cat f | cat` at
-an empty `f`); `LSecc` keeps its silent round (the seccomp round is
-terminal, design `seccomp.md` §2).  THE PRINCIPLE: wherever a proof filed
-the silent alternative because the filer did not know what the child did,
-some process DID know, and the proof is re-routed to it.
-
-**The hook splits** (`LineModelLinks.lm_hooks`).  `lmh_noc` served two
-unrelated needs:
-
-- the PAD (`GenOutPure.lm_alts_pad`: the in-flight line's entry when the
-  stage's list runs one short) needs only admissible, free, not a panic --
-  `lmh_pad : lm_line -> nat`, total (the redirect's `RFExec`, sync's
-  ran-alternative, the cat's `RCExec`, echo's `REcho 1`);
-- the SILENT FILING needs `cont = u_prompt` -- `lmh_sil : lm_line -> option
-  nat`, `Some` only where the model has a silent round (pipelines, seccomp).
-
-A pad entry never reaches the wire (its block has not started), so the pad
-choosing a "ran" alternative says nothing -- which is why §5's floor is
-OBSERVATIONAL (§5).
-
-**The four fallbacks, and their replacements:**
-
-- (A) `UShURoundDefs.uWcf0_of_pre_line_id`, the prompt-first-byte arm: the
-  block credential it destructs already names its alternative `a` (with
-  `lm_apr I a`), and a prompt-first block has `cont a = u_prompt` (the
-  derivation is in `uWcf0_of_posts_alt`); file PEND at `a` itself.  This is
-  `cat f` at an empty `f` (`RCRan`), today filed as `RCSilent`.
-- (B) `uHwbl_f : Wcf I 3 -∗ Wcf I 0`, "PEND at the silent alternative",
-  spent by `UkShFork.wp_kshf_fork_at` at two sites: (i) the re-entry's
-  "lend came back whole" row, which `fork1`'s panic makes unreachable --
-  refute it at the re-entry (the answer is not -1 there) rather than
-  convert; (ii) a child's exit payload `ushf_wq I := Wc I 3 ∨ Wc I 0` at
-  its LEFT arm, the child that returned the lend untouched.  Every child
-  of a line with no silent round pays the RIGHT arm, converting at its own
-  alternative (`uHwbl_f_at a`, the law restated at an alternative the
-  child names, with `cont a = u_prompt` and a step the deed can pay):
-  sync's exit pays PEND at its ran-alternative after `sys_sync` returns.
-  Whether the left arm can then leave `ushf_wq` for good, or stays for the
-  pipeline/seccomp children, is SY1's first finding.
-- (C) `GenLinksLine.gprompt_dollar`'s settled arm and (D)
-  `gwc_line_of_blk0` / `LineModelLinks`' `lm_ab_noc`/`lm_apr_noc` block:
-  generic laws where the prompt writer holds only an owed credential.  They
-  take `lmh_sil l = Some a` as a premise (the models that have one) or the
-  alternative as a parameter from a holder that knows it (the deed's PEND
-  at the union).
+- **`ROom`**, one alternative shared by every forked line shape (echo,
+  redirect, cat, seccomp, sync, and the pipelines through `UR ROom`): cont
+  `out of memory\n$ `, step the identity (the parse precedes the redirect's
+  open), not a panic, state-free, hence free.  It is the only honest
+  "the command did not run" outcome that the console can show.
+- **The silent alternatives leave**: `REcho 2`, `RFSilent`, `RCSilent`
+  (echo, redirect, cat, and seccomp's), and `sync` never has one.  ONE
+  exception, a proof artefact with no trace meaning: a BLANK line is
+  handled in sh's parent with no fork (`sh.c:164`), and the proofs file it
+  at the parser's fallback line `LEcho []`, which no admissible input
+  parses to; `REcho 2` stays admissible THERE ONLY.  Pipelines keep `PLRun
+  []` (a pipeline that prints nothing is a real outcome, `cat f | cat` at an
+  empty `f`).
+- **The hook**: `lmh_noc` becomes optional (`Some` at pipelines and at
+  `LEcho []`); the PAD (`GenOutPure.lm_alts_pad`, the in-flight line's
+  entry) moves to `lmh_exf`, which already has the three properties it
+  needs (admissible, free, not a panic); `UnionDecU.u_canon_name` needs a
+  pad output that does not merge (to check).
+- **The proofs, and who knows the true alternative**:
+  - the constructors' NULL arm (formerly the fault at the null store,
+    `UkSh.wp_ksh_memset_null`) is now `cmdalloc` -> `panic`: the CHILD,
+    holding the lend (`Wc I 3`), prints `out of memory\n`, files `ROom` at
+    its first byte, and exits paying `Wc I 0` -- the exec-failed diagnostic's
+    shape (`ush_execfail_law`), at the panic walk (`UkShDiag`);
+  - so no child returns the lend untouched: `ushf_wq`'s left arm has no
+    producer and goes, and with it `uHwbl_f`'s payload use;
+  - the fork re-entry's whole-lend row is refuted inside
+    `wp_kshf_fork_core` (its `r <> -1` is discarded there today);
+  - `uWcf0_of_pre_line_id`'s prompt-first arm files PEND at the block's own
+    alternative (`lm_aprs I a`; `cat f` at an empty `f`, `RCRan`);
+  - `gprompt_dollar`'s settled arm is dead at the union; `gwc_line_of_blk0`
+    is reached only under the taint (`uHcltaint` instead).
 
 ## 3. The sync line
 
