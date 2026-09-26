@@ -1289,7 +1289,7 @@ Section UserHeap.
         routing through the Prop-level [uinstr].  It lives HERE rather than
         in a leaf statement because the decode lemmas discharge it for free,
         one [vm_compute] per pc. *)
-     ⌜ Z.rem (uint pc) 4096 <= 4092 ⌝ ∗
+     ⌜ Z.rem (uint pc) 4096 <= (if is_rvc then 4094 else 4092) ⌝ ∗
      if is_rvc
      then ∃ h : mword 16,
             ⌜ isRVC h = true ⌝ ∗ ⌜ udecode_rvc h i ⌝ ∗
@@ -1488,7 +1488,7 @@ Section UserHeap.
   Lemma uinstr_is_rvc4 (γt : gname) (pc : mword 64) (h : mword 16)
       (w : mword 32) (i : instruction) :
     is_aligned_vaddr (Virtaddr pc) 4 = true ->
-    Z.rem (uint pc) 4096 <= 4092 ->
+    Z.rem (uint pc) 4096 <= 4094 ->
     isRVC h = true -> udecode_rvc h i -> subrange_vec_dec w 15 0 = h ->
     ([∗ list] j ∈ seq 0 4, utext γt (uint pc + Z.of_nat j) (nth_byte w j)) -∗
     uinstr_is γt pc true i.
@@ -1506,7 +1506,7 @@ Section UserHeap.
       (i : instruction) :
     is_aligned_vaddr (Virtaddr pc) 2 = true ->
     is_aligned_vaddr (Virtaddr pc) 4 = false ->
-    Z.rem (uint pc) 4096 <= 4092 ->
+    Z.rem (uint pc) 4096 <= 4094 ->
     isRVC h = true -> udecode_rvc h i ->
     ([∗ list] j ∈ seq 0 2, utext γt (uint pc + Z.of_nat j) (nth_byte h j)) -∗
     uinstr_is γt pc true i.

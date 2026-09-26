@@ -300,10 +300,25 @@ Proof.
   lia.
 Qed.
 
+(* a 4-aligned pc inside the 2-byte in-page bound is inside the 4-byte one *)
+Lemma ukp_al4_inpage (a : mword 64) :
+  is_aligned_vaddr (Virtaddr a) 4 = true ->
+  (Z.rem (uint a) 4096 <= 4094)%Z -> (Z.rem (uint a) 4096 <= 4092)%Z.
+Proof.
+  unfold is_aligned_vaddr. intros H%Z.eqb_eq Hpg.
+  pose proof (proj1 (bv_unsigned_in_range _ a)) as Hlo.
+  rewrite uint_unsigned in H, Hpg |- *.
+  rewrite Z.rem_mod_nonneg in H; [ | exact Hlo | lia ].
+  rewrite Z.rem_mod_nonneg in Hpg; [ | exact Hlo | lia ].
+  rewrite Z.rem_mod_nonneg; [ | exact Hlo | lia ].
+  Z.div_mod_to_equations. lia.
+Qed.
+
 (* THE INSTRUCTION FACT, TRANSPORTED.  A program states its decode fact at
    the KEY's image; the machine fetches out of the MAPPED sub-image.  The
-   pc's page is mapped ([ui_leaf]) and the whole 4-byte window stays on it
-   ([ui_inpage]), so every byte of the window transports. *)
+   pc's page is mapped ([ui_leaf]) and the whole fetch window stays on it
+   ([ui_inpage]: 4 bytes, or 2 for a compressed instruction at a 2-mod-4
+   pc), so every byte of the window transports. *)
 Lemma uk_instr_mapped (π : gmap (mword 27) uperm) (M Mp : gmap Z (bv 8))
     (pc : mword 64) (is_rvc : bool) (i : instruction) (pt : uptd) (sz : Z) :
   proc_pt_wf pt -> perm_of (ud_um pt) sz = π -> uk_pt_pure pt sz M Mp ->
@@ -317,25 +332,31 @@ Proof.
   pose proof (ui_inpage _ _ _ _ _ Hu) as Hinpage.
   pose proof (ui_code _ _ _ _ _ Hu) as Hcode.
   destruct Hleaf as (w_leaf & Hl & Hlok).
-  assert (Hoff : forall d : Z, (0 <= d < 4)%Z ->
-            (bv_unsigned pc mod 4096 + d < 4096)%Z)
-    by (intros d Hd; exact (ukp_off pc 4 d ltac:(lia) Hd)).
   refine (UInstr pt Mp pc is_rvc i Hal2 Hcanon
             (ex_intro _ w_leaf (conj Hl Hlok)) Hinpage _
             (ui_text _ _ _ _ _ Hu)).
   destruct is_rvc.
-  - destruct Hcode as (h & HisRVC & Hbytes & Hdec & Hnext2).
+  - cbn iota in Hinpage.
+    assert (Hoff : forall d : Z, (0 <= d < 2)%Z ->
+              (bv_unsigned pc mod 4096 + d < 4096)%Z)
+      by (intros d Hd; exact (ukp_off pc 2 d ltac:(lia) Hd)).
+    destruct Hcode as (h & HisRVC & Hbytes & Hdec & Hnext2).
     exists h. split_and!; [ exact HisRVC | | exact Hdec | ].
     + intros j Hj.
       exact (ukp_win pt sz M Mp pc w_leaf j _ (proj1 Hwf) Hp Hl
                (Hoff (Z.of_nat j) ltac:(lia)) (Hbytes j Hj)).
     + intros Hal4. destruct (Hnext2 Hal4) as (b2 & b3 & Hb2 & Hb3).
+      pose proof (ukp_al4_inpage pc Hal4 Hinpage) as Hpg4.
       exists b2, b3. split.
       * exact (ukp_win pt sz M Mp pc w_leaf 2%nat b2 (proj1 Hwf) Hp Hl
-                 (Hoff 2 ltac:(lia)) Hb2).
+                 (ukp_off pc 4 2 ltac:(lia) ltac:(lia)) Hb2).
       * exact (ukp_win pt sz M Mp pc w_leaf 3%nat b3 (proj1 Hwf) Hp Hl
-                 (Hoff 3 ltac:(lia)) Hb3).
-  - destruct Hcode as (w & HnRVC & Hbytes & Hdec).
+                 (ukp_off pc 4 3 ltac:(lia) ltac:(lia)) Hb3).
+  - cbn iota in Hinpage.
+    assert (Hoff : forall d : Z, (0 <= d < 4)%Z ->
+              (bv_unsigned pc mod 4096 + d < 4096)%Z)
+      by (intros d Hd; exact (ukp_off pc 4 d ltac:(lia) Hd)).
+    destruct Hcode as (w & HnRVC & Hbytes & Hdec).
     exists w. split_and!; [ exact HnRVC | | exact Hdec ].
     intros j Hj.
     exact (ukp_win pt sz M Mp pc w_leaf j _ (proj1 Hwf) Hp Hl

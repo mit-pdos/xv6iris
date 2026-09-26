@@ -168,7 +168,11 @@ Definition udecode_rvc (h : mword 16) (i : instruction) : Prop :=
 (* the next instruction's 2 bytes too), so the RVC-at-4-aligned case needs *)
 (* the following two bytes present in [M] as well.  A 2-mod-4 pc reads 2   *)
 (* bytes, then (base case) 2 more at pc+2.  [ui_inpage] keeps the whole    *)
-(* 4-byte window on one page, so one leaf fact serves every byte.          *)
+(* fetch window on one page, so one leaf fact serves every byte.  The      *)
+(* window is 4 bytes for a base instruction and 2 for a compressed one     *)
+(* at a 2-mod-4 pc, hence the two bounds; a compressed one at a 4-aligned  *)
+(* pc is at most 4092 anyway.  (The d66e41c bump put a REACHABLE [c.ldsp]  *)
+(* of sh's vprintf at 0xffe, which the old uniform 4092 could not state.)  *)
 (* ===================================================================== *)
 
 Record uinstr (pt : uptd) (M : gmap Z (bv 8)) (pc : mword 64)
@@ -176,7 +180,7 @@ Record uinstr (pt : uptd) (M : gmap Z (bv 8)) (pc : mword 64)
   ui_al2    : is_aligned_vaddr (Virtaddr pc) 2 = true;
   ui_canon  : uva_canon pc;
   ui_leaf   : uva_fetch_leaf pt pc;
-  ui_inpage : Z.rem (uint pc) 4096 <= 4092;
+  ui_inpage : Z.rem (uint pc) 4096 <= (if is_rvc then 4094 else 4092);
   ui_code   :
     if is_rvc
     then exists h : mword 16,

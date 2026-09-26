@@ -373,7 +373,9 @@ def verify(dump, pcs):
         rvc = (enc & 3) != 3
         if rvc != (width == 16):
             fail(a, 'width %d disagrees with the RVC bits of 0x%x' % (width, enc))
-        if a % PAGE > PAGE - 4:
+        # the fetch window: 2 bytes for a compressed instruction at a 2-mod-4
+        # pc, 4 otherwise (UmodeMem.ui_inpage's two bounds)
+        if a % PAGE > PAGE - (2 if rvc else 4):
             fail(a, 'fetch window crosses a page (ui_inpage would be false)')
         if width == 16 and a % 4 == 0:
             for j in (2, 3):
