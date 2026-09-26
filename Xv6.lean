@@ -1390,3 +1390,9 @@ import Xv6.ProofUlibFprintf
 import Xv6.ProofUlibPrintf
 import Xv6.UlibPrintfReloc
 import Xv6.LinkUlibPrintf
+import Xv6.UserStepLand
+import Xv6.UserStepClose
+import Xv6.UserStepTrap
+import Xv6.UserStepActive
+import Xv6.UserStepWait
+import Xv6.UserStep
