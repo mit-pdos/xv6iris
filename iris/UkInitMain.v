@@ -323,7 +323,8 @@ Section UkInitMain.
       - subst l.
         iDestruct ("Hflaw" $! np N' with "Hp") as "Hpay'".
         rewrite /UkInit.kinit_banner_pay.
-        iDestruct ("Hpay'" with "Hstd") as (Ch) "(#Hw & HCh & _)".
+        iDestruct (ustd_ustd_at with "Hstd") as (vw) "Hstd".
+        iDestruct ("Hpay'" $! vw with "Hstd") as (Ch) "(#Hw & HCh & _)".
         iExists Ch. iFrame "Hw HCh".
       - (* THE CLOSED ROW (lane EXEC-SEAM, (D)): fd 1 is closed, the bytes
            go nowhere, and the ledger itself is the per-byte carrier of the
@@ -483,7 +484,8 @@ Section UkInitMain.
       - subst l.
         iDestruct ("Hxlaw" $! np N' with "Hp") as "Hpay'".
         rewrite /UkInit.kinit_banner_pay.
-        iDestruct ("Hpay'" with "Hstd") as (Ch) "(#Hw & HCh & Hgive)".
+        iDestruct (ustd_ustd_at with "Hstd") as (vw) "Hstd".
+        iDestruct ("Hpay'" $! vw with "Hstd") as (Ch) "(#Hw & HCh & Hgive)".
         iExists Ch. iFrame "Hw HCh".
         iIntros "HC". iDestruct ("Hgive" with "HC") as "[_ Hb]".
         rewrite Hpeq.
@@ -626,7 +628,7 @@ Section UkInitMain.
        ([UkSh.ush_fd0]).  The head is what travels, whole, and it is SPENT
        here: the one path past a returning exec is the diagnostic and
        exit(1). *)
-    UserFd.ustd (ukn_fd N') l -∗
+    UserFd.ustd_ok T (ukn_fd N') l -∗
     UInitFd.ufd_row T stc l -∗
     (* ...AND THE CREDENTIAL AT THAT LEDGER (lane IO-LEAF, step 3):
        prompt-shaped on the console row, banner-owed on the closed one,
@@ -883,7 +885,7 @@ Section UkInitMain.
        stated at the ledger, so the caller opens the head first
        ([UInitFd.ufd_head_open_row]) and closes it again on the parent's
        arm ([UInitFd.ufd_head_of_row]). *)
-    UserFd.ustd γfd l -∗
+    UserFd.ustd_ok T γfd l -∗
     UInitFd.ufd_row T stc l -∗
     (* the working directory, index-free: fork keeps it and init never
        reads it, but the child's half is minted at the parent's value and
@@ -915,7 +917,7 @@ Section UkInitMain.
              child_tok γc pidv (ucons_pay cn γ T (init_rd (cc_rd Cr) (cc_wbn Cr))) ∗
              UserChildren.uch γch (Sc ∪ {[γc]})) -∗
         (init_code γt ∗ init_rodata γt ∗ init_argv γd) -∗ usz γs szv -∗
-        UserFd.ustd γfd l -∗
+        UserFd.ustd_ok T γfd l -∗
         UserCwd.ucwd γcwd FsImg.ROOTINO -∗
         urun N h'
           (<[Regidx a0_idx := r]>
@@ -933,7 +935,7 @@ Section UkInitMain.
            ([UkInit.init_exec_sup_pos]). *)
          (init_code (ukn_t N') ∗ init_rodata (ukn_t N') ∗ init_argv (ukn_d N'))
           -∗ usz (ukn_s N') szv -∗
-        UserFd.ustd (ukn_fd N') l -∗
+        UserFd.ustd_ok T (ukn_fd N') l -∗
         UInitFd.ufd_row T stc l -∗
         init_lend_cred T stc (cc_wp Cr) (cc_wbn Cr) l np -∗
         upos γ np -∗
@@ -954,6 +956,7 @@ Section UkInitMain.
   Proof using.
     intros Hkt.
     iIntros "#Hcode #Hro #Hargv Hsz HQ Hpos Hcred Hstd #Hrow Hcwd Hch Hrun [Hpar Hchi]".
+    iDestruct "Hstd" as (vw) "[#Hvw Hstd]".
     (* THE KILL ROW, OFF THE LEND (lane TL-6): the row the child's exit
        payload is founded on is bought here, with the very credential
        this round is about to hand the child, and the lend comes back --
@@ -993,8 +996,8 @@ Section UkInitMain.
        [UkRunSys.wp_uk_ecall_dup_untracked], which mints none.  So the
        handle set fork carries across is empty and both extra premises are
        [emp]. *)
-    iApply (wp_uk_ecall_fork N h1 mf1 (mword_of_int 0x36c) avail szv
-              l ∅ FsImg.ROOTINO Sc (ucons_pay cn γ T (init_rd (cc_rd Cr) (cc_wbn Cr)))
+    iApply (wp_uk_ecall_fork_at N h1 mf1 (mword_of_int 0x36c) avail szv
+              l ∅ FsImg.ROOTINO vw Sc (ucons_pay cn γ T (init_rd (cc_rd Cr) (cc_wbn Cr)))
               (upos γ np ∗ ucons_pay cn γ T (cc_rd Cr) (-1)
                ∗ init_lend_cred T stc (cc_wp Cr) (cc_wbn Cr) l np)%I
               (fun gt gd _ =>
@@ -1041,7 +1044,7 @@ Section UkInitMain.
                 with "[] Hrun").
       { iApply (uis_init_370 with "Hcp"). }
       iIntros (hp2) "Hrun".
-      iApply ("Hpar" $! hp2 r with "[] [Hans] [] Hsz Hstd Hcwd Hrun").
+      iApply ("Hpar" $! hp2 r with "[] [Hans] [] Hsz [Hstd] Hcwd Hrun").
       { iPureIntro. exact Hrnz. }
       (* THE REFUND IS KEPT (lane M6b): the leaf's failing arm hands back
          what init LENT its child, verbatim, and this arm names it. *)
@@ -1057,6 +1060,7 @@ Section UkInitMain.
           iSplitR; [ iPureIntro; exact Hrng | ].
           iFrame "Htok Hf". }
       { iFrame "Hcp Hrp Hap". }
+      { iExists vw. iFrame "Hvw Hstd". }
     - (* ...and the CHILD under fresh ones.  Its ledger is dropped: init's
          child execs, and nothing before the exec allocates. *)
       (* the child's own children fragment is [∅] and init's child execs
@@ -1076,9 +1080,10 @@ Section UkInitMain.
       { iApply (uis_init_370 with "Hck"). }
       iIntros (hc2) "Hrun".
       iApply ("Hchi" $! N' hc2
-                with "[%] [] Hsz Hstd Hrow Hcred Hpos Hlease Hcwd Hch' Hpid' Hrun").
+                with "[%] [] Hsz [Hstd] Hrow Hcred Hpos Hlease Hcwd Hch' Hpid' Hrun").
       { exact Hpeq. }
       { iFrame "Hck Hrk Hak". }
+      { iExists vw. iFrame "Hvw Hstd". }
   Qed.
 
 

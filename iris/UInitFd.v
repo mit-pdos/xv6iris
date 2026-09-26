@@ -223,7 +223,10 @@ Section UInitFd.
      program tier names no application ([UConsLine.v:202]). *)
   Definition ufd_headL (T : iProp Σ) (γfd : gname) (l : list fdstate)
       : iProp Σ :=
-    (ustd γfd l ∨ ustd γfd ufd_l0 ∨ (ustd_any γfd ∗ T))%I.
+    (* ...the two clean arms AT AN OK TABLE VIEW (seccomp S4): /init's
+       opens and dups install the console, so the view the fork hands sh
+       has no inode or pipe row *)
+    (ustd_ok T γfd l ∨ ustd_ok T γfd ufd_l0 ∨ (ustd_any γfd ∗ T))%I.
 
   (* the head BEFORE the two dups -- what the second open hands over
      ([UkInit.uki_open2]) and what [UkInitMain.wp_kinit_main_from_1e]
@@ -252,11 +255,11 @@ Section UInitFd.
 
   (* the three arms of the generic head, and the ledger it is at *)
   Lemma ufd_headL_at (T : iProp Σ) (γfd : gname) (l : list fdstate) :
-    ustd γfd l -∗ ufd_headL T γfd l.
+    ustd_ok T γfd l -∗ ufd_headL T γfd l.
   Proof using . iIntros "H". rewrite /ufd_headL. by iLeft. Qed.
 
   Lemma ufd_headL_closed (T : iProp Σ) (γfd : gname) (l : list fdstate) :
-    ustd γfd ufd_l0 -∗ ufd_headL T γfd l.
+    ustd_ok T γfd ufd_l0 -∗ ufd_headL T γfd l.
   Proof using . iIntros "H". rewrite /ufd_headL. iRight. by iLeft. Qed.
 
   Lemma ufd_headL_taint (T : iProp Σ) (γfd : gname) (l l' : list fdstate) :
@@ -271,17 +274,18 @@ Section UInitFd.
   Proof using .
     rewrite /ufd_headL /ustd_any.
     iIntros "[H | [H | [H _]]]";
-      [ by iExists l | by iExists _ | iExact "H" ].
+      [ iExists l; iApply (ustd_ok_ustd with "H")
+      | iExists _; iApply (ustd_ok_ustd with "H") | iExact "H" ].
   Qed.
 
   (* the two ledgers the console arm is ENTERED at: right after the second
      open (slot 0 alone) and after both dups (all three) *)
   Lemma ufd_head1_l1 (T : iProp Σ) (st : fdstate) (γfd : gname) :
-    ustd γfd (ufd_l1 st) -∗ ufd_head1 T st γfd.
+    ustd_ok T γfd (ufd_l1 st) -∗ ufd_head1 T st γfd.
   Proof using . rewrite /ufd_head1. iApply (ufd_headL_at T γfd (ufd_l1 st)). Qed.
 
   Lemma ufd_head1_closed (T : iProp Σ) (st : fdstate) (γfd : gname) :
-    ustd γfd ufd_l0 -∗ ufd_head1 T st γfd.
+    ustd_ok T γfd ufd_l0 -∗ ufd_head1 T st γfd.
   Proof using . rewrite /ufd_head1. iApply (ufd_headL_closed T γfd (ufd_l1 st)). Qed.
 
   Lemma ufd_head1_taint (T : iProp Σ) (st : fdstate) (γfd : gname)
@@ -290,7 +294,7 @@ Section UInitFd.
   Proof using . rewrite /ufd_head1. iApply (ufd_headL_taint T γfd (ufd_l1 st) l). Qed.
 
   Lemma ufd_head_l3 (T : iProp Σ) (st : fdstate) (γfd : gname) :
-    ustd γfd (ufd_l3 st) -∗ ufd_head T st γfd.
+    ustd_ok T γfd (ufd_l3 st) -∗ ufd_head T st γfd.
   Proof using . rewrite /ufd_head. iApply (ufd_headL_at T γfd (ufd_l3 st)). Qed.
 
   (* the two FOLDINGS the walk needs: [ufd_head1] IS the generic head at
@@ -305,7 +309,7 @@ Section UInitFd.
   Proof using . rewrite /ufd_head. by iIntros "$". Qed.
 
   Lemma ufd_head_closed (T : iProp Σ) (st : fdstate) (γfd : gname) :
-    ustd γfd ufd_l0 -∗ ufd_head T st γfd.
+    ustd_ok T γfd ufd_l0 -∗ ufd_head T st γfd.
   Proof using . rewrite /ufd_head. iApply (ufd_headL_closed T γfd (ufd_l3 st)). Qed.
 
   Lemma ufd_head_taint (T : iProp Σ) (st : fdstate) (γfd : gname)
@@ -336,9 +340,11 @@ Section UInitFd.
   Proof using .
     rewrite /ufd_head /ufd_headL.
     iIntros "Ha [H | [H | [_ HT]]]".
-    - iDestruct (ustd_agree with "Ha H") as %->.
+    - iDestruct (ustd_ok_ustd with "H") as "H".
+      iDestruct (ustd_agree with "Ha H") as %->.
       iFrame "Ha". iLeft. iPureIntro. exact (ufd_l3_row0 st).
-    - iDestruct (ustd_agree with "Ha H") as %->.
+    - iDestruct (ustd_ok_ustd with "H") as "H".
+      iDestruct (ustd_agree with "Ha H") as %->.
       iFrame "Ha". iRight. iLeft. iPureIntro. exact ufd_l0_row0.
     - iFrame "Ha". iRight. iRight. iExact "HT".
   Qed.
@@ -358,10 +364,12 @@ Section UInitFd.
   Proof using .
     rewrite /ufd_head /ufd_headL.
     iIntros "Ha [H | [H | [_ HT]]]".
-    - iDestruct (ustd_agree with "Ha H") as %->.
+    - iDestruct (ustd_ok_ustd with "H") as "H".
+      iDestruct (ustd_agree with "Ha H") as %->.
       iFrame "Ha". iLeft. iSplit; iPureIntro;
         [ exact (ufd_l3_row1 st) | exact (ufd_l3_row2 st) ].
-    - iDestruct (ustd_agree with "Ha H") as %->.
+    - iDestruct (ustd_ok_ustd with "H") as "H".
+      iDestruct (ustd_agree with "Ha H") as %->.
       iFrame "Ha". iRight. iLeft. iPureIntro. exact ufd_l0_row0.
     - iFrame "Ha". iRight. iRight. iExact "HT".
   Qed.
@@ -376,7 +384,7 @@ Section UInitFd.
       (γfd : gname) :
     ufd_head T st γfd -∗
     ∃ l : list fdstate,
-      ustd γfd l ∗ □ (∀ γ : gname, ustd γ l -∗ ufd_head T st γ).
+      ustd_ok T γfd l ∗ □ (∀ γ : gname, ustd_ok T γ l -∗ ufd_head T st γ).
   Proof using .
     rewrite /ufd_head /ufd_headL.
     iIntros "[H | [H | [Hl #Ht]]]".
@@ -384,8 +392,10 @@ Section UInitFd.
       iIntros (γ) "H". iApply (ufd_head_l3 T st γ with "H").
     - iExists ufd_l0. iFrame "H". iModIntro. iIntros (γ) "H".
       iApply (ufd_head_closed with "H").
-    - iDestruct "Hl" as (l) "Hl". iExists l. iFrame "Hl". iModIntro.
-      iIntros (γ) "H". iApply (ufd_head_taint with "Ht H").
+    - iDestruct "Hl" as (l) "Hl". iExists l.
+      iSplitL "Hl"; [ iApply (ustd_ok_taint with "Ht Hl") |]. iModIntro.
+      iIntros (γ) "H". iApply (ufd_head_taint with "Ht [H]").
+      iApply (ustd_ok_ustd with "H").
   Qed.
 
   (* THE ROW BEHIND THE HEAD, AS A PURE FACT (lane IO-LEAF, step 3).  Which
@@ -408,8 +418,8 @@ Section UInitFd.
       (γfd : gname) :
     ufd_head T st γfd -∗
     ∃ l : list fdstate,
-      ustd γfd l ∗ ufd_row T st l
-      ∗ □ (∀ γ : gname, ustd γ l -∗ ufd_head T st γ).
+      ustd_ok T γfd l ∗ ufd_row T st l
+      ∗ □ (∀ γ : gname, ustd_ok T γ l -∗ ufd_head T st γ).
   Proof using .
     rewrite /ufd_head /ufd_headL /ufd_row.
     iIntros "[H | [H | [Hl #Ht]]]".
@@ -417,19 +427,21 @@ Section UInitFd.
       iModIntro. iIntros (γ) "H". iApply (ufd_head_l3 T st γ with "H").
     - iExists ufd_l0. iFrame "H". iSplitR; [ iRight; iLeft; done | ].
       iModIntro. iIntros (γ) "H". iApply (ufd_head_closed with "H").
-    - iDestruct "Hl" as (l) "Hl". iExists l. iFrame "Hl".
+    - iDestruct "Hl" as (l) "Hl". iExists l.
+      iSplitL "Hl"; [ iApply (ustd_ok_taint with "Ht Hl") |].
       iSplitR; [ iRight; iRight; iExact "Ht" | ].
-      iModIntro. iIntros (γ) "H". iApply (ufd_head_taint with "Ht H").
+      iModIntro. iIntros (γ) "H". iApply (ufd_head_taint with "Ht [H]").
+      iApply (ustd_ok_ustd with "H").
   Qed.
 
   (* ...and back: a ledger at its row is the head *)
   Lemma ufd_head_of_row (T : iProp Σ) `{!Persistent T} (st : fdstate)
       (γfd : gname) (l : list fdstate) :
-    ufd_row T st l -∗ ustd γfd l -∗ ufd_head T st γfd.
+    ufd_row T st l -∗ ustd_ok T γfd l -∗ ufd_head T st γfd.
   Proof using .
     rewrite /ufd_row. iIntros "[-> | [-> | #Ht]] H".
     - iApply (ufd_head_l3 T st γfd with "H").
     - iApply (ufd_head_closed with "H").
-    - iApply (ufd_head_taint with "Ht H").
+    - iApply (ufd_head_taint with "Ht [H]"). iApply (ustd_ok_ustd with "H").
   Qed.
 End UInitFd.

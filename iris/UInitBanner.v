@@ -172,12 +172,12 @@ Section UInitBannerGen.
      era's wild licence after a wild-era fork panic,
      [kinit_banner_pay_of_lic]).  [UShPanic.ksh_w1_of_step] at /init. *)
   Lemma kinit_w1_of_step (N : uk_names Σ) (F0 F1 : iProp Σ)
-      (l : list fdstate) (rb : bool) (b : bv 8) :
+      (l vw : list fdstate) (rb : bool) (b : bv 8) :
     l !! 1%nat = Some (FdOpen rb true (FdDevice CONSOLE)) ->
     □ (∀ Φ : iProp Σ, F0 -∗ (F1 -∗ Φ) -∗ out_link Uart0 (S gen_id) b Φ) -∗
     UkInit.kinit_w1 N (mword_of_int 1 : mword 64) b
-      (UserFd.ustd (ukn_fd N) l ∗ F0)
-      (UserFd.ustd (ukn_fd N) l ∗ F1).
+      (UserFd.ustd_at (ukn_fd N) l vw ∗ F0)
+      (UserFd.ustd_at (ukn_fd N) l vw ∗ F1).
   Proof using .
     intros Hli.
     iIntros "#Hst" (h m avail) "%Ha0 %Ha2 #Hcode Hbuf [Hl Hbnd] Hrun Hcont".
@@ -211,8 +211,8 @@ Section UInitBannerGen.
                     ((<[Regidx a7_idx := (mword_of_int 16 : mword 64)]> m)
                        !!! Regidx a0_idx)) = Z.of_nat 1)
       by (rewrite Ham0; vm_compute; reflexivity).
-    iApply (UkInit.wp_kinit_write_chain N h m avail
-              (kbn_fam_at N Q) l (DfracOwn (1/2)) 1%nat (fun _ => b)
+    iApply (UkInit.wp_kinit_write_chain_at N h m avail
+              (kbn_fam_at N Q) l vw (DfracOwn (1/2)) 1%nat (fun _ => b)
               with "Hcode Hrun [Hb1 Hbnd] Hl [Hb2]").
     { (* THE DEPOSIT: the caller's own chain at its own cursor *)
       iApply (uwrite_chain_sup N Q
@@ -254,17 +254,17 @@ Section UInitBannerGen.
   Qed.
 
   Lemma kinit_w1_of_link_at (N : uk_names Σ) (v : era_pins) (I : list (bv 8))
-      (l : list fdstate) (rb : bool) (i : nat) (b : bv 8) :
+      (l vw : list fdstate) (rb : bool) (i : nat) (b : bv 8) :
     l !! 1%nat = Some (FdOpen rb true (FdDevice CONSOLE)) ->
     u_banner !! i = Some b ->
     lk_pin L (S gen_id) v -∗
     lk_links L -∗
     UkInit.kinit_w1 N (mword_of_int 1 : mword 64) b
-      (UserFd.ustd (ukn_fd N) l ∗ bnr_at v I i)
-      (UserFd.ustd (ukn_fd N) l ∗ bnr_at v I (S i)).
+      (UserFd.ustd_at (ukn_fd N) l vw ∗ bnr_at v I i)
+      (UserFd.ustd_at (ukn_fd N) l vw ∗ bnr_at v I (S i)).
   Proof using .
     intros Hli Hb. iIntros "#Hpin #Hlk".
-    iApply (kinit_w1_of_step N _ _ l rb b Hli). iIntros "!>" (Φ) "Hbnd HΦ".
+    iApply (kinit_w1_of_step N _ _ l vw rb b Hli). iIntros "!>" (Φ) "Hbnd HΦ".
     rewrite /bnr_at.
     iApply (lk_ban_step L (S gen_id) v I i b Φ Hb with "Hpin Hlk Hbnd HΦ").
   Qed.
@@ -339,12 +339,12 @@ Section UInitBannerGen.
   Proof using .
     iIntros "#Hlk !>" (n N) "Hban".
     rewrite /UkInitMain.kinit_banner0 /UkInit.kinit_banner_pay.
-    iIntros "Hl".
+    iIntros (vw) "Hl".
     iDestruct "Hban" as (v I) "(%Hlen & #Hpin & Hbnr)".
-    iExists (fun i => UserFd.ustd (ukn_fd N) (ufd_l3 stc_cons) ∗ bnr_at v I i)%I.
+    iExists (fun i => UserFd.ustd_at (ukn_fd N) (ufd_l3 stc_cons) vw ∗ bnr_at v I i)%I.
     iSplitR "Hbnr Hl".
     { iIntros "!>" (j) "%Hj".
-      iApply (kinit_w1_of_link_at N v I (ufd_l3 stc_cons) true j
+      iApply (kinit_w1_of_link_at N v I (ufd_l3 stc_cons) vw true j
                 (init_lit LIT_START j)
                 (ufd_l3_row1 stc_cons) (init_banner_bytes j Hj)
                 with "Hpin Hlk"). }
@@ -366,11 +366,11 @@ Section UInitBannerGen.
     □ (∀ (b : bv 8) (Φ : iProp Σ), F -∗ (F -∗ Φ) -∗ out_link Uart0 (S gen_id) b Φ) -∗
     F -∗ (F -∗ Rt) -∗ UkInit.kinit_banner_pay N stc_cons len f Rt.
   Proof using .
-    iIntros "#Hst HF HRt". rewrite /UkInit.kinit_banner_pay. iIntros "Hl".
-    iExists (fun _ => UserFd.ustd (ukn_fd N) (ufd_l3 stc_cons) ∗ F)%I.
+    iIntros "#Hst HF HRt". rewrite /UkInit.kinit_banner_pay. iIntros (vw) "Hl".
+    iExists (fun _ => UserFd.ustd_at (ukn_fd N) (ufd_l3 stc_cons) vw ∗ F)%I.
     iSplitR.
     { iIntros "!>" (j) "%Hj".
-      iApply (kinit_w1_of_step N F F (ufd_l3 stc_cons) true (f j)
+      iApply (kinit_w1_of_step N F F (ufd_l3 stc_cons) vw true (f j)
                 (ufd_l3_row1 stc_cons)).
       iIntros "!>" (Φ). iApply "Hst". }
     iFrame "Hl HF". iIntros "[$ HF]". iApply ("HRt" with "HF").
@@ -401,7 +401,7 @@ Section UInitBannerGen.
   Proof using .
     iIntros "Hm H".
     rewrite /UkInitMain.kinit_banner0 /UkInit.kinit_banner_pay.
-    iIntros "Hl". iDestruct ("H" with "Hl") as (Ch) "(#Hst & H0 & Hfin)".
+    iIntros (vw) "Hl". iDestruct ("H" $! vw with "Hl") as (Ch) "(#Hst & H0 & Hfin)".
     iExists Ch. iFrame "Hst H0".
     iIntros "HC". iDestruct ("Hfin" with "HC") as "[$ Hrt]".
     iApply ("Hm" with "Hrt").
@@ -481,15 +481,15 @@ Section UInitBannerEcho.
   Proof using . rewrite /kinit_own. apply _. Qed.
 
   Definition kinit_w1_of_link (N : uk_names Σ) (v : era_pins)
-      (I : list (bv 8)) (l : list fdstate) (rb : bool) (i : nat) (b : bv 8) :
+      (I : list (bv 8)) (l vw : list fdstate) (rb : bool) (i : nat) (b : bv 8) :
     l !! 1%nat = Some (FdOpen rb true (FdDevice CONSOLE)) ->
     u_banner !! i = Some b ->
     era_pin γ (S gen_id) v -∗
     echo_links T γ -∗
     UkInit.kinit_w1 N (mword_of_int 1 : mword 64) b
-      (UserFd.ustd (ukn_fd N) l ∗ bnr v I i)
-      (UserFd.ustd (ukn_fd N) l ∗ bnr v I (S i))
-    := kinit_w1_of_link_at EI N v I l rb i b.
+      (UserFd.ustd_at (ukn_fd N) l vw ∗ bnr v I i)
+      (UserFd.ustd_at (ukn_fd N) l vw ∗ bnr v I (S i))
+    := kinit_w1_of_link_at EI N v I l vw rb i b.
 
   Definition kinit_ban0_of_eturn :
     eturn γ (S gen_id) -∗ kinit_dl0 ∗ kinit_ban 0%nat

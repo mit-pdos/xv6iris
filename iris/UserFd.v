@@ -802,6 +802,25 @@ Section UserFd.
     iPureIntro. intros k Hk. injection Hk as Heq. subst k0. exact Hne0.
   Qed.
 
+  (* ...both readings at a named view (seccomp S4) *)
+  Lemma ufd_own_agree_at (γf : gname) (fdv l v : list fdstate) (fd : nat) (st : fdstate) :
+    ufd_auth γf fdv -∗ ustd_at γf l v -∗ ufd_own γf l fd st -∗
+    ⌜fdv !! fd = Some st /\ (fd < NOFILE)%nat⌝.
+  Proof using .
+    iIntros "Ha [Hl Ht] Ho". iApply (ufd_own_agree with "Ha [Hl Ht] Ho").
+    iFrame "Hl". by iExists v.
+  Qed.
+
+  Lemma ufd_own_ne_lowest_at (γf : gname) (l v : list fdstate) (fd0 : nat)
+      (st : fdstate) :
+    st <> FdClosed ->
+    ustd_at γf l v -∗ ufd_own γf l fd0 st -∗
+    ⌜forall k : nat, fd_lowest_closed l = Some k -> k <> fd0⌝.
+  Proof using .
+    iIntros (Hne) "[Hl Ht] Ho". iApply (ufd_own_ne_lowest γf l fd0 st Hne with "[Hl Ht] Ho").
+    iFrame "Hl". by iExists v.
+  Qed.
+
   Lemma ufd_own_after (γf : gname) (l : list fdstate) (fd0 : nat)
       (st st' : fdstate) :
     (forall k : nat, fd_lowest_closed l = Some k -> k <> fd0) ->

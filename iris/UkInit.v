@@ -1365,11 +1365,13 @@ Section UkInit.
      application's claim, and a parameter is all it needs. *)
   Definition kinit_banner_pay (stc : fdstate) (len : nat) (f : nat -> bv 8)
       (Rt : iProp Σ) : iProp Σ :=
-    (UserFd.ustd γfd (ufd_l3 stc) -∗
+    (* ...AT ANY NAMED TABLE VIEW (seccomp S4): a print moves no descriptor,
+       so the ledger comes back at the view it went in at *)
+    (∀ v : list fdstate, UserFd.ustd_at γfd (ufd_l3 stc) v -∗
      ∃ Ch : nat -> iProp Σ,
        □ (∀ j : nat, ⌜(j < len)%nat⌝ -∗
             kinit_w1 (mword_of_int 1 : mword 64) (f j) (Ch j) (Ch (S j)))
-       ∗ Ch 0%nat ∗ (Ch len -∗ UserFd.ustd γfd (ufd_l3 stc) ∗ Rt))%I.
+       ∗ Ch 0%nat ∗ (Ch len -∗ UserFd.ustd_at γfd (ufd_l3 stc) v ∗ Rt))%I.
 
   (* ...AND THE SAME STUB WITH THE OUTPUT CHAIN AND THE POST                *)
   (* (app-echo.md, lane IO-LEAF, first half; the leaf is                    *)
@@ -1447,6 +1449,116 @@ Section UkInit.
     rewrite <- Ha1m1.
     iApply (wp_uk_ecall_write_chain_buf N h1 m1 (mword_of_int 0x394) avail
               fdep l dq nb fb
+              ltac:(unfold m1, usysno;
+                    rewrite (upd_eq m (Regidx a7_idx)
+                               (mword_of_int 16 : mword 64));
+                    vm_compute; reflexivity)
+              ltac:(vm_compute; reflexivity)
+              with "[] Hrun Hsb Hstd Hbuf").
+    { iApply (uis_init_394 with "Hcode"). }
+    assert (E394 : add_vec_int (mword_of_int 0x394 : mword 64) 4
+                   = mword_of_int 0x398)
+      by (apply bv_eq; vm_compute; reflexivity).
+    rewrite E394.
+    iIntros (h2 ret W cw' cs')
+      "%Ha0 %Ha1 %Ha2 %Htk %Hlz %Hnf Hstd Hbuf Hpost Hrun".
+    rewrite Ha1m1.
+    set (m2 := <[Regidx a0_idx := ret]> m1).
+    (* ---- 0x398  c.jr ra ---- *)
+    assert (Hra : m2 !!! Regidx ra_idx = m !!! Regidx ra_idx).
+    { unfold m2, m1.
+      exact (eq_trans
+               (upd_ne m1 (Regidx a0_idx) (Regidx ra_idx) ret
+                  ltac:(vm_compute; discriminate))
+               (upd_ne m (Regidx a7_idx) (Regidx ra_idx)
+                  (mword_of_int 16 : mword 64)
+                  ltac:(vm_compute; discriminate))). }
+    iApply (wp_uk_cjr N h2 m2 (mword_of_int 0x398) ra_idx
+              (ret_pc (m !!! Regidx ra_idx)) avail
+              ltac:(vm_compute; discriminate)
+              ltac:(rewrite Hra; reflexivity)
+              with "[] Hrun").
+    { iApply (uis_init_398 with "Hcode"). }
+    iIntros (h3) "Hrun".
+    (* the three argument words are the CALLER's: the stub writes a7 and
+       then a0, and neither is a0/a1/a2 before the bump *)
+    iApply ("Hcont" $! h3 ret W cw' cs'
+              with "[%] [%] [%] [%] [%] [%] Hstd Hbuf Hpost Hrun").
+    { rewrite Ha0 /m1.
+      exact (upd_ne m (Regidx a7_idx) (Regidx a0_idx)
+               (mword_of_int 16 : mword 64) ltac:(vm_compute; discriminate)). }
+    { rewrite Ha1 /m1.
+      exact (upd_ne m (Regidx a7_idx) (Regidx a1_idx)
+               (mword_of_int 16 : mword 64) ltac:(vm_compute; discriminate)). }
+    { rewrite Ha2 /m1.
+      exact (upd_ne m (Regidx a7_idx) (Regidx a2_idx)
+               (mword_of_int 16 : mword 64) ltac:(vm_compute; discriminate)). }
+    { exact Htk. }
+    { exact Hlz. }
+    { rewrite <- Ha1m1. exact Hnf. }
+  Qed.
+
+  (* ...AT A NAMED TABLE VIEW (seccomp S4) *)
+  Lemma wp_kinit_write_chain_at (h : CpuId) (m : regfile) (avail : nat)
+      (fdep : sfam) (l v : list fdstate)
+      (dq : dfrac) (nb : nat) (fb : nat -> bv 8) :
+    init_code γt -∗
+    urun N h m (mword_of_int InitSyms.write) avail -∗
+    udepwf_std N (<[Regidx a7_idx := (mword_of_int 16 : mword 64)]> m)
+      (add_vec_int (mword_of_int InitSyms.write : mword 64) 2) 16 fdep l -∗
+    UserFd.ustd_at γfd l v -∗
+    ubytesq γd dq (uint (m !!! Regidx a1_idx)) nb fb -∗
+    (∀ (h' : CpuId) (ret : mword 64) (W : uvis) (cw' : Z) (cs' : gset gname),
+       ⌜tf_w (uvis_tf W) (tf_arg_idx 0) = m !!! Regidx a0_idx⌝ -∗
+       ⌜tf_w (uvis_tf W) (tf_arg_idx 1) = m !!! Regidx a1_idx⌝ -∗
+       ⌜tf_w (uvis_tf W) (tf_arg_idx 2) = m !!! Regidx a2_idx⌝ -∗
+       ⌜take NSTD (uvis_fd W) = l⌝ -∗
+       ⌜uvis_lazy W = false⌝ -∗
+       ⌜ forall (P : uptd) (j : nat),
+           ProcPtOwn.proc_pt_wf P ->
+           perm_of (ud_um P) (uvis_sz W) = uvis_perm W ->
+           lazy_free (ud_um P) (uvis_sz W) ->
+           (j < nb)%nat ->
+           UserPtTree.uva_rmapped P
+             (uint (add_vec_int (m !!! Regidx a1_idx) (Z.of_nat j))) ⌝ -∗
+       UserFd.ustd_at γfd l v -∗
+       ubytesq γd dq (uint (m !!! Regidx a1_idx)) nb fb -∗
+       spost_at uslot 16 fdep W ret (uvis_M W) (uvis_fd W) cw' cs' -∗
+       urun N h'
+         (<[Regidx a0_idx := ret]>
+            (<[Regidx a7_idx := (mword_of_int 16 : mword 64)]> m))
+         (ret_pc (m !!! Regidx ra_idx)) avail -∗
+       mWP (Loop : expr riscv_lang)) -∗
+    mWP (Loop : expr riscv_lang).
+  Proof using .
+    iIntros "#Hcode Hrun Hsb Hstd Hbuf Hcont".
+    destruct init_syms_pins as (_ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & Hwrite & _). rewrite Hwrite.
+    (* ---- 0x392  c.li a7,16 ---- *)
+    iApply (wp_uk_cli N h m (mword_of_int 0x392)
+              (mword_of_int 16 : mword 6) a7_idx avail
+              ltac:(unfold unot_sp; vm_compute; discriminate)
+              ltac:(vm_compute; discriminate) with "[] Hrun").
+    { iApply (uis_init_392 with "Hcode"). }
+    assert (E392 : add_vec_int (mword_of_int 0x392 : mword 64) 2
+                   = mword_of_int 0x394)
+      by (apply bv_eq; vm_compute; reflexivity).
+    assert (Em : <[Regidx a7_idx
+                   := regval_into_reg (sign_extend' 64 (mword_of_int 16 : mword 6)
+                                       : mword 64)]> m
+                 = <[Regidx a7_idx := (mword_of_int 16 : mword 64)]> m)
+      by (f_equal; apply bv_eq; vm_compute; reflexivity).
+    rewrite E392 Em.
+    iIntros (h1) "Hrun".
+    set (m1 := <[Regidx a7_idx := (mword_of_int 16 : mword 64)]> m).
+    (* ---- 0x394  ecall -- THE CHAIN-PAYING WRITE ---- *)
+    (* the buffer address is the CALLER's a1: the stub writes a7 and then
+       a0, and neither is a1 *)
+    assert (Ha1m1 : m1 !!! Regidx a1_idx = m !!! Regidx a1_idx)
+      by exact (upd_ne m (Regidx a7_idx) (Regidx a1_idx)
+                  (mword_of_int 16 : mword 64) ltac:(vm_compute; discriminate)).
+    rewrite <- Ha1m1.
+    iApply (wp_uk_ecall_write_chain_buf_at N h1 m1 (mword_of_int 0x394) avail
+              fdep l v dq nb fb
               ltac:(unfold m1, usysno;
                     rewrite (upd_eq m (Regidx a7_idx)
                                (mword_of_int 16 : mword 64));

@@ -179,92 +179,19 @@ Section UInitDiagGen.
      step in the banner's place. *)
   Lemma kinit_w1_of_link_pdiag_at (N : uk_names Σ) (v : era_pins)
       (I : list (bv 8))
-      (l : list fdstate) (rb : bool) (a i : nat) (b : bv 8) :
+      (l vw : list fdstate) (rb : bool) (a i : nat) (b : bv 8) :
     l !! 1%nat = Some (FdOpen rb true (FdDevice CONSOLE)) ->
     pro_alts !!! a !! i = Some b ->
     lk_pin L (S gen_id) v -∗
     lk_links L -∗
     UkInit.kinit_w1 N (mword_of_int 1 : mword 64) b
-      (UserFd.ustd (ukn_fd N) l ∗ pdg_at v I a i)
-      (UserFd.ustd (ukn_fd N) l ∗ pdg_at v I a (S i)).
+      (UserFd.ustd_at (ukn_fd N) l vw ∗ pdg_at v I a i)
+      (UserFd.ustd_at (ukn_fd N) l vw ∗ pdg_at v I a (S i)).
   Proof using .
-    intros Hli Hb.
-    iIntros "#Hpin #Hlk" (h m avail) "%Ha0 %Ha2 #Hcode Hbuf [Hl Hbnd] Hrun Hcont".
-    (* the two halves *)
-    iDestruct (ubyte_split with "Hbuf") as "[Hb1 Hb2]".
-    set (ua := m !!! Regidx a1_idx).
-    (* the cursor family the deposit is stated at: the closure's half of
-       the byte, and the era's cursor before and after this byte *)
-    set (Q := (fun k : nat =>
-                 ubyteq (ukn_d N) (DfracOwn (1/2)) (uint ua) b
-                 ∗ match k with
-                   | O => pdg_at v I a i
-                   | _ => pdg_at v I a (S i)
-                   end)%I).
-    assert (Ham1 : (<[Regidx a7_idx := (mword_of_int 16 : mword 64)]> m)
-                     !!! Regidx a1_idx = ua)
-      by exact (upd_ne m (Regidx a7_idx) (Regidx a1_idx) _
-                  ltac:(vm_compute; discriminate)).
-    assert (Ham0 : (<[Regidx a7_idx := (mword_of_int 16 : mword 64)]> m)
-                     !!! Regidx a0_idx = (mword_of_int 1 : mword 64)).
-    { rewrite <- Ha0.
-      exact (upd_ne m (Regidx a7_idx) (Regidx a0_idx) _
-               ltac:(vm_compute; discriminate)). }
-    assert (Ham2 : (<[Regidx a7_idx := (mword_of_int 16 : mword 64)]> m)
-                     !!! Regidx a2_idx = (mword_of_int 1 : mword 64)).
-    { rewrite <- Ha2.
-      exact (upd_ne m (Regidx a7_idx) (Regidx a2_idx) _
-               ltac:(vm_compute; discriminate)). }
-    assert (Hcnt : Z.to_nat (sys_rw_count
-                     ((<[Regidx a7_idx := (mword_of_int 16 : mword 64)]> m)
-                        !!! Regidx a2_idx)) = 1%nat)
-      by (rewrite Ham2; vm_compute; reflexivity).
-    assert (Hi0 : bv_signed (trunc32
-                    ((<[Regidx a7_idx := (mword_of_int 16 : mword 64)]> m)
-                       !!! Regidx a0_idx)) = Z.of_nat 1)
-      by (rewrite Ham0; vm_compute; reflexivity).
-    iApply (UkInit.wp_kinit_write_chain N h m avail
-              (kbn_fam_at N Q) l (DfracOwn (1/2)) 1%nat (fun _ => b)
-              with "Hcode Hrun [Hb1 Hbnd] Hl [Hb2]").
-    { (* THE DEPOSIT: the caller's own chain at its own cursor *)
-      iApply (uwrite_chain_sup N Q
-                (<[Regidx a7_idx := (mword_of_int 16 : mword 64)]> m)
-                (add_vec_int (mword_of_int InitSyms.write : mword 64) 2)
-                l 1%nat rb CONSOLE Hi0 ltac:(unfold NSTD; lia) Hli).
-      iIntros (M pm sz) "Hheap".
-      iDestruct (uheap_ubytes_wat (ukn_t N) (ukn_d N) (ukn_s N) M pm sz
-                   (DfracOwn (1/2)) ua 1%nat (fun _ => b)
-                   with "Hheap [Hb1]") as %HM;
-        [ iApply (ubytesq_of_one with "Hb1") | ].
-      iFrame "Hheap".
-      rewrite Ham1 Hcnt. cbn [cons_out_chain].
-      iSplit.
-      - (* the cursor, unmoved: what the SHORT arm would hand back *)
-        rewrite /Q. iFrame "Hb1 Hbnd".
-      - iIntros (b') "%Hb'".
-        assert (Hbb : b' = b).
-        { pose proof (HM 0%nat ltac:(lia)) as HM0.
-          cbn in HM0. rewrite HM0 in Hb'. by injection Hb'. }
-        subst b'.
-        iApply (lk_pdiag_step L (S gen_id) v I a i b (Q 1%nat)
-                  Hb with "Hpin Hlk Hbnd [Hb1]").
-        iIntros "Hres". rewrite /Q. iFrame "Hb1". rewrite /pdg_at.
-        iExact "Hres". }
-    { iApply (ubytesq_of_one with "Hb2"). }
-    iIntros (h' ret W cw' cs') "%Hka0 %Hka1 %Hka2 %Htk %Hlz %Hnf Hl Hb2 Hpost Hrun".
-    (* THE POST: the short arm is refuted from the run the caller owns *)
-    iDestruct (uwrite_no_short Q (ukn_pay N) W ret (uvis_M W) (uvis_fd W)
-                 cw' cs' l 1%nat rb 1%nat
-                 ltac:(rewrite Hka0 Ha0; vm_compute; reflexivity)
-                 ltac:(unfold NSTD; lia) Htk Hli
-                 ltac:(rewrite Hka2 Ha2; vm_compute; reflexivity)
-                 Hlz
-                 ltac:(rewrite Hka1; exact Hnf)
-                 with "Hpost") as "[_ HQ]".
-    rewrite /Q. iDestruct "HQ" as "[Hb1 Hbnd]".
-    iDestruct (ubytesq_to_one with "Hb2") as "Hb2".
-    iDestruct (ubyte_join with "Hb1 Hb2") as "Hbuf".
-    iApply ("Hcont" $! h' ret with "Hbuf [$Hl $Hbnd] Hrun").
+    intros Hli Hb. iIntros "#Hpin #Hlk".
+    iApply (UInitBanner.kinit_w1_of_step N _ _ l vw rb b Hli).
+    iIntros "!>" (Φ) "Hbnd HΦ". rewrite /pdg_at.
+    iApply (lk_pdiag_step L (S gen_id) v I a i b Φ Hb with "Hpin Hlk Hbnd HΦ").
   Qed.
 
   (* =================================================================== *)
@@ -317,14 +244,14 @@ Section UInitDiagGen.
   Proof using .
     iIntros "#Hlk !>" (n N) "Hban".
     rewrite /UkInitMain.kinit_banner0 /UkInit.kinit_banner_pay.
-    iIntros "Hl".
+    iIntros (vw) "Hl".
     rewrite /UInitBanner.kinit_ban_at.
     iDestruct "Hban" as (v I) "(%Hlen & #Hpin & Hbnr)".
-    iExists (fun i => UserFd.ustd (ukn_fd N) (ufd_l3 stc_cons)
+    iExists (fun i => UserFd.ustd_at (ukn_fd N) (ufd_l3 stc_cons) vw
                       ∗ UInitBanner.bnr_at L v I i)%I.
     iSplitR "Hbnr Hl".
     { iIntros "!>" (j) "%Hj".
-      iApply (UInitBanner.kinit_w1_of_link_at L N v I (ufd_l3 stc_cons) true j
+      iApply (UInitBanner.kinit_w1_of_link_at L N v I (ufd_l3 stc_cons) vw true j
                 (init_lit LIT_START j)
                 (ufd_l3_row1 stc_cons) (UInitBanner.init_banner_bytes j Hj)
                 with "Hpin Hlk"). }
@@ -361,13 +288,13 @@ Section UInitDiagGen.
            (UInitBanner.kinit_ban_at L n)).
   Proof using .
     iIntros "#Hlk !>" (n N) "Hpro".
-    rewrite /UkInit.kinit_banner_pay. iIntros "Hl".
+    rewrite /UkInit.kinit_banner_pay. iIntros (vw) "Hl".
     rewrite /kinit_pro_at. iDestruct "Hpro" as (v I) "(%Hlen & #Hpin & Hc)".
-    iExists (fun i => UserFd.ustd (ukn_fd N) (ufd_l3 stc_cons)
+    iExists (fun i => UserFd.ustd_at (ukn_fd N) (ufd_l3 stc_cons) vw
                       ∗ pdg_at v I 1%nat i)%I.
     iSplitR "Hc Hl".
     { iIntros "!>" (j) "%Hj".
-      iApply (kinit_w1_of_link_pdiag_at N v I (ufd_l3 stc_cons) true 1%nat j
+      iApply (kinit_w1_of_link_pdiag_at N v I (ufd_l3 stc_cons) vw true 1%nat j
                 (init_lit LIT_EXEC j)
                 (ufd_l3_row1 stc_cons) (init_execfail_bytes j Hj)
                 with "Hpin Hlk"). }
@@ -391,13 +318,13 @@ Section UInitDiagGen.
          UkInit.kinit_banner_pay N stc_cons 18%nat (init_lit LIT_FORK) emp).
   Proof using .
     iIntros "#Hlk !>" (n N) "Hpro".
-    rewrite /UkInit.kinit_banner_pay. iIntros "Hl".
+    rewrite /UkInit.kinit_banner_pay. iIntros (vw) "Hl".
     rewrite /kinit_pro_at. iDestruct "Hpro" as (v I) "(%Hlen & #Hpin & Hc)".
-    iExists (fun i => UserFd.ustd (ukn_fd N) (ufd_l3 stc_cons)
+    iExists (fun i => UserFd.ustd_at (ukn_fd N) (ufd_l3 stc_cons) vw
                       ∗ pdg_at v I 2%nat i)%I.
     iSplitR "Hc Hl".
     { iIntros "!>" (j) "%Hj".
-      iApply (kinit_w1_of_link_pdiag_at N v I (ufd_l3 stc_cons) true 2%nat j
+      iApply (kinit_w1_of_link_pdiag_at N v I (ufd_l3 stc_cons) vw true 2%nat j
                 (init_lit LIT_FORK j)
                 (ufd_l3_row1 stc_cons) (init_forkfail_bytes j Hj)
                 with "Hpin Hlk"). }
@@ -434,15 +361,15 @@ Section UInitDiagEcho.
 
   Definition kinit_w1_of_link_pdiag (N : uk_names Σ) (v : era_pins)
       (I : list (bv 8))
-      (l : list fdstate) (rb : bool) (a i : nat) (b : bv 8) :
+      (l vw : list fdstate) (rb : bool) (a i : nat) (b : bv 8) :
     l !! 1%nat = Some (FdOpen rb true (FdDevice CONSOLE)) ->
     pro_alts !!! a !! i = Some b ->
     era_pin γ (S gen_id) v -∗
     echo_links T γ -∗
     UkInit.kinit_w1 N (mword_of_int 1 : mword 64) b
-      (UserFd.ustd (ukn_fd N) l ∗ pdg v I a i)
-      (UserFd.ustd (ukn_fd N) l ∗ pdg v I a (S i))
-    := kinit_w1_of_link_pdiag_at EI N v I l rb a i b.
+      (UserFd.ustd_at (ukn_fd N) l vw ∗ pdg v I a i)
+      (UserFd.ustd_at (ukn_fd N) l vw ∗ pdg v I a (S i))
+    := kinit_w1_of_link_pdiag_at EI N v I l vw rb a i b.
 
   Definition kinit_pro (n : nat) : iProp Σ := kinit_pro_at EI n.
 

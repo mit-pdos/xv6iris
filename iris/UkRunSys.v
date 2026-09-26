@@ -1208,6 +1208,205 @@ Section UkRunSys.
       iRight. iFrame "Hstd Hh0". iPureIntro. split; [ exact Hrm | exact Hnone ].
   Qed.
 
+  (* ...AT A NAMED TABLE VIEW (seccomp S4) *)
+  Lemma wp_uk_ecall_dup_at (N : uk_names Σ) (h : CpuId) (m : regfile)
+      (pc : mword 64) (l v : list fdstate) (fd0 : nat) (st : fdstate)
+      (avail : nat) :
+    usysno m = USYS_dup ->
+    (* the argument register IS the descriptor the claim is for, read the
+       way [argfd] reads it -- as a C [int] *)
+    bv_signed (trunc32 (m !!! Regidx (mword_of_int 10))) = Z.of_nat fd0 ->
+    st <> FdClosed ->
+    (* ...AND THE RECORD HOLDS NO OFFSET HALF (lane OFF-HAND-4, S1).  dup
+       COPIES its argument's row onto the slot fdalloc chose, and that slot
+       is not one the record can be said to hold -- [UkRun.urun_rows_dup]'s
+       guard.  At the empty held set the run's own row says the source is
+       parked and the guard is discharged HERE, so no caller pays anything
+       it does not already know.  (Duplicating a HELD descriptor is the
+       next lane's: design/app-file.md SS3 has dup share the object's
+       surrender.) *)
+    is_aligned_vaddr (Virtaddr (add_vec_int pc 4)) 2 = true ->
+    uinstr_is (ukn_t N) pc false (ECALL tt) -∗
+    urun N h m pc avail -∗
+    udepw N m pc USYS_dup -∗
+    ustd_at (ukn_fd N) l v -∗
+    ufd_own (ukn_fd N) l fd0 st -∗
+    (∀ (h' : CpuId) (r : mword 64),
+       ((∃ fd1 : nat,
+           ⌜r = (mword_of_int (Z.of_nat fd1) : mword 64)
+            /\ (fd1 < NOFILE)%nat⌝ ∗
+           (* the ledger at the NEW TABLE as its view: the old table under
+              the caller's view, the copied row the source's (seccomp S4) *)
+           (∃ fdv : list fdstate, ⌜tab_le fdv v /\ fdv !! fd0 = Some st⌝
+              ∗ ualloc_v (ukn_fd N) l fd1 st (<[fd1 := st]> fdv))
+           ∗ ufd_own (ukn_fd N) (ustd_after l st) fd0 st)
+        (* ...OR IT FAILED, AND THE LEDGER SAYS WHY.  [UsysMemOk]'s dup row
+           gives two reasons for a -1 and the caller's own claim refutes
+           the first (the source is OPEN, [Hstne]), so what is left is THE
+           TABLE WAS FULL -- and a full table has no closed slot in its
+           standard-stream prefix either, which is the form the caller can
+           read.  A caller whose ledger holds a CLOSED standard stream
+           therefore refutes this arm by computation, which is what lets
+           /init pin fds 1 and 2 at the console. *)
+        ∨ (⌜r = (mword_of_int (-1) : mword 64)
+            /\ fd_lowest_closed l = None⌝ ∗
+           ustd_at (ukn_fd N) l v ∗ ufd_own (ukn_fd N) l fd0 st)) -∗
+       urun N h' (<[Regidx (mword_of_int 10) := r]> m)
+         (add_vec_int pc 4) avail -∗
+       mWP (Loop : expr riscv_lang)) -∗
+    mWP (Loop : expr riscv_lang).
+  Proof using .
+    intros Hn Harg Hstne Hal4.
+    iIntros "#Hi Hrun Hsb Hstd Hh0 Hcont".
+    iDestruct "Hrun" as (xi C pt Rfd Rut sz M pm fdv cw gn cs pidv) "(%Hlo & %Hpm & %Hlzf & %HRut & Hheap & Hstk & Hufd & Hcwda & Hcha & #Hmy & #Hdep & #Hnpx & Hb)".
+    iMod (udepw_mint N m pc _ M pm _ fdv cw gn cs pidv
+                with "Hdep Hmy Hsb Hheap Hufd") as "(Hheap & Hufd & Hdepn)".
+    iDestruct (uinstr_is_uk_instr with "Hheap Hi") as %Hui.
+    iDestruct (uvb_x0 with "Hb") as "[%Hx0 Hb]".
+    (* the claim READS the view: this is what says the source descriptor is
+       open, and at which state -- which is what dup's row copies. *)
+    iDestruct (ufd_own_agree_at with "Hufd Hstd Hh0") as %[Hsrc _].
+    iDestruct (ufd_auth_len with "Hufd") as %Hfdlen.
+    (* ...and the LEDGER against the same authority, which is what turns the
+       row's `no closed slot in the table' into `none in the prefix' *)
+    iDestruct (ustd_at_agree (ukn_fd N) fdv l v with "Hufd Hstd") as %Htake.
+    (* ...and the slot the copy lands in is never the source's, which is
+       what lets the claim come back at the ledger the copy left *)
+    iDestruct (ufd_own_ne_lowest_at (ukn_fd N) l v fd0 st Hstne with "Hstd Hh0") as %Hnel.
+    iApply (UkStep.wp_uk_ecall C pt Rfd Rut pm sz Hlo Hpm HRut Hlzf M m pc fdv cw gn cs pidv Hui
+              (fun (s : mstate)
+                   (Hp : register_lookup cur_privilege s.(sregs) = User)
+                   (Hc : register_lookup (R_bitvector_64 PC) s.(sregs) = pc) =>
+                 UserExecFacts.goodmb_execute_ECALL_U UserFrame.Du_r UserFrame.Du_w
+                   s pc ltac:(vm_compute; reflexivity)
+                   ltac:(vm_compute; reflexivity) Hp Hc)
+              with "Hb Hmy").
+    rewrite (uexec_ret_ecall _ _ eq_refl).
+    assert (Hnum : uvis_num (uvis_of_run m pc M pm sz fdv cw gn cs pidv false secc_all) = USYS_dup).
+    { assert (Hraw : usys_num (uvis_tf (uvis_of_run m pc M pm sz fdv cw gn cs pidv false secc_all)) = USYS_dup)
+        by (cbn [uvis_tf uvis_of_run]; rewrite tf_of_num; exact Hn).
+      rewrite uvis_num_full0; [ exact Hraw | reflexivity | rewrite Hraw; usys_range ]. }
+    (* the PAYMENT's guard IS the deposit's own, so it is opened BEFORE the
+       number is rewritten and the destructs below then reduce both copies
+       at once *)
+    rewrite /uexec_pay_dep /upay_at.
+    pose proof Hnum as Hnume. unfold uvis_num in Hnume. rewrite ?Hnum ?Hnume. cbv zeta.
+    destruct (decide (uecall_scause = uecall_scause)) as [_ | Hpne];
+      [ | exfalso; exact (Hpne eq_refl) ].
+    destruct (decide (USYS_dup = USYS_exit)) as [He | _];
+      [ exfalso; vm_compute in He; discriminate | ].
+    destruct (decide (USYS_dup = USYS_fork)) as [He | _];
+      [ exfalso; vm_compute in He; discriminate | ].
+    (* the arm binds the deposit's FAMILIES ([UexecSG.v]'s header); the
+       law mints at some [f] and this leaf, which discards its post,
+       hands that witness straight over. *)
+    (* THE MINT ALREADY NAMED THE PAYLOAD (app-echo.md, "SH-LINE RULING",
+       R1): read's bundle is a wand from the depositing process's own exit
+       payload, so nothing is re-keyed here any more -- the family the
+       deposit came at IS at [ukn_pay N]. *)
+    iDestruct "Hdepn" as (fdep) "[%Hfp Hdepn]".
+    iExists fdep. rewrite Hfp.
+    cbn [uvis_gen uvis_of_run].
+    iSplitR; [ iFrame "Hmy" | ].
+    iSplitL "Hdepn"; [ iExact "Hdepn" | ].
+    iIntros (r M' pm' sz' fdv' cw' gn' cs' lz' secc') "%Hok %Hfdok %Hpiperow %Hcwrow %Hgnrow %Hpidrow %Hliverow %Hscrow %Hchrow _".
+    (* THE LAZY BIT CROSSED THE TRAP UNCHANGED (lane LAZY-FLAG, L6).  The
+       trapping key is at [false] -- the U tier's run is
+       ([UexecRet.ukcq]) -- and every row but sbrk's is the equation
+       ([UsysMemOk.usys_mem_ok_lazy]), so the resume key is at [false] too
+       and the close below is at the run's own bit. *)
+    assert (Hlzq : lz' = false)
+      by (refine (usys_mem_ok_lazy _ _ _ _ _ _ _ _ _ _ _ _ Hok);
+          first [ assumption | vm_compute; discriminate ]).
+    subst lz'.
+    (* ...AND SO DID THE MASK: not seccomp's number, so the row is the
+       equation ([UsysMemOk.usys_secc_ok_quiet]), and the resume key is at
+       the full mask [urun] is keyed at *)
+    pose proof (fun Hne => usys_secc_ok_quiet _ _ _ _ _ Hne Hscrow) as Hscq.
+    specialize (Hscq ltac:(usys_range)).
+    cbn [uvis_secc uvis_of_run] in Hscq. subst secc'.
+    (* THE CWD CROSSED THE TRAP UNCHANGED -- chdir is the one row that moves
+       it, and this is not it -- so the engine's half is re-keyed onto the
+       view the process resumes at and the program's half never moved. *)
+    assert (Hcw : cw' = cw)
+      by (refine (usys_cwd_ok_quiet _ _ _ _ _ Hcwrow); vm_compute; discriminate).
+    iDestruct (ucwd_auth_quiet N cw cw' Hcw with "Hcwda") as "Hcwda".
+    (* ...AND SO DID THE GENERATION AND THE CHILDREN SET: no entry
+       re-incarnates its caller, and this lane's children row is the
+       identity at every number ([UsysMemOk] SS2e/SS2f).  Both are
+       substituted rather than re-keyed -- the generation has no
+       authority beside it, and the children authority is already at
+       the set the process resumes at. *)
+    assert (Hgn : gn' = gn) by exact (usys_gen_ok_quiet _ _ _ Hgnrow).
+    assert (Hch : cs' = cs) by exact (usys_ch_ok_quiet _ _ _ _ Hchrow).
+    subst gn' cs'.
+    destruct (usys_mem_ok_quiet USYS_dup _ r _ _ _ _ _ _ _ _
+                ltac:(discriminate) ltac:(discriminate) ltac:(discriminate)
+                ltac:(discriminate) ltac:(discriminate) ltac:(discriminate) Hok)
+      as [-> [-> ->]].
+    unfold usys_fd_ok in Hfdok.
+    destruct (decide (USYS_dup = USYS_close)) as [Hc | _]; [ discriminate Hc | ].
+    destruct (decide (USYS_dup = USYS_dup)) as [_ | Hc];
+      [ | exfalso; exact (Hc eq_refl) ].
+    cbn [uvis_M uvis_perm uvis_fd uvis_of_run] in Hfdok |- *.
+    (* THE ROW'S ARGUMENT INDEX IS THE CALLER'S [fd0]: the row reads a0 of
+       the trapframe as a C [int], and [tf_of] puts the register there. *)
+    assert (Haiz : usys_argfd (tf_of m pc) = Z.of_nat fd0).
+    { unfold usys_argfd. cbn [tf_of]. exact Harg. }
+    assert (Hai : Z.to_nat (usys_argfd (tf_of m pc)) = fd0).
+    { rewrite Haiz. exact (Nat2Z.id fd0). }
+    iApply uslot_bupd.
+    destruct Hfdok as [(fd1 & Hr & Hcl & _ & ->) | (Hrm & -> & Hwhy)].
+    - (* DUPLICATED.  [Hai] turns the row's copied state into the caller's
+         own [st] ([Hsrc], off the claim), and the destination slot was the
+         LOWEST free one, which the ledger reads as a number. *)
+      rewrite Hai (list_lookup_total_correct fdv fd0 st Hsrc).
+      iDestruct (ufd_own_after (ukn_fd N) l fd0 st st Hnel with "Hh0") as "Hh0".
+      iMod (ufd_alloc_least_at (ukn_fd N) fdv l v fd1 st Hcl Hstne with "Hufd Hstd")
+        as "(%Htab & Hufd & Hh1a & Hh1b)".
+      iModIntro.
+      (* ...and dup copies a row the table already had, so it holds no
+         pipe either (design/pipe.md, "The exit path") *)
+      iDestruct (urun_rows_dup N fdv fd0 fd1 st Hsrc with "Hnpx") as "#Hnpo".
+      rewrite (uslot_bump_run m pc M M pm pm sz sz fdv
+                 (<[fd1 := st]> fdv) cw cw' gn gn cs cs pidv false false secc_all secc_all r Hx0 Hal4).
+      iApply ukcq_ukc.
+      iApply (urun_close_upd _ _ _ m (mword_of_int 10) _ _ _ _ _ _ _ _ _
+                ltac:(unfold unot_sp; vm_compute; discriminate)
+                with "Hheap Hstk Hufd Hcwda Hcha Hmy Hdep Hnpo").
+      iIntros (h') "Hrun".
+      iApply ("Hcont" $! h' r with "[Hh1a Hh1b Hh0] Hrun").
+      iLeft. iExists fd1. iFrame "Hh0". iSplitR.
+      { iPureIntro. split; [ exact Hr | ].
+        rewrite <- Hfdlen. exact (fd_least_closed_lt _ _ Hcl). }
+      iExists fdv. iSplitR; [ iPureIntro; exact (conj Htab Hsrc) |].
+      rewrite /ualloc_v. iFrame "Hh1a Hh1b".
+    - (* THE TABLE WAS FULL -- the row's OTHER reason for a -1, `the
+         argument is not an open descriptor', is refuted by the caller's own
+         claim ([Hsrc] at [Hstne]).  So no slot of the table is closed, and
+         in particular none of the prefix the LEDGER is: [fd_lowest_closed]
+         of an append answers the prefix first ([FdSlots]), so a closed slot
+         in the prefix would have been the table's own answer.  Nothing
+         moved, and both resources come straight back. *)
+      assert (Hnone : fd_lowest_closed l = None).
+      { destruct Hwhy as [Hno | Hfull].
+        - exfalso. exact (Hstne (Hno fd0 st Haiz Hsrc)).
+        - rewrite <- Htake.
+          destruct (fd_lowest_closed (take NSTD fdv)) as [k |] eqn:Hk;
+            [| reflexivity ].
+          exfalso. rewrite <- (take_drop NSTD fdv) in Hfull.
+          rewrite fd_lowest_closed_app Hk in Hfull. discriminate Hfull. }
+      iModIntro.
+      rewrite (uslot_bump_run m pc M M pm pm sz sz fdv fdv cw cw' gn gn cs cs pidv false false secc_all secc_all r Hx0 Hal4).
+      iApply ukcq_ukc.
+      iApply (urun_close_upd _ _ _ m (mword_of_int 10) _ _ _ _ _ _ _ _ _
+                ltac:(unfold unot_sp; vm_compute; discriminate)
+                with "Hheap Hstk Hufd Hcwda Hcha Hmy Hdep Hnpx").
+      iIntros (h') "Hrun".
+      iApply ("Hcont" $! h' r with "[Hstd Hh0] Hrun").
+      iRight. iFrame "Hstd Hh0". iPureIntro. split; [ exact Hrm | exact Hnone ].
+  Qed.
+
 
   (* ------------------------------------------------------------------- *)
   (* ecall, at DUP, WITHOUT TRACKING THE SOURCE.  A program that holds no    *)

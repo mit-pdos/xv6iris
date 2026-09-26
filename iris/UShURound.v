@@ -1268,7 +1268,7 @@ Section UShURound.
                   (fun k H => H) sz Hszlo Hszal Hszok (uHwbl_u ug r s0 PT PD)
                   with "Hkl Hcatl Hplaw") as "#Hcat".
     iPoseProof (UkShRedirBody.ushf_child_law_at_of_redir (PS := uprogSG_free)
-                  (SG := uexecSG_xv6) (ghost_varG0 := offbox_offG) Wcu
+                  (SG := uexecSG_xv6) (ghost_varG0 := offbox_offG) T Wcu
                   with "Hred") as "#Hchr".
     rewrite /UkShFork.ushf_body_law.
     iIntros "!>" (lu h m f k len l n)
