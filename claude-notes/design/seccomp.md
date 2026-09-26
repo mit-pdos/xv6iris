@@ -651,3 +651,20 @@ path, the knob, the top theorem's statement through the model.
   token of era `k` licenses only era `k`'s claim.  Rejected: an
   era-indexed `lk_T` (a sweep of the generic sh tier) and a third read
   outcome with era-indexed wild arms in the families.
+
+### 10.8 Lane S1's deviations, accepted (owner, 2026-09-25)
+
+- THE UNIVERSE'S OWN EXEC needs no credential: it is the closed generic
+  bundle (`fsabs_exec_half` + `ax_hops_triv`, the mould of
+  `xv6_sbundle_of_supply`'s exec branch) with both slot wands answered
+  from the Löb hypothesis at the exec'd key.  The taint-shaped walk at
+  `T := riscv_wild` is the seccomp PROGRAM's (S3), where a name to
+  resolve is in hand.
+- The generalised `image_entry_taint T sts secc Q X` is stated
+  `∀ sts` in the U-tier exec rules and `TreeExec` (no single key in
+  scope), and `∀ sts secc` at sh's entry (`UShKernel`, `UInitSh`), with
+  `image_entry_taint_all_elim` giving the unpinned wand back.
+- `secc_key` is persistent but NOT timeless (`wild_pipe` is an
+  invariant).  `UexecSecc.useccomp_image_entry_taint` answers the
+  generalised taint entry at a table in the universe and a masked mask;
+  S3 uses it.
