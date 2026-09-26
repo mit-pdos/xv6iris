@@ -39,9 +39,11 @@ note stage 4 states its contract as the one named local Hypothesis
 note [ushp_malloc_ok] in iris/UkShParse.v -- the Hypothesis consumes the run
 note at malloc's ENTRY pc and hands it back at the return address, so no
 note instruction of malloc is ever fetched by this walk and a catalog fact
-note about one would be a claim nothing reads.  [memset], which [execcmd]
+note about one would be a claim nothing reads.  [memset], which [cmdalloc]
 note calls, is already catalogued in UCodeShK.v and the walk reuses
-note [UkSh.wp_ksh_memset] across the [shp_code]/[shk_code] bridge.
+note [UkSh.wp_ksh_memset] across the [shp_code]/[shk_code] bridge.  So is
+note [panic], which [cmdalloc] calls when [malloc] returns NULL: the walk
+note stops at panic's ENTRY and hands the run to an abstract continuation.
 
 # ---- the parser proper -----------------------------------------------
 func parsecmd
@@ -67,7 +69,13 @@ func gettoken
 # later: it is reached only from [parsepipe]'s [peek(ps,es,"|")] arm, which
 # [ushp_no_symbols] refutes and [UkShPipeLex.ushq_pipe] admits (one '|').
 # Lane SH-PARSE-PIPE walks [parsepipe]'s turn (iris/UkShPipeCm.v), the turn
-# calls it at 0x6da, and its own walk is iris/UkShPipeCmd.v.
+# calls it at 0x6b6, and its own walk is iris/UkShPipeCmd.v.
+#
+# [cmdalloc] is every constructor's allocation since d66e41c ("sh: panic
+# when out of memory"): [malloc(n)], [panic("out of memory")] on NULL,
+# [memset(p, 0, n)].  The three walked constructors call it, and its one
+# walk (iris/UkShCmdalloc.v) serves all three.
+func cmdalloc
 func execcmd
 func redircmd
 func pipecmd
@@ -82,5 +90,5 @@ skipfunc listcmd reached only from parseline's [peek(ps,es,";")] arm -- excluded
 skipfunc backcmd reached only from parseline's [peek(ps,es,"&")] loop -- excluded by [ushp_no_symbols]
 skipfunc malloc stage 3's; stage 4 states its contract as the named local Hypothesis [ushp_malloc_ok], which crosses the call without fetching a single instruction of the allocator
 skipfunc memset already catalogued in iris/UCodeShK.v; the walk reuses [UkSh.wp_ksh_memset] across the [shp_code]/[shk_code] bridge
-skipfunc panic the two [panic] calls this walk crosses -- parseexec's "syntax" and "too many args" -- are REFUTED, not proved: on a symbol-free line every token [gettoken] returns is 'a' or 0, and the argument count is bounded by the token list's length
+skipfunc panic already catalogued in iris/UCodeShK.v.  Of the [panic] calls this walk crosses, parseexec's "syntax" and "too many args" are REFUTED (on a symbol-free line every token [gettoken] returns is 'a' or 0, and the argument count is bounded by the token list's length), and [cmdalloc]'s "out of memory" is handed to an abstract continuation at panic's ENTRY, so no instruction of panic is fetched here
 skipdefault not on the parser's path: the command loop and the ELF entry are UCodeShK.v's (SH lane stages 1-2), the allocator is stage 3's, and runcmd's tree walk with its fork/exec arms is stage 5's

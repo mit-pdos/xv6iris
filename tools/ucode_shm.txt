@@ -23,16 +23,16 @@
 
 note SH LANE STAGE 3: the ALLOCATOR -- K&R [malloc]/[free] over [sbrk].
 note
-note [malloc] (0x118c, 91 instructions) has [morecore] INLINED into it: the
-note first-call arm at 0x11e2 initialises the degenerate free list ([base]
+note [malloc] (0x1170, 91 instructions) has [morecore] INLINED into it: the
+note first-call arm at 0x11c6 initialises the degenerate free list ([base]
 note points at itself with size 0 and [freep] points at [base]), the arm at
-note 0x1226 asks [sbrk] for a 4096-unit chunk and hands it to [free], and the
-note cut at 0x1244 splits the block the search found.  [free] (0x1106, 46
+note 0x120a asks [sbrk] for a 4096-unit chunk and hands it to [free], and the
+note cut at 0x1228 splits the block the search found.  [free] (0x10ea, 46
 note instructions) is the circular-list insert with its two coalesce arms.
 note
-note [sbrk] (0xc52) is NOT one of the two-instruction usys.S stubs the other
+note [sbrk] (0xc2e) is NOT one of the two-instruction usys.S stubs the other
 note catalogs hold: user/umalloc.c calls the C wrapper, which passes the
-note EAGER flag in a1 and tail-calls the real stub [sys_sbrk] (0xd0e).  Both
+note EAGER flag in a1 and tail-calls the real stub [sys_sbrk] (0xcea).  Both
 note are here, and both are on the walk.
 
 # ---- the allocator ---------------------------------------------------
