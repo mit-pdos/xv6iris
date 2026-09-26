@@ -126,19 +126,22 @@ theorem ctxBytes_exclReadAU (ξ : CtxId) (pa : PAddr) (n : Nat) (dq : DFrac) (w 
 
 /-- A store of an exclusive pair by the running context: the memory model
 moves, the new timestamp enters ξ's dirty set (`ctx_store`, over
-`memModel_store_excl`). -/
+`memModel_store_excl_any`).  From ANY reservation state (Rocq `resv_any`):
+the machine lets the conditional write through whenever no other hart
+reserves the footprint, whatever this hart holds; an acquire pair's view
+receipt is dropped. -/
 theorem ctx_store_excl (σ : MState) (cpu : CPU) (ξ : CtxId) (pa : PAddr) (n : Nat) (w : BitVec (8 * n))
-    (r : Resv) (hram : ramBytes pa n) (hno : ¬ othersReserve σ.resv cpu pa n) :
-    memModel σ ∗ ownCtx cpu ξ ∗ resvFrag cpu (some r) false ⊢@{IProp GF} |==>
+    (r : Option Resv) (hram : ramBytes pa n) (hno : ¬ othersReserve σ.resv cpu pa n) :
+    memModel σ ∗ ownCtx cpu ξ ∗ resvFragAny cpu r ⊢@{IProp GF} |==>
       (memModel (σ.store cpu pa n w true) ∗ ownCtx cpu ξ ∗ resvFrag cpu none false ∗
        keyAt (MachGS.era (hlc := hlc) (GF := GF)) ξ (σ.top + 1)) := by
-  unfold ownCtx ownCtxAt resvFrag memModel
-  iintro ⟨Hmm, ⟨%B, %K, %W, %D, Hctx, #HK, %hBK, #HW, %hDW, #Hels⟩, Hfrag⟩
+  unfold ownCtx ownCtxAt resvFragAny resvFragAnyAt resvFrag memModel
+  iintro ⟨Hmm, ⟨%B, %K, %W, %D, Hctx, #HK, %hBK, #HW, %hDW, #Hels⟩, %acq, Hfrag⟩
   ihave %hW : ⌜W ≤ σ.top⌝ $$ [Hmm HW]
   · iapply memModel_topLb _ σ W $$ [Hmm HW]
     iframe Hmm
     iexact HW
-  imod memModel_store_excl _ σ cpu pa n w r false hram hno $$ [$Hmm $Hfrag] with ⟨Hmm, Hfrag, #Hau, #Htop', _⟩
+  imod memModel_store_excl_any _ σ cpu pa n w r acq hram hno $$ [$Hmm $Hfrag] with ⟨Hmm, Hfrag, #Hau, #Htop', _⟩
   unfold ctxAt
   icases Hctx with ⟨Hbound, Hdirty⟩
   have hfresh : get? D (σ.top + 1) = none := by
@@ -189,14 +192,17 @@ theorem ctx_store_excl (σ : MState) (cpu : CPU) (ξ : CtxId) (pa : PAddr) (n : 
 /-! ## The memory leaves -/
 
 /-- **The write half of an exclusive pair, on owned bytes**: full ownership
-and the reservation the read half left; the bytes come back at the new
-value, justified at ξ as ξ's own store. -/
+and the hart's reservation fragment in ANY state (Rocq `resv_any`: the read
+half's snapshot, none -- an `SC` whose `LR` a store or a trap already spent,
+the model's `match_reservation` having let it through -- or a pending
+acquire); the bytes come back at the new value, justified at ξ as ξ's own
+store. -/
 theorem swp_sail_mem_write_excl_ctx (cpu : CPU) {n vasize : Nat}
     (req : Mem_write_request n vasize Arch.pa Arch.translation Arch.arch_ak)
-    (ξ : CtxId) (r : Resv) (w w' : BitVec (8 * n)) (hv : req.value = some w')
+    (ξ : CtxId) (r : Option Resv) (w w' : BitVec (8 * n)) (hv : req.value = some w')
     (hk : akExcl req.access_kind = true)
     (Φ : Result (Option Bool) Arch.abort → IProp GF) :
-    ownCtx cpu ξ ∗ resvFrag cpu (some r) false ∗ ctxBytes ξ req.pa n (DFrac.own 1) w ∗
+    ownCtx cpu ξ ∗ resvFragAny cpu r ∗ ctxBytes ξ req.pa n (DFrac.own 1) w ∗
     ▷ (ownCtx cpu ξ -∗ resvFrag cpu none false -∗ ctxBytes ξ req.pa n (DFrac.own 1) w' -∗ Φ (.Ok (some true)))
     ⊢ swp cpu (ConcurrencyInterfaceV1.sail_mem_write req) Φ := by
   unfold ConcurrencyInterfaceV1.sail_mem_write PreSail.sail_mem_write PreSail.emit
@@ -305,7 +311,7 @@ theorem swp_read_pte_exclusive_ctx [CurCtx] (cpu : CPU) (dq : DFrac) (c : MConf)
     (hok : SConfPhys (GF := GF) c sie)
     (pa : BitVec 64) (hram : inRam pa 8) (hal : pa.toNat % 8 = 0) (r : Option Resv) (dq' : DFrac) (w : BitVec (8 * 8))
     (Φ : Result (BitVec (8 * 8)) (physaddr × ExceptionType) → IProp GF) :
-    confCells cpu dq Privilege.Supervisor c ∗ resvFrag cpu r false ∗ bytesPointsTo pa 8 dq' w ∗
+    confCells cpu dq Privilege.Supervisor c ∗ resvFragAny cpu r ∗ bytesPointsTo pa 8 dq' w ∗
     ▷ (confCells cpu dq Privilege.Supervisor c -∗ resvFrag cpu (some (snapOf pa 8 w)) false -∗
         bytesPointsTo pa 8 dq' w -∗ Φ (.Ok w))
     ⊢ swp cpu (read_pte_exclusive (physaddr.Physaddr pa) 8) Φ := by
@@ -344,7 +350,8 @@ theorem swp_checked_mem_write_pte8_cond_S_ctx [CurCtx] (cpu : CPU) (dq : DFrac) 
   unfold checked_mem_write
   checked_mem_S_au_prefix pa 8 hram hal
   iapply swp_bind
-  iapply (swp_sail_mem_write_excl_ctx cpu _ curCtx (snapOf pa 8 w0) w data rfl rfl)
+  iapply (swp_sail_mem_write_excl_ctx cpu _ curCtx (some (snapOf pa 8 w0)) w data rfl rfl)
+  ihave Hfrag := resvFragAny_of cpu (some (snapOf pa 8 w0)) false $$ Hfrag
   iframe Hctx Hfrag Hb
   inext
   iintro Hctx Hfrag Hb
@@ -537,7 +544,7 @@ theorem swp_update_and_write_pte_own [CurCtx] (cpu : CPU) (dq : DFrac) (c : MCon
     | none =>
       swp_run 40
       iapply HΦ $$ HmConf [Hctx Hfrag] %(some (kLeaf ppn perm a d)) %a %d [] Hb
-      · iapply ctxTok_intro cpu curCtx _; iframe Hctx Hfrag
+      · iapply ctxTok_introB cpu curCtx _ false; iframe Hctx Hfrag
       · ipureintro; exact Or.inr rfl
     | some p2 =>
       have hp2 : ∃ a2 d2, p2 = kLeaf ppn perm a2 d2 := by
@@ -555,7 +562,7 @@ theorem swp_update_and_write_pte_own [CurCtx] (cpu : CPU) (dq : DFrac) (c : MCon
       iintro HmConf Hctx Hfrag Hb
       swp_run 40
       iapply HΦ $$ HmConf [Hctx Hfrag] %(some (kLeaf ppn perm a2 d2)) %a2 %d2 [] Hb
-      · iapply ctxTok_intro cpu curCtx none; iframe Hctx Hfrag
+      · iapply ctxTok_introB cpu curCtx none false; iframe Hctx Hfrag
       · ipureintro; exact Or.inr rfl
 
 /-! ## The TLB, whatever the provenance of its entries -/

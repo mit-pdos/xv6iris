@@ -59,7 +59,7 @@ theorem swp_sail_mem_write_plain_auT (cpu : CPU) {n vasize : Nat}
     (w' : BitVec (8 * n)) (hv : req.value = some w')
     (hk : akExcl req.access_kind = false)
     (r : Option Resv) (Φ : Result (Option Bool) Arch.abort → IProp GF) :
-    resvFrag cpu r false ∗
+    resvFragAny cpu r ∗
     writeAUT cpu req.pa n w' iprop(resvFrag cpu none false -∗ Φ (.Ok (some true)))
     ⊢ swp cpu (ConcurrencyInterfaceV1.sail_mem_write req) Φ := by
   unfold ConcurrencyInterfaceV1.sail_mem_write PreSail.sail_mem_write PreSail.emit writeAUT
@@ -113,7 +113,8 @@ theorem swp_sail_mem_write_plain_auT (cpu : CPU) {n vasize : Nat}
       · exact absurd hdev (not_devBytes_of_ramBytes hram (devWrite_pos hdw))
       rw [hv] at hv'
       obtain rfl := Option.some.inj hv'
-      imod memModel_store_plain _ σ cpu req.pa n w' r hram hno $$ [$Hmm $Hfrag] with ⟨Hmm, Hfrag, #Hau, #Htop'⟩
+      icases resvFragAny_cases cpu r $$ Hfrag with ⟨%b, Hfrag⟩
+      imod memModel_store_plain _ σ cpu req.pa n w' r b hram hno $$ [$Hmm $Hfrag] with ⟨Hmm, Hfrag, #Hau, #Htop'⟩
       imod histBytes_update σ.mem req.pa n Hs (σ.top + 1) (hartAgent cpu) w' $$ [$Hmem $Hb]
         with ⟨Hmem, Hb⟩
       imod Hcont $$ %(σ.top + 1) %(by omega) Hb Hau Htop' with HΦ
@@ -135,7 +136,7 @@ theorem swp_checked_mem_write_store4_S_auT (cpu : CPU) (dq : DFrac) (c : MConf) 
     (hok : SConfPhys (GF := GF) c sie)
     (pa : BitVec 64) (data : BitVec (8 * 4)) (hram : inRam pa 4) (hal : pa.toNat % 4 = 0) (r : Option Resv) (Ψ : IProp GF)
     (Φ : Result Bool (physaddr × ExceptionType) → IProp GF) :
-    confCells cpu dq Privilege.Supervisor c ∗ resvFrag cpu r false ∗ writeAUT cpu pa 4 data Ψ ∗
+    confCells cpu dq Privilege.Supervisor c ∗ resvFragAny cpu r ∗ writeAUT cpu pa 4 data Ψ ∗
     ▷ (confCells cpu dq Privilege.Supervisor c -∗ resvFrag cpu none false -∗ Ψ -∗ Φ (.Ok true))
     ⊢ swp cpu (checked_mem_write (physaddr.Physaddr pa) 4 data
         (MemoryAccessType.Store mem_payload.Data) page_based_mem_type.PBMT_PMA
@@ -216,7 +217,7 @@ theorem wp_s_sw_auT [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU) (k : KCtx
       iframe Hctx HΨ
     · inext
       iintro HmConf HPC HnextPC ⟨Htrans, Hfrag, HF, Hctx, HΨ⟩
-      ihave Htok := ctxTok_intro cpu curCtx none $$ [Hctx Hfrag]
+      ihave Htok := ctxTok_introB cpu curCtx none false $$ [Hctx Hfrag]
       case' _ => iframe
       ihave HT := transTok_intro cpu curTier k.root $$ [Htrans Htok]
       case' _ => iframe

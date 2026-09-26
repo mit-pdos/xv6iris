@@ -896,15 +896,15 @@ theorem hartViews_store_plain (σ : MState) (cpu : CPU) (pa : PAddr) (n : Nat) (
 
 /-- A plain store by a hart: the store order grows by the hart's message,
 whose authorship and position become persistent facts; the hart's
-reservation, whatever it was, is cleared. -/
+reservation and pending acquire bit, whatever they were, are cleared. -/
 theorem memModel_store_plain (σ : MState) (cpu : CPU) (pa : PAddr) (n : Nat) (w : BitVec (8 * n))
-    (r : Option Resv) (hram : ramBytes pa n) (hno : ¬ othersReserve σ.resv cpu pa n) :
-    memModelAt E σ ∗ resvFragAt E cpu r false ⊢@{IProp GF} |==>
+    (r : Option Resv) (b : Bool) (hram : ramBytes pa n) (hno : ¬ othersReserve σ.resv cpu pa n) :
+    memModelAt E σ ∗ resvFragAt E cpu r b ⊢@{IProp GF} |==>
       (memModelAt E (σ.store cpu pa n w false) ∗ resvFragAt E cpu none false ∗
        authoredByAt E (σ.top + 1) (hartAgent cpu) ∗ topLbAt E (σ.top + 1)) := by
   iintro ⟨Hmm, Hfrag⟩
-  ihave %hres : ⌜σ.resv cpu = r ∧ (σ.hr cpu).acq = false⌝ $$ [Hmm Hfrag]
-  · iapply memModel_resv E σ cpu r false $$ [Hmm Hfrag]
+  ihave %hres : ⌜σ.resv cpu = r ∧ (σ.hr cpu).acq = b⌝ $$ [Hmm Hfrag]
+  · iapply memModel_resv E σ cpu r b $$ [Hmm Hfrag]
     iframe
   unfold memModelAt
   icases Hmm with ⟨Htop, Hauth, Hviews, Hresv, %hmm⟩
@@ -1147,16 +1147,16 @@ theorem readBytes_unique (m : FlatMem) (h : Agent) (tv : Nat) (pa : PAddr) (n : 
 enters ξ's dirty set (authored on `cpu`), and ξ's token is re-established. -/
 theorem ctx_store (σ : MState) (cpu : CPU) (ξ : CtxId) (pa : PAddr) (n : Nat) (w : BitVec (8 * n))
     (r : Option Resv) (hram : ramBytes pa n) (hno : ¬ othersReserve σ.resv cpu pa n) :
-    memModel σ ∗ ownCtx cpu ξ ∗ resvFrag cpu r false ⊢@{IProp GF} |==>
+    memModel σ ∗ ownCtx cpu ξ ∗ resvFragAny cpu r ⊢@{IProp GF} |==>
       (memModel (σ.store cpu pa n w false) ∗ ownCtx cpu ξ ∗ resvFrag cpu none false ∗
        keyAt (MachGS.era (hlc := hlc) (GF := GF)) ξ (σ.top + 1)) := by
-  unfold ownCtx ownCtxAt resvFrag memModel
-  iintro ⟨Hmm, ⟨%B, %K, %W, %D, Hctx, #HK, %hBK, #HW, %hDW, #Hels⟩, Hfrag⟩
+  unfold ownCtx ownCtxAt resvFragAny resvFragAnyAt resvFrag memModel
+  iintro ⟨Hmm, ⟨%B, %K, %W, %D, Hctx, #HK, %hBK, #HW, %hDW, #Hels⟩, %b, Hfrag⟩
   ihave %hW : ⌜W ≤ σ.top⌝ $$ [Hmm HW]
   · iapply memModel_topLb _ σ W $$ [Hmm HW]
     iframe Hmm
     iexact HW
-  imod memModel_store_plain _ σ cpu pa n w r hram hno $$ [$Hmm $Hfrag] with ⟨Hmm, Hfrag, #Hau, #Htop'⟩
+  imod memModel_store_plain _ σ cpu pa n w r b hram hno $$ [$Hmm $Hfrag] with ⟨Hmm, Hfrag, #Hau, #Htop'⟩
   unfold ctxAt
   icases Hctx with ⟨Hbound, Hdirty⟩
   have hfresh : get? D (σ.top + 1) = none := by
@@ -1379,7 +1379,7 @@ theorem swp_sail_mem_write_plain (cpu : CPU) {n vasize : Nat}
     · iapply Hclose $$ %(σ.store cpu req.pa n w' false) %⟨fun _ _ => rfl, rfl⟩ Hregs Hmem Hmm
     · iapply swp_ret
       iapply HΦ $$ [Hctx Hfrag] Hb
-      iapply ctxTok_intro cpu ξ none
+      iapply ctxTok_introB cpu ξ none false
       iframe Hctx Hfrag
   · iintro %Hbk
     obtain ⟨_, hσ⟩ := Hbk

@@ -17,13 +17,18 @@ byte it can reach (an owned byte map).  `runRW` walks a computation over
   no hart's frame: their reads are answered by an ORACLE, a stream of
   answers; `swp_runRW` quantifies over it (`swp_readReg_any`), and so does
   every `choose` (`swp_choose`);
-* an owned byte map `s.mm : PAddr → Option (BitVec 8)`: a plain read must
-  find every byte of its footprint in the map and returns their
-  little-endian value; a write must find its footprint in the map's domain
-  and updates it; an exclusive (non-acquire) read steps like a plain read
-  and sets the walk's reservation bit `s.rv`; an exclusive write needs that
-  bit (it pays with the reservation the read took) and clears it, as does a
-  plain write; a fetch is refused (Rocq parity: fetches are their own node
+* an owned byte map `s.mm : PAddr → Option (BitVec 8)`: a read must find
+  every byte of its footprint in the map and returns their little-endian
+  value; a write must find its footprint in the map's domain and updates it.
+  The walker does not know about the reservation (Rocq `hmrun`, design §3a):
+  an exclusive read (acquire or not) steps like a plain read, and an
+  exclusive (conditional) write like a plain write, from ANY reservation
+  state -- the machine lets it through whenever no other hart reserves the
+  footprint, and whether an `SC` writes at all is the model's opaque
+  `match_reservation`, decided before the write event.  `s.rv` is only a
+  bookkeeping bit (an exclusive read sets it, every write clears it); the
+  hart's actual reservation rides `ctxTok` as Rocq's `resv_any`
+  (`uResvTok`).  A fetch is refused (Rocq parity: fetches are their own node
   rule), and so are the legacy RAM events and accesses of 2^64 bytes or more;
 * the silent events (fences, TLB/cache ops, the announce events).
 
@@ -33,7 +38,7 @@ byte it can reach (an owned byte map).  `runRW` walks a computation over
 per-event leaves (`swp_readReg`, `swp_writeReg`, `swp_readReg_any`,
 `swp_choose`, `swp_sail_mem_read_plain_ctx`, `swp_sail_mem_write_plain`,
 `swp_sail_mem_read_excl_au` over `ctxBytes_exclReadAU`,
-`swp_sail_mem_write_excl_ctx`, the silent rules).  It is stated over any
+`swp_sail_mem_write_excl_ctx` from any reservation state, the silent rules).  It is stated over any
 register frame and byte frame that hand out the cells they own
 (`URegFrame` / `UByteFrame`, the analogue of `runRead`'s `hacc`; a register
 is handed out at its own fraction).  The concrete instances here are
@@ -286,11 +291,9 @@ def runRW {X : Type} (D : UFoot) : UOrc → UWSt → SailM X → Option (X × UW
       if akIfetch req.access_kind then none
       else if n < 2 ^ 64 then
         if akExcl req.access_kind then
-          if akAcq req.access_kind then none
-          else
-            match bmRead s.mm req.pa n with
-            | some w => runRW D orc { s with rv := true } (k (.Ok (w, none)))
-            | none => none
+          match bmRead s.mm req.pa n with
+          | some w => runRW D orc { s with rv := true } (k (.Ok (w, none)))
+          | none => none
         else
           match bmRead s.mm req.pa n with
           | some w => runRW D orc s (k (.Ok (w, none)))
@@ -302,11 +305,7 @@ def runRW {X : Type} (D : UFoot) : UOrc → UWSt → SailM X → Option (X × UW
         | none => none
         | some w' =>
           if bmOwned s.mm req.pa n then
-            if akExcl req.access_kind then
-              if s.rv then
-                runRW D orc { s with mm := bmWrite s.mm req.pa n w', rv := false } (k (.Ok (some true)))
-              else none
-            else runRW D orc { s with mm := bmWrite s.mm req.pa n w', rv := false } (k (.Ok (some true)))
+            runRW D orc { s with mm := bmWrite s.mm req.pa n w', rv := false } (k (.Ok (some true)))
           else none
       else none
     | .barrier _, k => runRW D orc s (k ())
@@ -490,10 +489,22 @@ end toolkit
 section iris
 variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF]
 
-/-- The walk's hold on the hart's reservation: when the walk took an
-exclusive read (`rv`), the reservation is some snapshot. -/
-def uResvTok (cpu : CPU) (rv : Bool) : IProp GF :=
-  iprop(∃ r : Option Resv, ⌜rv = true → r.isSome = true⌝ ∗ resvFrag cpu r false)
+/-- The walk's hold on the hart's reservation: the fragment in ANY state
+(Rocq `resv_any`: any reservation, either pending-acquire bit), whatever the
+walk's bookkeeping bit `rv` says. -/
+def uResvTok (cpu : CPU) (_rv : Bool) : IProp GF :=
+  iprop(∃ r : Option Resv, resvFragAny cpu r)
+
+theorem uResvTok_rv (cpu : CPU) (rv rv' : Bool) : uResvTok (GF := GF) cpu rv ⊢ uResvTok cpu rv' := by
+  unfold uResvTok
+  iintro H; iexact H
+
+theorem uResvTok_of (cpu : CPU) (rv : Bool) (r : Option Resv) (b : Bool) :
+    resvFrag cpu r b ⊢@{IProp GF} uResvTok cpu rv := by
+  unfold uResvTok
+  iintro H
+  iexists r
+  iapply resvFragAny_of cpu r b $$ H
 
 theorem ctxTok_uResvTok (cpu : CPU) (ξ : CtxId) :
     ctxTok (GF := GF) cpu ξ ⊢ ownCtx cpu ξ ∗ uResvTok cpu false := by
@@ -502,14 +513,12 @@ theorem ctxTok_uResvTok (cpu : CPU) (ξ : CtxId) :
   icases ctxTok_cases cpu ξ $$ H with ⟨Hc, %r, Hf⟩
   iframe Hc
   iexists r
-  iframe Hf
-  ipureintro
-  intro h; cases h
+  iexact Hf
 
 theorem uResvTok_ctxTok (cpu : CPU) (ξ : CtxId) (rv : Bool) :
     ownCtx cpu ξ ∗ uResvTok (GF := GF) cpu rv ⊢ ctxTok cpu ξ := by
   unfold uResvTok
-  iintro ⟨Hc, %r, _, Hf⟩
+  iintro ⟨Hc, %r, Hf⟩
   iapply ctxTok_intro cpu ξ r
   iframe Hc Hf
 
@@ -704,22 +713,19 @@ theorem urw_memRead {X : Type} (n vasize : Nat)
     unfold uFr
     iframe
   | true =>
-    -- the read half of an exclusive pair
-    cases hacq : akAcq req.access_kind with
-    | true =>
-      exact (urw_absurd _ s hok (by simp only [runRW, hif, hn, hex, hacq, Bool.false_eq_true, ↓reduceIte])).elim
-    | false =>
+    -- the read half of an exclusive pair (acquire or not), from any
+    -- reservation state
     have hstep : ∀ orc', ∃ orc, runRW D orc s (FreeM.impure (.ok (.memRead n vasize req)) k) =
         runRW D orc' { s with rv := true } (k (.Ok (w, none))) := fun o =>
-      ⟨o, by simp only [runRW, hif, hex, hacq, hrd, hn, Bool.false_eq_true, ↓reduceIte]⟩
+      ⟨o, by simp only [runRW, hif, hex, hrd, hn, Bool.false_eq_true, ↓reduceIte]⟩
     unfold uFr uResvTok
-    iintro ⟨⟨HF, HB, Hc, %r, _, Hfrag⟩, HP⟩
+    iintro ⟨⟨HF, HB, Hc, %r, Hfrag⟩, HP⟩
     icases BF.acc s.mm req.pa n hn (bmOwned_of_read _ _ _ _ hrd) $$ HB with ⟨%w0, %hw0, Hb, HBc⟩
     rw [hrd] at hw0
     obtain rfl := Option.some.inj hw0
     rw [e]
     iapply swp_bind
-    iapply swp_sail_mem_read_excl_au cpu req false hex hacq hn r (fun v => swp cpu (k v) Φ)
+    iapply swp_sail_mem_read_excl_au cpu req (akAcq req.access_kind) hex rfl hn r (fun v => swp cpu (k v) Φ)
     iframe Hfrag
     ihave Hau := ctxBytes_exclReadAU ξ req.pa n (DFrac.own 1) w $$ Hb
     iapply exclReadAU_wand req.pa n _ _ $$ Hau
@@ -731,13 +737,10 @@ theorem urw_memRead {X : Type} (n vasize : Nat)
     rw [← e]
     iapply urw_cont RF BF _ _ (ih _) s _ hok hstep Φ
     iframe HP
-    unfold uFr uResvTok
+    unfold uFr
     rw [show ({ s with rv := true } : UWSt).file = s.file from rfl]
     iframe HF HB Hc
-    iexists (some (snapOf req.pa n w1))
-    iframe Hfrag
-    ipureintro
-    intro _; rfl
+    iapply uResvTok_of cpu true _ _ $$ Hfrag
 
 theorem urw_memWrite {X : Type} (n vasize : Nat)
     (req : Mem_write_request n vasize Arch.pa Arch.translation Arch.arch_ak)
@@ -755,11 +758,11 @@ theorem urw_memWrite {X : Type} (n vasize : Nat)
   cases ho : bmOwned s.mm req.pa n with
   | false => exact (urw_absurd _ s hok (by simp only [runRW, hn, hv, ho, Bool.false_eq_true, ↓reduceIte])).elim
   | true =>
+  have hstep : ∀ orc', ∃ orc, runRW D orc s (FreeM.impure (.ok (.memWrite n vasize req)) k) =
+      runRW D orc' { s with mm := bmWrite s.mm req.pa n w', rv := false } (k (.Ok (some true))) :=
+    fun o => ⟨o, by simp only [runRW, hn, hv, ho, ↓reduceIte]⟩
   cases hex : akExcl req.access_kind with
   | false =>
-    have hstep : ∀ orc', ∃ orc, runRW D orc s (FreeM.impure (.ok (.memWrite n vasize req)) k) =
-        runRW D orc' { s with mm := bmWrite s.mm req.pa n w', rv := false } (k (.Ok (some true))) :=
-      fun o => ⟨o, by simp only [runRW, hn, hv, ho, hex, Bool.false_eq_true, ↓reduceIte]⟩
     unfold uFr
     iintro ⟨⟨HF, HB, Hc, Hr⟩, HP⟩
     icases BF.acc s.mm req.pa n hn ho $$ HB with ⟨%w0, %_, Hb, HBc⟩
@@ -779,20 +782,15 @@ theorem urw_memWrite {X : Type} (n vasize : Nat)
     rw [show ({ s with mm := bmWrite s.mm req.pa n w', rv := false } : UWSt).file = s.file from rfl]
     iframe
   | true =>
-    cases hrv : s.rv with
-    | false =>
-      exact (urw_absurd _ s hok (by simp only [runRW, hn, hv, ho, hex, hrv, Bool.false_eq_true, ↓reduceIte])).elim
-    | true =>
-    have hstep : ∀ orc', ∃ orc, runRW D orc s (FreeM.impure (.ok (.memWrite n vasize req)) k) =
-        runRW D orc' { s with mm := bmWrite s.mm req.pa n w', rv := false } (k (.Ok (some true))) :=
-      fun o => ⟨o, by simp only [runRW, hn, hv, ho, hex, hrv, ↓reduceIte]⟩
+    -- the write half of an exclusive pair, from ANY reservation state
+    -- (Rocq `resv_any`): the `SC` got here because `match_reservation`
+    -- said so; the machine only asks that no other hart reserve the bytes
     unfold uFr uResvTok
-    iintro ⟨⟨HF, HB, Hc, %r, %hr, Hfrag⟩, HP⟩
-    obtain ⟨r0, rfl⟩ := Option.isSome_iff_exists.1 (hr hrv)
+    iintro ⟨⟨HF, HB, Hc, %r, Hfrag⟩, HP⟩
     icases BF.acc s.mm req.pa n hn ho $$ HB with ⟨%w0, %_, Hb, HBc⟩
     rw [e]
     iapply swp_bind
-    iapply swp_sail_mem_write_excl_ctx cpu req ξ r0 w0 w' hv hex (fun v => swp cpu (k v) Φ)
+    iapply swp_sail_mem_write_excl_ctx cpu req ξ r w0 w' hv hex (fun v => swp cpu (k v) Φ)
     iframe Hc Hfrag Hb
     inext
     iintro Hc Hfrag Hb
@@ -800,13 +798,10 @@ theorem urw_memWrite {X : Type} (n vasize : Nat)
     rw [← e]
     iapply urw_cont RF BF _ _ (ih _) s _ hok hstep Φ
     iframe HP
-    unfold uFr uResvTok
+    unfold uFr
     rw [show ({ s with mm := bmWrite s.mm req.pa n w', rv := false } : UWSt).file = s.file from rfl]
     iframe HF HB Hc
-    iexists none
-    iframe Hfrag
-    ipureintro
-    intro h; cases h
+    iapply uResvTok_of cpu false none false $$ Hfrag
 
 /-- A silent node: one step, the state unchanged. -/
 theorem urw_silent {X : Type} (o : Outcome Register RegisterType) (u : o.ret) (k : o.ret → SailM X)

@@ -69,6 +69,11 @@ def authoredByAt (t : Nat) (h : Agent) : IProp GF := E.authName ↪◯MAP[t]{.di
 def resvFragAt (cpu : CPU) (r : Option Resv) (b : Bool) : IProp GF :=
   E.resvName ↪◯MAP[cpu.val] ((r, b) : ResvVal)
 
+/-- Hart `cpu`'s reservation fragment at reservation `r`, whatever the pending
+acquire bit (Rocq `resv_frag`, over `resv_fragb` = `resvFragAt`). -/
+def resvFragAnyAt (cpu : CPU) (r : Option Resv) : IProp GF :=
+  iprop(∃ b : Bool, resvFragAt E cpu r b)
+
 /-- A list of lock names as a map. -/
 def locksMap : List String → StrMapF Unit
   | [] => ∅
@@ -113,6 +118,8 @@ instance (t : Nat) (h : Agent) : Timeless (PROP := IProp GF) (authoredByAt E t h
   unfold authoredByAt; infer_instance
 instance (cpu : CPU) (r : Option Resv) (b : Bool) : Timeless (PROP := IProp GF) (resvFragAt E cpu r b) := by
   unfold resvFragAt; infer_instance
+instance (cpu : CPU) (r : Option Resv) : Timeless (PROP := IProp GF) (resvFragAnyAt E cpu r) := by
+  unfold resvFragAnyAt; infer_instance
 
 theorem topLbAt_0 : ⊢@{IProp GF} topLbAt E 0 := by
   unfold topLbAt
@@ -284,11 +291,12 @@ def ownCtxAt (E : EraGS) (cpu : CPU) (ξ : CtxId) : IProp GF := iprop%
     topLbAt E W ∗ ⌜dirtyOk cpu B W D⌝ ∗ dirtyElems E ξ D
 
 /-- What a hart's memory operations thread: its running context and its
-reservation fragment (some reservation or none -- a page walk's exclusive
-re-read may leave one standing, and every store clears it -- and no pending
-acquire, outside an AMO). -/
+reservation fragment at ANY state (Rocq `resv_any`): some reservation or none
+-- a page walk's exclusive re-read, or a user `LR` whose `SC` comes in a later
+cycle, leaves one standing, and every store clears it -- and either pending
+acquire bit (an `lr.aq` sets it; the paired write, or any store, clears it). -/
 def ctxTokAt (E : EraGS) (cpu : CPU) (ξ : CtxId) : IProp GF := iprop%
-  ownCtxAt E cpu ξ ∗ ∃ r : Option Resv, resvFragAt E cpu r false
+  ownCtxAt E cpu ξ ∗ ∃ r : Option Resv, resvFragAnyAt E cpu r
 
 
 end fixed
@@ -305,6 +313,8 @@ abbrev rviewLb (cpu : CPU) (K : Nat) : IProp GF := rviewLbAt (MachGS.era (hlc :=
 abbrev authoredBy (t : Nat) (h : Agent) : IProp GF := authoredByAt (MachGS.era (hlc := hlc) (GF := GF)) t h
 abbrev resvFrag (cpu : CPU) (r : Option Resv) (b : Bool) : IProp GF :=
   resvFragAt (MachGS.era (hlc := hlc) (GF := GF)) cpu r b
+abbrev resvFragAny (cpu : CPU) (r : Option Resv) : IProp GF :=
+  resvFragAnyAt (MachGS.era (hlc := hlc) (GF := GF)) cpu r
 abbrev ownCtx (cpu : CPU) (ξ : CtxId) : IProp GF := ownCtxAt (MachGS.era (hlc := hlc) (GF := GF)) cpu ξ
 abbrev ctxTok (cpu : CPU) (ξ : CtxId) : IProp GF := ctxTokAt (MachGS.era (hlc := hlc) (GF := GF)) cpu ξ
 abbrev lockSet (cpu : CPU) (locks : List String) : IProp GF :=
@@ -378,18 +388,40 @@ theorem ownCtx_intro (cpu : CPU) (ξ : CtxId) (B K W : Nat) (D : RegMapF CPU) :
   iexists B, K, W, D
   iexact H
 
+/-- A fragment at a known acquire bit is one at any (Rocq `resv_frag_of_fragb`). -/
+theorem resvFragAny_of (cpu : CPU) (r : Option Resv) (b : Bool) :
+    resvFrag cpu r b ⊢@{IProp GF} resvFragAny cpu r := by
+  unfold resvFragAny resvFragAnyAt resvFrag
+  iintro H
+  iexists b
+  iexact H
+
+/-- The fragment's acquire bit, named. -/
+theorem resvFragAny_cases (cpu : CPU) (r : Option Resv) :
+    resvFragAny cpu r ⊢@{IProp GF} ∃ b : Bool, resvFrag cpu r b := by
+  unfold resvFragAny resvFragAnyAt resvFrag
+  iintro H; iexact H
+
 theorem ctxTok_cases (cpu : CPU) (ξ : CtxId) :
-    ctxTok cpu ξ ⊢@{IProp GF} ownCtx cpu ξ ∗ ∃ r : Option Resv, resvFrag cpu r false := by
-  unfold ctxTok ctxTokAt ownCtx resvFrag
+    ctxTok cpu ξ ⊢@{IProp GF} ownCtx cpu ξ ∗ ∃ r : Option Resv, resvFragAny cpu r := by
+  unfold ctxTok ctxTokAt ownCtx resvFragAny
   iintro H; iexact H
 
 theorem ctxTok_intro (cpu : CPU) (ξ : CtxId) (r : Option Resv) :
-    ownCtx cpu ξ ∗ resvFrag cpu r false ⊢@{IProp GF} ctxTok cpu ξ := by
-  unfold ctxTok ctxTokAt ownCtx resvFrag
+    ownCtx cpu ξ ∗ resvFragAny cpu r ⊢@{IProp GF} ctxTok cpu ξ := by
+  unfold ctxTok ctxTokAt ownCtx resvFragAny
   iintro ⟨H, Hf⟩
   iframe H
   iexists r
   iexact Hf
+
+/-- The token from a fragment at a known acquire bit (Rocq `resv_any_of_fragb`). -/
+theorem ctxTok_introB (cpu : CPU) (ξ : CtxId) (r : Option Resv) (b : Bool) :
+    ownCtx cpu ξ ∗ resvFrag cpu r b ⊢@{IProp GF} ctxTok cpu ξ := by
+  iintro ⟨H, Hf⟩
+  iapply ctxTok_intro cpu ξ r
+  iframe H
+  iapply resvFragAny_of cpu r b $$ Hf
 
 /-! ## Memory points-to -/
 

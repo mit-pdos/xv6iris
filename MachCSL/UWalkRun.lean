@@ -124,35 +124,63 @@ theorem uwk_mrd (X : Type) (D : UFoot) (orc : UOrc) (s : UWSt) (n vasize : Nat)
     runRW D orc s (FreeM.impure (.ok (.memRead n vasize req)) k) = res := by
   rw [← h]; simp only [runRW, hif, hn, hex, hr, Bool.false_eq_true, ↓reduceIte]
 
+/-- An exclusive read, acquire or not (Rocq `resv_any`: the walker does not
+know about the reservation). -/
+theorem uwk_mrdxA (X : Type) (D : UFoot) (orc : UOrc) (s : UWSt) (n vasize : Nat)
+    (req : Mem_read_request n vasize Arch.pa Arch.translation Arch.arch_ak)
+    (k : Result ((BitVec (8 * n)) × (Option Bool)) Arch.abort → SailM X)
+    (res : Option (X × UWSt × UOrc)) (w : BitVec (8 * n))
+    (hif : akIfetch req.access_kind = false) (hn : n < 2 ^ 64) (hex : akExcl req.access_kind = true)
+    (hr : bmRead s.mm req.pa n = some w)
+    (h : runRW D orc (UWSt.mk s.pin s.rs s.mm true) (k (.Ok (w, none))) = res) :
+    runRW D orc s (FreeM.impure (.ok (.memRead n vasize req)) k) = res := by
+  rw [← h]; simp only [runRW, hif, hn, hex, hr, Bool.false_eq_true, ↓reduceIte]
+
+/-- `uwk_mrdxA` at a non-acquire read (the stepper's first choice: its shape
+is the one the fetch walker's twin lemmas mirror). -/
 theorem uwk_mrdx (X : Type) (D : UFoot) (orc : UOrc) (s : UWSt) (n vasize : Nat)
     (req : Mem_read_request n vasize Arch.pa Arch.translation Arch.arch_ak)
     (k : Result ((BitVec (8 * n)) × (Option Bool)) Arch.abort → SailM X)
     (res : Option (X × UWSt × UOrc)) (w : BitVec (8 * n))
     (hif : akIfetch req.access_kind = false) (hn : n < 2 ^ 64) (hex : akExcl req.access_kind = true)
-    (hacq : akAcq req.access_kind = false) (hr : bmRead s.mm req.pa n = some w)
+    (_hacq : akAcq req.access_kind = false) (hr : bmRead s.mm req.pa n = some w)
     (h : runRW D orc (UWSt.mk s.pin s.rs s.mm true) (k (.Ok (w, none))) = res) :
-    runRW D orc s (FreeM.impure (.ok (.memRead n vasize req)) k) = res := by
-  rw [← h]; simp only [runRW, hif, hn, hex, hacq, hr, Bool.false_eq_true, ↓reduceIte]
+    runRW D orc s (FreeM.impure (.ok (.memRead n vasize req)) k) = res :=
+  uwk_mrdxA X D orc s n vasize req k res w hif hn hex hr h
 
+/-- A write of owned bytes, plain or exclusive, from any reservation state
+(Rocq `resv_any`). -/
+theorem uwk_mwrA (X : Type) (D : UFoot) (orc : UOrc) (s : UWSt) (n vasize : Nat)
+    (req : Mem_write_request n vasize Arch.pa Arch.translation Arch.arch_ak)
+    (k : Result (Option Bool) Arch.abort → SailM X)
+    (res : Option (X × UWSt × UOrc)) (w : BitVec (8 * n))
+    (hn : n < 2 ^ 64) (hv : req.value = some w) (ho : bmOwned s.mm req.pa n = true)
+    (h : runRW D orc (UWSt.mk s.pin s.rs (bmWrite s.mm req.pa n w) false) (k (.Ok (some true))) = res) :
+    runRW D orc s (FreeM.impure (.ok (.memWrite n vasize req)) k) = res := by
+  rw [← h]; simp only [runRW, hn, hv, ho, ↓reduceIte]
+
+/-- `uwk_mwrA` at a plain write (the stepper's first choice; the fetch
+walker's twin lemmas mirror this shape and `uwk_mwrx`'s). -/
 theorem uwk_mwr (X : Type) (D : UFoot) (orc : UOrc) (s : UWSt) (n vasize : Nat)
     (req : Mem_write_request n vasize Arch.pa Arch.translation Arch.arch_ak)
     (k : Result (Option Bool) Arch.abort → SailM X)
     (res : Option (X × UWSt × UOrc)) (w : BitVec (8 * n))
     (hn : n < 2 ^ 64) (hv : req.value = some w) (ho : bmOwned s.mm req.pa n = true)
-    (hex : akExcl req.access_kind = false)
+    (_hex : akExcl req.access_kind = false)
     (h : runRW D orc (UWSt.mk s.pin s.rs (bmWrite s.mm req.pa n w) false) (k (.Ok (some true))) = res) :
-    runRW D orc s (FreeM.impure (.ok (.memWrite n vasize req)) k) = res := by
-  rw [← h]; simp only [runRW, hn, hv, ho, hex, Bool.false_eq_true, ↓reduceIte]
+    runRW D orc s (FreeM.impure (.ok (.memWrite n vasize req)) k) = res :=
+  uwk_mwrA X D orc s n vasize req k res w hn hv ho h
 
+/-- `uwk_mwrA` at an exclusive write whose walk took the reservation bit. -/
 theorem uwk_mwrx (X : Type) (D : UFoot) (orc : UOrc) (s : UWSt) (n vasize : Nat)
     (req : Mem_write_request n vasize Arch.pa Arch.translation Arch.arch_ak)
     (k : Result (Option Bool) Arch.abort → SailM X)
     (res : Option (X × UWSt × UOrc)) (w : BitVec (8 * n))
     (hn : n < 2 ^ 64) (hv : req.value = some w) (ho : bmOwned s.mm req.pa n = true)
-    (hex : akExcl req.access_kind = true) (hrv : s.rv = true)
+    (_hex : akExcl req.access_kind = true) (_hrv : s.rv = true)
     (h : runRW D orc (UWSt.mk s.pin s.rs (bmWrite s.mm req.pa n w) false) (k (.Ok (some true))) = res) :
-    runRW D orc s (FreeM.impure (.ok (.memWrite n vasize req)) k) = res := by
-  rw [← h]; simp only [runRW, hn, hv, ho, hex, hrv, ↓reduceIte]
+    runRW D orc s (FreeM.impure (.ok (.memWrite n vasize req)) k) = res :=
+  uwk_mwrA X D orc s n vasize req k res w hn hv ho h
 
 theorem uwk_choose (X : Type) (D : UFoot) (orc : UOrc) (s : UWSt) (p : Sail.Primitive)
     (k : p.reflect → SailM X) (res : Option (X × UWSt × UOrc))
@@ -695,8 +723,8 @@ partial def walkEvent (cx : Cfg) (X orc s m : Lean.Expr) : TacticM (Lean.Expr ×
   let lems : List Name :=
     if ofn.isConstOf ``Outcome.regRead then [``uwk_rr, ``uwk_rr_any]
     else if ofn.isConstOf ``Outcome.regWrite then [``uwk_rw]
-    else if ofn.isConstOf ``Outcome.memRead then [``uwk_mrd, ``uwk_mrdx]
-    else if ofn.isConstOf ``Outcome.memWrite then [``uwk_mwr, ``uwk_mwrx]
+    else if ofn.isConstOf ``Outcome.memRead then [``uwk_mrd, ``uwk_mrdx, ``uwk_mrdxA]
+    else if ofn.isConstOf ``Outcome.memWrite then [``uwk_mwr, ``uwk_mwrx, ``uwk_mwrA]
     else if ofn.isConstOf ``Outcome.choose then [``uwk_choose]
     else []
   for lem in lems do

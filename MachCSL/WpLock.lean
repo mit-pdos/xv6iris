@@ -1295,7 +1295,7 @@ theorem wp_s_amoswap_lock (cpu : CPU) (k : KCtx) (hsie : k.sie = false)
         iframe Hctx Hlocks
     · inext
       iintro HmConf HPC HnextPC ⟨Htrans, Hfrag, %old, HF, Hctx, Hlocks, Hpost⟩
-      ihave Htok := ctxTok_intro cpu curCtx none $$ [Hctx Hfrag]
+      ihave Htok := ctxTok_introB cpu curCtx none false $$ [Hctx Hfrag]
       case' _ => iframe
       ihave HT := transTok_intro cpu curTier k.root $$ [Htrans Htok]
       case' _ => iframe
@@ -1501,7 +1501,7 @@ theorem wp_s_amoswap_lock_gen (cpu : CPU) (k : KCtx) (hsie : k.sie = false)
         iframe Hctx Hlocks Hcred
     · inext
       iintro HmConf HPC HnextPC ⟨Htrans, Hfrag, %old, HF, Hctx, Hlocks, Hpost, Hcred⟩
-      ihave Htok := ctxTok_intro cpu curCtx none $$ [Hctx Hfrag]
+      ihave Htok := ctxTok_introB cpu curCtx none false $$ [Hctx Hfrag]
       case' _ => iframe
       ihave HT := transTok_intro cpu curTier k.root $$ [Htrans Htok]
       case' _ => iframe
@@ -1592,7 +1592,7 @@ theorem wp_s_sd_lkcpu_acquire (cpu : CPU) (k : KCtx) (hsie : k.sie = false)
     · inext
       iintro HmConf HPC HnextPC ⟨Htrans, Hfrag, HF, Hctx, Hhalf0⟩
       iapply HΦ $$ HmConf HPC HnextPC
-      ihave Htok := ctxTok_intro cpu curCtx none $$ [Hctx Hfrag]
+      ihave Htok := ctxTok_introB cpu curCtx none false $$ [Hctx Hfrag]
       case' _ => iframe
       ihave HT := transTok_intro cpu curTier k.root $$ [Htrans Htok]
       case' _ => iframe
@@ -1682,7 +1682,7 @@ theorem wp_s_sd_lkcpu_acquire_gen (cpu : CPU) (k : KCtx) (hsie : k.sie = false)
     · inext
       iintro HmConf HPC HnextPC ⟨Htrans, Hfrag, HF, Hctx, Hhalf0, Hcred⟩
       iapply HΦ $$ HmConf HPC HnextPC
-      ihave Htok := ctxTok_intro cpu curCtx none $$ [Hctx Hfrag]
+      ihave Htok := ctxTok_introB cpu curCtx none false $$ [Hctx Hfrag]
       case' _ => iframe
       ihave HT := transTok_intro cpu curTier k.root $$ [Htrans Htok]
       case' _ => iframe
@@ -1766,7 +1766,7 @@ theorem wp_s_sd_zero_lkcpu_release (cpu : CPU) (k : KCtx) (hsie : k.sie = false)
     · inext
       iintro HmConf HPC HnextPC ⟨Htrans, Hfrag, HF, Hctx, Hhalf0⟩
       iapply HΦ $$ HmConf HPC HnextPC
-      ihave Htok := ctxTok_intro cpu curCtx none $$ [Hctx Hfrag]
+      ihave Htok := ctxTok_introB cpu curCtx none false $$ [Hctx Hfrag]
       case' _ => iframe
       ihave HT := transTok_intro cpu curTier k.root $$ [Htrans Htok]
       case' _ => iframe
@@ -1856,7 +1856,7 @@ theorem wp_s_sd_zero_lkcpu_release_gen (cpu : CPU) (k : KCtx) (hsie : k.sie = fa
     · inext
       iintro HmConf HPC HnextPC ⟨Htrans, Hfrag, HF, Hctx, Hhalf0, Hcred⟩
       iapply HΦ $$ HmConf HPC HnextPC
-      ihave Htok := ctxTok_intro cpu curCtx none $$ [Hctx Hfrag]
+      ihave Htok := ctxTok_introB cpu curCtx none false $$ [Hctx Hfrag]
       case' _ => iframe
       ihave HT := transTok_intro cpu curTier k.root $$ [Htrans Htok]
       case' _ => iframe
@@ -1964,7 +1964,7 @@ theorem wp_s_sw_zero_release_hook (cpu : CPU) (k : KCtx) (hsie : k.sie = false)
       ipureintro; exact hmem
     · inext
       iintro HmConf HPC HnextPC ⟨Htrans, Hfrag, HF, Hctx, Hlocks, %hmem⟩
-      ihave Htok := ctxTok_intro cpu curCtx none $$ [Hctx Hfrag]
+      ihave Htok := ctxTok_introB cpu curCtx none false $$ [Hctx Hfrag]
       case' _ => iframe
       ihave HT := transTok_intro cpu curTier k.root $$ [Htrans Htok]
       case' _ => iframe
@@ -2100,7 +2100,7 @@ theorem wp_s_sw_zero_release_gen (cpu : CPU) (k : KCtx) (hsie : k.sie = false)
       ipureintro; exact hmem
     · inext
       iintro HmConf HPC HnextPC ⟨Htrans, Hfrag, HF, Hctx, Hlocks, %hmem, Hcred⟩
-      ihave Htok := ctxTok_intro cpu curCtx none $$ [Hctx Hfrag]
+      ihave Htok := ctxTok_introB cpu curCtx none false $$ [Hctx Hfrag]
       case' _ => iframe
       ihave HT := transTok_intro cpu curTier k.root $$ [Htrans Htok]
       case' _ => iframe
@@ -2230,7 +2230,7 @@ theorem wp_s_sw_zero_release_cancel (cpu : CPU) (k : KCtx) (hsie : k.sie = false
         iexact Hhc
     · inext
       iintro HmConf HPC HnextPC ⟨Htrans, Hfrag, HF, Hctx, Hlocks, %hmem, Hword, Hcpu, HOut⟩
-      ihave Htok := ctxTok_intro cpu curCtx none $$ [Hctx Hfrag]
+      ihave Htok := ctxTok_introB cpu curCtx none false $$ [Hctx Hfrag]
       case' _ => iframe
       ihave HT := transTok_intro cpu curTier k.root $$ [Htrans Htok]
       case' _ => iframe
@@ -2581,7 +2581,7 @@ theorem wp_s_sd_zero_lkcpu_release_refute (cpu : CPU) (k : KCtx) (hsie : k.sie =
     · inext
       iintro HmConf HPC HnextPC ⟨Htrans, Hfrag, HF, Hctx, Hhalf0⟩
       iapply HΦ $$ HmConf HPC HnextPC
-      ihave Htok := ctxTok_intro cpu curCtx none $$ [Hctx Hfrag]
+      ihave Htok := ctxTok_introB cpu curCtx none false $$ [Hctx Hfrag]
       case' _ => iframe
       ihave HT := transTok_intro cpu curTier k.root $$ [Htrans Htok]
       case' _ => iframe
@@ -2700,7 +2700,7 @@ theorem wp_s_sw_zero_release_refute (cpu : CPU) (k : KCtx) (hsie : k.sie = false
       ipureintro; exact hmem
     · inext
       iintro HmConf HPC HnextPC ⟨Htrans, Hfrag, HF, Hctx, Hlocks, %hmem⟩
-      ihave Htok := ctxTok_intro cpu curCtx none $$ [Hctx Hfrag]
+      ihave Htok := ctxTok_introB cpu curCtx none false $$ [Hctx Hfrag]
       case' _ => iframe
       ihave HT := transTok_intro cpu curTier k.root $$ [Htrans Htok]
       case' _ => iframe

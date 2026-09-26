@@ -258,7 +258,7 @@ theorem wp_s_sw_free [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU) (k : KCt
       · iexact Hkey
     · inext
       iintro HmConf HPC HnextPC ⟨Htrans, Hfrag, HF, Hctx, Hword⟩
-      ihave Htok := ctxTok_intro cpu' curCtx none $$ [Hctx Hfrag]
+      ihave Htok := ctxTok_introB cpu' curCtx none false $$ [Hctx Hfrag]
       case' _ => iframe
       ihave HT := transTok_intro cpu' curTier k.root $$ [Htrans Htok]
       case' _ => iframe

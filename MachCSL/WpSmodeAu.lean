@@ -109,7 +109,7 @@ theorem swp_checked_mem_write_store4_S_au (cpu : CPU) (dq : DFrac) (c : MConf) (
     (hok : SConfPhys (GF := GF) c sie)
     (pa : BitVec 64) (data : BitVec (8 * 4)) (hram : inRam pa 4) (hal : pa.toNat % 4 = 0) (r : Option Resv) (Ψ : IProp GF)
     (Φ : Result Bool (physaddr × ExceptionType) → IProp GF) :
-    confCells cpu dq Privilege.Supervisor c ∗ resvFrag cpu r false ∗ writeAU cpu pa 4 data Ψ ∗
+    confCells cpu dq Privilege.Supervisor c ∗ resvFragAny cpu r ∗ writeAU cpu pa 4 data Ψ ∗
     ▷ (confCells cpu dq Privilege.Supervisor c -∗ resvFrag cpu none false -∗ Ψ -∗ Φ (.Ok true))
     ⊢ swp cpu (checked_mem_write (physaddr.Physaddr pa) 4 data
         (MemoryAccessType.Store mem_payload.Data) page_based_mem_type.PBMT_PMA
@@ -135,7 +135,7 @@ theorem swp_checked_mem_write_store8_S_au (cpu : CPU) (dq : DFrac) (c : MConf) (
     (hok : SConfPhys (GF := GF) c sie)
     (pa : BitVec 64) (data : BitVec (8 * 8)) (hram : inRam pa 8) (hal : pa.toNat % 8 = 0) (r : Option Resv) (Ψ : IProp GF)
     (Φ : Result Bool (physaddr × ExceptionType) → IProp GF) :
-    confCells cpu dq Privilege.Supervisor c ∗ resvFrag cpu r false ∗ writeAU cpu pa 8 data Ψ ∗
+    confCells cpu dq Privilege.Supervisor c ∗ resvFragAny cpu r ∗ writeAU cpu pa 8 data Ψ ∗
     ▷ (confCells cpu dq Privilege.Supervisor c -∗ resvFrag cpu none false -∗ Ψ -∗ Φ (.Ok true))
     ⊢ swp cpu (checked_mem_write (physaddr.Physaddr pa) 8 data
         (MemoryAccessType.Store mem_payload.Data) page_based_mem_type.PBMT_PMA
@@ -165,7 +165,7 @@ theorem swp_checked_mem_read_amo4_S (cpu : CPU) (dq : DFrac) (c : MConf) (sie : 
     (hok : SConfPhys (GF := GF) c sie)
     (pa : BitVec 64) (hram : inRam pa 4) (hal : pa.toNat % 4 = 0) (r : Option Resv) (Ψ : BitVec (8 * 4) → IProp GF)
     (Φ : Result ((BitVec (8 * 4)) × Unit) (physaddr × ExceptionType) → IProp GF) :
-    confCells cpu dq Privilege.Supervisor c ∗ resvFrag cpu r false ∗
+    confCells cpu dq Privilege.Supervisor c ∗ resvFragAny cpu r ∗
     exclReadAU pa 4 (fun w => iprop(resvFrag cpu (some (snapOf pa 4 w)) true -∗ Ψ w)) ∗
     ▷ (confCells cpu dq Privilege.Supervisor c -∗ ∀ w, Ψ w -∗ Φ (.Ok (w, ())))
     ⊢ swp cpu (checked_mem_read amoswapAq page_based_mem_type.PBMT_PMA

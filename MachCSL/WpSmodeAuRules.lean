@@ -134,7 +134,7 @@ theorem swp_checked_mem_write_store2_S_au (cpu : CPU) (dq : DFrac) (c : MConf) (
     (pa : BitVec 64) (data : BitVec (8 * 2)) (hram : inRam pa 2) (hal : pa.toNat % 2 = 0)
     (r : Option Resv) (Ψ : IProp GF)
     (Φ : Result Bool (physaddr × ExceptionType) → IProp GF) :
-    confCells cpu dq Privilege.Supervisor c ∗ resvFrag cpu r false ∗ writeAU cpu pa 2 data Ψ ∗
+    confCells cpu dq Privilege.Supervisor c ∗ resvFragAny cpu r ∗ writeAU cpu pa 2 data Ψ ∗
     ▷ (confCells cpu dq Privilege.Supervisor c -∗ resvFrag cpu none false -∗ Ψ -∗ Φ (.Ok true))
     ⊢ swp cpu (checked_mem_write (physaddr.Physaddr pa) 2 data
         (MemoryAccessType.Store mem_payload.Data) page_based_mem_type.PBMT_PMA
@@ -543,7 +543,7 @@ theorem wp_s_sb_au [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU) (k : KCtx)
       iframe Hctx HΨ
     · inext
       iintro HmConf HPC HnextPC ⟨Htrans, Hfrag, HF, Hctx, HΨ⟩
-      ihave Htok := ctxTok_intro cpu curCtx none $$ [Hctx Hfrag]
+      ihave Htok := ctxTok_introB cpu curCtx none false $$ [Hctx Hfrag]
       case' _ => iframe
       ihave HT := transTok_intro cpu curTier k.root $$ [Htrans Htok]
       case' _ => iframe
@@ -600,7 +600,7 @@ theorem wp_s_sh_au [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU) (k : KCtx)
       iframe Hctx HΨ
     · inext
       iintro HmConf HPC HnextPC ⟨Htrans, Hfrag, HF, Hctx, HΨ⟩
-      ihave Htok := ctxTok_intro cpu curCtx none $$ [Hctx Hfrag]
+      ihave Htok := ctxTok_introB cpu curCtx none false $$ [Hctx Hfrag]
       case' _ => iframe
       ihave HT := transTok_intro cpu curTier k.root $$ [Htrans Htok]
       case' _ => iframe
@@ -657,7 +657,7 @@ theorem wp_s_sw_au [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU) (k : KCtx)
       iframe Hctx HΨ
     · inext
       iintro HmConf HPC HnextPC ⟨Htrans, Hfrag, HF, Hctx, HΨ⟩
-      ihave Htok := ctxTok_intro cpu curCtx none $$ [Hctx Hfrag]
+      ihave Htok := ctxTok_introB cpu curCtx none false $$ [Hctx Hfrag]
       case' _ => iframe
       ihave HT := transTok_intro cpu curTier k.root $$ [Htrans Htok]
       case' _ => iframe
@@ -714,7 +714,7 @@ theorem wp_s_sd_au [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU) (k : KCtx)
       iframe Hctx HΨ
     · inext
       iintro HmConf HPC HnextPC ⟨Htrans, Hfrag, HF, Hctx, HΨ⟩
-      ihave Htok := ctxTok_intro cpu curCtx none $$ [Hctx Hfrag]
+      ihave Htok := ctxTok_introB cpu curCtx none false $$ [Hctx Hfrag]
       case' _ => iframe
       ihave HT := transTok_intro cpu curTier k.root $$ [Htrans Htok]
       case' _ => iframe

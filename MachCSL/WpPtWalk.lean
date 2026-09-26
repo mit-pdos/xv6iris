@@ -78,7 +78,7 @@ theorem swp_checked_mem_read_pte8_excl_S (cpu : CPU) (dq : DFrac) (c : MConf) (s
     (hok : SConfPhys (GF := GF) c sie)
     (pa : BitVec 64) (hram : inRam pa 8) (hal : pa.toNat % 8 = 0) (r : Option Resv) (Ψ : BitVec (8 * 8) → IProp GF)
     (Φ : Result ((BitVec (8 * 8)) × Unit) (physaddr × ExceptionType) → IProp GF) :
-    confCells cpu dq Privilege.Supervisor c ∗ resvFrag cpu r false ∗
+    confCells cpu dq Privilege.Supervisor c ∗ resvFragAny cpu r ∗
     exclReadAU pa 8 (fun w => iprop(resvFrag cpu (some (snapOf pa 8 w)) false -∗ Ψ w)) ∗
     ▷ (confCells cpu dq Privilege.Supervisor c -∗ ∀ w, Ψ w -∗ Φ (.Ok (w, ())))
     ⊢ swp cpu (checked_mem_read (MemoryAccessType.Load mem_payload.PageTableEntry) page_based_mem_type.PBMT_PMA
@@ -105,7 +105,7 @@ theorem swp_read_pte_exclusive (cpu : CPU) (dq : DFrac) (c : MConf) (sie : Bool)
     (hok : SConfPhys (GF := GF) c sie)
     (pa : BitVec 64) (hram : inRam pa 8) (hal : pa.toNat % 8 = 0) (r : Option Resv) (Ψ : BitVec (8 * 8) → IProp GF)
     (Φ : Result (BitVec (8 * 8)) (physaddr × ExceptionType) → IProp GF) :
-    confCells cpu dq Privilege.Supervisor c ∗ resvFrag cpu r false ∗
+    confCells cpu dq Privilege.Supervisor c ∗ resvFragAny cpu r ∗
     exclReadAU pa 8 (fun w => iprop(resvFrag cpu (some (snapOf pa 8 w)) false -∗ Ψ w)) ∗
     ▷ (confCells cpu dq Privilege.Supervisor c -∗ ∀ w, Ψ w -∗ Φ (.Ok w))
     ⊢ swp cpu (read_pte_exclusive (physaddr.Physaddr pa) 8) Φ := by
@@ -478,9 +478,9 @@ theorem swp_update_and_write_pte_kpt [CurCtx] (cpu : CPU) (dq : DFrac) (c : MCon
     (addr : BitVec 64) (ppn : BitVec 44) (perm : KPerm) (a d a0 d0 : BitVec 1)
     (hmem : (addr, kLeaf ppn perm a0 d0) ∈ t.entries 2) (hperm : perm.allows acc = true) (u : Unit)
     (r0 : Option Resv) (Φ : Result (Option (BitVec 64) × Unit) (PTW_Error × Unit) → IProp GF) :
-    confCells cpu dq Privilege.Supervisor c ∗ kptOn t M ∗ ownCtx cpu curCtx ∗ resvFrag cpu r0 false ∗
+    confCells cpu dq Privilege.Supervisor c ∗ kptOn t M ∗ ownCtx cpu curCtx ∗ resvFragAny cpu r0 ∗
     (confCells cpu dq Privilege.Supervisor c -∗ ownCtx cpu curCtx -∗
-        ∀ (r : Option Resv), resvFrag cpu r false -∗
+        ∀ (r : Option Resv), resvFragAny cpu r -∗
         ∀ (p : Option (BitVec 64)), ⌜pteOptVariant ppn perm p⌝ -∗ Φ (.Ok (p, u)))
     ⊢ swp cpu (update_and_write_pte39 vpn (physaddr.Physaddr addr) (kLeaf ppn perm a d) 0 acc
         Privilege.Supervisor mxr do_sum u) Φ := by
@@ -523,6 +523,7 @@ theorem swp_update_and_write_pte_kpt [CurCtx] (cpu : CPU) (dq : DFrac) (c : MCon
     cases hupd2 : update_PTE_Bits (kLeaf ppn perm a1 d1) acc with
     | none =>
       swp_run 40
+      ihave Hfrag := resvFragAny_of cpu (some (snapOf addr 8 (kLeaf ppn perm a1 d1))) false $$ Hfrag
       iapply HΦ $$ HmConf Hctx %(some (snapOf addr 8 (kLeaf ppn perm a1 d1))) Hfrag %(some (kLeaf ppn perm a1 d1))
       ipureintro; exact ⟨a1, d1, rfl⟩
     | some p2 =>
@@ -542,6 +543,7 @@ theorem swp_update_and_write_pte_kpt [CurCtx] (cpu : CPU) (dq : DFrac) (c : MCon
       inext
       iintro HmConf Hfrag _
       swp_run 40
+      ihave Hfrag := resvFragAny_of cpu none false $$ Hfrag
       iapply HΦ $$ HmConf Hctx %none Hfrag %(some (kLeaf ppn perm a2 d2))
       ipureintro; exact ⟨a2, d2, rfl⟩
 
@@ -727,10 +729,10 @@ theorem swp_translate_TLB_hit_kpt [CurCtx] (cpu : CPU) (dq : DFrac) (c : MConf) 
     (addr : BitVec 64) (ppn : BitVec 44) (perm : KPerm) (hmaps : t.maps vpn addr ppn perm)
     (hperm : perm.allows acc = true) (u : Unit)
     (r0 : Option Resv) (Φ : Result (BitVec 44 × page_based_mem_type × Unit) (PTW_Error × Unit) → IProp GF) :
-    confCells cpu dq Privilege.Supervisor c ∗ kptOn t M ∗ ownCtx cpu curCtx ∗ resvFrag cpu r0 false ∗
+    confCells cpu dq Privilege.Supervisor c ∗ kptOn t M ∗ ownCtx cpu curCtx ∗ resvFragAny cpu r0 ∗
     Register.tlb ↦ᵣ[cpu] tlb ∗
     (confCells cpu dq Privilege.Supervisor c -∗ ownCtx cpu curCtx -∗
-        ∀ (r : Option Resv), resvFrag cpu r false -∗
+        ∀ (r : Option Resv), resvFragAny cpu r -∗
         ∀ (tlb' : Tlb), Register.tlb ↦ᵣ[cpu] tlb' -∗ ⌜tlbOk t tlb'⌝ -∗
         Φ (.Ok (ppn, page_based_mem_type.PBMT_PMA, u)))
     ⊢ swp cpu (translate_TLB_hit39 0#16 vpn acc Privilege.Supervisor mxr do_sum u i ent) Φ := by
@@ -776,10 +778,10 @@ theorem swp_translate_TLB_miss_kpt [CurCtx] (cpu : CPU) (dq : DFrac) (c : MConf)
     (addr : BitVec 64) (ppn : BitVec 44) (perm : KPerm) (hmaps : t.maps vpn addr ppn perm)
     (hperm : perm.allows acc = true) (u : Unit)
     (r0 : Option Resv) (Φ : Result (BitVec 44 × page_based_mem_type × Unit) (PTW_Error × Unit) → IProp GF) :
-    confCells cpu dq Privilege.Supervisor c ∗ kptOn t M ∗ ownCtx cpu curCtx ∗ resvFrag cpu r0 false ∗
+    confCells cpu dq Privilege.Supervisor c ∗ kptOn t M ∗ ownCtx cpu curCtx ∗ resvFragAny cpu r0 ∗
     Register.tlb ↦ᵣ[cpu] tlb ∗
     (confCells cpu dq Privilege.Supervisor c -∗ ownCtx cpu curCtx -∗
-        ∀ (r : Option Resv), resvFrag cpu r false -∗
+        ∀ (r : Option Resv), resvFragAny cpu r -∗
         ∀ (tlb' : Tlb), Register.tlb ↦ᵣ[cpu] tlb' -∗ ⌜tlbOk t tlb'⌝ -∗
         Φ (.Ok (ppn, page_based_mem_type.PBMT_PMA, u)))
     ⊢ swp cpu (translate_TLB_miss39 0#16 t.base vpn acc Privilege.Supervisor mxr do_sum u) Φ := by
@@ -879,10 +881,10 @@ theorem swp_translateAddr_kpt [CurCtx] (cpu : CPU) (dq : DFrac) (c : MConf) (sie
     (addr : BitVec 64) (ppn : BitVec 44) (perm : KPerm) (hmaps : t.maps (vpnOf va) addr ppn perm)
     (hperm : perm.allows acc = true)
     (r0 : Option Resv) (Φ : Result (physaddr × page_based_mem_type × Unit) (ExceptionType × Unit) → IProp GF) :
-    confCells cpu dq Privilege.Supervisor c ∗ kptOn t M ∗ ownCtx cpu curCtx ∗ resvFrag cpu r0 false ∗
+    confCells cpu dq Privilege.Supervisor c ∗ kptOn t M ∗ ownCtx cpu curCtx ∗ resvFragAny cpu r0 ∗
     Register.tlb ↦ᵣ[cpu] tlb ∗
     (confCells cpu dq Privilege.Supervisor c -∗ ownCtx cpu curCtx -∗
-        ∀ (r : Option Resv), resvFrag cpu r false -∗
+        ∀ (r : Option Resv), resvFragAny cpu r -∗
         ∀ (tlb' : Tlb), Register.tlb ↦ᵣ[cpu] tlb' -∗ ⌜tlbOk t tlb'⌝ -∗
         Φ (.Ok (physaddr.Physaddr (BitVec.setWidth 64 (ppn ++ BitVec.extractLsb' 0 12 va)),
           page_based_mem_type.PBMT_PMA, ())))

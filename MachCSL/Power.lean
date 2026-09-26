@@ -277,8 +277,10 @@ theorem ctxTok_boot_elem (E : EraGS) (c : CPU) :
     (∃ ξ : CtxId, ownCtxAt E c ξ) ∗ resvFragAt E c none false ⊢@{IProp GF} ∃ ξ : CtxId, ctxTokAt E c ξ := by
   iintro ⟨⟨%ξ, H⟩, Hf⟩
   iexists ξ
-  unfold ctxTokAt
-  iframe H Hf
+  unfold ctxTokAt resvFragAnyAt
+  iframe H
+  iexists none, false
+  iexact Hf
 
 /-- Every byte history of the memory `m`, fully owned, in era `E`'s heap. -/
 def memCells (E : EraGS) (m : MemF Hist) : IProp GF := iprop%

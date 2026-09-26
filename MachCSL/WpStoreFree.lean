@@ -36,7 +36,7 @@ theorem swp_checked_mem_write_store1_S_au (cpu : CPU) (dq : DFrac) (c : MConf) (
     (pa : BitVec 64) (data : BitVec (8 * 1)) (hram : inRam pa 1) (hal : pa.toNat % 1 = 0)
     (r : Option Resv) (Ψ : IProp GF)
     (Φ : Result Bool (physaddr × ExceptionType) → IProp GF) :
-    confCells cpu dq Privilege.Supervisor c ∗ resvFrag cpu r false ∗ writeAU cpu pa 1 data Ψ ∗
+    confCells cpu dq Privilege.Supervisor c ∗ resvFragAny cpu r ∗ writeAU cpu pa 1 data Ψ ∗
     ▷ (confCells cpu dq Privilege.Supervisor c -∗ resvFrag cpu none false -∗ Ψ -∗ Φ (.Ok true))
     ⊢ swp cpu (checked_mem_write (physaddr.Physaddr pa) 1 data
         (MemoryAccessType.Store mem_payload.Data) page_based_mem_type.PBMT_PMA
@@ -228,7 +228,7 @@ theorem wp_s_sb_free [CurCtx] [KernelGeom] [KernelImage GF] (cpu : CPU) (k : KCt
       iexact Hbyte
     · inext
       iintro HmConf HPC HnextPC ⟨Htrans, Hfrag, HF, Hctx, Hword⟩
-      ihave Htok := ctxTok_intro cpu' curCtx none $$ [Hctx Hfrag]
+      ihave Htok := ctxTok_introB cpu' curCtx none false $$ [Hctx Hfrag]
       case' _ => iframe
       ihave HT := transTok_intro cpu' curTier k.root $$ [Htrans Htok]
       case' _ => iframe

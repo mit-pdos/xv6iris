@@ -137,14 +137,11 @@ theorem uxc_runRW_ro {X : Type} (Lr : List Register) (D : UFoot) (hD : ∀ r ∈
           · simp only [h2, ↓reduceIte] at h ⊢
             by_cases h3 : akExcl req.access_kind = true
             · simp only [h3, ↓reduceIte] at h ⊢
-              by_cases h4 : akAcq req.access_kind = true
-              · simp only [h4, ↓reduceIte, reduceCtorEq] at h
-              · simp only [h4, Bool.false_eq_true, ↓reduceIte] at h ⊢
-                cases hw : bmRead s.mm req.pa n with
-                | none => simp only [hw, reduceCtorEq] at h
-                | some w =>
-                  simp only [hw] at h ⊢
-                  exact ih _ _ _ { s₀ with mm := s.mm, rv := true } { s with rv := true } _ _ hf rfl rfl h
+              cases hw : bmRead s.mm req.pa n with
+              | none => simp only [hw, reduceCtorEq] at h
+              | some w =>
+                simp only [hw] at h ⊢
+                exact ih _ _ _ { s₀ with mm := s.mm, rv := true } { s with rv := true } _ _ hf rfl rfl h
             · simp only [h3, Bool.false_eq_true, ↓reduceIte] at h ⊢
               cases hw : bmRead s.mm req.pa n with
               | none => simp only [hw, reduceCtorEq] at h
@@ -154,7 +151,7 @@ theorem uxc_runRW_ro {X : Type} (Lr : List Register) (D : UFoot) (hD : ∀ r ∈
           · simp only [h2, ↓reduceIte, reduceCtorEq] at h
       | memWrite n vs req =>
         simp only [runRW] at h ⊢
-        rw [hm, hr] at h
+        rw [hm] at h
         by_cases h2 : n < 2 ^ 64
         · simp only [h2, ↓reduceIte] at h ⊢
           cases hv : req.value with
@@ -163,16 +160,8 @@ theorem uxc_runRW_ro {X : Type} (Lr : List Register) (D : UFoot) (hD : ∀ r ∈
             simp only [hv] at h ⊢
             by_cases h3 : bmOwned s.mm req.pa n = true
             · simp only [h3, ↓reduceIte] at h ⊢
-              by_cases h4 : akExcl req.access_kind = true
-              · simp only [h4, ↓reduceIte] at h ⊢
-                by_cases h5 : s.rv = true
-                · simp only [h5, ↓reduceIte] at h ⊢
-                  exact ih _ _ _ { s₀ with mm := bmWrite s.mm req.pa n w', rv := false }
-                    { s with mm := bmWrite s.mm req.pa n w', rv := false } _ _ hf rfl rfl h
-                · simp only [h5, Bool.false_eq_true, ↓reduceIte, reduceCtorEq] at h
-              · simp only [h4, Bool.false_eq_true, ↓reduceIte] at h ⊢
-                exact ih _ _ _ { s₀ with mm := bmWrite s.mm req.pa n w', rv := false }
-                  { s with mm := bmWrite s.mm req.pa n w', rv := false } _ _ hf rfl rfl h
+              exact ih _ _ _ { s₀ with mm := bmWrite s.mm req.pa n w', rv := false }
+                { s with mm := bmWrite s.mm req.pa n w', rv := false } _ _ hf rfl rfl h
             · simp only [h3, Bool.false_eq_true, ↓reduceIte, reduceCtorEq] at h
         · simp only [h2, ↓reduceIte, reduceCtorEq] at h
       | barrier _ => exact ih _ _ _ _ _ _ _ hf hm hr h
