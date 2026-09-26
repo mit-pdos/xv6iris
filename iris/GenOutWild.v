@@ -39,6 +39,7 @@ Require Import LineModelLinks.
 Require Import GenOutPure.
 Require Import EchoOut.          (* [ch_E], [seg_of], [echoed] *)
 Require Import GenOutHist.
+Require Import ConsoleInv.       (* [cons_chain], [cons_placed]: the ring's facts *)
 From stdpp Require Import ssreflect.
 Local Open Scope nat_scope.
 
@@ -398,5 +399,101 @@ Section gen_out_wild.
     split_and!; [exact Harm | exact Hdlall | exact HEI | exact Hw |].
     rewrite /lm_cs_len_ok decide_True in Hcsl; [exact Hcsl |].
     split; [exact Hw | rewrite HEI; exact Hr].
+  Qed.
+  (* ================================================================== *)
+  (*  S5a.  THE SECCOMP NEWLINE'S TRACE, AND WHAT A LATER BYTE'S IS       *)
+  (* ================================================================== *)
+
+  (* AT A READ: the delivered list's LAST trace names the whole delivered
+     input.  The delivered entries are echoed log entries (their era, their
+     shape), consecutive ones extend ([read_ok]'s [hist_chain]), so every
+     earlier trace's segment is a prefix of the last one's, and [E_index]
+     puts entry [j]'s byte at input position [j]. *)
+  Lemma lm_rd_last_hist (k : nat) (pops : list log_entry)
+      (D : list (list mobs * bv 8)) :
+    D `prefix_of` echoed pops -> E_index (seg_of (echoed pops)) ->
+    (forall e, e ∈ pops -> obs_boots (le_hist e) = k) ->
+    (forall e, e ∈ pops -> trace_shape (le_hist e) true) ->
+    hist_chain D -> D <> [] ->
+    exists (h0 : list mobs) (c0 : bv 8),
+      list_basics.last D = Some (h0, c0) /\ ins (open_seg h0) = snd <$> D
+      /\ obs_boots h0 = k /\ trace_shape h0 true.
+  Proof using.
+    intros HD Hidx Hbt Hsh Hch Hne.
+    destruct (list_basics.last D) as [[h0 c0] |] eqn:Hl; last first.
+    { exfalso. apply Hne. by apply last_None. }
+    assert (Hlk : D !! (length D - 1)%nat = Some (h0, c0)).
+    { rewrite -Hl last_lookup. f_equal. destruct D; cbn; [done | lia]. }
+    assert (Hof : forall x, x ∈ D -> obs_boots x.1 = k /\ trace_shape x.1 true).
+    { intros x Hx.
+      destruct (echoed_elem_inv pops x (elem_of_prefix _ _ _ Hx HD)) as (e & He & _ & <-).
+      split; [exact (Hbt e He) | exact (Hsh e He)]. }
+    destruct (Hof (h0, c0) (elem_of_list_lookup_2 _ _ _ Hlk)) as [Hb0 Hs0].
+    assert (HidxD : E_index (seg_of D)).
+    { intros j x Hx. apply Hidx.
+      apply (prefix_lookup_Some _ _ _ _ Hx).
+      destruct HD as [z ->]. rewrite seg_of_app. by eexists. }
+    assert (Hpre : forall j x, seg_of D !! j = Some x -> x.1 `prefix_of` open_seg h0).
+    { intros j x Hx. rewrite /seg_of list_lookup_fmap in Hx.
+      destruct (D !! j) as [[hj cj] |] eqn:Hj; [| discriminate Hx].
+      injection Hx as <-. cbn [fst].
+      pose proof (lookup_lt_Some _ _ _ Hj) as Hjl.
+      destruct (decide (j = length D - 1)%nat) as [-> | Hjne].
+      { rewrite Hlk in Hj. injection Hj as -> ->. done. }
+      destruct (hist_chain_lt D j (length D - 1) hj cj h0 c0 Hch ltac:(lia) Hj Hlk)
+        as [Hp _].
+      destruct (Hof (hj, cj) (elem_of_list_lookup_2 _ _ _ Hj)) as [Hbj _].
+      apply (open_seg_prefix_of_boots hj h0 Hp); [cbn [fst] in Hbj; rewrite Hbj Hb0; reflexivity | exact Hs0]. }
+    assert (Hlen : length (ins (open_seg h0)) = length D).
+    { assert (Hx : seg_of D !! (length D - 1)%nat = Some (open_seg h0, c0))
+        by (rewrite /seg_of list_lookup_fmap Hlk; reflexivity).
+      destruct (HidxD _ _ Hx) as [_ Hl']. cbn [fst] in Hl'.
+      destruct D; cbn in *; [done | lia]. }
+    pose proof (E_bytes_of_hist (seg_of D) (open_seg h0) HidxD Hpre
+                  ltac:(rewrite seg_of_length; lia)) as Hby.
+    rewrite seg_of_snd seg_of_length take_ge in Hby; [| lia].
+    exists h0, c0. split_and!; [reflexivity | by rewrite Hby | exact Hb0 | exact Hs0].
+  Qed.
+
+  (* THE CHAIN LEMMA (seccomp design 10.12): a byte the ring stored AFTER
+     the seccomp newline (position [n0], trace [h0], whose era input [I0]
+     ends in a complete wild line) has a push trace that strictly extends
+     the newline's; in the newline's own era that trace's input has a byte
+     after [I0], so D4 ([lm_disc_wild_last]) says it is not disciplined. *)
+  Lemma lm_placed_wild_undisc (sl : list (list mobs * bv 8)) (n0 lo d : nat)
+      (hs : list (list mobs)) (j : nat) (h0 : list mobs) (c0 : bv 8)
+      (I0 : list (bv 8)) :
+    cons_chain sl -> sl !! n0 = Some (h0, c0) -> (n0 < lo)%nat ->
+    cons_placed sl lo d hs -> (j < d)%nat ->
+    I0 `prefix_of` ins (open_seg h0) ->
+    I0 <> [] -> rest_of I0 = [] -> lm_wild (lm_line_at M I0) ->
+    trace_shape (hs !!! j) true -> obs_boots (hs !!! j) = obs_boots h0 ->
+    ~ lm_disc M (hs !!! j).
+  Proof using.
+    intros Hch Hn0 Hlo [_ Hpl] Hj HI0 Hne Hr Hw Hsh Hbt Hd.
+    destruct (Hpl j Hj) as (p & h & b & Hp & Hhs & [g Hg] & Hsl).
+    rewrite (list_lookup_total_correct _ _ _ Hhs) in Hsh Hbt Hd.
+    destruct (Hch n0 p h0 h c0 b Hn0 Hsl ltac:(lia)) as [[z Hz] Hlt].
+    subst h.
+    assert (Hg0 : h0 `prefix_of` g).
+    { destruct z as [| e z _] using rev_ind.
+      - rewrite app_nil_r in Hz. subst h0. lia.
+      - rewrite app_assoc in Hz. apply app_inj_tail in Hz as [-> _]. by eexists. }
+    assert (Hshg : trace_shape g true).
+    { revert Hsh. rewrite /trace_shape foldl_app.
+      destruct (foldl obs_step (Some false) g) as [[|] |]; cbn; done. }
+    assert (Hbg : obs_boots g = obs_boots h0).
+    { rewrite obs_boots_app in Hbt. cbn in Hbt. lia. }
+    pose proof (open_seg_prefix_of_boots h0 g Hg0 (eq_sym Hbg) Hshg) as Hseg.
+    assert (Hins : ins (open_seg (g ++ [ObsUartIn Uart0 b])) = ins (open_seg g) ++ [b]).
+    { rewrite open_seg_io; [| by repeat constructor]. by rewrite ins_app ins_in. }
+    assert (HIg : I0 `prefix_of` ins (open_seg g)).
+    { etrans; [exact HI0 | exact (ins_prefix_of _ _ Hseg)]. }
+    destruct HIg as [u Hu].
+    set (c := match u with [] => b | x :: _ => x end).
+    apply (lm_disc_wild_last (g ++ [ObsUartIn Uart0 b]) I0 c Hd Hsh Hne Hr Hw).
+    rewrite Hins Hu. destruct u as [| x u]; cbn [c].
+    - rewrite app_nil_r. done.
+    - exists (u ++ [b]). by rewrite -!app_assoc.
   Qed.
 End gen_out_wild.

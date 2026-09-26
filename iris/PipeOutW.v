@@ -126,12 +126,21 @@ Section pipes_wild_v.
        ∗ ⌜(0 < nlines I0)%nat /\ rest_of I0 = []⌝
        ∗ cs_frozen_at v (nlines I0 - 1)%nat)%I.
 
-  (* ...AT ITS OWN LINE: the input the read completed, named *)
+  (* ...AT ITS OWN LINE: the input the read completed, named -- and the
+     seccomp NEWLINE's push trace [h0] (the delivered list's last entry,
+     [(h0, wl_nl)]), whose era input IS [I0] (seccomp design 10.12, lane
+     S5a): what lets the wild shape's read refute a byte the ring stored
+     after it ([GenOutWild.lm_placed_wild_undisc]) *)
   Definition secc_tok_at (k : nat) (I0 : list (bv 8)) : iProp Σ :=
     (∃ v : era_pins,
        PIN k v ∗ mono_nat_lb_own (ep_secc v) 1 ∗ inp_lb v I0
        ∗ ⌜(0 < nlines I0)%nat /\ rest_of I0 = [] /\ lm_disc_input M I0⌝
-       ∗ cs_frozen_at v (nlines I0 - 1)%nat)%I.
+       ∗ cs_frozen_at v (nlines I0 - 1)%nat
+       ∗ ∃ (D : list (list mobs * bv 8)) (h0 : list mobs),
+           dl_list_lb v D
+           ∗ ⌜(snd <$> D) = I0 /\ list_basics.last D = Some (h0, wl_nl)
+              /\ ins (open_seg h0) = I0 /\ obs_boots h0 = k
+              /\ trace_shape h0 true⌝)%I.
 
   Global Instance secc_flag_timeless v n : Timeless (secc_flag v n).
   Proof using . rewrite /secc_flag. apply _. Qed.
@@ -146,7 +155,7 @@ Section pipes_wild_v.
 
   Lemma secc_tok_of_at (k : nat) (I0 : list (bv 8)) : secc_tok_at k I0 -∗ secc_tok k.
   Proof using .
-    iIntros "(%v & Hp & Hlb & HI & %Hn & Hf)". iExists v, I0. iFrame.
+    iIntros "(%v & Hp & Hlb & HI & %Hn & Hf & _)". iExists v, I0. iFrame.
     iPureIntro. split; [exact (proj1 Hn) | exact (proj1 (proj2 Hn))].
   Qed.
 
@@ -691,8 +700,18 @@ Section pipes_wild_v.
       pose proof Hall as Hall0.
       destruct Hall as (Hpure & Hcsl & Hpsl & Hin & Hera & HEtie & Hdlok).
       pose proof Hin as Hin2.
-      destruct Hin2 as (_ & _ & Hbt & _ & Hidx & Hbyte & _ & _).
+      destruct Hin2 as (_ & _ & Hbt & _ & Hidx & Hbyte & _ & _ & Hdh).
       destruct (gin_read_pure M B k _ _ ws _ Hread Hin) as (Hpref & _ & _).
+      (* THE SECCOMP NEWLINE: the delivered list's last trace, whose era
+         input is the whole delivered input (lane S5a) *)
+      destruct (lm_rd_last_hist k (LogEntryDefs.ch_log CH) (LogEntryDefs.ch_dl CH ++ ws)
+                  Hpref Hidx Hbt (fun e He => proj2 (Hdh e He)) (proj1 (proj2 Hread))
+                  ltac:(intros Hq; apply Hne; by rewrite Hq))
+        as (h0 & c0 & Hl0 & Hins0 & Hb0 & Hs0).
+      assert (Hc0 : c0 = wl_nl).
+      { destruct (rest_of_end _ Hr) as [Hq | Hq]; [by destruct Hne |].
+        rewrite fmap_last Hl0 /= in Hq. by injection Hq. }
+      subst c0.
       destruct (lm_rd_wild_stage M sd k ho so CH ws Hall0 Hpref Hws Hne Hr (HWL _ Hwl))
         as (Harm & Hdlall & HEI & Hw0 & Hcslen).
       pose proof Hpure as (Hacc & _ & _ & HEdisc & _ & _ & _ & _ & _ & _ & _ & _ & Hf0n & _).
@@ -761,7 +780,10 @@ Section pipes_wild_v.
         iApply (turn_lb_weaken with "Htlb").
         rewrite /lm_pcount Hw0 HEI. cbn [length]. unfold I' in *. lia.
       + iIntros "_". iLeft. iExists v. iFrame "Hpin2 Hlb HI' Hfzat".
-        iPureIntro. split_and!; [exact Hpos | exact Hr | exact Hdi].
+        iSplit; [iPureIntro; split_and!; [exact Hpos | exact Hr | exact Hdi] |].
+        iExists (LogEntryDefs.ch_dl CH ++ ws), h0. iFrame "Hdllb".
+        iPureIntro. split_and!; [reflexivity | exact Hl0 | exact Hins0 | exact Hb0
+                                | exact Hs0].
     - (* THE WILD ERA: nothing is delivered *)
       iDestruct "Hw" as (v2 so u)
         "(#Hpn & Hfl & Hwa & Hx & Hta & #Hcs & Hps & HE & Hdl & Hdll & %Hw)".
