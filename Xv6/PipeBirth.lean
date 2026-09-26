@@ -254,21 +254,24 @@ theorem pageOwn_pipeRaw (pi : BitVec 64) (hpv : pageValid pi) :
 
 /-! ## The pipe's ghost names -/
 
-/-- **The pipe's four ghosts** (the Lean port of Rocq `pipe_ends_alloc`):
-one reference and one open-marker per end. -/
+/-- **The pipe's five ghosts** (the Lean port of Rocq `pipe_ends_alloc`):
+one reference and one open-marker per end, and the byte queue at its birth
+state, authority and fragment. -/
 theorem pipe_ends_alloc :
     ⊢@{IProp GF} |==> ∃ γp : PipeNames,
-      pipeEndFull γp false ∗ pipeEndFull γp true ∗ pipeOpenmark γp false ∗ pipeOpenmark γp true := by
+      pipeEndFull γp false ∗ pipeEndFull γp true ∗ pipeOpenmark γp false ∗ pipeOpenmark γp true ∗
+      pipeQauth γp.pnQueue pst0 ∗ pipeQfrag γp.pnQueue pst0 := by
   iintro
   imod ghost_var_alloc () with ⟨%g1, H1⟩
   imod ghost_var_alloc () with ⟨%g2, H2⟩
   imod ghost_var_alloc () with ⟨%g3, H3⟩
   imod ghost_var_alloc () with ⟨%g4, H4⟩
+  imod pipeQueue_alloc (GF := GF) with ⟨%gq, Hqa, Hqf⟩
   imodintro
-  iexists (PipeNames.mk g1 g2 g3 g4)
+  iexists (PipeNames.mk g1 g2 g3 g4 gq)
   unfold pipeEndFull pipeRef pipeOpenmark pnEnd pnMark
   simp only [Bool.false_eq_true, if_false, if_true]
-  iframe H1 H2 H3 H4
+  iframe H1 H2 H3 H4 Hqa Hqf
 
 /-! ## The pipe's birth -/
 
@@ -287,7 +290,7 @@ theorem newPipe (cpu : CPU) (pi : BitVec 64) (hpv : pageValid pi) (vname : BitVe
   unfold lkFresh
   iintro ⟨#Hcl, #Hcl', Hrun, ⟨%hok, ⟨%lo, %lc, Hw, #Hflo, Hc, #Hflc⟩⟩,
     Hnm, Hnr, Hnw, Hro, Hwo, Hdat, Hslack⟩
-  imod pipe_ends_alloc with ⟨%γp, Hf0, Hf1, Hm0, Hm1⟩
+  imod pipe_ends_alloc with ⟨%γp, Hf0, Hf1, Hm0, Hm1, -, -⟩
   ihave Hst0 := pipeEndstate_open_intro γp false 1#32 pflag_one_open $$ Hm0
   ihave Hst1 := pipeEndstate_open_intro γp true 1#32 pflag_one_open $$ Hm1
   ihave HR : pipeResAt γp pi curCtx $$ [Hnm Hnr Hnw Hro Hwo Hst0 Hst1 Hdat Hslack]

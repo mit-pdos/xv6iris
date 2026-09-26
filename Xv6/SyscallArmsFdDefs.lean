@@ -537,22 +537,22 @@ theorem syscPipe_fd_fail (V : ProcPriv) (sts : List FdState) (hnum : syscNum V =
 
 /-- pipe's two least free descriptors, as the state list sees them. -/
 theorem syscPipe_least (V : ProcPriv) (sts : List FdState) (ha : syscFdAgree V.ofile sts)
-    (fd0 fd1 : Nat) (l : List Nat) (hfr : fdFrees V.ofile = fd0 :: fd1 :: l) :
-    fdLeastClosed sts fd0 ∧ fdLeastClosed (sts.set fd0 (.open true false .pipe)) fd1 := by
+    (fd0 fd1 : Nat) (l : List Nat) (γp : PipeNames) (hfr : fdFrees V.ofile = fd0 :: fd1 :: l) :
+    fdLeastClosed sts fd0 ∧ fdLeastClosed (sts.set fd0 (.open true false (.pipe γp))) fd1 := by
   refine ⟨fdFrees_leastClosed ha hfr, ?_⟩
-  have ha' := syscFdAgree_set ha fd0 1#64 (.open true false .pipe) (by decide) (by simp)
+  have ha' := syscFdAgree_set ha fd0 1#64 (.open true false (.pipe γp)) (by decide) (by simp)
   exact fdFrees_leastClosed ha' (fdFrees_insert V.ofile fd0 (fd1 :: l) 1#64 (by decide) hfr)
 
 /-- pipe's row, both ends installed. -/
 theorem syscPipe_fd_ok (V : ProcPriv) (sts : List FdState) (hnum : syscNum V = 4)
-    (ha : syscFdAgree V.ofile sts) (fd0 fd1 : Nat) (l : List Nat)
+    (ha : syscFdAgree V.ofile sts) (fd0 fd1 : Nat) (l : List Nat) (γp : PipeNames)
     (hfr : fdFrees V.ofile = fd0 :: fd1 :: l) (hne : fd0 ≠ fd1) :
-    syscFdOk V 0#64 sts ((sts.set fd0 (.open true false .pipe)).set fd1 (.open false true .pipe)) := by
+    syscFdOk V 0#64 sts ((sts.set fd0 (.open true false (.pipe γp))).set fd1 (.open false true (.pipe γp))) := by
   unfold syscFdOk usysFdOk
   rw [hnum, if_neg (by decide), if_neg (by decide), if_neg (by decide), if_pos (by decide),
     if_pos (by decide)]
-  obtain ⟨h0, h1⟩ := syscPipe_least V sts ha fd0 fd1 l hfr
-  exact ⟨fd0, fd1, hne, h0, h1, rfl⟩
+  obtain ⟨h0, h1⟩ := syscPipe_least V sts ha fd0 fd1 l γp hfr
+  exact ⟨fd0, fd1, γp, hne, h0, h1, rfl⟩
 
 /-! ## §7 The return tail with the three foreign channels answered -/
 

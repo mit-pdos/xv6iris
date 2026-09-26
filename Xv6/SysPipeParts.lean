@@ -368,12 +368,12 @@ the environment is the PIPE bundle (`fileclosePipeEnv`), whose rows are
 sys_pipe's own persistent ones at the uncounted page count; the returned
 page-count disjunction is dropped. -/
 theorem sys_pipe_fileclose (FC : FILECLOSE) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ] (c : CPU)
-    (k' : KCtx) (γl : GName) (γ : FileNames) (kk : Nat) (r w : Bool) (γkl : GName) (γk : KmemNames)
+    (k' : KCtx) (γl : GName) (γ : FileNames) (kk : Nat) (r w : Bool) (γp : PipeNames) (γkl : GName) (γk : KmemNames)
     (pidv : BitVec 32) (dqp : DFrac) (s : Bool) (hs : k'.sie = s) (pj : BitVec 64) (hpj : k'.proc = pj)
     (hK : filecloseSlots ≤ k'.avail) (hnoff : k'.noff = 0) (htier : k'.tier = KTier.kpt)
     (ha0 : k'.regs 10#5 = fnode kk) :
     kctx c k' ∗ pcIs c KA.«fileclose» ∗ trapCsrsExt c s ∗ cpuClaimExt c s pj ∗
-    isFtable γl γ ∗ panicEnv ∗ fileRef γ kk 1 (.open r w .pipe) ∗
+    isFtable γl γ ∗ panicEnv ∗ fileRef γ kk 1 (.open r w (.pipe γp)) ∗
     wordPointsTo (pPid pj) 4 dqp pidv ∗ irefSlot ∗
     procsInv Γ ∗ isLock γkl kmemLockAddr "kmem" (kmemRes γk) ∗ kallocAvail γk none ∗
     wpNext true pj c (fun cpu' => iprop(∀ (spie spp : Bool) (R' : RegMap),
@@ -383,7 +383,7 @@ theorem sys_pipe_fileclose (FC : FILECLOSE) (Γ : SchedNames) [ClaimIs (hlc := h
       wordPointsTo (pPid pj) 4 dqp pidv -∗ fdSlot -∗ irefSlot -∗ wpLoop cpu'))
     ⊢ wpLoop (GF := GF) c := by
   subst hs hpj
-  have h := FC.wp_fileclose_eb (hlc := hlc) (GF := GF) Γ c k' γl γ kk 1 (.open r w .pipe) 0 γkl γk none
+  have h := FC.wp_fileclose_eb (hlc := hlc) (GF := GF) Γ c k' γl γ kk 1 (.open r w (.pipe γp)) 0 γkl γk none
     pidv dqp hK hnoff htier ha0
   unfold wp_fileclose_eb_body at h
   simp only [filecloseAddr] at h
@@ -392,7 +392,7 @@ theorem sys_pipe_fileclose (FC : FILECLOSE) (Γ : SchedNames) [ClaimIs (hlc := h
   iframe Hk Hpc Hte Hce Hft Hpe Href Hpid Hir
   isplitl []
   · iapply (show fileclosePipeEnv (hlc := hlc) (GF := GF) Γ γkl γk none ⊢
-        filecloseEnv (hlc := hlc) Γ 0 k'.proc γkl γk none (.open r w .pipe) from .rfl)
+        filecloseEnv (hlc := hlc) Γ 0 k'.proc γkl γk none (.open r w (.pipe γp)) from .rfl)
     unfold fileclosePipeEnv
     iframe Hpi Hkl Hav
   iapply wpNext_mono _ _ _ _ _ $$ Hnext

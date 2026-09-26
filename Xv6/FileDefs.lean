@@ -131,7 +131,10 @@ inductive OffMode where
   deriving DecidableEq
 
 inductive FdType where
-  | pipe
+  /-- `FdPipe γp` (FdSlots.v): THE PIPE'S GHOST NAMES (Rocq design/pipe.md,
+  "The byte queue"): a descriptor's state names the pipe it is an end of,
+  and both ends of one pipe carry the SAME record. -/
+  | pipe (γp : PipeNames)
   /-- `FdInode inum γo om` (FdSlots.v): the inode number, the offset
   shadow's name (`FPNames.ooff`), and whose the offset is. -/
   | inode (n : Nat) (g : GName) (om : OffMode)
@@ -142,41 +145,48 @@ inductive FdState where
   | closed
   | open (readable writable : Bool) (t : FdType)
 
+/-- A PIPE FILE'S TWO ENDS ARE COMPLEMENTARY (Rocq `FileInvDefs.fdpipe_ends`,
+lane PIPE-RO): a pipe file is readable exactly when it is not writable, so
+a READABLE pipe row IS the read end and a writable one the write end. -/
+def fdpipeEnds (r w : Bool) : Prop := w = !r
+
 /-- When a state is the honest reading of a file: a RELATION pinning
 `f->type` in both directions (FileInvDefs.fdstate_ok).  The `FD_INODE` arm
 also pins the offset mode PARKED ("...AND THE OFFSET MODE IS PARKED": the
 kernel's proofs advance `f->off` against `foffRow`, which claims the user
-half only at a parked row). -/
-def fdstateOk (inum : BitVec 32) (γo : GName) (C : FContent) : FdState → Prop
+half only at a parked row).  The `FD_PIPE` arm pins the pipe's NAMES to the
+payload's (`γp`, Rocq's `g = γp`) and the two ends complementary
+(`fdpipeEnds`). -/
+def fdstateOk (inum : BitVec 32) (γo : GName) (γp : PipeNames) (C : FContent) : FdState → Prop
   | .closed => C.type = FD_NONE
   | .open r w t =>
     C.readable = (if r then 1#8 else 0#8) ∧ C.writable = (if w then 1#8 else 0#8) ∧
     match t with
-    | .pipe => C.type = FD_PIPE
+    | .pipe g => C.type = FD_PIPE ∧ g = γp ∧ fdpipeEnds r w
     | .inode n g om => C.type = FD_INODE ∧ n = inum.toNat ∧ g = γo ∧ om = .parked
     | .device mj => C.type = FD_DEVICE ∧ mj = C.major.toNat
 
 /-- The type code a state pins. -/
 def fdTypeCode : FdState → BitVec 32
   | .closed => FD_NONE
-  | .open _ _ .pipe => FD_PIPE
+  | .open _ _ (.pipe _) => FD_PIPE
   | .open _ _ (.inode _ _ _) => FD_INODE
   | .open _ _ (.device _) => FD_DEVICE
 
-theorem fdstateOk_type (inum : BitVec 32) (γo : GName) (C : FContent) (st : FdState)
-    (h : fdstateOk inum γo C st) : C.type = fdTypeCode st := by
+theorem fdstateOk_type (inum : BitVec 32) (γo : GName) (γp : PipeNames) (C : FContent) (st : FdState)
+    (h : fdstateOk inum γo γp C st) : C.type = fdTypeCode st := by
   cases st with
   | closed => exact h
   | «open» r w t =>
     cases t with
-    | pipe => exact h.2.2
+    | pipe g => exact h.2.2.1
     | inode n g om => exact h.2.2.1
     | device mj => exact h.2.2.1
 
 /-- One file admits at most one state (`fdstate_ok_inj`). -/
-theorem fdstateOk_inj (inum : BitVec 32) (γo : GName) (C : FContent) (st1 st2 : FdState)
-    (h1 : fdstateOk inum γo C st1) (h2 : fdstateOk inum γo C st2) : st1 = st2 := by
-  have e := (fdstateOk_type inum γo C st1 h1).symm.trans (fdstateOk_type inum γo C st2 h2)
+theorem fdstateOk_inj (inum : BitVec 32) (γo : GName) (γp : PipeNames) (C : FContent) (st1 st2 : FdState)
+    (h1 : fdstateOk inum γo γp C st1) (h2 : fdstateOk inum γo γp C st2) : st1 = st2 := by
+  have e := (fdstateOk_type inum γo γp C st1 h1).symm.trans (fdstateOk_type inum γo γp C st2 h2)
   cases st1 with
   | closed =>
     cases st2 with
@@ -194,14 +204,17 @@ theorem fdstateOk_inj (inum : BitVec 32) (γo : GName) (C : FContent) (st1 st2 :
         rw [hw] at hw'; cases w <;> cases w' <;> first | rfl | exact absurd hw' (by decide)
       subst er; subst ew
       cases t with
-      | pipe =>
+      | pipe g =>
         cases t' with
-        | pipe => rfl
+        | pipe g' =>
+          obtain ⟨-, h2, -⟩ := h
+          obtain ⟨-, h2', -⟩ := h'
+          subst h2; subst h2'; rfl
         | inode n g om => simp [fdTypeCode, FD_PIPE, FD_INODE] at e
         | device mj => simp [fdTypeCode, FD_PIPE, FD_DEVICE] at e
       | inode n g om =>
         cases t' with
-        | pipe => simp [fdTypeCode, FD_PIPE, FD_INODE] at e
+        | pipe _ => simp [fdTypeCode, FD_PIPE, FD_INODE] at e
         | inode n' g' om' =>
           obtain ⟨-, h2, h3, h4⟩ := h
           obtain ⟨-, h2', h3', h4'⟩ := h'
@@ -209,7 +222,7 @@ theorem fdstateOk_inj (inum : BitVec 32) (γo : GName) (C : FContent) (st1 st2 :
         | device mj => simp [fdTypeCode, FD_DEVICE, FD_INODE] at e
       | device mj =>
         cases t' with
-        | pipe => simp [fdTypeCode, FD_PIPE, FD_DEVICE] at e
+        | pipe _ => simp [fdTypeCode, FD_PIPE, FD_DEVICE] at e
         | inode n' g' om' => simp [fdTypeCode, FD_DEVICE, FD_INODE] at e
         | device mj' =>
           obtain ⟨-, h2⟩ := h
@@ -224,17 +237,63 @@ def fdstParked : FdState → Prop
 
 /-- A state a live `struct file` admits is PARKED (`fdstate_ok_parked`): the
 `FD_INODE` arm's pin, read as the fact it is. -/
-theorem fdstateOk_parked (inum : BitVec 32) (γo : GName) (C : FContent) (st : FdState)
-    (h : fdstateOk inum γo C st) : fdstParked st := by
+theorem fdstateOk_parked (inum : BitVec 32) (γo : GName) (γp : PipeNames) (C : FContent) (st : FdState)
+    (h : fdstateOk inum γo γp C st) : fdstParked st := by
   cases st with
   | closed => trivial
   | «open» r w t =>
     cases t with
-    | pipe => trivial
+    | pipe _ => trivial
     | device mj => trivial
     | inode n g om =>
       obtain ⟨-, -, -, -, -, hom⟩ := h
       subst hom; trivial
+
+/-- "This row is not a pipe end" (Rocq FdSlots.v `fdst_nopipe`): the pure
+reading of `PipeReg.pipeRowReg`, one resource down. -/
+def fdstNopipe : FdState → Prop
+  | .open _ _ (.pipe _) => False
+  | _ => True
+
+/-- A pipe file's ends are complementary (Rocq `fdstate_ok_pipe_ends`). -/
+theorem fdstateOk_pipe_ends (inum : BitVec 32) (γo : GName) (γp : PipeNames) (C : FContent)
+    (r w : Bool) (g : PipeNames) (h : fdstateOk inum γo γp C (.open r w (.pipe g))) : w = !r :=
+  h.2.2.2.2
+
+/-- A READABLE pipe row IS the read end of the payload's pipe (Rocq
+`fdstate_ok_pipe_rd`). -/
+theorem fdstateOk_pipe_rd (inum : BitVec 32) (γo : GName) (γp : PipeNames) (C : FContent)
+    (st : FdState) (h : fdstateOk inum γo γp C st) (ht : C.type = FD_PIPE)
+    (hr : C.readable ≠ 0#8) : st = .open true false (.pipe γp) := by
+  have e := fdstateOk_type inum γo γp C st h
+  rcases st with _ | ⟨r, w, _ | ⟨n, g, om⟩ | mj⟩
+  · simp [fdTypeCode, FD_NONE, FD_PIPE, ht] at e
+  · obtain ⟨hr', -, -, hg, hends⟩ := h
+    subst hg
+    cases r
+    · exact absurd hr' (by simpa using hr)
+    · unfold fdpipeEnds at hends; subst hends; rfl
+  · simp [fdTypeCode, FD_INODE, FD_PIPE, ht] at e
+  · simp [fdTypeCode, FD_DEVICE, FD_PIPE, ht] at e
+
+/-- ...and a WRITABLE one the write end (the mirror, what pipewrite's `w =
+true` is read off). -/
+theorem fdstateOk_pipe_wr (inum : BitVec 32) (γo : GName) (γp : PipeNames) (C : FContent)
+    (st : FdState) (h : fdstateOk inum γo γp C st) (ht : C.type = FD_PIPE)
+    (hw : C.writable ≠ 0#8) : st = .open false true (.pipe γp) := by
+  have e := fdstateOk_type inum γo γp C st h
+  rcases st with _ | ⟨r, w, _ | ⟨n, g, om⟩ | mj⟩
+  · simp [fdTypeCode, FD_NONE, FD_PIPE, ht] at e
+  · obtain ⟨-, hw', -, hg, hends⟩ := h
+    subst hg
+    cases w
+    · exact absurd hw' (by simpa using hw)
+    · unfold fdpipeEnds at hends
+      cases r
+      · rfl
+      · exact absurd hends (by decide)
+  · simp [fdTypeCode, FD_INODE, FD_PIPE, ht] at e
+  · simp [fdTypeCode, FD_DEVICE, FD_PIPE, ht] at e
 
 /-! ## Ghost names -/
 
@@ -455,7 +514,7 @@ def filePay (γ : FileNames) (k : Nat) (q : Qp) (C : FContent) : IProp GF := ipr
 
 /-- The payload indexed by the state it gives a descriptor. -/
 def filePaySt (γ : FileNames) (k : Nat) (q : Qp) (C : FContent) (st : FdState) : IProp GF := iprop%
-  ∃ pn : FPNames, ⌜fdstateOk pn.inum pn.ooff C st⌝ ∗ fpayTok γ k q pn ∗ fileCore k q pn C
+  ∃ pn : FPNames, ⌜fdstateOk pn.inum pn.ooff pn.pipe C st⌝ ∗ fpayTok γ k q pn ∗ fileCore k q pn C
 
 /-! ## THE predicate: holding one reference on file slot `k` -/
 

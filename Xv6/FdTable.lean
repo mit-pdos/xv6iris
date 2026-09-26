@@ -241,13 +241,13 @@ instance foffRow_persistent (st : FdState) : Persistent (foffRow (GF := GF) st) 
   | closed => unfold foffRow; infer_instance
   | «open» r w t =>
     cases t with
-    | pipe => unfold foffRow; infer_instance
+    | pipe _ => unfold foffRow; infer_instance
     | device mj => unfold foffRow; infer_instance
     | inode n g om => cases om <;> (unfold foffRow; infer_instance)
 
 theorem foffRow_closed : ⊢ foffRow (GF := GF) .closed := by
   unfold foffRow; iintro; ipureintro; trivial
-theorem foffRow_pipe (r w : Bool) : ⊢ foffRow (GF := GF) (.open r w .pipe) := by
+theorem foffRow_pipe (r w : Bool) (γp : PipeNames) : ⊢ foffRow (GF := GF) (.open r w (.pipe γp)) := by
   unfold foffRow; iintro; ipureintro; trivial
 theorem foffRow_dev (r w : Bool) (mj : Nat) : ⊢ foffRow (GF := GF) (.open r w (.device mj)) := by
   unfold foffRow; iintro; ipureintro; trivial
@@ -269,14 +269,14 @@ theorem foffRow_inode_of (st : FdState) (r w : Bool) (i : Nat) (γo : GName)
 `foff_row_of_ok`): the user half's invariant on the `FD_INODE` arm, nothing
 on the others; the state decides, and the state's shadow name IS the
 payload's. -/
-theorem foffRow_of_ok (inum : BitVec 32) (γo : GName) (C : FContent) (st : FdState)
-    (hok : fdstateOk inum γo C st) :
+theorem foffRow_of_ok (inum : BitVec 32) (γo : GName) (γp : PipeNames) (C : FContent) (st : FdState)
+    (hok : fdstateOk inum γo γp C st) :
     (if C.type = FD_INODE then offUserInv (GF := GF) γo else iprop(True)) ⊢ foffRow st := by
   cases st with
   | closed => unfold foffRow; iintro -; ipureintro; trivial
   | «open» r w t =>
     cases t with
-    | pipe => unfold foffRow; iintro -; ipureintro; trivial
+    | pipe _ => unfold foffRow; iintro -; ipureintro; trivial
     | device mj => unfold foffRow; iintro -; ipureintro; trivial
     | inode n g om =>
       obtain ⟨-, -, ht, -, hg, hom⟩ := hok

@@ -194,6 +194,8 @@ def xv6GF : BundledGFunctors :=
   |>.set 92 ⟨constOF OffSetUR, inferInstance⟩
   -- MachCSL: the era registry (`MachGpreS.registry_pre`)
   |>.set 93 ⟨xgfGm Nat EraGS RegMapF, inferInstance⟩
+  -- Xv6G: the pipe byte queue (Rocq `pipeqR`)
+  |>.set 94 ⟨constOF (ExclAuth.ExclAuthR (A := PipeSt)), inferInstance⟩
 
 /-! ## One instance per camera -/
 
@@ -316,6 +318,8 @@ instance xgfOffSlotp : GhostVarG xv6GF (L2Reg Nat) := { elemG := xgf_slot 91 }
 instance xgfOffSet : ElemG xv6GF (constOF OffSetUR) := xgf_slot 92
 -- MachCSL: the era registry
 instance xgfRegistry : GhostMapG xv6GF Nat EraGS RegMapF := ⟨xgf_slot 93⟩
+-- Xv6G: the pipe byte queue
+instance xgfPipeq : ElemG xv6GF (constOF (ExclAuth.ExclAuthR (A := PipeSt))) := xgf_slot 94
 
 end cameras
 

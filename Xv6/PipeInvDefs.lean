@@ -21,11 +21,21 @@ end open.  Closing an end spends an exclusive marker (`pipeOpenmark`),
 discarding it into the persistent `pipeShut`; the last closer recovers
 fraction `1` of both ends plus the lock's free-state half, which is the
 licence to reclaim the page (`pipeResDead`).
+
+THE BYTE QUEUE (Rocq `PipeQueue.v`, `pipe_queue_ok`, `pipe_qres`): the ring
+coupling (`pipeQueueOk` with its push/pop steps) and the queue's authority
+coupled-or-tainted (`pipeQres`) are ported here.  DEVIATION (interim):
+`pipeQres` is NOT yet the payload's last conjunct (Rocq's `pipe_res_at`
+has it): pipeclose's flag store must then step the ghost, paid by the
+closer's `pipe_cpay`, which fileclose can only supply once it takes
+Rocq's `fileclose_cpay` (the PQ-b wave's close payment).
 -/
 import MachCSL.Lock
 import MachCSL.WpLock
 import Xv6.KallocDefs
 import MachCSL.KCtxMove
+import Xv6.PipeNames
+import Xv6.PipeQueue
 
 namespace Xv6
 
@@ -69,6 +79,9 @@ def pipeLockName (pi : BitVec 64) : BitVec 64 := pi + 8#64
 the flag is nonzero (sign-extended to 64 bits). -/
 def pflagOpen (v : BitVec 32) : Prop := BitVec.signExtend 64 v ≠ 0#64
 
+instance pflagOpen_decidable (v : BitVec 32) : Decidable (pflagOpen v) := by
+  unfold pflagOpen; infer_instance
+
 theorem pflag_one_open : pflagOpen 1#32 := by unfold pflagOpen; decide
 theorem pflag_zero_not_open : ¬ pflagOpen 0#32 := by unfold pflagOpen; decide
 
@@ -106,15 +119,123 @@ between `0` and `n` (with `n` clamped at `0`). -/
 def pipeRwRet (n : Int) (r : BitVec 64) : Prop :=
   r = -1#64 ∨ ∃ i : Int, r = BitVec.ofInt 64 i ∧ 0 ≤ i ∧ i ≤ max 0 n
 
+/-! ## THE QUEUE COUPLING PROPER (Rocq `PipeInvDefs.pipe_queue_ok` & co.)
+
+THE PIPE'S IN-MEMORY BUFFER IS EXACTLY THE WRITTEN SEQUENCE MINUS THE READ
+PREFIX.  `ws` is every byte ever written, `rp` the read pointer: the two
+free-running counters are the two lengths mod 2^32, at most `PIPESIZE` bytes
+are live, and every live byte sits in the ring at its index mod `PIPESIZE`.
+It subsumes `pipeCountOk` (`pipeQueueOk_count`); the two guarded steps are
+keyed on the same failed full/empty tests as `pipeCount_incr_w` /
+`pipeCount_decr_r`, and they also say which ring index the code's
+`%PIPESIZE` computes. -/
+
+/-- Rocq `pipe_queue_ok`. -/
+def pipeQueueOk (ws : List (BitVec 8)) (rp : Nat) (nr nw : BitVec 32) (bs : List (BitVec 8)) :
+    Prop :=
+  rp ≤ ws.length ∧ ws.length ≤ rp + PIPESIZE ∧
+    nr = BitVec.ofNat 32 rp ∧ nw = BitVec.ofNat 32 ws.length ∧
+    ∀ k : Nat, rp ≤ k → k < ws.length → bs[k % PIPESIZE]? = ws[k]?
+
+/-- Rocq `pipe_queue_ok_00`. -/
+theorem pipeQueueOk_00 (bs : List (BitVec 8)) : pipeQueueOk [] 0 0#32 0#32 bs := by
+  refine ⟨Nat.le_refl 0, Nat.zero_le _, rfl, rfl, ?_⟩
+  intro k _ hk; exact absurd hk (Nat.not_lt_zero k)
+
+/-- Rocq `pipe_queue_ok_count`. -/
+theorem pipeQueueOk_count (ws : List (BitVec 8)) (rp : Nat) (nr nw : BitVec 32)
+    (bs : List (BitVec 8)) (h : pipeQueueOk ws rp nr nw bs) : pipeCountOk nr nw := by
+  obtain ⟨h1, h2, rfl, rfl, -⟩ := h
+  have hP : PIPESIZE = 512 := rfl
+  rw [hP] at h2
+  unfold pipeCountOk pipeCount
+  rw [BitVec.le_def, BitVec.toNat_sub]
+  simp only [BitVec.toNat_ofNat]
+  omega
+
+/-- The ring index the code computes (`andi ..,511` on the counter) (Rocq
+`pipe_queue_widx`). -/
+theorem pipeQueue_widx (ws : List (BitVec 8)) (rp : Nat) (nr nw : BitVec 32)
+    (bs : List (BitVec 8)) (h : pipeQueueOk ws rp nr nw bs) :
+    nw.toNat % 512 = ws.length % PIPESIZE := by
+  obtain ⟨-, -, -, rfl, -⟩ := h
+  simp only [BitVec.toNat_ofNat, PIPESIZE]
+  omega
+
+/-- Rocq `pipe_queue_ridx`. -/
+theorem pipeQueue_ridx (ws : List (BitVec 8)) (rp : Nat) (nr nw : BitVec 32)
+    (bs : List (BitVec 8)) (h : pipeQueueOk ws rp nr nw bs) :
+    nr.toNat % 512 = rp % PIPESIZE := by
+  obtain ⟨-, -, rfl, -, -⟩ := h
+  simp only [BitVec.toNat_ofNat, PIPESIZE]
+  omega
+
+/-- pipewrite's step, licensed by the failed full test: the byte goes to the
+ring at `|ws| mod PIPESIZE` and to the end of the sequence (Rocq
+`pipe_queue_push`). -/
+theorem pipeQueue_push (ws : List (BitVec 8)) (rp : Nat) (nr nw : BitVec 32)
+    (bs : List (BitVec 8)) (b : BitVec 8) (hlen : bs.length = PIPESIZE)
+    (h : pipeQueueOk ws rp nr nw bs) (hne : nw ≠ nr + 512#32) :
+    pipeQueueOk (ws ++ [b]) rp nr (nw + 1#32) (bs.set (ws.length % PIPESIZE) b) := by
+  obtain ⟨h1, h2, rfl, rfl, hbs⟩ := h
+  have hP : PIPESIZE = 512 := rfl
+  simp only [hP] at h2 hbs hlen ⊢
+  have hlt : ws.length < rp + 512 := by
+    rcases Nat.lt_or_ge ws.length (rp + 512) with hl | hge
+    · exact hl
+    · exfalso; apply hne
+      have hl : ws.length = rp + 512 := by omega
+      rw [hl]; apply BitVec.eq_of_toNat_eq
+      simp only [BitVec.toNat_ofNat, BitVec.toNat_add]
+      omega
+  refine ⟨?_, ?_, rfl, ?_, ?_⟩
+  · simp only [List.length_append, List.length_singleton]; omega
+  · simp only [List.length_append, List.length_singleton]; omega
+  · apply BitVec.eq_of_toNat_eq
+    simp only [BitVec.toNat_ofNat, BitVec.toNat_add, List.length_append, List.length_singleton]
+    omega
+  · intro k hk1 hk2
+    simp only [List.length_append, List.length_singleton] at hk2
+    rw [hP]
+    by_cases hkw : k = ws.length
+    · subst hkw
+      rw [List.getElem?_set_self (by rw [hlen]; exact Nat.mod_lt _ (by decide))]
+      simp
+    · have hk : k < ws.length := by omega
+      rw [List.getElem?_set_ne, hbs k hk1 hk, List.getElem?_append_left hk]
+      intro heq
+      have := Nat.div_add_mod k 512
+      have := Nat.div_add_mod ws.length 512
+      omega
+
+/-- piperead's step, licensed by the failed empty test: the ring holds the
+next byte at `rp mod PIPESIZE`, and dequeuing it moves the pointer (Rocq
+`pipe_queue_pop`). -/
+theorem pipeQueue_pop (ws : List (BitVec 8)) (rp : Nat) (nr nw : BitVec 32)
+    (bs : List (BitVec 8)) (h : pipeQueueOk ws rp nr nw bs) (hne : nr ≠ nw) :
+    ∃ b : BitVec 8, ws[rp]? = some b ∧ bs[rp % PIPESIZE]? = some b ∧
+      pipeQueueOk ws (rp + 1) (nr + 1#32) nw bs := by
+  obtain ⟨h1, h2, rfl, rfl, hbs⟩ := h
+  have hlt : rp < ws.length := by
+    rcases Nat.lt_or_ge rp ws.length with hl | hge
+    · exact hl
+    · exfalso; apply hne; rw [Nat.le_antisymm h1 hge]
+  obtain ⟨b, hb⟩ : ∃ b, ws[rp]? = some b := ⟨ws[rp], List.getElem?_eq_getElem hlt⟩
+  refine ⟨b, hb, by rw [hbs rp (Nat.le_refl rp) hlt, hb], ?_, ?_, ?_, rfl, ?_⟩
+  · omega
+  · have hP : PIPESIZE = 512 := rfl
+    rw [hP] at h2 ⊢; omega
+  · apply BitVec.eq_of_toNat_eq
+    simp only [BitVec.toNat_ofNat, BitVec.toNat_add]
+    omega
+  · intro k hk1 hk2; exact hbs k (by omega) hk2
+
 /-! ## The reference algebra: one fraction ghost per end -/
 
-/-- A pipe's ghost identity: per end, the reference fraction and the
-"still open" marker. -/
-structure PipeNames where
-  pnRead : GName
-  pnWrite : GName
-  pnMread : GName
-  pnMwrite : GName
+-- A pipe's ghost identity (`PipeNames`: per end, the reference fraction and
+-- the "still open" marker, and the byte queue's name `pnQueue`) is defined in
+-- `Xv6/PipeNames.lean`, below `FileDefs`, so that a descriptor's state can
+-- carry it (`FileDefs.FdType.pipe`), as Rocq's `PipeNames.v`.
 
 def pnEnd (γp : PipeNames) (w : Bool) : GName := if w then γp.pnWrite else γp.pnRead
 def pnMark (γp : PipeNames) (w : Bool) : GName := if w then γp.pnMwrite else γp.pnMread
@@ -277,6 +398,45 @@ theorem pipeShut_both (γp : PipeNames) (w : Bool) :
     pipeShut (GF := GF) γp w -∗ pipeShut γp (!w) -∗
     pipeShut γp false ∗ pipeShut γp true := by
   cases w <;> simp only [Bool.not_false, Bool.not_true] <;> · iintro H1 H2; iframe
+
+/-! ### THE BYTE QUEUE'S AUTHORITY, COUPLED OR DISCONNECTED (Rocq `pipe_qres`)
+
+The COUPLED arm: the ghost state IS the physical one -- the written sequence
+minus the read prefix is the ring (`pipeQueueOk`), and the two open flags
+are the two flag words (`pflagBool`).  The TAINT arm: somebody moved the
+pipe without the fragment, which the kernel may do exactly at the price of
+the application's taint (`MachFixedGS.killCred`, PipeQueue deviation 1),
+and from then on the ghost says nothing -- the authority is dropped and the
+arm is permanent. -/
+
+/-- A flag word as the open bool the ghost state records (Rocq
+`pflag_bool`). -/
+def pflagBool (v : BitVec 32) : Bool := decide (pflagOpen v)
+
+theorem pflagBool_true (v : BitVec 32) (h : pflagOpen v) : pflagBool v = true := by
+  unfold pflagBool; exact decide_eq_true h
+
+theorem pflagBool_false (v : BitVec 32) (h : ¬ pflagOpen v) : pflagBool v = false := by
+  unfold pflagBool; exact decide_eq_false h
+
+theorem pflagBool_zero : pflagBool 0#32 = false := pflagBool_false _ pflag_zero_not_open
+
+theorem pflagBool_one : pflagBool 1#32 = true := pflagBool_true _ pflag_one_open
+
+/-- Rocq `pipe_qres`. -/
+def pipeQres (γp : PipeNames) (nr nw ro wo : BitVec 32) (bs : List (BitVec 8)) : IProp GF :=
+  iprop((∃ (ws : List (BitVec 8)) (rp : Nat), ⌜pipeQueueOk ws rp nr nw bs⌝ ∗
+      pipeQauth γp.pnQueue ⟨ws, rp, pflagBool ro, pflagBool wo⟩) ∨
+    MachFixedGS.killCred (hlc := hlc) (GF := GF))
+
+instance pipeQres_timeless (γp : PipeNames) (nr nw ro wo : BitVec 32) (bs : List (BitVec 8)) :
+    Timeless (pipeQres (hlc := hlc) (GF := GF) γp nr nw ro wo bs) := by
+  unfold pipeQres; infer_instance
+
+/-- The disconnect, at the taint's price (Rocq `pipe_qres_taint`). -/
+theorem pipeQres_taint (γp : PipeNames) (nr nw ro wo : BitVec 32) (bs : List (BitVec 8)) :
+    MachFixedGS.killCred (hlc := hlc) (GF := GF) ⊢ pipeQres (hlc := hlc) γp nr nw ro wo bs := by
+  unfold pipeQres; exact or_intro_r
 
 end
 

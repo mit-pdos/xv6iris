@@ -425,8 +425,9 @@ def usysFdOk (n : Int) (tf : List (BitVec 64)) (r : BitVec 64) (sts sts' : List 
     (r = -1#64 ∧ sts' = sts)
   else if n = USYS_pipe then
     (if r.toNat = 0 then
-      ∃ a b : Nat, a ≠ b ∧ fdLeastClosed sts a ∧ fdLeastClosed (sts.set a (.open true false .pipe)) b ∧
-        sts' = (sts.set a (.open true false .pipe)).set b (.open false true .pipe)
+      ∃ (a b : Nat) (γp : PipeNames), a ≠ b ∧ fdLeastClosed sts a ∧
+        fdLeastClosed (sts.set a (.open true false (.pipe γp))) b ∧
+        sts' = (sts.set a (.open true false (.pipe γp))).set b (.open false true (.pipe γp))
     else sts' = sts)
   else sts' = sts
 
@@ -488,7 +489,7 @@ theorem usysFdOk_length {n : Int} {tf : List (BitVec 64)} {r : BitVec 64} {sts s
   by_cases hp : n = USYS_pipe
   · rw [if_pos hp] at H
     split at H
-    · obtain ⟨_, _, -, -, -, rfl⟩ := H; simp
+    · obtain ⟨_, _, _, -, -, -, rfl⟩ := H; simp
     · subst H; rfl
   rw [if_neg hp] at H
   subst H; rfl
@@ -535,9 +536,9 @@ theorem usysFdOk_parked {n : Int} {tf : List (BitVec 64)} {r : BitVec 64} {sts s
   by_cases hp : n = USYS_pipe
   · rw [if_pos hp] at H
     split at H
-    · obtain ⟨_, _, -, -, -, rfl⟩ := H
-      exact fdvParked_set (fdvParked_set hpk _ (x := .open true false .pipe) trivial) _
-        (x := .open false true .pipe) trivial
+    · obtain ⟨_, _, γp, -, -, -, rfl⟩ := H
+      exact fdvParked_set (fdvParked_set hpk _ (x := .open true false (.pipe γp)) trivial) _
+        (x := .open false true (.pipe γp)) trivial
     · subst H; exact hpk
   rw [if_neg hp] at H
   subst H; exact hpk
@@ -549,10 +550,11 @@ opened ARE the two words written at argument 0. -/
 def usysPipeOk (n : Int) (tf : List (BitVec 64)) (r : BitVec 64) (M M' : ElfMem)
     (sts sts' : List FdState) : Prop :=
   n = USYS_pipe → r.toNat = 0 →
-    ∃ a b : Nat, a ≠ b ∧ fdLeastClosed sts a ∧ fdLeastClosed (sts.set a (.open true false .pipe)) b ∧
+    ∃ (a b : Nat) (γp : PipeNames), a ≠ b ∧ fdLeastClosed sts a ∧
+      fdLeastClosed (sts.set a (.open true false (.pipe γp))) b ∧
       M' = usysWr M (tfW tf (tfArgIdx 0))
         (wordToBytes4 (BitVec.ofNat 32 a) ++ wordToBytes4 (BitVec.ofNat 32 b)) ∧
-      sts' = (sts.set a (.open true false .pipe)).set b (.open false true .pipe)
+      sts' = (sts.set a (.open true false (.pipe γp))).set b (.open false true (.pipe γp))
 
 /-- Rocq `usys_pipe_ok_quiet`. -/
 theorem usysPipeOk_quiet (n : Int) (tf : List (BitVec 64)) (r : BitVec 64) (M M' : ElfMem)

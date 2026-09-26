@@ -32,8 +32,8 @@ nothing moved (pipealloc or an fdalloc failed); a copyout failed after the
 two least free descriptors had been filled -- they are null again, and the
 user image carries whatever PREFIX of the two words reached it; or
 success -- the two least free descriptors `fd0`, `fd1` hold the read end
-and the write end, their bundle rows are `.open true false .pipe` and
-`.open false true .pipe`, and the eight bytes at `v` ARE the two
+and the write end, their bundle rows are `.open true false (.pipe γp)` and
+`.open false true (.pipe γp)`, and the eight bytes at `v` ARE the two
 descriptor numbers (Rocq's success conjunct on the written bytes).
 
 THE WINDOW IS ROCQ'S ONE MERGED WINDOW AT `v` (`sysPipeMem`): the two
@@ -55,6 +55,8 @@ duration of each call (Rocq's `proc_priv_pid` lending, the note in its
 header on the three-quarter trap).
 
 DEVIATIONS FROM ROCQ:
+  * THE SUCCESS ARM NAMES THE PIPE (`∃ γp`, both rows `.pipe γp`, Rocq's)
+    but hands out no queue fragment yet (SpecPipealloc deviation 4).
   * eb-GENERIC AT DEPTH 0 (Rocq's `cpu_own 0 eb` -- the same).
   * THE PAGE COUNT IS THE UNCOUNTED MODE (`kallocAvail γk none`, Rocq's
     `kalloc_env γa None`): copyout's vmfault needs it, and `none` is
@@ -63,7 +65,7 @@ DEVIATIONS FROM ROCQ:
     (`fileclosePipeEnv`, whose rows sys_pipe already holds, all persistent at
     the uncounted page count): sys_pipe closes the two pipe ends it made
     straight out of its LOCALS, whose states it knows (`.open true false
-    .pipe` / `.open false true .pipe`), so the FS bundle is never asked for.
+    .pipe` / `.open false true (.pipe γp)`), so the FS bundle is never asked for.
     Rocq carries both bundles (`fileclose_pipe_env` / `_fs_env_nopid`)
     because its `ofile_slot` forgets the type; SHARPER, not weaker.
     Consequently the post returns no environment (Rocq's `∃ on',
@@ -121,12 +123,13 @@ def sysPipePost (γ : FileNames) (γd : GName) (pa : BitVec 64) (pid : BitVec 32
       ((d0 < 4 ∧ d1 = 0) ∨ (d0 = 4 ∧ d1 < 4)) ∧
       sysPipeMem V.sz V.upt M v ((sysPipeFdBytes fd0).take d0) ((sysPipeFdBytes fd1).take d1) P' M'⌝ ∗
     procPrivFd γ pa pid { V with upt := P' } M' ∗ fdFrags γd sts) ∨
-  (∃ (fd0 fd1 : Nat) (l : List Nat) (k0 k1 : Nat) (P' : UPtd) (M' : Nat → List (BitVec 8)),
+  (∃ (fd0 fd1 : Nat) (l : List Nat) (k0 k1 : Nat) (γp : PipeNames) (P' : UPtd)
+    (M' : Nat → List (BitVec 8)),
     ⌜r = 0#64 ∧ fdFrees V.ofile = fd0 :: fd1 :: l ∧ fd0 ≠ fd1 ∧
       sts[fd0]? = some .closed ∧ sts[fd1]? = some .closed ∧
       sysPipeMem V.sz V.upt M v (sysPipeFdBytes fd0) (sysPipeFdBytes fd1) P' M'⌝ ∗
     procPrivFd γ pa pid { V with ofile := (V.ofile.set fd0 (fnode k0)).set fd1 (fnode k1), upt := P' } M' ∗
-    fdFrags γd ((sts.set fd0 (.open true false .pipe)).set fd1 (.open false true .pipe)))
+    fdFrags γd ((sts.set fd0 (.open true false (.pipe γp))).set fd1 (.open false true (.pipe γp))))
 
 /-- What sys_pipe's caller resumes with: the `true` crossing. -/
 def sysPipeCont (cpu : CPU) (k : KCtx) (γ : FileNames) (γd : GName) (pa : BitVec 64)

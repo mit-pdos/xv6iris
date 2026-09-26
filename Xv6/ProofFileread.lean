@@ -104,7 +104,7 @@ to its stage lemma. -/
 theorem frd_dispatch (PR : PIPEREAD) (IL : ILOCK) (RD : READI) (IU : IUNLOCK) (CR : CONSOLEREAD)
     (PA : PANIC) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
     (cpu : CPU) (k : KCtx) (R : RegMap) (γ : FileNames) (fk : Nat) (q : Qp) (st : FdState)
-    (C : FContent) (inumC : BitVec 32) (γoC : GName)
+    (C : FContent) (inumC : BitVec 32) (γoC : GName) (γpC : PipeNames)
     (j : Nat) (pid : BitVec 32) (V : ProcPriv) (M : Nat → List (BitVec 8))
     (γkl : GName) (γk : KmemNames) (n : Int)
     (F : Pfam GF (Aview → Nat → Anode → Nat → IProp GF)) (Rd : Nat → Nat → IProp GF)
@@ -112,7 +112,7 @@ theorem frd_dispatch (PR : PIPEREAD) (IL : ILOCK) (RD : READI) (IU : IUNLOCK) (C
     (hK : filereadSlots ≤ k.avail) (hj : j < NPROC) (hproc : k.proc = procAddr j)
     (hnoff : k.noff = 0) (htier : k.tier = KTier.kpt) (ht0 : curTier = KTier.kpt)
     (hlocks : k.locks = []) (hn : -2 ^ 31 ≤ n ∧ n < 2 ^ 31) (hn0 : 0 ≤ n)
-    (hok : fdstateOk inumC γoC C st) (hrd : ¬ C.readable = 0#8)
+    (hok : fdstateOk inumC γoC γpC C st) (hrd : ¬ C.readable = 0#8)
     (hr : frdRegs k (fnode fk) (k.regs 11#5) (BitVec.ofInt 64 n) R) (h10 : R 10#5 = fnode fk)
     (h11 : R 11#5 = k.regs 11#5) (h12 : R 12#5 = BitVec.ofInt 64 n) :
     kctx cpu (((k.withSpie k.spie k.spp).pushed 6).withRegs R) ∗
@@ -147,8 +147,8 @@ theorem frd_dispatch (PR : PIPEREAD) (IL : ILOCK) (RD : READI) (IU : IUNLOCK) (C
     k_step_e (wp_s_branch cpu _ (KA.«fileread» + 0x24#64) false 70#13 15#5 14#5 (by decide) bop.BEQ)
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [filerw_beq1, decide_eq_true h1]
     iintro Hk Hpc
-    obtain ⟨wb, rfl⟩ := frd_st_pipe inumC γoC C st hok h1 hrd
-    iapply (frd_arm_pipe PR Γ cpu k k.spie k.spp _ γ fk q C wb j pid V M γkl γk n F Rd Rin P
+    obtain ⟨wb, rfl⟩ := frd_st_pipe inumC γoC γpC C st hok h1 hrd
+    iapply (frd_arm_pipe PR Γ cpu k k.spie k.spp _ γ fk q C wb γpC j pid V M γkl γk n F Rd Rin P
       hK hj hproc hnoff htier ht0 hn hn0 h1 ?hrp ?h10p ?h11p ?h12p) $$ [- $Hk $Hpc]
     rotate_right 1
     k_norm_g
@@ -173,7 +173,7 @@ theorem frd_dispatch (PR : PIPEREAD) (IL : ILOCK) (RD : READI) (IU : IUNLOCK) (C
     k_step_e (wp_s_branch cpu _ (KA.«fileread» + 0x2a#64) false 78#13 15#5 14#5 (by decide) bop.BEQ)
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [filerw_beq3, decide_eq_true h3]
     iintro Hk Hpc
-    obtain ⟨wb, rfl⟩ := frd_st_device inumC γoC C st hok h3 hrd
+    obtain ⟨wb, rfl⟩ := frd_st_device inumC γoC γpC C st hok h3 hrd
     ihave Henv := frd_env_dev true wb C.major.toNat $$ Henv
     iapply (frd_arm_dev CR Γ cpu k k.spie k.spp _ γ fk q C wb C.major.toNat j pid V M γkl γk n F Rd
       Rin P hK hj hproc hnoff htier ht0 hn hn0 rfl ?hrd' ?h10d ?h11d ?h12d) $$ [- $Hk $Hpc]
@@ -216,7 +216,7 @@ theorem frd_dispatch (PR : PIPEREAD) (IL : ILOCK) (RD : READI) (IU : IUNLOCK) (C
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
     with [filerw_bne2, decide_eq_true h2, Bool.not_true]
   iintro Hk Hpc
-  obtain ⟨wb, i, rfl⟩ := frd_st_inode inumC γoC C st hok h2 hrd
+  obtain ⟨wb, i, rfl⟩ := frd_st_inode inumC γoC γpC C st hok h2 hrd
   ihave Href := filerw_ref_close γ fk q _ C $$ [Htok Hfields Hpay]
   · iframe
   icases frd_env_inode true wb i γoC .parked $$ Henv with ⟨#Hfs, Hbs⟩
@@ -273,7 +273,7 @@ theorem fileread_main (PR : PIPEREAD) (IL : ILOCK) (RD : READI) (IU : IUNLOCK) (
       iframe
     iapply HK $$ %spie %spp %R' %P' %M' %d %hp Hk Hpc Hte Hce Href Hpriv Henv Harms
   -- the reference, taken apart
-  icases filerw_ref_open γ fk q st $$ Href with ⟨%C, %⟨inumC, γoC, hok⟩, Htok, Hfields, Hpay⟩
+  icases filerw_ref_open γ fk q st $$ Href with ⟨%C, %⟨inumC, γoC, γpC, hok⟩, Htok, Hfields, Hpay⟩
   simp only [filereadAddr]
   have e0 : kctx (GF := GF) cpu k ⊢ kctx cpu (k.withRegs k.regs) := .rfl
   ihave Hk := e0 $$ Hk
@@ -312,7 +312,7 @@ theorem fileread_main (PR : PIPEREAD) (IL : ILOCK) (RD : READI) (IU : IUNLOCK) (
     ihave Href := filerw_ref_close γ fk q st C $$ [Htok Hfields Hpay]
     · iframe
     ihave Henv := fileread_env_out_of_env st $$ Henv
-    ihave HP := filereadIn_unreadable F Rd Rin P inumC γoC C st hok hrz $$ Hin HP
+    ihave HP := filereadIn_unreadable F Rd Rin P inumC γoC γpC C st hok hrz $$ Hin HP
     unfold frdK
     iapply HΦ $$ %c' %k.spie %k.spp %R' %V.upt %M %0 [] Hk Hpc Hte Hce Href Hpriv Hgen Henv [HP]
     · ipureintro
@@ -321,7 +321,7 @@ theorem fileread_main (PR : PIPEREAD) (IL : ILOCK) (RD : READI) (IU : IUNLOCK) (
       rw [show R' 10#5 = -1#64 by rw [h10]; decide]
       isplitr
       · ipureintro; exact filereadRet_m1 n
-      iapply filereadExtra_unreadable V.gen V.upt F Rd Rin P inumC γoC C st n M (k.regs 11#5) hok hrz $$ HP
+      iapply filereadExtra_unreadable V.gen V.upt F Rd Rin P inumC γoC γpC C st n M (k.regs 11#5) hok hrz $$ HP
   -- +0x0e  c.beqz a5 : falls (a readable descriptor)
   k_step_e (wp_s_branch cpu _ (KA.«fileread» + 0x0e#64) true 166#13 15#5 0#5 (by decide) bop.BEQ)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [filerw_beqz, decide_eq_false hrz]
@@ -401,7 +401,7 @@ theorem fileread_main (PR : PIPEREAD) (IL : ILOCK) (RD : READI) (IU : IUNLOCK) (
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc]
     with [filerw_bnez_sign n hn, decide_eq_false hneg]
   iintro Hk Hpc
-  iapply (frd_dispatch PR IL RD IU CR PA Γ cpu k _ γ fk q st C inumC γoC j pid V M γkl γk n F Rd Rin P
+  iapply (frd_dispatch PR IL RD IU CR PA Γ cpu k _ γ fk q st C inumC γoC γpC j pid V M γkl γk n F Rd Rin P
     hK hj hproc hnoff htier ht0 hlocks hn (by omega) hok hrz ?hrd ?h10d ?h11d ?h12d) $$ [- $Hk $Hpc]
   rotate_right 1
   k_norm_g

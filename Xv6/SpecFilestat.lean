@@ -182,14 +182,14 @@ instance fstatHasInode_dec (C : FContent) : Decidable (fstatHasInode C) := by
 def fstatStInode (st : FdState) : Prop :=
   match st with
   | .closed => False
-  | .open _ _ .pipe => False
+  | .open _ _ (.pipe _) => False
   | .open _ _ (.inode _ _ _) => True
   | .open _ _ (.device _) => True
 
 /-- The two readings agree on an honest state (`fdstateOk_type`). -/
-theorem fstatHasInode_st (inum : BitVec 32) (γo : GName) (C : FContent) (st : FdState)
-    (h : fdstateOk inum γo C st) : fstatHasInode C ↔ fstatStInode st := by
-  have ht := fdstateOk_type inum γo C st h
+theorem fstatHasInode_st (inum : BitVec 32) (γo : GName) (γp : PipeNames) (C : FContent) (st : FdState)
+    (h : fdstateOk inum γo γp C st) : fstatHasInode C ↔ fstatStInode st := by
+  have ht := fdstateOk_type inum γo γp C st h
   unfold fstatHasInode fstatStInode
   rw [ht]
   cases st with
@@ -218,7 +218,7 @@ def filestatFsOut : IProp GF := iprop(bslot)
 def filestatEnv (st : FdState) : IProp GF :=
   match st with
   | .closed => emp
-  | .open _ _ .pipe => emp
+  | .open _ _ (.pipe _) => emp
   | .open _ _ (.inode _ _ _) => filestatFsEnv (hlc := hlc)
   | .open _ _ (.device _) => filestatFsEnv (hlc := hlc)
 
@@ -226,7 +226,7 @@ def filestatEnv (st : FdState) : IProp GF :=
 def filestatEnvOut (st : FdState) : IProp GF :=
   match st with
   | .closed => emp
-  | .open _ _ .pipe => emp
+  | .open _ _ (.pipe _) => emp
   | .open _ _ (.inode _ _ _) => filestatFsOut
   | .open _ _ (.device _) => filestatFsOut
 

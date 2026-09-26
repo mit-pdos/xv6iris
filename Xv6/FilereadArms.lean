@@ -55,7 +55,7 @@ variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [Fdslot
   [Appcfg GF] [FileG GF] [Fscfg] [Icfg] [CurCtx]
 
 /-- The environment's output at a pipe and at an inode (by computation). -/
-theorem frd_envout_pipe (r w : Bool) : ⊢ filereadEnvOut (hlc := hlc) (GF := GF) (.open r w .pipe) :=
+theorem frd_envout_pipe (r w : Bool) (γp : PipeNames) : ⊢ filereadEnvOut (hlc := hlc) (GF := GF) (.open r w (.pipe γp)) :=
   .rfl
 theorem frd_envout_inode (r w : Bool) (i : Nat) (γo : GName) (om : OffMode) :
     bslot ⊢ filereadEnvOut (hlc := hlc) (GF := GF) (.open r w (.inode i γo om)) := .rfl
@@ -100,7 +100,7 @@ set_option maxHeartbeats 16000000 in
 `c.ld a0,16(a0)`, piperead, `c.mv s2,a0`, the lazy restores, `c.j`. -/
 theorem frd_arm_pipe (PR : PIPEREAD) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
     (cpu : CPU) (k : KCtx) (spie spp : Bool) (R : RegMap) (γ : FileNames) (fk : Nat)
-    (q : Qp) (C : FContent) (wb : Bool) (j : Nat) (pid : BitVec 32) (V : ProcPriv)
+    (q : Qp) (C : FContent) (wb : Bool) (γp : PipeNames) (j : Nat) (pid : BitVec 32) (V : ProcPriv)
     (M : Nat → List (BitVec 8)) (γkl : GName) (γk : KmemNames) (n : Int)
     (F : Pfam GF (Aview → Nat → Anode → Nat → IProp GF)) (Rd : Nat → Nat → IProp GF)
     (Rin : List (List Obs × BitVec 8) → IProp GF) (P : IProp GF)
@@ -114,16 +114,16 @@ theorem frd_arm_pipe (PR : PIPEREAD) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF 
     frame6s3 (k.regs 2#5) (k.regs 1#5) (k.regs 8#5) (k.regs 9#5) (k.regs 18#5) (k.regs 19#5) ∗
     trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗
     procsInv Γ ∗ isLock γkl kmemLockAddr "kmem" (kmemRes γk) ∗ kallocAvail γk none ∗
-    frefTok γ fk q ∗ fileFieldsAt curCtx fk q C ∗ filePaySt γ fk q C (.open true wb .pipe) ∗
+    frefTok γ fk q ∗ fileFieldsAt curCtx fk q C ∗ filePaySt γ fk q C (.open true wb (.pipe γp)) ∗
     procPrivExt (procAddr j) pid V V.upt M ∗ genHalvesPriv (procAddr j) pid V.gen ∗ P ∗
-    frdK (hlc := hlc) k γ fk q (.open true wb .pipe) j pid V M n F Rd Rin P
+    frdK (hlc := hlc) k γ fk q (.open true wb (.pipe γp)) j pid V M n F Rd Rin P
     ⊢ wpLoop (GF := GF) cpu := by
   have hK' : 6 + readiSlots ≤ k.avail := hK
   have hK6 : 6 ≤ k.avail := by unfold readiSlots bmapSlots ballocSlots breadSlots panicSlots at hK'; omega
   iintro ⟨Hk, Hpc, Hframe, Hte, Hce, #Hpi, #Hkl, #Hav, Htok, Hfields, Hpay, Hpriv, Hgen, HP, HΦ⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
   icases filerw_fields_pipe fk q C $$ Hfields with ⟨Hpcell, Hfw⟩
-  icases filerw_pay_pipe γ fk q C true wb hty $$ Hpay with ⟨%γl, %γp, #Hpp, Hpref, Hpback⟩
+  icases filerw_pay_pipe γ fk q C true wb γp hty $$ Hpay with ⟨%γl, #Hpp, Hpref, Hpback⟩
   -- +0x6a  c.ld a0,16(a0)
   k_step_e (wp_s_ld cpu _ (KA.«fileread» + 0x6a#64) true 16#12 10#5 10#5 (by decide) (by decide)
       (DFrac.own q) C.pipe)
@@ -184,7 +184,7 @@ theorem frd_arm_pipe (PR : PIPEREAD) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF 
   iintro %c' %R' %⟨hcs, h10'⟩ Hk Hpc Hte Hce
   ihave Hpay := Hpback $$ Hpref
   ihave Hfields := Hfw $$ Hpcell
-  ihave Href := filerw_ref_close γ fk q (.open true wb .pipe) C $$ [Htok Hfields Hpay]
+  ihave Href := filerw_ref_close γ fk q (.open true wb (.pipe γp)) C $$ [Htok Hfields Hpay]
   · iframe
   have hr10 : R' 10#5 = BitVec.ofNat 64 d ∨ R' 10#5 = -1#64 := by
     rw [h10']
@@ -201,7 +201,7 @@ theorem frd_arm_pipe (PR : PIPEREAD) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF 
       rcases hr10 with hd | hm
       · rw [hd]; exact frd_ret_nat n d hdle
       · rw [hm]; exact filereadRet_m1 n
-    iapply filereadExtra_pipe V.gen V.upt F Rd Rin P wb n _ M' _ $$ HP
+    iapply filereadExtra_pipe V.gen V.upt F Rd Rin P wb γp n _ M' _ $$ HP
 
 set_option maxHeartbeats 8000000 in
 /-- **`+0xa4 .. +0xac`: THE ELSE ARM** (Rocq's `fr_panic`): the literal,

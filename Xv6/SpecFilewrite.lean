@@ -308,7 +308,7 @@ theorem filewriteDevsw_env (γl : GName) (γu : UartNames) (mj : Nat) :
 def filewriteEnv (γl : GName) (γu : UartNames) (st : FdState) : IProp GF :=
   match st with
   | .closed => emp
-  | .open _ _ .pipe => emp
+  | .open _ _ (.pipe _) => emp
   | .open _ _ (.inode _ _ _) => filewriteFsEnv (hlc := hlc)
   | .open _ _ (.device mj) => filewriteDevEnv γl γu mj
 
@@ -317,7 +317,7 @@ Rocq's `filewrite_dev_out` = the environment, only read). -/
 def filewriteEnvOut (γl : GName) (γu : UartNames) (st : FdState) : IProp GF :=
   match st with
   | .closed => emp
-  | .open _ _ .pipe => emp
+  | .open _ _ (.pipe _) => emp
   | .open _ _ (.inode _ _ _) => filewriteFsOut
   | .open _ _ (.device mj) => filewriteDevEnv γl γu mj
 
@@ -542,7 +542,7 @@ def filewriteExtra (P : UPtd) (st : FdState) (n : Int) (M : Nat → List (BitVec
   match st with
   | .open _ true (.inode i γo _) => writeArmsAt (hlc := hlc) (fsGammaL fscFs) i γo P n M ua Q r
   | .open _ true (.device mj) => if mj = CONSOLE then writeConsArms P ua Q n r else emp
-  | .open _ true .pipe => iprop(⌜pipeWpostR P ua n.toNat r⌝)
+  | .open _ true (.pipe _) => iprop(⌜pipeWpostR P ua n.toNat r⌝)
   | _ => emp
 
 /-- THE WHOLE POST'S ARMED PART (Rocq `filewrite_arms`): the landed blanket
@@ -604,9 +604,9 @@ theorem filewriteExtra_dev_drop (P : UPtd) (rb : Bool) (mj : Nat) (hmj : mj ≠ 
 /-- Rocq `filewrite_extra_pipe`: the pipe arm is pipewrite's answer and its
 reason (`SpecPipewrite.pipeWpostR`, Rocq `pipe_wpost`'s pure part) at a
 writable end. -/
-theorem filewriteExtra_pipe (P : UPtd) (rb wb : Bool) (n : Int) (M : Nat → List (BitVec 8)) (ua : BitVec 64)
+theorem filewriteExtra_pipe (P : UPtd) (rb wb : Bool) (γp : PipeNames) (n : Int) (M : Nat → List (BitVec 8)) (ua : BitVec 64)
     (Q : Nat → IProp GF) (r : BitVec 64) (h : wb = true → pipeWpostR P ua n.toNat r) :
-    ⊢ filewriteExtra (hlc := hlc) P (.open rb wb .pipe) n M ua Q r := by
+    ⊢ filewriteExtra (hlc := hlc) P (.open rb wb (.pipe γp)) n M ua Q r := by
   unfold filewriteExtra
   cases wb
   · exact .rfl
@@ -614,9 +614,9 @@ theorem filewriteExtra_pipe (P : UPtd) (rb wb : Bool) (n : Int) (M : Nat → Lis
 
 /-- Rocq `filewrite_extra_unwritable`: the `f->writable == 0` early return
 arms nothing -- every armed state is WRITABLE. -/
-theorem filewriteExtra_unwritable (P : UPtd) (inum : BitVec 32) (γo : GName) (C : FContent) (st : FdState)
+theorem filewriteExtra_unwritable (P : UPtd) (inum : BitVec 32) (γo : GName) (γp : PipeNames) (C : FContent) (st : FdState)
     (n : Int) (M : Nat → List (BitVec 8)) (ua : BitVec 64) (Q : Nat → IProp GF) (r : BitVec 64)
-    (hok : fdstateOk inum γo C st) (hw : C.writable = 0#8) :
+    (hok : fdstateOk inum γo γp C st) (hw : C.writable = 0#8) :
     ⊢ filewriteExtra (hlc := hlc) P st n M ua Q r := by
   rcases st with _ | ⟨rb, wb, t⟩
   · exact .rfl
@@ -627,9 +627,9 @@ theorem filewriteExtra_unwritable (P : UPtd) (inum : BitVec 32) (γo : GName) (C
 
 /-- ... and its input is dropped there (the chains are only asked of a
 writable descriptor). -/
-theorem filewriteIn_unwritable (inum : BitVec 32) (γo : GName) (C : FContent) (st : FdState)
+theorem filewriteIn_unwritable (inum : BitVec 32) (γo : GName) (γp : PipeNames) (C : FContent) (st : FdState)
     (n : Int) (M : Nat → List (BitVec 8)) (ua : BitVec 64) (Q : Nat → IProp GF)
-    (hok : fdstateOk inum γo C st) (hw : C.writable = 0#8) :
+    (hok : fdstateOk inum γo γp C st) (hw : C.writable = 0#8) :
     filewriteIn (hlc := hlc) st n M ua Q ⊢ emp := by
   rcases st with _ | ⟨rb, wb, t⟩
   · exact .rfl
@@ -648,10 +648,10 @@ theorem filewriteExtra_neg (P : UPtd) (st : FdState) (n : Int) (M : Nat → List
   · exact .rfl
   · cases wb
     · unfold filewriteIn filewriteExtra; rcases t with _ | ⟨i, g, om⟩ | mj <;> exact .rfl
-    · rcases t with _ | ⟨i, g, om⟩ | mj
+    · rcases t with γp | ⟨i, g, om⟩ | mj
       · -- a negative request never reaches the pipe (Rocq `pipe_wpost_neg`)
         iintro -
-        iapply filewriteExtra_pipe P rb true n M ua Q (-1#64) (fun _ => by
+        iapply filewriteExtra_pipe P rb true γp n M ua Q (-1#64) (fun _ => by
           rw [show n.toNat = 0 by omega]; exact pipeWpostR_neg P ua)
       · unfold filewriteIn filewriteExtra
         iintro Hc

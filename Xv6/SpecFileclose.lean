@@ -145,14 +145,14 @@ def filecloseFsOut : IProp GF := bslots (GF := GF) 3
 `fileclose_env`). -/
 def filecloseEnv (Γ : SchedNames) (j : Nat) (p : BitVec 64) (γkl : GName) (γk : KmemNames)
     (on : Option Nat) : FdState → IProp GF
-  | .open _ _ .pipe => fileclosePipeEnv Γ γkl γk on
+  | .open _ _ (.pipe _) => fileclosePipeEnv Γ γkl γk on
   | .open _ _ (.inode _ _ _) => filecloseFsEnv (hlc := hlc) Γ j p
   | .open _ _ (.device _) => filecloseFsEnv (hlc := hlc) Γ j p
   | .closed => iprop(emp)
 
 /-- Rocq `fileclose_env_out`. -/
 def filecloseEnvOut (γk : KmemNames) (on : Option Nat) : FdState → IProp GF
-  | .open _ _ .pipe => fileclosePipeOut γk on
+  | .open _ _ (.pipe _) => fileclosePipeOut γk on
   | .open _ _ (.inode _ _ _) => filecloseFsOut
   | .open _ _ (.device _) => filecloseFsOut
   | .closed => iprop(emp)
@@ -189,7 +189,7 @@ theorem filecloseEnv_outOfEnv (Γ : SchedNames) (j : Nat) (p : BitVec 64) (γkl 
   | closed => unfold filecloseEnv filecloseEnvOut; exact .rfl
   | «open» r w t =>
     cases t with
-    | pipe => exact fileclosePipeEnv_out Γ γkl γk on
+    | pipe _ => exact fileclosePipeEnv_out Γ γkl γk on
     | inode n g om => exact filecloseFsEnv_out Γ j p
     | device mj => exact filecloseFsEnv_out Γ j p
 
@@ -242,7 +242,7 @@ theorem filecloseEnv_split (Γ : SchedNames) (j : Nat) (p : BitVec 64) (γkl : G
     · iapply filecloseFsEnv_out $$ Hf
   | «open» r w t =>
     cases t with
-    | pipe =>
+    | pipe _ =>
       unfold filecloseEnv filecloseEnvOut
       iintro ⟨Hp, Hf⟩
       isplitl [Hp]

@@ -270,7 +270,7 @@ def filereadFsOut : IProp GF := iprop(bslot)
 def filereadEnv (st : FdState) : IProp GF :=
   match st with
   | .closed => emp
-  | .open _ _ .pipe => emp
+  | .open _ _ (.pipe _) => emp
   | .open _ _ (.inode _ _ _) => filereadFsEnv (hlc := hlc)
   | .open _ _ (.device mj) => filereadDevEnv mj
 
@@ -278,7 +278,7 @@ def filereadEnv (st : FdState) : IProp GF :=
 def filereadEnvOut (st : FdState) : IProp GF :=
   match st with
   | .closed => emp
-  | .open _ _ .pipe => emp
+  | .open _ _ (.pipe _) => emp
   | .open _ _ (.inode _ _ _) => filereadFsOut
   | .open _ _ (.device mj) => filereadDevOut mj
 
@@ -440,7 +440,7 @@ def filereadExtraCore (gn : GName) (pt : UPtd) (st : FdState) (n : Int) (F : Pfa
   | .open true _ (.inode i γo _) => readArms (hlc := hlc) (fsGammaL fscFs) i γo n F r M' addr
   | .open true _ (.device mj) =>
     if mj = CONSOLE then consoleReceipt (hlc := hlc) gn pt Rd Rin n r M' addr else iprop(emp)
-  | .open true _ .pipe => iprop(emp)
+  | .open true _ (.pipe _) => iprop(emp)
   | .closed => iprop(⌜r = -1#64⌝)
   | .open false _ _ => iprop(⌜r = -1#64⌝)
 
@@ -507,9 +507,9 @@ theorem filereadExtra_inode_of (st : FdState) (wb : Bool) (i : Nat) (γo : GName
   iframe HP H
 
 /-- Rocq `fileread_extra_pipe`. -/
-theorem filereadExtra_pipe (wb : Bool) (n : Int) (r : BitVec 64) (M' : Nat → List (BitVec 8))
+theorem filereadExtra_pipe (wb : Bool) (γp : PipeNames) (n : Int) (r : BitVec 64) (M' : Nat → List (BitVec 8))
     (addr : BitVec 64) :
-    P ⊢ filereadExtra (hlc := hlc) gn pt (.open true wb .pipe) n F Rd Rin P r M' addr := by
+    P ⊢ filereadExtra (hlc := hlc) gn pt (.open true wb (.pipe γp)) n F Rd Rin P r M' addr := by
   unfold filereadExtra filereadExtraCore
   iintro HP
   iframe HP
@@ -574,9 +574,9 @@ theorem filereadIn_dev_console (st : FdState) (wb : Bool) (mj : Nat)
 
 /-- THE `f->readable == 0` EARLY RETURN (Rocq `fileread_extra_unreadable`):
 the arm there is the -1 claim itself. -/
-theorem filereadExtra_unreadable (inum : BitVec 32) (γo : GName) (C : FContent) (st : FdState)
+theorem filereadExtra_unreadable (inum : BitVec 32) (γo : GName) (γp : PipeNames) (C : FContent) (st : FdState)
     (n : Int) (M' : Nat → List (BitVec 8)) (addr : BitVec 64)
-    (hok : fdstateOk inum γo C st) (hz : C.readable = 0#8) :
+    (hok : fdstateOk inum γo γp C st) (hz : C.readable = 0#8) :
     P ⊢ filereadExtra (hlc := hlc) gn pt st n F Rd Rin P (-1#64) M' addr := by
   rcases st with _ | ⟨rb, wb, t⟩
   · exact filereadExtra_closed gn pt F Rd Rin P n M' addr
@@ -589,8 +589,8 @@ theorem filereadExtra_unreadable (inum : BitVec 32) (γo : GName) (C : FContent)
       rw [hz] at hr; exact absurd hr (by decide)
 
 /-- ... and its input, handed straight back. -/
-theorem filereadIn_unreadable (inum : BitVec 32) (γo : GName) (C : FContent) (st : FdState)
-    (hok : fdstateOk inum γo C st) (hz : C.readable = 0#8) :
+theorem filereadIn_unreadable (inum : BitVec 32) (γo : GName) (γp : PipeNames) (C : FContent) (st : FdState)
+    (hok : fdstateOk inum γo γp C st) (hz : C.readable = 0#8) :
     filereadIn (hlc := hlc) st F Rd Rin P ⊢ P -∗ P := by
   rcases st with _ | ⟨rb, wb, t⟩
   · simp only [filereadIn]

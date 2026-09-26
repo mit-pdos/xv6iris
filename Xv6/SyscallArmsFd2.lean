@@ -304,7 +304,7 @@ theorem syscall_arm_pipe (SP : SYSPIPE)
   unfold sysPipePost
   icases Hpost with ⟨⟨%hr, Hpriv, Hfr⟩ |
     ⟨%fd0, %fd1, %l, %d0, %d1, %P', %M1, %⟨hr, hfr, hd, hext, heq, hm⟩, Hpriv, Hfr⟩ |
-    ⟨%fd0, %fd1, %l, %k0, %k1, %P', %M1, %⟨hr, hfr, hne, -, -, hext, heq, hm⟩, Hpriv, Hfr⟩⟩
+    ⟨%fd0, %fd1, %l, %k0, %k1, %γp, %P', %M1, %⟨hr, hfr, hne, -, -, hext, heq, hm⟩, Hpriv, Hfr⟩⟩
   · -- nothing moved
     have hmem : syscMemOk V (syscStore { V with ofile := V.ofile, upt := V.upt } (R2 10#5)) (syscImg V M)
         (syscImg (syscStore { V with ofile := V.ofile, upt := V.upt } (R2 10#5)) M) := by
@@ -363,12 +363,12 @@ theorem syscall_arm_pipe (SP : SYSPIPE)
       refine ⟨_, ?_, himg⟩
       simp only [List.length_append, sysPipeFdBytes_length]
       omega
-    have hfd := syscPipe_fd_ok V sts hn4 ha fd0 fd1 l hfr hne
-    obtain ⟨hl0', hl1'⟩ := syscPipe_least V sts ha fd0 fd1 l hfr
+    have hfd := syscPipe_fd_ok V sts hn4 ha fd0 fd1 l γp hfr hne
+    obtain ⟨hl0', hl1'⟩ := syscPipe_least V sts ha fd0 fd1 l γp hfr
     have hpp : syscPipeOk V (syscImg V M)
         (syscImg (syscStore { V with ofile := (V.ofile.set fd0 (fnode k0)).set fd1 (fnode k1), upt := P' } (R2 10#5)) M1) 0#64 sts
-        ((sts.set fd0 (.open true false .pipe)).set fd1 (.open false true .pipe)) :=
-      fun _ _ => ⟨fd0, fd1, hne, hl0', hl1', himg, rfl⟩
+        ((sts.set fd0 (.open true false (.pipe γp))).set fd1 (.open false true (.pipe γp))) :=
+      fun _ _ => ⟨fd0, fd1, γp, hne, hl0', hl1', himg, rfl⟩
     rw [← hr] at hfd hpp
     have hrows := syscRows_gen V M M1 sts _ cs pid ((V.ofile.set fd0 (fnode k0)).set fd1 (fnode k1)) P'
       (R2 10#5) 4 hn4 (by decide) (by decide) (by decide) (by decide) (by decide) hl0 hext hmem hfd hpp

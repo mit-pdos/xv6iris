@@ -176,7 +176,7 @@ variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [Fdslot
 state the caller keyed its environment on IS its reading. -/
 theorem filerw_ref_open (γ : FileNames) (fk : Nat) (q : Qp) (st : FdState) :
     fileRef (GF := GF) γ fk q st ⊢
-      ∃ C : FContent, ⌜∃ (inum : BitVec 32) (γo : GName), fdstateOk inum γo C st⌝ ∗
+      ∃ C : FContent, ⌜∃ (inum : BitVec 32) (γo : GName) (γp : PipeNames), fdstateOk inum γo γp C st⌝ ∗
         frefTok γ fk q ∗ fileFieldsAt curCtx fk q C ∗ filePaySt γ fk q C st := by
   unfold fileRef
   iintro ⟨%C, Htok, Hf, Hp⟩
@@ -185,7 +185,7 @@ theorem filerw_ref_open (γ : FileNames) (fk : Nat) (q : Qp) (st : FdState) :
   icases Hp with ⟨%pn, %hok, Hpt, Hc⟩
   iframe Htok Hf
   isplitr
-  · ipureintro; exact ⟨pn.inum, pn.ooff, hok⟩
+  · ipureintro; exact ⟨pn.inum, pn.ooff, pn.pipe, hok⟩
   iexists pn
   iframe Hpt Hc
   ipureintro; exact hok
@@ -249,15 +249,17 @@ theorem filerw_fields_major (fk : Nat) (q : Qp) (C : FContent) :
 /-- THE PIPE ARM'S PAYLOAD (Rocq's `file_core_noff` pipe arm, read by
 pipewrite): the pipe's handle and the end's reference, lent. -/
 theorem filerw_pay_pipe (γ : FileNames) (fk : Nat) (q : Qp) (C : FContent) (r w : Bool)
-    (h : C.type = FD_PIPE) :
-    filePaySt (GF := GF) γ fk q C (.open r w .pipe) ⊢
-      ∃ (γl : GName) (γp : PipeNames), isPipe γl γp C.pipe ∗ pipeRef γp (fcWbool C) q ∗
-        (pipeRef γp (fcWbool C) q -∗ filePaySt γ fk q C (.open r w .pipe)) := by
+    (γp : PipeNames) (h : C.type = FD_PIPE) :
+    filePaySt (GF := GF) γ fk q C (.open r w (.pipe γp)) ⊢
+      ∃ γl : GName, isPipe γl γp C.pipe ∗ pipeRef γp (fcWbool C) q ∗
+        (pipeRef γp (fcWbool C) q -∗ filePaySt γ fk q C (.open r w (.pipe γp))) := by
   unfold filePaySt fileCore
   iintro ⟨%pn, %hok, Htok, Hnoff, Hoff⟩
+  have hg : γp = pn.pipe := hok.2.2.2.1
+  subst hg
   ihave Hnoff := (fileCoreNoff_pipe q pn C h).1 $$ Hnoff
   icases Hnoff with ⟨#Hpi, Href, Hir⟩
-  iexists pn.lock, pn.pipe
+  iexists pn.lock
   iframe Hpi Href
   iintro Href
   iexists pn

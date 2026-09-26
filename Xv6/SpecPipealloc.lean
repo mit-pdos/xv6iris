@@ -24,8 +24,8 @@ filealloc hands back license the eight unlocked stores into the two
 file's PAYLOAD is published as `f->pipe` is written: the slot's
 payload-names field is updated (`fpayTok_update`) with the pipe's names,
 legal with no lock because this is the only reference.  The two ends come
-out INSIDE their files: `FdState.open true false .pipe` is the read end and
-`.open false true .pipe` the write end (`fdstateOk` ties the flags to the
+out INSIDE their files: `FdState.open true false (.pipe γp)` is the read end and
+`.open false true (.pipe γp)` the write end (`fdstateOk` ties the flags to the
 cells).  On the bad paths the two `struct file *` cells are NOT restored,
 so failure promises the cells back with unspecified contents, both fd
 units back, and the page count untouched.
@@ -40,6 +40,15 @@ fileclose's Lean contract is at depth 0 and sys_pipe (the one caller) runs
 there; (2) the block is its pid cell (the Lean fs convention);
 (3) `procsInv` is no longer a premise (Rocq has none: the files pipealloc
 closes are untyped, so fileclose's environment is `emp`).
+(4) THE ENDS NAME THEIR PIPE (Rocq `FdOpen true false (FdPipe γp)` /
+`FdOpen false true (FdPipe γp)`, one `γp` for both): as Rocq; but Rocq's
+success arm ALSO hands out the byte queue's fragment at the birth state
+(`pipe_qfrag (pn_queue γp) pst0`), and this one does not yet: the lock's
+payload (`PipeInvDefs.pipeResAt`) does not carry the queue's authority
+(`pipeQres`) until pipeclose can pay the close step, which needs
+fileclose's close payment (`fileclose_cpay`, the PQ-b wave).  The birth
+allocates the queue (`PipeBirth.pipe_ends_alloc`, Rocq's) and drops both
+halves meanwhile.
 -/
 import Xv6.SpecFileclose
 import Xv6.SpecKalloc
@@ -61,9 +70,9 @@ def pipeallocPost {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF
   (⌜r = 0xFFFFFFFFFFFFFFFF#64⌝ ∗ kallocAvail γk on ∗ fdSlot ∗ fdSlot ∗
     (∃ w0 w1 : BitVec 64, wordPointsTo pf0 8 (DFrac.own 1) w0 ∗ wordPointsTo pf1 8 (DFrac.own 1) w1)) ∨
   (⌜r = 0#64⌝ ∗ kallocAvail γk (availDec on) ∗
-    ∃ k0 k1 : Nat, ⌜k0 < NFILE ∧ k1 < NFILE⌝ ∗
+    ∃ (k0 k1 : Nat) (γp : PipeNames), ⌜k0 < NFILE ∧ k1 < NFILE⌝ ∗
       wordPointsTo pf0 8 (DFrac.own 1) (fnode k0) ∗ wordPointsTo pf1 8 (DFrac.own 1) (fnode k1) ∗
-      fileRef γ k0 1 (.open true false .pipe) ∗ fileRef γ k1 1 (.open false true .pipe))
+      fileRef γ k0 1 (.open true false (.pipe γp)) ∗ fileRef γ k1 1 (.open false true (.pipe γp)))
 
 /-- **WP of `pipealloc(f0 = a0, f1 = a1)`** (Rocq `wp_pipealloc_sconf_body`),
 eb-generic at depth 0: the trap-CSR complement, the running thread's pid

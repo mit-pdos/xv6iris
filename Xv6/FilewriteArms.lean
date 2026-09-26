@@ -164,7 +164,7 @@ set_option maxHeartbeats 16000000 in
 `c.j`. -/
 theorem fwr_arm_pipe (PW : PIPEWRITE) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
     (cpu : CPU) (k : KCtx) (spie spp : Bool) (R : RegMap) (γl : GName) (γu : UartNames)
-    (γ : FileNames) (fk : Nat) (q : Qp) (C : FContent) (rb wb : Bool) (j : Nat) (pid : BitVec 32) (V : ProcPriv)
+    (γ : FileNames) (fk : Nat) (q : Qp) (C : FContent) (rb wb : Bool) (γp : PipeNames) (j : Nat) (pid : BitVec 32) (V : ProcPriv)
     (M : Nat → List (BitVec 8)) (γkl : GName) (γk : KmemNames) (n : Int) (Q : Nat → IProp GF)
     (w2 w4 w5 w8 w9 w10 w11 : BitVec 64)
     (hK : filewriteSlots ≤ k.avail) (hj : j < NPROC) (hproc : k.proc = procAddr j)
@@ -179,15 +179,15 @@ theorem fwr_arm_pipe (PW : PIPEWRITE) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF
       (k.regs 22#5) w8 w9 w10 w11 ∗
     trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗
     procsInv Γ ∗ isLock γkl kmemLockAddr "kmem" (kmemRes γk) ∗ kallocAvail γk none ∗
-    frefTok γ fk q ∗ fileFieldsAt curCtx fk q C ∗ filePaySt γ fk q C (.open rb wb .pipe) ∗
+    frefTok γ fk q ∗ fileFieldsAt curCtx fk q C ∗ filePaySt γ fk q C (.open rb wb (.pipe γp)) ∗
     procPrivExt (procAddr j) pid V V.upt M ∗
-    fwrK (hlc := hlc) k γl γu γ fk q (.open rb wb .pipe) j pid V M n Q
+    fwrK (hlc := hlc) k γl γu γ fk q (.open rb wb (.pipe γp)) j pid V M n Q
     ⊢ wpLoop (GF := GF) cpu := by
   have hK' : 12 + writeiSlots ≤ k.avail := hK
   iintro ⟨Hk, Hpc, Hframe, Hte, Hce, #Hpi, #Hkl, #Hav, Htok, Hfields, Hpay, Hpriv, HΦ⟩
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩
   icases filerw_fields_pipe fk q C $$ Hfields with ⟨Hpcell, Hfw⟩
-  icases filerw_pay_pipe γ fk q C rb wb hty $$ Hpay with ⟨%γl, %γp, #Hpp, Hpref, Hpback⟩
+  icases filerw_pay_pipe γ fk q C rb wb γp hty $$ Hpay with ⟨%γl, #Hpp, Hpref, Hpback⟩
   -- +0x5c  c.ld a0,16(a0)
   k_step_e (wp_s_ld cpu _ (KA.«filewrite» + 0x5c#64) true 16#12 10#5 10#5 (by decide) (by decide)
       (DFrac.own q) C.pipe)
@@ -231,7 +231,7 @@ theorem fwr_arm_pipe (PW : PIPEWRITE) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF
   iintro %c' %R' %⟨hcs, h10'⟩ Hk Hpc Hte Hce
   ihave Hpay := Hpback $$ Hpref
   ihave Hfields := Hfw $$ Hpcell
-  ihave Href := filerw_ref_close γ fk q (.open rb wb .pipe) C $$ [Htok Hfields Hpay]
+  ihave Href := filerw_ref_close γ fk q (.open rb wb (.pipe γp)) C $$ [Htok Hfields Hpay]
   · iframe
   unfold fwrK
   iapply HΦ $$ %c' %spie1 %spp1 %R' %P' [] Hk Hpc Hte Hce Href Hpriv [] []
@@ -241,7 +241,7 @@ theorem fwr_arm_pipe (PW : PIPEWRITE) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF
     rw [h10']
     isplitr
     · ipureintro; exact hret
-    iapply filewriteExtra_pipe _ _ _ _ _ _ _ _ (fun _ => by rw [h11] at hwp; exact hwp)
+    iapply filewriteExtra_pipe _ _ _ _ _ _ _ _ _ (fun _ => by rw [h11] at hwp; exact hwp)
 
 /-! ## The FD_DEVICE arm's readings -/
 

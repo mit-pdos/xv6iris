@@ -71,20 +71,22 @@ theorem fwr_blez (n : Int) (hn : 0 ≤ n ∧ n < 2 ^ 31) :
     simp [h, this]
 
 /-- The dispatch's states, read off the content through `fdstateOk`. -/
-theorem fwr_st_pipe (inum : BitVec 32) (γo : GName) (C : FContent) (st : FdState)
-    (hok : fdstateOk inum γo C st) (h : C.type = FD_PIPE) : ∃ rb wb, st = .open rb wb .pipe := by
-  have ht := fdstateOk_type inum γo C st hok
+theorem fwr_st_pipe (inum : BitVec 32) (γo : GName) (γp : PipeNames) (C : FContent) (st : FdState)
+    (hok : fdstateOk inum γo γp C st) (h : C.type = FD_PIPE) : ∃ rb wb, st = .open rb wb (.pipe γp) := by
+  have ht := fdstateOk_type inum γo γp C st hok
   rw [h] at ht
-  rcases st with _ | ⟨rb, wb, _ | ⟨i, g, om⟩ | mj⟩
+  rcases st with _ | ⟨rb, wb, g | ⟨i, g, om⟩ | mj⟩
   · simp [fdTypeCode, FD_PIPE, FD_DEVICE, FD_INODE, FD_NONE] at ht
-  · exact ⟨rb, wb, rfl⟩
+  · obtain ⟨-, -, -, hg, -⟩ := hok
+    subst hg
+    exact ⟨rb, wb, rfl⟩
   · simp [fdTypeCode, FD_PIPE, FD_DEVICE, FD_INODE, FD_NONE] at ht
   · simp [fdTypeCode, FD_PIPE, FD_DEVICE, FD_INODE, FD_NONE] at ht
 
-theorem fwr_st_device (inum : BitVec 32) (γo : GName) (C : FContent) (st : FdState)
-    (hok : fdstateOk inum γo C st) (h : C.type = FD_DEVICE) (hw : C.writable ≠ 0#8) :
+theorem fwr_st_device (inum : BitVec 32) (γo : GName) (γp : PipeNames) (C : FContent) (st : FdState)
+    (hok : fdstateOk inum γo γp C st) (h : C.type = FD_DEVICE) (hw : C.writable ≠ 0#8) :
     ∃ rb mj, st = .open rb true (.device mj) ∧ mj = C.major.toNat := by
-  have ht := fdstateOk_type inum γo C st hok
+  have ht := fdstateOk_type inum γo γp C st hok
   rw [h] at ht
   rcases st with _ | ⟨rb, wb, _ | ⟨i, g, om⟩ | mj⟩
   · simp [fdTypeCode, FD_PIPE, FD_DEVICE, FD_INODE, FD_NONE] at ht
@@ -95,10 +97,10 @@ theorem fwr_st_device (inum : BitVec 32) (γo : GName) (C : FContent) (st : FdSt
     · exact absurd hw' hw
     · exact ⟨rb, mj, rfl, hmj⟩
 
-theorem fwr_st_inode (inum : BitVec 32) (γo : GName) (C : FContent) (st : FdState)
-    (hok : fdstateOk inum γo C st) (h : C.type = FD_INODE) (hw : C.writable ≠ 0#8) :
+theorem fwr_st_inode (inum : BitVec 32) (γo : GName) (γp : PipeNames) (C : FContent) (st : FdState)
+    (hok : fdstateOk inum γo γp C st) (h : C.type = FD_INODE) (hw : C.writable ≠ 0#8) :
     ∃ rb i, st = .open rb true (.inode i γo .parked) := by
-  have ht := fdstateOk_type inum γo C st hok
+  have ht := fdstateOk_type inum γo γp C st hok
   rw [h] at ht
   rcases st with _ | ⟨rb, wb, _ | ⟨i, g, om⟩ | mj⟩
   · simp [fdTypeCode, FD_PIPE, FD_DEVICE, FD_INODE, FD_NONE] at ht
@@ -129,7 +131,7 @@ refuted by its (stopped) environment. -/
 theorem fwr_dispatch (PW : PIPEWRITE) (IL : ILOCK) (WI : WRITEI) (IU : IUNLOCK) (BO : BEGIN_OP)
     (EO : END_OP) (CW : CONSOLEWRITE) (PA : PANIC) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF Γ]
     (cpu : CPU) (k : KCtx) (R : RegMap) (γ : FileNames) (fk : Nat) (q : Qp) (st : FdState)
-    (C : FContent) (inumC : BitVec 32) (γoC : GName)
+    (C : FContent) (inumC : BitVec 32) (γoC : GName) (γpC : PipeNames)
     (j : Nat) (pid : BitVec 32) (V : ProcPriv) (M : Nat → List (BitVec 8))
     (γkl : GName) (γk : KmemNames) (γl : GName) (γu : UartNames) (n : Int) (Q : Nat → IProp GF)
     (w2 w4 w5 w8 w9 w10 w11 : BitVec 64)
@@ -137,7 +139,7 @@ theorem fwr_dispatch (PW : PIPEWRITE) (IL : ILOCK) (WI : WRITEI) (IU : IUNLOCK) 
     (hj : j < NPROC) (hproc : k.proc = procAddr j)
     (hnoff : k.noff = 0) (htier : k.tier = KTier.kpt) (ht0 : curTier = KTier.kpt)
     (hlocks : k.locks = []) (hn : -2 ^ 31 ≤ n ∧ n < 2 ^ 31) (hn0 : 0 ≤ n)
-    (hok : fdstateOk inumC γoC C st) (hw : ¬ C.writable = 0#8)
+    (hok : fdstateOk inumC γoC γpC C st) (hw : ¬ C.writable = 0#8)
     (hr : fwrRegs k fk n (k.regs 9#5) (k.regs 19#5) (k.regs 20#5) (k.regs 23#5) (k.regs 24#5)
       (k.regs 25#5) R) (h10 : R 10#5 = fnode fk) (h11 : R 11#5 = k.regs 11#5)
     (h12 : R 12#5 = BitVec.ofInt 64 n) :
@@ -172,8 +174,8 @@ theorem fwr_dispatch (PW : PIPEWRITE) (IL : ILOCK) (WI : WRITEI) (IU : IUNLOCK) 
     k_step_e (wp_s_branch cpu _ (KA.«filewrite» + 0x28#64) false 52#13 15#5 14#5 (by decide) bop.BEQ)
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [filerw_beq1, decide_eq_true h1]
     iintro Hk Hpc
-    obtain ⟨rb, wb, rfl⟩ := fwr_st_pipe inumC γoC C st hok h1
-    iapply (fwr_arm_pipe PW Γ cpu k k.spie k.spp _ γl γu γ fk q C rb wb j pid V M γkl γk n Q w2 w4 w5 w8 w9
+    obtain ⟨rb, wb, rfl⟩ := fwr_st_pipe inumC γoC γpC C st hok h1
+    iapply (fwr_arm_pipe PW Γ cpu k k.spie k.spp _ γl γu γ fk q C rb wb γpC j pid V M γkl γk n Q w2 w4 w5 w8 w9
       w10 w11 hK hj hproc hnoff htier ht0 hn h1 ?hrp ?h10p ?h12p ?h11p) $$ [- $Hk $Hpc]
     rotate_right 1
     k_norm_g
@@ -198,7 +200,7 @@ theorem fwr_dispatch (PW : PIPEWRITE) (IL : ILOCK) (WI : WRITEI) (IU : IUNLOCK) 
     k_step_e (wp_s_branch cpu _ (KA.«filewrite» + 0x2e#64) false 54#13 15#5 14#5 (by decide) bop.BEQ)
       from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [filerw_beq3, decide_eq_true h3]
     iintro Hk Hpc
-    obtain ⟨rb, mj, rfl, hmj⟩ := fwr_st_device inumC γoC C st hok h3 hw
+    obtain ⟨rb, mj, rfl, hmj⟩ := fwr_st_device inumC γoC γpC C st hok h3 hw
     unfold filewriteEnv
     iapply (fwr_arm_dev CW Γ cpu k k.spie k.spp _ γl γu γ fk q C rb mj j pid V M γkl γk n Q w2 w4 w5
       w8 w9 w10 w11 hK hj hproc hnoff htier ht0 hn hn0 hmj ?hrv ?h10v ?h11v ?h12v) $$ [- $Hk $Hpc]
@@ -240,7 +242,7 @@ theorem fwr_dispatch (PW : PIPEWRITE) (IL : ILOCK) (WI : WRITEI) (IU : IUNLOCK) 
   k_step_e (wp_s_branch cpu _ (KA.«filewrite» + 0x34#64) false 206#13 15#5 14#5 (by decide) bop.BNE)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [filerw_bne2, decide_eq_true h2, Bool.not_true]
   iintro Hk Hpc
-  obtain ⟨rb, i, rfl⟩ := fwr_st_inode inumC γoC C st hok h2 hw
+  obtain ⟨rb, i, rfl⟩ := fwr_st_inode inumC γoC γpC C st hok h2 hw
   ihave Href := filerw_ref_close γ fk q _ C $$ [Htok Hfields Hpay]
   · iframe
   by_cases hz : n = 0
@@ -315,7 +317,7 @@ theorem filewrite_main (PW : PIPEWRITE) (IL : ILOCK) (WI : WRITEI) (IU : IUNLOCK
     · iframe
     iapply HK $$ %spie %spp %R' %P' %hp Hk Hpc Hte Hce Href Hpriv Henv Harms
   -- the reference, taken apart
-  icases filerw_ref_open γ fk q st $$ Href with ⟨%C, %⟨inumC, γoC, hok⟩, Htok, Hfields, Hpay⟩
+  icases filerw_ref_open γ fk q st $$ Href with ⟨%C, %⟨inumC, γoC, γpC, hok⟩, Htok, Hfields, Hpay⟩
   icases fwr_fields_writable fk q C $$ Hfields with ⟨Hw, Hfw⟩
   simp only [filewriteAddr]
   have e0 : kctx (GF := GF) cpu k ⊢ kctx cpu (k.withRegs k.regs) := .rfl
@@ -346,7 +348,7 @@ theorem filewrite_main (PW : PIPEWRITE) (IL : ILOCK) (WI : WRITEI) (IU : IUNLOCK
     · iframe
     ihave Hpriv := fwr_priv_self (procAddr j) pid V M $$ Hpriv
     ihave Henv := filewrite_env_out_of_env γl γu st $$ Henv
-    ihave - := filewriteIn_unwritable inumC γoC C st n _ _ Q hok hw $$ Hin
+    ihave - := filewriteIn_unwritable inumC γoC γpC C st n _ _ Q hok hw $$ Hin
     unfold fwrK
     iapply HΦ $$ %cpu %k.spie %k.spp %_ %V.upt [] Hk Hpc Hte Hce Href Hpriv Henv []
     · ipureintro
@@ -355,7 +357,7 @@ theorem filewrite_main (PW : PIPEWRITE) (IL : ILOCK) (WI : WRITEI) (IU : IUNLOCK
     · unfold filewriteArms
       isplitr
       · ipureintro; simp only [RegMap.set_apply]; exact filewriteRet_m1 n
-      iapply filewriteExtra_unwritable _ inumC γoC C st n _ _ Q _ hok hw
+      iapply filewriteExtra_unwritable _ inumC γoC γpC C st n _ _ Q _ hok hw
   -- +0x04  beqz a5 : falls (a writable descriptor)
   k_step_e (wp_s_branch cpu _ (KA.«filewrite» + 4#64) false 310#13 15#5 0#5 (by decide) bop.BEQ)
     from (text_instr _ _ _ _ rfl rfl) Htext $$ [- $Hk $Hpc] with [filerw_beqz, decide_eq_false hw]
@@ -408,7 +410,7 @@ theorem filewrite_main (PW : PIPEWRITE) (IL : ILOCK) (WI : WRITEI) (IU : IUNLOCK
     with [filerw_bnez_sign n hn, decide_eq_false hneg]
   iintro Hk Hpc
   ihave Hk := fwr_ctx_entry _ _ _ _ $$ Hk
-  iapply (fwr_dispatch PW IL WI IU BO EO CW PA Γ cpu k _ γ fk q st C inumC γoC j pid V M γkl γk γl γu
+  iapply (fwr_dispatch PW IL WI IU BO EO CW PA Γ cpu k _ γ fk q st C inumC γoC γpC j pid V M γkl γk γl γu
     n Q w2 w4 w5 w8 w9 w10 w11 hK hK12 hfk hj hproc hnoff htier ht0 hlocks hn (by omega) hok hw ?hrd
     ?h10d ?h11d ?h12d) $$ [- $Hk $Hpc]
   rotate_right 1
