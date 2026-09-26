@@ -359,7 +359,9 @@ Section UkShFork.
           ustr (ukn_d N') (DfracOwn 1) s0 len g -∗
           ustr (ukn_d N') dw ushp_whitespace 5 ushp_ws_f -∗
           ustr (ukn_d N') dv ushp_symbols 7 ushp_sym_f -∗
-          UserFd.ustd (ukn_fd N') ld -∗
+          (* ...AT THE PARENT'S OK VIEW (seccomp S4): the child's table is
+             sh's, every row closed or the console *)
+          UkSh.ush_std N' ld -∗
           UserCwd.ucwd (ukn_cwd N') FsImg.ROOTINO -∗
           (* ...AND ITS CHILDREN SET IS EMPTY, ON THE NOSE (design
              app-pipe SS4.3w, purchase 2), where the law used to take
@@ -517,7 +519,8 @@ Section UkShFork.
          (fun j : nat => f (k + j)%nat) -∗
        ustr (ukn_d N') DfracDiscarded ushp_whitespace 5 ushp_ws_f -∗
        ustr (ukn_d N') DfracDiscarded ushp_symbols 7 ushp_sym_f -∗
-       UserFd.ustd (ukn_fd N') l -∗
+       (* ...AT THE PARENT'S OK VIEW (seccomp S4) *)
+       UkSh.ush_std N' l -∗
        UserCwd.ucwd (ukn_cwd N') FsImg.ROOTINO -∗
        UserChildren.uch (ukn_ch N') ∅ -∗
        (* ...and its own pid, not <init>'s (design app-pipe SS4.3w,
@@ -579,8 +582,9 @@ Section UkShFork.
        M3a) and closed again at the loop head: the fork MINTS the token at
        the generation that joined it, and the wait REPORTS what the reap
        left.  THE PAYLOAD AND THE LEND ARE THE CALLER'S (step 4). *)
-    iApply (UkShDiag.wp_kshr_fork1_final N (ushf_pay f)
-              sz l ∅ h1 m1 (74 + (UkSh.ush_Dpipe + n)) FsImg.ROOTINO ∅ Q Rc Pex HQc
+    iDestruct "Hustd" as (vw) "[%Hvok Hustd]".
+    iApply (UkShDiag.wp_kshr_fork1_final_at N (ushf_pay f)
+              sz l vw ∅ h1 m1 (74 + (UkSh.ush_Dpipe + n)) FsImg.ROOTINO ∅ Q Rc Pex HQc
               with "Hcode Hro [Hdat Hbuf] Hsz Hustd Hcwd Hch [] HRc Hkw
                     Hlease Hrun").
     { rewrite /ushf_pay.
@@ -613,8 +617,8 @@ Section UkShFork.
         iDestruct "Hpid" as (γx pidx) "(%Hr & %Hrng & _ & Htok & Hf)".
         iRight. iExists γx, pidx. iFrame "Htok Hf".
         iSplitR; [ iPureIntro; exact Hr | iPureIntro; exact Hrng ]. }
-      iApply ("Hpanic" $! ∅ hA mA rA with "[%] [%] Hans Hustd Hpex Hrun");
-        [ exact Hmsg | exact HrA ]. }
+      iApply ("Hpanic" $! ∅ hA mA rA with "[%] [%] Hans [Hustd] Hpex Hrun");
+        [ exact Hmsg | exact HrA | by iApply ustd_at_ustd ]. }
     iSplitL "Hhead Hpid Hre".
     - (* ================= THE PARENT: reap, and round again ============= *)
       iIntros (hA mA rA) "%HrA _ %HcsA %Ha0A Hans Hpay Hsz Hustd Hcwd _ Hlease
@@ -752,7 +756,8 @@ Section UkShFork.
                 with "[%] [%] [Hustd Hcwd Hch Hpid Hpos] Hdat Hsz Hbuf Hrun").
       + exact HregsD.
       + exact Hfd0.
-      + rewrite /UkSh.ush_pstate /UkSh.ush_std. iFrame "Hustd Hcwd Hch Hpid Hpos".
+      + rewrite /UkSh.ush_pstate /UkSh.ush_std. iFrame "Hcwd Hch Hpid Hpos".
+        iExists vw. by iFrame "Hustd".
     - (* ================= THE CHILD: parse, run, exec =================== *)
       iIntros (N' hA mA γ') "%Hpeq' %HcsA %Ha0A Hmy HRc #Hcode' Hpay Hsz Hustd Hcwd
                              Hch Hpid' _ Hrun".
@@ -787,8 +792,8 @@ Section UkShFork.
         with (68 + (8 + (UkShDiag.ush_Dg + (UkSh.ush_Dpipe + n))))%nat
         by (unfold UkShDiag.ush_Dg, UkSh.ush_Dbody, UkSh.ush_Dpipe; lia).
       iApply ("Hchild" $! N' hB mA γ' with "[%] [%] Hmy HRc Hcode' Hro' Hjt'
-                Hline Hws Hsy Hustd Hcwd Hch Hpid' Hfresh Hrun");
-        [ exact Hpeq' | exact Hs1_A ].
+                Hline Hws Hsy [Hustd] Hcwd Hch Hpid' Hfresh Hrun");
+        [ exact Hpeq' | exact Hs1_A | rewrite /UkSh.ush_std; iExists vw; by iFrame "Hustd" ].
   Qed.
 
   (* ===================================================================== *)
