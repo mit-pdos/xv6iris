@@ -1235,3 +1235,6 @@ import Xv6.FsImgCheckUsed
 import Xv6.FsImgCheckRegion
 import Xv6.FsImgCheck
 import Xv6.FsImgBoot
+import Xv6.SystemBootEra
+import Xv6.SystemAdequacy
+import Xv6.LinkUexecWp
