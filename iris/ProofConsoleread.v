@@ -434,18 +434,27 @@ Section CrBodies.
     rewrite /cons_dl. iExists dv. iFrame "Hdv Hlb". iLeft. by iPureIntro.
   Qed.
 
+  (* THE MARKED ARMS KEEP THE POSITIONS (lane seccomp S2k, seccomp.md
+     10.12).  Every pop is at the ring's cursor and takes the stored
+     sequence's element there, and the cursor is never below the reader's
+     own position -- so on the tokenless arm and on the holder's marked arm
+     the run carries a bound [sl] with its order ([cons_chain]) and the
+     stored position of every byte delivered so far ([cons_placed]), at or
+     after [0] resp. the holder's own [n0]. *)
   Definition cr_racc `{XI : CurCtx} (cn : cons_names) (Wd : iProp Σ)
       (ord : option nat) (d : nat) (bs : nat -> bv 8)
       (hs : list (list mobs)) : iProp Σ :=
     match ord with
-    | None => ((∃ sl : list (list mobs * bv 8), cons_stored_lb cn sl) ∗
+    | None => ((∃ sl : list (list mobs * bv 8), cons_stored_lb cn sl ∗
+                  ⌜cons_chain sl⌝ ∗ ⌜cons_placed sl 0 d hs⌝) ∗
                (⌜d = 0%nat⌝ ∨ cons_dirty_lb cn))%I
     | Some n0 =>
         ((∃ sl : list (list mobs * bv 8),
             cons_rdtok cn (n0 + d)%nat ∗ cr_dlc cn n0 ∗ cons_read_pay (S gen_id) Rin ∗
             cons_stored_lb cn sl ∗
             ⌜cons_window sl n0 d bs hs⌝ ∗ ⌜cons_chain sl⌝)
-         ∨ (∃ sl : list (list mobs * bv 8), cons_stored_lb cn sl) ∗
+         ∨ (∃ sl : list (list mobs * bv 8), cons_stored_lb cn sl ∗
+              ⌜cons_chain sl⌝ ∗ ⌜cons_placed sl n0 d hs⌝) ∗
            cons_rdtok cn (n0 + d)%nat ∗ cons_dl cn n0 ∗ cons_dirty_lb cn)%I
     end.
 
@@ -462,7 +471,8 @@ Section CrBodies.
       (bs : nat -> bv 8)
       (hs : list (list mobs)) : iProp Σ :=
     match ord with
-    | None => ((∃ sl : list (list mobs * bv 8), cons_stored_lb cn sl) ∗
+    | None => ((∃ sl : list (list mobs * bv 8), cons_stored_lb cn sl ∗
+                  ⌜cons_chain sl⌝ ∗ ⌜cons_placed sl 0 d hs⌝) ∗
                (⌜d = 0%nat⌝ ∨ cons_dirty_lb cn))%I
     | Some n0 =>
         ((∃ sl : list (list mobs * bv 8),
@@ -470,7 +480,8 @@ Section CrBodies.
             cons_rdtok cn (n0 + dc)%nat ∗ cr_dlc cn n0 ∗ cons_read_pay (S gen_id) Rin ∗
             cons_stored_lb cn sl ∗
             ⌜cons_window sl n0 d bs hs⌝ ∗ ⌜cons_chain sl⌝)
-         ∨ (∃ sl : list (list mobs * bv 8), cons_stored_lb cn sl) ∗
+         ∨ (∃ sl : list (list mobs * bv 8), cons_stored_lb cn sl ∗
+              ⌜cons_chain sl⌝ ∗ ⌜cons_placed sl n0 d hs⌝) ∗
            cons_rdtok cn (n0 + dc)%nat ∗ cons_dl cn n0 ∗ cons_dirty_lb cn)%I
     end.
 
@@ -510,7 +521,10 @@ Section CrBodies.
                ⌜forall j : nat, (j < dc)%nat ->
                   ws !! j = sl' !! (cur + j)%nat⌝ ∗
                Rin ws)
-        ∨ cons_dirty_cred Wd) ∗
+        (* ...and where it did not, the credential and where each byte
+           came from: the stored position of every delivered byte, at or
+           after the start [cur] this call reports (lane seccomp S2k) *)
+        ∨ cons_dirty_cred Wd ∗ ⌜cons_chain sl⌝ ∗ ⌜cons_placed sl cur d hs⌝) ∗
        cons_out cn Wd ord cur dc)%I.
 
   (* ...AND THIS IS WHERE THE BOUNDARY'S LINK IS FIRED (lane CONS-IO,
@@ -602,18 +616,23 @@ Section CrBodies.
            marker costs the boundary. *)
         iMod (cons_cred_read cn Wd ⊤ ltac:(solve_ndisj) with "Hcinv Hdt")
           as "#Hc".
-        iDestruct "Hsl" as (sl) "#Hsl".
+        iDestruct "Hsl" as (sl) "(#Hsl & %Hchs & %Hpls)".
         iDestruct (cons_dl_dirty cn n0 (n0 + dc)%nat with "Hdt Hdl") as "Hdl".
         iModIntro. iFrame "Hres". iNext. iExists n0, sl.
         iSplitR; [iExact "Hsl" |].
-        iSplitR; [iRight; iExact "Hc" |].
+        iSplitR.
+        { iRight. iSplitR; [iExact "Hc" |].
+          iSplitR; [by iPureIntro | by iPureIntro]. }
         rewrite /cons_out /cons_reader. iFrame "Hrd Hdl".
-        iRight. iExact "Hc".
-    - iDestruct "H" as "[Hsl _]". iDestruct "Hsl" as (sl) "#Hsl".
+        iRight. iSplitR; [iExact "Hc" | by iPureIntro].
+    - iDestruct "H" as "[Hsl _]".
+      iDestruct "Hsl" as (sl) "(#Hsl & %Hchs & %Hpls)".
       iPoseProof (cr_price_none cn Wd with "Hpr") as "#Hc".
       iModIntro. iFrame "Hres". iNext. iExists 0%nat, sl.
       iSplitR; [iExact "Hsl" |].
-      iSplitR; [iRight; iExact "Hc" | by rewrite /cons_out].
+      iSplitR; [| by rewrite /cons_out].
+      iRight. iSplitR; [iExact "Hc" |].
+      iSplitR; [by iPureIntro | by iPureIntro].
   Qed.
 
   (* ---- THE POP, AS ONE GHOST STEP ------------------------------------
@@ -710,11 +729,23 @@ Section CrBodies.
             iRight. iExact "Hdt". }
           (* the link is DROPPED here: a marked ring never fires, and
              [dl] freezes where it stood (lane CONS-IO, milestone B). *)
-          iRight. iSplitR; [iExists st; iExact "Hstlb" |]. iFrame "Hrd".
+          (* ...but KEEP WHERE THE BYTES CAME FROM (lane seccomp S2k): the
+             window places every byte so far at or after [n0], and the one
+             just popped is at the cursor, which the token's own count
+             [n0 + d] never exceeds. *)
+          iRight. iSplitR.
+          { iExists st. iFrame "Hstlb". iPureIntro. split; [exact (cons_chain_prefix _ _ Hstpd Hch) |].
+            apply (cons_placed_snoc st n0 d cur hs h b); [| lia | exact Hs0 | exact Hends].
+            exact (cons_placed_prefix sl st n0 d hs Hpfx
+                     (cons_placed_of_window sl n0 d src hs Hwin)). }
+          iFrame "Hrd".
           iSplitL "Hdl"; [iApply (cr_dlc_dl with "Hdl") |]. iExact "Hdt".
       + (* ...and the same on a run that was already marked: the token is
            at [n0 + d] and the pop carries it to [n0 + S d]. *)
         iDestruct (cons_cursor_agree with "Hcu Hrd") as %Hnrd. subst nrd.
+        iDestruct "Hsl" as (sl) "(#Hsl & %Hchsl & %Hplsl)".
+        iDestruct (cons_stored_lb_prefix with "Ha Hsl") as %Hpfx.
+        iDestruct (cons_stored_lb_get with "Ha") as "[Ha #Hstlb]".
         iMod (cons_cursor_update cn (n0 + d)%nat (n0 + S d)%nat
                 with "Hcu Hrd") as "[Hcu Hrd]".
         iModIntro. iSplitL "Ha Hcu Hhi Hlm Hdc".
@@ -725,9 +756,15 @@ Section CrBodies.
           iSplitR; [iPureIntro; exact Hlog |].
           iSplitR; [iPureIntro; lia |]. iSplitR; [iPureIntro; lia |].
           iRight. iExact "Hdt". }
-        iRight. iFrame "Hsl Hrd Hdl". iExact "Hdt".
+        iRight. iFrame "Hrd Hdl". iSplitR; [| iExact "Hdt"].
+        iExists st. iFrame "Hstlb". iPureIntro. split; [exact (cons_chain_prefix _ _ Hstpd Hch) |].
+        apply (cons_placed_snoc st n0 d cur hs h b); [| lia | exact Hs0 | exact Hends].
+        exact (cons_placed_prefix sl st n0 d hs Hpfx Hplsl).
     - rewrite /cr_racc.
       iDestruct "Hacc" as "[Hsl _]".
+      iDestruct "Hsl" as (sl) "(#Hsl & %Hchsl & %Hplsl)".
+      iDestruct (cons_stored_lb_prefix with "Ha Hsl") as %Hpfx.
+      iDestruct (cons_stored_lb_get with "Ha") as "[Ha #Hstlb]".
       iPoseProof (cr_price_none cn Wd with "Hpr") as "#Hc".
       iMod (cons_cred_pay cn Wd ⊤ ltac:(solve_ndisj) with "Hcinv Hc") as "#Hdt".
       iModIntro. iSplitL "Ha Hcu Hhi Hlm Hdc".
@@ -738,7 +775,10 @@ Section CrBodies.
         iSplitR; [iPureIntro; exact Hlog |].
         iSplitR; [iPureIntro; lia |]. iSplitR; [iPureIntro; lia |].
         iRight. iExact "Hdt". }
-      iFrame "Hsl". iRight. iExact "Hdt".
+      iSplitR; [| iRight; iExact "Hdt"].
+      iExists st. iFrame "Hstlb". iPureIntro. split; [exact (cons_chain_prefix _ _ Hstpd Hch) |].
+      apply (cons_placed_snoc st 0 d cur hs h b); [| lia | exact Hs0 | exact Hends].
+      exact (cons_placed_prefix sl st 0 d hs Hpfx Hplsl).
   Qed.
 
   (* THE READ'S FIRST LOOK AT THE RING.  Everything the run will earn
@@ -774,7 +814,8 @@ Section CrBodies.
               [exact Hst | exact Hpd | exact Hch | exact Hbl | exact Hlog
               | exact Hnc | exact Hdn]. }
           iRight. rewrite Nat.add_0_r. iFrame "Hpay".
-          iSplitR; [iExists st; iExact "Hstlb" |].
+          iSplitR; [iExists st; iFrame "Hstlb"; iPureIntro;
+                   split; [exact (cons_chain_prefix _ _ Hstpd Hch) | apply cons_placed_0] |].
           iSplitL "Hdv"; [| iExact "Hdt0"].
           rewrite /cons_dl. iExists dv. iFrame "Hdv Hdvlb".
           iRight. iExact "Hdt0". }
@@ -809,7 +850,8 @@ Section CrBodies.
           iSplitR; [iPureIntro; lia |]. iSplitR; [iPureIntro; lia |].
           iRight. iExact "Hdt". }
         iRight. rewrite Nat.add_0_r. iFrame "Hpay".
-        iSplitR; [iExists st; iExact "Hstlb" |].
+        iSplitR; [iExists st; iFrame "Hstlb"; iPureIntro;
+                   split; [exact (cons_chain_prefix _ _ Hstpd Hch) | apply cons_placed_0] |].
         iSplitL "Hdv"; [| iExact "Hdt"].
         rewrite /cons_dl. iExists dv. iFrame "Hdv Hdvlb". by iLeft.
     - rewrite /cr_racc.
@@ -818,7 +860,8 @@ Section CrBodies.
         iPureIntro. split_and!;
           [exact Hst | exact Hpd | exact Hch | exact Hbl | exact Hlog
           | exact Hnc | exact Hdn]. }
-      iSplitR; [iExists st; iExact "Hstlb" |]. iLeft. by iPureIntro.
+      iSplitR; [iExists st; iFrame "Hstlb"; iPureIntro;
+                   split; [exact (cons_chain_prefix _ _ Hstpd Hch) | apply cons_placed_0] |]. iLeft. by iPureIntro.
   Qed.
 
   (* ...AND THE POP THAT DELIVERS NOTHING.  Two exits do it -- the [C('D')]
@@ -915,7 +958,11 @@ Section CrBodies.
             iRight. iExact "Hdt". }
           (* the link is DROPPED here: a marked ring never fires, and
              [dl] freezes where it stood (lane CONS-IO, milestone B). *)
-          iRight. iSplitR; [iExists st; iExact "Hstlb" |]. iFrame "Hrd".
+          iRight. iSplitR.
+          { iExists st. iFrame "Hstlb". iPureIntro. split; [exact (cons_chain_prefix _ _ Hstpd Hch) |].
+            exact (cons_placed_prefix sl st n0 d hs Hpfx
+                     (cons_placed_of_window sl n0 d src hs Hwin)). }
+          iFrame "Hrd".
           iSplitL "Hdl"; [iApply (cr_dlc_dl with "Hdl") |]. iExact "Hdt".
       + iDestruct (cons_cursor_agree with "Hcu Hrd") as %Hnrd. subst nrd.
         iMod (cons_cursor_update cn (n0 + d)%nat (n0 + S d)%nat

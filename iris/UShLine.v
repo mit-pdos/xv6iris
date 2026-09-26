@@ -1045,7 +1045,7 @@ Section UShLine.
       iEval (rewrite ucons_reader_eq) in "Hrd0".
       iApply (cons_acc_reader fsc_cons app_rdcred n with "Hrd0 [Hpos Hpa]").
       iIntros (cur dc) "Hout". rewrite /cons_out.
-      iDestruct "Hout" as "[Hrd' [%Hcur | #Hdirty]]".
+      iDestruct "Hout" as "[Hrd' [%Hcur | [#Hdirty _]]]".
       + (* nobody read behind its back: the window is at its own position,
            and BOTH halves move ([upos_update]) *)
         subst cur.
@@ -1264,7 +1264,7 @@ Section UShLine.
         iDestruct "Hp" as (n') "Hp". iExists n'. iFrame "Hp".
         rewrite Hpay. iApply (ucons_pay_taint with "HT"). }
       subst cur.
-      iDestruct "Hwin" as "[Hw | #Hdirty]"; last first.
+      iDestruct "Hwin" as "[Hw | [#Hdirty _]]"; last first.
       { (* a tokenless reader popped while the call slept *)
         iAssert (lk_T L) as "#HT";
           [ iApply (app_rdcred_elim _ Hst Hwd); iExact "Hdirty" | ].

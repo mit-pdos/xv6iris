@@ -250,6 +250,37 @@ line while `adm_s_off`); S4 replaces it with init's licence path.  Not
 done: 10.9's two-taint / tprompt sweep -- moot under 10.10 (`lk_T = UT`
 still pays `sh_deps`).
 
+STATUS (lane S2k, `secc/s2k`, design 10.12's KERNEL bullet): landed,
+tree green, audits at the baseline.  The console read's marked
+(credential) arm now carries where each delivered byte came from.  New
+pure vocabulary in `ConsoleInv.v`: `cons_placed l lo d hs` (`length hs =
+d` and every `j < d` has a position `p >= lo` with `hs !! j = Some h`,
+`obs_ends_in Uart0 h b`, `l !! p = Some (h, b)`), with `cons_placed_0`,
+`_of_window`, `_prefix`, `_snoc`.  Shapes: `SpecConsoleread`'s receipt
+right arm is `cons_dirty_cred Wd ∗ ⌜cons_chain sl⌝ ∗ ⌜cons_placed sl cur d
+hs⌝` (`sl` the receipt's own `cons_stored_lb` bound, `cur` the start it
+reports); `SpecFileread.console_receipt`'s is the same at `app_rdcred`
+(`console_receipt_of_dirty` takes the two facts); `UkReadCons.
+uread_cons_ans`'s is `cons_dirty_cred app_rdcred ∗ ∃ sl, ucons_stored_lb
+sl ∗ ⌜cons_chain sl⌝ ∗ ⌜cons_placed sl cur dd hs⌝`.  THE POSITION TIE:
+`ConsoleInv.cons_out`'s marked disjunct is now `cons_dirty_cred Wd ∗
+⌜cur = nrd⌝` -- the kernel always answered a holder at its own `nrd`,
+but a holder's `Rd` could not learn it on that arm, so the placed facts
+(at or after `cur`) would have been useless to it; with the tie a lease
+holder's `Rd` can relay `cur = n` on the marked arm too (S4/union: this
+is what `ush_rd_ret`'s right arm should keep).  Kernel side: `cr_racc` /
+`cr_rout`'s tokenless arm and the holder's marked arm carry `∃ sl,
+cons_stored_lb sl ∗ ⌜cons_chain sl⌝ ∗ ⌜cons_placed sl lo d hs⌝` (`lo = 0`
+resp. `n0`); each pop places its byte at the cursor `cur >= nrd`
+(`nrd = n0 + d` for the holder) and moves the bound to the ring's `st`.
+NOT GIVEN: the positions are not promised to INCREASE in `j` -- the ring
+keeps no monotone witness of its cursor across a release (it is a pure
+existential in `cons_res`), so two pops separated by a sleep cannot be
+compared; that would need a `mono_nat` for `cur` in `cons_res`.  The
+holder does get `p_j >= n0 + j` per pop, but only `>= n0` is stated.
+UShLine: pattern-only (`[#Hdirty _]` at the cons_out and receipt
+disjuncts).
+
 ## S3 -- the seccomp program (design §7, §9) -- brief written when S1 and S2 land
 
 `UCodeSeccomp.v` is generated.  sh-style proof (fork, wait): the child's

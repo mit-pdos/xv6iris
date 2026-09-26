@@ -1176,7 +1176,15 @@ Section SpecFileread.
                 ⌜forall j : nat, (j < dc)%nat ->
                    ws !! j = sl' !! (cur + j)%nat⌝ ∗
                 Rin ws)
-          ∨ cons_dirty_cred app_rdcred) ∗
+          (* ...AND ON THE CREDENTIAL ARM, WHERE THE BYTES CAME FROM (lane
+             seccomp S2k), relayed verbatim from [SpecConsoleread]'s post:
+             each delivered byte sits in [sl] at some position at or after
+             [cur] -- a lease holder's own position, which its [Rd] learns
+             from [ConsoleInv.cons_out] on this arm too -- along the stored
+             order.  No window: the positions need not be consecutive, and
+             are not promised to increase. *)
+          ∨ cons_dirty_cred app_rdcred ∗ ⌜cons_chain sl⌝
+              ∗ ⌜cons_placed sl cur d hs⌝) ∗
          Rd cur dc)%I.
 
   (* the -1 arm, at every caller: whatever the caller asked for comes back,
@@ -1297,13 +1305,16 @@ Section SpecFileread.
     (Z.of_nat d = Z.max 0 n -> dc = d) ->
     (d = 0%nat -> (0 < n)%Z -> dc = (d + 1)%nat) ->
     cons_tagged bs hs d ->
+    (* ...and where each byte came from (lane seccomp S2k) *)
+    cons_chain sl ->
+    cons_placed sl cur d hs ->
     ([∗ list] h ∈ hs, riscv_rx_tag h) -∗
     cons_stored_lb fsc_cons sl -∗
     cons_dirty_cred app_rdcred -∗
     Rd cur dc -∗
     console_receipt gn P Rd Rin n r (umem_wr M addr d bs) addr.
   Proof using .
-    intros Hd Hdmax Hb1 Hb4 [Hhl Htie].
+    intros Hd Hdmax Hb1 Hb4 [Hhl Htie] Hchd Hpld.
     iIntros "Hts Hlb #Hcred Hrd".
     rewrite /console_receipt. iRight. iExists d, dc, cur, hs, sl.
     iSplitR; [by iPureIntro |]. iSplitR; [by iPureIntro |].
@@ -1315,7 +1326,8 @@ Section SpecFileread.
       exists h, b. split_and!; [exact Hhj | exact Hends |].
       rewrite (umem_wr_lookup_in M addr d bs j Hj Hlin). by rewrite Hbj. }
     iFrame "Hts Hlb". iSplitR; [| iExact "Hrd"].
-    iRight. iExact "Hcred".
+    iRight. iSplitR; [iExact "Hcred" |].
+    iSplitR; [by iPureIntro | by iPureIntro].
   Qed.
 
   (* THE ARM'S PAYOUT WITHOUT THE PAYLOAD.  This is what the PROCESS is
