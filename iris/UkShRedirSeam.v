@@ -37,7 +37,7 @@ Require Import UkShParse.
 Require Import UkShParseSym.
 Require Import UkShParseCmd.
 Require Import UkShRedirCmd.
-Require Import UkShRedirPc.
+Require Import UkShRedirCut.    (* [ushs_nulcut]: the redirect line's cut *)
 Require Import UkShRedir.
 Require Import UkShMain.
 Require Import RefParse.
@@ -187,7 +187,7 @@ Section UkShRedirSeam.
   (* exactly what terminates the file name.                                 *)
   (* ===================================================================== *)
 
-  Local Notation ushs_nulcut := UkShRedirPc.ushs_nulcut.
+  Local Notation ushs_nulcut := UkShRedirCut.ushs_nulcut.
 
   (* the file name, as the runner reads it *)
   Definition ushs_file (s0 : Z) (len : nat) (f : nat -> bv 8)
@@ -358,11 +358,11 @@ Section UkShRedirSeam.
       - intros i tk Hi.
         destruct (ushs_arg_below len f gp fe args Hred Htoks i tk Hi) as [Hl Hh].
         split; lia.
-      - intros i tk Hi. exact (UkShRedirPc.ushs_nulcut_arg args len f fe i tk Hi).
+      - intros i tk Hi. exact (UkShRedirCut.ushs_nulcut_arg args len f fe i tk Hi).
       - exact (ushs_nulcut_body len f gp fe args Hred Htoks Hnn).
       - lia.
       - lia.
-      - exact (UkShRedirPc.ushs_nulcut_file args len f fe).
+      - exact (UkShRedirCut.ushs_nulcut_file args len f fe).
       - exact (ushs_nulcut_filebody len f gp fe args Hred Htoks Hnn). }
     iMod (UkShSeam.ush_cmd_of_ushp_tree N h m pc avail s0 len
             (ushs_nulcut args len f fe)

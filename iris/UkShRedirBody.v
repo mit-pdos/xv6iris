@@ -50,7 +50,7 @@ Require Import UkShDiag.
 Require Import UkShMalloc.
 Require Import UkShLoop.
 Require Import UkShParseCmd.    (* [ushp_setb] / [ushp_nulfold]: the cut *)
-Require Import UkShRedirPc.     (* [ushs_nulcut]: the redirect line's cut *)
+Require Import UkShRedirCut.    (* [ushs_nulcut]: the redirect line's cut *)
 Require Import UkShWords.       (* [wl_cut_in] / [wl_cut_end] *)
 Require Import UkShEcho.        (* [echo_argv_bytes] and the exec arm *)
 Require Import UkShRedirLine.   (* [ushs_line_is] and the typed bridge *)
@@ -199,7 +199,7 @@ Section UkShRedirBody.
   (*                                                                     *)
   (*  [UkShEcho.echo_argv_bytes_of_line_holds] is this at the SYMBOL-FREE *)
   (*  cut, [ushp_nulfold (echo_toks ws) (ushp_ext len f)].  The redirect  *)
-  (*  child's tree is built over [UkShRedirPc.ushs_nulcut], which is that *)
+  (*  child's tree is built over [UkShRedirCut.ushs_nulcut], which is that *)
   (*  cut with ONE MORE terminator -- [nulterminate]'s REDIR arm zeroes   *)
   (*  the file name's end too -- and SH-LEX-REDIR's ruling makes the      *)
   (*  token list the SAME ([wl_toks ws], echo's own).  So the whole proof *)
@@ -212,7 +212,7 @@ Section UkShRedirBody.
     UkShRedirLine.ushs_line_is ws file f k len ->
     fe = (length (wl_body ws) + 3 + length file)%nat ->
     UkShEcho.echo_argv_bytes ws
-      (UkShRedirPc.ushs_nulcut (wl_toks ws) len
+      (UkShRedirCut.ushs_nulcut (wl_toks ws) len
          (fun j : nat => f (k + j)%nat) fe).
   Proof using .
     intros Hl Hfe. pose proof Hl as HL.
@@ -228,7 +228,7 @@ Section UkShRedirBody.
         by exact (wl_off_le_body ws 0%nat i (ws !!! i) (j + 1)%nat Hw
                     ltac:(lia)).
       rewrite /UkShEcho.echo_off in Hle |- *.
-      rewrite /UkShRedirPc.ushs_nulcut /ushp_setb.
+      rewrite /UkShRedirCut.ushs_nulcut /ushp_setb.
       rewrite (proj2 (Nat.eqb_neq (wl_off 0%nat ws i + j)%nat fe)
                  ltac:(lia)).
       rewrite (wl_cut_in ws (fun x : nat => f (k + x)%nat) len i
@@ -244,7 +244,7 @@ Section UkShRedirBody.
         by exact (wl_off_le_body ws 0%nat i (ws !!! i) (length (ws !!! i))
                     Hw ltac:(lia)).
       rewrite /UkShEcho.echo_off /UkShEcho.echo_alen in Hle |- *.
-      rewrite /UkShRedirPc.ushs_nulcut /ushp_setb.
+      rewrite /UkShRedirCut.ushs_nulcut /ushp_setb.
       rewrite (proj2 (Nat.eqb_neq
                         (wl_off 0%nat ws i + length (ws !!! i))%nat fe)
                  ltac:(lia)).

@@ -8,21 +8,22 @@
 (* and which [runcmd] arm run:                                            *)
 (*                                                                        *)
 (*   0x9c0  c.mv a0,s1        the line                                     *)
-(*   0x9c2  jal  ra,parsecmd  -> [UkShPipeCm.wp_kshp_parsecmd_bar]:        *)
-(*                              the PIPE node over two EXEC nodes          *)
+(*   0x9c2  jal  ra,parsecmd  -> [UkShParser.wp_ref_parser] at the        *)
+(*                              reference's PIPE of two EXECs              *)
 (*   0x9c6  jal  ra,runcmd    -> [UkShPipe.wp_kshr_pipe_arm]:              *)
 (*                              pipe(2), two fork1s, six closes, two waits *)
 (*                                                                        *)
 (* and between them the seam [UkShPipeSeam.ush_cmd_of_ushp_pipe], whose    *)
 (* two [ushq_cut_ok] premises are SS1 of this file.                         *)
 (*                                                                        *)
-(* WHY THE PARSER THEOREM IS NOT THE ONE USED.  [UkShPipeCm.                *)
-(* wp_kshp_parser_pipe] closes the three nodes into one [ushp_tree] with   *)
-(* [UkShPipeParse.ushp_pipe_close]; the SEAM wants them SEPARATE (it       *)
-(* reads the node's own three fields and converts each subtree with        *)
-(* [UkShMain.ush_cmd_of_ushp_gen]).  So this walk goes through             *)
-(* [wp_kshp_parsecmd_bar], the theorem one step below it, exactly as the   *)
-(* redirect seam goes through [UkShRedirPc.wp_kshp_parsecmd_gt].           *)
+(* SINCE user-once A3a the walk is a corollary: [UkShSeam.wp_ref_child_pipe] *)
+(* is the child at ANY pipe line the reference parses, and [wp_kshm_child_ *)
+(* pipe] below is it at this file's line shape ([RefParseBridge.            *)
+(* ref_parsecmd_pipe] turns [ushq_pipe]/[ushs_toks] into the reference's   *)
+(* equation, [UkShParser.ushp_nulfold_zero_at] turns [ushq_cut] into the   *)
+(* reference's cut).  SS1's [ushq_cut_ok] facts are what the landed seam    *)
+(* [UkShPipeSeam.ush_cmd_of_ushp_pipe] still states, for its own           *)
+(* consumers.                                                              *)
 (*                                                                        *)
 (* WHAT THE ARM FORCES ON THE WALK, and it is a finding for the round:     *)
 (* [wp_kshr_pipe_arm] takes the exit payload FREE ([(⊢ ukn_pay N (-1))],   *)
@@ -63,7 +64,6 @@ Require Import LineWords.
 Require Import PipeDisc.
 Require Import UkShPipeLex.
 Require Import UkShPipeSeam.
-Require Import UkShPipeCm.
 Require Import RefParse.
 Require Import RefParseBridge.  (* [ref_parsecmd_pipe]: the pipe line at the reference *)
 Require Import UkShRedirs.      (* [ushp_malloc_chain] *)
@@ -104,8 +104,10 @@ Section UkShPipeRound.
   Local Notation ushp_malloc_ty := (UkShParse.ushp_malloc_ty_le N 168).
 
   (* the three allocator links a pipe line's parse spends (design SS5.1 as
-     landed: two [execcmd]s and one [pipecmd]); UM1 -> UM2 is a section
-     hypothesis of [UkShPipeCm] and therefore one here too *)
+     landed: two [execcmd]s and one [pipecmd]); UM1 -> UM2 was a section
+     hypothesis of the pipe parser shell and stays one here so the landed
+     statements do not move -- the three together are
+     [UkShRedirs.ushp_malloc_chain 3 UM0 UM3] *)
   Context (UM0 UM1 UM2 UM3 : iProp Σ).
   Hypothesis ushq_malloc_ok12 : ushp_malloc_ty UM1 UM2.
 
@@ -115,7 +117,7 @@ Section UkShPipeRound.
   (* [nulterminate]'s PIPE row zeroes the end index of every argument       *)
   (* token of the LEFT command and then the end index of the right          *)
   (* command's single word, on ONE buffer -- which is exactly the redirect  *)
-  (* cut [UkShRedirPc.ushs_nulcut args len f ge] (the outer fold over a     *)
+  (* cut [UkShRedirCut.ushs_nulcut args len f ge] (the outer fold over a    *)
   (* one-element list IS [ushp_setb]).  So the two shapes share one         *)
   (* definition and only the INDEX BOUNDS differ.                           *)
   (* ===================================================================== *)

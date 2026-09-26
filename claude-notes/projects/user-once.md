@@ -196,7 +196,23 @@ console instance waits for its M3.
   five plus `UkShParseCmd.wp_kshp_parser` become one-line corollaries;
   DELETE `UkShPipeRight.v` (only `UkShPipeCm` imports it).  A statement of
   THIS campaign changes, no landed one.
-- [ ] **A3** the consumers.  **A3a LANDED** (2026-09-26, branch `user-once/A3`;
+- [x] **A3** the consumers.  **A3b LANDED** (2026-09-26, `user-once/A3`): the fifteen
+  shells DELETED -- `UkShRedir{Lex,Gtk,Pr,Ex,Pex,Nul,Cm,Pc}`, `UkShPipe{Tok,Pr,
+  Ex,Ex2,Pex,Cm,Parse}` -- net -4,442 lines.  NOT deleted, and the worklist below
+  was wrong to list them: `UkShRedirCmd` (the `redircmd` walk + node predicate)
+  and `UkShPipeCmd` (the `pipecmd` walk) are what `UkShRedirs`/`UkShParser`
+  CALL, and they are already named for what they are.  Re-homed: the redirect
+  line's cut `ushs_nulcut`/`_arg`/`_file` in the new pure `UkShRedirCut.v`
+  (after `UkShParseCmd`; consumers `UkShRedirSeam`/`UkShRedirBody`/
+  `UkShRedirChild`); the pipe node predicate was already `UkShPipeNode` (A2d),
+  `UkShPipeSeam` reads it there now.  `UShPipeChild.wp_ref_child_pipe_paid`: the
+  PAID pipe child at the reference (`UkShSeam.wp_ref_child` ending on
+  `UkShPipePaid.wp_kshr_pipe_arm_paid`, the family born by the fancy update at
+  runcmd's entry), `wp_kshm_child_pipe_paid_at_sz` its corollary -- it lives in
+  `UShPipeChild` because `UkShPipePaid` sits above `UkShSeam` in the build
+  order and nothing else consumes it.  Comments in the general files that say
+  "was UkShPipeTok" etc. are left as history (editing them rebuilds the tier).
+  Gate: 39 files, 0 errors, nothing pending; audits unmoved (system 13, tree 13, file 14, pipe 14).  **A3a LANDED** (2026-09-26, branch `user-once/A3`;
   `iris/UkShSeam.v`, 1,607 lines, after `UkShParser`/`UkShRedir`/`UkShPipe`
   and BEFORE `UkShMain`): (P) the cut read back -- `ushp_toks_ok` (every
   token of the reference's answer is a word-arm token: body neither blank
@@ -283,4 +299,4 @@ RULED by the owner: A starts now.  Branch `user-once/A` off `main` at
 monotonicity, the symbol-free bridge both ways, the redirect and pipe
 bridges, the three line-shape facts on `ush_line_is`/`ushs_line_is`/
 `ushq_line_is`) is stated and elaborates; its proofs are with a subagent.
-A1 and A2a-e are on `main`; A3a is on branch `user-once/A3`.  NEXT: A3b -- the deletions and re-homing (the shells `UkShRedir{Lex,Gtk,Pr,Ex,Pex,Nul,Cm,Pc}`, `UkShPipe{Tok,Pr,Ex,Ex2,Pex,Cm,Cmd,Parse}`), with `UShPipeChild`'s paid child re-pointed at `UkShSeam.wp_ref_child` first (it is the last direct consumer of `UkShPipeCm`).
+A1 and A2a-e are on `main`; A3a and A3b are on branch `user-once/A3` -- LANE A IS COMPLETE there, awaiting the owner's merge to `main`.  NEXT: C1 (independent of everything; `image_geom E frame` from `UShEcho` §1-§2) or B1 (`UkFdStream.v`); B2 waits on app-both's M3.  Still owed elsewhere: the fork law's `Lp` at the reference equation is app-both's SLOT-WS (M4).

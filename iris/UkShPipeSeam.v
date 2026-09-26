@@ -17,7 +17,8 @@
 (*   - the node's address bound [p < 2 ^ 38] is read off the RUN's own     *)
 (*     heap, as the EXEC conversion reads it, not assumed;                 *)
 (*   - the two [ush_args] lists are cut from THE SAME line [g], which is   *)
-(*     what [UkShPipeParse.wp_kshp_nulterminate_pipe] leaves behind        *)
+(*     what [nulterminate]'s PIPE row ([UkShParser.wp_ref_nulterminate])   *)
+(*     leaves behind                                                       *)
 (*     ([ushp_nulfold toksr (ushp_nulfold toksl g)]), so the caller hands  *)
 (*     one line and gets both commands.                                    *)
 (*                                                                        *)
@@ -47,7 +48,7 @@ Require Import UkShRun.
 Require Import UkShMain.
 Require Import UkShMalloc.
 Require Import UkShPipeLex.
-Require Import UkShPipeParse.
+Require Import UkShPipeNode.    (* the pipe node predicate and its close *)
 Require Import UkShSeam.        (* THE SEAM, once *)
 Require Import UexecSG.
 Local Open Scope Z_scope.
@@ -68,7 +69,7 @@ Section UkShPipeSeam.
   Context `{PS : uprogSG Σ}.
 
   Local Notation ushp_tree := (UkShParse.ushp_tree N).
-  Local Notation ushp_pipe_node := (UkShPipeParse.ushp_pipe_node N).
+  Local Notation ushp_pipe_node := (UkShPipeNode.ushp_pipe_node N).
   Local Notation ush_args := (UkShMain.ush_args).
   Local Notation ush_cmd_of_ushp_gen := (UkShMain.ush_cmd_of_ushp_gen N).
   Local Notation ubytes_persist := (UkShMain.ubytes_persist).
@@ -107,7 +108,7 @@ Section UkShPipeSeam.
     iIntros "Hrun Hn Hl Hr #Hline".
     (* the three nodes are the tree, closed; [ushq_cut_ok] at each side IS
        the general seam's EXEC case, conjunct for conjunct *)
-    iDestruct (UkShPipeParse.ushp_pipe_close N s0 p pl pr (UshpExec toksl) (UshpExec toksr)
+    iDestruct (UkShPipeNode.ushp_pipe_close N s0 p pl pr (UshpExec toksl) (UshpExec toksr)
                  with "Hn Hl Hr") as "Htree".
     iApply (UkShSeam.ush_cmd_of_ushp_tree N h m pc avail s0 len g
               (UshpPipe (UshpExec toksl) (UshpExec toksr)) (conj Hl Hr)
@@ -154,7 +155,7 @@ Section UkShPipeSeam.
   (* that never instantiates it cannot tell a threaded premise from an      *)
   (* unsatisfiable one (durable-notes, Vacuity).  Here it is at the         *)
   (* application's own line and at the cut                                  *)
-  (* [UkShPipeParse.wp_kshp_nulterminate_pipe] leaves behind -- the right   *)
+  (* [nulterminate]'s PIPE row leaves behind -- the right                   *)
   (* command's fold OVER the left command's, on one buffer.                 *)
   (* ===================================================================== *)
 

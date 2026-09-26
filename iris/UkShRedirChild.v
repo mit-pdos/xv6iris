@@ -30,7 +30,7 @@ Require Import UkSh.
 Require Import UkShParse.
 Require Import UkShDiag.
 Require Import UkShMalloc.
-Require Import UkShRedirPc.     (* [ushs_nulcut]: the redirect line's cut *)
+Require Import UkShRedirCut.    (* [ushs_nulcut]: the redirect line's cut *)
 Require Import UkShEcho.        (* [echo_argv_bytes] and the exec arm *)
 Require Import UkShRedirSeam.   (* [wp_kshm_child_alloc_redir]: the walk *)
 Require Import UShLexRedir.     (* [ush_line_toks_holds_redir] *)
@@ -201,7 +201,7 @@ Section UkShRedirChild.
         with (6 + (2 + (UkShDiag.ush_Dg + (62 + n))))%nat by lia.
       iApply (UkShEcho.wp_kshr_exec_echo_at_holds (UkShRedirBody.ushs_fd1f ty) ws Q
                 (Cr' ∗ K' ty)%I Cx N' Hc hf mf q (sz + 65536) s0
-                (UkShRedirPc.ushs_nulcut (wl_toks ws) len
+                (UkShRedirCut.ushs_nulcut (wl_toks ws) len
                    (fun j : nat => fb (0 + j)%nat)
                    (length (wl_body ws) + 3 + length file)%nat)
                 (<[1%nat := FdOpen false true ty]> (<[1%nat := FdClosed]> ld))

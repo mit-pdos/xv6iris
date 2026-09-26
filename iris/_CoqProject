@@ -1618,13 +1618,12 @@ UkShGettoken.v
 UkShParseRedir.v
 UkShParseExec.v
 UkShParseCmd.v
+UkShRedirCut.v
 UkShRedirLex.v
-UkShRedirGtk.v
 UkShRedirCmd.v
 UkShRedirs.v
 UkShRedirPr.v
 UkShArgs.v
-UkShRedirEx.v
 UkShRedirPex.v
 UkShPipeNode.v
 UkShPipeCmd.v
@@ -1651,7 +1650,6 @@ UShLexRedir.v
 UkShPipeLex.v
 UkShPipesLex.v
 RefParseBridge.v
-UkShPipeTok.v
 UkShPipeSeam.v
 UkShPipeEx.v
 UkShPipePr.v

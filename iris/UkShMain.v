@@ -360,7 +360,7 @@ End UkShMain.
 (* THE MOVED VOCABULARY, RE-EXPORTED (lane user-once A3a).  These lived    *)
 (* in SS1-SS3 of this file and are [UkShSeam.v]'s now; every consumer      *)
 (* names them [UkShMain.X], so each keeps that name as an abbreviation of  *)
-(* the one constant -- the same device [UkShPipeParse.ushp_pipe_node] uses. *)
+(* the one constant -- the same device [UkShPipeNode.ushp_pipe_node] uses. *)
 (* ===================================================================== *)
 Notation ubytes_persist := UkShSeam.ubytes_persist.
 Notation uword_persist := UkShSeam.uword_persist.

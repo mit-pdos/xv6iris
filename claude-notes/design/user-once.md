@@ -162,13 +162,21 @@ beside it and the per-shape seams and children its corollaries); the child laws'
 shape — which is the SLOT-WS cleanup app-both owes ("the fork interface
 speaking the parsed line") paid here.
 
-**What goes.**  `UkShRedir{Lex,Tok,Pr,Pc,Ex,Pex,Cm,Cmd,Gtk,Nul,Seam,Paid,
-Line,Ans}` and `UkShPipe{Lex,Tok,Pr,Ex,Ex2,Pex,Cm,Cmd,Parse,Right,Seam,
-Paid}`: ~30k lines.  `UkShParse*` are re-stated in place (the walks ARE
-the reference's cases; the cost is the statements).  Kept: the runcmd
-arms and child walks (`UkShRedir`, `UkShRedirBody/Child`, `UkShPipe`,
-`UkShPipeFork*`, `UkShPipeRound`, `UkShPipeWait`), at the general parser
-theorem.
+**What went (as landed, A2a-A3b, 2026-09-26).**  The per-shape parser
+walks: `UkShRedir{Lex,Tok,Gtk,Pr,Ex,Pex,Nul,Cm,Pc}`, `UkShPipe{Tok,Pr,Ex,
+Ex2,Pex,Right,Cm,Parse}` -- about 14k lines net across the lane.  What
+the proposal above listed but STAYS, because it is not a per-shape copy:
+`UkShRedirCmd` / `UkShPipeCmd` (the `redircmd` / `pipecmd` allocation
+walks the general parser calls), `UkShRedirLine` / `UkShPipeLex` (the
+pure line models the application rounds state their lines at, with the
+bridge lemmas in `RefParseBridge`), `UkShRedirSeam` / `UkShPipeSeam`
+(now one-line corollaries of `UkShSeam`, kept for their consumers'
+spellings), `UkShRedirPaid` / `UkShPipePaid` (the PAID runcmd arms:
+arms, not parser), `UkShRedirAns`, and the new pure `UkShRedirCut`
+(the redirect cut in its landed spelling).  `UkShParse*` were not
+re-stated: the general walks sit beside them and the symbol-free
+statements are corollaries.  Kept as planned: the runcmd arms and child
+walks, at the general parser theorem.
 
 ## 3. Abstraction B — `fd_stream`: a descriptor row as a byte stream with an owned payment
 
