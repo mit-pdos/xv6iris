@@ -8,8 +8,14 @@ its own.
 Note: `copyinstr` copies byte-by-byte (with `lbu`/`sb`) rather than through
 `memmove`, and does not check `PTE_W`, so it needs neither `walk` nor
 `memmove`; the interface below takes exactly the callees the proof uses.
+
+`CopyinstrClosed` is the fully closed form (every parameter at its linked,
+closed term).
 -/
 import Xv6.ProofCopyinstr
+import Xv6.LinkWalkaddr
+import Xv6.LinkWalk
+import Xv6.LinkVmfault
 
 namespace Xv6
 
@@ -19,5 +25,9 @@ namespace Xv6
 theorem Copyinstr (WA : WALKADDR) (VF : VMFAULT) :
     COPYINSTR :=
   copyinstr_proof WA VF
+
+/-- `copyinstr` CLOSED: `walkaddr` over the no-alloc walk, `VmfaultClosed`. -/
+theorem CopyinstrClosed : COPYINSTR :=
+  Copyinstr (Walkaddr WalkNoalloc) VmfaultClosed
 
 end Xv6

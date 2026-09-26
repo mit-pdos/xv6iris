@@ -9,6 +9,9 @@ dirlookup, ialloc, iupdate, dirlink, ilock, iunlockput under it).
 `fetchstr` is closed over the linked `copyinstr` / `strlen`, whose
 page-table walkers (`walkaddr`, `vmfault`) stay parameters, as in
 `LinkSysChdir` / `LinkSysLink`.
+
+`SysMkdirClosed` is the fully closed form (every parameter at its linked,
+closed term).
 -/
 import Xv6.ProofSysMkdir
 import Xv6.LinkMyproc
@@ -21,6 +24,11 @@ import Xv6.LinkBeginOp
 import Xv6.LinkCreate
 import Xv6.LinkIunlockput
 import Xv6.LinkEndOp
+import Xv6.LinkCopyout
+import Xv6.LinkCopyin
+import Xv6.LinkWalkaddr
+import Xv6.LinkWalk
+import Xv6.LinkVmfault
 
 namespace Xv6
 
@@ -29,5 +37,9 @@ page-table walkers `copyinstr` runs over. -/
 theorem SysMkdir (CO : COPYOUT) (CI : COPYIN) (WA : WALKADDR) (VF : VMFAULT) : SYSMKDIR :=
   sys_mkdir_proof (Argstr (Argraw Myproc) (Fetchstr Myproc (Copyinstr WA VF) Strlen)) BeginOp
     (Create CO CI) Iunlockput EndOp
+
+/-- `sys_mkdir` CLOSED over `CopyoutClosed` / `CopyinClosed` and the closed walkers. -/
+theorem SysMkdirClosed : SYSMKDIR :=
+  SysMkdir CopyoutClosed CopyinClosed (Walkaddr WalkNoalloc) VmfaultClosed
 
 end Xv6

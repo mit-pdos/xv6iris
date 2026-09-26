@@ -99,7 +99,9 @@ namespace Xv6
 
 open Iris MachCSL
 
-/-- The proved `syscall` interface at the kernel's deposit instance. -/
+/-- The proved `syscall` interface at the kernel's deposit instance.  The
+vm / file entries are their `Link*Closed` forms; the proc.c chain behind
+`kfork` / `kwait` / `pipealloc` / `sbrk` is closed here. -/
 theorem Syscall : SYSCALL_XV6 :=
   let AC := Acquire
   let RE := Release
@@ -109,32 +111,25 @@ theorem Syscall : SYSCALL_XV6 :=
   let MA := MappagesAny (Walk KAL MS)
   let UM := Uvmunmap WalkNoalloc KF
   let UF := Uvmfree (UvmunmapBare WalkNoalloc KF) (Freewalk KF)
-  let WA := Walkaddr WalkNoalloc
-  let VF := Vmfault (Ismapped WalkNoalloc) KAL KF MS MA
-  let CO := Copyout WA VF WalkNoalloc Memmove
-  let CI := Copyin WA VF Memmove
+  let CO := CopyoutClosed
   let AR := Argraw Myproc
   let AI := Argint Myproc AR
   let AA := Argaddr Myproc AR
   let AF := Argfd AI Myproc
   let SP := SleepPrepare Myproc AC RE
   let SL := Sleep Myproc AC RE Sched
-  let PC := Pipeclose AcquireGen Wakeup ReleaseRefute ReleaseCancel (KfreeFree AC RE MemsetFree)
-  let PR := Piperead Myproc AcquireGen ReleaseGen Wakeup SP SL Killed CO
-  let PW := Pipewrite Myproc AcquireGen ReleaseGen Wakeup SP SL Killed CI
-  let FC := Fileclose AC RE PC BeginOp Iput EndOp
+  let FC := FilecloseClosed
   let PFP := ProcFreepagetable UM UF
   let FP := Freeproc KF PFP AC RE
   let AL := Allocproc AC RE KAL MS (ProcPagetable (Uvmcreate KAL MS) MA UM UF) FP
   let KFK := Kfork Myproc AC RE AL (Uvmcopy WalkNoalloc KAL KF Memmove MA UM) FP Safestrcpy
   syscall_proof Myproc Printk
-    (SysFork KFK) (SysExit AI (Kexit FC)) (SysWait AA (Kwait Myproc AC RE CO FP Killed SP SL))
+    (SysFork KFK) SysExitClosed (SysWait AA (Kwait Myproc AC RE CO FP Killed SP SL))
     (SysPipe Myproc AA (Pipealloc (Filealloc AC RE) KAL Initlock FC) (Fdalloc Myproc) CO FC)
-    (SysRead PR CO) (SysKill AI Kkill) (SysExec WA VF) (SysFstat CO) (SysChdir CO WA VF)
+    SysReadClosed (SysKill AI Kkill) SysExecClosed SysFstatClosed SysChdirClosed
     (SysDup AF (Fdalloc Myproc) (Filedup AC RE)) SysGetpid
     (SysSbrk AI Myproc (Growproc Myproc (Uvmalloc KAL KF MS MA UM) (Uvmdealloc UM)))
-    (SysPause AI AC RE Myproc Killed SP SL) SysUptime (SysOpen CO CI WA VF PC) (SysWrite PW CI)
-    (SysMknod CO CI WA VF) (SysUnlink CO CI WA VF) (SysLink CO CI WA VF) (SysMkdir CO CI WA VF)
-    (SysClose AF Myproc FC) SysSync
+    (SysPause AI AC RE Myproc Killed SP SL) SysUptime SysOpenClosed SysWriteClosed
+    SysMknodClosed SysUnlinkClosed SysLinkClosed SysMkdirClosed SysCloseClosed SysSync
 
 end Xv6

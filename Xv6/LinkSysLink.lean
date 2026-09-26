@@ -8,6 +8,9 @@ namei / nameiparent enter at their PLAIN contracts (`LinkNamei`,
 `LinkNamei` / `LinkDirlink`; argstr's `fetchstr` is closed over the linked
 `copyinstr` / `strlen`, whose page-table walkers (`walkaddr`, `vmfault`)
 stay parameters, as in `LinkCopyinstr` / `LinkSysChdir`.
+
+`SysLinkClosed` is the fully closed form (every parameter at its linked,
+closed term).
 -/
 import Xv6.ProofSysLink
 import Xv6.LinkMyproc
@@ -26,6 +29,11 @@ import Xv6.LinkDirlink
 import Xv6.LinkIput
 import Xv6.LinkIunlockput
 import Xv6.LinkEndOp
+import Xv6.LinkCopyout
+import Xv6.LinkCopyin
+import Xv6.LinkWalkaddr
+import Xv6.LinkWalk
+import Xv6.LinkVmfault
 
 namespace Xv6
 
@@ -34,5 +42,9 @@ page-table walkers `copyinstr` runs over. -/
 theorem SysLink (CO : COPYOUT) (CI : COPYIN) (WA : WALKADDR) (VF : VMFAULT) : SYSLINK :=
   sys_link_proof (Argstr (Argraw Myproc) (Fetchstr Myproc (Copyinstr WA VF) Strlen)) BeginOp
     (Namei CO) (Nameiparent CO) Ilock Iunlock Iupdate (Dirlink CO CI) Iput Iunlockput EndOp
+
+/-- `sys_link` CLOSED over `CopyoutClosed` / `CopyinClosed` and the closed walkers. -/
+theorem SysLinkClosed : SYSLINK :=
+  SysLink CopyoutClosed CopyinClosed (Walkaddr WalkNoalloc) VmfaultClosed
 
 end Xv6

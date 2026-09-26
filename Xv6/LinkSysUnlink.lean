@@ -10,6 +10,9 @@ nameiparent enters at the ERA contract (`LinkNparWrapEra.NparWrapEra`).
 over the linked `copyinstr` / `strlen`, whose page-table walkers
 (`walkaddr`, `vmfault`) stay parameters, as in `LinkSysLink`.  The
 whole-function memset is the landed `Memset` (Rocq's `MemsetArray`).
+
+`SysUnlinkClosed` is the fully closed form (every parameter at its linked,
+closed term).
 -/
 import Xv6.ProofSysUnlink
 import Xv6.LinkMyproc
@@ -30,6 +33,11 @@ import Xv6.LinkIupdate
 import Xv6.LinkIunlockput
 import Xv6.LinkEndOp
 import Xv6.LinkPanic
+import Xv6.LinkCopyout
+import Xv6.LinkCopyin
+import Xv6.LinkWalkaddr
+import Xv6.LinkWalk
+import Xv6.LinkVmfault
 
 namespace Xv6
 
@@ -39,5 +47,9 @@ theorem SysUnlink (CO : COPYOUT) (CI : COPYIN) (WA : WALKADDR) (VF : VMFAULT) : 
   sys_unlink_proof (Argstr (Argraw Myproc) (Fetchstr Myproc (Copyinstr WA VF) Strlen)) BeginOp
     (NparWrapEra CO) Ilock Namecmp (Dirlookup CO) Memset (Readi CO) (Writei CI) Iupdate Iunlockput
     EndOp Panic
+
+/-- `sys_unlink` CLOSED over `CopyoutClosed` / `CopyinClosed` and the closed walkers. -/
+theorem SysUnlinkClosed : SYSUNLINK :=
+  SysUnlink CopyoutClosed CopyinClosed (Walkaddr WalkNoalloc) VmfaultClosed
 
 end Xv6
