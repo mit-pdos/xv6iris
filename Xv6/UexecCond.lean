@@ -95,6 +95,7 @@ is (deviation 4). -/
 theorem loopOk_uptEmpty {C : UCfg} {P : UPtd} (root tfp : BitVec 44) (h : loopOk C P)
     (hv : pageValid (pageAddr tfp)) : loopOk C ⟨root, tfp, ∅⟩ := by
   obtain ⟨h1, h2, h3, h4, _⟩ := h
-  refine ⟨h1, h2, h3, h4, ⟨?_, ?_, hv⟩⟩
+  refine ⟨h1, h2, h3, h4, ⟨?_, ?_, hv, ?_⟩⟩
   · intro k w hk; rw [Iris.Std.LawfulPartialMap.get?_empty] at hk; cases hk
   · intro k1 w1 k2 w2 hk1; rw [Iris.Std.LawfulPartialMap.get?_empty] at hk1; cases hk1
+  · intro k w hk; rw [Iris.Std.LawfulPartialMap.get?_empty] at hk; cases hk

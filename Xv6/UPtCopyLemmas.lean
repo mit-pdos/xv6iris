@@ -289,11 +289,11 @@ theorem ptRep_setLeaf_insert {t : PTree} {L : RegMapF (BitVec 64)} (vpn : BitVec
 /-! ## `uptWf` under an insert -/
 
 theorem uptWf_insert (P : UPtd) (k : Nat) (leaf : BitVec 64) (hwf : uptWf P)
-    (hk : k < tfVpn.toNat) (hlf : isLeafPte leaf) (hpv : pageValid (pte2pa leaf))
+    (hk : k < tfVpn.toNat) (hlf : isLeafPte leaf) (hpv : pageValid (pte2pa leaf)) (hpin : uLeafPins leaf)
     (hfresh : ∀ j w, get? P.um j = some w → ptePpn w ≠ ptePpn leaf) :
     uptWf { P with um := insert P.um k leaf } := by
-  obtain ⟨hleaves, hinj, htfp⟩ := hwf
-  refine ⟨?_, ?_, htfp⟩
+  obtain ⟨hleaves, hinj, htfp, hpins⟩ := hwf
+  refine ⟨?_, ?_, htfp, ?_⟩
   · intro j w hw
     by_cases he : k = j
     · rw [get?_insert_eq he] at hw
@@ -322,6 +322,14 @@ theorem uptWf_insert (P : UPtd) (k : Nat) (leaf : BitVec 64) (hwf : uptWf P)
       · rw [get?_insert_ne he1] at h1
         rw [get?_insert_ne he2] at h2
         exact hinj k1 w1 k2 w2 h1 h2 hq
+  · intro j w hw
+    by_cases he : k = j
+    · rw [get?_insert_eq he] at hw
+      simp only [Option.some.injEq] at hw
+      subst hw
+      exact hpin
+    · rw [get?_insert_ne he] at hw
+      exact hpins j w hw
 
 /-! ## `delRunL`: the rollback -/
 

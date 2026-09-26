@@ -243,9 +243,10 @@ theorem leaves_of_empty (root tfp : BitVec 44) :
 page. -/
 theorem uptWf_empty (root tfp : BitVec 44) (h : pageValid (pageAddr tfp)) :
     uptWf (UPtd.mk root tfp ∅) := by
-  refine ⟨?_, ?_, h⟩
+  refine ⟨?_, ?_, h, ?_⟩
   · intro k w hk; rw [get?_empty] at hk; exact absurd hk (by simp)
   · intro k1 w1 k2 w2 hk; rw [get?_empty] at hk; exact absurd hk (by simp)
+  · intro k w hk; rw [get?_empty] at hk; exact absurd hk (by simp)
 
 theorem umBelow_empty (sz : BitVec 64) (root tfp : BitVec 44) :
     umBelow sz (UPtd.mk root tfp ∅) := by

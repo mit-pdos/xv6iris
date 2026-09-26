@@ -21,7 +21,7 @@ extension only reaches bits at or above 3, which both `andi`s clear.
 What the one caller (kexec, handing the result to uvmalloc as `xperm`) needs
 is `flags2permRet_cases` (one of four literals, Rocq `f2p_cases`) and
 `flags2permRet_permOk` -- the Lean `SpecUvmalloc` premise
-`xperm &&& ~~~0x3EE = 0` (the Lean counterpart of Rocq's `f2p_range` plus
+`xperm &&& ~~~0x3CE = 0` (the Lean counterpart of Rocq's `f2p_range` plus
 the four `uvm_perm_ok_18/22/26/30` instances at the call site).  Both are
 pure `BitVec` facts, so stating the second here pulls no page-table
 definitions into this leaf spec.
@@ -57,7 +57,7 @@ theorem flags2permRet_cases (fl : BitVec 64) :
 
 /-- The answer is a legal `uvmalloc` `xperm` (the `SpecUvmalloc` premise
 `hperm`; Rocq `f2p_range` + `uvm_perm_ok_*`). -/
-theorem flags2permRet_permOk (fl : BitVec 64) : flags2permRet fl &&& ~~~0x3EE#64 = 0#64 := by
+theorem flags2permRet_permOk (fl : BitVec 64) : flags2permRet fl &&& ~~~0x3CE#64 = 0#64 := by
   rcases flags2permRet_cases fl with h | h | h | h <;> rw [h] <;> decide
 
 /-- **WP of `flags2perm`.**  Two stack slots (its frame); returns

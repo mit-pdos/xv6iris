@@ -416,7 +416,7 @@ theorem growproc_proof (MP : MYPROC) (UA : UVMALLOC) (UD : UVMDEALLOC) : GROWPRO
   have hua : ∀ (cc : CPU) (k' : KCtx) (P : UPtd) (M' : Nat → List (BitVec 8))
       (hnoff' : k'.noff + 1 < 2 ^ 31) (hK' : uvmallocSlots ≤ k'.avail) (hlk' : "kmem" ∉ k'.locks)
       (hroot' : k'.regs 10#5 = pageAddr P.root) (hold' : (k'.regs 11#5).toNat ≤ uvmMaxsz)
-      (hnew' : (k'.regs 12#5).toNat ≤ uvmMaxsz) (hperm' : k'.regs 13#5 &&& ~~~0x3EE#64 = 0#64)
+      (hnew' : (k'.regs 12#5).toNat ≤ uvmMaxsz) (hperm' : k'.regs 13#5 &&& ~~~0x3CE#64 = 0#64)
       (hfree' : ∀ i, i < uvmaNp (k'.regs 11#5) (k'.regs 12#5) →
         Iris.Std.PartialMap.get? P.um (uvmaVpn0 (k'.regs 11#5) + i) = none),
       kctx cc k' ∗ pcIs cc KA.«uvmalloc» ∗ isLock γl kmemLockAddr "kmem" (kmemRes γk) ∗

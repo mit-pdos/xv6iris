@@ -142,7 +142,7 @@ theorem uservec_proof : USERVEC :=
   obtain ⟨hk0, hk1, hk2, hk4⟩ := hkw
   simp only [KCtx.sp] at hk0 hk1
   have hmdl : 0x220#64 &&& ~~~C.mideleg = 0#64 := by have h := C.mm; rw [hmie] at h; exact h
-  have hv : pageValid (pageAddr P.tfp) := hwfP.2.2
+  have hv : pageValid (pageAddr P.tfp) := hwfP.2.2.1
   iintro ⟨Hfr, #Hcl, Hpage, ⟨%⟨hkwf, htc⟩, Hstack, Hcpu, Htok, #Hon, #Hro⟩, HΦ⟩
   icases uservec_frame_open cpu C P Rut sz M ms sc tv sep g hdq hmie hmed $$ Hfr with
     ⟨%mepc, %stc, %Mp, %⟨⟨hsm, hsr⟩, hM⟩, HmConf, Hclock, Hpc, HF, Hsep, Hsc, Hstv, Hstvec, %hwf, Hslot, Hum, HR⟩

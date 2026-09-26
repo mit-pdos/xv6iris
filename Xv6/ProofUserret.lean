@@ -111,7 +111,7 @@ theorem userret_proof : USERRET :=
   icases userret_kptSlot_on cpu root $$ Hkpt with ⟨#Hon, Hkpt⟩
   unfold procPtAt
   icases Hppt with ⟨%hwfP, Hfr, Hum⟩
-  have hv : pageValid (pageAddr P.tfp) := hwfP.2.2
+  have hv : pageValid (pageAddr P.tfp) := hwfP.2.2.1
   -- the switch
   iapply (userret_entry cpu root P ms mdl mepc stc hsm hmdl (tpPin cpu regs) (userret_a0_get cpu regs _ ha0))
   iframe Htext HS Hcl HmConf Hclock Hpc Hkpt Htok HF

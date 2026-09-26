@@ -236,7 +236,7 @@ theorem delRun_get_not_mem (P : UPtd) (v0 n k : Nat) (h : k < v0 ∨ v0 + n ≤ 
 
 /-- Deleting leaves keeps the table well formed. -/
 theorem uptWf_delRun (P : UPtd) (v0 n : Nat) (h : uptWf P) : uptWf (P.delRun v0 n) := by
-  refine ⟨?_, ?_, h.2.2⟩
+  refine ⟨?_, ?_, h.2.2.1, ?_⟩
   · intro k w hk
     by_cases hr : v0 ≤ k ∧ k < v0 + n
     · rw [delRun_get_mem P v0 n k hr.1 hr.2] at hk; exact absurd hk (by simp)
@@ -249,6 +249,10 @@ theorem uptWf_delRun (P : UPtd) (v0 n : Nat) (h : uptWf P) : uptWf (P.delRun v0 
     exact h.2.1 k1 w1 k2 w2
       (by rw [← delRun_get_not_mem P v0 n k1 (by omega)]; exact hk1)
       (by rw [← delRun_get_not_mem P v0 n k2 (by omega)]; exact hk2) hp
+  · intro k w hk
+    by_cases hr : v0 ≤ k ∧ k < v0 + n
+    · rw [delRun_get_mem P v0 n k hr.1 hr.2] at hk; exact absurd hk (by simp)
+    · exact h.2.2.2 k w (by rw [← delRun_get_not_mem P v0 n k (by omega)]; exact hk)
 
 /-- Clearing `PTE_U` on a leaf keeps the table well formed (the guard page
 of `uvmclear`: `V` and `R`/`W`/`X` survive). -/
@@ -274,7 +278,7 @@ theorem uptWf_clearU (P : UPtd) (k : Nat) (w : BitVec 64) (h : uptWf P)
           rw [this]; exact hl.2
     · rw [get?_insert_ne hjk] at hj
       exact ⟨w', hj, rfl, rfl, id⟩
-  refine ⟨?_, ?_, h.2.2⟩
+  refine ⟨?_, ?_, h.2.2.1, ?_⟩
   · intro j w' hj
     obtain ⟨v, hv, _, hpa', hl⟩ := hkey j w' hj
     obtain ⟨h1, h2, h3⟩ := h.1 j v hv
@@ -283,6 +287,13 @@ theorem uptWf_clearU (P : UPtd) (k : Nat) (w : BitVec 64) (h : uptWf P)
     obtain ⟨v1, hv1, hpp1, _, _⟩ := hkey j1 w1 h1
     obtain ⟨v2, hv2, hpp2, _, _⟩ := hkey j2 w2 h2
     exact h.2.1 j1 v1 j2 v2 hv1 hv2 (by rw [← hpp1, ← hpp2]; exact hp)
+  · intro j w' hj
+    by_cases hjk : k = j
+    · rw [get?_insert_eq hjk] at hj
+      cases hj
+      exact uLeafPins_andNotU w (h.2.2.2 k w hk)
+    · rw [get?_insert_ne hjk] at hj
+      exact h.2.2.2 j w' hj
 
 /-- Deleting leaves keeps every leaf below the size. -/
 theorem umBelow_delRun (sz : BitVec 64) (P : UPtd) (v0 n : Nat) (h : umBelow sz P) :

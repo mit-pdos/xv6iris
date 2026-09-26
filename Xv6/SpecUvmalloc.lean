@@ -46,7 +46,7 @@ def wp_uvmalloc_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G
     (hroot : k.regs 10#5 = pageAddr P.root)
     (hold : (k.regs 11#5).toNat ≤ uvmMaxsz)
     (hnew : (k.regs 12#5).toNat ≤ uvmMaxsz ∨ lazyFree P.um (k.regs 11#5))
-    (hperm : k.regs 13#5 &&& ~~~0x3EE#64 = 0#64)
+    (hperm : k.regs 13#5 &&& ~~~0x3CE#64 = 0#64)
     (hfree : ∀ i, i < uvmaNp (k.regs 11#5) (k.regs 12#5) →
       pgRoundUpN (k.regs 11#5).toNat + 4096 * i + 4096 ≤ uvmMaxsz →
       Iris.Std.PartialMap.get? P.um (uvmaVpn0 (k.regs 11#5) + i) = none) : Prop :=

@@ -1964,7 +1964,7 @@ theorem kf_procPtAt_valids [CurCtx] (P : UPtd) (M : Nat → List (BitVec 8)) :
         · ipureintro; exact hwf
         · iframe H1 H2) $$ H with ⟨%hwf, H⟩
   isplitl []
-  · ipureintro; exact ⟨hroot, hwf.2.2⟩
+  · ipureintro; exact ⟨hroot, hwf.2.2.1⟩
   · iexact H
 
 /-- `freeproc` at its entry (folded to `0x80001b1a`). -/

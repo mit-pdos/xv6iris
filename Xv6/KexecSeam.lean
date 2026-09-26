@@ -603,7 +603,7 @@ theorem kxc_call_uvmalloc (UA : UVMALLOC) (Γ : SchedNames) (cpu : CPU) (k : KCt
     (hK : kexecSlots ≤ k.avail) (hnoff : k.noff = 0)
     (hroot : R 10#5 = pageAddr P.root) (hold : (R 11#5).toNat ≤ uvmMaxsz)
     (hnew : (R 12#5).toNat ≤ uvmMaxsz ∨ lazyFree P.um (R 11#5))
-    (hperm : R 13#5 &&& ~~~0x3EE#64 = 0#64)
+    (hperm : R 13#5 &&& ~~~0x3CE#64 = 0#64)
     (hfree : ∀ i, i < uvmaNp (R 11#5) (R 12#5) →
       pgRoundUpN (R 11#5).toNat + 4096 * i + 4096 ≤ uvmMaxsz → get? P.um (uvmaVpn0 (R 11#5) + i) = none) :
     instr X false (instruction.JAL (imm, regidx.Regidx 1#5)) ∗

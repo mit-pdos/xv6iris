@@ -136,7 +136,7 @@ theorem procPrivFd_tfpValid (γ : FileNames) (pa : BitVec 64) (pid : BitVec 32) 
       procPrivFd γ pa pid V M ∗ ⌜pageValid (pageAddr V.upt.tfp)⌝ := by
   iintro H
   icases procPrivFd_facts γ pa pid V M $$ H with ⟨H, %h⟩
-  iframe H; ipureintro; exact h.2.2.2.2.2
+  iframe H; ipureintro; exact h.2.2.2.2.2.1
 
 /-- **Raising the lazy bit is free** (Rocq `proc_priv_lazy_true`): `true`
 claims nothing. -/

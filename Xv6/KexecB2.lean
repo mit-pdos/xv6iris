@@ -223,7 +223,7 @@ theorem kxcB2_call_uvmalloc (UV : UVMALLOC) (Γ : SchedNames) (cpu : CPU) (k : K
     (hret : jumpPc (X + 4#64) = X + 4#64) (P : UPtd) (Mi : Nat → List (BitVec 8))
     (hK : kexecSlots ≤ k.avail) (hnoff : k.noff = 0)
     (hroot : R 10#5 = pageAddr P.root) (hbelow : umBelow (R 11#5) P) (hcov : lazyFree P.um (R 11#5))
-    (hperm : R 13#5 &&& ~~~0x3EE#64 = 0#64) :
+    (hperm : R 13#5 &&& ~~~0x3CE#64 = 0#64) :
     instr X false (instruction.JAL (imm, regidx.Regidx 1#5)) ∗
     kctx cpu (((k.withSpie spie spp).pushed 68).withRegs R) ∗ pcIs cpu X ∗
     trapCsrsExt cpu k.sie ∗ cpuClaimExt cpu k.sie k.proc ∗

@@ -49,6 +49,12 @@ def uLeaf (ppn : BitVec 44) (perm : BitVec 64) : BitVec 64 :=
 def pteVU (w : BitVec 64) : Prop := w &&& PTE_V ≠ 0#64 ∧ w &&& PTE_U ≠ 0#64
 /-- A leaf the hardware walk stops at: valid with some of `R`/`W`/`X`. -/
 def isLeafPte (w : BitVec 64) : Prop := w &&& PTE_V ≠ 0#64 ∧ w &&& 0xE#64 ≠ 0#64
+/-- **The user-leaf pins** (D53; Rocq `upt_map_wf`'s `pte_no_napot` /
+`pte_pbmt0`, plus `G = 0`): the leaf is not global (`G`, bit 5), not a NAPOT
+leaf (`N`, bit 63) and has `PBMT = 0` (bits 61–62), so the walk at U is the
+plain Sv39 walk and its TLB entry is `tlbEntryOf`'s (`global := false`).  The
+`A`/`D` bits the hardware sets do not touch them (`uLeafPins_setAD`). -/
+def uLeafPins (w : BitVec 64) : Prop := w &&& 0xE000000000000020#64 = 0#64
 /-- `v` is `c` up to the `A`/`D` bits (the hardware sets them). -/
 def pteAD (c v : BitVec 64) : Prop := ∃ a d : BitVec 1, v = pteSetAD c a d
 
@@ -91,16 +97,39 @@ def ptRep (t : PTree) (L : RegMapF (BitVec 64)) : Prop :=
     ∃ (addr v : BitVec 64), t.walk 2 vpn = some (addr, v) ∧ pteAD w v) ∧
   (∀ vpn : BitVec 27, Iris.Std.PartialMap.get? L vpn.toNat = none → t.walk 2 vpn = none)
 
-/-- The pure facts of a live table (Rocq `proc_pt_wf`): user leaves below
-`TRAPFRAME`, real leaves (`U` may be clear: `uvmclear`'s guard page), on valid pages, distinct pages;
-the trapframe page valid.  (Disjointness of the user pages from the trapframe
+/-- The pure facts of a live table (Rocq `proc_pt_wf` + `upt_map_wf`): user
+leaves below `TRAPFRAME`, real leaves (`U` may be clear: `uvmclear`'s guard
+page), on valid pages, distinct pages; the trapframe page valid; every user
+leaf pinned (`uLeafPins`: `G = 0`, no NAPOT, `PBMT = 0`, D53).  (Disjointness of the user pages from the trapframe
 page is enforced by separation-logic ownership, not a pure fact.) -/
 def uptWf (P : UPtd) : Prop :=
   (∀ k w, Iris.Std.PartialMap.get? P.um k = some w →
     k < tfVpn.toNat ∧ isLeafPte w ∧ pageValid (pte2pa w)) ∧
   (∀ k1 w1 k2 w2, Iris.Std.PartialMap.get? P.um k1 = some w1 → Iris.Std.PartialMap.get? P.um k2 = some w2 →
     ptePpn w1 = ptePpn w2 → k1 = k2) ∧
-  pageValid (pageAddr P.tfp)
+  pageValid (pageAddr P.tfp) ∧
+  (∀ k w, Iris.Std.PartialMap.get? P.um k = some w → uLeafPins w)
+
+/-- The pins survive the hardware's `A`/`D` write-back. -/
+theorem uLeafPins_setAD (w : BitVec 64) (a d : BitVec 1) (h : uLeafPins w) : uLeafPins (pteSetAD w a d) := by
+  unfold uLeafPins at *
+  simp only [pteSetAD, Sail.BitVec.length, Nat.reduceBEq, Bool.false_eq_true, ↓reduceIte,
+    Sail.BitVec.extractLsb, Sail.BitVec.updateSubrange, Sail.BitVec.updateSubrange', BitVec.extractLsb,
+    LeanRV64D.Functions._update_PTE_Flags_A, LeanRV64D.Functions._update_PTE_Flags_D]
+  revert h; bv_decide
+
+/-- `mappages`' leaf is pinned when its permission word is. -/
+theorem uLeafPins_uLeaf (ppn : BitVec 44) (perm : BitVec 64) (h : perm &&& ~~~0x3DF#64 = 0#64) :
+    uLeafPins (uLeaf ppn perm) := by
+  unfold uLeafPins uLeaf; revert h; bv_decide
+
+/-- Clearing `U` keeps the pins. -/
+theorem uLeafPins_andNotU (w : BitVec 64) (h : uLeafPins w) : uLeafPins (w &&& ~~~PTE_U) := by
+  unfold uLeafPins PTE_U at *; revert h; bv_decide
+
+/-- A copy of a pinned leaf's flags (`uvmcopy`) is a pinned permission word. -/
+theorem pteFlags_pinMask (w : BitVec 64) (h : uLeafPins w) : pteFlags w &&& ~~~0x3DF#64 = 0#64 := by
+  unfold uLeafPins pteFlags at *; revert h; bv_decide
 
 /-- Every user leaf lies below `PGROUNDUP(sz)` (Rocq `um_below`). -/
 def umBelow (sz : BitVec 64) (P : UPtd) : Prop :=

@@ -435,7 +435,7 @@ theorem kw_dormant_freeprocIn (pa : BitVec 64) (pid0 : BitVec 32) :
   rw [if_pos rfl]
   icases Hspace with ⟨%M, %⟨hpt, htf, humb⟩, Hpt, Htf, Hstack⟩
   icases procPtAt_cases V.upt M $$ Hpt with ⟨%hwf, HptO, Hum⟩
-  have htfv : pageValid (pageAddr V.upt.tfp) := hwf.2.2
+  have htfv : pageValid (pageAddr V.upt.tfp) := hwf.2.2.1
   ihave Hpt := procPtAt_intro V.upt M hwf $$ [HptO Hum]
   · isplitl [HptO]
     · iexact HptO
