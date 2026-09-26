@@ -28,6 +28,7 @@ a symbolic address (performance rule 2):
 -/
 import MachCSL.UTranslate
 import MachCSL.Tactics
+import MachCSL.BvEnumSatp
 
 namespace MachCSL
 

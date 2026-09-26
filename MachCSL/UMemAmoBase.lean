@@ -29,6 +29,7 @@ two GPR accesses are lane U1-X1's `uxa_rX`/`uxa_wX`.
 import MachCSL.UWalkRun
 import MachCSL.UExecCtlBase
 import MachCSL.UTranslate
+import MachCSL.BvEnumSatp
 
 namespace MachCSL
 

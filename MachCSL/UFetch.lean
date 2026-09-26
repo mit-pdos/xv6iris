@@ -39,6 +39,7 @@ map: a coherent icache); see `UFetchMem`.
 import MachCSL.UFetchWalk
 import MachCSL.UWalk
 import MachCSL.UCycle
+import MachCSL.BvEnumSatp
 
 namespace MachCSL
 

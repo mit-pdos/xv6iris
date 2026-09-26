@@ -35,6 +35,7 @@ encoding -- that transfer belongs with lanes U1-P1/U1-P2).  They may move the
 state (a TLB fill, an A-bit write-back), and the fact lands where they did.
 -/
 import MachCSL.UMemAmoBase
+import MachCSL.BvEnumSatp
 
 namespace MachCSL
 
