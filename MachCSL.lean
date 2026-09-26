@@ -196,3 +196,9 @@ import MachCSL.UFetch
 import MachCSL.UFetchTotal
 import MachCSL.UclCbo
 import MachCSL.UclCtl
+import MachCSL.UMemFrame
+import MachCSL.UMemFrStore
+import MachCSL.UMemExec
+import MachCSL.UMemAmoPhys
+import MachCSL.UMemPfWalk
+import MachCSL.UMemPfPhys

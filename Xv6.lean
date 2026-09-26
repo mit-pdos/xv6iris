@@ -1513,3 +1513,11 @@ import Xv6.ShMallocCut
 import Xv6.ProofShMalloc
 import Xv6.UkShMallocCap
 import Xv6.LinkShMalloc
+import Xv6.UserMemTr
+import Xv6.UserMemLand
+import Xv6.UserMemLoad
+import Xv6.UserMemStore
+import Xv6.UserMemLrsc
+import Xv6.UserMemAmoArm
+import Xv6.UserMemPf
+import Xv6.UserMemArms
