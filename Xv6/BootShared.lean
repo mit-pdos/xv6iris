@@ -141,7 +141,7 @@ variable {hlc : HasLC} {GF : BundledGFunctors} [MachFixedGS hlc GF]
 (`MachGS.ofEra E gen …`, any claim/environment payload), `powerBootRes`
 is the ambient rows plus the client's lent resource.  Pure conversion. -/
 theorem powerBootRes_unpack (Mof : (Nat → BitVec 8) → LogMirror)
-    (Rb : Nat → (Nat → BitVec 8) → IProp GF) (E : EraGS GF) (gen : Nat)
+    (Rb : Nat → (Nat → BitVec 8) → IProp GF) (E : EraGS) (gen : Nat)
     (cP : CPU → BitVec 64 → IProp GF) (cI : ∀ cpu : CPU, ⊢ cP cpu 0#64) (eP : CtxId → IProp GF)
     (ePe : ∀ ξ : CtxId, Persistent (eP ξ)) (σ : MState) :
     powerBootRes Mof Rb E gen σ ⊢
@@ -591,7 +591,7 @@ deviation 3, ProcBoot deviation 1, at the whole output): the shared
 allocation runs at a provisional `MachGS.ofEra E gen …` (the names the final
 payload `procClaim Γ` / `envFam Γ …` is stated over are minted INSIDE it),
 and its output is the same proposition at every payload. -/
-theorem bootSharedOut_ofEra (E : EraGS GF) (gen : Nat)
+theorem bootSharedOut_ofEra (E : EraGS) (gen : Nat)
     (cP cP' : CPU → BitVec 64 → IProp GF) (cI : ∀ cpu : CPU, ⊢ cP cpu 0#64)
     (cI' : ∀ cpu : CPU, ⊢ cP' cpu 0#64) (eP eP' : CtxId → IProp GF)
     (ePe : ∀ ξ : CtxId, Persistent (eP ξ)) (ePe' : ∀ ξ : CtxId, Persistent (eP' ξ))
