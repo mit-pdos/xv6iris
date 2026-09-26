@@ -764,3 +764,37 @@ that when the kernel reports its ring dirty:
   refutes the tag's `lm_disc`, the tag's other half is `UT`, and the
   outcome is the ordinary taint.  The refutation lives at the U-tier read
   leaf (where the tags are), not in `cons_acc`.
+
+### 10.13 The two gaps of the wild read, and their closures (owner, 2026-09-26)
+
+Lane S5b found that the dirty arm's refutation (10.12) needs two facts the
+tree did not have:
+- GAP A, "this read is past the seccomp line": `cons_placed`'s positions
+  are at or after the holder's own position `length I`, and the chain
+  lemma needs `length I0 <= length I`.  Nothing persistent recorded the
+  shell's position at the transition.  CLOSURE, U tier: the shell's read
+  position (`UkSh.upos`) becomes a `mono_nat` with a persistent lower
+  bound; the transition records `upos_lb γp (length I0)` beside the token
+  (in `usecc_tok_at`'s union form / the residue), and the dirty read
+  compares its `upos γp (length I)` against it.  No kernel change.
+- GAP B, "a zero-byte dirty return carries no byte": a typed Ctrl-D is
+  swallowed (`d = 0`, `dc = 1`) and the dirty arm said nothing about it.
+  CLOSURE, kernel (lane S2k3): the dirty arms gain `⌜dc = d⌝ ∨ (⌜dc = S
+  d⌝ ∗ ∃ p h b, ⌜lo <= p ∧ sl !! p = Some (h, b) ∧ obs_ends_in Uart0 h b ∧
+  obs_boots h = k⌝ ∗ riscv_rx_tag h)` (the pops have every fact in hand);
+  and the shell's read leaf takes `⌜0 < cap⌝` (`gets` reads one byte).
+The union's `ai_rdwild` is the token in the form that carries what the
+discharge needs.  With both, the leaf's dirty case at the token half has
+three sub-cases (a delivered byte, the swallowed byte, nothing), the first
+two refuted through `lm_placed_wild_undisc`, the third by `0 < cap`.
+- GAP A, REFINED (lane S5b): the shell's position ghost `upos` is minted
+  fresh per shell (init restarts shells after a wild-era panic), so a
+  per-shell bound cannot reach a later shell.  The bound is therefore
+  PER ERA: `era_pins` gains `ep_rpos` (a `mono_nat`, the `ep_secc`
+  pattern), its full authority in the lease's era part beside `dl_cnt` in
+  `ush_mid_at`, handed shell to shell through `Pm` via init; the read leaf
+  advances it on the clean arm and holds it on the dirty arm (unlike
+  `dl_cnt`, whose half is spent into the read link and never returns on
+  the dirty arm); the transition's landing snapshots `rpos_lb v (length
+  I0)` into the wild shape, and the union's `ai_rdwild` is the token at
+  its line with that bound and the ring facts.

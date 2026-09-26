@@ -224,7 +224,9 @@ Section UkReadCons.
         ∨ cons_dirty_cred app_rdcred
           ∗ ∃ sl : list (list mobs * bv 8),
               ucons_stored_lb cnm sl ∗ ⌜cons_chain sl⌝ ∗
-              ⌜cons_placed sl cur (S gen_id) dd hs⌝))%I.
+              ⌜cons_placed sl cur (S gen_id) dd hs⌝ ∗
+              (* ...and the swallowed byte, placed the same way (S2k3) *)
+              cons_swallow_placed sl cur (S gen_id) dd dc))%I.
 
   (* =================================================================== *)
   (*  4.  THE LEAF                                                        *)
@@ -329,7 +331,7 @@ Section UkReadCons.
       apply uint_moi. unfold Z64. lia. }
     assert (Hddcap : (dd <= cap)%nat) by lia.
     iDestruct "Hwin"
-      as "[(%Hwj & %Hsl & %Hch & #Hsw & Hbnd) | (#Hdirty & %Hchd & %Hpld)]";
+      as "[(%Hwj & %Hsl & %Hch & #Hsw & Hbnd) | (#Hdirty & %Hchd & %Hpld & #Hswd)]";
       last first.
     { (* a tokenless reader popped while the call slept: the ring's
          credential is the answer, and nothing is claimed about the
@@ -345,7 +347,7 @@ Section UkReadCons.
       iSplitR; [ iExact "Htags" | ]. iFrame "Hrd".
       iRight. iSplitR; [ iExact "Hdirty" | ]. iExists sl.
       iSplitR; [ rewrite ucons_stored_lb_eq; iExact "Hlb" | ].
-      iSplitR; [ by iPureIntro | by iPureIntro ]. }
+      iSplitR; [ by iPureIntro | ]. iSplitR; [ by iPureIntro | iExact "Hswd" ]. }
     iDestruct "Hbnd" as (sl2 ws)
       "(#Hlb2 & %Hpre2 & %Hlen2 & %Hlws & %Hwsj & Hrin)".
     (* THE WINDOW, ASSEMBLED: the receipt's ORDER clause and its per-byte

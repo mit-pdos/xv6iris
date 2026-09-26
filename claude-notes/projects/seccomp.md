@@ -348,6 +348,19 @@ gen_id` (`cons_placed_era` off `fileread_dev_caps_era`), so
 the U tier.  `GenOutWild.lm_placed_wild_undisc` takes the extra era
 argument (its proof drops the new conjunct).
 
+S2k3 (`secc/s2k3`): the marked arms also report a SWALLOWED byte.
+`ConsoleInv.cons_swallow_placed sl lo k d dc := ⌜dc = d⌝ ∨ ⌜dc = S d⌝ ∗
+∃ p h b, ⌜lo <= p /\ sl !! p = Some (h, b) /\ obs_ends_in Uart0 h b /\
+obs_boots h = k⌝ ∗ riscv_rx_tag h` (persistent; `_eq`, `_prefix`, `_era`).
+It rides `cr_rout`'s tokenless and holder-marked arms (at `lo = 0` / `n0`,
+`k = cn_era cn`; `cr_rout_of_racc` gives the left disjunct,
+`cr_pop_swallow`'s three marked branches the right one at the cursor, the
+pop's row read before the arm split), `cr_out`'s and `SpecConsoleread`'s
+marked disjunct at `cur`, `SpecFileread.console_receipt`'s at `S gen_id`
+(`console_receipt_of_dirty` takes it; fileread converts by
+`cons_swallow_placed_era`) and `UkReadCons.uread_cons_ans`'s dirty
+disjunct inside its `∃ sl`, at `S gen_id`.
+
 STATUS (lane S5a, `secc/s5a` off main aa793e35c, design 10.12's UNION
 bullet, the claim/pure half): landed, tree green (VM log s5a-3: EXIT=0, no
 `Error`, second pass 0 compiles), audits system 13 / union 14 / tree 13

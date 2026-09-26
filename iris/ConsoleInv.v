@@ -1919,6 +1919,49 @@ Section ConsoleInv.
 
   (* ...and the bound it carries: [d] or one more, which is what the landed
      callers read off it *)
+  (* THE SWALLOWED BYTE ON A MARKED RING (lane seccomp S2k3).  The marked
+     arm has no window, so [cons_swallow]'s "the next element of the
+     sequence" is not available; what IS is where the popped byte sat:
+     every pop is at the ring's cursor, which is at or after [lo], and the
+     byte carries its input tag and the ring's era [k] -- exactly
+     [cons_placed]'s per-byte facts, for the one byte popped and not
+     delivered.  [dc] is [d] or one more, as on the clean arm. *)
+  Definition cons_swallow_placed (sl : list (list mobs * bv 8))
+      (lo k d dc : nat) : iProp Σ :=
+    (⌜dc = d⌝
+     ∨ ⌜dc = S d⌝ ∗
+       ∃ (p : nat) (h : list mobs) (b : bv 8),
+         ⌜(lo <= p)%nat /\ sl !! p = Some (h, b) /\ obs_ends_in Uart0 h b
+          /\ obs_boots h = k⌝ ∗ riscv_rx_tag h)%I.
+
+  Global Instance cons_swallow_placed_persistent sl lo k d dc :
+    Persistent (cons_swallow_placed sl lo k d dc).
+  Proof using . rewrite /cons_swallow_placed. apply _. Qed.
+
+  Lemma cons_swallow_placed_eq (sl : list (list mobs * bv 8)) (lo k d : nat) :
+    ⊢ cons_swallow_placed sl lo k d d.
+  Proof using . rewrite /cons_swallow_placed. iLeft. by iPureIntro. Qed.
+
+  (* the bound only grows *)
+  Lemma cons_swallow_placed_prefix (sl sl' : list (list mobs * bv 8))
+      (lo k d dc : nat) :
+    sl `prefix_of` sl' ->
+    cons_swallow_placed sl lo k d dc -∗ cons_swallow_placed sl' lo k d dc.
+  Proof using .
+    intros Hp. rewrite /cons_swallow_placed.
+    iIntros "[%He | [%He H]]"; [iLeft; by iPureIntro |].
+    iDestruct "H" as (q h b) "[%Hq #Ht]". iRight. iSplitR; [by iPureIntro |].
+    iExists q, h, b. iFrame "Ht". iPureIntro.
+    destruct Hq as (Hlo & Hl & Hen & Hk). split_and!; [exact Hlo | | exact Hen | exact Hk].
+    exact (prefix_lookup_Some sl sl' q (h, b) Hl Hp).
+  Qed.
+
+  (* the era, restated where a caller knows which era the ring is *)
+  Lemma cons_swallow_placed_era (sl : list (list mobs * bv 8))
+      (lo k k' d dc : nat) :
+    k = k' -> cons_swallow_placed sl lo k d dc -∗ cons_swallow_placed sl lo k' d dc.
+  Proof using . intros <-. by iIntros "$". Qed.
+
   Lemma cons_swallow_range (cn : cons_names) (fault : Prop)
       (sl : list (list mobs * bv 8)) (d dc : nat) :
     cons_swallow cn fault sl d dc -∗ ⌜(d <= dc <= d + 1)%nat⌝.
