@@ -386,6 +386,56 @@ token's `dl_list_lb v D` to the kernel's `sl` (index `n0 = length I0 - 1`)
 is the read leaf's job.  One shell-tier touch: `UShURoundLaws.
 uwild_read_absurd`'s destruct pattern gains `& _` for the new conjunct.
 
+STATUS (lane S5b, `secc/s5b` off `secc/s4` 369f7e7a3, `secc/bump` with
+S2k3 merged): the one open premise is DISCHARGED -- `UInitUnion.
+union_adequacy_closed` compiles at the knob ON with its statement
+unchanged; `union_adequacy_closed_rd` and `union_rdwild_premise` are
+deleted (redundant), `union_Hinit_boot` is the law again.  Tree green (VM
+log s5b-11: EXIT=0, no `Error`, `make -n` 0 compiles), audits system 13 /
+union 14 / tree 13 textually the S1 baseline -- the union audit is the
+real `UnionAssumptions.v` on `union_adequacy_closed`.
+- THE ERA'S READER POSITION (the owner's ruling on Gap A): `EchoOut.
+  era_pins` gains `ep_rpos`; `rpos_auth v n` (full `mono_nat` auth) /
+  `rpos_lb v n`; `era_full` carries it at 0, the era split hands it to the
+  reader's credential (`eturn`, `FileOut.fturn(_core)`, `LinkRec.lk_turn0`,
+  `UInitBanner.kinit_dl0_at`, `UShLine.ush_rd_pin_at`) and `ush_mid_at`
+  carries it beside `dl_cnt`.  The read link never sees it: `ush_read_pay_era_at`
+  holds it back in `ush_rd_ret`'s new `Rp` argument (`ush_rd_hold`: pin,
+  input bound, residue, position); the leaf advances it on the window arm
+  and hands it, unmoved, to the marked arm's law.  The per-shell `upos`
+  is a `mono_nat` too (harmless, kept; `upos_lb` unused).
+- THE LEAF'S LAW (`UShLine.ush_dirty_law L γ`, replacing the premise
+  `riscv_rdwild -∗ lk_T`): at one byte the call took -- stored at `p >=
+  length I` in the ring bound `sl`, `cons_chain sl`, its history this
+  era's, its tag -- `ucons_stored_lb fsc_cons sl -∗ riscv_rx_tag h -∗
+  era_pin γ v -∗ inp_lb v I -∗ lk_rres L v I -∗ rpos_auth v (length I) -∗
+  cons_dirty_cred app_rdcred -∗ lk_T L`.  The leaf picks the byte off the
+  S2k3 receipt: the first delivered one (`cons_placed`), else the
+  swallowed one (`cons_swallow_placed`, `dd = 0` with `0 < cap` gives `dc =
+  1`).  `UkSh.ush_read_recv_leaf_at` / `wp_ksh_read` take `0 < cap`.
+  Echo/pipe discharge it by `ush_dirty_law_of` (the old two premises).
+- THE UNION: `ai_rdwild := UnionOut.urdwild` (`∃ I0 v, usecc_tok_at k I0 ∗
+  ⌜uwild (lm_line_at U I0) = true⌝ ∗ UPIN k v ∗ rpos_lb v (length I0)`);
+  `useccomp_shape I` gains `∃ v, era_pin ∗ rpos_lb v (length I)` (snapshot
+  at `uWcu_read`'s landing, `umid_wild`), so `ush_rdwild_of_shape_holds`.
+  `urresw`'s third conjunct keeps the transition window's ring fact
+  (`UnionLinkInst.uring_at I`: `ucons_stored_lb fsc_cons sl ∗ ⌜sl !!
+  (length I - 1) = Some (h0, wl_nl) ∧ ins (open_seg h0) = I ∧ obs_boots h0
+  = S gen_id⌝`), built in `UnionReadInst.uri_arms` from the consumed
+  segment and `rd_retW`'s new pure newline fact.  `ReadRec.rk_arms` is at
+  `fsc_cons` (ambient `fscfg`).  `UnionReadInstAt.union_dirty_law`: the
+  supply half is `UT`; the token half splits on `uwild_at I` -- the
+  residue's own ring fact and `GenOutWild.lm_stored_wild_undisc` refute
+  the tag's `lm_disc` (other half `UT`), else `rpos_lb_le` puts `I0 ⊑ I`,
+  `I0 = I` contradicts the case and `I0 ⊏ I` is refuted by the token's
+  `cs_frozen_at` against the residue's `cs_lb` (`cs_frozen_at_lb_absurd`).
+- GOTCHA: `union_link_inst` now takes `xv6G` (the ring's cameras) and
+  `fscfg`.  Bind `xv6G`, not a bare `uartGhostG`, wherever a U-tier lemma
+  names the record: a lemma elaborated at a bare `uartGhostG` binder and
+  one at `xv6G`'s projection do not unify, and the mismatch showed up as a
+  30-minute hang in `iDestruct ... as "[$ $]"`, then as an OOM from a
+  section with no `fscfg`.
+
 ## S3 -- the seccomp program (design §7, §9) -- brief written when S1 and S2 land
 
 `UCodeSeccomp.v` is generated.  sh-style proof (fork, wait): the child's
