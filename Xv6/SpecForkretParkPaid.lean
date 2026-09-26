@@ -58,7 +58,7 @@ def forkretParkPaidBody (URB : ParkURB GF) (W : IProp GF) (Γ : SchedNames)
     Prop :=
   N.Γ = Γ → utWf N → rest.length = 12 →
   ⊢ ownCtx hp ξp -∗
-    parkPkg (hlc := hlc) (SG := SG) URB W N ξp V.kstack V.fdg V.chg V.cwi sts V.gen cs
+    parkPkg (hlc := hlc) (SG := SG) URB W N ξp V.kstack V.fdg V.chg V.cwi V.pvSecc sts V.gen cs
       (parkKey steady V M cs N.pid) -∗
     ▷ W -∗
     parkChild (hlc := hlc) ξp N rest V M steady -∗

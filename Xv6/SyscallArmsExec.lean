@@ -83,7 +83,7 @@ def SyscDepExec : Prop :=
       myPay gn (UexecSG.sexitPay f) ∗
       ∃ (P Pmiss : Nat → Nat → IProp GF) (Fo : Pfam GF (Aview → Nat → Anode → IProp GF)),
         sysExecAuPre (hlc := hlc) ⟨uslot (hlc := hlc), UexecSG.sexecRefund f⟩ (fsGammaL fscFs) fscFs
-          V.cwi (UexecSG.sexitPay f) P Pmiss Fo (viewLazy V.upt V.sz M)
+          V.cwi V.pvSecc (UexecSG.sexitPay f) P Pmiss Fo (viewLazy V.upt V.sz M)
           (tfW V.tf (tfArgIdx 0)) (tfW V.tf (tfArgIdx 1)) sts cs pid
 
 /-- `kexecOk`'s success arm, the fields the dispatch's rows read. -/
@@ -116,7 +116,7 @@ theorem syscExec_arms_read (f : UexecSG.sfam GF) (V : ProcPriv) (M : Nat → Lis
     (r : BitVec 64) (P Pmiss : Nat → Nat → IProp GF) (Fo : Pfam GF (Aview → Nat → Anode → IProp GF)) :
     ((⌜r = 0xFFFFFFFFFFFFFFFF#64 ∧ V' = { V with upt := P' } ∧ M' = viewFaulted V.upt P' M⌝ ∗
         sysExecPostFail (hlc := hlc) ⟨uslot (hlc := hlc), UexecSG.sexecRefund f⟩ (fsGammaL fscFs) fscFs
-          V.cwi (UexecSG.sexitPay f) P Pmiss Fo (viewLazy V.upt V.sz M)
+          V.cwi V.pvSecc (UexecSG.sexitPay f) P Pmiss Fo (viewLazy V.upt V.sz M)
           (tfW V.tf (tfArgIdx 0)) (tfW V.tf (tfArgIdx 1)) sts cs pid) ∨
      (∃ (pl : List (BitVec 8)) (na : Nat) (alen : Nat → Nat) (afun : Nat → Nat → BitVec 8),
         ⌜argPathOf (viewLazy V.upt V.sz M) (tfW V.tf (tfArgIdx 0)).toNat pl⌝ ∗

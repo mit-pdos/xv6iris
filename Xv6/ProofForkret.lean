@@ -133,7 +133,7 @@ theorem fkr_boot [X : CurCtx] (PR : PREPARE_RETURN) (FS : FSINIT) (KX : KEXEC) (
     trapCsrsExt c1 eb ∗ cpuClaimExt c1 eb (procAddr N.j) ∗
     parkGlobals Γ N.w N.ft N.f N.ip ∗ utSysParkRows Γ ∗
     parkBootBlock (hlc := hlc) N V M ∗ W ∗
-    initBootBundle (hlc := hlc) (SG := uexecSGXv6) V.cwi sts ∗ consReader fscCons 0 ∗
+    initBootBundle (hlc := hlc) (SG := uexecSGXv6) V.cwi V.pvSecc sts ∗ consReader fscCons 0 ∗
     fkrCloser W Γ N V.fdg V.chg V.cwi sts gn cs none
     ⊢ wpLoop (GF := GF) c1 := by
   obtain ⟨ξ, t⟩ := X

@@ -188,4 +188,20 @@ theorem kexecOkExec_lazy (f : ElfBytes) (V V' : ProcPriv) (r : BitVec 64) (na : 
   obtain ⟨e, spv, szv', -, hne, hok⟩ := h
   exact kexecOk_lazy V V' r _ spv szv' na alen hne hok
 
+/-- Rocq `kexec_ok_secc`: ...AND ITS MASK IS THE CALLER'S (xv6 7b2c1b1b):
+exec keeps `p->seccomp`, so the block the swap installs carries the entry
+block's `pvSecc`.  This pays `execSlotPre`'s mask row. -/
+theorem kexecOk_secc (V V' : ProcPriv) (r entry spv szv' : BitVec 64) (na : Nat) (alen : Nat → Nat)
+    (hne : r ≠ 0xFFFFFFFFFFFFFFFF#64) (hok : kexecOk V V' r entry spv szv' na alen) :
+    V'.pvSecc = V.pvSecc := by
+  rcases hok with ⟨hr, -⟩ | ⟨-, -, -, -, -, -, -, -, -, -, -, -, -, -, -, -, -, -, -, hsc⟩
+  · exact absurd hr hne
+  · exact hsc
+
+/-- Rocq `kexec_ok_exec_secc`. -/
+theorem kexecOkExec_secc (f : ElfBytes) (V V' : ProcPriv) (r : BitVec 64) (na : Nat)
+    (alen : Nat → Nat) (h : kexecOkExec f V V' r na alen) : V'.pvSecc = V.pvSecc := by
+  obtain ⟨e, spv, szv', -, hne, hok⟩ := h
+  exact kexecOk_secc V V' r _ spv szv' na alen hne hok
+
 end Xv6

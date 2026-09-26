@@ -200,7 +200,7 @@ theorem xv6Triv_initBoot (US : USER) (cov : ExtTreeSet Nat compare) (ls : Nat)
   ihave #Hl := hlic
   ihave #Hg := hgen
   imodintro
-  iapply initBootBundle_of_mint (hlc := hlc) (GF := GF) ROOTINO (List.replicate NOFILE FdState.closed)
+  iapply initBootBundle_of_mint (hlc := hlc) (GF := GF) ROOTINO seccAll (List.replicate NOFILE FdState.closed)
     $$ Hs Hk Hl Hg
 
 /-- The generic application's echo (Rocq `cons_echo_shift_triv`). -/

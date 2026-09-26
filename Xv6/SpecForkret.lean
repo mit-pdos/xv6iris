@@ -152,7 +152,7 @@ def wp_forkret_gen_body [CurCtx] (URB : ParkURB GF) (W : IProp GF)
   parkBlock (hlc := hlc) steady N V M ∗
   W ∗
   -- the mode's payload: `firstDone` (steady), the exec bundle (boot)
-  parkMode (hlc := hlc) (SG := SG) V.cwi sts (parkKey steady V M cs N.pid) ∗
+  parkMode (hlc := hlc) (SG := SG) V.cwi V.pvSecc sts (parkKey steady V M cs N.pid) ∗
   -- the residue closer
   forkretCloser (hlc := hlc) (SG := SG) URB W N V.fdg V.chg V.cwi sts gn cs (parkKey steady V M cs N.pid)
   ⊢ wpLoop (GF := GF) cpu

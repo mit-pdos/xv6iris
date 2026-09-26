@@ -455,7 +455,7 @@ theorem bootPrimarySupply_intro [Fscfg] [Icfg] (X : CurCtx)
     (dk : Nat → BitVec 8) (sb : FsSb) (nib : Nat) (cov : ExtTreeSet Nat compare)
     (Pb : Nat → List (BitVec 8)) (Rspent : ExtTreeSet Nat compare) :
     consEchoShift (hlc := hlc) (GF := GF) ∗
-      initBootBundle (hlc := hlc) (SG := uexecSGXv6) ROOTINO (List.replicate NOFILE FdState.closed) ∗
+      initBootBundle (hlc := hlc) (SG := uexecSGXv6) ROOTINO seccAll (List.replicate NOFILE FdState.closed) ∗
       bootSupplyCore X Γ γ0 γ1 γc γl0 γl1 γd γt cn l0 l1 c0 dk sb nib cov Pb Rspent ⊢
       bootPrimarySupply X Γ γ0 γ1 γc γl0 γl1 γd γt cn l0 l1 c0 dk sb nib cov Pb Rspent := by
   unfold bootSupplyCore bootPrimarySupply

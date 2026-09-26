@@ -136,6 +136,9 @@ theorem execKey_cwd : (execKey V' M' sts gn cs pidv na).cwd = V'.cwi := rfl
 /-- Rocq `exec_key_lazy`. -/
 theorem execKey_lazy : (execKey V' M' sts gn cs pidv na).lazy = V'.pvLazy := rfl
 
+/-- Rocq `exec_key_secc`: the key's mask reading, beside `execKey_lazy`. -/
+theorem execKey_secc : (execKey V' M' sts gn cs pidv na).secc = V'.pvSecc := rfl
+
 /-- Rocq `exec_key_tf`: the post-exec frame with argc inserted. -/
 theorem execKey_tf :
     (execKey V' M' sts gn cs pidv na).tf = V'.tf.set (tfArgIdx 0) (BitVec.ofNat 64 na) := rfl

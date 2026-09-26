@@ -72,34 +72,36 @@ variable {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF] [FsTopG
 /-- **Rocq `init_boot_bundle`**: WHAT THE APPLICATION OWES THE KERNEL ABOUT
 USER EXECUTION -- kexec's caller-side bundle at "/init" (`na = 1`, the one
 argument the path again: forkret's `kexec("/init", (char *[]){"/init", 0})`),
-at the first process's cwd `cw` and descriptor view `sts`, with the SLOT
+at the first process's cwd `cw`, SYSCALL MASK `secc` (exec keeps it: the
+slot wands' `W'.secc = secc` row, xv6 7b2c1b1b; the boot chain states it at
+`seccAll`, userinit's record) and descriptor view `sts`, with the SLOT
 PIECE at `UexecRet.uslot` and refund `R`; the cursor, miss family,
 observation pair and refund are the bundle's own choice (existential).
 LINEAR (its pieces are one-shot).  AT THE TRIVIAL PAYLOAD (`<init>` has no
 parent).  It TAKES THE CONSOLE'S READER TOKEN as an input (the kernel's to
 hand, threaded main → userinit → the park → forkret's boot arm), and is owed
 AT EVERY CHILDREN SET AND PID. -/
-def initBootBundle (cw : Nat) (sts : List FdState) : IProp GF :=
+def initBootBundle (cw : Nat) (secc : BitVec 64) (sts : List FdState) : IProp GF :=
   iprop(consReader fscCons 0 -∗
     ∃ (P Pmiss : Nat → Nat → IProp GF) (Fo : Pfam GF (Aview → Nat → Anode → IProp GF)) (R : IProp GF),
       ∀ (cs : ExtTreeSet GName compare) (pidv : BitVec 32),
-        execAuPre (hlc := hlc) ⟨uslot (hlc := hlc) (SG := SG), R⟩ (fsGammaL fscFs) fscFs cw
+        execAuPre (hlc := hlc) ⟨uslot (hlc := hlc) (SG := SG), R⟩ (fsGammaL fscFs) fscFs cw secc
           (fun _ => iprop(True)) P Pmiss Fo initBootPath 1 (fun _ => 5) (fun _ => initBootBytes)
           sts cs pidv)
 
 /-- **Rocq `init_boot_bundle_triv`**: THE GENERIC APPLICATION'S -- a slot at
 every key answers both wands and tracks nothing; the reader token is
 dropped. -/
-theorem initBootBundle_triv (cw : Nat) (sts : List FdState) :
+theorem initBootBundle_triv (cw : Nat) (secc : BitVec 64) (sts : List FdState) :
     ⊢ □ (∀ W : Uvis, myPay W.gen (fun _ => iprop(True)) -∗ uslot (hlc := hlc) (SG := SG) W) -∗
-      initBootBundle (hlc := hlc) (SG := SG) cw sts := by
+      initBootBundle (hlc := hlc) (SG := SG) cw secc sts := by
   iintro #HS
   unfold initBootBundle
   iintro -
   iexists (fun _ _ => iprop(True)), (fun _ _ => iprop(True)), (pfamTriv (fun _ _ _ => iprop(True))),
     iprop(True)
   iintro %cs %pidv
-  iapply (execAuPre_triv_at (hlc := hlc) (uslot (hlc := hlc) (SG := SG)) (fsGammaL fscFs) fscFs cw
+  iapply (execAuPre_triv_at (hlc := hlc) (uslot (hlc := hlc) (SG := SG)) (fsGammaL fscFs) fscFs cw secc
     initBootPath 1 (fun _ => 5) (fun _ => initBootBytes) sts cs pidv)
   iexact HS
 

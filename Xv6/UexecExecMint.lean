@@ -100,13 +100,13 @@ theorem uslotMint_all :
 `SystemAdequacy.init_boot_of_triv` over `init_boot_bundle_triv` and
 `uslot_mint`): the first process's exec bundle at the kernel's instance, out
 of the supply and the generic slot. -/
-theorem initBootBundle_of_mint (cw : Nat) (sts : List FdState) :
+theorem initBootBundle_of_mint (cw : Nat) (secc : BitVec 64) (sts : List FdState) :
     ⊢ appSup (GF := GF) -∗ uKillCred (hlc := hlc) -∗ consLicence (hlc := hlc) (GF := GF) -∗
       □ uexecWp (hlc := hlc) (GF := GF) -∗
-      initBootBundle (hlc := hlc) (SG := uexecSGXv6) cw sts := by
+      initBootBundle (hlc := hlc) (SG := uexecSGXv6) cw secc sts := by
   iintro #Hsup #Hkc #Hlic #Hgen
   ihave #Hm := uslotMint (hlc := hlc) (GF := GF) $$ Hsup Hkc Hlic Hgen
-  iapply (initBootBundle_triv (hlc := hlc) (SG := uexecSGXv6) cw sts) $$ Hm
+  iapply (initBootBundle_triv (hlc := hlc) (SG := uexecSGXv6) cw secc sts) $$ Hm
 
 end UexecExecMint
 

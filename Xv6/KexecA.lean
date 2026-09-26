@@ -135,7 +135,7 @@ the header was read from, at the inum the walk landed on, with the walk's
 cursor and the slot piece; the pure row beside it is where `inodeOk` was in
 scope (conditional on the type: kexec does not test it). -/
 def kxaReceipt (Fs : Pfam GF (Uvis → IProp GF)) (P : Nat → Nat → IProp GF)
-    (Fo : Pfam GF (Aview → Nat → Anode → IProp GF)) (Qpay : Int → IProp GF) (cw : Nat) (L zi : Nat)
+    (Fo : Pfam GF (Aview → Nat → Anode → IProp GF)) (Qpay : Int → IProp GF) (cw : Nat) (secc : BitVec 64) (L zi : Nat)
     (na : Nat) (alen : Nat → Nat) (afun : Nat → Nat → BitVec 8) (sts : List FdState)
     (cs : Std.ExtTreeSet GName compare) (pidv : BitVec 32) (dn : Dinode) (bm : Blkmap)
     (data : Nat → List (BitVec 8)) : IProp GF :=
@@ -143,20 +143,20 @@ def kxaReceipt (Fs : Pfam GF (Uvis → IProp GF)) (P : Nat → Nat → IProp GF)
     ⌜dn.diType.toNat = T_FILE → absRow (eraNode dn bm data) =
       ⟨.AFile (fileBytes data dn.diSize.toNat), fnNlink (eraNode dn bm data)⟩⌝ ∗
     Fo.pfRecv av zi (absRow (eraNode dn bm data)) ∗ P L zi ∗
-    pfAt (fun S => execSlotPre S Qpay (P L) Fo.pfRecv cw na alen afun sts cs pidv) Fs)
+    pfAt (fun S => execSlotPre S Qpay (P L) Fo.pfRecv cw secc na alen afun sts cs pidv) Fs)
 
 /-- **Rocq `kxa_fail_dead`: arm (ii)** -- the walk died, nothing was
 observed, both the commit and the slot premise come home beside the era
 refund. -/
-theorem kxa_fail_dead (Fs : Pfam GF (Uvis → IProp GF)) (cw : Nat) (Qpay : Int → IProp GF)
+theorem kxa_fail_dead (Fs : Pfam GF (Uvis → IProp GF)) (cw : Nat) (secc : BitVec 64) (Qpay : Int → IProp GF)
     (P Pmiss : Nat → Nat → IProp GF) (Fo : Pfam GF (Aview → Nat → Anode → IProp GF))
     (na : Nat) (alen : Nat → Nat) (afun : Nat → Nat → BitVec 8) (sts : List FdState)
     (cs : Std.ExtTreeSet GName compare) (pidv : BitVec 32) (pl : List (BitVec 8)) :
     nameiWalkDeadEra (hlc := hlc) fscFs P Pmiss pl ∗
       (pfAt (aopenCommitAt (hlc := hlc) (fsGammaL fscFs) appE) Fo ∗
-       pfAt (fun S => execSlotPre S Qpay (P (pathElems pl).length) Fo.pfRecv cw na alen afun sts cs pidv)
+       pfAt (fun S => execSlotPre S Qpay (P (pathElems pl).length) Fo.pfRecv cw secc na alen afun sts cs pidv)
          Fs) ⊢
-      execPostFail (hlc := hlc) Fs (fsGammaL fscFs) fscFs cw Qpay P Pmiss Fo pl na alen afun sts cs
+      execPostFail (hlc := hlc) Fs (fsGammaL fscFs) fscFs cw secc Qpay P Pmiss Fo pl na alen afun sts cs
         pidv := by
   iintro ⟨Hd, Hoc, Hsl⟩
   unfold execPostFail
@@ -166,14 +166,14 @@ theorem kxa_fail_dead (Fs : Pfam GF (Uvis → IProp GF)) (cw : Nat) (Qpay : Int 
 
 /-- **Rocq `kxa_fail_obs`: arm (iii)** -- the observation HAPPENED and exec
 failed past the lock, and the cause is `EfNotLoadable` on the nose. -/
-theorem kxa_fail_obs (Fs : Pfam GF (Uvis → IProp GF)) (cw : Nat) (Qpay : Int → IProp GF)
+theorem kxa_fail_obs (Fs : Pfam GF (Uvis → IProp GF)) (cw : Nat) (secc : BitVec 64) (Qpay : Int → IProp GF)
     (P Pmiss : Nat → Nat → IProp GF) (Fo : Pfam GF (Aview → Nat → Anode → IProp GF))
     (zi : Nat) (na : Nat) (alen : Nat → Nat) (afun : Nat → Nat → BitVec 8) (sts : List FdState)
     (cs : Std.ExtTreeSet GName compare) (pidv : BitVec 32) (pl : List (BitVec 8))
     (dn : Dinode) (bm : Blkmap) (data : Nat → List (BitVec 8)) (ef : List (BitVec 8))
     (hbad : kxcBadCause dn ef data) :
-    kxaReceipt Fs P Fo Qpay cw (pathElems pl).length zi na alen afun sts cs pidv dn bm data ⊢
-      execPostFail (hlc := hlc) Fs (fsGammaL fscFs) fscFs cw Qpay P Pmiss Fo pl na alen afun sts cs
+    kxaReceipt Fs P Fo Qpay cw secc (pathElems pl).length zi na alen afun sts cs pidv dn bm data ⊢
+      execPostFail (hlc := hlc) Fs (fsGammaL fscFs) fscFs cw secc Qpay P Pmiss Fo pl na alen afun sts cs
         pidv := by
   unfold kxaReceipt execPostFail
   iintro ⟨%av, %hav, %hrow, HΦ, HP, Hsl⟩
@@ -483,19 +483,19 @@ theorem kxc_phaseA_au (MP : MYPROC) (BO : BEGIN_OP) (NE : NAMEI_ERA) (IL : ILOCK
     fsFabric (hlc := hlc) Γ A.pd A.pav A.pu ∗
     exStart (hlc := hlc) fscFs A.V.cwi P Pmiss (bview A.plen A.pfun) ∗
     pfAt (aopenCommitAt (hlc := hlc) (fsGammaL fscFs) appE) Fo ∗
-    pfAt (fun S => execSlotPre S Qpay (P (pathElems (bview A.plen A.pfun)).length) Fo.pfRecv A.V.cwi
+    pfAt (fun S => execSlotPre S Qpay (P (pathElems (bview A.plen A.pfun)).length) Fo.pfRecv A.V.cwi A.V.pvSecc
       A.na A.alen A.afun sts cs A.pidv) Fs ∗
     procPrivFd A.γ k.proc A.pidv A.V A.M ∗ kxcBufs k A ∗ bslots 3 ∗ irefSlots 2 ∗
     (∀ c' : CPU, KEX c') ∗
     □ (∀ c : CPU, KEX c -∗
-        execPostFail (hlc := hlc) Fs (fsGammaL fscFs) fscFs A.V.cwi Qpay P Pmiss Fo
+        execPostFail (hlc := hlc) Fs (fsGammaL fscFs) fscFs A.V.cwi A.V.pvSecc Qpay P Pmiss Fo
           (bview A.plen A.pfun) A.na A.alen A.afun sts cs A.pidv -∗
         kexecCloser Q QF k A c) ∗
     (∀ (c : CPU) (spie spp : Bool) (R : RegMap) (kf : Nat) (qf sf : Qp) (gyf : GName)
         (loyf tlyf : Nat) (inumf : BitVec 32) (dnf : Dinode) (bmf : Blkmap)
         (data : Nat → List (BitVec 8)) (gilf gislf : GName) (n2 : Nat) (ef : List (BitVec 8)),
       kxcAt90 k A c spie spp R kf qf sf gyf loyf tlyf inumf dnf bmf data gilf gislf n2 ef -∗
-      (∃ zi : Nat, kxaReceipt Fs P Fo Qpay A.V.cwi (pathElems (bview A.plen A.pfun)).length zi
+      (∃ zi : Nat, kxaReceipt Fs P Fo Qpay A.V.cwi A.V.pvSecc (pathElems (bview A.plen A.pfun)).length zi
         A.na A.alen A.afun sts cs A.pidv dnf bmf data) -∗
       (∀ c' : CPU, KEX c') -∗ wpLoop c)
     ⊢ wpLoop (GF := GF) cpu := by
@@ -508,9 +508,9 @@ theorem kxc_phaseA_au (MP : MYPROC) (BO : BEGIN_OP) (NE : NAMEI_ERA) (IL : ILOCK
     iapply iregInv_ftop _ _ _ _ $$ Hinv
   iapply (kxc_a1_au MP BO NE EO Γ Q QF P Pmiss
     (iprop(pfAt (aopenCommitAt (hlc := hlc) (fsGammaL fscFs) appE) Fo ∗
-      pfAt (fun S => execSlotPre S Qpay (P (pathElems (bview A.plen A.pfun)).length) Fo.pfRecv A.V.cwi
+      pfAt (fun S => execSlotPre S Qpay (P (pathElems (bview A.plen A.pfun)).length) Fo.pfRecv A.V.cwi A.V.pvSecc
         A.na A.alen A.afun sts cs A.pidv) Fs))
-    (execPostFail (hlc := hlc) Fs (fsGammaL fscFs) fscFs A.V.cwi Qpay P Pmiss Fo
+    (execPostFail (hlc := hlc) Fs (fsGammaL fscFs) fscFs A.V.cwi A.V.pvSecc Qpay P Pmiss Fo
       (bview A.plen A.pfun) A.na A.alen A.afun sts cs A.pidv)
     KEX cpu k A hqf hK hnoff htier hj hproc hnn hterm hplen)
   iframe Hk Hpc Hte Hce Hfab Hpriv Hbufs Hbs Hirs Hstart Hex Hkw
@@ -519,15 +519,15 @@ theorem kxc_phaseA_au (MP : MYPROC) (BO : BEGIN_OP) (NE : NAMEI_ERA) (IL : ILOCK
   isplitl []
   · -- arm (ii): the refund rides straight into the arms
     iintro ⟨Hd, Hau⟩
-    iapply (kxa_fail_dead (hlc := hlc) Fs A.V.cwi Qpay P Pmiss Fo A.na A.alen A.afun sts cs A.pidv
+    iapply (kxa_fail_dead (hlc := hlc) Fs A.V.cwi A.V.pvSecc Qpay P Pmiss Fo A.na A.alen A.afun sts cs A.pidv
       (bview A.plen A.pfun)) $$ [Hd Hau]
     iframe
   -- ---- the seam at +0x032: `kxc_a2_r` takes it, at the receipt ----
   iintro %c %spie %spp %R %ipv %zi %n1 HP ⟨Hoc, Hsl⟩ Hseam Hex
   iapply (kxc_a2_r IL RD IUP EO Γ Q QF
-    (kxaReceipt Fs P Fo Qpay A.V.cwi (pathElems (bview A.plen A.pfun)).length zi A.na A.alen A.afun
+    (kxaReceipt Fs P Fo Qpay A.V.cwi A.V.pvSecc (pathElems (bview A.plen A.pfun)).length zi A.na A.alen A.afun
       sts cs A.pidv)
-    (fun _ => kxaReceipt Fs P Fo Qpay A.V.cwi (pathElems (bview A.plen A.pfun)).length zi A.na A.alen
+    (fun _ => kxaReceipt Fs P Fo Qpay A.V.cwi A.V.pvSecc (pathElems (bview A.plen A.pfun)).length zi A.na A.alen
       A.afun sts cs A.pidv)
     KEX c k A spie spp R ipv zi n1 hqf hK hnoff htier hj hproc)
   iframe Hseam Hfab Hex
@@ -555,7 +555,7 @@ theorem kxc_phaseA_au (MP : MYPROC) (BO : BEGIN_OP) (NE : NAMEI_ERA) (IL : ILOCK
     imodintro
     iintro %c' %dn %bm %dt %ef %hbad Hx HR
     iapply Hkw $$ %c' Hx
-    iapply (kxa_fail_obs (hlc := hlc) Fs A.V.cwi Qpay P Pmiss Fo zi A.na A.alen A.afun sts cs A.pidv
+    iapply (kxa_fail_obs (hlc := hlc) Fs A.V.cwi A.V.pvSecc Qpay P Pmiss Fo zi A.na A.alen A.afun sts cs A.pidv
       (bview A.plen A.pfun) dn bm dt ef hbad) $$ HR
   -- ---- and the +0x090 exit: the frozen seam, plus the receipt ----
   iintro %c2 %spie2 %spp2 %R2 %kf %qf %sf %gyf %loyf %tlyf %inumf %dnf %bmf %data %gilf %gislf %n2

@@ -230,11 +230,11 @@ theorem sys_exec_kexec (KX : KEXEC) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF �
     byteBuf (sysExecPath sp0) (DFrac.own 1) (bview (pl.length + 1) (sysfilePfun pl)) ∗
     kxcArgv (sysExecArgv sp0) (sysExecKA A P pl i pg alen afun) ∗
     sysExecPages pg afun 0 i ∗ bslots 3 ∗ irefSlots 2 ∗ myPay U.gn U.Q ∗
-    execAuPre (hlc := hlc) U.Fs (fsGammaL fscFs) fscFs A.V.cwi U.Q U.P U.Pmiss U.Fo pl i alen afun
+    execAuPre (hlc := hlc) U.Fs (fsGammaL fscFs) fscFs A.V.cwi A.V.pvSecc U.Q U.P U.Pmiss U.Fo pl i alen afun
       U.sts U.cs A.pid ∗
     (∀ (c : CPU) (spie spp : Bool) (R' : RegMap) (V' : ProcPriv) (M' : Nat → List (BitVec 8)),
       ⌜calleeSaved k'.regs R'⌝ -∗
-      execArms (hlc := hlc) U.Fs (fsGammaL fscFs) fscFs A.V.cwi U.Q U.P U.Pmiss U.Fo pl i alen afun
+      execArms (hlc := hlc) U.Fs (fsGammaL fscFs) fscFs A.V.cwi A.V.pvSecc U.Q U.P U.Pmiss U.Fo pl i alen afun
         U.sts U.gn U.cs A.pid (sysExecV2 A P) (sysExecM2 A P) V' M' (R' 10#5) -∗
       kctx c ((k'.withSpie spie spp).withRegs R') -∗ pcIs c (jumpPc (k'.regs 1#5)) -∗
       trapCsrsExt c se -∗ cpuClaimExt c se (procAddr A.j) -∗
@@ -287,7 +287,7 @@ theorem sys_exec_break (KX : KEXEC) (Γ : SchedNames) [ClaimIs (hlc := hlc) GF �
   obtain ⟨hK60, hKx, -, -, -, -, -, -⟩ := sys_exec_K _ hS.hK
   -- THE BUNDLE'S INSTANTIATION, at the vector the loop built
   have hargs := sysExec_argsOf (sysExecIm A) A.v1 uvf pg alen afun i hi hok havok hnul
-  ihave Hau := sysExecAuPre_at (hlc := hlc) U.Fs (fsGammaL fscFs) fscFs A.V.cwi U.Q U.P U.Pmiss U.Fo
+  ihave Hau := sysExecAuPre_at (hlc := hlc) U.Fs (fsGammaL fscFs) fscFs A.V.cwi A.V.pvSecc U.Q U.P U.Pmiss U.Fo
     (sysExecIm A) A.v0 A.v1 U.sts U.cs A.pid pl i alen afun hpath hargs $$ Hau
   obtain ⟨a2, a8, a9, a18, a19, a20, a21, a22, a23, a24, a25, a26, a27⟩ := hpins
   icases kctx_kernelText _ _ $$ Hk with ⟨#Htext, Hk⟩

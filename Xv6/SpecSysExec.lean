@@ -189,48 +189,48 @@ the process's own image holds at `av` (`execArgsOf`) and every path it holds
 at `pv` (`argPathOf`) -- the walk's last hop is that path's
 (`P (pathElems pl).length`). -/
 def sysExecSlotPre (S : Uvis → IProp GF) (Q : Int → IProp GF) (P : Nat → Nat → IProp GF)
-    (Φo : Aview → Nat → Anode → IProp GF) (cw : Nat) (M : Nat → List (BitVec 8))
+    (Φo : Aview → Nat → Anode → IProp GF) (cw : Nat) (secc : BitVec 64) (M : Nat → List (BitVec 8))
     (pv av : BitVec 64) (sts : List FdState) (cs : Std.ExtTreeSet GName compare)
     (pidv : BitVec 32) : IProp GF :=
   iprop(∀ (pl : List (BitVec 8)) (na : Nat) (alen : Nat → Nat) (afun : Nat → Nat → BitVec 8),
     ⌜argPathOf M pv.toNat pl⌝ -∗ ⌜execArgsOf M av na alen afun⌝ -∗
-    execSlotPre S Q (P (pathElems pl).length) Φo cw na alen afun sts cs pidv)
+    execSlotPre S Q (P (pathElems pl).length) Φo cw secc na alen afun sts cs pidv)
 
 /-- **Rocq `sys_exec_au_pre`**: `SpecKexec.execAuPre`'s shape at the
 syscall boundary -- the walk premise at every path the image holds at `pv`,
 the observation commit, and the slot piece at the argument-quantified wand,
 both one-shot pieces as `pfAt` pairs. -/
-def sysExecAuPre (Fs : Pfam GF (Uvis → IProp GF)) (Γ : FsViewNames GF) (γfs : FsNames) (cw : Nat)
+def sysExecAuPre (Fs : Pfam GF (Uvis → IProp GF)) (Γ : FsViewNames GF) (γfs : FsNames) (cw : Nat) (secc : BitVec 64)
     (Q : Int → IProp GF) (P Pmiss : Nat → Nat → IProp GF)
     (Fo : Pfam GF (Aview → Nat → Anode → IProp GF)) (M : Nat → List (BitVec 8))
     (pv av : BitVec 64) (sts : List FdState) (cs : Std.ExtTreeSet GName compare)
     (pidv : BitVec 32) : IProp GF :=
   iprop((∀ pl : List (BitVec 8), ⌜argPathOf M pv.toNat pl⌝ -∗ exStart (hlc := hlc) γfs cw P Pmiss pl) ∗
     pfAt (aopenCommitAt (hlc := hlc) Γ appE) Fo ∗
-    pfAt (fun S => sysExecSlotPre S Q P Fo.pfRecv cw M pv av sts cs pidv) Fs)
+    pfAt (fun S => sysExecSlotPre S Q P Fo.pfRecv cw secc M pv av sts cs pidv) Fs)
 
 /-- **Rocq `sys_exec_post_fail`**: ret = -1 -- sys_exec's own early exits
 (the whole bundle back) folded with kexec's three-way fold at the reading it
 ran at. -/
 def sysExecPostFail (Fs : Pfam GF (Uvis → IProp GF)) (Γ : FsViewNames GF) (γfs : FsNames)
-    (cw : Nat) (Q : Int → IProp GF) (P Pmiss : Nat → Nat → IProp GF)
+    (cw : Nat) (secc : BitVec 64) (Q : Int → IProp GF) (P Pmiss : Nat → Nat → IProp GF)
     (Fo : Pfam GF (Aview → Nat → Anode → IProp GF)) (M : Nat → List (BitVec 8))
     (pv av : BitVec 64) (sts : List FdState) (cs : Std.ExtTreeSet GName compare)
     (pidv : BitVec 32) : IProp GF :=
-  iprop(sysExecAuPre (hlc := hlc) Fs Γ γfs cw Q P Pmiss Fo M pv av sts cs pidv ∨
+  iprop(sysExecAuPre (hlc := hlc) Fs Γ γfs cw secc Q P Pmiss Fo M pv av sts cs pidv ∨
     (∃ (pl : List (BitVec 8)) (na : Nat) (alen : Nat → Nat) (afun : Nat → Nat → BitVec 8),
       ⌜argPathOf M pv.toNat pl⌝ ∗ ⌜execArgsOf M av na alen afun⌝ ∗
-      execPostFail (hlc := hlc) Fs Γ γfs cw Q P Pmiss Fo pl na alen afun sts cs pidv))
+      execPostFail (hlc := hlc) Fs Γ γfs cw secc Q P Pmiss Fo pl na alen afun sts cs pidv))
 
 /-- **Rocq `sys_exec_post_fail_refund`: THE FAILURE ARM REFUNDS THE
 DEPOSIT** -- `SpecKexec.execPostFail_refund` at the second disjunct, the
 bundle's own slot pair at the first. -/
 theorem sysExecPostFail_refund (Fs : Pfam GF (Uvis → IProp GF)) (Γ : FsViewNames GF)
-    (γfs : FsNames) (cw : Nat) (Q : Int → IProp GF) (P Pmiss : Nat → Nat → IProp GF)
+    (γfs : FsNames) (cw : Nat) (secc : BitVec 64) (Q : Int → IProp GF) (P Pmiss : Nat → Nat → IProp GF)
     (Fo : Pfam GF (Aview → Nat → Anode → IProp GF)) (M : Nat → List (BitVec 8))
     (pv av : BitVec 64) (sts : List FdState) (cs : Std.ExtTreeSet GName compare)
     (pidv : BitVec 32) :
-    sysExecPostFail (hlc := hlc) Fs Γ γfs cw Q P Pmiss Fo M pv av sts cs pidv ⊢ Fs.pfRefund := by
+    sysExecPostFail (hlc := hlc) Fs Γ γfs cw secc Q P Pmiss Fo M pv av sts cs pidv ⊢ Fs.pfRefund := by
   unfold sysExecPostFail sysExecAuPre
   iintro (⟨-, -, Hs⟩ | ⟨%pl, %na, %alen, %afun, -, -, Hf⟩)
   · iapply (pfAt_refund _ Fs) $$ Hs
@@ -249,7 +249,7 @@ copy-ins' growth (`VW` at `MW`, deviation 2) and the returned a0; `Mim` is
 the image the arguments were read from.  The two WAIT-EXIT readings the
 resume key is built at are the caller's own generation `gn` and children
 `cs` (exec keeps both, `SpecKexec.execKey`). -/
-def sysExecArms (Fs : Pfam GF (Uvis → IProp GF)) (Γ : FsViewNames GF) (γfs : FsNames) (cw : Nat)
+def sysExecArms (Fs : Pfam GF (Uvis → IProp GF)) (Γ : FsViewNames GF) (γfs : FsNames) (cw : Nat) (secc : BitVec 64)
     (γ : FileNames) (pa : BitVec 64) (pid : BitVec 32) (Q : Int → IProp GF)
     (P Pmiss : Nat → Nat → IProp GF) (Fo : Pfam GF (Aview → Nat → Anode → IProp GF))
     (Mim : Nat → List (BitVec 8)) (pv av : BitVec 64) (sts : List FdState) (gn : GName)
@@ -257,7 +257,7 @@ def sysExecArms (Fs : Pfam GF (Uvis → IProp GF)) (Γ : FsViewNames GF) (γfs :
     (r : BitVec 64) : IProp GF :=
   iprop(∃ (V' : ProcPriv) (M' : Nat → List (BitVec 8)), procPrivFd γ pa pid V' M' ∗
     ((⌜r = 0xFFFFFFFFFFFFFFFF#64 ∧ V' = VW ∧ M' = MW⌝ ∗
-        sysExecPostFail (hlc := hlc) Fs Γ γfs cw Q P Pmiss Fo Mim pv av sts cs pid) ∨
+        sysExecPostFail (hlc := hlc) Fs Γ γfs cw secc Q P Pmiss Fo Mim pv av sts cs pid) ∨
      (∃ (pl : List (BitVec 8)) (na : Nat) (alen : Nat → Nat) (afun : Nat → Nat → BitVec 8),
         ⌜argPathOf Mim pv.toNat pl⌝ ∗ ⌜execArgsOf Mim av na alen afun⌝ ∗
         execPostOk Fs na alen afun sts gn cs pid VW V' M' r)))
@@ -265,12 +265,12 @@ def sysExecArms (Fs : Pfam GF (Uvis → IProp GF)) (Γ : FsViewNames GF) (γfs :
 /-- **Rocq `sys_exec_arms_landed`: SANITY** -- the arms imply the landed
 `SysExecDefs.sysExecPost`. -/
 theorem sysExecArms_landed (Fs : Pfam GF (Uvis → IProp GF)) (Γ : FsViewNames GF) (γfs : FsNames)
-    (cw : Nat) (γ : FileNames) (pa : BitVec 64) (pid : BitVec 32) (Q : Int → IProp GF)
+    (cw : Nat) (secc : BitVec 64) (γ : FileNames) (pa : BitVec 64) (pid : BitVec 32) (Q : Int → IProp GF)
     (P Pmiss : Nat → Nat → IProp GF) (Fo : Pfam GF (Aview → Nat → Anode → IProp GF))
     (Mim : Nat → List (BitVec 8)) (pv av : BitVec 64) (sts : List FdState) (gn : GName)
     (cs : Std.ExtTreeSet GName compare) (VW : ProcPriv) (MW : Nat → List (BitVec 8))
     (r : BitVec 64) :
-    sysExecArms (hlc := hlc) Fs Γ γfs cw γ pa pid Q P Pmiss Fo Mim pv av sts gn cs VW MW r ⊢
+    sysExecArms (hlc := hlc) Fs Γ γfs cw secc γ pa pid Q P Pmiss Fo Mim pv av sts gn cs VW MW r ⊢
       sysExecPost γ pa pid VW r := by
   unfold sysExecArms sysExecPost execPostOk
   iintro ⟨%V', %M', Hp, (⟨%h, -⟩ | ⟨%pl, %na, %alen, %afun, -, -, %i, %av', %a, -,
@@ -308,7 +308,7 @@ def sysExecK (k : KCtx) (γ : FileNames) (j : Nat) (v0 v1 : BitVec 64) (pid : Bi
     kctx cpu' ((k.withSpie spie spp).withRegs R') -∗ pcIs cpu' (jumpPc (k.regs 1#5)) -∗
     trapCsrsExt cpu' k.sie -∗ cpuClaimExt cpu' k.sie k.proc -∗
     bslots 3 -∗ irefSlots 2 -∗
-    sysExecArms (hlc := hlc) Fs (fsGammaL fscFs) fscFs V.cwi γ (procAddr j) pid Q P Pmiss Fo
+    sysExecArms (hlc := hlc) Fs (fsGammaL fscFs) fscFs V.cwi V.pvSecc γ (procAddr j) pid Q P Pmiss Fo
       (viewLazy V.upt V.sz M) v0 v1 sts gn cs { V with upt := P' } (viewFaulted V.upt P' M)
       (R' 10#5) -∗
     wpLoop cpu')
@@ -343,7 +343,7 @@ def wp_sys_exec_eb_body {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [X
   -- ---- THE BUNDLE: the pay fact and the AU, the arguments read off THIS
   -- image at arguments 0 and 1 ----
   myPay gn Q ∗
-  sysExecAuPre (hlc := hlc) Fs (fsGammaL fscFs) fscFs V.cwi Q P Pmiss Fo (viewLazy V.upt V.sz M)
+  sysExecAuPre (hlc := hlc) Fs (fsGammaL fscFs) fscFs V.cwi V.pvSecc Q P Pmiss Fo (viewLazy V.upt V.sz M)
     v0 v1 sts cs pid ∗
   -- THE CROSSING IS THE LITERAL `true`: kexec parks
   wpNext true k.proc cpu (sysExecK (hlc := hlc) k γ j v0 v1 pid V M sts gn cs Fs Q P Pmiss Fo)

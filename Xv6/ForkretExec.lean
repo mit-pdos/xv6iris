@@ -162,11 +162,11 @@ theorem fkr_kexec_call [CurCtx] (KX : KEXEC) (Γ : SchedNames) [ClaimIs (hlc := 
     byteBuf KStr.«/init» DFrac.discard (bview 6 initBootBytes) ∗
     wordPointsTo av 8 (DFrac.own 1) KStr.«/init» ∗ wordPointsTo av8 8 (DFrac.own 1) 0#64 ∗
     bslots 3 ∗ irefSlots 2 ∗ myPay V.gen (fun _ => iprop(True)) ∗
-    execAuPre (hlc := hlc) ⟨uslot (hlc := hlc) (SG := SG), R⟩ (fsGammaL fscFs) fscFs V.cwi
+    execAuPre (hlc := hlc) ⟨uslot (hlc := hlc) (SG := SG), R⟩ (fsGammaL fscFs) fscFs V.cwi V.pvSecc
       (fun _ => iprop(True)) P Pmiss Fo initBootPath 1 (fun _ => 5) (fun _ => initBootBytes) sts cs pid ∗
     (∀ (c' : CPU) (spie spp : Bool) (R' : RegMap) (V' : ProcPriv) (M' : Nat → List (BitVec 8)),
       ⌜calleeSaved k.regs R'⌝ -∗
-      execArms (hlc := hlc) ⟨uslot (hlc := hlc) (SG := SG), R⟩ (fsGammaL fscFs) fscFs V.cwi
+      execArms (hlc := hlc) ⟨uslot (hlc := hlc) (SG := SG), R⟩ (fsGammaL fscFs) fscFs V.cwi V.pvSecc
         (fun _ => iprop(True)) P Pmiss Fo initBootPath 1 (fun _ => 5) (fun _ => initBootBytes) sts V.gen
         cs pid V M V' M' (R' 10#5) -∗
       kctx c' ((k.withSpie spie spp).withRegs R') -∗ pcIs c' (jumpPc (k.regs 1#5)) -∗
@@ -376,7 +376,7 @@ theorem fkr_boot_exec [X : CurCtx] (KX : KEXEC) (PN : PANIC) (Γ : SchedNames) [
     kctx c kr ∗ pcIs c (KA.«forkret» + 0x2c#64) ∗ trapCsrsExt c eb ∗ cpuClaimExt c eb (procAddr j) ∗
     fkrFrame ksp ∗ procsInv Γ ∗ panicEnv ∗ firstDone (hlc := hlc) ∗
     procPrivFd γ (procAddr j) pid V M ∗ bslots 3 ∗ irefSlots 2 ∗ myPay V.gen (fun _ => iprop(True)) ∗
-    initBootBundle (hlc := hlc) (SG := SG) V.cwi sts ∗ consReader fscCons 0 ∗
+    initBootBundle (hlc := hlc) (SG := SG) V.cwi V.pvSecc sts ∗ consReader fscCons 0 ∗
     (∀ (c2 : CPU) (kb : KCtx) (V' : ProcPriv) (M' : Nat → List (BitVec 8)),
       ⌜FkrAfter kb eb root (procAddr j) ksp⌝ -∗ ⌜FkrExecPins V V'⌝ -∗
       kctx c2 kb -∗ pcIs c2 (KA.«forkret» + 0x54#64) -∗

@@ -204,7 +204,7 @@ theorem mn_phaseC (BI : BINIT) (II : IINIT) (FI : FILEINIT) (VD : VIRTIO_DISK_IN
     (∃ (vl : BitVec 32) (vn vc pd0 pav0 pu0 : BitVec 64) (free0 : List (BitVec 8)),
       diskInitCells vl vn vc pd0 pav0 pu0 free0) ∗
     procsAvailAt Γ (some NPROC) true ∗ initPidTok 0#32 ∗
-    initBootBundle (hlc := hlc) (SG := uexecSGXv6) ROOTINO (List.replicate NOFILE FdState.closed) ∗
+    initBootBundle (hlc := hlc) (SG := uexecSGXv6) ROOTINO seccAll (List.replicate NOFILE FdState.closed) ∗
     consReader fscCons 0 ∗
     startedInv γi ξd P ∗ startedPrim γi ∗
     mainDepositRecipe ⟨ξ, KTier.bare⟩ Γ γ0 γ1 γc γl0 γl1 γd γdl γt P ∗
@@ -363,7 +363,7 @@ theorem mn_phaseB (PR : PROCINIT) (TI : TRAPINIT) (TIH : TRAPINITHART) (PLI : PL
     (∃ (vl : BitVec 32) (vn vc pd0 pav0 pu0 : BitVec 64) (free0 : List (BitVec 8)),
       diskInitCells vl vn vc pd0 pav0 pu0 free0) ∗
     procsAvailAt Γ (some NPROC) true ∗ initPidTok 0#32 ∗
-    initBootBundle (hlc := hlc) (SG := uexecSGXv6) ROOTINO (List.replicate NOFILE FdState.closed) ∗
+    initBootBundle (hlc := hlc) (SG := uexecSGXv6) ROOTINO seccAll (List.replicate NOFILE FdState.closed) ∗
     consReader fscCons 0 ∗
     startedInv γi ξd P ∗ startedPrim γi ∗
     mainDepositRecipe ⟨ξ, KTier.bare⟩ Γ γ0 γ1 γc γl0 γl1 γd γdl γt P ∗

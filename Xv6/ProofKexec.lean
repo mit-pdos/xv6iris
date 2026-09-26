@@ -198,7 +198,7 @@ theorem kxau_close_fail (k : KCtx) (A : KexecArgs) (Fs : Pfam GF (Uvis → IProp
     (sts : List FdState) (gn : GName) (cs : Std.ExtTreeSet GName compare) (Qpay : Int → IProp GF)
     (P Pmiss : Nat → Nat → IProp GF) (Fo : Pfam GF (Aview → Nat → Anode → IProp GF)) (c : CPU) :
     kexecK (hlc := hlc) k A Fs sts gn cs Qpay P Pmiss Fo c ⊢
-      execPostFail (hlc := hlc) Fs (fsGammaL fscFs) fscFs A.V.cwi Qpay P Pmiss Fo
+      execPostFail (hlc := hlc) Fs (fsGammaL fscFs) fscFs A.V.cwi A.V.pvSecc Qpay P Pmiss Fo
         (bview A.plen A.pfun) A.na A.alen A.afun sts cs A.pidv -∗
       kexecCloser kxauQ (fun _ => True) k A c := by
   iintro Hret Hfail
@@ -230,7 +230,7 @@ theorem kxau_close_at (k : KCtx) (A : KexecArgs) (Fs : Pfam GF (Uvis → IProp G
     myPay gn Qpay ⊢
       kexecK (hlc := hlc) k A Fs sts gn cs Qpay P Pmiss Fo c -∗
       Fo.pfRecv av zi a -∗ P (pathElems (bview A.plen A.pfun)).length zi -∗
-      pfAt (fun S => execSlotPre S Qpay (P (pathElems (bview A.plen A.pfun)).length) Fo.pfRecv A.V.cwi
+      pfAt (fun S => execSlotPre S Qpay (P (pathElems (bview A.plen A.pfun)).length) Fo.pfRecv A.V.cwi A.V.pvSecc
         A.na A.alen A.afun sts cs A.pidv) Fs -∗
       kexecCloser (execBuiltQ f ef A.na A.alen A.afun) (kxauQFp f A.na A.alen) k A c := by
   iintro #Hmp Hret HΦ HP Hsl
@@ -281,7 +281,8 @@ theorem kxau_close_at (k : KCtx) (A : KexecArgs) (Fs : Pfam GF (Uvis → IProp G
       icases Hsl with ⟨Hw, -⟩
       iapply Hw $$ %av %zi %f %nl %(execKey V' M' sts gn cs A.pidv A.na) HP HΦ %hload %himg
         %(kexecOkExec_cwi f A.V V' _ A.na A.alen hokx) %(kexecOkExec_lazy f A.V V' _ A.na A.alen hokx)
-        %rfl %rfl
+        -- ...AND ITS MASK IS THE CALLER'S: exec keeps `p->seccomp`
+        %(kexecOkExec_secc f A.V V' _ A.na A.alen hokx) %rfl %rfl
       rw [show (execKey V' M' sts gn cs A.pidv A.na).gen = gn from rfl]
       iexact Hmp
   · -- NOT A LOADABLE FILE: arm (b) on success, `EfNotLoadable` on a failure
@@ -320,7 +321,8 @@ theorem kxau_close_at (k : KCtx) (A : KexecArgs) (Fs : Pfam GF (Uvis → IProp G
         %(kexecOk_execKeyOk A.V V' M' sts gn cs A.pidv (R' 10#5) entry spv szv' A.na A.alen htflen hne
           hkok)
         %(kexecOk_cwi A.V V' _ entry spv szv' A.na A.alen hne hkok)
-        %(kexecOk_lazy A.V V' _ entry spv szv' A.na A.alen hne hkok) %rfl %rfl
+        %(kexecOk_lazy A.V V' _ entry spv szv' A.na A.alen hne hkok)
+        %(kexecOk_secc A.V V' _ entry spv szv' A.na A.alen hne hkok) %rfl %rfl
       rw [show (execKey V' M' sts gn cs A.pidv A.na).gen = gn from rfl]
       iexact Hmp
 
@@ -333,7 +335,7 @@ theorem kxau_close (k : KCtx) (A : KexecArgs) (Fs : Pfam GF (Uvis → IProp GF))
     (htflen : A.V.tf.length = 36) (hna : A.na ≤ MAXARG) (c : CPU) :
     myPay gn Qpay ⊢
       kexecK (hlc := hlc) k A Fs sts gn cs Qpay P Pmiss Fo c -∗
-      kxaReceipt Fs P Fo Qpay A.V.cwi (pathElems (bview A.plen A.pfun)).length zi A.na A.alen A.afun
+      kxaReceipt Fs P Fo Qpay A.V.cwi A.V.pvSecc (pathElems (bview A.plen A.pfun)).length zi A.na A.alen A.afun
         sts cs A.pidv dn bm data -∗
       kexecCloser (execBuiltQ (kxcFb data dn) ef A.na A.alen A.afun)
         (kxauQFp (kxcFb data dn) A.na A.alen) k A c := by

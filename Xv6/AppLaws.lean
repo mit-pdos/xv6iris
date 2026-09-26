@@ -23,16 +23,15 @@ Rocq's header on the laws, kept because the reasons are the content:
 > list.  The two that are NOT in it are the two about an IMAGE: `Happ_init`
 > and `Hphi`.
 
-## AMENDMENTS PENDING (marked `AMEND-K3` at the field)
+## AMENDMENTS (both landed)
 
 * (Done, K1 / DU6.) `al_pow`'s power-on arm mints the era's turn
   `A.turn c (obsBoots h + 1)` (Rocq `app_turn A c (S (obs_boots h))`), and
   `al_programs` (`EraInitBoot` at `A.turn`) takes `A.turn c (gen + 1)`
   (Rocq `app_turn A c (S gen_id) -∗`).
-* **`al_programs` (K3):** Rocq's `Hinit_boot` yields
-  `init_boot_bundle … secc_all fdt0`.  Today's hook `EraInitBoot` has no
-  seccomp argument; K3 adds it, and this field follows `EraInitBoot` by name,
-  so it moves with it.
+* (Done, K3.) `al_programs` yields Rocq's `init_boot_bundle … secc_all fdt0`:
+  `EraInitBoot` states `initBootBundle ROOTINO seccAll fdt0` (the exec's mask
+  pin, `SpecKexec.execSlotPre`'s `secc`), and this field follows it by name.
 
 ## DEVIATIONS from Rocq
 
@@ -137,8 +136,8 @@ class Xv6AppLaws {hlc : HasLC} {GF : BundledGFunctors} [MachGpreS hlc GF] [Xv6G 
   al_xfer : ∀ (c : A.fixed) (k : Nat), ⊢@{IProp GF} appXferBootRaw (A.pred c) (A.boot c k)
   /-- THE FIRST PROCESS'S EXEC BUNDLE at every era, at any record whose
   interface slots are the application's and whose generation counter is the
-  pre-structure's (deviation 2), handed the era's turn.  AMEND-K3: follows
-  `EraInitBoot` (the seccomp argument). -/
+  pre-structure's (deviation 2), handed the era's turn, at the first process's full
+  mask `seccAll` (`EraInitBoot`). -/
   al_programs : ∀ [F : MachFixedGS hlc GF] (c : A.fixed),
     MachFixedGS.rxTag (hlc := hlc) (GF := GF) = A.tag c →
     MachFixedGS.killCred (hlc := hlc) (GF := GF) = A.kill c →
@@ -263,7 +262,7 @@ theorem appTriv_initBoot (US : USER) (c : Unit)
   ihave #Hl := hlic
   ihave #Hg := hgen
   imodintro
-  iapply initBootBundle_of_mint (hlc := hlc) (GF := GF) ROOTINO (List.replicate NOFILE FdState.closed)
+  iapply initBootBundle_of_mint (hlc := hlc) (GF := GF) ROOTINO seccAll (List.replicate NOFILE FdState.closed)
     $$ Hs Hk Hl Hg
 
 end trivBoot

@@ -141,10 +141,10 @@ def parkBlock [CurCtx] (steady : Bool) (N : UtNames) (V : ProcPriv) (M : Nat →
 /-- **The mode's payload** (Rocq `park_pkg`'s `match Wk`): `firstDone` on the
 steady mode (the evidence the boot arm is dead), the first process's exec
 bundle and the console's reader token on the boot mode. -/
-def parkMode [CurCtx] (cw : Nat) (sts : List FdState) (Wk : Option Uvis) : IProp GF :=
+def parkMode [CurCtx] (cw : Nat) (secc : BitVec 64) (sts : List FdState) (Wk : Option Uvis) : IProp GF :=
   match Wk with
   | some _ => firstDone (hlc := hlc)
-  | none => iprop(initBootBundle (hlc := hlc) (SG := SG) cw sts ∗ consReader fscCons 0)
+  | none => iprop(initBootBundle (hlc := hlc) (SG := SG) cw secc sts ∗ consReader fscCons 0)
 
 /-- The slot a closer yields (Rocq `park_pkg`'s closer's `match Wk`): on the
 steady mode the slot AT THE RECORD THE RESUME LANDS ON, nothing on the boot
@@ -191,12 +191,12 @@ def parkCloser (URB : ParkURB GF) (W : IProp GF) (N : UtNames) (g γch : GName) 
 the child's kernel stack, the mode row -- NOW -- and the closer, under a
 later. -/
 def parkPkg (URB : ParkURB GF) (W : IProp GF) (N : UtNames) (ξ : CtxId) (ks : BitVec 64)
-    (g γch : GName) (cw : Nat) (sts : List FdState) (gn : GName) (cs : ExtTreeSet GName compare)
-    (Wk : Option Uvis) : IProp GF :=
+    (g γch : GName) (cw : Nat) (secc : BitVec 64) (sts : List FdState) (gn : GName)
+    (cs : ExtTreeSet GName compare) (Wk : Option Uvis) : IProp GF :=
   letI : CurCtx := ⟨ξ, KTier.kpt⟩
   iprop(parkGlobals N.Γ N.w N.ft N.f N.ip ∗ utSysParkRows N.Γ ∗ slotUsed N.Γ N.pj ∗
     stackOwn (ks + 4096#64) forkretStack ∗
-    parkMode (hlc := hlc) (SG := SG) cw sts Wk ∗
+    parkMode (hlc := hlc) (SG := SG) cw secc sts Wk ∗
     ▷ parkCloser (hlc := hlc) (SG := SG) URB W N g γch cw sts gn cs Wk)
 
 /-- **THE CHILD'S OWN ROWS** (Rocq `park_child`): the saved context (`ra =
@@ -222,7 +222,7 @@ def parkCap (URB : ParkURB GF) (W : IProp GF) (Γ : SchedNames) : IProp GF :=
       (M : Nat → List (BitVec 8)) (sts : List FdState) (cs : ExtTreeSet GName compare) (steady : Bool),
     ⌜N.Γ = Γ ∧ utWf N ∧ rest.length = 12⌝ -∗
     ownCtx hp ξp -∗
-    parkPkg (hlc := hlc) (SG := SG) URB W N ξp V.kstack V.fdg V.chg V.cwi sts V.gen cs
+    parkPkg (hlc := hlc) (SG := SG) URB W N ξp V.kstack V.fdg V.chg V.cwi V.pvSecc sts V.gen cs
       (parkKey steady V M cs N.pid) -∗
     ▷ W -∗
     parkChild (hlc := hlc) ξp N rest V M steady -∗
@@ -383,7 +383,7 @@ theorem parkToken_park (hp : CPU) (ξ : CtxId) (N : UtNames) (rest : List (BitVe
         stackOwn (V.kstack + 4096#64) forkretStack)) -∗
       slotUsed N.Γ N.pj -∗ parkOwn -∗ utParkCaps N -∗
       fdFrags V.fdg sts -∗ chFrag V.chg N.pj cs -∗
-      initBootBundle (hlc := hlc) (SG := SG) V.cwi sts -∗ consReader fscCons 0 -∗
+      initBootBundle (hlc := hlc) (SG := SG) V.cwi V.pvSecc sts -∗ consReader fscCons 0 -∗
       parkChild (hlc := hlc) ξ N rest V M false -∗
       |==> (ownCtx hp ξ ∗ procCtxAt N.Γ ξ N.pj) := by
   iintro Hrun #Htok ⟨#Hglob, #HG, Hstk⟩ #Hused Hown #Hcaps Hfr Hch Hbun Hrd Hchild
@@ -392,7 +392,7 @@ theorem parkToken_park (hp : CPU) (ξ : CtxId) (N : UtNames) (rest : List (BitVe
   icases Htok' with ⟨%URB, #Hcap, #Hchan⟩
   unfold parkChan
   ihave Hclose := Hchan $$ %N %rfl %hwf
-  ihave Hpkg : parkPkg (hlc := hlc) (SG := SG) URB (parkToken N.Γ) N ξ V.kstack V.fdg V.chg V.cwi sts
+  ihave Hpkg : parkPkg (hlc := hlc) (SG := SG) URB (parkToken N.Γ) N ξ V.kstack V.fdg V.chg V.cwi V.pvSecc sts
       V.gen cs (parkKey false V M cs N.pid) $$ [Hstk Hbun Hrd Hclose Hown Hfr Hch]
   · unfold parkPkg parkKey
     simp only [Bool.false_eq_true, ↓reduceIte]
@@ -437,7 +437,7 @@ theorem parkToken_park_steady (hp : CPU) (ξ : CtxId) (N : UtNames) (rest : List
   icases Htok' with ⟨%URB, #Hcap, #Hchan⟩
   unfold parkChan
   ihave Hclose := Hchan $$ %N %rfl %hwf
-  ihave Hpkg : parkPkg (hlc := hlc) (SG := SG) URB (parkToken N.Γ) N ξ V.kstack V.fdg V.chg V.cwi sts
+  ihave Hpkg : parkPkg (hlc := hlc) (SG := SG) URB (parkToken N.Γ) N ξ V.kstack V.fdg V.chg V.cwi V.pvSecc sts
       V.gen cs (parkKey true V M cs N.pid) $$ [Hstk Hslot Hclose Hown Hfr Hch]
   · unfold parkPkg parkKey
     simp only [↓reduceIte]

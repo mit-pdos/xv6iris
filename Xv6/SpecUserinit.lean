@@ -128,7 +128,7 @@ def userinitPark {hlc : HasLC} {GF : BundledGFunctors} [MachGS hlc GF] [Xv6G GF]
   (∃ (γ0 γ1 : UartNames) (γc γl0 γl1 γt : GName) (pd pav pu : BitVec 64),
     devintrCaps Γ γ0 γ1 γc γl0 γl1 fscDisk fscDlock γt pd pav pu) ∗
   wireInv ∗ syscTrampCl ∗
-  initBootBundle (hlc := hlc) (SG := SG) ROOTINO (List.replicate NOFILE FdState.closed) ∗
+  initBootBundle (hlc := hlc) (SG := SG) ROOTINO seccAll (List.replicate NOFILE FdState.closed) ∗
   consReader fscCons 0
 
 /-- **WP of `userinit`.** -/

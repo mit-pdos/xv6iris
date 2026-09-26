@@ -325,7 +325,7 @@ def xrowExec (X : Uvis → IProp GF) (Q : Int → IProp GF) (P Pmiss : Nat → N
     (Fo : Pfam GF (Aview → Nat → Anode → IProp GF)) (Rs : IProp GF) (W : Uvis) : IProp GF :=
   iprop(myPay W.gen Q ∗
     ∀ Mv : Nat → List (BitVec 8), ⌜imgAgrees W.M Mv⌝ -∗
-      sysExecAuPre (hlc := hlc) ⟨X, Rs⟩ (fsGammaL fscFs) fscFs W.cwd Q P Pmiss Fo Mv
+      sysExecAuPre (hlc := hlc) ⟨X, Rs⟩ (fsGammaL fscFs) fscFs W.cwd W.secc Q P Pmiss Fo Mv
         (xkA W 0) (xkA W 1) W.fd W.ch W.pid)
 
 /-- row 5: fileread's input at the key's descriptor, payload `True`. -/
@@ -484,7 +484,7 @@ theorem xrowExec_ne (k : Nat) (X Y : Uvis → IProp GF) (h : ∀ W, X W ≡{k}�
     xrowExec (hlc := hlc) X Q P Pmiss Fo Rs W ≡{k}≡ xrowExec (hlc := hlc) Y Q P Pmiss Fo Rs W := by
   unfold xrowExec
   exact BI.sep_ne.ne .rfl (BI.forall_ne (fun Mv => BI.wand_ne.ne .rfl
-    (sysExecAuPre_ne (hlc := hlc) k X Y Rs (fsGammaL fscFs) fscFs W.cwd Q P Pmiss Fo Mv (xkA W 0)
+    (sysExecAuPre_ne (hlc := hlc) k X Y Rs (fsGammaL fscFs) fscFs W.cwd W.secc Q P Pmiss Fo Mv (xkA W 0)
       (xkA W 1) W.fd W.ch W.pid h)))
 
 /-- **Rocq `xv6_sbundle_ne`**: exec's branch, and the identity elsewhere. -/
@@ -506,13 +506,13 @@ theorem xv6Spost_ne (k : Nat) (X Y : Uvis → IProp GF) (h : ∀ W, X W ≡{k}�
 /-- **Rocq `xv6_sbundle_cong`**: every branch reads only what `skeyEq` pins. -/
 theorem xv6Sbundle_cong (X : Uvis → IProp GF) (n : Int) (f : Xfam GF) (W W' : Uvis)
     (hk : skeyEq W W') : xv6Sbundle (hlc := hlc) X n f W ⊣⊢ xv6Sbundle (hlc := hlc) X n f W' := by
-  obtain ⟨hM, h0, h1, h2, hfd, hcw, hg, hch, hpid, hpi, hsz, hlz⟩ := hk
+  obtain ⟨hM, h0, h1, h2, hfd, hcw, hg, hch, hpid, hpi, hsz, hlz, hsc⟩ := hk
   have e0 : xkA W 0 = xkA W' 0 := h0
   have e1 : xkA W 1 = xkA W' 1 := h1
   have e2 : xkA W 2 = xkA W' 2 := h2
   unfold xv6Sbundle xv6SbundleRest xrowExec xrowRead xrowChdir xrowOpen xrowWrite xrowMknod
     xrowUnlink xrowMkdir
-  simp only [hM, e0, e1, e2, hfd, hcw, hg, hch, hpid]
+  simp only [hM, e0, e1, e2, hfd, hcw, hg, hch, hpid, hsc]
   exact .rfl
 
 /-- **Rocq `xv6_spost_cong`**: the same rows plus the permission map and the
@@ -550,12 +550,12 @@ theorem xv6Sbundle_mono (X Y : Uvis → IProp GF) (n : Int) (f : Xfam GF) (W : U
       ihave Hs := Hs $$ %pl %na %alen %afun %hpl %hargs
       icases Hs with ⟨Hsa, Hsb⟩
       isplitl [Hsa]
-      · iintro %av %i %ff %nl %W' HP Ho %h1 %h2 %h3 %h4 %h5 %h6 Hpy
+      · iintro %av %i %ff %nl %W' HP Ho %h1 %h2 %h3 %h4 %h5 %h6 %h7 Hpy
         iapply Hup
-        iapply Hsa $$ %av %i %ff %nl %W' HP Ho %h1 %h2 %h3 %h4 %h5 %h6 Hpy
-      · iintro %av %i %a %W' HP Ho %h1 %h2 %h3 %h4 %h5 %h6 Hpy
+        iapply Hsa $$ %av %i %ff %nl %W' HP Ho %h1 %h2 %h3 %h4 %h5 %h6 %h7 Hpy
+      · iintro %av %i %a %W' HP Ho %h1 %h2 %h3 %h4 %h5 %h6 %h7 Hpy
         iapply Hup
-        iapply Hsb $$ %av %i %a %W' HP Ho %h1 %h2 %h3 %h4 %h5 %h6 Hpy
+        iapply Hsb $$ %av %i %a %W' HP Ho %h1 %h2 %h3 %h4 %h5 %h6 %h7 Hpy
     · icases Hs with ⟨-, Hr⟩
       iexact Hr
   · iintro _ H
@@ -868,7 +868,7 @@ theorem syscDepExec_xv6 (X : Uvis → IProp GF) (f : Xfam GF) (W : Uvis) :
     @UexecSG.sbundleAt GF _ uexecSGXv6 X USYS_exec f W ⊢
       myPay W.gen (@UexecSG.sexitPay GF _ uexecSGXv6 f) ∗
       ∀ Mv : Nat → List (BitVec 8), ⌜imgAgrees W.M Mv⌝ -∗
-        sysExecAuPre (hlc := hlc) ⟨X, @UexecSG.sexecRefund GF _ uexecSGXv6 f⟩ (fsGammaL fscFs) fscFs W.cwd
+        sysExecAuPre (hlc := hlc) ⟨X, @UexecSG.sexecRefund GF _ uexecSGXv6 f⟩ (fsGammaL fscFs) fscFs W.cwd W.secc
           (@UexecSG.sexitPay GF _ uexecSGXv6 f) f.xP f.xPmiss f.xFo Mv (xkA W 0) (xkA W 1) W.fd W.ch W.pid := by
   show xv6Sbundle (hlc := hlc) X USYS_exec f W ⊢ _
   unfold xv6Sbundle

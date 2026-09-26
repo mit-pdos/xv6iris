@@ -317,10 +317,11 @@ says yes at a `True` cursor, the observation hands the lent half back, and
 BOTH slot wands answer from the persistent family `HS` at the payload `Q`
 the bundle carries. -/
 theorem sysExecAuPre_triv_at [CtokG GF] (S : Uvis → IProp GF) (Q : Int → IProp GF)
-    (Γ : FsViewNames GF) (γfs : FsNames) (cw : Nat) (M : Nat → List (BitVec 8)) (pv av : BitVec 64)
+    (Γ : FsViewNames GF) (γfs : FsNames) (cw : Nat) (secc : BitVec 64) (M : Nat → List (BitVec 8))
+    (pv av : BitVec 64)
     (sts : List FdState) (cs : Std.ExtTreeSet GName compare) (pidv : BitVec 32) :
     ⊢ □ (∀ W : Uvis, myPay W.gen Q -∗ S W) -∗
-      sysExecAuPre (hlc := hlc) ⟨S, iprop(True)⟩ Γ γfs cw Q (fun _ _ => iprop(True))
+      sysExecAuPre (hlc := hlc) ⟨S, iprop(True)⟩ Γ γfs cw secc Q (fun _ _ => iprop(True))
         (fun _ _ => iprop(True)) (pfamTriv (fun _ _ _ => iprop(True))) M pv av sts cs pidv := by
   iintro #HS
   unfold sysExecAuPre
@@ -339,9 +340,9 @@ theorem sysExecAuPre_triv_at [CtokG GF] (S : Uvis → IProp GF) (Q : Int → IPr
     isplit
     · iintro %pl %na %alen %afun %_ %_
       isplitl []
-      · iintro %av' %i %f %nl %W' - - %_ %_ %_ %_ %_ %_ Hp
+      · iintro %av' %i %f %nl %W' - - %_ %_ %_ %_ %_ %_ %_ Hp
         iapply HS $$ Hp
-      · iintro %av' %i %a %W' - - %_ %_ %_ %_ %_ %_ Hp
+      · iintro %av' %i %a %W' - - %_ %_ %_ %_ %_ %_ %_ Hp
         iapply HS $$ Hp
     · ipureintro; trivial
 

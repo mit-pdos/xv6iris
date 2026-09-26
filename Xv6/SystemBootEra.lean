@@ -211,7 +211,7 @@ theorem xv6Era_run (σ : MState) (ξ0 : CtxId) (Γ : SchedNames) [ClaimIs (hlc :
     (hperm : ∀ (i : UartId) (γ : UartNames), (i = .uart0 → fscUart = γ) →
       obsInv ⊢@{IProp GF} uartObsPermit (hlc := hlc) i γ) (B : IProp GF)
     (hinit : ⊢@{IProp GF} appInv (hlc := hlc) fscFs -∗ B ==∗
-        initBootBundle (hlc := hlc) (SG := uexecSGXv6) ROOTINO (List.replicate NOFILE FdState.closed)) :
+        initBootBundle (hlc := hlc) (SG := uexecSGXv6) ROOTINO seccAll (List.replicate NOFILE FdState.closed)) :
     obsInv ⊢@{IProp GF} consEchoShift (hlc := hlc) -∗ B -∗
       bootSharedOut σ ξ0 Γ γ0 γ1 γc γl0 γl1 γt cn γd ξd dk sb nib cov Pb Rspent -∗
       |={⊤}=> ([∗list] c ∈ cpus, wpLoop c) ∗
@@ -340,7 +340,9 @@ variable [IcacheG GF] [LogG GF] [FsBlocksG GF] [IregG GF] [FsTopG GF] [FsLinkG G
 at the era's application record `⟨N, appFs c, r⟩`, handed the application's
 invariant, the era's boot resource and THE ERA'S TURN `Tn c (gen + 1)` (the
 application's own per-era credential, minted at the power-on step and
-carried by `powerBootRes`; Rocq `Tn -∗`). -/
+carried by `powerBootRes`; Rocq `Tn -∗`).  The bundle is at the first
+process's mask `seccAll` (userinit's `li a5,-1 ; sd a5,360(s1)`; Rocq
+`init_boot_bundle … ProcDefs.secc_all fdt0`). -/
 def EraInitBoot {CT : Type} (N : Type) (appFs : CT → N → Aview → IProp GF)
     (appBoot : CT → Nat → N → IProp GF) (Tn : CT → Nat → IProp GF) (c : CT) : Prop :=
   ∀ (E : EraGS) (gen : Nat) (cP : CPU → BitVec 64 → IProp GF) (cI : ∀ cpu : CPU, ⊢ cP cpu 0#64)
@@ -349,7 +351,7 @@ def EraInitBoot {CT : Type} (N : Type) (appFs : CT → N → Aview → IProp GF)
     letI : MachGS hlc GF := MachGS.ofEra E gen cP cI
     letI : Appcfg GF := ⟨N, appFs c, r⟩
     (⊢@{IProp GF} appInv (hlc := hlc) fscFs -∗ appBoot c (gen + 1) r -∗ Tn c (gen + 1) ==∗
-      initBootBundle (hlc := hlc) (SG := uexecSGXv6) ROOTINO (List.replicate NOFILE FdState.closed))
+      initBootBundle (hlc := hlc) (SG := uexecSGXv6) ROOTINO seccAll (List.replicate NOFILE FdState.closed))
 
 end inst
 
