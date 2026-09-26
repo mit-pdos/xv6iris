@@ -1486,6 +1486,7 @@ FsShPin.v
 FsEchoPin.v
 FsCatPin.v
 FsGrepPin.v
+FsSeccPin.v
 FsFPin.v
 FsConsPin.v
 SpecKexec.v
@@ -1507,6 +1508,11 @@ UexecExecInst.v
 ExecRun.v
 UexecExecMint.v
 UexecSecc.v
+UkSeccPutc.v
+UkSeccVprintf.v
+UkSeccVprintfS.v
+UkSeccFprintf.v
+UkSeccLit.v
 ProofSysExec.v
 LinkSysExec.v
 ProofKexecA.v
