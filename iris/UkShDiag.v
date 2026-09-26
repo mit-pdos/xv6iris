@@ -9052,6 +9052,101 @@ Section UkShDiagLeaf.
     exact (wp_kshr_fork1 ush_Dg N P szv l D h m n cw Sc Q Rc Pex).
   Qed.
 
+  (* ...AT A NAMED TABLE VIEW (seccomp S4) *)
+  Lemma wp_kshr_fork1_final_at (N : uk_names Σ) `{!ukn_const N}
+      (P : gname -> gname -> gname -> iProp Σ) `{FP : !Forkable P}
+      (szv : Z) (l v : list fdstate) (D : gmap nat fdstate)
+      (h : CpuId) (m : regfile) (n : nat) (cw : Z)
+      (* the three binders [UkShRun.wp_kshr_fork] opens (lane IO-LEAF, M3a) *)
+      (Sc : gset gname) (Q : Z -> iProp Σ) (Rc : iProp Σ)
+      (* ...and what the panic spends (M4b(2)) *)
+      (Pex : iProp Σ) :
+    (forall x y : Z, Q x = Q y) ->
+    shk_code (ukn_t N) -∗ shk_rodata (ukn_t N) -∗ P (ukn_t N) (ukn_d N) (ukn_s N) -∗ usz (ukn_s N) szv -∗
+    UserFd.ustd_at (ukn_fd N) l v -∗
+    UserCwd.ucwd (ukn_cwd N) cw -∗
+    UserChildren.uch (ukn_ch N) Sc -∗
+    ([∗ map] fd ↦ st ∈ D, UserFd.ufd (ukn_fd N) fd st) -∗
+    Rc -∗
+    □ (app_taint -∗ Q (-1)) -∗
+    (* WHAT THE PANIC SPENDS, BORROWED (lane KILL-PAY, K4(a); M4b(2)):
+       fork1's [-1] arm panics, and the panic is the caller's.  The
+       returning arm hands it straight back. *)
+    Pex -∗
+    urun N h m (mword_of_int ShSyms.fork1) (2 + (ush_Dg + n)) -∗
+    ((* THE PANIC: fork returned -1, "fork" is in a0, and the run is at
+        [panic]'s entry -- see [UkShRun.wp_kshr_fork1] *)
+     (∀ (h' : CpuId) (m' : regfile) (r : mword 64),
+        ⌜ uint (m' !!! Regidx a0_idx) = 0x12a8 ⌝ -∗
+        ⌜ r = (mword_of_int (-1) : mword 64) ⌝ -∗
+        ((⌜r = (mword_of_int (-1) : mword 64)⌝ ∗
+            UserChildren.uch (ukn_ch N) Sc ∗ Rc)
+         ∨ ∃ (γ : gname) (pidv : mword 32),
+             ⌜r = (sign_extend' 64 pidv : mword 64)⌝ ∗
+             ⌜(1 <= bv_unsigned pidv <= PIDMAX)%Z⌝ ∗
+             (* ...and the generation is fresh (design app-pipe SS4.3y) --
+                [UkShRun.wp_kshr_fork1]'s row, relayed verbatim *)
+             ⌜γ ∉ Sc⌝ ∗
+             child_tok γ pidv Q ∗
+             UserChildren.uch (ukn_ch N) (Sc ∪ {[γ]})) -∗
+        UserFd.ustd_at (ukn_fd N) l v -∗
+        Pex -∗
+        urun N h' m' (mword_of_int ShSyms.panic) (ush_Dg + n) -∗
+        mWP (Loop : expr riscv_lang)) ∗
+     (∀ (h' : CpuId) (m' : regfile) (r : mword 64),
+        ⌜ r <> (mword_of_int 0 : mword 64) ⌝ -∗
+        (* ...and it is not -1 either (design app-pipe SS4.3w, purchase
+           3): fork1 panics at -1 -- see [UkShRun.wp_kshr_fork1] *)
+        ⌜ r <> (mword_of_int (-1) : mword 64) ⌝ -∗
+        ⌜ ucallee_saved m m' ⌝ -∗
+        ⌜ m' !!! Regidx a0_idx = r ⌝ -∗
+        ((⌜r = (mword_of_int (-1) : mword 64)⌝ ∗
+            UserChildren.uch (ukn_ch N) Sc ∗ Rc)
+         ∨ ∃ (γ : gname) (pidv : mword 32),
+             ⌜r = (sign_extend' 64 pidv : mword 64)⌝ ∗
+             ⌜(1 <= bv_unsigned pidv <= PIDMAX)%Z⌝ ∗
+             (* ...and the generation is fresh (design app-pipe SS4.3y) --
+                [UkShRun.wp_kshr_fork1]'s row, relayed verbatim *)
+             ⌜γ ∉ Sc⌝ ∗
+             child_tok γ pidv Q ∗
+             UserChildren.uch (ukn_ch N) (Sc ∪ {[γ]})) -∗
+        P (ukn_t N) (ukn_d N) (ukn_s N) -∗ usz (ukn_s N) szv -∗
+        UserFd.ustd_at (ukn_fd N) l v -∗
+        UserCwd.ucwd (ukn_cwd N) cw -∗
+        ([∗ map] fd ↦ st ∈ D, UserFd.ufd (ukn_fd N) fd st) -∗
+        (* ...and back, unspent: fork1 returned *)
+        Pex -∗
+        urun N h' m'
+          (ret_pc (m !!! Regidx (mword_of_int 1 : mword 5)))
+          (2 + (ush_Dg + n)) -∗
+        mWP (Loop : expr riscv_lang)) ∗
+     (∀ (N' : uk_names Σ) (h' : CpuId) (m' : regfile) (γ' : gname),
+        (* THE CHILD'S PAYLOAD IS THE ONE THE CALLER CHOSE; at
+           [Q := fun _ => True] the equation is [UkRun.ukn_triv]. *)
+        ⌜ ukn_pay N' = Q ⌝ -∗
+        (* ...and its held set is the caller's (lane OFF-HAND-4, S1/S2):
+           [UkShRun.wp_kshr_fork1]'s row, relayed *)
+        ⌜ ucallee_saved m m' ⌝ -∗
+        ⌜ m' !!! Regidx a0_idx = (mword_of_int 0 : mword 64) ⌝ -∗
+        my_pay γ' Q -∗
+        Rc -∗
+        shk_code (ukn_t N') -∗ P (ukn_t N') (ukn_d N') (ukn_s N') -∗ usz (ukn_s N') szv -∗
+        UserFd.ustd_at (ukn_fd N') l v -∗
+        UserCwd.ucwd (ukn_cwd N') cw -∗
+        UserChildren.uch (ukn_ch N') ∅ -∗
+        (* ...and its own pid, as a handle (design app-pipe SS4.3w,
+           purchase 1): [UkShRun.wp_kshr_fork1]'s row, relayed *)
+        (∃ p : Z, ⌜p <> 1⌝ ∗ UserChildren.upid (ukn_pid N') p) -∗
+        ([∗ map] fd ↦ st ∈ D, UserFd.ufd (ukn_fd N') fd st) -∗
+        urun N' h' m'
+          (ret_pc (m !!! Regidx (mword_of_int 1 : mword 5)))
+          (2 + (ush_Dg + n)) -∗
+        mWP (Loop : expr riscv_lang))) -∗
+    mWP (Loop : expr riscv_lang).
+  Proof using .
+    exact (wp_kshr_fork1_at ush_Dg N P szv l v D h m n cw Sc Q Rc Pex).
+  Qed.
+
   (* [wp_kshr_fork1_final_any] IS GONE (lane IO-LEAF, M3b): it had no
      callers and it hard-wired the child's payload at [fun _ => True].
      [UkShRun.wp_kshr_fork1_any] is the index-free corollary, and it
