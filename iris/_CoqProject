@@ -89,6 +89,7 @@ PermInv.v
 PageGeom.v
 KptExecMap.v
 RiscvExec.v
+HartCustody.v
 MinstretInv.v
 MstatusFacts.v
 WireInv.v

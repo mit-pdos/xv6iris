@@ -200,21 +200,34 @@ cone.
 
 **The helping slot `H`** (in `log_res`, both arms; `LogHelp.v`): a
 `ghost_map` at the new `log_names` field `ln_help`, keys the waiters'
-ids, values `(γw, n0)` -- the waiter's escrow token gname and the
-`ncommit` word it read at its deposit.  Per entry, an ESCROW invariant
-`inv (helpN .@ w) (Q ∨ help_tok γw)` (`help_tok γw := mono_nat_auth_own
-γw 1 0`, exclusive) and the state
+ids, values `(γw, n0)` -- the waiter's escrow gname and the `ncommit`
+word it read at its deposit.  Per entry, an ESCROW invariant at `helpN
+.@ w` over a `mono_nat` at `γw` with three arms,
 
-    (riscv_sync_hook gen_id Q ∗ ⌜n0 = nc⌝ ∗ ⌜cmt = true ∨ out ≠ 0⌝)   Pending
-    ∨ help_tok γw                                                     Done
+    esc Q γw := (Q ∗ ◯ 1)  ∨  ●{½} 0  ∨  ● 1          (◯ = mono_nat_lb_own,
+                                                        ● = mono_nat_auth_own)
 
-`nc`, `cmt`, `out` are `log_res`'s own cells.  A waiter holds the full
-fragment `w ↪[ln_help γ] (γw, n0)` and its escrow's handle at its own
-`Q`.  No `saved_prop`: the escrow pins `Q` to `w`, and the `▷` a waiter
-gets on `Q` is stripped by its next instruction.  The two pure clauses
-are what the two readers need: a waiter that wakes with `ncommit ≠ n0`
-knows its entry is `Done`; a fast-path `sys_sync` (`cmt = false`, `out =
-0`) knows every entry is `Done`, so it flips nothing.
+and the entry's state in the slot
+
+    Pending:  riscv_sync_hook gen_id Q ∗ ●{½} 0 ∗ ⌜n0 = nc⌝ ∗ ⌜cmt = true ∨ out ≠ 0⌝
+    Done:     ● 1
+
+`nc`, `cmt`, `out` are `log_res`'s own cells.  A waiter allocates `γw` at
+`0`, puts one half into the escrow (middle arm) and one into its `Pending`
+entry, and keeps the full fragment `w ↪[ln_help γ] (γw, n0)` and the
+escrow's handle at its own `Q`.  The committer's FLIP, holding the entry's
+half and the `Q` the ghost commit produced, opens the escrow: the first
+arm is refuted (`◯ 1` against an authority at `0`), the third by the
+fractions, the middle yields the other half; it joins, bumps the counter
+to `1`, leaves `Q ∗ ◯ 1` in the escrow and `● 1` in the `Done` entry.  The
+waiter's COLLECT, at `ncommit ≠ n0`, finds its entry `Done` (the `Pending`
+arm says `n0 = nc`), deletes it, and with `● 1` opens the escrow: the two
+token arms are refuted by the fractions, the first yields `▷ Q`, and the
+escrow closes in its terminal third arm.  No `saved_prop`: the escrow
+pins `Q` to `w`, every token arm is timeless, and the one `▷` (on `Q`) is
+stripped by the waiter's next instruction.  The two pure clauses are what
+the two readers need: a fast-path `sys_sync` (`cmt = false`, `out = 0`)
+knows every entry is `Done`, so it flips nothing.
 
 ### 4.3 The operations
 
