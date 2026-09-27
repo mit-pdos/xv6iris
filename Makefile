@@ -549,9 +549,9 @@ $(VTEST)/CoqMakefile.all: $(VTEST)/_CoqProject.all
 	cd $(VTEST) && $(RUN) coq_makefile -f _CoqProject.all -o CoqMakefile.all
 
 vtest-passes: $(VTEST)/CoqMakefile.all
-	rm -f $(VTEST)/*Pass.vo
+	rm -f $(VTEST)/*/*Pass.vo
 	-$(RUN) $(MAKE) -C $(VTEST) -f CoqMakefile.all -j$(JOBS) -k \
-	  $$(cd $(VTEST) && ls *Pass.v | sed 's/\.v$$/.vo/')
+	  $$(cd $(VTEST) && ls */*Pass.v | sed 's/\.v$$/.vo/')
 	$(PYTHON) tools/vtest/vtest.py project --from-build
 	$(PYTHON) tools/vtest/vtest.py table
 
@@ -572,7 +572,9 @@ vtest-passes: $(VTEST)/CoqMakefile.all
 # tools/vtest/README.md, "Recording a divergence"), which is green today and
 # goes red the day the model moves.  So every red test is news.
 #
-# IT DELETES THE .vo FIRST, and that is not tidiness -- it is what makes the
+# IT DELETES THE .vo FIRST -- IN EVERY PLATFORM DIRECTORY, which a top-level
+# `rm $(VTEST)/*.vo` did not do once the runs moved into QEMU/, JH7110/ and
+# CVA6/, leaving every run's proof unprotected -- and that is not tidiness -- it is what makes the
 # report's "this test passed" mean anything.  The report reads the filesystem,
 # and a FAILED recompile LEAVES THE PREVIOUS .vo IN PLACE: coq_makefile's
 # .DELETE_ON_ERROR removes the .glob (which coqc had begun) but not a .vo that
@@ -590,7 +592,8 @@ vtest-passes: $(VTEST)/CoqMakefile.all
 VTEST_LOG ?= $(VTEST)/vtest-check.log
 
 vtest-check-ci: $(VTEST)/CoqMakefile
-	rm -f $(VTEST)/*.vo $(VTEST)/*.vos $(VTEST)/*.vok $(VTEST)/*.glob
+	find $(VTEST) \( -name '*.vo' -o -name '*.vos' -o -name '*.vok' \
+	  -o -name '*.glob' \) -delete
 	-$(RUN) $(MAKE) -C $(VTEST) -f CoqMakefile -j$(JOBS) -k \
 	  --output-sync=target 2>&1 | tee $(VTEST_LOG)
 	$(PYTHON) tools/vtest/vtest.py table --check
