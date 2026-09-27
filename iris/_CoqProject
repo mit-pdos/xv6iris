@@ -1747,7 +1747,9 @@ UnionView.v
 PipesCut.v
 PipesDecE.v
 UnionDecU.v
+UnionAdm.v
 UnionOutPure.v
+UnionAdmDemo.v
 PipesLinksV.v
 UnionOut.v
 UnionLinks.v

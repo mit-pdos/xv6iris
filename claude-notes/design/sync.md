@@ -233,6 +233,36 @@ negative demos carry it: within an era, `echo a > f; echo b > f; cat f` ->
 > f; echo b > f; sync; <cut>; cat f` -> `a` refuted.  Without any sync the
 relation is the landed one (k = 0).
 
+**As built (lane SY3-M, pure; `UnionAdm.v`, `UnionOutPure.v`,
+`UnionAdmDemo.v`).**
+- The line list is EVERY complete line (`ulines_of h`, `uline_of_u` of
+  each body, cycle by cycle); a line's position is its global round index.
+  The rx wand appends `uline_of_u b` at the newline completing `b`; the
+  landed redirect list is its projection (`ulines_of_echof`).
+- A sync RECORD `(p, S)`: `S` the files at the sync, `p` the sync line's
+  position + 1; `srec0 = (0, ∅)`.  `uadm ls (p, S) s`: per name, `s !! N =
+  S !! N`, or a chunk subset of a redirect at `N` in `drop p ls`.  At
+  `srec0` it is `fadm_boot` (`uadm_srec0`).  `srec_le ls r r'` (`r.1 <=
+  r'.1` and `uadm ls r r'.2`) is a preorder; `uadm_shrink`,
+  `uadm_shrink_chain` (the counter form), `uadm_mono` (appending lines),
+  `uadm_ustep` (a round of a line at a position >= p stays inside).
+- The state at the sync is NOT a function of the lines (an open failure
+  keeps the old content, visible only on the console), so the record is
+  read off the cycle's RESOLUTION: `lm_good_sync s seg o` is `lm_good_out`
+  with `o = usync_last ps cs s I w`, the last round of line `sync` resolved
+  to `RSyncRan` whose whole block is on the wire (the pad never counts).
+  On the machine the record is minted by `Fs` (it knows σ); the counter
+  numbers the fires and the ledger files, at the prompt, the record of
+  the latest completed sync.
+- `union_phi`: `∃ W : list (fstate * option srec)`, cycle 0 boots `∅`,
+  cycle `k+1` boots in `uadm (ulines_before h (S k)) (ulast_before h (snd
+  <$> W) (S k))` -- the last completed sync of the earlier cycles, at its
+  global position -- and `Forall2 (λ w seg, lm_good_sync w.1 seg w.2)`.
+  The discipline (`lm_disc`) and its decider are untouched.
+- Demos: `demo_sync_cut` (b after the cut, admitted), `demo_sync_cut_neg`
+  (a after the cut, refuted at every `W`), `demo_nosync_cut` (no sync: a
+  admitted), `demo_sync_inflight` (sync's prompt not out: a admitted).
+
 ## 6. Honest limits
 
 - Limit 1 of app-file.md stands: the state at the sync is a chunk SUBSET of
