@@ -1588,6 +1588,11 @@ Proof.
      counter IS the pre-structure's here. *)
   assert (Hgenfix : @riscvF_genGS Σ F = riscv_pre_genGS)
     by (rewrite Hfix; reflexivity).
+  (* ...AND THE ERA'S SYNC TOKEN (claude-notes/design/sync.md §4.2), off
+     the same literal and for the same reason: at it the record's
+     [riscv_sync_tok] IS the application's [Tk] at this era's raw gnames. *)
+  assert (Htokfix : ⊢ |==> @riscv_sync_tok Σ F gen)
+    by (rewrite Hfix; exact (HTk Gt Gsw Gr Gs Gcl gen)).
   subst F.
   (* THE RECORD'S SHAPE, substituted: every projection below reduces, which
      is what makes the crash slot's value -- and hence the seam -- visible
@@ -1612,9 +1617,8 @@ Proof.
                copied *)
             (app_merge_raw_of_xfer _
                (app_xfer_raw_of_boot _ _ (Happ_boot Gcl (Datatypes.S gen))))
-            (* the era's sync token: [riscv_sync_tok gen] IS [Tk .. Gcl gen]
-               at the record literal, by iota *)
-            (HTk Gt Gsw Gr Gs Gcl gen)
+            (* the era's sync token, read off the record above *)
+            Htokfix
             (fun HBs HFd HIr HPav HWc HF r Hr =>
                Hinit_boot (RiscvGS Σ _ HE) gen HBs HFd HIr HPav HWc HF Gcl r
                  Hr Hifacefix Hgenfix)

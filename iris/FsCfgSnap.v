@@ -882,7 +882,7 @@ Section SnapMint.
        slot of the fixed record.  Its birth is the log names' birth: it
        goes into [LogDefs.log_free_tok], which initlog seals into the
        first [log_res]. ---- *)
-    riscv_sync_tok gen_id -∗
+    riscv_sync_tok RiscvLang.gen_id -∗
     (* ---- THE DURABLE SNAPSHOT, AS A RESOURCE, and it is the whole of the
        file system's side: the committed map IS what the machine would
        recover to, and it is the encoding of the abstract state [S].  What
