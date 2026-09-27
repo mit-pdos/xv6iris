@@ -79,9 +79,11 @@ Set Printing Depth 40.
 (* ===================================================================== *)
 (* S1  THE LINE'S COMMAND.                                                *)
 (*                                                                        *)
-(* THE PARSE IS FUNCTIONAL, and it always was: [UkShParseCmd.             *)
-(* wp_kshp_parser] takes the token list as a PREMISE                      *)
-(* ([UkShParse.ushp_tokens len f 0 toks]) and returns the node at THAT     *)
+(* THE PARSE IS FUNCTIONAL, and it always was: the parser theorem         *)
+(* ([UkShParser.wp_ref_parser], through [UkShSeam.wp_ref_child]) takes    *)
+(* the reference parser's answer as a PREMISE ([ref_parsecmd len f =      *)
+(* Some (UshpExec toks)], which at a symbol-free line is the token list   *)
+(* [UkShParse.ushp_tokens len f 0 toks]) and returns the node at THAT     *)
 (* list ([ushp_tree s0 p (UshpExec toks)]), so there is no determinacy     *)
 (* lemma to prove about the parser -- the caller names the tokens.  What   *)
 (* the disciplined branch owes is therefore that the line LEXES: it        *)
@@ -302,7 +304,8 @@ Proof.
 Qed.
 
 (* ---- the command, as a VALUE ---------------------------------------- *)
-(* [UkShMain.ush_cmd_of_ushp] converts the parser's node into the runner's
+(* The seam ([UkShSeam.ush_cmd_of_ushp_tree], at an EXEC node) converts the
+   parser's node into the runner's
    tree at [UExec (UkShMain.ush_args s0 g toks)], where [g] is the line
    AFTER [nulterminate]'s cut ([ushp_nulfold toks (ushp_ext len f)]).  At
    [toks := echo_toks ws] that value is one [UserHeap.uarg] per word of
@@ -1551,113 +1554,70 @@ Section UkShEcho.
     (* the line's own bytes are non-NUL, which is what makes each token a
        string once the cut lands *)
     iDestruct (ustr_nonul with "Hline") as %Hnn0.
-    iDestruct (ustr_len with "Hline") as %Hlen31.
-    (* ---- 0x99c  c.mv a0,s1 ---- *)
-    iApply (wp_uk_cmv N h m (mword_of_int 0x99c) a0_idx s1_idx
-              (add_vec zero_reg (m !!! Regidx s1_idx))
-              (60 + (8 + (UkShDiag.ush_Dg + n)))
-              ltac:(unfold unot_sp; vm_compute; discriminate)
-              ltac:(vm_compute; discriminate) eq_refl with "[] Hrun").
-    { iApply (uis_shk_99c with "Hcode"). }
-    assert (E9c0 : add_vec_int (mword_of_int 0x99c : mword 64) 2
-                   = mword_of_int 0x99e)
-      by (apply bv_eq; vm_compute; reflexivity).
-    rewrite E9c0. iIntros (h1) "Hrun".
-    set (m1 := <[Regidx a0_idx
-                 := regval_into_reg (add_vec zero_reg (m !!! Regidx s1_idx))]> m).
-    assert (Ha0_1 : m1 !!! Regidx a0_idx = (mword_of_int s0 : mword 64)).
-    { rewrite /m1 (upd_eq m (Regidx a0_idx) _).
-      rewrite Hs1. apply bv_eq. rewrite add_vec_unsigned.
-      unfold bv_wrap. cbn [bv_unsigned]. rewrite Z.add_0_l.
-      rewrite Z.mod_small; [ reflexivity | ].
-      pose proof (bv_unsigned_in_range _ (mword_of_int s0 : mword 64)) as Hr.
-      assert (Hm : bv_modulus (MachineWord.Z_idx 64) = 18446744073709551616%Z)
-        by (vm_compute; reflexivity).
-      rewrite Hm in Hr. exact Hr. }
-    assert (Hs1_1 : m1 !!! Regidx s1_idx = (mword_of_int s0 : mword 64))
-      by (rewrite /m1 (upd_ne m (Regidx a0_idx) (Regidx s1_idx) _
-                         ltac:(vm_compute; discriminate)); exact Hs1).
-    (* ---- 0x99e  jal ra,parsecmd ---- *)
-    iApply (wp_uk_jal N h1 m1 (mword_of_int 0x99e)
-              (mword_of_int 2096812 : mword 21) (mword_of_int 1 : mword 5)
-              (mword_of_int ShSyms.parsecmd) (mword_of_int 0x9a2)
-              (60 + (8 + (UkShDiag.ush_Dg + n)))
-              ltac:(unfold unot_sp; vm_compute; discriminate)
-              ltac:(vm_compute; discriminate)
-              ltac:(apply bv_eq; vm_compute; reflexivity)
-              ltac:(apply bv_eq; vm_compute; reflexivity)
-              ltac:(vm_compute; reflexivity)
-              with "[] Hrun").
-    { iApply (uis_shk_99e with "Hcode"). }
-    iIntros (h2) "Hrun".
-    set (m2 := <[Regidx (mword_of_int 1 : mword 5)
-                 := regval_into_reg (mword_of_int 0x9a2 : mword 64)]> m1).
-    assert (Ha0_2 : m2 !!! Regidx a0_idx = (mword_of_int s0 : mword 64))
-      by (rewrite /m2 (upd_ne m1 (Regidx (mword_of_int 1 : mword 5))
-                         (Regidx a0_idx) _ ltac:(vm_compute; discriminate));
-          exact Ha0_1).
-    assert (Hra_2 : ret_pc (m2 !!! Regidx (mword_of_int 1 : mword 5))
-                    = (mword_of_int 0x9a2 : mword 64))
-      by (rewrite /m2 (upd_eq m1 (Regidx (mword_of_int 1 : mword 5)) _);
-          apply bv_eq; vm_compute; reflexivity).
-    (* ---- parsecmd ---- *)
+    (* ---- 0x99c .. runcmd's entry: THE SEAM'S CHILD (UkShSeam.wp_ref_child),
+       at the ONE EXEC node the symbol-free line is at the reference
+       (RefParseBridge.ref_parsecmd_nosym) ---- *)
     (* the exit resource down the parser's walk is the LEND (step 4) and
        the LEDGER: the out-of-memory law [Hcq] takes both where [cmdalloc]
        panics, and they come back on the arm where the allocation
-       succeeded, for the exec below *)
+       succeeded, for the exec below; its budget is the room less the
+       EXEC node's deepest panic (60 - 42) *)
     iAssert (UkShCmdalloc.ushp_oom N (Cr ∗ UserFd.ustd (ukn_fd N) ld)
-               (18 + (8 + (UkShDiag.ush_Dg + n))))%I
+               (UkShParser.ushp_room (UshpExec (echo_toks ws))
+                + (8 + (UkShDiag.ush_Dg + n))
+                - UkShParser.ushp_deep (UshpExec (echo_toks ws))))%I
       as "#Hpxw".
-    { iExact "Hcq". }
+    { iApply (UkShCmdalloc.ushp_oom_mono N (Cr ∗ UserFd.ustd (ukn_fd N) ld)
+                (18 + (8 + (UkShDiag.ush_Dg + n)))
+                (UkShParser.ushp_room (UshpExec (echo_toks ws))
+                 + (8 + (UkShDiag.ush_Dg + n))
+                 - UkShParser.ushp_deep (UshpExec (echo_toks ws)))
+                ltac:(change (UkShParser.ushp_room (UshpExec (echo_toks ws))) with 60%nat;
+                      change (UkShParser.ushp_deep (UshpExec (echo_toks ws))) with 42%nat;
+                      lia)
+                with "Hcq"). }
+    replace (60 + (8 + (UkShDiag.ush_Dg + n)))%nat
+      with (UkShParser.ushp_room (UshpExec (echo_toks ws))
+            + (8 + (UkShDiag.ush_Dg + n)))%nat
+      by reflexivity.
     (* the parser takes the BOUNDED capability (lane SH-MALLOC-3) and the
        allocator's adapter proves the unbounded one; 168 <= 65504 *)
-    iApply (UkShParseCmd.wp_kshp_parser N (UkShMalloc.ushm_fresh N sz)
+    iApply (UkShSeam.wp_ref_child N (UkShMalloc.ushm_fresh N sz)
               (usz (ukn_s N) (sz + 65536))
-              (UkShParse.ushp_malloc_ty_le_mono N 65504 168 _ _ ltac:(lia)
-                 (UkShParse.ushp_malloc_ty_le_top N _ _
-                    (UkShMalloc.ushm_malloc_ok_holds N Hpsok_free sz
-                       Hszlo Hszal Hszok)))
-              h2 m2 dw dv s0 len f (echo_toks ws)
-              (8 + (UkShDiag.ush_Dg + n))
-              Ha0_2 Hns Htoks Htlen Hs0 Hs64
-              with "Hpcode Hpro Hline Hws Hsy HM Hpxw [$Hcr $Hstd] Hrun").
-    iIntros (p) "%Hparses Hnode Hline %Hcut Hws Hsy".
-    iIntros (h3 m3) "%Hcs3 %Ha0_3 Hsz [Hcr Hstd] Hrun".
-    rewrite Hra_2.
-    (* ---- 0x9a2  jal ra,runcmd ---- *)
-    iApply (wp_uk_jal N h3 m3 (mword_of_int 0x9a2)
-              (mword_of_int 2094828 : mword 21) (mword_of_int 1 : mword 5)
-              (mword_of_int ShSyms.runcmd) (mword_of_int 0x9a6)
-              (60 + (8 + (UkShDiag.ush_Dg + n)))
-              ltac:(unfold unot_sp; vm_compute; discriminate)
-              ltac:(vm_compute; discriminate)
-              ltac:(apply bv_eq; vm_compute; reflexivity)
-              ltac:(apply bv_eq; vm_compute; reflexivity)
-              ltac:(vm_compute; reflexivity)
-              with "[] Hrun").
-    { iApply (uis_shk_9a2 with "Hcode"). }
-    iIntros (h4) "Hrun".
-    set (m4 := <[Regidx (mword_of_int 1 : mword 5)
-                 := regval_into_reg (mword_of_int 0x9a6 : mword 64)]> m3).
-    assert (Ha0_4 : m4 !!! Regidx a0_idx = (mword_of_int p : mword 64))
-      by (rewrite /m4 (upd_ne m3 (Regidx (mword_of_int 1 : mword 5))
-                         (Regidx a0_idx) _ ltac:(vm_compute; discriminate));
-          exact Ha0_3).
-    (* ---- THE SEAM: the node the parser built is the tree runcmd walks ---- *)
-    iMod (UkShMain.ush_cmd_of_ushp N h4 m4 (mword_of_int ShSyms.runcmd)
-            (60 + (8 + (UkShDiag.ush_Dg + n))) s0 p len f (echo_toks ws)
-            Htoks Hns Hnn0 Hlen31 Hs0 Hs38
-            with "Hrun Hnode Hline") as "(Hrun & #Htree)".
+              h m dw dv s0 len f (UshpExec (echo_toks ws))
+              (8 + (UkShDiag.ush_Dg + n)) (Cr ∗ UserFd.ustd (ukn_fd N) ld)
+              Hs1 (RefParse.ref_sym_scope_nosym len f Hns)
+              (RefParseBridge.ref_parsecmd_nosym len f (echo_toks ws)
+                 Hnn0 Hns Htoks Htlen)
+              I
+              (UkShRedirs.ushp_malloc_chain_1 N (UkShMalloc.ushm_fresh N sz)
+                 (usz (ukn_s N) (sz + 65536))
+                 (UkShParse.ushp_malloc_ty_le_mono N 65504 168
+                    (UkShMalloc.ushm_fresh N sz) (usz (ukn_s N) (sz + 65536))
+                    ltac:(lia)
+                    (UkShParse.ushp_malloc_ty_le_top N
+                       (UkShMalloc.ushm_fresh N sz) (usz (ukn_s N) (sz + 65536))
+                       (UkShMalloc.ushm_malloc_ok_holds N Hpsok_free sz
+                          Hszlo Hszal Hszok))))
+              Hs0 Hs64 Hs38
+              with "Hcode Hpcode Hpro Hline Hws Hsy HM Hpxw [$Hcr $Hstd] Hrun").
+    iIntros (h4 m4 p) "%Ha0_4 %_ #Htree _ _ _ Hsz [Hcr Hstd] Hrun".
+    (* the tree the seam hands over is [UExec] at the line cut at each
+       token's end: [ushp_nulfold] is that cut *)
+    rewrite (UkShParser.ushp_nulfold_zero_at (echo_toks ws) (ushp_ext len f)) in Hbytes.
     (* ---- THE PINNED EXEC ARM, at the ONE command the line spells ---- *)
     (* [echo_cmd] is a [UExec], so [ush_ht] is 1 and the budget is the
        generic arm's at [c := echo_cmd s0 g]; the LIST and BACK arms -- the
        only consumers of [UkRun.uxsup] -- are not reached, which is why no
        generic supply appears anywhere in this walk. *)
-    replace (60 + (8 + (UkShDiag.ush_Dg + n)))%nat
-      with (6 + (2 + (UkShDiag.ush_Dg + (60 + n))))%nat by lia.
+    replace (UkShParser.ushp_room (UshpExec (echo_toks ws))
+             + (8 + (UkShDiag.ush_Dg + n)))%nat
+      with (6 + (2 + (UkShDiag.ush_Dg + (60 + n))))%nat
+      by (change (UkShParser.ushp_room (UshpExec (echo_toks ws))) with 60%nat; lia).
     iApply (wp_kshr_exec_x_at_holds Fd1 ws dg Q Cr Cd N _ h4 m4 p
               (sz + 65536) s0
-              (ushp_nulfold (echo_toks ws) (ushp_ext len f)) ld ((60 + n)%nat)
+              (UkShParser.ushp_zero_at (List.map snd (echo_toks ws)) (ushp_ext len f))
+              ld ((60 + n)%nat)
               Hok Hdgb Hpeq Ha0_4 Hbytes Hfd1 Hfd2
               with "Hcode Hexs Hxl Hcd Hjt Htree Hsz Hstd Hcwd Hch Hcr Hrun").
   Qed.
@@ -1687,114 +1647,75 @@ Section UkShEcho.
     (* the line's own bytes are non-NUL, which is what makes each token a
        string once the cut lands *)
     iDestruct (ustr_nonul with "Hline") as %Hnn0.
-    iDestruct (ustr_len with "Hline") as %Hlen31.
-    (* ---- 0x99c  c.mv a0,s1 ---- *)
-    iApply (wp_uk_cmv N h m (mword_of_int 0x99c) a0_idx s1_idx
-              (add_vec zero_reg (m !!! Regidx s1_idx))
-              (60 + (8 + (UkShDiag.ush_Dg + n)))
-              ltac:(unfold unot_sp; vm_compute; discriminate)
-              ltac:(vm_compute; discriminate) eq_refl with "[] Hrun").
-    { iApply (uis_shk_99c with "Hcode"). }
-    assert (E9c0 : add_vec_int (mword_of_int 0x99c : mword 64) 2
-                   = mword_of_int 0x99e)
-      by (apply bv_eq; vm_compute; reflexivity).
-    rewrite E9c0. iIntros (h1) "Hrun".
-    set (m1 := <[Regidx a0_idx
-                 := regval_into_reg (add_vec zero_reg (m !!! Regidx s1_idx))]> m).
-    assert (Ha0_1 : m1 !!! Regidx a0_idx = (mword_of_int s0 : mword 64)).
-    { rewrite /m1 (upd_eq m (Regidx a0_idx) _).
-      rewrite Hs1. apply bv_eq. rewrite add_vec_unsigned.
-      unfold bv_wrap. cbn [bv_unsigned]. rewrite Z.add_0_l.
-      rewrite Z.mod_small; [ reflexivity | ].
-      pose proof (bv_unsigned_in_range _ (mword_of_int s0 : mword 64)) as Hr.
-      assert (Hm : bv_modulus (MachineWord.Z_idx 64) = 18446744073709551616%Z)
-        by (vm_compute; reflexivity).
-      rewrite Hm in Hr. exact Hr. }
-    assert (Hs1_1 : m1 !!! Regidx s1_idx = (mword_of_int s0 : mword 64))
-      by (rewrite /m1 (upd_ne m (Regidx a0_idx) (Regidx s1_idx) _
-                         ltac:(vm_compute; discriminate)); exact Hs1).
-    (* ---- 0x99e  jal ra,parsecmd ---- *)
-    iApply (wp_uk_jal N h1 m1 (mword_of_int 0x99e)
-              (mword_of_int 2096812 : mword 21) (mword_of_int 1 : mword 5)
-              (mword_of_int ShSyms.parsecmd) (mword_of_int 0x9a2)
-              (60 + (8 + (UkShDiag.ush_Dg + n)))
-              ltac:(unfold unot_sp; vm_compute; discriminate)
-              ltac:(vm_compute; discriminate)
-              ltac:(apply bv_eq; vm_compute; reflexivity)
-              ltac:(apply bv_eq; vm_compute; reflexivity)
-              ltac:(vm_compute; reflexivity)
-              with "[] Hrun").
-    { iApply (uis_shk_99e with "Hcode"). }
-    iIntros (h2) "Hrun".
-    set (m2 := <[Regidx (mword_of_int 1 : mword 5)
-                 := regval_into_reg (mword_of_int 0x9a2 : mword 64)]> m1).
-    assert (Ha0_2 : m2 !!! Regidx a0_idx = (mword_of_int s0 : mword 64))
-      by (rewrite /m2 (upd_ne m1 (Regidx (mword_of_int 1 : mword 5))
-                         (Regidx a0_idx) _ ltac:(vm_compute; discriminate));
-          exact Ha0_1).
-    assert (Hra_2 : ret_pc (m2 !!! Regidx (mword_of_int 1 : mword 5))
-                    = (mword_of_int 0x9a2 : mword 64))
-      by (rewrite /m2 (upd_eq m1 (Regidx (mword_of_int 1 : mword 5)) _);
-          apply bv_eq; vm_compute; reflexivity).
-    (* ---- parsecmd ---- *)
+    (* ---- 0x99c .. runcmd's entry: THE SEAM'S CHILD (UkShSeam.wp_ref_child),
+       at the ONE EXEC node the symbol-free line is at the reference
+       (RefParseBridge.ref_parsecmd_nosym) ---- *)
     (* the exit resource down the parser's walk is the LEND (step 4) and
        the LEDGER: the out-of-memory law [Hcq] takes both where [cmdalloc]
        panics, and they come back on the arm where the allocation
-       succeeded, for the exec below *)
+       succeeded, for the exec below; its budget is the room less the
+       EXEC node's deepest panic (60 - 42) *)
     iAssert (UkShCmdalloc.ushp_oom N (Cr ∗ UserFd.ustd_at (ukn_fd N) ld v)
                (18 + (8 + (UkShDiag.ush_Dg + n))))%I
-      as "#Hpxw".
+      as "#Hpxw0".
     { iApply (UkShCmdalloc.ushp_oom_wand N with "[] Hcq").
       iIntros "!> [$ Hstd]". iApply (UserFd.ustd_at_ustd with "Hstd"). }
+    iAssert (UkShCmdalloc.ushp_oom N (Cr ∗ UserFd.ustd_at (ukn_fd N) ld v)
+               (UkShParser.ushp_room (UshpExec (echo_toks ws))
+                + (8 + (UkShDiag.ush_Dg + n))
+                - UkShParser.ushp_deep (UshpExec (echo_toks ws))))%I
+      as "#Hpxw".
+    { iApply (UkShCmdalloc.ushp_oom_mono N (Cr ∗ UserFd.ustd_at (ukn_fd N) ld v)
+                (18 + (8 + (UkShDiag.ush_Dg + n)))
+                (UkShParser.ushp_room (UshpExec (echo_toks ws))
+                 + (8 + (UkShDiag.ush_Dg + n))
+                 - UkShParser.ushp_deep (UshpExec (echo_toks ws)))
+                ltac:(change (UkShParser.ushp_room (UshpExec (echo_toks ws))) with 60%nat;
+                      change (UkShParser.ushp_deep (UshpExec (echo_toks ws))) with 42%nat;
+                      lia)
+                with "Hpxw0"). }
+    replace (60 + (8 + (UkShDiag.ush_Dg + n)))%nat
+      with (UkShParser.ushp_room (UshpExec (echo_toks ws))
+            + (8 + (UkShDiag.ush_Dg + n)))%nat
+      by reflexivity.
     (* the parser takes the BOUNDED capability (lane SH-MALLOC-3) and the
        allocator's adapter proves the unbounded one; 168 <= 65504 *)
-    iApply (UkShParseCmd.wp_kshp_parser N (UkShMalloc.ushm_fresh N sz)
+    iApply (UkShSeam.wp_ref_child N (UkShMalloc.ushm_fresh N sz)
               (usz (ukn_s N) (sz + 65536))
-              (UkShParse.ushp_malloc_ty_le_mono N 65504 168 _ _ ltac:(lia)
-                 (UkShParse.ushp_malloc_ty_le_top N _ _
-                    (UkShMalloc.ushm_malloc_ok_holds N Hpsok_free sz
-                       Hszlo Hszal Hszok)))
-              h2 m2 dw dv s0 len f (echo_toks ws)
-              (8 + (UkShDiag.ush_Dg + n))
-              Ha0_2 Hns Htoks Htlen Hs0 Hs64
-              with "Hpcode Hpro Hline Hws Hsy HM Hpxw [$Hcr $Hstd] Hrun").
-    iIntros (p) "%Hparses Hnode Hline %Hcut Hws Hsy".
-    iIntros (h3 m3) "%Hcs3 %Ha0_3 Hsz [Hcr Hstd] Hrun".
-    rewrite Hra_2.
-    (* ---- 0x9a2  jal ra,runcmd ---- *)
-    iApply (wp_uk_jal N h3 m3 (mword_of_int 0x9a2)
-              (mword_of_int 2094828 : mword 21) (mword_of_int 1 : mword 5)
-              (mword_of_int ShSyms.runcmd) (mword_of_int 0x9a6)
-              (60 + (8 + (UkShDiag.ush_Dg + n)))
-              ltac:(unfold unot_sp; vm_compute; discriminate)
-              ltac:(vm_compute; discriminate)
-              ltac:(apply bv_eq; vm_compute; reflexivity)
-              ltac:(apply bv_eq; vm_compute; reflexivity)
-              ltac:(vm_compute; reflexivity)
-              with "[] Hrun").
-    { iApply (uis_shk_9a2 with "Hcode"). }
-    iIntros (h4) "Hrun".
-    set (m4 := <[Regidx (mword_of_int 1 : mword 5)
-                 := regval_into_reg (mword_of_int 0x9a6 : mword 64)]> m3).
-    assert (Ha0_4 : m4 !!! Regidx a0_idx = (mword_of_int p : mword 64))
-      by (rewrite /m4 (upd_ne m3 (Regidx (mword_of_int 1 : mword 5))
-                         (Regidx a0_idx) _ ltac:(vm_compute; discriminate));
-          exact Ha0_3).
-    (* ---- THE SEAM: the node the parser built is the tree runcmd walks ---- *)
-    iMod (UkShMain.ush_cmd_of_ushp N h4 m4 (mword_of_int ShSyms.runcmd)
-            (60 + (8 + (UkShDiag.ush_Dg + n))) s0 p len f (echo_toks ws)
-            Htoks Hns Hnn0 Hlen31 Hs0 Hs38
-            with "Hrun Hnode Hline") as "(Hrun & #Htree)".
+              h m dw dv s0 len f (UshpExec (echo_toks ws))
+              (8 + (UkShDiag.ush_Dg + n)) (Cr ∗ UserFd.ustd_at (ukn_fd N) ld v)
+              Hs1 (RefParse.ref_sym_scope_nosym len f Hns)
+              (RefParseBridge.ref_parsecmd_nosym len f (echo_toks ws)
+                 Hnn0 Hns Htoks Htlen)
+              I
+              (UkShRedirs.ushp_malloc_chain_1 N (UkShMalloc.ushm_fresh N sz)
+                 (usz (ukn_s N) (sz + 65536))
+                 (UkShParse.ushp_malloc_ty_le_mono N 65504 168
+                    (UkShMalloc.ushm_fresh N sz) (usz (ukn_s N) (sz + 65536))
+                    ltac:(lia)
+                    (UkShParse.ushp_malloc_ty_le_top N
+                       (UkShMalloc.ushm_fresh N sz) (usz (ukn_s N) (sz + 65536))
+                       (UkShMalloc.ushm_malloc_ok_holds N Hpsok_free sz
+                          Hszlo Hszal Hszok))))
+              Hs0 Hs64 Hs38
+              with "Hcode Hpcode Hpro Hline Hws Hsy HM Hpxw [$Hcr $Hstd] Hrun").
+    iIntros (h4 m4 p) "%Ha0_4 %_ #Htree _ _ _ Hsz [Hcr Hstd] Hrun".
+    (* the tree the seam hands over is [UExec] at the line cut at each
+       token's end: [ushp_nulfold] is that cut *)
+    rewrite (UkShParser.ushp_nulfold_zero_at (echo_toks ws) (ushp_ext len f)) in Hbytes.
     (* ---- THE PINNED EXEC ARM, at the ONE command the line spells ---- *)
     (* [echo_cmd] is a [UExec], so [ush_ht] is 1 and the budget is the
        generic arm's at [c := echo_cmd s0 g]; the LIST and BACK arms -- the
        only consumers of [UkRun.uxsup] -- are not reached, which is why no
        generic supply appears anywhere in this walk. *)
-    replace (60 + (8 + (UkShDiag.ush_Dg + n)))%nat
-      with (6 + (2 + (UkShDiag.ush_Dg + (60 + n))))%nat by lia.
+    replace (UkShParser.ushp_room (UshpExec (echo_toks ws))
+             + (8 + (UkShDiag.ush_Dg + n)))%nat
+      with (6 + (2 + (UkShDiag.ush_Dg + (60 + n))))%nat
+      by (change (UkShParser.ushp_room (UshpExec (echo_toks ws))) with 60%nat; lia).
     iApply (wp_kshr_exec_x_at_v_holds Fd1 ws dg Q Cr Cd N _ h4 m4 p
               (sz + 65536) s0
-              (ushp_nulfold (echo_toks ws) (ushp_ext len f)) ld v ((60 + n)%nat)
+              (UkShParser.ushp_zero_at (List.map snd (echo_toks ws)) (ushp_ext len f))
+              ld v ((60 + n)%nat)
               Hok Hdgb Hpeq Ha0_4 Hbytes Hfd1 Hfd2
               with "Hcode Hexs Hxl Hcd Hjt Htree Hsz Hstd Hcwd Hch Hcr Hrun").
   Qed.

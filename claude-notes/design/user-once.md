@@ -30,7 +30,7 @@ Copied, along three axes:
 
 | what | copies | size | the axis |
 |---|---|---|---|
-| sh's PARSER walk | `UkShParse*` (symbol-free line), `UkShRedir*` (`… > f`), `UkShPipe*` (`… \| …`) | 7 + 17 + 17 files, ~48k lines | which SYMBOL BYTE the line carries |
+| sh's PARSER walk | `UkShParse*` (symbol-free line), `UkShRedir*` (`… > f`), `UkShPipe*` (`… \| …`) | 7 + 17 + 17 files, ~48k lines | which SYMBOL BYTE the line carries |  **DONE (A1-A4, 2026-09-27): one general walk at the reference parser, the three copies gone** |
 | echo's ENTRY | `UEchoOut` (fd 1 = console), `UEchoFile` (fd 1 = a held descriptor on `f`), `UEchoPipe` (fd 1 = a pipe's write end) | ~3.3k | what fd 1's LEDGER ROW is |
 | cat's ROUND + ENTRY | `UCatKernel`/`UCatOut` (fd = `f`, offset held), `UCatPipe` + `UShPipeCatRound` (fd 0 = a pipe's read end) | ~4.3k | what the read fd's ROW is, and which output chain the turn writes through |
 | the PROGRAM twins | `UShEcho`↔`UShCat` (image geometry), `UkShEcho`↔`UkShCat` (sh's exec arm), `UShEchoPay`↔`UShEchoPipePay`↔`UShRedirPay`↔`UShCatPay` (sh's exec supply) | ~5k | which PROGRAM, and which stream it is exec'd onto |
@@ -179,6 +179,11 @@ statements are corollaries.  Kept as planned: the runcmd arms and child
 walks, at the general parser theorem.  The N-stage layer `UkShPipes{Parse,
 Cmd,Seam,Round}` is corollaries too (the reference's right spine
 `RefParseBridge.ushq_ptree`), and the sixteen shells are gone (2026-09-26).
+The symbol-free copy went last (A4, 2026-09-27): `UkShParseRedir`,
+`UkShParseExec` and `UkShParseCmd`'s walks were still live under
+`UkShEcho`'s two child walks, which now go through `UkShSeam.wp_ref_child`
+like every other child; `UkShParseTok` and `UkShParseLex` stay as the
+pieces the general files are built from.
 
 **The out-of-memory law's budget is a function of the tree** (since xv6
 d66e41c, `UkShCmdalloc.ushp_oom Pex K`: the caller's law at every panic run

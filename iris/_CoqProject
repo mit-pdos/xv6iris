@@ -1617,8 +1617,6 @@ UkShCmdalloc.v
 UkShParseLex.v
 UkShParseTok.v
 UkShGettoken.v
-UkShParseRedir.v
-UkShParseExec.v
 UkShParseCmd.v
 UkShRedirCut.v
 UkShRedirCmd.v

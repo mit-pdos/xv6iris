@@ -265,6 +265,31 @@ console instance waits for its M3.
   and close, `UkShPipeLex`'s pure model and `ushq_line_is`, `UkShRedirLine`'s
   `ushs_line_is`: these are consumed outside the tier and stay, in files
   named for what they are).  Exit: three theorems closed, audits unmoved.
+- [x] **A4 the symbol-free copy retired** -- LANDED (2026-09-27, branch
+  `user-once/A4`).  READ OFF THE TREE after N: the general walks had
+  replaced the redirect and pipe copies but the SYMBOL-FREE copy
+  (`UkShParseRedir` / `UkShParseExec` / `UkShParseCmd`'s parsepipe,
+  parseline, nulterminate, parsecmd and `wp_kshp_parser`, ~7k lines of
+  walk text) was still live: `UkShEcho`'s two child walks
+  (`wp_kshm_child_x_holds`, `_x_v_holds`) walked 0x99c themselves through
+  `UkShParseCmd.wp_kshp_parser` and the symbol-free seam
+  `UkShMain.ush_cmd_of_ushp`.  Done: the two walks are one application of
+  `UkShSeam.wp_ref_child` at `UshpExec (echo_toks ws)` with the bridge
+  (`ref_sym_scope_nosym`, `ref_parsecmd_nosym`, the fresh allocator's
+  one-link chain) and the exec arm in its continuation (statements
+  byte-identical, 92/97 lines each, proved by an Opus subagent from a
+  brief); then DELETED `UkShParseExec.v` (2,466), `UkShParseRedir.v` (722),
+  `UkShParseCmd`'s four walks and `wp_kshp_nulterminate` (3,460 -> 666
+  lines; `ushp_ext`, `ushp_nulfold`, `ushp_setb`, the nul loop/fin the
+  general nulterminate is built from, and the byte lemmas stay),
+  `UkShMain.ush_cmd_of_ushp`, and the two dead notations in `UkShPipeNode`.
+  `UkShParseTok` (gettoken) and `UkShParseLex` (peek, execcmd) stay: the
+  general files are built from their pieces.  Gate: 52 files, 0 errors,
+  nothing pending; audits at baseline (system 13, tree 13, union 14).
+  Net for lane A, read off the tree: three copies of the parser walk
+  (~48k lines) -> one general walk (16.5k, `RefParse*` + the five general
+  files) beside the N-stage corollaries (2.6k) and the two base files
+  (`UkShParseTok` 3.2k, `UkShParseLex` 2.0k).
 
 ## C. The program-generic exec (alongside A2)
 
@@ -364,7 +389,14 @@ at a constant below the caller's extra.  A caller with a smaller `K` monos
 up; a caller with a larger one cannot come down, and that is exactly what
 blocked steps 2-3 for a day.
 
-**Next.**  C2 (`cmd_spec` / `sh_exec_arm C`), B1 (`fd_stream`); B2 behind
-app-both's M3.  Local branches: `user-once/N` (steps 0-3 on the previous
+**A4 (2026-09-27) closed lane A for real**: see the A4 entry above -- the
+symbol-free copy was still live under `UkShEcho`'s child walks; now gone.
+
+**Next.**  C2 (`cmd_spec` / `sh_exec_arm C`); C3 shrank (upstream deleted
+`UShEchoPay` / `UShRedirPay`; `UShCatPay` and `UShEchoPipePay` remain);
+lane B must be re-scoped first: upstream's sweeps (2026-09-24/25) deleted
+`UCatKernel` / `UCatOut` / `UCatPipe` / `UShPipeCatRound` / `UShRound` /
+`UShPipeRound`, so what remains of the B rows is echo's entry at three
+ledger rows (`UEchoOut` 991, `UEchoFile` 317, `UEchoPipe` 185 lines).  Local branches: `user-once/N` (steps 0-3 on the previous
 base, now fully superseded -- delete once this is pushed), `user-once/oom`
 (this cut).

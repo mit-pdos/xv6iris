@@ -112,8 +112,6 @@ Section UkShPipeNode.
   Local Notation ushp_bytes_upd := (UkShParseCmd.ushp_bytes_upd N).
   Local Notation ushp_ro_byte := (UkShParseCmd.ushp_ro_byte N).
   Local Notation wp_kshp_fp := (UkShParse.wp_kshp_fp N).
-  Local Notation wp_kshp_nul_fin := (UkShParseCmd.wp_kshp_nul_fin N).
-  Local Notation wp_kshp_nulterminate := (UkShParseCmd.wp_kshp_nulterminate N).
   Local Notation wp_kshp_peek := (UkShParseLex.wp_kshp_peek N).
   Local Notation wp_kshp_restore := (UkShParse.wp_kshp_restore N).
   Local Notation wp_kshp_spill := (UkShParse.wp_kshp_spill N).

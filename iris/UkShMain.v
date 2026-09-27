@@ -152,52 +152,6 @@ Section UkShMain.
   (* siblings resolve unchanged.                                             *)
   (* ===================================================================== *)
 
-  (* ---- the landed statement, which is that conversion at STAGE 4's cut -- *)
-  Lemma ush_cmd_of_ushp (h : CpuId) (m : regfile) (pc : mword 64) (avail : nat)
-      (s0 p : Z) (len : nat) (f : nat -> bv 8)
-      (toks : list (nat * nat)) :
-    ushp_tokens len f 0 toks ->
-    ushp_no_symbols len f ->
-    (forall j : nat, (j < len)%nat -> f j <> ubyte0) ->
-    Z.of_nat len < 2 ^ 31 ->
-    0 < s0 -> s0 + Z.of_nat len < 2 ^ 38 ->
-    urun N h m pc avail -∗
-    ushp_tree N s0 p (UshpExec toks) -∗
-    ubytes γd s0 (S len) (ushp_nulfold toks (ushp_ext len f)) ==∗
-    urun N h m pc avail ∗
-    ush_cmd γd p (UExec (ush_args s0 (ushp_nulfold toks (ushp_ext len f)) toks)).
-  Proof using .
-    intros Htoks Hns Hnn Hlen31 Hs0 Hs0hi.
-    iIntros "Hrun Hnode Hline".
-    iMod (UkShSeam.ubytes_persist γd s0 (S len) _ with "Hline") as "#Hline".
-    iApply (UkShSeam.ush_cmd_of_ushp_gen N h m pc avail s0 p len
-              (ushp_nulfold toks (ushp_ext len f)) toks
-              ltac:(intros i tk Hi;
-                    destruct (ushp_tokens_in len f 0%nat toks Htoks
-                                ltac:(lia) i tk Hi) as [Hlo Hhi];
-                    split; lia)
-              ltac:(intros i tk Hi;
-                    exact (UkShParseCmd.ushp_nulfold_hit toks
-                             (ushp_ext len f) i tk Hi))
-              ltac:(intros i tk Hi j Hj;
-                    destruct (ushp_tokens_in len f 0%nat toks Htoks
-                                ltac:(lia) i tk Hi) as [Hlo Hhi];
-                    rewrite (UkShSeam.ushp_nulfold_miss toks (ushp_ext len f)
-                               (fst tk + j)%nat
-                               ltac:(intros q t Hq;
-                                     exact (UkShSeam.ushp_tokens_gap len f 0%nat toks
-                                              Hns Htoks ltac:(lia)
-                                              i tk Hi q t Hq
-                                              (fst tk + j)%nat ltac:(lia))));
-                    rewrite /ushp_ext
-                      (bool_decide_eq_true_2 ((fst tk + j) < len)%nat
-                         ltac:(lia));
-                    apply Hnn; lia)
-              Hlen31 Hs0 Hs0hi
-              with "Hrun Hnode Hline").
-  Qed.
-
-
 
   (* ===================================================================== *)
   (* §4 THE CHILD: parse the line, then run the tree.                       *)
