@@ -93,7 +93,8 @@ branches of the UNCHANGED C (`kernel/log.c` `sys_sync`).  Design §4.2-4.3
 as revised at the K3 cut are the rulings; the four sub-lanes below are
 sequential except where marked, each a green landing on `main`.
 
-State: K3-1 and K3-2 not started (2026-09-27).
+State: K3-1 ON MAIN (`61ebcc249`: `iris/HartCustody.v`); K3-2 in flight on
+branch `sync3-k3-2` (worktree `/shared/xv6iris-3k`); K3-3, K3-4 not started.
 
 #### K3-1 -- custody (new leaf `iris/HartCustody.v`; parallel with K3-2)
 
