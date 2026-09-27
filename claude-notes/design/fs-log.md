@@ -419,7 +419,7 @@ hands both authorities straight back.  It moves no durable resource: the
 epoch is ALLOCATED out of what the collection assembles at that instant
 ([`durable-fs-plan.md`](durable-fs-plan.md) §4), which is why the WAL never
 allocates a file system from a value it cannot check and only swaps the
-registry over (`FsDurSnap.dsnap_step_xfer`).
+registry over (`FsDurSnap.dsnap_step_merge`).
 
 - **It is ARITY-FREE**, exactly as `sb_parked` is: the mask it runs in is
   closed over (`∃ N, ⌜↑fsbN ## N⌝ ∗ snap_law_at … N`), with the one fact a
@@ -443,6 +443,47 @@ registry over (`FsDurSnap.dsnap_step_xfer`).
 - A PURE conclusion would have crossed the lock release as a Coq hypothesis
   for free; a resource has to be carried.  That is the price of having the
   file system, rather than the WAL, build the epoch.
+
+#### The application's token rides the commit; the hooked law beside the parked one
+
+The WAL is GENERIC in the application's durability token `T` and a
+`sync` waiter's hook family `Hk : iProp Σ -> iProp Σ`
+([`sync.md`](sync.md) §4.2-4.3): `FsDurSnap.dur_merge G T gt :=
+(∀ gt_o, ▷ G gt_o ==∗ ▷ G gt ∗ T) ∧ T`, `dur_pair G T`,
+`LogSnapLaw.snap_law … T`, the two commit permits
+(`FsCrash.fs_commit_L_sector0_rec`/`fs_commit_L_seq_permit`, whose residual
+gains `T`) and the file system's builders all take them as parameters.
+They are PINNED in two places only: `LogInv.log_ctx` parks the laws at
+`riscv_sync_tok gen_id` / `riscv_sync_hook gen_id` (the fixed record's two
+client slots), and `AppInv` pins `app_merge`/`app_sync_run` there.
+
+- **The token's path.**  `log_res`'s non-committing arm holds
+  `riscv_sync_tok gen_id` (last before `log_state`).  The last `end_op`
+  checks it out WITH the batch; `eo_open_snap_law` hands it to the law,
+  which puts it into the pair's merge.  The pair is additive: the header
+  write's permit applies the LEFT arm to the old guest and the token comes
+  back bare in the permit's residual -- `write_head`'s post delivers it
+  under the write's `▷`, stripped at the `c.j` into `eo_tail` -- while the
+  EMPTY-LOG path, which writes no header, takes the RIGHT arm
+  (`LogSnapLaw.snap_law_out_tok`).  `eo_tail` re-deposits it.  `initlog`
+  seals the genesis token off `LogDefs.log_free_tok`.  So a reader holding
+  the idle arm knows the token is home.  The quiet loan
+  (`LogQuiet.log_res_quiet_acc`) does NOT lend it; the ghost commit takes
+  it separately.
+- **The hooked law** (`LogSnapLaw.snap_law_ghost`, parked in `log_ctx` with
+  `crash_inv` and `gen_cert` after `exc_sealed`) is the parked law's twin
+  for a commit with NO disk write: it takes the OLD guest, the token and
+  `[∗ list] Q ∈ Qs, Hk Q`, and returns the NEW guest itself (not a merge),
+  the token and each `Q`.  Its mask misses `crashN` as well as `fsbN`
+  (closed over as two disjointness facts), because the ghost commit runs it
+  with the crash invariant open; `snap_law_ghost_run` is the reading at
+  `⊤ ∖ ↑crashN ∖ ↑fsbN`, exposing the guest so the caller reads the old one
+  through the seam at the same `G`.  The file system supplies it
+  (`FsCollectAll.fs_snap_law_ghost_build`, over `fs_collect_ghost`:
+  `fs_collect_dur`'s accessor, then the merge's left arm on the old guest's
+  claim and `AppInv.app_sync_run_list` once per hook -- the one place the
+  fresh guest half, the new durable claim, the running claim and the token
+  meet at one map), and fsinit builds both laws side by side.
 
 #### The exception set, and why recovery needs no clean image
 

@@ -483,6 +483,20 @@ thread's continuation is unreachable); current-but-off is refuted by
 takes a hook, and the opening composes with the DMA completion's because
 the two never overlap in one fupd.
 
+**Its client is the ghost commit** (`LogGhostCommit.log_ghost_commit`,
+[`sync.md`](sync.md) §4.3 item 3): with the log batch quiescent and the
+era's sync token in hand, inside `wp_crash_fupd`'s hook it turns
+`▷ riscv_crash_pred` through the seam at the hooked law's guest into
+`◇ ∃ gt_o, P_fs_any_at gt_o ∗ ▷ G gt_o` (the record is timeless, the guest
+stays under its later), opens the record's snapshot slot at the quiescent
+picture (`LogQuiet.P_fs_rec_quiet_acc`, which takes the hook's
+`start_auth`), opens `fsbN` as the commit does, runs the hooked law at
+`⊤ ∖ ↑crashN ∖ ↑fsbN`, and closes in reverse: the new pair stands at the
+SAME committed map, so the record's closer takes it and the seam rebuilds
+the crash predicate.  Nothing moves on disk.  `log_ctx` carries what it
+needs (`crash_inv`, `gen_cert`, the hooked law); `crash_inv` reaches
+`initlog` beside `gen_cert` through `FirstTok.first_boot_persist`.
+
 ## Decision record (rejected shapes, and why)
 
 - **Per-thread crash `prim_step` absorbed by a WP engine** (the

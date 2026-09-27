@@ -98,7 +98,14 @@ State: K3-1 ON MAIN (`61ebcc249`: `iris/HartCustody.v`); K3-2 ON MAIN
 `_gen` theorem's birth premise `HTk`, `logG.loghelp_inG`, `ln_help`, the
 token and the empty help map in `log_free_tok`, `Htok` at `xv6_boot_era`;
 `FsCfg*`'s `GenId` binders qualified -- they were fresh type variables);
-K3-3 in flight on branch `sync3-k3-3` (worktree `/shared/xv6iris-3k`);
+K3-3 DONE on branch `sync3-k3-3`, green, awaiting merge (the token in
+`log_res`'s idle arm through the commit and back; `app_merge_raw A T`;
+`AppInv.app_sync_run_raw`, on kit 2 and `_gen`'s new premise `HHk` beside
+`HTk`; the hooked law `LogSnapLaw.snap_law_ghost`, `crash_inv` and
+`gen_cert` parked in `log_ctx` -- `crash_inv` reaches initlog through
+`FirstTok.first_boot_persist`; new leaf `iris/LogGhostCommit.v`.
+`AppInv.app_body` no longer parks the merge: pinned at the era's token it
+would have made `app_inv` era-indexed, and nothing read it there);
 K3-4 not started.
 
 #### K3-1 -- custody (new leaf `iris/HartCustody.v`; parallel with K3-2)

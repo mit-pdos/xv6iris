@@ -130,13 +130,15 @@ on `m`, an update needs the whole:
 
       app_body γfs := ∃ I, ghost_map_auth (fs_top γfs) (1/2) I
                          ∗ app_pred app_run (abs_view I)
-                         ∗ ⌜app_dom I⌝ ∗ app_merge
+                         ∗ ⌜app_dom I⌝
 
   `app_dom I` (the map's domain is the inode region) is a pure row the
   commit needs (the snapshot is at the region restriction of `I`), proved
-  at the mint from the snapshot's geometry and preserved by the mover;
-  `app_merge` (§3; the transport's place until SY3-K2) is the one
-  persistent law parked where the commit reads it.
+  at the mint from the snapshot's geometry and preserved by the mover.
+  The body parks NO law: `app_merge` (§3) is pinned at the era's sync
+  token, so parking it would make `app_inv` era-indexed, and a fupd under
+  the invariant's later cannot run without a step anyway; the commit takes
+  it off fsinit's kit.
 - **THE MOVER** (`InodeRegion.ireg_top_retag_*`, plus `_armed_` twins):
   the one operation that changes the map needs the whole authority, so it
   opens BOTH invariants (masks `↑ftopN ∪ ↑appN`) and re-establishes the
@@ -215,8 +217,8 @@ on `m`, an update needs the whole:
   is a fupd without a step, where the claim arrives as `▷ A`; timeless
   claims strip it, claims holding invariants duplicate under it.  The
   APPLICATION proves it ONCE as a closed lemma (`Happ_xfer`); since SY3-K2
-  what enters the era as the mint's premise, parked in `app_body` and in
-  the fsinit kit beside the seam, is the MERGE derived from it (crossing 1).
+  what enters the era as the mint's premise, carried on the fsinit kit
+  beside the seam, is the MERGE derived from it (crossing 1).
 - **The three crossings:**
   1. **Commit -- a MERGE (SY3-K2).**  The commit law (`LogSnapLaw.snap_law`,
      proved by `FsCollectAll.fs_snap_law_build` at quiescence) collects the
@@ -225,19 +227,20 @@ on `m`, an update needs the whole:
      running claim read off `app_inv` (the two halves agree on `I`) and
      returns the claim.  Its output is the PAIR
 
-         dur_merge G gt := ∀ gt_o, ▷ G gt_o ==∗ ▷ G gt
-         dur_pair G D   := ∃ gt, P_dur_at gt D ∗ dur_merge G gt
+         dur_merge G T gt := (∀ gt_o, ▷ G gt_o ==∗ ▷ G gt ∗ T) ∧ T
+         dur_pair G T D   := ∃ gt, P_dur_at gt D ∗ dur_merge G T gt
 
      at `G := app_guest := app_dur_raw app_pred`, and the header write's
      permit applies the wand to the OLD guest (`FsDurSnap.dsnap_step_merge`)
      instead of dropping it.  CURRIED because no instant holds both: the
      running claim is in hand only where `appN` opens (the collection), the
      old guest only inside the disk permit at mask `∅`.  The
-     application's law (`AppInv.app_merge_raw`, pinned `app_merge`, in the
-     transport's old place in `app_body` / the kit / the mint):
+     application's law (`AppInv.app_merge_raw`, pinned `app_merge` at the
+     era's sync token `T := riscv_sync_tok gen_id` -- sync K3-3, which
+     threads the token through the pair -- on the kit and the mint):
 
-         app_merge_raw A := □ ∀ r av, ▷ A r av ==∗ ▷ A r av ∗
-                              ∃ r', ((▷ ∃ r_o av_o, A r_o av_o) ==∗ ▷ A r' av)
+         app_merge_raw A T := □ ∀ r av, ▷ A r av -∗ T ==∗ ▷ A r av ∗
+                                ∃ r', (((▷ ∃ r_o av_o, A r_o av_o) ==∗ ▷ A r' av ∗ T) ∧ T)
 
      Whatever the new copy needs of the running claim goes INTO the wand at
      the collection.  Every landed application gets it from its transport
