@@ -93,22 +93,23 @@ branches of the UNCHANGED C (`kernel/log.c` `sys_sync`).  Design §4.2-4.3
 as revised at the K3 cut are the rulings; the four sub-lanes below are
 sequential except where marked, each a green landing on `main`.
 
-State: K3-1 ON MAIN (`61ebcc249`); K3-2 ON MAIN (`6a9fdb836`); K3-3 ON
-MAIN (`0da661d35`: the token through `log_res`/the merge/the permits/the
-tail, `AppInv.app_sync_run_raw`, `LogSnapLaw.snap_law_ghost` parked in
-`log_ctx` beside `crash_inv` and `gen_cert`, `iris/LogGhostCommit.v`;
-`app_body` no longer parks the merge -- nothing read it); K3-4 GREEN on
-branch `sync3-k3-4` (worktree `/shared/xv6iris-3k`), awaiting merge:
-`iris/LogHelp.v` (the slot, `log_help_entry`, the four lemmas and
-`log_help_empty`) in `log_res`'s both arms; `LogQuiet.log_res_quiet_acc`
-exposes the slot and lends the token beside the quiet loan;
-`LogGhostCommit.log_ghost_commit_loop`; `eo_tail` extracts and runs the
-ghost commit before the `committing := 0` store and flips at the
-re-deposit; `wp_sys_sync_sconf_body ... e oQ` with `hook_opt`/`Q_opt`
-(`ProofSysSync`: `ss_deposit`/`ss_collect`/`ss_ghost_commit`, the slow
-path keeps the guard's reading open into the spill block, the loop
-carries `s2 = sext n0` and the ticket, `ss_bge_fall_later` strips the
-collect's later); arm 22 passes `None`.
+State: K3 COMPLETE ON MAIN (K3-1 `61ebcc249`, K3-2 `6a9fdb836`, K3-3
+`0da661d35`, K3-4 `1a6f95a4d`).  What is on main: `iris/HartCustody.v`;
+the fixed record's `riscv_sync_tok`/`riscv_sync_hook` with adequacy's
+`Tk`/`Hk`, the `_gen` theorem's `HTk`/`HHk`, `Htok`/`Happ_sync_run` at
+`xv6_boot_era`; the token through `log_res`'s idle arm, the merge
+(`dur_merge G T`), the permits and `eo_tail`; `AppInv.app_sync_run_raw`;
+`LogSnapLaw.snap_law_ghost` parked in `log_ctx` beside `crash_inv` and
+`gen_cert`; `iris/LogGhostCommit.v`; `iris/LogHelp.v` in `log_res`'s
+both arms, the tail's flip, `wp_sys_sync_sconf_body ... e oQ` with
+`hook_opt`/`Q_opt`; arm 22 passes `None`.  `app_body` no longer parks the
+merge.  Cleanups left for a later sweep (none blocking): the old
+`flushed_sync` receipt and its bank are now dead weight in the contract;
+`ProofSysSync.ss_bge_fall_later` is a copy of `WpSconfBtype`'s fall rule
+with its later kept and belongs there; the trivial `Tk`/`Hk` values are
+spelled inside two adequacy statements (`xv6_power_adequacy_xv6Σ`,
+`xv6_app_adequacy`) until SY3-A moves them onto the `App` record.
+K4 in flight (branch `sync3-k4`, worktree `/shared/xv6iris-3k`).
 
 #### K3-1 -- custody (new leaf `iris/HartCustody.v`; parallel with K3-2)
 
