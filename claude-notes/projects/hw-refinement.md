@@ -224,7 +224,7 @@ execute); (g) Verilator output (no IR).
 
 **Recommendation: (a).**
 
-- Pinned Yosys script: `read_slang` (or `sv2v` + `read_verilog`),
+- Pinned Yosys script: `read_slang --keep-hierarchy` (or `sv2v` + `read_verilog`),
   `hierarchy -top`, `proc`, `opt_clean`, `memory -nomap`,
   `async2sync`, `write_json`.
 - About 40 coarse `$`-cells, each with a reference model in Yosys's
@@ -319,11 +319,50 @@ opt_clean; memory -nomap; write_json`):
   lemmas, reused at every instance.  Selectively inlining a leaf is a
   later option only if one proves pure noise.
 
+### 7.3b CVA6 through the front end: done (2026-09-27)
+
+`tools/hw/cva6-netlist.sh` (run on the VM: `./gcp-rocq/run-on-gcp
+tools/hw/cva6-netlist.sh`) pins CVA6 `81245a47f`, config
+`cv64a6_imafdc_sv39`, reads it with yosys-slang (OSS CAD Suite 2026-09-27,
+Yosys 0.69, in `~/hw/oss-cad-suite` on the VM) and writes the unflattened
+netlist; `tools/hw/netlist_summary.py` summarises it.  About 12 s and 0.6 GB.
+
+- **Result:** 398 modules (instance paths) from 89 source modules, **138
+  distinct shapes**; ~79k word-level cells; 35.5k flop bits; 36 writable
+  memories (590 kbit: I$, D$, tags) plus 36 read-only lookup tables; **one
+  clock** — every flop and memory port is on `cva6.clk_i`, rising edge; no
+  latches.  Top-level boundary: clock, reset, boot address, hart id,
+  interrupt pins (`irq_i`, `ipi_i`, `time_irq_i`, `debug_req_i`), the memory
+  bus (`noc_req_o`/`noc_resp_i`), the RVFI trace (`rvfi_probes_o`, 6974
+  bits) and the unused CV-X-IF coprocessor port.
+- **yosys-slang flattens on import unless `--keep-hierarchy`**
+  (marked experimental, but it worked here).  It names a module per
+  instance path, so identical instances arrive as copies; the structural
+  hash in `netlist_summary.py` recovers the sharing (24 `pmp_entry` → 1
+  shape, 36 `tc_sram_wrapper` → 1).  Flat and hierarchical cell counts
+  agree to within a few percent.
+- **Silent front-end loss, found and fixed:** `tc_sram_wrapper` hides its
+  behavioural `tc_sram` behind `synthesis translate_off` (tapeouts
+  substitute hard macros), so a plain read produced EMPTY cache SRAMs with
+  undriven read data — and Yosys reported success.  The script substitutes
+  a copy without the two pragma lines, and the summary now flags any module
+  with undriven outputs and no cells.  Lesson: every front-end run needs
+  such structural checks, and ultimately the Verilator co-simulation.
+- The FPU's divide/sqrt unit (vendored T-Head C910 code) uses clock-gating
+  cells, but the open-source `gated_clk_cell` is `assign clk_out = clk_in`,
+  so those clocks are `clk_i`; the summary traces through such
+  pass-throughs.
+- Remaining front-end facts for the semantics: CVA6's async active-low
+  resets become synchronous via `async2sync`; the SRAM read register is not
+  reset (it holds its value during reset); SRAM contents start undefined
+  (an oracle input, as planned in §7.2); `UseSharedTlb = 0` in this
+  configuration, and yosys leaves the dead shared-TLB `lfsr` behind as an
+  orphan module (ignored).
+
 ### 7.4 Next steps
 
-1. On the build VM: install a current Yosys (≥ 0.67, which bundles
-   yosys-slang; this host has 0.21) plus Verilator.  Run the §7.2 script on
-   CVA6 and on Wally to get real cell counts and see what breaks.
+1. ~~Front end on CVA6~~ — done, §7.3b.  Wally not yet tried (needs the
+   negedge register files handled first).
 2. Write the netlist semantics (`$`-cell set from `simlib.v`, `bv` values,
    `step`, well-formedness check, extracted interpreter) and a JSON
    importer.
@@ -334,6 +373,7 @@ opt_clean; memory -nomap; write_json`):
    it to the existing "does the model allow it" checker as a third
    platform beside QEMU and JH7110.
 
-Unverified in §7: all cell-count estimates; that yosys-slang/sv2v accept
+Unverified in §7: the cell-count estimates for Wally, BlackParrot and
+XiangShan (CVA6 is measured, §7.3b); that yosys-slang/sv2v accept
 Wally's `cvw_t`; the interpreter throughput; which CVA6 configuration ORFS
 PR #2939 used.
