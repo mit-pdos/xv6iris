@@ -844,7 +844,7 @@ Section SnapMint.
          GUEST HALF of the top map's authority it has just minted, at the
          founded map [fss_inodes S]: it takes the claim at that map's view
          -- the boot obligation, paid one rung up by the power arm's lend --
-         and the TRANSPORT the application parks there ([app_xfer]), and
+         and the MERGE the application parks there ([app_merge]), and
          hands the invariant to the region bundle and to kit 2's last row, AT
          [APP].  Spelled at the record's own projections so nothing ambient
          is consulted. ---- *)
@@ -872,10 +872,10 @@ Section SnapMint.
        instance through the transport (app-instances.md round C), and
        [inv_alloc] takes the later *)
     ▷ @app_pred Σ APP (@app_run Σ APP) (FsAbsDefs.abs_view (fss_inodes S)) -∗
-    (* ...the transport, parked in the invariant and handed to fsinit on
+    (* ...the merge, parked in the invariant and handed to fsinit on
        the kit, and the crash seam at the application's guest, handed to
        fsinit on the kit (round C) *)
-    app_xfer (APP := APP) -∗
+    app_merge (APP := APP) -∗
     FsCrash.fs_crash_seam_at (app_guest (APP := APP)) cov (sb_logstart (fss_sb S)) -∗
     (* ---- THE DURABLE SNAPSHOT, AS A RESOURCE, and it is the whole of the
        file system's side: the committed map IS what the machine would
@@ -926,7 +926,7 @@ Section SnapMint.
                     (fs_home_set cov (sb_logstart (fss_sb S))))).
     { intros b bs Hbs. apply fs_restrict_lookup_Some in Hbs as [_ ->].
       exact (HlPb b). }
-    iIntros "Hdisk Hsa Hsf Hok #Hxfer #Hseamg Hsnap".
+    iIntros "Hdisk Hsa Hsf Hok #Hmerge #Hseamg Hsnap".
     (* THE TIE IS A READING (durable-disk BT-3, plan section 2's "the
        epoch's IDENTITY is a resource"): [snap_ok] is no longer handed in
        anywhere on the boot side -- it comes off the epoch's own resources,
@@ -1057,7 +1057,7 @@ Section SnapMint.
     iEval (rewrite -Htp) in "Htopf".
     (* THE AUTHORITY IS SPLIT (app-instances.md section 2): the kernel's
        half founds [ftop_inv]; the other half founds the application's
-       invariant beside its claim at the same map and its transport.
+       invariant beside its claim at the same map and its merge.
        Agreement ties the two from here on. *)
     iDestruct "Htopa" as "[Htopa Htopb]".
     iMod (ftop_alloc E γfs (fss_inodes S) Hloc with "Htopa Hlkauth")
@@ -1068,7 +1068,7 @@ Section SnapMint.
     assert (Hdomapp : app_dom (fss_inodes S)).
     { intros z. rewrite (snap_ok_inum_dom S _ Hok z) Hnibeq. done. }
     iMod (app_inv_alloc (APP := APP) γfs (fss_inodes S) E Hdomapp
-            with "Htopb Hok Hxfer")
+            with "Htopb Hok Hmerge")
       as "#Henv".
     iEval (rewrite (big_sepM_as_set (fss_inodes S)
                       (fun i n => top_frag (fs_gamma_L γfs) i n))) in "Htopf".
@@ -1350,7 +1350,7 @@ Section SnapMint.
       iSplitR; [iExact "Hbinv" |].
       iSplitL "Hxo"; [iExact "Hxo" |].
       iSplitR; [iExact "Henv" |].
-      iSplitR; [iExact "Hseamg" | iExact "Hxfer"]. }
+      iSplitR; [iExact "Hseamg" | iExact "Hmerge"]. }
     iSplitL "Hfol"; [iExact "Hfol" | iExact "Hoffa"].
   Qed.
 

@@ -71,8 +71,8 @@ Require Import FsState.
 Require Import FsStateEra.
 Require Import InodeRegion.
 Require Import AppCfg.       (* [appcfg]: the era's application record, bound beside [icfg] (app-instances.md round A) *)
-Require Import AppInv.       (* [app_inv]/[app_body]/[app_xfer]/[app_dom]: the running side the commit copies from (round C) *)
-Require Import AppDur.       (* [app_guest]/[app_dur_raw_clone]: the durable guest the commit builds (round C) *)
+Require Import AppInv.       (* [app_inv]/[app_body]/[app_merge]/[app_dom]: the running side the commit copies from (round C) *)
+Require Import AppDur.       (* [app_guest]/[app_dur_raw_merge]: the durable guest the commit builds (round C; SY3-K2) *)
 Require Import BitmapInv.
 Require Import SbPark.
 Require Import IcacheRef.
@@ -1792,8 +1792,9 @@ Section CollectAll.
   (*  C, section 3 crossing 1).  With its invariant open, the running      *)
   (*  claim is at the SAME map as the kernel's half (agreement), the        *)
   (*  snapshot's fresh guest half comes out of the transport, and ONE      *)
-  (*  [app_xfer] copies the claim onto it: the output is the PAIR, the     *)
-  (*  guest under a later, and the running claim goes back where it was.   *)
+  (*  [app_merge] (SY3-K2) turns the claim into the guest's merge onto it: *)
+  (*  the output is the PAIR, the merge the header write applies to the    *)
+  (*  old guest, and the running claim goes back where it was.             *)
   (* ==================================================================== *)
 
   Lemma fs_collect_dur (E : coPset) (cn : ic_names)
@@ -1803,8 +1804,9 @@ Section CollectAll.
     ↑appN ⊆ E ->
     ↑ftopN ⊆ E -> ↑iregN ⊆ E -> ↑bitmapN ⊆ E -> ↑sbN ⊆ E ->
     ↑ipoolN ⊆ E -> ↑icEscN ⊆ E ->
-    (* the transport, the application's one durability obligation *)
-    app_xfer -∗
+    (* the merge, the application's one durability obligation at the
+       commit (SY3-K2) *)
+    app_merge -∗
     ireg_reg γi γfs (FsImg.sb_inodestart sb) icfg_nib -∗
     bitmap_reg γfs (FsImg.sb_bmapstart sb) cov ls (FsImg.sb_size sb) -∗
     ic_escrows cn γfs γi cov ls -∗
@@ -1817,7 +1819,7 @@ Section CollectAll.
       ∗ ghost_map_auth (ln_tx icfg_log) 1 (∅ : gmap nat unit).
   Proof using .
     intros Hgeom Hap Hft Hir Hbmn Hsbn Hipn Hien.
-    iIntros "#Hxfer #Hireg #Hbmi #Hesc #Hpool #Hpark Hauth Htx".
+    iIntros "#Hmerge #Hireg #Hbmi #Hesc #Hpool #Hpark Hauth Htx".
     iDestruct "Hireg" as "(#Hiregi & _ & #Hftop & #Happ)".
     iDestruct "Hbmi" as "(#Hbmb & _)".
     (* ---- 0. the application's invariant: its half, its claim, the domain
@@ -1887,12 +1889,13 @@ Section CollectAll.
             (col_view C (fs_home_set cov ls)) kv qp_half_lt_34 Hsh Hle
             with "Hauth HS Hkeep") as "(Hauth & HS & Hkeep & Hdur)".
     (* ---- THE APPLICATION'S CROSSING: the fresh guest half stands at the
-       collected map, which is the running map; the transport copies the
-       running claim onto it, under the later, and the original returns to
-       the application's invariant below ---- *)
+       collected map, which is the running map; the merge runs on the
+       running claim and hands out the wand from the old guest to the new
+       one at [gt] (SY3-K2), and the original returns to the application's
+       invariant below ---- *)
     iDestruct "Hdur" as (gt) "[Hdur Hguest]".
     iEval (rewrite HSI /snap_guest) in "Hguest".
-    iMod (app_dur_raw_clone app_pred gt I app_run with "Hxfer Hguest Hpa")
+    iMod (app_dur_raw_merge app_pred gt I app_run with "Hmerge Hguest Hpa")
       as "[Hpa Hg]".
     iAssert (∃ kv : ity, ireg_keep γfs ireg_root kv)%I
       with "[Hkeep]" as "Hkeep".
@@ -1920,7 +1923,7 @@ Section CollectAll.
        AUTHORITY, so no bare [iFrame] here (see [fs_snap_law_build]) *)
     iModIntro. iSplitR "Hauth Htx"; [| iFrame "Hauth Htx"].
     rewrite /dur_pair. iExists gt. iSplitL "Hdur"; [iExact "Hdur" |].
-    rewrite /app_guest. iExact "Hg".
+    rewrite /dur_merge /app_guest. iExact "Hg".
   Qed.
 
 
@@ -1943,7 +1946,7 @@ Section CollectAll.
   (*  ...AT THE APPLICATION'S GUEST (round C).  The law is stated at        *)
   (*  [G := app_guest], the ONE value of the WAL's opaque index, and it     *)
   (*  carries the crash seam at that guest, which reaches this file from   *)
-  (*  [SystemAdequacy] on the fsinit kit, together with the transport.     *)
+  (*  [SystemAdequacy] on the fsinit kit, together with the merge.         *)
   (*  The region's width is [icfg_nib], the mask gains [appN].              *)
   (* ==================================================================== *)
 
@@ -1953,7 +1956,7 @@ Section CollectAll.
     nib = icfg_nib ->
     col_geom sb (FsImg.sb_inodestart sb) nib (fs_home_set cov ls) ->
     FsCrash.fs_crash_seam_at app_guest cov ls -∗
-    app_xfer -∗
+    app_merge -∗
     ireg_reg γi γfs (FsImg.sb_inodestart sb) nib -∗
     bitmap_reg γfs (FsImg.sb_bmapstart sb) cov ls (FsImg.sb_size sb) -∗
     ic_escrows cn γfs γi cov ls -∗
@@ -1962,7 +1965,7 @@ Section CollectAll.
     snap_law γ γfs cov ls.
   Proof using .
     intros -> -> Hgeom.
-    iIntros "#Hseam #Hxfer #Hireg #Hbm #Hesc #Hpool #Hpark".
+    iIntros "#Hseam #Hmerge #Hireg #Hbm #Hesc #Hpool #Hpark".
     iApply (snap_law_intro icfg_log γfs cov ls
               ((↑ftopN : coPset) ∪ ↑iregN ∪ ↑bitmapN ∪ ↑sbN ∪ ↑ipoolN
                ∪ ↑icEscN ∪ ↑appN) app_guest with "Hseam").
@@ -1988,7 +1991,7 @@ Section CollectAll.
     assert (Hen : (↑icEscN : coPset) ⊆ E) by (etrans; [| exact HN]; set_solver).
     iMod (fs_collect_dur E cn γfs γi cov ls sb Lb C Hgeom
             Hap Hft Hir Hbn Hsn Hpn Hen
-            with "Hxfer Hireg Hbm Hesc Hpool Hpark [Hb] Ht")
+            with "Hmerge Hireg Hbm Hesc Hpool Hpark [Hb] Ht")
       as "(Hdur & Hauth & Ht)".
     { rewrite /col_auth. iFrame "Hb".
       iSplitR; [iPureIntro; exact Hdom |].

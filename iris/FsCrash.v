@@ -1998,7 +1998,7 @@ Section fs_crash.
           ONE copy of the file-system predicate over its OWN, existentially
           quantified ghost names, describing the committed map [fr_D r] --
           never updated: at each group commit the WAL drops it and allocates
-          a fresh one ([FsDurSnap.dsnap_step_xfer]).  It is indexed by
+          a fresh one ([FsDurSnap.dsnap_step_merge]).  It is indexed by
           [fr_D r] alone, so a permit that does not move the committed view
           frames it untouched and the COMMIT is the one write that advances
           it -- exactly ruling 2's "commit is the only write kind that moves
@@ -3043,12 +3043,12 @@ Section fs_crash_seam.
        WAL's permit ALLOCATING the file system's snapshot from a value it
        cannot check; now the file system builds its own epoch at its own
        ghost step and this permit only swaps the registry over
-       ([FsDurSnap.dsnap_step_xfer]).  Nothing is taken OUT of the crash
+       ([FsDurSnap.dsnap_step_merge]).  Nothing is taken OUT of the crash
        predicate, so plan section 8's refutation still does not bite.
-       ...AND THE GUEST BESIDE IT (round C): the law built the PAIR, and
-       this is the one permit that moves the guest -- the old one is
-       dropped with the old snapshot, the new one installed at the new
-       map name. *)
+       ...AND THE GUEST'S MERGE BESIDE IT (round C; SY3-K2): the law built
+       the PAIR, and this is the one permit that moves the guest -- the old
+       one goes to the pair's merge ([FsDurSnap.dur_merge]), which yields
+       the new one at the new map name; the old snapshot is dropped. *)
     dur_pair G (fs_restrict (dv_of_D L) (fs_home_set cov ls)) -∗
     fs_rec_permit G cov ls gen_id
       (Some ((log_hdr_bno ls * Z.of_nat BSIZE + Z.of_nat 0)%Z,
@@ -3124,15 +3124,16 @@ Section fs_crash_seam.
       by (rewrite -Hres; exact (proj1 (fs_recovery_clean _ _ _ _ Hn0) Hrec)).
     (* ---- THE SNAPSHOT STEPS.  This is the one write kind that moves the
        committed view, so it is the one place the durable instance moves:
-       the old copy is DROPPED (affine) and the caller's fresh one installed
-       at [D'] -- a [D'] the caller can NAME (it is [L] on the home set,
+       the old snapshot is DROPPED (affine), the old guest MERGED into the
+       new one (SY3-K2), and the caller's fresh pair installed at [D'] -- a
+       [D'] the caller can NAME (it is [L] on the home set,
        computed just above).  Nothing is taken OUT of the crash predicate
        and nothing is allocated here, which is why the refutation of plan
        section 8 (deposited client fupds that MOVE durable resources) does
        not bite.  [D'] is [fs_restrict (dv_of_D L) (fs_home_set cov ls)],
        exactly the map the premise is stated at. ---- *)
-    iMod (dsnap_step_xfer G gt (fr_D r) D' with "Hepoch Hdur HG") as "Hpair".
-    rewrite /dur_pair. iDestruct "Hpair" as (gt') "[Hdur HG]".
+    iMod (dsnap_step_merge G gt (fr_D r) D' with "Hepoch Hdur HG") as "Hpair".
+    iDestruct "Hpair" as (gt') "[Hdur HG]".
     iMod (fs_hist_update (fcn_hist γs) (fr_hist r) (fr_hist r ++ [D'])
             with "Hhist") as "Hhist"; [by eexists|].
     iDestruct (fs_hist_snapshot with "Hhist") as "[Hhist #Hlb]".

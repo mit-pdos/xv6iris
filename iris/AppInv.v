@@ -190,6 +190,52 @@ Section AppCredsRaw.
     intros HP. rewrite /app_xfer_raw. iIntros "!>" (r av) "#H".
     iModIntro. iSplitR; [iExact "H" |]. iExists r. iExact "H".
   Qed.
+
+  (* ------------------------------------------------------------------ *)
+  (*  1c.  THE MERGE (sync design section 4, operation 2; SY3-K2)         *)
+  (* ------------------------------------------------------------------ *)
+
+  (* THE COMMIT'S LAW: the new durable copy is built from the running
+     claim AND the old durable copy, so a durable-only resource (a share
+     of a counter that travels with the durable copy) can move from the
+     old copy to the new one instead of being dropped with it.
+
+     CURRIED AT THE COLLECTION, because no one instant holds both: the
+     running claim is in hand only where [appN] opens (the commit's
+     collection, [FsCollectAll.fs_collect_dur]), the old copy only inside
+     the header write's permit, at mask [∅]
+     ([FsCrash.fs_commit_L_seq_permit]).  So the law runs on the running
+     claim at the collection, gives it back, and hands out a WAND that
+     turns the old copy into the new one when the permit applies it.
+     Whatever the new copy needs of the running claim must be moved INTO
+     the wand here -- persistent witnesses, or an exclusive share the
+     running claim can spare.
+
+     The old copy arrives as the crash slot holds it, [▷] over its
+     existentials ([AppDur.app_dur_raw]), and is not stripped: a basic
+     update cannot eliminate the [◇] that pulling an existential through
+     a later costs.  RAW for [app_xfer_raw]'s reason. *)
+  Definition app_merge_raw {N : Type} (A : N -> aview -> iProp Σ) : iProp Σ :=
+    (□ (∀ (r : N) (av : aview),
+          ▷ A r av ==∗ ▷ A r av ∗
+          ∃ r' : N,
+            ((▷ ∃ (r_o : N) (av_o : aview), A r_o av_o) ==∗ ▷ A r' av)))%I.
+
+  Global Instance app_merge_raw_persistent {N} (A : N -> aview -> iProp Σ) :
+    Persistent (app_merge_raw A).
+  Proof using . rewrite /app_merge_raw. apply _. Qed.
+
+  (* EVERY TRANSPORT IS A MERGE: drop the old copy, copy the running claim.
+     This is what every application with nothing to carry across the
+     commit instantiates the merge with (the commit behaves as before). *)
+  Lemma app_merge_raw_of_xfer {N} (A : N -> aview -> iProp Σ) :
+    (⊢ app_xfer_raw A) -> ⊢ app_merge_raw A.
+  Proof using .
+    intros Hx. iPoseProof Hx as "#Hx".
+    rewrite /app_xfer_raw /app_merge_raw. iIntros "!>" (r av) "Hp".
+    iMod ("Hx" with "Hp") as "[Hp Hn]". iDestruct "Hn" as (r') "Hn".
+    iModIntro. iFrame "Hp". iExists r'. iIntros "_". iModIntro. iExact "Hn".
+  Qed.
 End AppCredsRaw.
 
 (* ------------------------------------------------------------------ *)
@@ -259,12 +305,13 @@ Section AppInv.
     iIntros "[H | H]"; [by iApply Hs | by iApply Hw].
   Qed.
 
-  (* THE TRANSPORT, PINNED (round C): parked in the body so the era owns
-     it, and the one application-side premise of the era mint. *)
-  Definition app_xfer : iProp Σ := app_xfer_raw app_pred.
+  (* THE MERGE, PINNED (round C's transport; the merge since SY3-K2):
+     parked in the body so the era owns it, and the one application-side
+     premise of the era mint.  The commit is its one runner. *)
+  Definition app_merge : iProp Σ := app_merge_raw app_pred.
 
-  Global Instance app_xfer_persistent : Persistent app_xfer.
-  Proof using . rewrite /app_xfer. apply _. Qed.
+  Global Instance app_merge_persistent : Persistent app_merge.
+  Proof using . rewrite /app_merge. apply _. Qed.
 
   (* THE DOMAIN ROW (round C).  The abstract map names EXACTLY the region's
      inums.  [InodeRegion.ftop_body] carries no such row, so the commit's
@@ -290,14 +337,14 @@ Section AppInv.
 
   (* THE BODY: the application's half of the authority, the claim about the
      map it carries (read through the view), the domain row and the
-     transport.  NOT timeless: the claim is an arbitrary iProp and stays
+     merge.  NOT timeless: the claim is an arbitrary iProp and stays
      under the later. *)
   Definition app_body (γfs : fs_names) : iProp Σ :=
     (∃ I : gmap Z fs_node,
        ghost_map_auth (fs_top γfs) (1/2) I ∗
        app_pred app_run (abs_view I) ∗
        ⌜app_dom I⌝ ∗
-       app_xfer)%I.
+       app_merge)%I.
 
   Definition app_inv (γfs : fs_names) : iProp Σ := inv appN (app_body γfs).
 
@@ -307,12 +354,12 @@ Section AppInv.
   (* ALLOCATION, at the era mint: the guest half of the authority the boot
      founded, the claim at the founded map -- LATER-SHAPED, because it
      arrives from the durable instance through the transport (round C) and
-     [inv_alloc] takes the later -- the domain row and the transport. *)
+     [inv_alloc] takes the later -- the domain row and the merge. *)
   Lemma app_inv_alloc (γfs : fs_names) (I : gmap Z fs_node) (E : coPset) :
     app_dom I ->
     ghost_map_auth (fs_top γfs) (1/2) I -∗
     ▷ app_pred app_run (abs_view I) -∗
-    app_xfer -∗ |={E}=> app_inv γfs.
+    app_merge -∗ |={E}=> app_inv γfs.
   Proof using .
     iIntros (Hd) "Hh Hp #Hx". rewrite /app_inv.
     iApply (inv_alloc appN E with "[Hh Hp]").
@@ -452,15 +499,15 @@ Section AppInv.
     iExact "Hp".
   Qed.
 
-  (* THE TRANSPORT, READ OFF THE INVARIANT: [▷]-shaped and persistent, so
+  (* THE MERGE, READ OFF THE INVARIANT: [▷]-shaped and persistent, so
      the body closes unchanged.
      Note what this is NOT good for: a fupd under a later cannot run
-     without a step, so the commit's law does not read the transport here
-     -- it takes [app_xfer] itself, carried from the mint on the fsinit kit
-     ([FsCfgKits.fs_kit_fsinit_ghost]). *)
-  Lemma app_xfer_acc (E : coPset) (γfs : fs_names) :
+     without a step, so the commit's law does not read the merge here
+     -- it takes [app_merge] itself, carried from the mint on the fsinit
+     kit ([FsCfgKits.fs_kit_fsinit_ghost]). *)
+  Lemma app_merge_acc (E : coPset) (γfs : fs_names) :
     ↑appN ⊆ E ->
-    app_inv γfs ={E}=∗ ▷ app_xfer.
+    app_inv γfs ={E}=∗ ▷ app_merge.
   Proof using .
     iIntros (HE) "#Hinv".
     iMod (inv_acc E appN with "Hinv") as "[Hbody Hclose]"; [exact HE |].

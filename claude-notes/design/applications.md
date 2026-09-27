@@ -130,12 +130,13 @@ on `m`, an update needs the whole:
 
       app_body γfs := ∃ I, ghost_map_auth (fs_top γfs) (1/2) I
                          ∗ app_pred app_run (abs_view I)
-                         ∗ ⌜app_dom I⌝ ∗ app_xfer
+                         ∗ ⌜app_dom I⌝ ∗ app_merge
 
   `app_dom I` (the map's domain is the inode region) is a pure row the
   commit needs (the snapshot is at the region restriction of `I`), proved
   at the mint from the snapshot's geometry and preserved by the mover;
-  `app_xfer` is the one persistent law parked where the commit reads it.
+  `app_merge` (§3; the transport's place until SY3-K2) is the one
+  persistent law parked where the commit reads it.
 - **THE MOVER** (`InodeRegion.ireg_top_retag_*`, plus `_armed_` twins):
   the one operation that changes the map needs the whole authority, so it
   opens BOTH invariants (masks `↑ftopN ∪ ↑appN`) and re-establishes the
@@ -213,21 +214,36 @@ on `m`, an update needs the whole:
   allocating a fresh one.  Stated under the later because every crossing
   is a fupd without a step, where the claim arrives as `▷ A`; timeless
   claims strip it, claims holding invariants duplicate under it.  The
-  APPLICATION proves it ONCE as a closed lemma (`Happ_xfer`), it enters
-  the era as a premise of the mint and is parked in `app_body` and in the
-  fsinit kit beside the seam.
+  APPLICATION proves it ONCE as a closed lemma (`Happ_xfer`); since SY3-K2
+  what enters the era as the mint's premise, parked in `app_body` and in
+  the fsinit kit beside the seam, is the MERGE derived from it (crossing 1).
 - **The three crossings:**
-  1. **Commit.**  The commit law (`LogSnapLaw.snap_law`, proved by
-     `FsCollectAll.fs_snap_law_build` at quiescence) collects the running
-     bundle, allocates the fresh snapshot (`P_dur_alloc_xfer` returns the
-     guest half at `gt`), runs `app_xfer` on the running claim read off
-     `app_inv` (the two halves agree on `I`), packs the guest and returns
-     the claim.  Its output is the PAIR
+  1. **Commit -- a MERGE (SY3-K2).**  The commit law (`LogSnapLaw.snap_law`,
+     proved by `FsCollectAll.fs_snap_law_build` at quiescence) collects the
+     running bundle, allocates the fresh snapshot (`P_dur_alloc_xfer`
+     returns the guest half at `gt`), runs the application's MERGE on the
+     running claim read off `app_inv` (the two halves agree on `I`) and
+     returns the claim.  Its output is the PAIR
 
-         dur_pair G D := ∃ gt, P_dur_at gt D ∗ ▷ G gt
+         dur_merge G gt := ∀ gt_o, ▷ G gt_o ==∗ ▷ G gt
+         dur_pair G D   := ∃ gt, P_dur_at gt D ∗ dur_merge G gt
 
-     at `G := app_guest := app_dur_raw app_pred`; the guest is under a
-     later because the transport yields `▷ A`.
+     at `G := app_guest := app_dur_raw app_pred`, and the header write's
+     permit applies the wand to the OLD guest (`FsDurSnap.dsnap_step_merge`)
+     instead of dropping it.  CURRIED because no instant holds both: the
+     running claim is in hand only where `appN` opens (the collection), the
+     old guest only inside the disk permit at mask `∅`.  The
+     application's law (`AppInv.app_merge_raw`, pinned `app_merge`, in the
+     transport's old place in `app_body` / the kit / the mint):
+
+         app_merge_raw A := □ ∀ r av, ▷ A r av ==∗ ▷ A r av ∗
+                              ∃ r', ((▷ ∃ r_o av_o, A r_o av_o) ==∗ ▷ A r' av)
+
+     Whatever the new copy needs of the running claim goes INTO the wand at
+     the collection.  Every landed application gets it from its transport
+     (`app_merge_raw_of_xfer`: the old copy dropped), at the one site
+     `SystemAdequacy` builds the era's premise `Happ_merge`; the App record
+     still carries the transport only.
   2. **PowerOn.**  `FsCrash.P_fs_swap` clones the snapshot
      (`P_dur_at_clone` returns the clone's guest half at the same map),
      adequacy runs `app_xfer` on the slot's claim, and the lend carries
@@ -259,13 +275,14 @@ The crash seam and the commit law are indexed by an OPAQUE guest
 `fs_rec_permit G` carries `▷ G gt` in and `▷ G gt'` out; every permit
 that does not commit chooses `gt' := gt` and FRAMES the guest (never
 `iMod`s it: it strips the later off the file system's timeless half
-only); only `fs_commit_L_seq_permit` moves it, by `dsnap_step_xfer` on
-the `dur_pair` the law produced — and it takes the seam and the pair off
+only); only `fs_commit_L_seq_permit` moves it, by `dsnap_step_merge` on
+the `dur_pair` the law produced (the pair's merge applied to the old
+guest) — and it takes the seam and the pair off
 the ONE handle `snap_law` bundles, so the two `G`s are identified
 without naming the application.  Adequacy discharges
 `fs_crash_seam_at (app_dur_raw (app_fs c))` by conversion at the
 composite slot; it rides the boot supply and the fsinit kit (beside
-`app_xfer`) to `ProofFsinit`, which proves the law at `G := app_guest`.
+`app_merge`) to `ProofFsinit`, which proves the law at `G := app_guest`.
 
 ## 5. The trace side, and the end of the run
 

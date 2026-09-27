@@ -84,7 +84,7 @@ Require Import ProcAvail.
    definition of THIS file and [FsCfgBoot] sits below it, so stating the
    second lemma there would be a dependency cycle. *)
 Require Import FsBoot.
-Require Import AppInv.         (* [app_inv]/[app_xfer]: the application's running invariant and its transport (app-instances.md) *)
+Require Import AppInv.         (* [app_inv]/[app_merge]: the application's running invariant and its merge (app-instances.md) *)
 Require Import AppDur.         (* [app_guest]: the guest kit 2's crash seam is stated at (round C) *)
 Require Import FsImg.
 Require Import FsImgBridge.
@@ -463,11 +463,11 @@ Section FirstTok.
         (* ...and the application's environment, kit 2's application row:
            what forkret's boot arm projects into [first_done] *)
         fsabs_env ∗
-        (* ...the crash seam at the application's guest and the transport,
+        (* ...the crash seam at the application's guest and the merge,
            kit 2's last two rows (round C): what fsinit builds the commit's
            law from *)
         FsCrash.fs_crash_seam_at app_guest fsc_cov fsc_logst ∗
-        app_xfer.
+        app_merge.
   Proof using .
     iIntros "H". rewrite /first_fsinit.
     iDestruct "H" as (dk sb Rspent Pb vlock v_start v_dev v_nc v_n vname vcpu
@@ -476,14 +476,14 @@ Section FirstTok.
         Hnc & Hn & Hblk & Hmir & Hiref & Hbsl)".
     iDestruct (fs_kit_fsinit_ghost_open with "Hkit")
       as "(Hlog & Hboot & #Hireg & Hb1 & Hauths & Hdty & Hhdr & Hslots &
-           Hbmres & Hrem & #Hbinv & Hxo & #Henv & #Hseam & #Hxfer)".
+           Hbmres & Hrem & #Hbinv & Hxo & #Henv & #Hseam & #Hmerge)".
     iExists dk, sb, Rspent, Pb, vlock, v_start, v_dev, v_nc, v_n, vname, vcpu,
             sb_old.
     iFrame "Hmir Hlog Hb1 Hsb Hireg Hboot Hbmres Hlk Hnm Hcpu Hst Hdv Hout
             Hcmt Hnc Hn Hblk Hauths Hdty Hhdr Hslots Hbsl Hiref Hrem Hbinv Hxo".
     iSplitR; [iPureIntro; exact Hp |].
     iSplitR; [rewrite /fsabs_env; iExact "Henv" |].
-    iSplitR; [iExact "Hseam" | iExact "Hxfer"].
+    iSplitR; [iExact "Hseam" | iExact "Hmerge"].
   Qed.
 
   (* ================================================================== *)

@@ -65,7 +65,7 @@ Require Import BitmapInv.
 Require Import FsCfg.          (* the record this file finally gives a value *)
 Require Import AppCfg.         (* [appcfg]: the application's record, threaded beside [fscfg] *)
 Require Import AppInv.         (* [app_inv]: kit 2's application row (app-instances.md section 2);
-                                  [app_xfer]: the transport, kit 2's last row (round C) *)
+                                  [app_merge]: the merge, kit 2's last row (round C; SY3-K2) *)
 Require Import AppDur.         (* [app_guest]: the guest the crash seam is stated at (round C) *)
 Require FsCrash.               (* [fs_crash_seam_at]: the seam at the application's guest,
                                   spelled QUALIFIED -- this file does not want FsCrash's exports *)
@@ -315,7 +315,7 @@ Section FsCfgKits.
      exc_own (fs_exc fsc_fs) Xexc ∗
      (* THE APPLICATION'S INVARIANT (app-instances.md section 2): the other
         half of the abstract map's authority beside the application's claim
-        about its view and its transport, FOUNDED AT THE ERA MINT at
+        about its view and its merge, FOUNDED AT THE ERA MINT at
         the founded map.  Persistent; forkret's boot arm projects it into
         [FirstTok.first_done], and it is the handle every commit's step is
         applied through.  LAST, so the pass-through sites'
@@ -323,17 +323,17 @@ Section FsCfgKits.
         this kit threads (explicit through the kits, ambient everywhere
         else). *)
      AppInv.app_inv (APP := APP) fsc_fs ∗
-     (* THE CRASH SEAM AT THE APPLICATION'S GUEST, AND THE TRANSPORT
-        (app-instances.md round C).  Both are what fsinit builds the
+     (* THE CRASH SEAM AT THE APPLICATION'S GUEST, AND THE MERGE
+        (app-instances.md round C; the transport's place since SY3-K2).  Both are what fsinit builds the
         commit's law from ([FsCollectAll.fs_snap_law_build]), and neither
         can be minted inside an era: the seam is a conversion at the
         composite crash slot, made only where the fixed record is built
-        ([SystemAdequacy]), and the transport is the application's own
+        ([SystemAdequacy]), and the merge is the application's own
         closed lemma.  So both ride this kit from the system theorem down
         to forkret's fsinit arm ([FirstTok.first_fsinit]).  Persistent;
         LAST, after the application's invariant. *)
      FsCrash.fs_crash_seam_at (app_guest (APP := APP)) fsc_cov fsc_logst ∗
-     AppInv.app_xfer (APP := APP))%I.
+     AppInv.app_merge (APP := APP))%I.
 
   Lemma fs_kit_fsinit_ghost_open (ICFG : icfg) (FSC : fscfg) (APP : appcfg Σ)
       (P : Z -> list (bv 8)) (Rspent : gset Z)
@@ -359,7 +359,7 @@ Section FsCfgKits.
       exc_own (fs_exc fsc_fs) Xexc ∗
       AppInv.app_inv (APP := APP) fsc_fs ∗
       FsCrash.fs_crash_seam_at (app_guest (APP := APP)) fsc_cov fsc_logst ∗
-      AppInv.app_xfer (APP := APP).
+      AppInv.app_merge (APP := APP).
   Proof using . iIntros "H". iExact "H". Qed.
 
   (* ==================================================================== *)
