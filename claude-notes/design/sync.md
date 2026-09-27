@@ -172,9 +172,49 @@ Shares, at all times:
 Both claims' witnesses: `state(σ) ∈ uadm ls (last Ls)` (`srec0` when `Ls =
 []`), with `◯⊒ls` a lower bound on the ledger's line list.
 
-**The helping slot `H`** (in the log invariant, both arms): `∃ m,
-ghost_map_auth γH 1 m ∗ [∗ map] w ↦ st ∈ m, (Pending w Fs ∗ Fs | Done w Q ∗
-Q)`, entries tagged by `saved_prop`s so the depositor recognises its own.
+**Where the WAL names the application's two opaque things** (ruled at the
+K3 cut, 2026-09-27).  The token `S` sits in the log invariant and the
+waiters' hooks sit in the log invariant's helping slot, so both have a
+TYPE the WAL must be able to write and the application must be able to
+match, at one place both can name.  That place is the machine's fixed
+ghost record: `RiscvPtsto.riscvFixedGS` gains two client slots beside
+`riscv_crash_pred`,
+
+    riscv_sync_tok  : nat -> iProp Σ            (* the token, per era   *)
+    riscv_sync_hook : nat -> iProp Σ -> iProp Σ  (* the hook family, per era *)
+
+filled by adequacy from two parameters stated at the same raw gnames as
+`Pc` (`Tk`, `Hk`: functions of the four gnames and the fixed part `c`) and
+delivered to every boot by the record-shape equation (`boot_fixedGS`), so
+no era-side equation is needed.  The WAL writes `T := riscv_sync_tok
+gen_id` and a waiter's hook as `riscv_sync_hook gen_id Q`; the application
+supplies, at the era mint, a persistent RUNNER (`AppInv.app_sync_run`)
+that fires `riscv_sync_hook gen_id Q` on the guest, the running claim and
+the token at one map -- that is the only place the family's meaning is
+used.  Every landed application takes `Tk := fun _ => True`, `Hk := fun _ Q
+=> Q`, and the runner is `iFrame`.  REJECTED on the way: a `saved_prop`
+per opaque index in `log_names` -- agreement costs a later, and a hook is
+a wand fired inside a fupd, which cannot absorb it; parametrising
+`log_res` (an arity change in ~370 files); a class ambient in the WAL's
+cone.
+
+**The helping slot `H`** (in `log_res`, both arms; `LogHelp.v`): a
+`ghost_map` at the new `log_names` field `ln_help`, keys the waiters'
+ids, values `(γw, n0)` -- the waiter's escrow token gname and the
+`ncommit` word it read at its deposit.  Per entry, an ESCROW invariant
+`inv (helpN .@ w) (Q ∨ help_tok γw)` (`help_tok γw := mono_nat_auth_own
+γw 1 0`, exclusive) and the state
+
+    (riscv_sync_hook gen_id Q ∗ ⌜n0 = nc⌝ ∗ ⌜cmt = true ∨ out ≠ 0⌝)   Pending
+    ∨ help_tok γw                                                     Done
+
+`nc`, `cmt`, `out` are `log_res`'s own cells.  A waiter holds the full
+fragment `w ↪[ln_help γ] (γw, n0)` and its escrow's handle at its own
+`Q`.  No `saved_prop`: the escrow pins `Q` to `w`, and the `▷` a waiter
+gets on `Q` is stripped by its next instruction.  The two pure clauses
+are what the two readers need: a waiter that wakes with `ncommit ≠ n0`
+knows its entry is `Done`; a fast-path `sys_sync` (`cmt = false`, `out =
+0`) knows every entry is `Done`, so it flips nothing.
 
 ### 4.3 The operations
 
@@ -188,60 +228,86 @@ Q)`, entries tagged by `saved_prop`s so the depositor recognises its own.
    running `¼`; it builds the MERGE WAND (`FsDurSnap.dur_merge`, landed by
    K2 as `∀ gt_o, ▷ G gt_o ==∗ ▷ G gt`) extended to carry `S`:
 
-       dur_merge' G T gt := (∀ gt_o, ▷ G gt_o ==∗ ▷ G gt ∗ ▷ T) ∧ T
+       dur_merge G T gt := (∀ gt_o, ▷ G gt_o ==∗ ▷ G gt ∗ T) ∧ T
 
-   The header-write permit (`FsCrash.fs_commit_L_sector0_rec`, mask ∅,
-   inside the DMA completion) applies the left arm: `S` agrees with the old
-   copy's `½` (so the list the new copy's witness was proved at is the old
-   copy's), the `½` moves into the new copy, and `▷ T` comes back in the
-   permit's `Q` (timeless, stripped by the permit's own update).  The
-   EMPTY-LOG path (`n = 0`, no header write; `ProofEndOp.v` ~5133-5170)
-   takes the right arm.  The commit's TAIL (`eo_tail`) re-deposits `S` into
-   the log invariant.  WHY `S`: the collection holds the running claim but
-   not the old copy, the permit holds the old copy but not the running
-   claim (and not the log invariant: the lock may be held by another hart
-   during `commit()`), so a share must travel from the collection to the
-   header write to pin the list and block any append in between; the fast
-   path knows `S` is home because it holds the log invariant's IDLE arm.
-3. **The GHOST COMMIT `GC(Fss)`** -- a commit with no disk write, run with
-   `log.lock` held, `outstanding = 0` and `committing = 0` (or by the
-   committer at its tail, where the same holds):
-   a. the hart lifting lemma lends the era's custody token `start_auth`
-      (today lent only to the DMA completion, `RiscvExec.wp_disk_step`);
-   b. open `CI` at `⊤`; K1's `LogQuiet.P_fs_rec_quiet_acc` gives the
-      snapshot `P_dur_at gt_o D` and a closer at any name over the same
-      map; `LogQuiet.log_res_quiet_acc` lends the bundle the commit law
-      consumes; `log_quiet_committed`: the committed map is the logged
-      view;
-   c. run the HOOKED commit law at `⊤ ∖ ↑crashN ∖ ↑fsbN`: the collection
-      (the one place where the running claim and the fresh guest meet at
-      one map -- `HSI` in `fs_collect_dur`), the merge applied at once to
-      the old guest, then each `Fs ∈ Fss` fired INSIDE the collection with
-      the running claim and the new guest at the same map;
-   d. close `CI` with the new pair (same committed map), return the loan.
-   Nothing changes on disk.  `Fs` has: the new guest's `½`, the running
-   `¼` (it opens `I_app`), `S` -- full authority.
-4. **`sys_sync(Fs)`**, generic in the caller's `Q`, with `Fs : ∀ gt I, G⁰
-   gt I ∗ T ∗ R I ={E}=∗ G⁰ gt I ∗ T ∗ R I ∗ Q` (`G⁰ gt I` the guest
-   unpacked at map `I`, `R I` the running claim at `I`):
+   (`T` NOT under a later on the way out: the wand captures the token
+   itself and returns it; the old copy's share is agreed with it UNDER
+   the old copy's later -- `▷ ●{½}Ls_o ∗ ●{¼}Ls ⊢ ▷ ⌜Ls_o = Ls⌝` -- and
+   moved into the new copy's later.)  The header-write permit
+   (`FsCrash.fs_commit_L_sector0_rec`, mask ∅, inside the DMA completion)
+   applies the left arm and returns `T` in the permit's `Q`, which rides
+   the write's receipt to the commit's tail.  The EMPTY-LOG path (`n = 0`,
+   no header write; `ProofEndOp.v` ~5133-5170) takes the right arm.  The
+   commit's TAIL (`eo_tail`) re-deposits `S` into the log invariant.  WHY
+   `S`: the collection holds the running claim but not the old copy, the
+   permit holds the old copy but not the running claim (and not the log
+   invariant: the lock may be held by another hart during `commit()`), so
+   a share must travel from the collection to the header write to pin the
+   list and block any append in between; the fast path knows `S` is home
+   because it holds the log invariant's IDLE arm.
+3. **The GHOST COMMIT `GC(Qs)`** (`LogGhostCommit.log_ghost_commit`) -- a
+   commit with no disk write, run with `log.lock` held and the batch
+   quiescent (the fast path: `outstanding = 0`, `committing = 0`; the
+   committer's tail: the checked-out batch at `n = 0`), at ANY point of a
+   kernel proof (it is a `mWP e -∗ mWP e` rule):
+   a. CUSTODY.  `HartCustody.wp_start_auth_fupd`: for any expression of
+      this generation, a client fupd at `⊤` runs against `state_interp`'s
+      `start_auth (start_count g)` with `⌜start_count g = gen_id + 1⌝`
+      WITHOUT taking a step -- `wp_unfold` once, the live/dead case split
+      of `RiscvExec.wp_hart_step` (dead: `wp_dead`), the hook, the same
+      `state_interp` handed to the continuation's own unfolding.  No
+      instruction leaf changes; the instruction chain (`swp_loop` →
+      `swp_tick_wrap_ex` → … → `wp_hart_step`) is untouched.
+      `wp_crash_fupd` opens `crash_inv` at `⊤` inside it: the second
+      opener of the crash invariant beside the DMA completion.
+   b. open `CI` at `⊤`; the seam at the parked law's `G` turns the slot
+      into the record and the old guest `▷ G gt_o` (the record is
+      timeless, so it comes out of the invariant's later); K1's
+      `LogQuiet.P_fs_rec_quiet_acc` gives the snapshot `P_dur_at gt_o D`
+      and a closer at any name over the same map; `log_quiet_committed`:
+      the committed map is the logged view.  The quiescent bundle
+      `log_quiet` comes from K1's `log_res_quiet_acc` (fast path) or from
+      the tail's checked-out batch (`log_state_quiet_acc`).
+   c. open `fsbN` (as `ProofEndOp.eo_snap_law_of_auth` does) and run the
+      HOOKED LAW parked in `log_ctx` at `⊤ ∖ ↑crashN ∖ ↑fsbN`
+      (`LogSnapLaw.snap_law_ghost`): it takes the old guest, `T` and the
+      hooks `[∗ list] Q ∈ Qs, riscv_sync_hook gen_id Q`, runs the
+      collection (the one place the running claim and the fresh guest half
+      meet at one map -- `HSI` in `fs_collect_dur`), applies the merge to
+      the old guest INSIDE the collection, fires every hook there through
+      `app_sync_run` (guest half at `gt`, the new guest's claim, the
+      running claim, `T`, all at map `I`), and returns `∃ gt, P_dur_at gt
+      D ∗ ▷ G gt ∗ T ∗ [∗ list] Q ∈ Qs, Q`.  (The law returns the guest
+      rather than a pair because the merge must be applied where the
+      running claim is in hand, and the hooks after it.)
+   d. close `CI` with the new pair at the same committed map, return the
+      loan.  Nothing changes on disk.
+4. **`sys_sync(oQ)`**, `oQ : option (iProp Σ)` (the dispatcher's arm 22
+   passes `None`; `/sync` passes `Some Q`), premise `hook_opt gen_id oQ`,
+   post `Q_opt oQ`:
    - FAST branch (`!committing && outstanding == 0` at the acquire,
-     `ProofSysSync.v` ~1500): `GC([Fs])`, return `Q`.
-   - SLOW branch: allocate `w`, deposit `Pending w Fs` in `H`, remember
-     `n0 = ncommit`, sleep (the C is UNCHANGED).  The committer's `eo_tail`
-     (after a real or an empty-log commit) runs `GC(all Pending)`, flips
-     each to `Done w Q`, then bumps `ncommit` and wakes.  `sys_sync` wakes
-     with `ncommit > n0`, finds `Done w Q`, removes it, returns `Q`.
-     Correct because a waiter depositing while `committing = 1` does so
-     after that commit's collection, so the FIRST `eo_tail` after the
-     deposit is the one that moves `ncommit` past `n0` and lands a state
-     covering every change before the call; commits are serialised.
-5. **The union's `Fs`**: with full authority, append the record `r =
-   (p, state(σ))` (p from sh's lower bound `◯⊒ls'` INCLUDING the sync
-   line, carried in by the payload -- the running claim's own lower bound
-   cannot contain it, no file step runs after the line is typed); rewrite
-   both witnesses to `uadm ls' r` (the state is `r.2` itself: `uadm_self`);
-   the chain rises because the running state was in `uadm ls (last Ls)`.
-   `Q := ◯⊒(Ls ++ [r]) ∗ ⌜r = (p, state)⌝`.
+     `ProofSysSync.v` ~1500): `GC([Q])`, return `Q`.
+   - SLOW branch: allocate `w` and `γw`, allocate the escrow at `Q`,
+     deposit `Pending` in `H` at `n0 = ncommit`, sleep (the C is
+     UNCHANGED).  The committer's `eo_tail` (after a real or an empty-log
+     commit; `committing` still reads 1, the lock held) extracts every
+     `Pending` hook (`LogHelp.log_help_extract`), runs `GC(all)`, fills
+     each escrow with its `Q` and flips the entry to `Done` -- all BEFORE
+     `committing := 0` and `ncommit++`.  `sys_sync` wakes with `ncommit ≠
+     n0`, so its entry is `Done` (`log_help_collect`): it deletes the
+     entry, takes the token, opens its escrow and leaves with `▷ Q`,
+     stripped at the next instruction.  Correct because a waiter
+     depositing while `committing = 1` does so after that commit's
+     collection, so the FIRST `eo_tail` after the deposit is the one that
+     moves `ncommit` past `n0` and lands a state covering every change
+     before the call; commits are serialised.
+5. **The union's `Fs`** (SY3-A instantiates `Hk`): with full authority,
+   append the record `r = (p, state(σ))` (p from sh's lower bound `◯⊒ls'`
+   INCLUDING the sync line, carried in by the payload -- the running
+   claim's own lower bound cannot contain it, no file step runs after the
+   line is typed); rewrite both witnesses to `uadm ls' r` (the state is
+   `r.2` itself: `uadm_self`); the chain rises because the running state
+   was in `uadm ls (last Ls)`.  `Q := ◯⊒(Ls ++ [r]) ∗ ⌜r = (p, state)⌝`.
 6. **Back to sh**: `/sync`'s exit payload (`UkSync.sync_pay`) carries `Q`
    through `wait()`; sh files the record on the ledger at the sync round's
    prompt (the model's `usync_last`, §5).
@@ -254,7 +320,9 @@ Q)`, entries tagged by `saved_prop`s so the depositor recognises its own.
    `Ls`; the ledger's floor is RE-STATED as a fragment of the new era's
    `γs` (the counter is per era), and the durable copy must be re-based to
    the new era's `γs` before the new era can crash (see the plan's risk
-   R4).
+   R4).  The token's birth is the era mint's: `LogDefs.log_ghost_alloc`
+   takes `riscv_sync_tok gen_id` and puts it in `log_free_tok`, which is
+   what `initlog` seals into the first `log_res`.
 
 ### 4.4 What is NOT done, and why
 

@@ -49,9 +49,9 @@ Open cleanups it left, none blocking:
   `iris/UnionAdmDemo.v` (the four demos, including the NEGATIVE
   `demo_sync_cut_neg`), and design §5 "as built".  First red file:
   `UnionOut.v` line ~572 (`union_phi_res`).
-- NOT STARTED: K3 (helping + ghost commit + `S` + the hooked law + the
-  custody lemma + `sys_sync`'s contract), K4 (the dispatcher's arm 22 and
-  `/sync`'s payload), A (the application side and the ledger).
+- NOT STARTED: K3 (four sub-lanes K3-1..K3-4 below; its rulings are in
+  design §4.2-4.3), K4 (the dispatcher's arm 22 and `/sync`'s payload),
+  A (the application side and the ledger).
 
 ### Rules for every lane
 
@@ -85,65 +85,229 @@ Open cleanups it left, none blocking:
 - If a statement below is unprovable or the design is wrong, STOP and
   report to the owner with specifics; do not bend a contract.
 
-### Lane SY3-K3 -- the ghost commit, `S`, helping, `sys_sync(Fs)` (kernel/WAL)
+### Lane SY3-K3 -- the ghost commit, `S`, helping, `sys_sync(oQ)` (kernel/WAL)
 
-Goal: `sys_sync`'s contract becomes "fires the caller's `Fs` exactly once
-at a ghost commit, returns `Q`" (design §4.3 items 2-4), proved for both
-branches of the UNCHANGED C (`kernel/log.c` `sys_sync`).
+Goal: `sys_sync`'s contract becomes "fires the caller's hook exactly once
+at a ghost commit, returns `Q`" (design §4.3 items 3-4), proved for both
+branches of the UNCHANGED C (`kernel/log.c` `sys_sync`).  Design §4.2-4.3
+as revised at the K3 cut are the rulings; the four sub-lanes below are
+sequential except where marked, each a green landing on `main`.
 
-Steps, in dependency order (each can be a commit; the tree must stay
-green at each landing):
-1. **The custody lemma.**  A variant of `RiscvExec.wp_hart_step`
-   (`RiscvExec.v` ~751) that lends `start_auth (start_count g)` with
-   `⌜n = gen_id + 1⌝` from `power_interp` (`RiscvPtsto.v` ~2813) into the
-   client's `={⊤,∅}=∗` prefix and takes it back -- exactly what
-   `wp_disk_step` (~1227) lends the DMA completion.  Then a kernel-level
-   leaf that, at one instruction, opens `crash_inv` at `⊤` and runs a
-   caller's update on `▷ riscv_crash_pred` with `start_auth` in hand.
-   Check the crash invariant's single-opener rule (`RiscvPtsto.v` ~904-910)
-   and document the new opener there.
-2. **The opaque token `T` and the `∧ T` merge.**  Parametrise the WAL's
-   guest interface by an opaque `T : iProp` (like `G`): `log_res`'s
-   non-committing arm holds `T`; `LogQuiet.log_res_quiet_acc` lends it
-   with the quiet bundle; `dur_merge` becomes `dur_merge' G T gt :=
-   (∀ gt_o, ▷ G gt_o ==∗ ▷ G gt ∗ ▷ T) ∧ T`; the collection takes `T` from
-   the checked-out `log_res` into the pair; `fs_commit_L_sector0_rec`'s
-   `Q` (`FsCrash.v` ~3053) returns `▷ T`; the empty-log arm of `end_op`
-   (`ProofEndOp.v` ~5133-5170) takes the right arm; `eo_tail` re-deposits.
-   Every landed application instantiates `T := True` (no behaviour change)
-   -- derive it generically, as K2 derived the merge from the transport.
-3. **The hooked commit law.**  A second parked closure in `log_ctx` beside
-   `snap_law_at` (`LogSnapLaw.v` ~99), same shape plus a HOOK `Φ` fired
-   inside `fs_collect_dur` (`FsCollectAll.v` ~1800; the merge is applied
-   at ~1898; `HSI` at ~1873) right after the merge, with the running claim
-   and the new guest at the same map, at mask `⊤ ∖ ↑crashN ∖ ↑fsbN`.  Built
-   by the same code as `fs_snap_law_build` (~1953).  Then `GC` as a
-   lemma: design §4.3 item 3, a-d, using K1's `LogQuiet` accessors (the
-   byte authority by opening `fsbN` as `ProofEndOp.eo_snap_law_of_auth`
-   ~836-880 does, in a `⊤ ∖ ↑crashN` variant).
-4. **The helping slot `H`** in `log_res` (both arms), with `saved_prop`
-   tags; `eo_tail` (`ProofEndOp.v`, the re-acquire before `committing :=
-   0`, `ncommit++`, `wakeup`) runs `GC(all Pending)` and flips them to
-   `Done` BEFORE bumping `ncommit`.  Check (and prove) the premises of
-   `LogQuiet` hold at that point on both the real and the empty-log path.
-5. **`sys_sync`'s new contract** (`SpecSysSync.v`: the module type
-   `SYS_SYNC`; `ProofSysSync.v`; `LinkSysSync.v`): generic in the caller's
-   `T`/`G`-level `Fs` and `Q` (design §4.3 item 4); fast branch
-   (`ProofSysSync.v` ~1500): `GC([Fs])`; slow branch: deposit, sleep until
-   `ncommit > n0`, collect `Done`.  Keep the receipt-free callers compiling
-   by instantiating `Fs` trivially (`Q := True`) where `sys_sync` is called
-   today (`ProofSyscall.v` ~5813-5826, arm 22).  The old `flushed_sync`
-   post may be deleted if nothing else uses it (grep first).
-Acceptance: green (as above); `SpecSysSync`'s header rewritten to the new
-contract; a paragraph in `design/fs-log.md` and `design/crash.md` (the new
-crash-invariant opener) stating the new facts.
-Risks: (R1) the masks at the hart step: `crashN` opened at `⊤`, then the
-hooked law at `⊤ ∖ crashN ∖ fsbN` -- verify `appN`, `ftopN`, `iregN`,
-`bitmapN`, `sbN`, `ipoolN`, `icEscN` are disjoint from both; (R2) `eo_tail`
-must hold, after the commit, everything `LogQuiet`'s accessors need (the
-reviewer believes `eo_open_to_batch … (fun _ => []) ∅ M0 HM0hdr HM0row`
-at `ProofEndOp.v` ~5155 is it -- verify); (R3) `Fs`'s later: the guest is
-under `▷`; unpack it the way `AppDur.app_dur_raw_merge` does.
+State: K3-1 and K3-2 not started (2026-09-27).
+
+#### K3-1 -- custody (new leaf `iris/HartCustody.v`; parallel with K3-2)
+
+Imports `RiscvExec` (the section context of `RiscvExec.v`'s WP rules:
+`riscvGS`, `GenId`, `CpuId`).  Two lemmas, no cone:
+
+    Lemma wp_start_auth_fupd (e : mexpr) (P : iProp Σ) :
+      thread_gen e = Some gen_id ->
+      gen_cert -∗
+      (∀ n : nat, ⌜n = (gen_id + 1)%nat⌝ -∗ start_auth n ={⊤}=∗ start_auth n ∗ P) -∗
+      (P -∗ mWP e) -∗ mWP e.
+
+Proof shape: `rewrite !wp_unfold /wp_pre /=` (`to_val` is the constant
+`None`, `RiscvLang.v` ~1597), intro `state_interp` = `(power_interp g ∗
+obs_interp g κs)` = `((Hgauth & Hsauth & Htie & HR) & Hobs)`; the
+live/dead case split of `RiscvExec.wp_hart_step` (~751): DEAD -- build
+`gen_dead gen_id` from `Hgauth` and hand the unfolded `wp_dead e gen_id`
+(~216) the reassembled `state_interp`; current-but-off refuted by
+`gen_started`; LIVE -- `start_count g = gen_id + 1` (`start_count`,
+`RiscvPtsto.v` ~851), `iMod` the hook at `⊤` BEFORE the mask drops, put
+`start_auth` back, apply the continuation and feed its unfolding the
+same `state_interp`.
+
+    Lemma wp_crash_fupd (e : mexpr) (P : iProp Σ) :
+      thread_gen e = Some gen_id ->
+      gen_cert -∗ crash_inv -∗
+      (∀ n : nat, ⌜n = (gen_id + 1)%nat⌝ -∗ start_auth n -∗ ▷ riscv_crash_pred
+         ={⊤ ∖ ↑crashN}=∗ start_auth n ∗ ▷ riscv_crash_pred ∗ P) -∗
+      (P -∗ mWP e) -∗ mWP e.
+
+(`iInv` inside the first lemma's hook.)  Also: the single-opener comment
+at `RiscvPtsto.v` ~904-925 and `design/crash.md` name the second opener.
+Acceptance: the file compiles on the VM (`--check` then `.vo`); a
+one-line `Lemma` instance at `e := Loop` (`thread_gen (LoopE gen_id
+cpu_id) = Some gen_id` by `reflexivity`).
+
+#### K3-2 -- the fixed record's sync slots, the cameras, the log names (parallel with K3-1; full rebuild)
+
+1. `RiscvPtsto.riscvFixedGS` gains, beside `riscv_crash_pred` (~634):
+   `riscv_sync_tok : nat -> iProp Σ` and `riscv_sync_hook : nat -> iProp Σ
+   -> iProp Σ`, with the comment of design §4.2 ("where the WAL names the
+   application's two opaque things").  `RiscvAdequacy.riscv_power_adequacy`
+   (~1533) and `riscv_fixed_alloc`-side construction take two new
+   parameters stated like `Pc` (`Tk : gname -> gname -> gname -> gname ->
+   CT -> nat -> iProp Σ`, `Hk : ... -> nat -> iProp Σ -> iProp Σ`) and fill
+   the two fields; the boot obligation learns them through the existing
+   record-shape equation (~1748), nothing else.  `SystemAdequacy.
+   xv6_power_adequacy` / `_gen` and `App.v`'s glue (~508) pass `Tk := fun
+   _ _ _ _ _ _ => True` and `Hk := fun _ _ _ _ _ _ Q => Q` (K3 has no
+   application-side field; SY3-A adds `al_sync_*` to the `App` record).
+2. `Xv6Cameras.logG` gains `loghelp_inG :: ghost_mapG Σ nat (gname *
+   SailStdpp.Values.mword 32)` (a value type used nowhere else -- the
+   duplicate-class trap, `LogInv.v`'s header); `logΣ` and `subG_logΣ`
+   follow.
+3. `LogDefs.log_names` gains `ln_help : gname`; `log_free_tok γ` gains
+   `ghost_map_auth (ln_help γ) 1 ∅` AND `riscv_sync_tok gen_id`
+   (the section gains `{GEN : GenId}`); `log_ghost_alloc` becomes
+   `riscv_sync_tok gen_id -∗ |==> ∃ γ, log_free_tok γ`.  Its one caller
+   (`FsCfgSnap.v` ~938) takes the token as a premise, and that premise is
+   threaded up to `SystemAdequacy`'s boot-era entailment as a new premise
+   `Htok : ⊢ |==> riscv_sync_tok gen_id` (the trivial application
+   discharges it by the `Tk` equation projected off the record shape).
+   Grep every consumer of `log_free_tok`/`log_names` construction
+   (`FsCfgKits.v` ~271/342, `FirstTok.v` ~426, `SpecFsinit.v` ~407,
+   `SpecInitlog.v` ~311, `ProofInitlog.v`): initlog's seal deposits
+   nothing new yet (K3-3 and K3-4 use the two conjuncts), so
+   `ProofInitlog` just DROPS them at this landing.
+Acceptance: whole tree green, audits at baseline; no statement outside
+the files named changes.
+
+#### K3-3 -- `T` through the WAL, the hooked law, the ghost commit (after K3-2)
+
+1. THE TOKEN.  `LogInv.log_res`'s non-committing arm gains `riscv_sync_tok
+   gen_id` (the section gains `GenId` if it lacks it; every consumer has
+   it ambient), placed LAST before `log_state` so no opener pattern
+   moves.  `FsDurSnap.dur_merge G T gt := (∀ gt_o, ▷ G gt_o ==∗ ▷ G gt ∗
+   T) ∧ T`, `dur_pair G T D`, `dsnap_step_merge` returns `T`;
+   `FsCrash.fs_commit_L_sector0_rec` / `fs_commit_L_seq_permit` (~3010,
+   ~3524) take `dur_pair G T` and return `T` in the permit's `Q`;
+   `LogSnapLaw.snap_law_out G T C home`, `snap_law_at ... T`, `snap_law γ
+   γfs cov ls T`; `LogInv.log_ctx` parks `snap_law ... (riscv_sync_tok
+   gen_id)`; `AppInv.app_merge_raw A T` (the wand's left arm returns `T`,
+   the right arm is `T`; `app_merge_raw_of_xfer` at any `T`),
+   `app_merge := app_merge_raw app_pred (riscv_sync_tok gen_id)` (its
+   section has `GenId` below; move the definition or add the binder);
+   `AppDur.app_dur_raw_merge` with `T`; `FsCollectAll.fs_collect_dur` and
+   `fs_snap_law_build` take `T` in and hand it into the pair;
+   `SystemAdequacy` derives the trivial merge.  `ProofEndOp`: the first
+   critical section takes `T` out of the idle arm with the batch
+   (~1606), the collection puts it in the pair (`eo_snap_law_of_auth`
+   ~836), the write_head post (~2134) gains `∗ riscv_sync_tok gen_id`
+   from the permit's `Q`, `eo_tail` (~1428) takes `riscv_sync_tok gen_id`
+   and re-deposits it (empty-log path ~5133-5170: the pair's right arm);
+   `ProofInitlog`'s seal deposits the token from `log_free_tok`.
+   `SpecEndOp.v`/`SpecWriteHead.v` follow their `dur_pair` mentions.
+2. THE RUNNER.  `AppInv.app_sync_run : iProp Σ :=
+   □ (∀ (Q : iProp Σ) (gt : gname) (I : gmap Z fs_node) (r' : app_names),
+        riscv_sync_hook gen_id Q -∗ ghost_map_auth gt (1/2) I -∗
+        ▷ app_pred r' (abs_view I) -∗ ▷ app_pred app_run (abs_view I) -∗
+        riscv_sync_tok gen_id ={∅}=∗
+        ghost_map_auth gt (1/2) I ∗ ▷ app_pred r' (abs_view I) ∗
+        ▷ app_pred app_run (abs_view I) ∗ riscv_sync_tok gen_id ∗ Q)`
+   (raw form over `A` first, as `app_merge_raw`), persistent; it rides
+   the same rows as `app_merge` (`FsCfgKits` kit 2, `FirstTok.first_fsinit`
+   ~470, `SpecFsinit` ~400, `SystemAdequacy`'s `Happ_merge` neighbour,
+   where the landed applications prove it by `iFrame` from the `Hk`
+   equation).
+3. THE HOOKED LAW.  `LogSnapLaw.snap_law_ghost_at γ γfs cov ls N G T :=
+   □ (∀ E Lb C (Qs : list (iProp Σ)) (gt_o : gname), ⌜N ⊆ E⌝ -∗ rows -∗
+        ghost_map_auth (fs_bytes γfs) 1 Lb -∗ ghost_map_auth (ln_tx γ) 1 ∅ -∗
+        ▷ G gt_o -∗ T -∗ ([∗ list] Q ∈ Qs, riscv_sync_hook gen_id Q) ={E}=∗
+        ∃ gt, P_dur_at gt (fs_restrict (dv_of_D C) (fs_home_set cov ls)) ∗
+              ▷ G gt ∗ T ∗ ([∗ list] Q ∈ Qs, Q) ∗ both auths)`
+   (`rows` = `snap_law_at`'s four pure premises); `snap_law_ghost γ γfs
+   cov ls T := ∃ N G, ⌜↑fsbN ## N⌝ ∗ ⌜↑crashN ## N⌝ ∗ fs_crash_seam_at G
+   cov ls ∗ snap_law_ghost_at ...`.  `LogInv.log_ctx` gains
+   `snap_law_ghost γ γfs cov ls (riscv_sync_tok gen_id)`, `crash_inv` and
+   `gen_cert` (all persistent, LAST); `SpecInitlog` (~389) takes `□
+   (sb_park γfs sbrec -∗ snap_law_ghost ...)`, `crash_inv` (`gen_cert` it
+   has); `ProofFsinit` (~611) builds it by `FsCollectAll.
+   fs_snap_law_ghost_build`, the twin of `fs_snap_law_build` over
+   `fs_collect_ghost` (the twin of `fs_collect_dur` ~1800: same accessor,
+   then `app_dur_raw_open` on the old guest, `app_merge_raw`'s wand on its
+   claim at `av := abs_view I`, `app_sync_run` per hook at `(gt, I, r')`,
+   `app_dur_raw_pack`); `crash_inv` reaches fsinit through
+   `FirstTok.first_boot_persist` (~249) from the boot bundle
+   (`BootShared.v` ~1437 has it beside `gen_cert`).
+4. THE GHOST COMMIT (new `iris/LogGhostCommit.v`, above `LogQuiet`,
+   `HartCustody`, `LogInv`):
+
+    Lemma log_state_quiet_acc ... :   (* the tail's batch, at n = 0 *)
+      log_state bn γfs cov ls 0 ∅ ∅ -∗ ghost_map_auth (ln_tx γ) 1 ∅ -∗
+      ∃ L M, log_quiet γ γfs cov ls L M ∗
+             (log_quiet γ γfs cov ls L M -∗
+              ghost_map_auth (ln_tx γ) 1 ∅ ∗ log_state bn γfs cov ls 0 ∅ ∅).
+
+    Lemma log_ghost_commit (e : mexpr) (Qs : list (iProp Σ)) L M ... :
+      thread_gen e = Some gen_id ->
+      log_ctx γ bn γfs cov ls dev -∗
+      log_quiet γ γfs cov ls L M -∗
+      riscv_sync_tok gen_id -∗
+      ([∗ list] Q ∈ Qs, riscv_sync_hook gen_id Q) -∗
+      (log_quiet γ γfs cov ls L M -∗ riscv_sync_tok gen_id -∗
+         ([∗ list] Q ∈ Qs, Q) -∗ mWP e) -∗
+      mWP e.
+
+   Proof: `wp_crash_fupd`; the seam (from the parked ghost law) turns
+   `▷ riscv_crash_pred` into `◇ ∃ gt_o, P_fs_any_at gt_o ∗ ▷ G gt_o`
+   (`P_fs_any_at` is timeless); `P_fs_rec_quiet_acc` at `L`, `M`; open
+   `fsbN` exactly as `eo_snap_law_of_auth` does (`exc_sealed_empty`,
+   `eo_cache_body_sub` or its `LogInv`-level twin; `C` is the byte view's
+   cache map, restricted to the home set by `eo_restrict_of_sub`); run
+   the ghost law at `⊤ ∖ ↑crashN ∖ ↑fsbN`; close in reverse.  Both
+   `eo_*` helpers used must move down to a file below `ProofEndOp` (or
+   be re-proved) -- `LogGhostCommit` must not import `ProofEndOp`.
+Acceptance: green; `fs-log.md` and `crash.md` paragraphs (the token's
+path, the hooked law, the second opener); this file's state block.
+Risks: (R1) the masks: `appN`, `ftopN`, `iregN`, `bitmapN`, `sbN`,
+`ipoolN`, `icEscN` disjoint from `crashN` and `fsbN` (all `nroot`
+children with distinct names -- `solve_ndisj`); (R3) the laters: the
+runner takes both claims under `▷`, the token bare.
+
+#### K3-4 -- the helping slot, the tail's flip, `sys_sync`'s contract (after K3-3)
+
+1. `iris/LogHelp.v` (below `LogInv`, imports `LogDefs`, `RiscvPtsto`):
+   `helpN := nroot .@ "loghelp"`, `help_tok γw := mono_nat_auth_own γw 1
+   0%nat`, and
+
+    Definition log_help γ (nc : mword 32) (out : nat) (cmt : bool) : iProp Σ :=
+      ∃ m : gmap nat (gname * mword 32),
+        ghost_map_auth (ln_help γ) 1 m ∗
+        [∗ map] w ↦ e ∈ m, ∃ Q : iProp Σ,
+          inv (helpN .@ w) (Q ∨ help_tok e.1) ∗
+          ((riscv_sync_hook gen_id Q ∗ ⌜e.2 = nc⌝ ∗ ⌜cmt = true \/ out ≠ 0%nat⌝)
+           ∨ help_tok e.1).
+
+   with `log_help_deposit` (at `cmt = true ∨ out ≠ 0`: allocate `γw`,
+   the escrow at the caller's `Q`, a fresh `w`; returns `w ↪[ln_help γ]
+   (γw, nc)` and the escrow's handle), `log_help_extract` (`log_help γ nc
+   out cmt -∗ ∃ Qs, ([∗ list] Q ∈ Qs, riscv_sync_hook gen_id Q) ∗
+   (([∗ list] Q ∈ Qs, Q) ={⊤}=∗ log_help γ nc' out' cmt')` for ANY `nc'
+   out' cmt'` -- every entry is `Done` afterwards), `log_help_collect`
+   (a waiter's fragment at `n0 ≠ nc` -∗ the entry is `Done`; delete it,
+   take the token, open the escrow: `▷ Q`), `log_help_cells` (the two
+   pure clauses are monotone in `out`'s growth and in `cmt := true`, so
+   `begin_op` and `end_op`'s non-final arm re-close by entailment).
+   `LogInv.log_res` gains `log_help γ nc out cmt` in BOTH arms (LAST
+   non-arm conjunct: the arm is the last existing conjunct, so the
+   pattern gains one name in every opener -- `ProofEndOp` ~1606/~4666,
+   `ProofBeginOp`, `ProofLogWrite`, `ProofInitlog`'s seal, `LogQuiet.
+   log_res_quiet_acc`); the seal starts it at `∅` from `log_free_tok`.
+2. `eo_tail`: after the re-acquire and before the `committing := 0`
+   store, `log_state_quiet_acc` on the batch, `log_help_extract` on the
+   checked-out `log_res`'s slot, `log_ghost_commit` at the `mWP Loop`
+   goal, the extract's return wand at `⊤`; then the stores as today.
+   `log_res` re-deposited with the token and the slot.
+3. `SpecSysSync.wp_sys_sync_sconf_body` gains `(oQ : option (iProp Σ))`,
+   the premise `hook_opt gen_id oQ` (`None => emp | Some Q =>
+   riscv_sync_hook gen_id Q`) and the post `Q_opt oQ` (`None => emp | Some
+   Q => Q`) beside the existing receipt (the bank stays; deleting the old
+   receipt is a later cleanup); header rewritten to design §4.3 item 4.
+   `ProofSysSync`: fast path (~1500) -- `log_res_quiet_acc`'s loan +
+   `log_ghost_commit [Q]` (at `oQ = None`, `Qs := []`); slow path --
+   `log_help_deposit` at the guard's `cmt ∨ out ≠ 0`, the loop invariant
+   carries the fragment and the escrow handle, the exit `bge` at `s2 ≠
+   a5` gives `n0 ≠ nc'` (sign-extension is injective), `log_help_collect`,
+   the `▷ Q` stripped by the next leaf's `▷ wp_next`.  `LinkSysSync`
+   follows; `ProofSyscall` arm 22 (~5813) passes `None`.
+Acceptance: green; `SpecSysSync`'s header states the new contract;
+`design/fs-log.md` names the slot; this file's state block.
+Risk (R2): `eo_tail` must reach `log_state_quiet_acc`'s premises on both
+paths -- `eo_open_to_batch ... (fun _ => []) ∅ M0 HM0hdr HM0row`
+(~5155, ~2750) is the batch at `n = 0` with a clean header; verify the
+tie row is over the whole home set there.
 
 ### Lane SY3-K4 -- arm 22 and `/sync` (after K3)
 
