@@ -51,6 +51,7 @@ Require Import ProcGeom.
 Require Import UexecRet.
 Require Import ExecEntry.
 Require Import UkRun UkRunSys.
+Require Import SyncHook.  (* [Q_opt]: the sync round's receipt *)
 Require Import UexecExecInst.
 Require Import WpUart.
 Require Import FsCfg.
@@ -1185,12 +1186,14 @@ Section UShURound.
 
   (* THE PAYMENT AT RAN: the lend is the round's credential at the block's
      head, and the deed moves from PRE to PEND at [RSyncRan] -- its step
-     is the identity *)
-  Lemma usync_ran_pay (I : list (bv 8)) :
+     is the identity.  AT ANY HOOK [oQ] (sync K4): the kernel's receipt
+     [Q_opt oQ] is [sync_pay]'s second premise, and this payment does not
+     spend it -- filing it on the ledger is lane SY3-A's. *)
+  Lemma usync_ran_pay (I : list (bv 8)) (oQ : option (iProp Σ)) :
     ul I = LSync -> (0 < nlines I)%nat ->
-    ⊢ UkSync.sync_pay (Wcu I 3%nat) (UkShFork.ushf_wq Wcu I).
+    ⊢ UkSync.sync_pay (Wcu I 3%nat) (Q_opt oQ) (UkShFork.ushf_wq Wcu I).
   Proof using .
-    intros Hul Hpos. rewrite /UkSync.sync_pay /UkShFork.ushf_wq. iIntros "Hc".
+    intros Hul Hpos. rewrite /UkSync.sync_pay /UkShFork.ushf_wq. iIntros "Hc _".
     iDestruct (uWcu_3_nw ug r s0 PT PD I ltac:(rewrite Hul; reflexivity) with "Hc") as "Hc".
     rewrite uWcf_S3. iDestruct "Hc" as "[Hc [Hd _]]".
     iApply (uWcu_of ug r s0 PT PD I 0%nat). rewrite uWcf_0. iRight. iFrame "Hc".
@@ -1218,7 +1221,9 @@ Section UShURound.
         (fun _ : Z => UkShFork.ushf_wq Wcu I) (Wcu I 3%nat).
   Proof using .
     intros Hul Hpos. iIntros "#Hdep #Hslot #Hkt".
-    iPoseProof (usync_ran_pay I Hul Hpos) as "#Hpay".
+    (* NO HOOK: the round deposits none (sync K4; the union's [Some Q] is
+       lane SY3-A's) *)
+    iPoseProof (usync_ran_pay I None Hul Hpos) as "#Hpay".
     iApply (UShExecPin.sh_exec_sup_x_of_entry (ghost_varG0 := offbox_offG)
               ucat_rows (FileDisc.uline_ws LSync) UShExecPin.sync_pl
               FsSyncPin.era0_sync_pins [FsImg.ROOTINO; FsSyncPin.SYNC_INO]
@@ -1230,7 +1235,7 @@ Section UShURound.
     iApply (UkSyncEntry.sync_image_entry (PS := uprogSG_free) (ghost_varG0 := offbox_offG)
               (FileDisc.uline_ws LSync) M sa t gn sts FsImg.ROOTINO cs pidv
               (fun _ : Z => UkShFork.ushf_wq Wcu I) (Wcu I 3%nat)
-              (fun k H => H) (fun _ _ => eq_refl) usync_ws_exec_ok Himg Hbytes Hlen
+              (fun _ _ => eq_refl) usync_ws_exec_ok Himg Hbytes Hlen
               with "Hpay Hnp Hdep").
   Qed.
 

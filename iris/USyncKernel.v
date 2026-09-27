@@ -48,6 +48,7 @@ Require Import UserFd.   (* [ufd_auth] -- the PROGRAM's own view of
                             its descriptor table, the authority for
                             which rides inside [urun] *)
 Require Import UexecSG.   (* [uexecSG] / [uprogSG]: the ARM deposit class *)
+Require Import SyncHook.  (* [hook_opt]: the entry deposits none *)
 
 Section USyncKernel.
   Context `{!riscvGS Σ}.
@@ -192,17 +193,20 @@ Section USyncKernel.
     iApply (uslot_of_urun W 4 (fun _ => True)%I
               Hal8 ltac:(lia) Hdata Hfdlen
               Hstop Hlzf Hscf with "Hdep Hnpw Hpay").
-    (* sync makes no descriptor call, so its ledger is dropped here *)
-    (* sync makes no descriptor call and no chdir, so its ledger and its
-       working directory are both dropped here *)
-    iIntros (N h) "%Hpayeq %Hsz Hszf #Ht _ _ _ _ Hrun".
+    (* sync makes no descriptor call, so its ledger is dropped here; its
+       working directory's fragment goes to the ecall leaf *)
+    iIntros (N h) "%Hpayeq %Hsz Hszf #Ht _ Hcwf _ _ Hrun".
     pose proof (Hpayeq : UkRun.ukn_triv N) as Hti.
     pose proof (UkRun.ukn_const_of_triv N Hti) as Hc.
     rewrite Hpc.
-    iApply (wp_ksync_start N Hpsok_free h (tf_resume_gpr0 (uvis_tf W))
+    (* NO HOOK at the generic entry (sync K4): the leaf at [None] is the
+       quiet one, at any instance ([UkSync.ksync_leaf_none]) *)
+    iApply (wp_ksync_start N None h (tf_resume_gpr0 (uvis_tf W))
               (tf_resume_gpr0 (uvis_tf W) !!! Regidx csp_rs1) 0 True%I
-              eq_refl with "[] [//] [] Hrun").
+              (uvis_cwd W) eq_refl with "[] [] [] Hcwf [//] [] Hrun").
     - iApply (sync_code_of_text (ukn_t N) (uvis_M W) (uvis_perm W) Hsub Hx with "Ht").
+    - iApply (ksync_leaf_none N Hpsok_free).
+    - cbv [hook_opt]. by iEmpIntro.
     - rewrite Hti. iApply sync_pay_triv.
   Qed.
 

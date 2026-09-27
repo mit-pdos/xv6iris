@@ -169,7 +169,8 @@ Section UkReadPipe.
        rf_pq     := Rp;
        rf_pqe    := Rpe;
        wf_Qe     := wf_Qe f0;
-       cl_P      := cl_P f0 |}.
+       cl_P      := cl_P f0;
+       sy_oQ     := sy_oQ f0 |}.
 
   (* =================================================================== *)
   (*  2.  THE DEPOSIT'S SUPPLIER: THE PIPE'S REAL PAYMENT                  *)

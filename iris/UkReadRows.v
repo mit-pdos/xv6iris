@@ -129,7 +129,8 @@ Section UkReadRows.
        rf_pq    := fun _ => True%I;
        rf_pqe   := fun _ _ => True%I;
        wf_Qe    := fun _ _ => True%I;
-       cl_P     := True%I |}.
+       cl_P     := True%I;
+       sy_oQ    := None |}.
 
   (* THE INODE MEMBER: [rf_F] is the observation commit's receipt, and the
      two console fields are the unit. *)
@@ -183,7 +184,8 @@ Section UkReadRows.
        rf_pq    := fun _ => True%I;
        rf_pqe   := fun _ _ => True%I;
        wf_Qe    := fun _ _ => True%I;
-       cl_P     := True%I |}.
+       cl_P     := True%I;
+       sy_oQ    := None |}.
 
   (* =================================================================== *)
   (*  2.  THE PAIR                                                        *)

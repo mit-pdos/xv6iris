@@ -146,7 +146,8 @@ Section UkWritePipe.
        rf_pq     := rf_pq f0;
        rf_pqe    := rf_pqe f0;
        wf_Qe     := Qe;
-       cl_P      := cl_P f0 |}.
+       cl_P      := cl_P f0;
+       sy_oQ     := sy_oQ f0 |}.
 
   (* =================================================================== *)
   (*  2.  THE DEPOSIT'S SUPPLIER: THE PIPE'S REAL PAYMENT                  *)

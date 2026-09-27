@@ -109,7 +109,18 @@ merge.  Cleanups left for a later sweep (none blocking): the old
 with its later kept and belongs there; the trivial `Tk`/`Hk` values are
 spelled inside two adequacy statements (`xv6_power_adequacy_xv6Σ`,
 `xv6_app_adequacy`) until SY3-A moves them onto the `App` record.
-K4 in flight (branch `sync3-k4`, worktree `/shared/xv6iris-3k`).
+K4 LANDED ON BRANCH `sync3-k4` (not yet merged): `iris/SyncHook.v`
+(`hook_opt`/`Q_opt`, re-exported by `SpecSysSync`); `xfam.sy_oQ`, rows 22
+of `xv6_sbundle`/`xv6_spost` and their four readers, `xfam_sy`;
+`sysc_num_nofs` excludes 22; `sysc_dep_sync`/`sysc_out_sync`, and arm 22
+passes the process's `sy_oQ fdep`; `UkSync.sync_pay P Qr R`,
+`ksync_leaf` (the ecall as a parameter) with `ksync_leaf_none`, and
+`wp_ksync_sync/main/start` at `oQ`; `UkSyncEntry.ksync_leaf_xv6` (every
+`oQ`); `usync_ran_pay I oQ`.  OPEN (owner's call, SY3-A): the entry and the
+round deposit `None` -- `image_entry` and `sh_exec_sup_echo_at` are `□`,
+so a linear `hook_opt gen_id oQ` premise on `sync_image_entry` /
+`usync_exec_sup` is unprovable at `Some Q`; the hook has to ride the lend
+(`Pay`, i.e. the round's `Cr`).
 
 #### K3-1 -- custody (new leaf `iris/HartCustody.v`; parallel with K3-2)
 

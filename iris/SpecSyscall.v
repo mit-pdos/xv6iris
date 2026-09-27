@@ -647,9 +647,12 @@ Section SyscExec.
   (* ...AND pipe (4) AND close (21) ARE IN IT TOO (design/pipe.md, "The byte
      queue"): pipe's post hands the process the new pipe's fragment, close's
      the answer to its close payment. *)
+  (* ...AND sync (22) IS IN IT (sync K4): its post hands the process the
+     hook's [Q] back ([SyncHook.Q_opt] of the families' [sy_oQ]), so its
+     arm pays the row itself ([ProofSyscall.sysc_out_sync]). *)
   Definition sysc_num_nofs (k : Z) : Prop :=
     ~ (k = 5 \/ k = 9 \/ k = 15 \/ k = 16 \/ k = 17 \/ k = 18 \/ k = 19
-       \/ k = 20 \/ k = 7 \/ k = 4 \/ k = 21).
+       \/ k = 20 \/ k = 7 \/ k = 4 \/ k = 21 \/ k = 22).
 
   Lemma sysc_sys_out_quiet (U : ustate) (sts : list fdstate) (gn : gname)
       (cs : gset gname) (pid : mword 32) (f : sfam)

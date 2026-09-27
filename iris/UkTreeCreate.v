@@ -247,7 +247,8 @@ Section UkTreeCreate.
        rf_pq    := fun _ => True%I;
        rf_pqe   := fun _ _ => True%I;
        wf_Qe    := fun _ _ => True%I;
-       cl_P     := True%I |}.
+       cl_P     := True%I;
+       sy_oQ    := None |}.
 
   (* THE OWNER'S CURSOR, and it is PURE at a parent prefix of length zero:
      the walk reads no claim law at all ([FsAbsEra.ep_hops_from] is the

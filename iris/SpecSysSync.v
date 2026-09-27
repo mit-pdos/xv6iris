@@ -45,8 +45,15 @@
        instruction.  One commit suffices: a waiter depositing while a commit
        is in flight does so after that commit's collection, and commits are
        serialised.
-   The syscall dispatcher's arm 22 passes [None]; [/sync] will pass its
-   ledger's [Some Q] (lane SY3-K4).
+   The syscall dispatcher's arm 22 passes the PROCESS's hook through: the
+   deposit's row 22 ([UexecExecInst.xv6_sbundle]) is [hook_opt gen_id
+   (sy_oQ f)] and the post's row 22 ([xv6_spost]) is [Q_opt (sy_oQ f)], at
+   the families [f] the process deposited ([ProofSyscall.sysc_arm_sync],
+   through [sysc_dep_sync] / [sysc_out_sync]).  A process that deposits no
+   hook sits at [sy_oQ f = None], where both rows are [emp] -- so 22 stays a
+   free number ([UexecSG.free_num]).  [/sync]'s ecall leaf
+   ([UkSync.ksync_leaf]) is discharged at any [oQ] at the xv6 instance
+   ([UkSyncEntry.ksync_leaf_xv6]); the union's [Some Q] is lane SY3-A's.
 
    THE WAL'S (the old receipt): the caller hands in its invocation-time
    batch witness [log_epoch_lb γ e] and gets [flushed_sync γ e] back beside
@@ -199,6 +206,7 @@ Require Import Xv6G.   (* the ghost-state bundle; see its header *)
    CONSUMER of the receipt composes with. *)
 Require Import FsDurSnap.      (* [snap_holds] -- the commit's certificate *)
 Require Import FsFlushedCore.  (* [flushed] -- the receipt itself          *)
+Require Export SyncHook.       (* [hook_opt] / [Q_opt] -- the optional hook *)
 Require Import CtxIdDefs.
 Import Defs.
 
@@ -273,14 +281,9 @@ Section sys_sync.
     iExists b, D. iSplitL; [iExact "Hf" | by iPureIntro].
   Qed.
 
-  (* THE OPTIONAL HOOK AND ITS RECEIPT (sync K3-4).  At [None] both are
-     [emp] (the dispatcher's arm 22); at [Some Q] the caller hands in the
-     era's hook at [Q] and gets [Q] back, fired once at a ghost commit. *)
-  Definition hook_opt (gen : nat) (oQ : option (iProp Σ)) : iProp Σ :=
-    (match oQ with None => emp | Some Q => riscv_sync_hook gen Q end)%I.
-
-  Definition Q_opt (oQ : option (iProp Σ)) : iProp Σ :=
-    (match oQ with None => emp | Some Q => Q end)%I.
+  (* THE OPTIONAL HOOK AND ITS RECEIPT (sync K3-4), [hook_opt] and [Q_opt],
+     are [SyncHook]'s: the process tier states the same pair and must not
+     import this file. *)
 
   (* the caller's witness is always obtainable, so the contract's premise
      costs nothing: a client with no operation history takes it at zero. *)

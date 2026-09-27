@@ -3414,6 +3414,18 @@ Section SyscallArms.
     rewrite (list_lookup_total_correct _ _ _ Hv0). iExact "H".
   Qed.
 
+  (* ...AND SYNC'S (sync K4): the process's optional hook, at the families
+     it deposited -- [emp] at [sy_oQ f = None] *)
+  Lemma sysc_dep_sync (U : ustate) (sts : list fdstate) (gn : gname) (cs : gset gname)
+      (pid : mword 32) (f : sfam) :
+    sysc_num (us_V U) = 22 ->
+    sysc_sys_in U sts gn cs pid f -∗ hook_opt gen_id (sy_oQ f).
+  Proof using .
+    intros Hn. iIntros "H".
+    iDestruct (sysc_sys_in_at U sts gn cs pid f 22 Hn ltac:(vm_compute; discriminate) with "H") as "H".
+    iApply (sbundle_at_sync_elim uslot f _ with "H").
+  Qed.
+
   Lemma sysc_dep_chdir (U : ustate) (sts : list fdstate) (gn : gname) (cs : gset gname)
       (pid : mword 32) (f : sfam) :
     sysc_num (us_V U) = 9 ->
@@ -3700,6 +3712,22 @@ Section SyscallArms.
     iApply (spost_at_close_intro uslot f (uvis_of U sts gn cs pid) r M' sts' cw' cs').
     rewrite /uvis_of /tf_w. cbn [uvis_tf uvis_fd].
     rewrite (list_lookup_total_correct _ _ _ Hv0). iExact "H".
+  Qed.
+
+  (* ...AND SYNC'S (sync K4): the hook's [Q], back at the same families *)
+  Lemma sysc_out_sync (U : ustate) (sts : list fdstate) (gn : gname) (cs : gset gname)
+      (pid : mword 32) (f : sfam) (r : mword 64) (M' : gmap Z (bv 8))
+      (sts' : list fdstate) (cw' : Z) (cs' : gset gname) :
+    sysc_num (us_V U) = 22 ->
+    Q_opt (sy_oQ f) -∗
+    sysc_sys_out U sts gn cs pid f r M' sts' cw' cs'.
+  Proof using .
+    intros Hn. iIntros "H".
+    iApply (sysc_sys_out_at U sts gn cs pid f r M' sts' cw' cs' 22 Hn
+              ltac:(vm_compute; discriminate)
+              ltac:(vm_compute; discriminate)).
+    iApply (spost_at_sync_intro uslot f (uvis_of U sts gn cs pid) r M' sts' cw' cs'
+              with "H").
   Qed.
 
   Lemma sysc_out_pipe (U : ustate) (sts : list fdstate) (gn : gname) (cs : gset gname)
@@ -5782,7 +5810,12 @@ Section SyscallArms.
      interior [sleep] needs; no process block, no bitmap, no allowance.  The
      log's names are [fn]'s own, which is what [sysc_proc_ties] makes the
      ambient ones.  The only thing the arm builds is the contract's batch
-     witness, at zero, and the only thing it discards is the receipt. *)
+     witness, at zero, and the only thing it discards is the WAL's receipt.
+     THE HOOK IS THE PROCESS'S (sync K4): the deposit's row 22 is
+     [hook_opt gen_id (sy_oQ fdep)] ([sysc_dep_sync]), handed to the
+     contract as it stands, and the [Q_opt (sy_oQ fdep)] the contract
+     returns goes back on the post's row 22 ([sysc_out_sync]) -- as close's
+     payment and its answer do. *)
   Lemma sysc_arm_sync (γf : gname) (γw : gname) (pj : mword 64)
       (γs : list gname) (j : nat) (γl : gname)
       (fn : fclose_names) (dqi : dfrac) (ip : mword 64)
@@ -5795,7 +5828,7 @@ Section SyscallArms.
     intros Hj Hgamma Hpj HMsp HMs2 HMra HMother Hav Hgnq Hpidt Hnum.
     subst pj.
     iIntros "(Hpc & Hcg & Hcpu & #Htext & #Hprocs & #Henv & Hbs & Hip & Hfd & Hir & Hpriv & Hufrag & Hrow & #Hwl)".
-    iIntros "Hra Hs0 Hs1 Hs2 #Hdata Hcont _ _ Hdep".
+    iIntros "Hra Hs0 Hs1 Hs2 #Hdata Hcont Hxin _ Hdep".
     iDestruct "Hcont" as "[Hcont _]".
     assert (Hpce : (mword_of_int (sysc_target 22) : mword 64)
                    = mword_of_int KernelSyms.sys_sync) by reflexivity.
@@ -5817,15 +5850,15 @@ Section SyscallArms.
     iApply fupd_wp.
     iMod (sync_witness_0 icfg_log) as "#Hlb".
     iModIntro.
+    (* THE PROCESS'S HOOK, out of its own deposit (sync K4) *)
+    iDestruct (sysc_dep_sync U sts gn cs pid fdep
+                 ltac:(rewrite Hnum; reflexivity) with "Hxin") as "Hhook".
     iApply (SysSync.wp_sys_sync_sconf γs j γl fsc_bio icfg_log fsc_fs
               fsc_cov fsc_logst icfg_dev
-              M (av - 4)%nat true true ∅ 0%nat None
+              M (av - 4)%nat true true ∅ 0%nat (sy_oQ fdep)
               ltac:(lia) Hj Hgamma (locks_below_empty "log")
-              with "Hcg Hcpu Htcx Hccx Htext Hpc Hlog Hlb [] Hprocs").
-    { (* NO HOOK at the dispatcher (sync K3-4): [hook_opt gen_id None] is
-         [emp], and so is the [Q_opt None] dropped below *)
-      rewrite /hook_opt /=. done. }
-    iIntros (CIDy Hsy mf) "%Hcs %Hr0 Hcg Hcpu _ _ _ _ Hpc".
+              with "Hcg Hcpu Htcx Hccx Htext Hpc Hlog Hlb Hhook Hprocs").
+    iIntros (CIDy Hsy mf) "%Hcs %Hr0 Hcg Hcpu _ _ _ HQo Hpc".
     assert (Hmfsp : mf !!! Regidx csp_rs1 = pa_stk (m !!! Regidx csp_rs1) 4).
     { rewrite (callee_saved_lookup Hcs csp_rs1 ltac:(vm_compute; reflexivity)). exact HMsp. }
     assert (Hmfs2 : mf !!! Regidx Rs2 = page_base (ud_tfp (pv_upt (us_V U)))).
@@ -5874,14 +5907,16 @@ Section SyscallArms.
                     unfold UsysMemOk.USYS_getpid in *; lia)
               (* ...and the mask row: not seccomp's number, so the mask is kept *)
               ltac:(sysc_secc_quiet Hnum)
-              with "Hcg Hcpu Htext Hra Hs0 Hs1 Hs2 Hbs Hip Hfd Hir Henv Hpriv Hufrag Hrow Hpc Hcont [] [] [] []").
+              with "Hcg Hcpu Htext Hra Hs0 Hs1 Hs2 Hbs Hip Hfd Hir Henv Hpriv Hufrag Hrow Hpc Hcont [] [] [] [HQo]").
     (* fork answers nothing at this entry: not its number *)
     { iApply sysc_fork_out_ne. unfold UsysMemOk.USYS_fork in *; lia. }
     (* ...and wait answers nothing here either *)
     { iApply sysc_wait_out_ne. unfold UsysMemOk.USYS_wait in *; lia. }
     iApply (sysc_exec_out_ne _ _ _ _ _ _ _ _ (sysc_num_ne7 _ _ Hnum eq_refl)).
-    iApply (sysc_sys_out_quiet U sts gn cs pid fdep _ _ _ _ _ _ Hnum
-              ltac:(unfold sysc_num_nofs; lia)).
+    (* sync(22) IS A CONTRACTED NUMBER now (sync K4): what goes back is the
+       hook's [Q] *)
+    iApply (sysc_out_sync U sts gn cs pid fdep _ _ _ _ _
+              ltac:(rewrite Hnum; reflexivity) with "HQo").
   Qed.
 
   (* ------------------------------------------------------------------- *)

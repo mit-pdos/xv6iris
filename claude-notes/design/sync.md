@@ -104,19 +104,41 @@ with a newline, `UkSh.ush_uline_head_nonnl`).
   `demo_sync_ok`/`demo_sync_cat` (`echo hi > a.txt; sync; cat a.txt` prints
   `hi`); NEGATIVE `demo_sync_only` (the four and nothing else, at every
   state), `demo_sync_neg`, `demo_sync_neg_x`.
-- **The program.**  `UkSync.wp_ksync_start` runs at a status-independent
-  payload, handed `P` and `sync_pay P (ukn_pay N (-1))`, which `main`
-  spends AFTER `sync()` returned -- SY3's durability receipt is a second
-  premise of `sync_pay`.  `UShSync` is `UShSecc`'s geometry at /sync;
-  `UkSyncEntry.sync_image_entry` takes any lend `P`, any status-independent
-  payload `Q` and `□ sync_pay P (Q (-1))`.  /sync is the seventh pin of the
+- **The row.**  Syscall 22 has a deposit and a post like every contracted
+  number: `UexecExecInst.xfam`'s last field `sy_oQ : option (iProp Σ)`
+  (`None` at every generic builder; `xfam_sy oQ f` sets it), the deposit's
+  row `hook_opt gen_id (sy_oQ f)` and the post's `Q_opt (sy_oQ f)`
+  (`SyncHook.v`, the one place both tiers can name them; both `emp` at
+  `None`, so 22 stays in `UexecSG.free_num`).  Readers
+  `sbundle_at_sync_elim`/`_intro`, `spost_at_sync_intro`/`_elim`.  The
+  dispatcher's arm (`ProofSyscall.sysc_arm_sync`) hands the process's hook
+  to `sys_sync` (`sysc_dep_sync`) and its `Q` back on the post
+  (`sysc_out_sync`); `SpecSyscall.sysc_num_nofs` excludes 22.
+- **The program.**  `UkSync.wp_ksync_start oQ` runs at a
+  status-independent payload, handed the lend `P`, the hook
+  `hook_opt gen_id oQ`, the cwd fragment, the ECALL LEAF `ksync_leaf oQ`
+  and `sync_pay P (Q_opt oQ) (ukn_pay N (-1))` (`sync_pay P Qr R := P -∗
+  Qr -∗ R`), which `main` spends AFTER `sync()` returned, on the kernel's
+  receipt.  The leaf is a PARAMETER because the program is stated at the
+  abstract `uexecSG` and 22's rows are the instance's: `ksync_leaf_none`
+  discharges it at `None` at any instance (22 is free; the quiet leaf),
+  `UkSyncEntry.ksync_leaf_xv6` at every `oQ` at the xv6 instance (the
+  receipt-keeping quiet leaf, supplier `udepwf_at` over `xfam_sy oQ
+  (xfam_at (ukn_pay N) xfam_pt)` out of the hook alone).  `UShSync` is
+  `UShSecc`'s geometry at /sync; `UkSyncEntry.sync_image_entry` takes any
+  lend `P`, any status-independent payload `Q` and `□ sync_pay P (Q_opt
+  None) (Q (-1))`: the entry deposits NO hook, because `image_entry` is a
+  `□` and a linear hook can reach the program only through the lend `Pay`
+  (SY3-A's to shape).  /sync is the seventh pin of the
   fixed part (`FsSyncPin`, inum 22, in `FileFsPure.file_fs_pure`; every
   write/unarm lemma threads `i <> SYNC_INO`), resolved by
   `UShExecPin.sh_sync_pin_resolves`/`sh_sync_slot`.
 - **The round** (`UShURound.uHchild_sync`): an EXEC line with no redirect,
   every alternative the identity, so the lend `Wcu I 3` goes to /sync
-  whole and `usync_ran_pay` pays PEND at `RSyncRan` (the deed PRE -> PEND,
-  the block owed whole; sh files RAN at its `$`, as for `RFRan sel`).  The
+  whole and `usync_ran_pay I oQ` pays PEND at `RSyncRan` (the deed PRE ->
+  PEND, the block owed whole; sh files RAN at its `$`, as for `RFRan
+  sel`) at any receipt `Q_opt oQ`, which it does not spend; the round
+  passes `None` (`usync_exec_sup`).  The
   exec failure (`usync_execfail_law`) and the out-of-memory death
   (`uHoom`) are the record's blocks beside the deed as found.  Dispatched
   at `LSync` by `UkShPipeForkTwin.wp_kshm_body_pipe_nc` in

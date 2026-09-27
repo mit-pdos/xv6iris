@@ -49,19 +49,22 @@ Require Import UserFd.   (* [ufd_auth] -- the PROGRAM's own view of
                             its descriptor table, the authority for
                             which rides inside [urun] *)
 Require Import UexecSG.   (* [uexecSG] / [uprogSG]: the ARM deposit class *)
+Require Import SyncHook.  (* [hook_opt] / [Q_opt]: sync()'s optional hook *)
 
 (* THE PAYMENT /sync MAKES, AND WHEN (claude-notes/design/sync.md section
    3).  The process is handed [P] at its entry and owes its parent the
-   payload [R] at its exit; [sync_pay P R] is what turns the one into the
-   other, and it is spent in [main] AFTER [sync()] returned -- the one
-   point of the program at which the call's effect is complete.  At a
-   trivial payload it is free ([sync_pay_triv]); the union's round pays
-   PEND at RAN with it ([UkSyncEntry]).  SY3 adds the kernel's durability
-   receipt here, as a second premise. *)
-Definition sync_pay {PROP : bi} (P R : PROP) : PROP := (P -∗ R)%I.
+   payload [R] at its exit; [sync_pay P Qr R] is what turns the one into
+   the other, and it is spent in [main] AFTER [sync()] returned -- the one
+   point of the program at which the call's effect is complete.  ITS SECOND
+   PREMISE IS THE KERNEL'S DURABILITY RECEIPT (sync K4): [Qr] is what the
+   call handed back -- [SyncHook.Q_opt oQ] at the hook [main] deposited
+   ([ksync_leaf]) -- so a payment may spend what the sync made durable.
+   At a trivial payload it is free ([sync_pay_triv]); the union's round
+   pays PEND at RAN with it ([UkSyncEntry]). *)
+Definition sync_pay {PROP : bi} (P Qr R : PROP) : PROP := (P -∗ Qr -∗ R)%I.
 
-Lemma sync_pay_triv {PROP : bi} (P : PROP) : ⊢ sync_pay P True.
-Proof. rewrite /sync_pay. iIntros "_". done. Qed.
+Lemma sync_pay_triv {PROP : bi} (P Qr : PROP) : ⊢ sync_pay P Qr True.
+Proof. rewrite /sync_pay. iIntros "_ _". done. Qed.
 
 Section UkSync.
   Context `{!riscvGS Σ}.
@@ -115,6 +118,63 @@ Section UkSync.
   Local Notation a0_idx := (mword_of_int 10 : mword 5).
   Local Notation a7_idx := (mword_of_int 17 : mword 5).
 
+  (* ------------------------------------------------------------------- *)
+  (* THE ECALL LEAF, AS A PARAMETER (sync K4; the mould is                  *)
+  (* [UkInit.uki_mknod_leaf]).  sync's one returning syscall is 22, whose   *)
+  (* deposit and post are the OPTIONAL HOOK and its receipt                 *)
+  (* ([UexecExecInst.xv6_sbundle] / [xv6_spost], row 22) -- rows only the   *)
+  (* xv6 instance can read, while this file is stated at the abstract       *)
+  (* [uexecSG].  So the ecall at 0x36a is a CONTRACT here: the run at the   *)
+  (* ecall's pc with a7 = 22, the cwd fragment (the instance's supplier     *)
+  (* fixes its deposit at the cwd, [UkRun.udepwf_at]) and the hook in; the  *)
+  (* run after the ecall with the hook's [Q] and the fragment out.          *)
+  (* [ksync_leaf_none] discharges it at [None] here, at any instance; the  *)
+  (* xv6 instance discharges it at every [oQ]                               *)
+  (* ([UkSyncEntry.ksync_leaf_xv6]).                                         *)
+  (* ------------------------------------------------------------------- *)
+  Definition ksync_leaf (oQ : option (iProp Σ)) : iProp Σ :=
+    (∀ (h : CpuId) (m : regfile) (avail : nat) (c : Z),
+       ⌜usysno m = 22⌝ -∗
+       sync_code γt -∗
+       urun N h m (mword_of_int 0x36a) avail -∗
+       UserCwd.ucwd γcwd c -∗
+       hook_opt gen_id oQ -∗
+       (∀ (h' : CpuId) (r : mword 64),
+          Q_opt oQ -∗
+          UserCwd.ucwd γcwd c -∗
+          urun N h' (<[Regidx a0_idx := r]> m) (mword_of_int 0x36e) avail -∗
+          mWP (Loop : expr riscv_lang)) -∗
+       mWP (Loop : expr riscv_lang))%I.
+
+  (* ...AT [None], at any instance: 22 is a FREE number
+     ([UexecSG.free_num]), so the deposit is minted from nothing and the
+     QUIET leaf walks the ecall; the hook and the receipt are both [emp]. *)
+  Lemma ksync_leaf_none : ⊢ ksync_leaf None.
+  Proof using Hpsok_free.
+    iIntros (h m avail c Hn) "#Hcode Hrun Hcwd _ Hcont".
+    iApply (wp_uk_ecall_quiet N h m (mword_of_int 0x36a) 22 avail Hn
+              ltac:(discriminate) ltac:(discriminate)
+              ltac:(discriminate) ltac:(discriminate)
+              ltac:(discriminate) ltac:(discriminate)
+              ltac:(discriminate) ltac:(discriminate)
+              (* ...and the three descriptor-moving numbers, and chdir *)
+              ltac:(discriminate) ltac:(discriminate) ltac:(discriminate)
+              ltac:(discriminate)
+              ltac:(lia) ltac:(discriminate)
+              ltac:(vm_compute; reflexivity)
+              with "[] Hrun []").
+    { iApply (uis_sync_36a with "Hcode"). }
+    { iApply udepw_of_psok; [ apply Hpsok_free; free_lit | ];
+      (discriminate || assumption || (vm_compute; discriminate)). }
+    assert (E36a : add_vec_int (mword_of_int 0x36a : mword 64) 4
+                   = mword_of_int 0x36e)
+      by (apply bv_eq; vm_compute; reflexivity).
+    rewrite E36a.
+    iIntros (h2 ret) "Hrun".
+    iApply ("Hcont" $! h2 ret with "[] Hcwd Hrun").
+    cbv [Q_opt]. by iEmpIntro.
+  Qed.
+
 
   (* ------------------------------------------------------------------- *)
   (* exit @0x2c8: c.li a7,2; ecall.  DIVERGES -- the exit arm of the       *)
@@ -163,20 +223,27 @@ Section UkSync.
   (* sync @0x368: c.li a7,22; ecall; c.jr ra.  RETURNS.  SYS_sync is 22,   *)
   (* whose [usys_mem_ok] row is the QUIET one, so the heap crosses the     *)
   (* trap INTACT -- and so does [avail], since the kernel does not move sp.*)
+  (* The ecall is the LEAF's ([ksync_leaf]): the hook goes in, and what    *)
+  (* comes back to the continuation is its receipt [Q_opt oQ].            *)
   (* ------------------------------------------------------------------- *)
-  Lemma wp_ksync_sync (h : CpuId) (m : regfile) (avail : nat) :
+  Lemma wp_ksync_sync (oQ : option (iProp Σ)) (h : CpuId) (m : regfile)
+      (avail : nat) (c : Z) :
     is_aligned_vaddr (Virtaddr (m !!! Regidx ra_idx)) 2 = true ->
     sync_code γt -∗
+    ksync_leaf oQ -∗
+    hook_opt gen_id oQ -∗
+    UserCwd.ucwd γcwd c -∗
     urun N h m (mword_of_int SyncSyms.sync) avail -∗
     (∀ (h' : CpuId) (ret : mword 64),
+       Q_opt oQ -∗
        urun N h'
          (<[Regidx a0_idx := ret]>
             (<[Regidx a7_idx := (mword_of_int 22 : mword 64)]> m))
          (m !!! Regidx ra_idx) avail -∗
        mWP (Loop : expr riscv_lang)) -∗
     mWP (Loop : expr riscv_lang).
-  Proof using Hpsok_free.
-    intros Hret2. iIntros "#Hcode Hrun Hcont".
+  Proof using .
+    intros Hret2. iIntros "#Hcode Hleaf Hhook Hcwd Hrun Hcont".
     destruct sync_syms_pins as (Hsmain & Hsstart & Hsexit & Hssync).
     rewrite Hssync.
     (* 0x368  c.li a7,22 *)
@@ -196,29 +263,14 @@ Section UkSync.
     rewrite E368 Em.
     iIntros (h1) "Hrun".
     set (m1 := <[Regidx a7_idx := (mword_of_int 22 : mword 64)]> m).
-    (* 0x36a  ecall -- the QUIET row *)
-    iApply (wp_uk_ecall_quiet N h1 m1 (mword_of_int 0x36a) 22 avail
-              ltac:(unfold m1, usysno;
-                    rewrite (upd_eq m (Regidx a7_idx) (mword_of_int 22 : mword 64));
-                    vm_compute; reflexivity)
-              ltac:(discriminate) ltac:(discriminate)
-              ltac:(discriminate) ltac:(discriminate)
-              ltac:(discriminate) ltac:(discriminate)
-              ltac:(discriminate) ltac:(discriminate)
-              (* ...and the three descriptor-moving numbers, and chdir *)
-              ltac:(discriminate) ltac:(discriminate) ltac:(discriminate)
-              ltac:(discriminate)
-              ltac:(lia) ltac:(discriminate)
-              ltac:(vm_compute; reflexivity)
-              with "[] Hrun []").
-    { iApply (uis_sync_36a with "Hcode"). }
-    { iApply udepw_of_psok; [ apply Hpsok_free; free_lit | ];
-      (discriminate || assumption || (vm_compute; discriminate)). }
-    assert (E36a : add_vec_int (mword_of_int 0x36a : mword 64) 4
-                   = mword_of_int 0x36e)
-      by (apply bv_eq; vm_compute; reflexivity).
-    rewrite E36a.
-    iIntros (h2 ret) "Hrun".
+    (* 0x36a  ecall -- THE LEAF: the hook in, its receipt out *)
+    assert (Hn1 : usysno m1 = 22).
+    { unfold m1, usysno.
+      rewrite (upd_eq m (Regidx a7_idx) (mword_of_int 22 : mword 64)).
+      vm_compute; reflexivity. }
+    iApply ("Hleaf" $! h1 m1 avail c with "[%] Hcode Hrun Hcwd Hhook");
+      [ exact Hn1 | ].
+    iIntros (h2 ret) "HQ _ Hrun".
     set (m2 := <[Regidx a0_idx := ret]> m1).
     (* 0x36e  c.jr ra -- neither insert touches ra *)
     assert (Hra : m2 !!! Regidx ra_idx = m !!! Regidx ra_idx).
@@ -236,7 +288,7 @@ Section UkSync.
                     exact (update_bit0_zero_of_aligned2 _ Hret2))
               with "[] Hrun").
     { iApply (uis_sync_36e with "Hcode"). }
-    iIntros (h3) "Hrun". iApply ("Hcont" $! h3 ret with "Hrun").
+    iIntros (h3) "Hrun". iApply ("Hcont" $! h3 ret with "HQ Hrun").
   Qed.
 
   (* ------------------------------------------------------------------- *)
@@ -253,15 +305,20 @@ Section UkSync.
   (* ------------------------------------------------------------------- *)
   (* main @0x00: prologue, jal sync, c.li a0,0, jal exit.  DIVERGES.       *)
   (* ------------------------------------------------------------------- *)
-  Lemma wp_ksync_main (h : CpuId) (m : regfile) (sp0 : mword 64) (n : nat)
-      (P : iProp Σ) :
+  (* THE HOOK AND THE LEAF COME IN BESIDE THE LEND (sync K4): [main]
+     deposits [hook_opt gen_id oQ] at its [sync()] and spends the receipt
+     [Q_opt oQ] in its payment, after the call returned.  The cwd fragment
+     is the leaf's ([ksync_leaf]). *)
+  Lemma wp_ksync_main (oQ : option (iProp Σ)) (h : CpuId) (m : regfile)
+      (sp0 : mword 64) (n : nat) (P : iProp Σ) (c : Z) :
     m !!! Regidx csp_rs1 = sp0 ->
     sync_code γt -∗
-    P -∗ sync_pay P (ukn_pay N (-1)) -∗
+    ksync_leaf oQ -∗ hook_opt gen_id oQ -∗ UserCwd.ucwd γcwd c -∗
+    P -∗ sync_pay P (Q_opt oQ) (ukn_pay N (-1)) -∗
     urun N h m (mword_of_int SyncSyms.main) (2 + n) -∗
     mWP (Loop : expr riscv_lang).
-  Proof using Hpay Hpsok_free.
-    intros Hsp. iIntros "#Hcode HP Hsp Hrun".
+  Proof using Hpay.
+    intros Hsp. iIntros "#Hcode Hleaf Hhook Hcwd HP Hsp Hrun".
     (* the free stack the run already owns says sp is aligned and has room *)
     iDestruct (urun_stack with "Hrun") as %[Hal8' Hroom'].
     rewrite Hsp in Hal8', Hroom'.
@@ -354,13 +411,14 @@ Section UkSync.
     assert (Hra3 : m3 !!! Regidx ra_idx = mword_of_int 0xc)
       by exact (upd_eq m2 (Regidx ra_idx)
                   (regval_into_reg (mword_of_int 0xc : mword 64))).
-    iApply (wp_ksync_sync h5 m3 n
+    iApply (wp_ksync_sync oQ h5 m3 n c
               ltac:(rewrite Hra3; vm_compute; reflexivity)
-              with "[] Hrun").
+              with "[] Hleaf Hhook Hcwd Hrun").
     { iExact "Hcode". }
-    iIntros (h6 ret) "Hrun".
-    (* sync() RETURNED: the payment is made here and nowhere earlier *)
-    iDestruct ("Hsp" with "HP") as "Hpay".
+    iIntros (h6 ret) "HQ Hrun".
+    (* sync() RETURNED: the payment is made here and nowhere earlier, and
+       it spends the call's receipt *)
+    iDestruct ("Hsp" with "HP HQ") as "Hpay".
     rewrite Hra3.
     set (m4 := <[Regidx a0_idx := ret]>
                  (<[Regidx a7_idx := (mword_of_int 22 : mword 64)]> m3)).
@@ -403,15 +461,16 @@ Section UkSync.
   (* old proof did this with [uk_stack_split] plus a re-derivation of the   *)
   (* stack facts at each updated image.                                     *)
   (* ------------------------------------------------------------------- *)
-  Lemma wp_ksync_start (h : CpuId) (m : regfile) (sp0 : mword 64) (n : nat)
-      (P : iProp Σ) :
+  Lemma wp_ksync_start (oQ : option (iProp Σ)) (h : CpuId) (m : regfile)
+      (sp0 : mword 64) (n : nat) (P : iProp Σ) (c : Z) :
     m !!! Regidx csp_rs1 = sp0 ->
     sync_code γt -∗
-    P -∗ sync_pay P (ukn_pay N (-1)) -∗
+    ksync_leaf oQ -∗ hook_opt gen_id oQ -∗ UserCwd.ucwd γcwd c -∗
+    P -∗ sync_pay P (Q_opt oQ) (ukn_pay N (-1)) -∗
     urun N h m (mword_of_int SyncSyms.start) (2 + (2 + n)) -∗
     mWP (Loop : expr riscv_lang).
-  Proof using Hpay Hpsok_free.
-    intros Hsp. iIntros "#Hcode HP Hsp Hrun".
+  Proof using Hpay.
+    intros Hsp. iIntros "#Hcode Hleaf Hhook Hcwd HP Hsp Hrun".
     (* the free stack the run already owns says sp is aligned and has room *)
     iDestruct (urun_stack with "Hrun") as %[Hal8' Hroom'].
     rewrite Hsp in Hal8', Hroom'.
@@ -512,7 +571,8 @@ Section UkSync.
                      (regval_into_reg (add_vec_int (add_vec_int sp0 (-16)) 16))
                      ltac:(vm_compute; discriminate))
                   Hsp1)). }
-    iApply (wp_ksync_main h5 m3 (add_vec_int sp0 (-16)) n P Hsp3 with "[] HP Hsp Hrun").
+    iApply (wp_ksync_main oQ h5 m3 (add_vec_int sp0 (-16)) n P c Hsp3
+              with "[] Hleaf Hhook Hcwd HP Hsp Hrun").
     iExact "Hcode".
   Qed.
 

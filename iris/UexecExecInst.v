@@ -171,6 +171,7 @@ Require Import SysMknodDefs. (* [dev_arg]                           *)
 Require Import SpecSysUnlink.  (* [unlink_au_at] / [unlink_arms]     *)
 Require Import SpecSysLink.    (* [link_commits] / [link_arms]        *)
 Require Import SpecSysMkdir.   (* [mkdir_au_at] / [mkdir_arms]       *)
+Require Import SyncHook.       (* [hook_opt] / [Q_opt]: sync's row 22 *)
 Require Import FsTree.         (* [fname]                             *)
 Require Import WpUart.         (* [cons_licence] -- the OUTPUT LICENCE the
                                   generic supply carries (lane OUT-FUPD) *)
@@ -339,6 +340,13 @@ Section UexecExecInst.
     rf_pqe   : list (bv 8) -> pipe_st -> iProp Σ;
     wf_Qe    : nat -> pipe_st -> iProp Σ;
     cl_P     : iProp Σ;
+    (* ---- sync (22): THE HOOK'S PROMISED [Q] (claude-notes/design/sync.md
+       section 4.3 item 4), [None] when the process deposits no hook.  The
+       deposit's row is [SyncHook.hook_opt gen_id] of it and the post's
+       [SyncHook.Q_opt] of it, so at [None] both rows are [emp] and 22
+       stays a free number.  LAST, so every positional builder only gained
+       a trailing argument. ---- *)
+    sy_oQ    : option (iProp Σ);
   }.
 
   (* THE RE-KEYING ([UexecSG.sfam_at]): the same families at another
@@ -373,7 +381,8 @@ Section UexecExecInst.
        rf_pq    := rf_pq f;
        rf_pqe   := rf_pqe f;
        wf_Qe    := wf_Qe f;
-       cl_P     := cl_P f |}.
+       cl_P     := cl_P f;
+       sy_oQ    := sy_oQ f |}.
 
   (* THE RECORD AT EXEC'S FOUR AND THE TRIVIAL FAMILIES ELSEWHERE.  The
      eight other numbers' fields are spelled at exactly the families the
@@ -445,7 +454,9 @@ Section UexecExecInst.
        rf_pq    := fun _ => True%I;
        rf_pqe   := fun _ _ => True%I;
        wf_Qe    := fun _ _ => True%I;
-       cl_P     := True%I |}.
+       cl_P     := True%I;
+       (* ...and no sync hook: row 22 is [emp] at every generic builder *)
+       sy_oQ    := None |}.
 
   (* ...AT THE TRIVIAL PAYLOAD, which is what every generic process forks
      with: a generic child's exit owes its parent nothing.  The four-argument
@@ -465,6 +476,41 @@ Section UexecExecInst.
   Definition xfam_pay (Q : Z -> iProp Σ) (Rc : iProp Σ) : xfam :=
     xfam_exec_at (fun _ _ => True%I) (fun _ _ => True%I)
                  (pfam_triv (fun _ _ _ => True%I)) True%I Q Rc.
+
+  (* ...AND THE SAME FAMILIES WITH A SYNC HOOK (sync K4): [f] with its
+     row-22 field replaced, every other field passed through -- what a
+     process that deposits a hook at [sync()] names
+     ([UkSyncEntry.ksync_leaf_xv6]). *)
+  Definition xfam_sy (oQ : option (iProp Σ)) (f : xfam) : xfam :=
+    {| xf_P := xf_P f; xf_Pmiss := xf_Pmiss f; xf_Fo := xf_Fo f;
+       xf_Rs := xf_Rs f;
+       rf_F     := rf_F f;
+       cf_P     := cf_P f; cf_Pmiss := cf_Pmiss f; cf_Fo := cf_Fo f;
+       of_P     := of_P f; of_Pmiss := of_Pmiss f;
+       of_Farm  := of_Farm f; of_Fun := of_Fun f; of_Fok := of_Fok f;
+       of_Fex   := of_Fex f; of_Fo := of_Fo f; of_Ft := of_Ft f;
+       of_om    := of_om f;
+       wf_Q     := wf_Q f;
+       nf_P     := nf_P f; nf_Pmiss := nf_Pmiss f;
+       nf_Farm  := nf_Farm f; nf_Fun := nf_Fun f; nf_Fok := nf_Fok f;
+       nf_Fex   := nf_Fex f;
+       uf_P     := uf_P f; uf_Pmiss := uf_Pmiss f;
+       uf_Fent  := uf_Fent f; uf_Ftgt := uf_Ftgt f; uf_Fex := uf_Fex f;
+       uf_Fmiss := uf_Fmiss f;
+       lf_Ftgt  := lf_Ftgt f; lf_Fent := lf_Fent f; lf_Funt := lf_Funt f;
+       df_P     := df_P f; df_Pmiss := df_Pmiss f;
+       df_Farm  := df_Farm f; df_Fdots := df_Fdots f; df_Fun := df_Fun f;
+       df_Fok   := df_Fok f; df_Fex := df_Fex f;
+       kf_pay   := kf_pay f;
+       kf_lend  := kf_lend f;
+       kf_xpay  := kf_xpay f;
+       rf_ret   := rf_ret f;
+       rf_in    := rf_in f;
+       rf_pq    := rf_pq f;
+       rf_pqe   := rf_pqe f;
+       wf_Qe    := wf_Qe f;
+       cl_P     := cl_P f;
+       sy_oQ    := oQ |}.
 
   (* ================================================================== *)
   (* THE KEY'S THREE ARGUMENT WORDS, named once.  A bundle reads nothing  *)
@@ -640,6 +686,14 @@ Section UexecExecInst.
           taint; a program at the table its key names.  LAST in the match
           so every reader above keeps its skip count. *)
        fileclose_cpays (uvis_fd W)
+     else if decide (n = 22) then
+       (* SYNC(22) DEPOSITS ITS OPTIONAL HOOK (claude-notes/design/sync.md
+          section 4.3 item 4): [emp] at [sy_oQ f = None] -- the generic
+          slot and every program that deposits none -- and the era's
+          [riscv_sync_hook] at [Some Q], which sys_sync fires exactly once
+          at a ghost commit.  AFTER exit's row, so no reader above moves
+          its skip count. *)
+       hook_opt gen_id (sy_oQ f)
      else emp)%I.
 
   (* ...AND THE ARMED POST BACK, at the same key and the same families.
@@ -832,6 +886,10 @@ Section UexecExecInst.
        (* CLOSE(21): the close payment's answer -- the link fired (the
           end's last close), or the payment back *)
        fileclose_cpost_any (fd_st_of_key (xk_a W 0) (uvis_fd W)) (cl_P f)
+     else if decide (n = 22) then
+       (* SYNC(22): the hook's [Q], fired once at a ghost commit covering
+          every change linearised before the call ([SpecSysSync]) *)
+       Q_opt (sy_oQ f)
      else emp)%I.
 
   (* THE SLOT FAMILY OCCURS IN ONE BRANCH OF THE DEPOSIT -- exec's slot wand
@@ -1031,6 +1089,9 @@ Section UexecExecInst.
     (* row 2: the table's close links, paid by the same taint *)
     destruct (decide (n = USYS_exit)) as [_ | _];
       [ iModIntro; iApply (fileclose_cpays_taint with "Hkc") | ].
+    (* row 22: the point deposits no hook *)
+    destruct (decide (n = 22)) as [_ | _];
+      [ iModIntro; cbv [hook_opt sy_oQ xfam_exec_at]; by iEmpIntro | ].
     by iModIntro.
   Qed.
 
@@ -1270,6 +1331,9 @@ Section UexecExecInst.
     destruct (decide (n = 6)) as [He | _]; [ exfalso; exact (H6 He) | ].
     destruct (decide (n = 21)) as [He | _]; [ exfalso; exact (H21 He) | ].
     destruct (decide (n = USYS_exit)) as [He | _]; [ exfalso; exact (H2 He) | ].
+    (* 22 -- sync: the point deposits no hook, so the row is [emp] *)
+    destruct (decide (n = 22)) as [_ | _];
+      [ iModIntro; cbv [hook_opt sy_oQ xfam_exec_at]; by iEmpIntro | ].
     by iModIntro.
   Qed.
 
@@ -1867,7 +1931,7 @@ Section UexecExecInst.
   Lemma spost_at_emp (X : uvis -d> iPropO Σ) (n : Z) (f : xfam) (W : uvis)
       (r : mword 64) (M' : gmap Z (bv 8)) (fdv' : list fdstate) (cw' : Z) (cs' : gset gname) :
     ~ (n = 5 \/ n = 9 \/ n = 15 \/ n = 16 \/ n = 17 \/ n = 18 \/ n = 19
-       \/ n = 20 \/ n = 7 \/ n = 4 \/ n = 21) ->
+       \/ n = 20 \/ n = 7 \/ n = 4 \/ n = 21 \/ n = 22) ->
     ⊢ spost_at X n f W r M' fdv' cw' cs'.
   Proof using .
     intros Hne. rewrite /spost_at /= /xv6_spost.
@@ -1884,6 +1948,7 @@ Section UexecExecInst.
     destruct (decide (n = USYS_pipe)) as [He | _];
       [ exfalso; apply Hne; unfold USYS_pipe in He; tauto |].
     destruct (decide (n = 21)) as [He | _]; [ exfalso; apply Hne; tauto |].
+    destruct (decide (n = 22)) as [He | _]; [ exfalso; apply Hne; tauto |].
     done.
   Qed.
 
@@ -1930,6 +1995,44 @@ Section UexecExecInst.
   Proof using .
     iIntros "H". rewrite /spost_at /= /xv6_spost /xk_a.
     do 10 xv6_skip. xv6_take. iExact "H".
+  Qed.
+
+  (* ================================================================== *)
+  (* SYNC'S ROW 22, ALL FOUR DIRECTIONS (sync K4).  The dispatcher's pair  *)
+  (* -- the deposit's ELIM and the post's INTRO -- is what                 *)
+  (* [ProofSyscall.sysc_arm_sync] hands [SpecSysSync] and back; the        *)
+  (* process's pair is what /sync's ecall leaf states its supplier and    *)
+  (* reads its receipt through ([UkSyncEntry.ksync_leaf_xv6]).  None of    *)
+  (* the four reads the key.                                               *)
+  (* ================================================================== *)
+  Lemma sbundle_at_sync_elim (X : uvis -d> iPropO Σ) (f : xfam) (W : uvis) :
+    sbundle_at X 22 f W -∗ hook_opt gen_id (sy_oQ f).
+  Proof using .
+    iIntros "H". rewrite /sbundle_at /= /xv6_sbundle /xk_a.
+    do 12 xv6_skip. xv6_take. iExact "H".
+  Qed.
+
+  Lemma sbundle_at_sync_intro (X : uvis -d> iPropO Σ) (f : xfam) (W : uvis) :
+    hook_opt gen_id (sy_oQ f) -∗ sbundle_at X 22 f W.
+  Proof using .
+    iIntros "H". rewrite /sbundle_at /= /xv6_sbundle /xk_a.
+    do 12 xv6_skip. xv6_take. iExact "H".
+  Qed.
+
+  Lemma spost_at_sync_intro (X : uvis -d> iPropO Σ) (f : xfam) (W : uvis)
+      (r : mword 64) (M' : gmap Z (bv 8)) (fdv' : list fdstate) (cw' : Z) (cs' : gset gname) :
+    Q_opt (sy_oQ f) -∗ spost_at X 22 f W r M' fdv' cw' cs'.
+  Proof using .
+    iIntros "H". rewrite /spost_at /= /xv6_spost /xk_a.
+    do 11 xv6_skip. xv6_take. iExact "H".
+  Qed.
+
+  Lemma spost_at_sync_elim (X : uvis -d> iPropO Σ) (f : xfam) (W : uvis)
+      (r : mword 64) (M' : gmap Z (bv 8)) (fdv' : list fdstate) (cw' : Z) (cs' : gset gname) :
+    spost_at X 22 f W r M' fdv' cw' cs' -∗ Q_opt (sy_oQ f).
+  Proof using .
+    iIntros "H". rewrite /spost_at /= /xv6_spost /xk_a.
+    do 11 xv6_skip. xv6_take. iExact "H".
   Qed.
 
 End UexecExecInst.

@@ -31,6 +31,7 @@ Require Import UexecSlot.
 Require Import UexecWp.
 Require Import UexecRet.
 Require Import UexecExecInst.   (* the class INSTANCE [uexecSG_xv6]: [xv6_sbundle] *)
+Require Import SyncHook.        (* [hook_opt]: row 22 of the point family *)
 Require Import FsAbsInvFire.    (* [fsabs_chdir_pre] / [fsabs_exec_half] *)
 Require FsAbsEra.               (* [ex_start] / [ax_hops_triv] *)
 Require Import SpecSysRead.     (* [sys_rw_count] *)
@@ -596,6 +597,9 @@ Section UexecSecc.
     destruct (decide (n = USYS_exit)) as [_ | _];
       [ iModIntro; iDestruct "Hk" as "[_ Hr]";
         iApply (secc_fileclose_cpays with "Hr") | ].
+    (* row 22: the point deposits no sync hook *)
+    destruct (decide (n = 22)) as [_ | _];
+      [ iModIntro; cbv [hook_opt sy_oQ]; by iEmpIntro | ].
     by iModIntro.
   Qed.
 

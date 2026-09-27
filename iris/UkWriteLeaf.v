@@ -146,7 +146,8 @@ Section UkWriteLeaf.
        rf_pq    := fun _ => True%I;
        rf_pqe   := fun _ _ => True%I;
        wf_Qe    := fun _ _ => True%I;
-       cl_P     := True%I |}.
+       cl_P     := True%I;
+       sy_oQ    := None |}.
 
   (* the payload row [UkRun.udepwf_std] asks for, by computation *)
   Lemma xfam_wr_pay (Q : nat -> iProp Σ) (Xp : Z -> iProp Σ) :

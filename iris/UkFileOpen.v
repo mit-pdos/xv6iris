@@ -815,7 +815,8 @@ Section UkFileOpen.
        rf_pq    := fun _ => True%I;
        rf_pqe   := fun _ _ => True%I;
        wf_Qe    := fun _ _ => True%I;
-       cl_P     := True%I |}.
+       cl_P     := True%I;
+       sy_oQ    := None |}.
 
   Definition file_create_fam (omo : offmode) (c : file_fixed) (r : file_names)
       (jo : option Z) (Nf : list (bv 8))

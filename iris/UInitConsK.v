@@ -263,7 +263,8 @@ Section UInitConsK.
        rf_pq    := fun _ => True%I;
        rf_pqe   := fun _ _ => True%I;
        wf_Qe    := fun _ _ => True%I;
-       cl_P     := True%I |}.
+       cl_P     := True%I;
+       sy_oQ    := None |}.
 
   (* =================================================================== *)
   (*  S3.  THE TWO ROWS, IN THE PROCESS'S DIRECTION                       *)
