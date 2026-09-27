@@ -29,6 +29,7 @@ Require Import FileDisc.
 Require Import FileOutPure.
 Require Import UnionDisc.
 Require Import UnionDiscDec.
+Require Import UnionAdm.
 From stdpp Require Import list.
 From stdpp Require Import ssreflect.
 Local Open Scope nat_scope.
@@ -92,28 +93,41 @@ Local Notation U := ulmG.
 Local Notation UB := (ulm_byte_laws adm_u_g adm_s_on).
 Local Notation UK := ulmG_hooks.
 
-(* THE CONCLUSION (design section 4): [FileDisc.file_phi] at the union *)
+(* THE CONCLUSION (union design section 4, sync design section 5):
+   [FileDisc.file_phi] at the union, each cycle carrying its resolution's
+   last completed sync ([UnionAdm.lm_good_sync]), each later boot state
+   admissible AT THE LAST COMPLETED SYNC OF THE EARLIER CYCLES
+   ([UnionAdm.uadm] at [ulast_before]; with no sync, the landed
+   [fadm_boot], [UnionAdm.uadm_srec0]) *)
 Definition union_phi (h : list mobs) : Prop :=
   lm_disc U h ->
-  exists s0s : list fstate,
-    length s0s = length (cycles_of h)
-    /\ (forall s, s0s !! 0%nat = Some s -> s = ∅)
-    /\ (forall k s, s0s !! S k = Some s ->
-          fadm_boot (echof_lines_before h (S k)) s)
-    /\ Forall2 (lm_good_out U) s0s (cycles_of h).
+  exists W : list (fstate * option srec),
+    length W = length (cycles_of h)
+    /\ (forall w, W !! 0%nat = Some w -> w.1 = ∅)
+    /\ (forall k w, W !! S k = Some w ->
+          uadm (ulines_before h (S k)) (ulast_before h (snd <$> W) (S k)) w.1)
+    /\ Forall2 (fun w seg => lm_good_sync w.1 seg w.2) W (cycles_of h).
 
-Definition union_phi_body (h : list mobs) (s0s : list fstate) : Prop :=
-  length s0s = length (cycles_of h)
-  /\ (forall s, s0s !! 0%nat = Some s -> s = ∅)
-  /\ (forall k s, s0s !! S k = Some s ->
-        fadm_boot (echof_lines_before h (S k)) s)
-  /\ Forall2 (lm_good_out U) s0s (cycles_of h).
+Definition union_phi_body (h : list mobs) (W : list (fstate * option srec)) : Prop :=
+  length W = length (cycles_of h)
+  /\ (forall w, W !! 0%nat = Some w -> w.1 = ∅)
+  /\ (forall k w, W !! S k = Some w ->
+        uadm (ulines_before h (S k)) (ulast_before h (snd <$> W) (S k)) w.1)
+  /\ Forall2 (fun w seg => lm_good_sync w.1 seg w.2) W (cycles_of h).
 
-Lemma union_phi_of_body (h : list mobs) (s0s : list fstate) :
-  (lm_disc U h -> union_phi_body h s0s) -> union_phi h.
+Lemma union_phi_of_body (h : list mobs) (W : list (fstate * option srec)) :
+  (lm_disc U h -> union_phi_body h W) -> union_phi h.
 Proof using.
   intros H Hd. destruct (H Hd) as (H1 & H2 & H3 & H4).
-  by exists s0s.
+  by exists W.
+Qed.
+
+(* ...and the per-cycle output claim the top theorem used to state *)
+Lemma union_phi_body_good (h : list mobs) (W : list (fstate * option srec)) :
+  union_phi_body h W -> Forall2 (lm_good_out U) (fst <$> W) (cycles_of h).
+Proof using.
+  intros (_ & _ & _ & HF). apply Forall2_fmap_l.
+  eapply Forall2_impl; [exact HF |]. intros w seg Hw. exact (lm_good_sync_out _ _ _ Hw).
 Qed.
 
 Lemma union_phi_body_nil : union_phi_body [] [].
@@ -149,71 +163,131 @@ Proof using.
   exact (echof_lines_before_cut (h ++ [e]) cs (open_seg h ++ [e]) H2).
 Qed.
 
+(* ...and the same of the whole line list the sync records index *)
+Lemma ulines_of_first_out_u (h : list mobs) (e : mobs) (n : nat) :
+  lm_disc U h -> trace_shape h true -> is_io e = true ->
+  obs_wire Uart0 (open_seg h) = [] ->
+  S n = length (cycles_of h) ->
+  ulines_of h = ulines_before (h ++ [e]) n.
+Proof using.
+  intros Hd Hsh Hio Hw Hn.
+  destruct (cycles_of_io h [e] Hsh (proj2 (Forall_singleton _ _) Hio)) as (cs & H1 & H2).
+  assert (Hlen : length cs = n).
+  { rewrite H1 length_app in Hn. cbn [length] in Hn. lia. }
+  rewrite (ulines_of_cut h cs (open_seg h) H1 (lm_disc_first_out U h Hd Hsh Hw)).
+  rewrite -Hlen. symmetry.
+  exact (ulines_before_cut (h ++ [e]) cs (open_seg h ++ [e]) H2).
+Qed.
+
+(* the earlier cycles' records are the same after the open cycle's moves *)
+Lemma take_snd_snoc (u : list (fstate * option srec)) (x : fstate * option srec) j :
+  j <= length u -> take j (snd <$> (u ++ [x])) = take j (snd <$> u).
+Proof using.
+  intros Hj. rewrite fmap_app take_app_le; [reflexivity | by rewrite length_fmap].
+Qed.
+
+(* the earlier cycles are the same after a console event *)
+Lemma take_cycles_io (h : list mobs) (e : mobs) (cs : list (list mobs)) j :
+  cycles_of h = cs ++ [open_seg h] ->
+  cycles_of (h ++ [e]) = cs ++ [open_seg h ++ [e]] ->
+  j <= length cs -> take j (cycles_of (h ++ [e])) = take j (cycles_of h).
+Proof using.
+  intros H1 H2 Hj. rewrite H1 H2 !take_app_le; [reflexivity | lia | lia].
+Qed.
+
 (* an event that puts nothing on the console's wire *)
-Lemma union_phi_body_step_io (h : list mobs) (e : mobs) (s0s : list fstate) :
+Lemma union_phi_body_step_io (h : list mobs) (e : mobs) (W : list (fstate * option srec)) :
   trace_shape h true -> is_io e = true -> obs_wire Uart0 [e] = [] ->
-  union_phi_body h s0s -> union_phi_body (h ++ [e]) s0s.
+  union_phi_body h W -> union_phi_body (h ++ [e]) W.
 Proof using.
   intros Hsh Hio Hw (Hlen & H0 & Hadm & HF).
   destruct (cycles_of_io h [e] Hsh (proj2 (Forall_singleton _ _) Hio)) as (cs & H1 & H2).
-  rewrite H1 in Hlen, HF. rewrite /union_phi_body H2.
-  assert (Hcut : forall j, (j < length s0s)%nat ->
-                   echof_lines_before (h ++ [e]) j = echof_lines_before h j).
-  { intros j Hj. rewrite /echof_lines_before H1 H2.
-    rewrite length_app in Hlen. cbn [length] in Hlen.
-    rewrite !take_app_le; [reflexivity | lia | lia]. }
+  assert (Hcs : length W = S (length cs)).
+  { rewrite Hlen H1 length_app. cbn [length]. lia. }
+  rewrite H1 in HF. rewrite /union_phi_body H2.
   split_and!.
-  - rewrite Hlen !length_app. reflexivity.
+  - rewrite Hcs length_app. cbn [length]. lia.
   - exact H0.
-  - intros k s Hs. rewrite (Hcut (S k) (lookup_lt_Some _ _ _ Hs)).
-    exact (Hadm k s Hs).
+  - intros k w Hs.
+    assert (Hk : S k <= length cs) by (apply lookup_lt_Some in Hs; lia).
+    rewrite /ulines_before (take_cycles_io h e cs (S k) H1 H2 Hk).
+    rewrite (ulast_before_ext (h ++ [e]) h (snd <$> W) (snd <$> W) (S k)
+               (take_cycles_io h e cs (S k) H1 H2 Hk) eq_refl).
+    exact (Hadm k w Hs).
   - apply Forall2_app_inv_r in HF as (u1 & u2 & Hu1 & Hu2 & ->).
     apply Forall2_app; [exact Hu1 |].
     apply Forall2_cons_inv_r in Hu2 as (y & u3 & Hy & Hu3 & ->).
     apply Forall2_nil_inv_r in Hu3 as ->.
     constructor; [| constructor].
-    exact (lm_good_out_step U UK UB y (open_seg h) e Hw Hy).
+    exact (lm_good_sync_step y.1 (open_seg h) e y.2 Hw Hy).
 Qed.
 
-Lemma union_phi_body_off (h : list mobs) (s0s : list fstate) :
-  union_phi_body h s0s -> union_phi_body (h ++ [ObsPowerOff]) s0s.
+Lemma union_phi_body_off (h : list mobs) (W : list (fstate * option srec)) :
+  union_phi_body h W -> union_phi_body (h ++ [ObsPowerOff]) W.
 Proof using.
-  rewrite /union_phi_body /echof_lines_before cycles_of_off. done.
+  rewrite /union_phi_body /ulines_before /ulast_before cycles_of_off. done.
 Qed.
 
-Lemma union_phi_body_on (h : list mobs) (s0s : list fstate) :
-  union_phi_body h s0s -> union_phi_body (h ++ [ObsPowerOn]) (s0s ++ [∅]).
+(* the last completed sync of the cycles so far: its state is the new
+   cycle's provisional boot state, admissible at its own record *)
+Definition union_rec_now (h : list mobs) (W : list (fstate * option srec)) : srec :=
+  ulast_before h (snd <$> W) (length W).
+
+Lemma union_phi_body_on (h : list mobs) (W : list (fstate * option srec)) :
+  union_phi_body h W ->
+  union_phi_body (h ++ [ObsPowerOn]) (W ++ [((union_rec_now h W).2, None)]).
 Proof using.
   intros (Hlen & H0 & Hadm & HF). rewrite /union_phi_body cycles_of_on.
-  assert (Hcut : forall j, (j <= length s0s)%nat ->
-                   echof_lines_before (h ++ [ObsPowerOn]) j
-                   = echof_lines_before h j).
-  { intros j Hj. rewrite /echof_lines_before cycles_of_on.
-    rewrite take_app_le; [reflexivity | lia]. }
+  assert (Htk : forall j, j <= length W ->
+                  take j (cycles_of h ++ [[]]) = take j (cycles_of h))
+    by (intros j Hj; rewrite take_app_le; [reflexivity | lia]).
+  assert (Hos : forall j, j <= length W ->
+                  take j (snd <$> (W ++ [((union_rec_now h W).2, None)]))
+                  = take j (snd <$> W))
+    by (intros j Hj; rewrite fmap_app take_app_le; [reflexivity | rewrite length_fmap; lia]).
+  assert (Hcut : forall j, j <= length W ->
+                   ulines_before (h ++ [ObsPowerOn]) j = ulines_before h j
+                   /\ ulast_before (h ++ [ObsPowerOn])
+                        (snd <$> (W ++ [((union_rec_now h W).2, None)])) j
+                      = ulast_before h (snd <$> W) j).
+  { intros j Hj. rewrite /ulines_before cycles_of_on (Htk j Hj). split; [reflexivity |].
+    apply ulast_before_ext; [by rewrite cycles_of_on (Htk j Hj) | exact (Hos j Hj)]. }
   split_and!.
   - rewrite !length_app Hlen. reflexivity.
-  - intros s Hs. destruct s0s as [| y s0s].
-    + cbn in Hs. by injection Hs as <-.
-    + rewrite -app_comm_cons in Hs. cbn in Hs. exact (H0 s Hs).
-  - intros k s Hs.
-    destruct (decide (S k < length s0s)%nat) as [Hk | Hk].
+  - intros w Hs. destruct W as [| y W].
+    + cbn in Hs. injection Hs as <-. reflexivity.
+    + rewrite -app_comm_cons in Hs. cbn in Hs. exact (H0 w Hs).
+  - intros k w Hs.
+    destruct (decide (S k < length W)) as [Hk | Hk].
     + rewrite lookup_app_l in Hs; [| lia].
-      rewrite (Hcut (S k) ltac:(lia)). exact (Hadm k s Hs).
+      destruct (Hcut (S k) ltac:(lia)) as [-> ->]. exact (Hadm k w Hs).
     + rewrite lookup_app_r in Hs; [| lia].
-      assert (Hje : S k = length s0s).
+      assert (Hje : S k = length W).
       { apply lookup_lt_Some in Hs. cbn [length] in Hs. lia. }
-      rewrite Hje Nat.sub_diag in Hs. cbn in Hs.
-      injection Hs as <-. apply fadm_boot_empty.
+      rewrite Hje Nat.sub_diag in Hs. cbn in Hs. injection Hs as <-.
+      destruct (Hcut (S k) ltac:(lia)) as [-> ->]. rewrite Hje. apply uadm_self.
   - apply Forall2_app; [exact HF |].
-    constructor; [exact (lm_good_out_nil U ∅) | constructor].
+    constructor; [exact (lm_good_sync_nil _) | constructor].
 Qed.
 
+(* the one admissible boot state with no line before it *)
+Lemma uadm_nil_srec0 (s : fstate) : uadm [] srec0 s -> s = ∅.
+Proof using.
+  intros H. apply map_empty. intros N.
+  destruct (H N) as [H0 | (ws & sel & Hin & _)]; [exact H0 |].
+  by apply elem_of_nil in Hin.
+Qed.
+
+Lemma ulast_before_0 h os : ulast_before h os 0 = srec0.
+Proof using. reflexivity. Qed.
+
 (* the admissibility the OPEN cycle's entry already carries *)
-Lemma union_phi_body_last_adm (h : list mobs) (e : mobs) (u1 : list fstate)
-    (x : fstate) :
+Lemma union_phi_body_last_adm (h : list mobs) (e : mobs) (u1 : list (fstate * option srec))
+    (x : fstate * option srec) :
   trace_shape h true -> is_io e = true ->
   union_phi_body h (u1 ++ [x]) ->
-  fadm_boot (echof_lines_before (h ++ [e]) (length u1)) x.
+  uadm (ulines_before (h ++ [e]) (length u1)) (ulast_before (h ++ [e]) (snd <$> u1) (length u1))
+    x.1.
 Proof using.
   intros Hsh Hio (Hlen & H0 & Hadm & _).
   destruct (cycles_of_io h [e] Hsh (proj2 (Forall_singleton _ _) Hio)) as (cs & H1 & H2).
@@ -222,22 +296,26 @@ Proof using.
   assert (Hlk : (u1 ++ [x]) !! length u1 = Some x)
     by (rewrite lookup_app_r; [by rewrite Nat.sub_diag | lia]).
   destruct (length u1) as [| n] eqn:Hn.
-  - rewrite (H0 x Hlk). apply fadm_boot_empty.
-  - assert (Hcut : echof_lines_before (h ++ [e]) (S n)
-                   = echof_lines_before h (S n)).
-    { rewrite /echof_lines_before H1 H2 !take_app_le; [reflexivity | lia | lia]. }
-    rewrite Hcut. exact (Hadm n x Hlk).
+  - rewrite (H0 x Hlk) ulast_before_0. intros N. left. reflexivity.
+  - assert (Hk : S n <= length cs) by lia.
+    rewrite /ulines_before (take_cycles_io h e cs (S n) H1 H2 Hk).
+    rewrite (ulast_before_ext (h ++ [e]) h (snd <$> u1) (snd <$> (u1 ++ [x])) (S n)
+               (take_cycles_io h e cs (S n) H1 H2 Hk)
+               (eq_sym (take_snd_snoc u1 x (S n) ltac:(lia)))).
+    exact (Hadm n x Hlk).
 Qed.
 
 (* THE DRAIN'S STEP, at the era's boot state, which the ledger may
-   REPLACE here (the entry it replaces may be provisional) *)
-Lemma union_phi_body_out (h : list mobs) (b : bv 8) (u1 : list fstate)
-    (x s0 : fstate) :
+   REPLACE here (the entry it replaces may be provisional), with the
+   open cycle's record at the new output *)
+Lemma union_phi_body_out (h : list mobs) (b : bv 8) (u1 : list (fstate * option srec))
+    (x : fstate * option srec) (s0 : fstate) (o : option srec) :
   trace_shape h true ->
-  lm_good_out U s0 (open_seg h ++ [ObsUartOut Uart0 b]) ->
-  fadm_boot (echof_lines_before (h ++ [ObsUartOut Uart0 b]) (length u1)) s0 ->
+  lm_good_sync s0 (open_seg h ++ [ObsUartOut Uart0 b]) o ->
+  uadm (ulines_before (h ++ [ObsUartOut Uart0 b]) (length u1))
+    (ulast_before (h ++ [ObsUartOut Uart0 b]) (snd <$> u1) (length u1)) s0 ->
   union_phi_body h (u1 ++ [x]) ->
-  union_phi_body (h ++ [ObsUartOut Uart0 b]) (u1 ++ [s0]).
+  union_phi_body (h ++ [ObsUartOut Uart0 b]) (u1 ++ [(s0, o)]).
 Proof using.
   intros Hsh Hgo Hadm0 (Hlen & H0 & Hadm & HF).
   destruct (cycles_of_io h [ObsUartOut Uart0 b] Hsh
@@ -245,69 +323,79 @@ Proof using.
                  (eq_refl : is_io (ObsUartOut Uart0 b) = true))) as (cs & H1 & H2).
   assert (Hcs : length cs = length u1).
   { rewrite H1 !length_app in Hlen. cbn [length] in Hlen. lia. }
-  assert (Hcut : forall j, (j <= length u1)%nat ->
-                   echof_lines_before (h ++ [ObsUartOut Uart0 b]) j
-                   = echof_lines_before h j).
-  { intros j Hj. rewrite /echof_lines_before H1 H2.
-    rewrite !take_app_le; [reflexivity | lia | lia]. }
   rewrite /union_phi_body H2. split_and!.
   - rewrite !length_app. rewrite H1 !length_app in Hlen. exact Hlen.
-  - intros s Hs. destruct u1 as [| y u1].
+  - intros w Hs. destruct u1 as [| y u1].
     + cbn in Hs. injection Hs as <-. cbn [length] in Hadm0.
-      apply fadm_boot_nil. revert Hadm0. rewrite /echof_lines_before take_0.
+      apply uadm_nil_srec0. revert Hadm0. rewrite ulast_before_0 /ulines_before take_0.
       cbn [fmap list_fmap concat]. done.
-    + apply (H0 s). exact Hs.
-  - intros k s Hs.
-    destruct (decide (S k < length u1)%nat) as [Hk | Hk].
+    + apply (H0 w). exact Hs.
+  - intros k w Hs.
+    destruct (decide (S k < length u1)) as [Hk | Hk].
     + rewrite lookup_app_l in Hs; [| lia].
-      rewrite (Hcut (S k) ltac:(lia)). apply (Hadm k s).
-      rewrite lookup_app_l; [exact Hs | lia].
+      rewrite /ulines_before (take_cycles_io h _ cs (S k) H1 H2 ltac:(lia)).
+      rewrite (ulast_before_ext _ h _ (snd <$> (u1 ++ [x])) (S k)
+                 (take_cycles_io h _ cs (S k) H1 H2 ltac:(lia))
+                 (eq_trans (take_snd_snoc u1 (s0, o) (S k) ltac:(lia))
+                    (eq_sym (take_snd_snoc u1 x (S k) ltac:(lia))))).
+      apply (Hadm k w). rewrite lookup_app_l; [exact Hs | lia].
     + rewrite lookup_app_r in Hs; [| lia].
       assert (Hje : S k = length u1).
       { apply lookup_lt_Some in Hs. cbn [length] in Hs. lia. }
-      rewrite Hje Nat.sub_diag in Hs. cbn in Hs.
-      injection Hs as <-. rewrite Hje. exact Hadm0.
+      rewrite Hje Nat.sub_diag in Hs. cbn in Hs. injection Hs as <-.
+      rewrite Hje.
+      rewrite (ulast_before_ext _ _ _ (snd <$> u1) (length u1) eq_refl
+                 (take_snd_snoc u1 (s0, o) (length u1) ltac:(lia))).
+      exact Hadm0.
   - rewrite H1 in HF.
-    destruct (Forall2_app_inv (lm_good_out U) u1 [x] cs [open_seg h] (eq_sym Hcs) HF)
-      as [Hv1 _].
+    destruct (Forall2_app_inv _ u1 [x] cs [open_seg h] (eq_sym Hcs) HF) as [Hv1 _].
     apply Forall2_app; [exact Hv1 |].
     constructor; [exact Hgo | constructor].
 Qed.
 
 (* THE LEDGER'S DRAIN STEP, PURELY: at the era's FIRST drain the state's
-   admissibility comes from the deed's witness read against the whole
-   history's line list, which is then the earlier cycles' ([efl_of_first_out_u]);
-   at a LATER drain the state is the one already fixed *)
-Lemma union_phi_body_drain (h : list mobs) (b : bv 8) (s0s : list fstate)
-    (s0 : fstate) :
+   admissibility comes from the witness read against the whole history's
+   line list, which is then the earlier cycles' ([ulines_of_first_out_u]),
+   at the last completed sync of the earlier cycles; at a LATER drain the
+   state is the one already fixed.  The open cycle's record is the new
+   output's ([o]). *)
+Lemma union_phi_body_drain (h : list mobs) (b : bv 8) (W : list (fstate * option srec))
+    (s0 : fstate) (o : option srec) :
   trace_shape h true -> lm_disc U h ->
-  lm_good_out U s0 (open_seg h ++ [ObsUartOut Uart0 b]) ->
-  fadm_boot (echof_lines_of h) s0 ->
-  (obs_wire Uart0 (open_seg h) <> [] -> exists u1, s0s = u1 ++ [s0]) ->
-  union_phi_body h s0s ->
-  union_phi_body (h ++ [ObsUartOut Uart0 b]) (removelast s0s ++ [s0]).
+  lm_good_sync s0 (open_seg h ++ [ObsUartOut Uart0 b]) o ->
+  uadm (ulines_of h) (ulast_before h (snd <$> W) (pred (length W))) s0 ->
+  (obs_wire Uart0 (open_seg h) <> [] -> exists u1 o0, W = u1 ++ [(s0, o0)]) ->
+  union_phi_body h W ->
+  union_phi_body (h ++ [ObsUartOut Uart0 b]) (removelast W ++ [(s0, o)]).
 Proof using.
   intros Hsh Hd Hgo Hadm Hlast Hb.
   destruct (cycles_of_io h [ObsUartOut Uart0 b] Hsh
               (proj2 (Forall_singleton _ _)
                  (eq_refl : is_io (ObsUartOut Uart0 b) = true)))
     as (cs & H1 & H2).
-  assert (Hne : s0s <> []).
+  assert (Hne : W <> []).
   { intros Hz. destruct Hb as (Hlen & _).
     rewrite Hz H1 length_app in Hlen. cbn [length] in Hlen. lia. }
-  destruct (fop_snoc_inv s0s Hne) as (u1 & x & ->).
+  destruct (fop_snoc_inv W Hne) as (u1 & x & ->).
   rewrite (epu_removelast_snoc u1 x).
-  apply (union_phi_body_out h b u1 x s0 Hsh Hgo); [| exact Hb].
+  apply (union_phi_body_out h b u1 x s0 o Hsh Hgo); [| exact Hb].
+  assert (Hlen : S (length u1) = length (cycles_of h)).
+  { destruct Hb as (Hl & _). rewrite length_app in Hl. cbn [length] in Hl. lia. }
+  assert (Hcs : length cs = length u1).
+  { rewrite H1 length_app in Hlen. cbn [length] in Hlen. lia. }
   destruct (decide (obs_wire Uart0 (open_seg h) = [])) as [Hw | Hw].
-  - assert (Hlen : S (length u1) = length (cycles_of h)).
-    { destruct Hb as (Hl & _). rewrite length_app in Hl. cbn [length] in Hl. lia. }
-    rewrite -(efl_of_first_out_u h (ObsUartOut Uart0 b) (length u1)
+  - rewrite -(ulines_of_first_out_u h (ObsUartOut Uart0 b) (length u1)
                 Hd Hsh eq_refl Hw Hlen).
+    rewrite (_ : pred (length (u1 ++ [x])) = length u1) in Hadm;
+      [| rewrite length_app /=; lia].
+    rewrite (ulast_before_ext _ h (snd <$> u1) (snd <$> (u1 ++ [x])) (length u1)
+               (take_cycles_io h _ cs (length u1) H1 H2 ltac:(lia))
+               (eq_sym (take_snd_snoc u1 x (length u1) ltac:(lia)))).
     exact Hadm.
-  - assert (Hx : x = s0).
-    { destruct (Hlast Hw) as (u2 & Hu2).
-      destruct (app_inj_2 u1 u2 [x] [s0] eq_refl Hu2) as [_ Hxx].
-      by injection Hxx. }
+  - assert (Hx : x.1 = s0).
+    { destruct (Hlast Hw) as (u2 & o0 & Hu2).
+      destruct (app_inj_2 u1 u2 [x] [(s0, o0)] eq_refl Hu2) as [_ Hxx].
+      by injection Hxx as ->. }
     rewrite -Hx.
     exact (union_phi_body_last_adm h (ObsUartOut Uart0 b) u1 x Hsh eq_refl Hb).
 Qed.
