@@ -651,82 +651,86 @@ Section UShURound.
       file_cons_cred (fgn_cl gf) r jo -∗
       UkShEcho.sh_exec_sup_echo_wq_at union_D Wcu.
   Proof using Heq Hkill Hcons HfifR.
-    iIntros "#Hdep (#Hinv & #Hcl & #Hgen) #Hmade".
+    iIntros "#Hdep #Hslot #Hmade".
+    iPoseProof "Hslot" as "(#Hinv & #Hcl & #Hgen)".
     rewrite /UkShEcho.sh_exec_sup_echo_wq_at. iIntros "!>" (I) "%HDI".
     pose proof HDI as [Hokws Hul].
+    assert (Hhead : last_ws I !!! 0%nat = UShEcho.echo_pl).
+    { rewrite (list_lookup_total_correct (last_ws I) 0%nat EchoDisc.cmd_echo
+                 (EchoDisc.line_ok_head (last_ws I) Hokws)).
+      vm_compute. reflexivity. }
+    pose proof (ExecWords.line_ok_exec_ok (last_ws I) Hokws) as Hxok.
+    (* the supply at the console row, at any taint continuation: the lend
+       as the entry sees it is [Wcu I 3] OPENED at its pin *)
+    iAssert (□ (□ (app_taint -∗ UkShFork.ushf_wq Wcu I) -∗
+             UkShEcho.sh_exec_sup_echo_at (SG := uexecSG_xv6)
+               (ghost_varG0 := offbox_offG) UkSh.ush_fd1p (last_ws I)
+               (fun _ : Z => UkShFork.ushf_wq Wcu I) (Wcu I 3%nat)))%I as "#Hsup".
+    { iIntros "!> #Hkt".
+      iAssert (∀ sts, image_entry_taint T sts ProcDefs.secc_all
+                 (fun _ : Z => UkShFork.ushf_wq Wcu I) uslot)%I as "#Hgen'".
+      { iIntros (sts). iApply image_entry_taint_intro. iModIntro. iIntros (W') "#HT #Hmp".
+        iApply ("Hgen" $! (UkShFork.ushf_wq Wcu I) W' with "HT Hmp Hkt"). }
+      iApply (UShExecPin.sh_exec_sup_x_of_entry_r (ghost_varG0 := offbox_offG)
+                UkSh.ush_fd1p (last_ws I) UShEcho.echo_pl FsEchoPin.era0_echo_pins
+                [FsImg.ROOTINO; FsEchoPin.ECHO_INO] FsEchoPin.ECHO_INO ElfUser.echo_elf T
+                (UkShFork.ushf_wq Wcu I) (Wcu I 3%nat)
+                (∃ v : era_pins, lk_pin FI (S gen_id) v
+                   ∗ lk_lpr FI (S gen_id) v I 3%nat ∗ PRE I)%I
+                Hxok Hhead UShEcho.echo_elf_loadable UShEcho.sh_echo_pin_resolves
+                with "[] [] [] Hkt [Hslot]").
+      - iIntros "!>" (M sa t gb fdv chs pidv) "%Himg %Hbytes %Hflen %Hrows #Hnp0".
+        destruct Hrows as [rb Hl1].
+        rewrite /image_entry. iModIntro.
+        iIntros (na alen afun W') "%Hok %Hcwd0 %Hlzf %Hscw %Hch0 %Hpid0 %Hargs Hmp HR".
+        iDestruct "HR" as (v) "(#Hpin & Hc & HR)".
+        cbn [lk_pin lk_lpr union_link_inst_at gen_link_inst gwc_lpr].
+        rewrite /ush_pre_at. iDestruct "HR" as "[Hdeed #Hwit]".
+        rewrite {1}/ush_deed_at. iDestruct "Hdeed" as "[Hdeed | #HT]"; last first.
+        { iApply ("Hgen'" $! (UexecSlot.uvis_fd W') W' with "HT [//] [%] Hmp"); exact Hscw. }
+        iDestruct "Hdeed" as (cs s v') "(Hown & %Htie & #Hty & #Hpin' & #Hcs & %Hnw)".
+        rewrite /fown /fdeed. iDestruct "Hown" as "[Hdq Htk]".
+        iPoseProof (uecho_cons_image_entry (PS := uprogSG_free)
+                      ug Hcons (last_ws I) M sa t gb fdv FsImg.ROOTINO chs pidv
+                      v s0 I r (1/2)%Qp s rb jo
+                      (fun _ : Z => UkShFork.ushf_wq Wcu I) (ftkt r s)
+                      (fun _ _ => eq_refl) Heq Hokws Himg Hbytes Hflen
+                      eq_refl Hl1 Hul
+                      (UShFileRedir.ush_line_len (last_ws I) Hokws)
+                      with "[] [] [] [] Hmade Hinv Hpin Hnp0 Hdep") as "#He".
+        { iIntros "!> Hk". iApply uHktaint'. iExact "Hk". }
+        { iIntros "!> HT". rewrite Hkill. iExact "HT". }
+        { (* THE BLOCK'S END PAYS THE EXIT: the deed comes back and PRE with it *)
+          iIntros "!> Hpost Hdq Htk". rewrite /UkShFork.ushf_wq.
+          iApply (uwc0 I v HDI with "Hpin Hpost [Hdq Htk]").
+          rewrite /ush_pre_at /ush_deed_at. iSplitL; [| iExact "Hwit"].
+          iLeft. iExists cs, s, v'. rewrite /fown /fdeed /FileOpen.fdq.
+          iFrame "Hty Hpin' Hcs".
+          iSplitL "Hdq Htk"; [iFrame "Hdq Htk" | by iPureIntro]. }
+        { iIntros "!> #HT". rewrite /UkShFork.ushf_wq.
+          iApply (uWcu_taint' I 0%nat v with "Hpin HT"). }
+        rewrite /image_entry.
+        iApply ("He" $! na alen afun W' with "[%] [%] [%] [%] [%] [%] [%] Hmp
+                                              [Hc Hdq Htk]");
+          [ exact Hok | exact Hcwd0 | exact Hlzf | exact Hscw | exact Hch0 | exact Hpid0
+          | exact Hargs | ].
+        rewrite /FileOpen.fdq. iFrame "Hc Hdq Htk".
+      - iIntros "!> Hc". iApply (uwc3 I (union_D_nw I HDI) with "Hc").
+      - iIntros "!> HR". iDestruct "HR" as (v) "(#Hp & Hc & HR)".
+        iApply (uwc3b I v with "Hp Hc HR").
+      - iApply (UShExecPin.sh_pin_slot_echo with "Hslot"). }
+    (* ...at the pin the lend names, and the console row is echo's own *)
     rewrite /UkShEcho.sh_exec_sup_echo.
     iIntros "!>" (N' m pc sa t gb ld)
       "%Hpeq %Ha0 %Ha1 %Hbytes %Hfd1 Hstd #Hcmd Hcr".
-    iDestruct (uwc3 I (union_D_nw I HDI) with "Hcr") as (v) "(#Hpin & Hcr & HR)".
-    iAssert (∀ sts, image_entry_taint T sts ProcDefs.secc_all
-               (fun _ : Z => UkShFork.ushf_wq Wcu I) uslot)%I as "#Hgen'".
-    { iIntros (sts). iApply image_entry_taint_intro. iModIntro. iIntros (W') "#HT #Hmp".
-      iApply ("Hgen" $! (UkShFork.ushf_wq Wcu I) W' with "HT Hmp []").
-      iIntros "!> #Hk". rewrite /UkShFork.ushf_wq.
+    iDestruct (uwc3 I (union_D_nw I HDI) with "Hcr") as (v) "(#Hpin & Hc & HR)".
+    iPoseProof (uwc3b I v with "Hpin Hc HR") as "Hcr".
+    iPoseProof ("Hsup" with "[]") as "#Hsup'".
+    { iIntros "!> #Hk". rewrite /UkShFork.ushf_wq.
       iApply (uWcu_taint' I 0%nat v with "Hpin"). iApply uHktaint'. iExact "Hk". }
-    iApply (udepw_at_refR_of_sup (ghost_varG0 := offbox_offG) N' m pc
-              (mword_of_int sa) (mword_of_int (t + 8))
-              FsImg.ROOTINO T UShEcho.echo_pl ElfUser.echo_elf 1%nat
-              (UserFd.ustd (ukn_fd N') ld
-               ∗ lk_lpr FI (S gen_id) v I 3%nat ∗ PRE I)%I
-              _ UShEcho.echo_elf_loadable Ha0 Ha1 with "[] [] [Hstd Hcr HR]").
-    { iIntros "!> ($ & Hc & HR)". iApply (uwc3b I v with "Hpin Hc HR"). }
-    { rewrite Hpeq. iExact "Hgen'". }
-    rewrite /uexec_sup_run.
-    iIntros (M pm sz fdv chs pidv) "#Hnpw Hheap Hufd".
-    iDestruct (UkRun.urun_rows_nopipe _ _ with "Hnpw") as "#Hnp0".
-    iAssert (⌜ UShEcho.echo_node_img (last_ws I) M sa t gb ⌝)%I as %Himg.
-    { iApply (UShEcho.echo_node_img_of_cmd (last_ws I) _ _ _ M pm sz sa t gb
-                Hokws with "Hheap Hcmd"). }
-    iDestruct (ufd_auth_len with "Hufd") as %Hflen.
-    iDestruct (ustd_agree (ukn_fd N') fdv ld with "Hufd Hstd") as %Hl.
-    destruct Hfd1 as [rb Hl1].
-    iFrame "Hheap Hufd".
-    iSplitR "Hstd Hcr HR".
-    { iPureIntro.
-      exact (UShEcho.sh_echo_path_of_holds (last_ws I) Hokws M sa t gb
-               Himg Hbytes). }
-    iSplitR "Hstd Hcr HR".
-    { iApply (exec_walk_of_pin FsEchoPin.era0_echo_pins T FsImg.ROOTINO
-                UShEcho.echo_pl [FsImg.ROOTINO; FsEchoPin.ECHO_INO]
-                FsEchoPin.ECHO_INO
-                (MkAnode (AFile ElfUser.echo_elf) 1%nat)
-                UShEcho.sh_echo_pin_resolves with "Hcl Hinv"). }
-    iSplitR "Hstd Hcr HR"; [| iFrame "Hstd Hcr HR"].
-    rewrite Hpeq. rewrite /image_entry. iModIntro.
-    iIntros (na alen afun W') "%Hok %Hcwd0 %Hlzf %Hscw %Hch0 %Hpid0 %Hargs Hmp
-                               (_ & Hc & HR)".
-    cbn [lk_pin lk_lpr union_link_inst_at gen_link_inst gwc_lpr].
-    rewrite /ush_pre_at. iDestruct "HR" as "[Hdeed #Hwit]".
-    rewrite {1}/ush_deed_at. iDestruct "Hdeed" as "[Hdeed | #HT]"; last first.
-    { iApply ("Hgen'" $! (UexecSlot.uvis_fd W') W' with "HT [//] [%] Hmp"); exact Hscw. }
-    iDestruct "Hdeed" as (cs s v') "(Hown & %Htie & #Hty & #Hpin' & #Hcs & %Hnw)".
-    rewrite /fown /fdeed. iDestruct "Hown" as "[Hdq Htk]".
-    iPoseProof (uecho_cons_image_entry (PS := uprogSG_free)
-                  ug Hcons (last_ws I) M sa t gb fdv FsImg.ROOTINO chs pidv
-                  v s0 I r (1/2)%Qp s rb jo
-                  (fun _ : Z => UkShFork.ushf_wq Wcu I) (ftkt r s)
-                  (fun _ _ => eq_refl) Heq Hokws Himg Hbytes Hflen
-                  eq_refl ltac:(rewrite Hl; exact Hl1) Hul
-                  (UShFileRedir.ush_line_len (last_ws I) Hokws)
-                  with "[] [] [] [] Hmade Hinv Hpin Hnp0 Hdep") as "#He".
-    { iIntros "!> Hk". iApply uHktaint'. iExact "Hk". }
-    { iIntros "!> HT". rewrite Hkill. iExact "HT". }
-    { (* THE BLOCK'S END PAYS THE EXIT: the deed comes back and PRE with it *)
-      iIntros "!> Hpost Hdq Htk". rewrite /UkShFork.ushf_wq.
-      iApply (uwc0 I v HDI with "Hpin Hpost [Hdq Htk]").
-      rewrite /ush_pre_at /ush_deed_at. iSplitL; [| iExact "Hwit"].
-      iLeft. iExists cs, s, v'. rewrite /fown /fdeed /FileOpen.fdq.
-      iFrame "Hty Hpin' Hcs".
-      iSplitL "Hdq Htk"; [iFrame "Hdq Htk" | by iPureIntro]. }
-    { iIntros "!> #HT". rewrite /UkShFork.ushf_wq.
-      iApply (uWcu_taint' I 0%nat v with "Hpin HT"). }
-    rewrite /image_entry.
-    iApply ("He" $! na alen afun W' with "[%] [%] [%] [%] [%] [%] [%] Hmp
-                                          [Hc Hdq Htk]");
-      [ exact Hok | exact Hcwd0 | exact Hlzf | exact Hscw | exact Hch0 | exact Hpid0
-      | exact Hargs | ].
-    rewrite /FileOpen.fdq. iFrame "Hc Hdq Htk".
+    rewrite /UkShEcho.sh_exec_sup_echo_at.
+    iApply ("Hsup'" $! N' m pc sa t gb ld with "[%] [%] [%] [%] [%] Hstd Hcmd Hcr");
+      [ exact Hpeq | exact Ha0 | exact Ha1 | exact Hbytes | exact Hfd1 ].
   Qed.
 
   Lemma uHchild_echo :
@@ -783,48 +787,28 @@ Section UShURound.
   Proof using Heq Hkill Hcons HfifR.
     intros Hu Hul Htie Hpos. pose proof Htie as [Hlen Hcon].
     assert (Hnp : uline_nopipe (ul I)) by (rewrite Hul; exact (uline_nopipe_cat nm)).
-    iIntros "#Hdep (#Hinv & #Hcl & #Hgen) #Hmade #Hpin' #Hcs' #Hty".
-    rewrite /UkShEcho.sh_exec_sup_echo_at.
-    iIntros "!>" (N' m pc sa t gb ld)
-      "%Hpeq %Ha0 %Ha1 %Hbytes %Hrows Hstd #Hcmd Hcr".
+    iIntros "#Hdep #Hslot #Hmade #Hpin' #Hcs' #Hty".
+    iPoseProof "Hslot" as "(#Hinv & #Hcl & #Hgen)".
     iAssert (□ (T -∗ UkShFork.ushf_wq Wcu I))%I as "#HQt".
     { iIntros "!> #HT". rewrite /UkShFork.ushf_wq.
       iApply (uWcu_taint' I 0%nat v' with "Hpin' HT"). }
+    iAssert (□ (app_taint -∗ UkShFork.ushf_wq Wcu I))%I as "#Hkt".
+    { iIntros "!> #Hk". iApply "HQt". iApply uHktaint'. iExact "Hk". }
     iAssert (∀ sts, image_entry_taint T sts ProcDefs.secc_all
                (fun _ : Z => UkShFork.ushf_wq Wcu I) uslot)%I as "#Hgen'".
     { iIntros (sts). iApply image_entry_taint_intro. iModIntro. iIntros (W') "#HT #Hmp".
-      iApply ("Hgen" $! (UkShFork.ushf_wq Wcu I) W' with "HT Hmp []").
-      iIntros "!> #Hk". iApply "HQt". iApply uHktaint'. iExact "Hk". }
-    iApply (udepw_at_refR_of_sup (ghost_varG0 := offbox_offG) N' m pc
-              (mword_of_int sa) (mword_of_int (t + 8))
-              FsImg.ROOTINO T UShCatPay.cat_pl ElfUser.cat_elf 1%nat
-              (UserFd.ustd (ukn_fd N') ld ∗ Wcl I 3%nat ∗ fown r s)%I
-              _ UShCat.cat_elf_loadable Ha0 Ha1 with "[] [] [Hstd Hcr]").
-    { iIntros "!> H". iExact "H". }
-    { rewrite Hpeq. iExact "Hgen'". }
-    rewrite /uexec_sup_run.
-    iIntros (M pm sz fdv chs pidv) "#Hnpw Hheap Hufd".
-    iDestruct (UkRun.urun_rows_nopipe _ _ with "Hnpw") as "#Hnp0".
-    iAssert (⌜ UShEcho.echo_node_img (ucat_ws nm) M sa t gb ⌝)%I as %Himg.
-    { iApply (UShEcho.echo_node_img_of_cmd_x (ucat_ws nm) _ _ _ M pm sz sa t gb
-                (ucat_ws_exec_ok nm Hu) with "Hheap Hcmd"). }
-    iDestruct (ufd_auth_len with "Hufd") as %Hflen.
-    iDestruct (ustd_agree (ukn_fd N') fdv ld with "Hufd Hstd") as %Hl.
-    iFrame "Hheap Hufd".
-    iSplitR "Hstd Hcr".
-    { iPureIntro. rewrite -(ucat_ws_head nm).
-      exact (UShEcho.sh_exec_path_of_x_holds (ucat_ws nm) (ucat_ws_exec_ok nm Hu)
-               M sa t gb Himg Hbytes). }
-    iSplitR "Hstd Hcr".
-    { iApply (exec_walk_of_pin FsCatPin.era0_cat_pins T FsImg.ROOTINO
-                UShCatPay.cat_pl [FsImg.ROOTINO; FsCatPin.CAT_INO]
-                FsCatPin.CAT_INO
-                (MkAnode (AFile ElfUser.cat_elf) 1%nat)
-                UShCatPay.sh_cat_pin_resolves with "Hcl Hinv"). }
-    iSplitR "Hstd Hcr"; [| iFrame "Hstd Hcr"].
-    rewrite Hpeq. rewrite /image_entry. iModIntro.
+      iApply ("Hgen" $! (UkShFork.ushf_wq Wcu I) W' with "HT Hmp Hkt"). }
+    iApply (UShExecPin.sh_exec_sup_x_of_entry (ghost_varG0 := offbox_offG)
+              ucat_rows (ucat_ws nm) UShCatPay.cat_pl FsCatPin.era0_cat_pins
+              [FsImg.ROOTINO; FsCatPin.CAT_INO] FsCatPin.CAT_INO ElfUser.cat_elf T
+              (UkShFork.ushf_wq Wcu I) (Wcl I 3%nat ∗ fown r s)%I
+              (ucat_ws_exec_ok nm Hu) (ucat_ws_head nm) UShCat.cat_elf_loadable
+              UShCatPay.sh_cat_pin_resolves with "[] Hkt [Hslot]");
+      [| iApply (UShExecPin.sh_pin_slot_cat with "Hslot")].
+    iIntros "!>" (M sa t gb fdv chs pidv) "%Himg %Hbytes %Hflen %Hrows #Hnp0".
+    rewrite /image_entry. iModIntro.
     iIntros (na alen afun W') "%Hok %Hcwd0 %Hlzf %Hscw %Hch0 %Hpid0 %Hargs Hmp
-                               (_ & Hc & Hd)".
+                               (Hc & Hd)".
     (* ---- the lend, OPENED into the round's cursor ---- *)
     rewrite {1}/uWcl /lk_lcred.
     iDestruct "Hc" as (v) "[#Hpin Hc]".
@@ -855,7 +839,7 @@ Section UShURound.
                   (fun _ _ => eq_refl) Heq Hw Hu Hul (eq_sym Hcon) Hshort
                   (ucat_ws_exec_ok nm Hu) Himg Hbytes Hflen
                   (ucat_ws_len nm) (ucat_ws_alen nm) (ucat_ws_fname nm) eq_refl
-                  ltac:(rewrite Hl; exact Hr1) ltac:(rewrite Hl; exact Hr2)
+                  Hr1 Hr2
                   with "[] [] [] HQt Hmade Hinv Hpin Hnp0 Hdep") as "#He".
     { iIntros "!> Hk". iApply uHktaint'. iExact "Hk". }
     { iIntros "!> HT". rewrite Hkill. iExact "HT". }
@@ -1087,7 +1071,7 @@ Section UShURound.
                     (fun _ : Z => UkShFork.ushf_wq Wcu I) rb2
                     (fun k H => H) (usecc_ws_exec_ok wsx Hok) Himg Hbytes Hlen Hr2
                     with "HQ Hwp Hnp Hdep") as "He".
-      iApply (UShEchoPipePay.image_entry_pay_mono with "[] He").
+      iApply (UShExecPin.image_entry_pay_mono with "[] He").
       iIntros "!> _". rewrite Hwild.
       iSplitR; [iPoseProof "Hsh" as "[Htok _]"; iApply (usecc_tok_of_at with "Htok") |].
       iSplitR; [iApply (Hrdw I with "Hsh") | iExact "Hrows"].
@@ -1491,46 +1475,33 @@ Section UShURound.
           (Wcl I 3%nat ∗ UShFileRedir.redir_K' gf r nm sp ty).
   Proof using Heq Hkill HfifR.
     intros Hu Hul Htp Hokws Hin Hlen Hpos.
-    iIntros "#Hdep (#Hinv & #Hcl & #Hgen) #Hpin' #Hcs #Hlb #Htyp" (ty).
-    rewrite /UkShEcho.sh_exec_sup_echo_at.
-    iIntros "!>" (N' m pc sa t gb ld)
-      "%Hpeq %Ha0 %Ha1 %Hbytes %Hfd1 Hstd #Hcmd Hcr".
+    iIntros "#Hdep #Hslot #Hpin' #Hcs #Hlb #Htyp" (ty).
+    iPoseProof "Hslot" as "(#Hinv & #Hcl & #Hgen)".
+    assert (Hhead : ws !!! 0%nat = UShEcho.echo_pl).
+    { rewrite (list_lookup_total_correct ws 0%nat EchoDisc.cmd_echo
+                 (EchoDisc.line_ok_head ws Hokws)).
+      vm_compute. reflexivity. }
+    pose proof (ExecWords.line_ok_exec_ok ws Hokws) as Hxok.
+    iAssert (□ (app_taint -∗ UkShFork.ushf_wq Wcu I))%I as "#Hkt".
+    { iIntros "!> #Hk". rewrite /UkShFork.ushf_wq.
+      iApply (uWcu_taint' I 0%nat v' with "Hpin'"). iApply uHktaint'.
+      iExact "Hk". }
     iAssert (∀ sts, image_entry_taint T sts ProcDefs.secc_all
                (fun _ : Z => UkShFork.ushf_wq Wcu I) uslot)%I as "#Hgen'".
     { iIntros (sts). iApply image_entry_taint_intro. iModIntro. iIntros (W') "#HT #Hmp".
-      iApply ("Hgen" $! (UkShFork.ushf_wq Wcu I) W' with "HT Hmp []").
-      iIntros "!> #Hk". rewrite /UkShFork.ushf_wq.
-      iApply (uWcu_taint' I 0%nat v' with "Hpin'"). iApply uHktaint'.
-      iExact "Hk". }
-    iApply (udepw_at_refR_of_sup (ghost_varG0 := offbox_offG) N' m pc
-              (mword_of_int sa) (mword_of_int (t + 8))
-              FsImg.ROOTINO T UShEcho.echo_pl ElfUser.echo_elf 1%nat
-              (UserFd.ustd (ukn_fd N') ld ∗ Wcl I 3%nat ∗ UShFileRedir.redir_K' gf r nm sp ty)%I
-              _ UShEcho.echo_elf_loadable Ha0 Ha1 with "[] [] [Hstd Hcr]").
-    { iIntros "!> H". iExact "H". }
-    { rewrite Hpeq. iExact "Hgen'". }
-    rewrite /uexec_sup_run.
-    iIntros (M pm sz fdv chs pidv) "#Hnpw Hheap Hufd".
-    iDestruct (UkRun.urun_rows_nopipe _ _ with "Hnpw") as "#Hnp0".
-    iAssert (⌜ UShEcho.echo_node_img ws M sa t gb ⌝)%I as %Himg.
-    { iApply (UShEcho.echo_node_img_of_cmd ws _ _ _ M pm sz sa t gb Hokws
-                with "Hheap Hcmd"). }
-    iDestruct (ufd_auth_len with "Hufd") as %Hflen.
-    iDestruct (ustd_agree (ukn_fd N') fdv ld with "Hufd Hstd") as %Hl.
-    iFrame "Hheap Hufd".
-    iSplitR "Hstd Hcr".
-    { iPureIntro.
-      exact (UShEcho.sh_echo_path_of_holds ws Hokws M sa t gb Himg Hbytes). }
-    iSplitR "Hstd Hcr".
-    { iApply (exec_walk_of_pin FsEchoPin.era0_echo_pins T FsImg.ROOTINO
-                UShEcho.echo_pl [FsImg.ROOTINO; FsEchoPin.ECHO_INO]
-                FsEchoPin.ECHO_INO
-                (MkAnode (AFile ElfUser.echo_elf) 1%nat)
-                UShEcho.sh_echo_pin_resolves with "Hcl Hinv"). }
-    iSplitR "Hstd Hcr"; [| iFrame "Hstd Hcr"].
-    rewrite Hpeq. rewrite /image_entry. iModIntro.
+      iApply ("Hgen" $! (UkShFork.ushf_wq Wcu I) W' with "HT Hmp Hkt"). }
+    iApply (UShExecPin.sh_exec_sup_x_of_entry (ghost_varG0 := offbox_offG)
+              (UkShRedirBody.ushs_fd1f ty) ws UShEcho.echo_pl FsEchoPin.era0_echo_pins
+              [FsImg.ROOTINO; FsEchoPin.ECHO_INO] FsEchoPin.ECHO_INO ElfUser.echo_elf T
+              (UkShFork.ushf_wq Wcu I)
+              (Wcl I 3%nat ∗ UShFileRedir.redir_K' gf r nm sp ty)%I
+              Hxok Hhead UShEcho.echo_elf_loadable UShEcho.sh_echo_pin_resolves
+              with "[] Hkt [Hslot]");
+      [| iApply (UShExecPin.sh_pin_slot_echo with "Hslot")].
+    iIntros "!>" (M sa t gb fdv chs pidv) "%Himg %Hbytes %Hflen %Hrows #Hnp0".
+    rewrite /image_entry. iModIntro.
     iIntros (na alen afun W') "%Hok %Hcwd0 %Hlzf %Hscw %Hch0 %Hpid0 %Hargs Hmp
-                               (Hstd & Hc & HK & Hino)".
+                               (Hc & HK & Hino)".
     (* a tainted receipt buys the generic slot *)
     iDestruct "Hino" as "[Hino | #HT]"; last first.
     { iApply ("Hgen'" $! (UexecSlot.uvis_fd W') W' with "HT [//] [%] Hmp"); exact Hscw. }
@@ -1542,18 +1513,19 @@ Section UShURound.
     iDestruct "HK" as (i1 γo1) "(%Hty1 & Hd & Hpub)".
     rewrite Hty in Hty1. injection Hty1 as <- <-.
     iDestruct (UserOff.foff_pub_of_held with "Hpub") as "Hu".
+    assert (Hl1 : take NSTD fdv !! 1%nat = Some (FdOpen false true (FdInode i γo OffHeld))).
+    { rewrite -Hty. exact Hrows. }
     (* the entry, at what is left of the lend *)
     iPoseProof (uefile_image_entry (PS := uprogSG_free)
                   ug s0 nm ws M sa t gb fdv FsImg.ROOTINO chs pidv
-                  r sp (UserFd.ustd (ukn_fd N') ld ∗ Wcl I 3%nat)%I
+                  r sp (Wcl I 3%nat)
                   i γo false
                   (fun _ : Z => UkShFork.ushf_wq Wcu I)
                   (fun _ _ => eq_refl) Heq Hokws Himg Hbytes Hflen
-                  eq_refl
-                  ltac:(rewrite Hl -Hty; exact Hfd1) Hi1 Hi2 Hi3 Hi4 Hi5 Hi6 Hi7
+                  eq_refl Hl1 Hi1 Hi2 Hi3 Hi4 Hi5 Hi6 Hi7
                   with "[] [] [] [] Hinv Hnp0 Hdep") as "#He".
     { (* echo RAN: the exit pays the round's payload *)
-      iIntros "!> [[_ Hc] Hex]". iDestruct "Hex" as (sel) "Hcur".
+      iIntros "!> [Hc Hex]". iDestruct "Hex" as (sel) "Hcur".
       rewrite /UkShFork.ushf_wq.
       rewrite /UEchoFile.efq /FileWrite.file_cur.
       iDestruct "Hcur" as "[[Hq _] | [#HT _]]".
@@ -1567,10 +1539,10 @@ Section UShURound.
       iApply (uWcu_taint' I 0%nat v' with "Hpin' HT"). }
     rewrite /image_entry.
     iApply ("He" $! na alen afun W' with "[%] [%] [%] [%] [%] [%] [%] Hmp
-                                          [Hstd Hc Hd Hu]");
+                                          [Hc Hd Hu]");
       [ exact Hok | exact Hcwd0 | exact Hlzf | exact Hscw | exact Hch0 | exact Hpid0
       | exact Hargs | ].
-    rewrite /UEchoFile.ef_pay /UEchoFile.efq. iFrame "Hstd Hc".
+    rewrite /UEchoFile.ef_pay /UEchoFile.efq. iFrame "Hc".
     iApply (FileWrite.file_cur_fired (fgn_cl gf) r nm sp i ws [] γo
               with "[Hd] Hu").
     rewrite /FileWrite.file_wq. iLeft. iExists ls. iFrame "Hd Hlb".

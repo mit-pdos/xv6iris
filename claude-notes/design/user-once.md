@@ -31,9 +31,9 @@ Copied, along three axes:
 | what | copies | size | the axis |
 |---|---|---|---|
 | sh's PARSER walk | `UkShParse*` (symbol-free line), `UkShRedir*` (`… > f`), `UkShPipe*` (`… \| …`) | 7 + 17 + 17 files, ~48k lines | which SYMBOL BYTE the line carries |  **DONE (A1-A4, 2026-09-27): one general walk at the reference parser, the three copies gone** |
-| echo's ENTRY | `UEchoOut` (fd 1 = console), `UEchoFile` (fd 1 = a held descriptor on `f`), `UEchoPipe` (fd 1 = a pipe's write end) | ~3.3k | what fd 1's LEDGER ROW is |
-| cat's ROUND + ENTRY | `UCatKernel`/`UCatOut` (fd = `f`, offset held), `UCatPipe` + `UShPipeCatRound` (fd 0 = a pipe's read end) | ~4.3k | what the read fd's ROW is, and which output chain the turn writes through |
-| the PROGRAM twins | `UShEcho`↔`UShCat` (image geometry), `UkShEcho`↔`UkShCat` (sh's exec arm), `UShEchoPay`↔`UShEchoPipePay`↔`UShRedirPay`↔`UShCatPay` (sh's exec supply) | ~5k | which PROGRAM, and which stream it is exec'd onto |
+| echo's ENTRY | `UEchoOut` (fd 1 = console), `UEchoFile` (fd 1 = a held descriptor on `f`), `UEchoPipe` (fd 1 = a pipe's write end) | ~3.3k | what fd 1's LEDGER ROW is |  **DONE (upstream's program-specs + B3): the entry once in `UkTreeEntry`, the three files are the devices' own vocabulary** |
+| cat's ROUND + ENTRY | `UCatKernel`/`UCatOut` (fd = `f`, offset held), `UCatPipe` + `UShPipeCatRound` (fd 0 = a pipe's read end) | ~4.3k | what the read fd's ROW is, and which output chain the turn writes through |  **DONE (upstream): `UkCatTree.kcat_round_tree` once, the four files deleted by the sweeps** |
+| the PROGRAM twins | `UShEcho`↔`UShCat` (image geometry), `UkShEcho`↔`UkShCat` (sh's exec arm), `UShEchoPay`↔`UShEchoPipePay`↔`UShRedirPay`↔`UShCatPay` (sh's exec supply) | ~5k | which PROGRAM, and which stream it is exec'd onto |  **DONE (C1-C3, 2026-09-27): `UShGeom` once, `wp_kshr_exec_x_at` once, `UShExecPin.sh_exec_sup_x_of_entry` once; the twins gone or corollaries** |
 | sh's ROUND and child dispatch | `UShRound` (file era) vs `UShPipeRound` (pipe era); `UkShRedirBody`'s three-way case | ~3.7k | the era's list of line shapes — **[`app-both.md`](app-both.md) M4's** |
 
 Echo's axis and cat's are duals of one object — a descriptor row seen from
@@ -301,7 +301,12 @@ statement with the constants named as parameters.
   arm at the payload — `UShEchoPay`'s text with `UEchoOut`'s entry
   replaced by `echo_entry S`.  `UShEchoPipePay` ("costs no walk: (W),
   (L) and the taint arm are the mould's verbatim") and `UShRedirPay`,
-  `UShCatPay` are its instances.
+  `UShCatPay` are its instances.  AS LANDED (C3, 2026-09-27): the one
+  supply is upstream's `UShExecPin.sh_exec_sup_x_of_entry` (any pinned
+  program, any exec'able word list, the entry a parameter), with a
+  lend-opened form `_r` added for the console's split lend; the pipe pay
+  file, the cat-f stage and the union round's three supplies are its
+  corollaries.
 
 ## 5. How this sits under app-both
 

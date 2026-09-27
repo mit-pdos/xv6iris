@@ -336,9 +336,26 @@ console instance waits for its M3.
   anti-vacuity witness stay; `cat_line_premises_absurd` is the note on why
   `line_ok` is not a parameter), `UShCatPay` 462 -> 225 (the path, the pin,
   the slot ingredients stay).  Gate and audits: with A4's commit.
-- [ ] **C3** `exec_sup P S` (from `UShEchoPay`); `UShEchoPipePay`,
-  `UShRedirPay`, `UShCatPay` as instances.  Exit: one supply lemma, four
-  one-line instances.
+- [x] **C3** `exec_sup P S` -- LANDED (2026-09-27, branch `user-once/C3`),
+  as read off the tree: the one supply is upstream's
+  `UShExecPin.sh_exec_sup_x_of_entry` (cut G7: sh's exec of a PINNED
+  program at a caller's entry, at any exec'able word list -- the pin, the
+  ELF, the fd row and the entry are its parameters).  Added its
+  lend-opened form `sh_exec_sup_x_of_entry_r` (the entry sees the lend as
+  `R`, with `□ (Cr -∗ R)` / `□ (R -∗ Cr)`; the plain form is `R := Cr`;
+  `_v_r` likewise) and `sh_pin_slot_echo`; `ush_fd1pipe` and
+  `image_entry_pay_mono` moved DOWN from `UShEchoPipePay` into
+  `UShExecPin` (re-exported by `Notation`) so the pipe pay file can import
+  the generic one.  Then the five hand-written copies of the supply's
+  proof became corollaries, statements byte-identical:
+  `UShEchoPipePay.sh_exec_sup_echo_pipe_of_entry` (55 -> 14 lines),
+  `UShCatFStage.sh_exec_sup_catf_of_entry` (50 -> 11), and the union
+  round's `uecho_exec_sup` (the console lend opened into the pin, the
+  credential and `PRE`: the `_r` form), `ucat_exec_sup` and
+  `uredir_exec_sup` (the entry-building tails stay, the supply skeleton
+  goes).  `UShRedirPay` and `UShEchoPay` were deleted by upstream before
+  this; `UShCatPay`'s supply half went with C2.  The proofs were written by
+  Opus subagents from briefs.  Gate and audits: see the RESUME block.
 
 ## B. `fd_stream`
 
@@ -444,11 +461,12 @@ upstream (see the C2 entry).
 **Lane B (2026-09-27)** re-scoped and closed: B1/B2 landed upstream as
 program-specs, B3 (this) deleted the last console payer copy.
 
-**Next.**  C3 shrank (upstream deleted
-`UShEchoPay` / `UShRedirPay`; `UShCatPay` and `UShEchoPipePay` remain);
-lane B must be re-scoped first: upstream's sweeps (2026-09-24/25) deleted
-`UCatKernel` / `UCatOut` / `UCatPipe` / `UShPipeCatRound` / `UShRound` /
-`UShPipeRound`, so what remains of the B rows is echo's entry at three
-ledger rows (`UEchoOut` 991, `UEchoFile` 317, `UEchoPipe` 185 lines).  Local branches: `user-once/N` (steps 0-3 on the previous
+**C3 (2026-09-27)** landed: the five copies of the pinned exec supply's
+proof are corollaries of `UShExecPin.sh_exec_sup_x_of_entry` (see C3).
+
+**THE CAMPAIGN IS COMPLETE.**  Lane A (A1-A4), lane C (C1-C3) and lane B
+(B1/B2 by upstream's program-specs, B3 here) are all landed; the design
+note's table reads as landed row by row.  Nothing is next on this
+worklist.  Local branches: `user-once/N` (steps 0-3 on the previous
 base, now fully superseded -- delete once this is pushed), `user-once/oom`
 (this cut).

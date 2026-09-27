@@ -57,7 +57,8 @@ Require Import LineWords EchoDisc.
 Require Import PipeDisc PipesDisc.
 Require Import UkSh UkShRun UkShMain UkShDiag.
 Require Import UkShEcho.
-Require Import UShEcho UShEchoPipePay UShCatPay UShCat UShGrep.
+Require Import UShEcho UShCatPay UShCat UShGrep.
+Require Import PipeNames FsEchoPin.
 Require UShSecc.
 Require Import UkShPipesLex.
 Require UkShDiagAt.
@@ -305,11 +306,36 @@ End ext.
 (*  3.  THE SUPPLY, AT ANY PINNED PROGRAM                                 *)
 (* ===================================================================== *)
 
+(* [UkSh.ush_fd1p] one descriptor kind over: the child's fd 1 is the
+   WRITE end of THIS pipe (moved here from [UShEchoPipePay], which
+   re-exports it under its old name). *)
+Definition ush_fd1pipe (γp : pipe_names) (l : list fdstate) : Prop :=
+  exists rb : bool, l !! 1%nat = Some (FdOpen rb true (FdPipe γp)).
+
 Section UShExecPin.
   Context `{HRg : !riscvGS Σ, !xv6G Σ, !bioslotG Σ, !fdslotG Σ, !fileG Σ,
             !irefslotG Σ, !pavG Σ, !wchG Σ, !ufdG Σ}.
   Context `{GEN : GenId} `{XI : CurCtx}.
   Context `{!ghost_varG Σ Z}.
+
+  (* the exec channel's entry is CONTRAVARIANT in its linear payload, and
+     that is the whole of the seam between the round's lend and echo's own
+     (moved here from [UShEchoPipePay], which re-exports it) *)
+  Lemma image_entry_pay_mono (f : elf_bytes) (M : gmap Z (bv 8))
+      (av : mword 64) (sts : list fdstate) (cw : Z) (secc : mword 64) (cs : gset gname)
+      (pidv : mword 32) (Q : Z -> iProp Σ) (P P' : iProp Σ)
+      (X : uvis -d> iPropO Σ) :
+    □ (P' -∗ P) -∗
+    image_entry f M av sts cw secc cs pidv Q P X -∗
+    image_entry f M av sts cw secc cs pidv Q P' X.
+  Proof using .
+    iIntros "#Hw #He". rewrite /image_entry.
+    iIntros "!>" (na alen afun W') "%Hok %Hcw %Hlz %Hscw %Hch %Hpid %Hargs Hp HP".
+    iApply ("He" $! na alen afun W' with "[%] [%] [%] [%] [%] [%] [%] Hp [HP]");
+      [ exact Hok | exact Hcw | exact Hlz | exact Hscw | exact Hch | exact Hpid
+      | exact Hargs | ].
+    iApply ("Hw" with "HP").
+  Qed.
 
   (* a program's SLOT: the file system's invariant, its pin (or the
      taint) at every running view, and the generic taint continuation --
@@ -328,6 +354,9 @@ Section UShExecPin.
 
   Lemma sh_pin_slot_cat (T : iProp Σ) : UShCatPay.sh_cat_slot T -∗ sh_pin_slot FsCatPin.era0_cat_pins T.
   Proof using . rewrite /UShCatPay.sh_cat_slot /sh_pin_slot. iIntros "$". Qed.
+
+  Lemma sh_pin_slot_echo (T : iProp Σ) : UShEcho.sh_echo_slot T -∗ sh_pin_slot FsEchoPin.era0_echo_pins T.
+  Proof using . rewrite /UShEcho.sh_echo_slot /sh_pin_slot. iIntros "$". Qed.
 
   (* grep's, and where it comes from: the claim's fixed part pins grep *)
   Definition sh_grep_slot (T : iProp Σ) : iProp Σ := sh_pin_slot FsGrepPin.era0_grep_pins T.
@@ -408,7 +437,66 @@ Section UShExecPin.
 
   (* THE SUPPLY: sh's exec of the words [ws] (argv[0] the pinned path
      [pl]) at the caller's entry, at every image the exec can produce; the
-     ledger fragment is spent at the exec, the lend is the entry's pay *)
+     ledger fragment is spent at the exec, the lend is the entry's pay --
+     at an OPENED lend [R], the lend as the entry sees it, the two
+     interconvertible ([sh_exec_sup_x_of_entry] is [R := Cr]) *)
+  Lemma sh_exec_sup_x_of_entry_r (Fd : list fdstate -> Prop) (ws : list (list (bv 8)))
+      (pl : list (bv 8)) (pins : aview -> Prop) (hops : list Z) (ino : Z) (elf : list (bv 8))
+      (T : iProp Σ) `{!Persistent T} `{!Timeless T} (Qv Cr R : iProp Σ) :
+    exec_ok ws -> ws !!! 0%nat = pl -> kexec_loadable elf ->
+    pin_resolves pins FsImg.ROOTINO pl hops ino elf 1%nat ->
+    □ (∀ (M : gmap Z (bv 8)) (s0 t : Z) (gn : nat -> bv 8)
+         (sts : list fdstate) (cs : gset gname) (pidv : mword 32),
+         ⌜UShEcho.echo_node_img ws M s0 t gn⌝ -∗
+         ⌜UkShEcho.echo_argv_bytes ws gn⌝ -∗
+         ⌜length sts = NOFILE⌝ -∗
+         ⌜Fd (take NSTD sts)⌝ -∗
+         UkRun.urun_nopipe sts -∗
+         image_entry elf M (mword_of_int (t + 8) : mword 64)
+           sts FsImg.ROOTINO ProcDefs.secc_all cs pidv (fun _ : Z => Qv) R uslot) -∗
+    □ (Cr -∗ R) -∗ □ (R -∗ Cr) -∗
+    □ (app_taint -∗ Qv) -∗
+    sh_pin_slot pins T -∗
+    UkShEcho.sh_exec_sup_echo_at (SG := uexecSG_xv6) Fd ws (fun _ : Z => Qv) Cr.
+  Proof using .
+    intros Hok Hhead Hload Hres.
+    iIntros "#Hent #Hcr2r #Hr2cr #Hkt (#Hinv & #Hcl & #Hgen)".
+    rewrite /UkShEcho.sh_exec_sup_echo_at.
+    iIntros "!>" (N' m pc s0 t gn ld) "%Hpeq %Ha0 %Ha1 %Hbytes %Hrows Hstd #Hcmd Hcr".
+    iAssert (∀ sts, image_entry_taint T sts ProcDefs.secc_all (fun _ : Z => Qv) uslot)%I as "#Hgen'".
+    { iIntros (sts). iApply image_entry_taint_intro. iModIntro. iIntros (W') "#HT #Hmp".
+      iApply ("Hgen" $! Qv W' with "HT Hmp Hkt"). }
+    iApply (udepw_at_refR_of_sup N' m pc (mword_of_int s0) (mword_of_int (t + 8))
+              FsImg.ROOTINO T pl elf 1%nat
+              (UserFd.ustd (ukn_fd N') ld ∗ R)%I
+              _ Hload Ha0 Ha1 with "[] [] [Hstd Hcr]").
+    { iIntros "!> [$ HR]". iApply ("Hr2cr" with "HR"). }
+    { rewrite Hpeq. iExact "Hgen'". }
+    rewrite /uexec_sup_run.
+    iIntros (M pm sz fdv chs pidv) "#Hnpw Hheap Hufd".
+    iDestruct (UkRun.urun_rows_nopipe _ _ with "Hnpw") as "#Hnp0".
+    iAssert (⌜UShEcho.echo_node_img ws M s0 t gn⌝)%I as %Himg.
+    { iApply (UShEcho.echo_node_img_of_cmd_x ws _ _ _ M pm sz s0 t gn Hok with "Hheap Hcmd"). }
+    iDestruct (ufd_auth_len with "Hufd") as %Hflen.
+    iDestruct (ustd_agree (ukn_fd N') fdv ld with "Hufd Hstd") as %Hl.
+    iFrame "Hheap Hufd".
+    iSplitR "Hstd Hcr".
+    { iPureIntro. rewrite -Hhead.
+      exact (UShEcho.sh_exec_path_of_x_holds ws Hok M s0 t gn Himg Hbytes). }
+    iSplitR "Hstd Hcr".
+    { iApply (exec_walk_of_pin pins T FsImg.ROOTINO pl hops ino (MkAnode (AFile elf) 1%nat) Hres
+                with "Hcl Hinv"). }
+    iSplitR "Hstd Hcr"; [ | iFrame "Hstd"; iApply ("Hcr2r" with "Hcr") ].
+    rewrite Hpeq.
+    iPoseProof ("Hent" $! M s0 t gn fdv chs pidv with "[%] [%] [%] [%] Hnp0") as "#He";
+      [ exact Himg | exact Hbytes | exact Hflen | rewrite Hl; exact Hrows | ].
+    iApply (image_entry_pay_mono elf M
+              (mword_of_int (t + 8) : mword 64) fdv FsImg.ROOTINO ProcDefs.secc_all chs pidv
+              (fun _ : Z => Qv) R (UserFd.ustd (ukn_fd N') ld ∗ R)%I uslot with "[] He").
+    iIntros "!> [_ Hc]". iExact "Hc".
+  Qed.
+
+  (* ...at the lend itself *)
   Lemma sh_exec_sup_x_of_entry (Fd : list fdstate -> Prop) (ws : list (list (bv 8)))
       (pl : list (bv 8)) (pins : aview -> Prop) (hops : list Z) (ino : Z) (elf : list (bv 8))
       (T : iProp Σ) `{!Persistent T} `{!Timeless T} (Qv Cr : iProp Σ) :
@@ -427,18 +515,46 @@ Section UShExecPin.
     sh_pin_slot pins T -∗
     UkShEcho.sh_exec_sup_echo_at (SG := uexecSG_xv6) Fd ws (fun _ : Z => Qv) Cr.
   Proof using .
+    intros Hok Hhead Hload Hres. iIntros "#Hent #Hkt #Hslot".
+    iApply (sh_exec_sup_x_of_entry_r Fd ws pl pins hops ino elf T Qv Cr Cr Hok Hhead Hload Hres with "Hent [] [] Hkt Hslot");
+      iIntros "!> $".
+  Qed.
+
+  (* ...AT THE PARENT'S VIEW (seccomp lane S4): the ledger the exec spends
+     names the table's view [v], and the entry is asked for only at a
+     table under it -- which is how a [seccomp x] child learns its rows *)
+  Lemma sh_exec_sup_x_of_entry_v_r (Fd : list fdstate -> Prop) (ws : list (list (bv 8)))
+      (pl : list (bv 8)) (pins : aview -> Prop) (hops : list Z) (ino : Z) (elf : list (bv 8))
+      (T : iProp Σ) `{!Persistent T} `{!Timeless T} (Qv Cr R : iProp Σ) (v : list fdstate) :
+    exec_ok ws -> ws !!! 0%nat = pl -> kexec_loadable elf ->
+    pin_resolves pins FsImg.ROOTINO pl hops ino elf 1%nat ->
+    □ (∀ (M : gmap Z (bv 8)) (s0 t : Z) (gn : nat -> bv 8)
+         (sts : list fdstate) (cs : gset gname) (pidv : mword 32),
+         ⌜UShEcho.echo_node_img ws M s0 t gn⌝ -∗
+         ⌜UkShEcho.echo_argv_bytes ws gn⌝ -∗
+         ⌜length sts = NOFILE⌝ -∗
+         ⌜Fd (take NSTD sts)⌝ -∗
+         ⌜tab_le sts v⌝ -∗
+         UkRun.urun_nopipe sts -∗
+         image_entry elf M (mword_of_int (t + 8) : mword 64)
+           sts FsImg.ROOTINO ProcDefs.secc_all cs pidv (fun _ : Z => Qv) R uslot) -∗
+    □ (Cr -∗ R) -∗ □ (R -∗ Cr) -∗
+    □ (app_taint -∗ Qv) -∗
+    sh_pin_slot pins T -∗
+    UkShEcho.sh_exec_sup_echo_at_v (SG := uexecSG_xv6) Fd ws (fun _ : Z => Qv) Cr v.
+  Proof using .
     intros Hok Hhead Hload Hres.
-    iIntros "#Hent #Hkt (#Hinv & #Hcl & #Hgen)".
-    rewrite /UkShEcho.sh_exec_sup_echo_at.
+    iIntros "#Hent #Hcr2r #Hr2cr #Hkt (#Hinv & #Hcl & #Hgen)".
+    rewrite /UkShEcho.sh_exec_sup_echo_at_v.
     iIntros "!>" (N' m pc s0 t gn ld) "%Hpeq %Ha0 %Ha1 %Hbytes %Hrows Hstd #Hcmd Hcr".
     iAssert (∀ sts, image_entry_taint T sts ProcDefs.secc_all (fun _ : Z => Qv) uslot)%I as "#Hgen'".
     { iIntros (sts). iApply image_entry_taint_intro. iModIntro. iIntros (W') "#HT #Hmp".
       iApply ("Hgen" $! Qv W' with "HT Hmp Hkt"). }
     iApply (udepw_at_refR_of_sup N' m pc (mword_of_int s0) (mword_of_int (t + 8))
               FsImg.ROOTINO T pl elf 1%nat
-              (UserFd.ustd (ukn_fd N') ld ∗ Cr)%I
+              (UserFd.ustd_at (ukn_fd N') ld v ∗ R)%I
               _ Hload Ha0 Ha1 with "[] [] [Hstd Hcr]").
-    { iIntros "!> H". iExact "H". }
+    { iIntros "!> [$ HR]". iApply ("Hr2cr" with "HR"). }
     { rewrite Hpeq. iExact "Hgen'". }
     rewrite /uexec_sup_run.
     iIntros (M pm sz fdv chs pidv) "#Hnpw Hheap Hufd".
@@ -446,7 +562,8 @@ Section UShExecPin.
     iAssert (⌜UShEcho.echo_node_img ws M s0 t gn⌝)%I as %Himg.
     { iApply (UShEcho.echo_node_img_of_cmd_x ws _ _ _ M pm sz s0 t gn Hok with "Hheap Hcmd"). }
     iDestruct (ufd_auth_len with "Hufd") as %Hflen.
-    iDestruct (ustd_agree (ukn_fd N') fdv ld with "Hufd Hstd") as %Hl.
+    iDestruct (ustd_at_agree (ukn_fd N') fdv ld v with "Hufd Hstd") as %Hl.
+    iDestruct (ustd_at_tab (ukn_fd N') fdv ld v with "Hufd Hstd") as %Htab.
     iFrame "Hheap Hufd".
     iSplitR "Hstd Hcr".
     { iPureIntro. rewrite -Hhead.
@@ -454,19 +571,17 @@ Section UShExecPin.
     iSplitR "Hstd Hcr".
     { iApply (exec_walk_of_pin pins T FsImg.ROOTINO pl hops ino (MkAnode (AFile elf) 1%nat) Hres
                 with "Hcl Hinv"). }
-    iSplitR "Hstd Hcr"; [ | iFrame "Hstd Hcr" ].
+    iSplitR "Hstd Hcr"; [ | iFrame "Hstd"; iApply ("Hcr2r" with "Hcr") ].
     rewrite Hpeq.
-    iPoseProof ("Hent" $! M s0 t gn fdv chs pidv with "[%] [%] [%] [%] Hnp0") as "#He";
-      [ exact Himg | exact Hbytes | exact Hflen | rewrite Hl; exact Hrows | ].
-    iApply (UShEchoPipePay.image_entry_pay_mono elf M
+    iPoseProof ("Hent" $! M s0 t gn fdv chs pidv with "[%] [%] [%] [%] [%] Hnp0") as "#He";
+      [ exact Himg | exact Hbytes | exact Hflen | rewrite Hl; exact Hrows | exact Htab | ].
+    iApply (image_entry_pay_mono elf M
               (mword_of_int (t + 8) : mword 64) fdv FsImg.ROOTINO ProcDefs.secc_all chs pidv
-              (fun _ : Z => Qv) Cr (UserFd.ustd (ukn_fd N') ld ∗ Cr)%I uslot with "[] He").
+              (fun _ : Z => Qv) R (UserFd.ustd_at (ukn_fd N') ld v ∗ R)%I uslot with "[] He").
     iIntros "!> [_ Hc]". iExact "Hc".
   Qed.
 
-  (* ...AT THE PARENT'S VIEW (seccomp lane S4): the ledger the exec spends
-     names the table's view [v], and the entry is asked for only at a
-     table under it -- which is how a [seccomp x] child learns its rows *)
+  (* ...at the lend itself *)
   Lemma sh_exec_sup_x_of_entry_v (Fd : list fdstate -> Prop) (ws : list (list (bv 8)))
       (pl : list (bv 8)) (pins : aview -> Prop) (hops : list Z) (ino : Z) (elf : list (bv 8))
       (T : iProp Σ) `{!Persistent T} `{!Timeless T} (Qv Cr : iProp Σ) (v : list fdstate) :
@@ -486,42 +601,9 @@ Section UShExecPin.
     sh_pin_slot pins T -∗
     UkShEcho.sh_exec_sup_echo_at_v (SG := uexecSG_xv6) Fd ws (fun _ : Z => Qv) Cr v.
   Proof using .
-    intros Hok Hhead Hload Hres.
-    iIntros "#Hent #Hkt (#Hinv & #Hcl & #Hgen)".
-    rewrite /UkShEcho.sh_exec_sup_echo_at_v.
-    iIntros "!>" (N' m pc s0 t gn ld) "%Hpeq %Ha0 %Ha1 %Hbytes %Hrows Hstd #Hcmd Hcr".
-    iAssert (∀ sts, image_entry_taint T sts ProcDefs.secc_all (fun _ : Z => Qv) uslot)%I as "#Hgen'".
-    { iIntros (sts). iApply image_entry_taint_intro. iModIntro. iIntros (W') "#HT #Hmp".
-      iApply ("Hgen" $! Qv W' with "HT Hmp Hkt"). }
-    iApply (udepw_at_refR_of_sup N' m pc (mword_of_int s0) (mword_of_int (t + 8))
-              FsImg.ROOTINO T pl elf 1%nat
-              (UserFd.ustd_at (ukn_fd N') ld v ∗ Cr)%I
-              _ Hload Ha0 Ha1 with "[] [] [Hstd Hcr]").
-    { iIntros "!> H". iExact "H". }
-    { rewrite Hpeq. iExact "Hgen'". }
-    rewrite /uexec_sup_run.
-    iIntros (M pm sz fdv chs pidv) "#Hnpw Hheap Hufd".
-    iDestruct (UkRun.urun_rows_nopipe _ _ with "Hnpw") as "#Hnp0".
-    iAssert (⌜UShEcho.echo_node_img ws M s0 t gn⌝)%I as %Himg.
-    { iApply (UShEcho.echo_node_img_of_cmd_x ws _ _ _ M pm sz s0 t gn Hok with "Hheap Hcmd"). }
-    iDestruct (ufd_auth_len with "Hufd") as %Hflen.
-    iDestruct (ustd_at_agree (ukn_fd N') fdv ld v with "Hufd Hstd") as %Hl.
-    iDestruct (ustd_at_tab (ukn_fd N') fdv ld v with "Hufd Hstd") as %Htab.
-    iFrame "Hheap Hufd".
-    iSplitR "Hstd Hcr".
-    { iPureIntro. rewrite -Hhead.
-      exact (UShEcho.sh_exec_path_of_x_holds ws Hok M s0 t gn Himg Hbytes). }
-    iSplitR "Hstd Hcr".
-    { iApply (exec_walk_of_pin pins T FsImg.ROOTINO pl hops ino (MkAnode (AFile elf) 1%nat) Hres
-                with "Hcl Hinv"). }
-    iSplitR "Hstd Hcr"; [ | iFrame "Hstd Hcr" ].
-    rewrite Hpeq.
-    iPoseProof ("Hent" $! M s0 t gn fdv chs pidv with "[%] [%] [%] [%] [%] Hnp0") as "#He";
-      [ exact Himg | exact Hbytes | exact Hflen | rewrite Hl; exact Hrows | exact Htab | ].
-    iApply (UShEchoPipePay.image_entry_pay_mono elf M
-              (mword_of_int (t + 8) : mword 64) fdv FsImg.ROOTINO ProcDefs.secc_all chs pidv
-              (fun _ : Z => Qv) Cr (UserFd.ustd_at (ukn_fd N') ld v ∗ Cr)%I uslot with "[] He").
-    iIntros "!> [_ Hc]". iExact "Hc".
+    intros Hok Hhead Hload Hres. iIntros "#Hent #Hkt #Hslot".
+    iApply (sh_exec_sup_x_of_entry_v_r Fd ws pl pins hops ino elf T Qv Cr Cr v Hok Hhead Hload Hres with "Hent [] [] Hkt Hslot");
+      iIntros "!> $".
   Qed.
 
   (* ...AT A FILTER STAGE's program *)

@@ -138,7 +138,8 @@ Section UShCatFStage.
 
   (* [UShEchoPipePay.sh_exec_sup_echo_pipe_of_entry] at cat's image: the
      entry at every image the exec can produce, the ledger fragment spent
-     at the exec *)
+     at the exec.  It is the generic supply [UShExecPin.sh_exec_sup_x_of_entry]'s
+     instance at cat's pin and the producer's rows (lane user-once C3). *)
   Lemma sh_exec_sup_catf_of_entry (f : list (bv 8)) (Hf : FileDisc.uname f)
       (γp : pipe_names) (Qv Cr : iProp Σ) :
     □ (∀ (M : gmap Z (bv 8)) (s0 t : Z) (gn : nat -> bv 8)
@@ -156,46 +157,15 @@ Section UShCatFStage.
     UkShEcho.sh_exec_sup_echo_at (SG := uexecSG_xv6) (catf_rows γp)
       (FileDisc.prod_words (PrCatF f)) (fun _ : Z => Qv) Cr.
   Proof using .
-    iIntros "#Hent #Hkt (#Hinv & #Hcl & #Hgen)".
-    rewrite /UkShEcho.sh_exec_sup_echo_at.
-    iIntros "!>" (N' m pc s0 t gn ld) "%Hpeq %Ha0 %Ha1 %Hbytes %Hrows Hstd #Hcmd Hcr".
-    destruct Hrows as [[rb1 Hl1] [rb2 Hl2]].
-    iAssert (∀ sts, image_entry_taint T sts ProcDefs.secc_all (fun _ : Z => Qv) uslot)%I as "#Hgen'".
-    { iIntros (sts). iApply image_entry_taint_intro. iModIntro. iIntros (W') "#HT #Hmp".
-      iApply ("Hgen" $! Qv W' with "HT Hmp Hkt"). }
-    iApply (udepw_at_refR_of_sup N' m pc (mword_of_int s0) (mword_of_int (t + 8))
-              FsImg.ROOTINO T UShCatPay.cat_pl ElfUser.cat_elf 1%nat
-              (UserFd.ustd (ukn_fd N') ld ∗ Cr)%I
-              _ UShCat.cat_elf_loadable Ha0 Ha1 with "[] [] [Hstd Hcr]").
-    { iIntros "!> H". iExact "H". }
-    { rewrite Hpeq. iExact "Hgen'". }
-    rewrite /uexec_sup_run.
-    iIntros (M pm sz fdv chs pidv) "#Hnpw Hheap Hufd".
-    iDestruct (UkRun.urun_rows_nopipe _ _ with "Hnpw") as "#Hnp0".
-    iAssert (⌜UShEcho.echo_node_img (FileDisc.prod_words (PrCatF f)) M s0 t gn⌝)%I
-      as %Himg.
-    { iApply (UShEcho.echo_node_img_of_cmd_x (FileDisc.prod_words (PrCatF f)) _ _ _
-                M pm sz s0 t gn (catf_ws_exec_ok f Hf) with "Hheap Hcmd"). }
-    iDestruct (ufd_auth_len with "Hufd") as %Hflen.
-    iDestruct (ustd_agree (ukn_fd N') fdv ld with "Hufd Hstd") as %Hl.
-    iFrame "Hheap Hufd".
-    iSplitR "Hstd Hcr".
-    { iPureIntro. rewrite -(catf_ws_head f).
-      exact (UShEcho.sh_exec_path_of_x_holds (FileDisc.prod_words (PrCatF f))
-               (catf_ws_exec_ok f Hf) M s0 t gn Himg Hbytes). }
-    iSplitR "Hstd Hcr".
-    { iApply (exec_walk_of_pin FsCatPin.era0_cat_pins T FsImg.ROOTINO
-                UShCatPay.cat_pl [FsImg.ROOTINO; FsCatPin.CAT_INO] FsCatPin.CAT_INO
-                (MkAnode (AFile ElfUser.cat_elf) 1%nat) UShCatPay.sh_cat_pin_resolves
-                with "Hcl Hinv"). }
-    iSplitR "Hstd Hcr"; [ | iFrame "Hstd Hcr" ].
-    rewrite Hpeq.
-    iPoseProof ("Hent" $! M s0 t gn fdv chs pidv rb1 rb2 with "[%] [%] [%] [%] [%] Hnp0") as "#He";
-      [ exact Himg | exact Hbytes | exact Hflen | rewrite Hl; exact Hl1 | rewrite Hl; exact Hl2 | ].
-    iApply (UShEchoPipePay.image_entry_pay_mono ElfUser.cat_elf M
-              (mword_of_int (t + 8) : mword 64) fdv FsImg.ROOTINO ProcDefs.secc_all chs pidv
-              (fun _ : Z => Qv) Cr (UserFd.ustd (ukn_fd N') ld ∗ Cr)%I uslot with "[] He").
-    iIntros "!> [_ Hc]". iExact "Hc".
+    iIntros "#Hent #Hkt #Hslot".
+    iApply (UShExecPin.sh_exec_sup_x_of_entry (catf_rows γp) (FileDisc.prod_words (PrCatF f))
+              UShCatPay.cat_pl FsCatPin.era0_cat_pins [FsImg.ROOTINO; FsCatPin.CAT_INO]
+              FsCatPin.CAT_INO ElfUser.cat_elf T Qv Cr (catf_ws_exec_ok f Hf) (catf_ws_head f)
+              UShCat.cat_elf_loadable UShCatPay.sh_cat_pin_resolves with "[] Hkt [Hslot]").
+    - iIntros "!>" (M s0 t gn sts cs pidv) "%Himg %Hb %Hlen %Hfd Hnp".
+      destruct Hfd as [[rb1 Hl1] [rb2 Hl2]].
+      iApply ("Hent" $! M s0 t gn sts cs pidv rb1 rb2 with "[%] [%] [%] [%] [%] Hnp"); done.
+    - iApply (UShExecPin.sh_pin_slot_cat with "Hslot").
   Qed.
 
   (* ================================================================= *)

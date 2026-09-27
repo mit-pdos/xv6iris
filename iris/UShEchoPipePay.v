@@ -74,10 +74,16 @@ Require Import EchoDisc.
 Require Import UEchoOut.
 Require Import UShEcho.           (* the pinned bundle's inputs *)
 Require Import UShEchoOut.
+Require Import UShExecPin.      (* [ush_fd1pipe] / [image_entry_pay_mono], re-exported *)
 Require Import UEchoPipe.         (* [ep_pay] / [ep_pay_of_alloc] *)
 Require User.EchoSyms.
 Local Open Scope Z_scope.
 Import Defs.
+
+(* re-exported from [UShExecPin], where they now live: consumers keep
+   writing [UShEchoPipePay.ush_fd1pipe] / [UShEchoPipePay.image_entry_pay_mono] *)
+Notation ush_fd1pipe := UShExecPin.ush_fd1pipe.
+Notation image_entry_pay_mono := UShExecPin.image_entry_pay_mono.
 
 Section UShEchoPipePay.
   (* [UEchoPipe.v]'s binder list (the file whose entry this applies), PLUS
@@ -106,30 +112,10 @@ Section UShEchoPipePay.
   (*  1.  THE fd-1 ROW, AND ONE GENERIC MOVE ON THE EXEC CHANNEL          *)
   (* =================================================================== *)
 
-  (* [UkSh.ush_fd1p] one descriptor kind over: the child's fd 1 is the
-     WRITE end of THIS pipe.  [UkShEcho.sh_exec_sup_echo_at] takes the row
-     as a parameter (lane SH-CHILD-2 made it one for the redirect child's
-     file row), so no landed definition moves. *)
-  Definition ush_fd1pipe (γp : pipe_names) (l : list fdstate) : Prop :=
-    exists rb : bool, l !! 1%nat = Some (FdOpen rb true (FdPipe γp)).
-
-  (* the exec channel's entry is CONTRAVARIANT in its linear payload, and
-     that is the whole of the seam between the round's lend and echo's own *)
-  Lemma image_entry_pay_mono (f : elf_bytes) (M : gmap Z (bv 8))
-      (av : mword 64) (sts : list fdstate) (cw : Z) (secc : mword 64) (cs : gset gname)
-      (pidv : mword 32) (Q : Z -> iProp Σ) (P P' : iProp Σ)
-      (X : uvis -d> iPropO Σ) :
-    □ (P' -∗ P) -∗
-    image_entry f M av sts cw secc cs pidv Q P X -∗
-    image_entry f M av sts cw secc cs pidv Q P' X.
-  Proof using .
-    iIntros "#Hw #He". rewrite /image_entry.
-    iIntros "!>" (na alen afun W') "%Hok %Hcw %Hlz %Hscw %Hch %Hpid %Hargs Hp HP".
-    iApply ("He" $! na alen afun W' with "[%] [%] [%] [%] [%] [%] [%] Hp [HP]");
-      [ exact Hok | exact Hcw | exact Hlz | exact Hscw | exact Hch | exact Hpid
-      | exact Hargs | ].
-    iApply ("Hw" with "HP").
-  Qed.
+  (* [ush_fd1pipe] (the fd-1 row at a pipe's write end) and
+     [image_entry_pay_mono] (the entry's contravariance in its payload)
+     moved to [UShExecPin] so that file need not import this one; they
+     are re-exported below, after the section, under their old names. *)
 
   (* =================================================================== *)
   (*  2.  THE SUPPLY, AT A CALLER'S ENTRY                                 *)
@@ -140,10 +126,9 @@ Section UShEchoPipePay.
      echo's lend; this one takes the entry from the caller, at every
      image the exec can produce, so the pipeline's round can hand
      over the TREE-ROUTE entry ([UkPipeEntries.pe_echo_image_entry_alloc])
-     without this file naming the pipeline's instance.  The caller's entry
-     is at the round's WHOLE lend [Cr]; the ledger fragment is spent at
-     the exec.  No [udep] and no exit wand: only the deleted entry read
-     them. *)
+     without this file naming the pipeline's instance.  It is now the
+     generic supply [UShExecPin.sh_exec_sup_x_of_entry]'s instance at the
+     pipe row [ush_fd1pipe γp] (lane user-once C3). *)
   Lemma sh_exec_sup_echo_pipe_of_entry
       (ws : list (list (bv 8))) (Qv Cr T : iProp Σ) (γp : pipe_names)
       `{!Persistent T} `{!Timeless T} :
@@ -162,54 +147,18 @@ Section UShEchoPipePay.
     UShEcho.sh_echo_slot T -∗
     UkShEcho.sh_exec_sup_echo_at (ush_fd1pipe γp) ws (fun _ : Z => Qv) Cr.
   Proof using ghost_varG0 ghost_varG1 ufdG0.
-    intros Hokws.
-    iIntros "#Hent #Hkt (#Hinv & #Hcl & #Hgen)".
-    rewrite /UkShEcho.sh_exec_sup_echo_at.
-    iIntros "!>" (N' m pc s0 t g ld)
-      "%Hpeq %Ha0 %Ha1 %Hbytes %Hfd1 Hstd #Hcmd Hcr".
-    destruct Hfd1 as [rb Hl1].
-    iAssert (∀ sts, image_entry_taint T sts ProcDefs.secc_all (fun _ : Z => Qv) uslot)%I as "#Hgen'".
-    { iIntros (sts). iApply image_entry_taint_intro. iModIntro. iIntros (W') "HT Hmp".
-      iApply ("Hgen" $! Qv W' with "HT Hmp []"). iExact "Hkt". }
-    iApply (udepw_at_refR_of_sup N' m pc
-              (mword_of_int s0) (mword_of_int (t + 8))
-              FsImg.ROOTINO T echo_pl ElfUser.echo_elf 1%nat
-              (UserFd.ustd (ukn_fd N') ld ∗ Cr)%I
-              _ echo_elf_loadable Ha0 Ha1 with "[] [] [Hstd Hcr]").
-    { iIntros "!> $". }
-    { rewrite Hpeq. iExact "Hgen'". }
-    rewrite /uexec_sup_run.
-    iIntros (M pm sz fdv cs pidv) "#Hnpw Hheap Hufd".
-    iDestruct (UkRun.urun_rows_nopipe _ _ with "Hnpw") as "#Hnp0".
-    iAssert (⌜ echo_node_img ws M s0 t g ⌝)%I as %Himg.
-    { iApply (echo_node_img_of_cmd ws _ _ _ M pm sz s0 t g Hokws
-                with "Hheap Hcmd"). }
-    iDestruct (ufd_auth_len with "Hufd") as %Hlen.
-    iDestruct (ustd_agree (ukn_fd N') fdv ld with "Hufd Hstd") as %Hl.
-    assert (Hl1' : take NSTD fdv !! 1%nat
-                   = Some (FdOpen rb true (FdPipe γp)))
-      by (rewrite Hl; exact Hl1).
-    iFrame "Hheap Hufd".
-    iSplitR "Hstd Hcr".
-    { iPureIntro.
-      exact (sh_echo_path_of_holds ws Hokws M s0 t g Himg Hbytes). }
-    iSplitR "Hstd Hcr".
-    { iApply (exec_walk_of_pin FsEchoPin.era0_echo_pins T FsImg.ROOTINO
-                echo_pl [FsImg.ROOTINO; FsEchoPin.ECHO_INO]
-                FsEchoPin.ECHO_INO
-                (MkAnode (AFile ElfUser.echo_elf) 1%nat) sh_echo_pin_resolves
-                with "Hcl Hinv"). }
-    iSplitR "Hstd Hcr".
-    { rewrite Hpeq.
-      iPoseProof ("Hent" $! M s0 t g fdv cs pidv rb
-                    with "[%] [%] [%] [%] Hnp0") as "#He";
-        [ exact Himg | exact Hbytes | exact Hlen | exact Hl1' | ].
-      iApply (image_entry_pay_mono ElfUser.echo_elf M
-                (mword_of_int (t + 8) : mword 64) fdv FsImg.ROOTINO ProcDefs.secc_all cs pidv
-                (fun _ : Z => Qv) Cr
-                (UserFd.ustd (ukn_fd N') ld ∗ Cr)%I uslot with "[] He").
-      iIntros "!> [_ Hc]". iExact "Hc". }
-    iFrame "Hstd Hcr".
+    intros Hokws. iIntros "#Hent #Hkt #Hslot".
+    assert (Hhead : ws !!! 0%nat = echo_pl).
+    { rewrite (list_lookup_total_correct ws 0%nat _ (EchoDisc.line_ok_head ws Hokws)).
+      vm_compute. reflexivity. }
+    iApply (UShExecPin.sh_exec_sup_x_of_entry (ush_fd1pipe γp) ws echo_pl
+              FsEchoPin.era0_echo_pins [FsImg.ROOTINO; FsEchoPin.ECHO_INO] FsEchoPin.ECHO_INO
+              ElfUser.echo_elf T Qv Cr (ExecWords.line_ok_exec_ok ws Hokws) Hhead echo_elf_loadable
+              sh_echo_pin_resolves with "[] Hkt [Hslot]").
+    - iIntros "!>" (M s0 t g sts cs pidv) "%Himg %Hb %Hlen %Hfd Hnp".
+      destruct Hfd as [rb Hfd].
+      iApply ("Hent" $! M s0 t g sts cs pidv rb with "[%] [%] [%] [%] Hnp"); done.
+    - iApply (UShExecPin.sh_pin_slot_echo with "Hslot").
   Qed.
 
   (* =================================================================== *)
